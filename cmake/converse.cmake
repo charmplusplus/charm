@@ -152,7 +152,11 @@ set(conv-util-cxx-sources
 
 if(CMK_CAN_LINK_FORTRAN)
     add_library(conv-utilf pup_f.f90)
-    target_compile_options(conv-utilf PRIVATE -cpmod)
+    add_custom_command(TARGET conv-utilf
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/pupmod.mod ${CMAKE_BINARY_DIR}/include/
+        VERBATIM
+    )
 endif()
 
 add_custom_command(OUTPUT pup_f.f90 COMMAND ${CMAKE_SOURCE_DIR}/src/util/pup_f.f90.sh > /dev/null)

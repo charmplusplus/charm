@@ -14,7 +14,7 @@
 #include "ckgraph.h"
 
 ProcArray::ProcArray(BaseLB::LDStats *stats) {
-  int numPes = stats->nprocs();
+  const int numPes = stats->procs.size();
   // fill the processor array
   procs.resize(numPes);
 
@@ -39,9 +39,9 @@ void ProcArray::resetTotalLoad() {
 
 ObjGraph::ObjGraph(BaseLB::LDStats *stats) {
   // fill the vertex list
-  vertices.resize(stats->n_objs);
+  vertices.resize(stats->objData.size());
 
-  for(int vert = 0; vert < stats->n_objs; vert++) {
+  for(int vert = 0; vert < stats->objData.size(); vert++) {
     vertices[vert].id         = vert;
     vertices[vert].compLoad   = stats->objData[vert].wallTime;
     vertices[vert].migratable = stats->objData[vert].migratable;
@@ -55,9 +55,7 @@ ObjGraph::ObjGraph(BaseLB::LDStats *stats) {
 
   int from, to;
 
-  for(int edge = 0; edge < stats->n_comm; edge++) {
-    LDCommData &commData = stats->commData[edge];
-
+  for(auto& commData : stats->commData) {
     // ensure that the message is not from a processor but from an object
     // and that the type is an object to object message
     if( (!commData.from_proc()) && (commData.recv_type()==LD_OBJ_MSG) ) {
@@ -88,9 +86,9 @@ ObjGraph::ObjGraph(BaseLB::LDStats *stats) {
 }
 
 void ObjGraph::convertDecisions(BaseLB::LDStats *stats) {
-  for(int vert = 0; vert < stats->n_objs; vert++) {
-    if(vertices[vert].newPe != -1) {
-      stats->to_proc[vertices[vert].id] = vertices[vert].newPe;
+  for(const auto& vertex : vertices) {
+    if(vertex.newPe != -1) {
+      stats->to_proc[vertex.id] = vertex.newPe;
     }
   }
 }

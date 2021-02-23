@@ -132,10 +132,14 @@ target_include_directories(ck PRIVATE . ../ck-ldb ../ck-perf ../ck-cp ../util/to
 target_include_directories(ckmain PRIVATE . ../ck-ldb ../ck-perf ../ck-cp ../util/topomanager)
 
 # Fortran interface
-if(${CMK_CAN_LINK_FORTRAN})
+if(CMK_CAN_LINK_FORTRAN)
     add_library(ckf charmf.C charmmod.f90 charmf.h)
-    target_compile_options(ckf PRIVATE -cpmod)
     add_dependencies(ckf ck)
+    add_custom_command(TARGET ckf
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/charm.mod ${CMAKE_BINARY_DIR}/include/
+        VERBATIM
+    )
     add_library(ckmainf mainf.f90)
 
     add_library(f90charm ../langs/f90charm/f90main.C ${CMAKE_BINARY_DIR}/include/f90main.decl.h)

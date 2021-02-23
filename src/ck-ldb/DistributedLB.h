@@ -88,8 +88,7 @@ private:
   void InitLB(const CkLBOptions &);
   void SendLoadInfo();
   void LoadBalance();
-  void LoadBalance(CkVec<int> &obj_no, CkVec<int> &obj_pe_no);
-  void MapObjsToPe(minHeap *objs, CkVec<int> &obj_no, CkVec<int> &obj_pe_no);
+  void MapObjsToPe(minHeap *objs, std::vector<int> &obj_no, std::vector<int> &obj_pe_no);
 	int PickRandReceiverPeIdx() const;
 	void CalculateCumulateDistribution();
   void Strategy(const DistBaseLB::LDStats* const stats);

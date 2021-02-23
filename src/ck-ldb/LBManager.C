@@ -49,9 +49,9 @@ class LBDBRegistry
     LBDBEntry(std::string n, LBCreateFn cf, LBAllocFn af, std::string h, bool show = true)
         : name(n), cfn(cf), afn(af), help(h), shown(show){};
   };
-  CkVec<LBDBEntry> lbtables;       // a list of available LBs linked
-  CkVec<const char*> compile_lbs;  // load balancers at compile time
-  CkVec<const char*> runtime_lbs;  // load balancers at run time
+  std::vector<LBDBEntry> lbtables;       // a list of available LBs linked
+  std::vector<const char*> compile_lbs;  // load balancers at compile time
+  std::vector<const char*> runtime_lbs;  // load balancers at run time
   // map of {index in runtime_lbs, name of legacy LB to instantiate TreeLB with}
   // for use with the legacy LBs (e.g. GreedyLB -> the predefined Greedy version of TreeLB)
   std::unordered_map<int, const char*> legacy_runtime_treelbs;
@@ -60,9 +60,8 @@ class LBDBRegistry
   void displayLBs()
   {
     CmiPrintf("\nAvailable load balancers:\n");
-    for (int i = 0; i < lbtables.length(); i++)
+    for (const auto& entry : lbtables)
     {
-      LBDBEntry& entry = lbtables[i];
       if (entry.shown) CmiPrintf("* %s:\t%s\n", entry.name.c_str(), entry.help.c_str());
     }
     CmiPrintf("\n");
@@ -70,7 +69,7 @@ class LBDBRegistry
   void addEntry(std::string name, LBCreateFn fn, LBAllocFn afn, std::string help,
                 bool shown)
   {
-    lbtables.push_back(LBDBEntry(name, fn, afn, help, shown));
+    lbtables.emplace_back(name, fn, afn, help, shown);
   }
   void addCompiletimeBalancer(const char* name) { compile_lbs.push_back(name); }
   void addRuntimeBalancer(const char* name, const char* legacyLBName = nullptr)
@@ -85,7 +84,7 @@ class LBDBRegistry
   LBCreateFn search(std::string name)
   {
     const auto index = name.find_first_of(":,");
-    for (int i = 0; i < lbtables.length(); i++)
+    for (int i = 0; i < lbtables.size(); i++)
       if (0 == lbtables[i].name.compare(0, index, name))
         return lbtables[i].cfn;
     return nullptr;
@@ -93,7 +92,7 @@ class LBDBRegistry
   LBAllocFn getLBAllocFn(std::string name)
   {
     const auto index = name.find_first_of(":,");
-    for (int i = 0; i < lbtables.length(); i++)
+    for (int i = 0; i < lbtables.size(); i++)
       if (0 == lbtables[i].name.compare(0, index, name))
         return lbtables[i].afn;
     return nullptr;
@@ -139,23 +138,21 @@ LBMgrInit::LBMgrInit(CkArgMsg* m)
   _lbmgr = CProxy_LBManager::ckNew();
 
   // runtime specified load balancer
-  if (lbRegistry.runtime_lbs.size() > 0)
+  if (!lbRegistry.runtime_lbs.empty())
   {
     for (int i = 0; i < lbRegistry.runtime_lbs.size(); i++)
     {
-      const char* balancer = lbRegistry.runtime_lbs[i];
       // If this is a legacy TreeLB, pass in the legacy LB name
       const char* legacybalancer = lbRegistry.legacy_runtime_treelbs.count(i) > 0
                                        ? lbRegistry.legacy_runtime_treelbs[i]
                                        : nullptr;
-      createLoadBalancer(balancer, legacybalancer);
+      createLoadBalancer(lbRegistry.runtime_lbs[i], legacybalancer);
     }
   }
-  else if (lbRegistry.compile_lbs.size() > 0)
+  else if (!lbRegistry.compile_lbs.empty())
   {
-    for (int i = 0; i < lbRegistry.compile_lbs.size(); i++)
+    for (const auto& balancer : lbRegistry.compile_lbs)
     {
-      const char* balancer = lbRegistry.compile_lbs[i];
       createLoadBalancer(balancer);
     }
   }
@@ -730,14 +727,14 @@ void LBManager::switchLoadbalancer(int switchFrom, int switchTo)
 // runtime has higher priority
 const char* LBManager::loadbalancer(int seq)
 {
-  if (lbRegistry.runtime_lbs.length())
+  if (!lbRegistry.runtime_lbs.empty())
   {
-    CmiAssert(seq < lbRegistry.runtime_lbs.length());
+    CmiAssert(seq < lbRegistry.runtime_lbs.size());
     return lbRegistry.runtime_lbs[seq];
   }
   else
   {
-    CmiAssert(seq < lbRegistry.compile_lbs.length());
+    CmiAssert(seq < lbRegistry.compile_lbs.size());
     return lbRegistry.compile_lbs[seq];
   }
 }

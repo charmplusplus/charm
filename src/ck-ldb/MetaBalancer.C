@@ -474,7 +474,7 @@ void MetaBalancer::ReceiveMinStats(double *load, int n) {
       Min Util : %lf for %lf procs\n",iteration_n, avg, max, avg_utilization,
       min_utilization, load[1]));
 
-   if(adaptive_lbdb.history_data.size() > 0){ // probably a better check exists than this
+   if(!adaptive_lbdb.history_data.empty()){ // probably a better check exists than this
     double mslope, aslope, mc, ac;
     double new_load_percent = max/avg;
     getLineEq(new_load_percent, aslope, ac, mslope, mc);
@@ -707,9 +707,7 @@ bool MetaBalancer::generatePlan(int& period, double& ratio_at_t) {
   // then max * new_lb_period > avg * new_lb_period + lb_cost
   double max = 0.0;
   double avg = 0.0;
-  AdaptiveData data;
-  for (int i = 0; i < adaptive_lbdb.history_data.size(); i++) {
-    data = adaptive_lbdb.history_data[i];
+  for (AdaptiveData& data : adaptive_lbdb.history_data) {
     max += data.max_load;
     avg += data.avg_load;
     DEBAD(("max (%d, %lf) avg (%d, %lf)\n", i, data.max_load, i, data.avg_load));
@@ -760,8 +758,7 @@ bool MetaBalancer::generatePlan(int& period, double& ratio_at_t) {
 
   max = 0.0;
   avg = 0.0;
-  for (int i = 0; i < adaptive_lbdb.history_data.size(); i++) {
-    data = adaptive_lbdb.history_data[i];
+  for (AdaptiveData& data : adaptive_lbdb.history_data) {
     max += data.max_load;
     avg += data.avg_load*tolerate_imb;
   }
