@@ -901,7 +901,7 @@ void CkArray::prepareCtorMsg(CkMessage *m, int *listenerData)
 
 int CkArray::findInitialHostPe(const CkArrayIndex &idx, int proposedPe)
 {
-  int hostPe = locMgr->whichPE(idx);
+  int hostPe = locMgr->whichPe(idx);
 
   if (hostPe == -1 && proposedPe == -1)
     return procNum(idx);

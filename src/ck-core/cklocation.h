@@ -311,8 +311,6 @@ enum CkElementCreation_t : uint8_t
 class CkLocCache : public CBase_CkLocCache
 {
 private:
-  // TODO: Temporary fix to allow for direct access to location entries
-  friend CkLocMgr;
   // This is the entry in the location table, which stores the PE and epoch number of the
   // latest location update.
   // TODO: If we can template CkLocCache on this type, we could store more useful
@@ -327,16 +325,33 @@ private:
 
   using Listener = std::function<void(CmiUInt8, int)>;
   std::list<Listener> listeners;
+
+  const CkLocEntry nullEntry = CkLocEntry();
 public:
   CkLocCache() = default;
   CkLocCache(CkMigrateMessage* m) : CBase_CkLocCache(m) {}
   ~CkLocCache() = default;
   void pup(PUP::er& p);
 
-  int homePe(const CmiUInt8 id) const { return id >> CMK_OBJID_ELEMENT_BITS; }
   void requestLocation(CmiUInt8 id);
+
+  // Entry methods for updating location tables across PEs
   void requestLocation(CmiUInt8 id, int peToTell);
   void updateLocation(const CkLocEntry& e);
+
+  // Query the local location table
+  const CkLocEntry& getLocationEntry(CmiUInt8 id) const
+  {
+    LocationMap::const_iterator itr = locMap.find(id);
+    return itr != locMap.end() ? itr->second : nullEntry;
+  }
+  int getPe(const CmiUInt8 id) const { return getLocationEntry(id).pe; }
+  int getEpoch(const CmiUInt8 id) const { return getLocationEntry(id).epoch; }
+  int homePe(const CmiUInt8 id) const { return id >> CMK_OBJID_ELEMENT_BITS; }
+
+  // Modify the location table
+  void moveTo(CmiUInt8 id, int pe);
+  void insert(CmiUInt8 id, int epoch = 0);
   void erase(CmiUInt8 id) { locMap.erase(id); }
 
   void addListener(Listener l) { listeners.push_back(l); }
@@ -346,21 +361,6 @@ public:
     {
       l(id, pe);
     }
-  }
-
-  int whichPE(const CmiUInt8 id) const
-  {
-    LocationMap::const_iterator itr = locMap.find(id);
-    return itr != locMap.end() ? itr->second.pe : -1;
-  }
-
-  int lastKnown(CmiUInt8 id) const
-  {
-    int pe = whichPE(id);
-    if (pe == -1)
-      return homePe(id);
-    else
-      return pe;
   }
 };
 
@@ -519,22 +519,13 @@ public:
     return CMK_RANK_0(map->procNum(mapHandle, idx));
   }
   bool isHome(const CkArrayIndex& idx) const { return homePe(idx) == CkMyPe(); }
-  int whichPE(const CmiUInt8 id) const { return cache->whichPE(id); }
-  int whichPE(const CkArrayIndex& idx) const
+  int whichPe(const CmiUInt8 id) const { return cache->getPe(id); }
+  int whichPe(const CkArrayIndex& idx) const
   {
     CmiUInt8 id;
     if (!lookupID(idx, id))
       return -1;
-    return cache->whichPE(id);
-  }
-  int lastKnown(const CmiUInt8 id) const { return cache->lastKnown(id); }
-  int lastKnown(const CkArrayIndex& idx) const
-  {
-    int pe = whichPE(idx);
-    if (pe == -1)
-      return homePe(idx);
-    else
-      return pe;
+    return cache->getPe(id);
   }
 
   CmiUInt8 lookupID(const CkArrayIndex& idx) const

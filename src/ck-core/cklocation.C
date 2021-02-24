@@ -2410,7 +2410,7 @@ void CkLocCache::pup(PUP::er& p)
       {
         requestLocation(id, homePe(id));
       }
-      CkAssert(whichPE(id) == pe);
+      CkAssert(getPe(id) == pe);
     }
   }
 #endif
@@ -2427,7 +2427,7 @@ void CkLocCache::requestLocation(CmiUInt8 id)
 
 void CkLocCache::requestLocation(CmiUInt8 id, const int peToTell)
 {
-  CkAssert(peToTell != CkMyPe());
+  if (peToTell == CkMyPe()) return;
 
   LocationMap::const_iterator itr = locMap.find(id);
   if (itr != locMap.end())
@@ -2438,12 +2438,35 @@ void CkLocCache::requestLocation(CmiUInt8 id, const int peToTell)
 
 void CkLocCache::updateLocation(const CkLocEntry& newEntry)
 {
+  CkAssert(newEntry.pe != -1);
   CkLocEntry& oldEntry = locMap[newEntry.id];
   if (newEntry.epoch > oldEntry.epoch)
   {
     oldEntry = newEntry;
     notifyListeners(newEntry.id, newEntry.pe);
   }
+}
+
+void CkLocCache::moveTo(CmiUInt8 id, int pe)
+{
+  LocationMap::iterator itr = locMap.find(id);
+
+  CkAssert(itr != locMap.end());
+  CkAssert(itr->second.pe == CkMyPe());
+
+  itr->second.pe = pe;
+  itr->second.epoch++;
+}
+
+
+void CkLocCache::insert(CmiUInt8 id, int epoch)
+{
+  CkLocEntry& e = locMap[id];
+  // TODO: This should be > probably, but demand creation needs some fixing up
+  CkAssert(epoch >= e.epoch);
+  e.id = id;
+  e.pe = CkMyPe();
+  e.epoch = epoch;
 }
 
 /*************************** LocMgr: CREATION *****************************/
@@ -2584,7 +2607,7 @@ void CkLocMgr::informHome(const CkArrayIndex& idx, int nowOnPe)
     // TODO: This may not need to be an idx update. Pretty sure the home will always
     // know the idx to id mapping.
     CmiUInt8 id = lookupID(idx);
-    thisProxy[home].updateLocation(idx, cache->locMap[id]);
+    thisProxy[home].updateLocation(idx, cache->getLocationEntry(id));
   }
 }
 
@@ -2596,11 +2619,8 @@ CkLocRec* CkLocMgr::createLocal(const CkArrayIndex& idx, bool forMigration,
 
   CkLocRec* rec = new CkLocRec(this, forMigration, ignoreArrival, idx, id);
   insertRec(rec, id);
-  CkLocEntry e;
-  e.id = id;
-  e.pe = CkMyPe();
-  e.epoch = epoch;
-  updateLocation(idx, e);
+  cache->insert(id, epoch);
+  updateLocation(idx, cache->getLocationEntry(id));
 
   if (notifyHome)
   {
@@ -2807,8 +2827,7 @@ bool CkLocMgr::requestLocation(const CkArrayIndex& idx, const int peToTell)
   if (lookupID(idx, id))
   {
     // We found the ID so update the location for peToTell
-    int onPe = lastKnown(idx);
-    thisProxy[peToTell].updateLocation(idx, cache->locMap[id]);
+    thisProxy[peToTell].updateLocation(idx, cache->getLocationEntry(id));
     return true;
   }
   else
@@ -2822,6 +2841,7 @@ bool CkLocMgr::requestLocation(const CkArrayIndex& idx, const int peToTell)
 
 void CkLocMgr::updateLocation(const CkArrayIndex& idx, const CkLocEntry& e)
 {
+  CkAssert(e.pe != -1);
   // Set the mapping from idx to id
   insertID(idx, e.id);
 
@@ -2837,7 +2857,7 @@ void CkLocMgr::updateLocation(const CkArrayIndex& idx, const CkLocEntry& e)
     {
       DEBN(("%d Replying to buffered ID/location req to pe %d\n", CkMyPe(), pe));
       if (pe != CkMyPe())
-        thisProxy[pe].updateLocation(idx, cache->locMap[e.id]);
+        thisProxy[pe].updateLocation(idx, e);
     }
     bufferedLocationRequests.erase(itr);
   }
@@ -2932,7 +2952,7 @@ int CkLocMgr::deliverMsg(CkArrayMessage* msg, CkArrayID mgr, CmiUInt8 id,
     const CmiUInt8 lbObjId = id;
 #  endif
     lbmgr->Send(
-        myLBHandle, lbObjId, UsrToEnv(msg)->getTotalsize(), cache->lastKnown(id), 1);
+        myLBHandle, lbObjId, UsrToEnv(msg)->getTotalsize(), cache->getPe(id), 1);
   }
 #endif
 
@@ -2940,7 +2960,7 @@ int CkLocMgr::deliverMsg(CkArrayMessage* msg, CkArrayID mgr, CmiUInt8 id,
   if (rec == NULL)
   {
     // known location
-    int destPE = cache->whichPE(id);
+    int destPE = cache->getPe(id);
     if (destPE != -1)
     {
       msg->array_hops()++;
@@ -3235,7 +3255,7 @@ void CkLocMgr::multiHop(CkArrayMessage* msg)
   {  // Send a routing message letting original sender know new element location
     DEBS((AA "Sending update back to %d for element %u\n" AB, srcPe,
           msg->array_element_id()));
-    cache->thisProxy[srcPe].updateLocation(cache->locMap[msg->array_element_id()]);
+    cache->requestLocation(msg->array_element_id(), srcPe);
   }
 }
 
@@ -3437,7 +3457,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
                                                     false,
 #endif
                                                     bufSize, managers.size(),
-                                                    cache->locMap[id].epoch+1);
+                                                    cache->getEpoch(id) + 1);
 
   {
     PUP::toMem p(msg->packData, PUP::er::IS_MIGRATION);
@@ -3464,17 +3484,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   }
   duringMigration = false;
 
-  // The element now lives on another processor-- tell ourselves and its home
-  // TODO: If a message arrives and the epoch is higher than expected, we might want to
-  // hold it because it means theres an immigration incoming.
-  // TODO: CkLocCache should have a moveTo method to handle this. It would update the
-  // entry, and epoch. Could also take a list of PEs to notify about the move. This
-  // would allow NDMeshStreamer and others to proactively update senders.
-  CkLocEntry e;
-  e.id = id;
-  e.pe = toPe;
-  e.epoch = cache->locMap[id].epoch+1;
-  updateLocation(idx, e);
+  cache->moveTo(id, toPe);
   informHome(idx, toPe);
 
 #if !CMK_LBDB_ON && CMK_GLOBAL_LOCATION_UPDATE
@@ -3603,7 +3613,7 @@ CkMagicNumber_impl::CkMagicNumber_impl(int m) : magic(m) {}
 /// Return true if this array element lives on another processor
 bool CkLocMgr::isRemote(const CkArrayIndex& idx, int* onPe) const
 {
-  int pe = whichPE(idx);
+  int pe = whichPe(idx);
   /* not definitely a remote element */
   if (pe == -1 || pe == CkMyPe())
     return false;
