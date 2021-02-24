@@ -135,7 +135,7 @@ void ReservedWord(int token, int fCol, int lCol);
 %token NAMESPACE
 %token USING
 %token <strval> IDENT NUMBER LITERAL CPROGRAM HASHIF HASHIFDEF
-%token <intval> INT LONG SHORT CHAR FLOAT DOUBLE UNSIGNED SIZET BOOL
+%token <intval> INT LONG SHORT CHAR FLOAT DOUBLE UNSIGNED
 %token ACCEL
 %token READWRITE
 %token WRITEONLY
@@ -425,8 +425,12 @@ BuiltinType	: INT
 		{ $$ = new BuiltinType("int"); }
 		| LONG
 		{ $$ = new BuiltinType("long"); }
+		| LONG INT
+		{ $$ = new BuiltinType("long int"); }
 		| SHORT
 		{ $$ = new BuiltinType("short"); }
+		| SHORT INT
+		{ $$ = new BuiltinType("short int"); }
 		| CHAR
 		{ $$ = new BuiltinType("char"); }
 		| UNSIGNED INT
@@ -434,15 +438,21 @@ BuiltinType	: INT
 		| UNSIGNED LONG
 		{ $$ = new BuiltinType("unsigned long"); }
 		| UNSIGNED LONG INT
-		{ $$ = new BuiltinType("unsigned long"); }
+		{ $$ = new BuiltinType("unsigned long int"); }
 		| UNSIGNED LONG LONG
 		{ $$ = new BuiltinType("unsigned long long"); }
+		| UNSIGNED LONG LONG INT
+		{ $$ = new BuiltinType("unsigned long long int"); }
 		| UNSIGNED SHORT
 		{ $$ = new BuiltinType("unsigned short"); }
+		| UNSIGNED SHORT INT
+		{ $$ = new BuiltinType("unsigned short int"); }
 		| UNSIGNED CHAR
 		{ $$ = new BuiltinType("unsigned char"); }
 		| LONG LONG
 		{ $$ = new BuiltinType("long long"); }
+		| LONG LONG INT
+		{ $$ = new BuiltinType("long long int"); }
 		| FLOAT
 		{ $$ = new BuiltinType("float"); }
 		| DOUBLE
@@ -451,10 +461,6 @@ BuiltinType	: INT
 		{ $$ = new BuiltinType("long double"); }
 		| VOID
 		{ $$ = new BuiltinType("void"); }
-		| SIZET
-		{ $$ = new BuiltinType("size_t"); }
-		| BOOL
-		{ $$ = new BuiltinType("bool"); }
 		;
 
 NamedType	: Name OptTParams { $$ = new NamedType($1,$2); };
