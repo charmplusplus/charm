@@ -35,8 +35,6 @@ Orion Sky Lawlor, olawlor@acm.org
 	Utility defines, includes, etc.
 */
 extern void _registerCkArray(void);
-CpvExtern (int ,serializer);
-
 
 /** This flag is true when in the system there is anytime migration, false when
  *  the user code guarantees that no migration happens except during load balancing

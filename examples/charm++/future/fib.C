@@ -1,6 +1,6 @@
 #include "fib.decl.h"
 
-#define THRESHOLD 3
+#define THRESHOLD 12
 
 struct Main : public CBase_Main {
   Main(CkArgMsg *m) { thisProxy.run(atoi(m->argv[1])); }

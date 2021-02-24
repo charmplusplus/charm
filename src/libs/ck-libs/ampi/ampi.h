@@ -9,7 +9,8 @@
 #define AMPI_INTERNAL_SKIP_FUNCTIONS
 
 #if CMK_CUDA
-#include "hapi.h"
+#include <cuda_runtime.h>
+typedef struct hapiWorkRequest hapiWorkRequest;
 #endif
 
 /* NON-standard define: this lets people #ifdef on

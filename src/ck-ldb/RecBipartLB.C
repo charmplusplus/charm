@@ -204,12 +204,13 @@ void RecursiveBiPart(ObjGraph* ogr, vector<Vertex*>& pvertices, int parent, int 
   // further
   if (nump == 1)
   {
-    parray->procs[peno].totalLoad() = 0.0;
+    double totalLoad = 0;
     for (Vertex* vertex : pvertices)
     {
       vertex->setNewPe(peno);
-      parray->procs[peno].totalLoad() += vertex->getVertexLoad();
+      totalLoad += vertex->getVertexLoad();
     }
+    parray->procs[peno].setTotalLoad(totalLoad);
     peno++;
 
     return;
