@@ -611,6 +611,10 @@ public:
     }
   }
 
+  inline size_t getNumLocalElems() {
+    return localElemVec.size();
+  }
+
   virtual CkMigratable* getEltFromArrMgr(const CmiUInt8 id) {
     const auto itr = localElems.find(id);
     return ( itr == localElems.end() ? NULL : localElemVec[itr->second] );
