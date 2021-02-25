@@ -185,8 +185,13 @@ class collideMgr : public CBase_collideMgr
   CProxy_collideClient client; //Collision client group
   collideStats statObj;
 
+  std::vector<collideVoxel *> myVoxels;
+
   int nContrib;//Number of registered contributors
   int contribCount;//Number of contribute calls given this step
+
+  int totalLocalVoxels;
+  int voxelContrib;
 
   CollisionAggregator aggregator;
   int msgsSent;//Messages sent out to voxels
@@ -217,6 +222,8 @@ class collideMgr : public CBase_collideMgr
 
   //collideVoxels send a return receipt here
   void voxelMessageRecvd(void);
+
+  void registerVoxel(collideVoxel *vox);
 };
 
 /********************** collideVoxel ********************
@@ -238,10 +245,13 @@ class collideVoxel : public CBase_collideVoxel
   void pup(PUP::er &p);
 
   void add(objListMsg *msg);
+  void initiateCollision(const CProxy_collideMgr &mgr);
+
   void startCollision(int step,
       const CollideGrid3d &gridMap,
       const CProxy_collideClient &client,
-      const collideStats &statObj);
+      const collideStats &statObj,
+      CollisionList &colls);
 };
 
 
@@ -274,6 +284,8 @@ class serialCollideClient : public collideClient {
   */
 class distributedCollideClient : public collideClient {
   CkCallback clientCb;
+  int voxelContrib;
+  int totalLocalVoxels;
   public:
   distributedCollideClient(CkCallback clientCb_);
 
