@@ -415,6 +415,8 @@ collideMgr::collideMgr(const CollideGrid3d &gridMap_,
   nContrib=0;
   contribCount=0;
   msgsSent=msgsRecvd=0;
+  totalLocalVoxels = -1;
+  collisionStarted = false;
 }
 
 //Maintain contributor registration count
@@ -504,7 +506,44 @@ void collideMgr::reductionFinished(void)
 {
   CM_STATUS("collideMgr::reductionFinished");
   //Broadcast Collision start:
-  voxelProxy.startCollision(steps,gridMap,client);
+  thisProxy.determineNumVoxels();
+  voxelProxy.initiateCollision(thisProxy);
+}
+
+void collideMgr::checkRegistrationComplete() {
+  if(myVoxels.size() == totalLocalVoxels && collisionStarted == false) {
+    collisionStarted = true;
+    //CmiPrintf("[%d][%d][%d][%d] all voxels registered totalvox=%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), thisIndex, totalLocalVoxels);
+    //fflush(stdout);
+    CollisionList colls;
+    for(int i =0 ; i<myVoxels.size(); i++) {
+      myVoxels[i]->startCollision(steps, gridMap, client, colls);
+    }
+    collideVoxel *vox;
+    client.ckLocalBranch()->collisions(vox,steps,colls);
+    collisionStarted = false;
+    myVoxels.clear();
+  }
+}
+
+void collideMgr::determineNumVoxels() {
+  if(totalLocalVoxels == -1 ) {
+    CkArray *array = voxelProxy.ckLocalBranch();
+    totalLocalVoxels = array->getNumLocalElems();
+  }
+  //CmiPrintf("[%d][%d][%d][%d] determineNumVoxels totalLocalVoxels=%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), thisIndex, totalLocalVoxels);
+  //fflush(stdout);
+  checkRegistrationComplete();
+}
+
+void collideMgr::registerVoxel(collideVoxel *vox) {
+  if(totalLocalVoxels == -1 ) {
+    CkArrayID arrID = vox->ckGetArrayID();
+    CkArray *array = (CkArray *)CkLocalBranch(arrID);
+    totalLocalVoxels = array->getNumLocalElems();
+  }
+  myVoxels.push_back(vox);
+  checkRegistrationComplete();
 }
 
 
@@ -607,9 +646,15 @@ void collideVoxel::collide(const bbox3d &territory,CollisionList &dest)
 }
 
 
+void collideVoxel::initiateCollision(const CProxy_collideMgr &mgr)
+{
+  mgr.ckLocalBranch()->registerVoxel(this);
+}
+
 void collideVoxel::startCollision(int step,
     const CollideGrid3d &gridMap,
-    const CProxy_collideClient &client)
+    const CProxy_collideClient &client,
+    CollisionList &colls)
 {
   CC_STATUS("startCollision "<<step<<" on "<<msgs.length()<<" messages {");
 
@@ -617,10 +662,7 @@ void collideVoxel::startCollision(int step,
       gridMap.grid2world(1,rSeg1d(thisIndex.y,thisIndex.y+1)),
       gridMap.grid2world(2,rSeg1d(thisIndex.z,thisIndex.z+1))
       );
-  CollisionList colls;
   collide(territory,colls);
-  client.ckLocalBranch()->collisions(this,step,colls);
-
   emptyMessages();
   CC_STATUS("} startCollision");
 }
@@ -652,11 +694,11 @@ void serialCollideClient::collisions(ArrayElement *src,
     int step,CollisionList &colls)
 {
   if(useCb) { // Use user passed callback as reduction target
-    src->contribute(colls.length()*sizeof(Collision),colls.getData(),
+    contribute(colls.length()*sizeof(Collision),colls.getData(),
       CkReduction::concat, clientCb);
   } else { // Use client fn with reduction targetted at serialCollideClient::reductionDone
     CkCallback cb(CkIndex_serialCollideClient::reductionDone(0),0,thisgroup);
-    src->contribute(colls.length()*sizeof(Collision),colls.getData(),
+    contribute(colls.length()*sizeof(Collision),colls.getData(),
       CkReduction::concat,cb);
   }
 }

@@ -156,8 +156,14 @@ class collideMgr : public CBase_collideMgr
   CollideGrid3d gridMap; //Shape of 3D voxel grid
   CProxy_collideClient client; //Collision client group
 
+  std::vector<collideVoxel *> myVoxels;
+
   int nContrib;//Number of registered contributors
   int contribCount;//Number of contribute calls given this step
+
+  int totalLocalVoxels;
+
+  bool collisionStarted;
 
   CollisionAggregator aggregator;
   int msgsSent;//Messages sent out to voxels
@@ -187,6 +193,11 @@ class collideMgr : public CBase_collideMgr
 
   //collideVoxels send a return receipt here
   void voxelMessageRecvd(void);
+
+  void registerVoxel(collideVoxel *vox);
+
+  void checkRegistrationComplete();
+  void determineNumVoxels(void);
 };
 
 /********************** collideVoxel ********************
@@ -208,9 +219,12 @@ class collideVoxel : public CBase_collideVoxel
   void pup(PUP::er &p);
 
   void add(objListMsg *msg);
+  void initiateCollision(const CProxy_collideMgr &mgr);
+
   void startCollision(int step,
       const CollideGrid3d &gridMap,
-      const CProxy_collideClient &client);
+      const CProxy_collideClient &client,
+      CollisionList &colls);
 };
 
 

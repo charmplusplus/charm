@@ -23,14 +23,13 @@ module collidecharm {
         CProxy_collideClient client,
         CkArrayID cells);
     entry void voxelMessageRecvd(void);
+    entry void determineNumVoxels();
   };
 
   array [3D] collideVoxel {
     entry collideVoxel(void);
     entry [createhere] void add(objListMsg *);
     //    entry [createhome] void add(objListMsg *);
-    entry void startCollision(int step,
-        CollideGrid3d gridMap,
-        CProxy_collideClient client);
+    entry void initiateCollision(CProxy_collideMgr mg);
   };
 };
