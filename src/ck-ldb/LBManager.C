@@ -431,8 +431,7 @@ void _loadbalancerInit()
 }
 
 bool LBManager::manualOn = false;
-char* LBManager::avail_vector = NULL;
-bool LBManager::avail_vector_set = false;
+std::vector<char> LBManager::avail_vector;
 CmiNodeLock avail_vector_lock;
 
 static LBRealType* _expectedLoad = NULL;
@@ -441,8 +440,8 @@ void LBManager::initnodeFn()
 {
   int proc;
   int num_proc = CkNumPes();
-  avail_vector = new char[num_proc];
-  for (proc = 0; proc < num_proc; proc++) avail_vector[proc] = 1;
+  avail_vector.clear();
+  avail_vector.resize(num_proc, 1);
   avail_vector_lock = CmiCreateLock();
 
   _expectedLoad = new LBRealType[num_proc];
@@ -609,20 +608,18 @@ void LBManager::Migrated(LDObjHandle h, int waitBarrier)
 
 LBManager::LastLBInfo::LastLBInfo() { expectedLoad = _expectedLoad; }
 
-void LBManager::get_avail_vector(char* bitmap)
+void LBManager::get_avail_vector(char* bitmap) const
 {
-  CmiAssert(bitmap && avail_vector);
+  CmiAssert(bitmap);
   const int num_proc = CkNumPes();
-  for (int proc = 0; proc < num_proc; proc++)
-  {
-    bitmap[proc] = avail_vector[proc];
-  }
+  CmiAssert(num_proc <= avail_vector.size());
+  std::copy(avail_vector.begin(), avail_vector.begin() + num_proc, bitmap);
 }
 
 // new_ld == -1(default) : calcualte a new ld
 //           -2 : ignore new ld
 //           >=0: given a new ld
-void LBManager::set_avail_vector(char* bitmap, int new_ld)
+void LBManager::set_avail_vector(const char* bitmap, int new_ld)
 {
   int assigned = 0;
   const int num_proc = CkNumPes();
@@ -634,11 +631,34 @@ void LBManager::set_avail_vector(char* bitmap, int new_ld)
     new_ld_balancer = new_ld;
     assigned = 1;
   }
-  CmiAssert(bitmap && avail_vector);
+  CmiAssert(bitmap);
+  CmiAssert(num_proc <= avail_vector.size());
   for (int count = 0; count < num_proc; count++)
   {
     avail_vector[count] = bitmap[count];
     if ((bitmap[count] == 1) && !assigned)
+    {
+      new_ld_balancer = count;
+      assigned = 1;
+    }
+  }
+}
+void LBManager::set_avail_vector(const std::vector<char> & bitmap, int new_ld)
+{
+  int assigned = 0;
+  const int num_proc = CkNumPes();
+  if (new_ld == -2)
+    assigned = 1;
+  else if (new_ld >= 0)
+  {
+    CmiAssert(new_ld < num_proc);
+    new_ld_balancer = new_ld;
+    assigned = 1;
+  }
+  avail_vector = bitmap;
+  for (int count = 0; count < num_proc; count++)
+  {
+    if (bitmap[count] == 1 && !assigned)
     {
       new_ld_balancer = count;
       assigned = 1;
@@ -746,35 +766,7 @@ void LBManager::pup(PUP::er& p)
   int np;
   if (!p.isUnpacking()) np = CkNumPes();
   p | np;
-  // in case number of processors changes
-  if (p.isUnpacking())
-  {
-    CmiLock(avail_vector_lock);
-    if (!avail_vector_set)
-    {
-      avail_vector_set = true;
-      CmiAssert(avail_vector);
-      if (np > CkNumPes())
-      {
-        delete[] avail_vector;
-        avail_vector = new char[np];
-        for (int i = 0; i < np; i++) avail_vector[i] = 1;
-      }
-      p(avail_vector, np);
-    }
-    else
-    {
-      char* tmp_avail_vector = new char[np];
-      p(tmp_avail_vector, np);
-      delete[] tmp_avail_vector;
-    }
-    CmiUnlock(avail_vector_lock);
-  }
-  else
-  {
-    CmiAssert(avail_vector);
-    p(avail_vector, np);
-  }
+  p | avail_vector;
   p | mystep;
   if (p.isUnpacking())
   {

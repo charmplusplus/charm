@@ -869,16 +869,16 @@ void CkMemCheckPT::resetLB(int diepe)
 {
 #if CMK_LBDB_ON
   int i;
-  std::vector<char> bitmap(CkNumPes());
+  std::vector<char> bitmap;
   // set processor available bitmap
-  get_avail_vector(bitmap.data());
+  get_avail_vector(bitmap);
 
   for (i=0; i<failedPes.size(); i++)
     bitmap[failedPes[i]] = 0; 
   bitmap[diepe] = 0;
 
 #if CK_NO_PROC_POOL
-  set_avail_vector(bitmap.data());
+  set_avail_vector(bitmap);
 #endif
 
   // if I am the crashed pe, rebuild my failedPEs array
