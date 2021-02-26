@@ -7557,7 +7557,7 @@ void ampi::irecvBcast(void *buf, int count, MPI_Datatype type, int src,
   // if msg has already arrived, do the receive right away
   if (msg) {
     newreq->receive(this, msg, false);
-    delete msg; // never add bcast msgs to AmpiMsgPool
+    delete msg; // never add bcast msgs to AmpiMsgPool because they are nokeep
   }
   else { // ... otherwise post the receive
     postedBcastReqs.put(newreq);
