@@ -232,11 +232,7 @@ class LBManager : public CBase_LBManager
 
   LBManager(void) { init(); }
   LBManager(CkMigrateMessage* m) : CBase_LBManager(m) { init(); }
-  ~LBManager()
-  {
-    if (avail_vector) delete[] avail_vector;
-    delete lbdb_obj;
-  }
+  ~LBManager() { delete lbdb_obj; }
 
  private:
   void init();
@@ -479,8 +475,7 @@ class LBManager : public CBase_LBManager
 
  private:
   int mystep;
-  static char* avail_vector;  // processor bit vector
-  static bool avail_vector_set;
+  static std::vector<char> avail_vector; // processor bit vector
   int new_ld_balancer;  // for Node 0
   MetaBalancer* metabalancer;
   int currentLBIndex;
@@ -499,9 +494,11 @@ class LBManager : public CBase_LBManager
   static bool manualOn;
 
  public:
-  char* availVector() { return avail_vector; }
-  void get_avail_vector(char* bitmap);
-  void set_avail_vector(char* bitmap, int new_ld = -1);
+  const char *availVector() const { return avail_vector.data(); }
+  void get_avail_vector(char * bitmap) const;
+  void get_avail_vector(std::vector<char> & bitmap) const { bitmap = avail_vector; }
+  void set_avail_vector(const char * bitmap, int new_ld = -1);
+  void set_avail_vector(const std::vector<char> & bitmap, int new_ld = -1);
   int& new_lbbalancer() { return new_ld_balancer; }
 
   struct LastLBInfo
@@ -547,9 +544,9 @@ inline LBManager* LBManagerObj() { return LBManager::Object(); }
 
 inline void CkStartLB() { LBManager::Object()->StartLB(); }
 
-inline void get_avail_vector(char* bitmap) { LBManagerObj()->get_avail_vector(bitmap); }
+inline void get_avail_vector(std::vector<char> & bitmap) { LBManagerObj()->get_avail_vector(bitmap); }
 
-inline void set_avail_vector(char* bitmap) { LBManagerObj()->set_avail_vector(bitmap); }
+inline void set_avail_vector(const std::vector<char> & bitmap) { LBManagerObj()->set_avail_vector(bitmap); }
 
 //  a helper class to suspend/resume load instrumentation when calling into
 //  runtime apis
