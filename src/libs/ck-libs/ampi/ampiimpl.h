@@ -1882,6 +1882,7 @@ class AmpiMsgPool {
   inline void deleteAmpiMsg(AmpiMsg* msg) noexcept {
     /* msg->origLength is the true size of the message's data buffer, while
      * msg->length is the space taken by the payload within it. */
+    CkAssert(msg->getTag() != MPI_BCAST_TAG);
     if (currMsgs != maxMsgs && msg->origLength >= msgLength && msg->origLength < 2*msgLength) {
       msgs[currMsgs] = msg;
       currMsgs++;
