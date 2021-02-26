@@ -2155,7 +2155,7 @@ void ampi::split(int color,int key,MPI_Comm *dest, int type) noexcept
     CkCallback cb(CkIndex_ampi::splitPhase1(0),CkArrayIndex1D(rootIdx),myComm.getProxy());
     contribute(sizeof(splitKey),&splitKey,CkReduction::concat,cb);
 
-    ampi * dis = block(); //Resumed by ampi::registrationPhase2
+    ampi * dis = block(); //Resumed by ampi::registrationFinish
     MPI_Comm newComm = dis->parent->getNextCart()-1;
     *dest=newComm;
   }
@@ -2165,7 +2165,7 @@ void ampi::split(int color,int key,MPI_Comm *dest, int type) noexcept
     CkCallback cb(CkIndex_ampi::splitPhase1(0),CkArrayIndex1D(rootIdx),myComm.getProxy());
     contribute(sizeof(splitKey),&splitKey,CkReduction::concat,cb);
 
-    ampi * dis = block(); //Resumed by ampi::registrationPhase2
+    ampi * dis = block(); //Resumed by ampi::registrationFinish
     MPI_Comm newComm = dis->parent->getNextGraph()-1;
     *dest=newComm;
   }
@@ -2175,7 +2175,7 @@ void ampi::split(int color,int key,MPI_Comm *dest, int type) noexcept
     CkCallback cb(CkIndex_ampi::splitPhase1(0),CkArrayIndex1D(rootIdx),myComm.getProxy());
     contribute(sizeof(splitKey),&splitKey,CkReduction::concat,cb);
 
-    ampi * dis = block(); //Resumed by ampi::registrationPhase2
+    ampi * dis = block(); //Resumed by ampi::registrationFinish
     MPI_Comm newComm = dis->parent->getNextDistGraph()-1;
     *dest=newComm;
   }
@@ -2185,7 +2185,7 @@ void ampi::split(int color,int key,MPI_Comm *dest, int type) noexcept
     CkCallback cb(CkIndex_ampi::splitPhaseInter(0),CkArrayIndex1D(rootIdx),myComm.getProxy());
     contribute(sizeof(splitKey),&splitKey,CkReduction::concat,cb);
 
-    ampi * dis = block(); //Resumed by ampi::registrationPhase2
+    ampi * dis = block(); //Resumed by ampi::registrationFinish
     MPI_Comm newComm = dis->parent->getNextInter()-1;
     *dest=newComm;
   }
@@ -2195,7 +2195,7 @@ void ampi::split(int color,int key,MPI_Comm *dest, int type) noexcept
     CkCallback cb(CkIndex_ampi::splitPhase1(0),CkArrayIndex1D(rootIdx),myComm.getProxy());
     contribute(sizeof(splitKey),&splitKey,CkReduction::concat,cb);
 
-    ampi * dis = block(); //Resumed by ampi::registrationPhase2
+    ampi * dis = block(); //Resumed by ampi::registrationFinish
     MPI_Comm newComm = dis->parent->getNextSplit()-1;
     *dest=newComm;
   }
@@ -2306,7 +2306,7 @@ void ampi::splitPhase1(CkReductionMsg *msg) noexcept
   delete msg;
 }
 
-void ampi::registrationPhase2() noexcept
+void ampi::registrationFinish() noexcept
 {
   CkAssert(numCommCreationsInProgress > 0);
   if (--numCommCreationsInProgress == 0)
@@ -2369,7 +2369,7 @@ void ampiParent::splitChildRegister(ampi * commPtr, const ampiCommStruct &s, CPr
   if (splitComm.size()<=idx) splitComm.resize(idx+1);
   splitComm[idx]=new ampiCommStruct(s);
 
-  CkCallback cb(CkReductionTarget(ampi, registrationPhase2), parentCommIdx, parentComm);
+  CkCallback cb(CkReductionTarget(ampi, registrationFinish), parentCommIdx, parentComm);
   commPtr->contribute(cb);
 }
 
@@ -2387,7 +2387,7 @@ void ampi::commCreate(const std::vector<int>& vec,MPI_Comm* newcomm) noexcept {
   contribute(sizeof(nextgroup), &nextgroup,CkReduction::max_int,cb);
 
   if(getPosOp(thisIndex,vec)>=0){
-    ampi * dis = block(); //Resumed by ampi::registrationPhase2
+    ampi * dis = block(); //Resumed by ampi::registrationFinish
     MPI_Comm retcomm = dis->parent->getNextGroup()-1;
     *newcomm = retcomm;
   }else{
@@ -2416,7 +2416,7 @@ void ampiParent::groupChildRegister(ampi * commPtr, const ampiCommStruct &s, CPr
   if (groupComm.size()<=idx) groupComm.resize(idx+1);
   groupComm[idx]=new ampiCommStruct(s);
 
-  CkCallback cb(CkReductionTarget(ampi, registrationPhase2), parentCommIdx, parentComm);
+  CkCallback cb(CkReductionTarget(ampi, registrationFinish), parentCommIdx, parentComm);
   commPtr->contribute(cb);
 }
 
@@ -2461,7 +2461,7 @@ MPI_Comm ampi::cartCreate(std::vector<int>& vec, int ndims, const int* dims) noe
   contribute(sizeof(nextcart), &nextcart,CkReduction::max_int,cb);
 
   if (getPosOp(thisIndex,vec)>=0) {
-    ampi * dis = block(); //Resumed by ampi::registrationPhase2
+    ampi * dis = block(); //Resumed by ampi::registrationFinish
     return dis->parent->getNextCart()-1;
   } else {
     return MPI_COMM_NULL;
@@ -2476,7 +2476,7 @@ void ampiParent::cartChildRegister(ampi * commPtr, const ampiCommStruct &s, CPro
   }
   cartComm[idx]=new ampiCommStruct(s,MPI_CART);
 
-  CkCallback cb(CkReductionTarget(ampi, registrationPhase2), parentCommIdx, parentComm);
+  CkCallback cb(CkReductionTarget(ampi, registrationFinish), parentCommIdx, parentComm);
   commPtr->contribute(cb);
 }
 
@@ -2489,7 +2489,7 @@ void ampi::graphCreate(const std::vector<int>& vec,MPI_Comm* newcomm) noexcept {
   contribute(sizeof(nextgraph), &nextgraph,CkReduction::max_int,cb);
 
   if(getPosOp(thisIndex,vec)>=0){
-    ampi * dis = block(); //Resumed by ampi::registrationPhase2
+    ampi * dis = block(); //Resumed by ampi::registrationFinish
     MPI_Comm retcomm = parent->getNextGraph()-1;
     *newcomm = retcomm;
   }else
@@ -2504,7 +2504,7 @@ void ampiParent::graphChildRegister(ampi * commPtr, const ampiCommStruct &s, CPr
   }
   graphComm[idx]=new ampiCommStruct(s,MPI_GRAPH);
 
-  CkCallback cb(CkReductionTarget(ampi, registrationPhase2), parentCommIdx, parentComm);
+  CkCallback cb(CkReductionTarget(ampi, registrationFinish), parentCommIdx, parentComm);
   commPtr->contribute(cb);
 }
 
@@ -2517,7 +2517,7 @@ void ampi::distGraphCreate(const std::vector<int>& vec, MPI_Comm* newcomm) noexc
   contribute(sizeof(nextDistGraph), &nextDistGraph, CkReduction::max_int, cb);
 
   if (getPosOp(thisIndex,vec) >= 0) {
-    ampi * dis = block(); //Resumed by ampi::registrationPhase2
+    ampi * dis = block(); //Resumed by ampi::registrationFinish
     MPI_Comm retcomm = dis->parent->getNextDistGraph()-1;
     *newcomm = retcomm;
   }
@@ -2535,7 +2535,7 @@ void ampiParent::distGraphChildRegister(ampi * commPtr, const ampiCommStruct &s,
   }
   distGraphComm[idx] = new ampiCommStruct(s,MPI_DIST_GRAPH);
 
-  CkCallback cb(CkReductionTarget(ampi, registrationPhase2), parentCommIdx, parentComm);
+  CkCallback cb(CkReductionTarget(ampi, registrationFinish), parentCommIdx, parentComm);
   commPtr->contribute(cb);
 }
 
@@ -2607,7 +2607,7 @@ void ampiParent::intraChildRegister(ampi * commPtr, const ampiCommStruct &s, CPr
   if (intraComm.size()<=idx) intraComm.resize(idx+1);
   intraComm[idx]=new ampiCommStruct(s);
 
-  CkCallback cb(CkReductionTarget(ampi, registrationPhase2), parentCommIdx, parentComm);
+  CkCallback cb(CkReductionTarget(ampi, registrationFinish), parentCommIdx, parentComm);
   commPtr->contribute(cb);
 }
 

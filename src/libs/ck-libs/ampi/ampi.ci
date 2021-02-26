@@ -62,7 +62,7 @@ module ampi {
     entry EXPEDITED_THREADED void splitPhase1(CkReductionMsg *msg);
     entry EXPEDITED_THREADED void splitPhaseInter(CkReductionMsg *msg);
     entry EXPEDITED_THREADED_REDN void commCreatePhase1(MPI_Comm nextGroupComm);
-    entry EXPEDITED_REDN void registrationPhase2();
+    entry EXPEDITED_REDN void registrationFinish();
     entry EXPEDITED_THREADED_REDN void intercommCreatePhase1(MPI_Comm nextInterComm);
     entry EXPEDITED_THREADED_REDN void intercommMergePhase1(MPI_Comm nextIntraComm);
     entry EXPEDITED void exchangeProxyForSplitLocal(int, CProxy_ampi);

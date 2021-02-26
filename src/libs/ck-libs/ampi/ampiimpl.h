@@ -2651,7 +2651,7 @@ class ampi final : public CBase_ampi {
   void splitPhase1(CkReductionMsg *msg) noexcept;
   void splitPhaseInter(CkReductionMsg *msg) noexcept;
   void commCreatePhase1(MPI_Comm nextGroupComm) noexcept;
-  void registrationPhase2() noexcept;
+  void registrationFinish() noexcept;
   void intercommCreatePhase1(MPI_Comm nextInterComm) noexcept;
   void intercommMergePhase1(MPI_Comm nextIntraComm) noexcept;
 
