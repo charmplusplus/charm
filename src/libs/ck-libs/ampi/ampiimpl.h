@@ -2178,7 +2178,7 @@ class ampiParent final : public CBase_ampiParent {
     if (idx>=splitComm.size()) CkAbort("Bad split communicator used");
     return *splitComm[idx];
   }
-  void splitChildRegister(ampi * commPtr, const ampiCommStruct &s, CProxy_ampi parentComm, CkArrayIndex1D parentCommIdx) noexcept;
+  void splitChildRegister(const ampiCommStruct &s) noexcept;
 
   inline bool isGroup(MPI_Comm comm) const noexcept {
     return (comm>=MPI_COMM_FIRST_GROUP && comm<MPI_COMM_FIRST_CART);
@@ -2188,16 +2188,16 @@ class ampiParent final : public CBase_ampiParent {
     if (idx>=groupComm.size()) CkAbort("Bad group communicator used");
     return *groupComm[idx];
   }
-  void groupChildRegister(ampi * commPtr, const ampiCommStruct &s, CProxy_ampi parentComm, CkArrayIndex1D parentCommIdx) noexcept;
+  void groupChildRegister(const ampiCommStruct &s) noexcept;
   inline bool isInGroups(MPI_Group group) const noexcept {
     return (group>=0 && group<groups.size());
   }
 
-  void cartChildRegister(ampi * commPtr, const ampiCommStruct &s, CProxy_ampi parentComm, CkArrayIndex1D parentCommIdx) noexcept;
-  void graphChildRegister(ampi * commPtr, const ampiCommStruct &s, CProxy_ampi parentComm, CkArrayIndex1D parentCommIdx) noexcept;
-  void distGraphChildRegister(ampi * commPtr, const ampiCommStruct &s, CProxy_ampi parentComm, CkArrayIndex1D parentCommIdx) noexcept;
+  void cartChildRegister(const ampiCommStruct &s) noexcept;
+  void graphChildRegister(const ampiCommStruct &s) noexcept;
+  void distGraphChildRegister(const ampiCommStruct &s) noexcept;
   void interChildRegister(const ampiCommStruct &s) noexcept;
-  void intraChildRegister(ampi * commPtr, const ampiCommStruct &s, CProxy_ampi parentComm, CkArrayIndex1D parentCommIdx) noexcept;
+  void intraChildRegister(const ampiCommStruct &s) noexcept;
 
  public:
   ampiParent(CProxy_TCharm threads_,int nRanks_) noexcept;
@@ -2211,7 +2211,7 @@ class ampiParent final : public CBase_ampiParent {
   ~ampiParent() noexcept;
 
   //Children call this when they are first created, or just migrated
-  TCharm *registerAmpi(ampi *ptr, ampiCommStruct s, bool forMigration, CProxy_ampi parentComm, CkArrayIndex1D parentCommIdx) noexcept;
+  TCharm *registerAmpi(ampi *ptr, ampiCommStruct s, bool forMigration) noexcept;
 
   // exchange proxy info between two ampi proxies
   void ExchangeProxy(CProxy_ampi rproxy) noexcept {
@@ -2613,20 +2613,17 @@ class ampi final : public CBase_ampi {
                            int srcRank, IReq* ireq) noexcept;
 
   void init() noexcept;
-  void findParent(bool forMigration, CProxy_ampi parentComm = {}, CkArrayIndex1D parentCommIdx = {}) noexcept;
+  void findParent(bool forMigration) noexcept;
 
  public: // entry methods
   ampi() noexcept;
-  ampi(CkArrayID parent_,const ampiCommStruct &s) noexcept;
+  ampi(CkArrayID parent_, const ampiCommStruct &s) noexcept;
   ampi(CkMigrateMessage *msg) noexcept;
   void ckJustMigrated() noexcept;
   void ckJustRestored() noexcept;
   ~ampi() noexcept;
 
   void pup(PUP::er &p) noexcept;
-
-  void setUpNew() noexcept;
-  void setUpInserted(CProxy_ampi parentComm, CkArrayIndex1D parentCommIdx) noexcept;
 
   void allInitDone() noexcept;
   void setInitDoneFlag() noexcept;
