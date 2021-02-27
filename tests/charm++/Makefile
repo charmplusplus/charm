@@ -6,7 +6,6 @@ DIRS = \
   simplearrayhello \
   provisioning \
   load_balancing \
-  chkpt \
   delegation \
   queue \
   sdag \
@@ -27,6 +26,12 @@ DIRS = \
   longIdle \
   bombard \
   varTRAM \
+
+ifneq ($(CMK_SMP),1)
+ifneq ($(CMK_MULTICORE),1)
+  DIRS += chkpt
+endif
+endif
 
 FTDIRS = \
   jacobi3d \
