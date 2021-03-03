@@ -484,17 +484,24 @@ These attributes are accessible from any rank by calling
 .. code-block:: fortran
 
    ! Fortran:
-   integer (kind=MPI_ADDRESS_KIND) :: my_wth
-   integer :: flag, ierr
-   call MPI_Comm_get_attr(MPI_COMM_WORLD, AMPI_MY_WTH, my_wth, flag, ierr)
-
+   integer (kind=MPI_ADDRESS_KIND) :: my_wth_ptr
+   integer :: my_wth, flag, ierr
+   call MPI_Comm_get_attr(MPI_COMM_WORLD, AMPI_MY_WTH, my_wth_ptr, flag, ierr)
+   my_wth = my_wth_ptr
 
 .. code-block:: c++
 
    // C/C++:
-   int * my_wth;
-   int flag;
-   MPI_Comm_get_attr(MPI_COMM_WORLD, AMPI_MY_WTH, &my_wth, &flag);
+   int * my_wth_ptr;
+   int my_wth, flag;
+   MPI_Comm_get_attr(MPI_COMM_WORLD, AMPI_MY_WTH, &my_wth_ptr, &flag);
+   my_wth = *my_wth_ptr;
+
+.. warning::
+
+   The pointers retrieved for these attributes will become invalid after
+   migration. Always copy their values into local variables if you need
+   to access the old values after a migration.
 
 AMPI also provides extra communicator types that users can pass to
 ``MPI_Comm_split_type``: ``AMPI_COMM_TYPE_HOST`` for splitting a
