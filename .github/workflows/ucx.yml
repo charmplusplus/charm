@@ -23,7 +23,7 @@ jobs:
         git clone --recursive --depth 1 --shallow-submodules --branch v1.9.0 https://github.com/openucx/ucx.git
         cd ucx
         ./autogen.sh
-        ./contrib/configure-release --disable-numa
+        ./contrib/configure-release --disable-numa --without-java
         make -j4
         sudo make install
     - name: build-openpmix
