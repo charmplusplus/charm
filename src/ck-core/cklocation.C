@@ -2948,12 +2948,9 @@ int CkLocMgr::deliverMsg(CkArrayMessage* msg, CkArrayID mgr, CmiUInt8 id,
     if (destPE != -1)
     {
       msg->array_hops()++;
-      // If we are hopping more than twice, we've discovered a stale chain
-      // of cache entries. Just route through home instead.
-      if (msg->array_hops() > 2 && CkMyPe() != cache->homePe(id))
-      {
-        destPE = cache->homePe(id);
-      }
+      // TODO: If we encounter too many hops, we should re-route the message back through
+      // home for a more direct path. This doesn't currently work however, because of a
+      // bug where homePe(id) may be different from homePe(idx).
       CkArrayManagerDeliver(destPE, msg, opts);
       return true;
     }
