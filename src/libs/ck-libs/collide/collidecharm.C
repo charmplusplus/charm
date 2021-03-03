@@ -527,7 +527,7 @@ void collideMgr::registerVoxel(collideVoxel *vox) {
   }
   myVoxels.push_back(vox);
   if(++voxelContrib == totalLocalVoxels) {
-    CmiPrintf("[%d][%d][%d][%d] all voxels registered totalvox=%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), thisIndex, totalLocalVoxels);
+    //CmiPrintf("[%d][%d][%d][%d] all voxels registered totalvox=%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), thisIndex, totalLocalVoxels);
     CollisionList colls;
     for(int i =0 ; i<myVoxels.size(); i++) {
       myVoxels[i]->startCollision(steps,gridMap,client,statObj, colls);
