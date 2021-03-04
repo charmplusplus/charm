@@ -534,7 +534,7 @@ public:
     auto req = std::make_shared<FutureToFuture>(theirs);
     auto fs = &(CpvAccess(futurestate));
     if (fs->is_ready(ours.id)) {
-      req->fulfill((*fs)[ours.id]);
+      req->fulfill(ours.id, (*fs)[ours.id]);
     } else {
       fs->request(ours.id, req);
     }
