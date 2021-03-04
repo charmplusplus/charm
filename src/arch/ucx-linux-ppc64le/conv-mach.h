@@ -75,7 +75,7 @@
 #define CMK_LBDB_ON                    1
 
 #define CMK_64BIT                      1
-#define CMK_AMD64                      1
+#define CMK_PPC64                      1
 
 /* Other possible definitions:
 

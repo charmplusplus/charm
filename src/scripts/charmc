@@ -486,8 +486,6 @@ do
 		case "$1" in
 		"ampi") AddModules tcharmmain ampi ; AMPI="1" ;;
 		"ampif") AddModules tcharmmain ampif ; USE_F90_LIBRARIES="1" ; AMPIF="1" ;;
-		"armci") AddModules tcharmmain armci ;;
-		"armcif") AddModules tcharmmain armci ; USE_F90_LIBRARIES="1" ;;
 		"fem") AddModules tcharmmain fem ; AMPIMAIN="femmain";;
 		"femf") AddModules tcharmmain fem ; AMPIMAIN="femmain"; USE_F90_LIBRARIES="1" ;;
 		"ParFUM_TOPS") AddModules tcharmmain ParFUM ParFUM_TOPS ; AMPIMAIN="ParFUMmain";;

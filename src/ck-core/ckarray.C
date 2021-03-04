@@ -1072,24 +1072,6 @@ inline void msg_prepareSend(CkArrayMessage *msg, int ep,CkArrayID aid)
 #endif
 }
 
-
-/// Just a non-inlined version of msg_prepareSend()
-void msg_prepareSend_noinline(CkArrayMessage *msg, int ep,CkArrayID aid)
-{
-	envelope *env=UsrToEnv((void *)msg);
-	env->setArrayMgr(aid);
-	env->getsetArraySrcPe()=CkMyPe();
-#if CMK_SMP_TRACE_COMMTHREAD
-        env->setSrcPe(CkMyPe());
-#endif
-	env->setEpIdx(ep);
-	env->getsetArrayHops()=0;
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-	criticalPath_send(env);
-	automaticallySetMessagePriority(env);
-#endif
-}
-
 void CProxyElement_ArrayBase::ckSend(CkArrayMessage *msg, int ep, int opts) const
 {
 #if CMK_ERROR_CHECKING
