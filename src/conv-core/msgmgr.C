@@ -169,6 +169,7 @@ CmmTable CmmPup(pup_er p, CmmTable t, CmmPupMessageFn msgpup)
       void *msg;
       pup_int(p, &ntags);
       tags = (int*) malloc(ntags*sizeof(int));
+      CmiEnforce(tags != nullptr);
       pup_ints(p, tags, ntags);
       msgpup(p,&msg);
       CmmPut(t, ntags, tags, msg);

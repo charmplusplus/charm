@@ -6,10 +6,12 @@ module CkSyncBarrier {
   };
 
   group [migratable] CkSyncBarrier {
-    entry void CkSyncBarrier(void);
-    entry void ResumeClients();
-    entry void recvLbStart(int lb_step, int sourcenode, int pe);
-    entry void CheckBarrier(bool flood_atsync);
+    entry void CkSyncBarrier();
+    entry void resumeClients();
+
+    // Only for internal use
+    entry void kick(int kickStep, int sourceNode, int sourcePe);
+    entry void checkBarrier();
   };
 
 };

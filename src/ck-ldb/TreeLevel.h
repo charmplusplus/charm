@@ -261,7 +261,11 @@ class StrategyWrapper : public IStrategyWrapper
     strategy = TreeStrategy::Factory::makeStrategy<O, P, Solution>(strategy_name, config);
   }
 
-  virtual ~StrategyWrapper() { delete strategy; }
+  virtual ~StrategyWrapper()
+  {
+    delete strategy;
+    delete sol;
+  }
 
   float prepStrategy(unsigned int nobjs, unsigned int nprocs,
                      std::vector<TreeLBMessage*>& msgs, LLBMigrateMsg* migMsg)

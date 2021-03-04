@@ -208,10 +208,6 @@ class TCharm: public CBase_TCharm
 	//Block, migrate to destPE, and resume
 	CMI_WARN_UNUSED_RESULT TCharm * migrateTo(int destPE) noexcept;
 
-#if CMK_FAULT_EVAC
-	CMI_WARN_UNUSED_RESULT TCharm * evacuate() noexcept;
-#endif
-
 	//Thread finished running
 	void done(int exitcode) noexcept;
 

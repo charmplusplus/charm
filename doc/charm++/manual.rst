@@ -2510,10 +2510,12 @@ See ``examples/charm++/PUP/HeapPUP``
 Load Balancing
 --------------
 
-Load balancing in Charm++ is enabled by its ability to place, or
-migrate, chares or chare array elements. Typical application usage to
-exploit this feature will construct many more chares than processors,
-and enable their runtime migration.
+Load balancing in Charm++ is enabled by its ability to place and
+migrate chares (note that only chare array elements are relocatable
+via migration, singleton chares can be created on a particular PE via
+seed balancing to balance load). Typical application usage to exploit
+this feature will construct many more chares than processors, and
+enable their runtime migration.
 
 Iterative applications, which are commonplace in physical simulations,
 are the most suitable target for Charm++’s measurement based load
@@ -2555,173 +2557,202 @@ Examples are in ``examples/charm++/load_balancing`` and
 Measurement-based Object Migration Strategies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-In Charm++, objects (except groups, nodegroups) can migrate from
-processor to processor at runtime. Object migration can potentially
-improve the performance of the parallel program by migrating objects
-from overloaded processors to underloaded ones.
+In Charm++, chare array elements can migrate from processor to
+processor at runtime. Object migration can potentially improve the
+performance of the parallel program by migrating objects from
+overloaded processors to underloaded ones.
 
-Charm++ implements a generic, measurement-based load balancing framework
-which automatically instruments all Charm++ objects, collects
-computation load and communication structure during execution and stores
-them into a load balancing database. Charm++ then provides a collection
-of load balancing strategies whose job it is to decide on a new mapping
-of objects to processors based on the information from the database.
-Such measurement based strategies are efficient when we can reasonably
-assume that objects in a Charm++ application tend to exhibit temporal
-correlation in their computation and communication patterns, i.e. future
-can be to some extent predicted using the historical measurement data,
-allowing effective measurement-based load balancing without
-application-specific knowledge.
+Charm++ implements a generic, measurement-based load balancing
+framework which automatically instruments all Charm++ objects,
+collecting computational load and communication structure during
+execution and storing them into a load balancing database (this only
+happens when a load balancer is activated during execution, see
+section :numref:`lbOption`). This instrumentation starts automatically
+at the beginning of application execution by default. It can be
+disabled at startup by passing the *+LBOff* flag at runtime, and
+toggled from the application by calling ``LBTurnInstrumentOn()`` and
+``LBTurnInstrumentOff()``, enabling or disabling instrumentation on
+the calling PE.
+
+Charm++ then provides a collection of load balancing strategies whose
+job it is to decide on a new mapping of objects to processors based on
+the information from the database. Such measurement based strategies
+are efficient when we can reasonably assume that objects in a Charm++
+application tend to exhibit temporal correlation in their computation
+and communication patterns, i.e. that the future can be to some extent
+predicted using the historical measurement data, allowing effective
+measurement-based load balancing without application-specific
+knowledge.
+
+The instrumentation stored in the load balancing database is cleared
+immediately following each time load balancing completes. This means
+that each invocation of load balancing uses only data measured since
+the last invocation, providing adaptive and responsive results even
+for dynamic applications.
 
 Two key terms in the Charm++ load balancing framework are:
 
--  Load balancing database provides the interface of almost all load
-   balancing calls. On each processor, it stores the load balancing
-   instrumented data and coordinates the load balancing manager and
-   balancer. It is implemented as a Chare Group called LBDatabase.
+- The **load balancing manager** provides the interface of almost all
+  load balancing calls. On each processor, it manages the load
+  balancing database, which stores the instrumented load data, and
+  controls and invokes the selected load balancing strategies. It is
+  implemented as a chare group called ``LBManager``.
 
--  Load balancer or strategy takes the load balancing database and
-   produces the new mapping of the objects. In Charm++, it is
-   implemented as Chare Group inherited from BaseLB. Three kinds of
-   schemes are implemented: (a) centralized load balancers, (b) fully
-   distributed load balancers and (c) hierarchical load balancers.
+- A **load balancing strategy** gathers the relevant load data, runs a
+  decision algorithm and produces the new mapping of the
+  objects. Charm++ supports several kinds of strategies:
+
+  a. Configurable, hierarchical load balancers using TreeLB
+  b. Fully distributed load balancers
+  c. *(deprecated)* Centralized load balancers using CentralLB
+  d. *(deprecated)* Hierarchical load balancers using HybridBaseLB
 
 .. _lbStrategy:
 
 Available Load Balancing Strategies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Load balancing can be performed in either a centralized, a fully
-distributed, or an hierarchical fashion.
+TreeLB and its pluggable strategies supersede the previous
+implementations of centralized and hierarchical load balancing. To use
+TreeLB, the user selects one of several trees. Each level corresponds
+to a different division of the overall execution (e.g. PE,
+process). Each level is configurable with a list of strategies,
+frequency, and other parameters. See :numref:`treeLb` below for more
+detail, along with configuration and execution instructions. The
+following strategies can be used with TreeLB (the old runtime
+selection syntax still works and is specified in parentheses, it uses
+the new TreeLB versions with a two level PE_Root tree rooted at PE 0,
+emulating the centralized structure of the old implementation):
 
-In centralized approaches, the entire machine’s load and communication
-structure are accumulated to a single point, typically processor 0,
-followed by a decision making process to determine the new distribution
-of Charm++ objects. Centralized load balancing requires synchronization
-which may incur an overhead and delay. However, due to the fact that the
-decision process has a high degree of the knowledge about the entire
-platform, it tends to be more accurate.
+- **Greedy**: Uses a greedy algorithm that iterates over the objects
+  and assigns the heaviest remaining object to the least loaded
+  processor. (Old: ``+balancer GreedyLB``)
 
-In distributed approaches, load data is only exchanged among neighboring
-processors. There is no global synchronization. However, they will not,
-in general, provide an immediate restoration for load balance - the
-process is iterated until the load balance can be achieved.
+- **GreedyRefine**: Uses a greedy algorithm that assigns the heaviest
+  remaining object to the least loaded processor when it is currently
+  assigned to a heavily loaded processor, otherwise leaves the object
+  on its current processor to limit migrations. It takes an optional
+  argument ``tolerance`` via the configuration file, which specifies
+  the tolerance it should allow above the maximum load Greedy would
+  produce (e.g. ``1.1`` allows the maximum load to be 10% higher than
+  Greedy's max load). (Old: ``+balancer GreedyRefineLB``)
 
-In hierarchical approaches, processors are divided into independent
-autonomous sets of processor groups and these groups are organized in
-hierarchies, thereby decentralizing the load balancing task. Different
-strategies can be used to balance the load on processors inside each
-processor group, and processors across groups in a hierarchical fashion.
+- **RefineA, RefineB**: Moves objects away from the most overloaded
+  processors to reach average, limits the number of objects
+  migrated. RefineA allows a heavy object to go to any of the lightly
+  loaded PEs, while RefineB always moves the heaviest remaining object
+  to the lightest loaded PE. (Old: ``+balancer RefineLB`` runs RefineA)
 
-Listed below are some of the available non-trivial centralized load
-balancers and their brief descriptions:
+Listed below are load balancers intended for diagnostic purposes:
 
--  **GreedyLB**: Uses a greedy algorithm that always assigns the
-   heaviest object to the least loaded processor.
+- **Dummy**: Does nothing, does not move objects at all. (Old:
+  ``+balancer DummyLB``)
 
--  **GreedyRefineLB**: Uses a greedy algorithm that assigns the heaviest
-   object to the least loaded processor when the benefit outweighs the
-   migration cost, otherwise leaves the object on its current processor.
-   It takes an optional command-line argument *+LBPercentMoves*,which
-   specifies the percentage of migrations that can be tolerated.
+- **Random**: Randomly assigns objects to processors. (Old:
+  ``+balancer RandCentLB``)
 
--  **TopoCentLB**: Extends the greedy algorithm to take processor
-   topology into account.
+- **Rotate**: Moves objects to the next available PE every time it is
+  called. It is useful for debugging PUP routines and other migration
+  related bugs. (Old: ``+balancer RotateLB``)
 
--  **RefineLB**: Moves objects away from the most overloaded processors
-   to reach average, limits the number of objects migrated.
+The following centralized communication-aware load balancers do not
+yet use TreeLB, but continue to be available using the old CentralLB
+infrastructure:
 
--  **RefineSwapLB**: Moves objects away from the most overloaded
-   processors to reach average. In case it cannot migrate an object from
-   an overloaded processor to an underloaded processor, it swaps objects
-   to reduce the load on the overloaded processor. This strategy limits
-   the number of objects migrated.
+- **RecBipartLB**: Uses recursive bipartitioning to partition the
+  object communication graph. (``+balancer RecBipartLB``)
 
--  **RefineTopoLB**: Same idea as in RefineLB, but takes processor
-   topology into account.
+- **MetisLB**: Uses `METIS
+  <http://glaros.dtc.umn.edu/gkhome/metis/metis/overview>`__ to
+  partition the object communication graph. METIS is distributed with
+  Charm++, so there is no need to separately get this
+  dependence. (``+balancer MetisLB``)
 
--  **BlockLB**: This strategy does a blocked distribution of objects to
-   processors.
+- **ScotchLB**: Uses the `SCOTCH
+  <http://www.labri.fr/perso/pelegrin/scotch/>`__ library for
+  partitioning the object communication graph, while also taking
+  object load imbalance into account. SCOTCH is not distributed with
+  Charm++, so end users must download and build the library from the
+  above link in order to use this load balancer. Because of this
+  dependence, ScotchLB is not built by default; it can be built by
+  running ``make ScotchLB`` in the Charm++ build folder
+  (e.g. ``netlrts-linux-x86_64-smp/``). If SCOTCH is installed in a
+  non-standard location, use the *-incdir* and *-libdir* build time
+  options to point to the include and library directories used,
+  respectively. (``+balancer ScotchLB``)
 
--  **ComboCentLB**: A special load balancer that can be used to combine
-   any number of centralized load balancers mentioned above.
-
-Listed below are some of the communication-aware load balancers:
-
--  **MetisLB**: Uses `METIS <http://glaros.dtc.umn.edu/gkhome/metis/metis/overview>`__
-   to partition the object communication graph.
-
--  **ScotchLB**: Uses the `SCOTCH <http://www.labri.fr/perso/pelegrin/scotch/>`__
-   library for partitioning the object
-   communication graph, while also taking object load imbalance into
-   account.
-
--  **GreedyCommLB**: Extends the greedy algorithm to take the
-   communication graph into account.
-
--  **RefineCommLB**: Same idea as in RefineLB, but takes communication
-   into account.
+In distributed approaches, the strategy executes across multiple PEs,
+providing scalable computational and communication performance.
 
 Listed below are the distributed load balancers:
 
--  **NeighborLB**: A neighborhood load balancer in which each processor
-   tries to average out its load only among its neighbors.
+- **DistributedLB**: A load balancer which uses partial information
+  about underloaded and overloaded processors in the system to do
+  probabilistic transfer of load. This is a refinement based
+  strategy. (``+balancer DistributedLB``)
 
--  **WSLB**: A load balancer for workstation clusters, which can detect
-   load changes on desktops (and other timeshared processors) and adjust
-   load without interfering with other’s use of the desktop.
+Custom strategies should be built using TreeLB or DistBaseLB (the base
+class for DistributedLB). Custom strategies that are based on
+CentralLB or HybridBaseLB will continue to be supported for now, but
+support for these will likely be dropped in a future release.
 
--  **DistributedLB**: A load balancer which uses partial information
-   about underloaded and overloaded processors in the system to do
-   probabilistic transfer of load. This is a refinement based strategy.
-
-An example of a hierarchical strategy can be found in:
-
--  **HybridLB**: This calls GreedyLB at the lower level and RefineLB at
-   the root.
-
-Listed below are load balancers for debugging purposes:
-
--  **RandCentLB**: Randomly assigns objects to processors;
-
--  **RotateLB**: This strategy moves objects to the next available PE
-   every time it is called. It is useful for debugging PUP routines and
-   other migration related bugs.
+All built-in load balancers that do not require external dependencies
+(that is, all of the above load balancers except for ScotchLB) are
+built by default. To use load balancing, users must link a load
+balancing module with their application and pass the appropriate
+runtime flags. See :numref:`lbOption` for details on how to
+use load balancing.
 
 Users can choose any load balancing strategy they think is appropriate
-for their application. We recommend using GreedyRefineLB with
+for their application. We recommend using TreeLB with GreedyRefine for
 applications in general. For applications where the cost of migrating
 objects is very high, say, due to frequent load balancing to handle
-frequent load changes or due to size of data in the object being large,
-a strategy which favors migration minimization at the cost of balance
-(eg: RefineLB) is more suitable. DistributedLB and HybridLB are suitable
-for large number of nodes. Communication-aware load balancers like
-MetisLB and ScotchLB are suitable for communication intensive
-applications. RotateLB and RandCentLB are more useful for debugging
-object migrations. The compiler and runtime options are described in
+frequent load changes or due to size of data in the object being
+large, a strategy which favors migration minimization at the cost of
+balance (eg: RefineLB) is more suitable. DistributedLB is suitable for
+a large number of nodes. Communication-aware load balancers like
+MetisLB and RecBipartLB are suitable for communication intensive
+applications. The compiler and runtime options are described in
 section :numref:`lbOption`.
 
-**TreeLB and its Configuration**
+.. _treeLb:
+
+TreeLB and its Configuration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 TreeLB allows for user-configurable hierarchical load balancing. While
 the legacy centralized strategies above are still supported, TreeLB
 allows load balancing to be performed at different levels and
 frequencies in a modular way. TreeLB includes several kinds of trees:
-the 2-level tree consists of PE and root levels (essentially the same as
-centralized load balancing), the 3-level tree consists of PE,
-process, and root levels, and the 4-level tree consists of
-PE, process, process group, and root levels (process groups are
+the 2-level tree consists of PE and root levels (essentially the same
+as centralized load balancing), the 3-level tree consists of PE,
+process, and root levels, and the 4-level tree consists of PE,
+process, process group, and root levels (process groups are
 collections of consecutive processes; the number of groups is
-configurable, see below). Each level only balances
-load within its corresponding domain; for example, for the 3-level
-PE-Process-Root tree during process steps, each process runs the
-specified LB strategy over only the PEs and objects contained within
-the process, while, at root steps, the root strategy is run over all
-PEs and objects in the job. The load balancing strategy to be used at
-each level and frequency at which to invoke LB at each level can be
-specified using a JSON configuration file with name ``treelb.json`` or
-by specifying the JSON file name using command line option
-``+TreeLBFile``. We provide examples of some configuration files below:
+configurable, see below). Each level only balances load within its
+corresponding domain; for example, for the 3-level PE-Process-Root
+tree: during process steps, each process runs the specified LB
+strategy over only the PEs and objects contained within the process,
+while, at root steps, the root strategy is run over all PEs and
+objects in the job. Supposing the root step frequency is 3, the root
+strategy is GreedyRefine, and the process strategy is Greedy, LB would
+proceed as follows:
+
+=======    ===================================================
+LB Step    LB Action
+=======    ===================================================
+0          Each process runs Greedy over its own PEs
+1          Each process runs Greedy over its own PEs
+2          Root PE runs GreedyRefine over all PEs
+3          Each process runs Greedy over its own PEs
+...        ...
+=======    ===================================================
+
+The load balancing strategy to be used at each level and frequency at
+which to invoke LB at each level can be specified using a JSON
+configuration file with name ``treelb.json`` or by specifying the JSON
+file name using command line option ``+TreeLBFile``. We provide
+examples of some configuration files below:
 
 Creating a 2-level tree that first uses the Greedy strategy and then
 the GreedyRefine strategy at the root:
@@ -2757,15 +2788,18 @@ steps:
     }
   }
 
-Creating a 4-level tree that uses the GreedyRefine strategy at the process
-and process group levels. The number of user-specified process groups is four in
-this example. A strategy is not allowed at root level for a 4-level tree since
-communicating all object load information to the root can be expensive given
-the size of the PE tree. Load is balanced at the process group level
-every five steps and at the root level every ten steps. Note also that
-the process group usage of GreedyRefine provides a custom parameter to
-the strategy. This parameter will only be used for the process group
-level version of GreedyRefine, not the process level version.
+Creating a 4-level tree that uses the GreedyRefine strategy at the
+process and process group levels. The number of user-specified process
+groups is four in this example. A strategy is not allowed at root
+level for a 4-level tree since communicating all object load
+information to the root can be expensive given the size of the PE
+tree. Instead, a scheme where coarsened representations of the
+subtrees exchange load tokens is used at the root level. Load is
+balanced at the process group level every five steps and at the root
+level every ten steps. Note also that the process group usage of
+GreedyRefine provides a custom parameter to the strategy. This
+parameter will only be used for the process group level version of
+GreedyRefine, not the process level version.
 
 .. code-block:: json
 
@@ -2850,8 +2884,10 @@ following tree level configuration parameters:
 
   - ``GreedyRefine``:
 
-    - ``tolerance``: Float specifying the tolerance GreedyRefine should
-      allow above the maximum load of Greedy.
+    - ``tolerance``: Float specifying the tolerance GreedyRefine
+      should allow above the maximum load of Greedy, e.g. ``1.1``
+      allows the maximum load to be 10% higher than Greedy's max load.
+      (default = ``1``)
 
 **Metabalancer to automatically schedule load balancing**
 
@@ -2871,13 +2907,13 @@ to collect load statistics.
 Metabalancer feature to automatically decide which load balancing
 strategy to invoke. A model trained on a generic representative load
 imbalance benchmark can be found in ``charm/src/ck-ldb/rf_model``.
-Metabalancer makes a decision on which load balancing strategy to invoke
-out of a subset of strategies, namely GreedyLB, RefineLB, HybridLB,
-DistributedLB, MetisLB and ScotchLB. For using the model based
-prediction in Metabalancer, Charm++ needs to be built with all the above
-load balancing strategies, including ScotchLB that relies on the
-external partitioning library SCOTCH specified in the
-Section :numref:`lbOption`.
+Metabalancer makes a decision on which load balancing strategy to
+invoke out of a subset of strategies, namely GreedyLB, RefineLB,
+HybridLB, DistributedLB, MetisLB and ScotchLB. For using the model
+based prediction in Metabalancer, Charm++ needs to be built with all
+the above load balancing strategies, including ScotchLB, which relies
+on the external graph partitioning library SCOTCH specified in Section
+:numref:`lbStrategy`.
 
 .. _lbarray:
 
@@ -2894,96 +2930,94 @@ elements migratable (see migration section above) and choose a load
 balancing strategy (see the section :numref:`lbStrategy` for a
 description of available load balancing strategies).
 
-There are three different ways to use load balancing for chare arrays to
-meet different needs of the applications. These methods are different in
-how and when a load balancing phase starts. The three methods are:
-**periodic load balancing mode**, **at sync mode** and **manual mode**.
+There are two different ways to use load balancing for chare arrays to
+meet different needs of the applications. These methods are different
+in how and when a load balancing phase starts. The two methods are:
+**AtSync mode** and **periodic load balancing mode**.  In *AtSync
+mode*, the application invokes the load balancer explicitly at an
+appropriate location (generally at a pre-existing synchronization
+boundary) to trigger load balancing by inserting a function call
+(``AtSync()``) in the application source code.  In *periodic load
+balancing mode*, a user specifies only how often load balancing is to
+occur, using the *+LBPeriod* runtime option to specify the time
+interval.
 
-In *periodic load balancing mode*, a user specifies only how often load
-balancing is to occur, using +LBPeriod runtime option to specify the
-time interval.
+The detailed APIs of these two methods are described as follows:
 
-In *at sync mode*, the application invokes the load balancer explicitly
-at appropriate (generally at a pre-existing synchronization boundary) to
-trigger load balancing by inserting a function call (AtSync) in the
-application source code.
+#. **AtSync mode**: Using this method, load balancing is triggered
+   only at certain points in the execution, when the application
+   invokes ``AtSync()``, which is essentially a non-blocking
+   barrier. In order to use AtSync mode, one should set the variable
+   ``usesAtSync`` to true in the constructors of chare array elements
+   that are participating in the AtSync barrier. When an element is
+   ready to start load balancing, it calls ``AtSync()`` [6]_. When all
+   local elements that have set ``usesAtSync`` to true call
+   ``AtSync()``, the load balancer is triggered. (Note that when the
+   load balancer is triggered, it is triggered for all array elements,
+   even those without ``usesAtSync`` set to true. If they are
+   migratable, then they should have PUP routines suitable for anytime
+   migration.) Once all local migrations (both in and out) are
+   completed, the load balancer calls the virtual function
+   ``ResumeFromSync()`` on each of the local array elements
+   participating in the AtSync barrier. This function is usually
+   overridden by the application to trigger the resumption of
+   execution.
 
-In the prior two load balancing modes, users do not need to worry about
-how to start load balancing. However, in one scenario, those automatic
-load balancers will fail to work - when array elements are created by
-dynamic insertion. This is because the above two load balancing modes
-require an application to have fixed the number of objects at the time
-of load balancing. The array manager needs to maintain a head count of
-local array elements for the local barrier. In this case, the
-application must use the *manual mode* to trigger load balancer.
-
-The detailed APIs of these three methods are described as follows:
-
-#. **Periodical load balancing mode**: In the default setting, load
-   balancing happens whenever the array elements are ready, with an
-   interval of 1 second. It is desirable for the application to set a
-   larger interval using +LBPeriod runtime option. For example
-   “+LBPeriod 5.0” can be used to start load balancing roughly every 5
-   seconds. By default, array elements may be asked to migrate at any
-   time, provided that they are not in the middle of executing an entry
-   method. The array element’s variable usesAtSync being false
-   attributes to this default behavior.
-
-#. **At sync mode**: Using this method, elements can be migrated only at
-   certain points in the execution when the application invokes
-   AtSync(). In order to use the at sync mode, one should set usesAtSync
-   to true in the array element constructor. When an element is ready to
-   migrate, call AtSync()  [6]_. When all local elements call AtSync,
-   the load balancer is triggered. Once all migrations are completed,
-   the load balancer calls the virtual function
-   ArrayElement::ResumeFromSync() on each of the array elements. This
-   function can be redefined in the application.
-
-   Note that the minimum time for AtSync() load balancing to occur is
-   controlled by the LBPeriod. Unusually high frequency load balancing
-   (more frequent than 500ms) will perform better if this value is set
-   via +LBPeriod or SetLBPeriod() to a number shorter than your load
-   balancing interval.
-
-   Note that *AtSync()* is not a blocking call, it just gives a hint to
-   load balancing that it is time for load balancing. During the time
-   between *AtSync* and *ResumeFromSync*, the object may be migrated.
-   One can choose to let objects continue working with incoming
-   messages, however keep in mind the object may suddenly show up in
-   another processor and make sure no operations that could possibly
-   prevent migration be performed. This is the automatic way of doing
-   load balancing where the application does not need to define
-   ResumeFromSync().
+   Note that ``AtSync()`` is not a blocking call. The object may be
+   migrated during the time between ``AtSync()`` and
+   ``ResumeFromSync()``. One can choose to let objects continue
+   working with incoming messages; however, keep in mind the object
+   may suddenly show up in another processor, so make sure no
+   operations that could possibly prevent migration be performed. This
+   is the automatic way of doing load balancing where the application
+   does not need to define ``ResumeFromSync()``.
 
    The more commonly used approach is to force the object to be idle
-   until load balancing finishes. The user places an AtSync call at the
-   end of some iteration and when all elements reach that call load
-   balancing is triggered. The objects can start executing again when
-   ResumeFromSync() is called. In this case, the user redefines
-   ResumeFromSync() to trigger the next iteration of the application.
-   This manual way of using the at sync mode results in a barrier at
-   load balancing (see example here :numref:`lbexample`).
+   until load balancing finishes. The user calls ``AtSync()`` at the
+   end of some iteration, then, when all participating elements reach
+   that call, load balancing is triggered. The objects can start
+   executing again when ``ResumeFromSync()`` is called. In this case,
+   the user redefines ``ResumeFromSync()`` to trigger the next
+   iteration of the application. This pattern effectively results in a
+   barrier at load balancing time (see example here
+   :numref:`lbexample`).
 
-#. **Manual mode**: The load balancer can be programmed to be started
-   manually. To switch to the manual mode, the application calls
-   *TurnManualLBOn()* on every processor to prevent the load balancer
-   from starting automatically. *TurnManualLBOn()* should be called as
-   early as possible in the program. It could be called at the
-   initialization part of the program, for example from a global
-   variable constructor, or in an initproc call
-   (Section :numref:`initproc`). It can also be called in the
-   constructor of a static array or before the *doneInserting* call for
-   a dynamic array. It can be called multiple times on one processor,
-   but only the last one takes effect.
+   .. note:: In AtSync mode, Applications that use dynamic insertion or
+	     deletion of array elements must not be doing so when any element
+	     calls ``AtSync()``. This is because AtSync mode requires an
+	     application to have a fixed, known number of objects when
+	     determining if ``AtSync()`` has been called by all relevant objects
+	     in order to prevent race conditions (the implementation is designed
+	     to be robust against these issues and will often be able to handle
+	     them, but we make no guarantees if these rules are not obeyed). If
+	     using dynamic insertion, please ensure that insertions and calls to
+	     ``AtSync()`` cannot be interleaved and that ``doneInserting()`` is
+	     called after insertions are complete and before any element calls
+	     ``AtSync()``. Insertions and/or deletions may begin again after
+	     load balancing is complete (i.e. ``ResumeFromSync()`` is called for
+	     an object on the given PE for insertions or for the object in
+	     question for deletions).
 
-   The function call *CkStartLB()* starts load balancing immediately.
-   This call should be made at only one place on only one processor.
-   This function is not blocking, the object will continue to process
-   messages and the load balancing, when triggered, happens in the
-   background.
+#. **Periodic load balancing mode**: This mode uses a timer to perform
+   load balancing periodically at a user-specified interval. In order
+   to use this mode, the user must provide the *+LBPeriod {period}*
+   runtime option, the *{period}* argument specifying the minimum time
+   between consecutive LB invocations in seconds. For example,
+   *+LBPeriod 10.5* can be used to invoke load balancing roughly every
+   10.5 seconds. Additionally, no array element can have
+   ``usesAtSync`` set to true. In this mode, array elements may be
+   asked to migrate at any time, provided that they are not in the
+   middle of executing an entry method. Thus, the PUP routines for
+   array elements must migrate all data needed to reconstruct the
+   object at any point in its lifecycle (as opposed to AtSync mode,
+   where PUP routines for load balancing migration are only called
+   after AtSync() and before ResumeFromSync(), so they can make some
+   assumptions about state).
 
-   *TurnManualLBOff()* turns off manual load balancing and switches back
-   to the automatic load balancing mode.
+   .. note:: Dynamic insertion works with periodic load balancing with
+	     no issues. However, dynamic deletion does not, since
+	     deletion may occur while the load balancing strategy is
+	     running.
 
 .. _lbmigobj:
 
@@ -3048,12 +3082,11 @@ to configure the load balancer, etc. These functions are:
    to tell the load balancer whether this object is migratable or
    not [7]_.
 
--  **LBSetPeriod(double s)**: this function can be called anywhere (even
-   in Charm++ initnodes or initprocs) to specify the load balancing
-   period time in seconds. It tells load balancer not to start next load
-   balancing in less than :math:`s` seconds. This can be used to prevent
-   load balancing from occurring too often in *automatic without sync
-   mode*. Here is how to use it:
+- **LBSetPeriod(double s)**: this function can be called anywhere
+   (even in Charm++ initnodes or initprocs) to change the load
+   balancing period time when using *periodic load balancing mode*. It
+   tells the load balancer not to start next load balancing in less
+   than :math:`s` seconds. Here is how to use it:
 
    .. code-block:: c++
 
@@ -3064,99 +3097,68 @@ to configure the load balancer, etc. These functions are:
       // if used outside of an array element
       LBSetPeriod(5.0);
 
-   Alternatively, one can specify +LBPeriod {seconds} at command line.
-
 .. _lbOption:
 
-Compiler and runtime options to use load balancing module
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Compiler and runtime options to use load balancing
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Load balancing strategies are implemented as libraries in Charm++. This
 allows programmers to easily experiment with different existing
 strategies by simply linking a pool of strategy modules and choosing one
 to use at runtime via a command line option.
 
-**Note:** linking a load balancing module is different from activating
+**Note:** linking a load balancing module is distinct from activating
 it:
 
--  link an LB module: is to link a Load Balancer module(library) at
-   compile time. You can link against multiple LB libraries as
-   candidates.
+  - link an LB module: to link an load balancing module (library) at
+    compile time. You can link against multiple LB libraries.
 
--  activate an LB: is to actually ask the runtime to create an LB
-   strategy and start it. You can only activate load balancers that have
-   been linked at compile time.
+  - activate an LB: to actually ask the runtime to create an LB
+    strategy and use it for a given run. You can only activate load
+    balancers that have been already been linked in at compile
+    time. The special ``-balancer {balancer name}`` link time argument
+    both links a module and activates it at runtime by default.
 
 Below are the descriptions about the compiler and runtime options:
 
-#. **compile time options:**
+#. **Compile time options:** (to ``charmc``)
 
-   -  | *-module NeighborLB -module GreedyCommLB ...*
-      | links the modules NeighborLB, GreedyCommLB etc into an
-        application, but these load balancers will remain inactive at
-        execution time unless overridden by other runtime options.
+   - | *-module TreeLB -module RecBipartLB ...*
+     | links the listed LB modules into an application, which can then
+       be used at runtime via the ``+balancer`` option.
 
-   -  | *-module CommonLBs*
-      | links a special module CommonLBs which includes some commonly
-        used Charm++ built-in load balancers. The commonly used load
-        balancers include: *DummyLB, GreedyLB, GreedyRefineLB, CommLB, RandCentLB, RefineLB, RefineCommLB, RotateLB, DistributedLB, HybridLB, ComboCentLB, RefineSwapLB, NeighborLB, OrbLB, BlockLB, GreedyCommLB*
+   - | *-module CommonLBs*
+     | links a special module CommonLBs which includes some commonly
+       used Charm++ built-in load balancers. This set includes the
+       following commonly used load balancers: *TreeLB (usable with
+       Greedy, GreedyRefine, RefineA, RefineB, Dummy, Random, and
+       Rotate) and DistributedLB*.
 
-   -  | *-balancer GreedyCommLB*
-      | links the load balancer GreedyCommLB and invokes it at runtime.
+   - | *-module EveryLB*
+     | links a special module EveryLB which includes all Charm++ load
+       balancers built by default. This set includes everything
+       specified in CommonLBs plus *MetisLB and RecBipartLB*.
 
-   -  | *-balancer GreedyCommLB -balancer RefineLB*
-      | invokes GreedyCommLB at the first load balancing step and
-        RefineLB in all subsequent load balancing steps.
+   - | *-balancer MetisLB*
+     | links the given load balancer *and activates* it for use at
+       runtime. This is equivalent to using *-module MetisLB* at
+       compile time and then *+balancer MetisLB* at runtime.
 
-   -  | *-balancer ComboCentLB:GreedyLB,RefineLB*
-      | You can create a new combination load balancer made of multiple
-        load balancers. In the above example, GreedyLB and RefineLB
-        strategies are applied one after the other in each load
-        balancing step.
+   - | *-balancer GreedyLB -balancer RefineLB*
+     | links both listed balancers, then invokes GreedyLB at the first
+       load balancing step and RefineLB in all subsequent load
+       balancing steps.
 
    The list of existing load balancers is given in Section
-   :numref:`lbStrategy`. Note: you can have multiple -module \*LB
+   :numref:`lbStrategy`. Note: you can have multiple *-module \*LB*
    options. LB modules are linked into a program, but they are not
-   activated automatically at runtime. Using -balancer A at compile time
+   activated automatically at runtime. Using *-balancer A* at compile time
    will activate load balancer A automatically at runtime. Having
-   -balancer A implies -module A, so you don’t have to write -module A
+   *-balancer A* implies *-module A*, so you don’t have to write *-module A*
    again, although that is not invalid. Using CommonLBs is a convenient
    way to link against the commonly used existing load balancers.
 
-   The SCOTCH-based load balancer(s) use an external partitioning
-   library requiring 3rd party software:
-
-   SCOTCH can be downloaded from:
-   http://www.labri.fr/perso/pelegrin/scotch/
-
-   Use the *-incdir and -libdir* build time option to add your
-   installation of any third party libraries you wish to use to the
-   Charm++ search paths.
-
-#. **Write and use your own load balancer**
-
-   Refer Section :numref:`lbWriteNewLB` for writing a new load
-   balancer. Compile it in the form of library and name it
-   *libmoduleFooLB.a* where *FooLB* is the new load balancer. Add the
-   path to the library and link the load balancer into an application
-   using *-module FooLB*.
-
-   You can create a library in the following way. This will create
-   *libmoduleFooLB.a*.
-
-   .. code-block:: bash
-
-      $ bin/charmc -o libmoduleFooLB.a FooLB.C
-
-   To include this balancer in your application, the Makefile can be
-   changed in the following way
-
-   .. code-block:: makefile
-
-      $(TARGET): $(OBJECTS)
-        $(CHARMC) -o $(TARGET) -L/path-to-the-lib $(OBJS) -module FooLB
-
-#. **runtime options:**
+#. **Runtime options:**
 
    Runtime balancer selection options are similar to the compile time
    options as described above, but they can be used to override those
@@ -3165,51 +3167,41 @@ Below are the descriptions about the compiler and runtime options:
    -  | *+balancer help*
       | displays all available balancers that have been linked in.
 
-   -  | *+balancer GreedyCommLB*
-      | invokes GreedyCommLB
+   -  | *+balancer DistributedLB*
+      | invokes DistributedLB
 
-   -  | *+balancer GreedyCommLB +balancer RefineLB*
-      | invokes GreedyCommLB at the first load balancing step and
+   -  | *+balancer GreedyLB +balancer RefineLB*
+      | invokes GreedyLB at the first load balancing step and
         RefineLB in all subsequent load balancing steps.
 
-   -  | *+balancer ComboCentLB:GreedyLB,RefineLB*
-      | same as the example in the -balancer compile time option.
-
-   Note: +balancer option works only if you have already linked the
-   corresponding load balancers module at compile time. Giving +balancer
-   with a wrong LB name will result in a runtime error. When you have
-   used -balancer A as compile time option, you do not need to use
-   +balancer A again to activate it at runtime. However, you can use
-   +balancer B to override the compile time option and choose to
-   activate B instead of A.
-
-#. **Handling the case that no load balancer is activated by users**
-
-   When no balancer is linked by users, but the program counts on a load
-   balancer because it used *AtSync()* and expect *ResumeFromSync()* to
-   be called to continue, a special load balancer called *NullLB* will
-   be automatically created to run the program. This default load
-   balancer calls *ResumeFromSync()* after *AtSync()*. It keeps a
-   program from hanging after calling *AtSync()*. *NullLB* will be
-   suppressed if another load balancer is created.
+   Note: The *+balancer* option works only if you have already linked
+   the corresponding load balancer module at compile time. Providing
+   *+balancer* with an invalid LB name will result in a runtime
+   error. When you have used *-balancer A* rather than *-module A* as
+   a compile time option, you do not need to use *+balancer A* again
+   to activate it at runtime. However, you can use *+balancer B* to
+   override the compile time option and choose to activate B instead
+   of A (assuming that B was also linked into the application).
 
 #. **Other useful runtime options**
 
    There are a few other runtime options for load balancing that may be
    useful:
 
-   -  | *+LBDebug {verbose level}*
-      | {verbose level} can be any positive integer number. 0 is to turn
-        off the verbose. This option asks load balancer to output load
-        balancing information to stdout. The bigger the verbose level
-        is, the more verbose the output is.
-
    -  | *+LBPeriod {seconds}*
-      | {Seconds} can be any float number. This option sets the minimum
-        period time in seconds between two consecutive load balancing
-        steps. The default value is 1 second. That is to say that a load
-        balancing step will not happen until 1 second after the last
-        load balancing step.
+      | When not using AtSync mode (meaning no chare array element in
+        the application has ``usesAtSync`` set to true), this option
+	enables *periodic load balancing mode*. The argument {seconds}
+	specifies the interval for invoking load balancing in seconds;
+	it can be any floating point number. Note that this sets the
+	*minimum period* between two consecutive load balancing steps.
+
+   -  | *+LBDebug {verbose level}*
+      | {verbose level} can be any non-negative integer. 0 is
+        equivalent to not passing this flag at all. When active, the
+	load balancer will output load balancing information to stdout
+	when it runs. The bigger {verbose level} is, the more verbose
+	the output (the number of levels varies by load balancer).
 
    -  | *+LBSameCpus*
       | This option simply tells load balancer that all processors are
@@ -5863,9 +5855,25 @@ is ``unsigned short``, limiting each PE to 65,535 outstanding futures.
 To increase this limit, build Charm++ with a larger *CMK_REFNUM_TYPE*, e.g. specifying
 ``--with-refnum-type=uint`` to use ``unsigned int`` when building Charm++.
 
+There are additional facilities for operating on collections of futures, which include:
 
-The Converse version of future functions can be found in the :ref:`conv-futures`
-section.
++-------------------+-----------+---------------------------------------------------+
+| Function          | Blocking? | Description                                       |
++===================+===========+===================================================+
+| ``ck::wait_any``  | Yes       | Take a value, as soon as one is available, and    |
+|                   |           | return a pair with the value and position of the  |
+|                   |           | fulfilled future. (``std::pair<T, InputIter>``)   |
++-------------------+-----------+---------------------------------------------------+
+| ``ck::wait_all``  | Yes       | Wait for all the futures to become available, and |
+|                   |           | return a vector of values. (``std::vector<T>``)   |
++-------------------+-----------+---------------------------------------------------+
+| ``ck::wait_some`` | No        | Take any immediately available values, returning  |
+|                   |           | the values and any outstanding futures.           |
+|                   |           | (``std::pair<std::vector<T>, InputIter>``)        |
++-------------------+-----------+---------------------------------------------------+
+
+Note, these are also demonstrated in ``examples/charm++/future``. The Converse
+version of future functions can be found in the :ref:`conv-futures` section.
 
 .. _sec-completion:
 
@@ -6413,17 +6421,17 @@ element does not need to call *AtSync()* itself.
 Dynamic Insertion
 ^^^^^^^^^^^^^^^^^
 
-In addition to creating initial array elements using ckNew, you can also
-create array elements during the computation.
+In addition to creating initial array elements using ``ckNew(...)``,
+you can also create array elements during the computation.
 
 You insert elements into the array by indexing the proxy and calling
-insert. The insert call optionally takes parameters, which are passed to
-the constructor; and a processor number, where the element will be
-created. Array elements can be inserted in any order from any processor
-at any time. Array elements need not be contiguous.
+``insert(...)``. This call optionally takes parameters, which are
+passed to the constructor, and a processor number, where the element
+will be created. Array elements can be inserted in any order from any
+processor at any time. Array elements need not be contiguous.
 
 If using insert to create all the elements of the array, you must call
-CProxy_Array::doneInserting before using the array.
+``CProxy_Array::doneInserting()`` before using the array.
 
 .. code-block:: c++
 
@@ -6453,14 +6461,19 @@ CProxy_Array::doneInserting before using the array.
    }
    aF.doneInserting();
 
-The doneInserting call starts the reduction manager (see “Array
-Reductions”) and load balancer (see  :numref:`lbFramework`)- since
-these objects need to know about all the array’s elements, they must be
-started after the initial elements are inserted. You may call
-doneInserting multiple times, but only the first call actually does
-anything. You may even insert or destroy elements after a call to
-doneInserting, with different semantics- see the reduction manager and
-load balancer sections for details.
+The ``doneInserting()`` call starts the reduction manager (see “Array
+Reductions”) and load balancer (see :numref:`lbFramework`). Since
+these objects need to know about all the array’s elements, they must
+be started after the initial elements are inserted. You may call
+``doneInserting()`` multiple times, but only the first call actually
+does anything. You may even insert or destroy elements after a call to
+``doneInserting()``, with different semantics - see the reduction
+manager. For AtSync load balancing, subsequent dynamic insertion or
+deletion sessions should begin with a call to
+``CProxy_Array::startInserting()`` and end with a call to
+``doneInserting()``. ``startInserting()`` is also idempotent and can
+be called multiple times with only the first having any effect until
+``doneInserting()`` is called on the same array proxy on the same PE.
 
 If you do not specify one, the system will choose a processor to create
 an array element on based on the current map object.
@@ -8280,15 +8293,32 @@ timestep. To save resources, the PUP routine can well omit the 8
 intermediate matrices and checkpoint the matrix with the final results
 of each timestep.
 
-Group, nodegroup (Section :numref:`sec:group`) and singleton chare
+Group, nodegroup (Section :numref:`sec:group`), and singleton chare
 objects are normally not meant to be migrated. In order to checkpoint
 them, however, the user has to write PUP routines for the groups and
 chare and declare them as ``[migratable]`` in the .ci file. Some
 programs use *mainchares* to hold key control data like global object
-counts, and thus mainchares need to be checkpointed too. To do this, the
-programmer should write a PUP routine for the mainchare and declare them
-as ``[migratable]`` in the .ci file, just as in the case of Group and
-NodeGroup.
+counts, and thus mainchares need to be checkpointed too. To do this,
+the programmer should write a PUP routine for the mainchares and
+declare them as ``[migratable]`` in the .ci file, just as in the case
+of group and nodegroup.
+
+Variables marked as readonly are automatically checkpointed and
+restored by the runtime system, so user PUP routines do not need to
+explicitly handle them.
+
+Checkpointing variables of type ``CProxy_*`` is completely valid.
+After the restart callback is invoked, the original chare structures
+will have been reconstructed and all proxy variables will be valid
+references to the restarted versions of whatever they originally
+referred to. The only caveat to this is when the application is
+restarted on a different number of processors than it was checkpointed
+on, in which case non-location invariant chares have special behavior:
+singleton chares are not created or restored at all and
+group/nodegroup chares are created per PE/node, but each
+group/nodegroup element is restored from the checkpoint corresponding
+to the element originally on PE/node 0. This does not effect
+mainchares, which are always restarted on PE 0.
 
 The checkpoint must be recorded at a synchronization point in the
 application, to ensure a consistent state upon restart. One easy way to
@@ -8323,6 +8353,17 @@ restarting the old checkpoint on a different number of physical
 processors. This provides the flexibility to expand or shrink your
 application when the availability of computing resources changes.
 
+When restarting, the runtime system recreates the state of the
+application based on the recorded log files, first restoring readonly
+variables, then mainchares, then singleton chares (only when the
+number of PEs in the restart matches the original number of PEs), then
+groups, then nodegroups, then chare arrays. Dependencies in group
+creation are implicitly respected since groups are recreated in the
+same order as they were originally created in on every PE (the same
+holds for nodegroups). Finally, when the state has been restored, the
+callback specified when the checkpoint was created is executed,
+restarting the application.
+
 Note that on restart, if an array or group reduction client was set to a
 static function, the function pointer might be lost and the user needs
 to register it again. A better alternative is to always use an entry
@@ -8340,9 +8381,13 @@ previous one at checkpoint time, so running a load balancer (see
 Section :numref:`loadbalancing`) after restart is suggested.
 
 If restart is not done on the same number of processors, the
-processor-specific data in a group/nodegroup branch cannot (and usually
-should not) be restored individually. A copy from processor 0 will be
-propagated to all the processors.
+processor-specific data in a group/nodegroup branch cannot (and
+usually should not) be restored individually. A copy from processor 0
+will be propagated to all the processors. Additionally, singleton
+chares will not be restored at all in this case, so they must be
+specially handled when restarting on a different number of processors.
+One can, for example, explicitly test for a new number of PEs when
+unpacking and reconstruct singleton objects in that case.
 
 Choosing What to Save
 ^^^^^^^^^^^^^^^^^^^^^
@@ -9151,8 +9196,71 @@ Inter-node messages will be transferred using the naive host-staged mechanism
 where the data is first transferred to the host from the source GPU, sent over
 the network, then transferred to the destination GPU.
 
+An optimized mechanism for inter-process communication using CUDA IPC, POSIX shared memory,
+and pre-allocated GPU communication buffers are available through runtime flags.
+This significantly reduces the overhead from creation and opening of CUDA IPC handles,
+especially for relatively small messages. ``+gpushm`` will turn on this optimization
+feature, ``+gpucommbuffer [size]`` specifies the size of the communication buffer
+allocated on each GPU (default is 64MB), and ``+gpuipceventpool`` determines the number of
+CUDA IPC events per PE that is used for this feature (default is 16).
+
 Examples using the direct GPU messaging feature can be found in
 ``examples/charm++/cuda/gpudirect``.
+
+Intra-node Persistent GPU Communication
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Persistent GPU communication is a feature designed to take advantage of the fact
+that the address and size of the source/destination buffers do not change in
+persistent communication. Such patterns are found in many applications, including
+iterative applications that exchange the same set of buffers between neighbors/peers
+at every iteration. This allows us to reduce the overheads involved with
+with direct GPU messaging, including the nature of the multi-hop mechanism and
+CUDA IPC setup, and directly issue ``cudaMemcpy`` calls at the message send sites
+(for a ``put`` type operation; a ``get`` type operation is also supported).
+In inter-process communication, CUDA IPC handles are created, exchanged
+and opened only once (this setup step can be performed again if the buffer addresses
+or sizes involved in the persistent communication change). Note that this feature
+is currently supported only for intra-node communication.
+
+Setup and communication routines are supported through ``CkDevicePersistent``:
+
+.. code-block:: c++
+
+   struct CkDevicePersistent {
+     // Constructors
+     CkDevicePersistent(const void* ptr, size_t size);
+     CkDevicePersistent(const void* ptr, size_t size, const CkCallback& cb);
+     CkDevicePersistent(const void* ptr, size_t size, cudaStream_t stream);
+     CkDevicePersistent(const void* ptr, size_t size, const CkCallback& cb, cudaStream_t stream);
+
+     void open(); // Creates an IPC handle for inter-process communication
+     void closes(); // Closes an opened IPC handle
+     void set_msg(void* msg); // Ties a Charm++ message to the stored callback
+     void get(CkDevicePersistent& src); // Initiates transfer from the specified source buffer
+     void put(CkDevicePersistent& dst); // Initiates transfer to the specified destination buffer
+   };
+
+``CkDevicePersistent`` objects should be created on both the sender and receiver chares,
+with the respective source and destination buffer addresses and sizes. The optional
+Charm++ callback object will be invoked once the communication using that persistent
+buffer is complete. For instance, if both sender and receiver ``CkDevicePersistent``
+objects have callbacks associated with them, the sender's callback will be invoked
+once the send operation is complete and when the user can reuse/free the associated buffer,
+and the receiver's callback will be invoked once the received data is available.
+The associated CUDA stream will be used in the ``cudaMemcpyAsync`` calls to asynchronously
+invoke the underlying data transfers, which are tracked to invoke the subsequent callbacks, if any.
+The ``open`` and ``close`` calls are required for CUDA IPC setup and teardown.
+``open`` should be called after the creation of the ``CkDevicePersistent`` object and before
+sending it to a communication peer, and ``close`` should be called when the persistent
+object will no longer be used or before migration.
+
+Once the ``CkDevicePersistent`` objects are created and ``open`` ed, they should be
+exchanged between the communication peers. After this setup stage, the objects'
+``get`` and ``put`` methods can be invoked freely to perform the desired communication.
+
+Examples using the intra-node persistent GPU communication can be found in
+``examples/charm++/cuda/gpudirect/persitent`` and ``examples/charm++/cuda/gpudirect/jacobi3d``.
 
 .. _sec:mpiinterop:
 
@@ -9938,6 +10046,28 @@ referred.
 
    ProcArray and ObjGraph data structures to be used when writing a load
    balancing strategy
+
+Use your own load balancer
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Compile it in the form of a library and name it *libmoduleFooLB.a*
+where *FooLB* is the new load balancer. Add the path to the library
+and link the load balancer into an application using *-module FooLB*.
+
+You can create a library in the following way. This will create
+*libmoduleFooLB.a*.
+
+.. code-block:: bash
+
+   $ bin/charmc -o libmoduleFooLB.a FooLB.C
+
+To include this balancer in your application, the application's
+Makefile can be changed in the following way:
+
+.. code-block:: makefile
+
+   $(TARGET): $(OBJECTS)
+     $(CHARMC) -o $(TARGET) -L/path-to-the-lib $(OBJS) -module FooLB
 
 Incorporating this strategy into the Charm++ build framework is
 explained in the next section.
@@ -12507,6 +12637,10 @@ tracemode:
 -  ``+gz-trace``: generate gzip (if available) compressed log files.
 
 -  ``+no-gz-trace``: generate regular (uncompressed) log files.
+
+-  ``+notracenested``: a debug option. Does not resume tracing outer
+   entry methods when entry methods are nested (as can happen with
+   ``[local]`` and ``[inline]`` calls.
 
 -  ``+checknested``: a debug option. Checks if events are improperly
    nested while recorded and issue a warning immediately.

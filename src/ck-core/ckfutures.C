@@ -14,13 +14,17 @@ This "sequential futures abstraction" is a well-studied concept
 in remote process control.
 */
 /*@{*/
+#include <limits>
+#include <memory>
+#include <vector>
+#include <cstdlib>
+#include <algorithm>
+#include <unordered_map>
+
 #include "charm++.h"
 #include "ck.h"
 #include "ckarray.h"
 #include "ckfutures.h"
-#include <stdlib.h>
-#include <limits>
-#include <memory>
 
 CkGroupID _fbocID;
 
@@ -33,7 +37,7 @@ struct FuturePairMsg : public CMessage_FuturePairMsg {
 };
 
 struct FutureRequest {
-  virtual void fulfill(void* value) = 0;
+  virtual void fulfill(const CkFutureID& id, void* value) = 0;
 };
 
 class FutureToThread: public FutureRequest {
@@ -41,9 +45,41 @@ class FutureToThread: public FutureRequest {
  public:
   FutureToThread(CthThread th_) : th(th_) {}
 
-  virtual void fulfill(void* value) override {
+  virtual void fulfill(const CkFutureID&, void* value) override {
+    // If we have a valid thread to wake up, do so
     if (th) CthAwaken(th);
+    // Then invalidate ourself
     th = nullptr;
+  }
+};
+
+class MultiToThread: public FutureRequest {
+  CthThread th;
+  const std::vector<CkFutureID>& ids;
+  std::size_t nRecvd;
+ public:
+  std::vector<void*> values;
+
+  MultiToThread(CthThread th_, const std::vector<CkFutureID>& ids_) : ids(ids_), th(th_), nRecvd(0) {
+    values.resize(ids.size());
+
+    std::fill(values.begin(), values.end(), nullptr);
+  }
+
+  virtual void fulfill(const CkFutureID& id, void* value) override {
+    const auto search = std::find(ids.begin(), ids.end(), id);
+    const auto offset = search - ids.begin();
+
+    CkAssert(value != nullptr && search != ids.end());
+
+    if (th != nullptr && values[offset] == nullptr) {
+      values[offset] = value;
+
+      if (++nRecvd >= values.size()) {
+        CthAwaken(th);
+        th = nullptr;
+      }
+    }
   }
 };
 
@@ -53,9 +89,10 @@ class FutureToFuture: public FutureRequest {
  public:
   FutureToFuture(const CkFuture& fut_) : fut(fut_), fulfilled(false) {}
 
-  virtual void fulfill(void* value) override {
-    // fulfillment destroys the message/value (destructive send)
+  virtual void fulfill(const CkFutureID&, void* value) override {
+    // If we have not been fulfilled, forward the value
     if (!fulfilled) CkSendToFuture(fut, value);
+    // Then mark ourself as fulfilled
     fulfilled = true;
   }
 };
@@ -66,30 +103,38 @@ struct FutureState {
  private:
   std::unordered_map<CkFutureID, void*> values;
   std::unordered_map<CkFutureID, request_queue_t> waiting;
-  std::set<CkFutureID> freeList;
+  std::vector<CkFutureID> freeList;
 
   CkFutureID last;
  public:
   FutureState() : last(-1) {}
 
+  // takes a free id from the set of released IDs, when one
+  // is available, or increments the PE's local ID counter
+  // and uses the updated value
   CkFutureID next() {
     CkFutureID id;
     if (freeList.empty()) {
       id = ++last;
     } else {
       id = *freeList.begin();
-      freeList.erase(id);
+      freeList.erase(freeList.begin());
     }
-    CkAssert(id <= std::numeric_limits<CMK_REFNUM_TYPE>::max());
+    CkAssert(id <= std::numeric_limits<CMK_REFNUM_TYPE>::max() &&
+             "future count has exceeded CMK_REFNUM_TYPE, see manual.");
     return id;
   }
 
-  void* operator[](CkFutureID f) const {
+  // returns a future's value when it's available, otherwise
+  // returns nullptr
+  void* operator[](const CkFutureID& f) const {
     auto found = values.find(f);
     return (found != values.end()) ? found->second : nullptr;
   }
 
-  void request(CkFutureID f, request_t req) {
+  // enqueue a request for a given future id, creating a
+  // queue as necessary
+  void request(const CkFutureID& f, request_t req) {
     auto found = waiting.find(f);
     if (found != waiting.end()) {
       found->second.push_back(req);
@@ -98,30 +143,39 @@ struct FutureState {
     }
   }
 
+  // enuqueue a request to be fulfilled by multiple futures
   void request(const std::vector<CkFutureID>& fs, request_t req) {
-    for (auto f : fs) {
+    for (auto& f : fs) {
       request(f, req);
     }
   }
 
-  void fulfill(CkFutureID f, void* value) {
+  // stores a value for a given future id, and fulfills all
+  // outstanding requests for the value (then erases them)
+  // (this is usually called by the FutureBOC chare-group)
+  void fulfill(const CkFutureID& f, void* value) {
     values[f] = value;
     auto found = waiting.find(f);
     if (found != waiting.end()) {
-      for (auto th : found->second) {
-        th->fulfill(value);
+      for (auto& th : found->second) {
+        th->fulfill(f, value);
       }
       waiting.erase(found);
     }
   }
 
-  void release(CkFutureID f) {
+  // erase any listeners and values for a given future
+  // and adds it to the set of free future ids (that
+  // can be reused). note, does not free any memory
+  void release(const CkFutureID& f) {
     values.erase(f);
     waiting.erase(f);
-    freeList.insert(f);
+    CkAssert(std::find(freeList.begin(), freeList.end(), f) == freeList.end() &&
+            "repeated frees of the same future");
+    freeList.push_back(f);
   }
 
-  bool is_ready(CkFutureID f) {
+  bool is_ready(const CkFutureID& f) {
     return values.find(f) != values.end();
   }
 };
@@ -208,7 +262,7 @@ CpvStaticDeclare(CkSemaPool*, semapool);
 
 static 
 inline
-int createFuture(void)
+CkFutureID createFuture(void)
 {
   FutureState *fs = &(CpvAccess(futurestate));
   return fs->next();
@@ -255,8 +309,13 @@ void *CkWaitFutureID(CkFutureID handle)
 
 std::pair<void*, CkFutureID> CkWaitAnyID(const std::vector<CkFutureID>& handles) {
   auto fs = &(CpvAccess(futurestate));
-  auto ready = handles.end() != std::find_if(handles.begin(), handles.end(),
+  const auto ready = std::any_of(handles.begin(), handles.end(),
     [&fs](const CkFutureID& id) { return fs->is_ready(id); });
+  /* A single request is generated, and enqueued for all the futures that we are
+   * interested in. Note, a request may only be fulfilled once, then it will expire
+   * and become a no-op; thus, the corresponding `CthAwaken` for this thread will
+   * only be called once (for more details, see FutureToThread::fulfill).
+   */ 
   if (!ready) fs->request(handles, std::make_shared<FutureToThread>(CthSelf()));
   do {
     if (!ready) CthSuspend();
@@ -269,13 +328,26 @@ std::pair<void*, CkFutureID> CkWaitAnyID(const std::vector<CkFutureID>& handles)
 }
 
 std::vector<void*> CkWaitAllIDs(const std::vector<CkFutureID>& ids) {
-  // a more sophisticated solution should be implemented that interleaves
-  // waiting on multiple futures... but this works in the meantime
-  std::vector<void*> results;
-  for (auto id: ids) {
-    results.push_back(CkWaitFutureID(id));
+  auto fs = &(CpvAccess(futurestate));
+  auto req = std::make_shared<MultiToThread>(CthSelf(), ids);
+  bool wait = false;
+
+  for (const auto& id : ids) {
+    auto val = (*fs)[id];
+
+    if (val != nullptr) {
+      req->fulfill(id, val);
+    } else {
+      fs->request(id, req);
+      wait = true;
+    }
   }
-  return results;
+
+  if (wait) {
+    CthSuspend();
+  }
+
+  return req->values;
 }
 
 void CkReleaseFuture(CkFuture fut)
@@ -540,4 +612,3 @@ void CkSemaDestroy(CkSemaID id)
 
 /*@}*/
 #include "CkFutures.def.h"
-

@@ -752,6 +752,11 @@ struct Builtin_kvs {
   int appnum = 0;
   int lastusedcode = MPI_ERR_LASTCODE;
   int universe_size = 0;
+
+  int mype = CkMyPe();
+  int numpes = CkNumPes();
+  int mynode = CkMyNode();
+  int numnodes = CkNumNodes();
 };
 
 // ------------ startup support -----------
@@ -1228,10 +1233,6 @@ ampiParent::ampiParent(CProxy_TCharm threads_,int nRanks_) noexcept
   thread->semaPut(AMPI_BARRIER_SEMAID,&barrier);
 
   thread->setResumeAfterMigrationCallback(CkCallback(CkIndex_ampiParent::resumeAfterMigration(), thisProxy[thisIndex]));
-
-#if CMK_FAULT_EVAC
-  AsyncEvacuate(false);
-#endif
 }
 
 ampiParent::ampiParent(CkMigrateMessage *msg) noexcept
@@ -1241,10 +1242,6 @@ ampiParent::ampiParent(CkMigrateMessage *msg) noexcept
   worldPtr=NULL;
 
   init();
-
-#if CMK_FAULT_EVAC
-  AsyncEvacuate(false);
-#endif
 }
 
 #if CMK_AMPI_WITH_ROMIO
@@ -1696,10 +1693,10 @@ bool ampiParent::getBuiltinAttributeComm(int keyval, void *attribute_val) noexce
     case MPI_APPNUM:            *(int **)attribute_val = &(CkpvAccess(bikvs).appnum);            return true;
     case MPI_LASTUSEDCODE:      *(int **)attribute_val = &(CkpvAccess(bikvs).lastusedcode);      return true;
     case MPI_UNIVERSE_SIZE:     *(int **)attribute_val = &(CkpvAccess(bikvs).universe_size);     return true;
-    case AMPI_MY_WTH:           *(int *)attribute_val = CkMyPe();     return true;
-    case AMPI_NUM_WTHS:         *(int *)attribute_val = CkNumPes();   return true;
-    case AMPI_MY_PROCESS:       *(int *)attribute_val = CkMyNode();   return true;
-    case AMPI_NUM_PROCESSES:    *(int *)attribute_val = CkNumNodes(); return true;
+    case AMPI_MY_WTH:           *(int **)attribute_val = &(CkpvAccess(bikvs).mype);              return true;
+    case AMPI_NUM_WTHS:         *(int **)attribute_val = &(CkpvAccess(bikvs).numpes);            return true;
+    case AMPI_MY_PROCESS:       *(int **)attribute_val = &(CkpvAccess(bikvs).mynode);            return true;
+    case AMPI_NUM_PROCESSES:    *(int **)attribute_val = &(CkpvAccess(bikvs).numnodes);          return true;
     default: return false;
   }
 }
@@ -2012,10 +2009,6 @@ void Amm<T, N>::pup(PUP::er& p, AmmPupMessageFn msgpup) noexcept
 void ampi::init() noexcept {
   parent=NULL;
   thread=NULL;
-
-#if CMK_FAULT_EVAC
-  AsyncEvacuate(false);
-#endif
 }
 
 ampi::ampi() noexcept
@@ -7563,7 +7556,8 @@ void ampi::irecvBcast(void *buf, int count, MPI_Datatype type, int src,
   AmpiMsg* msg = unexpectedBcastMsgs.get(MPI_BCAST_TAG, src);
   // if msg has already arrived, do the receive right away
   if (msg) {
-    newreq->receive(this, msg);
+    newreq->receive(this, msg, false);
+    delete msg; // never add bcast msgs to AmpiMsgPool because they are nokeep
   }
   else { // ... otherwise post the receive
     postedBcastReqs.put(newreq);
@@ -11499,16 +11493,6 @@ CLINKAGE int AMPI_Migrate(MPI_Info hints)
   return MPI_SUCCESS;
 }
 
-#if CMK_FAULT_EVAC
-CLINKAGE
-int AMPI_Evacuate(void)
-{
-  //AMPI_API("AMPI_Evacuate");
-  TCHARM_Evacuate();
-  return MPI_SUCCESS;
-}
-#endif
-
 CLINKAGE
 int AMPI_Migrate_to_pe(int dest)
 {
@@ -11742,9 +11726,8 @@ int AMPI_GPU_Iinvoke_wr(hapiWorkRequest *to_call, MPI_Request *request)
   *request = ptr->postReq(newreq);
 
   // A callback that completes the corresponding request
-  CkCallback *cb = new CkCallback(&AMPI_GPU_complete, newreq);
-  to_call->setCallback(cb);
-
+  CkCallback cb(&AMPI_GPU_complete, newreq);
+  hapiWorkRequestSetCallback(to_call, &cb);
   hapiEnqueue(to_call);
 }
 
@@ -11760,9 +11743,8 @@ int AMPI_GPU_Iinvoke(cudaStream_t stream, MPI_Request *request)
   *request = ptr->postReq(newreq);
 
   // A callback that completes the corresponding request
-  CkCallback *cb = new CkCallback(&AMPI_GPU_complete, newreq);
-
-  hapiAddCallback(stream, cb, NULL);
+  CkCallback cb(&AMPI_GPU_complete, newreq);
+  hapiAddCallback(stream, &cb, nullptr);
 }
 
 CLINKAGE

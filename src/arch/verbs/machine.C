@@ -890,9 +890,6 @@ static void CmiDestroyLocks(void)
   Must be called while holding comm. lock
 */
 
-extern double evacTime;
-
-
 /***************************************************************
  Communication with charmrun:
  We can send (ctrl_sendone) and receive (ctrl_getone)

@@ -9,7 +9,10 @@
 
 extern int quietModeRequested;
 
-CreateLBFunc_Def(DistributedLB, "The distributed load balancer")
+static void lbinit()
+{
+  LBRegisterBalancer<DistributedLB>("DistributedLB", "The distributed load balancer");
+}
 
 using std::vector;
 
@@ -49,9 +52,11 @@ void DistributedLB::Strategy(const DistBaseLB::LDStats* const stats) {
     CkPrintf("In DistributedLB strategy at %lf\n", start_time);
   }
 
+  const int n_objs = stats->objData.size();
+
   // Set constants for this iteration (these depend on CkNumPes() or number of
   // objects, so may not be constant for the entire program)
-  kMaxObjPickTrials = stats->n_objs;
+  kMaxObjPickTrials = n_objs;
   // Maximum number of times we will try to find a PE to transfer an object
   // successfully
   kMaxTrials = CkNumPes();
@@ -63,7 +68,7 @@ void DistributedLB::Strategy(const DistBaseLB::LDStats* const stats) {
   my_stats = stats;
 
 	my_load = 0.0;
-	for (int i = 0; i < my_stats->n_objs; i++) {
+	for (int i = 0; i < n_objs; i++) {
 		my_load += my_stats->objData[i].wallTime; 
   }
   init_load = my_load;
@@ -353,17 +358,17 @@ void DistributedLB::AfterLBReduction(CkReductionMsg* redn_msg) {
 * information propagation stage (gossip).
 */
 void DistributedLB::LoadBalance() {
-  CkVec<int> obj_no;
-  CkVec<int> obj_pe_no;
+  vector<int> obj_no;
+  vector<int> obj_pe_no;
 
   // Balance load and add objs to be transferred to obj_no and pe to be
   // transferred to in obj_pe_no
   MapObjsToPe(objs, obj_no, obj_pe_no);
-  total_migrates += obj_no.length();
-  total_migrates_ack = obj_no.length();
+  total_migrates += obj_no.size();
+  total_migrates_ack = obj_no.size();
 
   // If there is no migration, then this is done
-  if (obj_no.length() == 0) {
+  if (obj_no.empty()) {
     DoneWithLBPhase();
 	}
 }
@@ -373,7 +378,8 @@ void DistributedLB::Setup() {
   double avg_objload = 0.0;
   double max_objload = 0.0;
   // Count the number of objs that are migratable and whose load is not 0.
-  for(int i=0; i < my_stats->n_objs; i++) {
+  const int n_objs = my_stats->objData.size();
+  for(int i=0; i < n_objs; i++) {
     if (my_stats->objData[i].migratable &&
       my_stats->objData[i].wallTime > 0.000001) {
       objs_count++;
@@ -384,7 +390,7 @@ void DistributedLB::Setup() {
   // is that since we are making probabilistic transfer of load, sending small
   // objs will result in better load balance.
   objs = new minHeap(objs_count);
-  for(int i=0; i < my_stats->n_objs; i++) {
+  for(int i=0; i < n_objs; i++) {
     if (my_stats->objData[i].migratable &&
         my_stats->objData[i].wallTime > 0.0001) {
       InfoRecord* item = new InfoRecord;
@@ -414,8 +420,8 @@ void DistributedLB::Cleanup() {
 * can be transferred and finds suitable receiver PEs. The mapping is stored in
 * obj_no and the corresponding entry in obj_pe_no indicates the receiver PE.
 */
-void DistributedLB::MapObjsToPe(minHeap *objs, CkVec<int> &obj_no,
-    CkVec<int> &obj_pe_no) {
+void DistributedLB::MapObjsToPe(minHeap *objs, vector<int> &obj_no,
+                                vector<int> &obj_pe_no) {
   int p_id;
   double p_load;
   int rand_pe;
@@ -456,8 +462,8 @@ void DistributedLB::MapObjsToPe(minHeap *objs, CkVec<int> &obj_no,
 
     // Found an object and a suitable PE to transfer it to. Decrement the obj
     // count and update the loads.
-    obj_no.insertAtEnd(obj->Id);
-    obj_pe_no.insertAtEnd(p_id);
+    obj_no.push_back(obj->Id);
+    obj_pe_no.push_back(p_id);
     objs_count--;
     loads[rand_pe] += obj->load;
     my_load -= obj->load;
@@ -543,14 +549,14 @@ void DistributedLB::RecvAck(int obj_id, int assigned_pe, bool can_accept) {
     item->Id = obj_id;
     objs->insert(item);
 
-    CkVec<int> obj_no;
-    CkVec<int> obj_pe_no;
+    vector<int> obj_no;
+    vector<int> obj_pe_no;
     MapObjsToPe(objs, obj_no, obj_pe_no);
 
     // If a PE could be found to transfer this object, MapObjsToPe sends a
     // message to it. Wait for the ack.
     // Maybe at this point we can try to force it or just drop it.
-    if (obj_pe_no.size() > 0) {
+    if (!obj_pe_no.empty()) {
       total_migrates_ack++;
       total_migrates++;
     }

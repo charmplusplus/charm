@@ -45,7 +45,7 @@ void TreeModel::treeTest(const DataMatrix& X, std::vector<double>& Ysoft) const 
   int numInternals = (nd + 1) / 2 - 1;
 
   // Propagate data down the tree using weak classifiers at each node
-  std::vector<double> dataix(N * nd, 0.0);
+  std::vector<double> dataix((size_t)N * nd, 0.0);
 
   for (int n = 1; n <= numInternals; n++) {
     DataMatrix* reld;
