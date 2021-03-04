@@ -5549,6 +5549,11 @@ Possible constructors are:
    callback will send its message to the given entry method of the given
    group member.
 
+#. CkCallback(CkFuture fut) - When invoked, the callback will send its
+   message to the given future. For a ck::future object, the underlying
+   CkFuture is accesible via its handle method. For an example, see:
+      ``examples/charm++/hello/xarraySection/hello.C``
+
 One final type of callback, CkCallbackResumeThread(), can only be used
 from within threaded entry methods. This callback type is discussed in
 section :numref:`sec:ckcallbackresumethread`.
