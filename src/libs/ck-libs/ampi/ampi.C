@@ -2270,11 +2270,12 @@ void ampi::splitPhase1(CkReductionMsg *msg) noexcept
   {
     if (keys[c].color != lastColor)
     { //Hit a new color-- need to build a new communicator and array
-      std::vector<int> indices; //Maps rank to array indices for new array
-      for (int i = lastRoot; i < c; i++)
+      const int numIndices = c - lastRoot;
+      std::vector<int> indices{numIndices}; //Maps rank to array indices for new array
+      for (int i = 0; i < numIndices; i++)
       {
-        int idx=myComm.getIndexForRank(keys[i].rank);
-        indices.push_back(idx);
+        const int idx = myComm.getIndexForRank(keys[i + lastRoot].rank);
+        indices[i] = idx;
       }
       createNewSplitCommArray(newComm, indices);
 
@@ -2283,11 +2284,12 @@ void ampi::splitPhase1(CkReductionMsg *msg) noexcept
     }
   }
 
-  std::vector<int> indices; //Maps rank to array indices for new array
-  for (int i = lastRoot; i < nKeys; i++)
+  const int numIndices = nKeys - lastRoot;
+  std::vector<int> indices{numIndices}; //Maps rank to array indices for new array
+  for (int i = 0; i < numIndices; i++)
   {
-    int idx=myComm.getIndexForRank(keys[i].rank);
-    indices.push_back(idx);
+    const int idx = myComm.getIndexForRank(keys[i + lastRoot].rank);
+    indices[i] = idx;
   }
   createNewSplitCommArray(newComm, indices);
 
@@ -2337,11 +2339,12 @@ void ampi::splitPhaseInter(CkReductionMsg *msg) noexcept
   {
     if (keys[c].color != lastColor)
     { //Hit a new color-- need to build a new communicator and array
-      std::vector<int> indices; //Maps rank to array indices for new array
-      for (int i = lastRoot; i < c; i++)
+      const int numIndices = c - lastRoot;
+      std::vector<int> indices{numIndices}; //Maps rank to array indices for new array
+      for (int i = 0; i < numIndices; i++)
       {
-        int idx=myComm.getIndexForRank(keys[i].rank);
-        indices.push_back(idx);
+        const int idx = myComm.getIndexForRank(keys[i + lastRoot].rank);
+        indices[i] = idx;
       }
       CProxy_ampi lastAmpi = createNewSplitCommArray(newComm, indices);
       thisProxy[0].exchangeProxyForSplitLocal(lastColor, lastAmpi);
@@ -2352,11 +2355,12 @@ void ampi::splitPhaseInter(CkReductionMsg *msg) noexcept
     }
   }
 
-  std::vector<int> indices; //Maps rank to array indices for new array
-  for (int i = lastRoot; i < nKeys; i++)
+  const int numIndices = nKeys - lastRoot;
+  std::vector<int> indices{numIndices}; //Maps rank to array indices for new array
+  for (int i = 0; i < numIndices; i++)
   {
-    int idx=myComm.getIndexForRank(keys[i].rank);
-    indices.push_back(idx);
+    const int idx = myComm.getIndexForRank(keys[i + lastRoot].rank);
+    indices[i] = idx;
   }
   CProxy_ampi lastAmpi = createNewSplitCommArray(newComm, indices);
   thisProxy[0].exchangeProxyForSplitLocal(lastColor, lastAmpi);
