@@ -23,9 +23,9 @@ jobs:
         cd spack
         [[ $(uname) == "Linux" ]] && sudo apt-get install -y gfortran gfortran-7 gfortran-8 gfortran-9 gfortran-10
 
-        # Use this branch for testing, not master
+        # Use this branch for testing, not main
         sed -i -e 's,="master",="${{ github.head_ref }}",' var/spack/repos/builtin/packages/charmpp/package.py
-        
+
         # Use a fork, not the main repo
         sed -i -e 's,UIUC-PPL/charm.git,${{github.event.pull_request.head.repo.full_name}},' var/spack/repos/builtin/packages/charmpp/package.py
 
