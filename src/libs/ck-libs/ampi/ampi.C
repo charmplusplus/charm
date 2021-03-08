@@ -2260,8 +2260,7 @@ void ampi::splitPhase1(CkReductionMsg *msg) noexcept
         ++numColors;
       }
     }
-    CkAssert(numCommCreationsInProgress == 0);
-    numCommCreationsInProgress = numColors;
+    setNumCommCreationsInProgress(numColors);
   }
 
   //Loop over the sorted keys, which gives us the new arrays:
@@ -2328,8 +2327,7 @@ void ampi::splitPhaseInter(CkReductionMsg *msg) noexcept
         ++numColors;
       }
     }
-    CkAssert(numCommCreationsInProgress == 0);
-    numCommCreationsInProgress = numColors;
+    setNumCommCreationsInProgress(numColors);
   }
 
   //Loop over the sorted keys, which gives us the new arrays:
@@ -2405,8 +2403,7 @@ void ampi::insertNewChildAmpiElements(MPI_Comm nextComm, CProxy_ampi newAmpi) no
 }
 
 void ampi::commCreatePhase1(MPI_Comm nextGroupComm) noexcept {
-  CkAssert(numCommCreationsInProgress == 0);
-  numCommCreationsInProgress = 1;
+  setNumCommCreationsInProgress(1);
 
   CProxy_ampi newAmpi = createNewChildAmpiSync();
   insertNewChildAmpiElements(nextGroupComm, newAmpi);
@@ -2587,8 +2584,7 @@ void ampi::intercommMergePhase1(MPI_Comm nextIntraComm) noexcept {
   // gets called on two roots, first root creates the comm
   if(tmpVec.size()==0) return;
 
-  CkAssert(numCommCreationsInProgress == 0);
-  numCommCreationsInProgress = 1;
+  setNumCommCreationsInProgress(1);
 
   CProxy_ampi newAmpi = createNewChildAmpiSync();
   insertNewChildAmpiElements(nextIntraComm, newAmpi);

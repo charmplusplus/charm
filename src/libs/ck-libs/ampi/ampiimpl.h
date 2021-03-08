@@ -2600,6 +2600,11 @@ class ampi final : public CBase_ampi {
   CProxy_ampi remoteProxy; // valid only for intercommunicator
   CkPupPtrVec<win_obj> winObjects;
   int numCommCreationsInProgress{};
+  void setNumCommCreationsInProgress(int x)
+  {
+    CkAssert(numCommCreationsInProgress == 0);
+    numCommCreationsInProgress = x;
+  }
 
   // Intercommunicator splitting:
   std::unordered_map<int, CProxy_ampi> splitRProxyMap;
