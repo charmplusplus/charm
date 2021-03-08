@@ -2204,6 +2204,7 @@ CProxy_ampi ampi::createNewChildAmpiSync() noexcept {
   opts.bindTo(parentProxy);
   opts.setSectionAutoDelegate(false);
   opts.setNumInitial(0);
+  opts.setStaticInsertion(false);
   CkCallback initCB(CkIndex_ampi::registrationFinish(), thisProxy[thisIndex]);
   opts.setInitCallback(initCB);
 
