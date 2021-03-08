@@ -996,10 +996,6 @@ static void ampiNodeInit() noexcept
   AMPI_threadstart_idx = TCHARM_Register_thread_function(AMPI_threadstart);
 
   ampi_nodeinit_has_been_called=true;
-
-   // ASSUME NO ANYTIME MIGRATION and STATIC INSERTON
-  _isAnytimeMigration = false;
-  _isStaticInsertion = false;
 }
 
 #if AMPI_PRINT_IDLE
@@ -1150,6 +1146,7 @@ static ampi *ampiInit(char **argv) noexcept
     CkArrayID threads;
     opts=TCHARM_Attach_start(&threads,&_nchunks);
     opts.setSectionAutoDelegate(false);
+    opts.setStaticInsertion(true);
     CkArrayCreatedMsg *m;
     CProxy_ampiParent::ckNew(threads, _nchunks, opts, CkCallbackResumeThread((void*&)m));
     parent = CProxy_ampiParent(m->aid);

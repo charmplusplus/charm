@@ -72,10 +72,6 @@ void TCharm::nodeInit()
   }
 #endif
 
-  // Assumes no anytime migration and only static insertion
-  _isAnytimeMigration = false;
-  _isStaticInsertion = true;
-
   char **argv = CkGetArgv();
   nChunks = CkNumPes();
   CmiGetArgIntDesc(argv, "-vp", &nChunks, "Set the total number of virtual processors");
@@ -636,38 +632,38 @@ FLINKAGE void FTN_NAME(TCHARM_CREATE_DATA,tcharm_create_data)
 		  void *threadData,int *threadDataLen)
 { TCHARM_Create_data(*nThreads,threadFn,threadData,*threadDataLen); }
 
-CkGroupID CkCreatePropMap();
-
 static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
 {
+  CkArrayOptions mapopts;
+  mapopts.setStaticInsertion(true);
   CkArrayOptions opts(msg->numElements);
   CkAssert(CkpvAccess(mapCreated)==true);
 
   if(haveConfigurableRRMap()){
     CkPrintf("TCharm> using ConfigurableRRMap\n");
-    mapID=CProxy_ConfigurableRRMap::ckNew();
+    mapID=CProxy_ConfigurableRRMap::ckNew(mapopts);
     opts.setMap(mapID);
   } else if(mapping==NULL){
     /* do nothing: use the default map */
   } else if(0 == strcmp(mapping,"BLOCK_MAP")) {
     CkPrintf("TCharm> using BLOCK_MAP\n");
-    mapID = CProxy_BlockMap::ckNew();
+    mapID = CProxy_BlockMap::ckNew(mapopts);
     opts.setMap(mapID);
   } else if(0 == strcmp(mapping,"RR_MAP")) {
     CkPrintf("TCharm> using RR_MAP\n");
-    mapID = CProxy_RRMap::ckNew();
+    mapID = CProxy_RRMap::ckNew(mapopts);
     opts.setMap(mapID);
   } else if(0 == strcmp(mapping,"MAPFILE")) {
     CkPrintf("TCharm> reading map from mapfile\n");
-    mapID = CProxy_Simple1DFileMap::ckNew();
+    mapID = CProxy_Simple1DFileMap::ckNew(mapopts);
     opts.setMap(mapID);
   } else if(0 == strcmp(mapping,"TOPO_MAPFILE")) {
     CkPrintf("TCharm> reading topo map from mapfile\n");
-    mapID = CProxy_ReadFileMap::ckNew();
+    mapID = CProxy_ReadFileMap::ckNew(mapopts);
     opts.setMap(mapID);
   } else if(0 == strcmp(mapping,"PROP_MAP")) {
     CkPrintf("TCharm> using PROP_MAP\n");
-    mapID = CkCreatePropMap();
+    mapID = CProxy_PropMap::ckNew(mapopts);
     opts.setMap(mapID);
   }
   opts.setStaticInsertion(true);
