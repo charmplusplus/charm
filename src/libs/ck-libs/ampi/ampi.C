@@ -2206,10 +2206,9 @@ CProxy_ampi ampi::createNewChildAmpiSync() noexcept {
   opts.setNumInitial(0);
   CkCallback initCB(CkIndex_ampi::registrationFinish(), thisProxy[thisIndex]);
   opts.setInitCallback(initCB);
-  CkArrayID unusedAID;
-  ampiCommStruct unusedComm;
+
   CkCallback cb(CkCallback::resumeThread);
-  CProxy_ampi::ckNew(unusedAID, unusedComm, opts, cb);
+  CProxy_ampi::ckNew(opts, cb);
   CkArrayCreatedMsg *newAmpiMsg = static_cast<CkArrayCreatedMsg*>(cb.thread_delay());
   CProxy_ampi newAmpi = newAmpiMsg->aid;
   delete newAmpiMsg;
