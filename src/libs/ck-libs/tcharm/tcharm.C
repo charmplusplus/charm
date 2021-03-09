@@ -634,36 +634,34 @@ FLINKAGE void FTN_NAME(TCHARM_CREATE_DATA,tcharm_create_data)
 
 static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
 {
-  CkArrayOptions mapopts;
-  mapopts.setStaticInsertion(true);
   CkArrayOptions opts(msg->numElements);
   CkAssert(CkpvAccess(mapCreated)==true);
 
   if(haveConfigurableRRMap()){
     CkPrintf("TCharm> using ConfigurableRRMap\n");
-    mapID=CProxy_ConfigurableRRMap::ckNew(mapopts);
+    mapID=CProxy_ConfigurableRRMap::ckNew();
     opts.setMap(mapID);
   } else if(mapping==NULL){
     /* do nothing: use the default map */
   } else if(0 == strcmp(mapping,"BLOCK_MAP")) {
     CkPrintf("TCharm> using BLOCK_MAP\n");
-    mapID = CProxy_BlockMap::ckNew(mapopts);
+    mapID = CProxy_BlockMap::ckNew();
     opts.setMap(mapID);
   } else if(0 == strcmp(mapping,"RR_MAP")) {
     CkPrintf("TCharm> using RR_MAP\n");
-    mapID = CProxy_RRMap::ckNew(mapopts);
+    mapID = CProxy_RRMap::ckNew();
     opts.setMap(mapID);
   } else if(0 == strcmp(mapping,"MAPFILE")) {
     CkPrintf("TCharm> reading map from mapfile\n");
-    mapID = CProxy_Simple1DFileMap::ckNew(mapopts);
+    mapID = CProxy_Simple1DFileMap::ckNew();
     opts.setMap(mapID);
   } else if(0 == strcmp(mapping,"TOPO_MAPFILE")) {
     CkPrintf("TCharm> reading topo map from mapfile\n");
-    mapID = CProxy_ReadFileMap::ckNew(mapopts);
+    mapID = CProxy_ReadFileMap::ckNew();
     opts.setMap(mapID);
   } else if(0 == strcmp(mapping,"PROP_MAP")) {
     CkPrintf("TCharm> using PROP_MAP\n");
-    mapID = CProxy_PropMap::ckNew(mapopts);
+    mapID = CProxy_PropMap::ckNew();
     opts.setMap(mapID);
   }
   opts.setStaticInsertion(true);
