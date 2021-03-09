@@ -12,6 +12,7 @@ jobs:
       run: ./build charm++ netlrts-linux-x86_64 -g -j4 --with-production
     - name: build-namd
       run: |
+        sudo apt-get update
         sudo apt-get -y install sfftw-dev
         cd ..
         git clone https://${{ secrets.NAMD_CI_USERNAME_TOKEN }}@gitlab.com/tcbgUIUC/namd.git
