@@ -2226,7 +2226,7 @@ CProxy_ampi ampi::createNewSplitCommArray(MPI_Comm newComm, const std::vector<in
     lastAmpi[newIdx].insert(parentProxy, lastComm);
   }
 
-  lastAmpi.doneInserting();
+  lastAmpi.doneInserting(); // will call ampi::registrationFinish
 
   return lastAmpi;
 }
@@ -2400,7 +2400,7 @@ void ampi::insertNewChildAmpiElements(MPI_Comm nextComm, CProxy_ampi newAmpi) no
   ampiCommStruct newCommStruct = ampiCommStruct(nextComm, newAmpi, tmpVec);
   for (int i = 0; i < tmpVec.size(); ++i)
     newAmpi[tmpVec[i]].insert(parentProxy, newCommStruct);
-  newAmpi.doneInserting();
+  newAmpi.doneInserting(); // will call ampi::registrationFinish
 }
 
 void ampi::commCreatePhase1(MPI_Comm nextGroupComm) noexcept {
@@ -2546,7 +2546,7 @@ void ampi::intercommCreatePhase1(MPI_Comm nextInterComm) noexcept {
     int newIdx=lgroup[i];
     newAmpi[newIdx].insert(parentProxy,newCommstruct);
   }
-  newAmpi.doneInserting();
+  newAmpi.doneInserting(); // will call ampi::registrationFinish
 
   parentProxy[0].ExchangeProxy(newAmpi);
 }
