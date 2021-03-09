@@ -1146,8 +1146,8 @@ static ampi *ampiInit(char **argv) noexcept
     CkArrayID threads;
     opts=TCHARM_Attach_start(&threads,&_nchunks);
     opts.setSectionAutoDelegate(false);
-    opts.setStaticInsertion(true);
-    opts.setAnytimeMigration(false);
+    opts.setStaticInsertion(false);
+    opts.setAnytimeMigration(true);
     CkArrayCreatedMsg *m;
     CProxy_ampiParent::ckNew(threads, _nchunks, opts, CkCallbackResumeThread((void*&)m));
     parent = CProxy_ampiParent(m->aid);
@@ -2203,7 +2203,7 @@ CProxy_ampi ampi::createNewChildAmpiSync() noexcept {
   opts.setSectionAutoDelegate(false);
   opts.setNumInitial(0);
   opts.setStaticInsertion(false);
-  opts.setAnytimeMigration(false);
+  opts.setAnytimeMigration(true);
   CkCallback initCB(CkIndex_ampi::registrationFinish(), thisProxy[thisIndex]);
   opts.setInitCallback(initCB);
 

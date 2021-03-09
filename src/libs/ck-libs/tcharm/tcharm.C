@@ -664,8 +664,8 @@ static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
     mapID = CProxy_PropMap::ckNew();
     opts.setMap(mapID);
   }
-  opts.setStaticInsertion(true);
-  opts.setAnytimeMigration(false);
+  opts.setStaticInsertion(false);
+  opts.setAnytimeMigration(true);
   opts.setSectionAutoDelegate(false);
   return CProxy_TCharm::ckNew(msg,opts);
 }
