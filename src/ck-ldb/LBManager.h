@@ -476,6 +476,7 @@ class LBManager : public CBase_LBManager
  private:
   int mystep;
   static std::vector<char> avail_vector; // processor bit vector
+  static bool avail_vector_set;
   int new_ld_balancer;  // for Node 0
   MetaBalancer* metabalancer;
   int currentLBIndex;
