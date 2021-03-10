@@ -126,13 +126,13 @@ test $QUIET -eq 0 && printf "\nRunning on $pes processors: $args\n"
 if [ -n "$PBS_NODEFILE" ]
 then
 # we are in a job shell
-  aprun=`which aprun 2>/dev/null`
+  aprun=`command -v aprun 2>/dev/null`
   if test -n "$aprun"
   then
     test $QUIET -eq 0 && echo aprun -n $pes $args
     $aprun -n $pes $args
   else
-    mpirun_cmd=`which mpirun 2>/dev/null`
+    mpirun_cmd=`command -v mpirun 2>/dev/null`
     if test -n "$mpirun_cmd"
     then
       if echo $mpirun_cmd | grep 'mvapich2'  > /dev/null 2>/dev/null
@@ -215,15 +215,15 @@ then
 	esac
 	if test $USE_LSF -eq 0
 	then
-          mpirun=`which aprun 2>/dev/null`
+          mpirun=`command -v aprun 2>/dev/null`
           npcmd="-n "
           if test -z "$mpirun"
           then
-	    mpirun=`which mpirun 2>/dev/null`
+	    mpirun=`command -v mpirun 2>/dev/null`
             npcmd="-np "
             if test -z "$mpirun"
             then
-              mpirun=`which srun 2>/dev/null`
+              mpirun=`command -v srun 2>/dev/null`
               npcmd="-n "
             fi
           fi
@@ -337,13 +337,13 @@ End() {
                 	sleep 20
 		fi
         done
-elif [ -n "`which mpirun 2>/dev/null`" ]
+elif [ -n "`command -v mpirun 2>/dev/null`" ]
 then
-  mpirun_cmd=`which mpirun 2>/dev/null`
+  mpirun_cmd=`command -v mpirun 2>/dev/null`
   if test -n "$mpirun_cmd"
   then
     [ -n "$MPI_MACHINEFILE" ] && args=" -machinefile $MPI_MACHINEFILE $args"
-    setarch_cmd=`which setarch 2>/dev/null`
+    setarch_cmd=`command -v setarch 2>/dev/null`
     if [ -n "$setarch_cmd" -a -x "$setarch_cmd" ]
     then
       # Disables randomization of the virtual address  space  (turns  on
@@ -356,7 +356,7 @@ then
       mpirun -np $pes $args
     fi
   else
-    mpiexec_cmd=`which mpiexec 2>/dev/null`
+    mpiexec_cmd=`command -v mpiexec 2>/dev/null`
     if test -n "$mpiexec_cmd"
     then
       test $QUIET -eq 0 && echo "charmrun> $mpiexec_cmd -n $pes $args"
@@ -367,7 +367,7 @@ then
       exit 1
     fi
   fi
-elif [ -n "`which srun 2>/dev/null`" ]
+elif [ -n "`command -v srun 2>/dev/null`" ]
 then
   #mpirun is checked before srun to support the Bridges supercomputer at PSC
   #as srun has a known issue and fails to successfully launch the parallel job.
