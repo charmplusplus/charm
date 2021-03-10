@@ -432,6 +432,7 @@ void _loadbalancerInit()
 
 bool LBManager::manualOn = false;
 std::vector<char> LBManager::avail_vector;
+bool LBManager::avail_vector_set = false;
 CmiNodeLock avail_vector_lock;
 
 static LBRealType* _expectedLoad = NULL;
@@ -762,11 +763,30 @@ const char* LBManager::loadbalancer(int seq)
 void LBManager::pup(PUP::er& p)
 {
   IrrGroup::pup(p);
-  // the memory should be already allocated
-  int np;
-  if (!p.isUnpacking()) np = CkNumPes();
-  p | np;
-  p | avail_vector;
+  if (p.isUnpacking())
+  {
+    // Since avail_vector is static, only unpack one of them for real in SMP mode, the
+    // rest to some tmp variable
+    CmiLock(avail_vector_lock);
+    if (!avail_vector_set)
+    {
+      avail_vector_set = true;
+      p | avail_vector;
+      // If we're restarting with more PEs, make the new ones available
+      if (avail_vector.size() < CkNumPes())
+        avail_vector.resize(CkNumPes(), 1);
+    }
+    else
+    {
+      decltype(avail_vector) tmp;
+      p | tmp;
+    }
+    CmiUnlock(avail_vector_lock);
+  }
+  else
+  {
+    p | avail_vector;
+  }
   p | mystep;
   if (p.isUnpacking())
   {
