@@ -2270,7 +2270,7 @@ void ampi::splitPhase1(CkReductionMsg *msg) noexcept
     if (keys[c].color != lastColor)
     { //Hit a new color-- need to build a new communicator and array
       const int numIndices = c - lastRoot;
-      std::vector<int> indices{numIndices}; //Maps rank to array indices for new array
+      std::vector<int> indices(numIndices); //Maps rank to array indices for new array
       for (int i = 0; i < numIndices; i++)
       {
         const int idx = myComm.getIndexForRank(keys[i + lastRoot].rank);
@@ -2284,7 +2284,7 @@ void ampi::splitPhase1(CkReductionMsg *msg) noexcept
   }
 
   const int numIndices = nKeys - lastRoot;
-  std::vector<int> indices{numIndices}; //Maps rank to array indices for new array
+  std::vector<int> indices(numIndices); //Maps rank to array indices for new array
   for (int i = 0; i < numIndices; i++)
   {
     const int idx = myComm.getIndexForRank(keys[i + lastRoot].rank);
@@ -2339,7 +2339,7 @@ void ampi::splitPhaseInter(CkReductionMsg *msg) noexcept
     if (keys[c].color != lastColor)
     { //Hit a new color-- need to build a new communicator and array
       const int numIndices = c - lastRoot;
-      std::vector<int> indices{numIndices}; //Maps rank to array indices for new array
+      std::vector<int> indices(numIndices); //Maps rank to array indices for new array
       for (int i = 0; i < numIndices; i++)
       {
         const int idx = myComm.getIndexForRank(keys[i + lastRoot].rank);
@@ -2355,7 +2355,7 @@ void ampi::splitPhaseInter(CkReductionMsg *msg) noexcept
   }
 
   const int numIndices = nKeys - lastRoot;
-  std::vector<int> indices{numIndices}; //Maps rank to array indices for new array
+  std::vector<int> indices(numIndices); //Maps rank to array indices for new array
   for (int i = 0; i < numIndices; i++)
   {
     const int idx = myComm.getIndexForRank(keys[i + lastRoot].rank);
