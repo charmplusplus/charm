@@ -426,9 +426,10 @@ public:
   }
 };
 
-// TODO :
-// a poorly located helper function for getting a buffer from a message
-// should be moved elsewhere (when PR#3228 is merged), and probably named ck::get_message_buffer(void*)
+/* NOTE : this (currently) internal function may, eventually,
+ *        be expanded and made public. At that point, consider
+ *        renaming it to something like ck::get_msg_buffer(void*)
+ */
 void* CkGetMsgBuffer(void* msg) {
   auto env = UsrToEnv(msg);
   auto idx = env->getMsgIdx();
@@ -438,8 +439,10 @@ void* CkGetMsgBuffer(void* msg) {
     return static_cast<CkReductionMsg*>(msg)->getData();
   } else if (idx == CMessage_CkDataMsg::__idx) {
     return static_cast<CkDataMsg*>(msg)->getData();
+  } else if (idx == CMessage_CkArrayCreatedMsg::__idx) {
+    return &(static_cast<CkArrayCreatedMsg*>(msg)->aid);
   } else {
-    CkAbort("unsure how to handle msg of type %s.", _msgTable[idx]->name);
+    CkAbort("unsure how to handle a msg of type %s.", _msgTable[idx]->name);
   }
 }
 
