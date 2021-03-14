@@ -392,12 +392,6 @@ int main() {
 }
 " CMK_BALANCED_INJECTION_API)
 
-if(NOT CMK_BALANCED_INJECTION_API)
-  # Since it is often checked via #ifdef, CMK_BALANCED_INJECTION_API
-  # can't be set to zero, but must be unset.
-  unset(CMK_BALANCED_INJECTION_API CACHE)
-endif()
-
 if(${CMK_BUILD_OFI} EQUAL 1)
   set(tmp ${CMAKE_REQUIRED_LIBRARIES})
   set(CMAKE_REQUIRED_LIBRARIES "${CMAKE_REQUIRED_LIBRARIES} -lfabric")
