@@ -1505,7 +1505,7 @@ const ampiCommStruct& ampiParent::getWorldStruct() const noexcept {
 }
 
 //Children call this when they are first created or just migrated
-TCharm *ampiParent::registerAmpi(ampi *ptr, ampiCommStruct s, bool forMigration) noexcept
+TCharm *ampiParent::registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration) noexcept
 {
   if (thread==NULL) prepareCtv(); //Prevents CkJustMigrated race condition
 
@@ -2015,8 +2015,7 @@ ampi::ampi() noexcept
   CkAbort("Default ampi constructor should never be called");
 }
 
-ampi::ampi(CkArrayID parent_, const ampiCommStruct &s) noexcept
-  : parentProxy(parent_), oorder(s.getSize())
+ampi::ampi(CkArrayID parent_,const ampiCommStruct &s) noexcept :parentProxy(parent_), oorder(s.getSize())
 {
   init();
 
@@ -2050,7 +2049,7 @@ void ampi::findParent(bool forMigration) noexcept {
 #if CMK_ERROR_CHECKING
   if (parent==NULL) CkAbort("AMPI can't find its parent!");
 #endif
-  thread=parent->registerAmpi(this, myComm, forMigration);
+  thread=parent->registerAmpi(this,myComm,forMigration);
 #if CMK_ERROR_CHECKING
   if (thread==NULL) CkAbort("AMPI can't find its thread!");
 #endif
@@ -2407,7 +2406,6 @@ void ampi::insertNewChildAmpiElements(MPI_Comm nextComm, CProxy_ampi newAmpi) no
 
 void ampi::commCreatePhase1(MPI_Comm nextGroupComm) noexcept {
   setNumCommCreationsInProgress(1);
-
   CProxy_ampi newAmpi = createNewChildAmpiSync();
   insertNewChildAmpiElements(nextGroupComm, newAmpi);
 }
@@ -2578,7 +2576,7 @@ void ampi::intercommMerge(int first, MPI_Comm *ncomm) noexcept { // first valid 
   MPI_Comm nextintra = parent->getNextIntra();
   contribute(sizeof(nextintra), &nextintra,CkReduction::max_int,cb);
 
-  ampi * dis = block(); //Resumed by ampi::setRemoteProxy after ampiParent::ExchangeProxy from ampiParent::interChildRegister
+  ampi * dis = block(); //Resumed by ampi::registrationFinish
   MPI_Comm newcomm = dis->parent->getNextIntra()-1;
   *ncomm=newcomm;
 }
@@ -2588,7 +2586,6 @@ void ampi::intercommMergePhase1(MPI_Comm nextIntraComm) noexcept {
   if(tmpVec.size()==0) return;
 
   setNumCommCreationsInProgress(1);
-
   CProxy_ampi newAmpi = createNewChildAmpiSync();
   insertNewChildAmpiElements(nextIntraComm, newAmpi);
 }

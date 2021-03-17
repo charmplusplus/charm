@@ -2211,7 +2211,7 @@ class ampiParent final : public CBase_ampiParent {
   ~ampiParent() noexcept;
 
   //Children call this when they are first created, or just migrated
-  TCharm *registerAmpi(ampi *ptr, ampiCommStruct s, bool forMigration) noexcept;
+  TCharm *registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration) noexcept;
 
   // exchange proxy info between two ampi proxies
   void ExchangeProxy(CProxy_ampi rproxy) noexcept {
@@ -2622,7 +2622,7 @@ class ampi final : public CBase_ampi {
 
  public: // entry methods
   ampi() noexcept;
-  ampi(CkArrayID parent_, const ampiCommStruct &s) noexcept;
+  ampi(CkArrayID parent_,const ampiCommStruct &s) noexcept;
   ampi(CkMigrateMessage *msg) noexcept;
   void ckJustMigrated() noexcept;
   void ckJustRestored() noexcept;
