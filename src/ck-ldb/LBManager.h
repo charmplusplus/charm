@@ -466,8 +466,13 @@ class LBManager : public CBase_LBManager
   void LocalBarrierOff(void);
   void ResumeClients();
   static int ProcessorSpeed();
-  inline void SetLBPeriod(double s) {}
-  inline double GetLBPeriod() { return 0; }
+  static void SetLBPeriod(double period)
+  {
+    _lb_args.lbperiod() = period;
+    // If the manager has been initialized, then start the timer
+    if (auto* const obj = LBManager::Object()) obj->setTimer();
+  }
+  static double GetLBPeriod() { return _lb_args.lbperiod(); }
 
   void SetMigrationCost(double cost);
   void SetStrategyCost(double cost);
@@ -480,6 +485,7 @@ class LBManager : public CBase_LBManager
   int new_ld_balancer;  // for Node 0
   MetaBalancer* metabalancer;
   int currentLBIndex;
+  bool isPeriodicQueued = false;
 
  public:
   std::vector<BaseLB*> loadbalancers;
@@ -529,7 +535,9 @@ void LBTurnPredictorOn(LBPredictorFunction* model, int wind);
 void LBTurnPredictorOff();
 void LBChangePredictor(LBPredictorFunction* model);
 
-void LBSetPeriod(double second);
+// This alias remains for backwards compatibility
+CMK_DEPRECATED_MSG("Use LBManager::SetLBPeriod instead of LBSetPeriod")
+void LBSetPeriod(double period);
 
 #if CMK_LB_USER_DATA
 int LBRegisterObjUserData(int size);
