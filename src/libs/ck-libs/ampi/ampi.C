@@ -2533,7 +2533,7 @@ void ampi::intercommCreate(const std::vector<int>& remoteVec, const int root, MP
   CkCallback cb(CkReductionTarget(ampi, intercommCreatePhase1),CkArrayIndex1D(root),myComm.getProxy());
   MPI_Comm nextinter = parent->getNextInter();
   contribute(sizeof(nextinter), &nextinter,CkReduction::max_int,cb);
-  ampi * dis = block(); //Resumed by ampi::setRemoteProxy after ampiParent::ExchangeProxy from ampiParent::interChildRegister
+  ampi * dis = block(); //Resumed by ampi::registrationFinish
   *ncomm = dis->parent->getNextInter()-1;
 }
 

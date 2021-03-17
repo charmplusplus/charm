@@ -2831,7 +2831,7 @@ class ampi final : public CBase_ampi {
   inline std::vector<int> getRemoteIndices() const noexcept { return myComm.getRemoteIndices(); }
   inline const CProxy_ampi &getProxy() const noexcept {return thisProxy;}
   inline const CProxy_ampi &getRemoteProxy() const noexcept {return remoteProxy;}
-  inline void setRemoteProxy(CProxy_ampi rproxy) noexcept { remoteProxy = rproxy; thread->resume(); }
+  inline void setRemoteProxy(CProxy_ampi rproxy) noexcept { remoteProxy = rproxy; }
   inline int getIndexForRank(int r) const noexcept {return myComm.getIndexForRank(r);}
   inline int getIndexForRemoteRank(int r) const noexcept {return myComm.getIndexForRemoteRank(r);}
   void findNeighbors(MPI_Comm comm, int rank, std::vector<int>& neighbors) const noexcept;
