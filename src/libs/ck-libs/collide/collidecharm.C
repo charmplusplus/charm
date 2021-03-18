@@ -426,7 +426,7 @@ collideMgr::collideMgr(const CollideGrid3d &gridMap_,
   contribCount=0;
   msgsSent=msgsRecvd=0;
   totalLocalVoxels = -1;
-  voxelContrib = 0;
+  collisionStarted = false;
 }
 
 //Maintain contributor registration count
@@ -516,7 +516,32 @@ void collideMgr::reductionFinished(void)
 {
   CM_STATUS("collideMgr::reductionFinished");
   //Broadcast Collision start:
+  thisProxy.determineNumVoxels();
   voxelProxy.initiateCollision(thisProxy);
+}
+
+void collideMgr::checkRegistrationComplete() {
+  if(myVoxels.size() == totalLocalVoxels && collisionStarted == false) {
+    collisionStarted = true;
+    //CmiPrintf("[%d][%d][%d][%d] all voxels registered totalvox=%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), thisIndex, totalLocalVoxels);
+    //fflush(stdout);
+    CollisionList colls;
+    for(int i =0 ; i<myVoxels.size(); i++) {
+      myVoxels[i]->startCollision(steps,gridMap,client,statObj, colls);
+    }
+    collideVoxel *vox;
+    client.ckLocalBranch()->collisions(vox,steps,colls);
+  }
+}
+
+void collideMgr::determineNumVoxels() {
+  if(totalLocalVoxels == -1 ) {
+    CkArray *array = voxelProxy.ckLocalBranch();
+    totalLocalVoxels = array->getNumLocalElems();
+  }
+  //CmiPrintf("[%d][%d][%d][%d] determineNumVoxels totalLocalVoxels=%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), thisIndex, totalLocalVoxels);
+  //fflush(stdout);
+  checkRegistrationComplete();
 }
 
 void collideMgr::registerVoxel(collideVoxel *vox) {
@@ -526,14 +551,7 @@ void collideMgr::registerVoxel(collideVoxel *vox) {
     totalLocalVoxels = array->getNumLocalElems();
   }
   myVoxels.push_back(vox);
-  if(++voxelContrib == totalLocalVoxels) {
-    //CmiPrintf("[%d][%d][%d][%d] all voxels registered totalvox=%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), thisIndex, totalLocalVoxels);
-    CollisionList colls;
-    for(int i =0 ; i<myVoxels.size(); i++) {
-      myVoxels[i]->startCollision(steps,gridMap,client,statObj, colls);
-    }
-    client.ckLocalBranch()->collisions(vox,steps,colls);
-  }
+  checkRegistrationComplete();
 }
 
 
@@ -716,7 +734,6 @@ void serialCollideClient::reductionDone(CkReductionMsg *msg)
 distributedCollideClient::distributedCollideClient(CkCallback clientCb_) {
   clientCb = clientCb_;
   clientCb.transformBcastToLocalElem();
-  voxelContrib = 0;
   totalLocalVoxels = -1;
 }
 

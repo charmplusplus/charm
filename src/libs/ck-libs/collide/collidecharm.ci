@@ -30,6 +30,7 @@ module collidecharm {
         CkArrayID cells,
         collideStats statObj);
     entry void voxelMessageRecvd(void);
+    entry void determineNumVoxels();
   };
 
   array [3D] collideVoxel {

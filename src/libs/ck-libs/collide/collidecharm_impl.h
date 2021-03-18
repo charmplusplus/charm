@@ -191,7 +191,8 @@ class collideMgr : public CBase_collideMgr
   int contribCount;//Number of contribute calls given this step
 
   int totalLocalVoxels;
-  int voxelContrib;
+
+  bool collisionStarted;
 
   CollisionAggregator aggregator;
   int msgsSent;//Messages sent out to voxels
@@ -224,6 +225,9 @@ class collideMgr : public CBase_collideMgr
   void voxelMessageRecvd(void);
 
   void registerVoxel(collideVoxel *vox);
+
+  void checkRegistrationComplete();
+  void determineNumVoxels(void);
 };
 
 /********************** collideVoxel ********************
@@ -284,7 +288,6 @@ class serialCollideClient : public collideClient {
   */
 class distributedCollideClient : public collideClient {
   CkCallback clientCb;
-  int voxelContrib;
   int totalLocalVoxels;
   public:
   distributedCollideClient(CkCallback clientCb_);
