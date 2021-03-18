@@ -33,6 +33,9 @@ Misc:
   https://charm.readthedocs.io/en/latest/charm++/manual.html#installation-with-cmake
   for more information.
 
+- Charm++'s development branch has been renamed from 'master' to 'main'. Please see
+  https://github.com/UIUC-PPL/charm/pull/3303 for details.
+
 - We have adopted GitHub discussions
   (https://github.com/UIUC-PPL/charm/discussions) as the preferred
   venue for Charm++ questions and discussions instead of the
@@ -175,28 +178,28 @@ Misc:
 - We have moved bug/issue tracking from Redmine to GitHub, and code
   review from Gerrit to GitHub. Our GitHub repository is at:
   https://github.com/UIUC-PPL/charm .
-  
+
 - As a preview feature, Charm++ can now be built with CMake (version 3.4 or higher).
   To try it, you can replace your `./build` command with `./buildcmake`, which supports
   most of the options of `./build`. The old build system is still available.
   Please see https://charm.readthedocs.io/en/latest/charm++/manual.html#installation-with-cmake
   for more information.
-  
+
 - Upcoming deprecation notice: The next release of Charm++ will feature a significant overhaul of
   the load balancing infrastructure. There will be changes to the process of selecting and using
   load balancers, writing custom load balancers, and the internals of the load balancing
   infrastructure. Programs that rely on custom load balancers or the internals of the LB
   infrastructure will likely require some changes for compatibility.
-  
+
 - Upcoming deprecation notice: The next release of Charm++ will remove the BigSim emulation
   facility from the runtime system.
-  
+
 Known Issues:
 
 - Recent InfiniBand machines crash in SMP builds due to problems in the verbs layer implementation.
   Users are recommended to use UCX for the time being if possible.
   (https://github.com/UIUC-PPL/charm/issues/2532)
-  
+
 - UCX sometimes hangs/crashes on Frontera.
   (https://github.com/UIUC-PPL/charm/issues/2635, https://github.com/UIUC-PPL/charm/issues/2636)
 
@@ -271,7 +274,7 @@ Charm++ Features & Fixes:
 
 - Various improvements to Charm4Py, such as a new sections implementation, are
   described in the charm4py repository on GitHub.
-  
+
 - The CmiAbort and CkAbort functions now support printf-style format strings.
   Please make sure to replace '%' with '%%' in the argument string to print a '%'.
 
@@ -1328,20 +1331,20 @@ Summary of New Features:
 --------------------------------------------------------------------------------
 1. Structure Dagger
    Structured Dagger is a coordination language built on top of CHARM++.
-   Structured Dagger allows easy expression of dependences among messages and 
-   computations and also among computations within the same object using 
-   when-blocks and various structured constructs. 
+   Structured Dagger allows easy expression of dependences among messages and
+   computations and also among computations within the same object using
+   when-blocks and various structured constructs.
 
 2. Entry functions support parameter marshalling
-   Now you can declare and invoke remote entry functions using parameter 
+   Now you can declare and invoke remote entry functions using parameter
    marshalling instead of defining messages.
 
 3. Easier running - standalone mode
-   For net-* version running locally, you can now run Charm programs without 
+   For net-* version running locally, you can now run Charm programs without
    charmrun. Running a node program directly from command line is now the
-   same as "charmrun +p1 <program>"; for SMP version, you can also specify 
+   same as "charmrun +p1 <program>"; for SMP version, you can also specify
    multiple (local) processors, as in "program +p2".
-   
+
 
 --------------------------------------------------------------------------------
 Summary of Changes:
@@ -1364,14 +1367,14 @@ What's New in Charm++ 5.4 release 1 since 5.0
 New Supported Platforms:
 --------------------------------------------------------------------------------
 
-1. Win9x/2000/NT:  with Visual C++ or Cygwin gcc/g++, you can compile and run 
+1. Win9x/2000/NT:  with Visual C++ or Cygwin gcc/g++, you can compile and run
    Charm++ programs on all Win32 platforms.
-   
-2. Scyld Beowulf:  Charm++ has been ported to the Linux-based Scyld Beowulf 
+
+2. Scyld Beowulf:  Charm++ has been ported to the Linux-based Scyld Beowulf
    operating system. For more information on Scyld, see <http://www.scyld.com>
 
 3. MPI with VMI:   Charm++ has been ported to NCSA's Virtual Machine Interface,
-   which is an efficient messaging library for heterogeneous cluster 
+   which is an efficient messaging library for heterogeneous cluster
    communication.
 
 
@@ -1379,8 +1382,8 @@ New Supported Platforms:
 Summary of New Features:
 --------------------------------------------------------------------------------
 1. Dynamic Load balancing:
-   Chare migration is supported in the new release. Migration-based dynamic 
-   load balancing framework with various load balancing strategies library has 
+   Chare migration is supported in the new release. Migration-based dynamic
+   load balancing framework with various load balancing strategies library has
    been added.
 
 2. Chare Array
@@ -1389,23 +1392,23 @@ Summary of New Features:
    library on top of Chare array has been implemented and included.
 
 3. Projections
-   Projections, a Java application for Charm++ program performance analysis and 
+   Projections, a Java application for Charm++ program performance analysis and
    visualization, has been included and distributed in the new release. Two
    trace modes are available: trace-projections and trace-summary. Trace-summary
    is a light-weight trace library compared to trace-projections.
 
 4. AMPI
-   AMPI is a load-balancing based library for porting legacy MPI applications 
+   AMPI is a load-balancing based library for porting legacy MPI applications
    to Charm++. With few changes in the original MPI code to AMPI, the new
-   legacy MPI application on Charm++ will gain from Charm++'s adptive 
+   legacy MPI application on Charm++ will gain from Charm++'s adptive
    load balancing ability.
 
 5. Easier invocation
-   "Charmrun" is now available on all platforms, with a uniform command line 
+   "Charmrun" is now available on all platforms, with a uniform command line
    syntax. You can forget the difference between net-* versions and MPI versions,
-   and run charm++ application with this same charmrun command syntax. 
+   and run charm++ application with this same charmrun command syntax.
    ++local option is added in charmrun for net-* version, it provides
-   simple local use of Charm and no longer require the ability to 
+   simple local use of Charm and no longer require the ability to
    "rsh localhost" or a nodelist file in order to run charm only on the local
    machine. This is especially attractive when you run Charm++ on Windows.
 
@@ -1440,7 +1443,7 @@ Major Features:
 02/18/2000	paranjpy	New platforms supported: net-win32, and 					net-win32-smp
 04/04/2000	olawlor		Added arbitrarily indexed Charm++ arrays.
 				Also, added translator support for new arrays.
-04/15/2000	olawlor		Added "puppers" for packing and unpacking 
+04/15/2000	olawlor		Added "puppers" for packing and unpacking
 				objects.
 06/14/2000	milind		Added the threaded FEM framework.
 
@@ -1448,7 +1451,7 @@ Major Features:
 Minor Features:
 --------------------------------------------------------------------------------
 
-10/09/1999	rbrunner	Added packlib, a library for C and C++ to 
+10/09/1999	rbrunner	Added packlib, a library for C and C++ to
 				pack-unpack data to/from Charm++ messages.
 10/13/1999	gzheng		New LB strategy: RefineLB
 10/13/1999	paranjpy	New LB Strategy: Heap
@@ -1457,16 +1460,16 @@ Minor Features:
 10/21/1999	gzheng		New trace mode: trace-summary
 10/28/1999	milind		New supported platform: net-sol-x86
 10/29/1999	milind		Added runtime checks for ChareID assignment.
-11/10/1999	rbrunner	Added Neighborhood base strategy for LB 
+11/10/1999	rbrunner	Added Neighborhood base strategy for LB
 				framework.
-11/15/1999	olawlor		conv-host now reads in a startup file 
+11/15/1999	olawlor		conv-host now reads in a startup file
 				~/.conv-hostrc
 11/15/1999	olawlor		New test program for testing array reductions.
 11/16/1999	rbrunner	Added processor-speed checking functions to
 				LB framework
 11/19/1999	milind		Mapped SIGUSR to a Ccd condtion handler
 11/22/1999	rbrunner	New LB strategy: WSLB
-11/29/1999	ruiliu		Modified Metis LB strategy to deal with 
+11/29/1999	ruiliu		Modified Metis LB strategy to deal with
 				different processor speeds
 12/16/1999	rbrunner	New LB strategy: GreedyRef
 12/16/1999	rbrunner	New LB strategy: RandRef
@@ -1485,14 +1488,14 @@ Minor Features:
 				CCS port.
 03/10/2000	wilmarth	Random seed-based load balancer now uses
 				bit-vector for active PEs.
-03/21/2000	gzheng		Added support for marking user-defined events 
+03/21/2000	gzheng		Added support for marking user-defined events
 				in trace-summary.
 03/28/2000	wilmarth	Added CMK_TRUECRASH. Very helpful for
 				post-mortem debugging of Charm++ programs on
 				net-* versions.
-03/31/2000	jdesouza	Added Fortran90 support to the Charm++ 
+03/31/2000	jdesouza	Added Fortran90 support to the Charm++
 				interface translator.
-03/09/2000	milind		Added support for -LANG and -rpath options 
+03/09/2000	milind		Added support for -LANG and -rpath options
 				in charmc for Origin2000.
 04/28/2000	milind		Added prioritized converse threads.
 05/01/2000	milind		Added test programs for TeMPO, AMPI and irecv.
@@ -1501,86 +1504,86 @@ Minor Features:
 05/17/2000	olawlor		Each chare, group and array element now has to
 				have migration constructor.
 05/24/2000	milind		Added Jacobi3D programs for irecv and AMPI both.
-05/24/2000	milind		Made migratable an optional attribute of 
-				chares, groups, and nodegroups.  
+05/24/2000	milind		Made migratable an optional attribute of
+				chares, groups, and nodegroups.
 				Arrays are by default migratable.
-05/29/2000	paranjpy	Added pup methods to arrays, reductions etc 
+05/29/2000	paranjpy	Added pup methods to arrays, reductions etc
 				internal objects.
-06/13/2000	milind		Made CtvInitialize idempotent.  That is, it 
-				can be called by any number of threads now, 
-				only the first one will actually do 
+06/13/2000	milind		Made CtvInitialize idempotent.  That is, it
+				can be called by any number of threads now,
+				only the first one will actually do
 				CtvInitialize.
-06/20/2000	milind		Added a simple test program for the FEM 
+06/20/2000	milind		Added a simple test program for the FEM
 				framework.
-07/06/2000	milind		Imported Metis 4.0 sources in the CVS tree. 
-				Also added code to make metis libraries and 
+07/06/2000	milind		Imported Metis 4.0 sources in the CVS tree.
+				Also added code to make metis libraries and
 				executables to Makefile.
-07/07/2000	milind		Added more meaningfull error messages using 
+07/07/2000	milind		Added more meaningfull error messages using
 				perror in addition to a cryptic error codes in
 				net-* versions.
-07/10/2000	milind		fem and femf are now recognized as "languages" 
+07/10/2000	milind		fem and femf are now recognized as "languages"
 				by charmc.
 07/10/2000	saboo		Added the derived datatypes library.
-07/13/2000	milind		Added +idle_timeout functionality. It takes a 
-				commandline parameter denoting milliseconds of 
-				maximum consecutive idle time allowed per 
+07/13/2000	milind		Added +idle_timeout functionality. It takes a
+				commandline parameter denoting milliseconds of
+				maximum consecutive idle time allowed per
 				processor.
-07/14/2000	milind		Added group multicast. Added 
-				CkSendMsgBranchMulti, CldEnqueueMulti, and 
+07/14/2000	milind		Added group multicast. Added
+				CkSendMsgBranchMulti, CldEnqueueMulti, and
 				translator changes to support it.
-07/14/2000	milind		SUPER_INSTALL now takes "-*" arguments prior 
-				to the target, that will be passed to make as 
-				"makeflags". This makes it easy to suppress 
-				make's output of commands etc (with the -s 
-				flag). As a result of this, several Makefiles 
+07/14/2000	milind		SUPER_INSTALL now takes "-*" arguments prior
+				to the target, that will be passed to make as
+				"makeflags". This makes it easy to suppress
+				make's output of commands etc (with the -s
+				flag). As a result of this, several Makefiles
 				have been massaged.
-07/18/2000	milind		Added support for using "dbx" on suns as 
+07/18/2000	milind		Added support for using "dbx" on suns as
 				debugger.
-07/19/2000	milind		Added ability to tracemode projections which 
-				produces binary trace files. Use flag 
+07/19/2000	milind		Added ability to tracemode projections which
+				produces binary trace files. Use flag
 				+binary-trace on the command line.
 07/26/2000	milind		Separated AMPI from TeMPO.
-07/28/2000	milind		Added test programs to test reduce, alltoall 
+07/28/2000	milind		Added test programs to test reduce, alltoall
 				and allreduce functionality of AMPI.
-08/02/2000	milind		Added an option to let the user specify which 
-				"xterm" to use.  For example, on some systems 
-				(CDE), only dtterm is installed.  So, by 
-				putting ++xterm dtterm on the conv-host 
+08/02/2000	milind		Added an option to let the user specify which
+				"xterm" to use.  For example, on some systems
+				(CDE), only dtterm is installed.  So, by
+				putting ++xterm dtterm on the conv-host
 				commandline, one can use dtterm when ++in-xterm
 				option is specified on conv-host commandline.
-08/14/2000	milind		FEM Framework: Added capabilities to handle 
+08/14/2000	milind		FEM Framework: Added capabilities to handle
 				esoteric meshes to standalone offline programs.
-				Makefile now produces gmap and fgmap programs, 
-				which are used for this purpose.  They convert 
-				the mesh to a graph before partitioning it 
+				Makefile now produces gmap and fgmap programs,
+				which are used for this purpose.  They convert
+				the mesh to a graph before partitioning it
 				using Metis.
-08/24/2000	milind		Added the 2D crack propagation program as a 
+08/24/2000	milind		Added the 2D crack propagation program as a
 				test program for FEM framework.
-08/25/2000	milind		Initial implementation of isomalloc-based 
-				threads.  This implementation uses a fixed 
-				stack size for all threads (can be set at 
+08/25/2000	milind		Initial implementation of isomalloc-based
+				threads.  This implementation uses a fixed
+				stack size for all threads (can be set at
 				runtime.)
-08/26/2000	milind		Added a macro CtvAccessOther that lets you 
-				get/set a Ctv variable of any thread.  It 
+08/26/2000	milind		Added a macro CtvAccessOther that lets you
+				get/set a Ctv variable of any thread.  It
 				should be invoked as CtvAccessOther(thread,
-				varname); Added CthGetData function to each of 
-				the threads implementation.  This function is 
+				varname); Added CthGetData function to each of
+				the threads implementation.  This function is
 				used in the CtvAccessOther macro.
-08/27/2000	milind		FEM Framework: Separated mesh to graph 
+08/27/2000	milind		FEM Framework: Separated mesh to graph
 				conversion capability into a separate program.
 				This way, the generated graph can be partitioned
 				repeatedly.
-09/04/2000	milind		Added the class static readonly variables to 
+09/04/2000	milind		Added the class static readonly variables to
 				ci file syntax.
-09/05/2000	milind		FEM Framework: A very fast O(n) algorithm for 
+09/05/2000	milind		FEM Framework: A very fast O(n) algorithm for
 				mesh2graph , uses more memory, but the tradeoff
-				was worth it. Coded by Karthik Mahesh, minor 
+				was worth it. Coded by Karthik Mahesh, minor
 				optimizations by Milind.
-09/05/2000	milind		Added a barebones charm kernel scheduling 
+09/05/2000	milind		Added a barebones charm kernel scheduling
 				overhead measurement program.
 09/15/2000	milind		Added pup support for AMPI and FEM framework.
-09/20/2000	olawlor		Added capability to have an array of base type 
-				where individual element could be of derived 
+09/20/2000	olawlor		Added capability to have an array of base type
+				where individual element could be of derived
 				types.
 10/03/2000	gzheng		New supported platform: net-linux-axp
 10/05/2000	skumar2		Added program littleMD to the test suite.
@@ -1590,127 +1593,127 @@ Minor Features:
 11/05/2000	olawlor		FEM Framework: supports multiple element types,
 				mesh re-assembly, etc.
 11/15/2000	gzheng		New platform support: net-cygwin
-11/18/2000	gzheng		conv-host no longer needs /bin/csh to start 
-				remote program.  set 
-				CMK_CONV_HOST_CSH_UNAVAILABLE to 1 to use 
+11/18/2000	gzheng		conv-host no longer needs /bin/csh to start
+				remote program.  set
+				CMK_CONV_HOST_CSH_UNAVAILABLE to 1 to use
 				/bin/sh instead.
-11/25/2000	milind		Finished experimental implementation of 
+11/25/2000	milind		Finished experimental implementation of
 				converse-threads based on co-operative pthreads.
 11/25/2000	milind		Added a benchmark suite of all pingpongs in
 				Charm++.
-11/28/2000	milind		Removed deletion of _idx at the end of every 
-				send or doneInserting call.  Instead now it is 
-				in the destructor of the proxy. This allows us 
-				to cache proxies, when proxy creation becomes 
+11/28/2000	milind		Removed deletion of _idx at the end of every
+				send or doneInserting call.  Instead now it is
+				in the destructor of the proxy. This allows us
+				to cache proxies, when proxy creation becomes
 				a bottleneck.
-11/28/2000	olawlor		Added "seek blocks" to puppers.  This should 
+11/28/2000	olawlor		Added "seek blocks" to puppers.  This should
 				allow out-of-order pup'ing without the ugliness
-				of getBuf; and in a way that works with all 
+				of getBuf; and in a way that works with all
 				PUP::ers.
 11/29/2000	olawlor		Simplified and regularized command-line-argument
 				handling.
 11/29/2000	milind		AMPI: Added multiple-communicators capability.
-12/05/2000	gzheng		Now /bin/sh is default shell to fork node 
+12/05/2000	gzheng		Now /bin/sh is default shell to fork node
 				program on remote machines.
 12/13/2000	olawlor		Added charmrun wrapper for poe on mpi-sp.
-12/14/2000	milind		Added bluegene emulator sources and test 
+12/14/2000	milind		Added bluegene emulator sources and test
 				programs.  Added "bluegene" as a language known
-				to charmc.  Makefile now has a target called 
-				bluegene.  Added preliminary bluegene 
+				to charmc.  Makefile now has a target called
+				bluegene.  Added preliminary bluegene
 				documentation.  (copied from Arun's webpage.)
 12/15/2000	gzheng		f90charm addition to Makefile and charmc. Also,
-				added fixed size arrays support to f90charm. A 
+				added fixed size arrays support to f90charm. A
 				test program f90charm/hello is checked in.
 12/17/2000	milind		Added rtest test program. Contributed by jim to
 				test Converse message transmission.
-12/20/2000	olawlor		Added charmconfig script. Enables automatic 
-				determination of C++ compiler properties, 
-				replacing the verbose and error-prone 
-				conv-mach.h entries for CMK_BOOL, 
+12/20/2000	olawlor		Added charmconfig script. Enables automatic
+				determination of C++ compiler properties,
+				replacing the verbose and error-prone
+				conv-mach.h entries for CMK_BOOL,
 				CMK_STL_USE_DOT_H, CMK_CPP_CAST_OK, ...
-12/20/2000	olawlor		Charm++ Arrays optimizations: Key and object 
+12/20/2000	olawlor		Charm++ Arrays optimizations: Key and object
 				now variable-length fields, instead of pointers.
-				This extra flexibility lets us save many 
+				This extra flexibility lets us save many
 				dynamic allocations in the array framework.
-12/20/2000	olawlor		Added PUP::able support-- dynamic type 
-				identification, allocation, and deletion.  
-				Allows you to write:   p(objPtr); and 
-				objPointer will be properly identified, 
-				allocated, packed, and deallocated (depending 
-				on the PUP::er).  Requires you to register any 
-				such classes with DECLARE_PUPable and 
+12/20/2000	olawlor		Added PUP::able support-- dynamic type
+				identification, allocation, and deletion.
+				Allows you to write:   p(objPtr); and
+				objPointer will be properly identified,
+				allocated, packed, and deallocated (depending
+				on the PUP::er).  Requires you to register any
+				such classes with DECLARE_PUPable and
 				DEFINE_PUPable.
-12/20/2000	olawlor		Arrays optimizations: Made CkArrayIndex 
-				fixed-size.  This significantly improves 
-				messaging speed (7 us instead of 10 us 
-				roundtrip).  Move spring cleaning check into a 
+12/20/2000	olawlor		Arrays optimizations: Made CkArrayIndex
+				fixed-size.  This significantly improves
+				messaging speed (7 us instead of 10 us
+				roundtrip).  Move spring cleaning check into a
 				CcdCallFnAfter, which gains more speed (down to
 				4 us roundtrip).
-12/20/2000	olawlor		More optimizations: Minor speed tweaks-- 
-				conv-ccs.c uses hashtable for handler lookup; 
-				conv-conds skips timer test until needed; 
-				convcore.c scheduler loop optmizations (no 
-				superfluous EndIdle calls); threads.c 
+12/20/2000	olawlor		More optimizations: Minor speed tweaks--
+				conv-ccs.c uses hashtable for handler lookup;
+				conv-conds skips timer test until needed;
+				convcore.c scheduler loop optmizations (no
+				superfluous EndIdle calls); threads.c
 				CMK_OPTIMIZE-> no mprotect.
-12/20/2000	olawlor		More Optimizations: Minor speed tweaks-- ck.C 
-				groups cldEnqueue skip; init.h defines 
+12/20/2000	olawlor		More Optimizations: Minor speed tweaks-- ck.C
+				groups cldEnqueue skip; init.h defines
 				CkLocalBranch inline; and supporting changes.
 12/22/2000	gzheng		IA64 support for Converse user level threads.
-01/02/2001	olawlor		CCS: Minor update-- enabled CcsProbe, cleaned 
-				up superflous debug messages in server, added 
-				Java interface (originally written for 
+01/02/2001	olawlor		CCS: Minor update-- enabled CcsProbe, cleaned
+				up superflous debug messages in server, added
+				Java interface (originally written for
 				AppSpecter).
-01/09/2001	gzheng		charmconfig converted to autoconf style, need 
+01/09/2001	gzheng		charmconfig converted to autoconf style, need
 				to change configure.in and conv-autoconfig.h.in,
-				and run autoconf to get configure and copy to 
-				charmconfig.  added fortran subroutine name 
+				and run autoconf to get configure and copy to
+				charmconfig.  added fortran subroutine name
 				test and get libpthread.a
-01/10/2001	milind		Added telnet method of getting libpthread.a 
+01/10/2001	milind		Added telnet method of getting libpthread.a
 				from charm webserver.
-01/11/2001	olawlor		Moved projections files here from 
-				CVSROOT/projections-java.  Added fast Java 
-				versions of the .log file input routines in 
-				LogReader, LogLoader, LogAnalyzer, and 
-				UsageCalc.  Added "U.java" user interface 
-				utility file, allowing times to be input in 
-				seconds, milliseconds, or microseconds, 
+01/11/2001	olawlor		Moved projections files here from
+				CVSROOT/projections-java.  Added fast Java
+				versions of the .log file input routines in
+				LogReader, LogLoader, LogAnalyzer, and
+				UsageCalc.  Added "U.java" user interface
+				utility file, allowing times to be input in
+				seconds, milliseconds, or microseconds,
 				instead of just microseconds.
-01/15/2001	gzheng		add +trace-root to specify the directory to 
+01/15/2001	gzheng		add +trace-root to specify the directory to
 				put log files in. this is need in Scyld cluster
-				where there is no NFS mounting and no i/o 
+				where there is no NFS mounting and no i/o
 				access to home directory sharing on nodes.
-01/15/2001	milind		Made AMPI into a f90 module instead of 
-				'ampif.h' inclusion.  AMPI f90 bindings are 
-				now more inclusive.  Fixed argc,argv handling 
-				bugs in ArgsInfo message.  Fixed a bug in pup 
-				that caused thread not to be sized, but was 
-				packed nevertheless. Moved irecv to waitall 
-				instead of at in ampi_start.  Made 
-				AMPI_COMM_WORLD to be 0, because it clashed 
-				with wildcard(-1).  AMPI_COMM_UNIVERSE is now 
-				handled properly in the AMPI module.  
-				C/C++ data members are NOT visible to 
+01/15/2001	milind		Made AMPI into a f90 module instead of
+				'ampif.h' inclusion.  AMPI f90 bindings are
+				now more inclusive.  Fixed argc,argv handling
+				bugs in ArgsInfo message.  Fixed a bug in pup
+				that caused thread not to be sized, but was
+				packed nevertheless. Moved irecv to waitall
+				instead of at in ampi_start.  Made
+				AMPI_COMM_WORLD to be 0, because it clashed
+				with wildcard(-1).  AMPI_COMM_UNIVERSE is now
+				handled properly in the AMPI module.
+				C/C++ data members are NOT visible to
 				Fortran 90.
 01/18/2001	gzheng		New supported platform: net-linux-scyld
-01/20/2001	olawlor		Moved array index field from CMessage_* to the 
-				Ck envelope itself.  This is the right thing 
-				to do, because any message may be sent to/from 
-				an array element.  To reduce the wasted space 
-				in a message, a union is used to overlay the 
+01/20/2001	olawlor		Moved array index field from CMessage_* to the
+				Ck envelope itself.  This is the right thing
+				to do, because any message may be sent to/from
+				an array element.  To reduce the wasted space
+				in a message, a union is used to overlay the
 				fields for the various possible message types.
 01/29/2001	olawlor		Freed charmrun on net-* version from using
 				remote shell to fork off processes. One can now
 				use a daemon provided in the distribution.
 02/07/2001	olawlor		Added debugging support to puppers.
-02/13/2000	gzheng		Added ++local option to charmrun to start node 
-				program locally without any daemon; fix the 
-				hang program if you type wrong pgm name in 
-				scyld version, and redirect all output to 
-				/dev/null, otherwise all node program can send 
+02/13/2000	gzheng		Added ++local option to charmrun to start node
+				program locally without any daemon; fix the
+				hang program if you type wrong pgm name in
+				scyld version, and redirect all output to
+				/dev/null, otherwise all node program can send
 				its output to console in scyld. Also implemented				++local in net-win32 version.
 02/26/2000	milind		Changed the varsize syntax. Now one can specify
 				actual varsize arrays in the interface file
-				and have the translator generate alloc, pack 
+				and have the translator generate alloc, pack
 				and unpack.
 
 --------------------------------------------------------------------------------
@@ -1732,101 +1735,101 @@ Bug Fixes:
 03/02/2000	milind		Made CCS work on SMPs.
 03/07/2000	milind		Made ConverseInit consistent with the manual on
 				Origin2000 version.
-04/18/2000	milind		Fixed a bug in CkWaitFuture, which was caching 
-				a variable locally, while it was changed by 
+04/18/2000	milind		Fixed a bug in CkWaitFuture, which was caching
+				a variable locally, while it was changed by
 				another thread.
 05/04/2000	paranjpy	Fixed argv deletion bug on net-win32-smp.
-06/08/2000	milind	 	sp3 version: changed optimization flags, which 
+06/08/2000	milind	 	sp3 version: changed optimization flags, which
 				where power2 processor-specific.
 06/20/2000	milind		mpi-* versions: Fixed ConverseExit since it was
-				not obeying the following statement in the MPI 
+				not obeying the following statement in the MPI
 				standard: The user must ensure that all pending
-				communications involving a process completes 
+				communications involving a process completes
 				before the process calls MPI_FINALIZE.
-07/05/2000	milind		Fixed a nasty bug in charmc in the -cp option. 
-				It used to append the name provided to -o flag 
-				to the directory provided to the -cp flag.  
-				Thus, -o ../pgm -cp ../bin options meant that 
-				the pgm would be copied to ../bin/.., which is 
-				not the expected behavior. This fix correctly 
+07/05/2000	milind		Fixed a nasty bug in charmc in the -cp option.
+				It used to append the name provided to -o flag
+				to the directory provided to the -cp flag.
+				Thus, -o ../pgm -cp ../bin options meant that
+				the pgm would be copied to ../bin/.., which is
+				not the expected behavior. This fix correctly
 				copies pgm to ../bin.
-07/07/2000	milind		Removed variable arg_myhome, as it was not 
-				being used anywhere, and also, setting it was 
+07/07/2000	milind		Removed variable arg_myhome, as it was not
+				being used anywhere, and also, setting it was
 				causing problems of env var HOME was not set.
-07/27/2000	milind		thishandle for the arrayelement was not being 
+07/27/2000	milind		thishandle for the arrayelement was not being
 				correctly set.  Bug was reported by Neelam.
-08/26/2000	milind		Origin2000: Changed the page alignment to 
-				reflect the mmap alignment.  The mmap man page 
-				specifically states that it is not the same as 
+08/26/2000	milind		Origin2000: Changed the page alignment to
+				reflect the mmap alignment.  The mmap man page
+				specifically states that it is not the same as
 				page size.
-09/02/2000	milind		Fixed a bug in code generated for threaded 
-				(void) entry methods of array elements. The 
-				dummy message that is passed to that method in 
-				a thread has to be deleted before calling the 
-				object method, because upon object method's 
+09/02/2000	milind		Fixed a bug in code generated for threaded
+				(void) entry methods of array elements. The
+				dummy message that is passed to that method in
+				a thread has to be deleted before calling the
+				object method, because upon object method's
 				return, the thread might have migrated.
-09/03/2000	olawlor		Minor fix-fixes: 1.) Change to LBObjid hash 
+09/03/2000	olawlor		Minor fix-fixes: 1.) Change to LBObjid hash
 				function would fail for >4-int object indices.
-				Replaced with proper function, which also 
-				preserves the 1-int case.  2.) Array element 
-				sends must go via the message queue to prevent 
-				stack build-up for deep single-processor call 
-				chains. These might happen, e.g., in a driver 
+				Replaced with proper function, which also
+				preserves the 1-int case.  2.) Array element
+				sends must go via the message queue to prevent
+				stack build-up for deep single-processor call
+				chains. These might happen, e.g., in a driver
 				element calling itself for the main time loop.
-				Messages are now properly noted as sent, then 
-				wait through the queue for delivery.  This 
-				entailed minor reorganization of the message 
+				Messages are now properly noted as sent, then
+				wait through the queue for delivery.  This
+				entailed minor reorganization of the message
 				delivery subsystem.
-09/21/2000	olawlor		Tiny SMP thread fix-- registrations of a 
-				thread-private variable now reserve space on 
-				calls after the first.  This wastes space for 
+09/21/2000	olawlor		Tiny SMP thread fix-- registrations of a
+				thread-private variable now reserve space on
+				calls after the first.  This wastes space for
 				multiple CthInitialize's-- it's a quick hack to
 				get threads working again on SMP versions.
-10/16/2000	olawlor		A few CCS fixes:   -Added split-phase reply 
+10/16/2000	olawlor		A few CCS fixes:   -Added split-phase reply
 				(delay reply indefinitely)  -Cleaned up error
 				handling -Pass user data as "void *" instead of
 				"char *"
-11/03/2000	wilmarth	Removed 0 size array allocation in Charm++ 
+11/03/2000	wilmarth	Removed 0 size array allocation in Charm++
 				quiescence detection.
-11/20/2000	gzheng		Rewrote part of Fiber thread, including a bug 
-				fix for a the non thread-safe function, and a 
+11/20/2000	gzheng		Rewrote part of Fiber thread, including a bug
+				fix for a the non thread-safe function, and a
 				different fiber free strategy.
-11/29/2000	gzheng		The LB init procedure tried to allocate 
-				65536*160 as initial size, which is 10M memory 
-				for communication table, which is too big. 
-				Cut it down to roughly 1M, and it can expand 
+11/29/2000	gzheng		The LB init procedure tried to allocate
+				65536*160 as initial size, which is 10M memory
+				for communication table, which is too big.
+				Cut it down to roughly 1M, and it can expand
 				in later code.
-12/05/2000	gzheng		In many cases, conv-host exits without print 
-				out the error message from remote shell. try 
-				to fix it by calling sync to flush the pipe 
+12/05/2000	gzheng		In many cases, conv-host exits without print
+				out the error message from remote shell. try
+				to fix it by calling sync to flush the pipe
 				before exit 1.
-12/10/2000	milind		net-linux: Made static linking the default 
-				option because dynamic linking runtime causes 
+12/10/2000	milind		net-linux: Made static linking the default
+				option because dynamic linking runtime causes
 				isomalloc threads to crash.
-12/18/2000	milind		Increased portability of isomalloc threads by 
+12/18/2000	milind		Increased portability of isomalloc threads by
 				removing dependence on alloca.
 12/28/2000	milind		Fixed ctrl-getone abort bug on SMP.
-12/28/2000	milind		Made _groupTable a pointer on which a 
-				constructor is explicitly called.  Since it 
-				was a Cpv variable, its constructor was not 
+12/28/2000	milind		Made _groupTable a pointer on which a
+				constructor is explicitly called.  Since it
+				was a Cpv variable, its constructor was not
 				called by default in case of an SMP version.
-12/29/2000	olawlor		Prevent infinite copy constructor recursion on 
+12/29/2000	olawlor		Prevent infinite copy constructor recursion on
 				Origin2000.
-01/10/2001	olawlor		Added "explicit" keyword to remove ambiguity 
-				for KCC, which was confused by the private 
+01/10/2001	olawlor		Added "explicit" keyword to remove ambiguity
+				for KCC, which was confused by the private
 				PUP::er(int) "cast" constructor and the operator
 				|(PUP::er &p,T &t) into rejecting all operator|
 				(int,int) as ambiguous.
-2001/01/17	gzheng		fix the charmconfig bug on paragon-red: the 
-				failure testing of fortran won't stop the 
+2001/01/17	gzheng		fix the charmconfig bug on paragon-red: the
+				failure testing of fortran won't stop the
 				compilation.
 01/20/2001	olawlor		Arrays reduction:  Fixed bug-- reduction may end
-				because all contributors migrate away. 
-01/29/2001	olawlor		Fix heap-corrupting bug-- call ->init() on 
-				nodeGroupTable, which sets the "pending" 
-				message queue to NULL.  This prevents a nasty 
-				delete-unitialized-data bug later on.  Also 
-				delayed queue creation until messages actually 
+				because all contributors migrate away.
+01/29/2001	olawlor		Fix heap-corrupting bug-- call ->init() on
+				nodeGroupTable, which sets the "pending"
+				message queue to NULL.  This prevents a nasty
+				delete-unitialized-data bug later on.  Also
+				delayed queue creation until messages actually
 				arrive.
 
 --------------------------------------------------------------------------------
@@ -1849,7 +1852,7 @@ Documentation Changes:
 Other Changes:
 --------------------------------------------------------------------------------
 
-10/24/1999	olawlor		charmc is changed to Bourne shell script 
+10/24/1999	olawlor		charmc is changed to Bourne shell script
 				instead of csh. All conv-mach.csh are
 				replaced by conv-mach.sh.
 10/25/1999	olawlor		SUPER_INSTALL is converted to use bourne shell.
@@ -1858,46 +1861,46 @@ Other Changes:
 01/16/2000	olawlor		Simplified Charm++ interface translator.
 02/23/2000	ruiliu		Changed rand() calls from all over the codes
 				to the new Converse random number generator.
-02/26/2000	milind		Simplified the converse scheduler loop by 
+02/26/2000	milind		Simplified the converse scheduler loop by
 				combining the maxmsgs and poll modes.
 08/31/2000	milind		Imported system documentation into the CVS tree.
-				Also added super_install target for docs with 
+				Also added super_install target for docs with
 				necessary Makefile modifications.
-09/08/2000	olawlor		Made soft links use relative pathnames instead 
-				of absolute.  This lets you move a charm++ 
-				installation without having to recompile 
+09/08/2000	olawlor		Made soft links use relative pathnames instead
+				of absolute.  This lets you move a charm++
+				installation without having to recompile
 				anything.
 09/11/2000	olawlor		Grouped commonly needed code in the new util
 				directory. Also, added pup_c a C wrapper for
 				puppers.
-09/11/2000	olawlor		Slightly reorganized header structure.  Now no 
+09/11/2000	olawlor		Slightly reorganized header structure.  Now no
 				headers should need to be listed twice (once in
-				ALLHEADERS, again in CKHEADERS).  Now headers 
-				are soft-linked instead of copied.  This makes 
+				ALLHEADERS, again in CKHEADERS).  Now headers
+				are soft-linked instead of copied.  This makes
 				development much easier.  Added support for the
 				new Common/util directory.
-09/21/2000	olawlor		Major reorganization of net-* codes. Now all 
+09/21/2000	olawlor		Major reorganization of net-* codes. Now all
 				the TCP socket routines are in separate files.
 				Also combined windoes NT code with unix codes.
-09/21/2000	olawlor		Major rewrite of CCS-- underlying protocol is 
-				now binary (send/recv binary data everywhere); 
-				conv-host forwards requests to nodes; and 
-				source has been significantly re-arranged.  
+09/21/2000	olawlor		Major rewrite of CCS-- underlying protocol is
+				now binary (send/recv binary data everywhere);
+				conv-host forwards requests to nodes; and
+				source has been significantly re-arranged.
 				(especially if NODE_0_IS_CONVHOST).
 11/22/2000	milind		Removed IDL translator from distribution.
-12/01/2000	olawlor		Renamed conv-host charmrun; added test for 
-				script conv-host. Also added charmrun for most 
+12/01/2000	olawlor		Renamed conv-host charmrun; added test for
+				script conv-host. Also added charmrun for most
 				other machines.
-12/17/2000	milind		Moved List related data structures into 
+12/17/2000	milind		Moved List related data structures into
 				cklists.h in util. Removed most of the redundant
 				list implementations.
-12/20/2000	gzheng		SUPER_INSTALL: format the output of list of 
-				versions and make the help page fit into one 
+12/20/2000	gzheng		SUPER_INSTALL: format the output of list of
+				versions and make the help page fit into one
 				page of xterm.
-12/24/2000	milind		Added test-{charm,converse,ampi,fem} targets to 
+12/24/2000	milind		Added test-{charm,converse,ampi,fem} targets to
 				super_install.
 12/28/2000	milind		net-sol-smp now uses pthreads.
 01/29/2001	olawlor		Merged windowsNT and unix build procedures by
-				basing the Windows build on cygwin. Added 
-				scripts to deal with unix and windows 
+				basing the Windows build on cygwin. Added
+				scripts to deal with unix and windows
 				differences.
