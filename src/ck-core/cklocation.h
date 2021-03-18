@@ -523,7 +523,8 @@ public:
   {
     if (compressor)
     {
-      return compressor->compress(idx);
+      // TODO: If number of PEs doesn't fit into number of home bits, this will overflow
+      return (homePe(idx) << CMK_OBJID_ELEMENT_BITS) + compressor->compress(idx);
     }
     else
     {
@@ -537,7 +538,8 @@ public:
   {
     if (compressor)
     {
-      id = compressor->compress(idx);
+      // TODO: If number of PEs doesn't fit into number of home bits, this will overflow
+      id = (homePe(idx) << CMK_OBJID_ELEMENT_BITS) + compressor->compress(idx);
       return true;
     }
     else
