@@ -88,6 +88,15 @@ if(CMK_SUPPORTS_PIPGLOBALS)
         COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_globals_pip.dir/ampi_globals_pip.C.o ${CMAKE_BINARY_DIR}/lib/ampi_globals_pip.o
         VERBATIM
     )
+
+    add_library(ampi_globals_pie ampi_globals_pie.C)
+    target_compile_options(ampi_globals_pie PRIVATE -language ampi)
+    add_dependencies(ampi_globals_pie moduleampi)
+    add_custom_command(TARGET ampi_globals_pie
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_globals_pie.dir/ampi_globals_pie.C.o ${CMAKE_BINARY_DIR}/lib/ampi_globals_pie.o
+        VERBATIM
+    )
 endif()
 
 
