@@ -75,10 +75,6 @@ void TCharm::nodeInit()
   }
 #endif
 
-  // Assumes no anytime migration and only static insertion
-  _isAnytimeMigration = false;
-  _isStaticInsertion = true;
-
   char **argv = CkGetArgv();
   nChunks = CkNumPes();
   CmiGetArgIntDesc(argv, "-vp", &nChunks, "Set the total number of virtual processors");
@@ -650,8 +646,6 @@ FLINKAGE void FTN_NAME(TCHARM_CREATE_DATA,tcharm_create_data)
 		  void *threadData,int *threadDataLen)
 { TCHARM_Create_data(*nThreads,threadFn,threadData,*threadDataLen); }
 
-CkGroupID CkCreatePropMap();
-
 static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
 {
   CkArrayOptions opts(msg->numElements);
@@ -681,10 +675,11 @@ static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
     opts.setMap(mapID);
   } else if(0 == strcmp(mapping,"PROP_MAP")) {
     CkPrintf("TCharm> using PROP_MAP\n");
-    mapID = CkCreatePropMap();
+    mapID = CProxy_PropMap::ckNew();
     opts.setMap(mapID);
   }
   opts.setStaticInsertion(true);
+  opts.setAnytimeMigration(false);
   opts.setSectionAutoDelegate(false);
   return CProxy_TCharm::ckNew(msg,opts);
 }
