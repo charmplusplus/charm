@@ -2206,11 +2206,11 @@ CProxy_ampi ampi::createNewChildAmpiSync() noexcept {
   CkCallback initCB(CkIndex_ampi::registrationFinish(), thisProxy[thisIndex]);
   opts.setInitCallback(initCB);
 
-  CkCallback cb(CkCallback::resumeThread);
+  ck::future<CkArrayID> newAmpiFuture;
+  CkCallback cb(newAmpiFuture.handle());
   CProxy_ampi::ckNew(opts, cb);
-  CkArrayCreatedMsg *newAmpiMsg = static_cast<CkArrayCreatedMsg*>(cb.thread_delay());
-  CProxy_ampi newAmpi = newAmpiMsg->aid;
-  delete newAmpiMsg;
+  auto newAmpi = newAmpiFuture.get();
+  newAmpiFuture.release();
   return newAmpi;
 }
 
