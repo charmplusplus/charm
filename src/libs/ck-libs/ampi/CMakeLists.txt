@@ -7,13 +7,13 @@ set(ampi-h-sources ampi.h ampi-interoperate.h ampif.h ampiimpl.h ddt.h ampi_func
 
 add_library(ampi-compat compat_ampi.c
        compat_ampim.C compat_ampifm.C compat_ampicm.C
-       compat_ampicpp.C)
+       compat_ampicpp.C compat_ampins.C)
 
 
 # fsglobals/pipglobals
 
 add_library(ampi_funcptr_shim ampi_funcptr_shim.C)
-target_compile_options(ampi_funcptr_shim PRIVATE -language ampi -DAMPI_USE_FUNCPTR -DAMPI_NO_UNIMPLEMENTED_WARNINGS -fPIE -shared -fvisibility=hidden)
+target_compile_options(ampi_funcptr_shim PRIVATE -language ampi -DAMPI_USE_FUNCPTR -DAMPI_NO_UNIMPLEMENTED_WARNINGS -fPIE -shared)
 add_dependencies(ampi_funcptr_shim moduleampi)
 add_custom_command(TARGET ampi_funcptr_shim
     POST_BUILD
@@ -50,7 +50,7 @@ add_custom_command(TARGET ampi_funcptr_loader_stub
 
 if(CMK_CAN_LINK_FORTRAN)
     add_library(ampi_funcptr_shim_fortran ampif.C)
-    target_compile_options(ampi_funcptr_shim_fortran PRIVATE -language ampi -DAMPI_USE_FUNCPTR -fPIE -shared -fvisibility=hidden)
+    target_compile_options(ampi_funcptr_shim_fortran PRIVATE -language ampi -DAMPI_USE_FUNCPTR -fPIE -shared)
     add_dependencies(ampi_funcptr_shim_fortran moduleampi moduleampif)
     add_custom_command(TARGET ampi_funcptr_shim_fortran
         POST_BUILD

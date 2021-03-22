@@ -388,6 +388,8 @@ public:
 FLINKAGE void FTN_NAME(TCHARM_USER_NODE_SETUP,tcharm_user_node_setup)(void);
 FLINKAGE void FTN_NAME(TCHARM_USER_SETUP,tcharm_user_setup)(void);
 
+/* For internal use only: semantics subject to change. */
+CLINKAGE void TCHARM_Node_Setup(int numelements);
 
 #endif
 

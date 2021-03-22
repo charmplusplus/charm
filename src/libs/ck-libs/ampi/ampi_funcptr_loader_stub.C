@@ -1,8 +1,13 @@
 
 #include "ampi_funcptr_loader.h"
 
-int AMPI_FuncPtr_Loader(SharedObject myexe, int argc, char ** argv)
+void AMPI_FuncPtr_Pack(struct AMPI_FuncPtr_Transport * funcptrs)
 {
-  // jump to the user binary
-  return AMPI_Main_Dispatch(myexe, argc, argv);
+  (void)funcptrs;
+}
+
+AMPI_FuncPtr_Unpack_t AMPI_FuncPtr_Unpack_Locate(SharedObject myexe)
+{
+  (void)myexe;
+  return nullptr;
 }
