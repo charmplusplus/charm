@@ -470,10 +470,10 @@ for this get request including the data buffer. Finally,
 Compute Resource Awareness
 --------------------------
 
-AMPI provides a set of built-in attributes on all communicators and
-windows to find the number of the worker thread, process, or host that a
-rank is currently running on, as well as the total number of worker
-threads, processes, and hosts in the job. We define a worker thread to
+AMPI provides a set of built-in attributes on all communicators to find
+the number of the worker thread or process that a rank is currently
+running on, its home worker thread, as well as the total number of
+worker threads and processes in the job. We define a worker thread to
 be a thread on which one of more AMPI ranks are scheduled. We define a
 process here as an operating system process, which may contain one or
 more worker threads. The built-in attributes are listed in the following table:
