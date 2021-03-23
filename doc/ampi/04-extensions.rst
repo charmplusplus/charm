@@ -491,6 +491,7 @@ more worker threads. The built-in attributes are listed in the following table:
 +------------------------+-------------------------------------------------+
 | ``AMPI_MY_HOME_WTH``   | Home worker thread of the rank.                 |
 +------------------------+-------------------------------------------------+
+
 These attributes are accessible from any rank by calling
 ``MPI_Comm_get_attr``, such as:
 
