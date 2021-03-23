@@ -476,9 +476,21 @@ rank is currently running on, as well as the total number of worker
 threads, processes, and hosts in the job. We define a worker thread to
 be a thread on which one of more AMPI ranks are scheduled. We define a
 process here as an operating system process, which may contain one or
-more worker threads. The built-in attributes are ``AMPI_MY_WTH``,
-``AMPI_MY_PROCESS``, ``AMPI_NUM_WTHS``, ``AMPI_NUM_PROCESSES``, and
-``AMPI_MY_HOME_WTH``.
+more worker threads. The built-in attributes are listed in the following table:
+
++------------------------+-------------------------------------------------+
+| Attribute              | Defintion                                       |
++========================+=================================================+
+| ``AMPI_MY_WTH``        | Worker thread the rank is currently running on. |
++------------------------+-------------------------------------------------+
+| ``AMPI_MY_PROCESS``    | OS process the rank is currently running on.    |
++------------------------+-------------------------------------------------+
+| ``AMPI_NUM_WTHS``      | Number of worker threads in the application.    |
++------------------------+-------------------------------------------------+
+| ``AMPI_NUM_PROCESSES`` | Number of OS processes in the application.      |
++------------------------+-------------------------------------------------+
+| ``AMPI_MY_HOME_WTH``   | Home worker thread of the rank.                 |
++------------------------+-------------------------------------------------+
 These attributes are accessible from any rank by calling
 ``MPI_Comm_get_attr``, such as:
 
