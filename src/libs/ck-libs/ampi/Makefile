@@ -9,7 +9,7 @@ HEADDEP=$(HEADERS) \
 		../tcharm/tcharm.h ../tcharm/tcharm_impl.h
 COMPAT=compat_ampi.o \
        compat_ampim.o compat_ampifm.o compat_ampicm.o \
-	   compat_ampicpp.o
+       compat_ampicpp.o compat_ampins.o
 OBJS=ampi.o $(AMPIF_OBJ) ampiOneSided.o \
      ampiMisc.o ddt.o mpich-alltoall.o ampi_mpix.o ampi_noimpl.o
 
@@ -18,7 +18,6 @@ AMPI_LIBDIR=$(CDIR)/lib
 DEST=$(AMPI_LIBDIR)/$(AMPI_LIB).a
 DESTF=$(AMPI_LIBDIR)/$(AMPI_LIB)f.a
 COMPATLIB=$(AMPI_LIBDIR)/libampi-compat.a
-ROMIOLIB=$(AMPI_LIBDIR)/libampiromio
 
 AMPIF_OBJ=$(AMPI_LIBDIR)/ampif.o
 AMPIFIMPL_OBJ=$(AMPI_LIBDIR)/ampifimpl.o
@@ -52,13 +51,37 @@ ifeq (1,$(CMK_SUPPORTS_FSGLOBALS))
   AMPI_TARGET += $(GLOBALS_FS_OBJ)
 endif
 
-ifeq ($(CMK_NO_BUILD_SHARED),false)
-	ROMIOLIBSHARED=$(CDIR)/lib_so/libampiromio.$(CMK_SHARED_SUF)
+ifeq ($(CMK_AMPI_WITH_ROMIO),1)
+  ROMIO = romio/.libs/libromio.a
+
+  ROMIO_OBJ_DIRS := \
+    romio/adio/ad_ufs \
+    romio/adio/common \
+    romio/adio/ad_nfs \
+    romio/adio/ad_testfs \
+    romio/mpi-io \
+    romio/mpi-io/glue/default \
+    romio/mpi-io/glue \
+
+  ROMIO_FORTRAN_OBJ_DIRS := \
+    romio/mpi-io/fortran \
+
+  ROMIO_OBJS = \
+    $(foreach o,o obj, \
+      $(foreach d,$(ROMIO_OBJ_DIRS), \
+        $(wildcard $d/*.$o) \
+      ) \
+    )
+
+  ROMIO_FORTRAN_OBJS = \
+    $(foreach o,o obj, \
+      $(foreach d,$(ROMIO_FORTRAN_OBJ_DIRS), \
+        $(wildcard $d/*.$o) \
+      ) \
+    )
 endif
 
-ifeq ($(CMK_AMPI_WITH_ROMIO),1)
-	ROMIO=$(ROMIOLIB).a
-endif
+ROMIO_FLAGS = -DAMPI_NO_UNIMPLEMENTED_WARNINGS -standalone
 
 .SUFFIXES:
 .SUFFIXES: .C .o
@@ -67,40 +90,35 @@ endif
 	$(CHARMC) -c $<
 
 MAJOR_TARGETS := AMPI
-ROMIO_DEPS = $(DEST)
 ifeq (1,$(CMK_CAN_LINK_FORTRAN))
   MAJOR_TARGETS += AMPIF
-  ROMIO_DEPS += $(DESTF)
+  ROMIO_F77 := yes
+else
+  ROMIO_F77 := no
 endif
 
 all: $(MAJOR_TARGETS) $(COMPATLIB) $(ROMIO)
 
-$(ROMIO): $(ROMIO_DEPS)
+$(ROMIO): headers
 	@echo "Building ROMIO"
 	cd romio &&                                                                  \
 		MPI_IMPL="ampi" FROM_MPICH="no" FROM_LAM="no" FROM_OMPI="no"         \
 		MPI_LIB=""                                                           \
-		CFLAGS="$(OPTS) -ampi-romio-configure"                               \
-		FFLAGS="$(OPTS) -ampi-romio-configure"                               \
+		CFLAGS="$(OPTS) $(ROMIO_FLAGS)"        \
+		FFLAGS="$(OPTS) $(ROMIO_FLAGS)"        \
 		F77="$(CDIR)/bin/ampif90"                                            \
 		CC="$(CDIR)/bin/ampicc"                                              \
 		./configure                                                          \
 		--disable-aio                                                        \
-		--enable-f77=`test -f $(DESTF) && echo yes || echo no`               \
+		--enable-f77=$(ROMIO_F77)                                            \
 		--enable-static=yes                                                  \
-		--enable-shared=`test -n "$(ROMIOLIBSHARED)" && echo yes || echo no` \
+		--enable-shared=no                                                   \
 		--disable-weak-symbols                                               \
-		--srcdir=`pwd`
+		--srcdir=`pwd`                                                       \
+		|| ( cat config.log ; exit 1 )
 
 	cp romio/include/mpio.h romio/include/mpiof.h romio/include/mpio_functions.h $(CDIR)/include
 	$(MAKE) -C romio AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=:
-	cp romio/.libs/libromio.a $@
-ifneq ($(ROMIOLIBSHARED),)
-	cp romio/.libs/libromio.$(CMK_SHARED_SUF) $(ROMIOLIBSHARED)
-ifeq ($(CMK_MACOSX),1)
-	install_name_tool -id $(ROMIOLIBSHARED) $(ROMIOLIBSHARED)
-endif
-endif
 	@echo "ROMIO built successfully"
 
 AMPI: $(AMPI_TARGET)
@@ -109,15 +127,15 @@ AMPI: $(AMPI_TARGET)
 AMPIF: $(AMPIF_TARGET)
 	@echo "AMPIF built successfully"
 
-$(DEST): $(OBJS) headers
-	$(CHARMC) $(OBJS) -o $@
+$(DEST): $(OBJS) headers $(ROMIO)
+	$(CHARMC) $(OBJS) $(ROMIO_OBJS) -o $@
 	cp $(AMPI_LIB).dep $(AMPI_LIBDIR)/$(AMPI_LIB).dep
 
-$(DESTF): $(OBJS) headers
+$(DESTF): $(OBJS) headers $(ROMIO)
 	$(CHARMC) -c ampifimpl.f90 -o $(AMPIFIMPL_OBJ)
 	$(CHARMC) -c ampimod.f90 -o $(AMPIMOD_OBJ)
 	$(CHARMC) -cpmod ../../../../include mpi.M
-	$(CHARMC) $(OBJS) $(AMPIFIMPL_OBJ) $(AMPIMOD_OBJ) -o $@
+	$(CHARMC) $(OBJS) $(ROMIO_OBJS) $(ROMIO_FORTRAN_OBJS) $(AMPIFIMPL_OBJ) $(AMPIMOD_OBJ) -o $@
 	cp $(AMPI_LIB)f.dep $(AMPI_LIBDIR)/$(AMPI_LIB)f.dep
 
 $(COMPATLIB): $(COMPAT)
@@ -171,9 +189,13 @@ compat_ampicm.o: compat_ampicm.C
 compat_ampi.o: compat_ampi.c
 	$(CHARMC) -c compat_ampi.c
 
+compat_ampins.o: compat_ampins.C
+	$(CHARMC) -c $<
+
 ampi_mpix.o: ampi_mpix.C $(HEADDEP) headers
 
 ampi_noimpl.o: ampi_noimpl.C $(HEADDEP) headers
+	$(CHARMC) -c $< -DAMPI_NO_UNIMPLEMENTED_WARNINGS
 
 compat_ampicpp.o: compat_ampicpp.C
 	$(CHARMC) -c compat_ampicpp.C
@@ -199,7 +221,7 @@ ampi.decl.h ampi.def.h: ampi.ci
 ddt.o: ddt.C ddt.h $(HEADDEP) headers
 
 $(FUNCPTR_SHIM_OBJ): ampi_funcptr_shim.C $(HEADDEP) headers | $(ROMIO)
-	$(CHARMC) -language ampi -DAMPI_USE_FUNCPTR -fPIE -shared -fvisibility=hidden -c $< -o $@
+	$(CHARMC) -language ampi -DAMPI_USE_FUNCPTR -DAMPI_NO_UNIMPLEMENTED_WARNINGS -fPIE -shared -c $< -o $@
 
 $(FUNCPTR_SHIM_MAIN_OBJ): ampi_funcptr_shim_main.C | $(ROMIO)
 	$(CHARMC) -language ampi -fPIE -c $< -o $@
@@ -208,10 +230,10 @@ $(FUNCPTR_SHIM_FMPIMAIN_OBJ): ampi_funcptr_shim_fmpimain.C | $(ROMIO)
 	$(CHARMC) -language ampi -fPIE -c $< -o $@
 
 $(FUNCPTR_SHIM_FORTRAN_OBJ): ampif.C $(HEADDEP) headers | $(ROMIO)
-	$(CHARMC) -language ampi -DAMPI_USE_FUNCPTR -fPIE -shared -fvisibility=hidden -c $< -o $@
+	$(CHARMC) -language ampi -DAMPI_USE_FUNCPTR -fPIE -shared -c $< -o $@
 
 $(FUNCPTR_LOADER_OBJ): ampi_funcptr_loader.C $(HEADDEP) headers | $(ROMIO)
-	$(CHARMC) -language ampi -c $< -o $@
+	$(CHARMC) -language ampi -DAMPI_NO_UNIMPLEMENTED_WARNINGS -c $< -o $@
 
 $(FUNCPTR_LOADER_STUB_OBJ): ampi_funcptr_loader_stub.C $(HEADDEP) headers | $(ROMIO)
 	$(CHARMC) -language ampi -c $< -o $@

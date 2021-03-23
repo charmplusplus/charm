@@ -22,6 +22,7 @@ private:
   bool  readyMigrate;    /// status whether it is ready to migrate
   bool  enable_measure;
   int  nextPe;              /// next migration dest processor
+  CkSyncBarrier* syncBarrier;
   LBManager *lbmgr;
   MetaBalancer *the_metalb;
   LDObjHandle ldHandle;
@@ -56,6 +57,7 @@ public:
   inline const CkArrayIndex &getIndex(void) const {return idx;}
   inline CmiUInt8 getID() const { return id; }
   inline CkLocMgr *getLocMgr() const {return myLocMgr; }
+  inline CkSyncBarrier* getSyncBarrier() const { return syncBarrier; }
 
 #if CMK_LBDB_ON
 public:
@@ -77,20 +79,6 @@ public:
   inline void setMeasure(bool status) { enable_measure = status; }
 #else
   void AsyncMigrate(bool use){};
-#endif
-
-#if CMK_FAULT_EVAC
-private:
-	bool asyncEvacuate; //can the element be evacuated anytime, false for tcharm
-	bool bounced; //did this element try to immigrate into a processor which was evacuating
-											// and was bounced away to some other processor. This is assumed to happen
-											//only if this object was migrated by a load balancer, but the processor
-											// started crashing soon after
-public:	
-	bool isAsyncEvacuate(){return asyncEvacuate;}
-	void AsyncEvacuate(bool set){asyncEvacuate = set;}
-	bool isBounced(){return bounced;}
-	void Bounced(bool set){bounced = set;}
 #endif
 };
 

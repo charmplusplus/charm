@@ -1,36 +1,3 @@
-set(conv-core-c-sources cmipool.C conv-conds.C
-    conv-rdma.C conv-rdmadevice.C convcore.C cpm.C cpthreads.C cpuaffinity.C debug-conv.C futures.C
-    global-nop.C isomalloc.C mem-arena.C memoryaffinity.C msgmgr.C quiescence.C
-    random.C)
-
-set(conv-core-h-sources ../util/cmitls.h cmipool.h cmidemangle.h
-    conv-config.h conv-cpath.h conv-cpm.h conv-header.h conv-ooc.h
-    conv-qd.h conv-random.h conv-rdma.h conv-rdmadevice.h conv-taskQ.h conv-trace.h converse.h
-    cpthreads.h debug-conv++.h debug-conv.h hrctimer.h mem-arena.h memory-gnu-threads.h
-    memory-isomalloc.h msgq.h persistent.h queueing.h quiescence.h taskqueue.h)
-
-set(conv-core-cxx-sources ../util/cmitls.C conv-interoperate.C conv-taskQ.C cputopology.C
-    debug-conv++.C  memory-darwin-clang.C queueing.C hrctimer.C)
-
-set(conv-ccs-c-sources ../conv-ccs/conv-ccs.C)
-
-set(conv-ccs-h-sources ../conv-ccs/ccs-auth.h ../conv-ccs/ccs-builtins.h
-    ../conv-ccs/ccs-server.h ../conv-ccs/conv-ccs.h)
-
-set(conv-ccs-cxx-sources ../conv-ccs/ccs-builtins.C ../conv-ccs/middle-ccs.C)
-
-set(conv-perf-cxx-sources ../conv-perf/traceCore.C ../conv-perf/traceCoreCommon.C ../conv-perf/machineProjections.C)
-
-set(conv-perf-h-sources ../conv-perf/allEvents.h ../conv-perf/charmEvents.h
-    ../conv-perf/charmProjections.h ../conv-perf/converseEvents.h
-    ../conv-perf/converseProjections.h ../conv-perf/machineEvents.h
-    ../conv-perf/machineProjections.h ../conv-perf/threadEvents.h
-    ../conv-perf/traceCore.h ../conv-perf/traceCoreAPI.h
-    ../conv-perf/traceCoreCommon.h)
-
-foreach(filename ${conv-core-h-sources} ${conv-ccs-h-sources} ${conv-perf-h-sources})
-    configure_file(${filename} ${CMAKE_BINARY_DIR}/include/ COPYONLY)
-endforeach()
 
 add_library(ccs-client ../conv-ccs/ccs-client.C ../conv-ccs/ccs-client.h)
 target_include_directories(ccs-client PRIVATE ../util)
@@ -105,34 +72,6 @@ endif()
 
 
 add_library(global-swap global-elfgot.C)
-
-find_program(GIT git)
-
-if(GIT)
-  execute_process(COMMAND git describe --exact-match
-             OUTPUT_VARIABLE CHARM_VERSION_GIT
-             RESULT_VARIABLE git_result
-             OUTPUT_STRIP_TRAILING_WHITESPACE
-             ERROR_QUIET
-             )
-  if(NOT ${git_result} EQUAL 0)
-    execute_process(COMMAND git describe --long --always
-             OUTPUT_VARIABLE CHARM_VERSION_GIT
-             OUTPUT_STRIP_TRAILING_WHITESPACE
-             )
-  endif()
-else()
-  set(CHARM_VERSION_GIT "v${CHARM_VERSION}")
-endif()
-
-file(GENERATE OUTPUT ${CMAKE_BINARY_DIR}/include/commitid.C CONTENT
-"extern const char * const CmiCommitID;
-const char * const CmiCommitID = \"${CHARM_VERSION_GIT}\";
-"
-)
-
-add_library(conv-core ${CMAKE_BINARY_DIR}/include/commitid.C ${conv-core-c-sources} ${conv-core-cxx-sources} ${conv-core-h-sources} ${conv-ccs-c-sources} ${conv-ccs-h-sources} ${conv-ccs-cxx-sources} ${conv-perf-cxx-sources} ${conv-perf-h-sources} ../conv-ldb/cldb.C)
-add_dependencies(conv-core hwloc)
 
 add_library(threads-default threads.C $<TARGET_OBJECTS:boost-context>)
 target_compile_definitions(threads-default PRIVATE -DCMK_THREADS_BUILD_DEFAULT=1)
@@ -209,20 +148,6 @@ else()
     target_compile_options(threads-uJcontext-memoryalias PRIVATE -U_FORTIFY_SOURCE)
     target_include_directories(threads-uJcontext-memoryalias PRIVATE ../QuickThreads ${CMAKE_BINARY_DIR}/src/QuickThreads/include ../util)
 endif()
-
-add_library(conv-static OBJECT conv-static.c)
-add_custom_command(TARGET conv-core
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/conv-static.dir/conv-static.c.o ${CMAKE_BINARY_DIR}/lib/conv-static.o
-    VERBATIM
-)
-add_dependencies(conv-core conv-static)
-
-add_library(conv-machine ../arch/${GDIR}/machine.C)
-
-target_include_directories(conv-machine PRIVATE ../arch/util) # for machine*.*
-
-target_include_directories(conv-core PRIVATE ../util) # for sockRoutines.c
 
 add_executable(conv-cpm ../xlatcpm/conv-cpm.C)
 target_compile_options(conv-cpm PRIVATE -host)

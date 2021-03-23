@@ -590,13 +590,11 @@ static inline void _invokeEntryNoTrace(int epIdx,envelope *env,void *obj)
 {
   void *msg = EnvToUsr(env);
   _SET_USED(env, 0);
-#if CMK_ONESIDED_IMPL
   if(CMI_ZC_MSGTYPE(UsrToEnv(msg)) == CMK_ZC_P2P_RECV_MSG ||
      CMI_ZC_MSGTYPE(UsrToEnv(msg)) == CMK_ZC_BCAST_RECV_MSG ||
      CMI_ZC_MSGTYPE(UsrToEnv(msg)) == CMK_ZC_BCAST_RECV_DONE_MSG)
     CkDeliverMessageReadonly(epIdx,msg,obj); // Do not free a P2P_RECV_MSG or BCAST_RECV_MSG or a BCAST_RECV_DONE_MSG
   else
-#endif
     CkDeliverMessageFree(epIdx,msg,obj);
 }
 
@@ -1056,13 +1054,13 @@ static inline void _deliverForBocMsg(CkCoreState *ck,int epIdx,envelope *env,Irr
   }
 #endif
 
-#if CMK_ONESIDED_IMPL && CMK_SMP
+#if CMK_SMP
   unsigned short int msgType = CMI_ZC_MSGTYPE(env); // store msgType as msg could be freed
 #endif
 
   _invokeEntry(epIdx,env,obj);
 
-#if CMK_ONESIDED_IMPL && CMK_SMP
+#if CMK_SMP
   if(msgType == CMK_ZC_BCAST_RECV_DONE_MSG) {
     updatePeerCounterAndPush(env);
   }
@@ -1174,10 +1172,8 @@ static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
       CProxy_ArrayBase(env->getArrayMgr()).ckLocMgr()->multiHop(msg);
     }
     bool doFree = true;
-#if CMK_ONESIDED_IMPL
     if(CMI_ZC_MSGTYPE(env) == CMK_ZC_P2P_RECV_MSG) // Do not free a P2P_RECV_MSG
       doFree = false;
-#endif
     iter->second->ckInvokeEntry(env->getEpIdx(), msg, doFree);
   } else {
     // Otherwise fallback to delivery through the array manager
@@ -1204,7 +1200,6 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
 
   MESSAGE_PHASE_CHECK(env);
 
-#if CMK_ONESIDED_IMPL
   if(CMI_ZC_MSGTYPE(env) == CMK_ZC_P2P_SEND_MSG || CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_SEND_MSG){
     envelope *prevEnv = env;
 
@@ -1223,7 +1218,6 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
       return;
     }
   }
-#endif
 
 //#if CMK_RECORD_REPLAY
   if (ck->watcher!=NULL) {
@@ -1337,11 +1331,9 @@ void CkPackMessage(envelope **pEnv)
   envelope *env = *pEnv;
   if(!env->isPacked() && _msgTable[env->getMsgIdx()]->pack) {
     void *msg = EnvToUsr(env);
-#if CMK_ONESIDED_IMPL
     short int zcMsgType = CMI_ZC_MSGTYPE(env);
     if(zcMsgType == CMK_ZC_SEND_DONE_MSG) // Store buffer pointers as offsets
       CkPackRdmaPtrs(((CkMarshallMsg *)msg)->msgBuf);
-#endif
     _TRACE_BEGIN_PACK();
     msg = _msgTable[env->getMsgIdx()]->pack(msg);
     _TRACE_END_PACK();
@@ -1362,11 +1354,9 @@ void CkUnpackMessage(envelope **pEnv)
     _TRACE_END_UNPACK();
     env=UsrToEnv(msg);
     env->setPacked(0);
-#if CMK_ONESIDED_IMPL
     short int zcMsgType = CMI_ZC_MSGTYPE(env);
     if(zcMsgType == CMK_ZC_SEND_DONE_MSG) // Convert offsets back into buffer pointers
       CkUnpackRdmaPtrs(((CkMarshallMsg *)msg)->msgBuf);
-#endif
     *pEnv = env;
   }
 }
@@ -1413,21 +1403,11 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
   }
 #endif
 
-#if CMK_ONESIDED_IMPL
   // Store source information to handle acknowledgements on completion
   if (CMI_IS_ZC(env)) {
     CkRdmaPrepareZCMsg(env, CkNodeOf(pe));
   }
-#endif
 
-#if CMK_FAULT_EVAC
-  if (pe == CkMyPe()) {
-    if (!CmiNodeAlive(CkMyPe())) {
-      printf("[%d] Invalid processor sending itself a message \n",CkMyPe());
-      //return;
-    }
-  }
-#endif
   if (pe == CkMyPe() && !CmiImmIsRunning()) {
 #if CMK_OBJECT_QUEUE_AVAILABLE
     Chare *obj = CkFindObjectPtr(env);
@@ -1495,11 +1475,9 @@ static void _noCldEnqueue(int pe, envelope *env)
   }
 #endif
 
-#if CMK_ONESIDED_IMPL
   // Store source information to handle acknowledgements on completion
   if(CMI_IS_ZC(env))
     CkRdmaPrepareZCMsg(env, CkNodeOf(pe));
-#endif
 
   CkPackMessage(&env);
   int len=env->getTotalsize();
@@ -1524,11 +1502,9 @@ void _noCldNodeEnqueue(int node, envelope *env)
   }
 #endif
 
-#if CMK_ONESIDED_IMPL
   // Store source information to handle acknowledgements on completion
   if(CMI_IS_ZC(env))
     CkRdmaPrepareZCMsg(env, node);
-#endif
 
   CkPackMessage(&env);
   int len=env->getTotalsize();
@@ -1627,9 +1603,7 @@ void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid, int opts)
 #if CMK_ERROR_CHECKING
   //Allow rdma metadata messages marked as immediate to go through
   if (opts & CK_MSG_IMMEDIATE)
-#if CMK_ONESIDED_IMPL
     if (CMI_ZC_MSGTYPE(env) == CMK_REG_NO_ZC_MSG)
-#endif
       CmiAbort("Immediate message is not allowed in Chare!");
 #endif
   int destPE=_prepareMsg(entryIdx,msg,pCid);
@@ -1652,11 +1626,6 @@ void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid, int opts)
 {
   if (pCid->onPE==CkMyPe())
   {
-#if CMK_FAULT_EVAC
-    if(!CmiNodeAlive(CkMyPe())){
-	return;
-    }
-#endif
 #if CMK_CHARMDEBUG
     //Just in case we need to breakpoint or use the envelope in some way
     _prepareMsg(entryIndex,msg,pCid);
@@ -1807,11 +1776,6 @@ void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID, int o
 {
   if (destPE==CkMyPe())
   {
-#if CMK_FAULT_EVAC
-    if(!CmiNodeAlive(CkMyPe())){
-	return;
-    }
-#endif
     IrrGroup *obj=(IrrGroup *)_localBranch(gID);
     if (obj!=NULL)
     { //Just directly call the group:
@@ -1837,9 +1801,7 @@ void CkSendMsgBranch(int eIdx, void *msg, int pe, CkGroupID gID, int opts)
   envelope *env=UsrToEnv(msg);
   //Allow rdma metadata messages marked as immediate to go through
   if (opts & CK_MSG_IMMEDIATE) {
-#if CMK_ONESIDED_IMPL
     if (CMI_ZC_MSGTYPE(env) == CMK_REG_NO_ZC_MSG)
-#endif
     {
       CkSendMsgBranchImmediate(eIdx,msg,pe,gID);
       return;
@@ -1968,9 +1930,7 @@ void CkSendMsgNodeBranchImmediate(int eIdx, void *msg, int node, CkGroupID gID)
 void CkSendMsgNodeBranchInline(int eIdx, void *msg, int node, CkGroupID gID, int opts)
 {
   if (node==CkMyNode()) {
-#if CMK_ONESIDED_IMPL
     if (CMI_ZC_MSGTYPE(UsrToEnv(msg)) == CMK_REG_NO_ZC_MSG)
-#endif
     {
       CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
       void *obj = CksvAccess(_nodeGroupTable)->find(gID).getObj();

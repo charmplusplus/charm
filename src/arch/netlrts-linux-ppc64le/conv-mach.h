@@ -4,7 +4,7 @@
 
 #define CMK_NETPOLL                                        1
 
-#define CMK_AMD64                                          1
+#define CMK_PPC64                                          1
 
 #define CMK_ASYNC_NOT_NEEDED                               0
 #define CMK_ASYNC_USE_FIOASYNC_AND_FIOSETOWN               0
@@ -27,7 +27,6 @@
 #define CMK_SSH_NOT_NEEDED                                 0
 
 #define CMK_SHARED_VARS_UNAVAILABLE                        1
-#define CMK_SHARED_VARS_UNIPROCESSOR                       0
 
 #define CMK_THREADS_USE_CONTEXT                            1
 #define CMK_THREADS_USE_PTHREADS                           0

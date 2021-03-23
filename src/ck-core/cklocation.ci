@@ -17,9 +17,6 @@ module CkLocation {
         CkArrayIndex idx, CmiUInt8 id, int nowOnPe);
     entry [expedited] void updateLocation(CmiUInt8 id, int nowOnPe);
     entry void reclaimRemote(CkArrayIndex idx,int deletedOnPe);
-
-    //Load balancing:
-    entry void dummyAtSync(void);
   };
   
   // Array Map object support:
@@ -47,6 +44,10 @@ module CkLocation {
 
   group [migratable] ReadFileMap : DefaultArrayMap {
     entry ReadFileMap(void);
+  };
+
+  group [migratable] Simple1DFileMap : DefaultArrayMap {
+    entry Simple1DFileMap(void);
   };
 
   group [migratable] BlockMap : DefaultArrayMap {

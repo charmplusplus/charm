@@ -1590,13 +1590,11 @@ void Entry::genClosure(XStr& decls, bool isDef) {
                 << "        __p | deviceBuffer_" << sv->name << ";\n";
         } else {
           // CPU RDMA
-          structure << "\n#if CMK_ONESIDED_IMPL\n";
           if (sv->isFirstRdma()) {
             structure << "      "
                       << "int num_rdma_fields;\n";
             structure << "      "
                       << "int num_root_node;\n";
-            getter << "#if CMK_ONESIDED_IMPL\n";
             getter << "      "
                    << "int "
                    << "& "
@@ -1608,29 +1606,16 @@ void Entry::genClosure(XStr& decls, bool isDef) {
                    << "& "
                    << "getP" << i << "() { return "
                    << " num_root_node;}\n";
-            getter << "#endif\n";
             i++;
           }
           structure << "      "
                     << "CkNcpyBuffer "
                     << "ncpyBuffer_" << sv->name << ";\n";
-          structure << "#else\n";
-          structure << "      " << sv->type << " "
-                    << "*" << sv->name << ";\n";
-          structure << "#endif\n";
-          getter << "#if CMK_ONESIDED_IMPL\n";
           getter << "      "
                  << "CkNcpyBuffer "
                  << "& "
                  << "getP" << i << "() { return "
                  << "ncpyBuffer_" << sv->name << ";}\n";
-          getter << "#else\n";
-          getter << sv->type << " "
-                 << "*";
-          getter << "& "
-                 << "getP" << i << "() { return " << sv->name << ";}\n";
-          getter << "#endif\n";
-          toPup << "#if CMK_ONESIDED_IMPL\n";
           if (sv->isFirstRdma()) {
             toPup << "        char *impl_buf = _impl_marshall ? _impl_marshall->msgBuf : "
                      "_impl_buf_in;\n";
@@ -1653,7 +1638,6 @@ void Entry::genClosure(XStr& decls, bool isDef) {
           toPup << "        "
                 << "__p | "
                 << "ncpyBuffer_" << sv->name << ";\n";
-          toPup << "#endif\n";
         }
       } else {
         structure << "      ";
@@ -1899,18 +1883,12 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
 
   else {  // Normal case: call regular method
     if(param->hasRecvRdma()) {
-      str << "#if CMK_ONESIDED_IMPL\n";
       str << "  if(CMI_IS_ZC_RECV(env) || CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) {\n";
-      str << "#endif\n";
       genRegularCall(str, preCall, redn_wrapper, usesImplBuf, true);
-      str << "#if CMK_ONESIDED_IMPL\n";
       str << "  else if(CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) {\n";
-      //str << "#endif\n";
       genRegularCall(str, preCall, redn_wrapper, usesImplBuf, false);
-      //str << "#if CMK_ONESIDED_IMPL\n";
       str << "    }\n";
       str << "  } else {\n";
-      str << "#endif\n";
     } else if (param->hasDevice()) {
       str << "  bool is_inline = true;\n";
       str << "  if (CMI_ZC_MSGTYPE(env) == CMK_ZC_DEVICE_MSG) {\n";
@@ -1920,9 +1898,7 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
     }
     genRegularCall(str, preCall, redn_wrapper, usesImplBuf, false);
     if(param->hasRecvRdma()) {
-      str << "#if CMK_ONESIDED_IMPL\n";
       str << "  }\n";
-      str << "#endif\n";
     } else if (param->hasDevice()) {
       str << "  }\n";
     }
@@ -2007,10 +1983,8 @@ void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bo
           str << "  void *buffPtrs["<< numRdmaDeviceParams <<"];\n";
           str << "  int buffSizes["<< numRdmaDeviceParams <<"];\n";
         } else {
-          str << "#if CMK_ONESIDED_IMPL\n";
           str << "  void *buffPtrs["<< numRdmaRecvParams <<"];\n";
           str << "  int buffSizes["<< numRdmaRecvParams <<"];\n";
-          str << "#endif\n";
         }
         param->storePostedRdmaPtrs(str, isSDAGGen);
         if (param->hasDevice()) {
@@ -2025,7 +1999,6 @@ void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bo
             str << "impl_num_device_rdma_fields, ";
           str << "buffPtrs, buffSizes, devicePost);\n";
         } else {
-          str << "#if CMK_ONESIDED_IMPL\n";
           str << "  if(CMI_IS_ZC_RECV(env)) \n";
           str << "    CkRdmaIssueRgets(env, ((CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_MSG) ? ncpyEmApiMode::BCAST_RECV : ncpyEmApiMode::P2P_RECV), ";
           if(isSDAGGen)
@@ -2033,7 +2006,6 @@ void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bo
           else
             str << "impl_num_rdma_fields, impl_num_root_node, ";
           str << "buffPtrs, buffSizes, ncpyPost);\n";
-          str << "#endif\n";
         }
       }
       // pack pointers if it's a broadcast message

@@ -175,19 +175,19 @@ define(PAC_TEST_MPI,[
          MPI_Finalize(); 
      }
 EOF
-  rm -f conftest$EXEEXT
-  cmd="$CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -o conftest$EXEEXT mpitest.c $MPI_LIB"
+  rm -f conftest.$OBJEXT
+  cmd="$CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -c -o conftest.$OBJEXT mpitest.c $MPI_LIB"
   echo "$as_me:$LINENO: $cmd" >&5
   $cmd >&5 2>&5
-  if test ! -x conftest$EXEEXT ; then
+  if test ! -f conftest.$OBJEXT ; then
       echo "$as_me:$LINENO: failed program was:" >&5
       sed 's/^/| /' mpitest.c >&5
-      rm -f conftest$EXEEXT mpitest.c
+      rm -f conftest.$OBJEXT mpitest.c
       AC_MSG_ERROR([Unable to compile a simple MPI program.
 Use environment variables to provide the location of MPI libraries and
 include directories])
   else
-      rm -f conftest$EXEEXT mpitest.c
+      rm -f conftest.$OBJEXT mpitest.c
   fi
 AC_MSG_RESULT(yes)
 ])dnl
@@ -231,15 +231,15 @@ define(PAC_MPI_LONG_LONG_INT,[
          MPI_Finalize(); 
      }
 EOF
-  rm -f conftest$EXEEXT
-  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -o conftest$EXEEXT mpitest.c $MPI_LIB > /dev/null 2>&1
-  if test -x conftest$EXEEXT ; then
+  rm -f conftest.$OBJEXT
+  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -c -o conftest.$OBJEXT mpitest.c $MPI_LIB > /dev/null 2>&1
+  if test -f conftest.$OBJEXT ; then
       AC_MSG_RESULT(yes)
       AC_DEFINE(HAVE_MPI_LONG_LONG_INT,,[Define if mpi has long long it])
   else
       AC_MSG_RESULT(no)
   fi
-  rm -f conftest$EXEEXT mpitest.c
+  rm -f conftest.$OBJEXT mpitest.c
 ])dnl
 dnl
 dnl PAC_LONG_LONG_64: check if there is a 64-bit long long
@@ -292,11 +292,11 @@ dnl   because the program cannot be run.
            return 0;
         }
 EOF
-      rm -f conftest$EXEEXT
-      $CC $USER_CFLAGS -o conftest$EXEEXT ltest.c > /dev/null 2>&1
-      if test -x conftest$EXEEXT ; then
+      rm -f conftest.$OBJEXT
+      $CC $USER_CFLAGS -c -o conftest.$OBJEXT ltest.c > /dev/null 2>&1
+      if test -f conftest.$OBJEXT ; then
          echo "assuming size of long long is 8bytes; use '-longlongsize' to indicate otherwise"
-         rm -f conftest$EXEEXT ltest.c
+         rm -f conftest.$OBJEXT ltest.c
          echo "defining MPI_Offset as long long in C and integer*8 in Fortran" 
          AC_DEFINE(HAVE_LONG_LONG_64,,[Define if long long is 64 bits])
          DEFINE_MPI_OFFSET="typedef long long MPI_Offset;"
@@ -329,9 +329,9 @@ define(PAC_MPI_INFO,[
          MPI_Finalize(); 
      }
 EOF
-  rm -f conftest$EXEEXT
-  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -o conftest$EXEEXT mpitest.c $MPI_LIB > /dev/null 2>&1
-  if test -x conftest$EXEEXT ; then
+  rm -f conftest.$OBJEXT
+  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -c -o conftest.$OBJEXT mpitest.c $MPI_LIB > /dev/null 2>&1
+  if test -f conftest.$OBJEXT ; then
       AC_MSG_RESULT(yes)
       AC_DEFINE(HAVE_MPI_INFO,1,[Define if MPI_Info available])
       HAVE_MPI_INFO="#define HAVE_MPI_INFO"
@@ -347,7 +347,7 @@ EOF
       MPI_FINFO3="      INTEGER MPI_INFO_NULL"
       MPI_FINFO4="      PARAMETER (MPI_INFO_NULL=0)"
   fi
-  rm -f conftest$EXEEXT mpitest.c
+  rm -f conftest.$OBJEXT mpitest.c
 ])dnl
 dnl
 dnl
@@ -366,9 +366,9 @@ define(PAC_MPI_DARRAY_SUBARRAY,[
          MPI_Finalize(); 
      }
 EOF
-  rm -f conftest$EXEEXT
-  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -o conftest$EXEEXT mpitest.c $MPI_LIB > /dev/null 2>&1
-  if test -x conftest$EXEEXT ; then
+  rm -f conftest.$OBJEXT
+  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -c -o conftest.$OBJEXT mpitest.c $MPI_LIB > /dev/null 2>&1
+  if test -f conftest.$OBJEXT ; then
       AC_MSG_RESULT(yes)
       AC_DEFINE(HAVE_MPI_DARRAY_SUBARRAY,,[Define if MPI Darray available])
       HAVE_MPI_DARRAY_SUBARRAY="#define HAVE_MPI_DARRAY_SUBARRAY"
@@ -390,7 +390,7 @@ EOF
       MPI_FARRAY6="      PARAMETER (MPI_DISTRIBUTE_NONE=123)"
       MPI_FARRAY7="      PARAMETER (MPI_DISTRIBUTE_DFLT_DARG=-49767)"
   fi
-  rm -f conftest$EXEEXT mpitest.c
+  rm -f conftest.$OBJEXT mpitest.c
 ])dnl
 dnl
 dnl
@@ -405,15 +405,15 @@ define(PAC_CHECK_MPI_SGI_INFO_NULL,[
 	i = MPI_INFO_NULL;
      }
 EOF
-  rm -f conftest$EXEEXT
-  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -o conftest$EXEEXT mpitest.c $MPI_LIB > /dev/null 2>&1
-  if test -x conftest$EXEEXT ; then
+  rm -f conftest.$OBJEXT
+  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -c -o conftest.$OBJEXT mpitest.c $MPI_LIB > /dev/null 2>&1
+  if test -f conftest.$OBJEXT ; then
       AC_MSG_RESULT(yes)
       cp adio/sgi/mpi3.1/*.h include
   else
       AC_MSG_RESULT(no)
   fi
-  rm -f conftest$EXEEXT mpitest.c
+  rm -f conftest.$OBJEXT mpitest.c
 ])dnl
 dnl
 dnl
@@ -430,15 +430,15 @@ define(PAC_CHECK_MPIOF_H,[
       stop
       end
 EOF
-  rm -f conftest$EXEEXT
-  $F77 $FFLAGS -I$MPI_INCLUDE_DIR -o conftest$EXEEXT mpitest.f $MPI_LIB > /dev/null 2>&1
-  if test -x conftest$EXEEXT ; then
+  rm -f conftest.$OBJEXT
+  $F77 $FFLAGS -I$MPI_INCLUDE_DIR -c -o conftest.$OBJEXT mpitest.f $MPI_LIB > /dev/null 2>&1
+  if test -f conftest.$OBJEXT ; then
       AC_MSG_RESULT(yes)
       MPIOF_H_INCLUDED=1
   else
       AC_MSG_RESULT(no)
   fi
-  rm -f conftest$EXEEXT mpitest.f
+  rm -f conftest.$OBJEXT mpitest.f
 ])dnl
 dnl
 dnl
@@ -456,15 +456,15 @@ define(PAC_HAVE_PREAD64,[
          pread64(fd, &buf, i, off);
      }
 EOF
-  rm -f conftest$EXEEXT
-  $CC $USER_CFLAGS -o conftest$EXEEXT conftest.c > /dev/null 2>&1
-  if test -x conftest$EXEEXT ; then
+  rm -f conftest.$OBJEXT
+  $CC $USER_CFLAGS -c -o conftest.$OBJEXT conftest.c > /dev/null 2>&1
+  if test -f conftest.$OBJEXT ; then
       AC_MSG_RESULT(yes)
       AC_DEFINE(HAVE_PREAD64,,[Define if pread64 available])
   else
       AC_MSG_RESULT(no)
   fi
-rm -f conftest$EXEEXT conftest.c
+rm -f conftest.$OBJEXT conftest.c
 ])dnl
 dnl
 dnl
@@ -483,15 +483,15 @@ define(PAC_TEST_MPI_SGI_type_is_contig,[
          MPI_Finalize(); 
      }
 EOF
-  rm -f conftest$EXEEXT
-  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -o conftest$EXEEXT mpitest.c $MPI_LIB > /dev/null 2>&1
-  if test -x conftest$EXEEXT ; then
+  rm -f conftest.$OBJEXT
+  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -c -o conftest.$OBJEXT mpitest.c $MPI_LIB > /dev/null 2>&1
+  if test -f conftest.$OBJEXT ; then
      AC_MSG_RESULT(yes)
   else
      AC_MSG_RESULT(no)
      AC_DEFINE(NO_MPI_SGI_type_is_contig,,[Define if no MPI type is contig])
   fi
-  rm -f conftest$EXEEXT mpitest.c
+  rm -f conftest.$OBJEXT mpitest.c
 ])dnl
 dnl
 dnl
@@ -510,15 +510,15 @@ define(PAC_TEST_MPI_COMBINERS,[
          MPI_Finalize(); 
      }
 EOF
-  rm -f conftest$EXEEXT
-  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -o conftest$EXEEXT mpitest.c $MPI_LIB > /dev/null 2>&1
-  if test -x conftest$EXEEXT ; then
+  rm -f conftest.$OBJEXT
+  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -c -o conftest.$OBJEXT mpitest.c $MPI_LIB > /dev/null 2>&1
+  if test -f conftest.$OBJEXT ; then
      AC_MSG_RESULT(yes)
      AC_DEFINE(HAVE_MPI_COMBINERS,,[Define if MPI combiners available])
   else
      AC_MSG_RESULT(no)
   fi
-  rm -f conftest$EXEEXT mpitest.c
+  rm -f conftest.$OBJEXT mpitest.c
 ])dnl
 dnl
 dnl
@@ -610,16 +610,16 @@ define(PAC_TEST_MPI_HAVE_OFFSET_KIND,[
       stop
       end
 EOF
-  rm -f conftest$EXEEXT
-  $F77 $FFLAGS -I$MPI_INCLUDE_DIR -o conftest$EXEEXT mpitest.f $MPI_LIB > /dev/null 2>&1
-  if test -x conftest$EXEEXT ; then
+  rm -f conftest.$OBJEXT
+  $F77 $FFLAGS -I$MPI_INCLUDE_DIR -c -o conftest.$OBJEXT mpitest.f $MPI_LIB > /dev/null 2>&1
+  if test -f conftest.$OBJEXT ; then
      AC_MSG_RESULT(yes)
      MPI_OFFSET_KIND1="!"
      MPI_OFFSET_KIND2="!"
   else
      AC_MSG_RESULT(no)
   fi
-  rm -f conftest$EXEEXT mpitest.f
+  rm -f conftest.$OBJEXT mpitest.f
 ])dnl
 dnl
 dnl
@@ -667,9 +667,9 @@ define(PAC_HAVE_MOUNT_NFS,[
          int i=MOUNT_NFS;
      }
 EOF
-  rm -f conftest$EXEEXT
-  $CC $USER_CFLAGS -o conftest$EXEEXT conftest.c > /dev/null 2>&1
-  if test -x conftest$EXEEXT ; then
+  rm -f conftest.$OBJEXT
+  $CC $USER_CFLAGS -c -o conftest.$OBJEXT conftest.c > /dev/null 2>&1
+  if test -f conftest.$OBJEXT ; then
      AC_MSG_RESULT(yes)
      ROMIO_HAVE_MOUNT_NFS=1
      AC_DEFINE(HAVE_MOUNT_NFS,,[Define if MOUNT_NFS defined])
@@ -677,7 +677,7 @@ EOF
      ROMIO_HAVE_MOUNT_NFS=0
      AC_MSG_RESULT(no)
   fi
-  rm -f conftest$EXEEXT conftest.c
+  rm -f conftest.$OBJEXT conftest.c
 ])dnl
 dnl
 dnl
@@ -729,9 +729,9 @@ define(PAC_FUNC_STRERROR,[
         char *s = strerror(5);
      }
 EOF
-  rm -f conftest$EXEEXT
-  $CC $USER_CFLAGS -o conftest$EXEXT conftest.c >> config.log 2>&1
-  if test -x conftest$EXEEXT ; then
+  rm -f conftest.$OBJEXT
+  $CC $USER_CFLAGS -c -o conftest.$OBJEXT conftest.c >> config.log 2>&1
+  if test -f conftest.$OBJEXT ; then
      AC_MSG_RESULT(yes)
      AC_DEFINE(HAVE_STRERROR,,[Define if strerror available])
   else
@@ -748,16 +748,16 @@ changequote(,)
         }
 EOF
 changequote([,])
-     rm -f conftest$EXEEXT
-     $CC $USER_CFLAGS -o conftest$EXEEXT conftest.c > config.log 2>&1
-     if test -x conftest$EXEEXT ; then
+     rm -f conftest.$OBJEXT
+     $CC $USER_CFLAGS -c -o conftest.$OBJEXT conftest.c > config.log 2>&1
+     if test -f conftest.$OBJEXT ; then
         AC_MSG_RESULT(yes)
         AC_DEFINE(HAVE_SYSERRLIST,,[Define if syserrlist available])
      else
         AC_MSG_RESULT(no)
      fi
   fi
-  rm -f conftest$EXEEXT conftest.c
+  rm -f conftest.$OBJEXT conftest.c
 ])dnl
 dnl
 define(PAC_TEST_MPIR_STATUS_SET_BYTES,[
@@ -776,15 +776,15 @@ define(PAC_TEST_MPIR_STATUS_SET_BYTES,[
          MPI_Finalize(); 
      }
 EOF
-  rm -f conftest$EXEEXT
-  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -o conftest$EXEEXT mpitest.c $MPI_LIB > /dev/null 2>&1
-  if test -x conftest$EXEEXT ; then
+  rm -f conftest.$OBJEXT
+  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -c -o conftest.$OBJEXT mpitest.c $MPI_LIB > /dev/null 2>&1
+  if test -f conftest.$OBJEXT ; then
      AC_MSG_RESULT(yes)
      AC_DEFINE(HAVE_STATUS_SET_BYTES,,[Define if status set bytes available])
   else
      AC_MSG_RESULT(no)
   fi
-  rm -f conftest$EXEEXT mpitest.c
+  rm -f conftest.$OBJEXT mpitest.c
 ])dnl
 define(PAC_TEST_MPIU_FUNCS,[
   AC_MSG_CHECKING(support for MPICH memory macros)
@@ -797,15 +797,15 @@ define(PAC_TEST_MPIU_FUNCS,[
       MPIU_Free(NULL);
   }
 EOF
-  rm -f conftest$EXEEXT
-  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -o conftest$EXEEXT mpitest.c $MPI_LIB > /dev/null 2>&1
-  if test -x conftest$EXEEXT ; then
+  rm -f conftest.$OBJEXT
+  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -c -o conftest.$OBJEXT mpitest.c $MPI_LIB > /dev/null 2>&1
+  if test -f conftest.$OBJEXT ; then
      AC_MSG_RESULT(yes)
      AC_DEFINE(HAVE_MPIU_FUNCS,1,[Define if MPICH memory tracing macros defined])
   else
      AC_MSG_RESULT(no)
   fi
-  rm -f conftest$EXEEXT mpitest.c
+  rm -f conftest.$OBJEXT mpitest.c
 ])dnl
 dnl
 define(PAC_TEST_MPI_GREQUEST,[
@@ -822,16 +822,16 @@ define(PAC_TEST_MPI_GREQUEST,[
        MPI_Finalize();
      }
 EOF
-  rm -f conftest$EXEEXT
-  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -o conftest$EXEEXT mpitest.c $MPI_LIB > /dev/null 2>&1
-  if test -x conftest$EXEEXT ; then
+  rm -f conftest.$OBJEXT
+  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -c -o conftest.$OBJEXT mpitest.c $MPI_LIB > /dev/null 2>&1
+  if test -f conftest.$OBJEXT ; then
      AC_MSG_RESULT(yes)
      AC_DEFINE(HAVE_MPI_GREQUEST,1,[Define if generalized requests avaliable])
      DEFINE_HAVE_MPI_GREQUEST="#define HAVE_MPI_GREQUEST 1"
   else
      AC_MSG_RESULT(no)
   fi
-  rm -f conftest$EXEEXT mpitest.c
+  rm -f conftest.$OBJEXT mpitest.c
 ])dnl
 
 define(PAC_TEST_MPI_GREQUEST_EXTENSIONS,[
@@ -845,16 +845,16 @@ define(PAC_TEST_MPI_GREQUEST_EXTENSIONS,[
        MPIX_Grequest_class classtest
     }
 EOF
-  rm -f conftest$EXEEXT
-  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -o conftest$EXEEXT mpitest.c $MPI_LIB > /dev/null 2>&1
-  if test -x conftest$EXEEXT ; then
+  rm -f conftest.$OBJEXT
+  $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -c -o conftest.$OBJEXT mpitest.c $MPI_LIB > /dev/null 2>&1
+  if test -f conftest.$OBJEXT ; then
      AC_MSG_RESULT(yes)
      AC_DEFINE(HAVE_MPI_GREQUEST_EXTENTIONS,1,[Define if non-standard generalized requests extensions avaliable])
      DEFINE_HAVE_MPI_GREQUEST_EXTENSIONS="#define HAVE_MPI_GREQUEST_EXTENSIONS 1"
   else
      AC_MSG_RESULT(no)
   fi
-  rm -f conftest$EXEEXT mpitest.c
+  rm -f conftest.$OBJEXT mpitest.c
 ])dnl
 
 define(PAC_TEST_NEEDS_CONST,[

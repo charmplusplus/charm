@@ -94,10 +94,10 @@ int main(int argc, char** argv)
       local_memory_max = CmiMaxMemoryUsage() - memory_before;
 
     // Reduce MAX here
-    assert(MPI_SUCCESS == MPI_Reduce(&local_memory_max, &memory_max_large, 1,
-                                     MPI_UNSIGNED_LONG, MPI_MAX, 0, MPI_COMM_WORLD));
-    assert(MPI_SUCCESS == MPI_Reduce(&local_memory_max, &memory_min_large, 1,
-                                     MPI_UNSIGNED_LONG, MPI_MIN, 0, MPI_COMM_WORLD));
+    MPI_Reduce(&local_memory_max, &memory_max_large, 1,
+               MPI_UNSIGNED_LONG, MPI_MAX, 0, MPI_COMM_WORLD);
+    MPI_Reduce(&local_memory_max, &memory_min_large, 1,
+               MPI_UNSIGNED_LONG, MPI_MIN, 0, MPI_COMM_WORLD);
 
     if (my_id == 0)
       printf("Large Mem Max Usage=%8d Kb\tMin Usage=%8d Kb\tVP=%d\tMsgSize=%d\t Elapsed Time for AlltoAll_long=%8.3f us\n",
@@ -105,7 +105,9 @@ int main(int argc, char** argv)
 
     for (j = 0; j < p; j++)
       for (k = 0; k < msg_size; k++)
+      {
         assert(*(recvbuf + j * msg_size + k) == hash(j, my_id));
+      }
   }
 
 // Test Short
@@ -141,8 +143,8 @@ int main(int argc, char** argv)
       local_memory_max = CmiMaxMemoryUsage() - memory_before;
 
     // Reduce MAX here
-    assert(MPI_SUCCESS==MPI_Reduce(&local_memory_max, &memory_max_small, 1, MPI_UNSIGNED_LONG, MPI_MAX, 0, MPI_COMM_WORLD));
-    assert(MPI_SUCCESS==MPI_Reduce(&local_memory_max, &memory_min_small, 1, MPI_UNSIGNED_LONG, MPI_MIN, 0, MPI_COMM_WORLD));
+    MPI_Reduce(&local_memory_max, &memory_max_small, 1, MPI_UNSIGNED_LONG, MPI_MAX, 0, MPI_COMM_WORLD);
+    MPI_Reduce(&local_memory_max, &memory_min_small, 1, MPI_UNSIGNED_LONG, MPI_MIN, 0, MPI_COMM_WORLD);
 
     if(my_id==0)
       printf("Small Mem Max Usage=%8d Kb\tMin Usage=%8d Kb\tVP=%d\tMsgSize=%d\t Elapsed Time for AlltoAll_short=%8.3f us\n",
@@ -150,7 +152,9 @@ int main(int argc, char** argv)
 
     for(j=0;j<p;j++)
       for(k=0;k<msg_size;k++)
+      {
         assert(*(recvbuf+j*msg_size+k) == hash(j,my_id) );
+      }
   }
 #endif
 
@@ -192,10 +196,10 @@ int main(int argc, char** argv)
       local_memory_max = CmiMaxMemoryUsage() - memory_before;
 
     // Reduce MAX here
-    assert(MPI_SUCCESS == MPI_Reduce(&local_memory_max, &memory_max_medium, 1,
-                                     MPI_UNSIGNED_LONG, MPI_MAX, 0, MPI_COMM_WORLD));
-    assert(MPI_SUCCESS == MPI_Reduce(&local_memory_max, &memory_min_medium, 1,
-                                     MPI_UNSIGNED_LONG, MPI_MIN, 0, MPI_COMM_WORLD));
+    MPI_Reduce(&local_memory_max, &memory_max_medium, 1,
+               MPI_UNSIGNED_LONG, MPI_MAX, 0, MPI_COMM_WORLD);
+    MPI_Reduce(&local_memory_max, &memory_min_medium, 1,
+               MPI_UNSIGNED_LONG, MPI_MIN, 0, MPI_COMM_WORLD);
 
     if (my_id == 0)
       printf("Medium Mem Max Usage=%8d Kb\tMin Usage=%8d Kb\tVP=%d\tMsgSize=%d\tElapsed Time for AlltoAll_medium=%8.3f us\n",
@@ -203,7 +207,9 @@ int main(int argc, char** argv)
 
     for (j = 0; j < p; j++)
       for (k = 0; k < msg_size; k++)
+      {
         assert(*(recvbuf + j * msg_size + k) == hash(j, my_id));
+      }
   }
 
   // Test standard version
@@ -243,10 +249,10 @@ int main(int argc, char** argv)
       local_memory_max = CmiMaxMemoryUsage() - memory_before;
 
     // Reduce MAX here
-    assert(MPI_SUCCESS == MPI_Reduce(&local_memory_max, &memory_max_normal, 1,
-                                     MPI_UNSIGNED_LONG, MPI_MAX, 0, MPI_COMM_WORLD));
-    assert(MPI_SUCCESS == MPI_Reduce(&local_memory_max, &memory_min_normal, 1,
-                                     MPI_UNSIGNED_LONG, MPI_MIN, 0, MPI_COMM_WORLD));
+    MPI_Reduce(&local_memory_max, &memory_max_normal, 1,
+               MPI_UNSIGNED_LONG, MPI_MAX, 0, MPI_COMM_WORLD);
+    MPI_Reduce(&local_memory_max, &memory_min_normal, 1,
+               MPI_UNSIGNED_LONG, MPI_MIN, 0, MPI_COMM_WORLD);
 
 
   if (my_id == 0)
@@ -255,7 +261,9 @@ int main(int argc, char** argv)
 
     for (j = 0; j < p; j++)
       for (k = 0; k < msg_size; k++)
+      {
         assert(*(recvbuf + j * msg_size + k) == hash(j, my_id));
+      }
   }
 
   free(sndbuf);

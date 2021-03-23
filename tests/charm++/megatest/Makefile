@@ -50,10 +50,10 @@ CIFILES =  \
 .SUFFIXES:
 .SUFFIXES: .o .C .def.h .decl.h .ci .h
 
-all: pgm
+all: megatest
 
-pgm: $(OBJS)
-	$(CHARMC) -o pgm  $(OBJS) -language charm++ -module completion
+megatest: $(OBJS)
+	$(CHARMC) -o megatest  $(OBJS) -language charm++ -module completion
 
 .ci.decl.h:
 	$(CHARMC) -c $<
@@ -66,20 +66,20 @@ DEPENDFILE = Make.depends
 include $(DEPENDFILE)
 
 clean:
-	rm -r -f conv-host pgm pgm.exe pgm.pdb pgm.ilk *.o *.decl.h *.def.h *.log *.sts *~ *.bak charmrun SunWS_cache
+	rm -r -f conv-host megatest megatest.exe megatest.pdb megatest.ilk *.o *.decl.h *.def.h *.log *.sts *~ *.bak charmrun SunWS_cache
 
-test: pgm
-	$(call run, ./pgm +p1 )
-	$(call run, ./pgm +p2 )
-	$(call run, ./pgm +p3 )
-	$(call run, ./pgm +p4 )
+test: megatest
+	$(call run, ./megatest +p1 )
+	$(call run, ./megatest +p2 )
+	$(call run, ./megatest +p3 )
+	$(call run, ./megatest +p4 )
 
-testp: pgm
-	$(call run, ./pgm +p$(P) )
+testp: megatest
+	$(call run, ./megatest +p$(P) )
 
-smptest: pgm
-	$(call run, ./pgm +p2 ++ppn 2 )
-	$(call run, ./pgm +p4 ++ppn 2 )
+smptest: megatest
+	$(call run, ./megatest +p2 ++ppn 2 )
+	$(call run, ./megatest +p4 ++ppn 2 )
 
 depends:  $(CIFILES)
 	echo "Creating " $(DEPENDFILE) " ...";	\

@@ -52,7 +52,7 @@
 
 #define CMK_USE_COMMON_LOCK                                1
 
-#define CMK_ONESIDED_IMPL                                  CMK_MULTICORE
+#define CMK_ONESIDED_IMPL                                  0
 
 #define CMK_CMA_MIN                                        32768
 

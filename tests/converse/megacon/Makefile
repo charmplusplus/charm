@@ -24,10 +24,10 @@ OBJS = \
   reduction.o \
   nodereduction.o \
 
-all: pgm
+all: megacon
 
-pgm: $(OBJS)
-	$(CHARMC) -o pgm $(OBJS) -language converse++
+megacon: $(OBJS)
+	$(CHARMC) -o megacon $(OBJS) -language converse++
 
 megacon.o: megacon.c
 	$(CHARMC) -gen-cpm megacon.c
@@ -108,18 +108,18 @@ nodereduction.o: nodereduction.c
 clean:
 	rm -f core *.cpm.h
 	rm -f TAGS *.o
-	rm -f pgm
-	rm -f conv-host charmrun charmrun.exe pgm.exe pgm.pdb pgm.ilk
+	rm -f megacon
+	rm -f conv-host charmrun charmrun.exe megacon.exe megacon.pdb megacon.ilk
 
-test: pgm
-	$(call run, ./pgm +p1 )
-	$(call run, ./pgm +p2 )
-	$(call run, ./pgm +p3 )
-	$(call run, ./pgm +p4 )
+test: megacon
+	$(call run, ./megacon +p1 )
+	$(call run, ./megacon +p2 )
+	$(call run, ./megacon +p3 )
+	$(call run, ./megacon +p4 )
 
-smptest: pgm
-	$(call run, ./pgm +p2 ++ppn 2)
-	$(call run, ./pgm +p4 ++ppn 2)
+smptest: megacon
+	$(call run, ./megacon +p2 ++ppn 2)
+	$(call run, ./megacon +p4 ++ppn 2)
 
-testp: pgm
-	$(call run, ./pgm +p$(P) )
+testp: megacon
+	$(call run, ./megacon +p$(P) )

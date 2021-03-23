@@ -258,10 +258,14 @@ class StrategyWrapper : public IStrategyWrapper
   {
     strategy_name = _strategy_name;
     isTreeRoot = _isTreeRoot;
-    strategy = TreeStrategyFactory::makeStrategy<O, P, Solution>(strategy_name, config);
+    strategy = TreeStrategy::Factory::makeStrategy<O, P, Solution>(strategy_name, config);
   }
 
-  virtual ~StrategyWrapper() { delete strategy; }
+  virtual ~StrategyWrapper()
+  {
+    delete strategy;
+    delete sol;
+  }
 
   float prepStrategy(unsigned int nobjs, unsigned int nprocs,
                      std::vector<TreeLBMessage*>& msgs, LLBMigrateMsg* migMsg)
@@ -596,7 +600,7 @@ class RootLevel : public LevelLogic
             int& g2 = underloaded[underloaded_idx].first;
             float& l2 = underloaded[underloaded_idx].second;
             float transfer = std::min(l1 - avg_grp_load, avg_grp_load - l2);
-            solution.emplace_back(g1, g2, int(round(FLOAT_TO_INT_MULT * transfer)));
+            solution.emplace_back(g1, g2, roundf(FLOAT_TO_INT_MULT * transfer));
             //#if DEBUG__TREE_LB_L1
             if (_lb_args.debug() > 0)
               CkPrintf("[%d] Root: moving %f load from %d to %d\n", CkMyPe(), transfer,

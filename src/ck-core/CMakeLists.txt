@@ -21,7 +21,7 @@ set(ck-cxx-sources
     ../ck-perf/tracec.C ../ck-perf/tracef.C ../conv-perf/charmProjections.C
     ../util/ckbitvector.C ../util/ckregex.C
     ck.C ckarray.C ckarrayoptions.C ckcallback.C
-    ckcheckpoint.C ckevacuation.C ckfutures.C ckIgetControl.C
+    ckcheckpoint.C ckfutures.C ckIgetControl.C
     cklocation.C ckmemcheckpoint.C ckmulticast.C
     ckobjQ.C ckrdma.C ckrdmadevice.C ckreduction.C cksyncbarrier.C debug-charm.C
     debug-message.C init.C modifyScheduler.C mpi-interoperate.C msgalloc.C
@@ -31,7 +31,7 @@ set(ck-cxx-sources
 set(ck-h-sources XArraySectionReducer.h charm++.h charm++_type_traits.h
     charm-api.h charm.h charmf.h ck.h ckIgetControl.h ckarray.h ckarrayindex.h
     ckarrayoptions.h ckcallback-ccs.h ckcallback.h ckcheckpoint.h
-    ckevacuation.h ckfutures.h cklocation.h cklocrec.h
+    ckmarshall.h ckfutures.h cklocation.h cklocrec.h
     ckmemcheckpoint.h ckmessage.h ckmigratable.h ckmulticast.h
     ckobjQ.h ckrdma.h ckrdmadevice.h ckreduction.h cksection.h
     ckstream.h cksyncbarrier.h debug-charm.h envelope-path.h envelope.h init.h
@@ -43,6 +43,7 @@ set(ldb-cxx-sources
     ../ck-ldb/CommonLBs.C  ../ck-ldb/DistributedLB.C
     ../ck-ldb/EveryLB.C
     ../ck-ldb/LButil.C
+    ../ck-ldb/RecBipartLB.C
     ../ck-ldb/Refiner.C ../ck-ldb/RefinerTemp.C
     ../ck-ldb/TempAwareRefineLB.C
     ../ck-ldb/ckgraph.C ../ck-ldb/ckheap.C
@@ -57,6 +58,7 @@ set(ldb-h-sources ../ck-ldb/BaseLB.h ../ck-ldb/CentralLBMsg.h
     ../ck-ldb/LBObj.h ../ck-ldb/LBSimulation.h
     ../ck-ldb/MetaBalancer.h ../ck-ldb/MetisLB.h
     ../ck-ldb/RandomForestModel.h
+    ../ck-ldb/RecBipartLB.h
     ../ck-ldb/Refiner.h
     ../ck-ldb/RefinerTemp.h
     ../ck-ldb/ScotchLB.h ../ck-ldb/ScotchRefineLB.h
@@ -74,33 +76,38 @@ add_library(ck ${ck-cxx-sources} ${ck-h-sources} ${all-ci-outputs})
 add_library(ckmain main.C)
 add_dependencies(ckmain ck)
 
-add_library(moduleCommonLBs
-    ../ck-ldb/CommonLBs.C
-    ../ck-ldb/DistributedLB.C
-    ../ck-ldb/TreeLB.C
-    ../ck-ldb/manager.C
-)
-add_dependencies(moduleCommonLBs ck)
-
-if(${EVERYLB})
-add_library(moduleEveryLB
-    ${ldb-cxx-sources}
-    ${ldb-h-sources}
-)
+# CommonLBs used to be a subset of EveryLB, but they were unified as
+# part of the LB refactor. However, maintain both targets for
+# backwards compatibility and for possible future divergence.
+add_library(moduleCommonLBs ${ldb-cxx-sources} ${ldb-h-sources} ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h)
+add_library(moduleEveryLB ${ldb-cxx-sources} ${ldb-h-sources} ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h)
+configure_file(../ck-ldb/libmoduleCommonLBs.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
 configure_file(../ck-ldb/libmoduleEveryLB.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
-add_dependencies(moduleEveryLB ck)
+add_dependencies(moduleCommonLBs ck ckmetis)
+add_dependencies(moduleEveryLB ck ckmetis)
 
 add_library(moduleMetisLB ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h)
-add_dependencies(moduleMetisLB ck libckmetis)
 
-add_custom_target(libckmetis COMMAND make -C ${CMAKE_SOURCE_DIR}/src/libs/ck-libs/metis)
-endif()
+add_subdirectory(${CMAKE_SOURCE_DIR}/src/libs/ck-libs/metis/libmetis ${CMAKE_BINARY_DIR}/src/libs/ck-libs/metis/libmetis) # defines "ckmetis" target
+
+target_include_directories(ckmetis PRIVATE ${CMAKE_SOURCE_DIR}/src/libs/ck-libs/metis/GKlib )
+target_include_directories(moduleMetisLB PRIVATE ${CMAKE_SOURCE_DIR}/src/libs/ck-libs/metis/libmetis)
+target_include_directories(moduleCommonLBs PRIVATE ${CMAKE_SOURCE_DIR}/src/libs/ck-libs/metis/libmetis)
+target_include_directories(moduleEveryLB PRIVATE ${CMAKE_SOURCE_DIR}/src/libs/ck-libs/metis/libmetis)
+
+add_dependencies(moduleMetisLB ck ckmetis)
 
 # Single LBs
 add_library(moduleDistributedLB ../ck-ldb/DistributedLB.C)
 add_dependencies(moduleDistributedLB ck)
 add_library(moduleTreeLB ../ck-ldb/TreeLB.C)
 add_dependencies(moduleTreeLB ck)
+add_library(moduleRecBipartLB ../ck-ldb/RecBipartLB.C ../ck-ldb/RecBipartLB.h)
+add_dependencies(moduleRecBipartLB ck)
+add_library(moduleScotchLB EXCLUDE_FROM_ALL ../ck-ldb/ScotchLB.C ../ck-ldb/ScotchLB.h)
+configure_file(../ck-ldb/libmoduleScotchLB.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
+add_dependencies(moduleScotchLB ck)
+add_custom_target(ScotchLB DEPENDS moduleScotchLB)
 
 # Only for backwards compatibility
 add_library(moduleCkMulticast ../libs/ck-libs/dummy/ckdummy.C)
@@ -125,7 +132,7 @@ target_include_directories(ck PRIVATE . ../ck-ldb ../ck-perf ../ck-cp ../util/to
 target_include_directories(ckmain PRIVATE . ../ck-ldb ../ck-perf ../ck-cp ../util/topomanager)
 
 # Fortran interface
-if(${CMK_CAN_LINK_FORTRAN})
+if(CMK_CAN_LINK_FORTRAN)
     add_library(ckf charmf.C charmmod.f90 charmf.h)
     add_dependencies(ckf ck)
     add_custom_command(TARGET ckf

@@ -56,8 +56,6 @@ Orion Sky Lawlor, olawlor@acm.org
 #include "ckarray.h"
 #include <stdarg.h>
 
-CpvDeclare(int ,serializer); // if !CMK_FAULT_EVAC, serializer is always 0
-
 bool _isAnytimeMigration;
 bool _isStaticInsertion;
 bool _isNotifyChildInRed;
@@ -1075,24 +1073,6 @@ inline void msg_prepareSend(CkArrayMessage *msg, int ep,CkArrayID aid)
 #endif
 }
 
-
-/// Just a non-inlined version of msg_prepareSend()
-void msg_prepareSend_noinline(CkArrayMessage *msg, int ep,CkArrayID aid)
-{
-	envelope *env=UsrToEnv((void *)msg);
-	env->setArrayMgr(aid);
-	env->getsetArraySrcPe()=CkMyPe();
-#if CMK_SMP_TRACE_COMMTHREAD
-        env->setSrcPe(CkMyPe());
-#endif
-	env->setEpIdx(ep);
-	env->getsetArrayHops()=0;
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-	criticalPath_send(env);
-	automaticallySetMessagePriority(env);
-#endif
-}
-
 void CProxyElement_ArrayBase::ckSend(CkArrayMessage *msg, int ep, int opts) const
 {
 #if CMK_ERROR_CHECKING
@@ -1245,14 +1225,12 @@ int CkArrayBroadcaster::incrementBcastNo() {
 void CkArrayBroadcaster::incoming(CkArrayMessage *msg)
 {
 
-#if CMK_ONESIDED_IMPL
   if((CMI_ZC_MSGTYPE(UsrToEnv(msg)) == CMK_ZC_BCAST_SEND_MSG ||
       CMI_ZC_MSGTYPE(UsrToEnv(msg)) == CMK_ZC_BCAST_RECV_MSG) &&
       getRootNode(UsrToEnv(msg)) != 0 &&
       CkMyPe() == 0) {
     // Do not increment as it has already been incremented
   } else
-#endif
   {
     incBcastNo();
   }
@@ -1407,8 +1385,9 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage* msg, int ep, int opts) const
   } else {
     //Broadcast message via serializer node
     _TRACE_CREATION_DETAILED(UsrToEnv(msg), ep);
+    static constexpr int serializer = 0;
     int skipsched = opts & CK_MSG_EXPEDITED;
-    if (CkMyPe() == CpvAccess(serializer)) {
+    if (CkMyPe() == serializer) {
       DEBB((AA "Sending array broadcast\n" AB));
       if (skipsched && _entryTable[ep]->noKeep) {
         CProxy_CkArray(_aid).recvNoKeepExpeditedBroadcast(msg);
@@ -1421,9 +1400,8 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage* msg, int ep, int opts) const
       }
     } else {
       DEBB((AA "Forwarding array broadcast to serializer node %d\n" AB,
-          CpvAccess(serializer)));
+          serializer));
       CProxy_CkArray ap(_aid);
-#if CMK_ONESIDED_IMPL
       if (CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_SEND_MSG ||
           CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_MSG) {
         // ZC Bcast is implemented on non-zero root nodes by sending a small
@@ -1435,9 +1413,8 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage* msg, int ep, int opts) const
         w.msg = msg;
         w.ep = ep;
         w.opts = opts;
-        ap[CpvAccess(serializer)].incrementBcastNoAndSendBack(CkMyPe(), w);
+        ap[serializer].incrementBcastNoAndSendBack(CkMyPe(), w);
       } else
-#endif
       {
         // Regular Bcast (non ZC) is implemented on non-zero root nodes by
         // forwarding the message to PE 0 and then having PE 0 perform the
@@ -1445,15 +1422,15 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage* msg, int ep, int opts) const
         // (and avoid multiple delivery or no delivery of the message) when
         // load balancing occurs during a broadcast
         DEBB((AA "Forwarding array broadcast to serializer node %d\n" AB,
-            CpvAccess(serializer)));
+            serializer));
         if (skipsched && _entryTable[ep]->noKeep) {
-          ap[CpvAccess(serializer)].sendNoKeepExpeditedBroadcast(msg);
+          ap[serializer].sendNoKeepExpeditedBroadcast(msg);
         } else if (skipsched) {
-          ap[CpvAccess(serializer)].sendExpeditedBroadcast(msg);
+          ap[serializer].sendExpeditedBroadcast(msg);
         } else if (_entryTable[ep]->noKeep) {
-          ap[CpvAccess(serializer)].sendNoKeepBroadcast(msg);
+          ap[serializer].sendNoKeepBroadcast(msg);
         } else {
-          ap[CpvAccess(serializer)].sendBroadcast(msg);
+          ap[serializer].sendBroadcast(msg);
         }
       }
     }
@@ -1489,13 +1466,14 @@ void CkArray::sendZCBroadcast(MsgPointerWrapper w) {
 /// Reflect a broadcast off this Pe:
 void CkArray::sendBroadcast(CkMessage* msg) {
   CK_MAGICNUMBER_CHECK
+  static constexpr int serializer = 0;
   // TODO: is this recheck necessary? If so, it's necessary in the others too
-  if (CkMyPe() == CpvAccess(serializer)) {
+  if (CkMyPe() == serializer) {
     //Broadcast the message to all processors
     UsrToEnv(msg)->setMsgtype(ArrayBcastMsg);
     thisProxy.recvBroadcast(msg);
   } else {
-    thisProxy[CpvAccess(serializer)].sendBroadcast(msg);
+    thisProxy[serializer].sendBroadcast(msg);
   }
 }
 
@@ -1533,7 +1511,6 @@ void CkArray::recvBroadcast(CkMessage* m) {
   broadcaster->incoming(msg);
 
   int len = localElemVec.size();
-#if CMK_ONESIDED_IMPL
   // extract this field here so we can still check it even if msg is freed
   const auto zc_msgtype = CMI_ZC_MSGTYPE(env);
 
@@ -1558,7 +1535,6 @@ void CkArray::recvBroadcast(CkMessage* m) {
     bool doFree = false;
     broadcaster->deliver(msg, (ArrayElement*)localElemVec[0], doFree);
   } else
-#endif
   {
 #if CMK_CHARM4PY
     broadcaster->deliver(msg, localElemVec, thisgroup.idx, stableLocations);
@@ -1566,11 +1542,9 @@ void CkArray::recvBroadcast(CkMessage* m) {
     for (unsigned int i = 0; i < len; ++i) {
       bool doFree = false;
       if (stableLocations && i == len-1) doFree = true;
-#if CMK_ONESIDED_IMPL
       // Do not free if CMK_ZC_BCAST_RECV_DONE_MSG, since it'll be freed by the
       // first element during CMK_ZC_BCAST_ALL_DONE_MSG
       if (zc_msgtype == CMK_ZC_BCAST_RECV_DONE_MSG) doFree = false;
-#endif
       CmiAssert(i < localElemVec.size());
       broadcaster->deliver(msg, (ArrayElement*)localElemVec[i], doFree);
     }
@@ -1585,7 +1559,6 @@ void CkArray::recvBroadcast(CkMessage* m) {
   }
 }
 
-#if CMK_ONESIDED_IMPL
 void CkArray::forwardZCMsgToOtherElems(envelope *env) {
 
   CMI_ZC_MSGTYPE(env) = CMK_ZC_BCAST_RECV_DONE_MSG;
@@ -1598,7 +1571,6 @@ void CkArray::forwardZCMsgToOtherElems(envelope *env) {
     broadcaster->deliver((CkArrayMessage *)EnvToUsr(env), (ArrayElement*)localElemVec[i], doFree);
   }
 }
-#endif
 
 void CkArray::flushStates() {
   CkReductionMgr::flushStates();

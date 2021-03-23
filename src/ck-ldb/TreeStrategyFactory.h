@@ -5,33 +5,48 @@
 #include "greedy.h"
 #include "refine.h"
 
-#define LB_STRATEGIES_FOR_TESTING 1
-
-class TreeStrategyFactory
+namespace TreeStrategy
 {
- public:
+// Strategies must be added here to be usable.
+// The name must match exactly the name of the class and will be the string that is used
+// to specify it in the config file.
+// The second parameter is whether or not the constructor takes a json& config argument
+// (which some strategies to accept additional parameters from the config file)
+#define FOREACH_STRATEGY(STRATEGY) \
+  STRATEGY(Greedy, false)          \
+  STRATEGY(GreedyRefine, true)     \
+  STRATEGY(RefineA, false)         \
+  STRATEGY(RefineB, false)         \
+  STRATEGY(Random, false)          \
+  STRATEGY(Dummy, false)           \
+  STRATEGY(Rotate, false)
+
+#define STRINGIFYLB(_name, _) #_name,
+const auto LBNames = {FOREACH_STRATEGY(STRINGIFYLB)};
+
+class Factory
+{
+public:
   // NOTE: This is the only place currently where the templates for each strategy
   // are instantiated. This means that code for any strategies that are disabled here
   // during preprocessing will not be part of the executable (because the templates
   // won't be instantiated)
   template <class O, class P, class S>
-  static TreeStrategy::Strategy<O, P, S>* makeStrategy(const std::string& name,
-                                                       json& config)
+  static Strategy<O, P, S>* makeStrategy(const std::string& name, json& config)
   {
-    using namespace TreeStrategy;
-    if (name == "Greedy") return new Greedy<O, P, S>();
-    if (name == "GreedyRefine") return new GreedyRefine<O, P, S>(config);
-    if (name == "RefineA") return new RefineA<O, P, S>();
-    if (name == "RefineB") return new RefineB<O, P, S>();
-    if (name == "Random") return new Random<O, P, S>();
-#if LB_STRATEGIES_FOR_TESTING
-    if (name == "Dummy") return new Dummy<O, P, S>();
-    if (name == "Rotate") return new Rotate<O, P, S>();
-#endif
+    // Only pass config if the strategy needs it
+#define LBNEEDS_CONFIG(_config) LBNEEDS_CONFIG_##_config
+#define LBNEEDS_CONFIG_true config
+#define LBNEEDS_CONFIG_false
+
+#define REGISTERLB(_name, _config) \
+  if (name == (#_name)) return new _name<O, P, S>(LBNEEDS_CONFIG(_config));
+    FOREACH_STRATEGY(REGISTERLB);
+
     std::string error_msg("Unrecognized strategy ");
     error_msg += name;
     CkAbort("%s\n", error_msg.c_str());
   }
 };
-
+}  // namespace TreeStrategy
 #endif /* TREESTRATEGYFACTORY_H */

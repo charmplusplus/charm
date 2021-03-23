@@ -1,0 +1,11 @@
+mainmodule fib {
+  mainchare Main {
+    entry [nokeep] Main(CkArgMsg* m);
+    entry [threaded] void run(int);
+  };
+
+  chare Fib {
+    entry Fib(int, const ck::future<int>&);
+    entry [threaded] void calc(int);
+  };
+};

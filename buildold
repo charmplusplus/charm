@@ -32,8 +32,8 @@ syntax() {
   echo '  everylb         compile EveryLB suite of load balancing strategies'
   echo ''
   fi
-  echo '<versions>: ' 
-  ( cd $src ; ls -1 | egrep -v '(^shmem$)|(^mpi$)|(^sim$)|(^netlrts?$)|(^multicore$)|(^util$)|(^common$)|(^uth$)|(^win$)|(^gni$)|(^pami(lrts)?$)|(^verbs$)|(^ofi$)|(^ucx$)|(^template$)|(^cuda$)' | pr -3 -t )
+  echo '<versions>: '
+  ( cd $src ; ls -1 | egrep -v '(^mpi$)|(^netlrts?$)|(^multicore$)|(^util$)|(^common$)|(^win$)|(^gni$)|(^pami(lrts)?$)|(^verbs$)|(^ofi$)|(^ucx$)|(^template$)|(^cuda$)' | pr -3 -t )
   echo ''
   echo '<options>: compiler and platform specific options'
   echo 'icc iccstatic xlc xlc64 gcc clang pgcc cc mpicxx'
@@ -231,6 +231,7 @@ TAU_MAKEFILE=""
 QUIET=""
 BUILD_OMP=0
 ONLY_CONFIGURE=
+FORCE=
 AMPI_ONLY=
 
 [ "$1" = '--help' -o "$1" = '-h' ] && more=1 && syntax | ( less || more ) && exit 1
@@ -420,6 +421,10 @@ do
     ;;
     --only-configure)
     ONLY_CONFIGURE="true"
+    shift
+    ;;
+    --force)
+    FORCE='1'
     shift
     ;;
     --enable-tracing|--enable-tracing=*)
@@ -699,14 +704,39 @@ then
   esac
 fi
 
+if [[ "$PROGRAM" = "${PROGRAM%AMPI-only}AMPI-only" ]]
+then
+  # strip "-only" suffix from AMPI target
+  PROGRAM="${PROGRAM%-only}"
+  AMPI_ONLY='1'
+fi
+
 # ===================================================
 # ---------- begin file structure creation ----------
 # ===================================================
 
 if [ -f "$DESTINATION/tmp/basics" ]
 then
-  Echo "File structure already created; skipping directly to make"
-else
+  Echo "The configure step has already taken place for the specified build."
+  if [ -z "$FORCE" ]
+  then
+    Echo "To attempt a partial rebuild, run 'make' in \"$DESTINATION/tmp\"."
+    Echo "To remove the existing data and reconfigure, run this script again with --force."
+    exit 1
+  else
+    Echo "Removing existing data and starting over. (--force)"
+  fi
+elif [ -e "$DESTINATION" -a ! -e "$DESTINATION/.spack" ]
+then
+  Echo "\"$DESTINATION\" already exists but is in an inconsistent state."
+  if [ -z "$FORCE" ]
+  then
+    Echo "To remove the existing data and reconfigure, run this script again with --force."
+    exit 1
+  else
+    Echo "Removing existing data and starting over. (--force)"
+  fi
+fi
 
 for d in benchmarks bin examples include lib lib_so tests tmp; do
   rm -rf "$DESTINATION/$d"
@@ -761,8 +791,8 @@ EOF
     fi
     $DESTINATION/tmp/system_ln $DESTINATION/$newdir $newdir
   done
-  rm -f VERSION
-  $DESTINATION/tmp/system_ln $DESTINATION/include/VERSION VERSION
+  rm -f charm-version.h
+  $DESTINATION/tmp/system_ln $DESTINATION/include/charm-version.h charm-version.h
 fi
 
 Echo "Copying src/scripts/Makefile to $DESTINATION/tmp"
@@ -814,6 +844,7 @@ then
       echo '. $CHARMINC/'"cc-$i.sh" >> $ConvSh
 elif test `echo "$BASEVERSION" | grep -c "bluegeneq"` -gt 0
 then
+      echo "Support for Blue Gene/Q targets has been deprecated as of Charm++ 7.0.0."
       i="clang"
       bgclang++11 --version
       if [ $? -ne 0 ]; then
@@ -841,6 +872,8 @@ if test  "$BUILD_SHARED"  = "-build-shared"
 then
     echo "CMK_NO_BUILD_SHARED=false" >> $ConvSh
     echo "CMK_NO_BUILD_SHARED:=false" >> $ConvMak
+
+    OPTS="$OPTS $BUILD_SHARED"
 else
     echo "CMK_NO_BUILD_SHARED=true" >> $ConvSh
     echo "CMK_NO_BUILD_SHARED:=true" >> $ConvMak
@@ -857,17 +890,12 @@ else
     echo '#define CMK_AMPI_WITH_ROMIO 0' >> $ConvHeader
 fi
 
-if [[ -n "$AMPI_ONLY" || "$PROGRAM" = "${PROGRAM%AMPI-only}AMPI-only" ]]
+if [[ -n "$AMPI_ONLY" ]]
 then
     echo "CMK_AMPI_ONLY=\"1\"" >> $ConvSh
     echo "CMK_AMPI_ONLY:=1" >> $ConvMak
     echo '#define CMK_AMPI_ONLY 1' >> $ConvHeader
 
-    if [[ "$PROGRAM" = "${PROGRAM%AMPI-only}AMPI-only" ]]
-    then
-      # strip "-only" suffix from AMPI target
-      PROGRAM="${PROGRAM%-only}"
-    fi
     # AMPI doesn't use Charm-MPI interop or msg priorities of any kind.
     # AMPI creates O(NumVirtualRanks) chare arrays by default (for MPI_COMM_SELF),
     # so we bump up the number of bits reserved for the collection in the objid.
@@ -912,10 +940,9 @@ echo 'BUILDOPTS="'$OPTS'"'  >> $ConvSh
 echo "SRCBASE=$srcbase" > $DESTINATION/tmp/charmpath.mk
 
 echo "CONFIG_OPTS=\"$CONFIG_OPTS\"" > "$DESTINATION/tmp/config_opts.sh"
+echo "OPTS=\"$OPTS\"" >> "$DESTINATION/tmp/config_opts.sh"
 chmod +x "$DESTINATION/tmp/config_opts.sh"
 echo "OPTSATBUILDTIME:=$OPTS" >> $ConvMak
-
-fi
 
 # ===================================================
 # ----------- end file structure creation -----------
@@ -933,7 +960,7 @@ printError()
 
 Echo "Performing '$MAKE $MAKEOPTS basics OPTS="$OPTS" QUIET="$QUIET" CONFIG_OPTS="$CONFIG_OPTS"' in $DESTINATION/tmp"
 cd $DESTINATION/tmp 
-$MAKE $MAKEOPTS basics OPTS="$OPTS $BUILD_SHARED" QUIET="$QUIET"
+$MAKE $MAKEOPTS basics OPTS="$OPTS" QUIET="$QUIET"
 MAKEEXIT=$?
 [ $MAKEEXIT -ne 0 ] && printError
 
@@ -943,13 +970,13 @@ then
 fi
 
 Echo "Performing '$MAKE $MAKEOPTS $PROGRAM OPTS="$OPTS" QUIET="$QUIET"' in $DESTINATION/tmp"
-$MAKE $MAKEOPTS $PROGRAM OPTS="$OPTS $BUILD_SHARED" QUIET="$QUIET"
+$MAKE $MAKEOPTS $PROGRAM OPTS="$OPTS" QUIET="$QUIET"
 MAKEEXIT=$?
 if [ $MAKEEXIT -eq 0 ]
 then
   if [ $BUILD_OMP = 1 ];
   then
-    $MAKE MFLAGS="$MAKEOPTS" openmp_llvm OPTS="$OPTS $BUILD_SHARED" QUIET="$QUIET"
+    $MAKE MFLAGS="$MAKEOPTS" openmp_llvm OPTS="$OPTS" QUIET="$QUIET"
   fi
   Echo "-------------------------------------------------"
   Echo "$PROGRAM built successfully."

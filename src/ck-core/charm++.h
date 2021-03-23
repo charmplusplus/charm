@@ -149,14 +149,7 @@ public:
 	inline const CkGroupID *getGroupDepPtr() const { return &(depGroupIDs[0]); }
 };
 
-#include "CkMarshall.decl.h"
-//This is the message type marshalled parameters get packed into:
-class CkMarshallMsg : public CMessage_CkMarshallMsg {
-public: 
-	char *msgBuf;
-};
-
-
+#include "ckmarshall.h"
 
 //A queue-of-messages, like CkMsgQ<CkReductionMsg>
 template <class MSG>
@@ -350,11 +343,6 @@ class IrrGroup : public Chare {
     virtual void flushStates() {}
 
     virtual void CkAddThreadListeners(CthThread tid, void *msg);
-
-#if CMK_FAULT_EVAC
-		virtual void evacuate(){};
-		virtual void doneEvacuate(){};
-#endif
 };
 
 #if CMK_CHARM4PY
@@ -399,24 +387,6 @@ public:
 
 #endif
 
-// As described in http://www.gotw.ca/publications/mxc++-item-4.htm
-template<typename D, typename B>
-class IsDerivedFrom
-{
-  class No { };
-  class Yes { No no[3]; };
-
-  static Yes Test( B* ); // not defined
-  static No Test( ... ); // not defined
-
-  static void Constraints(D* p) { B* pb = p; pb = p; }
-
-public:
-  enum { Is = sizeof(Test(static_cast<D*>(0))) == sizeof(Yes) };
-
-  IsDerivedFrom() { void(*p)(D*) = Constraints; }
-};
-
 /// Base case for the infrastructure to recursively handle inheritance
 /// through CBase_foo from anything that implements X::pup(). Chare
 /// classes have generated specializations that call PUPs for their
@@ -427,13 +397,13 @@ public:
 /// The specialized templates are structs for reasons explained by
 /// http://www.gotw.ca/publications/mill17.htm
 struct CBase { };
-template <typename T, int automatic>
+template <typename T, bool automatic>
 struct recursive_pup_impl {
   void operator()(T *obj, PUP::er &p);
 };
 
 template <typename T>
-struct recursive_pup_impl<T, 1> {
+struct recursive_pup_impl<T, true> {
   void operator()(T *obj, PUP::er &p) {
     obj->parent_pup(p);
     obj->_sdag_pup(p);
@@ -442,14 +412,14 @@ struct recursive_pup_impl<T, 1> {
 };
 
 template <typename T>
-struct recursive_pup_impl<T, 0> {
+struct recursive_pup_impl<T, false> {
   void operator()(T *obj, PUP::er &p) {
     obj->T::pup(p);
   }
 };
 template <typename T>
 void recursive_pup(T *obj, PUP::er &p) {
-  recursive_pup_impl<T, IsDerivedFrom<T, CBase>::Is>()(obj, p);
+  recursive_pup_impl<T, std::is_base_of<CBase, T>::value>()(obj, p);
 }
 
 class CProxy_ArrayBase;
@@ -477,13 +447,8 @@ template <class Parent,class CProxy_Derived>
 struct CBaseT1 : Parent, virtual CBase {
   CBASE_MEMBERS;
 
-#if CMK_HAS_RVALUE_REFERENCES
   template <typename... Args>
   CBaseT1(Args&&... args) : Parent(std::forward<Args>(args)...) { thisProxy = this; }
-#else
-  template <typename... Args>
-  CBaseT1(Args... args) : Parent(args...) { thisProxy = this; }
-#endif
 
   void parent_pup(PUP::er &p) {
     recursive_pup<Parent>(this, p);
@@ -1236,7 +1201,6 @@ if(CpvAccess(networkProgressCount) >=  p)  \
 #include "waitqd.h"
 #include "sdag.h"
 #include "ckcheckpoint.h"
-#include "ckevacuation.h"
 #include "trace.h"
 #include "envelope.h"
 #include "pathHistory.h"
@@ -1314,45 +1278,6 @@ int CkRegisterEp(const std::string& name, CkCallFnPtr call, int msgIdx, int char
 
   return CkRegisterEpTemplated(combined.c_str(), call, msgIdx, chareIdx, ck_ep_flags);
 }
-
-CkMarshallMsg *CkAllocateMarshallMsgNoninline(int size,const CkEntryOptions *opts);
-inline CkMarshallMsg *CkAllocateMarshallMsg(int size,const CkEntryOptions *opts=NULL)
-{
-	if (opts==NULL) {
-	  CkMarshallMsg *newMemory = new (size,0)CkMarshallMsg;
-	  setMemoryTypeMessage(UsrToEnv(newMemory));
-	  return newMemory;
-	}
-	else return CkAllocateMarshallMsgNoninline(size,opts);
-}
-
-
-
-
-
-
-
-template <typename T> 
-inline T *CkAllocateMarshallMsgT(int size,const CkEntryOptions *opts) 
-{ 
-  int priobits = 0; 
-  if (opts!=NULL) priobits = opts->getPriorityBits(); 
-  //Allocate the message 
-  T *m=new (size,priobits)T; 
-  //Copy the user's priority data into the message 
-  envelope *env=UsrToEnv(m); 
-  setMemoryTypeMessage(env); 
-  if (opts!=NULL) { 
-    CmiMemcpy(env->getPrioPtr(),opts->getPriorityPtr(),env->getPrioBytes()); 
-    //Set the message's queueing type 
-    env->setQueueing((unsigned char)opts->getQueueing()); 
-  } 
-  return m; 
-} 
-
-
-
-
 
 /************************** Debugging Utilities **************/
 

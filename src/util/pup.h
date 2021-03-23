@@ -753,9 +753,10 @@ public:
 protected:
 	able() {}
 	able(CkMigrateMessage *) {}
-	virtual ~able();//Virtual destructor may be needed by some child
 
 public:
+	virtual ~able();//Virtual destructor may be needed by some child
+
 //Constructor function registration:
 	typedef able* (*constructor_function)(void);
 	static PUP_ID register_constructor(const char *className,

@@ -1,6 +1,13 @@
 module CkCheckpoint {
+  readonly CkGroupID _sysChkptWriteMgr;
   readonly CkGroupID _sysChkptMgr;
   extern module CkCheckpointStatus;
+  nodegroup [migratable] CkCheckpointWriteMgr {
+    entry CkCheckpointWriteMgr(void);
+    entry [exclusive] void Checkpoint(char dirname[strlen(dirname) + 1], CkCallback cb,
+                          bool requestStatus, int writersPerNode);
+    entry [exclusive] void FinishedCheckpoint(void);
+  };
   group [migratable] CkCheckpointMgr {
 	entry CkCheckpointMgr(void);
 	entry void Checkpoint(char dirname[strlen(dirname)+1],CkCallback cb, bool requestStatus);

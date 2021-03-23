@@ -22,11 +22,10 @@
    one of them must be 1, all the others 0. The different implementations are in
    convserve.h Typically used are UNAVAILABLE for non SMP versions and
    POSIX_THREADS_SMP for SMP versions. The others are used only in special
-   cases: UNIPROCESSOR in sim and uth, PTHREADS in origin,
+   cases: PTHREADS in origin,
    and NT_THREADS in windows. */
 #define CMK_SHARED_VARS_UNAVAILABLE                        1 /* non SMP versions */
 #define CMK_SHARED_VARS_POSIX_THREADS_SMP                  0 /* SMP versions */
-#define CMK_SHARED_VARS_UNIPROCESSOR                       0
 #define CMK_SHARED_VARS_NT_THREADS                         0
 
 /* the following define if signal handlers should be used, both equal to zero
@@ -76,7 +75,7 @@
 #define CMK_LBDB_ON                    1
 
 #define CMK_64BIT                      1
-#define CMK_AMD64                      1
+#define CMK_PPC64                      1
 
 /* Other possible definitions:
 

@@ -1,9 +1,0 @@
-#!/bin/bash
-#
-# Just executes all its arguments.
-
-export FROM_CHARMRUN='1'
-
-PATH=.:$PATH
-export PATH
-"$@"

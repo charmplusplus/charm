@@ -3,7 +3,7 @@
 #include <limits.h>
 #include "speed.h"
 
-void 
+void
 test::measure(int nc)
 {
   nchunks = nc;
@@ -110,7 +110,7 @@ test::distrib(void)
 main::main(CkArgMsg* m)
 {
   if(m->argc < 2) {
-    CkPrintf("Usage: charmrun pgm +pN <nchunks>\n");
+    CkPrintf("Usage: charmrun speed +pN <nchunks>\n");
     CkExit(1);
   }
   int nchunks = atoi(m->argv[1]);

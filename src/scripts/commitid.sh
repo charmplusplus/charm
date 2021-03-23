@@ -1,29 +1,34 @@
 #!/bin/bash
 
 # Get a string describing the current code, and compare it to the
-# recorded value in VERSION. Copy over that if it's changed, so that
+# recorded value in charm-version.h. Copy over that if it's changed, so that
 # Make sees a more recent file.
 
+# This script is only used in the old build system.
+
 VOLD=""
-if test -r VERSION
+if test -r charm-version.h
 then
-    VOLD=$(cat VERSION)
+    VOLD=$(grep CHARM_VERSION_GIT charm-version-git.h | awk '{print $3}')
 fi
+
+
+echo -n "#define CHARM_VERSION_GIT \"" > charm-version-git.h.new
 
 # Potentially set by the higher-level package-tarball.sh script
 if [ "$RELEASE" = "1" ]
 then
     echo Release mode
-    (cd "$SRCBASE" && git describe --exact-match) > VERSION.new || exit 1
+    echo "$(cd "$SRCBASE" && git describe --exact-match)\"" >> charm-version-git.h.new || exit 1
 else
     echo Dev mode
-    (cd "$SRCBASE" && git describe --long --always) > VERSION.new || touch VERSION.new
+    echo "$(cd "$SRCBASE" && git describe --long --always)\"" >> charm-version-git.h.new || touch charm-version-git.h.new
 fi
 
-VNEW=$(cat VERSION.new)
+VNEW=$(grep CHARM_VERSION_GIT charm-version-git.h.new | awk '{print $3}')
 
 if test -n "$VNEW" -a "$VOLD" != "$VNEW"
 then
-    cp VERSION.new VERSION
-    echo Copying VERSION.new = "$VNEW" over VERSION = "$VOLD"
+    cp charm-version-git.h.new charm-version-git.h
+    echo Copying charm-version-git.h.new = "$VNEW" over charm-version-git.h = "$VOLD"
 fi

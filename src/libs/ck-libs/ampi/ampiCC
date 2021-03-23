@@ -15,8 +15,6 @@ CHARMINC="$CHARMBIN/../include"
 [ -z "$AMPICC_MODE" ] && AMPICC_MODE='ampi'
 VERBOSE=''
 STANDALONE=''
-ROMIO_CONFIGURE=''
-MPITEST=''
 GLOBALS=''
 GLOBALS_SHARED=''
 GLOBALS_FUNCPTR=''
@@ -80,18 +78,6 @@ do
      ;;
   -standalone)
      STANDALONE='true'
-     ;;
-
-  # These arguments manage compilation of ROMIO's configure tests.
-  # Simple environment tests will be compiled as standalone binaries,
-  # while MPI tests will be compiled with AMPI.
-  -ampi-romio-configure) # Strictly for internal use.
-     ROMIO_CONFIGURE='true'
-     ARGS+=" -DAMPI_NO_UNIMPLEMENTED_WARNINGS " # Don't bother showing these warnings
-     ;;
-  mpitest*) # mpitest.c, mpitest1.c, mpitest.f, etc
-     ARGS="$ARGS \"$arg\""
-     MPITEST='true'
      ;;
 
   -fsglobals)
@@ -159,13 +145,11 @@ fi
 
 AMPICC_POST_OPTS=''
 
-[ -n "$ROMIO_CONFIGURE" -a -z "$MPITEST" ] && STANDALONE='true'
-
 [ -n "$STANDALONE" ] && ARGS="$ARGS -standalone"
 
-if [ -z "$STANDALONE" -a -z "$ROMIO_CONFIGURE" ]
+if [ -z "$STANDALONE" ]
 then
-  [ -f "$CHARMBIN/../lib/libampiromio.a" ] && ROMIO='-lampiromio -pthread'
+  [ "$CMK_AMPI_WITH_ROMIO" = '1' ] && ROMIO='-pthread'
 
   [ "$CMK_SUPPORTS_MEMORY_ISOMALLOC" = '1' ] && ARGS="-memory isomalloc $ARGS"
   ARGS="-module CommonLBs $ARGS"

@@ -88,7 +88,6 @@ check_function_exists(ffsl HAVE_FFSL)
 check_function_exists(fls HAVE_FLS)
 check_function_exists(flsl HAVE_FLSL)
 check_function_exists(getexecname HAVE_DECL_GETEXECNAME)
-check_function_exists(gethostname CMK_HAS_GETHOSTNAME)
 check_function_exists(getifaddrs CMK_HAS_GETIFADDRS)
 check_function_exists(getpagesize HAVE_GETPAGESIZE)
 check_function_exists(getpagesize CMK_HAS_GETPAGESIZE)
@@ -393,12 +392,6 @@ int main() {
 }
 " CMK_BALANCED_INJECTION_API)
 
-if(NOT CMK_BALANCED_INJECTION_API)
-  # Since it is often checked via #ifdef, CMK_BALANCED_INJECTION_API
-  # can't be set to zero, but must be unset.
-  unset(CMK_BALANCED_INJECTION_API CACHE)
-endif()
-
 if(${CMK_BUILD_OFI} EQUAL 1)
   set(tmp ${CMAKE_REQUIRED_LIBRARIES})
   set(CMAKE_REQUIRED_LIBRARIES "${CMAKE_REQUIRED_LIBRARIES} -lfabric")
@@ -421,7 +414,11 @@ check_c_source_compiles("
 #include <ucontext.h>
 struct _libc_fpstate   fpstate;
 fpregset_t *fp;
-int main() {}
+int main()
+{
+  ucontext_t context;
+  context.uc_mcontext.fpregs = 0;
+}
 " CMK_CONTEXT_FPU_POINTER)
 
 check_c_source_compiles("

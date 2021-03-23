@@ -172,6 +172,7 @@
        integer, parameter :: AMPI_NUM_WTHS         = -14
        integer, parameter :: AMPI_MY_PROCESS       = -15
        integer, parameter :: AMPI_NUM_PROCESSES    = -16
+       integer, parameter :: AMPI_MY_HOME_WTH      = -17
 
        integer, parameter :: MPI_STATUS_SIZE = 8
 

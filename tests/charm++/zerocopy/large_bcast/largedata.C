@@ -31,7 +31,7 @@ public:
     if(m->argc>2)
       iterations=atoi(m->argv[2]);
     if(m->argc>3) {
-      CkPrintf("Usage: pgm +p2 [payload] [iterations]\n Where payload (default %zd) is integer >0, iterations (default %d) is integer >0\n", (size_t)PAYLOAD, NITER);
+      CkPrintf("Usage: large_bcast +p2 [payload] [iterations]\n Where payload (default %zd) is integer >0, iterations (default %d) is integer >0\n", (size_t)PAYLOAD, NITER);
       CmiAbort("Incorrect arguments\n");
     }
     CkPrintf("Large data transfer with payload: %zd iterations: %d\n", payload, iterations);

@@ -300,7 +300,6 @@ int SdagConstruct::unravelClosuresBegin(XStr& defs, bool child) {
                  << "*) (deviceBuffer_" << var.name << ".ptr);\n";
           } else {
             if (var.isFirstRdma) {
-              defs << "#if CMK_ONESIDED_IMPL\n";
               indentBy(defs, cur + 2);
               defs << "int "
                    << "& num_rdma_fields = ";
@@ -313,12 +312,8 @@ int SdagConstruct::unravelClosuresBegin(XStr& defs, bool child) {
                    << "& num_root_node = ";
               defs << "gen" << cur;
               defs << "->"
-                   << "getP" << i << "();\n";
-              defs << "#else\n";
-              i++;
-              defs << "#endif\n";
+                   << "getP" << i++ << "();\n";
             }
-            defs << "#if CMK_ONESIDED_IMPL\n";
             indentBy(defs, cur + 2);
             defs << "CkNcpyBuffer "
                  << "& ncpyBuffer_" << var.name << " = ";
@@ -327,13 +322,6 @@ int SdagConstruct::unravelClosuresBegin(XStr& defs, bool child) {
             indentBy(defs, cur + 2);
             defs << var.type << "* " << var.name << " = "
                  << "(" << var.type << "*) (ncpyBuffer_" << var.name << ".ptr);\n";
-            defs << "#else\n";
-            indentBy(defs, cur + 2);
-            defs << var.type << "*"
-                 << "& " << var.name << " = ";
-            defs << "gen" << cur << "->"
-                 << "getP" << i << "();\n";
-            defs << "#endif\n";
           }
         } else {
           indentBy(defs, cur + 2);

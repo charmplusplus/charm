@@ -127,11 +127,13 @@ class CmiNcpyBuffer {
 
 #if CMK_ERROR_CHECKING
   void checkRegModeIsValid() {
-    if(regMode < CMK_BUFFER_REG || regMode > CMK_BUFFER_NOREG) CmiAbort("checkRegModeIsValid: Invalid value for regMode!\n");
+    if (regMode > CMK_BUFFER_NOREG)
+      CmiAbort("checkRegModeIsValid: Invalid value for regMode!\n");
   }
 
   void checkDeregModeIsValid() {
-    if(deregMode < CMK_BUFFER_DEREG || deregMode > CMK_BUFFER_NODEREG) CmiAbort("checkDeregModeIsValid: Invalid value for deregMode!\n");
+    if (deregMode < CMK_BUFFER_DEREG || deregMode > CMK_BUFFER_NODEREG)
+      CmiAbort("checkDeregModeIsValid: Invalid value for deregMode!\n");
   }
 #endif
 
@@ -265,9 +267,7 @@ class CmiNcpyBuffer {
   void rdmaGet(CmiNcpyBuffer &source, int ackSize, char *srcAck, char *destAck);
   void rdmaPut(CmiNcpyBuffer &destination, int ackSize, char *srcAck, char *destAck);
 
-#if CMK_ONESIDED_IMPL
   friend inline void deregisterBuffer(CmiNcpyBuffer &buffInfo);
-#endif
 
 
 };

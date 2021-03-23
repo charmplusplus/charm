@@ -98,10 +98,8 @@ class CkNcpyBuffer : public CmiNcpyBuffer {
 
   friend void performEmApiMemcpy(CkNcpyBuffer &source, CkNcpyBuffer &dest, ncpyEmApiMode emMode);
 
-#if CMK_ONESIDED_IMPL
   friend void deregisterMemFromMsg(envelope *env, bool isRecv);
   friend void CkRdmaEMDeregAndAckHandler(void *ack);
-#endif
 };
 
 // Ack handler for the Zerocopy Direct API
@@ -138,8 +136,6 @@ static inline CkNcpyBuffer CkSendBuffer(const void *ptr_, unsigned short int reg
 }
 
 
-
-#if CMK_ONESIDED_IMPL
 // NOTE: Inside CkRdmaIssueRgets, a large message allocation is made consisting of space
 // for the destination or receiver buffers and some additional information required for processing
 // and acknowledgment handling. The space for additional information is typically equal to
@@ -403,7 +399,6 @@ inline void deregisterSrcBuffer(NcpyOperationInfo *ncpyOpInfo);
 inline void invokeCmaDirectRemoteDeregAckHandler(CkNcpyBuffer &buffInfo, ncpyHandlerIdx opMode);
 int getRootNode(envelope *env);
 
-#endif /* End of CMK_ONESIDED_IMPL */
 
 // Function declaration for EM Ncpy Ack handler initialization
 void initEMNcpyAckHandler(void);

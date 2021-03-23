@@ -81,7 +81,7 @@ opt_incdir=""
 opt_lbtime_type="double"
 opt_lbuserdata=0
 opt_libdir=""
-opt_lockless=0
+opt_lockless_queue=0
 opt_lrts_pmi=""
 opt_mempool_cutoff=26
 opt_network=0
@@ -119,16 +119,17 @@ case "$triplet" in
     ;;
 esac
 
-# Compiler options
-opt_CC= #undef
-opt_CXX= #undef
-opt_FC= #undef
+# Compiler selection. By default, use whatever is specified in the environment.
+opt_CC=${CC:-}
+opt_CXX=${CXX:-}
+opt_FC=${FC:-}
 
 opt_compiler=""
 
 # Misc options
 VERBOSE=0
 ONLY_CONFIGURE=0
+FORCE=0
 
 processArgs() {
 
@@ -164,7 +165,7 @@ while [[ $# -gt 0 ]]; do
     pxshm)
       opt_pxshm=1
       ;;
-    simplepmi|slurmpmi|slurmpmi2|ompipmix)
+    simplepmi|slurmpmi|slurmpmi2|ompipmix|openpmix)
       opt_lrts_pmi=$arg
       ;;
     persistent)
@@ -181,8 +182,8 @@ while [[ $# -gt 0 ]]; do
       opt_CXX=${arg/cc/++}
       opt_compiler+="$arg "
       ;;
-    gfortran)
-      opt_FC=gfortran
+    gfortran|gfortran-*)
+      opt_FC=$arg
       opt_compiler+="$arg "
       ;;
     clang)
@@ -272,7 +273,7 @@ while [[ $# -gt 0 ]]; do
       opt_lbuserdata=1
       ;;
     --enable-lockless-queue)
-      opt_lockless-queue=1
+      opt_lockless_queue=1
       ;;
     --enable-shrinkexpand)
       opt_shrinkexpand=1
@@ -340,6 +341,10 @@ while [[ $# -gt 0 ]]; do
       # Run only cmake, not make
       ONLY_CONFIGURE=1
       ;;
+    --force)
+      # Overwrite existing build directory
+      FORCE=1
+      ;;
     -j)
       opt_parallel="$arg"
       if [[ $# -gt 0 && $1 == [0-9]* ]]; then
@@ -378,12 +383,65 @@ eval processArgs "$@"
 ############ End option parsing
 
 
+# Make adjustments to $target if necessary
+
 if [[ "$target" = "${target%AMPI-only}AMPI-only" ]]; then
     opt_ampi_only=1
 
     # strip "-only" suffix from AMPI target
     target="${target%AMPI-only}AMPI"
+fi
 
+
+# Determine the build directory name
+
+# Append certain features and compilers to the end of $builddir
+builddir_extra=""
+for flag in opt_omp opt_smp opt_tcp opt_pthreads opt_pxshm opt_syncft opt_ooc opt_persistent opt_cuda; do
+  [[ $flag -eq 1 ]] && builddir_extra+="-${flag/opt_/}"
+done
+
+for c in $opt_lrts_pmi $opt_compiler; do
+  [[ -n $c ]] &&  builddir_extra+="-${c}"
+done
+
+if [[ -n $opt_destination ]]; then
+  # Note that $builddir_extra is intentionally ignored here
+  builddir=$opt_destination$opt_suffix
+else
+  builddir=$triplet$builddir_extra$opt_suffix
+fi
+
+
+# Check whether configure step has already taken place
+
+if [[ -f "$builddir/Makefile" ]]
+then
+  echo "The configure step has already taken place for the specified build."
+  if [[ $FORCE -eq 0 ]]
+  then
+    echo "To attempt a partial rebuild, run 'make' in \"$builddir\"."
+    echo "To remove the existing data and reconfigure, run this script again with --force."
+    exit 1
+  else
+    echo "Removing existing data and starting over. (--force)"
+  fi
+elif [[ -e "$builddir" && ! -e "$builddir/.spack" ]]
+then
+  echo "\"$builddir\" already exists but is in an inconsistent state."
+  if [[ $FORCE -eq 0 ]]
+  then
+    echo "To remove the existing data and reconfigure, run this script again with --force."
+    exit 1
+  else
+    echo "Removing existing data and starting over. (--force)"
+  fi
+fi
+
+
+# Build option setup
+
+if [[ $opt_ampi_only -eq 1 ]]; then
     # AMPI doesn't use Charm-MPI interop or msg priorities of any kind.
     # AMPI creates O(NumVirtualRanks) chare arrays by default (for MPI_COMM_SELF),
     # so we bump up the number of bits reserved for the collection in the objid.
@@ -430,32 +488,18 @@ if [[ $VERBOSE -eq 1 ]]; then
   done
 fi
 
-# Append certain features and compilers to the end of the build directory name
-builddir_extra=""
-for flag in opt_omp opt_smp opt_tcp opt_pthreads opt_pxshm opt_syncft opt_ooc opt_persistent opt_cuda; do
-  [[ $flag -eq 1 ]] && builddir_extra+="-${flag/opt_/}"
-done
 
-for c in $opt_lrts_pmi $opt_compiler; do
-  [[ -n $c ]] &&  builddir_extra+="-${c}"
-done
+# Create builddir and its contents
 
-if [[ -n $opt_destination ]]; then
-  # Note that $builddir_extra is intentionally ignored here
-  builddir=$opt_destination$opt_suffix
-else
-  builddir=$triplet$builddir_extra$opt_suffix
-fi
+rm -rf "${builddir:?}"/*
 
-rm -rf "$builddir"
-
-mkdir "$builddir"
+mkdir -p "$builddir"
 
 cd "$builddir"
 
 if [[ -n $opt_libdir ]]; then
   mkdir -p include
-  echo "USER_OPTS_LD=$opt_libdir" >> include/conv-mach-pre.sh
+  echo "USER_OPTS_LD='$opt_libdir'" >> include/conv-mach-pre.sh
 fi
 
 if [[ -n $opt_incdir ]]; then
@@ -463,6 +507,9 @@ if [[ -n $opt_incdir ]]; then
   echo "USER_OPTS_CC='$opt_incdir'" >> include/conv-mach-pre.sh
   echo "USER_OPTS_CXX='$opt_incdir'" >> include/conv-mach-pre.sh
 fi
+
+
+# Run configure step
 
 CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
   -G "Unix Makefiles" \
@@ -481,7 +528,7 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
   -DEXTRA_OPTS="$opt_extra_opts" \
   -DLBTIME_TYPE="$opt_lbtime_type" \
   -DLBUSERDATA="$opt_lbuserdata" \
-  -DLOCKLESS_QUEUE="$opt_lockless" \
+  -DLOCKLESS_QUEUE="$opt_lockless_queue" \
   -DLRTS_PMI="$opt_lrts_pmi" \
   -DCMK_MEMPOOL_CUTOFFNUM="$opt_mempool_cutoff" \
   -DNETWORK="$opt_network" \
@@ -506,6 +553,9 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
   -DTRACING="$opt_tracing" \
   -DTRACING_COMMTHREAD="$opt_tracing_commthread" \
   -DZLIB="$opt_zlib"
+
+
+# Run build step
 
 [[ $ONLY_CONFIGURE -eq 1 ]] && exit 0
 

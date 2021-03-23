@@ -18,7 +18,11 @@
 
 extern int quietModeRequested;
 
-CreateLBFunc_Def(ScotchTopoLB, "Load balancing using the Scotch graph partitioning library")
+static void lbinit()
+{
+  LBRegisterBalancer<ScotchTopoLB>(
+      "ScotchTopoLB", "Load balancing using the Scotch graph partitioning library");
+}
 
 ScotchTopoLB::ScotchTopoLB(const CkLBOptions &opt) : CBase_ScotchTopoLB(opt) {
   lbname = "ScotchTopoLB";

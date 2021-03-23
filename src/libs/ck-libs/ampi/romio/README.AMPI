@@ -7,6 +7,9 @@ ROMIO integrated into AMPI:
 * Commented out the unconditional assignment of MPI_IMPL in the configure
   script so that AMPI can specify it when configuring.
 * ampi_mpi has been added to known_mpi_impls in configure.ac.
+* Configure tests that build MPI executables have been changed to only
+  compile object files, breaking a circular dependency between ROMIO and the
+  rest of AMPI. See confdb/aclocal_romio.m4.
 * Used MPI_Info_* calls from AMPI, and darray calls from ROMIO.
 * Set -DHAVE_STATUS_SET_BYTES in configure and configure.in, and
   add status setting call in adio/common/status_setb.c
@@ -16,9 +19,6 @@ ROMIO integrated into AMPI:
   (currently disabled pending review of CkDDT's contiguity handling)
 * Excluded directories doc, lib, man, and test in the distribution.
   (lib will be generated in the building directory $CHARMDIR/tmp/)
-* The final library lib/$ARCH/libmpio.a is copied to
-  $CHARMDIR/lib/libampiromio.a and the user is supposed to link
-  with ampiromio at link time.
 * Global variables were privatized, as shown in the section below.
 * Function declarations have been moved from mpio.h.in to a new file,
   mpio_functions.h, in line with ampi_functions.h. As part of this,
@@ -39,6 +39,8 @@ ROMIO integrated into AMPI:
 * MPI_Type_size_x and MPI_Status_set_elements_x in large_count.c are ifdef'd
   out, since they are provided by AMPI, but the ROMIO configure check for their
   presence is faulty.
+* Use `ACLOCAL=aclocal-1.15 AUTOMAKE=automake-1.15 autoreconf` to regenerate
+  the configure script if making additional changes.
 
 
 Variable privatization

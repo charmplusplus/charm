@@ -11,7 +11,8 @@
 # Ignore build artifacts
 config_opts.sh
 smart-build.log
-VERSION
+charm-version.h
+charm-version-git.h
 bin
 include
 lib

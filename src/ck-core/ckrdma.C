@@ -11,6 +11,8 @@
 #include "ckarray.h"
 #include "cklocation.h"
 
+void CmiFreeBroadcastAllExceptMeFn(int size, char *msg);
+
 #if CMK_SMP
 /*readonly*/ extern CProxy_ckcallback_group _ckcallbackgroup;
 #endif
@@ -290,7 +292,7 @@ void CkRdmaDirectAckHandler(void *ack) {
   switch(info->opMode) {
     case CMK_DIRECT_API             : handleDirectApiCompletion(info); // Ncpy Direct API
                                       break;
-#if CMK_ONESIDED_IMPL
+
     case CMK_EM_API                 : handleEntryMethodApiCompletion(info); // Ncpy EM API invoked through a GET
                                       break;
 
@@ -311,7 +313,7 @@ void CkRdmaDirectAckHandler(void *ack) {
 
     case CMK_READONLY_BCAST         : readonlyGetCompleted(info);
                                       break;
-#endif
+
     case CMK_ZC_PUP                 : zcPupGetCompleted(info);
                                       break;
 
@@ -373,7 +375,6 @@ inline void zcQdIncrement() {
 }
 
 
-#if CMK_ONESIDED_IMPL
 /*********************************** Zerocopy Entry Method API ****************************/
 
 /************************* Zerocopy Entry Method API - Utility functions ******************/
@@ -1915,7 +1916,8 @@ void readonlyGetCompleted(NcpyOperationInfo *ncpyOpInfo) {
   }
 
   // Free ncpyOpInfo allocated inside readonlyGet
-  CmiFree(ncpyOpInfo);
+  if(ncpyOpInfo->freeMe == CMK_FREE_NCPYOPINFO)
+    CmiFree(ncpyOpInfo);
 }
 /***************************** End of Zerocopy Readonly Bcast Support ****************************/
 
@@ -1958,14 +1960,11 @@ inline void _ncpyBcastNoHandler(ncpyBcastNoMsg *bcastNoMsg) {
   arrProxy[bcastNoMsg->srcPe].sendZCBroadcast(w);
 }
 
-#endif  /* End of CMK_ONESIDED_IMPL */
 
 // Register converse handler for invoking ncpy ack
 void initEMNcpyAckHandler(void) {
-#if CMK_ONESIDED_IMPL
   ncpy_bcastNo_handler_idx = CmiRegisterHandler((CmiHandler)_ncpyBcastNoHandler);
   ncpy_handler_idx = CmiRegisterHandler((CmiHandler)_ncpyAckHandler);
-#endif
 #if CMK_SMP
   zcpy_pup_complete_handler_idx = CmiRegisterHandler((CmiHandler)_zcpyPupCompleteHandler);
 #endif
@@ -1981,7 +1980,6 @@ inline void invokeRemoteNcpyAckHandler(int pe, void *ref, ncpyHandlerIdx opMode)
   CmiSyncSendAndFree(pe, sizeof(ncpyHandlerMsg), (char *)msg);
 }
 
-#if CMK_ONESIDED_IMPL
 inline void _ncpyAckHandler(ncpyHandlerMsg *msg) {
   QdProcess(1);
 
@@ -2002,7 +2000,6 @@ inline void _ncpyAckHandler(ncpyHandlerMsg *msg) {
                                                  break;
   }
 }
-#endif  /* End of CMK_ONESIDED_IMPL */
 
 
 /***************************** Zerocopy PUP Support ****************************/
@@ -2085,7 +2082,7 @@ void zcPupIssueRgets(CmiUInt8 id, CkLocMgr *locMgr) {
 
   // Create an entry for the unordered map with idx as the index and the vector size as the value
   CmiLock(CksvAccess(_nodeZCPendingLock));
-  CksvAccess(pendingZCOps).emplace(id, CpvAccess(newZCPupGets).size());
+  CksvAccess(pendingZCOps).emplace(id, (CmiUInt1)CpvAccess(newZCPupGets).size());
   CmiUnlock(CksvAccess(_nodeZCPendingLock));
 
   // Create an entry for the unordered map with idx as the index and vector of messages as the value

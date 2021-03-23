@@ -1,10 +1,10 @@
 # modify the path of CHARMC
 CHARMC ?= ../../../bin/charmc $(OPTS)
 
-all: pgm
+all: prio
 
-pgm: pgm.o
-	$(CHARMC) pgm.o  -o pgm -language charm++
+prio: pgm.o
+	$(CHARMC) pgm.o  -o prio -language charm++
 
 pgm.o : pgm.C pgm.def.h
 	$(CHARMC) -c pgm.C
@@ -16,4 +16,4 @@ pgm.ci.stamp: pgm.ci
 	touch $@
 
 clean:
-	rm -f pgm pgm_prof *.o conv-host *.decl.h *.def.h *.stamp *~ charmrun *.log *.sts core charmrun.exe pgm.exe pgm.pdb pgm.ilk
+	rm -f prio pgm_prof *.o conv-host *.decl.h *.def.h *.stamp *~ charmrun *.log *.sts core charmrun.exe prio.exe prio.pdb prio.ilk

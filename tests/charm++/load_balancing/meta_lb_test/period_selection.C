@@ -53,9 +53,6 @@ public:
       if (CkNumPes() == 1) {
         expected_migrations = 0;
       }
-#if CMK_UTH_VERSION
-      expected_migrations = 0;
-#endif
       if (migrations != expected_migrations) {
         CkAbort("Did not do expected number of migrations!\n");
       }

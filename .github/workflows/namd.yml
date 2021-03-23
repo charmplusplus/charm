@@ -1,6 +1,6 @@
 name: NAMD
 
-on: [push]
+on: pull_request
 
 jobs:
   build:
@@ -12,9 +12,10 @@ jobs:
       run: ./build charm++ netlrts-linux-x86_64 -g -j4 --with-production
     - name: build-namd
       run: |
+        sudo apt-get update
         sudo apt-get -y install sfftw-dev
         cd ..
-        git clone https://charm.cs.illinois.edu/gerrit/namd
+        git clone https://${{ secrets.NAMD_CI_USERNAME_TOKEN }}@gitlab.com/tcbgUIUC/namd.git
         cd namd
         ./config Linux-x86_64-g++ --charm-base ../charm --charm-arch netlrts-linux-x86_64 --without-tcl
         cd Linux-x86_64-g++
@@ -23,7 +24,7 @@ jobs:
       run: |
         cd ../namd/Linux-x86_64-g++
         ./charmrun ++local +p2 ./namd2 src/alanin
-        
+
     - name: Cache apoa1 files
       id: cache-apoa1-files
       uses: actions/cache@v2.0.0
@@ -40,7 +41,7 @@ jobs:
         sed -i 's,500,250,' apoa1/apoa1.namd # Reduce number of steps
         sed -i 's,/usr/tmp,/tmp,' apoa1/apoa1.namd # Change output prefix
         rm apoa1.tar.gz
-    
+
     - name: test-namd-apoa1
       run: |
         cd ../namd/Linux-x86_64-g++

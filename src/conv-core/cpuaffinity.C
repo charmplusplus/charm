@@ -344,7 +344,7 @@ int get_cpu_affinity(cpu_set_t *cpuset) {
 int get_thread_affinity(cpu_set_t *cpuset) {
 #if CMK_HAS_PTHREAD_SETAFFINITY
   CPU_ZERO(cpuset);
-  if (errno = pthread_getaffinity_np(pthread_self(), sizeof(cpu_set_t), cpuset)) {
+  if ((errno = pthread_getaffinity_np(pthread_self(), sizeof(cpu_set_t), cpuset))) {
     perror("pthread_getaffinity");
     return -1;
   }
@@ -1206,11 +1206,7 @@ void CmiInitCPUAffinity(char **argv)
     /* get my ip address */
   if (CmiMyRank() == 0)
   {
-#if CMK_HAS_GETHOSTNAME
     myip = skt_my_ip();        /* not thread safe, so only calls on rank 0 */
-#else
-    CmiAbort("Cannot get unique name for this host.\n");
-#endif
   }
   CmiNodeAllBarrier();
 

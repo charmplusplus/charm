@@ -354,9 +354,10 @@ Wesolowski, Esteban Meneses, Chao Mei, David Kunzman, Osman Sarood,
 Abhishek Gupta, Yanhua Sun, Ehsan Totoni, Akhil Langer, Cyril Bordage,
 Harshit Dokania, Prateek Jindal, Jonathan Lifflander, Xiang Ni,
 Harshitha Menon, Nikhil Jain, Vipul Harsh, Bilge Acun, Phil Miller,
-Seonmyeong Bak, and Karthik Senthil. Current developers include Eric Bohm,
-Ronak Buch, Michael Robson, Eric Mikida, Sam White, Juan Galvez, Nitin Bhat,
-Kavitha Chandrasekar, Jaemin Choi, Matthias Diener, Evan Ramos,
-Raghavendra Kanakagiri, and Venkatasubrahmanian Narayanan.
+Seonmyeong Bak, Karthik Senthil, Juan Galvez, Michael Robson, Raghavendra
+Kanakagiri, and Venkatasubrahmanian Narayanan. Current developers include
+Eric Bohm, Ronak Buch, Eric Mikida, Sam White, Nitin Bhat, Kavitha
+Chandrasekar, Jaemin Choi, Matthias Diener, Evan Ramos, Justin Szaday,
+and Zane Fink.
 
 Copyright (C) 1989-2020 Regents of the University of Illinois

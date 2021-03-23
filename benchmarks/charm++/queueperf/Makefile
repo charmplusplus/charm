@@ -2,13 +2,14 @@
 CHARMC := ../../../bin/charmc
 CXX := $(CHARMC) $(OPTS)
 
-TARGETS = pgm msgqtest
+TARGETS = queueperf msgqtest
 all: $(TARGETS)
 test: $(TARGETS)
-	$(call run, ./pgm  +p1)
+	$(call run, ./queueperf  +p1)
 	$(call run, ./msgqtest  +p1)
 
-pgm.C: main.decl.h
+queueperf: pgm.C main.decl.h
+	$(CHARMC) $(OPTS) -o $@ pgm.C
 
 msgqtest.C: main.decl.h
 
@@ -19,4 +20,4 @@ test.ci.stamp: test.ci
 	touch $@
 
 clean:
-	rm -f $(TARGETS) *.o *.decl.h *.def.h test.ci.stamp charmrun pgm.exe pgm.pdb pgm.ilk
+	rm -f $(TARGETS) *.o *.decl.h *.def.h test.ci.stamp charmrun queueperf.exe queueperf.pdb queueperf.ilk

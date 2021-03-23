@@ -81,7 +81,7 @@ else()
 endif()
 
 # Build options
-set(NETWORK "netlrts" CACHE STRING "Target network layer, can be one of mpi,multicore,netlrts,gni,ofi,pami,pamilrts,ucx,uth,verbs")
+set(NETWORK "netlrts" CACHE STRING "Target network layer, can be one of mpi,multicore,netlrts,gni,ofi,pami,pamilrts,ucx,verbs")
 set(TARGET "charm++" CACHE STRING "Target build type, can be one of charm++,AMPI,LIBS,charm4py,ChaNGa,everylb,all-test")
 
 # Platform specific options (choose multiple if desired):
@@ -146,7 +146,7 @@ option(CUDA                "Build with CUDA support" OFF)
 option(PXSHM               "Build with PXSHM" OFF)
 
 # LRTS PMI options
-set(LRTS_PMI "" CACHE STRING "PMI type for UCX and OFI layers, can be one of simplepmi, slurmpmi, slurmpmi2, or ompipmix")
+set(LRTS_PMI "" CACHE STRING "PMI type for UCX and OFI layers, can be one of simplepmi, slurmpmi, slurmpmi2, ompipmix, or openpmix")
 
 set(EXTRA_OPTS "" CACHE STRING "Extra flags to pass to compilers.")
 
@@ -171,31 +171,6 @@ if(BUILD_SHARED)
 endif()
 
 set(CMK_REPLAYSYSTEM ${REPLAY})
-
-if(${TARGET} STREQUAL "all-test")
-  add_custom_target(all-test ALL COMMAND make -C ${CMAKE_BINARY_DIR}/tmp all-test)
-  add_dependencies(all-test moduleampi ampi-compat ck modulecompletion
-        ampi_funcptr_shim ampi_funcptr_shim_main
-        ampi_funcptr_loader ampi_funcptr_loader_stub
-        conv-partition conv-util hwloc conv-static conv-core ldb-rand
-        memory-os-isomalloc memory-default threads-default ckmain moduletcharmmain
-        conv-machine tmgr conv-ldb ckqt tcharm-compat moduleNDMeshStreamer
-        create_symlinks moduleCkCache trace-converse moduleCommonLBs
-        moduleTreeLB moduleCkMulticast moduleCkIO conv-cpm memory-os-wrapper
-        threads-default-tls ldb-neighbor ldb-workstealing modulearmci
-        modulecollidecharm modulecollide memory-os memory-gnu-isomalloc)
-  if(CMK_CAN_LINK_FORTRAN)
-    add_dependencies(all-test moduleampif conv-utilf ckmainf
-        ampi_funcptr_shim_fortran ampi_funcptr_shim_fmpimain)
-  endif()
-  if(CMK_SUPPORTS_FSGLOBALS)
-    add_dependencies(all-test ampi_globals_fs)
-  endif()
-  if(CMK_SUPPORTS_PIPGLOBALS)
-    add_dependencies(all-test ampi_globals_pip)
-  endif()
-  set(TARGET "LIBS")
-endif()
 
 string(TOLOWER "${TARGET}" target_lower)
 
@@ -338,6 +313,7 @@ elseif(IS_DIRECTORY "/bgsys")
   set(CHARM_OS "bluegeneq")
   set(CMK_BLUEGENEQ 1)
   set(CMK_SUPPORTS_MEMORY_ISOMALLOC 0)
+  message(DEPRECATION "Support for Blue Gene/Q targets has been deprecated as of Charm++ 7.0.0.")
 else()
   message(FATAL_ERROR "Unsupported operating system ${CMAKE_SYSTEM_NAME}.")
 endif()
@@ -345,14 +321,18 @@ endif()
 set(CMK_POWER7 0)
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "AMD64")
   set(CHARM_CPU "x86_64")
+elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "i386" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "i686")
+  set(CHARM_CPU "i386")
 elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "powerpc" OR CMAKE_SYSTEM_PROCESSOR MATCHES "^ppc")
   set(CHARM_CPU "ppc64le")
   execute_process(COMMAND grep f Makefile RESULT_VARIABLE isppc7 OUTPUT_QUIET ERROR_QUIET)
   if(${isppc7})
     set(CMK_POWER7 1)
   endif()
-elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "arm7")
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "armv6" OR CMAKE_SYSTEM_PROCESSOR MATCHES "armv7")
   set(CHARM_CPU "arm7")
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "arm64")
+  set(CHARM_CPU "arm8")
 else()
   message(FATAL_ERROR "Unsupported CPU ${CMAKE_SYSTEM_PROCESSOR}.")
 endif()
@@ -363,6 +343,8 @@ if(${PROJECT_VERSION_PATCH} LESS 10)
   set(CHARM_VERSION_PATCH_PREFIX 0)
 endif()
 set(CHARM_VERSION "${PROJECT_VERSION_MAJOR}${PROJECT_VERSION_MINOR}${CHARM_VERSION_PATCH_PREFIX}${PROJECT_VERSION_PATCH}")
+
+unset(CHARM_VERSION_PATCH_PREFIX)
 
 set(CHARM_PLATFORM "${NETWORK}-${CHARM_OS}-${CHARM_CPU}")
 
@@ -457,6 +439,33 @@ endif()
 include(cmake/detect-features.cmake)
 include(cmake/ci-files.cmake)
 
+if(${TARGET} STREQUAL "all-test")
+  add_custom_target(all-test ALL COMMAND $(MAKE) -C ${CMAKE_BINARY_DIR}/tmp all-test
+        COMMENT "Building all-test. This will take several minutes.")
+  add_dependencies(all-test moduleampi ampi-compat ck modulecompletion
+        ampi_funcptr_shim ampi_funcptr_shim_main
+        ampi_funcptr_loader ampi_funcptr_loader_stub
+        converse conv-static ldb-rand
+        memory-os-isomalloc memory-default threads-default ckmain moduletcharmmain
+        ckqt tcharm-compat moduleNDMeshStreamer
+        create_symlinks moduleCkCache trace-converse moduleCommonLBs
+        moduleTreeLB moduleCkMulticast moduleCkIO conv-cpm memory-os-wrapper
+        threads-default-tls ldb-neighbor ldb-workstealing
+        modulecollidecharm modulecollide memory-os memory-gnu-isomalloc
+        ampi_globals_fs)
+  if(CMK_CAN_LINK_FORTRAN)
+    add_dependencies(all-test moduleampif conv-utilf ckmainf
+        ampi_funcptr_shim_fortran ampi_funcptr_shim_fmpimain)
+  endif()
+  if(CMK_SUPPORTS_FSGLOBALS)
+    add_dependencies(all-test ampi_globals_fs)
+  endif()
+  if(CMK_SUPPORTS_PIPGLOBALS)
+    add_dependencies(all-test ampi_globals_pip)
+  endif()
+  set(TARGET "LIBS")
+endif()
+
 configure_file(${CMAKE_SOURCE_DIR}/src/scripts/charmc ${CMAKE_BINARY_DIR}/bin @ONLY)
 
 # Use charmc to compile/link everything
@@ -493,8 +502,15 @@ if(NOT DEFINED CMK_AMPI_WITH_ROMIO)
 endif()
 
 set(CMK_ENABLE_C11   ${CMAKE_C11_EXTENSION_COMPILE_OPTION})
-set(CMK_ENABLE_CPP11 ${CMAKE_CXX11_STANDARD_COMPILE_OPTION})
-set(OPTS_CXX "${OPTS_CXX} ${CMAKE_CXX11_STANDARD_COMPILE_OPTION}")
+
+# Use -std=gnu++11 if available
+if(NOT "${CMAKE_CXX11_EXTENSION_COMPILE_OPTION}" STREQUAL "")
+  set(OPTS_CXX "${OPTS_CXX} ${CMAKE_CXX11_EXTENSION_COMPILE_OPTION}")
+  set(CMK_ENABLE_CPP11 ${CMAKE_CXX11_EXTENSION_COMPILE_OPTION})
+else()
+  set(OPTS_CXX "${OPTS_CXX} ${CMAKE_CXX11_STANDARD_COMPILE_OPTION}")
+  set(CMK_ENABLE_CPP11 ${CMAKE_CXX11_STANDARD_COMPILE_OPTION})
+endif()
 
 set(CMK_CC ${CMAKE_C_COMPILER})
 set(CMK_CXX ${CMAKE_CXX_COMPILER})
@@ -727,68 +743,16 @@ endif()
 add_subdirectory(src/xlat-i)
 add_dependencies(charmxi create_symlinks)
 
+# Hwloc
+include(cmake/hwloc.cmake)
+
 # Converse
+include(cmake/converse.cmake)
 add_subdirectory(src/QuickThreads)
 add_subdirectory(src/util/boost-context)
 add_subdirectory(src/conv-core)
-add_subdirectory(src/conv-ldb)
-add_subdirectory(src/util)
 
-# Hwloc
-if(${BUILD_SHARED})
-    set(hwloc_shared yes)
-else()
-    set(hwloc_shared no)
-endif()
-
-# Determine arguments to pass to hwloc's configure
-set(command ${CMAKE_BINARY_DIR}/bin/charmc -print-building-blocks ${OPTS})
-execute_process(COMMAND ${command} COMMAND grep CHARM_CC_FLAGS= COMMAND cut -c16- COMMAND tr -d \' COMMAND tr -d '\n' OUTPUT_VARIABLE CHARM_CC_FLAGS)
-execute_process(COMMAND ${command} COMMAND grep CHARM_CC= COMMAND cut -c10- COMMAND tr -d \' COMMAND tr -d '\n' OUTPUT_VARIABLE CHARM_CC)
-
-# FIXME: copy .so
-set(hwloc_dir ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc)
-include(ExternalProject)
-ExternalProject_Add(hwloc
-    URL ${CMAKE_SOURCE_DIR}/contrib/hwloc
-    CONFIGURE_COMMAND
-        ${hwloc_dir}/configure
-        --disable-cairo
-        --disable-cuda
-        --disable-gl
-        --disable-libxml2
-        --disable-nvml
-        --disable-opencl
-        --disable-pci
-        --disable-libudev
-        --disable-visibility
-        --enable-embedded-mode
-        --enable-shared=${hwloc_shared}
-        --enable-static
-        --with-hwloc-symbol-prefix=cmi_
-        --without-x
-        HWLOC_FLAGS=${CHARM_CC_FLAGS}
-        CFLAGS=${CHARM_CC_FLAGS}
-        CC=${CHARM_CC}
-        CC_FOR_BUILD=${CHARM_CC}
-        > /dev/null
-    BUILD_COMMAND make V=$(VERBOSE) AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=:
-    INSTALL_COMMAND test -f hwloc/.libs/libhwloc_embedded.lib && cp hwloc/.libs/libhwloc_embedded.lib hwloc/.libs/libhwloc_embedded.a || true # On Windows, the library is created as .lib
-    COMMAND cp hwloc/.libs/libhwloc_embedded.a ${CMAKE_BINARY_DIR}/lib/
-    COMMAND cp -f ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc/include/hwloc.h ${CMAKE_BINARY_DIR}/include/
-    COMMAND cp -LRf ${CMAKE_SOURCE_DIR}/contrib/hwloc/include/hwloc ${CMAKE_BINARY_DIR}/include/
-    COMMAND cp -f ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/include/hwloc/autogen/config.h ${CMAKE_BINARY_DIR}/include/hwloc/autogen/
-)
-
-# TopoManager
-set(tmgr-cxx-sources src/util/topomanager/TopoManager.C src/util/topomanager/CrayNid.c src/util/topomanager/BGQTorus.C)
-set(tmgr-h-sources src/util/topomanager/TopoManager.h ${CMAKE_BINARY_DIR}/include/topomanager_config.h src/util/topomanager/XTTorus.h src/util/topomanager/BGQTorus.h)
-file(WRITE ${CMAKE_BINARY_DIR}/include/topomanager_config.h "// empty\n" )
-add_library(tmgr ${tmgr-cxx-sources} ${tmgr-h-sources})
-foreach(filename ${tmgr-h-sources})
-    configure_file(${filename} ${CMAKE_BINARY_DIR}/include/ COPYONLY)
-endforeach()
-
+# LIBS
 if(${TARGET} STREQUAL "LIBS")
   add_subdirectory(src/libs/conv-libs)
   add_subdirectory(src/libs/ck-libs)
@@ -875,10 +839,6 @@ if(${TARGET} STREQUAL "AMPI" OR ${TARGET} STREQUAL "LIBS")
   add_subdirectory(src/libs/ck-libs/ampi)
 endif()
 
-if(${NETWORK} STREQUAL "uth")
-  set(CMK_UTH 1)
-endif()
-
 # Charm4py
 if(${TARGET} STREQUAL "charm4py")
   # Create libcharm.so for Charm4py
@@ -887,16 +847,16 @@ if(${TARGET} STREQUAL "charm4py")
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
   add_library(charm SHARED empty.cpp)
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib_so)
-  target_link_libraries(charm ck conv-core conv-util memory-default conv-machine threads-default conv-partition tmgr hwloc_embedded ldb-rand conv-ldb "-Llib/ -standalone -whole-archive -c++stl -shared")
+  target_link_libraries(charm ck converse memory-default threads-default ldb-rand "-Llib/ -standalone -whole-archive -c++stl -shared")
 
   add_dependencies(charm hwloc)
 endif()
 
 # Check that we are able to build and link an executable
-add_executable(hello ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.C)
-add_dependencies(hello ck ldb-rand memory-default threads-default conv-static
-  conv-core ckmain conv-machine conv-util conv-partition conv-ldb ckqt
-  moduleNDMeshStreamer modulecompletion tmgr)
+add_executable(ckhello ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.C)
+add_dependencies(ckhello ck ldb-rand memory-default threads-default conv-static
+  converse ckmain ckqt
+  moduleNDMeshStreamer modulecompletion)
 
 # Create conv-mach-opt.sh
 set(optfile_sh ${CMAKE_BINARY_DIR}/include/conv-mach-opt.sh)
@@ -934,7 +894,6 @@ endforeach(l)
 if(NOT ${CMAKE_DL_LIBS} STREQUAL "")
     set(DL_LIB "-l${CMAKE_DL_LIBS}")
 endif()
-file(APPEND ${optfile_sh} "CMK_HWLOC_LIBS=\"-lhwloc_embedded -lm\"\n" )
 
 if (NOT CMK_WINDOWS)
   file(APPEND ${optfile_sh} "CMK_LIBS=\"$CMK_LIBS -lz ${DL_LIB}\"\n")
@@ -967,7 +926,7 @@ set(optfile_mak ${CMAKE_BINARY_DIR}/include/conv-mach-opt.mak)
 file(WRITE  ${optfile_mak} "# Build-time options header for Makefiles, automatically generated by cmake.\n")
 foreach(l CUDA_DIR BUILD_CUDA CMK_AMPI_WITH_ROMIO CMK_MACOSX CMK_BLUEGENEQ CMK_BUILD_PYTHON
         CMK_CHARMDEBUG CMK_COMPILER CMK_GDIR CMK_HAS_MALLOC_HOOK CMK_HAS_MMAP CMK_LIBJPEG
-        CMK_LUSTREAPI CMK_MULTICORE CMK_UTH CMK_NO_BUILD_SHARED CMK_NO_PARTITIONS
+        CMK_LUSTREAPI CMK_MULTICORE CMK_NO_BUILD_SHARED CMK_NO_PARTITIONS
         CMK_SHARED_SUF CMK_SMP CMK_SUPPORTS_FSGLOBALS CMK_SUPPORTS_PIPGLOBALS
         CMK_TRACE_ENABLED CMK_USE_LRTS CMK_VDIR OPTSATBUILDTIME CMK_AMPI_ONLY CMK_WINDOWS
         CMK_USE_CMA CMK_USER_SUFFIX CMK_CAN_LINK_FORTRAN CMK_SUPPORTS_MEMORY_ISOMALLOC)
@@ -1024,7 +983,7 @@ endif()
 # Get version information
 find_program(GIT git)
 
-if(GIT)
+if(GIT AND EXISTS ${CMAKE_SOURCE_DIR}/.git)
   execute_process(COMMAND git describe --exact-match --dirty=*
              OUTPUT_VARIABLE CHARM_VERSION_GIT
              RESULT_VARIABLE git_result
@@ -1095,10 +1054,15 @@ add_custom_target(create_symlinks ALL
 #   add_dependencies(create_symlinks createlink)
 # endif()
 
-# Create the .vdir/.gdir/VERSION files
+# Create the .vdir/.gdir/charm-version.h/charm-version-git.h files
 file(WRITE ${CMAKE_BINARY_DIR}/include/.gdir   "${CMK_GDIR}\n")
 file(WRITE ${CMAKE_BINARY_DIR}/include/.vdir   "${CMK_VDIR}\n")
-file(WRITE ${CMAKE_BINARY_DIR}/include/VERSION "${CHARM_VERSION}\n")
+file(WRITE ${CMAKE_BINARY_DIR}/include/charm-version.h "#define CHARM_VERSION ${CHARM_VERSION}\n")
+file(APPEND ${CMAKE_BINARY_DIR}/include/charm-version.h "#define CHARM_VERSION_MAJOR ${PROJECT_VERSION_MAJOR}\n")
+file(APPEND ${CMAKE_BINARY_DIR}/include/charm-version.h "#define CHARM_VERSION_MINOR ${PROJECT_VERSION_MINOR}\n")
+file(APPEND ${CMAKE_BINARY_DIR}/include/charm-version.h "#define CHARM_VERSION_PATCH ${PROJECT_VERSION_PATCH}\n")
+
+file(WRITE ${CMAKE_BINARY_DIR}/include/charm-version-git.h "#define CHARM_VERSION_GIT \"${CHARM_VERSION_GIT}\"\n")
 
 
 # Copy the Makefile used for building and running tests

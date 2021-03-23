@@ -40,12 +40,8 @@ jacobi.iso: jacobi.C
 	$(CHARMC) -o $@ jacobi.iso.o -memory isomalloc
 
 jacobi.tls: jacobi.C
-ifeq ($(CMK_UTH),1)
-	@echo "Skipping jacobi.tls test on UTH (tlsglobals not supported)."
-else
 	-$(CHARMC) -c -tlsglobals jacobi.C -o jacobi.tls.o
 	-$(CHARMC) -o jacobi.tls jacobi.tls.o -tlsglobals
-endif
 
 jacobi.rose: jacobi.C
 	$(CHARMC) -roseomptlsglobals -o jacobi.rose.o -c $<

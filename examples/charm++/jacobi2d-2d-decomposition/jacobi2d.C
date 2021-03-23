@@ -195,8 +195,8 @@ public:
         temperature = new double*[blockDimX+2];
         new_temperature = new double*[blockDimX+2];
         for (i=0; i<blockDimX+2; i++) {
-          temperature[i] = new double[blockDimY];
-          new_temperature[i] = new double[blockDimY];
+          temperature[i] = new double[blockDimY + 2];
+          new_temperature[i] = new double[blockDimY + 2];
         }
       }
       for(i=0;i<blockDimX+2; i++) {

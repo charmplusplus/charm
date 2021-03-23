@@ -256,6 +256,11 @@ getExtention() {
         fi
 }
 
+getAbsPath()
+{
+  ( cd "$*" >/dev/null 2>&1 && pwd || echo "$*" )
+}
+
 Debugf() {
 	[ -n "$VERBOSE" ] && echo "charmc>" $@
 }
@@ -389,7 +394,7 @@ filterLegacyLB()
 printVersion()
 {
 	findCharmBin $0
-	version=`cat $CHARMBIN/../include/VERSION`
+	version=$(grep "CHARM_VERSION " $CHARMBIN/../include/charm-version.h | awk '{print $3}')
 	echo Charm++ Version $version
 }
 
@@ -414,18 +419,13 @@ then
 	PROG_EXT=".exe"
 fi
 
-CHARMLIB="$CHARMBIN/../lib"
-CHARMINC="$CHARMBIN/../include"
+CHARMDIR="$(getAbsPath "$CHARMBIN/..")"
+CHARMLIB="$CHARMDIR/lib"
+CHARMINC="$CHARMDIR/include"
 CHARMLIBSO=
-if test -d "$CHARMBIN/../lib_so"
+if test -d "$CHARMDIR/lib_so"
 then
-  CHARMLIBSO=`cd $CHARMBIN/../lib_so 2>/dev/null && pwd`
-  #getting absolute path is harder than thought because of symbolic links and ..
-  #ksh needs cd -P to resolve werid symbolic links, however -P is not portable
-  #csh is ok too if it exists
-  test -z "$CHARMLIBSO" && CHARMLIBSO=`cd -P $CHARMBIN/../lib_so 2>/dev/null && pwd`
-  test -z "$CHARMLIBSO" && CHARMLIBSO=`csh -c "cd $CHARMBIN/../lib_so >& /dev/null && pwd"`
-  test -z "$CHARMLIBSO" && echo "$CHARMBIN/../lib_so: not found" && exit 1
+  CHARMLIBSO="$CHARMDIR/lib_so"
 fi
 
 ##############################################################################
@@ -486,8 +486,6 @@ do
 		case "$1" in
 		"ampi") AddModules tcharmmain ampi ; AMPI="1" ;;
 		"ampif") AddModules tcharmmain ampif ; USE_F90_LIBRARIES="1" ; AMPIF="1" ;;
-		"armci") AddModules tcharmmain armci ;;
-		"armcif") AddModules tcharmmain armci ; USE_F90_LIBRARIES="1" ;;
 		"fem") AddModules tcharmmain fem ; AMPIMAIN="femmain";;
 		"femf") AddModules tcharmmain fem ; AMPIMAIN="femmain"; USE_F90_LIBRARIES="1" ;;
 		"ParFUM_TOPS") AddModules tcharmmain ParFUM ParFUM_TOPS ; AMPIMAIN="ParFUMmain";;
@@ -983,7 +981,7 @@ for FILE in $FILES
 do
 
 	case "$FILE" in
-	*.o|*.so|*.so.*|*.sl|*.a|*.dylib|*.co)
+	*.o|*.so|*.so.*|*.sl|*.a|*.dylib|*.co|*.obj)
 		OBJECTFILES="$OBJECTFILES $FILE"
 		;;
 	*.c|*.s|*.S|*.asm|*.C|*.cc|*.cxx|*.cpp|*.c++|*.cu|*.f|*.F|*.f77|*.F77|*.f90|*.F90|*.fpp|*.FPP)
@@ -1106,7 +1104,8 @@ fi
 
 if [ "$TLSGLOBALS" = "1" ]
 then
-    TLSGLOBALS_OPTS='-ftls-model=initial-exec'
+    TLSGLOBALS_OPTS=''
+    [[ "$CMK_COMPILER_KNOWS_FTLS_MODEL" = '1' ]] && TLSGLOBALS_OPTS+=" -ftls-model=initial-exec"
     [ "$CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS" = '1' ] && TLSGLOBALS_OPTS="$TLSGLOBALS_OPTS -mno-tls-direct-seg-refs"
     OPTS_CC="$OPTS_CC $TLSGLOBALS_OPTS"
     OPTS_CXX="$OPTS_CXX $TLSGLOBALS_OPTS"
@@ -1461,11 +1460,6 @@ fi
 
 if [ "$TLSGLOBALS" = "1" ]
 then
-    if [ "$CMK_GDIR" = "uth" ]
-    then
-      echo "Error: -tlsglobals is not supported with the uth machine layer."
-      exit 1
-    fi
     if [ "$CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS" != '1' ] && [ "$CMK_COMPILER" != 'clang' -o "$CMK_MACOSX" != '1' ]
     then
       echo "Warning: -tlsglobals may not work with compilers that do not recognize -mno-tls-direct-seg-refs."
@@ -1565,7 +1559,7 @@ fi
 
 Debug "Finished with TRACEMODE=$TRACEMODE and BALANCE=$BALANCE..."
 
-BAL_OBJ="-lldb-$BALANCE -lconv-ldb"
+BAL_OBJ="-lldb-$BALANCE -lconverse"
 
 # Check for valid choice of MEMORY
 
@@ -1623,7 +1617,7 @@ modInitObj="$modInitName.o"
 MAKE_LDXX="0"
 MAKE_LD="0"
 
-CORE_LIBS="-lconv-core -ltmgr -lconv-util -lconv-partition $TRACE_OBJ $CMK_HWLOC_LIBS"
+CORE_LIBS="-lconverse $TRACE_OBJ -lm"
 
 # get TAU stub makefile variables
 if test "$CMK_WITH_TAU" = "true"
@@ -1650,7 +1644,7 @@ CMK_SYSLIBS="$CMK_SYSLIBS -lm"
 case "$PARADIGM" in
 "f90charm")
 	MAKE_LDXX="1"
-	MIDDLE_LIBS="-lck $MIDDLE_LIBS -lconv-machine $CORE_LIBS "
+	MIDDLE_LIBS="-lck $MIDDLE_LIBS $CORE_LIBS "
 	if [ -z "$NO_MAIN" ]
 	then
 		MIDDLE_LIBS="-lckmainf $MIDDLE_LIBS"
@@ -1665,7 +1659,7 @@ case "$PARADIGM" in
 	;;
 "charm"|"charm++"|"f90charm")
 	MAKE_LDXX="1"
-	MIDDLE_LIBS="-lck $MIDDLE_LIBS -lconv-machine $CORE_LIBS "
+	MIDDLE_LIBS="-lck $MIDDLE_LIBS $CORE_LIBS "
 	if [ -z "$NO_MAIN" ]
 	then
 		if [ -n "$AMPIF" ]
@@ -1686,7 +1680,7 @@ case "$PARADIGM" in
 	;;
 "converse"|"converse++")
 	MAKE_LDXX="1"
-	MIDDLE_LIBS="-lconv-core $MIDDLE_LIBS -lconv-machine $CORE_LIBS -ltrace-converse "
+	MIDDLE_LIBS="-lconverse $MIDDLE_LIBS $CORE_LIBS -ltrace-converse "
 	;;
 "c"|"C"|"c++"|"C++"|"f90"|"f77")
   ;;
@@ -2004,7 +1998,7 @@ do
 	*.fc|*.FC)
 		Abort "I'm not yet smart enough to compile $FILE"
 		;;
-	*.o|*.so|*.so.*|*.sl|*.a|*.dylib|*.co)
+	*.o|*.so|*.so.*|*.sl|*.a|*.dylib|*.co|*.obj)
 		[ ! -s $FILE ] && Abort "$FILE: file not recognized: File truncated"
 		;;
 	*.M|*.mod)

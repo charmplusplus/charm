@@ -1,10 +1,10 @@
 -include ../../common.mk
 CHARMC=../../../bin/ampicxx $(OPTS)
 
-all: pgm
+all: megampi
 
-pgm: test.o
-	$(CHARMC) -o pgm test.o -balancer TreeLB
+megampi: test.o
+	$(CHARMC) -o megampi test.o -balancer TreeLB
 
 test.o: test.C
 	$(CHARMC) -c test.C
@@ -12,17 +12,17 @@ test.o: test.C
 # clean up .o, .mod, .exe and EMACS backup files
 #
 clean:
-	rm -f *.o *.mod pgm bg_* *~ conv-host charmrun test.o pgm.exe pgm.pdb pgm.ilk ampirun
+	rm -f *.o *.mod megampi bg_* *~ conv-host charmrun test.o megampi.exe megampi.pdb megampi.ilk ampirun
 
-test: pgm
-	$(call run, ./pgm +p1 +vp1 +balancer RandCentLB)
-	$(call run, ./pgm +p1 +vp2 +balancer RandCentLB)
-	$(call run, ./pgm +p1 +vp4 +balancer RandCentLB)
-	$(call run, ./pgm +p2 +vp2 +balancer RandCentLB)
-	$(call run, ./pgm +p2 +vp4 +balancer RandCentLB)
-	$(call run, ./pgm +p2 +vp1 +balancer RandCentLB)
+test: megampi
+	$(call run, ./megampi +p1 +vp1 +balancer RandCentLB)
+	$(call run, ./megampi +p1 +vp2 +balancer RandCentLB)
+	$(call run, ./megampi +p1 +vp4 +balancer RandCentLB)
+	$(call run, ./megampi +p2 +vp2 +balancer RandCentLB)
+	$(call run, ./megampi +p2 +vp4 +balancer RandCentLB)
+	$(call run, ./megampi +p2 +vp1 +balancer RandCentLB)
 
-testp: pgm
-	$(call run, ./pgm +p$(P) +vp$(P) )
-	$(call run, ./pgm +p$(P) +vp$$(( $(P) * 2 )) )
-	$(call run, ./pgm +p$(P) +vp$$(( $(P) * 4 )) )
+testp: megampi
+	$(call run, ./megampi +p$(P) +vp$(P) )
+	$(call run, ./megampi +p$(P) +vp$$(( $(P) * 2 )) )
+	$(call run, ./megampi +p$(P) +vp$$(( $(P) * 4 )) )

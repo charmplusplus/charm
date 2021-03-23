@@ -123,7 +123,6 @@ UInt  _numInitMsgs = 0;
  */
 CksvDeclare(UInt,_numInitNodeMsgs);
 
-#if CMK_ONESIDED_IMPL
 #if CMK_SMP
 std::atomic<UInt> numZerocopyROops = {0};
 #else
@@ -134,7 +133,6 @@ bool usedCMAForROBcastTransfer = false;
 NcpyROBcastAckInfo *roBcastAckInfo;
 int   _roRdmaDoneHandlerIdx;
 CksvDeclare(int,  _numPendingRORdmaTransfers);
-#endif
 
 int   _infoIdx;
 int   _charmHandlerIdx;
@@ -199,11 +197,6 @@ int _ROGroupRestartHandlerIdx;
 const char* _shrinkexpand_basedir;
 #endif
 
-#if CMK_FAULT_EVAC
-CpvExtern(char *, _validProcessors);
-CkpvDeclare(char ,startedEvac);
-#endif
-
 int    _exitHandlerIdx;
 
 #if CMK_WITH_STATS
@@ -238,12 +231,6 @@ int _defaultObjectQ = 0;            // for obejct queue
 bool _ringexit = 0;		    // for charm exit
 int _ringtoken = 8;
 extern int _messageBufferingThreshold;
-
-#if CMK_FAULT_EVAC
-static bool _raiseEvac=0; // whether or not to trigger the processor shutdowns
-static char *_raiseEvacFile;
-void processRaiseEvacFile(char *raiseEvacFile);
-#endif
 
 extern bool useNodeBlkMapping;
 
@@ -337,12 +324,6 @@ static inline void _parseCommandLineOpts(char **argv)
       CkPrintf("Charm++> Program shutdown in token ring (%d).\n", _ringtoken);
     if (_ringtoken > CkNumPes())  _ringtoken = CkNumPes();
   }
-#if CMK_FAULT_EVAC
-  // if the argument +raiseevac is present then cause faults
-	if(CmiGetArgStringDesc(argv,"+raiseevac", &_raiseEvacFile,"Generates processor evacuation on random processors")){
-		_raiseEvac = 1;
-	}
-#endif
 
         if (!CmiGetArgIntDesc(argv, "+messageBufferingThreshold",
                               &_messageBufferingThreshold,
@@ -633,9 +614,6 @@ static void _exitHandler(envelope *env)
       DEBUGF(("ReqStatMsg on %d\n", CkMyPe()));
       CkNumberHandler(_charmHandlerIdx,_discardHandler);
       CkNumberHandler(_bocHandlerIdx, _discardHandler);
-#if CMK_FAULT_EVAC
-      if(CmiNodeAlive(CkMyPe()))
-#endif
       {
 #if CMK_WITH_STATS
          _sendStats();
@@ -905,7 +883,6 @@ static inline void _processRODataMsg(envelope *env)
     PUP::fromMem pu((char *)EnvToUsr(env));
     CmiSpanningTreeInfo &t = *_topoTree;
 
-#if CMK_ONESIDED_IMPL
 #if CMK_SMP
     UInt numZerocopyROopsTemp;
     pu|numZerocopyROopsTemp;
@@ -921,14 +898,13 @@ static inline void _processRODataMsg(envelope *env)
     if(numZerocopyROops > 0 && t.child_count != 0) {
       readonlyAllocateOnSource();
     }
-#endif
 
     for(size_t i=0;i<_readonlyTable.size();i++) {
       _readonlyTable[i]->pupData(pu);
     }
 
     // Forward message to peers after numZerocopyROops has been initialized
-#if CMK_ONESIDED_IMPL && CMK_SMP
+#if CMK_SMP
     if(CMI_IS_ZC_BCAST(env)) {
       // Send message to peers
       CmiForwardMsgToPeers(env->getTotalsize(), (char *)env);
@@ -961,7 +937,6 @@ static void _roRestartHandler(void *msg)
   _triggerHandler(NULL);
 }
 
-#if CMK_ONESIDED_IMPL
 static void _roRdmaDoneHandler(envelope *env) {
 
   switch(env->getMsgtype()) {
@@ -1005,12 +980,10 @@ static void _roRdmaDoneHandler(envelope *env) {
       break;
   }
 }
-#endif
 
 void checkForInitDone(bool rdmaROCompleted) {
 
   bool noPendingRORdmaTransfers = true;
-#if CMK_ONESIDED_IMPL
   // Ensure that there are no pending RO Rdma transfers on Rank 0 when numZerocopyROops > 0
 #if CMK_SMP
   if(numZerocopyROops.load(std::memory_order_relaxed) > 0)
@@ -1018,7 +991,6 @@ void checkForInitDone(bool rdmaROCompleted) {
   if(numZerocopyROops > 0)
 #endif
     noPendingRORdmaTransfers = rdmaROCompleted;
-#endif
   if (_numExpectInitMsgs && CkpvAccess(_numInitsRecd) + CksvAccess(_numInitNodeMsgs) == _numExpectInitMsgs && noPendingRORdmaTransfers)
     _initDone();
 }
@@ -1082,7 +1054,7 @@ static void _initHandler(void *msg, CkCoreState *ck)
       CmiAbort("Internal Error: Unknown-msg-type. Contact Developers.\n");
   }
   DEBUGF(("[%d,%.6lf] _numExpectInitMsgs %d CkpvAccess(_numInitsRecd)+CksvAccess(_numInitNodeMsgs) %d+%d\n",CmiMyPe(),CmiWallTimer(),_numExpectInitMsgs,CkpvAccess(_numInitsRecd),CksvAccess(_numInitNodeMsgs)));
-#if CMK_ONESIDED_IMPL && CMK_USE_CMA
+#if CMK_USE_CMA
   if(usedCMAForROBcastTransfer) {
     checkForInitDone(true); // RO ZCPY Bcast operation was completed inline (using CMA)
   } else
@@ -1160,7 +1132,7 @@ extern void _registerControlPoints(void);
 extern void _registerTraceControlPoints();
 extern void _registerExternalModules(char **argv);
 extern void _ckModuleInit(void);
-extern void _cksyncbarrierInit();
+extern void _CkSyncBarrierInit();
 extern void _loadbalancerInit();
 extern void _metabalancerInit();
 #if CMK_SMP && CMK_TASKQUEUE
@@ -1209,7 +1181,7 @@ void initQd(char **argv)
 	CpvInitialize(QdState*, _qd);
 	CpvAccess(_qd) = new QdState();
 	if (CmiMyRank() == 0) {
-#if !defined(CMK_CPV_IS_SMP) && !CMK_SHARED_VARS_UNIPROCESSOR
+#if !defined(CMK_CPV_IS_SMP)
 	CpvAccessOther(_qd, 1) = new QdState(); // for i/o interrupt
 #endif
 	}
@@ -1250,7 +1222,6 @@ void _sendReadonlies() {
   //Determine the size of the RODataMessage
   PUP::sizer ps;
 
-#if CMK_ONESIDED_IMPL
 #if CMK_SMP
   UInt numZerocopyROopsTemp;
   numZerocopyROopsTemp = numZerocopyROops;
@@ -1258,26 +1229,21 @@ void _sendReadonlies() {
 #else
   ps|numZerocopyROops;
 #endif
-#endif
 
   for(int i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(ps);
 
-#if CMK_ONESIDED_IMPL
   if(CkNumNodes() > 1 && numZerocopyROops > 0) { // No ZC ops are performed when CkNumNodes <= 1
     readonlyAllocateOnSource();
   }
-#endif
 
   //Allocate and fill out the RODataMessage
   envelope *env = _allocEnv(RODataMsg, ps.size());
   PUP::toMem pp((char *)EnvToUsr(env));
-#if CMK_ONESIDED_IMPL
 #if CMK_SMP
   numZerocopyROopsTemp = numZerocopyROops;
   pp|numZerocopyROopsTemp;
 #else
   pp|numZerocopyROops;
-#endif
 #endif
   for(int i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(pp);
 
@@ -1286,7 +1252,7 @@ void _sendReadonlies() {
   CmiSetHandler(env, _initHandlerIdx);
   DEBUGF(("[%d,%.6lf] RODataMsg being sent of size %d \n",CmiMyPe(),CmiWallTimer(),env->getTotalsize()));
   CmiSyncBroadcast(env->getTotalsize(), (char *)env);
-#if CMK_ONESIDED_IMPL && CMK_SMP
+#if CMK_SMP
   if(numZerocopyROops > 0) {
     // Send message to peers
     CmiForwardMsgToPeers(env->getTotalsize(), (char *)env);
@@ -1334,12 +1300,6 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvInitialize(MsgPool*, _msgPool);
 	CkpvInitialize(CkCoreState *, _coreState);
 
-#if CMK_FAULT_EVAC
-	CpvInitialize(char *,_validProcessors);
-	CkpvInitialize(char ,startedEvac);
-#endif
-	CpvInitialize(int,serializer);
-
 	_initChareTables();            // for checkpointable plain chares
 
 	CksvInitialize(UInt, _numNodeGroups);
@@ -1357,9 +1317,7 @@ void _initCharm(int unused_argc, char **argv)
 
 	CksvInitialize(objNumRdmaOpsMap, pendingZCOps);
 
-#if CMK_ONESIDED_IMPL
 	CksvInitialize(int, _numPendingRORdmaTransfers);
-#endif
 
 	CkpvInitialize(_CkOutStream*, _ckout);
 	CkpvInitialize(_CkErrStream*, _ckerr);
@@ -1380,9 +1338,7 @@ void _initCharm(int unused_argc, char **argv)
 	  	CksvAccess(_numNodeGroups) = 1; //make 0 an invalid group number
           	CksvAccess(_numInitNodeMsgs) = 0;
 
-#if CMK_ONESIDED_IMPL
 		CksvAccess(_numPendingRORdmaTransfers) = 0;
-#endif
 
 		CksvAccess(_nodeLock) = CmiCreateLock();
 		CksvAccess(_nodeGroupTable) = new GroupTable();
@@ -1413,9 +1369,7 @@ void _initCharm(int unused_argc, char **argv)
 	CmiAssignOnce(&_initHandlerIdx, CkRegisterHandlerEx(_initHandler, CkpvAccess(_coreState)));
 	CmiAssignOnce(&_roRestartHandlerIdx, CkRegisterHandler(_roRestartHandler));
 
-#if CMK_ONESIDED_IMPL
 	CmiAssignOnce(&_roRdmaDoneHandlerIdx, CkRegisterHandler(_roRdmaDoneHandler));
-#endif
 
 	CmiAssignOnce(&_exitHandlerIdx, CkRegisterHandler(_exitHandler));
 	//added for interoperabilitY
@@ -1434,7 +1388,7 @@ void _initCharm(int unused_argc, char **argv)
 	CldRegisterEstimator((CldEstimator)_charmLoadEstimator);
 
 	_futuresModuleInit(); // part of futures implementation is a converse module
-        _cksyncbarrierInit();
+        _CkSyncBarrierInit();
 	_loadbalancerInit();
         _metabalancerInit();
 
@@ -1593,36 +1547,6 @@ void _initCharm(int unused_argc, char **argv)
 	    }
 	}
     }
-#endif
-
-
-#if CMK_FAULT_EVAC
-	CpvAccess(_validProcessors) = new char[CkNumPes()];
-	for(int vProc=0;vProc<CkNumPes();vProc++){
-		CpvAccess(_validProcessors)[vProc]=1;
-	}
-	CmiAssignOnce(&_ckEvacBcastIdx, CkRegisterHandler(_ckEvacBcast));
-	CmiAssignOnce(&_ckAckEvacIdx, CkRegisterHandler(_ckAckEvac));
-
-	CkpvAccess(startedEvac) = 0;
-	evacuate = 0;
-	CcdCallOnCondition(CcdSIGUSR1,(CcdVoidFn)CkDecideEvacPe,0);
-#endif
-	CpvAccess(serializer) = 0;
-
-
-#if CMK_FAULT_EVAC
-	if(_raiseEvac){
-		processRaiseEvacFile(_raiseEvacFile);
-		/*
-		if(CkMyPe() == 2){
-		//	CcdCallOnConditionKeep(CcdPERIODIC_10s,(CcdVoidFn)CkDecideEvacPe,0);
-			CcdCallFnAfter((CcdVoidFn)CkDecideEvacPe, 0, 10000);
-		}
-		if(CkMyPe() == 3){
-			CcdCallFnAfter((CcdVoidFn)CkDecideEvacPe, 0, 10000);
-		}*/
-	}	
 #endif
 
     if (CkMyRank() == 0) {

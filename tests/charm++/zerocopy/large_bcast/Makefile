@@ -7,45 +7,45 @@ NAME = largedata
 
 OBJS = $(NAME).o
 
-all: pgm
+all: large_bcast
 
-pgm: $(OBJS)
-	$(CHARMC) -language charm++ -o pgm $(OBJS)
+large_bcast: $(OBJS)
+	$(CHARMC) -language charm++ -o large_bcast $(OBJS)
 
-pgm.prj: $(OBJS)
-	$(CHARMC) -tracemode projections -language charm++ -o pgm.prj $(OBJS)
+large_bcast.prj: $(OBJS)
+	$(CHARMC) -tracemode projections -language charm++ -o large_bcast.prj $(OBJS)
 
 cifiles: $(NAME).ci
 	$(CHARMC) $(NAME).ci
 	touch cifiles
 
 clean:
-	rm -f *.decl.h *.def.h conv-host *.o pgm charmrun cifiles pgm.exe pgm.pdb pgm.ilk
+	rm -f *.decl.h *.def.h conv-host *.o large_bcast charmrun cifiles large_bcast.exe large_bcast.pdb large_bcast.ilk
 
 $(NAME).o: $(NAME).C cifiles
 	$(CHARMC) -I$(SRC)/conv-core $<
 
 test: all
-	$(call run, ./pgm +p4 200000 10)
-	$(call run, ./pgm +p6 200000 10)
+	$(call run, ./large_bcast +p4 200000 10)
+	$(call run, ./large_bcast +p6 200000 10)
 ifeq ($(CMK_USE_CMA),1)
-	$(call run, ./pgm +p4 200000 10 +noCMAForZC)
-	$(call run, ./pgm +p6 200000 10 +noCMAForZC)
+	$(call run, ./large_bcast +p4 200000 10 +noCMAForZC)
+	$(call run, ./large_bcast +p6 200000 10 +noCMAForZC)
 endif
 
 testp: all
-	$(call run, ./pgm +p$(P) 200000 10)
+	$(call run, ./large_bcast +p$(P) 200000 10)
 ifeq ($(CMK_USE_CMA),1)
-	$(call run, ./pgm +p$(P) 200000 10 +noCMAForZC)
+	$(call run, ./large_bcast +p$(P) 200000 10 +noCMAForZC)
 endif
 
 smptest: all
-	$(call run, ./pgm +p4 200000 10 ++ppn 2)
-	$(call run, ./pgm +p4 200000 10 ++ppn 4)
+	$(call run, ./large_bcast +p4 200000 10 ++ppn 2)
+	$(call run, ./large_bcast +p4 200000 10 ++ppn 4)
 ifeq ($(CMK_USE_CMA),1)
-	$(call run, ./pgm +p4 200000 10 +noCMAForZC ++ppn 2)
-	$(call run, ./pgm +p4 200000 10 +noCMAForZC ++ppn 4)
+	$(call run, ./large_bcast +p4 200000 10 +noCMAForZC ++ppn 2)
+	$(call run, ./large_bcast +p4 200000 10 +noCMAForZC ++ppn 4)
 endif
 
 test-bench: all
-	$(call run, ./pgm +p10)
+	$(call run, ./large_bcast +p10)
