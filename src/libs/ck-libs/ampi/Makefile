@@ -9,7 +9,7 @@ HEADDEP=$(HEADERS) \
 		../tcharm/tcharm.h ../tcharm/tcharm_impl.h
 COMPAT=compat_ampi.o \
        compat_ampim.o compat_ampifm.o compat_ampicm.o \
-	   compat_ampicpp.o
+       compat_ampicpp.o compat_ampins.o
 OBJS=ampi.o $(AMPIF_OBJ) ampiOneSided.o \
      ampiMisc.o ddt.o mpich-alltoall.o ampi_mpix.o ampi_noimpl.o
 
@@ -189,6 +189,9 @@ compat_ampicm.o: compat_ampicm.C
 compat_ampi.o: compat_ampi.c
 	$(CHARMC) -c compat_ampi.c
 
+compat_ampins.o: compat_ampins.C
+	$(CHARMC) -c $<
+
 ampi_mpix.o: ampi_mpix.C $(HEADDEP) headers
 
 ampi_noimpl.o: ampi_noimpl.C $(HEADDEP) headers
@@ -218,7 +221,7 @@ ampi.decl.h ampi.def.h: ampi.ci
 ddt.o: ddt.C ddt.h $(HEADDEP) headers
 
 $(FUNCPTR_SHIM_OBJ): ampi_funcptr_shim.C $(HEADDEP) headers | $(ROMIO)
-	$(CHARMC) -language ampi -DAMPI_USE_FUNCPTR -DAMPI_NO_UNIMPLEMENTED_WARNINGS -fPIE -shared -fvisibility=hidden -c $< -o $@
+	$(CHARMC) -language ampi -DAMPI_USE_FUNCPTR -DAMPI_NO_UNIMPLEMENTED_WARNINGS -fPIE -shared -c $< -o $@
 
 $(FUNCPTR_SHIM_MAIN_OBJ): ampi_funcptr_shim_main.C | $(ROMIO)
 	$(CHARMC) -language ampi -fPIE -c $< -o $@
@@ -227,7 +230,7 @@ $(FUNCPTR_SHIM_FMPIMAIN_OBJ): ampi_funcptr_shim_fmpimain.C | $(ROMIO)
 	$(CHARMC) -language ampi -fPIE -c $< -o $@
 
 $(FUNCPTR_SHIM_FORTRAN_OBJ): ampif.C $(HEADDEP) headers | $(ROMIO)
-	$(CHARMC) -language ampi -DAMPI_USE_FUNCPTR -fPIE -shared -fvisibility=hidden -c $< -o $@
+	$(CHARMC) -language ampi -DAMPI_USE_FUNCPTR -fPIE -shared -c $< -o $@
 
 $(FUNCPTR_LOADER_OBJ): ampi_funcptr_loader.C $(HEADDEP) headers | $(ROMIO)
 	$(CHARMC) -language ampi -DAMPI_NO_UNIMPLEMENTED_WARNINGS -c $< -o $@
