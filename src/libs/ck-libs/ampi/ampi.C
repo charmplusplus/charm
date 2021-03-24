@@ -1650,6 +1650,7 @@ int ampiParent::setAttrComm(MPI_Comm comm, std::unordered_map<int, uintptr_t> & 
     case AMPI_NUM_WTHS:
     case AMPI_MY_PROCESS:
     case AMPI_NUM_PROCESSES:
+    case AMPI_MY_HOME_WTH:
       /* immutable */
       return MPI_ERR_KEYVAL;
     default:
@@ -1695,6 +1696,8 @@ bool ampiParent::getBuiltinAttributeComm(int keyval, void *attribute_val) noexce
     case AMPI_NUM_WTHS:         *(int **)attribute_val = &(CkpvAccess(bikvs).numpes);            return true;
     case AMPI_MY_PROCESS:       *(int **)attribute_val = &(CkpvAccess(bikvs).mynode);            return true;
     case AMPI_NUM_PROCESSES:    *(int **)attribute_val = &(CkpvAccess(bikvs).numnodes);          return true;
+    case AMPI_MY_HOME_WTH:      myHomePE = thisArray->homePe(ckGetArrayIndex());
+                                *(int **)attribute_val = &(myHomePE);                            return true;
     default: return false;
   }
 }
