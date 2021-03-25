@@ -527,7 +527,7 @@ void LBManager::init(void)
   if (manualOn) TurnManualLBOn();
 #endif
 
-  if (_lb_args.lbperiod() != -1.0)
+  if (_lb_args.lbperiod() > 0.0)
   {
     setTimer();
   }
