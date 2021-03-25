@@ -1059,8 +1059,6 @@ void CmiTimerInit(char **argv)
 #endif
     {
       CmiBarrier();
-      CmiBarrier();
-      CmiBarrier();
     }
 #endif
 if(CmiMyRank() == 0) /* initialize only  once */
@@ -1165,7 +1163,6 @@ void CmiTimerInit(char **argv)
   if(cmiArgDebugFlag == 0)
     {
       CmiBarrier();
-      CmiBarrier();
     }
 #endif
   _cpu_speed_factor = 1.0/(readMHz()*1.0e6); 
@@ -1240,8 +1237,6 @@ void CmiTimerInit(char **argv)
   /* try to synchronize calling barrier */
 #if !(__FAULT__)
   if(cmiArgDebugFlag == 0) {
-    CmiBarrier();
-    CmiBarrier();
     CmiBarrier();
   }
 #endif
@@ -1318,8 +1313,6 @@ void CmiTimerInit(char **argv)
 
   /* try to synchronize calling barrier */
 #if !(__FAULT__) && !CMK_CHARMDEBUG
-  CmiBarrier();
-  CmiBarrier();
   CmiBarrier();
 #endif
   CpvAccess(inittime) = PPC64_TimeBase ();

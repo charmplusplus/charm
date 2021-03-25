@@ -1526,8 +1526,6 @@ void _initCharm(int unused_argc, char **argv)
 
 #if !(__FAULT__)
 	CmiBarrier();
-	CmiBarrier();
-	CmiBarrier();
 #endif
 #if CMK_SMP_TRACE_COMMTHREAD
 	_TRACE_BEGIN_COMPUTATION();	

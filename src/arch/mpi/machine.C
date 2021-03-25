@@ -1886,8 +1886,6 @@ void CmiTimerInit(char **argv) {
     } else { /* we don't have a synchronous timer, set our own start time */
 #if ! CMK_MEM_CHECKPOINT && ! CMK_MESSAGE_LOGGING
         CmiBarrier();
-        CmiBarrier();
-        CmiBarrier();
 #endif
         starttimer = MPI_Wtime();
     }
