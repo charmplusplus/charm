@@ -117,7 +117,7 @@ fi
 test $QUIET -eq 0 && echo && echo "Running on $pes processors: $args"
 
 
-mpiexec_cmd=$(which mpiexec 2>/dev/null)
+mpiexec_cmd=$(command -v mpiexec 2>/dev/null)
 if test -n "$mpiexec_cmd"
 then
     test $QUIET -eq 0 && echo "charmrun> $mpiexec_cmd -n $pes $args"

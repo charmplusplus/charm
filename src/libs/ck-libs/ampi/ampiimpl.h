@@ -2122,6 +2122,8 @@ class ampiParent final : public CBase_ampiParent {
   bool isTmpRProxySet;
   CProxy_ampi tmpRProxy;
 
+  int myHomePE;
+
   MPI_MigrateFn userAboutToMigrateFn, userJustMigratedFn;
   bool didMigrate{};
 
@@ -2599,6 +2601,15 @@ class ampi final : public CBase_ampi {
   std::vector<int> tmpVec; // stores temp group info
   CProxy_ampi remoteProxy; // valid only for intercommunicator
   CkPupPtrVec<win_obj> winObjects;
+  int numCommCreationsInProgress{};
+  void setNumCommCreationsInProgress(int x)
+  {
+    CkAssert(numCommCreationsInProgress == 0);
+    numCommCreationsInProgress = x;
+  }
+
+  // Intercommunicator splitting:
+  std::unordered_map<int, CProxy_ampi> splitRProxyMap;
 
  private:
   inline bool isInOrder(int seqIdx, int seq) noexcept { return oorder.isInOrder(seqIdx, seq); }
@@ -2644,11 +2655,36 @@ class ampi final : public CBase_ampi {
   void splitPhase1(CkReductionMsg *msg) noexcept;
   void splitPhaseInter(CkReductionMsg *msg) noexcept;
   void commCreatePhase1(MPI_Comm nextGroupComm) noexcept;
+  void registrationFinish() noexcept;
   void intercommCreatePhase1(MPI_Comm nextInterComm) noexcept;
   void intercommMergePhase1(MPI_Comm nextIntraComm) noexcept;
 
+  void exchangeProxyForSplitLocal(int color, CProxy_ampi splitLocalProxy) noexcept {
+    auto iter = splitRProxyMap.find(color);
+    if (iter == splitRProxyMap.end()) {
+      splitRProxyMap.emplace(color, splitLocalProxy);
+    }
+    else {
+      CProxy_ampi splitRemoteProxy = iter->second;
+      splitRProxyMap.erase(iter);
+      splitLocalProxy.setRemoteProxy(splitRemoteProxy);
+    }
+  }
+  void exchangeProxyForSplitRemote(int color, CProxy_ampi splitRemoteProxy) noexcept {
+    auto iter = splitRProxyMap.find(color);
+    if (iter == splitRProxyMap.end()) {
+      splitRProxyMap.emplace(color, splitRemoteProxy);
+    }
+    else {
+      CProxy_ampi splitLocalProxy = iter->second;
+      splitRProxyMap.erase(iter);
+      splitLocalProxy.setRemoteProxy(splitRemoteProxy);
+    }
+  }
+
  private: // Used by the above entry methods that create new MPI_Comm objects
   CProxy_ampi createNewChildAmpiSync() noexcept;
+  CProxy_ampi createNewSplitCommArray(MPI_Comm newComm, const std::vector<int> & indices) noexcept;
   void insertNewChildAmpiElements(MPI_Comm newComm, CProxy_ampi newAmpi) noexcept;
 
   inline void handleBlockedReq(AmpiRequest* req) noexcept {
@@ -2797,7 +2833,7 @@ class ampi final : public CBase_ampi {
   inline std::vector<int> getRemoteIndices() const noexcept { return myComm.getRemoteIndices(); }
   inline const CProxy_ampi &getProxy() const noexcept {return thisProxy;}
   inline const CProxy_ampi &getRemoteProxy() const noexcept {return remoteProxy;}
-  inline void setRemoteProxy(CProxy_ampi rproxy) noexcept { remoteProxy = rproxy; thread->resume(); }
+  inline void setRemoteProxy(CProxy_ampi rproxy) noexcept { remoteProxy = rproxy; }
   inline int getIndexForRank(int r) const noexcept {return myComm.getIndexForRank(r);}
   inline int getIndexForRemoteRank(int r) const noexcept {return myComm.getIndexForRemoteRank(r);}
   void findNeighbors(MPI_Comm comm, int rank, std::vector<int>& neighbors) const noexcept;
@@ -3027,8 +3063,16 @@ typedef void * SharedObject;
 typedef int (*ampi_maintype)(int, char **);
 typedef void (*ampi_fmaintype)(void);
 
-ampi_maintype AMPI_Main_Get_C(SharedObject myexe);
-ampi_fmaintype AMPI_Main_Get_F(SharedObject myexe);
-int AMPI_Main_Dispatch(SharedObject myexe, int argc, char ** argv);
+struct ampi_mainstruct
+{
+  ampi_maintype c;
+  ampi_fmaintype f;
+};
+
+ampi_mainstruct AMPI_Main_Get(SharedObject myexe);
+int AMPI_Main_Dispatch(ampi_mainstruct, int argc, char ** argv);
+
+/* For internal AMPI use only: semantics subject to change. */
+CLINKAGE void AMPI_Node_Setup(int numranks);
 
 #endif // _AMPIIMPL_H
