@@ -55,25 +55,39 @@ void _futuresModuleInit(void);
 }
 
 void* CkGetMsgBuffer(void* msg);
+std::vector<void*> CkWaitAllIDs(const std::vector<CkFutureID>& handles);
+std::pair<void*, CkFutureID> CkWaitAnyID(const std::vector<CkFutureID>& handles);
 
 namespace ck {
+namespace {
+  void reject_non_local() {
+    CkAbort("A future may only be polled/released/retrieved on the PE it was created on.");
+  }
+}
+
   template <typename T> class future {
     CkFuture handle_;
 
   public:
+    using value_type = T;
+
     future() { handle_ = CkCreateFuture(); }
     future(PUP::reconstruct) { }
     future(const CkFuture &handle): handle_(handle) { }
     future(const future<T> &other) { handle_ = other.handle_; }
 
-    T get() const {
-      if (handle_.pe != CkMyPe()) {
-        CkAbort("A future's value can only be retrieved on the PE it was created on.");
-      }
-      PUP::fromMem p(CkGetMsgBuffer(CkWaitFuture(handle_)));
+    static T unmarshall_value(void *msg) {
+      PUP::fromMem p(CkGetMsgBuffer(msg));
       PUP::detail::TemporaryObjectHolder<T> holder;
       p | holder;
-      return std::move(holder.t);
+      return holder.t;
+    }
+
+    T get() const {
+      if (!is_local()) {
+        reject_non_local();
+      }
+      return unmarshall_value(CkWaitFuture(handle_));
     }
 
     void set(const T &value) {
@@ -87,16 +101,73 @@ namespace ck {
 
     CkFuture handle() const { return handle_; }
     bool is_ready() const { return CkProbeFuture(handle_); }
+    bool is_local() const { return handle_.pe == CkMyPe(); }
     void release() {
-      if (handle_.pe != CkMyPe()) {
-        CkAbort("A future can only be released on the PE it was created on.");
+      if (!is_local()) {
+        reject_non_local();
       } else if (is_ready()) {
         CkFreeMsg(CkWaitFuture(handle_));
       }
       CkReleaseFuture(handle_);
     }
     void pup(PUP::er &p) { p | handle_; }
+
+    inline bool operator==(const future<T>& other) const {
+      return (this->handle_.id == other.handle_.id) &&
+             (this->handle_.pe == other.handle_.pe);
+    }
   };
+
+namespace {
+  template<typename InputIter, typename T = typename InputIter::value_type::value_type>
+  bool all_local(InputIter first, InputIter last) {
+    return std::all_of(first, last,
+      [](const ck::future<T>& f) { return f.is_local(); });
+  }
+}
+
+  // returns a pair with the value and fulfilled future
+  template<typename InputIter, typename T = typename InputIter::value_type::value_type>
+  std::pair<T, InputIter> wait_any(InputIter first, InputIter last) {
+    if (!all_local(first, last)) reject_non_local();
+    const int n = last - first;
+    std::vector<CkFutureID> handles;
+    handles.reserve(n);
+    std::transform(first, last, std::back_inserter(handles),
+      [](future<T>& f) { return f.handle().id; });
+    auto pair = CkWaitAnyID(handles);
+    auto value = future<T>::unmarshall_value(pair.first);
+    auto which = std::find_if(first, last,
+      [&pair](future<T>& f) { return f.handle().id == pair.second; });
+    return std::make_pair(value, which);
+  }
+
+  // returns a list of all the values
+  template<typename InputIter, typename T = typename InputIter::value_type::value_type>
+  std::vector<T> wait_all(InputIter first, InputIter last) {
+    if (!all_local(first, last)) reject_non_local();
+    const int n = last - first;
+    std::vector<T> result;
+    std::vector<CkFutureID> handles;
+    result.reserve(n);
+    handles.reserve(n);
+    std::transform(first, last, std::back_inserter(handles),
+      [](future<T>& f) { return f.handle().id; });
+    auto values = CkWaitAllIDs(handles);
+    std::transform(values.begin(), values.end(), std::back_inserter(result),
+      [](void* value) { return future<T>::unmarshall_value(value); });
+    return result;
+  }
+
+  // parititions the input iterators into ready/non ready
+  // returns an iterator to the first non-ready future, and a list of any obtained value(s)
+  template<typename InputIter, typename T = typename InputIter::value_type::value_type>
+  std::pair<std::vector<T>, InputIter> wait_some(InputIter first, InputIter last) {
+    // all_local check occurs within wait_all, anything remote is not-ready anyway
+    auto pending = std::partition(first, last,
+      [](const future<T>& f) { return f.is_ready(); });
+    return std::make_pair(wait_all(first, pending), pending);
+  }
 }
 #endif
 

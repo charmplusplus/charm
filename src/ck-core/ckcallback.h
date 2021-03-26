@@ -78,7 +78,7 @@ public:
       case bcastArray: return "CkCallback::bcastArray";
       case bcastSection: return "CkCallback::bcastSection";
       case replyCCS: return "CkCallback::replyCCS";
-	  case sendFuture: return "CkCallback::sendFuture";
+      case sendFuture: return "CkCallback::sendFuture";
       default : return "unknown CkCallback type";
     }
   }
