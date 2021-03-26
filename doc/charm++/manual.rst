@@ -12662,7 +12662,7 @@ tracemode:
 Tracemode ``summary``
 ^^^^^^^^^^^^^^^^^^^^^
 
-Compile option: ``-tracemode summary``
+Link time option: ``-tracemode summary``
 
 In this tracemode, execution time across all entry points for each
 processor is partitioned into a fixed number of equally sized
