@@ -994,7 +994,7 @@ static void ampiNodeInit() noexcept
   if ((value = getenv("AMPI_MSG_POOL_SIZE"))) {
     AMPI_MSG_POOL_SIZE = atoi(value);
     if (CkMyNode() == 0) {
-      CkPrintf("AMPI> Message pool size size is %d Bytes.\n", AMPI_MSG_POOL_SIZE);
+      CkPrintf("AMPI> Message pool size is %d Bytes.\n", AMPI_MSG_POOL_SIZE);
     }
   }
   if ((value = getenv("AMPI_POOLED_MSG_SIZE"))) {
