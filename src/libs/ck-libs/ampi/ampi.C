@@ -779,6 +779,8 @@ int AMPI_PE_LOCAL_THRESHOLD = AMPI_PE_LOCAL_THRESHOLD_DEFAULT;
 int AMPI_NODE_LOCAL_THRESHOLD = AMPI_NODE_LOCAL_THRESHOLD_DEFAULT;
 int AMPI_RDMA_THRESHOLD = AMPI_RDMA_THRESHOLD_DEFAULT;
 int AMPI_SSEND_THRESHOLD = AMPI_SSEND_THRESHOLD_DEFAULT;
+int AMPI_MSG_POOL_SIZE = AMPI_MSG_POOL_SIZE_DEFAULT;
+int AMPI_POOLED_MSG_SIZE = AMPI_POOLED_MSG_SIZE_DEFAULT;
 
 bool ampi_nodeinit_has_been_called=false;
 CtvDeclare(ampiParent*, ampiPtr);
@@ -987,6 +989,18 @@ static void ampiNodeInit() noexcept
     AMPI_SSEND_THRESHOLD = atoi(value);
     if (CkMyNode() == 0) {
       CkPrintf("AMPI> Synchronous messaging threshold is %d Bytes.\n", AMPI_SSEND_THRESHOLD);
+    }
+  }
+  if ((value = getenv("AMPI_MSG_POOL_SIZE"))) {
+    AMPI_MSG_POOL_SIZE = atoi(value);
+    if (CkMyNode() == 0) {
+      CkPrintf("AMPI> Message pool size size is %d Bytes.\n", AMPI_MSG_POOL_SIZE);
+    }
+  }
+  if ((value = getenv("AMPI_POOLED_MSG_SIZE"))) {
+    AMPI_POOLED_MSG_SIZE = atoi(value);
+    if (CkMyNode() == 0) {
+      CkPrintf("AMPI> Pooled message size is %d Bytes.\n", AMPI_POOLED_MSG_SIZE);
     }
   }
 

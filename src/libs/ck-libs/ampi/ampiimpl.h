@@ -1833,8 +1833,13 @@ class AmpiMsg final : public CMessage_AmpiMsg {
   friend AmpiMsgPool;
 };
 
-#define AMPI_MSG_POOL_SIZE    32 // Max # of AmpiMsg's allowed in the pool
-#define AMPI_POOLED_MSG_SIZE 128 // Max # of Bytes in pooled msgs' payload
+#ifndef AMPI_MSG_POOL_SIZE_DEFAULT
+#define AMPI_MSG_POOL_SIZE_DEFAULT    32 // Max # of AmpiMsg's allowed in the pool
+#endif
+
+#ifndef AMPI_POOLED_MSG_SIZE_DEFAULT
+#define AMPI_POOLED_MSG_SIZE_DEFAULT 128 // Max # of Bytes in pooled msgs' payload
+#endif
 
 class AmpiMsgPool {
  private:
