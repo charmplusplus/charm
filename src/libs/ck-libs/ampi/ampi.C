@@ -962,10 +962,10 @@ static void ampiNodeInit() noexcept
   if (CkMyNode() == 0 && localThresholdSet) {
 #if AMPI_PE_LOCAL_IMPL
 #if AMPI_NODE_LOCAL_IMPL
-    CkPrintf("AMPI> PE-local messaging threshold is %d Bytes and Node-local messaging threshold is %d Bytes.\n",
+    CkPrintf("AMPI> PE-local messaging threshold is %d bytes and Node-local messaging threshold is %d bytes.\n",
              AMPI_PE_LOCAL_THRESHOLD, AMPI_NODE_LOCAL_THRESHOLD);
 #else
-    CkPrintf("AMPI> PE-local messaging threshold is %d Bytes.\n",
+    CkPrintf("AMPI> PE-local messaging threshold is %d bytes.\n",
              AMPI_PE_LOCAL_THRESHOLD);
     if (AMPI_NODE_LOCAL_THRESHOLD != AMPI_NODE_LOCAL_THRESHOLD_DEFAULT) {
       CkPrintf("Warning: AMPI Node-local messaging threshold ignored on non-SMP build.\n");
@@ -979,7 +979,7 @@ static void ampiNodeInit() noexcept
     AMPI_RDMA_THRESHOLD = atoi(value);
     if (CkMyNode() == 0) {
 #if AMPI_RDMA_IMPL
-      CkPrintf("AMPI> RDMA threshold is %d Bytes.\n", AMPI_RDMA_THRESHOLD);
+      CkPrintf("AMPI> RDMA threshold is %d bytes.\n", AMPI_RDMA_THRESHOLD);
 #else
       CkPrintf("Warning: AMPI RDMA threshold ignored since AMPI RDMA is disabled.\n");
 #endif
@@ -988,7 +988,7 @@ static void ampiNodeInit() noexcept
   if ((value = getenv("AMPI_SSEND_THRESHOLD"))) {
     AMPI_SSEND_THRESHOLD = atoi(value);
     if (CkMyNode() == 0) {
-      CkPrintf("AMPI> Synchronous messaging threshold is %d Bytes.\n", AMPI_SSEND_THRESHOLD);
+      CkPrintf("AMPI> Synchronous messaging threshold is %d bytes.\n", AMPI_SSEND_THRESHOLD);
     }
   }
   if ((value = getenv("AMPI_MSG_POOL_SIZE"))) {
@@ -1000,7 +1000,7 @@ static void ampiNodeInit() noexcept
   if ((value = getenv("AMPI_POOLED_MSG_SIZE"))) {
     AMPI_POOLED_MSG_SIZE = atoi(value);
     if (CkMyNode() == 0) {
-      CkPrintf("AMPI> Pooled message size is %d Bytes.\n", AMPI_POOLED_MSG_SIZE);
+      CkPrintf("AMPI> Pooled message size is %d bytes.\n", AMPI_POOLED_MSG_SIZE);
     }
   }
 
