@@ -2183,11 +2183,6 @@ const std::vector<LBRealType>& CkLocRec::getObjPosition()
 {
   return lbmgr->GetObjPosition(ldHandle);
 }
-double CkLocRec::getObjTime() {
-        LBRealType walltime, cputime;
-        lbmgr->GetObjLoad(ldHandle, walltime, cputime);
-        return walltime;
-}
 const std::vector<LBRealType> CkLocRec::getObjVectorLoad() const {
   return lbmgr->GetObjVectorLoad(ldHandle);
 }
