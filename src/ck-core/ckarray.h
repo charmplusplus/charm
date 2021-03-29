@@ -629,9 +629,10 @@ class CkArray : public CkReductionMgr
   friend class CProxyElement_ArrayBase;
   friend class CkLocMgr;
 
-  typedef std::unordered_map<CmiUInt8, std::vector<CkArrayMessage*> > MsgBuffer;
-  typedef std::unordered_map<CkArrayIndex, std::vector<CkArrayMessage*>, IndexHasher>
-      IndexMsgBuffer;
+  using IDMsgBuffer = std::unordered_map<CmiUInt8, std::vector<CkArrayMessage*> >;
+  using IndexMsgBuffer
+      = std::unordered_map<CkArrayIndex, std::vector<CkArrayMessage*>, IndexHasher>;
+  IDMsgBuffer bufferedIDMsgs;
   IndexMsgBuffer bufferedIndexMsgs;
   // We need a separate buffer for demand creation messages because it also serves as an
   // indicator of whether a demand creation request has already been sent.
@@ -706,7 +707,8 @@ private:
   void bufferForLocation(CkArrayMessage* msg, const CkArrayIndex& idx);
   void bufferForCreation(CkArrayMessage* msg, const CkArrayIndex& idx);
 
-  void sendBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id);
+  void sendBufferedMsgs(CmiUInt8, int pe);
+  void sendBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id, int pe);
 
 public:
   // TODO: Make sure the demand creation pipeline still obeys message delivery type?

@@ -366,9 +366,9 @@ public:
   void erase(CmiUInt8 id) { locMap.erase(id); }
 
   void addListener(Listener l) { listeners.push_back(l); }
-  void notifyListeners(CmiUInt8 id, int pe)
+  void notifyListeners(CmiUInt8 id, int pe) const
   {
-    for (Listener& l : listeners)
+    for (const Listener& l : listeners)
     {
       l(id, pe);
     }
@@ -392,6 +392,10 @@ private:
   using IdxIdMap = std::unordered_map<CkArrayIndex, CmiUInt8, IndexHasher>;
   using LocRecHash = std::unordered_map<CmiUInt8, CkLocRec*>;
   using ElemMap = std::unordered_map<CmiUInt8, CkMigratable*>;
+
+  using LocationListener = std::function<void(CmiUInt8, int)>;
+  using IndexListener = std::function<void(const CkArrayIndex&, CmiUInt8, int)>;
+  std::list<IndexListener> listeners;
 
   // Internal interface:
   void AtSyncBarrierReached();
@@ -579,6 +583,16 @@ public:
   int getMapHandle() const { return mapHandle; }
   CkGroupID getMap() const { return mapID; }
 
+  void addLocationListener(LocationListener l) { cache->addListener(l); }
+  void addIndexListener(IndexListener l) { listeners.push_back(l); }
+  void notifyListeners(const CkArrayIndex& idx, CmiUInt8 id, int pe) const
+  {
+    for (const IndexListener& l : listeners)
+    {
+      l(idx, id, pe);
+    }
+  }
+
   // Look up array element in hash table.  Index out-of-bounds if not found.
   CkLocRec* elementRec(const CkArrayIndex& idx);
   // Look up array element in hash table.  Return NULL if not there.
@@ -655,6 +669,7 @@ public:
 
   // Communication:
   void immigrate(CkArrayElementMigrateMessage* msg);
+  void requestLocation(CmiUInt8 id);
   void requestLocation(const CkArrayIndex& idx);
   bool requestLocation(const CkArrayIndex& idx, int peToTell);
   void updateLocation(const CkArrayIndex& idx, const CkLocEntry& e);
