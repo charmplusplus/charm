@@ -879,6 +879,8 @@ CkArray::CkArray(CkArrayOptions&& opts, CkMarshalledMessage&& initMsg)
 {
   // Register with our location manager
   locMgr->addManager(thisgroup, this);
+  locMgr->addLocationListener([=](CmiUInt8 id, int pe) { this->sendBufferedMsgs(id, pe); });
+  locMgr->addIndexListener([=](const CkArrayIndex& idx, CmiUInt8 id, int pe) { this->sendBufferedMsgs(idx, id, pe); });
 
   setupSpringCleaning();
 
@@ -958,6 +960,8 @@ void CkArray::pup(PUP::er& p)
     thisProxy = thisgroup;
     locMgr = CProxy_CkLocMgr::ckLocalBranch(locMgrID);
     locMgr->addManager(thisgroup, this);
+    locMgr->addLocationListener([=](CmiUInt8 id, int pe) { this->sendBufferedMsgs(id, pe); });
+    locMgr->addIndexListener([=](const CkArrayIndex& idx, CmiUInt8 id, int pe) { this->sendBufferedMsgs(idx, id, pe); });
     /// Restore our default listeners:
     broadcaster = (CkArrayBroadcaster*)(CkArrayListener*)(listeners[0]);
     reducer = (CkArrayReducer*)(CkArrayListener*)(listeners[1]);
@@ -1071,7 +1075,7 @@ bool CkArray::insertElement(CkArrayMessage* m, const CkArrayIndex& idx,
     // we may have already buffered some messages.
     // TODO: This may not be necessary because an inform call will occur once the element
     // is inserted, which will trigger clearing the buffers.
-    sendBufferedMsgs(idx, id);
+    sendBufferedMsgs(id, CkMyPe());
   }
 
   // Make sure the element doesn't already exist, then add it.
@@ -2019,11 +2023,25 @@ void CkArray::handleUnknown(CkArrayMessage* msg, const CkArrayIndex& idx,
 // location if we haven't send one yet for this index.
 void CkArray::bufferForLocation(CkArrayMessage* msg, const CkArrayIndex& idx)
 {
-  if (bufferedIndexMsgs.find(idx) == bufferedIndexMsgs.end())
+  CmiUInt8 id = msg->array_element_id();
+  if (UsrToEnv(msg)->getRecipientID() != 0)
   {
-    locMgr->requestLocation(idx);
+    CkAssert(bufferedIndexMsgs.find(idx) == bufferedIndexMsgs.end());
+    if (bufferedIDMsgs.find(id) == bufferedIDMsgs.end())
+    {
+      locMgr->requestLocation(id);
+    }
+    bufferedIDMsgs[id].push_back(msg);
   }
-  bufferedIndexMsgs[idx].push_back(msg);
+  else
+  {
+    CkAssert(bufferedIDMsgs.find(id) == bufferedIDMsgs.end());
+    if (bufferedIndexMsgs.find(idx) == bufferedIndexMsgs.end())
+    {
+      locMgr->requestLocation(idx);
+    }
+    bufferedIndexMsgs[idx].push_back(msg);
+  }
 }
 
 // Demand creation has 4 possible outcomes:
@@ -2128,17 +2146,27 @@ void CkArray::requestDemandCreation(const CkArrayIndex& idx, int ctor, int pe)
   }
 }
 
-// TODO: We can do better with these. Don't need to repeat the whole sendMsg call because
-// most likely this was triggered by a location request being fullfilled. Should be able
-// to skip directly to sendToPe(...). Once the requestLocation update is done, this can
-// maybe even almost go away.
-void CkArray::sendBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id)
+void CkArray::sendBufferedMsgs(CmiUInt8 id, int pe)
 {
+  for (CkArrayMessage* msg : bufferedIDMsgs[id])
+  {
+    CkAssert(msg->array_element_id() == id);
+    sendToPe(msg, pe, CkDeliver_queue);
+  }
+  bufferedIDMsgs.erase(id);
+
+  CkAssert(bufferedIDMsgs.find(id) == bufferedIDMsgs.end());
+}
+
+void CkArray::sendBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id, int pe)
+{
+  // TODO: This shouldn't be needed
+  sendBufferedMsgs(id, pe);
   for (CkArrayMessage* msg : bufferedIndexMsgs[idx])
   {
     UsrToEnv(msg)->setRecipientID(ck::ObjID(thisgroup, id));
     // TODO: Is deliver_queue right?
-    sendMsg(msg, idx, CkDeliver_queue);
+    sendToPe(msg, pe, CkDeliver_queue);
   }
   bufferedIndexMsgs.erase(idx);
 
@@ -2146,9 +2174,13 @@ void CkArray::sendBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id)
   {
     UsrToEnv(msg)->setRecipientID(ck::ObjID(thisgroup, id));
     // TODO: Is deliver_queue right?
-    sendMsg(msg, idx, CkDeliver_queue);
+    sendToPe(msg, pe, CkDeliver_queue);
   }
   bufferedCreationMsgs.erase(idx);
+
+  CkAssert(bufferedIDMsgs.find(id) == bufferedIDMsgs.end());
+  CkAssert(bufferedIndexMsgs.find(idx) == bufferedIndexMsgs.end());
+  CkAssert(bufferedCreationMsgs.find(idx) == bufferedCreationMsgs.end());
 }
 
 #include "CkArray.def.h"

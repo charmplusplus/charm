@@ -2482,9 +2482,6 @@ CkLocMgr::CkLocMgr(CkArrayOptions opts)
   cache = static_cast<CkLocCache*>(CkLocalBranch(cacheID));
   if (cache == nullptr)
     CkAbort("ERROR! Local branch of location cache is NULL!\n");
-  // TODO: Need to make it so we only do LocMgr::updateLocation as needed, and default
-  // to using the LocCache methods, and listeners. Eliminate idx wherever possible.
-  //cache->addListener([=](CmiUInt8 id, int pe) { this->deliverAllBufferedMsgs(id); });
 
   // Figure out the mapping from indices to object IDs if one is possible
   compressor = ck::FixedArrayIndexCompressor::make(bounds);
@@ -2544,8 +2541,6 @@ void CkLocMgr::pup(PUP::er& p)
     cache = static_cast<CkLocCache*>(CkLocalBranch(cacheID));
     if (cache == nullptr)
       CkAbort("ERROR! Local branch of location cache is NULL!");
-    // TODO: Need to register with the arrays or something here
-    //cache->addListener([=](CmiUInt8 id, int pe) { this->deliverAllBufferedMsgs(id); });
 
     // _lbdb is the fixed global groupID
     initLB(lbmgrID, metalbID);
@@ -2702,12 +2697,25 @@ bool CkLocMgr::addElementToRec(CkLocRec* rec, CkArray* mgr, CkMigratable* elt,
 }
 
 // TODO: This might be not needed
+void CkLocMgr::requestLocation(CmiUInt8 id)
+{
+  cache->requestLocation(id);
+}
+
 void CkLocMgr::requestLocation(const CkArrayIndex& idx)
 {
-  int home = homePe(idx);
-  if (home != CkMyPe())
+  CmiUInt8 id;
+  if (lookupID(idx, id))
   {
-    thisProxy[home].requestLocation(idx, CkMyPe());
+    requestLocation(id);
+  }
+  else
+  {
+    int home = homePe(idx);
+    if (home != CkMyPe())
+    {
+      thisProxy[home].requestLocation(idx, CkMyPe());
+    }
   }
 }
 
@@ -2754,12 +2762,7 @@ void CkLocMgr::updateLocation(const CkArrayIndex& idx, const CkLocEntry& e)
     bufferedLocationRequests.erase(itr);
   }
 
-  for (auto itr : managers)
-  {
-    CkArray* arr = itr.second;
-    CkAssert(arr);
-    arr->sendBufferedMsgs(idx, e.id);
-  }
+  notifyListeners(idx, e.id, e.pe);
 }
 
 /*************************** LocMgr: DELETION *****************************/
