@@ -27,7 +27,7 @@ in remote process control.
 #include "ckfutures.h"
 
 struct FutureRequest {
-  virtual void fulfill(void* value) = 0;
+  virtual void fulfill(const CkFutureID& id, void* value) = 0;
 };
 
 class FutureToThread: public FutureRequest {
@@ -35,9 +35,41 @@ class FutureToThread: public FutureRequest {
  public:
   FutureToThread(CthThread th_) : th(th_) {}
 
-  virtual void fulfill(void* value) override {
+  virtual void fulfill(const CkFutureID&, void* value) override {
+    // If we have a valid thread to wake up, do so
     if (th) CthAwaken(th);
+    // Then invalidate ourself
     th = nullptr;
+  }
+};
+
+class MultiToThread: public FutureRequest {
+  CthThread th;
+  const std::vector<CkFutureID>& ids;
+  std::size_t nRecvd;
+ public:
+  std::vector<void*> values;
+
+  MultiToThread(CthThread th_, const std::vector<CkFutureID>& ids_) : ids(ids_), th(th_), nRecvd(0) {
+    values.resize(ids.size());
+
+    std::fill(values.begin(), values.end(), nullptr);
+  }
+
+  virtual void fulfill(const CkFutureID& id, void* value) override {
+    const auto search = std::find(ids.begin(), ids.end(), id);
+    const auto offset = search - ids.begin();
+
+    CkAssert(value != nullptr && search != ids.end());
+
+    if (th != nullptr && values[offset] == nullptr) {
+      values[offset] = value;
+
+      if (++nRecvd >= values.size()) {
+        CthAwaken(th);
+        th = nullptr;
+      }
+    }
   }
 };
 
@@ -47,8 +79,10 @@ class FutureToFuture: public FutureRequest {
  public:
   FutureToFuture(CkFuture fut_) : fut(fut_), fulfilled(false) {}
 
-  virtual void fulfill(void* value) override {
+  virtual void fulfill(const CkFutureID&, void* value) override {
+    // If we have not been fulfilled, forward the value
     if (!fulfilled) CkSendToFuture(fut, value);
+    // Then mark ourself as fulfilled
     fulfilled = true;
   }
 };
@@ -83,14 +117,14 @@ struct FutureState {
 
   // returns a future's value when it's available, otherwise
   // returns nullptr
-  void* operator[](CkFutureID f) const {
+  void* operator[](const CkFutureID& f) const {
     auto found = values.find(f);
     return (found != values.end()) ? found->second : nullptr;
   }
 
   // enqueue a request for a given future id, creating a
   // queue as necessary
-  void request(CkFutureID f, request_t req) {
+  void request(const CkFutureID& f, request_t req) {
     auto found = waiting.find(f);
     if (found != waiting.end()) {
       found->second.push_back(req);
@@ -108,12 +142,13 @@ struct FutureState {
 
   // stores a value for a given future id, and fulfills all
   // outstanding requests for the value (then erases them)
-  void fulfill(CkFutureID f, void* value) {
+  // (this is usually called by the FutureBOC chare-group)
+  void fulfill(const CkFutureID& f, void* value) {
     values[f] = value;
     auto found = waiting.find(f);
     if (found != waiting.end()) {
       for (auto& th : found->second) {
-        th->fulfill(value);
+        th->fulfill(f, value);
       }
       waiting.erase(found);
     }
@@ -122,7 +157,7 @@ struct FutureState {
   // erase any listeners and values for a given future
   // and adds it to the set of free future ids (that
   // can be reused). note, does not free any memory
-  void release(CkFutureID f) {
+  void release(const CkFutureID& f) {
     values.erase(f);
     waiting.erase(f);
     CkAssert(std::find(freeList.begin(), freeList.end(), f) == freeList.end() &&
@@ -130,7 +165,7 @@ struct FutureState {
     freeList.push_back(f);
   }
 
-  bool is_ready(CkFutureID f) {
+  bool is_ready(const CkFutureID& f) {
     return values.find(f) != values.end();
   }
 };
@@ -260,6 +295,49 @@ void *CkWaitFutureID(CkFutureID handle)
 	"gets a CthAwaken call *before* the sync method returns.");
 #endif
   return value;
+}
+
+std::pair<void*, CkFutureID> CkWaitAnyID(const std::vector<CkFutureID>& handles) {
+  auto fs = &(CpvAccess(futurestate));
+  const auto ready = std::any_of(handles.begin(), handles.end(),
+    [&fs](const CkFutureID& id) { return fs->is_ready(id); });
+  /* A single request is generated, and enqueued for all the futures that we are
+   * interested in. Note, a request may only be fulfilled once, then it will expire
+   * and become a no-op; thus, the corresponding `CthAwaken` for this thread will
+   * only be called once (for more details, see FutureToThread::fulfill).
+   */ 
+  if (!ready) fs->request(handles, std::make_shared<FutureToThread>(CthSelf()));
+  do {
+    if (!ready) CthSuspend();
+    for (const auto& handle : handles) {
+      if (fs->is_ready(handle)) {
+        return std::make_pair((*fs)[handle], handle);
+      }
+    }
+  } while (true);
+}
+
+std::vector<void*> CkWaitAllIDs(const std::vector<CkFutureID>& ids) {
+  auto fs = &(CpvAccess(futurestate));
+  auto req = std::make_shared<MultiToThread>(CthSelf(), ids);
+  bool wait = false;
+
+  for (const auto& id : ids) {
+    auto val = (*fs)[id];
+
+    if (val != nullptr) {
+      req->fulfill(id, val);
+    } else {
+      fs->request(id, req);
+      wait = true;
+    }
+  }
+
+  if (wait) {
+    CthSuspend();
+  }
+
+  return req->values;
 }
 
 void CkReleaseFuture(CkFuture fut)
@@ -426,6 +504,26 @@ public:
   }
 };
 
+/* NOTE : this (currently) internal function may, eventually,
+ *        be expanded and made public. At that point, consider
+ *        renaming it to something like ck::get_msg_buffer(void*)
+ */
+void* CkGetMsgBuffer(void* msg) {
+  auto env = UsrToEnv(msg);
+  auto idx = env->getMsgIdx();
+  if (idx == CMessage_CkMarshallMsg::__idx) {
+    return static_cast<CkMarshallMsg*>(msg)->msgBuf;
+  } else if (idx == CMessage_CkReductionMsg::__idx) {
+    return static_cast<CkReductionMsg*>(msg)->getData();
+  } else if (idx == CMessage_CkDataMsg::__idx) {
+    return static_cast<CkDataMsg*>(msg)->getData();
+  } else if (idx == CMessage_CkArrayCreatedMsg::__idx) {
+    return &(static_cast<CkArrayCreatedMsg*>(msg)->aid);
+  } else {
+    CkAbort("unsure how to handle a msg of type %s.", _msgTable[idx]->name);
+  }
+}
+
 extern "C" 
 void CkSendToFutureID(CkFutureID futNum, void *m, int PE)
 {
@@ -487,4 +585,3 @@ void CkSemaDestroy(CkSemaID id)
 
 /*@}*/
 #include "CkFutures.def.h"
-
