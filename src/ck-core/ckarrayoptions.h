@@ -76,6 +76,7 @@ class CkArrayOptions {
   CkGroupID map;       ///< Array location map object
   CkGroupID locMgr;    ///< Location manager to bind to
   CkGroupID mCastMgr;  /// <ckmulticast mgr to bind to, for sections
+  CkGroupID locCache;
   CkPupAblePtrVec<CkArrayListener> arrayListeners;  // CkArrayListeners for this array
   CkCallback reductionClient;                       // Default target of reductions
   CkCallback initCallback; // Callback to be invoked after chare array creation is complete
@@ -221,6 +222,11 @@ class CkArrayOptions {
     return *this;
   }
 
+  CkArrayOptions& setLocationCache(const CkGroupID& l) {
+    locCache = l;
+    return *this;
+  }
+
   /// Add an array listener component to this array (keeps the new'd listener)
   CkArrayOptions& addListener(CkArrayListener* listener);
 
@@ -255,6 +261,7 @@ class CkArrayOptions {
   const CkGroupID& getMap(void) const { return map; }
   const CkGroupID& getLocationManager(void) const { return locMgr; }
   const CkGroupID& getMcastManager(void) const { return mCastMgr; }
+  const CkGroupID& getLocationCache(void) const { return locCache; }
   bool isSectionAutoDelegated(void) const { return sectionAutoDelegate; }
   const CkCallback &getInitCallback(void) const {return initCallback;}
   int getListeners(void) const { return arrayListeners.size(); }
