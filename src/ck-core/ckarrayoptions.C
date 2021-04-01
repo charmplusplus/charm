@@ -115,11 +115,13 @@ CkArrayOptions& CkArrayOptions::setStaticInsertion(bool b) {
 
 /// Bind our elements to this array
 CkArrayOptions& CkArrayOptions::bindTo(const CkArrayID& b) {
-  CkArray* arr = CProxy_CkArray(b).ckLocalBranch();
+  CkLocMgr* mgr = CProxy_CkArray(b).ckLocalBranch()->getLocMgr();
   // Stupid bug: need a way for arrays to stay the same size *FOREVER*,
   // not just initially.
   // setNumInitial(arr->getNumInitial());
-  return setLocationManager(arr->getLocMgr()->getGroupID());
+  setMap(mgr->getMap());
+  setLocationCache(mgr->getLocationCache());
+  return setLocationManager(mgr->getGroupID());
 }
 
 CkArrayOptions& CkArrayOptions::addListener(CkArrayListener* listener) {
@@ -187,6 +189,7 @@ void CkArrayOptions::pup(PUP::er& p) {
   p | map;
   p | locMgr;
   p | mCastMgr;
+  p | locCache;
   p | arrayListeners;
   p | reductionClient;
   p | initCallback;

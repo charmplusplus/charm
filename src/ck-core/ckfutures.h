@@ -1,6 +1,8 @@
 #ifndef _CKFUTURES_H_
 #define _CKFUTURES_H_
 
+#include "charm.h"
+
 #ifdef __cplusplus
 #include "ckmarshall.h"
 #endif
@@ -13,12 +15,6 @@
 These routines are implemented in ckfutures.C.
 */
 /*@{*/
-typedef unsigned long long CkFutureID;
-typedef struct _CkFuture {
-  CkFutureID id;
-  int        pe;
-} CkFuture;
-PUPbytes(CkFuture)
 
 /* forward declare */
 struct CkArrayID;
@@ -58,6 +54,7 @@ void _futuresModuleInit(void);
 #ifdef __cplusplus
 }
 
+void* CkGetMsgBuffer(void* msg);
 std::vector<void*> CkWaitAllIDs(const std::vector<CkFutureID>& handles);
 std::pair<void*, CkFutureID> CkWaitAnyID(const std::vector<CkFutureID>& handles);
 
@@ -79,8 +76,8 @@ namespace {
     future(const CkFuture &handle): handle_(handle) { }
     future(const future<T> &other) { handle_ = other.handle_; }
 
-    static T unmarshall_value(CkMarshallMsg *msg) {
-      PUP::fromMem p(msg->msgBuf);
+    static T unmarshall_value(void *msg) {
+      PUP::fromMem p(CkGetMsgBuffer(msg));
       PUP::detail::TemporaryObjectHolder<T> holder;
       p | holder;
       return holder.t;
@@ -90,7 +87,7 @@ namespace {
       if (!is_local()) {
         reject_non_local();
       }
-      return unmarshall_value(static_cast<CkMarshallMsg*>(CkWaitFuture(handle_)));
+      return unmarshall_value(CkWaitFuture(handle_));
     }
 
     void set(const T &value) {
@@ -109,7 +106,7 @@ namespace {
       if (!is_local()) {
         reject_non_local();
       } else if (is_ready()) {
-        delete (CkMarshallMsg *)CkWaitFuture(handle_);
+        CkFreeMsg(CkWaitFuture(handle_));
       }
       CkReleaseFuture(handle_);
     }
@@ -139,7 +136,7 @@ namespace {
     std::transform(first, last, std::back_inserter(handles),
       [](future<T>& f) { return f.handle().id; });
     auto pair = CkWaitAnyID(handles);
-    auto value = future<T>::unmarshall_value(static_cast<CkMarshallMsg*>(pair.first));
+    auto value = future<T>::unmarshall_value(pair.first);
     auto which = std::find_if(first, last,
       [&pair](future<T>& f) { return f.handle().id == pair.second; });
     return std::make_pair(value, which);
@@ -158,7 +155,7 @@ namespace {
       [](future<T>& f) { return f.handle().id; });
     auto values = CkWaitAllIDs(handles);
     std::transform(values.begin(), values.end(), std::back_inserter(result),
-      [](void* value) { return future<T>::unmarshall_value(static_cast<CkMarshallMsg*>(value)); });
+      [](void* value) { return future<T>::unmarshall_value(value); });
     return result;
   }
 
