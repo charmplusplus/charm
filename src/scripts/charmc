@@ -716,12 +716,12 @@ do
 		OPTS="$OPTS $arg"
 		;;
 #------ Dependency generation ---------
-	"-M" | "-MM" | "-MMD" | "-MG")
+	"-M" | "-MM" | "-MMD" | "-MG" | "-MD")
 		SKIPLINK="yes"
 		OPTS="$OPTS $arg"
 		GENDEPENDS="yes"
 		;;
-	"-MF" | "-MT" | "-MQ" | "-MD")	#-MP will pass through automatically
+	"-MF" | "-MT" | "-MQ")	#-MP will pass through automatically
 		OPTS="$OPTS $arg $1"
 		shift
 		;;
@@ -1878,15 +1878,6 @@ done
 ##############################################################################
 
 Debug "About to compile..."
-
-# Filter spurious cmake arguments
-# CHARM_CXX_FLAGS=`echo $CHARM_CXX_FLAGS | sed s,"$CMK_CXX",,g `
-# CHARM_CC_FLAGS=`echo $CHARM_CC_FLAGS | sed s,"$CMK_CC",,g `
-# CMK_CF90_COMPONLY=`echo $CMK_CF90 | awk '{print $1}'`
-# FILES=`echo $FILES | sed s,"$CMK_CF90_COMPONLY",,g`
-# OPTS_F90=`echo $OPTS_F90 | sed s,"$CMK_CF90_COMPONLY",,g`
-
-# echo $CHARM_CC_FLAGS
 
 for FILE in $FILES
 do
