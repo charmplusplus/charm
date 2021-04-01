@@ -5549,6 +5549,11 @@ Possible constructors are:
    callback will send its message to the given entry method of the given
    group member.
 
+#. CkCallback(CkFuture fut) - When invoked, the callback will send its
+   message to the given future. For a ck::future object, the underlying
+   CkFuture is accesible via its handle method. For an example, see:
+   ``examples/charm++/hello/xarraySection/hello.C``
+
 One final type of callback, CkCallbackResumeThread(), can only be used
 from within threaded entry methods. This callback type is discussed in
 section :numref:`sec:ckcallbackresumethread`.
@@ -5793,10 +5798,16 @@ futures, which include the following functions:
 | :code:`void CkSendToFuture(CkFuture fut, void *msg)` | :code:`void ck::future::set(T)`     |
 +------------------------------------------------------+-------------------------------------+
 
-You will note that the object-oriented versions are methods of `ck::future`,
-which can be templated with any pup'able type. An example of the
-object-oriented interface is available under `examples/charm++/future`,
-with an equivalent example for the C-compatible interface presented below:
+The object-oriented versions are methods of ``ck::future<T>``, which can be templated with any
+PUP-able type. Note, in most cases, messages/values cannot be retrieved via ``get`` when they were
+not been sent/set by a corresponding call to ``set``; however, it can receive messages of supported,
+internal message types sent via ``CkSendFuture``. Other message types must be wrapped as a PUP-able
+value and explicitly received as the expected message type(s); for example, one might wrap a message
+as ``CkMarshalledMsg`` or ``MsgPointerWrapper`` then type-cast the (``void*``) message on the
+receiver-side. In such cases, one may consider using the C-like API for greater efficiency.
+
+An example of the object-oriented interface is available under `examples/charm++/future`, with an
+equivalent example for the C-compatible interface presented below:
 
 .. code-block:: charmci
 
@@ -5855,9 +5866,25 @@ is ``unsigned short``, limiting each PE to 65,535 outstanding futures.
 To increase this limit, build Charm++ with a larger *CMK_REFNUM_TYPE*, e.g. specifying
 ``--with-refnum-type=uint`` to use ``unsigned int`` when building Charm++.
 
+There are additional facilities for operating on collections of futures, which include:
 
-The Converse version of future functions can be found in the :ref:`conv-futures`
-section.
++-------------------+-----------+---------------------------------------------------+
+| Function          | Blocking? | Description                                       |
++===================+===========+===================================================+
+| ``ck::wait_any``  | Yes       | Take a value, as soon as one is available, and    |
+|                   |           | return a pair with the value and position of the  |
+|                   |           | fulfilled future. (``std::pair<T, InputIter>``)   |
++-------------------+-----------+---------------------------------------------------+
+| ``ck::wait_all``  | Yes       | Wait for all the futures to become available, and |
+|                   |           | return a vector of values. (``std::vector<T>``)   |
++-------------------+-----------+---------------------------------------------------+
+| ``ck::wait_some`` | No        | Take any immediately available values, returning  |
+|                   |           | the values and any outstanding futures.           |
+|                   |           | (``std::pair<std::vector<T>, InputIter>``)        |
++-------------------+-----------+---------------------------------------------------+
+
+Note, these are also demonstrated in ``examples/charm++/future``. The Converse
+version of future functions can be found in the :ref:`conv-futures` section.
 
 .. _sec-completion:
 
@@ -12635,7 +12662,7 @@ tracemode:
 Tracemode ``summary``
 ^^^^^^^^^^^^^^^^^^^^^
 
-Compile option: ``-tracemode summary``
+Link time option: ``-tracemode summary``
 
 In this tracemode, execution time across all entry points for each
 processor is partitioned into a fixed number of equally sized
