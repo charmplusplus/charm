@@ -312,7 +312,7 @@ public:
   CkLocCache() = default;
   CkLocCache(CkMigrateMessage* m) : CBase_CkLocCache(m) {}
   ~CkLocCache() = default;
-  void pup(PUP::er& p) {}
+  void pup(PUP::er& p);
 
   void inform(CmiUInt8 id, int nowOnPe);
   int homePe(const CmiUInt8 id) const { return id >> CMK_OBJID_ELEMENT_BITS; }
