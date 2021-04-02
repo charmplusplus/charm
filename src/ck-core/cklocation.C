@@ -2363,6 +2363,55 @@ void CkLocMgr::flushLocalRecs(void)
 void CkLocMgr::flushAllRecs(void) { flushLocalRecs(); }
 
 /*************************** LocCache **************************/
+void CkLocCache::pup(PUP::er& p)
+{
+#if __FAULT__
+  if (!p.isUnpacking())
+  {
+    /**
+     * pack the indexes of elements which have their homes on this processor
+     * but dont exist on it.. needed for broadcast after a restart
+     * indexes of local elements dont need to be packed since they will be
+     * recreated later anyway
+     */
+    int count = 0;
+    std::vector<int> pe_list;
+    std::vector<CmiUInt8> id_list;
+    for (const auto& itr : id2pe)
+    {
+      if (homePe(itr.first) == CmiMyPe() && itr.second != CmiMyPe())
+      {
+        id_list.push_back(itr.first);
+        pe_list.push_back(itr.second);
+        count++;
+      }
+    }
+
+    p | count;
+    // syncft code depends on this exact arrangement:
+    for (int i = 0; i < count; i++)
+    {
+      p | id_list[i];
+      p | pe_list[i];
+    }
+  }
+  else
+  {
+    int count;
+    p | count;
+    for (int i = 0; i < count; i++)
+    {
+      CmiUInt8 id;
+      int pe;
+      p | id;
+      p | pe;
+      inform(id, pe);
+      CkAssert(whichPe(id) == pe);
+    }
+  }
+#endif
+}
+
 void CkLocCache::requestLocation(CmiUInt8 id)
 {
   int home = homePe(id);
@@ -2479,61 +2528,12 @@ void CkLocMgr::pup(PUP::er& p)
     initLB(lbmgrID, metalbID);
     compressor = ck::FixedArrayIndexCompressor::make(bounds);
 
-#if __FAULT__
-    int count = 0;
-    p | count;
-    DEBUG(CmiPrintf("[%d] Unpacking Locmgr %d has %d home elements\n", CmiMyPe(),
-                    thisgroup.idx, count));
-    for (int i = 0; i < count; i++)
-    {
-      CkArrayIndex idx;
-      int pe = 0;
-      p | idx;
-      p | pe;
-      inform(idx, lookupID(idx), pe);
-      CmiUInt8 id = lookupID(idx);
-      CkLocRec* rec = elementNrec(id);
-      CmiAssert(rec != NULL);
-      CmiAssert(lastKnown(idx) == pe);
-    }
-#endif
     // Delay doneInserting when it is unpacking during restart to prevent load
     // balancing from kicking in.
     if (!CkInRestarting())
     {
       doneInserting();
     }
-  }
-  else
-  {
-    /**
-     * pack the indexes of elements which have their homes on this processor
-     * but dont exist on it.. needed for broadcast after a restart
-     * indexes of local elements dont need to be packed since they will be
-     * recreated later anyway
-     */
-#if __FAULT__
-    int count = 0;
-    std::vector<int> pe_list;
-    std::vector<CmiUInt8> idx_list;
-    for (const auto& itr : cache->id2pe)
-    {
-      if (homePe(itr->first) == CmiMyPe() && itr->second != CmiMyPe())
-      {
-        idx_list.push_back(itr->first);
-        pe_list.push_back(itr->second);
-        count++;
-      }
-    }
-
-    p | count;
-    // syncft code depends on this exact arrangement:
-    for (int i = 0; i < count; i++)
-    {
-      p | idx_list[i];
-      p | pe_list[i];
-    }
-#endif
   }
 }
 
