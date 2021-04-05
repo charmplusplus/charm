@@ -766,8 +766,13 @@ AMPI_API_IMPL(int, MPI_Win_allocate, MPI_Aint size, int disp_unit, MPI_Info info
 // MPI_Win object deleted LOCALLY on all processes when the call returns
 AMPI_API_IMPL(int, MPI_Win_free, MPI_Win *win)
 {
-  AMPI_API("AMPI_Win_free", win);
-  if(win==NULL) { return ampiErrhandler("AMPI_Win_free", MPI_ERR_WIN); }
+  if (win == nullptr)
+  {
+    AMPI_API("AMPI_Win_free", win);
+    return ampiErrhandler("AMPI_Win_free", MPI_ERR_WIN);
+  }
+
+  AMPI_API("AMPI_Win_free", win, *win);
 
   ampiParent *parent = getAmpiParent();
   WinStruct *winStruct = parent->getWinStruct(*win);
@@ -1450,7 +1455,7 @@ AMPI_API_IMPL(int, MPI_Win_create_keyval, MPI_Win_copy_attr_function *copy_fn,
 
 AMPI_API_IMPL(int, MPI_Win_free_keyval, int *keyval)
 {
-  AMPI_API("AMPI_Win_free_keyval", keyval);
+  AMPI_API("AMPI_Win_free_keyval", keyval, *keyval);
   return MPI_Comm_free_keyval(keyval);
 }
 
