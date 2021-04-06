@@ -1186,10 +1186,14 @@ fi
 
 if [ "$USE_PIE" = "1" ]
 then
-       OPTS_CC="$OPTS_CC $CMK_PIE"
-       OPTS_CXX="$OPTS_CXX $CMK_PIE"
-       OPTS_F90="$OPTS_F90 $CMK_PIE"
-       OPTS_LD="$OPTS_LD $CMK_PIE"
+  # On ICC, specifying PIE cancels PIC even though PIC is stronger.
+  if [[ "$USE_PIC" != '1' ]]
+  then
+    OPTS_CC="$OPTS_CC $CMK_PIE"
+    OPTS_CXX="$OPTS_CXX $CMK_PIE"
+    OPTS_F90="$OPTS_F90 $CMK_PIE"
+  fi
+  OPTS_LD="$OPTS_LD $CMK_PIE"
 fi
 
 if [ "$USE_PIC" = "1" ]
