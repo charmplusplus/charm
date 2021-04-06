@@ -2374,25 +2374,20 @@ void CkLocCache::pup(PUP::er& p)
      * indexes of local elements dont need to be packed since they will be
      * recreated later anyway
      */
-    int count = 0;
-    std::vector<int> pe_list;
-    std::vector<CmiUInt8> id_list;
-    for (const auto& itr : id2pe)
+    std::vector<CkLocEntry> entries;
+    for (const auto& itr : locMap)
     {
-      if (homePe(itr.first) == CmiMyPe() && itr.second != CmiMyPe())
+      if (homePe(itr.first) == CmiMyPe() && itr.second.pe != CmiMyPe())
       {
-        id_list.push_back(itr.first);
-        pe_list.push_back(itr.second);
-        count++;
+        entries.push_back(itr.second);
       }
     }
 
+    int count = entries.size();
     p | count;
-    // syncft code depends on this exact arrangement:
     for (int i = 0; i < count; i++)
     {
-      p | id_list[i];
-      p | pe_list[i];
+      p | entries[i];
     }
   }
   else
@@ -2401,16 +2396,14 @@ void CkLocCache::pup(PUP::er& p)
     p | count;
     for (int i = 0; i < count; i++)
     {
-      CmiUInt8 id;
-      int pe;
-      p | id;
-      p | pe;
-      inform(id, pe);
-      if (homePe(id) != CkMyPe())
+      CkLocEntry e;
+      p | e;
+      updateLocation(e);
+      if (homePe(e.id) != CkMyPe())
       {
-        requestLocation(id, homePe(id));
+        thisProxy[homePe(e.id)].updateLocation(e);
       }
-      CkAssert(getPe(id) == pe);
+      CkAssert(getPe(e.id) == e.pe);
     }
   }
 #endif
