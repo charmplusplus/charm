@@ -581,6 +581,10 @@ do
 		ROSE_OMP_TLS_GLOBALS="yes"
 		;;
 
+	"-fpic"|"-fPIC")
+		USE_PIC='1'
+		;;
+
 	"-fpie"|"-fPIE")
 		USE_PIE='1'
 		;;

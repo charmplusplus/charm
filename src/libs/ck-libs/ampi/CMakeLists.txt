@@ -343,7 +343,7 @@ if(CMK_AMPI_WITH_ROMIO)
     # Compile ROMIO with the same flags as AMPI
     get_target_property(CK_CFLAGS ck COMPILE_OPTIONS)
     string(REPLACE ";" " " CK_CFLAGS "${CK_CFLAGS}")
-    set(ROMIO_FLAGS "${CK_CFLAGS} -DAMPI_NO_UNIMPLEMENTED_WARNINGS -standalone")
+    set(ROMIO_FLAGS "${CK_CFLAGS} -DAMPI_NO_UNIMPLEMENTED_WARNINGS -standalone -fPIC")
 
     include(ExternalProject)
     ExternalProject_Add(romio
@@ -371,6 +371,14 @@ if(CMK_AMPI_WITH_ROMIO)
         INSTALL_COMMAND ""
         LIST_SEPARATOR ^^
     )
+
+    if(CMK_CAN_LINK_FORTRAN)
+        add_custom_command(TARGET romio
+            POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy ${romio_dir}/mpi-io/fortran/romio_fortran${obj_suf} ${CMAKE_BINARY_DIR}/lib/ampi_funcptr_shim_fortran_romio.o
+            VERBATIM
+        )
+    endif()
 
     # Since we link a program with charmc as part of ROMIO's configure,
     # we need all libraries built at this point.

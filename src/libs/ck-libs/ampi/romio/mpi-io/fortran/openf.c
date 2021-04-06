@@ -11,6 +11,8 @@
 #include "adio.h"
 #include "mpio.h"
 
+#include "romio_fortran.h"
+
 
 #if defined(MPIO_BUILD_PROFILING) || defined(HAVE_WEAK_SYMBOLS)
 
@@ -111,12 +113,12 @@ void mpi_file_open_(MPI_Fint *comm,char *filename,MPI_Fint *amode,
 
     /* strip trailing blanks */
     if (filename <= (char *) 0) {
-        FPRINTF(stderr, "MPI_File_open: filename is an invalid address\n");
+        romio_fortran_error_print("MPI_File_open: filename is an invalid address\n");
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
     for (i=str_len-1; i>=0; i--) if (filename[i] != ' ') break;
     if (i < 0) {
-	FPRINTF(stderr, "MPI_File_open: filename is a blank string\n");
+	romio_fortran_error_print("MPI_File_open: filename is a blank string\n");
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
     real_len = i + 1;
@@ -165,12 +167,12 @@ FORTRAN_API void FORT_CALL mpi_file_open_(MPI_Fint *comm,char *filename FORT_MIX
 
     /* strip trailing blanks */
     if (filename <= (char *) 0) {
-        FPRINTF(stderr, "MPI_File_open: filename is an invalid address\n");
+        romio_fortran_error_print("MPI_File_open: filename is an invalid address\n");
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
     for (i=str_len-1; i>=0; i--) if (filename[i] != ' ') break;
     if (i < 0) {
-	FPRINTF(stderr, "MPI_File_open: filename is a blank string\n");
+	romio_fortran_error_print("MPI_File_open: filename is a blank string\n");
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
     real_len = i + 1;
