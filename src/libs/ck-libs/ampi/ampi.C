@@ -11617,6 +11617,22 @@ int AMPI_Load_set_value(double value)
   return MPI_SUCCESS;
 }
 
+CLINKAGE int AMPI_Load_set_phase(int phase)
+{
+  AMPI_API("AMPI_Load_set_phase", phase);
+  ampiParent *ptr = getAmpiParent();
+  ptr->CkLBSetPhase(phase);
+  return MPI_SUCCESS;
+}
+
+CLINKAGE int AMPI_Load_set_value_for_phase(double value, int phase)
+{
+  AMPI_API("AMPI_Load_set_value_for_phase", value, phase);
+  ampiParent *ptr = getAmpiParent();
+  ptr->setObjTime(value, phase);
+  return MPI_SUCCESS;
+}
+
 void _registerampif(void) {
   _registerampi();
 }

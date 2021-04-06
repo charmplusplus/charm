@@ -74,6 +74,10 @@ public:
     LbObj(h)->getTime(&walltime, &cputime);
   };
 
+  inline const std::vector<LBRealType> GetObjVectorLoad (const LDObjHandle& h) const {
+    return LbObj(h)->getVectorLoad();
+  }
+
   inline void* GetObjUserData(LDObjHandle &h) {
     return LbObj(h)->getLocalUserData();
   }
@@ -128,6 +132,7 @@ public:
                           int migratable);
   void UnregisterObj(LDObjHandle h);
   void EstObjLoad(const LDObjHandle &h, double cpuload);
+  void EstObjLoad(const LDObjHandle &h, double cpuload, int phase);
   void BackgroundLoad(LBRealType *walltime, LBRealType *cputime);
   void Send(const LDOMHandle &destOM, const CmiUInt8 &destID, unsigned int bytes, int destObjProc, int force = 0);
   void MulticastSend(const LDOMHandle &_om, CmiUInt8 *_ids, int _n, unsigned int _b, int _nMsgs=1);
@@ -192,6 +197,10 @@ public:
 
     NoRunningObj();
   };
+
+  inline void SetPhase(const LDObjHandle &h, int phase) {
+    LbObj(h)->setPhase(phase);
+  }
   inline const LDObjHandle &GetObjHandle(int idx) {
     return LbObjIdx(idx)->GetLDObjHandle();
   }

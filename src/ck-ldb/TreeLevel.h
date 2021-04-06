@@ -31,6 +31,13 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
   unsigned int nObjs;  // num objs in this msg
   unsigned int nPes;  // num pes in this msg
 
+  // Dimension of vector loads in this msg. Note that this can be 0. Object loads are
+  // stored as (regular walltime, <vector load>) where dimension gives the size of <vector
+  // load>. This can be -1 if there are no objects on this PE, in which case the value of
+  // dimension in another dimension will determine the dimension of the new message when
+  // merging.
+  int dimension;
+
   int* pe_ids;              // IDs of the pes in this msg
   float* bgloads;           // bgloads[i] is background load of i-th pe in this msg
   float* speeds;            // speeds[i] is speed of i-th pe
@@ -39,8 +46,6 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
 
   float* oloads;  // array of obj loads (grouped by pe), i-th obj in the array is
                   // considered to have ID i
-  unsigned int*
-      order;  // list of obj ids sorted by load (ids are determined by position in oloads)
 
   static TreeLBMessage* merge(std::vector<TreeLBMessage*>& msgs)
   {
@@ -54,22 +59,27 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
     // matter
     unsigned int nObjs = 0;
     unsigned int nPes = 0;
+
+    int dimension = -1;
+
     for (int i = 0; i < msgs.size(); i++)
     {
       LBStatsMsg_1* msg = (LBStatsMsg_1*)msgs[i];
+      dimension = std::max(dimension, msg->dimension);
       nObjs += msg->nObjs;
       nPes += msg->nPes;
     }
 
     LBStatsMsg_1* newMsg;
     if (rateAware)
-      newMsg = new (nPes, nPes, nPes, nPes + 1, nObjs, nObjs, 0) LBStatsMsg_1;
+      newMsg = new (nPes, nPes, nPes, nPes + 1, nObjs * (1 + dimension)) LBStatsMsg_1;
     else
-      newMsg = new (nPes, nPes, 0, nPes + 1, nObjs, nObjs, 0) LBStatsMsg_1;
+      newMsg = new (nPes, nPes, 0, nPes + 1, nObjs * (1 + dimension)) LBStatsMsg_1;
     newMsg->nObjs = nObjs;
     newMsg->nPes = nPes;
+    newMsg->dimension = dimension;
     int pe_cnt = 0;
-    int obj_cnt = 0;
+    int load_cnt = 0;
     for (int i = 0; i < msgs.size(); i++)
     {
       LBStatsMsg_1* msg = (LBStatsMsg_1*)msgs[i];
@@ -79,14 +89,25 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
       if (rateAware)
         memcpy(newMsg->speeds + pe_cnt, msg->speeds, sizeof(float) * msg_npes);
       // memcpy(newMsg->obj_start + pe_cnt, msg->obj_start, sizeof(int)*msg_npes);
-      for (int j = 0; j < msg_npes; j++)
-        newMsg->obj_start[pe_cnt + j] = msg->obj_start[j] + obj_cnt;
-      memcpy(newMsg->oloads + obj_cnt, msg->oloads, sizeof(float) * (msg->nObjs));
+      const auto msgDimension = msg->dimension;
 
-      obj_cnt += msg->nObjs;
-      pe_cnt += msg_npes;
+      for (int j = 0; j < msg_npes; j++)
+      {
+        newMsg->obj_start[pe_cnt++] = load_cnt;
+
+        // Copy this PE's objects to the new message, padding the dimension as necessary
+        for (auto k = msg->obj_start[j]; k < msg->obj_start[j + 1]; k += 1 + msgDimension)
+        {
+          const auto* const oldObjStart = msg->oloads + k;
+          auto* const newObjStart = newMsg->oloads + load_cnt;
+          std::copy(oldObjStart, oldObjStart + 1 + msgDimension, newObjStart);
+          // If msgDimension < dimension, then pad with 0
+          std::fill(newObjStart + 1 + msgDimension, newObjStart + 1 + dimension, 0);
+          load_cnt += 1 + dimension;
+        }
+      }
     }
-    newMsg->obj_start[pe_cnt] = obj_cnt;
+    newMsg->obj_start[pe_cnt] = load_cnt;
 
     return newMsg;
   }
@@ -99,6 +120,7 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
     int pe_cnt = 0;
     int obj_cnt = 0;
     float total_load = 0;
+
     for (int i = 0; i < msgs.size(); i++)
     {
       LBStatsMsg_1* msg = (LBStatsMsg_1*)msgs[i];
@@ -110,10 +132,15 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
         procs[pe_cnt++].resetLoad();
         migMsg->obj_start[pe] = obj_cnt;
         int local_id = 0;
+        const int msgDimension = 1 + msg->dimension;
         for (int k = msg->obj_start[j]; k < msg->obj_start[j + 1];
-             k++, obj_cnt++, local_id++)
+             k += msgDimension, obj_cnt++, local_id++)
         {
-          objs[obj_cnt].populate(obj_cnt, msg->oloads + k, pe);
+          float load[1 + O::dimension];
+          memcpy(load, msg->oloads + k, sizeof(float) * msgDimension);
+          if (msgDimension < 1 + O::dimension)
+            memset(load + msgDimension, 0, sizeof(float) * (1 + O::dimension - msgDimension));
+          objs[obj_cnt].populate(obj_cnt, load, pe);
           total_load += objs[obj_cnt].getLoad();
           migMsg->to_pes[obj_cnt] = pe;
           // if obj_local_ids.size() > 0:
@@ -121,6 +148,7 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
         }
       }
     }
+
     CkAssert(obj_cnt == objs.size());
     CkAssert(pe_cnt == procs.size());
     return total_load;
@@ -457,7 +485,13 @@ class RootLevel : public LevelLogic
 
   virtual ~RootLevel()
   {
-    for (auto w : wrappers) delete w;
+    for (auto v : wrappers)
+    {
+      for (auto w : v)
+      {
+        delete w;
+      }
+    }
   }
 
   /**
@@ -469,7 +503,13 @@ class RootLevel : public LevelLogic
                          bool token_passing = true)
   {
     using namespace TreeStrategy;
-    for (auto w : wrappers) delete w;
+    for (auto v : wrappers)
+    {
+      for (auto w : v)
+      {
+        delete w;
+      }
+    }
     wrappers.clear();
     if (num_groups == -1)
     {
@@ -478,13 +518,53 @@ class RootLevel : public LevelLogic
       {
         if (rateAware)
         {
-          wrappers.push_back(new StrategyWrapper<Obj<1>, Proc<1, true>>(
-              strategy_name, true, config[strategy_name]));
+          wrappers.push_back({new StrategyWrapper<Obj<1>, Proc<1, true>>(
+                                  strategy_name, true, config[strategy_name]),
+                              new StrategyWrapper<Obj<1>, Proc<1, true>>(
+                                  strategy_name, true, config[strategy_name]),
+                              new StrategyWrapper<Obj<2>, Proc<2, true>>(
+                                  strategy_name, true, config[strategy_name]),
+                              new StrategyWrapper<Obj<3>, Proc<3, true>>(
+                                  strategy_name, true, config[strategy_name]),
+                              new StrategyWrapper<Obj<4>, Proc<4, true>>(
+                                  strategy_name, true, config[strategy_name]),
+                              new StrategyWrapper<Obj<5>, Proc<5, true>>(
+                                  strategy_name, true, config[strategy_name]),
+                              new StrategyWrapper<Obj<6>, Proc<6, true>>(
+                                  strategy_name, true, config[strategy_name]),
+                              new StrategyWrapper<Obj<7>, Proc<7, true>>(
+                                  strategy_name, true, config[strategy_name]),
+                              new StrategyWrapper<Obj<8>, Proc<8, true>>(
+                                  strategy_name, true, config[strategy_name]),
+                              new StrategyWrapper<Obj<9>, Proc<9, true>>(
+                                  strategy_name, true, config[strategy_name]),
+                              new StrategyWrapper<Obj<10>, Proc<10, true>>(
+                                  strategy_name, true, config[strategy_name])});
         }
         else
         {
-          wrappers.push_back(new StrategyWrapper<Obj<1>, Proc<1, false>>(
-              strategy_name, true, config[strategy_name]));
+          wrappers.push_back({new StrategyWrapper<Obj<1>, Proc<1, false>>(
+                                  strategy_name, true, config[strategy_name]),
+                              new StrategyWrapper<Obj<1>, Proc<1, false>>(
+                                  strategy_name, true, config[strategy_name]),
+                              new StrategyWrapper<Obj<2>, Proc<2, false>>(
+                                  strategy_name, true, config[strategy_name]),
+                              new StrategyWrapper<Obj<3>, Proc<3, false>>(
+                                  strategy_name, true, config[strategy_name]),
+                              new StrategyWrapper<Obj<4>, Proc<4, false>>(
+                                  strategy_name, true, config[strategy_name]),
+                              new StrategyWrapper<Obj<5>, Proc<5, false>>(
+                                  strategy_name, true, config[strategy_name]),
+                              new StrategyWrapper<Obj<6>, Proc<6, false>>(
+                                  strategy_name, true, config[strategy_name]),
+                              new StrategyWrapper<Obj<7>, Proc<7, false>>(
+                                  strategy_name, true, config[strategy_name]),
+                              new StrategyWrapper<Obj<8>, Proc<8, false>>(
+                                  strategy_name, true, config[strategy_name]),
+                              new StrategyWrapper<Obj<9>, Proc<9, false>>(
+                                  strategy_name, true, config[strategy_name]),
+                              new StrategyWrapper<Obj<10>, Proc<10, false>>(
+                                  strategy_name, true, config[strategy_name])});
         }
       }
       this->repeat_strategies = repeat_strategies;
@@ -526,7 +606,16 @@ class RootLevel : public LevelLogic
     {
       // msg has object loads
       CkAssert(wrappers.size() > current_strategy);
-      IStrategyWrapper* wrapper = wrappers[current_strategy];
+
+      int dimension = -1;
+      for (const auto& treeMsg : stats_msgs)
+      {
+        const LBStatsMsg_1* msg = (LBStatsMsg_1*)treeMsg;
+        dimension = std::max(dimension, msg->dimension);
+      }
+      CkAssert(nObjs == 0 || (dimension > -1 && dimension <= 10));
+
+      IStrategyWrapper* wrapper = wrappers[current_strategy][dimension];
       CkAssert(wrapper != nullptr);
       CkAssert(nPes == CkNumPes());
       LLBMigrateMsg* migMsg = new (nPes, nPes, nObjs, 0) LLBMigrateMsg;
@@ -655,7 +744,7 @@ class RootLevel : public LevelLogic
   unsigned int nPes = 0;  // total number of processors in msgs I am processing
   unsigned int nObjs = 0;  // total number of objects in msgs I am processing
   float total_load = 0;
-  std::vector<IStrategyWrapper*> wrappers;
+  std::vector<std::vector<IStrategyWrapper*>> wrappers;
 };
 
 // ---------------- NodeSetLevel ----------------
@@ -1065,18 +1154,24 @@ class PELevel : public LevelLogic
     if (nobjs > 0) lbmgr->GetObjData(allLocalObjs.data());  // populate allLocalObjs
     myObjs.clear();
     LBRealType nonMigratableLoad = 0;
-    for (int i = 0; i < nobjs; i++)
+    int dimension = -1;
+    for (const auto& obj : allLocalObjs)
     {
-      if (allLocalObjs[i].migratable)
+      if (obj.migratable)
       {
-        myObjs.emplace_back(allLocalObjs[i]);
+        myObjs.emplace_back(obj);
+        dimension = std::max(dimension, (int)obj.vectorLoad.size());
       }
       else
       {
-        nonMigratableLoad += allLocalObjs[i].wallTime;
+        nonMigratableLoad += obj.wallTime;
       }
     }
     nobjs = myObjs.size();
+
+    // If dimension is 0, then phases are not being used
+    // If there are no objects, set dimension to -1
+    const auto nobjLoads = nobjs * (1 + dimension);
 
     // TODO verify that non-migratable objects are not added to msg and are only counted
     // as background load
@@ -1099,25 +1194,36 @@ class PELevel : public LevelLogic
     LBStatsMsg_1* msg;
     if (rateAware)
     {
-      msg = new (1, 1, 1, 2, nobjs, nobjs, 0) LBStatsMsg_1;
+      msg = new (1, 1, 1, 2, nobjLoads) LBStatsMsg_1;
       msg->speeds[0] = float(lbmgr->ProcessorSpeed());
     }
     else
-      msg = new (1, 1, 0, 2, nobjs, nobjs, 0) LBStatsMsg_1;
+      msg = new (1, 1, 0, 2, nobjLoads) LBStatsMsg_1;
     msg->nObjs = nobjs;
     msg->nPes = 1;
     msg->pe_ids[0] = mype;
     msg->obj_start[0] = 0;
-    msg->obj_start[1] = nobjs;
+    msg->obj_start[1] = nobjLoads;
+    msg->dimension = dimension;
     for (int i = 0; i < nobjs; i++)
     {
+      int index = i * (1 + dimension);
       // If rateAware, convert object loads by multiplying by processor speed
       // Note this conversion isn't done for bgloads because they never leave the PE
       if (rateAware)
-        msg->oloads[i] = float(myObjs[i].wallTime) * msg->speeds[0];
+        msg->oloads[index++] = float(myObjs[i].wallTime) * msg->speeds[0];
       else
-        msg->oloads[i] = float(myObjs[i].wallTime);
-      msg->order[i] = i;
+        msg->oloads[index++] = float(myObjs[i].wallTime);
+
+      const auto currentDim = myObjs[i].vectorLoad.size();
+      for (int j = 0; j < currentDim; j++)
+      {
+        msg->oloads[index++] = float(myObjs[i].vectorLoad[j]);
+      }
+      for (int j = currentDim; j < dimension; j++)
+      {
+        msg->oloads[index++] = 0;
+      }
     }
 
     LBRealType t1, t2, t3, t4, bg_walltime;

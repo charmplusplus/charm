@@ -20,6 +20,18 @@ void LBObj::Clear(void)
 //  data.id = myid;
 //  data.omHandle = parentOM;
 //  data.omID = parentDB->LbOM(parentOM)->id();
+  if (!data.vectorLoad.empty())
+  {
+    data.vectorLoad.clear();
+  }
+
+  if (data.wallTime > 0.0)
+  {
+    lastWallTime = data.wallTime;
+#if CMK_LB_CPUTIMER
+    lastCpuTime = data.cpuTime;
+#endif
+  }
   data.wallTime = 0.;
 #if CMK_LB_CPUTIMER
   data.cpuTime = 0.;
@@ -32,6 +44,14 @@ void LBObj::Clear(void)
 
 void LBObj::IncrementTime(LBRealType walltime, LBRealType cputime)
 {
+  if (phase >= 0)
+  {
+    if (data.vectorLoad.size() < phase + 1)
+    {
+      data.vectorLoad.resize(phase + 1);
+    }
+    data.vectorLoad[phase] += walltime;
+  }
   data.wallTime += walltime;
 #if CMK_LB_CPUTIMER
   data.cpuTime += cputime;

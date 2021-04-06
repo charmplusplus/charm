@@ -48,8 +48,11 @@ public:
   void startTiming(int ignore_running=0);
   void stopTiming(int ignore_running=0);
   void setObjTime(double cputime);
+  void setObjTime(double cputime, int phase);
   double getObjTime();
+  const std::vector<LBRealType> getObjVectorLoad() const;
   void *getObjUserData(int idx);
+  void CkLBSetPhase(int phase);
 #else
   inline void startTiming(int ignore_running=0) {  }
   inline void stopTiming(int ignore_running=0) { }
@@ -83,4 +86,3 @@ public:
 };
 
 #endif // CK_LOC_REC_H
-

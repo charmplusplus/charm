@@ -300,6 +300,10 @@ class LBManager : public CBase_LBManager
   {
     lbdb_obj->GetObjLoad(h, walltime, cputime);
   };
+  inline const std::vector<LBRealType> GetObjVectorLoad (const LDObjHandle& h)
+  {
+    return lbdb_obj->GetObjVectorLoad(h);
+  }
   void* GetObjUserData(LDObjHandle& h) { return lbdb_obj->GetObjUserData(h); }
   void MetaLBCallLBOnChares() { lbdb_obj->MetaLBCallLBOnChares(); }
   void MetaLBResumeWaitingChares(int lb_period)
@@ -328,6 +332,11 @@ class LBManager : public CBase_LBManager
   {
     lbdb_obj->EstObjLoad(h, cpuload);
   }
+  void EstObjLoad(const LDObjHandle& h, double cpuload, int phase)
+  {
+    lbdb_obj->EstObjLoad(h, cpuload, phase);
+  }
+
   void BackgroundLoad(LBRealType* walltime, LBRealType* cputime)
   {
     lbdb_obj->BackgroundLoad(walltime, cputime);
@@ -357,6 +366,11 @@ class LBManager : public CBase_LBManager
     return lbdb_obj->LbObj(h)->getDBUserData(idx);
   }
 #endif
+
+  inline void SetPhase(LDObjHandle& h, int phase)
+  {
+    lbdb_obj->SetPhase(h, phase);
+  }
 
   void ResetAdaptive();
 

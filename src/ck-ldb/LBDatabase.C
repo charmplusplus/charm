@@ -235,16 +235,7 @@ void LBDatabase::ClearLoads(void)
     LBObj *obj = objs[i].obj;
     if (obj)
     {
-      if (obj->data.wallTime > 0.0) {
-        obj->lastWallTime = obj->data.wallTime;
-#if CMK_LB_CPUTIMER
-        obj->lastCpuTime = obj->data.cpuTime;
-#endif
-      }
-      obj->data.wallTime = 0.0;
-#if CMK_LB_CPUTIMER
-      obj->data.cpuTime = 0.0;
-#endif
+      obj->Clear();
     }
   }
   delete commTable;
@@ -311,5 +302,15 @@ void LBDatabase::EstObjLoad(const LDObjHandle &_h, double cputime)
 
   CmiAssert(obj != NULL);
   obj->setTiming(cputime);
+#endif
+}
+
+void LBDatabase::EstObjLoad(const LDObjHandle &_h, double cputime, int phase)
+{
+#if CMK_LBDB_ON
+  LBObj *const obj = LbObj(_h);
+
+  CmiAssert(obj != NULL);
+  obj->setTiming(cputime, phase);
 #endif
 }
