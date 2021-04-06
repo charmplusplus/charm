@@ -2406,7 +2406,7 @@ void CkLocCache::pup(PUP::er& p)
       p | id;
       p | pe;
       inform(id, pe);
-      CkAssert(whichPe(id) == pe);
+      CkAssert(whichPE(id) == pe);
     }
   }
 #endif
