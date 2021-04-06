@@ -39,6 +39,7 @@ ROMIO integrated into AMPI:
 * MPI_Type_size_x and MPI_Status_set_elements_x in large_count.c are ifdef'd
   out, since they are provided by AMPI, but the ROMIO configure check for their
   presence is faulty.
+* The objects that define Fortran APIs are compiled as a single object.
 * Use `ACLOCAL=aclocal-1.15 AUTOMAKE=automake-1.15 autoreconf` to regenerate
   the configure script if making additional changes.
 
