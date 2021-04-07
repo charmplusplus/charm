@@ -181,6 +181,7 @@ then
     SHIM_OPTS="$SHIM_OPTS -standalone -DAMPI_USE_FUNCPTR"
     SHIM_OBJS="\"$CHARMLIB/ampi_funcptr_shim.o\" $SHIM_MAIN_OBJS"
     [ "$AMPICC_MODE" = 'ampif' ] && SHIM_OBJS="$SHIM_OBJS \"$CHARMLIB/ampi_funcptr_shim_fortran.o\" \"$CHARMLIB/ampifimpl.o\" \"$CHARMLIB/ampimod.o\""
+    [[ "$AMPICC_MODE" = 'ampif' && "$CMK_AMPI_WITH_ROMIO" = '1' ]] && SHIM_OBJS="$SHIM_OBJS \"$CHARMLIB/ampi_funcptr_shim_fortran_romio.o\""
     LOADER_OBJS="\"$CHARMLIB/ampi_funcptr_loader.o\" $ROMIO"
     ROMIO=''
   else

@@ -335,61 +335,7 @@ if(CMK_AMPI_WITH_ROMIO)
         set(romio_f77 yes)
 
         set(romio-fortran-objects
-            ${romio_dir}/mpi-io/fortran/closef${obj_suf}
-            ${romio_dir}/mpi-io/fortran/deletef${obj_suf}
-            ${romio_dir}/mpi-io/fortran/fsyncf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/get_amodef${obj_suf}
-            ${romio_dir}/mpi-io/fortran/get_atomf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/get_bytofff${obj_suf}
-            ${romio_dir}/mpi-io/fortran/get_errhf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/get_extentf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/get_groupf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/get_infof${obj_suf}
-            ${romio_dir}/mpi-io/fortran/get_posnf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/get_posn_shf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/get_sizef${obj_suf}
-            ${romio_dir}/mpi-io/fortran/get_viewf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/iotestf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/iowaitf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/iread_atf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/ireadf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/iread_shf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/iwrite_atf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/iwritef${obj_suf}
-            ${romio_dir}/mpi-io/fortran/iwrite_shf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/openf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/preallocf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/rd_atallbf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/rd_atallef${obj_suf}
-            ${romio_dir}/mpi-io/fortran/read_allbf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/read_allef${obj_suf}
-            ${romio_dir}/mpi-io/fortran/read_allf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/read_atallf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/read_atf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/readf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/read_ordbf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/read_ordef${obj_suf}
-            ${romio_dir}/mpi-io/fortran/read_ordf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/read_shf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/seekf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/seek_shf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/set_atomf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/set_errhf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/set_infof${obj_suf}
-            ${romio_dir}/mpi-io/fortran/set_sizef${obj_suf}
-            ${romio_dir}/mpi-io/fortran/set_viewf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/wr_atallbf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/wr_atallef${obj_suf}
-            ${romio_dir}/mpi-io/fortran/write_allbf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/write_allef${obj_suf}
-            ${romio_dir}/mpi-io/fortran/write_allf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/write_atallf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/write_atf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/writef${obj_suf}
-            ${romio_dir}/mpi-io/fortran/write_ordbf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/write_ordef${obj_suf}
-            ${romio_dir}/mpi-io/fortran/write_ordf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/write_shf${obj_suf}
+            ${romio_dir}/mpi-io/fortran/romio_fortran${obj_suf}
         )
     else()
         set(romio_f77 no)
@@ -406,7 +352,7 @@ if(CMK_AMPI_WITH_ROMIO)
     # Compile ROMIO with the same flags as AMPI
     get_target_property(CK_CFLAGS ck COMPILE_OPTIONS)
     string(REPLACE ";" " " CK_CFLAGS "${CK_CFLAGS}")
-    set(ROMIO_FLAGS "${CK_CFLAGS} -DAMPI_NO_UNIMPLEMENTED_WARNINGS -standalone")
+    set(ROMIO_FLAGS "${CK_CFLAGS} -DAMPI_NO_UNIMPLEMENTED_WARNINGS -standalone -fPIC")
 
     include(ExternalProject)
     ExternalProject_Add(romio
@@ -434,6 +380,14 @@ if(CMK_AMPI_WITH_ROMIO)
         INSTALL_COMMAND ""
         LIST_SEPARATOR ^^
     )
+
+    if(CMK_CAN_LINK_FORTRAN)
+        add_custom_command(TARGET romio
+            POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy ${romio_dir}/mpi-io/fortran/romio_fortran${obj_suf} ${CMAKE_BINARY_DIR}/lib/ampi_funcptr_shim_fortran_romio.o
+            VERBATIM
+        )
+    endif()
 
     # Since we link a program with charmc as part of ROMIO's configure,
     # we need all libraries built at this point.

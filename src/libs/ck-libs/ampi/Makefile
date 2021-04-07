@@ -26,6 +26,7 @@ AMPIMOD_OBJ=$(AMPI_LIBDIR)/ampimod.o
 FUNCPTR_SHIM_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_shim.o
 FUNCPTR_SHIM_MAIN_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_shim_main.o
 FUNCPTR_SHIM_FORTRAN_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_shim_fortran.o
+FUNCPTR_SHIM_FORTRAN_ROMIO_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_shim_fortran_romio.o
 FUNCPTR_SHIM_FMPIMAIN_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_shim_fmpimain.o
 FUNCPTR_LOADER_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_loader.o
 FUNCPTR_LOADER_STUB_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_loader_stub.o
@@ -82,7 +83,13 @@ ifeq ($(CMK_AMPI_WITH_ROMIO),1)
     )
 endif
 
-ROMIO_FLAGS = -DAMPI_NO_UNIMPLEMENTED_WARNINGS -standalone
+ROMIO_FLAGS = -DAMPI_NO_UNIMPLEMENTED_WARNINGS -standalone -fPIC
+
+ifneq ($(CMK_WINDOWS),1)
+  obj_suf := .o
+else
+  obj_suf := .obj
+endif
 
 .SUFFIXES:
 .SUFFIXES: .C .o
@@ -120,6 +127,7 @@ $(ROMIO): headers
 
 	cp romio/include/mpio.h romio/include/mpiof.h romio/include/mpio_functions.h $(CDIR)/include
 	$(MAKE) -C romio AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=:
+	cp romio/mpi-io/fortran/romio_fortran${obj_suf} $(FUNCPTR_SHIM_FORTRAN_ROMIO_OBJ)
 	@echo "ROMIO built successfully"
 
 AMPI: $(AMPI_TARGET)
