@@ -2423,6 +2423,9 @@ void CkLocCache::requestLocation(CmiUInt8 id, const int peToTell)
   if (peToTell == CkMyPe()) return;
 
   LocationMap::const_iterator itr = locMap.find(id);
+  // TODO: If the location is not found, we probably need to buffer this request. Should
+  // only effect very weird corner cases at the moment, and is a problem that already
+  // existed, but should be addressed in the upcoming delivery/buffering cleanup.
   if (itr != locMap.end())
   {
     thisProxy[peToTell].updateLocation(itr->second);
