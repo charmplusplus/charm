@@ -2460,6 +2460,7 @@ void CkLocCache::insert(CmiUInt8 id, int epoch)
   e.id = id;
   e.pe = CkMyPe();
   e.epoch = epoch;
+  notifyListeners(e.id, e.pe);
 }
 
 /*************************** LocMgr: CREATION *****************************/
