@@ -7,6 +7,7 @@
 #include <bitset>
 #include <complex>
 #include <iostream>
+#include <sstream>
 
 #include "ampi.h"
 #include "ddt.h"
@@ -53,15 +54,17 @@ extern int quietModeRequested;
 // Prints a single argument name and its value (unless the argument name is
 // '""', which indicates a nonexistent argument)
 #define PRINT_ARG(arg, last) \
-  if ("\"\""!=#arg) std::cout << #arg << "=" << arg << (last ? "" : ", ");
+  if ("\"\"" != #arg) stream << #arg << "=" << arg << (last ? "" : ", ");
 
 // Prints PE:VP, function name, and argument name/value for each function argument
 #define AMPI_DEBUG_ARGS(function_name, ...) \
   if(!quietModeRequested) { \
-  std::cout << "[" << CkMyPe() << ":" << \
-  (isAmpiThread() ? getAmpiParent()->thisIndex : -1) << "] "<< function_name <<"("; \
+  std::stringstream stream; \
+  stream << "[" << CkMyPe() << ":" << \
+  (isAmpiThread() ? getAmpiParent()->thisIndex : -1) << "] " << function_name << "("; \
   FOR_EACH(PRINT_ARG, __VA_ARGS__); \
-  std::cout << ")" << std::endl; }
+  stream << ")\n"; \
+  std::cout << stream.str() << std::flush; }
 
 #else // !AMPI_DO_DEBUG
 
