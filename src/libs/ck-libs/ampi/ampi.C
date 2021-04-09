@@ -1162,10 +1162,13 @@ static ampi *ampiInit(char **argv) noexcept
     opts.setSectionAutoDelegate(false);
     opts.setStaticInsertion(true);
     opts.setAnytimeMigration(false);
-    CkArrayCreatedMsg *m;
-    CProxy_ampiParent::ckNew(threads, _nchunks, opts, CkCallbackResumeThread((void*&)m));
-    parent = CProxy_ampiParent(m->aid);
-    delete m;
+
+    ck::future<CkArrayID> newAmpiFuture;
+    CkCallback cb(newAmpiFuture.handle());
+    CProxy_ampiParent::ckNew(threads, _nchunks, opts, cb);
+    parent = newAmpiFuture.get();
+    newAmpiFuture.release();
+
     STARTUP_DEBUG("ampiInit> array size "<<_nchunks);
   }
   int *barrier = (int *)TCharm::get()->semaGet(AMPI_BARRIER_SEMAID);
@@ -1176,13 +1179,13 @@ static ampi *ampiInit(char **argv) noexcept
   {
     //Make a new ampi array
     CkArrayID empty;
-
     ampiCommStruct worldComm(MPI_COMM_WORLD, empty, _nchunks);
-    CProxy_ampi arr;
-    CkArrayCreatedMsg *m;
-    CProxy_ampi::ckNew(parent, worldComm, opts, CkCallbackResumeThread((void*&)m));
-    arr = CProxy_ampi(m->aid);
-    delete m;
+
+    ck::future<CkArrayID> newAmpiFuture;
+    CkCallback cb(newAmpiFuture.handle());
+    CProxy_ampi::ckNew(parent, worldComm, opts, cb);
+    /* CProxy_ampi arr = */ newAmpiFuture.get();
+    newAmpiFuture.release();
 
     STARTUP_DEBUG("ampiInit> arrays created")
   }
