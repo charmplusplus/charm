@@ -127,7 +127,9 @@ $(ROMIO): headers
 
 	cp romio/include/mpio.h romio/include/mpiof.h romio/include/mpio_functions.h $(CDIR)/include
 	$(MAKE) -C romio AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=:
-	cp romio/mpi-io/fortran/romio_fortran${obj_suf} $(FUNCPTR_SHIM_FORTRAN_ROMIO_OBJ)
+ifeq (1,$(CMK_CAN_LINK_FORTRAN))
+	cp romio/mpi-io/fortran/romio_fortran$(obj_suf) $(FUNCPTR_SHIM_FORTRAN_ROMIO_OBJ)
+endif
 	@echo "ROMIO built successfully"
 
 AMPI: $(AMPI_TARGET)
