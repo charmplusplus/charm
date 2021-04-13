@@ -10,7 +10,8 @@ args=""
 
 # Arguments that need to be passed to the charm application, not mpirun (e.g. ++quiet)
 charm_args=""
-pes=1
+pes=0
+nodes=0
 ppn=1
 machinefile=""
 QUIET=0
@@ -23,6 +24,19 @@ DEBUGGER=''
 while [ $# -gt 0 ]
 do
 	case $1 in
+	+n|++n|++np)
+		nodes=$2
+		shift
+		;;
+	+n[0-9]*)
+		nodes="${1#\+n}"
+		;;
+	++n[0-9]*)
+		nodes="${1#\+\+n}"
+		;;
+	++np[0-9]*)
+		nodes="${1#\+\+np}"
+		;;
 	+ppn|++ppn)
 		args=$args" +ppn "$2
 		ppn=$2
@@ -30,26 +44,24 @@ do
 		;;
 	+ppn[0-9]*)
 		args=$args" "$1
-		ppn=`echo $1 | awk '{print substr($1,5)}'`
+		ppn="${1#\+ppn}"
 		;;
 	++ppn[0-9]*)
 		args=$args" "$1
-		ppn=`echo $1 | awk '{print substr($1,6)}'`
+		ppn="${1#\+\+ppn}"
 		;;
-	+p)
+	+p|++p)
 		pes=$2
 		shift
 		;;
+	+p[0-9]*)
+		pes="${1#\+p}"
+		;;
+	++p[0-9]*)
+		pes="${1#\+\+p}"
+		;;
 	+pemap)
 		args=$args" "$1" "$2
-		shift
-		;;
-	+p[0-9]*)
-		pes=`echo $1 | awk '{print substr($1,3)}'`
-		;;
-        -machinefile)
-		machinefile=$2
-		args=" "$1" "$2" "$args
 		shift
 		;;
 	++quiet)
@@ -116,30 +128,36 @@ then
   args="$XTERM -e $DEBUGGER $args"
 fi
 
-rem=`expr $pes % $ppn`
-quot=`expr $pes / $ppn`
-if [ $rem -ne 0 ];
+if [[ $nodes = 0 ]]
 then
-  printf "p = $pes should be a multiple of ppn = $ppn\n"
+  [[ $pes = 0 ]] && pes=1
+  if [[ $(($pes % $ppn)) -ne 0 ]]
+  then
+    printf "Charmrun> Error: ++ppn $ppn (number of PEs per node) does not divide +p $pes (number of PEs).\n"
+    exit 1
+  else
+    nodes=$(($pes / $ppn))
+  fi
+elif [[ $pes != 0 && $pes != $(($nodes * $ppn)) ]]
+then
+  printf "Charmrun> Error: +n/++np $nodes times ++ppn $ppn does not equal +p $pes.\n"
   exit 1
-else
-  pes=$quot
 fi
 
-test $QUIET -eq 0 && printf "\nRunning on $pes processors: $args\n"
+[[ $QUIET -eq 0 ]] && printf "\nRunning as $nodes OS processes: $args\n"
 
 if [ $LOCAL -eq 1 ]
 then
-  test $QUIET -eq 0 && echo $args +p $pes
-  $args +p $pes
+  [[ $QUIET -eq 0 ]] && echo $args +p $nodes
+  $args +p $nodes
 elif [ -n "$PBS_NODEFILE" ]
 then
 # we are in a job shell
   aprun=`command -v aprun 2>/dev/null`
   if test -n "$aprun"
   then
-    test $QUIET -eq 0 && echo aprun -n $pes $args
-    $aprun -n $pes $args
+    [[ $QUIET -eq 0 ]] && echo aprun -n $nodes $args
+    $aprun -n $nodes $args
   else
     mpirun_cmd=`command -v mpirun 2>/dev/null`
     if test -n "$mpirun_cmd"
@@ -151,12 +169,12 @@ then
         then
           mvapich2-start-mpd
         fi
-        mpirun -np $pes $args
+        mpirun -np $nodes $args
         #    mpdallexit
       else   # normal case
         test -z "$machinefile" && args=-machinefile" "$PBS_NODEFILE" "$args
-        test $QUIET -eq 0 && echo mpirun -np $pes $args
-        mpirun -np $pes $args
+        [[ $QUIET -eq 0 ]] && echo mpirun -np $nodes $args
+        mpirun -np $nodes $args
       fi
     else
       echo "Charmrun> can not locate mpirun in order to run the program."
@@ -166,7 +184,7 @@ then
 elif [ -n "$LSB_HOSTS" ]
 then
 # Tungsten
-  test $QUIET -eq 0 && echo cmpirun -lsf -poll -no_smp -gm_long 200000 $args
+  [[ $QUIET -eq 0 ]] && echo cmpirun -lsf -poll -no_smp -gm_long 200000 $args
   cmpirun -lsf -poll -no_smp -gm_long 200000 $args 
 elif [ -n "$PBS_QUEUE" -o -n "$LSF_QUEUE" ]
 then
@@ -186,19 +204,19 @@ then
 	hostname=`hostname`
 	case "$hostname" in
 	turing*.turing.uiuc.edu) 
-		ppn='#PBS -l nodes='$pes':ppn=1'
+		ppn='#PBS -l nodes='$nodes':ppn=1'
 		extra='-machinefile $PBS_NODEFILE'
 		;;
 	tg-login*|honest*.ncsa.uiuc.edu)
 		# always ppn=2
-		nodes=`expr \( $pes + 1 \) / 2`
- 		test $pes -eq 1 && ppns=1 || ppns=2
+		nodes=$(( ( $nodes + 1 ) / 2 ))
+		[[ $nodes -eq 1 ]] && ppns=1 || ppns=2
 		ppn='#PBS -l nodes='$nodes':ppn='$ppns
 		extra='-machinefile $PBS_NODEFILE'
 		;;
 	co-login*.ncsa.uiuc.edu)
 		mem='#PBS -l mem=500mb'
-		ncpus="#PBS -l ncpus=$pes"
+		ncpus="#PBS -l ncpus=$nodes"
 		;;
 	tun*)
 		USE_LSF=1
@@ -208,18 +226,18 @@ then
 		;;
 	abe*)
 		# always ppn=2
-		nodes=`expr \( $pes + 1 \) / 2`
- 		test $pes -eq 1 && ppns=1 || ppns=2
+		nodes=$(( ( $nodes + 1 ) / 2 ))
+		[[ $nodes -eq 1 ]] && ppns=1 || ppns=2
 		ppn='#PBS -l nodes='$nodes':ppn='$ppns
 		extra='-machinefile $PBS_NODEFILE'
 		;;
         kraken*)
-                ncores=`expr \( $pes + 11 \) / 12 \* 12`
+                ncores=$(( ( $nodes + 11 ) / 12 * 12 ))
 		ncpus="#PBS -l size=$ncores"
 		ppn=''
 		;;
 	*)
-		ncpus="#PBS -l ncpus=$pes"
+		ncpus="#PBS -l ncpus=$nodes"
 		;;
 	esac
 	if test $USE_LSF -eq 0
@@ -260,8 +278,8 @@ $mem
 cd $indir
 
 cat \$PBS_NODEFILE
-echo $mpirun $npcmd $pes $extra $args
-$mpirun $npcmd $pes $extra $args
+echo $mpirun $npcmd $nodes $extra $args
+$mpirun $npcmd $nodes $extra $args
 
 # Save mpirun exit status
 status=\$?
@@ -277,7 +295,7 @@ EOF
 #
 #BSUB -J autobuild
 #BSUB -W 0:$walllimit
-#BSUB -n $pes
+#BSUB -n $nodes
 #BSUB -o $output
 
 cd $indir
@@ -296,7 +314,7 @@ End() {
 	exit $1
 }
 
-        echo "Submitting batch job for> $mpirun -np $pes $args"
+        echo "Submitting batch job for> $mpirun -np $nodes $args"
         echo " using the command> $queue_qsub $script"
         chmod 755 $script
 	while [ -z "$jobid" ]
@@ -332,7 +350,7 @@ End() {
 		if test $exitstatus -ne 0
 		then
 # retry a few times when error occurs
-			retry=`expr $retry + 1`
+			retry=$(( $retry + 1 ))
 			if test $retry -gt 6
 			then
 				echo "Charmrun> too many errors, abort!"
@@ -358,19 +376,18 @@ then
       # Disables randomization of the virtual address  space  (turns  on
       #          ADDR_NO_RANDOMIZE).
       cur_arch=`uname -m`
-      test $QUIET -eq 0 && echo "charmrun>  $setarch_cmd $cur_arch -R  mpirun -np $pes $args"
-      $setarch_cmd $cur_arch -R  mpirun -np $pes $args
+      [[ $QUIET -eq 0 ]] && echo "charmrun>  $setarch_cmd $cur_arch -R  mpirun -np $nodes $args"
+      $setarch_cmd $cur_arch -R  mpirun -np $nodes $args
     else
-      test $QUIET -eq 0 && echo "charmrun> mpirun -np $pes $args"
-      mpirun -np $pes $args
+      [[ $QUIET -eq 0 ]] && echo "charmrun> mpirun -np $nodes $args"
+      mpirun -np $nodes $args
     fi
   else
     mpiexec_cmd=`command -v mpiexec 2>/dev/null`
     if test -n "$mpiexec_cmd"
     then
-      test $QUIET -eq 0 && echo "charmrun> $mpiexec_cmd -n $pes $args"
-      test $QUIET -eq 0 && echo
-      "$mpiexec_cmd" -n $pes $args
+      [[ $QUIET -eq 0 ]] && echo "charmrun> $mpiexec_cmd -n $nodes $args" && echo
+      "$mpiexec_cmd" -n $nodes $args
     else
       echo "Don't know how to run MPI program."
       exit 1
@@ -381,8 +398,8 @@ then
   #mpirun is checked before srun to support the Bridges supercomputer at PSC
   #as srun has a known issue and fails to successfully launch the parallel job.
   #This is required to run the nightly ofi autobuild.
-  test $QUIET -eq 0 && echo  srun -n $pes -c `expr $ppn + 1` $args
-  srun -n $pes -c `expr $ppn + 1` $args
+  [[ $QUIET -eq 0 ]] && echo srun -n $nodes -c $(( $ppn + 1 )) $args
+  srun -n $nodes -c $(( $ppn + 1 )) $args
 else
   echo "No job launcher found! (tried aprun, mpirun and srun)\n"
   exit 1
