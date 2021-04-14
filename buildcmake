@@ -68,6 +68,7 @@ triplet=$2
 opt_ampi_error_checking=0
 opt_ampi_mpich_tests=0
 opt_ampi_only=0
+opt_arch=$(echo $triplet | cut -f 3 -d -)
 opt_build_shared=0
 opt_ccs=0
 opt_charmdebug=0
@@ -513,6 +514,7 @@ fi
 
 CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
   -G "Unix Makefiles" \
+  -DARCH="$opt_arch" \
   -DCMAKE_BUILD_TYPE="$opt_production" \
   -DCMK_AMPI_ONLY="$opt_ampi_only" \
   -DCMK_AMPI_WITH_ROMIO="$opt_romio" \
