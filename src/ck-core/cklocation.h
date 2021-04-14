@@ -74,32 +74,6 @@ PUPbytes(CkDeliver_t)
     class CkArrayOptions;
 #include "CkLocation.decl.h"
 
-/************************** Array Messages ****************************/
-/**
- *  This is the message type used to actually send a migrating array element.
- */
-
-class CkArrayElementMigrateMessage : public CMessage_CkArrayElementMigrateMessage
-{
-public:
-  CkArrayElementMigrateMessage(CkArrayIndex idx_, CmiUInt8 id_, bool ignoreArrival_,
-                               int length_, int nManagers_)
-      : idx(idx_),
-        id(id_),
-        ignoreArrival(ignoreArrival_),
-        length(length_),
-        nManagers(nManagers_)
-  {
-  }
-
-  CkArrayIndex idx;    // Array index that is migrating
-  CmiUInt8 id;         // ID of the elements with this index in this collection
-  bool ignoreArrival;  // if to inform LB of arrival
-  int length;          // Size in bytes of the packed data
-  int nManagers;       // Number of associated array managers
-  char* packData;
-};
-
 /******************* Map object ******************/
 
 extern CkGroupID _defaultArrayMapID;
@@ -208,6 +182,30 @@ CkpvExtern(int, CkSaveRestorePrefetch);
 #endif
 
 #include "ckmigratable.h"
+
+/************************** Array Messages ****************************/
+/**
+ *  This is the message type used to actually send a migrating array element.
+ */
+
+class CkArrayElementMigrateMessage
+    : public CMessage_CkArrayElementMigrateMessage {
+public:
+  CkArrayElementMigrateMessage(CkArrayIndex idx_, CmiUInt8 id_,
+                               bool ignoreArrival_, int length_, int nManagers_)
+      : idx(idx_), id(id_), ignoreArrival(ignoreArrival_), length(length_),
+        nManagers(nManagers_) {}
+
+  CkArrayIndex idx;   // Array index that is migrating
+  CmiUInt8 id;        // ID of the elements with this index in this collection
+  bool ignoreArrival; // if to inform LB of arrival
+  int length;         // Size in bytes of the packed data
+  int nManagers;      // Number of associated array managers
+  int srcPe;
+  int elCType;
+  CkMigratable *migEl;
+  char *packData;
+};
 
 /********************** CkLocMgr ********************/
 /// A tiny class for detecting heap corruption
@@ -378,8 +376,9 @@ private:
   friend class ArrayElement;
   friend class MemElementPacker;
 
-  void pupElementsFor(PUP::er& p, CkLocRec* rec, CkElementCreation_t type,
-                      bool rebuild = false);
+  void pupElementsFor(PUP::er &p, CkLocRec *rec, CkElementCreation_t type,
+                      bool rebuild = false, int *elCTypeSend = NULL,
+                      CkMigratable **mig = NULL);
 
   // Call this member function on each element of this location:
   typedef void (CkMigratable::*CkMigratable_voidfn_t)(void);
@@ -464,8 +463,8 @@ public:
   void deliverAnyBufferedMsgs(CmiUInt8, MsgBuffer& buffer);
   void deliverAnyBufferedMsgs(const CkArrayIndex&, CmiUInt8, IndexMsgBuffer&);
 
-  bool addElementToRec(CkLocRec* rec, CkArray* m, CkMigratable* elt, int ctorIdx,
-                       void* ctorMsg);
+  bool addElementToRec(CkLocRec *rec, CkArray *m, CkMigratable *elt,
+                       int ctorIdx, void *ctorMsg, bool construct = true);
 
   CProxy_CkLocMgr thisProxy;
   CProxyElement_CkLocMgr thislocalproxy;

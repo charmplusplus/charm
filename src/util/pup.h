@@ -407,6 +407,50 @@ inline size_t size(T &t) {
 	PUP::sizer p; p|t; return p.size();
 }
 
+class dummy : public er {
+protected:
+  dummy(unsigned int type) : er(type) {}
+  dummy(const dummy &p);
+  void operator=(const dummy &p);
+
+public:
+  size_t size(void) const { return 0; }
+};
+
+class toDummy : public dummy {
+protected:
+  // Generic bottleneck: pack n items of size itemSize from p.
+  virtual void bytes(void *p, size_t n, size_t itemSize, dataType t);
+
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t);
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t,
+                          std::function<void *(size_t)> allocate,
+                          std::function<void(void *)> deallocate);
+  void pup_buffer_generic(void *&p, size_t n, size_t itemSize, dataType t,
+                          std::function<void *(size_t)> allocate,
+                          bool isMalloc);
+
+public:
+  toDummy() : dummy(IS_PACKING) {}
+};
+
+class fromDummy : public dummy {
+protected:
+  // Generic bottleneck: unpack n items of size itemSize from p.
+  virtual void bytes(void *p, size_t n, size_t itemSize, dataType t);
+
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t);
+  virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t,
+                          std::function<void *(size_t)> allocate,
+                          std::function<void(void *)> deallocate);
+  void pup_buffer_generic(void *&p, size_t n, size_t itemSize, dataType t,
+                          std::function<void *(size_t)> allocate,
+                          bool isMalloc);
+
+public:
+  fromDummy() : dummy(IS_UNPACKING) {}
+};
+
 /********** PUP::er -- Binary memory buffer pack/unpack *********/
 class mem : public er { //Memory-buffer packers and unpackers
  protected:
