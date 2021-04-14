@@ -1205,7 +1205,7 @@ static void arg_init(int argc, const char **argv)
 #else
     if (arg_requested_pes > 0 && arg_requested_nodes > 0 && arg_requested_pes != arg_requested_nodes)
     {
-      fprintf(stderr, "Charmrun> Error: +p %d and ++np %d do not agree.\n", arg_requested_pes, arg_requested_nodes);
+      fprintf(stderr, "Charmrun> Error: +p %d and +n/++np %d do not agree.\n", arg_requested_pes, arg_requested_nodes);
       exit(1);
     }
 #endif
