@@ -254,7 +254,7 @@ function processArgs() {
     shift
 
     # Platform/compiler options are handled here:
-    parse_platform_compilers $arg
+    parse_platform_compilers "$arg"
     [[ $handled -eq 1 ]] && continue
 
     # Other options are handled below:
@@ -412,7 +412,7 @@ eval processArgs "$@"
 
 # Also parse extra options appended to the triplet
 for arg in $extra_triplet_opts; do
-  parse_platform_compilers $arg
+  parse_platform_compilers "$arg"
 done
 
 
