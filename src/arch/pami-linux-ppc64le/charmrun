@@ -118,20 +118,20 @@ fi
 if [[ $nodes = 0 ]]
 then
   [[ $pes = 0 ]] && pes=1
-  if [[ $(($pes % $ppn)) -ne 0 ]]
+  if [[ $(( pes % ppn )) -ne 0 ]]
   then
-    printf "Charmrun> Error: ++ppn $ppn (number of PEs per node) does not divide +p $pes (number of PEs).\n"
+    printf "Charmrun> Error: ++ppn %s (number of PEs per node) does not divide +p %s (number of PEs).\n" "$ppn" "$pes"
     exit 1
   else
-    nodes=$(($pes / $ppn))
+    nodes=$(( pes / ppn ))
   fi
-elif [[ $pes != 0 && $pes != $(($nodes * $ppn)) ]]
+elif [[ $pes != 0 && $pes != $(( nodes * ppn )) ]]
 then
-  printf "Charmrun> Error: +n/++np $nodes times ++ppn $ppn does not equal +p $pes.\n"
+  printf "Charmrun> Error: +n/++np %s times ++ppn %s does not equal +p %s.\n" "$nodes" "$ppn" "$pes"
   exit 1
 fi
 
-[[ $QUIET -eq 0 ]] && printf "\nRunning as $nodes OS processes: $args\n"
+[[ $QUIET -eq 0 ]] && printf "\nRunning as $nodes OS processes: %s\n" "$args"
 
 
 if [ -n "$PBS_NODEFILE" ]
@@ -172,7 +172,7 @@ then
   if test -n "$jsrun"
   then
     #cores per resource set = ppn + 1 core for system processes
-    cores=$(( $ppn + 1 ))
+    cores=$(( ppn + 1 ))
     [[ $QUIET -eq 0 ]] && echo jsrun -r$nodes -c$cores $args
     $jsrun -r$nodes -c$cores  $args
   else
@@ -208,7 +208,7 @@ then
 		;;
 	tg-login*|honest*.ncsa.uiuc.edu)
 		# always ppn=2
-		nodes=$(( ( $nodes + 1 ) / 2 ))
+		nodes=$(( ( nodes + 1 ) / 2 ))
 		[[ $nodes -eq 1 ]] && ppns=1 || ppns=2
 		ppn='#PBS -l nodes='$nodes':ppn='$ppns
 		extra='-machinefile $PBS_NODEFILE'
@@ -225,13 +225,13 @@ then
 		;;
 	abe*)
 		# always ppn=2
-		nodes=$(( ( $nodes + 1 ) / 2 ))
+		nodes=$(( ( nodes + 1 ) / 2 ))
 		[[ $nodes -eq 1 ]] && ppns=1 || ppns=2
 		ppn='#PBS -l nodes='$nodes':ppn='$ppns
 		extra='-machinefile $PBS_NODEFILE'
 		;;
         kraken*)
-                ncores=$(( ( $nodes + 11 ) / 12 * 12 ))
+                ncores=$(( ( nodes + 11 ) / 12 * 12 ))
 		ncpus="#PBS -l size=$ncores"
 		ppn=''
 		;;
@@ -344,7 +344,7 @@ End() {
 		if test $exitstatus -ne 0
 		then
 # retry a few times when error occurs
-			retry=$(( $retry + 1 ))
+			retry=$(( retry + 1 ))
 			if test $retry -gt 6
 			then
 				echo "Charmrun> too many errors, abort!"

@@ -131,20 +131,20 @@ fi
 if [[ $nodes = 0 ]]
 then
   [[ $pes = 0 ]] && pes=1
-  if [[ $(($pes % $ppn)) -ne 0 ]]
+  if [[ $(( pes % ppn )) -ne 0 ]]
   then
-    printf "Charmrun> Error: ++ppn $ppn (number of PEs per node) does not divide +p $pes (number of PEs).\n"
+    printf "Charmrun> Error: ++ppn %s (number of PEs per node) does not divide +p %s (number of PEs).\n" "$ppn" "$pes"
     exit 1
   else
-    nodes=$(($pes / $ppn))
+    nodes=$(( pes / ppn ))
   fi
-elif [[ $pes != 0 && $pes != $(($nodes * $ppn)) ]]
+elif [[ $pes != 0 && $pes != $(( nodes * ppn )) ]]
 then
-  printf "Charmrun> Error: +n/++np $nodes times ++ppn $ppn does not equal +p $pes.\n"
+  printf "Charmrun> Error: +n/++np %s times ++ppn %s does not equal +p %s.\n" "$nodes" "$ppn" "$pes"
   exit 1
 fi
 
-[[ $QUIET -eq 0 ]] && printf "\nRunning as $nodes OS processes: $args\n"
+[[ $QUIET -eq 0 ]] && printf "\nRunning as $nodes OS processes: %s\n" "$args"
 
 if [ -n "$PBS_NODEFILE" ]
 then
@@ -205,7 +205,7 @@ then
 		;;
 	tg-login*|honest*.ncsa.uiuc.edu)
 		# always ppn=2
-		nodes=$(( ( $nodes + 1 ) / 2 ))
+		nodes=$(( ( nodes + 1 ) / 2 ))
 		[[ $nodes -eq 1 ]] && ppns=1 || ppns=2
 		ppn='#PBS -l nodes='$nodes':ppn='$ppns
 		extra='-machinefile $PBS_NODEFILE'
@@ -222,13 +222,13 @@ then
 		;;
 	abe*)
 		# always ppn=2
-		nodes=$(( ( $nodes + 1 ) / 2 ))
+		nodes=$(( ( nodes + 1 ) / 2 ))
 		[[ $nodes -eq 1 ]] && ppns=1 || ppns=2
 		ppn='#PBS -l nodes='$nodes':ppn='$ppns
 		extra='-machinefile $PBS_NODEFILE'
 		;;
         kraken*)
-                ncores=$(( ( $nodes + 11 ) / 12 * 12 ))
+                ncores=$(( ( nodes + 11 ) / 12 * 12 ))
 		ncpus="#PBS -l size=$ncores"
 		ppn=''
 		;;
@@ -346,7 +346,7 @@ End() {
 		if test $exitstatus -ne 0
 		then
 # retry a few times when error occurs
-			retry=$(( $retry + 1 ))
+			retry=$(( retry + 1 ))
 			if test $retry -gt 6
 			then
 				echo "Charmrun> too many errors, abort!"
@@ -393,8 +393,8 @@ elif [ -n "`command -v srun 2>/dev/null`" ]
 then
   #mpirun is checked before srun to support the Bridges supercomputer at PSC
   #as srun has a known issue and fails to successfully launch the parallel job
-  [[ $QUIET -eq 0 ]] && echo srun -n $nodes -c $(( $ppn + 1 )) $args
-  srun -n $nodes -c $(( $ppn + 1 )) $args
+  [[ $QUIET -eq 0 ]] && echo srun -n $nodes -c $(( ppn + 1 )) $args
+  srun -n $nodes -c $(( ppn + 1 )) $args
 else
   echo "No job launcher found! (tried aprun, mpirun and srun)\n"
   exit 1
