@@ -58,6 +58,24 @@ if(CMK_CAN_LINK_FORTRAN)
         VERBATIM
     )
 
+    add_library(ampi_funcptr_shim_fortran_impl ampifimpl.f90)
+    target_compile_options(ampi_funcptr_shim_fortran_impl PRIVATE -language ampi -fPIE -shared)
+    add_dependencies(ampi_funcptr_shim_fortran_impl moduleampi moduleampif)
+    add_custom_command(TARGET ampi_funcptr_shim_fortran_impl
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_funcptr_shim_fortran_impl.dir/ampifimpl.f90.o ${CMAKE_BINARY_DIR}/lib/ampi_funcptr_shim_fortran_impl.o
+        VERBATIM
+    )
+
+    add_library(ampi_funcptr_shim_fortran_mod ampimod.f90)
+    target_compile_options(ampi_funcptr_shim_fortran_mod PRIVATE -language ampi -fPIE -shared)
+    add_dependencies(ampi_funcptr_shim_fortran_mod moduleampi moduleampif)
+    add_custom_command(TARGET ampi_funcptr_shim_fortran_mod
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_funcptr_shim_fortran_mod.dir/ampimod.f90.o ${CMAKE_BINARY_DIR}/lib/ampi_funcptr_shim_fortran_mod.o
+        VERBATIM
+    )
+
     add_library(ampi_funcptr_shim_fmpimain ampi_funcptr_shim_fmpimain.C)
     target_compile_options(ampi_funcptr_shim_fmpimain PRIVATE -language ampi -fPIE)
     add_dependencies(ampi_funcptr_shim_fmpimain moduleampi moduleampif)
