@@ -160,14 +160,15 @@ ARGS+=" -language $AMPICC_MODE"
 if [ -n "$GLOBALS" ]
 then
   USER_SUFFIX="$CMK_USER_SUFFIX.$CMK_SHARED_SUF"
+  SHIM_OPTS='-seq'
   if [ -n "$GLOBALS_SHARED" ]
   then
     SHARED_OPTS='-shared'
-    [ "$CMK_MACOSX" != '1' ] && SHIM_OPTS='-fPIE' || SHIM_OPTS=''
+    [[ "$CMK_MACOSX" != '1' ]] && SHIM_OPTS+=' -fPIE'
     SHIM_MAIN_OBJS=''
   else
     SHARED_OPTS=''
-    SHIM_OPTS='-fPIE'
+    SHIM_OPTS+=' -fPIE'
     SHIM_MAIN_OBJS="\"$CHARMLIB/ampi_funcptr_shim_main.o\""
   fi
 
