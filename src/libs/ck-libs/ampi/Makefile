@@ -26,6 +26,8 @@ AMPIMOD_OBJ=$(AMPI_LIBDIR)/ampimod.o
 FUNCPTR_SHIM_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_shim.o
 FUNCPTR_SHIM_MAIN_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_shim_main.o
 FUNCPTR_SHIM_FORTRAN_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_shim_fortran.o
+FUNCPTR_SHIM_FORTRAN_IMPL_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_shim_fortran_impl.o
+FUNCPTR_SHIM_FORTRAN_MOD_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_shim_fortran_mod.o
 FUNCPTR_SHIM_FORTRAN_ROMIO_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_shim_fortran_romio.o
 FUNCPTR_SHIM_FMPIMAIN_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_shim_fmpimain.o
 FUNCPTR_LOADER_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_loader.o
@@ -44,6 +46,8 @@ AMPI_TARGET = \
 AMPIF_TARGET = \
   $(DESTF) \
   $(FUNCPTR_SHIM_FORTRAN_OBJ) \
+  $(FUNCPTR_SHIM_FORTRAN_IMPL_OBJ) \
+  $(FUNCPTR_SHIM_FORTRAN_MOD_OBJ) \
   $(FUNCPTR_SHIM_FMPIMAIN_OBJ) \
 
 ifeq (1,$(CMK_SUPPORTS_PIPGLOBALS))
@@ -245,6 +249,12 @@ $(FUNCPTR_SHIM_FMPIMAIN_OBJ): ampi_funcptr_shim_fmpimain.C | $(ROMIO)
 
 $(FUNCPTR_SHIM_FORTRAN_OBJ): ampif.C $(HEADDEP) headers | $(ROMIO)
 	$(CHARMC) -language ampi -DAMPI_USE_FUNCPTR -fPIE -shared -c $< -o $@
+
+$(FUNCPTR_SHIM_FORTRAN_IMPL_OBJ): ampifimpl.f90 $(HEADDEP) headers | $(ROMIO)
+	$(CHARMC) -language ampi -fPIE -shared -c $< -o $@
+
+$(FUNCPTR_SHIM_FORTRAN_MOD_OBJ): ampimod.f90 $(HEADDEP) headers | $(ROMIO)
+	$(CHARMC) -language ampi -fPIE -shared -c $< -o $@
 
 $(FUNCPTR_LOADER_OBJ): ampi_funcptr_loader.C $(HEADDEP) headers | $(ROMIO)
 	$(CHARMC) -language ampi -DAMPI_NO_UNIMPLEMENTED_WARNINGS -c $< -o $@
