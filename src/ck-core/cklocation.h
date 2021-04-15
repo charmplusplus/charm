@@ -317,7 +317,7 @@ private:
   // information for specific entities being managed. ie: for arrays it could store
   // indices as well. Could also store homePe if useful? Then one lookup would get you
   // everything you need, rather than looking up in a bunch of tables.
-  // TODO: Is in the right type for pe and epoch?
+  // TODO: Is int the right type for pe and epoch?
 
   // Map of ID to PE
   using LocationMap = std::unordered_map<CmiUInt8, CkLocEntry>;
