@@ -149,8 +149,8 @@ void TraceAutoPerf::creationDone(int num) { }
 
 void TraceAutoPerf::messageRecv(void *env, int size) {
   if(isTraceOn){
-    currentSummary->data[AVG_NumMsgRecv]++;
-    currentSummary->data[AVG_BytesMsgRecv] += size;
+    currentSummary->data[AVG_NumMsgRecvPerPE]++;
+    currentSummary->data[AVG_BytesMsgRecvPerPE] += size;
   }
 }
 
@@ -334,16 +334,18 @@ void TraceAutoPerf::summarizeObjectInfo(double &maxtime, double &totaltime,
 
 PerfData* TraceAutoPerf::getSummary() {
   if(isTraceOn){
-  currentSummary->data[AVG_TotalTime] = CkWallTimer()-startTimer;
-  currentSummary->data[AVG_IdlePercentage] = currentSummary->data[MIN_IdlePercentage]= currentSummary->data[MAX_IdlePercentage]= (idleTime())/currentSummary->data[AVG_TotalTime]; 
+  currentSummary->data[AVG_TotalTime] = totalTraceTime();
+  currentSummary->data[AVG_IdlePercentage] = idleRatio();
+  currentSummary->data[AVG_UtilizationPercentage] = utilRatio();
+  currentSummary->data[AVG_OverheadPercentage] = overheadRatio();
+
+  currentSummary->data[MIN_IdlePercentage]= currentSummary->data[MAX_IdlePercentage]= (idleTime())/currentSummary->data[AVG_TotalTime];
   currentSummary->data[MAX_LoadPerPE] = currentSummary->data[AVG_TotalTime] - idleTime();
-  currentSummary->data[MIN_UtilizationPercentage] = currentSummary->data[MAX_UtilizationPercentage] = (utilTime())/currentSummary->data[AVG_TotalTime]; 
-  currentSummary->data[AVG_UtilizationPercentage] = utilTime()/currentSummary->data[AVG_TotalTime];
+  currentSummary->data[MIN_UtilizationPercentage] = currentSummary->data[MAX_UtilizationPercentage] = (utilTime())/currentSummary->data[AVG_TotalTime];
   currentSummary->data[MIN_AppPercentage] = currentSummary->data[MAX_AppPercentage] = appTime();
   currentSummary->data[AVG_AppPercentage] = appTime();
-  currentSummary->data[AVG_TuningOverhead] = tuneOverheadTotalTime; 
-  currentSummary->data[MIN_OverheadPercentage] = currentSummary->data[MAX_OverheadPercentage] = overheadTime(); 
-  currentSummary->data[AVG_OverheadPercentage] = overheadTime()/currentSummary->data[AVG_TotalTime];
+  currentSummary->data[AVG_TuningOverhead] = tuneOverheadTotalTime;
+  currentSummary->data[MIN_OverheadPercentage] = currentSummary->data[MAX_OverheadPercentage] = overheadTime();
   currentSummary->data[AVG_EntryMethodDuration]= (double)totalEntryMethodTime;
   currentSummary->data[AVG_EntryMethodDuration_1]= (double)totalEntryMethodTime_1;
   currentSummary->data[AVG_EntryMethodDuration_2]= (double)totalEntryMethodTime_2;
@@ -363,8 +365,8 @@ PerfData* TraceAutoPerf::getSummary() {
   if((papiValues)[1]-previous_papiValues[1] > 0)
     currentSummary->data[AVG_CacheMissRate] = ((papiValues)[0]-previous_papiValues[0]) / ((papiValues)[1]-previous_papiValues[1]);
 #endif
-  currentSummary->data[MAX_NumMsgRecv] = currentSummary->data[MIN_NumMsgRecv] = currentSummary->data[AVG_NumMsgRecv];
-  currentSummary->data[MAX_BytesMsgRecv] = currentSummary->data[MIN_BytesMsgRecv] = currentSummary->data[AVG_BytesMsgRecv];
+  currentSummary->data[MAX_NumMsgRecv] = currentSummary->data[MIN_NumMsgRecv] = currentSummary->data[AVG_NumMsgRecvPerPE];
+  currentSummary->data[MAX_BytesMsgRecv] = currentSummary->data[MIN_BytesMsgRecv] = currentSummary->data[AVG_BytesMsgRecvPerPE];
   currentSummary->data[MinIdlePE] = CkMyPe();
   currentSummary->data[MAX_IdlePE] = CkMyPe();
   currentSummary->data[MAX_OverheadPE] = CkMyPe();
