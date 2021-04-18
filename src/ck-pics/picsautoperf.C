@@ -356,7 +356,7 @@ void TraceAutoPerfBOC::setCbAndRun(bool fromGlobal, int fromPE, CkCallback cb) {
 void TraceAutoPerfBOC::formatPerfData(PerfData *perfdata, int subStep, int phaseID) {
   double *data = perfdata->data;
   int numpes = numPesInGroup;
-  double totaltime = data[AVG_TotalTime]/numpes;
+  double totaltime = data[AVG_TotalTime];
   int steps = currentAppStep-lastAnalyzeStep;
 
   //derive metrics from raw performance data
