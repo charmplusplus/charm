@@ -2166,13 +2166,21 @@ class AmpiCommStructMap {
   }
   const ampiCommStruct& operator[](MPI_Comm comm) const noexcept {
     const auto search = comms.find(comm);
-    CkAssert(search != comms.end());
+#if CMK_ERROR_CHECKING
+    if (search == comms.end()) {
+      CkAbort("AMPI: invalid MPI_Comm %d used!", comm);
+    }
+#endif
     return search->second;
   }
   ampiCommStruct& operator[](MPI_Comm comm) noexcept { return comms[comm]; }
   AmpiCommType getType(MPI_Comm comm) const noexcept {
     const auto search = comms.find(comm);
-    CkAssert(search != comms.end());
+#if CMK_ERROR_CHECKING
+    if (search == comms.end()) {
+      CkAbort("AMPI: invalid MPI_Comm %d used!", comm);
+    }
+#endif
     return search->second.getType();
   }
 };
