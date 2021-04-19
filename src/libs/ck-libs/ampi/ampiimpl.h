@@ -2132,7 +2132,7 @@ class AmpiCommStructMap {
       return;
     const auto search = comms.find(comm);
     if (search == comms.end()) {
-      CkAbort("AMPI: invalid MPI_Comm used!");
+      CkAbort("AMPI: invalid MPI_Comm %d used!", comm);
     }
   }
   MPI_Comm getNextComm() const noexcept { return nextComm; }
@@ -2154,7 +2154,11 @@ class AmpiCommStructMap {
   }
   const ampiCommStruct& getCommStruct(MPI_Comm comm) const noexcept {
     const auto search = comms.find(comm);
-    CkAssert(search != comms.end());
+#if CMK_ERROR_CHECKING
+    if (search == comms.end()) {
+      CkAbort("AMPI: invalid MPI_Comm %d used!", comm);
+    }
+#endif
     return search->second;
   }
   ampiCommStruct& getCommStruct(MPI_Comm comm) noexcept {

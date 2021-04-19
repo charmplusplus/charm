@@ -2480,17 +2480,13 @@ void ampi::intercommMergePhase1(MPI_Comm nextIntraComm) noexcept {
 
 void ampi::topoDup(int topoType, int rank, MPI_Comm comm, MPI_Comm *newComm) noexcept
 {
-  if (parent->isInter(comm)) {
-    split(0, rank, newComm, INTER);
-  } else {
-    split(0, rank, newComm, parent->getCommStruct(comm).getType());
+  split(0, rank, newComm, parent->getCommStruct(comm).getType());
 
-    ampiParent * disParent = getAmpiParent();
-    if (topoType != MPI_UNDEFINED) {
-      ampiTopology *topo = disParent->getCommStruct(comm).getTopology();
-      ampiTopology *newTopo = disParent->getCommStruct(*newComm).getTopology();
-      newTopo->dup(topo);
-    }
+  if (topoType != MPI_UNDEFINED) {
+    ampiParent *disParent = getAmpiParent();
+    ampiTopology *topo = disParent->getCommStruct(comm).getTopology();
+    ampiTopology *newTopo = disParent->getCommStruct(*newComm).getTopology();
+    newTopo->dup(topo);
   }
 }
 
