@@ -728,12 +728,12 @@ if(${NETWORK} STREQUAL "ucx" OR ${NETWORK} STREQUAL "ofi")
   src/arch/util/proc_management/simple_pmi/simple_pmiutil.h
   )
 
-  # FIXME: this shoud be in include/proc_management/
+  # FIXME: this should be in include/proc_management/
   foreach(filename ${proc_management-sources})
       configure_file(${filename} include/ COPYONLY)
   endforeach()
 
-  # FIXME: this shoud be in include/proc_management/simple_pmi
+  # FIXME: this should be in include/proc_management/simple_pmi
   foreach(filename ${proc_management-simple_pmi-sources})
       configure_file(${filename} include/ COPYONLY)
   endforeach()

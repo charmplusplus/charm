@@ -1174,10 +1174,13 @@ static ampi *ampiInit(char **argv) noexcept
     opts.setSectionAutoDelegate(false);
     opts.setStaticInsertion(true);
     opts.setAnytimeMigration(false);
-    CkArrayCreatedMsg *m;
-    CProxy_ampiParent::ckNew(threads, _nchunks, opts, CkCallbackResumeThread((void*&)m));
-    parent = CProxy_ampiParent(m->aid);
-    delete m;
+
+    ck::future<CkArrayID> newAmpiFuture;
+    CkCallback cb(newAmpiFuture.handle());
+    CProxy_ampiParent::ckNew(threads, _nchunks, opts, cb);
+    parent = newAmpiFuture.get();
+    newAmpiFuture.release();
+
     STARTUP_DEBUG("ampiInit> array size "<<_nchunks);
   }
   int *barrier = (int *)TCharm::get()->semaGet(AMPI_BARRIER_SEMAID);
@@ -1188,13 +1191,13 @@ static ampi *ampiInit(char **argv) noexcept
   {
     //Make a new ampi array
     CkArrayID empty;
-
     ampiCommStruct worldComm(MPI_COMM_WORLD, empty, _nchunks);
-    CProxy_ampi arr;
-    CkArrayCreatedMsg *m;
-    CProxy_ampi::ckNew(parent, worldComm, opts, CkCallbackResumeThread((void*&)m));
-    arr = CProxy_ampi(m->aid);
-    delete m;
+
+    ck::future<CkArrayID> newAmpiFuture;
+    CkCallback cb(newAmpiFuture.handle());
+    CProxy_ampi::ckNew(parent, worldComm, opts, cb);
+    /* CProxy_ampi arr = */ newAmpiFuture.get();
+    newAmpiFuture.release();
 
     STARTUP_DEBUG("ampiInit> arrays created")
   }
@@ -5609,7 +5612,7 @@ AMPI_API_IMPL(int, MPI_Op_create, MPI_User_function *function, int commute, MPI_
 
 AMPI_API_IMPL(int, MPI_Op_free, MPI_Op *op)
 {
-  AMPI_API("AMPI_Op_free", op);
+  AMPI_API("AMPI_Op_free", op, *op);
   getAmpiParent()->freeOp(*op);
   *op = MPI_OP_NULL;
   return MPI_SUCCESS;
@@ -6435,7 +6438,7 @@ AMPI_API_IMPL(int, MPI_Testsome, int incount, MPI_Request *array_of_requests, in
 
 AMPI_API_IMPL(int, MPI_Request_free, MPI_Request *request)
 {
-  AMPI_API("AMPI_Request_free", request);
+  AMPI_API("AMPI_Request_free", request, *request);
   if(*request==MPI_REQUEST_NULL) return MPI_SUCCESS;
   checkRequest(*request);
   ampiParent* pptr = getAmpiParent();
@@ -6776,7 +6779,7 @@ AMPI_API_IMPL(int, MPI_Type_commit, MPI_Datatype *datatype)
 
 AMPI_API_IMPL(int, MPI_Type_free, MPI_Datatype *datatype)
 {
-  AMPI_API("AMPI_Type_free", datatype);
+  AMPI_API("AMPI_Type_free", datatype, *datatype);
 
   int ret;
 
@@ -7055,7 +7058,7 @@ AMPI_API_IMPL(int, MPI_Type_create_keyval, MPI_Type_copy_attr_function *copy_fn,
 
 AMPI_API_IMPL(int, MPI_Type_free_keyval, int *keyval)
 {
-  AMPI_API("AMPI_Type_free_keyval", keyval);
+  AMPI_API("AMPI_Type_free_keyval", keyval, *keyval);
   return MPI_Comm_free_keyval(keyval);
 }
 
@@ -9571,7 +9574,7 @@ AMPI_API_IMPL(int, MPI_Comm_split_type, MPI_Comm src, int split_type, int key,
 
 AMPI_API_IMPL(int, MPI_Comm_free, MPI_Comm *comm)
 {
-  AMPI_API("AMPI_Comm_free", comm);
+  AMPI_API("AMPI_Comm_free", comm, *comm);
   int ret = MPI_SUCCESS;
   if (*comm != MPI_COMM_NULL) {
     if (*comm != MPI_COMM_WORLD && *comm != MPI_COMM_SELF) {
@@ -10233,7 +10236,7 @@ AMPI_API_IMPL(int, MPI_Group_range_excl, MPI_Group group, int n, int ranges[][3]
 
 AMPI_API_IMPL(int, MPI_Group_free, MPI_Group *group)
 {
-  AMPI_API("AMPI_Group_free", group);
+  AMPI_API("AMPI_Group_free", group, *group);
   return MPI_SUCCESS;
 }
 
@@ -10379,7 +10382,7 @@ AMPI_API_IMPL(int, MPI_Comm_create_keyval, MPI_Comm_copy_attr_function *copy_fn,
 
 AMPI_API_IMPL(int, MPI_Comm_free_keyval, int *keyval)
 {
-  AMPI_API("AMPI_Comm_free_keyval", keyval);
+  AMPI_API("AMPI_Comm_free_keyval", keyval, *keyval);
   int ret = getAmpiParent()->freeKeyval(*keyval);
   *keyval = MPI_KEYVAL_INVALID;
   return ampiErrhandler("AMPI_Comm_free_keyval", ret);
@@ -10418,7 +10421,7 @@ AMPI_API_IMPL(int, MPI_Keyval_create, MPI_Copy_function *copy_fn, MPI_Delete_fun
 
 AMPI_API_IMPL(int, MPI_Keyval_free, int *keyval)
 {
-  AMPI_API("AMPI_Keyval_free", keyval);
+  AMPI_API("AMPI_Keyval_free", keyval, *keyval);
   return MPI_Comm_free_keyval(keyval);
 }
 

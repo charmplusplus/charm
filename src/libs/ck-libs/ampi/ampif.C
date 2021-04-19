@@ -1,6 +1,7 @@
 #include "ampi.h"
 
 #include <string.h>
+#include <stdio.h>
 #include <vector>
 
 FLINKAGE {
@@ -2326,5 +2327,9 @@ void ampi_get_command_argument(int *c, char *str, int *len, int *ierr) noexcept
   }
 }
 
-} // extern "C"
+} // FLINKAGE
 
+CLINKAGE void romio_fortran_error_print(const char * str)
+{
+  fputs(str, stderr);
+}
