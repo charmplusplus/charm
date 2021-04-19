@@ -2392,7 +2392,7 @@ MPI_Comm ampi::cartCreate0D() noexcept {
   if (getRank() == 0) {
     tmpVec.clear();
     tmpVec.push_back(0);
-    commCreatePhase1(parent->getNextComm(), CART);
+    commCreatePhase1(parent->getNextComm(), COMM_CART);
     MPI_Comm newComm = parent->getNextComm()-1;
     ampiCommStruct &newCommStruct = parent->getCommStruct(newComm);
     ampiTopology *newTopo = newCommStruct.getTopology();
@@ -2418,7 +2418,7 @@ MPI_Comm ampi::cartCreate(std::vector<int>& vec, int ndims, const int* dims) noe
     vec.pop_back();
   }
 
-  return commCreate(vec, CART);
+  return commCreate(vec, COMM_CART);
 }
 
 MPI_Comm ampi::intercommCreate(const std::vector<int>& remoteVec, const int root, MPI_Comm tcomm) noexcept {
@@ -2475,7 +2475,7 @@ void ampi::intercommMergePhase1(MPI_Comm nextIntraComm) noexcept {
 
   setNumCommCreationsInProgress(1);
   CProxy_ampi newAmpi = createNewChildAmpiSync();
-  insertNewChildAmpiElements(nextIntraComm, newAmpi, INTRA);
+  insertNewChildAmpiElements(nextIntraComm, newAmpi, COMM_INTRA);
 }
 
 void ampi::topoDup(int topoType, int rank, MPI_Comm comm, MPI_Comm *newComm) noexcept
@@ -10239,7 +10239,7 @@ AMPI_API_IMPL(int, MPI_Comm_create, MPI_Comm comm, MPI_Group group, MPI_Comm* ne
 
   if(getAmpiParent()->isInter(comm)){
     /* inter-communicator: create a single new comm. */
-    *newcomm = getAmpiInstance(comm)->commCreate(vec, INTER);
+    *newcomm = getAmpiInstance(comm)->commCreate(vec, COMM_INTER);
     ampi * unused = getAmpiInstance(comm)->barrier();
   }
   else{
@@ -10518,7 +10518,7 @@ AMPI_API_IMPL(int, MPI_Graph_create, MPI_Comm comm_old, int nnodes, const int *i
 
   ampiParent *ptr = getAmpiParent();
   std::vector<int> vec = ptr->group2vec(ptr->comm2group(comm_old));
-  *comm_graph = getAmpiInstance(comm_old)->commCreate(vec, GRAPH);
+  *comm_graph = getAmpiInstance(comm_old)->commCreate(vec, COMM_GRAPH);
   ampiTopology &topo = *getAmpiParent()->getCommStruct(*comm_graph).getTopology();
 
   std::vector<int> index_(index, index+nnodes), edges_, nborsv;
@@ -10560,7 +10560,7 @@ AMPI_API_IMPL(int, MPI_Dist_graph_create_adjacent, MPI_Comm comm_old, int indegr
 
   ampiParent *ptr = getAmpiParent();
   std::vector<int> vec = ptr->group2vec(ptr->comm2group(comm_old));
-  *comm_dist_graph = getAmpiInstance(comm_old)->commCreate(vec, DIST_GRAPH);
+  *comm_dist_graph = getAmpiInstance(comm_old)->commCreate(vec, COMM_DIST_GRAPH);
   ampiCommStruct &c = getAmpiParent()->getCommStruct(*comm_dist_graph);
   ampiTopology *topo = c.getTopology();
 
@@ -10614,7 +10614,7 @@ AMPI_API_IMPL(int, MPI_Dist_graph_create, MPI_Comm comm_old, int n, const int so
 
   ampiParent *ptr = getAmpiParent();
   std::vector<int> vec = ptr->group2vec(ptr->comm2group(comm_old));
-  *comm_dist_graph = getAmpiInstance(comm_old)->commCreate(vec, DIST_GRAPH);
+  *comm_dist_graph = getAmpiInstance(comm_old)->commCreate(vec, COMM_DIST_GRAPH);
   ampiCommStruct &c = getAmpiParent()->getCommStruct(*comm_dist_graph);
   ampiTopology *topo = c.getTopology();
 
@@ -11237,7 +11237,7 @@ AMPI_API_IMPL(int, MPI_Cart_sub, MPI_Comm comm, const int *remain_dims, MPI_Comm
     return MPI_SUCCESS;
   }
 
-  getAmpiInstance(comm)->split(color, key, newcomm, CART);
+  getAmpiInstance(comm)->split(color, key, newcomm, COMM_CART);
 
   ampiCommStruct &newc = getAmpiParent()->getCommStruct(*newcomm);
   ampiTopology *newtopo = newc.getTopology();

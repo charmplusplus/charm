@@ -782,14 +782,14 @@ class groupStruct {
 };
 
 enum AmpiCommType : uint8_t {
-   WORLD      = 0
-  ,INTRA      = 1
-  ,INTER      = 2
-  ,SPLIT      = 3
-  ,GROUP      = 4
-  ,CART       = 5
-  ,GRAPH      = 6
-  ,DIST_GRAPH = 7
+   COMM_WORLD      = 0
+  ,COMM_INTRA      = 1
+  ,COMM_INTER      = 2
+  ,COMM_SPLIT      = 3
+  ,COMM_GROUP      = 4
+  ,COMM_CART       = 5
+  ,COMM_GRAPH      = 6
+  ,COMM_DIST_GRAPH = 7
 };
 
 //Describes an AMPI communicator
@@ -814,10 +814,10 @@ class ampiCommStruct {
 
  public:
   ampiCommStruct(int ignored=0) noexcept
-    : size(-1), commType(INTRA), ampiTopo(NULL), topoType(MPI_UNDEFINED)
+    : size(-1), commType(COMM_INTRA), ampiTopo(NULL), topoType(MPI_UNDEFINED)
   {}
   ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,int size_) noexcept
-    : comm(comm_), ampiID(id_),size(size_), commType(WORLD), indices(size_),
+    : comm(comm_), ampiID(id_),size(size_), commType(COMM_WORLD), indices(size_),
       ampiTopo(NULL), topoType(MPI_UNDEFINED)
   {}
   ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_, const std::vector<int> &indices_, AmpiCommType type_) noexcept
@@ -825,15 +825,15 @@ class ampiCommStruct {
       ampiTopo(NULL), topoType(MPI_UNDEFINED)
   {
     switch (commType) {
-      case CART:
+      case COMM_CART:
         topoType = MPI_CART;
         ampiTopo = new ampiCartTopology();
         break;
-      case GRAPH:
+      case COMM_GRAPH:
         topoType = MPI_GRAPH;
         ampiTopo = new ampiGraphTopology();
         break;
-      case DIST_GRAPH:
+      case COMM_DIST_GRAPH:
         topoType = MPI_DIST_GRAPH;
         ampiTopo = new ampiDistGraphTopology();
         break;
@@ -845,7 +845,7 @@ class ampiCommStruct {
   }
   ampiCommStruct(MPI_Comm comm_, const CkArrayID &id_, const std::vector<int> &indices_,
                  const std::vector<int> &remoteIndices_) noexcept
-    : comm(comm_), ampiID(id_), size(indices_.size()), commType(INTER), indices(indices_),
+    : comm(comm_), ampiID(id_), size(indices_.size()), commType(COMM_INTER), indices(indices_),
       remoteIndices(remoteIndices_), ampiTopo(NULL), topoType(MPI_UNDEFINED)
   {}
 
@@ -915,7 +915,7 @@ class ampiCommStruct {
   const ampiTopology* getTopology() const noexcept { return ampiTopo; }
   ampiTopology* getTopology() noexcept { return ampiTopo; }
 
-  inline bool isinter() const noexcept {return commType==INTER;}
+  inline bool isinter() const noexcept {return commType==COMM_INTER;}
   inline AmpiCommType getType() const noexcept {return commType;}
   void setArrayID(const CkArrayID &nID) noexcept {ampiID=nID;}
 
@@ -2299,13 +2299,13 @@ class ampiParent final : public CBase_ampiParent {
   //Grab the next available split/group communicator
   MPI_Comm getNextComm() const noexcept {return comms.getNextComm();}
 
-  bool isSplit(MPI_Comm comm) const noexcept { return (comms.getType(comm) == SPLIT); }
-  bool isCart(MPI_Comm comm) const noexcept { return (comms.getType(comm) == CART); }
-  bool isGraph(MPI_Comm comm) const noexcept { return (comms.getType(comm) == GRAPH); }
-  bool isDistGraph(MPI_Comm comm) const noexcept { return (comms.getType(comm) == DIST_GRAPH); }
-  bool isInter(MPI_Comm comm) const noexcept { return (comms.getType(comm) == INTER); }
-  bool isIntra(MPI_Comm comm) const noexcept { return (comms.getType(comm) == INTRA); }
-  bool isGroup(MPI_Comm comm) const noexcept { return (comms.getType(comm) == GROUP); }
+  bool isSplit(MPI_Comm comm) const noexcept { return (comms.getType(comm) == COMM_SPLIT); }
+  bool isCart(MPI_Comm comm) const noexcept { return (comms.getType(comm) == COMM_CART); }
+  bool isGraph(MPI_Comm comm) const noexcept { return (comms.getType(comm) == COMM_GRAPH); }
+  bool isDistGraph(MPI_Comm comm) const noexcept { return (comms.getType(comm) == COMM_DIST_GRAPH); }
+  bool isInter(MPI_Comm comm) const noexcept { return (comms.getType(comm) == COMM_INTER); }
+  bool isIntra(MPI_Comm comm) const noexcept { return (comms.getType(comm) == COMM_INTRA); }
+  bool isGroup(MPI_Comm comm) const noexcept { return (comms.getType(comm) == COMM_GROUP); }
   bool isInGroups(MPI_Group group) const noexcept { return (group>=0 && group<groups.size()); }
 
   void pup(PUP::er &p) noexcept;
