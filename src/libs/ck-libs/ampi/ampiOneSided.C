@@ -226,7 +226,7 @@ int ampi::winPut(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank
 #if AMPI_RDMA_IMPL
     else if (orgtotalsize >= AMPI_RDMA_THRESHOLD) {
       AmpiRequestList& reqs = getReqs();
-      SendReq* ampiReq = parent->reqPool.newReq<SendReq>(orgtype, myComm.getComm(), getDDT());
+      SendReq* ampiReq = parent->reqPool.newReq<SendReq>(orgtype, myComm->getComm(), getDDT());
       MPI_Request req = reqs.insert(ampiReq);
       CkCallback completedSendCB(CkIndex_ampi::completedRdmaSend(NULL), thisProxy[thisIndex], true/*inline*/);
       completedSendCB.setRefnum(req);
@@ -411,7 +411,7 @@ int ampi::winAccumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, i
 #if AMPI_RDMA_IMPL
     else if (ddt->isContig() && orgtotalsize >= AMPI_RDMA_THRESHOLD) {
       AmpiRequestList& reqs = getReqs();
-      SendReq* ampiReq = parent->reqPool.newReq<SendReq>(orgtype, myComm.getComm(), getDDT());
+      SendReq* ampiReq = parent->reqPool.newReq<SendReq>(orgtype, myComm->getComm(), getDDT());
       MPI_Request req = reqs.insert(ampiReq);
       CkCallback completedSendCB(CkIndex_ampi::completedRdmaSend(NULL), thisProxy[thisIndex], true/*inline*/);
       completedSendCB.setRefnum(req);
@@ -474,7 +474,7 @@ int ampi::winGetAccumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype
 #if AMPI_RDMA_IMPL
     else if (orgtotalsize >= AMPI_RDMA_THRESHOLD) {
       AmpiRequestList& reqs = getReqs();
-      SendReq* ampiReq = parent->reqPool.newReq<SendReq>(orgtype, myComm.getComm(), getDDT());
+      SendReq* ampiReq = parent->reqPool.newReq<SendReq>(orgtype, myComm->getComm(), getDDT());
       MPI_Request req = reqs.insert(ampiReq);
       CkCallback completedSendCB(CkIndex_ampi::completedRdmaSend(NULL), thisProxy[thisIndex], true/*inline*/);
       completedSendCB.setRefnum(req);
@@ -663,11 +663,11 @@ void ampi::winRemoteUnlock(int winIndex, int requestRank) noexcept {
 }
 
 MPI_Win ampi::createWinInstance(void *base, MPI_Aint size, int disp_unit, MPI_Info info) noexcept {
-  AMPI_DEBUG("     Creating win obj {%d, %p}\n ", myComm.getComm(), base);
-  win_obj *newobj = new win_obj((char*)(NULL), base, size, disp_unit, myComm.getComm());
+  AMPI_DEBUG("     Creating win obj {%d, %p}\n ", myComm->getComm(), base);
+  win_obj *newobj = new win_obj((char*)(NULL), base, size, disp_unit, myComm->getComm());
   winObjects.push_back(newobj);
-  WinStruct *newwin = new WinStruct(myComm.getComm(),winObjects.size()-1);
-  AMPI_DEBUG("     Creating MPI_WIN at (%p) with {%d, %ld}\n", &newwin, myComm.getComm(), winObjects.size()-1);
+  WinStruct *newwin = new WinStruct(myComm->getComm(),winObjects.size()-1);
+  AMPI_DEBUG("     Creating MPI_WIN at (%p) with {%d, %ld}\n", &newwin, myComm->getComm(), winObjects.size()-1);
   return (parent->addWinStruct(newwin));
 }
 
