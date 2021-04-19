@@ -9527,21 +9527,7 @@ AMPI_API_IMPL(int, MPI_Comm_split, MPI_Comm src, int color, int key, MPI_Comm *d
   {
     ampiParent *pptr = getAmpiParent();
     ampi *ptr = pptr->comm2ampi(src);
-    if (pptr->isInter(src)) {
-      ptr->split(color, key, dest, INTER);
-    }
-    else if (pptr->isCart(src)) {
-      ptr->split(color, key, dest, CART);
-    }
-    else if (pptr->isGraph(src)) {
-      ptr->split(color, key, dest, GRAPH);
-    }
-    else if (getAmpiParent()->isDistGraph(src)) {
-      ptr->split(color, key, dest, DIST_GRAPH);
-    }
-    else {
-      ptr->split(color, key, dest, INTRA);
-    }
+    ptr->split(color, key, dest, ptr->getCommStruct().getType());
   }
   if (color == MPI_UNDEFINED) *dest = MPI_COMM_NULL;
 
