@@ -1003,18 +1003,6 @@ static void ampiNodeInit() noexcept
       CkPrintf("AMPI> Pooled message size is %d bytes.\n", AMPI_POOLED_MSG_SIZE);
     }
   }
-  if ((value = getenv("AMPI_MSG_POOL_SIZE"))) {
-    AMPI_MSG_POOL_SIZE = atoi(value);
-    if (CkMyNode() == 0) {
-      CkPrintf("AMPI> Message pool size size is %d Bytes.\n", AMPI_MSG_POOL_SIZE);
-    }
-  }
-  if ((value = getenv("AMPI_POOLED_MSG_SIZE"))) {
-    AMPI_POOLED_MSG_SIZE = atoi(value);
-    if (CkMyNode() == 0) {
-      CkPrintf("AMPI> Pooled message size is %d Bytes.\n", AMPI_POOLED_MSG_SIZE);
-    }
-  }
 
   AmpiReducer = CkReduction::addReducer(AmpiReducerFunc, true /*streamable*/, "AmpiReducerFunc");
 
