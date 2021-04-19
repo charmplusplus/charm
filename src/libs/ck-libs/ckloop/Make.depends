@@ -46,7 +46,7 @@ CkLoop.o: CkLoop.C CkLoop.h ../../../../tmp/converse.h \
  ../../../../tmp/ckfutures.h ../../../../tmp/CkFutures.decl.h \
  ../../../../tmp/waitqd.h ../../../../tmp/waitqd.decl.h \
  ../../../../tmp/ckcheckpoint.h ../../../../tmp/ckcallback.h \
- ../../../../tmp/CkCheckpointStatus.decl.h ../../../../tmp/ckevacuation.h \
+ ../../../../tmp/CkCheckpointStatus.decl.h \
  ../../../../tmp/trace.h \
  ../../../../tmp/pathHistory.h ../../../../tmp/PathHistory.decl.h \
  ../../../../tmp/ckcallback-ccs.h ../../../../tmp/CkCallback.decl.h \

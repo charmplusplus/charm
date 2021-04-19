@@ -80,20 +80,6 @@ public:
 #else
   void AsyncMigrate(bool use){};
 #endif
-
-#if CMK_FAULT_EVAC
-private:
-	bool asyncEvacuate; //can the element be evacuated anytime, false for tcharm
-	bool bounced; //did this element try to immigrate into a processor which was evacuating
-											// and was bounced away to some other processor. This is assumed to happen
-											//only if this object was migrated by a load balancer, but the processor
-											// started crashing soon after
-public:	
-	bool isAsyncEvacuate(){return asyncEvacuate;}
-	void AsyncEvacuate(bool set){asyncEvacuate = set;}
-	bool isBounced(){return bounced;}
-	void Bounced(bool set){bounced = set;}
-#endif
 };
 
 #endif // CK_LOC_REC_H

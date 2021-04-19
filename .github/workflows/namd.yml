@@ -8,13 +8,18 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - name: install-prerequisites
+      run: |
+        sudo apt-get update
+        sudo apt-get -y install sfftw-dev
+        # test build without Fortran support
+        sudo apt-get -y remove gfortran
     - name: build-charm++
-      run: ./build charm++ netlrts-linux-x86_64 -g -j4 --with-production
+      run: ./build LIBS netlrts-linux-x86_64 -g -j4 --with-production
     - name: build-namd
       run: |
-        sudo apt-get -y install sfftw-dev
         cd ..
-        git clone https://charm.cs.illinois.edu/gerrit/namd
+        git clone https://${{ secrets.NAMD_CI_USERNAME_TOKEN }}@gitlab.com/tcbgUIUC/namd.git
         cd namd
         ./config Linux-x86_64-g++ --charm-base ../charm --charm-arch netlrts-linux-x86_64 --without-tcl
         cd Linux-x86_64-g++

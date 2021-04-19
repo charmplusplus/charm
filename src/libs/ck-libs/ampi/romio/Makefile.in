@@ -105,63 +105,7 @@ host_triplet = @host@
 @BUILD_ROMIO_EMBEDDED_FALSE@am__append_3 = \
 @BUILD_ROMIO_EMBEDDED_FALSE@	mpi-io/glue/large_count.c
 
-@BUILD_F77_BINDINGS_TRUE@am__append_4 = \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/closef.c       \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/deletef.c      \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/fsyncf.c       \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/get_amodef.c   \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/get_atomf.c    \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/get_bytofff.c  \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/get_errhf.c    \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/get_extentf.c  \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/get_groupf.c   \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/get_infof.c    \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/get_posn_shf.c \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/get_posnf.c    \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/get_sizef.c    \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/get_viewf.c    \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/iotestf.c      \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/iowaitf.c      \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/iread_atf.c    \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/iread_shf.c    \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/ireadf.c       \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/iwrite_atf.c   \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/iwrite_shf.c   \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/iwritef.c      \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/openf.c        \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/preallocf.c    \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/rd_atallbf.c   \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/rd_atallef.c   \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/read_allbf.c   \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/read_allef.c   \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/read_allf.c    \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/read_atallf.c  \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/read_atf.c     \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/read_ordbf.c   \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/read_ordef.c   \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/read_ordf.c    \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/read_shf.c     \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/readf.c        \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/seek_shf.c     \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/seekf.c        \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/set_atomf.c    \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/set_errhf.c    \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/set_infof.c    \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/set_sizef.c    \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/set_viewf.c    \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/wr_atallbf.c   \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/wr_atallef.c   \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/write_allbf.c  \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/write_allef.c  \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/write_allf.c   \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/write_atallf.c \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/write_atf.c    \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/write_ordbf.c  \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/write_ordef.c  \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/write_ordf.c   \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/write_shf.c    \
-@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/writef.c
-
+@BUILD_F77_BINDINGS_TRUE@am__append_4 = mpi-io/fortran/romio_fortran.c
 
 # not used in MPICH, we use generalized requests instead
 @BUILD_MPIO_REQUEST_TRUE@am__append_5 = $(mpio_request_sources)
@@ -440,34 +384,7 @@ am__installdirs = "$(DESTDIR)$(libdir)" "$(DESTDIR)$(includedir)" \
 	"$(DESTDIR)$(includedir)"
 LTLIBRARIES = $(lib_LTLIBRARIES) $(noinst_LTLIBRARIES)
 libpromio_la_LIBADD =
-am__libpromio_la_SOURCES_DIST = mpi-io/fortran/closef.c \
-	mpi-io/fortran/deletef.c mpi-io/fortran/fsyncf.c \
-	mpi-io/fortran/get_amodef.c mpi-io/fortran/get_atomf.c \
-	mpi-io/fortran/get_bytofff.c mpi-io/fortran/get_errhf.c \
-	mpi-io/fortran/get_extentf.c mpi-io/fortran/get_groupf.c \
-	mpi-io/fortran/get_infof.c mpi-io/fortran/get_posn_shf.c \
-	mpi-io/fortran/get_posnf.c mpi-io/fortran/get_sizef.c \
-	mpi-io/fortran/get_viewf.c mpi-io/fortran/iotestf.c \
-	mpi-io/fortran/iowaitf.c mpi-io/fortran/iread_atf.c \
-	mpi-io/fortran/iread_shf.c mpi-io/fortran/ireadf.c \
-	mpi-io/fortran/iwrite_atf.c mpi-io/fortran/iwrite_shf.c \
-	mpi-io/fortran/iwritef.c mpi-io/fortran/openf.c \
-	mpi-io/fortran/preallocf.c mpi-io/fortran/rd_atallbf.c \
-	mpi-io/fortran/rd_atallef.c mpi-io/fortran/read_allbf.c \
-	mpi-io/fortran/read_allef.c mpi-io/fortran/read_allf.c \
-	mpi-io/fortran/read_atallf.c mpi-io/fortran/read_atf.c \
-	mpi-io/fortran/read_ordbf.c mpi-io/fortran/read_ordef.c \
-	mpi-io/fortran/read_ordf.c mpi-io/fortran/read_shf.c \
-	mpi-io/fortran/readf.c mpi-io/fortran/seek_shf.c \
-	mpi-io/fortran/seekf.c mpi-io/fortran/set_atomf.c \
-	mpi-io/fortran/set_errhf.c mpi-io/fortran/set_infof.c \
-	mpi-io/fortran/set_sizef.c mpi-io/fortran/set_viewf.c \
-	mpi-io/fortran/wr_atallbf.c mpi-io/fortran/wr_atallef.c \
-	mpi-io/fortran/write_allbf.c mpi-io/fortran/write_allef.c \
-	mpi-io/fortran/write_allf.c mpi-io/fortran/write_atallf.c \
-	mpi-io/fortran/write_atf.c mpi-io/fortran/write_ordbf.c \
-	mpi-io/fortran/write_ordef.c mpi-io/fortran/write_ordf.c \
-	mpi-io/fortran/write_shf.c mpi-io/fortran/writef.c \
+am__libpromio_la_SOURCES_DIST = mpi-io/fortran/romio_fortran.c \
 	mpi-io/close.c mpi-io/delete.c mpi-io/file_c2f.c \
 	mpi-io/file_f2c.c mpi-io/fsync.c mpi-io/get_amode.c \
 	mpi-io/get_atom.c mpi-io/get_bytoff.c mpi-io/get_errh.c \
@@ -490,61 +407,7 @@ am__libpromio_la_SOURCES_DIST = mpi-io/fortran/closef.c \
 	mpi-io/write_atall.c mpi-io/write_ord.c mpi-io/write_ordb.c \
 	mpi-io/write_orde.c mpi-io/write_sh.c
 am__dirstamp = $(am__leading_dot)dirstamp
-@BUILD_F77_BINDINGS_TRUE@am__objects_1 = mpi-io/fortran/libpromio_la-closef.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-deletef.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-fsyncf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-get_amodef.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-get_atomf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-get_bytofff.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-get_errhf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-get_extentf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-get_groupf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-get_infof.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-get_posn_shf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-get_posnf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-get_sizef.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-get_viewf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-iotestf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-iowaitf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-iread_atf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-iread_shf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-ireadf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-iwrite_atf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-iwrite_shf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-iwritef.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-openf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-preallocf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-rd_atallbf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-rd_atallef.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-read_allbf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-read_allef.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-read_allf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-read_atallf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-read_atf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-read_ordbf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-read_ordef.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-read_ordf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-read_shf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-readf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-seek_shf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-seekf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-set_atomf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-set_errhf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-set_infof.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-set_sizef.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-set_viewf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-wr_atallbf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-wr_atallef.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-write_allbf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-write_allef.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-write_allf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-write_atallf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-write_atf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-write_ordbf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-write_ordef.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-write_ordf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-write_shf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/libpromio_la-writef.lo
+@BUILD_F77_BINDINGS_TRUE@am__objects_1 = mpi-io/fortran/libpromio_la-romio_fortran.lo
 am__objects_2 = $(am__objects_1) mpi-io/libpromio_la-close.lo \
 	mpi-io/libpromio_la-delete.lo mpi-io/libpromio_la-file_c2f.lo \
 	mpi-io/libpromio_la-file_f2c.lo mpi-io/libpromio_la-fsync.lo \
@@ -608,34 +471,7 @@ am__v_lt_0 = --silent
 am__v_lt_1 = 
 @BUILD_PROFILING_LIB_TRUE@@BUILD_ROMIO_EMBEDDED_TRUE@am_libpromio_la_rpath =
 libromio_la_LIBADD =
-am__libromio_la_SOURCES_DIST = mpi-io/fortran/closef.c \
-	mpi-io/fortran/deletef.c mpi-io/fortran/fsyncf.c \
-	mpi-io/fortran/get_amodef.c mpi-io/fortran/get_atomf.c \
-	mpi-io/fortran/get_bytofff.c mpi-io/fortran/get_errhf.c \
-	mpi-io/fortran/get_extentf.c mpi-io/fortran/get_groupf.c \
-	mpi-io/fortran/get_infof.c mpi-io/fortran/get_posn_shf.c \
-	mpi-io/fortran/get_posnf.c mpi-io/fortran/get_sizef.c \
-	mpi-io/fortran/get_viewf.c mpi-io/fortran/iotestf.c \
-	mpi-io/fortran/iowaitf.c mpi-io/fortran/iread_atf.c \
-	mpi-io/fortran/iread_shf.c mpi-io/fortran/ireadf.c \
-	mpi-io/fortran/iwrite_atf.c mpi-io/fortran/iwrite_shf.c \
-	mpi-io/fortran/iwritef.c mpi-io/fortran/openf.c \
-	mpi-io/fortran/preallocf.c mpi-io/fortran/rd_atallbf.c \
-	mpi-io/fortran/rd_atallef.c mpi-io/fortran/read_allbf.c \
-	mpi-io/fortran/read_allef.c mpi-io/fortran/read_allf.c \
-	mpi-io/fortran/read_atallf.c mpi-io/fortran/read_atf.c \
-	mpi-io/fortran/read_ordbf.c mpi-io/fortran/read_ordef.c \
-	mpi-io/fortran/read_ordf.c mpi-io/fortran/read_shf.c \
-	mpi-io/fortran/readf.c mpi-io/fortran/seek_shf.c \
-	mpi-io/fortran/seekf.c mpi-io/fortran/set_atomf.c \
-	mpi-io/fortran/set_errhf.c mpi-io/fortran/set_infof.c \
-	mpi-io/fortran/set_sizef.c mpi-io/fortran/set_viewf.c \
-	mpi-io/fortran/wr_atallbf.c mpi-io/fortran/wr_atallef.c \
-	mpi-io/fortran/write_allbf.c mpi-io/fortran/write_allef.c \
-	mpi-io/fortran/write_allf.c mpi-io/fortran/write_atallf.c \
-	mpi-io/fortran/write_atf.c mpi-io/fortran/write_ordbf.c \
-	mpi-io/fortran/write_ordef.c mpi-io/fortran/write_ordf.c \
-	mpi-io/fortran/write_shf.c mpi-io/fortran/writef.c \
+am__libromio_la_SOURCES_DIST = mpi-io/fortran/romio_fortran.c \
 	mpi-io/close.c mpi-io/delete.c mpi-io/file_c2f.c \
 	mpi-io/file_f2c.c mpi-io/fsync.c mpi-io/get_amode.c \
 	mpi-io/get_atom.c mpi-io/get_bytoff.c mpi-io/get_errh.c \
@@ -790,61 +626,8 @@ am__libromio_la_SOURCES_DIST = mpi-io/fortran/closef.c \
 	adio/common/hint_fns.c adio/common/ad_threaded_io.c \
 	adio/common/p2p_aggregation.c \
 	adio/common/onesided_aggregation.c adio/common/utils.c
-@BUILD_F77_BINDINGS_TRUE@am__objects_3 = mpi-io/fortran/closef.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/deletef.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/fsyncf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/get_amodef.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/get_atomf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/get_bytofff.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/get_errhf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/get_extentf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/get_groupf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/get_infof.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/get_posn_shf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/get_posnf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/get_sizef.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/get_viewf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/iotestf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/iowaitf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/iread_atf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/iread_shf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/ireadf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/iwrite_atf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/iwrite_shf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/iwritef.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/openf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/preallocf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/rd_atallbf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/rd_atallef.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/read_allbf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/read_allef.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/read_allf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/read_atallf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/read_atf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/read_ordbf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/read_ordef.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/read_ordf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/read_shf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/readf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/seek_shf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/seekf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/set_atomf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/set_errhf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/set_infof.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/set_sizef.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/set_viewf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/wr_atallbf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/wr_atallef.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/write_allbf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/write_allef.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/write_allf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/write_atallf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/write_atf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/write_ordbf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/write_ordef.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/write_ordf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/write_shf.lo \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/writef.lo
+@BUILD_F77_BINDINGS_TRUE@am__objects_3 =  \
+@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/romio_fortran.lo
 am__objects_4 = $(am__objects_3) mpi-io/close.lo mpi-io/delete.lo \
 	mpi-io/file_c2f.lo mpi-io/file_f2c.lo mpi-io/fsync.lo \
 	mpi-io/get_amode.lo mpi-io/get_atom.lo mpi-io/get_bytoff.lo \
@@ -1580,6 +1363,63 @@ glue_sources =
 # ------------------------------------------------------------------------
 SUBDIRS = 
 DIST_SUBDIRS = test test-internal
+@BUILD_F77_BINDINGS_TRUE@disabled_romio_mpi_sources = \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/closef.c       \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/deletef.c      \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/fsyncf.c       \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/get_amodef.c   \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/get_atomf.c    \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/get_bytofff.c  \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/get_errhf.c    \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/get_extentf.c  \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/get_groupf.c   \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/get_infof.c    \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/get_posn_shf.c \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/get_posnf.c    \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/get_sizef.c    \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/get_viewf.c    \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/iotestf.c      \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/iowaitf.c      \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/iread_atf.c    \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/iread_shf.c    \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/ireadf.c       \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/iwrite_atf.c   \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/iwrite_shf.c   \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/iwritef.c      \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/openf.c        \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/preallocf.c    \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/rd_atallbf.c   \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/rd_atallef.c   \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/read_allbf.c   \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/read_allef.c   \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/read_allf.c    \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/read_atallf.c  \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/read_atf.c     \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/read_ordbf.c   \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/read_ordef.c   \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/read_ordf.c    \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/read_shf.c     \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/readf.c        \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/seek_shf.c     \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/seekf.c        \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/set_atomf.c    \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/set_errhf.c    \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/set_infof.c    \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/set_sizef.c    \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/set_viewf.c    \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/wr_atallbf.c   \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/wr_atallef.c   \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/write_allbf.c  \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/write_allef.c  \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/write_allf.c   \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/write_atallf.c \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/write_atf.c    \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/write_ordbf.c  \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/write_ordef.c  \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/write_ordf.c   \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/write_shf.c    \
+@BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/writef.c
+
 
 # helper variables for conditionally compiled sources
 mpio_request_sources = \
@@ -1751,163 +1591,8 @@ mpi-io/fortran/$(am__dirstamp):
 mpi-io/fortran/$(DEPDIR)/$(am__dirstamp):
 	@$(MKDIR_P) mpi-io/fortran/$(DEPDIR)
 	@: > mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-closef.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-deletef.lo:  \
+mpi-io/fortran/libpromio_la-romio_fortran.lo:  \
 	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-fsyncf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-get_amodef.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-get_atomf.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-get_bytofff.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-get_errhf.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-get_extentf.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-get_groupf.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-get_infof.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-get_posn_shf.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-get_posnf.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-get_sizef.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-get_viewf.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-iotestf.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-iowaitf.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-iread_atf.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-iread_shf.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-ireadf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-iwrite_atf.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-iwrite_shf.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-iwritef.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-openf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-preallocf.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-rd_atallbf.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-rd_atallef.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-read_allbf.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-read_allef.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-read_allf.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-read_atallf.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-read_atf.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-read_ordbf.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-read_ordef.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-read_ordf.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-read_shf.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-readf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-seek_shf.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-seekf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-set_atomf.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-set_errhf.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-set_infof.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-set_sizef.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-set_viewf.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-wr_atallbf.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-wr_atallef.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-write_allbf.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-write_allef.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-write_allf.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-write_atallf.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-write_atf.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-write_ordbf.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-write_ordef.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-write_ordf.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-write_shf.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-writef.lo: mpi-io/fortran/$(am__dirstamp) \
 	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
 mpi-io/$(am__dirstamp):
 	@$(MKDIR_P) mpi-io
@@ -2042,115 +1727,7 @@ mpi-io/libpromio_la-write_sh.lo: mpi-io/$(am__dirstamp) \
 
 libpromio.la: $(libpromio_la_OBJECTS) $(libpromio_la_DEPENDENCIES) $(EXTRA_libpromio_la_DEPENDENCIES) 
 	$(AM_V_CCLD)$(LINK) $(am_libpromio_la_rpath) $(libpromio_la_OBJECTS) $(libpromio_la_LIBADD) $(LIBS)
-mpi-io/fortran/closef.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/deletef.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/fsyncf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/get_amodef.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/get_atomf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/get_bytofff.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/get_errhf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/get_extentf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/get_groupf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/get_infof.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/get_posn_shf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/get_posnf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/get_sizef.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/get_viewf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/iotestf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/iowaitf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/iread_atf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/iread_shf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/ireadf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/iwrite_atf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/iwrite_shf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/iwritef.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/openf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/preallocf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/rd_atallbf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/rd_atallef.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/read_allbf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/read_allef.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/read_allf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/read_atallf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/read_atf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/read_ordbf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/read_ordef.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/read_ordf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/read_shf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/readf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/seek_shf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/seekf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/set_atomf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/set_errhf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/set_infof.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/set_sizef.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/set_viewf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/wr_atallbf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/wr_atallef.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/write_allbf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/write_allef.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/write_allf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/write_atallf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/write_atf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/write_ordbf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/write_ordef.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/write_ordf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/write_shf.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/writef.lo: mpi-io/fortran/$(am__dirstamp) \
+mpi-io/fortran/romio_fortran.lo: mpi-io/fortran/$(am__dirstamp) \
 	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
 mpi-io/close.lo: mpi-io/$(am__dirstamp) \
 	mpi-io/$(DEPDIR)/$(am__dirstamp)
@@ -3262,116 +2839,8 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@mpi-io/$(DEPDIR)/write_ordb.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@mpi-io/$(DEPDIR)/write_orde.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@mpi-io/$(DEPDIR)/write_sh.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/closef.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/deletef.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/fsyncf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/get_amodef.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/get_atomf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/get_bytofff.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/get_errhf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/get_extentf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/get_groupf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/get_infof.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/get_posn_shf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/get_posnf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/get_sizef.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/get_viewf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/iotestf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/iowaitf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/iread_atf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/iread_shf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/ireadf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/iwrite_atf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/iwrite_shf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/iwritef.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-closef.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-deletef.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-fsyncf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-get_amodef.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-get_atomf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-get_bytofff.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-get_errhf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-get_extentf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-get_groupf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-get_infof.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-get_posn_shf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-get_posnf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-get_sizef.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-get_viewf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-iotestf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-iowaitf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-iread_atf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-iread_shf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-ireadf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-iwrite_atf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-iwrite_shf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-iwritef.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-openf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-preallocf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-rd_atallbf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-rd_atallef.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-read_allbf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-read_allef.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-read_allf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-read_atallf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-read_atf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-read_ordbf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-read_ordef.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-read_ordf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-read_shf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-readf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-seek_shf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-seekf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-set_atomf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-set_errhf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-set_infof.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-set_sizef.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-set_viewf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-wr_atallbf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-wr_atallef.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-write_allbf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-write_allef.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-write_allf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-write_atallf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-write_atf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-write_ordbf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-write_ordef.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-write_ordf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-write_shf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-writef.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/openf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/preallocf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/rd_atallbf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/rd_atallef.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/read_allbf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/read_allef.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/read_allf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/read_atallf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/read_atf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/read_ordbf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/read_ordef.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/read_ordf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/read_shf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/readf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/seek_shf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/seekf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/set_atomf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/set_errhf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/set_infof.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/set_sizef.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/set_viewf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/wr_atallbf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/wr_atallef.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/write_allbf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/write_allef.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/write_allf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/write_atallf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/write_atf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/write_ordbf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/write_ordef.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/write_ordf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/write_shf.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/writef.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-romio_fortran.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/romio_fortran.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@mpi-io/glue/$(DEPDIR)/large_count.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@mpi-io/glue/default/$(DEPDIR)/mpio_err.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@mpi-io/glue/default/$(DEPDIR)/mpio_file.Plo@am__quote@
@@ -3402,390 +2871,12 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LTCOMPILE) -c -o $@ $<
 
-mpi-io/fortran/libpromio_la-closef.lo: mpi-io/fortran/closef.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-closef.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-closef.Tpo -c -o mpi-io/fortran/libpromio_la-closef.lo `test -f 'mpi-io/fortran/closef.c' || echo '$(srcdir)/'`mpi-io/fortran/closef.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-closef.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-closef.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/closef.c' object='mpi-io/fortran/libpromio_la-closef.lo' libtool=yes @AMDEPBACKSLASH@
+mpi-io/fortran/libpromio_la-romio_fortran.lo: mpi-io/fortran/romio_fortran.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-romio_fortran.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-romio_fortran.Tpo -c -o mpi-io/fortran/libpromio_la-romio_fortran.lo `test -f 'mpi-io/fortran/romio_fortran.c' || echo '$(srcdir)/'`mpi-io/fortran/romio_fortran.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-romio_fortran.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-romio_fortran.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/romio_fortran.c' object='mpi-io/fortran/libpromio_la-romio_fortran.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-closef.lo `test -f 'mpi-io/fortran/closef.c' || echo '$(srcdir)/'`mpi-io/fortran/closef.c
-
-mpi-io/fortran/libpromio_la-deletef.lo: mpi-io/fortran/deletef.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-deletef.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-deletef.Tpo -c -o mpi-io/fortran/libpromio_la-deletef.lo `test -f 'mpi-io/fortran/deletef.c' || echo '$(srcdir)/'`mpi-io/fortran/deletef.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-deletef.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-deletef.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/deletef.c' object='mpi-io/fortran/libpromio_la-deletef.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-deletef.lo `test -f 'mpi-io/fortran/deletef.c' || echo '$(srcdir)/'`mpi-io/fortran/deletef.c
-
-mpi-io/fortran/libpromio_la-fsyncf.lo: mpi-io/fortran/fsyncf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-fsyncf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-fsyncf.Tpo -c -o mpi-io/fortran/libpromio_la-fsyncf.lo `test -f 'mpi-io/fortran/fsyncf.c' || echo '$(srcdir)/'`mpi-io/fortran/fsyncf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-fsyncf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-fsyncf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/fsyncf.c' object='mpi-io/fortran/libpromio_la-fsyncf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-fsyncf.lo `test -f 'mpi-io/fortran/fsyncf.c' || echo '$(srcdir)/'`mpi-io/fortran/fsyncf.c
-
-mpi-io/fortran/libpromio_la-get_amodef.lo: mpi-io/fortran/get_amodef.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-get_amodef.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-get_amodef.Tpo -c -o mpi-io/fortran/libpromio_la-get_amodef.lo `test -f 'mpi-io/fortran/get_amodef.c' || echo '$(srcdir)/'`mpi-io/fortran/get_amodef.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-get_amodef.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-get_amodef.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/get_amodef.c' object='mpi-io/fortran/libpromio_la-get_amodef.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-get_amodef.lo `test -f 'mpi-io/fortran/get_amodef.c' || echo '$(srcdir)/'`mpi-io/fortran/get_amodef.c
-
-mpi-io/fortran/libpromio_la-get_atomf.lo: mpi-io/fortran/get_atomf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-get_atomf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-get_atomf.Tpo -c -o mpi-io/fortran/libpromio_la-get_atomf.lo `test -f 'mpi-io/fortran/get_atomf.c' || echo '$(srcdir)/'`mpi-io/fortran/get_atomf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-get_atomf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-get_atomf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/get_atomf.c' object='mpi-io/fortran/libpromio_la-get_atomf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-get_atomf.lo `test -f 'mpi-io/fortran/get_atomf.c' || echo '$(srcdir)/'`mpi-io/fortran/get_atomf.c
-
-mpi-io/fortran/libpromio_la-get_bytofff.lo: mpi-io/fortran/get_bytofff.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-get_bytofff.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-get_bytofff.Tpo -c -o mpi-io/fortran/libpromio_la-get_bytofff.lo `test -f 'mpi-io/fortran/get_bytofff.c' || echo '$(srcdir)/'`mpi-io/fortran/get_bytofff.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-get_bytofff.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-get_bytofff.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/get_bytofff.c' object='mpi-io/fortran/libpromio_la-get_bytofff.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-get_bytofff.lo `test -f 'mpi-io/fortran/get_bytofff.c' || echo '$(srcdir)/'`mpi-io/fortran/get_bytofff.c
-
-mpi-io/fortran/libpromio_la-get_errhf.lo: mpi-io/fortran/get_errhf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-get_errhf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-get_errhf.Tpo -c -o mpi-io/fortran/libpromio_la-get_errhf.lo `test -f 'mpi-io/fortran/get_errhf.c' || echo '$(srcdir)/'`mpi-io/fortran/get_errhf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-get_errhf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-get_errhf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/get_errhf.c' object='mpi-io/fortran/libpromio_la-get_errhf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-get_errhf.lo `test -f 'mpi-io/fortran/get_errhf.c' || echo '$(srcdir)/'`mpi-io/fortran/get_errhf.c
-
-mpi-io/fortran/libpromio_la-get_extentf.lo: mpi-io/fortran/get_extentf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-get_extentf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-get_extentf.Tpo -c -o mpi-io/fortran/libpromio_la-get_extentf.lo `test -f 'mpi-io/fortran/get_extentf.c' || echo '$(srcdir)/'`mpi-io/fortran/get_extentf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-get_extentf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-get_extentf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/get_extentf.c' object='mpi-io/fortran/libpromio_la-get_extentf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-get_extentf.lo `test -f 'mpi-io/fortran/get_extentf.c' || echo '$(srcdir)/'`mpi-io/fortran/get_extentf.c
-
-mpi-io/fortran/libpromio_la-get_groupf.lo: mpi-io/fortran/get_groupf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-get_groupf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-get_groupf.Tpo -c -o mpi-io/fortran/libpromio_la-get_groupf.lo `test -f 'mpi-io/fortran/get_groupf.c' || echo '$(srcdir)/'`mpi-io/fortran/get_groupf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-get_groupf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-get_groupf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/get_groupf.c' object='mpi-io/fortran/libpromio_la-get_groupf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-get_groupf.lo `test -f 'mpi-io/fortran/get_groupf.c' || echo '$(srcdir)/'`mpi-io/fortran/get_groupf.c
-
-mpi-io/fortran/libpromio_la-get_infof.lo: mpi-io/fortran/get_infof.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-get_infof.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-get_infof.Tpo -c -o mpi-io/fortran/libpromio_la-get_infof.lo `test -f 'mpi-io/fortran/get_infof.c' || echo '$(srcdir)/'`mpi-io/fortran/get_infof.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-get_infof.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-get_infof.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/get_infof.c' object='mpi-io/fortran/libpromio_la-get_infof.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-get_infof.lo `test -f 'mpi-io/fortran/get_infof.c' || echo '$(srcdir)/'`mpi-io/fortran/get_infof.c
-
-mpi-io/fortran/libpromio_la-get_posn_shf.lo: mpi-io/fortran/get_posn_shf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-get_posn_shf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-get_posn_shf.Tpo -c -o mpi-io/fortran/libpromio_la-get_posn_shf.lo `test -f 'mpi-io/fortran/get_posn_shf.c' || echo '$(srcdir)/'`mpi-io/fortran/get_posn_shf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-get_posn_shf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-get_posn_shf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/get_posn_shf.c' object='mpi-io/fortran/libpromio_la-get_posn_shf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-get_posn_shf.lo `test -f 'mpi-io/fortran/get_posn_shf.c' || echo '$(srcdir)/'`mpi-io/fortran/get_posn_shf.c
-
-mpi-io/fortran/libpromio_la-get_posnf.lo: mpi-io/fortran/get_posnf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-get_posnf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-get_posnf.Tpo -c -o mpi-io/fortran/libpromio_la-get_posnf.lo `test -f 'mpi-io/fortran/get_posnf.c' || echo '$(srcdir)/'`mpi-io/fortran/get_posnf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-get_posnf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-get_posnf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/get_posnf.c' object='mpi-io/fortran/libpromio_la-get_posnf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-get_posnf.lo `test -f 'mpi-io/fortran/get_posnf.c' || echo '$(srcdir)/'`mpi-io/fortran/get_posnf.c
-
-mpi-io/fortran/libpromio_la-get_sizef.lo: mpi-io/fortran/get_sizef.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-get_sizef.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-get_sizef.Tpo -c -o mpi-io/fortran/libpromio_la-get_sizef.lo `test -f 'mpi-io/fortran/get_sizef.c' || echo '$(srcdir)/'`mpi-io/fortran/get_sizef.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-get_sizef.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-get_sizef.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/get_sizef.c' object='mpi-io/fortran/libpromio_la-get_sizef.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-get_sizef.lo `test -f 'mpi-io/fortran/get_sizef.c' || echo '$(srcdir)/'`mpi-io/fortran/get_sizef.c
-
-mpi-io/fortran/libpromio_la-get_viewf.lo: mpi-io/fortran/get_viewf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-get_viewf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-get_viewf.Tpo -c -o mpi-io/fortran/libpromio_la-get_viewf.lo `test -f 'mpi-io/fortran/get_viewf.c' || echo '$(srcdir)/'`mpi-io/fortran/get_viewf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-get_viewf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-get_viewf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/get_viewf.c' object='mpi-io/fortran/libpromio_la-get_viewf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-get_viewf.lo `test -f 'mpi-io/fortran/get_viewf.c' || echo '$(srcdir)/'`mpi-io/fortran/get_viewf.c
-
-mpi-io/fortran/libpromio_la-iotestf.lo: mpi-io/fortran/iotestf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-iotestf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-iotestf.Tpo -c -o mpi-io/fortran/libpromio_la-iotestf.lo `test -f 'mpi-io/fortran/iotestf.c' || echo '$(srcdir)/'`mpi-io/fortran/iotestf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-iotestf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-iotestf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/iotestf.c' object='mpi-io/fortran/libpromio_la-iotestf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-iotestf.lo `test -f 'mpi-io/fortran/iotestf.c' || echo '$(srcdir)/'`mpi-io/fortran/iotestf.c
-
-mpi-io/fortran/libpromio_la-iowaitf.lo: mpi-io/fortran/iowaitf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-iowaitf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-iowaitf.Tpo -c -o mpi-io/fortran/libpromio_la-iowaitf.lo `test -f 'mpi-io/fortran/iowaitf.c' || echo '$(srcdir)/'`mpi-io/fortran/iowaitf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-iowaitf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-iowaitf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/iowaitf.c' object='mpi-io/fortran/libpromio_la-iowaitf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-iowaitf.lo `test -f 'mpi-io/fortran/iowaitf.c' || echo '$(srcdir)/'`mpi-io/fortran/iowaitf.c
-
-mpi-io/fortran/libpromio_la-iread_atf.lo: mpi-io/fortran/iread_atf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-iread_atf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-iread_atf.Tpo -c -o mpi-io/fortran/libpromio_la-iread_atf.lo `test -f 'mpi-io/fortran/iread_atf.c' || echo '$(srcdir)/'`mpi-io/fortran/iread_atf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-iread_atf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-iread_atf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/iread_atf.c' object='mpi-io/fortran/libpromio_la-iread_atf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-iread_atf.lo `test -f 'mpi-io/fortran/iread_atf.c' || echo '$(srcdir)/'`mpi-io/fortran/iread_atf.c
-
-mpi-io/fortran/libpromio_la-iread_shf.lo: mpi-io/fortran/iread_shf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-iread_shf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-iread_shf.Tpo -c -o mpi-io/fortran/libpromio_la-iread_shf.lo `test -f 'mpi-io/fortran/iread_shf.c' || echo '$(srcdir)/'`mpi-io/fortran/iread_shf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-iread_shf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-iread_shf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/iread_shf.c' object='mpi-io/fortran/libpromio_la-iread_shf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-iread_shf.lo `test -f 'mpi-io/fortran/iread_shf.c' || echo '$(srcdir)/'`mpi-io/fortran/iread_shf.c
-
-mpi-io/fortran/libpromio_la-ireadf.lo: mpi-io/fortran/ireadf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-ireadf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-ireadf.Tpo -c -o mpi-io/fortran/libpromio_la-ireadf.lo `test -f 'mpi-io/fortran/ireadf.c' || echo '$(srcdir)/'`mpi-io/fortran/ireadf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-ireadf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-ireadf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/ireadf.c' object='mpi-io/fortran/libpromio_la-ireadf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-ireadf.lo `test -f 'mpi-io/fortran/ireadf.c' || echo '$(srcdir)/'`mpi-io/fortran/ireadf.c
-
-mpi-io/fortran/libpromio_la-iwrite_atf.lo: mpi-io/fortran/iwrite_atf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-iwrite_atf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-iwrite_atf.Tpo -c -o mpi-io/fortran/libpromio_la-iwrite_atf.lo `test -f 'mpi-io/fortran/iwrite_atf.c' || echo '$(srcdir)/'`mpi-io/fortran/iwrite_atf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-iwrite_atf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-iwrite_atf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/iwrite_atf.c' object='mpi-io/fortran/libpromio_la-iwrite_atf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-iwrite_atf.lo `test -f 'mpi-io/fortran/iwrite_atf.c' || echo '$(srcdir)/'`mpi-io/fortran/iwrite_atf.c
-
-mpi-io/fortran/libpromio_la-iwrite_shf.lo: mpi-io/fortran/iwrite_shf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-iwrite_shf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-iwrite_shf.Tpo -c -o mpi-io/fortran/libpromio_la-iwrite_shf.lo `test -f 'mpi-io/fortran/iwrite_shf.c' || echo '$(srcdir)/'`mpi-io/fortran/iwrite_shf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-iwrite_shf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-iwrite_shf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/iwrite_shf.c' object='mpi-io/fortran/libpromio_la-iwrite_shf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-iwrite_shf.lo `test -f 'mpi-io/fortran/iwrite_shf.c' || echo '$(srcdir)/'`mpi-io/fortran/iwrite_shf.c
-
-mpi-io/fortran/libpromio_la-iwritef.lo: mpi-io/fortran/iwritef.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-iwritef.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-iwritef.Tpo -c -o mpi-io/fortran/libpromio_la-iwritef.lo `test -f 'mpi-io/fortran/iwritef.c' || echo '$(srcdir)/'`mpi-io/fortran/iwritef.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-iwritef.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-iwritef.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/iwritef.c' object='mpi-io/fortran/libpromio_la-iwritef.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-iwritef.lo `test -f 'mpi-io/fortran/iwritef.c' || echo '$(srcdir)/'`mpi-io/fortran/iwritef.c
-
-mpi-io/fortran/libpromio_la-openf.lo: mpi-io/fortran/openf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-openf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-openf.Tpo -c -o mpi-io/fortran/libpromio_la-openf.lo `test -f 'mpi-io/fortran/openf.c' || echo '$(srcdir)/'`mpi-io/fortran/openf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-openf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-openf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/openf.c' object='mpi-io/fortran/libpromio_la-openf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-openf.lo `test -f 'mpi-io/fortran/openf.c' || echo '$(srcdir)/'`mpi-io/fortran/openf.c
-
-mpi-io/fortran/libpromio_la-preallocf.lo: mpi-io/fortran/preallocf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-preallocf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-preallocf.Tpo -c -o mpi-io/fortran/libpromio_la-preallocf.lo `test -f 'mpi-io/fortran/preallocf.c' || echo '$(srcdir)/'`mpi-io/fortran/preallocf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-preallocf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-preallocf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/preallocf.c' object='mpi-io/fortran/libpromio_la-preallocf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-preallocf.lo `test -f 'mpi-io/fortran/preallocf.c' || echo '$(srcdir)/'`mpi-io/fortran/preallocf.c
-
-mpi-io/fortran/libpromio_la-rd_atallbf.lo: mpi-io/fortran/rd_atallbf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-rd_atallbf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-rd_atallbf.Tpo -c -o mpi-io/fortran/libpromio_la-rd_atallbf.lo `test -f 'mpi-io/fortran/rd_atallbf.c' || echo '$(srcdir)/'`mpi-io/fortran/rd_atallbf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-rd_atallbf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-rd_atallbf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/rd_atallbf.c' object='mpi-io/fortran/libpromio_la-rd_atallbf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-rd_atallbf.lo `test -f 'mpi-io/fortran/rd_atallbf.c' || echo '$(srcdir)/'`mpi-io/fortran/rd_atallbf.c
-
-mpi-io/fortran/libpromio_la-rd_atallef.lo: mpi-io/fortran/rd_atallef.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-rd_atallef.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-rd_atallef.Tpo -c -o mpi-io/fortran/libpromio_la-rd_atallef.lo `test -f 'mpi-io/fortran/rd_atallef.c' || echo '$(srcdir)/'`mpi-io/fortran/rd_atallef.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-rd_atallef.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-rd_atallef.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/rd_atallef.c' object='mpi-io/fortran/libpromio_la-rd_atallef.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-rd_atallef.lo `test -f 'mpi-io/fortran/rd_atallef.c' || echo '$(srcdir)/'`mpi-io/fortran/rd_atallef.c
-
-mpi-io/fortran/libpromio_la-read_allbf.lo: mpi-io/fortran/read_allbf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-read_allbf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-read_allbf.Tpo -c -o mpi-io/fortran/libpromio_la-read_allbf.lo `test -f 'mpi-io/fortran/read_allbf.c' || echo '$(srcdir)/'`mpi-io/fortran/read_allbf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-read_allbf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-read_allbf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/read_allbf.c' object='mpi-io/fortran/libpromio_la-read_allbf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-read_allbf.lo `test -f 'mpi-io/fortran/read_allbf.c' || echo '$(srcdir)/'`mpi-io/fortran/read_allbf.c
-
-mpi-io/fortran/libpromio_la-read_allef.lo: mpi-io/fortran/read_allef.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-read_allef.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-read_allef.Tpo -c -o mpi-io/fortran/libpromio_la-read_allef.lo `test -f 'mpi-io/fortran/read_allef.c' || echo '$(srcdir)/'`mpi-io/fortran/read_allef.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-read_allef.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-read_allef.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/read_allef.c' object='mpi-io/fortran/libpromio_la-read_allef.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-read_allef.lo `test -f 'mpi-io/fortran/read_allef.c' || echo '$(srcdir)/'`mpi-io/fortran/read_allef.c
-
-mpi-io/fortran/libpromio_la-read_allf.lo: mpi-io/fortran/read_allf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-read_allf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-read_allf.Tpo -c -o mpi-io/fortran/libpromio_la-read_allf.lo `test -f 'mpi-io/fortran/read_allf.c' || echo '$(srcdir)/'`mpi-io/fortran/read_allf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-read_allf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-read_allf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/read_allf.c' object='mpi-io/fortran/libpromio_la-read_allf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-read_allf.lo `test -f 'mpi-io/fortran/read_allf.c' || echo '$(srcdir)/'`mpi-io/fortran/read_allf.c
-
-mpi-io/fortran/libpromio_la-read_atallf.lo: mpi-io/fortran/read_atallf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-read_atallf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-read_atallf.Tpo -c -o mpi-io/fortran/libpromio_la-read_atallf.lo `test -f 'mpi-io/fortran/read_atallf.c' || echo '$(srcdir)/'`mpi-io/fortran/read_atallf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-read_atallf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-read_atallf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/read_atallf.c' object='mpi-io/fortran/libpromio_la-read_atallf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-read_atallf.lo `test -f 'mpi-io/fortran/read_atallf.c' || echo '$(srcdir)/'`mpi-io/fortran/read_atallf.c
-
-mpi-io/fortran/libpromio_la-read_atf.lo: mpi-io/fortran/read_atf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-read_atf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-read_atf.Tpo -c -o mpi-io/fortran/libpromio_la-read_atf.lo `test -f 'mpi-io/fortran/read_atf.c' || echo '$(srcdir)/'`mpi-io/fortran/read_atf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-read_atf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-read_atf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/read_atf.c' object='mpi-io/fortran/libpromio_la-read_atf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-read_atf.lo `test -f 'mpi-io/fortran/read_atf.c' || echo '$(srcdir)/'`mpi-io/fortran/read_atf.c
-
-mpi-io/fortran/libpromio_la-read_ordbf.lo: mpi-io/fortran/read_ordbf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-read_ordbf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-read_ordbf.Tpo -c -o mpi-io/fortran/libpromio_la-read_ordbf.lo `test -f 'mpi-io/fortran/read_ordbf.c' || echo '$(srcdir)/'`mpi-io/fortran/read_ordbf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-read_ordbf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-read_ordbf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/read_ordbf.c' object='mpi-io/fortran/libpromio_la-read_ordbf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-read_ordbf.lo `test -f 'mpi-io/fortran/read_ordbf.c' || echo '$(srcdir)/'`mpi-io/fortran/read_ordbf.c
-
-mpi-io/fortran/libpromio_la-read_ordef.lo: mpi-io/fortran/read_ordef.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-read_ordef.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-read_ordef.Tpo -c -o mpi-io/fortran/libpromio_la-read_ordef.lo `test -f 'mpi-io/fortran/read_ordef.c' || echo '$(srcdir)/'`mpi-io/fortran/read_ordef.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-read_ordef.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-read_ordef.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/read_ordef.c' object='mpi-io/fortran/libpromio_la-read_ordef.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-read_ordef.lo `test -f 'mpi-io/fortran/read_ordef.c' || echo '$(srcdir)/'`mpi-io/fortran/read_ordef.c
-
-mpi-io/fortran/libpromio_la-read_ordf.lo: mpi-io/fortran/read_ordf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-read_ordf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-read_ordf.Tpo -c -o mpi-io/fortran/libpromio_la-read_ordf.lo `test -f 'mpi-io/fortran/read_ordf.c' || echo '$(srcdir)/'`mpi-io/fortran/read_ordf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-read_ordf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-read_ordf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/read_ordf.c' object='mpi-io/fortran/libpromio_la-read_ordf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-read_ordf.lo `test -f 'mpi-io/fortran/read_ordf.c' || echo '$(srcdir)/'`mpi-io/fortran/read_ordf.c
-
-mpi-io/fortran/libpromio_la-read_shf.lo: mpi-io/fortran/read_shf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-read_shf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-read_shf.Tpo -c -o mpi-io/fortran/libpromio_la-read_shf.lo `test -f 'mpi-io/fortran/read_shf.c' || echo '$(srcdir)/'`mpi-io/fortran/read_shf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-read_shf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-read_shf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/read_shf.c' object='mpi-io/fortran/libpromio_la-read_shf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-read_shf.lo `test -f 'mpi-io/fortran/read_shf.c' || echo '$(srcdir)/'`mpi-io/fortran/read_shf.c
-
-mpi-io/fortran/libpromio_la-readf.lo: mpi-io/fortran/readf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-readf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-readf.Tpo -c -o mpi-io/fortran/libpromio_la-readf.lo `test -f 'mpi-io/fortran/readf.c' || echo '$(srcdir)/'`mpi-io/fortran/readf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-readf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-readf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/readf.c' object='mpi-io/fortran/libpromio_la-readf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-readf.lo `test -f 'mpi-io/fortran/readf.c' || echo '$(srcdir)/'`mpi-io/fortran/readf.c
-
-mpi-io/fortran/libpromio_la-seek_shf.lo: mpi-io/fortran/seek_shf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-seek_shf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-seek_shf.Tpo -c -o mpi-io/fortran/libpromio_la-seek_shf.lo `test -f 'mpi-io/fortran/seek_shf.c' || echo '$(srcdir)/'`mpi-io/fortran/seek_shf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-seek_shf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-seek_shf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/seek_shf.c' object='mpi-io/fortran/libpromio_la-seek_shf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-seek_shf.lo `test -f 'mpi-io/fortran/seek_shf.c' || echo '$(srcdir)/'`mpi-io/fortran/seek_shf.c
-
-mpi-io/fortran/libpromio_la-seekf.lo: mpi-io/fortran/seekf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-seekf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-seekf.Tpo -c -o mpi-io/fortran/libpromio_la-seekf.lo `test -f 'mpi-io/fortran/seekf.c' || echo '$(srcdir)/'`mpi-io/fortran/seekf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-seekf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-seekf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/seekf.c' object='mpi-io/fortran/libpromio_la-seekf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-seekf.lo `test -f 'mpi-io/fortran/seekf.c' || echo '$(srcdir)/'`mpi-io/fortran/seekf.c
-
-mpi-io/fortran/libpromio_la-set_atomf.lo: mpi-io/fortran/set_atomf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-set_atomf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-set_atomf.Tpo -c -o mpi-io/fortran/libpromio_la-set_atomf.lo `test -f 'mpi-io/fortran/set_atomf.c' || echo '$(srcdir)/'`mpi-io/fortran/set_atomf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-set_atomf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-set_atomf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/set_atomf.c' object='mpi-io/fortran/libpromio_la-set_atomf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-set_atomf.lo `test -f 'mpi-io/fortran/set_atomf.c' || echo '$(srcdir)/'`mpi-io/fortran/set_atomf.c
-
-mpi-io/fortran/libpromio_la-set_errhf.lo: mpi-io/fortran/set_errhf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-set_errhf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-set_errhf.Tpo -c -o mpi-io/fortran/libpromio_la-set_errhf.lo `test -f 'mpi-io/fortran/set_errhf.c' || echo '$(srcdir)/'`mpi-io/fortran/set_errhf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-set_errhf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-set_errhf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/set_errhf.c' object='mpi-io/fortran/libpromio_la-set_errhf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-set_errhf.lo `test -f 'mpi-io/fortran/set_errhf.c' || echo '$(srcdir)/'`mpi-io/fortran/set_errhf.c
-
-mpi-io/fortran/libpromio_la-set_infof.lo: mpi-io/fortran/set_infof.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-set_infof.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-set_infof.Tpo -c -o mpi-io/fortran/libpromio_la-set_infof.lo `test -f 'mpi-io/fortran/set_infof.c' || echo '$(srcdir)/'`mpi-io/fortran/set_infof.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-set_infof.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-set_infof.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/set_infof.c' object='mpi-io/fortran/libpromio_la-set_infof.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-set_infof.lo `test -f 'mpi-io/fortran/set_infof.c' || echo '$(srcdir)/'`mpi-io/fortran/set_infof.c
-
-mpi-io/fortran/libpromio_la-set_sizef.lo: mpi-io/fortran/set_sizef.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-set_sizef.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-set_sizef.Tpo -c -o mpi-io/fortran/libpromio_la-set_sizef.lo `test -f 'mpi-io/fortran/set_sizef.c' || echo '$(srcdir)/'`mpi-io/fortran/set_sizef.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-set_sizef.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-set_sizef.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/set_sizef.c' object='mpi-io/fortran/libpromio_la-set_sizef.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-set_sizef.lo `test -f 'mpi-io/fortran/set_sizef.c' || echo '$(srcdir)/'`mpi-io/fortran/set_sizef.c
-
-mpi-io/fortran/libpromio_la-set_viewf.lo: mpi-io/fortran/set_viewf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-set_viewf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-set_viewf.Tpo -c -o mpi-io/fortran/libpromio_la-set_viewf.lo `test -f 'mpi-io/fortran/set_viewf.c' || echo '$(srcdir)/'`mpi-io/fortran/set_viewf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-set_viewf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-set_viewf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/set_viewf.c' object='mpi-io/fortran/libpromio_la-set_viewf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-set_viewf.lo `test -f 'mpi-io/fortran/set_viewf.c' || echo '$(srcdir)/'`mpi-io/fortran/set_viewf.c
-
-mpi-io/fortran/libpromio_la-wr_atallbf.lo: mpi-io/fortran/wr_atallbf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-wr_atallbf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-wr_atallbf.Tpo -c -o mpi-io/fortran/libpromio_la-wr_atallbf.lo `test -f 'mpi-io/fortran/wr_atallbf.c' || echo '$(srcdir)/'`mpi-io/fortran/wr_atallbf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-wr_atallbf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-wr_atallbf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/wr_atallbf.c' object='mpi-io/fortran/libpromio_la-wr_atallbf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-wr_atallbf.lo `test -f 'mpi-io/fortran/wr_atallbf.c' || echo '$(srcdir)/'`mpi-io/fortran/wr_atallbf.c
-
-mpi-io/fortran/libpromio_la-wr_atallef.lo: mpi-io/fortran/wr_atallef.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-wr_atallef.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-wr_atallef.Tpo -c -o mpi-io/fortran/libpromio_la-wr_atallef.lo `test -f 'mpi-io/fortran/wr_atallef.c' || echo '$(srcdir)/'`mpi-io/fortran/wr_atallef.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-wr_atallef.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-wr_atallef.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/wr_atallef.c' object='mpi-io/fortran/libpromio_la-wr_atallef.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-wr_atallef.lo `test -f 'mpi-io/fortran/wr_atallef.c' || echo '$(srcdir)/'`mpi-io/fortran/wr_atallef.c
-
-mpi-io/fortran/libpromio_la-write_allbf.lo: mpi-io/fortran/write_allbf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-write_allbf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-write_allbf.Tpo -c -o mpi-io/fortran/libpromio_la-write_allbf.lo `test -f 'mpi-io/fortran/write_allbf.c' || echo '$(srcdir)/'`mpi-io/fortran/write_allbf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-write_allbf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-write_allbf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/write_allbf.c' object='mpi-io/fortran/libpromio_la-write_allbf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-write_allbf.lo `test -f 'mpi-io/fortran/write_allbf.c' || echo '$(srcdir)/'`mpi-io/fortran/write_allbf.c
-
-mpi-io/fortran/libpromio_la-write_allef.lo: mpi-io/fortran/write_allef.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-write_allef.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-write_allef.Tpo -c -o mpi-io/fortran/libpromio_la-write_allef.lo `test -f 'mpi-io/fortran/write_allef.c' || echo '$(srcdir)/'`mpi-io/fortran/write_allef.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-write_allef.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-write_allef.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/write_allef.c' object='mpi-io/fortran/libpromio_la-write_allef.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-write_allef.lo `test -f 'mpi-io/fortran/write_allef.c' || echo '$(srcdir)/'`mpi-io/fortran/write_allef.c
-
-mpi-io/fortran/libpromio_la-write_allf.lo: mpi-io/fortran/write_allf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-write_allf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-write_allf.Tpo -c -o mpi-io/fortran/libpromio_la-write_allf.lo `test -f 'mpi-io/fortran/write_allf.c' || echo '$(srcdir)/'`mpi-io/fortran/write_allf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-write_allf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-write_allf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/write_allf.c' object='mpi-io/fortran/libpromio_la-write_allf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-write_allf.lo `test -f 'mpi-io/fortran/write_allf.c' || echo '$(srcdir)/'`mpi-io/fortran/write_allf.c
-
-mpi-io/fortran/libpromio_la-write_atallf.lo: mpi-io/fortran/write_atallf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-write_atallf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-write_atallf.Tpo -c -o mpi-io/fortran/libpromio_la-write_atallf.lo `test -f 'mpi-io/fortran/write_atallf.c' || echo '$(srcdir)/'`mpi-io/fortran/write_atallf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-write_atallf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-write_atallf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/write_atallf.c' object='mpi-io/fortran/libpromio_la-write_atallf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-write_atallf.lo `test -f 'mpi-io/fortran/write_atallf.c' || echo '$(srcdir)/'`mpi-io/fortran/write_atallf.c
-
-mpi-io/fortran/libpromio_la-write_atf.lo: mpi-io/fortran/write_atf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-write_atf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-write_atf.Tpo -c -o mpi-io/fortran/libpromio_la-write_atf.lo `test -f 'mpi-io/fortran/write_atf.c' || echo '$(srcdir)/'`mpi-io/fortran/write_atf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-write_atf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-write_atf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/write_atf.c' object='mpi-io/fortran/libpromio_la-write_atf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-write_atf.lo `test -f 'mpi-io/fortran/write_atf.c' || echo '$(srcdir)/'`mpi-io/fortran/write_atf.c
-
-mpi-io/fortran/libpromio_la-write_ordbf.lo: mpi-io/fortran/write_ordbf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-write_ordbf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-write_ordbf.Tpo -c -o mpi-io/fortran/libpromio_la-write_ordbf.lo `test -f 'mpi-io/fortran/write_ordbf.c' || echo '$(srcdir)/'`mpi-io/fortran/write_ordbf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-write_ordbf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-write_ordbf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/write_ordbf.c' object='mpi-io/fortran/libpromio_la-write_ordbf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-write_ordbf.lo `test -f 'mpi-io/fortran/write_ordbf.c' || echo '$(srcdir)/'`mpi-io/fortran/write_ordbf.c
-
-mpi-io/fortran/libpromio_la-write_ordef.lo: mpi-io/fortran/write_ordef.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-write_ordef.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-write_ordef.Tpo -c -o mpi-io/fortran/libpromio_la-write_ordef.lo `test -f 'mpi-io/fortran/write_ordef.c' || echo '$(srcdir)/'`mpi-io/fortran/write_ordef.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-write_ordef.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-write_ordef.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/write_ordef.c' object='mpi-io/fortran/libpromio_la-write_ordef.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-write_ordef.lo `test -f 'mpi-io/fortran/write_ordef.c' || echo '$(srcdir)/'`mpi-io/fortran/write_ordef.c
-
-mpi-io/fortran/libpromio_la-write_ordf.lo: mpi-io/fortran/write_ordf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-write_ordf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-write_ordf.Tpo -c -o mpi-io/fortran/libpromio_la-write_ordf.lo `test -f 'mpi-io/fortran/write_ordf.c' || echo '$(srcdir)/'`mpi-io/fortran/write_ordf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-write_ordf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-write_ordf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/write_ordf.c' object='mpi-io/fortran/libpromio_la-write_ordf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-write_ordf.lo `test -f 'mpi-io/fortran/write_ordf.c' || echo '$(srcdir)/'`mpi-io/fortran/write_ordf.c
-
-mpi-io/fortran/libpromio_la-write_shf.lo: mpi-io/fortran/write_shf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-write_shf.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-write_shf.Tpo -c -o mpi-io/fortran/libpromio_la-write_shf.lo `test -f 'mpi-io/fortran/write_shf.c' || echo '$(srcdir)/'`mpi-io/fortran/write_shf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-write_shf.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-write_shf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/write_shf.c' object='mpi-io/fortran/libpromio_la-write_shf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-write_shf.lo `test -f 'mpi-io/fortran/write_shf.c' || echo '$(srcdir)/'`mpi-io/fortran/write_shf.c
-
-mpi-io/fortran/libpromio_la-writef.lo: mpi-io/fortran/writef.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-writef.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-writef.Tpo -c -o mpi-io/fortran/libpromio_la-writef.lo `test -f 'mpi-io/fortran/writef.c' || echo '$(srcdir)/'`mpi-io/fortran/writef.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-writef.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-writef.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/writef.c' object='mpi-io/fortran/libpromio_la-writef.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-writef.lo `test -f 'mpi-io/fortran/writef.c' || echo '$(srcdir)/'`mpi-io/fortran/writef.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-romio_fortran.lo `test -f 'mpi-io/fortran/romio_fortran.c' || echo '$(srcdir)/'`mpi-io/fortran/romio_fortran.c
 
 mpi-io/libpromio_la-close.lo: mpi-io/close.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/libpromio_la-close.lo -MD -MP -MF mpi-io/$(DEPDIR)/libpromio_la-close.Tpo -c -o mpi-io/libpromio_la-close.lo `test -f 'mpi-io/close.c' || echo '$(srcdir)/'`mpi-io/close.c

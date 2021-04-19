@@ -1,6 +1,7 @@
 #include "ampi.h"
 
 #include <string.h>
+#include <stdio.h>
 #include <vector>
 
 FLINKAGE {
@@ -318,7 +319,6 @@ FLINKAGE {
 #define ampi_load_stop_measure FTN_NAME( AMPI_LOAD_STOP_MEASURE, ampi_load_stop_measure )
 #define ampi_load_reset_measure FTN_NAME( AMPI_LOAD_RESET_MEASURE, ampi_load_reset_measure )
 #define ampi_load_set_value FTN_NAME( AMPI_SET_LOAD_VALUE, ampi_load_set_value )
-#define ampi_evacuate FTN_NAME ( AMPI_EVACUATE , ampi_evacuate )
 #define ampi_migrate_to_pe FTN_NAME( AMPI_MIGRATE_TO_PE , ampi_migrate_to_pe )
 #define ampi_set_migratable FTN_NAME ( AMPI_SET_MIGRATABLE , ampi_set_migratable )
 #define ampi_register_pup FTN_NAME( AMPI_REGISTER_PUP , ampi_register_pup )
@@ -2177,13 +2177,6 @@ void ampi_load_set_value(double *value, int *ierr) noexcept
   *ierr = AMPI_Load_set_value(*value);
 }
 
-#if CMK_FAULT_EVAC
-void ampi_evacuate(int *ierr) noexcept
-{
-  *ierr = AMPI_Evacuate();
-}
-#endif
-
 void ampi_migrate_to_pe(int *dest, int *ierr) noexcept
 {
   *ierr = AMPI_Migrate_to_pe(*dest);
@@ -2334,5 +2327,9 @@ void ampi_get_command_argument(int *c, char *str, int *len, int *ierr) noexcept
   }
 }
 
-} // extern "C"
+} // FLINKAGE
 
+CLINKAGE void romio_fortran_error_print(const char * str)
+{
+  fputs(str, stderr);
+}

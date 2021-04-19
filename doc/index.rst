@@ -54,10 +54,7 @@ Charm++ Documentation
    :caption: Deprecated Manuals
    :numbered:
 
-   armci/manual
    charisma/manual
-   charj/manual
-   jade/manual
    parfum/manual
 
 .. toctree::

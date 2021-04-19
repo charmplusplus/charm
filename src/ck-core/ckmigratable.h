@@ -123,14 +123,6 @@ private:
   int prefetchObjID; //From CooRegisterObject
   bool isInCore; //If true, the object is present in memory
 #endif
-
-#if CMK_FAULT_EVAC
-private:
-  bool asyncEvacuate;
-  void AsyncEvacuate(bool set){myRec->AsyncEvacuate(set);asyncEvacuate = set;};
-public:
-  bool isAsyncEvacuate(){return asyncEvacuate;};
-#endif
 };
 
 #endif // CKMIGRATABLE_H

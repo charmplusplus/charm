@@ -7,13 +7,13 @@ set(ampi-h-sources ampi.h ampi-interoperate.h ampif.h ampiimpl.h ddt.h ampi_func
 
 add_library(ampi-compat compat_ampi.c
        compat_ampim.C compat_ampifm.C compat_ampicm.C
-       compat_ampicpp.C)
+       compat_ampicpp.C compat_ampins.C)
 
 
 # fsglobals/pipglobals
 
 add_library(ampi_funcptr_shim ampi_funcptr_shim.C)
-target_compile_options(ampi_funcptr_shim PRIVATE -language ampi -DAMPI_USE_FUNCPTR -DAMPI_NO_UNIMPLEMENTED_WARNINGS -fPIE -shared -fvisibility=hidden)
+target_compile_options(ampi_funcptr_shim PRIVATE -language ampi -DAMPI_USE_FUNCPTR -DAMPI_NO_UNIMPLEMENTED_WARNINGS -fPIE -shared)
 add_dependencies(ampi_funcptr_shim moduleampi)
 add_custom_command(TARGET ampi_funcptr_shim
     POST_BUILD
@@ -50,11 +50,29 @@ add_custom_command(TARGET ampi_funcptr_loader_stub
 
 if(CMK_CAN_LINK_FORTRAN)
     add_library(ampi_funcptr_shim_fortran ampif.C)
-    target_compile_options(ampi_funcptr_shim_fortran PRIVATE -language ampi -DAMPI_USE_FUNCPTR -fPIE -shared -fvisibility=hidden)
+    target_compile_options(ampi_funcptr_shim_fortran PRIVATE -language ampi -DAMPI_USE_FUNCPTR -fPIE -shared)
     add_dependencies(ampi_funcptr_shim_fortran moduleampi moduleampif)
     add_custom_command(TARGET ampi_funcptr_shim_fortran
         POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_funcptr_shim_fortran.dir/ampif.C.o ${CMAKE_BINARY_DIR}/lib/ampi_funcptr_shim_fortran.o
+        VERBATIM
+    )
+
+    add_library(ampi_funcptr_shim_fortran_impl ampifimpl.f90)
+    target_compile_options(ampi_funcptr_shim_fortran_impl PRIVATE -language ampi -fPIE -shared)
+    add_dependencies(ampi_funcptr_shim_fortran_impl moduleampi moduleampif)
+    add_custom_command(TARGET ampi_funcptr_shim_fortran_impl
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_funcptr_shim_fortran_impl.dir/ampifimpl.f90.o ${CMAKE_BINARY_DIR}/lib/ampi_funcptr_shim_fortran_impl.o
+        VERBATIM
+    )
+
+    add_library(ampi_funcptr_shim_fortran_mod ampimod.f90)
+    target_compile_options(ampi_funcptr_shim_fortran_mod PRIVATE -language ampi -fPIE -shared)
+    add_dependencies(ampi_funcptr_shim_fortran_mod moduleampi moduleampif)
+    add_custom_command(TARGET ampi_funcptr_shim_fortran_mod
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_funcptr_shim_fortran_mod.dir/ampimod.f90.o ${CMAKE_BINARY_DIR}/lib/ampi_funcptr_shim_fortran_mod.o
         VERBATIM
     )
 
@@ -326,61 +344,7 @@ if(CMK_AMPI_WITH_ROMIO)
         set(romio_f77 yes)
 
         set(romio-fortran-objects
-            ${romio_dir}/mpi-io/fortran/closef${obj_suf}
-            ${romio_dir}/mpi-io/fortran/deletef${obj_suf}
-            ${romio_dir}/mpi-io/fortran/fsyncf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/get_amodef${obj_suf}
-            ${romio_dir}/mpi-io/fortran/get_atomf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/get_bytofff${obj_suf}
-            ${romio_dir}/mpi-io/fortran/get_errhf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/get_extentf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/get_groupf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/get_infof${obj_suf}
-            ${romio_dir}/mpi-io/fortran/get_posnf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/get_posn_shf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/get_sizef${obj_suf}
-            ${romio_dir}/mpi-io/fortran/get_viewf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/iotestf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/iowaitf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/iread_atf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/ireadf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/iread_shf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/iwrite_atf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/iwritef${obj_suf}
-            ${romio_dir}/mpi-io/fortran/iwrite_shf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/openf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/preallocf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/rd_atallbf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/rd_atallef${obj_suf}
-            ${romio_dir}/mpi-io/fortran/read_allbf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/read_allef${obj_suf}
-            ${romio_dir}/mpi-io/fortran/read_allf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/read_atallf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/read_atf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/readf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/read_ordbf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/read_ordef${obj_suf}
-            ${romio_dir}/mpi-io/fortran/read_ordf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/read_shf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/seekf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/seek_shf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/set_atomf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/set_errhf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/set_infof${obj_suf}
-            ${romio_dir}/mpi-io/fortran/set_sizef${obj_suf}
-            ${romio_dir}/mpi-io/fortran/set_viewf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/wr_atallbf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/wr_atallef${obj_suf}
-            ${romio_dir}/mpi-io/fortran/write_allbf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/write_allef${obj_suf}
-            ${romio_dir}/mpi-io/fortran/write_allf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/write_atallf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/write_atf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/writef${obj_suf}
-            ${romio_dir}/mpi-io/fortran/write_ordbf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/write_ordef${obj_suf}
-            ${romio_dir}/mpi-io/fortran/write_ordf${obj_suf}
-            ${romio_dir}/mpi-io/fortran/write_shf${obj_suf}
+            ${romio_dir}/mpi-io/fortran/romio_fortran${obj_suf}
         )
     else()
         set(romio_f77 no)
@@ -397,7 +361,7 @@ if(CMK_AMPI_WITH_ROMIO)
     # Compile ROMIO with the same flags as AMPI
     get_target_property(CK_CFLAGS ck COMPILE_OPTIONS)
     string(REPLACE ";" " " CK_CFLAGS "${CK_CFLAGS}")
-    set(ROMIO_FLAGS "${CK_CFLAGS} -DAMPI_NO_UNIMPLEMENTED_WARNINGS -standalone")
+    set(ROMIO_FLAGS "${CK_CFLAGS} -DAMPI_NO_UNIMPLEMENTED_WARNINGS -standalone -fPIC")
 
     include(ExternalProject)
     ExternalProject_Add(romio
@@ -425,6 +389,14 @@ if(CMK_AMPI_WITH_ROMIO)
         INSTALL_COMMAND ""
         LIST_SEPARATOR ^^
     )
+
+    if(CMK_CAN_LINK_FORTRAN)
+        add_custom_command(TARGET romio
+            POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy ${romio_dir}/mpi-io/fortran/romio_fortran${obj_suf} ${CMAKE_BINARY_DIR}/lib/ampi_funcptr_shim_fortran_romio.o
+            VERBATIM
+        )
+    endif()
 
     # Since we link a program with charmc as part of ROMIO's configure,
     # we need all libraries built at this point.
@@ -475,7 +447,7 @@ if(CMK_CAN_LINK_FORTRAN)
     add_library(ampifimpl OBJECT ampifimpl.f90)
     target_compile_options(ampifimpl PRIVATE -I${CMAKE_BINARY_DIR}/include/ampi/)
     add_library(ampimod OBJECT ampimod.f90)
-    target_compile_options(ampimod PRIVATE -cpmod -I${CMAKE_BINARY_DIR}/include/ampi/)
+    target_compile_options(ampimod PRIVATE -I${CMAKE_BINARY_DIR}/include/ampi/)
     add_dependencies(ampif ck)
     add_dependencies(ampifimpl ck)
     add_dependencies(ampimod ck)
@@ -485,6 +457,7 @@ if(CMK_CAN_LINK_FORTRAN)
         COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampif.dir/ampif.C.o ${CMAKE_BINARY_DIR}/lib/ampif.o
         COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampifimpl.dir/ampifimpl.f90.o ${CMAKE_BINARY_DIR}/lib/ampifimpl.o
         COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampimod.dir/ampimod.f90.o ${CMAKE_BINARY_DIR}/lib/ampimod.o
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/mpi.mod ${CMAKE_BINARY_DIR}/include/
         VERBATIM
     )
 endif()

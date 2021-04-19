@@ -577,7 +577,7 @@ public:
 		CcdCallOnConditionKeep(CcdPROCESSOR_END_IDLE,perfmanager_stats_idle,0);
 		
 		/* Don't let the load balancer move stuff onto node 0: */
-		char *bitmap=new char[CkNumPes()];
+		std::vector<char> bitmap(CkNumPes());
 		for (int i=0;i<CkNumPes();i++)
 			bitmap[i]=(i!=masterProcessor);
 		set_avail_vector(bitmap);

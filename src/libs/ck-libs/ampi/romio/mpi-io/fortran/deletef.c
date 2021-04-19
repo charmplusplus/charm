@@ -11,6 +11,8 @@
 #include "adio.h"
 #include "mpio.h"
 
+#include "romio_fortran.h"
+
 
 #if defined(MPIO_BUILD_PROFILING) || defined(HAVE_WEAK_SYMBOLS)
 
@@ -124,12 +126,12 @@ FORTRAN_API void FORT_CALL mpi_file_delete_(char *filename FORT_MIXED_LEN(str_le
 
     /* strip trailing blanks */
     if (filename <= (char *) 0) {
-        FPRINTF(stderr, "MPI_File_delete: filename is an invalid address\n");
+        romio_fortran_error_print("MPI_File_delete: filename is an invalid address\n");
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
     for (i=str_len-1; i>=0; i--) if (filename[i] != ' ') break;
     if (i < 0) {
-        FPRINTF(stderr, "MPI_File_delete: filename is a blank string\n");
+        romio_fortran_error_print("MPI_File_delete: filename is a blank string\n");
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
     real_len = i + 1;

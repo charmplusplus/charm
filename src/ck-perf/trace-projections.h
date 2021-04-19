@@ -24,7 +24,7 @@
 
 #include "pup.h"
 
-#define PROJECTION_VERSION  "10.0"
+#define PROJECTION_VERSION  "11.0"
 
 #define PROJ_ANALYSIS 1
 

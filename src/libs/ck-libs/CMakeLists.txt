@@ -14,12 +14,6 @@ configure_file(sparseContiguousReducer/cksparsecontiguousreducer.h ${CMAKE_BINAR
 add_library(modulemsa multiphaseSharedArrays/msa.h multiphaseSharedArrays/msa-common.h multiphaseSharedArrays/msa-distArray.h multiphaseSharedArrays/msa-DistPageMgr.h multiphaseSharedArrays/msa-distArray.C)
 add_dependencies(modulemsa ck)
 
-# armci
-configure_file(armci/libmodulearmci.dep ${CMAKE_BINARY_DIR}/lib COPYONLY)
-configure_file(armci/armci.h ${CMAKE_BINARY_DIR}/include COPYONLY)
-add_library(modulearmci armci/armci_vp.C armci/armci_impl.h armci/armci_api.C armci/armci.h)
-add_dependencies(modulearmci ck)
-
 # collide
 set(collide-h-sources collide/collide_util.h collide/bbox.h
     collide/collide_cfg.h collide/collidecharm.h collide/collidec.h

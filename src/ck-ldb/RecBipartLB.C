@@ -111,9 +111,12 @@ vector<Vertex_helper*> vhelpers;
 int numparts, peno;
 ProcArray* parray;
 
-CreateLBFunc_Def(
-    RecBipartLB,
-    "Algorithm for load balacing based on recursive bipartitioning of object graph");
+static void lbinit()
+{
+  LBRegisterBalancer<RecBipartLB>(
+      "RecBipartLB",
+      "Algorithm for load balacing based on recursive bipartitioning of object graph");
+}
 
 // removes from BQueue but not from boundaryline
 bool BQueue::removeToSwap(Vertex* vert)
@@ -201,12 +204,13 @@ void RecursiveBiPart(ObjGraph* ogr, vector<Vertex*>& pvertices, int parent, int 
   // further
   if (nump == 1)
   {
-    parray->procs[peno].totalLoad() = 0.0;
+    double totalLoad = 0;
     for (Vertex* vertex : pvertices)
     {
       vertex->setNewPe(peno);
-      parray->procs[peno].totalLoad() += vertex->getVertexLoad();
+      totalLoad += vertex->getVertexLoad();
     }
+    parray->procs[peno].setTotalLoad(totalLoad);
     peno++;
 
     return;

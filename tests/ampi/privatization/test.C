@@ -104,8 +104,10 @@ void privatization_test_framework(void)
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &p);
 
-  int my_wth, flag;
-  MPI_Comm_get_attr(MPI_COMM_WORLD, AMPI_MY_WTH, &my_wth, &flag);
+  int * my_wth_ptr;
+  int flag;
+  MPI_Comm_get_attr(MPI_COMM_WORLD, AMPI_MY_WTH, &my_wth_ptr, &flag);
+  int my_wth = *my_wth_ptr;
 
   int test = 1;
   int operation;

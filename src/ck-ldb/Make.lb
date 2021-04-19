@@ -2,6 +2,8 @@
 COMMON_LDBS=\
    TreeLB \
    DistributedLB \
+   MetisLB \
+   RecBipartLB \
    manager.o
 
 ALL_LDBS=\
@@ -48,6 +50,8 @@ EVERYLB_DEPS=EveryLB.o \
 COMMONLBS_DEPS=CommonLBs.o \
     TreeLB.o \
     DistributedLB.o \
+    MetisLB.o \
+    RecBipartLB.o \
     manager.o \
 
 $(L)/libmoduleEveryLB.a: $(EVERYLB_DEPS)

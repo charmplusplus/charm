@@ -56,8 +56,6 @@ Orion Sky Lawlor, olawlor@acm.org
 #include "ckarray.h"
 #include <stdarg.h>
 
-CpvDeclare(int ,serializer); // if !CMK_FAULT_EVAC, serializer is always 0
-
 bool _isAnytimeMigration;
 bool _isStaticInsertion;
 bool _isNotifyChildInRed;
@@ -585,9 +583,14 @@ static CkArrayID CkCreateArray(CkArrayMessage *m, int ctor, CkArrayOptions opts)
   CkGroupID locMgr = opts.getLocationManager();
   if (locMgr.isZero())
   { //Create a new location manager
-    CkEntryOptions  e_opts;
-    e_opts.setGroupDepID(opts.getMap());       // group creation dependence
-    locMgr = CProxy_CkLocMgr::ckNew(opts, &e_opts);
+    CkGroupID locCache;
+    CkEntryOptions locCacheOpts;
+    locCacheOpts.setGroupDepID(opts.getMap());       // group creation dependence
+    locCache = CProxy_CkLocCache::ckNew(&locCacheOpts);
+    opts.setLocationCache(locCache);
+    CkEntryOptions locMgrOpts;
+    locMgrOpts.setGroupDepID(locCache);
+    locMgr = CProxy_CkLocMgr::ckNew(opts, &locMgrOpts);
     opts.setLocationManager(locMgr);
   }
   CkGroupID mCastMgr = opts.getMcastManager();
@@ -1075,24 +1078,6 @@ inline void msg_prepareSend(CkArrayMessage *msg, int ep,CkArrayID aid)
 #endif
 }
 
-
-/// Just a non-inlined version of msg_prepareSend()
-void msg_prepareSend_noinline(CkArrayMessage *msg, int ep,CkArrayID aid)
-{
-	envelope *env=UsrToEnv((void *)msg);
-	env->setArrayMgr(aid);
-	env->getsetArraySrcPe()=CkMyPe();
-#if CMK_SMP_TRACE_COMMTHREAD
-        env->setSrcPe(CkMyPe());
-#endif
-	env->setEpIdx(ep);
-	env->getsetArrayHops()=0;
-#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-	criticalPath_send(env);
-	automaticallySetMessagePriority(env);
-#endif
-}
-
 void CProxyElement_ArrayBase::ckSend(CkArrayMessage *msg, int ep, int opts) const
 {
 #if CMK_ERROR_CHECKING
@@ -1405,8 +1390,9 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage* msg, int ep, int opts) const
   } else {
     //Broadcast message via serializer node
     _TRACE_CREATION_DETAILED(UsrToEnv(msg), ep);
+    static constexpr int serializer = 0;
     int skipsched = opts & CK_MSG_EXPEDITED;
-    if (CkMyPe() == CpvAccess(serializer)) {
+    if (CkMyPe() == serializer) {
       DEBB((AA "Sending array broadcast\n" AB));
       if (skipsched && _entryTable[ep]->noKeep) {
         CProxy_CkArray(_aid).recvNoKeepExpeditedBroadcast(msg);
@@ -1419,7 +1405,7 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage* msg, int ep, int opts) const
       }
     } else {
       DEBB((AA "Forwarding array broadcast to serializer node %d\n" AB,
-          CpvAccess(serializer)));
+          serializer));
       CProxy_CkArray ap(_aid);
       if (CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_SEND_MSG ||
           CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_MSG) {
@@ -1432,7 +1418,7 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage* msg, int ep, int opts) const
         w.msg = msg;
         w.ep = ep;
         w.opts = opts;
-        ap[CpvAccess(serializer)].incrementBcastNoAndSendBack(CkMyPe(), w);
+        ap[serializer].incrementBcastNoAndSendBack(CkMyPe(), w);
       } else
       {
         // Regular Bcast (non ZC) is implemented on non-zero root nodes by
@@ -1441,15 +1427,15 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage* msg, int ep, int opts) const
         // (and avoid multiple delivery or no delivery of the message) when
         // load balancing occurs during a broadcast
         DEBB((AA "Forwarding array broadcast to serializer node %d\n" AB,
-            CpvAccess(serializer)));
+            serializer));
         if (skipsched && _entryTable[ep]->noKeep) {
-          ap[CpvAccess(serializer)].sendNoKeepExpeditedBroadcast(msg);
+          ap[serializer].sendNoKeepExpeditedBroadcast(msg);
         } else if (skipsched) {
-          ap[CpvAccess(serializer)].sendExpeditedBroadcast(msg);
+          ap[serializer].sendExpeditedBroadcast(msg);
         } else if (_entryTable[ep]->noKeep) {
-          ap[CpvAccess(serializer)].sendNoKeepBroadcast(msg);
+          ap[serializer].sendNoKeepBroadcast(msg);
         } else {
-          ap[CpvAccess(serializer)].sendBroadcast(msg);
+          ap[serializer].sendBroadcast(msg);
         }
       }
     }
@@ -1485,13 +1471,14 @@ void CkArray::sendZCBroadcast(MsgPointerWrapper w) {
 /// Reflect a broadcast off this Pe:
 void CkArray::sendBroadcast(CkMessage* msg) {
   CK_MAGICNUMBER_CHECK
+  static constexpr int serializer = 0;
   // TODO: is this recheck necessary? If so, it's necessary in the others too
-  if (CkMyPe() == CpvAccess(serializer)) {
+  if (CkMyPe() == serializer) {
     //Broadcast the message to all processors
     UsrToEnv(msg)->setMsgtype(ArrayBcastMsg);
     thisProxy.recvBroadcast(msg);
   } else {
-    thisProxy[CpvAccess(serializer)].sendBroadcast(msg);
+    thisProxy[serializer].sendBroadcast(msg);
   }
 }
 
