@@ -2159,8 +2159,14 @@ void ampi::split(int color,int key,MPI_Comm *dest, AmpiCommType type) noexcept
   MPI_Comm nextComm = parent->getNextComm();
   ampiSplitKey splitKey(nextComm,color,key,myRank,type);
   int rootIdx=myComm->getIndexForRank(0);
-  CkCallback cb(CkIndex_ampi::splitPhase1(0),CkArrayIndex1D(rootIdx),myComm->getProxy());
-  contribute(sizeof(splitKey),&splitKey,CkReduction::concat,cb);
+  if (type == COMM_INTER) {
+    CkCallback cb(CkIndex_ampi::splitPhaseInter(0),CkArrayIndex1D(rootIdx),myComm->getProxy());
+    contribute(sizeof(splitKey),&splitKey,CkReduction::concat,cb);
+  }
+  else {
+    CkCallback cb(CkIndex_ampi::splitPhase1(0),CkArrayIndex1D(rootIdx),myComm->getProxy());
+    contribute(sizeof(splitKey),&splitKey,CkReduction::concat,cb);
+  }
 
   ampi * dis = block(); //Resumed by ampi::registrationFinish
   nextComm = dis->parent->getNextComm()-1;
