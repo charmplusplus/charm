@@ -128,6 +128,11 @@ void SavedPerfDatabase::setData(PerfData *source) {
   perfList[curIdx] = source;
 }
 
+
+/*
+ * Reduction operation
+ * Logic is using number of operations of MAX, MIN, AVG
+ */
 void combinePerfData(PerfData *ret, PerfData *source) {
   int k;
   CkAssert(ret!=NULL);
@@ -376,13 +381,14 @@ void TraceAutoPerfBOC::formatPerfData(PerfData *perfdata, int subStep, int phase
     data[AVG_LoadPerObject] /= (data[AVG_NumObjectsPerPE]*numpes);
     data[AVG_BytesPerMsg] = data[AVG_BytesPerObject]/data[AVG_NumMsgsPerObject];
 
-    //TODO
     data[AVG_NumMsgPerPE] = data[AVG_NumMsgsPerObject]/numpes;
     data[AVG_BytesPerPE] = data[AVG_BytesPerObject]/numpes;
-    data[MAX_LoadPerPE] = data[MAX_UtilizationPercentage]*totaltime/steps;
+    data[MAX_LoadPerPE] = data[MAX_UtilizationPercentage]*totaltime;
+    data[AVG_NumInvocations] = data[AVG_NumInvocations]/numpes;
+
+    //TODO
     data[AVG_EntryMethodDuration_1] /= data[AVG_NumInvocations_1];
     data[AVG_EntryMethodDuration_2] /= data[AVG_NumInvocations_2];
-    data[AVG_NumInvocations] = data[AVG_NumInvocations]/numpes/steps;
     data[AVG_NumInvocations_1] = data[AVG_NumInvocations_1]/numpes/steps;
     data[AVG_NumInvocations_2] = data[AVG_NumInvocations_2]/numpes/steps;
   }

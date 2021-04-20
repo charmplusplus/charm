@@ -8,6 +8,7 @@ extern char EffectName[][30];
 #define NUM_MIN 9
 #define NUM_MAX 40 
 #define NUM_NODES   79
+
 enum FieldIndex_t {
   AVG_TotalTime=0,
   AVG_IdlePercentage,
@@ -24,7 +25,7 @@ enum FieldIndex_t {
   AVG_BytesPerObject,
   AVG_LoadPerObject,
   AVG_BytesPerMsg,
-  //TODO
+  //TODO fix average values
   AVG_AppPercentage,
   AVG_EntryMethodDuration_1,
   AVG_EntryMethodDuration_2,
@@ -38,6 +39,7 @@ enum FieldIndex_t {
   AVG_CompressDestBytes,
   AVG_MsgTimeCost,
   AVG_TuningOverhead,
+  //TODO fix order of values reported
   MAX_IdlePercentage,
   MAX_IdlePE,
   MAX_OverheadPercentage,

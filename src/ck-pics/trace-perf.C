@@ -335,35 +335,32 @@ void TraceAutoPerf::summarizeObjectInfo(double &maxtime, double &totaltime,
 PerfData* TraceAutoPerf::getSummary() {
   if(isTraceOn){
   currentSummary->data[AVG_TotalTime] = totalTraceTime();
-  currentSummary->data[AVG_IdlePercentage] = idleRatio();
-  currentSummary->data[AVG_UtilizationPercentage] = utilRatio();
-  currentSummary->data[AVG_OverheadPercentage] = overheadRatio();
+  currentSummary->data[MIN_IdlePercentage] = currentSummary->data[MAX_IdlePercentage] = currentSummary->data[AVG_IdlePercentage] = idleRatio();
+  currentSummary->data[MIN_OverheadPercentage] = currentSummary->data[MAX_OverheadPercentage] = currentSummary->data[AVG_OverheadPercentage] = overheadRatio();
+  currentSummary->data[MIN_UtilizationPercentage] = currentSummary->data[MAX_UtilizationPercentage] = currentSummary->data[AVG_UtilizationPercentage] = utilRatio();
+  currentSummary->data[MAX_NumInvocations] = currentSummary->data[AVG_NumInvocations] = currentSummary->data[AVG_NumInvocations] = (double)totalEntryMethodInvocations;
+
   summarizeObjectInfo(currentSummary->data[MAX_LoadPerObject], currentSummary->data[AVG_LoadPerObject],
                       currentSummary->data[MAX_NumMsgsPerObject],  currentSummary->data[AVG_NumMsgsPerObject],
                       currentSummary->data[MAX_BytesPerObject], currentSummary->data[AVG_BytesPerObject], currentSummary->data[AVG_NumObjectsPerPE]);
   currentSummary->data[AVG_NumMsgRecvPerPE] = currentSummary->data[AVG_NumMsgsPerObject];
   currentSummary->data[AVG_BytesMsgRecvPerPE] = currentSummary->data[AVG_BytesPerObject];
-
-  currentSummary->data[MIN_IdlePercentage]= currentSummary->data[MAX_IdlePercentage]= (idleTime())/currentSummary->data[AVG_TotalTime];
-  currentSummary->data[MAX_LoadPerPE] = currentSummary->data[AVG_TotalTime] - idleTime();
-  currentSummary->data[MIN_UtilizationPercentage] = currentSummary->data[MAX_UtilizationPercentage] = (utilTime())/currentSummary->data[AVG_TotalTime];
-  currentSummary->data[MIN_AppPercentage] = currentSummary->data[MAX_AppPercentage] = appTime();
-  currentSummary->data[AVG_AppPercentage] = appTime();
-  currentSummary->data[AVG_TuningOverhead] = tuneOverheadTotalTime;
-  currentSummary->data[MIN_OverheadPercentage] = currentSummary->data[MAX_OverheadPercentage] = overheadTime();
+  currentSummary->data[MAX_LoadPerPE] = utilRatio();
   currentSummary->data[AVG_EntryMethodDuration]= (double)totalEntryMethodTime;
+  currentSummary->data[MAX_EntryMethodDuration]= maxEntryTime;
+  currentSummary->data[MAX_EntryID]= maxEntryIdx;
+
+  //TODO
+  currentSummary->data[MIN_AppPercentage] = currentSummary->data[MAX_AppPercentage] = currentSummary->data[AVG_AppPercentage] = appTime();
+  currentSummary->data[AVG_TuningOverhead] = tuneOverheadTotalTime;
   currentSummary->data[AVG_EntryMethodDuration_1]= (double)totalEntryMethodTime_1;
   currentSummary->data[AVG_EntryMethodDuration_2]= (double)totalEntryMethodTime_2;
-  currentSummary->data[AVG_NumInvocations] = (double)totalEntryMethodInvocations;
   currentSummary->data[AVG_NumInvocations_1] = (double)totalEntryMethodInvocations_1;
   currentSummary->data[AVG_NumInvocations_2] = (double)totalEntryMethodInvocations_2;
-  currentSummary->data[MAX_EntryMethodDuration]= maxEntryTime;
   currentSummary->data[MAX_EntryMethodDuration_1]= maxEntryTime_1;
   currentSummary->data[MAX_EntryMethodDuration_2]= maxEntryTime_2;
-  currentSummary->data[MAX_EntryID]= maxEntryIdx;
   currentSummary->data[MAX_EntryID_1]= maxEntryIdx_1;
   currentSummary->data[MAX_EntryID_2]= maxEntryIdx_2;
-  currentSummary->data[MAX_NumInvocations] = currentSummary->data[AVG_NumInvocations] = (double)totalEntryMethodInvocations;
 #if CMK_HAS_COUNTER_PAPI
   readPAPI();
   if((papiValues)[1]-previous_papiValues[1] > 0)
