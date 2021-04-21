@@ -43,7 +43,7 @@ public:
   main(CkArgMsg *m);
 
   void accept(std::shared_ptr<Ping> ping);
-
+  void accept(std::vector<Ping*>* pings);
 };
 
 template <typename U> class SimpleArray : public CBase_SimpleArray<U> {
@@ -56,7 +56,6 @@ template <typename U> class SimpleArray : public CBase_SimpleArray<U> {
 
   void done(){
     CkPrintf("done int %d\n",localCopy.publicInt);
-    CkExit();
   }
 
   ~SimpleArray(){}
