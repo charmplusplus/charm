@@ -39,7 +39,6 @@ enum FieldIndex_t {
   AVG_CompressDestBytes,
   AVG_MsgTimeCost,
   AVG_TuningOverhead,
-  //TODO fix order of values reported
   MAX_IdlePercentage,
   MAX_IdlePE,
   MAX_OverheadPercentage,

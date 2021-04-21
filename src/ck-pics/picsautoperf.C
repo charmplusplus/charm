@@ -130,7 +130,7 @@ void SavedPerfDatabase::setData(PerfData *source) {
 
 
 /*
- * Reduction operation
+ * Reduction operation/ Data combined
  * Logic is using number of operations of MAX, MIN, AVG
  */
 void combinePerfData(PerfData *ret, PerfData *source) {
@@ -384,6 +384,7 @@ void TraceAutoPerfBOC::formatPerfData(PerfData *perfdata, int subStep, int phase
     data[AVG_NumMsgPerPE] = data[AVG_NumMsgsPerObject]/numpes;
     data[AVG_BytesPerPE] = data[AVG_BytesPerObject]/numpes;
     data[MAX_LoadPerPE] = data[MAX_UtilizationPercentage]*totaltime;
+    data[MIN_LoadPerPE] = data[MIN_UtilizationPercentage]*totaltime;
     data[AVG_NumInvocations] = data[AVG_NumInvocations]/numpes;
 
     //TODO
@@ -466,7 +467,7 @@ void TraceAutoPerfBOC::globalPerfAnalyze(CkReductionMsg *msg )
   }
   //autoTunerProxy.ckLocalBranch()->printCPToFile(CkpvAccess(fpSummary));
   data=(PerfData*) msg->getData();
-  //save results to database TODO
+  //save results to database
   if(bestTimeStep == -1 || bestTimeStep > timestep)
   {
     isBest = true;

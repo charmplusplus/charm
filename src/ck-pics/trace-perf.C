@@ -156,6 +156,10 @@ void TraceAutoPerf::messageRecv(void *env, int size) {
 
 void TraceAutoPerf::messageSend(void *env, int pe, int size) {
   if(isTraceOn){
+    currentSummary->data[MAX_BytesSend] += size;
+    currentSummary->data[MAX_BytesSendPE] = CkMyPe();
+    currentSummary->data[MAX_NumMsgSend] += 1;
+    currentSummary->data[MAX_NumMsgSendPE] = CkMyPe();
   }
 }
 
@@ -307,14 +311,23 @@ void TraceAutoPerf::traceClose(void)
 
 void TraceAutoPerf::printSummary() { }
 
-void TraceAutoPerf::summarizeObjectInfo(double &maxtime, double &totaltime,
+void TraceAutoPerf::summarizeObjectInfo(double &maxtime, double &totaltime, double &mintime,
     double &maxMsgCount, double &totalMsgCount, double &maxMsgSize,
-    double &totalMsgSize, double &numObjs) {
+    double &totalMsgSize, double &numObjs, double &maxBytesPerMsg, double &minBytesPerMsg) {
   void *maximum = NULL;
+
+  if(objectLoads.size() > 0) {
+    mintime = objectLoads.begin()->second->executeTime;
+    minBytesPerMsg = maxBytesPerMsg = (double)(objectLoads.begin()->second->msgSize)/(double)(objectLoads.begin()->second->msgCount);
+  }
   for(ObjectLoadMap_t::iterator it= objectLoads.begin(); it!= objectLoads.end(); it++)
   {
-    if( it->second->executeTime > maxtime)
+    if(it -> second->executeTime < mintime) {
+      mintime = it->second->executeTime;
+    }
+    if( it->second->executeTime > maxtime) {
       maxtime = it->second->executeTime;
+    }
     totaltime += it->second->executeTime;
 
     if( it->second->msgCount > maxMsgCount) 
@@ -328,6 +341,14 @@ void TraceAutoPerf::summarizeObjectInfo(double &maxtime, double &totaltime,
       maxMsgSize = it->second->msgSize;
     totalMsgSize += it->second->msgSize;
     numObjs++;
+
+    double temp = (double)(it->second->msgSize)/(double)(it->second->msgCount);
+    if(temp > maxBytesPerMsg) {
+      maxBytesPerMsg = temp;
+    }
+    if(temp < minBytesPerMsg) {
+      minBytesPerMsg = temp;
+    }
   }
   numObjs += numNewObjects;
 }
@@ -340,12 +361,13 @@ PerfData* TraceAutoPerf::getSummary() {
   currentSummary->data[MIN_UtilizationPercentage] = currentSummary->data[MAX_UtilizationPercentage] = currentSummary->data[AVG_UtilizationPercentage] = utilRatio();
   currentSummary->data[MAX_NumInvocations] = currentSummary->data[AVG_NumInvocations] = currentSummary->data[AVG_NumInvocations] = (double)totalEntryMethodInvocations;
 
-  summarizeObjectInfo(currentSummary->data[MAX_LoadPerObject], currentSummary->data[AVG_LoadPerObject],
+  summarizeObjectInfo(currentSummary->data[MAX_LoadPerObject], currentSummary->data[AVG_LoadPerObject], currentSummary->data[MIN_LoadPerObject],
                       currentSummary->data[MAX_NumMsgsPerObject],  currentSummary->data[AVG_NumMsgsPerObject],
-                      currentSummary->data[MAX_BytesPerObject], currentSummary->data[AVG_BytesPerObject], currentSummary->data[AVG_NumObjectsPerPE]);
+                      currentSummary->data[MAX_BytesPerObject], currentSummary->data[AVG_BytesPerObject], currentSummary->data[AVG_NumObjectsPerPE],
+                      currentSummary->data[MAX_BytesPerMsg], currentSummary->data[MIN_BytesPerMsg]);
   currentSummary->data[AVG_NumMsgRecvPerPE] = currentSummary->data[AVG_NumMsgsPerObject];
   currentSummary->data[AVG_BytesMsgRecvPerPE] = currentSummary->data[AVG_BytesPerObject];
-  currentSummary->data[MAX_LoadPerPE] = utilRatio();
+  currentSummary->data[MAX_LoadPerPE] = currentSummary->data[MIN_LoadPerPE] = utilRatio();
   currentSummary->data[AVG_EntryMethodDuration]= (double)totalEntryMethodTime;
   currentSummary->data[MAX_EntryMethodDuration]= maxEntryTime;
   currentSummary->data[MAX_EntryID]= maxEntryIdx;
