@@ -185,15 +185,8 @@
        integer, dimension(MPI_STATUS_SIZE) :: MPI_STATUSES_IGNORE
        parameter (MPI_STATUSES_IGNORE = (/-9,-9,-9,-9,-9,-9,-9,-9/))
 
-       integer, parameter :: MPI_COMM_SELF        = 1000000
-       integer, parameter :: MPI_COMM_FIRST_SPLIT = 1000000
-       integer, parameter :: MPI_COMM_FIRST_GROUP = 2000000
-       integer, parameter :: MPI_COMM_FIRST_CART  = 3000000
-       integer, parameter :: MPI_COMM_FIRST_GRAPH = 4000000
-       integer, parameter :: MPI_COMM_FIRST_INTER = 5000000
-       integer, parameter :: MPI_COMM_FIRST_INTRA = 6000000
-       integer, parameter :: MPI_COMM_FIRST_RESVD = 7000000
-       integer, parameter :: MPI_COMM_WORLD       = 9000000
+       integer, parameter :: MPI_COMM_WORLD       = 1000000
+       integer, parameter :: MPI_COMM_SELF        = 1000001
 
        integer, parameter :: MPI_INFO_ENV              = 0
        integer, parameter :: AMPI_INFO_LB_SYNC         = 1
