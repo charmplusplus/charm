@@ -504,6 +504,13 @@ extern void CkChareExtSendWithDeviceData(int aid, int *idx, int ndims,
                                          long *devBufSizesInBytes,
                                          long *streamPtrs, int numDevBufs
                                          );
+extern void CkChareExtSendWithDeviceData_multi(int aid, int *idx, int ndims,
+                                               int epIdx, int num_bufs, char **bufs,
+                                               int *buf_sizes,
+                                               long *devBufPtrs,
+                                               long *devBufSizesInBytes,
+                                               long *streamPtrs, int numDevBufs
+                                              );
 extern int CkDeviceBufferSizeInBytes();
 extern void CkCUDAHtoD(void *dest, void *src, int nbytes, cudaStream_t stream);
 extern void CkCUDADtoH(void *dest, void *src, int nbytes, cudaStream_t stream);

@@ -467,12 +467,11 @@ public:
         int msgSize; implP | msgSize;
         int epIdx; implP | epIdx;
         int d; implP | d;
-
         ArrayMsgGPUDirectRecvExtCallback(((CkGroupID)e->thisArrayID).idx,
                                          int(e->thisIndexMax.getDimension()),
                                          e->thisIndexMax.data(), epIdx,
                                          numDevBufs, devBufSizes, devBufs,
-                                         msgSize, impl_buf+directCopySize+3*sizeof(int), 0);
+                                         msgSize, impl_buf+directCopySize+3*sizeof(int), d);
     } else {
 #endif
     int msgSize; implP|msgSize;
