@@ -824,9 +824,6 @@ do
 		USER_INITIATED_SHARED='1'
 		ARG_OPTS_LD="$ARG_OPTS_LD $arg"
 		;;
-	-L*)
-		ARG_OPTS_LD="$ARG_OPTS_LD $arg"
-		;;
 	-charm-shared|-cs)
 		CHARM_SHARED="1"
 		;;
@@ -853,10 +850,6 @@ do
 		PRODUCTION_MODE=false
 		;;
 
-	-Wl,*)
-		POST_LIBRARIES="$POST_LIBRARIES $arg"
-		;;
-
 	"-pg"|"-g"|-W*|-O*)
 		OPTS="$OPTS $arg"
 		;;
@@ -866,14 +859,34 @@ do
 		shift
 		;;
 
-	-l*|*.a|*.so|*.so.*|*.dylib)
-		if [ -n "$POST_LANGUAGE" ]
-		then
-			POST_LIBRARIES="$POST_LIBRARIES $arg"
-		else
-			PRE_LIBRARIES="$PRE_LIBRARIES $arg"
-		fi
-                INPUT_GIVEN="1"
+	-extend-source)
+		ARG_OPTS_F90+=" $arg"
+		case "$1" in
+		72|80|132)
+			ARG_OPTS_F90+=" $1"
+			shift
+			;;
+		esac
+		;;
+	-no-extend-source)
+		ARG_OPTS_F90+=" $arg"
+		;;
+
+	-L)
+		[[ -n "$POST_LANGUAGE" ]] && POST_LIBRARIES+=" $arg $1" || PRE_LIBRARIES+=" $arg $1"
+		shift
+		;;
+	-L*|-Wl,*)
+		[[ -n "$POST_LANGUAGE" ]] && POST_LIBRARIES+=" $arg" || PRE_LIBRARIES+=" $arg"
+		;;
+	-l)
+		[[ -n "$POST_LANGUAGE" ]] && POST_LIBRARIES+=" $arg $1" || PRE_LIBRARIES+=" $arg $1"
+		shift
+		INPUT_GIVEN='1'
+		;;
+	-l*|*.a|*.so|*.so.*|*.dylib|*.dylib.*)
+		[[ -n "$POST_LANGUAGE" ]] && POST_LIBRARIES+=" $arg" || PRE_LIBRARIES+=" $arg"
+		INPUT_GIVEN='1'
 		;;
 
 	"-whole-archive")
