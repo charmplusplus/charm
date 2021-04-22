@@ -860,43 +860,43 @@ do
 		;;
 
         # filter out Fortran-specific compiler options
-        -ffree-form)
+	-ffree-form)
 		ARG_OPTS_F90+=" $arg"
-                ;;
-        -ffixed-form)
+		;;
+	-ffixed-form)
 		ARG_OPTS_F90+=" $arg"
-                ;;
-        -free)
+		;;
+	-free)
 		ARG_OPTS_F90+=" $arg"
-                ;;
-        -nofree)
+		;;
+	-nofree)
 		ARG_OPTS_F90+=" $arg"
-                ;;
-        -fixed)
+		;;
+	-fixed)
 		ARG_OPTS_F90+=" $arg"
-                ;;
-        -nofixed)
+		;;
+	-nofixed)
 		ARG_OPTS_F90+=" $arg"
-                ;;
-        -ffree-line-length*)
+		;;
+	-ffree-line-length*)
 		ARG_OPTS_F90+=" $arg"
-                ;;
-        -ffixed-line-length*)
+		;;
+	-ffixed-line-length*)
 		ARG_OPTS_F90+=" $arg"
-                ;;
-        -fimplicit-none)
+		;;
+	-fimplicit-none)
 		ARG_OPTS_F90+=" $arg"
-                ;;
-        -fdefault-integer-*)
+		;;
+	-fdefault-integer-*)
 		ARG_OPTS_F90+=" $arg"
-                ;;
-        -fdefault-real-*)
+		;;
+	-fdefault-real-*)
 		ARG_OPTS_F90+=" $arg"
-                ;;
-        -i8)
+		;;
+	-i8)
 		ARG_OPTS_F90+=" $arg"
-                ;;
-        -integer-size)
+		;;
+	-integer-size)
 		ARG_OPTS_F90+=" $arg"
 		case "$1" in
 		16|32|64)
@@ -904,7 +904,7 @@ do
 			shift
 			;;
 		esac
-                ;;
+		;;
 	-extend-source)
 		ARG_OPTS_F90+=" $arg"
 		case "$1" in
