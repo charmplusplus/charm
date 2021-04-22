@@ -36,10 +36,29 @@ main::main(CkArgMsg *m)
     std::vector<bool> dataToCompare3{ false, false, true};
     execute_example<bool>(dataToCompare3);
 
-    thisProxy.accept(std::make_shared<Ping>(42));
+    // create a vector of heap-allocated pings
+    std::vector<Ping*>* pings = new std::vector<Ping*>();
+    for (int i = 0; i < CkNumPes() * 4; i++) {
+      pings->push_back(new Ping(i + 1));
+    }
+    // send the vector as a CkPointer
+    thisProxy.accept(CkPointer<std::vector<Ping*>>(pings));
+    // then clean it up
+    for (auto p: *pings) delete p;
+    delete pings;
+
+    // start QD
+    CkStartQD(CkCallback(CkCallback::ckExit));
 }
 
-void main::accept(std::shared_ptr<Ping> ping)
-{
-    (*ping)();
+void main::accept(std::shared_ptr<Ping> ping) {
+  (*ping)();
+}
+
+void main::accept(std::vector<Ping*>* pings) {
+  for (auto p: *pings) {
+    std::shared_ptr<Ping> p_(p);
+    thisProxy.accept(p_);
+  }
+  delete pings;
 }
