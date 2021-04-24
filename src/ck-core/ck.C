@@ -2268,8 +2268,8 @@ void registerDepositFutureWithIdFn(void (*cb)(void*, void*))
 }
 
 #if CMK_CUDA
-void (*ArrayMsgGPUDirectRecvExtCallback)(int, int, int*, int, int, long*, void *, int, char*, int) = NULL;
-void registerArrayMsgGPUDirectRecvExtCallback(void (*cb)(int, int, int*, int, int, long*, void *, int, char*,int))
+void (*ArrayMsgGPUDirectRecvExtCallback)(int, int, int*, int, int, int*, void *, int, char*, int) = NULL;
+void registerArrayMsgGPUDirectRecvExtCallback(void (*cb)(int, int, int*, int, int, int*, void *, int, char*,int))
 {
   ArrayMsgGPUDirectRecvExtCallback = cb;
 }
@@ -2576,7 +2576,7 @@ void CkChareExtSendWithDeviceData(int aid, int *idx, int ndims,
                                   int epIdx, int num_bufs, char **bufs,
                                   int *buf_sizes,
                                   long *devBufPtrs,
-                                  long *devBufSizesInBytes,
+                                  int *devBufSizesInBytes,
                                   long *streamPtrs, int numDevBufs
                                   )
 {
