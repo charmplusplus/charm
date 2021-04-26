@@ -497,7 +497,7 @@ extern int CkCudaEnabled(void);
 extern int CUDAPointerOnDevice(const void *ptr);
 extern void CkGetGPUDirectData(int numBuffers, void *recvBufPtrs, int *arrSizes,
                                void *remoteBufInfo, void *streamPtrs, int futureId);
-extern void CkChareExtSendWithDeviceData(int aid, int *idx, int ndims,
+extern void CkArrayExtSendWithDeviceData(int aid, int *idx, int ndims,
                                          int epIdx, int num_bufs, char **bufs,
                                          int *buf_sizes,
                                          long *devBufPtrs,
