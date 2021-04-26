@@ -2587,6 +2587,43 @@ void CkGroupExtSend(int gid, int npes, const int *pes, int epIdx, char *msg, int
     CkSendMsgBranchMulti(epIdx, impl_msg, gId, npes, pes, 0);
 }
 
+void CkGroupExtSendWithDeviceData(int gid, int pe, int epIdx, int num_bufs, char **bufs,
+                                  int *buf_sizes, long *devBufPtrs,
+                                  int *devBufSizesInBytes,
+                                  long *streamPtrs, int numDevBufs
+                                  )
+{
+  #if CMK_CUDA
+  CkDeviceBuffer deviceBuffs[numDevBufs];
+  CkDeviceBuffer *deviceBufPtrs[numDevBufs];
+  for (int i = 0; i < numDevBufs; ++i) {
+    //deviceBuffs[i] = CkDeviceBuffer((void *) devBufPtrs[i], ((cudaStream_t*)streamPtrs)[i]);
+    deviceBuffs[i] = CkDeviceBuffer((void *) devBufPtrs[i]);
+    deviceBuffs[i].cnt = devBufSizesInBytes[i];
+    deviceBufPtrs[i] = &deviceBuffs[i];
+  }
+
+  CkRdmaDeviceOnSender(destPe, numDevBufs, deviceBufPtrs);
+
+  CkMarshallMsg *impl_msg = NULL;
+  CkPrepareMessageWithDeviceData(&impl_msg,
+                                 epIdx,
+                                 num_bufs,
+                                 bufs,
+                                 buf_sizes,
+                                 deviceBuffs,
+                                 devBufSizesInBytes,
+                                 numDevBufs
+                                 );
+  CkGroupID gId;
+  gId.idx = gid;
+
+  CkSendMsgBranch(epIdx, impl_msg, pes[0], gId, 0);
+  #else
+  CkAbort("Charm4Py must be built with UCX and CUDA-enabled Charm++ for this feature");
+  #endif
+}
+
 void CkGroupExtSend_multi(int gid, int npes, const int *pes, int epIdx, int num_bufs, char **bufs, int *buf_sizes) {
   CkAssert(num_bufs >= 1);
   int totalSize = 0;
