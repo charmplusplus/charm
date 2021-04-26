@@ -449,6 +449,71 @@ void CUDACallbackManager(void *fn, void *msg) {
 #endif
 
 #if CMK_CHARM4PY
+
+#if CMK_CUDA
+void CkPrepareMessageWithDeviceData(CkMarshallMsg **dest,
+                                    int epIdx,
+                                    int num_bufs,
+                                    char **bufs,
+                                    int *buf_sizes,
+                                    CkDeviceBuffer *deviceBuffs,
+                                    int *devBufSizesInBytes,
+                                    int numDevBufs
+                                    )
+{
+  int impl_off = 0;
+  int totalSize = 0;
+  for(int i = 0; i < num_bufs; i++) totalSize += buf_sizes[i];
+  // Find the size of the PUP'd data
+  int directCopySize = 0;
+  {
+    PUP::sizer implP;
+
+    // GPUDirect data
+    implP | numDevBufs;
+    implP | directCopySize;
+    for (int i = 0; i < numDevBufs; ++i) {
+      implP | devBufSizesInBytes[i];
+      implP | deviceBuffs[i];
+    }
+
+    // Store the size of the data that is used for
+    // GPU Direct. This needs to be separated from the
+    // data in the non-GPUdirect part of the message
+    directCopySize = implP.size();
+
+    // Regular Charm4Py message
+    implP | totalSize;
+    implP | epIdx;
+    implP | buf_sizes[0];
+    for (int i=0; i < num_bufs; i++) implP(bufs[i], buf_sizes[i]);
+    impl_off += implP.size();
+  }
+
+  CkMarshallMsg *impl_msg=CkAllocateMarshallMsg(impl_off,0);
+  {
+    PUP::toMem implP((void *) impl_msg->msgBuf);
+
+    implP | numDevBufs;
+    implP | directCopySize;
+    for (int i = 0; i < numDevBufs; ++i) {
+      implP | devBufSizesInBytes[i];
+      implP | deviceBuffs[i];
+    }
+
+    implP | totalSize;
+    implP | epIdx;
+    implP | buf_sizes[0];
+    for (int i=0; i < num_bufs; i++) implP(bufs[i], buf_sizes[i]);
+  }
+
+  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_DEVICE_MSG;
+  *dest = impl_msg;
+
+}
+
+#endif // CMK_CUDA
+
 extern void (*DepositFutureWithIdFn)(void *, void*);
 int CUDAPointerOnDevice(const void *ptr)
 {
@@ -2581,7 +2646,6 @@ void CkChareExtSendWithDeviceData(int aid, int *idx, int ndims,
                                   )
 {
 #if CMK_CUDA
-  int impl_off = 0;
   CkGroupID gId;
   gId.idx = aid;
 
@@ -2602,52 +2666,17 @@ void CkChareExtSendWithDeviceData(int aid, int *idx, int ndims,
 
   CkRdmaDeviceOnSender(destPe, numDevBufs, deviceBufPtrs);
 
-  int totalSize = 0;
-  for(int i = 0; i < num_bufs; i++) totalSize += buf_sizes[i];
-  // Find the size of the PUP'd data
-  int directCopySize = 0;
-  {
-    PUP::sizer implP;
+  CkMarshallMsg *impl_msg = NULL;
+  CkPrepareMessageWithDeviceData(&impl_msg,
+                                 epIdx,
+                                 num_bufs,
+                                 bufs,
+                                 buf_sizes,
+                                 deviceBuffs,
+                                 devBufSizesInBytes,
+                                 numDevBufs
+                                 );
 
-    // GPUDirect data
-    implP | numDevBufs;
-    implP | directCopySize;
-    for (int i = 0; i < numDevBufs; ++i) {
-      implP | devBufSizesInBytes[i];
-      implP | deviceBuffs[i];
-    }
-
-    // Store the size of the data that is used for
-    // GPU Direct. This needs to be separated from the
-    // data in the non-GPUdirect part of the message
-    directCopySize = implP.size();
-
-    // Regular Charm4Py message
-    implP | totalSize;
-    implP | epIdx;
-    implP | buf_sizes[0];
-    for (int i=0; i < num_bufs; i++) implP(bufs[i], buf_sizes[i]);
-    impl_off += implP.size();
-  }
-
-  CkMarshallMsg *impl_msg=CkAllocateMarshallMsg(impl_off,0);
-  {
-    PUP::toMem implP((void *) impl_msg->msgBuf);
-
-    implP | numDevBufs;
-    implP | directCopySize;
-    for (int i = 0; i < numDevBufs; ++i) {
-      implP | devBufSizesInBytes[i];
-      implP | deviceBuffs[i];
-    }
-
-    implP | totalSize;
-    implP | epIdx;
-    implP | buf_sizes[0];
-    for (int i=0; i < num_bufs; i++) implP(bufs[i], buf_sizes[i]);
-  }
-
-  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_DEVICE_MSG;
 
   UsrToEnv(impl_msg)->setMsgtype(ForArrayEltMsg);
   CkArrayMessage *impl_amsg=(CkArrayMessage *)impl_msg;
