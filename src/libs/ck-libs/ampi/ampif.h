@@ -136,7 +136,7 @@
        integer, parameter :: MPI_KEYVAL_INVALID = -1
        integer, parameter :: MPI_INFO_NULL      = -1
 
-       integer, pointer   :: MPI_IN_PLACE
+       integer, pointer   :: MPI_IN_PLACE => null()
 
        integer, parameter :: MPI_BOTTOM = 0
 
