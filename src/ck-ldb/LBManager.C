@@ -272,7 +272,7 @@ void _loadbalancerInit()
                    "The maximum number of phases that DistributedLB will attempt");
 
   // set up init value for LBPeriod time in seconds
-  // it can also be set by calling LDSetLBPeriod()
+  // it can also be set by calling LBSetPeriod/LBManager::SetLBPeriod
   CmiGetArgDoubleDesc(argv, "+LBPeriod", &_lb_args.lbperiod(),
                       "the minimum time period in seconds allowed for two consecutive "
                       "automatic load balancing");
@@ -486,15 +486,28 @@ void LBManager::InvokeLB()
   {
     loadbalancers[currentLBIndex]->InvokeLB();
   }
+  else
+  {
+    ResumeClients();
+  }
 }
 
 // Called at end of each load balancing cycle
-void LBManager::periodicLB(void* in) { ((LBManager*)in)->InvokeLB(); }
+void LBManager::periodicLB(void* in)
+{
+  auto* const manager = static_cast<LBManager*>(in);
+  manager->isPeriodicQueued = false;
+  manager->InvokeLB();
+}
 
 void LBManager::setTimer()
 {
-  CcdCallFnAfterOnPE((CcdVoidFn)periodicLB, (void*)this, 1000 * _lb_args.lbperiod(),
-                     CkMyPe());
+  if (!isPeriodicQueued)
+  {
+    isPeriodicQueued = true;
+    CcdCallFnAfterOnPE((CcdVoidFn)periodicLB, (void*)this, 1000 * _lb_args.lbperiod(),
+                       CkMyPe());
+  }
 }
 
 // called my constructor
@@ -518,7 +531,7 @@ void LBManager::init(void)
   if (manualOn) TurnManualLBOn();
 #endif
 
-  if (_lb_args.lbperiod() != -1.0)  // check if user set LBPeriod - fix later
+  if (_lb_args.lbperiod() > 0.0)
   {
     setTimer();
   }
@@ -1117,13 +1130,10 @@ void LBChangePredictor(LBPredictorFunction* model)
 #endif
 }
 
-void LBSetPeriod(double second)
+void LBSetPeriod(double period)
 {
 #if CMK_LBDB_ON
-  if (CkpvAccess(lbmanagerInited))
-    LBManager::Object()->SetLBPeriod(second);
-  else
-    _lb_args.lbperiod() = second;
+  LBManager::SetLBPeriod(period);
 #endif
 }
 

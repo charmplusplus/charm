@@ -1185,7 +1185,7 @@ static void arg_init(int argc, const char **argv)
 #if CMK_SMP
     if (arg_requested_pes > 0 && arg_requested_nodes > 0 && arg_ppn > 0 && arg_ppn * arg_requested_nodes != arg_requested_pes)
     {
-      fprintf(stderr, "Charmrun> Error: ++np times ++ppn does not equal +p.\n");
+      fprintf(stderr, "Charmrun> Error: +n/++np %d times ++ppn %d does not equal +p %d.\n", arg_requested_nodes, arg_ppn, arg_requested_pes);
       exit(1);
     }
 
@@ -1198,14 +1198,14 @@ static void arg_init(int argc, const char **argv)
       }
       else
       {
-        fprintf(stderr, "Charmrun> Error: ++ppn (number of PEs per node) does not divide +p (number of PEs).\n");
+        fprintf(stderr, "Charmrun> Error: ++ppn %d (number of PEs per node) does not divide +p %d (number of PEs).\n", arg_ppn, arg_requested_pes);
         exit(1);
       }
     }
 #else
     if (arg_requested_pes > 0 && arg_requested_nodes > 0 && arg_requested_pes != arg_requested_nodes)
     {
-      fprintf(stderr, "Charmrun> Error: +p and ++np do not agree.\n");
+      fprintf(stderr, "Charmrun> Error: +p %d and +n/++np %d do not agree.\n", arg_requested_pes, arg_requested_nodes);
       exit(1);
     }
 #endif

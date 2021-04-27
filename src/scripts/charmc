@@ -581,6 +581,10 @@ do
 		ROSE_OMP_TLS_GLOBALS="yes"
 		;;
 
+	"-fpic"|"-fPIC")
+		USE_PIC='1'
+		;;
+
 	"-fpie"|"-fPIE")
 		USE_PIE='1'
 		;;
@@ -716,12 +720,12 @@ do
 		OPTS="$OPTS $arg"
 		;;
 #------ Dependency generation ---------
-	"-M" | "-MM" | "-MMD" | "-MG")
+	"-M" | "-MM" | "-MMD" | "-MG" | "-MD")
 		SKIPLINK="yes"
 		OPTS="$OPTS $arg"
 		GENDEPENDS="yes"
 		;;
-	"-MF" | "-MT" | "-MQ" | "-MD")	#-MP will pass through automatically
+	"-MF" | "-MT" | "-MQ")	#-MP will pass through automatically
 		OPTS="$OPTS $arg $1"
 		shift
 		;;
@@ -820,9 +824,6 @@ do
 		USER_INITIATED_SHARED='1'
 		ARG_OPTS_LD="$ARG_OPTS_LD $arg"
 		;;
-	-L*)
-		ARG_OPTS_LD="$ARG_OPTS_LD $arg"
-		;;
 	-charm-shared|-cs)
 		CHARM_SHARED="1"
 		;;
@@ -849,10 +850,6 @@ do
 		PRODUCTION_MODE=false
 		;;
 
-	-Wl,*)
-		POST_LIBRARIES="$POST_LIBRARIES $arg"
-		;;
-
 	"-pg"|"-g"|-W*|-O*)
 		OPTS="$OPTS $arg"
 		;;
@@ -862,14 +859,80 @@ do
 		shift
 		;;
 
-	-l*|*.a|*.so|*.so.*|*.dylib)
-		if [ -n "$POST_LANGUAGE" ]
-		then
-			POST_LIBRARIES="$POST_LIBRARIES $arg"
-		else
-			PRE_LIBRARIES="$PRE_LIBRARIES $arg"
-		fi
-                INPUT_GIVEN="1"
+        # filter out Fortran-specific compiler options
+	-ffree-form)
+		ARG_OPTS_F90+=" $arg"
+		;;
+	-ffixed-form)
+		ARG_OPTS_F90+=" $arg"
+		;;
+	-free)
+		ARG_OPTS_F90+=" $arg"
+		;;
+	-nofree)
+		ARG_OPTS_F90+=" $arg"
+		;;
+	-fixed)
+		ARG_OPTS_F90+=" $arg"
+		;;
+	-nofixed)
+		ARG_OPTS_F90+=" $arg"
+		;;
+	-ffree-line-length*)
+		ARG_OPTS_F90+=" $arg"
+		;;
+	-ffixed-line-length*)
+		ARG_OPTS_F90+=" $arg"
+		;;
+	-fimplicit-none)
+		ARG_OPTS_F90+=" $arg"
+		;;
+	-fdefault-integer-*)
+		ARG_OPTS_F90+=" $arg"
+		;;
+	-fdefault-real-*)
+		ARG_OPTS_F90+=" $arg"
+		;;
+	-i8)
+		ARG_OPTS_F90+=" $arg"
+		;;
+	-integer-size)
+		ARG_OPTS_F90+=" $arg"
+		case "$1" in
+		16|32|64)
+			ARG_OPTS_F90+=" $1"
+			shift
+			;;
+		esac
+		;;
+	-extend-source)
+		ARG_OPTS_F90+=" $arg"
+		case "$1" in
+		72|80|132)
+			ARG_OPTS_F90+=" $1"
+			shift
+			;;
+		esac
+		;;
+	-no-extend-source)
+		ARG_OPTS_F90+=" $arg"
+		;;
+
+	-L)
+		[[ -n "$POST_LANGUAGE" ]] && POST_LIBRARIES+=" $arg $1" || PRE_LIBRARIES+=" $arg $1"
+		shift
+		;;
+	-L*|-Wl,*)
+		[[ -n "$POST_LANGUAGE" ]] && POST_LIBRARIES+=" $arg" || PRE_LIBRARIES+=" $arg"
+		;;
+	-l)
+		[[ -n "$POST_LANGUAGE" ]] && POST_LIBRARIES+=" $arg $1" || PRE_LIBRARIES+=" $arg $1"
+		shift
+		INPUT_GIVEN='1'
+		;;
+	-l*|*.a|*.so|*.so.*|*.dylib|*.dylib.*)
+		[[ -n "$POST_LANGUAGE" ]] && POST_LIBRARIES+=" $arg" || PRE_LIBRARIES+=" $arg"
+		INPUT_GIVEN='1'
 		;;
 
 	"-whole-archive")
@@ -1182,10 +1245,14 @@ fi
 
 if [ "$USE_PIE" = "1" ]
 then
-       OPTS_CC="$OPTS_CC $CMK_PIE"
-       OPTS_CXX="$OPTS_CXX $CMK_PIE"
-       OPTS_F90="$OPTS_F90 $CMK_PIE"
-       OPTS_LD="$OPTS_LD $CMK_PIE"
+  # On ICC, specifying PIE cancels PIC even though PIC is stronger.
+  if [[ "$USE_PIC" != '1' ]]
+  then
+    OPTS_CC="$OPTS_CC $CMK_PIE"
+    OPTS_CXX="$OPTS_CXX $CMK_PIE"
+    OPTS_F90="$OPTS_F90 $CMK_PIE"
+  fi
+  OPTS_LD="$OPTS_LD $CMK_PIE"
 fi
 
 if [ "$USE_PIC" = "1" ]
@@ -1879,15 +1946,6 @@ done
 
 Debug "About to compile..."
 
-# Filter spurious cmake arguments
-# CHARM_CXX_FLAGS=`echo $CHARM_CXX_FLAGS | sed s,"$CMK_CXX",,g `
-# CHARM_CC_FLAGS=`echo $CHARM_CC_FLAGS | sed s,"$CMK_CC",,g `
-# CMK_CF90_COMPONLY=`echo $CMK_CF90 | awk '{print $1}'`
-# FILES=`echo $FILES | sed s,"$CMK_CF90_COMPONLY",,g`
-# OPTS_F90=`echo $OPTS_F90 | sed s,"$CMK_CF90_COMPONLY",,g`
-
-# echo $CHARM_CC_FLAGS
-
 for FILE in $FILES
 do
 	BASE=`stripExtention \`basename $FILE\``
@@ -2156,10 +2214,10 @@ case "$LANGUAGE" in
         if [ -n "$NATIVE" ]
  	then
 	  Do $CMK_NATIVE_LD $CMK_NATIVE_LD_FLAGS $OPTS_LD -o $OBJECT $OBJECTFILES \
-		-L$CHARMLIB $PRE_LIBRARIES $CMK_NATIVE_LIBS $POST_LIBRARIES
+		-L$CHARMLIB $USER_PRE_LIBRARIES $CMK_NATIVE_LIBS $USER_POST_LIBRARIES
   	else
 	  Do $CMK_SEQ_LD $CMK_SEQ_LD_FLAGS $CMK_LIBDIR $OPTS_LD -o $OBJECT $OBJECTFILES \
-		-L$CHARMLIB $PRE_LIBRARIES $CMK_SEQ_LIBS $POST_LIBRARIES
+		-L$CHARMLIB $USER_PRE_LIBRARIES $CMK_SEQ_LIBS $USER_POST_LIBRARIES
 	fi
 	Copyobj
 	;;
@@ -2167,10 +2225,10 @@ case "$LANGUAGE" in
         if [ -n "$NATIVE" ]
  	then
 	  Do $CMK_NATIVE_LDXX $CMK_NATIVE_LDXX_FLAGS $OPTS_LD -o $OBJECT $OBJECTFILES \
-		-L$CHARMLIB $PRE_LIBRARIES $CMK_NATIVE_LIBS $POST_LIBRARIES
+		-L$CHARMLIB $USER_PRE_LIBRARIES $CMK_NATIVE_LIBS $USER_POST_LIBRARIES
 	else
 	  Do $CMK_SEQ_LDXX $CMK_SEQ_LDXX_FLAGS $CMK_LIBDIR $OPTS_LD -o $OBJECT $OBJECTFILES \
-		-L$CHARMLIB $PRE_LIBRARIES $CMK_SEQ_LIBS $POST_LIBRARIES
+		-L$CHARMLIB $USER_PRE_LIBRARIES $CMK_SEQ_LIBS $USER_POST_LIBRARIES
 	fi
 	Copyobj
 	;;

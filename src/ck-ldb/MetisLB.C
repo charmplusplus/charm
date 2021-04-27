@@ -134,6 +134,13 @@ void MetisLB::work(LDStats* stats)
   // mapping of objs to partitions
   std::vector<idx_t> pemap(numVertices);
 
+  // METIS always looks at the zeroth element of these, even when there are no edges, so
+  // create dummy elements when there are no edges
+  if (adjncy.data() == nullptr)
+    adjncy = {0};
+  if (adjwgt.data() == nullptr)
+    adjwgt = {0};
+
   // numVertices: num vertices in the graph; ncon: num balancing constrains
   // xadj, adjncy: of size n+1 and adjncy of 2m, adjncy[xadj[i]] through and
   // including adjncy[xadj[i+1]-1];

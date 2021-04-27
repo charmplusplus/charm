@@ -2939,7 +2939,8 @@ appropriate location (generally at a pre-existing synchronization
 boundary) to trigger load balancing by inserting a function call
 (``AtSync()``) in the application source code.  In *periodic load
 balancing mode*, a user specifies only how often load balancing is to
-occur, using the *+LBPeriod* runtime option to specify the time
+occur, using the *+LBPeriod* runtime parameter or the
+``LBManager::SetLBPeriod(double period)`` call to specify the time
 interval.
 
 The detailed APIs of these two methods are described as follows:
@@ -3000,19 +3001,21 @@ The detailed APIs of these two methods are described as follows:
 
 #. **Periodic load balancing mode**: This mode uses a timer to perform
    load balancing periodically at a user-specified interval. In order
-   to use this mode, the user must provide the *+LBPeriod {period}*
-   runtime option, the *{period}* argument specifying the minimum time
-   between consecutive LB invocations in seconds. For example,
-   *+LBPeriod 10.5* can be used to invoke load balancing roughly every
-   10.5 seconds. Additionally, no array element can have
-   ``usesAtSync`` set to true. In this mode, array elements may be
-   asked to migrate at any time, provided that they are not in the
-   middle of executing an entry method. Thus, the PUP routines for
-   array elements must migrate all data needed to reconstruct the
-   object at any point in its lifecycle (as opposed to AtSync mode,
-   where PUP routines for load balancing migration are only called
-   after AtSync() and before ResumeFromSync(), so they can make some
-   assumptions about state).
+   to use this mode, the user must either provide the *+LBPeriod
+   {period}* runtime option or set the period from the application
+   using ``LBManager::SetLBPeriod(double period)`` on every PE, the
+   *period* argument specifying the minimum time between consecutive
+   LB invocations in seconds in both cases. For example, *+LBPeriod
+   10.5* can be used to invoke load balancing roughly every 10.5
+   seconds. Additionally, no array element can have ``usesAtSync`` set
+   to true. In this mode, array elements may be asked to migrate at
+   any time, provided that they are not in the middle of executing an
+   entry method. Thus, the PUP routines for array elements must
+   migrate all data needed to reconstruct the object at any point in
+   its lifecycle (as opposed to AtSync mode, where PUP routines for
+   load balancing migration are only called after ``AtSync()`` and
+   before ``ResumeFromSync()``, so they can make some assumptions
+   about state).
 
    .. note:: Dynamic insertion works with periodic load balancing with
 	     no issues. However, dynamic deletion does not, since
@@ -3082,20 +3085,31 @@ to configure the load balancer, etc. These functions are:
    to tell the load balancer whether this object is migratable or
    not [7]_.
 
-- **LBSetPeriod(double s)**: this function can be called anywhere
-   (even in Charm++ initnodes or initprocs) to change the load
-   balancing period time when using *periodic load balancing mode*. It
-   tells the load balancer not to start next load balancing in less
-   than :math:`s` seconds. Here is how to use it:
+-  **double LBManager::GetLBPeriod()**: returns the current load
+   balancing period when using *periodic load balancing mode*. Returns
+   -1.0 when no period is set or when using a different LB mode.
+
+-  **LBManager::SetLBPeriod(double s)**: The **SetLBPeriod** function
+   can be called anywhere (even in Charm++ initnodes or initprocs) to
+   change the load balancing period time when using *periodic load
+   balancing mode*. It tells the load balancer to use the given period
+   :math:`s` as the new minimum time between load balancing
+   invocations. It may take up to one full cycle of load balancing
+   before the new period comes into effect (so up to the the period
+   after the next load balancing invocation completes). This call
+   should be made at least once on every PE when setting the
+   period. If no elements have ``usesAtSync`` set to true and no LB
+   period was set on the command line, this call will also enable
+   *periodic load balancing mode*. Here is how to use it:
 
    .. code-block:: c++
 
-      // if used in an array element
+      // if used in an array element:
       LBManager* lbmgr = getLBMgr();
       lbmgr->SetLBPeriod(5.0);
 
-      // if used outside of an array element
-      LBSetPeriod(5.0);
+      // If used outside an array element, since it's a static member function:
+      LBManager::SetLBPeriod(5.0);
 
 .. _lbOption:
 
@@ -5549,6 +5563,11 @@ Possible constructors are:
    callback will send its message to the given entry method of the given
    group member.
 
+#. CkCallback(CkFuture fut) - When invoked, the callback will send its
+   message to the given future. For a ck::future object, the underlying
+   CkFuture is accesible via its handle method. For an example, see:
+   ``examples/charm++/hello/xarraySection/hello.C``
+
 One final type of callback, CkCallbackResumeThread(), can only be used
 from within threaded entry methods. This callback type is discussed in
 section :numref:`sec:ckcallbackresumethread`.
@@ -5793,10 +5812,16 @@ futures, which include the following functions:
 | :code:`void CkSendToFuture(CkFuture fut, void *msg)` | :code:`void ck::future::set(T)`     |
 +------------------------------------------------------+-------------------------------------+
 
-You will note that the object-oriented versions are methods of `ck::future`,
-which can be templated with any pup'able type. An example of the
-object-oriented interface is available under `examples/charm++/future`,
-with an equivalent example for the C-compatible interface presented below:
+The object-oriented versions are methods of ``ck::future<T>``, which can be templated with any
+PUP-able type. Note, in most cases, messages/values cannot be retrieved via ``get`` when they were
+not been sent/set by a corresponding call to ``set``; however, it can receive messages of supported,
+internal message types sent via ``CkSendFuture``. Other message types must be wrapped as a PUP-able
+value and explicitly received as the expected message type(s); for example, one might wrap a message
+as ``CkMarshalledMsg`` or ``MsgPointerWrapper`` then type-cast the (``void*``) message on the
+receiver-side. In such cases, one may consider using the C-like API for greater efficiency.
+
+An example of the object-oriented interface is available under `examples/charm++/future`, with an
+equivalent example for the C-compatible interface presented below:
 
 .. code-block:: charmci
 
@@ -12651,7 +12676,7 @@ tracemode:
 Tracemode ``summary``
 ^^^^^^^^^^^^^^^^^^^^^
 
-Compile option: ``-tracemode summary``
+Link time option: ``-tracemode summary``
 
 In this tracemode, execution time across all entry points for each
 processor is partitioned into a fixed number of equally sized

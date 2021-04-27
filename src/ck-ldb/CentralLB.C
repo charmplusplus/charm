@@ -447,7 +447,7 @@ void CentralLB::depositData(CLBStatsMsg *m)
   statsData->from_proc.insert(statsData->from_proc.end(), n_objs, pe);
   statsData->to_proc.insert(statsData->to_proc.end(), n_objs, pe);
 
-  CmiAssert(statsData->commData.size() + n_objs <= statsData->commData.capacity());
+  CmiAssert(statsData->commData.size() + n_comm <= statsData->commData.capacity());
   statsData->commData.insert(statsData->commData.end(), m->commData.begin(), m->commData.end());
 
   statsData->n_migrateobjs +=
@@ -486,7 +486,8 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &&msg)
     CLBStatsMsg *m = msg.getMessage(num);
     CmiAssert(m!=NULL);
     const int pe = m->from_pe;
-    DEBUGF(("Stats msg received, %d %d %d %p step %d\n", pe,stats_msg_count,m->n_objs,m,step()));
+    const int msg_n_objs = m->objData.size();
+    DEBUGF(("Stats msg received, %d %d %d %p step %d\n", pe,stats_msg_count,msg_n_objs,m,step()));
 	
     if (!m->avail_vector.empty()) {
       LBManagerObj()->set_avail_vector(m->avail_vector, m->next_lb);
@@ -513,10 +514,10 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &&msg)
       procStat.pe_speed = m->pe_speed;
       //procStat.utilization = 1.0;
       procStat.available = true;
-      procStat.n_objs = m->n_objs;
+      procStat.n_objs = msg_n_objs;
 
-      n_objs += m->n_objs;
-      n_comm += m->n_comm;
+      n_objs += msg_n_objs;
+      n_comm += m->commData.size();
 #if defined(TEMP_LDB)
 			procStat.pe_temp=m->pe_temp;
 			procStat.pe_speed=m->pe_speed;
