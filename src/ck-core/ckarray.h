@@ -591,7 +591,7 @@ public:
   /// Return the last known processor for this array index.
   /// Valid for any possible array index.
   inline int lastKnown(const CkArrayIndex &idx) const
-	{
+  {
     int pe = locMgr->whichPe(idx);
     return pe == -1 ? homePe(idx) : pe;
   }
