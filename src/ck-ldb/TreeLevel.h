@@ -7,10 +7,12 @@
 #include "TreeLB.h"
 #include "TreeStrategyBase.h"
 #include "charm.h"
+#include "lbdb.h"
 
 #include <algorithm>
 #include <cmath>
 #include <limits>  // std::numeric_limits
+#include <unordered_map>
 #include <vector>
 
 #define FLOAT_TO_INT_MULT 10000
@@ -1138,7 +1140,7 @@ class PELevel : public LevelLogic
     }
   };
 
-  PELevel(LBManager* _lbmgr) : lbmgr(_lbmgr), rateAware(_lb_args.testPeSpeed()) {}
+  PELevel(LBManager* _lbmgr, const bool _useCommMsgs, const bool _useCommBytes) : lbmgr(_lbmgr), useCommMsgs(_useCommMsgs), useCommBytes(_useCommBytes), rateAware(_lb_args.testPeSpeed()) {}
 
   virtual ~PELevel() {}
 
@@ -1148,9 +1150,48 @@ class PELevel : public LevelLogic
     int nobjs = lbmgr->GetObjDataSz();
     std::vector<LDObjData> allLocalObjs(nobjs);
     if (nobjs > 0) lbmgr->GetObjData(allLocalObjs.data());  // populate allLocalObjs
+
+    int dimension = 0;
+    int commDimension = 0;
+
+    struct CommEntry
+    {
+      CmiUInt8 numMessages = 0;
+      CmiUInt8 numBytes = 0;
+    };
+
+    // Object ID -> object comm information
+    std::unordered_map<CmiUInt8, CommEntry> commMap;
+
+    if (useCommMsgs || useCommBytes)  // TODO: pass in some flag to decide to use comm or not
+    {
+      const auto commSize = lbmgr->GetCommDataSz();
+      std::vector<LDCommData> commData;
+      commData.resize(commSize);
+      lbmgr->GetCommData(commData.data());
+
+      for (const auto& entry : commData)
+      {
+        if (entry.from_proc())
+        {
+          // If this send is from a processor rather than an object, skip it
+          continue;
+        }
+        const CmiUInt8 id = entry.sender.objID();
+        auto& value = commMap[id];
+        value.numMessages++;
+        value.numBytes += entry.bytes;
+      }
+
+      if (useCommMsgs)
+        commDimension++;
+      if (useCommBytes)
+        commDimension++;
+    }
+
     myObjs.clear();
     LBRealType nonMigratableLoad = 0;
-    int dimension = -1;
+    int maxObjDimension = -1;
     size_t minPosDimension = std::numeric_limits<size_t>::max();
     size_t maxPosDimension = std::numeric_limits<size_t>::min();
     for (const auto& obj : allLocalObjs)
@@ -1158,7 +1199,7 @@ class PELevel : public LevelLogic
       if (obj.migratable)
       {
         myObjs.emplace_back(obj);
-        dimension = std::max(dimension, (int)obj.vectorLoad.size());
+        maxObjDimension = std::max(maxObjDimension, (int)obj.vectorLoad.size());
         minPosDimension = std::min(minPosDimension, obj.position.size());
         maxPosDimension = std::max(maxPosDimension, obj.position.size());
       }
@@ -1171,9 +1212,12 @@ class PELevel : public LevelLogic
     CkAssertMsg(nobjs == 0 || minPosDimension == maxPosDimension,
                 "Position of every object for LB must be of same dimension!");
     const size_t posDimension = (nobjs == 0) ? 0 : minPosDimension;
+    const bool haveVectorLoad = maxObjDimension > 0;
+    if (haveVectorLoad)
+      dimension = commDimension + maxObjDimension;
+    else
+      dimension = commDimension + 1;
 
-    // Currently assumes that every object sent to LB has the same dimension
-    // Assumes that every PE has at least one object for LB
     // If dimension is 0, then phases are not being used
     // If there are no objects, set dimension to -1
     const auto nobjLoads = nobjs * (1 + dimension);
@@ -1221,15 +1265,42 @@ class PELevel : public LevelLogic
       else
         msg->oloads[index++] = float(myObjs[i].wallTime);
 
-      const auto currentDim = myObjs[i].vectorLoad.size();
-      for (int j = 0; j < currentDim; j++)
+      if (commDimension > 0)
       {
-        msg->oloads[index++] = float(myObjs[i].vectorLoad[j]);
+        CmiUInt8 numMessages = 0;
+        CmiUInt8 numBytes = 0;
+        // If we have a comm entry for this object
+        if (commMap.count(myObjs[i].objID()) > 0)
+        {
+          const auto& objCommData = commMap[myObjs[i].objID()];
+          numMessages = objCommData.numMessages;
+          numBytes = objCommData.numBytes;
+        }
+        if (useCommMsgs)
+          msg->oloads[index++] = numMessages;
+        if (useCommBytes)
+          msg->oloads[index++] = numBytes;
       }
-      for (int j = currentDim; j < dimension; j++)
+
+      if (haveVectorLoad)
       {
-        msg->oloads[index++] = 0;
+        const auto objDim = myObjs[i].vectorLoad.size();
+        for (int j = 0; j < objDim; j++)
+        {
+          msg->oloads[index++] = float(myObjs[i].vectorLoad[j]);
+        }
+        for (int j = objDim; j < maxObjDimension; j++)
+        {
+          msg->oloads[index++] = 0;
+        }
       }
+      // We don't have application vector loads, but we want to use comm info as part of a
+      // vector, so add the regular walltime to the load vector in the message
+      else if (commDimension > 0)
+      {
+        msg->oloads[index++] = msg->oloads[i * (1 + dimension)];
+      }
+
       if (posDimension > 0)
       {
         for (int j = 0; j < posDimension; j++)
@@ -1319,7 +1390,7 @@ class PELevel : public LevelLogic
 
  protected:
   LBManager* lbmgr;
-  bool rateAware;
+  bool rateAware, useCommMsgs, useCommBytes;
   std::vector<LDObjData> myObjs;
 };
 
