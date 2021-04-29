@@ -2443,7 +2443,7 @@ void CkLocCache::updateLocation(const CkLocEntry& newEntry)
   }
 }
 
-void CkLocCache::moveTo(CmiUInt8 id, int pe)
+void CkLocCache::recordEmigration(CmiUInt8 id, int pe)
 {
   LocationMap::iterator itr = locMap.find(id);
 
@@ -3481,7 +3481,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   }
   duringMigration = false;
 
-  cache->moveTo(id, toPe);
+  cache->recordEmigration(id, toPe);
   informHome(idx, toPe);
 
 #if !CMK_LBDB_ON && CMK_GLOBAL_LOCATION_UPDATE

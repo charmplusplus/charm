@@ -339,6 +339,9 @@ public:
   void requestLocation(CmiUInt8 id, int peToTell);
   void updateLocation(const CkLocEntry& e);
 
+  // Update the location table when an element migrates away
+  void recordEmigration(CmiUInt8 id, int pe);
+
   // Query the local location table
   const CkLocEntry& getLocationEntry(CmiUInt8 id) const
   {
@@ -349,8 +352,7 @@ public:
   int getEpoch(const CmiUInt8 id) const { return getLocationEntry(id).epoch; }
   int homePe(const CmiUInt8 id) const { return id >> CMK_OBJID_ELEMENT_BITS; }
 
-  // Modify the location table
-  void moveTo(CmiUInt8 id, int pe);
+  // Insertion and removal
   void insert(CmiUInt8 id, int epoch = 0);
   void erase(CmiUInt8 id) { locMap.erase(id); }
 
