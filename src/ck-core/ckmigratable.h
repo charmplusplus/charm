@@ -55,6 +55,7 @@ public:
   /// for inline call
   LDObjHandle timingBeforeCall(int *objstopped);
   void timingAfterCall(LDObjHandle objHandle,int *objstopped);
+  void initForIntraNodeTransfer();
 
   //Initiate a migration to the given processor
   inline void ckMigrate(int toPe) {myRec->migrateMe(toPe);}
@@ -66,6 +67,8 @@ public:
   void recvLBPeriod(void *data);
   void metaLBCallLB();
   void clearMetaLBData(void);
+
+  virtual void SafeDeleteIntraNode(void);
 
   //used for out-of-core emulation
   virtual void ckJustRestored(void); /*default is empty*/

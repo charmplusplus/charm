@@ -301,7 +301,9 @@ public:
   /// Called by the system just before and after migration to another processor:
   virtual void ckAboutToMigrate(void);
   virtual void ckJustMigrated(void);
-  
+  virtual void eraseObj(void);
+  virtual void updateArray(void);
+
   virtual void ckJustRestored(void);
   
   virtual void ckDestroy(void);

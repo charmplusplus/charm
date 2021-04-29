@@ -1816,6 +1816,22 @@ CkMigratable::~CkMigratable()
   thisIndexMax.dimension = 0;
 }
 
+void CkMigratable::SafeDeleteIntraNode() {
+#if CMK_LBDB_ON
+  if (barrierRegistered) {
+    if (usesAtSync)
+      myRec->getSyncBarrier()->removeClient(ldBarrierHandle);
+  }
+
+  if (_lb_args.metaLbOn()) {
+    myRec->getMetaBalancer()->AdjustCountForDeadContributor(atsync_iteration);
+  }
+#endif
+  myRec->destroy(); /* Attempt to delete myRec if it's no longer in use */
+
+  ((ArrayElement *)this)->eraseObj();
+}
+
 void CkMigratable::CkAbort(const char* format, ...) const
 {
   char newmsg[256];
@@ -2735,9 +2751,8 @@ bool CkLocMgr::addElement(CkArrayID mgr, const CkArrayIndex& idx, CkMigratable* 
 }
 
 // As above, but shared with the migration code
-bool CkLocMgr::addElementToRec(CkLocRec* rec, CkArray* mgr, CkMigratable* elt,
-                               int ctorIdx, void* ctorMsg)
-{
+bool CkLocMgr::addElementToRec(CkLocRec *rec, CkArray *mgr, CkMigratable *elt,
+                               int ctorIdx, void *ctorMsg, bool construct) {
   // Insert the new element into its manager's local list
   CmiUInt8 id = lookupID(rec->getIndex());
   if (mgr->getEltFromArrMgr(id))
@@ -2757,8 +2772,9 @@ bool CkLocMgr::addElementToRec(CkLocRec* rec, CkArray* mgr, CkMigratable* elt,
   CkpvAccess(currentChareIdx) = -1;
 #endif
 
-  if (!rec->invokeEntry(elt, ctorMsg, ctorIdx, true))
-    return false;
+  if (construct)
+    if (!rec->invokeEntry(elt, ctorMsg, ctorIdx, true))
+      return false;
 
 #ifndef CMK_CHARE_USE_PTR
   CkpvAccess(currentChareIdx) = callingChareIdx;
@@ -3286,54 +3302,74 @@ void CkLocMgr::iterate(CkLocIterator& dest)
 }
 
 /************************** LocMgr: MIGRATION *************************/
-void CkLocMgr::pupElementsFor(PUP::er& p, CkLocRec* rec, CkElementCreation_t type,
-                              bool rebuild)
-{
+void CkLocMgr::pupElementsFor(PUP::er &p, CkLocRec *rec,
+                              CkElementCreation_t type, bool rebuild,
+                              int *elCTypeSend, CkMigratable **mig) {
   p.comment("-------- Array Location --------");
+  bool interNode = true;
+  if (mig != NULL)
+    interNode = false;
 
   // First pup the element types
   // (A separate loop so ckLocal works even in element pup routines)
-  for (auto itr = managers.begin(); itr != managers.end(); ++itr)
-  {
+  for (auto itr = managers.begin(); itr != managers.end(); ++itr) {
     int elCType;
-    CkArray* arr = itr->second;
-    if (!p.isUnpacking())
-    {  // Need to find the element's existing type
-      CkMigratable* elt = arr->getEltFromArrMgr(rec->getID());
+    CkArray *arr = itr->second;
+    if (!p.isUnpacking()) { // Need to find the element's existing type
+      CkMigratable *elt = arr->getEltFromArrMgr(rec->getID());
       if (elt)
         elCType = elt->ckGetChareType();
       else
-        elCType = -1;  // Element hasn't been created
+        elCType = -1; // Element hasn't been created
+      if (mig != NULL) {
+        *mig = elt;
+        *elCTypeSend = elCType;
+      }
     }
     p(elCType);
-    if (p.isUnpacking() && elCType != -1)
-    {
+    if (p.isUnpacking() && elCTypeSend != NULL) {
+      elCType = *elCTypeSend;
+    }
+    if (p.isUnpacking() && elCType != -1) {
       // Create the element
-      CkMigratable* elt = arr->allocateMigrated(elCType, type);
+      CkMigratable *elt;
+      if (mig != NULL)
+        elt = *mig;
+      else
+        elt = arr->allocateMigrated(elCType, type);
+
       int migCtorIdx = _chareTable[elCType]->getMigCtor();
+
       // Insert into our tables and call migration constructor
-      if (!addElementToRec(rec, arr, elt, migCtorIdx, NULL))
+      if (!addElementToRec(rec, arr, elt, migCtorIdx, NULL, interNode))
         return;
-      if (type == CkElementCreation_resume)
-      {  // HACK: Re-stamp elements on checkpoint resume--
+      if (!interNode) {
+        elt->initForIntraNodeTransfer();
+        elt->ckFinishConstruction();
+      }
+
+      if (type == CkElementCreation_resume) { // HACK: Re-stamp elements on
+                                              // checkpoint resume--
         //  this restores, e.g., reduction manager's gcount
         arr->stampListenerData(elt);
       }
     }
   }
-  // Next pup the element data
-  for (auto itr = managers.begin(); itr != managers.end(); ++itr)
-  {
-    CkMigratable* elt = itr->second->getEltFromArrMgr(rec->getID());
-    if (elt != NULL)
-    {
-      elt->virtual_pup(p);
+
+  if (interNode) {
+    // Next pup the element data
+    for (auto itr = managers.begin(); itr != managers.end(); ++itr) {
+      CkMigratable *elt = itr->second->getEltFromArrMgr(rec->getID());
+      if (elt != NULL) {
+        elt->virtual_pup(p);
 #if CMK_ERROR_CHECKING
       if (p.isUnpacking())
         elt->sanitycheck();
 #endif
+      }
     }
   }
+
 #if CMK_MEM_CHECKPOINT
   if (rebuild)
   {
@@ -3439,7 +3475,15 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 #endif
                                                     bufSize, managers.size());
 
-  {
+  if (CkMyNode() == CkNodeOf(toPe)) {
+    PUP::toDummy p;
+    int elCType;
+    CkMigratable *mig;
+    pupElementsFor(p, rec, CkElementCreation_migrate, false, &elCType, &mig);
+    msg->elCType = elCType;
+    msg->migEl = mig;
+    msg->srcPe = CkMyPe();
+  } else {
     PUP::toMem p(msg->packData, PUP::er::IS_MIGRATION);
     p.becomeDeleting();
     pupElementsFor(p, rec, CkElementCreation_migrate);
@@ -3451,18 +3495,24 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
           bufSize, p.size());
       CkAbort("Array element's pup routine has a direction mismatch.\n");
     }
+    msg->srcPe = -1;
   }
 
   DEBM((AA "Migrated index size %s to %d \n" AB, idx2str(idx), toPe));
 
-  thisProxy[toPe].immigrate(msg);
-
   duringMigration = true;
   for (auto itr = managers.begin(); itr != managers.end(); ++itr)
   {
-    itr->second->deleteElt(id);
+    CkMigratable *obj = itr->second->getEltFromArrMgr(id);
+    itr->second->eraseEltFromArrMgr(id);
+    if (CkMyNode() == CkNodeOf(toPe))
+      obj->SafeDeleteIntraNode();
+    else
+      delete obj;
   }
   duringMigration = false;
+
+  thisProxy[toPe].immigrate(msg);
 
   // The element now lives on another processor-- tell ourselves and its home
   inform(idx, id, toPe);
@@ -3478,6 +3528,17 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   CK_MAGICNUMBER_CHECK
 }
 
+void CkMigratable::initForIntraNodeTransfer() {
+  CkMigratable_initInfo &i = CkpvAccess(mig_initInfo);
+  myRec = i.locRec;
+  thisIndexMax = myRec->getIndex();
+  thisChareType = i.chareType;
+  barrierRegistered = false;
+  local_state = OFF;
+  prev_load = 0.0;
+  can_reset = false;
+  ((ArrayElement *)this)->updateArray();
+}
 #if CMK_LBDB_ON
 void CkLocMgr::informLBPeriod(CkLocRec* rec, int lb_ideal_period)
 {
@@ -3496,50 +3557,63 @@ void CkLocMgr::metaLBCallLB(CkLocRec* rec)
 void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
 {
   const CkArrayIndex& idx = msg->idx;
+  CkLocRec *rec;
+  bool zcRgetsActive = false;
+  if (msg->srcPe != -1 && CkMyNode() == CkNodeOf(msg->srcPe)) {
+    PUP::fromDummy p;
+    insertID(idx, msg->id);
 
-  PUP::fromMem p(msg->packData, PUP::er::IS_MIGRATION);
+    // Create a record for this element
+    rec = createLocal(idx, true, msg->ignoreArrival,
+                      false /* home told on departure */);
 
-  if (msg->nManagers < managers.size())
-    CkAbort("Array element arrived from location with fewer managers!\n");
-  if (msg->nManagers > managers.size())
-  {
-    // Some array managers haven't registered yet -- buffer the message
-    DEBM((AA "Buffering %s immigrate msg waiting for array registration\n" AB,
-          idx2str(idx)));
-    pendingImmigrate.push_back(msg);
-    return;
-  }
+    // Create the new elements as we unpack the message
+    pupElementsFor(p, rec, CkElementCreation_migrate, false, &(msg->elCType),
+                   &(msg->migEl));
+  } else {
 
-  insertID(idx, msg->id);
+    PUP::fromMem p(msg->packData, PUP::er::IS_MIGRATION);
 
-  // Create a record for this element
-  CkLocRec* rec =
-      createLocal(idx, true, msg->ignoreArrival, false /* home told on departure */);
+    if (msg->nManagers < managers.size())
+      CkAbort("Array element arrived from location with fewer managers!\n");
+    if (msg->nManagers > managers.size()) {
+      // Some array managers haven't registered yet -- buffer the message
+      DEBM((AA "Buffering %s immigrate msg waiting for array registration\n" AB,
+            idx2str(idx)));
+      pendingImmigrate.push_back(msg);
+      return;
+    }
 
-  envelope* env = UsrToEnv(msg);
-  CmiAssert(CpvAccess(newZCPupGets).empty());  // Ensure that vector is empty
-  // Create the new elements as we unpack the message
-  pupElementsFor(p, rec, CkElementCreation_migrate);
-  bool zcRgetsActive = !CpvAccess(newZCPupGets).empty();
-  if (zcRgetsActive)
-  {
-    // newZCPupGets is not empty, rgets need to be launched
-    // newZCPupGets is populated with NcpyOperationInfo during pupElementsFor by
-    // pup_buffer calls that require Rgets Issue Rgets using the populated newZCPupGets
-    // vector
-    zcPupIssueRgets(msg->id, this);
-  }
-  CpvAccess(newZCPupGets).clear();  // Clear this to reuse the vector
-  if (p.size() != msg->length)
-  {
-    CkError(
-        "ERROR! Array element claimed it was %d bytes to a"
-        "packing PUP::er, but %zu bytes in the unpacking PUP::er!\n",
-        msg->length, p.size());
-    CkError("(I have %zu managers; it claims %d managers)\n", managers.size(),
-            msg->nManagers);
+    insertID(idx, msg->id);
 
-    CkAbort("Array element's pup routine has a direction mismatch.\n");
+    // Create a record for this element
+    rec = createLocal(idx, true, msg->ignoreArrival,
+                      false /* home told on departure */);
+
+    envelope *env = UsrToEnv(msg);
+    CmiAssert(CpvAccess(newZCPupGets).empty()); // Ensure that vector is empty
+    // Create the new elements as we unpack the message
+    pupElementsFor(p, rec, CkElementCreation_migrate);
+    zcRgetsActive = !CpvAccess(newZCPupGets).empty();
+    if (zcRgetsActive) {
+      // newZCPupGets is not empty, rgets need to be launched
+      // newZCPupGets is populated with NcpyOperationInfo during pupElementsFor
+      // by
+      // pup_buffer calls that require Rgets Issue Rgets using the populated
+      // newZCPupGets
+      // vector
+      zcPupIssueRgets(msg->id, this);
+    }
+    CpvAccess(newZCPupGets).clear(); // Clear this to reuse the vector
+    if (p.size() != msg->length) {
+      CkError("ERROR! Array element claimed it was %d bytes to a"
+              "packing PUP::er, but %zu bytes in the unpacking PUP::er!\n",
+              msg->length, p.size());
+      CkError("(I have %zu managers; it claims %d managers)\n", managers.size(),
+              msg->nManagers);
+
+      CkAbort("Array element's pup routine has a direction mismatch.\n");
+    }
   }
 
   if (!zcRgetsActive)

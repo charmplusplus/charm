@@ -145,6 +145,30 @@ void PUP::sizer::bytes(void * /*p*/,size_t n,size_t itemSize,dataType /*t*/)
 	nBytes+=n*itemSize;
 }
 
+/*Dummy PUP::er's*/
+void PUP::toDummy::bytes(void *p, size_t n, size_t itemSize, dataType t) {}
+void PUP::fromDummy::bytes(void *p, size_t n, size_t itemSize, dataType t) {}
+
+void PUP::toDummy::pup_buffer(void *&p, size_t n, size_t itemSize, dataType t) {
+}
+void PUP::toDummy::pup_buffer_generic(void *&p, size_t n, size_t itemSize,
+                                      dataType t,
+                                      std::function<void *(size_t)> allocate,
+                                      bool isMalloc) {}
+void PUP::toDummy::pup_buffer(void *&p, size_t n, size_t itemSize, dataType t,
+                              std::function<void *(size_t)> allocate,
+                              std::function<void(void *)> deallocate) {}
+
+void PUP::fromDummy::pup_buffer(void *&p, size_t n, size_t itemSize,
+                                dataType t) {}
+void PUP::fromDummy::pup_buffer_generic(void *&p, size_t n, size_t itemSize,
+                                        dataType t,
+                                        std::function<void *(size_t)> allocate,
+                                        bool isMalloc) {}
+void PUP::fromDummy::pup_buffer(void *&p, size_t n, size_t itemSize, dataType t,
+                                std::function<void *(size_t)> allocate,
+                                std::function<void(void *)> deallocate) {}
+
 /*Memory PUP::er's*/
 void PUP::toMem::bytes(void *p,size_t n,size_t itemSize,dataType t)
 {

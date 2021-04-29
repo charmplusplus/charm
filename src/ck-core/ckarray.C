@@ -387,6 +387,18 @@ ArrayElement::~ArrayElement()
   thisArray=(CkArray *)(intptr_t)0xDEADa7a1;
 }
 
+void ArrayElement::eraseObj() {
+  DEBC((AA "Removing %llu from PE level hashtable\n" AB, ckGetID().getID()));
+  CkpvAccess(array_objs).erase(ckGetID().getID());
+  // To detect use-after-delete:
+  thisArray = (CkArray *)(intptr_t)0xDEADa7a1;
+}
+
+void ArrayElement::updateArray() {
+  thisArray = thisArrayID.ckLocalBranch();
+  CkpvAccess(array_objs)[ckGetID().getID()] = this;
+}
+
 void ArrayElement::pup(PUP::er &p)
 {
   DEBM((AA "  ArrayElement::pup()\n" AB));
