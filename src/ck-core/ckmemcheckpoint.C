@@ -1061,7 +1061,8 @@ void CkMemCheckPT::gotData()
 
 void CkMemCheckPT::updateLocations(int n, CkGroupID *g, CkArrayIndex *idx, CmiUInt8 *id, int nowOnPe)
 {
-
+  // TODO: This function is not called, and no longer works with the new location
+  // management API.
   for (int i=0; i<n; i++) {
     CkLocMgr *mgr = CProxy_CkLocMgr(g[i]).ckLocalBranch();
     //mgr->updateLocation(idx[i], id[i], nowOnPe);

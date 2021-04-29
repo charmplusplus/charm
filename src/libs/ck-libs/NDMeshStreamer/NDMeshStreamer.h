@@ -1295,6 +1295,7 @@ public:
 
   void resendMisdeliveredItems(CkArrayIndex arrayId, int destinationPe) {
 
+    // TODO: This is an optimization that no longer works with the new CkLocMgr API
     //clientLocMgr_->updateLocation(arrayId, clientLocMgr_->lookupID(arrayId),destinationPe);
 
     std::vector<dtype > &bufferedItems
@@ -1315,6 +1316,7 @@ public:
     int prevOwner = clientArrayMgr_->lastKnown((CkArrayIndex)arrayId);
 
     if (prevOwner != destinationPe) {
+      // TODO: This is an optimization that no longer works with the new CkLocMgr API
       //clientLocMgr_->updateLocation(arrayId,clientLocMgr_->lookupID(arrayId), destinationPe);
 
       // it is possible to also fix destinations of items buffered for arrayId,
