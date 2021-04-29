@@ -85,11 +85,15 @@ set(NETWORK "netlrts" CACHE STRING "Target network layer, can be one of mpi,mult
 set(TARGET "charm++" CACHE STRING "Target build type, can be one of charm++,AMPI,LIBS,charm4py,ChaNGa,everylb,all-test")
 set(ARCH "" CACHE STRING "Target architecture, can be one of i386,x86_64,arm7,arm8,ppc64le") # By default, detect arch we are running on.
 
-if(NOT ${ARCH} STREQUAL ${CMAKE_HOST_SYSTEM_PROCESSOR})
-  message(WARNING "Attempting to cross-compile from ${CMAKE_HOST_SYSTEM_PROCESSOR} to ${ARCH}. This is only supported for x86_64 -> i386 currently.")
-  set(CMAKE_C_FLAGS -m32)
-  set(CMAKE_CXX_FLAGS -m32)
-  set(CMAKE_FORTRAN_FLAGS -m32)
+if(NOT ARCH STREQUAL CMAKE_HOST_SYSTEM_PROCESSOR)
+  if (ARCH STREQUAL "i386" AND CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "x86_64")
+    message(WARNING "Attempting to cross-compile from ${CMAKE_HOST_SYSTEM_PROCESSOR} to ${ARCH}. This is only supported for x86_64 -> i386 currently.")
+    set(CMAKE_C_FLAGS -m32)
+    set(CMAKE_CXX_FLAGS -m32)
+    set(CMAKE_FORTRAN_FLAGS -m32)
+  else()
+    message(FATAL_ERROR "Cross-compiling from  ${CMAKE_HOST_SYSTEM_PROCESSOR} to ${ARCH} is not supported currently.")
+  endif()
 endif()
 
 # Platform specific options (choose multiple if desired):
