@@ -92,7 +92,7 @@ if(NOT ARCH STREQUAL CMAKE_HOST_SYSTEM_PROCESSOR)
     set(CMAKE_CXX_FLAGS -m32)
     set(CMAKE_FORTRAN_FLAGS -m32)
   else()
-    message(FATAL_ERROR "Cross-compiling from  ${CMAKE_HOST_SYSTEM_PROCESSOR} to ${ARCH} is not supported currently.")
+    message(WARNING "Cross-compiling from  ${CMAKE_HOST_SYSTEM_PROCESSOR} to ${ARCH} is not supported currently.")
   endif()
 endif()
 
