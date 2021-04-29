@@ -56,9 +56,11 @@ enum CkDDT_Dir : bool {
 inline void serializeContig(char* userdata, char* buffer, size_t size, CkDDT_Dir dir) noexcept
 {
   if (dir == PACK) {
+    DDTDEBUG("CkDDT serializeContig packing %lu bytes from %p to %p\n", size, userdata, buffer);
     memcpy(buffer, userdata, size);
   }
   else {
+    DDTDEBUG("CkDDT serializeContig unpacking %lu bytes from %p to %p\n", size, buffer, userdata);
     memcpy(userdata, buffer, size);
   }
 }
@@ -152,7 +154,7 @@ class CkDDT_DataType
   virtual size_t serialize(char* userdata, char* buffer, int num, int msgLength, CkDDT_Dir dir) const noexcept
   {
     size_t bufSize = std::min((size_t)num * (size_t)size, (size_t)msgLength);
-    DDTDEBUG("CkDDT_Datatype::serialize %s %d objects of type %d (%d bytes)\n",
+    DDTDEBUG("CkDDT_Datatype::serialize %s %d objects of type %d (%lu bytes)\n",
              (dir==PACK)?"packing":"unpacking", num, datatype, bufSize);
     if (iscontig) {
       serializeContig(userdata, buffer, bufSize, dir);
