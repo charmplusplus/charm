@@ -5,6 +5,13 @@
 #include "converse.h"
 #include "pup.h"
 
+#define CMK_OBJID_NULL_TAG 0
+#define CMK_OBJID_ARRAY_TAG 1
+#define CMK_OBJID_SECTION_TAG 2
+#define CMK_OBJID_GROUP_TAG 3
+#define CMK_OBJID_NODEGROUP_TAG 4
+#define CMK_OBJID_SINGLETON_TAG 5
+
 // The default 64-bit ID layout is: 21 collection bits + 24 home bits + 16 element bits + 3 type tag bits.
 // Users can override the number of bits for collections using -DCMK_OBJID_COLLECTION_BITS=N.
 // Users can override the number of home bits using -DCMK_OBJID_HOME_BITS=N.
@@ -40,6 +47,21 @@ static_assert((CMK_OBJID_COLLECTION_BITS + CMK_OBJID_ELEMENT_BITS + CMK_OBJID_HO
 //              "The total number of home bits is not enough for the number of PEs being run on!");
 
 namespace ck {
+
+CmiUInt8 createArrayID(CkGroupID aid, int home, CmiUInt8 eid)
+{
+  return (CMK_OBJID_ARRAY_TAG << (64 - CMK_OBJID_TYPE_TAG_BITS) |
+         (CmiUInt8)gid.idx << (CMK_OBJID_HOME_BITS + CMK_OBJID_ELEMENT_BITS) |
+          home << CMK_OBJID_ELEMENT_BITS |
+          eid);
+}
+
+CmiUInt8 createSectionID(int home, CmiUInt8 sid)
+{
+  return (CMK_OBJID_SECTION_TAG << (64 - CMK_OBJID_TYPE_TAG_BITS) |
+          home << (64 - (CMK_OBJID_TYPE_TAG_BITS + CMK_OBJID_HOME_BITS)) |
+          sid);
+}
 
 /**
  * The basic element identifier
