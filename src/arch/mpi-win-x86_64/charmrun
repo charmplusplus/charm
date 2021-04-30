@@ -10,7 +10,8 @@ args=""
 
 # Arguments that need to be passed to the charm application, not mpirun (e.g. ++quiet)
 charm_args=""
-pes=1
+pes=0
+nodes=0
 ppn=1
 QUIET=0
 XTERM='xterm'
@@ -20,32 +21,48 @@ DEBUGGER='gdb'
 
 while [ $# -gt 0 ]
 do
-    case $1 in
+	case $1 in
+	+n|++n|++np)
+		nodes=$2
+		shift
+		;;
+	+n[0-9]*)
+		nodes="${1#\+n}"
+		;;
+	++n[0-9]*)
+		nodes="${1#\+\+n}"
+		;;
+	++np[0-9]*)
+		nodes="${1#\+\+np}"
+		;;
 	+ppn|++ppn)
-	    args=$args" +ppn "$2
-	    ppn=$2
-	    shift
-	    ;;
+		args=$args" +ppn "$2
+		ppn=$2
+		shift
+		;;
 	+ppn[0-9]*)
-	    args=$args" "$1
-	    ppn=$(echo "$1" | awk '{print substr($1,5)}')
-	    ;;
+		args=$args" "$1
+		ppn="${1#\+ppn}"
+		;;
 	++ppn[0-9]*)
-	    args=$args" "$1
-	    ppn=$(echo "$1" | awk '{print substr($1,6)}')
-	    ;;
-	+p)
-	    pes=$2
-	    shift
-	    ;;
+		args=$args" "$1
+		ppn="${1#\+\+ppn}"
+		;;
+	+p|++p)
+		pes=$2
+		shift
+		;;
+	+p[0-9]*)
+		pes="${1#\+p}"
+		;;
+	++p[0-9]*)
+		pes="${1#\+\+p}"
+		;;
 	+pemap)
 	    args="$args $1 $2"
 	    shift
 	    ;;
-	+p[0-9]*)
-	    pes=$(echo "$1" | awk '{print substr($1,3)}')
-	    ;;
-        -machinefile)
+	-machinefile)
 	    args=" $1 $2 $args"
 	    shift
 	    ;;
@@ -104,26 +121,31 @@ then
   args="$XTERM -e $DEBUGGER $args"
 fi
 
-rem=$((pes % ppn))
-quot=$((pes / ppn))
-if [ $rem -ne 0 ];
+if [[ $nodes = 0 ]]
 then
-    echo "p = $pes should be a multiple of ppn = $ppn"
+  [[ $pes = 0 ]] && pes=1
+  if [[ $(( pes % ppn )) -ne 0 ]]
+  then
+    printf "Charmrun> Error: ++ppn %s (number of PEs per node) does not divide +p %s (number of PEs).\n" "$ppn" "$pes"
     exit 1
-else
-    pes=$quot
+  else
+    nodes=$(( pes / ppn ))
+  fi
+elif [[ $pes != 0 && $pes != $(( nodes * ppn )) ]]
+then
+  printf "Charmrun> Error: +n/++np %s times ++ppn %s does not equal +p %s.\n" "$nodes" "$ppn" "$pes"
+  exit 1
 fi
 
-test $QUIET -eq 0 && echo && echo "Running on $pes processors: $args"
+[[ $QUIET -eq 0 ]] && printf "\nRunning as $nodes OS processes: %s\n" "$args"
 
 
 mpiexec_cmd=$(command -v mpiexec 2>/dev/null)
 if test -n "$mpiexec_cmd"
 then
-    test $QUIET -eq 0 && echo "charmrun> $mpiexec_cmd -n $pes $args"
-    test $QUIET -eq 0 && echo
+    [[ $QUIET -eq 0 ]] && echo "charmrun> $mpiexec_cmd -n $nodes $args" && echo
     # shellcheck disable=SC2086
-    "$mpiexec_cmd" -n $pes $args
+    "$mpiexec_cmd" -n $nodes $args
 else
     echo "Don't know how to run MPI program."
     exit 1

@@ -664,7 +664,7 @@ class CkCompactVec : private CkSTLHelper<T> {
     size_t len; // total number of used elements in block, including ones before offset
     size_t offset;      // global seqno of the first element in the block
     size_t lastnull;    // the array index of the biggest consecutive NULLs
-    void makeBlock(int blklen_,int len_,int offset_=0,int lastnull_=sentinel) {
+    void makeBlock(size_t blklen_, size_t len_, size_t offset_ = 0, size_t lastnull_ = sentinel) {
        if (blklen_==0) block=NULL; //< saves 1-byte allocations
        else {
          block=new T[blklen_];
