@@ -308,7 +308,13 @@ public:
   virtual char *ckDebugChareName(void);
   virtual int ckDebugChareID(char*, int);
 
-  void ckEmigrate(int toPe) {ckMigrate(toPe);}
+  void ckEmigrate(int toPe) {
+    if(!_isAnytimeMigration) {
+      CkPrintf("Charm++> WARNING: Attempted anytime migration is disabled.\n");
+      return;
+    }
+    ckMigrate(toPe);
+  }
 
 
 #ifdef _PIPELINED_ALLREDUCE_
