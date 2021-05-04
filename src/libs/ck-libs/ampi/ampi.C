@@ -583,7 +583,8 @@ CkReductionMsg *AmpiReducerFunc(int nMsg, CkReductionMsg **msgs) noexcept {
   CkReductionMsg *retmsg = CkReductionMsg::buildNew(szhdr+szdata,NULL,AmpiReducer,msgs[0]);
   void *retPtr = (char *)retmsg->getData() + szhdr;
   for(int i=1;i<nMsg;i++){
-    (*func)((void *)((char *)msgs[i]->getData()+szhdr),retPtr,&len,&dtype);
+    AMPI_DEBUG("[%d] inside AmpiReducerFunc, func=%p, nMsg=%d, buf1=%p, buf2=%p, count=%d, size_data=%d, datatype=%d\n", CkMyPe(), func, nMsg, (void *)((char *)msgs[i]->getData()+szhdr), retPtr, len, szdata, dtype);
+    (func)((void *)((char *)msgs[i]->getData()+szhdr),retPtr,&len,&dtype);
   }
   return retmsg;
 }
@@ -5596,6 +5597,7 @@ AMPI_API_IMPL(int, MPI_Iexscan, const void* sendbuf, void* recvbuf, int count, M
 AMPI_API_IMPL(int, MPI_Op_create, MPI_User_function *function, int commute, MPI_Op *op)
 {
   AMPI_API("AMPI_Op_create", function, commute, op);
+  AMPI_DEBUG("[%d] Rank %d in MPI_op_create, user_function = %p\n", CkMyPe(), getAmpiParent()->thisIndex, (void *)function);
   *op = getAmpiParent()->createOp(function, commute);
   return MPI_SUCCESS;
 }
