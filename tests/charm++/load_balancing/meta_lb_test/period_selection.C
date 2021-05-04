@@ -35,6 +35,7 @@ public:
     // TODO: Make a test that works with some empty PEs
     arrayProxy = CProxy_TestArray::ckNew(CkNumPes() * OBJS_PER_PE);
     arrayProxy.balance(iteration);
+    _isAnytimeMigration = false;
   }
 
   void resume() {
@@ -56,6 +57,7 @@ public:
       if (migrations != expected_migrations) {
         CkAbort("Did not do expected number of migrations!\n");
       }
+      _isAnytimeMigration = true;
       CkExit();
     }
   }
