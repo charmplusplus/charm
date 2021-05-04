@@ -584,7 +584,7 @@ CkReductionMsg *AmpiReducerFunc(int nMsg, CkReductionMsg **msgs) noexcept {
   void *retPtr = (char *)retmsg->getData() + szhdr;
   for(int i=1;i<nMsg;i++){
     AMPI_DEBUG("[%d] inside AmpiReducerFunc, func=%p, nMsg=%d, buf1=%p, buf2=%p, count=%d, size_data=%d, datatype=%d\n", CkMyPe(), func, nMsg, (void *)((char *)msgs[i]->getData()+szhdr), retPtr, len, szdata, dtype);
-    (func)((void *)((char *)msgs[i]->getData()+szhdr),retPtr,&len,&dtype);
+    (*func)((void *)((char *)msgs[i]->getData()+szhdr),retPtr,&len,&dtype);
   }
   return retmsg;
 }
