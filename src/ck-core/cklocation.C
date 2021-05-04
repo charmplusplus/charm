@@ -2916,17 +2916,11 @@ void CkLocMgr::removeFromTable(const CmiUInt8 id)
 #endif
 }
 
-/************************** LocMgr: MESSAGING *************************/
-/// Deliver message to this element, going via the scheduler if local
-/// @return 0 if object local, 1 if not
-int CkLocMgr::deliverMsg(CkArrayMessage* msg, CkArrayID mgr, CmiUInt8 id,
-                         const CkArrayIndex* idx, CkDeliver_t type, int opts)
+void CkLocMgr::recordSend(const CkArrayIndex* idx, const CmiUInt8 id,
+                          const unsigned int bytes, const int opts)
 {
-  CkLocRec* rec = elementNrec(id);
-
 #if CMK_LBDB_ON
-  if ((idx || compressor) && type == CkDeliver_queue && !(opts & CK_MSG_LB_NOTRACE) &&
-      lbmgr->CollectingCommStats())
+  if ((idx || compressor) && !(opts & CK_MSG_LB_NOTRACE) && lbmgr->CollectingCommStats())
   {
     // LB deals in IDs with collection information only when CMK_GLOBAL_LOCATION_UPDATE
     // is enabled, so add the group information if so.
@@ -2935,10 +2929,20 @@ int CkLocMgr::deliverMsg(CkArrayMessage* msg, CkArrayID mgr, CmiUInt8 id,
 #  else
     const CmiUInt8 lbObjId = id;
 #  endif
-    lbmgr->Send(
-        myLBHandle, lbObjId, UsrToEnv(msg)->getTotalsize(), cache->lastKnown(id), 1);
+    lbmgr->Send(myLBHandle, lbObjId, bytes, cache->lastKnown(id), 1);
   }
 #endif
+}
+
+/************************** LocMgr: MESSAGING *************************/
+/// Deliver message to this element, going via the scheduler if local
+/// @return 0 if object local, 1 if not
+int CkLocMgr::deliverMsg(CkArrayMessage* msg, CkArrayID mgr, CmiUInt8 id,
+                         const CkArrayIndex* idx, CkDeliver_t type, int opts)
+{
+  CkLocRec* rec = elementNrec(id);
+
+  recordSend(idx, id, UsrToEnv(msg)->getTotalsize(), opts);
 
   // Known, remote location or unknown location
   if (rec == NULL)

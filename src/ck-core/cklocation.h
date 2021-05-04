@@ -644,6 +644,9 @@ public:
   void sendMsg(CkArrayMessage* msg, CkArrayID mgr, const CkArrayIndex& idx,
                CkDeliver_t type, int opts);
 
+  void recordSend(const CkArrayIndex* idx, const CmiUInt8 id, const unsigned int bytes,
+                  const int opts = 0);
+
   // Map stores the CkMigratable elements that have active Rgets
   // ResumeFromSync is not called for these elements until the Rgets have completed
   ElemMap toBeResumeFromSynced;
