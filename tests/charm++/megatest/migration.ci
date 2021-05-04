@@ -3,5 +3,6 @@ module migration {
     entry mig_Element();
     entry void arrive(void);
     entry void done(void);
+    entry void checkDisabledMigration(void);
   };
 };

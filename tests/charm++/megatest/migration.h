@@ -10,6 +10,7 @@ class mig_Element : public CBase_mig_Element
   mig_Element();
   mig_Element(CkMigrateMessage *msg){}
   void done(void);
+  void checkDisabledMigration(void);
   void arrive(void);
   void pup(PUP::er &p);
   void ckJustMigrated();

@@ -39,7 +39,7 @@ mig_Element::arrive(void)
   if(CkMyPe() == origPE) {
     if(sum != ((CkNumPes()+1)*CkNumPes())/2)
       CkAbort("migrate: Element did not migrate to all the processors!\n");
-    self[0].done();
+    self[0].checkDisabledMigration();
   } else {
     if(origPE==(-1)) origPE = CkMyPe();
     sum += CkMyPe() + 1;
@@ -56,11 +56,26 @@ mig_Element::ckJustMigrated()
 }
 
 void
-mig_Element::done(void)
+mig_Element::checkDisabledMigration(void)
 {
+  CProxy_mig_Element self(thisArrayID);
+  _isAnytimeMigration = false;
+  int currPE = CkMyPe();
+  int nextPE = (CkMyPe()+1)%CkNumPes();
+  migrateMe(nextPE);
+  CkWaitQD();
+  if(CkyPe() != currPE) {
+    CkAbort("migrate: Element migrated when anytime migration disabled!\n");
+  }
+  self[0].done();
+}
+
+void mig_Element::done(void) {
   numDone++;
-  if(numDone==ckGetArraySize())
+  if(numDone == ckGetArraySize()) {
+    _isAnytimeMigration = true;
     megatest_finish();
+  }
 }
 
 MEGATEST_REGISTER_TEST(migration,"jackie",1)
