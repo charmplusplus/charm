@@ -7,6 +7,8 @@ set -o errexit -o nounset
 # Determine the location of this script
 my_srcdir="$(cd -P "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
 
+full_args=("$@")
+
 # Check that CMake is available and that the version is sufficiently new
 command -v cmake >/dev/null 2>&1 && rc=$? || rc=$?
 
@@ -71,7 +73,7 @@ function parse_triplet() {
   # Extract extra options from the full_triplet, e.g.,
   # full_triplet='netlrts-darwin-x86_64-smp-omp'
   # becomes actual_triplet='netlrts-darwin-x86_64' and extra_triplet_opts='smp omp'
-  all_triplets=$(cd src/arch && find . -name '*-*' -type d -maxdepth 1 | sed 's,./,,')
+  all_triplets=$(cd src/arch && find . -maxdepth 1 -name '*-*' -type d | sed 's,./,,')
   extra_triplet_opts="$full_triplet"
   for t in $all_triplets; do
     extra_triplet_opts=${extra_triplet_opts#$t}
@@ -501,7 +503,7 @@ my_os=$(echo "$actual_triplet" | cut -d '-' -f2)
 if [[ $opt_network == "mpi" && $my_os == "win" ]]; then
   echo "Warning: CMake build is not supported with MPI on Windows, running ./buildold instead."
   sleep 2
-  "$my_srcdir"/buildold "$@"
+  "$my_srcdir"/buildold "${full_args[@]}"
   exit $?
 fi
 
