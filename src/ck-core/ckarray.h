@@ -680,7 +680,7 @@ public:
 
 /// Demand-creation:
   /// Demand-create an element at this index on this processor
-  void demandCreateElement(const CkArrayIndex &idx, int ctor, CkDeliver_t type);
+  void demandCreateElement(const CkArrayIndex &idx, int ctor);
 
 /// Broadcast communication:
   void sendBroadcast(CkMessage *msg);

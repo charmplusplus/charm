@@ -2959,7 +2959,7 @@ int CkLocMgr::deliverMsg(CkArrayMessage* msg, CkArrayID mgr, CmiUInt8 id,
       return true;
     }
     // unknown location
-    deliverUnknown(msg, idx, type, opts);
+    deliverUnknown(msg, idx, opts);
     return true;
   }
 
@@ -2982,7 +2982,7 @@ int CkLocMgr::deliverMsg(CkArrayMessage* msg, CkArrayID mgr, CmiUInt8 id,
   {  // That sibling of this object isn't created yet!
     if (msg->array_ifNotThere() != CkArray_IfNotThere_buffer)
     {
-      return demandCreateElement(msg, rec->getIndex(), CkMyPe(), type);
+      return demandCreateElement(msg, rec->getIndex(), CkMyPe());
     }
     else
     {  // BUFFERING message for nonexistent element
@@ -3093,15 +3093,14 @@ void CkLocMgr::sendMsg(CkArrayMessage* msg, CkArrayID mgr, const CkArrayIndex& i
       // If requested, demand-create the element:
       if (msg->array_ifNotThere() != CkArray_IfNotThere_buffer)
       {
-        demandCreateElement(msg, idx, -1, type);
+        demandCreateElement(msg, idx, -1);
       }
     }
   }
 }
 
 /// This index is not hashed-- somehow figure out what to do.
-void CkLocMgr::deliverUnknown(CkArrayMessage* msg, const CkArrayIndex* idx,
-                              CkDeliver_t type, int opts)
+void CkLocMgr::deliverUnknown(CkArrayMessage* msg, const CkArrayIndex* idx, int opts)
 {
   CK_MAGICNUMBER_CHECK
   CmiUInt8 id = msg->array_element_id();
@@ -3193,11 +3192,10 @@ void CkLocMgr::demandCreateElement(const CkArrayIndex& idx, int chareType, int o
   // Find the manager and build the element
   DEBC((AA "Demand-creating element %s on pe %d\n" AB, idx2str(idx), onPe));
   inform(idx, getNewObjectID(idx), onPe);
-  CProxy_CkArray(mgr)[onPe].demandCreateElement(idx, ctor, CkDeliver_inline);
+  CProxy_CkArray(mgr)[onPe].demandCreateElement(idx, ctor);
 }
 
-bool CkLocMgr::demandCreateElement(CkArrayMessage* msg, const CkArrayIndex& idx, int onPe,
-                                   CkDeliver_t type)
+bool CkLocMgr::demandCreateElement(CkArrayMessage* msg, const CkArrayIndex& idx, int onPe)
 {
   CK_MAGICNUMBER_CHECK
   int chareType = _entryTable[msg->array_ep()]->chareIdx;
@@ -3224,7 +3222,7 @@ bool CkLocMgr::demandCreateElement(CkArrayMessage* msg, const CkArrayIndex& idx,
   // Find the manager and build the element
   DEBC((AA "Demand-creating element %s on pe %d\n" AB, idx2str(idx), onPe));
   CkArrayID mgr = UsrToEnv((void*)msg)->getArrayMgr();
-  CProxy_CkArray(mgr)[onPe].demandCreateElement(idx, ctor, type);
+  CProxy_CkArray(mgr)[onPe].demandCreateElement(idx, ctor);
   return onPe == CkMyPe();
 }
 
