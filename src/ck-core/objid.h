@@ -48,6 +48,82 @@ static_assert((CMK_OBJID_COLLECTION_BITS + CMK_OBJID_ELEMENT_BITS + CMK_OBJID_HO
 
 namespace ck {
 
+class BaseID
+{
+  protected:
+    constexpr static CmiUInt8 tag_bits = 3;
+    constexpr static CmiUInt8 home_bits = 24;
+
+    constexpr static CmiUInt8 tag_offset = 64 - tag_bits;
+    constexpr static CmiUInt8 home_offset = 64 - (tag_bits + home_bits);
+
+    constexpr static CmiUInt8 tag_mask = ((1ULL << tag_bits) - 1) << tag_offset;
+    constexpr static CmiUInt8 home_mask = ((1ULL << home_bits) - 1) << home_offset;
+
+    CmiUInt8 _id;
+    BaseID() = default;
+    BaseID(CmiUInt8 id) : _id(id) {}
+
+  public:
+    CmiUInt8 id() const
+    {
+      return _id;
+    }
+
+    CmiUInt8 tag() const
+    {
+      return _id >> tag_offset;
+    }
+    CmiUInt8 home() const
+    {
+      return (_id & home_mask) >> home_offset;
+    }
+};
+
+class SectionID : public BaseID
+{
+  private:
+    constexpr static CmiUInt8 counter_bits = 37;
+
+  public:
+    explicit SectionID(CmiUInt8 id) : BaseID(id)
+    {
+      CkAssert(tag() == CMK_OBJID_SECTION_TAG);
+    }
+    SectionID(CmiUInt8 home, CmiUInt8 counter)
+    {
+      _id = CMK_OBJID_SECTION_TAG << tag_offset | home << home_offset | counter;
+    }
+};
+
+class ArrayElementID : public BaseID
+{
+  private:
+    constexpr static CmiUInt8 collection_bits = 21;
+    constexpr static CmiUInt8 elem_bits = 16;
+
+    constexpr static CmiUInt8 collection_offset = elem_bits;
+    constexpr static CmiUInt8 elem_offset = 0;
+
+    constexpr static CmiUInt8 collection_mask = ((1ULL << collection_bits) - 1) << collection_offset;
+    constexpr static CmiUInt8 elem_mask = (1ULL << elem_bits) - 1;
+
+  public:
+    explicit ArrayElementID(CmiUInt8 id) : BaseID(id)
+    {
+      CkAssert(tag() == CMK_OBJID_ARRAY_TAG);
+    }
+    ArrayElementID(CmiUInt8 home, CkGroupID aid, CmiUInt8 eid)
+    {
+      _id = CMK_OBJID_ARRAY_TAG << tag_offset | home << home_offset |
+            (CmiUInt8)aid.idx << collection_offset | eid;
+    }
+
+    CmiUInt8 elem() const
+    {
+      return _id & elem_mask;
+    }
+};
 
 /**
  * The basic element identifier
