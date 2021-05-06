@@ -2398,6 +2398,7 @@ void CkLocCache::pup(PUP::er& p)
     {
       CkLocEntry e;
       p | e;
+      e.epoch = 0;
       updateLocation(e);
       if (homePe(e.id) != CkMyPe())
       {
