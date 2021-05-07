@@ -596,8 +596,8 @@ public:
   /// doFree if is local
   inline void deliver(CkMessage *m, const CkArrayIndex &idx, CkDeliver_t type,int opts=0)
   { locMgr->sendMsg((CkArrayMessage*)m, thisgroup, idx, type, opts); }
-  inline int deliver(CkArrayMessage *m, CkDeliver_t type)
-  { return locMgr->deliverMsg(m, thisgroup, m->array_element_id(), NULL, type); }
+  inline int deliver(CkArrayMessage *m, CkDeliver_t type, bool firstAttempt = true)
+  { return locMgr->deliverMsg(m, thisgroup, m->array_element_id(), NULL, type, firstAttempt); }
   /// Fetch a local element via its ID (return NULL if not local)
   inline ArrayElement *lookup(const CmiUInt8 id) { return (ArrayElement*) getEltFromArrMgr(id); }
   /// Fetch a local element via its index (return NULL if not local)

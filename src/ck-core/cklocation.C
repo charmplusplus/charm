@@ -2627,7 +2627,7 @@ void CkLocMgr::deliverAllBufferedMsgs(CmiUInt8 id)
 {
   deliverAnyBufferedMsgs(id, bufferedMsgs);
   deliverAnyBufferedMsgs(id, bufferedRemoteMsgs);
-  deliverAnyBufferedMsgs(id, bufferedShadowElemMsgs);
+  deliverAnyBufferedMsgs(id, bufferedShadowElemMsgs, false);
 }
 
 void CkLocMgr::deliverAllBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id)
@@ -2636,7 +2636,8 @@ void CkLocMgr::deliverAllBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id)
   deliverAnyBufferedMsgs(idx, id, bufferedDemandMsgs);
 }
 
-void CkLocMgr::deliverAnyBufferedMsgs(CmiUInt8 id, MsgBuffer& buffer)
+void CkLocMgr::deliverAnyBufferedMsgs(CmiUInt8 id, MsgBuffer& buffer,
+                                      bool firstAttempt /* = true */)
 {
   auto itr = buffer.find(id);
   // If there are no buffered msgs, don't do anything
@@ -2649,7 +2650,7 @@ void CkLocMgr::deliverAnyBufferedMsgs(CmiUInt8 id, MsgBuffer& buffer)
   // deliver all buffered messages
   for (CkArrayMessage* m : messagesToFlush)
   {
-    deliverMsg(m, UsrToEnv(m)->getArrayMgr(), id, NULL, CkDeliver_queue);
+    deliverMsg(m, UsrToEnv(m)->getArrayMgr(), id, NULL, CkDeliver_queue, firstAttempt);
   }
 
   CkAssert(itr->second.empty());  // Nothing should have been added, since we
@@ -2660,7 +2661,8 @@ void CkLocMgr::deliverAnyBufferedMsgs(CmiUInt8 id, MsgBuffer& buffer)
 }
 
 void CkLocMgr::deliverAnyBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id,
-                                      IndexMsgBuffer& buffer)
+                                      IndexMsgBuffer& buffer,
+                                      bool firstAttempt /* = true */)
 {
   auto itr = buffer.find(idx);
   // If there are no buffered msgs, don't do anything
@@ -2678,7 +2680,7 @@ void CkLocMgr::deliverAnyBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id,
     CkGroupID mgr = ck::ObjID(env->getRecipientID()).getCollectionID();
     env->setRecipientID(ck::ObjID(mgr, id));
     // Send the updated message
-    deliverMsg(m, mgr, id, &idx, CkDeliver_queue);
+    deliverMsg(m, mgr, id, &idx, CkDeliver_queue, firstAttempt);
   }
 
   CkAssert(itr->second.empty());  // Nothing should have been added, since we
@@ -2938,11 +2940,15 @@ void CkLocMgr::recordSend(const CkArrayIndex* idx, const CmiUInt8 id,
 /// Deliver message to this element, going via the scheduler if local
 /// @return 0 if object local, 1 if not
 int CkLocMgr::deliverMsg(CkArrayMessage* msg, CkArrayID mgr, CmiUInt8 id,
-                         const CkArrayIndex* idx, CkDeliver_t type, int opts)
+                         const CkArrayIndex* idx, CkDeliver_t type,
+                         bool firstAttempt /* = true */, int opts /* = 0 */)
 {
   CkLocRec* rec = elementNrec(id);
 
-  recordSend(idx, id, UsrToEnv(msg)->getTotalsize(), opts);
+  // firstAttempt should be true iff this is the first time deliverMsg has been called for
+  // this msg, ergo this is the send side and it's not a buffered shadow element msg
+  if (firstAttempt)
+    recordSend(idx, id, UsrToEnv(msg)->getTotalsize(), opts);
 
   // Known, remote location or unknown location
   if (rec == NULL)
