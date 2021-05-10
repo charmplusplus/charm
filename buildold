@@ -844,7 +844,6 @@ then
       echo '. $CHARMINC/'"cc-$i.sh" >> $ConvSh
 elif test `echo "$BASEVERSION" | grep -c "bluegeneq"` -gt 0
 then
-      echo "Support for Blue Gene/Q targets has been deprecated as of Charm++ 7.0.0."
       i="clang"
       bgclang++11 --version
       if [ $? -ne 0 ]; then
@@ -860,12 +859,13 @@ then
     for i in $BOPTS
     do
       echo '#include "'conv-mach-$i.h'"' >> $ConvHeader
-      if [ $BUILD_CUDA -eq 1 ]; then
-        echo 'CUDA_DIR="'$CUDA_DIR'"'>>$ConvSh
-        echo "CUDA_DIR:=$CUDA_DIR" >> $ConvMak
-      fi
       echo '. $CHARMINC/'"conv-mach-$i.sh" >> $ConvSh
     done
+    if [ $BUILD_CUDA -eq 1 ]; then
+      echo 'CUDA_DIR="'$CUDA_DIR'"' >> $ConvSh
+      echo "CUDA_DIR:=$CUDA_DIR" >> $ConvMak
+      echo "BUILD_CUDA:=$BUILD_CUDA" >> $ConvMak
+    fi
 fi
 
 if test  "$BUILD_SHARED"  = "-build-shared"
