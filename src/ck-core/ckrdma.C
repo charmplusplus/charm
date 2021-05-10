@@ -1551,6 +1551,8 @@ void CkRdmaEMBcastPostAckHandler(void *msg) {
     // Send message to all peer elements on this PE
     handleMsgOnChildPostCompletionForRecvBcast(env);
 
+    CmiFree(ncpyEmInfo); // Allocated in CkRdmaIssueRgets
+
   } else if(t.child_count !=0 && t.parent != -1) {
 
     // Allocate a structure NcpyBcastInterimAckInfo to maintain state for ack handling
@@ -1999,6 +2001,8 @@ inline void _ncpyAckHandler(ncpyHandlerMsg *msg) {
     default                                    : CmiAbort("_ncpyAckHandler: Invalid OpMode\n");
                                                  break;
   }
+
+  CmiFree(msg); // Allocated in invokeRemoteNcpyAckHandler
 }
 
 
