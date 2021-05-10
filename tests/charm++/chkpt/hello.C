@@ -84,19 +84,38 @@ class Hello : public CBase_Hello
 {
   int step;
 public:
-  Hello(){ step = 0; }
+  Hello()
+  {
+    usesAtSync = true;
+    step = 0;
+  }
   Hello(CkMigrateMessage *m) : CBase_Hello(m) {}
-  
-  void SayHi(){
+
+  void SayHi()
+  {
     step++;
-    if(step < 10){
-      CkCallback cb(CkIndex_Main::myClient(0),mainProxy);
-      contribute(sizeof(int),(void*)&step,CkReduction::max_int,cb);
-    }else{
-      contribute(sizeof(int),(void*)&step,CkReduction::max_int,CkCallback(CkCallback::ckExit));
+    if (step == 1 || step == 4)
+    {
+      AtSync();
+    }
+    else if (step < 10)
+    {
+      CkCallback cb(CkIndex_Main::myClient(0), mainProxy);
+      contribute(sizeof(int), (void*)&step, CkReduction::max_int, cb);
+    }
+    else
+    {
+      contribute(sizeof(int), (void*)&step, CkReduction::max_int,
+                 CkCallback(CkCallback::ckExit));
     }
   }
-  
+
+  void ResumeFromSync()
+  {
+    CkCallback cb(CkIndex_Main::myClient(0), mainProxy);
+    contribute(sizeof(int), (void*)&step, CkReduction::max_int, cb);
+  }
+
   void pup(PUP::er &p){
     p|step;
   }

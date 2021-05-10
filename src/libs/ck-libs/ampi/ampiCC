@@ -160,14 +160,15 @@ ARGS+=" -language $AMPICC_MODE"
 if [ -n "$GLOBALS" ]
 then
   USER_SUFFIX="$CMK_USER_SUFFIX.$CMK_SHARED_SUF"
+  SHIM_OPTS='-seq'
   if [ -n "$GLOBALS_SHARED" ]
   then
     SHARED_OPTS='-shared'
-    [ "$CMK_MACOSX" != '1' ] && SHIM_OPTS='-fPIE' || SHIM_OPTS=''
+    [[ "$CMK_MACOSX" != '1' ]] && SHIM_OPTS+=' -fPIE'
     SHIM_MAIN_OBJS=''
   else
     SHARED_OPTS=''
-    SHIM_OPTS='-fPIE'
+    SHIM_OPTS+=' -fPIE'
     SHIM_MAIN_OBJS="\"$CHARMLIB/ampi_funcptr_shim_main.o\""
   fi
 
@@ -175,7 +176,7 @@ then
   then
     SHIM_OPTS="$SHIM_OPTS -standalone -DAMPI_USE_FUNCPTR"
     SHIM_OBJS="\"$CHARMLIB/ampi_funcptr_shim.o\" $SHIM_MAIN_OBJS"
-    [ "$AMPICC_MODE" = 'ampif' ] && SHIM_OBJS="$SHIM_OBJS \"$CHARMLIB/ampi_funcptr_shim_fortran.o\" \"$CHARMLIB/ampifimpl.o\" \"$CHARMLIB/ampimod.o\""
+    [ "$AMPICC_MODE" = 'ampif' ] && SHIM_OBJS="$SHIM_OBJS \"$CHARMLIB/ampi_funcptr_shim_fortran.o\" \"$CHARMLIB/ampi_funcptr_shim_fortran_impl.o\" \"$CHARMLIB/ampi_funcptr_shim_fortran_mod.o\""
     [[ "$AMPICC_MODE" = 'ampif' && "$CMK_AMPI_WITH_ROMIO" = '1' ]] && SHIM_OBJS="$SHIM_OBJS \"$CHARMLIB/ampi_funcptr_shim_fortran_romio.o\""
     LOADER_OBJS="\"$CHARMLIB/ampi_funcptr_loader.o\" $ROMIO"
     ROMIO=''
