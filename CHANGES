@@ -2,7 +2,7 @@ This file describes the most significant changes. For more detail, use
 'git log' on a clone of the charm repository.
 
 ================================================================================
-What's new in Charm++ 6.11.0
+What's new in Charm++ 7.0.0
 ================================================================================
 
 This is a feature release, with the following major changes:
@@ -33,10 +33,18 @@ Misc:
   https://charm.readthedocs.io/en/latest/charm++/manual.html#installation-with-cmake
   for more information.
 
+- Charm++'s development branch has been renamed from 'master' to 'main'. Please see
+  https://github.com/UIUC-PPL/charm/pull/3303 for details.
+
 - We have adopted GitHub discussions
   (https://github.com/UIUC-PPL/charm/discussions) as the preferred
   venue for Charm++ questions and discussions instead of the
   charm@cs.illinois.edu mailing list.
+
+- Support for Blue Gene/Q targets has been deprecated.
+
+- Charm++ now runs on the new Apple M1 chips with the targets:
+  multicore-darwin-arm8, netlrts-darwin-arm8, and mpi-darwin-arm8.
 
 - The BigSim emulator has been removed from Charm++.
 
@@ -45,6 +53,10 @@ Misc:
   * sim (Machine layer that simulates a simple message-passing machine with communications processors; based
          on the Dagger simulator)
   * shmem (Machine layer built on top of the OpenSHMEM API)
+
+- The following modules have been removed: ARMCI, Jade, and Charj.
+
+- The 'mpi-linux-mips64' target has been removed.
 
 Charm++ Features & Fixes:
 

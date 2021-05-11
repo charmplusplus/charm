@@ -232,10 +232,7 @@ class LBManager : public CBase_LBManager
 
   LBManager(void) { init(); }
   LBManager(CkMigrateMessage* m) : CBase_LBManager(m) { init(); }
-  ~LBManager()
-  {
-    if (avail_vector) delete[] avail_vector;
-  }
+  ~LBManager() { delete lbdb_obj; }
 
  private:
   void init();
@@ -469,8 +466,13 @@ class LBManager : public CBase_LBManager
   void LocalBarrierOff(void);
   void ResumeClients();
   static int ProcessorSpeed();
-  inline void SetLBPeriod(double s) {}
-  inline double GetLBPeriod() { return 0; }
+  static void SetLBPeriod(double period)
+  {
+    _lb_args.lbperiod() = period;
+    // If the manager has been initialized, then start the timer
+    if (auto* const obj = LBManager::Object()) obj->setTimer();
+  }
+  static double GetLBPeriod() { return _lb_args.lbperiod(); }
 
   void SetMigrationCost(double cost);
   void SetStrategyCost(double cost);
@@ -478,29 +480,32 @@ class LBManager : public CBase_LBManager
 
  private:
   int mystep;
-  static char* avail_vector;  // processor bit vector
+  static std::vector<char> avail_vector; // processor bit vector
   static bool avail_vector_set;
   int new_ld_balancer;  // for Node 0
   MetaBalancer* metabalancer;
   int currentLBIndex;
+  bool isPeriodicQueued = false;
 
  public:
-  CkVec<BaseLB*> loadbalancers;
+  std::vector<BaseLB*> loadbalancers;
 
   std::vector<StartLBCB*> startLBFnList;
   std::vector<MigrationDoneCB*> migrationDoneCBList;
 
  public:
-  BaseLB** getLoadBalancers() { return loadbalancers.getVec(); }
+  BaseLB** getLoadBalancers() { return loadbalancers.data(); }
   int getNLoadBalancers() { return loadbalancers.size(); }
 
  public:
   static bool manualOn;
 
  public:
-  char* availVector() { return avail_vector; }
-  void get_avail_vector(char* bitmap);
-  void set_avail_vector(char* bitmap, int new_ld = -1);
+  const char *availVector() const { return avail_vector.data(); }
+  void get_avail_vector(char * bitmap) const;
+  void get_avail_vector(std::vector<char> & bitmap) const { bitmap = avail_vector; }
+  void set_avail_vector(const char * bitmap, int new_ld = -1);
+  void set_avail_vector(const std::vector<char> & bitmap, int new_ld = -1);
   int& new_lbbalancer() { return new_ld_balancer; }
 
   struct LastLBInfo
@@ -530,7 +535,9 @@ void LBTurnPredictorOn(LBPredictorFunction* model, int wind);
 void LBTurnPredictorOff();
 void LBChangePredictor(LBPredictorFunction* model);
 
-void LBSetPeriod(double second);
+// This alias remains for backwards compatibility
+CMK_DEPRECATED_MSG("Use LBManager::SetLBPeriod instead of LBSetPeriod")
+void LBSetPeriod(double period);
 
 #if CMK_LB_USER_DATA
 int LBRegisterObjUserData(int size);
@@ -546,9 +553,9 @@ inline LBManager* LBManagerObj() { return LBManager::Object(); }
 
 inline void CkStartLB() { LBManager::Object()->StartLB(); }
 
-inline void get_avail_vector(char* bitmap) { LBManagerObj()->get_avail_vector(bitmap); }
+inline void get_avail_vector(std::vector<char> & bitmap) { LBManagerObj()->get_avail_vector(bitmap); }
 
-inline void set_avail_vector(char* bitmap) { LBManagerObj()->set_avail_vector(bitmap); }
+inline void set_avail_vector(const std::vector<char> & bitmap) { LBManagerObj()->set_avail_vector(bitmap); }
 
 //  a helper class to suspend/resume load instrumentation when calling into
 //  runtime apis

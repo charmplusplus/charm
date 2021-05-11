@@ -1017,12 +1017,48 @@ struct isommap
     }
   }
 
+  void JustMigrated()
+  {
+    // Can be used for any post-migration functionality, such as restoring mprotect permissions.
+  }
+
   void clear()
   {
     if (allocated_extent == start)
       return;
     unmap_global_memory(start, allocated_extent - start);
     allocated_extent = start;
+  }
+
+  void * permanent_alloc(size_t size)
+  {
+    const size_t realsize = CMIALIGN(size, pagesize);
+
+    CmiLock(lock);
+
+    void * const mapped = map_global_memory(allocated_extent, realsize);
+    if (mapped != nullptr)
+      allocated_extent += realsize;
+
+    CmiUnlock(lock);
+    return mapped;
+  }
+
+  void * permanent_alloc(size_t size, size_t align)
+  {
+    const size_t realsize = CMIALIGN(size, pagesize);
+
+    CmiLock(lock);
+
+    const auto alignstart = (uint8_t *)CMIALIGN((uintptr_t)allocated_extent, align);
+    const size_t allocsize = realsize + (alignstart - allocated_extent);
+
+    void * const mapped = map_global_memory(allocated_extent, allocsize);
+    if (mapped != nullptr)
+      allocated_extent += allocsize;
+
+    CmiUnlock(lock);
+    return mapped;
   }
 
   void EnableRDMA(int enable)
@@ -1035,6 +1071,11 @@ struct isommap
   int use_rdma;
 
   // local data
+  /*
+   * This lock provides mutual exclusion for this struct, particularly allocated_extent.
+   * It is usually uncontended since each migratable thread has its own context,
+   * but it is here as a safeguard for a multithreaded case such as AMPI+OpenMP.
+   */
   CmiNodeLock lock;
 };
 
@@ -1045,7 +1086,7 @@ struct isommap
 struct isomalloc_dlmalloc : dlmalloc_impl
 {
   isomalloc_dlmalloc(uint8_t * s, uint8_t * e)
-    : backend{s, e}, arena{create_mspace(0, 0)}
+    : backend{s, e}, arena{}
   {
     IMP_DBG("[%d][%p] isomalloc_dlmalloc::isomalloc_dlmalloc(%p, %p)\n", CmiMyPe(), this, s, e);
   }
@@ -1053,6 +1094,14 @@ struct isomalloc_dlmalloc : dlmalloc_impl
     : backend{pr}
   {
     IMP_DBG("[%d][%p] isomalloc_dlmalloc::isomalloc_dlmalloc(PUP::reconstruct)\n", CmiMyPe(), this);
+  }
+
+  void activate_random_access_heap()
+  {
+    if (arena != nullptr)
+      return;
+
+    arena = create_mspace(0, 0);
   }
 
   void pup(PUP::er & p)
@@ -1099,6 +1148,7 @@ struct isomalloc_dlmalloc : dlmalloc_impl
   void * alloc(size_t size)
   {
     CmiLock(backend.lock);
+    CmiAssert(arena != nullptr);
     void * ret = mspace_malloc(arena, size);
     CmiUnlock(backend.lock);
     return ret;
@@ -1106,6 +1156,7 @@ struct isomalloc_dlmalloc : dlmalloc_impl
   void * alloc(size_t size, size_t align)
   {
     CmiLock(backend.lock);
+    CmiAssert(arena != nullptr);
     void * ret = mspace_memalign(arena, align, size);
     CmiUnlock(backend.lock);
     return ret;
@@ -1113,6 +1164,7 @@ struct isomalloc_dlmalloc : dlmalloc_impl
   void * calloc(size_t nelem, size_t size)
   {
     CmiLock(backend.lock);
+    CmiAssert(arena != nullptr);
     void * ret = mspace_calloc(arena, nelem, size);
     CmiUnlock(backend.lock);
     return ret;
@@ -1120,6 +1172,7 @@ struct isomalloc_dlmalloc : dlmalloc_impl
   void * realloc(void * ptr, size_t size)
   {
     CmiLock(backend.lock);
+    CmiAssert(arena != nullptr);
     void * ret = mspace_realloc(arena, ptr, size);
     CmiUnlock(backend.lock);
     return ret;
@@ -1128,6 +1181,7 @@ struct isomalloc_dlmalloc : dlmalloc_impl
   {
     CmiLock(backend.lock);
 
+    CmiAssert(arena != nullptr);
     CmiAssert(backend.isInRange(ptr));
     CmiAssert(backend.isMapped(ptr));
 
@@ -1138,6 +1192,8 @@ struct isomalloc_dlmalloc : dlmalloc_impl
   size_t length(void * ptr)
   {
     CmiLock(backend.lock);
+
+    CmiAssert(arena != nullptr);
 
     mchunkptr oldp = mem2chunk(ptr);
     size_t oc = chunksize(oldp) - overhead_for(oldp);
@@ -1853,6 +1909,10 @@ struct Isomempool
     IMP_DBG("[%d][%p] Isomempool::Isomempool(PUP::reconstruct)\n", CmiMyPe(), this);
   }
 
+  void activate_random_access_heap()
+  {
+  }
+
   ~Isomempool()
   {
     IMP_DBG("[%d][%p] Isomempool::~Isomempool()\n", CmiMyPe(), this);
@@ -2485,10 +2545,28 @@ void CmiIsomallocContextPup(pup_er cpup, CmiIsomallocContext * ctxptr)
   }
 }
 
+void CmiIsomallocContextEnableRandomAccess(CmiIsomallocContext ctx)
+{
+  auto pool = (Mempool *)ctx.opaque;
+  pool->activate_random_access_heap();
+}
+
+void CmiIsomallocContextJustMigrated(CmiIsomallocContext ctx)
+{
+  auto pool = (Mempool *)ctx.opaque;
+  pool->backend.JustMigrated();
+}
+
 void CmiIsomallocEnableRDMA(CmiIsomallocContext ctx, int enable)
 {
   auto pool = (Mempool *)ctx.opaque;
   pool->backend.EnableRDMA(enable);
+}
+
+CmiIsomallocRegion CmiIsomallocContextGetUsedExtent(CmiIsomallocContext ctx)
+{
+  auto pool = (Mempool *)ctx.opaque;
+  return CmiIsomallocRegion{pool->backend.start, pool->backend.allocated_extent};
 }
 
 void * CmiIsomallocContextMalloc(CmiIsomallocContext ctx, size_t size)
@@ -2528,4 +2606,29 @@ size_t CmiIsomallocContextGetLength(CmiIsomallocContext ctx, void * ptr)
 {
   auto pool = (Mempool *)ctx.opaque;
   return pool->length(ptr);
+}
+
+void * CmiIsomallocContextPermanentAlloc(CmiIsomallocContext ctx, size_t size)
+{
+  CmiMemoryIsomallocDisablePush();
+
+  auto pool = (Mempool *)ctx.opaque;
+  auto ret = pool->backend.permanent_alloc(size);
+
+  CmiMemoryIsomallocDisablePop();
+
+  return ret;
+}
+
+void * CmiIsomallocContextPermanentAllocAlign(CmiIsomallocContext ctx, size_t align, size_t size)
+{
+  CmiMemoryIsomallocDisablePush();
+
+  auto pool = (Mempool *)ctx.opaque;
+  size_t real_align = isomalloc_internal_validate_align(align);
+  auto ret = pool->backend.permanent_alloc(size, real_align);
+
+  CmiMemoryIsomallocDisablePop();
+
+  return ret;
 }

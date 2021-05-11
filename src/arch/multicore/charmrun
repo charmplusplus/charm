@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/bash
 
 export FROM_CHARMRUN='1'
 
@@ -13,10 +13,27 @@ DEBUGGER=''
 
 while [ $# -gt 0 ]
 do
-        case $1 in
-	+p|+ppn|++ppn)
+	case $1 in
+	+p|++p|+ppn|++ppn)
 		args="$args $1 $2"
-		shift;
+		shift
+		shift
+		;;
+	+n|++n|++np)
+		if [[ $2 != 0 && $2 != 1 ]]
+		then
+			printf "Charmrun> Error: Multicore builds only support single-node runs.\n"
+		 	exit 1
+		fi
+		shift
+		shift
+		;;
+	+n0|+n1)
+		shift
+		;;
+	+n[0-9]*)
+		printf "Charmrun> Error: Multicore builds only support single-node runs.\n"
+		exit 1
 		shift
 		;;
 	++quiet)
@@ -94,8 +111,7 @@ then
   pre_args="$XTERM -e $DEBUGGER $pre_args"
 fi
 
-test $QUIET -eq 0 && echo Running command: "$pre_args" "$cmd" "$args"
-test $QUIET -eq 0 && echo
+[[ $QUIET -eq 0 ]] && echo Running command: "$pre_args" "$cmd" "$args" && echo
 
 # shellcheck disable=SC2086
 exec $pre_args "$cmd" $args

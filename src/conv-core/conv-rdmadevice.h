@@ -14,6 +14,9 @@
 // RDMA indicates that the PEs are on different physical nodes and requires GPUDirect RDMA
 enum class CmiNcpyModeDevice : char { MEMCPY, IPC, RDMA };
 
+// Status of Direct API (persistent) transfer
+enum class CmiDeviceStatus : char { incomplete, complete };
+
 class CmiDeviceBuffer {
 public:
   // Pointer to and size of the buffer

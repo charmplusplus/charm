@@ -5,7 +5,7 @@ mainmodule hello {
 
   mainchare Main {
     entry Main(CkArgMsg *m);
-    entry void rednPong(CkReductionMsg *msg);
+    entry [threaded] void awaitPong(void);
   };
 
   array [1D] Hello {

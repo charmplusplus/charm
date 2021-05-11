@@ -1683,13 +1683,6 @@ void CmiHandleMessage(void *msg)
 	/* setMemoryStatus(1) */ /* charmdebug */
 #endif
 
-/*
-	CMK_FAULT_EVAC
-*/
-/*	if((!CpvAccess(_validProcessors)[CmiMyPe()]) && handler != _exitHandlerIdx){
-		return;
-	}*/
-	
         MESSAGE_PHASE_CHECK(msg)
 #if CMK_ERROR_CHECKING
         if (handlerIdx >= CpvAccess(CmiHandlerCount)) {
@@ -1921,10 +1914,6 @@ int CsdScheduler(int maxmsgs)
 	break;\
       }
 #endif
-
-/*
-	EVAC
-*/
 
 
 extern void machine_OffloadAPIProgress(void);
