@@ -3531,7 +3531,7 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
 
   // Create a record for this element
   CkLocRec* rec =
-      createLocal(idx, true, msg->ignoreArrival, false, msg->epoch /* home told on departure */);
+      createLocal(idx, true, msg->ignoreArrival, false, /* home told on departure */, msg->epoch);
 
   envelope* env = UsrToEnv(msg);
   CmiAssert(CpvAccess(newZCPupGets).empty());  // Ensure that vector is empty

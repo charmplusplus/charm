@@ -73,6 +73,13 @@ PUPbytes(CkDeliver_t)
 
     class CkArrayOptions;
 
+// This is the entry in the location table, which stores the PE and epoch number of the
+// latest location update.
+// TODO: If we can template CkLocCache on this type, we could store more useful
+// information for specific entities being managed. ie: for arrays it could store
+// indices as well. Then one lookup would get you everything you need, rather than looking
+// up in a bunch of tables.
+// TODO: Is int the right type for pe and epoch?
 struct CkLocEntry {
   CmiUInt8 id = 0;
   int pe = -1;
@@ -311,14 +318,6 @@ enum CkElementCreation_t : uint8_t
 class CkLocCache : public CBase_CkLocCache
 {
 private:
-  // This is the entry in the location table, which stores the PE and epoch number of the
-  // latest location update.
-  // TODO: If we can template CkLocCache on this type, we could store more useful
-  // information for specific entities being managed. ie: for arrays it could store
-  // indices as well. Could also store homePe if useful? Then one lookup would get you
-  // everything you need, rather than looking up in a bunch of tables.
-  // TODO: Is int the right type for pe and epoch?
-
   // Map of ID to PE
   using LocationMap = std::unordered_map<CmiUInt8, CkLocEntry>;
   LocationMap locMap;
@@ -326,7 +325,7 @@ private:
   using Listener = std::function<void(CmiUInt8, int)>;
   std::list<Listener> listeners;
 
-  const CkLocEntry nullEntry = CkLocEntry();
+  constexpr CkLocEntry nullEntry = CkLocEntry();
 public:
   CkLocCache() = default;
   CkLocCache(CkMigrateMessage* m) : CBase_CkLocCache(m) {}
@@ -350,7 +349,7 @@ public:
   }
   int getPe(const CmiUInt8 id) const { return getLocationEntry(id).pe; }
   int getEpoch(const CmiUInt8 id) const { return getLocationEntry(id).epoch; }
-  int homePe(const CmiUInt8 id) const { return id >> CMK_OBJID_ELEMENT_BITS; }
+  int homePe(const CmiUInt8 id) const { return ck::ObjID(id).getHomeID(); }
 
   // Insertion and removal
   void insert(CmiUInt8 id, int epoch = 0);
