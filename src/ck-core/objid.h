@@ -50,47 +50,56 @@ namespace ck {
 
 class BaseID
 {
-  protected:
-    constexpr static CmiUInt8 tag_bits = 3;
-    constexpr static CmiUInt8 home_bits = 24;
+  //friend bool operator==(const BaseID&, const BaseID&);
+  //friend std::hash<BaseID>;
+  public:
+    using id_type = CmiUInt8;
 
-    constexpr static CmiUInt8 tag_offset = 64 - tag_bits;
-    constexpr static CmiUInt8 home_offset = 64 - (tag_bits + home_bits);
+    constexpr static id_type tag_bits = 3;
+    constexpr static id_type home_bits = 24;
 
-    constexpr static CmiUInt8 tag_mask = ((1ULL << tag_bits) - 1) << tag_offset;
-    constexpr static CmiUInt8 home_mask = ((1ULL << home_bits) - 1) << home_offset;
+    constexpr static id_type tag_offset = 64 - tag_bits;
+    constexpr static id_type home_offset = 64 - (tag_bits + home_bits);
 
-    CmiUInt8 _id;
+    constexpr static id_type tag_mask = ((1ULL << tag_bits) - 1) << tag_offset;
+    constexpr static id_type home_mask = ((1ULL << home_bits) - 1) << home_offset;
+
+    id_type _id;
     BaseID() = default;
-    BaseID(CmiUInt8 id) : _id(id) {}
+    BaseID(id_type id) : _id(id) {}
 
   public:
-    CmiUInt8 id() const
+    id_type id() const
     {
       return _id;
     }
 
-    CmiUInt8 tag() const
+    id_type tag() const
     {
       return _id >> tag_offset;
     }
-    CmiUInt8 home() const
+    id_type home() const
     {
       return (_id & home_mask) >> home_offset;
+    }
+
+    bool operator==(const BaseID& other) const
+    {
+      return _id == other._id;
     }
 };
 
 class SectionID : public BaseID
 {
   private:
-    constexpr static CmiUInt8 counter_bits = 37;
+    constexpr static BaseID::id_type counter_bits = 37;
 
   public:
-    explicit SectionID(CmiUInt8 id) : BaseID(id)
+    explicit SectionID(BaseID::id_type id) : BaseID(id)
     {
       CkAssert(tag() == CMK_OBJID_SECTION_TAG);
     }
-    SectionID(CmiUInt8 home, CmiUInt8 counter)
+    SectionID(BaseID::id_type home, BaseID::id_type counter)
     {
       _id = CMK_OBJID_SECTION_TAG << tag_offset | home << home_offset | counter;
     }
@@ -99,36 +108,75 @@ class SectionID : public BaseID
 class ArrayElementID : public BaseID
 {
   private:
-    constexpr static CmiUInt8 collection_bits = 21;
-    constexpr static CmiUInt8 elem_bits = 16;
+    constexpr static BaseID::id_type group_bits = 21;
+    constexpr static BaseID::id_type elem_bits = 16;
 
-    constexpr static CmiUInt8 collection_offset = elem_bits;
-    constexpr static CmiUInt8 elem_offset = 0;
+    constexpr static BaseID::id_type group_offset = elem_bits;
+    constexpr static BaseID::id_type elem_offset = 0;
 
-    constexpr static CmiUInt8 collection_mask = ((1ULL << collection_bits) - 1) << collection_offset;
-    constexpr static CmiUInt8 elem_mask = (1ULL << elem_bits) - 1;
+    constexpr static BaseID::id_type group_mask = ((1ULL << group_bits) - 1) << group_offset;
+    constexpr static BaseID::id_type elem_mask = (1ULL << elem_bits) - 1;
 
   public:
-    explicit ArrayElementID(CmiUInt8 id) : BaseID(id)
+    ArrayElementID() : BaseID(0) {}
+    explicit ArrayElementID(BaseID::id_type id) : BaseID(id)
     {
       CkAssert(tag() == CMK_OBJID_ARRAY_TAG);
     }
-    ArrayElementID(CmiUInt8 home, CkGroupID aid, CmiUInt8 eid)
+    ArrayElementID(BaseID::id_type home, BaseID::id_type eid)
     {
+      CkAssert(home <= home_mask >> home_offset);
+      //CkAssert(eid <= elem_mask >> elem_offset);
+      _id = CMK_OBJID_ARRAY_TAG << tag_offset | home << home_offset | (eid & elem_mask);
+      unsetGroup();
+    }
+    ArrayElementID(BaseID::id_type home, CkGroupID aid, BaseID::id_type eid)
+    {
+      CkAssert(home <= home_mask >> home_offset);
+      CkAssert(static_cast<BaseID::id_type>(aid.idx) <= group_mask >> group_offset);
+      //CkAssert(eid <= elem_mask >> elem_offset);
       _id = CMK_OBJID_ARRAY_TAG << tag_offset | home << home_offset |
-            (CmiUInt8)aid.idx << collection_offset | eid;
+            static_cast<BaseID::id_type>(aid.idx) << group_offset | (eid & elem_mask);
     }
 
-    CmiUInt8 elem() const
+    /*BaseID::id_type element() const
     {
-      return _id & elem_mask;
+      return _id | collection_mask;
+    }*/
+    // TODO: Probably need to ensure that this actually means the group is "unset"
+    // TODO: Maybe all ones should be a sentinel
+    void unsetGroup() { _id = _id | group_mask; }
+    void setGroup(CkGroupID gid) {
+      CkAssert(static_cast<BaseID::id_type>(gid.idx) <= group_mask >> group_offset);
+      unsetGroup();
+      _id = _id & (tag_mask | home_mask | (static_cast<BaseID::id_type>(gid.idx) << group_offset) | elem_mask);
     }
+};
+
+}
+
+template<>
+struct std::hash<ck::BaseID>
+{
+  std::size_t operator()(const ck::BaseID& id) const
+  {
+    return std::hash<ck::BaseID::id_type>()(id.id());
+  }
+};
+
+template<>
+struct std::hash<ck::ArrayElementID>
+{
+  std::size_t operator()(const ck::ArrayElementID& id) const
+  {
+    return std::hash<ck::BaseID>()(id);
+  }
 };
 
 /**
  * The basic element identifier
  */
-class ObjID {
+/*class ObjID {
     /// @note: may have to befriend the ArrayMgr
     public:
       static CmiUInt8 createArrayID(CkGroupID aid, CmiUInt8 home, CmiUInt8 eid)
@@ -210,10 +258,10 @@ inline bool operator==(ObjID lhs, ObjID rhs) {
 }
 inline bool operator!=(ObjID lhs, ObjID rhs) {
   return !(lhs == rhs);
-}
+}*/
 
-} // end namespace ck
+//} // end namespace ck
 
-PUPbytes(ck::ObjID)
+//PUPbytes(ck::ObjID)
 #endif // OBJID_H
 

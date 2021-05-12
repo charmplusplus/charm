@@ -235,8 +235,8 @@ void ArrayElement::initBasics(void)
 #ifdef _PIPELINED_ALLREDUCE_
   allredMgr = NULL;
 #endif
-  DEBC((AA "Inserting %llu into PE level hashtable\n" AB, ckGetID().getID()));
-  CkpvAccess(array_objs)[ckGetID().getID()] = this;
+  //DEBC((AA "Inserting %llu into PE level hashtable\n" AB, ckGetID().getID()));
+  //CkpvAccess(array_objs)[ckGetID().getID()] = this;
 }
 
 ArrayElement::ArrayElement(void)
@@ -383,7 +383,7 @@ int ArrayElement::getRedNo(void) const
 void ArrayElement::ckDestroy(void)
 {
   CK_ARRAYLISTENER_LOOP(thisArray->listeners, l->ckElementDied(this));
-  thisArray->deleteElt(CkMigratable::ckGetID());
+  thisArray->deleteElt(ck::ArrayElementID(CkMigratable::ckGetID()));
 }
 
 // Destructor (virtual)
@@ -394,8 +394,8 @@ ArrayElement::~ArrayElement()
     return; /* Just saving to disk--don't trash anything. */
 #endif
   // Erase from PE level hashtable for quick receives
-  DEBC((AA "Removing %llu from PE level hashtable\n" AB, ckGetID().getID()));
-  CkpvAccess(array_objs).erase(ckGetID().getID());
+  //DEBC((AA "Removing %llu from PE level hashtable\n" AB, ckGetID().getID()));
+  //CkpvAccess(array_objs).erase(ckGetID().getID());
   // To detect use-after-delete:
   thisArray = (CkArray*)(intptr_t)0xDEADa7a1;
 }
@@ -1148,7 +1148,7 @@ inline void msg_prepareSend(CkArrayMessage* msg, int ep, CkArrayID aid)
   env->setMsgtype(ForArrayEltMsg);
   env->setArrayMgr(aid);
   env->getsetArraySrcPe() = CkMyPe();
-  env->setRecipientID(ck::ObjID(0));
+  env->setRecipientID(0);
 #if CMK_SMP_TRACE_COMMTHREAD
   env->setSrcPe(CkMyPe());
 #endif

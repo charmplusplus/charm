@@ -386,7 +386,7 @@ public:
   // for _PIPELINED_ALLREDUCE_, assembler entry method
   inline void defrag(CkReductionMsg* msg);
   inline const CkArrayID& ckGetArrayID(void) const { return thisArrayID; }
-  inline ck::ObjID ckGetID(void) const { return ck::ObjID(thisArrayID, myRec->getID()); }
+  //inline ck::ObjID ckGetID(void) const { return ck::ObjID(thisArrayID, myRec->getID()); }
 
   inline int ckGetArraySize(void) const { return numInitialElements; }
 
@@ -641,7 +641,7 @@ class CkArray : public CkReductionMgr
   CkCallback initCallback;
   CProxy_CkArray thisProxy;
   // Separate mapping and storing the element pointers to speed iteration in broadcast
-  std::unordered_map<CmiUInt8, unsigned int> localElems;
+  std::unordered_map<ck::ArrayElementID, unsigned int> localElems;
   std::vector<CkMigratable*> localElemVec;
 
   UShort recvBroadcastEpIdx;
@@ -685,14 +685,14 @@ public:
     return locMgr->deliverMsg(m, thisgroup, m->array_element_id(), NULL, type);
   }
   /// Fetch a local element via its ID (return NULL if not local)
-  inline ArrayElement* lookup(const CmiUInt8 id)
+  inline ArrayElement* lookup(const ck::ArrayElementID& id)
   {
     return (ArrayElement*)getEltFromArrMgr(id);
   }
   /// Fetch a local element via its index (return NULL if not local)
   inline ArrayElement* lookup(const CkArrayIndex& idx)
   {
-    CmiUInt8 id;
+    ck::ArrayElementID id;
     if (locMgr->lookupID(idx, id))
     {
       return (ArrayElement*)getEltFromArrMgr(id);
@@ -703,17 +703,17 @@ public:
     }
   }
 
-  virtual CkMigratable* getEltFromArrMgr(const CmiUInt8 id)
+  virtual CkMigratable* getEltFromArrMgr(const ck::ArrayElementID& id)
   {
     const auto itr = localElems.find(id);
     return (itr == localElems.end() ? NULL : localElemVec[itr->second]);
   }
-  virtual void putEltInArrMgr(const CmiUInt8 id, CkMigratable* elt)
+  virtual void putEltInArrMgr(const ck::ArrayElementID id, CkMigratable* elt)
   {
     localElems[id] = localElemVec.size();
     localElemVec.push_back(elt);
   }
-  virtual void eraseEltFromArrMgr(const CmiUInt8 id)
+  virtual void eraseEltFromArrMgr(const ck::ArrayElementID id)
   {
     auto itr = localElems.find(id);
     if (itr != localElems.end())
@@ -726,14 +726,14 @@ public:
       {
         CkMigratable* moved = localElemVec[localElemVec.size() - 1];
         localElemVec[offset] = moved;
-        localElems[moved->ckGetID()] = offset;
+        localElems[ck::ArrayElementID(moved->ckGetID())] = offset;
       }
 
       localElemVec.pop_back();
     }
   }
 
-  void deleteElt(const CmiUInt8 id)
+  void deleteElt(const ck::ArrayElementID& id)
   {
     auto itr = localElems.find(id);
     if (itr != localElems.end())
@@ -746,7 +746,7 @@ public:
       {
         CkMigratable* moved = localElemVec[localElemVec.size() - 1];
         localElemVec[offset] = moved;
-        localElems[moved->ckGetID()] = offset;
+        localElems[ck::ArrayElementID(moved->ckGetID())] = offset;
       }
 
       localElemVec.pop_back();

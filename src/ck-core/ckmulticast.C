@@ -38,7 +38,7 @@ typedef std::vector<int> groupPeList;
 typedef std::vector<CkSectionInfo> sectionIdList;
 typedef std::vector<CkReductionMsg *> reductionMsgs;
 typedef CkQ<int> PieceSize;
-typedef std::vector<CmiUInt8> ObjKeyList;
+typedef std::vector<ck::ArrayElementID> ObjKeyList;
 typedef unsigned char byte;
 
 /** Information about the status of reductions proceeding along a given section
@@ -313,7 +313,7 @@ void CkMulticastMgr::setSection(CkSectionInfo &_id, CkArrayID aid, CkArrayIndex 
     for (int i=0; i<n; i++) {
         entry->allElem[i] = al[i];
 #if CMK_LBDB_ON
-        CmiUInt8 _key;
+        ck::ArrayElementID _key;
         if(CProxy_ArrayBase(aid).ckLocMgr()->lookupID(al[i], _key))
             entry->allObjKeys.push_back(_key);
 #endif
@@ -352,7 +352,7 @@ void CkMulticastMgr::setSection(CProxySection_ArrayElement &proxy)
   for (int i=0; i<proxy.ckGetNumElements(); i++) {
     entry->allElem[i] = al[i];
 #if CMK_LBDB_ON
-    CmiUInt8 _key;
+    ck::ArrayElementID _key;
     if(CProxy_ArrayBase(aid).ckLocMgr()->lookupID(al[i], _key))
       entry->allObjKeys.push_back(_key);
 #endif
@@ -409,7 +409,7 @@ void CkMulticastMgr::prepareCookie(mCastEntry *entry, CkSectionID &sid, const Ck
   for (int i=0; i<count; i++) {
     entry->allElem[i] = al[i];
 #if CMK_LBDB_ON
-    CmiUInt8 _key;
+    ck::ArrayElementID _key;
     if(CProxy_ArrayBase(aid).ckLocMgr()->lookupID(al[i], _key))
       entry->allObjKeys.push_back(_key);
 #endif
@@ -937,7 +937,7 @@ void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionI
       // fixme: running obj?
       envelope *env = UsrToEnv(msg);
       const LDOMHandle &om = CProxy_ArrayBase(s.get_aid()).ckLocMgr()->getOMHandle();
-      LBManagerObj()->MulticastSend(om,entry->allObjKeys.data(),entry->allObjKeys.size(),env->getTotalsize());
+      //LBManagerObj()->MulticastSend(om,entry->allObjKeys.data(),entry->allObjKeys.size(),env->getTotalsize());
     }
 #endif
 

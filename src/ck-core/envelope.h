@@ -443,10 +443,10 @@ public:
     int getArrayIfNotThere(void) const { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); return type.array.ifNotThere;}
     void setArrayIfNotThere(int nt) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); type.array.ifNotThere=nt;}
 
-    void setRecipientID(ck::ObjID objid)
+    void setRecipientID(CmiUInt8 id)
     {
       CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg);
-      type.array.id = objid.getID();
+      type.array.id = id;
     }
 
     CmiUInt8 getRecipientID() const
