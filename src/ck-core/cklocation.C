@@ -2363,6 +2363,7 @@ void CkLocMgr::flushLocalRecs(void)
 void CkLocMgr::flushAllRecs(void) { flushLocalRecs(); }
 
 /*************************** LocCache **************************/
+const CkLocEntry CkLocEntry::nullEntry = CkLocEntry();
 void CkLocCache::pup(PUP::er& p)
 {
 #if __FAULT__
@@ -3531,7 +3532,7 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
 
   // Create a record for this element
   CkLocRec* rec =
-      createLocal(idx, true, msg->ignoreArrival, false, /* home told on departure */, msg->epoch);
+      createLocal(idx, true, msg->ignoreArrival, false /* home told on departure */, msg->epoch);
 
   envelope* env = UsrToEnv(msg);
   CmiAssert(CpvAccess(newZCPupGets).empty());  // Ensure that vector is empty

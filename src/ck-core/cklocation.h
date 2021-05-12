@@ -84,6 +84,8 @@ struct CkLocEntry {
   CmiUInt8 id = 0;
   int pe = -1;
   int epoch = -1;
+
+  const static CkLocEntry nullEntry;
 };
 PUPbytes(CkLocEntry);
 
@@ -325,7 +327,6 @@ private:
   using Listener = std::function<void(CmiUInt8, int)>;
   std::list<Listener> listeners;
 
-  constexpr CkLocEntry nullEntry = CkLocEntry();
 public:
   CkLocCache() = default;
   CkLocCache(CkMigrateMessage* m) : CBase_CkLocCache(m) {}
@@ -345,7 +346,7 @@ public:
   const CkLocEntry& getLocationEntry(CmiUInt8 id) const
   {
     LocationMap::const_iterator itr = locMap.find(id);
-    return itr != locMap.end() ? itr->second : nullEntry;
+    return itr != locMap.end() ? itr->second : CkLocEntry::nullEntry;
   }
   int getPe(const CmiUInt8 id) const { return getLocationEntry(id).pe; }
   int getEpoch(const CmiUInt8 id) const { return getLocationEntry(id).epoch; }
