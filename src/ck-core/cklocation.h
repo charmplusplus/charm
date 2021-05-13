@@ -72,6 +72,23 @@ typedef enum : uint8_t
 PUPbytes(CkDeliver_t)
 
     class CkArrayOptions;
+
+// This is the entry in the location table, which stores the PE and epoch number of the
+// latest location update.
+// TODO: If we can template CkLocCache on this type, we could store more useful
+// information for specific entities being managed. ie: for arrays it could store
+// indices as well. Then one lookup would get you everything you need, rather than looking
+// up in a bunch of tables.
+// TODO: Is int the right type for pe and epoch?
+struct CkLocEntry {
+  CmiUInt8 id = 0;
+  int pe = -1;
+  int epoch = -1;
+
+  const static CkLocEntry nullEntry;
+};
+PUPbytes(CkLocEntry);
+
 #include "CkLocation.decl.h"
 
 /************************** Array Messages ****************************/
@@ -83,12 +100,13 @@ class CkArrayElementMigrateMessage : public CMessage_CkArrayElementMigrateMessag
 {
 public:
   CkArrayElementMigrateMessage(CkArrayIndex idx_, CmiUInt8 id_, bool ignoreArrival_,
-                               int length_, int nManagers_)
+                               int length_, int nManagers_, int epoch_)
       : idx(idx_),
         id(id_),
         ignoreArrival(ignoreArrival_),
         length(length_),
-        nManagers(nManagers_)
+        nManagers(nManagers_),
+        epoch(epoch_)
   {
   }
 
@@ -97,6 +115,7 @@ public:
   bool ignoreArrival;  // if to inform LB of arrival
   int length;          // Size in bytes of the packed data
   int nManagers;       // Number of associated array managers
+  int epoch;
   char* packData;
 };
 
@@ -302,8 +321,8 @@ class CkLocCache : public CBase_CkLocCache
 {
 private:
   // Map of ID to PE
-  using IdPeMap = std::unordered_map<CmiUInt8, int>;
-  IdPeMap id2pe;
+  using LocationMap = std::unordered_map<CmiUInt8, CkLocEntry>;
+  LocationMap locMap;
 
   using Listener = std::function<void(CmiUInt8, int)>;
   std::list<Listener> listeners;
@@ -314,12 +333,28 @@ public:
   ~CkLocCache() = default;
   void pup(PUP::er& p);
 
-  void inform(CmiUInt8 id, int nowOnPe);
-  int homePe(const CmiUInt8 id) const { return id >> CMK_OBJID_ELEMENT_BITS; }
   void requestLocation(CmiUInt8 id);
+
+  // Entry methods for updating location tables across PEs
   void requestLocation(CmiUInt8 id, int peToTell);
-  void updateLocation(CmiUInt8 id, int nowOnPe);
-  void erase(CmiUInt8 id) { id2pe.erase(id); }
+  void updateLocation(const CkLocEntry& e);
+
+  // Update the location table when an element migrates away
+  void recordEmigration(CmiUInt8 id, int pe);
+
+  // Query the local location table
+  const CkLocEntry& getLocationEntry(CmiUInt8 id) const
+  {
+    LocationMap::const_iterator itr = locMap.find(id);
+    return itr != locMap.end() ? itr->second : CkLocEntry::nullEntry;
+  }
+  int getPe(const CmiUInt8 id) const { return getLocationEntry(id).pe; }
+  int getEpoch(const CmiUInt8 id) const { return getLocationEntry(id).epoch; }
+  int homePe(const CmiUInt8 id) const { return ck::ObjID(id).getHomeID(); }
+
+  // Insertion and removal
+  void insert(CmiUInt8 id, int epoch = 0);
+  void erase(CmiUInt8 id) { locMap.erase(id); }
 
   void addListener(Listener l) { listeners.push_back(l); }
   void notifyListeners(CmiUInt8 id, int pe)
@@ -328,21 +363,6 @@ public:
     {
       l(id, pe);
     }
-  }
-
-  int whichPE(const CmiUInt8 id) const
-  {
-    IdPeMap::const_iterator itr = id2pe.find(id);
-    return itr != id2pe.end() ? itr->second : -1;
-  }
-
-  int lastKnown(CmiUInt8 id) const
-  {
-    int pe = whichPE(id);
-    if (pe == -1)
-      return homePe(id);
-    else
-      return pe;
   }
 };
 
@@ -390,7 +410,7 @@ private:
 
   // Create a new local record at this array index.
   CkLocRec* createLocal(const CkArrayIndex& idx, bool forMigration, bool ignoreArrival,
-                        bool notifyHome);
+                        bool notifyHome, int epoch = 0);
 
   LocationRequestBuffer bufferedLocationRequests;
 
@@ -500,22 +520,13 @@ public:
     return CMK_RANK_0(map->procNum(mapHandle, idx));
   }
   bool isHome(const CkArrayIndex& idx) const { return homePe(idx) == CkMyPe(); }
-  int whichPE(const CmiUInt8 id) const { return cache->whichPE(id); }
-  int whichPE(const CkArrayIndex& idx) const
+  int whichPe(const CmiUInt8 id) const { return cache->getPe(id); }
+  int whichPe(const CkArrayIndex& idx) const
   {
     CmiUInt8 id;
     if (!lookupID(idx, id))
       return -1;
-    return cache->whichPE(id);
-  }
-  int lastKnown(const CmiUInt8 id) const { return cache->lastKnown(id); }
-  int lastKnown(const CkArrayIndex& idx) const
-  {
-    int pe = whichPE(idx);
-    if (pe == -1)
-      return homePe(idx);
-    else
-      return pe;
+    return cache->getPe(id);
   }
 
   CmiUInt8 lookupID(const CkArrayIndex& idx) const
@@ -656,7 +667,6 @@ public:
 
   // Advisories:
   /// This index now lives on the given processor-- update local records
-  void inform(const CkArrayIndex& idx, CmiUInt8 id, int nowOnPe);
   void informHome(const CkArrayIndex& idx, int nowOnPe);
 
   /// This message took several hops to reach us-- fix it
@@ -686,7 +696,7 @@ public:
   void immigrate(CkArrayElementMigrateMessage* msg);
   void requestLocation(const CkArrayIndex& idx);
   bool requestLocation(const CkArrayIndex& idx, int peToTell);
-  void updateLocation(const CkArrayIndex& idx, CmiUInt8 id, int nowOnPe);
+  void updateLocation(const CkArrayIndex& idx, const CkLocEntry& e);
   void reclaimRemote(const CkArrayIndex& idx, int deletedOnPe);
   void dummyAtSync(void);
 
