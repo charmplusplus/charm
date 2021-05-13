@@ -2,7 +2,6 @@ mainmodule jacobi3d {
   include "jacobi3d.h";
 
   readonly CProxy_Main main_proxy;
-  readonly CProxy_Manager manager_proxy;
   readonly CProxy_Block block_proxy;
   readonly int num_chares;
   readonly int grid_width;
@@ -23,42 +22,54 @@ mainmodule jacobi3d {
   readonly int n_iters;
   readonly int warmup_iters;
   readonly bool use_zerocopy;
+  readonly bool use_persistent;
   readonly bool print_elements;
+
+  message PersistentMsg;
 
   mainchare Main {
     entry Main(CkArgMsg* m);
-    entry [reductiontarget] void managerInitDone();
     entry [reductiontarget] void initDone();
     entry void startIter();
     entry [reductiontarget] void warmupDone();
     entry [reductiontarget] void allDone();
   };
 
-  nodegroup Manager {
-    entry Manager();
-  };
-
   array [3D] Block {
     entry Block(void);
     entry void init();
-    entry void initDone();
-    entry void packDone();
+    entry void initRecv(int dir, CkDevicePersistent p_buf);
+    entry void packGhostsDone();
     entry void recvGhostZC(int ref, int dir, int w, nocopydevice DataType gh[w]);
+    entry void recvGhostP(PersistentMsg* msg);
     entry void recvGhostReg(int ref, int dir, int w, DataType gh[w]);
+    entry void updateDone();
     entry void print();
     entry void printDone();
 
-    entry void run() {
-      serial {
-        // For computation-communication overlap, it is important that
-        // Jacobi update and packing kernel invocations of the same chare
-        // stay together
-        updateAndPack();
+    entry void initDone() {
+      if (use_persistent) {
+        for (remote_count = 0; remote_count < neighbors; remote_count++) {
+          when initRecv(int dir, CkDevicePersistent p_buf) {
+            serial {
+              p_neighbor_bufs[dir] = p_buf;
+            }
+          }
+        }
       }
 
-      when packDone() serial {
-        std::swap(d_temperature, d_new_temperature);
-        my_iter++;
+      serial {
+        contribute(CkCallback(CkReductionTarget(Main, initDone), main_proxy));
+      }
+    }
+
+    entry void run() {
+      // Pack and send ghost data to neighbors
+      serial {
+        packGhosts();
+      }
+
+      when packGhostsDone() serial {
         sendGhosts();
       }
 
@@ -70,6 +81,10 @@ mainmodule jacobi3d {
               processGhostZC(dir, w, buf);
             }
           }
+        } else if (use_persistent) {
+          when recvGhostP[my_iter](PersistentMsg* msg) serial {
+            processGhostP(msg);
+          }
         } else {
           when recvGhostReg[my_iter](int ref, int dir, int w, DataType buf[w]) {
             serial {
@@ -79,20 +94,26 @@ mainmodule jacobi3d {
         }
       }
 
+      // Perform Jacobian update
       serial {
+        update();
+      }
+
+      // Iteration complete
+      when updateDone() serial {
         if (print_elements) {
           if (x == 0 && y == 0 && z == 0) {
             CkPrintf("Printing iteration %d\n", my_iter);
             thisProxy[thisIndex].print();
           }
         } else {
-          proceed();
+          prepNextIter();
         }
       }
 
       if (print_elements) {
         when printDone() serial {
-          proceed();
+          prepNextIter();
         }
       }
     }

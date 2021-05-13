@@ -36,7 +36,7 @@ class Main : public CBase_Main {
 
     // Process command line arguments
     int c;
-    while ((c = getopt(m->argc, m->argv, "s:x:i:l:w:d:z")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "s:x:i:l:w:d:")) != -1) {
       switch (c) {
         case 's':
           min_size = atoi(optarg);
@@ -56,9 +56,6 @@ class Main : public CBase_Main {
         case 'd':
           window_size = atoi(optarg);
           break;
-        case 'z':
-          zerocopy = true;
-          break;
         default:
           CkPrintf("Unknown command line argument detected");
           CkExit(1);
@@ -74,9 +71,8 @@ class Main : public CBase_Main {
     // Print info
     CkPrintf("# Charm++ GPU Bandwidth Test\n"
         "# Message sizes: %lu - %lu bytes\n# Window size: %d\n"
-        "# Iterations: %d regular, %d large\n# Warmup: %d\n# Zerocopy only: %s\n",
-        min_size, max_size, window_size, n_iters_reg, n_iters_large, warmup_iters,
-        zerocopy ? "true" : "false");
+        "# Iterations: %d regular, %d large\n# Warmup: %d\n",
+        min_size, max_size, window_size, n_iters_reg, n_iters_large, warmup_iters);
 
     // Create block group chare
     block_proxy = CProxy_Block::ckNew();
@@ -87,24 +83,19 @@ class Main : public CBase_Main {
   void initDone() {
     CkPrintf("Starting %s test...\n", zerocopy ? "zerocopy" : "regular");
     cur_size = min_size;
-    testSetup();
+    testBegin(cur_size, zerocopy);
   }
 
-  void testSetup() {
-    // Tell chares to memset their GPU data, will reduce back to testStart
-    block_proxy.memset(cur_size);
-  }
-
-  void testStart() {
+  void testBegin(size_t size, bool zerocopy) {
     // Start ping
-    block_proxy[0].send(cur_size, zerocopy);
+    block_proxy[0].send(size, zerocopy);
   }
 
   void testEnd() {
     cur_size *= 2;
     if (cur_size <= max_size) {
       // Proceed to next message size
-      thisProxy.testSetup();
+      thisProxy.testBegin(cur_size, zerocopy);
     } else {
       if (!zerocopy) {
         // Regular case done, proceed to zerocopy case
@@ -139,8 +130,6 @@ public:
 
   cudaStream_t stream;
   bool stream_created;
-
-  CkDeviceBuffer send_buffer;
 
   Block() {
     memory_allocated = false;
@@ -192,39 +181,21 @@ public:
       stream_created = true;
     }
 
-    // Set up buffer metadata
-    send_buffer = CkDeviceBuffer(d_local_data);
-
     // Reduce back to main
     contribute(CkCallback(CkReductionTarget(Main, initDone), main_proxy));
   }
 
-  void memset(size_t size) {
-    hapiCheck(cudaMemset(d_local_data, 'a', size));
-    hapiCheck(cudaMemset(d_remote_data, 'b', size));
-
-    // Reduce back to main
-    contribute(CkCallback(CkReductionTarget(Main, testStart), main_proxy));
-  }
-
   void send(size_t size, bool zerocopy) {
-    CkAssert(CkMyPe() == 0);
+    if (CkMyPe() == 0) start_time = CkWallTimer();
 
-    start_time = CkWallTimer();
-
-    if (!zerocopy) {
-      for (int i = 0; i < window_size; i++) {
-        cudaMemcpyAsync(h_local_data, d_local_data, size, cudaMemcpyDeviceToHost,
-            stream);
-      }
-      cudaStreamSynchronize(stream);
-
-      for (int i = 0; i < window_size; i++) {
+    for (int i = 0; i < window_size; i++) {
+      if (!zerocopy) {
+        hapiCheck(cudaMemcpyAsync(h_local_data, d_local_data, size,
+              cudaMemcpyDeviceToHost, stream));
+        cudaStreamSynchronize(stream);
         thisProxy[peer].receiveReg(size, h_local_data);
-      }
-    } else {
-      for (int i = 0; i < window_size; i++) {
-        thisProxy[peer].receiveZC(size, send_buffer);
+      } else {
+        thisProxy[peer].receiveZC(size, CkDeviceBuffer(d_local_data, stream));
       }
     }
   }
@@ -234,6 +205,7 @@ public:
     memcpy(h_remote_data, data, size);
     hapiCheck(cudaMemcpyAsync(d_remote_data, h_remote_data, size,
           cudaMemcpyHostToDevice, stream));
+    cudaStreamSynchronize(stream);
 
     afterReceive(size, false);
   }
@@ -243,35 +215,27 @@ public:
     // Inform the runtime where the incoming data should be stored
     // and which CUDA stream should be used for the transfer
     data = d_remote_data;
-    //devicePost[0].cuda_stream = stream;
+    devicePost[0].cuda_stream = stream;
   }
 
   // Second receive (regular entry method), invoked after the data transfer is initiated
   // The user can either wait for it to complete or offload other operations
   // into the stream (that may be dependent on the arriving data)
   void receiveZC(size_t size, char* data) {
-    // Wait for data transfer to complete (no need for UCX)
-    //cudaStreamSynchronize(stream);
+    // Wait for data transfer to complete
+    cudaStreamSynchronize(stream);
 
     afterReceive(size, true);
   }
 
   void afterReceive(size_t size, bool zerocopy) {
     if (++recv_count == window_size) {
-      CkAssert(CkMyPe() == 1);
+      thisProxy[peer].allReceived(size, zerocopy);
       recv_count = 0;
-
-      if (!zerocopy) {
-        cudaStreamSynchronize(stream);
-      }
-
-      thisProxy[peer].ack(size, zerocopy);
     }
   }
 
-  void ack(size_t size, bool zerocopy) {
-    CkAssert(CkMyPe() == 0);
-
+  void allReceived(size_t size, bool zerocopy) {
     int n_iters = (size > LARGE_MESSAGE_SIZE) ? n_iters_large : n_iters_reg;
 
     if (iter > warmup_iters) {

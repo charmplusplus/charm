@@ -15,9 +15,6 @@ OBJS = $(TARGET).o
 $(TARGET): $(OBJS)
 	$(CHARMC) -language charm++ -o $@ $(OBJS) $(LD_LIBS)
 
-$(TARGET)-proj: $(OBJS)
-	$(CHARMC) -language charm++ -tracemode projections -o $@ $(OBJS) $(LD_LIBS)
-
 $(TARGET).decl.h: $(TARGET).ci
 	$(CHARMC) $<
 
