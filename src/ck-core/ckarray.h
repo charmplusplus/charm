@@ -591,7 +591,10 @@ public:
   /// Return the last known processor for this array index.
   /// Valid for any possible array index.
   inline int lastKnown(const CkArrayIndex &idx) const
-	  {return locMgr->lastKnown(idx);}
+  {
+    int pe = locMgr->whichPe(idx);
+    return pe == -1 ? homePe(idx) : pe;
+  }
   /// Deliver message to this element (directly if local)
   /// doFree if is local
   inline void deliver(CkMessage *m, const CkArrayIndex &idx, CkDeliver_t type,int opts=0)
