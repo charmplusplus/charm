@@ -35,6 +35,8 @@
 
 static std::atomic<size_t> rank_count{};
 
+extern bool isPieglobalsEnabled;
+
 struct itemstruct
 {
   size_t offset;
@@ -239,6 +241,8 @@ static void pieglobalscleanupatexit()
 
 void AMPI_Node_Setup(int numranks)
 {
+  isPieglobalsEnabled = true;
+
   if (CmiMyNode() == 0 && !quietModeRequested)
     CmiPrintf("AMPI> Using pieglobals privatization method.\n");
 
