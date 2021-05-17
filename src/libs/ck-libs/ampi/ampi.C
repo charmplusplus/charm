@@ -29,6 +29,8 @@ extern const char * const CmiCommitID;
 
 bool ampiUsingPieglobals = false;
 
+CProxy_ampiPeMgr ampiPeMgrProxy;
+
 static CkDDT *getDDT() noexcept {
   return &getAmpiParent()->myDDT;
 }
@@ -547,6 +549,57 @@ void MPI_MINLOC_USER_FN( void *invec, void *inoutvec, int *len, MPI_Datatype *da
   }
 }
 
+// ampiPeMgr: keeps track of all PE-local virtual ranks.
+class ampiPeMgr : public CBase_ampiPeMgr {
+ private:
+  std::unordered_set<ampiParent *> localAmpiParents;
+
+ public:
+  ampiPeMgr() noexcept {
+    STARTUP_DEBUG("ampiInit> created ampiPeMgr group elem on PE "<<CkMyPe())
+    ampiPeMgrProxy = thisgroup;
+  }
+  ampiPeMgr(CkMigrateMessage *m) noexcept : CBase_ampiPeMgr(m) {}
+  void pup(PUP::er &p) noexcept {
+    // Do nothing, localAmpiParents will be repopulated as ranks are reconstructed
+  }
+  void insertAmpiParent(ampiParent *pptr) noexcept {
+    CkAssert(pptr != nullptr);
+    localAmpiParents.insert(pptr);
+  }
+  void eraseAmpiParent(ampiParent *pptr) noexcept {
+    CkAssert(pptr != nullptr);
+    localAmpiParents.erase(pptr);
+  }
+
+  /* When running with PIEglobals, function pointers are unique to each virtual rank.
+   * This is problematic for user-defined reduction operations, but all functions
+   * share the same offset from their base ptr in a PIE. So we keep track of all
+   * local ampiParents here so that we can lookup a base ptr on demand (in
+   * AmpiReducerFunc on an arbitrary PE), and add the MPI_Op's offset to the base
+   * ptr to get the MPI_User_function. */
+  MPI_User_function* getUserFunction(MPI_User_function* funcOffset) const noexcept {
+    if (ampiUsingPieglobals) {
+      const auto first = localAmpiParents.begin();
+      if (first == localAmpiParents.end()) {
+        CkAbort("AMPI> PE %d has no resident virtual ranks to reference in order to look up a user-defined reduction operator!", CkMyPe());
+        return nullptr;
+      }
+      else {
+        CkAssert(*first != nullptr);
+        const CthThread th = (*first)->getThread()->getThread();
+        CmiIsomallocContext ctx = CmiIsomallocGetThreadContext(th);
+        const CmiIsomallocRegion heap = CmiIsomallocContextGetUsedExtent(ctx);
+        char *basePtr = (char *)heap.start;
+        return (MPI_User_function *)(basePtr + (ptrdiff_t)funcOffset);
+      }
+    }
+    else {
+      return funcOffset;
+    }
+  }
+};
+
 /*
  * AMPI's generic reducer type, AmpiReducer, is used only
  * for MPI_Op/MPI_Datatype combinations that Charm++ does
@@ -569,14 +622,11 @@ CkReduction::reducerType AmpiReducer;
 // every msg contains a AmpiOpHeader structure before user data
 CkReductionMsg *AmpiReducerFunc(int nMsg, CkReductionMsg **msgs) noexcept {
   AmpiOpHeader *hdr = (AmpiOpHeader *)msgs[0]->getData();
-  MPI_Datatype dtype;
-  int szhdr, szdata, len;
-  MPI_User_function* func;
-  func = hdr->func;
-  dtype = hdr->dtype;
-  szdata = hdr->szdata;
-  len = hdr->len;
-  szhdr = sizeof(AmpiOpHeader);
+  MPI_User_function* func = ampiPeMgrProxy.ckLocalBranch()->getUserFunction(hdr->func);
+  MPI_Datatype dtype = hdr->dtype;
+  int szdata = hdr->szdata;
+  int len = hdr->len;
+  int szhdr = sizeof(AmpiOpHeader);
 
   CkReductionMsg *retmsg = CkReductionMsg::buildNew(szhdr+szdata,NULL,AmpiReducer,msgs[0]);
   void *retPtr = (char *)retmsg->getData() + szhdr;
@@ -1149,6 +1199,9 @@ static ampi *ampiInit(char **argv) noexcept
   CProxy_ampiParent parent;
   if (TCHARM_Element()==0) //the rank of a tcharm object
   { /* I'm responsible for building the arrays: */
+    STARTUP_DEBUG("ampiInit> creating ampiPeMgr group")
+    ampiPeMgrProxy = CProxy_ampiPeMgr::ckNew();
+
     STARTUP_DEBUG("ampiInit> creating arrays")
 
     // FIXME: Need to serialize global communicator allocation in one place.
@@ -1400,6 +1453,7 @@ void ampiParent::prepareCtv() noexcept {
 }
 
 void ampiParent::init() noexcept{
+  ampiPeMgrProxy.ckLocalBranch()->insertAmpiParent(this);
   resumeOnRecv = false;
   resumeOnColl = false;
   numBlockedReqs = 0;
@@ -1435,6 +1489,7 @@ void ampiParent::init() noexcept{
 }
 
 void ampiParent::finalize() noexcept {
+  ampiPeMgrProxy.ckLocalBranch()->eraseAmpiParent(this);
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(thisIndex)){
     delete toPUPer;
@@ -1599,6 +1654,17 @@ void ampiParent::Checkpoint(int len, const char* dname) noexcept {
 
 void ampiParent::ResumeThread() noexcept {
   thread->resume();
+}
+
+MPI_User_function* ampiParent::op2User_function(MPI_Op op) const noexcept {
+  if (opIsPredefined(op)) {
+    return predefinedOps[op];
+  }
+  else {
+    int opIdx = op - 1 - AMPI_MAX_PREDEFINED_OP;
+    CkAssert(opIdx < userOps.size());
+    return ampiPeMgrProxy.ckLocalBranch()->getUserFunction(userOps[opIdx].func);
+  }
 }
 
 int ampiParent::createKeyval(MPI_Comm_copy_attr_function *copy_fn, MPI_Comm_delete_attr_function *delete_fn,
