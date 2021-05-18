@@ -480,8 +480,8 @@ public:
   IndexMsgBuffer bufferedIndexMsgs;
   IndexMsgBuffer bufferedDemandMsgs;
 
-  void processDeliverBufferedMsgs(CmiUInt8, MsgBuffer& buffer, bool firstAttempt = true);
-  void processPrepBufferedMsgs(const CkArrayIndex&, CmiUInt8, IndexMsgBuffer&, bool firstAttempt = true);
+  void processDeliverBufferedMsgs(CmiUInt8, MsgBuffer& buffer);
+  void processPrepBufferedMsgs(const CkArrayIndex&, CmiUInt8, IndexMsgBuffer&);
 
   bool addElementToRec(CkLocRec* rec, CkArray* m, CkMigratable* elt, int ctorIdx,
                        void* ctorMsg);
@@ -650,9 +650,9 @@ public:
   // int deliverMsg(CkMessage *m, CkArrayID mgr, const CkArrayIndex &idx, CkDeliver_t
   // type, int opts = 0);
   int deliverMsg(CkArrayMessage* m, CkArrayID mgr, CmiUInt8 id, const CkArrayIndex* idx,
-                 CkDeliver_t type, bool firstAttempt = true, int opts = 0);
+                 CkDeliver_t type, int opts = 0);
   void sendMsg(CkArrayMessage* m, CkArrayID mgr, CmiUInt8 id, const CkArrayIndex* idx,
-                 CkDeliver_t type, bool firstAttempt = true, int opts = 0);
+                 CkDeliver_t type, int opts = 0);
   void prepMsg(CkArrayMessage* msg, CkArrayID mgr, const CkArrayIndex& idx,
                CkDeliver_t type, int opts);
 

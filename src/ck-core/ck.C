@@ -1181,7 +1181,7 @@ static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
     if (mgr) {
       _SET_USED(env, 0);
       ck->process(); // ck->process() updates mProcessed count used in QD
-      mgr->deliver((CkArrayMessage *)EnvToUsr(env), CkDeliver_inline, false);
+      mgr->deliver((CkArrayMessage *)EnvToUsr(env), CkDeliver_inline);
     }
   }
 }
