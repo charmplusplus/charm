@@ -310,7 +310,8 @@ public:
 
   void ckEmigrate(int toPe)
   {
-    if(!_isAnytimeMigration) {
+    if(!_isAnytimeMigration)
+    {
       CkPrintf("Charm++> WARNING: Attempted anytime migration is disabled.\n");
     }
     ckMigrate(toPe);
