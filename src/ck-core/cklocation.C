@@ -2713,7 +2713,7 @@ void CkLocMgr::processPrepBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id,
     CkGroupID mgr = ck::ObjID(env->getRecipientID()).getCollectionID();
     env->setRecipientID(ck::ObjID(mgr, id));
     // Send the updated message
-    deliverMsg(m, mgr, id, &idx, CkDeliver_queue, firstAttempt);
+    sendMsg(m, mgr, id, &idx, CkDeliver_queue, firstAttempt);
   }
 
   CkAssert(itr->second.empty());  // Nothing should have been added, since we
@@ -2960,11 +2960,6 @@ int CkLocMgr::deliverMsg(CkArrayMessage* msg, CkArrayID mgr, CmiUInt8 id,
 {
   CkLocRec* rec = elementNrec(id);
 
-  // firstAttempt should be true iff this is the first time deliverMsg has been called for
-  // this msg, ergo this is the send side and it's not a buffered shadow element msg
-  if (firstAttempt)
-    recordSend(idx, id, UsrToEnv(msg)->getTotalsize(), opts);
-
   // Known, remote location or unknown location
   if (rec == NULL)
   {
@@ -3033,6 +3028,25 @@ int CkLocMgr::deliverMsg(CkArrayMessage* msg, CkArrayID mgr, CmiUInt8 id,
   return result;
 }
 
+// This function should only get called once for any given send, when
+// the destination is thought to be known. deliverMsg, which actually
+// performs delivery to the target element or kicks off the chain that
+// puts this message on the wire, can be called multiple times, which
+// may be necessary due to migrations, etc.
+void CkLocMgr::sendMsg(CkArrayMessage* msg, CkArrayID mgr, CmiUInt8 id,
+                       const CkArrayIndex* idx, CkDeliver_t type,
+                       bool firstAttempt, int opts)
+{
+  // Trace this send for LB
+  // firstAttempt should be true iff this is the first time deliverMsg has been called for
+  // this msg, ergo this is the send side and it's not a buffered shadow element msg
+  if (firstAttempt)
+    recordSend(idx, id, UsrToEnv(msg)->getTotalsize(), opts);
+
+  // Actually trigger delivery
+  deliverMsg(msg, mgr, id, idx, type, firstAttempt, opts);
+}
+
 void CkLocMgr::prepMsg(CkArrayMessage* msg, CkArrayID mgr, const CkArrayIndex& idx,
                        CkDeliver_t type, int opts)
 {
@@ -3053,7 +3067,7 @@ void CkLocMgr::prepMsg(CkArrayMessage* msg, CkArrayID mgr, const CkArrayIndex& i
   {
     // We know the element's ID so we can go through normal delivery channels
     env->setRecipientID(ck::ObjID(mgr, id));
-    deliverMsg(msg, mgr, id, &idx, type, opts);
+    sendMsg(msg, mgr, id, &idx, type, true, opts);
   }
   else
   {

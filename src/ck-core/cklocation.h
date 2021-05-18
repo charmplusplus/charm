@@ -651,6 +651,8 @@ public:
   // type, int opts = 0);
   int deliverMsg(CkArrayMessage* m, CkArrayID mgr, CmiUInt8 id, const CkArrayIndex* idx,
                  CkDeliver_t type, bool firstAttempt = true, int opts = 0);
+  void sendMsg(CkArrayMessage* m, CkArrayID mgr, CmiUInt8 id, const CkArrayIndex* idx,
+                 CkDeliver_t type, bool firstAttempt = true, int opts = 0);
   void prepMsg(CkArrayMessage* msg, CkArrayID mgr, const CkArrayIndex& idx,
                CkDeliver_t type, int opts);
 
