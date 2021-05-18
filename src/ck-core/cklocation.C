@@ -3033,7 +3033,7 @@ int CkLocMgr::deliverMsg(CkArrayMessage* msg, CkArrayID mgr, CmiUInt8 id,
 // may be necessary due to migrations, etc.
 void CkLocMgr::sendMsg(CkArrayMessage* msg, CkArrayID mgr, CmiUInt8 id,
                        const CkArrayIndex* idx, CkDeliver_t type,
-                       int opts)
+                       int opts /* = 0 */)
 {
   // Trace this send for LB
   recordSend(idx, id, UsrToEnv(msg)->getTotalsize(), opts);
