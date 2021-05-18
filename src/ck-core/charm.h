@@ -52,6 +52,7 @@ extern "C" {
 #define CkError                 CmiError
 #define CkAbort                 CmiAbort
 #define CkAssert                CmiAssert
+#define CkEnforce               CmiEnforce
 #define CkSetPeHelpsOtherThreads CmiSetPeHelpsOtherThreads
 
 void realCkExit(int exitcode);
