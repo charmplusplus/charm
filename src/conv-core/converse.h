@@ -1105,14 +1105,10 @@ extern void __cmi_assert(const char *);
                     "\" failed in file " __FILE__ \
                     " line " __CMK_XSTRING(__LINE__) "."), 0)))
 
-#if ! CMK_ERROR_CHECKING
-#define CmiAssert(expr) ((void) 0)
+#if !CMK_ERROR_CHECKING
+#  define CmiAssert(expr) ((void)0)
 #else
-#define CmiAssert(expr) \
-  ((void) ((expr) ? 0 :                   \
-     (__cmi_assert ("Assertion \"" __CMK_STRING(expr) \
-                    "\" failed in file " __FILE__ \
-                    " line " __CMK_XSTRING(__LINE__) "."), 0)))
+#  define CmiAssert(expr) CmiEnforce(expr)
 #endif
 
 typedef void (*CmiStartFn)(int argc, char **argv);
