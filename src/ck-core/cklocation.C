@@ -2693,7 +2693,7 @@ void CkLocMgr::processDeliverBufferedMsgs(CmiUInt8 id, MsgBuffer& buffer)
 }
 
 void CkLocMgr::processPrepBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id,
-				       IndexMsgBuffer& buffer)
+                                       IndexMsgBuffer& buffer)
 {
   auto itr = buffer.find(idx);
   // If there are no buffered msgs, don't do anything
