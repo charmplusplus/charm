@@ -480,8 +480,8 @@ public:
   IndexMsgBuffer bufferedIndexMsgs;
   IndexMsgBuffer bufferedDemandMsgs;
 
-  void deliverAnyBufferedMsgs(CmiUInt8, MsgBuffer& buffer, bool firstAttempt = true);
-  void deliverAnyBufferedMsgs(const CkArrayIndex&, CmiUInt8, IndexMsgBuffer&, bool firstAttempt = true);
+  void processDeliverBufferedMsgs(CmiUInt8, MsgBuffer& buffer, bool firstAttempt = true);
+  void processPrepBufferedMsgs(const CkArrayIndex&, CmiUInt8, IndexMsgBuffer&, bool firstAttempt = true);
 
   bool addElementToRec(CkLocRec* rec, CkArray* m, CkMigratable* elt, int ctorIdx,
                        void* ctorMsg);
@@ -662,8 +662,8 @@ public:
   ElemMap toBeResumeFromSynced;
 
   // Deliver any buffered msgs to a newly created array element
-  void deliverAllBufferedMsgs(CmiUInt8);
-  void deliverAllBufferedMsgs(const CkArrayIndex&, CmiUInt8);
+  void processAllDeliverBufferedMsgs(CmiUInt8);
+  void processAllPrepBufferedMsgs(const CkArrayIndex&, CmiUInt8);
 
   // Advisories:
   /// This index now lives on the given processor-- update local records

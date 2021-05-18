@@ -2491,7 +2491,7 @@ CkLocMgr::CkLocMgr(CkArrayOptions opts)
   cache = static_cast<CkLocCache*>(CkLocalBranch(cacheID));
   if (cache == nullptr)
     CkAbort("ERROR! Local branch of location cache is NULL!\n");
-  cache->addListener([=](CmiUInt8 id, int pe) { this->deliverAllBufferedMsgs(id); });
+  cache->addListener([=](CmiUInt8 id, int pe) { this->processAllDeliverBufferedMsgs(id); });
 
   // Figure out the mapping from indices to object IDs if one is possible
   compressor = ck::FixedArrayIndexCompressor::make(bounds);
@@ -2551,7 +2551,7 @@ void CkLocMgr::pup(PUP::er& p)
     cache = static_cast<CkLocCache*>(CkLocalBranch(cacheID));
     if (cache == nullptr)
       CkAbort("ERROR! Local branch of location cache is NULL!");
-    cache->addListener([=](CmiUInt8 id, int pe) { this->deliverAllBufferedMsgs(id); });
+    cache->addListener([=](CmiUInt8 id, int pe) { this->processAllDeliverBufferedMsgs(id); });
 
     // _lbdb is the fixed global groupID
     initLB(lbmgrID, metalbID);
@@ -2656,20 +2656,20 @@ void CkLocMgr::processAfterActiveRgetsCompleted(CmiUInt8 id)
   }
 }
 
-void CkLocMgr::deliverAllBufferedMsgs(CmiUInt8 id)
+void CkLocMgr::processAllDeliverBufferedMsgs(CmiUInt8 id)
 {
-  deliverAnyBufferedMsgs(id, bufferedMsgs);
-  deliverAnyBufferedMsgs(id, bufferedRemoteMsgs);
-  deliverAnyBufferedMsgs(id, bufferedShadowElemMsgs, false);
+  processDeliverBufferedMsgs(id, bufferedMsgs);
+  processDeliverBufferedMsgs(id, bufferedRemoteMsgs);
+  processDeliverBufferedMsgs(id, bufferedShadowElemMsgs, false);
 }
 
-void CkLocMgr::deliverAllBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id)
+void CkLocMgr::processAllPrepBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id)
 {
-  deliverAnyBufferedMsgs(idx, id, bufferedIndexMsgs);
-  deliverAnyBufferedMsgs(idx, id, bufferedDemandMsgs);
+  processPrepBufferedMsgs(idx, id, bufferedIndexMsgs);
+  processPrepBufferedMsgs(idx, id, bufferedDemandMsgs);
 }
 
-void CkLocMgr::deliverAnyBufferedMsgs(CmiUInt8 id, MsgBuffer& buffer,
+void CkLocMgr::processDeliverBufferedMsgs(CmiUInt8 id, MsgBuffer& buffer,
                                       bool firstAttempt /* = true */)
 {
   auto itr = buffer.find(id);
@@ -2693,7 +2693,7 @@ void CkLocMgr::deliverAnyBufferedMsgs(CmiUInt8 id, MsgBuffer& buffer,
   buffer.erase(itr);
 }
 
-void CkLocMgr::deliverAnyBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id,
+void CkLocMgr::processPrepBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id,
                                       IndexMsgBuffer& buffer,
                                       bool firstAttempt /* = true */)
 {
@@ -2760,7 +2760,7 @@ bool CkLocMgr::addElement(CkArrayID mgr, const CkArrayIndex& idx, CkMigratable* 
   else
   {
     // rec is *already* local -- must not be the first insertion
-    deliverAnyBufferedMsgs(id, bufferedShadowElemMsgs);
+    processDeliverBufferedMsgs(id, bufferedShadowElemMsgs);
   }
 
   if (!addElementToRec(rec, managers[mgr], elt, ctorIdx, ctorMsg))
@@ -2865,7 +2865,7 @@ void CkLocMgr::updateLocation(const CkArrayIndex& idx, const CkLocEntry& e)
 
   // Any messages that were buffered on index because we did not know the ID or location
   // to send to can now be sent.
-  deliverAllBufferedMsgs(idx, e.id);
+  processAllPrepBufferedMsgs(idx, e.id);
 }
 
 /*************************** LocMgr: DELETION *****************************/
