@@ -3033,7 +3033,7 @@ int CkLocMgr::deliverMsg(CkArrayMessage* msg, CkArrayID mgr, CmiUInt8 id,
   return result;
 }
 
-void CkLocMgr::sendMsg(CkArrayMessage* msg, CkArrayID mgr, const CkArrayIndex& idx,
+void CkLocMgr::prepMsg(CkArrayMessage* msg, CkArrayID mgr, const CkArrayIndex& idx,
                        CkDeliver_t type, int opts)
 {
   CK_MAGICNUMBER_CHECK
