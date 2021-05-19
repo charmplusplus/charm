@@ -2286,10 +2286,25 @@ void registerGroupMsgRecvExtCallback(void (*cb)(int, int, int, char *, int)) {
   GroupMsgRecvExtCallback = cb;
 }
 
+#if CMK_CUDA
+void (*GroupMsgGPUDirectRecvExtCallback)(int, int, int, int *, void *, int, char *, int) = NULL;
+void registerGroupMsgGPUDirectRecvExtCallback(void (*cb)(int, int, int, int *, void *, int, char *, int)) {
+  GroupMsgGPUDirectRecvExtCallback = cb;
+}
+#endif
+
 void (*ArrayMsgRecvExtCallback)(int, int, int *, int, int, char *, int) = NULL;
 void registerArrayMsgRecvExtCallback(void (*cb)(int, int, int *, int, int, char *, int)) {
   ArrayMsgRecvExtCallback = cb;
 }
+
+#if CMK_CUDA
+void (*ArrayMsgGPUDirectRecvExtCallback)(int, int, int*, int, int, int*, void *, int, char*, int) = NULL;
+void registerArrayMsgGPUDirectRecvExtCallback(void (*cb)(int, int, int*, int, int, int*, void *, int, char*,int))
+{
+  ArrayMsgGPUDirectRecvExtCallback = cb;
+}
+#endif
 
 void (*ArrayBcastRecvExtCallback)(int, int, int, int, int *, int, int, char *, int) = NULL;
 void registerArrayBcastRecvExtCallback(void (*cb)(int, int, int, int, int *, int, int, char *, int)) {
@@ -2331,14 +2346,6 @@ void registerDepositFutureWithIdFn(void (*cb)(void*, void*))
 {
   DepositFutureWithIdFn = cb;
 }
-
-#if CMK_CUDA
-void (*ArrayMsgGPUDirectRecvExtCallback)(int, int, int*, int, int, int*, void *, int, char*, int) = NULL;
-void registerArrayMsgGPUDirectRecvExtCallback(void (*cb)(int, int, int*, int, int, int*, void *, int, char*,int))
-{
-  ArrayMsgGPUDirectRecvExtCallback = cb;
-}
-#endif
 
 int CkMyPeHook() { return CkMyPe(); }
 int CkNumPesHook() { return CkNumPes(); }
@@ -2603,7 +2610,7 @@ void CkGroupExtSendWithDeviceData(int gid, int pe, int epIdx, int num_bufs, char
     deviceBufPtrs[i] = &deviceBuffs[i];
   }
 
-  CkRdmaDeviceOnSender(destPe, numDevBufs, deviceBufPtrs);
+  CkRdmaDeviceOnSender(pe, numDevBufs, deviceBufPtrs);
 
   CkMarshallMsg *impl_msg = NULL;
   CkPrepareMessageWithDeviceData(&impl_msg,
@@ -2618,7 +2625,7 @@ void CkGroupExtSendWithDeviceData(int gid, int pe, int epIdx, int num_bufs, char
   CkGroupID gId;
   gId.idx = gid;
 
-  CkSendMsgBranch(epIdx, impl_msg, pes[0], gId, 0);
+  CkSendMsgBranch(epIdx, impl_msg, pe, gId, 0);
   #else
   CkAbort("Charm4Py must be built with UCX and CUDA-enabled Charm++ for this feature");
   #endif

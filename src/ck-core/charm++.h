@@ -355,6 +355,10 @@ class IrrGroup : public Chare {
 extern void (*GroupMsgRecvExtCallback)(int, int, int, char *, int);        // callback to forward received msg to external Group chare
 extern void (*ChareMsgRecvExtCallback)(int, void*, int, int, char *, int); // callback to forward received msg to external Chare
 
+#if CMK_CUDA
+extern void (*GroupMsgGPUDirectRecvExtCallback)(int, int, int, int *, void *, int, char *, int);
+#endif
+
 /// Supports readonlies outside of the C/C++ runtime. See README.charm4py
 class ReadOnlyExt {
 public:
@@ -1088,12 +1092,39 @@ public:
     CkMarshallMsg *impl_msg_typed = (CkMarshallMsg *)impl_msg;
     char *impl_buf = impl_msg_typed->msgBuf;
     PUP::fromMem implP(impl_buf);
-    int msgSize; implP|msgSize;
-    int ep; implP|ep;
-    int dcopy_start; implP|dcopy_start;
-    // relay received msg to external chare
-    GroupMsgRecvExtCallback(obj->thisgroup.idx, ep, msgSize, impl_buf+(3*sizeof(int)),
-                            dcopy_start);
+
+#if CMK_CUDA
+    if (CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) == CMK_ZC_DEVICE_MSG) {
+      int numDevBufs; implP | numDevBufs;
+      int directCopySize; implP | directCopySize;
+      int devBufSizes[numDevBufs];
+
+      CkDeviceBuffer *devBufs = new CkDeviceBuffer[numDevBufs];
+      for (int i = 0; i < numDevBufs; i++) {
+        implP | devBufSizes[i];
+        implP | devBufs[i];
+      }
+
+      int msgSize; implP | msgSize;
+      int ep; implP | ep;
+      int d; implP | d;
+
+      GroupMsgGPUDirectRecvExtCallback(obj->thisgroup.idx, ep,
+                                       numDevBufs, devBufSizes, (void*) devBufs,
+                                       msgSize, impl_buf+directCopySize+3*sizeof(int), d);
+
+
+    } else {
+#endif
+      int msgSize; implP|msgSize;
+      int ep; implP|ep;
+      int dcopy_start; implP|dcopy_start;
+      // relay received msg to external chare
+      GroupMsgRecvExtCallback(obj->thisgroup.idx, ep, msgSize, impl_buf+(3*sizeof(int)),
+                              dcopy_start);
+#if CMK_CUDA
+    }
+#endif
   }
 };
 
