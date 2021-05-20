@@ -599,7 +599,7 @@ void CmiDeprecateArgInt(char **argv,const char *arg,const char *desc,const char 
   int dummy = 0, found = CmiGetArgIntDesc(argv, arg, &dummy, desc);
 
   if (found)
-    CmiPrintf("%s", warning);
+    CmiPrintf("%s\n", warning);
 }
 
 /*****************************************************************************
