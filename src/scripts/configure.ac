@@ -1491,20 +1491,6 @@ test_linkc "whether synchronization primitives (__sync_synchronize) works in C" 
 AC_DEFINE_UNQUOTED(CMK_C_SYNC_SYNCHRONIZE_PRIMITIVE, $pass, [whether sync_synchronize primitives works in C])
 
 
-### test for _IO_file_overflow ###
-
-cat > $tc <<EOT
-#include <stdio.h>
-extern int _IO_file_overflow(FILE *, int);
-int main()
-{
-  return _IO_file_overflow(stdout, -1);
-}
-EOT
-test_linkc "whether has _IO_file_overflow" "yes" "no" ""
-AC_DEFINE_UNQUOTED([CMK_HAS_IO_FILE_OVERFLOW], $pass, [whether has _IO_file_overflow])
-
-
 ### test for __executable_start ###
 
 cat > $tc <<EOT

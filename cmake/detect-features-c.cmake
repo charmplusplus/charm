@@ -273,15 +273,6 @@ int main()
 " CMK_HAS_EXECUTABLE_START)
 
 check_c_source_compiles("
-#include <stdio.h>
-extern int _IO_file_overflow(FILE *, int);
-int main()
-{
-  return _IO_file_overflow(stdout, -1);
-}
-" CMK_HAS_IO_FILE_OVERFLOW)
-
-check_c_source_compiles("
 #include <stdlib.h>
 #include <stdio.h>
 #include <linux/mempolicy.h>
