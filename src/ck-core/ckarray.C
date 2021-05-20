@@ -1804,9 +1804,6 @@ void CkArray::sendMsg(CkArrayMessage* msg, const CkArrayIndex& idx, CkDeliver_t 
     if (dest != -1)
     {
       // We know the ID AND the location, so we can send the message as normal.
-      // TODO: We need to make sure we DO NOT insert home into the location table as a
-      // shortcut. Because then we will have a harder time determining if an object exists
-      // or not. Similarly, if objects are deleted, we may run into issues.
       sendToPe(msg, dest, type, opts);
     }
     else
@@ -1915,6 +1912,9 @@ void CkArray::sendToPe(CkArrayMessage* msg, int pe, CkDeliver_t type, int opts)
   else
   {
     // If it is for me, and inline delivery, attempt to invoke the entry method
+    // NOTE: We should only end up here when an inline entry method is called via callback
+    // or when a buffered message is sent from this PE to this PE. Normal inline sends are
+    // handled directly in the .ci file via generated code.
     CmiUInt8 id = msg->array_element_id();
     ArrayElement* elem = lookup(id);
     if (elem == nullptr)
@@ -1936,12 +1936,8 @@ void CkArray::sendToPe(CkArrayMessage* msg, int pe, CkDeliver_t type, int opts)
         // to request permission from home.
         int chareType = _entryTable[msg->array_ep()]->chareIdx;
         int ctor = _chareTable[chareType]->getDefaultCtor();
-        if (ctor == -1)
-        {
-          CkAbort(
-              "Can't create array element to handle message--\n"
-              "The element has no default constructor in the .ci file!\n");
-        }
+        CkAssertMsg(ctor != -1,
+            "Can't demand create an element with no default ctor in the .ci file\n");
         demandCreateElement(rec->getIndex(), ctor);
       }
     }
@@ -2096,10 +2092,8 @@ void CkArray::bufferForCreation(CkArrayMessage* msg, const CkArrayIndex& idx)
     // Figure out the constructor to call
     int chareType = _entryTable[msg->array_ep()]->chareIdx;
     int ctor = _chareTable[chareType]->getDefaultCtor();
-    if (ctor == -1)
-      CkAbort(
-          "Can't create array element to handle message--\n"
-          "The element has no default constructor in the .ci file!\n");
+    CkAssertMsg(ctor != -1,
+        "Can't demand create an element with no default ctor in the .ci file\n");
 
     // Figure out the pe we are requesting for
     int home = locMgr->homePe(idx);
