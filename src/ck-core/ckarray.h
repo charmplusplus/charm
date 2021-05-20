@@ -429,7 +429,7 @@ extern void (*ArrayMsgRecvExtCallback)(int, int, int *, int, int, char *, int);
 extern int (*ArrayElemLeaveExt)(int, int, int *, char**, int);
 extern void (*ArrayElemJoinExt)(int, int, int *, int, char*, int);
 extern void (*ArrayResumeFromSyncExtCallback)(int, int, int *);
-extern void (*ArrayMsgGPUDirectRecvExtCallback)(int, int, int*, int, int, long*, void *, int, char*, int);
+extern void (*ArrayMsgGPUDirectRecvExtCallback)(int, int, int*, int, int, int*, void *, int, char*, int);
 
 class ArrayElemExt: public ArrayElement {
 private:
@@ -454,7 +454,7 @@ public:
     if (CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) == CMK_ZC_DEVICE_MSG) {
         int numDevBufs; implP | numDevBufs;
         int directCopySize; implP | directCopySize;
-        long devBufSizes[numDevBufs];
+        int devBufSizes[numDevBufs];
 
         CkDeviceBuffer *devBufs = new CkDeviceBuffer[numDevBufs];
         for (int i = 0; i < numDevBufs; i++) {
@@ -465,12 +465,11 @@ public:
         int msgSize; implP | msgSize;
         int epIdx; implP | epIdx;
         int d; implP | d;
-
         ArrayMsgGPUDirectRecvExtCallback(((CkGroupID)e->thisArrayID).idx,
                                          int(e->thisIndexMax.getDimension()),
                                          e->thisIndexMax.data(), epIdx,
                                          numDevBufs, devBufSizes, devBufs,
-                                         msgSize, impl_buf+directCopySize+3*sizeof(int), 0);
+                                         msgSize, impl_buf+directCopySize+3*sizeof(int), d);
     } else {
 #endif
     int msgSize; implP|msgSize;

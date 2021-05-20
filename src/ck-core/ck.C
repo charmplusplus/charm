@@ -449,6 +449,71 @@ void CUDACallbackManager(void *fn, void *msg) {
 #endif
 
 #if CMK_CHARM4PY
+
+#if CMK_CUDA
+void CkPrepareMessageWithDeviceData(CkMarshallMsg **dest,
+                                    int epIdx,
+                                    int num_bufs,
+                                    char **bufs,
+                                    int *buf_sizes,
+                                    CkDeviceBuffer *deviceBuffs,
+                                    int *devBufSizesInBytes,
+                                    int numDevBufs
+                                    )
+{
+  int impl_off = 0;
+  int totalSize = 0;
+  for(int i = 0; i < num_bufs; i++) totalSize += buf_sizes[i];
+  // Find the size of the PUP'd data
+  int directCopySize = 0;
+  {
+    PUP::sizer implP;
+
+    // GPUDirect data
+    implP | numDevBufs;
+    implP | directCopySize;
+    for (int i = 0; i < numDevBufs; ++i) {
+      implP | devBufSizesInBytes[i];
+      implP | deviceBuffs[i];
+    }
+
+    // Store the size of the data that is used for
+    // GPU Direct. This needs to be separated from the
+    // data in the non-GPUdirect part of the message
+    directCopySize = implP.size();
+
+    // Regular Charm4Py message
+    implP | totalSize;
+    implP | epIdx;
+    implP | buf_sizes[0];
+    for (int i=0; i < num_bufs; i++) implP(bufs[i], buf_sizes[i]);
+    impl_off += implP.size();
+  }
+
+  CkMarshallMsg *impl_msg=CkAllocateMarshallMsg(impl_off,0);
+  {
+    PUP::toMem implP((void *) impl_msg->msgBuf);
+
+    implP | numDevBufs;
+    implP | directCopySize;
+    for (int i = 0; i < numDevBufs; ++i) {
+      implP | devBufSizesInBytes[i];
+      implP | deviceBuffs[i];
+    }
+
+    implP | totalSize;
+    implP | epIdx;
+    implP | buf_sizes[0];
+    for (int i=0; i < num_bufs; i++) implP(bufs[i], buf_sizes[i]);
+  }
+
+  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_DEVICE_MSG;
+  *dest = impl_msg;
+
+}
+
+#endif // CMK_CUDA
+
 extern void (*DepositFutureWithIdFn)(void *, void*);
 int CUDAPointerOnDevice(const void *ptr)
 {
@@ -2203,10 +2268,25 @@ void registerGroupMsgRecvExtCallback(void (*cb)(int, int, int, char *, int)) {
   GroupMsgRecvExtCallback = cb;
 }
 
+#if CMK_CUDA
+void (*GroupMsgGPUDirectRecvExtCallback)(int, int, int, int *, void *, int, char *, int) = NULL;
+void registerGroupMsgGPUDirectRecvExtCallback(void (*cb)(int, int, int, int *, void *, int, char *, int)) {
+  GroupMsgGPUDirectRecvExtCallback = cb;
+}
+#endif
+
 void (*ArrayMsgRecvExtCallback)(int, int, int *, int, int, char *, int) = NULL;
 void registerArrayMsgRecvExtCallback(void (*cb)(int, int, int *, int, int, char *, int)) {
   ArrayMsgRecvExtCallback = cb;
 }
+
+#if CMK_CUDA
+void (*ArrayMsgGPUDirectRecvExtCallback)(int, int, int*, int, int, int*, void *, int, char*, int) = NULL;
+void registerArrayMsgGPUDirectRecvExtCallback(void (*cb)(int, int, int*, int, int, int*, void *, int, char*,int))
+{
+  ArrayMsgGPUDirectRecvExtCallback = cb;
+}
+#endif
 
 void (*ArrayBcastRecvExtCallback)(int, int, int, int, int *, int, int, char *, int) = NULL;
 void registerArrayBcastRecvExtCallback(void (*cb)(int, int, int, int, int *, int, int, char *, int)) {
@@ -2248,14 +2328,6 @@ void registerDepositFutureWithIdFn(void (*cb)(void*, void*))
 {
   DepositFutureWithIdFn = cb;
 }
-
-#if CMK_CUDA
-void (*ArrayMsgGPUDirectRecvExtCallback)(int, int, int*, int, int, long*, void *, int, char*, int) = NULL;
-void registerArrayMsgGPUDirectRecvExtCallback(void (*cb)(int, int, int*, int, int, long*, void *, int, char*,int))
-{
-  ArrayMsgGPUDirectRecvExtCallback = cb;
-}
-#endif
 
 int CkMyPeHook() { return CkMyPe(); }
 int CkNumPesHook() { return CkNumPes(); }
@@ -2504,6 +2576,43 @@ void CkGroupExtSend(int gid, int npes, const int *pes, int epIdx, char *msg, int
     CkSendMsgBranchMulti(epIdx, impl_msg, gId, npes, pes, 0);
 }
 
+void CkGroupExtSendWithDeviceData(int gid, int pe, int epIdx, int num_bufs, char **bufs,
+                                  int *buf_sizes, long *devBufPtrs,
+                                  int *devBufSizesInBytes,
+                                  long *streamPtrs, int numDevBufs
+                                  )
+{
+  #if CMK_CUDA
+  CkDeviceBuffer deviceBuffs[numDevBufs];
+  CkDeviceBuffer *deviceBufPtrs[numDevBufs];
+  for (int i = 0; i < numDevBufs; ++i) {
+    //deviceBuffs[i] = CkDeviceBuffer((void *) devBufPtrs[i], ((cudaStream_t*)streamPtrs)[i]);
+    deviceBuffs[i] = CkDeviceBuffer((void *) devBufPtrs[i]);
+    deviceBuffs[i].cnt = devBufSizesInBytes[i];
+    deviceBufPtrs[i] = &deviceBuffs[i];
+  }
+
+  CkRdmaDeviceOnSender(pe, numDevBufs, deviceBufPtrs);
+
+  CkMarshallMsg *impl_msg = NULL;
+  CkPrepareMessageWithDeviceData(&impl_msg,
+                                 epIdx,
+                                 num_bufs,
+                                 bufs,
+                                 buf_sizes,
+                                 deviceBuffs,
+                                 devBufSizesInBytes,
+                                 numDevBufs
+                                 );
+  CkGroupID gId;
+  gId.idx = gid;
+
+  CkSendMsgBranch(epIdx, impl_msg, pe, gId, 0);
+  #else
+  CkAbort("Charm4Py must be built with UCX and CUDA-enabled Charm++ for this feature");
+  #endif
+}
+
 void CkGroupExtSend_multi(int gid, int npes, const int *pes, int epIdx, int num_bufs, char **bufs, int *buf_sizes) {
   CkAssert(num_bufs >= 1);
   int totalSize = 0;
@@ -2554,19 +2663,18 @@ void CkArrayExtSend(int aid, int *idx, int ndims, int epIdx, char *msg, int msgS
   }
 }
 
-void CkChareExtSendWithDeviceData(int aid, int *idx, int ndims,
-                                  int epIdx, int num_bufs, char *msg,
-                                  int msgSize,
+void CkArrayExtSendWithDeviceData(int aid, int *idx, int ndims,
+                                  int epIdx, int num_bufs, char **bufs,
+                                  int *buf_sizes,
                                   long *devBufPtrs,
-                                  long *devBufSizesInBytes,
+                                  int *devBufSizesInBytes,
                                   long *streamPtrs, int numDevBufs
                                   )
 {
 #if CMK_CUDA
-  int impl_off = 0;
-  int d = 0;
   CkGroupID gId;
   gId.idx = aid;
+
 
   CkArrayIndex arrIndex(ndims, idx);
 
@@ -2584,51 +2692,17 @@ void CkChareExtSendWithDeviceData(int aid, int *idx, int ndims,
 
   CkRdmaDeviceOnSender(destPe, numDevBufs, deviceBufPtrs);
 
-  // Find the size of the PUP'd data
-  int directCopySize = 0;
-  {
-    PUP::sizer implP;
+  CkMarshallMsg *impl_msg = NULL;
+  CkPrepareMessageWithDeviceData(&impl_msg,
+                                 epIdx,
+                                 num_bufs,
+                                 bufs,
+                                 buf_sizes,
+                                 deviceBuffs,
+                                 devBufSizesInBytes,
+                                 numDevBufs
+                                 );
 
-    // GPUDirect data
-    implP | numDevBufs;
-    implP | directCopySize;
-    for (int i = 0; i < numDevBufs; ++i) {
-      implP | devBufSizesInBytes[i];
-      implP | deviceBuffs[i];
-    }
-
-    // Store the size of the data that is used for
-    // GPU Direct. This needs to be separated from the
-    // data in the non-GPUdirect part of the message
-    directCopySize = implP.size();
-
-    // Regular Charm4Py message
-    implP | msgSize;
-    implP | epIdx;
-    implP | d;
-    implP(msg, msgSize);
-
-    impl_off += implP.size();
-  }
-
-  CkMarshallMsg *impl_msg=CkAllocateMarshallMsg(impl_off,0);
-  {
-    PUP::toMem implP((void *) impl_msg->msgBuf);
-
-    implP | numDevBufs;
-    implP | directCopySize;
-    for (int i = 0; i < numDevBufs; ++i) {
-      implP | devBufSizesInBytes[i];
-      implP | deviceBuffs[i];
-    }
-
-    implP | msgSize;
-    implP | epIdx;
-    implP | d;
-    implP(msg, msgSize);
-  }
-
-  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_DEVICE_MSG;
 
   UsrToEnv(impl_msg)->setMsgtype(ForArrayEltMsg);
   CkArrayMessage *impl_amsg=(CkArrayMessage *)impl_msg;
@@ -2640,6 +2714,7 @@ void CkChareExtSendWithDeviceData(int aid, int *idx, int ndims,
   CkAbort("Charm4Py must be built with UCX and CUDA-enabled Charm++ for this feature");
 #endif
 }
+
 
 void CkArrayExtSend_multi(int aid, int *idx, int ndims, int epIdx, int num_bufs, char **bufs, int *buf_sizes) {
   CkAssert(num_bufs >= 1);

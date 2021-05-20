@@ -131,7 +131,8 @@ extern void registerChareMsgRecvExtCallback(void (*cb)(int, void*, int, int, cha
 extern void registerGroupMsgRecvExtCallback(void (*cb)(int, int, int, char *, int));
 extern void registerArrayMsgRecvExtCallback(void (*cb)(int, int, int *, int, int, char *, int));
 #if CMK_CUDA
-extern void registerArrayMsgGPUDirectRecvExtCallback(void (*cb)(int, int, int*, int, int, long*, void *, int, char*,int));
+extern void registerArrayMsgGPUDirectRecvExtCallback(void (*cb)(int, int, int*, int, int, int*, void *, int, char*,int));
+  extern void registerGroupMsgGPUDirectRecvExtCallback(void (*cb)(int, int, int, int *, void *, int, char *, int));
 #endif
 extern void registerArrayBcastRecvExtCallback(void (*cb)(int, int, int, int, int*, int, int, char *, int));
 extern void registerArrayElemLeaveExtCallback(int (*cb)(int, int, int *, char**, int));
@@ -509,11 +510,16 @@ extern int CkCudaEnabled(void);
 extern int CUDAPointerOnDevice(const void *ptr);
 extern void CkGetGPUDirectData(int numBuffers, void *recvBufPtrs, int *arrSizes,
                                void *remoteBufInfo, void *streamPtrs, int futureId);
-extern void CkChareExtSendWithDeviceData(int aid, int *idx, int ndims,
-                                         int epIdx, int num_bufs, char *msg,
-                                         int msgSize,
+extern void CkArrayExtSendWithDeviceData(int aid, int *idx, int ndims,
+                                         int epIdx, int num_bufs, char **bufs,
+                                         int *buf_sizes,
                                          long *devBufPtrs,
-                                         long *devBufSizesInBytes,
+                                         int *devBufSizesInBytes,
+                                         long *streamPtrs, int numDevBufs
+                                        );
+extern void CkGroupExtSendWithDeviceData(int gid, int pe, int epIdx, int num_bufs, char **bufs,
+                                         int *buf_sizes, long *devBufPtrs,
+                                         int *devBufSizesInBytes,
                                          long *streamPtrs, int numDevBufs
                                          );
 extern int CkDeviceBufferSizeInBytes();
