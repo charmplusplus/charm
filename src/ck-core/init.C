@@ -79,6 +79,7 @@ never be excluded...
 
 #if CMK_CUDA
 #include "hapi_impl.h"
+#include "ckrdmadevice.h"
 
 extern void (*hapiInvokeCallback)(void*, void*);
 extern void CUDACallbackManager(void*, void*);
@@ -88,6 +89,8 @@ extern void (*hapiQdProcess)(int);
 extern void QdCreate(int);
 extern void QdProcess(int);
 #endif
+
+CkpvExtern(CkCallbackPool, cbPool);
 
 void CkRestartMain(const char* dirname, CkArgMsg* args);
 
@@ -1413,6 +1416,22 @@ void _initCharm(int unused_argc, char **argv)
 	
 	// Set the ack handler function used for the direct nocopy api
 	CmiSetDirectNcpyAckHandler(CkRdmaDirectAckHandler);
+
+#if CMK_CUDA
+#if CMK_CHARM4PY
+  CmiRdmaDeviceRecvInit(CkRdmaDeviceRecvHandler,
+                        CkRdmaDeviceAmpiRecvHandler,
+                        CkRdmaDeviceExtRecvHandler
+                        );
+#else
+  CmiRdmaDeviceRecvInit(CkRdmaDeviceRecvHandler, CkRdmaDeviceAmpiRecvHandler);
+#endif // CMK_CHARM4PY
+#endif // CMK_CUDA
+
+  // Used by tag send/recv API
+  CmiRdmaTagHandlerInit(CkRdmaTagHandler);
+  CkpvInitialize(CkCallbackPool, cbPool);
+  CkpvAccess(cbPool) = CkCallbackPool();
 
 	// Set the ack handler function used for the entry method p2p api and entry method bcast api
 	initEMNcpyAckHandler();

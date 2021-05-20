@@ -303,4 +303,12 @@ zcPupSourceInfo *zcPupAddSource(CmiNcpyBuffer &src, std::function<void (void *)>
 
 void zcPupGet(CmiNcpyBuffer &src, CmiNcpyBuffer &dest);
 
+/***************************** Tagged API *********************************/
+
+void CmiTagSend(const void* ptr, size_t size, int dest_pe, int tag, void* cb);
+void CmiTagRecv(const void* ptr, size_t size, int tag, void* cb);
+
+void CmiRdmaTagHandlerInit(RdmaAckCallerFn fn);
+void CmiInvokeTagHandler(void* cb);
+
 #endif

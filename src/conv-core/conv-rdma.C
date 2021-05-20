@@ -459,3 +459,24 @@ void CmiIssueRputUsingCMA(
 void CmiInvokeNcpyAck(void *ack) {
   ncpyDirectAckHandlerFn(ack);
 }
+
+
+/***************************** Tagged API ****************************/
+
+void CmiTagSend(const void* ptr, size_t size, int dest_pe, int tag, void* cb) {
+  LrtsTagSend(ptr, size, dest_pe, tag, cb);
+}
+
+void CmiTagRecv(const void* ptr, size_t size, int tag, void* cb) {
+  LrtsTagRecv(ptr, size, tag, cb);
+}
+
+RdmaAckCallerFn rdmaTagHandlerFn;
+
+void CmiRdmaTagHandlerInit(RdmaAckCallerFn fn) {
+  rdmaTagHandlerFn = fn;
+}
+
+void CmiInvokeTagHandler(void* cb) {
+  rdmaTagHandlerFn(cb);
+}

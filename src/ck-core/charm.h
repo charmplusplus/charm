@@ -8,6 +8,10 @@
 #include "converse.h"
 #include <sys/types.h> /* for size_t */
 
+#if CMK_CHARM4PY && CMK_CUDA
+#include <cuda_runtime.h>
+#endif
+
 #ifdef __cplusplus
 #include "conv-rdma.h"
 #include "pup.h"
@@ -126,11 +130,16 @@ extern void registerReadOnlyRecvExtCallback(void (*cb)(int, char*));
 extern void registerChareMsgRecvExtCallback(void (*cb)(int, void*, int, int, char*, int));
 extern void registerGroupMsgRecvExtCallback(void (*cb)(int, int, int, char *, int));
 extern void registerArrayMsgRecvExtCallback(void (*cb)(int, int, int *, int, int, char *, int));
+#if CMK_CUDA
+extern void registerArrayMsgGPUDirectRecvExtCallback(void (*cb)(int, int, int*, int, int, int*, void *, int, char*,int));
+  extern void registerGroupMsgGPUDirectRecvExtCallback(void (*cb)(int, int, int, int *, void *, int, char *, int));
+#endif
 extern void registerArrayBcastRecvExtCallback(void (*cb)(int, int, int, int, int*, int, int, char *, int));
 extern void registerArrayElemLeaveExtCallback(int (*cb)(int, int, int *, char**, int));
 extern void registerArrayElemJoinExtCallback(void (*cb)(int, int, int *, int, char*, int));
 extern void registerArrayResumeFromSyncExtCallback(void (*cb)(int, int, int *));
 extern void registerArrayMapProcNumExtCallback(int (*cb)(int, int, const int *));
+extern void registerDepositFutureWithIdFn(void (*cb)(void*, void*));
 extern void StartCharmExt(int argc, char **argv); // start Converse/Charm, argv are the command-line arguments
 extern int CkMyPeHook(void);   // function equivalent of CkMyPe macro
 extern int CkNumPesHook(void); // function equivalent of CkNumPes macro
@@ -145,7 +154,6 @@ extern void CkStartQDExt_ArrayCallback(int aid, int* idx, int ndims, int epIdx, 
 extern void CkStartQDExt_SectionCallback(int sid_pe, int sid_cnt, int rootPE, int ep);
 extern void registerCreateCallbackMsgExtCallback(void (*cb)(void*, int, int, int, int *, char**, int*));
 extern void registerPyReductionExtCallback(int (*cb)(char**, int*, int, char**));
-
 #endif
 /*********************************************************/
 /**
@@ -496,6 +504,29 @@ extern void CkSummary_StartPhase(int);
 extern int CkDisableTracing(int epIdx);
 extern void CkEnableTracing(int epIdx);
 extern void CkCallWhenIdle(int epIdx, void* obj);
+
+#if CMK_CHARM4PY
+extern int CkCudaEnabled(void);
+extern int CUDAPointerOnDevice(const void *ptr);
+extern void CkGetGPUDirectData(int numBuffers, void *recvBufPtrs, int *arrSizes,
+                               void *remoteBufInfo, void *streamPtrs, int futureId);
+extern void CkArrayExtSendWithDeviceData(int aid, int *idx, int ndims,
+                                         int epIdx, int num_bufs, char **bufs,
+                                         int *buf_sizes,
+                                         long *devBufPtrs,
+                                         int *devBufSizesInBytes,
+                                         long *streamPtrs, int numDevBufs
+                                        );
+extern void CkGroupExtSendWithDeviceData(int gid, int pe, int epIdx, int num_bufs, char **bufs,
+                                         int *buf_sizes, long *devBufPtrs,
+                                         int *devBufSizesInBytes,
+                                         long *streamPtrs, int numDevBufs
+                                         );
+extern int CkDeviceBufferSizeInBytes();
+extern void CkCUDAHtoD(void *dest, void *src, int nbytes, cudaStream_t stream);
+extern void CkCUDADtoH(void *dest, void *src, int nbytes, cudaStream_t stream);
+extern void CkCUDAStreamSynchronize(cudaStream_t stream);
+#endif
 
 #ifdef __cplusplus
 }

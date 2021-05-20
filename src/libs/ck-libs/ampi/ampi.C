@@ -1063,6 +1063,10 @@ static void ampiProcInit() noexcept {
     CkpvAccess(msgSizesRanks).set(ranks);
   }
 #endif
+
+#if CMK_CUDA
+  CkpvInitialize(std::unordered_set<const void*>, cudaPointerCache);
+#endif
 }
 
 #if AMPIMSGLOG
@@ -2774,6 +2778,48 @@ void ampi::completedRdmaRecv(CkDataMsg *msg) noexcept
   // [nokeep] entry method, so do not delete msg
 }
 
+#if CMK_CUDA
+void ampi::completedCudaSend(CkDataMsg *msg) noexcept
+{
+  // refnum is the index into reqList for this SendReq
+  int reqIdx = CkGetRefNum(msg);
+  //CkDeviceBuffer* srcInfo = (CkDeviceBuffer*)(msg->data);
+
+  MSG_ORDER_DEBUG(
+      CkPrintf("[%d] VP %d in completedCudaSend, reqIdx = %d\n",
+               CkMyPe(), parent->thisIndex, reqIdx);
+  )
+
+  AmpiRequestList& reqList = getReqs();
+  AmpiRequest& sreq = (*reqList[reqIdx]);
+  sreq.complete = true;
+
+  handleBlockedReq(&sreq);
+  resumeThreadIfReady();
+
+  // [nokeep] entry method, so do not delete msg
+}
+#endif
+
+#if CMK_CUDA
+void ampi::completedCudaRecv(CkDataMsg* msg) noexcept
+{
+  // refnum is the index into reqList for this IReq
+  int reqIdx = CkGetRefNum(msg);
+
+  MSG_ORDER_DEBUG(
+    CkPrintf("[%d] VP %d in completedCudaRecv, reqIdx = %d\n", CkMyPe(), parent->thisIndex, reqIdx);
+  )
+  AmpiRequestList& reqList = getReqs();
+  IReq& ireq = *((IReq*)(reqList[reqIdx]));
+  CkAssert(!ireq.complete);
+  ireq.complete = true;
+
+  handleBlockedReq(&ireq);
+  resumeThreadIfReady();
+}
+#endif
+
 void handle_MPI_BOTTOM(void* &buf, MPI_Datatype type) noexcept
 {
   if (buf == MPI_BOTTOM) {
@@ -2911,6 +2957,53 @@ AmpiMsg *ampi::makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int coun
   ddt->serialize((char*)buf, msg->getData(), count, msg->getLength(), PACK);
   return msg;
 }
+
+#if CMK_CUDA
+AmpiMsg *ampi::makeCudaMsg(int t, int sRank, const void *buf, int count,
+                           MPI_Datatype type, CProxy_ampi destProxy,
+                           int destIdx, int ssendReq, CMK_REFNUM_TYPE seq,
+                           ampi* destPtr) noexcept
+{
+  CkAssert(ssendReq >= 0);
+
+  CkDDT_DataType* ddt = getDDT()->getType(type);
+
+  if (ddt->isContig()) {
+    int len = ddt->getSize(count);
+
+    // Create callback to be invoked on the sender when send completes
+    CkCallback sendCB(CkIndex_ampi::completedCudaSend(NULL), thisProxy[thisIndex], true /*inline*/);
+    sendCB.setRefnum(ssendReq);
+
+    // Create metadata for the source GPU buffer
+    CkDeviceBuffer srcInfo = CkDeviceBuffer(buf, len, sendCB);
+
+    // Send source GPU buffer via UCX
+    // Tag will be created by the UCX layer
+    int destPe = destProxy.ckLocalBranch()->lastKnown(CkArrayIndex1D(destIdx));
+    CmiSendDevice(destPe, srcInfo.ptr, srcInfo.cnt, srcInfo.tag);
+
+    // Pack metadata
+    AmpiMsgType msgType = CUDA_MSG;
+    PUP::sizer pupSizer;
+    pupSizer | msgType;
+    pupSizer | srcInfo;
+    int srcInfoLen = pupSizer.size();
+    AmpiMsg* msg = CkpvAccess(msgPool).newAmpiMsg(seq, ssendReq, t, sRank, srcInfoLen);
+    msg->setLength(len); // Set AmpiMsg's length to be that of the real msg payload
+    PUP::toMem pupPacker(msg->getData());
+    pupPacker | msgType;
+    pupPacker | srcInfo;
+
+    return msg;
+  } else {
+    // TODO
+    CkAbort("Direct GPU communication with non-contiguous datatypes are currently not supported");
+
+    return NULL;
+  }
+}
+#endif
 
 void ampi::waitOnBlockingSend(MPI_Request* req, AmpiSendType sendType) noexcept
 {
@@ -3059,6 +3152,29 @@ MPI_Request ampi::sendSyncMsg(int t, int sRank, const void* buf, MPI_Datatype ty
   return reqIdx;
 }
 
+#if CMK_CUDA
+MPI_Request ampi::sendCudaMsg(int t, int sRank, const void* buf, MPI_Datatype type, int count,
+                              int rank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq, CProxy_ampi destProxy,
+                              int destIdx, AmpiSendType sendType, MPI_Request reqIdx, ampi* destPtr) noexcept
+{
+  if (reqIdx == MPI_REQUEST_NULL) {
+    reqIdx = postReq(parent->reqPool.newReq<SsendReq>((void*)buf, count, type, rank, t, destcomm, sRank, getDDT(),
+                                                      (sendType == BLOCKING_SSEND) ?
+                                                      AMPI_REQ_BLOCKED : AMPI_REQ_PENDING));
+  }
+
+  destProxy[destIdx].genericSync(makeCudaMsg(t, sRank, buf, count, type, destProxy, destIdx, reqIdx, seq, NULL));
+
+  return reqIdx;
+}
+#endif
+
+#if CMK_CUDA
+// Cache to speed up checking if user pointer points to GPU memory
+#include <unordered_set>
+CkpvDeclare(std::unordered_set<const void*>, cudaPointerCache);
+#endif
+
 MPI_Request ampi::delesend(int t, int sRank, const void* buf, int count, MPI_Datatype type,
                            int rank, MPI_Comm destcomm, CProxy_ampi arrProxy, AmpiSendType sendType,
                            MPI_Request reqIdx) noexcept
@@ -3083,6 +3199,29 @@ MPI_Request ampi::delesend(int t, int sRank, const void* buf, int count, MPI_Dat
   CkDDT_DataType *ddt = getDDT()->getType(type);
   int size = ddt->getSize(count);
   ampi *destPtr = arrProxy[destIdx].ckLocal();
+#if CMK_CUDA
+  // Check if user buffer is on the GPU
+  bool gpu = false;
+  auto& cache = CkpvAccess(cudaPointerCache);
+  if (cache.find(buf) == cache.end()) {
+    // Pointer not found, check if it points to GPU memory
+    cudaPointerAttributes attr;
+    cudaError_t ret = cudaPointerGetAttributes(&attr, buf);
+    if (ret == cudaSuccess
+        && (attr.type == cudaMemoryTypeDevice || attr.type == cudaMemoryTypeManaged)) {
+      gpu = true;
+      cache.insert(buf);
+    }
+  } else {
+    // Pointer found in cache, it points to GPU memory
+    gpu = true;
+  }
+
+  if (gpu) {
+    return sendCudaMsg(t, sRank, buf, type, count, rank, destcomm,
+                       seq, arrProxy, destIdx, sendType, reqIdx, destPtr);
+  }
+#endif
 #if AMPI_PE_LOCAL_IMPL
   if (destPtr != nullptr && destPtr->parent != nullptr) {
     // Complete message inline to PE-local destination VP
@@ -3163,6 +3302,11 @@ void ampi::requestPut(MPI_Request reqIdx, CkNcpyBuffer targetInfo) noexcept {
 bool ampi::processSsendMsg(AmpiMsg* msg, void* buf, MPI_Datatype type,
                            int count, MPI_Request req) noexcept {
   CkAssert(req != MPI_REQUEST_NULL);
+#if CMK_CUDA
+  if (msg->isCudaMsg()) {
+    return processSsendCudaMsg(msg, buf, type, count, req);
+  }
+#endif
   if (msg->isNcpyShmMsg()) {
     return processSsendNcpyShmMsg(msg, buf, type, count, req);
   }
@@ -3277,6 +3421,52 @@ bool ampi::processSsendNcpyMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int c
   targetInfo.get(srcInfo);
   return ireq.complete; // did the get() complete inline (i.e. src is in same process as target)?
 }
+
+#if CMK_CUDA
+bool ampi::processSsendCudaMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int count, MPI_Request req) noexcept {
+  MSG_ORDER_DEBUG(
+    CkPrintf("[%d] AMPI vp %d receiving GPU buffer with req %d\n",
+             CkMyPe(), parent->thisIndex, req);
+  )
+
+  CkDDT_DataType* ddt = getDDT()->getType(type);
+
+  if (ddt->isContig()) {
+    CkDeviceBuffer srcInfo;
+    msg->getDeviceBuffer(srcInfo);
+
+    int len = ddt->getSize(count);
+    CkAssert(len <= srcInfo.cnt);
+
+    void* rdma_data = CmiAlloc(sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp));
+    CmiEnforce(rdma_data);
+    DeviceRdmaInfo* rdma_info = (DeviceRdmaInfo*)rdma_data;
+    rdma_info->n_ops = 1;
+    rdma_info->counter = 0;
+    DeviceRdmaOp* rdma_op = (DeviceRdmaOp*)((char*)rdma_data + sizeof(DeviceRdmaInfo));
+    //rdma_op->src_pe = srcInfo.src_pe;
+    //rdma_op->src_ptr = srcInfo.ptr;
+    rdma_op->dest_pe = CkMyPe();
+    rdma_op->dest_ptr = buf;
+    rdma_op->size = len;
+    rdma_op->info = rdma_info;
+    rdma_op->src_cb = new CkCallback(srcInfo.cb);
+    rdma_op->dst_cb = new CkCallback(CkIndex_ampi::completedCudaRecv(NULL), thisProxy[thisIndex], true /*inline*/);
+    ((CkCallback*)(rdma_op->dst_cb))->setRefnum(req);
+    rdma_op->tag = srcInfo.tag;
+
+    //QdCreate(1);
+    CmiRecvDevice(rdma_op, DEVICE_RECV_TYPE_AMPI);
+    //CmiInvokeAmpiRecvHandler(rdma_op);
+  } else {
+    // TODO
+    CkAbort("Direct GPU communication with non-contiguous datatypes are currently not supported");
+  }
+
+  // Recv always completes after ampi::completedCudaRecv is invoked
+  return false;
+}
+#endif
 
 // Returns true if the message was processed,
 // false if it is a sync msg that could not yet be processed

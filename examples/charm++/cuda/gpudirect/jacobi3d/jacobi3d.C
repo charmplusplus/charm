@@ -4,9 +4,8 @@
 #include <utility>
 #include <sstream>
 
-#define CUDA_SYNC 0
-
 /* readonly */ CProxy_Main main_proxy;
+/* readonly */ CProxy_Manager manager_proxy;
 /* readonly */ CProxy_Block block_proxy;
 /* readonly */ int num_chares;
 /* readonly */ int grid_width;
@@ -27,7 +26,6 @@
 /* readonly */ int n_iters;
 /* readonly */ int warmup_iters;
 /* readonly */ bool use_zerocopy;
-/* readonly */ bool use_persistent;
 /* readonly */ bool print_elements;
 
 extern void invokeInitKernel(DataType* d_temperature, int block_width,
@@ -38,19 +36,12 @@ extern void invokeBoundaryKernels(DataType* d_temperature, int block_width,
     int block_height, int block_depth, bool bounds[], cudaStream_t stream);
 extern void invokeJacobiKernel(DataType* d_temperature, DataType* d_new_temperature,
     int block_width, int block_height, int block_depth, cudaStream_t stream);
-extern void invokePackingKernels(DataType* d_temperature, DataType* d_ghosts[],
-    bool bounds[], int block_width, int block_height, int block_depth,
+extern void invokePackingKernel(DataType* d_temperature, DataType* d_ghost,
+    int dir, int block_width, int block_height, int block_depth,
     cudaStream_t stream);
 extern void invokeUnpackingKernel(DataType* d_temperature, DataType* d_ghost,
     int dir, int block_width, int block_height, int block_depth,
     cudaStream_t stream);
-
-class PersistentMsg : public CMessage_PersistentMsg {
-public:
-  int dir;
-
-  PersistentMsg(int dir_) : dir(dir_) {}
-};
 
 class Main : public CBase_Main {
   int my_iter;
@@ -68,14 +59,13 @@ public:
     n_iters = 100;
     warmup_iters = 10;
     use_zerocopy = false;
-    use_persistent = false;
     print_elements = false;
     my_iter = 0;
 
     // Process arguments
     int c;
     bool dims[3] = {false, false, false};
-    while ((c = getopt(m->argc, m->argv, "c:x:y:z:i:w:dsp")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "c:x:y:z:i:w:dp")) != -1) {
       switch (c) {
         case 'c':
           num_chares = atoi(optarg);
@@ -101,9 +91,6 @@ public:
         case 'd':
           use_zerocopy = true;
           break;
-        case 's':
-          use_persistent = true;
-          break;
         case 'p':
           print_elements = true;
           break;
@@ -111,18 +98,12 @@ public:
           CkPrintf(
               "Usage: %s -x [grid width] -y [grid height] -z [grid depth] "
               "-c [number of chares] -i [iterations] -w [warmup iterations] "
-              "-d (use GPU zerocopy) -s (use persistent) -p (print blocks)\n",
+              "-d (use GPU zerocopy) -p (print blocks)\n",
               m->argv[0]);
           CkExit();
       }
     }
     delete m;
-
-    // Zerocopy and persistent cannot be used together
-    if (use_zerocopy && use_persistent) {
-      CkPrintf("Zerocopy and persistent cannot be used together!\n");
-      CkExit(-1);
-    }
 
     // If only the X dimension is given, use it for Y and Z as well
     if (dims[0] && !dims[1] && !dims[2]) grid_height = grid_depth = grid_width;
@@ -181,14 +162,19 @@ public:
     // Print configuration
     CkPrintf("\n[CUDA 3D Jacobi example]\n");
     CkPrintf("Grid: %d x %d x %d, Block: %d x %d x %d, Chares: %d x %d x %d, "
-        "Iterations: %d, Warm-up: %d, Zerocopy: %d, Persistent: %d, Print: %d\n\n",
+        "Iterations: %d, Warm-up: %d, Zerocopy: %d, Print: %d\n\n",
         grid_width, grid_height, grid_depth, block_width, block_height, block_depth,
         n_chares_x, n_chares_y, n_chares_z, n_iters, warmup_iters, use_zerocopy,
-        use_persistent, print_elements);
+        print_elements);
 
     // Create blocks and start iteration
     block_proxy = CProxy_Block::ckNew(n_chares_x, n_chares_y, n_chares_z);
+    manager_proxy = CProxy_Manager::ckNew();
     init_start_time = CkWallTimer();
+  }
+
+  void managerInitDone() {
+    CkPrintf("Managers initialized\n");
     block_proxy.init();
   }
 
@@ -210,18 +196,43 @@ public:
 
   void allDone() {
     double total_time = CkWallTimer() - start_time;
-    CkPrintf("Total time: %.3lf s\nAverage iteration time: %.3lf us\n",
-        total_time, (total_time / n_iters) * 1e6);
+    CkPrintf("Total time: %.3lf s\nAverage iteration time: %.3lf ms\n",
+        total_time, (total_time / n_iters) * 1e3);
     CkExit();
+  }
+};
+
+class Manager : public CBase_Manager {
+public:
+  cudaStream_t compute_stream;
+  cudaStream_t h2d_stream;
+  cudaStream_t d2h_stream;
+  cudaStream_t unpack_stream;
+  cudaStream_t pack_stream;
+
+  Manager() {
+    // Create CUDA streams
+    hapiCheck(cudaStreamCreateWithPriority(&compute_stream, cudaStreamDefault, 0));
+    hapiCheck(cudaStreamCreateWithPriority(&h2d_stream, cudaStreamDefault, -1));
+    hapiCheck(cudaStreamCreateWithPriority(&d2h_stream, cudaStreamDefault, -1));
+    hapiCheck(cudaStreamCreateWithPriority(&unpack_stream, cudaStreamDefault, -1));
+    hapiCheck(cudaStreamCreateWithPriority(&pack_stream, cudaStreamDefault, -1));
+
+    contribute(CkCallback(CkReductionTarget(Main, managerInitDone), main_proxy));
+  }
+
+  ~Manager() {
+    // Destroy CUDA streams
+    hapiCheck(cudaStreamDestroy(compute_stream));
+    hapiCheck(cudaStreamDestroy(h2d_stream));
+    hapiCheck(cudaStreamDestroy(d2h_stream));
+    hapiCheck(cudaStreamDestroy(unpack_stream));
+    hapiCheck(cudaStreamDestroy(pack_stream));
   }
 };
 
 class Block : public CBase_Block {
   Block_SDAG_CODE
-
-  std::vector<CkDevicePersistent> p_send_bufs;
-  std::vector<CkDevicePersistent> p_recv_bufs;
-  std::vector<CkDevicePersistent> p_neighbor_bufs;
 
  public:
   int my_iter;
@@ -237,14 +248,17 @@ class Block : public CBase_Block {
   DataType* d_ghosts[DIR_COUNT];
   DataType* d_send_ghosts[DIR_COUNT];
   DataType* d_recv_ghosts[DIR_COUNT];
+  CkDeviceBuffer send_ghosts_buf[DIR_COUNT];
 
-  cudaStream_t compute_stream;
-  cudaStream_t comm_stream;
-
-  cudaEvent_t compute_event;
-  cudaEvent_t comm_event;
+  Manager* manager;
+  cudaEvent_t compute_pack_event;
+  cudaEvent_t pack_d2h_events[DIR_COUNT];
+  cudaEvent_t h2d_unpack_events[DIR_COUNT];
+  cudaEvent_t unpack_compute_event;
 
   bool bounds[DIR_COUNT];
+  double comm_start_time;
+  double comm_time;
 
   Block() {}
 
@@ -252,7 +266,7 @@ class Block : public CBase_Block {
     hapiCheck(cudaFreeHost(h_temperature));
     hapiCheck(cudaFree(d_temperature));
     hapiCheck(cudaFree(d_new_temperature));
-    if (use_zerocopy || use_persistent) {
+    if (use_zerocopy) {
       for (int i = 0; i < DIR_COUNT; i++) {
         hapiCheck(cudaFree(d_send_ghosts[i]));
         hapiCheck(cudaFree(d_recv_ghosts[i]));
@@ -264,11 +278,12 @@ class Block : public CBase_Block {
       }
     }
 
-    hapiCheck(cudaStreamDestroy(compute_stream));
-    hapiCheck(cudaStreamDestroy(comm_stream));
-
-    hapiCheck(cudaEventDestroy(compute_event));
-    hapiCheck(cudaEventDestroy(comm_event));
+    hapiCheck(cudaEventDestroy(compute_pack_event));
+    for (int i = 0; i < DIR_COUNT; i++) {
+      hapiCheck(cudaEventDestroy(pack_d2h_events[i]));
+      hapiCheck(cudaEventDestroy(h2d_unpack_events[i]));
+    }
+    hapiCheck(cudaEventDestroy(unpack_compute_event));
   }
 
   void init() {
@@ -278,6 +293,7 @@ class Block : public CBase_Block {
     x = thisIndex.x;
     y = thisIndex.y;
     z = thisIndex.z;
+    comm_time = 0;
 
     // Check bounds and set number of valid neighbors
     for (int i = 0; i < DIR_COUNT; i++) bounds[i] = false;
@@ -304,11 +320,19 @@ class Block : public CBase_Block {
           sizeof(DataType) * (block_width+2) * (block_height+2) * (block_depth+2)));
     std::vector<size_t> ghost_sizes = {x_surf_size, x_surf_size, y_surf_size,
       y_surf_size, z_surf_size, z_surf_size};
-    if (use_zerocopy || use_persistent) {
+    if (use_zerocopy) {
       for (int i = 0; i < DIR_COUNT; i++) {
         hapiCheck(cudaMalloc((void**)&d_send_ghosts[i], ghost_sizes[i]));
         hapiCheck(cudaMalloc((void**)&d_recv_ghosts[i], ghost_sizes[i]));
       }
+
+      // Create CkDeviceBuffers
+      send_ghosts_buf[LEFT] = CkDeviceBuffer(d_send_ghosts[LEFT], x_surf_count);
+      send_ghosts_buf[RIGHT] = CkDeviceBuffer(d_send_ghosts[RIGHT], x_surf_count);
+      send_ghosts_buf[TOP] = CkDeviceBuffer(d_send_ghosts[TOP], y_surf_count);
+      send_ghosts_buf[BOTTOM] = CkDeviceBuffer(d_send_ghosts[BOTTOM], y_surf_count);
+      send_ghosts_buf[FRONT] = CkDeviceBuffer(d_send_ghosts[FRONT], z_surf_count);
+      send_ghosts_buf[BACK] = CkDeviceBuffer(d_send_ghosts[BACK], z_surf_count);
     } else {
       for (int i = 0; i < DIR_COUNT; i++) {
         hapiCheck(cudaMallocHost((void**)&h_ghosts[i], ghost_sizes[i]));
@@ -316,60 +340,37 @@ class Block : public CBase_Block {
       }
     }
 
-    // Create CUDA streams and events
-    hapiCheck(cudaStreamCreateWithPriority(&compute_stream, cudaStreamDefault, 0));
-    hapiCheck(cudaStreamCreateWithPriority(&comm_stream, cudaStreamDefault, -1));
-
-    hapiCheck(cudaEventCreateWithFlags(&compute_event, cudaEventDisableTiming));
-    hapiCheck(cudaEventCreateWithFlags(&comm_event, cudaEventDisableTiming));
-
-    // Create persistent buffers
-    if (use_persistent) {
-      CkCallback recv_cb = CkCallback(CkIndex_Block::recvGhostP(nullptr), thisProxy[thisIndex]);
-
-      p_send_bufs.reserve(DIR_COUNT);
-      p_recv_bufs.reserve(DIR_COUNT);
-      p_neighbor_bufs.resize(DIR_COUNT);
-
-      for (int i = 0; i < DIR_COUNT; i++) {
-        p_send_bufs.emplace_back(d_send_ghosts[i], ghost_sizes[i], CkCallback::ignore, comm_stream);
-        p_recv_bufs.emplace_back(d_recv_ghosts[i], ghost_sizes[i], recv_cb, comm_stream);
-
-        // Open buffers that will be sent to neighbors
-        p_recv_bufs[i].open();
-      }
-
-      // Send persistent buffer info to neighbors
-      if (!bounds[LEFT])   thisProxy(x-1, y, z).initRecv(RIGHT, p_recv_bufs[LEFT]);
-      if (!bounds[RIGHT])  thisProxy(x+1, y, z).initRecv(LEFT, p_recv_bufs[RIGHT]);
-      if (!bounds[TOP])    thisProxy(x, y-1, z).initRecv(BOTTOM, p_recv_bufs[TOP]);
-      if (!bounds[BOTTOM]) thisProxy(x, y+1, z).initRecv(TOP, p_recv_bufs[BOTTOM]);
-      if (!bounds[FRONT])  thisProxy(x, y, z-1).initRecv(BACK, p_recv_bufs[FRONT]);
-      if (!bounds[BACK])   thisProxy(x, y, z+1).initRecv(FRONT, p_recv_bufs[BACK]);
+    // Create CUDA events for enforcing dependencies
+    manager = manager_proxy.ckLocalBranch();
+    hapiCheck(cudaEventCreateWithFlags(&compute_pack_event, cudaEventDisableTiming));
+    for (int i = 0; i < DIR_COUNT; i++) {
+      hapiCheck(cudaEventCreateWithFlags(&pack_d2h_events[i], cudaEventDisableTiming));
+      hapiCheck(cudaEventCreateWithFlags(&h2d_unpack_events[i], cudaEventDisableTiming));
     }
+    hapiCheck(cudaEventCreateWithFlags(&unpack_compute_event, cudaEventDisableTiming));
 
     // Initialize temperature data
-    invokeInitKernel(d_temperature, block_width, block_height, block_depth, compute_stream);
-    invokeInitKernel(d_new_temperature, block_width, block_height, block_depth, compute_stream);
+    invokeInitKernel(d_temperature, block_width, block_height, block_depth, manager->compute_stream);
+    invokeInitKernel(d_new_temperature, block_width, block_height, block_depth, manager->compute_stream);
 
     // Initialize ghost data
     std::vector<int> ghost_counts = {x_surf_count, x_surf_count, y_surf_count,
       y_surf_count, z_surf_count, z_surf_count};
-    if (use_zerocopy || use_persistent) {
+    if (use_zerocopy) {
       std::vector<DataType*> send_ghosts;
       std::vector<DataType*> recv_ghosts;
       for (int i = 0; i < DIR_COUNT; i++) {
         send_ghosts.push_back(d_send_ghosts[i]);
         recv_ghosts.push_back(d_recv_ghosts[i]);
       }
-      invokeGhostInitKernels(send_ghosts, ghost_counts, compute_stream);
-      invokeGhostInitKernels(recv_ghosts, ghost_counts, compute_stream);
+      invokeGhostInitKernels(send_ghosts, ghost_counts, manager->compute_stream);
+      invokeGhostInitKernels(recv_ghosts, ghost_counts, manager->compute_stream);
     } else {
       std::vector<DataType*> ghosts;
       for (int i = 0; i < DIR_COUNT; i++) {
         ghosts.push_back(d_ghosts[i]);
       }
-      invokeGhostInitKernels(ghosts, ghost_counts, compute_stream);
+      invokeGhostInitKernels(ghosts, ghost_counts, manager->compute_stream);
 
       for (int i = 0; i < DIR_COUNT; i++) {
         int ghost_count = ghost_counts[i];
@@ -381,89 +382,85 @@ class Block : public CBase_Block {
 
     // Enforce boundary conditions
     invokeBoundaryKernels(d_temperature, block_width, block_height, block_depth,
-        bounds, compute_stream);
+        bounds, manager->compute_stream);
     invokeBoundaryKernels(d_new_temperature, block_width, block_height, block_depth,
-        bounds, compute_stream);
+        bounds, manager->compute_stream);
 
-#if CUDA_SYNC
-    cudaStreamSynchronize(compute_stream);
-    thisProxy[thisIndex].initDone();
-#else
     // TODO: Support reduction callback in hapiAddCallback
     CkCallback* cb = new CkCallback(CkIndex_Block::initDone(), thisProxy[thisIndex]);
-    hapiAddCallback(compute_stream, cb);
-#endif
+    hapiAddCallback(manager->compute_stream, cb);
   }
 
-  void packGhosts() {
-    if (use_persistent || use_zerocopy) {
-      // Pack non-contiguous ghosts to temporary contiguous buffers on device
-      invokePackingKernels(d_temperature, d_send_ghosts, bounds,
-          block_width, block_height, block_depth, comm_stream);
-    } else {
-      // Pack non-contiguous ghosts to temporary contiguous buffers on device
-      invokePackingKernels(d_temperature, d_ghosts, bounds,
-          block_width, block_height, block_depth, comm_stream);
+  void initDone() {
+    contribute(CkCallback(CkReductionTarget(Main, initDone), main_proxy));
+  }
 
-      // Transfer ghosts from device to host
-      std::vector<size_t> ghost_sizes = {x_surf_size, x_surf_size, y_surf_size,
-        y_surf_size, z_surf_size, z_surf_size};
-      for (int i = 0; i < DIR_COUNT; i++) {
-        if (!bounds[i]) {
+  void updateAndPack() {
+    // Enforce unpack -> compute dependency
+    hapiCheck(cudaEventRecord(unpack_compute_event, manager->unpack_stream));
+    hapiCheck(cudaStreamWaitEvent(manager->compute_stream, unpack_compute_event, 0));
+
+    // Invoke GPU kernel for Jacobi computation
+    invokeJacobiKernel(d_temperature, d_new_temperature, block_width, block_height,
+        block_depth, manager->compute_stream);
+    hapiCheck(cudaEventRecord(compute_pack_event, manager->compute_stream));
+
+    std::vector<size_t> ghost_sizes = {x_surf_size, x_surf_size, y_surf_size,
+      y_surf_size, z_surf_size, z_surf_size};
+
+    for (int i = 0; i < DIR_COUNT; i++) {
+      if (!bounds[i]) {
+        // Enforce compute -> pack dependency
+        hapiCheck(cudaStreamWaitEvent(manager->pack_stream, compute_pack_event, 0));
+
+        // Pack
+        DataType* pack_ghost = use_zerocopy ? d_send_ghosts[i] : d_ghosts[i];
+        invokePackingKernel(d_temperature, pack_ghost, i, block_width, block_height,
+            block_depth, manager->pack_stream);
+
+        if (!use_zerocopy) {
+          // Enforce pack -> d2h dependency
+          hapiCheck(cudaEventRecord(pack_d2h_events[i], manager->pack_stream));
+          hapiCheck(cudaStreamWaitEvent(manager->d2h_stream, pack_d2h_events[i], 0));
+
+          // Transfer ghosts from device to host when packing kernel completes
           hapiCheck(cudaMemcpyAsync(h_ghosts[i], d_ghosts[i], ghost_sizes[i],
-                cudaMemcpyDeviceToHost, comm_stream));
+                cudaMemcpyDeviceToHost, manager->d2h_stream));
         }
       }
     }
 
-    if (use_persistent) {
-      thisProxy[thisIndex].packGhostsDone();
+    CkCallback* cb = new CkCallback(CkIndex_Block::packDone(), thisProxy[thisIndex]);
+    if (use_zerocopy) {
+      hapiAddCallback(manager->pack_stream, cb);
     } else {
-#if CUDA_SYNC
-      cudaStreamSynchronize(comm_stream);
-      thisProxy[thisIndex].packGhostsDone();
-#else
-      // Add asynchronous callback to be invoked when packing kernels and
-      // ghost transfers are complete
-      CkCallback* cb = new CkCallback(CkIndex_Block::packGhostsDone(), thisProxy[thisIndex]);
-      hapiAddCallback(comm_stream, cb);
-#endif
+      hapiAddCallback(manager->d2h_stream, cb);
     }
   }
 
   void sendGhosts() {
+    if (my_iter > warmup_iters) comm_start_time = CkWallTimer();
+
     // Send ghosts to neighboring chares
-    if (use_persistent) {
-      // PersistentMsg is used to store the direction
-      PersistentMsg* msg;
-      for (int dir = 0; dir < DIR_COUNT; dir++) {
-        int rev_dir = (dir % 2 == 0) ? (dir+1) : (dir-1);
-        if (!bounds[dir]) {
-          msg = new PersistentMsg(rev_dir);
-          p_neighbor_bufs[dir].set_msg(msg);
-          p_neighbor_bufs[dir].cb.setRefNum(my_iter);
-          p_send_bufs[dir].put(p_neighbor_bufs[dir]);
-        }
-      }
-    } else if (use_zerocopy) {
+    if (use_zerocopy) {
       if (!bounds[LEFT])
         thisProxy(x-1, y, z).recvGhostZC(my_iter, RIGHT, x_surf_count,
-            CkDeviceBuffer(d_send_ghosts[LEFT], x_surf_count, comm_stream));
+            send_ghosts_buf[LEFT]);
       if (!bounds[RIGHT])
         thisProxy(x+1, y, z).recvGhostZC(my_iter, LEFT, x_surf_count,
-            CkDeviceBuffer(d_send_ghosts[RIGHT], x_surf_count, comm_stream));
+            send_ghosts_buf[RIGHT]);
       if (!bounds[TOP])
         thisProxy(x, y-1, z).recvGhostZC(my_iter, BOTTOM, y_surf_count,
-            CkDeviceBuffer(d_send_ghosts[TOP], y_surf_count, comm_stream));
+            send_ghosts_buf[TOP]);
       if (!bounds[BOTTOM])
         thisProxy(x, y+1, z).recvGhostZC(my_iter, TOP, y_surf_count,
-            CkDeviceBuffer(d_send_ghosts[BOTTOM], y_surf_count, comm_stream));
+            send_ghosts_buf[BOTTOM]);
       if (!bounds[FRONT])
         thisProxy(x, y, z-1).recvGhostZC(my_iter, BACK, z_surf_count,
-            CkDeviceBuffer(d_send_ghosts[FRONT], z_surf_count, comm_stream));
+            send_ghosts_buf[FRONT]);
       if (!bounds[BACK])
         thisProxy(x, y, z+1).recvGhostZC(my_iter, FRONT, z_surf_count,
-            CkDeviceBuffer(d_send_ghosts[BACK], z_surf_count, comm_stream));
+            send_ghosts_buf[BACK]);
     } else {
       if (!bounds[LEFT])
         thisProxy(x-1, y, z).recvGhostReg(my_iter, RIGHT,
@@ -494,62 +491,47 @@ class Block : public CBase_Block {
     if (dir == LEFT || dir == RIGHT) count = x_surf_count;
     else if (dir == TOP || dir == BOTTOM) count = y_surf_count;
     else if (dir == FRONT || dir == BACK) count = z_surf_count;
-    devicePost[0].cuda_stream = comm_stream;
+    //devicePost[0].cuda_stream = comm_stream;
   }
 
   void processGhostZC(int dir, int count, DataType* gh) {
-    // FIXME: d_recv_ghosts[dir] should be used instead of gh
-    invokeUnpackingKernel(d_temperature, d_recv_ghosts[dir], dir, block_width, block_height,
-        block_depth, comm_stream);
-  }
-
-  void processGhostP(PersistentMsg* msg) {
-    int dir = msg->dir;
     CkAssert(dir >= 0 && dir < DIR_COUNT);
-    DataType* d_ghost = d_recv_ghosts[dir];
-
-    invokeUnpackingKernel(d_temperature, d_ghost, dir, block_width, block_height,
-        block_depth, comm_stream);
-
-    delete msg;
+    // XXX: d_recv_ghosts[dir] should be used instead of gh
+    invokeUnpackingKernel(d_temperature, d_recv_ghosts[dir], dir, block_width, block_height,
+        block_depth, manager->unpack_stream);
   }
 
   void processGhostReg(int dir, int size, DataType* gh) {
-    DataType* h_ghost = nullptr; DataType* d_ghost = nullptr;
     CkAssert(dir >= 0 && dir < DIR_COUNT);
-    h_ghost = h_ghosts[dir];
-    d_ghost = d_ghosts[dir];
+    DataType* h_ghost = h_ghosts[dir];
+    DataType* d_ghost = d_ghosts[dir];
 
+    // Copy ghost from host to device buffer
     memcpy(h_ghost, gh, size * sizeof(DataType));
     hapiCheck(cudaMemcpyAsync(d_ghost, h_ghost, size * sizeof(DataType),
-          cudaMemcpyHostToDevice, comm_stream));
+          cudaMemcpyHostToDevice, manager->h2d_stream));
+
+    // Enforce h2d -> unpack dependency
+    hapiCheck(cudaEventRecord(h2d_unpack_events[dir], manager->h2d_stream));
+    hapiCheck(cudaStreamWaitEvent(manager->unpack_stream, h2d_unpack_events[dir], 0));
+
+    // Unpack
     invokeUnpackingKernel(d_temperature, d_ghost, dir, block_width, block_height,
-        block_depth, comm_stream);
+        block_depth, manager->unpack_stream);
   }
 
-  void update() {
-    // Operations in compute stream should only be executed when
-    // operations in communication stream (transfers and unpacking) complete
-    hapiCheck(cudaEventRecord(comm_event, comm_stream));
-    hapiCheck(cudaStreamWaitEvent(compute_stream, comm_event, 0));
-
-    // Invoke GPU kernel for Jacobi computation
-    invokeJacobiKernel(d_temperature, d_new_temperature, block_width, block_height,
-        block_depth, compute_stream);
-
-    CkCallback update_cb(CkIndex_Block::updateDone(), thisProxy[thisIndex]);
-    hapiAddCallback(compute_stream, update_cb);
-  }
-
-  void prepNextIter() {
-    std::swap(d_temperature, d_new_temperature);
-    my_iter++;
+  void proceed() {
     if (my_iter <= warmup_iters) {
       contribute(CkCallback(CkReductionTarget(Main, warmupDone), main_proxy));
     } else {
+      comm_time += CkWallTimer() - comm_start_time;
       if (my_iter < warmup_iters + n_iters) {
         thisProxy[thisIndex].run();
       } else {
+        if (x == 0 && y == 0 && z == 0) {
+          CkPrintf("Chare 0 comm time: %.3lf s (avg %.3lf ms, only valid without overdecomposition)\n",
+            comm_time, comm_time / n_iters * 1e3);
+        }
         contribute(CkCallback(CkReductionTarget(Main, allDone), main_proxy));
       }
     }
@@ -558,8 +540,8 @@ class Block : public CBase_Block {
   void print() {
     hapiCheck(cudaMemcpyAsync(h_temperature, d_temperature,
           sizeof(DataType) * (block_width+2)*(block_height+2)*(block_depth+2),
-          cudaMemcpyDeviceToHost, comm_stream));
-    cudaStreamSynchronize(comm_stream);
+          cudaMemcpyDeviceToHost, manager->d2h_stream));
+    cudaStreamSynchronize(manager->d2h_stream);
 
     CkPrintf("[%d,%d,%d]\n", x, y, z);
     for (int k = 0; k < block_depth+2; k++) {

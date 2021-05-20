@@ -15,5 +15,24 @@ void LrtsInvokeRemoteDeregAckHandler(int pe, NcpyOperationInfo *ncpyOpInfo);
 
 void CmiInvokeNcpyAck(void *ack);
 
+#if CMK_CUDA
+// Function pointer to acknowledgement handler
+typedef void (*RdmaAckHandlerFn)(void *token);
+
+void LrtsSendDevice(int dest_pe, const void*& ptr, size_t size, uint64_t& tag);
+void LrtsRecvDevice(DeviceRdmaOp* op, DeviceRecvType type);
+
+void CmiInvokeRecvHandler(void* data);
+void CmiInvokeAmpiRecvHandler(void* data);
+#if CMK_CHARM4PY
+void CmiInvokeExtRecvHandler(void* data);
+#endif // CMK_CHARM4PY
+#endif // CMK_CUDA
+
+void LrtsTagSend(const void* ptr, size_t size, int dest_pe, int tag, void* cb);
+void LrtsTagRecv(const void* ptr, size_t size, int tag, void* cb);
+
+void CmiInvokeTagHandler(void* cb);
+
 int CmiGetRdmaCommonInfoSize();
 #endif

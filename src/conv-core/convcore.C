@@ -71,6 +71,9 @@
 
 #include "converse.h"
 #include "conv-rdma.h"
+#if CMK_CUDA
+#include "conv-rdmadevice.h"
+#endif
 #include "conv-trace.h"
 #include "sockRoutines.h"
 #include "queueing.h"
