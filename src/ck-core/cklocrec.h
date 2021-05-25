@@ -14,7 +14,7 @@ class CkLocRec {
 private:
   CkLocMgr *myLocMgr;
   CkArrayIndex idx;/// Element's array index
-  CmiUInt8 id;
+  ck::BaseID id;
   bool *deletedMarker; /// Set this if we're deleted during processing
   bool running; /// True when inside a startTiming/stopTiming pair
 #if CMK_LBDB_ON
@@ -31,7 +31,7 @@ private:
 public:
 
   //Creation and Destruction:
-  CkLocRec(CkLocMgr *mgr,bool fromMigration,bool ignoreArrival, const CkArrayIndex &idx_, CmiUInt8 id);
+  CkLocRec(CkLocMgr *mgr,bool fromMigration,bool ignoreArrival, const CkArrayIndex &idx_, const ck::BaseID& id);
   void migrateMe(int toPe); //Leave this processor
   void destroy(void); //User called destructor
   ~CkLocRec();
@@ -55,7 +55,7 @@ public:
   inline void stopTiming(int ignore_running=0) { }
 #endif
   inline const CkArrayIndex &getIndex(void) const {return idx;}
-  inline CmiUInt8 getID() const { return id; }
+  inline const ck::BaseID& getID() const { return id; }
   inline CkLocMgr *getLocMgr() const {return myLocMgr; }
   inline CkSyncBarrier* getSyncBarrier() const { return syncBarrier; }
 

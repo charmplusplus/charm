@@ -90,13 +90,15 @@ private:
 public:
         ElementCheckpointer(CkLocMgr* mgr_, PUP::er &p_):locMgr(mgr_),p(p_){};
         void addLocation(CkLocation &loc) {
-                CkArrayIndex idx=loc.getIndex();
-		CkGroupID gID = locMgr->ckGetGroupID();
-                CmiUInt8 id = loc.getID();
-		p|gID;	    // store loc mgr's GID as well for easier restore
-                p|idx;
-                p|id;
-	        p|loc;
+          // TODO: Why not just pup CkLocation...this requires knowing the details of it
+          // TODO: Why do we need to first access, then pup?
+          CkGroupID gID = locMgr->ckGetGroupID();
+          CkArrayIndex idx = loc.getIndex();
+          ck::BaseID id = loc.getID();
+          p|gID;	    // store loc mgr's GID as well for easier restore
+          p|idx;
+          p|id;
+          p|loc;
 		//CkPrintf("[%d] addLocation: ", CkMyPe()), idx.print();
         }
 };
@@ -650,7 +652,7 @@ void CkPupArrayElementsData(PUP::er &p, int notifyListeners)
 	  for (int i=0; i<numElements; i++) {
 		CkGroupID gID;
 		CkArrayIndex idx;
-                CmiUInt8 id;
+                ck::BaseID id;
 		p|gID;
                 p|idx;
                 p|id;

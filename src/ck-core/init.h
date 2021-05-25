@@ -13,7 +13,7 @@ class envelope;
 typedef std::vector<CkZeroPtr<envelope> > PtrVec;
 
 // Map to store object index and number of pending rdma ops
-typedef std::unordered_map<CmiUInt8, CmiUInt1> ObjNumRdmaOpsMap;
+typedef std::unordered_map<ck::BaseID, CmiUInt1> ObjNumRdmaOpsMap;
 
 class IrrGroup;
 class TableEntry {

@@ -66,19 +66,19 @@ class BaseID
 
     id_type _id;
     BaseID() = default;
-    BaseID(id_type id) : _id(id) {}
+    explicit BaseID(id_type id) : _id(id) {}
 
   public:
-    id_type id() const
+    id_type getBits() const
     {
       return _id;
     }
 
-    id_type tag() const
+    id_type getTag() const
     {
       return _id >> tag_offset;
     }
-    id_type home() const
+    id_type getHome() const
     {
       return (_id & home_mask) >> home_offset;
     }
@@ -155,12 +155,16 @@ class ArrayElementID : public BaseID
 
 }
 
+PUPbytes(ck::BaseID);
+PUPbytes(ck::SectionID);
+PUPbytes(ck::ArrayElementID);
+
 template<>
 struct std::hash<ck::BaseID>
 {
   std::size_t operator()(const ck::BaseID& id) const
   {
-    return std::hash<ck::BaseID::id_type>()(id.id());
+    return std::hash<ck::BaseID::id_type>()(id.getBits());
   }
 };
 

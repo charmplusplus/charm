@@ -38,7 +38,7 @@ public:
 
   virtual int ckGetChareType(void) const;// {return thisChareType;}
   const CkArrayIndex &ckGetArrayIndex(void) const {return myRec->getIndex();}
-  CmiUInt8 ckGetID(void) const { return myRec->getID(); }
+  const ck::BaseID& ckGetID(void) const { return myRec->getID(); }
 
 #if CMK_LBDB_ON  //For load balancing:
   //Suspend load balancer measurements (e.g., before CthSuspend)

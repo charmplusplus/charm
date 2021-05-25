@@ -405,7 +405,7 @@ void initEMNcpyAckHandler(void);
 
 struct zcPupPendingRgetsMsg {
   char cmicore[CmiMsgHeaderSizeBytes];
-  CmiUInt8 id;
+  ck::BaseID::id_type id;
   int numops;
   CkGroupID locMgrId;
 #if CMK_SMP
@@ -419,7 +419,7 @@ void zcPupGetCompleted(NcpyOperationInfo *ncpyOpInfo);
 void _zcpyPupCompleteHandler(zcPupPendingRgetsMsg *msg);
 
 class CkLocMgr;
-void zcPupIssueRgets(CmiUInt8 id, CkLocMgr *locMgr);
+void zcPupIssueRgets(const ck::BaseID& id, CkLocMgr *locMgr);
 
 void CkRdmaZCPupCustomHandler(void *ack);
 

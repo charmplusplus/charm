@@ -149,7 +149,7 @@ namespace ck {
         UShort arrayEp;        ///< Used only for array broadcasts
       } group;
       struct s_array{             ///< For arrays only (ArrayEltInitMsg, ForArrayEltMsg)
-        CmiUInt8 id;              /// <ck::ObjID if it could be in a union
+        ck::BaseID::id_type id;   /// <ck::ObjID if it could be in a union
         CkGroupID arr;            ///< Array manager GID
 #if CMK_SMP_TRACE_COMMTHREAD
         UInt srcpe;
@@ -443,16 +443,16 @@ public:
     int getArrayIfNotThere(void) const { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); return type.array.ifNotThere;}
     void setArrayIfNotThere(int nt) { CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg); type.array.ifNotThere=nt;}
 
-    void setRecipientID(CmiUInt8 id)
+    void setRecipientID(const ck::BaseID& id)
     {
       CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg);
-      type.array.id = id;
+      type.array.id = id.getBits();
     }
 
-    CmiUInt8 getRecipientID() const
+    ck::BaseID getRecipientID() const
     {
       CkAssert(getMsgtype() == ForArrayEltMsg || getMsgtype() == ArrayEltInitMsg);
-      return type.array.id;
+      return ck::BaseID(type.array.id);
     }
 
 #if USE_CRITICAL_PATH_HEADER_ARRAY

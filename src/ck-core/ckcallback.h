@@ -228,7 +228,7 @@ public:
 	    case invalid:
 	      return true;
 	    default:
-	      CkAbort("Inconsistent CkCallback type");
+	      CkAbort("Inconsistent CkCallback type comparison");
 	      return false;
 	  }
 	}

@@ -383,7 +383,7 @@ int ArrayElement::getRedNo(void) const
 void ArrayElement::ckDestroy(void)
 {
   CK_ARRAYLISTENER_LOOP(thisArray->listeners, l->ckElementDied(this));
-  thisArray->deleteElt(ck::ArrayElementID(CkMigratable::ckGetID()));
+  thisArray->deleteElt(ck::BaseID(CkMigratable::ckGetID()));
 }
 
 // Destructor (virtual)
@@ -1148,7 +1148,7 @@ inline void msg_prepareSend(CkArrayMessage* msg, int ep, CkArrayID aid)
   env->setMsgtype(ForArrayEltMsg);
   env->setArrayMgr(aid);
   env->getsetArraySrcPe() = CkMyPe();
-  env->setRecipientID(0);
+  env->setRecipientID(ck::BaseID(0));
 #if CMK_SMP_TRACE_COMMTHREAD
   env->setSrcPe(CkMyPe());
 #endif

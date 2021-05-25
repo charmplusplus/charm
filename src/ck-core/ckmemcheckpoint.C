@@ -572,8 +572,10 @@ class MemElementPacker : public CkLocIterator{
 		void addLocation(CkLocation &loc){
 			CkArrayIndexMax idx = loc.getIndex();
 			CkGroupID gID = locMgr->ckGetGroupID();
-			CmiUInt8 id = loc.getID();
+			ck::BaseID id = loc.getID();
                         ArrayElement *elt = (ArrayElement *)loc.getLocalRecord();
+      // TODO: Why don't we do this test for regular checkpoint? Should this duplicate
+      // code be merged?
 			CmiAssert(elt);
 			//elt = (ArrayElement *)locMgr->lookup(idx, aid);
 			p|gID;
@@ -1174,7 +1176,7 @@ void CkMemCheckPT::recoverAll(CkArrayCheckPTMessage * msg,std::vector<CkGroupID>
 		for(int i=0;i<numElements;i++){
 			CkGroupID gID;
 			CkArrayIndex idx;
-                        CmiUInt8 id;
+                        ck::BaseID id;
 			p|gID;
 			p|idx;
                         p|id;

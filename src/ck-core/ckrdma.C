@@ -2011,7 +2011,7 @@ inline void _ncpyAckHandler(ncpyHandlerMsg *msg) {
 #if CMK_SMP
 // Executed on the worker thread to enqueue all buffered messages after Rgets complete
 void _zcpyPupCompleteHandler(zcPupPendingRgetsMsg *msg) {
-  CProxy_CkLocMgr(msg->locMgrId).ckLocalBranch()->processAfterActiveRgetsCompleted(msg->id);
+  CProxy_CkLocMgr(msg->locMgrId).ckLocalBranch()->processAfterActiveRgetsCompleted(ck::BaseID(msg->id));
   CmiFree(msg);
 }
 #endif
@@ -2021,7 +2021,7 @@ void zcPupGetCompleted(NcpyOperationInfo *info) {
   if(info->ackMode == CMK_SRC_DEST_ACK || info->ackMode == CMK_DEST_ACK) {
     zcPupPendingRgetsMsg *ref = (zcPupPendingRgetsMsg *)(info->destRef);
 
-    auto iter = CksvAccess(pendingZCOps).find(ref->id);
+    auto iter = CksvAccess(pendingZCOps).find(ck::BaseID(ref->id));
     if(iter != CksvAccess(pendingZCOps).end()) { // Entry found in pendingZCOps
 
       CmiLock(CksvAccess(_nodeZCPendingLock));
@@ -2066,11 +2066,11 @@ void zcPupGetCompleted(NcpyOperationInfo *info) {
 }
 
 // Issue Rgets for ZC Pup using NcpyOperationInfo stored in newZCPupGets
-void zcPupIssueRgets(CmiUInt8 id, CkLocMgr *locMgr) {
+void zcPupIssueRgets(const ck::BaseID& id, CkLocMgr *locMgr) {
 
   // Allocate a zcPupPendingRgetsMsg that is used for ack handling
   zcPupPendingRgetsMsg *ref = (zcPupPendingRgetsMsg *)CmiAlloc(sizeof(zcPupPendingRgetsMsg));
-  ref->id = id;
+  ref->id = id.getBits();
   ref->numops = CpvAccess(newZCPupGets).size();
   ref->locMgrId = locMgr->getGroupID();
 #if CMK_SMP
