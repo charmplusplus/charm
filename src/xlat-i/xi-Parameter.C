@@ -482,6 +482,8 @@ void Parameter::pupArray(XStr& str) {
 }
 
 void Parameter::pup(XStr& str) {
+  if (!name)
+    return;
   if (isArray()) {
     pupArray(str);
   } else if (!conditional) {

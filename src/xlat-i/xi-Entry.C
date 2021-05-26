@@ -570,7 +570,8 @@ void Entry::genArrayDefs(XStr& str) {
       inlineCall << "    const auto id = obj->ckGetID().getElementID();\n"
                  << "    const CkArrayIndex* idx = &ckGetIndex();\n";
       param->size(inlineCall); // Puts size of parameters in bytes into impl_off
-      inlineCall << "    ckLocMgr()->recordSend(idx, id, impl_off);\n";
+      inlineCall << "    impl_off += sizeof(envelope);\n"
+                 << "    ckLocMgr()->recordSend(idx, id, impl_off);\n";
     }
     inlineCall << "    LDObjHandle objHandle;\n"
                << "    int objstopped=0;\n"
