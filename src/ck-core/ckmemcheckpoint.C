@@ -432,7 +432,7 @@ void CkMemCheckPT::inmem_restore(CkArrayCheckPTMessage *m)
   PUP::fromMem p(m->packData, PUP::er::IS_CHECKPOINT);
   CkLocMgr *mgr = CProxy_CkLocMgr(m->locMgr).ckLocalBranch();
   CmiAssert(mgr);
-  CmiUInt8 id = mgr->lookupID(m->index);
+  ck::BaseID id = mgr->lookupID(m->index);
 #if !STREAMING_INFORMHOME && CK_NO_PROC_POOL
   mgr->resume(m->index, id, p, true);     // optimize notifyHome
 #else

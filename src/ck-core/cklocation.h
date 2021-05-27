@@ -111,7 +111,7 @@ public:
   }
 
   CkArrayIndex idx;    // Array index that is migrating
-  ck::BaseID id;       // ID of the elements with this index in this collection
+  ck::BaseID id;         // ID of the elements with this index in this collection
   bool ignoreArrival;  // if to inform LB of arrival
   int length;          // Size in bytes of the packed data
   int nManagers;       // Number of associated array managers

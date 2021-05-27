@@ -391,7 +391,7 @@ void CpdPupMessage(PUP::er &p, void *msg)
   if (envType == ForArrayEltMsg || envType == ArrayEltInitMsg) {
     int arrID = env->getArrayMgr().idx;
     PUPn(arrID);
-    CmiUInt8 id = env->getRecipientID();
+    ck::BaseID id = env->getRecipientID();
     PUPn(id);
   } else if (envType == ForNodeBocMsg || envType == ForBocMsg) {
     int groupID = env->getGroupNum().idx;

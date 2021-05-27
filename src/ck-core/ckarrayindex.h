@@ -356,8 +356,8 @@ public:
 namespace ck {
   class ArrayIndexCompressor {
   public:
-    virtual CmiUInt8 compress(const CkArrayIndex &idx) = 0;
-    virtual CkArrayIndex decompress(CmiUInt8 id) = 0;
+    virtual ck::BaseID::id_type compress(const CkArrayIndex &idx) = 0;
+    virtual CkArrayIndex decompress(ck::BaseID::id_type id) = 0;
   };
 
   class FixedArrayIndexCompressor : public ArrayIndexCompressor {
@@ -387,10 +387,10 @@ namespace ck {
     }
 
     /// Pack the bits of @arg idx into an ObjID
-    CmiUInt8 compress(const CkArrayIndex &idx) {
+    ck::BaseID::id_type compress(const CkArrayIndex &idx) {
       CkAssert(idx.dimension == dims);
 
-      CmiUInt8 eid = 0;
+      ck::BaseID::id_type eid = 0;
 
       bool shorts = idx.dimension > 3;
 
@@ -403,7 +403,7 @@ namespace ck {
       return eid;
     }
 
-    CkArrayIndex decompress(CmiUInt8 id) {
+    CkArrayIndex decompress(ck::BaseID::id_type id) {
       int ix[6];
       for (int i = dims - 1; i >= 0; --i) {
         int bits = bitsPerDim[i];
