@@ -447,7 +447,7 @@ void CentralLB::depositData(CLBStatsMsg *m)
   statsData->from_proc.insert(statsData->from_proc.end(), n_objs, pe);
   statsData->to_proc.insert(statsData->to_proc.end(), n_objs, pe);
 
-  CmiAssert(statsData->commData.size() + n_objs <= statsData->commData.capacity());
+  CmiAssert(statsData->commData.size() + n_comm <= statsData->commData.capacity());
   statsData->commData.insert(statsData->commData.end(), m->commData.begin(), m->commData.end());
 
   statsData->n_migrateobjs +=

@@ -564,8 +564,16 @@ void Entry::genArrayDefs(XStr& str) {
           << "    _TRACE_BEGIN_EXECUTE_DETAILED(0,ForArrayEltMsg,(" << epIdx()
           << "),CkMyPe(), 0, ((CkArrayIndex&)ckGetIndex()).getProjectionID(), obj);\n";
     if (isAppWork()) inlineCall << "    _TRACE_BEGIN_APPWORK();\n";
-    inlineCall << "#if CMK_LBDB_ON\n"
-               << "    LDObjHandle objHandle;\n"
+    inlineCall << "#if CMK_LBDB_ON\n";
+    if (isInline())
+    {
+      inlineCall << "    const auto id = obj->ckGetID().getElementID();\n"
+                 << "    const CkArrayIndex* idx = &ckGetIndex();\n";
+      param->size(inlineCall); // Puts size of parameters in bytes into impl_off
+      inlineCall << "    impl_off += sizeof(envelope);\n"
+                 << "    ckLocMgr()->recordSend(idx, id, impl_off);\n";
+    }
+    inlineCall << "    LDObjHandle objHandle;\n"
                << "    int objstopped=0;\n"
                << "    objHandle = obj->timingBeforeCall(&objstopped);\n"
                << "#endif\n";
