@@ -38,8 +38,8 @@ CkGroupID _sysChkptMgr;
 typedef struct _GroupInfo{
         CkGroupID gID;
         int MigCtor;
-        char name[256];
         bool present;
+        std::string name;
 } GroupInfo;
 PUPbytes(GroupInfo)
 
@@ -564,11 +564,11 @@ static void CkPupPerPlaceData(PUP::er &p, GroupIDTable *idTable, GroupTable *obj
       TableEntry ent = objectTable->find(tmpInfo[i].gID);
       tmpInfo[i].present = ent.getObj() != NULL;
       tmpInfo[i].MigCtor = _chareTable[ent.getcIdx()]->migCtor;
-      strncpy(tmpInfo[i].name,_chareTable[ent.getcIdx()]->name,255);
+      tmpInfo[i].name = _chareTable[ent.getcIdx()]->name;
       //CkPrintf("[%d] CkPupPerPlaceData: %s group %s \n", CkMyPe(), p.typeString(), tmpInfo[i].name);
 
       if(tmpInfo[i].MigCtor==-1) {
-        CkAbort("(Node)Group %s needs a migration constructor and PUP'er routine for restart.\n", tmpInfo[i].name);
+        CkAbort("(Node)Group %s needs a migration constructor and PUP'er routine for restart.\n", tmpInfo[i].name.c_str());
       }
     }
   }
@@ -583,7 +583,7 @@ static void CkPupPerPlaceData(PUP::er &p, GroupIDTable *idTable, GroupTable *obj
     if (p.isUnpacking()) {
       int eIdx = tmpInfo[i].MigCtor;
       if (eIdx == -1) {
-        CkPrintf("[%d] ERROR> (Node)Group %s's migration constructor is not defined!\n", CkMyPe(), tmpInfo[i].name);
+        CkPrintf("[%d] ERROR> (Node)Group %s's migration constructor is not defined!\n", CkMyPe(), tmpInfo[i].name.c_str());
         CkAbort("Abort");
       }
       void *m = CkAllocSysMsg();
