@@ -97,7 +97,7 @@ class SectionID : public BaseID
   public:
     explicit SectionID(BaseID::id_type id) : BaseID(id)
     {
-      CkAssert(tag() == CMK_OBJID_SECTION_TAG);
+      CkAssert(getTag() == CMK_OBJID_SECTION_TAG);
     }
     SectionID(BaseID::id_type home, BaseID::id_type counter)
     {
@@ -121,7 +121,7 @@ class ArrayElementID : public BaseID
     ArrayElementID() : BaseID(0) {}
     explicit ArrayElementID(BaseID::id_type id) : BaseID(id)
     {
-      CkAssert(tag() == CMK_OBJID_ARRAY_TAG);
+      CkAssert(getTag() == CMK_OBJID_ARRAY_TAG);
     }
     ArrayElementID(BaseID::id_type home, BaseID::id_type eid)
     {

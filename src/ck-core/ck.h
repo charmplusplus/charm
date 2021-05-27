@@ -93,7 +93,7 @@ CkpvExtern(std::vector<void *>, chare_objs);
 #endif
 
 #include <unordered_map>
-typedef std::unordered_map<CmiUInt8, ArrayElement*> ArrayObjMap;
+typedef std::unordered_map<ck::BaseID, ArrayElement*> ArrayObjMap;
 CkpvExtern(ArrayObjMap, array_objs);
 
 /// A set of "Virtual ChareID"'s

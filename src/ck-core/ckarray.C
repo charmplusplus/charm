@@ -236,7 +236,9 @@ void ArrayElement::initBasics(void)
   allredMgr = NULL;
 #endif
   //DEBC((AA "Inserting %llu into PE level hashtable\n" AB, ckGetID().getID()));
-  //CkpvAccess(array_objs)[ckGetID().getID()] = this;
+  ck::ArrayElementID id(ckGetID().getBits());
+  id.setGroup(thisArrayID);
+  CkpvAccess(array_objs)[id] = this;
 }
 
 ArrayElement::ArrayElement(void)
@@ -395,7 +397,9 @@ ArrayElement::~ArrayElement()
 #endif
   // Erase from PE level hashtable for quick receives
   //DEBC((AA "Removing %llu from PE level hashtable\n" AB, ckGetID().getID()));
-  //CkpvAccess(array_objs).erase(ckGetID().getID());
+  ck::ArrayElementID id(ckGetID().getBits());
+  id.setGroup(thisArrayID);
+  CkpvAccess(array_objs).erase(id);
   // To detect use-after-delete:
   thisArray = (CkArray*)(intptr_t)0xDEADa7a1;
 }

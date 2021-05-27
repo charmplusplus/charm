@@ -1148,7 +1148,7 @@ void _processNodeBocInitMsg(CkCoreState *ck,envelope *env)
 /************** Receive: Arrays *************/
 static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
   ArrayObjMap& object_map = CkpvAccess(array_objs);
-  auto iter = object_map.find(env->getRecipientID().getBits());
+  auto iter = object_map.find(env->getRecipientID());
   if (iter != object_map.end()) {
 
     CkArrayMessage* msg = (CkArrayMessage*)EnvToUsr(env);

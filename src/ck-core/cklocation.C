@@ -3459,7 +3459,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 
   // Allocate and pack into message
   CkArrayElementMigrateMessage* msg =
-      new (bufSize, 0) CkArrayElementMigrateMessage(idx, id.getBits(),
+      new (bufSize, 0) CkArrayElementMigrateMessage(idx, id,
 #if CMK_LBDB_ON
                                                     rec->isAsyncMigrate(),
 #else
