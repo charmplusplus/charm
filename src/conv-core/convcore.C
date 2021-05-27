@@ -600,7 +600,7 @@ void CmiDeprecateArgInt(char **argv,const char *arg,const char *desc,const char 
   int dummy = 0, found = CmiGetArgIntDesc(argv, arg, &dummy, desc);
 
   if (found)
-    CmiPrintf("%s", warning);
+    CmiPrintf("%s\n", warning);
 }
 
 /*****************************************************************************
@@ -3967,8 +3967,11 @@ void ConverseCommonInit(char **argv)
 {
 #if CMK_HAS_IO_FILE_OVERFLOW
   // forcibly allocate output buffers now, see issue #2814
-  _IO_file_overflow(stdout, -1);
-  _IO_file_overflow(stderr, -1);
+  if (CmiMyRank() == 0)
+  {
+    _IO_file_overflow(stdout, -1);
+    _IO_file_overflow(stderr, -1);
+  }
 #endif
 
   CpvInitialize(int, _urgentSend);
