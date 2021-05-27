@@ -678,7 +678,7 @@ public:
   inline void deliver(CkMessage* m, const CkArrayIndex& idx, CkDeliver_t type,
                       int opts = 0)
   {
-    locMgr->sendMsg((CkArrayMessage*)m, thisgroup, idx, type, opts);
+    locMgr->prepMsg((CkArrayMessage*)m, thisgroup, idx, type, opts);
   }
   inline int deliver(CkArrayMessage* m, CkDeliver_t type)
   {
@@ -781,7 +781,7 @@ public:
 
   /// Demand-creation:
   /// Demand-create an element at this index on this processor
-  void demandCreateElement(const CkArrayIndex& idx, int ctor, CkDeliver_t type);
+  void demandCreateElement(const CkArrayIndex& idx, int ctor);
 
   /// Broadcast communication:
   void sendBroadcast(CkMessage* msg);

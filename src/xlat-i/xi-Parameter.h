@@ -174,6 +174,7 @@ class ParamList {
   void printMsg(XStr& str);
   void preprocess();
   int hasConditional();
+  void size(XStr& str);
   void marshall(XStr& str, XStr& entry);
   void beginUnmarshall(XStr& str);
   void beginUnmarshallSDAG(XStr& str);
