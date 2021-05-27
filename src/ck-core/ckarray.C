@@ -1118,7 +1118,7 @@ void CkArray::remoteBeginInserting(void)
   }
 }
 
-void CkArray::demandCreateElement(const CkArrayIndex &idx, int ctor)
+void CkArray::demandCreateElement(const CkArrayIndex& idx, int ctor)
 {
   CkArrayMessage* m = (CkArrayMessage*)CkAllocSysMsg();
   envelope* env = UsrToEnv(m);
