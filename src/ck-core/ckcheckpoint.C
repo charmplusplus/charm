@@ -35,13 +35,21 @@ void noopit(const char*, ...)
 CkGroupID _sysChkptWriteMgr;
 CkGroupID _sysChkptMgr;
 
-typedef struct _GroupInfo{
-        CkGroupID gID;
-        int MigCtor;
-        bool present;
-        std::string name;
-} GroupInfo;
-PUPbytes(GroupInfo)
+struct GroupInfo
+{
+  CkGroupID gID;
+  int MigCtor;
+  std::string name;
+  bool present;
+
+  void pup(PUP::er& p)
+  {
+    p | gID;
+    p | MigCtor;
+    p | name;
+    p | present;
+  }
+};
 
 bool _inrestart = false;
 bool _restarted = false;
