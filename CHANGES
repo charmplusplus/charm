@@ -112,8 +112,7 @@ Charm++ Features & Fixes:
 
 - Added several new benchmarks and tests.
 
-- Bounded number of hops messages can take when chares frequently
-  migrate.
+- Fixed bug where out-of-order migration updates may cause a hang.
 
 Adaptive MPI:
 
