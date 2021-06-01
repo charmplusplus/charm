@@ -47,6 +47,7 @@
 #endif
 #include "envelope.h"
 #include "charm++.h"
+#include "ck.h"
 #include "ckrdmadevice.h"
 
 #if CMK_CUDA
@@ -224,6 +225,11 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     // Unpack source buffer from sender
     up|source;
 
+    if (arrSizes[i] > source.cnt) {
+      CkAbort("CkRdmaDeviceIssueRgets: posted data size is larger than source data size!");
+    }
+
+#if !CMK_GPU_COMM
     // Check if destination PE is correct
     // FIXME: Handle this case instead of aborting
     if (source.dest_pe != CkMyPe()) {
@@ -231,11 +237,6 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
           "Please enable CMK_GLOBAL_LOCATION_UPDATE.");
     }
 
-    if (arrSizes[i] > source.cnt) {
-      CkAbort("CkRdmaDeviceIssueRgets: posted data size is larger than source data size!");
-    }
-
-#if !CMK_GPU_COMM
     // Destination buffer (on this receiver)
     CkDeviceBuffer dest((const void *)arrPtrs[i], arrSizes[i]);
 

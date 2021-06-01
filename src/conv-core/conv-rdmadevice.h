@@ -22,6 +22,7 @@ public:
   // Pointer to and size of the buffer
   const void* ptr;
   size_t cnt;
+  cudaStream_t cuda_stream;
 
 #if !CMK_GPU_COMM
   // Source and destination PEs
@@ -32,7 +33,6 @@ public:
   int device_idx;
   size_t comm_offset;
   int event_idx;
-  cudaStream_t cuda_stream;
 
   // Store the actual data for host-staged inter-node messaging (no GPUDirect RDMA)
   bool data_stored;
