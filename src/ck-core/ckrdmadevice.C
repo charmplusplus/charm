@@ -57,11 +57,17 @@
 
 CsvExtern(GPUManager, gpu_manager);
 
+// Invoked when a GPU buffer arrives on the receiver
+#if !CMK_GPU_COMM
+void CkRdmaDeviceRecvHandler(void* data, void* msg)
+#else
+void CkRdmaDeviceRecvHandler(void* data)
+#endif
+{
 #if CMK_GPU_COMM
-// Invoked when the inter-node Rget completes on the receiver
-void CkRdmaDeviceRecvHandler(void* data) {
-  // Process QD to mark completion of the outstanding RDMA operation
+  // Process QD to mark completion of buffer transfer
   QdProcess(1);
+#endif
 
   DeviceRdmaOp* op = (DeviceRdmaOp*)data;
   DeviceRdmaInfo* info = op->info;
@@ -87,7 +93,6 @@ void CkRdmaDeviceRecvHandler(void* data) {
     CmiFree(info);
   }
 }
-#endif
 
 /****************************** Direct (Persistent) API ******************************/
 
@@ -212,8 +217,8 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
 
   // Find which mode of transfer should be used
   CkNcpyModeDevice mode = findTransferModeDevice(env->getSrcPe(), CkMyPe());
-#else
-  // Machine layer supports GPU-aware communication
+#endif
+
   // Allocate and fill in metadata for this zerocopy operation
   void* rdma_data = CmiAlloc(sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * numops);
   CmiEnforce(rdma_data);
@@ -221,7 +226,6 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
   rdma_info->n_ops = numops;
   rdma_info->counter = 0;
   rdma_info->msg = new_env;
-#endif
 
   for (int i = 0; i < numops; i++) {
     // Unpack source buffer from sender
@@ -230,6 +234,16 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     if (arrSizes[i] > source.cnt) {
       CkAbort("CkRdmaDeviceIssueRgets: posted data size is larger than source data size!");
     }
+
+    // Store information about this buffer
+    DeviceRdmaOp& save_op = *(DeviceRdmaOp*)((char*)rdma_data
+        + sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * i);
+    save_op.dest_pe = CkMyPe();
+    save_op.dest_ptr = arrPtrs[i];
+    save_op.size = (size_t)arrSizes[i];
+    save_op.info = rdma_info;
+    save_op.src_cb = (source.cb.type != CkCallback::ignore) ? new CkCallback(source.cb) : nullptr;
+    save_op.dst_cb = nullptr;
 
 #if !CMK_GPU_COMM
     // Machine layer does not support GPU-aware communication
@@ -289,17 +303,9 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     }
 
     // Add source callback for polling, so that it can be invoked once the transfer is complete
-    hapiAddCallback(postStructs[i].cuda_stream, source.cb);
+    hapiAddCallback(postStructs[i].cuda_stream, CkCallback(CkRdmaDeviceRecvHandler, rdma_data));
 #else
     // Machine layer supports GPU-aware communication
-    DeviceRdmaOp& save_op = *(DeviceRdmaOp*)((char*)rdma_data
-        + sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * i);
-    save_op.dest_pe = CkMyPe();
-    save_op.dest_ptr = arrPtrs[i];
-    save_op.size = (size_t)arrSizes[i];
-    save_op.info = rdma_info;
-    save_op.src_cb = (source.cb.type != CkCallback::ignore) ? new CkCallback(source.cb) : nullptr;
-    save_op.dst_cb = nullptr;
     save_op.tag = source.tag;
 #endif // CMK_GPU_COMM
   }
