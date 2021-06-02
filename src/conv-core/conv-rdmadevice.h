@@ -58,7 +58,7 @@ public:
   CmiDeviceBuffer() : ptr(NULL), cnt(0) {}
 
   explicit CmiDeviceBuffer(const void* ptr_, size_t cnt_) : ptr(ptr_), cnt(cnt_) {}
-#endif
+#endif // CMK_GPU_COMM
 
   void pup(PUP::er &p) {
     p((char *)&ptr, sizeof(ptr));
@@ -78,7 +78,7 @@ public:
     }
 #else
     p|tag;
-#endif
+#endif // CMK_GPU_COMM
   }
 
   ~CmiDeviceBuffer() {
@@ -90,12 +90,14 @@ public:
 
 CmiNcpyModeDevice findTransferModeDevice(int srcPe, int destPe);
 
+#if CMK_GPU_COMM
 typedef void (*RdmaAckCallerFn)(void *token);
 
 void CmiSendDevice(int dest_pe, const void*& ptr, size_t size, uint64_t& tag);
 void CmiRecvDevice(DeviceRdmaOp* op, DeviceRecvType type);
 void CmiRdmaDeviceRecvInit(RdmaAckCallerFn fn);
 void CmiInvokeRecvHandler(void* data);
+#endif // CMK_GPU_COMM
 #endif // CMK_CUDA
 
 #endif // _CONV_RDMADEVICE_H_

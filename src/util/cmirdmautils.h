@@ -59,7 +59,7 @@ typedef struct ncpystruct{
 
 }NcpyOperationInfo;
 
-#if CMK_CUDA
+#if CMK_CUDA && CMK_GPU_COMM
 enum DeviceRecvType {
   DEVICE_RECV_TYPE_CHARM,
   DEVICE_RECV_TYPE_AMPI,
@@ -86,7 +86,7 @@ typedef struct DeviceRdmaOpMsg_ {
   char header[CmiMsgHeaderSizeBytes];
   DeviceRdmaOp op;
 } DeviceRdmaOpMsg;
-#endif
+#endif // CMK_CUDA && CMK_GPU_COMM
 
 #ifdef __cplusplus
 extern "C" {

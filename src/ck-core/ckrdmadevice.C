@@ -57,6 +57,7 @@
 
 CsvExtern(GPUManager, gpu_manager);
 
+#if CMK_GPU_COMM
 // Invoked when the inter-node Rget completes on the receiver
 void CkRdmaDeviceRecvHandler(void* data) {
   // Process QD to mark completion of the outstanding RDMA operation
@@ -86,6 +87,7 @@ void CkRdmaDeviceRecvHandler(void* data) {
     CmiFree(info);
   }
 }
+#endif
 
 /****************************** Direct (Persistent) API ******************************/
 
@@ -230,8 +232,9 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     }
 
 #if !CMK_GPU_COMM
+    // Machine layer does not support GPU-aware communication
     // Check if destination PE is correct
-    // FIXME: Handle this case instead of aborting
+    // TODO: Handle this case instead of aborting
     if (source.dest_pe != CkMyPe()) {
       CkAbort("Current PE does not match the destination PE determined by the sender. "
           "Please enable CMK_GLOBAL_LOCATION_UPDATE.");
@@ -288,6 +291,7 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     // Add source callback for polling, so that it can be invoked once the transfer is complete
     hapiAddCallback(postStructs[i].cuda_stream, source.cb);
 #else
+    // Machine layer supports GPU-aware communication
     DeviceRdmaOp& save_op = *(DeviceRdmaOp*)((char*)rdma_data
         + sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * i);
     save_op.dest_pe = CkMyPe();
@@ -297,7 +301,7 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     save_op.src_cb = (source.cb.type != CkCallback::ignore) ? new CkCallback(source.cb) : nullptr;
     save_op.dst_cb = nullptr;
     save_op.tag = source.tag;
-#endif
+#endif // CMK_GPU_COMM
   }
 
 #if CMK_GPU_COMM

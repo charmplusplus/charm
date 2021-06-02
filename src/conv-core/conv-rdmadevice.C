@@ -21,6 +21,7 @@ CmiNcpyModeDevice findTransferModeDevice(int srcPe, int dstPe) {
   }
 }
 
+#if CMK_GPU_COMM
 #include "machine-rdma.h"
 
 void CmiSendDevice(int dest_pe, const void*& ptr, size_t size, uint64_t& tag) {
@@ -41,4 +42,5 @@ void CmiRdmaDeviceRecvInit(RdmaAckHandlerFn fn) {
 void CmiInvokeRecvHandler(void* data) {
   rdmaDeviceRecvHandlerFn(data);
 }
+#endif // CMK_GPU_COMM
 #endif // CMK_CUDA
