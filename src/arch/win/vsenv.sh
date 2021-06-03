@@ -16,38 +16,37 @@
 
 # VS 2017
 # VSYEAR="2017"
-# VCVER="15.0"
 # SDKVER="10.0.17763.0"
 # TOOLVER=""
 
 # VS 2019
-TOOLARCH="x64"
-SDKARCH="x64"
+VSYEAR="2019"
 SDKVER="10.0.19041.0"
 TOOLVER="14.28.29910"
+
+# Common to 2017 and 2019
+SDKARCH="x64"
+TOOLARCH="x64"
+EDITION="Enterprise"
 
 # Identify how to call vswhere if it exists
 VSWHERE="vswhere"
 if ! command -v "$VSWHERE" &> /dev/null
 then
-    VSWHERE="$(cygpath -u "C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe")"
+  VSWHERE="$(cygpath -u "C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe")"
 fi
 
-# If vswhere exists, use that, otherwise fall back on the hardcoded version
+# If vswhere exists, use that to get up to date info, otherwise fall back on the hardcoded values
 if command -v "$VSWHERE" &> /dev/null
 then
-    VSROOTINSTALLDIR=$("$VSWHERE" -latest -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath | tr -d '\r')
-    # Get tool version from this file if it exists
-    TOOLVERFILE="$(cygpath -u "$VSROOTINSTALLDIR"\\VC\\Auxiliary\\Build\\Microsoft.VCToolsVersion.default.txt)"
-    if test -f "$TOOLVERFILE"; then
-	TOOLVER=$(tr -d '\r' < "$TOOLVERFILE")
-    fi
-    export VCINSTALLDIR="$VSROOTINSTALLDIR\\VC\\Tools\\MSVC\\$TOOLVER"
-else
-    VSYEAR="2019"
-    EDITION="Enterprise"
+  VSROOTINSTALLDIR="$("$VSWHERE" -latest -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath | tr -d '\r')"
+  # Get tool version from this file if it exists
+  TOOLVERFILE="$(cygpath -u "$VSROOTINSTALLDIR\\VC\\Auxiliary\\Build\\Microsoft.VCToolsVersion.default.txt")"
+  [[ -f "$TOOLVERFILE" ]] && TOOLVER="$(tr -d '\r' < "$TOOLVERFILE")"
 
-    export VCINSTALLDIR="C:\\Program Files (x86)\\Microsoft Visual Studio\\$VSYEAR\\$EDITION\\VC\\Tools\\MSVC\\$TOOLVER"
+  export VCINSTALLDIR="$VSROOTINSTALLDIR\\VC\\Tools\\MSVC\\$TOOLVER"
+else
+  export VCINSTALLDIR="C:\\Program Files (x86)\\Microsoft Visual Studio\\$VSYEAR\\$EDITION\\VC\\Tools\\MSVC\\$TOOLVER"
 fi
 
 VSBIN="$(cygpath -u "$VCINSTALLDIR\\bin\\Hostx64\\$TOOLARCH")"
