@@ -1806,8 +1806,9 @@ XStr Entry::callThread(const XStr& procName, int prependEntryName) {
       << ", new CkThrCallArg(impl_msg,impl_obj), " << getStackSize() << ");\n";
   str << "  ((Chare *)impl_obj)->CkAddThreadListeners(tid,impl_msg);\n";
 // str << "  CkpvAccess(_traces)->CkAddThreadListeners(tid);\n";
-  str << "  CthResume(tid);\n";
-  str << "}\n";
+  str << "  CthTraceResume(tid);\n"
+      << "  CthResume(tid);\n"
+      << "}\n";
 
   str << makeDecl("void") << "::" << procFull << "(CkThrCallArg *impl_arg)\n";
   str << "{\n";
