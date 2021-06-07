@@ -13,6 +13,7 @@ dnl Copyright © 2006-2017 Cisco Systems, Inc.  All rights reserved.
 dnl Copyright © 2012  Blue Brain Project, BBP/EPFL. All rights reserved.
 dnl Copyright © 2012       Oracle and/or its affiliates.  All rights reserved.
 dnl Copyright © 2012  Los Alamos National Security, LLC. All rights reserved.
+dnl Copyright © 2020 IBM Corporation.  All rights reserved.
 dnl See COPYING in top-level directory.
 
 # Main hwloc m4 macro, to be invoked by the user
@@ -161,17 +162,17 @@ EOF])
           [AC_DEFINE([HWLOC_SYM_TRANSFORM], [0])],
           [AC_DEFINE([HWLOC_SYM_TRANSFORM], [1])])
 
-    # Disabled for Charm++ due to https://github.com/UIUC-PPL/charm/issues/2606
     # hwloc 2.0+ requires a C99 compliant compiler
-    #AC_PROG_CC_C99
+    AC_PROG_CC_C99
     # The result of AC_PROG_CC_C99 is stored in ac_cv_prog_cc_c99
-    #if test "x$ac_cv_prog_cc_c99" = xno ; then
-    #    AC_MSG_WARN([hwloc requires a C99 compiler])
-    #    AC_MSG_ERROR([Aborting.])
-    #fi
+    if test "x$ac_cv_prog_cc_c99" = xno ; then
+        AC_MSG_WARN([hwloc requires a C99 compiler])
+        AC_MSG_ERROR([Aborting.])
+    fi
 
     # GCC specifics.
-    if test "x$GCC" = "xyes"; then
+    _HWLOC_C_COMPILER_VENDOR([hwloc_c_vendor])
+    if test "$hwloc_c_vendor" = "gnu"; then
         HWLOC_GCC_CFLAGS="-Wall -Wmissing-prototypes -Wundef"
         HWLOC_GCC_CFLAGS="$HWLOC_GCC_CFLAGS -Wpointer-arith -Wcast-align"
     fi
@@ -330,7 +331,6 @@ EOF])
     #
     # Check for compiler attributes and visibility
     #
-    _HWLOC_C_COMPILER_VENDOR([hwloc_c_vendor])
     _HWLOC_CHECK_ATTRIBUTES
     _HWLOC_CHECK_VISIBILITY
     HWLOC_CFLAGS="$HWLOC_FLAGS $HWLOC_VISIBILITY_CFLAGS"
@@ -387,7 +387,7 @@ EOF])
               [AS_IF([test -e "$srcdir/.git"],
                      [hwloc_want_picky=1])])
         if test "$enable_picky" = "yes"; then
-            if test "$GCC" = "yes"; then
+            if test "$hwloc_c_vendor" = "gnu"; then
                 AC_MSG_RESULT([yes])
                 hwloc_want_picky=1
             else
@@ -412,14 +412,14 @@ EOF])
             add="$add -Wpointer-arith -Wbad-function-cast -Wold-style-definition"
             add="$add -Werror-implicit-function-declaration"
 
-	    _HWLOC_CHECK_GCC_OPTION([-Wdiscarded-qualifiers], [add])
-	    _HWLOC_CHECK_GCC_OPTION([-Wvariadic-macros], [add])
-	    _HWLOC_CHECK_GCC_OPTION([-Wtype-limits], [add])
-	    _HWLOC_CHECK_GCC_OPTION([-Wstack-usage=262144], [add])
+	    _HWLOC_CHECK_CC_OPTION([-Wdiscarded-qualifiers], [add])
+	    _HWLOC_CHECK_CC_OPTION([-Wvariadic-macros], [add])
+	    _HWLOC_CHECK_CC_OPTION([-Wtype-limits], [add])
+	    _HWLOC_CHECK_CC_OPTION([-Wstack-usage=262144], [add])
 
 	    # -Wextra enables some -Wfoo that we want to disable it at some place
-	    _HWLOC_CHECK_GCC_OPTION([-Wmissing-field-initializers], [add], [AC_DEFINE(HWLOC_HAVE_GCC_W_MISSING_FIELD_INITIALIZERS, 1, [Define to 1 if gcc -Wmissing-field-initializers is supported and enabled])])
-	    _HWLOC_CHECK_GCC_OPTION([-Wcast-function-type], [add], [AC_DEFINE(HWLOC_HAVE_GCC_W_CAST_FUNCTION_TYPE, 1, [Define to 1 if gcc -Wcast-function-type is supported and enabled])])
+	    _HWLOC_CHECK_CC_OPTION([-Wmissing-field-initializers], [add], [AC_DEFINE(HWLOC_HAVE_GCC_W_MISSING_FIELD_INITIALIZERS, 1, [Define to 1 if gcc -Wmissing-field-initializers is supported and enabled])])
+	    _HWLOC_CHECK_CC_OPTION([-Wcast-function-type], [add], [AC_DEFINE(HWLOC_HAVE_GCC_W_CAST_FUNCTION_TYPE, 1, [Define to 1 if gcc -Wcast-function-type is supported and enabled])])
 
             HWLOC_CFLAGS="$HWLOC_CFLAGS $add"
         fi

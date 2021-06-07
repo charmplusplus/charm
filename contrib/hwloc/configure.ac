@@ -97,6 +97,7 @@ LT_LANG([C++])
 CFLAGS_save=$CFLAGS
 AC_PROG_CC
 AM_PROG_CC_C_O
+AC_PROG_CC_C99
 CFLAGS=$CFLAGS_save
 
 AC_ARG_VAR(CC_FOR_BUILD,[build system C compiler])
