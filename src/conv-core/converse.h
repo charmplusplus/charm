@@ -1098,21 +1098,31 @@ void  CmiError(const char *format, ...);
 
 #define __CMK_XSTRING(x) __CMK_STRING(x)
 
-extern void __cmi_assert(const char *);
-#define CmiEnforce(expr) \
-  ((void) ((expr) ? 0 :                   \
-     (__cmi_assert ("Assertion \"" __CMK_STRING(expr) \
-                    "\" failed in file " __FILE__ \
-                    " line " __CMK_XSTRING(__LINE__) "."), 0)))
+void __CmiEnforceHelper(const char* expr, const char* fileName, const char* lineNum);
+#if defined __GNUC__ || defined __clang__
+__attribute__ ((format (printf, 4, 5)))
+#endif
+void __CmiEnforceMsgHelper(const char* expr, const char* fileName,
+			   const char* lineNum, const char* msg, ...);
 
-#if ! CMK_ERROR_CHECKING
-#define CmiAssert(expr) ((void) 0)
+#define CmiEnforce(expr)                                             \
+  ((void)((expr) ? 0                                                 \
+                 : (__CmiEnforceHelper(__CMK_STRING(expr), __FILE__, \
+                                       __CMK_XSTRING(__LINE__)),     \
+                    0)))
+
+#define CmiEnforceMsg(expr, msg, ...)                                                 \
+  ((void)((expr) ? 0                                                                  \
+                 : (__CmiEnforceMsgHelper(__CMK_STRING(expr), __FILE__,               \
+                                          __CMK_XSTRING(__LINE__), msg, __VA_ARGS__), \
+                    0)))
+
+#if !CMK_ERROR_CHECKING
+#  define CmiAssert(expr) ((void)0)
+#  define CmiAssertMsg(expr, msg, ...) ((void)0)
 #else
-#define CmiAssert(expr) \
-  ((void) ((expr) ? 0 :                   \
-     (__cmi_assert ("Assertion \"" __CMK_STRING(expr) \
-                    "\" failed in file " __FILE__ \
-                    " line " __CMK_XSTRING(__LINE__) "."), 0)))
+#  define CmiAssert(expr) CmiEnforce(expr)
+#  define CmiAssertMsg(expr, msg, ...) CmiEnforceMsg(expr, msg, __VA_ARGS__)
 #endif
 
 typedef void (*CmiStartFn)(int argc, char **argv);
