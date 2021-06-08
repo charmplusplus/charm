@@ -7089,7 +7089,7 @@ esac
 fi
 
 : ${AR=ar}
-: ${AR_FLAGS=cr}
+: ${AR_FLAGS=cru}
 
 
 
@@ -7590,8 +7590,11 @@ _LT_EOF
   test $ac_status = 0; }; then
     # Now try to grab the symbols.
     nlist=conftest.nm
-    $ECHO "$as_me:$LINENO: $NM conftest.$ac_objext | $lt_cv_sys_global_symbol_pipe > $nlist" >&5
-    if eval "$NM" conftest.$ac_objext \| "$lt_cv_sys_global_symbol_pipe" \> $nlist 2>&5 && test -s "$nlist"; then
+    if { { eval echo "\"\$as_me\":${as_lineno-$LINENO}: \"$NM conftest.$ac_objext \| "$lt_cv_sys_global_symbol_pipe" \> $nlist\""; } >&5
+  (eval $NM conftest.$ac_objext \| "$lt_cv_sys_global_symbol_pipe" \> $nlist) 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; } && test -s "$nlist"; then
       # Try sorting and uniquifying the output.
       if sort "$nlist" | uniq > "$nlist"T; then
 	mv -f "$nlist"T "$nlist"
@@ -8810,8 +8813,8 @@ int forced_loaded() { return 2;}
 _LT_EOF
       echo "$LTCC $LTCFLAGS -c -o conftest.o conftest.c" >&5
       $LTCC $LTCFLAGS -c -o conftest.o conftest.c 2>&5
-      echo "$AR cr libconftest.a conftest.o" >&5
-      $AR cr libconftest.a conftest.o 2>&5
+      echo "$AR cru libconftest.a conftest.o" >&5
+      $AR cru libconftest.a conftest.o 2>&5
       echo "$RANLIB libconftest.a" >&5
       $RANLIB libconftest.a 2>&5
       cat > conftest.c << _LT_EOF
@@ -8843,11 +8846,11 @@ $as_echo "$lt_cv_ld_force_load" >&6; }
       # to the OS version, if on x86, and 10.4, the deployment
       # target defaults to 10.4. Don't you love it?
       case ${MACOSX_DEPLOYMENT_TARGET-10.0},$host in
-	10.0,*86*-darwin8*|10.0,*-darwin[912]*)
+	10.0,*86*-darwin8*|10.0,*-darwin[91]*)
 	  _lt_dar_allow_undefined='$wl-undefined ${wl}dynamic_lookup' ;;
 	10.[012][,.]*)
 	  _lt_dar_allow_undefined='$wl-flat_namespace $wl-undefined ${wl}suppress' ;;
-	10.*|11.*)
+	10.*)
 	  _lt_dar_allow_undefined='$wl-undefined ${wl}dynamic_lookup' ;;
       esac
     ;;
@@ -9908,12 +9911,6 @@ lt_prog_compiler_static=
       ecc*)
 	lt_prog_compiler_wl='-Wl,'
 	lt_prog_compiler_pic='-KPIC'
-	lt_prog_compiler_static='-static'
-        ;;
-      # flang / f18. f95 an alias for gfortran or flang on Debian
-      flang* | f18* | f95*)
-	lt_prog_compiler_wl='-Wl,'
-	lt_prog_compiler_pic='-fPIC'
 	lt_prog_compiler_static='-static'
         ;;
       # icc used to be incompatible with GCC.
@@ -14277,7 +14274,7 @@ with_gnu_ld=$lt_cv_prog_gnu_ld
       # Commands to make compiler produce verbose output that lists
       # what "hidden" libraries, object files and flags are used when
       # linking a shared library.
-      output_verbose_link_cmd='$CC -shared $CFLAGS -v conftest.$objext 2>&1 | $GREP -v "^Configured with:" | $GREP " \-L"'
+      output_verbose_link_cmd='$CC -shared $CFLAGS -v conftest.$objext 2>&1 | $GREP -v "^Configured with:" | $GREP "\-L"'
 
     else
       GXX=no
@@ -14769,7 +14766,7 @@ fi
             # explicitly linking system object files so we need to strip them
             # from the output so that they don't get included in the library
             # dependencies.
-            output_verbose_link_cmd='templist=`($CC -b $CFLAGS -v conftest.$objext 2>&1) | $EGREP " \-L"`; list= ; for z in $templist; do case $z in conftest.$objext) list="$list $z";; *.$objext);; *) list="$list $z";;esac; done; func_echo_all "$list"'
+            output_verbose_link_cmd='templist=`($CC -b $CFLAGS -v conftest.$objext 2>&1) | $EGREP "\-L"`; list= ; for z in $templist; do case $z in conftest.$objext) list="$list $z";; *.$objext);; *) list="$list $z";;esac; done; func_echo_all "$list"'
             ;;
           *)
             if test yes = "$GXX"; then
@@ -14834,7 +14831,7 @@ fi
 	    # explicitly linking system object files so we need to strip them
 	    # from the output so that they don't get included in the library
 	    # dependencies.
-	    output_verbose_link_cmd='templist=`($CC -b $CFLAGS -v conftest.$objext 2>&1) | $GREP " \-L"`; list= ; for z in $templist; do case $z in conftest.$objext) list="$list $z";; *.$objext);; *) list="$list $z";;esac; done; func_echo_all "$list"'
+	    output_verbose_link_cmd='templist=`($CC -b $CFLAGS -v conftest.$objext 2>&1) | $GREP "\-L"`; list= ; for z in $templist; do case $z in conftest.$objext) list="$list $z";; *.$objext);; *) list="$list $z";;esac; done; func_echo_all "$list"'
 	    ;;
           *)
 	    if test yes = "$GXX"; then
@@ -15173,7 +15170,7 @@ fi
 	      # Commands to make compiler produce verbose output that lists
 	      # what "hidden" libraries, object files and flags are used when
 	      # linking a shared library.
-	      output_verbose_link_cmd='$CC -shared $CFLAGS -v conftest.$objext 2>&1 | $GREP -v "^Configured with:" | $GREP " \-L"'
+	      output_verbose_link_cmd='$CC -shared $CFLAGS -v conftest.$objext 2>&1 | $GREP -v "^Configured with:" | $GREP "\-L"'
 
 	    else
 	      # FIXME: insert proper C++ library support
@@ -15257,7 +15254,7 @@ fi
 	        # Commands to make compiler produce verbose output that lists
 	        # what "hidden" libraries, object files and flags are used when
 	        # linking a shared library.
-	        output_verbose_link_cmd='$CC -shared $CFLAGS -v conftest.$objext 2>&1 | $GREP -v "^Configured with:" | $GREP " \-L"'
+	        output_verbose_link_cmd='$CC -shared $CFLAGS -v conftest.$objext 2>&1 | $GREP -v "^Configured with:" | $GREP "\-L"'
 	      else
 	        # g++ 2.7 appears to require '-G' NOT '-shared' on this
 	        # platform.
@@ -15268,7 +15265,7 @@ fi
 	        # Commands to make compiler produce verbose output that lists
 	        # what "hidden" libraries, object files and flags are used when
 	        # linking a shared library.
-	        output_verbose_link_cmd='$CC -G $CFLAGS -v conftest.$objext 2>&1 | $GREP -v "^Configured with:" | $GREP " \-L"'
+	        output_verbose_link_cmd='$CC -G $CFLAGS -v conftest.$objext 2>&1 | $GREP -v "^Configured with:" | $GREP "\-L"'
 	      fi
 
 	      hardcode_libdir_flag_spec_CXX='$wl-R $wl$libdir'
@@ -17925,183 +17922,6 @@ fi
 
 
 
-   { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $CC option to accept ISO C99" >&5
-$as_echo_n "checking for $CC option to accept ISO C99... " >&6; }
-if ${ac_cv_prog_cc_c99+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_cv_prog_cc_c99=no
-ac_save_CC=$CC
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-#include <stdarg.h>
-#include <stdbool.h>
-#include <stdlib.h>
-#include <wchar.h>
-#include <stdio.h>
-
-// Check varargs macros.  These examples are taken from C99 6.10.3.5.
-#define debug(...) fprintf (stderr, __VA_ARGS__)
-#define showlist(...) puts (#__VA_ARGS__)
-#define report(test,...) ((test) ? puts (#test) : printf (__VA_ARGS__))
-static void
-test_varargs_macros (void)
-{
-  int x = 1234;
-  int y = 5678;
-  debug ("Flag");
-  debug ("X = %d\n", x);
-  showlist (The first, second, and third items.);
-  report (x>y, "x is %d but y is %d", x, y);
-}
-
-// Check long long types.
-#define BIG64 18446744073709551615ull
-#define BIG32 4294967295ul
-#define BIG_OK (BIG64 / BIG32 == 4294967297ull && BIG64 % BIG32 == 0)
-#if !BIG_OK
-  your preprocessor is broken;
-#endif
-#if BIG_OK
-#else
-  your preprocessor is broken;
-#endif
-static long long int bignum = -9223372036854775807LL;
-static unsigned long long int ubignum = BIG64;
-
-struct incomplete_array
-{
-  int datasize;
-  double data[];
-};
-
-struct named_init {
-  int number;
-  const wchar_t *name;
-  double average;
-};
-
-typedef const char *ccp;
-
-static inline int
-test_restrict (ccp restrict text)
-{
-  // See if C++-style comments work.
-  // Iterate through items via the restricted pointer.
-  // Also check for declarations in for loops.
-  for (unsigned int i = 0; *(text+i) != '\0'; ++i)
-    continue;
-  return 0;
-}
-
-// Check varargs and va_copy.
-static void
-test_varargs (const char *format, ...)
-{
-  va_list args;
-  va_start (args, format);
-  va_list args_copy;
-  va_copy (args_copy, args);
-
-  const char *str;
-  int number;
-  float fnumber;
-
-  while (*format)
-    {
-      switch (*format++)
-	{
-	case 's': // string
-	  str = va_arg (args_copy, const char *);
-	  break;
-	case 'd': // int
-	  number = va_arg (args_copy, int);
-	  break;
-	case 'f': // float
-	  fnumber = va_arg (args_copy, double);
-	  break;
-	default:
-	  break;
-	}
-    }
-  va_end (args_copy);
-  va_end (args);
-}
-
-int
-main ()
-{
-
-  // Check bool.
-  _Bool success = false;
-
-  // Check restrict.
-  if (test_restrict ("String literal") == 0)
-    success = true;
-  char *restrict newvar = "Another string";
-
-  // Check varargs.
-  test_varargs ("s, d' f .", "string", 65, 34.234);
-  test_varargs_macros ();
-
-  // Check flexible array members.
-  struct incomplete_array *ia =
-    malloc (sizeof (struct incomplete_array) + (sizeof (double) * 10));
-  ia->datasize = 10;
-  for (int i = 0; i < ia->datasize; ++i)
-    ia->data[i] = i * 1.234;
-
-  // Check named initializers.
-  struct named_init ni = {
-    .number = 34,
-    .name = L"Test wide string",
-    .average = 543.34343,
-  };
-
-  ni.number = 58;
-
-  int dynamic_array[ni.number];
-  dynamic_array[ni.number - 1] = 543;
-
-  // work around unused variable warnings
-  return (!success || bignum == 0LL || ubignum == 0uLL || newvar[0] == 'x'
-	  || dynamic_array[ni.number - 1] != 543);
-
-  ;
-  return 0;
-}
-_ACEOF
-for ac_arg in '' -std=gnu99 -std=c99 -c99 -AC99 -D_STDC_C99= -qlanglvl=extc99
-do
-  CC="$ac_save_CC $ac_arg"
-  if ac_fn_c_try_compile "$LINENO"; then :
-  ac_cv_prog_cc_c99=$ac_arg
-fi
-rm -f core conftest.err conftest.$ac_objext
-  test "x$ac_cv_prog_cc_c99" != "xno" && break
-done
-rm -f conftest.$ac_ext
-CC=$ac_save_CC
-
-fi
-# AC_CACHE_VAL
-case "x$ac_cv_prog_cc_c99" in
-  x)
-    { $as_echo "$as_me:${as_lineno-$LINENO}: result: none needed" >&5
-$as_echo "none needed" >&6; } ;;
-  xno)
-    { $as_echo "$as_me:${as_lineno-$LINENO}: result: unsupported" >&5
-$as_echo "unsupported" >&6; } ;;
-  *)
-    CC="$CC $ac_cv_prog_cc_c99"
-    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_prog_cc_c99" >&5
-$as_echo "$ac_cv_prog_cc_c99" >&6; } ;;
-esac
-if test "x$ac_cv_prog_cc_c99" != xno; then :
-
-fi
-
-
 CFLAGS=$CFLAGS_save
 
 
@@ -18793,190 +18613,14 @@ else
 
 fi
 
+    # Disabled for Charm++ due to https://github.com/UIUC-PPL/charm/issues/2606
     # hwloc 2.0+ requires a C99 compliant compiler
-       { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $CC option to accept ISO C99" >&5
-$as_echo_n "checking for $CC option to accept ISO C99... " >&6; }
-if ${ac_cv_prog_cc_c99+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_cv_prog_cc_c99=no
-ac_save_CC=$CC
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-#include <stdarg.h>
-#include <stdbool.h>
-#include <stdlib.h>
-#include <wchar.h>
-#include <stdio.h>
-
-// Check varargs macros.  These examples are taken from C99 6.10.3.5.
-#define debug(...) fprintf (stderr, __VA_ARGS__)
-#define showlist(...) puts (#__VA_ARGS__)
-#define report(test,...) ((test) ? puts (#test) : printf (__VA_ARGS__))
-static void
-test_varargs_macros (void)
-{
-  int x = 1234;
-  int y = 5678;
-  debug ("Flag");
-  debug ("X = %d\n", x);
-  showlist (The first, second, and third items.);
-  report (x>y, "x is %d but y is %d", x, y);
-}
-
-// Check long long types.
-#define BIG64 18446744073709551615ull
-#define BIG32 4294967295ul
-#define BIG_OK (BIG64 / BIG32 == 4294967297ull && BIG64 % BIG32 == 0)
-#if !BIG_OK
-  your preprocessor is broken;
-#endif
-#if BIG_OK
-#else
-  your preprocessor is broken;
-#endif
-static long long int bignum = -9223372036854775807LL;
-static unsigned long long int ubignum = BIG64;
-
-struct incomplete_array
-{
-  int datasize;
-  double data[];
-};
-
-struct named_init {
-  int number;
-  const wchar_t *name;
-  double average;
-};
-
-typedef const char *ccp;
-
-static inline int
-test_restrict (ccp restrict text)
-{
-  // See if C++-style comments work.
-  // Iterate through items via the restricted pointer.
-  // Also check for declarations in for loops.
-  for (unsigned int i = 0; *(text+i) != '\0'; ++i)
-    continue;
-  return 0;
-}
-
-// Check varargs and va_copy.
-static void
-test_varargs (const char *format, ...)
-{
-  va_list args;
-  va_start (args, format);
-  va_list args_copy;
-  va_copy (args_copy, args);
-
-  const char *str;
-  int number;
-  float fnumber;
-
-  while (*format)
-    {
-      switch (*format++)
-	{
-	case 's': // string
-	  str = va_arg (args_copy, const char *);
-	  break;
-	case 'd': // int
-	  number = va_arg (args_copy, int);
-	  break;
-	case 'f': // float
-	  fnumber = va_arg (args_copy, double);
-	  break;
-	default:
-	  break;
-	}
-    }
-  va_end (args_copy);
-  va_end (args);
-}
-
-int
-main ()
-{
-
-  // Check bool.
-  _Bool success = false;
-
-  // Check restrict.
-  if (test_restrict ("String literal") == 0)
-    success = true;
-  char *restrict newvar = "Another string";
-
-  // Check varargs.
-  test_varargs ("s, d' f .", "string", 65, 34.234);
-  test_varargs_macros ();
-
-  // Check flexible array members.
-  struct incomplete_array *ia =
-    malloc (sizeof (struct incomplete_array) + (sizeof (double) * 10));
-  ia->datasize = 10;
-  for (int i = 0; i < ia->datasize; ++i)
-    ia->data[i] = i * 1.234;
-
-  // Check named initializers.
-  struct named_init ni = {
-    .number = 34,
-    .name = L"Test wide string",
-    .average = 543.34343,
-  };
-
-  ni.number = 58;
-
-  int dynamic_array[ni.number];
-  dynamic_array[ni.number - 1] = 543;
-
-  // work around unused variable warnings
-  return (!success || bignum == 0LL || ubignum == 0uLL || newvar[0] == 'x'
-	  || dynamic_array[ni.number - 1] != 543);
-
-  ;
-  return 0;
-}
-_ACEOF
-for ac_arg in '' -std=gnu99 -std=c99 -c99 -AC99 -D_STDC_C99= -qlanglvl=extc99
-do
-  CC="$ac_save_CC $ac_arg"
-  if ac_fn_c_try_compile "$LINENO"; then :
-  ac_cv_prog_cc_c99=$ac_arg
-fi
-rm -f core conftest.err conftest.$ac_objext
-  test "x$ac_cv_prog_cc_c99" != "xno" && break
-done
-rm -f conftest.$ac_ext
-CC=$ac_save_CC
-
-fi
-# AC_CACHE_VAL
-case "x$ac_cv_prog_cc_c99" in
-  x)
-    { $as_echo "$as_me:${as_lineno-$LINENO}: result: none needed" >&5
-$as_echo "none needed" >&6; } ;;
-  xno)
-    { $as_echo "$as_me:${as_lineno-$LINENO}: result: unsupported" >&5
-$as_echo "unsupported" >&6; } ;;
-  *)
-    CC="$CC $ac_cv_prog_cc_c99"
-    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_prog_cc_c99" >&5
-$as_echo "$ac_cv_prog_cc_c99" >&6; } ;;
-esac
-if test "x$ac_cv_prog_cc_c99" != xno; then :
-
-fi
-
-
+    #AC_PROG_CC_C99
     # The result of AC_PROG_CC_C99 is stored in ac_cv_prog_cc_c99
-    if test "x$ac_cv_prog_cc_c99" = xno ; then
-        { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: hwloc requires a C99 compiler" >&5
-$as_echo "$as_me: WARNING: hwloc requires a C99 compiler" >&2;}
-        as_fn_error $? "Aborting." "$LINENO" 5
-    fi
+    #if test "x$ac_cv_prog_cc_c99" = xno ; then
+    #    AC_MSG_WARN([hwloc requires a C99 compiler])
+    #    AC_MSG_ERROR([Aborting.])
+    #fi
 
     # GCC specifics.
 
