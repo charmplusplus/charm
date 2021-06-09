@@ -1122,14 +1122,14 @@ void __CmiEnforceMsgHelper(const char* expr, const char* fileName,
 // format string. Append an empty string so that __VA_ARGS__ is never empty in the above
 // _CmiEnforceMsg macro and add a dummy "%s" to the end of the format string there to eat
 // it.
-#define CmiEnforceMsg(...) _CmiEnforceMsg(__VA_ARGS__, "")
+#define CmiEnforceMsg(expr, ...) _CmiEnforceMsg(expr, __VA_ARGS__, "")
 
 #if !CMK_ERROR_CHECKING
 #  define CmiAssert(expr) ((void)0)
-#  define CmiAssertMsg(expr, msg, ...) ((void)0)
+#  define CmiAssertMsg(expr, ...) ((void)0)
 #else
 #  define CmiAssert(expr) CmiEnforce(expr)
-#  define CmiAssertMsg(expr, msg, ...) CmiEnforceMsg(expr, msg, __VA_ARGS__)
+#  define CmiAssertMsg(expr, ...) CmiEnforceMsg(expr, __VA_ARGS__)
 #endif
 
 typedef void (*CmiStartFn)(int argc, char **argv);
