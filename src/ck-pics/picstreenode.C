@@ -221,8 +221,8 @@ bool Condition::test(double *input) {
 
 //TODO Solution fields called
 void Solution::printDataToFile(double *input, FILE *fp) {
-  int abseff = eff>=0?eff:-eff;
-  fprintf(fp, "Solution %s %s \n", eff>0?"UP":"Down", EffectName[abseff]);
+  /*int abseff = eff>=0?eff:-eff;
+  fprintf(fp, "Solution %s %s \n", eff>0?"UP":"Down", EffectName[abseff]);*/
 }
 
 TreeNode::TreeNode( TreeNode *p, Condition *c ) {
