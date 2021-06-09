@@ -116,8 +116,8 @@ void Condition::printMe() {
 //TODO Condition called
 void Condition::printDataToFile(double *input, FILE *fp) {
 
-  fprintf(fp, "Condition %s", name.c_str());
-  /*fprintf(fp, "Condition  %s %d %d ", name.c_str(), varIndex, baseIndex);
+  fprintf(fp, "Condition %s\n", name.c_str());
+  fprintf(fp, "Condition  %s %d %d ", name.c_str(), varIndex, baseIndex);
   if(thresholdIndex > -1)
     threshold = input[thresholdIndex];
   if(varIndex>-1)
@@ -141,7 +141,7 @@ void Condition::printDataToFile(double *input, FILE *fp) {
   }else if(varIndex>=NUM_AVG && varIndex<NUM_AVG+NUM_MAX)
     fprintf(fp, " %d ", (int)input[varIndex+1]);
 
-  fprintf(fp, "\n");*/
+  fprintf(fp, "\n");
 }
 
 bool Condition::test(double *input) {
@@ -221,8 +221,8 @@ bool Condition::test(double *input) {
 
 //TODO Solution fields called
 void Solution::printDataToFile(double *input, FILE *fp) {
-  /*int abseff = eff>=0?eff:-eff;
-  fprintf(fp, "Solution %s %s \n", eff>0?"UP":"Down", EffectName[abseff]);*/
+  int abseff = eff>=0?eff:-eff;
+  fprintf(fp, "Solution %s %s \n", eff>0?"UP":"Down", EffectName[abseff]);
 }
 
 TreeNode::TreeNode( TreeNode *p, Condition *c ) {
