@@ -465,6 +465,7 @@ void TraceAutoPerfBOC::globalPerfAnalyze(CkReductionMsg *msg )
     formatPerfData(data, j/CkpvAccess(numOfPhases), j%CkpvAccess(numOfPhases));
     data->printMe(CkpvAccess(fpSummary), "format");
   }
+
   //autoTunerProxy.ckLocalBranch()->printCPToFile(CkpvAccess(fpSummary));
   data=(PerfData*) msg->getData();
   //save results to database

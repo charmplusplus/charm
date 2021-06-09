@@ -372,7 +372,6 @@ PerfData* TraceAutoPerf::getSummary() {
   currentSummary->data[MAX_EntryMethodDuration]= maxEntryTime;
   currentSummary->data[MAX_EntryID]= maxEntryIdx;
 
-  //TODO
   currentSummary->data[MIN_AppPercentage] = currentSummary->data[MAX_AppPercentage] = currentSummary->data[AVG_AppPercentage] = appTime();
   currentSummary->data[AVG_TuningOverhead] = tuneOverheadTotalTime;
   currentSummary->data[AVG_EntryMethodDuration_1]= (double)totalEntryMethodTime_1;

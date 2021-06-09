@@ -25,7 +25,6 @@ enum FieldIndex_t {
   AVG_BytesPerObject,
   AVG_LoadPerObject,
   AVG_BytesPerMsg,
-  //TODO fix average values
   AVG_AppPercentage,
   AVG_EntryMethodDuration_1,
   AVG_EntryMethodDuration_2,
