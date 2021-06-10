@@ -1111,18 +1111,25 @@ void __CmiEnforceMsgHelper(const char* expr, const char* fileName,
                                        __CMK_XSTRING(__LINE__)),     \
                     0)))
 
-#define CmiEnforceMsg(expr, msg, ...)                                                 \
-  ((void)((expr) ? 0                                                                  \
-                 : (__CmiEnforceMsgHelper(__CMK_STRING(expr), __FILE__,               \
-                                          __CMK_XSTRING(__LINE__), msg, __VA_ARGS__), \
-                    0)))
+#define _CmiEnforceMsg(expr, msg, ...)                                                  \
+  ((void)((expr)                                                                        \
+              ? 0                                                                       \
+              : (__CmiEnforceMsgHelper(__CMK_STRING(expr), __FILE__,                    \
+                                       __CMK_XSTRING(__LINE__), msg "%s", __VA_ARGS__), \
+                 0)))
+
+// Very much a hack, but necessary to support the case when no arguments are given to the
+// format string. Append an empty string so that __VA_ARGS__ is never empty in the above
+// _CmiEnforceMsg macro and add a dummy "%s" to the end of the format string there to eat
+// it.
+#define CmiEnforceMsg(expr, ...) _CmiEnforceMsg(expr, __VA_ARGS__, "")
 
 #if !CMK_ERROR_CHECKING
 #  define CmiAssert(expr) ((void)0)
-#  define CmiAssertMsg(expr, msg, ...) ((void)0)
+#  define CmiAssertMsg(expr, ...) ((void)0)
 #else
 #  define CmiAssert(expr) CmiEnforce(expr)
-#  define CmiAssertMsg(expr, msg, ...) CmiEnforceMsg(expr, msg, __VA_ARGS__)
+#  define CmiAssertMsg(expr, ...) CmiEnforceMsg(expr, __VA_ARGS__)
 #endif
 
 typedef void (*CmiStartFn)(int argc, char **argv);
