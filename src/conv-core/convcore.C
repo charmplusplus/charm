@@ -52,6 +52,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <cstdarg>
 #include <vector>
 #include "hrctimer.h"
 #ifndef __STDC_FORMAT_MACROS
@@ -599,7 +600,7 @@ void CmiDeprecateArgInt(char **argv,const char *arg,const char *desc,const char 
   int dummy = 0, found = CmiGetArgIntDesc(argv, arg, &dummy, desc);
 
   if (found)
-    CmiPrintf("%s", warning);
+    CmiPrintf("%s\n", warning);
 }
 
 /*****************************************************************************
@@ -3966,8 +3967,11 @@ void ConverseCommonInit(char **argv)
 {
 #if CMK_HAS_IO_FILE_OVERFLOW
   // forcibly allocate output buffers now, see issue #2814
-  _IO_file_overflow(stdout, -1);
-  _IO_file_overflow(stderr, -1);
+  if (CmiMyRank() == 0)
+  {
+    _IO_file_overflow(stdout, -1);
+    _IO_file_overflow(stderr, -1);
+  }
 #endif
 
   CpvInitialize(int, _urgentSend);
@@ -4207,9 +4211,30 @@ void CmiError(const char *format, ...)
 
 #endif
 
-void __cmi_assert(const char *errmsg)
+void __CmiEnforceHelper(const char* expr, const char* fileName, const char* lineNum)
 {
-  CmiAbort("[%d] %s\n", CmiMyPe(), errmsg);
+  __CmiEnforceMsgHelper(expr, fileName, lineNum, "");
+}
+
+void __CmiEnforceMsgHelper(const char* expr, const char* fileName, const char* lineNum,
+                           const char* msg, ...)
+{
+  va_list args;
+  va_start(args, msg);
+
+  // Get length of formatted string
+  va_list argsCopy;
+  va_copy(argsCopy, args);
+  const auto size = 1 + vsnprintf(nullptr, 0, msg, argsCopy);
+  va_end(argsCopy);
+
+  // Allocate a buffer of right size and create formatted string in it
+  std::vector<char> formatted(size);
+  vsnprintf(formatted.data(), size, msg, args);
+  va_end(args);
+
+  CmiAbort("[%d] Assertion \"%s\" failed in file %s line %s.\n%s", CmiMyPe(), expr,
+           fileName, lineNum, formatted.data());
 }
 
 char *CmiCopyMsg(char *msg, int len)

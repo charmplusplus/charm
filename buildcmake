@@ -79,6 +79,11 @@ function parse_triplet() {
     extra_triplet_opts=${extra_triplet_opts#$t}
     [[ $full_triplet == $t* ]] && actual_triplet=$t
   done
+  if [[ -z ${actual_triplet:-} ]]; then
+    echo "Error: triplet '$full_triplet' is not supported."
+    echo "Supported triplets are: ${all_triplets//$'\n'/ }"
+    exit 2
+  fi
   return 0
 }
 

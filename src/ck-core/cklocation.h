@@ -406,8 +406,7 @@ private:
   typedef void (CkMigratable::*CkMigratable_voidfn_arg_t)(void*);
   void callMethod(CkLocRec* rec, CkMigratable_voidfn_arg_t fn, void*);
 
-  void deliverUnknown(CkArrayMessage* msg, const CkArrayIndex* idx, CkDeliver_t type,
-                      int opts);
+  void deliverUnknown(CkArrayMessage* msg, const CkArrayIndex* idx, int opts);
 
   // Create a new local record at this array index.
   CkLocRec* createLocal(const CkArrayIndex& idx, bool forMigration, bool ignoreArrival,
@@ -481,8 +480,8 @@ public:
   IndexMsgBuffer bufferedIndexMsgs;
   IndexMsgBuffer bufferedDemandMsgs;
 
-  void deliverAnyBufferedMsgs(CmiUInt8, MsgBuffer& buffer);
-  void deliverAnyBufferedMsgs(const CkArrayIndex&, CmiUInt8, IndexMsgBuffer&);
+  void processDeliverBufferedMsgs(CmiUInt8, MsgBuffer& buffer);
+  void processPrepBufferedMsgs(const CkArrayIndex&, CmiUInt8, IndexMsgBuffer&);
 
   bool addElementToRec(CkLocRec* rec, CkArray* m, CkMigratable* elt, int ctorIdx,
                        void* ctorMsg);
@@ -652,16 +651,21 @@ public:
   // type, int opts = 0);
   int deliverMsg(CkArrayMessage* m, CkArrayID mgr, CmiUInt8 id, const CkArrayIndex* idx,
                  CkDeliver_t type, int opts = 0);
-  void sendMsg(CkArrayMessage* msg, CkArrayID mgr, const CkArrayIndex& idx,
+  void sendMsg(CkArrayMessage* m, CkArrayID mgr, CmiUInt8 id, const CkArrayIndex* idx,
+                 CkDeliver_t type, int opts = 0);
+  void prepMsg(CkArrayMessage* msg, CkArrayID mgr, const CkArrayIndex& idx,
                CkDeliver_t type, int opts);
+
+  void recordSend(const CkArrayIndex* idx, const CmiUInt8 id, const unsigned int bytes,
+                  const int opts = 0);
 
   // Map stores the CkMigratable elements that have active Rgets
   // ResumeFromSync is not called for these elements until the Rgets have completed
   ElemMap toBeResumeFromSynced;
 
   // Deliver any buffered msgs to a newly created array element
-  void deliverAllBufferedMsgs(CmiUInt8);
-  void deliverAllBufferedMsgs(const CkArrayIndex&, CmiUInt8);
+  void processAllDeliverBufferedMsgs(CmiUInt8);
+  void processAllPrepBufferedMsgs(const CkArrayIndex&, CmiUInt8);
 
   // Advisories:
   /// This index now lives on the given processor-- update local records
@@ -686,8 +690,7 @@ public:
   void reclaim(CkLocRec* rec);
 
   void requestDemandCreation(const CkArrayIndex&, int, int, int, CkArrayID);
-  bool demandCreateElement(CkArrayMessage* msg, const CkArrayIndex& idx, int onPe,
-                           CkDeliver_t type);
+  bool demandCreateElement(CkArrayMessage* msg, const CkArrayIndex& idx, int onPe);
   void demandCreateElement(const CkArrayIndex& idx, int chareType, int onPe,
                            CkArrayID mgr);
 

@@ -54,6 +54,7 @@ set(hwloc-objects
   ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/bind${obj_suf}
   ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/bitmap${obj_suf}
   ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/components${obj_suf}
+  ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/cpukinds${obj_suf}
   ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/diff${obj_suf}
   ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/distances${obj_suf}
   ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/memattrs${obj_suf}
