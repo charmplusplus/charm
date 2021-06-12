@@ -3677,6 +3677,21 @@ int __kmp_register_root(int initial_thread) {
     /* find an available thread slot */
     // Don't reassign the zero slot since we need that to only be used by
     // initial thread. Slots for hidden helper threads should also be skipped.
+#if CHARM_OMP
+  /* setup new root thread structure */
+  root_thread = (kmp_info_t*) __kmp_allocate( sizeof(kmp_info_t) );
+  int candidate_gtid = initial_thread ? -1 : 0;
+  bool result = false;
+  while (!result) {
+    candidate_gtid ++;
+    result = KMP_COMPARE_AND_STORE_PTR(&__kmp_threads[candidate_gtid], NULL, root_thread);
+    KMP_DEBUG_ASSERT( candidate_gtid < __kmp_threads_capacity );
+  }
+
+  gtid = candidate_gtid;
+#else
+
+#endif /* CHARM_OMP */
     if (initial_thread && TCR_PTR(__kmp_threads[0]) == NULL) {
       gtid = 0;
     } else {
@@ -3688,6 +3703,10 @@ int __kmp_register_root(int initial_thread) {
         1, ("__kmp_register_root: found slot in threads array: T#%d\n", gtid));
     KMP_ASSERT(gtid < __kmp_threads_capacity);
   }
+
+#if CHARM_OMP
+    CpvAccess(prevGtid) = gtid;
+#endif
 
   /* update global accounting */
   __kmp_all_nth++;
@@ -3734,9 +3753,14 @@ int __kmp_register_root(int initial_thread) {
 
   /* setup new root thread structure */
   if (root->r.r_uber_thread) {
+#if CHARM_OMP
+    __kmp_free(root_thread);
+#endif
     root_thread = root->r.r_uber_thread;
   } else {
+#if !CHARM_OMP
     root_thread = (kmp_info_t *)__kmp_allocate(sizeof(kmp_info_t));
+#endif
     if (__kmp_storage_map) {
       __kmp_print_thread_storage_map(root_thread, gtid);
     }
@@ -4307,6 +4331,7 @@ kmp_info_t *__kmp_allocate_thread(kmp_root_t *root, kmp_team_t *team,
   KMP_ASSERT(__kmp_nth == __kmp_all_nth);
   KMP_ASSERT(__kmp_all_nth < __kmp_threads_capacity);
 
+#if !CHARM_OMP
 #if KMP_USE_MONITOR
   // If this is the first worker thread the RTL is creating, then also
   // launch the monitor thread.  We try to do this as early as possible.
@@ -4336,10 +4361,27 @@ kmp_info_t *__kmp_allocate_thread(kmp_root_t *root, kmp_team_t *team,
     __kmp_release_bootstrap_lock(&__kmp_monitor_lock);
   }
 #endif
+#endif /* CHARM_OMP */
 
   KMP_MB();
 
   {
+#if CHARM_OMP /*should be reconsidered */
+  /* start from team master's gtid */
+  new_thr = (kmp_info_t*) __kmp_allocate( sizeof(kmp_info_t) );
+
+  //TCW_SYNC_PTR(__kmp_threads[new_gtid], new_thr);
+
+  int candidate_gtid =__kmp_gtid_from_tid(0, team);
+  bool result = false;
+  while (!result) {
+    candidate_gtid ++;
+    result = KMP_COMPARE_AND_STORE_PTR(&__kmp_threads[candidate_gtid], NULL, new_thr);
+    KMP_DEBUG_ASSERT( candidate_gtid < __kmp_threads_capacity );
+  }
+
+  new_gtid = candidate_gtid;
+#else
     int new_start_gtid = TCR_4(__kmp_init_hidden_helper_threads)
                              ? 1
                              : __kmp_hidden_helper_threads_num + 1;
@@ -4358,7 +4400,7 @@ kmp_info_t *__kmp_allocate_thread(kmp_root_t *root, kmp_team_t *team,
   new_thr = (kmp_info_t *)__kmp_allocate(sizeof(kmp_info_t));
 
   TCW_SYNC_PTR(__kmp_threads[new_gtid], new_thr);
-
+#endif /* CHARM_OMP */
 #if USE_ITT_BUILD && USE_ITT_NOTIFY && KMP_DEBUG
   // suppress race conditions detection on synchronization flags in debug mode
   // this helps to analyze library internals eliminating false positives
@@ -4526,6 +4568,11 @@ static void __kmp_reinitialize_team(kmp_team_t *team,
 
   KF_TRACE(10, ("__kmp_reinitialize_team: exit this_thread=%p team=%p\n",
                 team->t.t_threads[0], team));
+
+#if CHARM_OMP
+  team->t.t_num_barrier_counts=team->t.t_num_local_tasks = team->t.t_num_shared_tasks = (team->t.t_nproc-1);
+  CmiMemoryWriteFence();
+#endif
 }
 
 /* Initialize the team data structure.
@@ -5508,10 +5555,12 @@ void __kmp_free_team(kmp_root_t *root,
             break;
           }
 #endif
+#if !CHARM_OMP
           // first check if thread is sleeping
           kmp_flag_64<> fl(&th->th.th_bar[bs_forkjoin_barrier].bb.b_go, th);
           if (fl.is_sleeping())
             fl.resume(__kmp_gtid_from_thread(th));
+#endif
           KMP_CPU_PAUSE();
         }
       }
@@ -5791,15 +5840,28 @@ void *__kmp_launch_thread(kmp_info_t *this_thr) {
 
   /* This is the place where threads wait for work */
   while (!TCR_4(__kmp_global.g.g_done)) {
+#if CHARM_OMP
+    CpvAccess(prevGtid)=__kmp_gtid_get_specific();
+#ifdef KMP_TDATA_GTID
+    CpvAccess(prevGtid)=__kmp_gtid;
+#endif
+    KMP_MB();
+    __kmp_gtid_set_specific(gtid);
+#ifdef KMP_TDATA_GTID
+    __kmp_gtid = gtid;
+#endif
+    CharmOMPDebug("[%f][%d] start, thread: %p, gtid: %d, prev_gtid: %d\n",CmiWallTimer(), CmiMyPe(), this_thr,gtid, CpvAccess(prevGtid));
+#endif
+
     KMP_DEBUG_ASSERT(this_thr == __kmp_threads[gtid]);
     KMP_MB();
 
     /* wait for work to do */
     KA_TRACE(20, ("__kmp_launch_thread: T#%d waiting for work\n", gtid));
-
+#if !CHARM_OMP
     /* No tid yet since not part of a team */
     __kmp_fork_barrier(gtid, KMP_GTID_DNE);
-
+#endif
 #if OMPT_SUPPORT
     if (ompt_enabled.enabled) {
       this_thr->th.ompt_thread_info.state = ompt_state_overhead;
@@ -5825,8 +5887,18 @@ void *__kmp_launch_thread(kmp_info_t *this_thr) {
           this_thr->th.ompt_thread_info.state = ompt_state_work_parallel;
         }
 #endif
-
+#if CHARM_OMP && KMP_DEBUG
+          KA_TRACE(20, ("[%f] Beginning invoke task, thread: %p, PE: %d, gtid: %d, master_tid: %d, t_invoke: %p,t_num_shared_tasks:%d\n", CmiWallTimer(), this_thr, CmiMyPe(), gtid, __kmp_tid_from_gtid(gtid),(*pteam)->t.t_invoke ,(*pteam)->t.t_num_shared_tasks));
+#endif
         rc = (*pteam)->t.t_invoke(gtid);
+#if CHARM_OMP
+#if KMP_DEBUG
+          if ((*pteam)->t.t_num_shared_tasks > (*pteam)->t.t_nproc-1)
+            CmiAbort("num_shared_tasks should not be less than number of threads in the team");
+#endif
+          KMP_TEST_THEN_DEC32(&(*pteam)->t.t_num_shared_tasks);
+          KA_TRACE(20, ("[%f] thread: %p, PE: %d, gtid: %d, master_tid: %d, t_num_shared_tasks:%d\n", CmiWallTimer(), this_thr, CmiMyPe(), gtid, __kmp_tid_from_gtid(gtid), (*pteam)->t.t_num_shared_tasks));
+#endif
         KMP_ASSERT(rc);
 
         KMP_MB();
@@ -5842,9 +5914,22 @@ void *__kmp_launch_thread(kmp_info_t *this_thr) {
         this_thr->th.ompt_thread_info.state = ompt_state_overhead;
       }
 #endif
+#if !CHARM_OMP
       /* join barrier after parallel region */
       __kmp_join_barrier(gtid);
+#endif
     }
+#if CHARM_OMP
+    __kmp_gtid_set_specific(CpvAccess(prevGtid));
+#ifdef KMP_TDATA_GTID
+    __kmp_gtid = CpvAccess(prevGtid);
+#endif
+    KA_TRACE(20, ("[%f][%d] end, thread: %p, __kmp_gtid: %d, gtid: %d, prev_gtid: %d\n",CmiWallTimer(), CmiMyPe(), this_thr, CpvAccess(prevGtid), gtid, CpvAccess(prevGtid)));
+    KMP_MB();
+    this_thr->th.th_reap_state = KMP_SAFE_TO_REAP;
+    CthSuspend();
+    this_thr->th.th_reap_state = KMP_NOT_SAFE_TO_REAP;
+#endif
   }
   TCR_SYNC_PTR((intptr_t)__kmp_global.g.g_done);
 
@@ -5932,6 +6017,7 @@ static void __kmp_reap_thread(kmp_info_t *thread, int is_root) {
   gtid = thread->th.th_info.ds.ds_gtid;
 
   if (!is_root) {
+#if !CHARM_OMP
     if (__kmp_dflt_blocktime != KMP_MAX_BLOCKTIME) {
       /* Assume the threads are at the fork barrier here */
       KA_TRACE(
@@ -5944,6 +6030,7 @@ static void __kmp_reap_thread(kmp_info_t *thread, int is_root) {
                          thread);
       __kmp_release_64(&flag);
     }
+#endif
 
     // Terminate OS thread.
     __kmp_reap_worker(thread);
@@ -7158,6 +7245,7 @@ void __kmp_parallel_initialize(void) {
 
   __kmp_suspend_initialize();
 
+#if !CHARM_OMP
 #if defined(USE_LOAD_BALANCE)
   if (__kmp_global.g.g_dynamic_mode == dynamic_default) {
     __kmp_global.g.g_dynamic_mode = dynamic_load_balance;
@@ -7166,6 +7254,7 @@ void __kmp_parallel_initialize(void) {
   if (__kmp_global.g.g_dynamic_mode == dynamic_default) {
     __kmp_global.g.g_dynamic_mode = dynamic_thread_limit;
   }
+#endif
 #endif
 
   if (__kmp_version) {
@@ -7529,6 +7618,17 @@ void __kmp_internal_fork(ident_t *id, int gtid, kmp_team_t *team) {
   KMP_MB(); /* Flush all pending memory write invalidates.  */
   KMP_ASSERT(this_thr->th.th_team == team);
 
+#if CHARM_OMP
+  KF_TRACE( 5, ( "__kmp_runtime: T#%d reset barrier counts: %d \n",
+                     gtid, team->t.t_num_barrier_counts) );
+  KMP_MB();
+   for (int i = 1; i < team->t.t_nproc ; i++) {
+    CharmOMPDebug("[%e] thread: %p, %p inserted\n", CmiWallTimer(), team->t.t_threads[i], team->t.t_threads[i]->th.th_info.ds.ds_thread);
+    CthAwaken(team->t.t_threads[i]->th.th_info.ds.ds_thread);
+  }
+  CharmOMPDebug("PE: %d, team: %p,shared: %d\n", CmiMyPe(), team, team->t.t_num_shared_tasks);
+#endif
+
 #ifdef KMP_DEBUG
   for (f = 0; f < team->t.t_nproc; f++) {
     KMP_DEBUG_ASSERT(team->t.t_threads[f] &&
@@ -7536,8 +7636,10 @@ void __kmp_internal_fork(ident_t *id, int gtid, kmp_team_t *team) {
   }
 #endif /* KMP_DEBUG */
 
+#if !CHARM_OMP
   /* release the worker threads so they may begin working */
   __kmp_fork_barrier(gtid, 0);
+#endif
 }
 
 void __kmp_internal_join(ident_t *id, int gtid, kmp_team_t *team) {
@@ -7565,7 +7667,79 @@ void __kmp_internal_join(ident_t *id, int gtid, kmp_team_t *team) {
                    __kmp_threads[gtid]->th.th_team_nproc == team->t.t_nproc);
 #endif /* KMP_DEBUG */
 
+#if CHARM_OMP
+  void * msg;
+  int num_local = 1; 
+/*
+  for (i = 0; i < num_local; i++) {
+    CmiHandleMessage((void*)(CpvAccess(ompConvMsg)+i));
+    KMP_MB();
+    temp_shared = TCR_4(team->t.t_num_shared_tasks);
+    if (num_local - temp_shared > 1) {
+      splitPoint = i+1 + (num_local - (i+1))/2;
+      KMP_TEST_THEN_ADD32(&(team->t.t_num_shared_tasks), num_local - splitPoint);
+      team->t.t_num_local_tasks = splitPoint;
+      KMP_MB();
+      for (j = splitPoint; j < num_local; j++) {
+        CsdTaskEnqueue((void*)(CpvAccess(ompConvMsg)+j));
+      }
+      num_local = splitPoint;
+    }
+  }
+*/
+  int num_tasks;
+  do {
+    CmiMemoryReadFence();
+    num_tasks = TCR_4(team->t.t_num_shared_tasks);
+    if (num_tasks <= 0) break;
+    msg = TaskQueuePop((TaskQueue)CpvAccess(CsdTaskQueue));
+    if (msg) {
+      CmiHandleMessage(msg);
+      num_local++;
+    }
+    else {
+      msg = CmiSuspendedTaskPop();
+      if (msg) 
+        CmiHandleMessage(msg);
+      else
+        StealTask();
+    }
+  } while(1);
+  
+  for (int i = 1; i< team->t.t_nproc; i++) {
+    int sched;
+    CthThread t = team->t.t_threads[i]->th.th_info.ds.ds_thread;
+    do {
+      CmiMemoryReadFence(); 
+      sched = TCR_4(CthScheduled(t));
+      if (sched <=0) break;
+    }
+    while (1);
+  }
+
+  /* Start to update the history vector */
+  CharmOMPDebug("team:%p, num_local: %d, t_num_shared_tasks: %d\n", team, num_local, team->t.t_nproc - num_local);
+  unsigned int currentRatio = (unsigned int)(ceil((double)(team->t.t_nproc)/num_local));
+  unsigned int victimRatio = CpvAccess(localRatioArray)[CpvAccess(ratioIdx) % windowSize];
+
+  CpvAccess(localRatioArray)[CpvAccess(ratioIdx) % windowSize] = currentRatio;
+  int numEntries = 0;
+  if (CpvAccess(ratioInit) || CpvAccess(ratioIdx) >= windowSize) {
+    CpvAccess(ratioSum) = CpvAccess(ratioSum) - victimRatio + currentRatio;
+    numEntries = windowSize;
+    if (!CpvAccess(ratioInit))
+      CpvAccess(ratioInit) = true;
+  }
+  else {
+      CpvAccess(ratioSum)+=currentRatio;
+      numEntries = CpvAccess(ratioIdx) + 1;
+  }
+
+  CpvAccess(localRatio) = CpvAccess(ratioSum) / numEntries;
+  CpvAccess(ratioIdx)+=1;
+#else
   __kmp_join_barrier(gtid); /* wait for everyone */
+#endif /* CHARM_OMP */
 #if OMPT_SUPPORT
   if (ompt_enabled.enabled &&
       this_thr->th.ompt_thread_info.state == ompt_state_wait_barrier_implicit) {
@@ -8387,7 +8561,9 @@ __kmp_determine_reduction_method(
           retval = atomic_reduce_block;
         }
       } else {
+#if !CHARM_OMP
         retval = TREE_REDUCE_BLOCK_WITH_REDUCTION_BARRIER;
+#endif
       }
     } else if (atomic_available) {
       retval = atomic_reduce_block;
@@ -8414,12 +8590,15 @@ __kmp_determine_reduction_method(
     int tree_available = FAST_REDUCTION_TREE_METHOD_GENERATED;
     if (atomic_available && (num_vars <= 3)) {
       retval = atomic_reduce_block;
-    } else if (tree_available) {
+    }
+#if !CHARM_OMP
+    else if (tree_available) {
       if ((reduce_size > (9 * sizeof(kmp_real64))) &&
           (reduce_size < (2000 * sizeof(kmp_real64)))) {
         retval = TREE_REDUCE_BLOCK_WITH_PLAIN_BARRIER;
       }
     } // otherwise: use critical section
+#endif
 
 #else
 #error "Unknown or unsupported OS"
@@ -8455,6 +8634,10 @@ __kmp_determine_reduction_method(
       break;
 
     case tree_reduce_block:
+#if CHARM_OMP
+      KMP_ASSERT( lck );
+      forced_retval = critical_reduce_block;
+# else
       tree_available = FAST_REDUCTION_TREE_METHOD_GENERATED;
       if (!tree_available) {
         KMP_WARNING(RedMethodNotSupported, "tree");
@@ -8464,6 +8647,7 @@ __kmp_determine_reduction_method(
         forced_retval = TREE_REDUCE_BLOCK_WITH_REDUCTION_BARRIER;
 #endif
       }
+#endif
       break;
 
     default:

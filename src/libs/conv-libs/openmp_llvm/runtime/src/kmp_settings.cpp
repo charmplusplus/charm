@@ -25,7 +25,9 @@
 #include "kmp_str.h"
 #include "kmp_wrapper_getpid.h"
 #include <ctype.h> // toupper()
-
+#if CHARM_OMP
+#include "ompcharm.h"
+#endif
 static int __kmp_env_toPrint(char const *name, int flag);
 
 bool __kmp_env_format = 0; // 0 - old format; 1 - new format
@@ -494,6 +496,9 @@ static void __kmp_stg_parse_par_range(char const *name, char const *value,
 #endif
 
 int __kmp_initial_threads_capacity(int req_nproc) {
+#if CHARM_OMP
+  int nth = CmiMyNodeSize() * CmiMyNodeSize() * 2;
+#else
   int nth = 32;
 
   /* MIN( MAX( 32, 4 * $OMP_NUM_THREADS, 4 * omp_get_num_procs() ),
@@ -511,7 +516,7 @@ int __kmp_initial_threads_capacity(int req_nproc) {
 
   if (nth > __kmp_max_nth)
     nth = __kmp_max_nth;
-
+#endif
   return nth;
 }
 

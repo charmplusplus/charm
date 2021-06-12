@@ -187,11 +187,13 @@ __kmp_wait_template(kmp_info_t *this_thr,
   kmp_uint32 hibernate;
 #endif
 
+#if !CHARM_OMP
   KMP_FSYNC_SPIN_INIT(spin, NULL);
   if (flag->done_check()) {
     KMP_FSYNC_SPIN_ACQUIRED(CCAST(void *, spin));
     return false;
   }
+#endif
   th_gtid = this_thr->th.th_info.ds.ds_gtid;
   if (Cancellable) {
     kmp_team_t *team = this_thr->th.th_team;
@@ -204,6 +206,7 @@ __kmp_wait_template(kmp_info_t *this_thr,
 #endif
   KA_TRACE(20,
            ("__kmp_wait_sleep: T#%d waiting for flag(%p)\n", th_gtid, flag));
+#if !CHARM_OMP
 #if KMP_STATS_ENABLED
   stats_state_e thread_state = KMP_GET_THREAD_STATE();
 #endif
@@ -446,6 +449,7 @@ final_spin=FALSE)
       if (final_spin)
         KMP_ATOMIC_ST_REL(&this_thr->th.th_blocking, false);
 #endif
+#endif /* CHARM_OMP */
       flag->suspend(th_gtid);
 #if KMP_OS_UNIX
       if (final_spin)
@@ -456,15 +460,19 @@ final_spin=FALSE)
 #endif
 
     if (TCR_4(__kmp_global.g.g_done)) {
+#if !CHARM_OMP
       if (__kmp_global.g.g_abort)
         __kmp_abort_thread();
       break;
+#endif
     } else if (__kmp_tasking_mode != tskm_immediate_exec &&
                this_thr->th.th_reap_state == KMP_SAFE_TO_REAP) {
       this_thr->th.th_reap_state = KMP_NOT_SAFE_TO_REAP;
     }
     // TODO: If thread is done with work and times out, disband/free
+#if !CHARM_OMP
   }
+#endif
 
 #if OMPT_SUPPORT
   ompt_state_t ompt_exit_state = this_thr->th.ompt_thread_info.state;
@@ -493,7 +501,9 @@ final_spin=FALSE)
   if (final_spin)
     KMP_ATOMIC_ST_REL(&this_thr->th.th_blocking, false);
 #endif
+#if !CHARM_OMP
   KMP_FSYNC_SPIN_ACQUIRED(CCAST(void *, spin));
+#endif
   if (Cancellable) {
     kmp_team_t *team = this_thr->th.th_team;
     if (team && team->t.t_cancel_request == cancel_parallel) {
@@ -618,10 +628,20 @@ template <class C> static inline void __kmp_release_template(C *flag) {
           KF_TRACE(50, ("__kmp_release: T#%d waking up thread T#%d since sleep "
                         "flag(%p) set\n",
                         gtid, wait_gtid, flag->get()));
+#if CHARM_OMP
+          flag->unset_sleeping();
+          KMP_MB();
+          CthAwaken(waiter->th.th_info.ds.ds_thread);
+#else
           flag->resume(wait_gtid); // unsets flag's current_waiter when done
+#endif
         }
       }
     }
+#if CHARM_OMP
+    else
+      CmiAbort("There should be sleeping thread here\n");
+#endif
   }
 }
 

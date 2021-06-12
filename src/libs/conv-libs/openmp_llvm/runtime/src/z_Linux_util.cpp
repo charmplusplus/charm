@@ -64,6 +64,11 @@
 #include <dirent.h>
 #include <fcntl.h>
 
+#if CHARM_OMP
+#include "ompcharm.h"
+CpvExtern(int, prevGtid);
+#endif
+
 #include "tsan_annotations.h"
 
 struct kmp_sys_timer {
@@ -450,6 +455,7 @@ kmp_uint64 __kmp_test_then_and64(volatile kmp_uint64 *p, kmp_uint64 d) {
 #endif /* (KMP_ARCH_X86 || KMP_ARCH_X86_64) && (! KMP_ASM_INTRINS) */
 
 void __kmp_terminate_thread(int gtid) {
+  #if !CHARM_OMP
   int status;
   kmp_info_t *th = __kmp_threads[gtid];
 
@@ -465,6 +471,7 @@ void __kmp_terminate_thread(int gtid) {
   }
 #endif
   KMP_YIELD(TRUE);
+#endif /* CHARM_OMP */
 } //
 
 /* Set thread stack info according to values returned by pthread_getattr_np().
@@ -484,7 +491,7 @@ static kmp_int32 __kmp_set_stack_info(int gtid, kmp_info_t *th) {
      initial thread stack range can be reduced by sibling thread creation so
      pthread_attr_getstack may cause thread gtid aliasing */
   if (!KMP_UBER_GTID(gtid)) {
-
+#if !CHARM_OMP
     /* Fetch the real thread attributes */
     status = pthread_attr_init(&attr);
     KMP_CHECK_SYSFAIL("pthread_attr_init", status);
@@ -503,6 +510,7 @@ static kmp_int32 __kmp_set_stack_info(int gtid, kmp_info_t *th) {
               gtid, size, addr));
     status = pthread_attr_destroy(&attr);
     KMP_CHECK_SYSFAIL("pthread_attr_destroy", status);
+#endif /* CHARM_OMP */
   }
 
   if (size != 0 && addr != 0) { // was stack parameter determination successful?
@@ -523,9 +531,11 @@ static kmp_int32 __kmp_set_stack_info(int gtid, kmp_info_t *th) {
 
 static void *__kmp_launch_worker(void *thr) {
   int status, old_type, old_state;
+#if !CHARM_OMP
 #ifdef KMP_BLOCK_SIGNALS
   sigset_t new_set, old_set;
 #endif /* KMP_BLOCK_SIGNALS */
+#endif /* CHARM_OMP */
   void *exit_val;
 #if KMP_OS_LINUX || KMP_OS_DRAGONFLY || KMP_OS_FREEBSD || KMP_OS_NETBSD ||     \
         KMP_OS_OPENBSD || KMP_OS_HURD
@@ -534,9 +544,11 @@ static void *__kmp_launch_worker(void *thr) {
   int gtid;
 
   gtid = ((kmp_info_t *)thr)->th.th_info.ds.ds_gtid;
+#if !CHARM_OMP
   __kmp_gtid_set_specific(gtid);
 #ifdef KMP_TDATA_GTID
   __kmp_gtid = gtid;
+#endif
 #endif
 #if KMP_STATS_ENABLED
   // set thread local index to point to thread-specific stats
@@ -554,12 +566,14 @@ static void *__kmp_launch_worker(void *thr) {
   __kmp_affinity_set_init_mask(gtid, FALSE);
 #endif
 
+#if !CHARM_OMP
 #ifdef KMP_CANCEL_THREADS
   status = pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, &old_type);
   KMP_CHECK_SYSFAIL("pthread_setcanceltype", status);
   // josh todo: isn't PTHREAD_CANCEL_ENABLE default for newly-created threads?
   status = pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &old_state);
   KMP_CHECK_SYSFAIL("pthread_setcancelstate", status);
+#endif
 #endif
 
 #if KMP_ARCH_X86 || KMP_ARCH_X86_64
@@ -569,15 +583,17 @@ static void *__kmp_launch_worker(void *thr) {
   __kmp_load_mxcsr(&__kmp_init_mxcsr);
 #endif /* KMP_ARCH_X86 || KMP_ARCH_X86_64 */
 
+#if !CHARM_OMP
 #ifdef KMP_BLOCK_SIGNALS
   status = sigfillset(&new_set);
   KMP_CHECK_SYSFAIL_ERRNO("sigfillset", status);
   status = pthread_sigmask(SIG_BLOCK, &new_set, &old_set);
   KMP_CHECK_SYSFAIL("pthread_sigmask", status);
 #endif /* KMP_BLOCK_SIGNALS */
+#endif 
 
-#if KMP_OS_LINUX || KMP_OS_DRAGONFLY || KMP_OS_FREEBSD || KMP_OS_NETBSD ||     \
-        KMP_OS_OPENBSD
+#if !CHARM_OMP && (KMP_OS_LINUX || KMP_OS_DRAGONFLY || KMP_OS_FREEBSD || KMP_OS_NETBSD || \
+                       KMP_OS_OPENBSD)
   if (__kmp_stkoffset > 0 && gtid > 0) {
     padding = KMP_ALLOCA(gtid * __kmp_stkoffset);
   }
@@ -590,10 +606,12 @@ static void *__kmp_launch_worker(void *thr) {
 
   exit_val = __kmp_launch_thread((kmp_info_t *)thr);
 
+#if !CHARM_OMP
 #ifdef KMP_BLOCK_SIGNALS
   status = pthread_sigmask(SIG_SETMASK, &old_set, NULL);
   KMP_CHECK_SYSFAIL("pthread_sigmask", status);
 #endif /* KMP_BLOCK_SIGNALS */
+#endif
 
   return exit_val;
 }
@@ -603,9 +621,11 @@ static void *__kmp_launch_worker(void *thr) {
 
 static void *__kmp_launch_monitor(void *thr) {
   int status, old_type, old_state;
+#if !CHARM_OMP
 #ifdef KMP_BLOCK_SIGNALS
   sigset_t new_set;
 #endif /* KMP_BLOCK_SIGNALS */
+#endif
   struct timespec interval;
 
   KMP_MB(); /* Flush all pending memory write invalidates.  */
@@ -733,12 +753,14 @@ static void *__kmp_launch_monitor(void *thr) {
 
   KA_TRACE(10, ("__kmp_launch_monitor: #3 cleanup\n"));
 
+#if !CHARM_OMP
 #ifdef KMP_BLOCK_SIGNALS
   status = sigfillset(&new_set);
   KMP_CHECK_SYSFAIL_ERRNO("sigfillset", status);
   status = pthread_sigmask(SIG_UNBLOCK, &new_set, NULL);
   KMP_CHECK_SYSFAIL("pthread_sigmask", status);
 #endif /* KMP_BLOCK_SIGNALS */
+#endif
 
   KA_TRACE(10, ("__kmp_launch_monitor: #4 finished\n"));
 
@@ -773,12 +795,22 @@ static void *__kmp_launch_monitor(void *thr) {
 #endif // KMP_USE_MONITOR
 
 void __kmp_create_worker(int gtid, kmp_info_t *th, size_t stack_size) {
+#if !CHARM_OMP
   pthread_t handle;
   pthread_attr_t thread_attr;
   int status;
+#endif
 
   th->th.th_info.ds.ds_gtid = gtid;
+#if CHARM_OMP
+    th->th.th_info.ds.ds_thread = CthCreate((CthVoidFn)__kmp_launch_worker, (void *)th, stack_size);
 
+    if (th->th.th_info.ds.ds_tid == 0)
+      CthSetSuspendable(th->th.th_info.ds.ds_thread,0);
+
+    CthSetStrategyWorkStealing(th->th.th_info.ds.ds_thread);
+    KA_TRACE(10, ("Thread created: %p\n", th->th.th_info.ds.ds_thread));
+#else // !CHARM_OMP
 #if KMP_STATS_ENABLED
   // sets up worker thread stats
   __kmp_acquire_tas_lock(&__kmp_stats_lock, gtid);
@@ -797,6 +829,7 @@ void __kmp_create_worker(int gtid, kmp_info_t *th, size_t stack_size) {
   __kmp_release_tas_lock(&__kmp_stats_lock, gtid);
 
 #endif // KMP_STATS_ENABLED
+#endif /* CHARM_OMP */
 
   if (KMP_UBER_GTID(gtid)) {
     KA_TRACE(10, ("__kmp_create_worker: uber thread (%d)\n", gtid));
@@ -905,6 +938,7 @@ void __kmp_create_worker(int gtid, kmp_info_t *th, size_t stack_size) {
 
 #if KMP_USE_MONITOR
 void __kmp_create_monitor(kmp_info_t *th) {
+  #if !CHARM_OMP
   pthread_t handle;
   pthread_attr_t thread_attr;
   size_t size;
@@ -1041,6 +1075,7 @@ retry:
   KA_TRACE(10, ("__kmp_create_monitor: monitor created %#.8lx\n",
                 th->th.th_info.ds.ds_thread));
 
+#endif /* CHARM_OMP */
 } // __kmp_create_monitor
 #endif // KMP_USE_MONITOR
 
@@ -1052,6 +1087,7 @@ void __kmp_exit_thread(int exit_status) {
 void __kmp_resume_monitor();
 
 void __kmp_reap_monitor(kmp_info_t *th) {
+#if !OMP_CHARM
   int status;
   void *exit_val;
 
@@ -1092,10 +1128,14 @@ void __kmp_reap_monitor(kmp_info_t *th) {
                 th->th.th_info.ds.ds_thread));
 
   KMP_MB(); /* Flush all pending memory write invalidates.  */
+#endif /* CHARM_OMP */
 }
 #endif // KMP_USE_MONITOR
 
 void __kmp_reap_worker(kmp_info_t *th) {
+#if CHARM_OMP
+    CthFree(th->th.th_info.ds.ds_thread);
+#else
   int status;
   void *exit_val;
 
@@ -1121,6 +1161,7 @@ void __kmp_reap_worker(kmp_info_t *th) {
                 th->th.th_info.ds.ds_gtid));
 
   KMP_MB(); /* Flush all pending memory write invalidates.  */
+#endif /* CHARM_OMP */
 }
 
 #if KMP_HANDLE_SIGNALS
@@ -1462,9 +1503,11 @@ static inline void __kmp_suspend_template(int th_gtid, C *flag) {
   KF_TRACE(30, ("__kmp_suspend_template: T#%d enter for flag = %p\n", th_gtid,
                 flag->get()));
 
+#if !CHARM_OMP
   __kmp_suspend_initialize_thread(th);
 
   __kmp_lock_suspend_mx(th);
+#endif
 
   KF_TRACE(10, ("__kmp_suspend_template: T#%d setting sleep bit for spin(%p)\n",
                 th_gtid, flag->get()));
@@ -1482,6 +1525,33 @@ static inline void __kmp_suspend_template(int th_gtid, C *flag) {
                " was %x\n",
                th_gtid, flag->get(), flag->load(), old_spin));
 
+#if CHARM_OMP
+  CthSetStrategySuspendedWorkStealing(th->th.th_info.ds.ds_thread);
+  KMP_TEST_THEN_DEC32((kmp_int32 *) &(th->th.th_team->t.t_num_barrier_counts));
+  //CmiMemoryAtomicDecrement(th->th.th_team->t.t_num_barrier_counts, memory_order_release); 
+  //CmiMemoryWriteFence();
+
+  KF_TRACE( 5, ( "__kmp_suspend_template: [%d] T#%d reduced barrier counts: %d, %p \n",CmiMyRank(),
+                     th_gtid, th->th.th_team->t.t_num_barrier_counts, &(th->th.th_team->t.t_num_barrier_counts)) );
+  KMP_MB();
+
+  if (CpvAccess(prevGtid) >=0) {
+#if KMP_TDATA_GTID
+    __kmp_gtid = CpvAccess(prevGtid);
+#endif
+    __kmp_gtid_set_specific(CpvAccess(prevGtid));
+  }
+  CthSuspend();
+  __kmp_gtid_set_specific(th_gtid);
+#if KMP_TDATA_GTID
+  __kmp_gtid = th_gtid;
+#endif
+  CharmOMPDebug( "__kmp_suspend_template: T#%d is resumed \n",
+                     th_gtid);
+
+  KF_TRACE( 5, ( "__kmp_suspend_template: T#%d is resumed \n",
+                     th_gtid) );
+#else /* CHARM_OMP */
   if (flag->done_check_val(old_spin)) {
     old_spin = flag->unset_sleeping();
     KF_TRACE(5, ("__kmp_suspend_template: T#%d false alarm, reset sleep bit "
@@ -1569,6 +1639,7 @@ static inline void __kmp_suspend_template(int th_gtid, C *flag) {
       }
     }
   }
+#endif /* CHARM_OMP */
 #ifdef DEBUG_SUSPEND
   {
     char buffer[128];
@@ -1578,7 +1649,9 @@ static inline void __kmp_suspend_template(int th_gtid, C *flag) {
   }
 #endif
 
+#if !CHARM_OMP
   __kmp_unlock_suspend_mx(th);
+#endif
   KF_TRACE(30, ("__kmp_suspend_template: T#%d exit\n", th_gtid));
 }
 
@@ -1805,6 +1878,9 @@ void __kmp_clear_system_time(void) {
 static int __kmp_get_xproc(void) {
 
   int r = 0;
+#if CHARM_OMP
+  r = CmiMyNodeSize();
+#else
 
 #if KMP_OS_LINUX || KMP_OS_DRAGONFLY || KMP_OS_FREEBSD || KMP_OS_NETBSD ||     \
         KMP_OS_OPENBSD || KMP_OS_HURD
@@ -1834,6 +1910,7 @@ static int __kmp_get_xproc(void) {
 #error "Unknown or unsupported OS."
 
 #endif
+#endif /* CHARM_OMP */
 
   return r > 0 ? r : 2; /* guess value of 2 if OS told us 0 */
 
