@@ -100,7 +100,7 @@ void Chare::CkEnableObjQ()
 Chare::~Chare() {
 #ifndef CMK_CHARE_USE_PTR
 /*
-  if (chareIdx >= 0 && chareIdx < CpvAccess(chare_objs).size() && CpvAccess(chare_objs)[chareIdx] == this) 
+  if (chareIdx >= 0 && chareIdx < CpvAccess(chare_objs).size() && CpvAccess(chare_objs)[chareIdx] == this)
 */
   if (chareIdx != -1)
   {
@@ -157,7 +157,11 @@ void Chare::ckDebugPup(PUP::er &p) {
 /// This method is called before starting a [threaded] entry method.
 void Chare::CkAddThreadListeners(CthThread th, void *msg) {
   CthSetThreadID(th, thishandle.onPE, (int)(((char *)thishandle.objPtr)-(char *)0), 0);
-  traceAddThreadListeners(th, UsrToEnv(msg));
+  envelope *env = UsrToEnv(msg);
+#if CMK_TRACE_ENABLED
+  CthSetEpIdx(th, env->getEpIdx());
+#endif
+  traceAddThreadListeners(th, env);
 }
 
 void CkMessage::ckDebugPup(PUP::er &p,void *msg) {
@@ -296,7 +300,7 @@ void CProxy::ckUndelegate(void) {
 
 /// Copy constructor
 CProxy::CProxy(const CProxy &src)
-  :delegatedMgr(src.delegatedMgr), delegatedGroupId(src.delegatedGroupId), 
+  :delegatedMgr(src.delegatedMgr), delegatedGroupId(src.delegatedGroupId),
    isNodeGroup(src.isNodeGroup) {
     delegatedPtr = NULL;
     if(delegatedMgr != NULL && src.delegatedPtr != NULL) {
@@ -309,7 +313,7 @@ CProxy& CProxy::operator=(const CProxy &src) {
 	CkDelegateData *oldPtr=delegatedPtr;
 	ckUndelegate();
 	delegatedMgr=src.delegatedMgr;
-        delegatedGroupId = src.delegatedGroupId; 
+        delegatedGroupId = src.delegatedGroupId;
         isNodeGroup = src.isNodeGroup;
 
         if(delegatedMgr != NULL && src.delegatedPtr != NULL)
@@ -333,23 +337,23 @@ void CProxy::pup(PUP::er &p) {
   if (!delegatedGroupId.isZero()) {
     p|isNodeGroup;
     if (p.isUnpacking()) {
-      delegatedMgr = ckDelegatedTo(); 
+      delegatedMgr = ckDelegatedTo();
     }
 
-    int migCtor = 0, cIdx; 
+    int migCtor = 0, cIdx;
     if (!p.isUnpacking()) {
       if (isNodeGroup) {
         CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
-        cIdx = CksvAccess(_nodeGroupTable)->find(delegatedGroupId).getcIdx(); 
-        migCtor = _chareTable[cIdx]->migCtor; 
+        cIdx = CksvAccess(_nodeGroupTable)->find(delegatedGroupId).getcIdx();
+        migCtor = _chareTable[cIdx]->migCtor;
         CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
       }
       else  {
         CmiImmediateLock(CkpvAccess(_groupTableImmLock));
         cIdx = CkpvAccess(_groupTable)->find(delegatedGroupId).getcIdx();
-        migCtor = _chareTable[cIdx]->migCtor; 
+        migCtor = _chareTable[cIdx]->migCtor;
         CmiImmediateUnlock(CkpvAccess(_groupTableImmLock));
-      }         
+      }
     }
 
     p|migCtor;
@@ -359,12 +363,12 @@ void CProxy::pup(PUP::er &p) {
     if (delegatedMgr == NULL) {
 
       // create a dummy object for calling DelegatePointerPup
-      int objId = _entryTable[migCtor]->chareIdx; 
+      int objId = _entryTable[migCtor]->chareIdx;
       size_t objSize = _chareTable[objId]->size;
-      void *obj = malloc(objSize); 
-      _entryTable[migCtor]->call(NULL, obj); 
+      void *obj = malloc(objSize);
+      _entryTable[migCtor]->call(NULL, obj);
       delegatedPtr = static_cast<CkDelegateMgr *> (obj)
-        ->DelegatePointerPup(p, delegatedPtr);           
+        ->DelegatePointerPup(p, delegatedPtr);
       free(obj);
 
     }
@@ -544,7 +548,7 @@ void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
 {
 #if CMK_CHARMDEBUG
   CpdBeforeEp(epIdx, obj, msg);
-#endif    
+#endif
   const auto msgtype = (msg == NULL) ? LAST_CK_ENVELOPE_TYPE : UsrToEnv(msg)->getMsgtype();
   _entryTable[epIdx]->call(msg, obj);
 #if CMK_CHARMDEBUG
@@ -601,7 +605,7 @@ static inline void _invokeEntryNoTrace(int epIdx,envelope *env,void *obj)
 static inline void _invokeEntry(int epIdx,envelope *env,void *obj)
 {
 
-#if CMK_TRACE_ENABLED 
+#if CMK_TRACE_ENABLED
   if (_entryTable[epIdx]->traceEnabled) {
     _TRACE_BEGIN_EXECUTE(env, obj);
     if(_entryTable[epIdx]->appWork)
@@ -936,7 +940,7 @@ static void _processNewVChareMsg(CkCoreState *ck,envelope *env)
   CkChareID vid;
   vid.onPE = srcPe;
   vid.objPtr = env->getVidPtr();
-  CkpvAccess(vmap)[idx] = vid;    
+  CkpvAccess(vmap)[idx] = vid;
 #endif
   CpvAccess(_qd)->create();
 #ifndef CMK_CHARE_USE_PTR
@@ -1233,7 +1237,7 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
     case BocInitMsg : // Group creation message
       TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: BocInitMsg\n", CkMyPe());)
       // QD processing moved inside _processBocInitMsg because it is conditional
-      //ck->process(); 
+      //ck->process();
       if(env->isPacked()) CkUnpackMessage(&env);
       _processBocInitMsg(ck,env);
       break;
@@ -1508,11 +1512,11 @@ void _noCldNodeEnqueue(int node, envelope *env)
 
   CkPackMessage(&env);
   int len=env->getTotalsize();
-  if (node==CLD_BROADCAST) { 
-	CmiSyncNodeBroadcastAndFree(len, (char *)env); 
+  if (node==CLD_BROADCAST) {
+	CmiSyncNodeBroadcastAndFree(len, (char *)env);
 }
-  else if (node==CLD_BROADCAST_ALL) { 
-		CmiSyncNodeBroadcastAllAndFree(len, (char *)env); 
+  else if (node==CLD_BROADCAST_ALL) {
+		CmiSyncNodeBroadcastAllAndFree(len, (char *)env);
 
 }
   else {
@@ -2610,7 +2614,7 @@ private:
     if (curpos > _recplay_logsize-128) flushLog();
     return true;
   }
-  
+
   virtual bool process(LBMigrateMsg **msg,CkCoreState *ck) {
     FILE *f;
     if (firstOpen) f = openReplayFile("ckreplay_",".lb","w");
@@ -2721,7 +2725,7 @@ class CkMessageReplay : public CkMessageWatcher {
             }
             if (crcnew2 != crc2) {
               CkPrintf("CkMessageReplay %d> Message Checksum changed during replay org: [0x%x] got: [0x%x]\n",CkMyPe(),crc2,crcnew2);
-            }		    
+            }
 		  }
 		  if (!wasPacked) CkUnpackMessage(&env);
 		}
@@ -2920,7 +2924,7 @@ void CthResumeNormalThreadDebug(CthThreadToken* token)
 #if ! CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
     CthTraceResume(t);
-/*    if(CpvAccess(_traceCoreOn)) 
+/*    if(CpvAccess(_traceCoreOn))
             resumeTraceCore();*/
 #endif
 #endif
