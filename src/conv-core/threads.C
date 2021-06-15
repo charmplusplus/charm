@@ -194,6 +194,7 @@ CLINKAGE void *memalign(size_t align, size_t size) CMK_THROW;
 #if CMK_TRACE_ENABLED
   int eventID;
   int srcPE;
+  int ep;
 #endif
   int magic; /* magic number for checking corruption */
 
@@ -329,6 +330,11 @@ void CthSetThreadID(CthThread th, int a, int b, int c)
   B(th)->tid.id[0] = a;
   B(th)->tid.id[1] = b;
   B(th)->tid.id[2] = c;
+}
+
+void CthSetEpIdx(CthThread th, int ep)
+{
+  B(th)->ep = ep;
 }
 
 /* possible hack? CW */
@@ -2226,7 +2232,7 @@ char * CthPointer(CthThread t, size_t pos)
 void CthTraceResume(CthThread t)
 {
 #if CMK_TRACE_ENABLED
-  traceResume(B(t)->eventID, B(t)->srcPE,&t->base.tid);
+  traceResume(B(t)->eventID, B(t)->srcPE, B(t)->ep, &t->base.tid);
 #endif
 }
 /* Functions that help debugging */
