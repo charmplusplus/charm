@@ -334,7 +334,9 @@ void CthSetThreadID(CthThread th, int a, int b, int c)
 
 void CthSetEpIdx(CthThread th, int ep)
 {
+#if CMK_TRACE_ENABLED
   B(th)->ep = ep;
+#endif
 }
 
 /* possible hack? CW */

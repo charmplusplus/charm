@@ -158,9 +158,7 @@ void Chare::ckDebugPup(PUP::er &p) {
 void Chare::CkAddThreadListeners(CthThread th, void *msg) {
   CthSetThreadID(th, thishandle.onPE, (int)(((char *)thishandle.objPtr)-(char *)0), 0);
   envelope *env = UsrToEnv(msg);
-#if CMK_TRACE_ENABLED
   CthSetEpIdx(th, env->getEpIdx());
-#endif
   traceAddThreadListeners(th, env);
 }
 
