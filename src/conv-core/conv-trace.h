@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-/*
+/* 
  * These functions are called from Converse, and should be provided C binding
  * by the tracing strategies.
  */
@@ -17,7 +17,7 @@ void traceCharmInit(char **argv);	/* init trace module in ck */
 void traceMessageRecv(char *msg, int pe);
 void traceBeginIdle(void);
 void traceEndIdle(void);
-void traceResume(int,int,int,CmiObjId *);
+void traceResume(int,int,CmiObjId *);
 void traceSuspend(void);
 void traceAwaken(CthThread t);
 void traceUserEvent(int);
@@ -71,7 +71,7 @@ void traceFlushLog(void);
 #if CMK_TRACE_ENABLED
 CpvExtern(int, traceOn);
 #define traceIsOn()  (CpvAccess(traceOn))
-#else
+#else 
 #define traceIsOn()  0
 #endif
 
@@ -101,8 +101,8 @@ int  traceAvailable(void);
 #else
 #define TRACE_COMM_CREATION(time, msg)
 #define TRACE_COMM_CONTROL_CREATION(time0, time1, time2, msg)
-#define TRACE_COMM_SET_MSGID(msg, pe, event)
-#define TRACE_COMM_GET_MSGID(msg, pe, event)
+#define TRACE_COMM_SET_MSGID(msg, pe, event) 
+#define TRACE_COMM_GET_MSGID(msg, pe, event) 
 #define TRACE_COMM_SET_COMM_MSGID(msg)
 #endif
 

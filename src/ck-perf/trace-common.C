@@ -193,7 +193,7 @@ static void traceCommonInit(char **argv)
     CkpvAccess(selective) = (char *) malloc(strlen(root)+1);
     _MEMCHECK(CkpvAccess(selective));
     strcpy(CkpvAccess(selective), root);
-    if (CkMyPe() == 0)
+    if (CkMyPe() == 0) 
       CmiPrintf("Trace: selective: %s\n", CkpvAccess(selective));
   }
   else {
@@ -212,13 +212,13 @@ static void traceCommonInit(char **argv)
   if (outlierAutomatic) {
     CmiGetArgIntDesc(argv, "+outlierNumSeeds", &numKSeeds,
 		     "Number of cluster seeds to apply at outlier analysis.");
-    CmiGetArgIntDesc(argv, "+outlierPeNumKeep",
+    CmiGetArgIntDesc(argv, "+outlierPeNumKeep", 
 		     &peNumKeep, "Number of Processors to retain data");
     CmiGetArgDoubleDesc(argv, "+outlierEpThresh", &entryThreshold,
 			"Minimum significance of entry points to be considered for clustering (%).");
     findOutliers =
       CmiGetArgFlagDesc(argv,"+outlier", "Find Outliers.");
-    outlierUsePhases =
+    outlierUsePhases = 
       CmiGetArgFlagDesc(argv,"+outlierUsePhases",
 			"Apply automatic outlier analysis to any available phases.");
     if (outlierUsePhases) {
@@ -230,8 +230,8 @@ static void traceCommonInit(char **argv)
         free(root);
   }
 
-
-
+  
+  
   if(CkMyRank()==0) {
     _threadMsg = CkRegisterMsg("dummy_thread_msg", 0, 0, 0, 0);
     _threadChare = CkRegisterChare("dummy_thread_chare", 0, TypeInvalid);
@@ -332,7 +332,7 @@ void traceCommonBeginIdle(void *proj,double curWallTime)
 {
   ((TraceArray *)proj)->beginIdle(curWallTime);
 }
-
+ 
 void traceCommonEndIdle(void *proj,double curWallTime)
 {
   ((TraceArray *)proj)->endIdle(curWallTime);
@@ -350,7 +350,7 @@ void TraceArray::traceBegin() {
 void TraceArray::traceBeginOnCommThread() {
 #if CMK_SMP_TRACE_COMMTHREAD
   if (n==0) return; // No tracing modules registered.
-/*#if ! CMK_TRACE_IN_CHARM
+/*#if ! CMK_TRACE_IN_CHARM	
   cancel_beginIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)traceCommonBeginIdle,this);
   cancel_endIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,(CcdVoidFn)traceCommonEndIdle,this);
 #endif*/
@@ -386,7 +386,7 @@ extern int Cmi_commthread;
 void traceBegin(void) {
 #if CMK_TRACE_ENABLED
   DEBUGF(("[%d] traceBegin called with %d at %f\n", CkMyPe(), CpvAccess(traceOn), TraceTimer()));
-
+  
 #if CMK_SMP_TRACE_COMMTHREAD
   //the first core of this node controls the condition of comm thread
 #if CMK_MULTICORE
@@ -394,7 +394,7 @@ void traceBegin(void) {
 #endif
   if(CmiMyRank()==0){
 	if(CpvAccessOther(traceOn, CmiMyNodeSize())!=1){
-		CkpvAccessOther(_traces, CmiMyNodeSize())->traceBeginOnCommThread();
+		CkpvAccessOther(_traces, CmiMyNodeSize())->traceBeginOnCommThread();		
 		CpvAccessOther(traceOn, CmiMyNodeSize()) = 1;
 	}
   }
@@ -422,8 +422,8 @@ void traceEnd(void) {
 	}
 }
 #endif
-
-
+	
+	
   if (CpvAccess(traceOn)==0) return;
   if (CkpvAccess(_traces) == NULL) {
     CmiPrintf("Warning: did you mix compilation with and without -DCMK_TRACE_ENABLED? \n");
@@ -502,7 +502,7 @@ extern void _createTracecontrolPoints(char **argv);
     traceCharmInit:	called at Charm++ level
 */
 /// initialize trace framework, also create the trace module(s).
-static inline void _traceInit(char **argv)
+static inline void _traceInit(char **argv) 
 {
   CkpvInitialize(TraceArray *, _traces);
   CkpvAccess(_traces) = new TraceArray;
@@ -519,15 +519,15 @@ static inline void _traceInit(char **argv)
 #endif
 
   // Now setup the control point tracing module if desired. It is always compiled/linked in, but is not always enabled
-  // FIXME: make sure it is safe to use argv in SMP version
+  // FIXME: make sure it is safe to use argv in SMP version 
   // because CmiGetArgFlagDesc is destructive and this is called on all PEs.
   if( CmiGetArgFlagDesc(argv,"+CPEnableMeasurements","Enable recording of measurements for Control Points") ){
     enableCPTracing = true;
-    _createTracecontrolPoints(argv);
+    _createTracecontrolPoints(argv);   
   } else {
     enableCPTracing = false;
   }
-
+  
 
   // set trace on/off
   CkpvAccess(_traces)->setTraceOnPE(CkpvAccess(traceOnPe));
@@ -535,7 +535,7 @@ static inline void _traceInit(char **argv)
 #if CMK_SMP_TRACE_COMMTHREAD
 /**
  * In traceBegin(), CkpvAccessOther will be used which means
- * this core needs to access to some cpv variable on another
+ * this core needs to access to some cpv variable on another 
  * core in the same memory address space. It's possible the
  * variable on the other core has not been initialized, which
  * implies the CpvAcessOther will cause a bad memory access.
@@ -546,7 +546,7 @@ static inline void _traceInit(char **argv)
 #endif
 
   if (CkpvAccess(_traces)->length()) {
-    if (CkMyPe() == 0)
+    if (CkMyPe() == 0) 
       CmiPrintf("Trace: traceroot: %s\n", CkpvAccess(traceRoot));
     if (!CmiGetArgFlagDesc(argv,"+traceoff","Disable tracing"))
       traceBegin();
@@ -554,7 +554,7 @@ static inline void _traceInit(char **argv)
 }
 
 /// Converse version
-void traceInit(char **argv)
+void traceInit(char **argv) 
 {
 #if ! CMK_TRACE_IN_CHARM
   _traceInit(argv);
@@ -563,7 +563,7 @@ void traceInit(char **argv)
 }
 
 /// Charm++ version
-void traceCharmInit(char **argv)
+void traceCharmInit(char **argv) 
 {
 #if CMK_TRACE_IN_CHARM
   _traceInit(argv);
@@ -591,9 +591,9 @@ void traceEndIdle()
 }
 
 // CMK_TRACE_ENABLED is already guarded in convcore.C
-void traceResume(int eventID, int srcPE, int ep, CmiObjId *tid)
+void traceResume(int eventID, int srcPE, CmiObjId *tid)
 {
-    _TRACE_BEGIN_EXECUTE_DETAILED(eventID, ForChareMsg, ep, srcPE, 0, NULL, tid);
+    _TRACE_BEGIN_EXECUTE_DETAILED(eventID, ForChareMsg, _threadEP, srcPE, 0, NULL, tid);
     if(CpvAccess(_traceCoreOn))
 	    resumeTraceCore();
 }
@@ -844,13 +844,13 @@ void traceCharmClose(void)
 {
 }
 
-/* **CW** This is the API called from user code to support CCS operations
+/* **CW** This is the API called from user code to support CCS operations 
    if supported by the underlying trace module.
  */
 void traceEnableCCS(void)
 {
   OPTIMIZE_WARNING
-  CkpvAccess(_traces)->traceEnableCCS();
+  CkpvAccess(_traces)->traceEnableCCS();  
 }
 
 /* **CW** Support for thread listeners. This makes a call to each
@@ -893,7 +893,7 @@ double CmiTraceTimer()
 }
 
 void TraceArray::creation(envelope *env, int ep, int num)
-{
+{ 
     if (_entryTable[ep]->traceEnabled)
         ALLDO(creation(env, ep, num));
 }
@@ -1005,8 +1005,8 @@ void initPAPI() {
   #endif
 #endif
   // PAPI 3 mandates the initialization of the set to PAPI_NULL
-  CkpvInitialize(int, papiEventSet);
-  CkpvAccess(papiEventSet) = PAPI_NULL;
+  CkpvInitialize(int, papiEventSet); 
+  CkpvAccess(papiEventSet) = PAPI_NULL; 
   if (PAPI_create_eventset(&CkpvAccess(papiEventSet)) != PAPI_OK) {
     CmiAbort("PAPI failed to create event set!\n");
   }

@@ -4,7 +4,7 @@
 
  FIXME: this file should be eliminated via a pluggable
  tracing architecture (projector?).
-
+ 
  Orion Sky Lawlor, olawlor@acm.org, 2003/3/27
 */
 #include <stdlib.h>
@@ -20,15 +20,15 @@ void traceInit(char **argv) {
   CpvInitialize(int, traceOn);
   CpvAccess(traceOn)=0;
 #if CMK_TRACE_ENABLED && CMK_PROJECTOR
-  CpvInitialize(int, _traceCoreOn);
-  CpvAccess(_traceCoreOn)=0;
+  CpvInitialize(int, _traceCoreOn); 
+  CpvAccess(_traceCoreOn)=0; 
   /* initTraceCore(argv); */
 #endif
 }
 void traceMessageRecv(char *msg, int pe) {}
 void traceBeginIdle(void) {}
 void traceEndIdle(void) {}
-void traceResume(int event, int srcPE, int ep, CmiObjId *t) {}
+void traceResume(int event, int srcPE, CmiObjId *t) {}
 void traceSuspend(void) {}
 void traceAwaken(CthThread t) {}
 void traceUserEvent(int i) {}
