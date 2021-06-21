@@ -974,6 +974,11 @@ struct isommap
 
     const size_t totalsize = allocated_extent - start;
 
+    DEBUG_PRINT("[%d] In Isomalloc PUP %s, start addr = %p, size = %lu\n", CmiMyPe(),
+                p.isSizing() ? "sizing" : p.isPacking() ? "packing" : p.isUnpacking() ?
+                "unpacking" : p.isDeleting() ? "deleting" : "",
+                start, totalsize);
+
     if (p.isUnpacking())
     {
       if (start < isomallocStart || isomallocEnd < allocated_extent)
