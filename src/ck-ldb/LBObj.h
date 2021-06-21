@@ -21,7 +21,7 @@ public:
     data.asyncArrival = _asyncArrival;
     Clear();
 //    data.cpuTime = 0.;
-//    data.wallTime = 0.;
+    data.wallTime = 0.;
 //    data.minWall = 1e6;
 //    data.maxWall = 0.;
     localUserData = usr_ptr;
