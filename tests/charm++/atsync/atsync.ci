@@ -1,0 +1,17 @@
+mainmodule atsync {
+  readonly CProxy_Main mainProxy;
+  readonly int nElements;
+  readonly int iters;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void done();
+  };
+
+  array [1D] atsync {
+    // Normal Charm++ entry methods
+    entry atsync(void);
+    entry void start();
+  };
+
+};
