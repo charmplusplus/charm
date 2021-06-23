@@ -61,7 +61,7 @@ class Main : public CBase_Main {
     }
 
     // Print info
-    CkPrintf("# Charm++ GPU Latency Test\n"
+    CkPrintf("# Charm++ Latency Test\n"
              "# Message sizes: %lu - %lu bytes\n"
              "# Iterations: %d regular, %d large\n"
              "# Warmup: %d\n",
