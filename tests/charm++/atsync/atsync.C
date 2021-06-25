@@ -26,7 +26,7 @@ public:
     CkPrintf("Running atsync on %d processors for %d elements\n", CkNumPes(), nElements);
 
     mainProxy = thisProxy;
-    CProxy_atsync arr = CProxy_atsync::ckNew();
+    CProxy_Test arr = CProxy_Test::ckNew();
     for (int i = 0; i < nElements; i++)
     {
       arr[i].insert();
@@ -43,14 +43,14 @@ public:
   };
 };
 
-class atsync : public CBase_atsync
+class Test : public CBase_Test
 {
 private:
   int counter;
   int originalPE;
 
 public:
-  atsync()
+  Test()
   {
     CkPrintf("atsync (%d) created on %d\n", thisIndex, CkMyPe());
     counter = 0;
@@ -58,12 +58,18 @@ public:
     usesAtSync = true;
   }
 
-  atsync(CkMigrateMessage* m) {}
+  Test(CkMigrateMessage* m) {}
 
   void ResumeFromSync()
   {
+    counter++;
     CkPrintf("[%d] %d resume from sync, iter %d\n", CkMyPe(), thisIndex, counter);
-    if (thisIndex == 0)
+    if (counter == iters)
+    {
+      CkCallback cb(CkIndex_Main::done(), mainProxy);
+      contribute(cb);
+    }
+    else if (thisIndex == 0)
       thisProxy[thisIndex].start();
   }
 
@@ -75,23 +81,14 @@ public:
 
   void start()
   {
-    counter++;
-    const int value = thisIndex;
-    if (value + 1 < nElements)
+    if (thisIndex + 1 < nElements)
     {
       CkPrintf("[%d] Sending to %d from element %d\n", CkMyPe(), thisIndex + 1,
                thisIndex);
       thisProxy[thisIndex + 1].start();
     }
 
-    if (counter < iters)
-    {
-      AtSync();
-    }
-    else
-    {
-      mainProxy.done();
-    }
+    AtSync();
   }
 };
 

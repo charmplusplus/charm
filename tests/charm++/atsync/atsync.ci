@@ -8,9 +8,8 @@ mainmodule atsync {
     entry void done();
   };
 
-  array [1D] atsync {
-    // Normal Charm++ entry methods
-    entry atsync(void);
+  array [1D] Test {
+    entry Test(void);
     entry void start();
   };
 
