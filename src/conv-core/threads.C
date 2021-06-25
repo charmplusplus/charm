@@ -194,7 +194,6 @@ CLINKAGE void *memalign(size_t align, size_t size) CMK_THROW;
 #if CMK_TRACE_ENABLED
   int eventID;
   int srcPE;
-  int ep;
 #endif
   int magic; /* magic number for checking corruption */
 
@@ -325,6 +324,10 @@ CthCpvStatic(CthThread,  CthCurrent); /*Current thread*/
 CthCpvDeclare(char *,    CthData); /*Current thread's private data (externally visible)*/
 CthCpvStatic(size_t,     CthDatasize);
 
+#if CMK_TRACE_ENABLED
+CtvDeclare(int, CthEP); //Entry point index
+#endif
+
 void CthSetThreadID(CthThread th, int a, int b, int c)
 {
   B(th)->tid.id[0] = a;
@@ -335,7 +338,7 @@ void CthSetThreadID(CthThread th, int a, int b, int c)
 void CthSetEpIdx(CthThread th, int ep)
 {
 #if CMK_TRACE_ENABLED
-  B(th)->ep = ep;
+  CtvAccess(CthEP) = ep;
 #endif
 }
 
@@ -1123,6 +1126,9 @@ void CthInit(char **argv)
   p = (CthProcInfo)malloc(sizeof(struct CthProcInfo_s));
   _MEMCHECK(p);
   CthCpvAccess(CthProc)=p;
+#if CMK_TRACE_ENABLED
+  CtvAccess(CthEP)=0; // dummy _threadEP
+#endif
 
   /* leave some space for current stack frame < 256 bytes */
   /* sp must be same on all processors for migration to work ! */
@@ -2234,7 +2240,7 @@ char * CthPointer(CthThread t, size_t pos)
 void CthTraceResume(CthThread t)
 {
 #if CMK_TRACE_ENABLED
-  traceResume(B(t)->eventID, B(t)->srcPE, B(t)->ep, &t->base.tid);
+  traceResume(B(t)->eventID, B(t)->srcPE, CtvAccess(CthEP), &t->base.tid);
 #endif
 }
 /* Functions that help debugging */
