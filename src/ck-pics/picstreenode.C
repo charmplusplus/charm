@@ -116,30 +116,35 @@ void Condition::printMe() {
 //TODO Condition called
 void Condition::printDataToFile(double *input, FILE *fp) {
 
-  fprintf(fp, "Condition %s\n", name.c_str());
-  fprintf(fp, "Condition  %s %d %d ", name.c_str(), varIndex, baseIndex);
+  if(name.c_str() == "CPU_Util") {
+    fprintf(fp, "%s is low\n", name.c_str());
+  } else {
+    fprintf(fp, "%s\n", name.c_str());
+  }
+  //fprintf(fp, "Condition %s\n", name.c_str());
+  //fprintf(fp, "Condition  %s %d %d ", name.c_str(), varIndex, baseIndex);
   if(thresholdIndex > -1)
     threshold = input[thresholdIndex];
-  if(varIndex>-1)
-    fprintf(fp, "  %s %f %s ", FieldName[varIndex], input[varIndex], operatorName[op]);
+  /*if(varIndex>-1)
+    fprintf(fp, "  %s %f %s ", FieldName[varIndex], input[varIndex], operatorName[op]);*/
 
   if(baseIndex > -1) {
     base = input[baseIndex];
-    fprintf(fp, " %s %f ", FieldName[baseIndex], base);
+    //fprintf(fp, " %s %f ", FieldName[baseIndex], base);
   }
-  else
-    fprintf(fp, " %f ", base);
+  /*else
+    fprintf(fp, " %f ", base);*/
 
-  fprintf(fp, " %s %f ", compareName[symbol], threshold);
+  //fprintf(fp, " %s %f ", compareName[symbol], threshold);
   //potential improvement
-  fprintf(fp, " %f ", potentialImprove);
+  //fprintf(fp, " %f ", potentialImprove);
 
-  if(varIndex == MAX_EntryMethodDuration)
+  /*if(varIndex == MAX_EntryMethodDuration)
   {
     int entryIdx = (int)input[varIndex+1];
     fprintf(fp, " %d  %s %s ", entryIdx, _entryTable[entryIdx]->name, _chareTable[_entryTable[entryIdx]->chareIdx]->name); 
   }else if(varIndex>=NUM_AVG && varIndex<NUM_AVG+NUM_MAX)
-    fprintf(fp, " %d ", (int)input[varIndex+1]);
+    fprintf(fp, " %d ", (int)input[varIndex+1]);*/
 
   fprintf(fp, "\n");
 }
