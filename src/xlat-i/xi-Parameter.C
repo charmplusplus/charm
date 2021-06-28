@@ -112,7 +112,7 @@ void ParamList::printTypes(XStr& str, int withDefaultValues, int useConst) {
 int Parameter::print(XStr& str, int withDefaultValues, int useConst, int fwdNum) {
   if (isRdma()) {
     if (isDevice()) {
-      str << "CkDeviceBuffer& deviceBuffer_" << name;
+      str << "CkDeviceBuffer deviceBuffer_" << name;
     } else {
       str << "CkNcpyBuffer ncpyBuffer_" << name;
     }
