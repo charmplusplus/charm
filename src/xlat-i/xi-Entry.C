@@ -1892,10 +1892,10 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
     } else if (param->hasDevice()) {
       str << "  if (CMI_IS_ZC_DEVICE(env)) {\n";
       genRegularCall(str, preCall, redn_wrapper, usesImplBuf, true);
-      str << "  }\n";
+      str << "  } else {\n";
     }
     genRegularCall(str, preCall, redn_wrapper, usesImplBuf, false);
-    if(param->hasRecvRdma()) {
+    if(param->hasRecvRdma() || param->hasDevice()) {
       str << "  }\n";
     }
   }
