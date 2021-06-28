@@ -278,7 +278,7 @@ void ParamList::size(XStr& str)
       }
       else if (container->isArray())
       {
-        str << "  dest_pe = ckLocMgr()->lastKnown(ckGetIndex());\n";
+        str << "  dest_pe = ckLocalBranch()->lastKnown(ckGetIndex());\n";
       }
       else if (container->isGroup() || container->isNodeGroup())
       {
