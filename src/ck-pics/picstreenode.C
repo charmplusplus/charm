@@ -116,7 +116,7 @@ void Condition::printMe() {
 //TODO Condition called
 void Condition::printDataToFile(double *input, FILE *fp) {
 
-  if(name.c_str() == "CPU_Util") {
+  if(strcmp(name.c_str(), "CPU_Util") == 0) {
     fprintf(fp, "%s is low\n", name.c_str());
   } else {
     fprintf(fp, "%s\n", name.c_str());
