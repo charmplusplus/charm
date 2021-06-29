@@ -6,8 +6,6 @@
 #include <unordered_map
 
 class CkSectionManager : public CBase_CkSectionManager {
- // Data and member functions as in C++
- // Entry functions as for normal chares
 private:
   SectionMapType sections;
 
@@ -17,8 +15,8 @@ public:
 
   // Create a single section containing the chares in the range
   // [begin, end), return a handle to it that can be referenced
-  // (This will probably return a CProxy_SectionXX but for now we are specifying the API)
-  // actually probably not, as I think CProxy_SectionXX will have the SectionID as a member
+  // returns SectionID, will be used to create CProxy_SectionXX
+  // CProxy_SectionXX will have the SectionID as a member
   template<class SectionFn, class InputIt>
   ck::SectionID createSection(SectionFn, InputIt begin, InputIt end);
 
