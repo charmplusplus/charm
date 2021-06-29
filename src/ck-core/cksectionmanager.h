@@ -3,7 +3,7 @@
 #include "cksectionmanager.def.h"
 
 #include "cksection.h"
-#include <unordered_map
+#include <unordered_map>
 
 class CkSectionManager : public CBase_CkSectionManager {
 private:
