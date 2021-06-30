@@ -329,6 +329,7 @@ void CpdInit(void)
   CpvAccess(conditionalQueue) = CdsFifo_Create();
   
   CcsRegisterHandler("debug/converse/freeze", (CmiHandler)CpdDebugHandlerFreeze);
+  CcsSetMergeFn("debug/converse/freeze",CmiReduceMergeFn_random);
   CcsRegisterHandler("debug/converse/status", (CmiHandler)CpdDebugHandlerStatus);
   CcsSetMergeFn("debug/converse/status", CcsMerge_concat);
 
