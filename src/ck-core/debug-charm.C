@@ -563,6 +563,18 @@ void CpdDeliverMessage(char * msg) {
   CpdDeliverMessageInt(msgNum);
 }
 
+static void CpdDeliverAllMessages(char *) {
+  void *debugQ=CkpvAccess(debugQueue);
+  CdsFifo_Enqueue(debugQ, (void*)(-1)); // Enqueue a guard
+  CkpvAccess(skipBreakpoint) = 1;
+  int msgNum = 0;
+  void *m;
+  while ((m=CdsFifo_Dequeue(debugQ)) != (void*)(-1)) {
+    CpdHandleMessage(m, msgNum++);
+  }
+  CkpvAccess(skipBreakpoint) = 0;
+}
+
 void *CpdGetNextMessageConditional(CsdSchedulerState_t *s) {
   int len;
   void *msg;
@@ -1055,6 +1067,8 @@ void CpdCharmInit()
   CpdListRegister(new CpdListAccessor_c("hostinfo",hostInfoLength,0,hostInfo,0));
   CpdListRegister(new CpdList_localQ());
   CcsRegisterHandler("debug/charm/deliver",(CmiHandler)CpdDeliverMessage);
+  CcsRegisterHandler("debug/charm/deliverall",(CmiHandler)CpdDeliverAllMessages);
+  CcsSetMergeFn("debug/charm/deliverall",CmiReduceMergeFn_random);
   CcsRegisterHandler("debug/provisional/deliver",(CmiHandler)CpdDeliverMessageConditionally);
   CcsRegisterHandler("debug/provisional/rollback",(CmiHandler)CpdEndConditionalDelivery);
   CcsRegisterHandler("debug/provisional/commit",(CmiHandler)CpdCommitConditionalDelivery);
