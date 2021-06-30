@@ -2223,12 +2223,12 @@ char * CthPointer(CthThread t, size_t pos)
 }
 #endif
 
-#if CMK_TRACE_ENABLED
 void CthTraceResume(CthThread t)
 {
+#if CMK_TRACE_ENABLED
   traceResume(B(t)->eventID, B(t)->srcPE,&t->base.tid);
-}
 #endif
+}
 /* Functions that help debugging */
 void CthPrintThdMagic(CthThread t){
   CmiPrintf("CthThread[%p]'s magic: %x\n", t, t->base.magic);

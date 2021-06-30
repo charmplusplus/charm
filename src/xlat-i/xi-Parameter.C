@@ -243,6 +243,107 @@ void ParamList::callEach(rdmadevicefn_t f, XStr& str, int& index) {
 
 int ParamList::hasConditional() { return orEach(&Parameter::isConditional); }
 
+void ParamList::size(XStr& str)
+{
+  str << "  int impl_off=0;\n";
+  int hasArrays = orEach(&Parameter::isArray);
+  if (hasArrays)
+  {
+    str << "  int impl_arrstart=0;\n";
+    callEach(&Parameter::marshallRegArraySizes, str);
+  }
+
+  bool hasrdma = hasRdma();
+  bool hasrecvrdma = hasRecvRdma();
+
+  Chare* container = entry->getContainer();
+  bool isP2P = (container->isChare() || container->isForElement());
+
+  // Generate device-related code only when this condition is met
+  bool deviceRdmaSupported = (hasDevice() && isP2P);
+
+  if (hasrdma)
+  {
+    if (deviceRdmaSupported)
+    {
+      str << "  int impl_num_device_rdma_fields = " << entry->numRdmaDeviceParams
+          << ";\n";
+      str << "  int dest_pe;\n";
+      if (container->isChare())
+      {
+        // TODO: Following code doesn't work, don't support singleton chares for now
+        // str << "  dest_pe = CkRdmaGetDestPEChare(ckGetChareID().onPE,
+        // ckGetChareID().objPtr);\n";
+        str << "  CkAbort(\"Singleton chares are not supported\");\n";
+      }
+      else if (container->isArray())
+      {
+        str << "  dest_pe = ckLocMgr()->lastKnown(ckGetIndex());\n";
+      }
+      else if (container->isGroup() || container->isNodeGroup())
+      {
+        str << "  dest_pe = ckGetGroupPe();\n";
+      }
+      else
+      {
+        str << "  CkAbort(\"Unknown container type\");\n";
+      }
+      str << "  CkDeviceBuffer* device_buffers[" << entry->numRdmaDeviceParams << "];\n";
+      int device_rdma_index = 0;
+      callEach(&Parameter::marshallDeviceRdmaParameters, str, device_rdma_index);
+      str << "  CkRdmaDeviceOnSender(dest_pe, impl_num_device_rdma_fields, "
+             "device_buffers);\n";
+    }
+    else if (hasDevice())
+    {
+      // Abort ASAP if broadcast or has host-side zero-copy
+      if (!isP2P)
+      {
+        str << "  CkAbort(\"Broadcast not supported with device buffers\");\n";
+      }
+      if (hasSendRdma() || hasRecvRdma())
+      {
+        str << "  CkAbort(\"Host-side RDMA cannot be used along with device RDMA\");\n";
+      }
+    }
+    else
+    {
+      str << "  int impl_num_rdma_fields = "
+          << entry->numRdmaSendParams + entry->numRdmaRecvParams << ";\n";
+      // Root node is pupped on the source as it is required for ZC Bcast when the source
+      // is non-zero
+      str << "  int impl_num_root_node = CkMyNode();\n";
+      callEach(&Parameter::marshallRdmaParameters, str, true);
+    }
+  }
+  str << "  { //Find the size of the PUP'd data\n";
+  str << "    PUP::sizer implP;\n";
+  callEach(&Parameter::pup, str);
+  if (hasrdma)
+  {
+    if (deviceRdmaSupported)
+    {
+      str << "    implP|impl_num_device_rdma_fields;\n";
+      callEach(&Parameter::pupRdma, str, true, true);
+    }
+    else if (!hasDevice())
+    {
+      str << "    implP|impl_num_rdma_fields;\n";
+      str << "    implP|impl_num_root_node;\n";
+      // All rdma parameters have to be pupped at the start
+      callEach(&Parameter::pupRdma, str, true, false);
+    }
+  }
+  if (hasArrays)
+  { /*round up pup'd data length--that's the first array*/
+    str << "    impl_arrstart=CK_ALIGN(implP.size(),16);\n";
+    str << "    impl_off+=impl_arrstart;\n";
+  }
+  else /*No arrays--no padding*/
+    str << "    impl_off+=implP.size();\n";
+  str << "  }\n";
+}
+
 /** marshalling: pack fields into flat byte buffer **/
 void ParamList::marshall(XStr& str, XStr& entry_str) {
   if (isVoid())
@@ -252,12 +353,9 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
     print(str, 0);
     str << "\n";
     // First pass: find sizes
-    str << "  int impl_off=0;\n";
+    size(str);
+    // Now that we know the size, allocate the packing buffer
     int hasArrays = orEach(&Parameter::isArray);
-    if (hasArrays) {
-      str << "  int impl_arrstart=0;\n";
-      callEach(&Parameter::marshallRegArraySizes, str);
-    }
 
     bool hasrdma = hasRdma();
     bool hasrecvrdma = hasRecvRdma();
@@ -267,62 +365,6 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
 
     // Generate device-related code only when this condition is met
     bool deviceRdmaSupported = (hasDevice() && isP2P);
-
-    if (hasrdma) {
-      if (deviceRdmaSupported) {
-        str << "  int impl_num_device_rdma_fields = " << entry->numRdmaDeviceParams << ";\n";
-        str << "  int dest_pe;\n";
-        if (container->isChare()) {
-          // TODO: Following code doesn't work, don't support singleton chares for now
-          //str << "  dest_pe = CkRdmaGetDestPEChare(ckGetChareID().onPE, ckGetChareID().objPtr);\n";
-          str << "  CkAbort(\"Singleton chares are not supported\");\n";
-        } else if (container->isArray()) {
-          str << "  dest_pe = ckLocMgr()->lastKnown(ckGetIndex());\n";
-        } else if (container->isGroup() || container->isNodeGroup()) {
-          str << "  dest_pe = ckGetGroupPe();\n";
-        } else {
-          str << "  CkAbort(\"Unknown container type\");\n";
-        }
-        str << "  CkDeviceBuffer* device_buffers[" << entry->numRdmaDeviceParams << "];\n";
-        int device_rdma_index = 0;
-        callEach(&Parameter::marshallDeviceRdmaParameters, str, device_rdma_index);
-        str << "  CkRdmaDeviceOnSender(dest_pe, impl_num_device_rdma_fields, device_buffers);\n";
-      } else if (hasDevice()) {
-        // Abort ASAP if broadcast or has host-side zero-copy
-        if (!isP2P) {
-          str << "  CkAbort(\"Broadcast not supported with device buffers\");\n";
-        }
-        if (hasSendRdma() || hasRecvRdma()) {
-          str << "  CkAbort(\"Host-side RDMA cannot be used along with device RDMA\");\n";
-        }
-      } else {
-        str << "  int impl_num_rdma_fields = "<<entry->numRdmaSendParams + entry->numRdmaRecvParams<<";\n";
-        // Root node is pupped on the source as it is required for ZC Bcast when the source is non-zero
-        str << "  int impl_num_root_node = CkMyNode();\n";
-        callEach(&Parameter::marshallRdmaParameters, str, true);
-      }
-    }
-    str << "  { //Find the size of the PUP'd data\n";
-    str << "    PUP::sizer implP;\n";
-    callEach(&Parameter::pup, str);
-    if (hasrdma) {
-      if (deviceRdmaSupported) {
-        str << "    implP|impl_num_device_rdma_fields;\n";
-        callEach(&Parameter::pupRdma, str, true, true);
-      } else if (!hasDevice()) {
-        str << "    implP|impl_num_rdma_fields;\n";
-        str << "    implP|impl_num_root_node;\n";
-        // All rdma parameters have to be pupped at the start
-        callEach(&Parameter::pupRdma, str, true, false);
-      }
-    }
-    if (hasArrays) { /*round up pup'd data length--that's the first array*/
-      str << "    impl_arrstart=CK_ALIGN(implP.size(),16);\n";
-      str << "    impl_off+=impl_arrstart;\n";
-    } else /*No arrays--no padding*/
-      str << "    impl_off+=implP.size();\n";
-    str << "  }\n";
-    // Now that we know the size, allocate the packing buffer
     if (hasConditional())
       str << "  MarshallMsg_" << entry_str << " *impl_msg=CkAllocateMarshallMsgT<MarshallMsg_"
           << entry_str << ">(impl_off,impl_e_opts);\n";
@@ -440,6 +482,8 @@ void Parameter::pupArray(XStr& str) {
 }
 
 void Parameter::pup(XStr& str) {
+  if (!name)
+    return;
   if (isArray()) {
     pupArray(str);
   } else if (!conditional) {
