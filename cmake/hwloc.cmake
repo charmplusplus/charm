@@ -7,8 +7,13 @@ else()
     set(hwloc_shared no)
 endif()
 
-# Used to determine arguments to pass to hwloc's configure
-set(building_blocks_command "${CMAKE_BINARY_DIR}/bin/charmc -print-building-blocks ${OPTS}")
+# Determine arguments to pass to hwloc's configure
+# Need to remove the '-verbose' option from the charmc command line,
+# as that prints extra stuff that will confuse bash's eval command.
+string(REPLACE "-verbose"
+       "" building_blocks_command_opts
+       ${OPTS})
+set(building_blocks_command "${CMAKE_BINARY_DIR}/bin/charmc -print-building-blocks ${building_blocks_command_opts}")
 
 set(hwloc_dir ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc)
 include(ExternalProject)
