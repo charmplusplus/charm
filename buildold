@@ -844,6 +844,7 @@ then
       echo '. $CHARMINC/'"cc-$i.sh" >> $ConvSh
 elif test `echo "$BASEVERSION" | grep -c "bluegeneq"` -gt 0
 then
+      echo "Support for Blue Gene/Q targets has been deprecated as of Charm++ 7.0.0."
       i="clang"
       bgclang++11 --version
       if [ $? -ne 0 ]; then
