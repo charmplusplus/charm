@@ -303,7 +303,7 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     }
 
     // Add source callback for polling, so that it can be invoked once the transfer is complete
-    hapiAddCallback(postStructs[i].cuda_stream, CkCallback(CkRdmaDeviceRecvHandler, rdma_data));
+    hapiAddCallback(postStructs[i].cuda_stream, CkCallback(CkRdmaDeviceRecvHandler, &save_op));
 #else
     // Machine layer supports GPU-aware communication
     save_op.tag = source.tag;
