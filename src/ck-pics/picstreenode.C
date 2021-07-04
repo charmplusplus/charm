@@ -114,15 +114,23 @@ void Condition::printMe() {
 }
 
 void Condition::parseString(std::string str, FILE *fp) {
-  if(strstr(str.c_str(), "LOW")) {
-    fprintf(fp, "%s is too low.\n", str.c_str());
-  } else if(strstr(str.c_str(), "HIGH")) {
-    fprintf(fp, "%s is too high.\n", str.c_str());
+  std::size_t pos = str.find("_");
+  if(strstr(str.c_str(), "Low")) {
+    fprintf(fp, "%s is too low.\n", str.substr(pos+1).c_str());
+  } else if(strstr(str.c_str(), "High")) {
+    fprintf(fp, "%s is too high.\n", str.substr(pos+1).c_str());
+  } else if(str.c_str(), "Small") {
+    fprintf(fp, "%s is too small.\n", str.substr(pos+1).c_str());
+  } else if(str.c_str(), "Many") {
+    fprintf(fp, "%s is too many.\n", str.substr(pos+1).c_str());
+  } else if(str.c_str(), "Few") {
+    fprintf(fp, "%s is too few.\n", str.substr(pos+1).c_str());
+  } else if(str.c_str(), "Long") {
+    fprintf(fp, "%s is too long.\n", str.substr(pos+1).c_str());
   } else {
-    fprintf(fp, "Invalid entry format in decision tree for %s.\n", str.c_str());
+    fprintf(fp, "Invalid entry format in decision tree for %s.\n", str.substr(pos+1).c_str());
   }
 }
-
 
 void Condition::printFields(double *input, FILE *fp) {
   if(thresholdIndex > -1) {
@@ -234,7 +242,7 @@ bool Condition::test(double *input) {
     printf("Undefined symbol \n");
     exit(1);
   }
-  if(!strcmp(name.c_str(), "CPU_Util"))
+  if(!strcmp(name.c_str(), "Low_CPU_Util"))
     potentialImprove = 1 - realValue;
   else if(!strcmp(name.c_str(), "High_Overhead"))
     potentialImprove = realValue;
