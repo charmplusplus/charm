@@ -113,40 +113,62 @@ void Condition::printMe() {
   printf("condition %s \n", name.c_str());
 }
 
-//TODO Condition called
-void Condition::printDataToFile(double *input, FILE *fp) {
-
-  if(strcmp(name.c_str(), "CPU_Util") == 0) {
-    fprintf(fp, "LOW_%s\n", name.c_str());
+void Condition::parseString(std::string str, FILE *fp) {
+  if(strstr(str.c_str(), "LOW")) {
+    fprintf(fp, "%s is too low.\n", str.c_str());
+  } else if(strstr(str.c_str(), "HIGH")) {
+    fprintf(fp, "%s is too high.\n", str.c_str());
   } else {
-    fprintf(fp, "%s\n", name.c_str());
+    fprintf(fp, "Invalid entry format in decision tree for %s.\n", str.c_str());
   }
-  //fprintf(fp, "Condition %s\n", name.c_str());
-  //fprintf(fp, "Condition  %s %d %d ", name.c_str(), varIndex, baseIndex);
-  if(thresholdIndex > -1)
+}
+
+
+void Condition::printFields(double *input, FILE *fp) {
+  if(thresholdIndex > -1) {
     threshold = input[thresholdIndex];
-  /*if(varIndex>-1)
-    fprintf(fp, "  %s %f %s ", FieldName[varIndex], input[varIndex], operatorName[op]);*/
+  }
+  if(varIndex > -1) {
+    fprintf(fp, "%s %f\n", FieldName[varIndex], input[varIndex]);
+  }
 
   if(baseIndex > -1) {
     base = input[baseIndex];
-    //fprintf(fp, " %s %f ", FieldName[baseIndex], base);
+    fprintf(fp, "%s %f \n", FieldName[baseIndex], base);
   }
-  /*else
-    fprintf(fp, " %f ", base);*/
+}
 
-  //fprintf(fp, " %s %f ", compareName[symbol], threshold);
+//TODO Condition called
+void Condition::printDataToFile(double *input, FILE *fp) {
+  parseString(name, fp);
+  printFields(input, fp);
+
+  //fprintf(fp, "Condition %s\n", name.c_str());
+  /*fprintf(fp, "Condition  %s %d %d ", name.c_str(), varIndex, baseIndex);
+  if(thresholdIndex > -1)
+    threshold = input[thresholdIndex];
+  if(varIndex>-1)
+    fprintf(fp, "  %s %f %s ", FieldName[varIndex], input[varIndex], operatorName[op]);
+
+  if(baseIndex > -1) {
+    base = input[baseIndex];
+    fprintf(fp, " %s %f ", FieldName[baseIndex], base);
+  }
+  else
+    fprintf(fp, " %f ", base);
+
+  fprintf(fp, " %s %f ", compareName[symbol], threshold);
   //potential improvement
-  //fprintf(fp, " %f ", potentialImprove);
+  fprintf(fp, " %f ", potentialImprove);
 
-  /*if(varIndex == MAX_EntryMethodDuration)
+  if(varIndex == MAX_EntryMethodDuration)
   {
     int entryIdx = (int)input[varIndex+1];
     fprintf(fp, " %d  %s %s ", entryIdx, _entryTable[entryIdx]->name, _chareTable[_entryTable[entryIdx]->chareIdx]->name); 
   }else if(varIndex>=NUM_AVG && varIndex<NUM_AVG+NUM_MAX)
-    fprintf(fp, " %d ", (int)input[varIndex+1]);*/
+    fprintf(fp, " %d ", (int)input[varIndex+1]);
 
-  fprintf(fp, "\n");
+  fprintf(fp, "\n");*/
 }
 
 bool Condition::test(double *input) {

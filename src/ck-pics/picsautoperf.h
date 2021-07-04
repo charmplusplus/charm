@@ -74,7 +74,7 @@ public:
 
   //TODO modify this and print only relevant fields --- some sort of decision making here to be done???
   void printMe(FILE *fp, const char *str) {
-    /*for(int i=0; i<NUM_NODES; i++)
+    for(int i=0; i<NUM_NODES; i++)
     {
       if (i == AVG_IdlePercentage || i == AVG_OverheadPercentage ||
           i == AVG_UtilizationPercentage || i == AVG_AppPercentage ||
@@ -85,7 +85,7 @@ public:
         fprintf(fp, "%d %s %.1f\n", i, FieldName[i], 100*data[i]);
       else
         fprintf(fp, "%d %s %f\n", i, FieldName[i], data[i]);
-    }*/
+    }
   }
 };
 
