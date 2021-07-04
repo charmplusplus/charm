@@ -115,6 +115,7 @@ void Condition::printMe() {
 
 void Condition::parseString(std::string str, FILE *fp) {
   std::size_t pos = str.find("_");
+  fprintf(fp, "Condition:\n");
   if(strstr(str.c_str(), "Low")) {
     fprintf(fp, "%s is too low.\n", str.substr(pos+1).c_str());
   } else if(strstr(str.c_str(), "High")) {
