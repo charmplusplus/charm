@@ -430,10 +430,11 @@ void TraceAutoPerfBOC::globalPerfAnalyze(CkReductionMsg *msg )
   lastAnalyzeTimer = now;
   CkpvAccess(cntAfterLdb)++;
   int numpes = numPesInGroup;
-  if(analyzeStep == 0)
+  //TODO Remove step 0 output
+  /*if(analyzeStep == 0)
   {
-    //autoTunerProxy.ckLocalBranch()->printCPNameToFile(CkpvAccess(fpSummary)); 
-  }
+    autoTunerProxy.ckLocalBranch()->printCPNameToFile(CkpvAccess(fpSummary));
+  }*/
   analyzeStep++;
   PerfData *data=(PerfData*) msg->getData();
   if(CkpvAccess(isExit) || analyzeStep<= WARMUP_STEP || analyzeStep >= PAUSE_STEP) {
@@ -463,7 +464,8 @@ void TraceAutoPerfBOC::globalPerfAnalyze(CkReductionMsg *msg )
   for(int j=0; j<CkpvAccess(numOfPhases)*PERIOD_PERF; j++)
   {
     formatPerfData(data, j/CkpvAccess(numOfPhases), j%CkpvAccess(numOfPhases));
-    data->printMe(CkpvAccess(fpSummary), "format");
+    //TODO Do not print entire PICS output
+    //data->printMe(CkpvAccess(fpSummary), "format");
   }
 
   //autoTunerProxy.ckLocalBranch()->printCPToFile(CkpvAccess(fpSummary));
