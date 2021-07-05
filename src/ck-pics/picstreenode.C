@@ -257,8 +257,8 @@ bool Condition::test(double *input) {
 
 //TODO Solution fields called
 void Solution::printDataToFile(double *input, FILE *fp) {
-  /*int abseff = eff>=0?eff:-eff;
-  fprintf(fp, "Solution %s %s \n", eff>0?"UP":"Down", EffectName[abseff]);*/
+  int abseff = eff>=0?eff:-eff;
+  fprintf(fp, "Solution %s %s \n", eff>0?"UP":"Down", EffectName[abseff]);
 }
 
 TreeNode::TreeNode( TreeNode *p, Condition *c ) {
@@ -319,14 +319,17 @@ void TreeNode::printMe() {
   }
 }
 
+//TODO Decide between solution and condition
 void TreeNode::printDataToFile(double *input, FILE *fp) {
-  if(_isSolution) {
+  if(!_isSolution) {
+    data.condition->printDataToFile(input, fp);
+  }
+  /*if(_isSolution) {
     data.solution->printDataToFile(input, fp);
   }
   else {
-    //TODO Tells which condition are being tracked
     data.condition->printDataToFile(input, fp);
-  }
+  }*/
 }
 
 
