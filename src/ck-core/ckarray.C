@@ -903,7 +903,7 @@ CkArray::CkArray(CkArrayOptions&& opts, CkMarshalledMessage&& initMsg)
   /// Set up initial elements (if any)
   locMgr->populateInitial(opts, initMsg.getMessage(), this);
   if (opts.isStaticInsertion())
-    initDone();
+    remoteDoneInserting();
 
   if (opts.reductionClient.type != CkCallback::invalid && CkMyPe() == 0)
     ckSetReductionClient(&opts.reductionClient);
