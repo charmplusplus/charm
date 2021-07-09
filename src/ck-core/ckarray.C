@@ -870,7 +870,7 @@ CkArray::CkArray(CkArrayOptions&& opts, CkMarshalledMessage&& initMsg)
       sectionAutoDelegate(opts.isSectionAutoDelegated()),
       initCallback(opts.getInitCallback()),
       thisProxy(thisgroup),
-      stableLocations(opts.getStaticInsertion() && !opts.anytimeMigration),
+      stableLocations(opts.isStaticInsertion() && !opts.anytimeMigration),
       numInitial(opts.getNumInitial()),
       isInserting(true),
       numPesInited(0)
@@ -902,7 +902,7 @@ CkArray::CkArray(CkArrayOptions&& opts, CkMarshalledMessage&& initMsg)
 
   /// Set up initial elements (if any)
   locMgr->populateInitial(opts, initMsg.getMessage(), this);
-  if (opts.getStaticInsertion())
+  if (opts.isStaticInsertion())
     initDone();
 
   if (opts.reductionClient.type != CkCallback::invalid && CkMyPe() == 0)

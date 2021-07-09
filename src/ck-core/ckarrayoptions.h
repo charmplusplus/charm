@@ -236,7 +236,7 @@ class CkArrayOptions {
     return *this;
   }
   CkArrayOptions& setStaticInsertion(bool b);
-  bool getStaticInsertion() {
+  bool isStaticInsertion() {
     if (staticInsertion != -1) return staticInsertion;
     bool empty = false;
     bool shorts = numInitial.dimension > 3;
