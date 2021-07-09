@@ -1,3 +1,6 @@
+CMK_DEFS="$CMK_DEFS -m32"
+CMK_FDEFS="$CMK_FDEFS -m32"
+
 . $CHARMINC/cc-mpi.sh
 
 CMK_QT='i386-gcc'
