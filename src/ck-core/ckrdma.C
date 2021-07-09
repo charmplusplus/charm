@@ -2093,3 +2093,28 @@ void zcPupIssueRgets(CmiUInt8 id, CkLocMgr *locMgr) {
   locMgr->bufferedActiveRgetMsgs.emplace(id, std::vector<CkArrayMessage *>()); // does not require locking as it is owned by locMgr
 }
 /***************************** End of Zerocopy PUP Support ****************************/
+
+
+/****************************** Channel API ******************************/
+
+CkChannel::CkChannel(int id_, const CProxyElement_ArrayBase &proxy) : CkChannel(id_) {
+  peer_pe = proxy.ckLocalBranch()->lastKnown(proxy.ckGetIndex());
+}
+
+CkChannel::CkChannel(int id_, const CProxyElement_Group &proxy) : CkChannel(id_) {
+  peer_pe = proxy.ckGetGroupPe();
+}
+
+CkChannel::CkChannel(int id_, const CProxyElement_NodeGroup &proxy) : CkChannel(id_) {
+  peer_pe = proxy.ckGetGroupPe();
+}
+
+void CkChannel::send(const void* ptr, size_t size) {
+  // TODO
+}
+
+void CkChannel::recv(const void* ptr, size_t size) {
+  // TODO
+}
+
+/****************************** End of Channel API ******************************/

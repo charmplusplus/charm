@@ -424,4 +424,26 @@ void zcPupIssueRgets(CmiUInt8 id, CkLocMgr *locMgr);
 void CkRdmaZCPupCustomHandler(void *ack);
 
 void _ncpyAckHandler(ncpyHandlerMsg *msg);
+
+/****************************** Channel API ******************************/
+
+class CkChannel {
+private:
+  int id;
+  int peer_pe;
+
+public:
+  CkChannel() : id(-1), peer_pe(-1) {}
+  CkChannel(int id_) : id(id_), peer_pe(-1) {}
+  CkChannel(int id_, const CProxyElement_ArrayBase &proxy);
+  CkChannel(int id_, const CProxyElement_Group &proxy);
+  CkChannel(int id_, const CProxyElement_NodeGroup &proxy);
+
+  int getID() { return id; }
+  int getPeerPe() { return peer_pe; }
+
+  void send(const void* ptr, size_t size);
+  void recv(const void* ptr, size_t size);
+};
+
 #endif
