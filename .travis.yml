@@ -42,3 +42,11 @@ jobs:
     - sudo apt-get install -y gfortran
     - ./build all-test netlrts-linux-ppc64le -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
     - make -C netlrts-linux-ppc64le/tmp test TESTOPTS="++local"
+  - os: linux
+    arch: ppc64le
+    name: "MPI-Power"
+    script:
+    - sudo apt-get update
+    - sudo apt-get install -y gfortran mpich libmpich-dev
+    - ./build all-test mpi-linux-ppc64le -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
+    - make -C mpi-linux-ppc64le/tmp test
