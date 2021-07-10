@@ -789,10 +789,6 @@ static int search_pemap(char *pecoremap, int pe)
   return i;
 }
 
-#if CMK_CRAYXE || CMK_CRAYXC
-CLINKAGE int getXTNodeID(int mpirank, int nummpiranks);
-#endif
-
 /**
  * Check that there are not multiple PEs assigned to the same core.
  * If a pemap has been computed by this module (or passed by the user) this
@@ -1162,47 +1158,6 @@ void CmiInitCPUAffinity(char **argv)
     return;
   }
 
-#if CMK_CRAYXE || CMK_CRAYXC
-  {
-    int numCores = CmiNumCores();
-
-    int myid = getXTNodeID(CmiMyNodeGlobal(), CmiNumNodesGlobal());
-    int myrank;
-    int pe, mype = CmiMyPeGlobal();
-    int node = CmiMyNodeGlobal();
-    int nnodes = 0;
-#if CMK_SMP
-    if (CmiMyPe() >= CmiNumPes()) {         /* this is comm thread */
-      int node = CmiMyPe() - CmiNumPes();
-      mype = CmiGetPeGlobal(CmiNodeFirst(node) + CmiMyNodeSize() - 1, CmiMyPartition()); /* last pe on SMP node */
-      node = CmiGetNodeGlobal(node, CmiMyPartition());
-    }
-#endif
-    pe = mype - 1;
-    while (pe >= 0) {
-      int n = CmiNodeOf(pe);
-      if (n != node) { nnodes++; node = n; }
-      if (getXTNodeID(n, CmiNumNodesGlobal()) != myid) break;
-      pe --;
-    }
-    CmiAssert(numCores > 0);
-    myrank = (mype - pe - 1 + nnodes)%numCores;
-#if CMK_SMP
-    if (CmiMyPe() >= CmiNumPes()) 
-        myrank = (myrank + 1)%numCores;
-#endif
-
-    if (-1 != CmiSetCPUAffinity(myrank)) {
-      DEBUGP(("Processor %d is bound to core #%d on node #%d\n", CmiMyPe(), myrank, mynode));
-    }
-    else{
-      CmiAbort("CmiSetCPUAffinity failed!");
-    }
-  }
-  if (CmiMyPe() < CmiNumPes()) 
-  CmiNodeAllBarrier();
-  CmiNodeAllBarrier();
-#else
     /* get my ip address */
   if (CmiMyRank() == 0)
   {
@@ -1257,7 +1212,6 @@ void CmiInitCPUAffinity(char **argv)
   affinity_doneflag++;
   CmiUnlock(affLock);
   CmiNodeAllBarrier();
-#endif
 
   if (show_affinity_flag) CmiPrintCPUAffinity();
 }
