@@ -557,7 +557,7 @@ synchronization that all useful work has finished before calling
 CkExit().
 
 ``double CkWallTimer()``
-Returns the elapsed wall time since the start of execution.
+Returns the elapsed wall time since the start of execution in seconds.
 
 Information about Logical Machine Entities
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -13246,6 +13246,8 @@ Acknowledgements
 -  Osman Sarood
 
 -  Parthasarathy Ramachandran
+
+-  Pathikrit Ghosh
 
 -  Phil Miller
 

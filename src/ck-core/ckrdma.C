@@ -695,7 +695,7 @@ int getSrcPe(envelope *env) {
   PUP::fromMem up((void *)((CkMarshallMsg *)EnvToUsr(env))->msgBuf);
   up|numops;
   up|rootNode;
-  CmiEnforce(numops > 0);
+  CkEnforce(numops > 0);
   CkNcpyBuffer w;
   up|w;
   return w.pe;
@@ -1060,7 +1060,7 @@ void CkRdmaEMDeregAndAckHandler(void *ack) {
 
   NcpyP2PAckInfo *p2pAckInfo = (NcpyP2PAckInfo *)ack;
 
-  CmiEnforce(p2pAckInfo->numOps > 0);
+  CkEnforce(p2pAckInfo->numOps > 0);
 
   for(int i = 0; i < p2pAckInfo->numOps; i++) {
     CkNcpyBuffer &source = p2pAckInfo->src[i];
@@ -1551,6 +1551,8 @@ void CkRdmaEMBcastPostAckHandler(void *msg) {
     // Send message to all peer elements on this PE
     handleMsgOnChildPostCompletionForRecvBcast(env);
 
+    CmiFree(ncpyEmInfo); // Allocated in CkRdmaIssueRgets
+
   } else if(t.child_count !=0 && t.parent != -1) {
 
     // Allocate a structure NcpyBcastInterimAckInfo to maintain state for ack handling
@@ -1999,6 +2001,8 @@ inline void _ncpyAckHandler(ncpyHandlerMsg *msg) {
     default                                    : CmiAbort("_ncpyAckHandler: Invalid OpMode\n");
                                                  break;
   }
+
+  CmiFree(msg); // Allocated in invokeRemoteNcpyAckHandler
 }
 
 
