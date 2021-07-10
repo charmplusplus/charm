@@ -689,6 +689,7 @@ TraceAutoPerfBOC::TraceAutoPerfBOC() {
 
 TraceAutoPerfBOC::~TraceAutoPerfBOC() { }
 
+//TODO fix this
 TraceAutoPerfInit::TraceAutoPerfInit(CkArgMsg* args)
 {
   CkPrintf("PICS> Enabled PICS autoPerf\n");
