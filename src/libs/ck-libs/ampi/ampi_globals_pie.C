@@ -31,9 +31,11 @@
 #endif
 #endif
 
+
+// debug level 1: process steps, object and segment layouts
+// debug level 2: (extremely verbose) relocation patching
 #define PIEGLOBALS_DEBUG 0
 
-static std::atomic<size_t> rank_count{};
 
 extern bool isPieglobalsEnabled;
 
@@ -55,19 +57,19 @@ struct objectstruct
 
 struct pieglobalsstruct
 {
-  int nodeleaderrank;
+  ampi_mainstruct mainstruct;
   SharedObject myexe;
+  ptrdiff_t main_c_diff, main_f_diff;
 
   size_t numobjects = 0;
   std::vector<objectstruct> objects{};
 
   std::vector<std::tuple<ptrdiff_t, uintptr_t, size_t>> segment_allocation_offsets{};
 
-  CmiIsomallocContext heap_context;
+  CmiIsomallocContext ctx;
   std::vector<std::tuple<uintptr_t, size_t, size_t>> global_constructor_heap{};
 
-  ampi_mainstruct mainstruct;
-  ptrdiff_t main_c_diff, main_f_diff;
+  int nodeleaderrank;
 
   void dealloc()
   {
@@ -75,13 +77,8 @@ struct pieglobalsstruct
   }
 };
 
-struct local_heap_entry
-{
-  void * addr;
-  size_t size;
-};
 
-static int print(struct dl_phdr_info * info, size_t size, void * data)
+static int phdr_print(struct dl_phdr_info * info, size_t size, void * data)
 {
   auto & numobjects = *(size_t *)data;
   if (numobjects > 0)
@@ -140,7 +137,7 @@ static int print(struct dl_phdr_info * info, size_t size, void * data)
   return 0;
 }
 
-static int probe(struct dl_phdr_info * info, size_t size, void * data)
+static int phdr_probe(struct dl_phdr_info * info, size_t size, void * data)
 {
   auto & pieglobalsdata = *(pieglobalsstruct *)data;
   size_t & numobjects = pieglobalsdata.numobjects;
@@ -196,48 +193,49 @@ static int probe(struct dl_phdr_info * info, size_t size, void * data)
   return 0;
 }
 
-static int count(struct dl_phdr_info * info, size_t size, void * data)
+static int phdr_count(struct dl_phdr_info * info, size_t size, void * data)
 {
   auto & numobjects = *(size_t *)data;
   ++numobjects;
   return 0;
 }
 
-static size_t numobjects;
+
 static pieglobalsstruct pieglobalsdata{};
 
 static void pieglobalscleanup()
 {
-  if (pieglobalsdata.heap_context.opaque == nullptr)
+  if (pieglobalsdata.ctx.opaque == nullptr)
     return;
 
   const CthThread th = TCharm::get()->getThread();
 
   CthInterceptionsDeactivatePush(th);
 
-  CmiMemoryIsomallocContextActivate(pieglobalsdata.heap_context);
+  CmiMemoryIsomallocContextActivate(pieglobalsdata.ctx);
   dlclose(pieglobalsdata.myexe);
 
   CthInterceptionsDeactivatePop(th);
 
-  CmiIsomallocContextDelete(pieglobalsdata.heap_context);
+  CmiIsomallocContextDelete(pieglobalsdata.ctx);
 
-  pieglobalsdata.heap_context.opaque = nullptr;
+  pieglobalsdata.ctx.opaque = nullptr;
 }
 
 static void pieglobalscleanupatexit()
 {
-  if (pieglobalsdata.heap_context.opaque == nullptr)
+  if (pieglobalsdata.ctx.opaque == nullptr)
     return;
 
-  CmiMemoryIsomallocContextActivate(pieglobalsdata.heap_context);
+  CmiMemoryIsomallocContextActivate(pieglobalsdata.ctx);
   dlclose(pieglobalsdata.myexe);
   CmiMemoryIsomallocContextActivate(CmiIsomallocContext{});
 
-  CmiIsomallocContextDelete(pieglobalsdata.heap_context);
+  CmiIsomallocContextDelete(pieglobalsdata.ctx);
 
-  pieglobalsdata.heap_context.opaque = nullptr;
+  pieglobalsdata.ctx.opaque = nullptr;
 }
+
 
 void AMPI_Node_Setup(int numranks)
 {
@@ -252,23 +250,23 @@ void AMPI_Node_Setup(int numranks)
               CmiMyNode(), CmiMyPe(), numranks);
 #endif
 
-  // set up fake isomalloc contexts using n+1th slot
+
+  // set up fake isomalloc context using slot n+1
+
   constexpr int subdivisions = 2;
   int finalslotstart = numranks * subdivisions;
   int numsubdividedslots = (numranks+1) * subdivisions;
-  CmiIsomallocContext heap_context = CmiIsomallocContextCreate(finalslotstart, numsubdividedslots);
+  CmiIsomallocContext ctx = CmiIsomallocContextCreate(finalslotstart, numsubdividedslots);
 
-  if (heap_context.opaque == nullptr)
+  if (ctx.opaque == nullptr)
     CkAbort("AMPI> pieglobals requires Isomalloc!");
 
 
-  atexit(pieglobalscleanupatexit);
+  // prepare common globals method user object data
 
   AMPI_FuncPtr_Transport funcptrs{};
-  AMPI_FuncPtr_Pack(&funcptrs);
-
-
-  dl_iterate_phdr(count, &numobjects);
+  if (AMPI_FuncPtr_Pack(&funcptrs, sizeof(funcptrs)))
+    CkAbort("Globals runtime linking pack failed due to mismatch!");
 
   static const char exe_suffix[] = STRINGIFY(CMK_POST_EXE);
   static const char suffix[] = STRINGIFY(CMK_USER_SUFFIX) "." STRINGIFY(CMK_SHARED_SUF);
@@ -282,16 +280,24 @@ void AMPI_Node_Setup(int numranks)
       binary_path.resize(pos);
   }
   binary_path += suffix;
+  const char * const binary_path_str = binary_path.c_str();
 
 
+  // pre-dlopen setup
+
+  size_t numobjects = 0;
+  dl_iterate_phdr(phdr_count, &numobjects);
+
+  atexit(pieglobalscleanupatexit);
+
+  CmiIsomallocContextEnableRandomAccess(ctx);
+  CmiIsomallocContextEnableRecording(ctx, 1);
+  CmiMemoryIsomallocContextActivate(ctx);
 
 
+  // load user object
 
-  CmiIsomallocContextEnableRandomAccess(heap_context);
-  CmiIsomallocContextEnableRecording(heap_context, 1);
-  CmiMemoryIsomallocContextActivate(heap_context);
-
-  SharedObject myexe = dlopen(binary_path.c_str(), RTLD_NOW|RTLD_LOCAL|RTLD_DEEPBIND);
+  SharedObject myexe = dlopen(binary_path_str, RTLD_NOW|RTLD_LOCAL|RTLD_DEEPBIND);
 
   if (myexe == nullptr)
   {
@@ -301,34 +307,45 @@ void AMPI_Node_Setup(int numranks)
 
   auto unpack = AMPI_FuncPtr_Unpack_Locate(myexe);
   if (unpack != nullptr)
-    unpack(&funcptrs);
+  {
+    if (unpack(&funcptrs, sizeof(funcptrs)))
+      CkAbort("Globals runtime linking unpack failed due to mismatch!");
+  }
 
   pieglobalsdata.mainstruct = AMPI_Main_Get(myexe);
-
-  CmiMemoryIsomallocContextActivate(CmiIsomallocContext{});
-  CmiIsomallocContextEnableRecording(heap_context, 0);
 
   if (pieglobalsdata.mainstruct.c == nullptr && pieglobalsdata.mainstruct.f == nullptr)
     CkAbort("Could not find any AMPI entry points!");
 
-  CmiIsomallocGetRecordedHeap(heap_context, pieglobalsdata.global_constructor_heap);
-  pieglobalsdata.heap_context = heap_context;
-  pieglobalsdata.myexe = myexe;
 
+  // post-dlopen handling
+
+  CmiMemoryIsomallocContextActivate(CmiIsomallocContext{});
+  CmiIsomallocContextEnableRecording(ctx, 0);
+
+  CmiIsomallocGetRecordedHeap(ctx, pieglobalsdata.global_constructor_heap);
+  pieglobalsdata.ctx = ctx;
+  pieglobalsdata.myexe = myexe;
 
   if (CmiMyNode() == 0 && !quietModeRequested)
   {
     size_t mynumobjects = numobjects;
-    dl_iterate_phdr(print, &mynumobjects);
+    dl_iterate_phdr(phdr_print, &mynumobjects);
   }
 
   pieglobalsdata.numobjects = numobjects;
-  dl_iterate_phdr(probe, &pieglobalsdata);
+  dl_iterate_phdr(phdr_probe, &pieglobalsdata);
   CmiAssert(!pieglobalsdata.objects.empty());
 
   atexit(ampiMarkAtexit);
 }
 
+
+struct local_heap_entry
+{
+  void * addr;
+  size_t size;
+};
 
 using heap_map_t = std::map<uintptr_t, local_heap_entry, std::greater<uintptr_t>>;
 
@@ -338,7 +355,7 @@ static void replace_in_range(
   const heap_map_t & my_heap_map,
   char * dstheapstart, CmiIsomallocRegion srcheap,
   const std::vector<char *> & segment_allocations,
-  const char * from)
+  const char * range_name)
 {
   for (void ** scan = (void **)range_start, ** end = (void **)range_end; scan < end; ++scan)
   {
@@ -357,7 +374,7 @@ static void replace_in_range(
                     " (in %s, to %s)\n",
                     CmiMyNode(), CmiMyPe(), myrank,
                     (uintptr_t)scan, (uintptr_t)data, (uintptr_t)out,
-                    from, obj2.name.c_str());
+                    range_name, obj2.name.c_str());
 #endif
         *scan = out;
       }
@@ -382,7 +399,9 @@ static void replace_in_range(
 #else
     // O(log n) method
     auto iter = my_heap_map.lower_bound((uintptr_t)data);
-    if (iter != my_heap_map.end() && /* (char *)iter->first <= data && */ data <= (char *)iter->first + iter->second.size)
+    if (iter != my_heap_map.end() &&
+        /* (char *)iter->first <= data && */
+        data <= (char *)iter->first + iter->second.size)
     {
       void * out = (char *)iter->second.addr + ((char *)data - (char *)iter->first);
 #if PIEGLOBALS_DEBUG >= 2
@@ -403,7 +422,10 @@ static void replace_in_range(
 static constexpr ptrdiff_t null_funcptr_diff = -1;
 
 template <typename T>
-static void calc_funcptr_diff(ptrdiff_t & diff, T funcptr, const void * objsource, const char * objend, const void * emptyheapstart, const char * allocation)
+static void calc_funcptr_isomorphic_offset(
+  ptrdiff_t & diff, T funcptr,
+  const void * src, const char * srcend,
+  const void * isomorphic, const char * dst)
 {
   auto ptr = (const char *)funcptr;
   if (ptr == nullptr)
@@ -412,14 +434,15 @@ static void calc_funcptr_diff(ptrdiff_t & diff, T funcptr, const void * objsourc
     return;
   }
 
-  if (ptr < objsource || objend <= ptr)
+  if (ptr < src || srcend <= ptr)
     return;
 
-  diff = ptr - (const char *)objsource + (allocation - (const char *)emptyheapstart);
+  diff = (ptr - (const char *)src) + (dst - (const char *)isomorphic);
 }
 
 void AMPI_Rank_Setup(int myrank, int numranks, CmiIsomallocContext ctx)
 {
+  static std::atomic<size_t> rank_count{};
   const size_t localrank = rank_count++;
 
 #if PIEGLOBALS_DEBUG >= 1
@@ -433,6 +456,8 @@ void AMPI_Rank_Setup(int myrank, int numranks, CmiIsomallocContext ctx)
 
   if (localrank == 0)
     pieglobalsdata.nodeleaderrank = myrank;
+
+  // allocate privatized segments for this rank
 
   std::vector<char *> segment_allocations;
   for (const auto & obj : pieglobalsdata.objects)
@@ -448,23 +473,27 @@ void AMPI_Rank_Setup(int myrank, int numranks, CmiIsomallocContext ctx)
 
     for (const auto & item : obj.items)
     {
-      char * addr = allocation + item.offset;
+      char * dst = allocation + item.offset;
       char * src = obj.source + item.offset;
       size_t len = item.size;
 
 #if PIEGLOBALS_DEBUG >= 1
       if (!quietModeRequested)
         CmiPrintf("pieglobals> [%d][%d][%d] [0x%012" PRIxPTR ", 0x%012" PRIxPTR ") --> [0x%012" PRIxPTR ", 0x%012" PRIxPTR ")\n",
-                  CmiMyNode(), CmiMyPe(), myrank, (uintptr_t)src, (uintptr_t)src + len, (uintptr_t)addr, (uintptr_t)addr + len);
+                  CmiMyNode(), CmiMyPe(), myrank, (uintptr_t)src, (uintptr_t)src + len, (uintptr_t)dst, (uintptr_t)dst + len);
 #endif
 
-      memcpy(addr, src, len);
+      memcpy(dst, src, len);
     }
   }
 
-  const CmiIsomallocRegion heapBefore = CmiIsomallocContextGetUsedExtent(ctx);
-  const auto heapstart = (char *)heapBefore.start;
-  const auto mallocstart = (char *)heapBefore.end;
+  const CmiIsomallocRegion memregion = CmiIsomallocContextGetUsedExtent(ctx);
+  const auto memregionstart = (char *)memregion.start;
+  const auto mallocstart = (char *)memregion.end;
+  CmiIsomallocContextEnableRandomAccess(ctx);
+
+
+  // determine entry point location
 
   if (localrank == 0)
   {
@@ -472,26 +501,26 @@ void AMPI_Rank_Setup(int myrank, int numranks, CmiIsomallocContext ctx)
     {
       char * allocation = segment_allocations[&obj - pieglobalsdata.objects.data()];
 
-      pieglobalsdata.segment_allocation_offsets.emplace_back(allocation - heapstart, (uintptr_t)obj.source, obj.size);
+      pieglobalsdata.segment_allocation_offsets.emplace_back(allocation - memregionstart, (uintptr_t)obj.source, obj.size);
 
       for (const auto & item : obj.items)
       {
-        char * addr = allocation + item.offset;
+        char * dst = allocation + item.offset;
         char * src = obj.source + item.offset;
         size_t len = item.size;
 
-        // calculate the offset of the function pointer into the isomalloc heap
+        // calculate the offset of the function pointer into the isomalloc region
         // will be isomorphic for all ranks
         // avoids needing to store per-rank segment information between AMPI_Rank_Setup and main
-        char * end = src + len;
-        calc_funcptr_diff(pieglobalsdata.main_c_diff, pieglobalsdata.mainstruct.c, src, end, heapstart, allocation);
-        calc_funcptr_diff(pieglobalsdata.main_f_diff, pieglobalsdata.mainstruct.f, src, end, heapstart, allocation);
+        char * srcend = src + len;
+        calc_funcptr_isomorphic_offset(pieglobalsdata.main_c_diff, pieglobalsdata.mainstruct.c, src, srcend, memregionstart, dst);
+        calc_funcptr_isomorphic_offset(pieglobalsdata.main_f_diff, pieglobalsdata.mainstruct.f, src, srcend, memregionstart, dst);
       }
     }
   }
 
 
-  CmiIsomallocContextEnableRandomAccess(ctx);
+  // replay heap allocations from global constructors
 
   heap_map_t my_heap_map;
   for (const auto & entry : pieglobalsdata.global_constructor_heap)
@@ -510,45 +539,45 @@ void AMPI_Rank_Setup(int myrank, int numranks, CmiIsomallocContext ctx)
     my_heap_map.emplace((uintptr_t)src, local_heap_entry{dst, size});
   }
 
-  // apply fixups here
 
-  const CmiIsomallocRegion srcheap = CmiIsomallocContextGetUsedExtent(pieglobalsdata.heap_context);
+  // apply fixups for pointers to locations in now-privatized segments
 
+  const CmiIsomallocRegion srcheap = CmiIsomallocContextGetUsedExtent(pieglobalsdata.ctx);
+
+  // scan the globals segment for pointers to code, globals, or the global constructor heap
   for (const auto & obj : pieglobalsdata.objects)
   {
     char * allocation = segment_allocations[&obj - pieglobalsdata.objects.data()];
 
     for (const auto & item : obj.items)
     {
-      char * addr = allocation + item.offset;
+      char * dst = allocation + item.offset;
       void * src = obj.source + item.offset;
       size_t len = item.size;
 
-      // scan the globals for pointers to code, globals, or the global constructor heap
       if (!(item.flags & PF_X))
       {
-        replace_in_range(myrank, addr, addr + len, my_heap_map, mallocstart, srcheap, segment_allocations, obj.name.c_str());
+        replace_in_range(myrank, dst, dst + len, my_heap_map, mallocstart, srcheap, segment_allocations, obj.name.c_str());
       }
     }
   }
 
-  // replace_in_range(myrank, heapBefore.end, heap.end, my_heap_map, mallocstart, srcheap, segment_allocations, "FULL HEAP - BAD");
-
-#if 1
   // scan the global constructor heap
   for (const auto & entry : my_heap_map)
   {
     const local_heap_entry & dst = entry.second;
     replace_in_range(myrank, dst.addr, (char *)dst.addr + dst.size, my_heap_map, mallocstart, srcheap, segment_allocations, "heap");
   }
-#endif
+
+
+  // apply mprotect permissions
 
   for (const auto & obj : pieglobalsdata.objects)
   {
     char * allocation = segment_allocations[&obj - pieglobalsdata.objects.data()];
     for (const auto & item : obj.items)
     {
-      char * addr = allocation + item.offset;
+      char * dst = allocation + item.offset;
       size_t len = item.size;
 
       int prot = 0;
@@ -559,27 +588,28 @@ void AMPI_Rank_Setup(int myrank, int numranks, CmiIsomallocContext ctx)
       if (item.flags & PF_X)
         prot |= PROT_EXEC;
 
-      CmiIsomallocContextProtect(ctx, addr, CMIALIGN(len, obj.align), prot);
+      CmiIsomallocContextProtect(ctx, dst, CMIALIGN(len, obj.align), prot);
     }
   }
 }
 
+
 // separate function so that setting a breakpoint is straightforward
-static inline int ampi_pieglobals(int argc, char ** argv)
+static int ampi_pieglobals(int argc, char ** argv)
 {
   const CthThread th = TCharm::get()->getThread();
   auto ctx = CmiIsomallocGetThreadContext(th);
-  const CmiIsomallocRegion heap = CmiIsomallocContextGetUsedExtent(ctx);
-  const auto heapstart = (char *)heap.start;
+  const CmiIsomallocRegion memregion = CmiIsomallocContextGetUsedExtent(ctx);
+  const auto memregionstart = (char *)memregion.start;
 
   if (pieglobalsdata.main_c_diff != null_funcptr_diff)
   {
-    auto newptr = (ampi_maintype)(heapstart + pieglobalsdata.main_c_diff);
+    auto newptr = (ampi_maintype)(memregionstart + pieglobalsdata.main_c_diff);
     return newptr(argc, argv);
   }
   else if (pieglobalsdata.main_f_diff != null_funcptr_diff)
   {
-    auto newptr = (ampi_fmaintype)(heapstart + pieglobalsdata.main_f_diff);
+    auto newptr = (ampi_fmaintype)(memregionstart + pieglobalsdata.main_f_diff);
     newptr();
     return 0;
   }
@@ -613,21 +643,22 @@ int main(int argc, char ** argv)
   return ampi_pieglobals(argc, argv);
 }
 
+
 // for debugging purposes
 // GDB: `call pieglobalsfind($rip)` or `call pieglobalsfind((void *)0x...)`
 void * pieglobalsfind(void * ptr)
 {
   const CthThread th = TCharm::get()->getThread();
   auto ctx = CmiIsomallocGetThreadContext(th);
-  const CmiIsomallocRegion heap = CmiIsomallocContextGetUsedExtent(ctx);
+  const CmiIsomallocRegion memregion = CmiIsomallocContextGetUsedExtent(ctx);
 
-  if (ptr < heap.start || heap.end <= ptr)
+  if (ptr < memregion.start || memregion.end <= ptr)
   {
     fprintf(stderr, "pointer not in range of rank's data\n");
     return nullptr;
   }
 
-  ptrdiff_t offset = (char *)ptr - (char *)heap.start;
+  ptrdiff_t offset = (char *)ptr - (char *)memregion.start;
 
   for (const auto & seg : pieglobalsdata.segment_allocation_offsets)
   {

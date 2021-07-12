@@ -36,7 +36,6 @@ void CmiIsomallocContextPup(pup_er p, CmiIsomallocContext * ctxptr);
 void CmiIsomallocContextEnableRandomAccess(CmiIsomallocContext ctx);
 void CmiIsomallocContextJustMigrated(CmiIsomallocContext ctx);
 void CmiIsomallocEnableRDMA(CmiIsomallocContext ctx, int enable); /* on by default */
-void CmiIsomallocContextEnableRecording(CmiIsomallocContext ctx, int enable); /* internal use only */
 CmiIsomallocRegion CmiIsomallocContextGetUsedExtent(CmiIsomallocContext ctx);
 
 /*Allocate/free from this context*/
@@ -46,14 +45,14 @@ void * CmiIsomallocContextCalloc(CmiIsomallocContext ctx, size_t nelem, size_t s
 void * CmiIsomallocContextRealloc(CmiIsomallocContext ctx, void * ptr, size_t size);
 void CmiIsomallocContextFree(CmiIsomallocContext ctx, void * ptr);
 size_t CmiIsomallocContextGetLength(CmiIsomallocContext ctx, void * ptr);
+void CmiIsomallocContextProtect(CmiIsomallocContext ctx, void * addr, size_t len, int prot);
 
 void * CmiIsomallocContextPermanentAlloc(CmiIsomallocContext ctx, size_t size);
 void * CmiIsomallocContextPermanentAllocAlign(CmiIsomallocContext ctx, size_t align, size_t size);
 
-void CmiIsomallocContextProtect(CmiIsomallocContext ctx, void * addr, size_t len, int prot);
-
 CmiIsomallocContext CmiIsomallocGetThreadContext(CthThread th);
 
+void CmiIsomallocContextEnableRecording(CmiIsomallocContext ctx, int enable); /* internal use only */
 #ifdef __cplusplus
 void CmiIsomallocGetRecordedHeap(CmiIsomallocContext ctx,
   std::vector<std::tuple<uintptr_t, size_t, size_t>> & heap_vector);

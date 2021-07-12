@@ -1030,10 +1030,12 @@ struct isommap
   void JustMigrated()
   {
     // Can be used for any post-migration functionality, such as restoring mprotect permissions.
+#if CMK_HAS_MPROTECT
     for (const auto & region : protect_regions)
     {
       mprotect((void *)std::get<0>(region), std::get<1>(region), std::get<2>(region));
     }
+#endif
   }
 
   void protect(void * addr, size_t len, int prot)
@@ -1041,7 +1043,10 @@ struct isommap
     CmiLock(lock);
     protect_regions.emplace_back((uintptr_t)addr, len, prot);
     CmiUnlock(lock);
+
+#if CMK_HAS_MPROTECT
     mprotect(addr, len, prot);
+#endif
   }
 
   void clear()

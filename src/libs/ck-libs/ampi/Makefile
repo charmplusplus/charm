@@ -268,8 +268,8 @@ $(GLOBALS_FS_OBJ): ampi_globals_fs.C $(HEADDEP) headers | $(ROMIO)
 $(GLOBALS_PIP_OBJ): ampi_globals_pip.C $(HEADDEP) headers | $(ROMIO)
 	$(CHARMC) -language ampi -c $< -o $@
 
-$(GLOBALS_PIE_OBJ): ampi_globals_pie.C $(HEADDEP)
-	$(CHARMC) -c $< -o $@
+$(GLOBALS_PIE_OBJ): ampi_globals_pie.C $(HEADDEP) headers | $(ROMIO)
+	$(CHARMC) -language ampi -c $< -o $@
 
 clean:
 	rm -fr *.o *~ *.decl.h *.def.h gmon.out $(DEST) $(DESTF) $(COMPATLIB) conv-host charmrun headers *.mod

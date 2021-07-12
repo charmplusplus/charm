@@ -427,6 +427,7 @@ if(CMK_AMPI_WITH_ROMIO)
     endif()
     if(CMK_SUPPORTS_PIPGLOBALS)
         add_dependencies(ampi_globals_pip romio)
+        add_dependencies(ampi_globals_pie romio)
     endif()
 endif()
 

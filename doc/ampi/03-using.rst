@@ -294,10 +294,10 @@ heap allocation because in AMPI, the stack sizes are fixed at the
 beginning (and can be specified from the command line) and stacks do not
 grow dynamically.
 
-Automatic Position Independent Executable Runtime Relocation
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+PIEglobals: Automatic Position-Independent Executable Runtime Relocation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Position Independent Executable (PIE) Globals allows fully automatic
+Position-Independent Executable (PIE) Globals allows fully automatic
 privatization of global variables on GNU/Linux systems without
 modification of user code. All languages (C, C++, Fortran, etc.) are
 supported. Runtime migration, load balancing, checkpointing, and SMP
@@ -305,7 +305,7 @@ mode are all fully supported.
 
 This method works by combining a specific method of building binaries
 with GNU extensions to the dynamic linker. First, AMPI's toolchain
-wrapper compiles your user program as a Position Independent Executable
+wrapper compiles your user program as a Position-Independent Executable
 (PIE) and links it against a special shim of function pointers instead
 of the normal AMPI runtime. It then builds a small loader utility that
 links directly against AMPI. This loader dynamically opens the PIE
@@ -351,8 +351,8 @@ included in the binary. In GDB, the command takes the form
 pass in the instruction pointer as an argument, such as
 ``call pieglobalsfind($rip)`` on x86_64.
 
-Automatic Thread-Local Storage Swapping
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+TLSglobals: Automatic Thread-Local Storage Swapping
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Thread Local Store (TLS) was originally employed in kernel threads to
 localize variables to threads and provide thread safety. It can be used
@@ -412,8 +412,8 @@ compile and link time:
 
    $ ampicxx -o example example.C -tlsglobals
 
-Automatic Process-in-Process Runtime Linking Privatization
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+PiPglobals: Automatic Process-in-Process Runtime Linking Privatization
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Process-in-Process (PiP) [PiP2018]_ Globals allows fully automatic
 privatization of global variables on GNU/Linux systems without
@@ -425,7 +425,7 @@ ranks per logical node, though this can be resolved by building a
 patched version of glibc.
 
 As with PIE-Globals, this method compiles your user program as a
-Position Independent Executable (PIE) and links it against a special
+Position-Independent Executable (PIE) and links it against a special
 shim of function pointers. A small loader utility calls the
 glibc-specific function ``dlmopen`` on the PIE binary with a unique
 namespace index. The loader uses ``dlsym`` to populate the PIE binary's
@@ -476,8 +476,8 @@ PiP-Globals is best suited for testing AMPI during exploratory phases
 of development, and for production jobs not requiring load balancing or
 fault tolerance.
 
-Automatic Filesystem-Based Runtime Linking Privatization
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+FSglobals: Automatic Filesystem-Based Runtime Linking Privatization
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Filesystem Globals (FS-Globals) was discovered during the development of
 PiP-Globals and the two are highly similar. Like PiP-Globals, it
@@ -518,8 +518,8 @@ require. For these reasons FS-Globals is best suited for the R&D phase
 of AMPI program development and for small jobs, and it may be less
 suitable for large production environments.
 
-Automatic Global Offset Table Swapping
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GOTglobals: Automatic Global Offset Table Swapping
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Thanks to the ELF Object Format, we have successfully automated the
 procedure of switching the set of user global variables when switching
