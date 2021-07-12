@@ -238,6 +238,7 @@ class CkArrayOptions {
   CkArrayOptions& setStaticInsertion(bool b);
   bool isStaticInsertion() {
     if (staticInsertion != -1) return staticInsertion;
+    if (numInitial.dimension == 0) return false;
     bool empty = false;
     bool shorts = numInitial.dimension > 3;
     for (int i = 0; i < numInitial.dimension; i++) {
