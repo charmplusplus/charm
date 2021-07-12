@@ -358,6 +358,6 @@ Seonmyeong Bak, Karthik Senthil, Juan Galvez, Michael Robson, Raghavendra
 Kanakagiri, and Venkatasubrahmanian Narayanan. Current developers include
 Eric Bohm, Ronak Buch, Eric Mikida, Sam White, Nitin Bhat, Kavitha
 Chandrasekar, Jaemin Choi, Matthias Diener, Evan Ramos, Justin Szaday,
-and Zane Fink.
+Zane Fink, and Pathikrit Ghosh.
 
 Copyright (C) 1989-2020 Regents of the University of Illinois

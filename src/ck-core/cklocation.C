@@ -2399,6 +2399,7 @@ void CkLocMgr::flushLocalRecs(void)
 void CkLocMgr::flushAllRecs(void) { flushLocalRecs(); }
 
 /*************************** LocCache **************************/
+const CkLocEntry CkLocEntry::nullEntry = CkLocEntry();
 void CkLocCache::pup(PUP::er& p)
 {
 #if __FAULT__
@@ -2410,25 +2411,20 @@ void CkLocCache::pup(PUP::er& p)
      * indexes of local elements dont need to be packed since they will be
      * recreated later anyway
      */
-    int count = 0;
-    std::vector<int> pe_list;
-    std::vector<CmiUInt8> id_list;
-    for (const auto& itr : id2pe)
+    std::vector<CkLocEntry> entries;
+    for (const auto& itr : locMap)
     {
-      if (homePe(itr.first) == CmiMyPe() && itr.second != CmiMyPe())
+      if (homePe(itr.first) == CmiMyPe() && itr.second.pe != CmiMyPe())
       {
-        id_list.push_back(itr.first);
-        pe_list.push_back(itr.second);
-        count++;
+        entries.push_back(itr.second);
       }
     }
 
+    int count = entries.size();
     p | count;
-    // syncft code depends on this exact arrangement:
     for (int i = 0; i < count; i++)
     {
-      p | id_list[i];
-      p | pe_list[i];
+      p | entries[i];
     }
   }
   else
@@ -2437,12 +2433,15 @@ void CkLocCache::pup(PUP::er& p)
     p | count;
     for (int i = 0; i < count; i++)
     {
-      CmiUInt8 id;
-      int pe;
-      p | id;
-      p | pe;
-      inform(id, pe);
-      CkAssert(whichPE(id) == pe);
+      CkLocEntry e;
+      p | e;
+      e.epoch = 0;
+      updateLocation(e);
+      if (homePe(e.id) != CkMyPe())
+      {
+        thisProxy[homePe(e.id)].updateLocation(e);
+      }
+      CkAssert(getPe(e.id) == e.pe);
     }
   }
 #endif
@@ -2459,21 +2458,50 @@ void CkLocCache::requestLocation(CmiUInt8 id)
 
 void CkLocCache::requestLocation(CmiUInt8 id, const int peToTell)
 {
-  if (peToTell == CkMyPe())
-  {
-    return;
-  }
+  if (peToTell == CkMyPe()) return;
 
-  int onPe = lastKnown(id);
-  thisProxy[peToTell].updateLocation(id, onPe);
+  LocationMap::const_iterator itr = locMap.find(id);
+  // TODO: If the location is not found, we probably need to buffer this request. Should
+  // only effect very weird corner cases at the moment, and is a problem that already
+  // existed, but should be addressed in the upcoming delivery/buffering cleanup.
+  if (itr != locMap.end())
+  {
+    thisProxy[peToTell].updateLocation(itr->second);
+  }
 }
 
-void CkLocCache::updateLocation(CmiUInt8 id, int nowOnPe) { inform(id, nowOnPe); }
-
-void CkLocCache::inform(CmiUInt8 id, int nowOnPe)
+void CkLocCache::updateLocation(const CkLocEntry& newEntry)
 {
-  id2pe[id] = nowOnPe;
-  notifyListeners(id, nowOnPe);
+  CkAssert(newEntry.pe != -1);
+  CkLocEntry& oldEntry = locMap[newEntry.id];
+  if (newEntry.epoch > oldEntry.epoch)
+  {
+    oldEntry = newEntry;
+    notifyListeners(newEntry.id, newEntry.pe);
+  }
+}
+
+void CkLocCache::recordEmigration(CmiUInt8 id, int pe)
+{
+  LocationMap::iterator itr = locMap.find(id);
+
+  CkAssert(itr != locMap.end());
+  CkAssert(itr->second.pe == CkMyPe());
+
+  itr->second.pe = pe;
+  itr->second.epoch++;
+}
+
+
+void CkLocCache::insert(CmiUInt8 id, int epoch)
+{
+  CkLocEntry& e = locMap[id];
+  // TODO: This should be > probably, but demand creation needs some fixing up
+  CkAssert(epoch >= e.epoch);
+  e.id = id;
+  e.pe = CkMyPe();
+  e.epoch = epoch;
+  notifyListeners(e.id, e.pe);
 }
 
 /*************************** LocMgr: CREATION *****************************/
@@ -2499,7 +2527,7 @@ CkLocMgr::CkLocMgr(CkArrayOptions opts)
   cache = static_cast<CkLocCache*>(CkLocalBranch(cacheID));
   if (cache == nullptr)
     CkAbort("ERROR! Local branch of location cache is NULL!\n");
-  cache->addListener([=](CmiUInt8 id, int pe) { this->deliverAllBufferedMsgs(id); });
+  cache->addListener([=](CmiUInt8 id, int pe) { this->processAllDeliverBufferedMsgs(id); });
 
   // Figure out the mapping from indices to object IDs if one is possible
   compressor = ck::FixedArrayIndexCompressor::make(bounds);
@@ -2543,6 +2571,7 @@ void CkLocMgr::pup(PUP::er& p)
   p | lbmgrID;
   p | metalbID;
   p | bounds;
+  p | idCounter;
   if (p.isUnpacking())
   {
     thisProxy = thisgroup;
@@ -2558,7 +2587,7 @@ void CkLocMgr::pup(PUP::er& p)
     cache = static_cast<CkLocCache*>(CkLocalBranch(cacheID));
     if (cache == nullptr)
       CkAbort("ERROR! Local branch of location cache is NULL!");
-    cache->addListener([=](CmiUInt8 id, int pe) { this->deliverAllBufferedMsgs(id); });
+    cache->addListener([=](CmiUInt8 id, int pe) { this->processAllDeliverBufferedMsgs(id); });
 
     // _lbdb is the fixed global groupID
     initLB(lbmgrID, metalbID);
@@ -2610,19 +2639,23 @@ void CkLocMgr::informHome(const CkArrayIndex& idx, int nowOnPe)
   // TODO: If home == CkMyPe() should we call update locally?
   if (home != CkMyPe() && home != nowOnPe)
   {
-    thisProxy[home].updateLocation(idx, lookupID(idx), nowOnPe);
+    // TODO: This may not need to be an idx update. Pretty sure the home will always
+    // know the idx to id mapping.
+    CmiUInt8 id = lookupID(idx);
+    thisProxy[home].updateLocation(idx, cache->getLocationEntry(id));
   }
 }
 
 CkLocRec* CkLocMgr::createLocal(const CkArrayIndex& idx, bool forMigration,
-                                bool ignoreArrival, bool notifyHome)
+                                bool ignoreArrival, bool notifyHome, int epoch)
 {
   DEBC((AA "Adding new record for element %s\n" AB, idx2str(idx)));
   CmiUInt8 id = lookupID(idx);
 
   CkLocRec* rec = new CkLocRec(this, forMigration, ignoreArrival, idx, id);
   insertRec(rec, id);
-  inform(idx, id, CkMyPe());
+  cache->insert(id, epoch);
+  updateLocation(idx, cache->getLocationEntry(id));
 
   if (notifyHome)
   {
@@ -2659,20 +2692,20 @@ void CkLocMgr::processAfterActiveRgetsCompleted(CmiUInt8 id)
   }
 }
 
-void CkLocMgr::deliverAllBufferedMsgs(CmiUInt8 id)
+void CkLocMgr::processAllDeliverBufferedMsgs(CmiUInt8 id)
 {
-  deliverAnyBufferedMsgs(id, bufferedMsgs);
-  deliverAnyBufferedMsgs(id, bufferedRemoteMsgs);
-  deliverAnyBufferedMsgs(id, bufferedShadowElemMsgs);
+  processDeliverBufferedMsgs(id, bufferedMsgs);
+  processDeliverBufferedMsgs(id, bufferedRemoteMsgs);
+  processDeliverBufferedMsgs(id, bufferedShadowElemMsgs);
 }
 
-void CkLocMgr::deliverAllBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id)
+void CkLocMgr::processAllPrepBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id)
 {
-  deliverAnyBufferedMsgs(idx, id, bufferedIndexMsgs);
-  deliverAnyBufferedMsgs(idx, id, bufferedDemandMsgs);
+  processPrepBufferedMsgs(idx, id, bufferedIndexMsgs);
+  processPrepBufferedMsgs(idx, id, bufferedDemandMsgs);
 }
 
-void CkLocMgr::deliverAnyBufferedMsgs(CmiUInt8 id, MsgBuffer& buffer)
+void CkLocMgr::processDeliverBufferedMsgs(CmiUInt8 id, MsgBuffer& buffer)
 {
   auto itr = buffer.find(id);
   // If there are no buffered msgs, don't do anything
@@ -2695,8 +2728,8 @@ void CkLocMgr::deliverAnyBufferedMsgs(CmiUInt8 id, MsgBuffer& buffer)
   buffer.erase(itr);
 }
 
-void CkLocMgr::deliverAnyBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id,
-                                      IndexMsgBuffer& buffer)
+void CkLocMgr::processPrepBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id,
+                                       IndexMsgBuffer& buffer)
 {
   auto itr = buffer.find(idx);
   // If there are no buffered msgs, don't do anything
@@ -2714,7 +2747,7 @@ void CkLocMgr::deliverAnyBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id,
     CkGroupID mgr = ck::ObjID(env->getRecipientID()).getCollectionID();
     env->setRecipientID(ck::ObjID(mgr, id));
     // Send the updated message
-    deliverMsg(m, mgr, id, &idx, CkDeliver_queue);
+    sendMsg(m, mgr, id, &idx, CkDeliver_queue);
   }
 
   CkAssert(itr->second.empty());  // Nothing should have been added, since we
@@ -2761,7 +2794,7 @@ bool CkLocMgr::addElement(CkArrayID mgr, const CkArrayIndex& idx, CkMigratable* 
   else
   {
     // rec is *already* local -- must not be the first insertion
-    deliverAnyBufferedMsgs(id, bufferedShadowElemMsgs);
+    processDeliverBufferedMsgs(id, bufferedShadowElemMsgs);
   }
 
   if (!addElementToRec(rec, managers[mgr], elt, ctorIdx, ctorMsg))
@@ -2829,8 +2862,7 @@ bool CkLocMgr::requestLocation(const CkArrayIndex& idx, const int peToTell)
   if (lookupID(idx, id))
   {
     // We found the ID so update the location for peToTell
-    int onPe = lastKnown(idx);
-    thisProxy[peToTell].updateLocation(idx, id, onPe);
+    thisProxy[peToTell].updateLocation(idx, cache->getLocationEntry(id));
     return true;
   }
   else
@@ -2842,35 +2874,17 @@ bool CkLocMgr::requestLocation(const CkArrayIndex& idx, const int peToTell)
   }
 }
 
-void CkLocMgr::updateLocation(const CkArrayIndex& idx, CmiUInt8 id, int nowOnPe)
+void CkLocMgr::updateLocation(const CkArrayIndex& idx, const CkLocEntry& e)
 {
-  inform(idx, id, nowOnPe);
-}
+  CkAssert(e.pe != -1);
+  // Set the mapping from idx to id
+  insertID(idx, e.id);
 
-void CkLocMgr::inform(const CkArrayIndex& idx, CmiUInt8 id, int nowOnPe)
-{
-  // On restart, conservatively determine the next 'safe' ID to
-  // generate for new elements by the max over all of the elements with
-  // IDs corresponding to each PE
-  if (CkInRestarting())
-  {
-    CmiUInt8 maskedID = id & ((1u << 24) - 1);
-    CmiUInt8 origPe = id >> 24;
-    if (origPe == CkMyPe())
-    {
-      if (maskedID >= idCounter)
-        idCounter = maskedID + 1;
-    }
-    else
-    {
-      if (origPe < CkNumPes())
-        thisProxy[origPe].updateLocation(idx, id, nowOnPe);
-    }
-  }
+  // Update the location information
+  cache->updateLocation(e);
 
-  insertID(idx, id);
-  cache->inform(id, nowOnPe);
-
+  // Any location requests that we had to buffer because we didn't know how the index
+  // mapped to the id can now be replied to.
   auto itr = bufferedLocationRequests.find(idx);
   if (itr != bufferedLocationRequests.end())
   {
@@ -2878,13 +2892,14 @@ void CkLocMgr::inform(const CkArrayIndex& idx, CmiUInt8 id, int nowOnPe)
     {
       DEBN(("%d Replying to buffered ID/location req to pe %d\n", CkMyPe(), pe));
       if (pe != CkMyPe())
-        thisProxy[pe].updateLocation(idx, id, nowOnPe);
+        thisProxy[pe].updateLocation(idx, e);
     }
     bufferedLocationRequests.erase(itr);
   }
 
-  deliverAllBufferedMsgs(id);
-  deliverAllBufferedMsgs(idx, id);
+  // Any messages that were buffered on index because we did not know the ID or location
+  // to send to can now be sent.
+  processAllPrepBufferedMsgs(idx, e.id);
 }
 
 /*************************** LocMgr: DELETION *****************************/
@@ -2952,17 +2967,11 @@ void CkLocMgr::removeFromTable(const CmiUInt8 id)
 #endif
 }
 
-/************************** LocMgr: MESSAGING *************************/
-/// Deliver message to this element, going via the scheduler if local
-/// @return 0 if object local, 1 if not
-int CkLocMgr::deliverMsg(CkArrayMessage* msg, CkArrayID mgr, CmiUInt8 id,
-                         const CkArrayIndex* idx, CkDeliver_t type, int opts)
+void CkLocMgr::recordSend(const CkArrayIndex* idx, const CmiUInt8 id,
+                          const unsigned int bytes, const int opts)
 {
-  CkLocRec* rec = elementNrec(id);
-
 #if CMK_LBDB_ON
-  if ((idx || compressor) && type == CkDeliver_queue && !(opts & CK_MSG_LB_NOTRACE) &&
-      lbmgr->CollectingCommStats())
+  if ((idx || compressor) && !(opts & CK_MSG_LB_NOTRACE) && lbmgr->CollectingCommStats())
   {
     // LB deals in IDs with collection information only when CMK_GLOBAL_LOCATION_UPDATE
     // is enabled, so add the group information if so.
@@ -2971,16 +2980,25 @@ int CkLocMgr::deliverMsg(CkArrayMessage* msg, CkArrayID mgr, CmiUInt8 id,
 #  else
     const CmiUInt8 lbObjId = id;
 #  endif
-    lbmgr->Send(
-        myLBHandle, lbObjId, UsrToEnv(msg)->getTotalsize(), cache->lastKnown(id), 1);
+    lbmgr->Send(myLBHandle, lbObjId, bytes, cache->getPe(id), 1);
   }
 #endif
+}
+
+/************************** LocMgr: MESSAGING *************************/
+/// Deliver message to this element, going via the scheduler if local
+/// @return 0 if object local, 1 if not
+int CkLocMgr::deliverMsg(CkArrayMessage* msg, CkArrayID mgr, CmiUInt8 id,
+                         const CkArrayIndex* idx, CkDeliver_t type,
+                         int opts /* = 0 */)
+{
+  CkLocRec* rec = elementNrec(id);
 
   // Known, remote location or unknown location
   if (rec == NULL)
   {
     // known location
-    int destPE = cache->whichPE(id);
+    int destPE = cache->getPe(id);
     if (destPE != -1)
     {
       msg->array_hops()++;
@@ -2991,7 +3009,7 @@ int CkLocMgr::deliverMsg(CkArrayMessage* msg, CkArrayID mgr, CmiUInt8 id,
       return true;
     }
     // unknown location
-    deliverUnknown(msg, idx, type, opts);
+    deliverUnknown(msg, idx, opts);
     return true;
   }
 
@@ -3014,7 +3032,7 @@ int CkLocMgr::deliverMsg(CkArrayMessage* msg, CkArrayID mgr, CmiUInt8 id,
   {  // That sibling of this object isn't created yet!
     if (msg->array_ifNotThere() != CkArray_IfNotThere_buffer)
     {
-      return demandCreateElement(msg, rec->getIndex(), CkMyPe(), type);
+      return demandCreateElement(msg, rec->getIndex(), CkMyPe());
     }
     else
     {  // BUFFERING message for nonexistent element
@@ -3044,7 +3062,23 @@ int CkLocMgr::deliverMsg(CkArrayMessage* msg, CkArrayID mgr, CmiUInt8 id,
   return result;
 }
 
-void CkLocMgr::sendMsg(CkArrayMessage* msg, CkArrayID mgr, const CkArrayIndex& idx,
+// This function should only get called once for any given send, when
+// the destination is thought to be known. deliverMsg, which actually
+// performs delivery to the target element or kicks off the chain that
+// puts this message on the wire, can be called multiple times, which
+// may be necessary due to migrations, etc.
+void CkLocMgr::sendMsg(CkArrayMessage* msg, CkArrayID mgr, CmiUInt8 id,
+                       const CkArrayIndex* idx, CkDeliver_t type,
+                       int opts /* = 0 */)
+{
+  // Trace this send for LB
+  recordSend(idx, id, UsrToEnv(msg)->getTotalsize(), opts);
+
+  // Actually trigger delivery
+  deliverMsg(msg, mgr, id, idx, type, opts);
+}
+
+void CkLocMgr::prepMsg(CkArrayMessage* msg, CkArrayID mgr, const CkArrayIndex& idx,
                        CkDeliver_t type, int opts)
 {
   CK_MAGICNUMBER_CHECK
@@ -3064,7 +3098,7 @@ void CkLocMgr::sendMsg(CkArrayMessage* msg, CkArrayID mgr, const CkArrayIndex& i
   {
     // We know the element's ID so we can go through normal delivery channels
     env->setRecipientID(ck::ObjID(mgr, id));
-    deliverMsg(msg, mgr, id, &idx, type, opts);
+    sendMsg(msg, mgr, id, &idx, type, opts);
   }
   else
   {
@@ -3125,15 +3159,14 @@ void CkLocMgr::sendMsg(CkArrayMessage* msg, CkArrayID mgr, const CkArrayIndex& i
       // If requested, demand-create the element:
       if (msg->array_ifNotThere() != CkArray_IfNotThere_buffer)
       {
-        demandCreateElement(msg, idx, -1, type);
+        demandCreateElement(msg, idx, -1);
       }
     }
   }
 }
 
 /// This index is not hashed-- somehow figure out what to do.
-void CkLocMgr::deliverUnknown(CkArrayMessage* msg, const CkArrayIndex* idx,
-                              CkDeliver_t type, int opts)
+void CkLocMgr::deliverUnknown(CkArrayMessage* msg, const CkArrayIndex* idx, int opts)
 {
   CK_MAGICNUMBER_CHECK
   CmiUInt8 id = msg->array_element_id();
@@ -3146,7 +3179,6 @@ void CkLocMgr::deliverUnknown(CkArrayMessage* msg, const CkArrayIndex* idx,
 
   if (home != CkMyPe())
   {  // Forward the message to its home processor
-    cache->inform(id, home);
     if (UsrToEnv(msg)->getTotalsize() < _messageBufferingThreshold)
     {
       DEBM((AA "Forwarding message for unknown %u to home %d \n" AB, id, home));
@@ -3224,12 +3256,15 @@ void CkLocMgr::demandCreateElement(const CkArrayIndex& idx, int chareType, int o
 
   // Find the manager and build the element
   DEBC((AA "Demand-creating element %s on pe %d\n" AB, idx2str(idx), onPe));
-  inform(idx, getNewObjectID(idx), onPe);
-  CProxy_CkArray(mgr)[onPe].demandCreateElement(idx, ctor, CkDeliver_inline);
+  CkLocEntry e;
+  e.id = getNewObjectID(idx);
+  e.pe = onPe;
+  e.epoch = 0;
+  updateLocation(idx, e);
+  CProxy_CkArray(mgr)[onPe].demandCreateElement(idx, ctor);
 }
 
-bool CkLocMgr::demandCreateElement(CkArrayMessage* msg, const CkArrayIndex& idx, int onPe,
-                                   CkDeliver_t type)
+bool CkLocMgr::demandCreateElement(CkArrayMessage* msg, const CkArrayIndex& idx, int onPe)
 {
   CK_MAGICNUMBER_CHECK
   int chareType = _entryTable[msg->array_ep()]->chareIdx;
@@ -3256,7 +3291,7 @@ bool CkLocMgr::demandCreateElement(CkArrayMessage* msg, const CkArrayIndex& idx,
   // Find the manager and build the element
   DEBC((AA "Demand-creating element %s on pe %d\n" AB, idx2str(idx), onPe));
   CkArrayID mgr = UsrToEnv((void*)msg)->getArrayMgr();
-  CProxy_CkArray(mgr)[onPe].demandCreateElement(idx, ctor, type);
+  CProxy_CkArray(mgr)[onPe].demandCreateElement(idx, ctor);
   return onPe == CkMyPe();
 }
 
@@ -3272,7 +3307,7 @@ void CkLocMgr::multiHop(CkArrayMessage* msg)
   {  // Send a routing message letting original sender know new element location
     DEBS((AA "Sending update back to %d for element %u\n" AB, srcPe,
           msg->array_element_id()));
-    cache->thisProxy[srcPe].updateLocation(msg->array_element_id(), CkMyPe());
+    cache->requestLocation(msg->array_element_id(), srcPe);
   }
 }
 
@@ -3473,7 +3508,8 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 #else
                                                     false,
 #endif
-                                                    bufSize, managers.size());
+                                                    bufSize, managers.size(),
+                                                    cache->getEpoch(id) + 1);
 
   {
     PUP::toMem p(msg->packData, PUP::er::IS_MIGRATION);
@@ -3500,8 +3536,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   }
   duringMigration = false;
 
-  // The element now lives on another processor-- tell ourselves and its home
-  inform(idx, id, toPe);
+  cache->recordEmigration(id, toPe);
   informHome(idx, toPe);
 
 #if !CMK_LBDB_ON && CMK_GLOBAL_LOCATION_UPDATE
@@ -3550,7 +3585,7 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
 
   // Create a record for this element
   CkLocRec* rec =
-      createLocal(idx, true, msg->ignoreArrival, false /* home told on departure */);
+      createLocal(idx, true, msg->ignoreArrival, false /* home told on departure */, msg->epoch);
 
   envelope* env = UsrToEnv(msg);
   CmiAssert(CpvAccess(newZCPupGets).empty());  // Ensure that vector is empty
@@ -3630,7 +3665,7 @@ CkMagicNumber_impl::CkMagicNumber_impl(int m) : magic(m) {}
 /// Return true if this array element lives on another processor
 bool CkLocMgr::isRemote(const CkArrayIndex& idx, int* onPe) const
 {
-  int pe = whichPE(idx);
+  int pe = whichPe(idx);
   /* not definitely a remote element */
   if (pe == -1 || pe == CkMyPe())
     return false;

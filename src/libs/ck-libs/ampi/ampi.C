@@ -21,12 +21,8 @@
 #define AMPI_ERRHANDLER MPI_ERRORS_ARE_FATAL
 #endif
 
-/* change this define to "x" to trace all send/recv's */
-#define MSG_ORDER_DEBUG(x) //x /* empty */
-/* change this define to "x" to trace user calls */
-#define USER_CALL_DEBUG(x) // ckout<<"vp "<<TCHARM_Element()<<": "<<x<<endl;
+#define MSG_ORDER_DEBUG(x) //x
 #define STARTUP_DEBUG(x) //ckout<<"ampi[pe "<<CkMyPe()<<"] "<< x <<endl;
-#define FUNCCALL_DEBUG(x) //x /* empty */
 
 /* For MPI_Get_library_version */
 extern const char * const CmiCommitID;
@@ -1195,7 +1191,6 @@ static void removeUnimportantArrayObjsfromPeCache() noexcept {
  */
 static ampi *ampiInit(char **argv) noexcept
 {
-  FUNCCALL_DEBUG(CkPrintf("Calling from proc %d for tcharm element %d\n", CkMyPe(), TCHARM_Element());)
   if (CtvAccess(ampiInitDone)) return NULL; /* Already called ampiInit */
   STARTUP_DEBUG("ampiInit> begin")
 
@@ -1228,8 +1223,6 @@ static ampi *ampiInit(char **argv) noexcept
     STARTUP_DEBUG("ampiInit> array size "<<_nchunks);
   }
   int *barrier = (int *)TCharm::get()->semaGet(AMPI_BARRIER_SEMAID);
-
-  FUNCCALL_DEBUG(CkPrintf("After BARRIER: sema size %d from tcharm's ele %d\n", TCharm::get()->sema.size(), TCHARM_Element());)
 
   if (TCHARM_Element()==0)
   {
@@ -1559,13 +1552,12 @@ void ampiParent::resumeAfterMigration() noexcept {
 }
 
 void ampiParent::ckJustRestored() noexcept {
-  FUNCCALL_DEBUG(CkPrintf("Call just restored from ampiParent[%d] with ampiInitCallDone %d\n", thisIndex, ampiInitCallDone);)
   ArrayElement1D::ckJustRestored();
   prepareCtv();
 }
 
 ampiParent::~ampiParent() noexcept {
-  STARTUP_DEBUG("ampiParent> destructor called");
+  STARTUP_DEBUG("ampiParent> destructor called")
   finalize();
 }
 
@@ -2115,7 +2107,6 @@ void ampi::ckJustMigrated() noexcept
 
 void ampi::ckJustRestored() noexcept
 {
-  FUNCCALL_DEBUG(CkPrintf("Call just restored from ampi[%d]\n", thisIndex);)
   findParentAfterMigration();
   ArrayElement1D::ckJustRestored();
 }
@@ -2148,7 +2139,7 @@ void ampi::findParentAfterCreation(const ampiCommStruct &s) noexcept {
 //The following method should be called on the first element of the
 //ampi array
 void ampi::allInitDone() noexcept {
-  FUNCCALL_DEBUG(CkPrintf("All mpi_init have been called!\n");)
+  STARTUP_DEBUG("ampi> all mpi_init have been called")
   thisProxy.setInitDoneFlag();
 }
 
@@ -4480,7 +4471,6 @@ AMPI_API_IMPL(int, MPI_Issend, const void *buf, int count, MPI_Datatype type, in
   }
 #endif
 
-  USER_CALL_DEBUG("AMPI_Issend("<<type<<","<<dest<<","<<tag<<","<<comm<<")");
   ampi* ptr = getAmpiInstance(comm);
   *request = ptr->send(tag, ptr->getRank(), buf, count, type, dest, comm, I_SSEND);
 
@@ -4607,7 +4597,6 @@ AMPI_API_IMPL(int, MPI_Imrecv, void* buf, int count, MPI_Datatype datatype, MPI_
   }
 #endif
 
-  USER_CALL_DEBUG("AMPI_Imrecv("<<datatype<<","<<src<<","<<tag<<","<<comm<<")");
   ampiParent* parent = getAmpiParent();
   AmpiMsg* msg = parent->getMatchedMsg(*message);
   CkAssert(msg);
@@ -7512,8 +7501,6 @@ AMPI_API_IMPL(int, MPI_Isend, const void *buf, int count, MPI_Datatype type, int
   }
 #endif
 
-  USER_CALL_DEBUG("AMPI_Isend("<<type<<","<<dest<<","<<tag<<","<<comm<<")");
-
   ampi *ptr = getAmpiInstance(comm);
   *request = ptr->send(tag, ptr->getRank(), buf, count, type, dest, comm, I_SEND);
 
@@ -7615,7 +7602,6 @@ AMPI_API_IMPL(int, MPI_Irecv, void *buf, int count, MPI_Datatype type, int src,
   }
 #endif
 
-  USER_CALL_DEBUG("AMPI_Irecv("<<type<<","<<src<<","<<tag<<","<<comm<<")");
   ampi *ptr = getAmpiInstance(comm);
 
   ptr->irecv(buf, count, type, src, tag, comm, request);

@@ -133,9 +133,17 @@ class LBTreeBuilder;
 class TreeLB : public CBase_TreeLB
 {
  public:
-  TreeLB(const CkLBOptions& opts) : CBase_TreeLB(opts) { init(opts); }
+  TreeLB(const CkLBOptions& opts) : CBase_TreeLB(opts)
+  {
+    loadConfigFile(opts);
+    init(opts);
+  }
   TreeLB(CkMigrateMessage* m) : CBase_TreeLB(m) {}
   virtual ~TreeLB();
+
+  void pup(PUP::er& p);
+
+  void loadConfigFile(const CkLBOptions& opts);
 
   /// these can be called multiple times to re-configure
   void configure(LBTreeBuilder& builder, json& config);
@@ -241,6 +249,7 @@ class TreeLB : public CBase_TreeLB
   // a barrier before/after lb helps to obtain consistent load balancing times between PEs
   bool barrier_before_lb = false;
   bool barrier_after_lb = false;
+  json config;
 };
 
 #endif /* TREELB_H */
