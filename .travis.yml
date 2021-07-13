@@ -1,7 +1,7 @@
 language: cpp
 
 os: linux
-dist: xenial
+dist: focal
 
 # Necessary for Windows builds - do not convert LF to CRLF:
 git:
