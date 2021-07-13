@@ -232,10 +232,27 @@ void SumLogPool::addEventType(int eventType, double time)
    markcount ++;
 }
 
+//TODO complete function to add message
+//TODO ensure add one entry per bin and refresh values at each bin entry
+void SumLogPool::addMessage(UChar type, int epIdx, int srcPe, int size, int cnt)
+{
+  if(type == CREATION) {
+    numMsg += cnt;
+    bytesSend += size;
+  } else {
+    CkPrintf("Invalid event type inside creation() for summary data : %s", type);
+  }
+}
+
+/**
+ * Constructor
+ * @param pgm
+ */
 SumLogPool::SumLogPool(char *pgm) : numBins(0), phaseTab(MAX_PHASES) 
 {
    // TBD: Can this be moved to initMem?
-  cpuTime = NULL;
+   cpuTime = NULL;
+   numMsg = bytesSend = 0;
    poolSize = CkpvAccess(binCount);
    if (poolSize % 2) poolSize++;	// make sure it is even
    pool = new BinEntry[poolSize];
@@ -595,6 +612,7 @@ void SumLogPool::shrink(double _maxBinSize)
         shrink();
     };
 }
+
 int  BinEntry::getU() 
 { 
   return (int)(_time * 100.0 / CkpvAccess(binSize)); 
@@ -944,6 +962,15 @@ void TraceSummary::traceEnableCCS() {
   sumProxy.initCCS();
 }
 
+/**
+ * override function called when a message is created
+ * @param epIdx
+ * @param num number of messages
+ */
+void TraceSummary::creation(envelope *e, int epIdx, int num)
+{
+  _logPool->addMessage(CREATION, epIdx, CkMyPe(), e->getTotalsize(), num);
+}
 
 void TraceSummary::fillData(double *buffer, double reqStartTime, 
 			    double reqBinSize, int reqNumBins) {

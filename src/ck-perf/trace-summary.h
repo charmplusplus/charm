@@ -177,6 +177,8 @@ class SumLogPool {
     } MarkEntry;
     CkVec<MarkEntry *> events[MAX_MARKS];
     int markcount;
+    int numMsg;
+    int bytesSend;
 
     /// for phases
     PhaseTable phaseTab;
@@ -202,6 +204,7 @@ class SumLogPool {
     void shrink(void);
     void shrink(double max);
     void addEventType(int eventType, double time);
+    void addMessage(UChar type, int epIdx, int srcPe, int size, int cnt);
     void startPhase(int phase) { phaseTab.startPhase(phase); }
     BinEntry *bins() { return pool; }
     UInt getNumEntries() { return numBins; }
@@ -261,7 +264,6 @@ class TraceSummary : public Trace {
     int depth;
   public:
     TraceSummary(char **argv);
-    void creation(envelope *e, int epIdx, int num=1) {}
 
     void beginExecute(envelope *e, void *obj);
     void beginExecute(char *msg);
@@ -279,6 +281,8 @@ class TraceSummary : public Trace {
     void endUnpack(void);
     void beginComputation(void);
     void endComputation(void);
+
+    void creation(envelope *e, int epIdx, int num=1);
 
     void traceClearEps();
     void traceWriteSts();
