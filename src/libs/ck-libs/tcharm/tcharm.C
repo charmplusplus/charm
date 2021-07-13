@@ -203,7 +203,8 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
       CmiIsomallocContext heapContext = CmiIsomallocContextCreate(thisIndex, initMsg->numElements+1);
       tid = CthCreateMigratable((CthVoidFn)startTCharmThread,initMsg,initMsg->opts.stackSize, heapContext);
       TCHARM_Element_Setup(thisIndex, initMsg->numElements, heapContext);
-      CmiIsomallocContextEnableRandomAccess(heapContext);
+      if (heapContext.opaque != nullptr)
+        CmiIsomallocContextEnableRandomAccess(heapContext);
     }
   }
   CtvAccessOther(tid,_curTCharm)=this;
