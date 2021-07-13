@@ -245,7 +245,7 @@ class CkArrayOptions {
       if (shorts && ((short*)numInitial.data())[i] == 0) {
         empty = true;
         break;
-      } else if (numInitial.data()[i] == 0) {
+      } else if (!shorts && numInitial.data()[i] == 0) {
         empty = true;
         break;
       }
