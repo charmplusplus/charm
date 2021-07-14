@@ -232,8 +232,7 @@ void SumLogPool::addEventType(int eventType, double time)
    markcount ++;
 }
 
-//TODO complete function to add message
-//TODO ensure add one entry per bin and refresh values at each bin entry
+//TODO complete function to add message as event for each message with EpIdx
 void SumLogPool::addMessage(UChar type, int epIdx, int srcPe, int size, int cnt)
 {
   /*if(type == CREATION) {
