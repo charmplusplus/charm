@@ -30,16 +30,24 @@ class BinEntry {
 #if defined(_WIN32) || CMK_MULTIPLE_DELETE
     void operator delete(void *, void *) { }
 #endif
-    BinEntry(): _time(0.), _idleTime(0.) {}
-    BinEntry(double t, double idleT): _time(t), _idleTime(idleT) {}
+    BinEntry(): _time(0.), _idleTime(0.),
+                 _msgSize(0),
+                 _msgCount(0) {}
+    BinEntry(double t, double idleT, int msgSize, int msgCount): _time(t), _idleTime(idleT),
+                                      _msgSize(msgSize),
+                                      _msgCount(msgCount) {}
     double &time() { return _time; }
     double &getIdleTime() { return _idleTime; }
+    int &getSize() { return _msgSize; }
+    int &getCount() {return _msgCount; }
     void write(FILE *fp);
     int  getU();
     int getUIdle();
   private:
     double _time;
     double _idleTime;
+    int _msgSize;
+    int _msgCount;
 };
 
 /// a phase entry for trace summary
@@ -177,8 +185,6 @@ class SumLogPool {
     } MarkEntry;
     CkVec<MarkEntry *> events[MAX_MARKS];
     int markcount;
-    int numMsg;
-    int bytesSend;
 
     /// for phases
     PhaseTable phaseTab;
@@ -194,7 +200,7 @@ class SumLogPool {
     void initMem();
     void write(void) ;
     void writeSts(void);
-    void add(double time, double idleTime, int pe);
+    void add(double time, double idleTime, int msgSize, int msgCount, int pe);
     void setEp(int epidx, double time);
     void clearEps() {
       for(int i=0; i < epInfoSize; i++) {
@@ -262,6 +268,9 @@ class TraceSummary : public Trace {
     int inIdle;
     int inExec;
     int depth;
+    int msgSize;
+    int msgCount;
+
   public:
     TraceSummary(char **argv);
 

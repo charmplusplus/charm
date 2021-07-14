@@ -236,12 +236,14 @@ void SumLogPool::addEventType(int eventType, double time)
 //TODO ensure add one entry per bin and refresh values at each bin entry
 void SumLogPool::addMessage(UChar type, int epIdx, int srcPe, int size, int cnt)
 {
-  if(type == CREATION) {
+  /*if(type == CREATION) {
     numMsg += cnt;
     bytesSend += size;
   } else {
     CkPrintf("Invalid event type inside creation() for summary data : %s", type);
-  }
+  }*/
+
+
 }
 
 /**
@@ -252,7 +254,6 @@ SumLogPool::SumLogPool(char *pgm) : numBins(0), phaseTab(MAX_PHASES)
 {
    // TBD: Can this be moved to initMem?
    cpuTime = NULL;
-   numMsg = bytesSend = 0;
    poolSize = CkpvAccess(binCount);
    if (poolSize % 2) poolSize++;	// make sure it is even
    pool = new BinEntry[poolSize];
@@ -311,6 +312,10 @@ int SumLogPool::getUtilization(int interval, int ep) {
     return (int)(getCPUtime(interval, ep) * 100.0 / CkpvAccess(binSize)); 
 }
 
+
+/**
+ * Log writer for each processor
+ */
 void SumLogPool::write(void) 
 {
   int i;
@@ -518,9 +523,9 @@ void SumLogPool::writeSts(void)
 }
 
 // Called once per interval
-void SumLogPool::add(double time, double idleTime, int pe) 
+void SumLogPool::add(double time, double idleTime, int msgSize, int msgCount, int pe)
 {
-  new (&pool[numBins++]) BinEntry(time, idleTime);
+  new (&pool[numBins++]) BinEntry(time, idleTime, msgSize, msgCount);
   if (poolSize==numBins) {
     shrink();
   }
@@ -588,6 +593,8 @@ void SumLogPool::shrink(void)
   {
      pool[i].time() = pool[i*2].time() + pool[i*2+1].time();
      pool[i].getIdleTime() = pool[i*2].getIdleTime() + pool[i*2+1].getIdleTime();
+     pool[i].getSize() = pool[i*2].getSize() + pool[i*2 + 1].getSize();
+     pool[i].getCount() = pool[i*2].getCount() + pool[i*2 + 1].getCount();
      if (sumDetail)
      for (int e=0; e < epInfoSize; e++) {
          setCPUtime(i, e, getCPUtime(i*2, e) + getCPUtime(i*2+1, e));
@@ -622,13 +629,15 @@ int BinEntry::getUIdle() {
   return (int)(_idleTime * 100.0 / CkpvAccess(binSize));
 }
 
+void BinEntry::
+
 void BinEntry::write(FILE* fp)
 {
   writeU(fp, getU());
 }
 
 TraceSummary::TraceSummary(char **argv):msgNum(0),binStart(0.0),idleStart(0.0),
-					binTime(0.0),binIdle(0.0)
+					binTime(0.0),binIdle(0.0), msgCount(0), msgSize(0)
 {
   if (CkpvAccess(traceOnPe) == 0) return;
 
@@ -760,9 +769,11 @@ void TraceSummary::beginExecute(int event,int msgType,int ep,int srcPe, int mlen
 	     binTime + binIdle, CkpvAccess(binSize));
     CkAssert(binTime + binIdle <= CkpvAccess(binSize));
     */
-     _logPool->add(binTime, binIdle, CkMyPe()); // add leftovers of last bin
+     _logPool->add(binTime, binIdle, msgSize, msgCount, CkMyPe()); // add leftovers of last bin
      binTime=0.0;                 // fill all other bins with 0 up till start
      binIdle = 0.0;
+     msgSize = 0;
+     msgCount = 0;
      binStart = ts;
   }
 }
@@ -805,9 +816,11 @@ void TraceSummary::endExecute()
      binTime += nts-ts;
      binStart  = nts;
      // This calls shrink() if needed
-     _logPool->add(binTime, binIdle, CkMyPe()); 
+     _logPool->add(binTime, binIdle, msgSize, msgCount, CkMyPe());
      binTime = 0.0;
      binIdle = 0.0;
+     msgSize = 0;
+     msgCount = 0;
      ts = nts;
   }
   binTime += t - ts;
@@ -849,9 +862,11 @@ void TraceSummary::beginIdle(double currT)
   double ts = binStart;
   // fill gaps
   while ((ts = ts + CkpvAccess(binSize)) < t) {
-    _logPool->add(binTime, binIdle, CkMyPe()); // add leftovers of last bin
+    _logPool->add(binTime, binIdle, msgSize, msgCount, CkMyPe()); // add leftovers of last bin
     binTime=0.0;                 // fill all other bins with 0 up till start
     binIdle = 0.0;
+    msgSize = 0;
+    msgCount = 0;
     binStart = ts;
   }
 }
@@ -871,9 +886,11 @@ void TraceSummary::endIdle(double currT)
     // fill the bins with time for idle
     binIdle += t_binStart - t_idleStart;
     binStart = t_binStart;
-    _logPool->add(binTime, binIdle, CkMyPe()); // This calls shrink() if needed
+    _logPool->add(binTime, binIdle, msgSize, msgCount, CkMyPe()); // This calls shrink() if needed
     binTime = 0.0;
     binIdle = 0.0;
+    msgSize = 0;
+    msgCount = 0;
     t_idleStart = t_binStart;
   }
   binIdle += t - t_idleStart;
@@ -928,9 +945,11 @@ void TraceSummary::endComputation(void)
   done = 1;
   if (msgNum==0) {
 //CmiPrintf("Add at last: %d pe:%d time:%f msg:%d\n", index, CkMyPe(), bin, msgNum);
-     _logPool->add(binTime, binIdle, CkMyPe());
+     _logPool->add(binTime, binIdle, msgSize, msgCount, CkMyPe());
      binTime = 0.0;
      binIdle = 0.0;
+     msgSize = 0;
+     msgCount = 0;
      msgNum ++;
 
      binStart  += CkpvAccess(binSize);
@@ -938,9 +957,11 @@ void TraceSummary::endComputation(void)
      double ts = binStart;
      while (ts < t)
      {
-       _logPool->add(binTime, binIdle, CkMyPe());
+       _logPool->add(binTime, binIdle, msgSize, msgCount, CkMyPe());
        binTime=0.0;
        binIdle = 0.0;
+       msgSize = 0;
+       msgCount = 0;
        ts += CkpvAccess(binSize);
      }
 
@@ -969,6 +990,8 @@ void TraceSummary::traceEnableCCS() {
  */
 void TraceSummary::creation(envelope *e, int epIdx, int num)
 {
+  msgSize += e->getTotalsize();
+  msgCount += num;
   _logPool->addMessage(CREATION, epIdx, CkMyPe(), e->getTotalsize(), num);
 }
 
