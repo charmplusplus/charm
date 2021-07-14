@@ -68,6 +68,7 @@ private:
 
 public:
 
+  CkSectionManager() = default;
   // Create a single section containing the chares in the range
   // [begin, end), return a handle to it that can be referenced
   // returns SectionID, will be used to create CProxy_SectionXX
@@ -114,7 +115,7 @@ public:
       {
         // assumes each chare is in exactly one section, but that may not be the case.
         // From here we could: specify that SectionFn can generate a sequence of section IDs
-        // or it can return a vector of section IDs
+        // or it can return a vector of section ID
         auto sectionNum = fn(*x);
         auto sectionID = ids[sectionNum];
         sections[sectionID].addLocalMember(*x);

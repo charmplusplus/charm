@@ -1,3 +1,4 @@
 group CkSectionManger {
+  entry CkSectionManager();
 
 };
