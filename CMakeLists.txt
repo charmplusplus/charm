@@ -14,7 +14,7 @@ cmake_minimum_required(VERSION 3.4)
 
 # Print warning
 message("#################################################################")
-message("# The CMake build system does not support all build options.    #")
+message("# The CMake build system may not support advanced build options.    #")
 message("# Please let us know if you experience any problems by opening  #")
 message("# an issue on our GitHub (https://github.com/UIUC-PPL/charm),   #")
 message("# with the below configuration information.                     #")
