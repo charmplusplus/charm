@@ -39,7 +39,7 @@ class BinEntry {
 
     BinEntry(double t, double idleT, int msgSize, int msgCount, CkVec<int> msgSizePerEP, CkVec<int> msgCountPerEP): _time(t), _idleTime(idleT),
                                                                _msgSize(msgSize), _msgCount(msgCount) {
-      for(int i = 0; i < _entryTable.size(); ++i) {
+      for(int i = 0; i < msgSizePerEP.size(); ++i) {
         _msgSizePerEP[i] = msgSizePerEP[i];
         _msgCountPerEP[i] = msgCountPerEP[i];
       }
@@ -185,7 +185,6 @@ class SumLogPool {
   private:
     UInt poolSize;
     UInt numBins;
-    int eps;
     BinEntry *pool;	/**< bins */
     FILE *fp, *stsfp, *sdfp ;
     char *pgm;
