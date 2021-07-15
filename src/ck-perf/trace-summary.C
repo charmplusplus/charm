@@ -803,7 +803,7 @@ void TraceSummary::beginExecute(envelope *e, void *obj)
     beginExecute(-1,-1,e->getEpIdx(),-1);
 
     int len = recvSizePerEP.size();
-    int epIdx = e->getEPIdx();
+    int epIdx = e->getEpIdx();
     if(epIdx >= len) {
       recvSizePerEP.resize(_entryTable.size() + 10);
       recvCountPerEP.resize(_entryTable.size() + 10);
