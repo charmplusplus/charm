@@ -729,8 +729,9 @@ void TraceSummary::resetCounters()
 void TraceSummary::setCounters()
 {
   int len = _entryTable.size() + 10;
-  msgSizePerEP = CkVec<int>(len, 0);
-  msgCountPerEP = CkVec<int>(len, 0);
+  msgSizePerEP = CkVec<int>(len);
+  msgCountPerEP = CkVec<int>(len);
+  resetCounters();
 }
 
 void TraceSummary::traceClearEps(void)

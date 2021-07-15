@@ -33,12 +33,16 @@ class BinEntry {
     BinEntry(): _time(0.), _idleTime(0.),
                  _msgSize(0),
                  _msgCount(0) {
-      _msgCountPerEP = CkVec<int>(_entryTable.size() + 10, 0);
-      _msgSizePerEP = CkVec<int>(_entryTable.size() + 10, 0);
+      _msgCountPerEP = CkVec<int>(_entryTable.size() + 10);
+      _msgSizePerEP = CkVec<int>(_entryTable.size() + 10);
+      for(int i = 0; i < _msgCountPerEP.size(); ++i) {
+        _msgCountPerEP[i] = _msgSizePerEP[i] = 0;
+      }
     }
 
     BinEntry(double t, double idleT, int msgSize, int msgCount, CkVec<int> msgSizePerEP, CkVec<int> msgCountPerEP): _time(t), _idleTime(idleT),
                                                                _msgSize(msgSize), _msgCount(msgCount) {
+
       for(int i = 0; i < msgSizePerEP.size(); ++i) {
         _msgSizePerEP[i] = msgSizePerEP[i];
         _msgCountPerEP[i] = msgCountPerEP[i];
