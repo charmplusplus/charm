@@ -1050,27 +1050,8 @@ bool CkArray::insertElement(CkArrayMessage* me, const CkArrayIndex& idx,
   if (!locMgr->addElement(thisgroup, idx, elt, ctorIdx, (void*)me))
     return false;
   CK_ARRAYLISTENER_LOOP(listeners, if (!l->ckElementCreated(elt)) return false;);
+  if (!initCallback.isInvalid()) elt->contribute(initCallback);
   return true;
-}
-
-void CkArray::initDone(void)
-{
-  if (initCallback.isInvalid())
-    return;
-
-  numPesInited++;
-  DEBC(("PE %d initDone, numPesInited %d, treeKids %d, parent %d\n", CkMyPe(),
-        numPesInited, treeKids(), treeParent()));
-
-  // Re-use the spanning tree for reductions over the array elements
-  // The "+1" is for the PE itself
-  if (numPesInited == treeKids() + 1)
-  {
-    if (hasParent())
-      thisProxy[treeParent()].initDone();
-    else
-      initCallback.send(CkReductionMsg::buildNew(0, NULL));
-  }
 }
 
 void CProxy_ArrayBase::doneInserting(void)
@@ -1100,7 +1081,6 @@ void CkArray::remoteDoneInserting(void)
     DEBC((AA "Done inserting objects\n" AB));
     for (int l = 0; l < listeners.size(); l++) listeners[l]->ckEndInserting();
     locMgr->doneInserting();
-    initDone();
   }
 }
 

@@ -766,7 +766,6 @@ public:
   virtual void beginInserting(void);
   void remoteDoneInserting(void);
   void remoteBeginInserting(void);
-  void initDone(void);
 
   /// Create manually:
   bool insertElement(CkArrayMessage*, const CkArrayIndex& idx,
