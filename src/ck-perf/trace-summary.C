@@ -650,8 +650,8 @@ void SumLogPool::shrink(void)
      pool[i].getIdleTime() = pool[i*2].getIdleTime() + pool[i*2+1].getIdleTime();
      pool[i].getSize() = pool[i*2].getSize() + pool[i*2 + 1].getSize();
      pool[i].getCount() = pool[i*2].getCount() + pool[i*2 + 1].getCount();
-      pool[i].getRecvSize() = pool[i*2].getRecvSize() + pool[i*2 + 1].getRecvSize();
-      pool[i].getRecvCount() = pool[i*2].getRecvCount() + pool[i*2 + 1].getRecvCount();
+     pool[i].getRecvSize() = pool[i*2].getRecvSize() + pool[i*2 + 1].getRecvSize();
+     pool[i].getRecvCount() = pool[i*2].getRecvCount() + pool[i*2 + 1].getRecvCount();
 
      int len = _entryTable.size();
      for(int j = 0; j < len; ++j) {
@@ -805,10 +805,12 @@ void TraceSummary::beginExecute(envelope *e, void *obj)
     int len = recvSizePerEP.size();
     int epIdx = e->getEpIdx();
     if(epIdx >= len) {
+      msgSizePerEP.resize(_entryTable.size() + 10);
+      msgCountPerEP.resize(_entryTable.size() + 10);
       recvSizePerEP.resize(_entryTable.size() + 10);
       recvCountPerEP.resize(_entryTable.size() + 10);
       for(int i = len; i < msgSizePerEP.size(); ++i) {
-        recvSizePerEP[i] = recvCountPerEP[i] = 0;
+        msgSizePerEP[i] = msgCountPerEP[i] = recvSizePerEP[i] = recvCountPerEP[i] = 0;
       }
     }
     recvSize += e->getTotalsize();
@@ -1135,8 +1137,10 @@ void TraceSummary::creation(envelope *e, int epIdx, int num)
   if(epIdx >= len) {
     msgSizePerEP.resize(_entryTable.size() + 10);
     msgCountPerEP.resize(_entryTable.size() + 10);
+    recvSizePerEP.resize(_entryTable.size() + 10);
+    recvCountPerEP.resize(_entryTable.size() + 10);
     for(int i = len; i < msgSizePerEP.size(); ++i) {
-      msgSizePerEP[i] = msgCountPerEP[i] = 0;
+      msgSizePerEP[i] = msgCountPerEP[i] = recvSizePerEP[i] = recvCountPerEP[i] = 0;
     }
   }
   msgSizePerEP[epIdx] += e->getTotalsize();
