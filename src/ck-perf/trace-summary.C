@@ -763,7 +763,7 @@ void TraceSummary::setCounters()
   msgSizePerEP = CkVec<int>(len);
   msgCountPerEP = CkVec<int>(len);
   recvSizePerEP = CkVec<int>(len);
-  recvSizePerEP = CkVec<int>(len);
+  recvCountPerEP = CkVec<int>(len);
   resetCounters();
 }
 
