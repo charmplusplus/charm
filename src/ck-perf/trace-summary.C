@@ -718,7 +718,7 @@ TraceSummary::TraceSummary(char **argv):msgNum(0),binStart(0.0),idleStart(0.0),
  */
 void TraceSummary::resetCounters()
 {
-  for(int i = 0; i < msgCountPerEP.size() ++i) {
+  for(int i = 0; i < msgCountPerEP.size(); ++i) {
     msgCountPerEP[i] = msgSizePerEP[i] = 0;
   }
 }
