@@ -32,22 +32,35 @@ class BinEntry {
 #endif
     BinEntry(): _time(0.), _idleTime(0.),
                  _msgSize(0),
-                 _msgCount(0) {}
-    BinEntry(double t, double idleT, int msgSize, int msgCount): _time(t), _idleTime(idleT),
-                                      _msgSize(msgSize),
-                                      _msgCount(msgCount) {}
+                 _msgCount(0) {
+      _msgCountPerEP = CkVec<int>(_entryTable.size() + 10, 0);
+      _msgSizePerEP = CkVec<int>(_entryTable.size() + 10, 0);
+    }
+
+    BinEntry(double t, double idleT, int msgSize, int msgCount, CkVec<int> msgSizePerEP, CkVec<int> msgCountPerEP): _time(t), _idleTime(idleT),
+                                                               _msgSize(msgSize), _msgCount(msgCount), _eps(eps) {
+      for(int i = 0; i < _entryTable.size(); ++i) {
+        _msgSizePerEP[i] = msgSizePerEP[i];
+        _msgCountPerEP[i] = msgCountPerEP[i];
+      }
+  }
     double &time() { return _time; }
     double &getIdleTime() { return _idleTime; }
     int &getSize() { return _msgSize; }
     int &getCount() {return _msgCount; }
+    CkVec<int> &getSizePerEP() { return _msgSizePerEP;}
+    CkVec<int> &getCountPerEP() {return _msgCountPerEP; }
     void write(FILE *fp);
     int  getU();
     int getUIdle();
+
   private:
     double _time;
     double _idleTime;
     int _msgSize;
     int _msgCount;
+    CkVec<int> _msgSizePerEP;
+    CkVec<int> _msgCountPerEP;
 };
 
 /// a phase entry for trace summary
@@ -172,6 +185,7 @@ class SumLogPool {
   private:
     UInt poolSize;
     UInt numBins;
+    int eps;
     BinEntry *pool;	/**< bins */
     FILE *fp, *stsfp, *sdfp ;
     char *pgm;
@@ -200,7 +214,7 @@ class SumLogPool {
     void initMem();
     void write(void) ;
     void writeSts(void);
-    void add(double time, double idleTime, int msgSize, int msgCount, int pe);
+    void add(double time, double idleTime, int msgSize, int msgCount, CkVec<int> msgSizePerEP, CkVec<int> msgCountPerEP, int pe);
     void setEp(int epidx, double time);
     void clearEps() {
       for(int i=0; i < epInfoSize; i++) {
@@ -270,6 +284,8 @@ class TraceSummary : public Trace {
     int depth;
     int msgSize;
     int msgCount;
+    CkVec<int> msgSizePerEP;
+    CkVec<int> msgCountPerEP;
 
   public:
     TraceSummary(char **argv);
@@ -292,6 +308,8 @@ class TraceSummary : public Trace {
     void endComputation(void);
 
     void creation(envelope *e, int epIdx, int num=1);
+    void resetCounters();
+    void setCounters();
 
     void traceClearEps();
     void traceWriteSts();
