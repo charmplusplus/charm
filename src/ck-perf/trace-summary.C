@@ -404,7 +404,7 @@ void SumLogPool::write(void)
   for(int k = 0; k < numBins; ++k)
   {
     int count = pool[k].getCount();
-    int size = pool[k].getCount();
+    int size = pool[k].getSize();
     CkVec<int> sizePerEP = pool[k].getSizePerEP();
     CkVec<int> countPerEP = pool[k].getCountPerEP();
 
