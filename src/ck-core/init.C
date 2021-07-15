@@ -343,8 +343,8 @@ static inline void _parseCommandLineOpts(char **argv)
 	}
 
 	if (CmiGetArgFlagDesc(argv,"+staticInsertion", "DEPRECATED")) {
-    CmiPrintf("WARNING: +staticInsertion has been deprecated.\n"
-              "Static insertion is now the default behavior for arrays that are non-empty at construction.\n");
+		CmiPrintf("WARNING: +staticInsertion has been deprecated.\n"
+		          "Static insertion is now the default behavior for arrays that are non-empty at construction.\n");
 	}
 
         useNodeBlkMapping = false;
