@@ -1054,6 +1054,14 @@ void TraceSummary::creation(envelope *e, int epIdx, int num)
 {
   msgSize += e->getTotalsize();
   msgCount += num;
+  int len = msgSizePerEP.size();
+  if(epIdx >= len) {
+    msgSizePerEP.resize(_entryTable.size() + 10);
+    msgCountPerEP.resize(_entryTable.size() + 10);
+    for(int i = len; i < msgSizePerEP.size(); ++i) {
+      msgSizePerEP[i] = msgCountPerEP[i] = 0;
+    }
+  }
   msgSizePerEP[epIdx] += e->getTotalsize();
   msgCountPerEP[epIdx] += num;
   //_logPool->addMessage(CREATION, epIdx, CkMyPe(), e->getTotalsize(), num);
