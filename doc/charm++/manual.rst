@@ -6218,9 +6218,13 @@ create them, CkArrayOptions contains a few flags that the runtime can
 use to optimize handling of a given array. If the array elements will
 only migrate at controlled points (such as periodic load balancing with
 ``AtASync()``), this is signaled to the runtime by calling
-``opts.setAnytimeMigration(false)``\  [11]_. If all array elements will
-be inserted by bulk creation or by ``fooArray[x].insert()`` calls,
-signal this by calling ``opts.setStaticInsertion(true)``  [12]_.
+``opts.setAnytimeMigration(false)``\  [11]_. Similarly, certain optimizations can
+be made if all array elements are statically inserted via bulk construction during the
+``ckNew(...)`` call [12]_. By default, insertion is set to ``STATIC`` if ``ckNew`` is
+called with a non-zero number of initial elements, and is set to ``DYNAMIC`` in cases
+where the number of initial elements is 0. Applications can call
+``opts.setStaticInsertion(false)`` to override this behavior for cases where there are a
+non-zero number of initial insertions, but more dynamic insertions will follow.
 
 .. _array map:
 
