@@ -579,7 +579,7 @@ void SumLogPool::add(double time, double idleTime, int msgSize, int msgCount,
                      CkVec<int> recvSizePerEP, CkVec<int> recvCountPerEP,
                      int pe)
 {
-  new (&pool[numBins++]) BinEntry(time, idleTime, msgSize, msgCount, msgSizePerEP, msgCountPerEP
+  new (&pool[numBins++]) BinEntry(time, idleTime, msgSize, msgCount, msgSizePerEP, msgCountPerEP,
                                   recvSize, recvCount, recvSizePerEP, recvCountPerEP);
   if (poolSize==numBins) {
     shrink();
@@ -801,10 +801,20 @@ void TraceSummary::beginExecute(envelope *e, void *obj)
   }
   else {
     beginExecute(-1,-1,e->getEpIdx(),-1);
+
+    int len = recvSizePerEP.size();
+    int epIdx = e->getEPIdx();
+    if(epIdx >= len) {
+      recvSizePerEP.resize(_entryTable.size() + 10);
+      recvCountPerEP.resize(_entryTable.size() + 10);
+      for(int i = len; i < msgSizePerEP.size(); ++i) {
+        recvSizePerEP[i] = recvCountPerEP[i] = 0;
+      }
+    }
     recvSize += e->getTotalsize();
-    recvSizePerEP[e->getEpIdx] += e->getTotalsize();
+    recvSizePerEP[epIdx] += e->getTotalsize();
     recvCount++;
-    recvCountPerEP[e->getEpIdx]++;
+    recvCountPerEP[epIdx]++;
   }  
 }
 
@@ -1071,9 +1081,9 @@ void TraceSummary::endComputation(void)
      msgSize = 0;
      msgCount = 0;
      recvSize = 0;
-     recvCount = 0'
+     recvCount = 0;
      resetCounters();
-     msgNum ++;
+     msgNum++;
 
      binStart  += CkpvAccess(binSize);
      double t = TraceTimer();
