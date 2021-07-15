@@ -1064,7 +1064,11 @@ void TraceSummary::creation(envelope *e, int epIdx, int num)
   }
   msgSizePerEP[epIdx] += e->getTotalsize();
   msgCountPerEP[epIdx] += num;
-  //_logPool->addMessage(CREATION, epIdx, CkMyPe(), e->getTotalsize(), num);
+}
+
+void TraceSummary::creationMulticast(envelope* e, int epIdx, int num, const int* pelist)
+{
+  creation(e, epIdx, num);
 }
 
 void TraceSummary::fillData(double *buffer, double reqStartTime, 

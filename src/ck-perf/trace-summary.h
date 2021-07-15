@@ -316,6 +316,7 @@ class TraceSummary : public Trace {
     void endComputation(void);
 
     void creation(envelope *e, int epIdx, int num=1);
+    void creationMulticast(envelope *e, int epIdx, int num=1, const int *pelist=NULL);
     void resetCounters();
     void setCounters();
 
