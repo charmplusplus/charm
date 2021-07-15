@@ -31,26 +31,38 @@ class BinEntry {
     void operator delete(void *, void *) { }
 #endif
     BinEntry(): _time(0.), _idleTime(0.),
-                 _msgSize(0),
-                 _msgCount(0) {
+                 _msgSize(0), _msgCount(0),
+                 _recvSize(0), _recvCount(0)
+    {
       _msgCountPerEP = CkVec<int>(_entryTable.size() + 10);
       _msgSizePerEP = CkVec<int>(_entryTable.size() + 10);
+      _recvCountPerEP = CkVec<int>(_entryTable.size() + 10);
+      _recvSizePerEP = CkVec<int>(_entryTable.size() + 10);
       for(int i = 0; i < _msgCountPerEP.size(); ++i) {
-        _msgCountPerEP[i] = _msgSizePerEP[i] = 0;
+        _msgCountPerEP[i] = _msgSizePerEP[i] = _recvCountPerEP[i] = _recvSizePerEP[i] = 0;
       }
     }
 
-    BinEntry(double t, double idleT, int msgSize, int msgCount, CkVec<int> msgSizePerEP, CkVec<int> msgCountPerEP): _time(t), _idleTime(idleT),
-                                                               _msgSize(msgSize), _msgCount(msgCount) {
-
+    BinEntry(double t, double idleT, int msgSize, int msgCount,
+             CkVec<int> msgSizePerEP, CkVec<int> msgCountPerEP,
+             int recvSize, int recvCount,
+             CkVec<int> recvSizePerEP, CkVec<int> recvCountPerEP
+             ): _time(t), _idleTime(idleT),
+                 _msgSize(msgSize), _msgCount(msgCount),
+                 _recvSize(recvSize), _recvCount(recvCount)
+    {
       if(_msgSizePerEP.size() == 0)
       {
-        _msgCountPerEP = CkVec<int>(msgCountPerEP.size());
+        _msgCountPerEP = CkVec<int>(msgSizePerEP.size());
         _msgSizePerEP = CkVec<int>(msgSizePerEP.size());
+        _recvCountPerEP = CkVec<int>(msgSizePerEP.size());
+        _recvSizePerEP = CkVec<int>(msgSizePerEP.size());
       }
       for(int i = 0; i < msgSizePerEP.size(); ++i) {
         _msgSizePerEP[i] = msgSizePerEP[i];
         _msgCountPerEP[i] = msgCountPerEP[i];
+        _recvSizePerEP[i] = recvSizePerEP[i];
+        _recvCountPerEP[i] = recvCountPerEP[i];
       }
   }
     double &time() { return _time; }
@@ -59,6 +71,10 @@ class BinEntry {
     int &getCount() {return _msgCount; }
     CkVec<int> &getSizePerEP() { return _msgSizePerEP;}
     CkVec<int> &getCountPerEP() {return _msgCountPerEP; }
+    int &getRecvSize() { return _recvSize; }
+    int &getRecvCount() { return _recvCount; }
+    CkVec<int> &getRecvSizePerEP() {return _recvSizePerEP; }
+    CkVec<int> &getRecvCountPerEP() {return _recvCountPerEP; }
     void write(FILE *fp);
     int  getU();
     int getUIdle();
@@ -70,6 +86,10 @@ class BinEntry {
     int _msgCount;
     CkVec<int> _msgSizePerEP;
     CkVec<int> _msgCountPerEP;
+    int _recvSize;
+    int _recvCount;
+    CkVec<int> _recvSizePerEP;
+    CkVec<int> _recvCountPerEP;
 };
 
 /// a phase entry for trace summary
@@ -222,7 +242,11 @@ class SumLogPool {
     void initMem();
     void write(void) ;
     void writeSts(void);
-    void add(double time, double idleTime, int msgSize, int msgCount, CkVec<int> msgSizePerEP, CkVec<int> msgCountPerEP, int pe);
+    void add(double time, double idleTime, int msgSize, int msgCount,
+             CkVec<int> msgSizePerEP, CkVec<int> msgCountPerEP,
+             int recvSize, int recvCount,
+             CkVec<int> recvSizePerEP, CkVec<int> recvCountPerEP,
+             int pe);
     void setEp(int epidx, double time);
     void clearEps() {
       for(int i=0; i < epInfoSize; i++) {
@@ -294,6 +318,10 @@ class TraceSummary : public Trace {
     int msgCount;
     CkVec<int> msgSizePerEP;
     CkVec<int> msgCountPerEP;
+    int recvSize;
+    int recvCount;
+    CkVec<int> recvSizePerEP;
+    CkVec<int> recvCountPerEP;
 
   public:
     TraceSummary(char **argv);
