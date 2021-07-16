@@ -85,10 +85,10 @@ class CkArrayOptions {
   bool broadcastViaScheduler;    // broadcast inline or through scheduler
   bool sectionAutoDelegate;      // Create a mCastMgr and auto-delegate all sections
 
-  enum InsertionType {
-    UNSET = -1,
-    DYNAMIC = 0,
-    STATIC = 1
+  enum class InsertionType : char {
+    UNSET,
+    DYNAMIC,
+    STATIC
   };
   InsertionType insertionType; // -1 = unset, 0 = false, 1 = true
 
@@ -242,8 +242,8 @@ class CkArrayOptions {
   }
   CkArrayOptions& setStaticInsertion(bool b);
   bool isStaticInsertion() {
-    if (insertionType == STATIC) return true;
-    if (insertionType == DYNAMIC || numInitial.dimension == 0) return false;
+    if (insertionType == InsertionType::STATIC) return true;
+    if (insertionType == InsertionType::DYNAMIC || numInitial.dimension == 0) return false;
 
     bool empty = false;
     bool shorts = numInitial.dimension > 3;

@@ -100,7 +100,7 @@ void CkArrayOptions::init() {
   locMgr.setZero();
   mCastMgr.setZero();
   anytimeMigration = _isAnytimeMigration;
-  insertionType = UNSET;
+  insertionType = InsertionType::UNSET;
   reductionClient.type = CkCallback::invalid;
   disableNotifyChildInRed = !_isNotifyChildInRed;
   broadcastViaScheduler = false;
@@ -108,7 +108,7 @@ void CkArrayOptions::init() {
 }
 
 CkArrayOptions& CkArrayOptions::setStaticInsertion(bool b) {
-  insertionType = b ? STATIC : DYNAMIC;
+  insertionType = b ? InsertionType::STATIC : InsertionType::DYNAMIC;
   if (b && map == _defaultArrayMapID) map = _fastArrayMapID;
   return *this;
 }
