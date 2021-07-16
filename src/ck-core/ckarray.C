@@ -1050,6 +1050,8 @@ bool CkArray::insertElement(CkArrayMessage* me, const CkArrayIndex& idx,
   if (!locMgr->addElement(thisgroup, idx, elt, ctorIdx, (void*)me))
     return false;
   CK_ARRAYLISTENER_LOOP(listeners, if (!l->ckElementCreated(elt)) return false;);
+  // The initCallback will only be valid if it was set in CkArrayOptions and this is the
+  // first wave of insertions.
   if (!initCallback.isInvalid()) elt->contribute(initCallback);
   return true;
 }
@@ -1090,6 +1092,8 @@ void CkArray::remoteBeginInserting(void)
 
   if (!isInserting)
   {
+    // After the first wave of insertions, the init callback should not be used
+    initCallback = CkCallback(CkCallback::invalid);
     isInserting = true;
     DEBC((AA "Begin inserting objects\n" AB));
     for (int l = 0; l < listeners.size(); l++) listeners[l]->ckBeginInserting();
