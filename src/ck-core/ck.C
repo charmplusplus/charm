@@ -487,7 +487,8 @@ static inline void _processBocBcastMsg(CkCoreState* ck, envelope* env);
 static
 void *_ckLocalNodeBranch(CkGroupID groupID) {
   CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
-  void *retval = CksvAccess(_nodeGroupTable)->find(groupID).getObj();
+  auto &entry = CksvAccess(_nodeGroupTable)->find(groupID);
+  void *retval = entry.isReady() ? entry.getObj() : nullptr;
   CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
   return retval;
 }
@@ -657,6 +658,10 @@ void CkCreateChare(int cIdx, int eIdx, void *msg, CkChareID *pCid, int destPE)
 }
 
 inline void CkReadyEntry(TableEntry& entry, bool nodeLevel) {
+  // the ready flag is set first to expedite the unblocking of
+  // node-level peers (that depend on the current [node]group)
+  entry.setReady();
+
   PtrQ *ptrq = entry.getPending();
   if(ptrq) {
     void *pending;
@@ -669,7 +674,6 @@ inline void CkReadyEntry(TableEntry& entry, bool nodeLevel) {
     }
     entry.clearPending();
   }
-  entry.setReady();
 }
 
 void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)

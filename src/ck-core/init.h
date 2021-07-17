@@ -171,8 +171,12 @@ static inline IrrGroup *_localBranch(CkGroupID gID)
 // Ensure thread safety while using this function as it is accessing a non-PE-local group
 static inline IrrGroup *_localBranchOther(CkGroupID gID, int rank)
 {
-  auto& entry = CkpvAccessOther(_groupTable, rank)->find(gID);
-  return entry.isReady() ? entry.getObj() : nullptr; // ensures the object has been constructed
+  if (rank == CkMyRank()) {
+    return _localBranch(gID);
+  } else {
+    auto &entry = CkpvAccessOther(_groupTable, rank)->find(gID);
+    return entry.isReady() ? entry.getObj() : nullptr; // ensures the object was created
+  }
 }
 
 extern void _registerCommandLineOpt(const char* opt);
