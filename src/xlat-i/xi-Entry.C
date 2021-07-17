@@ -558,15 +558,13 @@ void Entry::genArrayDefs(XStr& str) {
       inlineCall << "    impl_off += sizeof(envelope);\n"
                  << "    ckLocMgr()->recordSend(idx, id, impl_off);\n";
     }
-    inlineCall << "    LDObjHandle objHandle;\n"
-               << "    int objstopped=0;\n"
-               << "    objHandle = obj->timingBeforeCall(&objstopped);\n"
-               << "#endif\n";
+    inlineCall << "#endif\n";
     inlineCall << "#if CMK_CHARMDEBUG\n"
                   "    CpdBeforeEp("
                << epIdx()
                << ", obj, NULL);\n"
                   "#endif\n";
+    inlineCall << "    CkActivate(obj);\n";
     inlineCall << "    ";
     if (!retType->isVoid()) inlineCall << retType << " retValue = ";
     inlineCall << "obj->" << (tspec ? "template " : "") << name;
@@ -578,13 +576,12 @@ void Entry::genArrayDefs(XStr& str) {
     inlineCall << "(";
     param->unmarshallForward(inlineCall, true);
     inlineCall << ");\n";
+    inlineCall << "    CkDeactivate(obj);\n";
     inlineCall << "#if CMK_CHARMDEBUG\n"
                   "    CpdAfterEp("
                << epIdx()
                << ");\n"
                   "#endif\n";
-    inlineCall << "#if CMK_LBDB_ON\n    "
-                  "obj->timingAfterCall(objHandle,&objstopped);\n#endif\n";
     if (isAppWork()) inlineCall << "    _TRACE_END_APPWORK();\n";
     if (!isNoTrace()) inlineCall << "    _TRACE_END_EXECUTE();\n";
     if (!retType->isVoid()) {

@@ -238,6 +238,7 @@ extern int quietMode;
 extern int quietModeRequested;
 
 void CkCallWhenIdle(int epIdx, void* obj) {
+  // TODO extend object tracking to this region
   auto fn = reinterpret_cast<CcdVoidFn>(_entryTable[epIdx]->call);
   CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE, fn, obj);
 }

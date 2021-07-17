@@ -222,9 +222,7 @@ class Chare {
     CkObjectMsgQ objQ;                // object message queue
 #endif
   public:
-#if CMK_ERROR_CHECKING
     int magic;
-#endif
 #ifndef CMK_CHARE_USE_PTR
     int chareIdx;                  // index in the chare obj table (chare_objs)
 #endif
@@ -270,6 +268,9 @@ class Chare {
     }
 #endif
 };
+
+extern void CkActivate(Chare *obj);
+extern void CkDeactivate(Chare *obj);
 
 #if CMK_HAS_IS_CONSTRUCTIBLE
 #include <type_traits>

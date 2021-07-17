@@ -2060,14 +2060,12 @@ struct CkArrayThreadListener
 
 static void CkArrayThreadListener_suspend(struct CthThreadListener* l)
 {
-  CkArrayThreadListener* a = (CkArrayThreadListener*)l;
-  a->mig->ckStopTiming();
+  CkDeactivate(((CkArrayThreadListener*)l)->mig);
 }
 
 static void CkArrayThreadListener_resume(struct CthThreadListener* l)
 {
-  CkArrayThreadListener* a = (CkArrayThreadListener*)l;
-  a->mig->ckStartTiming();
+  CkActivate(((CkArrayThreadListener*)l)->mig);
 }
 
 static void CkArrayThreadListener_free(struct CthThreadListener* l)
@@ -2187,36 +2185,6 @@ void* CkLocRec::getObjUserData(int idx) { return lbmgr->GetDBObjUserData(ldHandl
 // record (because all array elements were destroyed) then it will be deleted.
 void CkLocRec::destroy(void) { myLocMgr->reclaim(this); }
 
-/**********Added for cosmology (inline function handling without parameter
- * marshalling)***********/
-
-LDObjHandle CkMigratable::timingBeforeCall(int* objstopped)
-{
-  LDObjHandle objHandle;
-#if CMK_LBDB_ON
-  if (getLBMgr()->RunningObject(&objHandle))
-  {
-    *objstopped = 1;
-    getLBMgr()->ObjectStop(objHandle);
-  }
-  myRec->startTiming(1);
-#endif
-
-  return objHandle;
-}
-
-void CkMigratable::timingAfterCall(LDObjHandle objHandle, int* objstopped)
-{
-  myRec->stopTiming(1);
-#if CMK_LBDB_ON
-  if (*objstopped)
-  {
-    getLBMgr()->ObjectStart(objHandle);
-  }
-#endif
-
-  return;
-}
 /****************************************************************************/
 
 bool CkLocRec::invokeEntry(CkMigratable* obj, void* msg, int epIdx, bool doFree)
@@ -2224,7 +2192,6 @@ bool CkLocRec::invokeEntry(CkMigratable* obj, void* msg, int epIdx, bool doFree)
   DEBS((AA "   Invoking entry %d on element %s\n" AB, epIdx, idx2str(idx)));
   bool isDeleted = false;  // Enables us to detect deletion during processing
   deletedMarker = &isDeleted;
-  startTiming();
 
 #if CMK_TRACE_ENABLED
   if (msg)

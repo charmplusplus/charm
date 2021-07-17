@@ -12,6 +12,8 @@ clients, including the rest of Charm++, are actually C++.
 
 #include "pathHistory.h"
 
+#include <stack>
+
 #if CMK_LBDB_ON
 #include "LBManager.h"
 #endif // CMK_LBDB_ON
@@ -32,6 +34,11 @@ CkpvDeclare(int, currentChareIdx);
 CkpvDeclare(ArrayObjMap, array_objs);
 
 #define CK_MSG_SKIP_OR_IMM    (CK_MSG_EXPEDITED | CK_MSG_IMMEDIATE)
+
+using ObjectStack = std::stack<Chare*>;
+CkpvDeclare(ObjectStack, runningObjs);
+
+void _trackAndInvoke(const int& epIdx, void *msg, void* obj);
 
 VidBlock::VidBlock() { state = UNFILLED; msgQ = new PtrQ(); _MEMCHECK(msgQ); }
 
@@ -55,6 +62,7 @@ void _initChareTables()
   CkpvAccess(currentChareIdx) = -1;
 #endif
 
+  CkpvInitialize(ObjectStack, runningObjs);
   CkpvInitialize(ArrayObjMap, array_objs);
 }
 
@@ -62,9 +70,7 @@ void _initChareTables()
 Chare::Chare(void) {
   thishandle.onPE=CkMyPe();
   thishandle.objPtr=this;
-#if CMK_ERROR_CHECKING
   magic = CHARE_MAGIC;
-#endif
 #ifndef CMK_CHARE_USE_PTR
      // for plain chare, objPtr is actually the index to chare obj table
   if (CkpvAccess(currentChareIdx) >= 0) {
@@ -362,7 +368,7 @@ void CProxy::pup(PUP::er &p) {
       int objId = _entryTable[migCtor]->chareIdx; 
       size_t objSize = _chareTable[objId]->size;
       void *obj = malloc(objSize); 
-      _entryTable[migCtor]->call(NULL, obj); 
+      _trackAndInvoke(migCtor, NULL, obj);
       delegatedPtr = static_cast<CkDelegateMgr *> (obj)
         ->DelegatePointerPup(p, delegatedPtr);           
       free(obj);
@@ -539,6 +545,75 @@ int CkGetArgc(void) {
 	return CmiGetArgc(CkpvAccess(Ck_argv));
 }
 
+Chare *CkActiveObj(void) {
+  auto& objs = *(&CkpvAccess(runningObjs));
+  if (objs.empty()) {
+    return nullptr;
+  } else {
+    return objs.top();
+  }
+}
+
+inline void _pushObj(Chare *obj) {
+  CkpvAccess(runningObjs).push(obj);
+}
+
+inline Chare *_popObj(void) {
+  auto& objs = *(&CkpvAccess(runningObjs));
+  if (objs.empty()) {
+    return nullptr;
+  } else {
+    auto* obj = objs.top();
+    objs.pop();
+    return obj;
+  }
+}
+
+inline void _ckStartTiming(void) {
+#if CMK_LBDB_ON
+  auto *active = CkActiveLocRec();
+  if (active) active->startTiming();
+#endif
+}
+
+inline void _ckStopTiming(void) {
+#if CMK_LBDB_ON
+  auto *active = CkActiveLocRec();
+  if (active) active->stopTiming();
+#endif
+}
+
+void CkActivate(Chare *obj) {
+  _ckStopTiming();    // suspend timing of the previous obj
+  _pushObj(obj);      // push the current object onto the stack
+  _ckStartTiming();   // start timing the current obj
+}
+
+void CkDeactivate(Chare *obj) {
+  _ckStopTiming();        // stop timing of the current obj
+  auto popd = _popObj();  // pop it from the stack
+  CkAssert(popd == obj && "object tracking mismatch");
+  _ckStartTiming();       // resume timing of the previous obj
+}
+
+#if CMK_LBDB_ON
+CkLocRec* CkActiveLocRec(void) {
+  auto* obj = CkActiveObj();
+  if (obj && obj->magic == CHARE_MAGIC) {
+    auto* mgt = obj ? dynamic_cast<CkMigratable*>(obj) : nullptr;
+    return mgt ? mgt->ckLocRec() : nullptr;
+  } else {
+    return nullptr;
+  }
+}
+#endif
+
+void _trackAndInvoke(const int& epIdx, void *msg, void* obj) {
+  CkActivate((Chare*)obj);
+  _entryTable[epIdx]->call(msg, obj);
+  CkDeactivate((Chare*)obj);
+}
+
 /******************** Basic support *****************/
 void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
 {
@@ -546,7 +621,7 @@ void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
   CpdBeforeEp(epIdx, obj, msg);
 #endif    
   const auto msgtype = (msg == NULL) ? LAST_CK_ENVELOPE_TYPE : UsrToEnv(msg)->getMsgtype();
-  _entryTable[epIdx]->call(msg, obj);
+  _trackAndInvoke(epIdx, msg, obj);
 #if CMK_CHARMDEBUG
   CpdAfterEp(epIdx);
 #endif
@@ -580,7 +655,7 @@ void CkDeliverMessageReadonly(int epIdx,const void *msg,void *obj)
 #if CMK_CHARMDEBUG
   CpdBeforeEp(epIdx, obj, (void*)msg);
 #endif
-  _entryTable[epIdx]->call(deliverMsg, obj);
+  _trackAndInvoke(epIdx, deliverMsg, obj);
 #if CMK_CHARMDEBUG
   CpdAfterEp(epIdx);
 #endif
