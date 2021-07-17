@@ -450,7 +450,7 @@ void CkPupMainChareData(PUP::er &p, CkArgMsg *args)
 				obj = _allocNewChare(chareIdx);
 				_mainTable[i]->setObj(obj);
 				//void *m = CkAllocSysMsg();
-        _toggleInvoke(obj, entryMigCtor, args);
+				_toggleInvoke(obj, entryMigCtor, args);
 			}
 			else 
 			 	obj = (Chare *)_mainTable[i]->getObj();

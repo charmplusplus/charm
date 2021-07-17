@@ -598,16 +598,11 @@ void CkDeactivate(Chare *obj) {
 CkLocRec* CkActiveLocRec(void) {
   auto* obj = CkActiveObj();
   if (obj && obj->magic == CHARE_MAGIC) {
-    auto idx = obj->ckGetChareType();
-    if (idx >= 0) {
-      const auto& type = _chareTable[idx]->chareType;
-      if (type == TypeArray) {
-        auto* mgt = dynamic_cast<CkMigratable*>(obj);
-        return mgt ? mgt->ckLocRec() : nullptr;
-      }
-    }
+    auto* mgt = dynamic_cast<CkMigratable*>(obj);
+    return mgt ? mgt->ckLocRec() : nullptr;
+  } else {
+    return nullptr;
   }
-  return nullptr;
 }
 #endif
 
