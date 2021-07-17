@@ -1688,9 +1688,7 @@ void _initCharm(int unused_argc, char **argv)
 			msg->argc = CmiGetArgc(argv);
 			msg->argv = argv;
       quietMode = 0;  // allow printing any mainchare user messages
-			CkActivate(obj);
-			_entryTable[_mainTable[i]->entryIdx]->call(msg, obj);
-			CkDeactivate(obj);
+      _toggleInvoke(obj, _mainTable[i]->entryIdx, msg);
       if (quietModeRequested) quietMode = 1;
 		}
                 _mainDone = true;

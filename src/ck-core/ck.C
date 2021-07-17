@@ -38,8 +38,6 @@ CkpvDeclare(ArrayObjMap, array_objs);
 using ObjectStack = std::stack<Chare*>;
 CkpvDeclare(ObjectStack, runningObjs);
 
-void _trackAndInvoke(const int& epIdx, void *msg, void* obj);
-
 VidBlock::VidBlock() { state = UNFILLED; msgQ = new PtrQ(); _MEMCHECK(msgQ); }
 
 int CMessage_CkMessage::__idx=-1;
@@ -366,8 +364,8 @@ void CProxy::pup(PUP::er &p) {
 
       // create a dummy object for calling DelegatePointerPup
       int objId = _entryTable[migCtor]->chareIdx; 
-      void *obj = _allocNewChare(objId); 
-      _trackAndInvoke(migCtor, NULL, obj);
+      auto *obj = _allocNewChare(objId); 
+      _toggleInvoke(obj, migCtor, NULL);
       delegatedPtr = static_cast<CkDelegateMgr *> (obj)
         ->DelegatePointerPup(p, delegatedPtr);           
       free(obj);
@@ -599,19 +597,18 @@ void CkDeactivate(Chare *obj) {
 CkLocRec* CkActiveLocRec(void) {
   auto* obj = CkActiveObj();
   if (obj && obj->magic == CHARE_MAGIC) {
-    auto* mgt = obj ? dynamic_cast<CkMigratable*>(obj) : nullptr;
-    return mgt ? mgt->ckLocRec() : nullptr;
-  } else {
-    return nullptr;
+    auto idx = obj->ckGetChareType();
+    if (idx >= 0) {
+      const auto& type = _chareTable[idx]->chareType;
+      if (type == TypeArray) {
+        auto* mgt = dynamic_cast<CkMigratable*>(obj);
+        return mgt ? mgt->ckLocRec() : nullptr;
+      }
+    }
   }
+  return nullptr;
 }
 #endif
-
-void _trackAndInvoke(const int& epIdx, void *msg, void* obj) {
-  CkActivate((Chare*)obj);
-  _entryTable[epIdx]->call(msg, obj);
-  CkDeactivate((Chare*)obj);
-}
 
 /******************** Basic support *****************/
 void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
@@ -620,7 +617,7 @@ void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
   CpdBeforeEp(epIdx, obj, msg);
 #endif    
   const auto msgtype = (msg == NULL) ? LAST_CK_ENVELOPE_TYPE : UsrToEnv(msg)->getMsgtype();
-  _trackAndInvoke(epIdx, msg, obj);
+  _toggleInvoke((Chare*)obj, epIdx, msg);
 #if CMK_CHARMDEBUG
   CpdAfterEp(epIdx);
 #endif
@@ -654,7 +651,7 @@ void CkDeliverMessageReadonly(int epIdx,const void *msg,void *obj)
 #if CMK_CHARMDEBUG
   CpdBeforeEp(epIdx, obj, (void*)msg);
 #endif
-  _trackAndInvoke(epIdx, deliverMsg, obj);
+  _toggleInvoke((Chare*)obj, epIdx, deliverMsg);
 #if CMK_CHARMDEBUG
   CpdAfterEp(epIdx);
 #endif

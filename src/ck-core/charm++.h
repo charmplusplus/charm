@@ -269,9 +269,16 @@ class Chare {
 #endif
 };
 
-extern Chare *_allocNewChare(const int &objId);
 extern void CkActivate(Chare *obj);
 extern void CkDeactivate(Chare *obj);
+
+extern Chare *_allocNewChare(const int &objId);
+
+static inline void _toggleInvoke(Chare* obj, const int& epIdx, void *msg) {
+  CkActivate(obj);
+  _entryTable[epIdx]->call(msg, obj);
+  CkDeactivate(obj);
+}
 
 #if CMK_HAS_IS_CONSTRUCTIBLE
 #include <type_traits>
