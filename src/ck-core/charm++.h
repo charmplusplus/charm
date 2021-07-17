@@ -269,6 +269,7 @@ class Chare {
 #endif
 };
 
+extern Chare *_allocNewChare(const int &objId);
 extern void CkActivate(Chare *obj);
 extern void CkDeactivate(Chare *obj);
 

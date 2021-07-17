@@ -236,6 +236,8 @@ public:
 
 CkpvExtern(CkCoreState *, _coreState);
 
+Chare *_allocNewChare(const int &objId);
+
 Chare *CkActiveObj(void);
 void CkActivate(Chare *obj);
 void CkDeactivate(Chare *obj);

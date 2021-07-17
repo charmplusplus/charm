@@ -1679,9 +1679,8 @@ void _initCharm(int unused_argc, char **argv)
 
 		for(i=0;i<nMains;i++)  /* Create all mainchares */
 		{
-			size_t size = _chareTable[_mainTable[i]->chareIdx]->size;
-			void *obj = malloc(size);
-			_MEMCHECK(obj);
+			const auto &chareIdx = _mainTable[i]->chareIdx;
+			auto *obj = _allocNewChare(chareIdx);
 			_mainTable[i]->setObj(obj);
 			CkpvAccess(_currentChare) = obj;
 			CkpvAccess(_currentChareType) = _mainTable[i]->chareIdx;
@@ -1689,7 +1688,9 @@ void _initCharm(int unused_argc, char **argv)
 			msg->argc = CmiGetArgc(argv);
 			msg->argv = argv;
       quietMode = 0;  // allow printing any mainchare user messages
+			CkActivate(obj);
 			_entryTable[_mainTable[i]->entryIdx]->call(msg, obj);
+			CkDeactivate(obj);
       if (quietModeRequested) quietMode = 1;
 		}
                 _mainDone = true;

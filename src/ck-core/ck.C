@@ -366,8 +366,7 @@ void CProxy::pup(PUP::er &p) {
 
       // create a dummy object for calling DelegatePointerPup
       int objId = _entryTable[migCtor]->chareIdx; 
-      size_t objSize = _chareTable[objId]->size;
-      void *obj = malloc(objSize); 
+      void *obj = _allocNewChare(objId); 
       _trackAndInvoke(migCtor, NULL, obj);
       delegatedPtr = static_cast<CkDelegateMgr *> (obj)
         ->DelegatePointerPup(p, delegatedPtr);           
@@ -734,9 +733,7 @@ void CkCreateChare(int cIdx, int eIdx, void *msg, CkChareID *pCid, int destPE)
 void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
 {
   int gIdx = _entryTable[epIdx]->chareIdx;
-  void *obj = malloc(_chareTable[gIdx]->size);
-  _MEMCHECK(obj);
-  setMemoryTypeChare(obj);
+  void *obj = _allocNewChare(gIdx);
   CmiImmediateLock(CkpvAccess(_groupTableImmLock));
   CkpvAccess(_groupTable)->find(groupID).setObj(obj);
   CkpvAccess(_groupTable)->find(groupID).setcIdx(gIdx);
@@ -771,10 +768,7 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
 void CkCreateLocalNodeGroup(CkGroupID groupID, int epIdx, envelope *env)
 {
   int gIdx = _entryTable[epIdx]->chareIdx;
-  size_t objSize=_chareTable[gIdx]->size;
-  void *obj = malloc(objSize);
-  _MEMCHECK(obj);
-  setMemoryTypeChare(obj);
+  void *obj = _allocNewChare(gIdx);
   CkpvAccess(_currentGroup) = groupID;
 
 // Now that the NodeGroup is created, add it to the table.
@@ -933,17 +927,26 @@ CkGroupID CkCreateNodeGroup(int cIdx, int eIdx, void *msg)
   return gid;
 }
 
+Chare *_allocNewChare(const int &objId) {
+  const auto &objSize = _chareTable[objId]->size;
+  auto *obj = (Chare*)malloc(objSize);
+  if (obj != nullptr) {
+    setMemoryTypeChare(obj);
+    obj->magic = 0x0;
+    _MEMCHECK(obj);
+  }
+  return obj;
+}
+
 static inline void *_allocNewChare(envelope *env, int &idx)
 {
   int chareIdx = _entryTable[env->getEpIdx()]->chareIdx;
-  void *tmp=malloc(_chareTable[chareIdx]->size);
-  _MEMCHECK(tmp);
+  auto *tmp = _allocNewChare(chareIdx);
 #ifndef CMK_CHARE_USE_PTR
   CkpvAccess(chare_objs).push_back(tmp);
   CkpvAccess(chare_types).push_back(chareIdx);
   idx = CkpvAccess(chare_objs).size()-1;
 #endif
-  setMemoryTypeChare(tmp);
   return tmp;
 }
 
