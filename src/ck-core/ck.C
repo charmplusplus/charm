@@ -102,6 +102,7 @@ void Chare::CkEnableObjQ()
 }
 
 Chare::~Chare() {
+  this->magic = 0x0;
 #ifndef CMK_CHARE_USE_PTR
 /*
   if (chareIdx >= 0 && chareIdx < CpvAccess(chare_objs).size() && CpvAccess(chare_objs)[chareIdx] == this) 
