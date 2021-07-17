@@ -2975,22 +2975,8 @@ int CkLocMgr::deliverMsg(CkArrayMessage* msg, CkArrayID mgr, CmiUInt8 id,
   if (msg->array_hops() > 1)
     multiHop(msg);
 
-#if CMK_LBDB_ON
-  // if there is a running obj being measured, stop it temporarily
-  LDObjHandle objHandle;
-  bool wasAnObjRunning = false;
-  if ((wasAnObjRunning = lbmgr->RunningObject(&objHandle)))
-  {
-    lbmgr->ObjectStop(objHandle);
-  }
-#endif
   // Finally, call the entry method
-  bool result = ((CkLocRec*)rec)->invokeEntry(obj, (void*)msg, msg->array_ep(), true);
-#if CMK_LBDB_ON
-  if (wasAnObjRunning)
-    lbmgr->ObjectStart(objHandle);
-#endif
-  return result;
+  return ((CkLocRec*)rec)->invokeEntry(obj, (void*)msg, msg->array_ep(), true);
 }
 
 // This function should only get called once for any given send, when

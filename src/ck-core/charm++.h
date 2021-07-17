@@ -269,6 +269,7 @@ class Chare {
 #endif
 };
 
+extern void CkUnwind(Chare *obj);
 extern void CkActivate(Chare *obj);
 extern void CkDeactivate(Chare *obj);
 

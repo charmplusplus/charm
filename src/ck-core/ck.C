@@ -35,7 +35,7 @@ CkpvDeclare(ArrayObjMap, array_objs);
 
 #define CK_MSG_SKIP_OR_IMM    (CK_MSG_EXPEDITED | CK_MSG_IMMEDIATE)
 
-using ObjectStack = std::stack<Chare*>;
+using ObjectStack = std::deque<Chare*>;
 CkpvDeclare(ObjectStack, runningObjs);
 
 VidBlock::VidBlock() { state = UNFILLED; msgQ = new PtrQ(); _MEMCHECK(msgQ); }
@@ -102,7 +102,8 @@ void Chare::CkEnableObjQ()
 }
 
 Chare::~Chare() {
-  this->magic = 0x0;
+  CkUnwind(this);
+
 #ifndef CMK_CHARE_USE_PTR
 /*
   if (chareIdx >= 0 && chareIdx < CpvAccess(chare_objs).size() && CpvAccess(chare_objs)[chareIdx] == this) 
@@ -548,12 +549,12 @@ Chare *CkActiveObj(void) {
   if (objs.empty()) {
     return nullptr;
   } else {
-    return objs.top();
+    return objs.back();
   }
 }
 
 inline void _pushObj(Chare *obj) {
-  CkpvAccess(runningObjs).push(obj);
+  CkpvAccess(runningObjs).emplace_back(obj);
 }
 
 inline Chare *_popObj(void) {
@@ -561,8 +562,8 @@ inline Chare *_popObj(void) {
   if (objs.empty()) {
     return nullptr;
   } else {
-    auto* obj = objs.top();
-    objs.pop();
+    auto* obj = objs.back();
+    objs.pop_back();
     return obj;
   }
 }
@@ -587,10 +588,23 @@ void CkActivate(Chare *obj) {
   _ckStartTiming();   // start timing the current obj
 }
 
+void CkUnwind(Chare *obj) {
+  auto& objs = *(&CkpvAccess(runningObjs));
+  auto start = std::begin(objs);
+  auto end = std::end(objs);
+  // ensures that all copies of the object are null'd
+  while (end != (start = std::find(start, end, obj))) {
+    *start = nullptr;
+  }
+#if !CMK_ERROR_CHECKING
+  obj->magic = 0x0;   // proactively prevent failures
+#endif
+}
+
 void CkDeactivate(Chare *obj) {
   _ckStopTiming();        // stop timing of the current obj
   auto popd = _popObj();  // pop it from the stack
-  CkAssert(popd == obj && "object tracking mismatch");
+  CkAssert((!popd || popd == obj) && "object tracking mismatch");
   _ckStartTiming();       // resume timing of the previous obj
 }
 
@@ -1114,17 +1128,6 @@ IrrGroup *lookupGroupAndBufferIfNotThere(CkCoreState *ck,envelope *env,const CkG
 
 static inline void _deliverForBocMsg(CkCoreState *ck,int epIdx,envelope *env,IrrGroup *obj)
 {
-#if CMK_LBDB_ON
-  // if there is a running obj being measured, stop it temporarily
-  LDObjHandle objHandle;
-  int objstopped = 0;
-  LBManager *the_lbmgr = (LBManager *)CkLocalBranch(_lbmgr);
-  if (the_lbmgr->RunningObject(&objHandle)) {
-    objstopped = 1;
-    the_lbmgr->ObjectStop(objHandle);
-  }
-#endif
-
 #if CMK_SMP
   unsigned short int msgType = CMI_ZC_MSGTYPE(env); // store msgType as msg could be freed
 #endif
@@ -1137,9 +1140,6 @@ static inline void _deliverForBocMsg(CkCoreState *ck,int epIdx,envelope *env,Irr
   }
 #endif
 
-#if CMK_LBDB_ON
-  if (objstopped) the_lbmgr->ObjectStart(objHandle);
-#endif
   _STATS_RECORD_PROCESS_BRANCH_1();
 }
 

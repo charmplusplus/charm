@@ -876,30 +876,19 @@ void Entry::genGroupDefs(XStr& str) {
             << "  _TRACE_BEGIN_EXECUTE_DETAILED(CpvAccess(curPeEvent),ForBocMsg,(" << epIdx()
             << "),CkMyPe(),0,NULL, NULL);\n";
       if (isAppWork()) str << " _TRACE_BEGIN_APPWORK();\n";
-      str << "#if CMK_LBDB_ON\n"
-             "  // if there is a running obj being measured, stop it temporarily\n"
-             "  LDObjHandle objHandle;\n"
-             "  int objstopped = 0;\n"
-             "  LBManager *the_lbmgr = (LBManager *)CkLocalBranch(_lbmgr);\n"
-             "  if (the_lbmgr->RunningObject(&objHandle)) {\n"
-             "    objstopped = 1;\n"
-             "    the_lbmgr->ObjectStop(objHandle);\n"
-             "  }\n"
-             "#endif\n";
       str << "#if CMK_CHARMDEBUG\n"
              "  CpdBeforeEp("
           << epIdx()
           << ", obj, NULL);\n"
              "#endif\n  ";
+      str << "CkActivate(obj);\n  ";
       if (!retType->isVoid()) str << retType << " retValue = ";
-      str << "obj->" << name << "(" << unmarshallStr << ");\n";
+      str << "obj->" << name << "(" << unmarshallStr << ");\n  ";
+      str << "CkDeactivate(obj);\n";
       str << "#if CMK_CHARMDEBUG\n"
              "  CpdAfterEp("
           << epIdx()
           << ");\n"
-             "#endif\n";
-      str << "#if CMK_LBDB_ON\n"
-             "  if (objstopped) the_lbmgr->ObjectStart(objHandle);\n"
              "#endif\n";
       if (isAppWork()) str << " _TRACE_END_APPWORK();\n";
       if (!isNoTrace()) str << "  _TRACE_END_EXECUTE();\n";
