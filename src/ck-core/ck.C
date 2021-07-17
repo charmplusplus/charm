@@ -656,6 +656,22 @@ void CkCreateChare(int cIdx, int eIdx, void *msg, CkChareID *pCid, int destPE)
   _TRACE_CREATION_DONE(1);
 }
 
+inline void CkReadyEntry(TableEntry& entry, bool nodeLevel) {
+  PtrQ *ptrq = entry.getPending();
+  if(ptrq) {
+    void *pending;
+    while((pending=ptrq->deq())!=nullptr) {
+      if (nodeLevel) {
+        _CldNodeEnqueue(CkMyNode(), pending, _infoIdx);
+      } else {
+        CsdEnqueueGeneral(pending, CQS_QUEUEING_FIFO, 0, 0);
+      }
+    }
+    entry.clearPending();
+  }
+  entry.setReady();
+}
+
 void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
 {
   int gIdx = _entryTable[epIdx]->chareIdx;
@@ -666,14 +682,6 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
   CkpvAccess(_groupTable)->find(groupID).setObj(obj);
   CkpvAccess(_groupTable)->find(groupID).setcIdx(gIdx);
   CkpvAccess(_groupIDTable)->push_back(groupID);
-  PtrQ *ptrq = CkpvAccess(_groupTable)->find(groupID).getPending();
-  if(ptrq) {
-    void *pending;
-    while((pending=ptrq->deq())!=0) {
-      CsdEnqueueGeneral(pending, CQS_QUEUEING_FIFO, 0, 0);
-    }
-    CkpvAccess(_groupTable)->find(groupID).clearPending();
-  }
   CmiImmediateUnlock(CkpvAccess(_groupTableImmLock));
 
   CkpvAccess(_currentGroup) = groupID;
@@ -690,6 +698,10 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
   CkpvAccess(currentChareIdx) = callingChareIdx;
 #endif
 
+  CmiImmediateLock(CkpvAccess(_groupTableImmLock));
+  CkReadyEntry(CkpvAccess(_groupTable)->find(groupID), false);
+  CmiImmediateUnlock(CkpvAccess(_groupTableImmLock));
+
   _STATS_RECORD_PROCESS_GROUP_1();
 }
 
@@ -700,6 +712,12 @@ void CkCreateLocalNodeGroup(CkGroupID groupID, int epIdx, envelope *env)
   void *obj = malloc(objSize);
   _MEMCHECK(obj);
   setMemoryTypeChare(obj);
+  CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
+  CksvAccess(_nodeGroupTable)->find(groupID).setObj(obj);
+  CksvAccess(_nodeGroupTable)->find(groupID).setcIdx(gIdx);
+  CksvAccess(_nodeGroupIDTable).push_back(groupID);
+  CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
+
   CkpvAccess(_currentGroup) = groupID;
 
 // Now that the NodeGroup is created, add it to the table.
@@ -722,22 +740,12 @@ void CkCreateLocalNodeGroup(CkGroupID groupID, int epIdx, envelope *env)
 #endif
 
   CkpvAccess(_currentNodeGroupObj) = NULL;
-  _STATS_RECORD_PROCESS_NODE_GROUP_1();
 
   CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
-  CksvAccess(_nodeGroupTable)->find(groupID).setObj(obj);
-  CksvAccess(_nodeGroupTable)->find(groupID).setcIdx(gIdx);
-  CksvAccess(_nodeGroupIDTable).push_back(groupID);
-
-  PtrQ *ptrq = CksvAccess(_nodeGroupTable)->find(groupID).getPending();
-  if(ptrq) {
-    void *pending;
-    while((pending=ptrq->deq())!=0) {
-      _CldNodeEnqueue(CkMyNode(), pending, _infoIdx);
-    }
-    CksvAccess(_nodeGroupTable)->find(groupID).clearPending();
-  }
+  CkReadyEntry(CksvAccess(_nodeGroupTable)->find(groupID), true);
   CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
+
+  _STATS_RECORD_PROCESS_NODE_GROUP_1();
 }
 
 void _createGroup(CkGroupID groupID, envelope *env)
