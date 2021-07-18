@@ -290,12 +290,11 @@ class LBManager : public CBase_LBManager
   void CollectStatsOn(void) { lbdb_obj->CollectStatsOn(); }
   void CollectStatsOff(void) { lbdb_obj->CollectStatsOff(); }
   bool StatsOn(void) { return lbdb_obj->StatsOn(); }
-  LDObjHandle* RunningObject(void) const { return lbdb_obj->RunningObj(); }
-  bool RunningObject(LDObjHandle* _o) const {
+  LDObjHandle *RunningObject(void) const { return lbdb_obj->RunningObj(); }
+  bool RunningObject(LDObjHandle *_o) const {
     auto *obj = this->RunningObject();
     if (obj) {
       *_o = *obj;
-
       return true;
     } else {
       return false;

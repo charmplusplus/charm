@@ -2052,39 +2052,11 @@ void CkMigratable::setMigratable(int migratable) { myRec->setMigratable(migratab
 
 void CkMigratable::setPupSize(size_t obj_pup_size) { myRec->setPupSize(obj_pup_size); }
 
-struct CkArrayThreadListener
-{
-  struct CthThreadListener base;
-  CkMigratable* mig;
-};
-
-static void CkArrayThreadListener_suspend(struct CthThreadListener* l)
-{
-  CkDeactivate(((CkArrayThreadListener*)l)->mig);
-}
-
-static void CkArrayThreadListener_resume(struct CthThreadListener* l)
-{
-  CkActivate(((CkArrayThreadListener*)l)->mig);
-}
-
-static void CkArrayThreadListener_free(struct CthThreadListener* l)
-{
-  CkArrayThreadListener* a = (CkArrayThreadListener*)l;
-  delete a;
-}
-
 void CkMigratable::CkAddThreadListeners(CthThread tid, void* msg)
 {
   Chare::CkAddThreadListeners(tid, msg);  // for trace
   CthSetThreadID(tid, thisIndexMax.data()[0], thisIndexMax.data()[1],
                  thisIndexMax.data()[2]);
-  CkArrayThreadListener* a = new CkArrayThreadListener;
-  a->base.suspend = CkArrayThreadListener_suspend;
-  a->base.resume = CkArrayThreadListener_resume;
-  a->base.free = CkArrayThreadListener_free;
-  a->mig = this;
-  CthAddListener(tid, (struct CthThreadListener*)a);
 }
 #else
 void CkMigratable::setObjTime(double cputime) {}

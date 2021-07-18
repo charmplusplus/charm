@@ -152,7 +152,7 @@ public:
   }
   inline void CollectStatsOn(void) {
     if (!StatsOn()) {
-      auto* runningObj = this->RunningObj();
+      auto *runningObj = this->RunningObj();
       if (runningObj) {
         LbObj(*runningObj)->StartTimer();
       }

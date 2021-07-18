@@ -160,10 +160,35 @@ void Chare::ckDebugPup(PUP::er &p) {
   pup(p);
 }
 
+using CkThreadListener = struct CthThreadListener;
+
+struct CkChareThreadListener: public CkThreadListener {
+  Chare* obj;
+  CkChareThreadListener(Chare* ch): obj(ch) {}
+};
+
+static void CkChareThreadListener_suspend(CkThreadListener *l) {
+  CkDeactivate(((CkChareThreadListener *)l)->obj);
+}
+
+static void CkChareThreadListener_resume(CkThreadListener *l) {
+  CkActivate(((CkChareThreadListener *)l)->obj);
+}
+
+static void CkChareThreadListener_free(CkThreadListener *l) {
+  delete (CkChareThreadListener *)l;
+}
+
 /// This method is called before starting a [threaded] entry method.
 void Chare::CkAddThreadListeners(CthThread th, void *msg) {
   CthSetThreadID(th, thishandle.onPE, (int)(((char *)thishandle.objPtr)-(char *)0), 0);
   traceAddThreadListeners(th, UsrToEnv(msg));
+
+  auto *l = new CkChareThreadListener(this);
+  l->suspend = CkChareThreadListener_suspend;
+  l->resume = CkChareThreadListener_resume;
+  l->free = CkChareThreadListener_free;
+  CthAddListener(th, l);
 }
 
 void CkMessage::ckDebugPup(PUP::er &p,void *msg) {
@@ -545,7 +570,7 @@ int CkGetArgc(void) {
 }
 
 Chare *CkActiveObj(void) {
-  auto& objs = *(&CkpvAccess(runningObjs));
+  auto &objs = *(&CkpvAccess(runningObjs));
   if (objs.empty()) {
     return nullptr;
   } else {
@@ -558,11 +583,11 @@ inline void _pushObj(Chare *obj) {
 }
 
 inline Chare *_popObj(void) {
-  auto& objs = *(&CkpvAccess(runningObjs));
+  auto &objs = *(&CkpvAccess(runningObjs));
   if (objs.empty()) {
     return nullptr;
   } else {
-    auto* obj = objs.back();
+    auto *obj = objs.back();
     objs.pop_back();
     return obj;
   }
@@ -592,7 +617,7 @@ void CkActivate(Chare *obj) {
 // removes all instances of ( obj ) from the stack
 void CkUnwind(Chare *obj) {
   CkAssert(obj != nullptr && "expected a valid object!");
-  auto& objs = *(&CkpvAccess(runningObjs));
+  auto &objs = *(&CkpvAccess(runningObjs));
   auto start = std::begin(objs);
   auto end = std::end(objs);
   // ensures that all copies of the object are null'd
@@ -608,16 +633,16 @@ void CkUnwind(Chare *obj) {
 // pops ( obj ) from the stack (and manages timing)
 void CkDeactivate(Chare *obj) {
   _ckStopTiming();        // stop timing the current obj
-  auto* popd = _popObj(); // pop it from the stack
+  auto *popd = _popObj(); // pop it from the stack
   CkAssert((!popd || popd == obj) && "object tracking mismatch");
   _ckStartTiming();       // resume timing of the previous obj
 }
 
 #if CMK_LBDB_ON
 CkLocRec* CkActiveLocRec(void) {
-  auto* obj = CkActiveObj();
+  auto *obj = CkActiveObj();
   if (obj && obj->magic == CHARE_MAGIC) {
-    auto* mgt = dynamic_cast<CkMigratable*>(obj);
+    auto *mgt = dynamic_cast<CkMigratable *>(obj);
     return mgt ? mgt->ckLocRec() : nullptr;
   } else {
     return nullptr;
