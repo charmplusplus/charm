@@ -582,28 +582,33 @@ inline void _ckStopTiming(void) {
 #endif
 }
 
+// puts ( obj ) on the stack (and manages timing)
 void CkActivate(Chare *obj) {
   _ckStopTiming();    // suspend timing of the previous obj
   _pushObj(obj);      // push the current object onto the stack
   _ckStartTiming();   // start timing the current obj
 }
 
+// removes all instances of ( obj ) from the stack
 void CkUnwind(Chare *obj) {
+  CkAssert(obj != nullptr && "expected a valid object!");
   auto& objs = *(&CkpvAccess(runningObjs));
   auto start = std::begin(objs);
   auto end = std::end(objs);
   // ensures that all copies of the object are null'd
   while (end != (start = std::find(start, end, obj))) {
     *start = nullptr;
+    start += 1; // avoids redundant checks!
   }
 #if !CMK_ERROR_CHECKING
-  obj->magic = 0x0;   // proactively prevent failures
+  obj->magic = 0x0;   // proactively prevents failures
 #endif
 }
 
+// pops ( obj ) from the stack (and manages timing)
 void CkDeactivate(Chare *obj) {
-  _ckStopTiming();        // stop timing of the current obj
-  auto popd = _popObj();  // pop it from the stack
+  _ckStopTiming();        // stop timing the current obj
+  auto* popd = _popObj(); // pop it from the stack
   CkAssert((!popd || popd == obj) && "object tracking mismatch");
   _ckStartTiming();       // resume timing of the previous obj
 }

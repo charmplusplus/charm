@@ -237,10 +237,26 @@ extern bool useNodeBlkMapping;
 extern int quietMode;
 extern int quietModeRequested;
 
+class CkWhenIdleRecord {
+  int epIdx_;
+  Chare* obj_;
+
+ public:
+  CkWhenIdleRecord(const int& epIdx, void* obj)
+      : epIdx_(epIdx), obj_(static_cast<Chare*>(obj)) {}
+
+  static void onIdle(CkWhenIdleRecord* self, double curWallTime) {
+    CkActivate(self->obj_);
+    ((CcdVoidFn)_entryTable[self->epIdx_]->call)(self->obj_, curWallTime);
+    CkDeactivate(self->obj_);
+    delete self;
+  }
+};
+
 void CkCallWhenIdle(int epIdx, void* obj) {
-  // TODO extend object tracking to this region
-  auto fn = reinterpret_cast<CcdVoidFn>(_entryTable[epIdx]->call);
-  CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE, fn, obj);
+  auto* record = new CkWhenIdleRecord(epIdx, obj);
+  CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE,
+                    (CcdVoidFn)CkWhenIdleRecord::onIdle, record);
 }
 
 // Modules are required to register command line opts they will parse. These
