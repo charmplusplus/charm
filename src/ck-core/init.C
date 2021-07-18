@@ -239,13 +239,13 @@ extern int quietModeRequested;
 
 class CkWhenIdleRecord {
   int epIdx_;
-  Chare* obj_;
+  Chare *obj_;
 
  public:
-  CkWhenIdleRecord(const int& epIdx, void* obj)
-      : epIdx_(epIdx), obj_(static_cast<Chare*>(obj)) {}
+  CkWhenIdleRecord(const int &epIdx, void *obj)
+  : epIdx_(epIdx), obj_(static_cast<Chare *>(obj)) {}
 
-  static void onIdle(CkWhenIdleRecord* self, double curWallTime) {
+  static void onIdle(CkWhenIdleRecord *self, double curWallTime) {
     CkActivate(self->obj_);
     ((CcdVoidFn)_entryTable[self->epIdx_]->call)(self->obj_, curWallTime);
     CkDeactivate(self->obj_);
@@ -253,8 +253,8 @@ class CkWhenIdleRecord {
   }
 };
 
-void CkCallWhenIdle(int epIdx, void* obj) {
-  auto* record = new CkWhenIdleRecord(epIdx, obj);
+void CkCallWhenIdle(int epIdx, void *obj) {
+  auto *record = new CkWhenIdleRecord(epIdx, obj);
   CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE,
                     (CcdVoidFn)CkWhenIdleRecord::onIdle, record);
 }

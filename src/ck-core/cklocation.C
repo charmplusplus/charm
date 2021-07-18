@@ -2948,7 +2948,7 @@ int CkLocMgr::deliverMsg(CkArrayMessage* msg, CkArrayID mgr, CmiUInt8 id,
     multiHop(msg);
 
   // Finally, call the entry method
-  return ((CkLocRec*)rec)->invokeEntry(obj, (void*)msg, msg->array_ep(), true);
+  return ((CkLocRec *)rec)->invokeEntry(obj, (void *)msg, msg->array_ep(), true);
 }
 
 // This function should only get called once for any given send, when

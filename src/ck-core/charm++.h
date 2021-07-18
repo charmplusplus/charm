@@ -275,7 +275,7 @@ extern void CkDeactivate(Chare *obj);
 
 extern Chare *_allocNewChare(const int &objId);
 
-static inline void _toggleInvoke(Chare* obj, const int& epIdx, void *msg) {
+static inline void _toggleInvoke(Chare *obj, const int &epIdx, void *msg) {
   CkActivate(obj);
   _entryTable[epIdx]->call(msg, obj);
   CkDeactivate(obj);

@@ -35,7 +35,7 @@ CkpvDeclare(ArrayObjMap, array_objs);
 
 #define CK_MSG_SKIP_OR_IMM    (CK_MSG_EXPEDITED | CK_MSG_IMMEDIATE)
 
-using ObjectStack = std::deque<Chare*>;
+using ObjectStack = std::deque<Chare *>;
 CkpvDeclare(ObjectStack, runningObjs);
 
 VidBlock::VidBlock() { state = UNFILLED; msgQ = new PtrQ(); _MEMCHECK(msgQ); }
@@ -163,8 +163,8 @@ void Chare::ckDebugPup(PUP::er &p) {
 using CkThreadListener = struct CthThreadListener;
 
 struct CkChareThreadListener: public CkThreadListener {
-  Chare* obj;
-  CkChareThreadListener(Chare* ch): obj(ch) {}
+  Chare *obj;
+  CkChareThreadListener(Chare *ch): obj(ch) {}
 };
 
 static void CkChareThreadListener_suspend(CkThreadListener *l) {
@@ -639,7 +639,7 @@ void CkDeactivate(Chare *obj) {
 }
 
 #if CMK_LBDB_ON
-CkLocRec* CkActiveLocRec(void) {
+CkLocRec *CkActiveLocRec(void) {
   auto *obj = CkActiveObj();
   if (obj && obj->magic == CHARE_MAGIC) {
     auto *mgt = dynamic_cast<CkMigratable *>(obj);
@@ -657,7 +657,7 @@ void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
   CpdBeforeEp(epIdx, obj, msg);
 #endif    
   const auto msgtype = (msg == NULL) ? LAST_CK_ENVELOPE_TYPE : UsrToEnv(msg)->getMsgtype();
-  _toggleInvoke((Chare*)obj, epIdx, msg);
+  _toggleInvoke((Chare *)obj, epIdx, msg);
 #if CMK_CHARMDEBUG
   CpdAfterEp(epIdx);
 #endif
@@ -691,7 +691,7 @@ void CkDeliverMessageReadonly(int epIdx,const void *msg,void *obj)
 #if CMK_CHARMDEBUG
   CpdBeforeEp(epIdx, obj, (void*)msg);
 #endif
-  _toggleInvoke((Chare*)obj, epIdx, deliverMsg);
+  _toggleInvoke((Chare *)obj, epIdx, deliverMsg);
 #if CMK_CHARMDEBUG
   CpdAfterEp(epIdx);
 #endif
@@ -966,7 +966,7 @@ CkGroupID CkCreateNodeGroup(int cIdx, int eIdx, void *msg)
 
 Chare *_allocNewChare(const int &objId) {
   const auto &objSize = _chareTable[objId]->size;
-  auto *obj = (Chare*)malloc(objSize);
+  auto *obj = (Chare *)malloc(objSize);
   if (obj != nullptr) {
     setMemoryTypeChare(obj);
     obj->magic = 0x0;
