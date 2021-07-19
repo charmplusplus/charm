@@ -657,15 +657,15 @@ void CkCreateChare(int cIdx, int eIdx, void *msg, CkChareID *pCid, int destPE)
   _TRACE_CREATION_DONE(1);
 }
 
-inline void CkReadyEntry(TableEntry& entry, bool nodeLevel) {
+inline void CkReadyEntry(TableEntry &entry, bool nodeLevel) {
   // the ready flag is set first to expedite the unblocking of
   // node-level peers (that depend on the current [node]group)
   entry.setReady();
 
-  PtrQ *ptrq = entry.getPending();
-  if(ptrq) {
-    void *pending;
-    while((pending=ptrq->deq())!=nullptr) {
+  auto *ptrq = entry.getPending();
+  if (ptrq) {
+    void *pending = nullptr;
+    while (nullptr != (pending = ptrq->deq())) {
       if (nodeLevel) {
         _CldNodeEnqueue(CkMyNode(), pending, _infoIdx);
       } else {

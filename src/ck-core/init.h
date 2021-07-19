@@ -31,7 +31,7 @@ class TableEntry {
     inline void setObj(void *_obj) { obj=(IrrGroup *)_obj; }
     PtrQ* getPending(void) { return pending; }
     inline void clearPending(void) { delete pending; pending = NULL; }
-    inline const bool& isReady(void) const { return this->ready; }
+    inline const bool &isReady(void) const { return this->ready; }
     inline void setReady(void) { this->ready = true; }
     void enqMsg(void *msg) {
       if (pending==0)
