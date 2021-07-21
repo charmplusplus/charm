@@ -1,6 +1,6 @@
 #ifndef _CK_SECTION_MANAGER_
 #define _CK_SECTION_MANAGER_
-#include "cksectionmanager.def.h"
+#include "cksec.decl.h"
 
 #include "cksection.h"
 #include <unordered_map>
@@ -20,7 +20,8 @@ private:
   // children in the spanning tree, but I think we will (for now) defer to Ckmulticast for the spanning tree.
   std::vector<int> childPEs;
 public:
-  _SectionInfo(int localElementSize)
+  using size_type = LocalMemberContainer<SectionEntry>::size_type;
+  _SectionInfo(size_type localElementSize)
     : localElements{localElementSize} {}
   _SectionInfo()
     : localElements{0} {}
@@ -46,15 +47,12 @@ public:
 
 class CkSectionManager : public CBase_CkSectionManager {
 public:
-  using SectionMapType = std::unordered_map<ck::SectionID, _SectionInfo>;
+  using SectionMapType = std::unordered_map<int, int>;
 private:
   SectionMapType sections;
   int lastCounter = 0;
 
-  ck::SectionID createSectionID()
-  {
-    return ck::SectionID(CkMyPe(), lastCounter++);
-  }
+  ck::SectionID createSectionID();
 
   template<class OutputIt>
   void createSectionIDs(OutputIt dest, int n)
@@ -68,7 +66,7 @@ private:
 
 public:
 
-  CkSectionManager() = default;
+  CkSectionManager();
   // Create a single section containing the chares in the range
   // [begin, end), return a handle to it that can be referenced
   // returns SectionID, will be used to create CProxy_SectionXX
@@ -79,14 +77,14 @@ public:
     ck::SectionID newSectionID = createSectionID();
     _SectionInfo newSectionInfo{};
 
-    for(const auto x = begin; x != end; x++)
+    for(auto x = begin; x != end; x++)
       {
-        if(fn(x))
+        if(fn(*x))
           {
-            newSectionInfo.addLocalMember(x);
+            newSectionInfo.addLocalMember(*x);
           }
       }
-    // should move it, not copy
+    // // should move it, not copy
     sections[newSectionID] = newSectionInfo;
   }
 
@@ -141,7 +139,5 @@ public:
   }
 
 };
-
-#include "cksectionmanager.decl.h"
 
 #endif // _CK_SECTION_MANAGER_

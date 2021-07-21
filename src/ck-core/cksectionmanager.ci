@@ -1,4 +1,5 @@
-group CkSectionManger {
-  entry CkSectionManager();
-
+module cksec{
+group CkSectionManager {
+  entry CkSectionManager(void);
 };
+}
