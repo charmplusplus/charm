@@ -682,6 +682,10 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
   void *obj = malloc(_chareTable[gIdx]->size);
   _MEMCHECK(obj);
   setMemoryTypeChare(obj);
+
+  // this enables groups to access themselves via
+  // ckLocalBranch during their construction (nodegroups
+  // use _currentNodeGroupObj to achieve this)
   CmiImmediateLock(CkpvAccess(_groupTableImmLock));
   CkpvAccess(_groupTable)->find(groupID).setObj(obj);
   CkpvAccess(_groupTable)->find(groupID).setcIdx(gIdx);
@@ -702,6 +706,8 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
   CkpvAccess(currentChareIdx) = callingChareIdx;
 #endif
 
+  // this enables other PEs to access this object via
+  // ckLocalBranchOther, and schedules pending dependencies
   CmiImmediateLock(CkpvAccess(_groupTableImmLock));
   CkReadyEntry(CkpvAccess(_groupTable)->find(groupID), false);
   CmiImmediateUnlock(CkpvAccess(_groupTableImmLock));
@@ -716,11 +722,6 @@ void CkCreateLocalNodeGroup(CkGroupID groupID, int epIdx, envelope *env)
   void *obj = malloc(objSize);
   _MEMCHECK(obj);
   setMemoryTypeChare(obj);
-  CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
-  CksvAccess(_nodeGroupTable)->find(groupID).setObj(obj);
-  CksvAccess(_nodeGroupTable)->find(groupID).setcIdx(gIdx);
-  CksvAccess(_nodeGroupIDTable).push_back(groupID);
-  CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
 
   CkpvAccess(_currentGroup) = groupID;
 
@@ -745,7 +746,14 @@ void CkCreateLocalNodeGroup(CkGroupID groupID, int epIdx, envelope *env)
 
   CkpvAccess(_currentNodeGroupObj) = NULL;
 
+  // nodegroups use `_currentNodeGroupObj` so they do not
+  // need a table entry for objects to access themselves
+  // during creation. therefore, everything can be
+  // consolidated into one critical section
   CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
+  CksvAccess(_nodeGroupTable)->find(groupID).setObj(obj);
+  CksvAccess(_nodeGroupTable)->find(groupID).setcIdx(gIdx);
+  CksvAccess(_nodeGroupIDTable).push_back(groupID);
   CkReadyEntry(CksvAccess(_nodeGroupTable)->find(groupID), true);
   CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
 
