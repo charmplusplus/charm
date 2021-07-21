@@ -1334,6 +1334,9 @@ public:
 // Method to check if the Charm RTS initialization phase has completed
 void checkForInitDone(bool rdmaROCompleted);
 
+// where does this actually go?
+#include "cksectionmanager.h"
+
 #endif
 
 

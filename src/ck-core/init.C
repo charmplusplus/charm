@@ -1459,7 +1459,9 @@ void _initCharm(int unused_argc, char **argv)
 		_registerCkCallback();
 		_registerwaitqd();
 		_registerCkCheckpoint();
-                _registerCkMulticast();
+    _registerCkMulticast();
+    _registercksec();
+
 #if CMK_MEM_CHECKPOINT
 		_registerCkMemCheckpoint();
 #endif
