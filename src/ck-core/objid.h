@@ -169,6 +169,15 @@ struct std::hash<ck::BaseID>
 };
 
 template<>
+struct std::hash<ck::SectionID>
+{
+  std::size_t operator()(const ck::SectionID& id) const
+  {
+    return std::hash<ck::BaseID>()(id);
+  }
+};
+
+template<>
 struct std::hash<ck::ArrayElementID>
 {
   std::size_t operator()(const ck::ArrayElementID& id) const
