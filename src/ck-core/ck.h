@@ -236,16 +236,9 @@ public:
 
 CkpvExtern(CkCoreState *, _coreState);
 
-Chare *_allocNewChare(const int &objId);
-Chare *CkActiveObj(void);
-
-void CkUnwind(Chare *obj);
-void CkActivate(Chare *obj);
-void CkDeactivate(Chare *obj);
-
 #if CMK_LBDB_ON
 CkLocRec *CkActiveLocRec(void);
-#endif
+#endif // CMK_LBDB_ON
 
 void CpdHandleLBMessage(LBMigrateMsg **msg);
 void CkMessageWatcherInit(char **argv,CkCoreState *ck);

@@ -269,13 +269,14 @@ class Chare {
 #endif
 };
 
-extern void CkUnwind(Chare *obj);
-extern void CkActivate(Chare *obj);
-extern void CkDeactivate(Chare *obj);
+void CkUnwind(Chare *obj);
+void CkActivate(Chare *obj);
+void CkDeactivate(Chare *obj);
 
-extern Chare *_allocNewChare(const int &objId);
+Chare *CkActiveObj(void);
+Chare *CkAllocateChare(const int &objId);
 
-static inline void _toggleInvoke(Chare *obj, const int &epIdx, void *msg) {
+static inline void CkInvokeEP(Chare *obj, const int &epIdx, void *msg) {
   CkActivate(obj);
   _entryTable[epIdx]->call(msg, obj);
   CkDeactivate(obj);

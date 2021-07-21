@@ -447,10 +447,10 @@ void CkPupMainChareData(PUP::er &p, CkArgMsg *args)
 			Chare* obj;
 			if (p.isUnpacking()) {
 				DEBCHK("MainChare PUP'ed: name = %s, idx = %d, size = %d\n", entry->name, i, entry->size);
-				obj = _allocNewChare(chareIdx);
+				obj = CkAllocateChare(chareIdx);
 				_mainTable[i]->setObj(obj);
 				//void *m = CkAllocSysMsg();
-				_toggleInvoke(obj, entryMigCtor, args);
+				CkInvokeEP(obj, entryMigCtor, args);
 			}
 			else 
 			 	obj = (Chare *)_mainTable[i]->getObj();

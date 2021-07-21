@@ -2204,7 +2204,6 @@ bool CkLocRec::invokeEntry(CkMigratable* obj, void* msg, int epIdx, bool doFree)
   if (isDeleted)
     return false;  // We were deleted
   deletedMarker = NULL;
-  stopTiming();
   return true;
 }
 

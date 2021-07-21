@@ -12,8 +12,6 @@ clients, including the rest of Charm++, are actually C++.
 
 #include "pathHistory.h"
 
-#include <stack>
-
 #if CMK_LBDB_ON
 #include "LBManager.h"
 #endif // CMK_LBDB_ON
@@ -35,7 +33,7 @@ CkpvDeclare(ArrayObjMap, array_objs);
 
 #define CK_MSG_SKIP_OR_IMM    (CK_MSG_EXPEDITED | CK_MSG_IMMEDIATE)
 
-using ObjectStack = std::deque<Chare *>;
+using ObjectStack = std::vector<Chare *>;
 CkpvDeclare(ObjectStack, runningObjs);
 
 VidBlock::VidBlock() { state = UNFILLED; msgQ = new PtrQ(); _MEMCHECK(msgQ); }
@@ -391,8 +389,8 @@ void CProxy::pup(PUP::er &p) {
 
       // create a dummy object for calling DelegatePointerPup
       int objId = _entryTable[migCtor]->chareIdx; 
-      auto *obj = _allocNewChare(objId); 
-      _toggleInvoke(obj, migCtor, NULL);
+      auto *obj = CkAllocateChare(objId); 
+      CkInvokeEP(obj, migCtor, NULL);
       delegatedPtr = static_cast<CkDelegateMgr *> (obj)
         ->DelegatePointerPup(p, delegatedPtr);           
       free(obj);
@@ -616,7 +614,7 @@ void CkActivate(Chare *obj) {
 
 // removes all instances of ( obj ) from the stack
 void CkUnwind(Chare *obj) {
-  CkAssert(obj != nullptr && "expected a valid object!");
+  CkAssertMsg(obj != nullptr, "expected a valid object!");
   auto &objs = *(&CkpvAccess(runningObjs));
   auto start = std::begin(objs);
   auto end = std::end(objs);
@@ -634,7 +632,7 @@ void CkUnwind(Chare *obj) {
 void CkDeactivate(Chare *obj) {
   _ckStopTiming();        // stop timing the current obj
   auto *popd = _popObj(); // pop it from the stack
-  CkAssert((!popd || popd == obj) && "object tracking mismatch");
+  CkAssertMsg(!popd || popd == obj, "object tracking mismatch");
   _ckStartTiming();       // resume timing of the previous obj
 }
 
@@ -657,7 +655,7 @@ void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
   CpdBeforeEp(epIdx, obj, msg);
 #endif    
   const auto msgtype = (msg == NULL) ? LAST_CK_ENVELOPE_TYPE : UsrToEnv(msg)->getMsgtype();
-  _toggleInvoke((Chare *)obj, epIdx, msg);
+  CkInvokeEP((Chare *)obj, epIdx, msg);
 #if CMK_CHARMDEBUG
   CpdAfterEp(epIdx);
 #endif
@@ -691,7 +689,7 @@ void CkDeliverMessageReadonly(int epIdx,const void *msg,void *obj)
 #if CMK_CHARMDEBUG
   CpdBeforeEp(epIdx, obj, (void*)msg);
 #endif
-  _toggleInvoke((Chare *)obj, epIdx, deliverMsg);
+  CkInvokeEP((Chare *)obj, epIdx, deliverMsg);
 #if CMK_CHARMDEBUG
   CpdAfterEp(epIdx);
 #endif
@@ -770,7 +768,7 @@ void CkCreateChare(int cIdx, int eIdx, void *msg, CkChareID *pCid, int destPE)
 void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
 {
   int gIdx = _entryTable[epIdx]->chareIdx;
-  void *obj = _allocNewChare(gIdx);
+  void *obj = CkAllocateChare(gIdx);
   CmiImmediateLock(CkpvAccess(_groupTableImmLock));
   CkpvAccess(_groupTable)->find(groupID).setObj(obj);
   CkpvAccess(_groupTable)->find(groupID).setcIdx(gIdx);
@@ -805,7 +803,7 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
 void CkCreateLocalNodeGroup(CkGroupID groupID, int epIdx, envelope *env)
 {
   int gIdx = _entryTable[epIdx]->chareIdx;
-  void *obj = _allocNewChare(gIdx);
+  void *obj = CkAllocateChare(gIdx);
   CkpvAccess(_currentGroup) = groupID;
 
 // Now that the NodeGroup is created, add it to the table.
@@ -964,21 +962,19 @@ CkGroupID CkCreateNodeGroup(int cIdx, int eIdx, void *msg)
   return gid;
 }
 
-Chare *_allocNewChare(const int &objId) {
+Chare *CkAllocateChare(const int &objId) {
   const auto &objSize = _chareTable[objId]->size;
   auto *obj = (Chare *)malloc(objSize);
-  if (obj != nullptr) {
-    setMemoryTypeChare(obj);
-    obj->magic = 0x0;
-    _MEMCHECK(obj);
-  }
+  _MEMCHECK(obj);
+  setMemoryTypeChare(obj);
+  obj->magic = 0x0;
   return obj;
 }
 
 static inline void *_allocNewChare(envelope *env, int &idx)
 {
   int chareIdx = _entryTable[env->getEpIdx()]->chareIdx;
-  auto *tmp = _allocNewChare(chareIdx);
+  auto *tmp = CkAllocateChare(chareIdx);
 #ifndef CMK_CHARE_USE_PTR
   CkpvAccess(chare_objs).push_back(tmp);
   CkpvAccess(chare_types).push_back(chareIdx);

@@ -3,11 +3,6 @@
 
 #include "ck.h"
 
-LDObjHandle *LBDatabase::RunningObj(void) const {
-  auto *activeRec = CkActiveLocRec();
-  return activeRec ? const_cast<LDObjHandle*>(&activeRec->getLdHandle()) : nullptr;
-}
-
 LBDatabase::LBDatabase() {
   omCount = omsRegistering = 0;
   obj_walltime = 0;
@@ -15,6 +10,17 @@ LBDatabase::LBDatabase() {
   objsEmptyHead = -1;
   commTable = new LBCommTable;
   syncBarrier = CkSyncBarrier::object();
+}
+
+void LBDatabase::CollectStatsOn(void){
+  if (!StatsOn()) {
+    auto *activeRec = CkActiveLocRec();
+    if (activeRec) {
+      const LDObjHandle &runObj = activeRec->getLdHandle();
+      LbObj(runObj)->StartTimer();
+    }
+    TurnStatsOn();
+  }
 }
 
 LDOMHandle LBDatabase::RegisterOM(LDOMid userID, void* userPtr, LDCallbacks cb) {
@@ -127,9 +133,9 @@ void LBDatabase::Send(const LDOMHandle &destOM, const CmiUInt8 &destID, unsigned
   if (force || (StatsOn() && _lb_args.traceComm())) {
     LBCommData* item_ptr;
 
-    auto *runningObj = this->RunningObj();
-    if (runningObj) {
-      const LDObjHandle &runObj = *runningObj;
+    auto *activeRec = CkActiveLocRec();
+    if (activeRec) {
+      const LDObjHandle &runObj = activeRec->getLdHandle();
 
       // Don't record self-messages from an object to an object
       if (runObj.omhandle.id == destOM.id
@@ -155,9 +161,10 @@ void LBDatabase::MulticastSend(const LDOMHandle &destOM, CmiUInt8 *destIDs, int 
 #if CMK_LBDB_ON
   if (StatsOn() && _lb_args.traceComm()) {
     LBCommData* item_ptr;
-    auto *runningObj = this->RunningObj();
-    if (runningObj) {
-      const LDObjHandle &runObj = *runningObj;
+
+    auto *activeRec = CkActiveLocRec();
+    if (activeRec) {
+      const LDObjHandle &runObj = activeRec->getLdHandle();
 
       LBCommData item(runObj, destOM.id, destIDs, nDests);
       item_ptr = commTable->HashInsertUnique(item);

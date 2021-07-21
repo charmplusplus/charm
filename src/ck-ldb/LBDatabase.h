@@ -58,8 +58,6 @@ public:
     return objs[h].obj;
   }
 
-  LDObjHandle *RunningObj(void) const;
-
   inline void ObjTime(LDObjHandle h, double walltime, double cputime) {
     LbObj(h)->IncrementTime(walltime, cputime);
     MeasuredObjTime(walltime, cputime);
@@ -150,15 +148,7 @@ public:
   inline const LDObjHandle &GetObjHandle(int idx) {
     return LbObjIdx(idx)->GetLDObjHandle();
   }
-  inline void CollectStatsOn(void) {
-    if (!StatsOn()) {
-      auto *runningObj = this->RunningObj();
-      if (runningObj) {
-        LbObj(*runningObj)->StartTimer();
-      }
-      TurnStatsOn();
-    }
-  };
+  void CollectStatsOn(void);
   inline void CollectStatsOff(void) { TurnStatsOff(); };
   inline int  CollectingStats(void) {
   #if CMK_LBDB_ON

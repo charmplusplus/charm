@@ -1696,7 +1696,7 @@ void _initCharm(int unused_argc, char **argv)
 		for(i=0;i<nMains;i++)  /* Create all mainchares */
 		{
 			const auto &chareIdx = _mainTable[i]->chareIdx;
-			auto *obj = _allocNewChare(chareIdx);
+			auto *obj = CkAllocateChare(chareIdx);
 			_mainTable[i]->setObj(obj);
 			CkpvAccess(_currentChare) = obj;
 			CkpvAccess(_currentChareType) = _mainTable[i]->chareIdx;
@@ -1704,7 +1704,7 @@ void _initCharm(int unused_argc, char **argv)
 			msg->argc = CmiGetArgc(argv);
 			msg->argv = argv;
 			quietMode = 0;  // allow printing any mainchare user messages
-			_toggleInvoke(obj, _mainTable[i]->entryIdx, msg);
+			CkInvokeEP(obj, _mainTable[i]->entryIdx, msg);
 			if (quietModeRequested) quietMode = 1;
 		}
                 _mainDone = true;
