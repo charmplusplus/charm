@@ -6,29 +6,42 @@
 #include <unordered_map>
 
 // placeholder, but I think this will be some base Proxy class
-using SectionEntry = void*;
+struct _SectionMember
+{
+  using collection_type = CkGroupID;
+  using element_type = CkArrayIndex;
+  CkGroupID collection;
+  CkArrayIndex element;
+  _SectionMember() {}
+  _SectionMember(CkGroupID c, CkArrayIndex e)
+    : collection{c}, element{e}
+  {}
+
+};
 
 class _SectionInfo
 {
 public:
   template<class T>
   using LocalMemberContainer = std::vector<T>;
-
+  using SectionMember = _SectionMember;
 private:
   CkSectionInfo info;
-  LocalMemberContainer<SectionEntry> localElements;
+  LocalMemberContainer<SectionMember> localElements;
   // children in the spanning tree, but I think we will (for now) defer to Ckmulticast for the spanning tree.
   std::vector<int> childPEs;
 public:
-  using size_type = LocalMemberContainer<SectionEntry>::size_type;
+  using size_type = LocalMemberContainer<SectionMember>::size_type;
   _SectionInfo(size_type localElementSize)
     : localElements{localElementSize} {}
   _SectionInfo()
     : localElements{0} {}
 
-  void addLocalMember(SectionEntry member)
+  void addLocalMember(SectionMember::collection_type collection,
+                      SectionMember::element_type element
+                      )
   {
-    localElements.push_back(member);
+    localElements.emplace_back(collection, element);
   }
   template<typename InputIt>
   void addLocalMembers(InputIt begin, InputIt end)
@@ -40,14 +53,14 @@ public:
     childPEs.push_back(pe);
   }
 
-  const LocalMemberContainer<SectionEntry>&
+  const LocalMemberContainer<SectionMember>&
   getLocalMembers() {return localElements;}
 
 };
 
 class CkSectionManager : public CBase_CkSectionManager {
 public:
-  using SectionMapType = std::unordered_map<int, int>;
+  using SectionMapType = std::unordered_map<ck::SectionID, _SectionInfo>;
 private:
   SectionMapType sections;
   int lastCounter = 0;
@@ -71,17 +84,19 @@ public:
   // [begin, end), return a handle to it that can be referenced
   // returns SectionID, will be used to create CProxy_SectionXX
   // CProxy_SectionXX will have the SectionID as a member
-  template<class SectionFn, class InputIt>
-  ck::SectionID createSection(SectionFn fn, InputIt begin, InputIt end)
+  template<class SectionFn, class InputIt, class ElementProxy>
+  ck::SectionID createSection(SectionFn fn, ElementProxy collection, InputIt begin, InputIt end)
   {
     ck::SectionID newSectionID = createSectionID();
     _SectionInfo newSectionInfo{};
+    auto aid = collection.ckGetArrayID();
 
     for(auto x = begin; x != end; x++)
       {
         if(fn(*x))
           {
-            newSectionInfo.addLocalMember(*x);
+            // can add a "getID" specialized for array/group members
+            newSectionInfo.addLocalMember(aid, *x);
           }
       }
     // // should move it, not copy
@@ -92,32 +107,33 @@ public:
   // create std::distance(outputBegin, outputEnd) sections from the chares in the range
   // [begin, end).
   // writes the section IDs of the created sections to the range [outputBegin, outputEnd)
-  template<class SectionFn, class InputIt, class OutputIt>
-  void createSection(SectionFn fn, InputIt begin, InputIt end, OutputIt outputBegin, OutputIt outputEnd)
+  template<class SectionFn, class InputIt, class OutputIt, class ElementProxy>
+  void createSection(SectionFn fn, ElementProxy collection, InputIt begin, InputIt end, OutputIt outputBegin, OutputIt outputEnd)
   {
-    auto nSections = std::distance(outputEnd, outputBegin);
-    ck::SectionID ids[nSections];
-    createSectionIDs(ids, nSections);
-    int idIdx = 0;
+    // auto nSections = std::distance(outputEnd, outputBegin);
+    // ck::SectionID ids[nSections];
+    // createSectionIDs(ids, nSections);
+    // int idIdx = 0;
+    // auto aid = collection.ckGetArrayID();
 
-    for(auto x = outputBegin; x != outputEnd; ++x)
-      {
-        auto id = ids[idIdx];
-        *x = id;
-        idIdx++;
+    // for(auto x = outputBegin; x != outputEnd; ++x)
+    //   {
+    //     auto id = ids[idIdx];
+    //     *x = id;
+    //     idIdx++;
 
-        sections[id] = _SectionInfo();
-      }
+    //     sections[id] = _SectionInfo();
+    //   }
 
-    for(const auto x = begin; x != end; ++x)
-      {
-        // assumes each chare is in exactly one section, but that may not be the case.
-        // From here we could: specify that SectionFn can generate a sequence of section IDs
-        // or it can return a vector of section ID
-        auto sectionNum = fn(*x);
-        auto sectionID = ids[sectionNum];
-        sections[sectionID].addLocalMember(*x);
-      }
+    // for(const auto x = begin; x != end; ++x)
+    //   {
+    //     // assumes each chare is in exactly one section, but that may not be the case.
+    //     // From here we could: specify that SectionFn can generate a sequence of section IDs
+    //     // or it can return a vector of section ID
+    //     auto sectionNum = fn(*x);
+    //     auto sectionID = ids[sectionNum];
+    //     sections[sectionID].addLocalMember(aid, *x);
+    //   }
 
   }
 
@@ -127,14 +143,14 @@ public:
   ck::SectionID combineSections(InputIt begin,  InputIt end)
   {
     ck::SectionID newSectionID = createSectionID();
-    _SectionInfo newSectionInfo{};
+    // _SectionInfo newSectionInfo{};
 
-    for(auto x = begin; x != end; ++x)
-      {
-        const auto& members = *x.getLocalMembers();
-        newSectionInfo.addLocalMembers(members.begin(), members.end());
-      }
-    sections[newSectionID] = newSectionInfo;
+    // for(auto x = begin; x != end; ++x)
+    //   {
+    //     const auto& members = *x.getLocalMembers();
+    //     newSectionInfo.addLocalMembers(members.begin(), members.end());
+    //   }
+    // sections[newSectionID] = newSectionInfo;
     return newSectionID;
   }
 
