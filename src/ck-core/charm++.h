@@ -222,7 +222,10 @@ class Chare {
     CkObjectMsgQ objQ;                // object message queue
 #endif
   public:
+    bool ckInitialized;
+#if CMK_ERROR_CHECKING
     int magic;
+#endif
 #ifndef CMK_CHARE_USE_PTR
     int chareIdx;                  // index in the chare obj table (chare_objs)
 #endif
@@ -269,17 +272,17 @@ class Chare {
 #endif
 };
 
-void CkUnwind(Chare *obj);
-void CkActivate(Chare *obj);
-void CkDeactivate(Chare *obj);
+void CkCallstackPop(Chare *obj);
+void CkCallstackPush(Chare *obj);
+void CkCallstackUnwind(Chare *obj);
 
 Chare *CkActiveObj(void);
 Chare *CkAllocateChare(const int &objId);
 
 static inline void CkInvokeEP(Chare *obj, const int &epIdx, void *msg) {
-  CkActivate(obj);
+  CkCallstackPush(obj);
   _entryTable[epIdx]->call(msg, obj);
-  CkDeactivate(obj);
+  CkCallstackPop(obj);
 }
 
 #if CMK_HAS_IS_CONSTRUCTIBLE

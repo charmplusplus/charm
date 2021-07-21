@@ -564,7 +564,7 @@ void Entry::genArrayDefs(XStr& str) {
                << epIdx()
                << ", obj, NULL);\n"
                   "#endif\n";
-    inlineCall << "    CkActivate(obj);\n";
+    inlineCall << "    CkCallstackPush(obj);\n";
     inlineCall << "    ";
     if (!retType->isVoid()) inlineCall << retType << " retValue = ";
     inlineCall << "obj->" << (tspec ? "template " : "") << name;
@@ -576,7 +576,7 @@ void Entry::genArrayDefs(XStr& str) {
     inlineCall << "(";
     param->unmarshallForward(inlineCall, true);
     inlineCall << ");\n";
-    inlineCall << "    CkDeactivate(obj);\n";
+    inlineCall << "    CkCallstackPop(obj);\n";
     inlineCall << "#if CMK_CHARMDEBUG\n"
                   "    CpdAfterEp("
                << epIdx()
@@ -881,10 +881,10 @@ void Entry::genGroupDefs(XStr& str) {
           << epIdx()
           << ", obj, NULL);\n"
              "#endif\n  ";
-      str << "CkActivate(obj);\n  ";
+      str << "CkCallstackPush(obj);\n  ";
       if (!retType->isVoid()) str << retType << " retValue = ";
       str << "obj->" << name << "(" << unmarshallStr << ");\n  ";
-      str << "CkDeactivate(obj);\n";
+      str << "CkCallstackPop(obj);\n";
       str << "#if CMK_CHARMDEBUG\n"
              "  CpdAfterEp("
           << epIdx()

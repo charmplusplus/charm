@@ -246,9 +246,9 @@ class CkWhenIdleRecord {
   : epIdx_(epIdx), obj_(static_cast<Chare *>(obj)) {}
 
   static void onIdle(CkWhenIdleRecord *self, double curWallTime) {
-    CkActivate(self->obj_);
+    CkCallstackPush(self->obj_);
     ((CcdVoidFn)_entryTable[self->epIdx_]->call)(self->obj_, curWallTime);
-    CkDeactivate(self->obj_);
+    CkCallstackPop(self->obj_);
     delete self;
   }
 };

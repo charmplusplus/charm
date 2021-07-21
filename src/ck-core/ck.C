@@ -66,7 +66,10 @@ void _initChareTables()
 Chare::Chare(void) {
   thishandle.onPE=CkMyPe();
   thishandle.objPtr=this;
+  this->ckInitialized=true;
+#if CMK_ERROR_CHECKING
   magic = CHARE_MAGIC;
+#endif
 #ifndef CMK_CHARE_USE_PTR
      // for plain chare, objPtr is actually the index to chare obj table
   if (CkpvAccess(currentChareIdx) >= 0) {
@@ -82,6 +85,7 @@ Chare::Chare(void) {
 Chare::Chare(CkMigrateMessage* m) {
   thishandle.onPE=CkMyPe();
   thishandle.objPtr=this;
+  this->ckInitialized=false;
 #if CMK_ERROR_CHECKING
   magic = 0;
 #endif
@@ -100,7 +104,7 @@ void Chare::CkEnableObjQ()
 }
 
 Chare::~Chare() {
-  CkUnwind(this);
+  CkCallstackUnwind(this);
 
 #ifndef CMK_CHARE_USE_PTR
 /*
@@ -136,6 +140,7 @@ void Chare::pup(PUP::er &p)
   p(chareIdx);
   if (chareIdx != -1) thishandle.objPtr=(void*)(CmiIntPtr)chareIdx;
 #endif
+  p(ckInitialized);
 #if CMK_ERROR_CHECKING
   p(magic);
 #endif
@@ -166,11 +171,11 @@ struct CkChareThreadListener: public CkThreadListener {
 };
 
 static void CkChareThreadListener_suspend(CkThreadListener *l) {
-  CkDeactivate(((CkChareThreadListener *)l)->obj);
+  CkCallstackPop(((CkChareThreadListener *)l)->obj);
 }
 
 static void CkChareThreadListener_resume(CkThreadListener *l) {
-  CkActivate(((CkChareThreadListener *)l)->obj);
+  CkCallstackPush(((CkChareThreadListener *)l)->obj);
 }
 
 static void CkChareThreadListener_free(CkThreadListener *l) {
@@ -606,14 +611,14 @@ inline void _ckStopTiming(void) {
 }
 
 // puts ( obj ) on the stack (and manages timing)
-void CkActivate(Chare *obj) {
+void CkCallstackPush(Chare *obj) {
   _ckStopTiming();    // suspend timing of the previous obj
   _pushObj(obj);      // push the current object onto the stack
   _ckStartTiming();   // start timing the current obj
 }
 
 // removes all instances of ( obj ) from the stack
-void CkUnwind(Chare *obj) {
+void CkCallstackUnwind(Chare *obj) {
   CkAssertMsg(obj != nullptr, "expected a valid object!");
   auto &objs = *(&CkpvAccess(runningObjs));
   auto start = std::begin(objs);
@@ -621,15 +626,13 @@ void CkUnwind(Chare *obj) {
   // ensures that all copies of the object are null'd
   while (end != (start = std::find(start, end, obj))) {
     *start = nullptr;
-    start += 1; // avoids redundant checks!
+    start += 1;                 // avoids redundant checks!
   }
-#if !CMK_ERROR_CHECKING
-  obj->magic = 0x0;   // proactively prevents failures
-#endif
+  obj->ckInitialized = false;   // proactively prevents failures
 }
 
 // pops ( obj ) from the stack (and manages timing)
-void CkDeactivate(Chare *obj) {
+void CkCallstackPop(Chare *obj) {
   _ckStopTiming();        // stop timing the current obj
   auto *popd = _popObj(); // pop it from the stack
   CkAssertMsg(!popd || popd == obj, "object tracking mismatch");
@@ -639,9 +642,9 @@ void CkDeactivate(Chare *obj) {
 #if CMK_LBDB_ON
 CkLocRec *CkActiveLocRec(void) {
   auto *obj = CkActiveObj();
-  if (obj && obj->magic == CHARE_MAGIC) {
+  if (obj && obj->ckInitialized) {
     auto *mgt = dynamic_cast<CkMigratable *>(obj);
-    return mgt ? mgt->ckLocRec() : nullptr;
+    return mgt ? mgt->getCkLocRec() : nullptr;
   } else {
     return nullptr;
   }
@@ -967,7 +970,7 @@ Chare *CkAllocateChare(const int &objId) {
   auto *obj = (Chare *)malloc(objSize);
   _MEMCHECK(obj);
   setMemoryTypeChare(obj);
-  obj->magic = 0x0;
+  obj->ckInitialized = false;
   return obj;
 }
 
