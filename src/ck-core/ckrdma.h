@@ -431,10 +431,12 @@ class CkChannel {
 private:
   int id;
   int peer_pe;
+  int send_counter;
+  int recv_counter;
 
 public:
-  CkChannel() : id(-1), peer_pe(-1) {}
-  CkChannel(int id_) : id(id_), peer_pe(-1) {}
+  CkChannel() : id(-1), peer_pe(-1), send_counter(0), recv_counter(0) {}
+  CkChannel(int id_) : CkChannel() { id = id_; }
   CkChannel(int id_, const CProxyElement_ArrayBase &proxy);
   CkChannel(int id_, const CProxyElement_Group &proxy);
   CkChannel(int id_, const CProxyElement_NodeGroup &proxy);

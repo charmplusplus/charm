@@ -25,5 +25,9 @@ void LrtsRecvDevice(DeviceRdmaOp* op, DeviceRecvType type);
 void CmiInvokeRecvHandler(void* data);
 #endif // CMK_CUDA && CMK_GPU_COMM
 
+void LrtsChannelSend(int dest_pe, const void*& ptr, size_t size, uint64_t tag);
+// TODO
+void LrtsChannelRecv();
+
 int CmiGetRdmaCommonInfoSize();
 #endif

@@ -10,6 +10,7 @@
 #include <algorithm>
 #include "ckarray.h"
 #include "cklocation.h"
+#include "conv-rdma.h"
 
 void CmiFreeBroadcastAllExceptMeFn(int size, char *msg);
 
@@ -2110,11 +2111,14 @@ CkChannel::CkChannel(int id_, const CProxyElement_NodeGroup &proxy) : CkChannel(
 }
 
 void CkChannel::send(const void* ptr, size_t size) {
-  // TODO
+  CkAssert(id != -1 && peer_pe != -1);
+  CmiChannelSend(peer_pe, ptr, size, send_counter++);
 }
 
 void CkChannel::recv(const void* ptr, size_t size) {
+  CkAssert(id != -1 && peer_pe != -1);
   // TODO
+  //CmiChannelRecv(peer_pe, ptr, size, recv_counter++);
 }
 
 /****************************** End of Channel API ******************************/

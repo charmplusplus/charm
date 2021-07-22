@@ -51,13 +51,13 @@
 #define UCX_LOG_PRIO 50 // Disabled by default
 
 enum {
-    UCX_SEND_OP,        // Regular Send using UcxSendMsg
-    UCX_RMA_OP_PUT,     // RMA Put operation using UcxRmaOp
-    UCX_RMA_OP_GET,     // RMA Get operation using UcxRmaOp
-#if CMK_CUDA
-    UCX_DEVICE_SEND_OP, // Device send
-    UCX_DEVICE_RECV_OP, // Device recv
-#endif
+    UCX_SEND_OP,         // Regular Send using UcxSendMsg
+    UCX_RMA_OP_PUT,      // RMA Put operation using UcxRmaOp
+    UCX_RMA_OP_GET,      // RMA Get operation using UcxRmaOp
+    UCX_DEVICE_SEND_OP,  // Device send
+    UCX_DEVICE_RECV_OP,  // Device recv
+    UCX_CHANNEL_SEND_OP, // Channel send
+    UCX_CHANNEL_RECV_OP  // Channel recv
 };
 
 #define UCX_LOG(prio, fmt, ...) \
@@ -650,8 +650,8 @@ static inline int ProcessTxQueue()
             UcxRmaOp((NcpyOperationInfo *)(req->msgBuf), req->op);
         }
 #endif
-#if CMK_CUDA
-        else if (req->op == UCX_DEVICE_SEND_OP) { // Send device data
+        else if (req->op == UCX_DEVICE_SEND_OP
+            || req->op == UCX_CHANNEL_SEND_OP) { // Send device/channel data
           ucs_status_ptr_t status_ptr;
           status_ptr = ucp_tag_send_nb(ucxCtx.eps[req->dNode], req->msgBuf,
                                        req->size, ucp_dt_make_contig(1),
@@ -665,7 +665,8 @@ static inline int ProcessTxQueue()
             UcxRequest* store_req = (UcxRequest*)status_ptr;
             store_req->msgBuf = req->msgBuf;
           }
-        } else if (req->op == UCX_DEVICE_RECV_OP) { // Recv device data
+        } else if (req->op == UCX_DEVICE_RECV_OP
+            || req->op == UCX_CHANNEL_RECV_OP) { // Recv device/channel data
           ucs_status_ptr_t status_ptr;
           status_ptr = ucp_tag_recv_nb(ucxCtx.worker, req->msgBuf, req->size,
                                        ucp_dt_make_contig(1), req->tag, req->mask,
@@ -675,18 +676,22 @@ static inline int ProcessTxQueue()
           UcxRequest* ret_req = (UcxRequest*)status_ptr;
           if (ret_req->completed) {
             // Recv was completed immediately
+            // TODO
+#if CMK_CUDA
             UcxInvokeRecvHandler(req->device_op, req->type);
+#endif
             UCX_REQUEST_FREE(ret_req);
           } else {
             // Recv wasn't completed immediately, recv_cb will be invoked
             // sometime later
+            // TODO
+#if CMK_CUDA
             ret_req->device_op = req->device_op;
+#endif
             ret_req->msgBuf = req->msgBuf;
             ret_req->type = req->type;
           }
-        }
-#endif
-        else {
+        } else {
           CmiAbort("[%d][%d][%d] UCX:ProcessTxQueue req->op(%d) is Invalid\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), req->op);
         }
         CmiFree(req);
@@ -907,6 +912,46 @@ void LrtsRecvDevice(DeviceRdmaOp* op, DeviceRecvType type)
 #endif // CMK_SMP
 }
 #endif // CMK_CUDA
+
+void UcxChannelSendCompleted(void* request, ucs_status_t status)
+{
+  CmiEnforce(status == UCS_OK);
+  UcxRequest* req = (UcxRequest*)request;
+
+  UCX_REQUEST_FREE(req);
+}
+
+void LrtsChannelSend(int dest_pe, const void*& ptr, size_t size, uint64_t tag) {
+#if CMK_SMP
+  UcxPendingRequest* req = (UcxPendingRequest*)CmiAlloc(sizeof(UcxPendingRequest));
+  req->msgBuf = (void*)ptr;
+  req->size   = size;
+  req->tag    = tag;
+  req->dNode  = CmiNodeOf(dest_pe);
+  req->cb     = UcxChannelSendCompleted;
+  req->op     = UCX_CHANNEL_SEND_OP;
+
+  PCQueuePush(ucxCtx.txQueue, (char *)req);
+#else
+  ucs_status_ptr_t status_ptr;
+  status_ptr = ucp_tag_send_nb(ucxCtx.eps[CmiNodeOf(dest_pe)], (void*)ptr, size,
+                               ucp_dt_make_contig(1), tag,
+                               UcxChannelSendCompleted);
+
+  if (!UCS_PTR_IS_PTR(status_ptr)) {
+    // Either send was complete or error
+    CmiEnforce(!UCS_PTR_IS_ERR(status_ptr));
+    CmiEnforce(UCS_PTR_STATUS(status_ptr) == UCS_OK);
+  } else {
+    // Callback function will be invoked once send completes
+    UcxRequest* req = (UcxRequest*)status_ptr;
+    req->msgBuf = (void*)ptr;
+  }
+#endif // CMK_SMP
+}
+
+// TODO
+void LrtsChannelRecv() {}
 
 #if CMK_ONESIDED_IMPL
 #include "machine-onesided.C"

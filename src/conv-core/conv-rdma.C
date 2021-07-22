@@ -459,3 +459,12 @@ void CmiIssueRputUsingCMA(
 void CmiInvokeNcpyAck(void *ack) {
   ncpyDirectAckHandlerFn(ack);
 }
+
+void CmiChannelSend(int dest_pe, const void*& ptr, size_t size, uint64_t tag) {
+  LrtsChannelSend(dest_pe, ptr, size, tag);
+}
+
+// TODO
+void CmiChannelRecv() {
+  LrtsChannelRecv();
+}
