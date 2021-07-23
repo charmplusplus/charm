@@ -1415,8 +1415,9 @@ void _initCharm(int unused_argc, char **argv)
 	// Set the ack handler function used for the direct nocopy api
 	CmiSetDirectNcpyAckHandler(CkRdmaDirectAckHandler);
 
+	CmiChannelRecvHandlerInit(CkChannelRecvHandler);
 #if CMK_CUDA && CMK_GPU_COMM
-	CmiRdmaDeviceRecvInit(CkRdmaDeviceRecvHandler);
+	CmiDeviceRecvHandlerInit(CkRdmaDeviceRecvHandler);
 #endif
 
 	// Set the ack handler function used for the entry method p2p api and entry method bcast api

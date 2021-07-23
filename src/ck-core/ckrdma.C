@@ -2117,8 +2117,40 @@ void CkChannel::send(const void* ptr, size_t size) {
 
 void CkChannel::recv(const void* ptr, size_t size) {
   CkAssert(id != -1 && peer_pe != -1);
+  CmiChannelRecv(ptr, size, recv_counter++);
+}
+
+void CkChannelRecvHandler(void* data)
+{
   // TODO
-  //CmiChannelRecv(peer_pe, ptr, size, recv_counter++);
+  /*
+  // Process QD to mark completion of buffer transfer
+  QdProcess(1);
+
+  DeviceRdmaOp* op = (DeviceRdmaOp*)data;
+  DeviceRdmaInfo* info = op->info;
+
+  // Invoke source callbacks
+  if (op->src_cb) {
+    CkCallback* cb = (CkCallback*)op->src_cb;
+    cb->send();
+    delete cb;
+  }
+
+  // Update counter (there may be multiple buffers in transit)
+  info->counter++;
+
+  // Check if all buffers have been received
+  // If so, invoke regular entry method
+  if (info->counter == info->n_ops) {
+    QdCreate(1);
+
+    enqueueNcpyMessage(op->dest_pe, info->msg);
+
+    // Free RDMA metadata
+    CmiFree(info);
+  }
+  */
 }
 
 /****************************** End of Channel API ******************************/

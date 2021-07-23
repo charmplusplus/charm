@@ -464,7 +464,16 @@ void CmiChannelSend(int dest_pe, const void*& ptr, size_t size, uint64_t tag) {
   LrtsChannelSend(dest_pe, ptr, size, tag);
 }
 
-// TODO
-void CmiChannelRecv() {
-  LrtsChannelRecv();
+void CmiChannelRecv(const void*& ptr, size_t size, uint64_t tag) {
+  LrtsChannelRecv(ptr, size, tag);
+}
+
+RdmaAckHandlerFn channelRecvHandlerFn;
+
+void CmiChannelRecvHandlerInit(RdmaAckHandlerFn fn) {
+  channelRecvHandlerFn = fn;
+}
+
+void CmiChannelRecvHandler(void* data) {
+  channelRecvHandlerFn(data);
 }

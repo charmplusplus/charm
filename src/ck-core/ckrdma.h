@@ -448,4 +448,6 @@ public:
   void recv(const void* ptr, size_t size);
 };
 
+void CkChannelRecvHandler(void* data);
+
 #endif
