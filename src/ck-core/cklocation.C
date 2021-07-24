@@ -269,7 +269,6 @@ void CkArrayMap::populateInitial(int arrayHdl, CkArrayOptions& options, void* ct
      how many of them are used */
   CKARRAYMAP_POPULATE_INITIAL(CMK_RANK_0(procNum(arrayHdl, idx)) == thisPe);
 
-  mgr->doneInserting();
   CkFreeMsg(ctorMsg);
 }
 
@@ -1280,7 +1279,6 @@ public:
     int numPes = CkNumPes();
 
     CKARRAYMAP_POPULATE_INITIAL(i % numPes == thisPe);
-    mgr->doneInserting();
     CkFreeMsg(ctorMsg);
   }
 };
@@ -1424,7 +1422,6 @@ public:
     }
     //        CKARRAYMAP_POPULATE_INITIAL(PE == thisPe);
 
-    mgr->doneInserting();
     CkFreeMsg(ctorMsg);
   }
 };

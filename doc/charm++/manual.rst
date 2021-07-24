@@ -6226,6 +6226,13 @@ where the number of initial elements is 0. Applications can call
 ``opts.setStaticInsertion(false)`` to override this behavior for cases where there are a
 non-zero number of initial insertions, but more dynamic insertions will follow.
 
+If the application needs to know when an array has been fully constructed, CkArrayOptions
+provides ``CkArrayOptions::setInitCallback(CkCallback)``. The callback passed will be
+invoked once every element in the initial set of elements has been created. This works
+both for bulk insertion, and if dynamic insertion is used to create the initial elements.
+In the latter case, after the initial elements have been inserted and ``doneInserting`` is
+called, the initialization callback will be invoked once all insertions have completed.
+
 .. _array map:
 
 Initial Placement Using Map Objects
@@ -6344,12 +6351,10 @@ constructor message. For example, to insert a 2D element (x,y), call:
 
     mgr->insertInitial(CkArrayIndex2D(x,y), CkCopyMsg(&msg));
 
-After inserting elements, inform the array manager that all elements have been
-created, and free the constructor message:
+After inserting elements free the constructor message:
 
 .. code-block:: c++
 
-    mgr->doneInserting();
     CkFreeMsg(msg);
 
 A simple example using populateInitial can be found in
@@ -6493,14 +6498,16 @@ If using insert to create all the elements of the array, you must call
 The ``doneInserting()`` call starts the reduction manager (see “Array
 Reductions”) and load balancer (see :numref:`lbFramework`). Since
 these objects need to know about all the array’s elements, they must
-be started after the initial elements are inserted. You may call
+be started after the initial elements are inserted. If this is the first wave
+of insertions, and an initialization callback was set on ``CkArrayOptions`` it will be
+invoked once these initial elements have all been created. You may call
 ``doneInserting()`` multiple times, but only the first call actually
 does anything. You may even insert or destroy elements after a call to
 ``doneInserting()``, with different semantics - see the reduction
 manager. For AtSync load balancing, subsequent dynamic insertion or
 deletion sessions should begin with a call to
-``CProxy_Array::startInserting()`` and end with a call to
-``doneInserting()``. ``startInserting()`` is also idempotent and can
+``CProxy_Array::beginInserting()`` and end with a call to
+``doneInserting()``. ``beginInserting()`` is also idempotent and can
 be called multiple times with only the first having any effect until
 ``doneInserting()`` is called on the same array proxy on the same PE.
 
