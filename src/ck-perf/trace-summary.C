@@ -433,7 +433,7 @@ void SumLogPool::write(void)
   prev_val = 0;
   streak = 0;
 
-  fprintf(fp, "Msg size data:\n");
+  fprintf(fp, "\nMsg size data:\n");
   for(int k = 0; k  < numBins; ++k)
   {
     CkVec<int> sizePerEP = pool[k].getSizePerEP();
@@ -639,7 +639,7 @@ void SumLogPool::write(void)
         prev_val = 0;
         streak = 0;
 
-        fprintf(sdfp, "Msg size data:\n");
+        fprintf(sdfp, "\nMsg size data:\n");
         for(int k = 0; k  < numBins; ++k)
         {
           CkVec<int> sizePerEP = pool[k].getSizePerEP();
