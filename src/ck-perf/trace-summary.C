@@ -401,7 +401,65 @@ void SumLogPool::write(void)
   fprintf(fp, "\n");
 
   fprintf(fp, "Communications data\n");
-  for(int k = 0; k < numBins; ++k)
+  int prev_val = 0;
+  int streak = 0;
+
+  fprintf(fp, "Msg count data:\n");
+  for(int k = 0; k  < numBins; ++k)
+  {
+    CkVec<int> countPerEP = pool[k].getCountPerEP();
+    for(int l = 0; l < _entryTable.size(); ++l)
+    {
+      int temp = countPerEP[l];
+      if(temp == prev_val)
+      {
+        streak++;
+      } else
+      {
+        if(streak > 0)
+        {
+          fprintf(fp,"%d+%d ", prev_val, streak);
+        }
+        prev_val = temp;
+        streak = 1;
+      }
+    }
+    if(streak > 0)
+    {
+      fprintf(fp,"%d+%d ", prev_val, streak);
+    }
+  }
+
+  prev_val = 0;
+  streak = 0;
+
+  fprintf(fp, "Msg size data:\n");
+  for(int k = 0; k  < numBins; ++k)
+  {
+    CkVec<int> sizePerEP = pool[k].getSizePerEP();
+    for(int l = 0; l < _entryTable.size(); ++l)
+    {
+      int temp = sizePerEP[l];
+      if(temp == prev_val)
+      {
+        streak++;
+      } else
+      {
+        if(streak > 0)
+        {
+          fprintf(fp,"%d+%d ", prev_val, streak);
+        }
+        prev_val = temp;
+        streak = 1;
+      }
+    }
+    if(streak > 0)
+    {
+      fprintf(fp, "%d+%d ", prev_val, streak);
+    }
+  }
+
+  /*for(int k = 0; k < numBins; ++k)
   {
     int count = pool[k].getCount();
     int size = pool[k].getSize();
@@ -446,9 +504,7 @@ void SumLogPool::write(void)
     {
       fprintf(fp, "%d %d\t", l, recvSizePerEP[l]);
     }
-    fprintf(fp, "\n");
-
-  }
+    fprintf(fp, "\n");*/
 
 
 #if 0
@@ -549,6 +605,112 @@ void SumLogPool::write(void)
         }
         if (count > 1) fprintf(sdfp, "+%d", count);
         fprintf(sdfp, "\n");
+
+        fprintf(sdfp, "Communications data\n");
+        int prev_val = 0;
+        int streak = 0;
+
+        fprintf(sdfp, "Msg count data:\n");
+        for(int k = 0; k  < numBins; ++k)
+        {
+          CkVec<int> countPerEP = pool[k].getCountPerEP();
+          for(int l = 0; l < _entryTable.size(); ++l)
+          {
+            int temp = countPerEP[l];
+            if(temp == prev_val)
+            {
+              streak++;
+            } else
+            {
+              if(streak > 0)
+              {
+                fprintf(sdfp, "%d+%d ", prev_val, streak);
+              }
+              prev_val = temp;
+              streak = 1;
+            }
+          }
+          if(streak > 0)
+          {
+            fprintf(sdfp, "%d+%d ", prev_val, streak);
+          }
+        }
+
+        prev_val = 0;
+        streak = 0;
+
+        fprintf(sdfp, "Msg size data:\n");
+        for(int k = 0; k  < numBins; ++k)
+        {
+          CkVec<int> sizePerEP = pool[k].getSizePerEP();
+          for(int l = 0; l < _entryTable.size(); ++l)
+          {
+            int temp = sizePerEP[l];
+            if(temp == prev_val)
+            {
+              streak++;
+            } else
+            {
+              if(streak > 0)
+              {
+                fprintf(sdfp,"%d+%d ", prev_val, streak);
+              }
+              prev_val = temp;
+              streak = 1;
+            }
+          }
+          if(streak > 0)
+          {
+            fprintf(sdfp,"%d+%d ", prev_val, streak);
+          }
+        }
+
+        /*for(int k = 0; k < numBins; ++k)
+        {
+          int count = pool[k].getCount();
+          int size = pool[k].getSize();
+          CkVec<int> sizePerEP = pool[k].getSizePerEP();
+          CkVec<int> countPerEP = pool[k].getCountPerEP();
+
+          fprintf(fp, "Bin Idx: %d\n", k);
+          fprintf(fp, "Total Msg Count: %d\n", count);
+          fprintf(fp, "Total Msg Size: %d\n", size);
+
+          fprintf(fp, "Msg Count Per Ep data:\n");
+          for(int l = 0; l < _entryTable.size(); ++l)
+          {
+            fprintf(fp, "%d %d\t", l, countPerEP[l]);
+          }
+          fprintf(fp, "\n");
+
+          fprintf(fp, "Msg Size Per Ep data:\n");
+          for(int l = 0; l < _entryTable.size(); ++l)
+          {
+            fprintf(fp, "%d %d\t", l, sizePerEP[l]);
+          }
+          fprintf(fp, "\n");
+
+          int recvCount = pool[k].getRecvCount();
+          int recvSize = pool[k].getRecvSize();
+          CkVec<int> recvCountPerEP = pool[k].getRecvCountPerEP();
+          CkVec<int> recvSizePerEP = pool[k].getRecvSizePerEP();
+
+          fprintf(fp, "Total RecvMsg Count: %d\n", recvCount);
+          fprintf(fp, "Total Recv Msg Size: %d\n", recvSize);
+
+          fprintf(fp, "Recv Msg Count Per Ep data:\n");
+          for(int l = 0; l < _entryTable.size(); ++l)
+          {
+            fprintf(fp, "%d %d\t", l, recvCountPerEP[l]);
+          }
+          fprintf(fp, "\n");
+
+          fprintf(fp, "Recv Msg Size Per Ep data:\n");
+          for(int l = 0; l < _entryTable.size(); ++l)
+          {
+            fprintf(fp, "%d %d\t", l, recvSizePerEP[l]);
+          }
+          fprintf(fp, "\n");*/
   }
 }
 
