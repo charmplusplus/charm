@@ -102,6 +102,7 @@ void CkArrayOptions::init() {
   anytimeMigration = _isAnytimeMigration;
   insertionType = InsertionType::UNSET;
   reductionClient.type = CkCallback::invalid;
+  initCallback = CkCallback(CkCallback::invalid);
   disableNotifyChildInRed = !_isNotifyChildInRed;
   broadcastViaScheduler = false;
   sectionAutoDelegate = true;
