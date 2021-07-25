@@ -103,9 +103,17 @@ CmiUInt8 CkArrayMessage::array_element_id(void)
   return ck::ObjID(UsrToEnv((void*)this)->getRecipientID()).getElementID();
 }
 
-void CkArrayMessage::set_array_element_id(const CmiUInt8& id)
+void CkArrayMessage::array_set_element_id(const CmiUInt8& id)
 {
   UsrToEnv((void*)this)->setRecipientID(ck::ObjID(id));
+}
+
+bool CkArrayMessage::array_was_forwarded(void) const {
+  return (bool)UsrToEnv((void*)this)->wasForwarded();
+}
+
+void CkArrayMessage::array_set_forwarded(const bool& b) {
+  UsrToEnv((void*)this)->setForwarded((UChar)b);
 }
 
 unsigned short& CkArrayMessage::array_ep(void)
@@ -2238,10 +2246,17 @@ bool CkLocRec::invokeEntry(CkMigratable* obj, void* msg, int epIdx, bool doFree)
   }
 #endif
 
-  if (doFree)
-    CkDeliverMessageFree(epIdx, msg, obj);
-  else /* !doFree */
-    CkDeliverMessageReadonly(epIdx, msg, obj);
+  auto* cast = (CkArrayMessage*)msg;
+  if (!cast->array_was_forwarded() || obj->ckScreenForwarded(cast)) {
+    if (doFree) {
+      CkDeliverMessageFree(epIdx, msg, obj);
+    } else {
+      CkDeliverMessageReadonly(epIdx, msg, obj);
+    }
+  } else if (doFree) {
+    // TODO should this do something else?
+    CkFreeMsg(msg);
+  }
 
 #if CMK_TRACE_ENABLED
   if (msg)

@@ -172,6 +172,7 @@ namespace ck {
       UChar isPacked:1; ///< If true, message must be unpacked before use
       UChar isUsed:1;   ///< Marker bit to prevent message re-send.
       UChar isVarSysMsg:1; ///< True if msg is a variable sized sys message that doesn't use a pool
+      UChar wasForwarded:1;
     };
 
   }
@@ -280,6 +281,8 @@ public:
     void   setPacked(const UChar p) { attribs.isPacked = p; }
     UChar  isVarSysMsg(void) const { return attribs.isVarSysMsg; }
     void   setIsVarSysMsg(const UChar d) { attribs.isVarSysMsg = d; }
+    UChar  wasForwarded(void) const { return attribs.wasForwarded; }
+    void   setForwarded(const UChar& d) { attribs.wasForwarded = d; }
     UShort getPriobits(void) const { return priobits; }
     void   setPriobits(const UShort p) { priobits = p; }
     UShort getPrioWords(void) const { return CkPriobitsToInts(priobits); }

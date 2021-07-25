@@ -52,6 +52,8 @@ public:
   inline void ckStartTiming(void) { }
 #endif
 
+  virtual bool ckScreenForwarded(CkMessage*) { return true; }
+
   /// for inline call
   LDObjHandle timingBeforeCall(int *objstopped);
   void timingAfterCall(LDObjHandle objHandle,int *objstopped);

@@ -683,7 +683,8 @@ public:
     auto before = m->array_element_id();
     auto after = locMgr->dealias(before);
     if (before != after) {
-      m->set_array_element_id(after);
+      m->array_set_forwarded(true);
+      m->array_set_element_id(after);
     }
     return after;
   }

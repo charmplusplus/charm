@@ -8,6 +8,11 @@ class Test : public CBase_Test {
     CkPrintf("%d> hi!\n", thisIndex);
     this->contribute(CkCallback(CkCallback::ckExit));
   }
+
+  virtual bool ckScreenForwarded(CkMessage*) override {
+    CkPrintf("%d> received a forwarded message!\n", thisIndex);
+    return true;
+  }
 };
 
 class Main : public CBase_Main {

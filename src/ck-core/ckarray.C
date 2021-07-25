@@ -1800,8 +1800,10 @@ void CkArray::sendMsg(CkArrayMessage* msg, const CkArrayIndex& idx, CkDeliver_t 
   {
     auto orig = id;
     auto home = locMgr->homePe(orig);
-    if (home == CkMyPe()) {
+    if (home == CkMyPe())
+    {
       id = locMgr->dealias(orig);
+      env->setForwarded(orig != id);
     }
     // We know the ID, so fill in the rest of the envelope to allow for sending
     env->setRecipientID(ck::ObjID(thisgroup, id));
