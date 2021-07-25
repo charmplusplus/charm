@@ -34,6 +34,7 @@ class CkArrayMessage : public CkMessage
 public:
   // These routines are implementation utilities
   CmiUInt8 array_element_id(void);
+  void set_array_element_id(const CmiUInt8& id);
   unsigned short& array_ep(void);
   unsigned short& array_ep_bcast(void);
   unsigned char& array_hops(void);
@@ -393,6 +394,9 @@ private:
   using LocRecHash = std::unordered_map<CmiUInt8, CkLocRec*>;
   using ElemMap = std::unordered_map<CmiUInt8, CkMigratable*>;
 
+  using ForwardingRequestMap = std::unordered_map<CmiUInt8, CmiUInt8>;
+  ForwardingRequestMap fwdReqs;
+
   using LocationListener = std::function<void(CmiUInt8, int)>;
   using IndexListener = std::function<void(const CkArrayIndex&, CmiUInt8, int)>;
   std::list<IndexListener> listeners;
@@ -577,6 +581,35 @@ public:
       }
       CkAssert(itr != idx2id.end());
       return itr->first;
+    }
+  }
+
+  inline void forward(const CkArrayIndex& from, const CkArrayIndex& to) {
+    auto id = this->getNewObjectID(from);
+    auto home = this->homePe(id);
+    if (home == CkMyPe()) {
+      this->fwdReqs[id] = this->lookupID(to);
+    } else {
+      thisProxy[home].forward(from, to);
+    }
+  }
+
+  inline CmiUInt8 dealias(const CmiUInt8& id) const {
+    auto search = this->fwdReqs.find(id);
+    if (search != std::end(this->fwdReqs)) {
+      return search->second;
+    } else {
+      return id;
+    }
+  }
+
+  inline CkArrayIndex dealias(const CkArrayIndex& idx) const {
+    CmiUInt8 id;
+    auto dst = this->lookupID(idx, id) ? this->dealias(id) : id;
+    if (id == dst) {
+      return idx;
+    } else {
+      return this->lookupIdx(dst);
     }
   }
 

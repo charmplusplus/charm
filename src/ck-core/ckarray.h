@@ -679,10 +679,19 @@ public:
     return pe == -1 ? homePe(idx) : pe;
   }
 
+  inline CmiUInt8 extractId(CkArrayMessage* m) const {
+    auto before = m->array_element_id();
+    auto after = locMgr->dealias(before);
+    if (before != after) {
+      m->set_array_element_id(after);
+    }
+    return after;
+  }
+
   // Called by the runtime system to deliver an array message to this array
   void deliver(CkArrayMessage* m, CkDeliver_t type)
   {
-    recvMsg(m, m->array_element_id(), type);
+    recvMsg(m, this->extractId(m), type);
   }
 
   // Methods for sending and receiving messages for array elements

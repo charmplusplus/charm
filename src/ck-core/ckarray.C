@@ -1798,6 +1798,11 @@ void CkArray::sendMsg(CkArrayMessage* msg, const CkArrayIndex& idx, CkDeliver_t 
   CmiUInt8 id;
   if (locMgr->lookupID(idx, id))
   {
+    auto orig = id;
+    auto home = locMgr->homePe(orig);
+    if (home == CkMyPe()) {
+      id = locMgr->dealias(orig);
+    }
     // We know the ID, so fill in the rest of the envelope to allow for sending
     env->setRecipientID(ck::ObjID(thisgroup, id));
     int dest = locMgr->whichPe(id);
@@ -1915,7 +1920,7 @@ void CkArray::sendToPe(CkArrayMessage* msg, int pe, CkDeliver_t type, int opts)
     // NOTE: We should only end up here when an inline entry method is called via callback
     // or when a buffered message is sent from this PE to this PE. Normal inline sends are
     // handled directly in the .ci file via generated code.
-    CmiUInt8 id = msg->array_element_id();
+    auto id = this->extractId(msg);
     ArrayElement* elem = lookup(id);
     if (elem == nullptr)
     {

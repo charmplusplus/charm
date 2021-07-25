@@ -102,6 +102,12 @@ CmiUInt8 CkArrayMessage::array_element_id(void)
 {
   return ck::ObjID(UsrToEnv((void*)this)->getRecipientID()).getElementID();
 }
+
+void CkArrayMessage::set_array_element_id(const CmiUInt8& id)
+{
+  UsrToEnv((void*)this)->setRecipientID(ck::ObjID(id));
+}
+
 unsigned short& CkArrayMessage::array_ep(void)
 {
   return UsrToEnv((void*)this)->getsetArrayEp();
@@ -2746,6 +2752,12 @@ void CkLocMgr::updateLocation(const CkArrayIndex& idx, const CkLocEntry& e)
 
   // Update the location information
   cache->updateLocation(e);
+
+  // Delete any existing forwading requests for this element
+  auto search = this->fwdReqs.find(e.id);
+  if (search != std::end(this->fwdReqs)) {
+    this->fwdReqs.erase(search);
+  }
 
   // Any location requests that we had to buffer because we didn't know how the index
   // mapped to the id can now be replied to.

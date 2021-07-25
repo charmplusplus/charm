@@ -17,6 +17,7 @@ module CkLocation {
     entry [expedited] void requestLocation(const CkArrayIndex& idx, int peToTell);
     entry [expedited] void updateLocation(const CkArrayIndex& idx, const CkLocEntry& e);
     entry void reclaimRemote(const CkArrayIndex& idx, int deletedOnPe);
+    entry void forward(const CkArrayIndex& from, const CkArrayIndex& to);
   };
   
   // Array Map object support:
