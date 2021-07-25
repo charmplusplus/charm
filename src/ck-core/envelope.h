@@ -321,6 +321,7 @@ public:
       env->totalsize = tsize;
       env->priobits = prio;
       env->setPacked(0);
+      env->setForwarded(0);
       env->setGroupDepNum((int)groupDepNumRequest);
       _SET_USED(env, 0);
       env->setEpIdx(0);

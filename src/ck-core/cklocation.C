@@ -2246,8 +2246,10 @@ bool CkLocRec::invokeEntry(CkMigratable* obj, void* msg, int epIdx, bool doFree)
   }
 #endif
 
-  auto* cast = (CkArrayMessage*)msg;
-  if (!cast->array_was_forwarded() || obj->ckScreenForwarded(cast)) {
+  auto *cast = (CkArrayMessage *)msg;
+  if ( (cast == nullptr) ||
+       !cast->array_was_forwarded() ||
+        obj->ckScreenForwarded(cast) ) {
     if (doFree) {
       CkDeliverMessageFree(epIdx, msg, obj);
     } else {
@@ -2546,6 +2548,7 @@ void CkLocMgr::pup(PUP::er& p)
   p | metalbID;
   p | bounds;
   p | idCounter;
+  p | fwdReqs;
   if (p.isUnpacking())
   {
     thisProxy = thisgroup;
