@@ -1914,11 +1914,18 @@ void CkArray::sendToPe(CkArrayMessage* msg, int pe, CkDeliver_t type, int opts)
   }
   else
   {
+    // determine whether the destination is known
+    auto tmp = this->getDestination(msg);
+    if (tmp.isIndex()) {
+      // if not, forward the message via the conventional codepath
+      this->sendMsg(msg, tmp, type, opts);
+      return;
+    }
     // If it is for me, and inline delivery, attempt to invoke the entry method
     // NOTE: We should only end up here when an inline entry method is called via callback
     // or when a buffered message is sent from this PE to this PE. Normal inline sends are
     // handled directly in the .ci file via generated code.
-    auto id = (CmiUInt8)this->getDestination(msg); // TODO handle the isIndex possibility
+    CmiUInt8 id = tmp;
     ArrayElement* elem = lookup(id);
     if (elem == nullptr)
     {
