@@ -673,15 +673,17 @@ public:
 
   struct IndexOrId {
   private:
-    union {
+    union u_options {
       CmiUInt8 id;
       CkArrayIndex idx;
+      u_options(const CmiUInt8& x) : id(x) {}
+      u_options(const CkArrayIndex& x) : idx(x) {}
     } options;
     const bool idx;
 
   public:
-    IndexOrId(const CkArrayIndex& idx) : options({.idx = idx}), idx(true) {}
-    IndexOrId(const CmiUInt8& id) : options({.id = id}), idx(false) {}
+    IndexOrId(const CkArrayIndex& idx) : options(idx), idx(true) {}
+    IndexOrId(const CmiUInt8& id) : options(id), idx(false) {}
     inline bool isIndex(void) const { return this->idx; }
     inline operator CmiUInt8(void) const {
       CkAssert(!this->isIndex());
@@ -726,12 +728,12 @@ public:
   // Called by the runtime system to deliver an array message to this array
   void deliver(CkArrayMessage* m, CkDeliver_t type)
   {
-    auto tmp = this->getDestination(m);
-    if (tmp.isIndex()) {
+    auto dst = this->getDestination(m);
+    if (dst.isIndex()) {
       // message is being forwarded and we do not know the destination
-      sendMsg(m, tmp, type);
+      sendMsg(m, dst, type);
     } else {
-      recvMsg(m, tmp, type);
+      recvMsg(m, dst, type);
     }
   }
 
