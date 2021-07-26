@@ -396,7 +396,7 @@ private:
   using LocRecHash = std::unordered_map<CmiUInt8, CkLocRec*>;
   using ElemMap = std::unordered_map<CmiUInt8, CkMigratable*>;
 
-  using ForwardingRequestMap = std::unordered_map<CmiUInt8, CkArrayIndex>;
+  using ForwardingRequestMap = std::unordered_map<CkArrayIndex, CkArrayIndex, IndexHasher>;
   ForwardingRequestMap fwdReqs;
 
   using LocationListener = std::function<void(CmiUInt8, int)>;
@@ -590,25 +590,14 @@ public:
     auto home = this->homePe(from);
     if (home == CkMyPe()) {
       // TODO do we need to resync send queues here?
-      auto id = this->getNewObjectID(from);
-      this->fwdReqs[id] = to;
+      this->fwdReqs[from] = to;
     } else {
       thisProxy[home].forward(from, to);
     }
   }
 
-  inline CmiUInt8 dealias(const CmiUInt8& id) const {
-    auto search = this->fwdReqs.find(id);
-    if (search != std::end(this->fwdReqs)) {
-      return this->lookupID(search->second);
-    } else {
-      return id;
-    }
-  }
-
-  inline CkArrayIndex dealias(const CkArrayIndex& idx) const {
-    auto id = this->lookupID(idx);
-    auto search = this->fwdReqs.find(id);
+  inline const CkArrayIndex& dealias(const CkArrayIndex& idx) const {
+    auto search = this->fwdReqs.find(idx);
     if (search != std::end(this->fwdReqs)) {
       return search->second;
     } else {

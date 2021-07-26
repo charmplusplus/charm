@@ -680,9 +680,9 @@ public:
   }
 
   inline CmiUInt8 extractId(CkArrayMessage* m) const {
-    auto before = m->array_element_id();
-    auto after = locMgr->dealias(before);
-    if (before != after) {
+    auto before = locMgr->lookupIdx(m->array_element_id());
+    auto after = locMgr->lookupID(locMgr->dealias(before));
+    if (m->array_element_id() != after) {
       m->array_set_forwarded(true);
       m->array_set_element_id(after);
     }

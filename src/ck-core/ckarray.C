@@ -1796,17 +1796,13 @@ void CkArray::sendMsg(CkArrayMessage* msg, const CkArrayIndex& idx, CkDeliver_t 
   }
 
   CmiUInt8 id;
-  if (locMgr->lookupID(idx, id))
+  auto home = locMgr->homePe(idx);
+  auto actual = (home == CkMyPe()) ? locMgr->dealias(idx) : idx;
+  if (locMgr->lookupID(actual, id))
   {
-    auto orig = id;
-    auto home = locMgr->homePe(orig);
-    if (home == CkMyPe())
-    {
-      id = locMgr->dealias(orig);
-      env->setForwarded(orig != id);
-    }
     // We know the ID, so fill in the rest of the envelope to allow for sending
     env->setRecipientID(ck::ObjID(thisgroup, id));
+    env->setForwarded(!(idx == actual));
     int dest = locMgr->whichPe(id);
     if (dest != -1)
     {
