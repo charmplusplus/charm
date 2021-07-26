@@ -672,15 +672,16 @@ public:
   inline int procNum(const CkArrayIndex& idx) const { return locMgr->procNum(idx); }
 
   struct IndexOrId {
-   private:
-    const union {
+  private:
+    union {
       CmiUInt8 id;
       CkArrayIndex idx;
     } options;
     const bool idx;
-   public:
-    IndexOrId(const CkArrayIndex& idx): options({.idx = idx}), idx(true) {}
-    IndexOrId(const CmiUInt8& id): options({.id = id}), idx(false) {}
+
+  public:
+    IndexOrId(const CkArrayIndex& idx) : options({.idx = idx}), idx(true) {}
+    IndexOrId(const CmiUInt8& id) : options({.id = id}), idx(false) {}
     inline bool isIndex(void) const { return this->idx; }
     inline operator CmiUInt8(void) const {
       CkAssert(!this->isIndex());
