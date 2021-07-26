@@ -58,6 +58,11 @@ FEATURES_roseomptlsglobals_cxx := threadlocalvars staticvars sharedlib migration
 FEATURES_fsglobals_cxx := globalvars staticvars
 FEATURES_pipglobals_cxx := globalvars staticvars sharedlib
 
+ifeq (1,$(CMK_SUPPORTS_TLSGLOBALS))
+  FEATURES_fsglobals_cxx += threadlocalvars
+  FEATURES_pipglobals_cxx += threadlocalvars
+endif
+
 
 # Universal settings
 LINKOPTS := -balancer TreeLB

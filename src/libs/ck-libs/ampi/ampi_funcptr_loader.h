@@ -3,6 +3,7 @@
 
 #include "ampiimpl.h"
 #include "ampi_funcptr.h"
+#include "cmitls.h"
 
 int AMPI_FuncPtr_Pack(struct AMPI_FuncPtr_Transport *, size_t);
 
