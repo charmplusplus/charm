@@ -1797,7 +1797,7 @@ void CkArray::sendMsg(CkArrayMessage* msg, const CkArrayIndex& idx, CkDeliver_t 
 
   CmiUInt8 id;
   auto home = locMgr->homePe(idx);
-  auto actual = (home == CkMyPe()) ? locMgr->dealias(idx) : idx;
+  auto &actual = (home == CkMyPe()) ? locMgr->dealias(idx) : idx;
   if (locMgr->lookupID(actual, id))
   {
     // We know the ID, so fill in the rest of the envelope to allow for sending
@@ -1813,7 +1813,7 @@ void CkArray::sendMsg(CkArrayMessage* msg, const CkArrayIndex& idx, CkDeliver_t 
     {
       // We know the ID but the location is unknown. This means the message can be sent,
       // but we don't know where to send it.
-      handleUnknown(msg, idx, type, opts);
+      handleUnknown(msg, actual, type, opts);
     }
   }
   else
@@ -1821,7 +1821,7 @@ void CkArray::sendMsg(CkArrayMessage* msg, const CkArrayIndex& idx, CkDeliver_t 
     // We don't know the ID, so set a sentinel ID to prevent the message from being sent
     // then handle the unknown (which will buffer or demand create).
     env->setRecipientID(0);
-    handleUnknown(msg, idx, type, opts);
+    handleUnknown(msg, actual, type, opts);
   }
 }
 
