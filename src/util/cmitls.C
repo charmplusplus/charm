@@ -137,7 +137,7 @@ static int count_tls_sizes(struct dl_phdr_info* info, size_t size, void* data)
   return 0;
 }
 
-static inline void CmiTLSStatsInit()
+void CmiTLSStatsInit()
 {
   CmiTLSDescription.size = 0;
   CmiTLSDescription.align = 0;
@@ -213,7 +213,7 @@ struct TLVDescriptor
 };
 
 
-static inline void CmiTLSStatsInit()
+void CmiTLSStatsInit()
 {
   size_t totalsize = 0;
   size_t total_emutls_num = 0;
@@ -346,8 +346,7 @@ static inline void CmiTLSStatsInit()
     {
       const size_t alignedsize = CMIALIGN(size, global_align);
 
-      const bool didInsert = CmiTLSSegments.emplace(key, CmiTLSSegment{start, alignedsize}).second;
-      CmiEnforce(didInsert);
+      CmiTLSSegments.emplace(key, CmiTLSSegment{start, alignedsize});
 
       totalsize += alignedsize;
     }
@@ -359,10 +358,13 @@ static inline void CmiTLSStatsInit()
 
   if (total_emutls_num > 0)
   {
-    // Predict the value that emutls_key will be after emutls_init is called.
-    pthread_key_t fakekey;
-    pthread_key_create(&fakekey, nullptr);
-    CmiTLSEmuTLSKey = fakekey + 1;
+    if (!CmiTLSEmuTLSKey)
+    {
+      // Predict the value that emutls_key will be after emutls_init is called.
+      pthread_key_t fakekey;
+      pthread_key_create(&fakekey, nullptr);
+      CmiTLSEmuTLSKey = fakekey + 1;
+    }
     CmiTLSEmuTLSNumObjects = total_emutls_num;
 
     totalsize += CmiTLSEmuTLSGetAlignedSize(total_emutls_num);
@@ -435,7 +437,7 @@ Phdr* getTLSPhdrEntry()
   return NULL;
 }
 
-static void CmiTLSStatsInit()
+void CmiTLSStatsInit()
 {
   /* Use dynamic linking in case Charm++ shared objects are used by a binary lacking
    * conv-static.o, such as in the case of Charm4py. */
@@ -455,7 +457,7 @@ static void CmiTLSStatsInit()
 
 #else
 
-static inline void CmiTLSStatsInit()
+void CmiTLSStatsInit()
 {
 }
 
