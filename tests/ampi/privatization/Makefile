@@ -63,6 +63,10 @@ FEATURES_fsglobals_cxx := globalvars staticvars
 FEATURES_pipglobals_cxx := globalvars staticvars sharedlib
 FEATURES_pieglobals_cxx := globalvars staticvars sharedlib migration
 
+ifeq (1,$(CMK_SUPPORTS_TLSGLOBALS))
+  FEATURES_pieglobals_cxx += threadlocalvars
+endif
+
 
 # Universal settings
 LINKOPTS := -balancer TreeLB

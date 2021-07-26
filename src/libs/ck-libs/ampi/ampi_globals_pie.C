@@ -94,9 +94,6 @@ static int phdr_print(struct dl_phdr_info * info, size_t size, void * data)
     const auto & phdr = info->dlpi_phdr[j];
     const int p_type = phdr.p_type;
 
-    if (p_type == PT_TLS)
-      CmiError("AMPI> Warning: Use of thread_local detected in pieglobals binary!\n");
-
 #if PIEGLOBALS_DEBUG >= 1
     const char * type;
     switch (p_type)
@@ -340,6 +337,10 @@ void AMPI_Node_Setup(int numranks)
   CmiAssert(!pieglobalsdata.objects.empty());
 
   atexit(ampiMarkAtexit);
+
+#if CMK_HAS_TLS_VARIABLES
+  CmiTLSStatsInit();
+#endif
 }
 
 
