@@ -671,6 +671,27 @@ public:
   inline int homePe(const CkArrayIndex& idx) const { return locMgr->homePe(idx); }
   inline int procNum(const CkArrayIndex& idx) const { return locMgr->procNum(idx); }
 
+  struct IndexOrId {
+   private:
+    const union {
+      CmiUInt8 id;
+      CkArrayIndex idx;
+    } options;
+    const bool idx;
+   public:
+    IndexOrId(const CkArrayIndex& idx): options({.idx = idx}), idx(true) {}
+    IndexOrId(const CmiUInt8& id): options({.id = id}), idx(false) {}
+    inline bool isIndex(void) const { return this->idx; }
+    inline operator CmiUInt8(void) const {
+      CkAssert(!this->isIndex());
+      return this->options.id;
+    }
+    inline operator CkArrayIndex(void) const {
+      CkAssert(this->isIndex());
+      return this->options.idx;
+    }
+  };
+
   /// Return the last known processor for this array index.
   /// Valid for any possible array index.
   inline int lastKnown(const CkArrayIndex& idx) const
@@ -679,20 +700,38 @@ public:
     return pe == -1 ? homePe(idx) : pe;
   }
 
-  inline CmiUInt8 extractId(CkArrayMessage* m) const {
-    auto before = locMgr->lookupIdx(m->array_element_id());
-    auto after = locMgr->lookupID(locMgr->dealias(before));
-    if (m->array_element_id() != after) {
-      m->array_set_forwarded(true);
-      m->array_set_element_id(after);
+  inline IndexOrId getDestination(CkArrayMessage* m) const {
+    auto id = m->array_element_id();
+    CkArrayIndex idx;
+    if (locMgr->lookupIdx(id, idx)) {
+      auto tmp = locMgr->dealias(idx);
+      auto fwd = !(idx == tmp);
+      m->array_set_forwarded(fwd || m->array_was_forwarded());
+      idx = tmp;
+      if (fwd) {
+        if (locMgr->lookupID(idx, id)) {
+          m->array_set_element_id(id);
+        } else {
+          // we only return the index when we were
+          // forwarded and the (local) id lookup fails
+          return idx;
+        }
+      }
     }
-    return after;
+    // implicit return id for all terminal paths
+    return id;
   }
 
   // Called by the runtime system to deliver an array message to this array
   void deliver(CkArrayMessage* m, CkDeliver_t type)
   {
-    recvMsg(m, this->extractId(m), type);
+    auto tmp = this->getDestination(m);
+    if (tmp.isIndex()) {
+      // message is being forwarded and we do not know the destination
+      sendMsg(m, tmp, type);
+    } else {
+      recvMsg(m, tmp, type);
+    }
   }
 
   // Methods for sending and receiving messages for array elements

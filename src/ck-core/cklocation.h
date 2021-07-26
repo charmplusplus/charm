@@ -567,22 +567,27 @@ public:
     }
   }
 
-  CkArrayIndex lookupIdx(const CmiUInt8& id) const
-  {
-    if (compressor)
-    {
-      return compressor->decompress(id);
-    }
-    else
-    {
-      IdxIdMap::const_iterator itr;
-      for (itr = idx2id.begin(); itr != idx2id.end(); itr++)
-      {
-        if (itr->second == id)
-          break;
+  CkArrayIndex lookupIdx(const CmiUInt8& id) const {
+    CkArrayIndex retval;
+    CkAssert(this->lookupIdx(id, retval));
+    return retval;
+  }
+
+  bool lookupIdx(const CmiUInt8& id, CkArrayIndex& idx) const {
+    if (compressor) {
+      idx = compressor->decompress(id);
+      return true;
+    } else {
+      using value_type = typename decltype(this->idx2id)::value_type;
+      auto search = std::find_if(
+          std::begin(this->idx2id), std::end(this->idx2id),
+          [id](const value_type& value) { return id == value.second; });
+      if (search != std::end(this->idx2id)) {
+        idx = search->first;
+        return true;
+      } else {
+        return false;
       }
-      CkAssert(itr != idx2id.end());
-      return itr->first;
     }
   }
 

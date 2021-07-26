@@ -2771,7 +2771,7 @@ void CkLocMgr::updateLocation(const CkArrayIndex& idx, const CkLocEntry& e)
   // Update the location information
   cache->updateLocation(e);
 
-  // Delete any existing forwading requests for this element
+  // Delete any existing forwarding requests for this element
   auto search = this->fwdReqs.find(idx);
   if (search != std::end(this->fwdReqs)) {
     this->fwdReqs.erase(search);
