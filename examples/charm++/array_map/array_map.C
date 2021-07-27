@@ -56,8 +56,7 @@ public:
         mgr->insertInitial(CkArrayIndex1D(i), CkCopyMsg(&ctorMsg));
       }
 
-      // Inform the mgr that we are done creating elements, and free ctorMsg.
-      mgr->doneInserting();
+      // Free the ctorMsg.
       CkFreeMsg(ctorMsg);
     } else {
       // For higher dimension indices we fall back to the default behavior,
