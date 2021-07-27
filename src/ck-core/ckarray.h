@@ -669,7 +669,6 @@ public:
   CkArray(CkArrayOptions&& c, CkMarshalledMessage&& initMsg);
   CkArray(CkMigrateMessage* m);
   ~CkArray();
-  CkGroupID& getGroupID(void) { return thisgroup; }
   CkGroupID& getmCastMgr(void) { return mCastMgrID; }
   bool isSectionAutoDelegated(void) { return sectionAutoDelegate; }
 

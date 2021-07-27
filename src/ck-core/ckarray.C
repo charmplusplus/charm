@@ -1777,8 +1777,6 @@ void CkArray::ckDestroy()
 void CkArray::sendMsg(CkArrayMessage* msg, const CkArrayIndex& idx, CkDeliver_t type,
                       int opts)
 {
-  locMgr->checkInBounds(idx);
-
   envelope* env = UsrToEnv(msg);
   env->setMsgtype(ForArrayEltMsg);
   _TRACE_CREATION_DETAILED(env, msg->array_ep());
@@ -1867,7 +1865,7 @@ void CkArray::recordSend(const CmiUInt8 id, const unsigned int bytes, int pe, co
 #  else
     const CmiUInt8 lbObjId = id;
 #  endif
-    locMgr->getLBMgr()->Send(locMgr->myLBHandle, lbObjId, bytes, pe, 1);
+    locMgr->getLBMgr()->Send(locMgr->getOMHandle(), lbObjId, bytes, pe, 1);
   }
 #endif
 }

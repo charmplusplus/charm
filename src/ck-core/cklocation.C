@@ -2490,8 +2490,8 @@ CkLocMgr::CkLocMgr(CkArrayOptions opts)
 #if CMK_LBDB_ON
   lbmgrID = _lbmgr;
   metalbID = _metalb;
-#endif
   initLB(lbmgrID, metalbID);
+#endif
 }
 
 CkLocMgr::CkLocMgr(CkMigrateMessage* m)
@@ -2522,8 +2522,6 @@ void CkLocMgr::pup(PUP::er& p)
   p | mapID;
   p | mapHandle;
   p | cacheID;
-  p | lbmgrID;
-  p | metalbID;
   p | bounds;
   p | idCounter;
   if (p.isUnpacking())
@@ -2542,16 +2540,23 @@ void CkLocMgr::pup(PUP::er& p)
     if (cache == nullptr)
       CkAbort("ERROR! Local branch of location cache is NULL!");
 
-    // _lbdb is the fixed global groupID
-    initLB(lbmgrID, metalbID);
     compressor = ck::FixedArrayIndexCompressor::make(bounds);
+  }
 
-    // Delay doneInserting when it is unpacking during restart to prevent load
-    // balancing from kicking in.
-    if (!CkInRestarting())
-    {
-      doneInserting();
-    }
+#if CMK_LBDB_ON
+  p | lbmgrID;
+  p | metalbID;
+  if (p.isUnpacking())
+  {
+    initLB(lbmgrID, metalbID);
+  }
+#endif
+
+  // Delay doneInserting when it is unpacking during restart to prevent load balancing
+  // from kicking in.
+  if (p.isUnpacking() && !CkInRestarting())
+  {
+    doneInserting();
   }
 }
 
@@ -2853,9 +2858,8 @@ void CkLocMgr::multiHop(CkArrayMessage* msg)
   }
 }
 
-void CkLocMgr::checkInBounds(const CkArrayIndex& idx)
+bool CkLocMgr::checkInBounds(const CkArrayIndex& idx) const
 {
-#if CMK_ERROR_CHECKING
   if (bounds.nInts > 0)
   {
     CkAssert(idx.dimension == bounds.dimension);
@@ -2865,10 +2869,10 @@ void CkLocMgr::checkInBounds(const CkArrayIndex& idx)
     {
       unsigned int thisDim = shorts ? idx.indexShorts[i] : idx.index[i];
       unsigned int thatDim = shorts ? bounds.indexShorts[i] : bounds.index[i];
-      CkAssert(thisDim < thatDim);
+      if (thisDim >= thatDim) return false;
     }
   }
-#endif
+  return true;
 }
 
 /************************** LocMgr: ITERATOR *************************/
@@ -3243,34 +3247,10 @@ static void abort_out_of_bounds(const CkArrayIndex& idx)
   CkAbort("Array index out of bounds\n");
 }
 
-// Look up array element in hash table.  Index out-of-bounds if not found.
-// TODO: Could this take an ID instead?
-CkLocRec* CkLocMgr::elementRec(const CkArrayIndex& idx)
-{
-#if !CMK_ERROR_CHECKING
-  // Assume the element will be found
-  return hash[lookupID(idx)];
-#else
-  // Include an out-of-bounds check if the element isn't found
-  CmiUInt8 id;
-  CkLocRec* rec = NULL;
-  if (lookupID(idx, id) && (rec = elementNrec(id)))
-  {
-    return rec;
-  }
-  else
-  {
-    if (rec == NULL)
-      abort_out_of_bounds(idx);
-    return NULL;
-  }
-#endif
-}
-
 // Look up array element in hash table.  Return NULL if not there.
-CkLocRec* CkLocMgr::elementNrec(const CmiUInt8 id)
+CkLocRec* CkLocMgr::elementNrec(const CmiUInt8 id) const
 {
-  LocRecHash::iterator it = hash.find(id);
+  LocRecHash::const_iterator it = hash.find(id);
   return it == hash.end() ? NULL : it->second;
 }
 
@@ -3292,7 +3272,6 @@ unsigned int CkLocMgr::numLocalElements()
 
 #if !CMK_LBDB_ON
 // Empty versions of all load balancer calls
-void CkLocMgr::initLB(CkGroupID lbmgrID_, CkGroupID metalbID_) {}
 void CkLocMgr::startInserting(void) {}
 void CkLocMgr::doneInserting(void) {}
 #endif
