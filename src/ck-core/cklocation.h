@@ -604,7 +604,7 @@ public:
   inline const CkArrayIndex& dealias(const CkArrayIndex& idx) const {
     auto search = this->fwdReqs.find(idx);
     if (search != std::end(this->fwdReqs)) {
-      return search->second;
+      return this->dealias(search->second);
     } else {
       return idx;
     }
