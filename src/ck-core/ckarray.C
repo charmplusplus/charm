@@ -1051,44 +1051,31 @@ bool CkArray::insertElement(CkArrayMessage* m, const CkArrayIndex& idx,
   CK_MAGICNUMBER_CHECK
   int onPe;
   // Element's sibling already lives somewhere else, so insert there instead.
+  // TODO: What if it's remote but we don't know it? Creation is not necessarily routed
+  // through home like demand creation is, which can cause problems.
   if (locMgr->isRemote(idx, &onPe))
   {
     thisProxy[onPe].insertElement(m, idx, listenerData);
     return false;
   }
+
+  // Register the new element with the location manager
+  CkLocRec* rec = locMgr->registerNewElement(idx);
+  CmiUInt8 id = rec->getID();
+
+  // Make sure the element doesn't already exist
+  CkAssertMsg(getEltFromArrMgr(id) == nullptr, "Cannot insert array element twice!");
+
+  // Create the new element and insert it into the array manager
   int ctorIdx = m->array_ep();
   int chareType = _entryTable[ctorIdx]->chareIdx;
   ArrayElement* elt = allocate(chareType, m, false, listenerData);
-
-  // Get the ID for this element
-  CmiUInt8 id = locMgr->getNewObjectID(idx);
-  CkLocRec* rec = locMgr->elementNrec(id);
-
-  // See if a location record needs to be created
-  if (rec == NULL)
-  {
-    rec = locMgr->createLocal(idx, false, false, true);
-  }
-  else
-  {
-    // The location record already existed, which means there's a sibling object here and
-    // we may have already buffered some messages.
-    // TODO: This may not be necessary because an inform call will occur once the element
-    // is inserted, which will trigger clearing the buffers.
-    sendBufferedMsgs(id, CkMyPe());
-  }
-
-  // Make sure the element doesn't already exist, then add it.
-  if (getEltFromArrMgr(id))
-  {
-    CkAbort("Cannot insert array element twice!");
-  }
   putEltInArrMgr(id, elt);
 
   // Set the constructor info for the new element
   CkMigratable_initInfo& i = CkpvAccess(mig_initInfo);
   i.locRec = rec;
-  i.chareType = _entryTable[ctorIdx]->chareIdx;
+  i.chareType = chareType;
 
   // Execute the constructor
   if (!rec->invokeEntry(elt, (void*)m, ctorIdx, true))
@@ -1100,6 +1087,10 @@ bool CkArray::insertElement(CkArrayMessage* m, const CkArrayIndex& idx,
   // The initCallback will only be valid if it was set in CkArrayOptions and this is the
   // first wave of insertions.
   if (!initCallback.isInvalid()) elt->contribute(initCallback);
+
+  // In the case where this is a sibling of an element that already existed on this PE,
+  // we need to make sure we deliver any buffered messages.
+  sendBufferedMsgs(id, CkMyPe());
   return true;
 }
 
@@ -1927,15 +1918,15 @@ void CkArray::sendToPe(CkArrayMessage* msg, int pe, CkDeliver_t type, int opts)
       }
       else
       {
-        CkLocRec* rec = locMgr->elementNrec(id);
-        CkAssert(rec);
         // Directly demand create. Since we are the location of a sibling, we don't need
         // to request permission from home.
+        const CkArrayIndex& idx = locMgr->lookupIdx(id);
+        CkAssert(!locMgr->isRemote(id));
         int chareType = _entryTable[msg->array_ep()]->chareIdx;
         int ctor = _chareTable[chareType]->getDefaultCtor();
         CkAssertMsg(ctor != -1,
             "Can't demand create an element with no default ctor in the .ci file\n");
-        demandCreateElement(rec->getIndex(), ctor);
+        demandCreateElement(idx, ctor);
       }
     }
 #if CMK_LBDB_ON

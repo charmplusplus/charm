@@ -2656,6 +2656,19 @@ CmiUInt8 CkLocMgr::getNewObjectID(const CkArrayIndex& idx)
   return id;
 }
 
+CkLocRec* CkLocMgr::registerNewElement(const CkArrayIndex& idx)
+{
+  CmiUInt8 id = getNewObjectID(idx);
+  CkLocRec* rec = elementNrec(id);
+  if (rec == nullptr)
+  {
+    // TODO: This is going to end up needlessly calling getNewObejctID(...) again
+    rec = createLocal(idx, false, false, true);
+  }
+
+  return rec;
+}
+
 bool CkLocMgr::addElementToRec(CkLocRec* rec, CkArray* mgr, CkMigratable* elt,
                                int ctorIdx, void* ctorMsg)
 {

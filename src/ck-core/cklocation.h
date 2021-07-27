@@ -475,6 +475,7 @@ public:
   CmiUInt8 getNewObjectID(const CkArrayIndex& idx);
 
   MsgBuffer bufferedActiveRgetMsgs;
+  CkLocRec* registerNewElement(const CkArrayIndex& idx);
 
   bool addElementToRec(CkLocRec* rec, CkArray* m, CkMigratable* elt, int ctorIdx,
                        void* ctorMsg);
@@ -563,9 +564,14 @@ public:
 
   CkArrayIndex lookupIdx(const CmiUInt8& id) const
   {
+    CkLocRec* rec = nullptr;
     if (compressor)
     {
       return compressor->decompress(id);
+    }
+    else if (rec = elementNrec(id))
+    {
+      return rec->getIndex();
     }
     else
     {
@@ -600,6 +606,9 @@ public:
 
   /// Return true if this array element lives on another processor
   bool isRemote(const CkArrayIndex& idx, int* onPe) const;
+  bool isRemote(const CmiUInt8 id) const {
+    return elementNrec(id) == nullptr;
+  }
 
   void setDuringDestruction(bool _duringDestruction);
 
