@@ -1844,6 +1844,13 @@ void CkArray::sendMsg(CkArrayMessage* msg, const CkArrayIndex& idx, CkDeliver_t 
 // similar logic as sendMsg to forward the message, buffer it, or trigger demand creation.
 void CkArray::recvMsg(CkArrayMessage* msg, CmiUInt8 id, CkDeliver_t type, int opts)
 {
+  auto iter = locMgr->bufferedActiveRgetMsgs.find(id);
+  if (iter != locMgr->bufferedActiveRgetMsgs.end())
+  {
+    iter->second.push_back(msg);
+    return;
+  }
+
   msg->array_hops()++;
 
   // First, if this is the actual location of the element, just deliver the message
@@ -1991,7 +1998,12 @@ void CkArray::deliverToElement(CkArrayMessage* msg, ArrayElement* elem)
     locMgr->getLBMgr()->ObjectStop(objHandle);
   }
 #endif
-  elem->ckInvokeEntry(msg->array_ep(), (void*)msg, true);
+  bool doFree = true;
+  if(CMI_ZC_MSGTYPE(UsrToEnv(msg)) == CMK_ZC_P2P_RECV_MSG) // Do not free a P2P_RECV_MSG
+  {
+    doFree = false;
+  }
+  elem->ckInvokeEntry(msg->array_ep(), (void*)msg, doFree);
 #if CMK_LBDB_ON
   if (wasAnObjRunning)
     locMgr->getLBMgr()->ObjectStart(objHandle);

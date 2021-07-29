@@ -1161,42 +1161,11 @@ void _processNodeBocInitMsg(CkCoreState *ck,envelope *env)
 
 /************** Receive: Arrays *************/
 static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
-  ArrayObjMap& object_map = CkpvAccess(array_objs);
-  auto iter = object_map.find(env->getRecipientID());
-  if (iter != object_map.end()) {
-
-    CkArrayMessage* msg = (CkArrayMessage*)EnvToUsr(env);
-
-    CkLocMgr *localLocMgr  = CProxy_ArrayBase(env->getArrayMgr()).ckLocMgr();
-
-    // Check if the array element has active Rgets (because of ZC Pup)
-    auto iter2 = localLocMgr->bufferedActiveRgetMsgs.find(msg->array_element_id());
-
-    if(iter2 != localLocMgr->bufferedActiveRgetMsgs.end()) {
-      // array element has active rgets
-      iter2->second.push_back(msg); // Buffer msg for now and handle it after rgets complete
-      return;
-    }
-
-    // First see if we already have a direct pointer to the object
+  CkArray *mgr=(CkArray *)_lookupGroupAndBufferIfNotThere(ck,env,env->getArrayMgr());
+  if (mgr) {
     _SET_USED(env, 0);
     ck->process(); // ck->process() updates mProcessed count used in QD
-    int opts = 0;
-    if (msg->array_hops()>1) {
-      CProxy_ArrayBase(env->getArrayMgr()).ckLocMgr()->multiHop(msg);
-    }
-    bool doFree = true;
-    if(CMI_ZC_MSGTYPE(env) == CMK_ZC_P2P_RECV_MSG) // Do not free a P2P_RECV_MSG
-      doFree = false;
-    iter->second->ckInvokeEntry(env->getEpIdx(), msg, doFree);
-  } else {
-    // Otherwise fallback to delivery through the array manager
-    CkArray *mgr=(CkArray *)_lookupGroupAndBufferIfNotThere(ck,env,env->getArrayMgr());
-    if (mgr) {
-      _SET_USED(env, 0);
-      ck->process(); // ck->process() updates mProcessed count used in QD
-      mgr->deliver((CkArrayMessage *)EnvToUsr(env), CkDeliver_inline);
-    }
+    mgr->deliver((CkArrayMessage *)EnvToUsr(env), CkDeliver_inline);
   }
 }
 
