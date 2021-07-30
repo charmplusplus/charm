@@ -473,7 +473,16 @@ LIBTMGR = TopoManager.o CrayNid.o BGQTorus.o
 
 include Makefile.machine
 
-converse: charmrun-target swapglobal-target conv-cpm $(L)/libconverse.a
+CONVERSE_DEPS := \
+  charmrun-target \
+  conv-cpm \
+  $(L)/libconverse.a \
+
+ifneq (0,$(CMK_SUPPORTS_SWAPGLOBALS))
+  CONVERSE_DEPS += swapglobal-target
+endif
+
+converse: $(CONVERSE_DEPS)
 
 cpuaffinity.o $(INC)/hwloc.h $(INC)/hwloc/autogen/config.h $(INC)/hwloc/rename.h $(INC)/hwloc/bitmap.h \
 $(INC)/hwloc/helper.h $(INC)/hwloc/inlines.h $(INC)/hwloc/diff.h $(INC)/hwloc/deprecated.h $(INC)/hwloc/export.h $(INC)/hwloc/distances.h : hwloc-target
@@ -656,7 +665,7 @@ $(eval $(call libthreads,uJcontext-memoryalias,uJcontext.C,-DCMK_THREADS_BUILD_J
 swapglobal-target: $(L)/libglobal-swap.a
 
 $(L)/libglobal-swap.a: global-elfgot.C $(CVHEADERS)
-	-$(CHARMC) -c global-elfgot.C -o $@ || touch $@
+	$(CHARMC) -c global-elfgot.C -o $@
 
 ###############################################################################
 #

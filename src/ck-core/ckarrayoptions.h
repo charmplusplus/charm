@@ -90,7 +90,7 @@ class CkArrayOptions {
     DYNAMIC,
     STATIC
   };
-  InsertionType insertionType; // -1 = unset, 0 = false, 1 = true
+  InsertionType insertionType;
 
   /// Set various safe defaults for all the constructors
   void init();
