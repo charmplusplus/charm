@@ -317,7 +317,7 @@ void TraceAutoPerf::summarizeObjectInfo(double &maxtime, double &totaltime, doub
   void *maximum = NULL;
 
   if(objectLoads.size() > 0) {
-    mintime = objectLoads.begin()->second->executeTime;
+    mintime = maxtime = objectLoads.begin()->second->executeTime;
     minBytesPerMsg = maxBytesPerMsg = (double)(objectLoads.begin()->second->msgSize)/(double)(objectLoads.begin()->second->msgCount);
   }
   for(ObjectLoadMap_t::iterator it= objectLoads.begin(); it!= objectLoads.end(); it++)
@@ -359,14 +359,12 @@ PerfData* TraceAutoPerf::getSummary() {
   currentSummary->data[MIN_IdlePercentage] = currentSummary->data[MAX_IdlePercentage] = currentSummary->data[AVG_IdlePercentage] = idleRatio();
   currentSummary->data[MIN_OverheadPercentage] = currentSummary->data[MAX_OverheadPercentage] = currentSummary->data[AVG_OverheadPercentage] = overheadRatio();
   currentSummary->data[MIN_UtilizationPercentage] = currentSummary->data[MAX_UtilizationPercentage] = currentSummary->data[AVG_UtilizationPercentage] = utilRatio();
-  currentSummary->data[MAX_NumInvocations] = currentSummary->data[AVG_NumInvocations] = currentSummary->data[AVG_NumInvocations] = (double)totalEntryMethodInvocations;
+  currentSummary->data[MAX_NumInvocations] = currentSummary->data[AVG_NumInvocations] = (double)totalEntryMethodInvocations;
 
   summarizeObjectInfo(currentSummary->data[MAX_LoadPerObject], currentSummary->data[AVG_LoadPerObject], currentSummary->data[MIN_LoadPerObject],
-                      currentSummary->data[MAX_NumMsgsPerObject],  currentSummary->data[AVG_NumMsgsPerObject],
-                      currentSummary->data[MAX_BytesPerObject], currentSummary->data[AVG_BytesPerObject], currentSummary->data[AVG_NumObjectsPerPE],
+                      currentSummary->data[MAX_NumMsgsPerObject],  currentSummary->data[AVG_NumMsgRecvPerPE],
+                      currentSummary->data[MAX_BytesPerObject], currentSummary->data[AVG_BytesMsgRecvPerPE], currentSummary->data[AVG_NumObjectsPerPE],
                       currentSummary->data[MAX_BytesPerMsg], currentSummary->data[MIN_BytesPerMsg]);
-  currentSummary->data[AVG_NumMsgRecvPerPE] = currentSummary->data[AVG_NumMsgsPerObject];
-  currentSummary->data[AVG_BytesMsgRecvPerPE] = currentSummary->data[AVG_BytesPerObject];
   currentSummary->data[MAX_LoadPerPE] = currentSummary->data[MIN_LoadPerPE] = utilRatio();
   currentSummary->data[AVG_EntryMethodDuration]= (double)totalEntryMethodTime;
   currentSummary->data[MAX_EntryMethodDuration]= maxEntryTime;

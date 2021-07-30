@@ -67,7 +67,7 @@ public:
     int abseff = eff>=0?eff:-eff;
     CkPrintf("solution %s  %s \n", eff>0?"UP":"Down", EffectName[abseff]);
   }
-  void printDataToFile(double *input, FILE *fp) ;
+
   int getValue() { return eff;}
 };
 

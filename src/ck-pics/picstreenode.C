@@ -5,8 +5,10 @@
 #include "register.h"
 
 
-/*
- * 28 Avg + 40 Max + 9 Min
+/**
+ * 28 Avg
+ * 40 Max
+ * 9 Min
  */
 char FieldName[NUM_NODES][30] = {
     "AVG_TotalTime",
@@ -116,17 +118,18 @@ void Condition::printMe() {
 void Condition::parseString(std::string str, FILE *fp) {
   std::size_t pos = str.find("_");
   fprintf(fp, "Condition:\n");
-  if(strstr(str.c_str(), "Low")) {
+
+  if(str.find("Low")) {
     fprintf(fp, "%s is too low.\n", str.substr(pos+1).c_str());
-  } else if(strstr(str.c_str(), "High")) {
+  } else if(str.find("High")) {
     fprintf(fp, "%s is too high.\n", str.substr(pos+1).c_str());
-  } else if(str.c_str(), "Small") {
+  } else if(str.find("Small")) {
     fprintf(fp, "%s is too small.\n", str.substr(pos+1).c_str());
-  } else if(str.c_str(), "Many") {
+  } else if(str.find("Many")) {
     fprintf(fp, "%s is too many.\n", str.substr(pos+1).c_str());
-  } else if(str.c_str(), "Few") {
+  } else if(str.find("Few")) {
     fprintf(fp, "%s is too few.\n", str.substr(pos+1).c_str());
-  } else if(str.c_str(), "Long") {
+  } else if(str.find("Long")) {
     fprintf(fp, "%s is too long.\n", str.substr(pos+1).c_str());
   } else {
     fprintf(fp, "Invalid entry format in decision tree for %s.\n", str.substr(pos+1).c_str());
@@ -143,41 +146,18 @@ void Condition::printFields(double *input, FILE *fp) {
 
   if(baseIndex > -1) {
     base = input[baseIndex];
-    fprintf(fp, "%s %f \n", FieldName[baseIndex], base);
+    fprintf(fp, "%s %f\n", FieldName[baseIndex], base);
   }
 }
 
-//TODO Condition called
+/**
+ * Parse string to print data to files in readable form
+ * @param input
+ * @param fp
+ */
 void Condition::printDataToFile(double *input, FILE *fp) {
   parseString(name, fp);
   printFields(input, fp);
-
-  //fprintf(fp, "Condition %s\n", name.c_str());
-  /*fprintf(fp, "Condition  %s %d %d ", name.c_str(), varIndex, baseIndex);
-  if(thresholdIndex > -1)
-    threshold = input[thresholdIndex];
-  if(varIndex>-1)
-    fprintf(fp, "  %s %f %s ", FieldName[varIndex], input[varIndex], operatorName[op]);
-
-  if(baseIndex > -1) {
-    base = input[baseIndex];
-    fprintf(fp, " %s %f ", FieldName[baseIndex], base);
-  }
-  else
-    fprintf(fp, " %f ", base);
-
-  fprintf(fp, " %s %f ", compareName[symbol], threshold);
-  //potential improvement
-  fprintf(fp, " %f ", potentialImprove);
-
-  if(varIndex == MAX_EntryMethodDuration)
-  {
-    int entryIdx = (int)input[varIndex+1];
-    fprintf(fp, " %d  %s %s ", entryIdx, _entryTable[entryIdx]->name, _chareTable[_entryTable[entryIdx]->chareIdx]->name); 
-  }else if(varIndex>=NUM_AVG && varIndex<NUM_AVG+NUM_MAX)
-    fprintf(fp, " %d ", (int)input[varIndex+1]);
-
-  fprintf(fp, "\n");*/
 }
 
 bool Condition::test(double *input) {
@@ -255,12 +235,6 @@ bool Condition::test(double *input) {
   return ret;
 }
 
-//TODO Solution fields called
-void Solution::printDataToFile(double *input, FILE *fp) {
-  int abseff = eff>=0?eff:-eff;
-  fprintf(fp, "Solution %s %s \n", eff>0?"UP":"Down", EffectName[abseff]);
-}
-
 TreeNode::TreeNode( TreeNode *p, Condition *c ) {
   parent = p;
   data.condition = c;
@@ -319,17 +293,15 @@ void TreeNode::printMe() {
   }
 }
 
-//TODO Decide between solution and condition
+/**
+ * Call printData func iff the data is a condition data and not solution data
+ * @param input
+ * @param fp
+ */
 void TreeNode::printDataToFile(double *input, FILE *fp) {
   if(!_isSolution) {
     data.condition->printDataToFile(input, fp);
   }
-  /*if(_isSolution) {
-    data.solution->printDataToFile(input, fp);
-  }
-  else {
-    data.condition->printDataToFile(input, fp);
-  }*/
 }
 
 

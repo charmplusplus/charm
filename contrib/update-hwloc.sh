@@ -104,6 +104,7 @@ DIST_STUB=( \
   utils/lstopo/test-lstopo.sh.am \
   utils/lstopo/test-lstopo-shmem.sh.am \
   utils/lstopo/lstopo-windows.c \
+  utils/lstopo/lstopo-android.c \
   utils/netloc/infiniband/netloc_ib_gather_raw.am \
 )
 for i in "${DIST_STUB[@]}"; do

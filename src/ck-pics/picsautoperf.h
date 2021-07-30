@@ -72,7 +72,11 @@ public:
     userMetrics = src->userMetrics;
   }
 
-  //TODO modify this and print only relevant fields --- some sort of decision making here to be done???
+  /**
+   * Print field values as raw performance measures
+   * @param fp
+   * @param str
+   */
   void printMe(FILE *fp, const char *str) {
     for(int i=0; i<NUM_NODES; i++)
     {

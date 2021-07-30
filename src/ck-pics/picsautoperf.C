@@ -130,8 +130,8 @@ void SavedPerfDatabase::setData(PerfData *source) {
 
 
 /*
- * Reduction operation/ Data combined
- * Logic is using number of operations of MAX, MIN, AVG
+ * Reduction operation from diff PEs
+ * Uses number of operations of MAX, MIN, AVG to iterate
  */
 void combinePerfData(PerfData *ret, PerfData *source) {
   int k;
@@ -365,34 +365,32 @@ void TraceAutoPerfBOC::formatPerfData(PerfData *perfdata, int subStep, int phase
   double totaltime = data[AVG_TotalTime];
 
   //derive metrics from raw performance data
-  //if (steps > 0) {
-    data[AVG_UtilizationPercentage] /= numpes;
-    data[AVG_IdlePercentage] /= numpes;
-    data[AVG_OverheadPercentage] /= numpes;
-    data[AVG_NumObjectsPerPE] /= numpes;
-    data[AVG_NumMsgRecvPerPE] /= numpes;
-    data[AVG_BytesMsgRecvPerPE] /= numpes;
-    data[AVG_EntryMethodDuration] /= data[AVG_NumInvocations];
-    data[AVG_LoadPerPE] = data[AVG_UtilizationPercentage] * totaltime;
-    data[AVG_CacheMissRate] = data[AVG_CacheMissRate]/numpes;
+  data[AVG_UtilizationPercentage] /= numpes;
+  data[AVG_IdlePercentage] /= numpes;
+  data[AVG_OverheadPercentage] /= numpes;
+  data[AVG_NumObjectsPerPE] /= numpes;
+  data[AVG_NumMsgRecvPerPE] /= numpes;
+  data[AVG_BytesMsgRecvPerPE] /= numpes;
+  data[AVG_EntryMethodDuration] /= data[AVG_NumInvocations];
+  data[AVG_LoadPerPE] = data[AVG_UtilizationPercentage] * totaltime;
+  data[AVG_CacheMissRate] = data[AVG_CacheMissRate]/numpes;
 
-    data[AVG_NumMsgsPerObject] /= (data[AVG_NumObjectsPerPE]*numpes);
-    data[AVG_BytesPerObject] /= (data[AVG_NumObjectsPerPE]*numpes);
-    data[AVG_LoadPerObject] /= (data[AVG_NumObjectsPerPE]*numpes);
-    data[AVG_BytesPerMsg] = data[AVG_BytesPerObject]/data[AVG_NumMsgsPerObject];
+  data[AVG_NumMsgsPerObject] /= (data[AVG_NumObjectsPerPE]*numpes);
+  data[AVG_BytesPerObject] /= (data[AVG_NumObjectsPerPE]*numpes);
+  data[AVG_LoadPerObject] /= (data[AVG_NumObjectsPerPE]*numpes);
+  data[AVG_BytesPerMsg] = data[AVG_BytesPerObject]/data[AVG_NumMsgsPerObject];
 
-    data[AVG_NumMsgPerPE] = data[AVG_NumMsgsPerObject]/numpes;
-    data[AVG_BytesPerPE] = data[AVG_BytesPerObject]/numpes;
-    data[MAX_LoadPerPE] = data[MAX_UtilizationPercentage]*totaltime;
-    data[MIN_LoadPerPE] = data[MIN_UtilizationPercentage]*totaltime;
-    data[AVG_NumInvocations] = data[AVG_NumInvocations]/numpes;
+  data[AVG_NumMsgPerPE] = data[AVG_NumMsgsPerObject]/numpes;
+  data[AVG_BytesPerPE] = data[AVG_BytesPerObject]/numpes;
+  data[MAX_LoadPerPE] = data[MAX_UtilizationPercentage]*totaltime;
+  data[MIN_LoadPerPE] = data[MIN_UtilizationPercentage]*totaltime;
+  data[AVG_NumInvocations] = data[AVG_NumInvocations]/numpes;
 
     //TODO
-    data[AVG_EntryMethodDuration_1] /= data[AVG_NumInvocations_1];
-    data[AVG_EntryMethodDuration_2] /= data[AVG_NumInvocations_2];
-    data[AVG_NumInvocations_1] = data[AVG_NumInvocations_1]/numpes/steps;
-    data[AVG_NumInvocations_2] = data[AVG_NumInvocations_2]/numpes/steps;
-  //}
+  data[AVG_EntryMethodDuration_1] /= data[AVG_NumInvocations_1];
+  data[AVG_EntryMethodDuration_2] /= data[AVG_NumInvocations_2];
+  data[AVG_NumInvocations_1] = data[AVG_NumInvocations_1]/numpes;
+  data[AVG_NumInvocations_2] = data[AVG_NumInvocations_2]/numpes;
 
   CkPrintf("\nPICS Data: PEs in group: %d\nIDLE: %.2f%%\nOVERHEAD: %.2f%%\nUTIL: %.2f%%\nAVG_ENTRY_DURATION: %fs\n", numpes, data[AVG_IdlePercentage]*100, data[AVG_OverheadPercentage]*100, data[AVG_UtilizationPercentage]*100, data[AVG_EntryMethodDuration]);
 }
@@ -420,8 +418,11 @@ void TraceAutoPerfBOC::getPerfData(int reductionPE, CkCallback cb) {
   }
 }
 
-//perf data from all processors within a group is collected at the root of that
-//group and the data is output to a file.
+
+/**
+ * perf data from all processors within a group is collected at the root of that
+ * group and the data is output to a file.
+ */
 void TraceAutoPerfBOC::globalPerfAnalyze(CkReductionMsg *msg )
 {
   double now = CkWallTimer();
@@ -430,11 +431,7 @@ void TraceAutoPerfBOC::globalPerfAnalyze(CkReductionMsg *msg )
   lastAnalyzeTimer = now;
   CkpvAccess(cntAfterLdb)++;
   int numpes = numPesInGroup;
-  //TODO Remove step 0 output
-  /*if(analyzeStep == 0)
-  {
-    autoTunerProxy.ckLocalBranch()->printCPNameToFile(CkpvAccess(fpSummary));
-  }*/
+
   analyzeStep++;
   PerfData *data=(PerfData*) msg->getData();
   if(CkpvAccess(isExit) || analyzeStep<= WARMUP_STEP || analyzeStep >= PAUSE_STEP) {
@@ -464,13 +461,10 @@ void TraceAutoPerfBOC::globalPerfAnalyze(CkReductionMsg *msg )
   for(int j=0; j<CkpvAccess(numOfPhases)*PERIOD_PERF; j++)
   {
     formatPerfData(data, j/CkpvAccess(numOfPhases), j%CkpvAccess(numOfPhases));
-    //TODO Do not print entire PICS output
-    //data->printMe(CkpvAccess(fpSummary), "format");
   }
-
   //autoTunerProxy.ckLocalBranch()->printCPToFile(CkpvAccess(fpSummary));
   data=(PerfData*) msg->getData();
-  //save results to database
+  //save results to database TODO
   if(bestTimeStep == -1 || bestTimeStep > timestep)
   {
     isBest = true;
@@ -689,7 +683,9 @@ TraceAutoPerfBOC::TraceAutoPerfBOC() {
 
 TraceAutoPerfBOC::~TraceAutoPerfBOC() { }
 
-//TODO fix this
+/**
+ * Perf report initialization
+ */
 TraceAutoPerfInit::TraceAutoPerfInit(CkArgMsg* args)
 {
   CkPrintf("PICS> Enabled PICS autoPerf\n");

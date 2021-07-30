@@ -486,6 +486,10 @@ void LBManager::InvokeLB()
   {
     loadbalancers[currentLBIndex]->InvokeLB();
   }
+  else
+  {
+    ResumeClients();
+  }
 }
 
 // Called at end of each load balancing cycle
