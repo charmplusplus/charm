@@ -13,20 +13,20 @@
 cmake_minimum_required(VERSION 3.4)
 
 # Print warning
-message("#################################################################")
-message("# The CMake build system is currently a beta version.           #")
-message("# Please let us know if you experience any problems by opening  #")
-message("# an issue on our GitHub (https://github.com/UIUC-PPL/charm),   #")
-message("# with the below configuration information.                     #")
-message("# You can run './buildold' to use the previous build system.    #")
-message("#################################################################")
+message("##################################################################")
+message("# The CMake build system may not support advanced build options. #")
+message("# Please let us know if you experience any problems by opening   #")
+message("# an issue on our GitHub (https://github.com/UIUC-PPL/charm),    #")
+message("# with the below configuration information.                      #")
+message("# You can run './buildold' to use the previous build system.     #")
+message("##################################################################")
 
 if(CMAKE_VERSION VERSION_GREATER 3.12 OR CMAKE_VERSION VERSION_EQUAL 3.12)
   cmake_policy(SET CMP0075 OLD)
 endif()
 
 # Fortran is optional, so don't include it in LANGUAGES here
-project(Charm++ LANGUAGES CXX C VERSION 6.10.2)
+project(Charm++ LANGUAGES CXX C ASM VERSION 7.0.0)
 
 find_package(Threads)
 find_package(OpenMP) # Do this before Fortran, in case we don't have a Fortran compiler
@@ -83,6 +83,18 @@ endif()
 # Build options
 set(NETWORK "netlrts" CACHE STRING "Target network layer, can be one of mpi,multicore,netlrts,gni,ofi,pami,pamilrts,ucx,verbs")
 set(TARGET "charm++" CACHE STRING "Target build type, can be one of charm++,AMPI,LIBS,charm4py,ChaNGa,everylb,all-test")
+set(ARCH "" CACHE STRING "Target architecture, can be one of i386,x86_64,arm7,arm8,ppc64le") # By default, detect arch we are running on.
+
+if(NOT ARCH STREQUAL CMAKE_HOST_SYSTEM_PROCESSOR)
+  if (ARCH STREQUAL "i386" AND CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "x86_64")
+    message(WARNING "Attempting to cross-compile from ${CMAKE_HOST_SYSTEM_PROCESSOR} to ${ARCH}. This is only supported for x86_64 -> i386 currently.")
+    set(CMAKE_C_FLAGS -m32)
+    set(CMAKE_CXX_FLAGS -m32)
+    set(CMAKE_FORTRAN_FLAGS -m32)
+  else()
+    message(WARNING "Cross-compiling from  ${CMAKE_HOST_SYSTEM_PROCESSOR} to ${ARCH} is not supported currently.")
+  endif()
+endif()
 
 # Platform specific options (choose multiple if desired):
 option(SMP "Enable shared-memory communication within a single multi-processor machine instead of message passing." ON)
@@ -319,7 +331,9 @@ else()
 endif()
 
 set(CMK_POWER7 0)
-if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "AMD64")
+if(ARCH)
+  set(CHARM_CPU ${ARCH})
+elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "AMD64")
   set(CHARM_CPU "x86_64")
 elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "i386" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "i686")
   set(CHARM_CPU "i386")
@@ -342,9 +356,13 @@ endif()
 if(${PROJECT_VERSION_PATCH} LESS 10)
   set(CHARM_VERSION_PATCH_PREFIX 0)
 endif()
-set(CHARM_VERSION "${PROJECT_VERSION_MAJOR}${PROJECT_VERSION_MINOR}${CHARM_VERSION_PATCH_PREFIX}${PROJECT_VERSION_PATCH}")
+if(${PROJECT_VERSION_MINOR} LESS 10)
+  set(CHARM_VERSION_MINOR_PREFIX 0)
+endif()
+set(CHARM_VERSION "${PROJECT_VERSION_MAJOR}${CHARM_VERSION_MINOR_PREFIX}${PROJECT_VERSION_MINOR}${CHARM_VERSION_PATCH_PREFIX}${PROJECT_VERSION_PATCH}")
 
 unset(CHARM_VERSION_PATCH_PREFIX)
+unset(CHARM_VERSION_MINOR_PREFIX)
 
 set(CHARM_PLATFORM "${NETWORK}-${CHARM_OS}-${CHARM_CPU}")
 
@@ -555,7 +573,6 @@ configure_file(src/arch/common/cc-iccstatic.sh               include/ COPYONLY)
 configure_file(src/arch/common/cc-iccstatic.h                include/ COPYONLY)
 configure_file(src/arch/common/cc-gcc.sh                     include/ COPYONLY)
 configure_file(src/arch/common/cc-gcc.h                      include/ COPYONLY)
-configure_file(src/arch/common/cc-mpi.sh                     include/ COPYONLY)
 configure_file(src/arch/common/cc-mpiopts.sh                 include/ COPYONLY)
 configure_file(src/arch/common/cc-msvc.h                     include/ COPYONLY)
 configure_file(src/arch/common/cc-msvc.sh                    include/ COPYONLY)
@@ -882,6 +899,7 @@ file(APPEND ${optfile_sh} "CMK_NO_BUILD_SHARED=${CMK_NO_BUILD_SHARED}\n")
 foreach(l BUILDOPTS CMK_AMPI_WITH_ROMIO CMK_BUILD_PYTHON CMK_CAN_LINK_FORTRAN
         CMK_CHARMDEBUG CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS CMK_HAS_INT16 CMK_HAS_MMAP
         CMK_LIBJPEG CMK_MOD_EXT CMK_SUPPORTS_FSGLOBALS CMK_SUPPORTS_PIPGLOBALS
+        CMK_SUPPORTS_SWAPGLOBALS CMK_SUPPORTS_TLSGLOBALS
         CMK_SYSLIBS CMK_TRACE_ENABLED CP OPTS_CC OPTS_CXX CMK_VDIR CMK_GDIR
         CMK_HAS_ELF_H CMK_HAS_OPENMP CMK_AMPI_ONLY CMK_WINDOWS CMK_BLUEGENEQ
         CXX_NO_AS_NEEDED LDXX_WHOLE_ARCHIVE_PRE LDXX_WHOLE_ARCHIVE_POST
@@ -928,6 +946,7 @@ foreach(l CUDA_DIR BUILD_CUDA CMK_AMPI_WITH_ROMIO CMK_MACOSX CMK_BLUEGENEQ CMK_B
         CMK_CHARMDEBUG CMK_COMPILER CMK_GDIR CMK_HAS_MALLOC_HOOK CMK_HAS_MMAP CMK_LIBJPEG
         CMK_LUSTREAPI CMK_MULTICORE CMK_NO_BUILD_SHARED CMK_NO_PARTITIONS
         CMK_SHARED_SUF CMK_SMP CMK_SUPPORTS_FSGLOBALS CMK_SUPPORTS_PIPGLOBALS
+        CMK_SUPPORTS_SWAPGLOBALS CMK_SUPPORTS_TLSGLOBALS CMK_HAS_OPENMP
         CMK_TRACE_ENABLED CMK_USE_LRTS CMK_VDIR OPTSATBUILDTIME CMK_AMPI_ONLY CMK_WINDOWS
         CMK_USE_CMA CMK_USER_SUFFIX CMK_CAN_LINK_FORTRAN CMK_SUPPORTS_MEMORY_ISOMALLOC)
     file(APPEND ${optfile_mak} "${l}:=${${l}}\n" )

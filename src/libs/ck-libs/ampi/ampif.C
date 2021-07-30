@@ -388,7 +388,7 @@ static MPI_Status* handle_MPI_STATUSES_IGNORE(int *sts) noexcept {
   }
 }
 
-static void handle_MPI_IN_PLACE_f(void* inbuf, void* outbuf) noexcept {
+static void handle_MPI_IN_PLACE_f(void *& inbuf, void *& outbuf) noexcept {
   if (inbuf == NULL) inbuf = MPI_IN_PLACE;
   if (outbuf == NULL) outbuf = MPI_IN_PLACE;
 }
