@@ -46,6 +46,8 @@ public:
   void setPotentialImprove(double v) { potentialImprove = v;}
   void printMe();
   void printDataToFile(double *input, FILE *fp);
+  void parseString(std::string str, FILE *fp);
+  void printFields(double *input, FILE *fp);
   bool test(double *input); //test whether this condition is satisfied with input data
 };
 
@@ -65,7 +67,7 @@ public:
     int abseff = eff>=0?eff:-eff;
     CkPrintf("solution %s  %s \n", eff>0?"UP":"Down", EffectName[abseff]);
   }
-  void printDataToFile(double *input, FILE *fp) ;
+
   int getValue() { return eff;}
 };
 
