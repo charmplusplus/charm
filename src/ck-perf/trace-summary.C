@@ -460,6 +460,7 @@ void SumLogPool::write(void)
     }
   }
   fprintf(fp, "\n");
+
   /*for(int k = 0; k < numBins; ++k)
   {
     int count = pool[k].getCount();
