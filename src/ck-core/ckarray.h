@@ -164,6 +164,10 @@ public:
       : CProxy_ArrayBase(aid), _idx(idx)
   {
   }
+  CProxyElement_ArrayBase(const CProxyElement_ArrayBase& other)
+      : CProxy_ArrayBase(other.ckGetArrayID()), _idx(other.ckGetIndex())
+  {
+  }
   CProxyElement_ArrayBase(const ArrayElement* e);
 
   bool operator==(const CProxyElement_ArrayBase& other)
