@@ -529,7 +529,7 @@ if [[ $VERBOSE -eq 1 ]]; then
 
   # Print selected options
   for option in ${!opt*}; do
-    echo "  $option = ${!option}"
+    echo "  $option = ${!option:-}"
   done
 fi
 
