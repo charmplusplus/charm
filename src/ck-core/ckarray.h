@@ -170,6 +170,11 @@ public:
   }
   CProxyElement_ArrayBase(const ArrayElement* e);
 
+  CProxyElement_ArrayBase& operator=(const CProxyElement_ArrayBase& other)
+  {
+    return *this = CProxyElement_ArrayBase(other);
+  }
+
   bool operator==(const CProxyElement_ArrayBase& other)
   {
     return ckGetArrayID() == other.ckGetArrayID() && ckGetIndex() == other.ckGetIndex();
