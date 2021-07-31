@@ -2110,47 +2110,23 @@ CkChannel::CkChannel(int id_, const CProxyElement_NodeGroup &proxy) : CkChannel(
   peer_pe = proxy.ckGetGroupPe();
 }
 
-void CkChannel::send(const void* ptr, size_t size) {
+void CkChannel::send(const void* ptr, size_t size, const CkCallback& cb) {
   CkAssert(id != -1 && peer_pe != -1);
-  CmiChannelSend(peer_pe, ptr, size, send_counter++);
+  CkCallback* cb_copy = new CkCallback(cb);
+  CmiChannelSend(peer_pe, ptr, size, cb_copy, send_counter++);
 }
 
-void CkChannel::recv(const void* ptr, size_t size) {
+void CkChannel::recv(const void* ptr, size_t size, const CkCallback& cb) {
   CkAssert(id != -1 && peer_pe != -1);
-  CmiChannelRecv(ptr, size, recv_counter++);
+  CkCallback* cb_copy = new CkCallback(cb);
+  CmiChannelRecv(ptr, size, cb_copy, recv_counter++);
 }
 
-void CkChannelRecvHandler(void* data)
+void CkChannelHandler(void* data)
 {
-  // TODO
-  /*
-  // Process QD to mark completion of buffer transfer
-  QdProcess(1);
-
-  DeviceRdmaOp* op = (DeviceRdmaOp*)data;
-  DeviceRdmaInfo* info = op->info;
-
-  // Invoke source callbacks
-  if (op->src_cb) {
-    CkCallback* cb = (CkCallback*)op->src_cb;
-    cb->send();
-    delete cb;
-  }
-
-  // Update counter (there may be multiple buffers in transit)
-  info->counter++;
-
-  // Check if all buffers have been received
-  // If so, invoke regular entry method
-  if (info->counter == info->n_ops) {
-    QdCreate(1);
-
-    enqueueNcpyMessage(op->dest_pe, info->msg);
-
-    // Free RDMA metadata
-    CmiFree(info);
-  }
-  */
+  CkCallback* cb = static_cast<CkCallback*>(data);
+  cb->send();
+  delete cb;
 }
 
 /****************************** End of Channel API ******************************/

@@ -16,6 +16,6 @@ mainmodule latency {
   group Block {
     entry Block();
     entry void init();
-    entry void test();
+    entry [threaded] void test();
   };
 };

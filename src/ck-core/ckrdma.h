@@ -444,10 +444,10 @@ public:
   int getID() { return id; }
   int getPeerPe() { return peer_pe; }
 
-  void send(const void* ptr, size_t size);
-  void recv(const void* ptr, size_t size);
+  void send(const void* ptr, size_t size, const CkCallback& cb);
+  void recv(const void* ptr, size_t size, const CkCallback& cb);
 };
 
-void CkChannelRecvHandler(void* data);
+void CkChannelHandler(void* data);
 
 #endif

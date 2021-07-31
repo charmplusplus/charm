@@ -28,7 +28,7 @@ void CmiSendDevice(int dest_pe, const void*& ptr, size_t size, uint64_t& tag) {
   LrtsSendDevice(dest_pe, ptr, size, tag);
 }
 
-void CmiRecvDevice(DeviceRdmaOp* op, RecvType type) {
+void CmiRecvDevice(DeviceRdmaOp* op, CommType type) {
   LrtsRecvDevice(op, type);
 }
 

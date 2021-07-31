@@ -460,20 +460,20 @@ void CmiInvokeNcpyAck(void *ack) {
   ncpyDirectAckHandlerFn(ack);
 }
 
-void CmiChannelSend(int dest_pe, const void*& ptr, size_t size, uint64_t tag) {
-  LrtsChannelSend(dest_pe, ptr, size, tag);
+void CmiChannelSend(int dest_pe, const void*& ptr, size_t size, void* cb, uint64_t tag) {
+  LrtsChannelSend(dest_pe, ptr, size, cb, tag);
 }
 
-void CmiChannelRecv(const void*& ptr, size_t size, uint64_t tag) {
-  LrtsChannelRecv(ptr, size, tag);
+void CmiChannelRecv(const void*& ptr, size_t size, void* cb, uint64_t tag) {
+  LrtsChannelRecv(ptr, size, cb, tag);
 }
 
-RdmaAckHandlerFn channelRecvHandlerFn;
+RdmaAckHandlerFn channelHandlerFn;
 
-void CmiChannelRecvHandlerInit(RdmaAckHandlerFn fn) {
-  channelRecvHandlerFn = fn;
+void CmiChannelHandlerInit(RdmaAckHandlerFn fn) {
+  channelHandlerFn = fn;
 }
 
-void CmiChannelRecvHandler(void* data) {
-  channelRecvHandlerFn(data);
+void CmiChannelHandler(void* data) {
+  channelHandlerFn(data);
 }

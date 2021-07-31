@@ -165,11 +165,11 @@ public:
         start_time = CkWallTimer();
 
         if (CkMyPe() == 0) {
-          channel.send(d_local_data, cur_size);
-          channel.recv(d_remote_data, cur_size);
+          channel.send(d_local_data, cur_size, CkCallbackResumeThread());
+          channel.recv(d_remote_data, cur_size, CkCallbackResumeThread());
         } else {
-          channel.recv(d_remote_data, cur_size);
-          channel.send(d_local_data, cur_size);
+          channel.recv(d_remote_data, cur_size, CkCallbackResumeThread());
+          channel.send(d_local_data, cur_size, CkCallbackResumeThread());
         }
 
         if (iter >= warmup_iters) {

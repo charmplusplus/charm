@@ -59,10 +59,10 @@ typedef struct ncpystruct{
 
 }NcpyOperationInfo;
 
-enum RecvType {
-  RECV_TYPE_CHARM,
-  RECV_TYPE_AMPI,
-  RECV_TYPE_CHARM4PY
+enum CommType {
+  COMM_TYPE_CHARM,
+  COMM_TYPE_AMPI,
+  COMM_TYPE_CHARM4PY
 };
 
 #if CMK_CUDA

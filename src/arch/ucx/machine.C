@@ -80,13 +80,13 @@ typedef struct UcxRequest
     void           *msgBuf;
     int            idx;
     int            completed;
-    RecvType       type;
+    CommType       type;
+    void*          charm_cb;
 #if CMK_ONESIDED_IMPL
     void           *ncpyAck;
     ucp_rkey_h     rkey;
 #endif
 #if CMK_CUDA
-    void*          cb;
     DeviceRdmaOp*  device_op;
 #endif
 } UcxRequest;
@@ -114,10 +114,11 @@ typedef struct UcxPendingRequest
     ucp_tag_t               tag;
     int                     dNode;
     int                     op;
-    ucp_send_callback_t     cb;
+    ucp_send_callback_t     send_cb;
     ucp_tag_recv_callback_t recv_cb;
     ucp_tag_t               mask;
-    RecvType                type;
+    CommType                type;
+    void*                   charm_cb;
 #if CMK_CUDA
     DeviceRdmaOp*           device_op;
 #endif
@@ -155,9 +156,9 @@ CpvDeclare(int, tag_counter);
 #define UCX_CHECK_PMI_RET(_ret, _str) UCX_CHECK_RET(_ret, _str, _ret)
 
 #if CMK_CUDA
-inline void UcxDeviceRecvHandler(DeviceRdmaOp* op, RecvType type) {
+inline void UcxDeviceRecvHandler(DeviceRdmaOp* op, CommType type) {
   switch (type) {
-    case RECV_TYPE_CHARM:
+    case COMM_TYPE_CHARM:
       CmiDeviceRecvHandler(op);
       break;
     // TODO: AMPI and Charm4py
@@ -174,8 +175,8 @@ void UcxRequestInit(void *request)
     req->msgBuf     = NULL;
     req->idx        = -1;
     req->completed  = 0;
+    req->charm_cb   = NULL;
 #if CMK_CUDA
-    req->cb         = NULL;
     req->device_op  = NULL;
 #endif
 }
@@ -561,7 +562,7 @@ inline void* UcxSendMsg(int destNode, int destPE, int size, char *msg,
     req->size   = size;
     req->tag    = sTag;
     req->dNode  = destNode;
-    req->cb     = cb;
+    req->send_cb     = cb;
     req->op     = UCX_SEND_OP;   // Mark this request as a regular message (UCX_SEND_OP)
 
     UCX_LOG(3, " --> (PE=%i) enq msg (queue depth=%i), dNode %i, size %i",
@@ -627,7 +628,7 @@ static inline int ProcessTxQueue()
             ucs_status_ptr_t status_ptr;
             status_ptr = ucp_tag_send_nb(ucxCtx.eps[req->dNode], req->msgBuf,
                                          req->size, ucp_dt_make_contig(1),
-                                         req->tag, req->cb);
+                                         req->tag, req->send_cb);
 
             if (!UCS_PTR_IS_PTR(status_ptr)) {
                 CmiEnforce(!UCS_PTR_IS_ERR(status_ptr));
@@ -655,7 +656,7 @@ static inline int ProcessTxQueue()
           ucs_status_ptr_t status_ptr;
           status_ptr = ucp_tag_send_nb(ucxCtx.eps[req->dNode], req->msgBuf,
                                        req->size, ucp_dt_make_contig(1),
-                                       req->tag, req->cb);
+                                       req->tag, req->send_cb);
           if (!UCS_PTR_IS_PTR(status_ptr)) {
             // Either send was complete or error
             CmiEnforce(!UCS_PTR_IS_ERR(status_ptr));
@@ -850,12 +851,12 @@ void LrtsSendDevice(int dest_pe, const void*& ptr, size_t size, uint64_t& tag) {
   tag = ((uint64_t)CpvAccess(tag_counter)++ << (UCX_TAG_PE_BITS + UCX_TAG_MSG_BITS)) | (CmiMyPe() << UCX_TAG_MSG_BITS) | UCX_MSG_TAG_DEVICE;
 #if CMK_SMP
   UcxPendingRequest* req = (UcxPendingRequest*)CmiAlloc(sizeof(UcxPendingRequest));
-  req->msgBuf = (void*)ptr;
-  req->size   = size;
-  req->tag    = tag;
-  req->dNode  = CmiNodeOf(dest_pe);
-  req->cb     = UcxSendDeviceCompleted;
-  req->op     = UCX_DEVICE_SEND_OP;
+  req->msgBuf  = (void*)ptr;
+  req->size    = size;
+  req->tag     = tag;
+  req->dNode   = CmiNodeOf(dest_pe);
+  req->send_cb = UcxSendDeviceCompleted;
+  req->op      = UCX_DEVICE_SEND_OP;
 
   PCQueuePush(ucxCtx.txQueue, (char *)req);
 #else
@@ -876,7 +877,7 @@ void LrtsSendDevice(int dest_pe, const void*& ptr, size_t size, uint64_t& tag) {
 #endif // CMK_SMP
 }
 
-void LrtsRecvDevice(DeviceRdmaOp* op, RecvType type)
+void LrtsRecvDevice(DeviceRdmaOp* op, CommType type)
 {
 #if CMK_SMP
   UcxPendingRequest *req = (UcxPendingRequest*)CmiAlloc(sizeof(UcxPendingRequest));
@@ -913,23 +914,40 @@ void LrtsRecvDevice(DeviceRdmaOp* op, RecvType type)
 }
 #endif // CMK_CUDA
 
+inline void UcxChannelHandler(CommType type, void* cb) {
+  switch (type) {
+    case COMM_TYPE_CHARM:
+      CmiChannelHandler(cb);
+      break;
+    // TODO: AMPI and Charm4py
+    default:
+      CmiAbort("Invalid comm type: %d\n", type);
+      break;
+  }
+}
+
 void UcxChannelSendCompleted(void* request, ucs_status_t status)
 {
   CmiEnforce(status == UCS_OK);
   UcxRequest* req = (UcxRequest*)request;
 
+  UcxChannelHandler(req->type, req->charm_cb);
+
   UCX_REQUEST_FREE(req);
 }
 
-void LrtsChannelSend(int dest_pe, const void*& ptr, size_t size, uint64_t tag) {
+void LrtsChannelSend(int dest_pe, const void*& ptr, size_t size, void* cb, uint64_t tag) {
+  CommType type = COMM_TYPE_CHARM; // TODO: AMPI and Charm4py
 #if CMK_SMP
   UcxPendingRequest* req = (UcxPendingRequest*)CmiAlloc(sizeof(UcxPendingRequest));
-  req->msgBuf = (void*)ptr;
-  req->size   = size;
-  req->tag    = tag;
-  req->dNode  = CmiNodeOf(dest_pe);
-  req->cb     = UcxChannelSendCompleted;
-  req->op     = UCX_CHANNEL_SEND_OP;
+  req->msgBuf   = (void*)ptr;
+  req->size     = size;
+  req->tag      = tag;
+  req->op       = UCX_CHANNEL_SEND_OP;
+  req->dNode    = CmiNodeOf(dest_pe);
+  req->send_cb  = UcxChannelSendCompleted;
+  req->type     = type;
+  req->charm_cb = cb;
 
   PCQueuePush(ucxCtx.txQueue, (char *)req);
 #else
@@ -942,24 +960,15 @@ void LrtsChannelSend(int dest_pe, const void*& ptr, size_t size, uint64_t tag) {
     // Either send was complete or error
     CmiEnforce(!UCS_PTR_IS_ERR(status_ptr));
     CmiEnforce(UCS_PTR_STATUS(status_ptr) == UCS_OK);
+    UcxChannelHandler(type, cb);
   } else {
     // Callback function will be invoked once send completes
     UcxRequest* req = (UcxRequest*)status_ptr;
-    req->msgBuf = (void*)ptr;
+    req->msgBuf   = (void*)ptr;
+    req->type     = type;
+    req->charm_cb = cb;
   }
 #endif // CMK_SMP
-}
-
-inline void UcxChannelRecvHandler(RecvType type) {
-  switch (type) {
-    case RECV_TYPE_CHARM:
-      CmiChannelRecvHandler(NULL); // TODO
-      break;
-    // TODO: AMPI and Charm4py
-    default:
-      CmiAbort("Invalid recv type: %d\n", type);
-      break;
-  }
 }
 
 void UcxChannelRecvCompleted(void* request, ucs_status_t status,
@@ -971,8 +980,8 @@ void UcxChannelRecvCompleted(void* request, ucs_status_t status,
   CmiEnforce(status == UCS_OK);
 
   if (req->msgBuf != NULL) {
-    // Invoke recv handler since data transfer is complete
-    UcxChannelRecvHandler(req->type);
+    // Invoke handler since data transfer is complete
+    UcxChannelHandler(req->type, req->charm_cb);
     UCX_REQUEST_FREE(req);
   } else {
     // Request was completed immediately
@@ -981,8 +990,8 @@ void UcxChannelRecvCompleted(void* request, ucs_status_t status,
   }
 }
 
-void LrtsChannelRecv(const void*& ptr, size_t size, uint64_t tag) {
-  RecvType type = RECV_TYPE_CHARM; // TODO: AMPI and Charm4py
+void LrtsChannelRecv(const void*& ptr, size_t size, void* cb, uint64_t tag) {
+  CommType type = COMM_TYPE_CHARM; // TODO: AMPI and Charm4py
 #if CMK_SMP
   UcxPendingRequest *req = (UcxPendingRequest*)CmiAlloc(sizeof(UcxPendingRequest));
   req->msgBuf    = (void*)ptr;
@@ -992,6 +1001,7 @@ void LrtsChannelRecv(const void*& ptr, size_t size, uint64_t tag) {
   req->mask      = UCX_MSG_TAG_MASK_FULL;
   req->recv_cb   = UcxChannelRecvCompleted;
   req->type      = type;
+  req->charm_cb  = cb;
 
   PCQueuePush(ucxCtx.txQueue, (char *)req);
 #else
@@ -1004,13 +1014,14 @@ void LrtsChannelRecv(const void*& ptr, size_t size, uint64_t tag) {
   UcxRequest* req = (UcxRequest*)status_ptr;
   if (req->completed) {
     // Recv was completed immediately
-    UcxChannelRecvHandler(type);
+    UcxChannelHandler(type, cb);
     UCX_REQUEST_FREE(req);
   } else {
     // Recv wasn't completed immediately, recv_cb will be invoked
     // sometime later
-    req->msgBuf = (void*)ptr;
-    req->type = type;
+    req->msgBuf   = (void*)ptr;
+    req->type     = type;
+    req->charm_cb = cb;
   }
 #endif // CMK_SMP
 }

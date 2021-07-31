@@ -1415,7 +1415,7 @@ void _initCharm(int unused_argc, char **argv)
 	// Set the ack handler function used for the direct nocopy api
 	CmiSetDirectNcpyAckHandler(CkRdmaDirectAckHandler);
 
-	CmiChannelRecvHandlerInit(CkChannelRecvHandler);
+	CmiChannelHandlerInit(CkChannelHandler);
 #if CMK_CUDA && CMK_GPU_COMM
 	CmiDeviceRecvHandlerInit(CkRdmaDeviceRecvHandler);
 #endif
