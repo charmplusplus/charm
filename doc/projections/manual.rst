@@ -1720,6 +1720,7 @@ some format requirements:
    canonical form, tolerating duplication of entries as well as
    out-of-order entries (ie. ``4,6,3`` is the same as ``3-4,6``).
 
+
 .. _sec::known issues:
 
 Known Issues
@@ -1735,3 +1736,29 @@ that we have not resolved at this time.
    currently known to hang for applications that make multiple calls to
    traceBegin() and traceEnd() on the same processor through multiple
    Charm++ objects.
+
+
+.. _sec::format of projections logs:
+
+Format of Projections Logs
+==============================================
+This section lists the format of projections logs.
+
+.. _sec::summary logs:
+
+Summary/Sum Detail Logs
+---------------------------------------------
+
+-   The EP count is given in the first line of each individual processor logs along with the size of the interval.
+
+    eg: -  ``ver:7.1 0/4 count:6665 ep:270 interval:1.000000e-03 phases:0``
+
+-   The data is one encoded. So for decoding, the following line decodes to 14 consecutive zeros, followed by 65, followed by 0 and 3 consecutive 32767.
+
+    eg: ``0+14 65+1 0+1 32767+3``
+
+-   The data is in order of EP followed by bin. So, for the above example the first 270 values are for 270 EPs in the 0th bin. The next 270 values are for the 1st bin and so on.
+
+
+
+
