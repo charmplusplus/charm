@@ -1742,23 +1742,30 @@ that we have not resolved at this time.
 
 Format of Projections Logs
 ==============================================
-This section lists the format of projections logs.
 
 .. _sec::summary logs:
 
 Summary/Sum Detail Logs
 ---------------------------------------------
 
--   The EP count is given in the first line of each individual processor logs along with the size of the interval.
+-   The first line gives the Charm++ version number used by program(ver:), the PE info where 0/4 signifies PE 0, total number of intervals/bins(count:), total number of EPs(ep:), size of each interval in seconds(interval:) and total phases(phases:)
 
     eg: -  ``ver:7.1 0/4 count:6665 ep:270 interval:1.000000e-03 phases:0``
 
--   The data is one encoded. So for decoding, the following line decodes to 14 consecutive zeros, followed by 65, followed by 0 and 3 consecutive 32767.
+-   Total EP Execution Time data is given in the line starting with "EPExeTime: ". The second line gives the EP Call time starting with "EPCallTime:".
+    The third line gives the last time when that particular EP is called and starts with the string "MaxEPTime: ".
+    All these lines have exactly the same number of values as the number of EPs and are not encoded.
 
-    eg: ``0+14 65+1 0+1 32767+3``
+-   The following utilization and communication data is run length encoded. So for decoding, the following line decodes to 5 consecutive zeros, followed by 65, followed by 0 and 3 consecutive 32767.
 
--   The data is in order of EP followed by bin. So, for the above example the first 270 values are for 270 EPs in the 0th bin. The next 270 values are for the 1st bin and so on.
+    eg: ``0+5 65+1 0+1 32767+3 decodes to 0 0 0 0 0 65 0 32767 32767 32767``
 
+-   Total messages sent per EP in the line following "MsgSendCount: " and the total bytes sent per EP is given in the line following "MsgSentSize: ".
+    Similarly, total messages received per EP and total bytes received per EP is given in the line following "MsgRecvCount: " and "MsgRecvSize: " respectively.
+    The data is run length encoded. The data when decoded is in order of EP followed by bin. So, for the above example the first 270 values are for 270 EPs in the 0th bin. The next 270 values are for the 1st bin and so on.
+
+-   The idle percentages of each interval in a particular PE is given by the line following the string "IdlePercent: ". It is run length encoded.
+    When the data is decoded, there should be exactly the same number of values as number of intervals.
 
 
 
