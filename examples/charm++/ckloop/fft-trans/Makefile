@@ -13,7 +13,7 @@ SLIBS = -lfftw3f -lm
 OBJS = fft1d.o
 
 #all: fft1d fft_ref fft1d.prj fft_bench
-all: fft1d fft1d.prj fft_bench
+all: fft1d
 
 #for single precision add -DSINGLE_PRECISION to OPTS on the command line
 singlePrecision: fft1d_s

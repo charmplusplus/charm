@@ -94,7 +94,7 @@ default_libs: $(DEFAULT_LIBS)
 $(DEFAULT_LIBS) cache pose fftlib liveViz metis:
 	$(MAKE) -C libs/ck-libs/$@
 
-openmp_llvm:
+openmp_llvm: converse
 	$(MAKE) -C libs/conv-libs/$@
 
 ChaNGa: charm++ cache liveViz everylb ckloop
@@ -133,7 +133,13 @@ Tau:
 	@echo "Building Charm trace library with support for TAU."
 	$(MAKE) $(L)/libtrace-Tau.a $(L)/libtrace-all.a TAU_TRACE_OBJ=libtrace-Tau.o
 
-LIBS: CONVLIBS CHARMLIBS everylb
+LIBS_TARGETS := CONVLIBS CHARMLIBS everylb
+
+ifeq (1,$(CMK_BUILD_OMP))
+  LIBS_TARGETS += openmp_llvm
+endif
+
+LIBS: $(LIBS_TARGETS)
 	@echo "Built LIBS successfully"
 
 CHARMC=../bin/charmc $(CHARMOPTS) $(OPTS)

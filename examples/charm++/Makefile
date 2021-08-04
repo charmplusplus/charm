@@ -4,6 +4,7 @@ DIRS = \
   allToAll \
   array_map \
   ckcallback \
+  ckloop \
   cksequence \
   completion \
   fib \
@@ -22,6 +23,7 @@ DIRS = \
   manyToMany \
   matmul \
   namespace \
+  openmp \
   piArray \
   PUP \
   NQueen \

@@ -1078,7 +1078,7 @@ then
     fi
 fi
 
-if [ "$USE_OPENMP" = "yes" -o "$CMK_OMP" = "1" -a -z "$SEQUENTIAL" -a -z "$NATIVE" ]
+if [[ "$USE_OPENMP" = "yes" ]] || [[ "$CMK_OMP" = "1" && -z "$SEQUENTIAL" && -z "$NATIVE" ]]
 then
     if [ "$CMK_HAS_OPENMP" != "1" ]
     then

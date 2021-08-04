@@ -1,17 +1,21 @@
 -include ../../../common.mk
-#NOTE: to compile the example, the CkLoop.decl/def.h should exist
-USEROPTS=-O3 -g -lpthread -fopenmp
+-include ../../../../include/conv-mach-opt.mak
 CHARMDIR=../../../..
 CHARMINC=$(CHARMDIR)/include
-OPTS=-I$(CHARMINC) $(USEROPTS)
-CHARMC=$(CHARMDIR)/bin/charmc $(OPTS)
+CHARMC=$(CHARMDIR)/bin/charmc $(OPTS) -fopenmp
 CHARMLIB=$(CHARMDIR)/lib
 
+TARGETS :=
+ifeq (1,$(CMK_HAS_OPENMP))
+  TARGETS += hello
+endif
 
-all: hello
+all: $(TARGETS)
 
 hello: hello.o
 	$(CHARMC) -language charm++ -o hello hello.o  -module CkLoop
+
+hello.prj: hello.o
 	$(CHARMC) -language charm++ -o hello.prj hello.o  -tracemode projections -module CkLoop
 
 hello.decl.h: hello.ci
@@ -23,19 +27,12 @@ hello.o: hello.C hello.decl.h
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o hello hello.prj charmrun *.log *.sum *.sts
 
-test: all
-	$(call run, ./hello +p4 10)
+test: $(addprefix test-,$(TARGETS))
 
-module: $(CHARMLIB)/libmoduleCkLoop.a
+testp: $(addprefix testp-,$(TARGETS))
 
-$(CHARMLIB)/libmoduleCkLoop.a: CkLoop.o
-	$(CHARMC)  -o $(CHARMLIB)/libmoduleCkLoop.a CkLoop.o
+test-hello: hello
+	$(call run, ./$< +p4 10)
 
-
-CkLoop.decl.h: CkLoop.ci
-	$(CHARMC)  CkLoop.ci
-
-
-CkLoop.o: CkLoop.C CkLoop.decl.h
-	$(CHARMC) -c CkLoop.C
-
+testp-hello: hello
+	$(call run, ./$< +p$(P) $$(( ($(P) * 5) / 2 )) )
