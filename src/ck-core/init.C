@@ -1279,21 +1279,21 @@ void _initCharm(int unused_argc, char **argv)
 	DEBUGF(("[%d,%.6lf ] _initCharm started\n",CmiMyPe(),CmiWallTimer()));
 	std::set_terminate([](){
     std::exception_ptr exptr = std::current_exception();
-    if(exptr)
+    if (exptr)
+    {
+      try
       {
-        try
-          {
-            std::rethrow_exception(exptr);
-          }
-        catch (std::exception &ex)
-          {
-            CkAbort("Unhandled C++ exception in user code: %s.\n", ex.what());
-          }
+        std::rethrow_exception(exptr);
       }
+      catch (std::exception &ex)
+      {
+        CkAbort("Unhandled C++ exception in user code: %s.\n", ex.what());
+      }
+    }
     else
-      {
-        CkAbort("Unhandled C++ exception in user code.\n");
-      }
+    {
+      CkAbort("Unhandled C++ exception in user code.\n");
+    }
   });
 
 	CkpvInitialize(size_t *, _offsets);
