@@ -1277,7 +1277,24 @@ void _initCharm(int unused_argc, char **argv)
 	int inCommThread = (CmiMyRank() == CmiMyNodeSize());
 
 	DEBUGF(("[%d,%.6lf ] _initCharm started\n",CmiMyPe(),CmiWallTimer()));
-	std::set_terminate([](){ CkAbort("Unhandled C++ exception in user code.\n");});
+	std::set_terminate([](){
+    std::exception_ptr exptr = std::current_exception();
+    if(exptr)
+      {
+        try
+          {
+            std::rethrow_exception(exptr);
+          }
+        catch (std::exception &ex)
+          {
+            CkAbort("Unhandled C++ exception in user code: %s.\n", ex.what());
+          }
+      }
+    else
+      {
+        CkAbort("Unhandled C++ exception in user code.\n");
+      }
+  });
 
 	CkpvInitialize(size_t *, _offsets);
 	CkpvAccess(_offsets) = new size_t[32];
