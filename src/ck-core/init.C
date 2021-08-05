@@ -1274,10 +1274,10 @@ void _sendReadonlies() {
 */
 void _initCharm(int unused_argc, char **argv)
 { 
-	int inCommThread = (CmiMyRank() == CmiMyNodeSize());
+  int inCommThread = (CmiMyRank() == CmiMyNodeSize());
 
-	DEBUGF(("[%d,%.6lf ] _initCharm started\n",CmiMyPe(),CmiWallTimer()));
-	std::set_terminate([](){
+  DEBUGF(("[%d,%.6lf ] _initCharm started\n",CmiMyPe(),CmiWallTimer()));
+  std::set_terminate([](){
     std::exception_ptr exptr = std::current_exception();
     if (exptr)
     {
