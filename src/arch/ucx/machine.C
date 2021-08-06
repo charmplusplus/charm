@@ -41,6 +41,7 @@
 #define UCX_MSG_TAG_EAGER               UCS_BIT(0)
 #define UCX_MSG_TAG_PROBE               UCS_BIT(1)
 #define UCX_MSG_TAG_DEVICE              UCS_BIT(2)
+#define UCX_MSG_TAG_CHANNEL             UCS_BIT(3)
 #define UCX_RMA_TAG_GET                 UCS_BIT(UCX_TAG_MSG_BITS + 1)
 #define UCX_RMA_TAG_REG_AND_SEND_BACK   UCS_BIT(UCX_TAG_MSG_BITS + 2)
 #define UCX_RMA_TAG_DEREG_AND_ACK       UCS_BIT(UCX_TAG_MSG_BITS + 3)
@@ -938,6 +939,7 @@ void UcxChannelSendCompleted(void* request, ucs_status_t status)
 
 void LrtsChannelSend(int dest_pe, const void*& ptr, size_t size, void* cb, uint64_t tag) {
   CommType type = COMM_TYPE_CHARM; // TODO: AMPI and Charm4py
+  tag = (tag << UCX_TAG_MSG_BITS) | UCX_MSG_TAG_CHANNEL;
 #if CMK_SMP
   UcxPendingRequest* req = (UcxPendingRequest*)CmiAlloc(sizeof(UcxPendingRequest));
   req->msgBuf   = (void*)ptr;
@@ -992,6 +994,7 @@ void UcxChannelRecvCompleted(void* request, ucs_status_t status,
 
 void LrtsChannelRecv(const void*& ptr, size_t size, void* cb, uint64_t tag) {
   CommType type = COMM_TYPE_CHARM; // TODO: AMPI and Charm4py
+  tag = (tag << UCX_TAG_MSG_BITS) | UCX_MSG_TAG_CHANNEL;
 #if CMK_SMP
   UcxPendingRequest *req = (UcxPendingRequest*)CmiAlloc(sizeof(UcxPendingRequest));
   req->msgBuf    = (void*)ptr;
