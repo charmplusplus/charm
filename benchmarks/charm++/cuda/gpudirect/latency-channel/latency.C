@@ -11,6 +11,7 @@
 /* readonly */ int n_iters_reg;
 /* readonly */ int n_iters_large;
 /* readonly */ int warmup_iters;
+/* readonly */ bool validate;
 
 class Main : public CBase_Main {
   double start_time;
@@ -25,13 +26,13 @@ class Main : public CBase_Main {
     warmup_iters = 10;
 
     if (CkNumPes() != 2) {
-      CkPrintf("Error: there should be 2 PEs");
+      CkPrintf("Error: should be run with 2 PEs");
       CkExit(1);
     }
 
     // Process command line arguments
     int c;
-    while ((c = getopt(m->argc, m->argv, "s:x:i:l:w:")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "s:x:i:l:w:v")) != -1) {
       switch (c) {
         case 's':
           min_size = atoi(optarg);
@@ -47,6 +48,9 @@ class Main : public CBase_Main {
           break;
         case 'w':
           warmup_iters = atoi(optarg);
+          break;
+        case 'v':
+          validate = true;
           break;
         default:
           CkPrintf("Unknown command line argument detected");
@@ -64,8 +68,10 @@ class Main : public CBase_Main {
     CkPrintf("# Charm++ GPU Latency Test (w/ Channels)\n"
         "# Message sizes: %lu - %lu bytes\n"
         "# Iterations: %d regular, %d large\n"
-        "# Warmup: %d\n",
-        min_size, max_size, n_iters_reg, n_iters_large, warmup_iters);
+        "# Warmup: %d\n"
+        "# Validation: %s\n",
+        min_size, max_size, n_iters_reg, n_iters_large, warmup_iters,
+        validate ? "true" : "false");
 
     // Create block group chare
     block_proxy = CProxy_Block::ckNew();
@@ -110,7 +116,7 @@ public:
 
   ~Block() {
     if (memory_allocated) {
-      if (CkMyPe() == 0) free(times);
+      free(times);
       hapiCheck(cudaFreeHost(h_local_data));
       hapiCheck(cudaFreeHost(h_remote_data));
       hapiCheck(cudaFree(d_local_data));
@@ -164,7 +170,7 @@ public:
       for (int iter = 0; iter < warmup_iters + n_iters; iter++) {
         start_time = CkWallTimer();
 
-        if (CkMyPe() == 0) {
+        if (thisIndex == 0) {
           channel.send(d_local_data, cur_size, CkCallbackResumeThread());
           channel.recv(d_remote_data, cur_size, CkCallbackResumeThread());
         } else {
@@ -191,9 +197,21 @@ public:
       }
       stdev = sqrt(stdev / n_iters);
 
-      if (CkMyPe() == 0) {
+      if (thisIndex == 0) {
         CkPrintf("Latency for %lu bytes: %.3lf += %.3lf us\n",
             cur_size, times_mean * 1e6, stdev * 1e6);
+      }
+
+      if (validate) {
+        hapiCheck(cudaMemcpy(h_remote_data, d_remote_data, cur_size, cudaMemcpyDeviceToHost));
+        for (int i = 0; i < cur_size; i++) {
+          if (h_remote_data[i] != 'a') {
+            CkPrintf("Validation error: received data at %d is incorrect (%c), message size %lu\n",
+                i, h_remote_data[i], cur_size);
+            break;
+          }
+        }
+        if (thisIndex == 0) CkPrintf("Validation passed\n");
       }
     }
 

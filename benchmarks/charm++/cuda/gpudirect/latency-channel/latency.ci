@@ -6,6 +6,7 @@ mainmodule latency {
   readonly int n_iters_reg;
   readonly int n_iters_large;
   readonly int warmup_iters;
+  readonly bool validate;
 
   mainchare Main {
     entry Main(CkArgMsg* m);
