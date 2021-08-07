@@ -268,7 +268,7 @@ static void CkCallbackSendExt(const CkCallback &cb, void *msg)
       CreateCallbackMsgExt(data, dataLen, reducerType, cb.d.array.refnum, sectionInfo,
                                   extResultMsgData, extResultMsgDataSizes);
       CkArrayExtSend_multi(cb.d.array.id.idx, cb.d.array.idx.asChild().data(), cb.d.array.idx.dimension,
-                           cb.d.array.ep, 2, extResultMsgData, extResultMsgDataSizes);
+                           cb.d.array.ep, 2, extResultMsgData, extResultMsgDataSizes, 0);
       break;
     case CkCallback::bcastGroup:
       CreateCallbackMsgExt(data, dataLen, reducerType, cb.d.group.refnum, sectionInfo,
@@ -281,7 +281,7 @@ static void CkCallbackSendExt(const CkCallback &cb, void *msg)
                                   extResultMsgData, extResultMsgDataSizes);
       // numDimensions is set to 0 since its bcast
       CkArrayExtSend_multi(cb.d.array.id.idx, cb.d.array.idx.asChild().data(), 0,
-                           cb.d.array.ep, 2, extResultMsgData, extResultMsgDataSizes);
+                           cb.d.array.ep, 2, extResultMsgData, extResultMsgDataSizes, 0);
       break;
     case CkCallback::bcastSection: // Send message to a section
       sectionInfo[0] = cb.d.section.sid_pe;

@@ -422,9 +422,10 @@ extern void CkGroupExtSend_multi(int gid, int npes, const int *pes, int epIdx, i
 extern void CkForwardMulticastMsg(int gid, int num_children, const int *children);
 /// Send msg to array with ID 'aid'. idx is index of destination and ndims the number
 /// of dimensions of the index. If ndims <= 0, msg will be broadcasted to all array elements
-extern void CkArrayExtSend(int aid, int *idx, int ndims, int epIdx, char *msg, int msgSize);
+extern void CkArrayExtSend(int aid, int *idx, int ndims, int epIdx, char *msg, int msgSize, int opts);
 /// Send msg to array copying data into CkMessage from multiple input buffers
-extern void CkArrayExtSend_multi(int aid, int *idx, int ndims, int epIdx, int num_bufs, char **bufs, int *buf_sizes);
+  extern void CkArrayExtSend_multi(int aid, int *idx, int ndims, int epIdx, int num_bufs, char **bufs, int *buf_sizes, int opts);
+
 #endif
 
 /*@}*/

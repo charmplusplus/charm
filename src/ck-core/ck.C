@@ -2123,6 +2123,7 @@ void CkDeleteChares() {
 
 //------------------- External client support (e.g. Charm4py) ----------------
 #if CMK_CHARM4PY
+int MSG_EXPEDITED = CK_MSG_EXPEDITED;
 
 static std::vector< std::vector<char> > ext_args;
 static std::vector<char*> ext_argv;
@@ -2498,7 +2499,7 @@ void CkForwardMulticastMsg(int _gid, int num_children, const int *children) {
   ((SectionManagerExt*)CkLocalBranch(gid))->forwardMulticastMsg(num_children, children);
 }
 
-void CkArrayExtSend(int aid, int *idx, int ndims, int epIdx, char *msg, int msgSize) {
+void CkArrayExtSend(int aid, int *idx, int ndims, int epIdx, char *msg, int msgSize, int opts) {
   int marshall_msg_size = (sizeof(char)*msgSize + 3*sizeof(int));
   CkMarshallMsg *impl_msg = CkAllocateMarshallMsg(marshall_msg_size, NULL);
   PUP::toMem implP((void *)impl_msg->msgBuf);
@@ -2514,13 +2515,13 @@ void CkArrayExtSend(int aid, int *idx, int ndims, int epIdx, char *msg, int msgS
   if (ndims > 0) {
     CkArrayIndex arrIndex(ndims, idx);
     // TODO is there a better function for this?
-    CProxyElement_ArrayBase::ckSendWrapper(gId, arrIndex, impl_amsg, epIdx, 0);
+    CProxyElement_ArrayBase::ckSendWrapper(gId, arrIndex, impl_amsg, epIdx, opts);
   } else { // broadcast
-    CkBroadcastMsgArray(epIdx, impl_amsg, gId, 0);
+    CkBroadcastMsgArray(epIdx, impl_amsg, gId, opts);
   }
 }
 
-void CkArrayExtSend_multi(int aid, int *idx, int ndims, int epIdx, int num_bufs, char **bufs, int *buf_sizes) {
+void CkArrayExtSend_multi(int aid, int *idx, int ndims, int epIdx, int num_bufs, char **bufs, int *buf_sizes, int opts) {
   CkAssert(num_bufs >= 1);
   int totalSize = 0;
   for (int i=0; i < num_bufs; i++) totalSize += buf_sizes[i];
