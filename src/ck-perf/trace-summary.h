@@ -82,8 +82,8 @@ class BinEntry {
   private:
     double _time;
     double _idleTime;
-    int _msgSize;
-    int _msgCount;
+    long _msgSize;
+    long _msgCount;
     CkVec<long> _msgSizePerEP;
     CkVec<long> _msgCountPerEP;
     long _recvSize;

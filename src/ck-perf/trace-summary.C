@@ -444,7 +444,7 @@ void SumLogPool::write(void)
             streak++;
         } else {
             if (streak > 0) {
-                fprintf(fp, "%d+%d ", prev_val, streak);
+                fprintf(fp, "%ld+%ld ", prev_val, streak);
             }
             prev_val = temp;
             streak = 1;
@@ -735,9 +735,9 @@ void SumLogPool::writeSts(void)
   fclose(stsfp);
 }
 
-void SumLogPool::add(double time, double idleTime, int msgSize, int msgCount,
+void SumLogPool::add(double time, double idleTime, long msgSize, long msgCount,
                      CkVec<long> msgSizePerEP, CkVec<long> msgCountPerEP,
-                     int recvSize, int recvCount,
+                     long recvSize, long recvCount,
                      CkVec<long> recvSizePerEP, CkVec<long> recvCountPerEP,
                      int pe)
 {
