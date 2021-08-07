@@ -401,16 +401,16 @@ void SumLogPool::write(void)
   fprintf(fp, "\n");
 
   fprintf(fp, "Communications data\n");
-  int prev_val = 0;
-  int streak = 0;
+  long prev_val = 0;
+  long streak = 0;
 
-  fprintf(fp, "Msg count data:\n");
+  fprintf(fp, "MsgSentCount: ");
   for(int k = 0; k  < numBins; ++k)
   {
-    CkVec<int> countPerEP = pool[k].getCountPerEP();
+    CkVec<long> countPerEP = pool[k].getCountPerEP();
     for(int l = 0; l < _entryTable.size(); ++l)
     {
-      int temp = countPerEP[l];
+      long temp = countPerEP[l];
       if(temp == prev_val)
       {
         streak++;
@@ -418,26 +418,26 @@ void SumLogPool::write(void)
       {
         if(streak > 0)
         {
-          fprintf(fp,"%d+%d ", prev_val, streak);
+          fprintf(fp,"%ld+%ld ", prev_val, streak);
         }
         prev_val = temp;
         streak = 1;
       }
     }
-    if(streak > 0)
-    {
-      fprintf(fp,"%d+%d ", prev_val, streak);
-    }
+  }
+  if(streak > 0)
+  {
+      fprintf(fp,"%ld+%ld ", prev_val, streak);
   }
   fprintf(fp, "\n");
 
   prev_val = 0;
   streak = 0;
 
-  fprintf(fp, "Msg size data:\n");
+  fprintf(fp, "MsgSentSize:\n");
   for(int k = 0; k  < numBins; ++k)
   {
-    CkVec<int> sizePerEP = pool[k].getSizePerEP();
+    CkVec<long> sizePerEP = pool[k].getSizePerEP();
     for(int l = 0; l < _entryTable.size(); ++l) {
         int temp = sizePerEP[l];
         if (temp == prev_val) {
@@ -453,7 +453,7 @@ void SumLogPool::write(void)
   }
   if(streak > 0)
   {
-      fprintf(fp, "%d+%d ", prev_val, streak);
+      fprintf(fp, "%ld+%ld ", prev_val, streak);
   }
   fprintf(fp, "\n");
 
@@ -605,16 +605,16 @@ void SumLogPool::write(void)
         fprintf(sdfp, "\n");
 
         fprintf(sdfp, "Communications data\n");
-        int prev_val = 0;
-        int streak = 0;
+        long prev_val = 0;
+        long streak = 0;
 
-        fprintf(sdfp, "Msg count data:\n");
+        fprintf(sdfp, "MsgSentSize:\n");
         for(int k = 0; k  < numBins; ++k)
         {
-          CkVec<int> countPerEP = pool[k].getCountPerEP();
+          CkVec<long> countPerEP = pool[k].getCountPerEP();
           for(int l = 0; l < _entryTable.size(); ++l)
           {
-            int temp = countPerEP[l];
+            long temp = countPerEP[l];
             if(temp == prev_val)
             {
               streak++;
@@ -622,29 +622,29 @@ void SumLogPool::write(void)
             {
               if(streak > 0)
               {
-                fprintf(sdfp, "%d+%d ", prev_val, streak);
+                fprintf(sdfp, "%ld+%ld ", prev_val, streak);
               }
               prev_val = temp;
               streak = 1;
             }
           }
-          if(streak > 0)
-          {
-            fprintf(sdfp, "%d+%d ", prev_val, streak);
-          }
+        }
+        if(streak > 0)
+        {
+          fprintf(sdfp, "%ld+%ld ", prev_val, streak);
         }
         fprintf(sdfp, "\n");
 
         prev_val = 0;
         streak = 0;
 
-        fprintf(sdfp, "\nMsg size data:\n");
+        fprintf(sdfp, "\nMsgSentCount:\n");
         for(int k = 0; k  < numBins; ++k)
         {
-          CkVec<int> sizePerEP = pool[k].getSizePerEP();
+          CkVec<long> sizePerEP = pool[k].getSizePerEP();
           for(int l = 0; l < _entryTable.size(); ++l)
           {
-            int temp = sizePerEP[l];
+            long temp = sizePerEP[l];
             if(temp == prev_val)
             {
               streak++;
@@ -652,16 +652,16 @@ void SumLogPool::write(void)
             {
               if(streak > 0)
               {
-                fprintf(sdfp,"%d+%d ", prev_val, streak);
+                fprintf(sdfp,"%ld+%ld ", prev_val, streak);
               }
               prev_val = temp;
               streak = 1;
             }
           }
-          if(streak > 0)
-          {
-            fprintf(sdfp,"%d+%d ", prev_val, streak);
-          }
+        }
+        if(streak > 0)
+        {
+          fprintf(sdfp,"%ld+%ld ", prev_val, streak);
         }
         fprintf(sdfp, "\n");
 
@@ -736,9 +736,9 @@ void SumLogPool::writeSts(void)
 }
 
 void SumLogPool::add(double time, double idleTime, int msgSize, int msgCount,
-                     CkVec<int> msgSizePerEP, CkVec<int> msgCountPerEP,
+                     CkVec<long> msgSizePerEP, CkVec<long> msgCountPerEP,
                      int recvSize, int recvCount,
-                     CkVec<int> recvSizePerEP, CkVec<int> recvCountPerEP,
+                     CkVec<long> recvSizePerEP, CkVec<long> recvCountPerEP,
                      int pe)
 {
   new (&pool[numBins++]) BinEntry(time, idleTime, msgSize, msgCount, msgSizePerEP, msgCountPerEP,
@@ -922,10 +922,10 @@ void TraceSummary::resetCounters()
 void TraceSummary::setCounters()
 {
   int len = _entryTable.size() + 10;
-  msgSizePerEP = CkVec<int>(len);
-  msgCountPerEP = CkVec<int>(len);
-  recvSizePerEP = CkVec<int>(len);
-  recvCountPerEP = CkVec<int>(len);
+  msgSizePerEP = CkVec<long>(len);
+  msgCountPerEP = CkVec<long>(len);
+  recvSizePerEP = CkVec<long>(len);
+  recvCountPerEP = CkVec<long>(len);
   resetCounters();
 }
 
@@ -964,7 +964,7 @@ void TraceSummary::beginExecute(envelope *e, void *obj)
   else {
     beginExecute(-1,-1,e->getEpIdx(),-1);
 
-    int len = recvSizePerEP.size();
+    long len = recvSizePerEP.size();
     int epIdx = e->getEpIdx();
     if(epIdx >= len) {
       msgSizePerEP.resize(_entryTable.size() + 10);
