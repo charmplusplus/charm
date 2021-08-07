@@ -438,26 +438,22 @@ void SumLogPool::write(void)
   for(int k = 0; k  < numBins; ++k)
   {
     CkVec<int> sizePerEP = pool[k].getSizePerEP();
-    for(int l = 0; l < _entryTable.size(); ++l)
-    {
-      int temp = sizePerEP[l];
-      if(temp == prev_val)
-      {
-        streak++;
-      } else
-      {
-        if(streak > 0)
-        {
-          fprintf(fp,"%d+%d ", prev_val, streak);
+    for(int l = 0; l < _entryTable.size(); ++l) {
+        int temp = sizePerEP[l];
+        if (temp == prev_val) {
+            streak++;
+        } else {
+            if (streak > 0) {
+                fprintf(fp, "%d+%d ", prev_val, streak);
+            }
+            prev_val = temp;
+            streak = 1;
         }
-        prev_val = temp;
-        streak = 1;
-      }
     }
-    if(streak > 0)
-    {
+  }
+  if(streak > 0)
+  {
       fprintf(fp, "%d+%d ", prev_val, streak);
-    }
   }
   fprintf(fp, "\n");
 
