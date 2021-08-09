@@ -290,6 +290,7 @@ void CkReductionMgr::contributorStamped(contributorInfo *ci)
   gcount++;
   if (inProgress)
   {
+    printf("BEFORE, IN PROGRESS\n");
     ci->redNo=redNo+1;//Created *during* reduction => contribute to *next* reduction
     adj(redNo).gcount--;//He'll wrongly be counted in the global count at end
   } else
@@ -399,6 +400,7 @@ void CkReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
 {
   DEBR((AA "Contributor %p contributed for %d in grp %d ismigratable %d \n" AB,ci,ci->redNo,thisgroup.idx,m->isMigratableContributor()));
   m->redNo=ci->redNo++;
+  CkPrintf("Reduction number icremented\n");
   m->sourceFlag=-1;//A single contribution
   m->gcount=0;
 
@@ -690,6 +692,7 @@ void CkReductionMgr::finishReduction(void)
 
   //House Keeping Operations will have to check later what needs to be changed
   redNo++;
+  CkPrintf("Reduction number icremented\n");
   // Check after every reduction contribution whether this makes the PE inactive
   // starting this redNo
   checkIsActive();
@@ -2071,6 +2074,7 @@ void CkNodeReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
 {
 
   m->redNo=ci->redNo++;
+  CkPrintf("Reduction number icremented\n");
   m->sourceFlag=-1;//A single contribution
   m->gcount=0;
   DEBR(("[%d,%d] NodeGroup %d> localContribute called for redNo %d \n",CkMyNode(),CkMyPe(),thisgroup.idx,m->redNo));
@@ -2082,6 +2086,7 @@ void CkNodeReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
 void CkNodeReductionMgr::contributeWithCounter(contributorInfo *ci,CkReductionMsg *m,int count)
 {
   m->redNo=ci->redNo++;
+  CkPrintf("Reduction number icremented\n");
   m->gcount=count;
   DEBR(("[%d,%d] contributewithCounter started for %d at %0.6f{{{\n",CkMyNode(),CkMyPe(),m->redNo,CmiWallTimer()));
   addContribution(m);
@@ -2293,6 +2298,7 @@ void CkNodeReductionMgr::finishReduction(void)
   // DEBR((AA "Reduction %d finished in group!\n" AB,redNo));
   //CkPrintf("[%d,%d]Reduction %d finished with %d\n",CkMyNode(),CkMyPe(),redNo,nContrib);
   redNo++;
+  CkPrintf("Reduction number icremented\n");
   int i;
   inProgress=false;
   startRequested=false;

@@ -5,6 +5,7 @@
 #include "converse.h"
 #include "pup.h"
 
+#include <iostream>
 #define CMK_OBJID_NULL_TAG 0ULL
 #define CMK_OBJID_ARRAY_TAG 1ULL
 #define CMK_OBJID_SECTION_TAG 2ULL
@@ -103,6 +104,7 @@ class SectionID : public BaseID
     {
       _id = CMK_OBJID_SECTION_TAG << tag_offset | home << home_offset | counter;
     }
+  SectionID() {}
 };
 
 class ArrayElementID : public BaseID

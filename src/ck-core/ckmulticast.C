@@ -192,6 +192,7 @@ class mCastEntry
         /// Increment the reduction number across the whole linked list of cookies
         inline void incReduceNo() {
             red.redNo ++;
+            CkPrintf("Increasing the reduction number\n");
             for (mCastEntry *next = newc; next; next=next->newc) 
                 next->red.redNo++;
         }
@@ -487,6 +488,15 @@ void CkMulticastMgr::initDelegateMgr(CProxy *cproxy, int opts)
       prepareCookie(entry, *sid, al, proxy->ckGetNumElements(i), aid);
       initCookie(sid->_cookie);
   }
+}
+
+void CkMulticastMgr::initDelegateMgr(CkSectionID &id, CkArrayID aid)
+{
+  // TODO: this needs to be updated for x-array sections
+  mCastEntry *entry = new mCastEntry(aid);
+  prepareCookie(entry, id, id._elems.data(),
+                id.nElems(), aid);
+  initCookie(id._cookie);
 }
 
 
@@ -1269,8 +1279,17 @@ void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType
 
 void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &id, const CkCallback &cb, int userFlag, int fragSize)
 {
-  if (id.get_val() == NULL || id.get_redNo() == -1) 
-    CmiAbort("contribute: SectionID is not initialized\n");
+  int sum = 0;
+  if (id.get_val() == NULL) 
+    {
+    CmiPrintf("contribute: SectionID is not initialized (null val)\n");
+    ++sum;
+    }
+  if(id.get_redNo() == -1)
+    {
+    CmiPrintf("contribute: SectionID is not initialized (null val)\n");
+    ++sum;
+    }
 
   int8_t nFrags;
   if (-1 == fragSize) {		// no frag
@@ -1531,6 +1550,7 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
 
 
     DEBUGF(("[%d] RecvRedMsg, entry: %p, lcount: %d, cccount: %d, #localelems: %d, #children: %d \n", CkMyPe(), entry, redInfo.lcount[msg->fragNo], redInfo.ccount[msg->fragNo], entry->getNumLocalElems(), entry->children.size()));
+    CmiPrintf("This reduction has %d localelems\n", entry->getNumLocalElems());
 
     //-------------------------------------------------------------------------
     /// If you've received a msg from a previous redn, something has gone horribly wrong somewhere!
@@ -1542,6 +1562,7 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
     //-------------------------------------------------------------------------
     /// If the current tree is not yet ready or if you've received a msg for a future redn, buffer the msg
     if (entry->notReady() || msg->redNo > redInfo.redNo) {
+      printf("Buffering it for future, not ready: %d, redno mismatch: %d\n", entry->notReady(), msg->redNo > redInfo.redNo);
         DEBUGF(("[%d] Future redmsgs, buffered! msg:%p entry:%p ready:%d msg red:%d sys redno:%d\n", CkMyPe(), msg, entry, entry->notReady(), msg->redNo, redInfo.redNo));
         redInfo.futureMsgs.push_back(msg);
         return;
@@ -1552,10 +1573,12 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
     // New contribution from an ArrayElement
     if (msg->isFromUser()) {
         redInfo.lcount [index] ++;
+        CkPrintf("Lcount is now %d\n", redInfo.lcount[index]);
     }
     // Redn from a child
     if (msg->sourceFlag == 2) {
         redInfo.ccount [index] ++;
+        CkPrintf("Ccount is now %d\n", redInfo.ccount[index]);
     }
     // Total elems that have contributed the indexth fragment
     redInfo.gcount [index] += msg->gcount;

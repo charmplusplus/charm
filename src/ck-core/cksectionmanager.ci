@@ -1,5 +1,7 @@
 module cksec{
+  message SectionMulticastMsg;
 group CkSectionManager {
   entry CkSectionManager(void);
+  entry void doMulticast(ck::SectionID sid, int ep);
 };
 }

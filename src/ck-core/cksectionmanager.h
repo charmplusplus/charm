@@ -5,6 +5,18 @@
 #include "cksection.h"
 #include <unordered_map>
 
+class SectionMulticastMsg : public CkMcastBaseMsg, public CMessage_SectionMulticastMsg
+{
+public:
+  ck::SectionID sid;
+  int ep;
+  CProxy_CkSectionManager secmgr;
+  SectionMulticastMsg(ck::SectionID _sid, int _ep, CProxy_CkSectionManager _secmgr)
+    : sid{_sid}, ep{_ep}, secmgr{_secmgr} {}
+  void pup(PUP::er &p);
+};
+
+
 // placeholder, but I think this will be some base Proxy class
 struct _SectionMember
 {
@@ -30,6 +42,16 @@ private:
   LocalMemberContainer<SectionMember> localElements;
   // children in the spanning tree, but I think we will (for now) defer to Ckmulticast for the spanning tree.
   std::vector<int> childPEs;
+
+  void initializeInfo(SectionMember::collection_type collection)
+  {
+    // NOTE: Doesn't work for x-array sections
+    if(localElements.empty())
+      {
+        this->info = CkSectionInfo(CkMyPe(), NULL, 0, collection);
+      }
+  }
+
 public:
   using size_type = LocalMemberContainer<SectionMember>::size_type;
   _SectionInfo(size_type localElementSize)
@@ -41,11 +63,15 @@ public:
                       SectionMember::element_type element
                       )
   {
+    initializeInfo(collection);
     localElements.emplace_back(collection, element);
   }
   template<typename InputIt>
-  void addLocalMembers(InputIt begin, InputIt end)
+  void addLocalMembers(SectionMember::collection_type collection,
+                       InputIt begin, InputIt end
+                       )
   {
+    initializeInfo(collection);
     localElements.insert(localElements.end(), begin, end);
   }
   void addChildPE(int pe)
@@ -60,10 +86,13 @@ public:
 
 class CkSectionManager : public CBase_CkSectionManager {
 public:
-  using SectionMapType = std::unordered_map<ck::SectionID, _SectionInfo>;
+  using SectionInfo = CkSectionID;
+  using SectionMapType = std::unordered_map<ck::SectionID, SectionInfo>;
 private:
   SectionMapType sections;
+  CkMulticastMgr *mcastMgr;
   int lastCounter = 0;
+  int myPe = -1;
 
   ck::SectionID createSectionID();
 
@@ -79,7 +108,13 @@ private:
 
 public:
 
-  CkSectionManager();
+  CkSectionManager()
+    : myPe{CkMyPe()}
+  {
+    // Where is this created for regular sections? For each new section upon creation?
+    CkGroupID mCastGrpId = CProxy_CkMulticastMgr::ckNew();
+    this->mcastMgr = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
+  }
   // Create a single section containing the chares in the range
   // [begin, end), return a handle to it that can be referenced
   // returns SectionID, will be used to create CProxy_SectionXX
@@ -88,7 +123,8 @@ public:
   ck::SectionID createSection(SectionFn fn, ElementProxy collection, InputIt begin, InputIt end)
   {
     ck::SectionID newSectionID = createSectionID();
-    _SectionInfo newSectionInfo{};
+    SectionInfo newSectionInfo{};
+    newSectionInfo._cookie = CkSectionInfo{};
     auto aid = collection.ckGetArrayID();
 
     for(auto x = begin; x != end; x++)
@@ -96,13 +132,37 @@ public:
         if(fn(*x))
           {
             // can add a "getID" specialized for array/group members
-            newSectionInfo.addLocalMember(aid, *x);
+            newSectionInfo.addMember(*x);
           }
       }
+
+    // this needs to happen on each processor?
+    this->mcastMgr->initDelegateMgr(newSectionInfo, aid);
+    // this->mcastMgr->setSection(newSectionInfo._cookie, aid, newSectionInfo._elems.data(),
+    //                            newSectionInfo.nElems()
+    //                            );
     // // should move it, not copy
+    // SectionCreationMsg *creationMsg = new SectionCreationMsg(newSectionID, newSectionInfo);
+    // CkGetSectionInfo(newSectionInfo._cookie, creationMsg);
+    // broadcast to all sectionmanagers this new section
     sections[newSectionID] = newSectionInfo;
+
+    return newSectionID;
   }
 
+  void initSectionLocal(SectionMulticastMsg *m);
+  void contribute(ck::SectionID sid, int size, void *data,
+                  CkReduction::reducerType reduction, CkCallback cb
+                  );
+  void multicast(ck::SectionID sid, int ep);
+
+  // private method
+  void doMulticast(ck::SectionID sid, int ep);
+  // void send(ck::SectionID sid, int ep, void *m)
+  // {
+
+  //   this->mcastMgr->ArraySectionSend();
+  // }
 
   // create std::distance(outputBegin, outputEnd) sections from the chares in the range
   // [begin, end).

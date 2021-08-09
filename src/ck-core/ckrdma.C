@@ -2043,7 +2043,7 @@ void zcPupGetCompleted(NcpyOperationInfo *info) {
                     (char *)ref);
 #else
         // On worker thread, handle all buffered messages
-        CProxy_CkLocMgr(ref->locMgrId).ckLocalBranch()->processAfterActiveRgetsCompleted(ref->id);
+        CProxy_CkLocMgr(ref->locMgrId).ckLocalBranch()->processAfterActiveRgetsCompleted(ck::BaseID(ref->id));
 #endif
         CmiFree(ref);
       }

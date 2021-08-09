@@ -115,6 +115,8 @@ class CkMulticastMgr: public CkDelegateMgr
         void resetSection(CProxySection_ArrayBase &proxy);  // called by root
         /// Implement the CkDelegateMgr interface to accept the delegation of a section proxy
         virtual void initDelegateMgr(CProxy *proxy, int opts=0);
+        // TODO: This should be declared in CkDelegateMgr
+        void initDelegateMgr(CkSectionID &id, CkArrayID aid);
         /// To implement the CkDelegateMgr interface for section mcasts
         void ArraySectionSend(CkDelegateData *pd,int ep,void *m, int nsid, CkSectionID *s, int opts);
         /// Send individually to each section member. Used when tree is out-of-date and needs a rebuild
@@ -127,7 +129,9 @@ class CkMulticastMgr: public CkDelegateMgr
         /// release buffered contributed messages, send them to parent
         void GroupSectionSend(CkDelegateData *pd,int ep,void *m,int nsid,CkSectionID *s);
 
-    private:
+  // make public for now so SectionManager can access these without making a proxy
+  // Don't want to make a friend class right now, requires to include the cksectionmanager header
+    public:
         /// Fill the SectionInfo cookie in the SectionID obj with relevant info
         void prepareCookie(mCastEntry *entry, CkSectionID &sid, const CkArrayIndex *al, int count, CkArrayID aid);
         /// Get info from the CkSectionInfo and call setup() to start the spanning tree build

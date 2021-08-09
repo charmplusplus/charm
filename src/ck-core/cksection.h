@@ -176,6 +176,7 @@ public:
   inline CkGroupID get_aid() const { return _cookie.get_aid(); }
   inline int nElems() const { return _elems.size(); }
   inline int nPes() const { return pelist.size(); }
+  inline void addMember(CkArrayIndex &e) {_elems.push_back(e);}
   void operator=(const CkSectionID &);
   ~CkSectionID() = default;
   void pup(PUP::er &p);
