@@ -106,7 +106,9 @@ if(CMK_SUPPORTS_PIPGLOBALS)
         COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_globals_pip.dir/ampi_globals_pip.C.o ${CMAKE_BINARY_DIR}/lib/ampi_globals_pip.o
         VERBATIM
     )
+endif()
 
+if(CMK_SUPPORTS_PIEGLOBALS)
     add_library(ampi_globals_pie ampi_globals_pie.C)
     target_compile_options(ampi_globals_pie PRIVATE -language ampi)
     add_dependencies(ampi_globals_pie moduleampi)
@@ -427,6 +429,8 @@ if(CMK_AMPI_WITH_ROMIO)
     endif()
     if(CMK_SUPPORTS_PIPGLOBALS)
         add_dependencies(ampi_globals_pip romio)
+    endif()
+    if(CMK_SUPPORTS_PIEGLOBALS)
         add_dependencies(ampi_globals_pie romio)
     endif()
 endif()

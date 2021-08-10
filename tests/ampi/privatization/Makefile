@@ -36,7 +36,10 @@ ifeq (1,$(CMK_SUPPORTS_FSGLOBALS))
   TARGETS += fsglobals
 endif
 ifeq (1,$(CMK_SUPPORTS_PIPGLOBALS))
-  TARGETS += pipglobals pieglobals
+  TARGETS += pipglobals
+endif
+ifeq (1,$(CMK_SUPPORTS_PIEGLOBALS))
+  TARGETS += pieglobals
 endif
 
 $(foreach i,$(VARIANTS),$(eval LANGUAGES_$i := $(LANGUAGES)))

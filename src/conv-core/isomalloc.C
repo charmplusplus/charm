@@ -997,6 +997,17 @@ struct isommap
     {
       uint8_t * localstart = start;
 
+#if CMK_HAS_MPROTECT
+      // hack: reset all regions to RW- to avoid a conflict with RDMA registration
+      if (p.isPacking() && p.isDeleting())
+      {
+        for (const auto & region : protect_regions)
+        {
+          mprotect((void *)std::get<0>(region), std::get<1>(region), PROT_READ|PROT_WRITE);
+        }
+      }
+#endif
+
       p.pup_buffer(localstart, totalsize,
                    [localstart](size_t totalsize) -> void *
                    {

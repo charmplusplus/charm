@@ -144,6 +144,13 @@ then
     echo "Error: Prerequisites for -pipglobals support were not detected."
     exit 1
   fi
+elif [ "$GLOBALS" = 'pie' ]
+then
+  if [ "$CMK_SUPPORTS_PIEGLOBALS" != '1' ]
+  then
+    echo "Error: Prerequisites for -pieglobals support were not detected."
+    exit 1
+  fi
 fi
 
 AMPICC_POST_OPTS=()
