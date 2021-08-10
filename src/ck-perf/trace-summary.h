@@ -30,16 +30,66 @@ class BinEntry {
 #if defined(_WIN32) || CMK_MULTIPLE_DELETE
     void operator delete(void *, void *) { }
 #endif
-    BinEntry(): _time(0.), _idleTime(0.) {}
-    BinEntry(double t, double idleT): _time(t), _idleTime(idleT) {}
+    BinEntry(): _time(0.), _idleTime(0.),
+                 _msgSize(0), _msgCount(0),
+                 _recvSize(0), _recvCount(0)
+    {
+      _msgCountPerEP = CkVec<long>(_entryTable.size() + 10);
+      _msgSizePerEP = CkVec<long>(_entryTable.size() + 10);
+      _recvCountPerEP = CkVec<long>(_entryTable.size() + 10);
+      _recvSizePerEP = CkVec<long>(_entryTable.size() + 10);
+      for(int i = 0; i < _msgCountPerEP.size(); ++i) {
+        _msgCountPerEP[i] = _msgSizePerEP[i] = _recvCountPerEP[i] = _recvSizePerEP[i] = 0;
+      }
+    }
+
+    BinEntry(double t, double idleT, long msgSize, long msgCount,
+             CkVec<long> msgSizePerEP, CkVec<long> msgCountPerEP,
+             long recvSize, long recvCount,
+             CkVec<long> recvSizePerEP, CkVec<long> recvCountPerEP
+             ): _time(t), _idleTime(idleT),
+                 _msgSize(msgSize), _msgCount(msgCount),
+                 _recvSize(recvSize), _recvCount(recvCount)
+    {
+      if(_msgSizePerEP.size() == 0)
+      {
+        _msgCountPerEP = CkVec<long>(msgSizePerEP.size());
+        _msgSizePerEP = CkVec<long>(msgSizePerEP.size());
+        _recvCountPerEP = CkVec<long>(msgSizePerEP.size());
+        _recvSizePerEP = CkVec<long>(msgSizePerEP.size());
+      }
+      for(int i = 0; i < msgSizePerEP.size(); ++i) {
+        _msgSizePerEP[i] = msgSizePerEP[i];
+        _msgCountPerEP[i] = msgCountPerEP[i];
+        _recvSizePerEP[i] = recvSizePerEP[i];
+        _recvCountPerEP[i] = recvCountPerEP[i];
+      }
+  }
     double &time() { return _time; }
     double &getIdleTime() { return _idleTime; }
+    long &getSize() { return _msgSize; }
+    long &getCount() {return _msgCount; }
+    CkVec<long> &getSizePerEP() { return _msgSizePerEP;}
+    CkVec<long> &getCountPerEP() {return _msgCountPerEP; }
+    long &getRecvSize() { return _recvSize; }
+    long &getRecvCount() { return _recvCount; }
+    CkVec<long> &getRecvSizePerEP() {return _recvSizePerEP; }
+    CkVec<long> &getRecvCountPerEP() {return _recvCountPerEP; }
     void write(FILE *fp);
     int  getU();
     int getUIdle();
+
   private:
     double _time;
     double _idleTime;
+    long _msgSize;
+    long _msgCount;
+    CkVec<long> _msgSizePerEP;
+    CkVec<long> _msgCountPerEP;
+    long _recvSize;
+    long _recvCount;
+    CkVec<long> _recvSizePerEP;
+    CkVec<long> _recvCountPerEP;
 };
 
 /// a phase entry for trace summary
@@ -192,7 +242,11 @@ class SumLogPool {
     void initMem();
     void write(void) ;
     void writeSts(void);
-    void add(double time, double idleTime, int pe);
+    void add(double time, double idleTime, long msgSize, long msgCount,
+             CkVec<long> msgSizePerEP, CkVec<long> msgCountPerEP,
+             long recvSize, long recvCount,
+             CkVec<long> recvSizePerEP, CkVec<long> recvCountPerEP,
+             int pe);
     void setEp(int epidx, double time);
     void clearEps() {
       for(int i=0; i < epInfoSize; i++) {
@@ -259,9 +313,17 @@ class TraceSummary : public Trace {
     int inIdle;
     int inExec;
     int depth;
+    long msgSize;
+    long msgCount;
+    CkVec<long> msgSizePerEP;
+    CkVec<long> msgCountPerEP;
+    long recvSize;
+    long recvCount;
+    CkVec<long> recvSizePerEP;
+    CkVec<long> recvCountPerEP;
+
   public:
     TraceSummary(char **argv);
-    void creation(envelope *e, int epIdx, int num=1) {}
 
     void beginExecute(envelope *e, void *obj);
     void beginExecute(char *msg);
@@ -279,6 +341,11 @@ class TraceSummary : public Trace {
     void endUnpack(void);
     void beginComputation(void);
     void endComputation(void);
+
+    void creation(envelope *e, int epIdx, int num=1);
+    void creationMulticast(envelope *e, int epIdx, int num=1, const int *pelist=NULL);
+    void resetCounters();
+    void setCounters();
 
     void traceClearEps();
     void traceWriteSts();

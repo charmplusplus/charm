@@ -232,10 +232,14 @@ void SumLogPool::addEventType(int eventType, double time)
    markcount ++;
 }
 
+/**
+ * Constructor
+ * @param pgm
+ */
 SumLogPool::SumLogPool(char *pgm) : numBins(0), phaseTab(MAX_PHASES) 
 {
    // TBD: Can this be moved to initMem?
-  cpuTime = NULL;
+   cpuTime = NULL;
    poolSize = CkpvAccess(binCount);
    if (poolSize % 2) poolSize++;	// make sure it is even
    pool = new BinEntry[poolSize];
@@ -294,6 +298,10 @@ int SumLogPool::getUtilization(int interval, int ep) {
     return (int)(getCPUtime(interval, ep) * 100.0 / CkpvAccess(binSize)); 
 }
 
+
+/**
+ * Log writer for each processor
+ */
 void SumLogPool::write(void) 
 {
   int i;
@@ -378,6 +386,64 @@ void SumLogPool::write(void)
   for (i=0; i<_numEntries; i++)
     fprintf(fp, "%ld ", (long)(epInfo[i].epMaxTime*1.0e6));
   fprintf(fp, "\n");
+
+  long prev_val = 0;
+  long streak = 0;
+
+  fprintf(fp, "MsgSentCount: ");
+  for(int k = 0; k  < numBins; ++k)
+  {
+    CkVec<long> countPerEP = pool[k].getCountPerEP();
+    for(int l = 0; l < _entryTable.size(); ++l)
+    {
+      long temp = countPerEP[l];
+      if(temp == prev_val)
+      {
+        streak++;
+      } else
+      {
+        if(streak > 0)
+        {
+          fprintf(fp,"%ld+%ld ", prev_val, streak);
+        }
+        prev_val = temp;
+        streak = 1;
+      }
+    }
+  }
+  if(streak > 0)
+  {
+      fprintf(fp,"%ld+%ld ", prev_val, streak);
+  }
+  fprintf(fp, "\n");
+
+  prev_val = 0;
+  streak = 0;
+
+  fprintf(fp, "MsgSentSize: ");
+  for(int k = 0; k  < numBins; ++k)
+  {
+    CkVec<long> sizePerEP = pool[k].getSizePerEP();
+    for(int l = 0; l < _entryTable.size(); ++l) {
+        int temp = sizePerEP[l];
+        if (temp == prev_val) {
+            streak++;
+        } else {
+            if (streak > 0) {
+                fprintf(fp, "%ld+%ld ", prev_val, streak);
+            }
+            prev_val = temp;
+            streak = 1;
+        }
+    }
+  }
+  if(streak > 0)
+  {
+      fprintf(fp, "%ld+%ld ", prev_val, streak);
+  }
+  fprintf(fp, "\n");
+
+
 #if 0
   for (i=0; i<SumEntryInfo::HIST_SIZE; i++) {
     for (j=0; j<_numEntries; j++) 
@@ -476,6 +542,66 @@ void SumLogPool::write(void)
         }
         if (count > 1) fprintf(sdfp, "+%d", count);
         fprintf(sdfp, "\n");
+
+        long prev_val = 0;
+        long streak = 0;
+
+        fprintf(sdfp, "MsgSentCount: ");
+        for(int k = 0; k  < numBins; ++k)
+        {
+          CkVec<long> countPerEP = pool[k].getCountPerEP();
+          for(int l = 0; l < _entryTable.size(); ++l)
+          {
+            long temp = countPerEP[l];
+            if(temp == prev_val)
+            {
+              streak++;
+            } else
+            {
+              if(streak > 0)
+              {
+                fprintf(sdfp, "%ld+%ld ", prev_val, streak);
+              }
+              prev_val = temp;
+              streak = 1;
+            }
+          }
+        }
+        if(streak > 0)
+        {
+          fprintf(sdfp, "%ld+%ld ", prev_val, streak);
+        }
+        fprintf(sdfp, "\n");
+
+        prev_val = 0;
+        streak = 0;
+
+        fprintf(sdfp, "\nMsgSentSize: ");
+        for(int k = 0; k  < numBins; ++k)
+        {
+          CkVec<long> sizePerEP = pool[k].getSizePerEP();
+          for(int l = 0; l < _entryTable.size(); ++l)
+          {
+            long temp = sizePerEP[l];
+            if(temp == prev_val)
+            {
+              streak++;
+            } else
+            {
+              if(streak > 0)
+              {
+                fprintf(sdfp,"%ld+%ld ", prev_val, streak);
+              }
+              prev_val = temp;
+              streak = 1;
+            }
+          }
+        }
+        if(streak > 0)
+        {
+          fprintf(sdfp,"%ld+%ld ", prev_val, streak);
+        }
+        fprintf(sdfp, "\n");
   }
 }
 
@@ -500,10 +626,17 @@ void SumLogPool::writeSts(void)
   fclose(stsfp);
 }
 
-// Called once per interval
-void SumLogPool::add(double time, double idleTime, int pe) 
+/*
+ * msgSize, msgCount -> never used, but useful for debugging
+ */
+void SumLogPool::add(double time, double idleTime, long msgSize, long msgCount,
+                     CkVec<long> msgSizePerEP, CkVec<long> msgCountPerEP,
+                     long recvSize, long recvCount,
+                     CkVec<long> recvSizePerEP, CkVec<long> recvCountPerEP,
+                     int pe)
 {
-  new (&pool[numBins++]) BinEntry(time, idleTime);
+  new (&pool[numBins++]) BinEntry(time, idleTime, msgSize, msgCount, msgSizePerEP, msgCountPerEP,
+                                  recvSize, recvCount, recvSizePerEP, recvCountPerEP);
   if (poolSize==numBins) {
     shrink();
   }
@@ -571,6 +704,19 @@ void SumLogPool::shrink(void)
   {
      pool[i].time() = pool[i*2].time() + pool[i*2+1].time();
      pool[i].getIdleTime() = pool[i*2].getIdleTime() + pool[i*2+1].getIdleTime();
+     pool[i].getSize() = pool[i*2].getSize() + pool[i*2 + 1].getSize();
+     pool[i].getCount() = pool[i*2].getCount() + pool[i*2 + 1].getCount();
+     pool[i].getRecvSize() = pool[i*2].getRecvSize() + pool[i*2 + 1].getRecvSize();
+     pool[i].getRecvCount() = pool[i*2].getRecvCount() + pool[i*2 + 1].getRecvCount();
+
+     int len = _entryTable.size();
+     for(int j = 0; j < len; ++j) {
+       pool[i].getSizePerEP()[j] = pool[i*2].getSizePerEP()[j] + pool[i*2 + 1].getSizePerEP()[j];
+       pool[i].getCountPerEP()[j] = pool[i*2].getCountPerEP()[j] + pool[i*2 + 1].getCountPerEP()[j];
+       pool[i].getRecvSizePerEP()[j] = pool[i*2].getRecvSizePerEP()[j] + pool[i*2 + 1].getRecvSizePerEP()[j];
+       pool[i].getRecvCountPerEP()[j] = pool[i*2].getRecvCountPerEP()[j] + pool[i*2 + 1].getRecvCountPerEP()[j];
+     }
+
      if (sumDetail)
      for (int e=0; e < epInfoSize; e++) {
          setCPUtime(i, e, getCPUtime(i*2, e) + getCPUtime(i*2+1, e));
@@ -610,8 +756,11 @@ void BinEntry::write(FILE* fp)
 }
 
 TraceSummary::TraceSummary(char **argv):msgNum(0),binStart(0.0),idleStart(0.0),
-					binTime(0.0),binIdle(0.0)
+					binTime(0.0),binIdle(0.0),
+                                          msgCount(0), msgSize(0),
+                                          recvCount(0), recvSize(0)
 {
+  setCounters();
   if (CkpvAccess(traceOnPe) == 0) return;
 
     // use absolute time
@@ -651,6 +800,29 @@ TraceSummary::TraceSummary(char **argv):msgNum(0),binStart(0.0),idleStart(0.0),
   depth = 0;
 }
 
+/**
+ * Reset counts per EP to zero for new bins
+ */
+void TraceSummary::resetCounters()
+{
+  for(int i = 0; i < msgCountPerEP.size(); ++i) {
+    msgCountPerEP[i] = msgSizePerEP[i] = recvCountPerEP[i] = recvSizePerEP[i] = 0;
+  }
+}
+
+/**
+ * Allocate memory and set initial counters for communications view to 0
+ */
+void TraceSummary::setCounters()
+{
+  int len = _entryTable.size() + 10;
+  msgSizePerEP = CkVec<long>(len);
+  msgCountPerEP = CkVec<long>(len);
+  recvSizePerEP = CkVec<long>(len);
+  recvCountPerEP = CkVec<long>(len);
+  resetCounters();
+}
+
 void TraceSummary::traceClearEps(void)
 {
   _logPool->clearEps();
@@ -677,6 +849,11 @@ void TraceSummary::beginExecute(CmiObjId *tid)
   beginExecute(-1,-1,_threadEP,-1);
 }
 
+/**
+ * Tracks recv messages??
+ * @param e
+ * @param obj
+ */
 void TraceSummary::beginExecute(envelope *e, void *obj)
 {
   // no message means thread execution
@@ -685,6 +862,22 @@ void TraceSummary::beginExecute(envelope *e, void *obj)
   }
   else {
     beginExecute(-1,-1,e->getEpIdx(),-1);
+
+    long len = recvSizePerEP.size();
+    int epIdx = e->getEpIdx();
+    if(epIdx >= len) {
+      msgSizePerEP.resize(_entryTable.size() + 10);
+      msgCountPerEP.resize(_entryTable.size() + 10);
+      recvSizePerEP.resize(_entryTable.size() + 10);
+      recvCountPerEP.resize(_entryTable.size() + 10);
+      for(int i = len; i < msgSizePerEP.size(); ++i) {
+        msgSizePerEP[i] = msgCountPerEP[i] = recvSizePerEP[i] = recvCountPerEP[i] = 0;
+      }
+    }
+    recvSize += e->getTotalsize();
+    recvSizePerEP[epIdx] += e->getTotalsize();
+    recvCount++;
+    recvCountPerEP[epIdx]++;
   }  
 }
 
@@ -742,9 +935,17 @@ void TraceSummary::beginExecute(int event,int msgType,int ep,int srcPe, int mlen
 	     binTime + binIdle, CkpvAccess(binSize));
     CkAssert(binTime + binIdle <= CkpvAccess(binSize));
     */
-     _logPool->add(binTime, binIdle, CkMyPe()); // add leftovers of last bin
+     _logPool->add(binTime, binIdle,
+                  msgSize, msgCount, msgSizePerEP, msgCountPerEP,
+                  recvSize, recvCount, recvSizePerEP, recvCountPerEP,
+                  CkMyPe()); // add leftovers of last bin
      binTime=0.0;                 // fill all other bins with 0 up till start
      binIdle = 0.0;
+     msgSize = 0;
+     msgCount = 0;
+     recvSize= 0;
+     recvCount = 0;
+     resetCounters();
      binStart = ts;
   }
 }
@@ -787,9 +988,17 @@ void TraceSummary::endExecute()
      binTime += nts-ts;
      binStart  = nts;
      // This calls shrink() if needed
-     _logPool->add(binTime, binIdle, CkMyPe()); 
+     _logPool->add(binTime, binIdle,
+                   msgSize, msgCount, msgSizePerEP, msgCountPerEP,
+                   recvSize, recvCount, recvSizePerEP, recvCountPerEP,
+                   CkMyPe());
      binTime = 0.0;
      binIdle = 0.0;
+     msgSize = 0;
+     msgCount = 0;
+     recvSize = 0;
+     recvCount = 0;
+     resetCounters();
      ts = nts;
   }
   binTime += t - ts;
@@ -831,9 +1040,17 @@ void TraceSummary::beginIdle(double currT)
   double ts = binStart;
   // fill gaps
   while ((ts = ts + CkpvAccess(binSize)) < t) {
-    _logPool->add(binTime, binIdle, CkMyPe()); // add leftovers of last bin
+    _logPool->add(binTime, binIdle,
+                  msgSize, msgCount, msgSizePerEP, msgCountPerEP,
+                  recvSize, recvCount, recvSizePerEP, recvCountPerEP,
+                  CkMyPe()); // add leftovers of last bin
     binTime=0.0;                 // fill all other bins with 0 up till start
     binIdle = 0.0;
+    msgSize = 0;
+    msgCount = 0;
+    recvSize = 0;
+    recvCount = 0;
+    resetCounters();
     binStart = ts;
   }
 }
@@ -853,9 +1070,17 @@ void TraceSummary::endIdle(double currT)
     // fill the bins with time for idle
     binIdle += t_binStart - t_idleStart;
     binStart = t_binStart;
-    _logPool->add(binTime, binIdle, CkMyPe()); // This calls shrink() if needed
+    _logPool->add(binTime, binIdle,
+                  msgSize, msgCount, msgSizePerEP, msgCountPerEP,
+                  recvSize, recvCount, recvCountPerEP, recvCountPerEP,
+                  CkMyPe()); // This calls shrink() if needed
     binTime = 0.0;
     binIdle = 0.0;
+    msgSize = 0;
+    msgCount = 0;
+    recvSize = 0;
+    recvCount = 0;
+    resetCounters();
     t_idleStart = t_binStart;
   }
   binIdle += t - t_idleStart;
@@ -910,19 +1135,35 @@ void TraceSummary::endComputation(void)
   done = 1;
   if (msgNum==0) {
 //CmiPrintf("Add at last: %d pe:%d time:%f msg:%d\n", index, CkMyPe(), bin, msgNum);
-     _logPool->add(binTime, binIdle, CkMyPe());
+     _logPool->add(binTime, binIdle,
+              msgSize, msgCount, msgSizePerEP, msgCountPerEP,
+              recvSize, recvCount, recvSizePerEP, recvCountPerEP,
+              CkMyPe());
      binTime = 0.0;
      binIdle = 0.0;
-     msgNum ++;
+     msgSize = 0;
+     msgCount = 0;
+     recvSize = 0;
+     recvCount = 0;
+     resetCounters();
+     msgNum++;
 
      binStart  += CkpvAccess(binSize);
      double t = TraceTimer();
      double ts = binStart;
      while (ts < t)
      {
-       _logPool->add(binTime, binIdle, CkMyPe());
+       _logPool->add(binTime, binIdle,
+                     msgSize, msgCount, msgSizePerEP, msgCountPerEP,
+                     recvSize, recvCount, recvSizePerEP, recvCountPerEP,
+                     CkMyPe());
        binTime=0.0;
        binIdle = 0.0;
+       msgSize = 0;
+       msgCount = 0;
+       recvSize = 0;
+       recvCount = 0;
+       resetCounters();
        ts += CkpvAccess(binSize);
      }
 
@@ -944,6 +1185,33 @@ void TraceSummary::traceEnableCCS() {
   sumProxy.initCCS();
 }
 
+/**
+ * override function called when a message is created
+ * @param epIdx
+ * @param num number of messages
+ */
+void TraceSummary::creation(envelope *e, int epIdx, int num)
+{
+  msgSize += e->getTotalsize();
+  msgCount += num;
+  int len = msgSizePerEP.size();
+  if(epIdx >= len) {
+    msgSizePerEP.resize(_entryTable.size() + 10);
+    msgCountPerEP.resize(_entryTable.size() + 10);
+    recvSizePerEP.resize(_entryTable.size() + 10);
+    recvCountPerEP.resize(_entryTable.size() + 10);
+    for(int i = len; i < msgSizePerEP.size(); ++i) {
+      msgSizePerEP[i] = msgCountPerEP[i] = recvSizePerEP[i] = recvCountPerEP[i] = 0;
+    }
+  }
+  msgSizePerEP[epIdx] += e->getTotalsize();
+  msgCountPerEP[epIdx] += num;
+}
+
+void TraceSummary::creationMulticast(envelope* e, int epIdx, int num, const int* pelist)
+{
+  creation(e, epIdx, num);
+}
 
 void TraceSummary::fillData(double *buffer, double reqStartTime, 
 			    double reqBinSize, int reqNumBins) {
