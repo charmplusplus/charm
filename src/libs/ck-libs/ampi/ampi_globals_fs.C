@@ -133,6 +133,10 @@ void AMPI_Node_Setup(int numranks)
     rankdata[myrank].exe = myexe;
     rankdata[myrank].mainstruct = AMPI_Main_Get(myexe);
   }
+
+#if CMK_HAS_TLS_VARIABLES
+  // CmiTLSStatsInit();
+#endif
 }
 
 // separate function so that setting a breakpoint is straightforward
