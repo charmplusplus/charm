@@ -1223,7 +1223,7 @@ void TraceSummary::traceBegin(void)
 {
     // fake as a start of an event, assuming traceBegin is called inside an
     // entry function.
-  beginExecute(-1, -1, TRACEON_EP, CkMyPe());
+  beginExecute(-1, -1, 0, CkMyPe());
 }
 
 void TraceSummary::traceEnd(void)
