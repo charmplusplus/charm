@@ -972,7 +972,7 @@ void TraceSummary::beginExecute(envelope *e, void *obj)
   else {
     beginExecute(-1,-1,e->getEpIdx(),-1);
 
-    long len = recvSizePerEP.size();
+    /*long len = recvSizePerEP.size();
     int epIdx = e->getEpIdx();
     if(epIdx >= len) {
       msgSizePerEP.resize(_entryTable.size() + 10);
@@ -986,8 +986,28 @@ void TraceSummary::beginExecute(envelope *e, void *obj)
     recvSize += e->getTotalsize();
     recvSizePerEP[epIdx] += e->getTotalsize();
     recvCount++;
-    recvCountPerEP[epIdx]++;
+    recvCountPerEP[epIdx]++;*/
   }  
+}
+
+void TraceSummary::messageRecv(char *env, int pe) {
+    int len = recvSizePerEP.size();
+    envelope *e = (envelope *)env;
+    int epIdx = e->getEpIdx();
+    if(epIdx >= len) {
+        msgSizePerEP.resize(_entryTable.size() + 10);
+        msgCountPerEP.resize(_entryTable.size() + 10);
+        recvSizePerEP.resize(_entryTable.size() + 10);
+        recvCountPerEP.resize(_entryTable.size() + 10);
+        for (int i = len; i < msgSizePerEP.size(); ++i) {
+            msgSizePerEP[i] = msgCountPerEP[i] = recvSizePerEP[i] = recvCountPerEP[i] = 0;
+        }
+    }
+
+    recvSize += e->getTotalsize();
+    recvSizePerEP[epIdx] += e->getTotalsize();
+    recvCount++;
+    recvCountPerEP[epIdx]++;
 }
 
 void TraceSummary::beginExecute(char *msg)
