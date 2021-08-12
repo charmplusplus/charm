@@ -490,31 +490,31 @@ extern "C" void LrtsInitCpuTopo(char **argv)
     return;
   }
 
-  if (CmiNumNodes() > 1)
-  {
 #if CMK_SMP && !CMK_SMP_NO_COMMTHD
-    if (CmiInCommThread())
-    {
-      cpuTopoSyncWaitCommThread();
-    }
-    else
+  if (CmiInCommThread())
+  {
+    cpuTopoSyncWaitCommThread();
+  }
+  else
 #endif
+  {
+    /* prepare a msg to send */
+    hostnameMsg *msg = (hostnameMsg *)CmiAlloc(sizeof(hostnameMsg)+sizeof(_procInfo));
+    msg->n = 1;
+    msg->procs = (_procInfo*)((char*)msg + sizeof(hostnameMsg));
+    CmiSetHandler((char *)msg, cpuTopoHandlerIdx);
+    auto proc = &msg->procs[0];
+    proc->pe = CmiMyPe();
+    proc->ip = myip;
+    proc->ncores = CmiNumCores();
+    proc->rank = 0;
+    proc->nodeID = 0;
+    CmiReduce(msg, sizeof(hostnameMsg)+sizeof(_procInfo), combineMessage);
+
+    cpuTopoSyncWait();
+
+    if (CmiMyRank() == 0)
     {
-      /* prepare a msg to send */
-      hostnameMsg *msg = (hostnameMsg *)CmiAlloc(sizeof(hostnameMsg)+sizeof(_procInfo));
-      msg->n = 1;
-      msg->procs = (_procInfo*)((char*)msg + sizeof(hostnameMsg));
-      CmiSetHandler((char *)msg, cpuTopoHandlerIdx);
-      auto proc = &msg->procs[0];
-      proc->pe = CmiMyPe();
-      proc->ip = myip;
-      proc->ncores = CmiNumCores();
-      proc->rank = 0;
-      proc->nodeID = 0;
-      CmiReduce(msg, sizeof(hostnameMsg)+sizeof(_procInfo), combineMessage);
-
-      cpuTopoSyncWait();
-
       if (CmiMyPe() == 0)
       {
         CmiSyncNodeBroadcastAllAndFree(sizeof(nodeTopoMsg)+CmiNumPes()*sizeof(int), (char *)topomsg);
@@ -526,9 +526,9 @@ extern "C" void LrtsInitCpuTopo(char **argv)
       cpuTopoSyncCommThreadDone = 1;
 #endif
     }
-
-    CmiBarrier();
   }
+
+  CmiBarrier();
 
   if (CmiMyPe() == 0) {
       CmiPrintf("Charm++> cpu topology info is gathered in %.3f seconds.\n", CmiWallTimer()-startT);
