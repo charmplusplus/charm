@@ -91,7 +91,7 @@ public:
 private:
   void ResumeFromSyncHelper();
 public:
-  CkLocRec *getCkLocRec(void) const { return myRec; }
+  virtual CkLocRec *getCkLocRec(void) const override { return myRec; }
 
   void ReadyMigrate(bool ready);
   void ckFinishConstruction(int epoch = -1);

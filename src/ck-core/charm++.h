@@ -211,6 +211,8 @@ public:
 
 #define CHARE_MAGIC    0x201201
 
+/* forward */ class CkLocRec;
+
 /**
   The base class of all parallel objects in Charm++,
   including Array Elements, Groups, and NodeGroups.
@@ -256,6 +258,7 @@ class Chare {
     CHARM_INPLACE_NEW
     /// Return the type of this chare, as present in _chareTable
     virtual int ckGetChareType() const;
+    virtual CkLocRec *getCkLocRec(void) const { return nullptr; }
     /// Return a strdup'd array containing this object's string name.
     virtual char *ckDebugChareName(void);
     /// Place into str a copy of the id of this object up to limit bytes, return

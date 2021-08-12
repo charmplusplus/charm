@@ -643,8 +643,7 @@ void CkCallstackPop(Chare *obj) {
 CkLocRec *CkActiveLocRec(void) {
   auto *obj = CkActiveObj();
   if (obj && obj->ckInitialized) {
-    auto *mgt = dynamic_cast<CkMigratable *>(obj);
-    return mgt ? mgt->getCkLocRec() : nullptr;
+    return obj->getCkLocRec();
   } else {
     return nullptr;
   }
