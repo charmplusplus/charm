@@ -405,8 +405,8 @@ void SumLogPool::write(void)
       long recvSize = pool[k].getRecvSize();
 
       fprintf(fp, "Bin Number: %d\n", k);
-      fprintf(fp, "Total RecvMsg Count : %d\n", recvCount);
-      fprintf(fp, "Total Recv Msg Size: %d\n", recvSize);
+      fprintf(fp, "Total RecvMsg Count : %ld\n", recvCount);
+      fprintf(fp, "Total Recv Msg Size: %ld\n", recvSize);
   }
   /*fprintf(fp, "Communications data\n");
   long prev_val = 0;
