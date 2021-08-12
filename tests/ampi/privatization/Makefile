@@ -23,15 +23,24 @@ PHONIES := \
   everything \
 
 # for determining `all`, `test` rules
-CANDIDATES := \
-  swapglobals \
-  tlsglobals \
+TARGETS :=
 
+ifeq (1,$(CMK_SUPPORTS_SWAPGLOBALS))
+  TARGETS += swapglobals
+endif
+ifeq (1,$(CMK_SUPPORTS_TLSGLOBALS))
+  TARGETS += tlsglobals
+endif
 ifeq (1,$(CMK_SUPPORTS_FSGLOBALS))
-  CANDIDATES += fsglobals
+  TARGETS += fsglobals
 endif
 ifeq (1,$(CMK_SUPPORTS_PIPGLOBALS))
-  CANDIDATES += pipglobals
+  TARGETS += pipglobals
+endif
+
+$(foreach i,$(VARIANTS),$(eval LANGUAGES_$i := $(LANGUAGES)))
+ifneq (1,$(CMK_HAS_OPENMP))
+  LANGUAGES_tlsglobals := $(filter-out f90,$(LANGUAGES_tlsglobals))
 endif
 
 
@@ -50,28 +59,6 @@ FEATURES_cxx_fsglobals := staticvars
 FEATURES_cxx_pipglobals := staticvars sharedlib
 
 
-# Determine which methods to test in the current environment and target.
-TARGETS :=
-
-define TEST_TARGET_AVAILABILITY
-  AMPICC_OUTPUT_$1 := $$(shell $$(AMPICC) -print-building-blocks $$(OPTS_cxx_$1) 2>&1)
-  ifeq (,$$(findstring Error:,$$(AMPICC_OUTPUT_$1)))
-    ifeq (,$$(findstring Warning: -$1,$$(AMPICC_OUTPUT_$1)))
-      TARGETS += cxx-$1
-    endif
-  endif
-
-  AMPIF90_OUTPUT_$1 := $$(shell $$(AMPIF90) -print-building-blocks $$(OPTS_f90_$1) 2>&1)
-  ifeq (,$$(findstring Error:,$$(AMPIF90_OUTPUT_$1)))
-    ifeq (,$$(findstring Warning: -$1,$$(AMPIF90_OUTPUT_$1)))
-      TARGETS += f90-$1
-    endif
-  endif
-endef
-
-$(foreach i,$(CANDIDATES),$(eval $(call TEST_TARGET_AVAILABILITY,$i)))
-
-
 # Universal settings
 LINKOPTS := -balancer TreeLB
 
@@ -80,30 +67,30 @@ LINKOPTS := -balancer TreeLB
 
 EMPTY_MESSAGE := "No privatization methods supported for current AMPI target."
 
-all: $(foreach i,$(TARGETS),$i)
+all: $(foreach i,$(TARGETS),$(foreach j,$(LANGUAGES_$i),$j-$i))
 ifeq (,$(TARGETS))
 	@echo $(EMPTY_MESSAGE)
 endif
 
-test: $(foreach i,$(TARGETS),test-$i)
+test: $(foreach i,$(TARGETS),$(foreach j,$(LANGUAGES_$i),test-$j-$i))
 ifeq (,$(TARGETS))
 	@echo $(EMPTY_MESSAGE)
 endif
 
-testp: $(foreach i,$(TARGETS),testp-$i)
+testp: $(foreach i,$(TARGETS),$(foreach j,$(LANGUAGES_$i),testp-$j-$i))
 ifeq (,$(TARGETS))
 	@echo $(EMPTY_MESSAGE)
 endif
 
-everything: $(VARIANTS)
-test-everything: $(addprefix test-,$(VARIANTS))
+everything: $(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),$j-$i))
+test-everything: $(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),test-$j-$i))
 
 add_if_contains = $(subst $2,$3,$(findstring $2,$1))
 
 define VARIANT_RULES
 
-$1: $$(foreach j,$$(LANGUAGES),$$j-$1)
-test-$1: $$(foreach j,$$(LANGUAGES),test-$$j-$1)
+$1: $$(foreach j,$$(LANGUAGES_$1),$$j-$1)
+test-$1: $$(foreach j,$$(LANGUAGES_$1),test-$$j-$1)
 
 # link
 cxx-$1: $1-test.o $1-test-cxx.o cxx-$1-other-object.o | libcxx-$1-static-library.a $$(call add_if_contains,$$(FEATURES_cxx_$1),sharedlib,libcxx-$1-shared-library.so) $$(call add_if_contains,$$(FEATURES_cxx_$1),dynamiclib,libcxx-$1-shared-library-dynamic.so)

@@ -164,7 +164,16 @@ public:
       : CProxy_ArrayBase(aid), _idx(idx)
   {
   }
+  CProxyElement_ArrayBase(const CProxyElement_ArrayBase& other)
+      : CProxy_ArrayBase(other.ckGetArrayID()), _idx(other.ckGetIndex())
+  {
+  }
   CProxyElement_ArrayBase(const ArrayElement* e);
+
+  CProxyElement_ArrayBase& operator=(const CProxyElement_ArrayBase& other)
+  {
+    return *this = CProxyElement_ArrayBase(other);
+  }
 
   bool operator==(const CProxyElement_ArrayBase& other)
   {
@@ -766,7 +775,6 @@ public:
   virtual void beginInserting(void);
   void remoteDoneInserting(void);
   void remoteBeginInserting(void);
-  void initDone(void);
 
   /// Create manually:
   bool insertElement(CkArrayMessage*, const CkArrayIndex& idx,

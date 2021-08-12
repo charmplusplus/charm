@@ -268,7 +268,7 @@ void traceWriteSTS(FILE *stsfp,int nUserEvents) {
 #else
   fprintf(stsfp, "PROCESSORS %d\n", CkNumPes());
 #endif
-#ifdef CMK_SMP
+#if CMK_SMP
   fprintf(stsfp, "SMPMODE %d %d\n", CkMyNodeSize(), CkNumNodes());
 #endif
 
