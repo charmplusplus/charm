@@ -400,7 +400,13 @@ void SumLogPool::write(void)
     fprintf(fp, "%ld ", (long)(epInfo[i].epMaxTime*1.0e6));
   fprintf(fp, "\n");
 
-  fprintf(fp, "Communications data\n");
+  int recvCount = pool[k].getRecvCount();
+  int recvSize = pool[k].getRecvSize();
+
+  fprintf(fp, "Total RecvMsg Count: %d\n", recvCount);
+  fprintf(fp, "Total Recv Msg Size: %d\n", recvSize);
+
+  /*fprintf(fp, "Communications data\n");
   long prev_val = 0;
   long streak = 0;
 
@@ -455,7 +461,7 @@ void SumLogPool::write(void)
   {
       fprintf(fp, "%ld+%ld ", prev_val, streak);
   }
-  fprintf(fp, "\n");
+  fprintf(fp, "\n");*/
 
   /*for(int k = 0; k < numBins; ++k)
   {
@@ -604,7 +610,7 @@ void SumLogPool::write(void)
         if (count > 1) fprintf(sdfp, "+%d", count);
         fprintf(sdfp, "\n");
 
-        fprintf(sdfp, "Communications data\n");
+        /*fprintf(sdfp, "Communications data\n");
         long prev_val = 0;
         long streak = 0;
 
@@ -663,7 +669,7 @@ void SumLogPool::write(void)
         {
           fprintf(sdfp,"%ld+%ld ", prev_val, streak);
         }
-        fprintf(sdfp, "\n");
+        fprintf(sdfp, "\n");*/
 
         /*for(int k = 0; k < numBins; ++k)
         {
