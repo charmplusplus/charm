@@ -960,54 +960,19 @@ void TraceSummary::traceClose(void)
 
 void TraceSummary::beginExecute(CmiObjId *tid)
 {
-  beginExecute(-1,-1,_threadEP,-1);
+  beginExecute(-1,-1,_threadEP, CkMyPe());
 }
 
 void TraceSummary::beginExecute(envelope *e, void *obj)
 {
   // no message means thread execution
   if (e==NULL) {
-    beginExecute(-1,-1,_threadEP,-1);
+    beginExecute(-1,-1,_threadEP, CkMyPe());
   }
   else {
-    beginExecute(-1,-1,e->getEpIdx(),-1);
-
-    /*long len = recvSizePerEP.size();
-    int epIdx = e->getEpIdx();
-    if(epIdx >= len) {
-      msgSizePerEP.resize(_entryTable.size() + 10);
-      msgCountPerEP.resize(_entryTable.size() + 10);
-      recvSizePerEP.resize(_entryTable.size() + 10);
-      recvCountPerEP.resize(_entryTable.size() + 10);
-      for(int i = len; i < msgSizePerEP.size(); ++i) {
-        msgSizePerEP[i] = msgCountPerEP[i] = recvSizePerEP[i] = recvCountPerEP[i] = 0;
-      }
-    }
-    recvSize += e->getTotalsize();
-    recvSizePerEP[epIdx] += e->getTotalsize();
-    recvCount++;
-    recvCountPerEP[epIdx]++;*/
-  }  
-}
-
-void TraceSummary::messageRecv(char *env, int pe) {
-    int len = recvSizePerEP.size();
-    envelope *e = (envelope *)env;
-    int epIdx = e->getEpIdx();
-    if(epIdx >= len) {
-        msgSizePerEP.resize(_entryTable.size() + 10);
-        msgCountPerEP.resize(_entryTable.size() + 10);
-        recvSizePerEP.resize(_entryTable.size() + 10);
-        recvCountPerEP.resize(_entryTable.size() + 10);
-        for (int i = len; i < msgSizePerEP.size(); ++i) {
-            msgSizePerEP[i] = msgCountPerEP[i] = recvSizePerEP[i] = recvCountPerEP[i] = 0;
-        }
-    }
-
-    recvSize += e->getTotalsize();
-    recvSizePerEP[epIdx] += e->getTotalsize();
-    recvCount++;
-    recvCountPerEP[epIdx]++;
+      beginExecute(e->getEvent(),e->getMsgtype(),e->getEpIdx(),
+                   e->getSrcPe(),e->getTotalsize());
+  }
 }
 
 void TraceSummary::beginExecute(char *msg)
@@ -1019,7 +984,7 @@ void TraceSummary::beginExecute(char *msg)
     int ep = e->getEpIdx();
     if(ep<0 || ep>=num) return;
     if(_entryTable[ep]->traceEnabled)
-        beginExecute(-1,-1,e->getEpIdx(),-1);
+        beginExecute(-1,-1,e->getEpIdx(), CkMyPe());
 #endif
 }
 
@@ -1044,6 +1009,21 @@ void TraceSummary::beginExecute(int event,int msgType,int ep,int srcPe, int mlen
     return;
   }
 */
+
+    int len = recvSizePerEP.size();
+    if(epIdx >= len) {
+        msgSizePerEP.resize(_entryTable.size() + 10);
+        msgCountPerEP.resize(_entryTable.size() + 10);
+        recvSizePerEP.resize(_entryTable.size() + 10);
+        recvCountPerEP.resize(_entryTable.size() + 10);
+        for(int i = len; i < msgSizePerEP.size(); ++i) {
+            msgSizePerEP[i] = msgCountPerEP[i] = recvSizePerEP[i] = recvCountPerEP[i] = 0;
+        }
+    }
+    recvSize += mlen;
+    recvSizePerEP[ep] += mlen;
+    recvCount++;
+    recvCountPerEP[ep]++;
   
   execEp=ep;
   double t = TraceTimer();
@@ -1219,7 +1199,7 @@ void TraceSummary::traceBegin(void)
 {
     // fake as a start of an event, assuming traceBegin is called inside an
     // entry function.
-  beginExecute(-1, -1, TRACEON_EP, -1, -1);
+  beginExecute(-1, -1, TRACEON_EP, CkMyPe());
 }
 
 void TraceSummary::traceEnd(void)

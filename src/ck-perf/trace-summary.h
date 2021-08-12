@@ -347,7 +347,6 @@ class TraceSummary : public Trace {
     void creationMulticast(envelope *e, int epIdx, int num=1, const int *pelist=NULL);
     void resetCounters();
     void setCounters();
-    void messageRecv(char *env, int pe);
 
     void traceClearEps();
     void traceWriteSts();
