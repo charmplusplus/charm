@@ -1015,16 +1015,19 @@ void TraceSummary::beginExecute(int event,int msgType,int ep,int srcPe, int mlen
                           extRecvSizePerEP[i] = extRecvCountPerEP[i] = 0;
       }
   }
-  recvSize += mlen;
-  recvSizePerEP[ep] += mlen;
-  recvCount++;
-  recvCountPerEP[ep]++;
 
-  if(srcPe != CkMyPe()) {
-      extRecvSize += mlen;
-      extRecvSizePerEP[ep] += mlen;
-      extRecvCount++;
-      extRecvCountPerEP[ep]++;
+  if(ep >= 0) {
+      recvSize += mlen;
+      recvSizePerEP[ep] += mlen;
+      recvCount++;
+      recvCountPerEP[ep]++;
+
+      if (srcPe != CkMyPe()) {
+          extRecvSize += mlen;
+          extRecvSizePerEP[ep] += mlen;
+          extRecvCount++;
+          extRecvCountPerEP[ep]++;
+      }
   }
   // printf("BEGIN exec: %d %d %d\n", inIdle, inExec, depth);
 
@@ -1223,7 +1226,7 @@ void TraceSummary::traceBegin(void)
 {
     // fake as a start of an event, assuming traceBegin is called inside an
     // entry function.
-  beginExecute(-1, -1, 0, CkMyPe());
+  beginExecute(-1, -1, TRACEON_EP, -1);
 }
 
 void TraceSummary::traceEnd(void)
