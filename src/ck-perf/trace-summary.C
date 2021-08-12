@@ -400,12 +400,14 @@ void SumLogPool::write(void)
     fprintf(fp, "%ld ", (long)(epInfo[i].epMaxTime*1.0e6));
   fprintf(fp, "\n");
 
-  int recvCount = pool[k].getRecvCount();
-  int recvSize = pool[k].getRecvSize();
+  for(int k = 0; k < numBins; ++k) {
+      long recvCount = pool[k].getRecvCount();
+      long recvSize = pool[k].getRecvSize();
 
-  fprintf(fp, "Total RecvMsg Count: %d\n", recvCount);
-  fprintf(fp, "Total Recv Msg Size: %d\n", recvSize);
-
+      fprintf(fp, "Bin Number: %d\n", k);
+      fprintf(fp, "Total RecvMsg Count : %d\n", recvCount);
+      fprintf(fp, "Total Recv Msg Size: %d\n", recvSize);
+  }
   /*fprintf(fp, "Communications data\n");
   long prev_val = 0;
   long streak = 0;
