@@ -390,6 +390,8 @@ void SumLogPool::write(void)
   for(int k = 0; k < numBins; ++k) {
       long recvCount = pool[k].getRecvCount();
       long recvSize = pool[k].getRecvSize();
+      long extRecvCount = pool[k].getExtRecvCount();
+      long extRecvSize = pool[k].getExtRecvSize();
 
       fprintf(fp, "Bin Number: %d\n", k);
       fprintf(fp, "Total RecvMsg Count : %ld\n", recvCount);
@@ -1010,7 +1012,7 @@ void TraceSummary::beginExecute(int event,int msgType,int ep,int srcPe, int mlen
 */
 
     int len = recvSizePerEP.size();
-    if(epIdx >= len) {
+    if(ep >= len) {
         msgSizePerEP.resize(_entryTable.size() + 10);
         msgCountPerEP.resize(_entryTable.size() + 10);
         recvSizePerEP.resize(_entryTable.size() + 10);
@@ -1201,7 +1203,7 @@ void TraceSummary::endIdle(double currT)
     _logPool->add(binTime, binIdle,
                   msgSize, msgCount, msgSizePerEP, msgCountPerEP,
                   recvSize, recvCount, recvSizePerEP, recvCountPerEP,
-                  extRecvSize, extRecvCount, extRecvSizePerEP, extRecvCountPerEP
+                  extRecvSize, extRecvCount, extRecvSizePerEP, extRecvCountPerEP,
                   CkMyPe()); // This calls shrink() if needed
     binTime = 0.0;
     binIdle = 0.0;
