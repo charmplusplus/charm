@@ -1000,6 +1000,32 @@ void TraceSummary::beginExecute(int event,int msgType,int ep,int srcPe, int mlen
     inExec = 1;
   }
   depth ++;
+
+  int len = recvSizePerEP.size();
+  if(ep >= len) {
+      msgSizePerEP.resize(_entryTable.size() + 10);
+      msgCountPerEP.resize(_entryTable.size() + 10);
+      recvSizePerEP.resize(_entryTable.size() + 10);
+      recvCountPerEP.resize(_entryTable.size() + 10);
+      extRecvSizePerEP.resize(_entryTable.size() + 10);
+      extRecvCountPerEP.resize(_entryTable.size() + 10);
+      for(int i = len; i < msgSizePerEP.size(); ++i) {
+          msgSizePerEP[i] = msgCountPerEP[i] =
+                  recvSizePerEP[i] = recvCountPerEP[i] =
+                          extRecvSizePerEP[i] = extRecvCountPerEP[i] = 0;
+      }
+  }
+  recvSize += mlen;
+  recvSizePerEP[ep] += mlen;
+  recvCount++;
+  recvCountPerEP[ep]++;
+
+  if(srcPe != CkMyPe()) {
+      extRecvSize += mlen;
+      extRecvSizePerEP[ep] += mlen;
+      extRecvCount++;
+      extRecvCountPerEP[ep]++;
+  }
   // printf("BEGIN exec: %d %d %d\n", inIdle, inExec, depth);
 
   if (depth > 1) return;          //  nested
@@ -1010,32 +1036,6 @@ void TraceSummary::beginExecute(int event,int msgType,int ep,int srcPe, int mlen
     return;
   }
 */
-
-    int len = recvSizePerEP.size();
-    if(ep >= len) {
-        msgSizePerEP.resize(_entryTable.size() + 10);
-        msgCountPerEP.resize(_entryTable.size() + 10);
-        recvSizePerEP.resize(_entryTable.size() + 10);
-        recvCountPerEP.resize(_entryTable.size() + 10);
-        extRecvSizePerEP.resize(_entryTable.size() + 10);
-        extRecvCountPerEP.resize(_entryTable.size() + 10);
-        for(int i = len; i < msgSizePerEP.size(); ++i) {
-            msgSizePerEP[i] = msgCountPerEP[i] =
-                    recvSizePerEP[i] = recvCountPerEP[i] =
-                            extRecvSizePerEP[i] = extRecvCountPerEP[i] = 0;
-        }
-    }
-    recvSize += mlen;
-    recvSizePerEP[ep] += mlen;
-    recvCount++;
-    recvCountPerEP[ep]++;
-
-    if(srcPe != CkMyPe()) {
-        extRecvSize += mlen;
-        extRecvSizePerEP[ep] += mlen;
-        extRecvCount++;
-        extRecvCountPerEP[ep]++;
-    }
   
   execEp=ep;
   double t = TraceTimer();
