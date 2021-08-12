@@ -232,19 +232,6 @@ void SumLogPool::addEventType(int eventType, double time)
    markcount ++;
 }
 
-//TODO complete function to add message as event for each message with EpIdx
-void SumLogPool::addMessage(UChar type, int epIdx, int srcPe, int size, int cnt)
-{
-  /*if(type == CREATION) {
-    numMsg += cnt;
-    bytesSend += size;
-  } else {
-    CkPrintf("Invalid event type inside creation() for summary data : %s", type);
-  }*/
-
-
-}
-
 /**
  * Constructor
  * @param pgm
@@ -407,6 +394,8 @@ void SumLogPool::write(void)
       fprintf(fp, "Bin Number: %d\n", k);
       fprintf(fp, "Total RecvMsg Count : %ld\n", recvCount);
       fprintf(fp, "Total Recv Msg Size: %ld\n", recvSize);
+      fprintf(fp, "Total Ext Msg Count: %ld\n", extRecvCount);
+      fprintf(fp, "Total Ext Msg Size: %ld\n", extRecvSize);
   }
   /*fprintf(fp, "Communications data\n");
   long prev_val = 0;
@@ -747,10 +736,13 @@ void SumLogPool::add(double time, double idleTime, long msgSize, long msgCount,
                      CkVec<long> msgSizePerEP, CkVec<long> msgCountPerEP,
                      long recvSize, long recvCount,
                      CkVec<long> recvSizePerEP, CkVec<long> recvCountPerEP,
+                     long extRecvSize, long extRecvCount,
+                     CkVec<long> extRecvSizePerEP, CkVec<long> extRecvCountPerEP,
                      int pe)
 {
   new (&pool[numBins++]) BinEntry(time, idleTime, msgSize, msgCount, msgSizePerEP, msgCountPerEP,
-                                  recvSize, recvCount, recvSizePerEP, recvCountPerEP);
+                                  recvSize, recvCount, recvSizePerEP, recvCountPerEP,
+                                  extRecvSize, extRecvCount, extRecvSizePerEP, extRecvCountPerEP);
   if (poolSize==numBins) {
     shrink();
   }
@@ -822,6 +814,8 @@ void SumLogPool::shrink(void)
      pool[i].getCount() = pool[i*2].getCount() + pool[i*2 + 1].getCount();
      pool[i].getRecvSize() = pool[i*2].getRecvSize() + pool[i*2 + 1].getRecvSize();
      pool[i].getRecvCount() = pool[i*2].getRecvCount() + pool[i*2 + 1].getRecvCount();
+     pool[i].getExtRecvSize() = pool[i*2].getExtRecvSize() + pool[i*2 + 1].getExtRecvSize();
+     pool[i].getExtRecvCount() = pool[i*2].getExtRecvCount() + pool[i*2 + 1].getExtRecvCount();
 
      int len = _entryTable.size();
      for(int j = 0; j < len; ++j) {
@@ -829,6 +823,8 @@ void SumLogPool::shrink(void)
        pool[i].getCountPerEP()[j] = pool[i*2].getCountPerEP()[j] + pool[i*2 + 1].getCountPerEP()[j];
        pool[i].getRecvSizePerEP()[j] = pool[i*2].getRecvSizePerEP()[j] + pool[i*2 + 1].getRecvSizePerEP()[j];
        pool[i].getRecvCountPerEP()[j] = pool[i*2].getRecvCountPerEP()[j] + pool[i*2 + 1].getRecvCountPerEP()[j];
+       pool[i].getExtRecvSizePerEP()[j] = pool[i*2].getExtRecvSizePerEP()[j] + pool[i*2 + 1].getExtRecvSizePerEP()[j];
+       pool[i].getExtRecvCountPerEP()[j] = pool[i*2].getExtRecvCountPerEP()[j] + pool[i*2 + 1].getExtRecvCountPerEP()[j];
      }
 
      if (sumDetail)
@@ -872,7 +868,8 @@ void BinEntry::write(FILE* fp)
 TraceSummary::TraceSummary(char **argv):msgNum(0),binStart(0.0),idleStart(0.0),
 					binTime(0.0),binIdle(0.0),
                                           msgCount(0), msgSize(0),
-                                          recvCount(0), recvSize(0)
+                                          recvCount(0), recvSize(0),
+                                          extRecvCount(0), extRecvSize(0)
 {
   setCounters();
   if (CkpvAccess(traceOnPe) == 0) return;
@@ -934,6 +931,8 @@ void TraceSummary::setCounters()
   msgCountPerEP = CkVec<long>(len);
   recvSizePerEP = CkVec<long>(len);
   recvCountPerEP = CkVec<long>(len);
+  extRecvSizePerEP = CkVec<long>(len);
+  extRecvCountPerEP = CkVec<long>(len);
   resetCounters();
 }
 
@@ -1016,14 +1015,25 @@ void TraceSummary::beginExecute(int event,int msgType,int ep,int srcPe, int mlen
         msgCountPerEP.resize(_entryTable.size() + 10);
         recvSizePerEP.resize(_entryTable.size() + 10);
         recvCountPerEP.resize(_entryTable.size() + 10);
+        extRecvSizePerEP.resize(_entryTable.size() + 10);
+        extRecvCountPerEP.resize(_entryTable.size() + 10);
         for(int i = len; i < msgSizePerEP.size(); ++i) {
-            msgSizePerEP[i] = msgCountPerEP[i] = recvSizePerEP[i] = recvCountPerEP[i] = 0;
+            msgSizePerEP[i] = msgCountPerEP[i] =
+                    recvSizePerEP[i] = recvCountPerEP[i] =
+                            extRecvSizePerEP[i] = extRecvCountPerEP[i] = 0;
         }
     }
     recvSize += mlen;
     recvSizePerEP[ep] += mlen;
     recvCount++;
     recvCountPerEP[ep]++;
+
+    if(srcPe != CkMyPe()) {
+        extRecvSize += mlen;
+        extRecvSizePerEP[ep] += mlen;
+        extRecvCount++;
+        extRecvCountPerEP[ep]++;
+    }
   
   execEp=ep;
   double t = TraceTimer();
@@ -1047,6 +1057,7 @@ void TraceSummary::beginExecute(int event,int msgType,int ep,int srcPe, int mlen
      _logPool->add(binTime, binIdle,
                   msgSize, msgCount, msgSizePerEP, msgCountPerEP,
                   recvSize, recvCount, recvSizePerEP, recvCountPerEP,
+                  extRecvSize, extRecvCount, extRecvSizePerEP, extRecvCountPerEP,
                   CkMyPe()); // add leftovers of last bin
      binTime=0.0;                 // fill all other bins with 0 up till start
      binIdle = 0.0;
@@ -1054,6 +1065,8 @@ void TraceSummary::beginExecute(int event,int msgType,int ep,int srcPe, int mlen
      msgCount = 0;
      recvSize= 0;
      recvCount = 0;
+     extRecvSize = 0;
+     extRecvCount = 0;
      resetCounters();
      binStart = ts;
   }
@@ -1100,6 +1113,7 @@ void TraceSummary::endExecute()
      _logPool->add(binTime, binIdle,
                    msgSize, msgCount, msgSizePerEP, msgCountPerEP,
                    recvSize, recvCount, recvSizePerEP, recvCountPerEP,
+                   extRecvSize, extRecvCount, extRecvSizePerEP, extRecvCountPerEP,
                    CkMyPe());
      binTime = 0.0;
      binIdle = 0.0;
@@ -1107,6 +1121,8 @@ void TraceSummary::endExecute()
      msgCount = 0;
      recvSize = 0;
      recvCount = 0;
+     extRecvSize = 0;
+     extRecvCount = 0;
      resetCounters();
      ts = nts;
   }
@@ -1152,6 +1168,7 @@ void TraceSummary::beginIdle(double currT)
     _logPool->add(binTime, binIdle,
                   msgSize, msgCount, msgSizePerEP, msgCountPerEP,
                   recvSize, recvCount, recvSizePerEP, recvCountPerEP,
+                  extRecvSize, extRecvCount, extRecvSizePerEP, extRecvCountPerEP,
                   CkMyPe()); // add leftovers of last bin
     binTime=0.0;                 // fill all other bins with 0 up till start
     binIdle = 0.0;
@@ -1159,6 +1176,8 @@ void TraceSummary::beginIdle(double currT)
     msgCount = 0;
     recvSize = 0;
     recvCount = 0;
+    extRecvSize = 0;
+    extRecvCount = 0;
     resetCounters();
     binStart = ts;
   }
@@ -1181,7 +1200,8 @@ void TraceSummary::endIdle(double currT)
     binStart = t_binStart;
     _logPool->add(binTime, binIdle,
                   msgSize, msgCount, msgSizePerEP, msgCountPerEP,
-                  recvSize, recvCount, recvCountPerEP, recvCountPerEP,
+                  recvSize, recvCount, recvSizePerEP, recvCountPerEP,
+                  extRecvSize, extRecvCount, extRecvSizePerEP, extRecvCountPerEP
                   CkMyPe()); // This calls shrink() if needed
     binTime = 0.0;
     binIdle = 0.0;
@@ -1189,6 +1209,8 @@ void TraceSummary::endIdle(double currT)
     msgCount = 0;
     recvSize = 0;
     recvCount = 0;
+    extRecvSize = 0;
+    extRecvCount = 0;
     resetCounters();
     t_idleStart = t_binStart;
   }
@@ -1247,6 +1269,7 @@ void TraceSummary::endComputation(void)
      _logPool->add(binTime, binIdle,
               msgSize, msgCount, msgSizePerEP, msgCountPerEP,
               recvSize, recvCount, recvSizePerEP, recvCountPerEP,
+              extRecvSize, extRecvCount, extRecvSizePerEP, extRecvCountPerEP,
               CkMyPe());
      binTime = 0.0;
      binIdle = 0.0;
@@ -1254,6 +1277,8 @@ void TraceSummary::endComputation(void)
      msgCount = 0;
      recvSize = 0;
      recvCount = 0;
+     extRecvSize = 0;
+     extRecvCount = 0;
      resetCounters();
      msgNum++;
 
@@ -1265,6 +1290,7 @@ void TraceSummary::endComputation(void)
        _logPool->add(binTime, binIdle,
                      msgSize, msgCount, msgSizePerEP, msgCountPerEP,
                      recvSize, recvCount, recvSizePerEP, recvCountPerEP,
+                     extRecvSize, extRecvCount, extRecvSizePerEP, extRecvCountPerEP,
                      CkMyPe());
        binTime=0.0;
        binIdle = 0.0;
@@ -1272,6 +1298,8 @@ void TraceSummary::endComputation(void)
        msgCount = 0;
        recvSize = 0;
        recvCount = 0;
+       extRecvSize = 0;
+       extRecvCount = 0;
        resetCounters();
        ts += CkpvAccess(binSize);
      }
