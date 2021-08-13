@@ -170,6 +170,18 @@ inline void UcxDeviceRecvHandler(DeviceRdmaOp* op, CommType type) {
 }
 #endif
 
+inline void UcxChannelHandler(CommType type, void* cb) {
+  switch (type) {
+    case COMM_TYPE_CHARM:
+      CmiChannelHandler(cb);
+      break;
+    // TODO: AMPI and Charm4py
+    default:
+      CmiAbort("Invalid comm type: %d\n", type);
+      break;
+  }
+}
+
 void UcxRequestInit(void *request)
 {
     UcxRequest *req = (UcxRequest*)request;
@@ -662,10 +674,17 @@ static inline int ProcessTxQueue()
             // Either send was complete or error
             CmiEnforce(!UCS_PTR_IS_ERR(status_ptr));
             CmiEnforce(UCS_PTR_STATUS(status_ptr) == UCS_OK);
+            if (req->op == UCX_CHANNEL_SEND_OP) {
+              UcxChannelHandler(req->type, req->charm_cb);
+            }
           } else {
             // Callback function will be invoked once send completes
             UcxRequest* store_req = (UcxRequest*)status_ptr;
             store_req->msgBuf = req->msgBuf;
+            store_req->type = req->type;
+            if (req->op == UCX_CHANNEL_SEND_OP) {
+              store_req->charm_cb = req->charm_cb;
+            }
           }
         } else if (req->op == UCX_DEVICE_RECV_OP
             || req->op == UCX_CHANNEL_RECV_OP) { // Recv device/channel data
@@ -678,20 +697,29 @@ static inline int ProcessTxQueue()
           UcxRequest* ret_req = (UcxRequest*)status_ptr;
           if (ret_req->completed) {
             // Recv was completed immediately
-            // TODO
+            if (req->op == UCX_DEVICE_RECV_OP) {
 #if CMK_CUDA
-            UcxDeviceRecvHandler(req->device_op, req->type);
+              UcxDeviceRecvHandler(req->device_op, req->type);
+#else
+              CmiAbort("Unsupported op: UCX_DEVICE_RECV_OP\n");
 #endif
+            } else if (req->op == UCX_CHANNEL_RECV_OP) {
+              UcxChannelHandler(req->type, req->charm_cb);
+            } else {
+              CmiAbort("Unsupported op: %d\n", req->op);
+            }
             UCX_REQUEST_FREE(ret_req);
           } else {
             // Recv wasn't completed immediately, recv_cb will be invoked
             // sometime later
-            // TODO
 #if CMK_CUDA
             ret_req->device_op = req->device_op;
 #endif
             ret_req->msgBuf = req->msgBuf;
             ret_req->type = req->type;
+            if (req->op == UCX_CHANNEL_RECV_OP) {
+              ret_req->charm_cb = req->charm_cb;
+            }
           }
         } else {
           CmiAbort("[%d][%d][%d] UCX:ProcessTxQueue req->op(%d) is Invalid\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), req->op);
@@ -914,18 +942,6 @@ void LrtsRecvDevice(DeviceRdmaOp* op, CommType type)
 #endif // CMK_SMP
 }
 #endif // CMK_CUDA
-
-inline void UcxChannelHandler(CommType type, void* cb) {
-  switch (type) {
-    case COMM_TYPE_CHARM:
-      CmiChannelHandler(cb);
-      break;
-    // TODO: AMPI and Charm4py
-    default:
-      CmiAbort("Invalid comm type: %d\n", type);
-      break;
-  }
-}
 
 void UcxChannelSendCompleted(void* request, ucs_status_t status)
 {
