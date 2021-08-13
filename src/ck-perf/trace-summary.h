@@ -262,7 +262,7 @@ class SumLogPool {
     double *getCpuTime() {return cpuTime;}
     void initMem();
     void write(void) ;
-    void writeEncoder(string msg, int numBins, int event);
+    void writeEncoder(int numBins, int event);
     void writeSts(void);
     void add(double time, double idleTime, long msgSize, long msgCount,
              CkVec<long> msgSizePerEP, CkVec<long> msgCountPerEP,

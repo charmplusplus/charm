@@ -499,20 +499,25 @@ void SumLogPool::write(void)
         if (count > 1) fprintf(sdfp, "+%d", count);
         fprintf(sdfp, "\n");
 
-        writeEncoder("MsgSentCount: ", numBins, 1);
-        writeEncoder("MsgSentSize: ", numBins, 2);
-        writeEncoder("MsgRecvCount: ", numBins, 3);
-        writeEncoder("MsgRecvSize: ", numBins, 4);
-        writeEncoder("ExternalMsgRecvCount: ", numBins, 5);
-        writeEncoder("ExternalMsgRecvSize: ", numBins, 6);
+        fprintf(sdfp, "MsgSentCount: ");
+        writeEncoder(numBins, 1);
+        fprintf(sdfp, "MsgSentSize: ");
+        writeEncoder(numBins, 2);
+        fprintf(sdfp, "MsgRecvCount: ");
+        writeEncoder(numBins, 3);
+        fprintf(sdfp, "MsgRecvSize: ");
+        writeEncoder(numBins, 4);
+        fprintf(sdfp, "ExternalMsgRecvCount: ");
+        writeEncoder(numBins, 5);
+        fprintf(sdfp, "ExternalMsgRecvSize: ");
+        writeEncoder(numBins, 6);
   }
 }
 
-void SumLogPool::write_encoder(string msg, int numBins, int event) {
+void SumLogPool::writeEncoder(int numBins, int event) {
     long prev_val = 0;
     long streak = 0;
 
-    fprintf(sdfp, msg);
     for(int k = 0; k < numBins; ++k) {
         for(int l = 0; l < _entryTable.size(); ++l) {
             CkVec<long> vec;
