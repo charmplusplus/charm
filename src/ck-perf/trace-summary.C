@@ -961,14 +961,14 @@ void TraceSummary::traceClose(void)
 
 void TraceSummary::beginExecute(CmiObjId *tid)
 {
-  beginExecute(-1,-1,_threadEP, CkMyPe());
+  beginExecute(-1,-1,_threadEP, -1);
 }
 
 void TraceSummary::beginExecute(envelope *e, void *obj)
 {
   // no message means thread execution
   if (e==NULL) {
-    beginExecute(-1,-1,_threadEP, CkMyPe());
+    beginExecute(-1,-1,_threadEP, -1);
   }
   else {
       beginExecute(e->getEvent(),e->getMsgtype(),e->getEpIdx(),
@@ -985,7 +985,7 @@ void TraceSummary::beginExecute(char *msg)
     int ep = e->getEpIdx();
     if(ep<0 || ep>=num) return;
     if(_entryTable[ep]->traceEnabled)
-        beginExecute(-1,-1,e->getEpIdx(), CkMyPe());
+        beginExecute(-1,-1,e->getEpIdx(), -1);
 #endif
 }
 
@@ -1022,7 +1022,7 @@ void TraceSummary::beginExecute(int event,int msgType,int ep,int srcPe, int mlen
       recvCount++;
       recvCountPerEP[ep]++;
 
-      if (srcPe != CkMyPe()) {
+      if (srcPe != CkMyPe() && srcPe != -1) {
           extRecvSize += mlen;
           extRecvSizePerEP[ep] += mlen;
           extRecvCount++;
@@ -1226,7 +1226,7 @@ void TraceSummary::traceBegin(void)
 {
     // fake as a start of an event, assuming traceBegin is called inside an
     // entry function.
-  beginExecute(-1, -1, TRACEON_EP, -1);
+  beginExecute(-1, -1, TRACEON_EP, -1, -1);
 }
 
 void TraceSummary::traceEnd(void)
