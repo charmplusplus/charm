@@ -1001,7 +1001,7 @@ void TraceSummary::beginExecute(int event,int msgType,int ep,int srcPe, int mlen
   }
   depth ++;
 
-  int len = recvSizePerEP.size();
+  int len = extRecvSizePerEP.size();
   if(ep >= len) {
       msgSizePerEP.resize(_entryTable.size() + 10);
       msgCountPerEP.resize(_entryTable.size() + 10);
