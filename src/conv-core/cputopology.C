@@ -196,10 +196,10 @@ static void printTopology(int numNodes)
     CmiPrintf("Charm++> Running on %d hosts\n", numNodes);
 }
 
-static std::atomic<char> cpuTopoSyncHandlerDone;
+static std::atomic<bool> cpuTopoSyncHandlerDone{};
 #if CMK_SMP && !CMK_SMP_NO_COMMTHD
 extern void CommunicationServerThread(int sleepTime);
-static std::atomic<char> cpuTopoSyncCommThreadDone;
+static std::atomic<bool> cpuTopoSyncCommThreadDone{};
 #endif
 
 #if CMK_SMP && !CMK_SMP_NO_COMMTHD
@@ -268,7 +268,7 @@ static void cpuTopoHandler(void *m)
   hostTable.clear();
   CmiFree(msg);
 
-  cpuTopoSyncHandlerDone = 1;
+  cpuTopoSyncHandlerDone = true;
 }
 
 /* called on each processor */
@@ -287,7 +287,7 @@ static void cpuTopoRecvHandler(void *msg)
 
   //if (CmiMyPe() == 0) cpuTopo.print();
 
-  cpuTopoSyncHandlerDone = 1;
+  cpuTopoSyncHandlerDone = true;
 }
 
 // reduction function
@@ -523,7 +523,7 @@ extern "C" void LrtsInitCpuTopo(char **argv)
       }
 
 #if CMK_SMP && !CMK_SMP_NO_COMMTHD
-      cpuTopoSyncCommThreadDone = 1;
+      cpuTopoSyncCommThreadDone = true;
 #endif
     }
   }
