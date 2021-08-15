@@ -1760,8 +1760,9 @@ Summary/Sum Detail Logs
 
     eg: ``0+5 65+1 0+1 32767+3 decodes to 0 0 0 0 0 65 0 32767 32767 32767``
 
--   Total messages sent per EP in the line following "MsgSendCount: " and the total bytes sent per EP is given in the line following "MsgSentSize: ".
+-   Total messages sent per EP in the line following "MsgSentCount: " and the total bytes sent per EP is given in the line following "MsgSentSize: ".
     Similarly, total messages received per EP and total bytes received per EP is given in the line following "MsgRecvCount: " and "MsgRecvSize: " respectively.
+    And, total external messages received per EP and total external bytes received per EP is given in the line following "ExternalMsgRecvCount: " and "ExternalMsgRecvSize: " respectively.
     The data is run length encoded. The data when decoded is in order of EP followed by bin. So, for the above example the first 270 values are for 270 EPs in the 0th bin. The next 270 values are for the 1st bin and so on.
 
 -   The idle percentages of each interval in a particular PE is given by the line following the string "IdlePercent: ". It is run length encoded.
