@@ -2098,6 +2098,10 @@ void zcPupIssueRgets(CmiUInt8 id, CkLocMgr *locMgr) {
 
 /****************************** Channel API ******************************/
 
+#define CKCALLBACK_POOL 1 // Pool CkCallback allocations
+
+CkpvDeclare(CkCallbackPool, cb_pool);
+
 CkChannel::CkChannel(int id_, const CProxyElement_ArrayBase &proxy) : CkChannel(id_) {
   peer_pe = proxy.ckLocalBranch()->lastKnown(proxy.ckGetIndex());
 }
@@ -2112,13 +2116,23 @@ CkChannel::CkChannel(int id_, const CProxyElement_NodeGroup &proxy) : CkChannel(
 
 void CkChannel::send(const void* ptr, size_t size, const CkCallback& cb) {
   CkAssert(id != -1 && peer_pe != -1);
+#if CKCALLBACK_POOL
+  CkCallback* cb_copy = CkpvAccess(cb_pool).alloc();
+  new (cb_copy) CkCallback(cb);
+#else
   CkCallback* cb_copy = new CkCallback(cb);
+#endif
   CmiChannelSend(peer_pe, ptr, size, cb_copy, send_counter++);
 }
 
 void CkChannel::recv(const void* ptr, size_t size, const CkCallback& cb) {
   CkAssert(id != -1 && peer_pe != -1);
+#if CKCALLBACK_POOL
+  CkCallback* cb_copy = CkpvAccess(cb_pool).alloc();
+  new (cb_copy) CkCallback(cb);
+#else
   CkCallback* cb_copy = new CkCallback(cb);
+#endif
   CmiChannelRecv(ptr, size, cb_copy, recv_counter++);
 }
 
@@ -2126,7 +2140,11 @@ void CkChannelHandler(void* data)
 {
   CkCallback* cb = static_cast<CkCallback*>(data);
   cb->send();
+#if CKCALLBACK_POOL
+  CkpvAccess(cb_pool).free(cb);
+#else
   delete cb;
+#endif
 }
 
 /****************************** End of Channel API ******************************/
