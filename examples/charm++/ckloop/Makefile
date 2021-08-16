@@ -1,5 +1,4 @@
 DIRS = \
-  dotProd \
   simpleLoopBench \
 
 TESTDIRS = $(DIRS)
