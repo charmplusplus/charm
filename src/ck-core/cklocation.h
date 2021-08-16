@@ -317,6 +317,8 @@ enum CkElementCreation_t : uint8_t
 #  define CMK_RANK_0(pe) pe
 #endif
 
+class CkLocMgr;
+
 class CkLocCache : public CBase_CkLocCache
 {
 private:
@@ -328,6 +330,8 @@ private:
   std::list<Listener> listeners;
 
 public:
+  friend class CkLocMgr;
+
   CkLocCache() = default;
   CkLocCache(CkMigrateMessage* m) : CBase_CkLocCache(m) {}
   ~CkLocCache() = default;
@@ -710,6 +714,36 @@ public:
   void pup(PUP::er& p);
 
   void callMethod(CkLocRec* rec, CkMigratable_voidfn_t fn);
+
+  /// subscribe a fn to location updates
+  using listener_fn_t =
+      std::function<void(const CkGroupID&, const CmiUInt8&, const int&)>;
+  inline void addListener(const listener_fn_t& fn)
+  { /* it is important for listeners to know an update's origin
+     * since they may be subscribed to multiple locmgrs
+     */
+    using namespace std::placeholders;  // for _1, _2, etc.
+    this->cache->addListener(std::bind(fn, this->ckGetGroupID(), _1, _2));
+  }
+
+  /* iterate through all cached indices in the loc mgr, stopping
+   * if the fn returns false. useful for discovering distant peers.
+   */
+  using CkArrayIndex_boolfn_t = std::function<bool(const CkArrayIndex&)>;
+  inline void perKnown(const CkArrayIndex_boolfn_t& fn) const
+  {
+    for (auto& pair : this->cache->locMap)
+    {
+      if (fn(this->lookupIdx(pair.first)))
+      {
+        continue;
+      }
+      else
+      {
+        break;
+      }
+    }
+  }
 };
 
 /// check the command line arguments to determine if we can use ConfigurableRRMap

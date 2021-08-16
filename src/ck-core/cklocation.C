@@ -2451,6 +2451,9 @@ void CkLocCache::recordEmigration(CmiUInt8 id, int pe)
 
   itr->second.pe = pe;
   itr->second.epoch++;
+
+  // inform listeners of the new location
+  notifyListeners(id, pe);
 }
 
 
