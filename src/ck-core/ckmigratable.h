@@ -95,6 +95,10 @@ public:
 #if CMK_LB_USER_DATA
   void *getObjUserData(int idx);
 #endif
+  template<N>
+  void setObjPosition()
+  {
+  }
 
 #if CMK_LBDB_ON  //For load balancing:
   void AtSync(int waitForMigration=1);
