@@ -1765,6 +1765,13 @@ void CkMigratable::pup(PUP::er& p)
     p | epoch;
   }
 
+  std::vector<LBRealType> position;
+  if (!p.isUnpacking())
+    position = myRec->getObjPosition();
+  p | position;
+  if (p.isUnpacking())
+    myRec->setObjPosition(position);
+
   if (p.isUnpacking())
     ckFinishConstruction(epoch);
 }
@@ -1828,6 +1835,10 @@ void CkMigratable::UserSetLBLoad()
 #if CMK_LBDB_ON  // For load balancing:
 // user can call this helper function to set obj load (for model-based lb)
 void CkMigratable::setObjTime(double cputime) { myRec->setObjTime(cputime); }
+void CkMigratable::setObjPosition(const std::vector<LBRealType>& pos)
+{
+  myRec->setObjPosition(pos);
+}
 double CkMigratable::getObjTime() { return myRec->getObjTime(); }
 
 #  if CMK_LB_USER_DATA
@@ -2051,6 +2062,7 @@ void CkMigratable::CkAddThreadListeners(CthThread tid, void* msg)
 }
 #else
 void CkMigratable::setObjTime(double cputime) {}
+void CkMigratable::setObjPosition(const std::vector<LBRealType> pos) {}
 double CkMigratable::getObjTime() { return 0.0; }
 
 #  if CMK_LB_USER_DATA
@@ -2133,11 +2145,19 @@ void CkLocRec::stopTiming(int ignore_running)
     running = false;
 }
 void CkLocRec::setObjTime(double cputime) { lbmgr->EstObjLoad(ldHandle, cputime); }
+void CkLocRec::setObjPosition(const std::vector<LBRealType>& pos)
+{
+  lbmgr->SetObjPosition(ldHandle, pos);
+}
 double CkLocRec::getObjTime()
 {
   LBRealType walltime, cputime;
   lbmgr->GetObjLoad(ldHandle, walltime, cputime);
   return walltime;
+}
+const std::vector<LBRealType>& CkLocRec::getObjPosition()
+{
+  return lbmgr->GetObjPosition(ldHandle);
 }
 #  if CMK_LB_USER_DATA
 void* CkLocRec::getObjUserData(int idx) { return lbmgr->GetDBObjUserData(ldHandle, idx); }
