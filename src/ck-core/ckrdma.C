@@ -2215,7 +2215,7 @@ void updateTagArray(envelope *env, int localElems) {
   for(int i=0; i<numops; i++){
     CkNcpyBuffer w;
     up|w;
-    w.ncpyEmInfo->tagArray[CmiMyRank()].resize(localElems * numops);
+    w.ncpyEmInfo->tagArray[CmiMyRank()].resize(static_cast<size_t>(localElems) * numops);
     std::fill(w.ncpyEmInfo->tagArray[CmiMyRank()].begin(), w.ncpyEmInfo->tagArray[CmiMyRank()].end(), -1);
     w.ncpyEmInfo->peerAckInfo->incNumElems(localElems);
     w.ncpyEmInfo->peerAckInfo->decNumPeers();
@@ -2339,7 +2339,7 @@ void CkRdmaAsyncPostPreprocess(envelope *env, int numops, CkNcpyBufferPost *post
       int numElems = mgr->getNumLocalElems();
 
       tagArray = new std::vector<int>[CmiMyNodeSize()];
-      tagArray[CmiMyRank()].resize(numElems * numops);
+      tagArray[CmiMyRank()].resize(static_cast<size_t>(numElems) * numops);
       std::fill(tagArray[CmiMyRank()].begin(), tagArray[CmiMyRank()].end(), -1);
 
       peerAckInfo = new NcpyBcastRecvPeerAckInfo();
