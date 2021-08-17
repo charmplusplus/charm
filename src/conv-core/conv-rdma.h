@@ -303,8 +303,8 @@ zcPupSourceInfo *zcPupAddSource(CmiNcpyBuffer &src, std::function<void (void *)>
 
 void zcPupGet(CmiNcpyBuffer &src, CmiNcpyBuffer &dest);
 
-void CmiChannelSend(int dest_pe, const void*& ptr, size_t size, void* cb, uint64_t tag);
-void CmiChannelRecv(const void*& ptr, size_t size, void* cb, uint64_t tag);
+void CmiChannelSend(int dest_pe, int id, const void*& ptr, size_t size, void* cb, uint64_t tag);
+void CmiChannelRecv(int id, const void*& ptr, size_t size, void* cb, uint64_t tag);
 void CmiChannelHandlerInit(RdmaAckCallerFn fn);
 void CmiChannelHandler(void* data);
 

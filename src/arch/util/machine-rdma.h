@@ -25,8 +25,8 @@ void LrtsRecvDevice(DeviceRdmaOp* op, CommType type);
 void CmiDeviceRecvHandler(void* data);
 #endif // CMK_CUDA && CMK_GPU_COMM
 
-void LrtsChannelSend(int dest_pe, const void*& ptr, size_t size, void* cb, uint64_t tag);
-void LrtsChannelRecv(const void*& ptr, size_t size, void* cb, uint64_t tag);
+void LrtsChannelSend(int dest_pe, int id, const void*& ptr, size_t size, void* cb, uint64_t tag);
+void LrtsChannelRecv(int id, const void*& ptr, size_t size, void* cb, uint64_t tag);
 
 void CmiChannelHandler(void* data);
 

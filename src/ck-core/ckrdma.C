@@ -2122,7 +2122,7 @@ void CkChannel::send(const void* ptr, size_t size, const CkCallback& cb) {
 #else
   CkCallback* cb_copy = new CkCallback(cb);
 #endif
-  CmiChannelSend(peer_pe, ptr, size, cb_copy, send_counter++);
+  CmiChannelSend(peer_pe, id, ptr, size, cb_copy, send_counter++);
 }
 
 void CkChannel::recv(const void* ptr, size_t size, const CkCallback& cb) {
@@ -2133,7 +2133,7 @@ void CkChannel::recv(const void* ptr, size_t size, const CkCallback& cb) {
 #else
   CkCallback* cb_copy = new CkCallback(cb);
 #endif
-  CmiChannelRecv(ptr, size, cb_copy, recv_counter++);
+  CmiChannelRecv(id, ptr, size, cb_copy, recv_counter++);
 }
 
 void CkChannelHandler(void* data)
