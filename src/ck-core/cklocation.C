@@ -3309,6 +3309,7 @@ void CkLocMgr::pupElementsFor(PUP::er &p, CkLocRec *rec,
   bool interNode = true;
   if (mig != NULL)
     interNode = false;
+  int i = 0;
 
   // First pup the element types
   // (A separate loop so ckLocal works even in element pup routines)
@@ -3322,19 +3323,19 @@ void CkLocMgr::pupElementsFor(PUP::er &p, CkLocRec *rec,
       else
         elCType = -1; // Element hasn't been created
       if (mig != NULL) {
-        *mig = elt;
-        *elCTypeSend = elCType;
+        mig[i] = elt;
+        elCTypeSend[i++] = elCType;
       }
     }
     p(elCType);
     if (p.isUnpacking() && elCTypeSend != NULL) {
-      elCType = *elCTypeSend;
+      elCType = elCTypeSend[i];
     }
     if (p.isUnpacking() && elCType != -1) {
       // Create the element
       CkMigratable *elt;
       if (mig != NULL)
-        elt = *mig;
+        elt = mig[i++];
       else
         elt = arr->allocateMigrated(elCType, type);
 
@@ -3477,9 +3478,9 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 
   if (CkMyNode() == CkNodeOf(toPe)) {
     PUP::toDummy p;
-    int elCType;
-    CkMigratable *mig;
-    pupElementsFor(p, rec, CkElementCreation_migrate, false, &elCType, &mig);
+    int *elCType = new int[managers.size()];
+    CkMigratable **mig = new CkMigratable*[managers.size()];
+    pupElementsFor(p, rec, CkElementCreation_migrate, false, elCType, mig);
     msg->elCType = elCType;
     msg->migEl = mig;
     msg->srcPe = CkMyPe();
@@ -3568,8 +3569,8 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
                       false /* home told on departure */);
 
     // Create the new elements as we unpack the message
-    pupElementsFor(p, rec, CkElementCreation_migrate, false, &(msg->elCType),
-                   &(msg->migEl));
+    pupElementsFor(p, rec, CkElementCreation_migrate, false, msg->elCType,
+                   msg->migEl);
   } else {
 
     PUP::fromMem p(msg->packData, PUP::er::IS_MIGRATION);

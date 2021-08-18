@@ -202,8 +202,8 @@ public:
   int length;         // Size in bytes of the packed data
   int nManagers;      // Number of associated array managers
   int srcPe;
-  int elCType;
-  CkMigratable *migEl;
+  int *elCType;
+  CkMigratable **migEl;
   char *packData;
 };
 
