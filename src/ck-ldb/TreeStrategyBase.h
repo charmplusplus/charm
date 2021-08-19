@@ -1,6 +1,7 @@
 #ifndef TREESTRATEGYBASE_H
 #define TREESTRATEGYBASE_H
 
+#include "lbdb.h"
 #include <algorithm>
 #include <random>
 
@@ -130,6 +131,19 @@ inline float Obj<1>::getLoad() const
   return load;
 }
 
+template <int N>
+class ObjPos : public Obj<N>
+{
+public:
+  bool hasPosition = false;
+  std::vector<LBRealType> position;
+
+  inline void setPosition(const std::vector<LBRealType>& position)
+  {
+    hasPosition = true;
+    this->position = position;
+  }
+};
 // ------------------ Proc ------------------
 
 /**
