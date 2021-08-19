@@ -3013,6 +3013,8 @@ fi
 
 eval `"$CHARMBIN/charmc" $OPTS -print-building-blocks -standalone`
 add_make_flag "HWLOC_CC:=$(get_full_command_name "$CHARM_CC")" "hwloc"
+add_make_flag "HWLOC_CXX:=$(get_full_command_name "$CHARM_CXX")" "hwloc"
 add_make_flag "HWLOC_CC_FLAGS:=$CHARM_CC_FLAGS" "hwloc"
+add_make_flag "HWLOC_CXX_FLAGS:=$CHARM_CXX_FLAGS" "hwloc"
 
 AC_OUTPUT
