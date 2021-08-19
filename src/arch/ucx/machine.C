@@ -162,7 +162,7 @@ inline void UcxInvokeRecvHandler(DeviceRdmaOp* op, DeviceRecvType type) {
       break;
     // TODO: AMPI and Charm4py
     default:
-      CmiAbort("Invvalid recv type: %d\n", type);
+      CmiAbort("Invalid recv type: %d\n", type);
       break;
   }
 }
