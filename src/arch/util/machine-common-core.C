@@ -1736,7 +1736,7 @@ if (MSG_STATISTIC)
 #endif
     CmiYield();
     if (!CharmLibInterOperate || userDrivenMode) {
-      while (1) {
+      while (ckExitComplete.load() == 0) {
         CmiYield();
       }
     }
