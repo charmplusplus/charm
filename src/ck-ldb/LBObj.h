@@ -79,6 +79,11 @@ public:
 #endif
   }
 
+  inline void setPosition(const std::vector<LBRealType>& pos)
+  {
+    position = pos;
+  }
+
   inline LDOMHandle &parentOM() { return data.handle.omhandle; }
   inline const LDObjHandle &GetLDObjHandle() const { return data.handle; }
   inline void SetMigratable(bool mig) { data.migratable = mig; }
@@ -108,6 +113,7 @@ private:
 //  bool registered;
   double startWTime;             // needs double precision
   LBRealType lastWallTime;
+  std::vector<LBRealType> position;
 #if CMK_LB_CPUTIMER
   double startCTime;
   LBRealType lastCpuTime;

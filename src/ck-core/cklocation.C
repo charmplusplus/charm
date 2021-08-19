@@ -1828,6 +1828,10 @@ void CkMigratable::UserSetLBLoad()
 #if CMK_LBDB_ON  // For load balancing:
 // user can call this helper function to set obj load (for model-based lb)
 void CkMigratable::setObjTime(double cputime) { myRec->setObjTime(cputime); }
+void CkMigratable::setObjPosition(const std::vector<LBRealType>& pos)
+{
+  myRec->setObjPosition(pos);
+}
 double CkMigratable::getObjTime() { return myRec->getObjTime(); }
 
 #  if CMK_LB_USER_DATA
@@ -2081,6 +2085,7 @@ void CkMigratable::CkAddThreadListeners(CthThread tid, void* msg)
 }
 #else
 void CkMigratable::setObjTime(double cputime) {}
+void CkMigratable::setObjPosition(const std::vector<LBRealType> pos) {}
 double CkMigratable::getObjTime() { return 0.0; }
 
 #  if CMK_LB_USER_DATA
@@ -2163,6 +2168,7 @@ void CkLocRec::stopTiming(int ignore_running)
     running = false;
 }
 void CkLocRec::setObjTime(double cputime) { lbmgr->EstObjLoad(ldHandle, cputime); }
+void CkLocRec::setObjPosition(const std::vector<LBRealType>& pos) { lbmgr->ObjPosition(ldHandle, pos); }
 double CkLocRec::getObjTime()
 {
   LBRealType walltime, cputime;

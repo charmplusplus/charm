@@ -48,6 +48,7 @@ public:
   void startTiming(int ignore_running=0);
   void stopTiming(int ignore_running=0);
   void setObjTime(double cputime);
+  void setObjPosition(const std::vector<LBRealType>& pos);
   double getObjTime();
   void *getObjUserData(int idx);
 #else
