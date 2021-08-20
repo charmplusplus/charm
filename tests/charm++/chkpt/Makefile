@@ -1,4 +1,5 @@
 -include ../../common.mk
+-include ../../../include/conv-mach-opt.mak
 CHARMC=../../../bin/charmc $(OPTS)
 
 OBJS = hello.o
@@ -22,35 +23,53 @@ hello.o: hello.C hello.decl.h
 test: all
 	-rm -fr log
 	$(call run, ./hello +p4 +balancer GreedyLB +LBDebug 1 )
+ifeq (1,$(CMK_HAS_SYNC))
 	-sync
+endif
 	$(call run, ./hello +p4 +restart log +balancer GreedyLB +LBDebug 1 )
 	$(call run, ./hello +p2 +restart log +balancer GreedyLB +LBDebug 1 )
+ifeq (1,$(CMK_HAS_SYNC))
 	-sync
+endif
 	-rm -fr log
 	$(call run, ./hello +p2 )
+ifeq (1,$(CMK_HAS_SYNC))
 	-sync
+endif
 	$(call run, ./hello +p4 +restart log )
 
 testp: all
 	-rm -fr log
 	$(call run, ./hello +p$(P) )
+ifeq (1,$(CMK_HAS_SYNC))
 	-sync
+endif
 	$(call run, ./hello +p$(P) +restart log )
 	$(call run, ./hello +p$$(( $(P) / 2 )) +restart log )
+ifeq (1,$(CMK_HAS_SYNC))
 	-sync
+endif
 	-rm -fr log
 	$(call run, ./hello +p$(P) )
+ifeq (1,$(CMK_HAS_SYNC))
 	-sync
+endif
 	$(call run, ./hello +p$(P) +restart log )
 
 smptest: all
 	-rm -fr log
 	$(call run, ./hello +p4 ++ppn 2 )
+ifeq (1,$(CMK_HAS_SYNC))
 	-sync
+endif
 	$(call run, ./hello +p4 +restart log ++ppn 4 )
 	$(call run, ./hello +p2 +restart log ++ppn 2 )
+ifeq (1,$(CMK_HAS_SYNC))
 	-sync
+endif
 	-rm -fr log
 	$(call run, ./hello +p2 ++ppn 2)
+ifeq (1,$(CMK_HAS_SYNC))
 	-sync
+endif
 	$(call run, ./hello +p4 +restart log ++ppn 4 )

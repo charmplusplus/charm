@@ -55,10 +55,10 @@ OPTS_control_f90 :=
 OPTS_tlsglobals_f90 += -fopenmp
 
 # Define the features that each privatization method supports.
-FEATURES_control_cxx := globalvars threadlocalvars staticvars sharedlib dynamiclib migration
-FEATURES_swapglobals_cxx := globalvars migration
-FEATURES_tlsglobals_cxx := threadlocalvars staticvars sharedlib migration
-FEATURES_roseomptlsglobals_cxx := threadlocalvars staticvars sharedlib migration
+FEATURES_control_cxx := globalvars threadlocalvars staticvars sharedlib dynamiclib migration checkpointing
+FEATURES_swapglobals_cxx := globalvars migration checkpointing
+FEATURES_tlsglobals_cxx := threadlocalvars staticvars sharedlib migration checkpointing
+FEATURES_roseomptlsglobals_cxx := threadlocalvars staticvars sharedlib migration checkpointing
 FEATURES_fsglobals_cxx := globalvars staticvars
 FEATURES_pipglobals_cxx := globalvars staticvars sharedlib
 FEATURES_pieglobals_cxx := globalvars staticvars sharedlib migration
@@ -66,6 +66,7 @@ FEATURES_pieglobals_cxx := globalvars staticvars sharedlib migration
 
 # Universal settings
 LINKOPTS := -balancer TreeLB
+CHKPTNAME := priv-chkpt
 
 
 # Rule construction
@@ -118,26 +119,136 @@ $1-%.o $1-%-f90.o: %.f90
 
 # test
 test-$1-cxx: $1-cxx
+ifneq (,$$(findstring checkpointing,$$(FEATURES_$1_cxx)))
+	-rm -rf $$(CHKPTNAME)
+endif
 	$$(call run, ./$1-cxx +p1 +vp2 +balancer RandCentLB)
+ifneq (,$$(findstring checkpointing,$$(FEATURES_$1_cxx)))
+ifeq (1,$$(CMK_HAS_SYNC))
+	-sync
+endif
+	$$(call run, ./$1-cxx +p1 +vp2 +balancer RandCentLB +restart $$(CHKPTNAME))
+	-rm -rf $$(CHKPTNAME)
+endif
 	$$(call run, ./$1-cxx +p1 +vp4 +balancer RandCentLB)
+ifneq (,$$(findstring checkpointing,$$(FEATURES_$1_cxx)))
+ifeq (1,$$(CMK_HAS_SYNC))
+	-sync
+endif
+	$$(call run, ./$1-cxx +p1 +vp4 +balancer RandCentLB +restart $$(CHKPTNAME))
+	-rm -rf $$(CHKPTNAME)
+endif
 	$$(call run, ./$1-cxx +p2 +vp2 +balancer RandCentLB)
+ifneq (,$$(findstring checkpointing,$$(FEATURES_$1_cxx)))
+ifeq (1,$$(CMK_HAS_SYNC))
+	-sync
+endif
+	$$(call run, ./$1-cxx +p2 +vp2 +balancer RandCentLB +restart $$(CHKPTNAME))
+	-rm -rf $$(CHKPTNAME)
+endif
 	$$(call run, ./$1-cxx +p2 +vp4 +balancer RandCentLB)
+ifneq (,$$(findstring checkpointing,$$(FEATURES_$1_cxx)))
+ifeq (1,$$(CMK_HAS_SYNC))
+	-sync
+endif
+	$$(call run, ./$1-cxx +p2 +vp4 +balancer RandCentLB +restart $$(CHKPTNAME))
+	-rm -rf $$(CHKPTNAME)
+endif
 
 test-$1-f90: $1-f90
+ifneq (,$$(findstring checkpointing,$$(FEATURES_$1_cxx)))
+	-rm -rf $$(CHKPTNAME)
+endif
 	$$(call run, ./$1-f90 +p1 +vp2 +balancer RandCentLB)
+ifneq (,$$(findstring checkpointing,$$(FEATURES_$1_cxx)))
+ifeq (1,$$(CMK_HAS_SYNC))
+	-sync
+endif
+	$$(call run, ./$1-f90 +p1 +vp2 +balancer RandCentLB +restart $$(CHKPTNAME))
+	-rm -rf $$(CHKPTNAME)
+endif
 	$$(call run, ./$1-f90 +p1 +vp4 +balancer RandCentLB)
+ifneq (,$$(findstring checkpointing,$$(FEATURES_$1_cxx)))
+ifeq (1,$$(CMK_HAS_SYNC))
+	-sync
+endif
+	$$(call run, ./$1-f90 +p1 +vp4 +balancer RandCentLB +restart $$(CHKPTNAME))
+	-rm -rf $$(CHKPTNAME)
+endif
 	$$(call run, ./$1-f90 +p2 +vp2 +balancer RandCentLB)
+ifneq (,$$(findstring checkpointing,$$(FEATURES_$1_cxx)))
+ifeq (1,$$(CMK_HAS_SYNC))
+	-sync
+endif
+	$$(call run, ./$1-f90 +p2 +vp2 +balancer RandCentLB +restart $$(CHKPTNAME))
+	-rm -rf $$(CHKPTNAME)
+endif
 	$$(call run, ./$1-f90 +p2 +vp4 +balancer RandCentLB)
+ifneq (,$$(findstring checkpointing,$$(FEATURES_$1_cxx)))
+ifeq (1,$$(CMK_HAS_SYNC))
+	-sync
+endif
+	$$(call run, ./$1-f90 +p2 +vp4 +balancer RandCentLB +restart $$(CHKPTNAME))
+	-rm -rf $$(CHKPTNAME)
+endif
 
 testp-$1-cxx: $1-cxx
+ifneq (,$$(findstring checkpointing,$$(FEATURES_$1_cxx)))
+	-rm -rf $$(CHKPTNAME)
+endif
 	$$(call run, ./$1-cxx +p$(P) +vp$(P) +balancer RandCentLB)
+ifneq (,$$(findstring checkpointing,$$(FEATURES_$1_cxx)))
+ifeq (1,$$(CMK_HAS_SYNC))
+	-sync
+endif
+	$$(call run, ./$1-cxx +p$(P) +vp$(P) +balancer RandCentLB +restart $$(CHKPTNAME))
+	-rm -rf $$(CHKPTNAME)
+endif
 	$$(call run, ./$1-cxx +p$(P) +vp$$$$(( $(P) * 2 )) +balancer RandCentLB)
+ifneq (,$$(findstring checkpointing,$$(FEATURES_$1_cxx)))
+ifeq (1,$$(CMK_HAS_SYNC))
+	-sync
+endif
+	$$(call run, ./$1-cxx +p$(P) +vp$$$$(( $(P) * 2 )) +balancer RandCentLB +restart $$(CHKPTNAME))
+	-rm -rf $$(CHKPTNAME)
+endif
 	$$(call run, ./$1-cxx +p$(P) +vp$$$$(( $(P) * 4 )) +balancer RandCentLB)
+ifneq (,$$(findstring checkpointing,$$(FEATURES_$1_cxx)))
+ifeq (1,$$(CMK_HAS_SYNC))
+	-sync
+endif
+	$$(call run, ./$1-cxx +p$(P) +vp$$$$(( $(P) * 4 )) +balancer RandCentLB +restart $$(CHKPTNAME))
+	-rm -rf $$(CHKPTNAME)
+endif
 
 testp-$1-f90: $1-f90
+ifneq (,$$(findstring checkpointing,$$(FEATURES_$1_cxx)))
+	-rm -rf $$(CHKPTNAME)
+endif
 	$$(call run, ./$1-f90 +p$(P) +vp$(P) +balancer RandCentLB)
+ifneq (,$$(findstring checkpointing,$$(FEATURES_$1_cxx)))
+ifeq (1,$$(CMK_HAS_SYNC))
+	-sync
+endif
+	$$(call run, ./$1-f90 +p$(P) +vp$(P) +balancer RandCentLB +restart $$(CHKPTNAME))
+	-rm -rf $$(CHKPTNAME)
+endif
 	$$(call run, ./$1-f90 +p$(P) +vp$$$$(( $(P) * 2 )) +balancer RandCentLB)
+ifneq (,$$(findstring checkpointing,$$(FEATURES_$1_cxx)))
+ifeq (1,$$(CMK_HAS_SYNC))
+	-sync
+endif
+	$$(call run, ./$1-f90 +p$(P) +vp$$$$(( $(P) * 2 )) +balancer RandCentLB +restart $$(CHKPTNAME))
+	-rm -rf $$(CHKPTNAME)
+endif
 	$$(call run, ./$1-f90 +p$(P) +vp$$$$(( $(P) * 4 )) +balancer RandCentLB)
+ifneq (,$$(findstring checkpointing,$$(FEATURES_$1_cxx)))
+ifeq (1,$$(CMK_HAS_SYNC))
+	-sync
+endif
+	$$(call run, ./$1-f90 +p$(P) +vp$$$$(( $(P) * 4 )) +balancer RandCentLB +restart $$(CHKPTNAME))
+	-rm -rf $$(CHKPTNAME)
+endif
 
 endef
 

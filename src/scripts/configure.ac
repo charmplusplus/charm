@@ -2861,10 +2861,9 @@ fi
 
 #### test the if command sync exists ####
 AC_CHECK_PROG(SYNC, sync, sync )
-if test -n "$SYNC"
-then
-AC_DEFINE_UNQUOTED(CMK_HAS_SYNC, 1, [sync program])
-fi
+test -n "$SYNC" && CMK_HAS_SYNC='1' || CMK_HAS_SYNC='0'
+AC_DEFINE_UNQUOTED(CMK_HAS_SYNC, $CMK_HAS_SYNC, [sync program])
+add_make_flag "CMK_HAS_SYNC:=$CMK_HAS_SYNC" "sync program"
 
 ################## Fortran #########################
 

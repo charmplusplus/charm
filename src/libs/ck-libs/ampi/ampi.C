@@ -11397,12 +11397,13 @@ CLINKAGE int AMPI_Migrate(MPI_Info hints)
       }
     }
     else if (strncmp(key, "ampi_checkpoint", MPI_MAX_INFO_KEY) == 0) {
-
+      static const char s_to_file[] = "to_file=";
+      static constexpr size_t s_to_file_len = sizeof(s_to_file)-1;
       if (strncmp(value, "true", MPI_MAX_INFO_VAL) == 0) {
         CkAbort("AMPI> Error: Value \"true\" is not supported for AMPI_Migrate key \"ampi_checkpoint\"!\n");
       }
-      else if (strncmp(value, "to_file=", strlen("to_file=")) == 0) {
-        int offset = strlen("to_file=");
+      else if (strncmp(value, s_to_file, s_to_file_len) == 0) {
+        int offset = int(s_to_file_len);
         int restart_dir_name_len = 0;
         MPI_Info_get_valuelen(hints, key, &restart_dir_name_len, &exists);
         if (restart_dir_name_len > offset) {

@@ -54,6 +54,10 @@ void test_privatization(int & failed, int & test, int & rank, int & my_wth, int 
   {
     failed += print_test_result(test, rank, my_wth, &global, "migration", global == rank);
   }
+  else if (operation == 2)
+  {
+    failed += print_test_result(test, rank, my_wth, &global, "checkpointing", global == rank);
+  }
 
   MPI_Barrier(MPI_COMM_WORLD);
 
@@ -121,9 +125,30 @@ void privatization_test_framework(void)
   if (failed_before != failed_after)
     printf("[%d](%d) Migration caused a test inconsistency.\n", rank, my_wth);
 
+#if defined test_checkpointing
+  if (rank == 0)
+    printf("Requesting checkpoint.\n");
+
+  MPI_Info chkptInfo;
+  MPI_Info_create(&chkptInfo);
+  MPI_Info_set(chkptInfo, "ampi_checkpoint", "to_file=priv-chkpt");
+  AMPI_Migrate(chkptInfo);
+  MPI_Info_free(&chkptInfo);
+
+  // TODO: Skip this phase if we saved the checkpoint, run it if we restored from it
+  // TODO: Fix hang on "WARNING: ckSetReductionClient should only be called from processor zero!"
+
+  int failed_checkpointing = 0;
+  operation = 2;
+  perform_test_batch_dispatch(failed_checkpointing, test, rank, my_wth, operation);
+#endif
+
   int failed = failed_before + failed_after;
 #if defined test_migration
   failed += failed_migration;
+#endif
+#if defined test_checkpointing
+  failed += failed_checkpointing;
 #endif
   int total_failures = 0;
   MPI_Reduce(&failed, &total_failures, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
