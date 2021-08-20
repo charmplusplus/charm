@@ -515,31 +515,43 @@ void SumLogPool::write(void)
 }
 
 void SumLogPool::writeEncoder(int numBins, int event) {
-    long prev_val = 0;
-    long streak = 0;
+    unsigned long prev_val = 0;
+    unsigned long streak = 0;
 
     for(int k = 0; k < numBins; ++k) {
-        for(int l = 0; l < _entryTable.size(); ++l) {
-            CkVec<long> vec;
-            if(event == 1) {
-                vec = pool[k].getCountPerEP();
-            } else if(event == 2) {
-                vec = pool[k].getSizePerEP();
-            } else if(event == 3) {
-                vec = pool[k].getRecvCountPerEP();
-            } else if(event == 4) {
-                vec = pool[k].getRecvSizePerEP();
-            } else if(event == 5) {
-                vec = pool[k].getExtRecvCountPerEP();
-            } else if(event == 6) {
-                vec = pool[k].getExtRecvSizePerEP();
-            }
-            long temp = vec[l];
+        CkVec<unsigned long> vec;
+        if(event == 1) {
+            vec = pool[k].getCountPerEP();
+        } else if(event == 2) {
+            vec = pool[k].getSizePerEP();
+        } else if(event == 3) {
+            vec = pool[k].getRecvCountPerEP();
+        } else if(event == 4) {
+            vec = pool[k].getRecvSizePerEP();
+        } else if(event == 5) {
+            vec = pool[k].getExtRecvCountPerEP();
+        } else if(event == 6) {
+            vec = pool[k].getExtRecvSizePerEP();
+        }
+        for(int l = 0; l < vec.size(); ++l) {
+            unsigned long temp = vec[l];
             if(temp == prev_val) {
                 streak++;
             } else {
                 if(streak > 0) {
-                    fprintf(sdfp, "%ld+%ld ", prev_val, streak);
+                    fprintf(sdfp, "%lu+%lu ", prev_val, streak);
+                }
+                prev_val = temp;
+                streak = 1;
+            }
+        }
+        for(int l = vec.size(); l < _entryTable.size(); ++l) {
+            unsigned long temp = 0;
+            if(temp == prev_val) {
+                streak++;
+            } else {
+                if(streak > 0) {
+                    fprintf(sdfp, "%lu+%lu ", prev_val, streak);
                 }
                 prev_val = temp;
                 streak = 1;
@@ -547,7 +559,7 @@ void SumLogPool::writeEncoder(int numBins, int event) {
         }
     }
     if(streak > 0) {
-        fprintf(sdfp, "%ld+%ld ", prev_val, streak);
+        fprintf(sdfp, "%lu+%lu ", prev_val, streak);
     }
     fprintf(sdfp, "\n");
 }
@@ -573,12 +585,12 @@ void SumLogPool::writeSts(void)
   fclose(stsfp);
 }
 
-void SumLogPool::add(double time, double idleTime, long msgSize, long msgCount,
-                     CkVec<long> msgSizePerEP, CkVec<long> msgCountPerEP,
-                     long recvSize, long recvCount,
-                     CkVec<long> recvSizePerEP, CkVec<long> recvCountPerEP,
-                     long extRecvSize, long extRecvCount,
-                     CkVec<long> extRecvSizePerEP, CkVec<long> extRecvCountPerEP,
+void SumLogPool::add(double time, double idleTime, unsigned long msgSize, unsigned long msgCount,
+                     CkVec<unsigned long> msgSizePerEP, CkVec<unsigned long> msgCountPerEP,
+                     unsigned long recvSize, unsigned long recvCount,
+                     CkVec<unsigned long> recvSizePerEP, CkVec<unsigned long> recvCountPerEP,
+                     unsigned long extRecvSize, unsigned long extRecvCount,
+                     CkVec<unsigned long> extRecvSizePerEP, CkVec<unsigned long> extRecvCountPerEP,
                      int pe)
 {
   new (&pool[numBins++]) BinEntry(time, idleTime, msgSize, msgCount, msgSizePerEP, msgCountPerEP,
@@ -758,7 +770,8 @@ TraceSummary::TraceSummary(char **argv):msgNum(0),binStart(0.0),idleStart(0.0),
 void TraceSummary::resetCounters()
 {
   for(int i = 0; i < msgCountPerEP.size(); ++i) {
-    msgCountPerEP[i] = msgSizePerEP[i] = recvCountPerEP[i] = recvSizePerEP[i] = 0;
+    msgCountPerEP[i] = msgSizePerEP[i] = recvCountPerEP[i] = recvSizePerEP[i] =
+            extRecvCountPerEP[i] = extRecvSizePerEP[i] = 0;
   }
 }
 
@@ -768,12 +781,12 @@ void TraceSummary::resetCounters()
 void TraceSummary::setCounters()
 {
   int len = _entryTable.size() + 10;
-  msgSizePerEP = CkVec<long>(len);
-  msgCountPerEP = CkVec<long>(len);
-  recvSizePerEP = CkVec<long>(len);
-  recvCountPerEP = CkVec<long>(len);
-  extRecvSizePerEP = CkVec<long>(len);
-  extRecvCountPerEP = CkVec<long>(len);
+  msgSizePerEP = CkVec<unsigned long>(len);
+  msgCountPerEP = CkVec<unsigned long>(len);
+  recvSizePerEP = CkVec<unsigned long>(len);
+  recvCountPerEP = CkVec<unsigned long>(len);
+  extRecvSizePerEP = CkVec<unsigned long>(len);
+  extRecvCountPerEP = CkVec<unsigned long>(len);
   resetCounters();
 }
 
@@ -848,7 +861,7 @@ void TraceSummary::beginExecute(int event,int msgType,int ep,int srcPe, int mlen
       recvCountPerEP.resize(_entryTable.size() + 10);
       extRecvSizePerEP.resize(_entryTable.size() + 10);
       extRecvCountPerEP.resize(_entryTable.size() + 10);
-      for(int i = len; i < msgSizePerEP.size(); ++i) {
+      for(int i = 0; i < msgSizePerEP.size(); ++i) {
           msgSizePerEP[i] = msgCountPerEP[i] =
                   recvSizePerEP[i] = recvCountPerEP[i] =
                           extRecvSizePerEP[i] = extRecvCountPerEP[i] = 0;
@@ -1177,13 +1190,17 @@ void TraceSummary::creation(envelope *e, int epIdx, int num)
   msgCount += num;
   int len = msgSizePerEP.size();
   if(epIdx >= len) {
-    msgSizePerEP.resize(_entryTable.size() + 10);
-    msgCountPerEP.resize(_entryTable.size() + 10);
-    recvSizePerEP.resize(_entryTable.size() + 10);
-    recvCountPerEP.resize(_entryTable.size() + 10);
-    for(int i = len; i < msgSizePerEP.size(); ++i) {
-      msgSizePerEP[i] = msgCountPerEP[i] = recvSizePerEP[i] = recvCountPerEP[i] = 0;
-    }
+      msgSizePerEP.resize(_entryTable.size() + 10);
+      msgCountPerEP.resize(_entryTable.size() + 10);
+      recvSizePerEP.resize(_entryTable.size() + 10);
+      recvCountPerEP.resize(_entryTable.size() + 10);
+      extRecvSizePerEP.resize(_entryTable.size() + 10);
+      extRecvCountPerEP.resize(_entryTable.size() + 10);
+      for(int i = 0; i < msgSizePerEP.size(); ++i) {
+          msgSizePerEP[i] = msgCountPerEP[i] =
+          recvSizePerEP[i] = recvCountPerEP[i] =
+          extRecvSizePerEP[i] = extRecvCountPerEP[i] = 0;
+      }
   }
   msgSizePerEP[epIdx] += e->getTotalsize();
   msgCountPerEP[epIdx] += num;

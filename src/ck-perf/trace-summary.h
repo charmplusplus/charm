@@ -35,12 +35,12 @@ class BinEntry {
                  _recvSize(0), _recvCount(0),
                  _extRecvSize(0), _extRecvCount(0)
     {
-      _msgCountPerEP = CkVec<long>(_entryTable.size() + 10);
-      _msgSizePerEP = CkVec<long>(_entryTable.size() + 10);
-      _recvCountPerEP = CkVec<long>(_entryTable.size() + 10);
-      _recvSizePerEP = CkVec<long>(_entryTable.size() + 10);
-      _extRecvCountPerEP = CkVec<long>(_entryTable.size() + 10);
-      _extRecvSizePerEP = CkVec<long>(_entryTable.size() + 10);
+      _msgCountPerEP = CkVec<unsigned long>(_entryTable.size() + 10);
+      _msgSizePerEP = CkVec<unsigned long>(_entryTable.size() + 10);
+      _recvCountPerEP = CkVec<unsigned long>(_entryTable.size() + 10);
+      _recvSizePerEP = CkVec<unsigned long>(_entryTable.size() + 10);
+      _extRecvCountPerEP = CkVec<unsigned long>(_entryTable.size() + 10);
+      _extRecvSizePerEP = CkVec<unsigned long>(_entryTable.size() + 10);
       for(int i = 0; i < _msgCountPerEP.size(); ++i) {
         _msgCountPerEP[i] = _msgSizePerEP[i] =
                 _recvCountPerEP[i] = _recvSizePerEP[i] =
@@ -48,12 +48,12 @@ class BinEntry {
       }
     }
 
-    BinEntry(double t, double idleT, long msgSize, long msgCount,
-             CkVec<long> msgSizePerEP, CkVec<long> msgCountPerEP,
-             long recvSize, long recvCount,
-             CkVec<long> recvSizePerEP, CkVec<long> recvCountPerEP,
-             long extRecvSize, long extRecvCount,
-             CkVec<long> extRecvSizePerEP, CkVec<long> extRecvCountPerEP
+    BinEntry(double t, double idleT, unsigned long msgSize, unsigned long msgCount,
+             CkVec<unsigned long> msgSizePerEP, CkVec<unsigned long> msgCountPerEP,
+             unsigned long recvSize, unsigned long recvCount,
+             CkVec<unsigned long> recvSizePerEP, CkVec<unsigned long> recvCountPerEP,
+             unsigned long extRecvSize, unsigned long extRecvCount,
+             CkVec<unsigned long> extRecvSizePerEP, CkVec<unsigned long> extRecvCountPerEP
              ): _time(t), _idleTime(idleT),
                  _msgSize(msgSize), _msgCount(msgCount),
                  _recvSize(recvSize), _recvCount(recvCount),
@@ -62,12 +62,18 @@ class BinEntry {
     {
       if(_msgSizePerEP.size() == 0)
       {
-        _msgCountPerEP = CkVec<long>(msgSizePerEP.size());
-        _msgSizePerEP = CkVec<long>(msgSizePerEP.size());
-        _recvCountPerEP = CkVec<long>(msgSizePerEP.size());
-        _recvSizePerEP = CkVec<long>(msgSizePerEP.size());
-        _extRecvCountPerEP = CkVec<long>(msgSizePerEP.size());
-        _extRecvSizePerEP = CkVec<long>(msgSizePerEP.size());
+        _msgCountPerEP = CkVec<unsigned long>(msgSizePerEP.size());
+        _msgSizePerEP = CkVec<unsigned long>(msgSizePerEP.size());
+        _recvCountPerEP = CkVec<unsigned long>(msgSizePerEP.size());
+        _recvSizePerEP = CkVec<unsigned long>(msgSizePerEP.size());
+        _extRecvCountPerEP = CkVec<unsigned long>(msgSizePerEP.size());
+        _extRecvSizePerEP = CkVec<unsigned long>(msgSizePerEP.size());
+
+        for(int i = 0; i < _msgSizePerEP.size(); ++i) {
+            _msgSizePerEP[i] = _msgCountPerEP[i] =
+            _recvSizePerEP[i] = _recvCountPerEP[i] =
+            _extRecvSizePerEP[i] = _extRecvCountPerEP[i] = 0;
+        }
       }
       for(int i = 0; i < msgSizePerEP.size(); ++i) {
         _msgSizePerEP[i] = msgSizePerEP[i];
@@ -80,18 +86,18 @@ class BinEntry {
   }
     double &time() { return _time; }
     double &getIdleTime() { return _idleTime; }
-    long &getSize() { return _msgSize; }
-    long &getCount() {return _msgCount; }
-    CkVec<long> &getSizePerEP() { return _msgSizePerEP;}
-    CkVec<long> &getCountPerEP() {return _msgCountPerEP; }
-    long &getRecvSize() { return _recvSize; }
-    long &getRecvCount() { return _recvCount; }
-    CkVec<long> &getRecvSizePerEP() {return _recvSizePerEP; }
-    CkVec<long> &getRecvCountPerEP() {return _recvCountPerEP; }
-    long &getExtRecvSize() {return _extRecvSize;}
-    long &getExtRecvCount() {return _extRecvCount;}
-    CkVec<long> &getExtRecvSizePerEP() {return _extRecvSizePerEP; }
-    CkVec<long> &getExtRecvCountPerEP() {return _extRecvCountPerEP; }
+    unsigned long &getSize() { return _msgSize; }
+    unsigned long &getCount() {return _msgCount; }
+    CkVec<unsigned long> &getSizePerEP() { return _msgSizePerEP;}
+    CkVec<unsigned long> &getCountPerEP() {return _msgCountPerEP; }
+    unsigned long &getRecvSize() { return _recvSize; }
+    unsigned long &getRecvCount() { return _recvCount; }
+    CkVec<unsigned long> &getRecvSizePerEP() {return _recvSizePerEP; }
+    CkVec<unsigned long> &getRecvCountPerEP() {return _recvCountPerEP; }
+    unsigned long &getExtRecvSize() {return _extRecvSize;}
+    unsigned long &getExtRecvCount() {return _extRecvCount;}
+    CkVec<unsigned long> &getExtRecvSizePerEP() {return _extRecvSizePerEP; }
+    CkVec<unsigned long> &getExtRecvCountPerEP() {return _extRecvCountPerEP; }
     void write(FILE *fp);
     int  getU();
     int getUIdle();
@@ -99,18 +105,18 @@ class BinEntry {
   private:
     double _time;
     double _idleTime;
-    long _msgSize;
-    long _msgCount;
-    CkVec<long> _msgSizePerEP;
-    CkVec<long> _msgCountPerEP;
-    long _recvSize;
-    long _recvCount;
-    CkVec<long> _recvSizePerEP;
-    CkVec<long> _recvCountPerEP;
-    long _extRecvSize;
-    long _extRecvCount;
-    CkVec<long> _extRecvSizePerEP;
-    CkVec<long> _extRecvCountPerEP;
+    unsigned long _msgSize;
+    unsigned long _msgCount;
+    CkVec<unsigned long> _msgSizePerEP;
+    CkVec<unsigned long> _msgCountPerEP;
+    unsigned long _recvSize;
+    unsigned long _recvCount;
+    CkVec<unsigned long> _recvSizePerEP;
+    CkVec<unsigned long> _recvCountPerEP;
+    unsigned long _extRecvSize;
+    unsigned long _extRecvCount;
+    CkVec<unsigned long> _extRecvSizePerEP;
+    CkVec<unsigned long> _extRecvCountPerEP;
 };
 
 /// a phase entry for trace summary
@@ -264,12 +270,12 @@ class SumLogPool {
     void write(void) ;
     void writeEncoder(int numBins, int event);
     void writeSts(void);
-    void add(double time, double idleTime, long msgSize, long msgCount,
-             CkVec<long> msgSizePerEP, CkVec<long> msgCountPerEP,
-             long recvSize, long recvCount,
-             CkVec<long> recvSizePerEP, CkVec<long> recvCountPerEP,
-             long extRecvSize, long extRecvCount,
-             CkVec<long> extRecvSizePerEP, CkVec<long> extRecvCountPerEP,
+    void add(double time, double idleTime, unsigned long msgSize, unsigned long msgCount,
+             CkVec<unsigned long> msgSizePerEP, CkVec<unsigned long> msgCountPerEP,
+             unsigned long recvSize, unsigned long recvCount,
+             CkVec<unsigned long> recvSizePerEP, CkVec<unsigned long> recvCountPerEP,
+             unsigned long extRecvSize, unsigned long extRecvCount,
+             CkVec<unsigned long> extRecvSizePerEP, CkVec<unsigned long> extRecvCountPerEP,
              int pe);
     void setEp(int epidx, double time);
     void clearEps() {
@@ -337,18 +343,18 @@ class TraceSummary : public Trace {
     int inIdle;
     int inExec;
     int depth;
-    long msgSize;
-    long msgCount;
-    CkVec<long> msgSizePerEP;
-    CkVec<long> msgCountPerEP;
-    long recvSize;
-    long recvCount;
-    CkVec<long> recvSizePerEP;
-    CkVec<long> recvCountPerEP;
-    long extRecvSize;
-    long extRecvCount;
-    CkVec<long> extRecvSizePerEP;
-    CkVec<long> extRecvCountPerEP;
+    unsigned long msgSize;
+    unsigned long msgCount;
+    CkVec<unsigned long> msgSizePerEP;
+    CkVec<unsigned long> msgCountPerEP;
+    unsigned long recvSize;
+    unsigned long recvCount;
+    CkVec<unsigned long> recvSizePerEP;
+    CkVec<unsigned long> recvCountPerEP;
+    unsigned long extRecvSize;
+    unsigned long extRecvCount;
+    CkVec<unsigned long> extRecvSizePerEP;
+    CkVec<unsigned long> extRecvCountPerEP;
 
   public:
     TraceSummary(char **argv);
