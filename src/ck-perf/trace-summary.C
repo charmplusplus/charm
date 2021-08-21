@@ -533,7 +533,11 @@ void SumLogPool::writeEncoder(int numBins, int event) {
         } else if(event == 6) {
             vec = pool[k].getExtRecvSizePerEP();
         }
-        for(int l = 0; l < vec.size(); ++l) {
+
+        //need to take min as we store _entryTable + 10 elements
+        //and in the first few bins, entryTable.size() does not show all the elements
+        int len = std::min(vec.size(), _entryTable.size());
+        for(int l = 0; l < len; ++l) {
             unsigned long temp = vec[l];
             if(temp == prev_val) {
                 streak++;
@@ -545,7 +549,7 @@ void SumLogPool::writeEncoder(int numBins, int event) {
                 streak = 1;
             }
         }
-        for(int l = vec.size(); l < _entryTable.size(); ++l) {
+        for(int l = len; l < _entryTable.size(); ++l) {
             unsigned long temp = 0;
             if(temp == prev_val) {
                 streak++;
