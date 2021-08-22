@@ -2114,6 +2114,12 @@ CkChannel::CkChannel(int id_, const CProxyElement_NodeGroup &proxy) : CkChannel(
   peer_pe = proxy.ckGetGroupPe();
 }
 
+
+void CkChannel::send(const void* ptr, size_t size) {
+  CkAssert(id != -1 && peer_pe != -1);
+  CmiChannelSend(peer_pe, id, ptr, size, nullptr, send_counter++);
+}
+
 void CkChannel::send(const void* ptr, size_t size, const CkCallback& cb) {
   CkAssert(id != -1 && peer_pe != -1);
 #if CKCALLBACK_POOL
@@ -2123,6 +2129,10 @@ void CkChannel::send(const void* ptr, size_t size, const CkCallback& cb) {
   CkCallback* cb_copy = new CkCallback(cb);
 #endif
   CmiChannelSend(peer_pe, id, ptr, size, cb_copy, send_counter++);
+}
+
+void CkChannel::recv(const void* ptr, size_t size) {
+  CmiChannelRecv(id, ptr, size, nullptr, recv_counter++);
 }
 
 void CkChannel::recv(const void* ptr, size_t size, const CkCallback& cb) {
@@ -2138,13 +2148,15 @@ void CkChannel::recv(const void* ptr, size_t size, const CkCallback& cb) {
 
 void CkChannelHandler(void* data)
 {
-  CkCallback* cb = static_cast<CkCallback*>(data);
-  cb->send();
+  if (data) {
+    CkCallback* cb = static_cast<CkCallback*>(data);
+    cb->send();
 #if CKCALLBACK_POOL
-  CkpvAccess(cb_pool).free(cb);
+    CkpvAccess(cb_pool).free(cb);
 #else
-  delete cb;
+    delete cb;
 #endif
+  }
 }
 
 /****************************** End of Channel API ******************************/
