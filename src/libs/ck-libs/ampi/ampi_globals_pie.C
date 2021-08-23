@@ -237,6 +237,8 @@ static void pieglobalscleanupatexit()
 
 void AMPI_Node_Setup(int numranks)
 {
+  ampiUsingPieglobals = true;
+
   if (CmiMyNode() == 0 && !quietModeRequested)
     CmiPrintf("AMPI> Using pieglobals privatization method.\n");
 

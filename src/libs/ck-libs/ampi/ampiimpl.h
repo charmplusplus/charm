@@ -111,6 +111,7 @@ extern int quietModeRequested;
 #endif
 
 extern char * ampi_binary_path;
+extern bool ampiUsingPieglobals;
 
 #if AMPIMSGLOG
 #include "ckliststring.h"

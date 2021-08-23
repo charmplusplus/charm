@@ -27,6 +27,8 @@
 /* For MPI_Get_library_version */
 extern const char * const CmiCommitID;
 
+bool ampiUsingPieglobals = false;
+
 static CkDDT *getDDT() noexcept {
   return &getAmpiParent()->myDDT;
 }
