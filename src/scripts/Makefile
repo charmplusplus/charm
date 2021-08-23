@@ -509,8 +509,15 @@ hwloc-target: conv-autoconfig.h
     --without-x \
     HWLOC_FLAGS="$(HWLOC_CC_FLAGS)" \
     CFLAGS="$(HWLOC_CC_FLAGS)" \
+    CXXFLAGS="$(HWLOC_CXX_FLAGS)" \
     CC="$(HWLOC_CC)" \
+    CXX="$(HWLOC_CXX)" \
     CC_FOR_BUILD="$(HWLOC_CC)" \
+    CPP= \
+    CXXCPP= \
+    CPPFLAGS= \
+    LDFLAGS= \
+    LIBS= \
     > /dev/null || ( cat config.log ; exit 1 ) )
 	( $(MAKE) -C hwloc AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=: )
 	( cp -f hwloc/include/hwloc.h $(INC) )
