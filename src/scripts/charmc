@@ -1454,10 +1454,15 @@ fi
 
 if [ "$TLSGLOBALS" = "1" ]
 then
-    if [ "$CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS" != '1' ] && [ "$CMK_COMPILER" != 'clang' -o "$CMK_MACOSX" != '1' ]
+    if [[ "$CMK_SUPPORTS_TLSGLOBALS" = '0' ]]
+    then
+      echo "Error: -tlsglobals is not supported on $CMK_VDIR"
+      exit 1
+    elif [[ "$CMK_SUPPORTS_TLSGLOBALS" = '2' ]]
     then
       echo "Warning: -tlsglobals may not work with compilers that do not recognize -mno-tls-direct-seg-refs."
     fi
+
     if [ "$CMK_HAS_ELF_H" != '1' -a "$CMK_MACOSX" != '1' ]
     then
       echo "Warning: -tlsglobals requires elf.h"
@@ -1472,37 +1477,35 @@ then
 		exit 1
 	fi
 
-	LD_VERSION_TEXT="$($CMK_LD -Wl,--version,-v 2>/dev/null)"
-	if ! $(printf "$LD_VERSION_TEXT" | grep -q 'GNU ld')
+	if [[ "$CMK_SUPPORTS_SWAPGLOBALS" = '0' ]]
+	then
+		echo "Error: -swapglobals is not supported on this platform."
+		exit 1
+	elif [[ "$CMK_SUPPORTS_SWAPGLOBALS" = '2' ]]
 	then
 		echo "Warning: -swapglobals may not work with linkers other than GNU ld."
-	else
-		LD_VERSION="$(printf "$LD_VERSION_TEXT" | grep -Eo 'GNU ld (\([^)]*\) )?(version )?[-0-9._a-zA-Z]+' | awk '{print $NF}')"
-		LD_VERSION_MAJOR="$(printf $LD_VERSION | cut -d. -f1)"
-		LD_VERSION_MINOR="$(printf $LD_VERSION | cut -d. -f2 | cut -d- -f1)"
-		if [ "$LD_VERSION_MAJOR" -gt 2 ] || [ "$LD_VERSION_MAJOR" -eq 2 -a "$LD_VERSION_MINOR" -gt 23 ]
-		then
-			echo "Warning: -swapglobals may not work with GNU ld >= 2.24."
-			echo "For some versions, an experimental patch is available:"
-			echo 'https://charm.cs.illinois.edu/gerrit/gitweb?p=libbfd-patches.git;a=tree;f=swapglobals'
-		fi
+	elif [[ "$CMK_SUPPORTS_SWAPGLOBALS" = '3' ]]
+	then
+		echo "Warning: -swapglobals may not work with GNU ld >= 2.24."
+		echo "For some versions, an experimental patch is available:"
+		echo 'https://charm.cs.illinois.edu/gerrit/gitweb?p=libbfd-patches.git;a=tree;f=swapglobals'
 	fi
 
 	if [ "$CMK_SMP" = "1" ]
 	then
 		echo "Error: -swapglobals is not supported on SMP builds of Charm++/AMPI"
 		exit 1
-	else
-		swapo="$CHARMLIB/libglobal-swap.a"
-		if [ ! -r "$swapo" -o ! -s "$swapo" ]
-		then
-			echo "Error: global-swapping library $swapo missing--"
-			echo "  Is -swapglobals supported on this machine?"
-			exit 1
-		else
-			MIDDLE_LIBS=(-lglobal-swap "${MIDDLE_LIBS[@]}")
-		fi
 	fi
+
+	swapo="$CHARMLIB/libglobal-swap.a"
+	if [[ ! -r "$swapo" || ! -s "$swapo" ]]
+	then
+		echo "Error: global-swapping library $swapo missing--"
+		echo "  Is -swapglobals supported on this machine?"
+		exit 1
+	fi
+
+	MIDDLE_LIBS=(-lglobal-swap "${MIDDLE_LIBS[@]}")
 fi
 if [ "$SWAPGLOBALS" = "2" ]
 then

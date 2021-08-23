@@ -820,6 +820,7 @@ fi
 
 # Test for a flag tlsglobals sometimes depends on
 test_cxx "whether C++ compiler accepts -mno-tls-direct-seg-refs" "yes" "no" "-mno-tls-direct-seg-refs"
+CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS="$strictpass"
 if test $strictpass -eq 1
 then
     add_flag 'CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS="1"' "tlsglobals"
@@ -1516,34 +1517,6 @@ int main()
 EOT
 test_linkc "whether has __executable_start" "yes" "no" ""
 AC_DEFINE_UNQUOTED([CMK_HAS_EXECUTABLE_START], $pass, [whether has __executable_start])
-
-### test if switching TLS register ###
-if test $in64bit = 1
-then
-cat > $t <<EOT
-void switchTLS() {
-  void * m1, * m2;
-  asm volatile ("movq %%fs:0x0, %0\n\t"
-                "movq %1, %%fs:0x0\n\t"
-                : "=&r"(m1)
-                : "r"(m2));
-}
-EOT
-test_cxx "whether switching TLS register (64-bit) is supported" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_TLS_SWITCHING_X86_64, $strictpass, [Allows switching TLS on x86_64.])
-else
-cat > $t <<EOT
-void switchTLS() {
-  void * m1, * m2;
-  asm volatile ("movl %%gs:0x0, %0\n\t"
-                "movl %1, %%gs:0x0\n\t"
-                : "=&r"(m1)
-                : "r"(m2));
-}
-EOT
-test_cxx "whether switching TLS register (32-bit) is supported" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_TLS_SWITCHING_X86, $strictpass, [Allows switching TLS on x86.])
-fi
 
 ### test for dl_iterate_phdr ###
 
@@ -2533,10 +2506,54 @@ int main() {
 EOT
 test_cxx "whether has elf.h " "yes" "no" ""
 AC_DEFINE_UNQUOTED([CMK_HAS_ELF_H], $pass, [whether has elf.h])
-if test $pass -eq 1
+add_flag "CMK_HAS_ELF_H='$pass'" "elf.h"
+
+CMK_SUPPORTS_SWAPGLOBALS='0'
+CMK_SUPPORTS_TLSGLOBALS='0'
+if [[ "$CMK_MACOSX" = '1' -a "$CMK_VDIR" = "${CMK_VDIR%x86_64}x86_64" ]]
 then
-	add_flag "CMK_HAS_ELF_H='1'" "elf.h"
+  CMK_SUPPORTS_TLSGLOBALS='1'
+elif test $pass -eq 1
+then
+  # swapglobals
+  if [[ "$CMK_SMP" != '1' ]]
+  then
+    LD_VERSION_OUTPUT="$($CMK_LD -Wl,--version,-v 2>/dev/null)"
+    if ! $(printf "$LD_VERSION_OUTPUT" | grep -q 'GNU ld')
+    then
+      CMK_SUPPORTS_SWAPGLOBALS='2'
+    else
+      LD_VERSION="$(printf "$LD_VERSION_OUTPUT" | grep -Eo 'GNU ld (\([[^)]]*\) )?(version )?[[-0-9._a-zA-Z]]+' | awk '{print $NF}')"
+      LD_VERSION_MAJOR="$(printf $LD_VERSION | cut -d. -f1)"
+      LD_VERSION_MINOR="$(printf $LD_VERSION | cut -d. -f2 | cut -d- -f1)"
+      if [[ "$LD_VERSION_MAJOR" -gt 2 ]] || [[ "$LD_VERSION_MAJOR" -eq 2 -a "$LD_VERSION_MINOR" -gt 23 ]]
+      then
+        CMK_SUPPORTS_SWAPGLOBALS='3'
+      else
+        CMK_SUPPORTS_SWAPGLOBALS='1'
+      fi
+    fi
+  fi
+
+  # tlsglobals
+  if [[ "$CMK_VDIR" = "${CMK_VDIR%x86_64}x86_64" -o "$CMK_VDIR" = "${CMK_VDIR%i386}i386" ]]
+  then
+    if [[ "$CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS" != '1' -a "$CMK_COMPILER" != 'clang' ]]
+    then
+      CMK_SUPPORTS_TLSGLOBALS='2'
+    else
+      CMK_SUPPORTS_TLSGLOBALS='1'
+    fi
+  fi
 fi
+
+AC_DEFINE_UNQUOTED(CMK_SUPPORTS_SWAPGLOBALS, $CMK_SUPPORTS_SWAPGLOBALS, [whether supports swapglobals])
+add_flag "CMK_SUPPORTS_SWAPGLOBALS=$CMK_SUPPORTS_SWAPGLOBALS" 'swapglobals'
+add_make_flag "CMK_SUPPORTS_SWAPGLOBALS:=$CMK_SUPPORTS_SWAPGLOBALS" 'swapglobals'
+AC_DEFINE_UNQUOTED(CMK_SUPPORTS_TLSGLOBALS, $CMK_SUPPORTS_TLSGLOBALS, [whether supports tlsglobals])
+add_flag "CMK_SUPPORTS_TLSGLOBALS=$CMK_SUPPORTS_TLSGLOBALS" 'tlsglobals'
+add_make_flag "CMK_SUPPORTS_TLSGLOBALS:=$CMK_SUPPORTS_TLSGLOBALS" 'tlsglobals'
+
 
 #### test if has Multiprocessing.h for apple ####
 cat > $t <<EOT
@@ -2970,10 +2987,8 @@ int main(void)
 }
 EOT
 test_linkc "whether OpenMP is supported" "yes" "no" "$CMK_C_OPENMP"
-if test $pass -eq 1
-then
-	add_flag "CMK_HAS_OPENMP='1'" "OpenMP"
-fi
+add_flag "CMK_HAS_OPENMP='$pass'" "OpenMP"
+add_make_flag "CMK_HAS_OPENMP:=$pass" "OpenMP"
 
 ### check for Lustre FS availability ###
 cat > $tc <<EOT
@@ -2998,6 +3013,8 @@ fi
 
 eval `"$CHARMBIN/charmc" $OPTS -print-building-blocks -standalone`
 add_make_flag "HWLOC_CC:=$(get_full_command_name "$CHARM_CC")" "hwloc"
+add_make_flag "HWLOC_CXX:=$(get_full_command_name "$CHARM_CXX")" "hwloc"
 add_make_flag "HWLOC_CC_FLAGS:=$CHARM_CC_FLAGS" "hwloc"
+add_make_flag "HWLOC_CXX_FLAGS:=$CHARM_CXX_FLAGS" "hwloc"
 
 AC_OUTPUT
