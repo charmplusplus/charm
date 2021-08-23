@@ -108,6 +108,7 @@ public:
   bool stream_created;
 
   CkChannel channel;
+  CkFuture* futures;
 
   Block() {
     memory_allocated = false;
@@ -121,6 +122,7 @@ public:
       hapiCheck(cudaFreeHost(h_remote_data));
       hapiCheck(cudaFree(d_local_data));
       hapiCheck(cudaFree(d_remote_data));
+      delete futures;
     }
 
     if (stream_created) cudaStreamDestroy(stream);
@@ -140,11 +142,13 @@ public:
       hapiCheck(cudaFreeHost(h_remote_data));
       hapiCheck(cudaFree(d_local_data));
       hapiCheck(cudaFree(d_remote_data));
+      delete futures;
     }
     hapiCheck(cudaMallocHost(&h_local_data, max_size));
     hapiCheck(cudaMallocHost(&h_remote_data, max_size));
     hapiCheck(cudaMalloc(&d_local_data, max_size));
     hapiCheck(cudaMalloc(&d_remote_data, max_size));
+    futures = new CkFuture[window_size];
     memory_allocated = true;
 
     // Create CUDA stream
@@ -168,22 +172,35 @@ public:
       int n_iters = (cur_size > LARGE_MESSAGE_SIZE) ? n_iters_large : n_iters_reg;
 
       for (int iter = 0; iter < warmup_iters + n_iters; iter++) {
+        for (int i = 0; i < window_size; i++) {
+          futures[i] = CkCreateFuture();
+        }
         start_time = CkWallTimer();
 
         if (thisIndex == 0) {
           for (int i = 0; i < window_size; i++) {
-            channel.send(d_local_data, cur_size);
+            channel.send(d_local_data, cur_size, &futures[i]);
+          }
+          for (int i = 0; i < window_size; i++) {
+            CkWaitFuture(futures[i]);
           }
           channel.recv(d_remote_data, cur_size, CkCallbackResumeThread());
         } else {
           for (int i = 0; i < window_size; i++) {
-            channel.recv(d_remote_data, cur_size);
+            channel.recv(d_remote_data, cur_size, &futures[i]);
+          }
+          for (int i = 0; i < window_size; i++) {
+            CkWaitFuture(futures[i]);
           }
           channel.send(d_local_data, cur_size, CkCallbackResumeThread());
         }
 
         if (iter >= warmup_iters) {
           times[iter-warmup_iters] = CkWallTimer() - start_time;
+        }
+
+        for (int i = 0; i < window_size; i++) {
+          CkReleaseFuture(futures[i]);
         }
       }
 
@@ -211,6 +228,9 @@ public:
         if (thisIndex == 0) CkPrintf("Validation passed\n");
       }
     }
+
+    // Reduce back to main
+    contribute(CkCallback(CkReductionTarget(Main, terminate), main_proxy));
   }
 };
 

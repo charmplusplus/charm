@@ -36,7 +36,7 @@ class Main : public CBase_Main {
 
     // Process command line arguments
     int c;
-    while ((c = getopt(m->argc, m->argv, "s:x:i:l:w:d:")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "s:x:i:l:w:d:z")) != -1) {
       switch (c) {
         case 's':
           min_size = atoi(optarg);
@@ -55,6 +55,9 @@ class Main : public CBase_Main {
           break;
         case 'd':
           window_size = atoi(optarg);
+          break;
+        case 'z':
+          zerocopy = true;
           break;
         default:
           CkPrintf("Unknown command line argument detected");
