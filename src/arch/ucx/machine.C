@@ -83,7 +83,7 @@ typedef struct UcxRequest
     int            idx;
     int            completed;
     CommType       type;
-    void*          charm_cb;
+    void*          metadata;
 #if CMK_ONESIDED_IMPL
     void           *ncpyAck;
     ucp_rkey_h     rkey;
@@ -120,7 +120,7 @@ typedef struct UcxPendingRequest
     ucp_tag_recv_callback_t recv_cb;
     ucp_tag_t               mask;
     CommType                type;
-    void*                   charm_cb;
+    void*                   metadata;
 #if CMK_CUDA
     DeviceRdmaOp*           device_op;
 #endif
@@ -171,10 +171,10 @@ inline void UcxDeviceRecvHandler(DeviceRdmaOp* op, CommType type) {
 }
 #endif
 
-inline void UcxChannelHandler(CommType type, void* cb) {
+inline void UcxChannelHandler(CommType type, void* meta) {
   switch (type) {
     case COMM_TYPE_CHARM:
-      CmiChannelHandler(cb);
+      CmiChannelHandler(meta);
       break;
     // TODO: AMPI and Charm4py
     default:
@@ -189,7 +189,7 @@ void UcxRequestInit(void *request)
     req->msgBuf     = NULL;
     req->idx        = -1;
     req->completed  = 0;
-    req->charm_cb   = NULL;
+    req->metadata   = NULL;
 #if CMK_CUDA
     req->device_op  = NULL;
 #endif
@@ -676,7 +676,7 @@ static inline int ProcessTxQueue()
             CmiEnforce(!UCS_PTR_IS_ERR(status_ptr));
             CmiEnforce(UCS_PTR_STATUS(status_ptr) == UCS_OK);
             if (req->op == UCX_CHANNEL_SEND_OP) {
-              UcxChannelHandler(req->type, req->charm_cb);
+              UcxChannelHandler(req->type, req->metadata);
             }
           } else {
             // Callback function will be invoked once send completes
@@ -684,7 +684,7 @@ static inline int ProcessTxQueue()
             store_req->msgBuf = req->msgBuf;
             store_req->type = req->type;
             if (req->op == UCX_CHANNEL_SEND_OP) {
-              store_req->charm_cb = req->charm_cb;
+              store_req->metadata = req->metadata;
             }
           }
         } else if (req->op == UCX_DEVICE_RECV_OP
@@ -705,7 +705,7 @@ static inline int ProcessTxQueue()
               CmiAbort("Unsupported op: UCX_DEVICE_RECV_OP\n");
 #endif
             } else if (req->op == UCX_CHANNEL_RECV_OP) {
-              UcxChannelHandler(req->type, req->charm_cb);
+              UcxChannelHandler(req->type, req->metadata);
             } else {
               CmiAbort("Unsupported op: %d\n", req->op);
             }
@@ -719,7 +719,7 @@ static inline int ProcessTxQueue()
             ret_req->msgBuf = req->msgBuf;
             ret_req->type = req->type;
             if (req->op == UCX_CHANNEL_RECV_OP) {
-              ret_req->charm_cb = req->charm_cb;
+              ret_req->metadata = req->metadata;
             }
           }
         } else {
@@ -949,12 +949,12 @@ void UcxChannelSendCompleted(void* request, ucs_status_t status)
   CmiEnforce(status == UCS_OK);
   UcxRequest* req = (UcxRequest*)request;
 
-  UcxChannelHandler(req->type, req->charm_cb);
+  UcxChannelHandler(req->type, req->metadata);
 
   UCX_REQUEST_FREE(req);
 }
 
-void LrtsChannelSend(int dest_pe, int id, const void*& ptr, size_t size, void* cb, uint64_t tag) {
+void LrtsChannelSend(int dest_pe, int id, const void*& ptr, size_t size, void* metadata, uint64_t tag) {
   CommType type = COMM_TYPE_CHARM; // TODO: AMPI and Charm4py
   tag = (tag << UCX_TAG_ID_BITS) | id;
   tag = (tag << UCX_TAG_MSG_BITS) | UCX_MSG_TAG_CHANNEL;
@@ -967,7 +967,7 @@ void LrtsChannelSend(int dest_pe, int id, const void*& ptr, size_t size, void* c
   req->dNode    = CmiNodeOf(dest_pe);
   req->send_cb  = UcxChannelSendCompleted;
   req->type     = type;
-  req->charm_cb = cb;
+  req->metadata = metadata;
 
   PCQueuePush(ucxCtx.txQueue, (char *)req);
 #else
@@ -980,13 +980,13 @@ void LrtsChannelSend(int dest_pe, int id, const void*& ptr, size_t size, void* c
     // Either send was complete or error
     CmiEnforce(!UCS_PTR_IS_ERR(status_ptr));
     CmiEnforce(UCS_PTR_STATUS(status_ptr) == UCS_OK);
-    UcxChannelHandler(type, cb);
+    UcxChannelHandler(type, metadata);
   } else {
     // Callback function will be invoked once send completes
     UcxRequest* req = (UcxRequest*)status_ptr;
     req->msgBuf   = (void*)ptr;
     req->type     = type;
-    req->charm_cb = cb;
+    req->metadata = metadata;
   }
 #endif // CMK_SMP
 }
@@ -1001,7 +1001,7 @@ void UcxChannelRecvCompleted(void* request, ucs_status_t status,
 
   if (req->msgBuf != NULL) {
     // Invoke handler since data transfer is complete
-    UcxChannelHandler(req->type, req->charm_cb);
+    UcxChannelHandler(req->type, req->metadata);
     UCX_REQUEST_FREE(req);
   } else {
     // Request was completed immediately
@@ -1010,7 +1010,7 @@ void UcxChannelRecvCompleted(void* request, ucs_status_t status,
   }
 }
 
-void LrtsChannelRecv(int id, const void*& ptr, size_t size, void* cb, uint64_t tag) {
+void LrtsChannelRecv(int id, const void*& ptr, size_t size, void* metadata, uint64_t tag) {
   CommType type = COMM_TYPE_CHARM; // TODO: AMPI and Charm4py
   tag = (tag << UCX_TAG_ID_BITS) | id;
   tag = (tag << UCX_TAG_MSG_BITS) | UCX_MSG_TAG_CHANNEL;
@@ -1023,7 +1023,7 @@ void LrtsChannelRecv(int id, const void*& ptr, size_t size, void* cb, uint64_t t
   req->mask      = UCX_MSG_TAG_MASK_FULL;
   req->recv_cb   = UcxChannelRecvCompleted;
   req->type      = type;
-  req->charm_cb  = cb;
+  req->metadata  = metadata;
 
   PCQueuePush(ucxCtx.txQueue, (char *)req);
 #else
@@ -1036,14 +1036,14 @@ void LrtsChannelRecv(int id, const void*& ptr, size_t size, void* cb, uint64_t t
   UcxRequest* req = (UcxRequest*)status_ptr;
   if (req->completed) {
     // Recv was completed immediately
-    UcxChannelHandler(type, cb);
+    UcxChannelHandler(type, metadata);
     UCX_REQUEST_FREE(req);
   } else {
     // Recv wasn't completed immediately, recv_cb will be invoked
     // sometime later
     req->msgBuf   = (void*)ptr;
     req->type     = type;
-    req->charm_cb = cb;
+    req->metadata = metadata;
   }
 #endif // CMK_SMP
 }

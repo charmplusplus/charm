@@ -485,10 +485,17 @@ public:
   int getID() { return id; }
   int getPeerPe() { return peer_pe; }
 
-  void send(const void* ptr, size_t size);
+  void send(const void* ptr, size_t size, CkFuture* fut);
   void send(const void* ptr, size_t size, const CkCallback& cb);
-  void recv(const void* ptr, size_t size);
+  void recv(const void* ptr, size_t size, CkFuture* fut);
   void recv(const void* ptr, size_t size, const CkCallback& cb);
+};
+
+struct CkChannelMetadata {
+  CkCallback* cb;
+  CkFuture* fut;
+
+  CkChannelMetadata() : cb(nullptr), fut(nullptr) {}
 };
 
 void CkChannelHandler(void* data);

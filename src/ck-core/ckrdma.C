@@ -2114,49 +2114,70 @@ CkChannel::CkChannel(int id_, const CProxyElement_NodeGroup &proxy) : CkChannel(
   peer_pe = proxy.ckGetGroupPe();
 }
 
-
-void CkChannel::send(const void* ptr, size_t size) {
+void CkChannel::send(const void* ptr, size_t size, CkFuture* fut) {
   CkAssert(id != -1 && peer_pe != -1);
-  CmiChannelSend(peer_pe, id, ptr, size, nullptr, send_counter++);
+  CkChannelMetadata* metadata = new CkChannelMetadata();
+  metadata->fut = fut;
+  CmiChannelSend(peer_pe, id, ptr, size, metadata, send_counter++);
 }
 
 void CkChannel::send(const void* ptr, size_t size, const CkCallback& cb) {
   CkAssert(id != -1 && peer_pe != -1);
+  CkChannelMetadata* metadata = new CkChannelMetadata();
 #if CKCALLBACK_POOL
-  CkCallback* cb_copy = CkpvAccess(cb_pool).alloc();
-  new (cb_copy) CkCallback(cb);
+  metadata->cb = CkpvAccess(cb_pool).alloc();
+  new (metadata->cb) CkCallback(cb);
 #else
-  CkCallback* cb_copy = new CkCallback(cb);
+  metadata->cb = new CkCallback(cb);
 #endif
-  CmiChannelSend(peer_pe, id, ptr, size, cb_copy, send_counter++);
+  CmiChannelSend(peer_pe, id, ptr, size, metadata, send_counter++);
 }
 
-void CkChannel::recv(const void* ptr, size_t size) {
-  CmiChannelRecv(id, ptr, size, nullptr, recv_counter++);
+void CkChannel::recv(const void* ptr, size_t size, CkFuture* fut) {
+  CkAssert(id != -1 && peer_pe != -1);
+  CkChannelMetadata* metadata = new CkChannelMetadata();
+  metadata->fut = fut;
+  CmiChannelRecv(id, ptr, size, metadata, recv_counter++);
 }
 
 void CkChannel::recv(const void* ptr, size_t size, const CkCallback& cb) {
   CkAssert(id != -1 && peer_pe != -1);
+  CkChannelMetadata* metadata = new CkChannelMetadata();
 #if CKCALLBACK_POOL
-  CkCallback* cb_copy = CkpvAccess(cb_pool).alloc();
-  new (cb_copy) CkCallback(cb);
+  metadata->cb = CkpvAccess(cb_pool).alloc();
+  new (metadata->cb) CkCallback(cb);
 #else
-  CkCallback* cb_copy = new CkCallback(cb);
+  metadata->cb = new CkCallback(cb);
 #endif
-  CmiChannelRecv(id, ptr, size, cb_copy, recv_counter++);
+  CmiChannelRecv(id, ptr, size, metadata, recv_counter++);
 }
 
 void CkChannelHandler(void* data)
 {
-  if (data) {
-    CkCallback* cb = static_cast<CkCallback*>(data);
-    cb->send();
+  CkChannelMetadata* metadata = static_cast<CkChannelMetadata*>(data);
+  CkAssert(metadata);
+
+  // Invoke Charm++ callback
+  if (metadata->cb) {
+    metadata->cb->send();
 #if CKCALLBACK_POOL
-    CkpvAccess(cb_pool).free(cb);
+    CkpvAccess(cb_pool).free(metadata->cb);
 #else
-    delete cb;
+    delete metadata->cb;
 #endif
   }
+
+  // Flag request as complete
+  if (metadata->fut) {
+    CkMarshallMsg* msg = CkAllocateMarshallMsg(sizeof(bool), NULL);
+    PUP::toMem p((void*)msg->msgBuf);
+    int value = true;
+    p | value;
+    CkSendToFuture(*metadata->fut, msg);
+  }
+
+  // Delete metadata object
+  delete metadata;
 }
 
 /****************************** End of Channel API ******************************/
