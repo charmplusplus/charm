@@ -461,13 +461,17 @@ void CmiPushPE(int rank,void *msg) {
     }
 #endif
 
+    if (rank == CmiMyRank()) {
+        CmiSendSelf((char*)msg);
+    } else {
 #if CMK_MACH_SPECIALIZED_QUEUE
-    LrtsSpecializedQueuePush(rank, msg);
+        LrtsSpecializedQueuePush(rank, msg);
 #elif CMK_SMP_MULTIQ
-    CMIQueuePush(cs->recv[CmiGetState()->myGrpIdx], (char *)msg);
+        CMIQueuePush(cs->recv[CmiGetState()->myGrpIdx], (char *)msg);
 #else
-    CMIQueuePush(cs->recv,(char*)msg);
+        CMIQueuePush(cs->recv,(char*)msg);
 #endif
+    }
 
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
   if (_Cmi_sleepOnIdle)
