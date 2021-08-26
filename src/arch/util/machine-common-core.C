@@ -451,19 +451,20 @@ extern "C" void CmiPushImmediateMsg(void *);
 void CmiPushPE(int rank,void *msg) {
     CmiState cs = CmiGetStateN(rank);
     MACHSTATE2(3,"Pushing message into rank %d's queue %p{",rank, cs->recv);
-#if CMK_IMMEDIATE_MSG
-    if (CmiIsImmediate(msg)) {
-        MACHSTATE1(3, "[%p] Push Immediate Message begin{",CmiGetState());
-        CMI_DEST_RANK(msg) = rank;
-        CmiPushImmediateMsg(msg);
-        MACHSTATE1(3, "[%p] Push Immediate Message end}",CmiGetState());
-        return;
-    }
-#endif
 
     if (rank == CmiMyRank()) {
         CmiSendSelf((char*)msg);
     } else {
+#if CMK_IMMEDIATE_MSG
+        if (CmiIsImmediate(msg)) {
+            MACHSTATE1(3, "[%p] Push Immediate Message begin{",CmiGetState());
+            CMI_DEST_RANK(msg) = rank;
+            CmiPushImmediateMsg(msg);
+            MACHSTATE1(3, "[%p] Push Immediate Message end}",CmiGetState());
+            return;
+        }
+#endif
+
 #if CMK_MACH_SPECIALIZED_QUEUE
         LrtsSpecializedQueuePush(rank, msg);
 #elif CMK_SMP_MULTIQ
