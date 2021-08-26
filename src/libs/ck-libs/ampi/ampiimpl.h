@@ -1,6 +1,15 @@
 #ifndef _AMPIIMPL_H
 #define _AMPIIMPL_H
 
+#ifndef __STDC_FORMAT_MACROS
+# define __STDC_FORMAT_MACROS
+#endif
+#ifndef __STDC_LIMIT_MACROS
+# define __STDC_LIMIT_MACROS
+#endif
+#include <stdint.h>
+#include <inttypes.h>
+
 #include <string.h> /* for strlen */
 #include <algorithm>
 #include <numeric>
@@ -102,6 +111,7 @@ extern int quietModeRequested;
 #endif
 
 extern char * ampi_binary_path;
+extern bool ampiUsingPieglobals;
 
 #if AMPIMSGLOG
 #include "ckliststring.h"

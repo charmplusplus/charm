@@ -18,6 +18,7 @@ VARIANTS := \
   roseomptlsglobals \
   fsglobals \
   pipglobals \
+  pieglobals \
 
 PHONIES := \
   everything \
@@ -36,6 +37,9 @@ ifeq (1,$(CMK_SUPPORTS_FSGLOBALS))
 endif
 ifeq (1,$(CMK_SUPPORTS_PIPGLOBALS))
   TARGETS += pipglobals
+endif
+ifeq (1,$(CMK_SUPPORTS_PIEGLOBALS))
+  TARGETS += pieglobals
 endif
 
 $(foreach i,$(VARIANTS),$(eval LANGUAGES_$i := $(LANGUAGES)))
@@ -57,6 +61,7 @@ FEATURES_tlsglobals_cxx := threadlocalvars staticvars sharedlib migration
 FEATURES_roseomptlsglobals_cxx := threadlocalvars staticvars sharedlib migration
 FEATURES_fsglobals_cxx := globalvars staticvars
 FEATURES_pipglobals_cxx := globalvars staticvars sharedlib
+FEATURES_pieglobals_cxx := globalvars staticvars sharedlib migration
 
 
 # Universal settings
