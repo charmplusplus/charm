@@ -21,6 +21,8 @@
 #include "ampi.h"
 #include "ddt.h"
 #include "charm++.h"
+#include "tcharm.h"
+#include "tcharmc.h"
 
 #if CMK_AMPI_WITH_ROMIO
 # include "mpio_globals.h"
@@ -317,6 +319,10 @@ PUPfunctionpointer(MPI_User_function*)
  * OpStruct's are used to lookup an MPI_User_function* and check its commutativity.
  * They are also used to create AmpiOpHeader's, which are transmitted in reductions
  * that are user-defined or else lack an equivalent Charm++ reducer type.
+ *
+ * Note: when running with PIEglobals, func is stored as its offset from the rank's
+ *       base address, so that the real function can be looked up relative to any
+ *       rank's base address via ampiPeMgr.
  */
 class OpStruct {
  public:
@@ -325,12 +331,24 @@ class OpStruct {
  private:
   bool isValid;
 
+  MPI_User_function *createUserFunc(MPI_User_function *f) noexcept {
+    if (ampiUsingPieglobals) { // handle PIEglobals code relocation:
+      const CthThread th = TCharm::get()->getThread();
+      CmiIsomallocContext ctx = CmiIsomallocGetThreadContext(th);
+      const CmiIsomallocRegion heap = CmiIsomallocContextGetUsedExtent(ctx);
+      char *basePtr = (char *)heap.start;
+      return (MPI_User_function *)((char *)f - basePtr);
+    } else {
+      return f;
+    }
+  }
+
  public:
   OpStruct() = default;
-  OpStruct(MPI_User_function* f) noexcept : func(f), isCommutative(true), isValid(true) {}
-  OpStruct(MPI_User_function* f, bool c) noexcept : func(f), isCommutative(c), isValid(true) {}
+  OpStruct(MPI_User_function* f) noexcept : func(createUserFunc(f)), isCommutative(true), isValid(true) {}
+  OpStruct(MPI_User_function* f, bool c) noexcept : func(createUserFunc(f)), isCommutative(c), isValid(true) {}
   void init(MPI_User_function* f, bool c) noexcept {
-    func = f;
+    func = createUserFunc(f);
     isCommutative = c;
     isValid = true;
   }
@@ -1158,9 +1176,6 @@ inline std::vector<int> rangeExclOp(int n, int ranges[][3], const std::vector<in
   *flag = MPI_SUCCESS;
   return exclOp(ranks.size(), &ranks[0], vec);
 }
-
-#include "tcharm.h"
-#include "tcharmc.h"
 
 #include "ampi.decl.h"
 #include "charm-api.h"
@@ -2485,16 +2500,7 @@ class ampiParent final : public CBase_ampiParent {
       return userOps[opIdx].isCommutative;
     }
   }
-  inline MPI_User_function* op2User_function(MPI_Op op) const noexcept {
-    if (opIsPredefined(op)) {
-      return predefinedOps[op];
-    }
-    else {
-      int opIdx = op - 1 - AMPI_MAX_PREDEFINED_OP;
-      CkAssert(opIdx < userOps.size());
-      return userOps[opIdx].func;
-    }
-  }
+  MPI_User_function* op2User_function(MPI_Op op) const noexcept;
   inline AmpiOpHeader op2AmpiOpHeader(MPI_Op op, MPI_Datatype type, int count) const noexcept {
     if (opIsPredefined(op)) {
       int size = myDDT.getType(type)->getSize(count);
