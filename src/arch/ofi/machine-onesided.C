@@ -1,4 +1,4 @@
-struct fid_mr* registerDirectMemory(void *info, const void *addr, int size) {
+void registerDirectMemory(void *info, const void *addr, int size) {
   CmiOfiRdmaPtr_t *rdmaInfo = (CmiOfiRdmaPtr_t *)info;
   uint64_t requested_key = 0;
   int ret;
