@@ -76,6 +76,7 @@ my $x86;
 my $amd64;
 my $ppc;
 my $arm7;
+my $arm8;
 # Determine architecture (x86, ppc, ...)
 if($cpu =~ m/i[0-9]86/){
   $x86 = 1;
@@ -85,7 +86,9 @@ if($cpu =~ m/i[0-9]86/){
   $ppc = 1;
 } elsif($cpu =~ m/ppc*/){
   $ppc = 1;
-} elsif($cpu =~ m/arm7/){
+} elsif($cpu =~ m/aarch64*/ || $cpu =~ m/arm64*/){
+  $arm8 = 1;
+} elsif($cpu =~ m/arm7/ || $cpu =~ m/armv7*/ || $cpu =~ m/armv6*/){
   $arm7 = 1;
 }
 
@@ -341,22 +344,18 @@ if($arch eq ""){
 		$arch = $arch . "-x86_64";
 	  } elsif($ppc){
 		$arch = $arch . "-ppc64le";
+	  } elsif($arm8){
+	  	$arch = $arch . "-arm8";
 	  } elsif($arm7){
 	  	$arch = $arch . "-arm7";
 	  }
-}
-
-# Fixup $arch to match the inconsistent directories in src/archs
-
-if($arch eq "netlrts-darwin"){
-	$arch = "netlrts-darwin-x86_64";
 }
 
 
 #================ Choose SMP/PXSHM =================================
 
 # find what options are available
-my $opts = `$dirname/build charm++ $arch help 2>&1 | grep "Supported options"`;
+my $opts = `$dirname/buildold charm++ $arch help 2>&1 | grep "Supported options"`;
 $opts =~ m/Supported options: (.*)/;
 $opts = $1;
 
