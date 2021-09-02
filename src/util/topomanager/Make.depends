@@ -7,7 +7,7 @@ TopoManager.o: TopoManager.C TopoManager.h topomanager_config.h \
  ../../tmp/conv-qd.h ../../tmp/conv-random.h ../../tmp/conv-lists.h \
  ../../tmp/conv-trace.h ../../tmp/persistent.h ../../tmp/debug-conv.h \
  ../../tmp/partitioning_strategies.h
-	$(CHARMC) -I../../tmp -o TopoManager.o TopoManager.C
+	$(CHARMC) -I../../tmp -o TopoManager.o -c TopoManager.C
 CrayNid.o: CrayNid.c topomanager_config.h ../../tmp/converse.h \
  ../../tmp/conv-config.h ../../tmp/conv-autoconfig.h \
  ../../tmp/conv-common.h ../../tmp/conv-mach.h ../../tmp/conv-mach-opt.h \
@@ -15,7 +15,7 @@ CrayNid.o: CrayNid.c topomanager_config.h ../../tmp/converse.h \
  ../../tmp/conv-cpm.h ../../tmp/converse.h ../../tmp/conv-cpath.h \
  ../../tmp/conv-qd.h ../../tmp/conv-random.h ../../tmp/conv-lists.h \
  ../../tmp/conv-trace.h ../../tmp/persistent.h ../../tmp/debug-conv.h
-	$(CHARMC) -I../../tmp -o CrayNid.o CrayNid.c
+	$(CHARMC) -I../../tmp -o CrayNid.o -c CrayNid.c
 BGQTorus.o: BGQTorus.C BGQTorus.h topomanager_config.h \
  ../../tmp/converse.h ../../tmp/conv-config.h ../../tmp/conv-autoconfig.h \
  ../../tmp/conv-common.h ../../tmp/conv-mach.h ../../tmp/conv-mach-opt.h \
@@ -23,4 +23,4 @@ BGQTorus.o: BGQTorus.C BGQTorus.h topomanager_config.h \
  ../../tmp/conv-cpm.h ../../tmp/converse.h ../../tmp/conv-cpath.h \
  ../../tmp/conv-qd.h ../../tmp/conv-random.h ../../tmp/conv-lists.h \
  ../../tmp/conv-trace.h ../../tmp/persistent.h ../../tmp/debug-conv.h
-	$(CHARMC) -I../../tmp -o BGQTorus.o BGQTorus.C
+	$(CHARMC) -I../../tmp -o BGQTorus.o -c BGQTorus.C
