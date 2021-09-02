@@ -369,7 +369,16 @@ class Partition : public Strategy<O, P, S>
   void solve(std::vector<O>& objs, std::vector<P>& procs, S& solution, bool objsSorted)
   {
     static_assert(O::isPosition, "Partition must be used with position objects");
-    for (const auto& o : objs) solution.assign(o, o.oldPe);
+
+    for (const auto& o : objs)
+    {
+      CkPrintf("%d -", o.id);
+      for (const auto& coordinate : o.position)
+      {
+        CkPrintf(" %f", coordinate);
+      }
+      CkPrintf("\n");
+    }
   }
 };
 
