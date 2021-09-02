@@ -81,7 +81,7 @@ public:
 
   inline void setPosition(const std::vector<LBRealType>& pos)
   {
-    position = pos;
+    data.position = pos;
   }
 
   inline LDOMHandle &parentOM() { return data.handle.omhandle; }
@@ -113,7 +113,6 @@ private:
 //  bool registered;
   double startWTime;             // needs double precision
   LBRealType lastWallTime;
-  std::vector<LBRealType> position;
 #if CMK_LB_CPUTIMER
   double startCTime;
   LBRealType lastCpuTime;

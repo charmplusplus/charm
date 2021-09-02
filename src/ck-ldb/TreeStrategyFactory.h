@@ -19,7 +19,8 @@ namespace TreeStrategy
   STRATEGY(RefineB, false)         \
   STRATEGY(Random, false)          \
   STRATEGY(Dummy, false)           \
-  STRATEGY(Rotate, false)
+  STRATEGY(Rotate, false)          \
+  STRATEGY(Partition, false)
 
 #define STRINGIFYLB(_name, _) #_name,
 const auto LBNames = {FOREACH_STRATEGY(STRINGIFYLB)};

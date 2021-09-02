@@ -6,6 +6,7 @@ module TreeLevel {
     float speeds[];
     unsigned int obj_start[];
     float oloads[];
+    float positions[];
     unsigned int order[];
   };
 

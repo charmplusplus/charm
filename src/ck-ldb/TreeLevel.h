@@ -5,6 +5,7 @@
 #include "TreeLB.h"
 #include "TreeStrategyBase.h"
 #include "TreeStrategyFactory.h"
+#include <algorithm>
 #include <cmath>
 #include <limits>  // std::numeric_limits
 
@@ -30,6 +31,7 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
  public:
   unsigned int nObjs;  // num objs in this msg
   unsigned int nPes;  // num pes in this msg
+  unsigned int posDimension; // dimension of entries in positions
 
   int* pe_ids;              // IDs of the pes in this msg
   float* bgloads;           // bgloads[i] is background load of i-th pe in this msg
@@ -39,6 +41,7 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
 
   float* oloads;  // array of obj loads (grouped by pe), i-th obj in the array is
                   // considered to have ID i
+  float* positions; // array of object positions, if needed; indexing is same as oloads
   unsigned int*
       order;  // list of obj ids sorted by load (ids are determined by position in oloads)
 
@@ -54,20 +57,23 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
     // matter
     unsigned int nObjs = 0;
     unsigned int nPes = 0;
+    unsigned int posDimension = 0;
     for (int i = 0; i < msgs.size(); i++)
     {
       LBStatsMsg_1* msg = (LBStatsMsg_1*)msgs[i];
       nObjs += msg->nObjs;
       nPes += msg->nPes;
+      posDimension = std::max(posDimension, msg->posDimension);
     }
 
     LBStatsMsg_1* newMsg;
     if (rateAware)
-      newMsg = new (nPes, nPes, nPes, nPes + 1, nObjs, nObjs, 0) LBStatsMsg_1;
+      newMsg = new (nPes, nPes, nPes, nPes + 1, nObjs, nObjs, nObjs * posDimension, 0) LBStatsMsg_1;
     else
-      newMsg = new (nPes, nPes, 0, nPes + 1, nObjs, nObjs, 0) LBStatsMsg_1;
+      newMsg = new (nPes, nPes, 0, nPes + 1, nObjs, nObjs, nObjs * posDimension, 0) LBStatsMsg_1;
     newMsg->nObjs = nObjs;
     newMsg->nPes = nPes;
+    newMsg->posDimension = posDimension;
     int pe_cnt = 0;
     int obj_cnt = 0;
     for (int i = 0; i < msgs.size(); i++)
@@ -1065,6 +1071,7 @@ class PELevel : public LevelLogic
     if (nobjs > 0) lbmgr->GetObjData(allLocalObjs.data());  // populate allLocalObjs
     myObjs.clear();
     LBRealType nonMigratableLoad = 0;
+    unsigned int posDimension = 0;
     for (int i = 0; i < nobjs; i++)
     {
       if (allLocalObjs[i].migratable)
@@ -1099,11 +1106,11 @@ class PELevel : public LevelLogic
     LBStatsMsg_1* msg;
     if (rateAware)
     {
-      msg = new (1, 1, 1, 2, nobjs, nobjs, 0) LBStatsMsg_1;
+      msg = new (1, 1, 1, 2, nobjs, nobjs, nobjs * posDimension, 0) LBStatsMsg_1;
       msg->speeds[0] = float(lbmgr->ProcessorSpeed());
     }
     else
-      msg = new (1, 1, 0, 2, nobjs, nobjs, 0) LBStatsMsg_1;
+      msg = new (1, 1, 0, 2, nobjs, nobjs, nobjs * posDimension, 0) LBStatsMsg_1;
     msg->nObjs = nobjs;
     msg->nPes = 1;
     msg->pe_ids[0] = mype;

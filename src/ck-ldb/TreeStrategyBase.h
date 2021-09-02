@@ -135,6 +135,7 @@ template <int N>
 class ObjPos : public Obj<N>
 {
 public:
+  static constexpr bool isPosition = true;
   bool hasPosition = false;
   std::vector<LBRealType> position;
 
@@ -144,6 +145,7 @@ public:
     this->position = position;
   }
 };
+
 // ------------------ Proc ------------------
 
 /**
@@ -357,6 +359,17 @@ class Rotate : public Strategy<O, P, S>
       solution.assign(o, p);
       // fprintf(stderr, "Moving object %d from PE %d to %d\n", o.id, o.oldPe, p.id);
     }
+  }
+};
+
+template <typename O, typename P, typename S>
+class Partition : public Strategy<O, P, S>
+{
+ public:
+  void solve(std::vector<O>& objs, std::vector<P>& procs, S& solution, bool objsSorted)
+  {
+    static_assert(O::isPosition, "Partition must be used with position objects");
+    for (const auto& o : objs) solution.assign(o, o.oldPe);
   }
 };
 
