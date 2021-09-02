@@ -139,6 +139,10 @@ $(ROMIO): headers
 		CPPFLAGS= \
 		LIBS= \
 		LDFLAGS= \
+		TEST_CC="$(CDIR)/bin/ampicc" \
+		TEST_F77="$(CDIR)/bin/ampif77" \
+		USER_CFLAGS="$(OPTS) $(ROMIO_FLAGS)" \
+		USER_FFLAGS="$(OPTS) $(ROMIO_FLAGS)" \
 		|| ( cat config.log ; exit 1 )
 
 	cp romio/include/mpio.h romio/include/mpiof.h romio/include/mpio_functions.h $(CDIR)/include

@@ -399,6 +399,10 @@ if(CMK_AMPI_WITH_ROMIO)
             CPPFLAGS=
             LIBS=
             LDFLAGS=
+            TEST_CC=${CMAKE_BINARY_DIR}/bin/ampicc
+            TEST_F77=${CMAKE_BINARY_DIR}/bin/ampif77
+            USER_CFLAGS=${ROMIO_FLAGS}
+            USER_FFLAGS=${ROMIO_FLAGS}
             > /dev/null
         COMMAND cp -f ${romio_dir}/include/mpio.h ${CMAKE_BINARY_DIR}/include/
         COMMAND cp -f ${romio_dir}/include/mpiof.h ${CMAKE_BINARY_DIR}/include/
