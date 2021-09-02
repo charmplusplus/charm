@@ -17,7 +17,7 @@ hello_user.o: hello_user.cpp hello_user.decl.h
 	$(CHARMC) -c $< -o $@
 
 hello_user: hello_user.o
-	$(CHARMC) -c $^ -o $@
+	$(CHARMC) $^ -o $@
 
 hello_user_with_main.decl.h: hello_user.ci
 	$(CHARMC) -DHELLO_USE_MAINCHARE $<
@@ -26,7 +26,7 @@ hello_user_with_main.o: hello_user.cpp hello_user_with_main.decl.h
 	$(CHARMC) -DHELLO_USE_MAINCHARE -c $< -o $@
 
 hello_user_with_main: hello_user_with_main.o
-	$(CHARMC) -DHELLO_USE_MAINCHARE -c $^ -o $@
+	$(CHARMC) -DHELLO_USE_MAINCHARE $^ -o $@
 
 clean:
 	rm -f hello_user hello_user_with_main *.o charmrun *.decl.h *.def.h
