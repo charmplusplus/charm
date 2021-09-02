@@ -315,12 +315,12 @@ call in order to determine the location of the PIE binary's code and
 data segments in memory. This is useful because PIE binaries locate the
 data segment containing global variables immediately after the code
 segment so that they are accessed relative to the instruction pointer.
-The PIE-Globals loader makes a copy of the code and data segments for
+The PIEglobals loader makes a copy of the code and data segments for
 each AMPI rank in the job via the Isomalloc allocator, thereby
 privatizing their global state. It then constructs a synthetic function
 pointer for each rank at its new locations and calls it.
 
-To use PIE-Globals in your AMPI program, compile and link with the
+To use PIEglobals in your AMPI program, compile and link with the
 ``-pieglobals`` parameter:
 
 .. code-block:: bash
@@ -405,7 +405,7 @@ global variables:
    !$omp threadprivate(myrank)
    !$omp threadprivate(xyz)
 
-The runtime system also should know that TLS-Globals is used at both
+The runtime system also should know that TLSglobals is used at both
 compile and link time:
 
 .. code-block:: bash
@@ -424,7 +424,7 @@ Additionally, overdecomposition is limited to approximately 12 virtual
 ranks per logical node, though this can be resolved by building a
 patched version of glibc.
 
-As with PIE-Globals, this method compiles your user program as a
+As with PIEglobals, this method compiles your user program as a
 Position-Independent Executable (PIE) and links it against a special
 shim of function pointers. A small loader utility calls the
 glibc-specific function ``dlmopen`` on the PIE binary with a unique
@@ -438,7 +438,7 @@ accessed relative to the instruction pointer, and because ``dlmopen``
 creates a separate copy of these segments in memory for each unique
 namespace index.
 
-Optionally, the first step in using PiP-Globals is to build PiP-glibc to
+Optionally, the first step in using PiPglobals is to build PiP-glibc to
 overcome the limitation on rank count per process. Use the instructions
 at https://github.com/RIKEN-SysSoft/PiP/blob/pip-1/INSTALL.md to download
 an installable PiP package or build PiP-glibc from source by following
@@ -451,7 +451,7 @@ the environment variable ``PIP_GLIBC_INSTALL_DIR`` to the value of
 
    $ export PIP_GLIBC_INSTALL_DIR=~/pip
 
-To use PiP-Globals in your AMPI program (with or without PiP-glibc),
+To use PiPglobals in your AMPI program (with or without PiP-glibc),
 compile and link with the ``-pipglobals`` parameter:
 
 .. code-block:: bash
@@ -472,27 +472,27 @@ Potential future support for checkpointing and migration will require
 modification of the ``ld-linux.so`` runtime loader to intercept mmap
 allocations of the previously mentioned segments and redirect them
 through Isomalloc. The present lack of support for these features mean
-PiP-Globals is best suited for testing AMPI during exploratory phases
+PiPglobals is best suited for testing AMPI during exploratory phases
 of development, and for production jobs not requiring load balancing or
 fault tolerance.
 
 FSglobals: Automatic Filesystem-Based Runtime Linking Privatization
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Filesystem Globals (FS-Globals) was discovered during the development of
-PiP-Globals and the two are highly similar. Like PiP-Globals, it
+Filesystem Globals (FSglobals) was discovered during the development of
+PiPglobals and the two are highly similar. Like PiPglobals, it
 requires no modification of user code and works with any language.
 It also currently lacks support for checkpointing and migration,
-preventing use of load balancing and fault tolerance. Unlike PiP-Globals,
+preventing use of load balancing and fault tolerance. Unlike PiPglobals,
 it is portable beyond GNU/Linux and has no limits to overdecomposition
 beyond available disk space.
 
-FS-Globals works in the same way as PiP-Globals except that instead of
+FSglobals works in the same way as PiPglobals except that instead of
 specifying namespaces using ``dlmopen``, which is a GNU/Linux-specific
 feature, this method creates copies of the user's PIE binary on the
 filesystem for each rank and calls the POSIX-standard ``dlopen``.
 
-To use FS-Globals, compile and link with the ``-fsglobals`` parameter:
+To use FSglobals, compile and link with the ``-fsglobals`` parameter:
 
 .. code-block:: bash
 
@@ -504,7 +504,7 @@ will be automatically privatized when the program is run. Variables in
 statically linked libraries will also be privatized if compiled as PIE.
 It is recommended to achieve this by building with the AMPI toolchain
 wrappers and ``-fsglobals``, and this is necessary if the libraries call
-MPI functions. Shared objects are currently not supported by FS-Globals
+MPI functions. Shared objects are currently not supported by FSglobals
 due to the extra overhead of iterating through all dependencies and
 copying each one per rank while avoiding system components, plus the
 complexity of ensuring each rank's program binary sees the proper set of
@@ -513,13 +513,13 @@ objects.
 This method's use of the filesystem is a drawback in that it is slow
 during startup and can be considered wasteful. Additionally, support for
 load balancing and fault tolerance would require further development in
-the future, using the same infrastructure as what PiP-Globals would
-require. For these reasons FS-Globals is best suited for the R&D phase
+the future, using the same infrastructure as what PiPglobals would
+require. For these reasons FSglobals is best suited for the R&D phase
 of AMPI program development and for small jobs, and it may be less
 suitable for large production environments.
 
-GOTglobals: Automatic Global Offset Table Swapping
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Swapglobals: Automatic Global Offset Table Swapping
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Thanks to the ELF Object Format, we have successfully automated the
 procedure of switching the set of user global variables when switching
@@ -559,7 +559,7 @@ Currently, there is a tool called *Photran*
 that can do this transformation. It is Eclipse-based and works by
 constructing Abstract Syntax Trees (ASTs) of the program.
 We also have a tool built with *LLVM/LibTooling* that applies the
-TLS-Globals transformation to C/C++ codes, available upon request.
+TLSglobals transformation to C/C++ codes, available upon request.
 
 Summary
 ~~~~~~~
@@ -574,9 +574,9 @@ different schemes.
    Privatization Scheme Linux Mac OS BG/Q Windows x86 x86_64 PPC   ARM7
    ==================== ===== ====== ==== ======= === ====== ===== =====
    Manual Code Editing  Yes   Yes    Yes  Yes     Yes Yes    Yes   Yes
-   PIE-Globals          Yes   No     No   No      Yes Yes    Yes   Yes
-   TLS-Globals          Yes   Yes    No   Maybe   Yes Yes    Maybe Maybe
-   PiP-Globals          Yes   No     No   No      Yes Yes    Yes   Yes
-   FS-Globals           Yes   Yes    No   Yes     Yes Yes    Yes   Yes
-   GOT-Globals          Yes   No     No   No      Yes Yes    Yes   Yes
+   PIEglobals           Yes   No     No   No      Yes Yes    Yes   Yes
+   TLSglobals           Yes   Yes    No   Maybe   Yes Yes    Maybe Maybe
+   PiPglobals           Yes   No     No   No      Yes Yes    Yes   Yes
+   FSglobals            Yes   Yes    No   Yes     Yes Yes    Yes   Yes
+   Swapglobals          Yes   No     No   No      Yes Yes    Yes   Yes
    ==================== ===== ====== ==== ======= === ====== ===== =====

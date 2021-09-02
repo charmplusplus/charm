@@ -113,6 +113,7 @@ extern int quietModeRequested;
 #endif
 
 extern char * ampi_binary_path;
+extern bool ampiUsingPieglobals;
 
 #if AMPIMSGLOG
 #include "ckliststring.h"
@@ -314,7 +315,6 @@ class Amm {
 
 PUPfunctionpointer(MPI_User_function*)
 
-extern bool isPieglobalsEnabled;
 /*
  * OpStruct's are used to lookup an MPI_User_function* and check its commutativity.
  * They are also used to create AmpiOpHeader's, which are transmitted in reductions
@@ -332,7 +332,7 @@ class OpStruct {
   bool isValid;
 
   MPI_User_function *createUserFunc(MPI_User_function *f) noexcept {
-    if (isPieglobalsEnabled) { // handle PIEglobals code relocation:
+    if (ampiUsingPieglobals) { // handle PIEglobals code relocation:
       const CthThread th = TCharm::get()->getThread();
       CmiIsomallocContext ctx = CmiIsomallocGetThreadContext(th);
       const CmiIsomallocRegion heap = CmiIsomallocContextGetUsedExtent(ctx);

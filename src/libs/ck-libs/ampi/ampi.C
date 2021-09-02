@@ -27,9 +27,9 @@
 /* For MPI_Get_library_version */
 extern const char * const CmiCommitID;
 
-CProxy_ampiPeMgr ampiPeMgrProxy;
+bool ampiUsingPieglobals = false;
 
-bool isPieglobalsEnabled = false;
+CProxy_ampiPeMgr ampiPeMgrProxy;
 
 static CkDDT *getDDT() noexcept {
   return &getAmpiParent()->myDDT;
@@ -579,7 +579,7 @@ class ampiPeMgr : public CBase_ampiPeMgr {
    * AmpiReducerFunc on an arbitrary PE), and add the MPI_Op's offset to the base
    * ptr to get the MPI_User_function. */
   MPI_User_function* getUserFunction(MPI_User_function* funcOffset) const noexcept {
-    if (isPieglobalsEnabled) {
+    if (ampiUsingPieglobals) {
       const auto first = localAmpiParents.begin();
       if (first == localAmpiParents.end()) {
         CkAbort("AMPI> PE %d has no resident virtual ranks to reference in order to look up a user-defined reduction operator!", CkMyPe());

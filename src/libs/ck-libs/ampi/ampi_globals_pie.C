@@ -37,8 +37,6 @@
 #define PIEGLOBALS_DEBUG 0
 
 
-extern bool isPieglobalsEnabled;
-
 struct itemstruct
 {
   size_t offset;
@@ -236,7 +234,7 @@ static void pieglobalscleanupatexit()
 
 void AMPI_Node_Setup(int numranks)
 {
-  isPieglobalsEnabled = true;
+  ampiUsingPieglobals = true;
 
   if (CmiMyNode() == 0 && !quietModeRequested)
     CmiPrintf("AMPI> Using pieglobals privatization method.\n");
