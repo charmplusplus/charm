@@ -110,7 +110,7 @@ completion: charmxi
 NDMeshStreamer: charm-core completion
 
 $(L)/libmpi-mainmodule.a: mpi-mainmodule.o
-	$(CHARMC) -o $@ $<
+	$(CHARMC) -o $@ $^
 
 $(L)/libckmain.a: main.o
 	$(CHARMC) -o $@ $^
@@ -547,7 +547,7 @@ $(L)/conv-static.o: conv-static.o
 	cp -f $< $@
 
 machine.o: machine.C $(CVHEADERS)
-	$(CHARMC) -I. -o $@ $<
+	$(CHARMC) -I. -o $@ -c $<
 
 $(L)/libconv-utilf.a: $(LIBCONV_UTILF)
 	$(CHARMC) -o $@ $(LIBCONV_UTILF)
