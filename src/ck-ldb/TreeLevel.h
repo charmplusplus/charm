@@ -4,7 +4,7 @@
 #include "TopoManager.h"
 #include "TreeLB.h"
 #include "TreeStrategyBase.h"
-#include "TreeStrategyFactory.h"
+
 #include <algorithm>
 #include <cmath>
 #include <limits>  // std::numeric_limits
@@ -260,11 +260,11 @@ class StrategyWrapper : public IStrategyWrapper
 #endif
   };
 
-  StrategyWrapper(const std::string& _strategy_name, bool _isTreeRoot, json& config)
+  StrategyWrapper(TreeStrategy::Strategy<O, P, Solution>* _strategy, const std::string& _strategy_name, bool _isTreeRoot, json& config)
   {
     strategy_name = _strategy_name;
     isTreeRoot = _isTreeRoot;
-    strategy = TreeStrategy::Factory::makeStrategy<O, P, Solution>(strategy_name, config);
+    strategy = _strategy;
   }
 
   virtual ~StrategyWrapper()
@@ -452,6 +452,21 @@ class StrategyWrapper : public IStrategyWrapper
   TreeStrategy::Strategy<O, P, Solution>* strategy;
 };
 
+#include "TreeStrategyFactory.h"
+
+template <int N>
+IStrategyWrapper* CreateStrategyWrapper(const std::string& strategy_name, bool isTreeRoot,
+                                        json& config, bool rateAware)
+{
+  if (rateAware)
+    return TreeStrategy::Factory::CreateStrategyWrapper<N, true>(
+      strategy_name, isTreeRoot, config[strategy_name]);
+  else
+    return TreeStrategy::Factory::CreateStrategyWrapper<N, false>(
+      strategy_name, isTreeRoot, config[strategy_name]);
+}
+
+
 // --------------------------------------------------------------
 
 // ---------------- RootLevel ----------------
@@ -482,16 +497,7 @@ class RootLevel : public LevelLogic
       current_strategy = 0;
       for (const std::string& strategy_name : strategies)
       {
-        if (rateAware)
-        {
-          wrappers.push_back(new StrategyWrapper<Obj<1>, Proc<1, true>>(
-              strategy_name, true, config[strategy_name]));
-        }
-        else
-        {
-          wrappers.push_back(new StrategyWrapper<Obj<1>, Proc<1, false>>(
-              strategy_name, true, config[strategy_name]));
-        }
+        wrappers.push_back(CreateStrategyWrapper<1>(strategy_name, true, config[strategy_name], rateAware));
       }
       this->repeat_strategies = repeat_strategies;
     }
@@ -686,16 +692,7 @@ class NodeSetLevel : public LevelLogic
     current_strategy = 0;
     for (const std::string& strategy_name : strategies)
     {
-      if (rateAware)
-      {
-        wrappers.push_back(new StrategyWrapper<Obj<1>, Proc<1, true>>(
-            strategy_name, false, config[strategy_name]));
-      }
-      else
-      {
-        wrappers.push_back(new StrategyWrapper<Obj<1>, Proc<1, false>>(
-            strategy_name, false, config[strategy_name]));
-      }
+      wrappers.push_back(CreateStrategyWrapper<1>(strategy_name, false, config[strategy_name], rateAware));
     }
     this->repeat_strategies = repeat_strategies;;
     cutoff_freq = _cutoff_freq;
@@ -940,16 +937,7 @@ class NodeLevel : public LevelLogic
     current_strategy = 0;
     for (const std::string& strategy_name : strategies)
     {
-      if (rateAware)
-      {
-        wrappers.push_back(new StrategyWrapper<Obj<1>, Proc<1, true>>(
-            strategy_name, false, config[strategy_name]));
-      }
-      else
-      {
-        wrappers.push_back(new StrategyWrapper<Obj<1>, Proc<1, false>>(
-            strategy_name, false, config[strategy_name]));
-      }
+      wrappers.push_back(CreateStrategyWrapper<1>(strategy_name, false, config[strategy_name], rateAware));
     }
     this->repeat_strategies = repeat_strategies;
     cutoff_freq = _cutoff_freq;
