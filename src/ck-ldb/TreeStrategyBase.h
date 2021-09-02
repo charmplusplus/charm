@@ -1,6 +1,7 @@
 #ifndef TREESTRATEGYBASE_H
 #define TREESTRATEGYBASE_H
 
+#include "charm.h"
 #include "lbdb.h"
 #include <algorithm>
 #include <random>
@@ -115,6 +116,7 @@ class Obj : public std::conditional<multi, obj_N_data<N>, obj_1_data>::type
   }
 
   inline float getLoad() const { return this->maxload; }
+  void setPosition(std::vector<float>&& position) {}
 };
 
 template <>
@@ -137,10 +139,11 @@ class ObjPos : public Obj<N>
 public:
   static constexpr bool isPosition = true;
   bool hasPosition = false;
-  std::vector<LBRealType> position;
+  std::vector<float> position;
 
-  inline void setPosition(const std::vector<LBRealType>& position)
+  inline void setPosition(std::vector<float>&& position)
   {
+    CkAssert(!position.empty());
     hasPosition = true;
     this->position = position;
   }

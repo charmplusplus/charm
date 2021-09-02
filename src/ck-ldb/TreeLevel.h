@@ -4,10 +4,12 @@
 #include "TopoManager.h"
 #include "TreeLB.h"
 #include "TreeStrategyBase.h"
+#include "charm.h"
 
 #include <algorithm>
 #include <cmath>
 #include <limits>  // std::numeric_limits
+#include <vector>
 
 #define FLOAT_TO_INT_MULT 10000
 
@@ -57,15 +59,20 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
     // matter
     unsigned int nObjs = 0;
     unsigned int nPes = 0;
-    unsigned int posDimension = 0;
+    unsigned int minPosDimension = std::numeric_limits<unsigned int>::max();
+    unsigned int maxPosDimension = std::numeric_limits<unsigned int>::min();
+
     for (int i = 0; i < msgs.size(); i++)
     {
       LBStatsMsg_1* msg = (LBStatsMsg_1*)msgs[i];
       nObjs += msg->nObjs;
       nPes += msg->nPes;
-      posDimension = std::max(posDimension, msg->posDimension);
+      minPosDimension = std::min(minPosDimension, msg->posDimension);
+      maxPosDimension = std::max(maxPosDimension, msg->posDimension);
     }
-
+    CkAssertMsg(msgs.empty() || minPosDimension == maxPosDimension,
+                "Position of every object for LB must be of same dimension");
+    const unsigned int posDimension = minPosDimension;
     LBStatsMsg_1* newMsg;
     if (rateAware)
       newMsg = new (nPes, nPes, nPes, nPes + 1, nObjs, nObjs, nObjs * posDimension, 0) LBStatsMsg_1;
@@ -88,7 +95,8 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
       for (int j = 0; j < msg_npes; j++)
         newMsg->obj_start[pe_cnt + j] = msg->obj_start[j] + obj_cnt;
       memcpy(newMsg->oloads + obj_cnt, msg->oloads, sizeof(float) * (msg->nObjs));
-
+      memcpy(newMsg->positions + obj_cnt * posDimension, msg->positions,
+             sizeof(float) * msg->nObjs * posDimension);
       obj_cnt += msg->nObjs;
       pe_cnt += msg_npes;
     }
@@ -120,6 +128,11 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
              k++, obj_cnt++, local_id++)
         {
           objs[obj_cnt].populate(obj_cnt, msg->oloads + k, pe);
+          if (msg->posDimension > 0)
+            objs[obj_cnt].setPosition(
+              std::vector<float>(msg->positions + k * msg->posDimension,
+                                 msg->positions + k * msg->posDimension + msg->posDimension));
+
           total_load += objs[obj_cnt].getLoad();
           migMsg->to_pes[obj_cnt] = pe;
           // if obj_local_ids.size() > 0:
@@ -1059,12 +1072,15 @@ class PELevel : public LevelLogic
     if (nobjs > 0) lbmgr->GetObjData(allLocalObjs.data());  // populate allLocalObjs
     myObjs.clear();
     LBRealType nonMigratableLoad = 0;
-    unsigned int posDimension = 0;
+    size_t minPosDimension = std::numeric_limits<size_t>::max();
+    size_t maxPosDimension = std::numeric_limits<size_t>::min();
     for (int i = 0; i < nobjs; i++)
     {
       if (allLocalObjs[i].migratable)
       {
         myObjs.emplace_back(allLocalObjs[i]);
+        minPosDimension = std::min(minPosDimension, allLocalObjs[i].position.size());
+        maxPosDimension = std::max(maxPosDimension, allLocalObjs[i].position.size());
       }
       else
       {
@@ -1072,7 +1088,9 @@ class PELevel : public LevelLogic
       }
     }
     nobjs = myObjs.size();
-
+    CkAssertMsg(nobjs == 0 || minPosDimension == maxPosDimension,
+                "Position of every object for LB must be of same dimension!");
+    const unsigned int posDimension = (unsigned int)minPosDimension;
     // TODO verify that non-migratable objects are not added to msg and are only counted
     // as background load
 
@@ -1112,6 +1130,9 @@ class PELevel : public LevelLogic
         msg->oloads[i] = float(myObjs[i].wallTime) * msg->speeds[0];
       else
         msg->oloads[i] = float(myObjs[i].wallTime);
+      if (posDimension > 0)
+        std::copy(myObjs[i].position.begin(), myObjs[i].position.end(),
+                  &(msg->positions[i * posDimension]));
       msg->order[i] = i;
     }
 
