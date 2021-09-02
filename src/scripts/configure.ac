@@ -1540,6 +1540,7 @@ int main()
 }
 EOT
 test_linkc "whether has dl_iterate_phdr" "yes" "no" ""
+CMK_HAS_DL_ITERATE_PHDR="$pass"
 AC_DEFINE_UNQUOTED([CMK_HAS_DL_ITERATE_PHDR], $pass, [whether has dl_iterate_phdr])
 
 
@@ -2241,6 +2242,16 @@ fi
 AC_DEFINE_UNQUOTED(CMK_SUPPORTS_PIPGLOBALS, $CMK_SUPPORTS_PIPGLOBALS, [whether supports PiP globals])
 add_flag "CMK_SUPPORTS_PIPGLOBALS=$CMK_SUPPORTS_PIPGLOBALS" 'PiP globals'
 add_make_flag "CMK_SUPPORTS_PIPGLOBALS:=$CMK_SUPPORTS_PIPGLOBALS" 'PiP globals'
+
+if test "$CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY" = '1' -a "$CMK_CAN_GET_BINARY_PATH" = '1' -a "$CMK_HAS_DL_ITERATE_PHDR" = '1'
+then
+  CMK_SUPPORTS_PIEGLOBALS='1'
+else
+  CMK_SUPPORTS_PIEGLOBALS='0'
+fi
+AC_DEFINE_UNQUOTED(CMK_SUPPORTS_PIEGLOBALS, $CMK_SUPPORTS_PIEGLOBALS, [whether supports PIE globals])
+add_flag "CMK_SUPPORTS_PIEGLOBALS=$CMK_SUPPORTS_PIEGLOBALS" 'PIE globals'
+add_make_flag "CMK_SUPPORTS_PIEGLOBALS:=$CMK_SUPPORTS_PIEGLOBALS" 'PIE globals'
 
 #### check if getProcAddress works ####
 cat > $t <<EOT
