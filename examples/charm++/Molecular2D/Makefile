@@ -4,7 +4,7 @@ OPTS	= -O3
 all: mol2d
 
 mol2d: Patch.o Compute.o
-	$(CHARMC) -language charm++ -o mol2d Patch.o -c Compute.o
+	$(CHARMC) -language charm++ -o mol2d Patch.o Compute.o
 
 Patch.o: Patch.C Patch.h Patch.decl.h common.h
 	$(CHARMC) -o Patch.o -c Patch.C
