@@ -190,6 +190,9 @@ string(TOLOWER "${TARGET}" target_lower)
 if(${target_lower} STREQUAL "changa")
   set(TARGET "LIBS")
   set(LBUSERDATA 1)
+  set(BUILD_CHANGA 1)
+else()
+  set(BUILD_CHANGA 0)
 endif()
 
 if(${TARGET} STREQUAL "everylb")
@@ -856,7 +859,7 @@ add_dependencies(moduletcharmmain ck)
 add_dependencies(moduletcharm ck)
 add_dependencies(tcharm-compat ck)
 
-if(${TARGET} STREQUAL "AMPI" OR ${TARGET} STREQUAL "LIBS")
+if(${TARGET} STREQUAL "AMPI" OR (${TARGET} STREQUAL "LIBS" AND NOT BUILD_CHANGA))
   add_subdirectory(src/libs/ck-libs/ampi)
 endif()
 
