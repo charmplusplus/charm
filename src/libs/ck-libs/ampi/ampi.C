@@ -11766,6 +11766,10 @@ static ampi_maintype AMPI_Main_Get_C(SharedObject myexe)
   if (AMPI_Main_ptr)
     return AMPI_Main_ptr;
 
+  auto main_ptr = (ampi_maintype)dlsym(myexe, "main");
+  if (main_ptr)
+    return main_ptr;
+
   return nullptr;
 }
 
