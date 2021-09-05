@@ -262,13 +262,22 @@ class SumLogPool {
     double *cpuTime;    //[MAX_INTERVALS * MAX_ENTRIES];
     int *numExecutions; //[MAX_INTERVALS * MAX_ENTRIES];
 
+    enum LogWriter {
+        MsgSentCount,
+        MsgSentSize,
+        MsgRecvCount,
+        MsgRecvSize,
+        ExternalMsgRecvCount,
+        ExternalMsgRecvSize
+    };
+
   public:
     SumLogPool(char *pgm);
     ~SumLogPool();
     double *getCpuTime() {return cpuTime;}
     void initMem();
     void write(void) ;
-    void writeEncoder(int numBins, int event);
+    void writeEncoder(int numBins, LogWriter writer);
     void writeSts(void);
     void add(double time, double idleTime, unsigned long msgSize, unsigned long msgCount,
              CkVec<unsigned long> msgSizePerEP, CkVec<unsigned long> msgCountPerEP,

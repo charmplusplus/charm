@@ -387,7 +387,9 @@ void SumLogPool::write(void)
     fprintf(fp, "%ld ", (long)(epInfo[i].epMaxTime*1.0e6));
   fprintf(fp, "\n");
 
-  /*for(int k = 0; k < numBins; ++k) {
+  /*
+   * Useful for debugging to match absolute counts
+   * for(int k = 0; k < numBins; ++k) {
       long recvCount = pool[k].getRecvCount();
       long recvSize = pool[k].getRecvSize();
       long extRecvCount = pool[k].getExtRecvCount();
@@ -447,7 +449,7 @@ void SumLogPool::write(void)
   //CkPrintf("writing to detail file:%d    %d \n", getNumEntries(), numBins);
   // write summary details
   if (sumDetail) {
-        fprintf(sdfp, "ver:%3.1f cpu:%d/%d numIntervals:%d numEPs:%d intervalSize:%e\n",
+        fprintf(sdfp, "ver:%4.1f cpu:%d/%d numIntervals:%d numEPs:%d intervalSize:%e\n",
                 CkpvAccess(version), CkMyPe(), CkNumPes(),
                 numBins, _numEntries, CkpvAccess(binSize));
 
@@ -500,38 +502,47 @@ void SumLogPool::write(void)
         fprintf(sdfp, "\n");
 
         fprintf(sdfp, "MsgSentCount: ");
-        writeEncoder(numBins, 1);
+        writeEncoder(numBins, MsgSentCount);
         fprintf(sdfp, "MsgSentSize: ");
-        writeEncoder(numBins, 2);
+        writeEncoder(numBins, MsgSentSize);
         fprintf(sdfp, "MsgRecvCount: ");
-        writeEncoder(numBins, 3);
+        writeEncoder(numBins, MsgSentCount);
         fprintf(sdfp, "MsgRecvSize: ");
-        writeEncoder(numBins, 4);
+        writeEncoder(numBins, MsgRecvSize);
         fprintf(sdfp, "ExternalMsgRecvCount: ");
-        writeEncoder(numBins, 5);
+        writeEncoder(numBins, ExternalMsgRecvCount);
         fprintf(sdfp, "ExternalMsgRecvSize: ");
-        writeEncoder(numBins, 6);
+        writeEncoder(numBins, ExternalMsgRecvSize);
   }
 }
 
-void SumLogPool::writeEncoder(int numBins, int event) {
+void SumLogPool::writeEncoder(int numBins, LogWriter event) {
     unsigned long prev_val = 0;
     unsigned long streak = 0;
 
     for(int k = 0; k < numBins; ++k) {
         CkVec<unsigned long> vec;
-        if(event == 1) {
-            vec = pool[k].getCountPerEP();
-        } else if(event == 2) {
-            vec = pool[k].getSizePerEP();
-        } else if(event == 3) {
-            vec = pool[k].getRecvCountPerEP();
-        } else if(event == 4) {
-            vec = pool[k].getRecvSizePerEP();
-        } else if(event == 5) {
-            vec = pool[k].getExtRecvCountPerEP();
-        } else if(event == 6) {
-            vec = pool[k].getExtRecvSizePerEP();
+        switch(event) {
+            case MsgSentCount:
+                vec = pool[k].getCountPerEP();
+                break;
+            case MsgSentSize:
+                vec = pool[k].getSizePerEP();
+                break;
+            case MsgRecvCount:
+                vec = pool[k].getRecvCountPerEP();
+                break;
+            case MsgRecvSize:
+                vec = pool[k].getRecvSizePerEP();
+                break;
+            case ExternalMsgRecvCount:
+                vec = pool[k].getExtRecvCountPerEP();
+                break;
+            case ExternalMsgRecvSize:
+                vec = pool[k].getExtRecvSizePerEP();
+                break;
+            default:
+                fprintf("Error in printing communication data\n");
         }
 
         //need to take min as we store _entryTable + 10 elements
@@ -542,8 +553,10 @@ void SumLogPool::writeEncoder(int numBins, int event) {
             if(temp == prev_val) {
                 streak++;
             } else {
-                if(streak > 0) {
-                    fprintf(sdfp, "%lu+%lu ", prev_val, streak);
+                if(streak == 1) {
+                    fprintf(sdfp, " %lu", prev_val);
+                } else if(streak > 1) {
+                    fprintf(sdfp, " %lu+%lu", prev_val, streak);
                 }
                 prev_val = temp;
                 streak = 1;
@@ -665,23 +678,28 @@ void SumLogPool::shrink(void)
   int entries = numBins/2;
   for (int i=0; i<entries; i++)
   {
-     pool[i].time() = pool[i*2].time() + pool[i*2+1].time();
-     pool[i].getIdleTime() = pool[i*2].getIdleTime() + pool[i*2+1].getIdleTime();
-     pool[i].getSize() = pool[i*2].getSize() + pool[i*2 + 1].getSize();
-     pool[i].getCount() = pool[i*2].getCount() + pool[i*2 + 1].getCount();
-     pool[i].getRecvSize() = pool[i*2].getRecvSize() + pool[i*2 + 1].getRecvSize();
-     pool[i].getRecvCount() = pool[i*2].getRecvCount() + pool[i*2 + 1].getRecvCount();
-     pool[i].getExtRecvSize() = pool[i*2].getExtRecvSize() + pool[i*2 + 1].getExtRecvSize();
-     pool[i].getExtRecvCount() = pool[i*2].getExtRecvCount() + pool[i*2 + 1].getExtRecvCount();
+     if(sumDetail) {
+         pool[i].time() = pool[i * 2].time() + pool[i * 2 + 1].time();
+         pool[i].getIdleTime() = pool[i * 2].getIdleTime() + pool[i * 2 + 1].getIdleTime();
+         pool[i].getSize() = pool[i * 2].getSize() + pool[i * 2 + 1].getSize();
+         pool[i].getCount() = pool[i * 2].getCount() + pool[i * 2 + 1].getCount();
+         pool[i].getRecvSize() = pool[i * 2].getRecvSize() + pool[i * 2 + 1].getRecvSize();
+         pool[i].getRecvCount() = pool[i * 2].getRecvCount() + pool[i * 2 + 1].getRecvCount();
+         pool[i].getExtRecvSize() = pool[i * 2].getExtRecvSize() + pool[i * 2 + 1].getExtRecvSize();
+         pool[i].getExtRecvCount() = pool[i * 2].getExtRecvCount() + pool[i * 2 + 1].getExtRecvCount();
 
-     int len = _entryTable.size();
-     for(int j = 0; j < len; ++j) {
-       pool[i].getSizePerEP()[j] = pool[i*2].getSizePerEP()[j] + pool[i*2 + 1].getSizePerEP()[j];
-       pool[i].getCountPerEP()[j] = pool[i*2].getCountPerEP()[j] + pool[i*2 + 1].getCountPerEP()[j];
-       pool[i].getRecvSizePerEP()[j] = pool[i*2].getRecvSizePerEP()[j] + pool[i*2 + 1].getRecvSizePerEP()[j];
-       pool[i].getRecvCountPerEP()[j] = pool[i*2].getRecvCountPerEP()[j] + pool[i*2 + 1].getRecvCountPerEP()[j];
-       pool[i].getExtRecvSizePerEP()[j] = pool[i*2].getExtRecvSizePerEP()[j] + pool[i*2 + 1].getExtRecvSizePerEP()[j];
-       pool[i].getExtRecvCountPerEP()[j] = pool[i*2].getExtRecvCountPerEP()[j] + pool[i*2 + 1].getExtRecvCountPerEP()[j];
+         int len = _entryTable.size();
+         for (int j = 0; j < len; ++j) {
+             pool[i].getSizePerEP()[j] = pool[i * 2].getSizePerEP()[j] + pool[i * 2 + 1].getSizePerEP()[j];
+             pool[i].getCountPerEP()[j] = pool[i * 2].getCountPerEP()[j] + pool[i * 2 + 1].getCountPerEP()[j];
+             pool[i].getRecvSizePerEP()[j] = pool[i * 2].getRecvSizePerEP()[j] + pool[i * 2 + 1].getRecvSizePerEP()[j];
+             pool[i].getRecvCountPerEP()[j] =
+                     pool[i * 2].getRecvCountPerEP()[j] + pool[i * 2 + 1].getRecvCountPerEP()[j];
+             pool[i].getExtRecvSizePerEP()[j] =
+                     pool[i * 2].getExtRecvSizePerEP()[j] + pool[i * 2 + 1].getExtRecvSizePerEP()[j];
+             pool[i].getExtRecvCountPerEP()[j] =
+                     pool[i * 2].getExtRecvCountPerEP()[j] + pool[i * 2 + 1].getExtRecvCountPerEP()[j];
+         }
      }
 
      if (sumDetail)
@@ -724,9 +742,9 @@ void BinEntry::write(FILE* fp)
 
 TraceSummary::TraceSummary(char **argv):msgNum(0),binStart(0.0),idleStart(0.0),
 					binTime(0.0),binIdle(0.0),
-                                          msgCount(0), msgSize(0),
-                                          recvCount(0), recvSize(0),
-                                          extRecvCount(0), extRecvSize(0)
+					msgCount(0), msgSize(0),
+					recvCount(0), recvSize(0),
+					extRecvCount(0), extRecvSize(0)
 {
   setCounters();
   if (CkpvAccess(traceOnPe) == 0) return;
@@ -785,12 +803,12 @@ void TraceSummary::resetCounters()
 void TraceSummary::setCounters()
 {
   int len = _entryTable.size() + 10;
-  msgSizePerEP = CkVec<unsigned long>(len);
-  msgCountPerEP = CkVec<unsigned long>(len);
-  recvSizePerEP = CkVec<unsigned long>(len);
-  recvCountPerEP = CkVec<unsigned long>(len);
-  extRecvSizePerEP = CkVec<unsigned long>(len);
-  extRecvCountPerEP = CkVec<unsigned long>(len);
+  msgSizePerEP.resize(len);
+  msgCountPerEP.resize(len);
+  recvSizePerEP.resize(len);
+  recvCountPerEP.resize(len);
+  extRecvSizePerEP.resize(len);
+  extRecvCountPerEP.resize(len);
   resetCounters();
 }
 
