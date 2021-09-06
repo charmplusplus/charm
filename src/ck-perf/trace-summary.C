@@ -542,7 +542,7 @@ void SumLogPool::writeEncoder(int numBins, LogWriter event) {
                 vec = pool[k].getExtRecvSizePerEP();
                 break;
             default:
-                fprintf("Error in printing communication data\n");
+                fprintf(sdfp, "Error in printing communication data\n");
         }
 
         //need to take min as we store _entryTable + 10 elements
