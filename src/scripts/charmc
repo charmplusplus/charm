@@ -2131,8 +2131,24 @@ case "$OBJECT" in
 	runCmd $CMK_RANLIB "$OBJECT"
 	Copyobj
 	;;
+*.o)
+	if [[ "$EXPLICIT_COMPILATION" = 'yes' ]]
+	then
+		Copyobj
+	elif [[ -z "$AMPI" && -z "$AMPIF" ]]
+	then
+		Warning 'charmc no longer assumes .o outputs imply compilation only. If you mean to build an object file, please add "-c".'
+	fi
+	;;
 *)
-	[[ "$EXPLICIT_COMPILATION" = 'yes' ]] && Copyobj
+	if [[ "$EXPLICIT_COMPILATION" = 'yes' ]]
+	then
+		if [[ -z "$AMPI" && -z "$AMPIF" && -z "$(getExtension "$OBJECT")" ]]
+		then
+			Warning 'charmc no longer assumes outputs without .o force linking. If you mean to build an executable, please remove "-c".'
+		fi
+		Copyobj
+	fi
 	;;
 esac
 fi
