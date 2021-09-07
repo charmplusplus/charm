@@ -17,6 +17,21 @@ if [ "$1" = "@CMAKE_C_COMPILER@" ]; then shift; fi
 if [ "$1" = "@CMAKE_CXX_COMPILER@" ]; then shift; fi
 if [ "$1" = "@CMAKE_Fortran_COMPILER@" ]; then shift; fi
 
+# Avoid mpicc using these variables, particularly during configure phases.
+unset -v CC
+unset -v CXX
+unset -v F77
+unset -v FC
+unset -v CFLAGS
+unset -v CXXFLAGS
+unset -v FFLAGS
+unset -v FCFLAGS
+unset -v CPP
+unset -v CXXCPP
+unset -v CPPFLAGS
+unset -v LIBS
+unset -v LDFLAGS
+
 #Prepare aliases for the external commands we use--
 # Note that adding /bin/ to everything breaks Cygwin32.
 RM="rm -f"
