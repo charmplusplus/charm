@@ -1,0 +1,39 @@
+name: MPI Windows
+
+on: [pull_request, merge_group]
+
+jobs:
+  build:
+    timeout-minutes: 360
+
+    runs-on: windows-latest
+
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: git mingw-w64-x86_64-toolchain mingw-w64-x86_64-libtool mingw-w64-x86_64-cmake make libtool autoconf automake wget
+
+    - name: install-prerequisites
+      run: |
+        wget 'https://download.microsoft.com/download/B/2/E/B2EB83FE-98C2-4156-834A-E1711E6884FB/MSMpiSetup.exe'
+        wget 'https://download.microsoft.com/download/B/2/E/B2EB83FE-98C2-4156-834A-E1711E6884FB/msmpisdk.msi'
+        ./MSMpiSetup.exe -unattend
+        msiexec.exe -i msmpisdk.msi -passive
+
+    - name: build
+      run: |
+        . src/arch/win/vsenv.sh
+        ./build AMPI mpi-win-x86_64 --with-production --enable-error-checking -j2
+        make -C mpi-win-x86_64/tests -j2
+
+    - name: test
+      run: |
+        export PATH="/c/Program Files/Microsoft MPI/Bin:$PATH"
+        make -C mpi-win-x86_64/tests test
