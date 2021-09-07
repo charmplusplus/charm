@@ -30,6 +30,10 @@ module ampi {
   initnode void ampiNodeInit(void);
   initproc void ampiProcInit(void);
 
+  group [migratable] ampiPeMgr {
+    entry EXPEDITED ampiPeMgr();
+  };
+
   array[1D] ampiParent {
     entry EXPEDITED_NOTRACE ampiParent(CProxy_TCharm threads_, int nRanks_);
     entry EXPEDITED void ResumeThread();
@@ -59,7 +63,7 @@ module ampi {
     entry EXPEDITED_NOKEEP void irednResult(CkReductionMsg *msg);
     entry EXPEDITED_THREADED void splitPhase1(CkReductionMsg *msg);
     entry EXPEDITED_THREADED void splitPhaseInter(CkReductionMsg *msg);
-    entry EXPEDITED_THREADED_REDN void commCreatePhase1(MPI_Comm nextGroupComm);
+    entry EXPEDITED_THREADED_REDN void commCreatePhase1(int nextComm, int commType);
     entry EXPEDITED void registrationFinish();
     entry EXPEDITED_THREADED_REDN void intercommCreatePhase1(MPI_Comm nextInterComm);
     entry EXPEDITED_THREADED_REDN void intercommMergePhase1(MPI_Comm nextIntraComm);

@@ -108,6 +108,7 @@ public:
 
     start_time = CkWallTimer();
     ngid.recv_zerocopy(CkSendBuffer(buffer, cb), payload);
+    delete msg;
   }
 
   void done() {

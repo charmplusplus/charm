@@ -161,23 +161,23 @@ namespace PUP {
   {
     c.clear();
   }
-  template <class dtype>
-  inline void reserve_if_applicable(std::set<dtype> &c, size_t nElem)
+  template <class dtype, class cmp>
+  inline void reserve_if_applicable(std::set<dtype, cmp> &c, size_t nElem)
   {
     c.clear();
   }
-  template <class dtype>
-  inline void reserve_if_applicable(std::multiset<dtype> &c, size_t nElem)
+  template <class dtype, class cmp>
+  inline void reserve_if_applicable(std::multiset<dtype, cmp> &c, size_t nElem)
   {
     c.clear();
   }
-  template <class K, class V>
-  inline void reserve_if_applicable(std::map<K, V> &c, size_t nElem)
+  template <class K, class V, class cmp>
+  inline void reserve_if_applicable(std::map<K, V, cmp> &c, size_t nElem)
   {
     c.clear();
   }
-  template <class K, class V>
-  inline void reserve_if_applicable(std::multimap<K, V> &c, size_t nElem)
+  template <class K, class V, class cmp>
+  inline void reserve_if_applicable(std::multimap<K, V, cmp> &c, size_t nElem)
   {
     c.clear();
   }
@@ -462,19 +462,10 @@ using Requires = typename requires_impl<
   template <typename T,
             Requires<!std::is_base_of<PUP::able, T>::value> = nullptr>
   inline void pup(PUP::er& p, std::unique_ptr<T>& t) {
-    bool is_nullptr = nullptr == t;
-    p | is_nullptr;
-    if (!is_nullptr) {
-      T* t1;
-      if (p.isUnpacking()) {
-        t1 = new T;
-      } else {
-        t1 = t.get();
-      }
-      p | *t1;
-      if (p.isUnpacking()) {
-        t.reset(t1);
-      }
+    T* t1 = t.get();
+    PUP::ptr_helper<T>()(p, t1);
+    if (p.isUnpacking()) {
+      t.reset(t1);
     }
   }
 
@@ -498,19 +489,10 @@ using Requires = typename requires_impl<
   template <typename T,
             Requires<!std::is_base_of<PUP::able, T>::value> = nullptr>
   inline void pup(PUP::er& p, std::shared_ptr<T>& t) {
-    bool is_nullptr = nullptr == t;
-    p | is_nullptr;
-    if (!is_nullptr) {
-      T* t1;
-      if (p.isUnpacking()) {
-        t1 = new T;
-      } else {
-        t1 = t.get();
-      }
-      p | *t1;
-      if (p.isUnpacking()) {
-        t.reset(t1);
-      }
+    T* t1 = t.get();
+    PUP::ptr_helper<T>()(p, t1);
+    if (p.isUnpacking()) {
+      t.reset(t1);
     }
   }
 
@@ -520,9 +502,9 @@ using Requires = typename requires_impl<
     p(&_);
     if (p.isUnpacking()) {
       // the shared ptr must be created with the original PUP::able ptr
-      // otherwise the dynamic cast can lead to invalid free's
-      // (it changes the pointer's address)
-      t = std::dynamic_pointer_cast<T>(std::shared_ptr<PUP::able>(_));
+      // otherwise the static cast can lead to invalid frees
+      // (since it can change the pointer's value)
+      t = std::static_pointer_cast<T>(std::shared_ptr<PUP::able>(_));
     }
   }
 

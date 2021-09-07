@@ -100,26 +100,29 @@ void CkArrayOptions::init() {
   locMgr.setZero();
   mCastMgr.setZero();
   anytimeMigration = _isAnytimeMigration;
-  staticInsertion = _isStaticInsertion;
+  insertionType = InsertionType::UNSET;
   reductionClient.type = CkCallback::invalid;
+  initCallback = CkCallback(CkCallback::invalid);
   disableNotifyChildInRed = !_isNotifyChildInRed;
   broadcastViaScheduler = false;
   sectionAutoDelegate = true;
 }
 
 CkArrayOptions& CkArrayOptions::setStaticInsertion(bool b) {
-  staticInsertion = b;
+  insertionType = b ? InsertionType::STATIC : InsertionType::DYNAMIC;
   if (b && map == _defaultArrayMapID) map = _fastArrayMapID;
   return *this;
 }
 
 /// Bind our elements to this array
 CkArrayOptions& CkArrayOptions::bindTo(const CkArrayID& b) {
-  CkArray* arr = CProxy_CkArray(b).ckLocalBranch();
+  CkLocMgr* mgr = CProxy_CkArray(b).ckLocalBranch()->getLocMgr();
   // Stupid bug: need a way for arrays to stay the same size *FOREVER*,
   // not just initially.
   // setNumInitial(arr->getNumInitial());
-  return setLocationManager(arr->getLocMgr()->getGroupID());
+  setMap(mgr->getMap());
+  setLocationCache(mgr->getLocationCache());
+  return setLocationManager(mgr->getGroupID());
 }
 
 CkArrayOptions& CkArrayOptions::addListener(CkArrayListener* listener) {
@@ -187,12 +190,13 @@ void CkArrayOptions::pup(PUP::er& p) {
   p | map;
   p | locMgr;
   p | mCastMgr;
+  p | locCache;
   p | arrayListeners;
   p | reductionClient;
   p | initCallback;
   p | anytimeMigration;
   p | disableNotifyChildInRed;
-  p | staticInsertion;
+  p | insertionType;
   p | broadcastViaScheduler;
   p | sectionAutoDelegate;
 }

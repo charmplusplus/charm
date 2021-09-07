@@ -33,8 +33,15 @@ ExternalProject_Add(hwloc
         --without-x \
         HWLOC_FLAGS=\"$CHARM_CC_FLAGS\" \
         CFLAGS=\"$CHARM_CC_FLAGS\" \
-        CC=$CHARM_CC \
-        CC_FOR_BUILD=$CHARM_CC \
+        CXXFLAGS=\"$CHARM_CXX_FLAGS\" \
+        CC=\"$CHARM_CC\" \
+        CXX=\"$CHARM_CXX\" \
+        CC_FOR_BUILD=\"$CHARM_CC\" \
+        CPP= \
+        CXXCPP= \
+        CPPFLAGS= \
+        LDFLAGS= \
+        LIBS= \
         > /dev/null"
     BUILD_COMMAND $(MAKE) V=$(VERBOSE) AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=:
     INSTALL_COMMAND cp -f ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc/include/hwloc.h ${CMAKE_BINARY_DIR}/include/
@@ -54,6 +61,7 @@ set(hwloc-objects
   ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/bind${obj_suf}
   ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/bitmap${obj_suf}
   ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/components${obj_suf}
+  ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/cpukinds${obj_suf}
   ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/diff${obj_suf}
   ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/distances${obj_suf}
   ${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/memattrs${obj_suf}

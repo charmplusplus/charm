@@ -426,9 +426,6 @@ void Entry::genChareStaticConstructorDecl(XStr& str) {
       << ");\n";
   str << "    static void ckNew(" << paramComma(1)
       << "CkChareID* pcid, int onPE=CK_PE_ANY" << eo(1) << ");\n";
-  if (!param->isVoid())
-    str << "    " << container->proxyName(0) << "(" << paramComma(1)
-        << "int onPE=CK_PE_ANY" << eo(1) << ");\n";
 }
 
 void Entry::genChareStaticConstructorDefs(XStr& str) {
@@ -449,18 +446,6 @@ void Entry::genChareStaticConstructorDefs(XStr& str) {
   str << "  CkCreateChare(" << chareIdx() << ", " << epIdx()
       << ", impl_msg, pcid, impl_onPE);\n";
   str << "}\n";
-
-  if (!param->isVoid()) {
-    str << makeDecl(" ", 1) << "::" << container->proxyName(0) << "(" << paramComma(0)
-        << "int impl_onPE" << eo(0) << ")\n";
-    str << "{\n";
-    str << marshallMsg();
-    str << "  CkChareID impl_ret;\n";
-    str << "  CkCreateChare(" << chareIdx() << ", " << epIdx()
-        << ", impl_msg, &impl_ret, impl_onPE);\n";
-    str << "  ckSetChareID(impl_ret);\n";
-    str << "}\n";
-  }
 }
 
 /***************************** Array Entry Points **************************/
@@ -560,12 +545,27 @@ void Entry::genArrayDefs(XStr& str) {
     str << "  ckCheck();\n";
     XStr inlineCall;
     if (!isNoTrace())
+      // Create a dummy envelope to represent the "message send" to the local/inline method
+      // so that Projections can trace the method back to its caller
       inlineCall
-          << "    _TRACE_BEGIN_EXECUTE_DETAILED(0,ForArrayEltMsg,(" << epIdx()
+          << "  envelope env;\n"
+          << "  env.setMsgtype(ForArrayEltMsg);\n"
+          << "  env.setTotalsize(0);\n"
+          << "  _TRACE_CREATION_DETAILED(&env, " << epIdx() << ");\n"
+          << "  _TRACE_CREATION_DONE(1);\n"
+          << "  _TRACE_BEGIN_EXECUTE_DETAILED(CpvAccess(curPeEvent),ForArrayEltMsg,(" << epIdx()
           << "),CkMyPe(), 0, ((CkArrayIndex&)ckGetIndex()).getProjectionID(), obj);\n";
     if (isAppWork()) inlineCall << "    _TRACE_BEGIN_APPWORK();\n";
-    inlineCall << "#if CMK_LBDB_ON\n"
-               << "    LDObjHandle objHandle;\n"
+    inlineCall << "#if CMK_LBDB_ON\n";
+    if (isInline())
+    {
+      inlineCall << "    const auto id = obj->ckGetID().getElementID();\n"
+                 << "    const CkArrayIndex* idx = &ckGetIndex();\n";
+      param->size(inlineCall); // Puts size of parameters in bytes into impl_off
+      inlineCall << "    impl_off += sizeof(envelope);\n"
+                 << "    ckLocMgr()->recordSend(idx, id, impl_off);\n";
+    }
+    inlineCall << "    LDObjHandle objHandle;\n"
                << "    int objstopped=0;\n"
                << "    objHandle = obj->timingBeforeCall(&objstopped);\n"
                << "#endif\n";
@@ -1798,8 +1798,9 @@ XStr Entry::callThread(const XStr& procName, int prependEntryName) {
       << ", new CkThrCallArg(impl_msg,impl_obj), " << getStackSize() << ");\n";
   str << "  ((Chare *)impl_obj)->CkAddThreadListeners(tid,impl_msg);\n";
 // str << "  CkpvAccess(_traces)->CkAddThreadListeners(tid);\n";
-  str << "  CthResume(tid);\n";
-  str << "}\n";
+  str << "  CthTraceResume(tid);\n"
+      << "  CthResume(tid);\n"
+      << "}\n";
 
   str << makeDecl("void") << "::" << procFull << "(CkThrCallArg *impl_arg)\n";
   str << "{\n";
@@ -1890,16 +1891,12 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
       str << "    }\n";
       str << "  } else {\n";
     } else if (param->hasDevice()) {
-      str << "  bool is_inline = true;\n";
-      str << "  if (CMI_ZC_MSGTYPE(env) == CMK_ZC_DEVICE_MSG) {\n";
+      str << "  if (CMI_IS_ZC_DEVICE(env)) {\n";
       genRegularCall(str, preCall, redn_wrapper, usesImplBuf, true);
-      str << "  }\n";
-      str << "  if (is_inline) {\n";
+      str << "  } else {\n";
     }
     genRegularCall(str, preCall, redn_wrapper, usesImplBuf, false);
-    if(param->hasRecvRdma()) {
-      str << "  }\n";
-    } else if (param->hasDevice()) {
+    if(param->hasRecvRdma() || param->hasDevice()) {
       str << "  }\n";
     }
   }
@@ -1980,19 +1977,15 @@ void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bo
       if(isRdmaPost) {
         // Allocate an array of rdma pointers
         if (param->hasDevice()) {
-          str << "  void *buffPtrs["<< numRdmaDeviceParams <<"];\n";
-          str << "  int buffSizes["<< numRdmaDeviceParams <<"];\n";
+          str << "    void *buffPtrs["<< numRdmaDeviceParams <<"];\n";
+          str << "    int buffSizes["<< numRdmaDeviceParams <<"];\n";
         } else {
-          str << "  void *buffPtrs["<< numRdmaRecvParams <<"];\n";
-          str << "  int buffSizes["<< numRdmaRecvParams <<"];\n";
+          str << "    void *buffPtrs["<< numRdmaRecvParams <<"];\n";
+          str << "    int buffSizes["<< numRdmaRecvParams <<"];\n";
         }
         param->storePostedRdmaPtrs(str, isSDAGGen);
         if (param->hasDevice()) {
-          // is_inline determines if the regular entry method should be invoked
-          // right after the post entry method or if it should be invoked later
-          // with a message
-          str << "  if(CMI_IS_ZC_DEVICE(env))\n";
-          str << "    is_inline = CkRdmaDeviceIssueRgets(env, ";
+          str << "    CkRdmaDeviceIssueRgets(env, ";
           if (isSDAGGen)
             str << "genClosure->num_device_rdma_fields, ";
           else

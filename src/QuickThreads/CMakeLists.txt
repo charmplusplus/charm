@@ -14,7 +14,8 @@ elseif(${CMK_QT} STREQUAL "aix") # BG
 elseif(${CMK_QT} STREQUAL "none") # Win
 	set(ckqt-c-sources md/setjmp.c)
 elseif(${CMK_QT} STREQUAL "i386-gcc")
-	message(FATAL_ERROR "Unsupported Quickthreads version \"${CMK_QT}\"")
+	set(ckqt-c-sources md/i386.h md/i386.s)
+	set_source_files_properties(md/i386.s PROPERTIES COMPILE_FLAGS -m32)
 else()
 	message(FATAL_ERROR "Unknown Quickthreads version \"${CMK_QT}\"")
 endif()

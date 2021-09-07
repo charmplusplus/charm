@@ -1,16 +1,28 @@
 #ifndef _AMPIIMPL_H
 #define _AMPIIMPL_H
 
+#ifndef __STDC_FORMAT_MACROS
+# define __STDC_FORMAT_MACROS
+#endif
+#ifndef __STDC_LIMIT_MACROS
+# define __STDC_LIMIT_MACROS
+#endif
+#include <stdint.h>
+#include <inttypes.h>
+
 #include <string.h> /* for strlen */
 #include <algorithm>
 #include <numeric>
 #include <bitset>
 #include <complex>
 #include <iostream>
+#include <sstream>
 
 #include "ampi.h"
 #include "ddt.h"
 #include "charm++.h"
+#include "tcharm.h"
+#include "tcharmc.h"
 
 #if CMK_AMPI_WITH_ROMIO
 # include "mpio_globals.h"
@@ -53,15 +65,17 @@ extern int quietModeRequested;
 // Prints a single argument name and its value (unless the argument name is
 // '""', which indicates a nonexistent argument)
 #define PRINT_ARG(arg, last) \
-  if ("\"\""!=#arg) std::cout << #arg << "=" << arg << (last ? "" : ", ");
+  if ("\"\"" != #arg) stream << #arg << "=" << arg << (last ? "" : ", ");
 
 // Prints PE:VP, function name, and argument name/value for each function argument
 #define AMPI_DEBUG_ARGS(function_name, ...) \
   if(!quietModeRequested) { \
-  std::cout << "[" << CkMyPe() << ":" << \
-  (isAmpiThread() ? getAmpiParent()->thisIndex : -1) << "] "<< function_name <<"("; \
+  std::stringstream stream; \
+  stream << "[" << CkMyPe() << ":" << \
+  (isAmpiThread() ? getAmpiParent()->thisIndex : -1) << "] " << function_name << "("; \
   FOR_EACH(PRINT_ARG, __VA_ARGS__); \
-  std::cout << ")" << std::endl; }
+  stream << ")\n"; \
+  std::cout << stream.str() << std::flush; }
 
 #else // !AMPI_DO_DEBUG
 
@@ -99,6 +113,7 @@ extern int quietModeRequested;
 #endif
 
 extern char * ampi_binary_path;
+extern bool ampiUsingPieglobals;
 
 #if AMPIMSGLOG
 #include "ckliststring.h"
@@ -304,6 +319,10 @@ PUPfunctionpointer(MPI_User_function*)
  * OpStruct's are used to lookup an MPI_User_function* and check its commutativity.
  * They are also used to create AmpiOpHeader's, which are transmitted in reductions
  * that are user-defined or else lack an equivalent Charm++ reducer type.
+ *
+ * Note: when running with PIEglobals, func is stored as its offset from the rank's
+ *       base address, so that the real function can be looked up relative to any
+ *       rank's base address via ampiPeMgr.
  */
 class OpStruct {
  public:
@@ -312,12 +331,24 @@ class OpStruct {
  private:
   bool isValid;
 
+  MPI_User_function *createUserFunc(MPI_User_function *f) noexcept {
+    if (ampiUsingPieglobals) { // handle PIEglobals code relocation:
+      const CthThread th = TCharm::get()->getThread();
+      CmiIsomallocContext ctx = CmiIsomallocGetThreadContext(th);
+      const CmiIsomallocRegion heap = CmiIsomallocContextGetUsedExtent(ctx);
+      char *basePtr = (char *)heap.start;
+      return (MPI_User_function *)((char *)f - basePtr);
+    } else {
+      return f;
+    }
+  }
+
  public:
   OpStruct() = default;
-  OpStruct(MPI_User_function* f) noexcept : func(f), isCommutative(true), isValid(true) {}
-  OpStruct(MPI_User_function* f, bool c) noexcept : func(f), isCommutative(c), isValid(true) {}
+  OpStruct(MPI_User_function* f) noexcept : func(createUserFunc(f)), isCommutative(true), isValid(true) {}
+  OpStruct(MPI_User_function* f, bool c) noexcept : func(createUserFunc(f)), isCommutative(c), isValid(true) {}
   void init(MPI_User_function* f, bool c) noexcept {
-    func = f;
+    func = createUserFunc(f);
     isCommutative = c;
     isValid = true;
   }
@@ -779,9 +810,14 @@ class groupStruct {
 };
 
 enum AmpiCommType : uint8_t {
-   WORLD = 0
-  ,INTRA = 1
-  ,INTER = 2
+   COMM_WORLD      = 0
+  ,COMM_INTRA      = 1
+  ,COMM_INTER      = 2
+  ,COMM_SPLIT      = 3
+  ,COMM_GROUP      = 4
+  ,COMM_CART       = 5
+  ,COMM_GRAPH      = 6
+  ,COMM_DIST_GRAPH = 7
 };
 
 //Describes an AMPI communicator
@@ -790,7 +826,8 @@ class ampiCommStruct {
   MPI_Comm comm; //Communicator
   CkArrayID ampiID; //ID of corresponding ampi array
   int size; //Number of processes in communicator
-  AmpiCommType commType; //COMM_WORLD, intracomm, intercomm?
+  AmpiCommType commType; //COMM_WORLD, intracomm, intercomm, etc?
+
   groupStruct indices;  //indices[r] gives the array index for rank r
   groupStruct remoteIndices;  // remote group for inter-communicator
 
@@ -805,19 +842,38 @@ class ampiCommStruct {
 
  public:
   ampiCommStruct(int ignored=0) noexcept
-    : size(-1), commType(INTRA), ampiTopo(NULL), topoType(MPI_UNDEFINED)
+    : size(-1), commType(COMM_INTRA), ampiTopo(NULL), topoType(MPI_UNDEFINED)
   {}
   ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_,int size_) noexcept
-    : comm(comm_), ampiID(id_),size(size_), commType(WORLD), indices(size_),
+    : comm(comm_), ampiID(id_),size(size_), commType(COMM_WORLD), indices(size_),
       ampiTopo(NULL), topoType(MPI_UNDEFINED)
   {}
-  ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_, const std::vector<int> &indices_) noexcept
-    : comm(comm_), ampiID(id_), size(indices_.size()), commType(INTRA), indices(indices_),
+  ampiCommStruct(MPI_Comm comm_,const CkArrayID &id_, const std::vector<int> &indices_, AmpiCommType type_) noexcept
+    : comm(comm_), ampiID(id_), size(indices_.size()), commType(type_), indices(indices_),
       ampiTopo(NULL), topoType(MPI_UNDEFINED)
-  {}
+  {
+    switch (commType) {
+      case COMM_CART:
+        topoType = MPI_CART;
+        ampiTopo = new ampiCartTopology();
+        break;
+      case COMM_GRAPH:
+        topoType = MPI_GRAPH;
+        ampiTopo = new ampiGraphTopology();
+        break;
+      case COMM_DIST_GRAPH:
+        topoType = MPI_DIST_GRAPH;
+        ampiTopo = new ampiDistGraphTopology();
+        break;
+      default:
+        topoType = MPI_UNDEFINED;
+        ampiTopo = NULL;
+        break;
+    }
+  }
   ampiCommStruct(MPI_Comm comm_, const CkArrayID &id_, const std::vector<int> &indices_,
                  const std::vector<int> &remoteIndices_) noexcept
-    : comm(comm_), ampiID(id_), size(indices_.size()), commType(INTER), indices(indices_),
+    : comm(comm_), ampiID(id_), size(indices_.size()), commType(COMM_INTER), indices(indices_),
       remoteIndices(remoteIndices_), ampiTopo(NULL), topoType(MPI_UNDEFINED)
   {}
 
@@ -826,9 +882,8 @@ class ampiCommStruct {
       delete ampiTopo;
   }
 
-  // Overloaded copy constructor. Used when creating virtual topologies.
-  ampiCommStruct(const ampiCommStruct &obj, int topoNumber=MPI_UNDEFINED) noexcept {
-    switch (topoNumber) {
+  ampiCommStruct(const ampiCommStruct &obj) noexcept {
+    switch (obj.topoType) {
       case MPI_CART:
         ampiTopo = new ampiCartTopology();
         break;
@@ -842,7 +897,8 @@ class ampiCommStruct {
         ampiTopo = NULL;
         break;
     }
-    topoType       = topoNumber;
+    commType       = obj.commType;
+    topoType       = obj.topoType;
     comm           = obj.comm;
     ampiID         = obj.ampiID;
     size           = obj.size;
@@ -871,6 +927,7 @@ class ampiCommStruct {
         ampiTopo = NULL;
         break;
     }
+    commType       = obj.commType;
     topoType       = obj.topoType;
     comm           = obj.comm;
     ampiID         = obj.ampiID;
@@ -883,15 +940,11 @@ class ampiCommStruct {
     return *this;
   }
 
-  const ampiTopology* getTopologyforNeighbors() const noexcept {
-    return ampiTopo;
-  }
+  const ampiTopology* getTopology() const noexcept { return ampiTopo; }
+  ampiTopology* getTopology() noexcept { return ampiTopo; }
 
-  ampiTopology* getTopology() noexcept {
-    return ampiTopo;
-  }
-
-  inline bool isinter() const noexcept {return commType==INTER;}
+  inline bool isinter() const noexcept {return commType==COMM_INTER;}
+  inline AmpiCommType getType() const noexcept {return commType;}
   void setArrayID(const CkArrayID &nID) noexcept {ampiID=nID;}
 
   MPI_Comm getComm() const noexcept {return comm;}
@@ -1123,9 +1176,6 @@ inline std::vector<int> rangeExclOp(int n, int ranges[][3], const std::vector<in
   *flag = MPI_SUCCESS;
   return exclOp(ranks.size(), &ranks[0], vec);
 }
-
-#include "tcharm.h"
-#include "tcharmc.h"
 
 #include "ampi.decl.h"
 #include "charm-api.h"
@@ -1833,8 +1883,13 @@ class AmpiMsg final : public CMessage_AmpiMsg {
   friend AmpiMsgPool;
 };
 
-#define AMPI_MSG_POOL_SIZE    32 // Max # of AmpiMsg's allowed in the pool
-#define AMPI_POOLED_MSG_SIZE 128 // Max # of Bytes in pooled msgs' payload
+#ifndef AMPI_MSG_POOL_SIZE_DEFAULT
+#define AMPI_MSG_POOL_SIZE_DEFAULT    32 // Max # of AmpiMsg's allowed in the pool
+#endif
+
+#ifndef AMPI_POOLED_MSG_SIZE_DEFAULT
+#define AMPI_POOLED_MSG_SIZE_DEFAULT 128 // Max # of Bytes in pooled msgs' payload
+#endif
 
 class AmpiMsgPool {
  private:
@@ -2079,6 +2134,82 @@ inline CProxy_ampi ampiCommStruct::getProxy() const noexcept {return ampiID;}
 // Max value of a predefined MPI_Op (values defined in ampi.h)
 #define AMPI_MAX_PREDEFINED_OP 13
 
+// COMM_WORLD and COMM_SELF, in that order, are the first two communicators
+// created in AMPI, so MPI_COMM_SELF must be MPI_COMM_WORLD+1 in ampi.h
+static_assert(MPI_COMM_SELF == MPI_COMM_WORLD+1,
+              "AMPI's MPI_COMM_SELF constant should be equal to MPI_COMM_WORLD+1");
+
+class AmpiCommStructMap {
+ private:
+  std::unordered_map<MPI_Comm, ampiCommStruct> comms; //All communicators
+  MPI_Comm nextComm = MPI_COMM_WORLD; // Value of the next MPI_Comm to be created
+                                      // COMM_WORLD and COMM_SELF are the first two created
+
+ public:
+  AmpiCommStructMap() = default;
+  ~AmpiCommStructMap() = default;
+  void pup(PUP::er& p) noexcept {
+    p|comms;
+    p|nextComm;
+  }
+  void checkComm(MPI_Comm comm) const noexcept {
+    if (comm == MPI_COMM_SELF || comm == MPI_COMM_WORLD)
+      return;
+    const auto search = comms.find(comm);
+    if (search == comms.end()) {
+      CkAbort("AMPI: invalid MPI_Comm %d used!", comm);
+    }
+  }
+  MPI_Comm getNextComm() const noexcept { return nextComm; }
+  MPI_Comm insert(const ampiCommStruct &commStruct) noexcept {
+    int comm = commStruct.getComm();
+    comms[comm] = commStruct;
+    if (comm >= nextComm) {
+      nextComm = comm+1;
+    }
+    return comm;
+  }
+  void free(MPI_Comm comm) noexcept {
+    comms.erase(comm);
+    if (comm == nextComm-1) nextComm--;
+  }
+  bool isComm(MPI_Comm comm) const noexcept {
+    const auto search = comms.find(comm);
+    return (search != comms.end());
+  }
+  const ampiCommStruct& getCommStruct(MPI_Comm comm) const noexcept {
+    const auto search = comms.find(comm);
+#if CMK_ERROR_CHECKING
+    if (search == comms.end()) {
+      CkAbort("AMPI: invalid MPI_Comm %d used!", comm);
+    }
+#endif
+    return search->second;
+  }
+  ampiCommStruct& getCommStruct(MPI_Comm comm) noexcept {
+    return comms[comm];
+  }
+  const ampiCommStruct& operator[](MPI_Comm comm) const noexcept {
+    const auto search = comms.find(comm);
+#if CMK_ERROR_CHECKING
+    if (search == comms.end()) {
+      CkAbort("AMPI: invalid MPI_Comm %d used!", comm);
+    }
+#endif
+    return search->second;
+  }
+  ampiCommStruct& operator[](MPI_Comm comm) noexcept { return comms[comm]; }
+  AmpiCommType getType(MPI_Comm comm) const noexcept {
+    const auto search = comms.find(comm);
+#if CMK_ERROR_CHECKING
+    if (search == comms.end()) {
+      CkAbort("AMPI: invalid MPI_Comm %d used!", comm);
+    }
+#endif
+    return search->second.getType();
+  }
+};
+
 /*
 An ampiParent holds all the communicators and the TCharm thread
 for its children, which are bound to it.
@@ -2099,13 +2230,7 @@ class ampiParent final : public CBase_ampiParent {
  private:
   ampi *worldPtr; //AMPI element corresponding to MPI_COMM_WORLD
 
-  CkPupPtrVec<ampiCommStruct> splitComm;     //Communicators from MPI_Comm_split
-  CkPupPtrVec<ampiCommStruct> groupComm;     //Communicators from MPI_Comm_group
-  CkPupPtrVec<ampiCommStruct> cartComm;      //Communicators from MPI_Cart_create
-  CkPupPtrVec<ampiCommStruct> graphComm;     //Communicators from MPI_Graph_create
-  CkPupPtrVec<ampiCommStruct> distGraphComm; //Communicators from MPI_Dist_graph_create
-  CkPupPtrVec<ampiCommStruct> interComm;     //Communicators from MPI_Intercomm_create
-  CkPupPtrVec<ampiCommStruct> intraComm;     //Communicators from MPI_Intercomm_merge
+  AmpiCommStructMap comms; //All communicators
 
   CkPupPtrVec<groupStruct> groups; // "Wild" groups that don't have a communicator
   CkPupPtrVec<WinStruct> winStructList; //List of windows for one-sided communication
@@ -2172,36 +2297,11 @@ class ampiParent final : public CBase_ampiParent {
     *(void **)buffer = bsendBuffer;
     *size = bsendBufferSize;
   }
-  inline bool isSplit(MPI_Comm comm) const noexcept {
-    return (comm>=MPI_COMM_FIRST_SPLIT && comm<MPI_COMM_FIRST_GROUP);
-  }
-  const ampiCommStruct &getSplit(MPI_Comm comm) const noexcept {
-    int idx=comm-MPI_COMM_FIRST_SPLIT;
-    if (idx>=splitComm.size()) CkAbort("Bad split communicator used");
-    return *splitComm[idx];
-  }
-  void splitChildRegister(const ampiCommStruct &s) noexcept;
 
-  inline bool isGroup(MPI_Comm comm) const noexcept {
-    return (comm>=MPI_COMM_FIRST_GROUP && comm<MPI_COMM_FIRST_CART);
-  }
-  const ampiCommStruct &getGroup(MPI_Comm comm) const noexcept {
-    int idx=comm-MPI_COMM_FIRST_GROUP;
-    if (idx>=groupComm.size()) CkAbort("Bad group communicator used");
-    return *groupComm[idx];
-  }
-  void groupChildRegister(const ampiCommStruct &s) noexcept;
-  inline bool isInGroups(MPI_Group group) const noexcept {
-    return (group>=0 && group<groups.size());
-  }
+  AmpiCommStructMap &getCommStructMap() noexcept { return comms; }
+  ampiCommStruct &getCommStruct(MPI_Comm comm) noexcept { return comms[comm]; }
+  const ampiCommStruct &getCommStruct(MPI_Comm comm) const noexcept { return comms[comm]; }
 
-  void cartChildRegister(const ampiCommStruct &s) noexcept;
-  void graphChildRegister(const ampiCommStruct &s) noexcept;
-  void distGraphChildRegister(const ampiCommStruct &s) noexcept;
-  void interChildRegister(const ampiCommStruct &s) noexcept;
-  void intraChildRegister(const ampiCommStruct &s) noexcept;
-
- public:
   ampiParent(CProxy_TCharm threads_,int nRanks_) noexcept;
   ampiParent(CkMigrateMessage *msg) noexcept;
   void ckAboutToMigrate() noexcept;
@@ -2213,7 +2313,7 @@ class ampiParent final : public CBase_ampiParent {
   ~ampiParent() noexcept;
 
   //Children call this when they are first created, or just migrated
-  TCharm *registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration) noexcept;
+  TCharm *registerAmpi(ampi *ptr,const ampiCommStruct &s,bool forMigration) noexcept;
 
   // exchange proxy info between two ampi proxies
   void ExchangeProxy(CProxy_ampi rproxy) noexcept {
@@ -2222,54 +2322,16 @@ class ampiParent final : public CBase_ampiParent {
   }
 
   //Grab the next available split/group communicator
-  MPI_Comm getNextSplit() const noexcept {return MPI_COMM_FIRST_SPLIT+splitComm.size();}
-  MPI_Comm getNextGroup() const noexcept {return MPI_COMM_FIRST_GROUP+groupComm.size();}
-  MPI_Comm getNextCart() const noexcept {return MPI_COMM_FIRST_CART+cartComm.size();}
-  MPI_Comm getNextGraph() const noexcept {return MPI_COMM_FIRST_GRAPH+graphComm.size();}
-  MPI_Comm getNextDistGraph() const noexcept {return MPI_COMM_FIRST_DIST_GRAPH+distGraphComm.size();}
-  MPI_Comm getNextInter() const noexcept {return MPI_COMM_FIRST_INTER+interComm.size();}
-  MPI_Comm getNextIntra() const noexcept {return MPI_COMM_FIRST_INTRA+intraComm.size();}
+  MPI_Comm getNextComm() const noexcept {return comms.getNextComm();}
 
-  inline bool isCart(MPI_Comm comm) const noexcept {
-    return (comm>=MPI_COMM_FIRST_CART && comm<MPI_COMM_FIRST_GRAPH);
-  }
-  ampiCommStruct &getCart(MPI_Comm comm) const noexcept {
-    int idx=comm-MPI_COMM_FIRST_CART;
-    if (idx>=cartComm.size()) CkAbort("AMPI> Bad cartesian communicator used!\n");
-    return *cartComm[idx];
-  }
-  inline bool isGraph(MPI_Comm comm) const noexcept {
-    return (comm>=MPI_COMM_FIRST_GRAPH && comm<MPI_COMM_FIRST_DIST_GRAPH);
-  }
-  ampiCommStruct &getGraph(MPI_Comm comm) const noexcept {
-    int idx=comm-MPI_COMM_FIRST_GRAPH;
-    if (idx>=graphComm.size()) CkAbort("AMPI> Bad graph communicator used!\n");
-    return *graphComm[idx];
-  }
-  inline bool isDistGraph(MPI_Comm comm) const noexcept {
-    return (comm >= MPI_COMM_FIRST_DIST_GRAPH && comm < MPI_COMM_FIRST_INTER);
-  }
-  ampiCommStruct &getDistGraph(MPI_Comm comm) const noexcept {
-    int idx = comm-MPI_COMM_FIRST_DIST_GRAPH;
-    if (idx>=distGraphComm.size()) CkAbort("Bad distributed graph communicator used");
-    return *distGraphComm[idx];
-  }
-  inline bool isInter(MPI_Comm comm) const noexcept {
-    return (comm>=MPI_COMM_FIRST_INTER && comm<MPI_COMM_FIRST_INTRA);
-  }
-  const ampiCommStruct &getInter(MPI_Comm comm) const noexcept {
-    int idx=comm-MPI_COMM_FIRST_INTER;
-    if (idx>=interComm.size()) CkAbort("AMPI> Bad inter-communicator used!\n");
-    return *interComm[idx];
-  }
-  inline bool isIntra(MPI_Comm comm) const noexcept {
-    return (comm>=MPI_COMM_FIRST_INTRA && comm<MPI_COMM_FIRST_RESVD);
-  }
-  const ampiCommStruct &getIntra(MPI_Comm comm) const noexcept {
-    int idx=comm-MPI_COMM_FIRST_INTRA;
-    if (idx>=intraComm.size()) CkAbort("Bad intra-communicator used");
-    return *intraComm[idx];
-  }
+  bool isSplit(MPI_Comm comm) const noexcept { return (comms.getType(comm) == COMM_SPLIT); }
+  bool isCart(MPI_Comm comm) const noexcept { return (comms.getType(comm) == COMM_CART); }
+  bool isGraph(MPI_Comm comm) const noexcept { return (comms.getType(comm) == COMM_GRAPH); }
+  bool isDistGraph(MPI_Comm comm) const noexcept { return (comms.getType(comm) == COMM_DIST_GRAPH); }
+  bool isInter(MPI_Comm comm) const noexcept { return (comms.getType(comm) == COMM_INTER); }
+  bool isIntra(MPI_Comm comm) const noexcept { return (comms.getType(comm) == COMM_INTRA); }
+  bool isGroup(MPI_Comm comm) const noexcept { return (comms.getType(comm) == COMM_GROUP); }
+  bool isInGroups(MPI_Group group) const noexcept { return (group>=0 && group<groups.size()); }
 
   void pup(PUP::er &p) noexcept;
 
@@ -2288,18 +2350,9 @@ class ampiParent final : public CBase_ampiParent {
 
   const ampiCommStruct &getWorldStruct() const noexcept;
 
-  inline const ampiCommStruct &comm2CommStruct(MPI_Comm comm) const noexcept {
-    if (comm==MPI_COMM_WORLD) return getWorldStruct();
-    if (isSplit(comm)) return getSplit(comm);
-    if (isGroup(comm)) return getGroup(comm);
-    if (isCart(comm)) return getCart(comm);
-    if (isGraph(comm)) return getGraph(comm);
-    if (isDistGraph(comm)) return getDistGraph(comm);
-    if (isInter(comm)) return getInter(comm);
-    if (isIntra(comm)) return getIntra(comm);
-    CkAbort("Invalid communicator used: %d", comm);
-    return getWorldStruct();
-  }
+  const ampiCommStruct &comm2CommStruct(MPI_Comm comm) const noexcept;
+
+  void freeCommStruct(MPI_Comm comm) noexcept { comms.free(comm); }
 
   inline std::unordered_map<int, uintptr_t> & getAttributes(MPI_Comm comm) noexcept {
     ampiCommStruct & cs = const_cast<ampiCommStruct &>(comm2CommStruct(comm));
@@ -2308,42 +2361,13 @@ class ampiParent final : public CBase_ampiParent {
 
   inline ampi *comm2ampi(MPI_Comm comm) const noexcept {
     if (comm==MPI_COMM_WORLD) return worldPtr;
-    if (isSplit(comm)) {
-      const ampiCommStruct &st=getSplit(comm);
-      return st.getProxy()[thisIndex].ckLocal();
-    }
-    if (isGroup(comm)) {
-      const ampiCommStruct &st=getGroup(comm);
-      return st.getProxy()[thisIndex].ckLocal();
-    }
-    if (isCart(comm)) {
-      const ampiCommStruct &st = getCart(comm);
-      return st.getProxy()[thisIndex].ckLocal();
-    }
-    if (isGraph(comm)) {
-      const ampiCommStruct &st = getGraph(comm);
-      return st.getProxy()[thisIndex].ckLocal();
-    }
-    if (isDistGraph(comm)) {
-      const ampiCommStruct &st = getDistGraph(comm);
-      return st.getProxy()[thisIndex].ckLocal();
-    }
-    if (isInter(comm)) {
-      const ampiCommStruct &st=getInter(comm);
-      return st.getProxy()[thisIndex].ckLocal();
-    }
-    if (isIntra(comm)) {
-      const ampiCommStruct &st=getIntra(comm);
-      return st.getProxy()[thisIndex].ckLocal();
-    }
-    CkAbort("Invalid communicator used: %d", comm);
-    return NULL;
+    const ampiCommStruct &st = getCommStruct(comm);
+    return st.getProxy()[thisIndex].ckLocal();
   }
 
   inline bool hasComm(const MPI_Group group) const noexcept {
     MPI_Comm comm = (MPI_Comm)group;
-    return ( comm==MPI_COMM_WORLD || isSplit(comm) || isGroup(comm) ||
-             isCart(comm) || isGraph(comm) || isDistGraph(comm) || isIntra(comm) );
+    return (comms.isComm(comm) && !isInter(comm));
     //isInter omitted because its comm number != its group number
   }
   inline std::vector<int> group2vec(MPI_Group group) const noexcept {
@@ -2378,31 +2402,23 @@ class ampiParent final : public CBase_ampiParent {
   }
 
   inline void checkComm(MPI_Comm comm) const noexcept {
-    if ((comm != MPI_COMM_SELF && comm != MPI_COMM_WORLD)
-     || (isSplit(comm) && comm-MPI_COMM_FIRST_SPLIT >= splitComm.size())
-     || (isGroup(comm) && comm-MPI_COMM_FIRST_GROUP >= groupComm.size())
-     || (isCart(comm)  && comm-MPI_COMM_FIRST_CART  >=  cartComm.size())
-     || (isGraph(comm) && comm-MPI_COMM_FIRST_GRAPH >= graphComm.size())
-     || (isDistGraph(comm) && comm-MPI_COMM_FIRST_DIST_GRAPH >= distGraphComm.size())
-     || (isInter(comm) && comm-MPI_COMM_FIRST_INTER >= interComm.size())
-     || (isIntra(comm) && comm-MPI_COMM_FIRST_INTRA >= intraComm.size()) )
-      CkAbort("Invalid MPI_Comm\n");
+    comms.checkComm(comm);
   }
 
   /// if intra-communicator, return comm, otherwise return null group
   inline MPI_Group comm2group(const MPI_Comm comm) const noexcept {
     if(isInter(comm)) return MPI_GROUP_NULL;   // we don't support inter-communicator in such functions
-    ampiCommStruct s = comm2CommStruct(comm);
+    const ampiCommStruct& s = comm2CommStruct(comm);
     if(comm!=MPI_COMM_WORLD && comm!=s.getComm()) CkAbort("Error in ampiParent::comm2group()");
     return (MPI_Group)(s.getComm());
   }
 
   inline int getRemoteSize(const MPI_Comm comm) const noexcept {
-    if(isInter(comm)) return getInter(comm).getRemoteIndices().size();
+    if(isInter(comm)) return getCommStruct(comm).getRemoteIndices().size();
     else return -1;
   }
   inline MPI_Group getRemoteGroup(const MPI_Comm comm) noexcept {
-    if(isInter(comm)) return saveGroupStruct(getInter(comm).getRemoteIndices());
+    if(isInter(comm)) return saveGroupStruct(getCommStruct(comm).getRemoteIndices());
     else return MPI_GROUP_NULL;
   }
 
@@ -2484,16 +2500,7 @@ class ampiParent final : public CBase_ampiParent {
       return userOps[opIdx].isCommutative;
     }
   }
-  inline MPI_User_function* op2User_function(MPI_Op op) const noexcept {
-    if (opIsPredefined(op)) {
-      return predefinedOps[op];
-    }
-    else {
-      int opIdx = op - 1 - AMPI_MAX_PREDEFINED_OP;
-      CkAssert(opIdx < userOps.size());
-      return userOps[opIdx].func;
-    }
-  }
+  MPI_User_function* op2User_function(MPI_Op op) const noexcept;
   inline AmpiOpHeader op2AmpiOpHeader(MPI_Op op, MPI_Datatype type, int count) const noexcept {
     if (opIsPredefined(op)) {
       int size = myDDT.getType(type)->getSize(count);
@@ -2577,6 +2584,7 @@ class ampi final : public CBase_ampi {
   ampiParent *parent;
   CProxy_ampiParent parentProxy;
   TCharm *thread;
+  MPI_Comm comm;
   int myRank;
   AmpiSeqQ oorder;
 
@@ -2597,7 +2605,7 @@ class ampi final : public CBase_ampi {
   std::vector<greq_class_desc> greq_classes;
 
  private:
-  ampiCommStruct myComm;
+  ampiCommStruct* myComm; // pointer to my ampiCommStruct, owned by ampiParent::comms
   std::vector<int> tmpVec; // stores temp group info
   CProxy_ampi remoteProxy; // valid only for intercommunicator
   CkPupPtrVec<win_obj> winObjects;
@@ -2620,7 +2628,8 @@ class ampi final : public CBase_ampi {
                            int srcRank, IReq* ireq) noexcept;
 
   void init() noexcept;
-  void findParent(bool forMigration) noexcept;
+  void findParentAfterMigration() noexcept;
+  void findParentAfterCreation(const ampiCommStruct &s) noexcept;
 
  public: // entry methods
   ampi() noexcept;
@@ -2654,7 +2663,7 @@ class ampi final : public CBase_ampi {
 
   void splitPhase1(CkReductionMsg *msg) noexcept;
   void splitPhaseInter(CkReductionMsg *msg) noexcept;
-  void commCreatePhase1(MPI_Comm nextGroupComm) noexcept;
+  void commCreatePhase1(int nextComm, int commType) noexcept;
   void registrationFinish() noexcept;
   void intercommCreatePhase1(MPI_Comm nextInterComm) noexcept;
   void intercommMergePhase1(MPI_Comm nextIntraComm) noexcept;
@@ -2684,8 +2693,8 @@ class ampi final : public CBase_ampi {
 
  private: // Used by the above entry methods that create new MPI_Comm objects
   CProxy_ampi createNewChildAmpiSync() noexcept;
-  CProxy_ampi createNewSplitCommArray(MPI_Comm newComm, const std::vector<int> & indices) noexcept;
-  void insertNewChildAmpiElements(MPI_Comm newComm, CProxy_ampi newAmpi) noexcept;
+  CProxy_ampi createNewSplitCommArray(MPI_Comm newComm, const std::vector<int> & indices, AmpiCommType type) noexcept;
+  void insertNewChildAmpiElements(MPI_Comm newComm, CProxy_ampi newAmpi, AmpiCommType type) noexcept;
 
   inline void handleBlockedReq(AmpiRequest* req) noexcept {
     if (req->isBlocked() && parent->numBlockedReqs != 0) {
@@ -2705,10 +2714,8 @@ class ampi final : public CBase_ampi {
   static void static_mprobe(ampi* dis, int t, int s, MPI_Comm comm, MPI_Status *sts, MPI_Message *message) noexcept;
 
  public: // to be used by MPI_* functions
-  inline const ampiCommStruct &comm2CommStruct(MPI_Comm comm) const noexcept {
-    return parent->comm2CommStruct(comm);
-  }
-  inline const ampiCommStruct &getCommStruct() const noexcept { return myComm; }
+  const ampiCommStruct &comm2CommStruct(MPI_Comm comm) const noexcept { return parent->comm2CommStruct(comm); }
+  const ampiCommStruct &getCommStruct() const noexcept { return *myComm; }
 
   CMI_WARN_UNUSED_RESULT inline ampi* blockOnRecv() noexcept;
   CMI_WARN_UNUSED_RESULT CMI_FORCE_INLINE ampi* blockOnColl() noexcept {
@@ -2810,34 +2817,32 @@ class ampi final : public CBase_ampi {
   void ibcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm comm, MPI_Request* request) noexcept;
   int intercomm_ibcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm intercomm, MPI_Request *request) noexcept;
   static void bcastraw(void* buf, int len, CkArrayID aid) noexcept;
-  void split(int color,int key,MPI_Comm *dest, int type) noexcept;
-  void commCreate(const std::vector<int>& vec,MPI_Comm *newcomm) noexcept;
+  void split(int color,int key,MPI_Comm *dest, AmpiCommType type) noexcept;
+  MPI_Comm commCreate(const std::vector<int>& vec, AmpiCommType type) noexcept;
   MPI_Comm cartCreate0D() noexcept;
   MPI_Comm cartCreate(std::vector<int>& vec, int ndims, const int* dims) noexcept;
-  void graphCreate(const std::vector<int>& vec, MPI_Comm *newcomm) noexcept;
-  void distGraphCreate(const std::vector<int>& vec, MPI_Comm *newcomm) noexcept;
-  void intercommCreate(const std::vector<int>& rvec, int root, MPI_Comm tcomm, MPI_Comm *ncomm) noexcept;
+  MPI_Comm intercommCreate(const std::vector<int>& rvec, int root, MPI_Comm tcomm) noexcept;
 
-  inline bool isInter() const noexcept { return myComm.isinter(); }
+  inline bool isInter() const noexcept { return myComm->isinter(); }
   void intercommMerge(int first, MPI_Comm *ncomm) noexcept;
 
   inline ampiParent* getParent() const noexcept { return parent; }
   inline int getWorldRank() const noexcept {return parent->thisIndex;}
   /// Return our rank in this communicator
   inline int getRank() const noexcept {return myRank;}
-  inline int getSize() const noexcept {return myComm.getSize();}
-  inline MPI_Comm getComm() const noexcept {return myComm.getComm();}
-  inline void setCommName(const char *name) noexcept {myComm.setName(name);}
-  inline void getCommName(char *name, int *len) const noexcept {myComm.getName(name,len);}
-  inline std::vector<int> getIndices() const noexcept { return myComm.getIndices(); }
-  inline std::vector<int> getRemoteIndices() const noexcept { return myComm.getRemoteIndices(); }
+  inline int getSize() const noexcept {return myComm->getSize();}
+  inline MPI_Comm getComm() const noexcept {return comm;}
+  inline void setCommName(const char *name) noexcept {myComm->setName(name);}
+  inline void getCommName(char *name, int *len) const noexcept {myComm->getName(name,len);}
+  inline std::vector<int> getIndices() const noexcept { return myComm->getIndices(); }
+  inline std::vector<int> getRemoteIndices() const noexcept { return myComm->getRemoteIndices(); }
   inline const CProxy_ampi &getProxy() const noexcept {return thisProxy;}
   inline const CProxy_ampi &getRemoteProxy() const noexcept {return remoteProxy;}
   inline void setRemoteProxy(CProxy_ampi rproxy) noexcept { remoteProxy = rproxy; }
-  inline int getIndexForRank(int r) const noexcept {return myComm.getIndexForRank(r);}
-  inline int getIndexForRemoteRank(int r) const noexcept {return myComm.getIndexForRemoteRank(r);}
+  inline int getIndexForRank(int r) const noexcept {return myComm->getIndexForRank(r);}
+  inline int getIndexForRemoteRank(int r) const noexcept {return myComm->getIndexForRemoteRank(r);}
   void findNeighbors(MPI_Comm comm, int rank, std::vector<int>& neighbors) const noexcept;
-  inline const std::vector<int>& getNeighbors() const noexcept { return myComm.getTopologyforNeighbors()->getnbors(); }
+  inline const std::vector<int>& getNeighbors() const noexcept { return myComm->getTopology()->getnbors(); }
   inline bool opIsCommutative(MPI_Op op) const noexcept { return parent->opIsCommutative(op); }
   inline MPI_User_function* op2User_function(MPI_Op op) const noexcept { return parent->op2User_function(op); }
   void topoDup(int topoType, int rank, MPI_Comm comm, MPI_Comm *newcomm) noexcept;
@@ -3074,5 +3079,6 @@ int AMPI_Main_Dispatch(ampi_mainstruct, int argc, char ** argv);
 
 /* For internal AMPI use only: semantics subject to change. */
 CLINKAGE void AMPI_Node_Setup(int numranks);
+CLINKAGE void AMPI_Rank_Setup(int myrank, int numranks, CmiIsomallocContext ctx);
 
 #endif // _AMPIIMPL_H
