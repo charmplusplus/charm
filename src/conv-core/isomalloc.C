@@ -696,28 +696,28 @@ struct CmiAddressSpaceRegionMsg
   CmiAddressSpaceRegion region;
 };
 
-static std::atomic<char> CmiIsomallocSyncHandlerDone;
+static std::atomic<bool> CmiIsomallocSyncHandlerDone{};
 #if CMK_SMP && !CMK_SMP_NO_COMMTHD
 extern void CommunicationServerThread(int sleepTime);
-static std::atomic<char> CmiIsomallocSyncCommThreadDone;
+static std::atomic<bool> CmiIsomallocSyncCommThreadDone{};
 #endif
 
 #if CMK_SMP && !CMK_SMP_NO_COMMTHD
-static void CmiIsomallocSyncWaitCommThread()
+static void CmiIsomallocSyncWaitCommThread(std::atomic<bool> & done)
 {
   do
     CommunicationServerThread(5);
-  while (!CmiIsomallocSyncCommThreadDone.load());
+  while (!done.load());
 
   CommunicationServerThread(5);
 }
 #endif
 
-static void CmiIsomallocSyncWait()
+static void CmiIsomallocSyncWait(std::atomic<bool> & done)
 {
   do
     CsdSchedulePoll();
-  while (!CmiIsomallocSyncHandlerDone.load());
+  while (!done.load());
 
   CsdSchedulePoll();
 }
@@ -729,7 +729,7 @@ static void CmiIsomallocSyncReductionHandler(void * data)
   auto region = (CmiAddressSpaceRegion *)data;
   CmiAssert(region == &IsoRegion);
 
-  CmiIsomallocSyncHandlerDone = 1;
+  CmiIsomallocSyncHandlerDone = true;
 }
 static void CmiIsomallocSyncBroadcastHandler(void * msg)
 {
@@ -741,7 +741,7 @@ static void CmiIsomallocSyncBroadcastHandler(void * msg)
 
   CmiFree(msg);
 
-  CmiIsomallocSyncHandlerDone = 1;
+  CmiIsomallocSyncHandlerDone = true;
 }
 
 static void CmiIsomallocInitExtent(char ** argv)
@@ -853,6 +853,13 @@ static void CmiIsomallocInitExtent(char ** argv)
   }
   else if (CmiNumNodes() > 1)
   {
+#if CMK_SMP && !CMK_SMP_NO_COMMTHD
+    if (CmiInCommThread())
+    {
+      CmiIsomallocSyncWaitCommThread(CmiIsomallocSyncCommThreadDone);
+    }
+    else
+#endif
     if (CmiMyRank() == 0)
     {
       if (CmiMyNode() == 0)
@@ -866,7 +873,7 @@ static void CmiIsomallocInitExtent(char ** argv)
       CmiNodeReduceStruct(&IsoRegion, CmiAddressSpaceRegionPup, CmiAddressSpaceRegionMerge,
                           CmiIsomallocSyncReductionHandler, nullptr);
 
-      CmiIsomallocSyncWait();
+      CmiIsomallocSyncWait(CmiIsomallocSyncHandlerDone);
 
       if (CmiMyNode() == 0)
       {
@@ -897,15 +904,9 @@ static void CmiIsomallocInitExtent(char ** argv)
       CmiIsomallocSyncCommThreadDone = 1;
 #endif
     }
-#if CMK_SMP && !CMK_SMP_NO_COMMTHD
-    else if (CmiInCommThread())
-    {
-      CmiIsomallocSyncWaitCommThread();
-    }
-#endif
     else
     {
-      CmiIsomallocSyncWait();
+      CmiIsomallocSyncWait(CmiIsomallocSyncHandlerDone);
     }
 
     CmiBarrier();

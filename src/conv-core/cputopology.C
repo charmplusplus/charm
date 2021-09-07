@@ -69,10 +69,6 @@ typedef struct _nodeTopoMsg {
   int *nodes;
 } nodeTopoMsg;
 
-typedef struct _topoDoneMsg { // used for empty reduction to indicate all PEs have topo info
-  char core[CmiMsgHeaderSizeBytes];
-} topoDoneMsg;
-
 // nodeIDs[pe] is the node number of processor pe
 class CpuTopology {
 public:
@@ -203,21 +199,21 @@ static std::atomic<bool> cpuTopoSyncCommThreadDone{};
 #endif
 
 #if CMK_SMP && !CMK_SMP_NO_COMMTHD
-static void cpuTopoSyncWaitCommThread()
+static void cpuTopoSyncWaitCommThread(std::atomic<bool> & done)
 {
   do
     CommunicationServerThread(5);
-  while (!cpuTopoSyncCommThreadDone.load());
+  while (!done.load());
 
   CommunicationServerThread(5);
 }
 #endif
 
-static void cpuTopoSyncWait()
+static void cpuTopoSyncWait(std::atomic<bool> & done)
 {
   do
     CsdSchedulePoll();
-  while (!cpuTopoSyncHandlerDone.load());
+  while (!done.load());
 
   CsdSchedulePoll();
 }
@@ -493,7 +489,7 @@ extern "C" void LrtsInitCpuTopo(char **argv)
 #if CMK_SMP && !CMK_SMP_NO_COMMTHD
   if (CmiInCommThread())
   {
-    cpuTopoSyncWaitCommThread();
+    cpuTopoSyncWaitCommThread(cpuTopoSyncCommThreadDone);
   }
   else
 #endif
@@ -511,7 +507,7 @@ extern "C" void LrtsInitCpuTopo(char **argv)
     proc->nodeID = 0;
     CmiReduce(msg, sizeof(hostnameMsg)+sizeof(_procInfo), combineMessage);
 
-    cpuTopoSyncWait();
+    cpuTopoSyncWait(cpuTopoSyncHandlerDone);
 
     if (CmiMyRank() == 0)
     {
