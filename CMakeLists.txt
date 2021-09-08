@@ -260,6 +260,12 @@ IF(JPEG_FOUND)
   set(CMK_USE_LIBJPEG 1)
 ENDIF()
 
+if(NETWORK STREQUAL "pami")
+  set(CMK_USE_LRTS 0)
+else()
+  set(CMK_USE_LRTS 1)
+endif()
+
 # Check for Python
 # PythonCCS requires Python v2.x and is the only target that uses this
 # With CMake 3.12+ we could use FindPython() here
