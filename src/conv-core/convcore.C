@@ -4213,7 +4213,8 @@ void CmiError(const char *format, ...)
 
 void __CmiEnforceHelper(const char* expr, const char* fileName, const char* lineNum)
 {
-  __CmiEnforceMsgHelper(expr, fileName, lineNum, "");
+  CmiAbort("[%d] Assertion \"%s\" failed in file %s line %s.\n", CmiMyPe(), expr,
+           fileName, lineNum);
 }
 
 void __CmiEnforceMsgHelper(const char* expr, const char* fileName, const char* lineNum,
