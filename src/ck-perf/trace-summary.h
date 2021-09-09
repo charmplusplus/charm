@@ -90,14 +90,22 @@ class BinEntry {
     unsigned long &getCount() {return _msgCount; }
     CkVec<unsigned long> &getSizePerEP() { return _msgSizePerEP;}
     CkVec<unsigned long> &getCountPerEP() {return _msgCountPerEP; }
+    unsigned long &getSizePerEPPerIndex(int j) {return (j < _msgSizePerEP.size())?_msgSizePerEP[j]:0; }
+    unsigned long &getCountPerEPPerIndex(int j) {return (j < _msgCountPerEP.size())?_msgCountPerEP[j]:0; }
+
     unsigned long &getRecvSize() { return _recvSize; }
     unsigned long &getRecvCount() { return _recvCount; }
     CkVec<unsigned long> &getRecvSizePerEP() {return _recvSizePerEP; }
     CkVec<unsigned long> &getRecvCountPerEP() {return _recvCountPerEP; }
+    unsigned long &getRecvSizePerEPPerIndex(int j) {return (j < _recvSizePerEP.size())?_recvSizePerEP[j]:0; }
+    unsigned long &getRecvCountPerEPPerIndex(int j) {return (j < _recvCountPerEP.size())?_recvCountPerEP[j]:0; }
+
     unsigned long &getExtRecvSize() {return _extRecvSize;}
     unsigned long &getExtRecvCount() {return _extRecvCount;}
     CkVec<unsigned long> &getExtRecvSizePerEP() {return _extRecvSizePerEP; }
     CkVec<unsigned long> &getExtRecvCountPerEP() {return _extRecvCountPerEP; }
+    unsigned long &getExtRecvSizePerEPPerIndex(int j) {return (j < _extRecvSizePerEP.size())?_extRecvSizePerEP[j]:0; }
+    unsigned long &getExtRecvCountPerEPPerIndex(int j) {return (j < _extRecvCountPerEP.size())?_extRecvCountPerEP[j]:0; }
     void write(FILE *fp);
     int  getU();
     int getUIdle();
@@ -277,7 +285,8 @@ class SumLogPool {
     double *getCpuTime() {return cpuTime;}
     void initMem();
     void write(void) ;
-    void writeEncoder(int numBins, LogWriter writer);
+    void writeEncoder(int numBins, LogWriter event);
+    void writeEncoderRow(int numBins, LogWriter event);
     void writeSts(void);
     void add(double time, double idleTime, unsigned long msgSize, unsigned long msgCount,
              CkVec<unsigned long> msgSizePerEP, CkVec<unsigned long> msgCountPerEP,

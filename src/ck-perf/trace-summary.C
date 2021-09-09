@@ -520,6 +520,55 @@ void SumLogPool::writeEncoder(int numBins, LogWriter event) {
     unsigned long prev_val = 0;
     unsigned long streak = 0;
 
+    for(int i = 0; i < _entryTable.size(); ++i) {
+        for(int j = 0; j < numBins; ++j) {
+            unsigned long temp;
+            switch (event) {
+                case MsgSentCount:
+                    temp = pool[j].getCountPerEPPerIndex(i);
+                    break;
+                case MsgSentSize:
+                    temp = pool[j].getSizePerEPPerIndex(i);
+                    break;
+                case MsgRecvCount:
+                    temp = pool[j].getRecvCountPerEPPerIndex(i);
+                    break;
+                case MsgRecvSize:
+                    temp = pool[j].getRecvSizePerEPPerIndex(i);
+                    break;
+                case ExternalMsgRecvCount:
+                    temp = pool[j].getExtRecvCountPerEPPerIndex(i);
+                    break;
+                case ExternalMsgRecvSize:
+                    temp = pool[j].getExtRecvSizePerEPPerIndex(i);
+                    break;
+                default:
+                    fprintf(sdfp, "Error in printing communication data\n");
+            }
+
+            if(temp == prev_val) {
+                streak++;
+            } else {
+                if(streak == 1) {
+                    fprintf(sdfp, " %lu", prev_val);
+                } else if(streak > 1) {
+                    fprintf(sdfp, " %lu+%lu", prev_val, streak);
+                }
+                prev_val = temp;
+                streak = 1;
+            }
+        }
+    }
+    if(streak > 0) {
+        fprintf(sdfp, "%lu+%lu ", prev_val, streak);
+    }
+    fprintf(sdfp, "\n");
+}
+
+void SumLogPool::writeEncoderRow(int numBins, LogWriter event) {
+    unsigned long prev_val = 0;
+    unsigned long streak = 0;
+
     for(int k = 0; k < numBins; ++k) {
         CkVec<unsigned long> vec;
         switch(event) {
