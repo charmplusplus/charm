@@ -172,7 +172,8 @@ public:
 
   CProxyElement_ArrayBase& operator=(const CProxyElement_ArrayBase& other)
   {
-    return *this = CProxyElement_ArrayBase(other);
+    new (this) CProxyElement_ArrayBase(other);
+    return *this;
   }
 
   bool operator==(const CProxyElement_ArrayBase& other)

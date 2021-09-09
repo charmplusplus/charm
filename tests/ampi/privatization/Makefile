@@ -18,6 +18,7 @@ VARIANTS := \
   roseomptlsglobals \
   fsglobals \
   pipglobals \
+  pieglobals \
 
 PHONIES := \
   everything \
@@ -36,6 +37,9 @@ ifeq (1,$(CMK_SUPPORTS_FSGLOBALS))
 endif
 ifeq (1,$(CMK_SUPPORTS_PIPGLOBALS))
   TARGETS += pipglobals
+endif
+ifeq (1,$(CMK_SUPPORTS_PIEGLOBALS))
+  TARGETS += pieglobals
 endif
 
 $(foreach i,$(VARIANTS),$(eval LANGUAGES_$i := $(LANGUAGES)))
@@ -57,6 +61,7 @@ FEATURES_tlsglobals_cxx := threadlocalvars staticvars sharedlib migration
 FEATURES_roseomptlsglobals_cxx := threadlocalvars staticvars sharedlib migration
 FEATURES_fsglobals_cxx := globalvars staticvars
 FEATURES_pipglobals_cxx := globalvars staticvars sharedlib
+FEATURES_pieglobals_cxx := globalvars staticvars sharedlib migration
 
 
 # Universal settings
@@ -100,7 +105,7 @@ $1-f90: $1-framework.o $1-test-f90.o
 	$$(AMPIF90) -o $$@ $$(OPTS_$1_f90) $$^ $$(LINKOPTS)
 
 lib$1-%-cxx.so: $1-%-cxx-so.o
-	$$(AMPICC) -o $$@ $$(OPTS_$1_cxx) -shared -fvisibility=hidden -standalone $$<
+	$$(AMPICC) -o $$@ $$(OPTS_$1_cxx) -shared -fvisibility=hidden -standalone $$^
 
 $1-%.o $1-%-cxx.o: %.C
 	$$(AMPICC) -o $$@ $$(OPTS_$1_cxx) -Dprivatization_method=$1 $$(foreach i,$$(FEATURES_$1_cxx),-Dtest_$$i) -c $$<

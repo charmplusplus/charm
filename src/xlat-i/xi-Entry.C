@@ -1960,17 +1960,13 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
       str << "    }\n";
       str << "  } else {   // Final message that executes the Regular EM on primary element\n";
     } else if (param->hasDevice()) {
-      str << "  bool is_inline = true;\n";
-      str << "  if (CMI_ZC_MSGTYPE(env) == CMK_ZC_DEVICE_MSG) {\n";
+      str << "  if (CMI_IS_ZC_DEVICE(env)) {\n";
       genRegularCall(str, preCall, redn_wrapper, usesImplBuf, true);
-      str << "  }\n";
-      str << "  if (is_inline) {\n";
+      str << "  } else {\n";
     }
     str << "  ";
     genRegularCall(str, preCall, redn_wrapper, usesImplBuf, false);
-    if(param->hasRecvRdma()) {
-      str << "  }\n";
-    } else if (param->hasDevice()) {
+    if(param->hasRecvRdma() || param->hasDevice()) {
       str << "  }\n";
     }
   }
@@ -2047,6 +2043,33 @@ void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bo
           }
         }
         str << ");\n";
+      }
+      if(isRdmaPost) {
+        // Allocate an array of rdma pointers
+        if (param->hasDevice()) {
+          str << "    void *buffPtrs["<< numRdmaDeviceParams <<"];\n";
+          str << "    int buffSizes["<< numRdmaDeviceParams <<"];\n";
+        } else {
+          str << "    void *buffPtrs["<< numRdmaRecvParams <<"];\n";
+          str << "    int buffSizes["<< numRdmaRecvParams <<"];\n";
+        }
+        param->storePostedRdmaPtrs(str, isSDAGGen);
+        if (param->hasDevice()) {
+          str << "    CkRdmaDeviceIssueRgets(env, ";
+          if (isSDAGGen)
+            str << "genClosure->num_device_rdma_fields, ";
+          else
+            str << "impl_num_device_rdma_fields, ";
+          str << "buffPtrs, buffSizes, devicePost);\n";
+        } else {
+          str << "  if(CMI_IS_ZC_RECV(env)) \n";
+          str << "    CkRdmaIssueRgets(env, ((CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_MSG) ? ncpyEmApiMode::BCAST_RECV : ncpyEmApiMode::P2P_RECV), ";
+          if(isSDAGGen)
+            str << "genClosure->num_rdma_fields, genClosure->num_root_node, ";
+          else
+            str << "impl_num_rdma_fields, impl_num_root_node, ";
+          str << "buffPtrs, buffSizes, ncpyPost);\n";
+        }
       }
       // pack pointers if it's a broadcast message
       if(param->hasRdma() && !container->isForElement() && !isRdmaPost) {

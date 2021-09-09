@@ -146,14 +146,6 @@ check_function_exists(usleep CMK_HAS_USLEEP)
 
 # Complex tests
 
-if(CMK_WINDOWS OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-  set(CMK_CAN_GET_BINARY_PATH 1)
-elseif(${CMK_HAS_READLINK} OR ${CMK_HAS_REALPATH})
-  set(CMK_CAN_GET_BINARY_PATH 1)
-else()
-  set(CMK_CAN_GET_BINARY_PATH 0)
-endif()
-
 file(WRITE ${CMAKE_BINARY_DIR}/test_file "")
 execute_process(COMMAND cp -p test_file test_file2 ERROR_VARIABLE CP_P_OPTION_ERROR)
 if(NOT ${CP_P_OPTION_ERROR} STREQUAL "")
