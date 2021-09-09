@@ -33,7 +33,8 @@ class BinEntry {
     BinEntry(): _time(0.), _idleTime(0.),
                  _msgSize(0), _msgCount(0),
                  _recvSize(0), _recvCount(0),
-                 _extRecvSize(0), _extRecvCount(0)
+                 _extRecvSize(0), _extRecvCount(0),
+                 _defaultVal(0)
     {
       _msgCountPerEP = CkVec<unsigned long>(_entryTable.size() + 10);
       _msgSizePerEP = CkVec<unsigned long>(_entryTable.size() + 10);
@@ -57,7 +58,8 @@ class BinEntry {
              ): _time(t), _idleTime(idleT),
                  _msgSize(msgSize), _msgCount(msgCount),
                  _recvSize(recvSize), _recvCount(recvCount),
-                 _extRecvSize(extRecvSize), _extRecvCount(extRecvCount)
+                 _extRecvSize(extRecvSize), _extRecvCount(extRecvCount),
+                 _defaultVal(0)
 
     {
       if(_msgSizePerEP.size() == 0)
@@ -90,22 +92,22 @@ class BinEntry {
     unsigned long &getCount() {return _msgCount; }
     CkVec<unsigned long> &getSizePerEP() { return _msgSizePerEP;}
     CkVec<unsigned long> &getCountPerEP() {return _msgCountPerEP; }
-    unsigned long &getSizePerEPPerIndex(int j) {return (j < _msgSizePerEP.size())?_msgSizePerEP[j]:0; }
-    unsigned long &getCountPerEPPerIndex(int j) {return (j < _msgCountPerEP.size())?_msgCountPerEP[j]:0; }
+    unsigned long &getSizePerEPPerIndex(int j) {return (j < _msgSizePerEP.size())?_msgSizePerEP[j]:_defaultVal; }
+    unsigned long &getCountPerEPPerIndex(int j) {return (j < _msgCountPerEP.size())?_msgCountPerEP[j]:_defaultVal; }
 
     unsigned long &getRecvSize() { return _recvSize; }
     unsigned long &getRecvCount() { return _recvCount; }
     CkVec<unsigned long> &getRecvSizePerEP() {return _recvSizePerEP; }
     CkVec<unsigned long> &getRecvCountPerEP() {return _recvCountPerEP; }
-    unsigned long &getRecvSizePerEPPerIndex(int j) {return (j < _recvSizePerEP.size())?_recvSizePerEP[j]:0; }
-    unsigned long &getRecvCountPerEPPerIndex(int j) {return (j < _recvCountPerEP.size())?_recvCountPerEP[j]:0; }
+    unsigned long &getRecvSizePerEPPerIndex(int j) {return (j < _recvSizePerEP.size())?_recvSizePerEP[j]:_defaultVal; }
+    unsigned long &getRecvCountPerEPPerIndex(int j) {return (j < _recvCountPerEP.size())?_recvCountPerEP[j]:_defaultVal; }
 
     unsigned long &getExtRecvSize() {return _extRecvSize;}
     unsigned long &getExtRecvCount() {return _extRecvCount;}
     CkVec<unsigned long> &getExtRecvSizePerEP() {return _extRecvSizePerEP; }
     CkVec<unsigned long> &getExtRecvCountPerEP() {return _extRecvCountPerEP; }
-    unsigned long &getExtRecvSizePerEPPerIndex(int j) {return (j < _extRecvSizePerEP.size())?_extRecvSizePerEP[j]:0; }
-    unsigned long &getExtRecvCountPerEPPerIndex(int j) {return (j < _extRecvCountPerEP.size())?_extRecvCountPerEP[j]:0; }
+    unsigned long &getExtRecvSizePerEPPerIndex(int j) {return (j < _extRecvSizePerEP.size())?_extRecvSizePerEP[j]:_defaultVal; }
+    unsigned long &getExtRecvCountPerEPPerIndex(int j) {return (j < _extRecvCountPerEP.size())?_extRecvCountPerEP[j]:_defaultVal; }
     void write(FILE *fp);
     int  getU();
     int getUIdle();
@@ -125,6 +127,7 @@ class BinEntry {
     unsigned long _extRecvCount;
     CkVec<unsigned long> _extRecvSizePerEP;
     CkVec<unsigned long> _extRecvCountPerEP;
+    unsigned long _defaultVal;
 };
 
 /// a phase entry for trace summary
