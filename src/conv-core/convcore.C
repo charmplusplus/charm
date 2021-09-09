@@ -2423,6 +2423,13 @@ void CmiSyncVectorSendAndFree(int destPE, int n, int *sizes, char **msgs) {
  * particular by the rank zero in each node.
  ****************************************************************************/
 
+#define REDUCTION_DEBUG 0
+#if REDUCTION_DEBUG
+#define REDN_DBG(...) CmiPrintf(__VA_ARGS__)
+#else
+#define REDN_DBG(...)
+#endif
+
 CpvStaticDeclare(int, CmiReductionMessageHandler);
 CpvStaticDeclare(int, CmiReductionDynamicRequestHandler);
 
@@ -2644,7 +2651,7 @@ void CmiSendReduce(CmiReduction *red) {
     }
     CmiSetHandler(msg, CpvAccess(CmiReductionMessageHandler));
     CmiSetRedID(msg, red->seqID);
-    /*CmiPrintf("CmiSendReduce(%d): sending %d bytes to %d\n",CmiMyPe(),msg_size,red->parent);*/
+    REDN_DBG("[%d] CmiSendReduce: sending %d bytes to %d\n",CmiMyPe(),msg_size,red->parent);
     CmiSyncSendAndFree(red->parent, msg_size, msg);
   } else {
     (red->ops.destination)(msg);
@@ -2682,7 +2689,8 @@ void CmiSendNodeReduce(CmiReduction *red) {
     }
     CmiSetHandler(msg, CpvAccess(CmiNodeReductionMessageHandler));
     CmiSetRedID(msg, red->seqID);
-    /*CmiPrintf("CmiSendNodeReduce(%d): sending %d bytes to %d\n",CmiMyNode(),msg_size,red->parent);*/
+    REDN_DBG("[%d:%d][%d] CmiSendNodeReduce: sending %d bytes to %d\n",
+             CmiMyNode(),CmiMyRank(),CmiMyPe(),msg_size,red->parent);
     CmiSyncNodeSendAndFree(red->parent, msg_size, msg);
   } else {
     (red->ops.destination)(msg);
@@ -2712,7 +2720,7 @@ static void CmiGlobalReduce(void *msg, int size, CmiReduceMergeFn mergeFn, CmiRe
   red->ops.destination = (CmiHandler)CmiGetHandlerFunction(msg);
   red->ops.mergeFn = mergeFn;
   red->ops.pupFn = NULL;
-  /*CmiPrintf("[%d] CmiReduce::local %hd parent=%d, numChildren=%d\n",CmiMyPe(),red->seqID,red->parent,red->numChildren);*/
+  REDN_DBG("[%d] CmiReduce::local %hd parent=%d, numChildren=%d\n",CmiMyPe(),red->seqID,red->parent,red->numChildren);
   CmiSendReduce(red);
 }
 
@@ -2729,7 +2737,7 @@ static void CmiGlobalReduceStruct(void *data, CmiReducePupFn pupFn,
   red->ops.mergeFn = mergeFn;
   red->ops.pupFn = pupFn;
   red->ops.deleteFn = deleteFn;
-  /*CmiPrintf("[%d] CmiReduceStruct::local %hd parent=%d, numChildren=%d\n",CmiMyPe(),red->seqID,red->parent,red->numChildren);*/
+  REDN_DBG("[%d] CmiReduceStruct::local %hd parent=%d, numChildren=%d\n",CmiMyPe(),red->seqID,red->parent,red->numChildren);
   CmiSendReduce(red);
 }
 
@@ -2743,7 +2751,8 @@ static void CmiGlobalNodeReduce(void *msg, int size, CmiReduceMergeFn mergeFn, C
   red->ops.destination = (CmiHandler)CmiGetHandlerFunction(msg);
   red->ops.mergeFn = mergeFn;
   red->ops.pupFn = NULL;
-  /*CmiPrintf("[%d] CmiNodeReduce::local %hd parent=%d, numChildren=%d\n",CmiMyNode(),red->seqID,red->parent,red->numChildren);*/
+  REDN_DBG("[%d:%d][%d] CmiNodeReduce::local %hd parent=%d, numChildren=%d\n",
+           CmiMyNode(),CmiMyRank(),CmiMyPe(),red->seqID,red->parent,red->numChildren);
   CmiSendNodeReduce(red);
 }
 
@@ -2760,7 +2769,8 @@ static void CmiGlobalNodeReduceStruct(void *data, CmiReducePupFn pupFn,
   red->ops.mergeFn = mergeFn;
   red->ops.pupFn = pupFn;
   red->ops.deleteFn = deleteFn;
-  /*CmiPrintf("[%d] CmiNodeReduceStruct::local %hd parent=%d, numChildren=%d\n",CmiMyNode(),red->seqID,red->parent,red->numChildren);*/
+  REDN_DBG("[%d:%d][%d] CmiNodeReduceStruct::local %hd parent=%d, numChildren=%d\n",
+           CmiMyNode(),CmiMyRank(),CmiMyPe(),red->seqID,red->parent,red->numChildren);
   CmiSendNodeReduce(red);
 }
 
@@ -2807,7 +2817,7 @@ void CmiListReduce(int npes, int *pes, void *msg, int size, CmiReduceMergeFn mer
   red->ops.destination = (CmiHandler)CmiGetHandlerFunction(msg);
   red->ops.mergeFn = mergeFn;
   red->ops.pupFn = NULL;
-  /*CmiPrintf("[%d] CmiListReduce::local %hd parent=%d, numChildren=%d\n",CmiMyPe(),red->seqID,red->parent,red->numChildren);*/
+  REDN_DBG("[%d] CmiListReduce::local %hd parent=%d, numChildren=%d\n",CmiMyPe(),red->seqID,red->parent,red->numChildren);
   CmiSendReduce(red);
 }
 
@@ -2879,7 +2889,7 @@ void CmiHandleReductionMessage(void *msg) {
   CmiReduction *red = CmiGetReduction(CmiGetRedID(msg));
   if (red->numRemoteReceived == red->numChildren) red = CmiGetReductionCreate(CmiGetRedID(msg), red->numChildren+4);
   red->remoteData[red->numRemoteReceived++] = (char *)msg;
-  /*CmiPrintf("[%d] CmiReduce::remote %hd\n",CmiMyPe(),red->seqID);*/
+  REDN_DBG("[%d] CmiReduce::remote %hd\n",CmiMyPe(),red->seqID);
   CmiSendReduce(red);
 }
 
@@ -2887,7 +2897,8 @@ void CmiHandleNodeReductionMessage(void *msg) {
   CmiReduction *red = CmiGetNodeReduction(CmiGetRedID(msg));
   if (red->numRemoteReceived == red->numChildren) red = CmiGetNodeReductionCreate(CmiGetRedID(msg), red->numChildren+4);
   red->remoteData[red->numRemoteReceived++] = (char *)msg;
-  /*CmiPrintf("[%d] CmiNodeReduce::remote %hd\n",CmiMyNode(),red->seqID);*/
+  REDN_DBG("[%d:%d][%d] CmiNodeReduce::remote %hd\n",
+           CmiMyNode(),CmiMyRank(),CmiMyPe(),red->seqID);
   CmiSendNodeReduce(red);
 }
 
