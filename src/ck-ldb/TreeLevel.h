@@ -44,8 +44,6 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
   float* oloads;  // array of obj loads (grouped by pe), i-th obj in the array is
                   // considered to have ID i
   float* positions; // array of object positions, if needed; indexing is same as oloads
-  unsigned int*
-      order;  // list of obj ids sorted by load (ids are determined by position in oloads)
 
   static TreeLBMessage* merge(std::vector<TreeLBMessage*>& msgs)
   {
@@ -1134,7 +1132,6 @@ class PELevel : public LevelLogic
       if (posDimension > 0)
         std::copy(myObjs[i].position.begin(), myObjs[i].position.end(),
                   &(msg->positions[i * posDimension]));
-      msg->order[i] = i;
     }
 
     LBRealType t1, t2, t3, t4, bg_walltime;
