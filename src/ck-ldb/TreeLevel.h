@@ -1119,6 +1119,7 @@ class PELevel : public LevelLogic
       msg = new (1, 1, 0, 2, nobjs, nobjs, nobjs * posDimension, 0) LBStatsMsg_1;
     msg->nObjs = nobjs;
     msg->nPes = 1;
+    msg->posDimension = posDimension;
     msg->pe_ids[0] = mype;
     msg->obj_start[0] = 0;
     msg->obj_start[1] = nobjs;
