@@ -73,9 +73,9 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
     const unsigned int posDimension = minPosDimension;
     LBStatsMsg_1* newMsg;
     if (rateAware)
-      newMsg = new (nPes, nPes, nPes, nPes + 1, nObjs, nObjs, nObjs * posDimension, 0) LBStatsMsg_1;
+      newMsg = new (nPes, nPes, nPes, nPes + 1, nObjs, nObjs, nObjs * posDimension) LBStatsMsg_1;
     else
-      newMsg = new (nPes, nPes, 0, nPes + 1, nObjs, nObjs, nObjs * posDimension, 0) LBStatsMsg_1;
+      newMsg = new (nPes, nPes, 0, nPes + 1, nObjs, nObjs, nObjs * posDimension) LBStatsMsg_1;
     newMsg->nObjs = nObjs;
     newMsg->nPes = nPes;
     newMsg->posDimension = posDimension;
@@ -1110,11 +1110,11 @@ class PELevel : public LevelLogic
     LBStatsMsg_1* msg;
     if (rateAware)
     {
-      msg = new (1, 1, 1, 2, nobjs, nobjs, nobjs * posDimension, 0) LBStatsMsg_1;
+      msg = new (1, 1, 1, 2, nobjs, nobjs, nobjs * posDimension) LBStatsMsg_1;
       msg->speeds[0] = float(lbmgr->ProcessorSpeed());
     }
     else
-      msg = new (1, 1, 0, 2, nobjs, nobjs, nobjs * posDimension, 0) LBStatsMsg_1;
+      msg = new (1, 1, 0, 2, nobjs, nobjs, nobjs * posDimension) LBStatsMsg_1;
     msg->nObjs = nobjs;
     msg->nPes = 1;
     msg->posDimension = posDimension;
