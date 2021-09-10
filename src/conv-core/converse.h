@@ -1316,23 +1316,6 @@ typedef void * (*CmiReduceMergeFn)(int*,void*,void**,int);
 typedef void (*CmiReducePupFn)(void*,void*);
 typedef void (*CmiReduceDeleteFn)(void*);
 
-typedef struct {
-  void *localData;
-  char **remoteData;
-  int localSize;
-  short int numRemoteReceived;
-  short int numChildren;
-  int parent;
-  CmiUInt2 seqID;
-  char localContributed;
-  struct {
-    CmiHandler destination;
-    CmiReduceMergeFn mergeFn;
-    CmiReducePupFn pupFn;
-    CmiReduceDeleteFn deleteFn;
-  } ops;
-} CmiReduction;
-
 typedef CmiUInt2 CmiReductionID;
 
 void * CmiReduceMergeFn_random(int*, void*, void**, int);
