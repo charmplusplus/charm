@@ -155,7 +155,7 @@ class Stencil: public CBase_Stencil {
     // Constructor, initialize values
     Stencil() {
       usesAtSync = true;
-
+      setObjPosition({(float)thisIndex.x, (float)thisIndex.y, (float)thisIndex.z});
       int i, j, k;
       // allocate a three dimensional array
       temperature = new double[(blockDimX+2) * (blockDimY+2) * (blockDimZ+2)];
