@@ -47,10 +47,4 @@ testp: all
 ifeq ($(CMK_USE_LRTS), 1)
 	$(call run, +p$(P) ./hello_user $$(( $(P) * 8 ))  )
 	$(call run, +p$(P) ./hello_user_with_main $$(( $(P) * 8 )) )
-ifeq ($(CMK_SMP), 1)
-ifneq ($(CMK_MULTICORE), 1)
-	$(call run, +p$(P) ./hello_user $$(( $(P) * 8 )) ++ppn 2 )
-	$(call run, +p$(P) ./hello_user_with_main $$(( $(P) * 8 )) ++ppn 2 )
-endif
-endif
 endif
