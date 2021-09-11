@@ -5,6 +5,7 @@
 #include "TreeLB.h"
 #include "TreeStrategyBase.h"
 #include "charm.h"
+#include "envelope.h"
 
 #include <algorithm>
 #include <cmath>
@@ -534,6 +535,9 @@ class RootLevel : public LevelLogic
 
   TreeLBMessage* loadBalance(IDM& idm)
   {
+    CkPrintf("Length (Beginning): %zu\n", stats_msgs.size());
+    for (auto msg : stats_msgs) CkPrintf("%d\n", REFFIELD(UsrToEnv(msg)));
+
 #if DEBUG__TREE_LB_L1
     // print('[' + str(charm.myPe()) + ']', self.__class__, 'loadBalance')
 #endif
@@ -557,6 +561,8 @@ class RootLevel : public LevelLogic
       std::fill(migMsg->num_incoming, migMsg->num_incoming + nPes, 0);
 
       double t0 = CkWallTimer();
+      CkPrintf("Length (Before): %zu\n", stats_msgs.size());
+      for (auto msg : stats_msgs) CkPrintf("%d\n", REFFIELD(UsrToEnv(msg)));
       wrapper->prepStrategy(nObjs, nPes, stats_msgs, migMsg);
       wrapper->runStrategy(migMsg);
       if (current_strategy == wrappers.size() - 1)
@@ -572,7 +578,12 @@ class RootLevel : public LevelLogic
                CkWallTimer() - t0);
 #endif
       // need to cast pointer to ensure delete of CMessage_LBStatsMsg_1 is called
-      for (auto msg : stats_msgs) delete (LBStatsMsg_1*)msg;
+      CkPrintf("Length (After): %zu\n", stats_msgs.size());
+      for (auto msg : stats_msgs)
+      {
+        CkPrintf("%d\n", REFFIELD(UsrToEnv(msg)));
+        delete (LBStatsMsg_1*)msg;
+      }
       stats_msgs.clear();
       nPes = nObjs = 0;
       return migMsg;
