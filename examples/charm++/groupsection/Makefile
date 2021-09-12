@@ -7,7 +7,7 @@ check: check.o
 	$(CHARMC) $(OPTS) -language charm++ -o check check.o -module CkMulticast 
 
 check.o: check.C check.decl.h
-	$(CHARMC) $(OPTS) -language charm++ -o check.o check.C
+	$(CHARMC) $(OPTS) -language charm++ -o check.o -c check.C
 
 check.decl.h: check.ci
 	$(CHARMC) $(OPTS) -language charm++ check.ci
