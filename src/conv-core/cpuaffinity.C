@@ -1214,6 +1214,7 @@ void CmiInitCPUAffinity(char **argv)
     {
       myip = skt_my_ip();        /* not thread safe, so only calls on rank 0 */
     }
+    CmiNodeAllBarrier();
 
 #if CMK_SMP && !CMK_SMP_NO_COMMTHD
     if (CmiInCommThread())
