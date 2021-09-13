@@ -439,8 +439,6 @@ private:
   bool duringDestruction;
 
   // Internal interface:
-  void AtSyncBarrierReached();
-
   void pupElementsFor(PUP::er& p, CkLocRec* rec, CkElementCreation_t type,
                       bool rebuild = false);
 

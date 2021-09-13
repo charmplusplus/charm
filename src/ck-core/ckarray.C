@@ -1828,7 +1828,7 @@ void CkArray::recvMsg(CkArrayMessage* msg, CmiUInt8 id, CkDeliver_t type, int op
     int pe = locMgr->whichPe(id);
     if (pe == -1)
     {
-      // The element is unknown to us. If we are it's home, then it just means it hasn't
+      // The element is unknown to us. If we are its home, then it just means it hasn't
       // been created yet (or has been deleted). If we are not the home this can still
       // occur if we knew the element but it has been deleted or our location cache has
       // been purged.
@@ -1993,12 +1993,16 @@ void CkArray::handleUnknown(CkArrayMessage* msg, const CkArrayIndex& idx,
   {
     // This is a message that utilizes demand creation
     if (isSmall && hasID && CkMyPe() != home &&
-        msg->array_ifNotThere() != CkArray_IfNotThere_createhere)
+        msg->array_ifNotThere() == CkArray_IfNotThere_createhome)
     {
+      // Send the message home where it will trigger demand creation, or get delivered to
+      // the element if it already exists
       sendToPe(msg, home, type, opts);
     }
     else
     {
+      // Buffer the message here and query the home PE to see if demand creation is
+      // required
       bufferForCreation(msg, idx);
     }
   }
