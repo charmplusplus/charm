@@ -62,7 +62,6 @@
 # define __STDC_LIMIT_MACROS
 #endif
 #include <inttypes.h>
-#include <limits>
 #include <errno.h>
 #ifndef _WIN32
 #include <sys/time.h>
@@ -2419,9 +2418,8 @@ void CmiSyncVectorSendAndFree(int destPE, int n, int *sizes, char **msgs) {
  * merge call will not be deleted by the system, and the CmiHandler function
  * will be in charge of its deletion.
  * 
- * CmiReduce/CmiReduceStruct MUST be called once by every processor,
- * CmiNodeReduce/CmiNodeReduceStruct MUST be called once by every node, and in
- * particular by the rank zero in each node.
+ * CmiReduce/CmiReduceStruct MUST be called once by every processor.
+ * CmiNodeReduce/CmiNodeReduceStruct MUST be called once by every node.
  ****************************************************************************/
 
 #define REDUCTION_DEBUG 0
@@ -2459,6 +2457,20 @@ struct CmiNodeReduction {
   CmiReduction * red;
 };
 
+static inline CmiReductionID CmiReductionIDFetchAdd(CmiReductionID & id, CmiReductionID addend) {
+  const CmiReductionID oldid = id;
+  id = oldid + addend;
+  return oldid;
+}
+#if CMK_SMP
+static inline CmiReductionID CmiReductionIDFetchAdd(std::atomic<CmiReductionID> & id, CmiReductionID addend) {
+  return id.fetch_add(addend);
+}
+using CmiNodeReductionID = std::atomic<CmiReductionID>;
+#else
+using CmiNodeReductionID = CmiReductionID;
+#endif
+
 CpvStaticDeclare(int, CmiReductionMessageHandler);
 CpvStaticDeclare(int, CmiReductionDynamicRequestHandler);
 
@@ -2471,15 +2483,16 @@ CpvStaticDeclare(CmiReductionID, _reduce_seqID_request);
 CpvStaticDeclare(CmiReductionID, _reduce_seqID_dynamic);
 
 CsvStaticDeclare(CmiNodeReduction *, _nodereduce_info);
-CsvStaticDeclare(CmiReductionID, _nodereduce_seqID_global);
-CsvStaticDeclare(CmiReductionID, _nodereduce_seqID_request);
-CsvStaticDeclare(CmiReductionID, _nodereduce_seqID_dynamic);
+CsvStaticDeclare(CmiNodeReductionID, _nodereduce_seqID_global);
+CsvStaticDeclare(CmiNodeReductionID, _nodereduce_seqID_request);
+CsvStaticDeclare(CmiNodeReductionID, _nodereduce_seqID_dynamic);
 
 enum : CmiReductionID {
   CmiReductionID_globalOffset = 0, /* Reductions that involve the whole set of processors */
   CmiReductionID_requestOffset = 1, /* Reductions IDs that are requested by all the processors (i.e during intialization) */
   CmiReductionID_dynamicOffset = 2, /* Reductions IDs that are requested by only one processor (typically at runtime) */
-  CmiReductionID_multiplier = 3
+
+  CmiReductionID_multiplier = 4 /* MUST be a power of two because the ID counter may overflow and wrap to 0 */
 };
 
 static inline unsigned int CmiGetRedIndex(CmiReductionID id) {
@@ -2520,22 +2533,17 @@ static void CmiClearReduction(int id) {
   free(red);
 }
 
-static CmiReductionID CmiGetNextReductionID() {
-  const CmiReductionID id = CpvAccess(_reduce_seqID_global);
-  CmiReductionID newid = id + CmiReductionID_multiplier;
-  if (id > std::numeric_limits<CmiReductionID>::max() - 2*CmiReductionID_multiplier)
-    newid = CmiReductionID_globalOffset;
-  CpvAccess(_reduce_seqID_global) = newid;
-  return id;
+static CmiReductionID CmiGetNextReductionID(void) {
+  return CmiReductionIDFetchAdd(CpvAccess(_reduce_seqID_global), CmiReductionID_multiplier);
 }
 
 CmiReductionID CmiGetGlobalReduction(void) {
-  return CpvAccess(_reduce_seqID_request)+=CmiReductionID_multiplier;
+  return CmiReductionIDFetchAdd(CpvAccess(_reduce_seqID_request), CmiReductionID_multiplier);
 }
 
 CmiReductionID CmiGetDynamicReduction(void) {
   if (CmiMyPe() != 0) CmiAbort("Cannot call CmiGetDynamicReduction on processors other than zero!\n");
-  return CpvAccess(_reduce_seqID_dynamic)+=CmiReductionID_multiplier;
+  return CmiReductionIDFetchAdd(CpvAccess(_reduce_seqID_dynamic), CmiReductionID_multiplier);
 }
 
 static CmiReduction* CmiGetNodeReductionCreate(int id, short int numChildren) {
@@ -2572,22 +2580,17 @@ static void CmiClearNodeReduction(int id) {
   free(red);
 }
 
-static CmiReductionID CmiGetNextNodeReductionID() {
-  const CmiReductionID id = CsvAccess(_nodereduce_seqID_global);
-  CmiReductionID newid = id + CmiReductionID_multiplier;
-  if (id > std::numeric_limits<CmiReductionID>::max() - 2*CmiReductionID_multiplier)
-    newid = CmiReductionID_globalOffset;
-  CsvAccess(_nodereduce_seqID_global) = newid;
-  return id;
+static CmiReductionID CmiGetNextNodeReductionID(void) {
+  return CmiReductionIDFetchAdd(CsvAccess(_nodereduce_seqID_global), CmiReductionID_multiplier);
 }
 
 CmiReductionID CmiGetGlobalNodeReduction(void) {
-  return CsvAccess(_nodereduce_seqID_request)+=CmiReductionID_multiplier;
+  return CmiReductionIDFetchAdd(CsvAccess(_nodereduce_seqID_request), CmiReductionID_multiplier);
 }
 
 CmiReductionID CmiGetDynamicNodeReduction(void) {
   if (CmiMyNode() != 0) CmiAbort("Cannot call CmiGetDynamicNodeReduction on nodes other than zero!\n");
-  return CsvAccess(_nodereduce_seqID_dynamic)+=CmiReductionID_multiplier;
+  return CmiReductionIDFetchAdd(CsvAccess(_nodereduce_seqID_dynamic), CmiReductionID_multiplier);
 }
 
 void CmiReductionHandleDynamicRequest(char *msg) {
@@ -3010,11 +3013,11 @@ void CmiReductionsInit(void) {
 
   if (CmiMyRank() == 0)
   {
-    CsvInitialize(CmiReductionID, _nodereduce_seqID_global);
+    CsvInitialize(CmiNodeReductionID, _nodereduce_seqID_global);
     CsvAccess(_nodereduce_seqID_global) = CmiReductionID_globalOffset;
-    CsvInitialize(CmiReductionID, _nodereduce_seqID_request);
+    CsvInitialize(CmiNodeReductionID, _nodereduce_seqID_request);
     CsvAccess(_nodereduce_seqID_request) = CmiReductionID_requestOffset;
-    CsvInitialize(CmiReductionID, _nodereduce_seqID_dynamic);
+    CsvInitialize(CmiNodeReductionID, _nodereduce_seqID_dynamic);
     CsvAccess(_nodereduce_seqID_dynamic) = CmiReductionID_dynamicOffset;
     CsvInitialize(CmiNodeReduction *, _nodereduce_info);
     auto noderedinfo = (CmiNodeReduction *)malloc(CmiMaxReductions * sizeof(CmiNodeReduction));
