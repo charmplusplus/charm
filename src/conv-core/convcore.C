@@ -2736,7 +2736,6 @@ void CmiResetGlobalReduceSeqID(void) {
 }
 
 void CmiResetGlobalNodeReduceSeqID(void) {
-	CmiAssert(CmiMyRank() == 0);
 	CsvAccess(_nodereduce_seqID_global) = 0;
 }
 
@@ -2894,8 +2893,6 @@ void CmiGroupReduceStruct(CmiGroup grp, void *data, CmiReducePupFn pupFn,
 }
 
 void CmiNodeReduce(void *msg, int size, CmiReduceMergeFn mergeFn) {
-  CmiAssert(CmiMyRank() == 0);
-
   const CmiReductionID id = CmiGetNextNodeReductionID();
 #if CMK_SMP
   CmiNodeReduction & nodered = CsvAccess(_nodereduce_info)[CmiGetRedIndex(id)];
@@ -2913,8 +2910,6 @@ void CmiNodeReduce(void *msg, int size, CmiReduceMergeFn mergeFn) {
 void CmiNodeReduceStruct(void *data, CmiReducePupFn pupFn,
                          CmiReduceMergeFn mergeFn, CmiHandler dest,
                          CmiReduceDeleteFn deleteFn) {
-  CmiAssert(CmiMyRank() == 0);
-
   const CmiReductionID id = CmiGetNextNodeReductionID();
 #if CMK_SMP
   CmiNodeReduction & nodered = CsvAccess(_nodereduce_info)[CmiGetRedIndex(id)];
@@ -2930,8 +2925,6 @@ void CmiNodeReduceStruct(void *data, CmiReducePupFn pupFn,
 }
 
 void CmiNodeReduceID(void *msg, int size, CmiReduceMergeFn mergeFn, CmiReductionID id) {
-  CmiAssert(CmiMyRank() == 0);
-
 #if CMK_SMP
   CmiNodeReduction & nodered = CsvAccess(_nodereduce_info)[CmiGetRedIndex(id)];
   CmiLock(nodered.lock);
@@ -2948,8 +2941,6 @@ void CmiNodeReduceID(void *msg, int size, CmiReduceMergeFn mergeFn, CmiReduction
 void CmiNodeReduceStructID(void *data, CmiReducePupFn pupFn,
                            CmiReduceMergeFn mergeFn, CmiHandler dest,
                            CmiReduceDeleteFn deleteFn, CmiReductionID id) {
-  CmiAssert(CmiMyRank() == 0);
-
 #if CMK_SMP
   CmiNodeReduction & nodered = CsvAccess(_nodereduce_info)[CmiGetRedIndex(id)];
   CmiLock(nodered.lock);
