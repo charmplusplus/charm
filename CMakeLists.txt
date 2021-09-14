@@ -479,8 +479,10 @@ if(${TARGET} STREQUAL "all-test")
         create_symlinks moduleCkCache trace-converse moduleCommonLBs
         moduleTreeLB moduleCkMulticast moduleCkIO conv-cpm memory-os-wrapper
         threads-default-tls ldb-neighbor ldb-workstealing
-        modulecollidecharm modulecollide memory-os memory-gnu-isomalloc
-        ampi_globals_fs)
+        modulecollidecharm modulecollide memory-os memory-os-isomalloc)
+  if(CMK_HAS_MMAP)
+    add_dependencies(all-test memory-gnu-isomalloc)
+  endif()
   if(CMK_CAN_LINK_FORTRAN)
     add_dependencies(all-test moduleampif conv-utilf ckmainf
         ampi_funcptr_shim_fortran ampi_funcptr_shim_fmpimain)
