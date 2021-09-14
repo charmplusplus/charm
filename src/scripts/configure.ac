@@ -642,12 +642,6 @@ test_finish() {
 	exit $1
 }
 
-# detect certain architectures
-if cat /proc/cpuinfo 2>/dev/null | grep 'POWER7'  > /dev/null
-then
-  AC_DEFINE_UNQUOTED(CMK_POWER7, 1, [whether is power7])
-fi
-
 # detect OS
 OSNAME=`uname -s`
 if test $OSNAME = "Linux"

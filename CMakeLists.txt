@@ -366,14 +366,6 @@ else()
   message(FATAL_ERROR "Unsupported operating system ${CMAKE_SYSTEM_NAME}.")
 endif()
 
-set(CMK_POWER7 0)
-if(CHARM_CPU STREQUAL "ppc64le")
-  execute_process(COMMAND grep f Makefile RESULT_VARIABLE isppc7 OUTPUT_QUIET ERROR_QUIET)
-  if(${isppc7})
-    set(CMK_POWER7 1)
-  endif()
-endif()
-
 # Adjust version number so it can be tested by numerical comparisons, e.g. 6.10.1 -> 61001:
 # #if CHARM_VERSION > 61001
 if(${PROJECT_VERSION_PATCH} LESS 10)
