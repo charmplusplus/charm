@@ -62,6 +62,7 @@
 # define __STDC_LIMIT_MACROS
 #endif
 #include <inttypes.h>
+#include <limits>
 #include <errno.h>
 #ifndef _WIN32
 #include <sys/time.h>
@@ -2481,9 +2482,12 @@ enum : CmiReductionID {
   CmiReductionID_multiplier = 3
 };
 
+static inline unsigned int CmiGetRedIndex(CmiReductionID id) {
+  return id & ~((~0u) << CmiLogMaxReductions);
+}
+
 static CmiReduction* CmiGetReductionCreate(int id, short int numChildren) {
-  const int idx = id & ~((~0u) << CmiLogMaxReductions);
-  auto & redref = CpvAccess(_reduce_info)[idx];
+  auto & redref = CpvAccess(_reduce_info)[CmiGetRedIndex(id)];
   CmiReduction *red = redref;
   if (red != NULL && red->seqID != id) {
     /* The table needs to be expanded */
@@ -2510,19 +2514,19 @@ static CmiReduction* CmiGetReductionCreate(int id, short int numChildren) {
 }
 
 static void CmiClearReduction(int id) {
-  const int idx = id & ~((~0u) << CmiLogMaxReductions);
-  auto & redref = CpvAccess(_reduce_info)[idx];
+  auto & redref = CpvAccess(_reduce_info)[CmiGetRedIndex(id)];
   auto red = redref;
   redref = nullptr;
   free(red);
 }
 
-static CmiReduction* CmiGetNextReduction(short int numChildren) {
-  int id = CpvAccess(_reduce_seqID_global);
-  int newid = id + CmiReductionID_multiplier;
-  if (id > 0xFFF0) newid = CmiReductionID_globalOffset;
+static CmiReductionID CmiGetNextReductionID() {
+  const CmiReductionID id = CpvAccess(_reduce_seqID_global);
+  CmiReductionID newid = id + CmiReductionID_multiplier;
+  if (id > std::numeric_limits<CmiReductionID>::max() - 2*CmiReductionID_multiplier)
+    newid = CmiReductionID_globalOffset;
   CpvAccess(_reduce_seqID_global) = newid;
-  return CmiGetReductionCreate(id, numChildren);
+  return id;
 }
 
 CmiReductionID CmiGetGlobalReduction(void) {
@@ -2535,8 +2539,7 @@ CmiReductionID CmiGetDynamicReduction(void) {
 }
 
 static CmiReduction* CmiGetNodeReductionCreate(int id, short int numChildren) {
-  const int idx = id & ~((~0u) << CmiLogMaxReductions);
-  auto & redref = CsvAccess(_nodereduce_info)[idx].red;
+  auto & redref = CsvAccess(_nodereduce_info)[CmiGetRedIndex(id)].red;
   CmiReduction *red = redref;
   if (red != NULL && red->seqID != id) {
     /* The table needs to be expanded */
@@ -2563,19 +2566,19 @@ static CmiReduction* CmiGetNodeReductionCreate(int id, short int numChildren) {
 }
 
 static void CmiClearNodeReduction(int id) {
-  const int idx = id & ~((~0u) << CmiLogMaxReductions);
-  auto & redref = CsvAccess(_nodereduce_info)[idx].red;
+  auto & redref = CsvAccess(_nodereduce_info)[CmiGetRedIndex(id)].red;
   auto red = redref;
   redref = nullptr;
   free(red);
 }
 
-static CmiReduction* CmiGetNextNodeReduction(short int numChildren) {
-  int id = CsvAccess(_nodereduce_seqID_global);
-  int newid = id + CmiReductionID_multiplier;
-  if (id > 0xFFF0) newid = CmiReductionID_globalOffset;
+static CmiReductionID CmiGetNextNodeReductionID() {
+  const CmiReductionID id = CsvAccess(_nodereduce_seqID_global);
+  CmiReductionID newid = id + CmiReductionID_multiplier;
+  if (id > std::numeric_limits<CmiReductionID>::max() - 2*CmiReductionID_multiplier)
+    newid = CmiReductionID_globalOffset;
   CsvAccess(_nodereduce_seqID_global) = newid;
-  return CmiGetNodeReductionCreate(id, numChildren);
+  return id;
 }
 
 CmiReductionID CmiGetGlobalNodeReduction(void) {
@@ -2801,14 +2804,16 @@ static void CmiGlobalNodeReduceStruct(void *data, CmiReducePupFn pupFn,
 }
 
 void CmiReduce(void *msg, int size, CmiReduceMergeFn mergeFn) {
-  CmiReduction *red = CmiGetNextReduction(CmiNumSpanTreeChildren(CmiMyPe()));
+  const CmiReductionID id = CmiGetNextReductionID();
+  CmiReduction *red = CmiGetReductionCreate(id, CmiNumSpanTreeChildren(CmiMyPe()));
   CmiGlobalReduce(msg, size, mergeFn, red);
 }
 
 void CmiReduceStruct(void *data, CmiReducePupFn pupFn,
                      CmiReduceMergeFn mergeFn, CmiHandler dest,
                      CmiReduceDeleteFn deleteFn) {
-  CmiReduction *red = CmiGetNextReduction(CmiNumSpanTreeChildren(CmiMyPe()));
+  const CmiReductionID id = CmiGetNextReductionID();
+  CmiReduction *red = CmiGetReductionCreate(id, CmiNumSpanTreeChildren(CmiMyPe()));
   CmiGlobalReduceStruct(data, pupFn, mergeFn, dest, deleteFn, red);
 }
 
@@ -2888,27 +2893,65 @@ void CmiGroupReduceStruct(CmiGroup grp, void *data, CmiReducePupFn pupFn,
 }
 
 void CmiNodeReduce(void *msg, int size, CmiReduceMergeFn mergeFn) {
-  CmiReduction *red = CmiGetNextNodeReduction(CmiNumNodeSpanTreeChildren(CmiMyNode()));
+  const CmiReductionID id = CmiGetNextNodeReductionID();
+#if CMK_SMP
+  CmiNodeReduction & nodered = CsvAccess(_nodereduce_info)[CmiGetRedIndex(id)];
+  CmiLock(nodered.lock);
+#endif
+
+  CmiReduction *red = CmiGetNodeReductionCreate(id, CmiNumNodeSpanTreeChildren(CmiMyNode()));
   CmiGlobalNodeReduce(msg, size, mergeFn, red);
+
+#if CMK_SMP
+  CmiUnlock(nodered.lock);
+#endif
 }
 
 void CmiNodeReduceStruct(void *data, CmiReducePupFn pupFn,
                          CmiReduceMergeFn mergeFn, CmiHandler dest,
                          CmiReduceDeleteFn deleteFn) {
-  CmiReduction *red = CmiGetNextNodeReduction(CmiNumNodeSpanTreeChildren(CmiMyNode()));
+  const CmiReductionID id = CmiGetNextNodeReductionID();
+#if CMK_SMP
+  CmiNodeReduction & nodered = CsvAccess(_nodereduce_info)[CmiGetRedIndex(id)];
+  CmiLock(nodered.lock);
+#endif
+
+  CmiReduction *red = CmiGetNodeReductionCreate(id, CmiNumNodeSpanTreeChildren(CmiMyNode()));
   CmiGlobalNodeReduceStruct(data, pupFn, mergeFn, dest, deleteFn, red);
+
+#if CMK_SMP
+  CmiUnlock(nodered.lock);
+#endif
 }
 
 void CmiNodeReduceID(void *msg, int size, CmiReduceMergeFn mergeFn, CmiReductionID id) {
+#if CMK_SMP
+  CmiNodeReduction & nodered = CsvAccess(_nodereduce_info)[CmiGetRedIndex(id)];
+  CmiLock(nodered.lock);
+#endif
+
   CmiReduction *red = CmiGetNodeReductionCreate(id, CmiNumNodeSpanTreeChildren(CmiMyNode()));
   CmiGlobalNodeReduce(msg, size, mergeFn, red);
+
+#if CMK_SMP
+  CmiUnlock(nodered.lock);
+#endif
 }
 
 void CmiNodeReduceStructID(void *data, CmiReducePupFn pupFn,
                            CmiReduceMergeFn mergeFn, CmiHandler dest,
                            CmiReduceDeleteFn deleteFn, CmiReductionID id) {
+#if CMK_SMP
+  CmiNodeReduction & nodered = CsvAccess(_nodereduce_info)[CmiGetRedIndex(id)];
+  CmiLock(nodered.lock);
+#endif
+
   CmiReduction *red = CmiGetNodeReductionCreate(id, CmiNumNodeSpanTreeChildren(CmiMyNode()));
   CmiGlobalNodeReduceStruct(data, pupFn, mergeFn, dest, deleteFn, red);
+
+#if CMK_SMP
+  CmiUnlock(nodered.lock);
+#endif
 }
 
 static void CmiHandleReductionMessage(void *msg) {
@@ -2925,8 +2968,7 @@ static void CmiHandleReductionMessage(void *msg) {
 static void CmiHandleNodeReductionMessage(void *msg) {
   const auto id = CmiGetRedID(msg);
 #if CMK_SMP
-  const int idx = id & ~((~0u) << CmiLogMaxReductions);
-  CmiNodeReduction & nodered = CsvAccess(_nodereduce_info)[idx];
+  CmiNodeReduction & nodered = CsvAccess(_nodereduce_info)[CmiGetRedIndex(id)];
   CmiLock(nodered.lock);
 #endif
 
