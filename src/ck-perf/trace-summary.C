@@ -1257,8 +1257,10 @@ void TraceSummary::traceEnableCCS() {
  */
 void TraceSummary::creation(envelope *e, int epIdx, int num)
 {
-  msgSize += e->getTotalsize();
-  msgCount += num;
+  if(e != 0) {
+    msgSize += e->getTotalsize();
+    msgCount += num;
+  }
   int len = msgSizePerEP.size();
   if(epIdx >= len) {
       msgSizePerEP.resize(_entryTable.size() + 10);
@@ -1273,8 +1275,10 @@ void TraceSummary::creation(envelope *e, int epIdx, int num)
           extRecvSizePerEP[i] = extRecvCountPerEP[i] = 0;
       }
   }
-  msgSizePerEP[epIdx] += e->getTotalsize();
-  msgCountPerEP[epIdx] += num;
+  if(e != 0) {
+    msgSizePerEP[epIdx] += e->getTotalsize();
+    msgCountPerEP[epIdx] += num;
+  }
 }
 
 void TraceSummary::creationMulticast(envelope* e, int epIdx, int num, const int* pelist)
