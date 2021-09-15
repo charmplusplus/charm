@@ -2492,8 +2492,11 @@ enum : CmiReductionID {
   CmiReductionID_requestOffset = 1, /* Reductions IDs that are requested by all the processors (i.e during intialization) */
   CmiReductionID_dynamicOffset = 2, /* Reductions IDs that are requested by only one processor (typically at runtime) */
 
-  CmiReductionID_multiplier = 4 /* MUST be a power of two because the ID counter may overflow and wrap to 0 */
+  CmiReductionID_multiplier = 4
 };
+
+static_assert(CmiIsPow2(CmiReductionID_multiplier),
+              "CmiReductionID_multiplier must be a power of two because seqID counters may overflow and wrap to 0");
 
 static inline unsigned int CmiGetRedIndex(CmiReductionID id) {
   return id & ~((~0u) << CmiLogMaxReductions);
