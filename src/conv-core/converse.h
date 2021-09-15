@@ -78,6 +78,9 @@
 
 #define CMI_MSG_NOKEEP(msg)                  ((CmiMsgHeaderBasic *)msg)->nokeep
 
+#define CmiIsPow2OrZero(v) (((v) & ((v) - 1)) == 0)
+#define CmiIsPow2(v) (CmiIsPow2OrZero(v) && (v))
+
 #define CMIALIGN(x,n)       (size_t)((~((size_t)n-1))&((x)+(n-1)))
 /*#define ALIGN8(x)        (size_t)((~7)&((x)+7)) */
 #define ALIGN8(x)          CMIALIGN(x,8)
