@@ -1141,8 +1141,10 @@ class PELevel : public LevelLogic
       else
         msg->oloads[i] = float(myObjs[i].wallTime);
       if (posDimension > 0)
-        std::copy(myObjs[i].position.begin(), myObjs[i].position.end(),
-                  &(msg->positions[i * posDimension]));
+      {
+        for (int j = 0; j < posDimension; j++)
+          msg->positions[i * posDimension + j] = myObjs[i].position[j];
+      }
     }
 
     LBRealType t1, t2, t3, t4, bg_walltime;
