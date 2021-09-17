@@ -21,6 +21,9 @@
 
 #define  MAX_PHASES       100
 
+int sumonly = 0;
+int sumDetail = 0;
+
 /// Bin entry record CPU time in an interval
 class BinEntry {
   public:
@@ -36,25 +39,29 @@ class BinEntry {
                  _extRecvSize(0), _extRecvCount(0),
                  _defaultVal(0)
     {
-      _msgCountPerEP = CkVec<unsigned long>(_entryTable.size() + 10);
-      _msgSizePerEP = CkVec<unsigned long>(_entryTable.size() + 10);
-      _recvCountPerEP = CkVec<unsigned long>(_entryTable.size() + 10);
-      _recvSizePerEP = CkVec<unsigned long>(_entryTable.size() + 10);
-      _extRecvCountPerEP = CkVec<unsigned long>(_entryTable.size() + 10);
-      _extRecvSizePerEP = CkVec<unsigned long>(_entryTable.size() + 10);
-      for(int i = 0; i < _msgCountPerEP.size(); ++i) {
-        _msgCountPerEP[i] = _msgSizePerEP[i] =
-                _recvCountPerEP[i] = _recvSizePerEP[i] =
-                        _extRecvCountPerEP[i] = _extRecvCountPerEP[i] = 0;
+      if(sumDetail) {
+        _msgCountPerEP = std::vector<unsigned long>(_entryTable.size() + 10);
+        _msgSizePerEP = std::vector<unsigned long>(_entryTable.size() + 10);
+        _recvCountPerEP = std::vector<unsigned long>(_entryTable.size() + 10);
+        _recvSizePerEP = std::vector<unsigned long>(_entryTable.size() + 10);
+        _extRecvCountPerEP = std::vector<unsigned long>(_entryTable.size() + 10);
+        _extRecvSizePerEP = std::vector<unsigned long>(_entryTable.size() + 10);
+        for (int i = 0; i < _msgCountPerEP.size(); ++i) {
+          _msgCountPerEP[i] = _msgSizePerEP[i] =
+          _recvCountPerEP[i] = _recvSizePerEP[i] =
+          _extRecvCountPerEP[i] = _extRecvCountPerEP[i] = 0;
+        }
       }
     }
 
+    BinEntry(double t, double idleT): _time(t), _idleTime(idleT), _defaultVal(0) {}
+
     BinEntry(double t, double idleT, unsigned long msgSize, unsigned long msgCount,
-             CkVec<unsigned long> msgSizePerEP, CkVec<unsigned long> msgCountPerEP,
+             std::vector<unsigned long> msgSizePerEP, std::vector<unsigned long> msgCountPerEP,
              unsigned long recvSize, unsigned long recvCount,
-             CkVec<unsigned long> recvSizePerEP, CkVec<unsigned long> recvCountPerEP,
+             std::vector<unsigned long> recvSizePerEP, std::vector<unsigned long> recvCountPerEP,
              unsigned long extRecvSize, unsigned long extRecvCount,
-             CkVec<unsigned long> extRecvSizePerEP, CkVec<unsigned long> extRecvCountPerEP
+             std::vector<unsigned long> extRecvSizePerEP, std::vector<unsigned long> extRecvCountPerEP
              ): _time(t), _idleTime(idleT),
                  _msgSize(msgSize), _msgCount(msgCount),
                  _recvSize(recvSize), _recvCount(recvCount),
@@ -64,12 +71,12 @@ class BinEntry {
     {
       if(_msgSizePerEP.size() == 0)
       {
-        _msgCountPerEP = CkVec<unsigned long>(msgSizePerEP.size());
-        _msgSizePerEP = CkVec<unsigned long>(msgSizePerEP.size());
-        _recvCountPerEP = CkVec<unsigned long>(msgSizePerEP.size());
-        _recvSizePerEP = CkVec<unsigned long>(msgSizePerEP.size());
-        _extRecvCountPerEP = CkVec<unsigned long>(msgSizePerEP.size());
-        _extRecvSizePerEP = CkVec<unsigned long>(msgSizePerEP.size());
+        _msgCountPerEP = std::vector<unsigned long>(msgSizePerEP.size());
+        _msgSizePerEP = std::vector<unsigned long>(msgSizePerEP.size());
+        _recvCountPerEP = std::vector<unsigned long>(msgSizePerEP.size());
+        _recvSizePerEP = std::vector<unsigned long>(msgSizePerEP.size());
+        _extRecvCountPerEP = std::vector<unsigned long>(msgSizePerEP.size());
+        _extRecvSizePerEP = std::vector<unsigned long>(msgSizePerEP.size());
 
         for(int i = 0; i < _msgSizePerEP.size(); ++i) {
             _msgSizePerEP[i] = _msgCountPerEP[i] =
@@ -90,22 +97,22 @@ class BinEntry {
     double &getIdleTime() { return _idleTime; }
     unsigned long &getSize() { return _msgSize; }
     unsigned long &getCount() {return _msgCount; }
-    CkVec<unsigned long> &getSizePerEP() { return _msgSizePerEP;}
-    CkVec<unsigned long> &getCountPerEP() {return _msgCountPerEP; }
+    std::vector<unsigned long> &getSizePerEP() { return _msgSizePerEP;}
+    std::vector<unsigned long> &getCountPerEP() {return _msgCountPerEP; }
     unsigned long &getSizePerEPPerIndex(int j) {return (j < _msgSizePerEP.size())?_msgSizePerEP[j]:_defaultVal; }
     unsigned long &getCountPerEPPerIndex(int j) {return (j < _msgCountPerEP.size())?_msgCountPerEP[j]:_defaultVal; }
 
     unsigned long &getRecvSize() { return _recvSize; }
     unsigned long &getRecvCount() { return _recvCount; }
-    CkVec<unsigned long> &getRecvSizePerEP() {return _recvSizePerEP; }
-    CkVec<unsigned long> &getRecvCountPerEP() {return _recvCountPerEP; }
+    std::vector<unsigned long> &getRecvSizePerEP() {return _recvSizePerEP; }
+    std::vector<unsigned long> &getRecvCountPerEP() {return _recvCountPerEP; }
     unsigned long &getRecvSizePerEPPerIndex(int j) {return (j < _recvSizePerEP.size())?_recvSizePerEP[j]:_defaultVal; }
     unsigned long &getRecvCountPerEPPerIndex(int j) {return (j < _recvCountPerEP.size())?_recvCountPerEP[j]:_defaultVal; }
 
     unsigned long &getExtRecvSize() {return _extRecvSize;}
     unsigned long &getExtRecvCount() {return _extRecvCount;}
-    CkVec<unsigned long> &getExtRecvSizePerEP() {return _extRecvSizePerEP; }
-    CkVec<unsigned long> &getExtRecvCountPerEP() {return _extRecvCountPerEP; }
+    std::vector<unsigned long> &getExtRecvSizePerEP() {return _extRecvSizePerEP; }
+    std::vector<unsigned long> &getExtRecvCountPerEP() {return _extRecvCountPerEP; }
     unsigned long &getExtRecvSizePerEPPerIndex(int j) {return (j < _extRecvSizePerEP.size())?_extRecvSizePerEP[j]:_defaultVal; }
     unsigned long &getExtRecvCountPerEPPerIndex(int j) {return (j < _extRecvCountPerEP.size())?_extRecvCountPerEP[j]:_defaultVal; }
     void write(FILE *fp);
@@ -117,16 +124,16 @@ class BinEntry {
     double _idleTime;
     unsigned long _msgSize;
     unsigned long _msgCount;
-    CkVec<unsigned long> _msgSizePerEP;
-    CkVec<unsigned long> _msgCountPerEP;
+    std::vector<unsigned long> _msgSizePerEP;
+    std::vector<unsigned long> _msgCountPerEP;
     unsigned long _recvSize;
     unsigned long _recvCount;
-    CkVec<unsigned long> _recvSizePerEP;
-    CkVec<unsigned long> _recvCountPerEP;
+    std::vector<unsigned long> _recvSizePerEP;
+    std::vector<unsigned long> _recvCountPerEP;
     unsigned long _extRecvSize;
     unsigned long _extRecvCount;
-    CkVec<unsigned long> _extRecvSizePerEP;
-    CkVec<unsigned long> _extRecvCountPerEP;
+    std::vector<unsigned long> _extRecvSizePerEP;
+    std::vector<unsigned long> _extRecvCountPerEP;
     unsigned long _defaultVal;
 };
 
@@ -292,12 +299,13 @@ class SumLogPool {
     void writeEncoderRow(int numBins, LogWriter event);
     void writeSts(void);
     void add(double time, double idleTime, unsigned long msgSize, unsigned long msgCount,
-             CkVec<unsigned long> msgSizePerEP, CkVec<unsigned long> msgCountPerEP,
+             std::vector<unsigned long> msgSizePerEP, std::vector<unsigned long> msgCountPerEP,
              unsigned long recvSize, unsigned long recvCount,
-             CkVec<unsigned long> recvSizePerEP, CkVec<unsigned long> recvCountPerEP,
+             std::vector<unsigned long> recvSizePerEP, std::vector<unsigned long> recvCountPerEP,
              unsigned long extRecvSize, unsigned long extRecvCount,
-             CkVec<unsigned long> extRecvSizePerEP, CkVec<unsigned long> extRecvCountPerEP,
+             std::vector<unsigned long> extRecvSizePerEP, std::vector<unsigned long> extRecvCountPerEP,
              int pe);
+    void add(double time, double idleTime, int pe);
     void setEp(int epidx, double time);
     void clearEps() {
       for(int i=0; i < epInfoSize; i++) {
@@ -366,16 +374,16 @@ class TraceSummary : public Trace {
     int depth;
     unsigned long msgSize;
     unsigned long msgCount;
-    CkVec<unsigned long> msgSizePerEP;
-    CkVec<unsigned long> msgCountPerEP;
+    std::vector<unsigned long> msgSizePerEP;
+    std::vector<unsigned long> msgCountPerEP;
     unsigned long recvSize;
     unsigned long recvCount;
-    CkVec<unsigned long> recvSizePerEP;
-    CkVec<unsigned long> recvCountPerEP;
+    std::vector<unsigned long> recvSizePerEP;
+    std::vector<unsigned long> recvCountPerEP;
     unsigned long extRecvSize;
     unsigned long extRecvCount;
-    CkVec<unsigned long> extRecvSizePerEP;
-    CkVec<unsigned long> extRecvCountPerEP;
+    std::vector<unsigned long> extRecvSizePerEP;
+    std::vector<unsigned long> extRecvCountPerEP;
 
   public:
     TraceSummary(char **argv);
