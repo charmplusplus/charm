@@ -1765,6 +1765,13 @@ void CkMigratable::pup(PUP::er& p)
     p | epoch;
   }
 
+  std::vector<LBRealType> position;
+  if (!p.isUnpacking())
+    position = myRec->getObjPosition();
+  p | position;
+  if (p.isUnpacking())
+    myRec->setObjPosition(position);
+
   if (p.isUnpacking())
     ckFinishConstruction(epoch);
 }
