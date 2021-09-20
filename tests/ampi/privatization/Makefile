@@ -111,7 +111,7 @@ $1-f90: $1-framework.o $1-test-f90.o
 	$$(AMPIF90) -o $$@ $$(OPTS_$1_f90) $$^ $$(LINKOPTS)
 
 lib$1-%-cxx.so: $1-%-cxx-so.o
-	$$(AMPICC) -o $$@ $$(OPTS_$1_cxx) -shared -fvisibility=hidden -standalone $$<
+	$$(AMPICC) -o $$@ $$(OPTS_$1_cxx) -shared -fvisibility=hidden -standalone $$^
 
 $1-%.o $1-%-cxx.o: %.C
 	$$(AMPICC) -o $$@ $$(OPTS_$1_cxx) -Dprivatization_method=$1 $$(foreach i,$$(FEATURES_$1_cxx),-Dtest_$$i) -c $$<

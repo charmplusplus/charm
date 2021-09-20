@@ -86,14 +86,40 @@ set(NETWORK "netlrts" CACHE STRING "Target network layer, can be one of mpi,mult
 set(TARGET "charm++" CACHE STRING "Target build type, can be one of charm++,AMPI,LIBS,charm4py,ChaNGa,everylb,all-test")
 set(ARCH "" CACHE STRING "Target architecture, can be one of i386,x86_64,arm7,arm8,ppc64le") # By default, detect arch we are running on.
 
-if(NOT ARCH STREQUAL CMAKE_HOST_SYSTEM_PROCESSOR)
-  if (ARCH STREQUAL "i386" AND CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "x86_64")
-    message(WARNING "Attempting to cross-compile from ${CMAKE_HOST_SYSTEM_PROCESSOR} to ${ARCH}. This is only supported for x86_64 -> i386 currently.")
+function(charm_determine_arch output input)
+  if(input STREQUAL "x86_64" OR input STREQUAL "AMD64")
+    set(retval "x86_64")
+  elseif(input STREQUAL "i386" OR input STREQUAL "i686")
+    set(retval "i386")
+  elseif(input STREQUAL "powerpc" OR input MATCHES "^ppc")
+    set(retval "ppc64le")
+  elseif(input MATCHES "armv6" OR input MATCHES "armv7")
+    set(retval "arm7")
+  elseif(input MATCHES "aarch64" OR input MATCHES "arm64")
+    set(retval "arm8")
+  else()
+    set(retval ${input})
+  endif()
+
+  set(${output} ${retval} PARENT_SCOPE)
+endfunction()
+
+if(ARCH)
+  set(CHARM_CPU ${ARCH})
+else()
+  charm_determine_arch(CHARM_CPU ${CMAKE_SYSTEM_PROCESSOR})
+endif()
+
+charm_determine_arch(CHARM_HOST_CPU ${CMAKE_HOST_SYSTEM_PROCESSOR})
+
+if(NOT CHARM_CPU STREQUAL CHARM_HOST_CPU)
+  if (CHARM_CPU STREQUAL "i386" AND CHARM_HOST_CPU STREQUAL "x86_64")
+    message(STATUS "Attempting to cross-compile from ${CHARM_HOST_CPU} to ${CHARM_CPU}.")
     set(CMAKE_C_FLAGS -m32)
     set(CMAKE_CXX_FLAGS -m32)
     set(CMAKE_Fortran_FLAGS -m32)
   else()
-    message(WARNING "Cross-compiling from  ${CMAKE_HOST_SYSTEM_PROCESSOR} to ${ARCH} is not supported currently.")
+    message(WARNING "Cross-compiling from ${CHARM_HOST_CPU} to ${CHARM_CPU} is not supported currently.")
   endif()
 endif()
 
@@ -190,6 +216,9 @@ string(TOLOWER "${TARGET}" target_lower)
 if(${target_lower} STREQUAL "changa")
   set(TARGET "LIBS")
   set(LBUSERDATA 1)
+  set(BUILD_CHANGA 1)
+else()
+  set(BUILD_CHANGA 0)
 endif()
 
 if(${TARGET} STREQUAL "everylb")
@@ -256,6 +285,12 @@ IF(JPEG_FOUND)
   set(CMK_LIBJPEG "-ljpeg")
   set(CMK_USE_LIBJPEG 1)
 ENDIF()
+
+if(NETWORK STREQUAL "pami")
+  set(CMK_USE_LRTS 0)
+else()
+  set(CMK_USE_LRTS 1)
+endif()
 
 # Check for Python
 # PythonCCS requires Python v2.x and is the only target that uses this
@@ -329,27 +364,6 @@ elseif(IS_DIRECTORY "/bgsys")
   message(DEPRECATION "Support for Blue Gene/Q targets has been deprecated as of Charm++ 7.0.0.")
 else()
   message(FATAL_ERROR "Unsupported operating system ${CMAKE_SYSTEM_NAME}.")
-endif()
-
-set(CMK_POWER7 0)
-if(ARCH)
-  set(CHARM_CPU ${ARCH})
-elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "AMD64")
-  set(CHARM_CPU "x86_64")
-elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "i386" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "i686")
-  set(CHARM_CPU "i386")
-elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "powerpc" OR CMAKE_SYSTEM_PROCESSOR MATCHES "^ppc")
-  set(CHARM_CPU "ppc64le")
-  execute_process(COMMAND grep f Makefile RESULT_VARIABLE isppc7 OUTPUT_QUIET ERROR_QUIET)
-  if(${isppc7})
-    set(CMK_POWER7 1)
-  endif()
-elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "armv6" OR CMAKE_SYSTEM_PROCESSOR MATCHES "armv7")
-  set(CHARM_CPU "arm7")
-elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "arm64")
-  set(CHARM_CPU "arm8")
-else()
-  message(FATAL_ERROR "Unsupported CPU ${CMAKE_SYSTEM_PROCESSOR}.")
 endif()
 
 # Adjust version number so it can be tested by numerical comparisons, e.g. 6.10.1 -> 61001:
@@ -470,8 +484,10 @@ if(${TARGET} STREQUAL "all-test")
         create_symlinks moduleCkCache trace-converse moduleCommonLBs
         moduleTreeLB moduleCkMulticast moduleCkIO conv-cpm memory-os-wrapper
         threads-default-tls ldb-neighbor ldb-workstealing
-        modulecollidecharm modulecollide memory-os memory-gnu-isomalloc
-        ampi_globals_fs)
+        modulecollidecharm modulecollide memory-os memory-os-isomalloc)
+  if(CMK_HAS_MMAP)
+    add_dependencies(all-test memory-gnu-isomalloc)
+  endif()
   if(CMK_CAN_LINK_FORTRAN)
     add_dependencies(all-test moduleampif conv-utilf ckmainf
         ampi_funcptr_shim_fortran ampi_funcptr_shim_fmpimain)
@@ -494,22 +510,22 @@ configure_file(${CMAKE_SOURCE_DIR}/src/scripts/charmc ${CMAKE_BINARY_DIR}/bin @O
 set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ${CMAKE_BINARY_DIR}/bin/charmc)
 
 set(CMAKE_CXX_LINK_EXECUTABLE
-      "${CMAKE_BINARY_DIR}/bin/charmc <CMAKE_CXX_LINK_FLAGS> <LINK_FLAGS> <OBJECTS>  -o <TARGET> <LINK_LIBRARIES>")
+      "${CMAKE_BINARY_DIR}/bin/charmc <CMAKE_CXX_LINK_FLAGS> <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES> ${MY_EXTRA_OPTS}")
 
 set(CMAKE_CXX_CREATE_SHARED_LIBRARY
-      "${CMAKE_BINARY_DIR}/bin/charmc -build-shared <CMAKE_CXX_LINK_FLAGS> <LINK_FLAGS> <OBJECTS>  -o <TARGET> <LINK_LIBRARIES>")
+      "${CMAKE_BINARY_DIR}/bin/charmc -build-shared <CMAKE_CXX_LINK_FLAGS> <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES> ${MY_EXTRA_OPTS}")
 set(CMAKE_CXX_CREATE_STATIC_LIBRARY
-      "${CMAKE_BINARY_DIR}/bin/charmc ${BUILD_SHARED_OPTION} <CMAKE_CXX_LINK_FLAGS> <LINK_FLAGS> <OBJECTS>  -o <TARGET> <LINK_LIBRARIES>")
+      "${CMAKE_BINARY_DIR}/bin/charmc ${BUILD_SHARED_OPTION} <CMAKE_CXX_LINK_FLAGS> <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES> ${MY_EXTRA_OPTS}")
 
 set(CMAKE_C_CREATE_SHARED_LIBRARY
-      "${CMAKE_BINARY_DIR}/bin/charmc -build-shared <CMAKE_C_LINK_FLAGS> <LINK_FLAGS> <OBJECTS>  -o <TARGET> <LINK_LIBRARIES>")
+      "${CMAKE_BINARY_DIR}/bin/charmc -build-shared <CMAKE_C_LINK_FLAGS> <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES> ${MY_EXTRA_OPTS}")
 set(CMAKE_C_CREATE_STATIC_LIBRARY
-      "${CMAKE_BINARY_DIR}/bin/charmc ${BUILD_SHARED_OPTION} <CMAKE_C_LINK_FLAGS> <LINK_FLAGS> <OBJECTS>  -o <TARGET> <LINK_LIBRARIES>")
+      "${CMAKE_BINARY_DIR}/bin/charmc ${BUILD_SHARED_OPTION} <CMAKE_C_LINK_FLAGS> <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES> ${MY_EXTRA_OPTS}")
 
 set(CMAKE_Fortran_CREATE_SHARED_LIBRARY
-      "${CMAKE_BINARY_DIR}/bin/charmc -build-shared <CMAKE_Fortran_LINK_FLAGS> <LINK_FLAGS> <OBJECTS>  -o <TARGET> <LINK_LIBRARIES>")
+      "${CMAKE_BINARY_DIR}/bin/charmc -build-shared <CMAKE_Fortran_LINK_FLAGS> <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES> ${MY_EXTRA_OPTS}")
 set(CMAKE_Fortran_CREATE_STATIC_LIBRARY
-      "${CMAKE_BINARY_DIR}/bin/charmc ${BUILD_SHARED_OPTION} <CMAKE_Fortran_LINK_FLAGS> <LINK_FLAGS> <OBJECTS>  -o <TARGET> <LINK_LIBRARIES>")
+      "${CMAKE_BINARY_DIR}/bin/charmc ${BUILD_SHARED_OPTION} <CMAKE_Fortran_LINK_FLAGS> <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES> ${MY_EXTRA_OPTS}")
 
 
 set(CMK_COMPILER_KNOWS_C11 1)
@@ -557,6 +573,10 @@ set(VDIR ${CHARM_PLATFORM})
 
 set(CMK_VDIR ${VDIR})
 set(CMK_GDIR ${GDIR})
+
+if(NOT EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/)
+  message(FATAL_ERROR "Unsupported platform ${VDIR}.")
+endif()
 
 configure_file(src/arch/common/cc-bluegene.sh                include/ COPYONLY)
 configure_file(src/arch/common/cc-clang.sh                   include/ COPYONLY)
@@ -856,7 +876,7 @@ add_dependencies(moduletcharmmain ck)
 add_dependencies(moduletcharm ck)
 add_dependencies(tcharm-compat ck)
 
-if(${TARGET} STREQUAL "AMPI" OR ${TARGET} STREQUAL "LIBS")
+if(${TARGET} STREQUAL "AMPI" OR (${TARGET} STREQUAL "LIBS" AND NOT BUILD_CHANGA))
   add_subdirectory(src/libs/ck-libs/ampi)
 endif()
 

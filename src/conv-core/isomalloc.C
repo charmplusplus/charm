@@ -26,15 +26,20 @@ Substantially rewritten by Evan Ramos in 2019.
 #include "pup_stl.h"
 
 #define ISOMALLOC_DEBUG 0
-
 #if ISOMALLOC_DEBUG
 #define DEBUG_PRINT(...) CmiPrintf(__VA_ARGS__)
 #else
 #define DEBUG_PRINT(...)
 #endif
 
-#define ISOMEMPOOL_DEBUG 0
+#define ISOSYNC_DEBUG 0
+#if ISOSYNC_DEBUG
+#define SYNC_DBG(...) CmiPrintf(__VA_ARGS__)
+#else
+#define SYNC_DBG(...)
+#endif
 
+#define ISOMEMPOOL_DEBUG 0
 #if ISOMEMPOOL_DEBUG
 #define IMP_DBG(...) CmiPrintf(__VA_ARGS__)
 #else
@@ -691,28 +696,28 @@ struct CmiAddressSpaceRegionMsg
   CmiAddressSpaceRegion region;
 };
 
-static std::atomic<char> CmiIsomallocSyncHandlerDone;
+static std::atomic<bool> CmiIsomallocSyncHandlerDone{};
 #if CMK_SMP && !CMK_SMP_NO_COMMTHD
 extern void CommunicationServerThread(int sleepTime);
-static std::atomic<char> CmiIsomallocSyncCommThreadDone;
+static std::atomic<bool> CmiIsomallocSyncCommThreadDone{};
 #endif
 
 #if CMK_SMP && !CMK_SMP_NO_COMMTHD
-static void CmiIsomallocSyncWaitCommThread()
+static void CmiIsomallocSyncWaitCommThread(std::atomic<bool> & done)
 {
   do
     CommunicationServerThread(5);
-  while (!CmiIsomallocSyncCommThreadDone.load());
+  while (!done.load());
 
   CommunicationServerThread(5);
 }
 #endif
 
-static void CmiIsomallocSyncWait()
+static void CmiIsomallocSyncWait(std::atomic<bool> & done)
 {
   do
     CsdSchedulePoll();
-  while (!CmiIsomallocSyncHandlerDone.load());
+  while (!done.load());
 
   CsdSchedulePoll();
 }
@@ -724,19 +729,19 @@ static void CmiIsomallocSyncReductionHandler(void * data)
   auto region = (CmiAddressSpaceRegion *)data;
   CmiAssert(region == &IsoRegion);
 
-  CmiIsomallocSyncHandlerDone = 1;
+  CmiIsomallocSyncHandlerDone = true;
 }
 static void CmiIsomallocSyncBroadcastHandler(void * msg)
 {
   const CmiAddressSpaceRegion region = ((CmiAddressSpaceRegionMsg *)msg)->region;
-  DEBUG_PRINT("Isomalloc> Node %d received region for assignment: %" PRIx64 " %" PRIx64 "\n",
-              CmiMyNode(), region.s, region.e);
+  SYNC_DBG("Isomalloc> Node %d received region for assignment: %" PRIx64 " %" PRIx64 "\n",
+           CmiMyNode(), region.s, region.e);
 
   IsoRegion = region;
 
   CmiFree(msg);
 
-  CmiIsomallocSyncHandlerDone = 1;
+  CmiIsomallocSyncHandlerDone = true;
 }
 
 static void CmiIsomallocInitExtent(char ** argv)
@@ -835,8 +840,8 @@ static void CmiIsomallocInitExtent(char ** argv)
       if (CmiMyPe() == 0)
         CmiPrintf("Isomalloc> Synchronized global address space.\n");
 
-      DEBUG_PRINT("Charm++> Consolidated Isomalloc memory region at restart: %p - %p (%" PRId64 " MB).\n",
-                  (void *)IsoRegion.s, (void *)IsoRegion.e, (IsoRegion.e - IsoRegion.s) / meg);
+      SYNC_DBG("Charm++> Consolidated Isomalloc memory region at restart: %p - %p (%" PRId64 " MB).\n",
+               (void *)IsoRegion.s, (void *)IsoRegion.e, (IsoRegion.e - IsoRegion.s) / meg);
     }
   }
   else
@@ -848,25 +853,32 @@ static void CmiIsomallocInitExtent(char ** argv)
   }
   else if (CmiNumNodes() > 1)
   {
+#if CMK_SMP && !CMK_SMP_NO_COMMTHD
+    if (CmiInCommThread())
+    {
+      CmiIsomallocSyncWaitCommThread(CmiIsomallocSyncCommThreadDone);
+    }
+    else
+#endif
     if (CmiMyRank() == 0)
     {
       if (CmiMyNode() == 0)
       {
-        DEBUG_PRINT("Charm++> Synchronizing Isomalloc memory region...\n");
+        SYNC_DBG("Charm++> Synchronizing Isomalloc memory region...\n");
       }
 
-      DEBUG_PRINT("Isomalloc> Node %d sending region for comparison: %" PRIx64 " %" PRIx64 "\n",
-                  CmiMyNode(), IsoRegion.s, IsoRegion.e);
+      SYNC_DBG("Isomalloc> Node %d sending region for comparison: %" PRIx64 " %" PRIx64 "\n",
+               CmiMyNode(), IsoRegion.s, IsoRegion.e);
 
       CmiNodeReduceStruct(&IsoRegion, CmiAddressSpaceRegionPup, CmiAddressSpaceRegionMerge,
                           CmiIsomallocSyncReductionHandler, nullptr);
 
-      CmiIsomallocSyncWait();
+      CmiIsomallocSyncWait(CmiIsomallocSyncHandlerDone);
 
       if (CmiMyNode() == 0)
       {
-        DEBUG_PRINT("Isomalloc> Node %d sending region for assignment: %" PRIx64 " %" PRIx64 "\n",
-                    CmiMyNode(), IsoRegion.s, IsoRegion.e);
+        SYNC_DBG("Isomalloc> Node %d sending region for assignment: %" PRIx64 " %" PRIx64 "\n",
+                 CmiMyNode(), IsoRegion.s, IsoRegion.e);
 
         CmiAddressSpaceRegionMsg msg;
         CmiInitMsgHeader(msg.converseHeader, sizeof(CmiAddressSpaceRegionMsg));
@@ -884,23 +896,17 @@ static void CmiIsomallocInitExtent(char ** argv)
         if (CmiMyPe() == 0)
           CmiPrintf("Isomalloc> Synchronized global address space.\n");
 
-        DEBUG_PRINT("Charm++> Consolidated Isomalloc memory region: %p - %p (%" PRId64 " MB).\n",
-                    (void *)IsoRegion.s, (void *)IsoRegion.e, (IsoRegion.e - IsoRegion.s) / meg);
+        SYNC_DBG("Charm++> Consolidated Isomalloc memory region: %p - %p (%" PRId64 " MB).\n",
+                 (void *)IsoRegion.s, (void *)IsoRegion.e, (IsoRegion.e - IsoRegion.s) / meg);
       }
 
 #if CMK_SMP && !CMK_SMP_NO_COMMTHD
       CmiIsomallocSyncCommThreadDone = 1;
 #endif
     }
-#if CMK_SMP && !CMK_SMP_NO_COMMTHD
-    else if (CmiInCommThread())
-    {
-      CmiIsomallocSyncWaitCommThread();
-    }
-#endif
     else
     {
-      CmiIsomallocSyncWait();
+      CmiIsomallocSyncWait(CmiIsomallocSyncHandlerDone);
     }
 
     CmiBarrier();

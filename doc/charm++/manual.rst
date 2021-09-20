@@ -11664,8 +11664,8 @@ below. The options are described next.
 
 .. code-block:: none
 
-    * Compile C                            charmc -o pgm.o pgm.c
-    * Compile C++                          charmc -o pgm.o pgm.C
+    * Compile C                            charmc -o pgm.o -c pgm.c
+    * Compile C++                          charmc -o pgm.o -c pgm.C
     * Link                                 charmc -o pgm   obj1.o obj2.o obj3.o...
     * Compile + Link                       charmc -o pgm   src1.c src2.ci src3.C
     * Create Library                       charmc -o lib.a obj1.o obj2.o obj3.o...

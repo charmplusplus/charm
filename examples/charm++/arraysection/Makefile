@@ -7,7 +7,7 @@ check1d: check1d.o
 	$(CHARMC) $(OPTS) -language charm++ -o check1d check1d.o
 
 check1d.o: check1d.C check1d.decl.h
-	$(CHARMC) $(OPTS) -language charm++ -o check1d.o check1d.C
+	$(CHARMC) $(OPTS) -language charm++ -o check1d.o -c check1d.C
 
 check1d.decl.h: check1d.ci
 	$(CHARMC) $(OPTS) -language charm++ check1d.ci
@@ -16,7 +16,7 @@ check2d: check2d.o
 	$(CHARMC) $(OPTS) -language charm++ -o check2d check2d.o
 
 check2d.o: check2d.C check2d.decl.h
-	$(CHARMC) $(OPTS) -language charm++ -o check2d.o check2d.C
+	$(CHARMC) $(OPTS) -language charm++ -o check2d.o -c check2d.C
 
 check2d.decl.h: check2d.ci
 	$(CHARMC) $(OPTS) -language charm++ check2d.ci
