@@ -79,6 +79,7 @@ never be excluded...
 
 #if CMK_CUDA
 #include "hapi_impl.h"
+#include "ckrdmadevice.h"
 
 extern void (*hapiInvokeCallback)(void*, void*);
 extern void CUDACallbackManager(void*, void*);
@@ -342,9 +343,9 @@ static inline void _parseCommandLineOpts(char **argv)
 	  _isNotifyChildInRed = false;
 	}
 
-	_isStaticInsertion = false;
-	if (CmiGetArgFlagDesc(argv,"+staticInsertion","Array elements are only inserted at construction")) {
-	  _isStaticInsertion = true;
+	if (CmiGetArgFlagDesc(argv,"+staticInsertion", "DEPRECATED")) {
+		CmiPrintf("WARNING: +staticInsertion has been deprecated.\n"
+		          "Static insertion is now the default behavior for arrays that are non-empty at construction.\n");
 	}
 
         useNodeBlkMapping = false;
@@ -1274,10 +1275,27 @@ void _sendReadonlies() {
 */
 void _initCharm(int unused_argc, char **argv)
 { 
-	int inCommThread = (CmiMyRank() == CmiMyNodeSize());
+  int inCommThread = (CmiMyRank() == CmiMyNodeSize());
 
-	DEBUGF(("[%d,%.6lf ] _initCharm started\n",CmiMyPe(),CmiWallTimer()));
-	std::set_terminate([](){ CkAbort("Unhandled C++ exception in user code.\n");});
+  DEBUGF(("[%d,%.6lf ] _initCharm started\n",CmiMyPe(),CmiWallTimer()));
+  std::set_terminate([](){
+    std::exception_ptr exptr = std::current_exception();
+    if (exptr)
+    {
+      try
+      {
+        std::rethrow_exception(exptr);
+      }
+      catch (std::exception &ex)
+      {
+        CkAbort("Unhandled C++ exception in user code: %s.\n", ex.what());
+      }
+    }
+    else
+    {
+      CkAbort("Unhandled C++ exception in user code.\n");
+    }
+  });
 
 	CkpvInitialize(size_t *, _offsets);
 	CkpvAccess(_offsets) = new size_t[32];
@@ -1413,6 +1431,10 @@ void _initCharm(int unused_argc, char **argv)
 	
 	// Set the ack handler function used for the direct nocopy api
 	CmiSetDirectNcpyAckHandler(CkRdmaDirectAckHandler);
+
+#if CMK_CUDA && CMK_GPU_COMM
+	CmiRdmaDeviceRecvInit(CkRdmaDeviceRecvHandler);
+#endif
 
 	// Set the ack handler function used for the entry method p2p api and entry method bcast api
 	initEMNcpyAckHandler();

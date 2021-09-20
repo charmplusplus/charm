@@ -146,14 +146,6 @@ check_function_exists(usleep CMK_HAS_USLEEP)
 
 # Complex tests
 
-if(CMK_WINDOWS OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-  set(CMK_CAN_GET_BINARY_PATH 1)
-elseif(${CMK_HAS_READLINK} OR ${CMK_HAS_REALPATH})
-  set(CMK_CAN_GET_BINARY_PATH 1)
-else()
-  set(CMK_CAN_GET_BINARY_PATH 0)
-endif()
-
 file(WRITE ${CMAKE_BINARY_DIR}/test_file "")
 execute_process(COMMAND cp -p test_file test_file2 ERROR_VARIABLE CP_P_OPTION_ERROR)
 if(NOT ${CP_P_OPTION_ERROR} STREQUAL "")
@@ -358,26 +350,6 @@ void test()
     if (attr.link_layer == IBV_LINK_LAYER_INFINIBAND)  return;
 }
 " CMK_IBV_PORT_ATTR_HAS_LINK_LAYER)
-
-check_c_source_compiles([=[
-void main() {
-  void * m1, * m2;
-  asm volatile ("movq %%fs:0x0, %0\\n\t"
-                "movq %1, %%fs:0x0\\n\t"
-                : "=&r"(m1)
-                : "r"(m2));
-}
-]=] CMK_TLS_SWITCHING_X86_64)
-
-check_c_source_compiles([=[
-void main() {
-  void * m1, * m2;
-  asm volatile ("movl %%gs:0x0, %0\\n\t"
-                "movl %1, %%gs:0x0\\n\t"
-                : "=&r"(m1)
-                : "r"(m2));
-}
-]=] CMK_TLS_SWITCHING_X86)
 
 check_c_source_compiles("
 #include <stdint.h>

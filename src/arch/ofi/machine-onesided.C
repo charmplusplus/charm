@@ -1,12 +1,12 @@
-struct fid_mr* registerDirectMemory(void *info, const void *addr, int size) {
+void registerDirectMemory(void *info, const void *addr, int size) {
   CmiOfiRdmaPtr_t *rdmaInfo = (CmiOfiRdmaPtr_t *)info;
   uint64_t requested_key = 0;
-  int ret;
+  int err;
 
   if(FI_MR_SCALABLE == context.mr_mode) {
     requested_key = __sync_fetch_and_add(&(context.mr_counter), 1);
   }
-  ret = fi_mr_reg(context.domain,
+  err = fi_mr_reg(context.domain,
                   addr,
                   size,
                   FI_REMOTE_READ | FI_REMOTE_WRITE | FI_READ | FI_WRITE,
@@ -15,7 +15,7 @@ struct fid_mr* registerDirectMemory(void *info, const void *addr, int size) {
                   0ULL,
                   &(rdmaInfo->mr),
                   NULL);
-  if (ret) {
+  if (err) {
     CmiAbort("registerDirectMemory: fi_mr_reg failed!\n");
   }
   rdmaInfo->key = fi_mr_key(rdmaInfo->mr);
@@ -320,12 +320,12 @@ void LrtsIssueRput(NcpyOperationInfo *ncpyOpInfo) {
 // Method invoked to deregister memory handle
 void LrtsDeregisterMem(const void *ptr, void *info, int pe, unsigned short int mode){
   CmiOfiRdmaPtr_t *rdmaSrc = (CmiOfiRdmaPtr_t *)info;
-  int ret;
+  int err;
 
   if(mode != CMK_BUFFER_NOREG && rdmaSrc->mr) {
     // Deregister the buffer
-    ret = fi_close((struct fid *)rdmaSrc->mr);
-    if(ret)
+    err = fi_close((struct fid *)rdmaSrc->mr);
+    if(err)
       CmiAbort("LrtsDeregisterMem: fi_close(mr) failed!\n");
   }
 }

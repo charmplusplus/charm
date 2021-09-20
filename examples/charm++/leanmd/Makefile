@@ -10,16 +10,16 @@ leanmd: Main.o Cell.o Compute.o leanmd.decl.h
 	-language charm++ -o leanmd Main.o Cell.o Compute.o
 
 Main.o: Main.C Main.h leanmd.decl.h defs.h
-	$(CHARMC) $(OPTS) -o $@ $<
+	$(CHARMC) $(OPTS) -o $@ -c $<
 
 Cell.o: Cell.C Cell.h leanmd.decl.h defs.h
-	$(CHARMC) $(OPTS) -o $@ $<
+	$(CHARMC) $(OPTS) -o $@ -c $<
 
 leanmd.decl.h:	leanmd.ci
 	$(CHARMC) leanmd.ci
 
 Compute.o: Compute.C Compute.h leanmd.decl.h defs.h physics.h
-	$(CHARMC) $(OPTS) -o $@ $<
+	$(CHARMC) $(OPTS) -o $@ -c $<
 
 test: leanmd
 	$(call run, +p4 ./leanmd 3 3 3 20 )

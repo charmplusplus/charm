@@ -6218,9 +6218,20 @@ create them, CkArrayOptions contains a few flags that the runtime can
 use to optimize handling of a given array. If the array elements will
 only migrate at controlled points (such as periodic load balancing with
 ``AtASync()``), this is signaled to the runtime by calling
-``opts.setAnytimeMigration(false)``\  [11]_. If all array elements will
-be inserted by bulk creation or by ``fooArray[x].insert()`` calls,
-signal this by calling ``opts.setStaticInsertion(true)``  [12]_.
+``opts.setAnytimeMigration(false)``\  [11]_. Similarly, certain optimizations can
+be made if all array elements are statically inserted via bulk construction during the
+``ckNew(...)`` call [12]_. By default, insertion is set to ``STATIC`` if ``ckNew`` is
+called with a non-zero number of initial elements, and is set to ``DYNAMIC`` in cases
+where the number of initial elements is 0. Applications can call
+``opts.setStaticInsertion(false)`` to override this behavior for cases where there are a
+non-zero number of initial insertions, but more dynamic insertions will follow.
+
+If the application needs to know when an array has been fully constructed, CkArrayOptions
+provides ``CkArrayOptions::setInitCallback(CkCallback)``. The callback passed will be
+invoked once every element in the initial set of elements has been created. This works
+both for bulk insertion, and if dynamic insertion is used to create the initial elements.
+In the latter case, after the initial elements have been inserted and ``doneInserting`` is
+called, the initialization callback will be invoked once all insertions have completed.
 
 .. _array map:
 
@@ -6340,12 +6351,10 @@ constructor message. For example, to insert a 2D element (x,y), call:
 
     mgr->insertInitial(CkArrayIndex2D(x,y), CkCopyMsg(&msg));
 
-After inserting elements, inform the array manager that all elements have been
-created, and free the constructor message:
+After inserting elements free the constructor message:
 
 .. code-block:: c++
 
-    mgr->doneInserting();
     CkFreeMsg(msg);
 
 A simple example using populateInitial can be found in
@@ -6489,14 +6498,16 @@ If using insert to create all the elements of the array, you must call
 The ``doneInserting()`` call starts the reduction manager (see “Array
 Reductions”) and load balancer (see :numref:`lbFramework`). Since
 these objects need to know about all the array’s elements, they must
-be started after the initial elements are inserted. You may call
+be started after the initial elements are inserted. If this is the first wave
+of insertions, and an initialization callback was set on ``CkArrayOptions`` it will be
+invoked once these initial elements have all been created. You may call
 ``doneInserting()`` multiple times, but only the first call actually
 does anything. You may even insert or destroy elements after a call to
 ``doneInserting()``, with different semantics - see the reduction
 manager. For AtSync load balancing, subsequent dynamic insertion or
 deletion sessions should begin with a call to
-``CProxy_Array::startInserting()`` and end with a call to
-``doneInserting()``. ``startInserting()`` is also idempotent and can
+``CProxy_Array::beginInserting()`` and end with a call to
+``doneInserting()``. ``beginInserting()`` is also idempotent and can
 be called multiple times with only the first having any effect until
 ``doneInserting()`` is called on the same array proxy on the same PE.
 
@@ -9165,8 +9176,23 @@ where the sender sends a metadata message containing the address of the
 source buffer on the GPU and the receiver posts an Rget from the source
 buffer to the destination buffer (also on the GPU).
 
-To send a GPU buffer using direct GPU messaging, add a ``nocopydevice``
-specifier to the parameter of the receiving entry method in the ``.ci`` file:
+There are currently two implementations for direct GPU messaging:
+(1) CUDA memcpy and IPC based mechanism for intra-node communication
+(inter-node communication reverts back to a host-staging mechanism),
+and (2) UCX-based mechanism that supports both intra-node and inter-node
+communication. When Charm++ is built with the UCX machine layer
+and CUDA support (e.g., ucx-linux-x86_64-cuda), it will automatically use
+the UCX-based mechanism with the direct GPU messaging API.
+Other CUDA-enabled builds will only support
+the first mechanism and limit the use of direct GPU-GPU transfers within
+a single physical node. For inter-node messages, the runtime system will
+revert back to a host-staging mechanism where the GPU buffer is moved to
+host memory before being sent.
+The user APIs for both implementations remain the same, however, as detailed
+in the following.
+
+To send a GPU buffer with the direct GPU messaging feature, add a ``nocopydevice``
+specifier to the corresponding parameter of the receiver's entry method in the ``.ci`` file:
 
 .. code-block:: charmci
 
@@ -9176,7 +9202,7 @@ This entry method should be invoked on the sender by wrapping the
 source buffer with ``CkDeviceBuffer``, whose constructor takes a pointer
 to the source buffer, a Charm++ callback to be invoked once the transfer
 completes (optional), and a CUDA stream associated with the transfer
-(also optional):
+(which is only used internally in the CUDA memcpy and IPC based implementation and is also optional):
 
 .. code-block:: c++
 
@@ -9187,13 +9213,13 @@ completes (optional), and a CUDA stream associated with the transfer
    CkDeviceBuffer(const void* ptr, const CkCallback& cb, cudaStream_t stream);
 
    // Call on sender
-   someProxy.foo(source_buffer, cb, stream);
+   someProxy.foo(size, CkDeviceBuffer(buf, cb, stream));
 
-As with the Zero Copy Entry Method Post API, two entry methods
-(post entry method and regular entry method) must be specified, and the
-post entry method has an additional ``CkDeviceBufferPost`` argument that
-can be used to specify the CUDA stream where the data transfer will be
-enqueued:
+As with the Zero Copy Entry Method Post API, both the post entry method
+and regular entry method must be defined. In the post entry method,
+the user must specify the location of the destination GPU buffer,
+and the ``CkDeviceBufferPost`` parameter can be used to specify the CUDA stream
+where the CUDA data transfer will be enqueued (only used in the CUDA memcpy and IPC based mechanism):
 
 .. code-block:: c++
 
@@ -9205,32 +9231,23 @@ enqueued:
 
    // Regular entry method
    void foo(int size, double* arr) {
-     // Data transfer into arr has been initiated
+     // Data has arrived in the destination GPU buffer
      ...
    }
 
-The specified CUDA stream can be used by the receiver to asynchronously invoke
-GPU operations dependent on the arriving data, without explicitly synchronizing
-with the host. This brings us to an important difference from the host-side
-Zero Copy API: the regular entry method is invoked after the data transfer is
-**initiated**, not after it is complete. It should also be noted that the
-regular entry method can be defined as a SDAG method if so desired.
+As with the host-side Zero Copy API, the regular entry method is executed by the runtime
+system after the GPU buffer has arrived at the destination.
 
-Currently the direct GPU messaging feature is limited to **intra-node** messages.
-Inter-node messages will be transferred using the naive host-staged mechanism
-where the data is first transferred to the host from the source GPU, sent over
-the network, then transferred to the destination GPU.
-
-An optimized mechanism for inter-process communication using CUDA IPC, POSIX shared memory,
+For non-UCX builds, a more optimized mechanism for inter-process communication using CUDA IPC, POSIX shared memory,
 and pre-allocated GPU communication buffers are available through runtime flags.
-This significantly reduces the overhead from creation and opening of CUDA IPC handles,
-especially for relatively small messages. ``+gpushm`` will turn on this optimization
+This significantly reduces the overhead from creating and opening CUDA IPC handles,
+especially for small messages. ``+gpushm`` enables this optimization
 feature, ``+gpucommbuffer [size]`` specifies the size of the communication buffer
 allocated on each GPU (default is 64MB), and ``+gpuipceventpool`` determines the number of
-CUDA IPC events per PE that is used for this feature (default is 16).
+CUDA IPC events per PE (default is 16).
 
-Examples using the direct GPU messaging feature can be found in
-``examples/charm++/cuda/gpudirect``.
+Examples and benchmarks of the direct GPU messaging feature can be found in
+``examples/charm++/cuda/gpudirect`` and ``benchmarks/charm++/cuda/gpudirect``.
 
 Intra-node Persistent GPU Communication
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -11271,9 +11288,9 @@ Downloading Charm++
 
 Charm++ can be downloaded using one of the following methods:
 
--  From Charm++ website - The current stable version (source code and
+-  From the Charm++ website - The current stable version (source code and
    binaries) can be downloaded from our website at
-   *http://charm.cs.illinois.edu/software*.
+   *https://charm.cs.illinois.edu/software*.
 
 -  From source archive - The latest development version of Charm++ can
    be downloaded from our source archive using *git clone
@@ -11292,19 +11309,30 @@ Installation
 A typical prototype command for building Charm++ from the source code
 is:
 
-``./build <TARGET> <TARGET ARCHITECTURE> [OPTIONS]`` where,
+.. code-block:: bash
 
-TARGET
+   $ ./build <TARGET> <TARGET ARCHITECTURE> [OPTIONS]
+
+where,
+
+``TARGET``
    is the framework one wants to build such as *charm++* or *AMPI*.
 
-TARGET ARCHITECTURE
+``TARGET ARCHITECTURE``
    is the machine architecture one wants to build for such as
    *netlrts-linux-x86_64*, *pamilrts-bluegeneq* etc.
 
-OPTIONS
+``OPTIONS``
    are additional options to the build process, e.g. *smp* is used to
    build a shared memory version, *-j8* is given to build in parallel
    etc.
+
+.. note::
+
+   Starting from version 7.0, Charm++ uses the CMake-based build system
+   when building with the ``./build`` command. To use the old configure-based
+   build system, you can build with the ``./buildold`` command with the same
+   options. We intend to remove the old build system in Charm++ 7.1.
 
 In Table :numref:`tab:buildlist`, a list of build
 commands is provided for some of the commonly used systems. Note that,
@@ -11362,13 +11390,13 @@ path would be ``netlrts-linux-x86_64/tmp``. On Linux and macOS, the tmp
 symlink in the top-level charm directory also points to the tmp
 directory of the most recent build.
 
-Alternatively, CMake can be used for configuring and building Charm++.
+Alternatively, CMake can be used directly for configuring and building Charm++.
 You can use ``cmake-gui`` or ``ccmake`` for an overview of available
 options. Note that some are only effective when passed with ``-D`` from
 the command line while configuring from a blank slate. To build with all
 defaults, ``cmake .`` is sufficient, though invoking CMake from a
 separate location (ex:
-``mkdir mybuild && cd mybuild && cmake ../charm``) is recommended.
+``mkdir mybuild && cd mybuild && cmake ..``) is recommended.
 Please see Section :numref:`sec:cmakeinstall` for building Charm++
 directly with CMake.
 
@@ -11419,9 +11447,8 @@ select another version with the ``@`` option (for example,
 Installation with CMake
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-As an experimental feature, Charm++ can be installed with the CMake tool,
-version 3.4 or newer.
-This is currently supported on Linux and Darwin, but not on Windows.
+Charm++ can be installed directly with the CMake tool,
+version 3.4 or newer, without using the ``./build`` command.
 
 After downloading and unpacking Charm++, it can be installed in the following way:
 
@@ -11442,46 +11469,40 @@ For example, to build Charm++ and AMPI on top of the MPI layer with SMP, the fol
 
    $ cmake .. -DNETWORK=mpi -DSMP=on -DTARGET=AMPI
 
-To simplify building with CMake, the `buildcmake` command is a simple wrapper around cmake
-that supports many of the options that `build` supports.
-
-.. code-block:: bash
-
-   $ ./buildcmake AMPI netlrts-linux-x86_64 smp --with-production
 
 Charm++ installation directories
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The main directories in a Charm++ installation are:
 
-charm/bin
+``charm/bin``
    Executables, such as charmc and charmrun, used by Charm++.
 
-charm/doc
+``charm/doc``
    Documentation for Charm++, such as this document. Distributed as
-   LaTeX source code; HTML and PDF versions can be built or downloaded
-   from our web site.
+   reStructuredText (RST or ReST) source code; HTML and PDF versions can be
+   built or downloaded from our web site.
 
-charm/include
+``charm/include``
    The Charm++ C++ and Fortran user include files (.h).
 
-charm/lib
+``charm/lib``
    The static libraries (.a) that comprise Charm++.
 
-charm/lib_so
+``charm/lib_so``
    The shared libraries (.so/.dylib) that comprise Charm++, if Charm++
    is compiled with the ``-build-shared`` option.
 
-charm/examples
+``charm/examples``
    Example Charm++ programs.
 
-charm/src
+``charm/src``
    Source code for Charm++ itself.
 
-charm/tmp
+``charm/tmp``
    Directory where Charm++ is built.
 
-charm/tests
+``charm/tests``
    Test Charm++ programs used by autobuild.
 
 Reducing disk usage
@@ -11643,8 +11664,8 @@ below. The options are described next.
 
 .. code-block:: none
 
-    * Compile C                            charmc -o pgm.o pgm.c
-    * Compile C++                          charmc -o pgm.o pgm.C
+    * Compile C                            charmc -o pgm.o -c pgm.c
+    * Compile C++                          charmc -o pgm.o -c pgm.C
     * Link                                 charmc -o pgm   obj1.o obj2.o obj3.o...
     * Compile + Link                       charmc -o pgm   src1.c src2.ci src3.C
     * Create Library                       charmc -o lib.a obj1.o obj2.o obj3.o...
