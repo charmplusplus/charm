@@ -2178,6 +2178,10 @@ double CkLocRec::getObjTime()
   lbmgr->GetObjLoad(ldHandle, walltime, cputime);
   return walltime;
 }
+const std::vector<LBRealType>& CkLocRec::getObjPosition()
+{
+  return lbmgr->GetObjPosition(ldHandle);
+}
 #  if CMK_LB_USER_DATA
 void* CkLocRec::getObjUserData(int idx) { return lbmgr->GetDBObjUserData(ldHandle, idx); }
 #  endif
