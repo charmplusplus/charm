@@ -2168,7 +2168,10 @@ void CkLocRec::stopTiming(int ignore_running)
     running = false;
 }
 void CkLocRec::setObjTime(double cputime) { lbmgr->EstObjLoad(ldHandle, cputime); }
-void CkLocRec::setObjPosition(const std::vector<LBRealType>& pos) { lbmgr->ObjPosition(ldHandle, pos); }
+void CkLocRec::setObjPosition(const std::vector<LBRealType>& pos)
+{
+  lbmgr->SetObjPosition(ldHandle, pos);
+}
 double CkLocRec::getObjTime()
 {
   LBRealType walltime, cputime;

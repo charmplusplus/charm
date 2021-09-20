@@ -300,7 +300,7 @@ class LBManager : public CBase_LBManager
   {
     lbdb_obj->GetObjLoad(h, walltime, cputime);
   };
-  void ObjPosition(LDObjHandle h, const std::vector<LBRealType>& pos)
+  void SetObjPosition(LDObjHandle h, const std::vector<LBRealType>& pos)
   {
     lbdb_obj->ObjPosition(h, pos);
   }
