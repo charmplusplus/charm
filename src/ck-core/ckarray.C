@@ -236,7 +236,7 @@ void ArrayElement::initBasics(void)
 #ifdef _PIPELINED_ALLREDUCE_
   allredMgr = NULL;
 #endif
-  DEBC((AA "Inserting %llu into PE level hashtable\n" AB, ckGetID().getID()));
+  DEBC((AA "Inserting %" PRIu64 " into PE level hashtable\n" AB, ckGetID().getID()));
   CkpvAccess(array_objs)[ckGetID().getID()] = this;
 }
 
@@ -395,7 +395,7 @@ ArrayElement::~ArrayElement()
     return; /* Just saving to disk--don't trash anything. */
 #endif
   // Erase from PE level hashtable for quick receives
-  DEBC((AA "Removing %llu from PE level hashtable\n" AB, ckGetID().getID()));
+  DEBC((AA "Removing %" PRIu64 " from PE level hashtable\n" AB, ckGetID().getID()));
   CkpvAccess(array_objs).erase(ckGetID().getID());
   // To detect use-after-delete:
   thisArray = (CkArray*)(intptr_t)0xDEADa7a1;
