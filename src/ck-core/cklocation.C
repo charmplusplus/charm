@@ -42,7 +42,7 @@ CkpvExtern(int, currentChareIdx);
 CpvExtern(void*, CkGridObject);
 #endif
 
-#define ARRAY_DEBUG_OUTPUT 0
+#define ARRAY_DEBUG_OUTPUT 1
 
 #if ARRAY_DEBUG_OUTPUT
 #  define DEB(x) CkPrintf x   // General debug messages

@@ -31,7 +31,7 @@
 extern int quietModeRequested;
 
 // Set to 1 to print debug statements
-#define AMPI_DO_DEBUG 0
+#define AMPI_DO_DEBUG 1
 
 #if AMPI_DO_DEBUG
 

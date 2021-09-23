@@ -54,7 +54,7 @@ waits for the migrant contributions to straggle in.
 
 #include "pathHistory.h"
 
-#if CMK_DEBUG_REDUCTIONS
+#if 1
 //Debugging messages:
 // Reduction mananger internal information:
 #define DEBR(x) CkPrintf x
