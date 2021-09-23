@@ -4,13 +4,9 @@
 OPTS += $(OPTSATBUILDTIME)
 
 DIRS = \
-  util \
-  charm++ \
-  converse \
   ampi \
 
 FTDIRS = \
-  charm++ \
   ampi \
 
 TESTDIRS = $(DIRS)

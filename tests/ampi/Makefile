@@ -2,30 +2,10 @@
 
 DIRS = \
   megampi \
-  stacksize \
-  migration \
-  datatype \
-  privatization \
-  jacobi3d \
-  exit \
-#  chkpt \
-#  intercomm_coll \ # causes hangs in SMP mode
-
-ifeq (1,$(CMK_CAN_LINK_FORTRAN))
-  DIRS += fallreduce
-endif
 
 NONSCALEDIRS = \
-  privatization \
-  datatype \
-  exit \
-
-ifeq ($(BUILD_MPICH_TESTS),true)
-DIRS += mpich-test
-endif
 
 FTDIRS = \
-  jacobi3d
 
 TESTDIRS = $(filter-out $(FTDIRS),$(DIRS))
 

@@ -4,16 +4,10 @@
 OPTS += $(OPTSATBUILDTIME)
 
 DIRS = \
-  charm++ \
-  converse \
-  ampi \
-  collide \
 
 TESTDIRS = $(DIRS)
 
 TESTPDIRS = \
-  charm++ \
-  ampi \
 
 all: $(foreach i,$(DIRS),build-$i)
 
