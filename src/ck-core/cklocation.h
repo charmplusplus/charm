@@ -577,7 +577,7 @@ public:
     {
       return compressor->decompress(id);
     }
-    else if (rec = elementNrec(id))
+    else if ((rec = elementNrec(id)))
     {
       return rec->getIndex();
     }
