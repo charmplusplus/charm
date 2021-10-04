@@ -527,41 +527,6 @@ void *valloc(size_t size) CMK_THROW { return meta_valloc(size); }
 CLINKAGE void *pvalloc(size_t size) CMK_THROW { return meta_pvalloc(size); }
 #endif /* ! CMK_MEMORY_BUILD_GNU_HOOKS */
 
-#else
-
-#define mm_impl_malloc   malloc
-#define mm_impl_free     free
-#define mm_impl_calloc   calloc
-#if CMK_HAS_CFREE
-#define mm_impl_cfree    cfree
-#else
-#define mm_impl_cfree    free
-#endif
-#define mm_impl_memalign memalign
-#define mm_impl_posix_memalign posix_memalign
-#if (defined __cplusplus && __cplusplus >= 201703L) || (defined __STDC_VERSION__ && __STDC_VERSION__ >= 201112L)
-#define mm_impl_aligned_alloc aligned_alloc
-#else
-#define mm_impl_aligned_alloc memalign
-#endif
-#if CMK_HAS_VALLOC
-#define mm_impl_valloc   valloc
-#else
-static inline void *mm_impl_valloc(size_t size)
-{
-  return memalign(CmiGetPageSize(), size);
-}
-#endif
-#if CMK_HAS_PVALLOC
-#define mm_impl_pvalloc  pvalloc
-#else
-static inline void *mm_impl_pvalloc(size_t size)
-{
-  const size_t pagesize = CmiGetPageSize();
-  return memalign(pagesize, CMIALIGN(size, pagesize));
-}
-#endif
-
 #endif /* CMK_MEMORY_BUILD_OS_WRAPPED || CMK_MEMORY_BUILD_GNU_HOOKS */
 
 static int skip_mallinfo = 0;
