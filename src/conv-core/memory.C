@@ -107,31 +107,40 @@ int cpdInSystem=1; /*Start inside the system (until we start executing user code
 #if CMK_MEMORY_BUILD_OS
 #if CMK_MEMORY_BUILD_OS_WRAPPED
 
-struct mallinfo;
-
 void initialize_memory_wrapper(void);
-void * initialize_memory_wrapper_calloc(size_t nelem, size_t size);
-void * initialize_memory_wrapper_malloc(size_t size);
-void * initialize_memory_wrapper_realloc(void *ptr, size_t size);
-void * initialize_memory_wrapper_memalign(size_t align, size_t size);
-int initialize_memory_wrapper_posix_memalign(void **memptr, size_t align, size_t size);
-void * initialize_memory_wrapper_aligned_alloc(size_t align, size_t size);
-void * initialize_memory_wrapper_valloc(size_t size);
-void * initialize_memory_wrapper_pvalloc(size_t size);
-void initialize_memory_wrapper_free(void *ptr);
-void initialize_memory_wrapper_cfree(void *ptr);
 
+void * initialize_memory_wrapper_malloc(size_t size);
 void * (*mm_impl_malloc)(size_t) = initialize_memory_wrapper_malloc;
+void * initialize_memory_wrapper_calloc(size_t nelem, size_t size);
 void * (*mm_impl_calloc)(size_t,size_t) = initialize_memory_wrapper_calloc;
+void * initialize_memory_wrapper_realloc(void *ptr, size_t size);
 void * (*mm_impl_realloc)(void*,size_t) = initialize_memory_wrapper_realloc;
-void * (*mm_impl_memalign)(size_t,size_t) = initialize_memory_wrapper_memalign;
-int (*mm_impl_posix_memalign)(void **,size_t,size_t) = initialize_memory_wrapper_posix_memalign;
-void * (*mm_impl_aligned_alloc)(size_t,size_t) = initialize_memory_wrapper_aligned_alloc;
-void * (*mm_impl_valloc)(size_t) = initialize_memory_wrapper_valloc;
-void * (*mm_impl_pvalloc)(size_t) = initialize_memory_wrapper_pvalloc;
+void initialize_memory_wrapper_free(void *ptr);
 void (*mm_impl_free)(void*) = initialize_memory_wrapper_free;
+
+void * initialize_memory_wrapper_memalign(size_t align, size_t size);
+void * (*mm_impl_memalign)(size_t,size_t) = initialize_memory_wrapper_memalign;
+int initialize_memory_wrapper_posix_memalign(void **memptr, size_t align, size_t size);
+int (*mm_impl_posix_memalign)(void **,size_t,size_t) = initialize_memory_wrapper_posix_memalign;
+void * initialize_memory_wrapper_aligned_alloc(size_t align, size_t size);
+void * (*mm_impl_aligned_alloc)(size_t,size_t) = initialize_memory_wrapper_aligned_alloc;
+
+#if CMK_HAS_VALLOC
+void * initialize_memory_wrapper_valloc(size_t size);
+void * (*mm_impl_valloc)(size_t) = initialize_memory_wrapper_valloc;
+#endif
+#if CMK_HAS_PVALLOC
+void * initialize_memory_wrapper_pvalloc(size_t size);
+void * (*mm_impl_pvalloc)(size_t) = initialize_memory_wrapper_pvalloc;
+#endif
+#if CMK_HAS_CFREE
+void initialize_memory_wrapper_cfree(void *ptr);
 void (*mm_impl_cfree)(void*) = initialize_memory_wrapper_cfree;
+#endif
+#if CMK_HAS_MALLINFO
+struct mallinfo;
 struct mallinfo (*mm_impl_mallinfo)(void) = NULL;
+#endif
 
 static char fake_malloc_buffer[1024];
 static char* fake_malloc_buffer_pos = fake_malloc_buffer;
@@ -203,15 +212,19 @@ void * initialize_memory_wrapper_aligned_alloc(size_t align, size_t size) {
   return (*mm_impl_aligned_alloc)(align,size);
 }
 
+#if CMK_HAS_VALLOC
 void * initialize_memory_wrapper_valloc(size_t size) {
   initialize_memory_wrapper();
   return (*mm_impl_valloc)(size);
 }
+#endif
 
+#if CMK_HAS_PVALLOC
 void * initialize_memory_wrapper_pvalloc(size_t size) {
   initialize_memory_wrapper();
   return (*mm_impl_pvalloc)(size);
 }
+#endif
 
 void initialize_memory_wrapper_free(void *ptr) {
   if (initialize_memory_wrapper_status)
@@ -220,21 +233,42 @@ void initialize_memory_wrapper_free(void *ptr) {
   (*mm_impl_free)(ptr);
 }
 
+#if CMK_HAS_CFREE
 void initialize_memory_wrapper_cfree(void *ptr) {
   initialize_memory_wrapper();
   (*mm_impl_cfree)(ptr);
 }
+#endif
 
 #define mm_impl_malloc   (*mm_impl_malloc)
 #define mm_impl_free     (*mm_impl_free)
 #define mm_impl_calloc   (*mm_impl_calloc)
+#if CMK_HAS_CFREE
 #define mm_impl_cfree    (*mm_impl_cfree)
+#else
+#define mm_impl_cfree    (*mm_impl_free)
+#endif
 #define mm_impl_realloc  (*mm_impl_realloc)
 #define mm_impl_memalign (*mm_impl_memalign)
 #define mm_impl_posix_memalign (*mm_impl_posix_memalign)
 #define mm_impl_aligned_alloc (*mm_impl_aligned_alloc)
+#if CMK_HAS_VALLOC
 #define mm_impl_valloc   (*mm_impl_valloc)
+#else
+static inline void *mm_impl_valloc(size_t size)
+{
+  return mm_impl_memalign(CmiGetPageSize(), size);
+}
+#endif
+#if CMK_HAS_PVALLOC
 #define mm_impl_pvalloc  (*mm_impl_pvalloc)
+#else
+static inline void *mm_impl_pvalloc(size_t size)
+{
+  const size_t pagesize = CmiGetPageSize();
+  return mm_impl_memalign(pagesize, CMIALIGN(size, pagesize));
+}
+#endif
 #endif /* CMK_MEMORY_BUILD_OS_WRAPPED */
 #endif /* CMK_MEMORY_BUILD_OS */
 
@@ -365,14 +399,16 @@ static inline void *mm_impl_calloc(size_t nelem, size_t size)
   AFTER_MALLOC_CALL;
   return result;
 }
-#if 0
 static inline void mm_impl_cfree(void *mem)
 {
   BEFORE_MALLOC_CALL;
+#if CMK_HAS_CFREE
   cfree(mem);
+#else
+  free(mem);
+#endif
   AFTER_MALLOC_CALL;
 }
-#endif
 static inline void *mm_impl_realloc(void *mem, size_t size)
 {
   void *result;
@@ -409,12 +445,15 @@ static inline void *mm_impl_aligned_alloc(size_t align, size_t size)
   AFTER_MALLOC_CALL;
   return result;
 }
-#if 0
 static inline void *mm_impl_valloc(size_t size)
 {
   void *result;
   BEFORE_MALLOC_CALL;
+#if CMK_HAS_VALLOC
   result = valloc(size);
+#else
+  result = memalign(CmiGetPageSize(), size);
+#endif
   AFTER_MALLOC_CALL;
   return result;
 }
@@ -422,11 +461,15 @@ static inline void *mm_impl_pvalloc(size_t size)
 {
   void *result;
   BEFORE_MALLOC_CALL;
+#if CMK_HAS_PVALLOC
   result = pvalloc(size);
+#else
+  const size_t pagesize = CmiGetPageSize();
+  return memalign(pagesize, CMIALIGN(size, pagesize));
+#endif
   AFTER_MALLOC_CALL;
   return result;
 }
-#endif
 
 #undef BEFORE_MALLOC_CALL
 #undef AFTER_MALLOC_CALL
@@ -489,7 +532,11 @@ CLINKAGE void *pvalloc(size_t size) CMK_THROW { return meta_pvalloc(size); }
 #define mm_impl_malloc   malloc
 #define mm_impl_free     free
 #define mm_impl_calloc   calloc
+#if CMK_HAS_CFREE
 #define mm_impl_cfree    cfree
+#else
+#define mm_impl_cfree    free
+#endif
 #define mm_impl_memalign memalign
 #define mm_impl_posix_memalign posix_memalign
 #if (defined __cplusplus && __cplusplus >= 201703L) || (defined __STDC_VERSION__ && __STDC_VERSION__ >= 201112L)
@@ -497,8 +544,23 @@ CLINKAGE void *pvalloc(size_t size) CMK_THROW { return meta_pvalloc(size); }
 #else
 #define mm_impl_aligned_alloc memalign
 #endif
+#if CMK_HAS_VALLOC
 #define mm_impl_valloc   valloc
+#else
+static inline void *mm_impl_valloc(size_t size)
+{
+  return memalign(CmiGetPageSize(), size);
+}
+#endif
+#if CMK_HAS_PVALLOC
 #define mm_impl_pvalloc  pvalloc
+#else
+static inline void *mm_impl_pvalloc(size_t size)
+{
+  const size_t pagesize = CmiGetPageSize();
+  return memalign(pagesize, CMIALIGN(size, pagesize));
+}
+#endif
 
 #endif /* CMK_MEMORY_BUILD_OS_WRAPPED || CMK_MEMORY_BUILD_GNU_HOOKS */
 
@@ -579,7 +641,7 @@ INLINE static CMK_TYPEDEF_UINT8 MemusageProcSelfStat(void){
     return vsz;
 }
 
-#if ! CMK_HAS_MALLINFO || defined(CMK_MALLINFO_IS_BROKEN)
+#if ! CMK_HAS_MALLINFO
 INLINE static CMK_TYPEDEF_UINT8 MemusageMallinfo(void){ return 0;}
 #else
 #if CMK_HAS_MALLOC_H
