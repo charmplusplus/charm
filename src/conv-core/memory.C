@@ -527,6 +527,13 @@ void *valloc(size_t size) CMK_THROW { return meta_valloc(size); }
 CLINKAGE void *pvalloc(size_t size) CMK_THROW { return meta_pvalloc(size); }
 #endif /* ! CMK_MEMORY_BUILD_GNU_HOOKS */
 
+#else
+
+// So that this file can call allocators with or without interception:
+
+#define mm_impl_malloc   malloc
+#define mm_impl_free     free
+
 #endif /* CMK_MEMORY_BUILD_OS_WRAPPED || CMK_MEMORY_BUILD_GNU_HOOKS */
 
 static int skip_mallinfo = 0;
