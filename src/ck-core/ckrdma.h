@@ -536,28 +536,30 @@ void initPostStruct(CkNcpyBufferPost *ncpyPost, int index);
 void CkPostBufferInternal(void *destBuffer, size_t destSize, int tag);
 void CkPostNodeBufferInternal(void *destBuffer, size_t destSize, int tag);
 
-template <typename T>
-static inline constexpr size_t safe_sizeof(T * ptr)
-{
-    return sizeof(T);
-}
-
-template <>
-inline constexpr size_t safe_sizeof(void * ptr)
-{
-    return 1;
+namespace sizeofutils {
+  template <typename T>
+  static inline constexpr size_t safe_sizeof(T * ptr)
+  {
+      return sizeof(T);
+  }
+  
+  template <>
+  inline constexpr size_t safe_sizeof(void * ptr)
+  {
+      return 1;
+  }
 }
 
 template <typename T>
 void CkPostBuffer(T *buffer, size_t size, int tag) {
-  int destSize = (std::is_same<T, void>::value) ? size : safe_sizeof(buffer) * size;
+  int destSize = (std::is_same<T, void>::value) ? size : sizeofutils::safe_sizeof(buffer) * size;
   void *destBuffer = (void *)buffer;
   CkPostBufferInternal(destBuffer, destSize, tag);
 }
 
 template <typename T>
 void CkPostNodeBuffer(T *buffer, size_t size, int tag) {
-  int destSize = (std::is_same<T, void>::value) ? size : safe_sizeof(buffer) * size;
+  int destSize = (std::is_same<T, void>::value) ? size : sizeofutils::safe_sizeof(buffer) * size;
   void *destBuffer = (void *)buffer;
   CkPostNodeBufferInternal(destBuffer, destSize, tag);
 }

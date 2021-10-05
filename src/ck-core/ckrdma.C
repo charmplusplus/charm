@@ -1610,7 +1610,7 @@ void CkReplaceSourcePtrsInBcastMsg(envelope *env, NcpyBcastInterimAckInfo *bcast
 }
 
 
-#if CMK_SMP || CMK_UTH_VERSION
+#if CMK_SMP
 void sendRecvDoneMsgToPeers(envelope *env, CkArray *mgr) {
 
   CmiForwardMsgToPeers(env->getTotalsize(), (char *)env);
@@ -2191,18 +2191,20 @@ void CkMatchNodeBuffer(CkNcpyBufferPost *post, int index, int tag) {
 }
 
 void initPostStruct(CkNcpyBufferPost *ncpyPost, int index) {
-  ncpyPost[index].regMode = CK_BUFFER_REG;
-  ncpyPost[index].deregMode = CK_BUFFER_DEREG;
-  ncpyPost[index].index = index;
-  ncpyPost[index].postAsync = false;
+  CkNcpyBufferPost &ncpyPostElem = ncpyPost[index];
+  ncpyPostElem.regMode = CK_BUFFER_REG;
+  ncpyPostElem.deregMode = CK_BUFFER_DEREG;
+  ncpyPostElem.index = index;
+  ncpyPostElem.postAsync = false;
 }
 
 void setPostStruct(CkNcpyBufferPost *ncpyPost, int index, CkNcpyBuffer &buffObj, CmiUInt8 elemIndex) {
-  ncpyPost[index].srcBuffer = (void *)buffObj.ptr;
-  ncpyPost[index].srcSize = buffObj.cnt;
-  ncpyPost[index].ncpyEmInfo->tagArray = buffObj.ncpyEmInfo->tagArray;
-  ncpyPost[index].opIndex = index;
-  ncpyPost[index].arrayIndex = elemIndex;
+  CkNcpyBufferPost &ncpyPostElem = ncpyPost[index];
+  ncpyPostElem.srcBuffer = (void *)buffObj.ptr;
+  ncpyPostElem.srcSize = buffObj.cnt;
+  ncpyPostElem.ncpyEmInfo->tagArray = buffObj.ncpyEmInfo->tagArray;
+  ncpyPostElem.opIndex = index;
+  ncpyPostElem.arrayIndex = elemIndex;
 }
 
 void updateTagArray(envelope *env, int localElems) {
