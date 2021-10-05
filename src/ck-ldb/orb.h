@@ -67,8 +67,14 @@ private:
 
     // Decide where to split along the longest dimension
     const int numLeftProcs = numProcs / 2;
+    const float bgLeft =
+        std::accumulate(procStart, procStart + numLeftProcs, 0.0,
+                        [&](float val, const P& proc) { return val + proc.getLoad(); });
+    const float bgRight =
+        std::accumulate(procStart + numLeftProcs, procEnd, 0.0,
+                        [&](float val, const P& proc) { return val + proc.getLoad(); });
     const float ratio = (1.0F * numLeftProcs) / numProcs;
-    const int splitIndex = findSplit(objs, sortedIndices[maxDim], ratio);
+    const int splitIndex = findSplit(objs, sortedIndices[maxDim], ratio, bgLeft, bgRight);
 
     // Now actually split into two sets
     // First, split the box
@@ -120,22 +126,26 @@ private:
   }
 
   int findSplit(const std::vector<O>& objs, const Indices& sortedPositions,
-                const float ratio) const
+                const float ratio, const float bgLeft, const float bgRight) const
   {
+    // Total load is the bg load of left procs + bg load of right procs + load of objects
     const float totalLoad =
+        bgLeft + bgRight +
         std::accumulate(sortedPositions.begin(), sortedPositions.end(), 0.0,
                         [&](float l, int index) { return l + objs[index].getLoad(); });
-    const float target = ratio * totalLoad;
+
+    // leftTarget is the amount of object load we want to assign to the left procs
+    const float leftTarget = ratio * totalLoad - bgLeft;
 
     int splitIndex = 0;
     float leftLoad = 0;
     for (splitIndex = 0; splitIndex < sortedPositions.size(); splitIndex++)
     {
       const float newLeftLoad = objs[sortedPositions[splitIndex]].getLoad() + leftLoad;
-      if (newLeftLoad > target)
+      if (newLeftLoad > leftTarget)
       {
         // Decide if split element should go to left or right partition
-        if (std::abs(newLeftLoad - target) < std::abs(leftLoad - target))
+        if (std::abs(newLeftLoad - leftTarget) < std::abs(leftLoad - leftTarget))
           splitIndex++;
         break;
       }
