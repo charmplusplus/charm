@@ -10,3 +10,5 @@ jobs:
     if: ${{ (github.event_name == 'pull_request' && !github.event.pull_request.repo.fork) ||
             (github.event_name == 'pull_request_review' && github.event.pull_request.fork.repo &&
              github.event.review.state == 'approved') }}
+    steps:
+      - run: env
