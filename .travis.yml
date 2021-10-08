@@ -48,6 +48,7 @@ jobs:
     name: "MPI-Power"
     script:
     - sudo apt-get update
-    - sudo apt-get install -y gfortran mpich libmpich-dev
+    - sudo apt-get install -y gfortran libopenmpi-dev
+    - export OMPI_MCA_rmaps_base_oversubscribe=1
     - ./build all-test mpi-linux-ppc64le -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
     - make -C mpi-linux-ppc64le/tmp test
