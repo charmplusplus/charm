@@ -1,6 +1,7 @@
 
 PGCC=`CC -V 2>&1 | grep pgCC`
 ICPC=`CC -V 2>&1 | grep Intel`
+CLANG=`CC -V 2>&1 | grep 'clang'`
 GNU=`CC -V 2>&1 | grep 'g++'`
 CCE=`CC -V 2>&1 | grep 'Cray'`
 
@@ -42,6 +43,11 @@ then
 CMK_SEQ_CC="icc -fPIC "
 CMK_SEQ_CXX="icpc -fPIC "
 CMK_COMPILER='icc'
+elif test -n "$CLANG"
+then
+CMK_SEQ_CC="clang -fPIC "
+CMK_SEQ_CXX="clang++ -fPIC "
+CMK_COMPILER='clang'
 else   # gcc
 CMK_SEQ_CC="gcc -fPIC"
 CMK_SEQ_CXX="g++ -fPIC "
