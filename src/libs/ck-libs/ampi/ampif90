@@ -7,7 +7,7 @@ ORIGIN='\$ORIGIN'
 export AMPICC="$(basename $0)"
 export AMPICC_MODE='ampif'
 
-cp -n $CHARMBIN/../include/mpif.h .
+[[ ! -f "mpif.h" ]] && cp -f "$CHARMBIN/../include/mpif.h" .
 $CHARMBIN/ampiCC "$@"
 status=$?
 /bin/rm -f mpif.h
