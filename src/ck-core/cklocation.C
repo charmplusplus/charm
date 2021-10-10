@@ -505,7 +505,8 @@ public:
   int procNum(int arrayHdl, const CkArrayIndex& i)
   {
     int flati;
-    if (amaps[arrayHdl]->_nelems.dimension == 0)
+    auto& info = amaps[arrayHdl];
+    if (info->_nelems.dimension == 0)
     {
       dynamicIns[arrayHdl] = true;
       return RRMap::procNum(arrayHdl, i);
@@ -517,48 +518,48 @@ public:
     }
     else if (i.dimension == 2)
     {
-      flati = i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1];
+      flati = i.data()[0] * info->_nelems.data()[1] + i.data()[1];
     }
     else if (i.dimension == 3)
     {
-      flati = (i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1]) *
-                  amaps[arrayHdl]->_nelems.data()[2] +
+      flati = (i.data()[0] * info->_nelems.data()[1] + i.data()[1]) *
+                  info->_nelems.data()[2] +
               i.data()[2];
     }
     else if (i.dimension == 4)
     {
       flati = (int)(((((short int*)i.data())[0] *
-                          ((short int*)amaps[arrayHdl]->_nelems.data())[1] +
+                          ((short int*)info->_nelems.data())[1] +
                       ((short int*)i.data())[1]) *
-                         ((short int*)amaps[arrayHdl]->_nelems.data())[2] +
+                         ((short int*)info->_nelems.data())[2] +
                      ((short int*)i.data())[2]) *
-                        ((short int*)amaps[arrayHdl]->_nelems.data())[3] +
+                        ((short int*)info->_nelems.data())[3] +
                     ((short int*)i.data())[3]);
     }
     else if (i.dimension == 5)
     {
       flati = (int)((((((short int*)i.data())[0] *
-                           ((short int*)amaps[arrayHdl]->_nelems.data())[1] +
+                           ((short int*)info->_nelems.data())[1] +
                        ((short int*)i.data())[1]) *
-                          ((short int*)amaps[arrayHdl]->_nelems.data())[2] +
+                          ((short int*)info->_nelems.data())[2] +
                       ((short int*)i.data())[2]) *
-                         ((short int*)amaps[arrayHdl]->_nelems.data())[3] +
+                         ((short int*)info->_nelems.data())[3] +
                      ((short int*)i.data())[3]) *
-                        ((short int*)amaps[arrayHdl]->_nelems.data())[4] +
+                        ((short int*)info->_nelems.data())[4] +
                     ((short int*)i.data())[4]);
     }
     else if (i.dimension == 6)
     {
       flati = (int)(((((((short int*)i.data())[0] *
-                            ((short int*)amaps[arrayHdl]->_nelems.data())[1] +
+                            ((short int*)info->_nelems.data())[1] +
                         ((short int*)i.data())[1]) *
-                           ((short int*)amaps[arrayHdl]->_nelems.data())[2] +
+                           ((short int*)info->_nelems.data())[2] +
                        ((short int*)i.data())[2]) *
-                          ((short int*)amaps[arrayHdl]->_nelems.data())[3] +
+                          ((short int*)info->_nelems.data())[3] +
                       ((short int*)i.data())[3]) *
-                         ((short int*)amaps[arrayHdl]->_nelems.data())[4] +
+                         ((short int*)info->_nelems.data())[4] +
                      ((short int*)i.data())[4]) *
-                        ((short int*)amaps[arrayHdl]->_nelems.data())[5] +
+                        ((short int*)info->_nelems.data())[5] +
                     ((short int*)i.data())[5]);
     }
 #if CMK_ERROR_CHECKING
@@ -570,11 +571,11 @@ public:
 
     if (useNodeBlkMapping)
     {
-      if (flati < amaps[arrayHdl]->_numChares)
+      if (flati < info->_numChares)
       {
-        int numCharesOnNode = amaps[arrayHdl]->_nBinSizeFloor;
+        int numCharesOnNode = info->_nBinSizeFloor;
         int startNodeID, offsetInNode;
-        if (flati < amaps[arrayHdl]->_nNumFirstSet)
+        if (flati < info->_nNumFirstSet)
         {
           numCharesOnNode++;
           startNodeID = flati / numCharesOnNode;
@@ -582,9 +583,9 @@ public:
         }
         else
         {
-          startNodeID = amaps[arrayHdl]->_nRemChares +
-                        (flati - amaps[arrayHdl]->_nNumFirstSet) / numCharesOnNode;
-          offsetInNode = (flati - amaps[arrayHdl]->_nNumFirstSet) % numCharesOnNode;
+          startNodeID = info->_nRemChares +
+                        (flati - info->_nNumFirstSet) / numCharesOnNode;
+          offsetInNode = (flati - info->_nNumFirstSet) % numCharesOnNode;
         }
         int nodeSize = CkMyNodeSize();  // assuming every node has same number of PEs
         int elemsPerPE = numCharesOnNode / nodeSize;
@@ -604,11 +605,11 @@ public:
         return (flati % CkNumPes());
     }
     // regular PE-based block mapping
-    if (flati < amaps[arrayHdl]->_numFirstSet)
-      return (flati / (amaps[arrayHdl]->_binSizeFloor + 1));
-    else if (flati < amaps[arrayHdl]->_numChares)
-      return (amaps[arrayHdl]->_remChares +
-              (flati - amaps[arrayHdl]->_numFirstSet) / (amaps[arrayHdl]->_binSizeFloor));
+    if (flati < info->_numFirstSet)
+      return (flati / (info->_binSizeFloor + 1));
+    else if (flati < info->_numChares)
+      return (info->_remChares +
+              (flati - info->_numFirstSet) / (info->_binSizeFloor));
     else
       return (flati % CkNumPes());
   }
