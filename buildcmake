@@ -495,7 +495,7 @@ if [[ $opt_ampi_only -eq 1 ]]; then
 fi
 
 # Special handling for gni-crayxc, gni-crayxe, mpi-crayxc, mpi-crayxe
-if [[ $actual_triplet == gni-* || $actual_triplet == *-crayx? ]]; then
+if [[ $actual_triplet == gni-* || $actual_triplet == *-cray* ]]; then
   opt_network=$actual_triplet
   # Need to use Cray's compiler frontends on Cray systems
   opt_CC=cc
