@@ -261,7 +261,16 @@ done
 
 ############ End option parsing
 
-opt_network=$(echo $triplet | cut -d '-' -f1)
+# Special handling for Cray builds
+if [[ $triplet == gni-* || $triplet == *-cray* ]]; then
+  opt_network=$triplet
+  # Need to use Cray's compiler frontends on Cray systems
+  opt_CC=cc
+  opt_CXX=CC
+  opt_FC=ftn
+else
+  opt_network=$(echo $triplet | cut -d '-' -f1)
+fi
 
 [[ $opt_production -eq 0 ]] && opt_production='Debug' || opt_production='Release'
 
