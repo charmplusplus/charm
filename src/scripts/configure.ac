@@ -2188,6 +2188,23 @@ cat > $tc <<EOT
 #include <stddef.h>
 int main()
 {
+  return dlopen("", RTLD_DEEPBIND) == NULL;
+}
+EOT
+test_cc "whether has RTLD_DEEPBIND" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_RTLD_DEEPBIND, $pass, [whether has RTLD_DEEPBIND])
+
+cat > $tc <<EOT
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE
+#endif
+#ifndef __USE_GNU
+# define __USE_GNU
+#endif
+#include <dlfcn.h>
+#include <stddef.h>
+int main()
+{
   return dlsym(RTLD_DEFAULT, "main") != NULL;
 }
 EOT
