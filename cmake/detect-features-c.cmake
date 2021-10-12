@@ -121,6 +121,7 @@ check_symbol_exists(pthread_setaffinity_np pthread.h HAVE_DECL_PTHREAD_SETAFFINI
 set(CMK_HAS_PTHREAD_SETAFFINITY ${HAVE_DECL_PTHREAD_SETAFFINITY_NP})
 check_symbol_exists(pthread_spin_lock pthread.h CMK_HAS_SPINLOCK)
 check_symbol_exists(pvalloc malloc.h CMK_HAS_PVALLOC)
+check_symbol_exists(RTLD_DEEPBIND dlfcn.h CMK_HAS_RTLD_DEEPBIND)
 check_symbol_exists(RTLD_DEFAULT dlfcn.h CMK_HAS_RTLD_DEFAULT)
 check_symbol_exists(RTLD_NEXT dlfcn.h CMK_HAS_RTLD_NEXT)
 check_function_exists(readlink CMK_HAS_READLINK)
