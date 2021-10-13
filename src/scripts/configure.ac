@@ -1564,7 +1564,7 @@ int main(int argc, char **argv)
   return 0;
 }
 EOT
-test_cc "whether build on OFI" "yes" "no" "-lfabric"
+test_cc "whether build on OFI" "yes" "no"
 AC_DEFINE_UNQUOTED(CMK_BUILD_ON_OFI, $strictpass, [build OFI.])
 BUILD_OFI=$strictpass
 
