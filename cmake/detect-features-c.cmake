@@ -74,6 +74,7 @@ check_function_exists(_strdup HAVE__STRDUP)
 check_function_exists(asctime CMK_HAS_ASCTIME)
 check_function_exists(backtrace CMK_USE_BACKTRACE)
 check_function_exists(bindprocessor CMK_HAS_BINDPROCESSOR)
+check_function_exists(cfree CMK_HAS_CFREE)
 check_function_exists(clz HAVE_CLZ)
 check_function_exists(clzl HAVE_CLZL)
 check_symbol_exists(dlopen dlfcn.h CMK_DLL_USE_DLOPEN)
@@ -119,6 +120,7 @@ check_symbol_exists(pthread_getaffinity_np pthread.h HAVE_DECL_PTHREAD_GETAFFINI
 check_symbol_exists(pthread_setaffinity_np pthread.h HAVE_DECL_PTHREAD_SETAFFINITY_NP)
 set(CMK_HAS_PTHREAD_SETAFFINITY ${HAVE_DECL_PTHREAD_SETAFFINITY_NP})
 check_symbol_exists(pthread_spin_lock pthread.h CMK_HAS_SPINLOCK)
+check_symbol_exists(pvalloc malloc.h CMK_HAS_PVALLOC)
 check_symbol_exists(RTLD_DEFAULT dlfcn.h CMK_HAS_RTLD_DEFAULT)
 check_symbol_exists(RTLD_NEXT dlfcn.h CMK_HAS_RTLD_NEXT)
 check_function_exists(readlink CMK_HAS_READLINK)
@@ -142,6 +144,7 @@ check_function_exists(sysctl HAVE_SYSCTL)
 check_function_exists(sysctlbyname HAVE_SYSCTLBYNAME)
 check_function_exists(uname HAVE_UNAME)
 check_function_exists(usleep CMK_HAS_USLEEP)
+check_symbol_exists(valloc malloc.h CMK_HAS_VALLOC)
 
 
 # Complex tests
