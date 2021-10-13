@@ -157,11 +157,19 @@ if($skip_choosing eq "false"){
                     $skip_choosing = "true";
       }
     } else {
-      print "\nI found that you have a Cray environment.\nDo you want to build Charm++ targeting Cray XC? [Y/n]: ";
+      print "\nI found that you have a Cray environment.\nDo you want to build Charm++ targeting Cray Shasta? [Y/n]: ";
       my $p = promptUserYN();
       if($p eq "yes" || $p eq "default") {
-                    $arch = "gni-crayxc";
+                    $arch = "ofi-crayshasta";
                     $skip_choosing = "true";
+      }
+      else {
+	  print "\nDo you want to build Charm++ targeting Cray XC? [Y/n]: ";
+	  my $p = promptUserYN();
+	  if($p eq "yes" || $p eq "default") {
+	      $arch = "gni-crayxc";
+	      $skip_choosing = "true";
+	  }
       }
     }
   }
