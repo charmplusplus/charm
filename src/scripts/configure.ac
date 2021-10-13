@@ -1878,6 +1878,36 @@ EOT
 test_link "whether has mallinfo" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_MALLINFO, $pass, [whether has mallinfo])
 
+#### test for cfree ###
+cat > $t <<EOT
+#include <stdlib.h>
+int main() {
+  cfree(0);
+}
+EOT
+test_link "whether has cfree" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_CFREE, $pass, [whether has cfree])
+
+#### test for pvalloc ###
+cat > $t <<EOT
+#include <malloc.h>
+int main() {
+  return pvalloc(4096) == 0;
+}
+EOT
+test_link "whether has pvalloc" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_PVALLOC, $pass, [whether has pvalloc])
+
+#### test for valloc ###
+cat > $t <<EOT
+#include <malloc.h>
+int main() {
+  return valloc(4096) == 0;
+}
+EOT
+test_link "whether has valloc" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_VALLOC, $pass, [whether has valloc])
+
 #### test for __morecore ###
 cat > $t <<EOT
 #include <cstddef>
