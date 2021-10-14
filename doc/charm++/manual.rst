@@ -11888,8 +11888,10 @@ For example, ``++no-scalable-start``.
 
 .. note::
 
-   When running on OFI platforms such as Cray Shasta, the OFI runtime
-   parameter ``+ofi_runtime_tcp`` may be required.
+   When running on OFI platforms such as Cray Shasta, the OFI runtime parameter
+   ``+ofi_runtime_tcp`` may be required. By default, the exchange of EP names at
+   startup is done via both PMI and OFI. With this flag, it is only done via
+   PMI.
 
 .. _command line options:
 
