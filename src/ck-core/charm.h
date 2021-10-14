@@ -148,6 +148,9 @@ extern void CkStartQDExt_ArrayCallback(int aid, int* idx, int ndims, int epIdx, 
 extern void CkStartQDExt_SectionCallback(int sid_pe, int sid_cnt, int rootPE, int ep);
 extern void registerCreateCallbackMsgExtCallback(void (*cb)(void*, int, int, int, int *, char**, int*));
 extern void registerPyReductionExtCallback(int (*cb)(char**, int*, int, char**));
+extern int CkTraceRegisterUserEvent(char *EventDesc, int eventID);
+extern void CkTraceBeginUserBracketEvent(int eventID);
+extern void CkTraceEndUserBracketEvent(int eventID);
 
 #endif
 /*********************************************************/

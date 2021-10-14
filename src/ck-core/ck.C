@@ -2545,6 +2545,19 @@ void CkArrayExtSend_multi(int aid, int *idx, int ndims, int epIdx, int num_bufs,
   }
 }
 
+int CkTraceRegisterUserEvent(char *EventDesc, int eventNum)
+{
+  return traceRegisterUserEvent(EventDesc, eventNum);
+}
+
+void CkTraceBeginUserBracketEvent(int eventID)
+{
+  traceBeginUserBracketEvent(eventID);
+}
+void CkTraceEndUserBracketEvent(int eventID)
+{
+  traceEndUserBracketEvent(eventID);
+}
 #endif
 
 //------------------- Message Watcher (record/replay) ----------------
