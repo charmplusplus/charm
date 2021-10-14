@@ -448,6 +448,10 @@ for c in $opt_lrts_pmi $opt_compiler; do
   [[ -n $c ]] &&  builddir_extra+="-${c}"
 done
 
+if [[ "$actual_triplet" = ofi-cray* && -z "$opt_lrts_pmi" ]]; then
+    opt_lrts_pmi="slurmpmi2"
+fi
+
 if [[ -n $opt_destination ]]; then
   # Note that $builddir_extra is intentionally ignored here
   builddir=$opt_destination$opt_suffix
@@ -492,7 +496,7 @@ if [[ $opt_ampi_only -eq 1 ]]; then
     opt_extra_opts="-DCMK_NO_INTEROP=1 -DCMK_NO_MSG_PRIOS=1 -DCMK_FIFO_QUEUE_ONLY=1 -DCMK_OBJID_COLLECTION_BITS=29 $opt_extra_opts "
 fi
 
-# Special handling for gni-crayxc, gni-crayxe, mpi-crayxc, mpi-crayxe
+# Special handling for gni-crayxc, gni-crayxe, mpi-crayxc, mpi-crayxe, mpi-crayshasta, ofi-crayshasta
 if [[ $actual_triplet == gni-* || $actual_triplet == *-cray* ]]; then
   opt_network=$actual_triplet
   # Need to use Cray's compiler frontends on Cray systems
