@@ -387,7 +387,7 @@ set(CHARM_PLATFORM "${NETWORK}-${CHARM_OS}-${CHARM_CPU}")
 
 
 set(CMK_BUILD_CRAY 0)
-if(${NETWORK} MATCHES "gni-")
+if(${NETWORK} MATCHES "gni-" OR ${NETWORK} MATCHES "ofi-cray")
   set(CHARM_PLATFORM "${NETWORK}")
   set(CMK_BUILD_CRAY 1)
 elseif(${NETWORK} MATCHES "mpi-cray")
@@ -569,6 +569,8 @@ elseif(${NETWORK} MATCHES "gni-")
   set(GDIR "gni")
 elseif(${NETWORK} MATCHES "mpi-cray")
   set(GDIR "mpi")
+elseif(${NETWORK} MATCHES "ofi-cray")
+  set(GDIR "ofi")
 else()
   set(GDIR ${NETWORK})
 endif()
@@ -754,7 +756,7 @@ endforeach()
 
 
 # proc_management
-if(${NETWORK} STREQUAL "ucx" OR ${NETWORK} STREQUAL "ofi")
+if(${NETWORK} MATCHES "ucx" OR ${NETWORK} MATCHES "ofi")
   # file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/proc_management/simple_pmi)
 
   set(proc_management-sources
