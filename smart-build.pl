@@ -402,7 +402,7 @@ if ($counter != 1) {
 #================ Choose Compiler =================================
 
 # Lookup list of compilers
-my $cs = `$dirname/build charm++ $arch help 2>&1 | grep "Supported compilers"`;
+my $cs = `$dirname/buildold charm++ $arch help 2>&1 | grep "Supported compilers"`;
 # prune away beginning of the line
 $cs =~ m/Supported compilers: (.*)/;
 $cs = $1;
