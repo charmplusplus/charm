@@ -26,7 +26,7 @@
 
 #define MAXDOUBLE  std::numeric_limits<double>::max()
 
-#define DEBAD(x) /*CkPrintf x*/
+#define DEBAD(x) CkPrintf x
 #define DEBADDETAIL(x) /*CkPrintf x*/
 #define EXTRA_FEATURE 0
 
@@ -710,7 +710,7 @@ bool MetaBalancer::generatePlan(int& period, double& ratio_at_t) {
   for (AdaptiveData& data : adaptive_lbdb.history_data) {
     max += data.max_load;
     avg += data.avg_load;
-    DEBAD(("max (%d, %lf) avg (%d, %lf)\n", i, data.max_load, i, data.avg_load));
+    DEBAD(("max ( %lf) avg ( %lf)\n", data.max_load, data.avg_load));
   }
 //  max /= (adaptive_struct.lb_iteration_no - adaptive_lbdb.history_data[0].iteration);
 //  avg /= (adaptive_struct.lb_iteration_no - adaptive_lbdb.history_data[0].iteration);
