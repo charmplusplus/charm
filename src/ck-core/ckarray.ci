@@ -12,12 +12,10 @@ module CkArray {
     // Insertion
     entry [inline] void insertElement(CkMarshalledMessage, CkArrayIndex,
         int listenerData[CK_ARRAYLISTENER_MAXLEN]);
-    entry [inline] void demandCreateElement(const CkArrayIndex &idx, int ctor,
-        CkDeliver_t type);
+    entry [inline] void demandCreateElement(const CkArrayIndex &idx, int ctor);
     entry void remoteBeginInserting(void);
     entry void sendZCBroadcast(MsgPointerWrapper p);
     entry void remoteDoneInserting(void);
-    entry void initDone(void);
 
     //Broadcast
     entry void sendBroadcast(CkMessage *);

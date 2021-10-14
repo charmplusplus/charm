@@ -612,7 +612,7 @@ inline void CkCacheManager<CkCacheKey>::recvData(CkCacheKey key, void *data, CkC
     CkCacheStatistics cs(dataArrived, dataTotalArrived,
         dataMisses, dataLocal, dataError, totalDataRequested,
         maxData, CkMyPe());
-    contribute(sizeof(CkCacheStatistics), &cs, CkCacheStatistics::sum, cb);
+    this->contribute(sizeof(CkCacheStatistics), &cs, CkCacheStatistics::sum, cb);
 #else
     CkAbort("Invalid call, only valid if COSMO_STATS is defined");
 #endif

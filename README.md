@@ -1,6 +1,6 @@
 # Charm++
 
-[![Build Status](https://travis-ci.org/UIUC-PPL/charm.svg?branch=master)](https://travis-ci.org/UIUC-PPL/charm)
+[![Build Status](https://travis-ci.org/UIUC-PPL/charm.svg?branch=main)](https://travis-ci.org/UIUC-PPL/charm)
 [![Documentation Status](https://readthedocs.org/projects/charm/badge/?version=latest)](https://charm.readthedocs.io/en/latest/?badge=latest)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3370873.svg)](https://doi.org/10.5281/zenodo.3370873)
 [![CDash](https://img.shields.io/badge/CDash-dashboard-blue)](https://my.cdash.org/index.php?project=Charm%2B%2B)
@@ -358,6 +358,6 @@ Seonmyeong Bak, Karthik Senthil, Juan Galvez, Michael Robson, Raghavendra
 Kanakagiri, and Venkatasubrahmanian Narayanan. Current developers include
 Eric Bohm, Ronak Buch, Eric Mikida, Sam White, Nitin Bhat, Kavitha
 Chandrasekar, Jaemin Choi, Matthias Diener, Evan Ramos, Justin Szaday,
-and Zane Fink.
+Zane Fink, and Pathikrit Ghosh.
 
 Copyright (C) 1989-2020 Regents of the University of Illinois

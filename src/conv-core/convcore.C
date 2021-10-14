@@ -52,6 +52,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <cstdarg>
 #include <vector>
 #include "hrctimer.h"
 #ifndef __STDC_FORMAT_MACROS
@@ -599,7 +600,7 @@ void CmiDeprecateArgInt(char **argv,const char *arg,const char *desc,const char 
   int dummy = 0, found = CmiGetArgIntDesc(argv, arg, &dummy, desc);
 
   if (found)
-    CmiPrintf("%s", warning);
+    CmiPrintf("%s\n", warning);
 }
 
 /*****************************************************************************
@@ -1680,13 +1681,6 @@ void CmiHandleMessage(void *msg)
 	/* setMemoryStatus(1) */ /* charmdebug */
 #endif
 
-/*
-	CMK_FAULT_EVAC
-*/
-/*	if((!CpvAccess(_validProcessors)[CmiMyPe()]) && handler != _exitHandlerIdx){
-		return;
-	}*/
-	
         MESSAGE_PHASE_CHECK(msg)
 #if CMK_ERROR_CHECKING
         if (handlerIdx >= CpvAccess(CmiHandlerCount)) {
@@ -1841,14 +1835,14 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
 	/*#warning "CsdNextMessage: CMK_NODE_QUEUE_AVAILABLE" */
 	if (NULL!=(msg=CmiGetNonLocalNodeQ())) return msg;
 #if !CMK_NO_MSG_PRIOS
-	if (!CqsEmpty(s->nodeQ)
-	 && CqsPrioGT(CqsGetPriority(s->schedQ),
-		       CqsGetPriority(s->nodeQ))) {
-	  if(CmiTryLock(s->nodeLock) == 0) {
+	if(CmiTryLock(s->nodeLock) == 0) {
+	  if (!CqsEmpty(s->nodeQ)
+	   && CqsPrioGT(CqsGetPriority(s->schedQ),
+		         CqsGetPriority(s->nodeQ))) {
 	    CqsDequeue(s->nodeQ,(void **)&msg);
-	    CmiUnlock(s->nodeLock);
-	    if (msg!=NULL) return msg;
 	  }
+	  CmiUnlock(s->nodeLock);
+	  if (msg!=NULL) return msg;
 	}
 #endif
 #endif
@@ -1918,10 +1912,6 @@ int CsdScheduler(int maxmsgs)
 	break;\
       }
 #endif
-
-/*
-	EVAC
-*/
 
 
 extern void machine_OffloadAPIProgress(void);
@@ -2136,11 +2126,15 @@ void CthResumeNormalThread(CthThreadToken* token)
 #endif
 }
 
+int CthIsMainThread(CthThread t) {
+  return t == CpvAccess(CthMainThread);
+}
+
 void CthResumeSchedulingThread(CthThreadToken  *token)
 {
   CthThread t = token->thread;
   CthThread me = CthSelf();
-  if (me == CpvAccess(CthMainThread)) {
+  if (CthIsMainThread(me)) {
     CthEnqueueSchedulingThread(CthGetToken(me),CQS_QUEUEING_FIFO, 0, 0);
   } else {
     CthSetNext(me, CpvAccess(CthSleepingStandins));
@@ -2424,10 +2418,58 @@ void CmiSyncVectorSendAndFree(int destPE, int n, int *sizes, char **msgs) {
  * merge call will not be deleted by the system, and the CmiHandler function
  * will be in charge of its deletion.
  * 
- * CmiReduce/CmiReduceStruct MUST be called once by every processor,
- * CmiNodeReduce/CmiNodeReduceStruct MUST be called once by every node, and in
- * particular by the rank zero in each node.
+ * CmiReduce/CmiReduceStruct MUST be called once by every processor.
+ * CmiNodeReduce/CmiNodeReduceStruct MUST be called once by every node.
  ****************************************************************************/
+
+#define REDUCTION_DEBUG 0
+#if REDUCTION_DEBUG
+#define REDN_DBG(...) CmiPrintf(__VA_ARGS__)
+#else
+#define REDN_DBG(...)
+#endif
+
+static constexpr unsigned int CmiLogMaxReductions = 4u;
+static constexpr int CmiMaxReductions = 1u << CmiLogMaxReductions;
+static constexpr int CmiReductionsNumChildren = 4;
+
+struct CmiReduction {
+  void *localData;
+  char **remoteData;
+  struct {
+    CmiHandler destination;
+    CmiReduceMergeFn mergeFn;
+    CmiReducePupFn pupFn;
+    CmiReduceDeleteFn deleteFn;
+  } ops;
+  int localSize;
+  int parent;
+  short int numRemoteReceived;
+  short int numChildren;
+  CmiUInt2 seqID;
+  char localContributed;
+};
+
+struct CmiNodeReduction {
+#if CMK_SMP
+  CmiNodeLock lock;
+#endif
+  CmiReduction * red;
+};
+
+static inline CmiReductionID CmiReductionIDFetchAdd(CmiReductionID & id, CmiReductionID addend) {
+  const CmiReductionID oldid = id;
+  id = oldid + addend;
+  return oldid;
+}
+#if CMK_SMP
+static inline CmiReductionID CmiReductionIDFetchAdd(std::atomic<CmiReductionID> & id, CmiReductionID addend) {
+  return id.fetch_add(addend);
+}
+using CmiNodeReductionID = std::atomic<CmiReductionID>;
+#else
+using CmiNodeReductionID = CmiReductionID;
+#endif
 
 CpvStaticDeclare(int, CmiReductionMessageHandler);
 CpvStaticDeclare(int, CmiReductionDynamicRequestHandler);
@@ -2436,27 +2478,33 @@ CpvStaticDeclare(int, CmiNodeReductionMessageHandler);
 CpvStaticDeclare(int, CmiNodeReductionDynamicRequestHandler);
 
 CpvStaticDeclare(CmiReduction**, _reduce_info);
-CpvStaticDeclare(int, _reduce_info_size); /* This is the log2 of the size of the array */
-CpvStaticDeclare(CmiUInt2, _reduce_seqID_global); /* This is used only by global reductions */
-CpvStaticDeclare(CmiUInt2, _reduce_seqID_request);
-CpvStaticDeclare(CmiUInt2, _reduce_seqID_dynamic);
+CpvStaticDeclare(CmiReductionID, _reduce_seqID_global); /* This is used only by global reductions */
+CpvStaticDeclare(CmiReductionID, _reduce_seqID_request);
+CpvStaticDeclare(CmiReductionID, _reduce_seqID_dynamic);
 
-CsvStaticDeclare(CmiReduction**, _nodereduce_info);
-CsvStaticDeclare(int, _nodereduce_info_size);
-CsvStaticDeclare(CmiUInt2, _nodereduce_seqID_global);
-CsvStaticDeclare(CmiUInt2, _nodereduce_seqID_request);
-CsvStaticDeclare(CmiUInt2, _nodereduce_seqID_dynamic);
+CsvStaticDeclare(CmiNodeReduction *, _nodereduce_info);
+CsvStaticDeclare(CmiNodeReductionID, _nodereduce_seqID_global);
+CsvStaticDeclare(CmiNodeReductionID, _nodereduce_seqID_request);
+CsvStaticDeclare(CmiNodeReductionID, _nodereduce_seqID_dynamic);
 
-enum {
+enum : CmiReductionID {
   CmiReductionID_globalOffset = 0, /* Reductions that involve the whole set of processors */
   CmiReductionID_requestOffset = 1, /* Reductions IDs that are requested by all the processors (i.e during intialization) */
   CmiReductionID_dynamicOffset = 2, /* Reductions IDs that are requested by only one processor (typically at runtime) */
-  CmiReductionID_multiplier = 3
+
+  CmiReductionID_multiplier = 4
 };
 
+static_assert(CmiIsPow2(CmiReductionID_multiplier),
+              "CmiReductionID_multiplier must be a power of two because seqID counters may overflow and wrap to 0");
+
+static inline unsigned int CmiGetRedIndex(CmiReductionID id) {
+  return id & ~((~0u) << CmiLogMaxReductions);
+}
+
 static CmiReduction* CmiGetReductionCreate(int id, short int numChildren) {
-  int index = id & ~((~0u)<<CpvAccess(_reduce_info_size));
-  CmiReduction *red = CpvAccess(_reduce_info)[index];
+  auto & redref = CpvAccess(_reduce_info)[CmiGetRedIndex(id)];
+  CmiReduction *red = redref;
   if (red != NULL && red->seqID != id) {
     /* The table needs to be expanded */
     CmiAbort("Too many simultaneous reductions");
@@ -2464,7 +2512,7 @@ static CmiReduction* CmiGetReductionCreate(int id, short int numChildren) {
   if (red == NULL || red->numChildren < numChildren) {
     CmiReduction *newred;
     CmiAssert(red == NULL || red->localContributed == 0);
-    if (numChildren == 0) numChildren = 4;
+    if (numChildren == 0) numChildren = CmiReductionsNumChildren;
     newred = (CmiReduction*)malloc(sizeof(CmiReduction)+numChildren*sizeof(void*));
     newred->numRemoteReceived = 0;
     newred->localContributed = 0;
@@ -2476,40 +2524,34 @@ static CmiReduction* CmiGetReductionCreate(int id, short int numChildren) {
     red = newred;
     red->numChildren = numChildren;
     red->remoteData = (char**)(red+1);
-    CpvAccess(_reduce_info)[index] = red;
+    redref = red;
   }
   return red;
 }
 
-static CmiReduction* CmiGetReduction(int id) {
-  return CmiGetReductionCreate(id, 0);
-}
-
 static void CmiClearReduction(int id) {
-  int index = id & ~((~0u)<<CpvAccess(_reduce_info_size));
-  free(CpvAccess(_reduce_info)[index]);
-  CpvAccess(_reduce_info)[index] = NULL;
+  auto & redref = CpvAccess(_reduce_info)[CmiGetRedIndex(id)];
+  auto red = redref;
+  redref = nullptr;
+  free(red);
 }
 
-static CmiReduction* CmiGetNextReduction(short int numChildren) {
-  int id = CpvAccess(_reduce_seqID_global);
-  CpvAccess(_reduce_seqID_global) += CmiReductionID_multiplier;
-  if (id > 0xFFF0) CpvAccess(_reduce_seqID_global) = CmiReductionID_globalOffset;
-  return CmiGetReductionCreate(id, numChildren);
+static CmiReductionID CmiGetNextReductionID(void) {
+  return CmiReductionIDFetchAdd(CpvAccess(_reduce_seqID_global), CmiReductionID_multiplier);
 }
 
 CmiReductionID CmiGetGlobalReduction(void) {
-  return CpvAccess(_reduce_seqID_request)+=CmiReductionID_multiplier;
+  return CmiReductionIDFetchAdd(CpvAccess(_reduce_seqID_request), CmiReductionID_multiplier);
 }
 
 CmiReductionID CmiGetDynamicReduction(void) {
   if (CmiMyPe() != 0) CmiAbort("Cannot call CmiGetDynamicReduction on processors other than zero!\n");
-  return CpvAccess(_reduce_seqID_dynamic)+=CmiReductionID_multiplier;
+  return CmiReductionIDFetchAdd(CpvAccess(_reduce_seqID_dynamic), CmiReductionID_multiplier);
 }
 
 static CmiReduction* CmiGetNodeReductionCreate(int id, short int numChildren) {
-  int index = id & ~((~0u)<<CsvAccess(_nodereduce_info_size));
-  CmiReduction *red = CsvAccess(_nodereduce_info)[index];
+  auto & redref = CsvAccess(_nodereduce_info)[CmiGetRedIndex(id)].red;
+  CmiReduction *red = redref;
   if (red != NULL && red->seqID != id) {
     /* The table needs to be expanded */
     CmiAbort("Too many simultaneous reductions");
@@ -2517,7 +2559,7 @@ static CmiReduction* CmiGetNodeReductionCreate(int id, short int numChildren) {
   if (red == NULL || red->numChildren < numChildren) {
     CmiReduction *newred;
     CmiAssert(red == NULL || red->localContributed == 0);
-    if (numChildren == 0) numChildren = 4;
+    if (numChildren == 0) numChildren = CmiReductionsNumChildren;
     newred = (CmiReduction*)malloc(sizeof(CmiReduction)+numChildren*sizeof(void*));
     newred->numRemoteReceived = 0;
     newred->localContributed = 0;
@@ -2529,35 +2571,29 @@ static CmiReduction* CmiGetNodeReductionCreate(int id, short int numChildren) {
     red = newred;
     red->numChildren = numChildren;
     red->remoteData = (char**)(red+1);
-    CsvAccess(_nodereduce_info)[index] = red;
+    redref = red;
   }
   return red;
 }
 
-static CmiReduction* CmiGetNodeReduction(int id) {
-  return CmiGetNodeReductionCreate(id, 0);
-}
-
 static void CmiClearNodeReduction(int id) {
-  int index = id & ~((~0u)<<CsvAccess(_nodereduce_info_size));
-  free(CsvAccess(_nodereduce_info)[index]);
-  CsvAccess(_nodereduce_info)[index] = NULL;
+  auto & redref = CsvAccess(_nodereduce_info)[CmiGetRedIndex(id)].red;
+  auto red = redref;
+  redref = nullptr;
+  free(red);
 }
 
-static CmiReduction* CmiGetNextNodeReduction(short int numChildren) {
-  int id = CsvAccess(_nodereduce_seqID_global);
-  CsvAccess(_nodereduce_seqID_global) += CmiReductionID_multiplier;
-  if (id > 0xFFF0) CsvAccess(_nodereduce_seqID_global) = CmiReductionID_globalOffset;
-  return CmiGetNodeReductionCreate(id, numChildren);
+static CmiReductionID CmiGetNextNodeReductionID(void) {
+  return CmiReductionIDFetchAdd(CsvAccess(_nodereduce_seqID_global), CmiReductionID_multiplier);
 }
 
 CmiReductionID CmiGetGlobalNodeReduction(void) {
-  return CsvAccess(_nodereduce_seqID_request)+=CmiReductionID_multiplier;
+  return CmiReductionIDFetchAdd(CsvAccess(_nodereduce_seqID_request), CmiReductionID_multiplier);
 }
 
 CmiReductionID CmiGetDynamicNodeReduction(void) {
   if (CmiMyNode() != 0) CmiAbort("Cannot call CmiGetDynamicNodeReduction on nodes other than zero!\n");
-  return CsvAccess(_nodereduce_seqID_dynamic)+=CmiReductionID_multiplier;
+  return CmiReductionIDFetchAdd(CsvAccess(_nodereduce_seqID_dynamic), CmiReductionID_multiplier);
 }
 
 void CmiReductionHandleDynamicRequest(char *msg) {
@@ -2650,7 +2686,7 @@ void CmiSendReduce(CmiReduction *red) {
     }
     CmiSetHandler(msg, CpvAccess(CmiReductionMessageHandler));
     CmiSetRedID(msg, red->seqID);
-    /*CmiPrintf("CmiSendReduce(%d): sending %d bytes to %d\n",CmiMyPe(),msg_size,red->parent);*/
+    REDN_DBG("[%d] CmiSendReduce: sending %d bytes to %d\n",CmiMyPe(),msg_size,red->parent);
     CmiSyncSendAndFree(red->parent, msg_size, msg);
   } else {
     (red->ops.destination)(msg);
@@ -2688,7 +2724,8 @@ void CmiSendNodeReduce(CmiReduction *red) {
     }
     CmiSetHandler(msg, CpvAccess(CmiNodeReductionMessageHandler));
     CmiSetRedID(msg, red->seqID);
-    /*CmiPrintf("CmiSendNodeReduce(%d): sending %d bytes to %d\n",CmiMyNode(),msg_size,red->parent);*/
+    REDN_DBG("[%d:%d][%d] CmiSendNodeReduce: sending %d bytes to %d\n",
+             CmiMyNode(),CmiMyRank(),CmiMyPe(),msg_size,red->parent);
     CmiSyncNodeSendAndFree(red->parent, msg_size, msg);
   } else {
     (red->ops.destination)(msg);
@@ -2718,7 +2755,7 @@ static void CmiGlobalReduce(void *msg, int size, CmiReduceMergeFn mergeFn, CmiRe
   red->ops.destination = (CmiHandler)CmiGetHandlerFunction(msg);
   red->ops.mergeFn = mergeFn;
   red->ops.pupFn = NULL;
-  /*CmiPrintf("[%d] CmiReduce::local %hd parent=%d, numChildren=%d\n",CmiMyPe(),red->seqID,red->parent,red->numChildren);*/
+  REDN_DBG("[%d] CmiReduce::local %hd parent=%d, numChildren=%d\n",CmiMyPe(),red->seqID,red->parent,red->numChildren);
   CmiSendReduce(red);
 }
 
@@ -2735,7 +2772,7 @@ static void CmiGlobalReduceStruct(void *data, CmiReducePupFn pupFn,
   red->ops.mergeFn = mergeFn;
   red->ops.pupFn = pupFn;
   red->ops.deleteFn = deleteFn;
-  /*CmiPrintf("[%d] CmiReduceStruct::local %hd parent=%d, numChildren=%d\n",CmiMyPe(),red->seqID,red->parent,red->numChildren);*/
+  REDN_DBG("[%d] CmiReduceStruct::local %hd parent=%d, numChildren=%d\n",CmiMyPe(),red->seqID,red->parent,red->numChildren);
   CmiSendReduce(red);
 }
 
@@ -2749,7 +2786,8 @@ static void CmiGlobalNodeReduce(void *msg, int size, CmiReduceMergeFn mergeFn, C
   red->ops.destination = (CmiHandler)CmiGetHandlerFunction(msg);
   red->ops.mergeFn = mergeFn;
   red->ops.pupFn = NULL;
-  /*CmiPrintf("[%d] CmiNodeReduce::local %hd parent=%d, numChildren=%d\n",CmiMyNode(),red->seqID,red->parent,red->numChildren);*/
+  REDN_DBG("[%d:%d][%d] CmiNodeReduce::local %hd parent=%d, numChildren=%d\n",
+           CmiMyNode(),CmiMyRank(),CmiMyPe(),red->seqID,red->parent,red->numChildren);
   CmiSendNodeReduce(red);
 }
 
@@ -2766,19 +2804,22 @@ static void CmiGlobalNodeReduceStruct(void *data, CmiReducePupFn pupFn,
   red->ops.mergeFn = mergeFn;
   red->ops.pupFn = pupFn;
   red->ops.deleteFn = deleteFn;
-  /*CmiPrintf("[%d] CmiNodeReduceStruct::local %hd parent=%d, numChildren=%d\n",CmiMyNode(),red->seqID,red->parent,red->numChildren);*/
+  REDN_DBG("[%d:%d][%d] CmiNodeReduceStruct::local %hd parent=%d, numChildren=%d\n",
+           CmiMyNode(),CmiMyRank(),CmiMyPe(),red->seqID,red->parent,red->numChildren);
   CmiSendNodeReduce(red);
 }
 
 void CmiReduce(void *msg, int size, CmiReduceMergeFn mergeFn) {
-  CmiReduction *red = CmiGetNextReduction(CmiNumSpanTreeChildren(CmiMyPe()));
+  const CmiReductionID id = CmiGetNextReductionID();
+  CmiReduction *red = CmiGetReductionCreate(id, CmiNumSpanTreeChildren(CmiMyPe()));
   CmiGlobalReduce(msg, size, mergeFn, red);
 }
 
 void CmiReduceStruct(void *data, CmiReducePupFn pupFn,
                      CmiReduceMergeFn mergeFn, CmiHandler dest,
                      CmiReduceDeleteFn deleteFn) {
-  CmiReduction *red = CmiGetNextReduction(CmiNumSpanTreeChildren(CmiMyPe()));
+  const CmiReductionID id = CmiGetNextReductionID();
+  CmiReduction *red = CmiGetReductionCreate(id, CmiNumSpanTreeChildren(CmiMyPe()));
   CmiGlobalReduceStruct(data, pupFn, mergeFn, dest, deleteFn, red);
 }
 
@@ -2806,14 +2847,14 @@ void CmiListReduce(int npes, int *pes, void *msg, int size, CmiReduceMergeFn mer
   }
   CmiAssert(myPos < npes);
   red->numChildren = npes - (myPos << 2) - 1;
-  if (red->numChildren > 4) red->numChildren = 4;
+  if (red->numChildren > CmiReductionsNumChildren) red->numChildren = CmiReductionsNumChildren;
   if (red->numChildren < 0) red->numChildren = 0;
   if (myPos == 0) red->parent = -1;
   else red->parent = pes[(myPos - 1) >> 2];
   red->ops.destination = (CmiHandler)CmiGetHandlerFunction(msg);
   red->ops.mergeFn = mergeFn;
   red->ops.pupFn = NULL;
-  /*CmiPrintf("[%d] CmiListReduce::local %hd parent=%d, numChildren=%d\n",CmiMyPe(),red->seqID,red->parent,red->numChildren);*/
+  REDN_DBG("[%d] CmiListReduce::local %hd parent=%d, numChildren=%d\n",CmiMyPe(),red->seqID,red->parent,red->numChildren);
   CmiSendReduce(red);
 }
 
@@ -2832,7 +2873,7 @@ void CmiListReduceStruct(int npes, int *pes,
   }
   CmiAssert(myPos < npes);
   red->numChildren = npes - (myPos << 2) - 1;
-  if (red->numChildren > 4) red->numChildren = 4;
+  if (red->numChildren > CmiReductionsNumChildren) red->numChildren = CmiReductionsNumChildren;
   if (red->numChildren < 0) red->numChildren = 0;
   red->parent = (myPos - 1) >> 2;
   if (myPos == 0) red->parent = -1;
@@ -2858,48 +2899,99 @@ void CmiGroupReduceStruct(CmiGroup grp, void *data, CmiReducePupFn pupFn,
 }
 
 void CmiNodeReduce(void *msg, int size, CmiReduceMergeFn mergeFn) {
-  CmiReduction *red = CmiGetNextNodeReduction(CmiNumNodeSpanTreeChildren(CmiMyNode()));
+  const CmiReductionID id = CmiGetNextNodeReductionID();
+#if CMK_SMP
+  CmiNodeReduction & nodered = CsvAccess(_nodereduce_info)[CmiGetRedIndex(id)];
+  CmiLock(nodered.lock);
+#endif
+
+  CmiReduction *red = CmiGetNodeReductionCreate(id, CmiNumNodeSpanTreeChildren(CmiMyNode()));
   CmiGlobalNodeReduce(msg, size, mergeFn, red);
+
+#if CMK_SMP
+  CmiUnlock(nodered.lock);
+#endif
 }
 
 void CmiNodeReduceStruct(void *data, CmiReducePupFn pupFn,
                          CmiReduceMergeFn mergeFn, CmiHandler dest,
                          CmiReduceDeleteFn deleteFn) {
-  CmiReduction *red = CmiGetNextNodeReduction(CmiNumNodeSpanTreeChildren(CmiMyNode()));
+  const CmiReductionID id = CmiGetNextNodeReductionID();
+#if CMK_SMP
+  CmiNodeReduction & nodered = CsvAccess(_nodereduce_info)[CmiGetRedIndex(id)];
+  CmiLock(nodered.lock);
+#endif
+
+  CmiReduction *red = CmiGetNodeReductionCreate(id, CmiNumNodeSpanTreeChildren(CmiMyNode()));
   CmiGlobalNodeReduceStruct(data, pupFn, mergeFn, dest, deleteFn, red);
+
+#if CMK_SMP
+  CmiUnlock(nodered.lock);
+#endif
 }
 
 void CmiNodeReduceID(void *msg, int size, CmiReduceMergeFn mergeFn, CmiReductionID id) {
+#if CMK_SMP
+  CmiNodeReduction & nodered = CsvAccess(_nodereduce_info)[CmiGetRedIndex(id)];
+  CmiLock(nodered.lock);
+#endif
+
   CmiReduction *red = CmiGetNodeReductionCreate(id, CmiNumNodeSpanTreeChildren(CmiMyNode()));
   CmiGlobalNodeReduce(msg, size, mergeFn, red);
+
+#if CMK_SMP
+  CmiUnlock(nodered.lock);
+#endif
 }
 
 void CmiNodeReduceStructID(void *data, CmiReducePupFn pupFn,
                            CmiReduceMergeFn mergeFn, CmiHandler dest,
                            CmiReduceDeleteFn deleteFn, CmiReductionID id) {
+#if CMK_SMP
+  CmiNodeReduction & nodered = CsvAccess(_nodereduce_info)[CmiGetRedIndex(id)];
+  CmiLock(nodered.lock);
+#endif
+
   CmiReduction *red = CmiGetNodeReductionCreate(id, CmiNumNodeSpanTreeChildren(CmiMyNode()));
   CmiGlobalNodeReduceStruct(data, pupFn, mergeFn, dest, deleteFn, red);
+
+#if CMK_SMP
+  CmiUnlock(nodered.lock);
+#endif
 }
 
-void CmiHandleReductionMessage(void *msg) {
-  CmiReduction *red = CmiGetReduction(CmiGetRedID(msg));
-  if (red->numRemoteReceived == red->numChildren) red = CmiGetReductionCreate(CmiGetRedID(msg), red->numChildren+4);
+static void CmiHandleReductionMessage(void *msg) {
+  const auto id = CmiGetRedID(msg);
+
+  CmiReduction *red = CmiGetReductionCreate(id, 0);
+  if (red->numRemoteReceived == red->numChildren)
+    red = CmiGetReductionCreate(id, red->numChildren + CmiReductionsNumChildren);
   red->remoteData[red->numRemoteReceived++] = (char *)msg;
-  /*CmiPrintf("[%d] CmiReduce::remote %hd\n",CmiMyPe(),red->seqID);*/
+  REDN_DBG("[%d] CmiReduce::remote %hd\n",CmiMyPe(),red->seqID);
   CmiSendReduce(red);
 }
 
-void CmiHandleNodeReductionMessage(void *msg) {
-  CmiReduction *red = CmiGetNodeReduction(CmiGetRedID(msg));
-  if (red->numRemoteReceived == red->numChildren) red = CmiGetNodeReductionCreate(CmiGetRedID(msg), red->numChildren+4);
+static void CmiHandleNodeReductionMessage(void *msg) {
+  const auto id = CmiGetRedID(msg);
+#if CMK_SMP
+  CmiNodeReduction & nodered = CsvAccess(_nodereduce_info)[CmiGetRedIndex(id)];
+  CmiLock(nodered.lock);
+#endif
+
+  CmiReduction * red = CmiGetNodeReductionCreate(id, 0);
+  if (red->numRemoteReceived == red->numChildren)
+    red = CmiGetNodeReductionCreate(id, red->numChildren + CmiReductionsNumChildren);
   red->remoteData[red->numRemoteReceived++] = (char *)msg;
-  /*CmiPrintf("[%d] CmiNodeReduce::remote %hd\n",CmiMyNode(),red->seqID);*/
+  REDN_DBG("[%d:%d][%d] CmiNodeReduce::remote %hd\n",
+           CmiMyNode(),CmiMyRank(),CmiMyPe(),red->seqID);
   CmiSendNodeReduce(red);
+
+#if CMK_SMP
+  CmiUnlock(nodered.lock);
+#endif
 }
 
 void CmiReductionsInit(void) {
-  int i;
-
   CpvInitialize(int, CmiReductionMessageHandler);
   CpvAccess(CmiReductionMessageHandler) = CmiRegisterHandler((CmiHandler)CmiHandleReductionMessage);
   CpvInitialize(int, CmiReductionDynamicRequestHandler);
@@ -2910,31 +3002,37 @@ void CmiReductionsInit(void) {
   CpvInitialize(int, CmiNodeReductionDynamicRequestHandler);
   CpvAccess(CmiNodeReductionDynamicRequestHandler) = CmiRegisterHandler((CmiHandler)CmiNodeReductionHandleDynamicRequest);
 
-  CpvInitialize(CmiUInt2, _reduce_seqID_global);
+  CpvInitialize(CmiReductionID, _reduce_seqID_global);
   CpvAccess(_reduce_seqID_global) = CmiReductionID_globalOffset;
-  CpvInitialize(CmiUInt2, _reduce_seqID_request);
+  CpvInitialize(CmiReductionID, _reduce_seqID_request);
   CpvAccess(_reduce_seqID_request) = CmiReductionID_requestOffset;
-  CpvInitialize(CmiUInt2, _reduce_seqID_dynamic);
+  CpvInitialize(CmiReductionID, _reduce_seqID_dynamic);
   CpvAccess(_reduce_seqID_dynamic) = CmiReductionID_dynamicOffset;
-  CpvInitialize(int, _reduce_info_size);
-  CpvAccess(_reduce_info_size) = 4;
   CpvInitialize(CmiReduction**, _reduce_info);
-  CpvAccess(_reduce_info) = (CmiReduction **)malloc(16*sizeof(CmiReduction*));
-  for (i=0; i<16; ++i) CpvAccess(_reduce_info)[i] = NULL;
+  auto redinfo = (CmiReduction **)malloc(CmiMaxReductions * sizeof(CmiReduction *));
+  for (int i = 0; i < CmiMaxReductions; ++i)
+    redinfo[i] = nullptr;
+  CpvAccess(_reduce_info) = redinfo;
 
   if (CmiMyRank() == 0)
   {
-    CsvInitialize(CmiUInt2, _nodereduce_seqID_global);
+    CsvInitialize(CmiNodeReductionID, _nodereduce_seqID_global);
     CsvAccess(_nodereduce_seqID_global) = CmiReductionID_globalOffset;
-    CsvInitialize(CmiUInt2, _nodereduce_seqID_request);
+    CsvInitialize(CmiNodeReductionID, _nodereduce_seqID_request);
     CsvAccess(_nodereduce_seqID_request) = CmiReductionID_requestOffset;
-    CsvInitialize(CmiUInt2, _nodereduce_seqID_dynamic);
+    CsvInitialize(CmiNodeReductionID, _nodereduce_seqID_dynamic);
     CsvAccess(_nodereduce_seqID_dynamic) = CmiReductionID_dynamicOffset;
-    CsvInitialize(int, _nodereduce_info_size);
-    CsvAccess(_nodereduce_info_size) = 4;
-    CsvInitialize(CmiReduction**, _nodereduce_info);
-    CsvAccess(_nodereduce_info) = (CmiReduction **)malloc(16*sizeof(CmiReduction*));
-    for (i=0; i<16; ++i) CsvAccess(_nodereduce_info)[i] = NULL;
+    CsvInitialize(CmiNodeReduction *, _nodereduce_info);
+    auto noderedinfo = (CmiNodeReduction *)malloc(CmiMaxReductions * sizeof(CmiNodeReduction));
+    for (int i = 0; i < CmiMaxReductions; ++i)
+    {
+      CmiNodeReduction & nodered = noderedinfo[i];
+#if CMK_SMP
+      nodered.lock = CmiCreateLock();
+#endif
+      nodered.red = nullptr;
+    }
+    CsvAccess(_nodereduce_info) = noderedinfo;
   }
 }
 
@@ -3977,8 +4075,11 @@ void ConverseCommonInit(char **argv)
 {
 #if CMK_HAS_IO_FILE_OVERFLOW
   // forcibly allocate output buffers now, see issue #2814
-  _IO_file_overflow(stdout, -1);
-  _IO_file_overflow(stderr, -1);
+  if (CmiMyRank() == 0)
+  {
+    _IO_file_overflow(stdout, -1);
+    _IO_file_overflow(stderr, -1);
+  }
 #endif
 
   CpvInitialize(int, _urgentSend);
@@ -4218,9 +4319,31 @@ void CmiError(const char *format, ...)
 
 #endif
 
-void __cmi_assert(const char *errmsg)
+void __CmiEnforceHelper(const char* expr, const char* fileName, const char* lineNum)
 {
-  CmiAbort("[%d] %s\n", CmiMyPe(), errmsg);
+  CmiAbort("[%d] Assertion \"%s\" failed in file %s line %s.\n", CmiMyPe(), expr,
+           fileName, lineNum);
+}
+
+void __CmiEnforceMsgHelper(const char* expr, const char* fileName, const char* lineNum,
+                           const char* msg, ...)
+{
+  va_list args;
+  va_start(args, msg);
+
+  // Get length of formatted string
+  va_list argsCopy;
+  va_copy(argsCopy, args);
+  const auto size = 1 + vsnprintf(nullptr, 0, msg, argsCopy);
+  va_end(argsCopy);
+
+  // Allocate a buffer of right size and create formatted string in it
+  std::vector<char> formatted(size);
+  vsnprintf(formatted.data(), size, msg, args);
+  va_end(args);
+
+  CmiAbort("[%d] Assertion \"%s\" failed in file %s line %s.\n%s", CmiMyPe(), expr,
+           fileName, lineNum, formatted.data());
 }
 
 char *CmiCopyMsg(char *msg, int len)

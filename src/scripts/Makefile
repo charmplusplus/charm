@@ -76,9 +76,6 @@ AMPI:  charm++
 
 AMPIC AMPIF: AMPI
 
-ARMCI: charm++ LIBS
-
-
 f90charm: charm++
 
 libcharm: charm++
@@ -113,7 +110,7 @@ completion: charmxi
 NDMeshStreamer: charm-core completion
 
 $(L)/libmpi-mainmodule.a: mpi-mainmodule.o
-	$(CHARMC) -o $@ $<
+	$(CHARMC) -o $@ $^
 
 $(L)/libckmain.a: main.o
 	$(CHARMC) -o $@ $^
@@ -126,20 +123,6 @@ translators: charmxi conv-cpm
 msa: charm++
 	$(MAKE) -C libs/ck-libs/multiphaseSharedArrays
 
-jade: charm++ msa
-#	make the lib, include
-	$(MAKE) -C langs/jade
-
-
-# This should be done offline, since the user does not need to compile
-# parser files, etc.  All they need is the libjade + include files,
-# antlr.jar, jade.jar, and a few scripts which the jade target takes
-# care of.
-#jadeall: jade
-#	make parser.g -> .java files
-#	$(MAKE) -C langs/jade p
-#	make the jade.jar file
-#	$(MAKE) -C ../java/charm/jade
 
 #include TAU defs
 TAU_MAKEFILE=Make.tau
@@ -211,7 +194,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckcallback.h CkCallback.decl.h ckcallback-ccs.h 	\
 	  cksection.h ckmessage.h cklocrec.h ckmigratable.h \
 	  ckarrayindex.h ckarrayoptions.h ckarray.h cklocation.h ckmulticast.h ckreduction.h \
-	  ckcheckpoint.h ckmemcheckpoint.h ckevacuation.h ckrdma.h ckrdmadevice.h cksyncbarrier.h \
+	  ckcheckpoint.h ckmemcheckpoint.h ckrdma.h ckrdmadevice.h cksyncbarrier.h \
 	  ckobjQ.h readonly.h charm++_type_traits.h \
           $(UTILHEADERS) \
 	  waitqd.h LBDatabase.h LBManager.h MetaBalancer.h RandomForestModel.h lbdb.h $(LBHEADERS) \
@@ -321,7 +304,6 @@ endif
 	./gathertree $(SRCBASE)/arch/util/proc_management        proc_management
 	./gathertree $(SRCBASE)/util                             .
 	./gathertree $(SRCBASE)/langs                            langs
-	./gathertree $(SRCBASE)/langs/jade                       langs/jade
 	./gathertree $(SRCBASE)/arch/common                      .
 	./gathertree $(SRCBASE)/arch/$(CMK_GDIR)                 .
 	test -f $(SRCBASE)/arch/$(CMK_GDIR)/gdir_link && cat $(SRCBASE)/arch/$(CMK_GDIR)/gdir_link > .gdir.new && ./gathertree $(SRCBASE)/arch/`cat .gdir.new`      . || true
@@ -491,7 +473,16 @@ LIBTMGR = TopoManager.o CrayNid.o BGQTorus.o
 
 include Makefile.machine
 
-converse: charmrun-target swapglobal-target conv-cpm $(L)/libconverse.a
+CONVERSE_DEPS := \
+  charmrun-target \
+  conv-cpm \
+  $(L)/libconverse.a \
+
+ifneq (0,$(CMK_SUPPORTS_SWAPGLOBALS))
+  CONVERSE_DEPS += swapglobal-target
+endif
+
+converse: $(CONVERSE_DEPS)
 
 cpuaffinity.o $(INC)/hwloc.h $(INC)/hwloc/autogen/config.h $(INC)/hwloc/rename.h $(INC)/hwloc/bitmap.h \
 $(INC)/hwloc/helper.h $(INC)/hwloc/inlines.h $(INC)/hwloc/diff.h $(INC)/hwloc/deprecated.h $(INC)/hwloc/export.h $(INC)/hwloc/distances.h : hwloc-target
@@ -518,8 +509,15 @@ hwloc-target: conv-autoconfig.h
     --without-x \
     HWLOC_FLAGS="$(HWLOC_CC_FLAGS)" \
     CFLAGS="$(HWLOC_CC_FLAGS)" \
+    CXXFLAGS="$(HWLOC_CXX_FLAGS)" \
     CC="$(HWLOC_CC)" \
+    CXX="$(HWLOC_CXX)" \
     CC_FOR_BUILD="$(HWLOC_CC)" \
+    CPP= \
+    CXXCPP= \
+    CPPFLAGS= \
+    LDFLAGS= \
+    LIBS= \
     > /dev/null || ( cat config.log ; exit 1 ) )
 	( $(MAKE) -C hwloc AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=: )
 	( cp -f hwloc/include/hwloc.h $(INC) )
@@ -549,7 +547,7 @@ $(L)/conv-static.o: conv-static.o
 	cp -f $< $@
 
 machine.o: machine.C $(CVHEADERS)
-	$(CHARMC) -I. -o $@ $<
+	$(CHARMC) -I. -o $@ -c $<
 
 $(L)/libconv-utilf.a: $(LIBCONV_UTILF)
 	$(CHARMC) -o $@ $(LIBCONV_UTILF)
@@ -561,7 +559,7 @@ ccs-client.o: ccs-client.C $(CVHEADERS)
 	$(CHARMC) -DCMK_NOT_USE_CONVERSE=1 ccs-client.C
 
 sockRoutines-seq.o: sockRoutines.C $(CVHEADERS) $(UTILHEADERS)
-	$(CHARMC) -seq -DCMK_NOT_USE_CONVERSE=1 -o sockRoutines-seq.o sockRoutines.C
+	$(CHARMC) -seq -DCMK_NOT_USE_CONVERSE=1 -o sockRoutines-seq.o -c sockRoutines.C
 
 pup_f.f90: pup_f.f90.sh
 	rm -f pup_f.f90 && ./pup_f.f90.sh
@@ -602,7 +600,7 @@ MEM_DEPS=memory-gnu.C memory-gnu-internal.C converse.h conv-mach.h $(CVHEADERS)
 # $1 is the name of the module, $2 is any additional dependency beyond memory.C and $(MEM_DEPS), $3 is extra arguments to charmc
 define libmem
 $(L)/libmemory-$1.a: memory.C $$(MEM_DEPS) $2
-	$$(CHARMC) -I. -o libmemory-$1.o $3 $$<
+	$$(CHARMC) -I. -o libmemory-$1.o $3 -c $$<
 	$$(CHARMC) -I. -o $$@ $3 libmemory-$1.o
 endef
 
@@ -640,7 +638,7 @@ LIBTHREADSDEPS = $(CVHEADERS) QUICK_THREADS
 # $1 is the name of the module, $2 is any additional dependency beyond threads.C and $(LIBTHREADSDEPS), $3 is extra arguments to charmc, $4 is an option to include 'boost-context'
 define libthreads
 $(L)/libthreads-$1.a: threads.C $$(LIBTHREADSDEPS) $2
-	$$(CHARMC) -IQuickThreads -I. -o libthreads-$1.o $3 $$<
+	$$(CHARMC) -IQuickThreads -I. -o libthreads-$1.o $3 -c $$<
 ifeq (1,$$(strip $4))
 	$$(CHARMC) -IQuickThreads -I. -o $$@ $3 $$(wildcard boost-context/*.o) libthreads-$1.o
 else
@@ -674,7 +672,7 @@ $(eval $(call libthreads,uJcontext-memoryalias,uJcontext.C,-DCMK_THREADS_BUILD_J
 swapglobal-target: $(L)/libglobal-swap.a
 
 $(L)/libglobal-swap.a: global-elfgot.C $(CVHEADERS)
-	-$(CHARMC) -c global-elfgot.C -o $@ || touch $@
+	$(CHARMC) -c global-elfgot.C -o $@
 
 ###############################################################################
 #
@@ -686,7 +684,7 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
 	   msgalloc.o ckfutures.o ckIgetControl.o debug-message.o debug-charm.o ckcallback.o \
 	   cklocation.o ckmulticast.o ckarrayoptions.o ckarray.o ckreduction.o ckrdma.o ckrdmadevice.o cksyncbarrier.o \
            waitqd.o LBDatabase.o LBManager.o MetaBalancer.o weakTest.o treeTest.o forestTest.o readmodel.o lbdbf.o ckobjQ.o  \
-	   ckcheckpoint.o ckmemcheckpoint.o ckevacuation.o \
+	   ckcheckpoint.o ckmemcheckpoint.o \
            LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
 	   BaseLB.o CentralLB.o TreeLB.o HybridBaseLB.o DistBaseLB.o \
            ckgraph.o LButil.o RefinerTemp.o Refiner.o \
@@ -771,7 +769,7 @@ libtrace-Tau.o: trace-Tau.C charm++.h charm.h converse.h conv-config.h \
   LBMachineUtil.h LBManager.decl.h MetaBalancer.decl.h BaseLB.decl.h \
   CkLocation.decl.h CkMulticast.decl.h CkArray.decl.h objid.h envelope.h envelope-path.h XArraySectionReducer.h CkFutures.decl.h \
   waitqd.h waitqd.decl.h \
-  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h \
   trace.h trace-simple.h \
   register.h trace-common.h trace-simpleBOC.h TraceSimple.decl.h \
   TraceSimple.def.h ckregex.h

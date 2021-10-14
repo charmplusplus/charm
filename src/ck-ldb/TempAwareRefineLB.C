@@ -20,7 +20,10 @@
 
 extern int quietModeRequested;
 
-CreateLBFunc_Def(TempAwareRefineLB, "always assign the heaviest obj onto lightest loaded processor.")
+static void lbinit()
+{
+  LBRegisterBalancer<TempAwareRefineLB>("TempAwareRefineLB", "always assign the heaviest obj onto lightest loaded processor.");
+}
 
 #ifdef TEMP_LDB
 
@@ -323,7 +326,7 @@ void TempAwareRefineLB::work(LDStats* stats)
 {
 #ifdef TEMP_LDB
 ////////////////////////////////////////////////////
-  numProcs=stats->nprocs();
+  numProcs=stats->procs.size();
   numChips=numProcs/logicalCoresPerChip;
   avgChipTemp=new float[numChips];
   if(procFreq!=NULL) delete [] procFreq;
@@ -434,7 +437,7 @@ for(int j=i*logicalCoresPerChip;j<i*logicalCoresPerChip+logicalCoresPerChip;j++)
 
 #ifndef NO_TEMP_LB
   int obj;
-  int n_pes = stats->nprocs();
+  int n_pes = stats->procs.size();
 
   //  CkPrintf("[%d] RefineLB strategy\n",CkMyPe());
 

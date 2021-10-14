@@ -14,12 +14,6 @@ configure_file(sparseContiguousReducer/cksparsecontiguousreducer.h ${CMAKE_BINAR
 add_library(modulemsa multiphaseSharedArrays/msa.h multiphaseSharedArrays/msa-common.h multiphaseSharedArrays/msa-distArray.h multiphaseSharedArrays/msa-DistPageMgr.h multiphaseSharedArrays/msa-distArray.C)
 add_dependencies(modulemsa ck)
 
-# armci
-configure_file(armci/libmodulearmci.dep ${CMAKE_BINARY_DIR}/lib COPYONLY)
-configure_file(armci/armci.h ${CMAKE_BINARY_DIR}/include COPYONLY)
-add_library(modulearmci armci/armci_vp.C armci/armci_impl.h armci/armci_api.C armci/armci.h)
-add_dependencies(modulearmci ck)
-
 # collide
 set(collide-h-sources collide/collide_util.h collide/bbox.h
     collide/collide_cfg.h collide/collidecharm.h collide/collidec.h
@@ -123,16 +117,18 @@ configure_file(pose/libmodulepose.dep ${CMAKE_BINARY_DIR}/lib/libmoduleseqpose.d
 
 
 # idxl
-set(idxl-h-sources idxl/idxlc.h idxl/idxlf.h idxl/idxl.h idxl/idxl_layout.h idxl/idxl_comm.h)
-set(idxl-cxx-sources idxl/idxl.C idxl/idxl_layout.C idxl/idxl_comm.C idxl/idxl_api.C)
-add_library(idxl ${idxl-h-sources} ${idxl-cxx-sources})
-add_dependencies(idxl ck moduleampi)
+if(NOT BUILD_CHANGA)
+  set(idxl-h-sources idxl/idxlc.h idxl/idxlf.h idxl/idxl.h idxl/idxl_layout.h idxl/idxl_comm.h)
+  set(idxl-cxx-sources idxl/idxl.C idxl/idxl_layout.C idxl/idxl_comm.C idxl/idxl_api.C)
+  add_library(idxl ${idxl-h-sources} ${idxl-cxx-sources})
+  add_dependencies(idxl ck moduleampi)
 
-set_target_properties(idxl PROPERTIES RULE_LAUNCH_COMPILE ${CMAKE_BINARY_DIR}/bin/ampicxx)
+  set_target_properties(idxl PROPERTIES RULE_LAUNCH_COMPILE ${CMAKE_BINARY_DIR}/bin/ampicxx)
 
-foreach(file ${idxl-h-sources})
-	configure_file(${file} ${CMAKE_BINARY_DIR}/include COPYONLY)
-endforeach()
+  foreach(file ${idxl-h-sources})
+    configure_file(${file} ${CMAKE_BINARY_DIR}/include COPYONLY)
+  endforeach()
+endif()
 
 
 # searchengine

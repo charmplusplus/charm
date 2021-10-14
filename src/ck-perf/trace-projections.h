@@ -24,7 +24,7 @@
 
 #include "pup.h"
 
-#define PROJECTION_VERSION  "10.0"
+#define PROJECTION_VERSION  "11.0"
 
 #define PROJ_ANALYSIS 1
 
@@ -526,7 +526,6 @@ public:
     }
 
     /* for overiding basic thread listener support in Trace class */
-    virtual void traceAddThreadListeners(CthThread tid, envelope *e);
 };
 
 using namespace PUP;

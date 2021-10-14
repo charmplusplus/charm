@@ -13,7 +13,7 @@ Zero out this image-- make it all black.
 */
 void CkImage::clear(void) {
 	for (int y=0;y<ht;y++)
-		memset(&data[y*row],0,wid*colors);
+		memset(&data[y*row],0,(size_t)wid*colors);
 }
 
 	/*

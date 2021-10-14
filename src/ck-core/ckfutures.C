@@ -14,26 +14,161 @@ This "sequential futures abstraction" is a well-studied concept
 in remote process control.
 */
 /*@{*/
+#include <limits>
+#include <memory>
+#include <vector>
+#include <cstdlib>
+#include <algorithm>
+#include <unordered_map>
+
 #include "charm++.h"
 #include "ck.h"
 #include "ckarray.h"
 #include "ckfutures.h"
-#include <stdlib.h>
-#include <limits>
 
-typedef struct Future_s {
-  bool ready;
-  void *value;
-  CthThread waiters;
-  int next; 
-} Future;
+struct FutureRequest {
+  virtual void fulfill(const CkFutureID& id, void* value) = 0;
+};
 
-typedef struct {
-  Future *array;
-  int max;
-  int freelist;
-}
-FutureState;
+class FutureToThread: public FutureRequest {
+  CthThread th;
+ public:
+  FutureToThread(CthThread th_) : th(th_) {}
+
+  virtual void fulfill(const CkFutureID&, void* value) override {
+    // If we have a valid thread to wake up, do so
+    if (th) CthAwaken(th);
+    // Then invalidate ourself
+    th = nullptr;
+  }
+};
+
+class MultiToThread: public FutureRequest {
+  CthThread th;
+  const std::vector<CkFutureID>& ids;
+  std::size_t nRecvd;
+ public:
+  std::vector<void*> values;
+
+  MultiToThread(CthThread th_, const std::vector<CkFutureID>& ids_) : ids(ids_), th(th_), nRecvd(0) {
+    values.resize(ids.size());
+
+    std::fill(values.begin(), values.end(), nullptr);
+  }
+
+  virtual void fulfill(const CkFutureID& id, void* value) override {
+    const auto search = std::find(ids.begin(), ids.end(), id);
+    const auto offset = search - ids.begin();
+
+    CkAssert(value != nullptr && search != ids.end());
+
+    if (th != nullptr && values[offset] == nullptr) {
+      values[offset] = value;
+
+      if (++nRecvd >= values.size()) {
+        CthAwaken(th);
+        th = nullptr;
+      }
+    }
+  }
+};
+
+class FutureToFuture: public FutureRequest {
+  CkFuture fut; 
+  bool fulfilled;
+ public:
+  FutureToFuture(CkFuture fut_) : fut(fut_), fulfilled(false) {}
+
+  virtual void fulfill(const CkFutureID&, void* value) override {
+    // If we have not been fulfilled, forward the value
+    if (!fulfilled) CkSendToFuture(fut, value);
+    // Then mark ourself as fulfilled
+    fulfilled = true;
+  }
+};
+
+struct FutureState {
+  using request_t = std::shared_ptr<FutureRequest>;
+  using request_queue_t = std::vector<request_t>;
+ private:
+  std::unordered_map<CkFutureID, void*> values;
+  std::unordered_map<CkFutureID, request_queue_t> waiting;
+  std::vector<CkFutureID> freeList;
+
+  CkFutureID last;
+ public:
+  FutureState() : last(-1) {}
+
+  // takes a free id from the set of released IDs, when one
+  // is available, or increments the PE's local ID counter
+  // and uses the updated value
+  CkFutureID next() {
+    CkFutureID id;
+    if (freeList.empty()) {
+      id = ++last;
+    } else {
+      id = *freeList.begin();
+      freeList.erase(freeList.begin());
+    }
+    CkAssert(id <= std::numeric_limits<CMK_REFNUM_TYPE>::max() &&
+             "future count has exceeded CMK_REFNUM_TYPE, see manual.");
+    return id;
+  }
+
+  // returns a future's value when it's available, otherwise
+  // returns nullptr
+  void* operator[](const CkFutureID& f) const {
+    auto found = values.find(f);
+    return (found != values.end()) ? found->second : nullptr;
+  }
+
+  // enqueue a request for a given future id, creating a
+  // queue as necessary
+  void request(const CkFutureID& f, request_t req) {
+    auto found = waiting.find(f);
+    if (found != waiting.end()) {
+      found->second.push_back(req);
+    } else {
+      waiting[f] = {req};
+    }
+  }
+
+  // enuqueue a request to be fulfilled by multiple futures
+  void request(const std::vector<CkFutureID>& fs, request_t req) {
+    for (auto& f : fs) {
+      request(f, req);
+    }
+  }
+
+  // stores a value for a given future id, and fulfills all
+  // outstanding requests for the value (then erases them)
+  // (this is usually called by the FutureBOC chare-group)
+  void fulfill(const CkFutureID& f, void* value) {
+    values[f] = value;
+    auto found = waiting.find(f);
+    if (found != waiting.end()) {
+      for (auto& th : found->second) {
+        th->fulfill(f, value);
+      }
+      waiting.erase(found);
+    }
+  }
+
+  // erase any listeners and values for a given future
+  // and adds it to the set of free future ids (that
+  // can be reused). note, does not free any memory
+  void release(const CkFutureID& f) {
+    values.erase(f);
+    waiting.erase(f);
+    CkAssert(std::find(freeList.begin(), freeList.end(), f) == freeList.end() &&
+            "repeated frees of the same future");
+    freeList.push_back(f);
+  }
+
+  bool is_ready(const CkFutureID& f) {
+    return values.find(f) != values.end();
+  }
+};
 
 class CkSema {
   private:
@@ -115,45 +250,12 @@ class CkSemaPool {
 CpvStaticDeclare(FutureState, futurestate);
 CpvStaticDeclare(CkSemaPool*, semapool);
 
-static void addedFutures(int lo, int hi)
-{
-  int i;
-  FutureState *fs = &(CpvAccess(futurestate));
-  Future *array = fs->array;
-
-  for (i=lo; i<hi; i++)
-    array[i].next = i+1;
-  array[hi-1].next = fs->freelist;
-  fs->freelist = lo;
-}
-
 static 
 inline
-int createFuture(void)
+CkFutureID createFuture(void)
 {
   FutureState *fs = &(CpvAccess(futurestate));
-  Future *fut; int handle, origsize;
-
-  /* if the freelist is empty, allocate more futures. */
-  if (fs->freelist == -1) {
-    origsize = fs->max;
-    fs->max = fs->max * 2;
-    fs->array = (Future*)realloc(fs->array, sizeof(Future)*(fs->max));
-    _MEMCHECK(fs->array);
-    addedFutures(origsize, fs->max);
-  }
-  
-  // handle may overflow CMK_REFNUM_TYPE, creating problems when waiting on this future
-  CkAssert(fs->freelist <= std::numeric_limits<CMK_REFNUM_TYPE>::max());
-
-  handle = fs->freelist;
-  fut = fs->array + handle;
-  fs->freelist = fut->next;
-  fut->ready = false;
-  fut->value = 0;
-  fut->waiters = 0;
-  fut->next = 0;
-  return handle;
+  return fs->next();
 }
 
 CkFuture CkCreateFuture(void)
@@ -167,32 +269,25 @@ CkFuture CkCreateFuture(void)
 void CkReleaseFutureID(CkFutureID handle)
 {
   FutureState *fs = &(CpvAccess(futurestate));
-  Future *fut = (fs->array)+handle;
-  fut->next = fs->freelist;
-  fs->freelist = handle;
+  fs->release(handle);
 }
 
 int CkProbeFutureID(CkFutureID handle)
 {
   FutureState *fs = &(CpvAccess(futurestate));
-  Future *fut = (fs->array)+handle;
-  return (int)(fut->ready);
+  return fs->is_ready(handle);
 }
 
 void *CkWaitFutureID(CkFutureID handle)
 {
-  CthThread self = CthSelf();
   FutureState *fs = &(CpvAccess(futurestate));
-  Future *fut = (fs->array)+handle;
-  void *value;
 
-  if (!(fut->ready)) {
-    CthSetNext(self, fut->waiters);
-    fut->waiters = self;
-    while (!(fut->ready)) { CthSuspend(); fut = (fs->array)+handle; }
+  if (!fs->is_ready(handle)) {
+    fs->request(handle, std::make_shared<FutureToThread>(CthSelf()));
+    while (!fs->is_ready(handle)) { CthSuspend(); }
   }
-  fut = (fs->array)+handle;
-  value = fut->value;
+
+  void *value = (*fs)[handle];
 #if CMK_ERROR_CHECKING
   if (value==NULL) 
 	CkAbort("ERROR! CkWaitFuture would have to return NULL!\n"
@@ -200,6 +295,49 @@ void *CkWaitFutureID(CkFutureID handle)
 	"gets a CthAwaken call *before* the sync method returns.");
 #endif
   return value;
+}
+
+std::pair<void*, CkFutureID> CkWaitAnyID(const std::vector<CkFutureID>& handles) {
+  auto fs = &(CpvAccess(futurestate));
+  const auto ready = std::any_of(handles.begin(), handles.end(),
+    [&fs](const CkFutureID& id) { return fs->is_ready(id); });
+  /* A single request is generated, and enqueued for all the futures that we are
+   * interested in. Note, a request may only be fulfilled once, then it will expire
+   * and become a no-op; thus, the corresponding `CthAwaken` for this thread will
+   * only be called once (for more details, see FutureToThread::fulfill).
+   */ 
+  if (!ready) fs->request(handles, std::make_shared<FutureToThread>(CthSelf()));
+  do {
+    if (!ready) CthSuspend();
+    for (const auto& handle : handles) {
+      if (fs->is_ready(handle)) {
+        return std::make_pair((*fs)[handle], handle);
+      }
+    }
+  } while (true);
+}
+
+std::vector<void*> CkWaitAllIDs(const std::vector<CkFutureID>& ids) {
+  auto fs = &(CpvAccess(futurestate));
+  auto req = std::make_shared<MultiToThread>(CthSelf(), ids);
+  bool wait = false;
+
+  for (const auto& id : ids) {
+    auto val = (*fs)[id];
+
+    if (val != nullptr) {
+      req->fulfill(id, val);
+    } else {
+      fs->request(id, req);
+      wait = true;
+    }
+  }
+
+  if (wait) {
+    CthSuspend();
+  }
+
+  return req->values;
 }
 
 void CkReleaseFuture(CkFuture fut)
@@ -224,28 +362,14 @@ void CkWaitVoidFuture(CkFutureID handle)
 
 static void setFuture(CkFutureID handle, void *pointer)
 {
-  CthThread t;
   FutureState *fs = &(CpvAccess(futurestate));
-  Future *fut = (fs->array)+handle;
-  fut->ready = true;
-#if CMK_ERROR_CHECKING
-  if (pointer==NULL) CkAbort("setFuture called with NULL!");
-#endif
-  fut->value = pointer;
-  for (t=fut->waiters; t; t=CthGetNext(t))
-    CthAwaken(t);
-  fut->waiters = 0;
+  fs->fulfill(handle, pointer);
 }
 
 void _futuresModuleInit(void)
 {
   CpvInitialize(FutureState, futurestate);
   CpvInitialize(CkSemaPool *, semapool);
-  CpvAccess(futurestate).array = (Future *)malloc(10*sizeof(Future));
-  _MEMCHECK(CpvAccess(futurestate).array);
-  CpvAccess(futurestate).max   = 10;
-  CpvAccess(futurestate).freelist = -1;
-  addedFutures(0,10);
   CpvAccess(semapool) = new CkSemaPool();
 }
 
@@ -380,6 +504,26 @@ public:
   }
 };
 
+/* NOTE : this (currently) internal function may, eventually,
+ *        be expanded and made public. At that point, consider
+ *        renaming it to something like ck::get_msg_buffer(void*)
+ */
+void* CkGetMsgBuffer(void* msg) {
+  auto env = UsrToEnv(msg);
+  auto idx = env->getMsgIdx();
+  if (idx == CMessage_CkMarshallMsg::__idx) {
+    return static_cast<CkMarshallMsg*>(msg)->msgBuf;
+  } else if (idx == CMessage_CkReductionMsg::__idx) {
+    return static_cast<CkReductionMsg*>(msg)->getData();
+  } else if (idx == CMessage_CkDataMsg::__idx) {
+    return static_cast<CkDataMsg*>(msg)->getData();
+  } else if (idx == CMessage_CkArrayCreatedMsg::__idx) {
+    return &(static_cast<CkArrayCreatedMsg*>(msg)->aid);
+  } else {
+    CkAbort("unsure how to handle a msg of type %s.", _msgTable[idx]->name);
+  }
+}
+
 extern "C" 
 void CkSendToFutureID(CkFutureID futNum, void *m, int PE)
 {
@@ -441,4 +585,3 @@ void CkSemaDestroy(CkSemaID id)
 
 /*@}*/
 #include "CkFutures.def.h"
-

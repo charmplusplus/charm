@@ -19,6 +19,8 @@
 #include "allEvents.h"          //projector
 #include "register.h" // for _entryTable
 
+#include "envelope.h"
+
 // To get username
 #if defined(_WIN32) || defined(_WIN64)
 #define WIN32_LEAN_AND_MEAN
@@ -261,13 +263,15 @@ extern const char* const CmiCommitID;
 /** Write out the common parts of the .sts file. */
 void traceWriteSTS(FILE *stsfp,int nUserEvents) {
   fprintf(stsfp, "MACHINE \"%s\"\n",CMK_MACHINE_NAME);
-#if CMK_SMP_TRACE_COMMTHREAD
+#if CMK_SMP_TRACE_COMMTHREAD && CMK_SMP && !CMK_SMP_NO_COMMTHD
   //Assuming there's only 1 comm thread now! --Chao Mei
   //considering the extra comm thread per node
-  fprintf(stsfp, "PROCESSORS %d\n", CkNumPes()+CkNumNodes());  
-  fprintf(stsfp, "SMPMODE %d %d\n", CkMyNodeSize(), CkNumNodes());
-#else	
+  fprintf(stsfp, "PROCESSORS %d\n", CkNumPes()+CkNumNodes());
+#else
   fprintf(stsfp, "PROCESSORS %d\n", CkNumPes());
+#endif
+#if CMK_SMP
+  fprintf(stsfp, "SMPMODE %d %d\n", CkMyNodeSize(), CkNumNodes());
 #endif
 
 #if defined(_WIN32) || defined(_WIN64)
@@ -849,12 +853,61 @@ void traceEnableCCS(void)
   CkpvAccess(_traces)->traceEnableCCS();  
 }
 
-/* **CW** Support for thread listeners. This makes a call to each
-   trace module which must support the call.
-*/
-void traceAddThreadListeners(CthThread tid, envelope *e) {
-  _TRACE_ONLY(CkpvAccess(_traces)->traceAddThreadListeners(tid, e));
+struct TraceThreadListener {
+  struct CthThreadListener base;
+  int event;
+  int msgType;
+  int ep;
+  int srcPe;
+  int ml;
+  CmiObjId idx;
+};
+
+static void traceThreadListener_suspend(struct CthThreadListener *l)
+{
+  TraceThreadListener *a=(TraceThreadListener *)l;
+  /* here, we activate the appropriate trace codes for the appropriate
+     registered modules */
+  traceSuspend();
 }
+
+static void traceThreadListener_resume(struct CthThreadListener *l)
+{
+  TraceThreadListener *a=(TraceThreadListener *)l;
+  /* here, we activate the appropriate trace codes for the appropriate
+     registered modules */
+  _TRACE_BEGIN_EXECUTE_DETAILED(a->event,a->msgType,a->ep,a->srcPe,a->ml,
+				CthGetThreadID(a->base.thread), NULL);
+  a->event=-1;
+  a->srcPe=CkMyPe(); /* potential lie to migrated threads */
+  a->ml=0;
+}
+
+static void traceThreadListener_free(struct CthThreadListener *l)
+{
+  TraceThreadListener *a=(TraceThreadListener *)l;
+  delete a;
+}
+
+void traceAddThreadListeners(CthThread tid, envelope *e)
+{
+#if CMK_TRACE_ENABLED
+  /* strip essential information from the envelope */
+  TraceThreadListener *a= new TraceThreadListener;
+
+  a->base.suspend=traceThreadListener_suspend;
+  a->base.resume=traceThreadListener_resume;
+  a->base.free=traceThreadListener_free;
+  a->event=e->getEvent();
+  a->msgType=e->getMsgtype();
+  a->ep=e->getEpIdx();
+  a->srcPe=e->getSrcPe();
+  a->ml=e->getTotalsize();
+
+  CthAddListener(tid, (CthThreadListener *)a);
+#endif
+}
+
 
 #if 1
 // helper functions

@@ -188,7 +188,7 @@ private:
   };
 
   struct AdaptiveMetaBalancer {
-    CkVec<AdaptiveData> history_data;
+    std::vector<AdaptiveData> history_data;
     int lb_iter_no;
   } adaptive_lbdb;
 

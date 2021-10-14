@@ -110,63 +110,6 @@ void _createTraceprojections(char **argv)
   CkpvAccess(_traces)->addTrace(CkpvAccess(_trace));
   if (CkMyPe()==0) CkPrintf("Charm++: Tracemode Projections enabled.\n");
 }
- 
-/* ****** CW TEMPORARY LOCATION ***** Support for thread listeners */
-
-struct TraceThreadListener {
-  struct CthThreadListener base;
-  int event;
-  int msgType;
-  int ep;
-  int srcPe;
-  int ml;
-  CmiObjId idx;
-};
-
-static void traceThreadListener_suspend(struct CthThreadListener *l)
-{
-  TraceThreadListener *a=(TraceThreadListener *)l;
-  /* here, we activate the appropriate trace codes for the appropriate
-     registered modules */
-  traceSuspend();
-}
-
-static void traceThreadListener_resume(struct CthThreadListener *l)
-{
-  TraceThreadListener *a=(TraceThreadListener *)l;
-  /* here, we activate the appropriate trace codes for the appropriate
-     registered modules */
-  _TRACE_BEGIN_EXECUTE_DETAILED(a->event,a->msgType,a->ep,a->srcPe,a->ml,
-				CthGetThreadID(a->base.thread), NULL);
-  a->event=-1;
-  a->srcPe=CkMyPe(); /* potential lie to migrated threads */
-  a->ml=0;
-}
-
-static void traceThreadListener_free(struct CthThreadListener *l)
-{
-  TraceThreadListener *a=(TraceThreadListener *)l;
-  delete a;
-}
-
-void TraceProjections::traceAddThreadListeners(CthThread tid, envelope *e)
-{
-#if CMK_TRACE_ENABLED
-  /* strip essential information from the envelope */
-  TraceThreadListener *a= new TraceThreadListener;
-  
-  a->base.suspend=traceThreadListener_suspend;
-  a->base.resume=traceThreadListener_resume;
-  a->base.free=traceThreadListener_free;
-  a->event=e->getEvent();
-  a->msgType=e->getMsgtype();
-  a->ep=e->getEpIdx();
-  a->srcPe=e->getSrcPe();
-  a->ml=e->getTotalsize();
-
-  CthAddListener(tid, (CthThreadListener *)a);
-#endif
-}
 
 void LogPool::openLog(const char *mode)
 {
@@ -935,7 +878,7 @@ void LogEntry::pup(PUP::er &p)
 
 TraceProjections::TraceProjections(char **argv): 
   _logPool(NULL), curevent(0), inEntry(false), computationStarted(false),
-	traceNestedEvents(false), converseExit(false),
+	traceNestedEvents(true), converseExit(false),
 	currentPhaseID(0), lastPhaseEvent(NULL), endTime(0.0)
 {
   //  CkPrintf("Trace projections dummy constructor called on %d\n",CkMyPe());
@@ -953,7 +896,7 @@ TraceProjections::TraceProjections(char **argv):
     CmiGetArgFlagDesc(argv,"+checknested",
 		      "check projections nest begin end execute events");
   traceNestedEvents = 
-    CmiGetArgFlagDesc(argv,"+tracenested",
+    !CmiGetArgFlagDesc(argv,"+notracenested",
               "trace projections nest begin/end execute events");
   int binary = 
     CmiGetArgFlagDesc(argv,"+binary-trace",
@@ -962,17 +905,21 @@ TraceProjections::TraceProjections(char **argv):
   int nSubdirs = 0;
   CmiGetArgIntDesc(argv,"+trace-subdirs", &nSubdirs, "Number of subdirectories into which traces will be written");
 
-
 #if CMK_USE_ZLIB
-  int compressed = true;
-  CmiGetArgFlagDesc(argv,"+gz-trace","Write log files pre-compressed with gzip");
-  int disableCompressed = CmiGetArgFlagDesc(argv,"+no-gz-trace","Disable writing log files pre-compressed with gzip");
+  bool compressed = true;
+  CmiGetArgFlagDesc(argv,"+gz-trace","Write log files compressed with gzip");
+  const bool disableCompressed = CmiGetArgFlagDesc(argv,"+no-gz-trace","Disable writing log files compressed with gzip");
   compressed = compressed && !disableCompressed;
+  if (binary && compressed)
+    CkAbort("Binary logs cannot be compressed with gzip, must use +no-gz-trace with +binary-trace");
 #else
-  // consume the flag so there's no confusing
-  CmiGetArgFlagDesc(argv,"+gz-trace",
-		    "Write log files pre-compressed with gzip");
-  if(CkMyPe() == 0) CkPrintf("Warning> gz-trace is not supported on this machine!\n");
+  // consume the flags so there's no confusion
+  const bool compressed =
+      CmiGetArgFlagDesc(argv, "+gz-trace", "Write log files compressed with gzip");
+  CmiGetArgFlagDesc(argv, "+no-gz-trace",
+                    "Disable writing log files compressed with gzip");
+  if (CkMyPe() == 0 && compressed)
+    CkPrintf("Warning> gz-trace is not supported because Charm++ was built without zlib!\n");
 #endif
 
   int writeSummaryFiles = CmiGetArgFlagDesc(argv,"+write-analysis-file","Enable writing summary files "); 

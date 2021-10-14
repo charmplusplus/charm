@@ -4,11 +4,11 @@
 
 /*readonly*/ CProxy_Main mainProxy;
 
-class pingMsg: public CkMcastBaseMsg, public CMessage_pingMsg
+struct pingMsg: public CkMcastBaseMsg, public CMessage_pingMsg
 {
-    public:
-        pingMsg(int num=0): hiNo(num) {}
-        int hiNo;
+  ck::future<int> done;
+  int hiNo;
+  pingMsg(ck::future<int> f, int num): done(f), hiNo(num) {}
 };
 
 
@@ -16,7 +16,7 @@ class pingMsg: public CkMcastBaseMsg, public CMessage_pingMsg
 class Main : public CBase_Main
 {
 public:
-  Main(CkArgMsg* m): numArrays(2), numElements(5), sectionSize(numElements), maxIter(3), numIter(0)
+  Main(CkArgMsg* m): numArrays(2), numElements(5), sectionSize(numElements), maxIter(3)
   {
     // Save a proxy to main for use as a reduction target
     mainProxy = thisProxy;
@@ -55,39 +55,32 @@ public:
     }
     // Create the x-array section, which is autodelegated to CkMulticast
     sectionProxy = CProxySection_Hello(arrID, elems);
-
-    // Start the test by pinging the section
-    pingMsg *msg = new pingMsg(numIter);
-    sectionProxy.mcastPing(msg);
+    thisProxy.awaitPong();
   }
 
   /// Test controller method
-  void rednPong(CkReductionMsg *msg)
+  void awaitPong(void)
   {
-      CkPrintf("----------------- testController: Received pong via reduction msg for iter %d\n", numIter+1);
-      CkAssert( msg->getSize() == sizeof(int) );
-      CkAssert( *( reinterpret_cast<int*>(msg->getData()) ) == numIter * numArrays * sectionSize);
-
-      if (++numIter == maxIter) {
-          CkPrintf("----------------- testController: All %d iterations done\n", numIter);
-          CkExit();
-      }
-      else
-      {
-          // Ping the section
-          CkPrintf("----------------- testController: Iteration %d done\n", numIter);
-          pingMsg *nextPing = new pingMsg(numIter);
-          sectionProxy.mcastPing(nextPing);
-      }
-
-      delete msg;
+    for (auto numIter = 0; numIter < maxIter; numIter++) {
+      // Make a new ping message
+      ck::future<int> redn;
+      pingMsg *nextPing = new pingMsg(redn, numIter);
+      // Then send it to the section
+      sectionProxy.mcastPing(nextPing);
+      // Get the value of, then release future
+      auto data = redn.get();
+      redn.release();
+      // Print the message (and test the value)
+      CkPrintf("----------------- testController:  Received pong (%d) via future for iter %d\n", data, numIter+1);
+      CkAssert(data == (numIter * numArrays * sectionSize));
+    }
+    CkPrintf("----------------- testController: All %d iterations done\n", maxIter);
+    CkExit();
   }
 
 private:
   /// Input parameters
   int numArrays, numElements, sectionSize, maxIter;
-  /// Counters
-  int numIter;
   /// The cross-array section proxy
   CProxySection_Hello sectionProxy;
 };
@@ -112,7 +105,7 @@ public:
     CkPrintf("Array %d, Element %d received ping number %d\n", aNum, thisIndex, msg->hiNo);
     CkGetSectionInfo(sectionCookie, msg);
     // Contribute to the section reduction
-    CProxySection_Hello::contribute(sizeof(int), &(msg->hiNo), CkReduction::sum_int, sectionCookie, CkCallback(CkIndex_Main::rednPong(NULL), mainProxy));
+    CProxySection_Hello::contribute(sizeof(int), &(msg->hiNo), CkReduction::sum_int, sectionCookie, CkCallback(msg->done.handle()));
     delete msg;
   }
 

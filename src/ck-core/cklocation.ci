@@ -5,18 +5,20 @@ module CkLocation {
     char packData[];
   };
 
+  group [migratable] CkLocCache {
+    entry CkLocCache();
+    entry [expedited] void requestLocation(CmiUInt8 id, int peToTell);
+    entry [expedited] void updateLocation(const CkLocEntry& newEntry);
+  };
+
   group [migratable] CkLocMgr {
     entry CkLocMgr(CkArrayOptions opts);
     entry [expedited] void immigrate(CkArrayElementMigrateMessage *msg);
-    entry [expedited] void requestLocation(
-        CkArrayIndex idx, int peToTell, bool suppressIfHere, int ifNonExistent,
-        int chareType, CkArrayID mgr);
-    entry [expedited] void requestLocation(
-        CmiUInt8 id, int peToTell, bool suppressIfHere);
-    entry [expedited] void updateLocation(
-        CkArrayIndex idx, CmiUInt8 id, int nowOnPe);
-    entry [expedited] void updateLocation(CmiUInt8 id, int nowOnPe);
-    entry void reclaimRemote(CkArrayIndex idx,int deletedOnPe);
+    entry [expedited] void requestLocation(const CkArrayIndex& idx, int peToTell);
+    entry [expedited] void updateLocation(const CkArrayIndex& idx, const CkLocEntry& e);
+    entry [expedited] void requestDemandCreation(
+        const CkArrayIndex& idx, int forPe, int onPe, int cType, CkArrayID mgr);
+    entry void reclaimRemote(const CkArrayIndex& idx,int deletedOnPe);
   };
   
   // Array Map object support:
@@ -44,6 +46,10 @@ module CkLocation {
 
   group [migratable] ReadFileMap : DefaultArrayMap {
     entry ReadFileMap(void);
+  };
+
+  group [migratable] Simple1DFileMap : DefaultArrayMap {
+    entry Simple1DFileMap(void);
   };
 
   group [migratable] BlockMap : DefaultArrayMap {

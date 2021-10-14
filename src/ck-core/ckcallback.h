@@ -53,7 +53,8 @@ public:
 	bcastNodeGroup, //Broadcast to a nodegroup (d.group)
 	bcastArray, //Broadcast to an array (d.array)
 	bcastSection,//Broadcast to a section(d.section)
-	replyCCS // Reply to a CCS message (d.ccsReply)
+	replyCCS, // Reply to a CCS message (d.ccsReply)
+	sendFuture // Send to a future
 	};
 #if CMK_ERROR_CHECKING
   static const char* typeName(callbackType type) {
@@ -77,12 +78,16 @@ public:
       case bcastArray: return "CkCallback::bcastArray";
       case bcastSection: return "CkCallback::bcastSection";
       case replyCCS: return "CkCallback::replyCCS";
+      case sendFuture: return "CkCallback::sendFuture";
       default : return "unknown CkCallback type";
     }
   }
 #endif
 private:
 	union callbackData {
+	struct s_future {
+		CkFuture fut;
+	} future;
 	struct s_thread { //resumeThread
 		int onPE; //Thread is waiting on this PE
 		int cb; //The suspending callback (0 if already done)
@@ -159,6 +164,8 @@ public:
 	    case resumeThread:
 	      return (d.thread.onPE == other.d.thread.onPE &&
 		  d.thread.cb == other.d.thread.cb);
+	    case sendFuture:
+	      return (d.future.fut == other.d.future.fut);
 	    case isendChare:
 	    case sendChare:
 	      return (d.chare.ep == other.d.chare.ep &&
@@ -329,6 +336,14 @@ public:
 	  d.array.hasRefnum = false;
           d.array.refnum = 0;
         }
+
+    CkCallback(const CkFuture& fut) {
+#if CMK_REPLAYSYSTEM
+      memset(this, 0, sizeof(CkCallback));
+#endif
+      type = sendFuture;
+      d.future.fut = fut;
+    }
 
     // Bcast to array
 	CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,bool forceInline=false);

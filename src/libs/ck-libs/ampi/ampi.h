@@ -9,7 +9,8 @@
 #define AMPI_INTERNAL_SKIP_FUNCTIONS
 
 #if CMK_CUDA
-#include "hapi.h"
+#include <cuda_runtime.h>
+typedef struct hapiWorkRequest hapiWorkRequest;
 #endif
 
 /* NON-standard define: this lets people #ifdef on
@@ -237,6 +238,8 @@ typedef long long int MPI_Offset;
 #define MPI_REQUEST_NULL   (-1)
 #define MPI_GROUP_NULL     (-1)
 #define MPI_GROUP_EMPTY       0
+#define MPI_COMM_WORLD        AMPI_API_STATIC_CAST(MPI_Comm, 1000000)
+#define MPI_COMM_SELF         AMPI_API_STATIC_CAST(MPI_Comm, 1000001)
 #define MPI_COMM_NULL      (-1)
 #define MPI_PROC_NULL      (-2)
 #define MPI_ROOT           (-3)
@@ -313,6 +316,7 @@ typedef void (MPI_User_function)(void *invec, void *inoutvec,
 #define AMPI_NUM_WTHS         -14
 #define AMPI_MY_PROCESS       -15
 #define AMPI_NUM_PROCESSES    -16
+#define AMPI_MY_HOME_WTH      -17
 
 /** Communicators give a communication context to a set of processors.
     An intercommunicator can be used for point to point messaging between two groups.
@@ -323,17 +327,6 @@ typedef int MPI_Comm;
 typedef int MPI_Group;
 
 typedef int MPI_Info;
-
-#define MPI_COMM_SELF               AMPI_API_STATIC_CAST(MPI_Comm, 1000000) /*MPI_COMM_SELF is the first split comm */
-#define MPI_COMM_FIRST_SPLIT        AMPI_API_STATIC_CAST(MPI_Comm, 1000000) /*Communicator from MPI_Comm_split */
-#define MPI_COMM_FIRST_GROUP        AMPI_API_STATIC_CAST(MPI_Comm, 2000000) /*Communicator from MPI_Comm_group */
-#define MPI_COMM_FIRST_CART         AMPI_API_STATIC_CAST(MPI_Comm, 3000000) /*Communicator from MPI_Cart_create */
-#define MPI_COMM_FIRST_GRAPH        AMPI_API_STATIC_CAST(MPI_Comm, 4000000) /*Communicator from MPI_Graph_create */
-#define MPI_COMM_FIRST_DIST_GRAPH   AMPI_API_STATIC_CAST(MPI_Comm, 5000000) /*Communicator from MPI_Dist_Graph_create */
-#define MPI_COMM_FIRST_INTER        AMPI_API_STATIC_CAST(MPI_Comm, 6000000) /*Communicator from MPI_Intercomm_create*/
-#define MPI_COMM_FIRST_INTRA        AMPI_API_STATIC_CAST(MPI_Comm, 7000000) /*Communicator from MPI_Intercomm_merge*/
-#define MPI_COMM_FIRST_RESVD        AMPI_API_STATIC_CAST(MPI_Comm, 8000000) /*Communicator reserved for now*/
-#define MPI_COMM_WORLD              AMPI_API_STATIC_CAST(MPI_Comm, 9000000) /*Start of universe*/
 
 #define MPI_INFO_ENV                AMPI_API_STATIC_CAST(MPI_Info, 0)
 #define AMPI_INFO_LB_SYNC           AMPI_API_STATIC_CAST(MPI_Info, 1)

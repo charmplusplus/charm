@@ -52,6 +52,9 @@ extern "C" {
 #define CkError                 CmiError
 #define CkAbort                 CmiAbort
 #define CkAssert                CmiAssert
+#define CkAssertMsg             CmiAssertMsg
+#define CkEnforce               CmiEnforce
+#define CkEnforceMsg            CmiEnforceMsg
 #define CkSetPeHelpsOtherThreads CmiSetPeHelpsOtherThreads
 
 void realCkExit(int exitcode);
@@ -427,7 +430,19 @@ extern void CkArrayExtSend_multi(int aid, int *idx, int ndims, int epIdx, int nu
 
 /*@}*/
 
+typedef CMK_REFNUM_TYPE CkFutureID;
+typedef struct _ckFuture {
+  CkFutureID id;
+  int        pe;
+#ifdef __cplusplus
+  public:
+    void pup(PUP::er &p) { p(id); p(pe); }
 
+    bool operator==(const _ckFuture& other) const {
+      return this->id == other.id && this->pe == other.pe;
+    }
+#endif
+} CkFuture;
 
 /******************************************************************************
  *

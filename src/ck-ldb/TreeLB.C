@@ -1,31 +1,33 @@
 #include "TreeBuilder.h"  // TODO this can be deleted if we change it so that LBManager instantiates the builders
 #include "TreeLB.h"
+#include "TreeStrategyFactory.h"
 #include "spanningTree.h"
 #include <fstream>  // TODO delete if json file is read from LBManager
+#include <sstream>
 #include "json.hpp"
 
 extern int quietModeRequested;
 
-CreateLBFunc_Def(TreeLB, "Pluggable hierarchical LB with available strategies:" +
-                             TreeStrategy::getLBNamesString());
+static void lbinit()
+{
+  const auto& names = TreeStrategy::LBNames;
+  std::ostringstream o;
+  for (const auto& name : names)
+  {
+    o << "\n\t" << name;
+  }
+  LBRegisterBalancer<TreeLB>(
+      "TreeLB", "Pluggable hierarchical LB with available strategies:" + o.str());
+}
 
 void TreeLB::Migrated(int waitBarrier)
 {
   objMovedIn(waitBarrier);
 }
 
-void TreeLB::init(const CkLBOptions& opts)
+void TreeLB::loadConfigFile(const CkLBOptions& opts)
 {
-#if CMK_LBDB_ON
-
-  lbname = "TreeLB";
-
-  if (_lb_args.syncResume()) barrier_after_lb = true;
-
-  // create and turn on by default
-  startLbFnHdl = lbmgr->AddStartLBFn(this, &TreeLB::StartLB);
-
-  json config;
+  config.clear();
   std::ifstream ifs(_lb_args.treeLBFile(), std::ifstream::in);
   if (opts.getLegacyName() != nullptr)
   {
@@ -90,6 +92,19 @@ void TreeLB::init(const CkLBOptions& opts)
     }
   }
   ifs.close();
+}
+
+void TreeLB::init(const CkLBOptions& opts)
+{
+#if CMK_LBDB_ON
+
+  lbname = "TreeLB";
+
+  if (_lb_args.syncResume()) barrier_after_lb = true;
+
+  // create and turn on by default
+  startLbFnHdl = lbmgr->AddStartLBFn(this, &TreeLB::StartLB);
+
   configure(config);
 
   // TODO this functionality needs to move to LBManager
@@ -185,6 +200,21 @@ void TreeLB::configure(json& config)
     CkAbort("TreeLB: configured tree not recognized\n");
   }
 #endif
+}
+
+void TreeLB::pup(PUP::er& p)
+{
+  std::string configString;
+  if (p.isPacking())
+  {
+    configString = config.dump();
+  }
+  p | configString;
+  if (p.isUnpacking())
+  {
+    config = json::parse(configString);
+    init(CkLBOptions(seqno));
+  }
 }
 
 void TreeLB::InvokeLB()

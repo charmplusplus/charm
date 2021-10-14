@@ -718,12 +718,11 @@ static void CmiMachineInit(char** argv)
   rdmaThreshold = 22000;
   firstBinSize = 128;
   CmiAssert(rdmaThreshold > firstBinSize);
-#if 0
-  blockAllocRatio = 16;
-  blockThreshold = 8;
-#endif
-  blockAllocRatio = 128;
-  blockThreshold = 9;
+
+  if (CmiGetArgIntDesc(argv, "+IBVBlockAllocRatio", &blockAllocRatio,"") == 0)
+    blockAllocRatio = 128;
+  if (CmiGetArgIntDesc(argv, "+IBVBlockThreshold", &blockThreshold,"") == 0)
+    blockThreshold = 9;
 
 #if !THREAD_MULTI_POOL
   initInfiCmiChunkPools();

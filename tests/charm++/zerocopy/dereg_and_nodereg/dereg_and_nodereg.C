@@ -123,6 +123,7 @@ class testArr : public CBase_testArr {
         // contribute to a reduction
         contribute(testDoneCb);
       }
+      delete msg;
     }
 
     // executed on half of the array elements

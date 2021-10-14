@@ -93,18 +93,22 @@ foreach(in_f ${ci-files})
 
     set(all-ci-outputs ${all-ci-outputs} ${CMAKE_BINARY_DIR}/include/${ci-output} ${CMAKE_BINARY_DIR}/include/${ci-output-defh})
 
+    if(CUDA)
+        set(CUDA_OPT "-DCMK_CUDA=1")
+    endif()
+
     if(${ci-output} MATCHES "search.decl.h")
         set(all-ci-outputs ${all-ci-outputs} ${CMAKE_BINARY_DIR}/include/cklibs/${ci-output} ${CMAKE_BINARY_DIR}/include/${ci-output-defh})
         add_custom_command(
           OUTPUT ${CMAKE_BINARY_DIR}/include/cklibs/${ci-output} ${CMAKE_BINARY_DIR}/include/cklibs/${ci-output-defh}
-          COMMAND ${CMAKE_BINARY_DIR}/bin/charmc -I. ${in_f}
+          COMMAND ${CMAKE_BINARY_DIR}/bin/charmc -I. ${OPTS} ${CUDA_OPT} ${in_f}
           WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/include/cklibs
           DEPENDS ${in_f} charmxi
           )
     endif()
     add_custom_command(
       OUTPUT ${CMAKE_BINARY_DIR}/include/${ci-output} ${CMAKE_BINARY_DIR}/include/${ci-output-defh}
-      COMMAND ${CMAKE_BINARY_DIR}/bin/charmc -I. ${in_f}
+      COMMAND ${CMAKE_BINARY_DIR}/bin/charmc -I. ${OPTS} ${CUDA_OPT} ${in_f}
       WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/include/
       DEPENDS ${in_f} charmxi
       )
