@@ -1878,6 +1878,36 @@ EOT
 test_link "whether has mallinfo" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_MALLINFO, $pass, [whether has mallinfo])
 
+#### test for cfree ###
+cat > $t <<EOT
+#include <stdlib.h>
+int main() {
+  cfree(0);
+}
+EOT
+test_link "whether has cfree" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_CFREE, $pass, [whether has cfree])
+
+#### test for pvalloc ###
+cat > $t <<EOT
+#include <malloc.h>
+int main() {
+  return pvalloc(4096) == 0;
+}
+EOT
+test_link "whether has pvalloc" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_PVALLOC, $pass, [whether has pvalloc])
+
+#### test for valloc ###
+cat > $t <<EOT
+#include <malloc.h>
+int main() {
+  return valloc(4096) == 0;
+}
+EOT
+test_link "whether has valloc" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_VALLOC, $pass, [whether has valloc])
+
 #### test for __morecore ###
 cat > $t <<EOT
 #include <cstddef>
@@ -2120,6 +2150,23 @@ then
 # One version or another of dlopen worked: compile it in
 	AC_DEFINE_UNQUOTED(CMK_DLL_USE_DLOPEN, 1, [dlopen])
 fi
+
+cat > $tc <<EOT
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE
+#endif
+#ifndef __USE_GNU
+# define __USE_GNU
+#endif
+#include <dlfcn.h>
+#include <stddef.h>
+int main()
+{
+  return dlopen("", RTLD_DEEPBIND) == NULL;
+}
+EOT
+test_cc "whether has RTLD_DEEPBIND" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_RTLD_DEEPBIND, $pass, [whether has RTLD_DEEPBIND])
 
 cat > $tc <<EOT
 #ifndef _GNU_SOURCE

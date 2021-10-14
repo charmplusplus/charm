@@ -295,7 +295,11 @@ void AMPI_Node_Setup(int numranks)
 
   // load user object
 
-  SharedObject myexe = dlopen(binary_path_str, RTLD_NOW|RTLD_LOCAL|RTLD_DEEPBIND);
+  int flags = RTLD_NOW|RTLD_LOCAL;
+#if CMK_HAS_RTLD_DEEPBIND
+  flags |= RTLD_DEEPBIND;
+#endif
+  SharedObject myexe = dlopen(binary_path_str, flags);
 
   if (myexe == nullptr)
   {
