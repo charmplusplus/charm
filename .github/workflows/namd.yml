@@ -1,19 +1,13 @@
 name: NAMD
 
-on:
-  workflow_run:
-    workflows: ["Trigger NAMD"]
-    types: [completed]
+on: pull_request
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:
     - uses: actions/checkout@v2
-      with:
-        ref: ${{ github.event.workflow_run.head_branch }}
     - name: install-prerequisites
       run: |
         sudo apt-get update
