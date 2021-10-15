@@ -50,6 +50,9 @@ private:
     // numObjs is the number of objects in the current subset, which corresponds to the
     // size of the entries in sortedIndices.
     const size_t numObjs = sortedIndices[0].size();
+    // If there are no more objects left, then they've all gone to other partitions
+    if (numObjs == 0)
+      return;
     const int posDimension = box.size();
 
     // Find longest dimension
