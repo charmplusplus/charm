@@ -148,7 +148,7 @@ private:
       if (newLeftLoad > leftTarget)
       {
         // Decide if split element should go to left or right partition
-        if (std::abs(newLeftLoad - leftTarget) < std::abs(leftLoad - leftTarget))
+        if (std::abs(newLeftLoad - leftTarget) < std::abs(leftLoad - leftTarget) && splitIndex < sortedPositions.size() - 1)
           splitIndex++;
         break;
       }
