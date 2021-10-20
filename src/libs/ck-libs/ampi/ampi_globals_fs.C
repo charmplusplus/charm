@@ -51,7 +51,7 @@ static void fs_copy(const char * src, const char * dst)
   pid_t pid = fork();
   if (pid == 0)
   {
-    execl("/bin/cp", "/bin/cp", src, dst, NULL);
+    execl("/bin/cp", "/bin/cp", src, dst, nullptr);
     CkError("ERROR> execl(): %s\n", strerror(errno));
     CkAbort(abortmsg);
   }
