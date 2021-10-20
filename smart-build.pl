@@ -133,7 +133,7 @@ if($skip_choosing eq "false"){
 }
 
 
-# check for GNI
+# check for Cray
 
 if($skip_choosing eq "false"){
   my $craycc_found = index(`which CC 2>/dev/null`, "/opt/cray/") != -1;
@@ -143,11 +143,23 @@ if($skip_choosing eq "false"){
     $PE_PRODUCT_LIST = "";
   }
 
+  my $CRAYPE_NETWORK_TARGET = $ENV{'CRAYPE_NETWORK_TARGET'};
+  if (not defined $CRAYPE_NETWORK_TARGET) {
+    $CRAYPE_NETWORK_TARGET = "";
+  }
+
   my $CRAY_UGNI_found = index(":$PE_PRODUCT_LIST:", ":CRAY_UGNI:") != -1;
 
   my $gni_found = $craycc_found || $CRAY_UGNI_found;
 
-  if ($gni_found) {
+  if ($CRAYPE_NETWORK_TARGET eq "ofi") {
+    print "\nI found that you have a Cray environment.\nDo you want to build Charm++ targeting Cray Shasta? [Y/n]: ";
+    my $p = promptUserYN();
+    if($p eq "yes" || $p eq "default") {
+                  $arch = "ofi-crayshasta";
+                  $skip_choosing = "true";
+    }
+  } elsif ($gni_found) {
     my $CRAYPE_INTERLAGOS_found = index(":$PE_PRODUCT_LIST:", ":CRAYPE_INTERLAGOS:") != -1;
     if ($CRAYPE_INTERLAGOS_found) {
       print "\nI found that you have a Cray environment with Interlagos processors.\nDo you want to build Charm++ targeting Cray XE? [Y/n]: ";
@@ -402,7 +414,7 @@ if ($counter != 1) {
 #================ Choose Compiler =================================
 
 # Lookup list of compilers
-my $cs = `$dirname/build charm++ $arch help 2>&1 | grep "Supported compilers"`;
+my $cs = `$dirname/buildold charm++ $arch help 2>&1 | grep "Supported compilers"`;
 # prune away beginning of the line
 $cs =~ m/Supported compilers: (.*)/;
 $cs = $1;
