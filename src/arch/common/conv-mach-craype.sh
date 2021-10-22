@@ -1,7 +1,6 @@
 
 PGCC=`CC -V 2>&1 | grep pgCC`
 ICPC=`CC -V 2>&1 | grep Intel`
-CLANG=`CC -V 2>&1 | grep 'clang'`
 GNU=`CC -V 2>&1 | grep 'g++'`
 CCE=`CC -V 2>&1 | grep 'Cray'`
 
@@ -16,12 +15,7 @@ CMK_CPP_C_FLAGS="-E"
 
 CMK_LINK_BINARY='-dynamic'
 
-if test -v CMK_CRAY_NOGNI
-then
-    CMK_CRAY_LIBS="$CRAY_PMI_POST_LINK_OPTS -lpmi $CRAY_RCA_POST_LINK_OPTS"
-else
-    CMK_CRAY_LIBS="$CRAY_PMI_POST_LINK_OPTS $CRAY_UGNI_POST_LINK_OPTS -lugni -lpmi $CRAY_RCA_POST_LINK_OPTS"
-fi
+CMK_CRAY_LIBS="$CRAY_PMI_POST_LINK_OPTS $CRAY_UGNI_POST_LINK_OPTS -lugni -lpmi $CRAY_RCA_POST_LINK_OPTS"
 CMK_LIBS="-lckqt $CMK_CRAY_LIBS"
 
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
@@ -48,11 +42,6 @@ then
 CMK_SEQ_CC="icc -fPIC "
 CMK_SEQ_CXX="icpc -fPIC "
 CMK_COMPILER='icc'
-elif test -n "$CLANG"
-then
-CMK_SEQ_CC="clang -fPIC "
-CMK_SEQ_CXX="clang++ -fPIC "
-CMK_COMPILER='clang'
 else   # gcc
 CMK_SEQ_CC="gcc -fPIC"
 CMK_SEQ_CXX="g++ -fPIC "

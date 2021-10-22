@@ -92,7 +92,7 @@ MiniAMR v1.0
 -  miniAMR applies a stencil calculation on a unit cube computational
    domain, which is refined over time.
 
--  No changes if using swapglobals. Explicitly extern global variables
+-  No changes if using swap-globals. Explicitly extern global variables
    if using TLS.
 
 Not yet AMPI-zed (reason)

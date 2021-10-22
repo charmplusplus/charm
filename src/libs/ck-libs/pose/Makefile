@@ -94,12 +94,12 @@ depends: cidepends.default $(CIOBJ)
 	      SRCFILE=`basename $$i .o`.C ; \
               echo "checking dependencies for $$i : $$SRCFILE" ; \
               g++ -MM -Wno-deprecated -I$(CHARMINC) $$SRCFILE >> $(DEPENDFILE); \
-              echo '	$$(CHARMC) -o '$$i -c $$SRCFILE >> $(DEPENDFILE) ; \
+              echo '	$$(CHARMC) -o '$$i $$SRCFILE >> $(DEPENDFILE) ; \
         done; 	\
         for i in $(SEQOBJECTS) ; do \
 	      SRCFILE=`basename $$i .seq.o`.C ; \
               echo "checking dependencies for $$i : $$SRCFILE" ; \
               g++ -MM -MT $$i -Wno-deprecated -I$(CHARMINC) $$SRCFILE >> $(DEPENDFILE); \
-              echo '	$$(CHARMC) -o '$$i -c -DSEQUENTIAL_POSE=1 $$SRCFILE >> $(DEPENDFILE) ; \
+              echo '	$$(CHARMC) -o '$$i -DSEQUENTIAL_POSE=1 $$SRCFILE >> $(DEPENDFILE) ; \
         done; 
 

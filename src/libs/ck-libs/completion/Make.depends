@@ -51,4 +51,4 @@ completion.o: completion.C completion.h completion.decl.h \
  ../../../../tmp/pathHistory.h ../../../../tmp/PathHistory.decl.h \
  ../../../../tmp/ckcallback-ccs.h ../../../../tmp/CkCallback.decl.h \
  ../../../../tmp/sdag.h completion.def.h
-	$(CHARMC) -I../../../../tmp -o completion.o -c completion.C
+	$(CHARMC) -I../../../../tmp -o completion.o completion.C

@@ -46,6 +46,6 @@ depends:  completion.decl.h
 	      SRCFILE=`basename $$i .o`.C ; \
               echo "checking dependencies for $$i : $$SRCFILE" ; \
               g++ -MM -Wno-deprecated -I$(CDIR)/tmp $$SRCFILE >> $(DEPENDFILE); \
-              echo '	$$(CHARMC) -I$(CDIR)/tmp -o '$$i -c $$SRCFILE >> $(DEPENDFILE) ; \
+              echo '	$$(CHARMC) -I$(CDIR)/tmp -o '$$i $$SRCFILE >> $(DEPENDFILE) ; \
         done; 
 

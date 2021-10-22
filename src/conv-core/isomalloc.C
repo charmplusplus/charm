@@ -26,20 +26,15 @@ Substantially rewritten by Evan Ramos in 2019.
 #include "pup_stl.h"
 
 #define ISOMALLOC_DEBUG 0
+
 #if ISOMALLOC_DEBUG
 #define DEBUG_PRINT(...) CmiPrintf(__VA_ARGS__)
 #else
 #define DEBUG_PRINT(...)
 #endif
 
-#define ISOSYNC_DEBUG 0
-#if ISOSYNC_DEBUG
-#define SYNC_DBG(...) CmiPrintf(__VA_ARGS__)
-#else
-#define SYNC_DBG(...)
-#endif
-
 #define ISOMEMPOOL_DEBUG 0
+
 #if ISOMEMPOOL_DEBUG
 #define IMP_DBG(...) CmiPrintf(__VA_ARGS__)
 #else
@@ -63,9 +58,6 @@ Substantially rewritten by Evan Ramos in 2019.
 #if CMK_HAS_ADDR_NO_RANDOMIZE
 #include <sys/personality.h>
 #endif
-
-#include <unordered_map>
-#include <utility>
 
 template <typename T>
 static inline typename std::enable_if<std::is_pointer<T>::value>::type pup_raw_pointer(PUP::er & p, T & ptr)
@@ -337,22 +329,12 @@ static uint8_t * pmax(uint8_t * a, uint8_t * b) { return pointer_lt(a, b) ? b : 
 static const constexpr memRange_t meg = 1024u * 1024u;         /* One megabyte */
 static const constexpr memRange_t gig = 1024u * 1024u * 1024u; /* One gigabyte */
 static const constexpr CmiUInt8 tb = (CmiUInt8)gig * 1024ull;  /* One terabyte */
-
-#if CMK_64BIT
 static const constexpr CmiUInt8 vm_limit = tb * 256ull;
+
 static const constexpr memRange_t other_libs = 16ul * gig; /* space for other libraries to use */
-static const constexpr memRange_t heuristicHeapSize = 1u * gig;
-static const constexpr memRange_t heuristicMmapSize = 2u * gig;
-static const constexpr int minimumRegionSize = 512u * meg;
+
 /* the smallest size used when describing unavailable regions */
 static const constexpr memRange_t division_size = 256u * meg;
-#else
-static const constexpr memRange_t other_libs = 256u * meg;
-static const constexpr memRange_t heuristicHeapSize = 64u * meg;
-static const constexpr memRange_t heuristicMmapSize = 64u * meg;
-static const constexpr int minimumRegionSize = 64u * meg;
-static const constexpr memRange_t division_size = 32u * meg;
-#endif
 
 /* Maybe write a new function that distributes start points as
  * 0, 1/2, 1/4, 3/4, 1/8, 3/8, 5/8, 7/8, 1/16, ... */
@@ -417,7 +399,15 @@ static void check_range(uint8_t * start, uint8_t * end, memRegion_t * max)
   if (start >= end) return; /*Ran out of hole*/
   len = (memRange_t)end - (memRange_t)start;
 
-#if CMK_64BIT
+#if 0
+  /* too conservative */
+  if (len/gig>64u)
+  { /* This is an absurd amount of space-- cut it down, for safety */
+    start += 16u * gig;
+    end = start + 32u * gig;
+    len = (memRange_t)end - (memRange_t)start;
+  }
+#else
   /* Note: 256TB == 2^48 bytes.  So a 48-bit virtual-address CPU
    *    can only actually address 256TB of space. */
   if (len / tb > 10u)
@@ -428,7 +418,6 @@ static void check_range(uint8_t * start, uint8_t * end, memRegion_t * max)
     len = (memRange_t)end - (memRange_t)start;
   }
 #endif
-
   if (len <= max->len) return; /*It's too short already!*/
   DEBUG_PRINT("[%d] Checking at %p - %p\n", CmiMyPe(), start, end);
 
@@ -525,11 +514,11 @@ static int find_largest_free_region(memRegion_t * destRegion)
 
   regions[nRegions].type = "Heap (small blocks)";
   regions[nRegions].start = heapLil;
-  regions[nRegions++].len = heuristicHeapSize;
+  regions[nRegions++].len = 1u * gig;
 
   regions[nRegions].type = "Heap (large blocks)";
   regions[nRegions].start = heapBig;
-  regions[nRegions++].len = heuristicHeapSize;
+  regions[nRegions++].len = 1u * gig;
 
   regions[nRegions].type = "Stack space";
   regions[nRegions].start = stack;
@@ -543,7 +532,7 @@ static int find_largest_free_region(memRegion_t * destRegion)
   {
     regions[nRegions].type = "Result of a non-fixed call to mmap";
     regions[nRegions].start = (uint8_t *)mmapAny;
-    regions[nRegions++].len = heuristicMmapSize;
+    regions[nRegions++].len = 2u * gig;
 
     call_munmap(mmapAny, mmapAnyLen);
   }
@@ -696,28 +685,28 @@ struct CmiAddressSpaceRegionMsg
   CmiAddressSpaceRegion region;
 };
 
-static std::atomic<bool> CmiIsomallocSyncHandlerDone{};
+static std::atomic<char> CmiIsomallocSyncHandlerDone;
 #if CMK_SMP && !CMK_SMP_NO_COMMTHD
 extern void CommunicationServerThread(int sleepTime);
-static std::atomic<bool> CmiIsomallocSyncCommThreadDone{};
+static std::atomic<char> CmiIsomallocSyncCommThreadDone;
 #endif
 
 #if CMK_SMP && !CMK_SMP_NO_COMMTHD
-static void CmiIsomallocSyncWaitCommThread(std::atomic<bool> & done)
+static void CmiIsomallocSyncWaitCommThread()
 {
   do
     CommunicationServerThread(5);
-  while (!done.load());
+  while (!CmiIsomallocSyncCommThreadDone.load());
 
   CommunicationServerThread(5);
 }
 #endif
 
-static void CmiIsomallocSyncWait(std::atomic<bool> & done)
+static void CmiIsomallocSyncWait()
 {
   do
     CsdSchedulePoll();
-  while (!done.load());
+  while (!CmiIsomallocSyncHandlerDone.load());
 
   CsdSchedulePoll();
 }
@@ -729,19 +718,19 @@ static void CmiIsomallocSyncReductionHandler(void * data)
   auto region = (CmiAddressSpaceRegion *)data;
   CmiAssert(region == &IsoRegion);
 
-  CmiIsomallocSyncHandlerDone = true;
+  CmiIsomallocSyncHandlerDone = 1;
 }
 static void CmiIsomallocSyncBroadcastHandler(void * msg)
 {
   const CmiAddressSpaceRegion region = ((CmiAddressSpaceRegionMsg *)msg)->region;
-  SYNC_DBG("Isomalloc> Node %d received region for assignment: %" PRIx64 " %" PRIx64 "\n",
-           CmiMyNode(), region.s, region.e);
+  DEBUG_PRINT("Isomalloc> Node %d received region for assignment: %" PRIx64 " %" PRIx64 "\n",
+              CmiMyNode(), region.s, region.e);
 
   IsoRegion = region;
 
   CmiFree(msg);
 
-  CmiIsomallocSyncHandlerDone = true;
+  CmiIsomallocSyncHandlerDone = 1;
 }
 
 static void CmiIsomallocInitExtent(char ** argv)
@@ -840,8 +829,8 @@ static void CmiIsomallocInitExtent(char ** argv)
       if (CmiMyPe() == 0)
         CmiPrintf("Isomalloc> Synchronized global address space.\n");
 
-      SYNC_DBG("Charm++> Consolidated Isomalloc memory region at restart: %p - %p (%" PRId64 " MB).\n",
-               (void *)IsoRegion.s, (void *)IsoRegion.e, (IsoRegion.e - IsoRegion.s) / meg);
+      DEBUG_PRINT("Charm++> Consolidated Isomalloc memory region at restart: %p - %p (%" PRId64 " MB).\n",
+                  (void *)IsoRegion.s, (void *)IsoRegion.e, (IsoRegion.e - IsoRegion.s) / meg);
     }
   }
   else
@@ -853,32 +842,25 @@ static void CmiIsomallocInitExtent(char ** argv)
   }
   else if (CmiNumNodes() > 1)
   {
-#if CMK_SMP && !CMK_SMP_NO_COMMTHD
-    if (CmiInCommThread())
-    {
-      CmiIsomallocSyncWaitCommThread(CmiIsomallocSyncCommThreadDone);
-    }
-    else
-#endif
     if (CmiMyRank() == 0)
     {
       if (CmiMyNode() == 0)
       {
-        SYNC_DBG("Charm++> Synchronizing Isomalloc memory region...\n");
+        DEBUG_PRINT("Charm++> Synchronizing Isomalloc memory region...\n");
       }
 
-      SYNC_DBG("Isomalloc> Node %d sending region for comparison: %" PRIx64 " %" PRIx64 "\n",
-               CmiMyNode(), IsoRegion.s, IsoRegion.e);
+      DEBUG_PRINT("Isomalloc> Node %d sending region for comparison: %" PRIx64 " %" PRIx64 "\n",
+                  CmiMyNode(), IsoRegion.s, IsoRegion.e);
 
       CmiNodeReduceStruct(&IsoRegion, CmiAddressSpaceRegionPup, CmiAddressSpaceRegionMerge,
                           CmiIsomallocSyncReductionHandler, nullptr);
 
-      CmiIsomallocSyncWait(CmiIsomallocSyncHandlerDone);
+      CmiIsomallocSyncWait();
 
       if (CmiMyNode() == 0)
       {
-        SYNC_DBG("Isomalloc> Node %d sending region for assignment: %" PRIx64 " %" PRIx64 "\n",
-                 CmiMyNode(), IsoRegion.s, IsoRegion.e);
+        DEBUG_PRINT("Isomalloc> Node %d sending region for assignment: %" PRIx64 " %" PRIx64 "\n",
+                    CmiMyNode(), IsoRegion.s, IsoRegion.e);
 
         CmiAddressSpaceRegionMsg msg;
         CmiInitMsgHeader(msg.converseHeader, sizeof(CmiAddressSpaceRegionMsg));
@@ -896,17 +878,23 @@ static void CmiIsomallocInitExtent(char ** argv)
         if (CmiMyPe() == 0)
           CmiPrintf("Isomalloc> Synchronized global address space.\n");
 
-        SYNC_DBG("Charm++> Consolidated Isomalloc memory region: %p - %p (%" PRId64 " MB).\n",
-                 (void *)IsoRegion.s, (void *)IsoRegion.e, (IsoRegion.e - IsoRegion.s) / meg);
+        DEBUG_PRINT("Charm++> Consolidated Isomalloc memory region: %p - %p (%" PRId64 " MB).\n",
+                    (void *)IsoRegion.s, (void *)IsoRegion.e, (IsoRegion.e - IsoRegion.s) / meg);
       }
 
 #if CMK_SMP && !CMK_SMP_NO_COMMTHD
       CmiIsomallocSyncCommThreadDone = 1;
 #endif
     }
+#if CMK_SMP && !CMK_SMP_NO_COMMTHD
+    else if (CmiInCommThread())
+    {
+      CmiIsomallocSyncWaitCommThread();
+    }
+#endif
     else
     {
-      CmiIsomallocSyncWait(CmiIsomallocSyncHandlerDone);
+      CmiIsomallocSyncWait();
     }
 
     CmiBarrier();
@@ -939,12 +927,12 @@ static void CmiIsomallocInitExtent(char ** argv)
 struct isommap
 {
   isommap(uint8_t * s, uint8_t * e)
-    : start{s}, end{e}, allocated_extent{s}, use_rdma{1}, lock{CmiCreateLock()}, use_recording{0}
+    : start{s}, end{e}, allocated_extent{s}, use_rdma{1}, lock{CmiCreateLock()}
   {
     IMP_DBG("[%d][%p] isommap::isommap(%p, %p)\n", CmiMyPe(), this, s, e);
   }
   isommap(PUP::reconstruct pr)
-    : lock{CmiCreateLock()}, use_recording{0}
+    : lock{CmiCreateLock()}
   {
     IMP_DBG("[%d][%p] isommap::isommap(PUP::reconstruct)\n", CmiMyPe(), this);
   }
@@ -979,8 +967,6 @@ struct isommap
     pup_raw_pointer(p, allocated_extent);
     p | use_rdma;
 
-    p | protect_regions;
-
     const size_t totalsize = allocated_extent - start;
 
     if (p.isUnpacking())
@@ -997,17 +983,6 @@ struct isommap
     if (use_rdma)
     {
       uint8_t * localstart = start;
-
-#if CMK_HAS_MPROTECT
-      // hack: reset all regions to RW- to avoid a conflict with RDMA registration
-      if (p.isPacking() && p.isDeleting())
-      {
-        for (const auto & region : protect_regions)
-        {
-          mprotect((void *)std::get<0>(region), std::get<1>(region), PROT_READ|PROT_WRITE);
-        }
-      }
-#endif
 
       p.pup_buffer(localstart, totalsize,
                    [localstart](size_t totalsize) -> void *
@@ -1045,23 +1020,6 @@ struct isommap
   void JustMigrated()
   {
     // Can be used for any post-migration functionality, such as restoring mprotect permissions.
-#if CMK_HAS_MPROTECT
-    for (const auto & region : protect_regions)
-    {
-      mprotect((void *)std::get<0>(region), std::get<1>(region), std::get<2>(region));
-    }
-#endif
-  }
-
-  void protect(void * addr, size_t len, int prot)
-  {
-    CmiLock(lock);
-    protect_regions.emplace_back((uintptr_t)addr, len, prot);
-    CmiUnlock(lock);
-
-#if CMK_HAS_MPROTECT
-    mprotect(addr, len, prot);
-#endif
   }
 
   void clear()
@@ -1108,15 +1066,9 @@ struct isommap
     use_rdma = enable;
   }
 
-  void EnableRecording(int enable)
-  {
-    use_recording = enable;
-  }
-
   // canonical data
   uint8_t * start, * end, * allocated_extent;
   int use_rdma;
-  std::vector<std::tuple<uintptr_t, size_t, int>> protect_regions;
 
   // local data
   /*
@@ -1125,10 +1077,6 @@ struct isommap
    * but it is here as a safeguard for a multithreaded case such as AMPI+OpenMP.
    */
   CmiNodeLock lock;
-
-  // transient data, resets after migration
-  int use_recording;
-  std::unordered_map<uintptr_t, std::pair<size_t, size_t>> heap_record;
 };
 
 /************** dlmalloc mempool ***************/
@@ -2615,12 +2563,6 @@ void CmiIsomallocEnableRDMA(CmiIsomallocContext ctx, int enable)
   pool->backend.EnableRDMA(enable);
 }
 
-void CmiIsomallocContextEnableRecording(CmiIsomallocContext ctx, int enable)
-{
-  auto pool = (Mempool *)ctx.opaque;
-  pool->backend.EnableRecording(enable);
-}
-
 CmiIsomallocRegion CmiIsomallocContextGetUsedExtent(CmiIsomallocContext ctx)
 {
   auto pool = (Mempool *)ctx.opaque;
@@ -2629,78 +2571,26 @@ CmiIsomallocRegion CmiIsomallocContextGetUsedExtent(CmiIsomallocContext ctx)
 
 void * CmiIsomallocContextMalloc(CmiIsomallocContext ctx, size_t size)
 {
-  CmiMemoryIsomallocDisablePush();
-
   auto pool = (Mempool *)ctx.opaque;
-  auto ret = pool->alloc(size);
-
-  if (ret != nullptr && pool->backend.use_recording)
-  {
-    auto & rec = pool->backend.heap_record;
-    rec[(uintptr_t)ret] = std::make_pair(size, size_t{});
-  }
-
-  CmiMemoryIsomallocDisablePop();
-
-  return ret;
+  return pool->alloc(size);
 }
 
 void * CmiIsomallocContextMallocAlign(CmiIsomallocContext ctx, size_t align, size_t size)
 {
-  CmiMemoryIsomallocDisablePush();
-
   auto pool = (Mempool *)ctx.opaque;
-  size_t real_align = isomalloc_internal_validate_align(align);
-  auto ret = pool->alloc(size, real_align);
-
-  if (ret != nullptr && pool->backend.use_recording)
-  {
-    auto & rec = pool->backend.heap_record;
-    rec[(uintptr_t)ret] = std::make_pair(size, real_align);
-  }
-
-  CmiMemoryIsomallocDisablePop();
-
-  return ret;
+  return pool->alloc(size, isomalloc_internal_validate_align(align));
 }
 
 void * CmiIsomallocContextCalloc(CmiIsomallocContext ctx, size_t nelem, size_t size)
 {
-  CmiMemoryIsomallocDisablePush();
-
   auto pool = (Mempool *)ctx.opaque;
-  auto ret = pool->calloc(nelem, size);
-
-  if (ret != nullptr && pool->backend.use_recording)
-  {
-    auto & rec = pool->backend.heap_record;
-    rec[(uintptr_t)ret] = std::make_pair(nelem*size, size_t{});
-  }
-
-  CmiMemoryIsomallocDisablePop();
-
-  return ret;
+  return pool->calloc(nelem, size);
 }
 
 void * CmiIsomallocContextRealloc(CmiIsomallocContext ctx, void * ptr, size_t size)
 {
-  CmiMemoryIsomallocDisablePush();
-
   auto pool = (Mempool *)ctx.opaque;
-  auto ret = pool->realloc(ptr, size);
-
-  if (ret != nullptr && pool->backend.use_recording)
-  {
-    auto & rec = pool->backend.heap_record;
-    auto iter = rec.find((uintptr_t)ptr);
-    if (iter != rec.end())
-      rec.erase(iter);
-    rec[(uintptr_t)ret] = std::make_pair(size, size_t{});
-  }
-
-  CmiMemoryIsomallocDisablePop();
-
-  return ret;
+  return pool->realloc(ptr, size);
 }
 
 void CmiIsomallocContextFree(CmiIsomallocContext ctx, void * ptr)
@@ -2708,20 +2598,8 @@ void CmiIsomallocContextFree(CmiIsomallocContext ctx, void * ptr)
   if (ptr == nullptr)
     return;
 
-  CmiMemoryIsomallocDisablePush();
-
   auto pool = (Mempool *)ctx.opaque;
   pool->free(ptr);
-
-  if (pool->backend.use_recording)
-  {
-    auto & rec = pool->backend.heap_record;
-    auto iter = rec.find((uintptr_t)ptr);
-    if (iter != rec.end())
-      rec.erase(iter);
-  }
-
-  CmiMemoryIsomallocDisablePop();
 }
 
 size_t CmiIsomallocContextGetLength(CmiIsomallocContext ctx, void * ptr)
@@ -2753,28 +2631,4 @@ void * CmiIsomallocContextPermanentAllocAlign(CmiIsomallocContext ctx, size_t al
   CmiMemoryIsomallocDisablePop();
 
   return ret;
-}
-
-void CmiIsomallocContextProtect(CmiIsomallocContext ctx, void * addr, size_t len, int prot)
-{
-  CmiMemoryIsomallocDisablePush();
-
-  auto pool = (Mempool *)ctx.opaque;
-  pool->backend.protect(addr, len, prot);
-
-  CmiMemoryIsomallocDisablePop();
-}
-
-void CmiIsomallocGetRecordedHeap(CmiIsomallocContext ctx, std::vector<std::tuple<uintptr_t, size_t, size_t>> & heap_vector)
-{
-  CmiMemoryIsomallocDisablePush();
-
-  auto pool = (Mempool *)ctx.opaque;
-  auto & rec = pool->backend.heap_record;
-  heap_vector.reserve(rec.size());
-  for (const auto & entry : rec)
-    heap_vector.emplace_back(entry.first, entry.second.first, entry.second.second);
-  rec.clear();
-
-  CmiMemoryIsomallocDisablePop();
 }

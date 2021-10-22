@@ -1297,18 +1297,12 @@ static void CombineSummary()
       // pe 0 start the sumonly process
     CProxy_TraceSummaryBOC sumProxy(traceSummaryGID);
     sumProxy[0].startSumOnly();
-  }
-  /*
-  // This is only used for the creation of the .sumall file, but it's causing crashes with
-  // sumDetail (Assertion "inIdle == 0 && inExec == 0" failed in beginIdle)
-  else if (sumDetail)
+  }else if(sumDetail)
   {
-    CProxy_TraceSummaryBOC sumProxy(traceSummaryGID);
-    sumProxy.traceSummaryParallelShutdown(-1);
+      CProxy_TraceSummaryBOC sumProxy(traceSummaryGID);
+      sumProxy.traceSummaryParallelShutdown(-1);
   }
-  */
-  else
-  {
+  else {
     CkContinueExit();
   }
 #else

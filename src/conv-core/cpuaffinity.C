@@ -110,6 +110,8 @@ void CmiInitHwlocTopology(void)
 static int excludecore[MAX_EXCLUDE] = {-1};
 static int excludecount = 0;
 
+static int affinity_doneflag = 0;
+
 #ifndef _WIN32
 static int affMsgsRecvd = 1;  // number of affinity messages received at PE0
 static cpu_set_t core_usage;  // used to record union of CPUs used by every PE in physical node
@@ -429,35 +431,7 @@ struct affMsg {
 
 static rankMsg *rankmsg = NULL;
 static std::map<skt_ip_t, hostnameMsg *> hostTable;
-
-static std::atomic<bool> cpuAffSyncHandlerDone{};
-static std::atomic<bool> cpuAffSyncBroadcastDone{};
-static std::atomic<bool> cpuPhyAffCheckDone{};
-#if CMK_SMP && !CMK_SMP_NO_COMMTHD
-extern void CommunicationServerThread(int sleepTime);
-static std::atomic<bool> cpuAffSyncCommThreadDone{};
-static std::atomic<bool> cpuPhyAffCheckCommThreadDone{};
-#endif
-
-#if CMK_SMP && !CMK_SMP_NO_COMMTHD
-static void cpuAffSyncWaitCommThread(std::atomic<bool> & done)
-{
-  do
-    CommunicationServerThread(5);
-  while (!done.load());
-
-  CommunicationServerThread(5);
-}
-#endif
-
-static void cpuAffSyncWait(std::atomic<bool> & done)
-{
-  do
-    CsdSchedulePoll();
-  while (!done.load());
-
-  CsdSchedulePoll();
-}
+static CmiNodeLock affLock = 0;
 
 /* called on PE 0 */
 static void cpuAffinityHandler(void *m)
@@ -467,7 +441,8 @@ static void cpuAffinityHandler(void *m)
   hostnameMsg *rec;
   hostnameMsg *msg = (hostnameMsg *)m;
   void *tmpm;
-  const int npes = CmiNumPes();
+  int nnodes = CmiNumNodes();
+  int npes = CmiNumPes();
 
 /*   for debug
   char str[128];
@@ -497,8 +472,28 @@ static void cpuAffinityHandler(void *m)
   rankmsg->node_numpes[node]++;
   rankmsg->pe_hosts[pe] = rec->seq;
 
-  if (++count == npes)
-    cpuAffSyncHandlerDone = true;
+  if (++count == npes) {
+    DEBUGP(("Cpuaffinity> %zu unique hosts detected!\n", hostTable.size()));
+    for (const auto & pair : hostTable)
+      CmiFree(pair.second);
+    hostTable.clear();
+
+    int* ranks_on_host = new int[hostcount];
+
+    memset(ranks_on_host, 0, hostcount*sizeof(int));
+    for (int i = 0; i < nnodes; i++) {
+      rankmsg->node_ranks_on_host[i] = ranks_on_host[rankmsg->node_hosts[i]]++;
+    }
+
+    memset(ranks_on_host, 0, hostcount*sizeof(int));
+    for (int i = 0; i < npes; i++) {
+      rankmsg->pe_ranks_on_host[i] = ranks_on_host[rankmsg->pe_hosts[i]]++;
+    }
+
+    delete [] ranks_on_host;
+
+    CmiSyncBroadcastAllAndFree(rankMsg::size(nnodes, npes), (void *)rankmsg);
+  }
 }
 
 /*
@@ -688,27 +683,17 @@ static void cpuAffinityRecvHandler(void *msg)
     CmiAbort("CmiSetCPUAffinity failed!");
   }
   CmiFree(m);
-
-  CmiNodeBarrier();
-
-  if (CmiMyRank() == 0)
-    cpuAffSyncBroadcastDone = true;
 }
 
 /* called on first PE in physical node, receive affinity set from other PEs in phy node */
 static void cpuPhyNodeAffinityRecvHandler(void *msg)
 {
-  static int count = 0;
-
   affMsg *m = (affMsg *)msg;
 #if !defined(_WIN32) && defined(CPU_OR)
   CPU_OR(&core_usage, &core_usage, &m->affinity);
   affMsgsRecvd++;
 #endif
   CmiFree(m);
-
-  if (++count == CmiNumPesOnPhysicalNode(0) - 1)
-    cpuPhyAffCheckDone = true;
 }
 
 #if defined(_WIN32)
@@ -821,66 +806,18 @@ void CmiCheckAffinity(void)
 
   if (!CmiCpuTopologyEnabled()) return;  // only works if cpu topology enabled
 
-  if (CmiNumPes() == 1)
-    return;
-
-#if CMK_SMP && !CMK_SMP_NO_COMMTHD
-  if (CmiInCommThread())
-  {
-    cpuAffSyncWaitCommThread(cpuPhyAffCheckCommThreadDone);
-  }
-  else
-#endif
-  if (CmiMyPe() == 0)
-  {
+  if (CmiMyPe() == 0) {
     // wait for every PE affinity from my physical node (for now only done on phy node 0)
 
     cpu_set_t my_aff;
     if (get_affinity(&my_aff) == -1) CmiAbort("get_affinity failed\n");
     CPU_OR(&core_usage, &core_usage, &my_aff); // add my affinity (pe0)
+    int N = CmiNumPesOnPhysicalNode(0);
+    while (affMsgsRecvd < N)
+      CmiDeliverSpecificMsg(cpuPhyNodeAffinityRecvHandlerIdx);
 
-    cpuAffSyncWait(cpuPhyAffCheckDone);
-
-#if CMK_SMP && !CMK_SMP_NO_COMMTHD
-    CmiNodeBarrier();
-
-    cpuPhyAffCheckCommThreadDone = true;
-#endif
-  }
-  else if (CmiPhysicalNodeID(CmiMyPe()) == 0)
-  {
-    // send my affinity to first PE on physical node (only done on phy node 0 for now)
-    affMsg *m = (affMsg*)CmiAlloc(sizeof(affMsg));
-    CmiSetHandler((char *)m, cpuPhyNodeAffinityRecvHandlerIdx);
-    if (get_affinity(&m->affinity) == -1) { // put my affinity in msg
-      CmiFree(m);
-      CmiAbort("get_affinity failed\n");
-    }
-    CmiSyncSendAndFree(0, sizeof(affMsg), (void *)m);
-
-    CsdSchedulePoll();
-
-#if CMK_SMP && !CMK_SMP_NO_COMMTHD
-    CmiNodeBarrier();
-
-    if (CmiMyRank() == 0)
-      cpuPhyAffCheckCommThreadDone = true;
-#endif
-  }
-#if CMK_SMP && !CMK_SMP_NO_COMMTHD
-  else if (CmiMyRank() == 0)
-  {
-    cpuPhyAffCheckCommThreadDone = true;
-  }
-#endif
-
-  CmiBarrier();
-
-  if (CmiMyPe() == 0)
-  {
     // NOTE this test is simple and may not detect every possible case of
     // oversubscription
-    const int N = CmiNumPesOnPhysicalNode(0);
     if (CPU_COUNT(&core_usage) < N) {
       // TODO suggest command line arguments?
       if (!aff_is_set) {
@@ -892,6 +829,15 @@ void CmiCheckAffinity(void)
         "interference.\n");
       }
     }
+  } else if ((CmiMyPe() < CmiNumPes()) && (CmiPhysicalNodeID(CmiMyPe()) == 0)) {
+    // send my affinity to first PE on physical node (only done on phy node 0 for now)
+    affMsg *m = (affMsg*)CmiAlloc(sizeof(affMsg));
+    CmiSetHandler((char *)m, cpuPhyNodeAffinityRecvHandlerIdx);
+    if (get_affinity(&m->affinity) == -1) { // put my affinity in msg
+      CmiFree(m);
+      CmiAbort("get_affinity failed\n");
+    }
+    CmiSyncSendAndFree(0, sizeof(affMsg), (void *)m);
   }
 #endif
 }
@@ -1029,6 +975,7 @@ static int check_logical_indices(char **mapptr) {
 
 void CmiInitCPUAffinity(char **argv)
 {
+  static skt_ip_t myip;
   int ret, i, exclude;
   hostnameMsg  *msg;
   char *pemap = NULL;
@@ -1112,6 +1059,7 @@ void CmiInitCPUAffinity(char **argv)
   }
 
   if (CmiMyRank() ==0) {
+     affLock = CmiCreateLock();
 #ifndef _WIN32
      aff_is_set = affinity_flag;
      CPU_ZERO(&core_usage);
@@ -1149,28 +1097,73 @@ void CmiInitCPUAffinity(char **argv)
            pemap_logical_flag ? "logical indices" : "OS indices", pemap);
   }
 
-  if (pemap != NULL)
-  {
-#if CMK_SMP && !CMK_SMP_NO_COMMTHD
-    if (!CmiInCommThread())
-#endif
-    {
-      int mycore = search_pemap(pemap, CmiMyPeGlobal());
-      if (pemap_logical_flag) {
-        if (CmiSetCPUAffinityLogical(mycore) == -1) CmiAbort("CmiSetCPUAffinityLogical failed");
+  if (CmiMyPe() >= CmiNumPes()) {         /* this is comm thread */
+      /* comm thread either can float around, or pin down to the last rank.
+         however it seems to be reportedly slower if it is floating */
+    CmiNodeAllBarrier();
+    if (commap != NULL) {
+      int mycore = search_pemap(commap, CmiMyPeGlobal()-CmiNumPesGlobal());
+      if (commap_logical_flag) {
+        if (-1 == CmiSetCPUAffinityLogical(mycore))
+          CmiAbort("CmiSetCPUAffinityLogical failed!");
       }
       else {
-        if (CmiSetCPUAffinity(mycore) == -1) CmiAbort("CmiSetCPUAffinity failed!");
+        if (-1 == CmiSetCPUAffinity(mycore))
+          CmiAbort("CmiSetCPUAffinity failed!");
       }
-      if (show_affinity_flag) {
-        CmiPrintf("Charm++> set PE %d on node %d to PU %c#%d\n", CmiMyPe(), CmiMyNode(),
-            pemap_logical_flag ? 'L' : 'P', mycore);
+      if (CmiPhysicalNodeID(CmiMyPe()) == 0) {
+        CmiPrintf("Charm++> set comm %d on node %d to PU %c#%d\n",
+            CmiMyPe()-CmiNumPes(), CmiMyNode(), commap_logical_flag ? 'L' : 'P', mycore);
+      }
+      CmiNodeAllBarrier();
+      if (show_affinity_flag) CmiPrintCPUAffinity();
+      return;    /* comm thread return */
+    }
+    else {
+    /* if (CmiSetCPUAffinity(CmiNumCores()-1) == -1) CmiAbort("CmiSetCPUAffinity failed!"); */
+#if !CMK_CRAYXE && !CMK_CRAYXC && !CMK_BLUEGENEQ && !CMK_PAMI_LINUX_PPC8
+      if (pemap == NULL) {
+#if CMK_MACHINE_PROGRESS_DEFINED
+        while (affinity_doneflag < CmiMyNodeSize())  CmiNetworkProgress();
+#else
+#if CMK_SMP
+        #error "Machine progress call needs to be implemented for cpu affinity!"
+#endif
+#endif
+      }
+#endif
+#if CMK_CRAYXE || CMK_CRAYXC
+      /* if both pemap and commmap are NULL, will compute one */
+      if (pemap != NULL)      
+#endif
+      {
+      CmiNodeAllBarrier();
+      if (show_affinity_flag) CmiPrintCPUAffinity();
+      return;    /* comm thread return */
       }
     }
   }
-  else
-  {
+
+  if (pemap != NULL && CmiMyPe()<CmiNumPes()) {    /* work thread */
+    int mycore = search_pemap(pemap, CmiMyPeGlobal());
+    if (pemap_logical_flag) {
+      if (CmiSetCPUAffinityLogical(mycore) == -1) CmiAbort("CmiSetCPUAffinityLogical failed");
+    }
+    else {
+      if (CmiSetCPUAffinity(mycore) == -1) CmiAbort("CmiSetCPUAffinity failed!");
+    }
+    if (show_affinity_flag) {
+      CmiPrintf("Charm++> set PE %d on node %d to PU %c#%d\n", CmiMyPe(), CmiMyNode(),
+          pemap_logical_flag ? 'L' : 'P', mycore);
+    }
+    CmiNodeAllBarrier();
+    CmiNodeAllBarrier();
+    /* if (show_affinity_flag) CmiPrintCPUAffinity(); */
+    return;
+  }
+
 #if CMK_CRAYXE || CMK_CRAYXC
+  {
     int numCores = CmiNumCores();
 
     int myid = getXTNodeID(CmiMyNodeGlobal(), CmiNumNodesGlobal());
@@ -1178,8 +1171,8 @@ void CmiInitCPUAffinity(char **argv)
     int pe, mype = CmiMyPeGlobal();
     int node = CmiMyNodeGlobal();
     int nnodes = 0;
-#if CMK_SMP && !CMK_SMP_NO_COMMTHD
-    if (CmiInCommThread()) {
+#if CMK_SMP
+    if (CmiMyPe() >= CmiNumPes()) {         /* this is comm thread */
       int node = CmiMyPe() - CmiNumPes();
       mype = CmiGetPeGlobal(CmiNodeFirst(node) + CmiMyNodeSize() - 1, CmiMyPartition()); /* last pe on SMP node */
       node = CmiGetNodeGlobal(node, CmiMyPartition());
@@ -1194,8 +1187,8 @@ void CmiInitCPUAffinity(char **argv)
     }
     CmiAssert(numCores > 0);
     myrank = (mype - pe - 1 + nnodes)%numCores;
-#if CMK_SMP && !CMK_SMP_NO_COMMTHD
-    if (CmiInCommThread())
+#if CMK_SMP
+    if (CmiMyPe() >= CmiNumPes()) 
         myrank = (myrank + 1)%numCores;
 #endif
 
@@ -1205,123 +1198,66 @@ void CmiInitCPUAffinity(char **argv)
     else{
       CmiAbort("CmiSetCPUAffinity failed!");
     }
-
-    CmiNodeAllBarrier();
+  }
+  if (CmiMyPe() < CmiNumPes()) 
+  CmiNodeAllBarrier();
+  CmiNodeAllBarrier();
 #else
     /* get my ip address */
-    static skt_ip_t myip;
-    if (CmiMyRank() == 0)
-    {
-      myip = skt_my_ip();        /* not thread safe, so only calls on rank 0 */
-    }
-    CmiNodeAllBarrier();
-
-#if CMK_SMP && !CMK_SMP_NO_COMMTHD
-    if (CmiInCommThread())
-    {
-      cpuAffSyncWaitCommThread(cpuAffSyncCommThreadDone);
-    }
-    else
-#endif
-    {
-      const int numnodes = CmiNumNodes();
-      const int numpes = CmiNumPes();
-
-      if (CmiMyPe() == 0)
-      {
-        int i;
-        rankmsg = (rankMsg *)CmiAlloc(rankMsg::size(numnodes, numpes));
-        CmiSetHandler((char *)rankmsg, cpuAffinityRecvHandlerIdx);
-        size_t siz = sizeof(rankMsg);
-        rankmsg->node_ranks_on_host = (int *)((char*)rankmsg + siz);
-        siz += numnodes*sizeof(int);
-        rankmsg->node_hosts = (int *)((char*)rankmsg + siz);
-        siz += numnodes*sizeof(int);
-        rankmsg->node_numpes = (int *)((char*)rankmsg + siz);
-        siz += numnodes*sizeof(int);
-        rankmsg->pe_ranks_on_host = (int *)((char*)rankmsg + siz);
-        siz += numpes*sizeof(int);
-        rankmsg->pe_hosts = (int *)((char*)rankmsg + siz);
-        siz += numpes*sizeof(int);
-        CmiAssert(siz == rankMsg::size(numnodes, numpes));
-        for (i=0; i<numnodes; i++) {
-          rankmsg->node_ranks_on_host[i] = 0;
-          rankmsg->node_hosts[i] = -1;
-          rankmsg->node_numpes[i] = 0;
-        }
-        for (i=0; i<numpes; i++) {
-          rankmsg->pe_ranks_on_host[i] = 0;
-          rankmsg->pe_hosts[i] = -1;
-        }
-      }
-
-      /* prepare a msg to send */
-      msg = (hostnameMsg *)CmiAlloc(sizeof(hostnameMsg));
-      CmiSetHandler((char *)msg, cpuAffinityHandlerIdx);
-      msg->node = CmiMyNode();
-      msg->pe = CmiMyPe();
-      msg->ip = myip;
-      CmiSyncSendAndFree(0, sizeof(hostnameMsg), (void *)msg);
-
-      if (CmiMyPe() == 0)
-      {
-        cpuAffSyncWait(cpuAffSyncHandlerDone);
-
-        const size_t hostcount = hostTable.size();
-
-        DEBUGP(("Cpuaffinity> %zu unique hosts detected!\n", hostcount));
-        for (const auto & pair : hostTable)
-          CmiFree(pair.second);
-        hostTable.clear();
-
-        {
-          std::vector<int> ranks_on_host(hostcount);
-          for (int i = 0; i < numnodes; i++) {
-            rankmsg->node_ranks_on_host[i] = ranks_on_host[rankmsg->node_hosts[i]]++;
-          }
-          ranks_on_host.assign(hostcount, 0);
-          for (int i = 0; i < numpes; i++) {
-            rankmsg->pe_ranks_on_host[i] = ranks_on_host[rankmsg->pe_hosts[i]]++;
-          }
-        }
-
-        CmiSyncBroadcastAllAndFree(rankMsg::size(numnodes, numpes), (void *)rankmsg);
-      }
-
-      cpuAffSyncWait(cpuAffSyncBroadcastDone);
-
-#if CMK_SMP && !CMK_SMP_NO_COMMTHD
-      if (CmiMyRank() == 0)
-        cpuAffSyncCommThreadDone = true;
-#endif
-    }
-
-    CmiBarrier();
-#endif
-  }
-
-#if CMK_SMP && !CMK_SMP_NO_COMMTHD
-  if (CmiInCommThread() && commap != NULL)
+  if (CmiMyRank() == 0)
   {
-    /* comm thread either can float around, or pin down to the last rank.
-       however it seems to be reportedly slower if it is floating */
-    int mycore = search_pemap(commap, CmiMyPeGlobal()-CmiNumPesGlobal());
-    if (commap_logical_flag) {
-      if (-1 == CmiSetCPUAffinityLogical(mycore))
-        CmiAbort("CmiSetCPUAffinityLogical failed!");
-    }
-    else {
-      if (-1 == CmiSetCPUAffinity(mycore))
-        CmiAbort("CmiSetCPUAffinity failed!");
-    }
-    if (CmiPhysicalNodeID(CmiMyPe()) == 0) {
-      CmiPrintf("Charm++> set comm %d on node %d to PU %c#%d\n",
-          CmiMyPe()-CmiNumPes(), CmiMyNode(), commap_logical_flag ? 'L' : 'P', mycore);
-    }
+    myip = skt_my_ip();        /* not thread safe, so only calls on rank 0 */
   }
-#endif
-
   CmiNodeAllBarrier();
+
+  const int numnodes = CmiNumNodes();
+  const int numpes = CmiNumPes();
+
+    /* prepare a msg to send */
+  msg = (hostnameMsg *)CmiAlloc(sizeof(hostnameMsg));
+  CmiSetHandler((char *)msg, cpuAffinityHandlerIdx);
+  msg->node = CmiMyNode();
+  msg->pe = CmiMyPe();
+  msg->ip = myip;
+  CmiSyncSendAndFree(0, sizeof(hostnameMsg), (void *)msg);
+
+  if (CmiMyPe() == 0) {
+    int i;
+    rankmsg = (rankMsg *)CmiAlloc(rankMsg::size(numnodes, numpes));
+    CmiSetHandler((char *)rankmsg, cpuAffinityRecvHandlerIdx);
+    size_t siz = sizeof(rankMsg);
+    rankmsg->node_ranks_on_host = (int *)((char*)rankmsg + siz);
+    siz += numnodes*sizeof(int);
+    rankmsg->node_hosts = (int *)((char*)rankmsg + siz);
+    siz += numnodes*sizeof(int);
+    rankmsg->node_numpes = (int *)((char*)rankmsg + siz);
+    siz += numnodes*sizeof(int);
+    rankmsg->pe_ranks_on_host = (int *)((char*)rankmsg + siz);
+    siz += numpes*sizeof(int);
+    rankmsg->pe_hosts = (int *)((char*)rankmsg + siz);
+    siz += numpes*sizeof(int);
+    CmiAssert(siz == rankMsg::size(numnodes, numpes));
+    for (i=0; i<numnodes; i++) {
+      rankmsg->node_ranks_on_host[i] = 0;
+      rankmsg->node_hosts[i] = -1;
+      rankmsg->node_numpes[i] = 0;
+    }
+    for (i=0; i<numpes; i++) {
+      rankmsg->pe_ranks_on_host[i] = 0;
+      rankmsg->pe_hosts[i] = -1;
+    }
+
+    for (i=0; i<numpes; i++)
+      CmiDeliverSpecificMsg(cpuAffinityHandlerIdx);
+  }
+
+    /* receive broadcast from PE 0 */
+  CmiDeliverSpecificMsg(cpuAffinityRecvHandlerIdx);
+  CmiLock(affLock);
+  affinity_doneflag++;
+  CmiUnlock(affLock);
+  CmiNodeAllBarrier();
+#endif
 
   if (show_affinity_flag) CmiPrintCPUAffinity();
 }

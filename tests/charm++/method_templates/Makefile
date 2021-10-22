@@ -38,7 +38,7 @@ $(TARGET): $(OBJ)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) -o $@ $^
 
 clean:
-	$(RM) $(wildcard *.decl.h *.def.h *.ci.stamp *.o) $(TARGET) charmrun
+	$(RM) $(wildcard *.decl.h *.def.h *.d *.di *.ci.stamp *.o) $(TARGET) charmrun 
 
 again: 
 	$(MAKE) clean; $(MAKE)
@@ -60,8 +60,13 @@ smptest: all
 mylib.o: mylib.C mylib.h mylib.decl.h mylib.def.h
 pgm.o: pgm.C client.decl.h mylib.h mylib.decl.h mylib.def.h utils.h client.def.h
 
+# Rule to generate dependency info for charm++ interface (ci) definition files
+%.di: %.ci
+	$(CXX) -M $< > $@
+
 %.ci.stamp: %.ci
 	$(CXX) $< && touch $@
 
-client.decl.h client.def.h: pgm.ci.stamp
-mylib.decl.h mylib.def.h: mylib.ci.stamp
+# Include the generated files containing dependency info
+-include $(INTF:.ci=.di)
+

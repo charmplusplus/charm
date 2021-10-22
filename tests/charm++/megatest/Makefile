@@ -92,5 +92,5 @@ depends:  $(CIFILES)
               echo "checking dependencies for $$SRCFILE" ; \
               g++ -std=c++0x -MM -I$(CHARMINC) $$SRCFILE | \
               perl $(CHARMBIN)/dep.pl $(CHARMINC) /usr/include /usr/local >> $(DEPENDFILE); \
-              echo '	$$(CHARMC) -o '$$i -c $$SRCFILE >> $(DEPENDFILE) ; \
+              echo '	$$(CHARMC) -o '$$i $$SRCFILE >> $(DEPENDFILE) ; \
         done;

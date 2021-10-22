@@ -7,7 +7,7 @@ set(ampi-h-sources ampi.h ampi-interoperate.h ampif.h ampiimpl.h ddt.h ampi_func
 
 add_library(ampi-compat compat_ampi.c
        compat_ampim.C compat_ampifm.C compat_ampicm.C
-       compat_ampicpp.C compat_ampins.C compat_ampirs.C)
+       compat_ampicpp.C compat_ampins.C)
 
 
 # fsglobals/pipglobals
@@ -104,17 +104,6 @@ if(CMK_SUPPORTS_PIPGLOBALS)
     add_custom_command(TARGET ampi_globals_pip
         POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_globals_pip.dir/ampi_globals_pip.C.o ${CMAKE_BINARY_DIR}/lib/ampi_globals_pip.o
-        VERBATIM
-    )
-endif()
-
-if(CMK_SUPPORTS_PIEGLOBALS)
-    add_library(ampi_globals_pie ampi_globals_pie.C)
-    target_compile_options(ampi_globals_pie PRIVATE -language ampi)
-    add_dependencies(ampi_globals_pie moduleampi)
-    add_custom_command(TARGET ampi_globals_pie
-        POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_globals_pie.dir/ampi_globals_pie.C.o ${CMAKE_BINARY_DIR}/lib/ampi_globals_pie.o
         VERBATIM
     )
 endif()
@@ -378,31 +367,20 @@ if(CMK_AMPI_WITH_ROMIO)
     ExternalProject_Add(romio
         URL ${CMAKE_CURRENT_SOURCE_DIR}/romio
         CONFIGURE_COMMAND cd ${romio_dir} &&
+            export MPI_IMPL=ampi &&
+            export FROM_MPICH=no &&
+            export FROM_MPICH2=no &&
+            export FROM_LAM=no &&
+            export F77=${CMAKE_BINARY_DIR}/bin/ampif90 &&
+            export CC=${CMAKE_BINARY_DIR}/bin/ampicc &&
             ./configure
             --disable-aio
             --enable-f77=${romio_f77}
             --enable-static=yes
             --enable-shared=no
             --disable-weak-symbols
-            MPI_IMPL=ampi
-            FROM_MPICH=no
-            FROM_LAM=no
-            FROM_OMPI=no
-            MPI_LIB=
-            CC=${CMAKE_BINARY_DIR}/bin/ampicc
-            F77=${CMAKE_BINARY_DIR}/bin/ampif77
-            FC=${CMAKE_BINARY_DIR}/bin/ampif90
             CFLAGS=${ROMIO_FLAGS}
             FFLAGS=${ROMIO_FLAGS}
-            FCFLAGS=${ROMIO_FLAGS}
-            CPP=
-            CPPFLAGS=
-            LIBS=
-            LDFLAGS=
-            TEST_CC=${CMAKE_BINARY_DIR}/bin/ampicc
-            TEST_F77=${CMAKE_BINARY_DIR}/bin/ampif77
-            USER_CFLAGS=${ROMIO_FLAGS}
-            USER_FFLAGS=${ROMIO_FLAGS}
             > /dev/null
         COMMAND cp -f ${romio_dir}/include/mpio.h ${CMAKE_BINARY_DIR}/include/
         COMMAND cp -f ${romio_dir}/include/mpiof.h ${CMAKE_BINARY_DIR}/include/
@@ -440,9 +418,6 @@ if(CMK_AMPI_WITH_ROMIO)
     endif()
     if(CMK_SUPPORTS_PIPGLOBALS)
         add_dependencies(ampi_globals_pip romio)
-    endif()
-    if(CMK_SUPPORTS_PIEGLOBALS)
-        add_dependencies(ampi_globals_pie romio)
     endif()
 endif()
 

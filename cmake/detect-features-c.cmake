@@ -74,7 +74,6 @@ check_function_exists(_strdup HAVE__STRDUP)
 check_function_exists(asctime CMK_HAS_ASCTIME)
 check_function_exists(backtrace CMK_USE_BACKTRACE)
 check_function_exists(bindprocessor CMK_HAS_BINDPROCESSOR)
-check_function_exists(cfree CMK_HAS_CFREE)
 check_function_exists(clz HAVE_CLZ)
 check_function_exists(clzl HAVE_CLZL)
 check_symbol_exists(dlopen dlfcn.h CMK_DLL_USE_DLOPEN)
@@ -120,8 +119,6 @@ check_symbol_exists(pthread_getaffinity_np pthread.h HAVE_DECL_PTHREAD_GETAFFINI
 check_symbol_exists(pthread_setaffinity_np pthread.h HAVE_DECL_PTHREAD_SETAFFINITY_NP)
 set(CMK_HAS_PTHREAD_SETAFFINITY ${HAVE_DECL_PTHREAD_SETAFFINITY_NP})
 check_symbol_exists(pthread_spin_lock pthread.h CMK_HAS_SPINLOCK)
-check_symbol_exists(pvalloc malloc.h CMK_HAS_PVALLOC)
-check_symbol_exists(RTLD_DEEPBIND dlfcn.h CMK_HAS_RTLD_DEEPBIND)
 check_symbol_exists(RTLD_DEFAULT dlfcn.h CMK_HAS_RTLD_DEFAULT)
 check_symbol_exists(RTLD_NEXT dlfcn.h CMK_HAS_RTLD_NEXT)
 check_function_exists(readlink CMK_HAS_READLINK)
@@ -145,10 +142,17 @@ check_function_exists(sysctl HAVE_SYSCTL)
 check_function_exists(sysctlbyname HAVE_SYSCTLBYNAME)
 check_function_exists(uname HAVE_UNAME)
 check_function_exists(usleep CMK_HAS_USLEEP)
-check_symbol_exists(valloc malloc.h CMK_HAS_VALLOC)
 
 
 # Complex tests
+
+if(CMK_WINDOWS OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  set(CMK_CAN_GET_BINARY_PATH 1)
+elseif(${CMK_HAS_READLINK} OR ${CMK_HAS_REALPATH})
+  set(CMK_CAN_GET_BINARY_PATH 1)
+else()
+  set(CMK_CAN_GET_BINARY_PATH 0)
+endif()
 
 file(WRITE ${CMAKE_BINARY_DIR}/test_file "")
 execute_process(COMMAND cp -p test_file test_file2 ERROR_VARIABLE CP_P_OPTION_ERROR)
@@ -354,6 +358,26 @@ void test()
     if (attr.link_layer == IBV_LINK_LAYER_INFINIBAND)  return;
 }
 " CMK_IBV_PORT_ATTR_HAS_LINK_LAYER)
+
+check_c_source_compiles([=[
+void main() {
+  void * m1, * m2;
+  asm volatile ("movq %%fs:0x0, %0\\n\t"
+                "movq %1, %%fs:0x0\\n\t"
+                : "=&r"(m1)
+                : "r"(m2));
+}
+]=] CMK_TLS_SWITCHING_X86_64)
+
+check_c_source_compiles([=[
+void main() {
+  void * m1, * m2;
+  asm volatile ("movl %%gs:0x0, %0\\n\t"
+                "movl %1, %%gs:0x0\\n\t"
+                : "=&r"(m1)
+                : "r"(m2));
+}
+]=] CMK_TLS_SWITCHING_X86)
 
 check_c_source_compiles("
 #include <stdint.h>

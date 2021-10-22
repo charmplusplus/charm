@@ -7,7 +7,7 @@ histogram: pgm.o
 	$(CHARMC) -language charm++ -o histogram pgm.o
 
 pgm.o: pgm.C pgm.decl.h 
-	$(CHARMC) -o $@ -c $<
+	$(CHARMC) -o $@ $<
 
 pgm.decl.h: pgm.ci
 	$(CHARMC) pgm.ci

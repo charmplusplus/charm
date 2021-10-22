@@ -793,8 +793,8 @@ void CthScheduledDecrement() {
     if (!B(prevCurrent))
       return;
     CthDebug("[%f][%d] scheduled before decremented: %d\n", CmiWallTimer(), CmiMyRank(), B(prevCurrent)->scheduled);
-    /* only decrement positive scheduled counts for non-main threads */
-    if (!CthIsMainThread(prevCurrent) && B(prevCurrent)->scheduled > 0) {
+    /* CthMainThread should have empty stack(stack == NULL) and never scheduled(scheduled == 0) */
+    if (B(prevCurrent)->stack && B(prevCurrent)->scheduled > 0) {
         CmiMemoryAtomicDecrement(B(prevCurrent)->scheduled, memory_order_release);
         CthDebug("[%f][%d] scheduled decremented: %d\n", CmiWallTimer(), CmiMyRank(), B(prevCurrent)->scheduled);
     }

@@ -1,6 +1,9 @@
 #!/bin/bash
-DIR="$(dirname "$0")"
-FN="$(basename "$0")"
+DIR=$(dirname $0)
+FN=$(basename $0)
+
+# protect rpath arguments from disappearing due to variable expansion
+ORIGIN='\$ORIGIN'
 
 # detect and handle circular calls when:
 # * building with the MPI machine layer

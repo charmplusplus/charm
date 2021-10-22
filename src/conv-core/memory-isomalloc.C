@@ -200,7 +200,7 @@ static void *meta_valloc(size_t size)
 static void *meta_pvalloc(size_t size)
 {
 	const size_t pagesize = CmiGetPageSize();
-	return meta_memalign(pagesize, CMIALIGN(size, pagesize));
+	return meta_memalign(pagesize, (size + pagesize - 1) & ~(pagesize - 1));
 }
 
 #define CMK_MEMORY_HAS_NOMIGRATE

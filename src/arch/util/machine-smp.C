@@ -164,16 +164,19 @@ static DWORD WINAPI call_startfn(LPVOID vindex)
   ConverseRunPE(0);
 
   if(CharmLibInterOperate) {
-    while(!_cleanUp.load()) {
-      StartInteropScheduler();
-      CmiNodeAllBarrier();
-    }
-
-    if (CmiMyRank() == CmiMyNodeSize()) {
-      while (ckExitComplete.load() == 0) { CommunicationServerThread(5); }
-    } else {
-      CsdScheduler(-1);
-      CmiNodeAllBarrier();
+    while(1) {
+      if(!_cleanUp.load()) {
+        StartInteropScheduler();
+        CmiNodeAllBarrier();
+      } else {
+        if (CmiMyRank() == CmiMyNodeSize()) {
+          while (ckExitComplete.load() == 0) { CommunicationServerThread(5); }
+        } else {
+          CsdScheduler(-1);
+          CmiNodeAllBarrier();
+        }
+        break;
+      }
     }
   }
 
@@ -370,16 +373,19 @@ static void *call_startfn(void *vindex)
   ConverseRunPE(0);
 
   if(CharmLibInterOperate) {
-    while(!_cleanUp.load()) {
-      StartInteropScheduler();
-      CmiNodeAllBarrier();
-    }
-
-    if (CmiMyRank() == CmiMyNodeSize()) {
-      while (ckExitComplete.load() == 0) { CommunicationServerThread(5); }
-    } else {
-      CsdScheduler(-1);
-      CmiNodeAllBarrier();
+    while(1) {
+      if(!_cleanUp.load()) {
+        StartInteropScheduler();
+        CmiNodeAllBarrier();
+      } else {
+        if (CmiMyRank() == CmiMyNodeSize()) {
+          while (ckExitComplete.load() == 0) { CommunicationServerThread(5); }
+        } else { 
+          CsdScheduler(-1);
+          CmiNodeAllBarrier();
+        }
+        break;
+      }
     }
   }
 

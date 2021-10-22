@@ -19,8 +19,7 @@ void AMPI_Node_Setup(int numranks)
     CmiPrintf("AMPI> Using pipglobals privatization method.\n");
 
   AMPI_FuncPtr_Transport funcptrs{};
-  if (AMPI_FuncPtr_Pack(&funcptrs, sizeof(funcptrs)))
-    CkAbort("Globals runtime linking pack failed due to mismatch!");
+  AMPI_FuncPtr_Pack(&funcptrs);
 
   static const char exe_suffix[] = STRINGIFY(CMK_POST_EXE);
   static const char suffix[] = STRINGIFY(CMK_USER_SUFFIX) "." STRINGIFY(CMK_SHARED_SUF);
@@ -39,10 +38,7 @@ void AMPI_Node_Setup(int numranks)
   for (int myrank = 0; myrank < numranks; ++myrank)
   {
     const Lmid_t lmid = LM_ID_NEWLM;
-    int flags = RTLD_NOW|RTLD_LOCAL;
-#if CMK_HAS_RTLD_DEEPBIND
-    flags |= RTLD_DEEPBIND;
-#endif
+    const int flags = RTLD_NOW|RTLD_LOCAL|RTLD_DEEPBIND;
     SharedObject myexe = dlmopen(lmid, binary_path.c_str(), flags);
 
     if (myexe == nullptr)
@@ -53,10 +49,7 @@ void AMPI_Node_Setup(int numranks)
 
     auto unpack = AMPI_FuncPtr_Unpack_Locate(myexe);
     if (unpack != nullptr)
-    {
-      if (unpack(&funcptrs, sizeof(funcptrs)))
-        CkAbort("Globals runtime linking unpack failed due to mismatch!");
-    }
+      unpack(&funcptrs);
 
     rankdata[myrank].exe = myexe;
     rankdata[myrank].mainstruct = AMPI_Main_Get(myexe);

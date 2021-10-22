@@ -1466,8 +1466,7 @@ static void reportChkpSeqHandler(char * m)
 {
   CmiFree(m);
   CmiResetGlobalReduceSeqID();
-  if (CmiMyRank() == 0)
-    CmiResetGlobalNodeReduceSeqID();
+  CmiResetGlobalNodeReduceSeqID();
   char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes+sizeof(int));
   int num = CpvAccess(chkpNum);
   if(CkMyNode() == CpvAccess(_crashedNode))

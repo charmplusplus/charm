@@ -487,8 +487,7 @@ static inline void _processBocBcastMsg(CkCoreState* ck, envelope* env);
 static
 void *_ckLocalNodeBranch(CkGroupID groupID) {
   CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
-  auto &entry = CksvAccess(_nodeGroupTable)->find(groupID);
-  void *retval = entry.isReady() ? entry.getObj() : nullptr;
+  void *retval = CksvAccess(_nodeGroupTable)->find(groupID).getObj();
   CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
   return retval;
 }
@@ -657,39 +656,24 @@ void CkCreateChare(int cIdx, int eIdx, void *msg, CkChareID *pCid, int destPE)
   _TRACE_CREATION_DONE(1);
 }
 
-inline void CkReadyEntry(TableEntry &entry, bool nodeLevel) {
-  // the ready flag is set first to expedite the unblocking of
-  // node-level peers (that depend on the current [node]group)
-  entry.setReady();
-
-  auto *ptrq = entry.getPending();
-  if (ptrq) {
-    void *pending = nullptr;
-    while (nullptr != (pending = ptrq->deq())) {
-      if (nodeLevel) {
-        _CldNodeEnqueue(CkMyNode(), pending, _infoIdx);
-      } else {
-        CsdEnqueueGeneral(pending, CQS_QUEUEING_FIFO, 0, 0);
-      }
-    }
-    entry.clearPending();
-  }
-}
-
 void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
 {
   int gIdx = _entryTable[epIdx]->chareIdx;
   void *obj = malloc(_chareTable[gIdx]->size);
   _MEMCHECK(obj);
   setMemoryTypeChare(obj);
-
-  // this enables groups to access themselves via
-  // ckLocalBranch during their construction (nodegroups
-  // use _currentNodeGroupObj to achieve this)
   CmiImmediateLock(CkpvAccess(_groupTableImmLock));
   CkpvAccess(_groupTable)->find(groupID).setObj(obj);
   CkpvAccess(_groupTable)->find(groupID).setcIdx(gIdx);
   CkpvAccess(_groupIDTable)->push_back(groupID);
+  PtrQ *ptrq = CkpvAccess(_groupTable)->find(groupID).getPending();
+  if(ptrq) {
+    void *pending;
+    while((pending=ptrq->deq())!=0) {
+      CsdEnqueueGeneral(pending, CQS_QUEUEING_FIFO, 0, 0);
+    }
+    CkpvAccess(_groupTable)->find(groupID).clearPending();
+  }
   CmiImmediateUnlock(CkpvAccess(_groupTableImmLock));
 
   CkpvAccess(_currentGroup) = groupID;
@@ -706,12 +690,6 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
   CkpvAccess(currentChareIdx) = callingChareIdx;
 #endif
 
-  // this enables other PEs to access this object via
-  // ckLocalBranchOther, and schedules pending dependencies
-  CmiImmediateLock(CkpvAccess(_groupTableImmLock));
-  CkReadyEntry(CkpvAccess(_groupTable)->find(groupID), false);
-  CmiImmediateUnlock(CkpvAccess(_groupTableImmLock));
-
   _STATS_RECORD_PROCESS_GROUP_1();
 }
 
@@ -722,7 +700,6 @@ void CkCreateLocalNodeGroup(CkGroupID groupID, int epIdx, envelope *env)
   void *obj = malloc(objSize);
   _MEMCHECK(obj);
   setMemoryTypeChare(obj);
-
   CkpvAccess(_currentGroup) = groupID;
 
 // Now that the NodeGroup is created, add it to the table.
@@ -745,19 +722,22 @@ void CkCreateLocalNodeGroup(CkGroupID groupID, int epIdx, envelope *env)
 #endif
 
   CkpvAccess(_currentNodeGroupObj) = NULL;
+  _STATS_RECORD_PROCESS_NODE_GROUP_1();
 
-  // nodegroups use `_currentNodeGroupObj` so they do not
-  // need a table entry for objects to access themselves
-  // during creation. therefore, everything can be
-  // consolidated into one critical section
   CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
   CksvAccess(_nodeGroupTable)->find(groupID).setObj(obj);
   CksvAccess(_nodeGroupTable)->find(groupID).setcIdx(gIdx);
   CksvAccess(_nodeGroupIDTable).push_back(groupID);
-  CkReadyEntry(CksvAccess(_nodeGroupTable)->find(groupID), true);
-  CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
 
-  _STATS_RECORD_PROCESS_NODE_GROUP_1();
+  PtrQ *ptrq = CksvAccess(_nodeGroupTable)->find(groupID).getPending();
+  if(ptrq) {
+    void *pending;
+    while((pending=ptrq->deq())!=0) {
+      _CldNodeEnqueue(CkMyNode(), pending, _infoIdx);
+    }
+    CksvAccess(_nodeGroupTable)->find(groupID).clearPending();
+  }
+  CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
 }
 
 void _createGroup(CkGroupID groupID, envelope *env)
@@ -1079,6 +1059,12 @@ static inline void _deliverForBocMsg(CkCoreState *ck,int epIdx,envelope *env,Irr
 #endif
 
   _invokeEntry(epIdx,env,obj);
+
+#if CMK_SMP
+  if(msgType == CMK_ZC_BCAST_RECV_DONE_MSG) {
+    updatePeerCounterAndPush(env);
+  }
+#endif
 
 #if CMK_LBDB_ON
   if (objstopped) the_lbmgr->ObjectStart(objHandle);
