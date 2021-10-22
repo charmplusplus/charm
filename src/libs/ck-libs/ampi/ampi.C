@@ -11625,7 +11625,7 @@ bool GPUReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) noexcept
   return complete;
 }
 
-CMI_WARN_UNUSED_RESULT ampiParent* GPUReq::wait(ampiParent* parent, MPI_Status *sts, int* result/*=nullptr*/) noexcept
+CMI_WARN_UNUSED_RESULT ampiParent* GPUReq::wait(ampiParent* parent, MPI_Status *sts) noexcept
 {
   (void)sts;
   while (!complete) {
