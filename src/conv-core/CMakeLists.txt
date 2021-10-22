@@ -71,7 +71,9 @@ if(${CMK_CHARMDEBUG})
 endif()
 
 
-add_library(global-swap global-elfgot.C)
+if(CMK_SUPPORTS_SWAPGLOBALS)
+  add_library(global-swap global-elfgot.C)
+endif()
 
 add_library(threads-default threads.C $<TARGET_OBJECTS:boost-context>)
 target_compile_definitions(threads-default PRIVATE -DCMK_THREADS_BUILD_DEFAULT=1)

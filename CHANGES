@@ -46,6 +46,9 @@ Misc:
 - Charm++ now runs on the new Apple M1 chips with the targets:
   multicore-darwin-arm8, netlrts-darwin-arm8, and mpi-darwin-arm8.
 
+- Charm++ now runs on the new Cray Shasta machines with the targets (in beta):
+  ofi-crayshasta, and mpi-crayshasta.
+
 - The BigSim emulator has been removed from Charm++.
 
 - The following unmaintained machine layers have been removed from Charm++:

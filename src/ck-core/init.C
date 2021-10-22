@@ -162,6 +162,8 @@ CkpvDeclare(GroupIDTable*, _groupIDTable);
 CkpvDeclare(CmiImmediateLockType, _groupTableImmLock);
 CkpvDeclare(UInt, _numGroups);
 
+CkpvDeclare(ReqTagPostMap, ncpyPostedReqMap);
+CkpvDeclare(ReqTagBufferMap, ncpyPostedBufferMap);
 CkpvDeclare(CkCoreState *, _coreState);
 
 CksvDeclare(UInt, _numNodeGroups);
@@ -170,6 +172,12 @@ CksvDeclare(GroupIDTable, _nodeGroupIDTable);
 CksvDeclare(CmiImmediateLockType, _nodeGroupTableImmLock);
 CksvDeclare(CmiNodeLock, _nodeLock);
 CksvDeclare(CmiNodeLock, _nodeZCPendingLock);
+
+CksvDeclare(ReqTagPostMap, ncpyPostedReqNodeMap);
+CksvDeclare(ReqTagBufferMap, ncpyPostedBufferNodeMap);
+CksvDeclare(CmiNodeLock, _nodeZCPostReqLock);
+CksvDeclare(CmiNodeLock, _nodeZCBufferReqLock);
+
 CksvStaticDeclare(PtrVec*,_nodeBocInitVec);
 CkpvDeclare(int, _charmEpoch);
 
@@ -345,9 +353,9 @@ static inline void _parseCommandLineOpts(char **argv)
 	  _isNotifyChildInRed = false;
 	}
 
-	_isStaticInsertion = false;
-	if (CmiGetArgFlagDesc(argv,"+staticInsertion","Array elements are only inserted at construction")) {
-	  _isStaticInsertion = true;
+	if (CmiGetArgFlagDesc(argv,"+staticInsertion", "DEPRECATED")) {
+		CmiPrintf("WARNING: +staticInsertion has been deprecated.\n"
+		          "Static insertion is now the default behavior for arrays that are non-empty at construction.\n");
 	}
 
         useNodeBlkMapping = false;
@@ -1277,10 +1285,27 @@ void _sendReadonlies() {
 */
 void _initCharm(int unused_argc, char **argv)
 { 
-	int inCommThread = (CmiMyRank() == CmiMyNodeSize());
+  int inCommThread = (CmiMyRank() == CmiMyNodeSize());
 
-	DEBUGF(("[%d,%.6lf ] _initCharm started\n",CmiMyPe(),CmiWallTimer()));
-	std::set_terminate([](){ CkAbort("Unhandled C++ exception in user code.\n");});
+  DEBUGF(("[%d,%.6lf ] _initCharm started\n",CmiMyPe(),CmiWallTimer()));
+  std::set_terminate([](){
+    std::exception_ptr exptr = std::current_exception();
+    if (exptr)
+    {
+      try
+      {
+        std::rethrow_exception(exptr);
+      }
+      catch (std::exception &ex)
+      {
+        CkAbort("Unhandled C++ exception in user code: %s.\n", ex.what());
+      }
+    }
+    else
+    {
+      CkAbort("Unhandled C++ exception in user code.\n");
+    }
+  });
 
 	CkpvInitialize(size_t *, _offsets);
 	CkpvAccess(_offsets) = new size_t[32];
@@ -1302,6 +1327,8 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvInitialize(char**, Ck_argv); CkpvAccess(Ck_argv)=argv;
 	CkpvInitialize(MsgPool*, _msgPool);
 	CkpvInitialize(CkCoreState *, _coreState);
+	CkpvInitialize(ReqTagPostMap, ncpyPostedReqMap);
+	CkpvInitialize(ReqTagBufferMap, ncpyPostedBufferMap);
 
 	_initChareTables();            // for checkpointable plain chares
 
@@ -1313,6 +1340,10 @@ void _initCharm(int unused_argc, char **argv)
 	CksvInitialize(CmiNodeLock, _nodeZCPendingLock);
 	CksvInitialize(PtrVec*,_nodeBocInitVec);
 	CksvInitialize(UInt,_numInitNodeMsgs);
+	CksvInitialize(ReqTagPostMap, ncpyPostedReqNodeMap);
+	CksvInitialize(ReqTagBufferMap, ncpyPostedBufferNodeMap);
+	CksvInitialize(CmiNodeLock, _nodeZCPostReqLock);
+	CksvInitialize(CmiNodeLock, _nodeZCBufferReqLock);
 	CkpvInitialize(int,_charmEpoch);
 	CkpvAccess(_charmEpoch)=0;
 	CksvInitialize(bool, _triggersSent);
@@ -1349,6 +1380,8 @@ void _initCharm(int unused_argc, char **argv)
 		CksvAccess(_nodeGroupTableImmLock) = CmiCreateImmediateLock();
 		CksvAccess(_nodeBocInitVec) = new PtrVec();
 		CksvAccess(_nodeZCPendingLock) = CmiCreateLock();
+		CksvAccess(_nodeZCPostReqLock) = CmiCreateLock();
+		CksvAccess( _nodeZCBufferReqLock) = CmiCreateLock();
 
 		CmiSetNcpyAckSize(sizeof(CkCallback));
 	}
