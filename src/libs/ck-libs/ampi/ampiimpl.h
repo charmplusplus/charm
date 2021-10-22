@@ -813,7 +813,7 @@ class groupStruct {
   int incRefCount() noexcept { return refCount++; }
 };
 
-bool operator==(const groupStruct &g1, const groupStruct &g2) {
+inline bool operator==(const groupStruct &g1, const groupStruct &g2) {
   if (g1.size() != g2.size() || g1.isIota() != g2.isIota()) {
     return false;
   }
@@ -825,7 +825,7 @@ bool operator==(const groupStruct &g1, const groupStruct &g2) {
   return true;
 }
 
-bool operator!=(const groupStruct &g1, const groupStruct &g2) {
+inline bool operator!=(const groupStruct &g1, const groupStruct &g2) {
   return !(g1 == g2);
 }
 
