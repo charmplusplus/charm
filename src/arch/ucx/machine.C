@@ -165,7 +165,7 @@ inline void UcxDeviceRecvHandler(DeviceRdmaOp* op, CommType type) {
       break;
     // TODO: AMPI and Charm4py
     default:
-      CmiAbort("Invvalid recv type: %d\n", type);
+      CmiAbort("Invalid recv type: %d\n", type);
       break;
   }
 }
@@ -572,12 +572,12 @@ inline void* UcxSendMsg(int destNode, int destPE, int size, char *msg,
             destNode, destPE, size, msg, tag);
 #if CMK_SMP
     UcxPendingRequest *req = (UcxPendingRequest*)CmiAlloc(sizeof(UcxPendingRequest));
-    req->msgBuf = msg;
-    req->size   = size;
-    req->tag    = sTag;
-    req->dNode  = destNode;
-    req->send_cb     = cb;
-    req->op     = UCX_SEND_OP;   // Mark this request as a regular message (UCX_SEND_OP)
+    req->msgBuf  = msg;
+    req->size    = size;
+    req->tag     = sTag;
+    req->dNode   = destNode;
+    req->send_cb = cb;
+    req->op      = UCX_SEND_OP; // Mark this request as a regular message (UCX_SEND_OP)
 
     UCX_LOG(3, " --> (PE=%i) enq msg (queue depth=%i), dNode %i, size %i",
             CmiMyPe(), PCQueueLength(ucxCtx.txQueue), destNode, size);

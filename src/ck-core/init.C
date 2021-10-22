@@ -1451,8 +1451,8 @@ void _initCharm(int unused_argc, char **argv)
 	CmiSetDirectNcpyAckHandler(CkRdmaDirectAckHandler);
 
 	CmiChannelHandlerInit(CkChannelHandler);
-  CkpvInitialize(CkCallbackPool, cb_pool);
-  CkpvAccess(cb_pool) = CkCallbackPool();
+	CkpvInitialize(CkCallbackPool, cb_pool);
+	CkpvAccess(cb_pool) = CkCallbackPool();
 #if CMK_CUDA && CMK_GPU_COMM
 	CmiDeviceRecvHandlerInit(CkRdmaDeviceRecvHandler);
 #endif
