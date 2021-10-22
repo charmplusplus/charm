@@ -10227,6 +10227,11 @@ AMPI_API_IMPL(int, MPI_Group_range_excl, MPI_Group group, int n, int ranges[][3]
 AMPI_API_IMPL(int, MPI_Group_free, MPI_Group *group)
 {
   AMPI_API("AMPI_Group_free", group, *group);
+  ampiParent *ptr = getAmpiParent();
+  if (*group != MPI_GROUP_EMPTY && *group != MPI_GROUP_NULL) {
+    ptr->freeGroupStruct(*group);
+  }
+  *group = MPI_GROUP_NULL;
   return MPI_SUCCESS;
 }
 
