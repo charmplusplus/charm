@@ -3,7 +3,7 @@ DIRS = \
   bandwidth \
   bandwidth-channel \
   latency-persistent \
-	latency-channel \
+  latency-channel \
 
 TESTDIRS = $(DIRS)
 
