@@ -1993,7 +1993,7 @@ void CkArray::handleUnknown(CkArrayMessage* msg, const CkArrayIndex& idx,
   {
     // This is a message that utilizes demand creation
     if (isSmall && hasID && CkMyPe() != home &&
-        msg->array_ifNotThere() == CkArray_IfNotThere_createhome)
+        msg->array_ifNotThere() != CkArray_IfNotThere_createhere)
     {
       // Send the message home where it will trigger demand creation, or get delivered to
       // the element if it already exists
