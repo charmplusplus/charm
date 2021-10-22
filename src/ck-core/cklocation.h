@@ -471,6 +471,7 @@ private:
   typedef void (CkMigratable::*CkMigratable_voidfn_t)(void);
   typedef void (CkMigratable::*CkMigratable_voidfn_arg_t)(void*);
   void callMethod(CkLocRec* rec, CkMigratable_voidfn_arg_t fn, void*);
+  void callMethod(CkLocRec* rec, CkMigratable_voidfn_t fn);
 
 #if CMK_LBDB_ON
   CkGroupID lbmgrID;
@@ -694,8 +695,6 @@ public:
   void flushAllRecs(void);
   void flushLocalRecs(void);
   void pup(PUP::er& p);
-
-  void callMethod(CkLocRec* rec, CkMigratable_voidfn_t fn);
 };
 
 /// check the command line arguments to determine if we can use ConfigurableRRMap

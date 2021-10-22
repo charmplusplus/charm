@@ -2091,7 +2091,7 @@ void CkArray::bufferForCreation(CkArrayMessage* msg, const CkArrayIndex& idx)
     if (msg->array_ifNotThere() == CkArray_IfNotThere_createhere)
       pe = UsrToEnv(msg)->getsetArraySrcPe();
 
-    // Send the request to the home PE
+    // Send the request to the target PE
     thisProxy[home].requestDemandCreation(idx, ctor, pe);
   }
   bufferedCreationMsgs[idx].push_back(msg);

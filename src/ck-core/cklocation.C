@@ -2667,7 +2667,7 @@ CkLocRec* CkLocMgr::registerNewElement(const CkArrayIndex& idx)
   CkLocRec* rec = elementNrec(id);
   if (rec == nullptr)
   {
-    // TODO: This is going to end up needlessly calling getNewObejctID(...) again
+    // TODO: This is going to end up needlessly calling getNewObjectID(...) again
     rec = createLocal(idx, false, false, true);
   }
 
