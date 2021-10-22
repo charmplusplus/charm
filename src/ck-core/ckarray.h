@@ -41,11 +41,6 @@ extern void _registerCkArray(void);
  *  (in which case it can only happen between AtSync and ResumeFromSync). */
 extern bool _isAnytimeMigration;
 
-/**
-  Array elements are only inserted at construction
- */
-extern bool _isStaticInsertion;
-
 /** This flag is true when users are sure there is at least one charm array element
  *  per processor. In such case, when doing reduction on the array, the children
  *  don't need to be notified that reduction starts
@@ -169,7 +164,17 @@ public:
       : CProxy_ArrayBase(aid), _idx(idx)
   {
   }
+  CProxyElement_ArrayBase(const CProxyElement_ArrayBase& other)
+      : CProxy_ArrayBase(other.ckGetArrayID()), _idx(other.ckGetIndex())
+  {
+  }
   CProxyElement_ArrayBase(const ArrayElement* e);
+
+  CProxyElement_ArrayBase& operator=(const CProxyElement_ArrayBase& other)
+  {
+    new (this) CProxyElement_ArrayBase(other);
+    return *this;
+  }
 
   bool operator==(const CProxyElement_ArrayBase& other)
   {
@@ -703,6 +708,15 @@ public:
     }
   }
 
+ inline size_t getNumLocalElems() {
+    return localElemVec.size();
+  }
+
+  inline unsigned int getEltLocalIndex(const CmiUInt8 id) {
+    const auto itr = localElems.find(id);
+    return ( itr == localElems.end() ? -1 : itr->second);
+  }
+
   virtual CkMigratable* getEltFromArrMgr(const CmiUInt8 id)
   {
     const auto itr = localElems.find(id);
@@ -771,7 +785,6 @@ public:
   virtual void beginInserting(void);
   void remoteDoneInserting(void);
   void remoteBeginInserting(void);
-  void initDone(void);
 
   /// Create manually:
   bool insertElement(CkArrayMessage*, const CkArrayIndex& idx,
@@ -846,7 +859,8 @@ private:
 public:
   CkArrayBroadcaster* getBroadcaster() { return broadcaster; }
   void flushStates();
-  void forwardZCMsgToOtherElems(envelope* env);
+  void forwardZCMsgToOtherElems(envelope *env);
+  void forwardZCMsgToSpecificElem(envelope *env, CkMigratable *elem);
 
   static bool isIrreducible() { return true; }
 };
@@ -893,6 +907,7 @@ public:
   int incrementBcastNo();
 
   bool deliver(CkArrayMessage* bcast, ArrayElement* el, bool doFree);
+  bool deliverAlreadyDelivered(CkArrayMessage* bcast, ArrayElement* el, bool doFree);
 #if CMK_CHARM4PY
   void deliver(CkArrayMessage* bcast, std::vector<CkMigratable*>& elements, int arrayId,
                bool doFree);

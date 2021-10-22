@@ -34,13 +34,13 @@ nqueen_centralized : main.o nqueen.o counter.o
 	$(CHARMC) -language charm++  -balance centralized -o nqueen_centralized main.o nqueen.o counter.o
 
 main.o : main.C main.h Counter.decl.h main.decl.h main.def.h
-	$(CHARMC) -o main.o main.C
+	$(CHARMC) -o main.o -c main.C
 
 nqueen.o : nqueen.C nqueen.h Counter.decl.h main.decl.h
-	$(CHARMC) -o nqueen.o nqueen.C
+	$(CHARMC) -o nqueen.o -c nqueen.C
 
 counter.o: counter.C  Counter.decl.h Counter.def.h
-	$(CHARMC) -o counter.o counter.C
+	$(CHARMC) -o counter.o -c counter.C
 
 %.stamp: %
 	$(CHARMC) $<

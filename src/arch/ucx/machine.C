@@ -89,7 +89,13 @@ typedef struct UcxRequest
     ucp_rkey_h     rkey;
 #endif
 #if CMK_CUDA
+<<<<<<< HEAD
     DeviceRdmaOp*  device_op;
+=======
+    void*          cb;
+    DeviceRdmaOp*  device_op;
+    DeviceRecvType type;
+>>>>>>> main
 #endif
 } UcxRequest;
 

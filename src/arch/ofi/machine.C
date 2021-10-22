@@ -1633,7 +1633,7 @@ int fill_av_ofi(int myid,
                            OFI_OP_NAMES,
                            &epnames_contexts[i]);
             if (ret) {
-                CmiAbort("OFI::LrtsInit::fi_tsend error");
+                CmiAbort("OFI::LrtsInit::fi_tsend error (+ofi_runtime_tcp may be needed)");
             }
         }
 

@@ -533,20 +533,26 @@ class CpdList_message : public CpdListAccessor {
   }
 };
 
+static void CpdHandleMessage(void *queuedMsg, int msgNum) {
+  if (_conditionalDelivery) {
+    if (_conditionalDelivery==1) conditionalShm->msgs[conditionalShm->count++] = msgNum;
+    CmiReference(queuedMsg);
+    CdsFifo_Enqueue(CpvAccess(conditionalQueue),queuedMsg);
+  }
+  CmiHandleMessage(queuedMsg);
+}
+
 static void CpdDeliverMessageInt(int msgNum) {
-  void *m;
   void *debugQ=CkpvAccess(debugQueue);
+
   CdsFifo_Enqueue(debugQ, (void*)(-1)); // Enqueue a guard
   for (int i=0; i<msgNum; ++i) CdsFifo_Enqueue(debugQ, CdsFifo_Dequeue(debugQ));
+
   CkpvAccess(skipBreakpoint) = 1;
-  char *queuedMsg = (char *)CdsFifo_Dequeue(debugQ);
-  if (_conditionalDelivery==1) conditionalShm->msgs[conditionalShm->count++] = msgNum;
-  if (_conditionalDelivery) {
-    CmiReference(queuedMsg);
-    CdsFifo_Enqueue(CpvAccess(conditionalQueue), queuedMsg);
-  }  
-  CmiHandleMessage(queuedMsg);
+  CpdHandleMessage((char *)CdsFifo_Dequeue(debugQ), msgNum);
   CkpvAccess(skipBreakpoint) = 0;
+
+  void *m;
   while ((m=CdsFifo_Dequeue(debugQ)) != (void*)(-1)) CdsFifo_Enqueue(debugQ, m);  
 }
 
@@ -555,6 +561,18 @@ void CpdDeliverMessage(char * msg) {
   sscanf(msg+CmiMsgHeaderSizeBytes, "%d", &msgNum);
   //CmiPrintf("received deliver request %d\n",msgNum);
   CpdDeliverMessageInt(msgNum);
+}
+
+static void CpdDeliverAllMessages(char *) {
+  void *debugQ=CkpvAccess(debugQueue);
+  CdsFifo_Enqueue(debugQ, (void*)(-1)); // Enqueue a guard
+  CkpvAccess(skipBreakpoint) = 1;
+  int msgNum = 0;
+  void *m;
+  while ((m=CdsFifo_Dequeue(debugQ)) != (void*)(-1)) {
+    CpdHandleMessage(m, msgNum++);
+  }
+  CkpvAccess(skipBreakpoint) = 0;
 }
 
 void *CpdGetNextMessageConditional(CsdSchedulerState_t *s) {
@@ -812,15 +830,10 @@ void CpdDeliverSingleMessage () {
   }
   else {
     // we were not stopped at a breakpoint, then deliver the first message in the debug queue
-    if (!CdsFifo_Empty(CkpvAccess(debugQueue))) {
+    void *debugQ = CkpvAccess(debugQueue);
+    if (!CdsFifo_Empty(debugQ)) {
       CkpvAccess(skipBreakpoint) = 1;
-      char *queuedMsg = (char *)CdsFifo_Dequeue(CkpvAccess(debugQueue));
-      if (_conditionalDelivery) {
-        if (_conditionalDelivery==1) conditionalShm->msgs[conditionalShm->count++] = 0;
-        CmiReference(queuedMsg);
-        CdsFifo_Enqueue(CpvAccess(conditionalQueue),queuedMsg);
-      }
-      CmiHandleMessage(queuedMsg);
+      CpdHandleMessage((char *)CdsFifo_Dequeue(debugQ), 0);
       CkpvAccess(skipBreakpoint) = 0;
     }
   }
@@ -1054,6 +1067,8 @@ void CpdCharmInit()
   CpdListRegister(new CpdListAccessor_c("hostinfo",hostInfoLength,0,hostInfo,0));
   CpdListRegister(new CpdList_localQ());
   CcsRegisterHandler("debug/charm/deliver",(CmiHandler)CpdDeliverMessage);
+  CcsRegisterHandler("debug/charm/deliverall",(CmiHandler)CpdDeliverAllMessages);
+  CcsSetMergeFn("debug/charm/deliverall",CmiReduceMergeFn_random);
   CcsRegisterHandler("debug/provisional/deliver",(CmiHandler)CpdDeliverMessageConditionally);
   CcsRegisterHandler("debug/provisional/rollback",(CmiHandler)CpdEndConditionalDelivery);
   CcsRegisterHandler("debug/provisional/commit",(CmiHandler)CpdCommitConditionalDelivery);

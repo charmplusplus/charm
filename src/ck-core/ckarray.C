@@ -57,7 +57,6 @@ Orion Sky Lawlor, olawlor@acm.org
 #include <stdarg.h>
 
 bool _isAnytimeMigration;
-bool _isStaticInsertion;
 bool _isNotifyChildInRed;
 
 #define ARRAY_DEBUG_OUTPUT 0
@@ -871,7 +870,7 @@ CkArray::CkArray(CkArrayOptions&& opts, CkMarshalledMessage&& initMsg)
       sectionAutoDelegate(opts.isSectionAutoDelegated()),
       initCallback(opts.getInitCallback()),
       thisProxy(thisgroup),
-      stableLocations(opts.staticInsertion && !opts.anytimeMigration),
+      stableLocations(opts.isStaticInsertion() && !opts.anytimeMigration),
       numInitial(opts.getNumInitial()),
       isInserting(true),
       numPesInited(0)
@@ -903,8 +902,8 @@ CkArray::CkArray(CkArrayOptions&& opts, CkMarshalledMessage&& initMsg)
 
   /// Set up initial elements (if any)
   locMgr->populateInitial(opts, initMsg.getMessage(), this);
-  if (opts.staticInsertion)
-    initDone();
+  if (opts.isStaticInsertion())
+    remoteDoneInserting();
 
   if (opts.reductionClient.type != CkCallback::invalid && CkMyPe() == 0)
     ckSetReductionClient(&opts.reductionClient);
@@ -1051,27 +1050,10 @@ bool CkArray::insertElement(CkArrayMessage* me, const CkArrayIndex& idx,
   if (!locMgr->addElement(thisgroup, idx, elt, ctorIdx, (void*)me))
     return false;
   CK_ARRAYLISTENER_LOOP(listeners, if (!l->ckElementCreated(elt)) return false;);
+  // The initCallback will only be valid if it was set in CkArrayOptions and this is the
+  // first wave of insertions.
+  if (!initCallback.isInvalid()) elt->contribute(initCallback);
   return true;
-}
-
-void CkArray::initDone(void)
-{
-  if (initCallback.isInvalid())
-    return;
-
-  numPesInited++;
-  DEBC(("PE %d initDone, numPesInited %d, treeKids %d, parent %d\n", CkMyPe(),
-        numPesInited, treeKids(), treeParent()));
-
-  // Re-use the spanning tree for reductions over the array elements
-  // The "+1" is for the PE itself
-  if (numPesInited == treeKids() + 1)
-  {
-    if (hasParent())
-      thisProxy[treeParent()].initDone();
-    else
-      initCallback.send(CkReductionMsg::buildNew(0, NULL));
-  }
 }
 
 void CProxy_ArrayBase::doneInserting(void)
@@ -1101,7 +1083,6 @@ void CkArray::remoteDoneInserting(void)
     DEBC((AA "Done inserting objects\n" AB));
     for (int l = 0; l < listeners.size(); l++) listeners[l]->ckEndInserting();
     locMgr->doneInserting();
-    initDone();
   }
 }
 
@@ -1111,6 +1092,8 @@ void CkArray::remoteBeginInserting(void)
 
   if (!isInserting)
   {
+    // After the first wave of insertions, the init callback should not be used
+    initCallback = CkCallback(CkCallback::invalid);
     isInserting = true;
     DEBC((AA "Begin inserting objects\n" AB));
     for (int l = 0; l < listeners.size(); l++) listeners[l]->ckBeginInserting();
@@ -1364,6 +1347,27 @@ bool CkArrayBroadcaster::deliver(CkArrayMessage* bcast, ArrayElement* el, bool d
       bcast = newMsg;
     }
     envelope* env = UsrToEnv(bcast);
+    env->setRecipientID(el->ckGetID());
+    CkArrayManagerDeliver(CkMyPe(), bcast, 0);
+    return true;
+  }
+}
+
+bool CkArrayBroadcaster::deliverAlreadyDelivered(CkArrayMessage *bcast, ArrayElement *el, bool doFree)
+{
+  int &elBcastNo=getData(el);
+  DEBB((AA "Delivering broadcast %d to element %s\n" AB,elBcastNo,idx2str(el)));
+
+  CkAssert(UsrToEnv(bcast)->getMsgtype() == ArrayBcastFwdMsg);
+
+  if (!broadcastViaScheduler)
+    return el->ckInvokeEntry(bcast->array_ep_bcast(), bcast, doFree);
+  else {
+    if (!doFree) {
+      CkArrayMessage *newMsg = (CkArrayMessage *)CkCopyMsg((void **)&bcast);
+      bcast = newMsg;
+    }
+    envelope *env = UsrToEnv(bcast);
     env->setRecipientID(el->ckGetID());
     CkArrayManagerDeliver(CkMyPe(), bcast, 0);
     return true;
@@ -1680,6 +1684,11 @@ void CkArray::recvBroadcast(CkMessage* m)
 #if CMK_CHARM4PY
     broadcaster->deliver(msg, localElemVec, thisgroup.idx, stableLocations);
 #else
+    // Do not free if CMK_ZC_BCAST_RECV_DONE_MSG, since it'll be freed by the
+    // first element during CMK_ZC_BCAST_ALL_DONE_MSG
+    if (zc_msgtype == CMK_ZC_BCAST_RECV_DONE_MSG) {
+      updateTagArray(env, localElemVec.size());
+    }
     for (unsigned int i = 0; i < len; ++i)
     {
       bool doFree = false;
@@ -1719,6 +1728,11 @@ void CkArray::forwardZCMsgToOtherElems(envelope* env)
     broadcaster->deliver((CkArrayMessage*)EnvToUsr(env), (ArrayElement*)localElemVec[i],
                          doFree);
   }
+}
+
+void CkArray::forwardZCMsgToSpecificElem(envelope *env, CkMigratable *elem) {
+  bool doFree = false;
+  broadcaster->deliverAlreadyDelivered((CkArrayMessage *)EnvToUsr(env), (ArrayElement*)elem, doFree);
 }
 
 void CkArray::flushStates()
