@@ -142,11 +142,13 @@ class Main : public CBase_Main {
     void zcSrcCompleted(CkDataMsg *m) {
       srcCompletedCounter++;
       DEBUG(CkPrintf("[%d][%d][%d] srcCompleted:%d, completed:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), srcCompletedCounter, CkGetRefNum(m));)
+      delete m;
     }
 
     void zcDestCompleted(CkDataMsg *m) {
       destCompletedCounter++;
       DEBUG(CkPrintf("[%d][%d][%d] destCompleted:%d, completed:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), destCompletedCounter, CkGetRefNum(m));)
+      delete m;
     }
 };
 

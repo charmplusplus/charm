@@ -35,7 +35,8 @@ extern int quietModeRequested;
  * Of note are sections 3.4.2 (IA-32, a.k.a. x86) and 3.4.6 (x86-64).
  */
 
-#if CMK_TLS_SWITCHING_X86_64
+#if defined __x86_64__ || defined _M_X64
+# define CMK_TLS_X86
 # define CMK_TLS_X86_MOV "movq"
 # ifdef __APPLE__
 #  define CMK_TLS_X86_REG "gs"
@@ -43,7 +44,8 @@ extern int quietModeRequested;
 #  define CMK_TLS_X86_REG "fs"
 # endif
 # define CMK_TLS_X86_WIDTH "8"
-#elif CMK_TLS_SWITCHING_X86
+#elif defined __i386 || defined __i386__ || defined _M_IX86
+# define CMK_TLS_X86
 # define CMK_TLS_X86_MOV "movl"
 # define CMK_TLS_X86_REG "gs"
 # define CMK_TLS_X86_WIDTH "4"
@@ -60,20 +62,18 @@ void setTLSForKey(size_t, void*);
 
 void* getTLSForKey(size_t key)
 {
-#ifdef CMK_TLS_X86_MOV
-  void* ptr;
+  void * ptr = nullptr;
+#if defined CMK_TLS_X86
   asm volatile (CMK_TLS_X86_MOV " %%" CMK_TLS_X86_REG ":0x0(,%1," CMK_TLS_X86_WIDTH "), %0\n"
                 : "=&r"(ptr)
                 : "r"(key));
-  return ptr;
-#else
-  return nullptr;
 #endif
+  return ptr;
 }
 
 void setTLSForKey(size_t key, void* newptr)
 {
-#ifdef CMK_TLS_X86_MOV
+#if defined CMK_TLS_X86
   asm volatile (CMK_TLS_X86_MOV " %0, %%" CMK_TLS_X86_REG ":0x0(,%1," CMK_TLS_X86_WIDTH ")\n"
                 :
                 : "r"(newptr), "r"(key));
@@ -89,19 +89,17 @@ void setTLS(void*);
 
 void* getTLS()
 {
-#ifdef CMK_TLS_X86_MOV
-  void* ptr;
+  void * ptr = nullptr;
+#if defined CMK_TLS_X86
   asm volatile (CMK_TLS_X86_MOV " %%" CMK_TLS_X86_REG ":0x0, %0\n"
                 : "=&r"(ptr));
-  return ptr;
-#else
-  return nullptr;
 #endif
+  return ptr;
 }
 
 void setTLS(void* newptr)
 {
-#ifdef CMK_TLS_X86_MOV
+#if defined CMK_TLS_X86
   asm volatile (CMK_TLS_X86_MOV " %0, %%" CMK_TLS_X86_REG ":0x0\n"
                 :
                 : "r"(newptr));
@@ -139,7 +137,7 @@ static int count_tls_sizes(struct dl_phdr_info* info, size_t size, void* data)
   return 0;
 }
 
-static inline void CmiTLSStatsInit(void)
+static inline void CmiTLSStatsInit()
 {
   CmiTLSDescription.size = 0;
   CmiTLSDescription.align = 0;
@@ -591,7 +589,7 @@ void CmiTLSCreateSegUsingPtr(const tlsseg_t * threadParent, tlsseg_t * t, void *
 
 void * CmiTLSGetBuffer(tlsseg_t * t)
 {
-#ifdef __APPLE__
+#if defined __APPLE__
   return t->memseg;
 #else
   return (char *)t->memseg - CmiTLSDescription.size;
