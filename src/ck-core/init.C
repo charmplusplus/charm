@@ -90,7 +90,9 @@ extern void QdCreate(int);
 extern void QdProcess(int);
 #endif
 
+#if CMK_GPU_COMM
 CkpvExtern(CkCallbackPool, cb_pool);
+#endif
 
 void CkRestartMain(const char* dirname, CkArgMsg* args);
 
@@ -1450,11 +1452,13 @@ void _initCharm(int unused_argc, char **argv)
 	// Set the ack handler function used for the direct nocopy api
 	CmiSetDirectNcpyAckHandler(CkRdmaDirectAckHandler);
 
+#if CMK_GPU_COMM
 	CmiChannelHandlerInit(CkChannelHandler);
 	CkpvInitialize(CkCallbackPool, cb_pool);
 	CkpvAccess(cb_pool) = CkCallbackPool();
-#if CMK_CUDA && CMK_GPU_COMM
+#if CMK_CUDA
 	CmiDeviceRecvHandlerInit(CkRdmaDeviceRecvHandler);
+#endif
 #endif
 
 	// Set the ack handler function used for the entry method p2p api and entry method bcast api

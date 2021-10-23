@@ -473,6 +473,7 @@ void _ncpyAckHandler(ncpyHandlerMsg *msg);
 
 /****************************** Channel API ******************************/
 
+#if CMK_GPU_COMM
 // Pool to speed up allocation of CkCallback objects
 #define CKCALLBACK_POOL_SIZE 65536
 #define CKCALLBACK_POOL_INC_FACTOR 2
@@ -544,6 +545,9 @@ struct CkChannelMetadata {
 };
 
 void CkChannelHandler(void* data);
+#endif // CMK_GPU_COMM
+
+/****************************** End of Channel API ******************************/
 
 void setNcpyEmInfo(NcpyEmInfo *ref, envelope *env, int &numops, void *forwardMsg, ncpyEmApiMode emMode);
 

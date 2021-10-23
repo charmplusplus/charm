@@ -460,6 +460,9 @@ void CmiInvokeNcpyAck(void *ack) {
   ncpyDirectAckHandlerFn(ack);
 }
 
+#if CMK_GPU_COMM
+#include "machine-rdma.h"
+
 void CmiChannelSend(int dest_pe, int id, const void*& ptr, size_t size, void* metadata, uint64_t tag) {
   LrtsChannelSend(dest_pe, id, ptr, size, metadata, tag);
 }
@@ -477,3 +480,4 @@ void CmiChannelHandlerInit(RdmaAckHandlerFn fn) {
 void CmiChannelHandler(void* data) {
   channelHandlerFn(data);
 }
+#endif // CMK_GPU_COMM

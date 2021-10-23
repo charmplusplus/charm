@@ -2064,6 +2064,7 @@ void zcPupIssueRgets(CmiUInt8 id, CkLocMgr *locMgr) {
 
 /****************************** Channel API ******************************/
 
+#if CMK_GPU_COMM
 #define CKCALLBACK_POOL 1 // Pool CkCallback allocations
 
 CkpvDeclare(CkCallbackPool, cb_pool);
@@ -2145,6 +2146,7 @@ void CkChannelHandler(void* data)
   // Delete metadata object
   delete metadata;
 }
+#endif // CMK_GPU_COMM
 
 /****************************** End of Channel API ******************************/
 
