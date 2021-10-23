@@ -110,7 +110,7 @@ class arr : public CBase_arr {
 #endif
     }
 
-    void recv_zerocopy(int *&buffer, size_t &size, bool isBcast, CkNcpyBufferPost *ncpyPost) {
+    void recv_zerocopy(int *buffer, size_t size, bool isBcast, CkNcpyBufferPost *ncpyPost) {
       CkMatchBuffer(ncpyPost, 0, tag);
 
 #if DELAYED_POST
@@ -134,6 +134,7 @@ class arr : public CBase_arr {
     }
 
     void recv_zerocopy(int *buffer, size_t size, bool isBcast) {
+      CkAssert(size == SIZE);
       verifyValuesWithConstant(destBuffer, SIZE, CONSTANT);
 
       if(isBcast) {
@@ -191,7 +192,9 @@ class grp : public CBase_grp {
     }
 
     void recv_zerocopy(int *buffer1, size_t size1, int *buffer2, size_t size2, bool isBcast ) {
+      CkAssert(size1 == SIZE);
       verifyValuesWithConstant(destBuffer1, SIZE, CONSTANT);
+      CkAssert(size2 == SIZE);
       verifyValuesWithConstant(destBuffer2, SIZE, CONSTANT);
 
       if(isBcast) {
@@ -244,6 +247,7 @@ class nodegrp : public CBase_nodegrp {
     }
 
     void recv_zerocopy(int *buffer, size_t size, bool isBcast) {
+      CkAssert(size == SIZE);
       verifyValuesWithConstant(destBuffer, SIZE, CONSTANT);
 
       if(isBcast) {

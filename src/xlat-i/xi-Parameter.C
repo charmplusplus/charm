@@ -734,7 +734,7 @@ void Parameter::extractPostedPtrs(XStr& str, bool genRdma, bool isSDAGGen, bool 
     str << count++ << ", (void *&)(";
     if(isSDAGGen)
       str << "genClosure->";
-    str << "ncpyBuffer_" << name << ".ptr));\n";
+    str << "ncpyBuffer_" << name << ".ptr)) / sizeof(" << dt << ") ;\n";
   }
 }
 
