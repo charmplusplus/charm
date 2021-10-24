@@ -763,6 +763,7 @@ class groupStruct {
  private:
   int sz; // -1 if ranks is valid, otherwise the size to pass to std::iota()
   std::vector<int> ranks;
+  int refCount = 1;
 
  private:
   bool ranksIsIota() const noexcept {
@@ -791,6 +792,7 @@ class groupStruct {
   void pup(PUP::er& p) noexcept {
     p|sz;
     p|ranks;
+    p|refCount;
   }
   bool isIota() const noexcept {return (sz != -1);}
   int operator[](int i) const noexcept {return (isIota()) ? i : ranks[i];}
@@ -807,7 +809,25 @@ class groupStruct {
       return ranks;
     }
   }
+  int decRefCount() noexcept { return refCount--; }
+  int incRefCount() noexcept { return refCount++; }
 };
+
+inline bool operator==(const groupStruct &g1, const groupStruct &g2) {
+  if (g1.size() != g2.size() || g1.isIota() != g2.isIota()) {
+    return false;
+  }
+  for (int i=0; i<g1.size(); i++) {
+    if (g1[i] != g2[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+inline bool operator!=(const groupStruct &g1, const groupStruct &g2) {
+  return !(g1 == g2);
+}
 
 enum AmpiCommType : uint8_t {
    COMM_WORLD      = 0
@@ -2384,10 +2404,25 @@ class ampiParent final : public CBase_ampiParent {
   }
   inline MPI_Group saveGroupStruct(const std::vector<int>& vec) noexcept {
     if (vec.empty()) return MPI_GROUP_EMPTY;
+    for (int i=0; i<groups.size(); i++) {
+      if (vec == groups[i]->getRanks()) {
+        groups[i]->incRefCount();
+        return i;
+      }
+    }
     int idx = groups.size();
     groups.resize(idx+1);
     groups[idx]=new groupStruct(vec);
     return (MPI_Group)idx;
+  }
+  void freeGroupStruct(const MPI_Group group) noexcept {
+    if (group == MPI_GROUP_EMPTY || group == MPI_GROUP_NULL || hasComm(group)) {
+      return;
+    }
+    if (groups[group]->decRefCount() == 0) {
+      delete groups[group];
+      groups.remove(group);
+    }
   }
   inline int getRank(const MPI_Group group) const noexcept {
     std::vector<int> vec = group2vec(group);
