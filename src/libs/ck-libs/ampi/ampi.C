@@ -2674,6 +2674,7 @@ void ampi::bcastResult(AmpiMsg* msg) noexcept
 inline static AmpiRequestList &getReqs() noexcept;
 
 void AmpiRequestList::freeNonPersReq(ampiParent* pptr, int &idx) noexcept {
+  CkAssert(idx >= 0);
   if (!reqs[idx]->isPersistent()) {
     free(idx, pptr->getDDT());
     idx = MPI_REQUEST_NULL;
@@ -2683,7 +2684,7 @@ void AmpiRequestList::freeNonPersReq(ampiParent* pptr, int &idx) noexcept {
 }
 
 void AmpiRequestList::free(int idx, CkDDT *ddt) noexcept {
-  if (idx < 0) return;
+  CkAssert(idx >= 0);
   reqs[idx]->free(ddt);
   reqPool->deleteReq(reqs[idx]);
   reqs[idx] = NULL;
@@ -2996,7 +2997,7 @@ void ampi::waitOnBlockingSend(MPI_Request* req, AmpiSendType sendType) noexcept
     AmpiRequestList& reqList = getReqs();
     AmpiRequest& sreq = *reqList[*req];
     parent = sreq.wait(parent, MPI_STATUS_IGNORE);
-    parent->getReqs().free(*req, parent->getDDT());
+    parent->getReqs().freeNonPersReq(parent, *req);
     *req = MPI_REQUEST_NULL;
   }
 }
@@ -4109,8 +4110,7 @@ int testRequest(ampiParent* pptr, MPI_Request *reqIdx, int *flag, MPI_Status *st
   checkRequest(*reqIdx);
   AmpiRequestList& reqList = pptr->getReqs();
   AmpiRequest& req = *reqList[*reqIdx];
-  if(1 == (*flag = req.test())){
-    pptr = req.wait(pptr, sts);
+  if(1 == (*flag = req.test(sts))){
     reqList.freeNonPersReq(pptr, *reqIdx);
   }
   return MPI_SUCCESS;
@@ -4125,9 +4125,7 @@ int testRequestNoFree(ampiParent* pptr, MPI_Request *reqIdx, int *flag, MPI_Stat
   checkRequest(*reqIdx);
   AmpiRequestList& reqList = pptr->getReqs();
   AmpiRequest& req = *reqList[*reqIdx];
-  *flag = req.test();
-  if(*flag)
-    pptr = req.wait(pptr, sts);
+  *flag = req.test(sts);
   return MPI_SUCCESS;
 }
 
@@ -5931,7 +5929,6 @@ CMI_WARN_UNUSED_RESULT ampiParent* ampiParent::wait(MPI_Request *request, MPI_St
   }
 #endif
 
-
   reqs.freeNonPersReq(pptr, *request);
 
   return MPI_SUCCESS;
@@ -6248,8 +6245,7 @@ bool ATAReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) noexcept {
       continue;
     }
     AmpiRequest& req = *reqList[reqs[i]];
-    if (req.test()) {
-      pptr = req.wait(pptr, sts);
+    if (req.test(sts)) {
       reqList.freeNonPersReq(pptr, reqs[i]);
       std::swap(reqs[i], reqs.back());
       reqs.pop_back();
@@ -6469,8 +6465,10 @@ AMPI_API_IMPL(int, MPI_Request_free, MPI_Request *request)
   checkRequest(*request);
   ampiParent* pptr = getAmpiParent();
   AmpiRequestList& reqs = pptr->getReqs();
-  reqs.free(*request, pptr->getDDT());
-  *request = MPI_REQUEST_NULL;
+  if (*request != MPI_REQUEST_NULL) {
+    reqs.free(*request, pptr->getDDT());
+    *request = MPI_REQUEST_NULL;
+  }
   return MPI_SUCCESS;
 }
 
