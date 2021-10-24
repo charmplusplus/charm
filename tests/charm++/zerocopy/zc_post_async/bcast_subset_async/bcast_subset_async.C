@@ -93,7 +93,7 @@ class arr : public CBase_arr {
       evenElement = (thisIndex % 2 == 0);
     }
 
-    void recv_zerocopy(int *&buffer, size_t &size, CkNcpyBufferPost *ncpyPost) {
+    void recv_zerocopy(int *buffer, size_t size, CkNcpyBufferPost *ncpyPost) {
       CkMatchBuffer(ncpyPost, 0, tag);
 
 #if DELAYED_POST
@@ -118,6 +118,7 @@ class arr : public CBase_arr {
     }
 
     void recv_zerocopy(int *buffer, size_t size) {
+      CkAssert(size == SIZE);
       verifyValuesWithConstant(destBuffer, SIZE, CONSTANT);
 
       CkCallback doneCb = CkCallback(CkReductionTarget(tester, bcastDone), chareProxy);
@@ -144,7 +145,7 @@ class grp : public CBase_grp {
       evenElement = (thisIndex % 2 == 0);
     }
 
-    void recv_zerocopy(int *&buffer1, size_t &size1, int *&buffer2, size_t &size2, CkNcpyBufferPost *ncpyPost) {
+    void recv_zerocopy(int *buffer1, size_t size1, int *buffer2, size_t size2, CkNcpyBufferPost *ncpyPost) {
       CkMatchBuffer(ncpyPost, 0, tag1);
       CkMatchBuffer(ncpyPost, 1, tag2);
 
@@ -170,7 +171,9 @@ class grp : public CBase_grp {
     }
 
     void recv_zerocopy(int *buffer1, size_t size1, int *buffer2, size_t size2) {
+      CkAssert(size1 == SIZE);
       verifyValuesWithConstant(destBuffer1, SIZE, CONSTANT);
+      CkAssert(size2 == SIZE);
       verifyValuesWithConstant(destBuffer2, SIZE, CONSTANT);
 
       CkCallback doneCb = CkCallback(CkReductionTarget(tester, bcastDone), chareProxy);
@@ -191,7 +194,7 @@ class nodegrp : public CBase_nodegrp {
       tag = 400 + thisIndex;
     }
 
-    void recv_zerocopy(int *&buffer, size_t &size, CkNcpyBufferPost *ncpyPost) {
+    void recv_zerocopy(int *buffer, size_t size, CkNcpyBufferPost *ncpyPost) {
       CkMatchNodeBuffer(ncpyPost, 0, tag);
 
 #if DELAYED_POST
@@ -215,6 +218,7 @@ class nodegrp : public CBase_nodegrp {
     }
 
     void recv_zerocopy(int *buffer, size_t size) {
+      CkAssert(size == SIZE);
       verifyValuesWithConstant(destBuffer, SIZE, CONSTANT);
 
       CkCallback doneCb = CkCallback(CkReductionTarget(tester, bcastDone), chareProxy);
