@@ -71,6 +71,10 @@ if(CMAKE_Fortran_COMPILER)
   include(FortranCInterface)
   FortranCInterface_VERIFY()
   FortranCInterface_VERIFY(CXX)
+  if(CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
+    # Needed to make lowercase modules on Cray platforms
+    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -ef")
+  endif()
 else()
   message(STATUS "Charm++: No Fortran support.")
 endif()
@@ -383,10 +387,10 @@ set(CHARM_PLATFORM "${NETWORK}-${CHARM_OS}-${CHARM_CPU}")
 
 
 set(CMK_BUILD_CRAY 0)
-if(${NETWORK} MATCHES "gni-")
+if(${NETWORK} MATCHES "gni-" OR ${NETWORK} MATCHES "ofi-cray")
   set(CHARM_PLATFORM "${NETWORK}")
   set(CMK_BUILD_CRAY 1)
-elseif(${NETWORK} MATCHES "mpi-crayx")
+elseif(${NETWORK} MATCHES "mpi-cray")
   set(CHARM_PLATFORM "${NETWORK}")
 endif()
 
@@ -563,8 +567,10 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${NETWORK}/gdir_link)
   file(STRINGS src/arch/${NETWORK}/gdir_link GDIR)
 elseif(${NETWORK} MATCHES "gni-")
   set(GDIR "gni")
-elseif(${NETWORK} MATCHES "mpi-crayx")
+elseif(${NETWORK} MATCHES "mpi-cray")
   set(GDIR "mpi")
+elseif(${NETWORK} MATCHES "ofi-cray")
+  set(GDIR "ofi")
 else()
   set(GDIR ${NETWORK})
 endif()
@@ -750,7 +756,7 @@ endforeach()
 
 
 # proc_management
-if(${NETWORK} STREQUAL "ucx" OR ${NETWORK} STREQUAL "ofi")
+if(${NETWORK} MATCHES "ucx" OR ${NETWORK} MATCHES "ofi")
   # file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/proc_management/simple_pmi)
 
   set(proc_management-sources
@@ -908,7 +914,7 @@ file(APPEND  ${optfile_sh} "[ -z \"$CHARMINC\" ] && CHARMINC=\".\"\n")
 # This needs to appear before sourcing the cc-$compiler.sh file
 file(APPEND  ${optfile_sh} "CMK_COMPILER_SUFFIX=${CMK_COMPILER_SUFFIX}\n")
 
-if(NOT ${NETWORK} STREQUAL "mpi" AND NOT ${NETWORK} MATCHES "gni-" AND NOT ${NETWORK} MATCHES "-crayx")
+if(NOT ${NETWORK} STREQUAL "mpi" AND NOT ${NETWORK} MATCHES "gni-" AND NOT ${NETWORK} MATCHES "-cray")
     file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/cc-${CMK_COMPILER}.sh\n")
 endif()
 
@@ -954,7 +960,7 @@ foreach(l CMK_AMPI_WITH_ROMIO CMK_OPTIMIZE CMK_AMPI_ONLY CMK_POST_EXE CMK_SHARED
     file(APPEND ${optfile_h} "#define ${l} ${${l}}\n")
 endforeach(l)
 
-if(NOT ${NETWORK} STREQUAL "mpi" AND NOT ${NETWORK} MATCHES "gni-" AND NOT ${NETWORK} MATCHES "-crayx")
+if(NOT ${NETWORK} STREQUAL "mpi" AND NOT ${NETWORK} MATCHES "gni-" AND NOT ${NETWORK} MATCHES "-cray")
     file(APPEND ${optfile_h} "#include \"cc-${CMK_COMPILER}.h\"\n")
 endif()
 

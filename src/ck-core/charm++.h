@@ -329,6 +329,8 @@ class IrrGroup : public Chare {
 
     virtual void pup(PUP::er &p);//<- pack/unpack routine
     virtual void ckJustMigrated(void);
+    // TODO: We don't need three versions of this (undocumented) function
+    inline const CkGroupID &getGroupID(void) const {return thisgroup;}
     inline const CkGroupID &ckGetGroupID(void) const {return thisgroup;}
     inline CkGroupID CkGetGroupID(void) const {return thisgroup;}
     virtual int ckGetChareType() const;

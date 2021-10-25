@@ -11377,6 +11377,7 @@ appropriate choices for the build one wants to perform.
    Cray XE6                                                         ``./build charm++ gni-crayxe --with-production -j8``
    Cray XK7                                                         ``./build charm++ gni-crayxe-cuda --with-production -j8``
    Cray XC40                                                        ``./build charm++ gni-crayxc --with-production -j8``
+   Cray Shasta                                                      ``./build charm++ ofi-crayshasta --with-production -j8``
    ================================================================ =====================================================================
 
 As mentioned earlier, one can also build Charm++ using the precompiled
@@ -11884,6 +11885,13 @@ using the ``++verbose`` option to help diagnose the issue. (See the
 Parameters that function as boolean flags within Charmrun (taking no
 other parameters) can be prefixed with "no-" to negate their effect.
 For example, ``++no-scalable-start``.
+
+.. note::
+
+   When running on OFI platforms such as Cray Shasta, the OFI runtime parameter
+   ``+ofi_runtime_tcp`` may be required. By default, the exchange of EP names at
+   startup is done via both PMI and OFI. With this flag, it is only done via
+   PMI.
 
 .. _command line options:
 
