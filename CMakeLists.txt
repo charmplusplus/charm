@@ -280,7 +280,7 @@ endif()
 
 if(${CMK_USE_ZLIB})
   find_package(ZLIB REQUIRED)
-  set(CMK_SYSLIBS "$CMK_SYSLIBS -lz")
+  set(CMK_SYSLIBS "${CMK_SYSLIBS} -lz")
 endif()
 
 set(CMK_USE_LIBJPEG 0)

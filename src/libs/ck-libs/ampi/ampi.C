@@ -3931,22 +3931,22 @@ void AmpiRequest::print() const noexcept {
 
 void IReq::print() const noexcept {
   AmpiRequest::print();
-  CkPrintf("In IReq: this=%p, length=%d, cancelled=%d, persistent=%d\n", this, length, (int)cancelled, (int)persistent);
+  CkPrintf("In IReq: this=%p, length=%d, cancelled=%d, persistent=%d\n", (void *)this, length, (int)cancelled, (int)persistent);
 }
 
 void RednReq::print() const noexcept {
   AmpiRequest::print();
-  CkPrintf("In RednReq: this=%p, op=%d\n", this, op);
+  CkPrintf("In RednReq: this=%p, op=%d\n", (void *)this, op);
 }
 
 void GatherReq::print() const noexcept {
   AmpiRequest::print();
-  CkPrintf("In GatherReq: this=%p\n", this);
+  CkPrintf("In GatherReq: this=%p\n", (void *)this);
 }
 
 void GathervReq::print() const noexcept {
   AmpiRequest::print();
-  CkPrintf("In GathervReq: this=%p\n", this);
+  CkPrintf("In GathervReq: this=%p\n", (void *)this);
 }
 
 void ATAReq::print() const noexcept { //not complete for reqs
@@ -3956,17 +3956,17 @@ void ATAReq::print() const noexcept { //not complete for reqs
 
 void GReq::print() const noexcept {
   AmpiRequest::print();
-  CkPrintf("In GReq: this=%p\n", this);
+  CkPrintf("In GReq: this=%p\n", (void *)this);
 }
 
 void SendReq::print() const noexcept {
   AmpiRequest::print();
-  CkPrintf("In SendReq: this=%p, persistent=%d\n", this, (int)persistent);
+  CkPrintf("In SendReq: this=%p, persistent=%d\n", (void *)this, (int)persistent);
 }
 
 void SsendReq::print() const noexcept {
   AmpiRequest::print();
-  CkPrintf("In SsendReq: this=%p, persistent=%d\n", this, (int)persistent);
+  CkPrintf("In SsendReq: this=%p, persistent=%d\n", (void *)this, (int)persistent);
 }
 
 void AmpiRequestList::pup(PUP::er &p, AmpiRequestPool* pool) noexcept {

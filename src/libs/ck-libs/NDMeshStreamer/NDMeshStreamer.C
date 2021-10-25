@@ -27,4 +27,4 @@ CkArrayIndex& TramBroadcastInstance<CkArrayIndex>::value(int dims) {
     case 6: return TramBroadcastInstance<CkArrayIndex6D>::value;
     default: CmiAbort("TRAM only supports 1-6D arrays\n");
   }
-};
+}

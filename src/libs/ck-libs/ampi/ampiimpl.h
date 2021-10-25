@@ -1764,7 +1764,7 @@ class AmpiRequestList {
   void print() const noexcept {
     for (int i=0; i<reqs.size(); i++) {
       if (reqs[i] == NULL) continue;
-      CkPrintf("AmpiRequestList Element %d [%p]: \n", i+1, reqs[i]);
+      CkPrintf("AmpiRequestList Element %d [%p]: \n", i+1, (void *)reqs[i]);
       reqs[i]->print();
     }
   }
