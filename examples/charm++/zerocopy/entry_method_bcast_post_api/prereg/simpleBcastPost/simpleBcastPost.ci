@@ -2,6 +2,7 @@ mainmodule simpleBcastPost {
 
   readonly CProxy_Main mainProxy;
   readonly int bufferSize;
+  readonly int arrSize;
 
   mainchare Main {
     entry Main(CkArgMsg *m);

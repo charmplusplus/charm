@@ -168,7 +168,7 @@ class grp : public CBase_grp {
 #endif
     }
 
-    void recv_zerocopy(int *&buffer1, size_t &size1, int *&buffer2, size_t &size2, bool isBcast, CkNcpyBufferPost *ncpyPost) {
+    void recv_zerocopy(int *buffer1, size_t size1, int *buffer2, size_t size2, bool isBcast, CkNcpyBufferPost *ncpyPost) {
       CkMatchBuffer(ncpyPost, 0, tag1);
       CkMatchBuffer(ncpyPost, 1, tag2);
 
@@ -225,7 +225,7 @@ class nodegrp : public CBase_nodegrp {
 #endif
     }
 
-    void recv_zerocopy(int *&buffer, size_t &size, bool isBcast, CkNcpyBufferPost *ncpyPost) {
+    void recv_zerocopy(int *buffer, size_t size, bool isBcast, CkNcpyBufferPost *ncpyPost) {
       CkMatchNodeBuffer(ncpyPost, 0, tag);
 
 #if DELAYED_POST
