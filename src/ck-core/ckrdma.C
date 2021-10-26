@@ -2267,10 +2267,10 @@ bool isUnposted(std::vector<int> *tagArray, envelope *env, CmiUInt8 elemIndex, i
   }
 }
 
-int extractStoredBuffer(std::vector<int> *tagArray, envelope *env, CmiUInt8 elemIndex, int numops, int opIndex, void *&ptr) {
+void *extractStoredBuffer(std::vector<int> *tagArray, envelope *env, CmiUInt8 elemIndex, int numops, int opIndex) {
   int tag = 0;
   int localIndex = -1;
-  int buffSize = -1;
+  void *ptr = nullptr;
 
   // Retrieve tag
   if(env->getMsgtype() == ArrayBcastFwdMsg) {
@@ -2296,16 +2296,14 @@ int extractStoredBuffer(std::vector<int> *tagArray, envelope *env, CmiUInt8 elem
     } else {
       CkPostedBuffer buff = (iter2->second);
       ptr = buff.buffer; // set ptr
-      buffSize = buff.bufferSize;
       CkpvAccess(ncpyPostedBufferMap).erase(iter2);
     }
   } else {
     CkNcpyBufferPost *post = &(iter->second);
     ptr = post->srcBuffer; // set ptr
-    buffSize = post->srcSize;
     CkpvAccess(ncpyPostedReqMap).erase(iter);
   }
-  return buffSize;
+  return ptr;
 }
 
 // Preprocess method executed for primary element (that performs the zcpy operation)
