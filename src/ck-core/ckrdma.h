@@ -525,7 +525,7 @@ void setPosted(std::vector<int> *tagArray, envelope *env, CmiUInt8 elemIndex, in
 
 bool isUnposted(std::vector<int> *tagArray, envelope *env, CmiUInt8 elemIndex, int numops);
 
-int extractStoredBuffer(std::vector<int> *tagArray, envelope *env, CmiUInt8 elemIndex, int numops, int opIndex, void *&ptr);
+void *extractStoredBuffer(std::vector<int> *tagArray, envelope *env, CmiUInt8 elemIndex, int numops, int opIndex);
 
 int CkPerformRget(CkNcpyBufferPost &post, void *destBuffer, int destSize);
 
