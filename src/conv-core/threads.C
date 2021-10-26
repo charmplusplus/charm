@@ -2193,7 +2193,7 @@ CthThread CthPup(pup_er p, CthThread t)
 
 /* Functions that help debugging */
 void CthPrintThdStack(CthThread t){
-  CmiPrintf("thread=%p, base stack=%p, stack pointer=%p\n", t, t->base.stack, t->stackp);
+  CmiPrintf("thread=%p, base stack=%p, stack pointer=%p\n", (void *)t, t->base.stack, (void *)t->stackp);
 }
 #endif
 
@@ -2231,7 +2231,7 @@ void CthTraceResume(CthThread t)
 }
 /* Functions that help debugging */
 void CthPrintThdMagic(CthThread t){
-  CmiPrintf("CthThread[%p]'s magic: %x\n", t, t->base.magic);
+  CmiPrintf("CthThread[%p]'s magic: %x\n", (void *)t, t->base.magic);
 }
 
 CmiIsomallocContext CmiIsomallocGetThreadContext(CthThread th)

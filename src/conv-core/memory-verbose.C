@@ -73,7 +73,7 @@ static int meta_posix_memalign(void **outptr, size_t align, size_t size)
   void *origptr = *outptr;
   int ret=mm_posix_memalign(outptr,align,size);
   if (memInit) CmiPrintf("CMI_MEMORY(%d)> posix_memalign(%p,%zu,%zu), %p => %d, %p\n",
-			 CmiMyPe(),outptr,align,size,origptr,ret,*outptr);
+			 CmiMyPe(),(void *)outptr,align,size,origptr,ret,*outptr);
   return ret;
 }
 

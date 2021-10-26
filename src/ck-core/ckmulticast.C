@@ -199,7 +199,7 @@ class mCastEntry
         inline CkArrayID getAid() { return aid; }
         inline int hasOldtree() { return oldtree.entry != NULL; }
         inline void print() {
-            CmiPrintf("[%d] mCastEntry: %p, numChild: %d pe: %d flag: %d asm_msg:%p asm_fill:%d\n", CkMyPe(), this, numChild, pe, flag, asm_msg, asm_fill);
+            CmiPrintf("[%d] mCastEntry: %p, numChild: %d pe: %d flag: %d asm_msg:%p asm_fill:%d\n", CkMyPe(), (void *)this, numChild, pe, flag, (void *)asm_msg, asm_fill);
         }
 };
 
@@ -1530,19 +1530,19 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
     reductionInfo &redInfo = entry->red;
 
 
-    DEBUGF(("[%d] RecvRedMsg, entry: %p, lcount: %d, cccount: %d, #localelems: %d, #children: %d \n", CkMyPe(), entry, redInfo.lcount[msg->fragNo], redInfo.ccount[msg->fragNo], entry->getNumLocalElems(), entry->children.size()));
+    DEBUGF(("[%d] RecvRedMsg, entry: %p, lcount: %d, cccount: %d, #localelems: %d, #children: %d \n", CkMyPe(), (void *)entry, redInfo.lcount[msg->fragNo], redInfo.ccount[msg->fragNo], entry->getNumLocalElems(), entry->children.size()));
 
     //-------------------------------------------------------------------------
     /// If you've received a msg from a previous redn, something has gone horribly wrong somewhere!
     if (msg->redNo < redInfo.redNo) {
-        CmiPrintf("[%d] msg redNo:%d, msg:%p, entry:%p redno:%d\n", CkMyPe(), msg->redNo, msg, entry, redInfo.redNo);
+        CmiPrintf("[%d] msg redNo:%d, msg:%p, entry:%p redno:%d\n", CkMyPe(), msg->redNo, (void *)msg, (void *)entry, redInfo.redNo);
         CmiAbort("CkMulticast received a reduction msg with redNo less than the current redn number. Should never happen! \n");
     }
 
     //-------------------------------------------------------------------------
     /// If the current tree is not yet ready or if you've received a msg for a future redn, buffer the msg
     if (entry->notReady() || msg->redNo > redInfo.redNo) {
-        DEBUGF(("[%d] Future redmsgs, buffered! msg:%p entry:%p ready:%d msg red:%d sys redno:%d\n", CkMyPe(), msg, entry, entry->notReady(), msg->redNo, redInfo.redNo));
+        DEBUGF(("[%d] Future redmsgs, buffered! msg:%p entry:%p ready:%d msg red:%d sys redno:%d\n", CkMyPe(), (void *)msg, (void *)entry, entry->notReady(), msg->redNo, redInfo.redNo));
         redInfo.futureMsgs.push_back(msg);
         return;
     }

@@ -62,7 +62,7 @@ extern void makeJcontext (uJcontext_t *__ucp, uJcontext_fn_t func,
                          int __argc, void *a1,void *a2);
 
 #ifdef __cplusplus
-};
+}
 #endif
 
 #endif
