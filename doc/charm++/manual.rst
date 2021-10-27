@@ -5418,7 +5418,7 @@ is the size of the destination buffer. Note that this size should be always smal
 The third parameter is the same user provided integer tag (22 in this case) that was used in the corresponding ``CkMatchBuffer``
 call inside the Post Entry Method.
 
-It is important to associate a unique tag with the CkMatchBuffer and CkPostBuffer calls for a single buffer on that PE.
+It is important to associate a unique tag with the ``CkMatchBuffer`` and ``CkPostBuffer`` calls for a single buffer on that PE.
 Using the same tag on the PE when the RDMA transfer is in progress triggers an abort from the runtime system because
 the same tag cannot be used to denote two different buffers in the internal PE-level data structures.
 
