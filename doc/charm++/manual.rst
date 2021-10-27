@@ -5489,7 +5489,7 @@ have the exact same signature but are applicable for node-level matching operati
 are often useful for node groups. The node equivalent match and post buffers allows two
 different PEs of the same node to call ``CkMatchNodeBuffer`` and ``CkPostNodeBuffer``.
 Similar to the PE-level API, it is important to associate a unique tag with the
-CkMatchNodeBuffer and CkPostNodeBuffer calls for a single buffer on that node.
+``CkMatchNodeBuffer`` and ``CkPostNodeBuffer`` calls for a single buffer on that node.
 Using the same tag on the node when the RDMA transfer is in progress triggers an abort
 from the runtime system because the same tag cannot be used to denote two different buffers
 in the internal node-level data structures.
