@@ -5414,7 +5414,7 @@ As seen in the above example, the ``CkPostBuffer`` call has the following signat
 
 It takes three parameters, the destination buffer pointer, the size of the destination buffer and a tag.
 The first parameter is the destination buffer pointer where the user wants the source data. The second parameter
-is the size of the destination buffer. Note that this size should be always smaller than the size of the source buffer.
+is the size of the destination buffer. Note that this size should be always smaller than or equal to the size of the source buffer.
 The third parameter is the same user provided integer tag (22 in this case) that was used in the corresponding ``CkMatchBuffer``
 call inside the Post Entry Method.
 
