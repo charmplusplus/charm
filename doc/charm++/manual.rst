@@ -5390,7 +5390,7 @@ The first parameter is always the ``CkNcpyBufferPost`` parameter received in the
 Post Entry Method. The second parameter is the index of the nocopypost buffer among the nocopypost buffers sent
 in the entry method, starting with 0. For example, for 1 nocopypost buffer sent in the entry method, the index will
 always be 0. For 2 nocopypost buffers, the index will be 0 for the first buffer and 1 for the second buffer. For n
-buffers, it will be 0 for the first buffer, 1 for the second buffer, 2 for the third buffer upto (n-1) for the nth buffer.
+buffers, it will be 0 for the first buffer, 1 for the second buffer, 2 for the third buffer up to (n-1) for the nth buffer.
 The third parameter is a user provided integer tag (22 in this case), used to associate the 0th source buffer of this
 entry method with tag 22.
 
