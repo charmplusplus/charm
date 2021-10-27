@@ -5395,7 +5395,7 @@ The third parameter is a user provided integer tag (22 in this case), used to as
 entry method with tag 22.
 
 In order to post a buffer when ready, the user has to also call ``CkPostBuffer`` with the same tag (22) to associate
-the tag(22) with a receiver or destination buffer. As mentioned earlier, this function can be called at any time the user
+the tag (22) with a receiver or destination buffer. As mentioned earlier, this function can be called at any time the user
 is ready to post a buffer. The following code illustrates the usage of ``CkPostBuffer``, which is called in a function
 when the user is ready to supply a destination buffer.
 
