@@ -68,11 +68,67 @@ inline void _CldNodeEnqueue(int node, void *msg, int infofn) {
 }
 #else
 
+
+
+#if CMK_USE_SHMEM
+#include "cldb.h"
+
+bool _sendFreeWithIpc(int pe, envelope* env, int len);
+
+inline void _IpcCldPrepare(void* msg, int infofn) {
+
+  int len, queueing, priobits; unsigned int *prioptr;
+  CldInfoFn ifn;
+  CldPackFn pfn;
+
+  ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
+  ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+  if (pfn) {
+    pfn(&msg);
+    ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+  }
+
+  CldSwitchHandler((char *)msg, CpvAccess(CldHandlerIndex));
+  CmiSetInfo(msg,infofn);
+}
+
+template<bool Node>
+inline bool _IpcCldEnqueue(int dst, envelope* env, int infofn) {
+  if ((dst == CLD_ANYWHERE) || (dst == CLD_BROADCAST) || (dst == CLD_BROADCAST_ALL)) {
+    return false;
+  } else if (dst == (Node ? CmiMyNode() : CmiMyPe())) {
+    return false;
+  }
+  int pe = Node ? CmiNodeFirst(dst) : dst;
+  int theirs = CmiPhysicalNodeID(pe);
+  int mine = Node ? CmiNodeFirst(CmiMyNode()) : CmiMyPe();
+  int ours = CmiPhysicalNodeID(mine);
+  // TODO ( ensure not same process )
+  if (ours == theirs) {
+    _IpcCldPrepare(env, infofn);
+#if CMK_SMP
+    // TODO ( implement this )
+#else
+    auto len = env->getTotalsize();
+    if (!_sendFreeWithIpc(pe, env, len)) {
+      CmiSyncSendAndFree(pe, len, (char*)env);
+    }
+    return true;
+#endif
+  } else {
+    return false;
+  }
+}
+#endif
+
 inline void _CldEnqueue(int pe, void *msg, int infofn) {
   envelope *env = (envelope *)msg;
   // Store source information to handle acknowledgements on completion
   if(CMI_IS_ZC(msg))
     CkRdmaPrepareZCMsg(env, CkNodeOf(pe));
+#if CMK_USE_SHMEM
+  if (!_IpcCldEnqueue<false>(pe, env, infofn))
+#endif
   CldEnqueue(pe, msg, infofn);
 }
 
@@ -81,6 +137,9 @@ inline void _CldNodeEnqueue(int node, void *msg, int infofn) {
   // Store source information to handle acknowledgements on completion
   if(CMI_IS_ZC(msg))
     CkRdmaPrepareZCMsg(env, node);
+#if CMK_USE_SHMEM
+  if (!_IpcCldEnqueue<true>(node, env, infofn))
+#endif
   CldNodeEnqueue(node, msg, infofn);
 }
 #define _CldEnqueueMulti      CldEnqueueMulti

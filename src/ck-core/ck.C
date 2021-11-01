@@ -1408,7 +1408,7 @@ void _skipCldHandler(void *converseMsg)
 #if CMK_USE_SHMEM
 // attempts to send in an ipc-aware manner
 // returns "true" when successful
-static bool _sendFreeWithIpc(int pe, envelope* env, int len) {
+bool _sendFreeWithIpc(int pe, envelope* env, int len) {
   auto thisPe = CmiMyPe();
   auto thisNode = CmiPhysicalNodeID(thisPe);
   auto node = CmiPhysicalNodeID(pe);
