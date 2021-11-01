@@ -41,7 +41,6 @@ struct CmiIpcBlock {
 };
 
 void CmiInitIpcMetadata(char** argv, CthThread th);
-void CmiIpcBlockCallback(int cond = CcdSCHEDLOOP);
 
 bool CmiPushBlock(CmiIpcBlock*);
 CmiIpcBlock* CmiPopBlock(void);

@@ -103,18 +103,25 @@ inline bool _IpcCldEnqueue(int dst, envelope* env, int infofn) {
   int theirs = CmiPhysicalNodeID(pe);
   int mine = Node ? CmiNodeFirst(CmiMyNode()) : CmiMyPe();
   int ours = CmiPhysicalNodeID(mine);
+  auto len = env->getTotalsize();
+#if CMK_SMP
+  auto sameProc = (CmiNodeOf(mine) != (Node ? dst : CmiNodeOf(dst)));
+#else
+  constexpr auto sameProc = false;
+#endif
   // TODO ( ensure not same process )
-  if (ours == theirs) {
+  if ((ours == theirs) && !sameProc) {
     _IpcCldPrepare(env, infofn);
 #if CMK_SMP
-    // TODO ( implement this )
-#else
-    auto len = env->getTotalsize();
+    if (Node) {
+      // TODO ( add node send )
+      CmiSyncNodeSendAndFree(dst, len, (char*)env);
+    } else
+#endif
     if (!_sendFreeWithIpc(pe, env, len)) {
       CmiSyncSendAndFree(pe, len, (char*)env);
     }
     return true;
-#endif
   } else {
     return false;
   }

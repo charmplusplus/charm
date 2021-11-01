@@ -104,7 +104,7 @@ inline static void putSleeper_(CthThread th) {
 #endif
   (CsvAccess(sleepers))[CmiMyRank()] = th;
 #if CMK_SMP
-  CmiAssert(!th || !CthIsMainThread(th));
+  // CmiAssert(!th || !CthIsMainThread(th));
   CmiUnlock(CsvAccess(sleeper_lock));
 #endif
 }

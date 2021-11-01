@@ -38,12 +38,6 @@ static void CmiHandleBlock_(void*, double) {
   }
 }
 
-void CmiIpcBlockCallback(int cond) {
-  if (CmiMyRank() == 0) {
-    CcdCallOnConditionKeep(cond, CmiHandleBlock_, nullptr);
-  }
-}
-
 inline static bool metadataReady_(ipc_metadata_ptr_& meta) {
   return meta && meta->shared[meta->mine];
 }

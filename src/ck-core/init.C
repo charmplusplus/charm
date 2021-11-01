@@ -1657,10 +1657,16 @@ void _initCharm(int unused_argc, char **argv)
 #endif
 
 #if CMK_USE_SHMEM
-    auto th = CthSelf();
-    CmiInitIpcMetadata(argv, th);
-    CthSuspend();
-    CmiIpcBlockCallback();
+#if CMK_SMP
+    if (CmiInCommThread()) {
+      CmiInitIpcMetadata(argv, nullptr);
+    } else
+#endif
+    {
+      auto th = CthSelf();
+      CmiInitIpcMetadata(argv, th);
+      CthSuspend();
+    }
 #endif
 
 #if CMK_USE_PXSHM && ( CMK_CRAYXE || CMK_CRAYXC ) && CMK_SMP

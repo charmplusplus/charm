@@ -1631,6 +1631,21 @@ static INLINE_KEYWORD void AdvanceCommunication(int whenidle) {
     CommunicationServerXpmem();
 #endif
 
+#if CMK_USE_SHMEM
+    CmiIpcBlock* block;
+    if (block = CmiPopBlock()) {
+      auto* msg = CmiBlockToMsg(block);
+#if CMK_SMP
+      if (CMI_DEST_RANK(msg) == DGRAM_NODEMESSAGE) {
+        CmiPushNode(msg);
+      } else
+#endif
+      {
+        CmiPushPE(CmiRankOf(block->src), msg);
+      }
+    }
+#endif
+
     LrtsAdvanceCommunication(whenidle);
 
 #if CMK_OFFLOAD_BCAST_PROCESS

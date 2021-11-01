@@ -1412,9 +1412,13 @@ bool _sendFreeWithIpc(int pe, envelope* env, int len) {
   auto thisPe = CmiMyPe();
   auto thisNode = CmiPhysicalNodeID(thisPe);
   auto node = CmiPhysicalNodeID(pe);
-  if (node == thisNode) {
+#if CMK_SMP
+  auto sameProc = CmiNodeOf(pe) == CmiMyNode();
+#else
+  constexpr auto sameProc = false;
+#endif
+  if ((node == thisNode) && !sameProc) {
     CmiIpcBlock* block;
-    // TODO ( relax this requirement )
     if ((block = CmiIsBlock(BLKSTART(env))) && (block->src == pe)) {
       if (thisPe != block->dst) {
         CkAbort("%d> odd block(src=%d, dst=%d)\n", thisPe, pe, block->dst);
