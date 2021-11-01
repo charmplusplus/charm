@@ -283,6 +283,15 @@ if(${CMK_USE_ZLIB})
   set(CMK_SYSLIBS "${CMK_SYSLIBS} -lz")
 endif()
 
+if(${CMK_USE_SHMEM})
+  # assert CMK_HAS_MMAP
+  #find_package(XPMEM)
+  #if(XPMEM_FOUND)
+  #set(CMK_USE_XPMEM 1)
+  #else
+  set(CMK_SYSLIBS "${CMK_SYSLIBS} -lrt")
+endif()
+
 set(CMK_USE_LIBJPEG 0)
 find_package(JPEG)
 IF(JPEG_FOUND)

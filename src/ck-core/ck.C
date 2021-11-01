@@ -1405,6 +1405,48 @@ void _skipCldHandler(void *converseMsg)
 #endif
 }
 
+#if CMK_USE_SHMEM
+// attempts to send in an ipc-aware manner
+// returns "true" when successful
+static bool _sendFreeWithIpc(int pe, envelope* env, int len) {
+  auto thisPe = CmiMyPe();
+  auto thisNode = CmiPhysicalNodeID(thisPe);
+  auto node = CmiPhysicalNodeID(pe);
+  if (node == thisNode) {
+    CmiIpcBlock* block;
+    // TODO ( relax this requirement )
+    if ((block = CmiIsBlock(BLKSTART(env))) && (block->src == pe)) {
+      if (thisPe != block->dst) {
+        CkAbort("%d> odd block(src=%d, dst=%d)\n", thisPe, pe, block->dst);
+      }
+    } else {
+      try {
+        auto nSpin = 4;
+        while (nSpin-- && !(block = CmiAllocBlock(pe, len + sizeof(CmiChunkHeader))))
+          ;
+      } catch (std::bad_alloc) {
+        return false;
+      }
+
+      if (block == nullptr) {
+        return false;
+      } else {
+        auto* next = CmiBlockToMsg(block, true);
+        memcpy(next, env, len);
+        CmiFree(env);
+      }
+    }
+
+    // spin until we succeed!
+    while (!CmiPushBlock(block))
+      ;
+
+    return true;
+  } else {
+    return false;
+  }
+}
+#endif
 
 //static void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 // Made non-static to be used by ckmessagelogging
@@ -1455,6 +1497,9 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
     } else if (pe==CLD_BROADCAST_ALL) {
       CmiSyncNodeBroadcastAllAndFree(len, (char *)env);
     } else {
+#if CMK_USE_SHMEM
+      if (!_sendFreeWithIpc(pe, env, len))
+#endif
       CmiSyncSendAndFree(pe, len, (char *)env);
     }
   }

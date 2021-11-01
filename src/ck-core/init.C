@@ -1656,6 +1656,13 @@ void _initCharm(int unused_argc, char **argv)
   hapiQdProcess = QdProcess;
 #endif
 
+#if CMK_USE_SHMEM
+    auto th = CthSelf();
+    CmiInitIpcMetadata(argv, th);
+    CthSuspend();
+    CmiIpcBlockCallback();
+#endif
+
 #if CMK_USE_PXSHM && ( CMK_CRAYXE || CMK_CRAYXC ) && CMK_SMP
       // for SMP on Cray XE6 (hopper) it seems pxshm has to be initialized
       // again after cpuaffinity is done

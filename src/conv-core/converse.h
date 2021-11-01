@@ -2284,6 +2284,10 @@ extern double CmiLog2(double);
 
 #if defined(__cplusplus)
 }                                         /* end of extern "C"  */
+
+#if CMK_USE_SHMEM
+#include "cmishmem.h"
+#endif
 #endif
 
 #if CMK_GRID_QUEUE_AVAILABLE

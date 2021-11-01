@@ -3425,6 +3425,15 @@ void CmiFree(void *blk)
     CpvAccess(BlocksAllocated)--;
 #endif
 
+#if CMK_USE_SHMEM
+    // if this is an ipc block, we need to free it as such
+    CmiIpcBlock* ipc;
+    if (blk && (ipc = CmiIsBlock(BLKSTART(blk)))) {
+      CmiFreeBlock(ipc);
+      return;
+    }
+#endif
+
 #if CMK_USE_IBVERBS | CMK_USE_IBUD
     /* is this message the head of a MultipleSend that we received?
        Then the parts with INFIMULTIPOOL have metadata which must be 
