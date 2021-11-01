@@ -1542,7 +1542,11 @@ static void _noCldEnqueue(int pe, envelope *env)
   int len=env->getTotalsize();
   if (pe==CLD_BROADCAST) { CmiSyncNodeBroadcastAndFree(len, (char *)env); }
   else if (pe==CLD_BROADCAST_ALL) { CmiSyncNodeBroadcastAllAndFree(len, (char *)env); }
-  else CmiSyncSendAndFree(pe, len, (char *)env);
+  else 
+#if CMK_USE_SHMEM
+    if (!_sendFreeWithIpc(pe, env, len))
+#endif
+  CmiSyncSendAndFree(pe, len, (char *)env);
 }
 
 //static void _noCldNodeEnqueue(int node, envelope *env)
