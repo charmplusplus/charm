@@ -37,7 +37,7 @@ private:
     // Note that objs is always the vector of all the objects and objs.size() != numObjs.
     // numObjs is the number of objects in the current subset, which corresponds to the
     // size of the entries in sortedIndices.
-    const size_t numObjs = sortedIndices[0].size();
+    const auto numObjs = sortedIndices[0].size();
     // If there are no more objects left, then they've all gone to other partitions
     if (numObjs == 0)
       return;
@@ -82,7 +82,7 @@ private:
     // splitIndex is the index in sortedIndices[maxDim] of the first object
     // going to the right partition. Note that this can be equal to numObjs if
     // all objs are going to the left partition, which we correct for below.
-    const int splitIndex = findSplit(objs, sortedIndices[maxDim], ratio, bgLeft, bgRight);
+    const auto splitIndex = findSplit(objs, sortedIndices[maxDim], ratio, bgLeft, bgRight);
 
     // Now actually split into two sets
     // First, split the box
@@ -125,16 +125,15 @@ private:
     }
 
     // Free the current index collection
-    for (auto& index : sortedIndices)
-      Indices().swap(index);
+    for (auto& index : sortedIndices) Indices().swap(index);
 
     // Recurse on the two halves
     partition(objs, procStart, procStart + numLeftProcs, solution, leftIndices, leftBox);
     partition(objs, procStart + numLeftProcs, procEnd, solution, rightIndices, rightBox);
   }
 
-  int findSplit(const std::vector<O>& objs, const Indices& sortedPositions,
-                const float ratio, const float bgLeft, const float bgRight) const
+  size_t findSplit(const std::vector<O>& objs, const Indices& sortedPositions,
+                   const float ratio, const float bgLeft, const float bgRight) const
   {
     // Total load is the bg load of left procs + bg load of right procs + load of objects
     const float totalLoad =
@@ -144,8 +143,7 @@ private:
 
     // leftTarget is the amount of object load we want to assign to the left procs
     const float leftTarget = ratio * totalLoad - bgLeft;
-
-    int splitIndex = 0;
+    size_t splitIndex = 0;
     float leftLoad = 0;
     for (splitIndex = 0; splitIndex < sortedPositions.size(); splitIndex++)
     {
