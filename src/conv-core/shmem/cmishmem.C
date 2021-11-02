@@ -6,7 +6,6 @@
 
 CpvExtern(int, CthResumeNormalThreadIdx);
 
-inline std::size_t whichBin_(std::size_t size);
 inline static CmiIpcBlock* popBlock_(std::atomic<std::uintptr_t>& head,
                                      void* base);
 inline static bool pushBlock_(std::atomic<std::uintptr_t>& head,

@@ -9,6 +9,8 @@ static_assert(CMK_USE_SHMEM, "enable shmem to use this header");
 
 namespace cmi {
 namespace ipc {
+// recommended cutoff for block sizes
+CpvExtern(std::size_t, kRecommendedCutoff);
 // used to represent an empty linked list
 constexpr auto nil = std::uintptr_t(0);
 // used to represent the tail of a linked list
@@ -67,6 +69,11 @@ inline void* CmiBlockToMsg(CmiIpcBlock* block) {
 
 inline CmiIpcBlock* CmiMsgToBlock(void* msg) {
   return CmiIsBlock((char*)msg - sizeof(CmiChunkHeader));
+}
+
+inline const std::size_t& CmiRecommendedBlockCutoff(void) {
+  using namespace cmi::ipc;
+  return CpvAccess(kRecommendedCutoff);
 }
 
 #endif

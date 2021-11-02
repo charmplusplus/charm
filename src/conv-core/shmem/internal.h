@@ -12,8 +12,14 @@
 
 #define DEBUGP(x) /* CmiPrintf x; */
 
-constexpr std::size_t kDefaultSegmentSize = 16384;
+namespace cmi {
+namespace ipc {
+CpvDeclare(std::size_t, kRecommendedCutoff);
+}
+}
+
 CpvStaticDeclare(std::size_t, kSegmentSize);
+constexpr std::size_t kDefaultSegmentSize = 8*1024*1024;
 
 constexpr std::size_t kNumCutOffPoints = 25;
 const std::array<std::size_t, kNumCutOffPoints> kCutOffPoints = {
@@ -61,6 +67,8 @@ struct ipc_metadata_ {
   virtual ~ipc_metadata_() {}
 };
 
+inline std::size_t whichBin_(std::size_t size);
+
 inline static void initIpcShared_(ipc_shared_* shared) {
   auto begin = (std::uintptr_t)(sizeof(ipc_shared_) +
                                 (sizeof(ipc_shared_) % ALIGN_BYTES));
@@ -82,6 +90,18 @@ inline void initSegmentSize_(char** argv) {
   auto flag =
       CmiGetArgLongDesc(argv, "+segmentsize", &value, "bytes per ipc segment");
   CpvAccess(kSegmentSize) = flag ? (std::size_t)value : kDefaultSegmentSize;
+  CmiEnforceMsg(CpvAccess(kSegmentSize), "segment size must be non-zero!");
+  using namespace cmi::ipc;
+  CpvInitialize(std::size_t, kRecommendedCutoff);
+  if (CmiGetArgLongDesc(argv, "+ipccutoff", &value, "enforce cutoff for ipc blocks")) {
+    auto bin = whichBin_((std::size_t)value);  
+    CmiEnforceMsg(bin < kNumCutOffPoints, "ipc cutoff out of range!");
+    CpvAccess(kRecommendedCutoff) = kCutOffPoints[bin];
+  } else {
+    auto max = CpvAccess(kSegmentSize) / kNumCutOffPoints;
+    auto bin = (std::intptr_t)whichBin_(max) - 1;
+    CpvAccess(kRecommendedCutoff) = kCutOffPoints[(bin >= 0) ? bin : 0];
+  }
 }
 
 inline static void initSleepers_(void) {

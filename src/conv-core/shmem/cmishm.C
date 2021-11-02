@@ -166,8 +166,8 @@ static void callbackHandler_(void* msg) {
       return;
     } else {
       // otherwise -- tell everyone we're ready!
-      CmiPrintf("CMI> posix shm pool init'd with %luB segment.\n",
-                CpvAccess(kSegmentSize));
+      CmiPrintf("CMI> posix shm pool init'd with %gMB segment, %gKB soft-cap.\n",
+                CpvAccess(kSegmentSize) / (1024.0 * 1024.0), CmiRecommendedBlockCutoff() / 1024.0);
       procBroadcastAndFree_((char*)msg, CmiMsgHeaderSizeBytes);
     }
   } else {

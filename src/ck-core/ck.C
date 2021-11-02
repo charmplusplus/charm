@@ -1417,7 +1417,9 @@ bool _sendFreeWithIpc(int pe, envelope* env, int len) {
 #else
   constexpr auto sameProc = false;
 #endif
-  if ((node == thisNode) && !sameProc) {
+  if (len > CmiRecommendedBlockCutoff()) {
+    return false;
+  } else if ((node == thisNode) && !sameProc) {
     CmiIpcBlock* block;
     if ((block = CmiIsBlock(BLKSTART(env))) && (block->src == pe)) {
       if (thisPe != block->dst) {
