@@ -1405,55 +1405,6 @@ void _skipCldHandler(void *converseMsg)
 #endif
 }
 
-#if CMK_USE_SHMEM
-// attempts to send in an ipc-aware manner
-// returns "true" when successful
-bool _sendFreeWithIpc(int pe, envelope* env, int len) {
-  auto thisPe = CmiMyPe();
-  auto thisNode = CmiPhysicalNodeID(thisPe);
-  auto node = CmiPhysicalNodeID(pe);
-#if CMK_SMP
-  auto sameProc = CmiNodeOf(pe) == CmiMyNode();
-#else
-  constexpr auto sameProc = false;
-#endif
-  if (len > CmiRecommendedBlockCutoff()) {
-    return false;
-  } else if ((node == thisNode) && !sameProc) {
-    CmiIpcBlock* block;
-    if ((block = CmiIsBlock(BLKSTART(env))) && (block->src == pe)) {
-      if (thisPe != block->dst) {
-        CkAbort("%d> odd block(src=%d, dst=%d)\n", thisPe, pe, block->dst);
-      }
-    } else {
-      try {
-        auto nSpin = 4;
-        while (nSpin-- && !(block = CmiAllocBlock(pe, len + sizeof(CmiChunkHeader))))
-          ;
-      } catch (std::bad_alloc) {
-        return false;
-      }
-
-      if (block == nullptr) {
-        return false;
-      } else {
-        auto* next = CmiBlockToMsg(block, true);
-        memcpy(next, env, len);
-        CmiFree(env);
-      }
-    }
-
-    // spin until we succeed!
-    while (!CmiPushBlock(block))
-      ;
-
-    return true;
-  } else {
-    return false;
-  }
-}
-#endif
-
 //static void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 // Made non-static to be used by ckmessagelogging
 void _skipCldEnqueue(int pe,envelope *env, int infoFn)
@@ -1504,7 +1455,7 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
       CmiSyncNodeBroadcastAllAndFree(len, (char *)env);
     } else {
 #if CMK_USE_SHMEM
-      if (!_sendFreeWithIpc(pe, env, len))
+      if (!_tryIpcSend<false, false>(pe, env, infoFn))
 #endif
       CmiSyncSendAndFree(pe, len, (char *)env);
     }
@@ -1550,7 +1501,7 @@ static void _noCldEnqueue(int pe, envelope *env)
   else if (pe==CLD_BROADCAST_ALL) { CmiSyncNodeBroadcastAllAndFree(len, (char *)env); }
   else 
 #if CMK_USE_SHMEM
-    if (!_sendFreeWithIpc(pe, env, len))
+    if (!_tryIpcSend<false, false>(pe, env, 0x0))
 #endif
   CmiSyncSendAndFree(pe, len, (char *)env);
 }
@@ -1585,6 +1536,9 @@ void _noCldNodeEnqueue(int node, envelope *env)
 
 }
   else {
+#if CMK_USE_SHMEM
+  if (!_tryIpcSend<true, false>(node, env, 0x0))
+#endif
 	CmiSyncNodeSendAndFree(node, len, (char *)env);
   }
 }
