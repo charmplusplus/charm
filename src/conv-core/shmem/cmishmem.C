@@ -56,8 +56,9 @@ bool CmiPushBlock(CmiIpcBlock* block) {
   auto& shared = meta->shared[block->src / CmiMyNodeSize()];
   auto& queue = shared->queue;
 #if CMK_SMP
-  auto mine = CmiPhysicalRank(CmiMyPe());
-  CmiAssert(mine == block->dst);
+  auto thisPe = CmiInCommThread() ? CmiNodeFirst(CmiMyNode()) : CmiMyPe();
+  auto thisNode = CmiPhysicalRank(thisPe);
+  CmiAssert(thisNode == block->dst);
 #else
   CmiAssert(meta->mine == block->dst);
 #endif
@@ -65,7 +66,11 @@ bool CmiPushBlock(CmiIpcBlock* block) {
 }
 
 CmiIpcBlock* CmiAllocBlock(int pe, std::size_t size) {
+#if CMK_SMP
+  auto myPe = CmiInCommThread() ? CmiNodeFirst(CmiMyNode()) : CmiMyPe();
+#else
   auto myPe = CmiMyPe();
+#endif
   auto myRank = CmiPhysicalRank(myPe);
   auto myNode = CmiPhysicalNodeID(myPe);
   auto theirRank = CmiPhysicalRank(pe);

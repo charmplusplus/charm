@@ -110,8 +110,9 @@ inline bool _IpcSendImpl(int thisNode, int dstPe, envelope* env) {
 #if CMK_SMP
     // ensure correct routing under smp mode
     // (where blocks can bounce around pes)
-    block->src = dstPe;
-    block->dst = CmiMyPe();
+    auto thisPe = CmiInCommThread() ? CmiNodeFirst(CmiMyNode()) : CmiMyPe();
+    block->src = CmiPhysicalRank(dstPe);
+    block->dst = CmiPhysicalRank(thisPe);
 #endif
   } else {
     auto len = env->getTotalsize();
