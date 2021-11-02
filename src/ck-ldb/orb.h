@@ -34,9 +34,18 @@ private:
   void partition(const std::vector<O>& objs, ProcIter procStart, ProcIter procEnd,
                  S& solution, std::vector<Indices>& sortedIndices, const Box& box)
   {
+    // Note that objs is always the vector of all the objects and objs.size() != numObjs.
+    // numObjs is the number of objects in the current subset, which corresponds to the
+    // size of the entries in sortedIndices.
+    const size_t numObjs = sortedIndices[0].size();
+    // If there are no more objects left, then they've all gone to other partitions
+    if (numObjs == 0)
+      return;
+
     const int numProcs = std::distance(procStart, procEnd);
-    // Only one PE in our subset, assign all of our objects there and stop recursing
-    if (numProcs == 1)
+    // Only one PE in our subset, assign all of our objects there or only one
+    // obj in our subset, assign it to first proc
+    if (numProcs == 1 || numObjs == 1)
     {
       P& p = *procStart;
       for (int index : sortedIndices[0])
@@ -46,13 +55,6 @@ private:
       return;
     }
 
-    // Note that objs is always the vector of all the objects and objs.size() != numObjs.
-    // numObjs is the number of objects in the current subset, which corresponds to the
-    // size of the entries in sortedIndices.
-    const size_t numObjs = sortedIndices[0].size();
-    // If there are no more objects left, then they've all gone to other partitions
-    if (numObjs == 0)
-      return;
     const int posDimension = box.size();
 
     // Find longest dimension
@@ -77,13 +79,16 @@ private:
         std::accumulate(procStart + numLeftProcs, procEnd, 0.0,
                         [&](float val, const P& proc) { return val + proc.getLoad(); });
     const float ratio = (1.0F * numLeftProcs) / numProcs;
+    // splitIndex is the index in sortedIndices[maxDim] of the first object
+    // going to the right partition. Note that this can be equal to numObjs if
+    // all objs are going to the left partition, which we correct for below.
     const int splitIndex = findSplit(objs, sortedIndices[maxDim], ratio, bgLeft, bgRight);
 
     // Now actually split into two sets
     // First, split the box
     Box leftBox(box);
     Box rightBox(box);
-    const float splitPosition = objs[sortedIndices[maxDim][splitIndex]].position[maxDim];
+    const float splitPosition = objs[sortedIndices[maxDim][std::min(numObjs - 1, splitIndex)]].position[maxDim];
     leftBox[maxDim].upper = splitPosition;
     rightBox[maxDim].lower = splitPosition;
 
@@ -148,7 +153,7 @@ private:
       if (newLeftLoad > leftTarget)
       {
         // Decide if split element should go to left or right partition
-        if (std::abs(newLeftLoad - leftTarget) < std::abs(leftLoad - leftTarget) && splitIndex < sortedPositions.size() - 1)
+        if (std::abs(newLeftLoad - leftTarget) < std::abs(leftLoad - leftTarget))
           splitIndex++;
         break;
       }
