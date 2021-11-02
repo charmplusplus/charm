@@ -99,17 +99,20 @@ inline bool _IpcSendImpl(int thisNode, int dstPe, envelope* env) {
   auto usableSrc = [&](void) -> bool {
     // defer this until we need it
     CmiGetPesOnPhysicalNode(thisNode, &pes, &nPes);
-    if (Node) {
-      return CmiNodeOf(dstPe) == CmiNodeOf(pes[block->src]);
-    } else {
-      return dstPe == pes[block->src];
-    }
+    // check whether block is from dst process
+    return CmiNodeOf(dstPe) == CmiNodeOf(pes[block->src]);
   };
 
   if ((block = CmiIsBlock(BLKSTART(env))) && usableSrc()) {
     if (CmiMyNode() != CmiNodeOf(pes[block->dst])) {
       CkAbort("alien block with (src=%d, dst=%d)\n", block->src, block->dst);
     }
+#if CMK_SMP
+    // ensure correct routing under smp mode
+    // (where blocks can bounce around pes)
+    block->src = dstPe;
+    block->dst = CmiMyPe();
+#endif
   } else {
     auto len = env->getTotalsize();
 
