@@ -28,16 +28,17 @@ struct pid_message_ {
   pid_t pid;
 };
 
-#define CMI_SHARED_FMT "cmi_pid%lu_rank%d_shared_"
+#define CMI_SHARED_FMT "cmi_pid%lu_node%d_shared_"
 
 // opens a shared memory segment for a given physical rank
-static std::pair<int, ipc_shared_*> openShared_(int rank) {
-  // get the size from the cpv
-  auto& size = CpvAccess(kSegmentSize);
+static std::pair<int, ipc_shared_*> openShared_(int node) {
+  // determine the size of the shared segment
+  // (adding the size of the queues and what nots)
+  auto size = CpvAccess(kSegmentSize) + sizeof(ipc_shared_);
   // generate a name for this pe
-  auto slen = snprintf(NULL, 0, CMI_SHARED_FMT, CsvAccess(node_pid), rank);
+  auto slen = snprintf(NULL, 0, CMI_SHARED_FMT, CsvAccess(node_pid), node);
   auto name = new char[slen];
-  sprintf(name, CMI_SHARED_FMT, CsvAccess(node_pid), rank);
+  sprintf(name, CMI_SHARED_FMT, CsvAccess(node_pid), node);
   DEBUGP(("%d> opening share %s\n", CmiMyPe(), name));
   // try opening the share exclusively
   auto fd = shm_open(name, O_CREAT | O_EXCL | O_RDWR, 0666);
@@ -77,18 +78,18 @@ struct ipc_shm_metadata_ : public ipc_metadata_ {
     auto& size = CpvAccess(kSegmentSize);
     // for each rank/descriptor pair
     for (auto& pair : this->fds) {
-      auto& rank = pair.first;
+      auto& proc = pair.first;
       auto& fd = pair.second;
       // unmap the memory segment
-      munmap(this->shared[rank], size);
+      munmap(this->shared[proc], size);
       // close the file
       close(fd);
       // unlinking the shm segment for our pe
-      if (rank == this->mine) {
+      if (proc == this->mine) {
         auto slen =
-            snprintf(NULL, 0, CMI_SHARED_FMT, CsvAccess(node_pid), rank);
+            snprintf(NULL, 0, CMI_SHARED_FMT, CsvAccess(node_pid), proc);
         auto name = new char[slen];
-        sprintf(name, CMI_SHARED_FMT, CsvAccess(node_pid), rank);
+        sprintf(name, CMI_SHARED_FMT, CsvAccess(node_pid), proc);
         shm_unlink(name);
         delete[] name;
       }
@@ -97,31 +98,36 @@ struct ipc_shm_metadata_ : public ipc_metadata_ {
 };
 
 static void openAllShared_(ipc_shm_metadata_* meta) {
-  int node = CmiPhysicalNodeID(CmiMyPe());
-  int nPes = CmiNumPesOnPhysicalNode(node);
-  int nProcs = nPes / CmiMyNodeSize();
+  int* pes;
+  int nPes;
+  int thisNode = CmiPhysicalNodeID(CmiMyPe());
+  CmiGetPesOnPhysicalNode(thisNode, &pes, &nPes);
+  int nSize = CmiMyNodeSize();
+  int nProcs = nPes / nSize;
   // for each rank in this physical node:
   for (auto rank = 0; rank < nProcs; rank++) {
     // open its shared segment
-    auto res = openShared_(rank);
+    auto pe = pes[rank * nSize];
+    auto proc = CmiNodeOf(pe);
+    auto res = openShared_(proc);
     // initializing it if it's ours
-    if (rank == meta->mine) initIpcShared_(res.second);
+    if (proc == meta->mine) initIpcShared_(res.second);
     // store the retrieved data
-    meta->fds[rank] = res.first;
-    meta->shared[rank] = res.second;
+    meta->fds[proc] = res.first;
+    meta->shared[proc] = res.second;
   }
 }
 
 // returns number of processes in node
 int procBroadcastAndFree_(char* msg, std::size_t size) {
-  int nPes;
   int* pes;
-  int mine = CmiMyPe();
-  int node = CmiPhysicalNodeID(mine);
-  CmiGetPesOnPhysicalNode(node, &pes, &nPes);
+  int nPes;
+  int thisPe = CmiMyPe();
+  int thisNode = CmiPhysicalNodeID(thisPe);
+  CmiGetPesOnPhysicalNode(thisNode, &pes, &nPes);
   int nSize = CmiMyNodeSize();
   int nProcs = nPes / nSize;
-  CmiAssert(mine == pes[0]);
+  CmiAssert(thisPe == pes[0]);
 
   CpvAccess(num_cbs_exptd) = nProcs - 1;
   for (auto rank = 1; rank < nProcs; rank++) {
@@ -166,8 +172,8 @@ static void callbackHandler_(void* msg) {
       return;
     } else {
       // otherwise -- tell everyone we're ready!
-      CmiPrintf("CMI> posix shm pool init'd with %gMB segment, %gKB soft-cap.\n",
-                CpvAccess(kSegmentSize) / (1024.0 * 1024.0), CmiRecommendedBlockCutoff() / 1024.0);
+      CmiPrintf("CMI> posix shm pool init'd with %luB segment.\n",
+                CpvAccess(kSegmentSize));
       procBroadcastAndFree_((char*)msg, CmiMsgHeaderSizeBytes);
     }
   } else {

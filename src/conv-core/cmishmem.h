@@ -1,5 +1,5 @@
-#ifndef CMI_SHMEM_H
-#define CMI_SHMEM_H
+#ifndef CMI_SHMEM_HH
+#define CMI_SHMEM_HH
 
 static_assert(CMK_USE_SHMEM, "enable shmem to use this header");
 
@@ -15,6 +15,10 @@ CpvExtern(std::size_t, kRecommendedCutoff);
 constexpr auto nil = std::uintptr_t(0);
 // used to represent the tail of a linked list
 constexpr auto max = std::numeric_limits<std::uintptr_t>::max();
+// used to indicate a message bound for a node
+constexpr auto nodeDatagram = std::numeric_limits<CmiUInt2>::max();
+// default number of attempts to alloc before timing out
+constexpr auto defaultTimeout = 4;
 }  // namespace ipc
 }  // namespace cmi
 
@@ -43,11 +47,17 @@ struct CmiIpcBlock {
 };
 
 void CmiInitIpcMetadata(char** argv, CthThread th);
+void CmiIpcBlockCallback(int cond = CcdSCHEDLOOP);
 
 bool CmiPushBlock(CmiIpcBlock*);
 CmiIpcBlock* CmiPopBlock(void);
 
-CmiIpcBlock* CmiAllocBlock(int pe, std::size_t size);
+// tries to allocate a block, returning null if unsucessful
+// (fails when other PEs are contending resources)
+// note: throws bad_alloc if we ran out of memory
+CmiIpcBlock* CmiAllocBlock(int node, std::size_t size);
+
+// frees a block -- enabling it to be used again
 void CmiFreeBlock(CmiIpcBlock*);
 
 // currently a no-op but may be eventually usable
@@ -70,6 +80,14 @@ inline void* CmiBlockToMsg(CmiIpcBlock* block) {
 inline CmiIpcBlock* CmiMsgToBlock(void* msg) {
   return CmiIsBlock((char*)msg - sizeof(CmiChunkHeader));
 }
+
+// note -- can throw std::bad_alloc if out of memory
+CmiIpcBlock* CmiMsgToBlock(char* msg, std::size_t len, int node,
+                           int rank = cmi::ipc::nodeDatagram,
+                           int timeout = cmi::ipc::defaultTimeout);
+
+// deliver a block as a message
+void CmiDeliverBlockMsg(CmiIpcBlock*);
 
 inline const std::size_t& CmiRecommendedBlockCutoff(void) {
   using namespace cmi::ipc;

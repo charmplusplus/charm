@@ -1,11 +1,19 @@
 #if CMI_HAS_XPMEM
-#include "cmixpmem.cc"
+#include "cmixpmem.C"
 #else
 #include "cmishm.C"
 #endif
 
+#if CMK_SMP
+#define CMI_DEST_RANK(msg) ((CmiMsgHeaderBasic*)msg)->rank
+#if CMK_NODE_QUEUE_AVAILABLE
+extern void CmiPushNode(void* msg);
+#endif
+#endif
+
 CpvExtern(int, CthResumeNormalThreadIdx);
 
+inline std::size_t whichBin_(std::size_t size);
 inline static CmiIpcBlock* popBlock_(std::atomic<std::uintptr_t>& head,
                                      void* base);
 inline static bool pushBlock_(std::atomic<std::uintptr_t>& head,
@@ -24,17 +32,49 @@ void* CmiBlockToMsg(CmiIpcBlock* block, bool init) {
   return msg;
 }
 
-static void CmiHandleBlock_(void*, double) {
-  auto* block = CmiPopBlock();
-  if (block != nullptr) {
-    auto* msg = CmiBlockToMsg(block);
-#if CMK_SMP
-    auto dst = block->dst % CmiMyNodeSize();
-    CmiPushPE(dst, msg);
-#else
-    CmiHandleMessage(msg);
-#endif
+CmiIpcBlock* CmiMsgToBlock(char* src, std::size_t len, int node, int rank,
+                           int timeout) {
+  char* dst;
+  CmiIpcBlock* block;
+  if ((block = CmiIsBlock(BLKSTART(src))) && (node == block->src)) {
+    dst = src;
+  } else {
+    if (timeout > 0) {
+      while (--timeout &&
+             !(block = CmiAllocBlock(node, len + sizeof(CmiChunkHeader))))
+        ;
+    } else {
+      // don't give up!
+      while (!(block = CmiAllocBlock(node, len + sizeof(CmiChunkHeader))))
+        ;
+    }
+    if (block == nullptr) {
+      return nullptr;
+    } else {
+      dst = (char*)CmiBlockToMsg(block, true);
+      memcpy(dst, src, len);
+      CmiFree(src);
+    }
   }
+#if CMK_SMP
+  CMI_DEST_RANK(dst) = rank;
+#endif
+  return block;
+}
+
+void CmiDeliverBlockMsg(CmiIpcBlock* block) {
+  auto* msg = CmiBlockToMsg(block);
+#if CMK_SMP
+  auto& rank = CMI_DEST_RANK(msg);
+#if CMK_NODE_QUEUE_AVAILABLE
+  if (rank == cmi::ipc::nodeDatagram) {
+    CmiPushNode(msg);
+  } else
+#endif
+    CmiPushPE(rank, msg);
+#else
+  CmiHandleMessage(msg);
+#endif
 }
 
 inline static bool metadataReady_(ipc_metadata_ptr_& meta) {
@@ -53,35 +93,36 @@ CmiIpcBlock* CmiPopBlock(void) {
 
 bool CmiPushBlock(CmiIpcBlock* block) {
   auto& meta = CsvAccess(metadata_);
-  auto& shared = meta->shared[block->src / CmiMyNodeSize()];
+  auto& shared = meta->shared[block->src];
   auto& queue = shared->queue;
-#if CMK_SMP
-  auto thisPe = CmiInCommThread() ? CmiNodeFirst(CmiMyNode()) : CmiMyPe();
-  auto thisNode = CmiPhysicalRank(thisPe);
-  CmiAssert(thisNode == block->dst);
-#else
   CmiAssert(meta->mine == block->dst);
-#endif
   return pushBlock_(queue, block->orig, shared);
 }
 
-CmiIpcBlock* CmiAllocBlock(int pe, std::size_t size) {
+CmiIpcBlock* CmiAllocBlock(int dstProc, std::size_t size) {
+  auto dstNode = CmiPhysicalNodeID(CmiNodeFirst(dstProc));
 #if CMK_SMP
-  auto myPe = CmiInCommThread() ? CmiNodeFirst(CmiMyNode()) : CmiMyPe();
+  auto thisPe = CmiInCommThread() ? CmiNodeFirst(CmiMyNode()) : CmiMyPe();
 #else
-  auto myPe = CmiMyPe();
+  auto thisPe = CmiMyPe();
 #endif
-  auto myRank = CmiPhysicalRank(myPe);
-  auto myNode = CmiPhysicalNodeID(myPe);
-  auto theirRank = CmiPhysicalRank(pe);
-  auto theirNode = CmiPhysicalNodeID(pe);
-  CmiAssert((myRank != theirRank) && (myNode == theirNode));
+  auto thisProc = CmiMyNode();
+  auto thisNode = CmiPhysicalNodeID(thisPe);
+  if ((thisProc == dstProc) || (thisNode != dstNode)) {
+    throw std::bad_alloc();
+  }
+
   auto& meta = CsvAccess(metadata_);
-  auto& shared = meta->shared[theirRank / CmiMyNodeSize()];
+  auto& shared = meta->shared[dstProc];
   auto bin = whichBin_(size);
   CmiAssert(bin < kNumCutOffPoints);
+  auto& free = shared->free[bin];
 
-  auto* block = popBlock_(shared->free[bin], shared);
+  CmiIpcBlock* block;
+  auto timeout = 4;
+  while (--timeout && !(block = popBlock_(free, shared)))
+    ;
+
   if (block == nullptr) {
     auto totalSize = kCutOffPoints[bin];
     auto offset = allocBlock_(shared, totalSize);
@@ -95,8 +136,8 @@ CmiIpcBlock* CmiAllocBlock(int pe, std::size_t size) {
     new (block) CmiIpcBlock(totalSize, offset);
   }
 
-  block->src = theirRank;
-  block->dst = myRank;
+  block->src = dstProc;
+  block->dst = thisProc;
 
   return block;
 }
@@ -105,7 +146,7 @@ void CmiFreeBlock(CmiIpcBlock* block) {
   auto& meta = CsvAccess(metadata_);
   auto bin = whichBin_(block->size);
   CmiAssertMsg(bin < kNumCutOffPoints);
-  auto& shared = meta->shared[block->src / CmiMyNodeSize()];
+  auto& shared = meta->shared[block->src];
   auto& free = shared->free[bin];
   while (!pushBlock_(free, block->orig, shared))
     ;
@@ -133,12 +174,14 @@ static std::uintptr_t allocBlock_(ipc_shared_* meta, std::size_t size) {
   } else {
     auto next = res + size + sizeof(CmiIpcBlock);
     auto offset = size % alignof(CmiIpcBlock);
-    auto status = meta->heap.exchange(next + offset, std::memory_order_release);
+    auto oom = next >= meta->max;
+    auto value = oom ? res : (next + offset);
+    auto status = meta->heap.exchange(value, std::memory_order_release);
     CmiAssert(status == cmi::ipc::nil);
-    if (next < meta->max) {
-      return res;
+    if (oom) {
+      throw std::bad_alloc();
     } else {
-      return cmi::ipc::nil;
+      return res;
     }
   }
 }

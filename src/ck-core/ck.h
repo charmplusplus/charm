@@ -96,43 +96,18 @@ inline bool _IpcSendImpl(int thisNode, int dstPe, envelope* env) {
   int* pes;
 
   CmiIpcBlock* block;
-  auto usableSrc = [&](void) -> bool {
-    // defer this until we need it
-    CmiGetPesOnPhysicalNode(thisNode, &pes, &nPes);
-    // check whether block is from dst process
-    return CmiNodeOf(dstPe) == CmiNodeOf(pes[block->src]);
-  };
-
-  if ((block = CmiIsBlock(BLKSTART(env))) && usableSrc()) {
-    if (CmiMyNode() != CmiNodeOf(pes[block->dst])) {
-      CkAbort("alien block with (src=%d, dst=%d)\n", block->src, block->dst);
-    }
-#if CMK_SMP
-    // ensure correct routing under smp mode
-    // (where blocks can bounce around pes)
-    auto thisPe = CmiInCommThread() ? CmiNodeFirst(CmiMyNode()) : CmiMyPe();
-    block->src = CmiPhysicalRank(dstPe);
-    block->dst = CmiPhysicalRank(thisPe);
-#endif
-  } else {
-    auto len = env->getTotalsize();
-
-    try {
-      auto nSpin = 4;
-      while (nSpin-- &&
-             !(block = CmiAllocBlock(dstPe, len + sizeof(CmiChunkHeader))))
-        ;
-    } catch (std::bad_alloc) {
-      return false;
-    }
-
-    if (block == nullptr) {
-      return false;
+  try {
+    if (Node) {
+      block = CmiMsgToBlock((char*)env, env->getTotalsize(), CmiNodeOf(dstPe));
     } else {
-      auto* next = CmiBlockToMsg(block, true);
-      memcpy(next, env, len);
-      CmiFree(env);
+      block = CmiMsgToBlock((char*)env, env->getTotalsize(), CmiNodeOf(dstPe), CmiRankOf(dstPe));
     }
+  } catch (std::bad_alloc) {
+    block = nullptr;
+  }
+
+  if (block == nullptr) {
+    return false;
   }
 
   // spin until we succeed!
