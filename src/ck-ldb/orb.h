@@ -135,6 +135,7 @@ private:
   size_t findSplit(const std::vector<O>& objs, const Indices& sortedPositions,
                    const float ratio, const float bgLeft, const float bgRight) const
   {
+    const float approxBgPerObj = (bgLeft + bgRight) / sortedPositions.size();
     // Total load is the bg load of left procs + bg load of right procs + load of objects
     const float totalLoad =
         bgLeft + bgRight +
@@ -142,12 +143,13 @@ private:
                         [&](float l, int index) { return l + objs[index].getLoad(); });
 
     // leftTarget is the amount of object load we want to assign to the left procs
-    const float leftTarget = ratio * totalLoad - bgLeft;
+    const float leftTarget = ratio * totalLoad;
     size_t splitIndex = 0;
     float leftLoad = 0;
     for (splitIndex = 0; splitIndex < sortedPositions.size(); splitIndex++)
     {
-      const float newLeftLoad = objs[sortedPositions[splitIndex]].getLoad() + leftLoad;
+      const float newLeftLoad =
+          objs[sortedPositions[splitIndex]].getLoad() + approxBgPerObj + leftLoad;
       if (newLeftLoad > leftTarget)
       {
         // Decide if split element should go to left or right partition
