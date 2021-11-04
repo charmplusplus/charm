@@ -146,18 +146,18 @@ private:
     const float leftTarget = ratio * totalLoad;
     size_t splitIndex = 0;
     float leftLoad = 0;
+    float nextLeftLoad = 0;
     for (splitIndex = 0; splitIndex < sortedPositions.size(); splitIndex++)
     {
-      const float newLeftLoad =
-          objs[sortedPositions[splitIndex]].getLoad() + approxBgPerObj + leftLoad;
-      if (newLeftLoad > leftTarget)
+      nextLeftLoad += objs[sortedPositions[splitIndex]].getLoad() + approxBgPerObj;
+      if (nextLeftLoad > leftTarget)
       {
         // Decide if split element should go to left or right partition
-        if (std::abs(newLeftLoad - leftTarget) < std::abs(leftLoad - leftTarget))
+        if (std::abs(nextLeftLoad - leftTarget) < std::abs(leftLoad - leftTarget))
           splitIndex++;
         break;
       }
-      leftLoad = newLeftLoad;
+      leftLoad = nextLeftLoad;
     }
 
     return splitIndex;
