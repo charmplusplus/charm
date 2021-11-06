@@ -584,19 +584,6 @@ void LogPool::add(UChar type, UShort mIdx, UShort eIdx,
   }
 }
 
-void LogPool::add(UChar type,double time,UShort funcID,int lineNum,char *fileName){
-  if (type == CREATION ||
-      type == CREATION_MULTICAST ||
-      type == CREATION_BCAST) {
-    lastCreationEvent = numEntries;
-  }
-  new (&pool[numEntries++])
-	LogEntry(time,type,funcID,lineNum,fileName);
-  if(poolSize == numEntries){
-    flushLogBuffer();
-  }
-}
-
 void LogPool::addUserBracketEventNestedID(unsigned char type, double time,
                                           UShort mIdx, int event, int nestedID) {
   new (&pool[numEntries++])
@@ -607,14 +594,9 @@ void LogPool::addUserBracketEventNestedID(unsigned char type, double time,
 }
 
   
-void LogPool::addMemoryUsage(unsigned char type,double time,double memUsage){
-  if (type == CREATION ||
-      type == CREATION_MULTICAST ||
-      type == CREATION_BCAST) {
-    lastCreationEvent = numEntries;
-  }
+void LogPool::addMemoryUsage(double time,double memUsage){
   new (&pool[numEntries++])
-	LogEntry(type,time,memUsage);
+	LogEntry(MEMORY_USAGE_CURRENT,time,memUsage);
   if(poolSize == numEntries){
     flushLogBuffer();
   }
@@ -713,6 +695,7 @@ void LogEntry::pup(PUP::er &p)
   p|type;
   if (p.isPacking()) itime = (CMK_TYPEDEF_UINT8)(1.0e6*time);
   if (p.isPacking()) iEndTime = (CMK_TYPEDEF_UINT8)(1.0e6*endTime);
+
 
   switch (type) {
     case USER_EVENT:
@@ -1166,7 +1149,7 @@ void TraceProjections::userSuppliedBracketedNote(char *note, int eventID, double
 void TraceProjections::memoryUsage(double m)
 {
   if (!computationStarted) return;
-  _logPool->addMemoryUsage(MEMORY_USAGE_CURRENT, TraceTimer(), m );
+  _logPool->addMemoryUsage(TraceTimer(), m);
   
 }
 //Updates User stat value. Makes appropriate Call to LogPool updateStat function
