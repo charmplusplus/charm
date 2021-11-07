@@ -639,26 +639,8 @@ void LogPool::addUserSuppliedNote(char *note){
 }
 
 void LogPool::addUserSuppliedBracketedNote(char *note, int eventID, double bt, double et){
-  //CkPrintf("LogPool::addUserSuppliedBracketedNote eventID=%d\n", eventID);
-#if MPI_TRACE_MACHINE_HACK
-  //This part of code is used  to combine the contiguous
-  //MPI_Test and MPI_Iprobe events to reduce the number of
-  //entries
-#define MPI_TEST_EVENT_ID 60
-#define MPI_IPROBE_EVENT_ID 70 
-  int lastEvent = pool[numEntries-1].event;
-  if((eventID==MPI_TEST_EVENT_ID || eventID==MPI_IPROBE_EVENT_ID) && (eventID==lastEvent)){
-    //just replace the endtime of last event
-    //CkPrintf("addUserSuppliedBracketNote: for event %d\n", lastEvent);
-    pool[numEntries].endTime = et;
-  }else{
-    new (&pool[numEntries++])
-      LogEntry(bt, et, USER_SUPPLIED_BRACKETED_NOTE, note, eventID);
-  }
-#else
   new (&pool[numEntries++])
     LogEntry(bt, et, USER_SUPPLIED_BRACKETED_NOTE, note, eventID);
-#endif
   if(poolSize == numEntries){
     flushLogBuffer();
   }
