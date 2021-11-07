@@ -62,7 +62,6 @@ class LogEntry {
 #if CMK_HAS_COUNTER_PAPI
     LONG_LONG_PAPI papiValues[NUMPAPIEVENTS];
 #endif
-    std::string fName;
     int userSuppliedData;
     unsigned char type;
 
@@ -88,35 +87,6 @@ class LogEntry {
       stat=statVal;
     }
 
-    LogEntry(double _time,unsigned char _type,unsigned short _funcID,
-	     int _lineNum,char *_fileName){
-      time = _time;
-      type = _type;
-      mIdx = _funcID;
-      event = _lineNum;
-      setFName(_fileName);
-    }
-
-    // Constructor for User Supplied Data
-    LogEntry(double _time,unsigned char _type, int value,
-	     int _lineNum,char *_fileName){
-      time = _time;
-      type = _type;
-      userSuppliedData = value;
-      setFName(_fileName);
-    }
-
-    // Constructor for User Supplied Data
-    LogEntry(double _time,unsigned char _type, char* note,
-	     int _lineNum,char *_fileName){
-      time = _time;
-      type = _type;
-      setFName(_fileName);
-      if(note != NULL)
-	setUserSuppliedNote(note);
-    }
-
-
    // Constructor for bracketed user supplied note
     LogEntry(double bt, double et, unsigned char _type, char *note, int eventID){
       time = bt;
@@ -126,7 +96,6 @@ class LogEntry {
       if(note != NULL)
 	setUserSuppliedNote(note);
     }
-
 
     // Constructor for multicast data
     LogEntry(double tm, unsigned short m, unsigned short e, int ev, int p,
@@ -146,14 +115,6 @@ class LogEntry {
         pes.assign(pelist, pelist + numPe);
       else
         pes.resize(numPe);
-    }
-
-    void setFName(char *_fileName){
-      if(_fileName == NULL){
-        fName.clear();
-      }else{
-        fName = _fileName;
-      }	
     }
 
     // complementary function for adding papi data
@@ -334,9 +295,6 @@ class LogPool {
         void addUserBracketEventNestedID(unsigned char type, double time,
                                          UShort mIdx, int event, int nestedID);
 
-
-	void add(unsigned char type,double time,unsigned short funcID,int lineNum,char *fileName);
-  
   	void addMemoryUsage(unsigned char type,double time,double memUsage);
 	void addUserSuppliedBracketedNote(char *note, int eventID, double bt, double et);
 

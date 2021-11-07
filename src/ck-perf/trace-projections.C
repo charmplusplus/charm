@@ -584,19 +584,6 @@ void LogPool::add(UChar type, UShort mIdx, UShort eIdx,
   }
 }
 
-void LogPool::add(UChar type,double time,UShort funcID,int lineNum,char *fileName){
-  if (type == CREATION ||
-      type == CREATION_MULTICAST ||
-      type == CREATION_BCAST) {
-    lastCreationEvent = numEntries;
-  }
-  new (&pool[numEntries++])
-	LogEntry(time,type,funcID,lineNum,fileName);
-  if(poolSize == numEntries){
-    flushLogBuffer();
-  }
-}
-
 void LogPool::addUserBracketEventNestedID(unsigned char type, double time,
                                           UShort mIdx, int event, int nestedID) {
   new (&pool[numEntries++])
