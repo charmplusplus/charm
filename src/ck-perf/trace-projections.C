@@ -507,7 +507,7 @@ void LogPool::flushLogBuffer()
 
 void LogPool::add(UChar type, UShort mIdx, UShort eIdx,
 		  double time, int event, int pe, int ml, CmiObjId *id, 
-		  double recvT, double cpuT, int numPe)
+		  double recvT, double cpuT)
 {
     switch(type)
     {
@@ -575,7 +575,7 @@ void LogPool::add(UChar type, UShort mIdx, UShort eIdx,
     lastCreationEvent = numEntries;
   }
   new (&pool[numEntries++])
-    LogEntry(time, type, mIdx, eIdx, event, pe, ml, id, recvT, cpuT, numPe);
+    LogEntry(time, type, mIdx, eIdx, event, pe, ml, id, recvT, cpuT);
   if ((type == END_PHASE) || (type == END_COMPUTATION)) {
     numPhases++;
   }
@@ -619,7 +619,7 @@ void LogPool::addUserStat(double time, int pe, int e, double stat,
 
 void LogPool::addUserSupplied(int data){
 	// add an event
-	add(USER_SUPPLIED, 0, 0, TraceTimer(), -1, -1, 0, 0, 0, 0, 0 );
+	add(USER_SUPPLIED, 0, 0, TraceTimer(), -1, -1, 0, 0, 0, 0);
 
 	// set the user supplied value for the previously created event 
 	pool[numEntries-1].setUserSuppliedData(data);
@@ -628,7 +628,7 @@ void LogPool::addUserSupplied(int data){
 
 void LogPool::addUserSuppliedNote(char *note){
 	// add an event
-	add(USER_SUPPLIED_NOTE, 0, 0, TraceTimer(), -1, -1, 0, 0, 0, 0, 0 );
+	add(USER_SUPPLIED_NOTE, 0, 0, TraceTimer(), -1, -1, 0, 0, 0, 0);
 
 	// set the user supplied note for the previously created event 
 	pool[numEntries-1].setUserSuppliedNote(note);
@@ -642,6 +642,18 @@ void LogPool::addUserSuppliedBracketedNote(char *note, int eventID, double bt, d
   }
 }
 
+void LogPool::addCreationBroadcast(unsigned short mIdx, unsigned short eIdx, double time,
+                                   int event, int pe, int ml, int numPe)
+
+{
+  lastCreationEvent = numEntries;
+  new (&pool[numEntries++])
+      LogEntry(CREATION_BCAST, time, mIdx, eIdx, event, pe, ml, numPe);
+  if (poolSize == numEntries)
+  {
+    flushLogBuffer();
+  }
+}
 
 /* **CW** Not sure if this is the right thing to do. Feels more like
    a hack than a solution to Sameer's request to add the destination
@@ -1175,9 +1187,8 @@ void TraceProjections::creation(envelope *e, int ep, int num)
     e->setEvent(curevent);
     CpvAccess(curPeEvent) = curevent;
     if (num > 1) {
-      _logPool->add(CREATION_BCAST, type, ep, curTime,
-		    curevent++, CkMyPe(), e->getTotalsize(), 
-		    NULL, 0, 0.0, num);
+      _logPool->addCreationBroadcast(type, ep, curTime, curevent++, CkMyPe(),
+                                     e->getTotalsize(), num);
     } else {
       _logPool->add(CREATION, type, ep, curTime,
 		    curevent++, CkMyPe(), e->getTotalsize(), 

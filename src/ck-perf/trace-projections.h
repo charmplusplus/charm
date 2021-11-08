@@ -53,7 +53,7 @@ class LogEntry {
     int nestedID;  // USER_EVENT_PAIR, BEGIN_USER_EVENT_PAIR, END_USER_EVENT_PAIR
                    // Nested thread ID, e.g. virtual AMPI rank number
     CmiObjId   id;
-    std::vector<int> pes;
+    std::vector<int> pes;  // CREATION_BCAST, CREATION_MULTICAST
     unsigned long memUsage;
     double stat;  // USER_STAT
     std::string userSuppliedNote;
@@ -74,7 +74,7 @@ class LogEntry {
 
     LogEntry(double tm, unsigned char t, unsigned short m=0, 
 	     unsigned short e=0, int ev=0, int p=0, int ml=0, 
-	     CmiObjId *d=NULL, double rt=0., double cputm=0., int numPe=0) {
+	     CmiObjId *d=NULL, double rt=0., double cputm=0.) {
       type = t; mIdx = m; eIdx = e; event = ev; pe = p; 
       time = tm; msglen = ml;
       if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=id.id[3]=0; };
@@ -85,7 +85,6 @@ class LogEntry {
 #else
       //numPapiEvents = 0;
 #endif
-      pes.resize(numPe);
     }
 
    // Constructor for bracketed user supplied note
@@ -116,6 +115,23 @@ class LogEntry {
         pes.assign(pelist, pelist + numPe);
       else
         pes.resize(numPe);
+    }
+
+    // Constructor for creation broadcast
+    // TODO: Resizing the pes vector to just store the size wastes a lot of memory,
+    // change to a variable
+    LogEntry(unsigned char type, double time, unsigned short mIdx, unsigned short eIdx,
+             int event, int pe, int msgLen, int numPe)
+        : type(type),
+          time(time),
+          mIdx(mIdx),
+          eIdx(eIdx),
+          event(event),
+          pe(pe),
+          msglen(msgLen)
+    {
+      CkAssert(type == CREATION_BCAST);
+      pes.resize(numPe);
     }
 
     // Constructor for user event pairs
@@ -295,7 +311,7 @@ class LogPool {
 
     void add(unsigned char type, unsigned short mIdx, unsigned short eIdx,
 	     double time, int event, int pe, int ml=0, CmiObjId* id=0, 
-	     double recvT=0.0, double cpuT=0.0, int numPe=0);
+	     double recvT=0.0, double cpuT=0.0);
 
     // complementary function to set papi info to current log entry
     // must be called after an add()
@@ -316,6 +332,8 @@ class LogPool {
   	void addMemoryUsage(unsigned char type,double time,double memUsage);
 	void addUserSuppliedBracketedNote(char *note, int eventID, double bt, double et);
 
+    void addCreationBroadcast(unsigned short mIdx, unsigned short eIdx, double time,
+                              int event, int pe, int ml, int numPe);
     void addCreationMulticast(unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., int numPe=0, const int *pelist=NULL);
     void flushLogBuffer();
     void postProcessLog();
