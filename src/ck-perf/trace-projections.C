@@ -507,7 +507,7 @@ void LogPool::flushLogBuffer()
 
 void LogPool::add(UChar type, UShort mIdx, UShort eIdx,
 		  double time, int event, int pe, int ml, CmiObjId *id, 
-		  double recvT, double cpuT, int numPe, double statVal)
+		  double recvT, double cpuT, int numPe)
 {
     switch(type)
     {
@@ -575,7 +575,7 @@ void LogPool::add(UChar type, UShort mIdx, UShort eIdx,
     lastCreationEvent = numEntries;
   }
   new (&pool[numEntries++])
-    LogEntry(time, type, mIdx, eIdx, event, pe, ml, id, recvT, cpuT, numPe, statVal);
+    LogEntry(time, type, mIdx, eIdx, event, pe, ml, id, recvT, cpuT, numPe);
   if ((type == END_PHASE) || (type == END_COMPUTATION)) {
     numPhases++;
   }
@@ -606,6 +606,16 @@ void LogPool::addMemoryUsage(unsigned char type,double time,double memUsage){
   }
 	
 }  
+
+void LogPool::addUserStat(double time, int pe, int e, double stat,
+                          double statTime)
+{
+  new (&pool[numEntries++]) LogEntry(USER_STAT, time, pe, e, stat, statTime);
+  if (poolSize == numEntries)
+  {
+    flushLogBuffer();
+  }
+}
 
 void LogPool::addUserSupplied(int data){
 	// add an event
@@ -1140,17 +1150,16 @@ void TraceProjections::memoryUsage(double m)
   
 }
 //Updates User stat value. Makes appropriate Call to LogPool updateStat function
-void TraceProjections::updateStatPair(int e, double stat, double time)
+void TraceProjections::updateStatPair(int e, double stat, double statTime)
 {
   if (!computationStarted) return;
-  _logPool->add(USER_STAT, e, 0, TraceTimer(), curevent, CkMyPe(), 0, 0, 0.0, time, 0, stat);
+  _logPool->addUserStat(TraceTimer(), CkMyPe(), e, stat, statTime);
 }
 
-//When user time is not given, -1 is stored instead.
+//When stat time is not given, -1 is stored instead.
 void TraceProjections::updateStat(int e, double stat)
 {
-  if (!computationStarted) return;
-  _logPool->add(USER_STAT, e, 0, TraceTimer(), curevent, CkMyPe(), 0, 0, 0.0, -1, 0, stat);
+  updateStatPair(e, stat, -1);
 }
 
 void TraceProjections::creation(envelope *e, int ep, int num)
