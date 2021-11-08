@@ -586,8 +586,7 @@ void LogPool::add(UChar type, UShort mIdx, UShort eIdx,
 
 void LogPool::addUserBracketEventNestedID(unsigned char type, double time,
                                           UShort mIdx, int event, int nestedID) {
-  new (&pool[numEntries++])
-  LogEntry(time, type, mIdx, 0, event, CkMyPe(), 0, 0, 0, 0, 0, 0, nestedID);
+  new (&pool[numEntries++]) LogEntry(type, time, mIdx, event, nestedID);
   if(poolSize == numEntries){
     flushLogBuffer();
   }
