@@ -64,7 +64,7 @@ class LogEntry {
 #if CMK_HAS_COUNTER_PAPI
     LONG_LONG_PAPI papiValues[NUMPAPIEVENTS];
 #endif
-    int userSuppliedData;
+    int userSuppliedData;  // USER_SUPPLIED
     unsigned char type;
 
   public:
@@ -85,6 +85,23 @@ class LogEntry {
 #else
       //numPapiEvents = 0;
 #endif
+    }
+
+    // Constructor for user supplied data or memory usage record
+    // Shared constructor to avoid ambiguity issues (userSuppliedData is int, memUsage is
+    // long)
+    LogEntry(unsigned char type, double time, long value) : type(type), time(time)
+    {
+      CkAssert(type == USER_SUPPLIED || type == MEMORY_USAGE_CURRENT);
+      switch (type)
+      {
+        case USER_SUPPLIED:
+          userSuppliedData = (int)value;
+          break;
+        case MEMORY_USAGE_CURRENT:
+          memUsage = value;
+          break;
+      }
     }
 
     // Constructor for user supplied note and bracketed user supplied note,
@@ -158,23 +175,12 @@ class LogEntry {
       CkAssert(type == USER_STAT);
     }
 
-    // Constructor for memory usage record
-    LogEntry(unsigned char type, double time, long memUsage)
-        : type(type), time(time), memUsage(memUsage)
-    {
-    }
-
     // complementary function for adding papi data
     void addPapi(LONG_LONG_PAPI *papiVals){
 #if CMK_HAS_COUNTER_PAPI
    	memcpy(papiValues, papiVals, sizeof(LONG_LONG_PAPI)*CkpvAccess(numEvents));
 #endif
     }
-   
-    void setUserSuppliedData(int data){
-      userSuppliedData = data;
-    }
-
 
     void *operator new(size_t s) {void*ret=malloc(s);_MEMCHECK(ret);return ret;}
     void *operator new(size_t, void *ptr) { return ptr; }

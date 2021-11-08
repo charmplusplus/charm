@@ -611,12 +611,13 @@ void LogPool::addUserStat(double time, int pe, int e, double stat,
   }
 }
 
-void LogPool::addUserSupplied(int data){
-	// add an event
-	add(USER_SUPPLIED, 0, 0, TraceTimer(), -1, -1, 0, 0, 0, 0);
-
-	// set the user supplied value for the previously created event 
-	pool[numEntries-1].setUserSuppliedData(data);
+void LogPool::addUserSupplied(int data)
+{
+  new (&pool[numEntries++]) LogEntry(USER_SUPPLIED, TraceTimer(), data);
+  if (poolSize == numEntries)
+  {
+    flushLogBuffer();
+  }
 }
 
 void LogPool::addUserSuppliedNote(char* note)
