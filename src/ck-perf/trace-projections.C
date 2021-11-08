@@ -592,20 +592,14 @@ void LogPool::addUserBracketEventNestedID(unsigned char type, double time,
   }
 }
 
-  
-void LogPool::addMemoryUsage(unsigned char type,double time,double memUsage){
-  if (type == CREATION ||
-      type == CREATION_MULTICAST ||
-      type == CREATION_BCAST) {
-    lastCreationEvent = numEntries;
-  }
-  new (&pool[numEntries++])
-	LogEntry(type,time,memUsage);
-  if(poolSize == numEntries){
+void LogPool::addMemoryUsage(double time, double memUsage)
+{
+  new (&pool[numEntries++]) LogEntry(MEMORY_USAGE_CURRENT, time, memUsage);
+  if (poolSize == numEntries)
+  {
     flushLogBuffer();
   }
-	
-}  
+}
 
 void LogPool::addUserStat(double time, int pe, int e, double stat,
                           double statTime)
@@ -1158,8 +1152,7 @@ void TraceProjections::userSuppliedBracketedNote(char *note, int eventID, double
 void TraceProjections::memoryUsage(double m)
 {
   if (!computationStarted) return;
-  _logPool->addMemoryUsage(MEMORY_USAGE_CURRENT, TraceTimer(), m );
-  
+  _logPool->addMemoryUsage(TraceTimer(), m);
 }
 //Updates User stat value. Makes appropriate Call to LogPool updateStat function
 void TraceProjections::updateStatPair(int e, double stat, double statTime)

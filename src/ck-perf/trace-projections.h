@@ -54,7 +54,7 @@ class LogEntry {
                    // Nested thread ID, e.g. virtual AMPI rank number
     CmiObjId   id;
     std::vector<int> pes;  // CREATION_BCAST, CREATION_MULTICAST
-    unsigned long memUsage;
+    unsigned long memUsage;  // MEMORY_USAGE_CURRENT
     double stat;  // USER_STAT
     std::string userSuppliedNote;
 
@@ -151,6 +151,12 @@ class LogEntry {
       CkAssert(type == USER_STAT);
     }
 
+    // Constructor for memory usage record
+    LogEntry(unsigned char type, double time, long memUsage)
+        : type(type), time(time), memUsage(memUsage)
+    {
+    }
+
     // complementary function for adding papi data
     void addPapi(LONG_LONG_PAPI *papiVals){
 #if CMK_HAS_COUNTER_PAPI
@@ -171,15 +177,6 @@ class LogEntry {
       std::replace(userSuppliedNote.begin(), userSuppliedNote.end(), '\n', ' ');
       std::replace(userSuppliedNote.begin(), userSuppliedNote.end(), '\r', ' ');
     }
-	
-
-    /// A constructor for a memory usage record
-    LogEntry(unsigned char _type, double _time, long _memUsage) {
-      time = _time;
-      type = _type;
-      memUsage = _memUsage;
-    }
-
 
     void *operator new(size_t s) {void*ret=malloc(s);_MEMCHECK(ret);return ret;}
     void *operator new(size_t, void *ptr) { return ptr; }
@@ -329,7 +326,7 @@ class LogPool {
         void addUserBracketEventNestedID(unsigned char type, double time,
                                          UShort mIdx, int event, int nestedID);
 
-  	void addMemoryUsage(unsigned char type,double time,double memUsage);
+  	void addMemoryUsage(double time, double memUsage);
 	void addUserSuppliedBracketedNote(char *note, int eventID, double bt, double et);
 
     void addCreationBroadcast(unsigned short mIdx, unsigned short eIdx, double time,
