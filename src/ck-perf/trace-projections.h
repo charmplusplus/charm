@@ -15,6 +15,7 @@
 #include <algorithm>
 
 #include "charm.h"
+#include "converse.h"
 #include "trace.h"
 #include "trace-common.h"
 #include "ckhashtable.h"
@@ -68,23 +69,33 @@ class LogEntry {
     unsigned char type;
 
   public:
-    
-    LogEntry() {
-    }
+    LogEntry() : type(INVALID) {}
 
-    LogEntry(double tm, unsigned char t, unsigned short m=0, 
-	     unsigned short e=0, int ev=0, int p=0, int ml=0, 
-	     CmiObjId *d=NULL, double rt=0., double cputm=0.) {
-      type = t; mIdx = m; eIdx = e; event = ev; pe = p; 
-      time = tm; msglen = ml;
-      if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=id.id[3]=0; };
-      recvTime = rt; cputime = cputm;
+    LogEntry(unsigned char type, double time, unsigned short mIdx,
+             unsigned short eIdx, int event, int pe, int msgLen,
+             CmiObjId* d, double recvTime, double cpuTime)
+        : type(type),
+          time(time),
+          mIdx(mIdx),
+          eIdx(eIdx),
+          event(event),
+          pe(pe),
+          msglen(msgLen),
+          recvTime(recvTime),
+          cputime(cpuTime)
+    {
+      if (d != nullptr)
+        id = *d;
+      else
+      {
+        std::fill(id.id, id.id + OBJ_ID_SZ, 0);
+      }
       // initialize for papi as well as non papi versions.
-#if CMK_HAS_COUNTER_PAPI
-      //numPapiEvents = NUMPAPIEVENTS;
-#else
-      //numPapiEvents = 0;
-#endif
+#  if CMK_HAS_COUNTER_PAPI
+      // numPapiEvents = NUMPAPIEVENTS;
+#  else
+      // numPapiEvents = 0;
+#  endif
     }
 
     // Constructor for user supplied data or memory usage record
@@ -122,19 +133,17 @@ class LogEntry {
     }
 
     // Constructor for multicast data
-    LogEntry(double tm, unsigned short m, unsigned short e, int ev, int p,
-	     int ml, CmiObjId *d, double rt, int numPe, const int *pelist){
-
-      type = CREATION_MULTICAST; 
-      mIdx = m; 
-      eIdx = e; 
-      event = ev; 
-      pe = p; 
-      time = tm; 
-      msglen = ml;
-      
-      if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=id.id[3]=-1; };
-      recvTime = rt; 
+    LogEntry(unsigned char type, double time, unsigned short mIdx, unsigned short eIdx,
+             int event, int pe, int msgLen, int numPe, const int* pelist)
+        : type(type),
+          time(time),
+          mIdx(mIdx),
+          eIdx(eIdx),
+          event(event),
+          pe(pe),
+          msglen(msgLen)
+    {
+      CkAssert(type == CREATION_MULTICAST);
       if (pelist != nullptr)
         pes.assign(pelist, pelist + numPe);
       else
@@ -335,7 +344,10 @@ class LogPool {
 
     void addCreationBroadcast(unsigned short mIdx, unsigned short eIdx, double time,
                               int event, int pe, int ml, int numPe);
-    void addCreationMulticast(unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., int numPe=0, const int *pelist=NULL);
+    void addCreationMulticast(unsigned short mIdx, unsigned short eIdx, double time,
+                              int event, int pe, int ml, int numPe,
+                              const int* pelist = nullptr);
+
     void flushLogBuffer();
     void postProcessLog();
 

@@ -495,8 +495,8 @@ void LogPool::flushLogBuffer()
     hasFlushed = true;
     numEntries = 0;
     lastCreationEvent = -1;
-    new (&pool[numEntries++]) LogEntry(writeTime, BEGIN_INTERRUPT);
-    new (&pool[numEntries++]) LogEntry(TraceTimer(), END_INTERRUPT);
+    new (&pool[numEntries++]) LogEntry(BEGIN_INTERRUPT, writeTime, 0, 0, 0, 0, 0, nullptr, 0, 0);
+    new (&pool[numEntries++]) LogEntry(END_INTERRUPT, TraceTimer(), 0, 0, 0, 0, 0, nullptr, 0, 0);
     //CkPrintf("Warning: Projections log flushed to disk on PE %d.\n", CkMyPe());
     if (!traceProjectionsGID.isZero()) {    // report flushing events to PE 0
       CProxy_TraceProjectionsBOC bocProxy(traceProjectionsGID);
@@ -575,7 +575,7 @@ void LogPool::add(UChar type, UShort mIdx, UShort eIdx,
     lastCreationEvent = numEntries;
   }
   new (&pool[numEntries++])
-    LogEntry(time, type, mIdx, eIdx, event, pe, ml, id, recvT, cpuT);
+    LogEntry(type, time, mIdx, eIdx, event, pe, ml, id, recvT, cpuT);
   if ((type == END_PHASE) || (type == END_COMPUTATION)) {
     numPhases++;
   }
@@ -659,14 +659,14 @@ void LogPool::addCreationBroadcast(unsigned short mIdx, unsigned short eIdx, dou
    pelist == NULL will be used to indicate a global broadcast with 
    num PEs.
 */
-void LogPool::addCreationMulticast(UShort mIdx, UShort eIdx, double time,
-				   int event, int pe, int ml, CmiObjId *id,
-				   double recvT, int numPe, const int *pelist)
+void LogPool::addCreationMulticast(UShort mIdx, UShort eIdx, double time, int event,
+                                   int pe, int ml, int numPe, const int* pelist)
 {
   lastCreationEvent = numEntries;
   new (&pool[numEntries++])
-    LogEntry(time, mIdx, eIdx, event, pe, ml, id, recvT, numPe, pelist);
-  if(poolSize==numEntries) {
+    LogEntry(CREATION_MULTICAST, time, mIdx, eIdx, event, pe, ml, numPe, pelist);
+  if (poolSize == numEntries)
+  {
     flushLogBuffer();
   }
 }
@@ -1263,12 +1263,12 @@ void TraceProjections::creationMulticast(envelope *e, int ep, int num,
   if (e==0) {
     CtvAccess(curThreadEvent)=curevent;
     _logPool->addCreationMulticast(ForChareMsg, ep, curTime, curevent++,
-				   CkMyPe(), 0, 0, 0.0, num, pelist);
+				   CkMyPe(), 0, num, pelist);
   } else {
     int type=e->getMsgtype();
     e->setEvent(curevent);
     _logPool->addCreationMulticast(type, ep, curTime, curevent++, CkMyPe(),
-				   e->getTotalsize(), 0, 0.0, num, pelist);
+				   e->getTotalsize(), num, pelist);
   }
 #endif
 }
