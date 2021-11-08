@@ -685,6 +685,8 @@ void LogEntry::pup(PUP::er &p)
 
   switch (type) {
     case USER_EVENT:
+      p|mIdx; p|itime; p|event; p|pe;
+      break;
     case USER_EVENT_PAIR:
     case BEGIN_USER_EVENT_PAIR:
     case END_USER_EVENT_PAIR:
