@@ -14,6 +14,7 @@
 #include <string>
 #include <algorithm>
 
+#include "charm.h"
 #include "trace.h"
 #include "trace-common.h"
 #include "ckhashtable.h"
@@ -49,7 +50,8 @@ class LogEntry {
     unsigned short mIdx;
     unsigned short eIdx;
     int msglen;
-    int nestedID; // Nested thread ID, e.g. virtual AMPI rank number
+    int nestedID;  // USER_EVENT_PAIR, BEGIN_USER_EVENT_PAIR, END_USER_EVENT_PAIR
+                   // Nested thread ID, e.g. virtual AMPI rank number
     CmiObjId   id;
     std::vector<int> pes;
     unsigned long memUsage;
@@ -72,9 +74,9 @@ class LogEntry {
 
     LogEntry(double tm, unsigned char t, unsigned short m=0, 
 	     unsigned short e=0, int ev=0, int p=0, int ml=0, 
-	     CmiObjId *d=NULL, double rt=0., double cputm=0., int numPe=0, double statVal=0., int _nestedID=0) {
+	     CmiObjId *d=NULL, double rt=0., double cputm=0., int numPe=0, double statVal=0.) {
       type = t; mIdx = m; eIdx = e; event = ev; pe = p; 
-      time = tm; msglen = ml; nestedID=_nestedID;
+      time = tm; msglen = ml;
       if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=id.id[3]=0; };
       recvTime = rt; cputime = cputm;
       // initialize for papi as well as non papi versions.
@@ -115,6 +117,15 @@ class LogEntry {
         pes.assign(pelist, pelist + numPe);
       else
         pes.resize(numPe);
+    }
+
+    // Constructor for user event pairs
+    LogEntry(unsigned char type, double time, unsigned short mIdx, int event,
+             int nestedID)
+        : type(type), time(time), mIdx(mIdx), event(event), nestedID(nestedID)
+    {
+      CkAssert(type == USER_EVENT_PAIR || type == BEGIN_USER_EVENT_PAIR ||
+               type == END_USER_EVENT_PAIR);
     }
 
     // complementary function for adding papi data
