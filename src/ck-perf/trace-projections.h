@@ -55,7 +55,7 @@ class LogEntry {
     CmiObjId   id;
     std::vector<int> pes;
     unsigned long memUsage;
-    double stat;	//Used for storing User Stats
+    double stat;  // USER_STAT
     std::string userSuppliedNote;
 
     // this is taken out so as to provide a placeholder value for non-PAPI
@@ -74,7 +74,7 @@ class LogEntry {
 
     LogEntry(double tm, unsigned char t, unsigned short m=0, 
 	     unsigned short e=0, int ev=0, int p=0, int ml=0, 
-	     CmiObjId *d=NULL, double rt=0., double cputm=0., int numPe=0, double statVal=0.) {
+	     CmiObjId *d=NULL, double rt=0., double cputm=0., int numPe=0) {
       type = t; mIdx = m; eIdx = e; event = ev; pe = p; 
       time = tm; msglen = ml;
       if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=id.id[3]=0; };
@@ -86,7 +86,6 @@ class LogEntry {
       //numPapiEvents = 0;
 #endif
       pes.resize(numPe);
-      stat=statVal;
     }
 
    // Constructor for bracketed user supplied note
@@ -126,6 +125,14 @@ class LogEntry {
     {
       CkAssert(type == USER_EVENT_PAIR || type == BEGIN_USER_EVENT_PAIR ||
                type == END_USER_EVENT_PAIR);
+    }
+
+    // Constructor for user stats
+    // TODO: Repurposes mIdx and cputime fields to store e and statTime, should clean up
+    LogEntry(unsigned char type, double time, int pe, int e, double stat, double statTime)
+        : type(type), time(time), pe(pe), mIdx(e), stat(stat), cputime(statTime)
+    {
+      CkAssert(type == USER_STAT);
     }
 
     // complementary function for adding papi data
@@ -288,7 +295,7 @@ class LogPool {
 
     void add(unsigned char type, unsigned short mIdx, unsigned short eIdx,
 	     double time, int event, int pe, int ml=0, CmiObjId* id=0, 
-	     double recvT=0.0, double cpuT=0.0, int numPe=0, double statVal=0.0);
+	     double recvT=0.0, double cpuT=0.0, int numPe=0);
 
     // complementary function to set papi info to current log entry
     // must be called after an add()
@@ -299,7 +306,7 @@ class LogPool {
 	/** add a record for a user supplied piece of data */
 	void addUserSupplied(int data);
 	/* Creates LogEntry for stat. Called by Trace-projections updateStat functions*/
-        void updateStat(unsigned char type,int e, double cputime,double time,double stat, int pe);
+	void addUserStat(double time, int pe, int e, double stat, double statTime);
 	/** add a record for a user supplied piece of data */
 	void addUserSuppliedNote(char *note);
 
