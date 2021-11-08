@@ -208,6 +208,10 @@ class LogEntry {
           pes.~vector<int>();
           break;
       }
+      // Make destruction idempotent
+      // Elements may get destroyed twice (once from flush, again at program end if their
+      // slot hasn't been written over)
+      type = INVALID;
     }
 
     // complementary function for adding papi data
