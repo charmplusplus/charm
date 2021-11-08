@@ -56,7 +56,7 @@ class LogEntry {
     std::vector<int> pes;  // CREATION_BCAST, CREATION_MULTICAST
     unsigned long memUsage;  // MEMORY_USAGE_CURRENT
     double stat;  // USER_STAT
-    std::string userSuppliedNote;
+    std::string userSuppliedNote;  // USER_SUPPLIED_NOTE, USER_SUPPLIED_BRACKETED_NOTE
 
     // this is taken out so as to provide a placeholder value for non-PAPI
     // versions (whose value is *always* zero).
@@ -87,14 +87,21 @@ class LogEntry {
 #endif
     }
 
-   // Constructor for bracketed user supplied note
-    LogEntry(double bt, double et, unsigned char _type, char *note, int eventID){
-      time = bt;
-      endTime = et;
-      type = _type;
-      event = eventID;
-      if(note != NULL)
-	setUserSuppliedNote(note);
+    // Constructor for user supplied note and bracketed user supplied note,
+    // event and endTime are only used for the bracketed version
+    LogEntry(unsigned char type, double time, char* note, int event = 0,
+             double endTime = 0)
+        : type(type), time(time), event(event), endTime(endTime)
+    {
+      CkAssert(type == USER_SUPPLIED_NOTE || type == USER_SUPPLIED_BRACKETED_NOTE);
+      if (note == nullptr)
+      {
+        userSuppliedNote.clear();
+        return;
+      }
+      userSuppliedNote = note;
+      std::replace(userSuppliedNote.begin(), userSuppliedNote.end(), '\n', ' ');
+      std::replace(userSuppliedNote.begin(), userSuppliedNote.end(), '\r', ' ');
     }
 
     // Constructor for multicast data
@@ -168,15 +175,6 @@ class LogEntry {
       userSuppliedData = data;
     }
 
-    void setUserSuppliedNote(char *note){
-      if (note == nullptr) {
-        userSuppliedNote.clear();
-        return;
-      }
-      userSuppliedNote = note;
-      std::replace(userSuppliedNote.begin(), userSuppliedNote.end(), '\n', ' ');
-      std::replace(userSuppliedNote.begin(), userSuppliedNote.end(), '\r', ' ');
-    }
 
     void *operator new(size_t s) {void*ret=malloc(s);_MEMCHECK(ret);return ret;}
     void *operator new(size_t, void *ptr) { return ptr; }
