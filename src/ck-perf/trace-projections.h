@@ -51,13 +51,6 @@ class LogEntry {
     unsigned short mIdx;
     unsigned short eIdx;
     int msglen;
-    int nestedID;  // USER_EVENT_PAIR, BEGIN_USER_EVENT_PAIR, END_USER_EVENT_PAIR
-                   // Nested thread ID, e.g. virtual AMPI rank number
-    CmiObjId   id;
-    std::vector<int> pes;  // CREATION_BCAST, CREATION_MULTICAST
-    unsigned long memUsage;  // MEMORY_USAGE_CURRENT
-    double stat;  // USER_STAT
-    std::string userSuppliedNote;  // USER_SUPPLIED_NOTE, USER_SUPPLIED_BRACKETED_NOTE
 
     // this is taken out so as to provide a placeholder value for non-PAPI
     // versions (whose value is *always* zero).
@@ -65,8 +58,25 @@ class LogEntry {
 #if CMK_HAS_COUNTER_PAPI
     LONG_LONG_PAPI papiValues[NUMPAPIEVENTS];
 #endif
-    int userSuppliedData;  // USER_SUPPLIED
     unsigned char type;
+
+    union
+    {
+      // MEMORY_USAGE_CURRENT
+      unsigned long memUsage;
+      // USER_STAT
+      double stat;
+      // USER_EVENT_PAIR, BEGIN_USER_EVENT_PAIR, END_USER_EVENT_PAIR
+      int nestedID;
+      // USER_SUPPLIED
+      int userSuppliedData;
+      // USER_SUPPLIED_NOTE, USER_SUPPLIED_BRACKETED_NOTE
+      std::string userSuppliedNote;
+      // CREATION_BCAST, CREATION_MULTICAST
+      std::vector<int> pes;
+      // All others
+      CmiObjId id;
+    };
 
   public:
     LogEntry() : type(INVALID) {}
@@ -119,12 +129,11 @@ class LogEntry {
     // event and endTime are only used for the bracketed version
     LogEntry(unsigned char type, double time, char* note, int event = 0,
              double endTime = 0)
-        : type(type), time(time), event(event), endTime(endTime)
+        : type(type), time(time), event(event), endTime(endTime), userSuppliedNote()
     {
       CkAssert(type == USER_SUPPLIED_NOTE || type == USER_SUPPLIED_BRACKETED_NOTE);
       if (note == nullptr)
       {
-        userSuppliedNote.clear();
         return;
       }
       userSuppliedNote = note;
@@ -141,13 +150,12 @@ class LogEntry {
           eIdx(eIdx),
           event(event),
           pe(pe),
-          msglen(msgLen)
+          msglen(msgLen),
+          pes(numPe)
     {
       CkAssert(type == CREATION_MULTICAST);
       if (pelist != nullptr)
         pes.assign(pelist, pelist + numPe);
-      else
-        pes.resize(numPe);
     }
 
     // Constructor for creation broadcast
@@ -161,10 +169,10 @@ class LogEntry {
           eIdx(eIdx),
           event(event),
           pe(pe),
-          msglen(msgLen)
+          msglen(msgLen),
+          pes(numPe)
     {
       CkAssert(type == CREATION_BCAST);
-      pes.resize(numPe);
     }
 
     // Constructor for user event pairs
@@ -182,6 +190,24 @@ class LogEntry {
         : type(type), time(time), pe(pe), mIdx(e), stat(stat), cputime(statTime)
     {
       CkAssert(type == USER_STAT);
+    }
+
+    ~LogEntry()
+    {
+      // Needed to call the destructors below
+      using namespace std;
+      // Destroy the field in the union if needed
+      switch (type)
+      {
+        case USER_SUPPLIED_NOTE:
+        case USER_SUPPLIED_BRACKETED_NOTE:
+          userSuppliedNote.~string();
+          break;
+        case CREATION_BCAST:
+        case CREATION_MULTICAST:
+          pes.~vector<int>();
+          break;
+      }
     }
 
     // complementary function for adding papi data
@@ -205,8 +231,6 @@ class LogEntry {
     }
 
     void pup(PUP::er &p);
-    ~LogEntry(){
-    }
 };
 
 class TraceProjections;
