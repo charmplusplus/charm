@@ -492,6 +492,10 @@ void LogPool::flushLogBuffer()
   if (numEntries) {
     double writeTime = TraceTimer();
     writeLog();
+    for (int i = 0; i < numEntries; i++)
+    {
+      pool[i].~LogEntry();
+    }
     hasFlushed = true;
     numEntries = 0;
     lastCreationEvent = -1;
