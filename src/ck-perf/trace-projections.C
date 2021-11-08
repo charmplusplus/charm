@@ -619,19 +619,20 @@ void LogPool::addUserSupplied(int data){
 	pool[numEntries-1].setUserSuppliedData(data);
 }
 
-
-void LogPool::addUserSuppliedNote(char *note){
-	// add an event
-	add(USER_SUPPLIED_NOTE, 0, 0, TraceTimer(), -1, -1, 0, 0, 0, 0);
-
-	// set the user supplied note for the previously created event 
-	pool[numEntries-1].setUserSuppliedNote(note);
+void LogPool::addUserSuppliedNote(char* note)
+{
+  new (&pool[numEntries++]) LogEntry(USER_SUPPLIED_NOTE, TraceTimer(), note);
+  if (poolSize == numEntries)
+  {
+    flushLogBuffer();
+  }
 }
 
-void LogPool::addUserSuppliedBracketedNote(char *note, int eventID, double bt, double et){
-  new (&pool[numEntries++])
-    LogEntry(bt, et, USER_SUPPLIED_BRACKETED_NOTE, note, eventID);
-  if(poolSize == numEntries){
+void LogPool::addUserSuppliedBracketedNote(char* note, int eventID, double bt, double et)
+{
+  new (&pool[numEntries++]) LogEntry(USER_SUPPLIED_BRACKETED_NOTE, bt, note, eventID, et);
+  if (poolSize == numEntries)
+  {
     flushLogBuffer();
   }
 }
