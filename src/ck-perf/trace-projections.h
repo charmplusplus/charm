@@ -192,6 +192,49 @@ class LogEntry {
       CkAssert(type == USER_STAT);
     }
 
+    // Copy constuctor
+    LogEntry(const LogEntry& other)
+        : type(other.type),
+          time(other.time),
+          mIdx(other.mIdx),
+          eIdx(other.eIdx),
+          event(other.event),
+          pe(other.pe),
+          msglen(other.msglen),
+          recvTime(other.recvTime),
+          cputime(other.cputime),
+          endTime(other.endTime)
+    {
+      switch (type)
+      {
+        case MEMORY_USAGE_CURRENT:
+          memUsage = other.memUsage;
+          break;
+        case USER_STAT:
+          stat = other.stat;
+          break;
+        case USER_EVENT_PAIR:
+        case BEGIN_USER_EVENT_PAIR:
+        case END_USER_EVENT_PAIR:
+          nestedID = other.nestedID;
+          break;
+        case USER_SUPPLIED:
+          userSuppliedData = other.userSuppliedData;
+          break;
+        case USER_SUPPLIED_NOTE:
+        case USER_SUPPLIED_BRACKETED_NOTE:
+          new (&userSuppliedNote) std::string(other.userSuppliedNote);
+          break;
+        case CREATION_BCAST:
+        case CREATION_MULTICAST:
+          new (&pes) std::vector<int>(other.pes);
+          break;
+        default:
+          id = other.id;
+          break;
+      }
+    }
+
     ~LogEntry()
     {
       // Needed to call the destructors below
@@ -208,10 +251,6 @@ class LogEntry {
           pes.~vector<int>();
           break;
       }
-      // Make destruction idempotent
-      // Elements may get destroyed twice (once from flush, again at program end if their
-      // slot hasn't been written over)
-      type = INVALID;
     }
 
     // complementary function for adding papi data
@@ -259,12 +298,10 @@ class LogPool {
 #if CMK_USE_ZLIB
     bool compressed;
 #endif
-    unsigned int poolSize;
-    unsigned int numEntries;
     unsigned int lastCreationEvent;
     int numPhases;
     int nSubdirs;
-    LogEntry *pool;
+    std::vector<LogEntry> pool;
     FILE *fp;
     FILE *deltafp;
     FILE *stsfp;
@@ -353,9 +390,7 @@ class LogPool {
 
     // complementary function to set papi info to current log entry
     // must be called after an add()
-    void addPapi(LONG_LONG_PAPI *papVals) {
-      pool[numEntries-1].addPapi(papVals);
-    }
+    void addPapi(LONG_LONG_PAPI* papVals) { pool.back().addPapi(papVals); }
 
 	/** add a record for a user supplied piece of data */
 	void addUserSupplied(int data);
@@ -376,7 +411,7 @@ class LogPool {
                               int event, int pe, int ml, int numPe,
                               const int* pelist = nullptr);
 
-    void flushLogBuffer();
+    void flushLogBuffer(bool force = false);
     void postProcessLog();
 
     void setWriteData(bool b){
@@ -384,8 +419,12 @@ class LogPool {
     }
     void modLastEntryTimestamp(double ts);
 
-    void setNewStartTime() {
-      for(UInt i=0; i<numEntries; i++) pool[i].setNewStartTime(globalStartTime);
+    void setNewStartTime()
+    {
+      for (auto& entry : pool)
+      {
+        entry.setNewStartTime(globalStartTime);
+      }
     }
 };
 
