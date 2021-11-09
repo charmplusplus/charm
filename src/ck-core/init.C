@@ -1452,7 +1452,9 @@ void _initCharm(int unused_argc, char **argv)
 	CmiRdmaDeviceRecvInit(CkRdmaDeviceRecvHandler);
 #endif
 
+#if CMK_USE_SHMEM
   CmiIpcInit(argv);
+#endif
 
 	// Set the ack handler function used for the entry method p2p api and entry method bcast api
 	initEMNcpyAckHandler();
