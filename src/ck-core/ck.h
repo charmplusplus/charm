@@ -92,15 +92,20 @@ inline void _IpcCldPrepare(void* msg, int infofn) {
 
 template <bool Node>
 inline bool _IpcSendImpl(int thisNode, int dstPe, envelope* env) {
+  auto* manager =
+    CpvInitialized(coreIpcManager_)
+      ? CpvAccess(coreIpcManager_)
+      : nullptr;
+
   int nPes;
   int* pes;
-
   CmiIpcBlock* block;
+
   try {
     if (Node) {
-      block = CmiMsgToBlock((char*)env, env->getTotalsize(), CmiNodeOf(dstPe));
+      block = CmiMsgToIpcBlock(manager, (char*)env, env->getTotalsize(), CmiNodeOf(dstPe));
     } else {
-      block = CmiMsgToBlock((char*)env, env->getTotalsize(), CmiNodeOf(dstPe), CmiRankOf(dstPe));
+      block = CmiMsgToIpcBlock(manager, (char*)env, env->getTotalsize(), CmiNodeOf(dstPe), CmiRankOf(dstPe));
     }
   } catch (std::bad_alloc) {
     block = nullptr;
@@ -111,7 +116,7 @@ inline bool _IpcSendImpl(int thisNode, int dstPe, envelope* env) {
   }
 
   // spin until we succeed!
-  while (!CmiPushBlock(block))
+  while (!CmiPushIpcBlock(manager, block))
     ;
 
   return true;
@@ -120,7 +125,7 @@ inline bool _IpcSendImpl(int thisNode, int dstPe, envelope* env) {
 template <bool Node, bool Cld>
 inline bool _tryIpcSend(int dst, envelope* env, int infofn) {
   auto len = env->getTotalsize();
-  if (len > CmiRecommendedBlockCutoff()) {
+  if (len > CmiRecommendedIpcBlockCutoff()) {
     return false;
   } else if ((dst == CLD_ANYWHERE) || (dst == CLD_BROADCAST) ||
              (dst == CLD_BROADCAST_ALL)) {

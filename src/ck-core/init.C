@@ -1452,8 +1452,11 @@ void _initCharm(int unused_argc, char **argv)
 	CmiRdmaDeviceRecvInit(CkRdmaDeviceRecvHandler);
 #endif
 
+  CmiIpcInit(argv);
+
 	// Set the ack handler function used for the entry method p2p api and entry method bcast api
 	initEMNcpyAckHandler();
+
 	/**
 	  The rank-0 processor of each node calls the 
 	  translator-generated "_register" routines. 
@@ -1657,14 +1660,17 @@ void _initCharm(int unused_argc, char **argv)
 #endif
 
 #if CMK_USE_SHMEM
+    CpvInitialize(CmiIpcManager*, coreIpcManager_);
+    CmiNodeAllBarrier();
 #if CMK_SMP
     if (CmiInCommThread()) {
-      CmiInitIpcMetadata(argv, nullptr);
+      CpvAccess(coreIpcManager_) = CmiMakeIpcManager(nullptr);
     } else
 #endif
     {
       auto th = CthSelf();
-      CmiInitIpcMetadata(argv, th);
+      CpvAccess(coreIpcManager_) = CmiMakeIpcManager(th);
+      CmiAssert(CthIsSuspendable(th));
       CthSuspend();
     }
 #endif

@@ -46,50 +46,54 @@ struct CmiIpcBlock {
   char padding[(sizeof(blockSizeHelper_) % ALIGN_BYTES)];
 };
 
-void CmiInitIpcMetadata(char** argv, CthThread th);
-void CmiIpcBlockCallback(int cond = CcdSCHEDLOOP);
+struct CmiIpcManager;
 
-bool CmiPushBlock(CmiIpcBlock*);
-CmiIpcBlock* CmiPopBlock(void);
+void CmiIpcInit(char** argv);
+CmiIpcManager* CmiMakeIpcManager(CthThread th);
+// void CmiIpcBlockCallback(int cond = CcdSCHEDLOOP);
+
+bool CmiPushIpcBlock(CmiIpcManager*, CmiIpcBlock*);
+CmiIpcBlock* CmiPopIpcBlock(CmiIpcManager*);
 
 // tries to allocate a block, returning null if unsucessful
 // (fails when other PEs are contending resources)
 // note: throws bad_alloc if we ran out of memory
-CmiIpcBlock* CmiAllocBlock(int node, std::size_t size);
+CmiIpcBlock* CmiAllocIpcBlock(CmiIpcManager*, int node, std::size_t size);
 
 // frees a block -- enabling it to be used again
-void CmiFreeBlock(CmiIpcBlock*);
+void CmiFreeIpcBlock(CmiIpcManager*, CmiIpcBlock*);
 
 // currently a no-op but may be eventually usable
 // intended to "capture" blocks from remote pes
-inline void CmiCacheBlock(CmiIpcBlock*) { return; }
+inline void CmiCacheIpcBlock(CmiIpcBlock*) { return; }
 
 // identifies whether a void* is the payload of a block
-CmiIpcBlock* CmiIsBlock(void*);
+// belonging to the given node
+CmiIpcBlock* CmiIsIpcBlock(CmiIpcManager*, void*, int node);
 
 // if (init) is true -- initializes the
 // memory segment for use as a message
-void* CmiBlockToMsg(CmiIpcBlock*, bool init);
+void* CmiIpcBlockToMsg(CmiIpcBlock*, bool init);
 
 // equivalent to calling above with (init = false)
-inline void* CmiBlockToMsg(CmiIpcBlock* block) {
+inline void* CmiIpcBlockToMsg(CmiIpcBlock* block) {
   auto res = (char*)block + sizeof(CmiIpcBlock) + sizeof(CmiChunkHeader);
   return (void*)res;
 }
 
-inline CmiIpcBlock* CmiMsgToBlock(void* msg) {
-  return CmiIsBlock((char*)msg - sizeof(CmiChunkHeader));
+inline CmiIpcBlock* CmiMsgToIpcBlock(CmiIpcManager* manager, void* msg) {
+  return CmiIsIpcBlock(manager, (char*)msg - sizeof(CmiChunkHeader), CmiMyNode());
 }
 
 // note -- can throw std::bad_alloc if out of memory
-CmiIpcBlock* CmiMsgToBlock(char* msg, std::size_t len, int node,
+CmiIpcBlock* CmiMsgToIpcBlock(CmiIpcManager*, char* msg, std::size_t len, int node,
                            int rank = cmi::ipc::nodeDatagram,
                            int timeout = cmi::ipc::defaultTimeout);
 
 // deliver a block as a message
-void CmiDeliverBlockMsg(CmiIpcBlock*);
+void CmiDeliverIpcBlockMsg(CmiIpcBlock*);
 
-inline const std::size_t& CmiRecommendedBlockCutoff(void) {
+inline const std::size_t& CmiRecommendedIpcBlockCutoff(void) {
   using namespace cmi::ipc;
   return CpvAccess(kRecommendedCutoff);
 }

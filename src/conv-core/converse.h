@@ -2287,6 +2287,7 @@ extern double CmiLog2(double);
 
 #if CMK_USE_SHMEM
 #include "cmishmem.h"
+CpvExtern(CmiIpcManager*, coreIpcManager_);
 #endif
 #endif
 

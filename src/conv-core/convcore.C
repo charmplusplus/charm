@@ -284,6 +284,10 @@ CpvDeclare(Queue, CsdTaskQueue);
 CpvDeclare(void *, CmiSuspendedTaskQueue);
 #endif
 
+#if CMK_USE_SHMEM
+CpvDeclare(CmiIpcManager*, coreIpcManager_);
+#endif
+
 CpvDeclare(int, isHelperOn);
 
 extern int CmiMyLocalRank;
@@ -3426,10 +3430,17 @@ void CmiFree(void *blk)
 #endif
 
 #if CMK_USE_SHMEM
-    // if this is an ipc block, we need to free it as such
+    auto* manager =
+      CpvInitialized(coreIpcManager_)
+        ? CpvAccess(coreIpcManager_)
+        : nullptr;
+    // we should only free _our_ IPC blocks -- so calling CmiFree on
+    // an IPC block issued by another process will cause a bad free!
+    // (note -- this would only occur if you alloc an ipc block then
+    //          decide not to send it; that should be avoided! )
     CmiIpcBlock* ipc;
-    if (blk && (ipc = CmiIsBlock(BLKSTART(blk)))) {
-      CmiFreeBlock(ipc);
+    if (blk && (ipc = CmiIsIpcBlock(manager, BLKSTART(blk), CmiMyNode()))) {
+      CmiFreeIpcBlock(manager, ipc);
       return;
     }
 #endif

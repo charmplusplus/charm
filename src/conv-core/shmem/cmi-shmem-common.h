@@ -2,6 +2,7 @@
 #define CMI_SHMEM_COMMON_HH
 
 #include <converse.h>
+#include <cmishmem.h>
 
 #include <array>
 #include <limits>
@@ -15,10 +16,10 @@ namespace cmi {
 namespace ipc {
 CpvDeclare(std::size_t, kRecommendedCutoff);
 }
-}
+}  // namespace cmi
 
 CpvStaticDeclare(std::size_t, kSegmentSize);
-constexpr std::size_t kDefaultSegmentSize = 8*1024*1024;
+constexpr std::size_t kDefaultSegmentSize = 8 * 1024 * 1024;
 
 constexpr std::size_t kNumCutOffPoints = 25;
 const std::array<std::size_t, kNumCutOffPoints> kCutOffPoints = {
@@ -28,9 +29,6 @@ const std::array<std::size_t, kNumCutOffPoints> kCutOffPoints = {
     134217728, 268435456, 536870912, 1073741824};
 
 struct ipc_metadata_;
-using ipc_metadata_ptr_ = std::unique_ptr<ipc_metadata_>;
-CsvStaticDeclare(ipc_metadata_ptr_, metadata_);
-
 #if CMK_SMP
 CsvStaticDeclare(CmiNodeLock, sleeper_lock);
 #endif
@@ -60,8 +58,10 @@ struct ipc_metadata_ {
   std::map<int, ipc_shared_*> shared;
   // physical node rank
   int mine;
+  // key of this instance
+  std::size_t key;
   // base constructor
-  ipc_metadata_(void) : mine(CmiMyNode()) {}
+  ipc_metadata_(std::size_t key_) : mine(CmiMyNode()), key(key_) {}
   // virtual destructor may be needed
   virtual ~ipc_metadata_() {}
 };
@@ -92,8 +92,9 @@ inline void initSegmentSize_(char** argv) {
   CmiEnforceMsg(CpvAccess(kSegmentSize), "segment size must be non-zero!");
   using namespace cmi::ipc;
   CpvInitialize(std::size_t, kRecommendedCutoff);
-  if (CmiGetArgLongDesc(argv, "+ipccutoff", &value, "enforce cutoff for ipc blocks")) {
-    auto bin = whichBin_((std::size_t)value);  
+  if (CmiGetArgLongDesc(argv, "+ipccutoff", &value,
+                        "enforce cutoff for ipc blocks")) {
+    auto bin = whichBin_((std::size_t)value);
     CmiEnforceMsg(bin < kNumCutOffPoints, "ipc cutoff out of range!");
     CpvAccess(kRecommendedCutoff) = kCutOffPoints[bin];
   } else {
@@ -129,5 +130,9 @@ inline static void putSleeper_(CthThread th) {
 }
 
 static void awakenSleepers_(void);
+
+using ipc_manager_ptr_ = std::unique_ptr<CmiIpcManager>;
+using ipc_manager_map_ = std::vector<ipc_manager_ptr_>;
+CsvStaticDeclare(ipc_manager_map_, managers_);
 
 #endif
