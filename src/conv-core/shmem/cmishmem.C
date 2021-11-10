@@ -189,7 +189,7 @@ static std::uintptr_t allocBlock_(ipc_shared_* meta, std::size_t size) {
   }
 }
 
-// TODO ( find a better way to do this )
+// NOTE ( there may be a faster way to do this? )
 inline std::size_t whichBin_(std::size_t size) {
   std::size_t bin;
   for (bin = 0; bin < kNumCutOffPoints; bin++) {
