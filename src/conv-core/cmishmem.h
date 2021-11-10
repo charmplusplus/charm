@@ -22,6 +22,7 @@ constexpr auto defaultTimeout = 4;
 }  // namespace ipc
 }  // namespace cmi
 
+// TODO ( find better names than src/dst? )
 #define CMK_IPC_BLOCK_FIELDS \
   int src;                   \
   std::uintptr_t orig;       \
@@ -29,7 +30,6 @@ constexpr auto defaultTimeout = 4;
   std::uintptr_t next;       \
   std::size_t size;
 
-// TODO ( generate better names than src/dst )
 struct CmiIpcBlock {
   // "home" rank of the block
  private:
@@ -48,10 +48,14 @@ struct CmiIpcBlock {
 
 struct CmiIpcManager;
 
+// sets up ipc environment
 void CmiIpcInit(char** argv);
-CmiIpcManager* CmiMakeIpcManager(CthThread th);
-// void CmiIpcBlockCallback(int cond = CcdSCHEDLOOP);
 
+// creates an ipc manager, waking the thread when it's done
+// ( this must be called in the same order on all pes! )
+CmiIpcManager* CmiMakeIpcManager(CthThread th);
+
+// push/pop blocks from the manager's send/recv queue
 bool CmiPushIpcBlock(CmiIpcManager*, CmiIpcBlock*);
 CmiIpcBlock* CmiPopIpcBlock(CmiIpcManager*);
 

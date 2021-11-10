@@ -125,7 +125,8 @@ inline bool _IpcSendImpl(int thisNode, int dstPe, envelope* env) {
 template <bool Node, bool Cld>
 inline bool _tryIpcSend(int dst, envelope* env, int infofn) {
   auto len = env->getTotalsize();
-  if (len > CmiRecommendedIpcBlockCutoff()) {
+  // include padding for the chunk size header
+  if (len > (CmiRecommendedIpcBlockCutoff() + sizeof(CmiChunkHeader))) {
     return false;
   } else if ((dst == CLD_ANYWHERE) || (dst == CLD_BROADCAST) ||
              (dst == CLD_BROADCAST_ALL)) {

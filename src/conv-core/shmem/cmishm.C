@@ -117,7 +117,7 @@ static void openAllShared_(CmiIpcManager* meta) {
     meta->fds[proc] = res.first;
     meta->shared[proc] = res.second;
   }
-  CmiPrintf("%d> finished opening all shared\n", meta->mine);
+  DEBUGP(("%d> finished opening all shared\n", meta->mine));
 }
 
 // returns number of processes in node
@@ -229,13 +229,13 @@ CmiIpcManager* CmiMakeIpcManager(CthThread th) {
     auto* manager = new CmiIpcManager(key);
     CsvAccess(managers_).emplace_back(manager);
 #if CMK_SMP
-    // ensure all sleepers are reg'd
+    // signal the metadata is ready
     CmiNodeAllBarrier();
 #endif
     return manager;
   } else {
 #if CMK_SMP
-    // ensure all sleepers are reg'd
+    // pause until the metadata is ready
     CmiNodeAllBarrier();
 #endif
     return CsvAccess(managers_).back().get();

@@ -27,8 +27,8 @@ struct init_msg_ {
   ipc_shared_* shared;
 };
 
-// TODO ( detach xpmem segments at close )
-// ( not urgently needed since xpmem does it for us )
+// NOTE ( we should eventually detach xpmem segments at close )
+//      ( it's not urgently needed since xpmem does it for us )
 struct CmiIpcManager : public ipc_metadata_ {
   // maps ranks to segments
   std::map<int, xpmem_segid_t> segments;
@@ -82,7 +82,6 @@ struct CmiIpcManager : public ipc_metadata_ {
 
 void* translateAddr_(ipc_manager_ptr_& meta, int proc, void* remote_ptr,
                      const std::size_t& size) {
-  // TODO ( add support for SMP mode )
   if (proc == meta->mine) {
     return remote_ptr;
   } else {
@@ -151,6 +150,7 @@ CmiIpcManager* CmiMakeIpcManager(CthThread th) {
     CsvAccess(managers_).emplace_back(meta);
   } else {
 #if CMK_SMP
+    // pause until the metadata is ready
     CmiNodeAllBarrier();
 #endif
     return CsvAccess(managers_).back().get();
@@ -195,6 +195,7 @@ CmiIpcManager* CmiMakeIpcManager(CthThread th) {
   }
 
 #if CMK_SMP
+  // signal that the metadata is ready
   CmiNodeAllBarrier();
 #endif
 

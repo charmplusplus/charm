@@ -55,6 +55,7 @@ public:
 protected:
   virtual void Strategy(const LDStats* const myStats);
   void ProcessMigrationDecision(LBMigrateMsg* migrateMsg);
+  void MigrationDone(int balancing);  // Call when migration is complete
 
   LDStats myStats;
   int migrates_expected;
@@ -69,7 +70,6 @@ private:
   LBMigrateMsg** mig_msgs;
 
   void AssembleStats();
-  void MigrationDone(int balancing);  // Call when migration is complete
 };
 
 #endif /* _DISTBASELB_H */
