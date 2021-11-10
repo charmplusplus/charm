@@ -1,4 +1,6 @@
-#if CMI_HAS_XPMEM
+#include "conv-autoconfig.h"
+
+#if CMK_HAS_XPMEM
 #include "cmixpmem.C"
 #else
 #include "cmishm.C"
@@ -36,8 +38,7 @@ CmiIpcBlock* CmiMsgToIpcBlock(CmiIpcManager* manager, char* src, std::size_t len
                            int node, int rank, int timeout) {
   char* dst;
   CmiIpcBlock* block;
-  if ((block = CmiIsIpcBlock(manager, BLKSTART(src), node))) {
-    CmiPrintf("reusing message?\n");
+  if ((block = CmiIsIpcBlock(manager, BLKSTART(src), node)) && (node == block->src)) {
     dst = src;
   } else {
     if (timeout > 0) {
@@ -163,9 +164,7 @@ CmiIpcBlock* CmiIsIpcBlock(CmiIpcManager* meta, void* addr, int node) {
   auto* begin = (char*)shared;
   auto* end = begin + shared->max;
   if (begin < addr && addr < end) {
-    auto* block = (CmiIpcBlock*)((char*)addr - sizeof(CmiIpcBlock));
-    CmiAssert(block->src == node);
-    return block;
+    return (CmiIpcBlock*)((char*)addr - sizeof(CmiIpcBlock));
   } else {
     return nullptr;
   }

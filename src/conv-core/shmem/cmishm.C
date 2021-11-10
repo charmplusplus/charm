@@ -117,7 +117,7 @@ static void openAllShared_(CmiIpcManager* meta) {
     meta->fds[proc] = res.first;
     meta->shared[proc] = res.second;
   }
-  CmiPrintf("%d> finished opening all shared\n", meta->mine);
+  DEBUGP(("%d> finished opening all shared\n", meta->mine));
 }
 
 // returns number of processes in node
