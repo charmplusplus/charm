@@ -284,7 +284,7 @@ if(${CMK_USE_ZLIB})
 endif()
 
 if(${CMK_USE_SHMEM})
-  if(${CMK_USE_XPMEM})
+  if(${CMI_HAS_XPMEM})
     set(CMK_SYSLIBS "${CMK_SYSLIBS} -lxpmem")
   else()
     set(CMK_SYSLIBS "${CMK_SYSLIBS} -lrt")

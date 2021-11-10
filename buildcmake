@@ -284,6 +284,10 @@ function processArgs() {
       --enable-shmem)
         opt_shmem=1
         ;;
+      --enable-xpmem)
+        opt_shmem=1
+        opt_xpmem=1 # XPMEM implies SHMEM
+        ;;
       --enable-ampi-error-checking)
         opt_ampi_error_checking=1
         ;;
@@ -595,7 +599,7 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
   -DPTHREADS="$opt_pthreads" \
   -DPXSHM="$opt_pxshm" \
   -DCMK_USE_SHMEM="$opt_shmem" \
-  -DCMK_USE_XPMEM="$opt_xpmem" \
+  -DCMI_HAS_XPMEM="$opt_xpmem" \
   -DQLOGIC="$opt_qlogic" \
   -DRANDOMIZED_MSGQ="$opt_randomized_msgq" \
   -DREFNUM_TYPE="$opt_refnum_type" \
