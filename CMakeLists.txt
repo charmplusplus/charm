@@ -284,12 +284,11 @@ if(${CMK_USE_ZLIB})
 endif()
 
 if(${CMK_USE_SHMEM})
-  # assert CMK_HAS_MMAP
-  #find_package(XPMEM)
-  #if(XPMEM_FOUND)
-  #set(CMK_USE_XPMEM 1)
-  #else
-  set(CMK_SYSLIBS "${CMK_SYSLIBS} -lrt")
+  if(${CMK_USE_XPMEM})
+    set(CMK_SYSLIBS "${CMK_SYSLIBS} -lxpmem")
+  else()
+    set(CMK_SYSLIBS "${CMK_SYSLIBS} -lrt")
+  endif()
 endif()
 
 set(CMK_USE_LIBJPEG 0)
@@ -661,6 +660,10 @@ endif()
 if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-pxshm.sh)
   configure_file(src/arch/${VDIR}/conv-mach-pxshm.sh         include/ COPYONLY)
   configure_file(src/arch/${VDIR}/conv-mach-pxshm.h          include/ COPYONLY)
+endif()
+
+if(${CMK_USE_SHMEM} AND EXISTS ${CMAKE_SOURCE_DIR}/src/conv-core/cmishmem.h)
+  configure_file(src/conv-core/cmishmem.h                    include/ COPYONLY)
 endif()
 
 if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-sysvshm.sh)

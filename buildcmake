@@ -124,6 +124,7 @@ opt_production=0
 opt_pthreads=0
 opt_pxshm=0
 opt_shmem=0
+opt_xpmem=0
 opt_qlogic=0
 opt_randomized_msgq=0
 opt_refnum_type="unsigned short"
@@ -594,6 +595,7 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
   -DPTHREADS="$opt_pthreads" \
   -DPXSHM="$opt_pxshm" \
   -DCMK_USE_SHMEM="$opt_shmem" \
+  -DCMK_USE_XPMEM="$opt_xpmem" \
   -DQLOGIC="$opt_qlogic" \
   -DRANDOMIZED_MSGQ="$opt_randomized_msgq" \
   -DREFNUM_TYPE="$opt_refnum_type" \
