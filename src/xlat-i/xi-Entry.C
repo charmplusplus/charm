@@ -1952,10 +1952,9 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
       str << "  } else {\n";
     }
     genRegularCall(str, preCall, redn_wrapper, usesImplBuf, false);
-    if(param->hasRecvRdma() || param->hasDevice()) {
+    if (param->hasRecvRdma() || param->hasDevice()) {
       str << "  }\n";
     }
-
   }
 }
 
