@@ -84,16 +84,38 @@ inline static ipc_shared_* makeIpcShared_(void) {
 }
 
 inline void initSegmentSize_(char** argv) {
-  CpvInitialize(std::size_t, kSegmentSize);
-  CmiInt8 value;
-  auto flag =
-      CmiGetArgLongDesc(argv, "++ipcpoolsize", &value, "bytes per ipc segment");
-  CpvAccess(kSegmentSize) = flag ? (std::size_t)value : kDefaultSegmentSize;
-  CmiEnforceMsg(CpvAccess(kSegmentSize), "segment size must be non-zero!");
   using namespace cmi::ipc;
   CpvInitialize(std::size_t, kRecommendedCutoff);
-  if (CmiGetArgLongDesc(argv, "++ipccutoff", &value,
-                        "enforce cutoff for ipc blocks")) {
+  CpvInitialize(std::size_t, kSegmentSize);
+#if CMK_CHARM4PY
+  char* s;
+  long long ll;
+
+  if ((s = getenv(CMI_IPC_POOL_SIZE_ENV_VAR)) && (ll = atoll(s)) >= 0) {
+    CpvAccess(kSegmentSize) = (std::size_t)ll;
+  } else {
+    CpvAccess(kSegmentSize) = kDefaultSegmentSize;
+  }
+
+  std::size_t max;
+  std::intptr_t bin;
+  if ((s = getenv(CMI_IPC_CUTOFF_ENV_VAR)) && (ll = atoll(s)) >= 0) {
+    max = (std::size_t)ll;
+    bin = (std::intptr_t)whichBin_(max);
+  } else {
+    max = CpvAccess(kSegmentSize) / kNumCutOffPoints;
+    bin = (std::intptr_t)whichBin_(max) - 1;
+  }
+
+  CmiEnforceMsg(bin < kNumCutOffPoints, "ipc cutoff out of range!");
+  CpvAccess(kRecommendedCutoff) = kCutOffPoints[(bin >= 0) ? bin : 0];
+#else
+  CmiInt8 value;
+  auto flag =
+      CmiGetArgLongDesc(argv, "++" CMI_IPC_POOL_SIZE_ARG, &value, CMI_IPC_POOL_SIZE_DESC);
+  CpvAccess(kSegmentSize) = flag ? (std::size_t)value : kDefaultSegmentSize;
+  CmiEnforceMsg(CpvAccess(kSegmentSize), "segment size must be non-zero!");
+  if (CmiGetArgLongDesc(argv, "++" CMI_IPC_CUTOFF_ARG, &value, CMI_IPC_CUTOFF_DESC)) {
     auto bin = whichBin_((std::size_t)value);
     CmiEnforceMsg(bin < kNumCutOffPoints, "ipc cutoff out of range!");
     CpvAccess(kRecommendedCutoff) = kCutOffPoints[bin];
@@ -102,6 +124,7 @@ inline void initSegmentSize_(char** argv) {
     auto bin = (std::intptr_t)whichBin_(max) - 1;
     CpvAccess(kRecommendedCutoff) = kCutOffPoints[(bin >= 0) ? bin : 0];
   }
+#endif
 }
 
 inline static void printIpcStartupMessage_(const char* implName) {
