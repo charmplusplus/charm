@@ -276,6 +276,10 @@ class Chare {
 #endif
 };
 
+// libraries can query this flag to
+// perform bookkeeping accordingly
+#define CMK_HAS_CKCALLSTACK 1
+
 void CkCallstackPop(Chare *obj);
 void CkCallstackPush(Chare *obj);
 void CkCallstackUnwind(Chare *obj);
