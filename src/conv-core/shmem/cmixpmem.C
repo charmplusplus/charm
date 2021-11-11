@@ -117,8 +117,7 @@ static void handleInitialize_(void* msg) {
   if (meta->nPeers == meta->shared.size()) {
     // resume the sleeping thread
     if (CmiMyPe() == 0) {
-      CmiPrintf("CMI> xpmem pool init'd with %luB segment.\n",
-                CpvAccess(kSegmentSize));
+      printIpcStartupMessage_("xpmem");
     }
 
     awakenSleepers_();

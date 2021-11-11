@@ -176,8 +176,7 @@ static void callbackHandler_(void* msg) {
       return;
     } else {
       // otherwise -- tell everyone we're ready!
-      CmiPrintf("CMI> posix shm pool init'd with %luB segment.\n",
-                CpvAccess(kSegmentSize));
+      printIpcStartupMessage_("pxshm");
       procBroadcastAndFree_((char*)msg, sizeof(pid_message_));
     }
   } else {

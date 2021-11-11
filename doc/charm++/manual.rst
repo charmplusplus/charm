@@ -10976,6 +10976,34 @@ superclass to do the final delivery after you’ve sent your messages.
 Experimental Features
 =====================
 
+CMI-SHMEM
+---------
+CMI-SHMEM is an experimental IPC module for Charm++, with the goal of
+adding fast IPC to any machine layer. Each process opens a shared segment
+containing an MPSC queue and a memory pool. Processes can allocate "blocks"
+of memory from their peers pools, and "push" them onto their MPSC queue.
+This is mechanically similar to the PXSHM layer, but "address-free" atomics
+are used for synchronization instead of memory fences, etc. The C++ recommends
+that its atomics are address-free, i.e., ordering is enforced no matter which
+virtual address is used to access a physical address; however, this is not
+guaranteed. In practice, all modern compilers comply with this recommendation,
+but please alert us if you encounter synchronization issues!
+
+To build with CMI-SHMEM, pass ``--enable-shmem`` (to use PXSHM) or
+``--enable-xpmem`` (to use XPMEM) as command-line options to a Charm++ build;
+only CMake builds are supported at this time. By default, Charm++ will only
+use CMI-SHMEM for "small" messages, after which it is recommended to use other
+IPC mechanisms like the Zero-Copy API. You can alter this behavior with the
+command line options ``++ipcpoolsize`` and ``++ipccutoff``, these change the size
+of the shared pool of memory and maximum message size (in bytes), respectively.
+For example, this command will run ``a.out`` with a 128MB IPC pool size and
+a 256KB message cutoff:
+``./charmrun ++local ++auto-provision ./a.out ++ipcpoolsize $((128*1024*1024)) ++ipccutoff $((256*1024))``
+
+Note, Charm++ maintains and polls a CMI-SHMEM IPC manager. Libraries can
+instantiate their own CMI-SHMEM IPC manager should they require custom IPC
+behaviors. For details, please consult the notes in ``cmishmem.h``.
+
 .. _sec:controlpoint:
 
 Control Point Automatic Tuning

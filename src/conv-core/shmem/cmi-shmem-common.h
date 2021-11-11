@@ -87,12 +87,12 @@ inline void initSegmentSize_(char** argv) {
   CpvInitialize(std::size_t, kSegmentSize);
   CmiInt8 value;
   auto flag =
-      CmiGetArgLongDesc(argv, "+segmentsize", &value, "bytes per ipc segment");
+      CmiGetArgLongDesc(argv, "++ipcpoolsize", &value, "bytes per ipc segment");
   CpvAccess(kSegmentSize) = flag ? (std::size_t)value : kDefaultSegmentSize;
   CmiEnforceMsg(CpvAccess(kSegmentSize), "segment size must be non-zero!");
   using namespace cmi::ipc;
   CpvInitialize(std::size_t, kRecommendedCutoff);
-  if (CmiGetArgLongDesc(argv, "+ipccutoff", &value,
+  if (CmiGetArgLongDesc(argv, "++ipccutoff", &value,
                         "enforce cutoff for ipc blocks")) {
     auto bin = whichBin_((std::size_t)value);
     CmiEnforceMsg(bin < kNumCutOffPoints, "ipc cutoff out of range!");
@@ -102,6 +102,13 @@ inline void initSegmentSize_(char** argv) {
     auto bin = (std::intptr_t)whichBin_(max) - 1;
     CpvAccess(kRecommendedCutoff) = kCutOffPoints[(bin >= 0) ? bin : 0];
   }
+}
+
+inline static void printIpcStartupMessage_(const char* implName) {
+  using namespace cmi::ipc;
+  CmiPrintf("CMI> %s pool init'd with %luB segment and %luB cutoff.\n",
+            implName, CpvAccess(kSegmentSize),
+            CpvAccess(kRecommendedCutoff));
 }
 
 inline static void initSleepers_(void) {
