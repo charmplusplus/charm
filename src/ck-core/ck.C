@@ -658,7 +658,7 @@ void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
   CpdBeforeEp(epIdx, obj, msg);
 #endif    
   const auto msgtype = (msg == NULL) ? LAST_CK_ENVELOPE_TYPE : UsrToEnv(msg)->getMsgtype();
-  CkInvokeEP((Chare *)obj, epIdx, msg);
+  CkInvokeEP((Chare*)obj, epIdx, msg);
 #if CMK_CHARMDEBUG
   CpdAfterEp(epIdx);
 #endif
@@ -692,7 +692,7 @@ void CkDeliverMessageReadonly(int epIdx,const void *msg,void *obj)
 #if CMK_CHARMDEBUG
   CpdBeforeEp(epIdx, obj, (void*)msg);
 #endif
-  CkInvokeEP((Chare *)obj, epIdx, deliverMsg);
+  CkInvokeEP((Chare*)obj, epIdx, deliverMsg);
 #if CMK_CHARMDEBUG
   CpdAfterEp(epIdx);
 #endif
@@ -790,7 +790,7 @@ inline void CkReadyEntry(TableEntry &entry, bool nodeLevel) {
 void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
 {
   int gIdx = _entryTable[epIdx]->chareIdx;
-  void *obj = CkAllocateChare(gIdx);
+  auto *obj = CkAllocateChare(gIdx);
 
   // this enables groups to access themselves via
   // ckLocalBranch during their construction (nodegroups
@@ -827,7 +827,7 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
 void CkCreateLocalNodeGroup(CkGroupID groupID, int epIdx, envelope *env)
 {
   int gIdx = _entryTable[epIdx]->chareIdx;
-  void *obj = CkAllocateChare(gIdx);
+  auto *obj = CkAllocateChare(gIdx);
   CkpvAccess(_currentGroup) = groupID;
 
 // Now that the NodeGroup is created, add it to the table.
@@ -983,9 +983,9 @@ CkGroupID CkCreateNodeGroup(int cIdx, int eIdx, void *msg)
   return gid;
 }
 
-Chare *CkAllocateChare(const int &objId) {
-  const auto &objSize = _chareTable[objId]->size;
-  auto *obj = (Chare *)malloc(objSize);
+Chare *CkAllocateChare(int objId) {
+  auto objSize = _chareTable[objId]->size;
+  auto *obj = (Chare*)::operator new(objSize);
   _MEMCHECK(obj);
   setMemoryTypeChare(obj);
   obj->ckInitialized = false;
@@ -1026,7 +1026,7 @@ static void _processNewChareMsg(CkCoreState *ck,envelope *env)
   if(ck)
     ck->process(); // ck->process() updates mProcessed count used in QD
   int idx;
-  void *obj = _allocNewChare(env, idx);
+  auto *obj = _allocNewChare(env, idx);
 #ifndef CMK_CHARE_USE_PTR
   CkpvAccess(currentChareIdx) = idx;
 #endif
@@ -1047,7 +1047,7 @@ static void _processNewVChareMsg(CkCoreState *ck,envelope *env)
     return;
   ck->process(); // ck->process() updates mProcessed count used in QD
   int idx;
-  void *obj = _allocNewChare(env, idx);
+  auto *obj = _allocNewChare(env, idx);
   CkChareID *pCid = (CkChareID *)
       _allocMsg(FillVidMsg, sizeof(CkChareID));
   pCid->onPE = CkMyPe();

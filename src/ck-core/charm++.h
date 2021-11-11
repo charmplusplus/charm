@@ -280,7 +280,7 @@ void CkCallstackPush(Chare *obj);
 void CkCallstackUnwind(Chare *obj);
 
 Chare *CkActiveObj(void);
-Chare *CkAllocateChare(const int &objId);
+Chare *CkAllocateChare(int objId);
 
 static inline void CkInvokeEP(Chare *obj, const int &epIdx, void *msg) {
   CkCallstackPush(obj);

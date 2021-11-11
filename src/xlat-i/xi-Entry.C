@@ -887,10 +887,10 @@ void Entry::genGroupDefs(XStr& str) {
           << epIdx()
           << ", obj, NULL);\n"
              "#endif\n  ";
-      str << "CkCallstackPush(obj);\n  ";
+      str << "CkCallstackPush((Chare*)obj);\n  ";
       if (!retType->isVoid()) str << retType << " retValue = ";
       str << "obj->" << name << "(" << unmarshallStr << ");\n  ";
-      str << "CkCallstackPop(obj);\n";
+      str << "CkCallstackPop((Chare*)obj);\n";
       str << "#if CMK_CHARMDEBUG\n"
              "  CpdAfterEp("
           << epIdx()
