@@ -1947,19 +1947,14 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
       str << "  } else {   // Final message that executes the Regular EM on primary element\n";
 
     } else if (param->hasDevice()) {
-      str << "  bool is_inline = true;\n";
-      str << "  if (CMI_ZC_MSGTYPE(env) == CMK_ZC_DEVICE_MSG) {\n";
+      str << "  if (CMI_IS_ZC_DEVICE(env)) {\n";
       genRegularCall(str, preCall, redn_wrapper, usesImplBuf, true);
-      str << "  }\n";
-      str << "  if (is_inline) {\n";
+      str << "  } else {\n";
     }
     genRegularCall(str, preCall, redn_wrapper, usesImplBuf, false);
-    if(param->hasRecvRdma()) {
-      str << "  }\n";
-    } else if (param->hasDevice()) {
+    if (param->hasRecvRdma() || param->hasDevice()) {
       str << "  }\n";
     }
-
   }
 }
 
