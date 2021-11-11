@@ -18,6 +18,7 @@ VARIANTS := \
   roseomptlsglobals \
   fsglobals \
   pipglobals \
+  pieglobals \
 
 PHONIES := \
   everything \
@@ -37,6 +38,9 @@ endif
 ifeq (1,$(CMK_SUPPORTS_PIPGLOBALS))
   TARGETS += pipglobals
 endif
+ifeq (1,$(CMK_SUPPORTS_PIEGLOBALS))
+  TARGETS += pieglobals
+endif
 
 $(foreach i,$(VARIANTS),$(eval LANGUAGES_$i := $(LANGUAGES)))
 ifneq (1,$(CMK_HAS_OPENMP))
@@ -45,18 +49,19 @@ endif
 
 
 # Define what options to pass to charmc for each method.
-$(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),$(eval OPTS_$j_$i := -$i)))
-OPTS_cxx_control :=
-OPTS_f90_control :=
-OPTS_f90_tlsglobals += -fopenmp
+$(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),$(eval OPTS_$i_$j := -$i)))
+OPTS_control_cxx :=
+OPTS_control_f90 :=
+OPTS_tlsglobals_f90 += -fopenmp
 
 # Define the features that each privatization method supports.
-FEATURES_cxx_control := migration staticvars sharedlib dynamiclib
-FEATURES_cxx_swapglobals := migration
-FEATURES_cxx_tlsglobals := migration staticvars sharedlib
-FEATURES_cxx_roseomptlsglobals := migration staticvars sharedlib
-FEATURES_cxx_fsglobals := staticvars
-FEATURES_cxx_pipglobals := staticvars sharedlib
+FEATURES_control_cxx := globalvars threadlocalvars staticvars sharedlib dynamiclib migration
+FEATURES_swapglobals_cxx := globalvars migration
+FEATURES_tlsglobals_cxx := threadlocalvars staticvars sharedlib migration
+FEATURES_roseomptlsglobals_cxx := threadlocalvars staticvars sharedlib migration
+FEATURES_fsglobals_cxx := globalvars staticvars
+FEATURES_pipglobals_cxx := globalvars staticvars sharedlib
+FEATURES_pieglobals_cxx := globalvars staticvars sharedlib migration
 
 
 # Universal settings
@@ -67,88 +72,84 @@ LINKOPTS := -balancer TreeLB
 
 EMPTY_MESSAGE := "No privatization methods supported for current AMPI target."
 
-all: $(foreach i,$(TARGETS),$(foreach j,$(LANGUAGES_$i),$j-$i))
+all: $(foreach i,$(TARGETS),$(foreach j,$(LANGUAGES_$i),$i-$j))
 ifeq (,$(TARGETS))
 	@echo $(EMPTY_MESSAGE)
 endif
 
-test: $(foreach i,$(TARGETS),$(foreach j,$(LANGUAGES_$i),test-$j-$i))
+test: $(foreach i,$(TARGETS),$(foreach j,$(LANGUAGES_$i),test-$i-$j))
 ifeq (,$(TARGETS))
 	@echo $(EMPTY_MESSAGE)
 endif
 
-testp: $(foreach i,$(TARGETS),$(foreach j,$(LANGUAGES_$i),testp-$j-$i))
+testp: $(foreach i,$(TARGETS),$(foreach j,$(LANGUAGES_$i),testp-$i-$j))
 ifeq (,$(TARGETS))
 	@echo $(EMPTY_MESSAGE)
 endif
 
-everything: $(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),$j-$i))
-test-everything: $(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),test-$j-$i))
+everything: $(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),$i-$j))
+test-everything: $(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),test-$i-$j))
 
 add_if_contains = $(subst $2,$3,$(findstring $2,$1))
 
 define VARIANT_RULES
 
-$1: $$(foreach j,$$(LANGUAGES_$1),$$j-$1)
-test-$1: $$(foreach j,$$(LANGUAGES_$1),test-$$j-$1)
+$1: $$(foreach j,$$(LANGUAGES_$1),$1-$$j)
+test-$1: $$(foreach j,$$(LANGUAGES_$1),test-$1-$$j)
 
 # link
-cxx-$1: $1-test.o $1-test-cxx.o cxx-$1-other-object.o | libcxx-$1-static-library.a $$(call add_if_contains,$$(FEATURES_cxx_$1),sharedlib,libcxx-$1-shared-library.so) $$(call add_if_contains,$$(FEATURES_cxx_$1),dynamiclib,libcxx-$1-shared-library-dynamic.so)
-	$$(AMPICC) -o $$@ $$(OPTS_cxx_$1) $$^ $$(LINKOPTS) -rpath-origin -L. -lcxx-$1-static-library $$(call add_if_contains,$$(FEATURES_cxx_$1),sharedlib,-lcxx-$1-shared-library) $$(call add_if_contains,$$(FEATURES_cxx_$1),dynamiclib,-ldl)
+$1-cxx: $1-framework.o $1-test-cxx.o $1-vars-static-cxx.o | $$(call add_if_contains,$$(FEATURES_$1_cxx),sharedlib,lib$1-vars-shared-cxx.so) $$(call add_if_contains,$$(FEATURES_$1_cxx),dynamiclib,lib$1-vars-dynamic-cxx.so)
+	$$(AMPICC) -o $$@ $$(OPTS_$1_cxx) $$^ $$(LINKOPTS) -rpath-origin -L. $$(call add_if_contains,$$(FEATURES_$1_cxx),sharedlib,-l$1-vars-shared-cxx) $$(call add_if_contains,$$(FEATURES_$1_cxx),dynamiclib,-ldl)
 
-f90-$1: $1-test.o $1-test-f90.o
-	$$(AMPIF90) -o $$@ $$(OPTS_f90_$1) $$^ $$(LINKOPTS)
+$1-f90: $1-framework.o $1-test-f90.o
+	$$(AMPIF90) -o $$@ $$(OPTS_$1_f90) $$^ $$(LINKOPTS)
 
-libcxx-$1-%.so: cxx-$1-%-so.o
-	$$(AMPICC) -o $$@ $$(OPTS_cxx_$1) -shared -standalone $$<
+lib$1-%-cxx.so: $1-%-cxx-so.o
+	$$(AMPICC) -o $$@ $$(OPTS_$1_cxx) -shared -fvisibility=hidden -standalone $$^
 
-libcxx-$1-%.a: cxx-$1-%.o
-	ar cr $$@ $$^
-	ranlib $$@
+$1-%.o $1-%-cxx.o: %.C
+	$$(AMPICC) -o $$@ $$(OPTS_$1_cxx) -Dprivatization_method=$1 $$(foreach i,$$(FEATURES_$1_cxx),-Dtest_$$i) -c $$<
 
-$1-%.o cxx-$1-%.o: %.C
-	$$(AMPICC) -o $$@ $$(OPTS_cxx_$1) -Dtest_using_$$(subst -,_,$1) -Dprivatization_method=$1 $$(foreach i,$$(FEATURES_cxx_$1),-Dtest_$$i) -c $$<
+$1-%-so.o $1-%-cxx-so.o: %.C
+	$$(AMPICC) -o $$@ $$(OPTS_$1_cxx) -Dprivatization_method=$1 $$(foreach i,$$(FEATURES_$1_cxx),-Dtest_$$i) -shared -fvisibility=hidden -c $$<
 
-$1-%-so.o cxx-$1-%-so.o: %.C
-	$$(AMPICC) -o $$@ $$(OPTS_cxx_$1) -Dtest_using_$$(subst -,_,$1) -Dprivatization_method=$1 $$(foreach i,$$(FEATURES_cxx_$1),-Dtest_$$i) -shared -c $$<
-
-$1-%.o f90-$1-%.o: %.f90
-	$$(AMPIF90) -o $$@ $$(OPTS_f90_$1) -c $$<
+$1-%.o $1-%-f90.o: %.f90
+	$$(AMPIF90) -o $$@ $$(OPTS_$1_f90) -c $$<
 
 # test
-test-cxx-$1: cxx-$1
-	$$(call run, ./cxx-$1 +p1 +vp2 +balancer RandCentLB)
-	$$(call run, ./cxx-$1 +p1 +vp4 +balancer RandCentLB)
-	$$(call run, ./cxx-$1 +p2 +vp2 +balancer RandCentLB)
-	$$(call run, ./cxx-$1 +p2 +vp4 +balancer RandCentLB)
+test-$1-cxx: $1-cxx
+	$$(call run, ./$1-cxx +p1 +vp2 +balancer RandCentLB)
+	$$(call run, ./$1-cxx +p1 +vp4 +balancer RandCentLB)
+	$$(call run, ./$1-cxx +p2 +vp2 +balancer RandCentLB)
+	$$(call run, ./$1-cxx +p2 +vp4 +balancer RandCentLB)
 
-test-f90-$1: f90-$1
-	$$(call run, ./f90-$1 +p1 +vp2 +balancer RandCentLB)
-	$$(call run, ./f90-$1 +p1 +vp4 +balancer RandCentLB)
-	$$(call run, ./f90-$1 +p2 +vp2 +balancer RandCentLB)
-	$$(call run, ./f90-$1 +p2 +vp4 +balancer RandCentLB)
+test-$1-f90: $1-f90
+	$$(call run, ./$1-f90 +p1 +vp2 +balancer RandCentLB)
+	$$(call run, ./$1-f90 +p1 +vp4 +balancer RandCentLB)
+	$$(call run, ./$1-f90 +p2 +vp2 +balancer RandCentLB)
+	$$(call run, ./$1-f90 +p2 +vp4 +balancer RandCentLB)
 
-testp-cxx-$1: cxx-$1
-	$$(call run, ./cxx-$1 +p$(P) +vp$(P) +balancer RandCentLB)
-	$$(call run, ./cxx-$1 +p$(P) +vp$$$$(( $(P) * 2 )) +balancer RandCentLB)
-	$$(call run, ./cxx-$1 +p$(P) +vp$$$$(( $(P) * 4 )) +balancer RandCentLB)
+testp-$1-cxx: $1-cxx
+	$$(call run, ./$1-cxx +p$(P) +vp$(P) +balancer RandCentLB)
+	$$(call run, ./$1-cxx +p$(P) +vp$$$$(( $(P) * 2 )) +balancer RandCentLB)
+	$$(call run, ./$1-cxx +p$(P) +vp$$$$(( $(P) * 4 )) +balancer RandCentLB)
 
-testp-f90-$1: f90-$1
-	$$(call run, ./f90-$1 +p$(P) +vp$(P) +balancer RandCentLB)
-	$$(call run, ./f90-$1 +p$(P) +vp$$$$(( $(P) * 2 )) +balancer RandCentLB)
-	$$(call run, ./f90-$1 +p$(P) +vp$$$$(( $(P) * 4 )) +balancer RandCentLB)
-
+testp-$1-f90: $1-f90
+	$$(call run, ./$1-f90 +p$(P) +vp$(P) +balancer RandCentLB)
+	$$(call run, ./$1-f90 +p$(P) +vp$$$$(( $(P) * 2 )) +balancer RandCentLB)
+	$$(call run, ./$1-f90 +p$(P) +vp$$$$(( $(P) * 4 )) +balancer RandCentLB)
 
 endef
 
 $(foreach i,$(VARIANTS),$(eval $(call VARIANT_RULES,$i)))
 
 # overrides
-tlsglobals-test-f90.o: test-f90-tlsglobals.f90
-	$(AMPIF90) -o $@ $(OPTS_f90_tlsglobals) -c $<
+tlsglobals-test-f90.o: test-tlsglobals.f90
+	$(AMPIF90) -o $@ $(OPTS_tlsglobals_f90) -c $<
+
 
 clean:
-	rm -f *.o *.a *.so *.dylib *.mod $(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),$(strip $j-$i $(wildcard $j-$i$(CMK_USER_SUFFIX)*)))) charmrun ampirun
+	rm -f *.o *.a *.so *.dylib *.mod $(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),$(strip $i-$j $(wildcard $i-$j$(CMK_USER_SUFFIX)*)))) charmrun ampirun
 
 .SUFFIXES:
 .PHONY: \
@@ -157,4 +158,4 @@ clean:
   clean \
   $(LANGUAGES) \
   $(addprefix test-,$(LANGUAGES)) \
-  $(foreach i,$(VARIANTS) $(PHONIES),$(foreach j,$(LANGUAGES),test-$j-$i) test-$i $i) \
+  $(foreach i,$(VARIANTS) $(PHONIES),$(foreach j,$(LANGUAGES),test-$i-$j) test-$i $i) \

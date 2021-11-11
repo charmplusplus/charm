@@ -3,25 +3,46 @@
 
 #include "charm-api.h"
 
-#define STRINGIZE(x) #x
-#define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
-#define privatization_method_str STRINGIZE_VALUE_OF(privatization_method)
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-#define test_format "#%02d"
+typedef int * (*int_ptr_accessor)();
 
-CLINKAGE void print_test(int & test, int & rank, const char * name);
+#if defined test_globalvars
+extern int extern_global_static;
+#if defined test_staticvars
+int * get_static_global_static();
+int * get_scoped_global_static();
+#endif
+#endif
+#if defined test_threadlocalvars
+thread_local extern int extern_threadlocal_static;
+#if defined test_staticvars
+int * get_static_threadlocal_static();
+int * get_scoped_threadlocal_static();
+#endif
+#endif
 
-#define print_test_fortran FTN_NAME(PRINT_TEST_FORTRAN, print_test_fortran)
-FLINKAGE void print_test_fortran(int & test, int & rank, const char * name, int name_len);
+#if defined test_sharedlib
+#if defined test_globalvars
+extern CMI_EXPORT int extern_global_shared;
+#if defined test_staticvars
+CMI_EXPORT int * get_static_global_shared();
+CMI_EXPORT int * get_scoped_global_shared();
+#endif
+#endif
+#if defined test_threadlocalvars
+thread_local extern CMI_EXPORT int extern_threadlocal_shared;
+#if defined test_staticvars
+CMI_EXPORT int * get_static_threadlocal_shared();
+CMI_EXPORT int * get_scoped_threadlocal_shared();
+#endif
+#endif
+#endif
 
-#define test_privatization FTN_NAME(TEST_PRIVATIZATION, test_privatization)
-FLINKAGE void test_privatization(int & failed, int & test, int & rank, int & my_wth, int & operation, int & global);
-#define test_skip FTN_NAME(TEST_SKIP, test_skip)
-FLINKAGE void test_skip(int & test, int & rank);
-#define privatization_test_framework FTN_NAME(PRIVATIZATION_TEST_FRAMEWORK, privatization_test_framework)
-FLINKAGE void privatization_test_framework(void);
-
-#define perform_test_batch FTN_NAME(PERFORM_TEST_BATCH, perform_test_batch)
-FLINKAGE void perform_test_batch(int & failed, int & test, int & rank, int & my_wth, int & operation);
+#ifdef __cplusplus
+}
+#endif
 
 #endif

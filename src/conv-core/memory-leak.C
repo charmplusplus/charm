@@ -55,7 +55,7 @@ static Slot *Slot_fmUser(void *user) {
 
 static void printSlot(Slot *s) {
 	CmiPrintf("[%d] Leaked block of %d bytes at %p:\n",
-		CmiMyPe(), s->userSize, Slot_toUser(s));
+		CmiMyPe(), s->userSize, (void *)Slot_toUser(s));
 	CmiBacktracePrint(s->from,STACK_LEN);
 }
 

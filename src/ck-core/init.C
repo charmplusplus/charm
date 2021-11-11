@@ -79,6 +79,7 @@ never be excluded...
 
 #if CMK_CUDA
 #include "hapi_impl.h"
+#include "ckrdmadevice.h"
 
 extern void (*hapiInvokeCallback)(void*, void*);
 extern void CUDACallbackManager(void*, void*);
@@ -159,6 +160,8 @@ CkpvDeclare(GroupIDTable*, _groupIDTable);
 CkpvDeclare(CmiImmediateLockType, _groupTableImmLock);
 CkpvDeclare(UInt, _numGroups);
 
+CkpvDeclare(ReqTagPostMap, ncpyPostedReqMap);
+CkpvDeclare(ReqTagBufferMap, ncpyPostedBufferMap);
 CkpvDeclare(CkCoreState *, _coreState);
 
 CksvDeclare(UInt, _numNodeGroups);
@@ -167,6 +170,12 @@ CksvDeclare(GroupIDTable, _nodeGroupIDTable);
 CksvDeclare(CmiImmediateLockType, _nodeGroupTableImmLock);
 CksvDeclare(CmiNodeLock, _nodeLock);
 CksvDeclare(CmiNodeLock, _nodeZCPendingLock);
+
+CksvDeclare(ReqTagPostMap, ncpyPostedReqNodeMap);
+CksvDeclare(ReqTagBufferMap, ncpyPostedBufferNodeMap);
+CksvDeclare(CmiNodeLock, _nodeZCPostReqLock);
+CksvDeclare(CmiNodeLock, _nodeZCBufferReqLock);
+
 CksvStaticDeclare(PtrVec*,_nodeBocInitVec);
 CkpvDeclare(int, _charmEpoch);
 
@@ -1333,6 +1342,8 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvInitialize(char**, Ck_argv); CkpvAccess(Ck_argv)=argv;
 	CkpvInitialize(MsgPool*, _msgPool);
 	CkpvInitialize(CkCoreState *, _coreState);
+	CkpvInitialize(ReqTagPostMap, ncpyPostedReqMap);
+	CkpvInitialize(ReqTagBufferMap, ncpyPostedBufferMap);
 
 	_initChareTables();            // for checkpointable plain chares
 
@@ -1344,6 +1355,10 @@ void _initCharm(int unused_argc, char **argv)
 	CksvInitialize(CmiNodeLock, _nodeZCPendingLock);
 	CksvInitialize(PtrVec*,_nodeBocInitVec);
 	CksvInitialize(UInt,_numInitNodeMsgs);
+	CksvInitialize(ReqTagPostMap, ncpyPostedReqNodeMap);
+	CksvInitialize(ReqTagBufferMap, ncpyPostedBufferNodeMap);
+	CksvInitialize(CmiNodeLock, _nodeZCPostReqLock);
+	CksvInitialize(CmiNodeLock, _nodeZCBufferReqLock);
 	CkpvInitialize(int,_charmEpoch);
 	CkpvAccess(_charmEpoch)=0;
 	CksvInitialize(bool, _triggersSent);
@@ -1380,6 +1395,8 @@ void _initCharm(int unused_argc, char **argv)
 		CksvAccess(_nodeGroupTableImmLock) = CmiCreateImmediateLock();
 		CksvAccess(_nodeBocInitVec) = new PtrVec();
 		CksvAccess(_nodeZCPendingLock) = CmiCreateLock();
+		CksvAccess(_nodeZCPostReqLock) = CmiCreateLock();
+		CksvAccess( _nodeZCBufferReqLock) = CmiCreateLock();
 
 		CmiSetNcpyAckSize(sizeof(CkCallback));
 	}
@@ -1447,6 +1464,10 @@ void _initCharm(int unused_argc, char **argv)
 	
 	// Set the ack handler function used for the direct nocopy api
 	CmiSetDirectNcpyAckHandler(CkRdmaDirectAckHandler);
+
+#if CMK_CUDA && CMK_GPU_COMM
+	CmiRdmaDeviceRecvInit(CkRdmaDeviceRecvHandler);
+#endif
 
 	// Set the ack handler function used for the entry method p2p api and entry method bcast api
 	initEMNcpyAckHandler();

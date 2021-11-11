@@ -39,6 +39,6 @@ depends:  $(CIFILES) CkLoop.def.h
 	      SRCFILE=`basename $$i .o`.C ; \
               echo "checking dependencies for $$i : $$SRCFILE" ; \
               g++ -MM -Wno-deprecated -I$(CDIR)/tmp $$SRCFILE >> $(DEPENDFILE); \
-              echo '	$$(CHARMC) -I$(CDIR)/tmp -o '$$i $$SRCFILE >> $(DEPENDFILE) ; \
+              echo '	$$(CHARMC) -I$(CDIR)/tmp -o '$$i -c $$SRCFILE >> $(DEPENDFILE) ; \
         done; 
 

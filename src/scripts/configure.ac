@@ -642,12 +642,6 @@ test_finish() {
 	exit $1
 }
 
-# detect certain architectures
-if cat /proc/cpuinfo 2>/dev/null | grep 'POWER7'  > /dev/null
-then
-  AC_DEFINE_UNQUOTED(CMK_POWER7, 1, [whether is power7])
-fi
-
 # detect OS
 OSNAME=`uname -s`
 if test $OSNAME = "Linux"
@@ -1540,6 +1534,7 @@ int main()
 }
 EOT
 test_linkc "whether has dl_iterate_phdr" "yes" "no" ""
+CMK_HAS_DL_ITERATE_PHDR="$pass"
 AC_DEFINE_UNQUOTED([CMK_HAS_DL_ITERATE_PHDR], $pass, [whether has dl_iterate_phdr])
 
 
@@ -1569,7 +1564,7 @@ int main(int argc, char **argv)
   return 0;
 }
 EOT
-test_cc "whether build on OFI" "yes" "no" "-lfabric"
+test_cc "whether build on OFI" "yes" "no"
 AC_DEFINE_UNQUOTED(CMK_BUILD_ON_OFI, $strictpass, [build OFI.])
 BUILD_OFI=$strictpass
 
@@ -1883,6 +1878,36 @@ EOT
 test_link "whether has mallinfo" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_MALLINFO, $pass, [whether has mallinfo])
 
+#### test for cfree ###
+cat > $t <<EOT
+#include <stdlib.h>
+int main() {
+  cfree(0);
+}
+EOT
+test_link "whether has cfree" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_CFREE, $pass, [whether has cfree])
+
+#### test for pvalloc ###
+cat > $t <<EOT
+#include <malloc.h>
+int main() {
+  return pvalloc(4096) == 0;
+}
+EOT
+test_link "whether has pvalloc" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_PVALLOC, $pass, [whether has pvalloc])
+
+#### test for valloc ###
+cat > $t <<EOT
+#include <malloc.h>
+int main() {
+  return valloc(4096) == 0;
+}
+EOT
+test_link "whether has valloc" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_VALLOC, $pass, [whether has valloc])
+
 #### test for __morecore ###
 cat > $t <<EOT
 #include <cstddef>
@@ -2137,6 +2162,23 @@ cat > $tc <<EOT
 #include <stddef.h>
 int main()
 {
+  return dlopen("", RTLD_DEEPBIND) == NULL;
+}
+EOT
+test_cc "whether has RTLD_DEEPBIND" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_RTLD_DEEPBIND, $pass, [whether has RTLD_DEEPBIND])
+
+cat > $tc <<EOT
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE
+#endif
+#ifndef __USE_GNU
+# define __USE_GNU
+#endif
+#include <dlfcn.h>
+#include <stddef.h>
+int main()
+{
   return dlsym(RTLD_DEFAULT, "main") != NULL;
 }
 EOT
@@ -2241,6 +2283,16 @@ fi
 AC_DEFINE_UNQUOTED(CMK_SUPPORTS_PIPGLOBALS, $CMK_SUPPORTS_PIPGLOBALS, [whether supports PiP globals])
 add_flag "CMK_SUPPORTS_PIPGLOBALS=$CMK_SUPPORTS_PIPGLOBALS" 'PiP globals'
 add_make_flag "CMK_SUPPORTS_PIPGLOBALS:=$CMK_SUPPORTS_PIPGLOBALS" 'PiP globals'
+
+if test "$CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY" = '1' -a "$CMK_CAN_GET_BINARY_PATH" = '1' -a "$CMK_HAS_DL_ITERATE_PHDR" = '1'
+then
+  CMK_SUPPORTS_PIEGLOBALS='1'
+else
+  CMK_SUPPORTS_PIEGLOBALS='0'
+fi
+AC_DEFINE_UNQUOTED(CMK_SUPPORTS_PIEGLOBALS, $CMK_SUPPORTS_PIEGLOBALS, [whether supports PIE globals])
+add_flag "CMK_SUPPORTS_PIEGLOBALS=$CMK_SUPPORTS_PIEGLOBALS" 'PIE globals'
+add_make_flag "CMK_SUPPORTS_PIEGLOBALS:=$CMK_SUPPORTS_PIEGLOBALS" 'PIE globals'
 
 #### check if getProcAddress works ####
 cat > $t <<EOT
@@ -3013,6 +3065,8 @@ fi
 
 eval `"$CHARMBIN/charmc" $OPTS -print-building-blocks -standalone`
 add_make_flag "HWLOC_CC:=$(get_full_command_name "$CHARM_CC")" "hwloc"
+add_make_flag "HWLOC_CXX:=$(get_full_command_name "$CHARM_CXX")" "hwloc"
 add_make_flag "HWLOC_CC_FLAGS:=$CHARM_CC_FLAGS" "hwloc"
+add_make_flag "HWLOC_CXX_FLAGS:=$CHARM_CXX_FLAGS" "hwloc"
 
 AC_OUTPUT

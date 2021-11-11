@@ -34,6 +34,7 @@ FUNCPTR_LOADER_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_loader.o
 FUNCPTR_LOADER_STUB_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_loader_stub.o
 GLOBALS_PIP_OBJ=$(AMPI_LIBDIR)/ampi_globals_pip.o
 GLOBALS_FS_OBJ=$(AMPI_LIBDIR)/ampi_globals_fs.o
+GLOBALS_PIE_OBJ=$(AMPI_LIBDIR)/ampi_globals_pie.o
 
 AMPI_TARGET = \
   $(DEST) \
@@ -49,6 +50,9 @@ AMPIF_TARGET = \
   $(FUNCPTR_SHIM_FORTRAN_MOD_OBJ) \
   $(FUNCPTR_SHIM_FMPIMAIN_OBJ) \
 
+ifeq (1,$(CMK_SUPPORTS_PIEGLOBALS))
+  AMPI_TARGET += $(GLOBALS_PIE_OBJ)
+endif
 ifeq (1,$(CMK_SUPPORTS_PIPGLOBALS))
   AMPI_TARGET += $(GLOBALS_PIP_OBJ)
 endif
@@ -112,20 +116,33 @@ all: $(MAJOR_TARGETS) $(COMPATLIB) $(ROMIO)
 
 $(ROMIO): headers
 	@echo "Building ROMIO"
-	cd romio &&                                                                  \
-		MPI_IMPL="ampi" FROM_MPICH="no" FROM_LAM="no" FROM_OMPI="no"         \
-		MPI_LIB=""                                                           \
-		CFLAGS="$(OPTS) $(ROMIO_FLAGS)"        \
-		FFLAGS="$(OPTS) $(ROMIO_FLAGS)"        \
-		F77="$(CDIR)/bin/ampif90"                                            \
-		CC="$(CDIR)/bin/ampicc"                                              \
-		./configure                                                          \
-		--disable-aio                                                        \
-		--enable-f77=$(ROMIO_F77)                                            \
-		--enable-static=yes                                                  \
-		--enable-shared=no                                                   \
-		--disable-weak-symbols                                               \
-		--srcdir=`pwd`                                                       \
+	cd romio && \
+		./configure \
+		--disable-aio \
+		--enable-f77=$(ROMIO_F77) \
+		--enable-static=yes \
+		--enable-shared=no \
+		--disable-weak-symbols \
+		--srcdir="$(pwd)" \
+		MPI_IMPL=ampi \
+		FROM_MPICH=no \
+		FROM_LAM=no \
+		FROM_OMPI=no \
+		MPI_LIB= \
+		CC="$(CDIR)/bin/ampicc" \
+		F77="$(CDIR)/bin/ampif77" \
+		FC="$(CDIR)/bin/ampif90" \
+		CFLAGS="$(OPTS) $(ROMIO_FLAGS)" \
+		FFLAGS="$(OPTS) $(ROMIO_FLAGS)" \
+		FCFLAGS="$(OPTS) $(ROMIO_FLAGS)" \
+		CPP= \
+		CPPFLAGS= \
+		LIBS= \
+		LDFLAGS= \
+		TEST_CC="$(CDIR)/bin/ampicc" \
+		TEST_F77="$(CDIR)/bin/ampif77" \
+		USER_CFLAGS="$(OPTS) $(ROMIO_FLAGS)" \
+		USER_FFLAGS="$(OPTS) $(ROMIO_FLAGS)" \
 		|| ( cat config.log ; exit 1 )
 
 	cp romio/include/mpio.h romio/include/mpiof.h romio/include/mpio_functions.h $(CDIR)/include
@@ -265,6 +282,9 @@ $(GLOBALS_FS_OBJ): ampi_globals_fs.C $(HEADDEP) headers | $(ROMIO)
 	$(CHARMC) -language ampi -c $< -o $@
 
 $(GLOBALS_PIP_OBJ): ampi_globals_pip.C $(HEADDEP) headers | $(ROMIO)
+	$(CHARMC) -language ampi -c $< -o $@
+
+$(GLOBALS_PIE_OBJ): ampi_globals_pie.C $(HEADDEP) headers | $(ROMIO)
 	$(CHARMC) -language ampi -c $< -o $@
 
 clean:

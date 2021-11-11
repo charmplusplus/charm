@@ -1181,12 +1181,6 @@ static inline void _deliverForBocMsg(CkCoreState *ck,int epIdx,envelope *env,Irr
 
   _invokeEntry(epIdx,env,obj);
 
-#if CMK_SMP
-  if(msgType == CMK_ZC_BCAST_RECV_DONE_MSG) {
-    updatePeerCounterAndPush(env);
-  }
-#endif
-
   _STATS_RECORD_PROCESS_BRANCH_1();
 }
 
