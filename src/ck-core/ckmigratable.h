@@ -3,7 +3,6 @@
 
 class CkMigratable : public Chare {
 protected:
-  CkLocRec *myRec;
 private:
   int thisChareType;//My chare type
   int atsync_iteration;
@@ -92,7 +91,6 @@ public:
 private:
   void ResumeFromSyncHelper();
 public:
-  virtual CkLocRec *getCkLocRec(void) const override { return myRec; }
 
   void ReadyMigrate(bool ready);
   void ckFinishConstruction(int epoch = -1);

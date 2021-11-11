@@ -63,7 +63,7 @@ void _initChareTables()
 }
 
 //Charm++ virtual functions: declaring these here results in a smaller executable
-Chare::Chare(void) {
+Chare::Chare(void) : myRec(nullptr) {
   thishandle.onPE=CkMyPe();
   thishandle.objPtr=this;
   this->ckInitialized=true;
@@ -82,7 +82,7 @@ Chare::Chare(void) {
 #endif
 }
 
-Chare::Chare(CkMigrateMessage* m) {
+Chare::Chare(CkMigrateMessage* m) : myRec(nullptr) {
   thishandle.onPE=CkMyPe();
   thishandle.objPtr=this;
   this->ckInitialized=false;

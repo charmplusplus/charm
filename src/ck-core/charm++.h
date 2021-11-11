@@ -223,6 +223,7 @@ class Chare {
 #if CMK_OBJECT_QUEUE_AVAILABLE
     CkObjectMsgQ objQ;                // object message queue
 #endif
+    CkLocRec *myRec;
   public:
     bool ckInitialized;
 #if CMK_ERROR_CHECKING
@@ -258,7 +259,7 @@ class Chare {
     CHARM_INPLACE_NEW
     /// Return the type of this chare, as present in _chareTable
     virtual int ckGetChareType() const;
-    virtual CkLocRec *getCkLocRec(void) const { return nullptr; }
+    CkLocRec *getCkLocRec(void) const { return this->myRec; }
     /// Return a strdup'd array containing this object's string name.
     virtual char *ckDebugChareName(void);
     /// Place into str a copy of the id of this object up to limit bytes, return
