@@ -718,12 +718,8 @@ void Parameter::printPeerAckInfo(XStr& str, bool genRdma, bool isSDAGGen, bool d
 void Parameter::extractPostedPtrs(XStr& str, bool genRdma, bool isSDAGGen, bool device, int &count) {
   Type* dt = type->deref();  // Type, without &
   if (isRdma()) {
-    str << "      ";
-    if(isSDAGGen)
-      str << "genClosure->" << arrLen;
-    else
-      str << arrLen << ".t";
-    str << " = extractStoredBuffer(";
+    str << "      ncpyBuffer_" << name << "_ptr = ";
+    str << " (" << dt << " *)extractStoredBuffer(";
     if(isSDAGGen)
       str << "genClosure->";
     str << "ncpyBuffer_" << name << ".ncpyEmInfo->tagArray, env, myIndex,";
@@ -731,10 +727,7 @@ void Parameter::extractPostedPtrs(XStr& str, bool genRdma, bool isSDAGGen, bool 
       str << "genClosure->num_rdma_fields,";
     else
       str << "impl_num_rdma_fields, ";
-    str << count++ << ", (void *&)(";
-    if(isSDAGGen)
-      str << "genClosure->";
-    str << "ncpyBuffer_" << name << ".ptr));\n";
+    str << count++ << ");\n";
   }
 }
 

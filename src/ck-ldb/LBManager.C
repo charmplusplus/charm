@@ -967,8 +967,8 @@ void LBManager::TurnOffBarrierReceiver(LDBarrierReceiver h)
   CkSyncBarrier::object()->turnOffReceiver(h);
 }
 
-void LBManager::LocalBarrierOn(void) { CkSyncBarrier::object()->turnOn(); };
-void LBManager::LocalBarrierOff(void) { CkSyncBarrier::object()->turnOff(); };
+void LBManager::LocalBarrierOn(void) { CkSyncBarrier::object()->turnOn(); }
+void LBManager::LocalBarrierOff(void) { CkSyncBarrier::object()->turnOff(); }
 
 #if CMK_LBDB_ON
 static void work(int iter_block, volatile int* result)

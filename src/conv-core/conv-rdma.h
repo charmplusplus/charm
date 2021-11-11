@@ -116,12 +116,12 @@ class CmiNcpyBuffer {
   bool isRegistered;
 
   // machine specific information about the buffer
-  #ifdef __GNUC__
+  #if defined(__GNUC__) || defined(__clang__)
   #pragma GCC diagnostic push
   #pragma GCC diagnostic ignored "-Wpedantic"
   #endif
   char layerInfo[CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES];
-  #ifdef __GNUC__
+  #if defined(__GNUC__) || defined(__clang__)
   #pragma GCC diagnostic pop
   #endif
 
