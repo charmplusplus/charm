@@ -985,7 +985,7 @@ CkGroupID CkCreateNodeGroup(int cIdx, int eIdx, void *msg)
 
 Chare *CkAllocateChare(int objId) {
   auto objSize = _chareTable[objId]->size;
-  auto *obj = (Chare*)aligned_alloc(alignof(Chare), objSize);
+  auto *obj = (Chare*)malloc(objSize);
   _MEMCHECK(obj);
   setMemoryTypeChare(obj);
   obj->ckInitialized = false;
