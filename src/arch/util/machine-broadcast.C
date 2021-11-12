@@ -120,7 +120,9 @@ void CmiForwardMsgToPeers(int size, char *msg) {
 }
 #endif
 
-static char *_lazyCopy(char* &dst, const char *src, int size, int rankToAssign) {
+// copies iff dst is null, and always references the message (+1) to ensure it 
+// isn't freed before we're completely done with it! (e.g., via an eager send)
+static char *_copyMsgOrRef(char* &dst, const char *src, int size, int rankToAssign) {
     if (dst == nullptr) {
         dst = CopyMsg(const_cast<char*>(src), size);
         CMI_DEST_RANK(dst) = rankToAssign;
@@ -131,6 +133,7 @@ static char *_lazyCopy(char* &dst, const char *src, int size, int rankToAssign) 
 
 static void SendSpanningChildren(int size, char *msg, int rankToAssign, int startNode) {
 #if CMK_BROADCAST_SPANNING_TREE
+    // copying is deferred via _copyMsgOrRef in case no sends are generated
     char* copy = nullptr;
     int i, oldRank;
 
@@ -147,7 +150,7 @@ static void SendSpanningChildren(int size, char *msg, int rankToAssign, int star
         CmiAssert(nd>=0 && nd!=CmiMyNode());
         CmiSendNetworkFunc(
             CmiNodeFirst(nd), size,
-            _lazyCopy(copy, msg, size, rankToAssign),
+            _copyMsgOrRef(copy, msg, size, rankToAssign),
             BCAST_SYNC
         );
       }
@@ -166,19 +169,20 @@ static void SendSpanningChildren(int size, char *msg, int rankToAssign, int star
         //CmiPrintf("[%d][%d] SendSpanningChildren: sending copymsg to %d \n", CmiMyPe(), CmiMyNode(), CmiNodeFirst(nd));
         CmiSendNetworkFunc(
             CmiNodeFirst(nd), size,
-            _lazyCopy(copy, msg, size, rankToAssign),
+            _copyMsgOrRef(copy, msg, size, rankToAssign),
             BCAST_SYNC
         );
       }
     }
 
-    // copy will have +1 extra references, so we need to decrement
+    // copy will have an extra reference so we need to decrement
     if (copy) CmiFree(copy);
 #endif
 }
 
 static void SendHyperCube(int size,  char *msg, int rankToAssign, int startNode) {
 #if CMK_BROADCAST_HYPERCUBE
+    // copying is deferred via _copyMsgOrRef in case no sends are generated
     char* copy = nullptr;
     int i, cnt, tmp, relDist, oldRank;
     const int dims=CmiNodesDim;
@@ -213,12 +217,12 @@ static void SendHyperCube(int size,  char *msg, int rankToAssign, int startNode)
         CmiAssert(nd>=0 && nd!=CmiMyNode());
         CmiSendNetworkFunc(
             CmiNodeFirst(nd), size,
-            _lazyCopy(copy, msg, size, rankToAssign),
+            _copyMsgOrRef(copy, msg, size, rankToAssign),
             BCAST_SYNC
         );
     }
 
-    // copy will have +1 extra references, so we need to decrement
+    // copy will have an extra reference so we need to decrement
     if (copy) CmiFree(copy);
 #endif
 }
