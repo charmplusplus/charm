@@ -60,8 +60,6 @@ PVM: converse $(L)/libpvmc.a
 AMR: charm++ LIBS
 	$(MAKE) -C libs/ck-libs/amr all
 
-FEM: ParFUM
-
 ParFUM: charm++ AMPI
 	$(MAKE) -C libs/ck-libs/ ParFUM
 
