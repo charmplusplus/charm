@@ -120,14 +120,20 @@ void CmiForwardMsgToPeers(int size, char *msg) {
 }
 #endif
 
+static char *_lazyCopy(char* &dst, const char *src, int size, int rankToAssign) {
+    if (dst == nullptr) {
+        dst = CopyMsg(const_cast<char*>(src), size);
+        CMI_DEST_RANK(dst) = rankToAssign;
+    }
+    CmiReference(dst);
+    return dst;
+}
+
 static void SendSpanningChildren(int size, char *msg, int rankToAssign, int startNode) {
 #if CMK_BROADCAST_SPANNING_TREE
+    char* copy = nullptr;
     int i, oldRank;
-    char *newmsg;
 
-    oldRank = CMI_DEST_RANK(msg);
-    /* doing this is to avoid the multiple assignment in the following for loop */
-    CMI_DEST_RANK(msg) = rankToAssign;
     /* first send msgs to other nodes */
     CmiAssert(startNode >=0 &&  startNode<CmiNumNodes());
     if (_topoTree == NULL) {
@@ -139,8 +145,11 @@ static void SendSpanningChildren(int size, char *msg, int rankToAssign, int star
         nd += startNode;
         nd = nd%CmiNumNodes();
         CmiAssert(nd>=0 && nd!=CmiMyNode());
-        newmsg = CopyMsg(msg, size);
-        CmiSendNetworkFunc(CmiNodeFirst(nd), size, newmsg, BCAST_SYNC);
+        CmiSendNetworkFunc(
+            CmiNodeFirst(nd), size,
+            _lazyCopy(copy, msg, size, rankToAssign),
+            BCAST_SYNC
+        );
       }
     } else {
       int parent, child_count;
@@ -154,23 +163,25 @@ static void SendSpanningChildren(int size, char *msg, int rankToAssign, int star
       }
       for (i=0; i < child_count; i++) {
         int nd = children[i];
-        newmsg = CopyMsg(msg, size);
         //CmiPrintf("[%d][%d] SendSpanningChildren: sending copymsg to %d \n", CmiMyPe(), CmiMyNode(), CmiNodeFirst(nd));
-        CmiSendNetworkFunc(CmiNodeFirst(nd), size, newmsg, BCAST_SYNC);
+        CmiSendNetworkFunc(
+            CmiNodeFirst(nd), size,
+            _lazyCopy(copy, msg, size, rankToAssign),
+            BCAST_SYNC
+        );
       }
     }
-    CMI_DEST_RANK(msg) = oldRank;
+
+    // copy will have +1 extra references, so we need to decrement
+    if (copy) CmiFree(copy);
 #endif
 }
 
 static void SendHyperCube(int size,  char *msg, int rankToAssign, int startNode) {
 #if CMK_BROADCAST_HYPERCUBE
+    char* copy = nullptr;
     int i, cnt, tmp, relDist, oldRank;
     const int dims=CmiNodesDim;
-
-    oldRank = CMI_DEST_RANK(msg);
-    /* doing this is to avoid the multiple assignment in the following for loop */
-    CMI_DEST_RANK(msg) = rankToAssign;
 
     /* first send msgs to other nodes */
     relDist = CmiMyNode()-startNode;
@@ -200,10 +211,15 @@ static void SendHyperCube(int size,  char *msg, int rankToAssign, int startNode)
         nd = (nd+startNode)%CmiNumNodes();
         /*CmiPrintf("ND[%d]: send to node %d\n", CmiMyNode(), nd);*/
         CmiAssert(nd>=0 && nd!=CmiMyNode());
-        newmsg = CopyMsg(msg, size);
-        CmiSendNetworkFunc(CmiNodeFirst(nd), size, newmsg, BCAST_SYNC);
+        CmiSendNetworkFunc(
+            CmiNodeFirst(nd), size,
+            _lazyCopy(copy, msg, size, rankToAssign),
+            BCAST_SYNC
+        );
     }
-    CMI_DEST_RANK(msg) = oldRank;
+
+    // copy will have +1 extra references, so we need to decrement
+    if (copy) CmiFree(copy);
 #endif
 }
 
