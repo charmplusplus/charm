@@ -297,6 +297,7 @@ LogPool::~LogPool()
   }
 
   delete [] fname;
+  delete [] pgmname;
 }
 
 void LogPool::writeHeader()
