@@ -29,7 +29,6 @@ irecv:
 liveViz:
 taskGraph:
 search:
-datatransfer: ampi collide
 NDMeshStreamer: completion
 
 pythonCCS:
