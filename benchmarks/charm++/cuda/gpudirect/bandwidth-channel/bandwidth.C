@@ -1,5 +1,8 @@
 #include "bandwidth.decl.h"
 #include "hapi.h"
+#include <vector>
+
+#define USE_WAITALL 0
 
 #define MAX_ITERS 1000000
 #define LARGE_MESSAGE_SIZE 8192
@@ -109,6 +112,9 @@ public:
 
   CkChannel channel;
   CkFuture* futures;
+#if USE_WAITALL
+  std::vector<CkFutureID> future_ids;
+#endif
 
   Block() {
     memory_allocated = false;
@@ -123,6 +129,9 @@ public:
       hapiCheck(cudaFree(d_local_data));
       hapiCheck(cudaFree(d_remote_data));
       delete futures;
+#if USE_WAITALL
+      future_ids.resize(0);
+#endif
     }
 
     if (stream_created) cudaStreamDestroy(stream);
@@ -143,6 +152,9 @@ public:
       hapiCheck(cudaFree(d_local_data));
       hapiCheck(cudaFree(d_remote_data));
       delete futures;
+#if USE_WAITALL
+      future_ids.resize(0);
+#endif
     }
     hapiCheck(cudaMallocHost(&h_local_data, max_size));
     hapiCheck(cudaMallocHost(&h_remote_data, max_size));
@@ -157,7 +169,8 @@ public:
       stream_created = true;
     }
 
-    // Create channel between the pair of chares (needs to be unique in the program)
+    // Create channel between the pair of chares
+    // (ID needs to be unique in the program)
     channel = CkChannel(0, thisProxy[peer]);
 
     // Reduce back to main
@@ -174,6 +187,9 @@ public:
       for (int iter = 0; iter < warmup_iters + n_iters; iter++) {
         for (int i = 0; i < window_size; i++) {
           futures[i] = CkCreateFuture();
+#if USE_WAITALL
+          future_ids.push_back(futures[i].id);
+#endif
         }
         start_time = CkWallTimer();
 
@@ -181,17 +197,28 @@ public:
           for (int i = 0; i < window_size; i++) {
             channel.send(d_local_data, cur_size, &futures[i]);
           }
+
+          // Note: For loop with CkWaitFuture seems to exhibit better performance
+          // than using CkWaitAllIDs
+#if USE_WAITALL
+          CkWaitAllIDs(future_ids);
+#else
           for (int i = 0; i < window_size; i++) {
             CkWaitFuture(futures[i]);
           }
+#endif
           channel.recv(d_remote_data, cur_size, CkCallbackResumeThread());
         } else {
           for (int i = 0; i < window_size; i++) {
             channel.recv(d_remote_data, cur_size, &futures[i]);
           }
+#if USE_WAITALL
+          CkWaitAllIDs(future_ids);
+#else
           for (int i = 0; i < window_size; i++) {
             CkWaitFuture(futures[i]);
           }
+#endif
           channel.send(d_local_data, cur_size, CkCallbackResumeThread());
         }
 
@@ -201,6 +228,9 @@ public:
 
         for (int i = 0; i < window_size; i++) {
           CkReleaseFuture(futures[i]);
+#if USE_WAITALL
+          future_ids.clear();
+#endif
         }
       }
 
