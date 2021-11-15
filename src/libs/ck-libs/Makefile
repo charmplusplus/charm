@@ -20,7 +20,6 @@ $(SIMPLE_DIRS) ParFUM ParFUM-Tops:
 ampi:  tcharm
 idxl:  ampi
 multiphaseSharedArrays:
-fem:  idxl ampi multiphaseSharedArrays
 ParFUM:	idxl ampi collide multiphaseSharedArrays
 ParFUM-Tops: ParFUM
 collide: tcharm
@@ -30,7 +29,7 @@ irecv:
 liveViz:
 taskGraph:
 search:
-datatransfer: ampi fem collide
+datatransfer: ampi collide
 NDMeshStreamer: completion
 
 pythonCCS:
