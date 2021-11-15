@@ -1537,7 +1537,7 @@ void _noCldNodeEnqueue(int node, envelope *env)
 }
   else {
 #if CMK_USE_SHMEM
-  if (!_tryIpcSend<true, false>(node, env, 0x0))
+    if (!_tryIpcSend<true, false>(node, env, 0x0))
 #endif
 	CmiSyncNodeSendAndFree(node, len, (char *)env);
   }

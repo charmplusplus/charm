@@ -92,10 +92,7 @@ inline void _IpcCldPrepare(void* msg, int infofn) {
 
 template <bool Node>
 inline bool _IpcSendImpl(int thisNode, int dstPe, envelope* env) {
-  auto* manager =
-    CpvInitialized(coreIpcManager_)
-      ? CpvAccess(coreIpcManager_)
-      : nullptr;
+  auto* manager = CsvAccess(coreIpcManager_);
 
   int nPes;
   int* pes;

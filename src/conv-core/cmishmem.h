@@ -6,6 +6,7 @@ static_assert(CMK_USE_SHMEM, "enable shmem to use this header");
 #include <atomic>
 #include <cstdint>
 #include <limits>
+#include <utility>
 
 #define CMI_IPC_CUTOFF_ARG "ipccutoff"
 #define CMI_IPC_CUTOFF_DESC "max message size for cmi-shmem (in bytes)"
@@ -58,6 +59,13 @@ struct CmiIpcBlock {
 
 struct CmiIpcManager;
 
+enum CmiIpcAllocStatus {
+  CMI_IPC_OUT_OF_MEMORY,
+  CMI_IPC_REMOTE_DESTINATION,
+  CMI_IPC_SUCCESS,
+  CMI_IPC_TIMEOUT
+};
+
 // sets up ipc environment
 void CmiIpcInit(char** argv);
 
@@ -71,8 +79,8 @@ CmiIpcBlock* CmiPopIpcBlock(CmiIpcManager*);
 
 // tries to allocate a block, returning null if unsucessful
 // (fails when other PEs are contending resources)
-// note: throws bad_alloc if we ran out of memory
-CmiIpcBlock* CmiAllocIpcBlock(CmiIpcManager*, int node, std::size_t size);
+// second value of pair indicates failure cause
+std::pair<CmiIpcBlock*, CmiIpcAllocStatus> CmiAllocIpcBlock(CmiIpcManager*, int node, std::size_t size);
 
 // frees a block -- enabling it to be used again
 void CmiFreeIpcBlock(CmiIpcManager*, CmiIpcBlock*);

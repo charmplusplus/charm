@@ -1662,16 +1662,19 @@ void _initCharm(int unused_argc, char **argv)
 #endif
 
 #if CMK_USE_SHMEM
-    CpvInitialize(CmiIpcManager*, coreIpcManager_);
-    CmiNodeAllBarrier();
 #if CMK_SMP
-    if (CmiInCommThread()) {
-      CpvAccess(coreIpcManager_) = CmiMakeIpcManager(nullptr);
+    CmiNodeAllBarrier();
+    if (inCommThread) {
+      CmiMakeIpcManager(nullptr);
     } else
 #endif
     {
       auto th = CthSelf();
-      CpvAccess(coreIpcManager_) = CmiMakeIpcManager(th);
+      if (CmiMyRank() == 0) {
+        CsvAccess(coreIpcManager_) = CmiMakeIpcManager(th);
+      } else {
+        CmiMakeIpcManager(th);
+      }
       CmiAssert(CthIsSuspendable(th));
       CthSuspend();
     }

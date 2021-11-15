@@ -38,19 +38,24 @@ CmiIpcBlock* CmiMsgToIpcBlock(CmiIpcManager* manager, char* src, std::size_t len
                            int node, int rank, int timeout) {
   char* dst;
   CmiIpcBlock* block;
+  // check whether we miraculously got a usable block
   if ((block = CmiIsIpcBlock(manager, BLKSTART(src), node)) && (node == block->src)) {
     dst = src;
   } else {
+    std::pair<CmiIpcBlock*, CmiIpcAllocStatus> status;
+    // we only want to attempt again if we fail due to a timeout:
     if (timeout > 0) {
-      while (--timeout && !(block = CmiAllocIpcBlock(
-                                manager, node, len + sizeof(CmiChunkHeader))))
-        ;
+      do {
+        status = CmiAllocIpcBlock(manager, node, len + sizeof(CmiChunkHeader));
+      } while ((--timeout) && (status.second == CMI_IPC_TIMEOUT));
     } else {
-      // don't give up!
-      while (
-          !(block = CmiAllocIpcBlock(manager, node, len + sizeof(CmiChunkHeader))))
-        ;
+      do {
+        status = CmiAllocIpcBlock(manager, node, len + sizeof(CmiChunkHeader));
+        // never give up, never surrender!
+      } while (status.second == CMI_IPC_TIMEOUT);
     }
+    // grab the block from the rval
+    block = status.first;
     if (block == nullptr) {
       return nullptr;
     } else {
@@ -110,7 +115,7 @@ bool CmiPushIpcBlock(CmiIpcManager* meta, CmiIpcBlock* block) {
   return pushBlock_(queue, block->orig, shared);
 }
 
-CmiIpcBlock* CmiAllocIpcBlock(CmiIpcManager* meta, int dstProc, std::size_t size) {
+std::pair<CmiIpcBlock*, CmiIpcAllocStatus> CmiAllocIpcBlock(CmiIpcManager* meta, int dstProc, std::size_t size) {
   auto dstNode = CmiPhysicalNodeID(CmiNodeFirst(dstProc));
 #if CMK_SMP
   auto thisPe = CmiInCommThread() ? CmiNodeFirst(CmiMyNode()) : CmiMyPe();
@@ -120,7 +125,7 @@ CmiIpcBlock* CmiAllocIpcBlock(CmiIpcManager* meta, int dstProc, std::size_t size
   auto thisProc = CmiMyNode();
   auto thisNode = CmiPhysicalNodeID(thisPe);
   if ((thisProc == dstProc) || (thisNode != dstNode)) {
-    throw std::bad_alloc();
+    return std::make_pair((CmiIpcBlock*)nullptr, CMI_IPC_REMOTE_DESTINATION);
   }
 
   auto& shared = meta->shared[dstProc];
@@ -131,8 +136,13 @@ CmiIpcBlock* CmiAllocIpcBlock(CmiIpcManager* meta, int dstProc, std::size_t size
   if (block == nullptr) {
     auto totalSize = kCutOffPoints[bin];
     auto offset = allocBlock_(shared, totalSize);
-    if (offset == cmi::ipc::nil) {
-      return nullptr;
+    switch (offset) {
+      case cmi::ipc::nil:
+        return std::make_pair((CmiIpcBlock*)nullptr, CMI_IPC_TIMEOUT);
+      case cmi::ipc::max:
+        return std::make_pair((CmiIpcBlock*)nullptr, CMI_IPC_OUT_OF_MEMORY);
+      default:
+        break;
     }
     // the block's address is relative to the share
     block = (CmiIpcBlock*)((char*)shared + offset);
@@ -144,7 +154,7 @@ CmiIpcBlock* CmiAllocIpcBlock(CmiIpcManager* meta, int dstProc, std::size_t size
   block->src = dstProc;
   block->dst = thisProc;
 
-  return block;
+  return std::make_pair(block, CMI_IPC_SUCCESS);
 }
 
 void CmiFreeIpcBlock(CmiIpcManager* meta, CmiIpcBlock* block) {
@@ -182,7 +192,7 @@ static std::uintptr_t allocBlock_(ipc_shared_* meta, std::size_t size) {
     auto status = meta->heap.exchange(value, std::memory_order_release);
     CmiAssert(status == cmi::ipc::nil);
     if (oom) {
-      throw std::bad_alloc();
+      return cmi::ipc::max;
     } else {
       return res;
     }

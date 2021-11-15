@@ -1633,11 +1633,7 @@ static INLINE_KEYWORD void AdvanceCommunication(int whenidle) {
 
 #if CMK_USE_SHMEM
     CmiIpcBlock* block;
-    auto* manager =
-      CpvInitialized(coreIpcManager_)
-        ? CpvAccess(coreIpcManager_)
-        : nullptr;
-    if (block = CmiPopIpcBlock(manager)) {
+    if (block = CmiPopIpcBlock(CsvAccess(coreIpcManager_))) {
       CmiDeliverIpcBlockMsg(block);
     }
 #endif
