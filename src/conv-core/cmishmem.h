@@ -107,7 +107,6 @@ inline CmiIpcBlock* CmiMsgToIpcBlock(CmiIpcManager* manager, void* msg) {
   return CmiIsIpcBlock(manager, (char*)msg - sizeof(CmiChunkHeader), CmiMyNode());
 }
 
-// note -- can throw std::bad_alloc if out of memory
 CmiIpcBlock* CmiMsgToIpcBlock(CmiIpcManager*, char* msg, std::size_t len, int node,
                            int rank = cmi::ipc::nodeDatagram,
                            int timeout = cmi::ipc::defaultTimeout);

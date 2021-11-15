@@ -98,14 +98,10 @@ inline bool _IpcSendImpl(int thisNode, int dstPe, envelope* env) {
   int* pes;
   CmiIpcBlock* block;
 
-  try {
-    if (Node) {
-      block = CmiMsgToIpcBlock(manager, (char*)env, env->getTotalsize(), CmiNodeOf(dstPe));
-    } else {
-      block = CmiMsgToIpcBlock(manager, (char*)env, env->getTotalsize(), CmiNodeOf(dstPe), CmiRankOf(dstPe));
-    }
-  } catch (std::bad_alloc) {
-    block = nullptr;
+  if (Node) {
+    block = CmiMsgToIpcBlock(manager, (char*)env, env->getTotalsize(), CmiNodeOf(dstPe));
+  } else {
+    block = CmiMsgToIpcBlock(manager, (char*)env, env->getTotalsize(), CmiNodeOf(dstPe), CmiRankOf(dstPe));
   }
 
   if (block == nullptr) {
