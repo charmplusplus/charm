@@ -54,8 +54,7 @@ Parallel context routines run in a migratable, user-level thread
 maintained by TCharm. Since there are normally several of these threads
 per processor, any code that runs in the parallel context has to be
 thread-safe. However, TCharm is non-preemptive, so it will only switch
-threads when you make a blocking call, like “MPI_Recv" or
-“FEM_Update_field".
+threads when you make a blocking call, like “MPI_Recv".
 
 .. _sec:global:
 
@@ -430,8 +429,7 @@ communication inside a finite element method solver.
 You specify how you want the frameworks to be combined by writing a
 special setup routine that runs when the program starts. The setup
 routine must be named TCHARM_User_setup. If you declare a user setup
-routine, the standard framework setup routines (such as the FEM
-framework’s init routine) are bypassed, and you do all the setup in the
+routine, the standard framework setup routines are bypassed, and you do all the setup in the
 user setup routine.
 
 The setup routine creates a set of threads and then attaches frameworks
@@ -495,7 +493,7 @@ The complete set of link-time arguments relevant to TCharm is:
 
 -module F
   Link in this framework. The current set of frameworks F includes
-  ampi, collide, fem, mblock, and netfem. You can link in multiple
+  ampi, collide, and mblock. You can link in multiple
   frameworks.
 
 The complete set of command-line arguments relevant to TCharm is:
