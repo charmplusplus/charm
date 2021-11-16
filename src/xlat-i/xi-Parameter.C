@@ -685,9 +685,9 @@ void ParamList::storePostedRdmaPtrs(XStr& str, bool isSDAGGen) {
   }
 }
 
-void ParamList::extractPostedPtrs(XStr& str, bool isSDAGGen) {
+void ParamList::extractPostedPtrs(XStr& str, bool isSDAGGen, bool isPrimary, bool device) {
     int count = 0;
-    callEach(&Parameter::extractPostedPtrs, str, true, isSDAGGen, false, count);
+    callEach(&Parameter::extractPostedPtrs, str, isSDAGGen, isPrimary, device, count);
 }
 
 void ParamList::printPeerAckInfo(XStr& str, bool isSDAGGen) {
@@ -715,19 +715,37 @@ void Parameter::printPeerAckInfo(XStr& str, bool genRdma, bool isSDAGGen, bool d
   }
 }
 
-void Parameter::extractPostedPtrs(XStr& str, bool genRdma, bool isSDAGGen, bool device, int &count) {
+void Parameter::extractPostedPtrs(XStr& str, bool isSDAGGen, bool isPrimary, bool device, int &count) {
   Type* dt = type->deref();  // Type, without &
   if (isRdma()) {
-    str << "      ncpyBuffer_" << name << "_ptr = ";
-    str << " (" << dt << " *)extractStoredBuffer(";
-    if(isSDAGGen)
-      str << "genClosure->";
-    str << "ncpyBuffer_" << name << ".ncpyEmInfo->tagArray, env, myIndex,";
-    if(isSDAGGen)
-      str << "genClosure->num_rdma_fields,";
-    else
-      str << "impl_num_rdma_fields, ";
-    str << count++ << ");\n";
+    bool hostPath = !device && !isDevice();
+    bool devicePath = device && isDevice();
+
+    if(hostPath) {
+      str << "      ncpyBuffer_" << name << "_ptr = ";
+      if(isPrimary) {
+        str << "(" << dt << " *)";
+        if(isSDAGGen)
+          str << "genClosure->";
+        str << "ncpyBuffer_" << name << ".ptr;\n";
+      } else {
+        str << " (" << dt << " *)extractStoredBuffer(";
+        if(isSDAGGen)
+          str << "genClosure->";
+        str << "ncpyBuffer_" << name << ".ncpyEmInfo->tagArray, env, myIndex,";
+        if(isSDAGGen)
+          str << "genClosure->num_rdma_fields,";
+        else
+          str << "impl_num_rdma_fields, ";
+        str << count++ << ");\n";
+      }
+    } else if(devicePath) {
+      str << "      deviceBuffer_" << name << "_ptr = ";
+      str << "(" << dt << " *)";
+      if(isSDAGGen)
+        str << "genClosure->";
+      str << "deviceBuffer_" << name << ".ptr;\n";
+    }
   }
 }
 
@@ -863,14 +881,18 @@ void Parameter::storePostedRdmaPtrs(XStr& str, bool genRdma, bool isSDAGGen, boo
 
     if (hostPath) {
       if (genRdma) {
-        str << "    buffPtrs[" << count << "] = (void *)" << "ncpyBuffer_";
+        str << "      if(ncpyBuffer_" << name << "_ptr == nullptr)\n";
+        str << "        CkAbort(\"Post Entry Method either doesn't call CkMatchBuffer or doesn't post the buffer by initializing the reference to the pointer for " << name << " \");\n";
+        str << "      buffPtrs[" << count << "] = (void *)" << "ncpyBuffer_";
         str << name << "_ptr;\n";
         if(isSDAGGen)
-          str << "    buffSizes[" << count++ << "] = sizeof(" << dt << ") * genClosure->"<< arrLen << ";\n";
+          str << "      buffSizes[" << count++ << "] = sizeof(" << dt << ") * genClosure->"<< arrLen << ";\n";
         else
-          str << "    buffSizes[" << count++ << "] = sizeof(" << dt << ") * " << arrLen << ".t;\n";
+          str << "      buffSizes[" << count++ << "] = sizeof(" << dt << ") * " << arrLen << ".t;\n";
       }
     } else if (devicePath) {
+       str << "      if(deviceBuffer_" << name << "_ptr == nullptr)\n";
+       str << "        CkAbort(\"Post Entry Method doesn't post the buffer by initializing the reference to the pointer for " << name << " \");\n";
       str << "    buffPtrs[" << count << "] = (void *)" << "deviceBuffer_";
       str << name << "_ptr;\n";
       str << "    buffSizes[" << count++ << "] = sizeof(" << dt << ") * ";
@@ -907,7 +929,11 @@ void Parameter::beginUnmarshallRdma(XStr& str, bool genRdma, bool device) {
         str << "  implP|ncpyBuffer_" << name << ";\n";
 
         str << "  " << dt << " *ncpyBuffer_" << name << "_ptr = ";
-        str << "(" << dt << " *)" << " ncpyBuffer_" << name << ".ptr;\n";
+        if(isRecvRdma()) {
+          str << "nullptr;\n";
+        } else { // Entry Method Send API
+          str << "(" << dt << " *)" << " ncpyBuffer_" << name << ".ptr;\n";
+        }
       } else {
         beginUnmarshallArray(str);
       }
@@ -915,8 +941,7 @@ void Parameter::beginUnmarshallRdma(XStr& str, bool genRdma, bool device) {
       str << "  CkDeviceBuffer deviceBuffer_" << name << ";\n";
       str << "  implP|deviceBuffer_" << name << ";\n";
 
-      str << "  " << dt << " *deviceBuffer_" << name << "_ptr = ";
-      str << "(" << dt << " *)" << " deviceBuffer_" << name << ".ptr;\n";
+      str << "  " << dt << " *deviceBuffer_" << name << "_ptr = nullptr;\n";
     }
   }
 }
@@ -947,8 +972,7 @@ void Parameter::beginUnmarshallSDAGCallRdma(XStr& str, bool genRdma, bool device
         str << "  implP|genClosure->ncpyBuffer_" << name << ";\n";
         if (isRecvRdma()) {
           Type* dt = type->deref();
-          str << "  " << dt << " *ncpyBuffer_" << name << "_ptr = ";
-          str << "(" << dt << " *)" << " (genClosure->ncpyBuffer_" << name << ").ptr;\n";
+          str << "  " << dt << " *ncpyBuffer_" << name << "_ptr = nullptr;\n";
         }
       } else {
         beginUnmarshallArray(str);
@@ -959,8 +983,7 @@ void Parameter::beginUnmarshallSDAGCallRdma(XStr& str, bool genRdma, bool device
       }
       str << "  implP|genClosure->deviceBuffer_" << name << ";\n";
       Type* dt = type->deref();
-      str << "  " << dt << " *deviceBuffer_" << name << "_ptr = ";
-      str << "(" << dt << " *)" << " (genClosure->deviceBuffer_" << name << ").ptr;\n";
+      str << "  " << dt << " *deviceBuffer_" << name << "_ptr = nullptr;\n";
     }
   }
 }
