@@ -553,8 +553,9 @@ void Entry::genArrayDefs(XStr& str) {
           << "  env.setTotalsize(0);\n"
           << "  _TRACE_CREATION_DETAILED(&env, " << epIdx() << ");\n"
           << "  _TRACE_CREATION_DONE(1);\n"
+          << "  CmiObjId projID = ((CkArrayIndex&)ckGetIndex()).getProjectionID();\n"
           << "  _TRACE_BEGIN_EXECUTE_DETAILED(CpvAccess(curPeEvent),ForArrayEltMsg,(" << epIdx()
-          << "),CkMyPe(), 0, ((CkArrayIndex&)ckGetIndex()).getProjectionID(), obj);\n";
+          << "),CkMyPe(), 0, &projID, obj);\n";
     if (isAppWork()) inlineCall << "    _TRACE_BEGIN_APPWORK();\n";
     inlineCall << "#if CMK_LBDB_ON\n";
     if (isInline())
