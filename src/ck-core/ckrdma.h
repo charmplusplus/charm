@@ -270,7 +270,14 @@ void CkRdmaEMBcastPostAckHandler(void *msg);
 // Structure is used for storing source buffer info to de-reg and invoke acks after completion of CMA operations
 struct NcpyP2PAckInfo{
   int numOps;
+  #if defined(__GNUC__) || defined(__clang__)
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wpedantic"
+  #endif
   CkNcpyBuffer src[0];
+  #if defined(__GNUC__) || defined(__clang__)
+  #pragma GCC diagnostic pop
+  #endif
 };
 
 /***************************** Zerocopy Bcast Entry Method API ****************************/
@@ -310,7 +317,14 @@ struct NcpyBcastAckInfo{
 };
 
 struct NcpyBcastRootAckInfo : public NcpyBcastAckInfo {
+  #if defined(__GNUC__) || defined(__clang__)
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wpedantic"
+  #endif
   CkNcpyBuffer src[0];
+  #if defined(__GNUC__) || defined(__clang__)
+  #pragma GCC diagnostic pop
+  #endif
 };
 
 struct NcpyBcastInterimAckInfo : public NcpyBcastAckInfo {
@@ -378,12 +392,12 @@ struct NcpyROBcastBuffAckInfo {
   int pe;
 
   // machine specific information about the buffer
-  #ifdef __GNUC__
+  #if defined(__GNUC__) || defined(__clang__)
   #pragma GCC diagnostic push
   #pragma GCC diagnostic ignored "-Wpedantic"
   #endif
   char layerInfo[CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES];
-  #ifdef __GNUC__
+  #if defined(__GNUC__) || defined(__clang__)
   #pragma GCC diagnostic pop
   #endif
 };
@@ -393,7 +407,14 @@ struct NcpyROBcastAckInfo {
   int counter;
   int numops;
   bool isRoot;
+  #if defined(__GNUC__) || defined(__clang__)
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wpedantic"
+  #endif
   NcpyROBcastBuffAckInfo buffAckInfo[0];
+  #if defined(__GNUC__) || defined(__clang__)
+  #pragma GCC diagnostic pop
+  #endif
 };
 
 void readonlyUpdateNumops();
@@ -525,7 +546,7 @@ void setPosted(std::vector<int> *tagArray, envelope *env, CmiUInt8 elemIndex, in
 
 bool isUnposted(std::vector<int> *tagArray, envelope *env, CmiUInt8 elemIndex, int numops);
 
-int extractStoredBuffer(std::vector<int> *tagArray, envelope *env, CmiUInt8 elemIndex, int numops, int opIndex, void *&ptr);
+void *extractStoredBuffer(std::vector<int> *tagArray, envelope *env, CmiUInt8 elemIndex, int numops, int opIndex);
 
 int CkPerformRget(CkNcpyBufferPost &post, void *destBuffer, int destSize);
 
