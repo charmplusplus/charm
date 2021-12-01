@@ -98,7 +98,8 @@ enum cmiZCMsgType {
   CMK_ZC_BCAST_RECV_MSG = 5,
   CMK_ZC_BCAST_RECV_DONE_MSG = 6,
   CMK_ZC_BCAST_RECV_ALL_DONE_MSG = 7,
-  CMK_ZC_DEVICE_MSG = 8
+  CMK_ZC_DEVICE_MSG = 8,
+  CMK_ZC_CHARM4PY_MSG = 9 // I doubt this is the best way to do this
 };
 
 #ifndef CMK_NOCOPY_DIRECT_BYTES
