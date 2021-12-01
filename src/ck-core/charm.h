@@ -500,6 +500,17 @@ extern int CkDisableTracing(int epIdx);
 extern void CkEnableTracing(int epIdx);
 extern void CkCallWhenIdle(int epIdx, void* obj);
 
+#ifdef CMK_CHARM4PY
+void CkGetZCData(int numBuffers, void *recvBufPtrs, int *arrSizes,
+                 void *remoteBufInfos, int futureId);
+
+extern void registerDepositFutureWithIdFn(void (*cb)(void*, void*));
+
+void CkGetZCData(int numBuffers, void *recvBufPtrs, int *arrSizes,
+                 void *remoteBufInfos, int futureId);
+
+#endif // CMK_CHARM4PY
+
 #ifdef __cplusplus
 }
 #endif

@@ -2538,6 +2538,88 @@ void CkArrayExtSend_multi(int aid, int *idx, int ndims, int epIdx, int num_bufs,
     CkBroadcastMsgArray(epIdx, impl_amsg, gId, 0);
   }
 }
+void CkPrepareMessageWithZCData(CkMarshallMsg **dest,
+                                int epIdx,
+                                int num_bufs,
+                                char **bufs,
+                                int *buf_sizes,
+                                CkNcpyBuffer *zcBufs,
+                                int *zcBufSizesInBytes,
+                                int numZCBufs
+                                )
+{
+  int impl_off = 0;
+  int totalSize = 0;
+  for(int i = 0; i < num_bufs; i++) totalSize += buf_sizes[i];
+  // Find the size of the PUP'd data
+  int directCopySize = 0;
+  {
+    PUP::sizer implP;
+
+    // ZC data
+    implP | numZCBufs;
+    implP | directCopySize;
+    for (int i = 0; i < numZCBufs; ++i) {
+      implP | zcBufSizesInBytes[i];
+      implP | zcBufs[i];
+    }
+
+    // Store the size of the data that is used for
+    // ZC. This needs to be separated from the
+    // data in the non-ZC part of the message
+    directCopySize = implP.size();
+
+    // Regular Charm4Py message
+    implP | totalSize;
+    implP | epIdx;
+    implP | buf_sizes[0];
+    for (int i=0; i < num_bufs; i++) implP(bufs[i], buf_sizes[i]);
+    impl_off += implP.size();
+  }
+
+  CkMarshallMsg *impl_msg=CkAllocateMarshallMsg(impl_off,0);
+  {
+    PUP::toMem implP((void *) impl_msg->msgBuf);
+
+    implP | numZCBufs;
+    implP | directCopySize;
+    for (int i = 0; i < numZCBufs; ++i) {
+      implP | zcBufSizesInBytes[i];
+      implP | zcBufs[i];
+    }
+
+    implP | totalSize;
+    implP | epIdx;
+    implP | buf_sizes[0];
+    for (int i=0; i < num_bufs; i++) implP(bufs[i], buf_sizes[i]);
+  }
+
+  // CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_P2P_SEND_MSG;
+  *dest = impl_msg;
+
+}
+
+extern void (*DepositFutureWithIdFn)(void *, void*);
+
+void CkGetZCData(int numBuffers, void *recvBufPtrs, int *arrSizes,
+                 void *remoteBufInfos, int futureId)
+{
+#if CMK_CUDA
+  CkCallback cb(DepositFutureWithIdFn, (void*) futureId);
+  // create the post structs
+  // FIXME: this is consistent with the current Charm++ impl but will break as soon as it's changed
+  CkDeviceBufferPost *postStructs = nullptr;
+  streamPtrs = nullptr;
+
+  // remoteBufInfos is an array of pointers to unpacked CkDeviceBuffers (each stored as long)
+  // recvBufPtrs is an array of pointers to destination GPU buffers
+  CkRdmaDeviceIssueRgetsFromUnpackedMessage(numBuffers, (CkDeviceBuffer**)remoteBufInfos, (void**)recvBufPtrs,
+                                            arrSizes, postStructs, cb);
+  delete[] *((CkDeviceBuffer**) remoteBufInfos);
+#else
+  CkAbort("Charm4Py must be built with UCX and CUDA-enabled Charm++ for this feature");
+#endif // CMK_CUDA
+}
 
 #endif
 
