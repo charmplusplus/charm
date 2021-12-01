@@ -2604,21 +2604,27 @@ extern void (*DepositFutureWithIdFn)(void *, void*);
 void CkGetZCData(int numBuffers, void *recvBufPtrs, int *arrSizes,
                  void *remoteBufInfos, int futureId)
 {
-#if CMK_CUDA
+  // TODO: This will be broken with multiple buffers
   CkCallback cb(DepositFutureWithIdFn, (void*) futureId);
+
   // create the post structs
-  // FIXME: this is consistent with the current Charm++ impl but will break as soon as it's changed
-  CkDeviceBufferPost *postStructs = nullptr;
-  streamPtrs = nullptr;
+  CkNcpyBuffer receiveBufs[numBuffers];
+  CkNcpyBuffer **remoteNcpyBufs = (CkNcpyBuffer**) remoteBufInfos;
+
+  for(int bufIdx = 0; bufIdx < numBuffers; bufIdx++)
+    {
+      receiveBufs[bufIdx] = CkNcpyBuffer(((void**)(recvBufPtrs))[bufIdx],
+                                         arrSizes[bufIdx],
+                                         cb
+                                         );
+      receiveBufs[bufIdx].get(*remoteNcpyBufs[bufIdx]);
+    }
 
   // remoteBufInfos is an array of pointers to unpacked CkDeviceBuffers (each stored as long)
   // recvBufPtrs is an array of pointers to destination GPU buffers
-  CkRdmaDeviceIssueRgetsFromUnpackedMessage(numBuffers, (CkDeviceBuffer**)remoteBufInfos, (void**)recvBufPtrs,
-                                            arrSizes, postStructs, cb);
-  delete[] *((CkDeviceBuffer**) remoteBufInfos);
-#else
-  CkAbort("Charm4Py must be built with UCX and CUDA-enabled Charm++ for this feature");
-#endif // CMK_CUDA
+  // CkRdmaDeviceIssueRgetsFromUnpackedMessage(numBuffers, (CkDeviceBuffer**)remoteBufInfos, (void**)recvBufPtrs,
+                                            // arrSizes, postStructs, cb);
+  delete[] *((CkNcpyBuffer**) remoteBufInfos);
 }
 
 #endif
