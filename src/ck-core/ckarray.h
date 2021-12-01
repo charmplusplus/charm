@@ -494,6 +494,9 @@ extern void (*ArrayMsgRecvExtCallback)(int, int, int*, int, int, char*, int);
 extern int (*ArrayElemLeaveExt)(int, int, int*, char**, int);
 extern void (*ArrayElemJoinExt)(int, int, int*, int, char*, int);
 extern void (*ArrayResumeFromSyncExtCallback)(int, int, int*);
+// TODO: this should be changed maybe (?)
+extern void (*ArrayMsgZCRecvExtCallback)(int, int, int*, int, int, int*, void *, int, char*, int);
+
 
 class ArrayElemExt : public ArrayElement
 {
@@ -509,22 +512,41 @@ public:
     new (impl_obj_void) ArrayElemExt(impl_msg);
   }
 
-  static void __entryMethod(void* impl_msg, void* impl_obj_void)
-  {
-    // fprintf(stderr, "ArrayElemExt:: Entry method invoked\n");
-    ArrayElemExt* e = static_cast<ArrayElemExt*>(impl_obj_void);
-    CkMarshallMsg* impl_msg_typed = (CkMarshallMsg*)impl_msg;
-    char* impl_buf = impl_msg_typed->msgBuf;
+  static void __entryMethod(void *impl_msg, void *impl_obj_void) {
+    //fprintf(stderr, "ArrayElemExt:: Entry method invoked\n");
+    ArrayElemExt *e = static_cast<ArrayElemExt *>(impl_obj_void);
+    CkMarshallMsg *impl_msg_typed = (CkMarshallMsg *)impl_msg;
+    char *impl_buf = impl_msg_typed->msgBuf;
     PUP::fromMem implP(impl_buf);
-    int msgSize;
-    implP | msgSize;
-    int ep;
-    implP | ep;
-    int dcopy_start;
-    implP | dcopy_start;
+
+    if (CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) == CMK_ZC_CHARM4PY_MSG) {
+        int numZCBufs; implP | numZCBufs;
+        int directCopySize; implP | directCopySize;
+        int zcBufSizes[numZCBufs];
+
+        CkNcpyBuffer *zcBufs = new CkNcpyBuffer[numZCBufs];
+        for (int i = 0; i < numZCBufs; i++) {
+          implP | zcBufSizes[i];
+          implP | zcBufs[i];
+        }
+
+        int msgSize; implP | msgSize;
+        int epIdx; implP | epIdx;
+        int d; implP | d;
+        ArrayMsgZCRecvExtCallback(((CkGroupID)e->thisArrayID).idx,
+                                         int(e->thisIndexMax.getDimension()),
+                                         e->thisIndexMax.data(), epIdx,
+                                         numZCBufs, zcBufSizes, zcBufs,
+                                         msgSize, impl_buf+directCopySize+3*sizeof(int), d);
+    } else {
+    int msgSize; implP|msgSize;
+    int ep; implP|ep;
+    int dcopy_start; implP|dcopy_start;
     ArrayMsgRecvExtCallback(((CkGroupID)e->thisArrayID).idx,
-                            int(e->thisIndexMax.getDimension()), e->thisIndexMax.data(),
-                            ep, msgSize, impl_buf + (3 * sizeof(int)), dcopy_start);
+                            int(e->thisIndexMax.getDimension()),
+                            e->thisIndexMax.data(), ep, msgSize, impl_buf+(3*sizeof(int)),
+                            dcopy_start);
+    }
   }
 
   static void __AtSyncEntryMethod(void* impl_msg, void* impl_obj_void)
