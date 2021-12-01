@@ -2594,7 +2594,7 @@ void CkPrepareMessageWithZCData(CkMarshallMsg **dest,
     for (int i=0; i < num_bufs; i++) implP(bufs[i], buf_sizes[i]);
   }
 
-  // CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_P2P_SEND_MSG;
+  CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) = CMK_ZC_CHARM4PY_MSG;
   *dest = impl_msg;
 
 }
