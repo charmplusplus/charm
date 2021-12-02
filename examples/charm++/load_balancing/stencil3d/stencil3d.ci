@@ -21,7 +21,7 @@ mainmodule stencil3d {
     entry Stencil(void);
     entry void begin_iteration(void);
     entry void receiveGhosts(int iter, int dir, int height, int width,
-        double ghosts[height*width]);
+        std::vector<double> ghosts);
 
     entry [reductiontarget] void doStep() {
       serial "begin_iteration" {
@@ -30,7 +30,7 @@ mainmodule stencil3d {
       for(imsg = 0; imsg < 6; imsg++) {
         // "iterations" keeps track of messages across steps
         when receiveGhosts[iterations] (int iter, int dir, int height,
-            int width, double ghosts[height*width])
+            int width, std::vector<double> ghosts)
           serial "process_ghosts" {
             processGhosts(dir, height, width, ghosts);
           }
