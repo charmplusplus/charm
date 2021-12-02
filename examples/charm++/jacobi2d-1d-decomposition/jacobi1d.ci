@@ -13,7 +13,7 @@ mainmodule jacobi1d {
 
   array [1D] Jacobi {
     entry Jacobi(void);
-    entry void receiveGhosts(int iter, int dir, int size, double gh[size]);
+    entry void receiveGhosts(int iter, int dir, int size, std::vector<double> gh);
     entry [reductiontarget] void recvConvergeResult(bool result);
 
     entry void run() {
@@ -21,12 +21,12 @@ mainmodule jacobi1d {
         serial "send_to_neighbors" {
           iterations++;
           if(!topBound)
-            thisProxy((thisIndex-1+numChares)%numChares).receiveGhosts(iterations, BOTTOM, arrayDimY, &temperature[1][0]);
+            thisProxy((thisIndex-1+numChares)%numChares).receiveGhosts(iterations, BOTTOM, arrayDimY, temperature[1]);
           if(!bottomBound)
-            thisProxy((thisIndex+1)%numChares).receiveGhosts(iterations, TOP, arrayDimY, &temperature[blockDimX][0]);
+            thisProxy((thisIndex+1)%numChares).receiveGhosts(iterations, TOP, arrayDimY, temperature[blockDimX]);
         }
         for(imsg = 0; imsg < neighbors; imsg++)
-          when receiveGhosts[iterations] (int iter, int dir, int size, double gh[size])
+          when receiveGhosts[iterations] (int iter, int dir, int size, std::vector<double> gh)
             serial "update_boundary" {
               int row = (dir == TOP) ? 0 : blockDimX+1;
               for(int j=0; j<size; j++)

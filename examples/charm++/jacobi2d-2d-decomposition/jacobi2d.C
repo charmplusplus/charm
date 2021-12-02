@@ -108,9 +108,12 @@ public:
 class Jacobi: public CBase_Jacobi {
   Jacobi_SDAG_CODE
 
+  using array2d = std::vector<std::vector<double>>;
+  using array1d = std::vector<double>;
+
 public:
-    double **temperature;
-    double **new_temperature;
+    array2d temperature;
+    array2d new_temperature;
     int imsg;
     int iterations;
     int neighbors;
@@ -119,27 +122,15 @@ public:
     bool leftBound, rightBound, topBound, bottomBound;
     int converged;
     // Constructor, initialize values
-    Jacobi() {
-      int i, j;
-      temperature = new double*[blockDimX+2];
-      new_temperature = new double*[blockDimX+2];
-
-      for (i=0; i<blockDimX+2; i++) {
-        temperature[i] = new double[blockDimY+2];
-        new_temperature[i] = new double[blockDimY+2];
-      }
-
-      for(i=0; i<blockDimX+2; ++i) {
-        for(j=0; j<blockDimY+2; ++j) {
-          temperature[i][j] = 0.;
-        } 
-      }
-
-      converged = 0;
-      imsg = 0;
-      iterations = 0;
-      neighbors = 0;
-      max_error = 0.;
+    Jacobi()
+    : temperature(blockDimX + 2, array1d(blockDimY + 2, 0.0))
+    , new_temperature(blockDimX + 2, array1d(blockDimY + 2, 0.0))
+    , imsg(0)
+    , iterations(0)
+    , neighbors(0)
+    , max_error(0)
+    , converged(0)
+    {
       // determine border conditions
       leftBound = rightBound = topBound = bottomBound = false;
       istart = jstart = 1;
@@ -177,12 +168,12 @@ public:
       }
       else
         neighbors++;
+
       constrainBC();
     }
 
     void pup(PUP::er &p)
     {
-      int i,j;
       p|imsg;
       p|iterations;
       p|neighbors;
@@ -190,33 +181,11 @@ public:
       p|leftBound; p|rightBound; p|topBound; p|bottomBound;
       p|converged;
       p|max_error;
-
-      if (p.isUnpacking()) {
-        temperature = new double*[blockDimX+2];
-        new_temperature = new double*[blockDimX+2];
-        for (i=0; i<blockDimX+2; i++) {
-          temperature[i] = new double[blockDimY + 2];
-          new_temperature[i] = new double[blockDimY + 2];
-        }
-      }
-      for(i=0;i<blockDimX+2; i++) {
-        for(j=0;j<blockDimY+2; j++) {
-          p|temperature[i][j];
-          p|new_temperature[i][j];
-        }
-      }
+      p|temperature;
+      p|new_temperature;
     }
 
     Jacobi(CkMigrateMessage* m) { }
-
-    ~Jacobi() { 
-      for (int i=0; i<blockDimX+2; i++) {
-        delete [] temperature[i];
-        delete [] new_temperature[i];
-      }
-      delete [] temperature; 
-      delete [] new_temperature; 
-    }
 
     // Send ghost faces to the six neighbors
     void begin_iteration(void) {
@@ -224,39 +193,35 @@ public:
 
       if(!leftBound)
       {
-        double *leftGhost =  new double[blockDimY];
+        array1d leftGhost(blockDimY);
         for(int j=0; j<blockDimY; ++j) 
           leftGhost[j] = temperature[1][j+1];
         thisProxy(thisIndex.x-1, thisIndex.y).receiveGhosts(iterations, RIGHT, blockDimY, leftGhost);
-        delete [] leftGhost;
       }
       if(!rightBound)
       {
-        double *rightGhost =  new double[blockDimY];
+        array1d rightGhost(blockDimY);
         for(int j=0; j<blockDimY; ++j) 
           rightGhost[j] = temperature[blockDimX][j+1];
         thisProxy(thisIndex.x+1, thisIndex.y).receiveGhosts(iterations, LEFT, blockDimY, rightGhost);
-        delete [] rightGhost;
       }
       if(!topBound)
       {
-        double *topGhost =  new double[blockDimX];
+        array1d topGhost(blockDimX);
         for(int i=0; i<blockDimX; ++i) 
           topGhost[i] = temperature[i+1][1];
         thisProxy(thisIndex.x, thisIndex.y-1).receiveGhosts(iterations, BOTTOM, blockDimX, topGhost);
-        delete [] topGhost;
       }
       if(!bottomBound)
       {
-        double *bottomGhost =  new double[blockDimX];
+        array1d bottomGhost(blockDimX);
         for(int i=0; i<blockDimX; ++i) 
           bottomGhost[i] = temperature[i+1][blockDimY];
         thisProxy(thisIndex.x, thisIndex.y+1).receiveGhosts(iterations, TOP, blockDimX, bottomGhost);
-        delete [] bottomGhost;
       }
     }
 
-    void processGhosts(int dir, int size, double gh[]) {
+    void processGhosts(int dir, int size, array1d gh) {
       switch(dir) {
       case LEFT:
         for(int j=0; j<size; ++j) {
@@ -286,7 +251,7 @@ public:
     void check_and_compute() {
       double temperatureIth = 0.;
       double difference = 0.;
-      double **tmp;
+      array2d tmp;
 
       max_error = 0.;
       // When all neighbor values have been received, we update our values and proceed
@@ -342,7 +307,7 @@ public:
     }
 
     // for debugging
-    void dumpMatrix(double **matrix)
+    void dumpMatrix(array2d matrix)
     {
       CkPrintf("\n\n[%d,%d]\n",thisIndex.x, thisIndex.y);
       for(int i=0; i<blockDimX+2;++i)
