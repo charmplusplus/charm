@@ -286,10 +286,9 @@ class Stencil: public CBase_Stencil {
 
       // calculate error
       // not being done right now since we are doing a fixed no. of iterations
-      vector_t tmp = temperature;
-      tmp = temperature;
-      temperature = new_temperature;
-      new_temperature = tmp;
+      vector_t tmp = std::move(temperature);
+      temperature = std::move(new_temperature);
+      new_temperature = std::move(tmp);
 
       constrainBC();
 

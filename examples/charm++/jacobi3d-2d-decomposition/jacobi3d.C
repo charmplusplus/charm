@@ -301,10 +301,9 @@ public:
             }
           } // end for
 
-      array3d tmp;
-      tmp = temperature;
-      temperature = new_temperature;
-      new_temperature = tmp;
+      array3d tmp = std::move(temperature);
+      temperature = std::move(new_temperature);
+      new_temperature = std::move(tmp);
       //dumpMatrix();
     }
 

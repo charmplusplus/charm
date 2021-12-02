@@ -151,7 +151,6 @@ public:
 
     void check_and_compute() {
       double error = 0.0;
-      array2d tmp;
 
       max_error = 0.0;
       for(int i=istart; i<ifinish; i++) {
@@ -165,9 +164,9 @@ public:
         }
       }
 
-      tmp = temperature;
-      temperature = new_temperature;
-      new_temperature = tmp;
+      array2d tmp = std::move(temperature);
+      temperature = std::move(new_temperature);
+      new_temperature = std::move(tmp);
     }
 
     // Enforce some boundary conditions

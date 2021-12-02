@@ -251,7 +251,6 @@ public:
     void check_and_compute() {
       double temperatureIth = 0.;
       double difference = 0.;
-      array2d tmp;
 
       max_error = 0.;
       // When all neighbor values have been received, we update our values and proceed
@@ -272,9 +271,9 @@ public:
         }
       }
 
-      tmp = temperature;
-      temperature = new_temperature;
-      new_temperature = tmp;
+      array2d tmp = std::move(temperature);
+      temperature = std::move(new_temperature);
+      new_temperature = std::move(tmp);
       //dumpMatrix(temperature);
     }
 
