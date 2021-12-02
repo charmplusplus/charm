@@ -18,7 +18,7 @@ mainmodule jacobi3d {
 
   array [3D] Jacobi {
     entry Jacobi(void);
-    entry void receiveGhosts(int ref, int dir, int w, int h, double gh[w*h]);
+    entry void receiveGhosts(int ref, int dir, int w, int h, std::vector<double> gh);
     entry [reductiontarget] void recvConvergeResult(bool result);
 
     entry void run() {
@@ -27,7 +27,7 @@ mainmodule jacobi3d {
           begin_iteration();
         }
         for (remoteCount = 0; remoteCount < neighbors; remoteCount++) {
-          when receiveGhosts[iterations](int ref, int dir, int w, int h, double buf[w*h]) serial {
+          when receiveGhosts[iterations](int ref, int dir, int w, int h, std::vector<double> buf) serial {
             processGhosts(dir, w, h, buf);
           }
         }
