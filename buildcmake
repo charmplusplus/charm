@@ -401,6 +401,9 @@ function processArgs() {
       --basedir=*)
         opt_incdir+=("-I${arg#*=}/include")
         opt_libdir+=("-L${arg#*=}/lib")
+        if [[ -d "${arg#*=}/lib64" ]]; then
+          opt_libdir+=("-L${arg#*=}/lib64")
+        fi
         ;;
       --libdir=*)
         opt_libdir+=("-L${arg#*=}")
