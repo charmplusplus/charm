@@ -17,9 +17,9 @@ mainmodule jacobi2d {
     // Normal Charm++ entry methods
     entry Jacobi(void);
     entry void begin_iteration(void);
-    entry void ghostsFromLeft(int width, std::vector<double> s);
-    entry void ghostsFromRight(int width, std::vector<double> s);
-    entry void ghostsFromTop(int width, std::vector<double> s);
-    entry void ghostsFromBottom(int width, std::vector<double> s);
+    entry void ghostsFromLeft(int width, double s[width]);
+    entry void ghostsFromRight(int width,double s[width]);
+    entry void ghostsFromTop(int width, double s[width]);
+    entry void ghostsFromBottom(int width, double s[width]);
   };
 };

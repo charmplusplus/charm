@@ -224,20 +224,20 @@ public:
 
       int x = thisIndex.x, y = thisIndex.y, z = thisIndex.z;
       if(!leftBound)
-        thisProxy(x-1,y,z).receiveGhosts(iterations, RIGHT,  blockDimY, blockDimZ, leftGhost);
+        thisProxy(x-1,y,z).receiveGhosts(iterations, RIGHT,  blockDimY, blockDimZ, leftGhost.data());
       if(!rightBound)
-        thisProxy(x+1,y,z).receiveGhosts(iterations, LEFT,   blockDimY, blockDimZ, rightGhost);
+        thisProxy(x+1,y,z).receiveGhosts(iterations, LEFT,   blockDimY, blockDimZ, rightGhost.data());
       if(!topBound)
-        thisProxy(x,y+1,z).receiveGhosts(iterations, BOTTOM,    blockDimX, blockDimZ, topGhost);
+        thisProxy(x,y+1,z).receiveGhosts(iterations, BOTTOM,    blockDimX, blockDimZ, topGhost.data());
       if(!bottomBound)
-        thisProxy(x,y-1,z).receiveGhosts(iterations, TOP, blockDimX, blockDimZ, bottomGhost);
+        thisProxy(x,y-1,z).receiveGhosts(iterations, TOP, blockDimX, blockDimZ, bottomGhost.data());
       if(!frontBound)
-        thisProxy(x,y,z+1).receiveGhosts(iterations, BACK,   blockDimX, blockDimY, frontGhost);
+        thisProxy(x,y,z+1).receiveGhosts(iterations, BACK,   blockDimX, blockDimY, frontGhost.data());
       if(!backBound)
-        thisProxy(x,y,z-1).receiveGhosts(iterations, FRONT,  blockDimX, blockDimY, backGhost);
+        thisProxy(x,y,z-1).receiveGhosts(iterations, FRONT,  blockDimX, blockDimY, backGhost.data());
     }
 
-    void processGhosts(int dir, int height, int width, array1d gh) {
+    void processGhosts(int dir, int height, int width, const double* gh) {
       switch(dir) {
       case LEFT:
         for(int k=0; k<width; ++k)
@@ -301,9 +301,7 @@ public:
             }
           } // end for
 
-      array3d tmp = std::move(temperature);
-      temperature = std::move(new_temperature);
-      new_temperature = std::move(tmp);
+      temperature.swap(new_temperature);
       //dumpMatrix();
     }
 

@@ -164,9 +164,7 @@ public:
         }
       }
 
-      array2d tmp = std::move(temperature);
-      temperature = std::move(new_temperature);
-      new_temperature = std::move(tmp);
+      temperature.swap(new_temperature);
     }
 
     // Enforce some boundary conditions
@@ -196,7 +194,7 @@ public:
       }
     } 
     // for debugging
-    void dumpMatrix(array2d matrix)
+    void dumpMatrix(array2d const& matrix)
     {
       CkPrintf("\n\n[%d]\n",thisIndex);
       for(int i=0; i<blockDimX+2;++i)

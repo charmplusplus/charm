@@ -220,25 +220,25 @@ class Stencil: public CBase_Stencil {
 
       // Send my left face
       thisProxy(wrap_x(thisIndex.x-1), thisIndex.y, thisIndex.z)
-        .receiveGhosts(iterations, RIGHT, blockDimY, blockDimZ, leftGhost);
+        .receiveGhosts(iterations, RIGHT, blockDimY, blockDimZ, leftGhost.data());
       // Send my right face
       thisProxy(wrap_x(thisIndex.x+1), thisIndex.y, thisIndex.z)
-        .receiveGhosts(iterations, LEFT, blockDimY, blockDimZ, rightGhost);
+        .receiveGhosts(iterations, LEFT, blockDimY, blockDimZ, rightGhost.data());
       // Send my bottom face
       thisProxy(thisIndex.x, wrap_y(thisIndex.y-1), thisIndex.z)
-        .receiveGhosts(iterations, TOP, blockDimX, blockDimZ, bottomGhost);
+        .receiveGhosts(iterations, TOP, blockDimX, blockDimZ, bottomGhost.data());
       // Send my top face
       thisProxy(thisIndex.x, wrap_y(thisIndex.y+1), thisIndex.z)
-        .receiveGhosts(iterations, BOTTOM, blockDimX, blockDimZ, topGhost);
+        .receiveGhosts(iterations, BOTTOM, blockDimX, blockDimZ, topGhost.data());
       // Send my front face
       thisProxy(thisIndex.x, thisIndex.y, wrap_z(thisIndex.z-1))
-        .receiveGhosts(iterations, BACK, blockDimX, blockDimY, frontGhost);
+        .receiveGhosts(iterations, BACK, blockDimX, blockDimY, frontGhost.data());
       // Send my back face
       thisProxy(thisIndex.x, thisIndex.y, wrap_z(thisIndex.z+1))
-        .receiveGhosts(iterations, FRONT, blockDimX, blockDimY, backGhost);
+        .receiveGhosts(iterations, FRONT, blockDimX, blockDimY, backGhost.data());
     }
 
-    void processGhosts(int dir, int height, int width, vector_t gh) {
+    void processGhosts(int dir, int height, int width, const double* gh) {
       switch(dir) {
         case LEFT:
           for(int k=0; k<width; ++k)
@@ -286,9 +286,7 @@ class Stencil: public CBase_Stencil {
 
       // calculate error
       // not being done right now since we are doing a fixed no. of iterations
-      vector_t tmp = std::move(temperature);
-      temperature = std::move(new_temperature);
-      new_temperature = std::move(tmp);
+      temperature.swap(new_temperature);
 
       constrainBC();
 

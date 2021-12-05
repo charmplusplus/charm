@@ -188,40 +188,40 @@ public:
         }
 
         // Send my left edge
-        thisProxy(wrap_x(thisIndex.x-1), thisIndex.y).ghostsFromRight(block_height, left_edge);
+        thisProxy(wrap_x(thisIndex.x-1), thisIndex.y).ghostsFromRight(block_height, left_edge.data());
 		// Send my right edge
-        thisProxy(wrap_x(thisIndex.x+1), thisIndex.y).ghostsFromLeft(block_height, right_edge);
+        thisProxy(wrap_x(thisIndex.x+1), thisIndex.y).ghostsFromLeft(block_height, right_edge.data());
 		// Send my top edge
-        thisProxy(thisIndex.x, wrap_y(thisIndex.y-1)).ghostsFromBottom(block_width, temperature[1]);
+        thisProxy(thisIndex.x, wrap_y(thisIndex.y-1)).ghostsFromBottom(block_width, temperature[1].data());
 		// Send my bottom edge
-        thisProxy(thisIndex.x, wrap_y(thisIndex.y+1)).ghostsFromTop(block_width, temperature[block_height]);
+        thisProxy(thisIndex.x, wrap_y(thisIndex.y+1)).ghostsFromTop(block_width, temperature[block_height].data());
     }
 }
 
 void ResumeFromSync() {begin_iteration();}
 
-    void ghostsFromRight(int width, array1d ghost_values) {
+    void ghostsFromRight(int width, const double* ghost_values) {
         for(int i=0;i<width;++i){
             temperature[i+1][block_width+1] = ghost_values[i];
         }
         check_and_compute();
     }
 
-    void ghostsFromLeft(int width, array1d ghost_values) {
+    void ghostsFromLeft(int width, const double* ghost_values) {
         for(int i=0;i<width;++i){
             temperature[i+1][0] = ghost_values[i];
         }
         check_and_compute();
     }
 
-    void ghostsFromBottom(int width, array1d ghost_values) {
+    void ghostsFromBottom(int width, const double* ghost_values) {
         for(int i=0;i<width;++i){
             temperature[block_height+1][i+1] = ghost_values[i];
         }
         check_and_compute();
     }
 
-    void ghostsFromTop(int width, array1d ghost_values) {
+    void ghostsFromTop(int width, const double* ghost_values) {
         for(int i=0;i<width;++i){
             temperature[0][i+1] = ghost_values[i];
         }

@@ -196,32 +196,32 @@ public:
         array1d leftGhost(blockDimY);
         for(int j=0; j<blockDimY; ++j) 
           leftGhost[j] = temperature[1][j+1];
-        thisProxy(thisIndex.x-1, thisIndex.y).receiveGhosts(iterations, RIGHT, blockDimY, leftGhost);
+        thisProxy(thisIndex.x-1, thisIndex.y).receiveGhosts(iterations, RIGHT, blockDimY, leftGhost.data());
       }
       if(!rightBound)
       {
         array1d rightGhost(blockDimY);
         for(int j=0; j<blockDimY; ++j) 
           rightGhost[j] = temperature[blockDimX][j+1];
-        thisProxy(thisIndex.x+1, thisIndex.y).receiveGhosts(iterations, LEFT, blockDimY, rightGhost);
+        thisProxy(thisIndex.x+1, thisIndex.y).receiveGhosts(iterations, LEFT, blockDimY, rightGhost.data());
       }
       if(!topBound)
       {
         array1d topGhost(blockDimX);
         for(int i=0; i<blockDimX; ++i) 
           topGhost[i] = temperature[i+1][1];
-        thisProxy(thisIndex.x, thisIndex.y-1).receiveGhosts(iterations, BOTTOM, blockDimX, topGhost);
+        thisProxy(thisIndex.x, thisIndex.y-1).receiveGhosts(iterations, BOTTOM, blockDimX, topGhost.data());
       }
       if(!bottomBound)
       {
         array1d bottomGhost(blockDimX);
         for(int i=0; i<blockDimX; ++i) 
           bottomGhost[i] = temperature[i+1][blockDimY];
-        thisProxy(thisIndex.x, thisIndex.y+1).receiveGhosts(iterations, TOP, blockDimX, bottomGhost);
+        thisProxy(thisIndex.x, thisIndex.y+1).receiveGhosts(iterations, TOP, blockDimX, bottomGhost.data());
       }
     }
 
-    void processGhosts(int dir, int size, array1d gh) {
+    void processGhosts(int dir, int size, const double* gh) {
       switch(dir) {
       case LEFT:
         for(int j=0; j<size; ++j) {
@@ -271,9 +271,7 @@ public:
         }
       }
 
-      array2d tmp = std::move(temperature);
-      temperature = std::move(new_temperature);
-      new_temperature = std::move(tmp);
+      temperature.swap(new_temperature);
       //dumpMatrix(temperature);
     }
 
@@ -306,7 +304,7 @@ public:
     }
 
     // for debugging
-    void dumpMatrix(array2d matrix)
+    void dumpMatrix(array2d const& matrix)
     {
       CkPrintf("\n\n[%d,%d]\n",thisIndex.x, thisIndex.y);
       for(int i=0; i<blockDimX+2;++i)
