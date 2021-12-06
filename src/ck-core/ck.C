@@ -2610,6 +2610,52 @@ void CkPrepareMessageWithZCData(CkMarshallMsg **dest,
   *dest = impl_msg;
 
 }
+void CkArrayExtSendWithZCData(int aid, int *idx, int ndims,
+                              int epIdx, int num_bufs, char **bufs,
+                              int *buf_sizes,
+                              long *zcBufPtrs,
+                              int *zcBufSizesInBytes,
+                              int numZCBufs
+                              )
+{
+  CkGroupID gId;
+  gId.idx = aid;
+
+
+  CkArrayIndex arrIndex(ndims, idx);
+
+  CProxyElement_ArrayBase destProxy = CProxyElement_ArrayBase(gId, arrIndex);
+  int destPe = destProxy.ckLocalBranch()->lastKnown(arrIndex);
+
+  CkNcpyBuffer zcBufs[numZCBufs];
+  for (int i = 0; i < numZCBufs; ++i) {
+    zcBufs[i] = CkNcpyBuffer((void *) zcBufPtrs[i], zcBufSizesInBytes[i]);
+  }
+
+  CkMarshallMsg *impl_msg = NULL;
+  CkPrepareMessageWithZCData(&impl_msg,
+                         epIdx,
+                         num_bufs,
+                         bufs,
+                         buf_sizes,
+                         zcBufs,
+                         zcBufSizesInBytes,
+                         numZCBufs
+                         );
+
+
+  UsrToEnv(impl_msg)->setMsgtype(ForArrayEltMsg);
+  CkArrayMessage *impl_amsg=(CkArrayMessage *)impl_msg;
+  impl_amsg->array_setIfNotThere(CkArray_IfNotThere_buffer);
+
+  CProxyElement_ArrayBase::ckSendWrapper(gId, arrIndex, impl_amsg, epIdx, 0);
+
+}
+
+int CkZCBufferSizeInBytes()
+{
+  return sizeof(CkNcpyBuffer);
+}
 
 extern void (*DepositFutureWithIdFn)(void *, void*);
 

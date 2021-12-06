@@ -149,6 +149,8 @@ extern void CkStartQDExt_ArrayCallback(int aid, int* idx, int ndims, int epIdx, 
 extern void CkStartQDExt_SectionCallback(int sid_pe, int sid_cnt, int rootPE, int ep);
 extern void registerCreateCallbackMsgExtCallback(void (*cb)(void*, int, int, int, int *, char**, int*));
 extern void registerPyReductionExtCallback(int (*cb)(char**, int*, int, char**));
+extern int CkZCBufferSizeInBytes();
+
 
 #endif
 /*********************************************************/
@@ -507,8 +509,16 @@ void CkGetZCData(int numBuffers, void *recvBufPtrs, int *arrSizes,
 
 extern void registerDepositFutureWithIdFn(void (*cb)(void*, void*));
 
-void CkGetZCData(int numBuffers, void *recvBufPtrs, int *arrSizes,
+extern void CkGetZCData(int numBuffers, void *recvBufPtrs, int *arrSizes,
                  void *remoteBufInfos, int futureId);
+extern void CkArrayExtSendWithZCData(int aid, int *idx, int ndims,
+                                     int epIdx, int num_bufs, char **bufs,
+                                     int *buf_sizes,
+                                     long *zcBufPtrs,
+                                     int *zcBufSizesInBytes,
+                                     int numZCBufs
+                                     );
+
 
 #endif // CMK_CHARM4PY
 
