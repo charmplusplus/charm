@@ -132,6 +132,7 @@ extern void registerArrayMsgRecvExtCallback(void (*cb)(int, int, int *, int, int
 extern void registerArrayBcastRecvExtCallback(void (*cb)(int, int, int, int, int*, int, int, char *, int));
 extern void registerArrayElemLeaveExtCallback(int (*cb)(int, int, int *, char**, int));
 extern void registerArrayElemJoinExtCallback(void (*cb)(int, int, int *, int, char*, int));
+extern void registerArrayMsgGPUDirectRecvExtCallback(void (*cb)(int, int, int*, int, int, int*, void *, int, char*,int));
 extern void registerArrayResumeFromSyncExtCallback(void (*cb)(int, int, int *));
 extern void registerArrayMapProcNumExtCallback(int (*cb)(int, int, const int *));
 extern void StartCharmExt(int argc, char **argv); // start Converse/Charm, argv are the command-line arguments

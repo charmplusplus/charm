@@ -2182,6 +2182,12 @@ void registerArrayMsgRecvExtCallback(void (*cb)(int, int, int *, int, int, char 
   ArrayMsgRecvExtCallback = cb;
 }
 
+void (*ArrayMsgZCRecvExtCallback)(int, int, int*, int, int, int*, void *, int, char*, int) = NULL;
+void registerArrayMsgZCRecvExtCallback(void (*cb)(int, int, int*, int, int, int*, void *, int, char*,int))
+{
+  ArrayMsgZCRecvExtCallback = cb;
+}
+
 void (*ArrayBcastRecvExtCallback)(int, int, int, int, int *, int, int, char *, int) = NULL;
 void registerArrayBcastRecvExtCallback(void (*cb)(int, int, int, int, int *, int, int, char *, int)) {
   ArrayBcastRecvExtCallback = cb;
@@ -2215,6 +2221,12 @@ void registerPyReductionExtCallback(int (*cb)(char**, int*, int, char**)) {
 int (*ArrayMapProcNumExtCallback)(int, int, const int *) = NULL;
 void registerArrayMapProcNumExtCallback(int (*cb)(int, int, const int *)) {
   ArrayMapProcNumExtCallback = cb;
+}
+
+void (*DepositFutureWithIdFn)(void *, void*) = NULL;
+void registerDepositFutureWithIdFn(void (*cb)(void*, void*))
+{
+  DepositFutureWithIdFn = cb;
 }
 
 int CkMyPeHook() { return CkMyPe(); }
