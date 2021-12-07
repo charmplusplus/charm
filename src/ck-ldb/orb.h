@@ -171,6 +171,9 @@ public:
     CkAssertMsg(!objs[0].position.empty(),
                 "Objects used with ORBLB must have a valid, non-empty position.");
 
+    // Sort processors by ID
+    std::sort(procs.begin(), procs.end(), CmpId<P>());
+
     // Assumes all objects have same position dimension
     const auto posDimension = objs[0].position.size();
 
