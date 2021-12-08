@@ -126,7 +126,9 @@ static void ipcHandleCreate();
 static void ipcHandleOpen();
 
 #ifndef HAPI_CUDA_CALLBACK
-static_assert(!CSD_NO_SCHEDLOOP, "please disable CSD_NO_SCHEDLOOP to use HAPI");
+#if CSD_NO_SCHEDLOOP
+#  error please disable CSD_NO_SCHEDLOOP to use HAPI
+#endif
 #endif
 
 // Called by all PEs in Charm++ layer init
