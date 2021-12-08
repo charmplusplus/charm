@@ -125,6 +125,10 @@ static void shmCleanup();
 static void ipcHandleCreate();
 static void ipcHandleOpen();
 
+#ifndef HAPI_CUDA_CALLBACK
+static_assert(!CSD_NO_SCHEDLOOP);
+#endif
+
 // Called by all PEs in Charm++ layer init
 void hapiInit(char** argv) {
   if (!CmiInCommThread()) {
