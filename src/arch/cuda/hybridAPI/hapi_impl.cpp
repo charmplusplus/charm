@@ -125,6 +125,12 @@ static void shmCleanup();
 static void ipcHandleCreate();
 static void ipcHandleOpen();
 
+#ifndef HAPI_CUDA_CALLBACK
+#if CSD_NO_SCHEDLOOP
+#  error please disable CSD_NO_SCHEDLOOP to use HAPI
+#endif
+#endif
+
 // Called by all PEs in Charm++ layer init
 void hapiInit(char** argv) {
   if (!CmiInCommThread()) {
