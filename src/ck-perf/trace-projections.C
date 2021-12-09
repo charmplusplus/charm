@@ -154,11 +154,10 @@ void LogPool::closeLog(void)
 }
 
 LogPool::LogPool(char *pgm) {
-  pool = new LogEntry[CkpvAccess(CtrLogBufSize)];
+  pool.reserve(CkpvAccess(CtrLogBufSize));
   // defaults to writing data (no outlier changes)
   writeSummaryFiles = false;
   writeData = true;
-  numEntries = 0;
   lastCreationEvent = -1;
   // **CW** for simple delta encoding
   prevTime = 0.0;
@@ -172,7 +171,6 @@ LogPool::LogPool(char *pgm) {
   keepPhase = NULL;
 
   fileCreated = false;
-  poolSize = CkpvAccess(CtrLogBufSize);
   pgmname = new char[strlen(pgm)+1];
   strcpy(pgmname, pgm);
 
@@ -298,9 +296,8 @@ LogPool::~LogPool()
 #endif
   }
 
-
-  delete[] pool;
   delete [] fname;
+  delete [] pgmname;
 }
 
 void LogPool::writeHeader()
@@ -310,16 +307,19 @@ void LogPool::writeHeader()
   if(!binary) {
 #if CMK_USE_ZLIB
     if(compressed) {
-      gzprintf(zfp, "PROJECTIONS-RECORD %d\n", numEntries);
+      // TODO: Remove these int casts after ensuring Projections can parse the uncasted
+      // values (particularly for the binary version, the other casts are for consistency)
+      gzprintf(zfp, "PROJECTIONS-RECORD %d\n", (int)pool.size());
     } 
     else /* else clause is below... */
 #endif
     /*... may hang over from else above */ {
-      fprintf(fp, "PROJECTIONS-RECORD %d\n", numEntries);
+      fprintf(fp, "PROJECTIONS-RECORD %d\n", (int)pool.size());
     }
   }
   else { // binary
-    fwrite(&numEntries,sizeof(numEntries),1,fp);
+    int size = pool.size();
+    fwrite(&size, sizeof(size), 1, fp);
   }
 }
 
@@ -355,32 +355,32 @@ void LogPool::write(int writedelta)
   // **FIXME** - Should probably consider a more sophisticated bounds-based
   //   approach for selective writing instead of making multiple if-checks
   //   for every single event.
-  for(UInt i=0; i<numEntries; i++) {
+  for(auto& entry : pool) {
     if (!writedelta) {
       if (keepPhase == NULL) {
 	// default case, when no phase selection is required.
-	pool[i].pup(*p);
+	entry.pup(*p);
       } else {
 	// **FIXME** Might be a good idea to create a "filler" event block for
 	//   all the events taken out by phase filtering.
-	if (pool[i].type == END_PHASE) {
+	if (entry.type == END_PHASE) {
 	  // always write phase markers
-	  pool[i].pup(*p);
+	  entry.pup(*p);
 	  curPhase++;
-	} else if (pool[i].type == BEGIN_COMPUTATION ||
-		   pool[i].type == END_COMPUTATION) {
+	} else if (entry.type == BEGIN_COMPUTATION ||
+		   entry.type == END_COMPUTATION) {
 	  // always write BEGIN and END COMPUTATION markers
-	  pool[i].pup(*p);
+	  entry.pup(*p);
 	} else if (keepPhase[curPhase]) {
-	  pool[i].pup(*p);
+	  entry.pup(*p);
 	}
       }
     }
     else {	// delta
       // **FIXME** Implement phase-selective writing for delta logs
       //   eventually
-      double time = pool[i].time;
-      if (pool[i].type != BEGIN_COMPUTATION && pool[i].type != END_COMPUTATION)
+      double time = entry.time;
+      if (entry.type != BEGIN_COMPUTATION && entry.type != END_COMPUTATION)
       {
         double timeDiff = (time-prevTime)*1.0e6;
         UInt intTimeDiff = (UInt)timeDiff;
@@ -389,10 +389,10 @@ void LogPool::write(int writedelta)
           timeErr -= 1.0;
           intTimeDiff++;
         }
-        pool[i].time = intTimeDiff/1.0e6;
+        entry.time = intTimeDiff/1.0e6;
       }
-      pool[i].pup(*p);
-      pool[i].time = time;	// restore time value
+      entry.pup(*p);
+      entry.time = time;	// restore time value
       prevTime = time;
     }
   }
@@ -485,24 +485,21 @@ void LogPool::writeStatis(void)
   fclose(statisfp);
 }
 
-
 // flush log entries to disk
-void LogPool::flushLogBuffer()
+void LogPool::flushLogBuffer(bool force /* = false */)
 {
-  if (numEntries) {
+  if (!pool.empty() && (force || pool.size() == pool.capacity()))
+  {
     double writeTime = TraceTimer();
     writeLog();
-    for (int i = 0; i < numEntries; i++)
-    {
-      pool[i].~LogEntry();
-    }
+    pool.clear();
     hasFlushed = true;
-    numEntries = 0;
     lastCreationEvent = -1;
-    new (&pool[numEntries++]) LogEntry(BEGIN_INTERRUPT, writeTime, 0, 0, 0, 0, 0, nullptr, 0, 0);
-    new (&pool[numEntries++]) LogEntry(END_INTERRUPT, TraceTimer(), 0, 0, 0, 0, 0, nullptr, 0, 0);
-    //CkPrintf("Warning: Projections log flushed to disk on PE %d.\n", CkMyPe());
-    if (!traceProjectionsGID.isZero()) {    // report flushing events to PE 0
+    pool.emplace_back(BEGIN_INTERRUPT, writeTime, 0, 0, 0, 0, 0, nullptr, 0, 0);
+    pool.emplace_back(END_INTERRUPT, TraceTimer(), 0, 0, 0, 0, 0, nullptr, 0, 0);
+    // CkPrintf("Warning: Projections log flushed to disk on PE %d.\n", CkMyPe());
+    if (!traceProjectionsGID.isZero())
+    {  // report flushing events to PE 0
       CProxy_TraceProjectionsBOC bocProxy(traceProjectionsGID);
       bocProxy[0].flush_warning(CkMyPe());
     }
@@ -576,83 +573,59 @@ void LogPool::add(UChar type, UShort mIdx, UShort eIdx,
   if (type == CREATION ||
       type == CREATION_MULTICAST ||
       type == CREATION_BCAST) {
-    lastCreationEvent = numEntries;
+    lastCreationEvent = pool.size();
   }
-  new (&pool[numEntries++])
-    LogEntry(type, time, mIdx, eIdx, event, pe, ml, id, recvT, cpuT);
+  pool.emplace_back(type, time, mIdx, eIdx, event, pe, ml, id, recvT, cpuT);
   if ((type == END_PHASE) || (type == END_COMPUTATION)) {
     numPhases++;
   }
-  if(poolSize==numEntries) {
-    flushLogBuffer();
-  }
+  flushLogBuffer();
 }
 
 void LogPool::addUserBracketEventNestedID(unsigned char type, double time,
                                           UShort mIdx, int event, int nestedID) {
-  new (&pool[numEntries++]) LogEntry(type, time, mIdx, event, nestedID);
-  if(poolSize == numEntries){
-    flushLogBuffer();
-  }
+  pool.emplace_back(type, time, mIdx, event, nestedID);
+  flushLogBuffer();
 }
 
 void LogPool::addMemoryUsage(double time, double memUsage)
 {
-  new (&pool[numEntries++]) LogEntry(MEMORY_USAGE_CURRENT, time, memUsage);
-  if (poolSize == numEntries)
-  {
-    flushLogBuffer();
-  }
+  pool.emplace_back(MEMORY_USAGE_CURRENT, time, memUsage);
+  flushLogBuffer();
 }
 
 void LogPool::addUserStat(double time, int pe, int e, double stat,
                           double statTime)
 {
-  new (&pool[numEntries++]) LogEntry(USER_STAT, time, pe, e, stat, statTime);
-  if (poolSize == numEntries)
-  {
-    flushLogBuffer();
-  }
+  pool.emplace_back(USER_STAT, time, pe, e, stat, statTime);
+  flushLogBuffer();
 }
 
 void LogPool::addUserSupplied(int data)
 {
-  new (&pool[numEntries++]) LogEntry(USER_SUPPLIED, TraceTimer(), data);
-  if (poolSize == numEntries)
-  {
-    flushLogBuffer();
-  }
+  pool.emplace_back(USER_SUPPLIED, TraceTimer(), data);
+  flushLogBuffer();
 }
 
 void LogPool::addUserSuppliedNote(char* note)
 {
-  new (&pool[numEntries++]) LogEntry(USER_SUPPLIED_NOTE, TraceTimer(), note);
-  if (poolSize == numEntries)
-  {
-    flushLogBuffer();
-  }
+  pool.emplace_back(USER_SUPPLIED_NOTE, TraceTimer(), note);
+  flushLogBuffer();
 }
 
 void LogPool::addUserSuppliedBracketedNote(char* note, int eventID, double bt, double et)
 {
-  new (&pool[numEntries++]) LogEntry(USER_SUPPLIED_BRACKETED_NOTE, bt, note, eventID, et);
-  if (poolSize == numEntries)
-  {
-    flushLogBuffer();
-  }
+  pool.emplace_back(USER_SUPPLIED_BRACKETED_NOTE, bt, note, eventID, et);
+  flushLogBuffer();
 }
 
 void LogPool::addCreationBroadcast(unsigned short mIdx, unsigned short eIdx, double time,
                                    int event, int pe, int ml, int numPe)
 
 {
-  lastCreationEvent = numEntries;
-  new (&pool[numEntries++])
-      LogEntry(CREATION_BCAST, time, mIdx, eIdx, event, pe, ml, numPe);
-  if (poolSize == numEntries)
-  {
-    flushLogBuffer();
-  }
+  lastCreationEvent = pool.size();
+  pool.emplace_back(CREATION_BCAST, time, mIdx, eIdx, event, pe, ml, numPe);
+  flushLogBuffer();
 }
 
 /* **CW** Not sure if this is the right thing to do. Feels more like
@@ -666,13 +639,9 @@ void LogPool::addCreationBroadcast(unsigned short mIdx, unsigned short eIdx, dou
 void LogPool::addCreationMulticast(UShort mIdx, UShort eIdx, double time, int event,
                                    int pe, int ml, int numPe, const int* pelist)
 {
-  lastCreationEvent = numEntries;
-  new (&pool[numEntries++])
-    LogEntry(CREATION_MULTICAST, time, mIdx, eIdx, event, pe, ml, numPe, pelist);
-  if (poolSize == numEntries)
-  {
-    flushLogBuffer();
-  }
+  lastCreationEvent = pool.size();
+  pool.emplace_back(CREATION_MULTICAST, time, mIdx, eIdx, event, pe, ml, numPe, pelist);
+  flushLogBuffer();
 }
 
 void LogPool::postProcessLog()
@@ -681,8 +650,8 @@ void LogPool::postProcessLog()
 
 void LogPool::modLastEntryTimestamp(double ts)
 {
-  pool[numEntries-1].time = ts;
-  //pool[numEntries-1].cputime = ts;
+  pool.back().time = ts;
+  //pool.back().cputime = ts;
 }
 
 //void LogEntry::addPapi(LONG_LONG_PAPI *papiVals)
@@ -1652,7 +1621,7 @@ void TraceProjections::endPhase() {
   double currentPhaseTime = TraceTimer();
   if (lastPhaseEvent != NULL) {
   } else {
-    if (_logPool->pool != NULL) {
+    if (!_logPool->pool.empty()) {
       // assumed to be BEGIN_COMPUTATION
     } else {
       CkPrintf("[%d] Warning: End Phase encountered in an empty log. Inserting BEGIN_COMPUTATION event\n", CkMyPe());
@@ -1664,9 +1633,9 @@ void TraceProjections::endPhase() {
   /* FIXME: Format should be TYPE, PHASE#, TimeStamp, [StartTime] */
   /*        We currently "borrow" from the standard add() method. */
   /*        It should really be its own add() method.             */
-  /* NOTE: assignment to lastPhaseEvent is "pre-emptive".         */
-  lastPhaseEvent = &(_logPool->pool[_logPool->numEntries]);
   _logPool->add(END_PHASE, 0, currentPhaseID, currentPhaseTime, -1, CkMyPe());
+  if (!_logPool->pool.empty() && _logPool->pool.back().type == END_PHASE)
+    lastPhaseEvent = &(_logPool->pool.back());
   currentPhaseID++;
 }
 
@@ -1906,11 +1875,11 @@ void KMeansBOC::getNextPhaseMetrics() {
   int numEventMethods = _entryTable.size();
   LogPool *pool = CkpvAccess(_trace)->_logPool;
   
-  CkAssert(pool->numEntries > lastPhaseIdx);
+  CkAssert(pool->pool.size() > lastPhaseIdx);
   double totalPhaseTime = 0.0;
   double totalActiveTime = 0.0; // entry method + idle
 
-  for (int i=lastPhaseIdx; i<pool->numEntries; i++) {
+  for (int i=lastPhaseIdx; i<pool->pool.size(); i++) {
     if (pool->pool[i].type == BEGIN_PROCESSING) {
       // check pairing
       if (!markedBegin) {
@@ -2623,8 +2592,8 @@ void KMeansBOC::phaseDone() {
 void TraceProjectionsBOC::startTimeAnalysis()
 {
   double startTime = 0.0;
-  if (CkpvAccess(_trace)->_logPool->numEntries>0)
-     startTime = CkpvAccess(_trace)->_logPool->pool[0].time;
+  if (!CkpvAccess(_trace)->_logPool->pool.empty())
+     startTime = CkpvAccess(_trace)->_logPool->pool.front().time;
   CkCallback cb(CkReductionTarget(TraceProjectionsBOC, startTimeDone), thisProxy);
   contribute(sizeof(double), &startTime, CkReduction::min_double, cb);
 }
