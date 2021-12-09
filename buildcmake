@@ -223,6 +223,11 @@ function parse_platform_compilers() {
       opt_FC=flang
       opt_compiler+=("$arg")
       ;;
+    dpcpp)
+      opt_CC=icx
+      opt_CXX=dpcpp
+      opt_compiler+=("$arg")
+      ;;
     icc|iccstatic)
       opt_CC=icc
       opt_CXX=icpc
