@@ -889,10 +889,10 @@ then
     echo "CMK_AMPI_ONLY:=1" >> "$ConvMak"
     echo '#define CMK_AMPI_ONLY 1' >> "$ConvHeader"
 
-    # AMPI doesn't use Charm-MPI interop or msg priorities of any kind.
+    # AMPI doesn't use Charm-MPI interop, msg priorities, non-FIFO queues, or CcdSCHEDLOOP.
     # AMPI creates O(NumVirtualRanks) chare arrays by default (for MPI_COMM_SELF),
     # so we bump up the number of bits reserved for the collection in the objid.
-    OPTS=('-DCMK_NO_INTEROP=1' '-DCMK_NO_MSG_PRIOS=1' '-DCMK_FIFO_QUEUE_ONLY=1' '-DCMK_OBJID_COLLECTION_BITS=29' "${OPTS[@]}")
+    OPTS=('-DCMK_NO_INTEROP=1' '-DCMK_NO_MSG_PRIOS=1' '-DCMK_FIFO_QUEUE_ONLY=1' '-DCSD_NO_SCHEDLOOP=1' '-DCMK_OBJID_COLLECTION_BITS=29' "${OPTS[@]}")
     CONFIG_OPTS=('--with-prio-type=char' "${CONFIG_OPTS[@]}")
 else
     echo "CMK_AMPI_ONLY=\"0\"" >> "$ConvSh"
