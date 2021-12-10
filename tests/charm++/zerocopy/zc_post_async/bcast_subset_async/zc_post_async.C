@@ -93,7 +93,7 @@ class arr : public CBase_arr {
       evenElement = (thisIndex % 2 == 0);
     }
 
-    void recv_zerocopy(int *&buffer, size_t &size, CkNcpyBufferPost *ncpyPost) {
+    void recv_zerocopy(int *buffer, size_t size, CkNcpyBufferPost *ncpyPost) {
       CkMatchBuffer(ncpyPost, 0, tag);
 
 #if DELAYED_POST
@@ -144,7 +144,7 @@ class grp : public CBase_grp {
       evenElement = (thisIndex % 2 == 0);
     }
 
-    void recv_zerocopy(int *&buffer1, size_t &size1, int *&buffer2, size_t &size2, CkNcpyBufferPost *ncpyPost) {
+    void recv_zerocopy(int *buffer1, size_t size1, int *buffer2, size_t size2, CkNcpyBufferPost *ncpyPost) {
       CkMatchBuffer(ncpyPost, 0, tag1);
       CkMatchBuffer(ncpyPost, 1, tag2);
 
@@ -191,7 +191,7 @@ class nodegrp : public CBase_nodegrp {
       tag = 400 + thisIndex;
     }
 
-    void recv_zerocopy(int *&buffer, size_t &size, CkNcpyBufferPost *ncpyPost) {
+    void recv_zerocopy(int *buffer, size_t size, CkNcpyBufferPost *ncpyPost) {
       CkMatchNodeBuffer(ncpyPost, 0, tag);
 
 #if DELAYED_POST

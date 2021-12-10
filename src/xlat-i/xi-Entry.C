@@ -553,8 +553,9 @@ void Entry::genArrayDefs(XStr& str) {
           << "  env.setTotalsize(0);\n"
           << "  _TRACE_CREATION_DETAILED(&env, " << epIdx() << ");\n"
           << "  _TRACE_CREATION_DONE(1);\n"
+          << "  CmiObjId projID = ((CkArrayIndex&)ckGetIndex()).getProjectionID();\n"
           << "  _TRACE_BEGIN_EXECUTE_DETAILED(CpvAccess(curPeEvent),ForArrayEltMsg,(" << epIdx()
-          << "),CkMyPe(), 0, ((CkArrayIndex&)ckGetIndex()).getProjectionID(), obj);\n";
+          << "),CkMyPe(), 0, &projID, obj);\n";
     if (isAppWork()) inlineCall << "    _TRACE_BEGIN_APPWORK();\n";
     inlineCall << "#if CMK_LBDB_ON\n";
     if (isInline())
@@ -1882,15 +1883,14 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
       str << "ncpyPost);\n";
       str << "  ";
       genRegularCall(str, preCall, redn_wrapper, usesImplBuf, true);
-      str << "    void *buffPtrs["<< numRdmaRecvParams <<"];\n";
-      str << "    int buffSizes["<< numRdmaRecvParams <<"];\n";
       for (int index = 0; index < numRdmaRecvParams; index++)
         str << "    if(ncpyPost[" << index << "].postAsync) numPostAsync++;\n";
+      str << "    if(numPostAsync == 0) {\n"; // all buffers are posted
+      str << "      void *buffPtrs["<< numRdmaRecvParams <<"];\n";
+      str << "      int buffSizes["<< numRdmaRecvParams <<"];\n";
       param->storePostedRdmaPtrs(str, isSDAGGen);
-
-      str << "    if(numPostAsync == 0)\n"; // all buffers are posted
       str << "      CkRdmaIssueRgets(env, buffPtrs, buffSizes, myIndex, ncpyPost);\n";
-      str << "    else if(";
+      str << "    } else if(";
       if(isSDAGGen)
         str << "genClosure->num_rdma_fields - ";
       else
@@ -1925,16 +1925,17 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
       str << "      }\n";
 
       str << "    } else { // Message that executes the Regular EM on secondary elements\n";
-      param->extractPostedPtrs(str, isSDAGGen);
+      param->extractPostedPtrs(str, isSDAGGen, false, false);
       str << "    ";
       genRegularCall(str, preCall, redn_wrapper, usesImplBuf, false);
       str << "      updatePeerCounter(ncpyEmInfo);\n";
       str << "    }\n";
       str << "  } else {   // Final message that executes the Regular EM on primary element\n";
-
+      param->extractPostedPtrs(str, isSDAGGen, true, false);
     } else if (param->hasDevice()) {
       str << "  if (CMI_IS_ZC_DEVICE(env)) {\n";
       genRegularCall(str, preCall, redn_wrapper, usesImplBuf, true);
+      param->extractPostedPtrs(str, isSDAGGen, false, true);
       str << "  } else {\n";
     }
     genRegularCall(str, preCall, redn_wrapper, usesImplBuf, false);

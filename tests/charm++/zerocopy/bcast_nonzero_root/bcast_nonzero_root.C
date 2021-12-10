@@ -8,6 +8,7 @@ CProxy_grp grpProxy;
 CProxy_nodegrp ngProxy;
 CProxy_tester testerProxy;
 CProxy_main mProxy;
+int arrSize;
 
 void assignValuesToIndex(int *arr, int size);
 void verifyValuesWithIndex(int *arr, int size);
@@ -18,8 +19,9 @@ class main : public CBase_main {
     main(CkArgMsg *m) {
       delete m;
 
+      arrSize = CkNumPes() * NUM_ELEMENTS_PER_PE;
       // Create a chare array
-      arrProxy = CProxy_arr::ckNew(CkNumPes() * NUM_ELEMENTS_PER_PE);
+      arrProxy = CProxy_arr::ckNew(arrSize);
 
       // Create a group
       grpProxy = CProxy_grp::ckNew();
@@ -117,9 +119,10 @@ class grp : public CBase_grp {
       contribute(doneCb);
     }
 
-    void recv_zerocopy_post(int *&buffer, size_t &size, int testIndex, CkNcpyBufferPost *ncpyPost) {
+    void recv_zerocopy_post(int *buffer, size_t size, int testIndex, CkNcpyBufferPost *ncpyPost) {
       DEBUG(CkPrintf("[%d][%d][%d] Group Post API: Post Entry Method\n", CkMyPe(), CkMyNode(), CkMyRank());)
-      buffer = destBuffer;
+      CkMatchBuffer(ncpyPost, 0, arrSize + thisIndex);
+      CkPostBuffer(destBuffer, size, arrSize + thisIndex);
     }
 
     void recv_zerocopy_post(int *buffer, size_t size, int testIndex) {
@@ -150,9 +153,10 @@ class arr : public CBase_arr {
       contribute(doneCb);
     }
 
-    void recv_zerocopy_post(int *&buffer, size_t &size, int testIndex, CkNcpyBufferPost *ncpyPost) {
+    void recv_zerocopy_post(int *buffer, size_t size, int testIndex, CkNcpyBufferPost *ncpyPost) {
       DEBUG(CkPrintf("[%d][%d][%d][%d] Array Post API: Post Entry Method\n", thisIndex, CkMyPe(), CkMyNode(), CkMyRank());)
-      buffer = destBuffer;
+      CkMatchBuffer(ncpyPost, 0, thisIndex);
+      CkPostBuffer(destBuffer, size, thisIndex);
     }
 
     void recv_zerocopy_post(int *buffer, size_t size, int testIndex) {
@@ -182,9 +186,10 @@ class nodegrp : public CBase_nodegrp {
       contribute(doneCb);
     }
 
-    void recv_zerocopy_post(int *&buffer, size_t &size, int testIndex, CkNcpyBufferPost *ncpyPost) {
+    void recv_zerocopy_post(int *buffer, size_t size, int testIndex, CkNcpyBufferPost *ncpyPost) {
       DEBUG(CkPrintf("[%d][%d][%d] Nodegroup Post API: Post Entry Method\n", CkMyPe(), CkMyNode(), CkMyRank());)
-      buffer = destBuffer;
+      CkMatchBuffer(ncpyPost, 0, arrSize + CkNumPes() + thisIndex);
+      CkPostBuffer(destBuffer, size, arrSize + CkNumPes() + thisIndex);
     }
 
     void recv_zerocopy_post(int *buffer, size_t size, int testIndex) {

@@ -606,7 +606,7 @@ print << "EOF";
 What do you want to build?
 	1) Charm++ [default] (choose this if you are building NAMD)
 	2) Charm++ and AMPI
-	3) Charm++, AMPI, ParFUM, FEM and other libraries
+	3) Charm++, AMPI, ParFUM and other libraries
 
 EOF
 

@@ -2164,8 +2164,9 @@ bool CkLocRec::invokeEntry(CkMigratable* obj, void* msg, int epIdx, bool doFree)
     //\n",env->getEvent(),env->getsetArraySrcPe());
     if (_entryTable[epIdx]->traceEnabled)
     {
+      CmiObjId projID = idx.getProjectionID();
       _TRACE_BEGIN_EXECUTE_DETAILED(env->getEvent(), ForChareMsg, epIdx, env->getSrcPe(),
-                                    env->getTotalsize(), idx.getProjectionID(), obj);
+                                    env->getTotalsize(), &projID, obj);
       if (_entryTable[epIdx]->appWork)
         _TRACE_BEGIN_APPWORK();
     }
