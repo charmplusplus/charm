@@ -35,11 +35,9 @@ typedef struct _ccd_cblist_elem {
  * A list of callbacks stored as an array and handled like a list
  */
 typedef struct _ccd_cblist {
-  unsigned short int maxlen;
-  unsigned short int len;
-  short int first, last;
-  short int first_free;
-  unsigned char flag;
+  unsigned short int len, maxlen;
+  short int first, last, first_free;
+  bool flag;
   ccd_cblist_elem *elems;
 } ccd_cblist;
 
@@ -60,7 +58,7 @@ static void init_cblist(ccd_cblist *l, unsigned int ml)
   l->maxlen = ml;
   l->first = l->last = -1;
   l->first_free = 0;
-  l->flag = 0;
+  l->flag = false;
 }
 
 
@@ -160,8 +158,7 @@ static int append_elem(ccd_cblist *l, CcdVoidFn fn, void *arg, int pe)
  */
 static void call_cblist_keep(ccd_cblist *l,double curWallTime)
 {
-  int i, len = l->len, idx;
-  for(i=0, idx=l->first;i<len;i++) {
+  for (int i = 0, idx = l->first; i < l->len; i++) {
     int old = CmiSwitchToPE(l->elems[idx].cb.pe);
     (*(l->elems[idx].cb.fn))(l->elems[idx].cb.arg,curWallTime);
     int unused = CmiSwitchToPE(old);
@@ -181,18 +178,18 @@ static void call_cblist_keep(ccd_cblist *l,double curWallTime)
  */
 static void call_cblist_remove(ccd_cblist *l,double curWallTime)
 {
-  int i, len = l->len, idx;
+  int len = l->len;
   /* reentrant */
-  if (l->flag) return;
-  l->flag = 1;
-  for(i=0, idx=l->first;i<len;i++) {
+  if (len == 0 || l->flag) return;
+  l->flag = true;
+  for (int i = 0, idx = l->first; i < len; i++) {
     int old = CmiSwitchToPE(l->elems[idx].cb.pe);
     (*(l->elems[idx].cb.fn))(l->elems[idx].cb.arg,curWallTime);
     int unused = CmiSwitchToPE(old);
     idx = l->elems[idx].next;
   }
   remove_n_elems(l,len);
-  l->flag = 0;
+  l->flag = false;
 }
 
 
@@ -528,13 +525,16 @@ void CcdCallFnAfter(CcdVoidFn fnp, void *arg, double deltaT)
  * Raise a condition causing all registered callbacks corresponding to 
  * that condition to be triggered
  */
-double CcdRaiseCondition(int condnum)
+void CcdRaiseCondition(int condnum)
 {
   CmiAssert(condnum < MAXNUMCONDS);
-  double curWallTime=CmiWallTimer();
-  call_cblist_remove(&(CpvAccess(conds).condcb[condnum]),curWallTime);
-  call_cblist_keep(&(CpvAccess(conds).condcb_keep[condnum]),curWallTime);
-  return curWallTime;
+  ccd_cblist *condcb = &(CpvAccess(conds).condcb[condnum]);
+  ccd_cblist *condcb_keep = &(CpvAccess(conds).condcb_keep[condnum]);
+  if (condcb->len > 0 || condcb_keep->len > 0) {
+    double curWallTime = CmiWallTimer();
+    call_cblist_remove(condcb, curWallTime);
+    call_cblist_keep(condcb_keep, curWallTime);
+  }
 }
 
 
