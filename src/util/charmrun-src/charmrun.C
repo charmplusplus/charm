@@ -749,7 +749,7 @@ static int arg_charmrun_port;
 static const char *arg_shrinkexpand_basedir;
 #endif
 
-#if (CMK_USE_SHMEM && (CMK_CHARM4PY || __APPLE__))
+#if CMK_USE_SHMEM
 static int arg_ipc_cutoff;
 static int arg_ipc_pool_size;
 #endif
@@ -831,7 +831,7 @@ static void arg_init(int argc, const char **argv)
   pparam_int(&arg_requested_nodes, 0, "n", "Number of processes to create");
   pparam_int(&arg_requested_nodes, 0, "np", "Number of processes to create");
 
-#if (CMK_USE_SHMEM && (CMK_CHARM4PY || __APPLE__))
+#if CMK_USE_SHMEM
   pparam_int(&arg_ipc_pool_size, -1, CMI_IPC_POOL_SIZE_ARG, CMI_IPC_POOL_SIZE_DESC);
   pparam_int(&arg_ipc_cutoff, -1, CMI_IPC_CUTOFF_ARG, CMI_IPC_CUTOFF_DESC);
 #endif
@@ -4730,7 +4730,7 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
 #endif
     fprintf(f, "NETMAGIC=\"%d\";export NETMAGIC\n", getpid() & 0x7FFF);
 
-#if (CMK_USE_SHMEM && (CMK_CHARM4PY || __APPLE__))
+#if CMK_USE_SHMEM
   fprintf(f,
           CMI_IPC_POOL_SIZE_ENV_VAR "=\"%d\";export " CMI_IPC_POOL_SIZE_ENV_VAR "\n",
           arg_ipc_pool_size);
@@ -5441,7 +5441,7 @@ struct local_nodestart
     const int onewth_active = onewth_per.active();
     extra += onewth_active;
 #endif
-#if (CMK_USE_SHMEM && (CMK_CHARM4PY || __APPLE__))
+#if CMK_USE_SHMEM
     extra += 2;
 #endif
     envp = (char **) malloc((envc + 3 + extra + 1) * sizeof(void *));
@@ -5499,7 +5499,7 @@ struct local_nodestart
       ++n;
     }
 #endif
-#if (CMK_USE_SHMEM && (CMK_CHARM4PY || __APPLE__))
+#if CMK_USE_SHMEM
     envp[envc + n] = (char *) malloc(256);
     sprintf(envp[envc + n], CMI_IPC_POOL_SIZE_ENV_VAR "=%d", arg_ipc_pool_size);
     ++n;
