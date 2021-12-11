@@ -13,7 +13,7 @@ static_assert(CMK_USE_SHMEM, "enable shmem to use this header");
 #define CMI_IPC_POOL_SIZE_ARG "ipcpoolsize"
 #define CMI_IPC_POOL_SIZE_DESC "size of cmi-shmem pool (in bytes)"
 
-#if CMK_CHARM4PY
+#if (CMK_CHARM4PY || __APPLE__)
 #define CMI_IPC_CUTOFF_ENV_VAR "CmiIpcCutoff"
 #define CMI_IPC_POOL_SIZE_ENV_VAR "CmiIpcPoolSize"
 #endif

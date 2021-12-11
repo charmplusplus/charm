@@ -87,7 +87,7 @@ inline void initSegmentSize_(char** argv) {
   using namespace cmi::ipc;
   CpvInitialize(std::size_t, kRecommendedCutoff);
   CpvInitialize(std::size_t, kSegmentSize);
-#if CMK_CHARM4PY
+#if (CMK_CHARM4PY || __APPLE__)
   char* s;
   long long ll;
 
