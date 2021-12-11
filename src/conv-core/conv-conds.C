@@ -245,13 +245,13 @@ typedef struct {
 
 
 /* Note : The heap is only stored in elements ccd_heap[0] to 
- * ccd_heap[ccd_heaplen]
+ * ccd_heap[_ccd_heaplen]
  */
 
 /** An array of time-scheduled callbacks managed as a heap */
 CpvStaticDeclare(ccd_heap_elem*, ccd_heap); 
 /** The length of the callback heap */
-CpvStaticDeclare(int, ccd_heaplen);
+CpvDeclare(int, _ccd_heaplen);
 /** The max allowed length of the callback heap */
 CpvStaticDeclare(int, ccd_heapmaxlen);
 
@@ -309,7 +309,7 @@ static void ccd_heap_insert(double t, CcdVoidFn fnp, void *arg, int pe)
   int child, parent;
   ccd_heap_elem *h;
   
-  if(CpvAccess(ccd_heaplen) >= CpvAccess(ccd_heapmaxlen)) {
+  if(CpvAccess(_ccd_heaplen) >= CpvAccess(ccd_heapmaxlen)) {
 /* CmiAbort("Heap overflow (InsertInHeap), exiting...\n"); */
     expand_ccd_heap();
   } 
@@ -317,12 +317,12 @@ static void ccd_heap_insert(double t, CcdVoidFn fnp, void *arg, int pe)
   h = CpvAccess(ccd_heap);
 
   {
-    ccd_heap_elem *e = &(h[++CpvAccess(ccd_heaplen)]);
+    ccd_heap_elem *e = &(h[++CpvAccess(_ccd_heaplen)]);
     e->time = t;
     e->cb.fn = fnp;
     e->cb.arg = arg;
     e->cb.pe = pe;
-    child  = CpvAccess(ccd_heaplen);    
+    child  = CpvAccess(_ccd_heaplen);
     parent = child / 2;
     while((parent>0) && (h[child].time<h[parent].time)) {
 	    ccd_heap_swap(child, parent);
@@ -343,15 +343,15 @@ static void ccd_heap_remove(void)
   ccd_heap_elem *h = CpvAccess(ccd_heap);
   
   parent = 1;
-  if(CpvAccess(ccd_heaplen)>0) {
+  if(CpvAccess(_ccd_heaplen)>0) {
     /* put deleted value at end of heap */
-    ccd_heap_swap(1,CpvAccess(ccd_heaplen)); 
-    CpvAccess(ccd_heaplen)--;
-    if(CpvAccess(ccd_heaplen)) {
+    ccd_heap_swap(1,CpvAccess(_ccd_heaplen));
+    CpvAccess(_ccd_heaplen)--;
+    if(CpvAccess(_ccd_heaplen)) {
       /* if any left, then bubble up values */
 	    child = 2 * parent;
-	    while(child <= CpvAccess(ccd_heaplen)) {
-	      if(((child + 1) <= CpvAccess(ccd_heaplen))  &&
+	    while(child <= CpvAccess(_ccd_heaplen)) {
+	      if(((child + 1) <= CpvAccess(_ccd_heaplen))  &&
 		       (h[child].time > h[child+1].time))
                 child++; /* use the smaller of the two */
 	      if(h[parent].time <= h[child].time) 
@@ -376,7 +376,7 @@ static void ccd_heap_update(double curWallTime)
   ccd_heap_elem *e = h+CpvAccess(ccd_heapmaxlen);
   int i,ne=0;
   /* Pull out all expired heap entries */
-  while ((CpvAccess(ccd_heaplen)>0) && (h[1].time<curWallTime)) {
+  while ((CpvAccess(_ccd_heaplen)>0) && (h[1].time<curWallTime)) {
     e[ne++]=h[1];
     ccd_heap_remove();
   }
@@ -409,11 +409,11 @@ void CcdModuleInit(char **ignored)
    CpvInitialize(ccd_heap_elem*, ccd_heap);
    CpvInitialize(ccd_cond_callbacks, conds);
    CpvInitialize(ccd_periodic_callbacks, pcb);
-   CpvInitialize(int, ccd_heaplen);
+   CpvInitialize(int, _ccd_heaplen);
    CpvInitialize(int, ccd_heapmaxlen);
    CpvInitialize(int, _ccd_numchecks);
 
-   CpvAccess(ccd_heaplen) = 0;
+   CpvAccess(_ccd_heaplen) = 0;
    CpvAccess(ccd_heapmaxlen) = MAXTIMERHEAPENTRIES;
    CpvAccess(ccd_heap) = 
      (ccd_heap_elem*) malloc(sizeof(ccd_heap_elem)*2*(MAXTIMERHEAPENTRIES + 1));
@@ -592,7 +592,7 @@ void CcdCallBacks(void)
 {
   int i;
   ccd_periodic_callbacks *o=&CpvAccess(pcb);
-  
+
   /* Figure out how many times to skip Ccd processing */
   double curWallTime = CmiWallTimer();
 

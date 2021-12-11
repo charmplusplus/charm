@@ -1947,9 +1947,7 @@ void CsdScheduleForever(void)
     } else { /*No message available-- go (or remain) idle*/
       SCHEDULE_IDLE
     }
-#if !CSD_NO_PERIODIC
     CsdPeriodic();
-#endif
   }
 }
 int CsdScheduleCount(int maxmsgs)
@@ -1968,9 +1966,7 @@ int CsdScheduleCount(int maxmsgs)
     } else { /*No message available-- go (or remain) idle*/
       SCHEDULE_IDLE
     }
-#if !CSD_NO_PERIODIC
     CsdPeriodic();
-#endif
   }
   return maxmsgs;
 }
@@ -1980,9 +1976,7 @@ void CsdSchedulePoll(void)
   SCHEDULE_TOP
   while (1)
   {
-#if !CSD_NO_PERIODIC
 	CsdPeriodic();
-#endif
         /*CmiMachineProgressImpl(); ??? */
 	if (NULL!=(msg = CsdNextMessage(&state)))
 	{
@@ -2014,9 +2008,7 @@ void CmiDeliverSpecificMsg(int handler)
  
   side = 0;
   while (1) {
-#if !CSD_NO_PERIODIC
     CsdPeriodic();
-#endif
     side ^= 1;
     if (side) msg = (int *)CmiGetNonLocal();
     else      msg = (int *)CdsFifo_Dequeue(localqueue);
