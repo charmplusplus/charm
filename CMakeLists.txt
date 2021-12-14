@@ -283,6 +283,14 @@ if(${CMK_USE_ZLIB})
   set(CMK_SYSLIBS "$CMK_SYSLIBS -lz")
 endif()
 
+if(${CMK_USE_SHMEM})
+  if(${CMK_HAS_XPMEM})
+    set(CMK_SYSLIBS "$CMK_SYSLIBS -lxpmem")
+  elseif(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    set(CMK_SYSLIBS "$CMK_SYSLIBS -lrt")
+  endif()
+endif()
+
 set(CMK_USE_LIBJPEG 0)
 find_package(JPEG)
 IF(JPEG_FOUND)
@@ -473,6 +481,33 @@ if(CMAKE_BUILD_TYPE MATCHES "Debug" OR CMAKE_BUILD_TYPE MATCHES "RelWithDebInfo"
   set(OPTSATBUILDTIME "${OPTSATBUILDTIME} -g")
 endif()
 
+# Identify arch/network-specific paths
+if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${NETWORK}/gdir_link)
+  file(STRINGS src/arch/${NETWORK}/gdir_link GDIR)
+elseif(${NETWORK} MATCHES "gni-")
+  set(GDIR "gni")
+elseif(${NETWORK} MATCHES "mpi-cray")
+  set(GDIR "mpi")
+elseif(${NETWORK} MATCHES "ofi-cray")
+  set(GDIR "ofi")
+else()
+  set(GDIR ${NETWORK})
+endif()
+
+set(VDIR ${CHARM_PLATFORM})
+
+# Identify whether charmrun will be built
+set(CMK_BUILD_CHARMRUN 0)
+if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${NETWORK}/charmrun)
+  set(CHARMRUN_DIR src/arch/${NETWORK})
+elseif(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/charmrun)
+  set(CHARMRUN_DIR src/arch/${GDIR})
+elseif(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/charmrun)
+  set(CHARMRUN_DIR src/arch/${VDIR})
+else()
+  set(CMK_BUILD_CHARMRUN 1)
+endif()
+
 include(cmake/detect-features.cmake)
 include(cmake/ci-files.cmake)
 
@@ -562,21 +597,6 @@ set(CMK_C_OPENMP ${OpenMP_C_FLAGS})
 set(CMK_F_OPENMP ${OpenMP_Fortran_FLAGS})
 
 # Shell scripts
-
-if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${NETWORK}/gdir_link)
-  file(STRINGS src/arch/${NETWORK}/gdir_link GDIR)
-elseif(${NETWORK} MATCHES "gni-")
-  set(GDIR "gni")
-elseif(${NETWORK} MATCHES "mpi-cray")
-  set(GDIR "mpi")
-elseif(${NETWORK} MATCHES "ofi-cray")
-  set(GDIR "ofi")
-else()
-  set(GDIR ${NETWORK})
-endif()
-
-set(VDIR ${CHARM_PLATFORM})
-
 set(CMK_VDIR ${VDIR})
 set(CMK_GDIR ${GDIR})
 
@@ -654,6 +674,12 @@ endif()
 if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-pxshm.sh)
   configure_file(src/arch/${VDIR}/conv-mach-pxshm.sh         include/ COPYONLY)
   configure_file(src/arch/${VDIR}/conv-mach-pxshm.h          include/ COPYONLY)
+endif()
+
+if(${CMK_USE_SHMEM})
+  if (EXISTS ${CMAKE_SOURCE_DIR}/src/conv-core/cmishmem.h)
+    configure_file(src/conv-core/cmishmem.h                  include/ COPYONLY)
+  endif()
 endif()
 
 if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-sysvshm.sh)
@@ -823,15 +849,11 @@ configure_file(src/libs/ck-libs/completion/completion.h include/ COPYONLY)
 add_dependencies(modulecompletion ck)
 
 # Charmrun + testrun
-if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${NETWORK}/charmrun)
-  configure_file(src/arch/${NETWORK}/charmrun ${CMAKE_BINARY_DIR}/bin COPYONLY)
-elseif(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/charmrun)
-  configure_file(src/arch/${GDIR}/charmrun ${CMAKE_BINARY_DIR}/bin COPYONLY)
-elseif(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/charmrun)
-  configure_file(src/arch/${VDIR}/charmrun ${CMAKE_BINARY_DIR}/bin COPYONLY)
-else()
+if(${CMK_BUILD_CHARMRUN})
   add_subdirectory(src/util/charmrun-src)
   add_dependencies(charmrun create_symlinks)
+else()
+  configure_file(${CHARMRUN_DIR}/charmrun ${CMAKE_BINARY_DIR}/bin COPYONLY)
 endif()
 configure_file(src/scripts/testrun bin/ COPYONLY)
 

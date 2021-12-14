@@ -1503,7 +1503,6 @@ void _skipCldHandler(void *converseMsg)
 #endif
 }
 
-
 //static void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 // Made non-static to be used by ckmessagelogging
 void _skipCldEnqueue(int pe,envelope *env, int infoFn)
@@ -1553,6 +1552,9 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
     } else if (pe==CLD_BROADCAST_ALL) {
       CmiSyncNodeBroadcastAllAndFree(len, (char *)env);
     } else {
+#if CMK_USE_SHMEM
+      if (!_tryIpcSend<false, false>(pe, env, infoFn))
+#endif
       CmiSyncSendAndFree(pe, len, (char *)env);
     }
   }
@@ -1595,7 +1597,11 @@ static void _noCldEnqueue(int pe, envelope *env)
   int len=env->getTotalsize();
   if (pe==CLD_BROADCAST) { CmiSyncNodeBroadcastAndFree(len, (char *)env); }
   else if (pe==CLD_BROADCAST_ALL) { CmiSyncNodeBroadcastAllAndFree(len, (char *)env); }
-  else CmiSyncSendAndFree(pe, len, (char *)env);
+  else 
+#if CMK_USE_SHMEM
+    if (!_tryIpcSend<false, false>(pe, env, 0x0))
+#endif
+  CmiSyncSendAndFree(pe, len, (char *)env);
 }
 
 //static void _noCldNodeEnqueue(int node, envelope *env)
@@ -1628,6 +1634,9 @@ void _noCldNodeEnqueue(int node, envelope *env)
 
 }
   else {
+#if CMK_USE_SHMEM
+    if (!_tryIpcSend<true, false>(node, env, 0x0))
+#endif
 	CmiSyncNodeSendAndFree(node, len, (char *)env);
   }
 }

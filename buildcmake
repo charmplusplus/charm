@@ -123,6 +123,8 @@ opt_prio_type="bitvec"
 opt_production=0
 opt_pthreads=0
 opt_pxshm=0
+opt_shmem=0
+opt_xpmem=0
 opt_qlogic=0
 opt_randomized_msgq=0
 opt_refnum_type="unsigned short"
@@ -283,6 +285,13 @@ function processArgs() {
     # Enable/disable features
       --enable-error-checking)
         opt_error_checking=1
+        ;;
+      --enable-shmem)
+        opt_shmem=1
+        ;;
+      --enable-xpmem)
+        opt_xpmem=1 # XPMEM implies SHMEM
+        opt_shmem=1
         ;;
       --enable-ampi-error-checking)
         opt_ampi_error_checking=1
@@ -597,6 +606,8 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
   -DPRIO_TYPE="$opt_prio_type" \
   -DPTHREADS="$opt_pthreads" \
   -DPXSHM="$opt_pxshm" \
+  -DCMK_HAS_XPMEM="$opt_xpmem" \
+  -DCMK_USE_SHMEM="$opt_shmem" \
   -DQLOGIC="$opt_qlogic" \
   -DRANDOMIZED_MSGQ="$opt_randomized_msgq" \
   -DREFNUM_TYPE="$opt_refnum_type" \
