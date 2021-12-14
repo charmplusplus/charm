@@ -211,6 +211,8 @@ public:
 
 #define CHARE_MAGIC    0x201201
 
+/* forward */ class CkLocRec;
+
 /**
   The base class of all parallel objects in Charm++,
   including Array Elements, Groups, and NodeGroups.
@@ -221,7 +223,9 @@ class Chare {
 #if CMK_OBJECT_QUEUE_AVAILABLE
     CkObjectMsgQ objQ;                // object message queue
 #endif
+    CkLocRec *myRec;
   public:
+    bool ckInitialized;
 #if CMK_ERROR_CHECKING
     int magic;
 #endif
@@ -255,6 +259,7 @@ class Chare {
     CHARM_INPLACE_NEW
     /// Return the type of this chare, as present in _chareTable
     virtual int ckGetChareType() const;
+    CkLocRec *getCkLocRec(void) const { return this->myRec; }
     /// Return a strdup'd array containing this object's string name.
     virtual char *ckDebugChareName(void);
     /// Place into str a copy of the id of this object up to limit bytes, return
@@ -270,6 +275,23 @@ class Chare {
     }
 #endif
 };
+
+// libraries can query this flag to
+// perform bookkeeping accordingly
+#define CMK_HAS_CKCALLSTACK 1
+
+void CkCallstackPop(Chare *obj);
+void CkCallstackPush(Chare *obj);
+void CkCallstackUnwind(Chare *obj);
+
+Chare *CkActiveObj(void);
+Chare *CkAllocateChare(int objId);
+
+static inline void CkInvokeEP(Chare *obj, const int &epIdx, void *msg) {
+  CkCallstackPush(obj);
+  _entryTable[epIdx]->call(msg, obj);
+  CkCallstackPop(obj);
+}
 
 #if CMK_HAS_IS_CONSTRUCTIBLE
 #include <type_traits>
