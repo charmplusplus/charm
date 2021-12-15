@@ -1044,7 +1044,7 @@ void TraceSummaryBOC::initCCS() {
 			 CkCallback(CkIndex_TraceSummaryBOC::ccsRequestSummaryUnsignedChar(NULL), sumProxy[0])); 
 
       CkPrintf("[%d] Setting up periodic startCollectData callback\n", CkMyPe());
-      CcdCallOnConditionKeep(CcdPERIODIC_1second, startCollectData,
+      CcdCallOnConditionKeep(CcdPERIODIC_1second, (CcdCondFn)startCollectData,
 			     (void *)this);
       summaryCcsStreaming = true;
     }
