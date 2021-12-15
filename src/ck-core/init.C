@@ -247,7 +247,7 @@ extern int quietMode;
 extern int quietModeRequested;
 
 void CkCallWhenIdle(int epIdx, void* obj) {
-  auto fn = reinterpret_cast<CcdVoidFn>(_entryTable[epIdx]->call);
+  auto fn = reinterpret_cast<CcdCondFn>(_entryTable[epIdx]->call);
   CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE, fn, obj);
 }
 

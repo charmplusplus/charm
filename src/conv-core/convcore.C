@@ -1925,11 +1925,9 @@ void CsdScheduleForever(void)
   while (1) {
 #if !CMK_NO_INTEROP
     /* The interoperation will cost this little overhead in scheduling */
-    if(CharmLibInterOperate) {
-      if(CpvAccess(interopExitFlag)) {
-        CpvAccess(interopExitFlag) = 0;
-        break;
-      }
+    if(CharmLibInterOperate && CpvAccess(interopExitFlag)) {
+      CpvAccess(interopExitFlag) = 0;
+      break;
     }
 #endif
 
@@ -3871,13 +3869,13 @@ static void on_timeout(cmi_cpu_idlerec *rec,double curWallTime)
     CmiAbort("Exiting.\n");
   }
 }
-static void on_idle(cmi_cpu_idlerec *rec,double curWallTime)
+static void on_idle(cmi_cpu_idlerec *rec)
 {
   CcdCallFnAfter((CcdVoidFn)on_timeout, rec, rec->idle_timeout);
   rec->call_count++; /*Keeps track of overlapping timeout calls.*/  
   rec->is_idle = 1;
 }
-static void on_busy(cmi_cpu_idlerec *rec,double curWallTime)
+static void on_busy(cmi_cpu_idlerec *rec)
 {
   rec->is_idle = 0;
 }
@@ -3891,8 +3889,8 @@ static void CIdleTimeoutInit(char **argv)
     rec->idle_timeout=idle_timeout*1000;
     rec->is_idle=0;
     rec->call_count=0;
-    CcdCallOnCondition(CcdPROCESSOR_BEGIN_IDLE, (CcdVoidFn)on_idle, rec);
-    CcdCallOnCondition(CcdPROCESSOR_BEGIN_BUSY, (CcdVoidFn)on_busy, rec);
+    CcdCallOnCondition(CcdPROCESSOR_BEGIN_IDLE, (CcdCondFn)on_idle, rec);
+    CcdCallOnCondition(CcdPROCESSOR_BEGIN_BUSY, (CcdCondFn)on_busy, rec);
   }
 }
 

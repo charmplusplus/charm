@@ -4395,8 +4395,7 @@ whenidle
    priority or speculative) in the absence of other work. ``whenidle``
    entry methods must return a ``bool`` value, indicating whether the
    entry method should be called when the processor is idle again, and
-   accept a ``double`` argument representing the current timestamp. An
-   example can be found in ``examples/charm++/whenidle``.
+   take no arguments. An example can be found in ``examples/charm++/whenidle``.
 
 python
    entry methods are enabled to be called from python scripts as

@@ -13,7 +13,7 @@ struct ConvQdMsg;
 struct ConvQdState;
 typedef struct ConvQdMsg    *CQdMsg;
 typedef struct ConvQdState  *CQdState;
-typedef CcdVoidFn CQdVoidFn;
+typedef CcdCondFn CQdVoidFn;
 
 CpvExtern(CQdState, cQdState);
 

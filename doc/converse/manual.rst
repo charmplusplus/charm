@@ -2002,18 +2002,18 @@ CcdUSERMAX
 
 .. code-block:: c++
 
-   int CcdCallOnCondition(int condnum, CcdVoidFn fnp, void* arg)
+   int CcdCallOnCondition(int condnum, CcdCondFn fnp, void* arg)
 
 This call instructs the system to call the function indicated by the
 function pointer ``fnp``, with the specified argument ``arg``, when
 the condition indicated by ``condnum`` is raised next. Multiple
 functions may be registered for the same condition number.
-``CcdVoidFn`` is a function pointer with the signature ``void fnp(void
-*userParam, double curWallTime)``
+``CcdCondFn`` is a function pointer with the signature ``void fnp(void
+*userParam)``
 
 .. code-block:: c++
 
-  int CcdCallOnConditionKeep(int condnum, CcdVoidFn fnp, void* arg)
+  int CcdCallOnConditionKeep(int condnum, CcdCondFn fnp, void* arg)
 
 As above, but the association is permanent- the given function will
 be called again whenever this condition is raised.
@@ -2047,6 +2047,11 @@ be called at least ``msLater`` milliseconds later. The registered
 function ``fnp`` is actually called the first time the scheduler gets
 control after ``deltaT`` milliseconds have elapsed. The default
 polling resolution for timed callbacks is 5 ms.
+``CcdVoidFn`` is a function pointer with the signature ``void fnp(void
+*userParam, double currWallTime)``. Note the extra wall-time parameter,
+which differs from ``CcdCondFn``, because the runtime system internally
+calls a timer in order to invoke periodic callbacks. It passes that
+time into the user callback as well to avoid the need for extra timer calls.
 
 .. code-block:: c++
 

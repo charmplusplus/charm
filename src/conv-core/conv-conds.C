@@ -10,13 +10,24 @@ CpvDeclare(double, idleBeginWalltime); // used for determining the conditon for 
 #endif
 
 /**
- * Structure to hold the requisites for a callback
+ * Structure to hold the requisites for a conditional callback
  */
-typedef struct _ccd_callback {
+typedef struct _ccd_cond_callback {
+  CcdCondFn fn;
+  void *arg;
+  int pe;			/* the pe that sets the callback */
+} ccd_cond_callback;
+
+
+
+/**
+ * Structure to hold the requisites for a periodic callback
+ */
+typedef struct _ccd_periodic_callback {
   CcdVoidFn fn;
   void *arg;
   int pe;			/* the pe that sets the callback */
-} ccd_callback;
+} ccd_periodic_callback;
 
 
 
@@ -24,7 +35,7 @@ typedef struct _ccd_callback {
  * An element (a single callback) in a list of callbacks
  */
 typedef struct _ccd_cblist_elem {
-  ccd_callback cb;
+  ccd_cond_callback cb;
   short int next;
   short int prev;
 } ccd_cblist_elem;
@@ -123,7 +134,7 @@ static void remove_n_elems(ccd_cblist *l, int n)
 
 
 /** Append callback to the given cblist, and return the index. */
-static int append_elem(ccd_cblist *l, CcdVoidFn fn, void *arg, int pe)
+static int append_elem(ccd_cblist *l, CcdCondFn fn, void *arg, int pe)
 {
   int idx;
   ccd_cblist_elem *e;
@@ -156,11 +167,11 @@ static int append_elem(ccd_cblist *l, CcdVoidFn fn, void *arg, int pe)
  * registered from other callbacks) are ignored. 
  * @note: It is illegal to cancel callbacks from within ccd callbacks.
  */
-static void call_cblist_keep(ccd_cblist *l,double curWallTime)
+static void call_cblist_keep(ccd_cblist *l)
 {
   for (int i = 0, idx = l->first; i < l->len; i++) {
     int old = CmiSwitchToPE(l->elems[idx].cb.pe);
-    (*(l->elems[idx].cb.fn))(l->elems[idx].cb.arg,curWallTime);
+    (*(l->elems[idx].cb.fn))(l->elems[idx].cb.arg);
     int unused = CmiSwitchToPE(old);
     idx = l->elems[idx].next;
   }
@@ -176,7 +187,7 @@ static void call_cblist_keep(ccd_cblist *l,double curWallTime)
  * registered from other callbacks) are ignored. 
  * @note: It is illegal to cancel callbacks from within ccd callbacks.
  */
-static void call_cblist_remove(ccd_cblist *l,double curWallTime)
+static void call_cblist_remove(ccd_cblist *l)
 {
   int len = l->len;
   /* reentrant */
@@ -184,7 +195,7 @@ static void call_cblist_remove(ccd_cblist *l,double curWallTime)
   l->flag = true;
   for (int i = 0, idx = l->first; i < len; i++) {
     int old = CmiSwitchToPE(l->elems[idx].cb.pe);
-    (*(l->elems[idx].cb.fn))(l->elems[idx].cb.arg,curWallTime);
+    (*(l->elems[idx].cb.fn))(l->elems[idx].cb.arg);
     int unused = CmiSwitchToPE(old);
     idx = l->elems[idx].next;
   }
@@ -240,7 +251,7 @@ CpvDeclare(int, _ccd_numchecks);
  */
 typedef struct {
     double time;
-    ccd_callback cb;
+    ccd_periodic_callback cb;
 } ccd_heap_elem;
 
 
@@ -397,7 +408,7 @@ static void ccd_heap_update(double curWallTime)
 
 
 
-CLINKAGE void CcdCallBacksReset(void *ignored,double curWallTime);
+CLINKAGE void CcdCallBacksReset(void *ignored);
 
 /**
  * Initialize the callback containers
@@ -443,7 +454,7 @@ void CcdModuleInit(char **ignored)
  * Register a callback function that will be triggered when the specified
  * condition is raised the next time
  */
-int CcdCallOnCondition(int condnum, CcdVoidFn fnp, void *arg)
+int CcdCallOnCondition(int condnum, CcdCondFn fnp, void *arg)
 {
   CmiAssert(condnum < MAXNUMCONDS);
   return append_elem(&(CpvAccess(conds).condcb[condnum]), fnp, arg, CcdIGNOREPE);
@@ -453,7 +464,7 @@ int CcdCallOnCondition(int condnum, CcdVoidFn fnp, void *arg)
  * Register a callback function that will be triggered on the specified PE
  * when the specified condition is raised the next time 
  */
-int CcdCallOnConditionOnPE(int condnum, CcdVoidFn fnp, void *arg, int pe)
+int CcdCallOnConditionOnPE(int condnum, CcdCondFn fnp, void *arg, int pe)
 {
   CmiAssert(condnum < MAXNUMCONDS);
   return append_elem(&(CpvAccess(conds).condcb[condnum]), fnp, arg, pe);
@@ -463,7 +474,7 @@ int CcdCallOnConditionOnPE(int condnum, CcdVoidFn fnp, void *arg, int pe)
  * Register a callback function that will be triggered *whenever* the specified
  * condition is raised
  */
-int CcdCallOnConditionKeep(int condnum, CcdVoidFn fnp, void *arg)
+int CcdCallOnConditionKeep(int condnum, CcdCondFn fnp, void *arg)
 {
   CmiAssert(condnum < MAXNUMCONDS);
   return append_elem(&(CpvAccess(conds).condcb_keep[condnum]), fnp, arg, CcdIGNOREPE);
@@ -473,7 +484,7 @@ int CcdCallOnConditionKeep(int condnum, CcdVoidFn fnp, void *arg)
  * Register a callback function that will be triggered on the specified PE
  * *whenever* the specified condition is raised
  */
-int CcdCallOnConditionKeepOnPE(int condnum, CcdVoidFn fnp, void *arg, int pe)
+int CcdCallOnConditionKeepOnPE(int condnum, CcdCondFn fnp, void *arg, int pe)
 {
   CmiAssert(condnum < MAXNUMCONDS);
   return append_elem(&(CpvAccess(conds).condcb_keep[condnum]), fnp, arg, pe);
@@ -528,13 +539,8 @@ void CcdCallFnAfter(CcdVoidFn fnp, void *arg, double deltaT)
 void CcdRaiseCondition(int condnum)
 {
   CmiAssert(condnum < MAXNUMCONDS);
-  ccd_cblist *condcb = &(CpvAccess(conds).condcb[condnum]);
-  ccd_cblist *condcb_keep = &(CpvAccess(conds).condcb_keep[condnum]);
-  if (condcb->len > 0 || condcb_keep->len > 0) {
-    double curWallTime = CmiWallTimer();
-    call_cblist_remove(condcb, curWallTime);
-    call_cblist_keep(condcb_keep, curWallTime);
-  }
+  call_cblist_remove(&CpvAccess(conds).condcb[condnum]);
+  call_cblist_keep(&CpvAccess(conds).condcb[condnum]);
 }
 
 
@@ -551,7 +557,7 @@ double CcdSetMinResolution(double newResolution, double minResolution) {
 
   // Ensure we don't miss the new quantum
   if (o->resolution < oldResolution) {
-    CcdCallBacksReset(NULL, CmiWallTimer());
+    CcdCallBacksReset(NULL);
   }
 
   return oldResolution;
@@ -636,11 +642,11 @@ void CcdCallBacks(void)
 /**
  * Called when something drastic changes-- restart ccd_num_checks
  */
-void CcdCallBacksReset(void *ignored,double curWallTime)
+void CcdCallBacksReset(void *ignored)
 {
   ccd_periodic_callbacks *o=&CpvAccess(pcb);
   CpvAccess(_ccd_numchecks)=o->nSkip=1;
-  o->lastCheck=curWallTime;
+  o->lastCheck=CmiWallTimer();
 }
 
 

@@ -270,7 +270,7 @@ void CQdHandler(CQdMsg msg)
 {
   CQdProcess(CpvAccess(cQdState), -1);
   CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE, 
-		     (CcdVoidFn)CQdCallWhenIdle, (void*) msg);  
+		     (CcdCondFn)CQdCallWhenIdle, (void*) msg);
 }
 
 

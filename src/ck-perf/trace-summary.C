@@ -1125,7 +1125,7 @@ void TraceSummaryBOC::ccsRequestSummaryUnsignedChar(CkCcsRequestMsg *m) {
 
 
 
-void startCollectData(void *data, double currT) {
+void startCollectData(void *data) {
   CkAssert(CkMyPe() == 0);
   // CkPrintf("startCollectData()\n");
   TraceSummaryBOC *sumObj = (TraceSummaryBOC *)data;
@@ -1135,7 +1135,7 @@ void startCollectData(void *data, double currT) {
   
   double startTime = lastRequestedIndexBlock*
     collectionGranularity * indicesPerBlock;
-  int numIndicesToGet = (int)floor((currT - startTime)/
+  int numIndicesToGet = (int)floor((CmiWallTimer() - startTime)/
 				   collectionGranularity);
   int numBlocksToGet = numIndicesToGet/indicesPerBlock;
   // **TODO** consider limiting the total number of blocks each collection

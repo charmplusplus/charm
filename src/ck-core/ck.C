@@ -2665,7 +2665,7 @@ private:
 };
 
 void CkMessageReplayQuiescence(void *rep, double time);
-void CkMessageDetailReplayDone(void *rep, double time);
+void CkMessageDetailReplayDone(void *rep);
 
 class CkMessageReplay : public CkMessageWatcher {
   int counter;
@@ -2891,7 +2891,7 @@ public:
 
     CsdEnqueue(getNext());
 
-    CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE, (CcdVoidFn)CkMessageDetailReplayDone, (void*)this);
+    CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE, (CcdCondFn)CkMessageDetailReplayDone, (void*)this);
   }
   virtual bool process(envelope **env,CkCoreState *ck) {
     void *msg = getNext();
@@ -2906,7 +2906,7 @@ void CkMessageReplayQuiescence(void *rep, double time) {
   //CmiStartQD(CkMessageReplayQuiescence, replay);
 }
 
-void CkMessageDetailReplayDone(void *rep, double time) {
+void CkMessageDetailReplayDone(void *rep) {
   CkMessageDetailReplay *replay = (CkMessageDetailReplay *)rep;
   CkPrintf("[%d] Detailed replay finished after %f seconds. Exiting.\n",CkMyPe(),CkWallTimer()-replay->starttime);
   ConverseExit();

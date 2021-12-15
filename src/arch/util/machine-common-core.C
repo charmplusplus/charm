@@ -1584,12 +1584,12 @@ static void ConverseRunPE(int everReturn) {
 #if CMK_SMP
     {
       CmiIdleState *sidle=CmiNotifyGetState();
-      CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)CmiNotifyBeginIdle,(void *)sidle);
-      CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyStillIdle,(void *)sidle);
+      CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdCondFn)CmiNotifyBeginIdle,(void *)sidle);
+      CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdCondFn)CmiNotifyStillIdle,(void *)sidle);
     }
 #else
-    CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)CmiNotifyBeginIdle, NULL);
-    CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyStillIdle, NULL);
+    CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdCondFn)CmiNotifyBeginIdle, NULL);
+    CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdCondFn)CmiNotifyStillIdle, NULL);
 #endif
 
 
