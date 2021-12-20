@@ -1031,11 +1031,7 @@ ArrayElement* CkArray::allocate(int elChareType, CkMessage* msg, bool fromMigrat
   init.fromMigration = fromMigration;
 
   // Build the element
-  size_t elSize = _chareTable[elChareType]->size;
-  ArrayElement* elem = (ArrayElement*)malloc(elSize);
-  if (elem != NULL)
-    setMemoryTypeChare(elem);
-  return elem;
+  return (ArrayElement *)CkAllocateChare(elChareType);
 }
 
 void CkArray::insertElement(CkMarshalledMessage&& m, const CkArrayIndex& idx,
@@ -1979,23 +1975,8 @@ void CkArray::deliverToElement(CkArrayMessage* msg, ArrayElement* elem)
   if (msg->array_hops() > 1)
     locMgr->multiHop(msg);
 
-  // TODO: This stop and start should probably be part of invoke. Or moved to a better
-  // part of the interfacing between arrays and LB
   // Invoke the entry method
-#if CMK_LBDB_ON
-  // If there is a running obj being measured, stop it temporarily
-  LDObjHandle objHandle;
-  bool wasAnObjRunning = false;
-  if ((wasAnObjRunning = locMgr->getLBMgr()->RunningObject(&objHandle)))
-  {
-    locMgr->getLBMgr()->ObjectStop(objHandle);
-  }
-#endif
   elem->ckInvokeEntry(msg->array_ep(), (void*)msg, true);
-#if CMK_LBDB_ON
-  if (wasAnObjRunning)
-    locMgr->getLBMgr()->ObjectStart(objHandle);
-#endif
 }
 
 // Handle a message to an unknown destination. If we at least know the ID, we have the

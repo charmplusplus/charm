@@ -1631,6 +1631,13 @@ static INLINE_KEYWORD void AdvanceCommunication(int whenidle) {
     CommunicationServerXpmem();
 #endif
 
+#if CMK_USE_SHMEM
+    CmiIpcBlock* block;
+    if ((block = CmiPopIpcBlock(CsvAccess(coreIpcManager_)))) {
+      CmiDeliverIpcBlockMsg(block);
+    }
+#endif
+
     LrtsAdvanceCommunication(whenidle);
 
 #if CMK_OFFLOAD_BCAST_PROCESS

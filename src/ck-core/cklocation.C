@@ -2060,41 +2060,11 @@ void CkMigratable::setMigratable(int migratable) { myRec->setMigratable(migratab
 
 void CkMigratable::setPupSize(size_t obj_pup_size) { myRec->setPupSize(obj_pup_size); }
 
-struct CkArrayThreadListener
-{
-  struct CthThreadListener base;
-  CkMigratable* mig;
-};
-
-static void CkArrayThreadListener_suspend(struct CthThreadListener* l)
-{
-  CkArrayThreadListener* a = (CkArrayThreadListener*)l;
-  a->mig->ckStopTiming();
-}
-
-static void CkArrayThreadListener_resume(struct CthThreadListener* l)
-{
-  CkArrayThreadListener* a = (CkArrayThreadListener*)l;
-  a->mig->ckStartTiming();
-}
-
-static void CkArrayThreadListener_free(struct CthThreadListener* l)
-{
-  CkArrayThreadListener* a = (CkArrayThreadListener*)l;
-  delete a;
-}
-
 void CkMigratable::CkAddThreadListeners(CthThread tid, void* msg)
 {
   Chare::CkAddThreadListeners(tid, msg);  // for trace
   CthSetThreadID(tid, thisIndexMax.data()[0], thisIndexMax.data()[1],
                  thisIndexMax.data()[2]);
-  CkArrayThreadListener* a = new CkArrayThreadListener;
-  a->base.suspend = CkArrayThreadListener_suspend;
-  a->base.resume = CkArrayThreadListener_resume;
-  a->base.free = CkArrayThreadListener_free;
-  a->mig = this;
-  CthAddListener(tid, (struct CthThreadListener*)a);
 }
 #else
 void CkMigratable::setObjTime(double cputime) {}
@@ -2214,36 +2184,6 @@ void CkLocRec::CkLBSetPhase(int phase) {
 // record (because all array elements were destroyed) then it will be deleted.
 void CkLocRec::destroy(void) { myLocMgr->reclaim(this); }
 
-/**********Added for cosmology (inline function handling without parameter
- * marshalling)***********/
-
-LDObjHandle CkMigratable::timingBeforeCall(int* objstopped)
-{
-  LDObjHandle objHandle;
-#if CMK_LBDB_ON
-  if (getLBMgr()->RunningObject(&objHandle))
-  {
-    *objstopped = 1;
-    getLBMgr()->ObjectStop(objHandle);
-  }
-  myRec->startTiming(1);
-#endif
-
-  return objHandle;
-}
-
-void CkMigratable::timingAfterCall(LDObjHandle objHandle, int* objstopped)
-{
-  myRec->stopTiming(1);
-#if CMK_LBDB_ON
-  if (*objstopped)
-  {
-    getLBMgr()->ObjectStart(objHandle);
-  }
-#endif
-
-  return;
-}
 /****************************************************************************/
 
 bool CkLocRec::invokeEntry(CkMigratable* obj, void* msg, int epIdx, bool doFree)
@@ -2251,7 +2191,6 @@ bool CkLocRec::invokeEntry(CkMigratable* obj, void* msg, int epIdx, bool doFree)
   DEBS((AA "   Invoking entry %d on element %s\n" AB, epIdx, idx2str(idx)));
   bool isDeleted = false;  // Enables us to detect deletion during processing
   deletedMarker = &isDeleted;
-  startTiming();
 
 #if CMK_TRACE_ENABLED
   if (msg)
@@ -2293,7 +2232,6 @@ bool CkLocRec::invokeEntry(CkMigratable* obj, void* msg, int epIdx, bool doFree)
   if (isDeleted)
     return false;  // We were deleted
   deletedMarker = NULL;
-  stopTiming();
   return true;
 }
 

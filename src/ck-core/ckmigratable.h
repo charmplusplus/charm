@@ -3,7 +3,6 @@
 
 class CkMigratable : public Chare {
 protected:
-  CkLocRec *myRec;
 private:
   int thisChareType;//My chare type
   int atsync_iteration;
@@ -41,20 +40,9 @@ public:
   CmiUInt8 ckGetID(void) const { return myRec->getID(); }
 
 #if CMK_LBDB_ON  //For load balancing:
-  //Suspend load balancer measurements (e.g., before CthSuspend)
-  inline void ckStopTiming(void) {myRec->stopTiming();}
-  //Begin load balancer measurements again (e.g., after CthSuspend)
-  inline void ckStartTiming(void) {myRec->startTiming();}
   inline LBManager *getLBMgr(void) const {return myRec->getLBMgr();}
   inline MetaBalancer *getMetaBalancer(void) const {return myRec->getMetaBalancer();}
-#else
-  inline void ckStopTiming(void) { }
-  inline void ckStartTiming(void) { }
 #endif
-
-  /// for inline call
-  LDObjHandle timingBeforeCall(int *objstopped);
-  void timingAfterCall(LDObjHandle objHandle,int *objstopped);
 
   //Initiate a migration to the given processor
   inline void ckMigrate(int toPe) {myRec->migrateMe(toPe);}
@@ -106,6 +94,7 @@ public:
 private:
   void ResumeFromSyncHelper();
 public:
+
   void ReadyMigrate(bool ready);
   void ckFinishConstruction(int epoch = -1);
   void setMigratable(int migratable);
