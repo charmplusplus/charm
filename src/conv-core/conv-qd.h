@@ -13,7 +13,7 @@ struct ConvQdMsg;
 struct ConvQdState;
 typedef struct ConvQdMsg    *CQdMsg;
 typedef struct ConvQdState  *CQdState;
-typedef CcdCondFn CQdVoidFn;
+typedef CcdCondFn CQdCondFn;
 
 CpvExtern(CQdState, cQdState);
 
@@ -23,8 +23,8 @@ void CQdCreate(CQdState, CmiInt8);
 void CQdProcess(CQdState, CmiInt8);
 CmiInt8 CQdGetCreated(CQdState);
 CmiInt8 CQdGetProcessed(CQdState);
-void CQdRegisterCallback(CQdVoidFn, void *);
-void CmiStartQD(CQdVoidFn, void *);
+void CQdRegisterCallback(CQdCondFn, void *);
+void CmiStartQD(CQdCondFn, void *);
 
 #ifdef __cplusplus
 }

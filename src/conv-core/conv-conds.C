@@ -540,7 +540,7 @@ void CcdRaiseCondition(int condnum)
 {
   CmiAssert(condnum < MAXNUMCONDS);
   call_cblist_remove(&CpvAccess(conds).condcb[condnum]);
-  call_cblist_keep(&CpvAccess(conds).condcb[condnum]);
+  call_cblist_keep(&CpvAccess(conds).condcb_keep[condnum]);
 }
 
 
