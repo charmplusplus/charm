@@ -539,7 +539,7 @@ void CkArray::setupSpringCleaning()
   // set up broadcast cleaner
   if (!stableLocations)
     springCleaningCcd =
-        CcdCallOnCondition(CcdPERIODIC_1minute, staticSpringCleaning, (void*)this);
+        CcdCallOnCondition(CcdPERIODIC_1minute, (CcdCondFn)CkArray::staticSpringCleaning, (void*)this);
 }
 
 /********************* Little CkArray Utilities ******************/

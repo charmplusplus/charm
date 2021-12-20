@@ -2762,7 +2762,7 @@ private:
   }
 };
 
-void CkMessageReplayQuiescence(void *rep, double time);
+void CkMessageReplayQuiescence(void *rep);
 void CkMessageDetailReplayDone(void *rep);
 
 class CkMessageReplay : public CkMessageWatcher {
@@ -2890,7 +2890,7 @@ public:
 	  getNext();
 	  REPLAYDEBUG("Constructing ckMessageReplay: "<< nextPE <<" "<< nextSize <<" "<<nextEvent);
 #if CMI_QD
-	  if (CkMyPe()==0) CmiStartQD(CkMessageReplayQuiescence, this);
+	  if (CkMyPe()==0) CmiStartQD((CcdCondFn)CkMessageReplayQuiescence, this);
 #endif
 	}
 	~CkMessageReplay() {fclose(f);}
@@ -2998,10 +2998,10 @@ public:
   }
 };
 
-void CkMessageReplayQuiescence(void *rep, double time) {
+void CkMessageReplayQuiescence(void *rep) {
   CkPrintf("[%d] Quiescence detected\n",CkMyPe());
   CkMessageReplay *replay = (CkMessageReplay*)rep;
-  //CmiStartQD(CkMessageReplayQuiescence, replay);
+  //CmiStartQD((CcdCondFn)CkMessageReplayQuiescence, replay);
 }
 
 void CkMessageDetailReplayDone(void *rep) {
