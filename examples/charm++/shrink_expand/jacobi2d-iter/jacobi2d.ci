@@ -18,7 +18,7 @@ mainmodule jacobi2d {
     entry Jacobi(void);
     entry void begin_iteration(void);
     entry void ghostsFromLeft(int width, double s[width]);
-    entry void ghostsFromRight(int width, double s[width]);
+    entry void ghostsFromRight(int width,double s[width]);
     entry void ghostsFromTop(int width, double s[width]);
     entry void ghostsFromBottom(int width, double s[width]);
   };
