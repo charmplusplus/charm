@@ -1,6 +1,0 @@
-# Classify external code as "library" to prevent lgtm from reporting their errors
-path_classifiers:
-  library:
-    - src/libs/ck-libs/metis/
-    - src/util/json*
-
