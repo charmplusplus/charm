@@ -166,8 +166,6 @@ then
   ARGS=(-module CommonLBs "${ARGS[@]}")
 fi
 
-ARGS+=(-language "$AMPICC_MODE")
-
 if [ -n "$GLOBALS" ]
 then
   [[ "$CMK_SUPPORTS_TLSGLOBALS" = '1' ]] && ARGS+=(-tlsglobals)
@@ -205,12 +203,14 @@ then
     # link the user program as its own file
     [ -z "$OBJECT" ] && USEROBJECT="a.out$USER_SUFFIX" || USEROBJECT="${OBJECT%$CMK_POST_EXE}$USER_SUFFIX"
     SHIM_OPTS+=(-standalone '-Wl,-undefined,dynamic_lookup')
-    runCmd "$CHARMBIN/charmc" "${ARGS[@]}" "${AMPICC_POST_OPTS[@]}" "${SHIM_OPTS[@]}" "${SHIM_OBJS[@]}" "${SHARED_OPTS[@]}" -o "$USEROBJECT"
+    runCmd "$CHARMBIN/charmc" -language "$AMPICC_MODE" "${ARGS[@]}" "${AMPICC_POST_OPTS[@]}" "${SHIM_OPTS[@]}" "${SHIM_OBJS[@]}" "${SHARED_OPTS[@]}" -o "$USEROBJECT"
     status=$?
     [ $status -ne 0 ] && exit $status
 
     # set up linking the loader against the runtime
     AMPICC_POST_OPTS+=(-clear-input "${LOADER_OBJS[@]}" "$CHARMLIB/ampi_globals_$GLOBALS.o")
+    # always link the loader as non-Fortran AMPI
+    AMPICC_MODE='ampi'
 
     if [ "$GLOBALS" = 'pip' ]
     then
@@ -235,7 +235,7 @@ fi
 
 [[ -n "$OBJECT" ]] && AMPICC_POST_OPTS+=(-o "$OBJECT")
 
-runCmd "$CHARMBIN/charmc" -default-to-aout "${ARGS[@]}" "${AMPICC_POST_OPTS[@]}" "${ROMIO[@]}"
+runCmd "$CHARMBIN/charmc" -language "$AMPICC_MODE" -default-to-aout "${ARGS[@]}" "${AMPICC_POST_OPTS[@]}" "${ROMIO[@]}"
 status=$?
 
 # Copy ampirun, but do not overwrite it if it already exists.
