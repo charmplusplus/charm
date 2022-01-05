@@ -53,4 +53,4 @@ NDMeshStreamer.o: NDMeshStreamer.C NDMeshStreamer.h NDMeshStreamer.decl.h \
  ../../../../tmp/sdag.h ../completion/completion.decl.h DataItemTypes.h \
  ../completion/completion.h ../completion/completion.decl.h \
  ../../../../tmp/ckarray.h VirtualRouter.h NDMeshStreamer.def.h
-	$(CHARMC) -I../../../../tmp -o NDMeshStreamer.o NDMeshStreamer.C
+	$(CHARMC) -I../../../../tmp -o NDMeshStreamer.o -c NDMeshStreamer.C

@@ -1,6 +1,15 @@
 #ifndef _AMPIIMPL_H
 #define _AMPIIMPL_H
 
+#ifndef __STDC_FORMAT_MACROS
+# define __STDC_FORMAT_MACROS
+#endif
+#ifndef __STDC_LIMIT_MACROS
+# define __STDC_LIMIT_MACROS
+#endif
+#include <stdint.h>
+#include <inttypes.h>
+
 #include <string.h> /* for strlen */
 #include <algorithm>
 #include <numeric>
@@ -12,6 +21,8 @@
 #include "ampi.h"
 #include "ddt.h"
 #include "charm++.h"
+#include "tcharm.h"
+#include "tcharmc.h"
 
 #if CMK_AMPI_WITH_ROMIO
 # include "mpio_globals.h"
@@ -102,6 +113,7 @@ extern int quietModeRequested;
 #endif
 
 extern char * ampi_binary_path;
+extern bool ampiUsingPieglobals;
 
 #if AMPIMSGLOG
 #include "ckliststring.h"
@@ -307,6 +319,10 @@ PUPfunctionpointer(MPI_User_function*)
  * OpStruct's are used to lookup an MPI_User_function* and check its commutativity.
  * They are also used to create AmpiOpHeader's, which are transmitted in reductions
  * that are user-defined or else lack an equivalent Charm++ reducer type.
+ *
+ * Note: when running with PIEglobals, func is stored as its offset from the rank's
+ *       base address, so that the real function can be looked up relative to any
+ *       rank's base address via ampiPeMgr.
  */
 class OpStruct {
  public:
@@ -315,12 +331,24 @@ class OpStruct {
  private:
   bool isValid;
 
+  MPI_User_function *createUserFunc(MPI_User_function *f) noexcept {
+    if (ampiUsingPieglobals) { // handle PIEglobals code relocation:
+      const CthThread th = TCharm::get()->getThread();
+      CmiIsomallocContext ctx = CmiIsomallocGetThreadContext(th);
+      const CmiIsomallocRegion heap = CmiIsomallocContextGetUsedExtent(ctx);
+      char *basePtr = (char *)heap.start;
+      return (MPI_User_function *)((char *)f - basePtr);
+    } else {
+      return f;
+    }
+  }
+
  public:
   OpStruct() = default;
-  OpStruct(MPI_User_function* f) noexcept : func(f), isCommutative(true), isValid(true) {}
-  OpStruct(MPI_User_function* f, bool c) noexcept : func(f), isCommutative(c), isValid(true) {}
+  OpStruct(MPI_User_function* f) noexcept : func(createUserFunc(f)), isCommutative(true), isValid(true) {}
+  OpStruct(MPI_User_function* f, bool c) noexcept : func(createUserFunc(f)), isCommutative(c), isValid(true) {}
   void init(MPI_User_function* f, bool c) noexcept {
-    func = f;
+    func = createUserFunc(f);
     isCommutative = c;
     isValid = true;
   }
@@ -735,6 +763,7 @@ class groupStruct {
  private:
   int sz; // -1 if ranks is valid, otherwise the size to pass to std::iota()
   std::vector<int> ranks;
+  int refCount = 1;
 
  private:
   bool ranksIsIota() const noexcept {
@@ -763,6 +792,7 @@ class groupStruct {
   void pup(PUP::er& p) noexcept {
     p|sz;
     p|ranks;
+    p|refCount;
   }
   bool isIota() const noexcept {return (sz != -1);}
   int operator[](int i) const noexcept {return (isIota()) ? i : ranks[i];}
@@ -779,7 +809,25 @@ class groupStruct {
       return ranks;
     }
   }
+  int decRefCount() noexcept { return refCount--; }
+  int incRefCount() noexcept { return refCount++; }
 };
+
+inline bool operator==(const groupStruct &g1, const groupStruct &g2) {
+  if (g1.size() != g2.size() || g1.isIota() != g2.isIota()) {
+    return false;
+  }
+  for (int i=0; i<g1.size(); i++) {
+    if (g1[i] != g2[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+inline bool operator!=(const groupStruct &g1, const groupStruct &g2) {
+  return !(g1 == g2);
+}
 
 enum AmpiCommType : uint8_t {
    COMM_WORLD      = 0
@@ -1149,9 +1197,6 @@ inline std::vector<int> rangeExclOp(int n, int ranges[][3], const std::vector<in
   return exclOp(ranks.size(), &ranks[0], vec);
 }
 
-#include "tcharm.h"
-#include "tcharmc.h"
-
 #include "ampi.decl.h"
 #include "charm-api.h"
 #include <sys/stat.h> // for mkdir
@@ -1236,7 +1281,7 @@ class AmpiRequest {
 
   /// Block until this request is finished,
   ///  returning a valid MPI error code.
-  virtual CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts, int* result=nullptr) noexcept =0;
+  virtual CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts) noexcept =0;
 
   /// Mark this request for cancellation.
   /// Supported only for IReq requests
@@ -1346,7 +1391,7 @@ class IReq final : public AmpiRequest {
   IReq() =default;
   ~IReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
-  CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts, int* result=nullptr) noexcept override;
+  CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts) noexcept override;
   void cancel() noexcept override { if (!complete) cancelled = true; }
   AmpiReqType getType() const noexcept override { return AMPI_I_REQ; }
   bool isUnmatched() const noexcept override { return !complete; }
@@ -1403,7 +1448,7 @@ class RednReq final : public AmpiRequest {
   RednReq() =default;
   ~RednReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
-  CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts, int* result=nullptr) noexcept override;
+  CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts) noexcept override;
   void cancel() noexcept override {}
   AmpiReqType getType() const noexcept override { return AMPI_REDN_REQ; }
   bool isUnmatched() const noexcept override { return !complete; }
@@ -1432,7 +1477,7 @@ class GatherReq final : public AmpiRequest {
   GatherReq() =default;
   ~GatherReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
-  CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts, int* result=nullptr) noexcept override;
+  CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts) noexcept override;
   void cancel() noexcept override {}
   AmpiReqType getType() const noexcept override { return AMPI_GATHER_REQ; }
   bool isUnmatched() const noexcept override { return !complete; }
@@ -1465,7 +1510,7 @@ class GathervReq final : public AmpiRequest {
   GathervReq() =default;
   ~GathervReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
-  CMI_WARN_UNUSED_RESULT ampiParent*  wait(ampiParent* parent, MPI_Status *sts, int* result=nullptr) noexcept override;
+  CMI_WARN_UNUSED_RESULT ampiParent*  wait(ampiParent* parent, MPI_Status *sts) noexcept override;
   AmpiReqType getType() const noexcept override { return AMPI_GATHERV_REQ; }
   bool isUnmatched() const noexcept override { return !complete; }
   bool receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override { return true; }
@@ -1502,7 +1547,7 @@ class SendReq final : public AmpiRequest {
   SendReq() noexcept {}
   ~SendReq() noexcept {}
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
-  CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts, int* result=nullptr) noexcept override;
+  CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts) noexcept override;
   void setPersistent(bool p) noexcept override { persistent = p; }
   bool isPersistent() const noexcept override { return persistent; }
   void start(MPI_Request reqIdx) noexcept override;
@@ -1558,7 +1603,7 @@ class SsendReq final : public AmpiRequest {
   SsendReq() =default;
   ~SsendReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
-  CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts, int* result=nullptr) noexcept override;
+  CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts) noexcept override;
   void setPersistent(bool p) noexcept override { persistent = p; }
   bool isPersistent() const noexcept override { return persistent; }
   void start(MPI_Request reqIdx) noexcept override;
@@ -1595,7 +1640,7 @@ class GPUReq : public AmpiRequest {
   GPUReq() noexcept;
   ~GPUReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
-  CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts, int* result=nullptr) noexcept override;
+  CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts) noexcept override;
   bool receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override;
   void receive(ampi *ptr, CkReductionMsg *msg) noexcept override;
   AmpiReqType getType() const noexcept override { return AMPI_GPU_REQ; }
@@ -1613,7 +1658,7 @@ class ATAReq final : public AmpiRequest {
   ATAReq() =default;
   ~ATAReq() =default;
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
-  CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts, int* result=nullptr) noexcept override;
+  CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts) noexcept override;
   bool receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override { return true; }
   void receive(ampi *ptr, CkReductionMsg *msg) noexcept override {}
   int getCount() const noexcept { return reqs.size(); }
@@ -1645,7 +1690,7 @@ class GReq final : public AmpiRequest {
   GReq() =default;
   ~GReq() noexcept { (*freeFn)(extraState); }
   bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
-  CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts, int* result=nullptr) noexcept override;
+  CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts) noexcept override;
   bool receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override { return true; }
   void receive(ampi *ptr, CkReductionMsg *msg) noexcept override {}
   void cancel() noexcept override { (*cancelFn)(extraState, complete); }
@@ -1719,7 +1764,7 @@ class AmpiRequestList {
   void print() const noexcept {
     for (int i=0; i<reqs.size(); i++) {
       if (reqs[i] == NULL) continue;
-      CkPrintf("AmpiRequestList Element %d [%p]: \n", i+1, reqs[i]);
+      CkPrintf("AmpiRequestList Element %d [%p]: \n", i+1, (void *)reqs[i]);
       reqs[i]->print();
     }
   }
@@ -2315,6 +2360,10 @@ class ampiParent final : public CBase_ampiParent {
   void ResumeThread() noexcept;
   TCharm* getTCharmThread() const noexcept {return thread;}
   CMI_WARN_UNUSED_RESULT inline ampiParent* blockOnRecv() noexcept;
+  CMI_WARN_UNUSED_RESULT static ampiParent* static_blockOnColl(ampiParent* dis) noexcept;
+  CMI_WARN_UNUSED_RESULT CMI_FORCE_INLINE ampiParent* blockOnColl() noexcept {
+    return static_blockOnColl(this);
+  }
   inline CkDDT* getDDT() noexcept { return &myDDT; }
 
 #if CMK_LBDB_ON
@@ -2359,10 +2408,25 @@ class ampiParent final : public CBase_ampiParent {
   }
   inline MPI_Group saveGroupStruct(const std::vector<int>& vec) noexcept {
     if (vec.empty()) return MPI_GROUP_EMPTY;
+    for (int i=0; i<groups.size(); i++) {
+      if (vec == groups[i]->getRanks()) {
+        groups[i]->incRefCount();
+        return i;
+      }
+    }
     int idx = groups.size();
     groups.resize(idx+1);
     groups[idx]=new groupStruct(vec);
     return (MPI_Group)idx;
+  }
+  void freeGroupStruct(const MPI_Group group) noexcept {
+    if (group == MPI_GROUP_EMPTY || group == MPI_GROUP_NULL || hasComm(group)) {
+      return;
+    }
+    if (groups[group]->decRefCount() == 0) {
+      delete groups[group];
+      groups.remove(group);
+    }
   }
   inline int getRank(const MPI_Group group) const noexcept {
     std::vector<int> vec = group2vec(group);
@@ -2475,16 +2539,7 @@ class ampiParent final : public CBase_ampiParent {
       return userOps[opIdx].isCommutative;
     }
   }
-  inline MPI_User_function* op2User_function(MPI_Op op) const noexcept {
-    if (opIsPredefined(op)) {
-      return predefinedOps[op];
-    }
-    else {
-      int opIdx = op - 1 - AMPI_MAX_PREDEFINED_OP;
-      CkAssert(opIdx < userOps.size());
-      return userOps[opIdx].func;
-    }
-  }
+  MPI_User_function* op2User_function(MPI_Op op) const noexcept;
   inline AmpiOpHeader op2AmpiOpHeader(MPI_Op op, MPI_Datatype type, int count) const noexcept {
     if (opIsPredefined(op)) {
       int size = myDDT.getType(type)->getSize(count);

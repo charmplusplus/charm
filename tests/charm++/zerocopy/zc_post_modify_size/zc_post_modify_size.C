@@ -7,6 +7,7 @@ CProxy_arr arrProxy;
 CProxy_grp grpProxy;
 CProxy_nodegrp ngProxy;
 CProxy_tester chareProxy;
+int arrSize;
 
 void assignValuesToIndex(int *arr, int size);
 void assignValuesToConstant(int *arr, int size, int constantVal);
@@ -18,8 +19,9 @@ class main : public CBase_main {
     main(CkArgMsg *m) {
       delete m;
 
+      arrSize = CkNumPes() * NUM_ELEMENTS_PER_PE;
       // Create a chare array
-      arrProxy = CProxy_arr::ckNew(CkNumPes() * NUM_ELEMENTS_PER_PE);
+      arrProxy = CProxy_arr::ckNew(arrSize);
 
       // Create a group
       grpProxy = CProxy_grp::ckNew();
@@ -78,12 +80,13 @@ class arr : public CBase_arr {
       assignValuesToIndex(destBuffer, SIZE);
     }
 
-    void recv_zerocopy(int *&buffer, size_t &size, bool isBcast, CkNcpyBufferPost *ncpyPost) {
-      buffer = destBuffer;
+    void recv_zerocopy(int *buffer, size_t size, bool isBcast, CkNcpyBufferPost *ncpyPost) {
+      CkMatchBuffer(ncpyPost, 0, thisIndex);
+
       if(isBcast) {
-        size = SIZE/2;
+        CkPostBuffer(destBuffer, SIZE/2, thisIndex);
       } else {
-        size = SIZE/4;
+        CkPostBuffer(destBuffer, SIZE/4, thisIndex);
       }
     }
 
@@ -113,12 +116,13 @@ class grp : public CBase_grp {
       assignValuesToIndex(destBuffer, SIZE);
     }
 
-    void recv_zerocopy(int *&buffer, size_t &size, bool isBcast, CkNcpyBufferPost *ncpyPost) {
-      buffer = destBuffer;
+    void recv_zerocopy(int *buffer, size_t size, bool isBcast, CkNcpyBufferPost *ncpyPost) {
+      CkMatchBuffer(ncpyPost, 0, arrSize + thisIndex);
+
       if(isBcast) {
-        size = SIZE/2;
+        CkPostBuffer(destBuffer, SIZE/2, arrSize + thisIndex);
       } else {
-        size = SIZE/4;
+        CkPostBuffer(destBuffer, SIZE/4, arrSize + thisIndex);
       }
     }
 
@@ -147,12 +151,14 @@ class nodegrp : public CBase_nodegrp {
       destBuffer = new int[SIZE/2];
       assignValuesToIndex(destBuffer, SIZE/2);
     }
-    void recv_zerocopy(int *&buffer, size_t &size, bool isBcast, CkNcpyBufferPost *ncpyPost) {
-      buffer = destBuffer;
+
+    void recv_zerocopy(int *buffer, size_t &size, bool isBcast, CkNcpyBufferPost *ncpyPost) {
+      CkMatchBuffer(ncpyPost, 0, arrSize + CkNumPes() + thisIndex);
+
       if(isBcast) {
-        size = SIZE/2;
+        CkPostBuffer(destBuffer, SIZE/2, arrSize + CkNumPes() + thisIndex);
       } else {
-        size = SIZE/4;
+        CkPostBuffer(destBuffer, SIZE/4, arrSize + CkNumPes() + thisIndex);
       }
     }
 

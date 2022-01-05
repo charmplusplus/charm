@@ -162,9 +162,11 @@ class zerocopyObject : public CBase_zerocopyObject{
         contribute(compReductionCb);
     }
 
-    void sdagRecv(int index, int &n1, int *& ptr1, CkNcpyBufferPost *ncpyPost) {
+    void sdagRecv(int index, int n1, int *ptr1, CkNcpyBufferPost *ncpyPost) {
       int *recvBuffer = iArr1Recv + (index - 1)*n1;
-      ptr1 = recvBuffer;
+
+      CkMatchBuffer(ncpyPost, 0, (TOTAL_ITER)*thisIndex + iter);
+      CkPostBuffer(recvBuffer, n1, (TOTAL_ITER)*thisIndex + iter);
 
       CkAssert(n1 == iSize1);
 

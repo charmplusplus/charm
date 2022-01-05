@@ -451,23 +451,28 @@ extern "C" void CmiPushImmediateMsg(void *);
 void CmiPushPE(int rank,void *msg) {
     CmiState cs = CmiGetStateN(rank);
     MACHSTATE2(3,"Pushing message into rank %d's queue %p{",rank, cs->recv);
+
+    if (rank == CmiMyRank()) {
+        CmiSendSelf((char*)msg);
+    } else {
 #if CMK_IMMEDIATE_MSG
-    if (CmiIsImmediate(msg)) {
-        MACHSTATE1(3, "[%p] Push Immediate Message begin{",CmiGetState());
-        CMI_DEST_RANK(msg) = rank;
-        CmiPushImmediateMsg(msg);
-        MACHSTATE1(3, "[%p] Push Immediate Message end}",CmiGetState());
-        return;
-    }
+        if (CmiIsImmediate(msg)) {
+            MACHSTATE1(3, "[%p] Push Immediate Message begin{",CmiGetState());
+            CMI_DEST_RANK(msg) = rank;
+            CmiPushImmediateMsg(msg);
+            MACHSTATE1(3, "[%p] Push Immediate Message end}",CmiGetState());
+            return;
+        }
 #endif
 
 #if CMK_MACH_SPECIALIZED_QUEUE
-    LrtsSpecializedQueuePush(rank, msg);
+        LrtsSpecializedQueuePush(rank, msg);
 #elif CMK_SMP_MULTIQ
-    CMIQueuePush(cs->recv[CmiGetState()->myGrpIdx], (char *)msg);
+        CMIQueuePush(cs->recv[CmiGetState()->myGrpIdx], (char *)msg);
 #else
-    CMIQueuePush(cs->recv,(char*)msg);
+        CMIQueuePush(cs->recv,(char*)msg);
 #endif
+    }
 
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
   if (_Cmi_sleepOnIdle)
@@ -1626,6 +1631,13 @@ static INLINE_KEYWORD void AdvanceCommunication(int whenidle) {
     CommunicationServerXpmem();
 #endif
 
+#if CMK_USE_SHMEM
+    CmiIpcBlock* block;
+    if ((block = CmiPopIpcBlock(CsvAccess(coreIpcManager_)))) {
+      CmiDeliverIpcBlockMsg(block);
+    }
+#endif
+
     LrtsAdvanceCommunication(whenidle);
 
 #if CMK_OFFLOAD_BCAST_PROCESS
@@ -1736,7 +1748,7 @@ if (MSG_STATISTIC)
 #endif
     CmiYield();
     if (!CharmLibInterOperate || userDrivenMode) {
-      while (1) {
+      while (ckExitComplete.load() == 0) {
         CmiYield();
       }
     }

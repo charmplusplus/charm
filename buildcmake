@@ -123,6 +123,8 @@ opt_prio_type="bitvec"
 opt_production=0
 opt_pthreads=0
 opt_pxshm=0
+opt_shmem=0
+opt_xpmem=0
 opt_qlogic=0
 opt_randomized_msgq=0
 opt_refnum_type="unsigned short"
@@ -223,6 +225,11 @@ function parse_platform_compilers() {
       opt_FC=flang
       opt_compiler+=("$arg")
       ;;
+    dpcpp)
+      opt_CC=icx
+      opt_CXX=dpcpp
+      opt_compiler+=("$arg")
+      ;;
     icc|iccstatic)
       opt_CC=icc
       opt_CXX=icpc
@@ -278,6 +285,13 @@ function processArgs() {
     # Enable/disable features
       --enable-error-checking)
         opt_error_checking=1
+        ;;
+      --enable-shmem)
+        opt_shmem=1
+        ;;
+      --enable-xpmem)
+        opt_xpmem=1 # XPMEM implies SHMEM
+        opt_shmem=1
         ;;
       --enable-ampi-error-checking)
         opt_ampi_error_checking=1
@@ -401,6 +415,9 @@ function processArgs() {
       --basedir=*)
         opt_incdir+=("-I${arg#*=}/include")
         opt_libdir+=("-L${arg#*=}/lib")
+        if [[ -d "${arg#*=}/lib64" ]]; then
+          opt_libdir+=("-L${arg#*=}/lib64")
+        fi
         ;;
       --libdir=*)
         opt_libdir+=("-L${arg#*=}")
@@ -450,6 +467,10 @@ for c in "$opt_lrts_pmi" "${opt_compiler[@]}"; do
   [[ -n "$c" ]] && builddir_extra+="-$c"
 done
 
+if [[ "$actual_triplet" = ofi-cray* && -z "$opt_lrts_pmi" ]]; then
+    opt_lrts_pmi="slurmpmi2"
+fi
+
 if [[ -n "$opt_destination" ]]; then
   # Note that $builddir_extra is intentionally ignored here
   builddir="$opt_destination$opt_suffix"
@@ -487,15 +508,15 @@ fi
 # Build option setup
 
 if [[ $opt_ampi_only -eq 1 ]]; then
-    # AMPI doesn't use Charm-MPI interop or msg priorities of any kind.
+    # AMPI doesn't use Charm-MPI interop, msg priorities, non-FIFO queues, or CcdSCHEDLOOP.
     # AMPI creates O(NumVirtualRanks) chare arrays by default (for MPI_COMM_SELF),
     # so we bump up the number of bits reserved for the collection in the objid.
     opt_prio_type="char"
-    opt_extra_opts=('-DCMK_NO_INTEROP=1' '-DCMK_NO_MSG_PRIOS=1' '-DCMK_FIFO_QUEUE_ONLY=1' '-DCMK_OBJID_COLLECTION_BITS=29' "${opt_extra_opts[@]}")
+    opt_extra_opts=('-DCMK_NO_INTEROP=1' '-DCMK_NO_MSG_PRIOS=1' '-DCMK_FIFO_QUEUE_ONLY=1' '-DCSD_NO_SCHEDLOOP=1' '-DCMK_OBJID_COLLECTION_BITS=29' "${opt_extra_opts[@]}")
 fi
 
-# Special handling for gni-crayxc, gni-crayxe, mpi-crayxc, mpi-crayxe
-if [[ $actual_triplet == gni-* || $actual_triplet == *-crayx? ]]; then
+# Special handling for gni-crayxc, gni-crayxe, mpi-crayxc, mpi-crayxe, mpi-crayshasta, ofi-crayshasta
+if [[ $actual_triplet == gni-* || $actual_triplet == *-cray* ]]; then
   opt_network=$actual_triplet
   # Need to use Cray's compiler frontends on Cray systems
   opt_CC=cc
@@ -585,6 +606,8 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
   -DPRIO_TYPE="$opt_prio_type" \
   -DPTHREADS="$opt_pthreads" \
   -DPXSHM="$opt_pxshm" \
+  -DCMK_HAS_XPMEM="$opt_xpmem" \
+  -DCMK_USE_SHMEM="$opt_shmem" \
   -DQLOGIC="$opt_qlogic" \
   -DRANDOMIZED_MSGQ="$opt_randomized_msgq" \
   -DREFNUM_TYPE="$opt_refnum_type" \

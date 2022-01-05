@@ -23,6 +23,7 @@
 #endif
 
 
+#define  INVALID            0
 #define  CREATION           1
 #define  BEGIN_PROCESSING   2
 #define  END_PROCESSING     3

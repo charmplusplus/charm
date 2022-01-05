@@ -86,6 +86,11 @@ do
      GLOBALS_SHARED='1'
      GLOBALS_FUNCPTR='1'
      ;;
+  -pieglobals)
+     GLOBALS='pie'
+     GLOBALS_SHARED='1'
+     GLOBALS_FUNCPTR='1'
+     ;;
 
   -c)
      EXPLICIT_COMPILATION='true'
@@ -137,6 +142,13 @@ then
   if [ "$CMK_SUPPORTS_PIPGLOBALS" != '1' ]
   then
     echo "Error: Prerequisites for -pipglobals support were not detected."
+    exit 1
+  fi
+elif [ "$GLOBALS" = 'pie' ]
+then
+  if [ "$CMK_SUPPORTS_PIEGLOBALS" != '1' ]
+  then
+    echo "Error: Prerequisites for -pieglobals support were not detected."
     exit 1
   fi
 fi
@@ -225,6 +237,6 @@ runCmd "$CHARMBIN/charmc" -default-to-aout "${ARGS[@]}" "${AMPICC_POST_OPTS[@]}"
 status=$?
 
 # Copy ampirun, but do not overwrite it if it already exists.
-[[ $status -eq 0 ]] && cp -n "$CHARMBIN/ampirun" .
+[[ $status -eq 0 && ! -f "ampirun" ]] && cp -f "$CHARMBIN/ampirun" .
 
 exit $status

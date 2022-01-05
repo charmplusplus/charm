@@ -17,6 +17,21 @@ if [ "$1" = "@CMAKE_C_COMPILER@" ]; then shift; fi
 if [ "$1" = "@CMAKE_CXX_COMPILER@" ]; then shift; fi
 if [ "$1" = "@CMAKE_Fortran_COMPILER@" ]; then shift; fi
 
+# Avoid mpicc using these variables, particularly during configure phases.
+unset -v CC
+unset -v CXX
+unset -v F77
+unset -v FC
+unset -v CFLAGS
+unset -v CXXFLAGS
+unset -v FFLAGS
+unset -v FCFLAGS
+unset -v CPP
+unset -v CXXCPP
+unset -v CPPFLAGS
+unset -v LIBS
+unset -v LDFLAGS
+
 #Prepare aliases for the external commands we use--
 # Note that adding /bin/ to everything breaks Cygwin32.
 RM="rm -f"
@@ -420,8 +435,6 @@ do
 		case "$1" in
 		"ampi") AddModules tcharmmain ampi ; AMPI="1" ;;
 		"ampif") AddModules tcharmmain ampif ; USE_F90_LIBRARIES="1" ; AMPIF="1" ;;
-		"fem") AddModules tcharmmain fem ; AMPIMAIN="femmain";;
-		"femf") AddModules tcharmmain fem ; AMPIMAIN="femmain"; USE_F90_LIBRARIES="1" ;;
 		"ParFUM_TOPS") AddModules tcharmmain ParFUM ParFUM_TOPS ; AMPIMAIN="ParFUMmain";;
     "ParFUM") AddModules tcharmmain ParFUM ; AMPIMAIN="ParFUMmain";;
     "ParFUMf") AddModules tcharmmain ParFUM ; AMPIMAIN="ParFUMmain"; USE_F90_LIBRARIES="1" ;;
@@ -972,20 +985,13 @@ for FILE in "${FILES[@]}"
 do
 
 	case "$FILE" in
-	*.o|*.so|*.so.*|*.sl|*.a|*.dylib|*.co|*.obj)
-		OBJECTFILES+=("$FILE")
-		;;
 	*.c|*.s|*.S|*.asm|*.C|*.cc|*.cxx|*.cpp|*.c++|*.cu|*.f|*.F|*.f77|*.F77|*.f90|*.F90|*.fpp|*.FPP)
 		BASE="$(stripExtension "$(basename "$FILE")")"
 		BASEO="$BASE.o"
 
-		if [ $numFiles = 1 -a -n "$OBJECT" ]
+		if [[ $numFiles = 1 && -n "$OBJECT" && "$EXPLICIT_COMPILATION" = 'yes' ]]
 		then
-			OBJ_EXT="$(getExtension "$OBJECT")"
-			if [ "$OBJ_EXT" = '.o' -o "$OBJ_EXT" = '.co' ]
-			then
-				BASEO="$OBJECT"
-			fi
+			BASEO="$OBJECT"
 		fi
 
 		# Handle new object files
@@ -997,6 +1003,13 @@ do
 			fi
 			OBJECTFILES+=("$BASEO")
 		fi
+		;;
+
+	*.ci)
+		;;
+
+	*)
+		OBJECTFILES+=("$FILE")
 		;;
 	esac
 done
@@ -1216,7 +1229,7 @@ then
 		OPTS_LD+=($CMK_LD_SHARED "${OPTS_LDRO[@]}")
 		[[ -n "$CHARMLIBSO" ]] && OPTS_LD+=("-L$CHARMLIBSO")
 		;;
-	*.so|*.so.*|*.sl|*.dylib)
+	*.so|*.so.*|*.sl|*.dylib|*.dylib.*)
 		OPTS_LD+=($CMK_LD_SHARED "${OPTS_LDRO[@]}")
 		[[ -n "$CHARMLIBSO" ]] && OPTS_LD+=("-L$CHARMLIBSO")
 		if [ "$CMK_MACOSX" = "1" -a -z "$STANDALONE" ]; then
@@ -1738,12 +1751,12 @@ Debugf "All libraries are: ${ALL_LIBS[*]}"
 
 # preserve this variable in its state here for use later
 CHARM_ALL_LIBS=("${ALL_LIBS[@]}")
-if [ "$BUILD_SHARE" = '1' -o "$USER_INITIATED_SHARED" = '1' -o -n "$SKIP_MODULEINIT" ]
+if [[ "$BUILD_SHARE" != '1' && "$USER_INITIATED_SHARED" != '1' && -z "$SKIP_MODULEINIT" ]]
 then
-  ALL_LIBS=("${OBJECTFILES[@]}" "${ALL_LIBS[@]}")
-else
-  ALL_LIBS=("${OBJECTFILES[@]}" "$modInitObj" "${ALL_LIBS[@]}")
+  ALL_LIBS=("$modInitObj" "${ALL_LIBS[@]}")
 fi
+
+ALL_LIBS=("${OBJECTFILES[@]}" "${ALL_LIBS[@]}")
 
 if [ -n "$F90_MAIN" ]
 then
@@ -1879,6 +1892,7 @@ done
 
 Debug "About to compile..."
 
+numFiles="${#FILES[@]}"
 for FILE in "${FILES[@]}"
 do
 	BASE="$(stripExtension "$(basename "$FILE")")"
@@ -1893,24 +1907,18 @@ do
  	# remove and generate foo.o may be dangerous in parallel make
 	# for example in the case of compiling several objs from one
 	# same c file such as memory.C.
-	if [ $numFiles = 1 -a -n "$OBJECT" ]
+	if [[ $numFiles = 1 && -n "$OBJECT" && "$EXPLICIT_COMPILATION" = 'yes' ]]
 	then
-		OBJ_EXT="$(getExtension "$OBJECT")"
-		if [ "$OBJ_EXT" = '.o' -o "$OBJ_EXT" = '.co' ]
-		then
-			BASEO="$OBJECT"
-			DESTO=(-o "$OBJECT")
-		fi
+		BASEO="$OBJECT"
+		DESTO=(-o "$OBJECT")
 	fi
 
-#	if [ "$FILE_EXT" != ".o" -a "$FILE_EXT" != ".co" -a "$FILE_EXT" != ".M" -a "$FILE_EXT" != ".ci" ]
-#	then
         case "$FILE_EXT" in
         .c|.s|.S|.asm|.C|.cc|.cxx|.cpp|.c++|.cu|.f|.F|.f90|.F90|.fpp|.FPP|.f77|.F77)
 		[ $VERBOSE ] && echo "Compiling $FILE"
 		DoNoErrCheck $RM "$BASEO" "$(stripExtension "$BASEO").f.o"
         esac
-#	fi
+
 	if [ ! -z "$SKIPLINK" ]
 	then
 		DESTO=()
@@ -1989,16 +1997,14 @@ do
 	*.fc|*.FC)
 		Abort "I'm not yet smart enough to compile $FILE"
 		;;
-	*.o|*.so|*.so.*|*.sl|*.a|*.dylib|*.co|*.obj)
-		[[ ! -s "$FILE" ]] && Abort "$FILE: file not recognized: File truncated"
-		;;
 	*.M|*.mod)
 	        OBJECT="$BASE"
 		Copymod
 		Success
 		;;
 	*)
-		Abort "file with unrecognized extension $FILE"
+		[[ ! -s "$FILE" ]] && Abort "$FILE: file not recognized: File truncated"
+		;;
 	esac
 done
 
@@ -2088,10 +2094,7 @@ fi
 if [ "$MPI_INTEROPERATE" = "" ]
 then
 case "$OBJECT" in
-*.o)
-	Copyobj
-	;;
-*.so|*.so.*|*.sl|*.dylib)
+*.so|*.so.*|*.sl|*.dylib|*.dylib.*)
 # Make shared library
 	if [ "$BUILD_SHARE" = '1' -a "$USER_INITIATED_SHARED" = '0' ]
 	then
@@ -2125,6 +2128,25 @@ case "$OBJECT" in
 	runCmd $CMK_AR "$OBJECT" "${OBJECTFILES[@]}"
 	runCmd $CMK_RANLIB "$OBJECT"
 	Copyobj
+	;;
+*.o)
+	if [[ "$EXPLICIT_COMPILATION" = 'yes' ]]
+	then
+		Copyobj
+	elif [[ -z "$AMPI" && -z "$AMPIF" ]]
+	then
+		Warning 'charmc no longer assumes .o outputs imply compilation only. If you mean to build an object file, please add "-c".'
+	fi
+	;;
+*)
+	if [[ "$EXPLICIT_COMPILATION" = 'yes' ]]
+	then
+		if [[ -z "$AMPI" && -z "$AMPIF" && -z "$(getExtension "$OBJECT")" ]]
+		then
+			Warning 'charmc no longer assumes outputs without .o force linking. If you mean to build an executable, please remove "-c".'
+		fi
+		Copyobj
+	fi
 	;;
 esac
 fi
@@ -2348,7 +2370,7 @@ case "$OBJECT" in
         echo "CHARM_ALL_LIBS=\"${CHARM_ALL_LIBS[*]}\""
 	Copyobj
 	;;
-*.so|*.so.*|*.sl|*.dylib)
+*.so|*.so.*|*.sl|*.dylib|*.dylib.*)
         echo "Warning: building shared library failed; for interoperation build
         static library."
         End 0

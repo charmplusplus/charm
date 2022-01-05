@@ -5,6 +5,7 @@
 
 #include "converse.h"
 #include <charm++.h>
+#include <ck.h>
 #include "cksyncbarrier.h"
 
 #include "DistributedLB.h"
@@ -28,6 +29,15 @@ bool _lb_predict = false;
 int _lb_predict_delay = 10;
 int _lb_predict_window = 20;
 bool _lb_psizer_on = false;
+
+SystemLoad::SystemLoad() {
+  auto *activeRec = CkActiveLocRec();
+  lbmgr = LBManagerObj();
+  if (lbmgr && activeRec) {
+    const LDObjHandle &runObj = activeRec->getLdHandle();
+    lbmgr->ObjectStop(runObj);
+  }
+}
 
 // registry class stores all load balancers linked and created at runtime
 class LBDBRegistry
@@ -967,8 +977,8 @@ void LBManager::TurnOffBarrierReceiver(LDBarrierReceiver h)
   CkSyncBarrier::object()->turnOffReceiver(h);
 }
 
-void LBManager::LocalBarrierOn(void) { CkSyncBarrier::object()->turnOn(); };
-void LBManager::LocalBarrierOff(void) { CkSyncBarrier::object()->turnOff(); };
+void LBManager::LocalBarrierOn(void) { CkSyncBarrier::object()->turnOn(); }
+void LBManager::LocalBarrierOff(void) { CkSyncBarrier::object()->turnOff(); }
 
 #if CMK_LBDB_ON
 static void work(int iter_block, volatile int* result)

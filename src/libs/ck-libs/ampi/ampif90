@@ -4,7 +4,7 @@ CHARMBIN="$(dirname "$0")"
 export AMPICC="$(basename "$0")"
 export AMPICC_MODE='ampif'
 
-cp -n "$CHARMBIN/../include/mpif.h" .
+[[ ! -f "mpif.h" ]] && cp -f "$CHARMBIN/../include/mpif.h" .
 "$CHARMBIN/ampiCC" "$@"
 status=$?
 rm -f 'mpif.h'
