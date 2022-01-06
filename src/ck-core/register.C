@@ -46,7 +46,7 @@ int CkRegisterEpInternal(const char *name, CkCallFnPtr call, int msgIdx, int cha
 {
 #if !CMK_CHARM4PY    // charm4py can support dynamic registration of Chares after program start
   if (__registerDone) {
-    CkPrintf("Charm++: late entry method registration happened after init\nEntry point: %s, addr: %p\n", name, call);
+    CkPrintf("Charm++: late entry method registration happened after init\nEntry point: %s, addr: %p\n", name, (void *)call);
     CkAbort("Did you forget to import a module or instantiate a templated entry method in a .ci file?\n");
   }
 #endif

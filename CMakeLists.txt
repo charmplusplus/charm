@@ -54,7 +54,8 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Cray")
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "PGI")
   set(CMK_COMPILER pgcc)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "XL")
-  set(CMK_COMPILER xlc)
+  # FIXME: No support for 32-bit XLC
+  set(CMK_COMPILER xlc64)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" OR (CMAKE_CXX_COMPILER_ID STREQUAL "" AND (CMAKE_SYSTEM_NAME STREQUAL "Windows" OR CMAKE_SYSTEM_NAME STREQUAL "CYGWIN")))
   set(CMK_COMPILER msvc)
 else()
@@ -70,6 +71,10 @@ if(CMAKE_Fortran_COMPILER)
   include(FortranCInterface)
   FortranCInterface_VERIFY()
   FortranCInterface_VERIFY(CXX)
+  if(CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
+    # Needed to make lowercase modules on Cray platforms
+    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -ef")
+  endif()
 else()
   message(STATUS "Charm++: No Fortran support.")
 endif()
@@ -85,14 +90,40 @@ set(NETWORK "netlrts" CACHE STRING "Target network layer, can be one of mpi,mult
 set(TARGET "charm++" CACHE STRING "Target build type, can be one of charm++,AMPI,LIBS,charm4py,ChaNGa,everylb,all-test")
 set(ARCH "" CACHE STRING "Target architecture, can be one of i386,x86_64,arm7,arm8,ppc64le") # By default, detect arch we are running on.
 
-if(NOT ARCH STREQUAL CMAKE_HOST_SYSTEM_PROCESSOR)
-  if (ARCH STREQUAL "i386" AND CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "x86_64")
-    message(WARNING "Attempting to cross-compile from ${CMAKE_HOST_SYSTEM_PROCESSOR} to ${ARCH}. This is only supported for x86_64 -> i386 currently.")
+function(charm_determine_arch output input)
+  if(input STREQUAL "x86_64" OR input STREQUAL "AMD64")
+    set(retval "x86_64")
+  elseif(input STREQUAL "i386" OR input STREQUAL "i686")
+    set(retval "i386")
+  elseif(input STREQUAL "powerpc" OR input MATCHES "^ppc")
+    set(retval "ppc64le")
+  elseif(input MATCHES "armv6" OR input MATCHES "armv7")
+    set(retval "arm7")
+  elseif(input MATCHES "aarch64" OR input MATCHES "arm64")
+    set(retval "arm8")
+  else()
+    set(retval ${input})
+  endif()
+
+  set(${output} ${retval} PARENT_SCOPE)
+endfunction()
+
+if(ARCH)
+  set(CHARM_CPU ${ARCH})
+else()
+  charm_determine_arch(CHARM_CPU ${CMAKE_SYSTEM_PROCESSOR})
+endif()
+
+charm_determine_arch(CHARM_HOST_CPU ${CMAKE_HOST_SYSTEM_PROCESSOR})
+
+if(NOT CHARM_CPU STREQUAL CHARM_HOST_CPU)
+  if (CHARM_CPU STREQUAL "i386" AND CHARM_HOST_CPU STREQUAL "x86_64")
+    message(STATUS "Attempting to cross-compile from ${CHARM_HOST_CPU} to ${CHARM_CPU}.")
     set(CMAKE_C_FLAGS -m32)
     set(CMAKE_CXX_FLAGS -m32)
-    set(CMAKE_FORTRAN_FLAGS -m32)
+    set(CMAKE_Fortran_FLAGS -m32)
   else()
-    message(WARNING "Cross-compiling from  ${CMAKE_HOST_SYSTEM_PROCESSOR} to ${ARCH} is not supported currently.")
+    message(WARNING "Cross-compiling from ${CHARM_HOST_CPU} to ${CHARM_CPU} is not supported currently.")
   endif()
 endif()
 
@@ -189,6 +220,9 @@ string(TOLOWER "${TARGET}" target_lower)
 if(${target_lower} STREQUAL "changa")
   set(TARGET "LIBS")
   set(LBUSERDATA 1)
+  set(BUILD_CHANGA 1)
+else()
+  set(BUILD_CHANGA 0)
 endif()
 
 if(${TARGET} STREQUAL "everylb")
@@ -253,12 +287,26 @@ if(${CMK_USE_ZLIB})
   set(CMK_SYSLIBS "$CMK_SYSLIBS -lz")
 endif()
 
+if(${CMK_USE_SHMEM})
+  if(${CMK_HAS_XPMEM})
+    set(CMK_SYSLIBS "$CMK_SYSLIBS -lxpmem")
+  elseif(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    set(CMK_SYSLIBS "$CMK_SYSLIBS -lrt")
+  endif()
+endif()
+
 set(CMK_USE_LIBJPEG 0)
 find_package(JPEG)
 IF(JPEG_FOUND)
   set(CMK_LIBJPEG "-ljpeg")
   set(CMK_USE_LIBJPEG 1)
 ENDIF()
+
+if(NETWORK STREQUAL "pami")
+  set(CMK_USE_LRTS 0)
+else()
+  set(CMK_USE_LRTS 1)
+endif()
 
 # Check for Python
 # PythonCCS requires Python v2.x and is the only target that uses this
@@ -334,27 +382,6 @@ else()
   message(FATAL_ERROR "Unsupported operating system ${CMAKE_SYSTEM_NAME}.")
 endif()
 
-set(CMK_POWER7 0)
-if(ARCH)
-  set(CHARM_CPU ${ARCH})
-elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "AMD64")
-  set(CHARM_CPU "x86_64")
-elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "i386" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "i686")
-  set(CHARM_CPU "i386")
-elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "powerpc" OR CMAKE_SYSTEM_PROCESSOR MATCHES "^ppc")
-  set(CHARM_CPU "ppc64le")
-  execute_process(COMMAND grep f Makefile RESULT_VARIABLE isppc7 OUTPUT_QUIET ERROR_QUIET)
-  if(${isppc7})
-    set(CMK_POWER7 1)
-  endif()
-elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "armv6" OR CMAKE_SYSTEM_PROCESSOR MATCHES "armv7")
-  set(CHARM_CPU "arm7")
-elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "arm64")
-  set(CHARM_CPU "arm8")
-else()
-  message(FATAL_ERROR "Unsupported CPU ${CMAKE_SYSTEM_PROCESSOR}.")
-endif()
-
 # Adjust version number so it can be tested by numerical comparisons, e.g. 6.10.1 -> 61001:
 # #if CHARM_VERSION > 61001
 if(${PROJECT_VERSION_PATCH} LESS 10)
@@ -372,10 +399,10 @@ set(CHARM_PLATFORM "${NETWORK}-${CHARM_OS}-${CHARM_CPU}")
 
 
 set(CMK_BUILD_CRAY 0)
-if(${NETWORK} MATCHES "gni-")
+if(${NETWORK} MATCHES "gni-" OR ${NETWORK} MATCHES "ofi-cray")
   set(CHARM_PLATFORM "${NETWORK}")
   set(CMK_BUILD_CRAY 1)
-elseif(${NETWORK} MATCHES "mpi-crayx")
+elseif(${NETWORK} MATCHES "mpi-cray")
   set(CHARM_PLATFORM "${NETWORK}")
 endif()
 
@@ -458,6 +485,33 @@ if(CMAKE_BUILD_TYPE MATCHES "Debug" OR CMAKE_BUILD_TYPE MATCHES "RelWithDebInfo"
   set(OPTSATBUILDTIME "${OPTSATBUILDTIME} -g")
 endif()
 
+# Identify arch/network-specific paths
+if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${NETWORK}/gdir_link)
+  file(STRINGS src/arch/${NETWORK}/gdir_link GDIR)
+elseif(${NETWORK} MATCHES "gni-")
+  set(GDIR "gni")
+elseif(${NETWORK} MATCHES "mpi-cray")
+  set(GDIR "mpi")
+elseif(${NETWORK} MATCHES "ofi-cray")
+  set(GDIR "ofi")
+else()
+  set(GDIR ${NETWORK})
+endif()
+
+set(VDIR ${CHARM_PLATFORM})
+
+# Identify whether charmrun will be built
+set(CMK_BUILD_CHARMRUN 0)
+if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${NETWORK}/charmrun)
+  set(CHARMRUN_DIR src/arch/${NETWORK})
+elseif(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/charmrun)
+  set(CHARMRUN_DIR src/arch/${GDIR})
+elseif(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/charmrun)
+  set(CHARMRUN_DIR src/arch/${VDIR})
+else()
+  set(CMK_BUILD_CHARMRUN 1)
+endif()
+
 include(cmake/detect-features.cmake)
 include(cmake/ci-files.cmake)
 
@@ -473,8 +527,10 @@ if(${TARGET} STREQUAL "all-test")
         create_symlinks moduleCkCache trace-converse moduleCommonLBs
         moduleTreeLB moduleCkMulticast moduleCkIO conv-cpm memory-os-wrapper
         threads-default-tls ldb-neighbor ldb-workstealing
-        modulecollidecharm modulecollide memory-os memory-gnu-isomalloc
-        ampi_globals_fs)
+        modulecollidecharm modulecollide memory-os memory-os-isomalloc)
+  if(CMK_HAS_MMAP)
+    add_dependencies(all-test memory-gnu-isomalloc)
+  endif()
   if(CMK_CAN_LINK_FORTRAN)
     add_dependencies(all-test moduleampif conv-utilf ckmainf
         ampi_funcptr_shim_fortran ampi_funcptr_shim_fmpimain)
@@ -485,6 +541,9 @@ if(${TARGET} STREQUAL "all-test")
   if(CMK_SUPPORTS_PIPGLOBALS)
     add_dependencies(all-test ampi_globals_pip)
   endif()
+  if(CMK_SUPPORTS_PIEGLOBALS)
+    add_dependencies(all-test ampi_globals_pie)
+  endif()
   set(TARGET "LIBS")
 endif()
 
@@ -494,22 +553,22 @@ configure_file(${CMAKE_SOURCE_DIR}/src/scripts/charmc ${CMAKE_BINARY_DIR}/bin @O
 set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ${CMAKE_BINARY_DIR}/bin/charmc)
 
 set(CMAKE_CXX_LINK_EXECUTABLE
-      "${CMAKE_BINARY_DIR}/bin/charmc <CMAKE_CXX_LINK_FLAGS> <LINK_FLAGS> <OBJECTS>  -o <TARGET> <LINK_LIBRARIES>")
+      "${CMAKE_BINARY_DIR}/bin/charmc <CMAKE_CXX_LINK_FLAGS> <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES> ${MY_EXTRA_OPTS}")
 
 set(CMAKE_CXX_CREATE_SHARED_LIBRARY
-      "${CMAKE_BINARY_DIR}/bin/charmc -build-shared <CMAKE_CXX_LINK_FLAGS> <LINK_FLAGS> <OBJECTS>  -o <TARGET> <LINK_LIBRARIES>")
+      "${CMAKE_BINARY_DIR}/bin/charmc -build-shared <CMAKE_CXX_LINK_FLAGS> <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES> ${MY_EXTRA_OPTS}")
 set(CMAKE_CXX_CREATE_STATIC_LIBRARY
-      "${CMAKE_BINARY_DIR}/bin/charmc ${BUILD_SHARED_OPTION} <CMAKE_CXX_LINK_FLAGS> <LINK_FLAGS> <OBJECTS>  -o <TARGET> <LINK_LIBRARIES>")
+      "${CMAKE_BINARY_DIR}/bin/charmc ${BUILD_SHARED_OPTION} <CMAKE_CXX_LINK_FLAGS> <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES> ${MY_EXTRA_OPTS}")
 
 set(CMAKE_C_CREATE_SHARED_LIBRARY
-      "${CMAKE_BINARY_DIR}/bin/charmc -build-shared <CMAKE_C_LINK_FLAGS> <LINK_FLAGS> <OBJECTS>  -o <TARGET> <LINK_LIBRARIES>")
+      "${CMAKE_BINARY_DIR}/bin/charmc -build-shared <CMAKE_C_LINK_FLAGS> <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES> ${MY_EXTRA_OPTS}")
 set(CMAKE_C_CREATE_STATIC_LIBRARY
-      "${CMAKE_BINARY_DIR}/bin/charmc ${BUILD_SHARED_OPTION} <CMAKE_C_LINK_FLAGS> <LINK_FLAGS> <OBJECTS>  -o <TARGET> <LINK_LIBRARIES>")
+      "${CMAKE_BINARY_DIR}/bin/charmc ${BUILD_SHARED_OPTION} <CMAKE_C_LINK_FLAGS> <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES> ${MY_EXTRA_OPTS}")
 
 set(CMAKE_Fortran_CREATE_SHARED_LIBRARY
-      "${CMAKE_BINARY_DIR}/bin/charmc -build-shared <CMAKE_Fortran_LINK_FLAGS> <LINK_FLAGS> <OBJECTS>  -o <TARGET> <LINK_LIBRARIES>")
+      "${CMAKE_BINARY_DIR}/bin/charmc -build-shared <CMAKE_Fortran_LINK_FLAGS> <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES> ${MY_EXTRA_OPTS}")
 set(CMAKE_Fortran_CREATE_STATIC_LIBRARY
-      "${CMAKE_BINARY_DIR}/bin/charmc ${BUILD_SHARED_OPTION} <CMAKE_Fortran_LINK_FLAGS> <LINK_FLAGS> <OBJECTS>  -o <TARGET> <LINK_LIBRARIES>")
+      "${CMAKE_BINARY_DIR}/bin/charmc ${BUILD_SHARED_OPTION} <CMAKE_Fortran_LINK_FLAGS> <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES> ${MY_EXTRA_OPTS}")
 
 
 set(CMK_COMPILER_KNOWS_C11 1)
@@ -542,25 +601,18 @@ set(CMK_C_OPENMP ${OpenMP_C_FLAGS})
 set(CMK_F_OPENMP ${OpenMP_Fortran_FLAGS})
 
 # Shell scripts
-
-if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${NETWORK}/gdir_link)
-  file(STRINGS src/arch/${NETWORK}/gdir_link GDIR)
-elseif(${NETWORK} MATCHES "gni-")
-  set(GDIR "gni")
-elseif(${NETWORK} MATCHES "mpi-crayx")
-  set(GDIR "mpi")
-else()
-  set(GDIR ${NETWORK})
-endif()
-
-set(VDIR ${CHARM_PLATFORM})
-
 set(CMK_VDIR ${VDIR})
 set(CMK_GDIR ${GDIR})
+
+if(NOT EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/)
+  message(FATAL_ERROR "Unsupported platform ${VDIR}.")
+endif()
 
 configure_file(src/arch/common/cc-bluegene.sh                include/ COPYONLY)
 configure_file(src/arch/common/cc-clang.sh                   include/ COPYONLY)
 configure_file(src/arch/common/cc-clang.h                    include/ COPYONLY)
+configure_file(src/arch/common/cc-dpcpp.sh                   include/ COPYONLY)
+configure_file(src/arch/common/cc-dpcpp.h                    include/ COPYONLY)
 configure_file(src/arch/common/cc-craycc.h                   include/ COPYONLY)
 configure_file(src/arch/common/cc-craycc.sh                  include/ COPYONLY)
 configure_file(src/arch/common/cc-msvc.h                     include/ COPYONLY)
@@ -626,6 +678,12 @@ endif()
 if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-pxshm.sh)
   configure_file(src/arch/${VDIR}/conv-mach-pxshm.sh         include/ COPYONLY)
   configure_file(src/arch/${VDIR}/conv-mach-pxshm.h          include/ COPYONLY)
+endif()
+
+if(${CMK_USE_SHMEM})
+  if (EXISTS ${CMAKE_SOURCE_DIR}/src/conv-core/cmishmem.h)
+    configure_file(src/conv-core/cmishmem.h                  include/ COPYONLY)
+  endif()
 endif()
 
 if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-sysvshm.sh)
@@ -730,7 +788,7 @@ endforeach()
 
 
 # proc_management
-if(${NETWORK} STREQUAL "ucx" OR ${NETWORK} STREQUAL "ofi")
+if(${NETWORK} MATCHES "ucx" OR ${NETWORK} MATCHES "ofi")
   # file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/proc_management/simple_pmi)
 
   set(proc_management-sources
@@ -795,15 +853,11 @@ configure_file(src/libs/ck-libs/completion/completion.h include/ COPYONLY)
 add_dependencies(modulecompletion ck)
 
 # Charmrun + testrun
-if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${NETWORK}/charmrun)
-  configure_file(src/arch/${NETWORK}/charmrun ${CMAKE_BINARY_DIR}/bin COPYONLY)
-elseif(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/charmrun)
-  configure_file(src/arch/${GDIR}/charmrun ${CMAKE_BINARY_DIR}/bin COPYONLY)
-elseif(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/charmrun)
-  configure_file(src/arch/${VDIR}/charmrun ${CMAKE_BINARY_DIR}/bin COPYONLY)
-else()
+if(${CMK_BUILD_CHARMRUN})
   add_subdirectory(src/util/charmrun-src)
   add_dependencies(charmrun create_symlinks)
+else()
+  configure_file(${CHARMRUN_DIR}/charmrun ${CMAKE_BINARY_DIR}/bin COPYONLY)
 endif()
 configure_file(src/scripts/testrun bin/ COPYONLY)
 
@@ -867,7 +921,7 @@ else()
 endif()
 
 # AMPI
-if(${TARGET} STREQUAL "AMPI" OR ${TARGET} STREQUAL "LIBS")
+if(${TARGET} STREQUAL "AMPI" OR (${TARGET} STREQUAL "LIBS" AND NOT BUILD_CHANGA))
   add_subdirectory(src/libs/ck-libs/ampi)
 endif()
 
@@ -899,7 +953,7 @@ file(APPEND  ${optfile_sh} "[ -z \"$CHARMINC\" ] && CHARMINC=\".\"\n")
 # This needs to appear before sourcing the cc-$compiler.sh file
 file(APPEND  ${optfile_sh} "CMK_COMPILER_SUFFIX=${CMK_COMPILER_SUFFIX}\n")
 
-if(NOT ${NETWORK} STREQUAL "mpi" AND NOT ${NETWORK} MATCHES "gni-" AND NOT ${NETWORK} MATCHES "-crayx")
+if(NOT ${NETWORK} STREQUAL "mpi" AND NOT ${NETWORK} MATCHES "gni-" AND NOT ${NETWORK} MATCHES "-cray")
     file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/cc-${CMK_COMPILER}.sh\n")
 endif()
 
@@ -914,7 +968,7 @@ file(APPEND ${optfile_sh} "CMK_NO_BUILD_SHARED=${CMK_NO_BUILD_SHARED}\n")
 foreach(l BUILDOPTS CMK_AMPI_WITH_ROMIO CMK_BUILD_PYTHON CMK_CAN_LINK_FORTRAN
         CMK_CHARMDEBUG CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS CMK_HAS_INT16 CMK_HAS_MMAP
         CMK_LIBJPEG CMK_MOD_EXT CMK_SUPPORTS_FSGLOBALS CMK_SUPPORTS_PIPGLOBALS
-        CMK_SUPPORTS_SWAPGLOBALS CMK_SUPPORTS_TLSGLOBALS
+        CMK_SUPPORTS_PIEGLOBALS CMK_SUPPORTS_SWAPGLOBALS CMK_SUPPORTS_TLSGLOBALS
         CMK_SYSLIBS CMK_TRACE_ENABLED CP OPTS_CC OPTS_CXX CMK_VDIR CMK_GDIR
         CMK_HAS_ELF_H CMK_HAS_OPENMP CMK_AMPI_ONLY CMK_WINDOWS CMK_BLUEGENEQ
         CXX_NO_AS_NEEDED LDXX_WHOLE_ARCHIVE_PRE LDXX_WHOLE_ARCHIVE_POST
@@ -945,7 +999,7 @@ foreach(l CMK_AMPI_WITH_ROMIO CMK_OPTIMIZE CMK_AMPI_ONLY CMK_POST_EXE CMK_SHARED
     file(APPEND ${optfile_h} "#define ${l} ${${l}}\n")
 endforeach(l)
 
-if(NOT ${NETWORK} STREQUAL "mpi" AND NOT ${NETWORK} MATCHES "gni-" AND NOT ${NETWORK} MATCHES "-crayx")
+if(NOT ${NETWORK} STREQUAL "mpi" AND NOT ${NETWORK} MATCHES "gni-" AND NOT ${NETWORK} MATCHES "-cray")
     file(APPEND ${optfile_h} "#include \"cc-${CMK_COMPILER}.h\"\n")
 endif()
 
@@ -959,8 +1013,6 @@ set(optfile_mak ${CMAKE_BINARY_DIR}/include/conv-mach-opt.mak)
 file(WRITE  ${optfile_mak} "# Build-time options header for Makefiles, automatically generated by cmake.\n")
 foreach(l CUDA_DIR BUILD_CUDA CMK_AMPI_WITH_ROMIO CMK_MACOSX CMK_BLUEGENEQ CMK_BUILD_PYTHON
         CMK_CHARMDEBUG CMK_COMPILER CMK_GDIR CMK_HAS_MALLOC_HOOK CMK_HAS_MMAP CMK_LIBJPEG
-        CMK_LUSTREAPI CMK_MULTICORE CMK_NO_BUILD_SHARED CMK_NO_PARTITIONS
-        CMK_SHARED_SUF CMK_SMP CMK_SUPPORTS_FSGLOBALS CMK_SUPPORTS_PIPGLOBALS
         CMK_SUPPORTS_SWAPGLOBALS CMK_SUPPORTS_TLSGLOBALS CMK_HAS_OPENMP CMK_BUILD_OMP
         CMK_TRACE_ENABLED CMK_USE_LRTS CMK_VDIR OPTSATBUILDTIME CMK_AMPI_ONLY CMK_WINDOWS
         CMK_USE_CMA CMK_USER_SUFFIX CMK_CAN_LINK_FORTRAN CMK_SUPPORTS_MEMORY_ISOMALLOC)

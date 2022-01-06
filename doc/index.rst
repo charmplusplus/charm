@@ -27,9 +27,6 @@ Charm++ Documentation
    :numbered:
 
    tcharm/manual
-   fem/manual
-   ifem/manual
-   netfem/manual
    mblock/manual
    pose/manual
 

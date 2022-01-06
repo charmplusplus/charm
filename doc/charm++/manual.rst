@@ -5322,8 +5322,8 @@ Unlike the Zero Copy Entry Method Send API, this API should be used when the use
 to receive the data in a user posted buffer, which is allocated and managed by the user.
 
 The posting of the receiver buffer happens at an object level, where each recipient object,
-for example, a chare array element or a group element or nodegroup element posts a receiver
-buffer using a special version of the entry method.
+for example, a chare array element or a group element or nodegroup element matches the received
+source buffer with a receiver buffer using tag matching.
 
 To send an array using the Zero Copy Post API, specify the array
 parameter in the .ci file with the nocopypost specifier.
@@ -5341,40 +5341,90 @@ Zero Copy Entry Method Send API and can be referenced from the previous section.
 we will highlight the differences between the two APIs and demonstrate the usage of the Post API
 on the receiver side.
 
-As previously mentioned, the Zero Copy Entry Method Post API posts user buffers to receive the
+As previously mentioned, the Zero Copy Entry Method Post API matches and posts user buffers to receive the
 data sent by the sender. This is done using a special overloaded version of the recipient
 entry method, called Post entry method. The overloaded function has all the entry method parameters
-and an additional ``CkNcpyBufferPost`` array parameter at the end of the signature. Additionally, the
-entry method parameters are specified as references instead of values. Inside this post entry method,
-the received references can be initialized by the user. The pointer reference is assigned to a user
-allocated buffer, i.e. the buffer in which the user wishes to receive the data. The size variable
-reference could be assigned to a value (or variable) that represents the size of the data of that type
-that needs to be received. If this reference variable is not assigned inside the post entry method, the size specified
-at the sender in the CkSendBuffer wrapper will be used as the default size. The post entry method also
-allows the receiver to specify the memory registration mode and the memory de-registration mode.
-This is done by indexing the ncpyPost array and assigning the ``regMode`` and ``deregMode`` parameters
-present inside each array element of the ``CkNcpyBufferPost`` array. When the network memory
+and an additional ``CkNcpyBufferPost`` array parameter at the end of the signature. Inside this post
+entry method, the user is required to make calls to ``CkMatchBuffer`` to specify the association between
+the received source buffer and a user provided integer tag. Additionally, for every ``CkMatchBuffer`` call,
+the user is also required to make a corresponding ``CkPostBuffer`` call with the same tag to specify the association
+between that tag and a receiver buffer. Note that the ``CkMatchBuffer`` call should always be made inside
+the Post Entry Method, whereas the ``CkPostBuffer`` call can be made from anywhere in the program whenever the
+receiver is ready to post a buffer. The Post Entry method executes on the arrival of the metadata message, and
+the ``CkPostBuffer`` call for receiving those buffers can be executed before, after, or inside the Post Entry Method.
+However, it is important to note that it is required that both the ``CkMatchBuffer`` and ``CkPostBuffer`` calls are made
+on the same PE.
+
+The post entry method also allows the receiver to specify the memory registration mode and the memory
+de-registration mode. This is done by indexing the ncpyPost array and assigning the ``regMode`` and ``deregMode``
+parameters present inside each array element of the ``CkNcpyBufferPost`` array. When the network memory
 registration mode is unassigned by the user, the default ``CK_BUFFER_REG`` regMode is used. Similarly, when
 the de-registration mode is unassigned by the user, the default ``CK_BUFFER_DEREG`` deregMode is used.
+It is important to ensure that the ``CkMatchBuffer`` call is made after setting the ``regMode`` and/or ``deregMode``
+parameters.
 
-For the entry method ``foo`` specified with a nocopypost specifier, the resulting post function defined
+For the entry method ``foo`` specified with a nocopypost specifier, the resulting post entry method defined
 in the .C file will be:
 
 .. code-block:: c++
 
-   void foo (int &size, int *& arr, CkNcpyBufferPost *ncpyPost) {
-     arr = myBuffer;      // myBuffer is a user allocated buffer
-
-     size = 2000;         // 2000 ints need to be received.
+   void foo (int size, int *arr, CkNcpyBufferPost *ncpyPost) {
 
      ncpyPost[0].regMode = CK_BUFFER_REG; // specify the regMode for the 0th pointer
 
      ncpyPost[0].deregMode = CK_BUFFER_DEREG; // specify the deregMode for the 0th pointer
+
+     CkMatchBuffer(ncpyPost, 0, 22);
    }
 
-In addition to the post entry method, the regular entry method also needs to be defined
-as in the case of the Entry Method Send API, where the nocopypost parameter is being received
-as a pointer as shown below:
+As seen in the above example, the ``CkMatchBuffer`` call associates the 0th source buffer with tag 22.
+It has the following signature:
+
+.. code-block:: c++
+
+   template <typename T>
+   void CkMatchBuffer(CkNcpyBufferPost *post, int index, int tag);
+
+It takes three parameters, the passed ``CkNcpyBufferPost`` pointer, index, and tag.
+The first parameter is always the ``CkNcpyBufferPost`` parameter received in the
+Post Entry Method. The second parameter is the index of the nocopypost buffer among the nocopypost buffers sent
+in the entry method, starting with 0. For example, for 1 nocopypost buffer sent in the entry method, the index will
+always be 0. For 2 nocopypost buffers, the index will be 0 for the first buffer and 1 for the second buffer. For n
+buffers, it will be 0 for the first buffer, 1 for the second buffer, 2 for the third buffer up to (n-1) for the nth buffer.
+The third parameter is a user provided integer tag (22 in this case), used to associate the 0th source buffer of this
+entry method with tag 22.
+
+In order to post a buffer when ready, the user has to also call ``CkPostBuffer`` with the same tag (22) to associate
+the tag (22) with a receiver or destination buffer. As mentioned earlier, this function can be called at any time the user
+is ready to post a buffer. The following code illustrates the usage of ``CkPostBuffer``, which is called in a function
+when the user is ready to supply a destination buffer.
+
+.. code-block:: c++
+
+   void readyToPost() {
+     CkPostBuffer(myBuffer, mySize, 22);
+   }
+
+As seen in the above example, the ``CkPostBuffer`` call has the following signature:
+
+.. code-block:: c++
+
+   template <typename T>
+   void CkPostBuffer(T *buffer, size_t size, int tag);
+
+It takes three parameters, the destination buffer pointer, the size of the destination buffer and a tag.
+The first parameter is the destination buffer pointer where the user wants the source data. The second parameter
+is the size of the destination buffer. Note that this size should be always smaller than or equal to the size of the source buffer.
+The third parameter is the same user provided integer tag (22 in this case) that was used in the corresponding ``CkMatchBuffer``
+call inside the Post Entry Method.
+
+It is important to associate a unique tag with the ``CkMatchBuffer`` and ``CkPostBuffer`` calls for a single buffer on that PE.
+Using the same tag on the PE when the RDMA transfer is in progress triggers an abort from the runtime system because
+the same tag cannot be used to denote two different buffers in the internal PE-level data structures.
+
+After the execution of the Post Entry Method with the ``CkMatchBuffer`` calls and corresponding ``CkPostBuffer`` calls,
+the regular entry method is executed to signal the completion of all zero copy transfers into the posted receiver buffers.
+The regular entry method needs to be defined as in the case of the Entry Method Send API as shown below:
 
 .. code-block:: c++
 
@@ -5397,15 +5447,25 @@ In the .C file, we define a post entry method and a regular entry method:
 .. code-block:: c++
 
   // post entry method
-  void foo(int *& arr1, int & size1, char *& arr2, int & size2, CkNcpyBufferPost *ncpyPost) {
+  void foo(int *arr1, int size1, char *arr2, int size2, CkNcpyBufferPost *ncpyPost) {
 
-    arr1 = myBuffer1;
     ncpyPost[0].regMode = CK_BUFFER_UNREG;
     ncpyPost[0].deregMode = CK_BUFFER_DEREG;
+    CkMatchBuffer(ncpyPost, 0, 60);
 
-    arr2 = myBuffer2; // myBuffer2 is allocated using CkRdmaAlloc
-    ncpyPost[1].regMode = CK_BUFFER_PREREG;
+    ncpyPost[1].regMode = CK_BUFFER_PREREG; // myBuffer2 is allocated using CkRdmaAlloc
     ncpyPost[1].deregMode = CK_BUFFER_NODEREG;
+    CkMatchBuffer(ncpyPost, 1, 61);
+  }
+
+  void otherFn1() {
+    // somewhere else in the code
+    CkPostBuffer(myBuffer1, mySize1, 60);
+  }
+
+  void otherFn2() {
+    // somewhere else in the code
+    CkPostBuffer(myBuffer2, mySize2, 61);
   }
 
   // regular entry method
@@ -5420,10 +5480,19 @@ It is important to note that the ``CkNcpyBufferPost`` array has as many elements
 number of ``nocopypost`` parameters in the entry method declaration in the .ci file. For
 n nocopypost parameters, the ``CkNcpyBufferPost`` array is indexed by 0 to n-1.
 
-This API for point to point communication is demonstrated in
-``examples/charm++/zerocopy/entry_method_post_api`` and
-for broadcast operations, the usage of this API is
-demonstrated in ``examples/charm++/zerocopy/entry_method_bcast_post_api``.
+This API for point to point communication and broadcast is demonstrated in
+``tests/charm++/zerocopy/zc_post_async``.
+
+In addition to the PE-level match and post buffers as described above, there are node-level
+variants of the same methods called ``CkMatchNodeBuffer`` and ``CkPostNodeBuffer``. They
+have the exact same signature but are applicable for node-level matching operations that
+are often useful for node groups. The node equivalent match and post buffers allows two
+different PEs of the same node to call ``CkMatchNodeBuffer`` and ``CkPostNodeBuffer``.
+Similar to the PE-level API, it is important to associate a unique tag with the
+``CkMatchNodeBuffer`` and ``CkPostNodeBuffer`` calls for a single buffer on that node.
+Using the same tag on the node when the RDMA transfer is in progress triggers an abort
+from the runtime system because the same tag cannot be used to denote two different buffers
+in the internal node-level data structures.
 
 Similar to the Zero Copy Entry Method Send API, it should be noted that calls to
 entry methods with nocopypost specified parameters are currently supported for
@@ -9176,8 +9245,23 @@ where the sender sends a metadata message containing the address of the
 source buffer on the GPU and the receiver posts an Rget from the source
 buffer to the destination buffer (also on the GPU).
 
-To send a GPU buffer using direct GPU messaging, add a ``nocopydevice``
-specifier to the parameter of the receiving entry method in the ``.ci`` file:
+There are currently two implementations for direct GPU messaging:
+(1) CUDA memcpy and IPC based mechanism for intra-node communication
+(inter-node communication reverts back to a host-staging mechanism),
+and (2) UCX-based mechanism that supports both intra-node and inter-node
+communication. When Charm++ is built with the UCX machine layer
+and CUDA support (e.g., ucx-linux-x86_64-cuda), it will automatically use
+the UCX-based mechanism with the direct GPU messaging API.
+Other CUDA-enabled builds will only support
+the first mechanism and limit the use of direct GPU-GPU transfers within
+a single physical node. For inter-node messages, the runtime system will
+revert back to a host-staging mechanism where the GPU buffer is moved to
+host memory before being sent.
+The user APIs for both implementations remain the same, however, as detailed
+in the following.
+
+To send a GPU buffer with the direct GPU messaging feature, add a ``nocopydevice``
+specifier to the corresponding parameter of the receiver's entry method in the ``.ci`` file:
 
 .. code-block:: charmci
 
@@ -9187,7 +9271,7 @@ This entry method should be invoked on the sender by wrapping the
 source buffer with ``CkDeviceBuffer``, whose constructor takes a pointer
 to the source buffer, a Charm++ callback to be invoked once the transfer
 completes (optional), and a CUDA stream associated with the transfer
-(also optional):
+(which is only used internally in the CUDA memcpy and IPC based implementation and is also optional):
 
 .. code-block:: c++
 
@@ -9198,13 +9282,13 @@ completes (optional), and a CUDA stream associated with the transfer
    CkDeviceBuffer(const void* ptr, const CkCallback& cb, cudaStream_t stream);
 
    // Call on sender
-   someProxy.foo(source_buffer, cb, stream);
+   someProxy.foo(size, CkDeviceBuffer(buf, cb, stream));
 
-As with the Zero Copy Entry Method Post API, two entry methods
-(post entry method and regular entry method) must be specified, and the
-post entry method has an additional ``CkDeviceBufferPost`` argument that
-can be used to specify the CUDA stream where the data transfer will be
-enqueued:
+As with the Zero Copy Entry Method Post API, both the post entry method
+and regular entry method must be defined. In the post entry method,
+the user must specify the location of the destination GPU buffer,
+and the ``CkDeviceBufferPost`` parameter can be used to specify the CUDA stream
+where the CUDA data transfer will be enqueued (only used in the CUDA memcpy and IPC based mechanism):
 
 .. code-block:: c++
 
@@ -9216,32 +9300,23 @@ enqueued:
 
    // Regular entry method
    void foo(int size, double* arr) {
-     // Data transfer into arr has been initiated
+     // Data has arrived in the destination GPU buffer
      ...
    }
 
-The specified CUDA stream can be used by the receiver to asynchronously invoke
-GPU operations dependent on the arriving data, without explicitly synchronizing
-with the host. This brings us to an important difference from the host-side
-Zero Copy API: the regular entry method is invoked after the data transfer is
-**initiated**, not after it is complete. It should also be noted that the
-regular entry method can be defined as a SDAG method if so desired.
+As with the host-side Zero Copy API, the regular entry method is executed by the runtime
+system after the GPU buffer has arrived at the destination.
 
-Currently the direct GPU messaging feature is limited to **intra-node** messages.
-Inter-node messages will be transferred using the naive host-staged mechanism
-where the data is first transferred to the host from the source GPU, sent over
-the network, then transferred to the destination GPU.
-
-An optimized mechanism for inter-process communication using CUDA IPC, POSIX shared memory,
+For non-UCX builds, a more optimized mechanism for inter-process communication using CUDA IPC, POSIX shared memory,
 and pre-allocated GPU communication buffers are available through runtime flags.
-This significantly reduces the overhead from creation and opening of CUDA IPC handles,
-especially for relatively small messages. ``+gpushm`` will turn on this optimization
+This significantly reduces the overhead from creating and opening CUDA IPC handles,
+especially for small messages. ``+gpushm`` enables this optimization
 feature, ``+gpucommbuffer [size]`` specifies the size of the communication buffer
 allocated on each GPU (default is 64MB), and ``+gpuipceventpool`` determines the number of
-CUDA IPC events per PE that is used for this feature (default is 16).
+CUDA IPC events per PE (default is 16).
 
-Examples using the direct GPU messaging feature can be found in
-``examples/charm++/cuda/gpudirect``.
+Examples and benchmarks of the direct GPU messaging feature can be found in
+``examples/charm++/cuda/gpudirect`` and ``benchmarks/charm++/cuda/gpudirect``.
 
 Intra-node Persistent GPU Communication
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -10970,6 +11045,36 @@ superclass to do the final delivery after you’ve sent your messages.
 Experimental Features
 =====================
 
+SHMEM
+---------
+Charm++ SHMEM is an experimental module that aims to add
+fast IPC to any machine layer. Each process opens a shared segment
+containing an MPSC queue and a memory pool. Processes can allocate "blocks"
+of memory from their peers' pools, and "push" them onto their MPSC queue.
+This is mechanically similar to the PXSHM layer, but SHMEM uses
+"address-free" atomics for synchronization instead of memory fences and the
+like. The C++ standardization committee recommends that C++ atomics should
+be address-free, i.e., ordering is enforced no matter which virtual address
+is used to access a physical address; however, this is not guaranteed.
+In practice, most modern compilers comply with this suggestion, but please
+alert us if you encounter synchronization issues!
+
+To build with SHMEM, pass ``--enable-shmem`` (to use PXSHM) or
+``--enable-xpmem`` (to use XPMEM) as command-line options to a Charm++ build;
+only CMake builds are supported at this time. Charm++ currently has a cutoff
+for using SHMEM, after which it falls back to conventional messaging. This
+decision accommodates SHMEM's bounded pool, and potentially more efficient
+IPC mechanisms exist for "large" messages (e.g., the ZeroCopy API). One can
+alter these behaviors with the command line options ``++ipcpoolsize`` and
+``++ipccutoff``, which change the size of the shared pool of memory and
+message size cutoff (in bytes), respectively. For example, this command
+will run ``a.out`` with a 128MB IPC pool size and a 256KB message cutoff:
+``./charmrun ++local ++auto-provision ./a.out ++ipcpoolsize $((128*1024*1024)) ++ipccutoff $((256*1024))``
+
+Note, Charm++ maintains and polls its own SHMEM IPC manager. Libraries can
+instantiate their own IPC manager if they require custom IPC behaviors. For
+details, please consult the notes in ``cmishmem.h``.
+
 .. _sec:controlpoint:
 
 Control Point Automatic Tuning
@@ -11371,6 +11476,7 @@ appropriate choices for the build one wants to perform.
    Cray XE6                                                         ``./build charm++ gni-crayxe --with-production -j8``
    Cray XK7                                                         ``./build charm++ gni-crayxe-cuda --with-production -j8``
    Cray XC40                                                        ``./build charm++ gni-crayxc --with-production -j8``
+   Cray Shasta                                                      ``./build charm++ ofi-crayshasta --with-production -j8``
    ================================================================ =====================================================================
 
 As mentioned earlier, one can also build Charm++ using the precompiled
@@ -11658,8 +11764,8 @@ below. The options are described next.
 
 .. code-block:: none
 
-    * Compile C                            charmc -o pgm.o pgm.c
-    * Compile C++                          charmc -o pgm.o pgm.C
+    * Compile C                            charmc -o pgm.o -c pgm.c
+    * Compile C++                          charmc -o pgm.o -c pgm.C
     * Link                                 charmc -o pgm   obj1.o obj2.o obj3.o...
     * Compile + Link                       charmc -o pgm   src1.c src2.ci src3.C
     * Create Library                       charmc -o lib.a obj1.o obj2.o obj3.o...
@@ -11746,7 +11852,7 @@ The following command-line options are available to users of charmc:
    always. This option causes charmc to switch to the most reliable
    compiler, regardless of whether it produces slow code or not.
 
-``-language {converse|charm++|ampi|fem|f90charm}``:
+``-language {converse|charm++|ampi|f90charm}``:
    When linking with charmc, one must specify the “language”. This is
    just a way to help charmc include the right libraries. Pick the
    “language” according to this table:
@@ -11878,6 +11984,13 @@ using the ``++verbose`` option to help diagnose the issue. (See the
 Parameters that function as boolean flags within Charmrun (taking no
 other parameters) can be prefixed with "no-" to negate their effect.
 For example, ``++no-scalable-start``.
+
+.. note::
+
+   When running on OFI platforms such as Cray Shasta, the OFI runtime parameter
+   ``+ofi_runtime_tcp`` may be required. By default, the exchange of EP names at
+   startup is done via both PMI and OFI. With this flag, it is only done via
+   PMI.
 
 .. _command line options:
 

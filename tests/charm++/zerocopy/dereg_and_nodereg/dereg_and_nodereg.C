@@ -146,18 +146,22 @@ class testArr : public CBase_testArr {
       }
     }
 
-    void recvBuffer2(int *&arr1, int *&arr2, int *&arr3, int &length, CkNcpyBufferPost *ncpyPost) {
+    void recvBuffer2(int *arr1, int *arr2, int *arr3, int length, CkNcpyBufferPost *ncpyPost) {
       recvBuff1 = new int[length];
       recvBuff2 = new int[length];
       recvBuff3 = new int[length];
 
-      arr1 = recvBuff1;
-      arr2 = recvBuff2;
-      arr3 = recvBuff3;
-
       // Do not modify deregMode of ncpyPost[0] (default is CK_BUFFER_DEREG)
       ncpyPost[1].deregMode = CK_BUFFER_DEREG;
       ncpyPost[2].deregMode = CK_BUFFER_NODEREG;
+
+      CkMatchBuffer(ncpyPost, 0, thisIndex*3);
+      CkMatchBuffer(ncpyPost, 1, thisIndex*3 + 1);
+      CkMatchBuffer(ncpyPost, 2, thisIndex*3 + 2);
+
+      CkPostBuffer(recvBuff1, length, thisIndex*3);
+      CkPostBuffer(recvBuff2, length, thisIndex*3 + 1);
+      CkPostBuffer(recvBuff3, length, thisIndex*3 + 2);
     }
 
     // executed on half of the array elements

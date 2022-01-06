@@ -1,6 +1,7 @@
 #ifndef __BUDDY_ALLOCATOR_H_
 #define __BUDDY_ALLOCATOR_H_
 
+#include <cstdint>
 #include <list>
 #include <unordered_map>
 

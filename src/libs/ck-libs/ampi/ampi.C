@@ -27,6 +27,10 @@
 /* For MPI_Get_library_version */
 extern const char * const CmiCommitID;
 
+bool ampiUsingPieglobals = false;
+
+CProxy_ampiPeMgr ampiPeMgrProxy;
+
 static CkDDT *getDDT() noexcept {
   return &getAmpiParent()->myDDT;
 }
@@ -545,6 +549,57 @@ void MPI_MINLOC_USER_FN( void *invec, void *inoutvec, int *len, MPI_Datatype *da
   }
 }
 
+// ampiPeMgr: keeps track of all PE-local virtual ranks.
+class ampiPeMgr : public CBase_ampiPeMgr {
+ private:
+  std::unordered_set<ampiParent *> localAmpiParents;
+
+ public:
+  ampiPeMgr() noexcept {
+    STARTUP_DEBUG("ampiInit> created ampiPeMgr group elem on PE "<<CkMyPe())
+    ampiPeMgrProxy = thisgroup;
+  }
+  ampiPeMgr(CkMigrateMessage *m) noexcept : CBase_ampiPeMgr(m) {}
+  void pup(PUP::er &p) noexcept {
+    // Do nothing, localAmpiParents will be repopulated as ranks are reconstructed
+  }
+  void insertAmpiParent(ampiParent *pptr) noexcept {
+    CkAssert(pptr != nullptr);
+    localAmpiParents.insert(pptr);
+  }
+  void eraseAmpiParent(ampiParent *pptr) noexcept {
+    CkAssert(pptr != nullptr);
+    localAmpiParents.erase(pptr);
+  }
+
+  /* When running with PIEglobals, function pointers are unique to each virtual rank.
+   * This is problematic for user-defined reduction operations, but all functions
+   * share the same offset from their base ptr in a PIE. So we keep track of all
+   * local ampiParents here so that we can lookup a base ptr on demand (in
+   * AmpiReducerFunc on an arbitrary PE), and add the MPI_Op's offset to the base
+   * ptr to get the MPI_User_function. */
+  MPI_User_function* getUserFunction(MPI_User_function* funcOffset) const noexcept {
+    if (ampiUsingPieglobals) {
+      const auto first = localAmpiParents.begin();
+      if (first == localAmpiParents.end()) {
+        CkAbort("AMPI> PE %d has no resident virtual ranks to reference in order to look up a user-defined reduction operator!", CkMyPe());
+        return nullptr;
+      }
+      else {
+        CkAssert(*first != nullptr);
+        const CthThread th = (*first)->getThread()->getThread();
+        CmiIsomallocContext ctx = CmiIsomallocGetThreadContext(th);
+        const CmiIsomallocRegion heap = CmiIsomallocContextGetUsedExtent(ctx);
+        char *basePtr = (char *)heap.start;
+        return (MPI_User_function *)(basePtr + (ptrdiff_t)funcOffset);
+      }
+    }
+    else {
+      return funcOffset;
+    }
+  }
+};
+
 /*
  * AMPI's generic reducer type, AmpiReducer, is used only
  * for MPI_Op/MPI_Datatype combinations that Charm++ does
@@ -567,14 +622,11 @@ CkReduction::reducerType AmpiReducer;
 // every msg contains a AmpiOpHeader structure before user data
 CkReductionMsg *AmpiReducerFunc(int nMsg, CkReductionMsg **msgs) noexcept {
   AmpiOpHeader *hdr = (AmpiOpHeader *)msgs[0]->getData();
-  MPI_Datatype dtype;
-  int szhdr, szdata, len;
-  MPI_User_function* func;
-  func = hdr->func;
-  dtype = hdr->dtype;
-  szdata = hdr->szdata;
-  len = hdr->len;
-  szhdr = sizeof(AmpiOpHeader);
+  MPI_User_function* func = ampiPeMgrProxy.ckLocalBranch()->getUserFunction(hdr->func);
+  MPI_Datatype dtype = hdr->dtype;
+  int szdata = hdr->szdata;
+  int len = hdr->len;
+  int szhdr = sizeof(AmpiOpHeader);
 
   CkReductionMsg *retmsg = CkReductionMsg::buildNew(szhdr+szdata,NULL,AmpiReducer,msgs[0]);
   void *retPtr = (char *)retmsg->getData() + szhdr;
@@ -1147,6 +1199,9 @@ static ampi *ampiInit(char **argv) noexcept
   CProxy_ampiParent parent;
   if (TCHARM_Element()==0) //the rank of a tcharm object
   { /* I'm responsible for building the arrays: */
+    STARTUP_DEBUG("ampiInit> creating ampiPeMgr group")
+    ampiPeMgrProxy = CProxy_ampiPeMgr::ckNew();
+
     STARTUP_DEBUG("ampiInit> creating arrays")
 
     // FIXME: Need to serialize global communicator allocation in one place.
@@ -1398,6 +1453,7 @@ void ampiParent::prepareCtv() noexcept {
 }
 
 void ampiParent::init() noexcept{
+  ampiPeMgrProxy.ckLocalBranch()->insertAmpiParent(this);
   resumeOnRecv = false;
   resumeOnColl = false;
   numBlockedReqs = 0;
@@ -1433,6 +1489,7 @@ void ampiParent::init() noexcept{
 }
 
 void ampiParent::finalize() noexcept {
+  ampiPeMgrProxy.ckLocalBranch()->eraseAmpiParent(this);
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(thisIndex)){
     delete toPUPer;
@@ -1597,6 +1654,17 @@ void ampiParent::Checkpoint(int len, const char* dname) noexcept {
 
 void ampiParent::ResumeThread() noexcept {
   thread->resume();
+}
+
+MPI_User_function* ampiParent::op2User_function(MPI_Op op) const noexcept {
+  if (opIsPredefined(op)) {
+    return predefinedOps[op];
+  }
+  else {
+    int opIdx = op - 1 - AMPI_MAX_PREDEFINED_OP;
+    CkAssert(opIdx < userOps.size());
+    return ampiPeMgrProxy.ckLocalBranch()->getUserFunction(userOps[opIdx].func);
+  }
 }
 
 int ampiParent::createKeyval(MPI_Comm_copy_attr_function *copy_fn, MPI_Comm_delete_attr_function *delete_fn,
@@ -2517,18 +2585,26 @@ CMI_WARN_UNUSED_RESULT ampi* ampi::blockOnRecv() noexcept {
 
 void ampi::setBlockingReq(AmpiRequest *req) noexcept {
   CkAssert(parent->blockingReq == NULL);
-  CkAssert(parent->resumeOnColl == false);
   parent->blockingReq = req;
-  parent->resumeOnColl = true;
+}
+
+// block on (All)Reduce or (All)Gather(v)
+CMI_WARN_UNUSED_RESULT ampiParent* ampiParent::static_blockOnColl(ampiParent *dis) noexcept {
+
+  dis->resumeOnColl = true;
+  dis = dis->block();
+  dis->resumeOnColl = false;
+
+  delete dis->blockingReq; dis->blockingReq = NULL;
+  return dis;
 }
 
 // block on (All)Reduce or (All)Gather(v)
 CMI_WARN_UNUSED_RESULT ampi* ampi::static_blockOnColl(ampi *dis) noexcept {
 
-  CkAssert(dis->parent->resumeOnColl == true);
+  dis->parent->resumeOnColl = true;
   dis = dis->block();
   dis->parent->resumeOnColl = false;
-
 
   delete dis->parent->blockingReq; dis->parent->blockingReq = NULL;
   return dis;
@@ -2598,14 +2674,17 @@ void ampi::bcastResult(AmpiMsg* msg) noexcept
 inline static AmpiRequestList &getReqs() noexcept;
 
 void AmpiRequestList::freeNonPersReq(ampiParent* pptr, int &idx) noexcept {
+  CkAssert(idx >= 0);
   if (!reqs[idx]->isPersistent()) {
     free(idx, pptr->getDDT());
     idx = MPI_REQUEST_NULL;
+  } else {
+    reqs[idx]->setBlocked(false);
   }
 }
 
 void AmpiRequestList::free(int idx, CkDDT *ddt) noexcept {
-  if (idx < 0) return;
+  CkAssert(idx >= 0);
   reqs[idx]->free(ddt);
   reqPool->deleteReq(reqs[idx]);
   reqs[idx] = NULL;
@@ -2918,7 +2997,7 @@ void ampi::waitOnBlockingSend(MPI_Request* req, AmpiSendType sendType) noexcept
     AmpiRequestList& reqList = getReqs();
     AmpiRequest& sreq = *reqList[*req];
     parent = sreq.wait(parent, MPI_STATUS_IGNORE);
-    parent->getReqs().free(*req, parent->getDDT());
+    parent->getReqs().freeNonPersReq(parent, *req);
     *req = MPI_REQUEST_NULL;
   }
 }
@@ -3863,22 +3942,22 @@ void AmpiRequest::print() const noexcept {
 
 void IReq::print() const noexcept {
   AmpiRequest::print();
-  CkPrintf("In IReq: this=%p, length=%d, cancelled=%d, persistent=%d\n", this, length, (int)cancelled, (int)persistent);
+  CkPrintf("In IReq: this=%p, length=%d, cancelled=%d, persistent=%d\n", (void *)this, length, (int)cancelled, (int)persistent);
 }
 
 void RednReq::print() const noexcept {
   AmpiRequest::print();
-  CkPrintf("In RednReq: this=%p, op=%d\n", this, op);
+  CkPrintf("In RednReq: this=%p, op=%d\n", (void *)this, op);
 }
 
 void GatherReq::print() const noexcept {
   AmpiRequest::print();
-  CkPrintf("In GatherReq: this=%p\n", this);
+  CkPrintf("In GatherReq: this=%p\n", (void *)this);
 }
 
 void GathervReq::print() const noexcept {
   AmpiRequest::print();
-  CkPrintf("In GathervReq: this=%p\n", this);
+  CkPrintf("In GathervReq: this=%p\n", (void *)this);
 }
 
 void ATAReq::print() const noexcept { //not complete for reqs
@@ -3888,17 +3967,17 @@ void ATAReq::print() const noexcept { //not complete for reqs
 
 void GReq::print() const noexcept {
   AmpiRequest::print();
-  CkPrintf("In GReq: this=%p\n", this);
+  CkPrintf("In GReq: this=%p\n", (void *)this);
 }
 
 void SendReq::print() const noexcept {
   AmpiRequest::print();
-  CkPrintf("In SendReq: this=%p, persistent=%d\n", this, (int)persistent);
+  CkPrintf("In SendReq: this=%p, persistent=%d\n", (void *)this, (int)persistent);
 }
 
 void SsendReq::print() const noexcept {
   AmpiRequest::print();
-  CkPrintf("In SsendReq: this=%p, persistent=%d\n", this, (int)persistent);
+  CkPrintf("In SsendReq: this=%p, persistent=%d\n", (void *)this, (int)persistent);
 }
 
 void AmpiRequestList::pup(PUP::er &p, AmpiRequestPool* pool) noexcept {
@@ -4031,8 +4110,7 @@ int testRequest(ampiParent* pptr, MPI_Request *reqIdx, int *flag, MPI_Status *st
   checkRequest(*reqIdx);
   AmpiRequestList& reqList = pptr->getReqs();
   AmpiRequest& req = *reqList[*reqIdx];
-  if(1 == (*flag = req.test())){
-    pptr = req.wait(pptr, sts);
+  if(1 == (*flag = req.test(sts))){
     reqList.freeNonPersReq(pptr, *reqIdx);
   }
   return MPI_SUCCESS;
@@ -4047,9 +4125,7 @@ int testRequestNoFree(ampiParent* pptr, MPI_Request *reqIdx, int *flag, MPI_Stat
   checkRequest(*reqIdx);
   AmpiRequestList& reqList = pptr->getReqs();
   AmpiRequest& req = *reqList[*reqIdx];
-  *flag = req.test();
-  if(*flag)
-    pptr = req.wait(pptr, sts);
+  *flag = req.test(sts);
   return MPI_SUCCESS;
 }
 
@@ -4741,12 +4817,9 @@ AMPI_API_IMPL(int, MPI_Sendrecv_replace, void* buf, int count, MPI_Datatype data
 
 CMI_WARN_UNUSED_RESULT ampi * ampi::barrier() noexcept
 {
-  CkAssert(parent->resumeOnColl == false);
-  parent->resumeOnColl = true;
   CkCallback barrierCB(CkReductionTarget(ampi, barrierResult), getProxy());
   contribute(barrierCB);
-  ampi * dis = block(); //Resumed by ampi::barrierResult
-  dis->parent->resumeOnColl = false;
+  ampi * dis = blockOnColl(); //Resumed by ampi::barrierResult
   return dis;
 }
 
@@ -5688,26 +5761,20 @@ void SsendReq::start(MPI_Request reqIdx) noexcept {
   ptr->send(tag, ptr->getRank(), buf, count, type, src /*really, the destination*/, comm, I_SSEND, reqIdx);
 }
 
-CMI_WARN_UNUSED_RESULT ampiParent* IReq::wait(ampiParent* parent, MPI_Status *sts, int* result/*=nullptr*/) noexcept {
-  // ampi::generic() writes directly to the buffer, so the only thing we do here is wait
+CMI_WARN_UNUSED_RESULT ampiParent* IReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
 
-  while (!complete) {
-    // parent is updated in case an ampi thread is migrated while waiting for a message
-    parent->resumeOnRecv = true;
+  if (cancelled) {
+    if (sts != MPI_STATUS_IGNORE) sts->MPI_CANCEL = 1;
+    complete = true;
+    return parent;
+  }
+
+  if (!complete) {
     parent->numBlockedReqs = 1;
     setBlocked(true);
-    parent = parent->block();
+    parent = parent->blockOnRecv(); // parent is updated in case an ampi thread is migrated while waiting for a message
     setBlocked(false);
-
-    if (cancelled) {
-      if (sts != MPI_STATUS_IGNORE) sts->MPI_CANCEL = 1;
-      complete = true;
-      parent->resumeOnRecv = false;
-      return parent;
-    }
-
-  } // end of while
-  parent->resumeOnRecv = false;
+  }
 
   AMPI_DEBUG("IReq::wait has resumed\n");
 
@@ -5723,90 +5790,58 @@ CMI_WARN_UNUSED_RESULT ampiParent* IReq::wait(ampiParent* parent, MPI_Status *st
   return parent;
 }
 
-CMI_WARN_UNUSED_RESULT ampiParent* RednReq::wait(ampiParent* parent, MPI_Status *sts, int* result/*=nullptr*/) noexcept {
-  // ampi::irednResult() writes directly to the buffer, so the only thing we do here is wait
-
-  while (!complete) {
-    parent->resumeOnColl = true;
+CMI_WARN_UNUSED_RESULT ampiParent* RednReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
+  if (!complete) {
     parent->numBlockedReqs = 1;
     setBlocked(true);
-    parent = parent->block();
+    parent = parent->blockOnColl();
     setBlocked(false);
-
   }
-  parent->resumeOnColl = false;
-
   AMPI_DEBUG("RednReq::wait has resumed\n");
-
   if (sts != MPI_STATUS_IGNORE) {
-    sts->MPI_TAG = tag;
-    sts->MPI_SOURCE = src;
     sts->MPI_COMM = comm;
     sts->MPI_CANCEL = 0;
   }
-
   return parent;
 }
 
-CMI_WARN_UNUSED_RESULT ampiParent* GatherReq::wait(ampiParent* parent, MPI_Status *sts, int* result/*=nullptr*/) noexcept {
-  // ampi::irednResult() writes directly to the buffer, so the only thing we do here is wait
-
-  while (!complete) {
-    parent->resumeOnColl = true;
+CMI_WARN_UNUSED_RESULT ampiParent* GatherReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
+  if (!complete) {
     parent->numBlockedReqs = 1;
     setBlocked(true);
-    parent = parent->block();
+    parent = parent->blockOnColl();
     setBlocked(false);
-
   }
-  parent->resumeOnColl = false;
-
   AMPI_DEBUG("GatherReq::wait has resumed\n");
-
   if (sts != MPI_STATUS_IGNORE) {
-    sts->MPI_TAG = tag;
-    sts->MPI_SOURCE = src;
     sts->MPI_COMM = comm;
     sts->MPI_CANCEL = 0;
   }
-
   return parent;
 }
 
-CMI_WARN_UNUSED_RESULT ampiParent* GathervReq::wait(ampiParent* parent, MPI_Status *sts, int* result/*=nullptr*/) noexcept {
-  // ampi::irednResult writes directly to the buffer, so the only thing we do here is wait
-
-  while (!complete) {
-    parent->resumeOnColl = true;
+CMI_WARN_UNUSED_RESULT ampiParent* GathervReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
+  if (!complete) {
     parent->numBlockedReqs = 1;
     setBlocked(true);
-    parent = parent->block();
+    parent = parent->blockOnColl();
     setBlocked(false);
-
   }
-  parent->resumeOnColl = false;
-
   AMPI_DEBUG("GathervReq::wait has resumed\n");
-
   if (sts != MPI_STATUS_IGNORE) {
-    sts->MPI_TAG = tag;
-    sts->MPI_SOURCE = src;
     sts->MPI_COMM = comm;
     sts->MPI_CANCEL = 0;
   }
-
   return parent;
 }
 
-CMI_WARN_UNUSED_RESULT ampiParent* SendReq::wait(ampiParent* parent, MPI_Status *sts, int* result/*=nullptr*/) noexcept {
-  while (!complete) {
-    parent->resumeOnRecv = true;
+CMI_WARN_UNUSED_RESULT ampiParent* SendReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
+  if (!complete) {
     parent->numBlockedReqs = 1;
     setBlocked(true);
-    parent = parent->block();
+    parent = parent->blockOnRecv();
     setBlocked(false);
   }
-  parent->resumeOnRecv = false;
   AMPI_DEBUG("SendReq::wait has resumed\n");
   if (sts != MPI_STATUS_IGNORE) {
     sts->MPI_COMM = comm;
@@ -5815,15 +5850,14 @@ CMI_WARN_UNUSED_RESULT ampiParent* SendReq::wait(ampiParent* parent, MPI_Status 
   return parent;
 }
 
-CMI_WARN_UNUSED_RESULT ampiParent* SsendReq::wait(ampiParent* parent, MPI_Status *sts, int* result/*=nullptr*/) noexcept {
-  while (!complete) {
-    parent->resumeOnRecv = true;
+CMI_WARN_UNUSED_RESULT ampiParent* SsendReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
+  if (!complete) {
     parent->numBlockedReqs = 1;
     setBlocked(true);
-    parent = parent->block();
+    parent = parent->blockOnRecv();
     setBlocked(false);
   }
-  parent->resumeOnRecv = false;
+  AMPI_DEBUG("SsendReq::wait has resumed\n");
   if (sts != MPI_STATUS_IGNORE) {
     sts->MPI_COMM = comm;
     sts->MPI_CANCEL = 0;
@@ -5831,14 +5865,14 @@ CMI_WARN_UNUSED_RESULT ampiParent* SsendReq::wait(ampiParent* parent, MPI_Status
   return parent;
 }
 
-CMI_WARN_UNUSED_RESULT ampiParent* ATAReq::wait(ampiParent* parent, MPI_Status *sts, int* result/*=nullptr*/) noexcept {
+CMI_WARN_UNUSED_RESULT ampiParent* ATAReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
   parent = parent->waitall(reqs.size(), reqs.data());
   reqs.clear();
   complete = true;
   return parent;
 }
 
-CMI_WARN_UNUSED_RESULT ampiParent* GReq::wait(ampiParent* parent, MPI_Status *sts, int* result/*=nullptr*/) noexcept {
+CMI_WARN_UNUSED_RESULT ampiParent* GReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
   MPI_Status tmpStatus;
   if (pollFn)
     (*pollFn)(extraState, (sts == MPI_STATUS_IGNORE || sts == MPI_STATUSES_IGNORE) ? &tmpStatus : sts);
@@ -5878,9 +5912,8 @@ CMI_WARN_UNUSED_RESULT ampiParent* ampiParent::wait(MPI_Request *request, MPI_St
              *request, reqs[*request], (int)(reqs[*request]->tag), &reqs);
   CkAssert(pptr->numBlockedReqs == 0);
 
-  int waitResult = -1;
-    AmpiRequest& waitReq = *reqs[*request];
-    pptr = waitReq.wait(pptr, sts, &waitResult);
+  AmpiRequest& waitReq = *reqs[*request];
+  pptr = waitReq.wait(pptr, sts);
   reqs = pptr->getReqs();
 
   CkAssert(pptr->numBlockedReqs == 0);
@@ -5895,7 +5928,6 @@ CMI_WARN_UNUSED_RESULT ampiParent* ampiParent::wait(MPI_Request *request, MPI_St
     PUParray(*(pptr->toPUPer), (char *)sts, sizeof(MPI_Status));
   }
 #endif
-
 
   reqs.freeNonPersReq(pptr, *request);
 
@@ -5933,9 +5965,7 @@ CMI_WARN_UNUSED_RESULT ampiParent* ampiParent::waitall(int count, MPI_Request re
       continue;
     }
     AmpiRequest& req = *reqs[request[i]];
-    if (req.test()) {
-      pptr = req.wait(pptr, (sts == MPI_STATUSES_IGNORE) ? MPI_STATUS_IGNORE : &sts[i]);
-      req.setBlocked(false);
+    if (req.test((sts == MPI_STATUSES_IGNORE) ? MPI_STATUS_IGNORE : &sts[i])) {
 #if AMPIMSGLOG
       if(msgLogWrite && record_msglog(thisIndex)){
         pupBytes = getDDT()->getSize(req.type) * req.count;
@@ -5952,6 +5982,8 @@ CMI_WARN_UNUSED_RESULT ampiParent* ampiParent::waitall(int count, MPI_Request re
     }
   }
 
+  MSG_ORDER_DEBUG(CkPrintf("[%d] MPI_Waitall called with count %d, blocking on completion of %d requests\n", ptr->thisIndex, count, numBlockedReqs));
+
   // If any requests are incomplete, block until all have been completed
   if (numBlockedReqs > 0) {
     pptr = pptr->blockOnRecv();
@@ -5962,12 +5994,9 @@ CMI_WARN_UNUSED_RESULT ampiParent* ampiParent::waitall(int count, MPI_Request re
         continue;
       }
       AmpiRequest& req = *reqs[request[i]];
-#if CMK_ERROR_CHECKING
-      if (!req.test())
+      if (!req.test((sts == MPI_STATUSES_IGNORE) ? MPI_STATUS_IGNORE : &sts[i])) {
         CkAbort("In AMPI_Waitall, all requests should have completed by now!");
-#endif
-      pptr = req.wait(pptr, (sts == MPI_STATUSES_IGNORE) ? MPI_STATUS_IGNORE : &sts[i]);
-      req.setBlocked(false);
+      }
 #if AMPIMSGLOG
       if(msgLogWrite && record_msglog(pptr->thisIndex)){
         (pptr->pupBytes) = getDDT()->getSize(req.type) * req.count;
@@ -5981,7 +6010,6 @@ CMI_WARN_UNUSED_RESULT ampiParent* ampiParent::waitall(int count, MPI_Request re
   }
 
   CkAssert(pptr->numBlockedReqs == 0);
-
 
   return pptr;
 }
@@ -6016,8 +6044,7 @@ AMPI_API_IMPL(int, MPI_Waitany, int count, MPI_Request *request, int *idx, MPI_S
       continue;
     }
     AmpiRequest& req = *reqs[request[i]];
-    if (req.test()) {
-      pptr = req.wait(pptr, sts);
+    if (req.test(sts)) {
       reqs.unblockReqs(&request[0], i);
       reqs.freeNonPersReq(pptr, request[i]);
       *idx = i;
@@ -6045,8 +6072,7 @@ AMPI_API_IMPL(int, MPI_Waitany, int count, MPI_Request *request, int *idx, MPI_S
       continue;
     }
     AmpiRequest& req = *reqs[request[i]];
-    if (req.test()) {
-      pptr = req.wait(pptr, sts);
+    if (req.test(sts)) {
       reqs.unblockReqs(&request[i], count-i);
       reqs.freeNonPersReq(pptr, request[i]);
       *idx = i;
@@ -6087,8 +6113,7 @@ AMPI_API_IMPL(int, MPI_Waitsome, int incount, MPI_Request *array_of_requests, in
       continue;
     }
     AmpiRequest& req = *reqs[array_of_requests[i]];
-    if (req.test()) {
-      pptr = req.wait(pptr, &sts);
+    if (req.test(&sts)) {
       array_of_indices[(*outcount)] = i;
       if (array_of_statuses != MPI_STATUSES_IGNORE)
         array_of_statuses[(*outcount)] = sts;
@@ -6120,8 +6145,7 @@ AMPI_API_IMPL(int, MPI_Waitsome, int incount, MPI_Request *array_of_requests, in
         continue;
       }
       AmpiRequest& req = *reqs[array_of_requests[i]];
-      if (req.test()) {
-        pptr = req.wait(pptr, &sts);
+      if (req.test(&sts)) {
         array_of_indices[(*outcount)] = i;
         if (array_of_statuses != MPI_STATUSES_IGNORE)
           array_of_statuses[(*outcount)] = sts;
@@ -6163,22 +6187,42 @@ bool IReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) noexcept {
 }
 
 bool RednReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) noexcept {
+  if (sts != MPI_STATUS_IGNORE) {
+    sts->MPI_COMM = comm;
+    sts->MPI_CANCEL = 0;
+  }
   return complete;
 }
 
 bool GatherReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) noexcept {
+  if (sts != MPI_STATUS_IGNORE) {
+    sts->MPI_COMM = comm;
+    sts->MPI_CANCEL = 0;
+  }
   return complete;
 }
 
 bool GathervReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) noexcept {
+  if (sts != MPI_STATUS_IGNORE) {
+    sts->MPI_COMM = comm;
+    sts->MPI_CANCEL = 0;
+  }
   return complete;
 }
 
 bool SendReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) noexcept {
+  if (sts != MPI_STATUS_IGNORE) {
+    sts->MPI_COMM = comm;
+    sts->MPI_CANCEL = 0;
+  }
   return complete;
 }
 
 bool SsendReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) noexcept {
+  if (sts != MPI_STATUS_IGNORE) {
+    sts->MPI_COMM = comm;
+    sts->MPI_CANCEL = 0;
+  }
   return complete;
 }
 
@@ -6201,8 +6245,7 @@ bool ATAReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) noexcept {
       continue;
     }
     AmpiRequest& req = *reqList[reqs[i]];
-    if (req.test()) {
-      pptr = req.wait(pptr, sts);
+    if (req.test(sts)) {
       reqList.freeNonPersReq(pptr, reqs[i]);
       std::swap(reqs[i], reqs.back());
       reqs.pop_back();
@@ -6422,8 +6465,10 @@ AMPI_API_IMPL(int, MPI_Request_free, MPI_Request *request)
   checkRequest(*request);
   ampiParent* pptr = getAmpiParent();
   AmpiRequestList& reqs = pptr->getReqs();
-  reqs.free(*request, pptr->getDDT());
-  *request = MPI_REQUEST_NULL;
+  if (*request != MPI_REQUEST_NULL) {
+    reqs.free(*request, pptr->getDDT());
+    *request = MPI_REQUEST_NULL;
+  }
   return MPI_SUCCESS;
 }
 
@@ -10213,6 +10258,11 @@ AMPI_API_IMPL(int, MPI_Group_range_excl, MPI_Group group, int n, int ranges[][3]
 AMPI_API_IMPL(int, MPI_Group_free, MPI_Group *group)
 {
   AMPI_API("AMPI_Group_free", group, *group);
+  ampiParent *ptr = getAmpiParent();
+  if (*group != MPI_GROUP_EMPTY && *group != MPI_GROUP_NULL) {
+    ptr->freeGroupStruct(*group);
+  }
+  *group = MPI_GROUP_NULL;
   return MPI_SUCCESS;
 }
 
@@ -11578,7 +11628,7 @@ bool GPUReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) noexcept
   return complete;
 }
 
-CMI_WARN_UNUSED_RESULT ampiParent* GPUReq::wait(ampiParent* parent, MPI_Status *sts, int* result/*=nullptr*/) noexcept
+CMI_WARN_UNUSED_RESULT ampiParent* GPUReq::wait(ampiParent* parent, MPI_Status *sts) noexcept
 {
   (void)sts;
   while (!complete) {
@@ -11697,6 +11747,10 @@ static ampi_maintype AMPI_Main_Get_C(SharedObject myexe)
   auto AMPI_Main_ptr = (ampi_maintype)dlsym(myexe, "AMPI_Main");
   if (AMPI_Main_ptr)
     return AMPI_Main_ptr;
+
+  auto main_ptr = (ampi_maintype)dlsym(myexe, "main");
+  if (main_ptr)
+    return main_ptr;
 
   return nullptr;
 }

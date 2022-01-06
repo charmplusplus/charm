@@ -61,7 +61,7 @@ void IDXL_Chunk::pup(PUP::er &p) {
 
 	p|layouts;
 	if (currentComm && !currentComm->isComplete()){
-	  CkPrintf("ERROR: Cannot migrate with ongoing IDXL communication: currentComm=%p ispacking=%d isunpacking=%d\n", currentComm, (int)p.isPacking(), (int)p.isUnpacking());
+	  CkPrintf("ERROR: Cannot migrate with ongoing IDXL communication: currentComm=%p ispacking=%d isunpacking=%d\n", (void *)currentComm, (int)p.isPacking(), (int)p.isUnpacking());
 	  CkAbort("Cannot migrate with ongoing IDXL communication");
 	}	
 
