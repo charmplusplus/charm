@@ -35,7 +35,7 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
  public:
   unsigned int nObjs;  // num objs in this msg
   unsigned int nPes;  // num pes in this msg
-  unsigned int posDimension; // dimension of entries in positions
+  size_t posDimension; // dimension of entries in positions
 
   int* pe_ids;              // IDs of the pes in this msg
   float* bgloads;           // bgloads[i] is background load of i-th pe in this msg
@@ -59,8 +59,8 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
     // matter
     unsigned int nObjs = 0;
     unsigned int nPes = 0;
-    unsigned int minPosDimension = std::numeric_limits<unsigned int>::max();
-    unsigned int maxPosDimension = std::numeric_limits<unsigned int>::min();
+    size_t minPosDimension = std::numeric_limits<size_t>::max();
+    size_t maxPosDimension = std::numeric_limits<size_t>::min();
 
     for (int i = 0; i < msgs.size(); i++)
     {
@@ -72,7 +72,7 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
     }
     CkAssertMsg(msgs.empty() || minPosDimension == maxPosDimension,
                 "Position of every object for LB must be of same dimension");
-    const unsigned int posDimension = minPosDimension;
+    const size_t posDimension = minPosDimension;
     LBStatsMsg_1* newMsg;
     if (rateAware)
       newMsg = new (nPes, nPes, nPes, nPes + 1, nObjs, nObjs * posDimension) LBStatsMsg_1;
@@ -1094,7 +1094,7 @@ class PELevel : public LevelLogic
     nobjs = myObjs.size();
     CkAssertMsg(nobjs == 0 || minPosDimension == maxPosDimension,
                 "Position of every object for LB must be of same dimension!");
-    const unsigned int posDimension = (nobjs == 0) ? 0 : (unsigned int)minPosDimension;
+    const size_t posDimension = (nobjs == 0) ? 0 : minPosDimension;
     // TODO verify that non-migratable objects are not added to msg and are only counted
     // as background load
 
