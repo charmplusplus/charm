@@ -873,6 +873,9 @@ else
     echo "CMK_NO_BUILD_SHARED:=true" >> "$ConvMak"
 fi
 
+echo "CMK_BUILD_OMP=$BUILD_OMP" >> "$ConvSh"
+echo "CMK_BUILD_OMP:=$BUILD_OMP" >> "$ConvMak"
+
 if test  -n "$WITH_ROMIO" 
 then
     echo "CMK_AMPI_WITH_ROMIO=\"1\"" >> "$ConvSh"
@@ -973,10 +976,6 @@ runCmd "$MAKE" "${MAKEOPTS[@]}" "$PROGRAM" OPTS="${OPTS[*]}" QUIET="$QUIET"
 MAKEEXIT=$?
 if [ $MAKEEXIT -eq 0 ]
 then
-  if [ $BUILD_OMP = 1 ];
-  then
-    "$MAKE" MFLAGS="${MAKEOPTS[*]}" openmp_llvm OPTS="${OPTS[*]}" QUIET="$QUIET"
-  fi
   Echo "-------------------------------------------------"
   Echo "$PROGRAM built successfully."
   Echo "Next, try out a sample program like" \

@@ -1,0 +1,16 @@
+name: NetLRTS Linux OMP SMP
+
+on: pull_request
+
+jobs:
+  build:
+    timeout-minutes: 90
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: build
+      run: ./buildold all-test netlrts-linux-x86_64 omp smp -j2 -g --with-production --enable-error-checking
+    - name: test
+      run: make -C netlrts-linux-x86_64-omp-smp/tmp test TESTOPTS="++local +setcpuaffinity"

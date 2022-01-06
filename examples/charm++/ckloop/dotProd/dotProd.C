@@ -111,7 +111,7 @@ public:
       {
   double t2 = CkWallTimer();
   //TODO: add print of number of iterations here.
-  CkPrintf("dotP: probSize = %lld \t \t charesPerNode = %d \t staticFraction = %f \t chunkSize=%d \t time = %f \n", probSize, numElemsPerNode, staticFraction, chunkSize, t2-t1);
+  CkPrintf("dotP: probSize = %d \t \t charesPerNode = %d \t staticFraction = %f \t chunkSize=%d \t time = %f \n", probSize, numElemsPerNode, staticFraction, chunkSize, t2-t1);
   CkPrintf("dotP: result = %f \n", result);
 /*
   float errorPercent = fabs( 100.0* (result - 6.00*probSize*CkNumNodes())/result);

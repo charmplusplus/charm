@@ -1,4 +1,5 @@
 -include ../../common.mk
+-include ../../../include/conv-mach-opt.mak
 CHARMC=../../../bin/charmc $(OPTS) $(MOPTS)
 
 OBJS = jacobi3d.o
@@ -7,7 +8,12 @@ OBJS_OMP = jacobi3d_omp.o
 
 OMP_FLAG = -DJACOBI_OPENMP -fopenmp
 
-all: jacobi3d
+TARGETS := jacobi3d
+ifeq (1,$(CMK_HAS_OPENMP))
+  TARGETS += jacobi3d_omp
+endif
+
+all: $(TARGETS)
 
 jacobi3d: $(OBJS)
 	$(CHARMC) -language charm++ -module TreeLB -o jacobi3d $(OBJS)
