@@ -644,7 +644,9 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
 [[ $VERBOSE -eq 1 ]] && export VERBOSE
 make "$opt_parallel"
 
-# Only Install if the user provides an install-prefix
+# Only Install if the user provides an install prefix with the 
+# `--install-prefix` option. Without this option, `make install` would be a
+# no-op.
 if [[ -n "$opt_install_prefix" ]]
 then
   make install

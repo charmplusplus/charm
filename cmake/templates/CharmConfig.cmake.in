@@ -1,3 +1,6 @@
+# Set the equivalent to Charm_DIR for dependent project to set-up the path
+# correctly in their cmake configs. This will be used to ease the set-up
+# of working with find_package.
 get_filename_component(CHARM_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" DIRECTORY)
 
 # Set Charm project version
