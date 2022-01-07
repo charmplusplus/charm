@@ -25,6 +25,15 @@ set(CHARM_CMK_COMPILER @CMK_COMPILER@)
 # Set Charm build type
 set(CHARM_BUILD_TYPE @CMAKE_BUILD_TYPE@)
 
+# Set Charm Network type
+set(CHARM_WITH_NETWORK @NETWORK@)
+
+# Set Charm TARGET type
+set(CHARM_WITH_TARGET @TARGET@)
+
+# Set Charm ARCH type
+set(CHARM_WITH_ARCH @ARCH@)
+
 # Set SMP option
 set(CHARM_WITH_SMP @SMP@)
 
