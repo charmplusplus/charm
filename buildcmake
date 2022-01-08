@@ -103,6 +103,7 @@ opt_charmdebug=0
 opt_controlpoint=0
 opt_cuda=0
 opt_destination=""
+opt_install_prefix=""
 opt_drone_mode=0
 opt_error_checking= #undef
 opt_extra_opts=()
@@ -409,6 +410,9 @@ function processArgs() {
       --destination=*)
         opt_destination=${arg#*=}
         ;;
+      --install-prefix=*)
+        opt_install_prefix=${arg#*=}
+        ;;
       --suffix=*)
         opt_suffix=-${arg#*=}
         ;;
@@ -504,6 +508,15 @@ then
   fi
 fi
 
+# Install directory set-up
+if [[ -n "$opt_install_prefix" ]]
+then
+  # Install directory provided by user - Update installdir to point to it instead.
+  installdir="$opt_install_prefix"
+else
+  # Default Install directory
+  installdir="$my_srcdir/$builddir-install"
+fi
 
 # Build option setup
 
@@ -574,13 +587,13 @@ if [[ ${#opt_incdir[@]} -ne 0 ]]; then
   echo "USER_OPTS_CXX='${opt_incdir[*]}'" >> "$ConvUsr"
 fi
 
-
 # Run configure step
 
 CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
   -G "Unix Makefiles" \
   -DARCH="$opt_arch" \
   -DCMAKE_BUILD_TYPE="$opt_production" \
+  -DCMAKE_INSTALL_PREFIX="$installdir" \
   -DCMK_AMPI_ONLY="$opt_ampi_only" \
   -DCMK_AMPI_WITH_ROMIO="$opt_romio" \
   -DAMPI_ERROR_CHECKING="$opt_ampi_error_checking" \
@@ -630,5 +643,13 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
 
 [[ $VERBOSE -eq 1 ]] && export VERBOSE
 make "$opt_parallel"
+
+# Only Install if the user provides an install prefix with the 
+# `--install-prefix` option. Without this option, `make install` would be a
+# no-op.
+if [[ -n "$opt_install_prefix" ]]
+then
+  make install
+fi
 
 echo 'Build successful.'
