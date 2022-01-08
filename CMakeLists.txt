@@ -1153,8 +1153,8 @@ configure_package_config_file(
 # before CMake v3.11
 if(CMAKE_VERSION VERSION_GREATER 3.11 OR CMAKE_VERSION VERSION_EQUAL 3.11)
   set(VERSION_COMPATIBILITY_MODE SameMinorVersion)
-elseif()
-  set(VERSION_COMPATIBILITY_MODE AnyNewerVersion)
+else()
+  set(VERSION_COMPATIBILITY_MODE ExactVersion)
 endif()
 write_basic_package_version_file(
   ${CMAKE_BINARY_DIR}/lib/cmake/Charm/CharmConfigVersion.cmake
