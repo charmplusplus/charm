@@ -98,7 +98,7 @@ void report(int completed_iteration) {
             CkExit();
         } else {
             if(iterations%1==0) CkPrintf("starting new iteration; iteration %d time: %.6lf time/itr::%.6f\n", iterations, CkWallTimer()-stTime,(CkWallTimer()-stTime)/iterations);
-            CkPrintf("Memory Usage: %d bytes \n", CmiMemoryUsage());
+            CkPrintf("Memory Usage: %ld bytes \n", CmiMemoryUsage());
             recieve_count=0;
             iterations++;
             // Call begin_iteration on all worker chares in array
@@ -122,29 +122,24 @@ void pup(PUP::er &p){
 };
 
 class Jacobi: public CBase_Jacobi {
+private:
+    using array2d = std::vector<std::vector<double>>;
+    using array1d = std::vector<double>;
+
 public:
     int messages_due;
 	int iteration;
     int useLB;
-    double **temperature;
+    array2d temperature;
 
     // Constructor, initialize values
-    Jacobi() {
-        int i,j;
-	    iteration = 0;
-        useLB = 1;
+    Jacobi()
+    : messages_due(4)
+    , iteration(0)
+    , useLB(1)
+    , temperature(block_height + 2, array1d(block_width + 2, 0.0))
+    {
         usesAtSync = true;
-
-        // allocate two dimensional array
-        temperature = new double*[block_height+2];
-        for (i=0; i<block_height+2; i++)
-            temperature[i] = new double[block_width+2];
-        messages_due = 4;
-        for(i=0;i<block_height+2;++i){
-            for(j=0;j<block_width+2;++j){
-                temperature[i][j] = 0.0;
-            }
-        }
         BC();
     }
 
@@ -152,11 +147,7 @@ public:
         p|messages_due;
         p|iteration;
         p|useLB;
-        if (p.isUnpacking()) temperature=new double*[block_height+2];
-        for (int i=0;i<block_height+2;i++) {
-                if (p.isUnpacking()) temperature[i]=new double[block_width+2]; // allocate i’th foo
-                p(temperature[i],block_height+2); //pup the i’th foo
-        }
+        p|temperature;
         /* There may be some more variables used in doWork */
     }
 
@@ -175,12 +166,6 @@ public:
     // this function might become useful
     Jacobi(CkMigrateMessage* m) {}
 
-    ~Jacobi() {
-      for (int i=0; i<block_height; i++)
-        delete [] temperature[i];
-      delete [] temperature;
-    }
-
     // Perform one iteration of work
     // The first step is to send the local state to the neighbors
     void begin_iteration(void) {
@@ -194,8 +179,8 @@ public:
         if(thisIndex.x==0 && thisIndex.y==0) CkPrintf("PROC#%d started --------------------- iteration=%d\n",CkMyPe(),iteration);
 				iteration++;
         // Copy left column and right column into temporary arrays
-        double *left_edge = new double[block_height];
-        double *right_edge = new double[block_height];
+        array1d left_edge(block_height);
+        array1d right_edge(block_height);
 
         for(int i=0;i<block_height;++i){
             left_edge[i] = temperature[i+1][1];
@@ -203,43 +188,40 @@ public:
         }
 
         // Send my left edge
-        thisProxy(wrap_x(thisIndex.x-1), thisIndex.y).ghostsFromRight(block_height, left_edge);
+        thisProxy(wrap_x(thisIndex.x-1), thisIndex.y).ghostsFromRight(block_height, left_edge.data());
 		// Send my right edge
-        thisProxy(wrap_x(thisIndex.x+1), thisIndex.y).ghostsFromLeft(block_height, right_edge);
+        thisProxy(wrap_x(thisIndex.x+1), thisIndex.y).ghostsFromLeft(block_height, right_edge.data());
 		// Send my top edge
-        thisProxy(thisIndex.x, wrap_y(thisIndex.y-1)).ghostsFromBottom(block_width, &temperature[1][1]);
+        thisProxy(thisIndex.x, wrap_y(thisIndex.y-1)).ghostsFromBottom(block_width, temperature[1].data());
 		// Send my bottom edge
-        thisProxy(thisIndex.x, wrap_y(thisIndex.y+1)).ghostsFromTop(block_width, &temperature[block_height][1]);
-
-        delete [] right_edge;
-        delete [] left_edge;
+        thisProxy(thisIndex.x, wrap_y(thisIndex.y+1)).ghostsFromTop(block_width, temperature[block_height].data());
     }
 }
 
 void ResumeFromSync() {begin_iteration();}
 
-    void ghostsFromRight(int width, double ghost_values[]) {
+    void ghostsFromRight(int width, const double* ghost_values) {
         for(int i=0;i<width;++i){
             temperature[i+1][block_width+1] = ghost_values[i];
         }
         check_and_compute();
     }
 
-    void ghostsFromLeft(int width, double ghost_values[]) {
+    void ghostsFromLeft(int width, const double* ghost_values) {
         for(int i=0;i<width;++i){
             temperature[i+1][0] = ghost_values[i];
         }
         check_and_compute();
     }
 
-    void ghostsFromBottom(int width, double ghost_values[]) {
+    void ghostsFromBottom(int width, const double* ghost_values) {
         for(int i=0;i<width;++i){
             temperature[block_height+1][i+1] = ghost_values[i];
         }
         check_and_compute();
     }
 
-    void ghostsFromTop(int width, double ghost_values[]) {
+    void ghostsFromTop(int width, const double* ghost_values) {
         for(int i=0;i<width;++i){
             temperature[0][i+1] = ghost_values[i];
         }
@@ -261,7 +243,7 @@ void ResumeFromSync() {begin_iteration();}
             // the values in temperature[][] array until using them first. Other schemes could be used
             // to accomplish this same problem. We just put the new values in a temporary array
             // and write them to temperature[][] after all of the new values are computed.
-            double new_temperature[block_height+2][block_width+2];
+            array2d new_temperature(block_height + 2, array1d(block_width + 2));
 
             for(int i=1;i<block_height+1;++i){
                 for(int j=1;j<block_width+1;++j){
