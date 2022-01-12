@@ -30,6 +30,8 @@ module ampi {
   initnode void ampiNodeInit(void);
   initproc void ampiProcInit(void);
 
+  readonly CProxy_ampiPeMgr ampiPeMgrProxy;
+
   group [migratable] ampiPeMgr {
     entry EXPEDITED ampiPeMgr();
   };
