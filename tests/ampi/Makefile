@@ -19,6 +19,7 @@ NONSCALEDIRS = \
   privatization \
   datatype \
   exit \
+  chkpt \
 
 ifeq ($(BUILD_MPICH_TESTS),true)
 DIRS += mpich-test
