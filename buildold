@@ -36,7 +36,7 @@ syntax() {
   ( cd "$src" ; ls -1 | egrep -v '(^mpi$)|(^netlrts?$)|(^multicore$)|(^util$)|(^common$)|(^win$)|(^gni$)|(^pami(lrts)?$)|(^verbs$)|(^ofi$)|(^ucx$)|(^template$)|(^cuda$)' | pr -3 -t )
   echo ''
   echo '<options>: compiler and platform specific options'
-  echo 'icc iccstatic xlc xlc64 gcc clang pgcc cc mpicxx'
+  echo 'icc iccstatic xlc xlc64 gcc clang dpcpp pgcc cc mpicxx'
   echo 'help smp omp tcp ooc syncft papi pthreads'
   echo '--incdir --libdir --basedir --build-shared --destination --suffix -j'
   if test $more = 1
@@ -50,6 +50,7 @@ syntax() {
   echo '  xlc, xlc64      IBM XL compilers (with 64-bit option on architectures with 32-bit modes)'
   echo '  gcc             GNU compiler collection (on platforms where the default differs)'
   echo '  clang           Clang C/C++ compiler (including bgclang)'
+  echo '  dpcpp           Intel oneAPI DPC++/C++ compiler'
   echo '  pgcc            Portland Group compilers'
   echo ''
   echo 'Choose an alternative fortran compiler (only one option is allowed from this section):'
@@ -311,6 +312,9 @@ do
       CheckDir "$dir/include" "$dir/lib"
       LIBDIR+=("-L$dir/lib")
       INCDIR+=("-I$dir/include")
+      if [[ -d "$dir/lib64" ]]; then
+        LIBDIR+=("-L$dir/lib64")
+      fi
       shift
       ;;
     --basedir=*)
@@ -318,6 +322,9 @@ do
       CheckDir "$dir/include" "$dir/lib"
       LIBDIR+=("-L$dir/lib")
       INCDIR+=("-I$dir/include")
+      if [[ -d "$dir/lib64" ]]; then
+        LIBDIR+=("-L$dir/lib64")
+      fi
       shift
       ;;
     "--libdir")
@@ -883,10 +890,10 @@ then
     echo "CMK_AMPI_ONLY:=1" >> "$ConvMak"
     echo '#define CMK_AMPI_ONLY 1' >> "$ConvHeader"
 
-    # AMPI doesn't use Charm-MPI interop or msg priorities of any kind.
+    # AMPI doesn't use Charm-MPI interop, msg priorities, non-FIFO queues, or CcdSCHEDLOOP.
     # AMPI creates O(NumVirtualRanks) chare arrays by default (for MPI_COMM_SELF),
     # so we bump up the number of bits reserved for the collection in the objid.
-    OPTS=('-DCMK_NO_INTEROP=1' '-DCMK_NO_MSG_PRIOS=1' '-DCMK_FIFO_QUEUE_ONLY=1' '-DCMK_OBJID_COLLECTION_BITS=29' "${OPTS[@]}")
+    OPTS=('-DCMK_NO_INTEROP=1' '-DCMK_NO_MSG_PRIOS=1' '-DCMK_FIFO_QUEUE_ONLY=1' '-DCSD_NO_SCHEDLOOP=1' '-DCMK_OBJID_COLLECTION_BITS=29' "${OPTS[@]}")
     CONFIG_OPTS=('--with-prio-type=char' "${CONFIG_OPTS[@]}")
 else
     echo "CMK_AMPI_ONLY=\"0\"" >> "$ConvSh"

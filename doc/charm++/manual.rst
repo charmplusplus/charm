@@ -5322,8 +5322,8 @@ Unlike the Zero Copy Entry Method Send API, this API should be used when the use
 to receive the data in a user posted buffer, which is allocated and managed by the user.
 
 The posting of the receiver buffer happens at an object level, where each recipient object,
-for example, a chare array element or a group element or nodegroup element posts a receiver
-buffer using a special version of the entry method.
+for example, a chare array element or a group element or nodegroup element matches the received
+source buffer with a receiver buffer using tag matching.
 
 To send an array using the Zero Copy Post API, specify the array
 parameter in the .ci file with the nocopypost specifier.
@@ -5341,40 +5341,90 @@ Zero Copy Entry Method Send API and can be referenced from the previous section.
 we will highlight the differences between the two APIs and demonstrate the usage of the Post API
 on the receiver side.
 
-As previously mentioned, the Zero Copy Entry Method Post API posts user buffers to receive the
+As previously mentioned, the Zero Copy Entry Method Post API matches and posts user buffers to receive the
 data sent by the sender. This is done using a special overloaded version of the recipient
 entry method, called Post entry method. The overloaded function has all the entry method parameters
-and an additional ``CkNcpyBufferPost`` array parameter at the end of the signature. Additionally, the
-entry method parameters are specified as references instead of values. Inside this post entry method,
-the received references can be initialized by the user. The pointer reference is assigned to a user
-allocated buffer, i.e. the buffer in which the user wishes to receive the data. The size variable
-reference could be assigned to a value (or variable) that represents the size of the data of that type
-that needs to be received. If this reference variable is not assigned inside the post entry method, the size specified
-at the sender in the CkSendBuffer wrapper will be used as the default size. The post entry method also
-allows the receiver to specify the memory registration mode and the memory de-registration mode.
-This is done by indexing the ncpyPost array and assigning the ``regMode`` and ``deregMode`` parameters
-present inside each array element of the ``CkNcpyBufferPost`` array. When the network memory
+and an additional ``CkNcpyBufferPost`` array parameter at the end of the signature. Inside this post
+entry method, the user is required to make calls to ``CkMatchBuffer`` to specify the association between
+the received source buffer and a user provided integer tag. Additionally, for every ``CkMatchBuffer`` call,
+the user is also required to make a corresponding ``CkPostBuffer`` call with the same tag to specify the association
+between that tag and a receiver buffer. Note that the ``CkMatchBuffer`` call should always be made inside
+the Post Entry Method, whereas the ``CkPostBuffer`` call can be made from anywhere in the program whenever the
+receiver is ready to post a buffer. The Post Entry method executes on the arrival of the metadata message, and
+the ``CkPostBuffer`` call for receiving those buffers can be executed before, after, or inside the Post Entry Method.
+However, it is important to note that it is required that both the ``CkMatchBuffer`` and ``CkPostBuffer`` calls are made
+on the same PE.
+
+The post entry method also allows the receiver to specify the memory registration mode and the memory
+de-registration mode. This is done by indexing the ncpyPost array and assigning the ``regMode`` and ``deregMode``
+parameters present inside each array element of the ``CkNcpyBufferPost`` array. When the network memory
 registration mode is unassigned by the user, the default ``CK_BUFFER_REG`` regMode is used. Similarly, when
 the de-registration mode is unassigned by the user, the default ``CK_BUFFER_DEREG`` deregMode is used.
+It is important to ensure that the ``CkMatchBuffer`` call is made after setting the ``regMode`` and/or ``deregMode``
+parameters.
 
-For the entry method ``foo`` specified with a nocopypost specifier, the resulting post function defined
+For the entry method ``foo`` specified with a nocopypost specifier, the resulting post entry method defined
 in the .C file will be:
 
 .. code-block:: c++
 
-   void foo (int &size, int *& arr, CkNcpyBufferPost *ncpyPost) {
-     arr = myBuffer;      // myBuffer is a user allocated buffer
-
-     size = 2000;         // 2000 ints need to be received.
+   void foo (int size, int *arr, CkNcpyBufferPost *ncpyPost) {
 
      ncpyPost[0].regMode = CK_BUFFER_REG; // specify the regMode for the 0th pointer
 
      ncpyPost[0].deregMode = CK_BUFFER_DEREG; // specify the deregMode for the 0th pointer
+
+     CkMatchBuffer(ncpyPost, 0, 22);
    }
 
-In addition to the post entry method, the regular entry method also needs to be defined
-as in the case of the Entry Method Send API, where the nocopypost parameter is being received
-as a pointer as shown below:
+As seen in the above example, the ``CkMatchBuffer`` call associates the 0th source buffer with tag 22.
+It has the following signature:
+
+.. code-block:: c++
+
+   template <typename T>
+   void CkMatchBuffer(CkNcpyBufferPost *post, int index, int tag);
+
+It takes three parameters, the passed ``CkNcpyBufferPost`` pointer, index, and tag.
+The first parameter is always the ``CkNcpyBufferPost`` parameter received in the
+Post Entry Method. The second parameter is the index of the nocopypost buffer among the nocopypost buffers sent
+in the entry method, starting with 0. For example, for 1 nocopypost buffer sent in the entry method, the index will
+always be 0. For 2 nocopypost buffers, the index will be 0 for the first buffer and 1 for the second buffer. For n
+buffers, it will be 0 for the first buffer, 1 for the second buffer, 2 for the third buffer up to (n-1) for the nth buffer.
+The third parameter is a user provided integer tag (22 in this case), used to associate the 0th source buffer of this
+entry method with tag 22.
+
+In order to post a buffer when ready, the user has to also call ``CkPostBuffer`` with the same tag (22) to associate
+the tag (22) with a receiver or destination buffer. As mentioned earlier, this function can be called at any time the user
+is ready to post a buffer. The following code illustrates the usage of ``CkPostBuffer``, which is called in a function
+when the user is ready to supply a destination buffer.
+
+.. code-block:: c++
+
+   void readyToPost() {
+     CkPostBuffer(myBuffer, mySize, 22);
+   }
+
+As seen in the above example, the ``CkPostBuffer`` call has the following signature:
+
+.. code-block:: c++
+
+   template <typename T>
+   void CkPostBuffer(T *buffer, size_t size, int tag);
+
+It takes three parameters, the destination buffer pointer, the size of the destination buffer and a tag.
+The first parameter is the destination buffer pointer where the user wants the source data. The second parameter
+is the size of the destination buffer. Note that this size should be always smaller than or equal to the size of the source buffer.
+The third parameter is the same user provided integer tag (22 in this case) that was used in the corresponding ``CkMatchBuffer``
+call inside the Post Entry Method.
+
+It is important to associate a unique tag with the ``CkMatchBuffer`` and ``CkPostBuffer`` calls for a single buffer on that PE.
+Using the same tag on the PE when the RDMA transfer is in progress triggers an abort from the runtime system because
+the same tag cannot be used to denote two different buffers in the internal PE-level data structures.
+
+After the execution of the Post Entry Method with the ``CkMatchBuffer`` calls and corresponding ``CkPostBuffer`` calls,
+the regular entry method is executed to signal the completion of all zero copy transfers into the posted receiver buffers.
+The regular entry method needs to be defined as in the case of the Entry Method Send API as shown below:
 
 .. code-block:: c++
 
@@ -5397,15 +5447,25 @@ In the .C file, we define a post entry method and a regular entry method:
 .. code-block:: c++
 
   // post entry method
-  void foo(int *& arr1, int & size1, char *& arr2, int & size2, CkNcpyBufferPost *ncpyPost) {
+  void foo(int *arr1, int size1, char *arr2, int size2, CkNcpyBufferPost *ncpyPost) {
 
-    arr1 = myBuffer1;
     ncpyPost[0].regMode = CK_BUFFER_UNREG;
     ncpyPost[0].deregMode = CK_BUFFER_DEREG;
+    CkMatchBuffer(ncpyPost, 0, 60);
 
-    arr2 = myBuffer2; // myBuffer2 is allocated using CkRdmaAlloc
-    ncpyPost[1].regMode = CK_BUFFER_PREREG;
+    ncpyPost[1].regMode = CK_BUFFER_PREREG; // myBuffer2 is allocated using CkRdmaAlloc
     ncpyPost[1].deregMode = CK_BUFFER_NODEREG;
+    CkMatchBuffer(ncpyPost, 1, 61);
+  }
+
+  void otherFn1() {
+    // somewhere else in the code
+    CkPostBuffer(myBuffer1, mySize1, 60);
+  }
+
+  void otherFn2() {
+    // somewhere else in the code
+    CkPostBuffer(myBuffer2, mySize2, 61);
   }
 
   // regular entry method
@@ -5420,10 +5480,19 @@ It is important to note that the ``CkNcpyBufferPost`` array has as many elements
 number of ``nocopypost`` parameters in the entry method declaration in the .ci file. For
 n nocopypost parameters, the ``CkNcpyBufferPost`` array is indexed by 0 to n-1.
 
-This API for point to point communication is demonstrated in
-``examples/charm++/zerocopy/entry_method_post_api`` and
-for broadcast operations, the usage of this API is
-demonstrated in ``examples/charm++/zerocopy/entry_method_bcast_post_api``.
+This API for point to point communication and broadcast is demonstrated in
+``tests/charm++/zerocopy/zc_post_async``.
+
+In addition to the PE-level match and post buffers as described above, there are node-level
+variants of the same methods called ``CkMatchNodeBuffer`` and ``CkPostNodeBuffer``. They
+have the exact same signature but are applicable for node-level matching operations that
+are often useful for node groups. The node equivalent match and post buffers allows two
+different PEs of the same node to call ``CkMatchNodeBuffer`` and ``CkPostNodeBuffer``.
+Similar to the PE-level API, it is important to associate a unique tag with the
+``CkMatchNodeBuffer`` and ``CkPostNodeBuffer`` calls for a single buffer on that node.
+Using the same tag on the node when the RDMA transfer is in progress triggers an abort
+from the runtime system because the same tag cannot be used to denote two different buffers
+in the internal node-level data structures.
 
 Similar to the Zero Copy Entry Method Send API, it should be noted that calls to
 entry methods with nocopypost specified parameters are currently supported for
@@ -10976,6 +11045,36 @@ superclass to do the final delivery after you’ve sent your messages.
 Experimental Features
 =====================
 
+SHMEM
+---------
+Charm++ SHMEM is an experimental module that aims to add
+fast IPC to any machine layer. Each process opens a shared segment
+containing an MPSC queue and a memory pool. Processes can allocate "blocks"
+of memory from their peers' pools, and "push" them onto their MPSC queue.
+This is mechanically similar to the PXSHM layer, but SHMEM uses
+"address-free" atomics for synchronization instead of memory fences and the
+like. The C++ standardization committee recommends that C++ atomics should
+be address-free, i.e., ordering is enforced no matter which virtual address
+is used to access a physical address; however, this is not guaranteed.
+In practice, most modern compilers comply with this suggestion, but please
+alert us if you encounter synchronization issues!
+
+To build with SHMEM, pass ``--enable-shmem`` (to use PXSHM) or
+``--enable-xpmem`` (to use XPMEM) as command-line options to a Charm++ build;
+only CMake builds are supported at this time. Charm++ currently has a cutoff
+for using SHMEM, after which it falls back to conventional messaging. This
+decision accommodates SHMEM's bounded pool, and potentially more efficient
+IPC mechanisms exist for "large" messages (e.g., the ZeroCopy API). One can
+alter these behaviors with the command line options ``++ipcpoolsize`` and
+``++ipccutoff``, which change the size of the shared pool of memory and
+message size cutoff (in bytes), respectively. For example, this command
+will run ``a.out`` with a 128MB IPC pool size and a 256KB message cutoff:
+``./charmrun ++local ++auto-provision ./a.out ++ipcpoolsize $((128*1024*1024)) ++ipccutoff $((256*1024))``
+
+Note, Charm++ maintains and polls its own SHMEM IPC manager. Libraries can
+instantiate their own IPC manager if they require custom IPC behaviors. For
+details, please consult the notes in ``cmishmem.h``.
+
 .. _sec:controlpoint:
 
 Control Point Automatic Tuning
@@ -11753,7 +11852,7 @@ The following command-line options are available to users of charmc:
    always. This option causes charmc to switch to the most reliable
    compiler, regardless of whether it produces slow code or not.
 
-``-language {converse|charm++|ampi|fem|f90charm}``:
+``-language {converse|charm++|ampi|f90charm}``:
    When linking with charmc, one must specify the “language”. This is
    just a way to help charmc include the right libraries. Pick the
    “language” according to this table:

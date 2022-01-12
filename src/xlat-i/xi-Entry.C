@@ -553,8 +553,9 @@ void Entry::genArrayDefs(XStr& str) {
           << "  env.setTotalsize(0);\n"
           << "  _TRACE_CREATION_DETAILED(&env, " << epIdx() << ");\n"
           << "  _TRACE_CREATION_DONE(1);\n"
+          << "  CmiObjId projID = ((CkArrayIndex&)ckGetIndex()).getProjectionID();\n"
           << "  _TRACE_BEGIN_EXECUTE_DETAILED(CpvAccess(curPeEvent),ForArrayEltMsg,(" << epIdx()
-          << "),CkMyPe(), 0, ((CkArrayIndex&)ckGetIndex()).getProjectionID(), obj);\n";
+          << "),CkMyPe(), 0, &projID, obj);\n";
     if (isAppWork()) inlineCall << "    _TRACE_BEGIN_APPWORK();\n";
     inlineCall << "#if CMK_LBDB_ON\n";
     if (isInline())
@@ -564,15 +565,13 @@ void Entry::genArrayDefs(XStr& str) {
       inlineCall << "    impl_off += sizeof(envelope);\n"
                  << "    ckLocalBranch()->recordSend(id, impl_off, CkMyPe());\n";
     }
-    inlineCall << "    LDObjHandle objHandle;\n"
-               << "    int objstopped=0;\n"
-               << "    objHandle = obj->timingBeforeCall(&objstopped);\n"
-               << "#endif\n";
+    inlineCall << "#endif\n";
     inlineCall << "#if CMK_CHARMDEBUG\n"
                   "    CpdBeforeEp("
                << epIdx()
                << ", obj, NULL);\n"
                   "#endif\n";
+    inlineCall << "    CkCallstackPush(obj);\n";
     inlineCall << "    ";
     if (!retType->isVoid()) inlineCall << retType << " retValue = ";
     inlineCall << "obj->" << (tspec ? "template " : "") << name;
@@ -584,13 +583,12 @@ void Entry::genArrayDefs(XStr& str) {
     inlineCall << "(";
     param->unmarshallForward(inlineCall, true);
     inlineCall << ");\n";
+    inlineCall << "    CkCallstackPop(obj);\n";
     inlineCall << "#if CMK_CHARMDEBUG\n"
                   "    CpdAfterEp("
                << epIdx()
                << ");\n"
                   "#endif\n";
-    inlineCall << "#if CMK_LBDB_ON\n    "
-                  "obj->timingAfterCall(objHandle,&objstopped);\n#endif\n";
     if (isAppWork()) inlineCall << "    _TRACE_END_APPWORK();\n";
     if (!isNoTrace()) inlineCall << "    _TRACE_END_EXECUTE();\n";
     if (!retType->isVoid()) {
@@ -885,30 +883,19 @@ void Entry::genGroupDefs(XStr& str) {
             << "  _TRACE_BEGIN_EXECUTE_DETAILED(CpvAccess(curPeEvent),ForBocMsg,(" << epIdx()
             << "),CkMyPe(),0,NULL, NULL);\n";
       if (isAppWork()) str << " _TRACE_BEGIN_APPWORK();\n";
-      str << "#if CMK_LBDB_ON\n"
-             "  // if there is a running obj being measured, stop it temporarily\n"
-             "  LDObjHandle objHandle;\n"
-             "  int objstopped = 0;\n"
-             "  LBManager *the_lbmgr = (LBManager *)CkLocalBranch(_lbmgr);\n"
-             "  if (the_lbmgr->RunningObject(&objHandle)) {\n"
-             "    objstopped = 1;\n"
-             "    the_lbmgr->ObjectStop(objHandle);\n"
-             "  }\n"
-             "#endif\n";
       str << "#if CMK_CHARMDEBUG\n"
              "  CpdBeforeEp("
           << epIdx()
           << ", obj, NULL);\n"
              "#endif\n  ";
+      str << "CkCallstackPush((Chare*)obj);\n  ";
       if (!retType->isVoid()) str << retType << " retValue = ";
-      str << "obj->" << name << "(" << unmarshallStr << ");\n";
+      str << "obj->" << name << "(" << unmarshallStr << ");\n  ";
+      str << "CkCallstackPop((Chare*)obj);\n";
       str << "#if CMK_CHARMDEBUG\n"
              "  CpdAfterEp("
           << epIdx()
           << ");\n"
-             "#endif\n";
-      str << "#if CMK_LBDB_ON\n"
-             "  if (objstopped) the_lbmgr->ObjectStart(objHandle);\n"
              "#endif\n";
       if (isAppWork()) str << " _TRACE_END_APPWORK();\n";
       if (!isNoTrace()) str << "  _TRACE_END_EXECUTE();\n";
@@ -1896,15 +1883,14 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
       str << "ncpyPost);\n";
       str << "  ";
       genRegularCall(str, preCall, redn_wrapper, usesImplBuf, true);
-      str << "    void *buffPtrs["<< numRdmaRecvParams <<"];\n";
-      str << "    int buffSizes["<< numRdmaRecvParams <<"];\n";
       for (int index = 0; index < numRdmaRecvParams; index++)
         str << "    if(ncpyPost[" << index << "].postAsync) numPostAsync++;\n";
+      str << "    if(numPostAsync == 0) {\n"; // all buffers are posted
+      str << "      void *buffPtrs["<< numRdmaRecvParams <<"];\n";
+      str << "      int buffSizes["<< numRdmaRecvParams <<"];\n";
       param->storePostedRdmaPtrs(str, isSDAGGen);
-
-      str << "    if(numPostAsync == 0)\n"; // all buffers are posted
       str << "      CkRdmaIssueRgets(env, buffPtrs, buffSizes, myIndex, ncpyPost);\n";
-      str << "    else if(";
+      str << "    } else if(";
       if(isSDAGGen)
         str << "genClosure->num_rdma_fields - ";
       else
@@ -1939,16 +1925,17 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
       str << "      }\n";
 
       str << "    } else { // Message that executes the Regular EM on secondary elements\n";
-      param->extractPostedPtrs(str, isSDAGGen);
+      param->extractPostedPtrs(str, isSDAGGen, false, false);
       str << "    ";
       genRegularCall(str, preCall, redn_wrapper, usesImplBuf, false);
       str << "      updatePeerCounter(ncpyEmInfo);\n";
       str << "    }\n";
       str << "  } else {   // Final message that executes the Regular EM on primary element\n";
-
+      param->extractPostedPtrs(str, isSDAGGen, true, false);
     } else if (param->hasDevice()) {
       str << "  if (CMI_IS_ZC_DEVICE(env)) {\n";
       genRegularCall(str, preCall, redn_wrapper, usesImplBuf, true);
+      param->extractPostedPtrs(str, isSDAGGen, false, true);
       str << "  } else {\n";
     }
     genRegularCall(str, preCall, redn_wrapper, usesImplBuf, false);
