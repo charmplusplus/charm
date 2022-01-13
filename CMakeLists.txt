@@ -108,11 +108,10 @@ function(charm_determine_arch output input)
   set(${output} ${retval} PARENT_SCOPE)
 endfunction()
 
-if(ARCH)
-  set(CHARM_CPU ${ARCH})
-else()
-  charm_determine_arch(CHARM_CPU ${CMAKE_SYSTEM_PROCESSOR})
+if(NOT ARCH)
+  charm_determine_arch(ARCH ${CMAKE_SYSTEM_PROCESSOR})
 endif()
+set(CHARM_CPU ${ARCH})
 
 charm_determine_arch(CHARM_HOST_CPU ${CMAKE_HOST_SYSTEM_PROCESSOR})
 
