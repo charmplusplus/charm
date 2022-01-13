@@ -244,7 +244,7 @@ class TCharm: public CBase_TCharm
 		if (tcharm_nothreads)
 			CkAbort("Cannot make blocking calls using +tcharm_nothreads!\n");
 		#endif
-		// AMPI does not trigger thread listeners on suspend/resume
+		// tcharm does not trigger thread listeners on suspend/resume
 		// so it needs to manually start/stop timing
 		this->getCkLocRec()->stopTiming();
 		isStopped=true;
@@ -264,7 +264,7 @@ class TCharm: public CBase_TCharm
 		TCharm *dis=TCharm::get();
 		TCharm::activateThread();
 		dis->isStopped=false;
-		// AMPI does not trigger thread listeners on suspend/resume
+		// tcharm does not trigger thread listeners on suspend/resume
 		// so it needs to manually start/stop timing
 		dis->getCkLocRec()->startTiming();
 		return dis;
