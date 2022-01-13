@@ -1143,11 +1143,22 @@ configure_file(${CMAKE_SOURCE_DIR}/cmake/Makefile.tests ${CMAKE_BINARY_DIR}/incl
 configure_file(${CMAKE_SOURCE_DIR}/cmake/Makefile.tests.common ${CMAKE_BINARY_DIR}/include/Makefile.tests.common COPYONLY)
 
 # Configure CharmConfig.cmake
-configure_file(
+include(CMakePackageConfigHelpers)
+configure_package_config_file(
   ${CMAKE_SOURCE_DIR}/cmake/templates/CharmConfig.cmake.in
   "${CMAKE_BINARY_DIR}/lib/cmake/Charm/CharmConfig.cmake"
-  ESCAPE_QUOTES
-  @ONLY)
+  INSTALL_DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/cmake/Charm/CharmConfig.cmake
+  )
+# We want the `SameMinorVersion` compatibility mode, but it isn't available
+# before CMake v3.11
+if(CMAKE_VERSION VERSION_GREATER 3.11 OR CMAKE_VERSION VERSION_EQUAL 3.11)
+  set(VERSION_COMPATIBILITY_MODE SameMinorVersion)
+else()
+  set(VERSION_COMPATIBILITY_MODE ExactVersion)
+endif()
+write_basic_package_version_file(
+  ${CMAKE_BINARY_DIR}/lib/cmake/Charm/CharmConfigVersion.cmake
+  COMPATIBILITY ${VERSION_COMPATIBILITY_MODE})
 
 # Installation rules
 
