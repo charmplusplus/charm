@@ -8,7 +8,7 @@ DIRS = \
   privatization \
   jacobi3d \
   exit \
-#  chkpt \
+  chkpt \
 #  intercomm_coll \ # causes hangs in SMP mode
 
 ifeq (1,$(CMK_CAN_LINK_FORTRAN))
@@ -19,6 +19,7 @@ NONSCALEDIRS = \
   privatization \
   datatype \
   exit \
+  chkpt \
 
 ifeq ($(BUILD_MPICH_TESTS),true)
 DIRS += mpich-test
