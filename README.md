@@ -173,7 +173,7 @@ for more information:
          
      will give:
     
-      Supported compilers: clang craycc gcc icc iccstatic msvc pgcc xlc xlc64 dpcpp
+      Supported compilers: clang craycc gcc icc iccstatic msvc pgcc xlc xlc64 icx
       Supported options: common cuda flang gfortran ifort local nolb omp ooc papi perftools persistent pgf90 pxshm smp syncft sysvshm tcp tsan
 
 
