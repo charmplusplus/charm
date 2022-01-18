@@ -108,11 +108,10 @@ function(charm_determine_arch output input)
   set(${output} ${retval} PARENT_SCOPE)
 endfunction()
 
-if(ARCH)
-  set(CHARM_CPU ${ARCH})
-else()
-  charm_determine_arch(CHARM_CPU ${CMAKE_SYSTEM_PROCESSOR})
+if(NOT ARCH)
+  charm_determine_arch(ARCH ${CMAKE_SYSTEM_PROCESSOR})
 endif()
+set(CHARM_CPU ${ARCH})
 
 charm_determine_arch(CHARM_HOST_CPU ${CMAKE_HOST_SYSTEM_PROCESSOR})
 
@@ -1142,11 +1141,53 @@ file(WRITE ${CMAKE_BINARY_DIR}/include/charm-version-git.h "#define CHARM_VERSIO
 configure_file(${CMAKE_SOURCE_DIR}/cmake/Makefile.tests ${CMAKE_BINARY_DIR}/include/Makefile COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/cmake/Makefile.tests.common ${CMAKE_BINARY_DIR}/include/Makefile.tests.common COPYONLY)
 
+# Configure CharmConfig.cmake
+include(CMakePackageConfigHelpers)
+configure_package_config_file(
+  ${CMAKE_SOURCE_DIR}/cmake/templates/CharmConfig.cmake.in
+  "${CMAKE_BINARY_DIR}/lib/cmake/Charm/CharmConfig.cmake"
+  INSTALL_DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/cmake/Charm/CharmConfig.cmake
+  )
+# We want the `SameMinorVersion` compatibility mode, but it isn't available
+# before CMake v3.11
+if(CMAKE_VERSION VERSION_GREATER 3.11 OR CMAKE_VERSION VERSION_EQUAL 3.11)
+  set(VERSION_COMPATIBILITY_MODE SameMinorVersion)
+else()
+  set(VERSION_COMPATIBILITY_MODE ExactVersion)
+endif()
+write_basic_package_version_file(
+  ${CMAKE_BINARY_DIR}/lib/cmake/Charm/CharmConfigVersion.cmake
+  COMPATIBILITY ${VERSION_COMPATIBILITY_MODE})
 
 # Installation rules
-install(DIRECTORY ${CMAKE_BINARY_DIR}/bin DESTINATION . PATTERN * PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ GROUP_EXECUTE GROUP_READ WORLD_READ WORLD_EXECUTE)
-install(DIRECTORY ${CMAKE_BINARY_DIR}/lib     DESTINATION .)
+
+# install all includes
+install(
+  DIRECTORY ${CMAKE_BINARY_DIR}/include
+  DESTINATION .)
+
+# install all libraries
+install(
+  DIRECTORY ${CMAKE_BINARY_DIR}/lib
+  DESTINATION .)
+
+# install shared libraries if present
 if (${BUILD_SHARED})
-  install(DIRECTORY ${CMAKE_BINARY_DIR}/lib_so  DESTINATION .)
+install(
+  DIRECTORY ${CMAKE_BINARY_DIR}/lib_so
+  DESTINATION .)
 endif()
-install(DIRECTORY ${CMAKE_BINARY_DIR}/include DESTINATION .)
+
+#install all executables
+install(
+  DIRECTORY ${CMAKE_BINARY_DIR}/bin
+  DESTINATION .
+  PATTERN *
+  PERMISSIONS
+    OWNER_EXECUTE
+    OWNER_WRITE
+    OWNER_READ
+    GROUP_EXECUTE
+    GROUP_READ
+    WORLD_READ
+    WORLD_EXECUTE)
