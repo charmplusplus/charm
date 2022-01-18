@@ -525,6 +525,16 @@ CLINKAGE int posix_memalign(void **outptr, size_t align, size_t size) CMK_THROW 
 CLINKAGE void *aligned_alloc(size_t align, size_t size) CMK_THROW { return meta_aligned_alloc(align,size); }
 void *valloc(size_t size) CMK_THROW { return meta_valloc(size); }
 CLINKAGE void *pvalloc(size_t size) CMK_THROW { return meta_pvalloc(size); }
+
+CLINKAGE void *__libc_malloc(size_t size) CMK_THROW { return meta_malloc(size); }
+CLINKAGE void __libc_free(void *ptr) CMK_THROW { meta_free(ptr); }
+CLINKAGE void *__libc_calloc(size_t nelem, size_t size) CMK_THROW { return meta_calloc(nelem,size); }
+CLINKAGE void __libc_cfree(void *ptr) CMK_THROW { meta_cfree(ptr); }
+CLINKAGE void *__libc_realloc(void *ptr, size_t size) CMK_THROW { return meta_realloc(ptr,size); }
+CLINKAGE void *__libc_memalign(size_t align, size_t size) CMK_THROW { return meta_memalign(align,size); }
+CLINKAGE int __posix_memalign(void **outptr, size_t align, size_t size) CMK_THROW { return meta_posix_memalign(outptr,align,size); }
+CLINKAGE void *__libc_valloc(size_t size) CMK_THROW { return meta_valloc(size); }
+CLINKAGE void *__libc_pvalloc(size_t size) CMK_THROW { return meta_pvalloc(size); }
 #endif /* ! CMK_MEMORY_BUILD_GNU_HOOKS */
 
 #else
@@ -1279,8 +1289,6 @@ void CmiFreeAligned(void* ptr) {
 #if (CMK_MEMORY_BUILD_OS && CMK_MEMORY_BUILD_OS_WRAPPED && !CMK_MEMORY_BUILD_GNU_HOOKS) || !CMK_MEMORY_BUILD_OS
 
 #if !defined CMI_MEMORY_GNU || !defined _LIBC
-CLINKAGE void * __libc_memalign (size_t alignment, size_t bytes) { return memalign(alignment, bytes); }
-
 #if CMK_EXPECTS_MORECORE
 CLINKAGE void * __default_morecore (ptrdiff_t) CMK_THROW;
 void *(*__morecore)(ptrdiff_t) = __default_morecore;
