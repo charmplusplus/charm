@@ -1,3 +1,5 @@
+// Author: Juan Galvez <jjgalvez@illinois.edu>
+
 #ifndef TREELEVEL_H
 #define TREELEVEL_H
 
