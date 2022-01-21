@@ -3,6 +3,7 @@
 set(conv-core-h-sources
     src/util/cmitls.h
     src/conv-core/cmipool.h
+    src/conv-core/cmishmem.h
     src/conv-core/cmidemangle.h
     src/conv-core/conv-config.h
     src/conv-core/conv-cpath.h
@@ -57,6 +58,12 @@ set(conv-core-cxx-sources
     src/conv-core/queueing.C
     src/conv-core/hrctimer.C
 )
+
+if(${CMK_USE_SHMEM})
+    set(conv-core-cxx-sources
+        "${conv-core-cxx-sources}"
+        src/conv-core/shmem/cmishmem.C)
+endif()
 
 # conv-ccs
 set(conv-ccs-h-sources

@@ -284,6 +284,10 @@ CpvDeclare(Queue, CsdTaskQueue);
 CpvDeclare(void *, CmiSuspendedTaskQueue);
 #endif
 
+#if CMK_USE_SHMEM
+CsvDeclare(CmiIpcManager*, coreIpcManager_);
+#endif
+
 CpvDeclare(int, isHelperOn);
 
 extern int CmiMyLocalRank;
@@ -3427,6 +3431,19 @@ void CmiFree(void *blk)
     CpvAccess(BlocksAllocated)--;
 #endif
 
+#if CMK_USE_SHMEM
+    // we should only free _our_ IPC blocks -- so calling CmiFree on
+    // an IPC block issued by another process will cause a bad free!
+    // (note -- this would only occur if you alloc an ipc block then
+    //          decide not to send it; that should be avoided! )
+    CmiIpcBlock* ipc;
+    auto* manager = CsvAccess(coreIpcManager_);
+    if (blk && (ipc = CmiIsIpcBlock(manager, BLKSTART(blk), CmiMyNode()))) {
+      CmiFreeIpcBlock(manager, ipc);
+      return;
+    }
+#endif
+
 #if CMK_USE_IBVERBS | CMK_USE_IBUD
     /* is this message the head of a MultipleSend that we received?
        Then the parts with INFIMULTIPOOL have metadata which must be 
@@ -4082,6 +4099,11 @@ void ConverseCommonInit(char **argv)
     _IO_file_overflow(stdout, -1);
     _IO_file_overflow(stderr, -1);
   }
+#endif
+
+#if CMK_USE_SHMEM
+  CsvInitialize(CmiIpcManager*, coreIpcManager_);
+  CsvAccess(coreIpcManager_) = nullptr;
 #endif
 
   CpvInitialize(int, _urgentSend);

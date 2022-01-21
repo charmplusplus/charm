@@ -1,0 +1,122 @@
+# Set Charm project version
+set(CHARM_VERSION "@CMAKE_PROJECT_VERSION@")
+
+@PACKAGE_INIT@
+
+# Set the equivalent to Charm_DIR for dependent project to set-up the path
+# correctly in their cmake configs. This will be used to ease the set-up
+# of working with find_package.
+get_filename_component(CHARM_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" DIRECTORY)
+
+# Set root for Charm installation
+get_filename_component(CHARM_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
+
+# Set cmake standard flag
+set(CHARM_CXX_STANDARD @CMAKE_CXX_STANDARD@)
+
+# Set Charm compiler
+set(CHARM_CXX_COMPILER "${CHARM_ROOT}/bin/charmc")
+set(CHARM_C_COMPILER "${CHARM_ROOT}/bin/charmc")
+
+# Set charmrun path
+set(CHARM_CHARMRUN_PATH "${CHARM_ROOT}/bin/charmrun")
+
+# Set CMK compiler used
+set(CHARM_CMK_COMPILER @CMK_COMPILER@)
+
+# Set Charm build type
+set(CHARM_BUILD_TYPE @CMAKE_BUILD_TYPE@)
+
+# Set Charm Network type
+set(CHARM_WITH_NETWORK @NETWORK@)
+
+# Set Charm TARGET type
+set(CHARM_WITH_TARGET @TARGET@)
+
+# Set Charm ARCH type
+set(CHARM_WITH_ARCH @ARCH@)
+
+# Set SMP option
+set(CHARM_WITH_SMP @SMP@)
+
+# Set OMP option
+set(CHARM_WITH_OMP @OMP@)
+
+# Set TCP option
+set(CHARM_WITH_TCP @TCP@)
+
+# Set Pthreads option
+set(CHARM_WITH_PTHREADS @PTHREADS@)
+
+# Set OOC option
+set(CHARM_WITH_OOC @OOC@)
+
+# Set SYNCFT option
+set(CHARM_WITH_SYNCFT @SYNCFT@)
+
+# Set PAPI option
+set(CHARM_WITH_PAPI @PAPI@)
+
+# Set STATS option
+set(CHARM_WITH_STATS @STATS@)
+
+# Set TRACING_COMMTHREAD option
+set(CHARM_WITH_TRACING_COMMTHREAD @TRACING_COMMTHREAD@)
+
+# Set CHARMDEBUG option
+set(CHARM_WITH_CHARMDEBUG @CHARMDEBUG@)
+
+# Set REPLAY option
+set(CHARM_WITH_REPLAY @REPLAY@)
+
+# Set CCS option
+set(CHARM_WITH_CCS @CCS@)
+
+# Set CONTROLPOINT option
+set(CHARM_WITH_CONTROLPOINT @CONTROLPOINT@)
+
+# Set PERSISTENT option
+set(CHARM_WITH_PERSISTENT @PERSISTENT@)
+
+# Set LBUSERDATA option
+set(CHARM_WITH_LBUSERDATA @LBUSERDATA@)
+
+# Set LOCKLESS_QUEUE option
+set(CHARM_WITH_LOCKLESS_QUEUE @LOCKLESS_QUEUE@)
+
+# Set SHRINKEXPAND option
+set(CHARM_WITH_SHRINKEXPAND @SHRINKEXPAND@)
+
+# Set NUMA option
+set(CHARM_WITH_NUMA @NUMA@)
+
+# Set QLOGIC option
+set(CHARM_WITH_QLOGIC @QLOGIC@)
+
+# Set RANDOMIZED_MSGQ option
+set(CHARM_WITH_RANDOMIZED_MSGQ @RANDOMIZED_MSGQ@)
+
+# Set ZLIB option
+set(CHARM_WITH_ZLIB @ZLIB@)
+
+# Set AMPI_MPICH_TESTS option
+set(CHARM_WITH_AMPI_MPICH_TESTS @AMPI_MPICH_TESTS@)
+
+# Set DRONE_MODE option
+set(CHARM_WITH_DRONE_MODE @DRONE_MODE@)
+
+# Set TASK_QUEUE option
+set(CHARM_WITH_TASK_QUEUE @TASK_QUEUE@)
+
+# Set BUILD_SHARED option
+set(CHARM_WITH_BUILD_SHARED @BUILD_SHARED@)
+
+# Set CUDA option
+set(CHARM_WITH_CUDA @CUDA@)
+
+# Set PXSHM option
+set(CHARM_WITH_PXSHM @PXSHM@)
+
+# TODO: Find more useful flags that can be used in dependant apps/libs
+
+check_required_components(Charm)
