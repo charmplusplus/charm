@@ -1762,7 +1762,7 @@ void _initCharm(int unused_argc, char **argv)
 			CmiPrintf("If any of the above arguments were intended for the RTS you may need to recompile Charm++ with different options.\n");
 		}
 
-		CmiCheckAffinity(); // check for thread oversubscription
+		//CmiCheckAffinity(); // check for thread oversubscription
 
 		for(i=0;i<nMains;i++)  /* Create all mainchares */
 		{
@@ -1788,7 +1788,7 @@ void _initCharm(int unused_argc, char **argv)
 		}
 	} else {
 		// check for thread oversubscription
-		CmiCheckAffinity();
+		//CmiCheckAffinity();
 		// NOTE: this assumes commthreads will not block from this point on
 	}
 
