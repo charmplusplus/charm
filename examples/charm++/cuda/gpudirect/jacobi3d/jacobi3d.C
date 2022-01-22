@@ -1,7 +1,9 @@
 #include "hapi.h"
+#include "hapi_nvtx.h"
 #include "jacobi3d.decl.h"
 #include "jacobi3d.h"
 #include <utility>
+#include <string>
 #include <sstream>
 
 #define CUDA_SYNC 0
@@ -59,6 +61,8 @@ class Main : public CBase_Main {
 
 public:
   Main(CkArgMsg* m) {
+    NVTXTracer nvtx_range("Main::Main", NVTXColor::Turquoise);
+
     // Set default values
     main_proxy = thisProxy;
     num_chares = CkNumPes();
@@ -193,6 +197,8 @@ public:
   }
 
   void initDone() {
+    NVTXTracer nvtx_range("Main::initDone", NVTXColor::Turquoise);
+
     CkPrintf("Init time: %.3lf s\n", CkWallTimer() - init_start_time);
 
     startIter();
@@ -205,10 +211,14 @@ public:
   }
 
   void warmupDone() {
+    NVTXTracer nvtx_range("Main::warmupDone", NVTXColor::Turquoise);
+
     startIter();
   }
 
   void allDone() {
+    NVTXTracer nvtx_range("Main::allDone", NVTXColor::Turquoise);
+
     double total_time = CkWallTimer() - start_time;
     CkPrintf("Total time: %.3lf s\nAverage iteration time: %.3lf us\n",
         total_time, (total_time / n_iters) * 1e6);
@@ -228,6 +238,7 @@ class Block : public CBase_Block {
   int neighbors;
   int remote_count;
   int x, y, z;
+  std::string index_str;
 
   DataType* h_temperature;
   DataType* d_temperature;
@@ -278,6 +289,8 @@ class Block : public CBase_Block {
     x = thisIndex.x;
     y = thisIndex.y;
     z = thisIndex.z;
+    index_str = "[" + std::to_string(x) + "," + std::to_string(y)
+      + "," + std::to_string(z) + "]";
 
     // Check bounds and set number of valid neighbors
     for (int i = 0; i < DIR_COUNT; i++) bounds[i] = false;
@@ -396,6 +409,8 @@ class Block : public CBase_Block {
   }
 
   void packGhosts() {
+    NVTXTracer nvtx_range(index_str + " packGhosts", NVTXColor::PeterRiver);
+
     if (use_persistent || use_zerocopy) {
       // Pack non-contiguous ghosts to temporary contiguous buffers on device
       invokePackingKernels(d_temperature, d_send_ghosts, bounds,
@@ -432,6 +447,8 @@ class Block : public CBase_Block {
   }
 
   void sendGhosts() {
+    NVTXTracer nvtx_range(index_str + " sendGhosts", NVTXColor::WetAsphalt);
+
     // Send ghosts to neighboring chares
     if (use_persistent) {
       // PersistentMsg is used to store the direction
@@ -515,6 +532,8 @@ class Block : public CBase_Block {
   }
 
   void processGhostReg(int dir, int size, DataType* gh) {
+    NVTXTracer nvtx_range(index_str + " processGhostReg " + std::to_string(dir), NVTXColor::Carrot);
+
     DataType* h_ghost = nullptr; DataType* d_ghost = nullptr;
     CkAssert(dir >= 0 && dir < DIR_COUNT);
     h_ghost = h_ghosts[dir];
@@ -528,6 +547,8 @@ class Block : public CBase_Block {
   }
 
   void update() {
+    NVTXTracer nvtx_range(index_str + " update", NVTXColor::Clouds);
+
     // Operations in compute stream should only be executed when
     // operations in communication stream (transfers and unpacking) complete
     hapiCheck(cudaEventRecord(comm_event, comm_stream));
@@ -542,6 +563,8 @@ class Block : public CBase_Block {
   }
 
   void prepNextIter() {
+    NVTXTracer nvtx_range(index_str + " prepNextIter", NVTXColor::GreenSea);
+
     std::swap(d_temperature, d_new_temperature);
     my_iter++;
     if (my_iter <= warmup_iters) {
