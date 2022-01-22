@@ -547,7 +547,7 @@ class Block : public CBase_Block {
   }
 
   void update() {
-    NVTXTracer nvtx_range(index_str + " update", NVTXColor::Clouds);
+    NVTXTracer nvtx_range(index_str + " update", NVTXColor::BelizeHole);
 
     // Operations in compute stream should only be executed when
     // operations in communication stream (transfers and unpacking) complete
