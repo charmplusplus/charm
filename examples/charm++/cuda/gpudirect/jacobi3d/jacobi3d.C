@@ -251,6 +251,8 @@ class Block : public CBase_Block {
 
   cudaStream_t compute_stream;
   cudaStream_t comm_stream;
+  cudaStream_t h2d_stream;
+  cudaStream_t d2h_stream;
 
   cudaEvent_t compute_event;
   cudaEvent_t comm_event;
@@ -277,6 +279,8 @@ class Block : public CBase_Block {
 
     hapiCheck(cudaStreamDestroy(compute_stream));
     hapiCheck(cudaStreamDestroy(comm_stream));
+    hapiCheck(cudaStreamDestroy(h2d_stream));
+    hapiCheck(cudaStreamDestroy(d2h_stream));
 
     hapiCheck(cudaEventDestroy(compute_event));
     hapiCheck(cudaEventDestroy(comm_event));
@@ -332,6 +336,8 @@ class Block : public CBase_Block {
     // Create CUDA streams and events
     hapiCheck(cudaStreamCreateWithPriority(&compute_stream, cudaStreamDefault, 0));
     hapiCheck(cudaStreamCreateWithPriority(&comm_stream, cudaStreamDefault, -1));
+    hapiCheck(cudaStreamCreateWithPriority(&h2d_stream, cudaStreamDefault, -1));
+    hapiCheck(cudaStreamCreateWithPriority(&d2h_stream, cudaStreamDefault, -1));
 
     hapiCheck(cudaEventCreateWithFlags(&compute_event, cudaEventDisableTiming));
     hapiCheck(cudaEventCreateWithFlags(&comm_event, cudaEventDisableTiming));
