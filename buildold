@@ -36,7 +36,7 @@ syntax() {
   ( cd "$src" ; ls -1 | egrep -v '(^mpi$)|(^netlrts?$)|(^multicore$)|(^util$)|(^common$)|(^win$)|(^gni$)|(^pami(lrts)?$)|(^verbs$)|(^ofi$)|(^ucx$)|(^template$)|(^cuda$)' | pr -3 -t )
   echo ''
   echo '<options>: compiler and platform specific options'
-  echo 'icc iccstatic xlc xlc64 gcc clang dpcpp pgcc cc mpicxx'
+  echo 'icc iccstatic xlc xlc64 gcc clang icx pgcc cc mpicxx'
   echo 'help smp omp tcp ooc syncft papi pthreads'
   echo '--incdir --libdir --basedir --build-shared --destination --suffix -j'
   if test $more = 1
@@ -50,7 +50,7 @@ syntax() {
   echo '  xlc, xlc64      IBM XL compilers (with 64-bit option on architectures with 32-bit modes)'
   echo '  gcc             GNU compiler collection (on platforms where the default differs)'
   echo '  clang           Clang C/C++ compiler (including bgclang)'
-  echo '  dpcpp           Intel oneAPI DPC++/C++ compiler'
+  echo '  icx             Intel oneAPI DPC++/C++ compiler'
   echo '  pgcc            Portland Group compilers'
   echo ''
   echo 'Choose an alternative fortran compiler (only one option is allowed from this section):'
