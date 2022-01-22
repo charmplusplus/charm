@@ -38,12 +38,14 @@ extern void invokeBoundaryKernels(DataType* d_temperature, int block_width,
     int block_height, int block_depth, bool bounds[], cudaStream_t stream);
 extern void invokeJacobiKernel(DataType* d_temperature, DataType* d_new_temperature,
     int block_width, int block_height, int block_depth, cudaStream_t stream);
-extern void invokePackingKernels(DataType* d_temperature, DataType* d_ghosts[],
-    bool bounds[], int block_width, int block_height, int block_depth,
-    cudaStream_t stream);
-extern void invokeUnpackingKernel(DataType* d_temperature, DataType* d_ghost,
-    int dir, int block_width, int block_height, int block_depth,
-    cudaStream_t stream);
+extern void packGhostsDevice(DataType* d_temperature,
+    DataType* d_ghosts[], DataType* h_ghosts[], bool bounds[],
+    int block_width, int block_height, int block_depth,
+    size_t x_surf_size, size_t y_surf_size, size_t z_surf_size,
+    cudaStream_t comm_stream, cudaStream_t d2h_stream, cudaEvent_t pack_events[]);
+extern void unpackGhostDevice(DataType* d_temperature, DataType* d_ghost, DataType* h_ghost,
+    int dir, int block_width, int block_height, int block_depth, size_t ghost_size,
+    cudaStream_t comm_stream, cudaStream_t h2d_stream, cudaEvent_t unpack_events[]);
 
 class Main : public CBase_Main {
   int my_iter;
@@ -218,8 +220,6 @@ class Block : public CBase_Block {
 
   DataType* h_ghosts[DIR_COUNT];
   DataType* d_ghosts[DIR_COUNT];
-  DataType* d_send_ghosts[DIR_COUNT];
-  DataType* d_recv_ghosts[DIR_COUNT];
 
   cudaStream_t compute_stream;
   cudaStream_t comm_stream;
@@ -228,6 +228,8 @@ class Block : public CBase_Block {
 
   cudaEvent_t compute_event;
   cudaEvent_t comm_event;
+  cudaEvent_t pack_events[DIR_COUNT];
+  cudaEvent_t unpack_events[DIR_COUNT];
 
   bool bounds[DIR_COUNT];
 
@@ -249,6 +251,10 @@ class Block : public CBase_Block {
 
     hapiCheck(cudaEventDestroy(compute_event));
     hapiCheck(cudaEventDestroy(comm_event));
+    for (int i = 0; i < DIR_COUNT; i++) {
+      hapiCheck(cudaEventDestroy(pack_events[i]));
+      hapiCheck(cudaEventDestroy(unpack_events[i]));
+    }
   }
 
   void init() {
@@ -284,7 +290,7 @@ class Block : public CBase_Block {
           sizeof(DataType) * (block_width+2) * (block_height+2) * (block_depth+2)));
     hapiCheck(cudaMalloc((void**)&d_new_temperature,
           sizeof(DataType) * (block_width+2) * (block_height+2) * (block_depth+2)));
-    std::vector<size_t> ghost_sizes = {x_surf_size, x_surf_size, y_surf_size,
+    size_t ghost_sizes[DIR_COUNT] = {x_surf_size, x_surf_size, y_surf_size,
       y_surf_size, z_surf_size, z_surf_size};
     for (int i = 0; i < DIR_COUNT; i++) {
       hapiCheck(cudaMallocHost((void**)&h_ghosts[i], ghost_sizes[i]));
@@ -299,6 +305,10 @@ class Block : public CBase_Block {
 
     hapiCheck(cudaEventCreateWithFlags(&compute_event, cudaEventDisableTiming));
     hapiCheck(cudaEventCreateWithFlags(&comm_event, cudaEventDisableTiming));
+    for (int i = 0; i < DIR_COUNT; i++) {
+      hapiCheck(cudaEventCreateWithFlags(&pack_events[i], cudaEventDisableTiming));
+      hapiCheck(cudaEventCreateWithFlags(&unpack_events[i], cudaEventDisableTiming));
+    }
 
     // Initialize temperature data
     invokeInitKernel(d_temperature, block_width, block_height, block_depth, compute_stream);
@@ -339,28 +349,20 @@ class Block : public CBase_Block {
   void packGhosts() {
     NVTXTracer nvtx_range(index_str + " packGhosts", NVTXColor::PeterRiver);
 
-    // Pack non-contiguous ghosts to temporary contiguous buffers on device
-    invokePackingKernels(d_temperature, d_ghosts, bounds,
-        block_width, block_height, block_depth, comm_stream);
-
-    // Transfer ghosts from device to host
-    std::vector<size_t> ghost_sizes = {x_surf_size, x_surf_size, y_surf_size,
-      y_surf_size, z_surf_size, z_surf_size};
-    for (int i = 0; i < DIR_COUNT; i++) {
-      if (!bounds[i]) {
-        hapiCheck(cudaMemcpyAsync(h_ghosts[i], d_ghosts[i], ghost_sizes[i],
-              cudaMemcpyDeviceToHost, comm_stream));
-      }
-    }
+    // Pack non-contiguous ghosts to temporary contiguous buffers on the device
+    // and transfer each from device to host
+    packGhostsDevice(d_temperature, d_ghosts, h_ghosts, bounds,
+        block_width, block_height, block_depth, x_surf_size, y_surf_size, z_surf_size,
+        comm_stream, d2h_stream, pack_events);
 
 #if CUDA_SYNC
-    cudaStreamSynchronize(comm_stream);
+    cudaStreamSynchronize(d2h_stream);
     thisProxy[thisIndex].packGhostsDone();
 #else
     // Add asynchronous callback to be invoked when packing kernels and
     // ghost transfers are complete
     CkCallback* cb = new CkCallback(CkIndex_Block::packGhostsDone(), thisProxy[thisIndex]);
-    hapiAddCallback(comm_stream, cb);
+    hapiAddCallback(d2h_stream, cb);
 #endif
   }
 
@@ -387,19 +389,20 @@ class Block : public CBase_Block {
           z_surf_count, h_ghosts[BACK]);
   }
 
-  void processGhostReg(int dir, int size, DataType* gh) {
+  void processGhostReg(int dir, int count, DataType* gh) {
     NVTXTracer nvtx_range(index_str + " processGhostReg " + std::to_string(dir), NVTXColor::Carrot);
 
-    DataType* h_ghost = nullptr; DataType* d_ghost = nullptr;
     CkAssert(dir >= 0 && dir < DIR_COUNT);
+    DataType* h_ghost = nullptr;
+    DataType* d_ghost = nullptr;
     h_ghost = h_ghosts[dir];
     d_ghost = d_ghosts[dir];
 
-    memcpy(h_ghost, gh, size * sizeof(DataType));
-    hapiCheck(cudaMemcpyAsync(d_ghost, h_ghost, size * sizeof(DataType),
-          cudaMemcpyHostToDevice, comm_stream));
-    invokeUnpackingKernel(d_temperature, d_ghost, dir, block_width, block_height,
-        block_depth, comm_stream);
+    size_t ghost_size = count * sizeof(DataType);
+    memcpy(h_ghost, gh, ghost_size);
+    unpackGhostDevice(d_temperature, d_ghost, h_ghost, dir,
+        block_width, block_height, block_depth, ghost_size,
+        comm_stream, h2d_stream, unpack_events);
   }
 
   void update() {

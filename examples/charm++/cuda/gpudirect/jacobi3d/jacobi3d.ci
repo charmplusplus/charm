@@ -35,7 +35,7 @@ mainmodule jacobi3d {
     entry Block(void);
     entry void init();
     entry void packGhostsDone();
-    entry void recvGhostReg(int ref, int dir, int w, DataType gh[w]);
+    entry void recvGhostReg(int ref, int dir, int count, DataType gh[count]);
     entry void updateDone();
     entry void print();
     entry void printDone();
@@ -58,9 +58,9 @@ mainmodule jacobi3d {
 
       // Receive ghost data from neighbors
       for (remote_count = 0; remote_count < neighbors; remote_count++) {
-        when recvGhostReg[my_iter](int ref, int dir, int w, DataType buf[w]) {
+        when recvGhostReg[my_iter](int ref, int dir, int count, DataType buf[count]) {
           serial {
-            processGhostReg(dir, w, buf);
+            processGhostReg(dir, count, buf);
           }
         }
       }

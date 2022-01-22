@@ -287,83 +287,113 @@ void invokeJacobiKernel(DataType* d_temperature, DataType* d_new_temperature,
   hapiCheck(cudaPeekAtLastError());
 }
 
-void invokePackingKernels(DataType* d_temperature, DataType* d_ghosts[],
-    bool bounds[], int block_width, int block_height, int block_depth,
-    cudaStream_t stream) {
+void packGhostsDevice(DataType* d_temperature,
+    DataType* d_ghosts[], DataType* h_ghosts[], bool bounds[],
+    int block_width, int block_height, int block_depth,
+    size_t x_surf_size, size_t y_surf_size, size_t z_surf_size,
+    cudaStream_t comm_stream, cudaStream_t d2h_stream, cudaEvent_t pack_events[]) {
   dim3 block_dim(TILE_SIZE_2D, TILE_SIZE_2D);
-
   if (!bounds[LEFT]) {
     dim3 grid_dim((block_height+(block_dim.x-1))/block_dim.x,
         (block_depth+(block_dim.y-1))/block_dim.y);
-    leftPackingKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature,
+    leftPackingKernel<<<grid_dim, block_dim, 0, comm_stream>>>(d_temperature,
         d_ghosts[LEFT], block_width, block_height, block_depth);
+    cudaEventRecord(pack_events[LEFT], comm_stream);
+    cudaStreamWaitEvent(d2h_stream, pack_events[LEFT], 0);
+    cudaMemcpyAsync(h_ghosts[LEFT], d_ghosts[LEFT], x_surf_size,
+        cudaMemcpyDeviceToHost, d2h_stream);
   }
   if (!bounds[RIGHT]) {
     dim3 grid_dim((block_height+(block_dim.x-1))/block_dim.x,
         (block_depth+(block_dim.y-1))/block_dim.y);
-    rightPackingKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature,
+    rightPackingKernel<<<grid_dim, block_dim, 0, comm_stream>>>(d_temperature,
         d_ghosts[RIGHT], block_width, block_height, block_depth);
+    cudaEventRecord(pack_events[RIGHT], comm_stream);
+    cudaStreamWaitEvent(d2h_stream, pack_events[RIGHT], 0);
+    cudaMemcpyAsync(h_ghosts[RIGHT], d_ghosts[RIGHT], x_surf_size,
+        cudaMemcpyDeviceToHost, d2h_stream);
   }
   if (!bounds[TOP]) {
     dim3 grid_dim((block_width+(block_dim.x-1))/block_dim.x,
         (block_depth+(block_dim.y-1))/block_dim.y);
-    topPackingKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature,
+    topPackingKernel<<<grid_dim, block_dim, 0, comm_stream>>>(d_temperature,
         d_ghosts[TOP], block_width, block_height, block_depth);
+    cudaEventRecord(pack_events[TOP], comm_stream);
+    cudaStreamWaitEvent(d2h_stream, pack_events[TOP], 0);
+    cudaMemcpyAsync(h_ghosts[TOP], d_ghosts[TOP], y_surf_size,
+        cudaMemcpyDeviceToHost, d2h_stream);
   }
   if (!bounds[BOTTOM]) {
     dim3 grid_dim((block_width+(block_dim.x-1))/block_dim.x,
         (block_depth+(block_dim.y-1))/block_dim.y);
-    bottomPackingKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature,
+    bottomPackingKernel<<<grid_dim, block_dim, 0, comm_stream>>>(d_temperature,
         d_ghosts[BOTTOM], block_width, block_height, block_depth);
+    cudaEventRecord(pack_events[BOTTOM], comm_stream);
+    cudaStreamWaitEvent(d2h_stream, pack_events[BOTTOM], 0);
+    cudaMemcpyAsync(h_ghosts[BOTTOM], d_ghosts[BOTTOM], y_surf_size,
+        cudaMemcpyDeviceToHost, d2h_stream);
   }
   if (!bounds[FRONT]) {
     dim3 grid_dim((block_width+(block_dim.x-1))/block_dim.x,
         (block_height+(block_dim.y-1))/block_dim.y);
-    frontPackingKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature,
+    frontPackingKernel<<<grid_dim, block_dim, 0, comm_stream>>>(d_temperature,
         d_ghosts[FRONT], block_width, block_height, block_depth);
+    cudaEventRecord(pack_events[FRONT], comm_stream);
+    cudaStreamWaitEvent(d2h_stream, pack_events[FRONT], 0);
+    cudaMemcpyAsync(h_ghosts[FRONT], d_ghosts[FRONT], z_surf_size,
+        cudaMemcpyDeviceToHost, d2h_stream);
   }
   if (!bounds[BACK]) {
     dim3 grid_dim((block_width+(block_dim.x-1))/block_dim.x,
         (block_height+(block_dim.y-1))/block_dim.y);
-    backPackingKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature,
+    backPackingKernel<<<grid_dim, block_dim, 0, comm_stream>>>(d_temperature,
         d_ghosts[BACK], block_width, block_height, block_depth);
+    cudaEventRecord(pack_events[BACK], comm_stream);
+    cudaStreamWaitEvent(d2h_stream, pack_events[BACK], 0);
+    cudaMemcpyAsync(h_ghosts[BACK], d_ghosts[BACK], z_surf_size,
+        cudaMemcpyDeviceToHost, d2h_stream);
   }
   hapiCheck(cudaPeekAtLastError());
 }
 
-void invokeUnpackingKernel(DataType* d_temperature, DataType* d_ghost, int dir,
-    int block_width, int block_height, int block_depth, cudaStream_t stream) {
-  dim3 block_dim(TILE_SIZE_2D, TILE_SIZE_2D);
+void unpackGhostDevice(DataType* d_temperature, DataType* d_ghost, DataType* h_ghost,
+    int dir, int block_width, int block_height, int block_depth, size_t ghost_size,
+    cudaStream_t comm_stream, cudaStream_t h2d_stream, cudaEvent_t unpack_events[]) {
+  cudaMemcpyAsync(d_ghost, h_ghost, ghost_size, cudaMemcpyHostToDevice,
+      h2d_stream);
+  cudaEventRecord(unpack_events[dir], h2d_stream);
+  cudaStreamWaitEvent(comm_stream, unpack_events[dir], 0);
 
+  dim3 block_dim(TILE_SIZE_2D, TILE_SIZE_2D);
   if (dir == LEFT) {
     dim3 grid_dim((block_height+(block_dim.x-1))/block_dim.x,
         (block_depth+(block_dim.y-1))/block_dim.y);
-    leftUnpackingKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature,
+    leftUnpackingKernel<<<grid_dim, block_dim, 0, comm_stream>>>(d_temperature,
         d_ghost, block_width, block_height, block_depth);
   } else if (dir == RIGHT) {
     dim3 grid_dim((block_height+(block_dim.x-1))/block_dim.x,
         (block_depth+(block_dim.y-1))/block_dim.y);
-    rightUnpackingKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature,
+    rightUnpackingKernel<<<grid_dim, block_dim, 0, comm_stream>>>(d_temperature,
         d_ghost, block_width, block_height, block_depth);
   } else if (dir == TOP) {
     dim3 grid_dim((block_width+(block_dim.x-1))/block_dim.x,
         (block_depth+(block_dim.y-1))/block_dim.y);
-    topUnpackingKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature,
+    topUnpackingKernel<<<grid_dim, block_dim, 0, comm_stream>>>(d_temperature,
         d_ghost, block_width, block_height, block_depth);
   } else if (dir == BOTTOM) {
     dim3 grid_dim((block_width+(block_dim.x-1))/block_dim.x,
         (block_depth+(block_dim.y-1))/block_dim.y);
-    bottomUnpackingKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature,
+    bottomUnpackingKernel<<<grid_dim, block_dim, 0, comm_stream>>>(d_temperature,
         d_ghost, block_width, block_height, block_depth);
   } else if (dir == FRONT) {
     dim3 grid_dim((block_width+(block_dim.x-1))/block_dim.x,
         (block_height+(block_dim.y-1))/block_dim.y);
-    frontUnpackingKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature,
+    frontUnpackingKernel<<<grid_dim, block_dim, 0, comm_stream>>>(d_temperature,
         d_ghost, block_width, block_height, block_depth);
   } else if (dir == BACK) {
     dim3 grid_dim((block_width+(block_dim.x-1))/block_dim.x,
         (block_height+(block_dim.y-1))/block_dim.y);
-    backUnpackingKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature,
+    backUnpackingKernel<<<grid_dim, block_dim, 0, comm_stream>>>(d_temperature,
         d_ghost, block_width, block_height, block_depth);
   }
   hapiCheck(cudaPeekAtLastError());
