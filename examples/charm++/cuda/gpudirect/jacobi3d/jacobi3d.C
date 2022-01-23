@@ -48,7 +48,6 @@ extern void unpackGhostDevice(DataType* d_temperature, DataType* d_ghost, DataTy
     cudaStream_t comm_stream, cudaStream_t h2d_stream, cudaEvent_t unpack_events[]);
 
 class Main : public CBase_Main {
-  int my_iter;
   double init_start_time;
   double start_time;
 
@@ -65,7 +64,6 @@ public:
     n_iters = 100;
     warmup_iters = 10;
     print_elements = false;
-    my_iter = 0;
 
     // Process arguments
     int c;
@@ -183,7 +181,7 @@ public:
   }
 
   void startIter() {
-    if (my_iter++ == warmup_iters) start_time = CkWallTimer();
+    start_time = CkWallTimer();
 
     block_proxy.run();
   }
@@ -349,9 +347,13 @@ class Block : public CBase_Block {
   void packGhosts() {
     NVTXTracer nvtx_range(index_str + " packGhosts", NVTXColor::PeterRiver);
 
+    // Packing must start only after update is complete on the device
+    cudaEventRecord(compute_event, compute_stream);
+    cudaStreamWaitEvent(comm_stream, compute_event, 0);
+
     // Pack non-contiguous ghosts to temporary contiguous buffers on the device
     // and transfer each from device to host
-    packGhostsDevice(d_temperature, d_ghosts, h_ghosts, bounds,
+    packGhostsDevice(d_new_temperature, d_ghosts, h_ghosts, bounds,
         block_width, block_height, block_depth, x_surf_size, y_surf_size, z_surf_size,
         comm_stream, d2h_stream, pack_events);
 
@@ -369,6 +371,12 @@ class Block : public CBase_Block {
   void sendGhosts() {
     NVTXTracer nvtx_range(index_str + " sendGhosts", NVTXColor::WetAsphalt);
 
+    // Increment iteration count and swap data pointers
+    // to avoid host synchronization
+    my_iter++;
+    std::swap(d_temperature, d_new_temperature);
+
+    // Send boundary data to neighbors
     if (!bounds[LEFT])
       thisProxy(x-1, y, z).recvGhostReg(my_iter, RIGHT,
           x_surf_count, h_ghosts[LEFT]);
@@ -408,8 +416,8 @@ class Block : public CBase_Block {
   void update() {
     NVTXTracer nvtx_range(index_str + " update", NVTXColor::BelizeHole);
 
-    // Operations in compute stream should only be executed when
-    // operations in communication stream (transfers and unpacking) complete
+    // Update should only be performed after operations in communication stream
+    // (transfers and unpacking) complete
     hapiCheck(cudaEventRecord(comm_event, comm_stream));
     hapiCheck(cudaStreamWaitEvent(compute_stream, comm_event, 0));
 
@@ -417,27 +425,33 @@ class Block : public CBase_Block {
     invokeJacobiKernel(d_temperature, d_new_temperature, block_width, block_height,
         block_depth, compute_stream);
 
-    CkCallback update_cb(CkIndex_Block::updateDone(), thisProxy[thisIndex]);
-    hapiAddCallback(compute_stream, update_cb);
+    // Synchronize with host only when necessary
+    if (print_elements || (my_iter == warmup_iters)
+        || (my_iter == warmup_iters + n_iters)) {
+      CkCallback update_cb(CkIndex_Block::updateDone(), thisProxy[thisIndex]);
+      hapiAddCallback(compute_stream, update_cb);
+    } else {
+      thisProxy[thisIndex].run();
+    }
   }
 
-  void prepNextIter() {
-    NVTXTracer nvtx_range(index_str + " prepNextIter", NVTXColor::GreenSea);
+  void updateDone() {
+    NVTXTracer nvtx_range(index_str + " updateDone", NVTXColor::GreenSea);
 
-    std::swap(d_temperature, d_new_temperature);
-    my_iter++;
-    if (my_iter <= warmup_iters) {
+    if (print_elements) {
+      if (x == 0 && y == 0 && z == 0) {
+        CkPrintf("Printing iteration %d\n", my_iter);
+        thisProxy[thisIndex].print();
+      }
+    } else if (my_iter == warmup_iters) {
       contribute(CkCallback(CkReductionTarget(Main, warmupDone), main_proxy));
     } else {
-      if (my_iter < warmup_iters + n_iters) {
-        thisProxy[thisIndex].run();
-      } else {
-        contribute(CkCallback(CkReductionTarget(Main, allDone), main_proxy));
-      }
+      contribute(CkCallback(CkReductionTarget(Main, allDone), main_proxy));
     }
   }
 
   void print() {
+    // Move data from device to host for printing
     hapiCheck(cudaMemcpyAsync(h_temperature, d_temperature,
           sizeof(DataType) * (block_width+2)*(block_height+2)*(block_depth+2),
           cudaMemcpyDeviceToHost, comm_stream));
@@ -458,8 +472,16 @@ class Block : public CBase_Block {
       CkPrintf("\n");
     }
 
+    // Go around all chares and print each one, until last chare
+    // returns control back to Main or resumes next iteration
     if (x == n_chares_x-1 && y == n_chares_y-1 && z == n_chares_z-1) {
-      thisProxy.printDone();
+      if (my_iter == warmup_iters) {
+        main_proxy.warmupDone();
+      } else if (my_iter == warmup_iters + n_iters) {
+        main_proxy.allDone();
+      } else {
+        thisProxy.run();
+      }
     } else {
       if (x == n_chares_x-1 && y == n_chares_y-1) {
         thisProxy(0,0,z+1).print();

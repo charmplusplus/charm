@@ -38,7 +38,6 @@ mainmodule jacobi3d {
     entry void recvGhostReg(int ref, int dir, int count, DataType gh[count]);
     entry void updateDone();
     entry void print();
-    entry void printDone();
 
     entry void initDone() {
       serial {
@@ -68,24 +67,6 @@ mainmodule jacobi3d {
       // Perform Jacobian update
       serial {
         update();
-      }
-
-      // Iteration complete
-      when updateDone() serial {
-        if (print_elements) {
-          if (x == 0 && y == 0 && z == 0) {
-            CkPrintf("Printing iteration %d\n", my_iter);
-            thisProxy[thisIndex].print();
-          }
-        } else {
-          prepNextIter();
-        }
-      }
-
-      if (print_elements) {
-        when printDone() serial {
-          prepNextIter();
-        }
       }
     }
   };
