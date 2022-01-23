@@ -30,7 +30,7 @@ endif()
 
 # CMA
 set(CMK_USE_CMA ${CMK_HAS_CMA})
-if(NETWORK STREQUAL "multicore" OR NETWORK MATCHES "bluegeneq")
+if(NETWORK STREQUAL "multicore")
   set(CMK_USE_CMA 0)
 endif()
 

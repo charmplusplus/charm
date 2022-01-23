@@ -127,7 +127,6 @@ add_flag "OPTS_CC='$OPTS_CC'"   'Pass through user-provided C compiler options'
 add_flag "OPTS_CXX='$OPTS_CXX'" 'Pass through user-provided C++ compiler options'
 add_flag "CMK_MACOSX='$CMK_MACOSX'" 'basic setup'
 add_flag "CMK_WINDOWS='$CMK_WINDOWS'" 'basic setup'
-add_flag "CMK_BLUEGENEQ='$CMK_BLUEGENEQ'" 'basic setup'
 add_flag "CMK_POST_EXE='$CMK_POST_EXE'" 'basic setup'
 add_flag "CMK_SHARED_SUF='$CMK_SHARED_SUF'" 'basic setup'
 add_flag "CMK_USER_SUFFIX='$CMK_USER_SUFFIX'" 'basic setup'
@@ -138,7 +137,6 @@ add_make_flag "CMK_USER_SUFFIX:=$CMK_USER_SUFFIX" 'basic setup'
 add_make_flag "CMK_NO_PARTITIONS:=$CMK_NO_PARTITIONS" 'basic setup'
 add_make_flag "CMK_MACOSX:=$CMK_MACOSX" 'basic setup'
 add_make_flag "CMK_WINDOWS:=$CMK_WINDOWS" 'basic setup'
-add_make_flag "CMK_BLUEGENEQ:=$CMK_BLUEGENEQ" 'basic setup'
 add_make_flag "CMK_MULTICORE:=$CMK_MULTICORE" 'basic setup'
 add_make_flag "CMK_USE_LRTS:=$CMK_USE_LRTS" 'basic setup'
 add_make_flag "BUILD_CUDA:=$BUILD_CUDA" 'basic setup'
@@ -2425,10 +2423,10 @@ test_link "whether has support for shm transport using Cross Memory Attach" "yes
 AC_DEFINE_UNQUOTED(CMK_HAS_CMA, $pass, [whether supports cma])
 CMK_HAS_CMA="$pass"
 
-test "$CMK_HAS_CMA" = '1' -a "$CMK_MULTICORE" != '1' -a "$CMK_BLUEGENEQ" != '1' && CMK_USE_CMA='1' || CMK_USE_CMA='0'
+test "$CMK_HAS_CMA" = '1' -a "$CMK_MULTICORE" != '1' && CMK_USE_CMA='1' || CMK_USE_CMA='0'
 add_make_flag "CMK_USE_CMA:=$CMK_USE_CMA" 'Cross Memory Attach'
 
-test "$CMK_WINDOWS" != '1' -a "$CMK_BLUEGENEQ" != '1' && CMK_SUPPORTS_MEMORY_ISOMALLOC='1' || CMK_SUPPORTS_MEMORY_ISOMALLOC='0'
+test "$CMK_WINDOWS" != '1' && CMK_SUPPORTS_MEMORY_ISOMALLOC='1' || CMK_SUPPORTS_MEMORY_ISOMALLOC='0'
 add_flag "CMK_SUPPORTS_MEMORY_ISOMALLOC='$CMK_SUPPORTS_MEMORY_ISOMALLOC'" '-memory isomalloc'
 add_make_flag "CMK_SUPPORTS_MEMORY_ISOMALLOC:=$CMK_SUPPORTS_MEMORY_ISOMALLOC" '-memory isomalloc'
 
