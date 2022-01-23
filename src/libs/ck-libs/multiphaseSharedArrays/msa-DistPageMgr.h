@@ -393,7 +393,12 @@ class MSA_PageT {
 	/** Merger object */
 	MERGER m;
 
+	using self_type = MSA_PageT<ENTRY, MERGER, ENTRIES_PER_PAGE>;
+
 public:
+
+	static_assert(!std::is_same<ENTRY, bool>::value,
+				  "boolean MSAs currently unsupported");
 
 	MSA_PageT()
 		{
@@ -429,8 +434,12 @@ public:
 	// These accessors might be used by the templated code.
  	inline ENTRY &operator[](int i) {return data[i];}
  	inline const ENTRY &operator[](int i) const {return data[i];}
-    inline ENTRY *getData() { return data; }
-	inline const ENTRY *getData() const { return (const ENTRY*) data; }
+
+	inline ENTRY *getData() { return (ENTRY *)this->data.data(); }
+
+	inline const ENTRY *getData() const {
+		return const_cast<self_type *>(this)->getData();
+	}
 };
 
 //=============================== Cache Manager =================================
@@ -1270,7 +1279,7 @@ protected:
     // MSA_PageArray::
     inline void combine(const ENTRY_TYPE* buffer, unsigned int begin, unsigned int end)
 		{
-			ENTRY_TYPE* pagePtr = epage.data() + begin;
+			ENTRY_TYPE* pagePtr = (ENTRY_TYPE *)epage.data() + begin;
 			for(unsigned int i = 0; i < (end - begin); i++)
 				entryOpsObject.accumulate(pagePtr[i], buffer[i]);
 		}
@@ -1307,7 +1316,7 @@ public:
 			if (entryOpsObject.pupEveryElement())
 				cache[pe].ReceivePageWithPUP(pageNo(), page_t(epage), epage.size());
 			else
-				cache[pe].ReceivePage(pageNo(), epage.data(), epage.size());
+				cache[pe].ReceivePage(pageNo(), (ENTRY_TYPE *)epage.data(), epage.size());
 		}
 
     /// Receive a non-runlength encoded page from the network:
