@@ -176,8 +176,10 @@ struct TopoManagerWrapper {
       if ( a < 0 || a >= na ) CmiAbort("inconsistent torus topology!");
       if ( b < 0 || b >= nb ) CmiAbort("inconsistent torus topology!");
       if ( c < 0 || c >= nc ) CmiAbort("inconsistent torus topology!");
+#if 0
       if ( d < 0 || d >= nd ) CmiAbort("inconsistent torus topology!");
       if ( e < 0 || e >= ne ) CmiAbort("inconsistent torus topology!");
+#endif
       a_flags[a] = 1;
       b_flags[b] = 1;
       c_flags[c] = 1;
