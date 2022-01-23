@@ -21,6 +21,7 @@ mainmodule jacobi3d {
   readonly int n_chares_z;
   readonly int n_iters;
   readonly int warmup_iters;
+  readonly bool use_channel;
   readonly bool print_elements;
 
   mainchare Main {
@@ -34,12 +35,30 @@ mainmodule jacobi3d {
   array [3D] Block {
     entry Block(void);
     entry void init();
+    entry void recvChannelID(int dir, int id);
     entry void packGhostsDone();
     entry void recvGhostReg(int ref, int dir, int count, DataType gh[count]);
     entry void updateDone();
     entry void print();
 
     entry void initDone() {
+      if (use_channel) {
+        serial {
+          sendChannelIDs();
+        }
+
+        // Wait for channel IDs from "lower" neighbors
+        for (nbr_count = 0; nbr_count < n_low_nbr; nbr_count++) {
+          when recvChannelID(int dir, int id) serial {
+            channel_ids[dir] = id;
+          }
+        }
+
+        serial {
+          createChannels();
+        }
+      }
+
       serial {
         contribute(CkCallback(CkReductionTarget(Main, initDone), main_proxy));
       }
@@ -56,7 +75,7 @@ mainmodule jacobi3d {
       }
 
       // Receive ghost data from neighbors
-      for (remote_count = 0; remote_count < neighbors; remote_count++) {
+      for (nbr_count = 0; nbr_count < n_nbr; nbr_count++) {
         when recvGhostReg[my_iter](int ref, int dir, int count, DataType buf[count]) {
           serial {
             processGhostReg(dir, count, buf);

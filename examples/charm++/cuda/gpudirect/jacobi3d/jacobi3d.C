@@ -28,6 +28,7 @@
 /* readonly */ int n_chares_z;
 /* readonly */ int n_iters;
 /* readonly */ int warmup_iters;
+/* readonly */ bool use_channel;
 /* readonly */ bool print_elements;
 
 extern void invokeInitKernel(DataType* d_temperature, int block_width,
@@ -63,12 +64,13 @@ public:
     grid_depth = 512;
     n_iters = 100;
     warmup_iters = 10;
+    use_channel = false;
     print_elements = false;
 
     // Process arguments
     int c;
     bool dims[3] = {false, false, false};
-    while ((c = getopt(m->argc, m->argv, "c:x:y:z:i:w:dsp")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "c:x:y:z:i:w:dp")) != -1) {
       switch (c) {
         case 'c':
           num_chares = atoi(optarg);
@@ -91,6 +93,9 @@ public:
         case 'w':
           warmup_iters = atoi(optarg);
           break;
+        case 'd':
+          use_channel = true;
+          break;
         case 'p':
           print_elements = true;
           break;
@@ -98,7 +103,7 @@ public:
           CkPrintf(
               "Usage: %s -x [grid width] -y [grid height] -z [grid depth] "
               "-c [number of chares] -i [iterations] -w [warmup iterations] "
-              "-p (print blocks)\n",
+              "-d [use channels] -p (print blocks)\n",
               m->argv[0]);
           CkExit();
       }
@@ -207,10 +212,16 @@ class Block : public CBase_Block {
 
  public:
   int my_iter;
-  int neighbors;
-  int remote_count;
+  int n_nbr;
+  int n_low_nbr;
+  int n_high_nbr;
+  int nbr_count;
   int x, y, z;
+  int linear_index;
   std::string index_str;
+
+  int channel_ids[DIR_COUNT];
+  CkChannel channels[DIR_COUNT];
 
   DataType* h_temperature;
   DataType* d_temperature;
@@ -258,28 +269,30 @@ class Block : public CBase_Block {
   void init() {
     // Initialize values
     my_iter = 0;
-    neighbors = 0;
+    n_nbr = 0;
     x = thisIndex.x;
     y = thisIndex.y;
     z = thisIndex.z;
+    linear_index = x * n_chares_y * n_chares_z + y * n_chares_z + z;
     index_str = "[" + std::to_string(x) + "," + std::to_string(y)
       + "," + std::to_string(z) + "]";
+    for (int i = 0; i < DIR_COUNT; i++) channel_ids[i] = -1;
 
     // Check bounds and set number of valid neighbors
     for (int i = 0; i < DIR_COUNT; i++) bounds[i] = false;
 
     if (x == 0)            bounds[LEFT] = true;
-    else                   neighbors++;
-    if (x == n_chares_x-1) bounds[RIGHT]= true;
-    else                   neighbors++;
+    else                   { n_nbr++; n_low_nbr++; }
+    if (x == n_chares_x-1) bounds[RIGHT] = true;
+    else                   { n_nbr++; n_high_nbr++; }
     if (y == 0)            bounds[TOP] = true;
-    else                   neighbors++;
+    else                   { n_nbr++; n_low_nbr++; }
     if (y == n_chares_y-1) bounds[BOTTOM] = true;
-    else                   neighbors++;
+    else                   { n_nbr++; n_high_nbr++; }
     if (z == 0)            bounds[FRONT] = true;
-    else                   neighbors++;
+    else                   { n_nbr++; n_low_nbr++; }
     if (z == n_chares_z-1) bounds[BACK] = true;
-    else                   neighbors++;
+    else                   { n_nbr++; n_high_nbr++; }
 
     // Allocate memory and create CUDA entities
     hapiCheck(cudaMallocHost((void**)&h_temperature,
@@ -342,6 +355,55 @@ class Block : public CBase_Block {
     CkCallback* cb = new CkCallback(CkIndex_Block::initDone(), thisProxy[thisIndex]);
     hapiAddCallback(compute_stream, cb);
 #endif
+  }
+
+  void sendChannelIDs() {
+    // Create channel IDs for "higher" neighbors and send them
+    int channel_id = -1;
+    if (!bounds[RIGHT]) {
+      channel_id = linear_index * (DIR_COUNT / 2);
+      channel_ids[RIGHT] = channel_id;
+      thisProxy(x+1, y, z).recvChannelID(LEFT, channel_id);
+    }
+    if (!bounds[BOTTOM]) {
+      channel_id = linear_index * (DIR_COUNT / 2) + 1;
+      channel_ids[BOTTOM] = channel_id;
+      thisProxy(x, y+1, z).recvChannelID(TOP, channel_id);
+    }
+    if (!bounds[BACK]) {
+      channel_id = linear_index * (DIR_COUNT / 2) + 2;
+      channel_ids[BACK] = channel_id;
+      thisProxy(x, y, z+1).recvChannelID(FRONT, channel_id);
+    }
+  }
+
+  void createChannels() {
+    // Check if channel IDs are properly stored
+    for (int dir = 0; dir < DIR_COUNT; dir++) {
+      if (!bounds[dir]) {
+        CkAssert(channel_ids[dir] != -1);
+      }
+    }
+
+    // Create channels
+    if (!bounds[LEFT]) {
+      channels[LEFT] = CkChannel(channel_ids[LEFT], thisProxy(x-1, y, z));
+    }
+    if (!bounds[RIGHT]) {
+      channels[RIGHT] = CkChannel(channel_ids[RIGHT], thisProxy(x+1, y, z));
+    }
+    if (!bounds[TOP]) {
+      channels[TOP] = CkChannel(channel_ids[TOP], thisProxy(x, y-1, z));
+    }
+    if (!bounds[BOTTOM]) {
+      channels[BOTTOM] = CkChannel(channel_ids[BOTTOM], thisProxy(x, y+1, z));
+    }
+    if (!bounds[FRONT]) {
+      channels[FRONT] = CkChannel(channel_ids[FRONT], thisProxy(x, y, z-1));
+    }
+    if (!bounds[BACK]) {
+      channels[BACK] = CkChannel(channel_ids[BACK], thisProxy(x, y, z+1));
+    }
   }
 
   void packGhosts() {
