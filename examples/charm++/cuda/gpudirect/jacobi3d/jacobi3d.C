@@ -228,7 +228,8 @@ class Block : public CBase_Block {
   DataType* d_new_temperature;
 
   DataType* h_ghosts[DIR_COUNT];
-  DataType* d_ghosts[DIR_COUNT];
+  DataType* d_send_ghosts[DIR_COUNT];
+  DataType* d_recv_ghosts[DIR_COUNT];
 
   cudaStream_t compute_stream;
   cudaStream_t comm_stream;
@@ -250,7 +251,8 @@ class Block : public CBase_Block {
     hapiCheck(cudaFree(d_new_temperature));
     for (int i = 0; i < DIR_COUNT; i++) {
       hapiCheck(cudaFreeHost(h_ghosts[i]));
-      hapiCheck(cudaFree(d_ghosts[i]));
+      hapiCheck(cudaFree(d_send_ghosts[i]));
+      hapiCheck(cudaFree(d_recv_ghosts[i]));
     }
 
     hapiCheck(cudaStreamDestroy(compute_stream));
@@ -305,7 +307,8 @@ class Block : public CBase_Block {
       y_surf_size, z_surf_size, z_surf_size};
     for (int i = 0; i < DIR_COUNT; i++) {
       hapiCheck(cudaMallocHost((void**)&h_ghosts[i], ghost_sizes[i]));
-      hapiCheck(cudaMalloc((void**)&d_ghosts[i], ghost_sizes[i]));
+      hapiCheck(cudaMalloc((void**)&d_send_ghosts[i], ghost_sizes[i]));
+      hapiCheck(cudaMalloc((void**)&d_recv_ghosts[i], ghost_sizes[i]));
     }
 
     // Create CUDA streams and events
@@ -328,11 +331,14 @@ class Block : public CBase_Block {
     // Initialize ghost data
     std::vector<int> ghost_counts = {x_surf_count, x_surf_count, y_surf_count,
       y_surf_count, z_surf_count, z_surf_count};
-    std::vector<DataType*> ghosts;
+    std::vector<DataType*> send_ghosts;
+    std::vector<DataType*> recv_ghosts;
     for (int i = 0; i < DIR_COUNT; i++) {
-      ghosts.push_back(d_ghosts[i]);
+      send_ghosts.push_back(d_send_ghosts[i]);
+      recv_ghosts.push_back(d_recv_ghosts[i]);
     }
-    invokeGhostInitKernels(ghosts, ghost_counts, compute_stream);
+    invokeGhostInitKernels(send_ghosts, ghost_counts, compute_stream);
+    invokeGhostInitKernels(recv_ghosts, ghost_counts, compute_stream);
 
     for (int i = 0; i < DIR_COUNT; i++) {
       int ghost_count = ghost_counts[i];
@@ -415,7 +421,7 @@ class Block : public CBase_Block {
 
     // Pack non-contiguous ghosts to temporary contiguous buffers on the device
     // and transfer each from device to host
-    packGhostsDevice(d_new_temperature, d_ghosts, h_ghosts, bounds,
+    packGhostsDevice(d_new_temperature, d_send_ghosts, h_ghosts, bounds,
         block_width, block_height, block_depth, x_surf_size, y_surf_size, z_surf_size,
         comm_stream, d2h_stream, pack_events);
 
@@ -463,14 +469,11 @@ class Block : public CBase_Block {
     NVTXTracer nvtx_range(index_str + " processGhostReg " + std::to_string(dir), NVTXColor::Carrot);
 
     CkAssert(dir >= 0 && dir < DIR_COUNT);
-    DataType* h_ghost = nullptr;
-    DataType* d_ghost = nullptr;
-    h_ghost = h_ghosts[dir];
-    d_ghost = d_ghosts[dir];
+    DataType* h_ghost = h_ghosts[dir];
 
     size_t ghost_size = count * sizeof(DataType);
     memcpy(h_ghost, gh, ghost_size);
-    unpackGhostDevice(d_temperature, d_ghost, h_ghost, dir,
+    unpackGhostDevice(d_temperature, d_recv_ghosts[dir], h_ghost, dir,
         block_width, block_height, block_depth, ghost_size,
         comm_stream, h2d_stream, unpack_events);
   }
