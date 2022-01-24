@@ -38,6 +38,8 @@ mainmodule jacobi3d {
     entry void recvChannelID(int dir, int id);
     entry void packGhostsDone();
     entry void recvGhostReg(int ref, int dir, int count, DataType gh[count]);
+    entry void sendCallback(int ref);
+    entry void recvCallback(int ref);
     entry void updateDone();
     entry void print();
 
@@ -75,10 +77,26 @@ mainmodule jacobi3d {
       }
 
       // Receive ghost data from neighbors
-      for (nbr_count = 0; nbr_count < n_nbr; nbr_count++) {
-        when recvGhostReg[my_iter](int ref, int dir, int count, DataType buf[count]) {
-          serial {
-            processGhostReg(dir, count, buf);
+      if (use_channel) {
+        serial {
+          recvGhosts();
+        }
+
+        for (nbr_count = 0; nbr_count < n_nbr; nbr_count++) {
+          when recvCallback[my_iter](int ref) serial {
+            // TODO
+            processGhostChannel(0);
+          }
+        }
+        for (nbr_count = 0; nbr_count < n_nbr; nbr_count++) {
+          when sendCallback[my_iter](int ref) serial {}
+        }
+      } else {
+        for (nbr_count = 0; nbr_count < n_nbr; nbr_count++) {
+          when recvGhostReg[my_iter](int ref, int dir, int count, DataType buf[count]) {
+            serial {
+              processGhostReg(dir, count, buf);
+            }
           }
         }
       }

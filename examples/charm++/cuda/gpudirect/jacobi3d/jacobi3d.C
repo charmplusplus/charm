@@ -43,10 +43,12 @@ extern void packGhostsDevice(DataType* d_temperature,
     DataType* d_ghosts[], DataType* h_ghosts[], bool bounds[],
     int block_width, int block_height, int block_depth,
     size_t x_surf_size, size_t y_surf_size, size_t z_surf_size,
-    cudaStream_t comm_stream, cudaStream_t d2h_stream, cudaEvent_t pack_events[]);
+    cudaStream_t comm_stream, cudaStream_t d2h_stream, cudaEvent_t pack_events[],
+    bool use_channel);
 extern void unpackGhostDevice(DataType* d_temperature, DataType* d_ghost, DataType* h_ghost,
     int dir, int block_width, int block_height, int block_depth, size_t ghost_size,
-    cudaStream_t comm_stream, cudaStream_t h2d_stream, cudaEvent_t unpack_events[]);
+    cudaStream_t comm_stream, cudaStream_t h2d_stream, cudaEvent_t unpack_events[],
+    bool use_channel);
 
 class Main : public CBase_Main {
   double init_start_time;
@@ -222,6 +224,8 @@ class Block : public CBase_Block {
 
   int channel_ids[DIR_COUNT];
   CkChannel channels[DIR_COUNT];
+  CkCallback send_cb;
+  CkCallback recv_cb;
 
   DataType* h_temperature;
   DataType* d_temperature;
@@ -230,6 +234,7 @@ class Block : public CBase_Block {
   DataType* h_ghosts[DIR_COUNT];
   DataType* d_send_ghosts[DIR_COUNT];
   DataType* d_recv_ghosts[DIR_COUNT];
+  size_t ghost_sizes[DIR_COUNT];
 
   cudaStream_t compute_stream;
   cudaStream_t comm_stream;
@@ -279,6 +284,8 @@ class Block : public CBase_Block {
     index_str = "[" + std::to_string(x) + "," + std::to_string(y)
       + "," + std::to_string(z) + "]";
     for (int i = 0; i < DIR_COUNT; i++) channel_ids[i] = -1;
+    send_cb = CkCallback(CkIndex_Block::sendCallback(0), thisProxy[thisIndex]);
+    recv_cb = CkCallback(CkIndex_Block::recvCallback(0), thisProxy[thisIndex]);
 
     // Check bounds and set number of valid neighbors
     for (int i = 0; i < DIR_COUNT; i++) bounds[i] = false;
@@ -303,8 +310,12 @@ class Block : public CBase_Block {
           sizeof(DataType) * (block_width+2) * (block_height+2) * (block_depth+2)));
     hapiCheck(cudaMalloc((void**)&d_new_temperature,
           sizeof(DataType) * (block_width+2) * (block_height+2) * (block_depth+2)));
-    size_t ghost_sizes[DIR_COUNT] = {x_surf_size, x_surf_size, y_surf_size,
-      y_surf_size, z_surf_size, z_surf_size};
+    ghost_sizes[LEFT] = x_surf_size;
+    ghost_sizes[RIGHT] = x_surf_size;
+    ghost_sizes[TOP] = y_surf_size;
+    ghost_sizes[BOTTOM] = y_surf_size;
+    ghost_sizes[FRONT] = z_surf_size;
+    ghost_sizes[BACK] = z_surf_size;
     for (int i = 0; i < DIR_COUNT; i++) {
       hapiCheck(cudaMallocHost((void**)&h_ghosts[i], ghost_sizes[i]));
       hapiCheck(cudaMalloc((void**)&d_send_ghosts[i], ghost_sizes[i]));
@@ -423,16 +434,24 @@ class Block : public CBase_Block {
     // and transfer each from device to host
     packGhostsDevice(d_new_temperature, d_send_ghosts, h_ghosts, bounds,
         block_width, block_height, block_depth, x_surf_size, y_surf_size, z_surf_size,
-        comm_stream, d2h_stream, pack_events);
+        comm_stream, d2h_stream, pack_events, use_channel);
 
 #if CUDA_SYNC
-    cudaStreamSynchronize(d2h_stream);
+    if (use_channel) {
+      cudaStreamSynchronize(comm_stream);
+    } else {
+      cudaStreamSynchronize(d2h_stream);
+    }
     thisProxy[thisIndex].packGhostsDone();
 #else
     // Add asynchronous callback to be invoked when packing kernels and
     // ghost transfers are complete
     CkCallback* cb = new CkCallback(CkIndex_Block::packGhostsDone(), thisProxy[thisIndex]);
-    hapiAddCallback(d2h_stream, cb);
+    if (use_channel) {
+      hapiAddCallback(comm_stream, cb);
+    } else {
+      hapiAddCallback(d2h_stream, cb);
+    }
 #endif
   }
 
@@ -445,24 +464,57 @@ class Block : public CBase_Block {
     std::swap(d_temperature, d_new_temperature);
 
     // Send boundary data to neighbors
-    if (!bounds[LEFT])
-      thisProxy(x-1, y, z).recvGhostReg(my_iter, RIGHT,
-          x_surf_count, h_ghosts[LEFT]);
-    if (!bounds[RIGHT])
-      thisProxy(x+1, y, z).recvGhostReg(my_iter, LEFT,
-          x_surf_count, h_ghosts[RIGHT]);
-    if (!bounds[TOP])
-      thisProxy(x, y-1, z).recvGhostReg(my_iter, BOTTOM,
-          y_surf_count, h_ghosts[TOP]);
-    if (!bounds[BOTTOM])
-      thisProxy(x, y+1, z).recvGhostReg(my_iter, TOP,
-          y_surf_count, h_ghosts[BOTTOM]);
-    if (!bounds[FRONT])
-      thisProxy(x, y, z-1).recvGhostReg(my_iter, BACK,
-          z_surf_count, h_ghosts[FRONT]);
-    if (!bounds[BACK])
-      thisProxy(x, y, z+1).recvGhostReg(my_iter, FRONT,
-          z_surf_count, h_ghosts[BACK]);
+    if (use_channel) {
+      // Set callback reference numbers
+      send_cb.setRefNum(my_iter);
+      recv_cb.setRefNum(my_iter);
+
+      // Send ghosts
+      for (int dir = 0; dir < DIR_COUNT; dir++) {
+        if (!bounds[dir]) {
+          channels[dir].send(d_send_ghosts[dir], ghost_sizes[dir], send_cb);
+        }
+      }
+    } else {
+      if (!bounds[LEFT])
+        thisProxy(x-1, y, z).recvGhostReg(my_iter, RIGHT,
+            x_surf_count, h_ghosts[LEFT]);
+      if (!bounds[RIGHT])
+        thisProxy(x+1, y, z).recvGhostReg(my_iter, LEFT,
+            x_surf_count, h_ghosts[RIGHT]);
+      if (!bounds[TOP])
+        thisProxy(x, y-1, z).recvGhostReg(my_iter, BOTTOM,
+            y_surf_count, h_ghosts[TOP]);
+      if (!bounds[BOTTOM])
+        thisProxy(x, y+1, z).recvGhostReg(my_iter, TOP,
+            y_surf_count, h_ghosts[BOTTOM]);
+      if (!bounds[FRONT])
+        thisProxy(x, y, z-1).recvGhostReg(my_iter, BACK,
+            z_surf_count, h_ghosts[FRONT]);
+      if (!bounds[BACK])
+        thisProxy(x, y, z+1).recvGhostReg(my_iter, FRONT,
+            z_surf_count, h_ghosts[BACK]);
+    }
+  }
+
+  void recvGhosts() {
+    NVTXTracer nvtx_range(index_str + " recvGhosts", NVTXColor::Carrot);
+
+    // Receive ghosts
+    for (int dir = 0; dir < DIR_COUNT; dir++) {
+      if (!bounds[dir]) {
+        channels[dir].recv(d_recv_ghosts[dir], ghost_sizes[dir], recv_cb);
+      }
+    }
+  }
+
+  void processGhostChannel(int dir) {
+    NVTXTracer nvtx_range(index_str + " processGhostChannel " + std::to_string(dir), NVTXColor::Carrot);
+
+    // Unpack received ghost
+    unpackGhostDevice(d_temperature, d_recv_ghosts[dir], nullptr, dir,
+        block_width, block_height, block_depth, ghost_sizes[dir],
+        comm_stream, h2d_stream, unpack_events, use_channel);
   }
 
   void processGhostReg(int dir, int count, DataType* gh) {
@@ -475,7 +527,7 @@ class Block : public CBase_Block {
     memcpy(h_ghost, gh, ghost_size);
     unpackGhostDevice(d_temperature, d_recv_ghosts[dir], h_ghost, dir,
         block_width, block_height, block_depth, ghost_size,
-        comm_stream, h2d_stream, unpack_events);
+        comm_stream, h2d_stream, unpack_events, use_channel);
   }
 
   void update() {
