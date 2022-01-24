@@ -27,7 +27,7 @@ else ifneq ($(findstring arm8,$(CMK_VDIR)),)
 else ifneq ($(findstring mips,$(CMK_VDIR)),)
   ARCHITECTURE := mips32
   ABI := o32
-else ifneq ($(findstring bluegene,$(CMK_VDIR))$(findstring pami,$(CMK_VDIR))$(findstring ppc,$(CMK_VDIR)),)
+else ifneq ($(findstring pami,$(CMK_VDIR))$(findstring ppc,$(CMK_VDIR)),)
   ARCHITECTURE := ppc64
 else ifneq ($(findstring cray,$(CMK_VDIR))$(findstring 64,$(CMK_VDIR)),)
   ARCHITECTURE := x86_64

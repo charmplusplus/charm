@@ -41,7 +41,6 @@ public:
     iters = dataSizeMin / DATA_ITEM_SIZE;
     allToAllGroup = CProxy_Participant::ckNew();
 
-#if !CMK_BLUEGENEQ
     int nDims = 2;
     int dims[2] = {CkNumNodes(), CkNumPes() / CkNumNodes()};
     CkPrintf("TEST 1: Using %dD TRAM Topology: %d %d\n",
@@ -59,26 +58,6 @@ public:
     // }
     // int dims[3] = {dim1, dim2, CkNumPes() / CkNumNodes()};
     // CkPrintf("Topology: %d %d %d\n", dims[0], dims[1], dims[2]);
-#else
-    TopoManager tmgr;
-
-    int nDims = 3;
-    int dims[3] = {tmgr.getDimNA() * tmgr.getDimNB(),
-                   tmgr.getDimNC() * tmgr.getDimND() * tmgr.getDimNE(),
-                   tmgr.getDimNT()};
-    CkPrintf("TEST 1: Using %dD TRAM Topology: %d %d %d\n",
-             nDims, dims[0], dims[1], dims[2]);
-
-    // Alternative TRAM topologies for Blue Gene/Q using Topology Manager
-    // int nDims = 4;
-    // int dims[4] = {tmgr.getDimNA() * tmgr.getDimNB(), tmgr.getDimNC(),
-    //                tmgr.getDimND() * tmgr.getDimNE(), tmgr.getDimNT()};
-
-    // int nDims = 6;
-    // int dims[6] = {tmgr.getDimNA(), tmgr.getDimNB(), tmgr.getDimNC(),
-    //                tmgr.getDimND() * tmgr.getDimNE(),
-    //                tmgr.getDimNT() / 8, 8};
-#endif
 
     mainProxy = thisProxy;
 

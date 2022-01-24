@@ -169,11 +169,7 @@ CpvDeclare(void*, CmiLocalQueue);
 
 enum MACHINE_SMP_MODE {
     INVALID_MODE,
-#if CMK_BLUEGENEQ
     COMM_THREAD_SEND_RECV = 0,
-#else 
-    COMM_THREAD_SEND_RECV = 0,
-#endif
     COMM_THREAD_ONLY_RECV, /* work threads will do the send */
     COMM_WORK_THREADS_SEND_RECV, /* work and comm threads do the both send/recv */
     COMM_THREAD_NOT_EXIST /* work threads will do both send and recv */
@@ -1721,7 +1717,7 @@ if (MSG_STATISTIC)
       CmiPrintf("[Partition %d][Node %d] End of program\n",CmiMyPartition(),CmiMyNode());
 #endif
 
-#if !CMK_SMP || CMK_BLUEGENEQ || CMK_PAMI_LINUX_PPC8
+#if !CMK_SMP || CMK_PAMI_LINUX_PPC8
 #if CMK_USE_PXSHM
     CmiExitPxshm();
 #endif

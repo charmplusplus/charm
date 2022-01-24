@@ -175,7 +175,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
       memory-isomalloc.h debug-conv.h debug-conv++.h conv-autoconfig.h \
       conv-common.h conv-config.sh conv-config.h conv-mach.h conv-mach.sh conv-mach-common.h \
       cmipool.h mempool.h cmiqueue.h \
-      TopoManager.h BGQTorus.h XTTorus.h topomanager_config.h \
+      TopoManager.h XTTorus.h topomanager_config.h \
       cmitls.h lrtslock.h conv-rdma.h conv-rdmadevice.h lrts-common.h conv-header.h
 
 # The .c files are there to be #included by clients whole
@@ -307,10 +307,8 @@ endif
 	test -f $(SRCBASE)/arch/$(CMK_GDIR)/gdir_link && cat $(SRCBASE)/arch/$(CMK_GDIR)/gdir_link > .gdir.new && ./gathertree $(SRCBASE)/arch/`cat .gdir.new`      . || true
 	./gatherflat $(SRCBASE)/arch/$(CMK_VDIR)                 .
 	-./system_ln $(SRCBASE)/util/topomanager/TopoManager.h   .
-	-./system_ln $(SRCBASE)/util/topomanager/BGQTorus.h      .
 	-./system_ln $(SRCBASE)/util/topomanager/XTTorus.h       .
 	-./system_ln $(SRCBASE)/util/topomanager/TopoManager.C   .
-	-./system_ln $(SRCBASE)/util/topomanager/BGQTorus.C      .
 	-./system_ln $(SRCBASE)/util/topomanager/CrayNid.c       .
 	./gathertree $(SRCBASE)/../benchmarks                    ../benchmarks
 	./gathertree $(SRCBASE)/../examples                      ../examples
@@ -467,7 +465,7 @@ LIBCONV_UTILF=pup_f.o
 
 LIBCONV_PARTITION = custom_partitioner.o set_partition_params.o
 
-LIBTMGR = TopoManager.o CrayNid.o BGQTorus.o
+LIBTMGR = TopoManager.o CrayNid.o
 
 include Makefile.machine
 
