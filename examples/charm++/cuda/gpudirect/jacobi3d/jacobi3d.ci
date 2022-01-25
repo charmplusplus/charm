@@ -24,6 +24,8 @@ mainmodule jacobi3d {
   readonly bool use_channel;
   readonly bool print_elements;
 
+  message CallbackMsg;
+
   mainchare Main {
     entry Main(CkArgMsg* m);
     entry [reductiontarget] void initDone();
@@ -38,8 +40,7 @@ mainmodule jacobi3d {
     entry void recvChannelID(int dir, int id);
     entry void packGhostsDone();
     entry void recvGhostReg(int ref, int dir, int count, DataType gh[count]);
-    entry void sendCallback(int ref);
-    entry void recvCallback(int ref);
+    entry void channelCallback(CallbackMsg* msg);
     entry void updateDone();
     entry void print();
 
@@ -82,14 +83,13 @@ mainmodule jacobi3d {
           recvGhosts();
         }
 
-        for (nbr_count = 0; nbr_count < n_nbr; nbr_count++) {
-          when recvCallback[my_iter](int ref) serial {
-            // TODO
-            processGhostChannel(0);
+        for (nbr_count = 0; nbr_count < 2 * n_nbr; nbr_count++) {
+          when channelCallback[my_iter](CallbackMsg* msg) serial {
+            if (msg->recv) {
+              processGhostChannel(msg->dir);
+              delete msg;
+            }
           }
-        }
-        for (nbr_count = 0; nbr_count < n_nbr; nbr_count++) {
-          when sendCallback[my_iter](int ref) serial {}
         }
       } else {
         for (nbr_count = 0; nbr_count < n_nbr; nbr_count++) {

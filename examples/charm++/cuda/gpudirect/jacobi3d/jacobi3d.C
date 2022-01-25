@@ -50,6 +50,14 @@ extern void unpackGhostDevice(DataType* d_temperature, DataType* d_ghost, DataTy
     cudaStream_t comm_stream, cudaStream_t h2d_stream, cudaEvent_t unpack_events[],
     bool use_channel);
 
+class CallbackMsg : public CMessage_CallbackMsg {
+public:
+  bool recv;
+  int dir;
+
+  CallbackMsg(bool recv_, int dir_) : recv(recv_), dir(dir_) {}
+};
+
 class Main : public CBase_Main {
   double init_start_time;
   double start_time;
@@ -224,8 +232,7 @@ class Block : public CBase_Block {
 
   int channel_ids[DIR_COUNT];
   CkChannel channels[DIR_COUNT];
-  CkCallback send_cb;
-  CkCallback recv_cb;
+  CkCallback channel_cb;
 
   DataType* h_temperature;
   DataType* d_temperature;
@@ -277,6 +284,8 @@ class Block : public CBase_Block {
     // Initialize values
     my_iter = 0;
     n_nbr = 0;
+    n_low_nbr = 0;
+    n_high_nbr = 0;
     x = thisIndex.x;
     y = thisIndex.y;
     z = thisIndex.z;
@@ -284,8 +293,7 @@ class Block : public CBase_Block {
     index_str = "[" + std::to_string(x) + "," + std::to_string(y)
       + "," + std::to_string(z) + "]";
     for (int i = 0; i < DIR_COUNT; i++) channel_ids[i] = -1;
-    send_cb = CkCallback(CkIndex_Block::sendCallback(0), thisProxy[thisIndex]);
-    recv_cb = CkCallback(CkIndex_Block::recvCallback(0), thisProxy[thisIndex]);
+    channel_cb = CkCallback(CkIndex_Block::channelCallback(nullptr), thisProxy[thisIndex]);
 
     // Check bounds and set number of valid neighbors
     for (int i = 0; i < DIR_COUNT; i++) bounds[i] = false;
@@ -466,13 +474,13 @@ class Block : public CBase_Block {
     // Send boundary data to neighbors
     if (use_channel) {
       // Set callback reference numbers
-      send_cb.setRefNum(my_iter);
-      recv_cb.setRefNum(my_iter);
+      channel_cb.setRefNum(my_iter);
 
       // Send ghosts
       for (int dir = 0; dir < DIR_COUNT; dir++) {
         if (!bounds[dir]) {
-          channels[dir].send(d_send_ghosts[dir], ghost_sizes[dir], send_cb);
+          channels[dir].send(d_send_ghosts[dir], ghost_sizes[dir], true,
+              channel_cb, new CallbackMsg(false, dir));
         }
       }
     } else {
@@ -503,7 +511,8 @@ class Block : public CBase_Block {
     // Receive ghosts
     for (int dir = 0; dir < DIR_COUNT; dir++) {
       if (!bounds[dir]) {
-        channels[dir].recv(d_recv_ghosts[dir], ghost_sizes[dir], recv_cb);
+        channels[dir].recv(d_recv_ghosts[dir], ghost_sizes[dir], true,
+            channel_cb, new CallbackMsg(true, dir));
       }
     }
   }
