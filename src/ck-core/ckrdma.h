@@ -552,17 +552,20 @@ public:
   int getID() { return id; }
   int getPeerPe() { return peer_pe; }
 
+  // Limitation: you can only send callbacks to the source or destination PE
   void send(const void* ptr, size_t size, CkFuture* fut);
-  void send(const void* ptr, size_t size, const CkCallback& cb);
+  void send(const void* ptr, size_t size, bool cb_self, const CkCallback& cb, void* msg = nullptr);
   void recv(const void* ptr, size_t size, CkFuture* fut);
-  void recv(const void* ptr, size_t size, const CkCallback& cb);
+  void recv(const void* ptr, size_t size, bool cb_self, const CkCallback& cb, void* msg = nullptr);
 };
 
 struct CkChannelMetadata {
   CkCallback* cb;
+  int cb_pe;
+  void* msg;
   CkFuture* fut;
 
-  CkChannelMetadata() : cb(nullptr), fut(nullptr) {}
+  CkChannelMetadata() : cb(nullptr), cb_pe(-1), msg(nullptr), fut(nullptr) {}
 };
 
 void CkChannelHandler(void* data);
