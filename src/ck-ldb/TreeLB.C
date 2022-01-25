@@ -1,3 +1,5 @@
+// Author: Juan Galvez <jjgalvez@illinois.edu>
+
 #include "TreeBuilder.h"  // TODO this can be deleted if we change it so that LBManager instantiates the builders
 #include "TreeLB.h"
 #include "TreeStrategyFactory.h"

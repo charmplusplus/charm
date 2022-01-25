@@ -1,3 +1,5 @@
+// Author: Juan Galvez <jjgalvez@illinois.edu>
+
 #ifndef TREESTRATEGYBASE_H
 #define TREESTRATEGYBASE_H
 
