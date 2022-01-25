@@ -400,7 +400,8 @@ void AMPI_Node_Setup(int numranks)
 
   int flags = RTLD_NOW|RTLD_LOCAL;
 #if CMK_HAS_RTLD_DEEPBIND
-  flags |= RTLD_DEEPBIND;
+  if (AMPI_FuncPtr_Active())
+    flags |= RTLD_DEEPBIND;
 #endif
   SharedObject myexe = dlopen(binary_path_str, flags);
 
