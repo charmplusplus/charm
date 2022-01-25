@@ -89,7 +89,6 @@ do
   -pieglobals)
      GLOBALS='pie'
      GLOBALS_SHARED='1'
-     GLOBALS_FUNCPTR='1'
      ;;
 
   -c)
