@@ -2082,42 +2082,30 @@ CkChannel::CkChannel(int id_, const CProxyElement_NodeGroup &proxy) : CkChannel(
 }
 
 void CkChannel::send(const void* ptr, size_t size, CkFuture* fut) {
-  CkAssert(id != -1 && peer_pe != -1);
   CkChannelMetadata* metadata = new CkChannelMetadata();
   metadata->fut = fut;
   CmiChannelSend(peer_pe, id, ptr, size, metadata, send_counter++);
 }
 
 void CkChannel::send(const void* ptr, size_t size, bool cb_self, const CkCallback& cb, void* msg) {
-  CkAssert(id != -1 && peer_pe != -1);
   CkChannelMetadata* metadata = new CkChannelMetadata();
-#if CKCALLBACK_POOL
-  metadata->cb = CkpvAccess(cb_pool).alloc();
-  new (metadata->cb) CkCallback(cb);
-#else
-  metadata->cb = new CkCallback(cb);
-#endif
+  metadata->use_cb = true;
+  metadata->cb = cb;
   metadata->cb_pe = cb_self ? CkMyPe() : peer_pe;
   metadata->msg = msg;
   CmiChannelSend(peer_pe, id, ptr, size, metadata, send_counter++);
 }
 
 void CkChannel::recv(const void* ptr, size_t size, CkFuture* fut) {
-  CkAssert(id != -1 && peer_pe != -1);
   CkChannelMetadata* metadata = new CkChannelMetadata();
   metadata->fut = fut;
   CmiChannelRecv(id, ptr, size, metadata, recv_counter++);
 }
 
 void CkChannel::recv(const void* ptr, size_t size, bool cb_self, const CkCallback& cb, void* msg) {
-  CkAssert(id != -1 && peer_pe != -1);
   CkChannelMetadata* metadata = new CkChannelMetadata();
-#if CKCALLBACK_POOL
-  metadata->cb = CkpvAccess(cb_pool).alloc();
-  new (metadata->cb) CkCallback(cb);
-#else
-  metadata->cb = new CkCallback(cb);
-#endif
+  metadata->use_cb = true;
+  metadata->cb = cb;
   metadata->cb_pe = cb_self ? CkMyPe() : peer_pe;
   metadata->msg = msg;
   CmiChannelRecv(id, ptr, size, metadata, recv_counter++);
@@ -2126,23 +2114,17 @@ void CkChannel::recv(const void* ptr, size_t size, bool cb_self, const CkCallbac
 void CkChannelHandler(void* data)
 {
   CkChannelMetadata* metadata = static_cast<CkChannelMetadata*>(data);
-  CkAssert(metadata);
 
   // Invoke Charm++ callback
-  if (metadata->cb) {
+  if (metadata->use_cb) {
 #if CMK_SMP
-    if (metadata->cb->type == CkCallback::resumeThread) {
-      metadata->cb->send(metadata->msg);
+    if (metadata->cb.type == CkCallback::resumeThread) {
+      metadata->cb.send(metadata->msg);
     } else {
-      _ckcallbackgroup[metadata->cb_pe].call(*metadata->cb, (CkMessage*)metadata->msg);
+      _ckcallbackgroup[metadata->cb_pe].call(metadata->cb, (CkMessage*)metadata->msg);
     }
 #else
-    metadata->cb->send(metadata->msg);
-#endif
-#if CKCALLBACK_POOL
-    CkpvAccess(cb_pool).free(metadata->cb);
-#else
-    delete metadata->cb;
+    metadata->cb.send(metadata->msg);
 #endif
   }
 

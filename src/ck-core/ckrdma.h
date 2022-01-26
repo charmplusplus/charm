@@ -560,12 +560,13 @@ public:
 };
 
 struct CkChannelMetadata {
-  CkCallback* cb;
+  bool use_cb;
+  CkCallback cb;
   int cb_pe;
   void* msg;
   CkFuture* fut;
 
-  CkChannelMetadata() : cb(nullptr), cb_pe(-1), msg(nullptr), fut(nullptr) {}
+  CkChannelMetadata() : use_cb(false), cb_pe(-1), msg(nullptr), fut(nullptr) {}
 };
 
 void CkChannelHandler(void* data);
