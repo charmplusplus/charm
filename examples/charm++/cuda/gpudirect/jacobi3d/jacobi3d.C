@@ -177,9 +177,10 @@ public:
     // Print configuration
     CkPrintf("\n[CUDA 3D Jacobi example]\n");
     CkPrintf("Grid: %d x %d x %d, Block: %d x %d x %d, Chares: %d x %d x %d, "
-        "Iterations: %d, Warm-up: %d, Print: %d\n\n",
+        "Iterations: %d, Warm-up: %d, Channel API: %d, Print: %d\n\n",
         grid_width, grid_height, grid_depth, block_width, block_height, block_depth,
-        n_chares_x, n_chares_y, n_chares_z, n_iters, warmup_iters, print_elements);
+        n_chares_x, n_chares_y, n_chares_z, n_iters, warmup_iters, use_channel,
+        print_elements);
 
     // Create blocks and start iteration
     block_proxy = CProxy_Block::ckNew(n_chares_x, n_chares_y, n_chares_z);
@@ -253,6 +254,10 @@ class Block : public CBase_Block {
   cudaEvent_t pack_events[DIR_COUNT];
   cudaEvent_t unpack_events[DIR_COUNT];
 
+  CkCallback init_cb;
+  CkCallback pack_cb;
+  CkCallback update_cb;
+
   bool bounds[DIR_COUNT];
 
   Block() {}
@@ -292,6 +297,8 @@ class Block : public CBase_Block {
     linear_index = x * n_chares_y * n_chares_z + y * n_chares_z + z;
     index_str = "[" + std::to_string(x) + "," + std::to_string(y)
       + "," + std::to_string(z) + "]";
+
+    // Channel API
     for (int i = 0; i < DIR_COUNT; i++) channel_ids[i] = -1;
     channel_cb = CkCallback(CkIndex_Block::channelCallback(nullptr), thisProxy[thisIndex]);
 
@@ -343,6 +350,11 @@ class Block : public CBase_Block {
       hapiCheck(cudaEventCreateWithFlags(&unpack_events[i], cudaEventDisableTiming));
     }
 
+    // Create Charm++ callbacks
+    init_cb = CkCallback(CkIndex_Block::initDone(), thisProxy[thisIndex]);
+    pack_cb = CkCallback(CkIndex_Block::packGhostsDone(), thisProxy[thisIndex]);
+    update_cb = CkCallback(CkIndex_Block::updateDone(), thisProxy[thisIndex]);
+
     // Initialize temperature data
     invokeInitKernel(d_temperature, block_width, block_height, block_depth, compute_stream);
     invokeInitKernel(d_new_temperature, block_width, block_height, block_depth, compute_stream);
@@ -377,8 +389,7 @@ class Block : public CBase_Block {
     thisProxy[thisIndex].initDone();
 #else
     // TODO: Support reduction callback in hapiAddCallback
-    CkCallback* cb = new CkCallback(CkIndex_Block::initDone(), thisProxy[thisIndex]);
-    hapiAddCallback(compute_stream, cb);
+    hapiAddCallback(compute_stream, init_cb);
 #endif
   }
 
@@ -454,11 +465,10 @@ class Block : public CBase_Block {
 #else
     // Add asynchronous callback to be invoked when packing kernels and
     // ghost transfers are complete
-    CkCallback* cb = new CkCallback(CkIndex_Block::packGhostsDone(), thisProxy[thisIndex]);
     if (use_channel) {
-      hapiAddCallback(comm_stream, cb);
+      hapiAddCallback(comm_stream, pack_cb);
     } else {
-      hapiAddCallback(d2h_stream, cb);
+      hapiAddCallback(d2h_stream, pack_cb);
     }
 #endif
   }
@@ -554,7 +564,6 @@ class Block : public CBase_Block {
     // Synchronize with host only when necessary
     if (print_elements || (my_iter == warmup_iters)
         || (my_iter == warmup_iters + n_iters)) {
-      CkCallback update_cb(CkIndex_Block::updateDone(), thisProxy[thisIndex]);
       hapiAddCallback(compute_stream, update_cb);
     } else {
       thisProxy[thisIndex].run();
