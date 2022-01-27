@@ -3,6 +3,7 @@
 
 #include "TreeStrategyBase.h"
 
+#include <limits>
 #include <vector>
 
 namespace TreeStrategy
@@ -135,16 +136,17 @@ private:
   size_t findSplit(const std::vector<O>& objs, const Indices& sortedPositions,
                    const float ratio, const float bgLeft, const float bgRight) const
   {
-    const float approxBgPerObj = (bgLeft + bgRight) / sortedPositions.size();
-    // Total load is the bg load of left procs + bg load of right procs + load of objects
-    const float totalLoad =
-        bgLeft + bgRight +
-        std::accumulate(sortedPositions.begin(), sortedPositions.end(), 0.0,
-                        [&](float l, int index) { return l + objs[index].getLoad(); });
-
-    size_t splitIndex = 0;
     if constexpr (O::dimension == 1)
     {
+      size_t splitIndex = 0;
+      const float approxBgPerObj = (bgLeft + bgRight) / sortedPositions.size();
+      // Total load is the bg load of left procs + bg load of right procs + load of
+      // objects
+      const float totalLoad =
+          bgLeft + bgRight +
+          std::accumulate(sortedPositions.begin(), sortedPositions.end(), 0.0,
+                          [&](float l, int index) { return l + objs[index].getLoad(); });
+
       // leftTarget is the amount of object load we want to assign to the left procs
       const float leftTarget = ratio * totalLoad;
       float leftLoad = 0;
@@ -161,29 +163,64 @@ private:
         }
         leftLoad = nextLeftLoad;
       }
+      return splitIndex;
     }
     else
     {
-      // leftTarget is the amount of object load we want to assign to the left procs
-      const float leftTarget = ratio * totalLoad;
-      float leftLoad = 0;
-      float nextLeftLoad = 0;
-      for (splitIndex = 0; splitIndex < sortedPositions.size(); splitIndex++)
+      // leftTargets is the amount of object load we want to assign to the left procs
+      std::vector<float> leftTargets(O::dimension);
+      for (const auto& index : sortedPositions)
       {
-        nextLeftLoad += objs[sortedPositions[splitIndex]].getLoad() + approxBgPerObj;
-        if (nextLeftLoad > leftTarget)
+        for (int dim = 0; dim < O::dimension; dim++)
         {
-          // Decide if split element should go to left or right partition
-          if (std::abs(nextLeftLoad - leftTarget) < std::abs(leftLoad - leftTarget))
-            splitIndex++;
-          break;
+          leftTargets[dim] += objs[index].getLoad(dim);
         }
-        leftLoad = nextLeftLoad;
       }
+
+      const float loadSum = std::accumulate(leftTargets.begin(), leftTargets.end(), 0);
+      std::vector<float> approxBgPerObj(O::dimension);
+      for (int i = 0; i < O::dimension; i++)
+      {
+        // Set this dimension of bgload by multiplying by percentage of total object load
+        // in this dimension
+        approxBgPerObj[i] = (bgLeft + bgRight) * (leftTargets[i] / loadSum);
+        leftTargets[i] += approxBgPerObj[i];
+        leftTargets[i] *= ratio;
+        // Divide by size of sortedPositions to make this value per object
+        approxBgPerObj[i] /= sortedPositions.size();
+      }
+
+      std::vector<float> leftLoad(O::dimension);
+
+      float minLoadDiff = std::numeric_limits<float>::max();
+      size_t minIndex = 0;
+      for (size_t splitIndex = 0; splitIndex < sortedPositions.size() + 1; splitIndex++)
+      {
+        // splitIndex is the index of the first element in the right partition
+        if (splitIndex > 0)
+        {
+          for (int i = 0; i < O::dimension; i++)
+          {
+            leftLoad[i] +=
+                objs[sortedPositions[splitIndex - 1]].getLoad(i) + approxBgPerObj[i];
+          }
+        }
+
+        float diff = 0;
+        for (int i = 0; i < O::dimension; i++)
+        {
+          diff += std::abs(leftLoad[i] - leftTargets[i]);
+        }
+
+        if (diff < minLoadDiff)
+        {
+          minLoadDiff = diff;
+          minIndex = splitIndex;
+        }
+      }
+
+      return minIndex;
     }
-
-
-    return splitIndex;
   }
 
 public:
