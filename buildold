@@ -835,17 +835,6 @@ then
       echo "CMK_COMPILER_SUFFIX=\"${COMPILER#$i}\"" >> "$ConvSh"
       echo '#include "'"cc-$i.h"'"' >> "$ConvHeader"
       echo '. "$CHARMINC/'"cc-$i.sh"'"' >> "$ConvSh"
-elif test `echo "$BASEVERSION" | grep -c "bluegeneq"` -gt 0
-then
-      echo "Support for Blue Gene/Q targets has been deprecated as of Charm++ 7.0.0."
-      i="clang"
-      bgclang++11 --version
-      if [ $? -ne 0 ]; then
-         echo "ERROR: bgclang C/C++ compiler missing. Please load bgclang compilers, i.e. 'soft add +mpiwrapper-bgclang'."
-         exit 1
-      fi
-      echo '#include "'cc-$i.h'"' >> "$ConvHeader"
-      echo '. "$CHARMINC/'"cc-$i.sh"'"' >> "$ConvSh"
 fi
 if [[ ${#MYTMP[@]} -ne 0 ]]
 then

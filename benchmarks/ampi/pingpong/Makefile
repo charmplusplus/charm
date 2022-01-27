@@ -17,15 +17,9 @@ pipe: pingpong-pipeline.c
 	$(CHARMC) pingpong-pipeline.c -o pingpong-pipe
 	$(MPICC) pingpong-pipeline.c -o pingpong-pipe-mpi
 
-# This test runs longer on BGQ, so reduce the number of iterations run there:
 test: all
-ifeq ($(CMK_BLUEGENEQ),1)
-	$(call run, +p1 ./pingpong 16 1024 10 5 1 +vp2)
-	$(call run, +p2 ./pingpong 16 1024 10 5 1 +vp2)
-else
 	$(call run, +p1 ./pingpong 16 1048576 100 10 1 +vp2)
 	$(call run, +p2 ./pingpong 16 1048576 100 10 1 +vp2)
-endif
 ifeq ($(CMK_USE_CMA),1)
 	$(call run, +p1 ./pingpong 16 1048576 100 10 1 +vp2 +noCMAForZC)
 	$(call run, +p2 ./pingpong 16 1048576 100 10 1 +vp2 +noCMAForZC)

@@ -112,27 +112,6 @@ if($arch_os eq "darwin") {
 }
 
 
-# check for BG/Q
-
-if($skip_choosing eq "false"){
-  my $BGQ_FLOOR = $ENV{'BGQ_FLOOR'};
-  if (not defined $BGQ_FLOOR) {
-    $BGQ_FLOOR = "/bgsys/drivers/ppcfloor";
-  }
-
-  my $bgq_found = system("which \"$BGQ_FLOOR/gnu-linux/bin/powerpc64-bgq-linux-cpp\" 2>/dev/null") / 256;
-
-  if ($bgq_found == 0) {
-    print "\nI found that you have a Blue Gene/Q toolchain available in your path.\nDo you want to build Charm++ targeting BG/Q? [Y/n]: ";
-    my $p = promptUserYN();
-    if($p eq "yes" || $p eq "default") {
-      $arch = "pamilrts-bluegeneq";
-      $skip_choosing = "true";
-    }
-  }
-}
-
-
 # check for Cray
 
 if($skip_choosing eq "false"){
@@ -291,10 +270,9 @@ Choose an interconnect from below: [1-10]
 	 2) Infiniband (verbs)
 	 3) Cray XE, XK
 	 4) Cray XC
-	 5) Blue Gene/Q
-	 6) Intel Omni-Path (ofi)
-	 7) PAMI
-	 8) UCX
+	 5) Intel Omni-Path (ofi)
+	 6) PAMI
+	 7) UCX
 
 EOF
 
@@ -313,15 +291,12 @@ EOF
 	        $arch = "gni-crayxc";
 	        last;
 	  } elsif($line eq "5"){
-		$arch = "pamilrts-bluegeneq";
-		last;
-	  } elsif($line eq "6"){
 		$converse_network_type = "ofi";
 		last;
-	  } elsif($line eq "7"){
+	  } elsif($line eq "6"){
 		$converse_network_type = "pamilrts";
 		last;
-	  } elsif($line eq "8"){
+	  } elsif($line eq "7"){
 		$converse_network_type = "ucx";
 		last;
 	  } else {
