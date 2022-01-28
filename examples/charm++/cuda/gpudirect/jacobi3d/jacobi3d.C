@@ -28,7 +28,7 @@
 /* readonly */ int warmup_iters;
 /* readonly */ bool use_channel;
 /* readonly */ bool fuse_pack;
-/* readonly */ bool fuse_unpack;
+/* readonly */ bool fuse_all;
 /* readonly */ bool print_elements;
 
 extern void invokeInitKernel(DataType* d_temperature, int block_width,
@@ -38,8 +38,9 @@ extern void invokeGhostInitKernels(const std::vector<DataType*>& ghosts,
 extern void invokeBoundaryKernels(DataType* d_temperature, int block_width,
     int block_height, int block_depth, bool bounds[], cudaStream_t stream);
 extern void invokeJacobiKernel(DataType* d_temperature, DataType* d_new_temperature,
-    DataType** d_ghosts, bool* d_bounds, int block_width, int block_height,
-    int block_depth, cudaStream_t stream, bool fuse_pack);
+    DataType** d_send_ghosts, DataType** d_recv_ghosts, bool* d_bounds,
+    int block_width, int block_height, int block_depth, cudaStream_t stream,
+    bool fuse_pack, bool fuse_all);
 extern void packGhostsDevice(DataType* d_temperature,
     DataType* d_ghosts[], DataType* h_ghosts[], bool bounds[],
     int block_width, int block_height, int block_depth,
@@ -79,7 +80,7 @@ public:
     use_channel = false;
     fuse_val = 0;
     fuse_pack = false;
-    fuse_unpack = false;
+    fuse_all = false;
     print_elements = false;
 
     // Process arguments
@@ -114,8 +115,7 @@ public:
         case 'f':
           fuse_val = atoi(optarg);
           if (fuse_val == 1) fuse_pack = true;
-          else if (fuse_val == 2) fuse_unpack = true;
-          else if (fuse_val == 3) fuse_pack = fuse_unpack = true;
+          else if (fuse_val == 2) fuse_all = true;
           else {
             CkAbort("ERROR: Invalid fusion value: %d\n", fuse_val);
             CkExit(-1);
@@ -265,6 +265,7 @@ class Block : public CBase_Block {
   DataType** d_recv_ghosts;
   size_t ghost_sizes[DIR_COUNT];
   DataType** d_send_ghosts_p;
+  DataType** d_recv_ghosts_p;
 
   cudaStream_t compute_stream;
   cudaStream_t comm_stream;
@@ -297,6 +298,7 @@ class Block : public CBase_Block {
     hapiCheck(cudaFreeHost(d_send_ghosts));
     hapiCheck(cudaFreeHost(d_recv_ghosts));
     hapiCheck(cudaFree(d_send_ghosts_p));
+    hapiCheck(cudaFree(d_recv_ghosts_p));
     hapiCheck(cudaFreeHost(bounds));
     hapiCheck(cudaFree(d_bounds));
 
@@ -367,13 +369,9 @@ class Block : public CBase_Block {
       hapiCheck(cudaMalloc((void**)&d_send_ghosts[i], ghost_sizes[i]));
       hapiCheck(cudaMalloc((void**)&d_recv_ghosts[i], ghost_sizes[i]));
     }
-
     hapiCheck(cudaMalloc((void**)&d_send_ghosts_p, sizeof(DataType*) * DIR_COUNT));
-    cudaMemcpyAsync(d_send_ghosts_p, d_send_ghosts, sizeof(DataType*) * DIR_COUNT,
-        cudaMemcpyHostToDevice, compute_stream);
+    hapiCheck(cudaMalloc((void**)&d_recv_ghosts_p, sizeof(DataType*) * DIR_COUNT));
     hapiCheck(cudaMalloc((void**)&d_bounds, sizeof(bool) * DIR_COUNT));
-    cudaMemcpyAsync(d_bounds, bounds, DIR_COUNT * sizeof(bool),
-        cudaMemcpyHostToDevice, compute_stream);
 
     // Create CUDA streams and events
     hapiCheck(cudaStreamCreateWithPriority(&compute_stream, cudaStreamDefault, 0));
@@ -392,6 +390,14 @@ class Block : public CBase_Block {
     init_cb = CkCallback(CkIndex_Block::initDone(), thisProxy[thisIndex]);
     pack_cb = CkCallback(CkIndex_Block::packGhostsDone(), thisProxy[thisIndex]);
     update_cb = CkCallback(CkIndex_Block::updateDone(), thisProxy[thisIndex]);
+
+    // Move pointers to device
+    hapiCheck(cudaMemcpyAsync(d_send_ghosts_p, d_send_ghosts, sizeof(DataType*) * DIR_COUNT,
+        cudaMemcpyHostToDevice, compute_stream));
+    hapiCheck(cudaMemcpyAsync(d_recv_ghosts_p, d_recv_ghosts, sizeof(DataType*) * DIR_COUNT,
+        cudaMemcpyHostToDevice, compute_stream));
+    hapiCheck(cudaMemcpyAsync(d_bounds, bounds, DIR_COUNT * sizeof(bool),
+        cudaMemcpyHostToDevice, compute_stream));
 
     // Initialize temperature data
     invokeInitKernel(d_temperature, block_width, block_height, block_depth, compute_stream);
@@ -478,22 +484,24 @@ class Block : public CBase_Block {
   void packGhosts() {
     NVTXTracer nvtx_range(index_str + " packGhosts", NVTXColor::PeterRiver);
 
-    // Packing must start only after update is complete on the device
-    cudaEventRecord(compute_event, compute_stream);
-    cudaStreamWaitEvent(comm_stream, compute_event, 0);
+    if (!fuse_all) {
+      // Packing must start only after update is complete on the device
+      cudaEventRecord(compute_event, compute_stream);
+      cudaStreamWaitEvent(comm_stream, compute_event, 0);
 
-    if (!fuse_pack) {
-      // Pack non-contiguous ghosts to temporary contiguous buffers on the device
-      // and transfer each from device to host
-      packGhostsDevice(d_new_temperature, d_send_ghosts, h_ghosts, bounds,
-          block_width, block_height, block_depth, x_surf_size, y_surf_size, z_surf_size,
-          comm_stream, d2h_stream, pack_events, use_channel);
+      if (!fuse_pack) {
+        // Pack non-contiguous ghosts to temporary contiguous buffers on the device
+        // and transfer each from device to host
+        packGhostsDevice(d_new_temperature, d_send_ghosts, h_ghosts, bounds,
+            block_width, block_height, block_depth, x_surf_size, y_surf_size, z_surf_size,
+            comm_stream, d2h_stream, pack_events, use_channel);
+      }
     }
 
     // Add asynchronous callback to be invoked when packing kernels and
     // ghost transfers are complete
     if (use_channel) {
-      if (fuse_pack) {
+      if (fuse_pack || fuse_all) {
         hapiAddCallback(compute_stream, pack_cb);
       } else {
         hapiAddCallback(comm_stream, pack_cb);
@@ -566,13 +574,6 @@ class Block : public CBase_Block {
         comm_stream, h2d_stream, unpack_events, use_channel);
   }
 
-  void processAllGhosts() {
-    NVTXTracer nvtx_range(index_str + " processAllGhosts", NVTXColor::Carrot);
-
-    // Unpack all received ghosts at once
-    // TODO
-  }
-
   void processGhostReg(int dir, int count, DataType* gh) {
     NVTXTracer nvtx_range(index_str + " processGhostReg " + std::to_string(dir), NVTXColor::Carrot);
 
@@ -589,14 +590,16 @@ class Block : public CBase_Block {
   void update() {
     NVTXTracer nvtx_range(index_str + " update", NVTXColor::BelizeHole);
 
-    // Update should only be performed after operations in communication stream
-    // (transfers and unpacking) complete
-    hapiCheck(cudaEventRecord(comm_event, comm_stream));
-    hapiCheck(cudaStreamWaitEvent(compute_stream, comm_event, 0));
+    if (!fuse_all) {
+      // Update should only be performed after operations in communication stream
+      // (transfers and unpacking) complete
+      hapiCheck(cudaEventRecord(comm_event, comm_stream));
+      hapiCheck(cudaStreamWaitEvent(compute_stream, comm_event, 0));
+    }
 
     // Invoke GPU kernel for Jacobi computation
-    invokeJacobiKernel(d_temperature, d_new_temperature, d_send_ghosts_p, d_bounds,
-        block_width, block_height, block_depth, compute_stream, fuse_pack);
+    invokeJacobiKernel(d_temperature, d_new_temperature, d_send_ghosts_p, d_recv_ghosts_p,
+        d_bounds, block_width, block_height, block_depth, compute_stream, fuse_pack, fuse_all);
 
     // Synchronize with host only when necessary
     if (print_elements || (my_iter == warmup_iters)
