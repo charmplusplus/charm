@@ -482,16 +482,6 @@ class Block : public CBase_Block {
     cudaEventRecord(compute_event, compute_stream);
     cudaStreamWaitEvent(comm_stream, compute_event, 0);
 
-    // There is a correctness issue since with fusing packing kernels,
-    // ghosts won't be packed in the first iteration
-#ifdef TEST_CORRECTNESS
-    if (fuse_pack && my_iter == 0) {
-      packGhostsDevice(d_new_temperature, d_send_ghosts, h_ghosts, bounds,
-          block_width, block_height, block_depth, x_surf_size, y_surf_size, z_surf_size,
-          compute_stream, d2h_stream, pack_events, use_channel);
-    }
-#endif
-
     if (!fuse_pack) {
       // Pack non-contiguous ghosts to temporary contiguous buffers on the device
       // and transfer each from device to host
