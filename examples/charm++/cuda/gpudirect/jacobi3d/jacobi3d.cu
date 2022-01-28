@@ -97,6 +97,61 @@ __global__ void jacobiKernel(DataType* temperature, DataType* new_temperature,
   }
 }
 
+__global__ void jacobiFusedKernel(DataType* temperature, DataType* new_temperature,
+    DataType** ghosts, bool* bounds, int block_width, int block_height, int block_depth) {
+  int i = (blockDim.x*blockIdx.x+threadIdx.x)+1;
+  int j = (blockDim.y*blockIdx.y+threadIdx.y)+1;
+  int k = (blockDim.z*blockIdx.z+threadIdx.z)+1;
+
+  DataType* left_ghost = ghosts[LEFT];
+  DataType* right_ghost = ghosts[RIGHT];
+  DataType* top_ghost = ghosts[TOP];
+  DataType* bottom_ghost = ghosts[BOTTOM];
+  DataType* front_ghost = ghosts[FRONT];
+  DataType* back_ghost = ghosts[BACK];
+  bool left_bound = bounds[LEFT];
+  bool right_bound = bounds[RIGHT];
+  bool top_bound = bounds[TOP];
+  bool bottom_bound = bounds[BOTTOM];
+  bool front_bound = bounds[FRONT];
+  bool back_bound = bounds[BACK];
+
+  if (i <= block_width && j <= block_height && k <= block_depth) {
+    // Interior Jacobi update
+#ifdef TEST_CORRECTNESS
+    new_temperature[IDX(i,j,k)] = (temperature[IDX(i,j,k)] +
+      temperature[IDX(i-1,j,k)] + temperature[IDX(i+1,j,k)] +
+      temperature[IDX(i,j-1,k)] + temperature[IDX(i,j+1,k)] +
+      temperature[IDX(i,j,k-1)] + temperature[IDX(i,j,k+1)]) % 10000;
+#else
+    new_temperature[IDX(i,j,k)] = (temperature[IDX(i,j,k)] +
+      temperature[IDX(i-1,j,k)] + temperature[IDX(i+1,j,k)] +
+      temperature[IDX(i,j-1,k)] + temperature[IDX(i,j+1,k)] +
+      temperature[IDX(i,j,k-1)] + temperature[IDX(i,j,k+1)]) * DIVIDEBY7;
+#endif
+
+    // Pack ghosts
+    if (!left_bound && i == 1) {
+      left_ghost[block_height*(k-1)+(j-1)] = new_temperature[IDX(i,j,k)];
+    }
+    if (!right_bound && i == block_width) {
+      right_ghost[block_height*(k-1)+(j-1)] = new_temperature[IDX(i,j,k)];
+    }
+    if (!top_bound && j == 1) {
+      top_ghost[block_width*(k-1)+(i-1)] = new_temperature[IDX(i,j,k)];
+    }
+    if (!bottom_bound && j == block_height) {
+      bottom_ghost[block_width*(k-1)+(i-1)] = new_temperature[IDX(i,j,k)];
+    }
+    if (!front_bound && k == 1) {
+      front_ghost[block_width*(j-1)+(i-1)] = new_temperature[IDX(i,j,k)];
+    }
+    if (!back_bound && k == block_depth) {
+      back_ghost[block_width*(j-1)+(i-1)] = new_temperature[IDX(i,j,k)];
+    }
+  }
+}
+
 __global__ void leftPackingKernel(DataType* temperature, DataType* ghost,
     int block_width, int block_height, int block_depth) {
   int j = blockDim.x*blockIdx.x+threadIdx.x;
@@ -205,6 +260,11 @@ __global__ void backUnpackingKernel(DataType* temperature, DataType* ghost,
   }
 }
 
+__global__ void unpackingFusedKernel(DataType* temperature, DataType** ghosts,
+    int block_width, int block_height, int block_depth) {
+  // TODO
+}
+
 void invokeInitKernel(DataType* d_temperature, int block_width, int block_height,
     int block_depth, cudaStream_t stream) {
   dim3 block_dim(TILE_SIZE_3D, TILE_SIZE_3D, TILE_SIZE_3D);
@@ -276,14 +336,20 @@ void invokeBoundaryKernels(DataType* d_temperature, int block_width,
 }
 
 void invokeJacobiKernel(DataType* d_temperature, DataType* d_new_temperature,
-    int block_width, int block_height, int block_depth, cudaStream_t stream) {
+    DataType** d_ghosts, bool* d_bounds, int block_width, int block_height,
+    int block_depth, cudaStream_t stream, bool fuse_pack) {
   dim3 block_dim(TILE_SIZE_3D, TILE_SIZE_3D, TILE_SIZE_3D);
   dim3 grid_dim((block_width+(block_dim.x-1))/block_dim.x,
       (block_height+(block_dim.y-1))/block_dim.y,
       (block_depth+(block_dim.z-1))/block_dim.z);
 
-  jacobiKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature, d_new_temperature,
-      block_width, block_height, block_depth);
+  if (fuse_pack) {
+    jacobiFusedKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature, d_new_temperature,
+        d_ghosts, d_bounds, block_width, block_height, block_depth);
+  } else {
+    jacobiKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature, d_new_temperature,
+        block_width, block_height, block_depth);
+  }
   hapiCheck(cudaPeekAtLastError());
 }
 

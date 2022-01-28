@@ -22,6 +22,8 @@ mainmodule jacobi3d {
   readonly int n_iters;
   readonly int warmup_iters;
   readonly bool use_channel;
+  readonly bool fuse_pack;
+  readonly bool fuse_unpack;
   readonly bool print_elements;
 
   message CallbackMsg;
@@ -85,10 +87,16 @@ mainmodule jacobi3d {
 
         for (nbr_count = 0; nbr_count < 2 * n_nbr; nbr_count++) {
           when channelCallback[my_iter](CallbackMsg* msg) serial {
-            if (msg->recv) {
+            if (msg->recv && !fuse_unpack) {
               processGhostChannel(msg->dir);
               delete msg;
             }
+          }
+        }
+
+        if (fuse_unpack) {
+          serial {
+            processAllGhosts();
           }
         }
       } else {

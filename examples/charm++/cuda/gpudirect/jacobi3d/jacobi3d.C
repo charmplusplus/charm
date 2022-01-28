@@ -6,8 +6,6 @@
 #include <string>
 #include <sstream>
 
-#define CUDA_SYNC 0
-
 /* readonly */ CProxy_Main main_proxy;
 /* readonly */ CProxy_Block block_proxy;
 /* readonly */ int num_chares;
@@ -29,6 +27,8 @@
 /* readonly */ int n_iters;
 /* readonly */ int warmup_iters;
 /* readonly */ bool use_channel;
+/* readonly */ bool fuse_pack;
+/* readonly */ bool fuse_unpack;
 /* readonly */ bool print_elements;
 
 extern void invokeInitKernel(DataType* d_temperature, int block_width,
@@ -38,7 +38,8 @@ extern void invokeGhostInitKernels(const std::vector<DataType*>& ghosts,
 extern void invokeBoundaryKernels(DataType* d_temperature, int block_width,
     int block_height, int block_depth, bool bounds[], cudaStream_t stream);
 extern void invokeJacobiKernel(DataType* d_temperature, DataType* d_new_temperature,
-    int block_width, int block_height, int block_depth, cudaStream_t stream);
+    DataType** d_ghosts, bool* d_bounds, int block_width, int block_height,
+    int block_depth, cudaStream_t stream, bool fuse_pack);
 extern void packGhostsDevice(DataType* d_temperature,
     DataType* d_ghosts[], DataType* h_ghosts[], bool bounds[],
     int block_width, int block_height, int block_depth,
@@ -61,6 +62,7 @@ public:
 class Main : public CBase_Main {
   double init_start_time;
   double start_time;
+  int fuse_val;
 
 public:
   Main(CkArgMsg* m) {
@@ -75,12 +77,15 @@ public:
     n_iters = 100;
     warmup_iters = 10;
     use_channel = false;
+    fuse_val = 0;
+    fuse_pack = false;
+    fuse_unpack = false;
     print_elements = false;
 
     // Process arguments
     int c;
     bool dims[3] = {false, false, false};
-    while ((c = getopt(m->argc, m->argv, "c:x:y:z:i:w:dp")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "c:x:y:z:i:w:df:p")) != -1) {
       switch (c) {
         case 'c':
           num_chares = atoi(optarg);
@@ -106,6 +111,16 @@ public:
         case 'd':
           use_channel = true;
           break;
+        case 'f':
+          fuse_val = atoi(optarg);
+          if (fuse_val == 1) fuse_pack = true;
+          else if (fuse_val == 2) fuse_unpack = true;
+          else if (fuse_val == 3) fuse_pack = fuse_unpack = true;
+          else {
+            CkAbort("ERROR: Invalid fusion value: %d\n", fuse_val);
+            CkExit(-1);
+          }
+          break;
         case 'p':
           print_elements = true;
           break;
@@ -113,12 +128,18 @@ public:
           CkPrintf(
               "Usage: %s -x [grid width] -y [grid height] -z [grid depth] "
               "-c [number of chares] -i [iterations] -w [warmup iterations] "
-              "-d [use channels] -p (print blocks)\n",
+              "-d [use channels] -f [fusion value] -p (print blocks)\n",
               m->argv[0]);
           CkExit();
       }
     }
     delete m;
+
+    // Kernel fusion can only be used with the Channel API
+    if (fuse_val != 0 && !use_channel) {
+      CkPrintf("ERROR: Kernel fusion can only be used with the Channel API\n");
+      CkExit(-1);
+    }
 
     // If only the X dimension is given, use it for Y and Z as well
     if (dims[0] && !dims[1] && !dims[2]) grid_height = grid_depth = grid_width;
@@ -177,10 +198,10 @@ public:
     // Print configuration
     CkPrintf("\n[CUDA 3D Jacobi example]\n");
     CkPrintf("Grid: %d x %d x %d, Block: %d x %d x %d, Chares: %d x %d x %d, "
-        "Iterations: %d, Warm-up: %d, Channel API: %d, Print: %d\n\n",
+        "Iterations: %d, Warm-up: %d, Channel API: %d, Fusion: %d, Print: %d\n\n",
         grid_width, grid_height, grid_depth, block_width, block_height, block_depth,
         n_chares_x, n_chares_y, n_chares_z, n_iters, warmup_iters, use_channel,
-        print_elements);
+        fuse_val, print_elements);
 
     // Create blocks and start iteration
     block_proxy = CProxy_Block::ckNew(n_chares_x, n_chares_y, n_chares_z);
@@ -243,6 +264,7 @@ class Block : public CBase_Block {
   DataType* d_send_ghosts[DIR_COUNT];
   DataType* d_recv_ghosts[DIR_COUNT];
   size_t ghost_sizes[DIR_COUNT];
+  DataType** d_send_ghosts_p;
 
   cudaStream_t compute_stream;
   cudaStream_t comm_stream;
@@ -259,6 +281,7 @@ class Block : public CBase_Block {
   CkCallback update_cb;
 
   bool bounds[DIR_COUNT];
+  bool* d_bounds;
 
   Block() {}
 
@@ -337,6 +360,13 @@ class Block : public CBase_Block {
       hapiCheck(cudaMalloc((void**)&d_recv_ghosts[i], ghost_sizes[i]));
     }
 
+    hapiCheck(cudaMalloc((void**)&d_send_ghosts_p, DIR_COUNT * sizeof(DataType*)));
+    cudaMemcpyAsync(d_send_ghosts_p, d_send_ghosts, DIR_COUNT * sizeof(DataType*),
+        cudaMemcpyHostToDevice, compute_stream);
+    hapiCheck(cudaMalloc((void**)&d_bounds, DIR_COUNT * sizeof(bool)));
+    cudaMemcpyAsync(d_bounds, bounds, DIR_COUNT * sizeof(bool),
+        cudaMemcpyHostToDevice, compute_stream);
+
     // Create CUDA streams and events
     hapiCheck(cudaStreamCreateWithPriority(&compute_stream, cudaStreamDefault, 0));
     hapiCheck(cudaStreamCreateWithPriority(&comm_stream, cudaStreamDefault, -1));
@@ -384,13 +414,8 @@ class Block : public CBase_Block {
     invokeBoundaryKernels(d_new_temperature, block_width, block_height, block_depth,
         bounds, compute_stream);
 
-#if CUDA_SYNC
-    cudaStreamSynchronize(compute_stream);
-    thisProxy[thisIndex].initDone();
-#else
     // TODO: Support reduction callback in hapiAddCallback
     hapiAddCallback(compute_stream, init_cb);
-#endif
   }
 
   void sendChannelIDs() {
@@ -443,37 +468,46 @@ class Block : public CBase_Block {
   }
 
   void packGhosts() {
+    CkPrintf("!!! packGhosts\n");
     NVTXTracer nvtx_range(index_str + " packGhosts", NVTXColor::PeterRiver);
 
     // Packing must start only after update is complete on the device
     cudaEventRecord(compute_event, compute_stream);
     cudaStreamWaitEvent(comm_stream, compute_event, 0);
 
-    // Pack non-contiguous ghosts to temporary contiguous buffers on the device
-    // and transfer each from device to host
-    packGhostsDevice(d_new_temperature, d_send_ghosts, h_ghosts, bounds,
-        block_width, block_height, block_depth, x_surf_size, y_surf_size, z_surf_size,
-        comm_stream, d2h_stream, pack_events, use_channel);
-
-#if CUDA_SYNC
-    if (use_channel) {
-      cudaStreamSynchronize(comm_stream);
-    } else {
-      cudaStreamSynchronize(d2h_stream);
+    // There is a correctness issue since with fusing packing kernels,
+    // ghosts won't be packed in the first iteration
+#ifdef TEST_CORRECTNESS
+    if (fuse_pack && my_iter == 0) {
+      packGhostsDevice(d_new_temperature, d_send_ghosts, h_ghosts, bounds,
+          block_width, block_height, block_depth, x_surf_size, y_surf_size, z_surf_size,
+          compute_stream, d2h_stream, pack_events, use_channel);
     }
-    thisProxy[thisIndex].packGhostsDone();
-#else
+#endif
+
+    if (!fuse_pack) {
+      // Pack non-contiguous ghosts to temporary contiguous buffers on the device
+      // and transfer each from device to host
+      packGhostsDevice(d_new_temperature, d_send_ghosts, h_ghosts, bounds,
+          block_width, block_height, block_depth, x_surf_size, y_surf_size, z_surf_size,
+          comm_stream, d2h_stream, pack_events, use_channel);
+    }
+
     // Add asynchronous callback to be invoked when packing kernels and
     // ghost transfers are complete
     if (use_channel) {
-      hapiAddCallback(comm_stream, pack_cb);
+      if (fuse_pack) {
+        hapiAddCallback(compute_stream, pack_cb);
+      } else {
+        hapiAddCallback(comm_stream, pack_cb);
+      }
     } else {
       hapiAddCallback(d2h_stream, pack_cb);
     }
-#endif
   }
 
   void sendGhosts() {
+    CkPrintf("!!! sendGhosts\n");
     NVTXTracer nvtx_range(index_str + " sendGhosts", NVTXColor::WetAsphalt);
 
     // Increment iteration count and swap data pointers
@@ -483,7 +517,7 @@ class Block : public CBase_Block {
 
     // Send boundary data to neighbors
     if (use_channel) {
-      // Set callback reference numbers
+      // Set reference number for callback
       channel_cb.setRefNum(my_iter);
 
       // Send ghosts
@@ -516,6 +550,7 @@ class Block : public CBase_Block {
   }
 
   void recvGhosts() {
+    CkPrintf("!!! recvGhosts\n");
     NVTXTracer nvtx_range(index_str + " recvGhosts", NVTXColor::Carrot);
 
     // Receive ghosts
@@ -528,12 +563,20 @@ class Block : public CBase_Block {
   }
 
   void processGhostChannel(int dir) {
+    CkPrintf("!!! processGhostChannel\n");
     NVTXTracer nvtx_range(index_str + " processGhostChannel " + std::to_string(dir), NVTXColor::Carrot);
 
     // Unpack received ghost
     unpackGhostDevice(d_temperature, d_recv_ghosts[dir], nullptr, dir,
         block_width, block_height, block_depth, ghost_sizes[dir],
         comm_stream, h2d_stream, unpack_events, use_channel);
+  }
+
+  void processAllGhosts() {
+    NVTXTracer nvtx_range(index_str + " processAllGhosts", NVTXColor::Carrot);
+
+    // Unpack all received ghosts at once
+    // TODO
   }
 
   void processGhostReg(int dir, int count, DataType* gh) {
@@ -550,6 +593,7 @@ class Block : public CBase_Block {
   }
 
   void update() {
+    CkPrintf("!!! update\n");
     NVTXTracer nvtx_range(index_str + " update", NVTXColor::BelizeHole);
 
     // Update should only be performed after operations in communication stream
@@ -558,8 +602,8 @@ class Block : public CBase_Block {
     hapiCheck(cudaStreamWaitEvent(compute_stream, comm_event, 0));
 
     // Invoke GPU kernel for Jacobi computation
-    invokeJacobiKernel(d_temperature, d_new_temperature, block_width, block_height,
-        block_depth, compute_stream);
+    invokeJacobiKernel(d_temperature, d_new_temperature, d_send_ghosts, d_bounds,
+        block_width, block_height, block_depth, compute_stream, fuse_pack);
 
     // Synchronize with host only when necessary
     if (print_elements || (my_iter == warmup_iters)
