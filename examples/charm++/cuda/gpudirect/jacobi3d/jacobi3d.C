@@ -261,8 +261,8 @@ class Block : public CBase_Block {
   DataType* d_new_temperature;
 
   DataType* h_ghosts[DIR_COUNT];
-  DataType* d_send_ghosts[DIR_COUNT];
-  DataType* d_recv_ghosts[DIR_COUNT];
+  DataType** d_send_ghosts;
+  DataType** d_recv_ghosts;
   size_t ghost_sizes[DIR_COUNT];
   DataType** d_send_ghosts_p;
 
@@ -280,7 +280,7 @@ class Block : public CBase_Block {
   CkCallback pack_cb;
   CkCallback update_cb;
 
-  bool bounds[DIR_COUNT];
+  bool* bounds;
   bool* d_bounds;
 
   Block() {}
@@ -294,6 +294,11 @@ class Block : public CBase_Block {
       hapiCheck(cudaFree(d_send_ghosts[i]));
       hapiCheck(cudaFree(d_recv_ghosts[i]));
     }
+    hapiCheck(cudaFreeHost(d_send_ghosts));
+    hapiCheck(cudaFreeHost(d_recv_ghosts));
+    hapiCheck(cudaFree(d_send_ghosts_p));
+    hapiCheck(cudaFreeHost(bounds));
+    hapiCheck(cudaFree(d_bounds));
 
     hapiCheck(cudaStreamDestroy(compute_stream));
     hapiCheck(cudaStreamDestroy(comm_stream));
@@ -326,6 +331,7 @@ class Block : public CBase_Block {
     channel_cb = CkCallback(CkIndex_Block::channelCallback(nullptr), thisProxy[thisIndex]);
 
     // Check bounds and set number of valid neighbors
+    hapiCheck(cudaMallocHost((void**)&bounds, sizeof(bool) * DIR_COUNT));
     for (int i = 0; i < DIR_COUNT; i++) bounds[i] = false;
 
     if (x == 0)            bounds[LEFT] = true;
@@ -354,16 +360,18 @@ class Block : public CBase_Block {
     ghost_sizes[BOTTOM] = y_surf_size;
     ghost_sizes[FRONT] = z_surf_size;
     ghost_sizes[BACK] = z_surf_size;
+    hapiCheck(cudaMallocHost((void**)&d_send_ghosts, sizeof(DataType*) * DIR_COUNT));
+    hapiCheck(cudaMallocHost((void**)&d_recv_ghosts, sizeof(DataType*) * DIR_COUNT));
     for (int i = 0; i < DIR_COUNT; i++) {
       hapiCheck(cudaMallocHost((void**)&h_ghosts[i], ghost_sizes[i]));
       hapiCheck(cudaMalloc((void**)&d_send_ghosts[i], ghost_sizes[i]));
       hapiCheck(cudaMalloc((void**)&d_recv_ghosts[i], ghost_sizes[i]));
     }
 
-    hapiCheck(cudaMalloc((void**)&d_send_ghosts_p, DIR_COUNT * sizeof(DataType*)));
-    cudaMemcpyAsync(d_send_ghosts_p, d_send_ghosts, DIR_COUNT * sizeof(DataType*),
+    hapiCheck(cudaMalloc((void**)&d_send_ghosts_p, sizeof(DataType*) * DIR_COUNT));
+    cudaMemcpyAsync(d_send_ghosts_p, d_send_ghosts, sizeof(DataType*) * DIR_COUNT,
         cudaMemcpyHostToDevice, compute_stream);
-    hapiCheck(cudaMalloc((void**)&d_bounds, DIR_COUNT * sizeof(bool)));
+    hapiCheck(cudaMalloc((void**)&d_bounds, sizeof(bool) * DIR_COUNT));
     cudaMemcpyAsync(d_bounds, bounds, DIR_COUNT * sizeof(bool),
         cudaMemcpyHostToDevice, compute_stream);
 
@@ -468,7 +476,6 @@ class Block : public CBase_Block {
   }
 
   void packGhosts() {
-    CkPrintf("!!! packGhosts\n");
     NVTXTracer nvtx_range(index_str + " packGhosts", NVTXColor::PeterRiver);
 
     // Packing must start only after update is complete on the device
@@ -507,7 +514,6 @@ class Block : public CBase_Block {
   }
 
   void sendGhosts() {
-    CkPrintf("!!! sendGhosts\n");
     NVTXTracer nvtx_range(index_str + " sendGhosts", NVTXColor::WetAsphalt);
 
     // Increment iteration count and swap data pointers
@@ -550,7 +556,6 @@ class Block : public CBase_Block {
   }
 
   void recvGhosts() {
-    CkPrintf("!!! recvGhosts\n");
     NVTXTracer nvtx_range(index_str + " recvGhosts", NVTXColor::Carrot);
 
     // Receive ghosts
@@ -563,7 +568,6 @@ class Block : public CBase_Block {
   }
 
   void processGhostChannel(int dir) {
-    CkPrintf("!!! processGhostChannel\n");
     NVTXTracer nvtx_range(index_str + " processGhostChannel " + std::to_string(dir), NVTXColor::Carrot);
 
     // Unpack received ghost
@@ -593,7 +597,6 @@ class Block : public CBase_Block {
   }
 
   void update() {
-    CkPrintf("!!! update\n");
     NVTXTracer nvtx_range(index_str + " update", NVTXColor::BelizeHole);
 
     // Update should only be performed after operations in communication stream
@@ -602,7 +605,7 @@ class Block : public CBase_Block {
     hapiCheck(cudaStreamWaitEvent(compute_stream, comm_event, 0));
 
     // Invoke GPU kernel for Jacobi computation
-    invokeJacobiKernel(d_temperature, d_new_temperature, d_send_ghosts, d_bounds,
+    invokeJacobiKernel(d_temperature, d_new_temperature, d_send_ghosts_p, d_bounds,
         block_width, block_height, block_depth, compute_stream, fuse_pack);
 
     // Synchronize with host only when necessary
