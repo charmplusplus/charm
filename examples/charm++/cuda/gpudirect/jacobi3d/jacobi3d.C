@@ -49,10 +49,16 @@ extern void packGhostsDevice(DataType* d_temperature,
     size_t x_surf_size, size_t y_surf_size, size_t z_surf_size,
     cudaStream_t comm_stream, cudaStream_t d2h_stream, cudaEvent_t pack_events[],
     bool use_channel);
+extern void packGhostsFusedDevice(DataType* d_temperature, DataType** d_send_ghosts,
+    bool* d_bounds, int block_width, int block_height, int block_depth,
+    cudaStream_t comm_stream);
 extern void unpackGhostDevice(DataType* d_temperature, DataType* d_ghost, DataType* h_ghost,
     int dir, int block_width, int block_height, int block_depth, size_t ghost_size,
     cudaStream_t comm_stream, cudaStream_t h2d_stream, cudaEvent_t unpack_events[],
     bool use_channel);
+extern void unpackGhostsFusedDevice(DataType* d_temperature, DataType** d_recv_ghosts,
+    bool* d_bounds, int block_width, int block_height, int block_depth,
+    cudaStream_t comm_stream);
 
 class CallbackMsg : public CMessage_CallbackMsg {
 public:
@@ -496,7 +502,10 @@ class Block : public CBase_Block {
       cudaEventRecord(compute_event, compute_stream);
       cudaStreamWaitEvent(comm_stream, compute_event, 0);
 
-      if (!fuse_update_pack) {
+      if (fuse_pack) {
+        packGhostsFusedDevice(d_new_temperature, d_send_ghosts, d_bounds,
+            block_width, block_height, block_depth, comm_stream);
+      } else if (!fuse_update_pack) {
         // Pack non-contiguous ghosts to temporary contiguous buffers on the device
         // and transfer each from device to host
         packGhostsDevice(d_new_temperature, d_send_ghosts, h_ghosts, bounds,
@@ -592,6 +601,14 @@ class Block : public CBase_Block {
     unpackGhostDevice(d_temperature, d_recv_ghosts[dir], h_ghost, dir,
         block_width, block_height, block_depth, ghost_size,
         comm_stream, h2d_stream, unpack_events, use_channel);
+  }
+
+  void processGhostsFused() {
+    NVTXTracer nvtx_range(index_str + " processGhostsFused", NVTXColor::Carrot);
+
+    // Unpack all ghosts together
+    unpackGhostsFusedDevice(d_temperature, d_recv_ghosts_p, d_bounds,
+        block_width, block_height, block_depth, comm_stream);
   }
 
   void update() {
