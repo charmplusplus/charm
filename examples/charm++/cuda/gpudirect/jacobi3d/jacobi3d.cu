@@ -290,6 +290,84 @@ __global__ void backPackingKernel(DataType* temperature, DataType* ghost,
   }
 }
 
+__global__ void fusedPackingKernel(DataType* temperature, DataType** ghosts,
+    bool* bounds, int block_width, int block_height, int block_depth) {
+  int t = blockDim.x*blockIdx.x+threadIdx.x;
+
+  int my_ghost = -1;
+  int left_cut = block_height * block_depth;
+  int right_cut = left_cut + block_height * block_depth;
+  int top_cut = right_cut + block_width * block_depth;
+  int bottom_cut = top_cut + block_width * block_depth;
+  int front_cut = bottom_cut + block_width * block_height;
+  int back_cut = front_cut + block_width * block_height;
+  if (t >= 0 && t < left_cut) {
+    my_ghost = LEFT;
+  } else if (t >= left_cut && t < right_cut) {
+    my_ghost = RIGHT;
+    t -= left_cut;
+  } else if (t >= right_cut && t < top_cut) {
+    my_ghost = TOP;
+    t -= right_cut;
+  } else if (t >= top_cut && t < bottom_cut) {
+    my_ghost = BOTTOM;
+    t -= top_cut;
+  } else if (t >= bottom_cut && t < front_cut) {
+    my_ghost = FRONT;
+    t -= bottom_cut;
+  } else if (t >= front_cut && t < back_cut) {
+    my_ghost = BACK;
+    t -= front_cut;
+  } else {
+    return;
+  }
+
+  DataType* left_ghost   = ghosts[LEFT];
+  DataType* right_ghost  = ghosts[RIGHT];
+  DataType* top_ghost    = ghosts[TOP];
+  DataType* bottom_ghost = ghosts[BOTTOM];
+  DataType* front_ghost  = ghosts[FRONT];
+  DataType* back_ghost   = ghosts[BACK];
+
+  bool left_bound   = bounds[LEFT];
+  bool right_bound  = bounds[RIGHT];
+  bool top_bound    = bounds[TOP];
+  bool bottom_bound = bounds[BOTTOM];
+  bool front_bound  = bounds[FRONT];
+  bool back_bound   = bounds[BACK];
+
+  if (my_ghost == LEFT && !left_bound) {
+    int j = t % block_height;
+    int k = t / block_height;
+    left_ghost[t] = temperature[IDX(1,1+j,1+k)];
+  }
+  if (my_ghost == RIGHT && !right_bound) {
+    int j = t % block_height;
+    int k = t / block_height;
+    right_ghost[t] = temperature[IDX(block_width,1+j,1+k)];
+  }
+  if (my_ghost == TOP && !top_bound) {
+    int i = t % block_width;
+    int k = t / block_width;
+    top_ghost[t] = temperature[IDX(1+i,1,1+k)];
+  }
+  if (my_ghost == BOTTOM && !bottom_bound) {
+    int i = t % block_width;
+    int k = t / block_width;
+    bottom_ghost[t] = temperature[IDX(1+i,block_height,1+k)];
+  }
+  if (my_ghost == FRONT && !front_bound) {
+    int i = t % block_width;
+    int j = t / block_width;
+    front_ghost[t] = temperature[IDX(1+i,1+j,1)];
+  }
+  if (my_ghost == BACK && !back_bound) {
+    int i = t % block_width;
+    int j = t / block_width;
+    back_ghost[t] = temperature[IDX(1+i,1+j,block_depth)];
+  }
+}
+
 __global__ void leftUnpackingKernel(DataType* temperature, DataType* ghost,
     int block_width, int block_height, int block_depth) {
   int j = blockDim.x*blockIdx.x+threadIdx.x;
@@ -417,16 +495,16 @@ void invokeBoundaryKernels(DataType* d_temperature, int block_width,
 void invokeJacobiKernel(DataType* d_temperature, DataType* d_new_temperature,
     DataType** d_send_ghosts, DataType** d_recv_ghosts, bool* d_bounds,
     int block_width, int block_height, int block_depth, cudaStream_t stream,
-    bool fuse_pack, bool fuse_all) {
+    bool fuse_update_pack, bool fuse_update_all) {
   dim3 block_dim(TILE_SIZE_3D, TILE_SIZE_3D, TILE_SIZE_3D);
   dim3 grid_dim((block_width+(block_dim.x-1))/block_dim.x,
       (block_height+(block_dim.y-1))/block_dim.y,
       (block_depth+(block_dim.z-1))/block_dim.z);
 
-  if (fuse_pack) {
+  if (fuse_update_pack) {
     jacobiFusedPackingKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature, d_new_temperature,
         d_send_ghosts, d_bounds, block_width, block_height, block_depth);
-  } else if (fuse_all) {
+  } else if (fuse_update_all) {
     jacobiFusedAllKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature, d_new_temperature,
         d_send_ghosts, d_recv_ghosts, d_bounds, block_width, block_height, block_depth);
   } else {
@@ -518,6 +596,15 @@ void packGhostsDevice(DataType* d_temperature,
   hapiCheck(cudaPeekAtLastError());
 }
 
+void packFusedDevice(DataType* d_temperature, DataType** d_send_ghosts, bool* d_bounds,
+    int block_width, int block_height, int block_depth, cudaStream_t comm_stream) {
+  int n_elems = 2*(block_width*block_height+block_width*block_depth+block_height*block_depth);
+  dim3 block_dim(256);
+  dim3 grid_dim((n_elems+block_dim.x-1)/block_dim.x);
+  fusedPackingKernel<<<grid_dim, block_dim, 0, comm_stream>>>(d_temperature,
+      d_send_ghosts, d_bounds, block_width, block_height, block_depth);
+}
+
 void unpackGhostDevice(DataType* d_temperature, DataType* d_ghost, DataType* h_ghost,
     int dir, int block_width, int block_height, int block_depth, size_t ghost_size,
     cudaStream_t comm_stream, cudaStream_t h2d_stream, cudaEvent_t unpack_events[],
@@ -562,4 +649,8 @@ void unpackGhostDevice(DataType* d_temperature, DataType* d_ghost, DataType* h_g
         d_ghost, block_width, block_height, block_depth);
   }
   hapiCheck(cudaPeekAtLastError());
+}
+
+void unpackFusedDevice() {
+  // TODO
 }
