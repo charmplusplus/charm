@@ -33,32 +33,40 @@
 /* readonly */ bool fuse_update_all;
 /* readonly */ bool print_elements;
 
-extern void invokeInitKernel(DataType* d_temperature, int block_width,
+extern void invokeInitKernel(DataType* temperature, int block_width,
     int block_height, int block_depth, cudaStream_t stream);
 extern void invokeGhostInitKernels(const std::vector<DataType*>& ghosts,
     const std::vector<int>& ghost_counts, cudaStream_t stream);
-extern void invokeBoundaryKernels(DataType* d_temperature, int block_width,
+extern void invokeBoundaryKernels(DataType* temperature, int block_width,
     int block_height, int block_depth, bool bounds[], cudaStream_t stream);
-extern void invokeJacobiKernel(DataType* d_temperature, DataType* d_new_temperature,
-    DataType** d_send_ghosts, DataType** d_recv_ghosts, bool* d_bounds,
-    int block_width, int block_height, int block_depth, cudaStream_t stream,
-    bool fuse_update_pack, bool fuse_update_all);
-extern void packGhostsDevice(DataType* d_temperature,
+extern void invokeJacobiKernel(DataType* temperature, DataType* new_temperature,
+    DataType* send_left_ghost, DataType* send_right_ghost, DataType* send_top_ghost,
+    DataType* send_bottom_ghost, DataType* send_front_ghost, DataType* send_back_ghost,
+    DataType* recv_left_ghost, DataType* recv_right_ghost, DataType* recv_top_ghost,
+    DataType* recv_bottom_ghost, DataType* recv_front_ghost, DataType* recv_back_ghost,
+    bool left_bound, bool right_bound, bool top_bound, bool bottom_bound,
+    bool front_bound, bool back_bound, int block_width, int block_height, int block_depth,
+    cudaStream_t stream, bool fuse_update_pack, bool fuse_update_all);
+extern void packGhostsDevice(DataType* temperature,
     DataType* d_ghosts[], DataType* h_ghosts[], bool bounds[],
     int block_width, int block_height, int block_depth,
     size_t x_surf_size, size_t y_surf_size, size_t z_surf_size,
     cudaStream_t comm_stream, cudaStream_t d2h_stream, cudaEvent_t pack_events[],
     bool use_channel);
-extern void packGhostsFusedDevice(DataType* d_temperature, DataType** d_send_ghosts,
-    bool* d_bounds, int block_width, int block_height, int block_depth,
-    cudaStream_t comm_stream);
-extern void unpackGhostDevice(DataType* d_temperature, DataType* d_ghost, DataType* h_ghost,
+extern void packGhostsFusedDevice(DataType* temperature, DataType* left_ghost,
+    DataType* right_ghost, DataType* top_ghost, DataType* bottom_ghost,
+    DataType* front_ghost, DataType* back_ghost, bool left_bound, bool right_bound,
+    bool top_bound, bool bottom_bound, bool front_bound, bool back_bound,
+    int block_width, int block_height, int block_depth, cudaStream_t comm_stream);
+extern void unpackGhostDevice(DataType* temperature, DataType* d_ghost, DataType* h_ghost,
     int dir, int block_width, int block_height, int block_depth, size_t ghost_size,
     cudaStream_t comm_stream, cudaStream_t h2d_stream, cudaEvent_t unpack_events[],
     bool use_channel);
-extern void unpackGhostsFusedDevice(DataType* d_temperature, DataType** d_recv_ghosts,
-    bool* d_bounds, int block_width, int block_height, int block_depth,
-    cudaStream_t comm_stream);
+extern void unpackGhostsFusedDevice(DataType* temperature, DataType* left_ghost,
+    DataType* right_ghost, DataType* top_ghost, DataType* bottom_ghost,
+    DataType* front_ghost, DataType* back_ghost, bool left_bound, bool right_bound,
+    bool top_bound, bool bottom_bound, bool front_bound, bool back_bound,
+    int block_width, int block_height, int block_depth, cudaStream_t comm_stream);
 
 class CallbackMsg : public CMessage_CallbackMsg {
 public:
@@ -277,8 +285,6 @@ class Block : public CBase_Block {
   DataType** d_send_ghosts;
   DataType** d_recv_ghosts;
   size_t ghost_sizes[DIR_COUNT];
-  DataType** d_send_ghosts_p;
-  DataType** d_recv_ghosts_p;
 
   cudaStream_t compute_stream;
   cudaStream_t comm_stream;
@@ -295,7 +301,6 @@ class Block : public CBase_Block {
   CkCallback update_cb;
 
   bool* bounds;
-  bool* d_bounds;
 
   Block() {}
 
@@ -310,10 +315,7 @@ class Block : public CBase_Block {
     }
     hapiCheck(cudaFreeHost(d_send_ghosts));
     hapiCheck(cudaFreeHost(d_recv_ghosts));
-    hapiCheck(cudaFree(d_send_ghosts_p));
-    hapiCheck(cudaFree(d_recv_ghosts_p));
     hapiCheck(cudaFreeHost(bounds));
-    hapiCheck(cudaFree(d_bounds));
 
     hapiCheck(cudaStreamDestroy(compute_stream));
     hapiCheck(cudaStreamDestroy(comm_stream));
@@ -382,9 +384,6 @@ class Block : public CBase_Block {
       hapiCheck(cudaMalloc((void**)&d_send_ghosts[i], ghost_sizes[i]));
       hapiCheck(cudaMalloc((void**)&d_recv_ghosts[i], ghost_sizes[i]));
     }
-    hapiCheck(cudaMalloc((void**)&d_send_ghosts_p, sizeof(DataType*) * DIR_COUNT));
-    hapiCheck(cudaMalloc((void**)&d_recv_ghosts_p, sizeof(DataType*) * DIR_COUNT));
-    hapiCheck(cudaMalloc((void**)&d_bounds, sizeof(bool) * DIR_COUNT));
 
     // Create CUDA streams and events
     hapiCheck(cudaStreamCreateWithPriority(&compute_stream, cudaStreamDefault, 0));
@@ -403,14 +402,6 @@ class Block : public CBase_Block {
     init_cb = CkCallback(CkIndex_Block::initDone(), thisProxy[thisIndex]);
     pack_cb = CkCallback(CkIndex_Block::packGhostsDone(), thisProxy[thisIndex]);
     update_cb = CkCallback(CkIndex_Block::updateDone(), thisProxy[thisIndex]);
-
-    // Move pointers to device
-    hapiCheck(cudaMemcpyAsync(d_send_ghosts_p, d_send_ghosts, sizeof(DataType*) * DIR_COUNT,
-        cudaMemcpyHostToDevice, compute_stream));
-    hapiCheck(cudaMemcpyAsync(d_recv_ghosts_p, d_recv_ghosts, sizeof(DataType*) * DIR_COUNT,
-        cudaMemcpyHostToDevice, compute_stream));
-    hapiCheck(cudaMemcpyAsync(d_bounds, bounds, DIR_COUNT * sizeof(bool),
-        cudaMemcpyHostToDevice, compute_stream));
 
     // Initialize temperature data
     invokeInitKernel(d_temperature, block_width, block_height, block_depth, compute_stream);
@@ -503,8 +494,10 @@ class Block : public CBase_Block {
       cudaStreamWaitEvent(comm_stream, compute_event, 0);
 
       if (fuse_pack) {
-        packGhostsFusedDevice(d_new_temperature, d_send_ghosts, d_bounds,
-            block_width, block_height, block_depth, comm_stream);
+        packGhostsFusedDevice(d_new_temperature, d_send_ghosts[LEFT], d_send_ghosts[RIGHT],
+            d_send_ghosts[TOP], d_send_ghosts[BOTTOM], d_send_ghosts[FRONT],
+            d_send_ghosts[BACK], bounds[LEFT], bounds[RIGHT], bounds[TOP], bounds[BOTTOM],
+            bounds[FRONT], bounds[BACK], block_width, block_height, block_depth, comm_stream);
       } else if (!fuse_update_pack) {
         // Pack non-contiguous ghosts to temporary contiguous buffers on the device
         // and transfer each from device to host
@@ -607,8 +600,10 @@ class Block : public CBase_Block {
     NVTXTracer nvtx_range(index_str + " processGhostsFused", NVTXColor::Carrot);
 
     // Unpack all ghosts together
-    unpackGhostsFusedDevice(d_temperature, d_recv_ghosts_p, d_bounds,
-        block_width, block_height, block_depth, comm_stream);
+    unpackGhostsFusedDevice(d_temperature, d_recv_ghosts[LEFT], d_recv_ghosts[RIGHT],
+        d_recv_ghosts[TOP], d_recv_ghosts[BOTTOM], d_recv_ghosts[FRONT],
+        d_recv_ghosts[BACK], bounds[LEFT], bounds[RIGHT], bounds[TOP], bounds[BOTTOM],
+        bounds[FRONT], bounds[BACK], block_width, block_height, block_depth, comm_stream);
   }
 
   void update() {
@@ -622,9 +617,14 @@ class Block : public CBase_Block {
     }
 
     // Invoke GPU kernel for Jacobi computation
-    invokeJacobiKernel(d_temperature, d_new_temperature, d_send_ghosts_p,
-        d_recv_ghosts_p, d_bounds, block_width, block_height, block_depth,
-        compute_stream, fuse_update_pack, fuse_update_all);
+    invokeJacobiKernel(d_temperature, d_new_temperature, d_send_ghosts[LEFT],
+        d_send_ghosts[RIGHT], d_send_ghosts[TOP], d_send_ghosts[BOTTOM],
+        d_send_ghosts[FRONT], d_send_ghosts[BACK], d_recv_ghosts[LEFT],
+        d_recv_ghosts[RIGHT], d_recv_ghosts[TOP], d_recv_ghosts[BOTTOM],
+        d_recv_ghosts[FRONT], d_recv_ghosts[BACK], bounds[LEFT], bounds[RIGHT],
+        bounds[TOP], bounds[BOTTOM], bounds[FRONT], bounds[BACK],
+        block_width, block_height, block_depth, compute_stream,
+        fuse_update_pack, fuse_update_all);
 
     // Synchronize with host only when necessary
     if (print_elements || (my_iter == warmup_iters)
