@@ -68,6 +68,20 @@ extern void unpackGhostsFusedDevice(DataType* temperature, DataType* left_ghost,
     DataType* front_ghost, DataType* back_ghost, bool left_bound, bool right_bound,
     bool top_bound, bool bottom_bound, bool front_bound, bool back_bound,
     int block_width, int block_height, int block_depth, cudaStream_t comm_stream);
+extern void setUnpackNode(cudaKernelNodeParams& params, DataType* temperature,
+  DataType* ghost, int dir, int block_width, int block_height, int block_depth);
+extern void setUnpackFusedNode(cudaKernelNodeParams& params, DataType* temperature,
+    DataType* ghosts[], bool bounds[], int block_width, int block_height,
+    int block_depth);
+extern void setUpdateNode(cudaKernelNodeParams& params, DataType* temperature,
+    DataType* new_temperature, DataType* send_ghosts[], DataType* recv_ghosts[],
+    bool bounds[], int block_width, int block_height, int block_depth,
+    bool fuse_update_pack, bool fuse_update_all);
+extern void setPackNode(cudaKernelNodeParams& params, DataType* temperature,
+  DataType* ghost, int dir, int block_width, int block_height, int block_depth);
+extern void setPackFusedNode(cudaKernelNodeParams& params, DataType* temperature,
+    DataType* ghosts[], bool bounds[], int block_width, int block_height,
+    int block_depth);
 
 class CallbackMsg : public CMessage_CallbackMsg {
 public:
@@ -303,8 +317,19 @@ class Block : public CBase_Block {
   cudaStream_t h2d_stream;
   cudaStream_t d2h_stream;
   cudaStream_t graph_stream;
-  cudaGraph_t cuda_graph;
-  cudaGraphExec_t cuda_graph_exec;
+  cudaGraph_t cuda_graph_1;
+  cudaGraph_t cuda_graph_2;
+  cudaGraphExec_t cuda_graph_exec_1;
+  cudaGraphExec_t cuda_graph_exec_2;
+  cudaGraphExec_t* cuda_graph_exec;
+  cudaGraphExec_t* cuda_graph_exec_next;
+  /*
+  cudaGraphNode_t unpack_nodes[DIR_COUNT];
+  cudaGraphNode_t fuse_unpack_node;
+  cudaGraphNode_t update_node;
+  cudaGraphNode_t pack_nodes[DIR_COUNT];
+  cudaGraphNode_t fuse_pack_node;
+  */
 
   cudaEvent_t compute_event;
   cudaEvent_t comm_event;
@@ -502,7 +527,17 @@ class Block : public CBase_Block {
     }
   }
 
-  void createCudaGraph() {
+  void createCudaGraph(cudaGraph_t& cg, cudaGraphExec_t& cge,
+      DataType* d_temp, DataType* d_new_temp) {
+    /*
+    std::vector<cudaGraphNode_t> dep1;
+    std::vector<cudaGraphNode_t> dep2;
+    std::vector<cudaGraphNode_t>* dep = &dep1;
+    std::vector<cudaGraphNode_t>* new_dep = &dep2;
+
+    hapiCheck(cudaGraphCreate(&cuda_graph, 0));
+    */
+
     // Start capturing
     if (!fuse_update_all) {
       hapiCheck(cudaStreamBeginCapture(comm_stream, cudaStreamCaptureModeGlobal));
@@ -513,16 +548,32 @@ class Block : public CBase_Block {
     // Unpack
     if (!fuse_update_all) {
       if (fuse_unpack) {
-        unpackGhostsFusedDevice(d_temperature, d_recv_ghosts[LEFT], d_recv_ghosts[RIGHT],
+        unpackGhostsFusedDevice(d_temp, d_recv_ghosts[LEFT], d_recv_ghosts[RIGHT],
             d_recv_ghosts[TOP], d_recv_ghosts[BOTTOM], d_recv_ghosts[FRONT],
             d_recv_ghosts[BACK], bounds[LEFT], bounds[RIGHT], bounds[TOP], bounds[BOTTOM],
             bounds[FRONT], bounds[BACK], block_width, block_height, block_depth, comm_stream);
+        /*
+        cudaKernelNodeParams fu_params = {0};
+        setUnpackFusedNode(fu_params, d_temperature, d_recv_ghosts, bounds,
+            block_width, block_height, block_depth);
+        hapiCheck(cudaGraphAddKernelNode(&fuse_unpack_node, cuda_graph,
+              dep->data(), dep->size(), &fu_params));
+        new_dep->push_back(fuse_unpack_node);
+        */
       } else {
         for (int dir = 0; dir < DIR_COUNT; dir++) {
           if (!bounds[dir]) {
-            unpackGhostDevice(d_temperature, d_recv_ghosts[dir], nullptr, dir,
+            unpackGhostDevice(d_temp, d_recv_ghosts[dir], nullptr, dir,
                 block_width, block_height, block_depth, ghost_sizes[dir],
                 comm_stream, h2d_stream, unpack_events, use_channel);
+            /*
+            cudaKernelNodeParams u_params = {0};
+            setUnpackNode(u_params, d_temperature, d_recv_ghosts[dir], dir,
+                block_width, block_height, block_depth);
+            hapiCheck(cudaGraphAddKernelNode(&unpack_nodes[dir], cuda_graph,
+                  dep->data(), dep->size(), &u_params));
+            new_dep->push_back(unpack_nodes[dir]);
+            */
           }
         }
       }
@@ -531,8 +582,13 @@ class Block : public CBase_Block {
       hapiCheck(cudaStreamWaitEvent(compute_stream, comm_event, 0));
     }
 
+    /*
+    dep->clear();
+    std::swap(dep, new_dep);
+    */
+
     // Jacobi update
-    invokeJacobiKernel(d_temperature, d_new_temperature, d_send_ghosts[LEFT],
+    invokeJacobiKernel(d_temp, d_new_temp, d_send_ghosts[LEFT],
         d_send_ghosts[RIGHT], d_send_ghosts[TOP], d_send_ghosts[BOTTOM],
         d_send_ghosts[FRONT], d_send_ghosts[BACK], d_recv_ghosts[LEFT],
         d_recv_ghosts[RIGHT], d_recv_ghosts[TOP], d_recv_ghosts[BOTTOM],
@@ -540,6 +596,18 @@ class Block : public CBase_Block {
         bounds[TOP], bounds[BOTTOM], bounds[FRONT], bounds[BACK],
         block_width, block_height, block_depth, compute_stream,
         fuse_update_pack, fuse_update_all);
+    /*
+    cudaKernelNodeParams j_params = {0};
+    setUpdateNode(j_params, d_temperature, d_new_temperature, d_send_ghosts,
+        d_recv_ghosts, bounds, block_width, block_height, block_depth,
+        fuse_update_pack, fuse_update_all);
+    hapiCheck(cudaGraphAddKernelNode(&update_node, cuda_graph,
+          dep->data(), dep->size(), &j_params));
+    new_dep->push_back(update_node);
+
+    dep->clear();
+    std::swap(dep, new_dep);
+    */
 
     // Pack
     if (!fuse_update_all) {
@@ -547,30 +615,63 @@ class Block : public CBase_Block {
       cudaStreamWaitEvent(comm_stream, compute_event, 0);
 
       if (fuse_pack) {
-        packGhostsFusedDevice(d_new_temperature, d_send_ghosts[LEFT], d_send_ghosts[RIGHT],
+        packGhostsFusedDevice(d_new_temp, d_send_ghosts[LEFT], d_send_ghosts[RIGHT],
             d_send_ghosts[TOP], d_send_ghosts[BOTTOM], d_send_ghosts[FRONT],
             d_send_ghosts[BACK], bounds[LEFT], bounds[RIGHT], bounds[TOP], bounds[BOTTOM],
             bounds[FRONT], bounds[BACK], block_width, block_height, block_depth, comm_stream);
+        /*
+        cudaKernelNodeParams fp_params = {0};
+        setPackFusedNode(fp_params, d_new_temperature, d_send_ghosts, bounds,
+            block_width, block_height, block_depth);
+        hapiCheck(cudaGraphAddKernelNode(&fuse_pack_node, cuda_graph,
+              dep->data(), dep->size(), &fp_params));
+        new_dep->push_back(fuse_pack_node);
+        */
       } else if (!fuse_update_pack) {
-        packGhostsDevice(d_new_temperature, d_send_ghosts, h_ghosts, bounds,
+        packGhostsDevice(d_new_temp, d_send_ghosts, h_ghosts, bounds,
             block_width, block_height, block_depth, x_surf_size, y_surf_size, z_surf_size,
             comm_stream, d2h_stream, pack_events, use_channel);
+        /*
+        for (int dir = 0; dir < DIR_COUNT; dir++) {
+          if (!bounds[dir]) {
+            cudaKernelNodeParams p_params = {0};
+            setPackNode(p_params, d_new_temperature, d_send_ghosts[dir], dir,
+                block_width, block_height, block_depth);
+            hapiCheck(cudaGraphAddKernelNode(&pack_nodes[dir], cuda_graph,
+                  dep->data(), dep->size(), &p_params));
+            new_dep->push_back(pack_nodes[dir]);
+          }
+        }
+        */
       }
     }
 
+    /*
+    dep->clear();
+    std::swap(dep, new_dep);
+    */
+
     // End capturing
     if (!fuse_update_all) {
-      hapiCheck(cudaStreamEndCapture(comm_stream, &cuda_graph));
+      hapiCheck(cudaStreamEndCapture(comm_stream, &cg));
     } else {
-      hapiCheck(cudaStreamEndCapture(compute_stream, &cuda_graph));
+      hapiCheck(cudaStreamEndCapture(compute_stream, &cg));
     }
 
     // Instantiate CUDA graph
-    hapiCheck(cudaGraphInstantiate(&cuda_graph_exec, cuda_graph, NULL, NULL, 0));
+    hapiCheck(cudaGraphInstantiate(&cge, cg, NULL, NULL, 0));
+  }
+
+  void createCudaGraphs() {
+    createCudaGraph(cuda_graph_1, cuda_graph_exec_1, d_temperature, d_new_temperature);
+    createCudaGraph(cuda_graph_2, cuda_graph_exec_2, d_new_temperature, d_temperature);
+    cuda_graph_exec = &cuda_graph_exec_1;
+    cuda_graph_exec_next = &cuda_graph_exec_2;
   }
 
   void launchCudaGraph() {
-    hapiCheck(cudaGraphLaunch(cuda_graph_exec, graph_stream));
+    std::swap(cuda_graph_exec, cuda_graph_exec_next);
+    hapiCheck(cudaGraphLaunch(*cuda_graph_exec, graph_stream));
   }
 
   void packGhosts() {

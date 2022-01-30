@@ -848,3 +848,181 @@ void unpackGhostsFusedDevice(DataType* temperature, DataType* left_ghost,
       block_width, block_height, block_depth);
   hapiCheck(cudaPeekAtLastError());
 }
+
+void setUnpackNode(cudaKernelNodeParams& params, DataType* temperature,
+  DataType* ghost, int dir, int block_width, int block_height, int block_depth) {
+  dim3 block_dim(TILE_SIZE_2D, TILE_SIZE_2D);
+  dim3 grid_dim;
+  if (dir == LEFT) {
+    grid_dim = dim3((block_height+(block_dim.x-1))/block_dim.x,
+        (block_depth+(block_dim.y-1))/block_dim.y);
+    params.func = (void*)leftUnpackingKernel;
+  } else if (dir == RIGHT) {
+    grid_dim = dim3((block_height+(block_dim.x-1))/block_dim.x,
+        (block_depth+(block_dim.y-1))/block_dim.y);
+    params.func = (void*)rightUnpackingKernel;
+  } else if (dir == TOP) {
+    grid_dim = dim3((block_width+(block_dim.x-1))/block_dim.x,
+        (block_depth+(block_dim.y-1))/block_dim.y);
+    params.func = (void*)topUnpackingKernel;
+  } else if (dir == BOTTOM) {
+    grid_dim = dim3((block_width+(block_dim.x-1))/block_dim.x,
+        (block_depth+(block_dim.y-1))/block_dim.y);
+    params.func = (void*)bottomUnpackingKernel;
+  } else if (dir == FRONT) {
+    grid_dim = dim3((block_width+(block_dim.x-1))/block_dim.x,
+        (block_height+(block_dim.y-1))/block_dim.y);
+    params.func = (void*)frontUnpackingKernel;
+  } else if (dir == BACK) {
+    grid_dim = dim3((block_width+(block_dim.x-1))/block_dim.x,
+        (block_height+(block_dim.y-1))/block_dim.y);
+    params.func = (void*)backUnpackingKernel;
+  }
+
+  void* kernel_args[] = {(void*)&temperature, (void*)&ghost, &block_width,
+    &block_height, &block_depth};
+
+  params.blockDim = block_dim;
+  params.gridDim = grid_dim;
+  params.sharedMemBytes = 0;
+  params.kernelParams = kernel_args;
+  params.extra = NULL;
+}
+
+void setUnpackFusedNode(cudaKernelNodeParams& params, DataType* temperature,
+    DataType* ghosts[], bool bounds[], int block_width, int block_height,
+    int block_depth) {
+#if UNPACK_FUSE_VER == 1
+  int n_elems = 2*(block_height*block_depth+block_width*block_depth+block_width*block_height);
+#elif UNPACK_FUSE_VER == 2
+  int n_elems = std::max({block_height*block_depth,block_width*block_depth,block_width*block_height});
+#endif
+  dim3 block_dim(256);
+  dim3 grid_dim((n_elems+block_dim.x-1)/block_dim.x);
+  params.blockDim = block_dim;
+  params.gridDim = grid_dim;
+#if UNPACK_FUSE_VER == 1
+  params.func = (void*)fusedUnpackingKernelv1;
+#elif UNPACK_FUSE_VER == 2
+  params.func = (void*)fusedUnpackingKernelv2;
+#endif
+
+  void* kernel_args[] = {(void*)&temperature, (void*)&ghosts[LEFT],
+    (void*)&ghosts[RIGHT], (void*)&ghosts[TOP], (void*)&ghosts[BOTTOM],
+    (void*)&ghosts[FRONT], (void*)&ghosts[BACK], &bounds[LEFT], &bounds[RIGHT],
+    &bounds[TOP], &bounds[BOTTOM], &bounds[FRONT], &bounds[BACK], &block_width,
+    &block_height, &block_depth};
+
+  params.sharedMemBytes = 0;
+  params.kernelParams = kernel_args;
+  params.extra = NULL;
+}
+
+void setUpdateNode(cudaKernelNodeParams& params, DataType* temperature,
+    DataType* new_temperature, DataType* send_ghosts[], DataType* recv_ghosts[],
+    bool bounds[], int block_width, int block_height, int block_depth,
+    bool fuse_update_pack, bool fuse_update_all) {
+  dim3 block_dim(TILE_SIZE_3D, TILE_SIZE_3D, TILE_SIZE_3D);
+  dim3 grid_dim((block_width+(block_dim.x-1))/block_dim.x,
+      (block_height+(block_dim.y-1))/block_dim.y,
+      (block_depth+(block_dim.z-1))/block_dim.z);
+  params.blockDim = block_dim;
+  params.gridDim = grid_dim;
+
+  if (fuse_update_pack) {
+    params.func = (void*)jacobiFusedPackingKernel;
+    void* kernel_args[] = {(void*)&temperature, (void*)&new_temperature,
+      (void*)&send_ghosts[LEFT], (void*)&send_ghosts[RIGHT], (void*)&send_ghosts[TOP],
+      (void*)&send_ghosts[BOTTOM], (void*)&send_ghosts[FRONT], (void*)&send_ghosts[BACK],
+      &bounds[LEFT], &bounds[RIGHT], &bounds[TOP], &bounds[BOTTOM], &bounds[FRONT],
+      &bounds[BACK], &block_width, &block_height, &block_depth};
+    params.kernelParams = kernel_args;
+  } else if (fuse_update_all) {
+    params.func = (void*)jacobiFusedAllKernel;
+    void* kernel_args[] = {(void*)&temperature, (void*)&new_temperature,
+      (void*)&send_ghosts[LEFT], (void*)&send_ghosts[RIGHT], (void*)&send_ghosts[TOP],
+      (void*)&send_ghosts[BOTTOM], (void*)&send_ghosts[FRONT], (void*)&send_ghosts[BACK],
+      (void*)&recv_ghosts[LEFT], (void*)&recv_ghosts[RIGHT], (void*)&recv_ghosts[TOP],
+      (void*)&recv_ghosts[BOTTOM], (void*)&recv_ghosts[FRONT], (void*)&recv_ghosts[BACK],
+      &bounds[LEFT], &bounds[RIGHT], &bounds[TOP], &bounds[BOTTOM], &bounds[FRONT],
+      &bounds[BACK], &block_width, &block_height, &block_depth};
+    params.kernelParams = kernel_args;
+  } else {
+    params.func = (void*)jacobiKernel;
+    void* kernel_args[] = {(void*)&temperature, (void*)&new_temperature,
+      &block_width, &block_height, &block_depth};
+    params.kernelParams = kernel_args;
+  }
+
+  params.sharedMemBytes = 0;
+  params.extra = NULL;
+}
+
+void setPackNode(cudaKernelNodeParams& params, DataType* temperature,
+  DataType* ghost, int dir, int block_width, int block_height, int block_depth) {
+  dim3 block_dim(TILE_SIZE_2D, TILE_SIZE_2D);
+  dim3 grid_dim;
+  if (dir == LEFT) {
+    grid_dim = dim3((block_height+(block_dim.x-1))/block_dim.x,
+        (block_depth+(block_dim.y-1))/block_dim.y);
+    params.func = (void*)leftPackingKernel;
+  } else if (dir == RIGHT) {
+    grid_dim = dim3((block_height+(block_dim.x-1))/block_dim.x,
+        (block_depth+(block_dim.y-1))/block_dim.y);
+    params.func = (void*)rightPackingKernel;
+  } else if (dir == TOP) {
+    grid_dim = dim3((block_width+(block_dim.x-1))/block_dim.x,
+        (block_depth+(block_dim.y-1))/block_dim.y);
+    params.func = (void*)topPackingKernel;
+  } else if (dir == BOTTOM) {
+    grid_dim = dim3((block_width+(block_dim.x-1))/block_dim.x,
+        (block_depth+(block_dim.y-1))/block_dim.y);
+    params.func = (void*)bottomPackingKernel;
+  } else if (dir == FRONT) {
+    grid_dim = dim3((block_width+(block_dim.x-1))/block_dim.x,
+        (block_height+(block_dim.y-1))/block_dim.y);
+    params.func = (void*)frontPackingKernel;
+  } else if (dir == BACK) {
+    grid_dim = dim3((block_width+(block_dim.x-1))/block_dim.x,
+        (block_height+(block_dim.y-1))/block_dim.y);
+    params.func = (void*)backPackingKernel;
+  }
+
+  void* kernel_args[] = {(void*)&temperature, (void*)&ghost, &block_width,
+    &block_height, &block_depth};
+
+  params.blockDim = block_dim;
+  params.gridDim = grid_dim;
+  params.sharedMemBytes = 0;
+  params.kernelParams = kernel_args;
+  params.extra = NULL;
+}
+
+void setPackFusedNode(cudaKernelNodeParams& params, DataType* temperature,
+    DataType* ghosts[], bool bounds[], int block_width, int block_height,
+    int block_depth) {
+#if PACK_FUSE_VER == 1
+  int n_elems = 2*(block_height*block_depth+block_width*block_depth+block_width*block_height);
+#elif PACK_FUSE_VER == 2
+  int n_elems = std::max({block_height*block_depth,block_width*block_depth,block_width*block_height});
+#endif
+  dim3 block_dim(256);
+  dim3 grid_dim((n_elems+block_dim.x-1)/block_dim.x);
+  params.blockDim = block_dim;
+  params.gridDim = grid_dim;
+#if PACK_FUSE_VER == 1
+  params.func = (void*)fusedPackingKernelv1;
+#elif PACK_FUSE_VER == 2
+  params.func = (void*)fusedPackingKernelv2;
+#endif
+
+  void* kernel_args[] = {(void*)&temperature, (void*)&ghosts[LEFT],
+    (void*)&ghosts[RIGHT], (void*)&ghosts[TOP], (void*)&ghosts[BOTTOM],
+    (void*)&ghosts[FRONT], (void*)&ghosts[BACK], &bounds[LEFT], &bounds[RIGHT],
+    &bounds[TOP], &bounds[BOTTOM], &bounds[FRONT], &bounds[BACK], &block_width,
+    &block_height, &block_depth};
+
+  params.sharedMemBytes = 0;
+  params.kernelParams = kernel_args;
+  params.extra = NULL;
+}
