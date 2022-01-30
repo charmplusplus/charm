@@ -26,6 +26,7 @@ mainmodule jacobi3d {
   readonly bool fuse_unpack;
   readonly bool fuse_update_pack;
   readonly bool fuse_update_all;
+  readonly bool use_cuda_graph;
   readonly bool print_elements;
 
   message CallbackMsg;
@@ -63,6 +64,10 @@ mainmodule jacobi3d {
 
         serial {
           createChannels();
+
+          if (use_cuda_graph) {
+            createCudaGraph();
+          }
         }
       }
 
@@ -89,16 +94,22 @@ mainmodule jacobi3d {
 
         for (nbr_count = 0; nbr_count < 2 * n_nbr; nbr_count++) {
           when channelCallback[my_iter](CallbackMsg* msg) serial {
-            if (msg->recv && !fuse_update_all && !fuse_unpack) {
+            if (msg->recv && !fuse_update_all && !fuse_unpack && !use_cuda_graph) {
               processGhostChannel(msg->dir);
             }
             delete msg;
           }
         }
 
-        if (fuse_unpack) {
+        if (use_cuda_graph) {
           serial {
-            processGhostsFused();
+            launchCudaGraph();
+          }
+        } else {
+          if (fuse_unpack) {
+            serial {
+              processGhostsFused();
+            }
           }
         }
       } else {
