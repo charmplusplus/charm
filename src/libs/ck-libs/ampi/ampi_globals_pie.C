@@ -786,3 +786,32 @@ void * pieglobalsfind(void * ptr)
   fprintf(stderr, "other rank data (call stack or heap)\n");
   return nullptr;
 }
+// for GDB scripting use
+void * pieglobalsgetsrc(void * ptr)
+{
+  const CthThread th = TCharm::get()->getThread();
+  auto ctx = CmiIsomallocGetThreadContext(th);
+  const CmiIsomallocRegion memregion = CmiIsomallocContextGetUsedExtent(ctx);
+
+  if (ptr < memregion.start || memregion.end <= ptr)
+  {
+    return nullptr;
+  }
+
+  ptrdiff_t offset = (char *)ptr - (char *)memregion.start;
+
+  for (const auto & seg : pieglobalsdata.segment_allocation_offsets)
+  {
+    ptrdiff_t allocation_offset = std::get<0>(seg);
+    uintptr_t src = std::get<1>(seg);
+    size_t size = std::get<2>(seg);
+
+    if (allocation_offset <= offset && offset < allocation_offset + size)
+    {
+      uintptr_t out = src + (offset - allocation_offset);
+      return (void *)out;
+    }
+  }
+
+  return nullptr;
+}
