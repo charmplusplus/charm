@@ -88,6 +88,7 @@ struct Param {
     n_iters = 100;
     warmup_iters = 10;
     cuda_aware = false;
+    fuse_val = 0;
     fuse_pack = false;
     fuse_unpack = false;
     fuse_update_pack = false;
@@ -831,7 +832,7 @@ int main(int argc, char** argv) {
     block.createCudaGraphs();
   }
   MPI_Barrier(MPI_COMM_WORLD);
-  if (rank == 0) printf("Blocks initialized in %.lf s\n", MPI_Wtime() - init_start_time);
+  if (rank == 0) printf("Blocks initialized in %.3lf s\n", MPI_Wtime() - init_start_time);
 
   // Main iteration loop
   if (rank == 0) printf("Running...\n");
@@ -854,7 +855,7 @@ int main(int argc, char** argv) {
 
   // Finalize
   if (rank == 0) {
-    printf("Total time: %.3lf s\nComm time: %.3lf s\n"
+    printf("Iterations complete!\nTotal time: %.3lf s\nComm time: %.3lf s\n"
         "Average iteration time: %.3lf ms\nAverage comm time: %.3lf ms\n",
         total_time, comm_time, (total_time / param.n_iters) * 1e3,
         (comm_time / param.n_iters) * 1e3);
