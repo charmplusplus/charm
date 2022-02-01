@@ -61,16 +61,15 @@ struct Param {
   int rank;
   MPI_Comm cart_comm;
 
-  int num_chares;
   int grid_width;
   int grid_height;
   int grid_depth;
   int block_width;
   int block_height;
   int block_depth;
-  int n_chares_x;
-  int n_chares_y;
-  int n_chares_z;
+  int n_procs_x;
+  int n_procs_y;
+  int n_procs_z;
   int n_iters;
   int warmup_iters;
   bool cuda_aware;
@@ -83,7 +82,6 @@ struct Param {
   bool print_elements;
 
   Param(int n_procs_, int rank_) : n_procs(n_procs_), rank(rank_) {
-    num_chares = n_procs;
     grid_width = grid_height = grid_depth = 512;
     n_iters = 100;
     warmup_iters = 10;
@@ -99,18 +97,18 @@ struct Param {
 
   void set() {
     // Calculate block size
-    block_width  = grid_width  / n_chares_x;
-    block_height = grid_height / n_chares_y;
-    block_depth  = grid_depth  / n_chares_z;
+    block_width  = grid_width  / n_procs_x;
+    block_height = grid_height / n_procs_y;
+    block_depth  = grid_depth  / n_procs_z;
   }
 
   void print() {
     printf("\n[CUDA 3D Jacobi example]\n");
-    printf("Grid: %d x %d x %d, Block: %d x %d x %d, Chares: %d x %d x %d, "
+    printf("Grid: %d x %d x %d, Block: %d x %d x %d, Procs: %d x %d x %d, "
         "Iterations: %d, Warm-up: %d, CUDA-aware: %d, Fusion: %d, CUDA Graph: %d, "
         "Print: %d\n\n",
         grid_width, grid_height, grid_depth, block_width, block_height, block_depth,
-        n_chares_x, n_chares_y, n_chares_z, n_iters, warmup_iters, cuda_aware,
+        n_procs_x, n_procs_y, n_procs_z, n_iters, warmup_iters, cuda_aware,
         fuse_val, use_cuda_graph, print_elements);
   }
 };
@@ -120,16 +118,15 @@ struct Block {
   int rank;
   MPI_Comm cart_comm;
 
-  int num_chares;
   int grid_width;
   int grid_height;
   int grid_depth;
   int block_width;
   int block_height;
   int block_depth;
-  int n_chares_x;
-  int n_chares_y;
-  int n_chares_z;
+  int n_procs_x;
+  int n_procs_y;
+  int n_procs_z;
   int n_iters;
   int warmup_iters;
   bool cuda_aware;
@@ -198,16 +195,15 @@ struct Block {
     n_procs          = param.n_procs;
     rank             = param.rank;
     cart_comm        = param.cart_comm;
-    num_chares       = param.num_chares;
     grid_width       = param.grid_width;
     grid_height      = param.grid_height;
     grid_depth       = param.grid_depth;
     block_width      = param.block_width;
     block_height     = param.block_height;
     block_depth      = param.block_depth;
-    n_chares_x       = param.n_chares_x;
-    n_chares_y       = param.n_chares_y;
-    n_chares_z       = param.n_chares_z;
+    n_procs_x        = param.n_procs_x;
+    n_procs_y        = param.n_procs_y;
+    n_procs_z        = param.n_procs_z;
     n_iters          = param.n_iters;
     warmup_iters     = param.warmup_iters;
     cuda_aware       = param.cuda_aware;
@@ -231,24 +227,24 @@ struct Block {
     n_nbr = 0;
     n_low_nbr = 0;
     n_high_nbr = 0;
-    linear_index = x * n_chares_y * n_chares_z + y * n_chares_z + z;
+    linear_index = x * n_procs_y * n_procs_z + y * n_procs_z + z;
 
     // Check bounds and set number of valid neighbors
     cudaCheck(cudaMallocHost((void**)&bounds, sizeof(bool) * DIR_COUNT));
     for (int i = 0; i < DIR_COUNT; i++) bounds[i] = false;
 
-    if (x == 0)            bounds[LEFT] = true;
-    else                   { n_nbr++; n_low_nbr++; }
-    if (x == n_chares_x-1) bounds[RIGHT] = true;
-    else                   { n_nbr++; n_high_nbr++; }
-    if (y == 0)            bounds[TOP] = true;
-    else                   { n_nbr++; n_low_nbr++; }
-    if (y == n_chares_y-1) bounds[BOTTOM] = true;
-    else                   { n_nbr++; n_high_nbr++; }
-    if (z == 0)            bounds[FRONT] = true;
-    else                   { n_nbr++; n_low_nbr++; }
-    if (z == n_chares_z-1) bounds[BACK] = true;
-    else                   { n_nbr++; n_high_nbr++; }
+    if (x == 0)           bounds[LEFT] = true;
+    else                  { n_nbr++; n_low_nbr++; }
+    if (x == n_procs_x-1) bounds[RIGHT] = true;
+    else                  { n_nbr++; n_high_nbr++; }
+    if (y == 0)           bounds[TOP] = true;
+    else                  { n_nbr++; n_low_nbr++; }
+    if (y == n_procs_y-1) bounds[BOTTOM] = true;
+    else                  { n_nbr++; n_high_nbr++; }
+    if (z == 0)           bounds[FRONT] = true;
+    else                  { n_nbr++; n_low_nbr++; }
+    if (z == n_procs_z-1) bounds[BACK] = true;
+    else                  { n_nbr++; n_high_nbr++; }
 
     // Determine neighbor ranks
     for (int i = 0; i < DIR_COUNT; i++) {
@@ -693,11 +689,8 @@ int main(int argc, char** argv) {
   // Process arguments
   int c;
   bool dims[3] = {false, false, false};
-  while ((c = getopt(argc, argv, "c:x:y:z:i:w:df:gp")) != -1) {
+  while ((c = getopt(argc, argv, "x:y:z:i:w:df:gp")) != -1) {
     switch (c) {
-      case 'c':
-        param.num_chares = atoi(optarg);
-        break;
       case 'x':
         param.grid_width = atoi(optarg);
         dims[0] = true;
@@ -742,8 +735,8 @@ int main(int argc, char** argv) {
         if (rank == 0) {
           fprintf(stderr,
               "Usage: %s -x [grid width] -y [grid height] -z [grid depth] "
-              "-c [number of chares] -i [iterations] -w [warmup iterations] "
-              "-d [use Channel API] -f [fusion value] -g [use CUDA Graph] "
+              "-i [iterations] -w [warmup iterations] "
+              "-d [use CUDA-aware MPI] -f [fusion value] -g [use CUDA Graph] "
               "-p (print blocks)\n", argv[0]);
         }
         MPI_Finalize();
@@ -770,7 +763,7 @@ int main(int argc, char** argv) {
     param.grid_height = param.grid_depth = param.grid_width;
   }
 
-  // Setup 3D grid of chares
+  // Setup 3D grid of processes
   double area[3];
   int ipx, ipy, ipz, nremain;
   double surf, bestsurf;
@@ -779,9 +772,9 @@ int main(int argc, char** argv) {
   area[2] = param.grid_height * param.grid_depth;
   bestsurf = 2.0 * (area[0] + area[1] + area[2]);
   ipx = 1;
-  while (ipx <= param.num_chares) {
-    if (param.num_chares % ipx == 0) {
-      nremain = param.num_chares / ipx;
+  while (ipx <= param.n_procs) {
+    if (param.n_procs % ipx == 0) {
+      nremain = param.n_procs / ipx;
       ipy = 1;
 
       while (ipy <= nremain) {
@@ -791,9 +784,9 @@ int main(int argc, char** argv) {
 
           if (surf < bestsurf) {
             bestsurf = surf;
-            param.n_chares_x = ipx;
-            param.n_chares_y = ipy;
-            param.n_chares_z = ipz;
+            param.n_procs_x = ipx;
+            param.n_procs_y = ipy;
+            param.n_procs_z = ipz;
           }
         }
         ipy++;
@@ -802,10 +795,10 @@ int main(int argc, char** argv) {
     ipx++;
   }
 
-  if (param.n_chares_x * param.n_chares_y * param.n_chares_z != param.num_chares) {
+  if (param.n_procs_x * param.n_procs_y * param.n_procs_z != param.n_procs) {
     if (rank == 0) {
-      fprintf(stderr, "ERROR: Bad grid of chares: %d x %d x %d != %d\n",
-          param.n_chares_x, param.n_chares_y, param.n_chares_z, param.num_chares);
+      fprintf(stderr, "ERROR: Bad grid of MPI processes: %d x %d x %d != %d\n",
+          param.n_procs_x, param.n_procs_y, param.n_procs_z, param.n_procs);
     }
     MPI_Finalize();
     exit(EXIT_FAILURE);
@@ -818,7 +811,7 @@ int main(int argc, char** argv) {
   }
 
   // Create 3D Cartesian topology and Block object
-  int proc_dims[NDIMS] = {param.n_chares_x, param.n_chares_y, param.n_chares_z};
+  int proc_dims[NDIMS] = {param.n_procs_x, param.n_procs_y, param.n_procs_z};
   int periods[NDIMS] = {0, 0, 0};
   int coords[NDIMS];
   MPI_Cart_create(MPI_COMM_WORLD, NDIMS, proc_dims, periods, 0, &param.cart_comm);
@@ -837,28 +830,20 @@ int main(int argc, char** argv) {
   // Main iteration loop
   if (rank == 0) printf("Running...\n");
   double start_time;
-  double comm_start_time;
-  double comm_time = 0;
   for (int i = 0; i < param.n_iters + param.warmup_iters; i++) {
     if (i == param.warmup_iters) start_time = MPI_Wtime();
-    comm_start_time = MPI_Wtime();
 
     block.packGhosts();
     block.exchangeGhosts();
     if (param.use_cuda_graph) block.launchCudaGraph();
-
-    if (i >= param.warmup_iters) comm_time += MPI_Wtime() - comm_start_time;
-
     block.update();
   }
   double total_time = MPI_Wtime() - start_time;
 
   // Finalize
   if (rank == 0) {
-    printf("Iterations complete!\nTotal time: %.3lf s\nComm time: %.3lf s\n"
-        "Average iteration time: %.3lf ms\nAverage comm time: %.3lf ms\n",
-        total_time, comm_time, (total_time / param.n_iters) * 1e3,
-        (comm_time / param.n_iters) * 1e3);
+    printf("Iterations complete!\n\nTotal time: %.3lf s\nAverage iteration time: %.3lf ms\n",
+        total_time, (total_time / param.n_iters) * 1e3);
   }
 
   MPI_Barrier(MPI_COMM_WORLD);
