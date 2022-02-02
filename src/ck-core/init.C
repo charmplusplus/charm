@@ -1469,8 +1469,13 @@ void _initCharm(int unused_argc, char **argv)
 	CmiRdmaDeviceRecvInit(CkRdmaDeviceRecvHandler);
 #endif
 
+#if CMK_USE_SHMEM
+  CmiIpcInit(argv);
+#endif
+
 	// Set the ack handler function used for the entry method p2p api and entry method bcast api
 	initEMNcpyAckHandler();
+
 	/**
 	  The rank-0 processor of each node calls the 
 	  translator-generated "_register" routines. 
@@ -1671,6 +1676,25 @@ void _initCharm(int unused_argc, char **argv)
   hapiInvokeCallback = CUDACallbackManager;
   hapiQdCreate = QdCreate;
   hapiQdProcess = QdProcess;
+#endif
+
+#if CMK_USE_SHMEM
+#if CMK_SMP
+    CmiNodeAllBarrier();
+    if (inCommThread) {
+      CmiMakeIpcManager(nullptr);
+    } else
+#endif
+    {
+      auto th = CthSelf();
+      if (CmiMyRank() == 0) {
+        CsvAccess(coreIpcManager_) = CmiMakeIpcManager(th);
+      } else {
+        CmiMakeIpcManager(th);
+      }
+      CmiAssert(CthIsSuspendable(th));
+      CthSuspend();
+    }
 #endif
 
 #if CMK_USE_PXSHM && ( CMK_CRAYXE || CMK_CRAYXC ) && CMK_SMP

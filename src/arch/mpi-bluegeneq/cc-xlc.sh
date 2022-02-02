@@ -1,5 +1,0 @@
-CMK_COMPILER='bgxlc'
-  
-
-
-

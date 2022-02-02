@@ -42,11 +42,17 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     string(REGEX REPLACE ".*(-.*)" "\\1" CMK_COMPILER_SUFFIX ${mytmp})
   endif()
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-  set(CMK_COMPILER clang)
+  if(CMAKE_CXX_COMPILER MATCHES "(icpx)$")
+    set(CMK_COMPILER icx)
+  else()
+    set(CMK_COMPILER clang)
+  endif()
   get_filename_component(mytmp ${CMAKE_CXX_COMPILER} NAME)
   if(mytmp MATCHES "-")
     string(REGEX REPLACE ".*(-.*)" "\\1" CMK_COMPILER_SUFFIX ${mytmp})
   endif()
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "IntelLLVM")
+  set(CMK_COMPILER icx)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
   set(CMK_COMPILER icc)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Cray")
@@ -108,11 +114,10 @@ function(charm_determine_arch output input)
   set(${output} ${retval} PARENT_SCOPE)
 endfunction()
 
-if(ARCH)
-  set(CHARM_CPU ${ARCH})
-else()
-  charm_determine_arch(CHARM_CPU ${CMAKE_SYSTEM_PROCESSOR})
+if(NOT ARCH)
+  charm_determine_arch(ARCH ${CMAKE_SYSTEM_PROCESSOR})
 endif()
+set(CHARM_CPU ${ARCH})
 
 charm_determine_arch(CHARM_HOST_CPU ${CMAKE_HOST_SYSTEM_PROCESSOR})
 
@@ -283,6 +288,14 @@ if(${CMK_USE_ZLIB})
   set(CMK_SYSLIBS "$CMK_SYSLIBS -lz")
 endif()
 
+if(${CMK_USE_SHMEM})
+  if(${CMK_HAS_XPMEM})
+    set(CMK_SYSLIBS "$CMK_SYSLIBS -lxpmem")
+  elseif(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    set(CMK_SYSLIBS "$CMK_SYSLIBS -lrt")
+  endif()
+endif()
+
 set(CMK_USE_LIBJPEG 0)
 find_package(JPEG)
 IF(JPEG_FOUND)
@@ -343,7 +356,6 @@ endif()
 set(CMK_OS_IS_LINUX 0)
 set(CMK_MACOSX 0)
 set(CMK_WINDOWS 0)
-set(CMK_BLUEGENEQ 0)
 set(CMK_POST_EXE "")
 set(CMK_SHARED_SUF "so")
 set(CMK_USER_SUFFIX ".user")
@@ -361,11 +373,6 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows" OR CMAKE_SYSTEM_NAME STREQUAL "CYGWI
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   set(CHARM_OS "linux")
   set(CMK_OS_IS_LINUX 1)
-elseif(IS_DIRECTORY "/bgsys")
-  set(CHARM_OS "bluegeneq")
-  set(CMK_BLUEGENEQ 1)
-  set(CMK_SUPPORTS_MEMORY_ISOMALLOC 0)
-  message(DEPRECATION "Support for Blue Gene/Q targets has been deprecated as of Charm++ 7.0.0.")
 else()
   message(FATAL_ERROR "Unsupported operating system ${CMAKE_SYSTEM_NAME}.")
 endif()
@@ -473,6 +480,33 @@ if(CMAKE_BUILD_TYPE MATCHES "Debug" OR CMAKE_BUILD_TYPE MATCHES "RelWithDebInfo"
   set(OPTSATBUILDTIME "${OPTSATBUILDTIME} -g")
 endif()
 
+# Identify arch/network-specific paths
+if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${NETWORK}/gdir_link)
+  file(STRINGS src/arch/${NETWORK}/gdir_link GDIR)
+elseif(${NETWORK} MATCHES "gni-")
+  set(GDIR "gni")
+elseif(${NETWORK} MATCHES "mpi-cray")
+  set(GDIR "mpi")
+elseif(${NETWORK} MATCHES "ofi-cray")
+  set(GDIR "ofi")
+else()
+  set(GDIR ${NETWORK})
+endif()
+
+set(VDIR ${CHARM_PLATFORM})
+
+# Identify whether charmrun will be built
+set(CMK_BUILD_CHARMRUN 0)
+if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${NETWORK}/charmrun)
+  set(CHARMRUN_DIR src/arch/${NETWORK})
+elseif(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/charmrun)
+  set(CHARMRUN_DIR src/arch/${GDIR})
+elseif(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/charmrun)
+  set(CHARMRUN_DIR src/arch/${VDIR})
+else()
+  set(CMK_BUILD_CHARMRUN 1)
+endif()
+
 include(cmake/detect-features.cmake)
 include(cmake/ci-files.cmake)
 
@@ -562,21 +596,6 @@ set(CMK_C_OPENMP ${OpenMP_C_FLAGS})
 set(CMK_F_OPENMP ${OpenMP_Fortran_FLAGS})
 
 # Shell scripts
-
-if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${NETWORK}/gdir_link)
-  file(STRINGS src/arch/${NETWORK}/gdir_link GDIR)
-elseif(${NETWORK} MATCHES "gni-")
-  set(GDIR "gni")
-elseif(${NETWORK} MATCHES "mpi-cray")
-  set(GDIR "mpi")
-elseif(${NETWORK} MATCHES "ofi-cray")
-  set(GDIR "ofi")
-else()
-  set(GDIR ${NETWORK})
-endif()
-
-set(VDIR ${CHARM_PLATFORM})
-
 set(CMK_VDIR ${VDIR})
 set(CMK_GDIR ${GDIR})
 
@@ -584,9 +603,10 @@ if(NOT EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/)
   message(FATAL_ERROR "Unsupported platform ${VDIR}.")
 endif()
 
-configure_file(src/arch/common/cc-bluegene.sh                include/ COPYONLY)
 configure_file(src/arch/common/cc-clang.sh                   include/ COPYONLY)
 configure_file(src/arch/common/cc-clang.h                    include/ COPYONLY)
+configure_file(src/arch/common/cc-icx.sh                     include/ COPYONLY)
+configure_file(src/arch/common/cc-icx.h                      include/ COPYONLY)
 configure_file(src/arch/common/cc-craycc.h                   include/ COPYONLY)
 configure_file(src/arch/common/cc-craycc.sh                  include/ COPYONLY)
 configure_file(src/arch/common/cc-msvc.h                     include/ COPYONLY)
@@ -652,6 +672,12 @@ endif()
 if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-pxshm.sh)
   configure_file(src/arch/${VDIR}/conv-mach-pxshm.sh         include/ COPYONLY)
   configure_file(src/arch/${VDIR}/conv-mach-pxshm.h          include/ COPYONLY)
+endif()
+
+if(${CMK_USE_SHMEM})
+  if (EXISTS ${CMAKE_SOURCE_DIR}/src/conv-core/cmishmem.h)
+    configure_file(src/conv-core/cmishmem.h                  include/ COPYONLY)
+  endif()
 endif()
 
 if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-sysvshm.sh)
@@ -821,15 +847,11 @@ configure_file(src/libs/ck-libs/completion/completion.h include/ COPYONLY)
 add_dependencies(modulecompletion ck)
 
 # Charmrun + testrun
-if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${NETWORK}/charmrun)
-  configure_file(src/arch/${NETWORK}/charmrun ${CMAKE_BINARY_DIR}/bin COPYONLY)
-elseif(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/charmrun)
-  configure_file(src/arch/${GDIR}/charmrun ${CMAKE_BINARY_DIR}/bin COPYONLY)
-elseif(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/charmrun)
-  configure_file(src/arch/${VDIR}/charmrun ${CMAKE_BINARY_DIR}/bin COPYONLY)
-else()
+if(${CMK_BUILD_CHARMRUN})
   add_subdirectory(src/util/charmrun-src)
   add_dependencies(charmrun create_symlinks)
+else()
+  configure_file(${CHARMRUN_DIR}/charmrun ${CMAKE_BINARY_DIR}/bin COPYONLY)
 endif()
 configure_file(src/scripts/testrun bin/ COPYONLY)
 
@@ -931,7 +953,7 @@ foreach(l BUILDOPTS CMK_AMPI_WITH_ROMIO CMK_BUILD_PYTHON CMK_CAN_LINK_FORTRAN
         CMK_LIBJPEG CMK_MOD_EXT CMK_SUPPORTS_FSGLOBALS CMK_SUPPORTS_PIPGLOBALS
         CMK_SUPPORTS_PIEGLOBALS CMK_SUPPORTS_SWAPGLOBALS CMK_SUPPORTS_TLSGLOBALS
         CMK_SYSLIBS CMK_TRACE_ENABLED CP OPTS_CC OPTS_CXX CMK_VDIR CMK_GDIR
-        CMK_HAS_ELF_H CMK_HAS_OPENMP CMK_AMPI_ONLY CMK_WINDOWS CMK_BLUEGENEQ
+        CMK_HAS_ELF_H CMK_HAS_OPENMP CMK_AMPI_ONLY CMK_WINDOWS
         CXX_NO_AS_NEEDED LDXX_WHOLE_ARCHIVE_PRE LDXX_WHOLE_ARCHIVE_POST
         CMK_MACOSX CMK_POST_EXE CMK_SHARED_SUF CMK_USER_SUFFIX OPTS_LD
         CMK_COMPILER_KNOWS_FVISIBILITY CMK_LINKER_KNOWS_UNDEFINED
@@ -972,7 +994,7 @@ endif()
 set(optfile_mak ${CMAKE_BINARY_DIR}/include/conv-mach-opt.mak)
 
 file(WRITE  ${optfile_mak} "# Build-time options header for Makefiles, automatically generated by cmake.\n")
-foreach(l CUDA_DIR BUILD_CUDA CMK_AMPI_WITH_ROMIO CMK_MACOSX CMK_BLUEGENEQ CMK_BUILD_PYTHON
+foreach(l CUDA_DIR BUILD_CUDA CMK_AMPI_WITH_ROMIO CMK_MACOSX CMK_BUILD_PYTHON
         CMK_CHARMDEBUG CMK_COMPILER CMK_GDIR CMK_HAS_MALLOC_HOOK CMK_HAS_MMAP CMK_LIBJPEG
         CMK_LUSTREAPI CMK_MULTICORE CMK_NO_BUILD_SHARED CMK_NO_PARTITIONS CMK_SHARED_SUF
         CMK_SMP CMK_SUPPORTS_FSGLOBALS CMK_SUPPORTS_PIPGLOBALS CMK_SUPPORTS_PIEGLOBALS
@@ -1118,11 +1140,53 @@ file(WRITE ${CMAKE_BINARY_DIR}/include/charm-version-git.h "#define CHARM_VERSIO
 configure_file(${CMAKE_SOURCE_DIR}/cmake/Makefile.tests ${CMAKE_BINARY_DIR}/include/Makefile COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/cmake/Makefile.tests.common ${CMAKE_BINARY_DIR}/include/Makefile.tests.common COPYONLY)
 
+# Configure CharmConfig.cmake
+include(CMakePackageConfigHelpers)
+configure_package_config_file(
+  ${CMAKE_SOURCE_DIR}/cmake/templates/CharmConfig.cmake.in
+  "${CMAKE_BINARY_DIR}/lib/cmake/Charm/CharmConfig.cmake"
+  INSTALL_DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/cmake/Charm/CharmConfig.cmake
+  )
+# We want the `SameMinorVersion` compatibility mode, but it isn't available
+# before CMake v3.11
+if(CMAKE_VERSION VERSION_GREATER 3.11 OR CMAKE_VERSION VERSION_EQUAL 3.11)
+  set(VERSION_COMPATIBILITY_MODE SameMinorVersion)
+else()
+  set(VERSION_COMPATIBILITY_MODE ExactVersion)
+endif()
+write_basic_package_version_file(
+  ${CMAKE_BINARY_DIR}/lib/cmake/Charm/CharmConfigVersion.cmake
+  COMPATIBILITY ${VERSION_COMPATIBILITY_MODE})
 
 # Installation rules
-install(DIRECTORY ${CMAKE_BINARY_DIR}/bin DESTINATION . PATTERN * PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ GROUP_EXECUTE GROUP_READ WORLD_READ WORLD_EXECUTE)
-install(DIRECTORY ${CMAKE_BINARY_DIR}/lib     DESTINATION .)
+
+# install all includes
+install(
+  DIRECTORY ${CMAKE_BINARY_DIR}/include
+  DESTINATION .)
+
+# install all libraries
+install(
+  DIRECTORY ${CMAKE_BINARY_DIR}/lib
+  DESTINATION .)
+
+# install shared libraries if present
 if (${BUILD_SHARED})
-  install(DIRECTORY ${CMAKE_BINARY_DIR}/lib_so  DESTINATION .)
+install(
+  DIRECTORY ${CMAKE_BINARY_DIR}/lib_so
+  DESTINATION .)
 endif()
-install(DIRECTORY ${CMAKE_BINARY_DIR}/include DESTINATION .)
+
+#install all executables
+install(
+  DIRECTORY ${CMAKE_BINARY_DIR}/bin
+  DESTINATION .
+  PATTERN *
+  PERMISSIONS
+    OWNER_EXECUTE
+    OWNER_WRITE
+    OWNER_READ
+    GROUP_EXECUTE
+    GROUP_READ
+    WORLD_READ
+    WORLD_EXECUTE)

@@ -25,10 +25,6 @@
 #define N_LLMSG_ELEM     1024
 #endif
 
-#if CMK_BLUEGENEQ
-#include <spi/include/kernel/location.h>
-#endif
-
 PPCAtomicQueue *sPPCMemallocVec;
 PPCAtomicQueue *mPPCMemallocVec;
 PPCAtomicQueue *llPPCMemallocVec;
@@ -54,15 +50,10 @@ void *CmiAlloc_ppcq (int size) {
   double start = CmiWallTimer();
 #endif
 
-#if CMK_BLUEGENEQ
-  //Comm threads are hidden on BG/Q
-  int myrank = Kernel_ProcessorID() - _nodeStart;
-#else
   int myrank = CmiMyRank();
 #if CMK_ENABLE_ASYNC_PROGRESS
   if (CmiInCommThread())
     myrank = CmiMyNodeSize() + _comm_thread_id;
-#endif
 #endif
 
   if (size <= SMSG_SIZE) {
@@ -154,13 +145,8 @@ void CmiMemAllocInit_ppcq (void   * atomic_mem,
 			   size_t   atomic_memsize)
 {
   int i = 0;
-#if CMK_BLUEGENEQ
-  int node_size = 64/Kernel_ProcessCount();
-  _nodeStart = node_size * Kernel_MyTcoord();
-#else
   int node_size = 2 * CmiMyNodeSize();
   _nodeStart = Cmi_nodestart;
-#endif
 
   //We want to align headers to 32 bytes
   CmiAssert(sizeof(CmiMemAllocHdr_ppcq)+sizeof(CmiChunkHeader) == ALIGNMENT);

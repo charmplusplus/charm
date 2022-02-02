@@ -255,11 +255,6 @@ void infi_freeMultipleSend(void *ptr);
 void infi_unregAndFreeMeta(void *ch);
 #endif
 
-#if CMK_SMP && CMK_BLUEGENEQ && SPECIFIC_PCQUEUE
-void * CmiAlloc_bgq (int     size);
-void   CmiFree_bgq  (void  * buf);
-#endif
-
 #if CMK_SMP && CMK_PPC_ATOMIC_QUEUE
 void * CmiAlloc_ppcq (int     size);
 void   CmiFree_ppcq  (void  * buf);
@@ -282,6 +277,10 @@ CpvStaticDeclare(int, cmiMyPeIdle);
 CsvDeclare(CmiMemoryAtomicUInt, idleThreadsCnt);
 CpvDeclare(Queue, CsdTaskQueue);
 CpvDeclare(void *, CmiSuspendedTaskQueue);
+#endif
+
+#if CMK_USE_SHMEM
+CsvDeclare(CmiIpcManager*, coreIpcManager_);
 #endif
 
 CpvDeclare(int, isHelperOn);
@@ -1194,76 +1193,6 @@ double CmiCpuTimer(void)
     (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
     (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
   return currenttime - CpvAccess(inittime_virtual);
-}
-
-#endif
-
-#if CMK_TIMER_USE_BLUEGENEQ  /* This module just compiles with GCC charm. */
-
-CpvStaticDeclare(unsigned long, inittime);
-CpvStaticDeclare(double, clocktick);
-
-int CmiTimerIsSynchronized(void)
-{
-  return 1;
-}
-
-int CmiTimerAbsolute(void)
-{
-  return 0;
-}
-
-#include "hwi/include/bqc/A2_inlines.h"
-#include "spi/include/kernel/process.h"
-
-double CmiStartTimer(void)
-{
-  return 0.0;
-}
-
-double CmiInitTime(void)
-{
-  return CpvAccess(inittime);
-}
-
-void CmiTimerInit(char **argv)
-{
-  CpvInitialize(double, clocktick);
-  CpvInitialize(unsigned long, inittime);
-
-  Personality_t  pers;
-  Kernel_GetPersonality(&pers, sizeof(pers));
-  uint32_t clockMhz = pers.Kernel_Config.FreqMHz;
-  CpvAccess(clocktick) = 1.0 / (clockMhz * 1e6); 
-
-  /*fprintf(stderr, "Blue Gene/Q running at clock speed of %d Mhz\n", clockMhz);*/
-
-  /* try to synchronize calling barrier */
-#if !(__FAULT__)
-  if(cmiArgDebugFlag == 0) {
-    CmiBarrier();
-    CmiBarrier();
-    CmiBarrier();
-  }
-#endif
-  CpvAccess(inittime) = GetTimeBase (); 
-}
-
-double CmiWallTimer(void)
-{
-  unsigned long long currenttime;
-  currenttime = GetTimeBase();
-  return CpvAccess(clocktick)*(currenttime-CpvAccess(inittime));
-}
-
-double CmiCpuTimer(void)
-{
-  return CmiWallTimer();
-}
-
-double CmiTimer(void)
-{
-  return CmiWallTimer();
 }
 
 #endif
@@ -3300,8 +3229,6 @@ void *CmiAlloc(int size)
   res =(char *) CmiPoolAlloc(size+sizeof(CmiChunkHeader));
 #elif USE_MPI_CTRLMSG_SCHEME && CMK_CONVERSE_MPI
   MPI_Alloc_mem(size+sizeof(CmiChunkHeader), MPI_INFO_NULL, &res);
-#elif CMK_SMP && CMK_BLUEGENEQ && SPECIFIC_PCQUEUE
-  res = (char *) CmiAlloc_bgq(size+sizeof(CmiChunkHeader));
 #elif CMK_SMP && CMK_PPC_ATOMIC_QUEUE
   res = (char *) CmiAlloc_ppcq(size+sizeof(CmiChunkHeader));
 #else
@@ -3418,6 +3345,19 @@ void CmiFree(void *blk)
     CpvAccess(BlocksAllocated)--;
 #endif
 
+#if CMK_USE_SHMEM
+    // we should only free _our_ IPC blocks -- so calling CmiFree on
+    // an IPC block issued by another process will cause a bad free!
+    // (note -- this would only occur if you alloc an ipc block then
+    //          decide not to send it; that should be avoided! )
+    CmiIpcBlock* ipc;
+    auto* manager = CsvAccess(coreIpcManager_);
+    if (blk && (ipc = CmiIsIpcBlock(manager, BLKSTART(blk), CmiMyNode()))) {
+      CmiFreeIpcBlock(manager, ipc);
+      return;
+    }
+#endif
+
 #if CMK_USE_IBVERBS | CMK_USE_IBUD
     /* is this message the head of a MultipleSend that we received?
        Then the parts with INFIMULTIPOOL have metadata which must be 
@@ -3435,8 +3375,6 @@ void CmiFree(void *blk)
     CmiPoolFree(BLKSTART(parentBlk));
 #elif USE_MPI_CTRLMSG_SCHEME && CMK_CONVERSE_MPI
     MPI_Free_mem(parentBlk);
-#elif CMK_SMP && CMK_BLUEGENEQ && SPECIFIC_PCQUEUE
-    CmiFree_bgq(BLKSTART(parentBlk));
 #elif CMK_SMP && CMK_PPC_ATOMIC_QUEUE
     CmiFree_ppcq(BLKSTART(parentBlk));
 #else
@@ -4073,6 +4011,11 @@ void ConverseCommonInit(char **argv)
     _IO_file_overflow(stdout, -1);
     _IO_file_overflow(stderr, -1);
   }
+#endif
+
+#if CMK_USE_SHMEM
+  CsvInitialize(CmiIpcManager*, coreIpcManager_);
+  CsvAccess(coreIpcManager_) = nullptr;
 #endif
 
   CpvInitialize(int, _urgentSend);

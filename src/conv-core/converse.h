@@ -471,7 +471,7 @@ extern CmiNodeLock CmiMemLock_lock;
 #define CmiMemUnlock() do{if (CmiMemLock_lock) CmiUnlock(CmiMemLock_lock);} while (0)
 
 
-#if (CMK_BLUEGENEQ || CMK_PAMI_LINUX_PPC8) && CMK_ENABLE_ASYNC_PROGRESS
+#if CMK_PAMI_LINUX_PPC8 && CMK_ENABLE_ASYNC_PROGRESS
 extern CMK_THREADLOCAL int32_t _cmi_bgq_incommthread;
 #define CmiInCommThread()  (_cmi_bgq_incommthread)
 #else
@@ -482,22 +482,7 @@ extern CMK_THREADLOCAL int32_t _cmi_bgq_incommthread;
 
 #include "string.h"
 
-#if CMK_BLUEGENEQ && CMK_BLUEGENEQ_OPTCOPY
-void CmiMemcpy_qpx (void *dst, const void *src, size_t n);
-#define CmiMemcpy(_dst, _src, _n)                                        \
-  do {                                                                   \
-    const void *_cmimemcpy_src = (_src);                                 \
-    void *_cmimemcpy_dst = (_dst);                                       \
-    size_t _cmimemcpy_n = (_n);                                          \
-    if ( (_cmimemcpy_n > 512+32) &&                                      \
-         ((((size_t)_cmimemcpy_dst|(size_t)_cmimemcpy_src) & 0x1F)==0) ) \
-      CmiMemcpy_qpx(_cmimemcpy_dst, _cmimemcpy_src, _cmimemcpy_n);       \
-    else                                                                 \
-      memcpy(_cmimemcpy_dst, _cmimemcpy_src, _cmimemcpy_n);              \
-  } while(0)
-#else
 #define CmiMemcpy(dest, src, size) memcpy((dest), (src), (size))
-#endif
 
 
 #if CMK_SHARED_VARS_NT_THREADS /*Used only by win versions*/
@@ -621,7 +606,7 @@ for each processor in the node.
     } while(0)
 #define CpvInitialized(v) (0!=CMK_TAG(Cpv_,v))
 
-#if (CMK_BLUEGENEQ || CMK_PAMI_LINUX_PPC8) && CMK_ENABLE_ASYNC_PROGRESS && CMK_IMMEDIATE_MSG
+#if CMK_PAMI_LINUX_PPC8 && CMK_ENABLE_ASYNC_PROGRESS && CMK_IMMEDIATE_MSG
   #define CpvAccess(v) (*(CMK_TAG(Cpv_addr_,v)[CmiMyRank()]))
 #else
 #define CpvAccess(v) (*CMK_TAG(Cpv_,v))
@@ -2292,6 +2277,11 @@ extern double CmiLog2(double);
 
 #if defined(__cplusplus)
 }                                         /* end of extern "C"  */
+
+#if CMK_USE_SHMEM
+#include "cmishmem.h"
+CsvExtern(CmiIpcManager*, coreIpcManager_);
+#endif
 #endif
 
 #if CMK_GRID_QUEUE_AVAILABLE

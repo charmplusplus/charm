@@ -24,7 +24,7 @@ checkpoints.
 Charm++ is a production-quality parallel programming system used by
 multiple applications in science and engineering on supercomputers as
 well as smaller clusters around the world. Currently the parallel
-platforms supported by Charm++ are the IBM BlueGene/Q and OpenPOWER
+platforms supported by Charm++ are OpenPOWER
 systems, Cray XE, XK, and XC systems, Omni-Path and Infiniband clusters,
 single workstations and networks of workstations (including x86 (running
 Linux, Windows, MacOS)), etc. The communication protocols and
@@ -5301,7 +5301,6 @@ used.
    ============================= =============== ====================== =============== ========== ==========
    Machine                       Network         Build Architecture     Intra Processor Intra Host Inter Host
    ============================= =============== ====================== =============== ========== ==========
-   Blue Gene/Q (Vesta)           PAMI            ``pamilrts-bluegeneq`` 4 MB            32 KB      256 KB
    Cray XC30 (Edison)            Aries           ``gni-crayxc``         1 MB            2 MB       2 MB
    Cray XC30 (Edison)            Aries           ``mpi-crayxc``         256 KB          8 KB       32 KB
    Dell Cluster (Golub)          Infiniband      ``verbs-linux-x86_64`` 128 KB          2 MB       1 MB
@@ -11044,6 +11043,36 @@ superclass to do the final delivery after you’ve sent your messages.
 Experimental Features
 =====================
 
+SHMEM
+---------
+Charm++ SHMEM is an experimental module that aims to add
+fast IPC to any machine layer. Each process opens a shared segment
+containing an MPSC queue and a memory pool. Processes can allocate "blocks"
+of memory from their peers' pools, and "push" them onto their MPSC queue.
+This is mechanically similar to the PXSHM layer, but SHMEM uses
+"address-free" atomics for synchronization instead of memory fences and the
+like. The C++ standardization committee recommends that C++ atomics should
+be address-free, i.e., ordering is enforced no matter which virtual address
+is used to access a physical address; however, this is not guaranteed.
+In practice, most modern compilers comply with this suggestion, but please
+alert us if you encounter synchronization issues!
+
+To build with SHMEM, pass ``--enable-shmem`` (to use PXSHM) or
+``--enable-xpmem`` (to use XPMEM) as command-line options to a Charm++ build;
+only CMake builds are supported at this time. Charm++ currently has a cutoff
+for using SHMEM, after which it falls back to conventional messaging. This
+decision accommodates SHMEM's bounded pool, and potentially more efficient
+IPC mechanisms exist for "large" messages (e.g., the ZeroCopy API). One can
+alter these behaviors with the command line options ``++ipcpoolsize`` and
+``++ipccutoff``, which change the size of the shared pool of memory and
+message size cutoff (in bytes), respectively. For example, this command
+will run ``a.out`` with a 128MB IPC pool size and a 256KB message cutoff:
+``./charmrun ++local ++auto-provision ./a.out ++ipcpoolsize $((128*1024*1024)) ++ipccutoff $((256*1024))``
+
+Note, Charm++ maintains and polls its own SHMEM IPC manager. Libraries can
+instantiate their own IPC manager if they require custom IPC behaviors. For
+details, please consult the notes in ``cmishmem.h``.
+
 .. _sec:controlpoint:
 
 Control Point Automatic Tuning
@@ -11388,7 +11417,7 @@ where,
 
 ``TARGET ARCHITECTURE``
    is the machine architecture one wants to build for such as
-   *netlrts-linux-x86_64*, *pamilrts-bluegeneq* etc.
+   *netlrts-linux-x86_64*, *multicore-darwin-arm8* etc.
 
 ``OPTIONS``
    are additional options to the build process, e.g. *smp* is used to
@@ -11440,8 +11469,6 @@ appropriate choices for the build one wants to perform.
    MPI with 64 bit Windows                                          ``./build charm++ mpi-win-x86_64 --with-production -j8``
    Net with 64 bit macOS (x86_64)                                   ``./build charm++ netlrts-darwin-x86_64 --with-production -j8``
    Net with 64 bit macOS (ARM64)                                    ``./build charm++ netlrts-darwin-arm8 --with-production -j8``
-   Blue Gene/Q (bgclang compilers)                                  ``./build charm++ pami-bluegeneq --with-production -j8``
-   Blue Gene/Q (bgclang compilers)                                  ``./build charm++ pamilrts-bluegeneq --with-production -j8``
    Cray XE6                                                         ``./build charm++ gni-crayxe --with-production -j8``
    Cray XK7                                                         ``./build charm++ gni-crayxe-cuda --with-production -j8``
    Cray XC40                                                        ``./build charm++ gni-crayxc --with-production -j8``

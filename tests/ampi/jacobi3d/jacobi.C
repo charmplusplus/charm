@@ -2,13 +2,6 @@
 #include <stdlib.h>
 #include "mpi.h"
 
-#if CMK_BLUEGENE_CHARM
-extern "C" void BgPrintf(const char *);
-#define BGPRINTF(x)  if (thisIndex == 0) BgPrintf(x);
-#else
-#define BGPRINTF(x)
-#endif
-
 #define DIMX 128
 #define DIMY 128
 #define DIMZ 128
@@ -174,7 +167,7 @@ int main(int ac, char** av)
 
   maxerr = 0.0;
   for(iter=1; iter<=niter; iter++) {
-    BGPRINTF("interation starts at %f\n");
+    // printf("interation starts at %f\n");
     maxerr = 0.0;
     copyout(cp->sbxm, cp->t, 1, 1, 1, DIMY, 1, DIMZ);
     copyout(cp->sbxp, cp->t, DIMX, DIMX, 1, DIMY, 1, DIMZ);
