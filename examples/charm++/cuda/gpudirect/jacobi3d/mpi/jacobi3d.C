@@ -20,6 +20,10 @@ extern void invokeJacobiKernel(DataType* temperature, DataType* new_temperature,
     bool left_bound, bool right_bound, bool top_bound, bool bottom_bound,
     bool front_bound, bool back_bound, int block_width, int block_height, int block_depth,
     cudaStream_t stream, bool fuse_update_pack, bool fuse_update_all);
+extern void invokeJacobiInteriorKernel(DataType* temperature, DataType* new_temperature,
+    int block_width, int block_height, int block_depth, cudaStream_t stream);
+extern void invokeJacobiBoundaryKernel(DataType* temperature, DataType* new_temperature,
+    int block_width, int block_height, int block_depth, cudaStream_t stream);
 extern void packGhostsDevice(DataType* temperature,
     DataType* d_ghosts[], DataType* h_ghosts[], bool bounds[],
     int block_width, int block_height, int block_depth,
@@ -73,6 +77,7 @@ struct Param {
   int n_iters;
   int warmup_iters;
   bool cuda_aware;
+  bool manual_overlap;
   int fuse_val;
   bool fuse_pack;
   bool fuse_unpack;
@@ -86,6 +91,7 @@ struct Param {
     n_iters = 100;
     warmup_iters = 10;
     cuda_aware = false;
+    manual_overlap = false;
     fuse_val = 0;
     fuse_pack = false;
     fuse_unpack = false;
@@ -105,11 +111,11 @@ struct Param {
   void print() {
     printf("\n[CUDA 3D Jacobi example]\n");
     printf("Grid: %d x %d x %d, Block: %d x %d x %d, Procs: %d x %d x %d, "
-        "Iterations: %d, Warm-up: %d, CUDA-aware: %d, Fusion: %d, CUDA Graph: %d, "
-        "Print: %d\n\n",
+        "Iterations: %d, Warm-up: %d, CUDA-aware: %d, Manual overlap: %d, "
+        "Fusion: %d, CUDA Graph: %d, Print: %d\n\n",
         grid_width, grid_height, grid_depth, block_width, block_height, block_depth,
         n_procs_x, n_procs_y, n_procs_z, n_iters, warmup_iters, cuda_aware,
-        fuse_val, use_cuda_graph, print_elements);
+        manual_overlap, fuse_val, use_cuda_graph, print_elements);
   }
 };
 
@@ -130,6 +136,7 @@ struct Block {
   int n_iters;
   int warmup_iters;
   bool cuda_aware;
+  bool manual_overlap;
   bool fuse_pack;
   bool fuse_unpack;
   bool fuse_update_pack;
@@ -207,6 +214,7 @@ struct Block {
     n_iters          = param.n_iters;
     warmup_iters     = param.warmup_iters;
     cuda_aware       = param.cuda_aware;
+    manual_overlap   = param.manual_overlap;
     fuse_pack        = param.fuse_pack;
     fuse_unpack      = param.fuse_unpack;
     fuse_update_pack = param.fuse_update_pack;
@@ -368,6 +376,7 @@ struct Block {
     }
   }
 
+  // FIXME
   void createCudaGraph(cudaGraph_t& cg, cudaGraphExec_t& cge,
       DataType* d_temp, DataType* d_new_temp) {
     /*
@@ -536,6 +545,12 @@ struct Block {
         }
       }
 
+      if (manual_overlap) {
+        // Invoke GPU kernel for interior
+        invokeJacobiInteriorKernel(d_temperature, d_new_temperature,
+            block_width, block_height, block_depth, compute_stream);
+      }
+
       // Wait for packing to complete
       if (cuda_aware) {
         if (fuse_update_pack || fuse_update_all) {
@@ -596,9 +611,9 @@ struct Block {
 
       if (!use_cuda_graph) {
         if (!fuse_update_all && !fuse_unpack) {
-    	  unpackGhostDevice(d_temperature, d_recv_ghosts[dir], h_recv_ghosts[dir], dir,
-    	      block_width, block_height, block_depth, ghost_sizes[dir],
-    	      comm_stream, h2d_stream, unpack_events, cuda_aware);
+          unpackGhostDevice(d_temperature, d_recv_ghosts[dir], h_recv_ghosts[dir], dir,
+              block_width, block_height, block_depth, ghost_sizes[dir],
+              comm_stream, h2d_stream, unpack_events, cuda_aware);
         }
       }
     }
@@ -625,15 +640,21 @@ struct Block {
         cudaCheck(cudaStreamWaitEvent(compute_stream, comm_event, 0));
       }
 
-      // Invoke GPU kernel for Jacobi computation
-      invokeJacobiKernel(d_temperature, d_new_temperature, d_send_ghosts[LEFT],
-          d_send_ghosts[RIGHT], d_send_ghosts[TOP], d_send_ghosts[BOTTOM],
-          d_send_ghosts[FRONT], d_send_ghosts[BACK], d_recv_ghosts[LEFT],
-          d_recv_ghosts[RIGHT], d_recv_ghosts[TOP], d_recv_ghosts[BOTTOM],
-          d_recv_ghosts[FRONT], d_recv_ghosts[BACK], bounds[LEFT], bounds[RIGHT],
-          bounds[TOP], bounds[BOTTOM], bounds[FRONT], bounds[BACK],
-          block_width, block_height, block_depth, compute_stream,
-          fuse_update_pack, fuse_update_all);
+      if (!manual_overlap) {
+        // Invoke GPU kernel for Jacobi computation
+        invokeJacobiKernel(d_temperature, d_new_temperature, d_send_ghosts[LEFT],
+            d_send_ghosts[RIGHT], d_send_ghosts[TOP], d_send_ghosts[BOTTOM],
+            d_send_ghosts[FRONT], d_send_ghosts[BACK], d_recv_ghosts[LEFT],
+            d_recv_ghosts[RIGHT], d_recv_ghosts[TOP], d_recv_ghosts[BOTTOM],
+            d_recv_ghosts[FRONT], d_recv_ghosts[BACK], bounds[LEFT], bounds[RIGHT],
+            bounds[TOP], bounds[BOTTOM], bounds[FRONT], bounds[BACK],
+            block_width, block_height, block_depth, compute_stream,
+            fuse_update_pack, fuse_update_all);
+      } else {
+        // Invoke GPU kernel for boundary
+        invokeJacobiBoundaryKernel(d_temperature, d_new_temperature,
+            block_width, block_height, block_depth, compute_stream);
+      }
     }
 
     // Synchronize with host only when necessary
@@ -689,7 +710,7 @@ int main(int argc, char** argv) {
   // Process arguments
   int c;
   bool dims[3] = {false, false, false};
-  while ((c = getopt(argc, argv, "x:y:z:i:w:df:gp")) != -1) {
+  while ((c = getopt(argc, argv, "x:y:z:i:w:dmf:gp")) != -1) {
     switch (c) {
       case 'x':
         param.grid_width = atoi(optarg);
@@ -711,6 +732,9 @@ int main(int argc, char** argv) {
         break;
       case 'd':
         param.cuda_aware = true;
+        break;
+      case 'm':
+        param.manual_overlap = true;
         break;
       case 'f':
         param.fuse_val = atoi(optarg);
@@ -735,8 +759,8 @@ int main(int argc, char** argv) {
         if (rank == 0) {
           fprintf(stderr,
               "Usage: %s -x [grid width] -y [grid height] -z [grid depth] "
-              "-i [iterations] -w [warmup iterations] "
-              "-d [use CUDA-aware MPI] -f [fusion value] -g [use CUDA Graph] "
+              "-i [iterations] -w [warmup iterations] -d [use CUDA-aware MPI] "
+              "-m [use manual overlap] -f [fusion value] -g [use CUDA Graph] "
               "-p (print blocks)\n", argv[0]);
         }
         MPI_Finalize();

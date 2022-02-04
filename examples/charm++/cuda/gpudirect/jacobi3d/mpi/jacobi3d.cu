@@ -108,6 +108,137 @@ __global__ void jacobiKernel(DataType* temperature, DataType* new_temperature,
   }
 }
 
+__global__ void jacobiInteriorKernel(DataType* temperature, DataType* new_temperature,
+    int block_width, int block_height, int block_depth) {
+  int i = (blockDim.x*blockIdx.x+threadIdx.x)+2;
+  int j = (blockDim.y*blockIdx.y+threadIdx.y)+2;
+  int k = (blockDim.z*blockIdx.z+threadIdx.z)+2;
+
+  if (i <= block_width-1 && j <= block_height-1 && k <= block_depth-1) {
+#ifdef TEST_CORRECTNESS
+    new_temperature[IDX(i,j,k)] = (temperature[IDX(i,j,k)] +
+      temperature[IDX(i-1,j,k)] + temperature[IDX(i+1,j,k)] +
+      temperature[IDX(i,j-1,k)] + temperature[IDX(i,j+1,k)] +
+      temperature[IDX(i,j,k-1)] + temperature[IDX(i,j,k+1)]) % 10000;
+#else
+    new_temperature[IDX(i,j,k)] = (temperature[IDX(i,j,k)] +
+      temperature[IDX(i-1,j,k)] + temperature[IDX(i+1,j,k)] +
+      temperature[IDX(i,j-1,k)] + temperature[IDX(i,j+1,k)] +
+      temperature[IDX(i,j,k-1)] + temperature[IDX(i,j,k+1)]) * DIVIDEBY7;
+#endif
+  }
+}
+
+__global__ void jacobiBoundaryKernel(DataType* temperature, DataType* new_temperature,
+    int block_width, int block_height, int block_depth) {
+  int t = blockDim.x*blockIdx.x+threadIdx.x;
+
+  int left_cut = block_height * block_depth;
+  int right_cut = block_height * block_depth;
+  int top_cut = block_width * block_depth;
+  int bottom_cut = block_width * block_depth;
+  int front_cut = block_width * block_height;
+  int back_cut = block_width * block_height;
+
+  int i, j, k;
+  if (t < left_cut) {
+    i = 1;
+    j = t % block_height + 1;
+    k = t / block_height + 1;
+#ifdef TEST_CORRECTNESS
+    new_temperature[IDX(i,j,k)] = (temperature[IDX(i,j,k)] +
+        temperature[IDX(i-1,j,k)] + temperature[IDX(i+1,j,k)] +
+        temperature[IDX(i,j-1,k)] + temperature[IDX(i,j+1,k)] +
+        temperature[IDX(i,j,k-1)] + temperature[IDX(i,j,k+1)]) % 10000;
+#else
+    new_temperature[IDX(i,j,k)] = (temperature[IDX(i,j,k)] +
+        temperature[IDX(i-1,j,k)] + temperature[IDX(i+1,j,k)] +
+        temperature[IDX(i,j-1,k)] + temperature[IDX(i,j+1,k)] +
+        temperature[IDX(i,j,k-1)] + temperature[IDX(i,j,k+1)]) * DIVIDEBY7;
+#endif
+  }
+  if (t < right_cut) {
+    i = block_width;
+    j = t % block_height + 1;
+    k = t / block_height + 1;
+#ifdef TEST_CORRECTNESS
+    new_temperature[IDX(i,j,k)] = (temperature[IDX(i,j,k)] +
+        temperature[IDX(i-1,j,k)] + temperature[IDX(i+1,j,k)] +
+        temperature[IDX(i,j-1,k)] + temperature[IDX(i,j+1,k)] +
+        temperature[IDX(i,j,k-1)] + temperature[IDX(i,j,k+1)]) % 10000;
+#else
+    new_temperature[IDX(i,j,k)] = (temperature[IDX(i,j,k)] +
+        temperature[IDX(i-1,j,k)] + temperature[IDX(i+1,j,k)] +
+        temperature[IDX(i,j-1,k)] + temperature[IDX(i,j+1,k)] +
+        temperature[IDX(i,j,k-1)] + temperature[IDX(i,j,k+1)]) * DIVIDEBY7;
+#endif
+  }
+  if (t < top_cut) {
+    i = t % block_width + 1;
+    j = 1;
+    k = t / block_width + 1;
+#ifdef TEST_CORRECTNESS
+    new_temperature[IDX(i,j,k)] = (temperature[IDX(i,j,k)] +
+        temperature[IDX(i-1,j,k)] + temperature[IDX(i+1,j,k)] +
+        temperature[IDX(i,j-1,k)] + temperature[IDX(i,j+1,k)] +
+        temperature[IDX(i,j,k-1)] + temperature[IDX(i,j,k+1)]) % 10000;
+#else
+    new_temperature[IDX(i,j,k)] = (temperature[IDX(i,j,k)] +
+        temperature[IDX(i-1,j,k)] + temperature[IDX(i+1,j,k)] +
+        temperature[IDX(i,j-1,k)] + temperature[IDX(i,j+1,k)] +
+        temperature[IDX(i,j,k-1)] + temperature[IDX(i,j,k+1)]) * DIVIDEBY7;
+#endif
+  }
+  if (t < bottom_cut) {
+    i = t % block_width + 1;
+    j = block_height;
+    k = t / block_width + 1;
+#ifdef TEST_CORRECTNESS
+    new_temperature[IDX(i,j,k)] = (temperature[IDX(i,j,k)] +
+        temperature[IDX(i-1,j,k)] + temperature[IDX(i+1,j,k)] +
+        temperature[IDX(i,j-1,k)] + temperature[IDX(i,j+1,k)] +
+        temperature[IDX(i,j,k-1)] + temperature[IDX(i,j,k+1)]) % 10000;
+#else
+    new_temperature[IDX(i,j,k)] = (temperature[IDX(i,j,k)] +
+        temperature[IDX(i-1,j,k)] + temperature[IDX(i+1,j,k)] +
+        temperature[IDX(i,j-1,k)] + temperature[IDX(i,j+1,k)] +
+        temperature[IDX(i,j,k-1)] + temperature[IDX(i,j,k+1)]) * DIVIDEBY7;
+#endif
+  }
+  if (t < front_cut) {
+    i = t % block_width + 1;
+    j = t / block_width + 1;
+    k = 1;
+#ifdef TEST_CORRECTNESS
+    new_temperature[IDX(i,j,k)] = (temperature[IDX(i,j,k)] +
+        temperature[IDX(i-1,j,k)] + temperature[IDX(i+1,j,k)] +
+        temperature[IDX(i,j-1,k)] + temperature[IDX(i,j+1,k)] +
+        temperature[IDX(i,j,k-1)] + temperature[IDX(i,j,k+1)]) % 10000;
+#else
+    new_temperature[IDX(i,j,k)] = (temperature[IDX(i,j,k)] +
+        temperature[IDX(i-1,j,k)] + temperature[IDX(i+1,j,k)] +
+        temperature[IDX(i,j-1,k)] + temperature[IDX(i,j+1,k)] +
+        temperature[IDX(i,j,k-1)] + temperature[IDX(i,j,k+1)]) * DIVIDEBY7;
+#endif
+  }
+  if (t < back_cut) {
+    i = t % block_width + 1;
+    j = t / block_width + 1;
+    k = block_depth;
+#ifdef TEST_CORRECTNESS
+    new_temperature[IDX(i,j,k)] = (temperature[IDX(i,j,k)] +
+        temperature[IDX(i-1,j,k)] + temperature[IDX(i+1,j,k)] +
+        temperature[IDX(i,j-1,k)] + temperature[IDX(i,j+1,k)] +
+        temperature[IDX(i,j,k-1)] + temperature[IDX(i,j,k+1)]) % 10000;
+#else
+    new_temperature[IDX(i,j,k)] = (temperature[IDX(i,j,k)] +
+        temperature[IDX(i-1,j,k)] + temperature[IDX(i+1,j,k)] +
+        temperature[IDX(i,j-1,k)] + temperature[IDX(i,j+1,k)] +
+        temperature[IDX(i,j,k-1)] + temperature[IDX(i,j,k+1)]) * DIVIDEBY7;
+#endif
+  }
+}
+
 __global__ void jacobiFusedPackingKernel(DataType* temperature, DataType* new_temperature,
     DataType* left_ghost, DataType* right_ghost, DataType* top_ghost, DataType* bottom_ghost,
     DataType* front_ghost, DataType* back_ghost, bool left_bound, bool right_bound,
@@ -679,6 +810,33 @@ void invokeJacobiKernel(DataType* temperature, DataType* new_temperature,
     jacobiKernel<<<grid_dim, block_dim, 0, stream>>>(temperature, new_temperature,
         block_width, block_height, block_depth);
   }
+  cudaCheck(cudaPeekAtLastError());
+}
+
+void invokeJacobiInteriorKernel(DataType* temperature, DataType* new_temperature,
+    int block_width, int block_height, int block_depth, cudaStream_t stream) {
+  if (block_height <= 2 || block_depth <= 2 || block_depth <= 2) return;
+
+  dim3 block_dim(TILE_SIZE_3D, TILE_SIZE_3D, TILE_SIZE_3D);
+  dim3 grid_dim(((block_width-2)+(block_dim.x-1))/block_dim.x,
+      ((block_height-2)+(block_dim.y-1))/block_dim.y,
+      ((block_depth-2)+(block_dim.z-1))/block_dim.z);
+
+  jacobiInteriorKernel<<<grid_dim, block_dim, 0, stream>>>(temperature, new_temperature,
+      block_width, block_height, block_depth);
+  cudaCheck(cudaPeekAtLastError());
+}
+
+void invokeJacobiBoundaryKernel(DataType* temperature, DataType* new_temperature,
+    int block_width, int block_height, int block_depth, cudaStream_t stream) {
+  int n_elems = std::max({block_height * block_depth,
+      block_width * block_depth,
+      block_width * block_height});
+  dim3 block_dim(256);
+  dim3 grid_dim((n_elems+block_dim.x-1)/block_dim.x);
+
+  jacobiBoundaryKernel<<<grid_dim, block_dim, 0, stream>>>(temperature, new_temperature,
+      block_width, block_height, block_depth);
   cudaCheck(cudaPeekAtLastError());
 }
 
