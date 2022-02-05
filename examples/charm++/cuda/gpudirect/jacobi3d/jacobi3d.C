@@ -27,6 +27,7 @@
 /* readonly */ int n_iters;
 /* readonly */ int warmup_iters;
 /* readonly */ bool use_channel;
+/* readonly */ bool manual_overlap;
 /* readonly */ bool fuse_pack;
 /* readonly */ bool fuse_unpack;
 /* readonly */ bool fuse_update_pack;
@@ -48,6 +49,10 @@ extern void invokeJacobiKernel(DataType* temperature, DataType* new_temperature,
     bool left_bound, bool right_bound, bool top_bound, bool bottom_bound,
     bool front_bound, bool back_bound, int block_width, int block_height, int block_depth,
     cudaStream_t stream, bool fuse_update_pack, bool fuse_update_all);
+extern void invokeJacobiInteriorKernel(DataType* temperature, DataType* new_temperature,
+    int block_width, int block_height, int block_depth, cudaStream_t stream);
+extern void invokeJacobiBoundaryKernel(DataType* temperature, DataType* new_temperature,
+    int block_width, int block_height, int block_depth, cudaStream_t stream);
 extern void packGhostsDevice(DataType* temperature,
     DataType* d_ghosts[], DataType* h_ghosts[], bool bounds[],
     int block_width, int block_height, int block_depth,
@@ -109,6 +114,7 @@ public:
     n_iters = 100;
     warmup_iters = 10;
     use_channel = false;
+    manual_overlap = false;
     fuse_val = 0;
     fuse_pack = false;
     fuse_unpack = false;
@@ -120,7 +126,7 @@ public:
     // Process arguments
     int c;
     bool dims[3] = {false, false, false};
-    while ((c = getopt(m->argc, m->argv, "c:x:y:z:i:w:df:gp")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "c:x:y:z:i:w:dmf:gp")) != -1) {
       switch (c) {
         case 'c':
           num_chares = atoi(optarg);
@@ -146,6 +152,9 @@ public:
         case 'd':
           use_channel = true;
           break;
+        case 'm':
+          manual_overlap = true;
+          break;
         case 'f':
           fuse_val = atoi(optarg);
           if (fuse_val == 1) fuse_pack = true;
@@ -168,8 +177,8 @@ public:
           CkPrintf(
               "Usage: %s -x [grid width] -y [grid height] -z [grid depth] "
               "-c [number of chares] -i [iterations] -w [warmup iterations] "
-              "-d [use Channel API] -f [fusion value] -g [use CUDA Graph] "
-              "-p (print blocks)\n", m->argv[0]);
+              "-d [use Channel API] -m [use manual overlap] -f [fusion value] "
+              "-g [use CUDA Graph] -p (print blocks)\n", m->argv[0]);
           CkExit();
       }
     }
@@ -244,11 +253,11 @@ public:
     // Print configuration
     CkPrintf("\n[CUDA 3D Jacobi example]\n");
     CkPrintf("Grid: %d x %d x %d, Block: %d x %d x %d, Chares: %d x %d x %d, "
-        "Iterations: %d, Warm-up: %d, Channel API: %d, Fusion: %d, CUDA Graph: %d, "
-        "Print: %d\n\n",
+        "Iterations: %d, Warm-up: %d, Channel API: %d, Manual overlap: %d, "
+        "Fusion: %d, CUDA Graphs: %d, Print: %d\n\n",
         grid_width, grid_height, grid_depth, block_width, block_height, block_depth,
         n_chares_x, n_chares_y, n_chares_z, n_iters, warmup_iters, use_channel,
-        fuse_val, use_cuda_graph, print_elements);
+        manual_overlap, fuse_val, use_cuda_graph, print_elements);
 
     // Create blocks and start iteration
     block_proxy = CProxy_Block::ckNew(n_chares_x, n_chares_y, n_chares_z);
@@ -697,6 +706,12 @@ class Block : public CBase_Block {
         }
       }
 
+      if (manual_overlap) {
+        // Invoke GPU kernel for interior
+        invokeJacobiInteriorKernel(d_temperature, d_new_temperature,
+            block_width, block_height, block_depth, compute_stream);
+      }
+
       // Add asynchronous callback to be invoked when packing kernels and
       // ghost transfers are complete
       if (use_channel) {
@@ -811,15 +826,21 @@ class Block : public CBase_Block {
         hapiCheck(cudaStreamWaitEvent(compute_stream, comm_event, 0));
       }
 
-      // Invoke GPU kernel for Jacobi computation
-      invokeJacobiKernel(d_temperature, d_new_temperature, d_send_ghosts[LEFT],
-          d_send_ghosts[RIGHT], d_send_ghosts[TOP], d_send_ghosts[BOTTOM],
-          d_send_ghosts[FRONT], d_send_ghosts[BACK], d_recv_ghosts[LEFT],
-          d_recv_ghosts[RIGHT], d_recv_ghosts[TOP], d_recv_ghosts[BOTTOM],
-          d_recv_ghosts[FRONT], d_recv_ghosts[BACK], bounds[LEFT], bounds[RIGHT],
-          bounds[TOP], bounds[BOTTOM], bounds[FRONT], bounds[BACK],
-          block_width, block_height, block_depth, compute_stream,
-          fuse_update_pack, fuse_update_all);
+      if (!manual_overlap) {
+        // Invoke GPU kernel for Jacobi computation
+        invokeJacobiKernel(d_temperature, d_new_temperature, d_send_ghosts[LEFT],
+            d_send_ghosts[RIGHT], d_send_ghosts[TOP], d_send_ghosts[BOTTOM],
+            d_send_ghosts[FRONT], d_send_ghosts[BACK], d_recv_ghosts[LEFT],
+            d_recv_ghosts[RIGHT], d_recv_ghosts[TOP], d_recv_ghosts[BOTTOM],
+            d_recv_ghosts[FRONT], d_recv_ghosts[BACK], bounds[LEFT], bounds[RIGHT],
+            bounds[TOP], bounds[BOTTOM], bounds[FRONT], bounds[BACK],
+            block_width, block_height, block_depth, compute_stream,
+            fuse_update_pack, fuse_update_all);
+      } else {
+        // Invoke GPU kernel for boundary
+        invokeJacobiBoundaryKernel(d_temperature, d_new_temperature,
+            block_width, block_height, block_depth, compute_stream);
+      }
     }
 
     // Synchronize with host only when necessary
