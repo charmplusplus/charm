@@ -151,6 +151,8 @@ $(foreach i,$(VARIANTS),$(eval $(call VARIANT_RULES,$i)))
 tlsglobals-test-f90.o: test-tlsglobals.f90
 	$(AMPIF90) -o $@ $(OPTS_tlsglobals_f90) -c $<
 
+pieglobals-test-f90.o: test-pieglobals.f90
+	$(AMPIF90) -o $@ $(OPTS_pieglobals_f90) -c $<
 
 clean:
 	rm -f *.o *.a *.so *.dylib *.mod $(foreach i,$(VARIANTS),$(foreach j,$(LANGUAGES),$(strip $i-$j $(wildcard $i-$j$(CMK_USER_SUFFIX)*)))) charmrun ampirun
