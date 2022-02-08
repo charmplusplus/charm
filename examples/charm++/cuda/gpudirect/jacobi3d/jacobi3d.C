@@ -470,13 +470,6 @@ class Block : public CBase_Block {
     invokeGhostInitKernels(send_ghosts, ghost_counts, compute_stream);
     invokeGhostInitKernels(recv_ghosts, ghost_counts, compute_stream);
 
-    for (int i = 0; i < DIR_COUNT; i++) {
-      int ghost_count = ghost_counts[i];
-      for (int j = 0; j < ghost_count; j++) {
-        h_ghosts[i][j] = 0;
-      }
-    }
-
     // Enforce boundary conditions
     invokeBoundaryKernels(d_temperature, block_width, block_height, block_depth,
         bounds, compute_stream);
