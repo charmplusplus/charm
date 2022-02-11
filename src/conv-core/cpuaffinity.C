@@ -56,11 +56,6 @@ void CmiInitHwlocTopology(void)
     // packages == sockets
     depth = cmi_hwloc_get_type_depth(topology, HWLOC_OBJ_PACKAGE);
     CmiHwlocTopologyLocal.num_sockets = depth != HWLOC_TYPE_DEPTH_UNKNOWN ? cmi_hwloc_get_nbobjs_by_depth(topology, depth) : 1;
-#if CMK_BLUEGENEQ
-  // ignore BG/Q's reserved socket
-  if (CmiHwlocTopologyLocal.num_sockets == 17)
-    CmiHwlocTopologyLocal.num_sockets = 16;
-#endif
 
     // cores
     depth = cmi_hwloc_get_type_depth(topology, HWLOC_OBJ_CORE);
@@ -903,11 +898,6 @@ static void bind_process_only(hwloc_obj_type_t process_unit)
   hwloc_cpuset_t cpuset;
 
   int process_unitcount = cmi_hwloc_get_nbobjs_by_type(topology, process_unit);
-#if CMK_BLUEGENEQ
-  // ignore BG/Q's reserved socket
-  if (process_unit == HWLOC_OBJ_PACKAGE && process_unitcount == 17)
-    process_unitcount = 16;
-#endif
 
   int process_assignment = CmiMyLocalRank % process_unitcount;
 
@@ -921,11 +911,6 @@ static void bind_threads_only(hwloc_obj_type_t thread_unit)
   hwloc_cpuset_t cpuset;
 
   int thread_unitcount = cmi_hwloc_get_nbobjs_by_type(topology, thread_unit);
-#if CMK_BLUEGENEQ
-  // ignore BG/Q's reserved socket
-  if (thread_unit == HWLOC_OBJ_PACKAGE && thread_unitcount == 17)
-    thread_unitcount = 16;
-#endif
 
   int thread_assignment = CmiMyRank() % thread_unitcount;
 
@@ -1117,17 +1102,6 @@ void CmiInitCPUAffinity(char **argv)
      CPU_ZERO(&core_usage);
 #endif
   }
-
-#if CMK_BLUEGENEQ
-  if(affinity_flag){
-      affinity_flag = 0;
-      if(CmiMyPe()==0) CmiPrintf("Charm++> cpu affinity setting is not needed on Blue Gene/Q, thus ignored.\n");
-  }
-  if(show_affinity_flag){
-      show_affinity_flag = 0;
-      if(CmiMyPe()==0) CmiPrintf("Charm++> printing cpu affinity is not supported on Blue Gene/Q.\n");
-  }
-#endif
 
   if (!affinity_flag) {
     if (show_affinity_flag) {

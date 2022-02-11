@@ -3,7 +3,7 @@
  */
 
 // Use CMA for intra node shared memory communication on all machines where it is supported, except for Multicore
-#define CMK_USE_CMA                    (CMK_HAS_CMA && !CMK_MULTICORE && !CMK_BLUEGENEQ)
+#define CMK_USE_CMA                    (CMK_HAS_CMA && !CMK_MULTICORE)
 
 #if CMK_USE_CMA
 
