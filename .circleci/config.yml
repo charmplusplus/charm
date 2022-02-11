@@ -2,7 +2,7 @@ version: 2.1
 jobs:
   NetLRTS:
     machine:
-      image: ubuntu-1604:201903-01
+      image: ubuntu-2004:202201-01
 
     steps:
       - checkout
@@ -18,7 +18,7 @@ jobs:
 
   NetLRTS-smp:
     machine:
-      image: ubuntu-1604:201903-01
+      image: ubuntu-2004:202201-01
 
     steps:
       - checkout
