@@ -6,6 +6,8 @@
 #include <string>
 #include <sstream>
 
+#define CUDA_SYNC 1
+
 /* readonly */ CProxy_Main main_proxy;
 /* readonly */ CProxy_Block block_proxy;
 /* readonly */ int num_chares;
@@ -477,7 +479,12 @@ class Block : public CBase_Block {
         bounds, compute_stream);
 
     // TODO: Support reduction callback in hapiAddCallback
+#if CUDA_SYNC
+    cudaStreamSynchronize(compute_stream);
+    thisProxy[thisIndex].initDone();
+#else
     hapiAddCallback(compute_stream, init_cb);
+#endif
   }
 
   void sendChannelIDs() {
@@ -709,16 +716,36 @@ class Block : public CBase_Block {
       // ghost transfers are complete
       if (use_channel) {
         if (fuse_update_pack || fuse_update_all) {
+#if CUDA_SYNC
+          cudaStreamSynchronize(compute_stream);
+          thisProxy[thisIndex].packGhostsDone();
+#else
           hapiAddCallback(compute_stream, pack_cb);
+#endif
         } else {
+#if CUDA_SYNC
+          cudaStreamSynchronize(comm_stream);
+          thisProxy[thisIndex].packGhostsDone();
+#else
           hapiAddCallback(comm_stream, pack_cb);
+#endif
         }
       } else {
+#if CUDA_SYNC
+        cudaStreamSynchronize(d2h_stream);
+        thisProxy[thisIndex].packGhostsDone();
+#else
         hapiAddCallback(d2h_stream, pack_cb);
+#endif
       }
     } else {
       // Communication should follow completion of CUDA graph
+#if CUDA_SYNC
+      cudaStreamSynchronize(graph_stream);
+      thisProxy[thisIndex].packGhostsDone();
+#else
       hapiAddCallback(graph_stream, pack_cb);
+#endif
     }
   }
 
@@ -840,9 +867,19 @@ class Block : public CBase_Block {
     if (print_elements || (my_iter == warmup_iters)
         || (my_iter == warmup_iters + n_iters)) {
       if (use_cuda_graph) {
+#ifdef CUDA_SYNC
+        cudaStreamSynchronize(graph_stream);
+        thisProxy[thisIndex].updateDone();
+#else
         hapiAddCallback(graph_stream, update_cb);
+#endif
       } else {
+#ifdef CUDA_SYNC
+        cudaStreamSynchronize(compute_stream);
+        thisProxy[thisIndex].updateDone();
+#else
         hapiAddCallback(compute_stream, update_cb);
+#endif
       }
     } else {
       thisProxy[thisIndex].run();
