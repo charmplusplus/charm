@@ -7,6 +7,7 @@
 #include <sstream>
 
 #define CUDA_SYNC 1
+#define USE_NVTX 0
 
 /* readonly */ CProxy_Main main_proxy;
 /* readonly */ CProxy_Block block_proxy;
@@ -105,7 +106,9 @@ class Main : public CBase_Main {
 
 public:
   Main(CkArgMsg* m) {
+#if USE_NVTX
     NVTXTracer nvtx_range("Main::Main", NVTXColor::Turquoise);
+#endif
 
     // Set default values
     main_proxy = thisProxy;
@@ -268,7 +271,9 @@ public:
   }
 
   void initDone() {
+#if USE_NVTX
     NVTXTracer nvtx_range("Main::initDone", NVTXColor::Turquoise);
+#endif
 
     CkPrintf("Init time: %.3lf s\n", CkWallTimer() - init_start_time);
 
@@ -282,13 +287,17 @@ public:
   }
 
   void warmupDone() {
+#if USE_NVTX
     NVTXTracer nvtx_range("Main::warmupDone", NVTXColor::Turquoise);
+#endif
 
     startIter();
   }
 
   void allDone() {
+#if USE_NVTX
     NVTXTracer nvtx_range("Main::allDone", NVTXColor::Turquoise);
+#endif
 
     double total_time = CkWallTimer() - start_time;
     CkPrintf("Total time: %.3lf s\nAverage iteration time: %.3lf us\n",
@@ -684,7 +693,9 @@ class Block : public CBase_Block {
   }
 
   void packGhosts() {
+#if USE_NVTX
     NVTXTracer nvtx_range(index_str + " packGhosts", NVTXColor::PeterRiver);
+#endif
 
     if (!use_cuda_graph) {
       if (!fuse_update_all) {
@@ -750,7 +761,9 @@ class Block : public CBase_Block {
   }
 
   void sendGhosts() {
+#if USE_NVTX
     NVTXTracer nvtx_range(index_str + " sendGhosts", NVTXColor::WetAsphalt);
+#endif
 
     // Increment iteration count and swap data pointers
     // to avoid host synchronization
@@ -792,7 +805,9 @@ class Block : public CBase_Block {
   }
 
   void recvGhosts() {
+#if USE_NVTX
     NVTXTracer nvtx_range(index_str + " recvGhosts", NVTXColor::Carrot);
+#endif
 
     // Receive ghosts
     for (int dir = 0; dir < DIR_COUNT; dir++) {
@@ -804,7 +819,9 @@ class Block : public CBase_Block {
   }
 
   void processGhostChannel(int dir) {
+#if USE_NVTX
     NVTXTracer nvtx_range(index_str + " processGhostChannel " + std::to_string(dir), NVTXColor::Carrot);
+#endif
 
     // Unpack received ghost
     unpackGhostDevice(d_temperature, d_recv_ghosts[dir], nullptr, dir,
@@ -813,7 +830,9 @@ class Block : public CBase_Block {
   }
 
   void processGhostReg(int dir, int count, DataType* gh) {
+#if USE_NVTX
     NVTXTracer nvtx_range(index_str + " processGhostReg " + std::to_string(dir), NVTXColor::Carrot);
+#endif
 
     CkAssert(dir >= 0 && dir < DIR_COUNT);
     DataType* h_ghost = h_ghosts[dir];
@@ -826,7 +845,9 @@ class Block : public CBase_Block {
   }
 
   void processGhostsFused() {
+#if USE_NVTX
     NVTXTracer nvtx_range(index_str + " processGhostsFused", NVTXColor::Carrot);
+#endif
 
     // Unpack all ghosts together
     unpackGhostsFusedDevice(d_temperature, d_recv_ghosts[LEFT], d_recv_ghosts[RIGHT],
@@ -836,7 +857,9 @@ class Block : public CBase_Block {
   }
 
   void update() {
+#if USE_NVTX
     NVTXTracer nvtx_range(index_str + " update", NVTXColor::BelizeHole);
+#endif
 
     if (!use_cuda_graph) {
       if (!fuse_update_all) {
@@ -887,7 +910,9 @@ class Block : public CBase_Block {
   }
 
   void updateDone() {
+#if USE_NVTX
     NVTXTracer nvtx_range(index_str + " updateDone", NVTXColor::GreenSea);
+#endif
 
     if (print_elements) {
       if (x == 0 && y == 0 && z == 0) {
