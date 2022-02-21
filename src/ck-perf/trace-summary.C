@@ -337,7 +337,7 @@ void SumLogPool::write(void)
     delete[] fname;
   }
 
-  fprintf(fp, "ver:%3.1f %d/%d count:%d ep:%d interval:%e", CkpvAccess(version), CkMyPe(), CkNumPes(), numBins, _numEntries, CkpvAccess(binSize));
+  fprintf(fp, "ver:%5.1f %d/%d count:%d ep:%d interval:%e", CkpvAccess(version), CkMyPe(), CkNumPes(), numBins, _numEntries, CkpvAccess(binSize));
   if (CkpvAccess(version)>=3.0)
   {
     fprintf(fp, " phases:%d", phaseTab.numPhasesCalled());
@@ -446,7 +446,7 @@ void SumLogPool::write(void)
   //CkPrintf("writing to detail file:%d    %d \n", getNumEntries(), numBins);
   // write summary details
   if (sumDetail) {
-        fprintf(sdfp, "ver:%4.1f cpu:%d/%d numIntervals:%d numEPs:%d intervalSize:%e\n",
+        fprintf(sdfp, "ver:%5.1f cpu:%d/%d numIntervals:%d numEPs:%d intervalSize:%e\n",
                 CkpvAccess(version), CkMyPe(), CkNumPes(),
                 numBins, _numEntries, CkpvAccess(binSize));
 
@@ -1396,7 +1396,7 @@ void TraceSummaryBOC::sumData(double *sumData, int totalsize) {
     sprintf(fname, "%s.sumall", CkpvAccess(traceRoot));
     FILE *sumfp = fopen(fname, "w+");
     delete [] fname;
-    fprintf(sumfp, "ver:%3.1f cpu:%d numIntervals:%d numEPs:%d intervalSize:%e\n",
+    fprintf(sumfp, "ver:%5.1f cpu:%d numIntervals:%d numEPs:%d intervalSize:%e\n",
                 CkpvAccess(version), CkNumPes(),
                 numBins, numEntries, _maxBinSize);
     for(int i=0; i<numBins; i++){
@@ -1640,7 +1640,7 @@ void TraceSummaryBOC::write(void)
   delete[] fname;
 
   int _numEntries=_entryTable.size();
-  fprintf(sumfp, "ver:%3.1f %d/%d count:%d ep:%d interval:%e numTracedPE:%d", CkpvAccess(version), CkMyPe(), CkNumPes(), nBins, _numEntries, CkpvAccess(binSize), nTracedPEs);
+  fprintf(sumfp, "ver:%5.1f %d/%d count:%d ep:%d interval:%e numTracedPE:%d", CkpvAccess(version), CkMyPe(), CkNumPes(), nBins, _numEntries, CkpvAccess(binSize), nTracedPEs);
   fprintf(sumfp, "\n");
 
   // write bin time
