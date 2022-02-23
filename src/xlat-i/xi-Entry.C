@@ -544,17 +544,17 @@ void Entry::genArrayDefs(XStr& str) {
     // regular broadcast and section broadcast for an entry method with rdma
     str << "  ckCheck();\n";
     XStr inlineCall;
+    bool nonMarshaled = param && param->getName() && !param->isMarshalled();
     if (!isNoTrace())
     {
-      if (param && param->getName() && !param->isMarshalled()) {
-        inlineCall
-            << "  envelope& env = *(UsrToEnv(" << param->getName() << "));\n";
+      if (nonMarshaled) {
+        inlineCall << "  envelope& env = *(UsrToEnv("
+                   << param->getName() << "));\n";
       } else {
         // Create a dummy envelope to represent the "message send" to the local/inline method
         // so that Projections can trace the method back to its caller
-        inlineCall
-            << "  envelope env;\n"
-            << "  env.setTotalsize(0);\n";
+        inlineCall << "  envelope env;\n"
+                   << "  env.setTotalsize(0);\n";
       }
 
       inlineCall
@@ -570,11 +570,12 @@ void Entry::genArrayDefs(XStr& str) {
     if (isInline())
     {
       inlineCall << "    const auto id = obj->ckGetID().getElementID();\n";
-      if (param->isMarshalled()) {
+      if (nonMarshaled) {
+        inlineCall << "    unsigned int impl_off = UsrToEnv("
+                   << param->getName() << ")->getTotalsize();\n";
+      } else {
         param->size(inlineCall); // Puts size of parameters in bytes into impl_off
         inlineCall << "    impl_off += sizeof(envelope);\n";
-      } else {
-        inlineCall << "    unsigned int impl_off = env.getTotalsize();\n";
       }
       inlineCall << "    ckLocalBranch()->recordSend(id, impl_off, CkMyPe());\n";
     }
@@ -597,7 +598,7 @@ void Entry::genArrayDefs(XStr& str) {
     param->unmarshallForward(inlineCall, true);
     inlineCall << ");\n";
     if (isInline() && isNoKeep()) {
-      if (param && param->getName() && !param->isMarshalled()) {
+      if (nonMarshaled) {
         inlineCall << "    CkFreeMsg(" << param->getName() << ");\n";
       }
     }
