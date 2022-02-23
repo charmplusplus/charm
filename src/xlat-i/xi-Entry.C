@@ -547,10 +547,17 @@ void Entry::genArrayDefs(XStr& str) {
     if (!isNoTrace())
       // Create a dummy envelope to represent the "message send" to the local/inline method
       // so that Projections can trace the method back to its caller
-      inlineCall
-          << "  envelope env;\n"
+        if (!param || !param->getName() || param->isMarshalled()) {
+          inlineCall
+              << "  envelope env;\n"
+              << "  env.setTotalsize(0);\n";
+        } else {
+          inlineCall
+              << "  envelope& env = *(UsrToEnv(" << param->getName() << "));\n";
+        }
+
+        inlineCall
           << "  env.setMsgtype(ForArrayEltMsg);\n"
-          << "  env.setTotalsize(0);\n"
           << "  _TRACE_CREATION_DETAILED(&env, " << epIdx() << ");\n"
           << "  _TRACE_CREATION_DONE(1);\n"
           << "  CmiObjId projID = ((CkArrayIndex&)ckGetIndex()).getProjectionID();\n"
@@ -561,9 +568,13 @@ void Entry::genArrayDefs(XStr& str) {
     if (isInline())
     {
       inlineCall << "    const auto id = obj->ckGetID().getElementID();\n";
-      param->size(inlineCall); // Puts size of parameters in bytes into impl_off
-      inlineCall << "    impl_off += sizeof(envelope);\n"
-                 << "    ckLocalBranch()->recordSend(id, impl_off, CkMyPe());\n";
+      if (param->isMarshalled()) {
+        param->size(inlineCall); // Puts size of parameters in bytes into impl_off
+        inlineCall << "    impl_off += sizeof(envelope);\n";
+      } else {
+        inlineCall << "    unsigned int impl_off = env.getTotalsize();\n";
+      }
+      inlineCall << "    ckLocalBranch()->recordSend(id, impl_off, CkMyPe());\n";
     }
     inlineCall << "#endif\n";
     inlineCall << "#if CMK_CHARMDEBUG\n"
@@ -583,6 +594,11 @@ void Entry::genArrayDefs(XStr& str) {
     inlineCall << "(";
     param->unmarshallForward(inlineCall, true);
     inlineCall << ");\n";
+    if (isInline() && isNoKeep()) {
+      if (param && param->getName() && !param->isMarshalled()) {
+        inlineCall << "    CkFreeMsg(" << param->getName() << ");\n";
+      }
+    }
     inlineCall << "    CkCallstackPop(obj);\n";
     inlineCall << "#if CMK_CHARMDEBUG\n"
                   "    CpdAfterEp("
