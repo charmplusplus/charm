@@ -545,24 +545,26 @@ void Entry::genArrayDefs(XStr& str) {
     str << "  ckCheck();\n";
     XStr inlineCall;
     if (!isNoTrace())
-      // Create a dummy envelope to represent the "message send" to the local/inline method
-      // so that Projections can trace the method back to its caller
-        if (!param || !param->getName() || param->isMarshalled()) {
-          inlineCall
-              << "  envelope env;\n"
-              << "  env.setTotalsize(0);\n";
-        } else {
-          inlineCall
-              << "  envelope& env = *(UsrToEnv(" << param->getName() << "));\n";
-        }
-
+    {
+      if (param && param->getName() && !param->isMarshalled()) {
         inlineCall
-          << "  env.setMsgtype(ForArrayEltMsg);\n"
-          << "  _TRACE_CREATION_DETAILED(&env, " << epIdx() << ");\n"
-          << "  _TRACE_CREATION_DONE(1);\n"
-          << "  CmiObjId projID = ((CkArrayIndex&)ckGetIndex()).getProjectionID();\n"
-          << "  _TRACE_BEGIN_EXECUTE_DETAILED(CpvAccess(curPeEvent),ForArrayEltMsg,(" << epIdx()
-          << "),CkMyPe(), 0, &projID, obj);\n";
+            << "  envelope& env = *(UsrToEnv(" << param->getName() << "));\n";
+      } else {
+        // Create a dummy envelope to represent the "message send" to the local/inline method
+        // so that Projections can trace the method back to its caller
+        inlineCall
+            << "  envelope env;\n"
+            << "  env.setTotalsize(0);\n";
+      }
+
+      inlineCall
+        << "  env.setMsgtype(ForArrayEltMsg);\n"
+        << "  _TRACE_CREATION_DETAILED(&env, " << epIdx() << ");\n"
+        << "  _TRACE_CREATION_DONE(1);\n"
+        << "  CmiObjId projID = ((CkArrayIndex&)ckGetIndex()).getProjectionID();\n"
+        << "  _TRACE_BEGIN_EXECUTE_DETAILED(CpvAccess(curPeEvent),ForArrayEltMsg,(" << epIdx()
+        << "),CkMyPe(), 0, &projID, obj);\n";
+    }
     if (isAppWork()) inlineCall << "    _TRACE_BEGIN_APPWORK();\n";
     inlineCall << "#if CMK_LBDB_ON\n";
     if (isInline())
