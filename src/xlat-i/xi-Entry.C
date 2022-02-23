@@ -558,12 +558,12 @@ void Entry::genArrayDefs(XStr& str) {
       }
 
       inlineCall
-        << "  env.setMsgtype(ForArrayEltMsg);\n"
-        << "  _TRACE_CREATION_DETAILED(&env, " << epIdx() << ");\n"
-        << "  _TRACE_CREATION_DONE(1);\n"
-        << "  CmiObjId projID = ((CkArrayIndex&)ckGetIndex()).getProjectionID();\n"
-        << "  _TRACE_BEGIN_EXECUTE_DETAILED(CpvAccess(curPeEvent),ForArrayEltMsg,(" << epIdx()
-        << "),CkMyPe(), 0, &projID, obj);\n";
+          << "  env.setMsgtype(ForArrayEltMsg);\n"
+          << "  _TRACE_CREATION_DETAILED(&env, " << epIdx() << ");\n"
+          << "  _TRACE_CREATION_DONE(1);\n"
+          << "  CmiObjId projID = ((CkArrayIndex&)ckGetIndex()).getProjectionID();\n"
+          << "  _TRACE_BEGIN_EXECUTE_DETAILED(CpvAccess(curPeEvent),ForArrayEltMsg,(" << epIdx()
+          << "),CkMyPe(), 0, &projID, obj);\n";
     }
     if (isAppWork()) inlineCall << "    _TRACE_BEGIN_APPWORK();\n";
     inlineCall << "#if CMK_LBDB_ON\n";
