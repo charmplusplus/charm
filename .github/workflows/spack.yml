@@ -41,9 +41,9 @@ jobs:
 
     - name: Build Charm++
       run: |
-        export OMPI_MCA_rmaps_base_oversubscribe=1
         cd ../spack
         source share/spack/setup-env.sh
         spack compiler find
         spack compiler list
-        spack install -v --test root charmpp@main
+        spack spec charmpp@main
+        spack install --test root charmpp@main
