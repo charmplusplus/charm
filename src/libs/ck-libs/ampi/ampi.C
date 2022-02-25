@@ -2451,6 +2451,13 @@ void ampi::commCreatePhase1(int nextComm, int commType) noexcept {
 }
 
 /* Virtual topology communicator creation */
+void ampiTopology::sortnbors(CProxy_ampi arrProxy, std::vector<int> &nbors_) noexcept {
+  if (nbors_.size() > 1) {
+    // Sort neighbors so that non-PE-local ranks are before PE-local ranks, so that
+    // we can overlap non-local messages with local ones which happen inline
+    std::partition(nbors_.begin(), nbors_.end(), [&](int idx) { return !arrProxy[idx].ckLocal(); } );
+  }
+}
 
 // 0-dimensional cart comm: rank 0 creates a dup of COMM_SELF with topo info.
 MPI_Comm ampi::cartCreate0D() noexcept {
@@ -9003,7 +9010,8 @@ AMPI_API_IMPL(int, MPI_Neighbor_alltoall, const void* sendbuf, int sendcount, MP
   if (ptr->getSize() == 1)
     return copyDatatype(sendtype, sendcount, recvtype, recvcount, sendbuf, recvbuf);
 
-  const std::vector<int>& neighbors = ptr->getNeighbors();
+  std::vector<int>& neighbors = ptr->getNeighbors();
+  ptr->sortNeighborsByLocality(neighbors);
   int num_neighbors = neighbors.size();
   int itemsize = getDDT()->getSize(sendtype) * sendcount;
   int extent = getDDT()->getExtent(recvtype) * recvcount;
@@ -9058,7 +9066,8 @@ AMPI_API_IMPL(int, MPI_Ineighbor_alltoall, const void* sendbuf, int sendcount, M
     return copyDatatype(sendtype, sendcount, recvtype, recvcount, sendbuf, recvbuf);
   }
 
-  const std::vector<int>& neighbors = ptr->getNeighbors();
+  std::vector<int>& neighbors = ptr->getNeighbors();
+  ptr->sortNeighborsByLocality(neighbors);
   int num_neighbors = neighbors.size();
   int itemsize = getDDT()->getSize(sendtype) * sendcount;
   int extent = getDDT()->getExtent(recvtype) * recvcount;
@@ -9108,7 +9117,8 @@ AMPI_API_IMPL(int, MPI_Neighbor_alltoallv, const void* sendbuf, const int *sendc
   if (ptr->getSize() == 1)
     return copyDatatype(sendtype, sendcounts[0], recvtype, recvcounts[0], sendbuf, recvbuf);
 
-  const std::vector<int>& neighbors = ptr->getNeighbors();
+  std::vector<int>& neighbors = ptr->getNeighbors();
+  ptr->sortNeighborsByLocality(neighbors);
   int num_neighbors = neighbors.size();
   int itemsize = getDDT()->getSize(sendtype);
   int extent = getDDT()->getExtent(recvtype);
@@ -9164,7 +9174,8 @@ AMPI_API_IMPL(int, MPI_Ineighbor_alltoallv, const void* sendbuf, const int *send
     return copyDatatype(sendtype, sendcounts[0], recvtype, recvcounts[0], sendbuf, recvbuf);
   }
 
-  const std::vector<int>& neighbors = ptr->getNeighbors();
+  std::vector<int>& neighbors = ptr->getNeighbors();
+  ptr->sortNeighborsByLocality(neighbors);
   int num_neighbors = neighbors.size();
   int itemsize = getDDT()->getSize(sendtype);
   int extent = getDDT()->getExtent(recvtype);
@@ -9214,7 +9225,8 @@ AMPI_API_IMPL(int, MPI_Neighbor_alltoallw, const void* sendbuf, const int *sendc
   if (ptr->getSize() == 1)
     return copyDatatype(sendtypes[0], sendcounts[0], recvtypes[0], recvcounts[0], sendbuf, recvbuf);
 
-  const std::vector<int>& neighbors = ptr->getNeighbors();
+  std::vector<int>& neighbors = ptr->getNeighbors();
+  ptr->sortNeighborsByLocality(neighbors);
   int num_neighbors = neighbors.size();
 
   std::vector<MPI_Request> reqs(num_neighbors*2);
@@ -9268,7 +9280,8 @@ AMPI_API_IMPL(int, MPI_Ineighbor_alltoallw, const void* sendbuf, const int *send
     return copyDatatype(sendtypes[0], sendcounts[0], recvtypes[0], recvcounts[0], sendbuf, recvbuf);
   }
 
-  const std::vector<int>& neighbors = ptr->getNeighbors();
+  std::vector<int>& neighbors = ptr->getNeighbors();
+  ptr->sortNeighborsByLocality(neighbors);
   int num_neighbors = neighbors.size();
 
   // use an ATAReq to non-block the caller and get a request ptr
@@ -9316,7 +9329,8 @@ AMPI_API_IMPL(int, MPI_Neighbor_allgather, const void* sendbuf, int sendcount, M
   if (ptr->getSize() == 1)
     return copyDatatype(sendtype, sendcount, recvtype, recvcount, sendbuf, recvbuf);
 
-  const std::vector<int>& neighbors = ptr->getNeighbors();
+  std::vector<int>& neighbors = ptr->getNeighbors();
+  ptr->sortNeighborsByLocality(neighbors);
   int num_neighbors = neighbors.size();
 
   int extent = getDDT()->getExtent(recvtype) * recvcount;
@@ -9370,7 +9384,8 @@ AMPI_API_IMPL(int, MPI_Ineighbor_allgather, const void* sendbuf, int sendcount, 
     return copyDatatype(sendtype, sendcount, recvtype, recvcount, sendbuf, recvbuf);
   }
 
-  const std::vector<int>& neighbors = ptr->getNeighbors();
+  std::vector<int>& neighbors = ptr->getNeighbors();
+  ptr->sortNeighborsByLocality(neighbors);
   int num_neighbors = neighbors.size();
 
   // use an ATAReq to non-block the caller and get a request ptr
@@ -9419,7 +9434,8 @@ AMPI_API_IMPL(int, MPI_Neighbor_allgatherv, const void* sendbuf, int sendcount, 
   if (ptr->getSize() == 1)
     return copyDatatype(sendtype, sendcount, recvtype, recvcounts[0], sendbuf, recvbuf);
 
-  const std::vector<int>& neighbors = ptr->getNeighbors();
+  std::vector<int>& neighbors = ptr->getNeighbors();
+  ptr->sortNeighborsByLocality(neighbors);
   int num_neighbors = neighbors.size();
   int extent = getDDT()->getExtent(recvtype);
   std::vector<MPI_Request> reqs(num_neighbors*2);
@@ -9471,7 +9487,8 @@ AMPI_API_IMPL(int, MPI_Ineighbor_allgatherv, const void* sendbuf, int sendcount,
     return copyDatatype(sendtype, sendcount, recvtype, recvcounts[0], sendbuf, recvbuf);
   }
 
-  const std::vector<int>& neighbors = ptr->getNeighbors();
+  std::vector<int>& neighbors = ptr->getNeighbors();
+  ptr->sortNeighborsByLocality(neighbors);
   int num_neighbors = neighbors.size();
 
   // use an ATAReq to non-block the caller and get a request ptr
