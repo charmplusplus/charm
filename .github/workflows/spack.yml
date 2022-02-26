@@ -45,5 +45,5 @@ jobs:
         source share/spack/setup-env.sh
         spack compiler find
         spack compiler list
-        spack spec charmpp@main
-        spack install --test root charmpp@main
+        spack spec charmpp@main backend=multicore
+        spack install --test root charmpp@main backend=multicore
