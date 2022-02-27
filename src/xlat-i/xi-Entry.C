@@ -544,26 +544,40 @@ void Entry::genArrayDefs(XStr& str) {
     // regular broadcast and section broadcast for an entry method with rdma
     str << "  ckCheck();\n";
     XStr inlineCall;
+    bool nonMarshaled = param && param->getName() && !param->isMarshalled();
     if (!isNoTrace())
-      // Create a dummy envelope to represent the "message send" to the local/inline method
-      // so that Projections can trace the method back to its caller
+    {
+      if (nonMarshaled) {
+        inlineCall << "  envelope& env = *(UsrToEnv("
+                   << param->getName() << "));\n";
+      } else {
+        // Create a dummy envelope to represent the "message send" to the local/inline method
+        // so that Projections can trace the method back to its caller
+        inlineCall << "  envelope env;\n"
+                   << "  env.setTotalsize(0);\n";
+      }
+
       inlineCall
-          << "  envelope env;\n"
           << "  env.setMsgtype(ForArrayEltMsg);\n"
-          << "  env.setTotalsize(0);\n"
           << "  _TRACE_CREATION_DETAILED(&env, " << epIdx() << ");\n"
           << "  _TRACE_CREATION_DONE(1);\n"
           << "  CmiObjId projID = ((CkArrayIndex&)ckGetIndex()).getProjectionID();\n"
           << "  _TRACE_BEGIN_EXECUTE_DETAILED(CpvAccess(curPeEvent),ForArrayEltMsg,(" << epIdx()
           << "),CkMyPe(), 0, &projID, obj);\n";
+    }
     if (isAppWork()) inlineCall << "    _TRACE_BEGIN_APPWORK();\n";
     inlineCall << "#if CMK_LBDB_ON\n";
     if (isInline())
     {
       inlineCall << "    const auto id = obj->ckGetID().getElementID();\n";
-      param->size(inlineCall); // Puts size of parameters in bytes into impl_off
-      inlineCall << "    impl_off += sizeof(envelope);\n"
-                 << "    ckLocalBranch()->recordSend(id, impl_off, CkMyPe());\n";
+      if (nonMarshaled) {
+        inlineCall << "    unsigned int impl_off = UsrToEnv("
+                   << param->getName() << ")->getTotalsize();\n";
+      } else {
+        param->size(inlineCall); // Puts size of parameters in bytes into impl_off
+        inlineCall << "    impl_off += sizeof(envelope);\n";
+      }
+      inlineCall << "    ckLocalBranch()->recordSend(id, impl_off, CkMyPe());\n";
     }
     inlineCall << "#endif\n";
     inlineCall << "#if CMK_CHARMDEBUG\n"
@@ -583,6 +597,11 @@ void Entry::genArrayDefs(XStr& str) {
     inlineCall << "(";
     param->unmarshallForward(inlineCall, true);
     inlineCall << ");\n";
+    if (isInline() && isNoKeep()) {
+      if (nonMarshaled) {
+        inlineCall << "    CkFreeMsg(" << param->getName() << ");\n";
+      }
+    }
     inlineCall << "    CkCallstackPop(obj);\n";
     inlineCall << "#if CMK_CHARMDEBUG\n"
                   "    CpdAfterEp("
