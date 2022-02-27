@@ -95,6 +95,7 @@ mainmodule jacobi3d {
 
         for (nbr_count = 0; nbr_count < 2 * n_nbr; nbr_count++) {
           when channelCallback[my_iter](CallbackMsg* msg) serial {
+            processTimer();
             if (msg->recv && !fuse_update_all && !fuse_unpack && !use_cuda_graph) {
               processGhostChannel(msg->dir);
             }

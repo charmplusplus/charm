@@ -9,6 +9,13 @@
 #define CUDA_SYNC 1
 #define USE_NVTX 0
 
+#define USE_TIMER 0
+#define TIMER_CNT 16384
+#define TIMERS_PER_ITER 8
+#define DURS_CNT (TIMERS_PER_ITER-1)
+
+#define COMM_ONLY 0
+
 /* readonly */ CProxy_Main main_proxy;
 /* readonly */ CProxy_Block block_proxy;
 /* readonly */ int num_chares;
@@ -362,6 +369,11 @@ class Block : public CBase_Block {
 
   bool* bounds;
 
+#if USE_TIMER
+  double timers[TIMER_CNT];
+  int timer_idx;
+#endif
+
   Block() {}
 
   ~Block() {
@@ -403,6 +415,11 @@ class Block : public CBase_Block {
     linear_index = x * n_chares_y * n_chares_z + y * n_chares_z + z;
     index_str = "[" + std::to_string(x) + "," + std::to_string(y)
       + "," + std::to_string(z) + "]";
+
+#if USE_TIMER
+    for (int i = 0; i < TIMER_CNT; i++) timers[i] = 0.0;
+    timer_idx = 0;
+#endif
 
     // Channel API
     for (int i = 0; i < DIR_COUNT; i++) channel_ids[i] = -1;
@@ -697,6 +714,7 @@ class Block : public CBase_Block {
     NVTXTracer nvtx_range(index_str + " packGhosts", NVTXColor::PeterRiver);
 #endif
 
+#if !COMM_ONLY
     if (!use_cuda_graph) {
       if (!fuse_update_all) {
         // Packing must start only after update is complete on the device
@@ -758,11 +776,17 @@ class Block : public CBase_Block {
       hapiAddCallback(graph_stream, pack_cb);
 #endif
     }
+#else
+    thisProxy[thisIndex].packGhostsDone();
+#endif // COMM_ONLY
   }
 
   void sendGhosts() {
 #if USE_NVTX
     NVTXTracer nvtx_range(index_str + " sendGhosts", NVTXColor::WetAsphalt);
+#endif
+#if USE_TIMER
+    timers[timer_idx++] = CkWallTimer();
 #endif
 
     // Increment iteration count and swap data pointers
@@ -802,11 +826,18 @@ class Block : public CBase_Block {
         thisProxy(x, y, z+1).recvGhostReg(my_iter, FRONT,
             z_surf_count, h_ghosts[BACK]);
     }
+
+#if USE_TIMER
+    timers[timer_idx++] = CkWallTimer();
+#endif
   }
 
   void recvGhosts() {
 #if USE_NVTX
     NVTXTracer nvtx_range(index_str + " recvGhosts", NVTXColor::Carrot);
+#endif
+#if USE_TIMER
+    timers[timer_idx++] = CkWallTimer();
 #endif
 
     // Receive ghosts
@@ -816,6 +847,21 @@ class Block : public CBase_Block {
             channel_cb, new CallbackMsg(true, dir));
       }
     }
+
+#if USE_TIMER
+    timers[timer_idx++] = CkWallTimer();
+#endif
+  }
+
+  void processTimer() {
+#if USE_TIMER
+    if (nbr_count == 0) {
+      timers[timer_idx++] = CkWallTimer();
+    }
+    if (nbr_count == 2*n_nbr-1) {
+      timers[timer_idx++] = CkWallTimer();
+    }
+#endif
   }
 
   void processGhostChannel(int dir) {
@@ -823,10 +869,12 @@ class Block : public CBase_Block {
     NVTXTracer nvtx_range(index_str + " processGhostChannel " + std::to_string(dir), NVTXColor::Carrot);
 #endif
 
+#if !COMM_ONLY
     // Unpack received ghost
     unpackGhostDevice(d_temperature, d_recv_ghosts[dir], nullptr, dir,
         block_width, block_height, block_depth, ghost_sizes[dir],
         comm_stream, h2d_stream, unpack_events, use_channel);
+#endif
   }
 
   void processGhostReg(int dir, int count, DataType* gh) {
@@ -860,7 +908,11 @@ class Block : public CBase_Block {
 #if USE_NVTX
     NVTXTracer nvtx_range(index_str + " update", NVTXColor::BelizeHole);
 #endif
+#if USE_TIMER
+    timers[timer_idx++] = CkWallTimer();
+#endif
 
+#if !COMM_ONLY
     if (!use_cuda_graph) {
       if (!fuse_update_all) {
         // Update should only be performed after operations in communication stream
@@ -885,10 +937,37 @@ class Block : public CBase_Block {
             block_width, block_height, block_depth, compute_stream);
       }
     }
+#endif
+
+#if USE_TIMER
+    timers[timer_idx++] = CkWallTimer();
+    if (my_iter == warmup_iters + n_iters) {
+      double durations[DURS_CNT];
+
+      for (int i = 0; i < DURS_CNT; i++) {
+        durations[i] = 0.0;
+      }
+
+      for (int i = warmup_iters; i < (warmup_iters + n_iters); i++) {
+        int idx = i * TIMERS_PER_ITER;
+        for (int j = 0; j < DURS_CNT; j++) {
+          durations[j] += (timers[idx+j+1] - timers[idx+j]);
+        }
+      }
+
+      for (int i = 0; i < DURS_CNT; i++) {
+        durations[i] /= n_iters;
+        if (x == 0 && y == 0 && z == 0) {
+          CkPrintf("Duration %d: %.3lf us\n", i, durations[i] * 1e6);
+        }
+      }
+    }
+#endif
 
     // Synchronize with host only when necessary
     if (print_elements || (my_iter == warmup_iters)
         || (my_iter == warmup_iters + n_iters)) {
+#if !COMM_ONLY
       if (use_cuda_graph) {
 #ifdef CUDA_SYNC
         cudaStreamSynchronize(graph_stream);
@@ -904,6 +983,9 @@ class Block : public CBase_Block {
         hapiAddCallback(compute_stream, update_cb);
 #endif
       }
+#else
+      thisProxy[thisIndex].updateDone();
+#endif // COMM_ONLY
     } else {
       thisProxy[thisIndex].run();
     }

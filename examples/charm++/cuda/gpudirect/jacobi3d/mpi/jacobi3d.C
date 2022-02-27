@@ -6,6 +6,13 @@
 #include <sstream>
 #include "jacobi3d.h"
 
+#define USE_TIMER 0
+#define TIMER_CNT 16384
+#define TIMERS_PER_ITER 6
+#define DURS_CNT (TIMERS_PER_ITER-1)
+
+#define COMM_ONLY 0
+
 extern void invokeInitKernel(DataType* temperature, int block_width,
     int block_height, int block_depth, cudaStream_t stream);
 extern void invokeGhostInitKernels(const std::vector<DataType*>& ghosts,
@@ -568,6 +575,17 @@ struct Block {
   }
 
   void exchangeGhosts() {
+#if USE_TIMER
+    static double timers[TIMER_CNT];
+    static int timer_idx = 0;
+
+    if (my_iter == 0) {
+      for (int i = 0; i < TIMER_CNT; i++) {
+        timers[i] = 0.0;
+      }
+    }
+#endif
+
     // Increment iteration count and swap data pointers
     // to avoid host synchronization
     my_iter++;
@@ -576,6 +594,10 @@ struct Block {
     // Data sizes
     size_t data_sizes[DIR_COUNT] = {x_surf_size, x_surf_size, y_surf_size,
       y_surf_size, z_surf_size, z_surf_size};
+
+#if USE_TIMER
+    timers[timer_idx++] = MPI_Wtime();
+#endif
 
 		// Send ghosts to neighbors
     MPI_Request send_requests[DIR_COUNT];
@@ -587,6 +609,10 @@ struct Block {
         MPI_Isend(send_ghost, data_sizes[dir], MPI_CHAR, neighbor_ranks[dir],
             my_iter * DIR_COUNT + rev_dir, cart_comm, &send_requests[send_count++]);
     }
+
+#if USE_TIMER
+    timers[timer_idx++] = MPI_Wtime();
+#endif
 
     // Receive ghosts from neighbors
     MPI_Request recv_requests[DIR_COUNT];
@@ -601,6 +627,10 @@ struct Block {
       }
     }
 
+#if USE_TIMER
+    timers[timer_idx++] = MPI_Wtime();
+#endif
+
     // Invoke unpacking kernel for each received ghost
     MPI_Status recv_statuses[DIR_COUNT];
     for (int i = 0; i < recv_count; i++) {
@@ -609,6 +639,13 @@ struct Block {
       MPI_Waitany(recv_count, recv_requests, &index, recv_statuses);
       int dir = recv_dirs[index];
 
+#if USE_TIMER
+      if (i == 0 || i == recv_count-1) {
+        timers[timer_idx++] = MPI_Wtime();
+      }
+#endif
+
+#if !COMM_ONLY
       if (!use_cuda_graph) {
         if (!fuse_update_all && !fuse_unpack) {
           unpackGhostDevice(d_temperature, d_recv_ghosts[dir], h_recv_ghosts[dir], dir,
@@ -616,6 +653,7 @@ struct Block {
               comm_stream, h2d_stream, unpack_events, cuda_aware);
         }
       }
+#endif
     }
 
     if (fuse_unpack) {
@@ -629,6 +667,32 @@ struct Block {
     // Wait for sends to complete
     MPI_Status send_statuses[DIR_COUNT];
     MPI_Waitall(send_count, send_requests, send_statuses);
+
+#if USE_TIMER
+    timers[timer_idx++] = MPI_Wtime();
+
+    if (my_iter == warmup_iters + n_iters) {
+      double durations[DURS_CNT];
+
+      for (int i = 0; i < DURS_CNT; i++) {
+        durations[i] = 0.0;
+      }
+
+      for (int i = warmup_iters; i < (warmup_iters + n_iters); i++) {
+        int idx = i * TIMERS_PER_ITER;
+        for (int j = 0; j < DURS_CNT; j++) {
+          durations[j] += (timers[idx+j+1] - timers[idx+j]);
+        }
+      }
+
+      for (int i = 0; i < DURS_CNT; i++) {
+        durations[i] /= n_iters;
+        if (rank == 0) {
+          printf("Durations %d: %.3lf us\n", i, durations[i] * 1e6);
+        }
+      }
+    }
+#endif
   }
 
   void update() {
@@ -857,10 +921,14 @@ int main(int argc, char** argv) {
   for (int i = 0; i < param.n_iters + param.warmup_iters; i++) {
     if (i == param.warmup_iters) start_time = MPI_Wtime();
 
+#if !COMM_ONLY
     block.packGhosts();
+#endif
     block.exchangeGhosts();
     if (param.use_cuda_graph) block.launchCudaGraph();
+#if !COMM_ONLY
     block.update();
+#endif
   }
   double total_time = MPI_Wtime() - start_time;
 
