@@ -6,7 +6,7 @@
 #include <string>
 #include <sstream>
 
-#define CUDA_SYNC 1
+#define CUDA_SYNC 0
 #define USE_NVTX 0
 
 #define USE_TIMER 0
