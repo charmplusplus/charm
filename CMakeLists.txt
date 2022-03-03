@@ -51,6 +51,8 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang" OR CMAKE_CXX_COMPILER_ID STRE
   if(mytmp MATCHES "-")
     string(REGEX REPLACE ".*(-.*)" "\\1" CMK_COMPILER_SUFFIX ${mytmp})
   endif()
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "IntelLLVM")
+  set(CMK_COMPILER icx)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
   set(CMK_COMPILER icc)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Cray")
