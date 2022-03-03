@@ -283,14 +283,14 @@ endif()
 
 if(${CMK_USE_ZLIB})
   find_package(ZLIB REQUIRED)
-  set(CMK_SYSLIBS "$CMK_SYSLIBS -lz")
+  set(CMK_SYSLIBS "${CMK_SYSLIBS} -lz")
 endif()
 
 if(${CMK_USE_SHMEM})
   if(${CMK_HAS_XPMEM})
-    set(CMK_SYSLIBS "$CMK_SYSLIBS -lxpmem")
+    set(CMK_SYSLIBS "${CMK_SYSLIBS} -lxpmem")
   elseif(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-    set(CMK_SYSLIBS "$CMK_SYSLIBS -lrt")
+    set(CMK_SYSLIBS "${CMK_SYSLIBS} -lrt")
   endif()
 endif()
 
