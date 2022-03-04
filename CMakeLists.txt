@@ -296,7 +296,8 @@ if(${CMK_USE_SHMEM})
   endif()
 endif()
 
-# Ensure parity of bash and CMake variables
+# $CMK_SYSLIBS also gets updated in the charmc shell config files, therefore we need to include
+# a reference to $CMK_SYSLIBS here.
 set(CMK_SYSLIBS "$CMK_SYSLIBS ${CMK_SYSLIBS}")
 
 set(CMK_USE_LIBJPEG 0)
