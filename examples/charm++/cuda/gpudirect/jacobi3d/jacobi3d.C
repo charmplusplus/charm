@@ -37,6 +37,7 @@
 /* readonly */ int n_iters;
 /* readonly */ int warmup_iters;
 /* readonly */ bool use_channel;
+/* readonly */ bool host_staging;
 /* readonly */ bool manual_overlap;
 /* readonly */ bool fuse_pack;
 /* readonly */ bool fuse_unpack;
@@ -68,7 +69,7 @@ extern void packGhostsDevice(DataType* temperature,
     int block_width, int block_height, int block_depth,
     size_t x_surf_size, size_t y_surf_size, size_t z_surf_size,
     cudaStream_t comm_stream, cudaStream_t d2h_stream, cudaEvent_t pack_events[],
-    bool use_channel);
+    bool use_channel, bool host_staging);
 extern void packGhostsFusedDevice(DataType* temperature, DataType* left_ghost,
     DataType* right_ghost, DataType* top_ghost, DataType* bottom_ghost,
     DataType* front_ghost, DataType* back_ghost, bool left_bound, bool right_bound,
@@ -77,7 +78,7 @@ extern void packGhostsFusedDevice(DataType* temperature, DataType* left_ghost,
 extern void unpackGhostDevice(DataType* temperature, DataType* d_ghost, DataType* h_ghost,
     int dir, int block_width, int block_height, int block_depth, size_t ghost_size,
     cudaStream_t comm_stream, cudaStream_t h2d_stream, cudaEvent_t unpack_events[],
-    bool use_channel);
+    bool use_channel, bool host_staging);
 extern void unpackGhostsFusedDevice(DataType* temperature, DataType* left_ghost,
     DataType* right_ghost, DataType* top_ghost, DataType* bottom_ghost,
     DataType* front_ghost, DataType* back_ghost, bool left_bound, bool right_bound,
@@ -126,6 +127,7 @@ public:
     n_iters = 100;
     warmup_iters = 10;
     use_channel = false;
+    host_staging = false;
     manual_overlap = false;
     fuse_val = 0;
     fuse_pack = false;
@@ -138,7 +140,7 @@ public:
     // Process arguments
     int c;
     bool dims[3] = {false, false, false};
-    while ((c = getopt(m->argc, m->argv, "c:x:y:z:i:w:dmf:gp")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "c:x:y:z:i:w:domf:gp")) != -1) {
       switch (c) {
         case 'c':
           num_chares = atoi(optarg);
@@ -163,6 +165,9 @@ public:
           break;
         case 'd':
           use_channel = true;
+          break;
+        case 'o':
+          host_staging = true;
           break;
         case 'm':
           manual_overlap = true;
@@ -189,8 +194,8 @@ public:
           CkPrintf(
               "Usage: %s -x [grid width] -y [grid height] -z [grid depth] "
               "-c [number of chares] -i [iterations] -w [warmup iterations] "
-              "-d [use Channel API] -m [use manual overlap] -f [fusion value] "
-              "-g [use CUDA Graph] -p (print blocks)\n", m->argv[0]);
+              "-d [use Channel API] -o [use host staging] -m [use manual overlap]"
+              "-f [fusion value] -g [use CUDA Graphs] -p (print blocks)\n", m->argv[0]);
           CkExit();
       }
     }
@@ -202,9 +207,15 @@ public:
       CkExit(-1);
     }
 
-    // CUDA Graph can only be used with the Channel API
+    // CUDA Graphs can only be used with the Channel API
     if (use_cuda_graph && !use_channel) {
-      CkPrintf("ERROR: CUDA Graph can only be used with the Channel API\n");
+      CkPrintf("ERROR: CUDA Graphs can only be used with the Channel API\n");
+      CkExit(-1);
+    }
+
+    // Kernel fusion or CUDA Graphs cannot be used with host-staging Channel API
+    if (use_channel && host_staging && (fuse_val != 0 || use_cuda_graph)) {
+      CkPrintf("ERROR: Host-staging Channel API cannot be used with kernel fusion or CUDA Graphs\n");
       CkExit(-1);
     }
 
@@ -265,11 +276,11 @@ public:
     // Print configuration
     CkPrintf("\n[CUDA 3D Jacobi example]\n");
     CkPrintf("Grid: %d x %d x %d, Block: %d x %d x %d, Chares: %d x %d x %d, "
-        "Iterations: %d, Warm-up: %d, Channel API: %d, Manual overlap: %d, "
-        "Fusion: %d, CUDA Graphs: %d, Print: %d\n\n",
+        "Iterations: %d, Warm-up: %d, Channel API: %d, Host-staging: %d, "
+        "Manual overlap: %d, Fusion: %d, CUDA Graphs: %d, Print: %d\n\n",
         grid_width, grid_height, grid_depth, block_width, block_height, block_depth,
         n_chares_x, n_chares_y, n_chares_z, n_iters, warmup_iters, use_channel,
-        manual_overlap, fuse_val, use_cuda_graph, print_elements);
+        host_staging, manual_overlap, fuse_val, use_cuda_graph, print_elements);
 
     // Create blocks and start iteration
     block_proxy = CProxy_Block::ckNew(n_chares_x, n_chares_y, n_chares_z);
@@ -334,7 +345,8 @@ class Block : public CBase_Block {
   DataType* d_temperature;
   DataType* d_new_temperature;
 
-  DataType* h_ghosts[DIR_COUNT];
+  DataType* h_send_ghosts[DIR_COUNT];
+  DataType* h_recv_ghosts[DIR_COUNT];
   DataType** d_send_ghosts;
   DataType** d_recv_ghosts;
   size_t ghost_sizes[DIR_COUNT];
@@ -381,7 +393,8 @@ class Block : public CBase_Block {
     hapiCheck(cudaFree(d_temperature));
     hapiCheck(cudaFree(d_new_temperature));
     for (int i = 0; i < DIR_COUNT; i++) {
-      hapiCheck(cudaFreeHost(h_ghosts[i]));
+      hapiCheck(cudaFreeHost(h_send_ghosts[i]));
+      hapiCheck(cudaFreeHost(h_recv_ghosts[i]));
       hapiCheck(cudaFree(d_send_ghosts[i]));
       hapiCheck(cudaFree(d_recv_ghosts[i]));
     }
@@ -458,7 +471,8 @@ class Block : public CBase_Block {
     hapiCheck(cudaMallocHost((void**)&d_send_ghosts, sizeof(DataType*) * DIR_COUNT));
     hapiCheck(cudaMallocHost((void**)&d_recv_ghosts, sizeof(DataType*) * DIR_COUNT));
     for (int i = 0; i < DIR_COUNT; i++) {
-      hapiCheck(cudaMallocHost((void**)&h_ghosts[i], ghost_sizes[i]));
+      hapiCheck(cudaMallocHost((void**)&h_send_ghosts[i], ghost_sizes[i]));
+      hapiCheck(cudaMallocHost((void**)&h_recv_ghosts[i], ghost_sizes[i]));
       hapiCheck(cudaMalloc((void**)&d_send_ghosts[i], ghost_sizes[i]));
       hapiCheck(cudaMalloc((void**)&d_recv_ghosts[i], ghost_sizes[i]));
     }
@@ -600,7 +614,7 @@ class Block : public CBase_Block {
           if (!bounds[dir]) {
             unpackGhostDevice(d_temp, d_recv_ghosts[dir], nullptr, dir,
                 block_width, block_height, block_depth, ghost_sizes[dir],
-                comm_stream, h2d_stream, unpack_events, use_channel);
+                comm_stream, h2d_stream, unpack_events, use_channel, host_staging);
             /*
             cudaKernelNodeParams u_params = {0};
             setUnpackNode(u_params, d_temperature, d_recv_ghosts[dir], dir,
@@ -663,9 +677,9 @@ class Block : public CBase_Block {
         new_dep->push_back(fuse_pack_node);
         */
       } else if (!fuse_update_pack) {
-        packGhostsDevice(d_new_temp, d_send_ghosts, h_ghosts, bounds,
+        packGhostsDevice(d_new_temp, d_send_ghosts, h_send_ghosts, bounds,
             block_width, block_height, block_depth, x_surf_size, y_surf_size, z_surf_size,
-            comm_stream, d2h_stream, pack_events, use_channel);
+            comm_stream, d2h_stream, pack_events, use_channel, host_staging);
         /*
         for (int dir = 0; dir < DIR_COUNT; dir++) {
           if (!bounds[dir]) {
@@ -729,9 +743,9 @@ class Block : public CBase_Block {
         } else if (!fuse_update_pack) {
           // Pack non-contiguous ghosts to temporary contiguous buffers on the device
           // and transfer each from device to host
-          packGhostsDevice(d_new_temperature, d_send_ghosts, h_ghosts, bounds,
+          packGhostsDevice(d_new_temperature, d_send_ghosts, h_send_ghosts, bounds,
               block_width, block_height, block_depth, x_surf_size, y_surf_size, z_surf_size,
-              comm_stream, d2h_stream, pack_events, use_channel);
+              comm_stream, d2h_stream, pack_events, use_channel, host_staging);
         }
       }
 
@@ -743,7 +757,7 @@ class Block : public CBase_Block {
 
       // Add asynchronous callback to be invoked when packing kernels and
       // ghost transfers are complete
-      if (use_channel) {
+      if (use_channel && !host_staging) {
         if (fuse_update_pack || fuse_update_all) {
 #if CUDA_SYNC
           cudaStreamSynchronize(compute_stream);
@@ -802,29 +816,30 @@ class Block : public CBase_Block {
       // Send ghosts
       for (int dir = 0; dir < DIR_COUNT; dir++) {
         if (!bounds[dir]) {
-          channels[dir].send(d_send_ghosts[dir], ghost_sizes[dir], true,
-              channel_cb, new CallbackMsg(false, dir));
+          DataType* buffer = host_staging ? h_send_ghosts[dir] : d_send_ghosts[dir];
+          channels[dir].send(buffer, ghost_sizes[dir], true, channel_cb,
+              new CallbackMsg(false, dir));
         }
       }
     } else {
       if (!bounds[LEFT])
         thisProxy(x-1, y, z).recvGhostReg(my_iter, RIGHT,
-            x_surf_count, h_ghosts[LEFT]);
+            x_surf_count, h_send_ghosts[LEFT]);
       if (!bounds[RIGHT])
         thisProxy(x+1, y, z).recvGhostReg(my_iter, LEFT,
-            x_surf_count, h_ghosts[RIGHT]);
+            x_surf_count, h_send_ghosts[RIGHT]);
       if (!bounds[TOP])
         thisProxy(x, y-1, z).recvGhostReg(my_iter, BOTTOM,
-            y_surf_count, h_ghosts[TOP]);
+            y_surf_count, h_send_ghosts[TOP]);
       if (!bounds[BOTTOM])
         thisProxy(x, y+1, z).recvGhostReg(my_iter, TOP,
-            y_surf_count, h_ghosts[BOTTOM]);
+            y_surf_count, h_send_ghosts[BOTTOM]);
       if (!bounds[FRONT])
         thisProxy(x, y, z-1).recvGhostReg(my_iter, BACK,
-            z_surf_count, h_ghosts[FRONT]);
+            z_surf_count, h_send_ghosts[FRONT]);
       if (!bounds[BACK])
         thisProxy(x, y, z+1).recvGhostReg(my_iter, FRONT,
-            z_surf_count, h_ghosts[BACK]);
+            z_surf_count, h_send_ghosts[BACK]);
     }
 
 #if USE_TIMER
@@ -843,8 +858,9 @@ class Block : public CBase_Block {
     // Receive ghosts
     for (int dir = 0; dir < DIR_COUNT; dir++) {
       if (!bounds[dir]) {
-        channels[dir].recv(d_recv_ghosts[dir], ghost_sizes[dir], true,
-            channel_cb, new CallbackMsg(true, dir));
+        DataType* buffer = host_staging ? h_recv_ghosts[dir] : d_recv_ghosts[dir];
+        channels[dir].recv(buffer, ghost_sizes[dir], true, channel_cb,
+            new CallbackMsg(true, dir));
       }
     }
 
@@ -871,9 +887,9 @@ class Block : public CBase_Block {
 
 #if !COMM_ONLY
     // Unpack received ghost
-    unpackGhostDevice(d_temperature, d_recv_ghosts[dir], nullptr, dir,
+    unpackGhostDevice(d_temperature, d_recv_ghosts[dir], h_recv_ghosts[dir], dir,
         block_width, block_height, block_depth, ghost_sizes[dir],
-        comm_stream, h2d_stream, unpack_events, use_channel);
+        comm_stream, h2d_stream, unpack_events, use_channel, host_staging);
 #endif
   }
 
@@ -883,13 +899,13 @@ class Block : public CBase_Block {
 #endif
 
     CkAssert(dir >= 0 && dir < DIR_COUNT);
-    DataType* h_ghost = h_ghosts[dir];
+    DataType* h_recv_ghost = h_recv_ghosts[dir];
 
     size_t ghost_size = count * sizeof(DataType);
-    memcpy(h_ghost, gh, ghost_size);
-    unpackGhostDevice(d_temperature, d_recv_ghosts[dir], h_ghost, dir,
+    memcpy(h_recv_ghost, gh, ghost_size);
+    unpackGhostDevice(d_temperature, d_recv_ghosts[dir], h_recv_ghost, dir,
         block_width, block_height, block_depth, ghost_size,
-        comm_stream, h2d_stream, unpack_events, use_channel);
+        comm_stream, h2d_stream, unpack_events, use_channel, host_staging);
   }
 
   void processGhostsFused() {

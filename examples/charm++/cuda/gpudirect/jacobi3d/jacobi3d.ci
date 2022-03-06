@@ -22,6 +22,7 @@ mainmodule jacobi3d {
   readonly int n_iters;
   readonly int warmup_iters;
   readonly bool use_channel;
+  readonly bool host_staging;
   readonly bool manual_overlap;
   readonly bool fuse_pack;
   readonly bool fuse_unpack;

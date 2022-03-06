@@ -834,14 +834,14 @@ void packGhostsDevice(DataType* temperature,
     int block_width, int block_height, int block_depth,
     size_t x_surf_size, size_t y_surf_size, size_t z_surf_size,
     cudaStream_t comm_stream, cudaStream_t d2h_stream, cudaEvent_t pack_events[],
-    bool use_channel) {
+    bool use_channel, bool host_staging) {
   dim3 block_dim(TILE_SIZE_2D, TILE_SIZE_2D);
   if (!bounds[LEFT]) {
     dim3 grid_dim((block_height+(block_dim.x-1))/block_dim.x,
         (block_depth+(block_dim.y-1))/block_dim.y);
     leftPackingKernel<<<grid_dim, block_dim, 0, comm_stream>>>(temperature,
         d_ghosts[LEFT], block_width, block_height, block_depth);
-    if (!use_channel) {
+    if (host_staging || !use_channel) {
       cudaEventRecord(pack_events[LEFT], comm_stream);
       cudaStreamWaitEvent(d2h_stream, pack_events[LEFT], 0);
       cudaMemcpyAsync(h_ghosts[LEFT], d_ghosts[LEFT], x_surf_size,
@@ -853,7 +853,7 @@ void packGhostsDevice(DataType* temperature,
         (block_depth+(block_dim.y-1))/block_dim.y);
     rightPackingKernel<<<grid_dim, block_dim, 0, comm_stream>>>(temperature,
         d_ghosts[RIGHT], block_width, block_height, block_depth);
-    if (!use_channel) {
+    if (host_staging || !use_channel) {
       cudaEventRecord(pack_events[RIGHT], comm_stream);
       cudaStreamWaitEvent(d2h_stream, pack_events[RIGHT], 0);
       cudaMemcpyAsync(h_ghosts[RIGHT], d_ghosts[RIGHT], x_surf_size,
@@ -865,7 +865,7 @@ void packGhostsDevice(DataType* temperature,
         (block_depth+(block_dim.y-1))/block_dim.y);
     topPackingKernel<<<grid_dim, block_dim, 0, comm_stream>>>(temperature,
         d_ghosts[TOP], block_width, block_height, block_depth);
-    if (!use_channel) {
+    if (host_staging || !use_channel) {
       cudaEventRecord(pack_events[TOP], comm_stream);
       cudaStreamWaitEvent(d2h_stream, pack_events[TOP], 0);
       cudaMemcpyAsync(h_ghosts[TOP], d_ghosts[TOP], y_surf_size,
@@ -877,7 +877,7 @@ void packGhostsDevice(DataType* temperature,
         (block_depth+(block_dim.y-1))/block_dim.y);
     bottomPackingKernel<<<grid_dim, block_dim, 0, comm_stream>>>(temperature,
         d_ghosts[BOTTOM], block_width, block_height, block_depth);
-    if (!use_channel) {
+    if (host_staging || !use_channel) {
       cudaEventRecord(pack_events[BOTTOM], comm_stream);
       cudaStreamWaitEvent(d2h_stream, pack_events[BOTTOM], 0);
       cudaMemcpyAsync(h_ghosts[BOTTOM], d_ghosts[BOTTOM], y_surf_size,
@@ -889,7 +889,7 @@ void packGhostsDevice(DataType* temperature,
         (block_height+(block_dim.y-1))/block_dim.y);
     frontPackingKernel<<<grid_dim, block_dim, 0, comm_stream>>>(temperature,
         d_ghosts[FRONT], block_width, block_height, block_depth);
-    if (!use_channel) {
+    if (host_staging || !use_channel) {
       cudaEventRecord(pack_events[FRONT], comm_stream);
       cudaStreamWaitEvent(d2h_stream, pack_events[FRONT], 0);
       cudaMemcpyAsync(h_ghosts[FRONT], d_ghosts[FRONT], z_surf_size,
@@ -901,7 +901,7 @@ void packGhostsDevice(DataType* temperature,
         (block_height+(block_dim.y-1))/block_dim.y);
     backPackingKernel<<<grid_dim, block_dim, 0, comm_stream>>>(temperature,
         d_ghosts[BACK], block_width, block_height, block_depth);
-    if (!use_channel) {
+    if (host_staging || !use_channel) {
       cudaEventRecord(pack_events[BACK], comm_stream);
       cudaStreamWaitEvent(d2h_stream, pack_events[BACK], 0);
       cudaMemcpyAsync(h_ghosts[BACK], d_ghosts[BACK], z_surf_size,
@@ -939,8 +939,8 @@ void packGhostsFusedDevice(DataType* temperature, DataType* left_ghost,
 void unpackGhostDevice(DataType* temperature, DataType* d_ghost, DataType* h_ghost,
     int dir, int block_width, int block_height, int block_depth, size_t ghost_size,
     cudaStream_t comm_stream, cudaStream_t h2d_stream, cudaEvent_t unpack_events[],
-    bool use_channel) {
-  if (!use_channel) {
+    bool use_channel, bool host_staging) {
+  if (host_staging || !use_channel) {
     cudaMemcpyAsync(d_ghost, h_ghost, ghost_size, cudaMemcpyHostToDevice,
         h2d_stream);
     cudaEventRecord(unpack_events[dir], h2d_stream);
