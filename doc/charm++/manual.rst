@@ -12196,7 +12196,8 @@ The remaining options cover details of process launch and connectivity:
 
    In this case, ``set_env_script`` is invoked on each node. **Note:** When this
    is provided, ``charmrun`` will not invoke the program directly, instead only
-   invoking the script; thus, ``set_env_script`` should generally end with ``$*``
+   invoking the script with the program parameters passed as script arguments; 
+   thus, ``set_env_script`` should generally end with ``$*``
    to actually start the program.
 
 ``++xterm``
