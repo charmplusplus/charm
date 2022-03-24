@@ -80,7 +80,7 @@ void CollideBoxesPrio(CollideHandle h,int chunkNo,
     int nBox,const bbox3d *boxes,const int *prio)
 {
   CProxy_collideMgr mgr(h);
-  mgr.ckLocalBranch()->contribute(chunkNo,nBox,boxes,prio);
+  mgr.ckLocalBranch()->addBoxes(chunkNo,nBox,boxes,prio);
 }
 
 /******************** objListMsg **********************/
@@ -305,85 +305,6 @@ void CollisionAggregator::compact(void)
   voxels.empty();
 }
 
-/********************* syncReductionMgr ******************/
-syncReductionMgr::syncReductionMgr()
-  :thisproxy(thisgroup)
-{
-  stepCount=-1;
-  stepFinished=true;
-  localFinished=false;
-
-  //Set up the reduction tree
-  onPE=CkMyPe();
-  if (onPE==0) treeParent=-1;
-  else treeParent=(onPE-1)/TREE_WID;
-  treeChildStart=(onPE*TREE_WID)+1;
-  treeChildEnd=treeChildStart+TREE_WID;
-  if (treeChildStart>CkNumPes()) treeChildStart=CkNumPes();
-  if (treeChildEnd>CkNumPes()) treeChildEnd=CkNumPes();
-  nChildren=treeChildEnd-treeChildStart;
-}
-void syncReductionMgr::startStep(int stepNo,bool withProd)
-{
-  SRM_STATUS("syncReductionMgr::startStep");
-  if (stepNo<1+stepCount) return;//Already started
-  if (stepNo>1+stepCount) CkAbort("Tried to start SRMgr step from future\n");
-  stepCount++;
-  stepFinished=false;
-  localFinished=false;
-  childrenCount=0;
-  if (nChildren>0)
-    for (int i=0;i<TREE_WID;i++)
-      if (treeChildStart+i<CkNumPes())
-        thisproxy[treeChildStart+i].childProd(stepCount);
-  if (withProd)
-    pleaseAdvance();//Advise subclass to advance
-}
-
-void syncReductionMgr::advance(void)
-{
-  SRM_STATUS("syncReductionMgr::advance");
-  if (stepFinished) startStep(stepCount+1,false);
-  localFinished=true;
-  tryFinish();
-}
-
-void syncReductionMgr::pleaseAdvance(void)
-{ /*Child advisory only*/ }
-
-//This is called on PE 0 once the reduction is finished
-void syncReductionMgr::reductionFinished(void)
-{ /*Child use only */ }
-
-void syncReductionMgr::tryFinish(void) //Try to finish reduction
-{
-  SRM_STATUS("syncReductionMgr::tryFinish");
-  if (localFinished && (!stepFinished) && childrenCount==nChildren)
-  {
-    stepFinished=true;
-    if (treeParent!=-1)
-      thisproxy[treeParent].childDone(stepCount);
-    else
-      reductionFinished();
-  }
-}
-//Called by parent-- will you contribute?
-void syncReductionMgr::childProd(int stepCount)
-{
-  SRM_STATUS("syncReductionMgr::childProd");
-  if (stepFinished) startStep(stepCount,true);
-  tryFinish();
-}
-//Called by tree children-- me and my children are finished
-void syncReductionMgr::childDone(int stepCount)
-{
-  SRM_STATUS("syncReductionMgr::childDone");
-  if (stepFinished) startStep(stepCount,true);
-  childrenCount++;
-  tryFinish();
-}
-
-
 /*********************** collideMgr ***********************/
 //Extract the (signed) low 23 bits of src--
 // this is the IEEE floating-point mantissa used as a grid index
@@ -432,11 +353,10 @@ void collideMgr::unregisterContributor(int chunkNo)
 }
 
 //Clients call this to contribute their triangle lists
-void collideMgr::contribute(int chunkNo,
-    int n,const bbox3d *boxes,const int *prio)
+void collideMgr::addBoxes(int chunkNo, int n, const bbox3d* boxes, const int* prio)
 {
   //printf("[%d] Receiving contribution from %d\n",CkMyPe(), chunkNo);
-  CM_STATUS("collideMgr::contribute "<<n<<" boxes from "<<chunkNo);
+  CM_STATUS("collideMgr::addBoxes "<<n<<" boxes from "<<chunkNo);
   aggregator.aggregate(CkMyPe(),chunkNo,n,boxes,prio);
   aggregator.send(); //Deliver all outgoing messages
   if (++contribCount==nContrib) { //That's everybody
@@ -494,10 +414,10 @@ void collideMgr::tryAdvance(void)
   CM_STATUS("tryAdvance: "<<nContrib-contribCount<<" contrib, "<<msgsSent-msgsRecvd<<" msg")
     if ((contribCount==nContrib) && (msgsSent==msgsRecvd)) {
       CM_STATUS("advancing");
-      advance();
       steps++;
       contribCount=0;
       msgsSent=msgsRecvd=0;
+      contribute(CkCallback(CkReductionTarget(collideMgr,reductionFinished), thisProxy[0]));
     }
 }
 

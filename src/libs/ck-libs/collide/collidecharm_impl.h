@@ -87,51 +87,6 @@ class CollisionAggregator {
   void compact(void);
 };
 
-/********************* syncReductionMgr *****************
-  A group to synchronize on some event across the machine.
-  Maintains a reduction tree and waits for the "advance"
-  method to be called from each processor.  To handle
-  non-autonomous cases, calls "pleaseAdvance" when an advance
-  is first expected from that PE.
-  */
-class syncReductionMgr : public CBase_syncReductionMgr
-{
-  CProxy_syncReductionMgr thisproxy;
-  void status(const char *msg) {
-    CkPrintf("SRMgr pe %d> %s\n",CkMyPe(),msg);
-  }
-  //Describes the reduction tree
-  int onPE;
-  enum {TREE_WID=4};
-  int treeParent;//Parent in reduction tree
-  int treeChildStart,treeChildEnd;//First and last+1 child
-  int nChildren;//Number of children in the reduction tree
-  void startStep(int stepNo,bool withProd);
-
-  //State data
-  int stepCount;//Increments by one every reduction, from zero
-  bool stepFinished;//prior step complete
-  bool localFinished;//Local advance called
-  int childrenCount;//Number of tree children in delivered state
-  void tryFinish(void);//Try to finish reduction
-
-  protected:
-  //This is called by subclasses
-  void advance(void);
-  //This is offered for subclasses's optional use
-  virtual void pleaseAdvance(void);
-  //This is called on PE 0 once the reduction is finished
-  virtual void reductionFinished(void);
-  public:
-  int getStepCount(void) const {return stepCount;}
-  syncReductionMgr();
-
-  //Called by parent-- will you contribute?
-  void childProd(int stepCount);
-  //Called by tree children-- me and my children are finished
-  void childDone(int stepCount);
-};
-
 /*********************** collideMgr **********************
   A group that synchronizes the Collision detection process.
   A single Collision operation consists of:
@@ -172,8 +127,6 @@ class collideMgr : public CBase_collideMgr
   protected:
   //Check if we're barren-- if so, advance now
   virtual void pleaseAdvance(void);
-  //This is called on PE 0 once the voxel send reduction is finished
-  virtual void reductionFinished(void);
   public:
   collideMgr(const CollideGrid3d &gridMap,
       const CProxy_collideClient &client,
@@ -184,8 +137,7 @@ class collideMgr : public CBase_collideMgr
   void unregisterContributor(int chunkNo);
 
   //Clients call this to contribute their objects
-  void contribute(int chunkNo,
-      int n,const bbox3d *boxes,const int *prio);
+  void addBoxes(int chunkNo, int n, const bbox3d* boxes, const int* prio);
 
   //voxelAggregators deliver messages to voxels via this bottleneck
   void sendVoxelMessage(const CollideLoc3d &dest,
@@ -198,6 +150,9 @@ class collideMgr : public CBase_collideMgr
 
   void checkRegistrationComplete();
   void determineNumVoxels(void);
+
+  //This is called on PE 0 once the voxel send reduction is finished
+  void reductionFinished(void);
 };
 
 /********************** collideVoxel ********************

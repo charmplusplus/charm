@@ -11,19 +11,15 @@ module collidecharm {
 
   group distributedCollideClient : collideClient {
     entry distributedCollideClient(CkCallback clientCb_);
-  }
-
-  group syncReductionMgr {
-    entry syncReductionMgr();
-    entry void childProd(int stepCount);
-    entry void childDone(int stepCount);
   };
-  group collideMgr : syncReductionMgr {
+
+  group collideMgr {
     entry collideMgr(CollideGrid3d gridMap,
         CProxy_collideClient client,
         CkArrayID cells);
     entry void voxelMessageRecvd(void);
     entry void determineNumVoxels();
+    entry [reductiontarget] void reductionFinished();
   };
 
   array [3D] collideVoxel {
