@@ -59,6 +59,7 @@ extern int quietModeRequested;
 static void lbinit()
 {
   LBRegisterBalancer<ZoltanLB>("ZoltanLB", "Use Zoltan(tm) to partition object graph");
+  LBTurnCommOn();
 }
 
 ZoltanLB::ZoltanLB(const CkLBOptions &opt): CBase_ZoltanLB(opt)

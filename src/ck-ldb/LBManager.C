@@ -397,9 +397,10 @@ void _loadbalancerInit()
   _lb_args.statsOn() =
       !CmiGetArgFlagDesc(argv, "+LBOff", "Turn load balancer instrumentation off");
 
-  // turn instrumentation of communicatin off at startup
-  _lb_args.traceComm() = !CmiGetArgFlagDesc(
-      argv, "+LBCommOff", "Turn load balancer instrumentation of communication off");
+  // turn instrumentation of communicatin on at startup
+  if(!_lb_args.traceComm())
+    _lb_args.traceComm() = CmiGetArgFlagDesc(
+      argv, "+LBCommOn", "Turn load balancer instrumentation of communication on");
 
   // set alpha and beta
   _lb_args.alpha() = PER_MESSAGE_SEND_OVERHEAD_DEFAULT;
@@ -484,7 +485,7 @@ void LBManager::initnodeFn()
   _registerCommandLineOpt("+LBSameCpus");
   _registerCommandLineOpt("+LBUseCpuTime");
   _registerCommandLineOpt("+LBOff");
-  _registerCommandLineOpt("+LBCommOff");
+  _registerCommandLineOpt("+LBCommOn");
   _registerCommandLineOpt("+MetaLB");
   _registerCommandLineOpt("+LBAlpha");
   _registerCommandLineOpt("+LBBeta");
@@ -1095,6 +1096,7 @@ void LBTurnCommOn()
 {
 #if CMK_LBDB_ON
   _lb_args.traceComm() = 1;
+  CkPrintf("CharmLB> Setting LB communication instrumentation to on.\n");
 #endif
 }
 
