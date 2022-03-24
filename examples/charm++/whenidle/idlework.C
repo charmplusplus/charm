@@ -15,7 +15,7 @@ void Test::registerIdleWork() {
     CkCallWhenIdle(CkIndex_Test::idleProgress(0), this);
 }
 
-bool Test::idleProgress(double time) {
+bool Test::idleProgress() {
     static bool calledBefore = false; 
     CkPrintf("[TEST] Idle Work Called, CalledBefore=%d.\n", (int)calledBefore);
     calledBefore = !calledBefore;

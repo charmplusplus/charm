@@ -45,8 +45,8 @@
 /* readonly */ extern CProxy_TraceUtilizationBOC traceUtilizationGroupProxy;
 
 // This function has unused arguments to match the type of
-// CcdVoidFn, which CcdCallOnConditionKeep takes
-void collectUtilizationData(void *, double);
+// CcdCondFn, which CcdCallOnConditionKeep takes
+void collectUtilizationData(void *);
 
 
 
