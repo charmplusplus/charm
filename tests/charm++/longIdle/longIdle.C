@@ -98,25 +98,25 @@ class testGroup : public CBase_testGroup {
   void testLongIdle1(int testId_) {
     testId = testId_;
     // Test one time call
-    idx = CcdCallOnCondition(CcdPROCESSOR_LONG_IDLE, (CcdVoidFn) longIdleUserFn, NULL);
+    idx = CcdCallOnCondition(CcdPROCESSOR_LONG_IDLE, (CcdCondFn) longIdleUserFn, NULL);
   }
 
   void testLongIdle2(int testId_) {
     testId = testId_;
     // Test one time call
-    idx = CcdCallOnConditionOnPE(CcdPROCESSOR_LONG_IDLE, (CcdVoidFn) longIdleUserFn, NULL, CkMyPe());
+    idx = CcdCallOnConditionOnPE(CcdPROCESSOR_LONG_IDLE, (CcdCondFn) longIdleUserFn, NULL, CkMyPe());
   }
 
   void testLongIdle3(int testId_) {
     testId = testId_;
     // Test persistent call
-    idx = CcdCallOnConditionKeep(CcdPROCESSOR_LONG_IDLE, (CcdVoidFn) longIdleUserFn, NULL);
+    idx = CcdCallOnConditionKeep(CcdPROCESSOR_LONG_IDLE, (CcdCondFn) longIdleUserFn, NULL);
   }
 
   void testLongIdle4(int testId_) {
     testId = testId_;
     // Test persistent call
-    idx = CcdCallOnConditionKeepOnPE(CcdPROCESSOR_LONG_IDLE, (CcdVoidFn) longIdleUserFn, NULL, CkMyPe());
+    idx = CcdCallOnConditionKeepOnPE(CcdPROCESSOR_LONG_IDLE, (CcdCondFn) longIdleUserFn, NULL, CkMyPe());
   }
 
   void reduceToCompletion() {

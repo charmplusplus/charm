@@ -856,7 +856,7 @@ void PerrorExit (const char *err) {
     exit (-1);
 }
 
-static void CmiNotifyIdleCcd(void *ignored1, double ignored2)
+static void CmiNotifyIdleCcd(void *ignored)
 {
     CmiNotifyIdle();
 }

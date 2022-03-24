@@ -130,9 +130,9 @@ void Entry::check() {
         first_line_);
     }
 
-    if (!param || param->next || strcmp(param->param->getType()->getBaseName(), "double")) {
+    if (param && !param->isVoid()) {
       XLAT_ERROR_NOCOL(
-        "whenidle functions must accept a single parameter of type 'double'",
+        "whenidle functions must be void of parameters",
         first_line_);
     }
   }
