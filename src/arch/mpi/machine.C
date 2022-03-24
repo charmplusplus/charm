@@ -1384,7 +1384,6 @@ extern int quietMode;
  */
 void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     int n,i;
-    int ver, subver;
     int provided;
     int thread_level;
     int myNID;
@@ -1443,11 +1442,14 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
 
     myNID = *myNodeID;
 
-    MPI_Get_version(&ver, &subver);
     if(!CharmLibInterOperate) {
       if ((myNID == 0) && (!quietMode)) {
-        printf("Charm++> Running on MPI version: %d.%d\n", ver, subver);
-        printf("Charm++> level of thread support used: %s (desired: %s)\n", thread_level_tostring(_thread_provided), thread_level_tostring(thread_level));
+        int ver, subver, libver_len;
+        char libver[MPI_MAX_LIBRARY_VERSION_STRING];
+        MPI_Get_version(&ver, &subver);
+        MPI_Get_library_version(libver, &libver_len);
+        printf("Charm++> Running on MPI library: %s (MPI standard: %d.%d)\n", libver, ver, subver);
+        printf("Charm++> Level of thread support used: %s (desired: %s)\n", thread_level_tostring(_thread_provided), thread_level_tostring(thread_level));
       }
     }
 
