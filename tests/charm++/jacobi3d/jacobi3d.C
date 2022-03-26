@@ -30,6 +30,7 @@
 #define CKP_FREQ    100
 #define MAX_ITER    500
 #define PRINT_FREQ  10
+#define OVERHEAD 1024
 
 /*readonly*/ CProxy_Main mainProxy;
 /*readonly*/ int arrayDimX;
@@ -47,6 +48,8 @@
 /*readonly*/ int globalBarrier;
 /*readonly*/ int maxIter;
 /*readonly*/ int ckptFreq;
+
+/*readonly*/ int overhead;
 
 static unsigned long next = 1;
 
@@ -84,6 +87,7 @@ class ghostMsg: public CMessage_ghostMsg {
     int height;
     int width;
     double* gh;
+    char *temp;
 
     ghostMsg(int _d, int _h, int _w) : dir(_d), height(_h), width(_w) {
     }
@@ -99,14 +103,15 @@ class Main : public CBase_Main {
 	std::vector<std::pair<double,int> > times;
 
     Main(CkArgMsg* m) {
-      if ( (m->argc != 3) && (m->argc != 7) && (m->argc != 5) && (m->argc != 9) ) {
+      if ( (m->argc != 3) && (m->argc != 7) && (m->argc != 5) && (m->argc != 9) && (m->argc != 10) ) {
         CkPrintf("%s [array_size] [block_size]\n", m->argv[0]);
-        CkPrintf("OR %s [array_size_X] [array_size_Y] [array_size_Z] [block_size_X] [block_size_Y] [block_size_Z]\n", m->argv[0]);
+        CkPrintf("OR %s [array_size_X] [array_size_Y] [array_size_Z] [block_size_X] [block_size_Y] [block_size_Z] [msg_overhead]\n", m->argv[0]);
         CkAbort("Abort");
       }
 
       // set iteration counter to zero
       iterations = 0;
+      overhead = OVERHEAD;
 
       // store the main proxy
 	mainProxy = thisProxy;
@@ -137,7 +142,17 @@ class Main : public CBase_Main {
 		blockDimZ = atoi(m->argv[6]);
 		maxIter = atoi(m->argv[7]);
 		ckptFreq = atoi(m->argv[8]);
-	}
+	} else if (m->argc == 10) {
+                arrayDimX = atoi(m->argv[1]);
+                arrayDimY = atoi(m->argv[2]);
+                arrayDimZ = atoi(m->argv[3]);
+                blockDimX = atoi(m->argv[4]);
+                blockDimY = atoi(m->argv[5]);
+                blockDimZ = atoi(m->argv[6]);
+                maxIter = atoi(m->argv[7]);
+                ckptFreq = atoi(m->argv[8]);
+                overhead = atoi(m->argv[9]);
+        }
 
       if (arrayDimX < blockDimX || arrayDimX % blockDimX != 0)
         CkAbort("array_size_X %% block_size_X != 0!");
@@ -217,6 +232,9 @@ class Jacobi: public CBase_Jacobi {
     double *temperature;
     double *new_temperature;
 
+    int msg_overhead;
+    char* temp;
+
     // Constructor, initialize values
     Jacobi() {
 
@@ -238,8 +256,9 @@ class Jacobi: public CBase_Jacobi {
 		iterations = 0;
       	imsg = 0;
       	constrainBC();
-
-		usesAtSync = true;
+        msg_overhead = overhead;
+        temp = new char[overhead];
+        usesAtSync = true;
     }
 
     Jacobi(CkMigrateMessage* m): CBase_Jacobi(m) {}
@@ -256,16 +275,18 @@ class Jacobi: public CBase_Jacobi {
 		// pupping properties of this class
 		p | iterations;
 		p | imsg;
+                p | msg_overhead;
 
 		// if unpacking, allocate the memory space
 		if(p.isUnpacking()){
 			temperature = new double[(blockDimX+2) * (blockDimY+2) * (blockDimZ+2)];
 			new_temperature = new double[(blockDimX+2) * (blockDimY+2) * (blockDimZ+2)];
-	
+                        temp = new char[msg_overhead];
 		}
 
 		// pupping the arrays
 		p((char *)temperature, (blockDimX+2) * (blockDimY+2) * (blockDimZ+2) * sizeof(double));
+                p((char *)temp, msg_overhead);
 		//p((char *) new_temperature, (blockDimX+2) * (blockDimY+2) * (blockDimZ+2) * sizeof(double));
 	}
 
