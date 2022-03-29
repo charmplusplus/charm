@@ -397,10 +397,15 @@ void _loadbalancerInit()
   _lb_args.statsOn() =
       !CmiGetArgFlagDesc(argv, "+LBOff", "Turn load balancer instrumentation off");
 
-  // turn instrumentation of communicatin on at startup
-  if(!_lb_args.traceComm())
-    _lb_args.traceComm() = CmiGetArgFlagDesc(
-      argv, "+LBCommOn", "Turn load balancer instrumentation of communication on");
+  // turn instrumentation of communication on at startup
+  _lb_args.traceComm() = CmiGetArgFlagDesc(
+    argv, "+LBCommOn", "Turn load balancer instrumentation of communication on");
+
+  // +LBCommOff is deprecated as instrumentation of communication is off by default
+  bool lbcommOff = CmiGetArgFlagDesc(
+      argv, "+LBCommOff", "(No-op) Turn load balancer instrumentation of communication off");
+  if(CkMyPe()==0 && lbcommOff)
+    CmiPrintf("Warning: Ignoring the deprecated +LBCommOff option as communication is off by default.\n");
 
   // set alpha and beta
   _lb_args.alpha() = PER_MESSAGE_SEND_OVERHEAD_DEFAULT;
@@ -434,8 +439,6 @@ void _loadbalancerInit()
           LBSimulation::dumpFile, _lb_args.lbversion());
     if (_lb_args.statsOn() == 0)
       CkPrintf("CharmLB> Load balancing instrumentation is off.\n");
-    if (_lb_args.traceComm() == 0)
-      CkPrintf("CharmLB> Load balancing instrumentation for communication is off.\n");
     if (_lb_args.migObjOnly())
       CkPrintf("LB> Load balancing strategy ignores non-migratable objects.\n");
   }
@@ -486,6 +489,7 @@ void LBManager::initnodeFn()
   _registerCommandLineOpt("+LBUseCpuTime");
   _registerCommandLineOpt("+LBOff");
   _registerCommandLineOpt("+LBCommOn");
+  _registerCommandLineOpt("+LBCommOff");
   _registerCommandLineOpt("+MetaLB");
   _registerCommandLineOpt("+LBAlpha");
   _registerCommandLineOpt("+LBBeta");
@@ -541,6 +545,8 @@ void LBManager::init(void)
 #if CMK_LBDB_ON
   if (manualOn) TurnManualLBOn();
 #endif
+  if (CkMyPe()==0 && _lb_args.traceComm() == 0)
+      CkPrintf("CharmLB> Load balancing instrumentation for communication is off.\n");
 
   if (_lb_args.lbperiod() > 0.0)
   {
@@ -1096,7 +1102,6 @@ void LBTurnCommOn()
 {
 #if CMK_LBDB_ON
   _lb_args.traceComm() = 1;
-  CkPrintf("CharmLB> Setting LB communication instrumentation to on.\n");
 #endif
 }
 
