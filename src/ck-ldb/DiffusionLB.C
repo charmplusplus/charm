@@ -9,8 +9,8 @@
 #include "Heap_helper.C"
 #define DEBUGR(x) /*CmiPrintf x*/;
 #define DEBUGL(x) /*CmiPrintf x*/;
-#define NUM_NEIGHBORS 2
-#define ITERATIONS 8
+#define NUM_NEIGHBORS 3
+#define ITERATIONS 20
 
 // Percentage of error acceptable.
 #define THRESHOLD 2
@@ -35,6 +35,203 @@ void DiffusionLB::staticAtSync(void* data)
 
   me->AtSync();
 }
+
+// preprocess topology information: only done once
+void DiffusionLB::preprocess(const int explore_limit)
+{
+  const int numProcs = CkNumPes();
+  // initialize nDims, dims, ppn and num_coordinates 
+  int nDims;
+  int num_coordinates=1;
+  TopoManager_getDimCount(&nDims);
+  int dims[nDims+1];
+  TopoManager_getDims(dims);
+  for (int i=0; i < nDims; i++) num_coordinates *= dims[i];
+  if ((CkMyPe() == 0) && (_lb_args.debug() > 1)) {
+    CkPrintf("[%d] Diffusion preprocessing...\n nDims=%d, ppn=%d, num_coordinates=%d\n",
+             CkMyPe(), nDims, dims[nDims], num_coordinates);
+  }
+
+  coord_table.resize(num_coordinates);
+  peToCoords.resize(numProcs);
+
+  ///int my_coordinates = 0;
+
+#if TORUS_3D
+  // // // TCoord::D1 = dims[2];
+  // // // TCoord::D0 = dims[1] * TCoord::D1;
+
+  //CkPrintf("PREPROCESS 3D\n");
+
+  // fill coord_table and coordinates
+  int p;
+  for (int i=0; i < dims[0]; i++) {
+    for (int j=0; j < dims[1]; j++) {
+      for (int k=0; k < dims[2]; k++) {
+        int coord[4] = {i, j, k, 0};
+        TopoManager_getPeRank(&p, coord);
+        if (p >= 0) {
+          ///my_coordinates++;
+          TCoord c0(coord);
+          c0.p = p;
+          int numranks = 1;
+          for (int kk=1; kk < dims[3]; kk++) {
+            coord[3] = kk;
+            TopoManager_getPeRank(&p, coord);
+            if (p >= 0) numranks++;
+          }
+          TCoord &c = coord_table[c0.idx];
+          c = c0;
+          //c.valid = true;
+          c.ppn = numranks;
+          //std::cerr << c << ", ppn=" << c.ppn << std::endl;
+        } else {
+          TCoord c0(coord);
+          c0.p = -1;
+          coord_table[c0.idx] = c0;
+        }
+      }
+    }
+  }
+
+  // populate coord adjacency lists
+  // I could avoid this piece of code and do it above if I consider all coordinates
+  // as valid
+  for (int i=0; i < num_coordinates; i++) {
+    if (coord_table[i].ppn) {
+      TCoord &c = coord_table[i];
+      std::vector<int> nbIdxs = c.calculateNbs(dims);
+      for (int j=0; j < nbIdxs.size(); j++) {
+        TCoord &nb = coord_table[nbIdxs[j]];
+        if (nb.ppn) c.nbs.push_back(&nb);
+      }
+    }
+  }
+
+//   std::vector<Component> components;
+//   calculateComponents(dims, num_coordinates, coord_table, components);
+
+  // populate peToCoords
+  int pdims[4];
+  for (int p=0; p < numProcs; p++) {
+    TopoManager_getPeCoordinates(p, pdims);
+    peToCoords[p] = &coord_table[TCoord(pdims).idx];
+  }  
+
+#elif TORUS_5D
+  // // // TCoord::D3 = dims[4];
+  // // // TCoord::D2 = dims[3] * TCoord::D3;
+  // // // TCoord::D1 = dims[2] * TCoord::D2;
+  // // // TCoord::D0 = dims[1] * TCoord::D1;
+  
+  //CkPrintf("PREPROCESS 5D\n");
+
+  // fill coord_table and coordinates
+  int p;
+  //int ranks[dims[5]];
+  for (int i=0; i < dims[0]; i++) {
+    for (int j=0; j < dims[1]; j++) {
+      for (int k=0; k < dims[2]; k++) {
+        for (int l=0; l < dims[3]; l++) {
+          for (int m=0; m < dims[4]; m++) {
+            int coord[6] = {i, j, k, l, m, 0};
+            TopoManager_getPeRank(&p, coord);
+            if (p >= 0) {
+              ///my_coordinates++;
+              TCoord c0(coord);
+              c0.p = p;
+              int numranks = 1;
+              for (int kk=1; kk < dims[5]; kk++) {
+                coord[5] = kk;
+                TopoManager_getPeRank(&p, coord);
+                if (p >= 0) numranks++;
+              }
+              //TopoManager_getRanks(&numranks, ranks, coord);
+              TCoord &c = coord_table[c0.idx];
+              c = c0;
+              //c.valid = true;
+              c.ppn = numranks;
+              //std::cerr << c << ", ppn=" << c.ppn << std::endl;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // populate coord adjacency lists
+  // I could avoid this piece of code and do it above if I consider all coordinates
+  // as valid
+  for (int i=0; i < num_coordinates; i++) {
+    if (coord_table[i].ppn) {
+      TCoord &c = coord_table[i];
+      std::vector<int> nbIdxs = c.calculateNbs(dims);
+      for (int j=0; j < nbIdxs.size(); j++) {
+        TCoord &nb = coord_table[nbIdxs[j]];
+        if (nb.ppn) c.nbs.push_back(&nb);
+      }
+    }
+  }
+
+  // populate peToCoords
+  int pdims[6];
+  for (int p=0; p < numProcs; p++) {
+    TopoManager_getPeCoordinates(p, pdims);
+    peToCoords[p] = &coord_table[TCoord(pdims).idx];
+  }
+#endif
+
+  // precalculate closest coords
+  closest_coords.resize(num_coordinates);
+  bool *visited = (bool*)malloc(sizeof(bool)*num_coordinates);
+  int nodeNum = 0;
+  for (int i=0; i < num_coordinates; i++) {
+    if (coord_table[i].ppn) { // consider only coordinates(nodes) in the allocation
+      if(peNodes.find(coord_table[i].p) == peNodes.end()) {
+        numNodes++;
+        peNodes[coord_table[i].p] = nodeNum;
+        nodes.push_back(coord_table[i].p);
+        nodeNum++;
+      }     
+      TCoord *c = &coord_table[i];
+      std::queue<TCoord*> Q;
+      Q.push(c);
+      memset(visited, 0, sizeof(bool)*num_coordinates);
+      visited[c->idx] = true;
+      for (int j=0; (j < explore_limit) && (Q.size() > 0); j++) {
+        TCoord *coord = Q.front(); Q.pop();
+        for (int k=0; k < coord->nbs.size(); k++) {
+          TCoord *nb_coord = coord->nbs[k];
+          if (!visited[nb_coord->idx]) {
+            visited[nb_coord->idx] = true;
+            Q.push(nb_coord);
+          }
+        }
+        closest_coords[i].push_back(coord);
+      }
+//       if (closest_coords[i].size() > explore_limit) {
+//         CkAbort("ERROR explore_limit=%d size=%d\n", explore_limit, closest_coords[i].size());
+//       }
+    }
+  }
+  free(visited);
+
+  if ((CkMyPe() == 0) && (_lb_args.debug() > 1)) {
+    int my_coordinates = 0;
+    int realNumProcs = 0;
+    for (int i=0; i < num_coordinates; i++) {
+      if (coord_table[i].ppn > 0) {
+        my_coordinates++;
+        realNumProcs += coord_table[i].ppn;
+      }
+    }
+    if (realNumProcs != numProcs) {
+      CkAbort("ERROR: num procs calculated from topoManager doesn't match input\n");
+    }
+    CkPrintf("# coordinates allocated to this job = %d\n", my_coordinates);
+  }
+}
+
 
 DiffusionLB::DiffusionLB(CkMigrateMessage *m) : CBase_DiffusionLB(m) {
 }
@@ -90,41 +287,7 @@ void DiffusionLB::InitLB(const CkLBOptions &opt) {
     myStats = new DistBaseLB::LDStats;
     myStats->objData = NULL;
     myStats->commData = NULL;
-//    ComputeNeighbors();
-
-
-    nodeSize = CkNumPes()/CkNumNodes();
-    nodeFirst = CkMyNode()*nodeSize;
-
-    if(CkMyPe()==nodeFirst){
-      int count = 0;
-
-      int nbor =  CkMyNode()-1;
-
-      if(CkMyNode() > 0) {
-        neighbors.push_back(nbor);
-        neighborPos[count++] = nbor;
-      }
-
-      for(int i=0;i<CkNumNodes();i++)
-        nodes.push_back(i);
-
-      if(CkMyNode() < CkNumNodes() - 1) {
-        int nbor2 =  (CkMyNode()+1)%CkNumNodes();
-        neighbors.push_back(nbor2);
-      }
-
-      neighborPos[count++] = nbor;
-      neighborCount = 2;
-      if(CkMyNode() == 0 || CkMyNode() == CkNumNodes()-1)
-        neighborCount = 1;
-    }
-    for(int i=0;i<CkNumPes();i++)
-    {
-      peNodes[i] = i/nodeSize;
-    }
-    numNodes = CkNumNodes();
-
+    ComputeNeighbors();
     if(CkMyPe() == nodeFirst) {
         gain_val = NULL;
         obj_arr = NULL;
@@ -187,8 +350,7 @@ void DiffusionLB::AtSync() {
         //toSend = 0;
         if(CkMyPe() == nodeFirst) {
             for(int i = 0; i < neighborCount; i++) {
-                int nbor_node = neighbors[i];
-                thisProxy[CkMyPe()].AddNeighbor(nbor_node);
+                thisProxy[nodes[neighbors[i]]].AddNeighbor(peNodes[nodeFirst]);
             }
         }
         CkCallback cb(CkIndex_DiffusionLB::PEStarted(), thisProxy[0]);
@@ -254,7 +416,8 @@ void DiffusionLB::ProcessAtSync()
 
 void DiffusionLB::ComputeNeighbors() {
     // TODO: Juan's topology aware mapping
-//    preprocess(NUM_NEIGHBORS);
+
+    preprocess(NUM_NEIGHBORS);
 
     int pdims[4];
     TopoManager_getPeCoordinates(CkMyPe(), pdims);
@@ -372,6 +535,7 @@ double DiffusionLB::average() {
     // TODO: check the value
     return (sum/neighborCount);
 }
+
 /*void Diffusion::ReceiveLoadInfo(double load, int node) {
     DEBUGR(("[%d] GRD Receive load info, load %f node %d loadReceived %d neighborCount %d\n", CkMyPe(), load, node, loadReceived, neighborCount));
     int pos = neighborPos[node];
@@ -469,8 +633,7 @@ void DiffusionLB::PseudoLoadBalancing() {
         if(my_load - tempToSend[i] < 0)
             CkAbort("Get out");
         my_load -= tempToSend[i];
-        int nbor_firstnode = (neighbors[i])*nodeSize;
-        thisProxy[nbor_firstnode].PseudoLoad(itr, tempToSend[i], peNodes[nodeFirst]);
+        thisProxy[nodes[neighbors[i]]].PseudoLoad(itr, tempToSend[i], peNodes[nodeFirst]);
     }
 }
 
@@ -491,6 +654,7 @@ void DiffusionLB::LoadBalancing() {
         for(int j = 0; j < neighborCount+1; j++)
             objectComms[i][j] = 0;
     }
+
     // TODO: Set objectComms to zero initially
     int obj = 0;
     for(int edge = 0; edge < nodeStats->n_comm; edge++) {
@@ -508,7 +672,6 @@ void DiffusionLB::LoadBalancing() {
           int toNode = toPE/nodeSize;
           if(fromNode == toNode) {
             int pos = neighborPos[toNode];
-            pos = 0;
             int fromObj = nodeStats->getHash(from);
             int toObj = nodeStats->getHash(to);
             //DEBUGR(("[%d] GRD Load Balancing from obj %d and to obj %d and total objects %d\n", CkMyPe(), fromObj, toObj, nodeStats->n_objs));
@@ -530,7 +693,6 @@ void DiffusionLB::LoadBalancing() {
             else {
                 pos = neighborCount;
             }
-            pos = 0;
             if(fromNode == peNodes[nodeFirst]) {
                 int fromObj = nodeStats->getHash(from);
                 //DEBUGR(("[%d] GRD Load Balancing from obj %d and pos %d\n", CkMyPe(), fromObj, pos));
@@ -539,7 +701,25 @@ void DiffusionLB::LoadBalancing() {
             }
           }
 
-        }
+        } //elstoNode    
+        // TODO: for each msg in object list we can do same as above ?
+        /*else if((!commData.from_proc()) && (commData.recv_type() == LD_OBJLIST_MSG)) {
+          int nobjs, offset;
+          LDObjKey *objs = commData.receiver.get_destObjs(nobjs);
+          McastSrc sender(nobjs, commData.messages, commData.bytes);
+
+          from = stats->getHash(commData.sender);
+          offset = vertices[from].mcastToList.size();
+
+          for(int i = 0; i < nobjs; i++) {
+            int idx = stats->getHash(objs[i]);
+            CmiAssert(idx != -1);
+            vertices[idx].mcastFromList.push_back(McastDest(from, offset,
+            commData.messages, commData.bytes));
+            sender.destList.push_back(idx);
+          }
+          vertices[from].mcastToList.push_back(sender);
+        }*/
       } // end for
 
       // calculate the gain value, initialize the heap.
@@ -586,7 +766,7 @@ void DiffusionLB::LoadBalancing() {
         double totalSent = 0;
         int counter = 0;
         while(my_loadB > 0 && actualSend > 0) {
-
+       
             counter++; 
             v_id = heap_pop(obj_heap, ObjCompareOperator(&objs, gain_val), heap_pos);
                 
@@ -943,7 +1123,7 @@ void DiffusionLB::PrintDebugMessage(int len, double* result) {
         CkPrintf("External communication before %f, after %f \n", externalBeforeFinal, externalAfterFinal);
         CkPrintf("Number of migrations across nodes %d \n", migrates);
         for(int i = 0; i < numNodes; i++) 
-            thisProxy[(i*nodeSize)].CallResumeClients();
+            thisProxy[nodes[i]].CallResumeClients();
     }
 }
 

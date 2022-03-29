@@ -170,7 +170,7 @@ private:
     bool preprocessingDone;
     std::vector< std::vector<TCoord*> > closest_coords;
     int GetPENumber(int& obj_id);
-//    void preprocess(const int explore_limit);
+    void preprocess(const int explore_limit);
     bool AggregateToSend();
     
     void InitLB(const CkLBOptions &);

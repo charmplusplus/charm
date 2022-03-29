@@ -13,7 +13,7 @@ module DiffusionLB {
     entry void ReceiveStats(CkMarshalledCLBStatsMessage &data);
     //entry void LoadTransfer(double load, int initPE, int objId);
     entry void LoadReceived(int objId, int fromPE);
-    entry [reductiontarget] void DoneNodeLB();
+    //entry [reductiontarget] void DoneNodeLB();
     entry void MigratedHelper(LDObjHandle h, int waitBarrier);
     entry void MigrationEnded();
     entry void LoadMetaInfo(LDObjHandle h, double load);
@@ -32,16 +32,14 @@ module DiffusionLB {
         //TODO: Currently fixed iterations
         for(itr = 0; itr < ITERATIONS; itr++) {
             // Send its load
-            // Send its load
             serial "Send loadInfo" {
-                for(int i = 0; i < neighborCount; i++) {
-                    int nbor = neighbors[i];
-                    int nbor_nodeFirst = nbor*nodeSize;
-                    double load_to_send = my_load;
-                    thisProxy[nbor_nodeFirst].ReceiveLoadInfo(itr, load_to_send, CkMyNode());
-                }
+                for(int i = 0; i < sendToNeighbors.size(); i++) {
+                    DEBUGR(("[%d] Sending to %d \n", CkMyPe(), nodes[sendToNeighbors[i]]));
+                    thisProxy[nodes[sendToNeighbors[i]]].ReceiveLoadInfo(itr, my_load, peNodes[nodeFirst]);
+                }         
+                 
             }
-
+             
             // Wait for all its neighbors load
             for(temp_itr = 0; temp_itr < neighborCount; temp_itr++) {
                 when ReceiveLoadInfo[itr](int itr, double load, int node) serial {
@@ -72,6 +70,7 @@ module DiffusionLB {
                     toReceiveLoad[pos] += load;
                 }
             }
+            
         }
 
         // Calculate the aggregate load that has to be sent.
