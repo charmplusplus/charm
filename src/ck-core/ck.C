@@ -2771,8 +2771,8 @@ private:
   }
 };
 
-void CkMessageReplayQuiescence(void *rep, double time);
-void CkMessageDetailReplayDone(void *rep, double time);
+void CkMessageReplayQuiescence(void *rep);
+void CkMessageDetailReplayDone(void *rep);
 
 class CkMessageReplay : public CkMessageWatcher {
   int counter;
@@ -2899,7 +2899,7 @@ public:
 	  getNext();
 	  REPLAYDEBUG("Constructing ckMessageReplay: "<< nextPE <<" "<< nextSize <<" "<<nextEvent);
 #if CMI_QD
-	  if (CkMyPe()==0) CmiStartQD(CkMessageReplayQuiescence, this);
+	  if (CkMyPe()==0) CmiStartQD((CcdCondFn)CkMessageReplayQuiescence, this);
 #endif
 	}
 	~CkMessageReplay() {fclose(f);}
@@ -2998,7 +2998,7 @@ public:
 
     CsdEnqueue(getNext());
 
-    CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE, (CcdVoidFn)CkMessageDetailReplayDone, (void*)this);
+    CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE, (CcdCondFn)CkMessageDetailReplayDone, (void*)this);
   }
   virtual bool process(envelope **env,CkCoreState *ck) {
     void *msg = getNext();
@@ -3007,13 +3007,13 @@ public:
   }
 };
 
-void CkMessageReplayQuiescence(void *rep, double time) {
+void CkMessageReplayQuiescence(void *rep) {
   CkPrintf("[%d] Quiescence detected\n",CkMyPe());
   CkMessageReplay *replay = (CkMessageReplay*)rep;
-  //CmiStartQD(CkMessageReplayQuiescence, replay);
+  //CmiStartQD((CcdCondFn)CkMessageReplayQuiescence, replay);
 }
 
-void CkMessageDetailReplayDone(void *rep, double time) {
+void CkMessageDetailReplayDone(void *rep) {
   CkMessageDetailReplay *replay = (CkMessageDetailReplay *)rep;
   CkPrintf("[%d] Detailed replay finished after %f seconds. Exiting.\n",CkMyPe(),CkWallTimer()-replay->starttime);
   ConverseExit();

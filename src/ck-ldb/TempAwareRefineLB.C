@@ -94,13 +94,13 @@ static int cpufreq_sysfs_read (int proc)
         return ff;
 }
 
-void printCurrentTemperature(void *LB, double curWallTime)
+void printCurrentTemperature(void *LB)
 {
   TempAwareRefineLB *taalb = static_cast<TempAwareRefineLB *>(LB);
   int pe = CkMyPe();
   float temp = taalb->getTemp(pe % taalb->physicalCoresPerNode);
   int freq = cpufreq_sysfs_read (pe % taalb->logicalCoresPerNode);
-  fprintf(taalb->logFD, "%f, %d, %f, %d\n", curWallTime, pe, temp, freq);
+  fprintf(taalb->logFD, "%f, %d, %f, %d\n", CkWallTimer(), pe, temp, freq);
 }
 
 int getProcFreqPtr(int *freqs,int numAvail,int freq)

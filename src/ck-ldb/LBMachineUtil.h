@@ -30,8 +30,8 @@ enum : uint8_t { off, on } state;
 
   void IdleStart(double curWallTime);
   void IdleEnd(double curWallTime);
-  static void staticIdleStart(LBMachineUtil *util,double curWallTime);
-  static void staticIdleEnd(LBMachineUtil *util,double curWallTime);
+  static void staticIdleStart(LBMachineUtil *util);
+  static void staticIdleEnd(LBMachineUtil *util);
 };
 
 #endif  // _LDMACHINEUTIL_H_
