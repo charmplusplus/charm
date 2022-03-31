@@ -5680,6 +5680,19 @@ the callback when the contribute operation has finished.
 For examples of how to use the various callback types, please see
 ``tests/charm++/megatest/callback.C``
 
+In addition to the above mechanisms for invoking a callback, it is possible
+that a library may want to accept a callback which broadcasts to a group
+or nodegroup, but then handles the exact logic for the broadcast manually.
+For example, if the data is already distributed across compute elements we
+can avoid performing the actual broadcast, or if we want to send different
+data to each member of the group. To accomplish this, users can invoke
+
+``void CkCallback::transformBcastToLocalElem(int elem = -1);``
+
+This will convert a callback that is broadcast to a group or nodegroup into
+a point-to-point callback for a particular element of the group (the local
+element if no element is passed).
+
 .. _sec:ckcallbackresumethread:
 
 Synchronous Execution with CkCallbackResumeThread
