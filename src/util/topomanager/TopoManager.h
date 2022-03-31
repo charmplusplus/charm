@@ -60,9 +60,7 @@ void TopoManager_createPartitions(int scheme, int numparts, int *nodeMap);
 #if defined(__cplusplus)
 }
 
-#if CMK_BLUEGENEQ
-#include "BGQTorus.h"
-#elif XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
+#if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
 #include "XTTorus.h"
 #endif
 
@@ -85,33 +83,11 @@ class TopoManager {
     inline int getDimNX() const { return dimNX; }
     inline int getDimNY() const { return dimNY; }
     inline int getDimNZ() const { return dimNZ; }
-#if CMK_BLUEGENEQ
-    inline int getDimNA() const { return dimNA; }
-    inline int getDimNB() const { return dimNB; }
-    inline int getDimNC() const { return dimNC; }
-    inline int getDimND() const { return dimND; }
-    inline int getDimNE() const { return dimNE; }
-#endif
     inline int getDimNT() const { return dimNT; }
     inline int getNumDims() const {
-#if CMK_BLUEGENEQ
-      return 5;
-#else
       return 3;
-#endif
     }
     inline int getDimSize(unsigned int i) const {
-#if CMK_BLUEGENEQ
-      CmiAssert(i < 5);
-      switch (i) {
-        case 0: return getDimNA();
-        case 1: return getDimNB();
-        case 2: return getDimNC();
-        case 3: return getDimND();
-        case 4: return getDimNE();
-        default: return -1;
-      }
-#else
       CmiAssert(i < 3);
       switch (i) {
         case 0: return getDimNX();
@@ -119,10 +95,9 @@ class TopoManager {
         case 2: return getDimNZ();
         default: return -1;
       }
-#endif
     }
     inline bool haveTopologyInfo() const {
-#if CMK_BLUEGENEQ || XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
+#if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
       return true;
 #else
       return false;
@@ -188,54 +163,6 @@ class TopoManager {
       else
         return pz;
     }
-#if CMK_BLUEGENEQ
-    inline int absA(int a) const {
-      int pa = abs(a);
-      int sa = dimNA - pa;
-      CmiAssert(sa>=0);
-      if(torusA)
-        return ((pa>sa) ? sa : pa);
-      else
-        return pa;
-    }
-
-    inline int absB(int b) const {
-      int pb = abs(b);
-      int sb = dimNB - pb;
-      CmiAssert(sb>=0);
-      if(torusB)
-        return ((pb>sb) ? sb : pb);
-      else
-        return pb;
-    }
-
-    inline int absC(int c) const {
-      int pc = abs(c);
-      int sc = dimNC - pc;
-      CmiAssert(sc>=0);
-      if(torusC)
-        return ((pc>sc) ? sc : pc);
-      else
-        return pc;
-    }
-
-    inline int absD(int d) const {
-      int pd = abs(d);
-      int sd = dimND - pd;
-      CmiAssert(sd>=0);
-      if(torusD)
-        return ((pd>sd) ? sd : pd);
-      else
-        return pd;
-    }
-
-    inline int absE(int e) const {
-      int pe = abs(e);
-      int se = dimNE - pe;
-      CmiAssert(se>=0);
-        return ((pe>se) ? se : pe);
-    }
-#endif
   private:
     int dimX;	// dimension of the allocation in X (no. of processors)
     int dimY;	// dimension of the allocation in Y (no. of processors)
@@ -246,14 +173,8 @@ class TopoManager {
     int dimNT;  // dimension of the allocation in T (no. of processors per node)
     int numPes;
     int torusX, torusY, torusZ, torusT;
-#if CMK_BLUEGENEQ
-    int dimNA, dimNB, dimNC, dimND, dimNE;
-    int torusA, torusB, torusC, torusD, torusE;
-#endif
     int procsPerNode;
-#if CMK_BLUEGENEQ
-    BGQTorusManager bgqtm;
-#elif XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
+#if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
     XTTorusManager xttm;
 #endif
 };

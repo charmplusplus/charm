@@ -3,7 +3,7 @@
 [![Build Status](https://travis-ci.org/UIUC-PPL/charm.svg?branch=main)](https://travis-ci.org/UIUC-PPL/charm)
 [![Documentation Status](https://readthedocs.org/projects/charm/badge/?version=latest)](https://charm.readthedocs.io/en/latest/?badge=latest)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3370873.svg)](https://doi.org/10.5281/zenodo.3370873)
-[![CDash](https://img.shields.io/badge/CDash-dashboard-blue)](https://my.cdash.org/index.php?project=Charm%2B%2B)
+
 
 ## Introduction
 Charm++ is a message-passing parallel language and runtime system.
@@ -94,7 +94,6 @@ of the `<options>` below.
 | `mpi-linux-x86_64`        | Linux   | MPI           | GNU compiler                          |
 | `multicore-linux-x86_64`  | Linux   | Shared memory | GNU compiler                          |
 | `multicore-darwin-x86_64` | macOS   | Shared memory | Clang C++ compiler                    |
-| `pamilrts-bluegeneq`      | CNK     | PAMI          | BGClang C++ compiler                  |
 | `gni-crayxc`              | Linux   | GNI           | CC (whatever PrgEnv module is loaded) |
 | `gni-crayxe`              | Linux   | GNI           | CC (whatever PrgEnv module is loaded) |
 | `verbs-linux-x86_64`      | Linux   | IB Verbs      | GNU compiler                          |
@@ -120,7 +119,6 @@ To choose `<version>`, your choice is determined by two options:
     * `linux-x86_64`: Linux with AMD64 64-bit x86 instructions
     * `win-x86_64`: MS Windows with MS Visual C++ compiler
     * `darwin-x86_64`: Apple macOS
-    * `bluegeneq`:IBM Blue Gene/Q
     * `cray{xe/xc}`: Cray XE/XC Supercomputer
     * `linux-ppc64le`: POWER/PowerPC
 
@@ -173,7 +171,7 @@ for more information:
          
      will give:
     
-      Supported compilers: clang craycc gcc icc iccstatic msvc pgcc xlc xlc64 dpcpp
+      Supported compilers: clang craycc gcc icc iccstatic msvc pgcc xlc xlc64 icx
       Supported options: common cuda flang gfortran ifort local nolb omp ooc papi perftools persistent pgf90 pxshm smp syncft sysvshm tcp tsan
 
 

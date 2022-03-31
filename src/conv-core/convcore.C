@@ -255,11 +255,6 @@ void infi_freeMultipleSend(void *ptr);
 void infi_unregAndFreeMeta(void *ch);
 #endif
 
-#if CMK_SMP && CMK_BLUEGENEQ && SPECIFIC_PCQUEUE
-void * CmiAlloc_bgq (int     size);
-void   CmiFree_bgq  (void  * buf);
-#endif
-
 #if CMK_SMP && CMK_PPC_ATOMIC_QUEUE
 void * CmiAlloc_ppcq (int     size);
 void   CmiFree_ppcq  (void  * buf);
@@ -1202,76 +1197,6 @@ double CmiCpuTimer(void)
 
 #endif
 
-#if CMK_TIMER_USE_BLUEGENEQ  /* This module just compiles with GCC charm. */
-
-CpvStaticDeclare(unsigned long, inittime);
-CpvStaticDeclare(double, clocktick);
-
-int CmiTimerIsSynchronized(void)
-{
-  return 1;
-}
-
-int CmiTimerAbsolute(void)
-{
-  return 0;
-}
-
-#include "hwi/include/bqc/A2_inlines.h"
-#include "spi/include/kernel/process.h"
-
-double CmiStartTimer(void)
-{
-  return 0.0;
-}
-
-double CmiInitTime(void)
-{
-  return CpvAccess(inittime);
-}
-
-void CmiTimerInit(char **argv)
-{
-  CpvInitialize(double, clocktick);
-  CpvInitialize(unsigned long, inittime);
-
-  Personality_t  pers;
-  Kernel_GetPersonality(&pers, sizeof(pers));
-  uint32_t clockMhz = pers.Kernel_Config.FreqMHz;
-  CpvAccess(clocktick) = 1.0 / (clockMhz * 1e6); 
-
-  /*fprintf(stderr, "Blue Gene/Q running at clock speed of %d Mhz\n", clockMhz);*/
-
-  /* try to synchronize calling barrier */
-#if !(__FAULT__)
-  if(cmiArgDebugFlag == 0) {
-    CmiBarrier();
-    CmiBarrier();
-    CmiBarrier();
-  }
-#endif
-  CpvAccess(inittime) = GetTimeBase (); 
-}
-
-double CmiWallTimer(void)
-{
-  unsigned long long currenttime;
-  currenttime = GetTimeBase();
-  return CpvAccess(clocktick)*(currenttime-CpvAccess(inittime));
-}
-
-double CmiCpuTimer(void)
-{
-  return CmiWallTimer();
-}
-
-double CmiTimer(void)
-{
-  return CmiWallTimer();
-}
-
-#endif
-
 
 #if CMK_TIMER_USE_PPC64
 
@@ -1636,19 +1561,20 @@ void CsdBeginIdle(void)
 #else
   CpvAccess(cmiMyPeIdle) = 1;
 #endif // CMK_SMP
-  double curWallTime = CcdRaiseCondition(CcdPROCESSOR_BEGIN_IDLE) ;
+  CcdRaiseCondition(CcdPROCESSOR_BEGIN_IDLE);
 #if CMK_ERROR_CHECKING
-  CpvAccess(idleBeginWalltime) = curWallTime;
+  CpvAccess(idleBeginWalltime) = CmiWallTimer();
 #endif
 }
 
 void CsdStillIdle(void)
 {
-  double curWallTime = CcdRaiseCondition(CcdPROCESSOR_STILL_IDLE);
+  CcdRaiseCondition(CcdPROCESSOR_STILL_IDLE);
 
 #if CMK_ERROR_CHECKING
+  double curWallTime = CmiWallTimer();
   if(curWallTime - CpvAccess(idleBeginWalltime) > longIdleThreshold) {
-    curWallTime = CcdRaiseCondition(CcdPROCESSOR_LONG_IDLE); // Invoke LONG_IDLE ccd callbacks
+    CcdRaiseCondition(CcdPROCESSOR_LONG_IDLE); // Invoke LONG_IDLE ccd callbacks
     CpvAccess(idleBeginWalltime) = curWallTime; // Reset idle timer
   }
 #endif
@@ -1928,11 +1854,9 @@ void CsdScheduleForever(void)
   while (1) {
 #if !CMK_NO_INTEROP
     /* The interoperation will cost this little overhead in scheduling */
-    if(CharmLibInterOperate) {
-      if(CpvAccess(interopExitFlag)) {
-        CpvAccess(interopExitFlag) = 0;
-        break;
-      }
+    if(CharmLibInterOperate && CpvAccess(interopExitFlag)) {
+      CpvAccess(interopExitFlag) = 0;
+      break;
     }
 #endif
 
@@ -1950,9 +1874,7 @@ void CsdScheduleForever(void)
     } else { /*No message available-- go (or remain) idle*/
       SCHEDULE_IDLE
     }
-#if !CSD_NO_PERIODIC
     CsdPeriodic();
-#endif
   }
 }
 int CsdScheduleCount(int maxmsgs)
@@ -1971,9 +1893,7 @@ int CsdScheduleCount(int maxmsgs)
     } else { /*No message available-- go (or remain) idle*/
       SCHEDULE_IDLE
     }
-#if !CSD_NO_PERIODIC
     CsdPeriodic();
-#endif
   }
   return maxmsgs;
 }
@@ -1983,9 +1903,7 @@ void CsdSchedulePoll(void)
   SCHEDULE_TOP
   while (1)
   {
-#if !CSD_NO_PERIODIC
 	CsdPeriodic();
-#endif
         /*CmiMachineProgressImpl(); ??? */
 	if (NULL!=(msg = CsdNextMessage(&state)))
 	{
@@ -2017,9 +1935,7 @@ void CmiDeliverSpecificMsg(int handler)
  
   side = 0;
   while (1) {
-#if !CSD_NO_PERIODIC
     CsdPeriodic();
-#endif
     side ^= 1;
     if (side) msg = (int *)CmiGetNonLocal();
     else      msg = (int *)CdsFifo_Dequeue(localqueue);
@@ -3313,8 +3229,6 @@ void *CmiAlloc(int size)
   res =(char *) CmiPoolAlloc(size+sizeof(CmiChunkHeader));
 #elif USE_MPI_CTRLMSG_SCHEME && CMK_CONVERSE_MPI
   MPI_Alloc_mem(size+sizeof(CmiChunkHeader), MPI_INFO_NULL, &res);
-#elif CMK_SMP && CMK_BLUEGENEQ && SPECIFIC_PCQUEUE
-  res = (char *) CmiAlloc_bgq(size+sizeof(CmiChunkHeader));
 #elif CMK_SMP && CMK_PPC_ATOMIC_QUEUE
   res = (char *) CmiAlloc_ppcq(size+sizeof(CmiChunkHeader));
 #else
@@ -3461,8 +3375,6 @@ void CmiFree(void *blk)
     CmiPoolFree(BLKSTART(parentBlk));
 #elif USE_MPI_CTRLMSG_SCHEME && CMK_CONVERSE_MPI
     MPI_Free_mem(parentBlk);
-#elif CMK_SMP && CMK_BLUEGENEQ && SPECIFIC_PCQUEUE
-    CmiFree_bgq(BLKSTART(parentBlk));
 #elif CMK_SMP && CMK_PPC_ATOMIC_QUEUE
     CmiFree_ppcq(BLKSTART(parentBlk));
 #else
@@ -3895,13 +3807,13 @@ static void on_timeout(cmi_cpu_idlerec *rec,double curWallTime)
     CmiAbort("Exiting.\n");
   }
 }
-static void on_idle(cmi_cpu_idlerec *rec,double curWallTime)
+static void on_idle(cmi_cpu_idlerec *rec)
 {
   CcdCallFnAfter((CcdVoidFn)on_timeout, rec, rec->idle_timeout);
   rec->call_count++; /*Keeps track of overlapping timeout calls.*/  
   rec->is_idle = 1;
 }
-static void on_busy(cmi_cpu_idlerec *rec,double curWallTime)
+static void on_busy(cmi_cpu_idlerec *rec)
 {
   rec->is_idle = 0;
 }
@@ -3915,8 +3827,8 @@ static void CIdleTimeoutInit(char **argv)
     rec->idle_timeout=idle_timeout*1000;
     rec->is_idle=0;
     rec->call_count=0;
-    CcdCallOnCondition(CcdPROCESSOR_BEGIN_IDLE, (CcdVoidFn)on_idle, rec);
-    CcdCallOnCondition(CcdPROCESSOR_BEGIN_BUSY, (CcdVoidFn)on_busy, rec);
+    CcdCallOnCondition(CcdPROCESSOR_BEGIN_IDLE, (CcdCondFn)on_idle, rec);
+    CcdCallOnCondition(CcdPROCESSOR_BEGIN_BUSY, (CcdCondFn)on_busy, rec);
   }
 }
 

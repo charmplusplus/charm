@@ -32,14 +32,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#if CMK_BLUEGENEQ
-#include "TopoManager.h"
-#endif
-
-#if CMK_BLUEGENEQ
-#include "spi/include/kernel/process.h"
-#endif
-
 #if CMK_CRAYXE || CMK_CRAYXC
 extern "C" int getXTNodeID(int mpirank, int nummpiranks);
 #endif
@@ -414,25 +406,7 @@ extern "C" void LrtsInitCpuTopo(char **argv)
       strcpy(hostname, "");
   }
 #endif
-#if CMK_BLUEGENEQ
-  if (CmiMyRank() == 0) {
-   TopoManager tmgr;
-
-    int numPes = cpuTopo.numPes = CmiNumPes();
-    cpuTopo.nodeIDs = new int[numPes];
-    CpuTopology::supported = 1;
-
-    int a, b, c, d, e, t, nid;
-    for(int i=0; i<numPes; i++) {
-      tmgr.rankToCoordinates(i, a, b, c, d, e, t);
-      nid = tmgr.coordinatesToRank(a, b, c, d, e, 0);
-      cpuTopo.nodeIDs[i] = nid;
-    }
-    cpuTopo.sort();
-    if (CmiMyPe()==0) printTopology(cpuTopo.numNodes);
-  }
-  CmiNodeAllBarrier();
-#elif CMK_CRAYXE || CMK_CRAYXC
+#if CMK_CRAYXE || CMK_CRAYXC
   if(CmiMyRank() == 0) {
     int numPes = cpuTopo.numPes = CmiNumPes();
     int numNodes = CmiNumNodes();
@@ -467,14 +441,8 @@ extern "C" void LrtsInitCpuTopo(char **argv)
   /* get my ip address */
   if (CmiMyRank() == 0)
   {
-  #if !CMK_BLUEGENEQ
     myip = skt_my_ip();        /* not thread safe, so only calls on rank 0 */
     // fprintf(stderr, "[%d] IP is %d.%d.%d.%d\n", CmiMyPe(), myip.data[0],myip.data[1],myip.data[2],myip.data[3]);
-  #else
-    if (!CmiMyPe())
-    CmiPrintf("CmiInitCPUTopology Warning: Can not get unique name for the compute nodes. \n");
-    _noip = 1; 
-  #endif
     cpuTopo.numPes = CmiNumPes();
   }
 

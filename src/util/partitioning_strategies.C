@@ -153,19 +153,11 @@ struct TopoManagerWrapper {
     return node; // CmiNodeOf(CmiGetFirstPeOnPhysicalNode(CmiPhysicalNodeID(CmiFirstPe(node))));
   }
   TopoManagerWrapper() {
-#if CMK_BLUEGENEQ
-    int na=tmgr.getDimNA();
-    int nb=tmgr.getDimNB();
-    int nc=tmgr.getDimNC();
-    int nd=tmgr.getDimND();
-    int ne=tmgr.getDimNE();
-#else
     int na=tmgr.getDimNX();
     int nb=tmgr.getDimNY();
     int nc=tmgr.getDimNZ();
     int nd=1;
     int ne=1;
-#endif
     std::vector<int> a_flags(na);
     std::vector<int> b_flags(nb);
     std::vector<int> c_flags(nc);
@@ -179,17 +171,15 @@ struct TopoManagerWrapper {
     int nnodes = CmiNumNodes();
     for ( int node=0; node<nnodes; ++node ) {
       int a,b,c,d,e,t;
-#if CMK_BLUEGENEQ
-      tmgr.rankToCoordinates(CmiNodeFirst(fixnode(node)),a,b,c,d,e,t);
-#else
       tmgr.rankToCoordinates(CmiNodeFirst(fixnode(node)),a,b,c,t);
       d=0; e=0;
-#endif
       if ( a < 0 || a >= na ) CmiAbort("inconsistent torus topology!");
       if ( b < 0 || b >= nb ) CmiAbort("inconsistent torus topology!");
       if ( c < 0 || c >= nc ) CmiAbort("inconsistent torus topology!");
+#if 0
       if ( d < 0 || d >= nd ) CmiAbort("inconsistent torus topology!");
       if ( e < 0 || e >= ne ) CmiAbort("inconsistent torus topology!");
+#endif
       a_flags[a] = 1;
       b_flags[b] = 1;
       c_flags[c] = 1;
@@ -218,66 +208,30 @@ struct TopoManagerWrapper {
     iout << "Charm++> " << "TORUS C SIZE " << nc << " USING";
     for ( int i=0; i<nc; ++i ) { if ( c_flags[i] ) iout << " " << i; }
     iout << "\n" ;
-#if CMK_BLUEGENEQ
-    iout << "Charm++> " << "TORUS D SIZE " << nd << " USING";
-    for ( int i=0; i<nd; ++i ) { if ( d_flags[i] ) iout << " " << i; }
-    iout << "\n" ;
-    iout << "Charm++> " << "TORUS E SIZE " << ne << " USING";
-    for ( int i=0; i<ne; ++i ) { if ( e_flags[i] ) iout << " " << i; }
-    iout << "\n" ;
-#endif
     // find most compact representation of our subset
     a_rot = b_rot = c_rot = d_rot = e_rot = 0;
     a_mod = na; b_mod = nb; c_mod = nc; d_mod = nd; e_mod = ne;
-#if CMK_BLUEGENEQ
-    if ( tmgr.absA(na) == 0 ) // torus
-#else
     if ( tmgr.absX(na) == 0 ) // torus
-#endif
       for ( int i=0, gaplen=0, gapstart=0; i<2*na; ++i ) {
         if ( a_flags[i%na] ) gapstart = i+1;
         else if ( i - gapstart >= gaplen ) {
           a_rot = 2*na-i-1; gaplen = i - gapstart;
         }
       }
-#if CMK_BLUEGENEQ
-    if ( tmgr.absB(nb) == 0 ) // torus
-#else
     if ( tmgr.absY(nb) == 0 ) // torus
-#endif
       for ( int i=0, gaplen=0, gapstart=0; i<2*nb; ++i ) {
         if ( b_flags[i%nb] ) gapstart = i+1;
         else if ( i - gapstart >= gaplen ) {
           b_rot = 2*nb-i-1; gaplen = i - gapstart;
         }
       }
-#if CMK_BLUEGENEQ
-    if ( tmgr.absC(nc) == 0 ) // torus
-#else
     if ( tmgr.absZ(nc) == 0 ) // torus
-#endif
       for ( int i=0, gaplen=0, gapstart=0; i<2*nc; ++i ) {
         if ( c_flags[i%nc] ) gapstart = i+1;
         else if ( i - gapstart >= gaplen ) {
           c_rot = 2*nc-i-1; gaplen = i - gapstart;
         }
       }
-#if CMK_BLUEGENEQ
-    if ( tmgr.absD(nd) == 0 ) // torus
-      for ( int i=0, gaplen=0, gapstart=0; i<2*nd; ++i ) {
-        if ( d_flags[i%nd] ) gapstart = i+1;
-        else if ( i - gapstart >= gaplen ) {
-          d_rot = 2*nd-i-1; gaplen = i - gapstart;
-        }
-      }
-    if ( tmgr.absE(ne) == 0 ) // torus
-      for ( int i=0, gaplen=0, gapstart=0; i<2*ne; ++i ) {
-        if ( e_flags[i%ne] ) gapstart = i+1;
-        else if ( i - gapstart >= gaplen ) {
-          e_rot = 2*ne-i-1; gaplen = i - gapstart;
-        }
-      }
-#endif
     // order dimensions by length
     int a_min=na, a_max=-1;
     int b_min=nb, b_max=-1;
@@ -286,12 +240,8 @@ struct TopoManagerWrapper {
     int e_min=ne, e_max=-1;
     for ( int node=0; node<nnodes; ++node ) {
       int a,b,c,d,e,t;
-#if CMK_BLUEGENEQ
-      tmgr.rankToCoordinates(CmiNodeFirst(fixnode(node)),a,b,c,d,e,t);
-#else
       tmgr.rankToCoordinates(CmiNodeFirst(fixnode(node)),a,b,c,t);
       d=0; e=0;
-#endif
       a = (a+a_rot)%a_mod;
       b = (b+b_rot)%b_mod;
       c = (c+c_rot)%c_mod;
@@ -328,21 +278,14 @@ struct TopoManagerWrapper {
     for ( int i=0; i<5; ++i ) { if ( (lensort[i] & 7) == 1 ) d_dim = 4-i; }
     for ( int i=0; i<5; ++i ) { if ( (lensort[i] & 7) == 0 ) e_dim = 4-i; }
     iout << "Charm++> " << "TORUS MINIMAL MESH SIZE IS " << a_len << " BY " << b_len << " BY " << c_len
-#if CMK_BLUEGENEQ
-    << " BY " << d_len << " BY " << e_len
-#endif
     << "\n" ;
     if ( CmiMyNodeGlobal() == 0 ) printf("%s",iout.str().c_str());
     // printf("TopoManagerWrapper dims %d %d %d %d %d\n", a_dim, b_dim, c_dim, d_dim, e_dim);
   }
   void coords(int node, int *crds) {
     int a,b,c,d,e,t;
-#if CMK_BLUEGENEQ
-    tmgr.rankToCoordinates(CmiNodeFirst(fixnode(node)),a,b,c,d,e,t);
-#else
     tmgr.rankToCoordinates(CmiNodeFirst(fixnode(node)),a,b,c,t);
     d=0; e=0;
-#endif
     crds[a_dim] = (a+a_rot)%a_mod;
     crds[b_dim] = (b+b_rot)%b_mod;
     crds[c_dim] = (c+c_rot)%c_mod;

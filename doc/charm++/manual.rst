@@ -24,7 +24,7 @@ checkpoints.
 Charm++ is a production-quality parallel programming system used by
 multiple applications in science and engineering on supercomputers as
 well as smaller clusters around the world. Currently the parallel
-platforms supported by Charm++ are the IBM BlueGene/Q and OpenPOWER
+platforms supported by Charm++ are OpenPOWER
 systems, Cray XE, XK, and XC systems, Omni-Path and Infiniband clusters,
 single workstations and networks of workstations (including x86 (running
 Linux, Windows, MacOS)), etc. The communication protocols and
@@ -4395,8 +4395,7 @@ whenidle
    priority or speculative) in the absence of other work. ``whenidle``
    entry methods must return a ``bool`` value, indicating whether the
    entry method should be called when the processor is idle again, and
-   accept a ``double`` argument representing the current timestamp. An
-   example can be found in ``examples/charm++/whenidle``.
+   take no arguments. An example can be found in ``examples/charm++/whenidle``.
 
 python
    entry methods are enabled to be called from python scripts as
@@ -5302,7 +5301,6 @@ used.
    ============================= =============== ====================== =============== ========== ==========
    Machine                       Network         Build Architecture     Intra Processor Intra Host Inter Host
    ============================= =============== ====================== =============== ========== ==========
-   Blue Gene/Q (Vesta)           PAMI            ``pamilrts-bluegeneq`` 4 MB            32 KB      256 KB
    Cray XC30 (Edison)            Aries           ``gni-crayxc``         1 MB            2 MB       2 MB
    Cray XC30 (Edison)            Aries           ``mpi-crayxc``         256 KB          8 KB       32 KB
    Dell Cluster (Golub)          Infiniband      ``verbs-linux-x86_64`` 128 KB          2 MB       1 MB
@@ -11419,7 +11417,7 @@ where,
 
 ``TARGET ARCHITECTURE``
    is the machine architecture one wants to build for such as
-   *netlrts-linux-x86_64*, *pamilrts-bluegeneq* etc.
+   *netlrts-linux-x86_64*, *multicore-darwin-arm8* etc.
 
 ``OPTIONS``
    are additional options to the build process, e.g. *smp* is used to
@@ -11471,8 +11469,6 @@ appropriate choices for the build one wants to perform.
    MPI with 64 bit Windows                                          ``./build charm++ mpi-win-x86_64 --with-production -j8``
    Net with 64 bit macOS (x86_64)                                   ``./build charm++ netlrts-darwin-x86_64 --with-production -j8``
    Net with 64 bit macOS (ARM64)                                    ``./build charm++ netlrts-darwin-arm8 --with-production -j8``
-   Blue Gene/Q (bgclang compilers)                                  ``./build charm++ pami-bluegeneq --with-production -j8``
-   Blue Gene/Q (bgclang compilers)                                  ``./build charm++ pamilrts-bluegeneq --with-production -j8``
    Cray XE6                                                         ``./build charm++ gni-crayxe --with-production -j8``
    Cray XK7                                                         ``./build charm++ gni-crayxe-cuda --with-production -j8``
    Cray XC40                                                        ``./build charm++ gni-crayxc --with-production -j8``
@@ -12189,15 +12185,19 @@ The remaining options cover details of process launch and connectivity:
    Print help messages
 
 ``++runscript``
-   Script to run node-program with. The specified run script is invoked
-   with the node program and parameter. For example:
+   Script to run program with. The specified run script is invoked with the
+   given program and arguments as parameters. This is useful for loading modules
+   or setting up an environment prior the running the program. For example:
 
    .. code-block:: bash
 
       $ ./charmrun +p4 ./pgm 100 2 3 ++runscript ./set_env_script
 
-   In this case, the ``set_env_script`` is invoked on each node before
-   launching ``pgm``.
+   In this case, ``set_env_script`` is invoked on each node. **Note:** When this
+   is provided, ``charmrun`` will not invoke the program directly, instead only
+   invoking the script with the program name and program arguments passed in as
+   script parameters; thus, ``set_env_script`` should generally end with ``$*``
+   to actually start the program.
 
 ``++xterm``
    Which xterm to use

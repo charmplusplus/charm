@@ -17,5 +17,5 @@ if(CMK_CAN_LINK_FORTRAN)
 endif()
 
 # Fortran module names
-set(CMK_MOD_NAME_ALLCAPS ${CMK_BLUEGENEQ})
+set(CMK_MOD_NAME_ALLCAPS 0)
 set(CMK_MOD_EXT mod)
