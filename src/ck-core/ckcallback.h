@@ -295,13 +295,21 @@ public:
           d.group.refnum = 0;
 	}
 
-  void transformBcastToLocalElem() {
+  void transformBcastToLocalElem(int elem = -1) {
     if(type == bcastGroup) {
       type = sendGroup;
-      d.group.onPE = CkMyPe();
+      if (elem == -1) {
+        d.group.onPE = CkMyPe();
+      } else {
+        d.group.onPE = elem;
+      }
     } else if(type == bcastNodeGroup) {
       type = sendNodeGroup;
-      d.group.onPE = CkMyNode();
+      if (elem == -1) {
+        d.group.onPE = CkMyNode();
+      } else {
+        d.group.onPE = elem;
+      }
     } else {
       CkAbort("CkCallback type needs to be either bcastGroup or bcastNodeGroup to be transformed!");
     }
