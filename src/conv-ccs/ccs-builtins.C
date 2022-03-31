@@ -562,7 +562,7 @@ CpvStaticDeclare(CWebModeStats *,cwebStats);
 
 /* Called to begin a collection interval
 */
-static void usageReset(CWebModeStats *stats,double curWallTime)
+static void usageReset(CWebModeStats *stats, double curWallTime)
 {
    stats->beginTime=curWallTime;
    stats->usedTime = 0.;
@@ -570,17 +570,17 @@ static void usageReset(CWebModeStats *stats,double curWallTime)
 
 /* Called when processor becomes busy
 */
-static void usageStart(CWebModeStats *stats,double curWallTime)
+static void usageStart(CWebModeStats *stats)
 {
-   stats->startTime  = curWallTime;
+   stats->startTime  = CmiWallTimer();
    stats->PROCESSING = 1;
 }
 
 /* Called when processor becomes idle
 */
-static void usageStop(CWebModeStats *stats,double curWallTime)
+static void usageStop(CWebModeStats *stats)
 {
-   stats->usedTime   += curWallTime - stats->startTime;
+   stats->usedTime   += CmiWallTimer() - stats->startTime;
    stats->PROCESSING = 0;
 }
 
@@ -593,10 +593,10 @@ static void initUsage()
    CpvInitialize(CWebModeStats *, cwebStats);
    CWebModeStats *stats=new CWebModeStats;
    CpvAccess(cwebStats)=stats;
-   usageReset(stats,CmiWallTimer());
-   usageStart(stats,CmiWallTimer());
-   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,(CcdVoidFn)usageStart,stats);
-   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)usageStop,stats);    
+   usageReset(stats, CmiWallTimer());
+   usageStart(stats);
+   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,(CcdCondFn)usageStart,stats);
+   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdCondFn)usageStop,stats);
 }
 
 static int getUsage(void)
@@ -608,7 +608,7 @@ static int getUsage(void)
 
    if(stats->PROCESSING)
    { /* Lock in current CPU usage */
-      usageStop(stats,time); usageStart(stats,time);
+      usageStop(stats); usageStart(stats);
    }
    if(totalTime > 0.)
       usage = (int)(0.5 + 100 *stats->usedTime/totalTime);

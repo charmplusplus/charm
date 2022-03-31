@@ -5,7 +5,7 @@ class Test : public CBase_Test {
 public:
   Test(CkMigrateMessage *m) {}
   Test();
-  bool idleProgress(double time);
+  bool idleProgress();
   void registerIdleWork();
 };
 

@@ -860,7 +860,7 @@ private:
 
   // Spring cleaning
   void springCleaning(void);
-  static void staticSpringCleaning(void* forWhom, double curWallTime);
+  static void staticSpringCleaning(void* forWhom);
   void setupSpringCleaning();
   int springCleaningCcd;
 

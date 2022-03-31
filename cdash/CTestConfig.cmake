@@ -1,8 +1,0 @@
-set(CTEST_PROJECT_NAME "Charm%2B%2B")
-set(CTEST_NIGHTLY_START_TIME "01:00:00 UTC")
-set(CTEST_DROP_METHOD "http")
-set(CTEST_DROP_SITE "my.cdash.org")
-set(CTEST_DROP_LOCATION "/cdash/submit.php?project=Charm%2B%2B")
-set(CTEST_CDASH_VERSION "1.6")
-set(CTEST_CDASH_QUERY_VERSION TRUE)
-
