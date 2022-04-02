@@ -43,3 +43,12 @@ testvar: all
 	$(call run, +p4 ./kNeighbor 4 50 128 10 10 10 10 1 +balancer RefineLB +LBDebug 1)
 	$(call run, +p4 ./kNeighbor 4 50 128 10 10 10 10 1 +balancer DistributedLB +LBDebug 1)
 	$(call run, +p4 ./kNeighbor 4 50 128 10 10 10 10 1 +balancer MetisLB +LBDebug 1)
+
+testscale: all
+	$(call run, +p4 ./kNeighbor 4 50 128 10 10 10 10 1 10 5 5)
+	$(call run, +p4 ./kNeighbor 4 50 128 10 10 10 10 1 10 5 5 +balancer DummyLB +LBDebug 1)
+	$(call run, +p4 ./kNeighbor 4 50 128 10 10 10 10 1 10 5 5 +balancer GreedyLB +LBDebug 1)
+	$(call run, +p4 ./kNeighbor 4 50 128 10 10 10 10 1 10 5 5 +balancer GreedyRefineLB +LBDebug 1)
+	$(call run, +p4 ./kNeighbor 4 50 128 10 10 10 10 1 10 5 5 +balancer RefineLB +LBDebug 1)
+	$(call run, +p4 ./kNeighbor 4 50 128 10 10 10 10 1 10 5 5 +balancer DistributedLB +LBDebug 1)
+	$(call run, +p4 ./kNeighbor 4 50 128 10 10 10 10 1 10 5 5 +balancer MetisLB +LBDebug 1)
