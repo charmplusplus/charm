@@ -439,8 +439,7 @@ void collideMgr::checkRegistrationComplete() {
     for(int i =0 ; i<myVoxels.size(); i++) {
       myVoxels[i]->startCollision(steps, gridMap, client, colls);
     }
-    collideVoxel *vox;
-    client.ckLocalBranch()->collisions(vox,steps,colls);
+    client.ckLocalBranch()->collisions(steps,colls);
     collisionStarted = false;
     myVoxels.clear();
   }
@@ -610,8 +609,7 @@ void serialCollideClient::setClient(CollisionClientFn clientFn_,void *clientPara
   clientParam=clientParam_;
 }
 
-void serialCollideClient::collisions(ArrayElement *src,
-    int step,CollisionList &colls)
+void serialCollideClient::collisions(int step,CollisionList &colls)
 {
   if(useCb) { // Use user passed callback as reduction target
     contribute(colls.length()*sizeof(Collision),colls.getData(),
@@ -641,8 +639,7 @@ distributedCollideClient::distributedCollideClient(CkCallback clientCb_) {
   clientCb.transformBcastToLocalElem();
 }
 
-void distributedCollideClient::collisions(ArrayElement *src,
-    int step,CollisionList &colls)
+void distributedCollideClient::collisions(int step,CollisionList &colls)
 {
   // Invoke clientCb
   clientCb.send(CkDataMsg::buildNew(colls.length()*sizeof(Collision), colls.getData()));

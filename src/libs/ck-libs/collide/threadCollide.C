@@ -79,7 +79,7 @@ class threadCollideMgr : public CBase_threadCollideMgr
 
   /// collideClient interface (called by voxels)
   /// Splits up collisions by destination PE
-  void collisions(ArrayElement *src,int step,CollisionList &colls);
+  void collisions(int step,CollisionList &colls);
 
   /// All voxels have now reported their collisions:
   ///  Send off the accumulated collisions to each destination PE
@@ -157,8 +157,7 @@ class threadCollide : public TCharmClient1D {
 
 /// collideClient interface (called by voxels)
 /// Splits up collisions by destination PE
-void threadCollideMgr::collisions(ArrayElement *src,int step,
-    CollisionList &colls) {
+void threadCollideMgr::collisions(int step, CollisionList &colls) {
   // Do a fake reduction, so we'll know when all voxels have reported:
   contribute(CkCallback(CkReductionTarget(threadCollideMgr, sendRemote),thisProxy));
 

@@ -23,8 +23,7 @@
 class collideClient : public Group {
   public:
     virtual ~collideClient();
-    virtual void collisions(ArrayElement *src,
-        int step,CollisionList &colls) =0;
+    virtual void collisions(int step,CollisionList &colls) =0;
 };
 
 /********************** serialCollideClient *****************

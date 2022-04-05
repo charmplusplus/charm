@@ -199,8 +199,7 @@ class serialCollideClient : public collideClient {
   void setClient(CollisionClientFn clientFn,void *clientParam);
 
   /// Called by voxel array on each processor:
-  virtual void collisions(ArrayElement *src,
-      int step,CollisionList &colls);
+  virtual void collisions(int step,CollisionList &colls);
 
   /// Called after the reduction is complete:
   virtual void reductionDone(CkReductionMsg *m);
@@ -216,8 +215,7 @@ class distributedCollideClient : public collideClient {
   distributedCollideClient(CkCallback clientCb_);
 
   /// Called by voxel array on each processor:
-  virtual void collisions(ArrayElement *src,
-      int step,CollisionList &colls);
+  virtual void collisions(int step,CollisionList &colls);
 };
 
 
