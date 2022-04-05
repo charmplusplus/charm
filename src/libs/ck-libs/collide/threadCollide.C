@@ -83,7 +83,7 @@ class threadCollideMgr : public CBase_threadCollideMgr
 
   /// All voxels have now reported their collisions:
   ///  Send off the accumulated collisions to each destination PE
-  void sendRemote(CkReductionMsg *m);
+  void sendRemote();
 
   /// Accept and buffer these remote collisions
   void remoteCollisions(threadCollisions *m);
@@ -142,7 +142,7 @@ class threadCollide : public TCharmClient1D {
 
 
   /// Contribute to Collision and suspend the caller
-  void contribute(int n,const bbox3d *boxes,const int *prio)
+  void addBoxes(int n,const bbox3d *boxes,const int *prio)
   {
     CollideBoxesPrio(collide,thisIndex,n,boxes,prio);
     TCharm * unused = thread->suspend(); //Will be resumed by call to resultsDone()
@@ -160,8 +160,7 @@ class threadCollide : public TCharmClient1D {
 void threadCollideMgr::collisions(ArrayElement *src,int step,
     CollisionList &colls) {
   // Do a fake reduction, so we'll know when all voxels have reported:
-  src->contribute(0,0,CkReduction::sum_int,
-      CkCallback(CkIndex_threadCollideMgr::sendRemote(0),thisProxy));
+  contribute(CkCallback(CkReductionTarget(threadCollideMgr, sendRemote),thisProxy));
 
   // Split out this voxel's contribution
   int i=0, n=colls.size();
@@ -195,7 +194,7 @@ threadCollisions *listToMessage(CollisionList &l)
 
 /// All voxels have now reported their collisions:
 ///  Send off the accumulated collisions to each destination PE
-void threadCollideMgr::sendRemote(CkReductionMsg *m) {
+void threadCollideMgr::sendRemote() {
   // FIXME: optimize this all-to-all
   int p,n=CkNumPes();
   for (p=0;p<n;p++) { // Loop over destination processors:
@@ -320,7 +319,7 @@ FORTRAN_AS_C_RETURN(int,COLLIDE_INIT,COLLIDE_Init,collide_init,
 CLINKAGE void COLLIDE_Boxes(collide_t c,int nBox,const double *boxes)
 {
   COLLIDEAPI("COLLIDE_Boxes");
-  COLLIDE_Lookup(c)->contribute(nBox,(const bbox3d *)boxes,NULL);
+  COLLIDE_Lookup(c)->addBoxes(nBox,(const bbox3d *)boxes,NULL);
 }
 FORTRAN_AS_C(COLLIDE_BOXES,COLLIDE_Boxes,collide_boxes,
     (int *c,int *n,double *box),(*c,*n,box))
@@ -328,7 +327,7 @@ FORTRAN_AS_C(COLLIDE_BOXES,COLLIDE_Boxes,collide_boxes,
 CLINKAGE void COLLIDE_Boxes_prio(collide_t c,int nBox,const double *boxes,const int *prio)
 {
   COLLIDEAPI("COLLIDE_Boxes_prio");
-  COLLIDE_Lookup(c)->contribute(nBox,(const bbox3d *)boxes,prio);
+  COLLIDE_Lookup(c)->addBoxes(nBox,(const bbox3d *)boxes,prio);
 }
 FORTRAN_AS_C(COLLIDE_BOXES_PRIO,COLLIDE_Boxes_prio,collide_boxes_prio,
     (int *c,int *n,double *box,int *prio),(*c,*n,box,prio))
