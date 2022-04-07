@@ -23,8 +23,7 @@
 class collideClient : public Group {
   public:
     virtual ~collideClient();
-    virtual void collisions(ArrayElement *src,
-        int step,CollisionList &colls) =0;
+    virtual void collisions(int step,CollisionList &colls) =0;
 };
 
 /********************** serialCollideClient *****************
@@ -42,6 +41,8 @@ CkGroupID CollideSerialClient(CollisionClientFn clientFn,void *clientParam);
 /// uses the passed callback as the reduction target for the final,
 /// complete Collision list.
 CkGroupID CollideSerialClient(CkCallback clientCb);
+
+CkGroupID CollideDistributedClient(CkCallback clientCb);
 
 /****************** Collision Interface ******************/
 typedef CkGroupID CollideHandle;
