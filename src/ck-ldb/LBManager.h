@@ -6,6 +6,7 @@
 #ifndef LBMANAGER_H
 #define LBMANAGER_H
 
+#include <fstream>
 #include "LBDatabase.h"
 #include "json_fwd.hpp"
 using json = nlohmann::json;
@@ -230,10 +231,16 @@ class LBManager : public CBase_LBManager
 
  public:
   int chare_count;
+  std::ofstream dumpFile;
 
   LBManager(void) { init(); }
   LBManager(CkMigrateMessage* m) : CBase_LBManager(m) { init(); }
-  ~LBManager() { delete lbdb_obj; }
+  ~LBManager()
+  {
+    if (dumpFile.is_open())
+      dumpFile.close();
+    delete lbdb_obj;
+  }
 
  private:
   void init();
