@@ -319,6 +319,11 @@ void _loadbalancerInit()
   if (CmiGetArgIntDesc(argv, "+LBDump", &LBSimulation::dumpStep,
                        "Dump the LB state from this step"))
     _lb_dump_activated = true;
+  if (!_lb_dump_activated && CmiGetArgFlag(argv, "+LBDump"))
+  {
+    _lb_dump_activated = true;
+    LBSimulation::dumpStep = 0;
+  }
   if (_lb_dump_activated && LBSimulation::dumpStep < 0)
   {
     CmiPrintf("LB> Argument LBDump (%d) negative, setting to 0\n",
@@ -557,6 +562,13 @@ void LBManager::init(void)
   else
   {
     CkSyncBarrier::object()->addReceiver([this](void) { this->InvokeLB(); });
+  }
+
+  if (LBSimulation::dumpStep >= 0)
+  {
+    const std::string filename =
+        std::string(LBSimulation::dumpFile) + "." + std::to_string(CkMyPe());
+    dumpFile.open(filename, std::ios::out);
   }
 }
 
