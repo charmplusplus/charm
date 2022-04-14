@@ -1674,24 +1674,6 @@ fi
 
 if test "$BUILD_MPI" = "1"
 then
-cat > $t <<EOT
-#include "mpi.h"
-int main(int argc, char **argv)
-{
-  int thread_level, provided;
-  thread_level = MPI_THREAD_FUNNELED;
-  MPI_Init_thread(&argc, &argv, thread_level, &provided);
-}
-EOT
-test_cxx "whether MPI_Init_thread is supported" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_MPI_INIT_THREAD, $strictpass, [Allows MPI_Init_thread.])
-fi
-mv -f ../include/mpi.h.bak ../include/mpi.h 2>/dev/null
-
-fi
-
-if test "$BUILD_MPI" = "1"
-then
 
 cat > $t <<EOT
 #include <stdio.h>

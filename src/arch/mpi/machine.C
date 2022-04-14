@@ -1352,7 +1352,6 @@ static void registerMPITraceEvents(void) {
 }
 
 static const char *thread_level_tostring(int thread_level) {
-#if CMK_MPI_INIT_THREAD
     switch (thread_level) {
     case MPI_THREAD_SINGLE:
         return "MPI_THREAD_SINGLE";
@@ -1362,18 +1361,9 @@ static const char *thread_level_tostring(int thread_level) {
         return "MPI_THREAD_SERIALIZED";
     case MPI_THREAD_MULTIPLE :
         return "MPI_THREAD_MULTIPLE";
-    default: {
-        char *str = (char *)malloc(5); // XXX: leaked
-        sprintf(str,"%d", thread_level);
-        return str;
+    default:
+        return "unknown";
     }
-    }
-    return  "unknown";
-#else
-    char *str = (char *)malloc(5); // XXX: leaked
-    sprintf(str,"%d", thread_level);
-    return str;
-#endif
 }
 
 extern int quietMode;
@@ -1403,7 +1393,6 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     *argc = CmiGetArgc(largv);     /* update it in case it is out of sync */
 
     if(!CharmLibInterOperate || userDrivenMode) {
-#if CMK_MPI_INIT_THREAD
 #if CMK_SMP
     if (Cmi_smp_mode_setting == COMM_THREAD_SEND_RECV)
         thread_level = MPI_THREAD_FUNNELED;
@@ -1414,11 +1403,6 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
 #endif
       MPI_Init_thread(argc, argv, thread_level, &provided);
       _thread_provided = provided;
-#else
-      MPI_Init(argc, argv);
-      thread_level = 0;
-      _thread_provided = -1;
-#endif
     }
 
     largc = *argc;
@@ -1894,7 +1878,7 @@ void CmiTimerInit(char **argv) {
         starttimer = MPI_Wtime();
     }
 
-#if 0 && CMK_SMP && CMK_MPI_INIT_THREAD
+#if 0 && CMK_SMP
     if (CmiMyRank()==0 && _thread_provided == MPI_THREAD_SINGLE)
         timerLock = CmiCreateLock();
 #endif
