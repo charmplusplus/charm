@@ -6,6 +6,7 @@ include(CheckCXXCompilerFlag)
 # https://stackoverflow.com/uestions/47213356/cmake-using-corrext-c-standard-when-checking-for-header-files
 set(CMAKE_REQUIRED_FLAGS "-std=c++11")
 
+check_cxx_compiler_flag("${CMAKE_CXX17_STANDARD_COMPILE_OPTION}" CMK_COMPILER_KNOWS_CPP17)
 
 # C++ type sizes
 check_type_size("std::void_t" CMK_HAS_STD_VOID_T LANGUAGE CXX)

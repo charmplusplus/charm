@@ -1081,6 +1081,13 @@ then
     fi
 fi
 
+if [ "$USE_NEW_STD" = "1" ] && [ "$CMK_COMPILER_KNOWS_CPP17" = "1" ]
+then
+	CMK_CXX_FLAGS="$CMK_ENABLE_CPP17 $CMK_CXX_FLAGS"
+else
+	CMK_CXX_FLAGS="$CMK_ENABLE_CPP11 $CMK_CXX_FLAGS"
+fi
+
 if [ "$ROSE_OMP_TLS_GLOBALS" = "yes" ]
 then
     USE_OPENMP="yes"
