@@ -14,7 +14,6 @@ int nElements;
 void printCollisionHandler(void *param,int nColl,Collision *colls)
 {
   CkPrintf("**********************************************\n");
-  CkPrintf("*** Final collision handler called-- %d records:\n",nColl);
   int nPrint=nColl;
   const int maxPrint=30;
   if (nPrint>maxPrint) nPrint=maxPrint;
@@ -42,12 +41,19 @@ class main : public CBase_main
 
       CollideGrid3d gridMap(CkVector3d(0,0,0),CkVector3d(2,100,2));
 
+#if COLLIDE_USE_DIST
+      CProxy_collResultCollector collProxy = CProxy_collResultCollector::ckNew();
+      CkStartQD(CkCallback(CkIndex_main::maindone(), thisProxy));
+      CollideHandle collide = CollideCreate(gridMap,
+            CollideDistributedClient(CkCallback(CkIndex_collResultCollector::myColls(NULL), collProxy)));
+#else
 #if COLLIDE_USE_CB
       CollideHandle collide = CollideCreate(gridMap,
           CollideSerialClient(CkCallback(CkIndex_main::printCollisionCb(NULL), thisProxy)));
 #else
       CollideHandle collide=CollideCreate(gridMap,
           CollideSerialClient(printCollisionHandler,0));
+#endif
 #endif
 
       arr = CProxy_Hello::ckNew(collide,nElements);
@@ -69,6 +75,25 @@ class main : public CBase_main
 
       delete msg;
     }
+};
+
+class collResultCollector : public CBase_collResultCollector {
+  public:
+  collResultCollector() {}
+
+  void myColls(CkDataMsg *msg) {
+    Collision *colls = (Collision *)msg->getData();
+    int nColl = msg->getSize()/sizeof(Collision);
+    int nPrint=nColl;
+    const int maxPrint=30;
+    if (nPrint>maxPrint) nPrint=maxPrint;
+    for (int c=0;c<nPrint;c++) {
+      CkPrintf("%d:%d hits %d:%d\n",
+          colls[c].A.chunk,colls[c].A.number,
+          colls[c].B.chunk,colls[c].B.number);
+    }
+    delete msg;
+  }
 };
 
 class Hello : public CBase_Hello
