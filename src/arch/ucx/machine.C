@@ -113,10 +113,11 @@ typedef struct UcxPendingRequest
     int                     index;
     void                    *msgBuf;
     int                     size;
-    ucp_tag_t               tag;
+    unsigned                id;
+    unsigned                send_flags;
     int                     dNode;
     int                     op;
-    ucp_send_callback_t     cb;
+    ucp_send_nbx_callback_t cb;
 #if CMK_CUDA
     ucp_tag_recv_callback_t recv_cb;
     ucp_tag_t               mask;
