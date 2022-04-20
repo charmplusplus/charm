@@ -32,7 +32,6 @@
 
 #define CmiSetMsgSize(msg, sz)    ((((CmiMsgHeaderBasic *)msg)->size) = (sz))
 
-<<<<<<< HEAD
 #define UCX_MSG_PROBE_THRESH            32768
 #define UCX_MSG_NUM_RX_REQS             64
 #define UCX_MSG_NUM_RX_REQS_MAX         1024
@@ -49,8 +48,6 @@
 #define UCX_RMA_TAG_MASK                (UCS_MASK(UCX_TAG_RMA_BITS) << UCX_TAG_MSG_BITS)
 #define UCX_MSG_TAG_MASK_FULL           0xffffffffffffffffUL
 
-=======
->>>>>>> f86e3cf3e (Use UCX AM API instead of TAG)
 #define UCX_LOG_PRIO 50 // Disabled by default
 
 enum {
@@ -82,6 +79,9 @@ enum {
 
 typedef struct UcxRequest
 {
+    void           *msgBuf;
+    int            idx;
+    int            completed;
 #if CMK_ONESIDED_IMPL
     void           *ncpyAck;
     ucp_rkey_h     rkey;
@@ -98,15 +98,17 @@ typedef struct UcxContext
     ucp_context_h     context;
     ucp_worker_h      worker;
     ucp_ep_h          *eps;
+    UcxRequest        **rxReqs;
 #if CMK_SMP
     PCQueue           txQueue;
 #endif
+    int               eagerSize;
+    int               numRxReqs;
 } UcxContext;
 
 #ifdef CMK_SMP
 typedef struct UcxPendingRequest
 {
-<<<<<<< HEAD
     int                     state;
     int                     index;
     void                    *msgBuf;
@@ -121,35 +123,24 @@ typedef struct UcxPendingRequest
     DeviceRdmaOp*           device_op;
     DeviceRecvType          type;
 #endif
-=======
-    void                    *msgBuf;
-    int                     size;
-    unsigned                id;
-    unsigned                send_flags;
-    int                     dNode;
-    int                     op;
-    ucp_send_nbx_callback_t cb;
->>>>>>> f86e3cf3e (Use UCX AM API instead of TAG)
 } UcxPendingRequest;
 #endif
 
 static UcxContext ucxCtx;
 
 static void UcxRxReqCompleted(void *request, ucs_status_t status,
-<<<<<<< HEAD
-                              ucp_tag_recv_info_t *info);
+                              size_t length, void* user_data);
+
 static void UcxPrepostRxBuffers();
 
 #if CMK_CUDA
 CpvDeclare(int, tag_counter);
 #endif
 
-=======
-                              size_t length, void *user_data);
 static ucs_status_t UcxAmRxDataCb(void *arg, const void *header, size_t header_length,
                                   void *data, size_t length,
                                   const ucp_am_recv_param_t *param);
->>>>>>> f86e3cf3e (Use UCX AM API instead of TAG)
+
 #if CMK_ONESIDED_IMPL
 static ucs_status_t UcxAmRxRmaPutCb(void *arg, const void *header, size_t header_length,
                                     void *data, size_t length,
@@ -180,7 +171,6 @@ static ucs_status_t UcxAmRxRmaDeregCb(void *arg, const void *header, size_t head
 
 #define UCX_CHECK_PMI_RET(_ret, _str) UCX_CHECK_RET(_ret, _str, _ret)
 
-<<<<<<< HEAD
 #if CMK_CUDA
 inline void UcxInvokeRecvHandler(DeviceRdmaOp* op, DeviceRecvType type) {
   switch (type) {
@@ -207,8 +197,6 @@ void UcxRequestInit(void *request)
 #endif
 }
 
-=======
->>>>>>> f86e3cf3e (Use UCX AM API instead of TAG)
 static void UcxInitEps(int numNodes, int myId)
 {
     size_t addrlen;
@@ -369,7 +357,6 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #if CMK_SMP
     ucxCtx.txQueue = PCQueueCreate();
 #endif
-<<<<<<< HEAD
 
     UCX_LOG(5, "Initialized: preposted reqs %d, rndv thresh %d\n",
             ucxCtx.numRxReqs, ucxCtx.eagerSize);
@@ -378,8 +365,6 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     CpvInitialize(int, tag_counter);
     CpvAccess(tag_counter) = 0;
 #endif
-=======
->>>>>>> f86e3cf3e (Use UCX AM API instead of TAG)
 }
 
 static ucs_status_t UcxAmRxDataCb(void *arg, const void *header, size_t header_length,
