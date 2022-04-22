@@ -1126,10 +1126,16 @@ typedef void (*CmiStartFn)(int argc, char **argv);
   @addtogroup ConverseScheduler
   @{
 */
-CpvExtern(int, _ccd_numchecks);
 extern void  CcdCallBacks(void);
-#define CsdPeriodic() do{ if (CpvAccess(_ccd_numchecks)-- <= 0) CcdCallBacks(); } while(0)
-#define CsdResetPeriodic()    CpvAccess(_ccd_numchecks) = 0;
+#if CSD_NO_PERIODIC
+#define CsdPeriodic()
+#define CsdResetPeriodic()
+#else
+CpvExtern(int, _ccd_numchecks);
+CpvExtern(int, _ccd_heaplen);
+#define CsdPeriodic() do{ if (CpvAccess(_ccd_heaplen) > 0 && CpvAccess(_ccd_numchecks)-- <= 0) CcdCallBacks(); } while(0)
+#define CsdResetPeriodic()    CpvAccess(_ccd_numchecks) = 0
+#endif
 
 extern void  CsdEndIdle(void);
 extern void  CsdStillIdle(void);
@@ -1804,6 +1810,8 @@ void CmiOutOfMemory(int nBytes);
 
 /******** CONVCONDS ********/
 
+#define CCD_COND_FN_EXISTS 1
+typedef void (*CcdCondFn)(void *userParam);
 typedef void (*CcdVoidFn)(void *userParam,double curWallTime);
 
 /*CPU conditions*/
@@ -1857,14 +1865,14 @@ extern CmiSwitchToPEFnPtr CmiSwitchToPE;
 #define CmiSwitchToPE(pe)  pe
 #endif
 void CcdCallFnAfter(CcdVoidFn fnp, void *arg, double msecs);
-int CcdCallOnCondition(int condnum, CcdVoidFn fnp, void *arg);
-int CcdCallOnConditionKeep(int condnum, CcdVoidFn fnp, void *arg);
+int CcdCallOnCondition(int condnum, CcdCondFn fnp, void *arg);
+int CcdCallOnConditionKeep(int condnum, CcdCondFn fnp, void *arg);
 void CcdCallFnAfterOnPE(CcdVoidFn fnp, void *arg, double msecs, int pe);
-int CcdCallOnConditionOnPE(int condnum, CcdVoidFn fnp, void *arg, int pe);
-int CcdCallOnConditionKeepOnPE(int condnum, CcdVoidFn fnp, void *arg, int pe);
+int CcdCallOnConditionOnPE(int condnum, CcdCondFn fnp, void *arg, int pe);
+int CcdCallOnConditionKeepOnPE(int condnum, CcdCondFn fnp, void *arg, int pe);
 void CcdCancelCallOnCondition(int condnum, int idx);
 void CcdCancelCallOnConditionKeep(int condnum, int idx);
-double CcdRaiseCondition(int condnum);
+void CcdRaiseCondition(int condnum);
 double CcdSetResolution(double newResolution);
 double CcdResetResolution(void);
 double CcdIncreaseResolution(double newResolution);

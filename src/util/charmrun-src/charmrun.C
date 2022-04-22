@@ -4142,6 +4142,15 @@ int main(int argc, const char **argv, char **envp)
       host_table.resize(arg_requested_numhosts);
   }
 
+#if !defined(_WIN32)
+  if (arg_runscript && access(arg_runscript, X_OK))
+  {
+    fprintf(stderr, "Charmrun> Error: runscript \"%s\" is not executable: %s\n",
+            arg_runscript, strerror(errno));
+    exit(1);
+  }
+#endif
+
   if (arg_verbose)
   {
     char ips[200];

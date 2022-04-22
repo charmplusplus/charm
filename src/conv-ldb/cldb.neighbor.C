@@ -92,7 +92,7 @@ static void CldEndIdle(void *dummy)
   CpvAccess(CldData)->lastCheck = -1;
 }
 
-static void CldStillIdle(void *dummy, double curT)
+static void CldStillIdle(void *dummy)
 {
   int i;
   double startT;
@@ -100,7 +100,7 @@ static void CldStillIdle(void *dummy, double curT)
   int myload;
   CldProcInfo  cldData = CpvAccess(CldData);
 
-  double now = curT;
+  double now = CmiWallTimer();
   double lt = cldData->lastCheck;
   /* only ask for work every 20ms */
   if (cldData->sent && (lt!=-1 && now-lt< PERIOD*0.001)) return;
@@ -698,7 +698,7 @@ void CldGraphModuleInit(char **argv)
 #endif
     CldBalancePeriod(NULL, CmiWallTimer());
 */
-    CcdCallOnCondition(CcdTOPOLOGY_AVAIL, (CcdVoidFn)topo_callback, NULL);
+    CcdCallOnCondition(CcdTOPOLOGY_AVAIL, (CcdCondFn)topo_callback, NULL);
 
   }
 
@@ -716,9 +716,9 @@ void CldGraphModuleInit(char **argv)
   if (_lbsteal) {
   /* register idle handlers - when idle, keep asking work from neighbors */
   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
-      (CcdVoidFn) CldBeginIdle, NULL);
+      (CcdCondFn) CldBeginIdle, NULL);
   CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,
-      (CcdVoidFn) CldStillIdle, NULL);
+      (CcdCondFn) CldStillIdle, NULL);
     if (CmiMyPe() == 0) 
       CmiPrintf("Charm++> Work stealing is enabled. \n");
   }

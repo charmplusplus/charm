@@ -298,6 +298,13 @@ public:
 };
 
 template<class MSA>
+class MSAFlatten;
+
+// type trait to map an n-dimension MSA to its 1D counterpart
+template<class MSA>
+using MSAFlattenT = typename MSAFlatten<MSA>::type;
+
+template<class MSA>
 class MSAAccum : public MSAHandle<MSA>
 {
 protected:
@@ -316,7 +323,7 @@ public:
     inline Accumulable<MSA> accumulate(int x)
     {
         checkValid();
-        return Accumulable<MSA>(msa->accumulate(x));
+        return Accumulable<MSA>(((MSAFlattenT<MSA> *)msa)->accumulate(x));
     }
     inline Accumulable<MSA> operator() (int x)
     { return accumulate(x); }
@@ -408,7 +415,9 @@ public:
     friend class MSAHandle<thisMSA>;
     friend class MSARead<thisMSA>;
     friend class MSAWrite<thisMSA>;
-    friend class MSAAccum<thisMSA>;
+
+    template<typename MSA>
+    friend class MSAAccum;
 
 protected:
     /// Total number of ENTRY's in the whole array.
@@ -668,6 +677,10 @@ protected:
     }
 };
 
+template<class ENTRY, class ENTRY_OPS_CLASS, unsigned int ENTRIES_PER_PAGE>
+struct MSAFlatten<MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>> {
+    using type = MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>;
+};
 
 // define a 2d distributed array based on the 1D array, support row major and column
 // major arrangement of data
@@ -792,6 +805,11 @@ public:
     }
 
 protected:
+    inline ENTRY& accumulate(unsigned int row, unsigned int col)
+    {
+        return super::accumulate(getIndex(row, col));
+    }
+
     inline const ENTRY& get(unsigned int row, unsigned int col)
     {
         return super::get(getIndex(row, col));
@@ -808,6 +826,11 @@ protected:
     {
         return super::set(getIndex(row, col));
     }
+};
+
+template<class ENTRY, class ENTRY_OPS_CLASS, unsigned int ENTRIES_PER_PAGE, MSA_Array_Layout_t ARRAY_LAYOUT>
+struct MSAFlatten<MSA2D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE, ARRAY_LAYOUT>> {
+    using type = MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>;
 };
 
 /**
@@ -1147,6 +1170,11 @@ protected:
     {
         cache->SyncReq(single, clear);
     }
+};
+
+template<class ENTRY, class ENTRY_OPS_CLASS, unsigned int ENTRIES_PER_PAGE>
+struct MSAFlatten<MSA3D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>> {
+    using type = MSA1D<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>;
 };
 
 }

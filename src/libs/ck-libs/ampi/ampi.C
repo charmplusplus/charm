@@ -1064,13 +1064,13 @@ static void ampiNodeInit() noexcept
 #if AMPI_PRINT_IDLE
 static double totalidle=0.0, startT=0.0;
 static int beginHandle, endHandle;
-static void BeginIdle(void *dummy,double curWallTime) noexcept
+static void BeginIdle(void *dummy) noexcept
 {
-  startT = curWallTime;
+  startT = CkWallTimer();
 }
-static void EndIdle(void *dummy,double curWallTime) noexcept
+static void EndIdle(void *dummy) noexcept
 {
-  totalidle += curWallTime - startT;
+  totalidle += CkWallTimer() - startT;
 }
 #endif
 
@@ -11616,8 +11616,8 @@ int AMPI_Trace_end(void)
 int AMPI_Install_idle_timer(void)
 {
 #if AMPI_PRINT_IDLE
-  beginHandle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)BeginIdle,NULL);
-  endHandle = CcdCallOnConditionKeep(CcdPROCESSOR_END_IDLE,(CcdVoidFn)EndIdle,NULL);
+  beginHandle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdCondFn)BeginIdle,NULL);
+  endHandle = CcdCallOnConditionKeep(CcdPROCESSOR_END_IDLE,(CcdCondFn)EndIdle,NULL);
 #endif
   return MPI_SUCCESS;
 }

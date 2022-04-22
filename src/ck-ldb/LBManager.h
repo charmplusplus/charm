@@ -50,7 +50,8 @@ class CkLBArgs
     _lb_debug = 0;
     _lb_ignoreBgLoad = _lb_syncResume = _lb_useCpuTime = false;
     _lb_printsummary = _lb_migObjOnly = false;
-    _lb_statson = _lb_traceComm = true;
+    _lb_statson = true;
+    _lb_traceComm = false;
     _lb_loop = false;
     _lb_central_pe = 0;
     _lb_maxDistPhases = 10;
