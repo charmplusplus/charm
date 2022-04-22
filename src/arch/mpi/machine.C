@@ -1423,9 +1423,16 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
 
     largc = *argc;
     largv = *argv;
+
     if(!CharmLibInterOperate || userDrivenMode) {
-      MPI_Comm_dup(MPI_COMM_WORLD, &charmComm);
+      /* Create our communicator, with info hints (such as us not requiring
+       * message ordering) to enable possible MPI runtime optimizations. */
+      MPI_Info hints;
+      MPI_Info_create(&hints);
+      MPI_Info_set(hints, "mpi_assert_allow_overtaking", "true");
+      MPI_Comm_dup_with_info(MPI_COMM_WORLD, hints, &charmComm);
     }
+
     MPI_Comm_size(charmComm, numNodes);
     MPI_Comm_rank(charmComm, myNodeID);
 
