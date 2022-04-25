@@ -205,7 +205,7 @@ static void CldEndIdle(void *dummy)
     CpvAccess(CldData)->lastCheck = -1;
 }
 
-static void CldStillIdle(void *dummy, double curT)
+static void CldStillIdle(void *dummy)
 {
     if(CmiMyPe() == 0) 
     {
@@ -224,7 +224,7 @@ static void CldStillIdle(void *dummy, double curT)
     double startT;
     requestmsg msg;
     CldProcInfo  cldData = CpvAccess(CldData);
-    double now = curT;
+    double now = CmiWallTimer();
     double lt = cldData->lastCheck;
    
     cldData->load  = 0;
@@ -375,11 +375,11 @@ void  CldOtherInit()
   if (_lbsteal) {
   /* register idle handlers - when idle, keep asking work from neighbors */
   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
-      (CcdVoidFn) CldBeginIdle, NULL);
+      (CcdCondFn) CldBeginIdle, NULL);
   CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,
-      (CcdVoidFn) CldStillIdle, NULL);
+      (CcdCondFn) CldStillIdle, NULL);
   CcdCallOnConditionKeep(CcdPROCESSOR_END_IDLE,
-      (CcdVoidFn) CldEndIdle, NULL);
+      (CcdCondFn) CldEndIdle, NULL);
     if (CmiMyPe() == 0) 
       CmiPrintf("Charm++> Work stealing is enabled. \n");
   }

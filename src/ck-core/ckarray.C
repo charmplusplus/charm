@@ -529,7 +529,7 @@ inline void CkArray::springCleaning(void)
   setupSpringCleaning();
 }
 
-void CkArray::staticSpringCleaning(void* forArray, double curWallTime)
+void CkArray::staticSpringCleaning(void* forArray)
 {
   ((CkArray*)forArray)->springCleaning();
 }
@@ -539,7 +539,7 @@ void CkArray::setupSpringCleaning()
   // set up broadcast cleaner
   if (!stableLocations)
     springCleaningCcd =
-        CcdCallOnCondition(CcdPERIODIC_1minute, staticSpringCleaning, (void*)this);
+        CcdCallOnCondition(CcdPERIODIC_1minute, (CcdCondFn)CkArray::staticSpringCleaning, (void*)this);
 }
 
 /********************* Little CkArray Utilities ******************/

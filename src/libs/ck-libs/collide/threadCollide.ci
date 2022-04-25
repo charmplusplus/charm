@@ -8,7 +8,7 @@ module collide {
 
   group threadCollideMgr : collideClient {
     entry threadCollideMgr(void);
-    entry void sendRemote(CkReductionMsg *m);
+    entry [reductiontarget] void sendRemote();
     entry void remoteCollisions(threadCollisions *m);
   };
   array[1D] threadCollide {
