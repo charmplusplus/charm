@@ -779,7 +779,7 @@ set(src-util-h-sources src/util/SSE-Double.h src/util/SSE-Float.h
     src/util/treeStrategy_nodeAware_minBytes.h
     src/util/treeStrategy_nodeAware_minGens.h src/util/treeStrategy_topoUnaware.h
     src/util/uFcontext.h src/util/uJcontext.h src/util/valgrind.h
-    src/util/vector2d.h)
+    src/util/vector2d.h src/util/fastforest.h)
 
 foreach(filename ${src-util-h-sources})
     configure_file(${filename} include/ COPYONLY)
