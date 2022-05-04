@@ -7,7 +7,6 @@
 
 #include "converse.h"
 #include <sys/types.h> /* for size_t */
-#include <stdint.h> /* for uint8_t */
 
 #ifdef __cplusplus
 #include "conv-rdma.h"
@@ -192,11 +191,10 @@ typedef enum{
 
 // What to do if an entry method is invoked on
 // an array element that does not (yet) exist:
-typedef enum : uint8_t
-{
-  CkArray_IfNotThere_buffer = 0,      // Wait for it to be created
-  CkArray_IfNotThere_createhere = 1,  // Make it on sending Pe
-  CkArray_IfNotThere_createhome = 2   // Make it on (a) home Pe
+typedef enum{
+	CkArray_IfNotThere_buffer = 0,			// Wait for it to be created
+	CkArray_IfNotThere_createhere = 1,	// Make it on sending Pe
+	CkArray_IfNotThere_createhome = 2		// Make it on (a) home Pe
 } CkArray_IfNotThere;
 
 /** A "call function" to invoke a method on an object. See EntryInfo */

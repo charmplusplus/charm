@@ -2029,7 +2029,7 @@ the runtime will not “commit” to this branch until the second arrives.
 If another dependency fully matches, the partial match will be ignored
 and can be used to trigger another ``when`` later in the execution.
 
-.. code-block:: charmci
+.. code-block:: text
 
    case {
      when a() { }
