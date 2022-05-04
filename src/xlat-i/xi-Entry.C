@@ -2459,6 +2459,19 @@ void Entry::genReg(XStr& str) {
   str << "  // REG: " << *this;
   str << "  " << epIdx(0) << ";\n";
   if (isReductionTarget()) str << "  " << epIdx(0, true) << ";\n";
+
+  const char* ifNot = nullptr;
+  if (isCreateHere()) ifNot = "CkArray_IfNotThere_createhere";
+  else if (isCreateHome()) ifNot = "CkArray_IfNotThere_createhome";
+
+  if (ifNot) {
+    auto regIfNot = [&](XStr&& idx) {
+      str << "  " << "CkRegisterIfNotThere(" << idx << ", " << ifNot << ");\n";
+    };
+    regIfNot(epIdx(0));
+    if (isReductionTarget()) regIfNot(epIdx(0, true));
+  }
+
   if (isConstructor()) {
     if (container->isMainChare() && !isMigrationConstructor())
       str << "  CkRegisterMainChare(__idx, " << epIdx(0) << ");\n";

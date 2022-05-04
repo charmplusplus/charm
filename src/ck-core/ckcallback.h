@@ -535,26 +535,27 @@ public:
                 }
         }
 
-int epIndex(void) const {
-  switch (type) {
-    case isendChare:
-    case sendChare:
-      return d.chare.ep;
-    case isendGroup:
-    case sendGroup:
-    case isendNodeGroup:
-    case sendNodeGroup:
-    case bcastNodeGroup:
-    case bcastGroup:
-      return d.group.ep;
-    case isendArray:
-    case sendArray:
-    case bcastArray:
-      return d.array.ep;
-    default:
-      return -1;
-  }
-}
+    // returns target EP's index (if one exists)
+    int epIndex(void) const {
+        switch (type) {
+            case isendChare:
+            case sendChare:
+                return d.chare.ep;
+            case isendGroup:
+            case sendGroup:
+            case isendNodeGroup:
+            case sendNodeGroup:
+            case bcastNodeGroup:
+            case bcastGroup:
+                return d.group.ep;
+            case isendArray:
+            case sendArray:
+            case bcastArray:
+                return d.array.ep;
+            default:
+                return -1;
+        }
+    }
 };
 //PUPbytes(CkCallback) //FIXME: write a real pup routine
 

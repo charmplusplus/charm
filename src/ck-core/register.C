@@ -200,6 +200,12 @@ void CkRegisterMainChareExt(const char *s, int numEntryMethods, int *chareIdx, i
 }
 #endif
 
+void CkRegisterIfNotThere(int epIdx, CkArray_IfNotThere policy) {
+  if ((epIdx >= -1) && (!__registerDone || CMK_CHARM4PY)) {
+    _entryTable[epIdx]->ifNotThere = policy;
+  }
+}
+
 void CkRegisterBase(int derivedIdx, int baseIdx)
 {
   if (baseIdx!=-1)
