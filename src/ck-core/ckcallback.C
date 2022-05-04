@@ -317,18 +317,21 @@ void CkCallback::send(int length,const void *data) const
   It takes the given message and handles it appropriately.
   After the send(), this callback is finished and cannot be reused.
 */
-void CkCallback::send(void *msg) const
+void CkCallback::send(void *msg,int opts) const
 {
-  // Variable is set with CK_MSG_IMMEDIATE when callback is pointing to an
-  // immediate entry method
-  int opts = 0;
-
 #if CMK_CHARM4PY
   if (isExtCallback) { // callback target is external
     CkCallbackSendExt(*this, msg);
     return;
   }
 #endif
+
+  // lookup flags in table for entry method
+  auto ep = this->epIndex();
+  auto* entry = (ep >= 0) ? _entryTable[ep] : nullptr;
+  if (entry && entry->isImmediate) {
+    opts |= CK_MSG_IMMEDIATE;
+  }
 
 	switch(type) {
 	case CkCallback::sendFuture:
@@ -367,61 +370,58 @@ void CkCallback::send(void *msg) const
 	case sendChare: //Send message to a chare
 		if (!msg) msg=CkAllocSysMsg();
                 if (d.chare.hasRefnum) CkSetRefNum(msg, d.chare.refnum);
-		CkSendMsg(d.chare.ep, msg, &d.chare.id);
+		CkSendMsg(d.chare.ep, msg, &d.chare.id, opts);
 		break;
 	case isendChare: //inline send-to-chare
 		if (!msg) msg=CkAllocSysMsg();
                 if (d.chare.hasRefnum) CkSetRefNum(msg, d.chare.refnum);
-		CkSendMsgInline(d.chare.ep, msg, &d.chare.id);
+		CkSendMsgInline(d.chare.ep, msg, &d.chare.id, opts);
 		break;
 	case sendGroup: //Send message to a group element
 		if (!msg) msg=CkAllocSysMsg();
                 if (d.group.hasRefnum) CkSetRefNum(msg, d.group.refnum);
-		CkSendMsgBranch(d.group.ep, msg, d.group.onPE, d.group.id);
+		CkSendMsgBranch(d.group.ep, msg, d.group.onPE, d.group.id, opts);
 		break;
 	case sendNodeGroup: //Send message to a group element
 		if (!msg) msg=CkAllocSysMsg();
                 if (d.group.hasRefnum) CkSetRefNum(msg, d.group.refnum);
-                if (_entryTable[d.group.ep]->isImmediate) opts = CK_MSG_IMMEDIATE;
 		CkSendMsgNodeBranch(d.group.ep, msg, d.group.onPE, d.group.id, opts);
 		break;
 	case isendGroup: //inline send-to-group element
 		if (!msg) msg=CkAllocSysMsg();
                 if (d.group.hasRefnum) CkSetRefNum(msg, d.group.refnum);
-		CkSendMsgBranchInline(d.group.ep, msg, d.group.onPE, d.group.id);
+		CkSendMsgBranchInline(d.group.ep, msg, d.group.onPE, d.group.id, opts);
 		break;
 	case isendNodeGroup: //inline send-to-group element
 		if (!msg) msg=CkAllocSysMsg();
                 if (d.group.hasRefnum) CkSetRefNum(msg, d.group.refnum);
-                if (_entryTable[d.group.ep]->isImmediate) opts = CK_MSG_IMMEDIATE;
 		CkSendMsgNodeBranchInline(d.group.ep, msg, d.group.onPE, d.group.id, opts);
 		break;
 	case sendArray: //Send message to an array element
 		if (!msg) msg=CkAllocSysMsg();
                 if (d.array.hasRefnum) CkSetRefNum(msg, d.array.refnum);
 		CkSetMsgArrayIfNotThere(msg);
-		CkSendMsgArray(d.array.ep, msg, d.array.id, d.array.idx.asChild());
+		CkSendMsgArray(d.array.ep, msg, d.array.id, d.array.idx.asChild(), opts);
 		break;
 	case isendArray: //inline send-to-array element
 		if (!msg) msg=CkAllocSysMsg();
                 if (d.array.hasRefnum) CkSetRefNum(msg, d.array.refnum);
-		CkSendMsgArrayInline(d.array.ep, msg, d.array.id, d.array.idx.asChild());
+		CkSendMsgArrayInline(d.array.ep, msg, d.array.id, d.array.idx.asChild(), opts);
 		break;
 	case bcastGroup:
 		if (!msg) msg=CkAllocSysMsg();
                 if (d.group.hasRefnum) CkSetRefNum(msg, d.group.refnum);
-		CkBroadcastMsgBranch(d.group.ep, msg, d.group.id);
+		CkBroadcastMsgBranch(d.group.ep, msg, d.group.id, opts);
 		break;
 	case bcastNodeGroup:
 		if (!msg) msg=CkAllocSysMsg();
                 if (d.group.hasRefnum) CkSetRefNum(msg, d.group.refnum);
-                if (_entryTable[d.group.ep]->isImmediate) opts = CK_MSG_IMMEDIATE;
 		CkBroadcastMsgNodeBranch(d.group.ep, msg, d.group.id, opts);
 		break;
 	case bcastArray:
 		if (!msg) msg=CkAllocSysMsg();
                 if (d.array.hasRefnum) CkSetRefNum(msg, d.array.refnum);
-		CkBroadcastMsgArray(d.array.ep, msg, d.array.id);
+		CkBroadcastMsgArray(d.array.ep, msg, d.array.id, opts);
 		break;
 #if !CMK_CHARM4PY
 	case bcastSection: {
@@ -429,7 +429,7 @@ void CkCallback::send(void *msg) const
                 if (d.section.hasRefnum) CkSetRefNum(msg, d.section.refnum);
                 CkSectionInfo sinfo(d.section.sinfo);
                 CkSectionID secID(sinfo, d.section._elems, d.section._nElems, d.section.pelist, d.section.npes);
-		CkBroadcastMsgSection(d.section.ep, msg, secID);
+		CkBroadcastMsgSection(d.section.ep, msg, secID, opts);
 		break;
              }
 #endif

@@ -322,7 +322,7 @@ public:
 };
 
 // Simple C-like API:
-void CkSetMsgArrayIfNotThere(void* msg);
+void CkSetMsgArrayIfNotThere(void* msg, CkArray_IfNotThere* opts = nullptr);
 void CkSendMsgArray(int entryIndex, void* msg, CkArrayID aID, const CkArrayIndex& idx,
                     int opts = 0);
 void CkSendMsgArrayInline(int entryIndex, void* msg, CkArrayID aID,
