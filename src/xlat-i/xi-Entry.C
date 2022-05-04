@@ -2465,11 +2465,11 @@ void Entry::genReg(XStr& str) {
   else if (isCreateHome()) ifNot = "CkArray_IfNotThere_createhome";
 
   if (ifNot) {
-    auto regIfNot = [&](XStr&& idx) {
-      str << "  " << "CkRegisterIfNotThere(" << idx << ", " << ifNot << ");\n";
-    };
-    regIfNot(epIdx(0));
-    if (isReductionTarget()) regIfNot(epIdx(0, true));
+    str << "  " << "CkRegisterIfNotThere(" << epIdx(0) << ", " << ifNot << ");\n";
+    if (isReductionTarget()) {
+      str << "  " << "CkRegisterIfNotThere(" << epIdx(0, true)
+          << ", " << ifNot << ");\n";
+    }
   }
 
   if (isConstructor()) {

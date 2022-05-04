@@ -5666,12 +5666,14 @@ then invokes it to return a result may have the following interface:
      cb.send(msg);
    }
 
-A CkCallback will accept any message type, or even NULL. The message is
+A *CkCallback* will accept any message type, even *nullptr*. The message is
 immediately sent to the user’s client function or entry point. A library
 which returns its result through a callback should have a clearly
 documented return message type. The type of the message returned by the
 library must be the same as the type accepted by the entry method
-specified in the callback.
+specified in the callback. Note that message flag(s) may be passed as an
+optional argument to “send;” for example, :code:`send(_, CK_MSG_EXPEDITED)`
+will send a message with expediency.
 
 As an alternative to “send”, the callback can be used in a *contribute*
 collective operation. This will internally invoke the “send” method on

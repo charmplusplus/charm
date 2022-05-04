@@ -326,7 +326,7 @@ void CkCallback::send(void *msg,int opts) const
   }
 #endif
 
-  // lookup an entry method's flags in table
+	// lookup an entry method's flags in table
 	auto ep = this->epIndex();
 	auto* entry = (ep >= 0) ? _entryTable[ep] : nullptr;
 	auto policy = CkArray_IfNotThere_buffer;
@@ -402,13 +402,13 @@ void CkCallback::send(void *msg,int opts) const
 	case sendArray: //Send message to an array element
 		if (!msg) msg=CkAllocSysMsg();
                 if (d.array.hasRefnum) CkSetRefNum(msg, d.array.refnum);
-		CkSetMsgArrayIfNotThere(msg, &policy);
+		CkSetMsgArrayIfNotThere(msg, policy);
 		CkSendMsgArray(d.array.ep, msg, d.array.id, d.array.idx.asChild(), opts);
 		break;
 	case isendArray: //inline send-to-array element
 		if (!msg) msg=CkAllocSysMsg();
                 if (d.array.hasRefnum) CkSetRefNum(msg, d.array.refnum);
-		CkSetMsgArrayIfNotThere(msg, &policy);
+		CkSetMsgArrayIfNotThere(msg, policy);
 		CkSendMsgArrayInline(d.array.ep, msg, d.array.id, d.array.idx.asChild(), opts);
 		break;
 	case bcastGroup:
@@ -424,7 +424,7 @@ void CkCallback::send(void *msg,int opts) const
 	case bcastArray:
 		if (!msg) msg=CkAllocSysMsg();
                 if (d.array.hasRefnum) CkSetRefNum(msg, d.array.refnum);
-		CkSetMsgArrayIfNotThere(msg, &policy);
+		CkSetMsgArrayIfNotThere(msg, policy);
 		CkBroadcastMsgArray(d.array.ep, msg, d.array.id, opts);
 		break;
 #if !CMK_CHARM4PY
