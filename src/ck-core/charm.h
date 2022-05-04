@@ -7,6 +7,7 @@
 
 #include "converse.h"
 #include <sys/types.h> /* for size_t */
+#include <stdint.h> /* for uint8_t */
 
 #ifdef __cplusplus
 #include "conv-rdma.h"
