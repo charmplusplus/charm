@@ -14,9 +14,9 @@
 /*
  * Variance in values in computation and communication loads
  */
-#define COMM_VAR 1
-#define COMP_VAR 1
-#define STEPS 1
+#define COMM_VAR        1
+#define COMP_VAR        1
+#define STEPS           1
 //Default value used to initialize parameter to define how many neighbours we communicate with
 #define STRIDEK		1
 
@@ -90,7 +90,7 @@ class Main: public CBase_Main {
       max_frequency = 1;
 
       if (m->argc < 4) {
-	CkPrintf("Usage: %s <#elements> <#iterations> <msg size> [ldb freq] [comm var] [comp var] [steps] [comm neighbours]\n", m->argv[0]);
+	CkPrintf("Usage: %s <#elements> <#iterations> <msg size> [ldb freq] [comm var] [comp var] [steps] [comm neighbours] [factor] [frequency] [max_frequency]\n", m->argv[0]);
 	delete m;
 	CkExit(1);
       }
@@ -306,8 +306,8 @@ class Block: public CBase_Block {
       p(internalStepCnt);
       p(sum);
       p(msg_var);
-      p(compute_var);
       p(compute_work);
+      p(compute_var);
       p(l_factor);
       p(l_frequency);
       p(l_max_frequency);
@@ -339,7 +339,12 @@ class Block: public CBase_Block {
 
       numNborsRcvd = 0;
       /* 1: pick a work size and do some computation */
-      //TODO
+      /*
+       * The next statement helps decide the computation load in each iteration
+       * compute_work is the base work done by this chare
+       * compte_var adds some randomness (if we decide to add it) to the base load
+       * factor and frequency variables decide how much the computation changes with each iteration
+      */
       int N = (thisIndex * thisIndex / num_chares) * compute_work * (rand()%compute_var + 1) + l_factor*l_frequency;
       l_frequency = (l_frequency+1)%l_max_frequency;
 
@@ -349,7 +354,7 @@ class Block: public CBase_Block {
 	}
 
       /* 2. send msg to K neighbors */
-      int msgSize = curIterMsgSize*(rand()%msg_var + 1);
+      //int msgSize = curIterMsgSize*(rand()%msg_var + 1);
 
       // Send msgs to neighbors
       for (int i=0; i<numNeighbors; i++) {

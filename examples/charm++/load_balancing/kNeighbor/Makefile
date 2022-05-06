@@ -7,7 +7,7 @@ OBJS	= kNeighbor.o
 all: kNeighbor 
 
 kNeighbor: $(OBJS)
-	$(CHARMC) -language charm++ -module EveryLB -o kNeighbor $(OBJS)
+	$(CHARMC) -language charm++ -module CommonLBs -o kNeighbor $(OBJS)
 
 projections: $(COMPOBJS)
 	$(CHARMC) -language charm++ -tracemode projections -lz -o kNeighbor.prj $(OBJS)

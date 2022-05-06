@@ -105,7 +105,7 @@ class Main : public CBase_Main {
     Main(CkArgMsg* m) {
       if ( (m->argc != 3) && (m->argc != 7) && (m->argc != 5) && (m->argc != 9) && (m->argc != 10) ) {
         CkPrintf("%s [array_size] [block_size]\n", m->argv[0]);
-        CkPrintf("OR %s [array_size_X] [array_size_Y] [array_size_Z] [block_size_X] [block_size_Y] [block_size_Z] [msg_overhead]\n", m->argv[0]);
+        CkPrintf("OR %s [array_size_X] [array_size_Y] [array_size_Z] [block_size_X] [block_size_Y] [block_size_Z] [msg_overhead_size]\n", m->argv[0]);
         CkAbort("Abort");
       }
 
@@ -232,7 +232,7 @@ class Jacobi: public CBase_Jacobi {
     double *temperature;
     double *new_temperature;
 
-    int msg_overhead;
+    int msg_overhead_size;
     char* temp;
 
     // Constructor, initialize values
@@ -240,8 +240,8 @@ class Jacobi: public CBase_Jacobi {
 
     	int i, j, k;
     	
-		// allocate a three dimensional array
-		temperature = new double[(blockDimX+2) * (blockDimY+2) * (blockDimZ+2)];
+        // allocate a three dimensional array
+        temperature = new double[(blockDimX+2) * (blockDimY+2) * (blockDimZ+2)];
     	new_temperature = new double[(blockDimX+2) * (blockDimY+2) * (blockDimZ+2)];
 
 
@@ -256,7 +256,7 @@ class Jacobi: public CBase_Jacobi {
 		iterations = 0;
       	imsg = 0;
       	constrainBC();
-        msg_overhead = overhead;
+        msg_overhead_size = overhead;
         temp = new char[overhead];
         usesAtSync = true;
     }
@@ -272,22 +272,22 @@ class Jacobi: public CBase_Jacobi {
 	// Pupping function for migration and fault tolerance
 	// Condition: assuming the 3D Chare Arrays are NOT used
 	void pup(PUP::er &p){
-		// pupping properties of this class
-		p | iterations;
-		p | imsg;
-                p | msg_overhead;
+          // pupping properties of this class
+          p | iterations;
+          p | imsg;
+          p | msg_overhead_size;
 
-		// if unpacking, allocate the memory space
-		if(p.isUnpacking()){
-			temperature = new double[(blockDimX+2) * (blockDimY+2) * (blockDimZ+2)];
-			new_temperature = new double[(blockDimX+2) * (blockDimY+2) * (blockDimZ+2)];
-                        temp = new char[msg_overhead];
-		}
+          // if unpacking, allocate the memory space
+          if(p.isUnpacking()){
+            temperature = new double[(blockDimX+2) * (blockDimY+2) * (blockDimZ+2)];
+            new_temperature = new double[(blockDimX+2) * (blockDimY+2) * (blockDimZ+2)];
+            temp = new char[msg_overhead_size];
+          }
 
-		// pupping the arrays
-		p((char *)temperature, (blockDimX+2) * (blockDimY+2) * (blockDimZ+2) * sizeof(double));
-                p((char *)temp, msg_overhead);
-		//p((char *) new_temperature, (blockDimX+2) * (blockDimY+2) * (blockDimZ+2) * sizeof(double));
+          // pupping the arrays
+          p((char *)temperature, (blockDimX+2) * (blockDimY+2) * (blockDimZ+2) * sizeof(double));
+          p((char *)temp, msg_overhead_size);
+          //p((char *) new_temperature, (blockDimX+2) * (blockDimY+2) * (blockDimZ+2) * sizeof(double));
 	}
 
     // Send ghost faces to the six neighbors
