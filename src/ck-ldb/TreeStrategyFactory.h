@@ -20,6 +20,7 @@ namespace TreeStrategy
 // (which some strategies to accept additional parameters from the config file)
 #define FOREACH_STRATEGY(STRATEGY)    \
   STRATEGY(Kd, false, false)          \
+  STRATEGY(KdConstraint, true, false) \
   STRATEGY(GreedyNorm, true, false)   \
   STRATEGY(Greedy, false, false)      \
   STRATEGY(GreedyRefine, true, false) \

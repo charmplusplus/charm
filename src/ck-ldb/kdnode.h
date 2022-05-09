@@ -19,13 +19,17 @@ protected:
   TreeType* right = nullptr;
   KDFloatType norm;
 
-  BaseKDNode(const Elem& key) : data(key), norm(calcNorm(data)) {}
+  BaseKDNode(const Elem& key, const int numConstraints)
+      : data(key), norm(calcNorm(data, numConstraints))
+  {
+  }
 
-  template <typename T>
-  static KDFloatType calcNorm(const T& x)
+  template <typename A, typename B = size_t,
+            typename std::enable_if<std::is_integral<B>::value, bool>::type = true>
+  static KDFloatType calcNorm(const A& x, const B numConstraints = 0)
   {
     KDFloatType sum = 0;
-    for (int i = 0; i < N; i++)
+    for (int i = 0; i < N - numConstraints; i++)
     {
       const auto element = x[i];
       /*
@@ -37,11 +41,12 @@ protected:
     return sum;
   }
 
-  template <typename A, typename B>
-  static KDFloatType calcNorm(const A& a, const B& b)
+  template <typename A, typename B, typename C = size_t,
+            typename std::enable_if<!std::is_integral<B>::value, bool>::type = true>
+  static KDFloatType calcNorm(const A& a, const B& b, const C numConstraints = 0)
   {
     KDFloatType sum = 0;
-    for (int i = 0; i < N; i++)
+    for (int i = 0; i < N - numConstraints; i++)
     {
       const auto element = a[i] + b[i];
       /*
@@ -93,17 +98,19 @@ private:
       // min returns the minimum positive normalized value for floating-point types
       x[dim] = 1e6 * std::numeric_limits<KDFloatType>::min();
     }
-    const auto maxVal = std::min(x[dim] * 1.01f, bounds[dim].second);
-    const auto minVal = std::max(x[dim] * 0.99f, bounds[dim].first) + std::numeric_limits<KDFloatType>::min();
+    const auto maxVal = std::min(x[dim] * 1.001f, bounds[dim].second);
+    const auto minVal = std::max(x[dim] * 0.999f, bounds[dim].first) + std::numeric_limits<KDFloatType>::min();
     x[dim] = std::uniform_real_distribution<KDFloatType>(minVal, maxVal)(rng);
   }
 
 public:
-  RKDNode(const Elem& key, const discr_t discr = random(0, N - 1)) : base(key), discr(discr)
+  RKDNode(const Elem& key, const int discr = random(0, N - 1),
+          const int numConstraints = 0)
+      : base(key, numConstraints), discr(random(0, N - 1))
   {
   }
 
-  static rkdt insert(rkdt t, Elem& x)
+  static rkdt insert(rkdt t, Elem& x, const int numConstraints = 0)
   {
     std::array<std::pair<KDFloatType, KDFloatType>, N> bounds;
     for (int i = 0; i < N; i++)
@@ -150,10 +157,10 @@ public:
     if (t != nullptr && t->data[maxDiffIndex] == x[maxDiffIndex])
     {
       perturb(x, maxDiffIndex, bounds);
-      t = insert_at_root(t, x, maxDiffIndex);
+      t = insert_at_root(t, x, maxDiffIndex, numConstraints);
     }
     else
-      t = insert_at_root(t, x, maxDiffIndex);
+      t = insert_at_root(t, x, maxDiffIndex, numConstraints);
 
     while (!stack.empty())
     {
@@ -188,10 +195,10 @@ public:
     return t;
   }
 
-  static rkdt insert_at_root(rkdt t, const Elem& x, const discr_t discr)
+  static rkdt insert_at_root(rkdt t, const Elem& x, const discr_t discr, const int numConstraints = 0)
   {
     rkdt r;
-    r = new RKDNode(x, discr);
+    r = new RKDNode(x, discr, numConstraints);
     if (t != nullptr) r->size += t->size;
     auto p = split(t, r);
     r->left = p.first;
@@ -308,6 +315,18 @@ public:
     return findMinNormHelper(t, x, nullptr, objNorm, bestNorm, mins);
   }
 
+  template <typename T>
+  static Elem* findMinNormConstraints(rkdt t, const T& x,
+                                      const std::vector<KDFloatType>& constraints)
+  {
+    std::array<KDFloatType, N> mins = {0};
+    KDFloatType bestNorm = std::numeric_limits<KDFloatType>::max();
+    Elem* result = findMinNormHelperC(t, x, 0, nullptr, bestNorm, mins, constraints);
+    CkAssertMsg(result != nullptr, "Cannot satisfy constraint!");
+    return result;
+  }
+
+
 private:
   template <typename T>
   static Elem* findMinNormHelper(rkdt t, const T& x, Elem* bestObj, const KDFloatType objNorm, KDFloatType& bestNorm,
@@ -334,6 +353,52 @@ private:
       if (base::calcNorm(x, minBounds) < bestNorm)
       {
         bestObj = findMinNormHelper(t->right, x, bestObj, objNorm, bestNorm, minBounds);
+      }
+      minBounds[dim] = oldMin;
+    }
+
+    return bestObj;
+  }
+
+  template <typename T>
+  static Elem* findMinNormHelperC(rkdt t, const T& x, unsigned int depth, Elem* bestObj,
+                                  KDFloatType& bestNorm,
+                                  std::array<KDFloatType, N>& minBounds,
+                                  const std::vector<KDFloatType>& constraints)
+  {
+    const auto dim = t->discr;
+    const int numConstraints = constraints.size();
+
+    if (t->left != nullptr)
+    {
+      bestObj = findMinNormHelperC(t->left, x, depth + 1, bestObj, bestNorm, minBounds,
+                                   constraints);
+    }
+    if (t->norm < bestNorm)
+    {
+      const auto sum = base::addVecs(x, t->data);
+      const auto rootNorm = base::calcNorm(sum, numConstraints);
+      const auto constraintsMet =
+          std::equal(constraints.begin(), constraints.end(), sum.end() - numConstraints,
+                     [&](const KDFloatType& a, const KDFloatType& b) { return a >= b; });
+      if (rootNorm < bestNorm && constraintsMet)
+      {
+        bestObj = &(t->data);
+        bestNorm = rootNorm;
+      }
+    }
+    if (t->right != nullptr)
+    {
+      const auto oldMin = minBounds[dim];
+      minBounds[dim] = t->data[dim];
+      const auto constraintMet =
+          (dim >= N - numConstraints)
+              ? minBounds[dim] + x[dim] < constraints[dim - (N - numConstraints)]
+              : true;
+      if (constraintMet && base::calcNorm(x, minBounds, numConstraints) < bestNorm)
+      {
+        bestObj = findMinNormHelperC(t->right, x, depth + 1, bestObj, bestNorm, minBounds,
+                                     constraints);
       }
       minBounds[dim] = oldMin;
     }
