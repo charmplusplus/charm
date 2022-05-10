@@ -103,9 +103,11 @@ class Main : public CBase_Main {
 	std::vector<std::pair<double,int> > times;
 
     Main(CkArgMsg* m) {
-      if ( (m->argc != 3) && (m->argc != 7) && (m->argc != 5) && (m->argc != 9) && (m->argc != 10) ) {
+      if ( (m->argc != 3) && (m->argc != 5) && (m->argc != 7) && (m->argc != 8) && (m->argc != 9) && (m->argc != 10) ) {
         CkPrintf("%s [array_size] [block_size]\n", m->argv[0]);
         CkPrintf("OR %s [array_size_X] [array_size_Y] [array_size_Z] [block_size_X] [block_size_Y] [block_size_Z] [msg_overhead_size]\n", m->argv[0]);
+        CkPrintf("OR %s [array_size_X] [array_size_Y] [array_size_Z] [block_size_X] [block_size_Y] [block_size_Z] [max_iterations] [checkpoint_frequency]\n", m->argv[0]);
+        CkPrintf("OR %s [array_size_X] [array_size_Y] [array_size_Z] [block_size_X] [block_size_Y] [block_size_Z] [max_iterations] [checkpoint_frequency] [msg_overhead_size] \n", m->argv[0]);
         CkAbort("Abort");
       }
 
@@ -133,7 +135,15 @@ class Main : public CBase_Main {
 		blockDimX = atoi(m->argv[4]); 
 		blockDimY = atoi(m->argv[5]); 
 		blockDimZ = atoi(m->argv[6]);
-	} else if (m->argc == 9) {
+	} else if (m->argc == 8) {
+                arrayDimX = atoi(m->argv[1]);
+                arrayDimY = atoi(m->argv[2]);
+                arrayDimZ = atoi(m->argv[3]);
+                blockDimX = atoi(m->argv[4]);
+                blockDimY = atoi(m->argv[5]);
+                blockDimZ = atoi(m->argv[6]);
+                overhead = atoi(m->argv[8]);
+        } else if (m->argc == 9) {
 		arrayDimX = atoi(m->argv[1]);
 		arrayDimY = atoi(m->argv[2]);
 		arrayDimZ = atoi(m->argv[3]);
