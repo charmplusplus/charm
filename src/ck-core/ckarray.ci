@@ -18,16 +18,16 @@ module CkArray {
     entry void remoteDoneInserting(void);
 
     //Broadcast
-    entry void sendBroadcast(CkMessage *);
+    entry [inline] void sendBroadcast(CkMessage *);
     entry void recvBroadcast(CkMessage *);
     entry void recvBroadcastViaTree(CkMessage *);
-    entry [expedited] void sendExpeditedBroadcast(CkMessage *);
+    entry [inline, expedited] void sendExpeditedBroadcast(CkMessage *);
     entry [expedited] void recvExpeditedBroadcast(CkMessage *);
     entry [expedited] void incrementBcastNoAndSendBack(int srcPe, MsgPointerWrapper p);
     entry [nokeep] void recvNoKeepBroadcast(CkMessage *);
-    entry void sendNoKeepBroadcast(CkMessage *);
+    entry [inline] void sendNoKeepBroadcast(CkMessage *);
     entry [expedited,nokeep] void recvNoKeepExpeditedBroadcast(CkMessage *);
-    entry [expedited] void sendNoKeepExpeditedBroadcast(CkMessage *);
+    entry [inline, expedited] void sendNoKeepExpeditedBroadcast(CkMessage *);
 
     entry void ckDestroy();
   };
