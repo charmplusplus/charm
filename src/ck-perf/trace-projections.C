@@ -1550,12 +1550,12 @@ void fromProjectionsFile::bytes(void *p,size_t n,size_t itemSize,dataType t)
 {
   for (int i=0;i<n;i++) 
     switch(t) {
-    case Tchar: { 
-      char c = fgetc(f);
-      if (c==EOF)
-	parseError("Could not match character");
+    case Tchar: {
+      int c = fgetc(f);
+      if (c == EOF)
+        parseError("Could not match character");
       else
-        ((char *)p)[i] = c;
+        ((char*)p)[i] = (char)c;
       break;
     }
     case Tuchar:
