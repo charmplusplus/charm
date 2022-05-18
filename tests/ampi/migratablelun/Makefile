@@ -3,8 +3,8 @@ CHARMC=../../../bin/ampif90 $(OPTS)
 
 all: migrateluntest migrateluntest-pie
 
-migrateluntest:  migratablelun.o luntest.o pgm.o
-	$(CHARMC) -tlsglobals -fopenmp -o migrateluntest migratablelun.o luntest.o pgm.o 
+migrateluntest:  AMPI_LUN_Migratable.o luntest.o pgm.o
+	$(CHARMC) -tlsglobals -fopenmp -o migrateluntest AMPI_LUN_Migratable.o luntest.o pgm.o 
 
 pgm.o: pgm.f90
 	$(CHARMC) -tlsglobals -fopenmp -c pgm.f90
@@ -12,12 +12,12 @@ pgm.o: pgm.f90
 luntest.o: luntest.f90
 	$(CHARMC) -tlsglobals -fopenmp -c luntest.f90 -o luntest.o
 
-migratablelun.o: MigratableLUN.f90
-	$(CHARMC) -tlsglobals -fopenmp -c MigratableLUN.f90 -o migratablelun.o
+AMPI_LUN_Migratable.o: AMPI_LUN_Migratable.f90
+	$(CHARMC) -tlsglobals -fopenmp -c AMPI_LUN_Migratable.f90 -o AMPI_LUN_Migratable.o
 
 
-migrateluntest-pie:  migratablelun-pie.o luntest-pie.o pgm-pie.o
-	$(CHARMC) -pieglobals -o migrateluntest-pie migratablelun-pie.o luntest-pie.o pgm-pie.o 
+migrateluntest-pie:  AMPI_LUN_Migratable-pie.o luntest-pie.o pgm-pie.o
+	$(CHARMC) -pieglobals -o migrateluntest-pie AMPI_LUN_Migratable-pie.o luntest-pie.o pgm-pie.o 
 
 pgm-pie.o: pgm.f90
 	$(CHARMC) -pieglobals -standalone -c pgm.f90 -o pgm-pie.o
@@ -25,8 +25,8 @@ pgm-pie.o: pgm.f90
 luntest-pie.o: luntest.f90
 	$(CHARMC) -pieglobals -standalone  -c luntest.f90 -o luntest-pie.o
 
-migratablelun-pie.o: MigratableLUN.f90
-	$(CHARMC) -pieglobals -standalone -c MigratableLUN.f90 -o migratablelun-pie.o
+AMPI_LUN_Migratable-pie.o: AMPI_LUN_Migratable.f90
+	$(CHARMC) -pieglobals -standalone -c AMPI_LUN_Migratable.f90 -o AMPI_LUN_Migratable-pie.o
 
 #
 # clean up .o, .mod, .exe and EMACS backup files
@@ -44,3 +44,5 @@ testp: migrateluntest
 
 test-pie: migrateluntest-pie
 	$(call run, ./migrateluntest-pie +p2 +vp4 +balancer GreedyRefineLB)
+
+test-all: test test-pie

@@ -1,5 +1,5 @@
 subroutine MPI_Main
-  use migratablelun
+  use AMPI_LUN_Migratable
   use luntest, only: about_to_migrate, just_migrated, migratablelun_test
   implicit none
   include 'mpif.h'

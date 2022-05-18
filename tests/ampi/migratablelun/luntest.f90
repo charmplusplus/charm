@@ -1,5 +1,5 @@
        module luntest
-         use migratablelun
+         use AMPI_LUN_Migratable
          implicit none
          include 'mpif.h'
 
@@ -13,7 +13,7 @@
 
            call mpi_comm_rank(MPI_COMM_WORLD, rank, ierr)
 !           write(*,*) rank, "About to migrate";
-           luncount = closeRegisteredLUNsForMigration();
+           luncount = AMPI_LUN_close_registered();
          end subroutine about_to_migrate
 
          subroutine just_migrated
@@ -22,7 +22,7 @@
            integer :: rank, ierr
            call mpi_comm_rank(MPI_COMM_WORLD, rank, ierr)
 
-           ierr= reopenRegisteredLUNs();
+           ierr= AMPI_LUN_reopen_registered();
 !           write(*,*) rank, " Just migrated";
          end subroutine just_migrated
 
@@ -46,11 +46,11 @@
            readaction='READ';
            writeaction='WRITE';
            writefilename='output' // trim(adjustl(rankstring)) //'.out';
-           open(UNIT=writelun,FILE=writefilename,ACTION=writeaction);
-           registercount= registerLUN(writelun,writefilename,writeaction);
+!           open(UNIT=writelun,FILE=writefilename,ACTION=writeaction);
+           registercount= AMPI_LUN_open(writelun,writefilename,writeaction);
            readfilename='luntest.f90';
-           open(UNIT=readlun,FILE=readfilename,ACTION=readaction);
-           registercount= registerLUN(readlun,readfilename,readaction);
+!           open(UNIT=readlun,FILE=readfilename,ACTION=readaction);
+           registercount= AMPI_LUN_open(readlun,readfilename,readaction);
          end subroutine openluns
 
          function dowork(rank, iteration) result(operand)
@@ -131,7 +131,7 @@
            integer :: ierr, rank, numranks
            integer(8) :: computed
            !       create the lun registry
-           call createRegistry(10);
+           call AMPI_LUN_create_registry(10);
 
            ! open some files and add them to the registry
 

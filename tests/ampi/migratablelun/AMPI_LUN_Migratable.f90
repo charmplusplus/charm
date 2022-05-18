@@ -1,10 +1,16 @@
 !     Handle the details of migrating LUNs across ranks
 !     basic idea:
 !     
-!  Application creates the registry using createRegistry()
+!  Application creates the registry using AMPI_LUN_create_registry()
 
 !  Application registers a LUN with the API using the same parameters
-!  it would use to open the file using registerLUN().
+!  it would use to open the file using AMPI_LUN_register().
+
+!  Application or opens and registers the LUN with the API by calling
+!  AMPI_open_lun() with the same parameters as a normal call to open.
+!  Note: no current support for non-numeric LUNs, as would be found in
+!  not-file I/O based usage of open.
+
 
 !  Application calls closeRegisteredLUNSForMigration() in
 !  about_to_migrate
@@ -15,11 +21,11 @@
 
 !  Implementation assumes it is being used for LUNs associated with files.
 !  YMMV if you need to migrate other LUNs.
-      module migratablelun
+      module AMPI_LUN_migratable
       implicit none
       
 !     The structure:
-      type, public :: lunrec
+      type, public :: AMPI_LUN_rec
         integer :: unit
         character(len=:),allocatable :: file
         character(len=:),allocatable :: action
@@ -35,9 +41,9 @@
         character(len=:), allocatable :: position
         integer:: recl
         
-      end type lunrec
+      end type AMPI_LUN_rec
       
-!      private LUNRegistry
+      private AMPI_LUN_Registry
 
 !     API provides migratability for each LUN by storing necessary
 !     metadata to reopen after migration.
@@ -77,23 +83,23 @@
 !     added to the migration callback hooks.
 
 
-      type(lunrec), allocatable :: LUNRegistry(:)
-!$omp threadprivate(LUNRegistry)      
-      integer lastregistry;
-!$omp threadprivate(lastregistry)
+      type(AMPI_LUN_rec), allocatable :: AMPI_LUN_Registry(:)
+!$omp threadprivate(AMPI_LUN_Registry)      
+      integer AMPI_LUN_lastregistry;
+!$omp threadprivate(AMPI_LUN_lastregistry)
       contains      
 
-      subroutine createRegistry(size)
+      subroutine AMPI_LUN_create_registry(size)
         implicit NONE      
         integer, intent(in) :: size
 
-        allocate(LUNRegistry(size))
-        lastregistry=0;
-      end subroutine createRegistry
+        allocate(AMPI_LUN_Registry(size))
+        AMPI_LUN_lastregistry=0;
+      end subroutine AMPI_LUN_create_registry
       
-      function registerLUN (unit, file, action, status, form,&
+      function AMPI_LUN_register (unit, file, action, status, form,&
            & access, position, blank, pad, delim, convert,&
-           & recl ) result(handle)
+           & recl, openit ) result(handle)
         implicit NONE
         integer, intent(in) :: unit
         character(len=*), intent(in) :: file
@@ -112,16 +118,17 @@
         character(len=*),intent(in),optional :: delim
         character(len=*),intent(in),optional :: convert
         integer,intent(in),optional :: recl
-
+        logical,intent(in),optional :: openit
+        
         logical :: active
         integer :: handle
-        type(lunrec) :: r
+        type(AMPI_LUN_rec) :: r
         
         r%unit=unit;
         r%file=file;
         r%action=action;
         r%offset=0;
-        lastregistry = lastregistry + 1;
+        AMPI_LUN_lastregistry = AMPI_LUN_lastregistry + 1;
         ! long ugly block to handle the idiosyncracies of defaults
         if(present(status)) then
            r%status=status;
@@ -172,84 +179,130 @@
         else
            r%recl=-1;
         end if
-        handle=lastregistry;
-        lunregistry(handle)=r;
+        handle=AMPI_LUN_lastregistry;
+        IF (openit .eqv. .TRUE.) THEN
+           IF (present(recl)) then
+              OPEN(UNIT=r%unit, FILE=r%file, ACTION=r%action, &
+                   & STATUS=r%status, FORM=r%form,&
+                   & ACCESS=r%access, POSITION=r%position, &
+                   & BLANK=r%blank, PAD=r%pad, &
+                   & DELIM=r%delim, CONVERT=r%convert, RECL=r%recl);
+           ELSE
+              OPEN(UNIT=r%unit, FILE=r%file, ACTION=r%action, &
+                   & STATUS=r%status, FORM=r%form,&
+                   & ACCESS=r%access, POSITION=r%position, &
+                   & BLANK=r%blank, PAD=r%pad, &
+                   & DELIM=r%delim, CONVERT=r%convert);
+           ENDIF
+        ENDIF
+        AMPI_LUN_registry(handle)=r;
         return
-      end function registerLUN
+      end function AMPI_LUN_register
 
-      function closeRegisteredLUNsForMigration() result(count)
+      function AMPI_LUN_open (unit, file, action, status, form,&
+           & access, position, blank, pad, delim, convert,&
+           & recl ) result(handle)
+
+        implicit NONE
+        integer, intent(in) :: unit
+        character(len=*), intent(in) :: file
+        character(len=*), intent(in) :: action
+
+        character(len=*),intent(in),optional :: status
+        character(len=*),intent(in),optional :: form
+        character(len=*),intent(in),optional :: access
+        character(len=*),intent(in),optional :: position
+        character(len=*),intent(in),optional :: blank
+        character(len=*),intent(in),optional :: pad
+        character(len=*),intent(in),optional :: delim
+        character(len=*),intent(in),optional :: convert
+        integer,intent(in),optional :: recl
+        integer :: handle
+        logical openit
+
+        openit= .TRUE.;
+        handle = AMPI_LUN_register(UNIT=unit, FILE=file, ACTION=action, &
+             & STATUS=status, FORM=form,&
+             & ACCESS=access, POSITION=position, &
+             & BLANK=blank, PAD=pad, &
+             & DELIM=delim, CONVERT=convert, RECL=recl, OPENIT=openit );        
+      end function AMPI_LUN_open
+      
+      function AMPI_LUN_close_registered() result(count)
         implicit NONE
         integer:: count
-        DO count=1, lastregistry
+        DO count=1, AMPI_LUN_lastregistry
 !     if registered lun is open, get the offset, close it
 !     use inquire to test for LUN open
-           INQUIRE( UNIT=LUNRegistry(count)%unit, OPENED = LUNRegistry(count)%active);
-           IF ( LUNRegistry(count)%active ) THEN
-              LUNRegistry(count)%offset = FTELL(LUNRegistry(count)%unit);
-              CLOSE ( LUNRegistry(count)%unit );
+           INQUIRE( UNIT=AMPI_LUN_Registry(count)%unit, &
+                & OPENED = AMPI_LUN_Registry(count)%active);
+           IF ( AMPI_LUN_Registry(count)%active ) THEN
+              AMPI_LUN_Registry(count)%offset = &
+                   & FTELL(AMPI_LUN_Registry(count)%unit);
+              CLOSE ( AMPI_LUN_Registry(count)%unit );
            END IF
 
         END DO
         return
-      end function closeRegisteredLUNsForMigration
+      end function AMPI_LUN_close_registered
 
-      function reopenRegisteredLUNs() result(ierr)
+      function AMPI_LUN_reopen_registered() result(ierr)
         implicit NONE
         integer ierr, count
         character:: iostring
-        DO count=1, lastregistry
+        DO count=1, AMPI_LUN_lastregistry
 
 !     if the action is read, or readwrite seek to the offset after opening
 !           print *,"checking registry entry ",count, " of ", lastregistry, " file ",trim(adjustl(LUNRegistry(count)%file));
-           IF(LUNRegistry(count)%active) THEN
-              IF(trim(adjustl(LUNRegistry(count)%action)).eq.'WRITE') THEN
+           IF(AMPI_LUN_Registry(count)%active) THEN
+              IF(trim(adjustl(AMPI_LUN_Registry(count)%action)).eq.'WRITE') THEN
                  ! modify the position & status
-                 LUNRegistry(count)%position='APPEND';
-                 LUNRegistry(count)%status='OLD';
+                 AMPI_LUN_Registry(count)%position='APPEND';
+                 AMPI_LUN_registry(count)%status='OLD';
               END IF
-              if(LUNRegistry(count)%recl .gt. 0) THEN
-              OPEN(UNIT=LUNRegistry(count)%unit, &
-                   & FILE=LUNRegistry(count)%file, &
+              if(AMPI_LUN_registry(count)%recl .gt. 0) THEN
+              OPEN(UNIT=AMPI_LUN_registry(count)%unit, &
+                   & FILE=AMPI_LUN_registry(count)%file, &
                    & IOSTAT=ierr, &
-                   & STATUS=LUNRegistry(count)%status, &
-                   & ACTION=LUNRegistry(count)%action, &
-                   & FORM=LUNRegistry(count)%form, &
-                   & DELIM=LUNRegistry(count)%delim, &
-                   & PAD=LUNRegistry(count)%pad, &
-                   & CONVERT=LUNRegistry(count)%convert, &
-                   & RECL=LUNRegistry(count)%recl, &
-                   & ACCESS=LUNRegistry(count)%ACCESS); 
+                   & STATUS=AMPI_LUN_registry(count)%status, &
+                   & ACTION=AMPI_LUN_registry(count)%action, &
+                   & FORM=AMPI_LUN_registry(count)%form, &
+                   & DELIM=AMPI_LUN_registry(count)%delim, &
+                   & PAD=AMPI_LUN_registry(count)%pad, &
+                   & CONVERT=AMPI_LUN_registry(count)%convert, &
+                   & RECL=AMPI_LUN_registry(count)%recl, &
+                   & ACCESS=AMPI_LUN_registry(count)%ACCESS); 
               ELSE
-                 OPEN(UNIT=LUNRegistry(count)%unit, &
-                      & FILE=LUNRegistry(count)%file, &
+                 OPEN(UNIT=AMPI_LUN_registry(count)%unit, &
+                      & FILE=AMPI_LUN_registry(count)%file, &
                       & IOSTAT=ierr, &
-                      & STATUS=LUNRegistry(count)%status, &
-                      & ACTION=LUNRegistry(count)%action, &
-                      & FORM=LUNRegistry(count)%form, &
-                      & DELIM=LUNRegistry(count)%delim, &
-                      & PAD=LUNRegistry(count)%pad, &
-                      & CONVERT=LUNRegistry(count)%convert, &
-                      & ACCESS=LUNRegistry(count)%ACCESS); 
+                      & STATUS=AMPI_LUN_registry(count)%status, &
+                      & ACTION=AMPI_LUN_registry(count)%action, &
+                      & FORM=AMPI_LUN_registry(count)%form, &
+                      & DELIM=AMPI_LUN_registry(count)%delim, &
+                      & PAD=AMPI_LUN_registry(count)%pad, &
+                      & CONVERT=AMPI_LUN_registry(count)%convert, &
+                      & ACCESS=AMPI_LUN_registry(count)%ACCESS); 
               END IF
               IF( ierr .NE. 0) THEN
-                 PRINT *,"error opening ",LUNRegistry(count)%file," err " &
-                      ," action ", LUNRegistry(count)%action &
+                 PRINT *,"error opening ",AMPI_LUN_registry(count)%file," err " &
+                      ," action ", AMPI_LUN_registry(count)%action &
                       ,ierr, iostring;
                  RETURN
               END IF
-              CALL FSEEK(LUNRegistry(count)%unit, LUNRegistry(count)%offset, 0, ierr);
+              CALL FSEEK(AMPI_LUN_registry(count)%unit, AMPI_LUN_registry(count)%offset, 0, ierr);
               IF( ierr .NE. 0) THEN
-                 PRINT *,"error fseek", trim(adjustl(LUNRegistry(count)%file)),"err", ierr;
+                 PRINT *,"error fseek", trim(adjustl(AMPI_LUN_registry(count)%file)),"err", ierr;
      
                  RETURN
               END IF
            ELSE
-              write(*,*) "not reopening inactive ",trim(adjustl(LUNRegistry(count)%file));
+              write(*,*) "not reopening inactive ",trim(adjustl(AMPI_LUN_registry(count)%file));
            END IF
         END DO
         RETURN
-      end function reopenRegisteredLUNs
+      end function AMPI_LUN_reopen_registered
       
-      END MODULE migratablelun
+      END MODULE AMPI_LUN_migratable
       
       
