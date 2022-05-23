@@ -901,15 +901,6 @@ public:
 // with usage in maps' populateInitial()
 typedef CkArray CkArrMgr;
 
-struct ncpyBcastNoMsg
-{
-  char cmicore[CmiMsgHeaderSizeBytes];
-  int srcPe;
-  void* ref;
-};
-
-void invokeNcpyBcastNoHandler(int serializerPe, ncpyBcastNoMsg* bcastNoMsg, int msgSize);
-
 /*@}*/
 
 /// This arrayListener is in charge of delivering broadcasts to the array.
