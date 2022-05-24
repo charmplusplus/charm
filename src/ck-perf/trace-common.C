@@ -330,21 +330,21 @@ void traceWriteSTS(FILE *stsfp,int nUserEvents) {
     fprintf(stsfp, "MESSAGE %d %u\n", (int)i, (int)_msgTable[i]->size);
 }
 
-void traceCommonBeginIdle(void *proj,double curWallTime)
+void traceCommonBeginIdle(void *proj)
 {
-  ((TraceArray *)proj)->beginIdle(curWallTime);
+  ((TraceArray *)proj)->beginIdle(CkWallTimer());
 }
  
-void traceCommonEndIdle(void *proj,double curWallTime)
+void traceCommonEndIdle(void *proj)
 {
-  ((TraceArray *)proj)->endIdle(curWallTime);
+  ((TraceArray *)proj)->endIdle(CkWallTimer());
 }
 
 void TraceArray::traceBegin() {
   if (n==0) return; // No tracing modules registered.
 #if ! CMK_TRACE_IN_CHARM
-  cancel_beginIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)traceCommonBeginIdle,this);
-  cancel_endIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,(CcdVoidFn)traceCommonEndIdle,this);
+  cancel_beginIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdCondFn)traceCommonBeginIdle,this);
+  cancel_endIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,(CcdCondFn)traceCommonEndIdle,this);
 #endif
   ALLDO(traceBegin());
 }
@@ -353,8 +353,8 @@ void TraceArray::traceBeginOnCommThread() {
 #if CMK_SMP_TRACE_COMMTHREAD
   if (n==0) return; // No tracing modules registered.
 /*#if ! CMK_TRACE_IN_CHARM	
-  cancel_beginIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)traceCommonBeginIdle,this);
-  cancel_endIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,(CcdVoidFn)traceCommonEndIdle,this);
+  cancel_beginIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdCondFn)traceCommonBeginIdle,this);
+  cancel_endIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,(CcdCondFn)traceCommonEndIdle,this);
 #endif*/
   ALLDO(traceBeginOnCommThread());
 #endif

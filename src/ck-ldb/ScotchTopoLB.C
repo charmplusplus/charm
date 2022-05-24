@@ -22,6 +22,7 @@ static void lbinit()
 {
   LBRegisterBalancer<ScotchTopoLB>(
       "ScotchTopoLB", "Load balancing using the Scotch graph partitioning library");
+  LBTurnCommOn();
 }
 
 ScotchTopoLB::ScotchTopoLB(const CkLBOptions &opt) : CBase_ScotchTopoLB(opt) {

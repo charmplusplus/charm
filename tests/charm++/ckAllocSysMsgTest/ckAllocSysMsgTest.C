@@ -30,7 +30,7 @@
 
 CProxy_main mainProxy;		
 int period;
-void timeout(void *, double thing)
+void timeout(void *ignored)
 {
   if(--period>0)
     CcdCallOnCondition(CcdPERIODIC_1minute,timeout,NULL);

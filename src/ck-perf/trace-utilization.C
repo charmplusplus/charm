@@ -14,8 +14,8 @@ CkReduction::reducerType sumDetailCompressedReducer;
 
 
 // This function has unused arguments to match the type of
-// CcdVoidFn, which CcdCallOnConditionKeep takes
-void collectUtilizationData(void *, double) {
+// CcdCondFn, which CcdCallOnConditionKeep takes
+void collectUtilizationData(void *ignored) {
   traceUtilizationGroupProxy.collectSumDetailData();
 }
 

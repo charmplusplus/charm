@@ -270,11 +270,11 @@ void CQdHandler(CQdMsg msg)
 {
   CQdProcess(CpvAccess(cQdState), -1);
   CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE, 
-		     (CcdVoidFn)CQdCallWhenIdle, (void*) msg);  
+		     (CcdCondFn)CQdCallWhenIdle, (void*) msg);
 }
 
 
-void CQdRegisterCallback(CQdVoidFn fn, void *arg)
+void CQdRegisterCallback(CQdCondFn fn, void *arg)
 {
   CcdCallOnCondition(CcdQUIESCENCE, fn, arg);
 }
@@ -298,7 +298,7 @@ void CQdInit(void)
     CmiRegisterHandler((CmiHandler)CQdAnnounceHandler);
 }
 
-void CmiStartQD(CQdVoidFn fn, void *arg)
+void CmiStartQD(CQdCondFn fn, void *arg)
 {
   CQdMsg msg = (CQdMsg) CmiAlloc(sizeof(struct ConvQdMsg));
   CQdRegisterCallback(fn, arg);

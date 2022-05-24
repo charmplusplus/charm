@@ -87,51 +87,6 @@ class CollisionAggregator {
   void compact(void);
 };
 
-/********************* syncReductionMgr *****************
-  A group to synchronize on some event across the machine.
-  Maintains a reduction tree and waits for the "advance"
-  method to be called from each processor.  To handle
-  non-autonomous cases, calls "pleaseAdvance" when an advance
-  is first expected from that PE.
-  */
-class syncReductionMgr : public CBase_syncReductionMgr
-{
-  CProxy_syncReductionMgr thisproxy;
-  void status(const char *msg) {
-    CkPrintf("SRMgr pe %d> %s\n",CkMyPe(),msg);
-  }
-  //Describes the reduction tree
-  int onPE;
-  enum {TREE_WID=4};
-  int treeParent;//Parent in reduction tree
-  int treeChildStart,treeChildEnd;//First and last+1 child
-  int nChildren;//Number of children in the reduction tree
-  void startStep(int stepNo,bool withProd);
-
-  //State data
-  int stepCount;//Increments by one every reduction, from zero
-  bool stepFinished;//prior step complete
-  bool localFinished;//Local advance called
-  int childrenCount;//Number of tree children in delivered state
-  void tryFinish(void);//Try to finish reduction
-
-  protected:
-  //This is called by subclasses
-  void advance(void);
-  //This is offered for subclasses's optional use
-  virtual void pleaseAdvance(void);
-  //This is called on PE 0 once the reduction is finished
-  virtual void reductionFinished(void);
-  public:
-  int getStepCount(void) const {return stepCount;}
-  syncReductionMgr();
-
-  //Called by parent-- will you contribute?
-  void childProd(int stepCount);
-  //Called by tree children-- me and my children are finished
-  void childDone(int stepCount);
-};
-
 /*********************** collideMgr **********************
   A group that synchronizes the Collision detection process.
   A single Collision operation consists of:
@@ -156,8 +111,14 @@ class collideMgr : public CBase_collideMgr
   CollideGrid3d gridMap; //Shape of 3D voxel grid
   CProxy_collideClient client; //Collision client group
 
+  std::vector<collideVoxel *> myVoxels;
+
   int nContrib;//Number of registered contributors
   int contribCount;//Number of contribute calls given this step
+
+  int totalLocalVoxels;
+
+  bool collisionStarted;
 
   CollisionAggregator aggregator;
   int msgsSent;//Messages sent out to voxels
@@ -166,8 +127,6 @@ class collideMgr : public CBase_collideMgr
   protected:
   //Check if we're barren-- if so, advance now
   virtual void pleaseAdvance(void);
-  //This is called on PE 0 once the voxel send reduction is finished
-  virtual void reductionFinished(void);
   public:
   collideMgr(const CollideGrid3d &gridMap,
       const CProxy_collideClient &client,
@@ -178,8 +137,7 @@ class collideMgr : public CBase_collideMgr
   void unregisterContributor(int chunkNo);
 
   //Clients call this to contribute their objects
-  void contribute(int chunkNo,
-      int n,const bbox3d *boxes,const int *prio);
+  void addBoxes(int chunkNo, int n, const bbox3d* boxes, const int* prio);
 
   //voxelAggregators deliver messages to voxels via this bottleneck
   void sendVoxelMessage(const CollideLoc3d &dest,
@@ -187,6 +145,14 @@ class collideMgr : public CBase_collideMgr
 
   //collideVoxels send a return receipt here
   void voxelMessageRecvd(void);
+
+  void registerVoxel(collideVoxel *vox);
+
+  void checkRegistrationComplete();
+  void determineNumVoxels(void);
+
+  //This is called on PE 0 once the voxel send reduction is finished
+  void reductionFinished(void);
 };
 
 /********************** collideVoxel ********************
@@ -208,9 +174,12 @@ class collideVoxel : public CBase_collideVoxel
   void pup(PUP::er &p);
 
   void add(objListMsg *msg);
+  void initiateCollision(const CProxy_collideMgr &mgr);
+
   void startCollision(int step,
       const CollideGrid3d &gridMap,
-      const CProxy_collideClient &client);
+      const CProxy_collideClient &client,
+      CollisionList &colls);
 };
 
 
@@ -230,12 +199,25 @@ class serialCollideClient : public collideClient {
   void setClient(CollisionClientFn clientFn,void *clientParam);
 
   /// Called by voxel array on each processor:
-  virtual void collisions(ArrayElement *src,
-      int step,CollisionList &colls);
+  virtual void collisions(int step,CollisionList &colls);
 
   /// Called after the reduction is complete:
   virtual void reductionDone(CkReductionMsg *m);
 };
+
+
+/********************** distributedCollideClient *****************
+  Invokes the callback passed on every PE with the collision list
+  */
+class distributedCollideClient : public collideClient {
+  CkCallback clientCb;
+  public:
+  distributedCollideClient(CkCallback clientCb_);
+
+  /// Called by voxel array on each processor:
+  virtual void collisions(int step,CollisionList &colls);
+};
+
 
 #if CMK_TRACE_ENABLED
 // List of COLLIDE functions to trace:
