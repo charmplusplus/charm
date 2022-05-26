@@ -101,6 +101,12 @@ public:
   }
 };
 
+class GhostMessage : public CMessage_GhostMessage {
+  public:
+  double *ghost;
+  int iter, dir, size, mynode;
+};
+
 /** \class Jacobi
  *
  */
@@ -114,6 +120,8 @@ class Jacobi: public CBase_Jacobi {
 public:
     array2d temperature;
     array2d new_temperature;
+    double *boundary_left, *boundary_right, *boundary_top, *boundary_bottom; //mine, to send
+    double *ghost_left, *ghost_right, *ghost_top, *ghost_bottom; //others', to receive
     int imsg;
     int iterations;
     int neighbors;
@@ -136,6 +144,14 @@ public:
       istart = jstart = 1;
       ifinish = blockDimX+1;
       jfinish = blockDimY+1;
+      boundary_left = new double[blockDimX];
+      boundary_right = new double[blockDimX];
+      boundary_top = new double[blockDimY];
+      boundary_bottom = new double[blockDimY];
+      ghost_left = new double[blockDimX];
+      ghost_right = new double[blockDimX];
+      ghost_top = new double[blockDimY];
+      ghost_bottom = new double[blockDimY];
 
       if(thisIndex.x==0)
       {
@@ -172,18 +188,6 @@ public:
       constrainBC();
     }
 
-    void pup(PUP::er &p)
-    {
-      p|imsg;
-      p|iterations;
-      p|neighbors;
-      p|istart; p|ifinish; p|jstart; p|jfinish;
-      p|leftBound; p|rightBound; p|topBound; p|bottomBound;
-      p|converged;
-      p|max_error;
-      p|temperature;
-      p|new_temperature;
-    }
 
     Jacobi(CkMigrateMessage* m) { }
 
@@ -193,59 +197,115 @@ public:
 
       if(!leftBound)
       {
+/*
         array1d leftGhost(blockDimY);
         for(int j=0; j<blockDimY; ++j) 
           leftGhost[j] = temperature[1][j+1];
-        thisProxy(thisIndex.x-1, thisIndex.y).receiveGhosts(iterations, RIGHT, blockDimY, leftGhost.data());
+*/
+        GhostMessage* msg = new (blockDimY) GhostMessage();
+        msg->ghost = boundary_left;
+        msg->iter = iterations;
+        msg->dir = RIGHT;
+        msg->size = blockDimY;
+        msg->mynode = CkMyNode();
+//        thisProxy(thisIndex.x-1, thisIndex.y).receiveGhosts(iterations, RIGHT, blockDimY, leftGhost.data());
+        thisProxy(thisIndex.x-1, thisIndex.y).receiveGhosts(msg);
       }
       if(!rightBound)
       {
+/*
         array1d rightGhost(blockDimY);
         for(int j=0; j<blockDimY; ++j) 
           rightGhost[j] = temperature[blockDimX][j+1];
-        thisProxy(thisIndex.x+1, thisIndex.y).receiveGhosts(iterations, LEFT, blockDimY, rightGhost.data());
+*/
+        GhostMessage* msg = new (blockDimY) GhostMessage();
+        msg->ghost = boundary_right;
+        msg->iter = iterations;
+        msg->dir = LEFT;
+        msg->size = blockDimY;
+        msg->mynode = CkMyNode();
+        thisProxy(thisIndex.x+1, thisIndex.y).receiveGhosts(msg);//iterations, LEFT, blockDimY, rightGhost.data());
       }
       if(!topBound)
       {
+/*
         array1d topGhost(blockDimX);
         for(int i=0; i<blockDimX; ++i) 
           topGhost[i] = temperature[i+1][1];
-        thisProxy(thisIndex.x, thisIndex.y-1).receiveGhosts(iterations, BOTTOM, blockDimX, topGhost.data());
+*/
+        GhostMessage* msg = new (blockDimY) GhostMessage();
+        msg->ghost = boundary_top;
+        msg->iter = iterations;
+        msg->dir = BOTTOM;
+        msg->size = blockDimX;
+        msg->mynode = CkMyNode();
+        thisProxy(thisIndex.x, thisIndex.y-1).receiveGhosts(msg);//iterations, BOTTOM, blockDimX, topGhost.data());
       }
       if(!bottomBound)
       {
+/*
         array1d bottomGhost(blockDimX);
         for(int i=0; i<blockDimX; ++i) 
           bottomGhost[i] = temperature[i+1][blockDimY];
-        thisProxy(thisIndex.x, thisIndex.y+1).receiveGhosts(iterations, TOP, blockDimX, bottomGhost.data());
+*/
+        GhostMessage* msg = new (blockDimY) GhostMessage();
+        msg->ghost = boundary_bottom;
+        msg->iter = iterations;
+        msg->dir = TOP;
+        msg->size = blockDimX;
+        msg->mynode = CkMyNode();
+        thisProxy(thisIndex.x, thisIndex.y+1).receiveGhosts(msg);//iterations, TOP, blockDimX, bottomGhost.data());
       }
     }
 
-    void processGhosts(int dir, int size, const double* gh) {
+    void processGhosts(int sourceNode, int dir, int size, double* gh) {
+      if(sourceNode == CkMyNode()) {
+        switch(dir) {
+        case LEFT:
+          ghost_left = gh;
+          break;
+        case RIGHT:
+          ghost_right = gh;
+          break;
+        case TOP:
+          ghost_top = gh;
+          break;
+        case BOTTOM:
+          ghost_bottom = gh;
+          break;
+        default:
+        CkAbort("ERROR\n");
+      }
+      }else {
       switch(dir) {
       case LEFT:
         for(int j=0; j<size; ++j) {
-          temperature[0][j+1] = gh[j];
+          ghost_left[j] = gh[j];
+          //temperature[0][j+1] = gh[j];
         }
         break;
       case RIGHT:
         for(int j=0; j<size; ++j) {
-          temperature[blockDimX+1][j+1] = gh[j];
+          ghost_right[j] = gh[j];
+          //temperature[blockDimX+1][j+1] = gh[j];
         }
         break;
       case TOP:
         for(int i=0; i<size; ++i) {
-          temperature[i+1][0] = gh[i];
+          ghost_top[i] = gh[i];
+          //temperature[i+1][0] = gh[i];
         }
         break;
       case BOTTOM:
         for(int i=0; i<size; ++i) {
-          temperature[i+1][blockDimY+1] = gh[i];
+          ghost_bottom[i] = gh[i];
+          //temperature[i+1][blockDimY+1] = gh[i];
         }
         break;
       default:
         CkAbort("ERROR\n");
       }
+    }
     }
 
     void check_and_compute() {
@@ -282,24 +342,28 @@ public:
         {
           temperature[i][1] = 1.0;
           new_temperature[i][1] = 1.0;
+          boundary_top[i] = 1.0;
         }
 
       if(leftBound)
         for(int j=0; j<blockDimY+2; ++j){
           temperature[1][j] = 1.0;
           new_temperature[1][j] = 1.0;
+          boundary_left[j] = 1.0;
         }
 
       if(bottomBound)
         for(int i=0; i<blockDimX+2; ++i){
           temperature[i][blockDimY] = 1.;
           new_temperature[i][blockDimY] = 1.;
+          boundary_bottom[i] = 1.;
         }
 
       if(rightBound)
         for(int j=0; j<blockDimY+2; ++j){
           temperature[blockDimX][j] = 1.;
           new_temperature[blockDimX][j] = 1.;
+          boundary_right[j] = 1.;
         }
     }
 

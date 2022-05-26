@@ -14,10 +14,14 @@ mainmodule jacobi2d {
     entry void done(int totalIter);
   };
 
+  message GhostMessage {
+    double ghost[];
+  };
+
   array [2D] Jacobi {
     entry Jacobi(void);
     entry void begin_iteration(void);
-    entry void receiveGhosts(int iter, int dir, int size, double ghosts[size]);
+    entry void receiveGhosts(GhostMessage*);//int iter, int dir, int size, double ghosts[size]);
     entry [reductiontarget] void recvConvergeResult(bool result);
 
     entry void run() {
@@ -27,9 +31,9 @@ mainmodule jacobi2d {
         }
         for(imsg = 0; imsg < neighbors; imsg++) {
           // "iterations" keeps track of messages across steps
-          when receiveGhosts[iterations] (int iter, int dir, int size, double ghosts[size])
+          when receiveGhosts (GhostMessage* msg)//int iter, int dir, int size, double ghosts[size])
             serial "process ghosts" {
-              processGhosts(dir, size, ghosts);
+              processGhosts(msg->mynode, msg->dir, msg->size, msg->ghost);
             }
         }
         serial "compute" { 
