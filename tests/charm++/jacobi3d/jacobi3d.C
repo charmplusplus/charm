@@ -87,7 +87,6 @@ class ghostMsg: public CMessage_ghostMsg {
     int height;
     int width;
     double* gh;
-    char *temp;
 
     ghostMsg(int _d, int _h, int _w) : dir(_d), height(_h), width(_w) {
     }
@@ -243,7 +242,6 @@ class Jacobi: public CBase_Jacobi {
     double *new_temperature;
 
     int msg_overhead_size;
-    char* temp;
 
     // Constructor, initialize values
     Jacobi() {
@@ -267,7 +265,6 @@ class Jacobi: public CBase_Jacobi {
       	imsg = 0;
       	constrainBC();
         msg_overhead_size = overhead;
-        temp = new char[overhead];
         usesAtSync = true;
     }
 
@@ -291,12 +288,10 @@ class Jacobi: public CBase_Jacobi {
           if(p.isUnpacking()){
             temperature = new double[(blockDimX+2) * (blockDimY+2) * (blockDimZ+2)];
             new_temperature = new double[(blockDimX+2) * (blockDimY+2) * (blockDimZ+2)];
-            temp = new char[msg_overhead_size];
           }
 
           // pupping the arrays
           p((char *)temperature, (blockDimX+2) * (blockDimY+2) * (blockDimZ+2) * sizeof(double));
-          p((char *)temp, msg_overhead_size);
           //p((char *) new_temperature, (blockDimX+2) * (blockDimY+2) * (blockDimZ+2) * sizeof(double));
 	}
 
