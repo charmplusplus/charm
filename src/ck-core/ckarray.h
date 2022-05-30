@@ -322,7 +322,7 @@ public:
 };
 
 // Simple C-like API:
-void CkSetMsgArrayIfNotThere(void* msg);
+void CkSetMsgArrayIfNotThere(void* msg, CkArray_IfNotThere policy = CkArray_IfNotThere_buffer);
 void CkSendMsgArray(int entryIndex, void* msg, CkArrayID aID, const CkArrayIndex& idx,
                     int opts = 0);
 void CkSendMsgArrayInline(int entryIndex, void* msg, CkArrayID aID,
@@ -860,7 +860,7 @@ private:
 
   // Spring cleaning
   void springCleaning(void);
-  static void staticSpringCleaning(void* forWhom, double curWallTime);
+  static void staticSpringCleaning(void* forWhom);
   void setupSpringCleaning();
   int springCleaningCcd;
 

@@ -2029,7 +2029,7 @@ the runtime will not “commit” to this branch until the second arrives.
 If another dependency fully matches, the partial match will be ignored
 and can be used to trigger another ``when`` later in the execution.
 
-.. code-block:: c++
+.. code-block:: text
 
    case {
      when a() { }
@@ -4395,8 +4395,7 @@ whenidle
    priority or speculative) in the absence of other work. ``whenidle``
    entry methods must return a ``bool`` value, indicating whether the
    entry method should be called when the processor is idle again, and
-   accept a ``double`` argument representing the current timestamp. An
-   example can be found in ``examples/charm++/whenidle``.
+   take no arguments. An example can be found in ``examples/charm++/whenidle``.
 
 python
    entry methods are enabled to be called from python scripts as
@@ -5667,12 +5666,14 @@ then invokes it to return a result may have the following interface:
      cb.send(msg);
    }
 
-A CkCallback will accept any message type, or even NULL. The message is
+A *CkCallback* will accept any message type, even *nullptr*. The message is
 immediately sent to the user’s client function or entry point. A library
 which returns its result through a callback should have a clearly
 documented return message type. The type of the message returned by the
 library must be the same as the type accepted by the entry method
-specified in the callback.
+specified in the callback. Note that message flag(s) may be passed as an
+optional argument to “send;” for example, :code:`send(_, CK_MSG_EXPEDITED)`
+will send a message with expediency.
 
 As an alternative to “send”, the callback can be used in a *contribute*
 collective operation. This will internally invoke the “send” method on
@@ -5680,6 +5681,19 @@ the callback when the contribute operation has finished.
 
 For examples of how to use the various callback types, please see
 ``tests/charm++/megatest/callback.C``
+
+In addition to the above mechanisms for invoking a callback, it is possible
+that a library may want to accept a callback which broadcasts to a group
+or nodegroup, but then handles the exact logic for the broadcast manually.
+For example, if the data is already distributed across compute elements we
+can avoid performing the actual broadcast, or if we want to send different
+data to each member of the group. To accomplish this, users can invoke
+
+``void CkCallback::transformBcastToLocalElem(int elem = -1);``
+
+This will convert a callback that is broadcast to a group or nodegroup into
+a point-to-point callback for a particular element of the group (the local
+element if no element is passed).
 
 .. _sec:ckcallbackresumethread:
 
@@ -12186,15 +12200,19 @@ The remaining options cover details of process launch and connectivity:
    Print help messages
 
 ``++runscript``
-   Script to run node-program with. The specified run script is invoked
-   with the node program and parameter. For example:
+   Script to run program with. The specified run script is invoked with the
+   given program and arguments as parameters. This is useful for loading modules
+   or setting up an environment prior the running the program. For example:
 
    .. code-block:: bash
 
       $ ./charmrun +p4 ./pgm 100 2 3 ++runscript ./set_env_script
 
-   In this case, the ``set_env_script`` is invoked on each node before
-   launching ``pgm``.
+   In this case, ``set_env_script`` is invoked on each node. **Note:** When this
+   is provided, ``charmrun`` will not invoke the program directly, instead only
+   invoking the script with the program name and program arguments passed in as
+   script parameters; thus, ``set_env_script`` should generally end with ``$*``
+   to actually start the program.
 
 ``++xterm``
    Which xterm to use

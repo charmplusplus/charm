@@ -529,7 +529,7 @@ inline void CkArray::springCleaning(void)
   setupSpringCleaning();
 }
 
-void CkArray::staticSpringCleaning(void* forArray, double curWallTime)
+void CkArray::staticSpringCleaning(void* forArray)
 {
   ((CkArray*)forArray)->springCleaning();
 }
@@ -539,7 +539,7 @@ void CkArray::setupSpringCleaning()
   // set up broadcast cleaner
   if (!stableLocations)
     springCleaningCcd =
-        CcdCallOnCondition(CcdPERIODIC_1minute, staticSpringCleaning, (void*)this);
+        CcdCallOnCondition(CcdPERIODIC_1minute, (CcdCondFn)CkArray::staticSpringCleaning, (void*)this);
 }
 
 /********************* Little CkArray Utilities ******************/
@@ -1234,12 +1234,12 @@ void CProxySection_ArrayBase::ckSend(CkArrayMessage* msg, int ep, int opts)
   }
 }
 
-void CkSetMsgArrayIfNotThere(void* msg)
+void CkSetMsgArrayIfNotThere(void* msg, CkArray_IfNotThere policy)
 {
   envelope* env = UsrToEnv((void*)msg);
   env->setMsgtype(ForArrayEltMsg);
   CkArrayMessage* m = (CkArrayMessage*)msg;
-  m->array_setIfNotThere(CkArray_IfNotThere_buffer);
+  m->array_setIfNotThere(policy);
 }
 
 void CkSendMsgArray(int entryIndex, void* msg, CkArrayID aID, const CkArrayIndex& idx,

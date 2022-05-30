@@ -397,9 +397,15 @@ void _loadbalancerInit()
   _lb_args.statsOn() =
       !CmiGetArgFlagDesc(argv, "+LBOff", "Turn load balancer instrumentation off");
 
-  // turn instrumentation of communicatin off at startup
-  _lb_args.traceComm() = !CmiGetArgFlagDesc(
-      argv, "+LBCommOff", "Turn load balancer instrumentation of communication off");
+  // turn instrumentation of communication on at startup
+  _lb_args.traceComm() = CmiGetArgFlagDesc(
+    argv, "+LBCommOn", "Turn load balancer instrumentation of communication on");
+
+  // +LBCommOff is deprecated as instrumentation of communication is off by default
+  bool lbcommOff = CmiGetArgFlagDesc(
+      argv, "+LBCommOff", "(No-op) Turn load balancer instrumentation of communication off");
+  if(CkMyPe()==0 && lbcommOff)
+    CmiPrintf("Warning: Ignoring the deprecated +LBCommOff option as communication is off by default.\n");
 
   // set alpha and beta
   _lb_args.alpha() = PER_MESSAGE_SEND_OVERHEAD_DEFAULT;
@@ -433,8 +439,6 @@ void _loadbalancerInit()
           LBSimulation::dumpFile, _lb_args.lbversion());
     if (_lb_args.statsOn() == 0)
       CkPrintf("CharmLB> Load balancing instrumentation is off.\n");
-    if (_lb_args.traceComm() == 0)
-      CkPrintf("CharmLB> Load balancing instrumentation for communication is off.\n");
     if (_lb_args.migObjOnly())
       CkPrintf("LB> Load balancing strategy ignores non-migratable objects.\n");
   }
@@ -484,6 +488,7 @@ void LBManager::initnodeFn()
   _registerCommandLineOpt("+LBSameCpus");
   _registerCommandLineOpt("+LBUseCpuTime");
   _registerCommandLineOpt("+LBOff");
+  _registerCommandLineOpt("+LBCommOn");
   _registerCommandLineOpt("+LBCommOff");
   _registerCommandLineOpt("+MetaLB");
   _registerCommandLineOpt("+LBAlpha");
@@ -540,6 +545,8 @@ void LBManager::init(void)
 #if CMK_LBDB_ON
   if (manualOn) TurnManualLBOn();
 #endif
+  if (CkMyPe()==0 && _lb_args.traceComm() == 0)
+      CkPrintf("CharmLB> Load balancing instrumentation for communication is off.\n");
 
   if (_lb_args.lbperiod() > 0.0)
   {

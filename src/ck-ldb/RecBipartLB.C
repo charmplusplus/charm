@@ -116,6 +116,7 @@ static void lbinit()
   LBRegisterBalancer<RecBipartLB>(
       "RecBipartLB",
       "Algorithm for load balacing based on recursive bipartitioning of object graph");
+  LBTurnCommOn();
 }
 
 // removes from BQueue but not from boundaryline

@@ -6,7 +6,7 @@ mainmodule idlework {
   array [1D] Test {
     entry Test();
     entry void registerIdleWork();
-    entry [whenidle] bool idleProgress(double);
+    entry [whenidle] bool idleProgress();
   };
 }
 
