@@ -768,8 +768,8 @@ for i in "-std=c++11" "--c++11" "-h std=c++11" "-hstd=c++11"; do
     test_cxx "whether C++ compiler supports C++11 with '$i'" "yes" "no" "$i"
     if test $strictpass -eq 1
     then
-      add_flag "$(echo OPTS_CXX=\"\$OPTS_CXX $i\")" "Enable C++11 support"
-      OPTS_CXX="$OPTS_CXX $i"
+      add_flag "$(echo CMK_CXX_FLAGS=\"\$CMK_CXX_FLAGS $i\")" "Enable C++11 support"
+      CMK_CXX_FLAGS="$CMK_CXX_FLAGS $i"
       got_cpp11="true"
       break
     fi
