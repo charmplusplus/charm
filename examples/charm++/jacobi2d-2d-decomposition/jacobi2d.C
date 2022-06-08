@@ -194,6 +194,23 @@ public:
     // Send ghost faces to the six neighbors
     void begin_iteration(void) {
       iterations++;
+      if(iterations > 1) {
+        if(topBound)
+          for(int i=0; i<blockDimX+2; ++i)
+            boundary_top[i] = temperature[i][1];
+
+      if(leftBound)
+        for(int j=0; j<blockDimY+2; ++j)
+          boundary_left[j] = temperature[1][j];
+
+      if(bottomBound)
+        for(int i=0; i<blockDimX+2; ++i)
+          boundary_bottom[i] = temperature[i][blockDimY];
+
+      if(rightBound)
+        for(int j=0; j<blockDimY+2; ++j)
+          boundary_right[j] = temperature[blockDimX][j];
+      }
 
       if(!leftBound)
       {
@@ -260,6 +277,7 @@ public:
 
     void processGhosts(int sourceNode, int dir, int size, double* gh) {
       if(sourceNode == CkMyNode()) {
+//        CkPrintf("\nCopy ptr within node");
         switch(dir) {
         case LEFT:
           ghost_left = gh;
@@ -314,13 +332,33 @@ public:
 
       max_error = 0.;
       // When all neighbor values have been received, we update our values and proceed
+      //boundaries i = 0, i=blockDimX+1, j = 0, j=blockDimY+1
       for(int i=istart; i<ifinish; ++i) {
         for(int j=jstart; j<jfinish; ++j) {
+          double left = temperature[i-1][j];
+          double right = temperature[i+1][j];
+          double top = temperature[i][j-1];
+          double bottom = temperature[i][j+1];
+          if(i==1)
+              left = ghost_left[j];
+          if(i==blockDimX+1)
+            right = ghost_right[j];
+          if(j==1)
+            top = ghost_top[i];
+          if(j==blockDimY+1)
+            bottom = ghost_bottom[i];
+/*
           temperatureIth=(temperature[i][j] 
             + temperature[i-1][j] 
             +  temperature[i+1][j]
             +  temperature[i][j-1]
             +  temperature[i][j+1]) * 0.2;
+*/
+
+          temperatureIth=(left
+            + right
+            + top
+            + bottom) * 0.2;
 
           // update relative error
           difference = temperatureIth-temperature[i][j];
