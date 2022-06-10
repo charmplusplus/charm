@@ -1,3 +1,0 @@
-module netfem {
-	initproc void NetFEM_Init(void);
-};

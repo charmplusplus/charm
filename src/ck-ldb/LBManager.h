@@ -50,7 +50,8 @@ class CkLBArgs
     _lb_debug = 0;
     _lb_ignoreBgLoad = _lb_syncResume = _lb_useCpuTime = false;
     _lb_printsummary = _lb_migObjOnly = false;
-    _lb_statson = _lb_traceComm = true;
+    _lb_statson = true;
+    _lb_traceComm = false;
     _lb_loop = false;
     _lb_central_pe = 0;
     _lb_maxDistPhases = 10;
@@ -290,8 +291,6 @@ class LBManager : public CBase_LBManager
   void CollectStatsOn(void) { lbdb_obj->CollectStatsOn(); }
   void CollectStatsOff(void) { lbdb_obj->CollectStatsOff(); }
   bool StatsOn(void) { return lbdb_obj->StatsOn(); }
-  int RunningObject(LDObjHandle* _o) const { return lbdb_obj->RunningObject(_o); }
-  const LDObjHandle* RunningObject() { return lbdb_obj->RunningObject(); }
   void ObjTime(LDObjHandle h, double walltime, double cputime)
   {
     lbdb_obj->ObjTime(h, walltime, cputime);
@@ -566,15 +565,8 @@ class SystemLoad
   LBManager* lbmgr;
 
  public:
-  SystemLoad()
-  {
-    lbmgr = LBManagerObj();
-    objHandle = lbmgr->RunningObject();
-    if (objHandle != NULL)
-    {
-      lbmgr->ObjectStop(*objHandle);
-    }
-  }
+  SystemLoad();
+
   ~SystemLoad()
   {
     if (objHandle) lbmgr->ObjectStart(*objHandle);

@@ -253,14 +253,19 @@ class zerocopyObject : public CBase_zerocopyObject{
 
     void zerocopySend(int &n1, int *& ptr1, int &n2, double *& ptr2, int &n3, char *& ptr3, CkNcpyBufferPost *ncpyPost) {
       DEBUG(ckout<<"["<<CkMyPe()<<"] "<<thisIndex<<"->"<<destIndex<<": ZeroCopy send post"<<endl;)
-      ptr1 = iArr1;
-      ptr2 = dArr1;
-      ptr3 = cArr1;
-
       ncpyPost[0].regMode = CK_BUFFER_UNREG;
       ncpyPost[1].regMode = CK_BUFFER_UNREG;
       ncpyPost[2].regMode = CK_BUFFER_UNREG;
-    }
+
+      CkMatchBuffer(ncpyPost, 0, thisIndex*7);
+      CkPostBuffer(iArr1, n1, thisIndex*7);
+
+      CkMatchBuffer(ncpyPost, 1, thisIndex*7 + 1);
+      CkPostBuffer(dArr1, n2, thisIndex*7 + 1);
+
+      CkMatchBuffer(ncpyPost, 2, thisIndex*7 + 2);
+      CkPostBuffer(cArr1, n3, thisIndex*7 + 2);
+   }
 
     void zerocopySend(int n1, int *ptr1, int n2, double *ptr2, int n3, char *ptr3){
 
@@ -279,11 +284,14 @@ class zerocopyObject : public CBase_zerocopyObject{
     }
 
     void mixedSend(int n1, int *ptr1, int n2, double *& ptr2, int n3, int *& ptr3, int n4, double *ptr4, CkNcpyBufferPost *ncpyPost) {
-      ptr2 = dArr1;
-      ptr3 = iArr2;
-
       ncpyPost[0].regMode = CK_BUFFER_UNREG;
       ncpyPost[1].regMode = CK_BUFFER_UNREG;
+
+      CkMatchBuffer(ncpyPost, 0, thisIndex*7 + 3);
+      CkPostBuffer(dArr1, n2, thisIndex*7 + 3);
+
+      CkMatchBuffer(ncpyPost, 1, thisIndex*7 + 4);
+      CkPostBuffer(iArr2, n3, thisIndex*7 + 4);
     }
 
     void mixedSend(int n1, int *ptr1, int n2, double *ptr2, int n3, int *ptr3, int n4, double *ptr4){
@@ -327,8 +335,6 @@ class zerocopyObject : public CBase_zerocopyObject{
     }
 
     void sdagRecv(int index, int &n1, int *& ptr1, int &n2, double *&ptr2, CkNcpyBufferPost *ncpyPost) {
-      ptr1 = iArr1;
-      ptr2 = dArr2;
       // NOTE: The same arrays are used to receive the data for all the 'num' sdag iterations and
       // the 'TOTAL_ITER' application iterations. This is entirely for the purpose of demonstration
       // and results in the same array being overwritten. It is important to note that messages can
@@ -336,6 +342,12 @@ class zerocopyObject : public CBase_zerocopyObject{
       // doesn't receive the arrays correctly.
       ncpyPost[0].regMode = CK_BUFFER_UNREG;
       ncpyPost[1].regMode = CK_BUFFER_UNREG;
+
+      CkMatchBuffer(ncpyPost, 0, thisIndex*7 + 5);
+      CkPostBuffer(iArr1, n1, thisIndex*7 + 5);
+
+      CkMatchBuffer(ncpyPost, 1, thisIndex*7 + 6);
+      CkPostBuffer(dArr2, n2, thisIndex*7 + 6);
     }
 
 };

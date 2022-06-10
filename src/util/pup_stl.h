@@ -161,23 +161,23 @@ namespace PUP {
   {
     c.clear();
   }
-  template <class dtype>
-  inline void reserve_if_applicable(std::set<dtype> &c, size_t nElem)
+  template <class dtype, class cmp>
+  inline void reserve_if_applicable(std::set<dtype, cmp> &c, size_t nElem)
   {
     c.clear();
   }
-  template <class dtype>
-  inline void reserve_if_applicable(std::multiset<dtype> &c, size_t nElem)
+  template <class dtype, class cmp>
+  inline void reserve_if_applicable(std::multiset<dtype, cmp> &c, size_t nElem)
   {
     c.clear();
   }
-  template <class K, class V>
-  inline void reserve_if_applicable(std::map<K, V> &c, size_t nElem)
+  template <class K, class V, class cmp>
+  inline void reserve_if_applicable(std::map<K, V, cmp> &c, size_t nElem)
   {
     c.clear();
   }
-  template <class K, class V>
-  inline void reserve_if_applicable(std::multimap<K, V> &c, size_t nElem)
+  template <class K, class V, class cmp>
+  inline void reserve_if_applicable(std::multimap<K, V, cmp> &c, size_t nElem)
   {
     c.clear();
   }
@@ -471,12 +471,12 @@ using Requires = typename requires_impl<
 
   template <typename T, Requires<std::is_base_of<PUP::able, T>::value> = nullptr>
   inline void pup(PUP::er& p, std::unique_ptr<T>& t) {
-    T* t1 = nullptr;
+    PUP::able* t1 = nullptr;
     if (p.isUnpacking()) {
       p | t1;
-      t = std::unique_ptr<T>(t1);
+      t.reset((T*)t1);
     } else {
-      t1 = t.get();
+      t1 = (PUP::able*)t.get();
       p | t1;
     }
   }

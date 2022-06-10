@@ -169,11 +169,7 @@ CpvDeclare(void*, CmiLocalQueue);
 
 enum MACHINE_SMP_MODE {
     INVALID_MODE,
-#if CMK_BLUEGENEQ
     COMM_THREAD_SEND_RECV = 0,
-#else 
-    COMM_THREAD_SEND_RECV = 0,
-#endif
     COMM_THREAD_ONLY_RECV, /* work threads will do the send */
     COMM_WORK_THREADS_SEND_RECV, /* work and comm threads do the both send/recv */
     COMM_THREAD_NOT_EXIST /* work threads will do both send and recv */
@@ -451,23 +447,28 @@ extern "C" void CmiPushImmediateMsg(void *);
 void CmiPushPE(int rank,void *msg) {
     CmiState cs = CmiGetStateN(rank);
     MACHSTATE2(3,"Pushing message into rank %d's queue %p{",rank, cs->recv);
+
+    if (rank == CmiMyRank()) {
+        CmiSendSelf((char*)msg);
+    } else {
 #if CMK_IMMEDIATE_MSG
-    if (CmiIsImmediate(msg)) {
-        MACHSTATE1(3, "[%p] Push Immediate Message begin{",CmiGetState());
-        CMI_DEST_RANK(msg) = rank;
-        CmiPushImmediateMsg(msg);
-        MACHSTATE1(3, "[%p] Push Immediate Message end}",CmiGetState());
-        return;
-    }
+        if (CmiIsImmediate(msg)) {
+            MACHSTATE1(3, "[%p] Push Immediate Message begin{",CmiGetState());
+            CMI_DEST_RANK(msg) = rank;
+            CmiPushImmediateMsg(msg);
+            MACHSTATE1(3, "[%p] Push Immediate Message end}",CmiGetState());
+            return;
+        }
 #endif
 
 #if CMK_MACH_SPECIALIZED_QUEUE
-    LrtsSpecializedQueuePush(rank, msg);
+        LrtsSpecializedQueuePush(rank, msg);
 #elif CMK_SMP_MULTIQ
-    CMIQueuePush(cs->recv[CmiGetState()->myGrpIdx], (char *)msg);
+        CMIQueuePush(cs->recv[CmiGetState()->myGrpIdx], (char *)msg);
 #else
-    CMIQueuePush(cs->recv,(char*)msg);
+        CMIQueuePush(cs->recv,(char*)msg);
 #endif
+    }
 
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
   if (_Cmi_sleepOnIdle)
@@ -1579,12 +1580,12 @@ static void ConverseRunPE(int everReturn) {
 #if CMK_SMP
     {
       CmiIdleState *sidle=CmiNotifyGetState();
-      CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)CmiNotifyBeginIdle,(void *)sidle);
-      CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyStillIdle,(void *)sidle);
+      CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdCondFn)CmiNotifyBeginIdle,(void *)sidle);
+      CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdCondFn)CmiNotifyStillIdle,(void *)sidle);
     }
 #else
-    CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)CmiNotifyBeginIdle, NULL);
-    CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyStillIdle, NULL);
+    CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdCondFn)CmiNotifyBeginIdle, NULL);
+    CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdCondFn)CmiNotifyStillIdle, NULL);
 #endif
 
 
@@ -1624,6 +1625,13 @@ static INLINE_KEYWORD void AdvanceCommunication(int whenidle) {
 #endif
 #if CMK_USE_XPMEM
     CommunicationServerXpmem();
+#endif
+
+#if CMK_USE_SHMEM
+    CmiIpcBlock* block;
+    if ((block = CmiPopIpcBlock(CsvAccess(coreIpcManager_)))) {
+      CmiDeliverIpcBlockMsg(block);
+    }
 #endif
 
     LrtsAdvanceCommunication(whenidle);
@@ -1709,7 +1717,7 @@ if (MSG_STATISTIC)
       CmiPrintf("[Partition %d][Node %d] End of program\n",CmiMyPartition(),CmiMyNode());
 #endif
 
-#if !CMK_SMP || CMK_BLUEGENEQ || CMK_PAMI_LINUX_PPC8
+#if !CMK_SMP || CMK_PAMI_LINUX_PPC8
 #if CMK_USE_PXSHM
     CmiExitPxshm();
 #endif
@@ -1736,7 +1744,7 @@ if (MSG_STATISTIC)
 #endif
     CmiYield();
     if (!CharmLibInterOperate || userDrivenMode) {
-      while (1) {
+      while (ckExitComplete.load() == 0) {
         CmiYield();
       }
     }

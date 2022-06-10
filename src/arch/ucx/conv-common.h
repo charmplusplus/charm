@@ -14,8 +14,7 @@
 #define CMK_CMIPRINTF_IS_A_BUILTIN                         0
 
 /* define the converse headers. For most of the purposes, only the UNIQUE header
-   needs to be modified, the others will follow. BLUEGENE may need to be
-   adapted.
+   needs to be modified, the others will follow.
 
    In particular, the fields "hdl", "xhdl" and "info" must be always present in
    the extended header, since they are directly accessed in converse.h */
@@ -91,3 +90,6 @@
 #define CMK_USE_SIMPLEPMI              1
 #define CMK_USE_PMI2                   0
 #define CMK_USE_PMIX                   0
+
+/* UCX machine layer supports GPU-aware communication */
+#define CMK_GPU_COMM                   1

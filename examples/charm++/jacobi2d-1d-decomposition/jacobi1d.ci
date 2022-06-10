@@ -21,9 +21,9 @@ mainmodule jacobi1d {
         serial "send_to_neighbors" {
           iterations++;
           if(!topBound)
-            thisProxy((thisIndex-1+numChares)%numChares).receiveGhosts(iterations, BOTTOM, arrayDimY, &temperature[1][0]);
+            thisProxy((thisIndex-1+numChares)%numChares).receiveGhosts(iterations, BOTTOM, arrayDimY, temperature[1].data());
           if(!bottomBound)
-            thisProxy((thisIndex+1)%numChares).receiveGhosts(iterations, TOP, arrayDimY, &temperature[blockDimX][0]);
+            thisProxy((thisIndex+1)%numChares).receiveGhosts(iterations, TOP, arrayDimY, temperature[blockDimX].data());
         }
         for(imsg = 0; imsg < neighbors; imsg++)
           when receiveGhosts[iterations] (int iter, int dir, int size, double gh[size])

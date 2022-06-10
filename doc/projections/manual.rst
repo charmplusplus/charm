@@ -1087,10 +1087,6 @@ communication characteristics:
 
 -  Number of bytes sent externally (physically) by entry methods
 
--  Number of hops messages travelled before being received by an
-   entry methods (available only on trace logs generated on the Bluegene
-   machine).
-
 .. figure:: fig/apoa1_512_CommTimeProfile.png
    :name: communication-time
    :width: 4in

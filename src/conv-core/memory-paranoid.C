@@ -104,7 +104,7 @@ static int memory_verbose=0; /*Print out every time we check the heap*/
 static void slotAbort(const char *why,Slot *s) {
 	memory_checkfreq=100000;
 	CmiPrintf("[%d] Error in block of %d bytes at %p, allocated from:\n",
-		CmiMyPe(), s->userSize, Slot_toUser(s));
+		CmiMyPe(), s->userSize, (void *)Slot_toUser(s));
 	CmiBacktracePrint(s->from,STACK_LEN);
 	memAbort(why,Slot_toUser(s));
 }

@@ -51,7 +51,7 @@ static void fs_copy(const char * src, const char * dst)
   pid_t pid = fork();
   if (pid == 0)
   {
-    execl("/bin/cp", "/bin/cp", src, dst, NULL);
+    execl("/bin/cp", "/bin/cp", src, dst, nullptr);
     CkError("ERROR> execl(): %s\n", strerror(errno));
     CkAbort(abortmsg);
   }
@@ -84,7 +84,8 @@ void AMPI_Node_Setup(int numranks)
     CmiPrintf("AMPI> Using fsglobals privatization method.\n");
 
   AMPI_FuncPtr_Transport funcptrs{};
-  AMPI_FuncPtr_Pack(&funcptrs);
+  if (AMPI_FuncPtr_Pack(&funcptrs, sizeof(funcptrs)))
+    CkAbort("Globals runtime linking pack failed due to mismatch!");
 
   static const char exe_suffix[] = STRINGIFY(CMK_POST_EXE);
   static const char user_suffix[] = STRINGIFY(CMK_USER_SUFFIX);
@@ -124,7 +125,10 @@ void AMPI_Node_Setup(int numranks)
 
     auto unpack = AMPI_FuncPtr_Unpack_Locate(myexe);
     if (unpack != nullptr)
-      unpack(&funcptrs);
+    {
+      if (unpack(&funcptrs, sizeof(funcptrs)))
+        CkAbort("Globals runtime linking unpack failed due to mismatch!");
+    }
 
     rankdata[myrank].exe = myexe;
     rankdata[myrank].mainstruct = AMPI_Main_Get(myexe);

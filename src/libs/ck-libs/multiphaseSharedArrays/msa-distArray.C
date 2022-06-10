@@ -37,9 +37,9 @@ void MSA_Thread_Listener::suspend(void) {
 	if (count>0) {
 		thread=CthSelf();
 		if (verbose) CkPrintf("Thread %p suspending for %d signals\n",
-			CthSelf(),count);
+			(void *)CthSelf(),count);
 		CthSuspend();
-		if (verbose) CkPrintf("Thread %p resumed\n",CthSelf());
+		if (verbose) CkPrintf("Thread %p resumed\n",(void *)CthSelf());
 	}
 }
 

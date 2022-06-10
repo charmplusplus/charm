@@ -60,8 +60,6 @@ PVM: converse $(L)/libpvmc.a
 AMR: charm++ LIBS
 	$(MAKE) -C libs/ck-libs/amr all
 
-FEM: ParFUM
-
 ParFUM: charm++ AMPI
 	$(MAKE) -C libs/ck-libs/ ParFUM
 
@@ -110,7 +108,7 @@ completion: charmxi
 NDMeshStreamer: charm-core completion
 
 $(L)/libmpi-mainmodule.a: mpi-mainmodule.o
-	$(CHARMC) -o $@ $<
+	$(CHARMC) -o $@ $^
 
 $(L)/libckmain.a: main.o
 	$(CHARMC) -o $@ $^
@@ -177,7 +175,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
       memory-isomalloc.h debug-conv.h debug-conv++.h conv-autoconfig.h \
       conv-common.h conv-config.sh conv-config.h conv-mach.h conv-mach.sh conv-mach-common.h \
       cmipool.h mempool.h cmiqueue.h \
-      TopoManager.h BGQTorus.h XTTorus.h topomanager_config.h \
+      TopoManager.h XTTorus.h topomanager_config.h \
       cmitls.h lrtslock.h conv-rdma.h conv-rdmadevice.h lrts-common.h conv-header.h
 
 # The .c files are there to be #included by clients whole
@@ -309,10 +307,8 @@ endif
 	test -f $(SRCBASE)/arch/$(CMK_GDIR)/gdir_link && cat $(SRCBASE)/arch/$(CMK_GDIR)/gdir_link > .gdir.new && ./gathertree $(SRCBASE)/arch/`cat .gdir.new`      . || true
 	./gatherflat $(SRCBASE)/arch/$(CMK_VDIR)                 .
 	-./system_ln $(SRCBASE)/util/topomanager/TopoManager.h   .
-	-./system_ln $(SRCBASE)/util/topomanager/BGQTorus.h      .
 	-./system_ln $(SRCBASE)/util/topomanager/XTTorus.h       .
 	-./system_ln $(SRCBASE)/util/topomanager/TopoManager.C   .
-	-./system_ln $(SRCBASE)/util/topomanager/BGQTorus.C      .
 	-./system_ln $(SRCBASE)/util/topomanager/CrayNid.c       .
 	./gathertree $(SRCBASE)/../benchmarks                    ../benchmarks
 	./gathertree $(SRCBASE)/../examples                      ../examples
@@ -469,11 +465,20 @@ LIBCONV_UTILF=pup_f.o
 
 LIBCONV_PARTITION = custom_partitioner.o set_partition_params.o
 
-LIBTMGR = TopoManager.o CrayNid.o BGQTorus.o
+LIBTMGR = TopoManager.o CrayNid.o
 
 include Makefile.machine
 
-converse: charmrun-target swapglobal-target conv-cpm $(L)/libconverse.a
+CONVERSE_DEPS := \
+  charmrun-target \
+  conv-cpm \
+  $(L)/libconverse.a \
+
+ifneq (0,$(CMK_SUPPORTS_SWAPGLOBALS))
+  CONVERSE_DEPS += swapglobal-target
+endif
+
+converse: $(CONVERSE_DEPS)
 
 cpuaffinity.o $(INC)/hwloc.h $(INC)/hwloc/autogen/config.h $(INC)/hwloc/rename.h $(INC)/hwloc/bitmap.h \
 $(INC)/hwloc/helper.h $(INC)/hwloc/inlines.h $(INC)/hwloc/diff.h $(INC)/hwloc/deprecated.h $(INC)/hwloc/export.h $(INC)/hwloc/distances.h : hwloc-target
@@ -500,8 +505,15 @@ hwloc-target: conv-autoconfig.h
     --without-x \
     HWLOC_FLAGS="$(HWLOC_CC_FLAGS)" \
     CFLAGS="$(HWLOC_CC_FLAGS)" \
+    CXXFLAGS="$(HWLOC_CXX_FLAGS)" \
     CC="$(HWLOC_CC)" \
+    CXX="$(HWLOC_CXX)" \
     CC_FOR_BUILD="$(HWLOC_CC)" \
+    CPP= \
+    CXXCPP= \
+    CPPFLAGS= \
+    LDFLAGS= \
+    LIBS= \
     > /dev/null || ( cat config.log ; exit 1 ) )
 	( $(MAKE) -C hwloc AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=: )
 	( cp -f hwloc/include/hwloc.h $(INC) )
@@ -531,7 +543,7 @@ $(L)/conv-static.o: conv-static.o
 	cp -f $< $@
 
 machine.o: machine.C $(CVHEADERS)
-	$(CHARMC) -I. -o $@ $<
+	$(CHARMC) -I. -o $@ -c $<
 
 $(L)/libconv-utilf.a: $(LIBCONV_UTILF)
 	$(CHARMC) -o $@ $(LIBCONV_UTILF)
@@ -543,7 +555,7 @@ ccs-client.o: ccs-client.C $(CVHEADERS)
 	$(CHARMC) -DCMK_NOT_USE_CONVERSE=1 ccs-client.C
 
 sockRoutines-seq.o: sockRoutines.C $(CVHEADERS) $(UTILHEADERS)
-	$(CHARMC) -seq -DCMK_NOT_USE_CONVERSE=1 -o sockRoutines-seq.o sockRoutines.C
+	$(CHARMC) -seq -DCMK_NOT_USE_CONVERSE=1 -o sockRoutines-seq.o -c sockRoutines.C
 
 pup_f.f90: pup_f.f90.sh
 	rm -f pup_f.f90 && ./pup_f.f90.sh
@@ -584,7 +596,7 @@ MEM_DEPS=memory-gnu.C memory-gnu-internal.C converse.h conv-mach.h $(CVHEADERS)
 # $1 is the name of the module, $2 is any additional dependency beyond memory.C and $(MEM_DEPS), $3 is extra arguments to charmc
 define libmem
 $(L)/libmemory-$1.a: memory.C $$(MEM_DEPS) $2
-	$$(CHARMC) -I. -o libmemory-$1.o $3 $$<
+	$$(CHARMC) -I. -o libmemory-$1.o $3 -c $$<
 	$$(CHARMC) -I. -o $$@ $3 libmemory-$1.o
 endef
 
@@ -622,7 +634,7 @@ LIBTHREADSDEPS = $(CVHEADERS) QUICK_THREADS
 # $1 is the name of the module, $2 is any additional dependency beyond threads.C and $(LIBTHREADSDEPS), $3 is extra arguments to charmc, $4 is an option to include 'boost-context'
 define libthreads
 $(L)/libthreads-$1.a: threads.C $$(LIBTHREADSDEPS) $2
-	$$(CHARMC) -IQuickThreads -I. -o libthreads-$1.o $3 $$<
+	$$(CHARMC) -IQuickThreads -I. -o libthreads-$1.o $3 -c $$<
 ifeq (1,$$(strip $4))
 	$$(CHARMC) -IQuickThreads -I. -o $$@ $3 $$(wildcard boost-context/*.o) libthreads-$1.o
 else
@@ -656,7 +668,7 @@ $(eval $(call libthreads,uJcontext-memoryalias,uJcontext.C,-DCMK_THREADS_BUILD_J
 swapglobal-target: $(L)/libglobal-swap.a
 
 $(L)/libglobal-swap.a: global-elfgot.C $(CVHEADERS)
-	-$(CHARMC) -c global-elfgot.C -o $@ || touch $@
+	$(CHARMC) -c global-elfgot.C -o $@
 
 ###############################################################################
 #

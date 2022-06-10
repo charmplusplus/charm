@@ -191,7 +191,7 @@ int LV3D0_toMaster_bytesPer=100*1024;
 /// Communication parameter: maximum number of bytes to store in bucket.
 int LV3D0_toMaster_bytesMax=2*LV3D0_toMaster_bytesPer;
 
-static void toMaster_fillBucket(void *ptr,double timer);
+static void toMaster_fillBucket(void *ptr);
 
 static stats::op_t op_master_count=stats::count_op("master.count","Number of final master impostors","count");
 static stats::op_t op_master_bytes=stats::count_op("master.bytes","Number of final master bytes","bytes");
@@ -246,7 +246,7 @@ public:
 	}
 };
 /// Called every 10ms via CcdPERIODIC_10ms.
-static void toMaster_fillBucket(void *ptr,double timer) {
+static void toMaster_fillBucket(void *ptr) {
 	LV3D0_ClientManager_toMaster *p=(LV3D0_ClientManager_toMaster *)ptr;
 	p->fillBucket();
 }

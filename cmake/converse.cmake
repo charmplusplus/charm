@@ -3,6 +3,7 @@
 set(conv-core-h-sources
     src/util/cmitls.h
     src/conv-core/cmipool.h
+    src/conv-core/cmishmem.h
     src/conv-core/cmidemangle.h
     src/conv-core/conv-config.h
     src/conv-core/conv-cpath.h
@@ -57,6 +58,12 @@ set(conv-core-cxx-sources
     src/conv-core/queueing.C
     src/conv-core/hrctimer.C
 )
+
+if(${CMK_USE_SHMEM})
+    set(conv-core-cxx-sources
+        "${conv-core-cxx-sources}"
+        src/conv-core/shmem/cmishmem.C)
+endif()
 
 # conv-ccs
 set(conv-ccs-h-sources
@@ -191,8 +198,8 @@ add_library(ldb-spray src/conv-ldb/cldb.spray.C ${conv-ldb-h-sources})
 
 # TopoManager
 set(tmgr-c-sources src/util/topomanager/CrayNid.c)
-set(tmgr-cxx-sources src/util/topomanager/TopoManager.C src/util/topomanager/BGQTorus.C)
-set(tmgr-h-sources src/util/topomanager/TopoManager.h ${CMAKE_BINARY_DIR}/include/topomanager_config.h src/util/topomanager/XTTorus.h src/util/topomanager/BGQTorus.h)
+set(tmgr-cxx-sources src/util/topomanager/TopoManager.C)
+set(tmgr-h-sources src/util/topomanager/TopoManager.h ${CMAKE_BINARY_DIR}/include/topomanager_config.h src/util/topomanager/XTTorus.h)
 file(WRITE ${CMAKE_BINARY_DIR}/include/topomanager_config.h "// empty\n" )
 
 # Converse

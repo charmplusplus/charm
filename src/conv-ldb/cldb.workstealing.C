@@ -356,7 +356,7 @@ void CldGraphModuleInit(char **argv)
   /* register idle handlers - when idle, keep asking work from neighbors */
   if(CmiNumPes() > 1)
     CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
-      (CcdVoidFn) CldBeginIdle, NULL);
+      (CcdCondFn) CldBeginIdle, NULL);
   if(WS_Threshold >= 0 && CmiMyPe() == 0)
       CmiPrintf("Charm++> Steal work when load is fewer than %d. \n", WS_Threshold);
 #if CMK_IMMEDIATE_MSG

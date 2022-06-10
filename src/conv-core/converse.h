@@ -78,6 +78,9 @@
 
 #define CMI_MSG_NOKEEP(msg)                  ((CmiMsgHeaderBasic *)msg)->nokeep
 
+#define CmiIsPow2OrZero(v) (((v) & ((v) - 1)) == 0)
+#define CmiIsPow2(v) (CmiIsPow2OrZero(v) && (v))
+
 #define CMIALIGN(x,n)       (size_t)((~((size_t)n-1))&((x)+(n-1)))
 /*#define ALIGN8(x)        (size_t)((~7)&((x)+7)) */
 #define ALIGN8(x)          CMIALIGN(x,8)
@@ -468,7 +471,7 @@ extern CmiNodeLock CmiMemLock_lock;
 #define CmiMemUnlock() do{if (CmiMemLock_lock) CmiUnlock(CmiMemLock_lock);} while (0)
 
 
-#if (CMK_BLUEGENEQ || CMK_PAMI_LINUX_PPC8) && CMK_ENABLE_ASYNC_PROGRESS
+#if CMK_PAMI_LINUX_PPC8 && CMK_ENABLE_ASYNC_PROGRESS
 extern CMK_THREADLOCAL int32_t _cmi_bgq_incommthread;
 #define CmiInCommThread()  (_cmi_bgq_incommthread)
 #else
@@ -479,22 +482,7 @@ extern CMK_THREADLOCAL int32_t _cmi_bgq_incommthread;
 
 #include "string.h"
 
-#if CMK_BLUEGENEQ && CMK_BLUEGENEQ_OPTCOPY
-void CmiMemcpy_qpx (void *dst, const void *src, size_t n);
-#define CmiMemcpy(_dst, _src, _n)                                        \
-  do {                                                                   \
-    const void *_cmimemcpy_src = (_src);                                 \
-    void *_cmimemcpy_dst = (_dst);                                       \
-    size_t _cmimemcpy_n = (_n);                                          \
-    if ( (_cmimemcpy_n > 512+32) &&                                      \
-         ((((size_t)_cmimemcpy_dst|(size_t)_cmimemcpy_src) & 0x1F)==0) ) \
-      CmiMemcpy_qpx(_cmimemcpy_dst, _cmimemcpy_src, _cmimemcpy_n);       \
-    else                                                                 \
-      memcpy(_cmimemcpy_dst, _cmimemcpy_src, _cmimemcpy_n);              \
-  } while(0)
-#else
 #define CmiMemcpy(dest, src, size) memcpy((dest), (src), (size))
-#endif
 
 
 #if CMK_SHARED_VARS_NT_THREADS /*Used only by win versions*/
@@ -618,7 +606,7 @@ for each processor in the node.
     } while(0)
 #define CpvInitialized(v) (0!=CMK_TAG(Cpv_,v))
 
-#if (CMK_BLUEGENEQ || CMK_PAMI_LINUX_PPC8) && CMK_ENABLE_ASYNC_PROGRESS && CMK_IMMEDIATE_MSG
+#if CMK_PAMI_LINUX_PPC8 && CMK_ENABLE_ASYNC_PROGRESS && CMK_IMMEDIATE_MSG
   #define CpvAccess(v) (*(CMK_TAG(Cpv_addr_,v)[CmiMyRank()]))
 #else
 #define CpvAccess(v) (*CMK_TAG(Cpv_,v))
@@ -1138,10 +1126,16 @@ typedef void (*CmiStartFn)(int argc, char **argv);
   @addtogroup ConverseScheduler
   @{
 */
-CpvExtern(int, _ccd_numchecks);
 extern void  CcdCallBacks(void);
-#define CsdPeriodic() do{ if (CpvAccess(_ccd_numchecks)-- <= 0) CcdCallBacks(); } while(0)
-#define CsdResetPeriodic()    CpvAccess(_ccd_numchecks) = 0;
+#if CSD_NO_PERIODIC
+#define CsdPeriodic()
+#define CsdResetPeriodic()
+#else
+CpvExtern(int, _ccd_numchecks);
+CpvExtern(int, _ccd_heaplen);
+#define CsdPeriodic() do{ if (CpvAccess(_ccd_heaplen) > 0 && CpvAccess(_ccd_numchecks)-- <= 0) CcdCallBacks(); } while(0)
+#define CsdResetPeriodic()    CpvAccess(_ccd_numchecks) = 0
+#endif
 
 extern void  CsdEndIdle(void);
 extern void  CsdStillIdle(void);
@@ -1315,23 +1309,6 @@ void          CmiInterFreeSendFn(int, int, int, char *);
 typedef void * (*CmiReduceMergeFn)(int*,void*,void**,int);
 typedef void (*CmiReducePupFn)(void*,void*);
 typedef void (*CmiReduceDeleteFn)(void*);
-
-typedef struct {
-  void *localData;
-  char **remoteData;
-  int localSize;
-  short int numRemoteReceived;
-  short int numChildren;
-  int parent;
-  CmiUInt2 seqID;
-  char localContributed;
-  struct {
-    CmiHandler destination;
-    CmiReduceMergeFn mergeFn;
-    CmiReducePupFn pupFn;
-    CmiReduceDeleteFn deleteFn;
-  } ops;
-} CmiReduction;
 
 typedef CmiUInt2 CmiReductionID;
 
@@ -1551,6 +1528,7 @@ typedef CthThread   (*CthThFn)(void);
 
 void       CthSetSerialNo(CthThread t, int no);
 int        CthImplemented(void);
+int        CthIsMainThread(CthThread t);
 
 CthThread  CthSelf(void);
 CthThread  CthCreate(CthVoidFn, void *, int);
@@ -1832,6 +1810,8 @@ void CmiOutOfMemory(int nBytes);
 
 /******** CONVCONDS ********/
 
+#define CCD_COND_FN_EXISTS 1
+typedef void (*CcdCondFn)(void *userParam);
 typedef void (*CcdVoidFn)(void *userParam,double curWallTime);
 
 /*CPU conditions*/
@@ -1885,14 +1865,14 @@ extern CmiSwitchToPEFnPtr CmiSwitchToPE;
 #define CmiSwitchToPE(pe)  pe
 #endif
 void CcdCallFnAfter(CcdVoidFn fnp, void *arg, double msecs);
-int CcdCallOnCondition(int condnum, CcdVoidFn fnp, void *arg);
-int CcdCallOnConditionKeep(int condnum, CcdVoidFn fnp, void *arg);
+int CcdCallOnCondition(int condnum, CcdCondFn fnp, void *arg);
+int CcdCallOnConditionKeep(int condnum, CcdCondFn fnp, void *arg);
 void CcdCallFnAfterOnPE(CcdVoidFn fnp, void *arg, double msecs, int pe);
-int CcdCallOnConditionOnPE(int condnum, CcdVoidFn fnp, void *arg, int pe);
-int CcdCallOnConditionKeepOnPE(int condnum, CcdVoidFn fnp, void *arg, int pe);
+int CcdCallOnConditionOnPE(int condnum, CcdCondFn fnp, void *arg, int pe);
+int CcdCallOnConditionKeepOnPE(int condnum, CcdCondFn fnp, void *arg, int pe);
 void CcdCancelCallOnCondition(int condnum, int idx);
 void CcdCancelCallOnConditionKeep(int condnum, int idx);
-double CcdRaiseCondition(int condnum);
+void CcdRaiseCondition(int condnum);
 double CcdSetResolution(double newResolution);
 double CcdResetResolution(void);
 double CcdIncreaseResolution(double newResolution);
@@ -2297,6 +2277,11 @@ extern double CmiLog2(double);
 
 #if defined(__cplusplus)
 }                                         /* end of extern "C"  */
+
+#if CMK_USE_SHMEM
+#include "cmishmem.h"
+CsvExtern(CmiIpcManager*, coreIpcManager_);
+#endif
 #endif
 
 #if CMK_GRID_QUEUE_AVAILABLE

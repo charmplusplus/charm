@@ -130,9 +130,9 @@ void Entry::check() {
         first_line_);
     }
 
-    if (!param || param->next || strcmp(param->param->getType()->getBaseName(), "double")) {
+    if (param && !param->isVoid()) {
       XLAT_ERROR_NOCOL(
-        "whenidle functions must accept a single parameter of type 'double'",
+        "whenidle functions must be void of parameters",
         first_line_);
     }
   }
@@ -544,29 +544,48 @@ void Entry::genArrayDefs(XStr& str) {
     // regular broadcast and section broadcast for an entry method with rdma
     str << "  ckCheck();\n";
     XStr inlineCall;
+    bool nonMarshaled = param && param->getName() && !param->isMarshalled();
     if (!isNoTrace())
+    {
+      if (nonMarshaled) {
+        inlineCall << "  envelope& env = *(UsrToEnv("
+                   << param->getName() << "));\n";
+      } else {
+        // Create a dummy envelope to represent the "message send" to the local/inline method
+        // so that Projections can trace the method back to its caller
+        inlineCall << "  envelope env;\n"
+                   << "  env.setTotalsize(0);\n";
+      }
+
       inlineCall
-          << "    _TRACE_BEGIN_EXECUTE_DETAILED(0,ForArrayEltMsg,(" << epIdx()
-          << "),CkMyPe(), 0, ((CkArrayIndex&)ckGetIndex()).getProjectionID(), obj);\n";
+          << "  env.setMsgtype(ForArrayEltMsg);\n"
+          << "  _TRACE_CREATION_DETAILED(&env, " << epIdx() << ");\n"
+          << "  _TRACE_CREATION_DONE(1);\n"
+          << "  CmiObjId projID = ((CkArrayIndex&)ckGetIndex()).getProjectionID();\n"
+          << "  _TRACE_BEGIN_EXECUTE_DETAILED(CpvAccess(curPeEvent),ForArrayEltMsg,(" << epIdx()
+          << "),CkMyPe(), 0, &projID, obj);\n";
+    }
     if (isAppWork()) inlineCall << "    _TRACE_BEGIN_APPWORK();\n";
     inlineCall << "#if CMK_LBDB_ON\n";
     if (isInline())
     {
-      inlineCall << "    const auto id = obj->ckGetID().getElementID();\n"
-                 << "    const CkArrayIndex* idx = &ckGetIndex();\n";
-      param->size(inlineCall); // Puts size of parameters in bytes into impl_off
-      inlineCall << "    impl_off += sizeof(envelope);\n"
-                 << "    ckLocMgr()->recordSend(idx, id, impl_off);\n";
+      inlineCall << "    const auto id = obj->ckGetID().getElementID();\n";
+      if (nonMarshaled) {
+        inlineCall << "    unsigned int impl_off = UsrToEnv("
+                   << param->getName() << ")->getTotalsize();\n";
+      } else {
+        param->size(inlineCall); // Puts size of parameters in bytes into impl_off
+        inlineCall << "    impl_off += sizeof(envelope);\n";
+      }
+      inlineCall << "    ckLocalBranch()->recordSend(id, impl_off, CkMyPe());\n";
     }
-    inlineCall << "    LDObjHandle objHandle;\n"
-               << "    int objstopped=0;\n"
-               << "    objHandle = obj->timingBeforeCall(&objstopped);\n"
-               << "#endif\n";
+    inlineCall << "#endif\n";
     inlineCall << "#if CMK_CHARMDEBUG\n"
                   "    CpdBeforeEp("
                << epIdx()
                << ", obj, NULL);\n"
                   "#endif\n";
+    inlineCall << "    CkCallstackPush(obj);\n";
     inlineCall << "    ";
     if (!retType->isVoid()) inlineCall << retType << " retValue = ";
     inlineCall << "obj->" << (tspec ? "template " : "") << name;
@@ -578,13 +597,17 @@ void Entry::genArrayDefs(XStr& str) {
     inlineCall << "(";
     param->unmarshallForward(inlineCall, true);
     inlineCall << ");\n";
+    if (isInline() && isNoKeep()) {
+      if (nonMarshaled) {
+        inlineCall << "    CkFreeMsg(" << param->getName() << ");\n";
+      }
+    }
+    inlineCall << "    CkCallstackPop(obj);\n";
     inlineCall << "#if CMK_CHARMDEBUG\n"
                   "    CpdAfterEp("
                << epIdx()
                << ");\n"
                   "#endif\n";
-    inlineCall << "#if CMK_LBDB_ON\n    "
-                  "obj->timingAfterCall(objHandle,&objstopped);\n#endif\n";
     if (isAppWork()) inlineCall << "    _TRACE_END_APPWORK();\n";
     if (!isNoTrace()) inlineCall << "    _TRACE_END_EXECUTE();\n";
     if (!retType->isVoid()) {
@@ -879,30 +902,19 @@ void Entry::genGroupDefs(XStr& str) {
             << "  _TRACE_BEGIN_EXECUTE_DETAILED(CpvAccess(curPeEvent),ForBocMsg,(" << epIdx()
             << "),CkMyPe(),0,NULL, NULL);\n";
       if (isAppWork()) str << " _TRACE_BEGIN_APPWORK();\n";
-      str << "#if CMK_LBDB_ON\n"
-             "  // if there is a running obj being measured, stop it temporarily\n"
-             "  LDObjHandle objHandle;\n"
-             "  int objstopped = 0;\n"
-             "  LBManager *the_lbmgr = (LBManager *)CkLocalBranch(_lbmgr);\n"
-             "  if (the_lbmgr->RunningObject(&objHandle)) {\n"
-             "    objstopped = 1;\n"
-             "    the_lbmgr->ObjectStop(objHandle);\n"
-             "  }\n"
-             "#endif\n";
       str << "#if CMK_CHARMDEBUG\n"
              "  CpdBeforeEp("
           << epIdx()
           << ", obj, NULL);\n"
              "#endif\n  ";
+      str << "CkCallstackPush((Chare*)obj);\n  ";
       if (!retType->isVoid()) str << retType << " retValue = ";
-      str << "obj->" << name << "(" << unmarshallStr << ");\n";
+      str << "obj->" << name << "(" << unmarshallStr << ");\n  ";
+      str << "CkCallstackPop((Chare*)obj);\n";
       str << "#if CMK_CHARMDEBUG\n"
              "  CpdAfterEp("
           << epIdx()
           << ");\n"
-             "#endif\n";
-      str << "#if CMK_LBDB_ON\n"
-             "  if (objstopped) the_lbmgr->ObjectStart(objHandle);\n"
              "#endif\n";
       if (isAppWork()) str << " _TRACE_END_APPWORK();\n";
       if (!isNoTrace()) str << "  _TRACE_END_EXECUTE();\n";
@@ -1877,23 +1889,76 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
 
   else {  // Normal case: call regular method
     if(param->hasRecvRdma()) {
-      str << "  if(CMI_IS_ZC_RECV(env) || CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) {\n";
+      if(getContainer()->isArray())
+        str << "  CmiUInt8 myIndex = static_cast<CkMigratable *>(impl_obj)->ckGetID();\n";
+      else
+        str << "  CmiUInt8 myIndex = impl_obj->thisIndex;\n";
+      str << "  if(CMI_IS_ZC_RECV(env)) { // Message that executes Post EM on primary element\n";
+      str << "    CkRdmaAsyncPostPreprocess(env, ";
+      if(isSDAGGen)
+        str << "genClosure->num_rdma_fields, ";
+      else
+        str << "impl_num_rdma_fields, ";
+      str << "ncpyPost);\n";
+      str << "  ";
       genRegularCall(str, preCall, redn_wrapper, usesImplBuf, true);
-      str << "  else if(CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) {\n";
+      for (int index = 0; index < numRdmaRecvParams; index++)
+        str << "    if(ncpyPost[" << index << "].postAsync) numPostAsync++;\n";
+      str << "    if(numPostAsync == 0) {\n"; // all buffers are posted
+      str << "      void *buffPtrs["<< numRdmaRecvParams <<"];\n";
+      str << "      int buffSizes["<< numRdmaRecvParams <<"];\n";
+      param->storePostedRdmaPtrs(str, isSDAGGen);
+      str << "      CkRdmaIssueRgets(env, buffPtrs, buffSizes, myIndex, ncpyPost);\n";
+      str << "    } else if(";
+      if(isSDAGGen)
+        str << "genClosure->num_rdma_fields - ";
+      else
+        str << "impl_num_rdma_fields - ";
+      str<< " numPostAsync > 0)\n"; // some buffers are posted and some are not\n";
+      str << "      CkAbort(\"Partial async posting of buffers is currently not supported!\");\n";
+      str << " } else if(CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) {\n";
+      str << "    // Message that executes the Post EM on secondary elements\n";
+      param->printPeerAckInfo(str, isSDAGGen);
+
+      str << "    if(isUnposted(tagArray, env, myIndex,";
+      if (isSDAGGen)
+        str << " genClosure->num_rdma_fields)) {\n";
+      else
+        str << " impl_num_rdma_fields)) {\n";
+      str << "      CkRdmaAsyncPostPreprocess(env, " << numRdmaRecvParams << ", ncpyPost, myIndex, peerAckInfo);\n";
+      param->setupPostedPtrs(str, isSDAGGen);
+      str << "      ";
+
+      genRegularCall(str, preCall, redn_wrapper, usesImplBuf, true);
+
+      for (int index = 0; index < numRdmaRecvParams; index++)
+        str << "      if(ncpyPost[" << index << "].postAsync) numPostAsync++;\n";
+
+      param->copyFromPostedPtrs(str, isSDAGGen);
+      str << "      if(numPostAsync == 0) {\n";
+      str << "        // Message that executes the Regular EM on secondary elements when all elements are posted inline\n";
+      str << "      ";
       genRegularCall(str, preCall, redn_wrapper, usesImplBuf, false);
+      str << "        updatePeerCounter(ncpyEmInfo);\n";
+      str << "        CmiFree(ncpyPost[0].ncpyEmInfo);\n";
+      str << "      }\n";
+
+      str << "    } else { // Message that executes the Regular EM on secondary elements\n";
+      param->extractPostedPtrs(str, isSDAGGen, false, false);
+      str << "    ";
+      genRegularCall(str, preCall, redn_wrapper, usesImplBuf, false);
+      str << "      updatePeerCounter(ncpyEmInfo);\n";
       str << "    }\n";
-      str << "  } else {\n";
+      str << "  } else {   // Final message that executes the Regular EM on primary element\n";
+      param->extractPostedPtrs(str, isSDAGGen, true, false);
     } else if (param->hasDevice()) {
-      str << "  bool is_inline = true;\n";
-      str << "  if (CMI_ZC_MSGTYPE(env) == CMK_ZC_DEVICE_MSG) {\n";
+      str << "  if (CMI_IS_ZC_DEVICE(env)) {\n";
       genRegularCall(str, preCall, redn_wrapper, usesImplBuf, true);
-      str << "  }\n";
-      str << "  if (is_inline) {\n";
+      param->extractPostedPtrs(str, isSDAGGen, false, true);
+      str << "  } else {\n";
     }
     genRegularCall(str, preCall, redn_wrapper, usesImplBuf, false);
-    if(param->hasRecvRdma()) {
-      str << "  }\n";
-    } else if (param->hasDevice()) {
+    if (param->hasRecvRdma() || param->hasDevice()) {
       str << "  }\n";
     }
   }
@@ -1974,32 +2039,15 @@ void Entry::genRegularCall(XStr& str, const XStr& preCall, bool redn_wrapper, bo
       if(isRdmaPost) {
         // Allocate an array of rdma pointers
         if (param->hasDevice()) {
-          str << "  void *buffPtrs["<< numRdmaDeviceParams <<"];\n";
-          str << "  int buffSizes["<< numRdmaDeviceParams <<"];\n";
-        } else {
-          str << "  void *buffPtrs["<< numRdmaRecvParams <<"];\n";
-          str << "  int buffSizes["<< numRdmaRecvParams <<"];\n";
-        }
-        param->storePostedRdmaPtrs(str, isSDAGGen);
-        if (param->hasDevice()) {
-          // is_inline determines if the regular entry method should be invoked
-          // right after the post entry method or if it should be invoked later
-          // with a message
-          str << "  if(CMI_IS_ZC_DEVICE(env))\n";
-          str << "    is_inline = CkRdmaDeviceIssueRgets(env, ";
+          str << "    void *buffPtrs["<< numRdmaDeviceParams <<"];\n";
+          str << "    int buffSizes["<< numRdmaDeviceParams <<"];\n";
+          param->storePostedRdmaPtrs(str, isSDAGGen);
+          str << "    CkRdmaDeviceIssueRgets(env, ";
           if (isSDAGGen)
             str << "genClosure->num_device_rdma_fields, ";
           else
             str << "impl_num_device_rdma_fields, ";
           str << "buffPtrs, buffSizes, devicePost);\n";
-        } else {
-          str << "  if(CMI_IS_ZC_RECV(env)) \n";
-          str << "    CkRdmaIssueRgets(env, ((CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_MSG) ? ncpyEmApiMode::BCAST_RECV : ncpyEmApiMode::P2P_RECV), ";
-          if(isSDAGGen)
-            str << "genClosure->num_rdma_fields, genClosure->num_root_node, ";
-          else
-            str << "impl_num_rdma_fields, impl_num_root_node, ";
-          str << "buffPtrs, buffSizes, ncpyPost);\n";
         }
       }
       // pack pointers if it's a broadcast message
@@ -2411,6 +2459,19 @@ void Entry::genReg(XStr& str) {
   str << "  // REG: " << *this;
   str << "  " << epIdx(0) << ";\n";
   if (isReductionTarget()) str << "  " << epIdx(0, true) << ";\n";
+
+  const char* ifNot = nullptr;
+  if (isCreateHere()) ifNot = "CkArray_IfNotThere_createhere";
+  else if (isCreateHome()) ifNot = "CkArray_IfNotThere_createhome";
+
+  if (ifNot) {
+    str << "  " << "CkRegisterIfNotThere(" << epIdx(0) << ", " << ifNot << ");\n";
+    if (isReductionTarget()) {
+      str << "  " << "CkRegisterIfNotThere(" << epIdx(0, true)
+          << ", " << ifNot << ");\n";
+    }
+  }
+
   if (isConstructor()) {
     if (container->isMainChare() && !isMigrationConstructor())
       str << "  CkRegisterMainChare(__idx, " << epIdx(0) << ");\n";

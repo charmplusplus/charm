@@ -68,11 +68,104 @@ inline void _CldNodeEnqueue(int node, void *msg, int infofn) {
 }
 #else
 
+
+
+#if CMK_USE_SHMEM
+#include "cldb.h"
+
+inline void _IpcCldPrepare(void* msg, int infofn) {
+  int len, queueing, priobits;
+  unsigned int* prioptr;
+  CldInfoFn ifn;
+  CldPackFn pfn;
+
+  ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
+  ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+  if (pfn) {
+    pfn(&msg);
+    ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+  }
+
+  CldSwitchHandler((char*)msg, CpvAccess(CldHandlerIndex));
+  CmiSetInfo(msg, infofn);
+}
+
+template <bool Node>
+inline bool _IpcSendImpl(int thisNode, int dstPe, envelope* env) {
+  auto* manager = CsvAccess(coreIpcManager_);
+
+  int nPes;
+  int* pes;
+  CmiIpcBlock* block;
+
+  if (Node) {
+    block = CmiMsgToIpcBlock(manager, (char*)env, env->getTotalsize(), CmiNodeOf(dstPe));
+  } else {
+    block = CmiMsgToIpcBlock(manager, (char*)env, env->getTotalsize(), CmiNodeOf(dstPe), CmiRankOf(dstPe));
+  }
+
+  if (block == nullptr) {
+    return false;
+  }
+
+  // spin until we succeed!
+  while (!CmiPushIpcBlock(manager, block))
+    ;
+
+  return true;
+}
+
+template <bool Node, bool Cld>
+inline bool _tryIpcSend(int dst, envelope* env, int infofn) {
+  auto len = env->getTotalsize();
+  // include padding for the chunk size header
+  if (len > (CmiRecommendedIpcBlockCutoff() + sizeof(envelope))) {
+    return false;
+  } else if ((dst == CLD_ANYWHERE) || (dst == CLD_BROADCAST) ||
+             (dst == CLD_BROADCAST_ALL)) {
+    return false;
+  }
+  auto dstPe = Node ? CmiNodeFirst(dst) : dst;
+  auto dstNode = CmiPhysicalNodeID(dstPe);
+  auto thisPe = CmiMyPe();
+  auto thisNode = CmiPhysicalNodeID(thisPe);
+#if CMK_SMP
+  auto dstProc = Node ? dst : CmiNodeOf(dst);
+  auto thisProc = CmiNodeOf(thisPe);
+  auto sameProc = dstProc == thisProc;
+#else
+  auto sameProc = dstPe == thisPe;
+#endif
+  if ((thisNode == dstNode) && !sameProc) {
+    if (Cld) {
+      _IpcCldPrepare(env, infofn);
+
+      if (!_IpcSendImpl<Node>(thisNode, dstPe, env)) {
+        if (Node) {
+          CmiSyncNodeSendAndFree(dst, env->getTotalsize(), (char*)env);
+        } else {
+          CmiSyncSendAndFree(dst, env->getTotalsize(), (char*)env);
+        }
+      }
+
+      return true;
+    } else {
+      return _IpcSendImpl<Node>(thisNode, dstPe, env);
+    }
+  } else {
+    return false;
+  }
+}
+#endif
+
 inline void _CldEnqueue(int pe, void *msg, int infofn) {
   envelope *env = (envelope *)msg;
   // Store source information to handle acknowledgements on completion
   if(CMI_IS_ZC(msg))
     CkRdmaPrepareZCMsg(env, CkNodeOf(pe));
+#if CMK_USE_SHMEM
+  if (!_tryIpcSend<false, true>(pe, env, infofn))
+#endif
   CldEnqueue(pe, msg, infofn);
 }
 
@@ -81,6 +174,9 @@ inline void _CldNodeEnqueue(int node, void *msg, int infofn) {
   // Store source information to handle acknowledgements on completion
   if(CMI_IS_ZC(msg))
     CkRdmaPrepareZCMsg(env, node);
+#if CMK_USE_SHMEM
+  if (!_tryIpcSend<true, true>(node, env, infofn))
+#endif
   CldNodeEnqueue(node, msg, infofn);
 }
 #define _CldEnqueueMulti      CldEnqueueMulti
@@ -235,6 +331,10 @@ public:
 };
 
 CkpvExtern(CkCoreState *, _coreState);
+
+#if CMK_LBDB_ON
+CkLocRec *CkActiveLocRec(void);
+#endif // CMK_LBDB_ON
 
 void CpdHandleLBMessage(LBMigrateMsg **msg);
 void CkMessageWatcherInit(char **argv,CkCoreState *ck);

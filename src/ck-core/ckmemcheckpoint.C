@@ -373,8 +373,8 @@ CkMemCheckPT::CkMemCheckPT(int w)
   if(CkNumPes() > 1) {
     void pingBuddy();
     void pingCheckHandler();
-    CcdCallOnCondition(CcdPERIODIC_100ms,(CcdVoidFn)pingBuddy,NULL);
-    CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
+    CcdCallOnCondition(CcdPERIODIC_100ms,(CcdCondFn)pingBuddy,NULL);
+    CcdCallOnCondition(CcdPERIODIC_5s,(CcdCondFn)pingCheckHandler,NULL);
   }
 #endif
 #if CMK_CHKP_ALL
@@ -416,8 +416,8 @@ void CkMemCheckPT::pup(PUP::er& p)
   if(CkNumPes() > 1) {
     void pingBuddy();
     void pingCheckHandler();
-    CcdCallOnCondition(CcdPERIODIC_100ms,(CcdVoidFn)pingBuddy,NULL);
-    CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
+    CcdCallOnCondition(CcdPERIODIC_100ms,(CcdCondFn)pingBuddy,NULL);
+    CcdCallOnCondition(CcdPERIODIC_5s,(CcdCondFn)pingCheckHandler,NULL);
   }
 #endif
   }
@@ -1220,7 +1220,7 @@ void CkMemCheckPT::finishUp()
 #if CMK_CONVERSE_MPI	
   if (CmiMyPe() == BuddyPE(thisFailedPe)) {
     lastPingTime = CmiWallTimer();
-    CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
+    CcdCallOnCondition(CcdPERIODIC_5s,(CcdCondFn)pingCheckHandler,NULL);
   }
 #endif
 
@@ -1466,7 +1466,8 @@ static void reportChkpSeqHandler(char * m)
 {
   CmiFree(m);
   CmiResetGlobalReduceSeqID();
-  CmiResetGlobalNodeReduceSeqID();
+  if (CmiMyRank() == 0)
+    CmiResetGlobalNodeReduceSeqID();
   char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes+sizeof(int));
   int num = CpvAccess(chkpNum);
   if(CkMyNode() == CpvAccess(_crashedNode))
@@ -1708,7 +1709,7 @@ void buddyDieHandler(char *msg)
    int buddy = obj->BuddyPE(CmiMyPe());
    if (buddy == diepe)  {
      mpi_restart_crashed(diepe, newrank);
-     //CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
+     //CcdCallOnCondition(CcdPERIODIC_5s,(CcdCondFn)pingCheckHandler,NULL);
    }
 #endif
 }
@@ -1754,7 +1755,7 @@ void pingCheckHandler()
 #endif
   }
   else 
-    CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
+    CcdCallOnCondition(CcdPERIODIC_5s,(CcdCondFn)pingCheckHandler,NULL);
 #endif
 }
 
@@ -1771,7 +1772,7 @@ void pingBuddy()
     CmiGetRestartPhase(msg) = 9999;
     CmiSyncSendAndFree(buddy, CmiMsgHeaderSizeBytes+sizeof(int), (char *)msg);
   }
-  CcdCallOnCondition(CcdPERIODIC_100ms,(CcdVoidFn)pingBuddy,NULL);
+  CcdCallOnCondition(CcdPERIODIC_100ms,(CcdCondFn)pingBuddy,NULL);
 #endif
 }
 #endif

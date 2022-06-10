@@ -100,7 +100,6 @@ int setJcontext (const uJcontext_t *u)
 		/* FIXME: only if stack grows down (they all do...) */
 		new_sp+=mu->uc_stack.ss_size-caller_distance;
 		
-#if !CMK_BLUEGENEQ
 		VERBOSE( printf("About to switch to stack %p ",new_sp); printStack(); )
 		if (1) { /* change to new stack */
 #ifdef _MSC_VER 
@@ -136,26 +135,6 @@ int setJcontext (const uJcontext_t *u)
 		        setJcontext(mu->uc_link);
 		else
 			threadFatal("uc_link not set-- thread should never return");
-#else
-		//Start the thread by changing the stack pointer and calling the start function
-		uint64_t startiar = *((uint64_t*)mu_fn);
-		//uint64_t sp  = ((uint64_t)(ptr->stackptr) + ptr->stacksize - 1024) & ~(0x1f);
-		asm volatile("mr 3, %0;"
-			     "mtlr 3;"
-			     "mr 1, %1;"
-			     "mr 3, %2;"
-			     "mr 4, %3;"
-			     "blr;"
-			     : : "r" (startiar), "r" (new_sp), "r" (mu->_uc_args[0]), "r" (mu->_uc_args[1]) : "r1", "r3", "r4", "memory");
-		
-		//mu->uc_link cannot be null. Call setJcontext to start next thread or return to master
-		startiar = *((uint64_t*)setJcontext);
-		asm volatile("mr 3, %0;"
-			     "mtlr 3;"
-			     "mr 3, %1;"
-			     "blr;"
-			     : : "r" (startiar), "r" (mu->uc_link) : "r3", "memory");
-#endif	
 		
 	}
 	return 0;
