@@ -810,10 +810,12 @@ if(${NETWORK} MATCHES "ucx" OR ${NETWORK} MATCHES "ofi")
       configure_file(${filename} include/ COPYONLY)
   endforeach()
 
-  # FIXME: this should be in include/proc_management/simple_pmi
-  foreach(filename ${proc_management-simple_pmi-sources})
+  if(${LRTS_PMI} MATCHES "simplepmi")
+    # FIXME: this should be in include/proc_management/simple_pmi
+    foreach(filename ${proc_management-simple_pmi-sources})
       configure_file(${filename} include/ COPYONLY)
-  endforeach()
+    endforeach()
+  endif()
 endif()
 
 # Charmxi

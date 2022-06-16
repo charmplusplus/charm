@@ -1231,6 +1231,13 @@ int process_completion_queue()
             }
             MACHSTATE2(3, "POLL: error is %d (ret=%d)\n", error.err, ret);
             CmiPrintf("POLL: error is %d (ret=%d)\n", error.err, ret);
+            const char* strerror = fi_cq_strerror(context.cq, error.prov_errno, error.err_data, nullptr, 0);
+            if (strerror == nullptr)
+            {
+                CmiAbort("can't retrieve error string");
+            }
+            MACHSTATE1(3, "POLL: error string is \"%s\"\n", strerror);
+            CmiPrintf("POLL: error string is \"%s\"\n", strerror);
         }
         CmiAbort("Polling error");
     }
