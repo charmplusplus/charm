@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>  // std::numeric_limits
+#include <sstream>
 #include <unordered_map>
 #include <vector>
 
@@ -367,6 +368,7 @@ class StrategyWrapper : public IStrategyWrapper
     }
 
     std::vector<int> procMap;
+    constexpr int N = O::dimension; // Assumes O and P dimensions are same
 #if CMK_ERROR_CHECKING
     {
 #else
@@ -380,15 +382,21 @@ class StrategyWrapper : public IStrategyWrapper
                  objs.size());
       if (objs.size() > 0)
       {
-        float objMinLoad = std::numeric_limits<float>::max();
-        float objMaxLoad = 0;
-        float objTotalLoad = 0;
+        std::array<float, N> objMinLoad;
+        objMinLoad.fill(std::numeric_limits<float>::max());
+        std::array<float, N> objMaxLoad;
+        objMaxLoad.fill(0);
+        std::array<float, N> objTotalLoad;
+        objTotalLoad.fill(0);
         for (const auto& o : objs)
         {
-          float oload = o.getLoad();
-          objMinLoad = std::min(objMinLoad, oload);
-          objMaxLoad = std::max(objMaxLoad, oload);
-          objTotalLoad += oload;
+          for (int i = 0; i < N; i++)
+          {
+            float oload = o.getLoad(i);
+            objMinLoad[i] = std::min(objMinLoad[i], oload);
+            objMaxLoad[i] = std::max(objMaxLoad[i], oload);
+            objTotalLoad[i] += oload;
+          }
           if (o.id < sol->foreign_obj_id_start)
           {
             CkAssert(procMap[o.oldPe] >= 0);
@@ -398,25 +406,51 @@ class StrategyWrapper : public IStrategyWrapper
 #if CMK_ERROR_CHECKING
         if ((CkMyPe() == 0 || isTreeRoot) && _lb_args.debug() > 0)
 #endif
-          CkPrintf("[%d] obj loads: min=%f mean=%f max=%f\n", CkMyPe(), objMinLoad,
-                   objTotalLoad / objs.size(), objMaxLoad);
+        {
+          for (auto& load : objTotalLoad)
+          {
+            load /= objs.size();
+          }
+          std::ostringstream output;
+          output << "\n\tmin =(" << join(objMinLoad.begin(), objMinLoad.end()) << ")"
+                 << "\n\tmean=(" << join(objTotalLoad.begin(), objTotalLoad.end()) << ")"
+                 << "\n\tmax =(" << join(objMaxLoad.begin(), objMaxLoad.end()) << ")";
+
+          CkPrintf("[%d] Initial obj loads: %s\n", CkMyPe(), output.str().c_str());
+        }
       }
 
-      float procMinLoad = std::numeric_limits<float>::max();
-      float procMaxLoad = 0;
-      float procTotalLoad = 0;
+      std::array<float, N> procMinLoad;
+      procMinLoad.fill(std::numeric_limits<float>::max());
+      std::array<float, N> procMaxLoad;
+      procMaxLoad.fill(0);
+      std::array<float, N> procTotalLoad;
+      procTotalLoad.fill(0);
       for (const auto& p : procs)
       {
-        float pload = p.getLoad();
-        procMinLoad = std::min(procMinLoad, pload);
-        procMaxLoad = std::max(procMaxLoad, pload);
-        procTotalLoad += pload;
+        for (int i = 0; i < N; i++)
+        {
+          float pload = p.getLoad(i);
+          procMinLoad[i] = std::min(procMinLoad[i], pload);
+          procMaxLoad[i] = std::max(procMaxLoad[i], pload);
+          procTotalLoad[i] += pload;
+        }
       }
 #if CMK_ERROR_CHECKING
       if ((CkMyPe() == 0 || isTreeRoot) && _lb_args.debug() > 0)
 #endif
-        CkPrintf("[%d] proc loads: min=%f mean=%f max=%f\n", CkMyPe(), procMinLoad,
-                 procTotalLoad / procs.size(), procMaxLoad);
+      {
+        for (auto& load : procTotalLoad)
+        {
+          load /= procs.size();
+        }
+        std::ostringstream output;
+        output << "\n\tmin =(" << join(procMinLoad.begin(), procMinLoad.end()) << ")"
+               << "\n\tmean=(" << join(procTotalLoad.begin(), procTotalLoad.end()) << ")"
+               << "\n\tmax =(" << join(procMaxLoad.begin(), procMaxLoad.end()) << ")";
+
+        CkPrintf("[%d] Initial proc loads: %s\n", CkMyPe(), output.str().c_str());
+      }
       if (objs.size() > 0)
         for (auto& p : procs) p.resetLoad();
     }
@@ -436,7 +470,6 @@ class StrategyWrapper : public IStrategyWrapper
 #endif
       double strategy_time = CkWallTimer() - t0;
       TopoManager* tmgr = TopoManager::getTopoManager();
-      float maxLoad = 0;
       unsigned int migrations_sum_hops = 0;
       for (auto& p : procs) p.resetLoad();
       for (const auto& o : objs)
@@ -469,16 +502,27 @@ class StrategyWrapper : public IStrategyWrapper
           migrations_sum_hops += tmgr->getHopsBetweenRanks(o.oldPe, dest);
         P& p = procs[procMap[dest]];
         p.assign(o);
-        maxLoad = std::max(maxLoad, p.getLoad());
       }
 #if CMK_ERROR_CHECKING
       if ((CkMyPe() == 0 || isTreeRoot) && _lb_args.debug() > 0)
 #endif
       {
+        std::array<float, N> maxLoad;
+        maxLoad.fill(0);
+        for (const auto& p : procs)
+        {
+          for (int i = 0; i < N; i++)
+          {
+            maxLoad[i] = std::max(maxLoad[i], p.getLoad(i));
+          }
+        }
         CkPrintf(
-            "[%d] strategy %s time=%f secs, maxLoad after strategy=%f, num_migrations=%d "
-            "migrations_sum_hops=%u\n",
-            CkMyPe(), strategy_name.c_str(), strategy_time, maxLoad, migMsg->n_moves,
+            "[%d] Finished strategy %s\n"
+            "\ttime=%f secs\n"
+            "\tmaxLoad=(%s)\n"
+            "\tnum_migrations=%d, migrations_sum_hops=%u\n",
+            CkMyPe(), strategy_name.c_str(), strategy_time,
+            join(maxLoad.begin(), maxLoad.end()).c_str(), migMsg->n_moves,
             migrations_sum_hops);
       }
     }
@@ -497,6 +541,25 @@ class StrategyWrapper : public IStrategyWrapper
   std::vector<O> foreign_objs;
   int foreign_obj_id;
   TreeStrategy::Strategy<O, P, Solution>* strategy;
+
+  template <typename It>
+  std::string join(It begin, It end, const std::string& separator = ", ")
+  {
+    std::ostringstream output;
+
+    if (begin != end)
+    {
+      output << *begin++;
+    }
+
+    while (begin != end)
+    {
+      output << separator;
+      output << *begin++;
+    }
+
+    return output.str();
+  }
 };
 
 #include "TreeStrategyFactory.h"
