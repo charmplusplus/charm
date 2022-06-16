@@ -1,10 +1,11 @@
 #ifndef GREEDY_H
 #define GREEDY_H
 
+#include "LBManager.h"
 #include "TreeStrategyBase.h"
 #include "pheap.h"
 
-#include <algorithm>
+
 #include <queue>
 #include <vector>
 
@@ -44,7 +45,8 @@ class Greedy : public Strategy<O, P, S>
     {
       int maxdimension = 0;
       float maxfactor = 0;
-      CkPrintf("Obj %d, dimension %d\n", o.id, O::dimension);
+      if (_lb_args.debug() > 1)
+        CkPrintf("Obj %d, dimension %d\n", o.id, O::dimension);
       for (int i = 0; i < O::dimension; i++)
       {
         if (o.load[i] / averageLoad[i] > maxfactor)
@@ -52,9 +54,11 @@ class Greedy : public Strategy<O, P, S>
           maxfactor = o.load[i] / averageLoad[i];
           maxdimension = i;
         }
-        CkPrintf(" %f", o.load[i]);
+        if (_lb_args.debug() > 1)
+          CkPrintf(" %f", o.load[i]);
       }
-      CkPrintf("\n");
+      if (_lb_args.debug() > 1)
+        CkPrintf("\n");
       P p = heaps[maxdimension].top();
       solution.assign(o, p);  // update solution (assumes solution updates processor load)
       for (int i = 0; i < O::dimension; i++)
@@ -62,7 +66,8 @@ class Greedy : public Strategy<O, P, S>
         heaps[i].remove(p);
         heaps[i].push(p);
       }
-      CkPrintf("Obj %d going to PE %d\n", o.id, p.id);
+      if (_lb_args.debug() > 1)
+        CkPrintf("Obj %d going to PE %d\n", o.id, p.id);
     }
   }
 };
