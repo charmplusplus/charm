@@ -398,7 +398,10 @@ inline void _TRACE_BEGIN_TUNEOVERHEAD()
 {
   _TRACE_ONLY(CkpvAccess(_traces)->beginTuneOverhead());
 }
-inline void _TRACE_END_TUNEOVERHEAD() { _TRACE_ONLY(CkpvAccess(_traces)->endTuneOverhead()); }
+inline void _TRACE_END_TUNEOVERHEAD()
+{
+  _TRACE_ONLY(CkpvAccess(_traces)->endTuneOverhead());
+}
 inline void _TRACE_CREATION_1(envelope* env)
 {
   _TRACE_ONLY(CkpvAccess(_traces)->creation(env, env->getEpIdx()));
@@ -419,7 +422,8 @@ inline void _TRACE_CREATION_DONE(int num)
 {
   _TRACE_ONLY(CkpvAccess(_traces)->creationDone(num));
 }
-inline void _TRACE_BEGIN_SDAG(int event, int msgType, int ep, int srcPe, int ml, CmiObjId* idx)
+inline void _TRACE_BEGIN_SDAG(int event, int msgType, int ep, int srcPe, int ml,
+                              CmiObjId* idx)
 {
   _TRACE_ONLY(CkpvAccess(_traces)->beginSDAGBlock(event, msgType, ep, srcPe, ml, idx));
 }
@@ -428,8 +432,8 @@ inline void _TRACE_BEGIN_EXECUTE(envelope* env, void* obj)
 {
   _TRACE_ONLY(CkpvAccess(_traces)->beginExecute(env, obj));
 }
-inline void _TRACE_BEGIN_EXECUTE_DETAILED(int event, int msgType, int ep, int srcPe, int mLen,
-                                   CmiObjId* idx, void* obj)
+inline void _TRACE_BEGIN_EXECUTE_DETAILED(int event, int msgType, int ep, int srcPe,
+                                          int mLen, CmiObjId* idx, void* obj)
 {
   _TRACE_ONLY(
       CkpvAccess(_traces)->beginExecute(event, msgType, ep, srcPe, mLen, idx, obj));
@@ -451,9 +455,18 @@ inline void _TRACE_BEGIN_COMPUTATION()
 {
   _TRACE_ALWAYS(CkpvAccess(_traces)->beginComputation());
 }
-inline void _TRACE_END_COMPUTATION() { _TRACE_ALWAYS(CkpvAccess(_traces)->endComputation()); }
-inline void _TRACE_ENQUEUE(envelope* env) { _TRACE_ONLY(CkpvAccess(_traces)->enqueue(env)); }
-inline void _TRACE_DEQUEUE(envelope* env) { _TRACE_ONLY(CkpvAccess(_traces)->dequeue(env)); }
+inline void _TRACE_END_COMPUTATION()
+{
+  _TRACE_ALWAYS(CkpvAccess(_traces)->endComputation());
+}
+inline void _TRACE_ENQUEUE(envelope* env)
+{
+  _TRACE_ONLY(CkpvAccess(_traces)->enqueue(env));
+}
+inline void _TRACE_DEQUEUE(envelope* env)
+{
+  _TRACE_ONLY(CkpvAccess(_traces)->dequeue(env));
+}
 
 inline void _TRACE_END_PHASE() { _TRACE_ONLY(CkpvAccess(_traces)->endPhase()); }
 
