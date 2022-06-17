@@ -11,7 +11,7 @@
 #include <papi.h>
 #endif
 
-class envelope;
+#include "envelope.h"
 
 /**
  \defgroup CkPerf  Charm++ Trace Module
@@ -375,41 +375,97 @@ extern "C" {
 #include "conv-trace.h"
 }
 
-#define _TRACE_USER_EVENT(x) _TRACE_ONLY(CkpvAccess(_traces)->userEvent(x))
-#define _TRACE_USER_EVENT_BRACKET(x,bt,et) _TRACE_ONLY(CkpvAccess(_traces)->userBracketEvent(x,bt,et))
-#define _TRACE_BEGIN_USER_EVENT_BRACKET(x) _TRACE_ONLY(CkpvAccess(_traces)->beginUserBracketEvent(x))
-#define _TRACE_END_USER_EVENT_BRACKET(x) _TRACE_ONLY(CkpvAccess(_traces)->endUserBracketEvent(x))
-#define _TRACE_BEGIN_APPWORK() _TRACE_ONLY(CkpvAccess(_traces)->beginAppWork())
-#define _TRACE_END_APPWORK() _TRACE_ONLY(CkpvAccess(_traces)->endAppWork())
-#define _TRACE_NEW_CHARE()  _TRACE_ONLY(CkpvAccess(_traces)->countNewChare())
-#define _TRACE_BEGIN_TUNEOVERHEAD() _TRACE_ONLY(CkpvAccess(_traces)->beginTuneOverhead())
-#define _TRACE_END_TUNEOVERHEAD() _TRACE_ONLY(CkpvAccess(_traces)->endTuneOverhead())
-#define _TRACE_CREATION_1(env) _TRACE_ONLY(CkpvAccess(_traces)->creation(env,env->getEpIdx()))
-#define _TRACE_CREATION_DETAILED(env,ep) _TRACE_ONLY(CkpvAccess(_traces)->creation(env,ep))
-#define _TRACE_CREATION_N(env, num) _TRACE_ONLY(CkpvAccess(_traces)->creation(env, env->getEpIdx(), num))
-#define _TRACE_CREATION_MULTICAST(env, num, pelist) _TRACE_ONLY(CkpvAccess(_traces)->creationMulticast(env, env->getEpIdx(), num, pelist))
-#define _TRACE_CREATION_DONE(num) _TRACE_ONLY(CkpvAccess(_traces)->creationDone(num))
-#define _TRACE_BEGIN_SDAG(env) _TRACE_ONLY(CkpvAccess(_traces)->beginSDAGBlock(env))
-#define _TRACE_END_SDAG(env) _TRACE_ONLY(CkpvAccess(_traces)->endSDAGBlock(env))
-#define _TRACE_BEGIN_EXECUTE(env, obj) _TRACE_ONLY(CkpvAccess(_traces)->beginExecute(env, obj))
-#define _TRACE_BEGIN_EXECUTE_DETAILED(evt,typ,ep,src,mlen,idx, obj) _TRACE_ONLY(CkpvAccess(_traces)->beginExecute(evt,typ,ep,src,mlen,idx, obj))
-#define _TRACE_END_EXECUTE() _TRACE_ONLY(CkpvAccess(_traces)->endExecute())
-#define _TRACE_MESSAGE_RECV(env, size) _TRACE_ONLY(CkpvAccess(_traces)->messageRecv(env, size))
-#define _TRACE_MESSAGE_SEND(env, pe, size) _TRACE_ONLY(CkpvAccess(_traces)->messageSend(env, pe, size))
-#define _TRACE_BEGIN_PACK() _TRACE_ONLY(CkpvAccess(_traces)->beginPack())
-#define _TRACE_END_PACK() _TRACE_ONLY(CkpvAccess(_traces)->endPack())
-#define _TRACE_BEGIN_UNPACK() _TRACE_ONLY(CkpvAccess(_traces)->beginUnpack())
-#define _TRACE_END_UNPACK() _TRACE_ONLY(CkpvAccess(_traces)->endUnpack())
-#define _TRACE_BEGIN_COMPUTATION() _TRACE_ALWAYS(CkpvAccess(_traces)->beginComputation())
-#define _TRACE_END_COMPUTATION() _TRACE_ALWAYS(CkpvAccess(_traces)->endComputation())
-#define _TRACE_ENQUEUE(env) _TRACE_ONLY(CkpvAccess(_traces)->enqueue(env))
-#define _TRACE_DEQUEUE(env) _TRACE_ONLY(CkpvAccess(_traces)->dequeue(env))
+inline void _TRACE_USER_EVENT(int eventID)
+{
+  _TRACE_ONLY(CkpvAccess(_traces)->userEvent(eventID));
+}
+inline void _TRACE_USER_EVENT_BRACKET(int eventID, double bt, double et)
+{
+  _TRACE_ONLY(CkpvAccess(_traces)->userBracketEvent(eventID, bt, et));
+}
+inline void _TRACE_BEGIN_USER_EVENT_BRACKET(int eventID)
+{
+  _TRACE_ONLY(CkpvAccess(_traces)->beginUserBracketEvent(eventID));
+}
+inline void _TRACE_END_USER_EVENT_BRACKET(int eventID)
+{
+  _TRACE_ONLY(CkpvAccess(_traces)->endUserBracketEvent(eventID));
+}
+inline void _TRACE_BEGIN_APPWORK() { _TRACE_ONLY(CkpvAccess(_traces)->beginAppWork()); }
+inline void _TRACE_END_APPWORK() { _TRACE_ONLY(CkpvAccess(_traces)->endAppWork()); }
+inline void _TRACE_NEW_CHARE() { _TRACE_ONLY(CkpvAccess(_traces)->countNewChare()); }
+inline void _TRACE_BEGIN_TUNEOVERHEAD()
+{
+  _TRACE_ONLY(CkpvAccess(_traces)->beginTuneOverhead());
+}
+inline void _TRACE_END_TUNEOVERHEAD() { _TRACE_ONLY(CkpvAccess(_traces)->endTuneOverhead()); }
+inline void _TRACE_CREATION_1(envelope* env)
+{
+  _TRACE_ONLY(CkpvAccess(_traces)->creation(env, env->getEpIdx()));
+}
+inline void _TRACE_CREATION_DETAILED(envelope* env, int ep)
+{
+  _TRACE_ONLY(CkpvAccess(_traces)->creation(env, ep));
+}
+inline void _TRACE_CREATION_N(envelope* env, int num)
+{
+  _TRACE_ONLY(CkpvAccess(_traces)->creation(env, env->getEpIdx(), num));
+}
+inline void _TRACE_CREATION_MULTICAST(envelope* env, int num, const int* pelist)
+{
+  _TRACE_ONLY(CkpvAccess(_traces)->creationMulticast(env, env->getEpIdx(), num, pelist));
+}
+inline void _TRACE_CREATION_DONE(int num)
+{
+  _TRACE_ONLY(CkpvAccess(_traces)->creationDone(num));
+}
+inline void _TRACE_BEGIN_SDAG(int event, int msgType, int ep, int srcPe, int ml, CmiObjId* idx)
+{
+  _TRACE_ONLY(CkpvAccess(_traces)->beginSDAGBlock(event, msgType, ep, srcPe, ml, idx));
+}
+inline void _TRACE_END_SDAG() { _TRACE_ONLY(CkpvAccess(_traces)->endSDAGBlock()); }
+inline void _TRACE_BEGIN_EXECUTE(envelope* env, void* obj)
+{
+  _TRACE_ONLY(CkpvAccess(_traces)->beginExecute(env, obj));
+}
+inline void _TRACE_BEGIN_EXECUTE_DETAILED(int event, int msgType, int ep, int srcPe, int mLen,
+                                   CmiObjId* idx, void* obj)
+{
+  _TRACE_ONLY(
+      CkpvAccess(_traces)->beginExecute(event, msgType, ep, srcPe, mLen, idx, obj));
+}
+inline void _TRACE_END_EXECUTE() { _TRACE_ONLY(CkpvAccess(_traces)->endExecute()); }
+inline void _TRACE_MESSAGE_RECV(void* env, int size)
+{
+  _TRACE_ONLY(CkpvAccess(_traces)->messageRecv(env, size));
+}
+inline void _TRACE_MESSAGE_SEND(void* env, int pe, int size)
+{
+  _TRACE_ONLY(CkpvAccess(_traces)->messageSend(env, pe, size));
+}
+inline void _TRACE_BEGIN_PACK() { _TRACE_ONLY(CkpvAccess(_traces)->beginPack()); }
+inline void _TRACE_END_PACK() { _TRACE_ONLY(CkpvAccess(_traces)->endPack()); }
+inline void _TRACE_BEGIN_UNPACK() { _TRACE_ONLY(CkpvAccess(_traces)->beginUnpack()); }
+inline void _TRACE_END_UNPACK() { _TRACE_ONLY(CkpvAccess(_traces)->endUnpack()); }
+inline void _TRACE_BEGIN_COMPUTATION()
+{
+  _TRACE_ALWAYS(CkpvAccess(_traces)->beginComputation());
+}
+inline void _TRACE_END_COMPUTATION() { _TRACE_ALWAYS(CkpvAccess(_traces)->endComputation()); }
+inline void _TRACE_ENQUEUE(envelope* env) { _TRACE_ONLY(CkpvAccess(_traces)->enqueue(env)); }
+inline void _TRACE_DEQUEUE(envelope* env) { _TRACE_ONLY(CkpvAccess(_traces)->dequeue(env)); }
 
-#define _TRACE_END_PHASE() _TRACE_ONLY(CkpvAccess(_traces)->endPhase())
+inline void _TRACE_END_PHASE() { _TRACE_ONLY(CkpvAccess(_traces)->endPhase()); }
 
 /* Memory tracing */
-#define _TRACE_MALLOC(where, size, stack, stackSize) _TRACE_ONLY(CkpvAccess(_traces)->malloc(where,size,stack,stackSize))
-#define _TRACE_FREE(where, size) _TRACE_ONLY(CkpvAccess(_traces)->free(where, size))
+inline void _TRACE_MALLOC(void* where, int size, void** stack, int stackSize)
+{
+  _TRACE_ONLY(CkpvAccess(_traces)->malloc(where, size, stack, stackSize));
+}
+inline void _TRACE_FREE(void* where, int size)
+{
+  _TRACE_ONLY(CkpvAccess(_traces)->free(where, size));
+}
 
 #endif
 
