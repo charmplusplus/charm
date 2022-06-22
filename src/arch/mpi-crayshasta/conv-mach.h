@@ -2,6 +2,8 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
+#define CMK_CRAYEX                                         1
+
 #define CMK_CONVERSE_MPI                                   1
 
 #define CMK_MEMORY_PREALLOCATE_HACK			   0

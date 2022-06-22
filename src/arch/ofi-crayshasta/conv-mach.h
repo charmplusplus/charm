@@ -1,7 +1,8 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
-#define CMK_OFI 1
+#define CMK_CRAYEX                                         1
+#define CMK_OFI                                            1
 
 /* define the default linker, together with its options */
 #define CMK_DLL_CC   "g++ -shared -O3 -o "
