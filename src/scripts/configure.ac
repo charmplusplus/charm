@@ -1672,6 +1672,9 @@ then
   fi
 fi
 
+mv -f ../include/mpi.h.bak ../include/mpi.h 2>/dev/null
+fi
+
 if test "$BUILD_MPI" = "1"
 then
 
