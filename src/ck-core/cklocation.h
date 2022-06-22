@@ -54,14 +54,6 @@ public:
 // Forward declarations
 class CkArray;
 class ArrayElement;
-// What to do if an entry method is invoked on
-// an array element that does not (yet) exist:
-typedef enum : uint8_t
-{
-  CkArray_IfNotThere_buffer = 0,      // Wait for it to be created
-  CkArray_IfNotThere_createhere = 1,  // Make it on sending Pe
-  CkArray_IfNotThere_createhome = 2   // Make it on (a) home Pe
-} CkArray_IfNotThere;
 
 /// How to do a message delivery:
 typedef enum : uint8_t

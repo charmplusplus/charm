@@ -23,7 +23,7 @@
 # endif
 #endif
 
-#if CMK_CRAYXE || CMK_CRAYXC
+#if CMK_CRAYXE || CMK_CRAYXC || CMK_CRAYEX
 
 #if XT3_TOPOLOGY
 #else	/* if it is a XT4/5 or XE */
@@ -49,7 +49,7 @@ CLINKAGE int getXTNodeID(int mpirank, int nummpiranks)
   return nid;
 }
 
-#endif /* CMK_CRAYXE || CMK_CRAYXC */
+#endif /* CMK_CRAYXE || CMK_CRAYXC || CMK_CRAYEX */
 
 #if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
 
