@@ -142,7 +142,9 @@ CpvStaticDeclare(double, projTraceStart);
  * is set then a default value for MPI_POST_RECV_SIZE is used
  * if not specified by the user.
  */
-#define MPI_POST_RECV 0
+#ifndef MPI_POST_RECV
+#  define MPI_POST_RECV 0
+#endif
 
 /* Making those parameters configurable for testing them easily */
 
