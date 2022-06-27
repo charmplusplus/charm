@@ -34,7 +34,9 @@
 
 // debug level 1: process steps, object and segment layouts
 // debug level 2: (extremely verbose) relocation patching
+#ifndef PIEGLOBALS_DEBUG
 #define PIEGLOBALS_DEBUG 0
+#endif
 
 
 struct itemstruct
