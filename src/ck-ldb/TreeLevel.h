@@ -1273,13 +1273,18 @@ class PELevel : public LevelLogic
                 "Position of every object for LB must be of same dimension!");
     const size_t posDimension = (nobjs == 0) ? 0 : minPosDimension;
     const bool haveVectorLoad = maxObjDimension > 0;
+
     if (haveVectorLoad)
       dimension = commDimension + maxObjDimension;
-    else
+    // Otherwise if we don't have application vector loads, but we want to use comm info
+    // as part of a vector, add the regular walltime to the load vector in the message
+    else if (commDimension > 0)
       dimension = commDimension + 1;
+    // Else there is no vector load, so dimension remains 0
 
-    // If dimension is 0, then phases are not being used
-    // If there are no objects, set dimension to -1
+    // dimension just specifies the size of an object's load vector; we always send the
+    // regular measured runtime, so each object will have (1 + dimension) loads in the
+    // message
     const auto nobjLoads = nobjs * (1 + dimension);
 
     // TODO verify that non-migratable objects are not added to msg and are only counted
