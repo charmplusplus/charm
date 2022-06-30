@@ -50,9 +50,11 @@ public:
   void setObjTime(double cputime);
   void setObjTime(double cputime, int phase);
   void setObjPosition(const std::vector<LBRealType>& pos);
+  void setObjConstraints(const std::vector<LBRealType>& values);
   double getObjTime();
   const std::vector<LBRealType> getObjVectorLoad() const;
   const std::vector<LBRealType>& getObjPosition();
+  const std::vector<LBRealType>& getObjConstraints();
   void *getObjUserData(int idx);
   void CkLBSetPhase(int phase);
 #else

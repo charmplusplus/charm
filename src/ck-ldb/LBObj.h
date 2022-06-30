@@ -99,6 +99,16 @@ public:
     return data.position;
   }
 
+  inline void setConstraints(const std::vector<LBRealType>& values)
+  {
+    data.constrainedValues = values;
+  }
+
+  inline const std::vector<LBRealType>& getConstraints()
+  {
+    return data.constrainedValues;
+  }
+
   inline LDOMHandle &parentOM() { return data.handle.omhandle; }
   inline const LDObjHandle &GetLDObjHandle() const { return data.handle; }
   inline void SetMigratable(bool mig) { data.migratable = mig; }

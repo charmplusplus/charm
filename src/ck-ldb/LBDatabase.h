@@ -79,6 +79,15 @@ public:
     return LbObj(h)->getPosition();
   };
 
+  inline void ObjConstraints(LDObjHandle h, const std::vector<LBRealType>& values)
+  {
+    LbObj(h)->setConstraints(values);
+  };
+
+  inline const std::vector<LBRealType>& GetObjConstraints(LDObjHandle h) const
+  {
+    return LbObj(h)->getConstraints();
+  };
 
   inline void* GetObjUserData(LDObjHandle &h) {
     return LbObj(h)->getLocalUserData();

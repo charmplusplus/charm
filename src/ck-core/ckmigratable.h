@@ -83,6 +83,7 @@ public:
   double getObjTime();
   const std::vector<LBRealType> getObjVectorLoad() const;
   void setObjPosition(const std::vector<LBRealType>& pos);
+  void setObjConstraints(const std::vector<LBRealType>& values);
 #if CMK_LB_USER_DATA
   void *getObjUserData(int idx);
 #endif

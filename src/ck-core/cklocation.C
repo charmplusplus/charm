@@ -1772,6 +1772,14 @@ void CkMigratable::pup(PUP::er& p)
   if (p.isUnpacking())
     myRec->setObjPosition(position);
 
+  std::vector<LBRealType> constrainedValues;
+  if (!p.isUnpacking())
+    constrainedValues = myRec->getObjConstraints();
+  p | constrainedValues;
+  if (p.isUnpacking())
+    myRec->setObjConstraints(constrainedValues);
+
+
   if (p.isUnpacking())
     ckFinishConstruction(epoch);
 }
@@ -1853,6 +1861,11 @@ const std::vector<LBRealType> CkMigratable::getObjVectorLoad() const {
 void CkMigratable::setObjPosition(const std::vector<LBRealType>& pos)
 {
   myRec->setObjPosition(pos);
+}
+
+void CkMigratable::setObjConstraints(const std::vector<LBRealType>& values)
+{
+  myRec->setObjConstraints(values);
 }
 
 #  if CMK_LB_USER_DATA
@@ -2087,6 +2100,7 @@ const std::vector<LBRealType> CkMigratable::getObjVectorLoad() const
   return std::vector<LBRealType>();
 };
 void CkMigratable::setObjPosition(const std::vector<LBRealType> pos) {}
+void CkMigratable::setObjConstraints(const std::vector<LBRealType> values) {}
 #  if CMK_LB_USER_DATA
 void* CkMigratable::getObjUserData(int idx) { return NULL; }
 #  endif
@@ -2173,6 +2187,10 @@ void CkLocRec::setObjPosition(const std::vector<LBRealType>& pos)
 {
   lbmgr->SetObjPosition(ldHandle, pos);
 }
+void CkLocRec::setObjConstraints(const std::vector<LBRealType>& values)
+{
+  lbmgr->SetObjConstraints(ldHandle, values);
+}
 double CkLocRec::getObjTime()
 {
   LBRealType walltime, cputime;
@@ -2185,6 +2203,10 @@ void CkLocRec::setObjTime(double cputime, int phase) {
 const std::vector<LBRealType>& CkLocRec::getObjPosition()
 {
   return lbmgr->GetObjPosition(ldHandle);
+}
+const std::vector<LBRealType>& CkLocRec::getObjConstraints()
+{
+  return lbmgr->GetObjConstraints(ldHandle);
 }
 const std::vector<LBRealType> CkLocRec::getObjVectorLoad() const {
   return lbmgr->GetObjVectorLoad(ldHandle);

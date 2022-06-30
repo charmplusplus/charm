@@ -161,6 +161,7 @@ struct LDObjData {
   LBRealType cpuTime;
 #endif
   std::vector<LBRealType> vectorLoad;
+  std::vector<LBRealType> constrainedValues;
 #if ! COMPRESS_LDB
   LBRealType minWall, maxWall;
 #endif

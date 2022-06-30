@@ -8,6 +8,7 @@
 #include "TreeLB.h"
 #include "TreeStrategyBase.h"
 #include "charm.h"
+#include "cklocation.h"
 #include "lbdb.h"
 
 #include <algorithm>
@@ -47,6 +48,9 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
   // dimension in another dimension will determine the dimension of the new message when
   // merging.
   int dimension;
+  // constraints are passed as the last entries in the oloads array
+  // (so # load vector entries + # constrants = dimension)
+  size_t numConstraints;
 
   int* pe_ids;              // IDs of the pes in this msg
   float* bgloads;           // bgloads[i] is background load of i-th pe in this msg
@@ -73,20 +77,29 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
     size_t minPosDimension = std::numeric_limits<size_t>::max();
     size_t maxPosDimension = std::numeric_limits<size_t>::min();
     int dimension = -1;
+    size_t minNumConstraints = std::numeric_limits<size_t>::max();
+    size_t maxNumConstraints = std::numeric_limits<size_t>::min();
 
     for (int i = 0; i < msgs.size(); i++)
     {
       LBStatsMsg_1* msg = (LBStatsMsg_1*)msgs[i];
       dimension = std::max(dimension, msg->dimension);
+      minNumConstraints = std::min(minNumConstraints, msg->numConstraints);
+      maxNumConstraints = std::max(maxNumConstraints, msg->numConstraints);
       nObjs += msg->nObjs;
       nPes += msg->nPes;
       minPosDimension = std::min(minPosDimension, msg->posDimension);
       maxPosDimension = std::max(maxPosDimension, msg->posDimension);
       CkAssert(dimension == msg->dimension || msg->nObjs == 0);
     }
+    CkAssertMsg(msgs.empty() || minNumConstraints == maxNumConstraints,
+                "Number of constraints of every object for LB must be the same");
+    const size_t numConstraints = minNumConstraints;
+
     CkAssertMsg(msgs.empty() || minPosDimension == maxPosDimension,
                 "Position of every object for LB must be of same dimension");
     const size_t posDimension = minPosDimension;
+
     LBStatsMsg_1* newMsg;
     if (rateAware)
       newMsg = new (nPes, nPes, nPes, nPes + 1, nObjs * (1 + dimension), nObjs * posDimension) LBStatsMsg_1;
@@ -95,6 +108,7 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
     newMsg->nObjs = nObjs;
     newMsg->nPes = nPes;
     newMsg->dimension = dimension;
+    newMsg->numConstraints = numConstraints;
     newMsg->posDimension = posDimension;
     int pe_cnt = 0;
     int obj_cnt = 0;
@@ -1212,7 +1226,7 @@ class PELevel : public LevelLogic
     if (nobjs > 0) lbmgr->GetObjData(allLocalObjs.data());  // populate allLocalObjs
 
     int dimension = 0;
-    int commDimension = 0;
+    int numComm = 0;
 
     struct CommEntry
     {
@@ -1244,14 +1258,16 @@ class PELevel : public LevelLogic
       }
 
       if (useCommMsgs)
-        commDimension++;
+        numComm++;
       if (useCommBytes)
-        commDimension++;
+        numComm++;
     }
 
     myObjs.clear();
     LBRealType nonMigratableLoad = 0;
     int maxObjDimension = -1;
+    size_t minNumConstraints = std::numeric_limits<size_t>::max();
+    size_t maxNumConstraints = std::numeric_limits<size_t>::min();
     size_t minPosDimension = std::numeric_limits<size_t>::max();
     size_t maxPosDimension = std::numeric_limits<size_t>::min();
     for (const auto& obj : allLocalObjs)
@@ -1260,6 +1276,10 @@ class PELevel : public LevelLogic
       {
         myObjs.emplace_back(obj);
         maxObjDimension = std::max(maxObjDimension, (int)obj.vectorLoad.size());
+
+        minNumConstraints = std::min(minNumConstraints, obj.constrainedValues.size());
+        maxNumConstraints = std::max(maxNumConstraints, obj.constrainedValues.size());
+
         minPosDimension = std::min(minPosDimension, obj.position.size());
         maxPosDimension = std::max(maxPosDimension, obj.position.size());
       }
@@ -1269,18 +1289,28 @@ class PELevel : public LevelLogic
       }
     }
     nobjs = myObjs.size();
+    CkAssertMsg(nobjs == 0 || minNumConstraints == maxNumConstraints,
+                "Number of constraints of every object for LB must be the same!");
+    const size_t numConstraints = (nobjs == 0) ? 0 : minNumConstraints;
     CkAssertMsg(nobjs == 0 || minPosDimension == maxPosDimension,
                 "Position of every object for LB must be of same dimension!");
     const size_t posDimension = (nobjs == 0) ? 0 : minPosDimension;
-    const bool haveVectorLoad = maxObjDimension > 0;
 
-    if (haveVectorLoad)
-      dimension = commDimension + maxObjDimension;
-    // Otherwise if we don't have application vector loads, but we want to use comm info
-    // as part of a vector, add the regular walltime to the load vector in the message
-    else if (commDimension > 0)
-      dimension = commDimension + 1;
-    // Else there is no vector load, so dimension remains 0
+    const bool haveVectorLoad = maxObjDimension > 0;
+    const bool haveConstraints = numConstraints > 0;
+    const bool haveComm = numComm > 0;
+
+    // If constraints or comm are used for LB, then we need to use vector LB, so if there
+    // is no load vector from the object, add a dimension to hold the regular walltime
+    if (haveConstraints || haveComm)
+    {
+      dimension = std::max(1, maxObjDimension) + numComm + numConstraints;
+    }
+    // Otherwise just use the dimension of the object load vector directly (may be 0)
+    else
+    {
+      dimension = maxObjDimension;
+    }
 
     // dimension just specifies the size of an object's load vector; we always send the
     // regular measured runtime, so each object will have (1 + dimension) loads in the
@@ -1320,6 +1350,7 @@ class PELevel : public LevelLogic
     msg->obj_start[0] = 0;
     msg->obj_start[1] = nobjLoads;
     msg->dimension = dimension;
+    msg->numConstraints = numConstraints;
     for (int i = 0; i < nobjs; i++)
     {
       int index = i * (1 + dimension);
@@ -1330,7 +1361,7 @@ class PELevel : public LevelLogic
       else
         msg->oloads[index++] = float(myObjs[i].wallTime);
 
-      if (commDimension > 0)
+      if (numComm > 0)
       {
         CmiUInt8 numMessages = 0;
         CmiUInt8 numBytes = 0;
@@ -1361,9 +1392,17 @@ class PELevel : public LevelLogic
       }
       // We don't have application vector loads, but we want to use comm info as part of a
       // vector, so add the regular walltime to the load vector in the message
-      else if (commDimension > 0)
+      else if (haveConstraints || haveComm)
       {
         msg->oloads[index++] = msg->oloads[i * (1 + dimension)];
+      }
+
+      // Constraints must always be the last elements in the load vector
+      if (numConstraints > 0)
+      {
+        const auto constrainedDim = myObjs[i].constrainedValues.size();
+        for (int j = 0; j < constrainedDim; j++)
+          msg->oloads[index++] = float(myObjs[i].constrainedValues[j]);
       }
 
       if (posDimension > 0)
