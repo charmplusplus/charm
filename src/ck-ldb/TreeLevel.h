@@ -621,27 +621,27 @@ class RootLevel : public LevelLogic
       for (const std::string& strategy_name : strategies)
       {
         wrappers.push_back({CreateStrategyWrapper<1>(strategy_name, true,
-                                                     config[strategy_name], rateAware),
+                                                     config, rateAware),
                             CreateStrategyWrapper<1>(strategy_name, true,
-                                                     config[strategy_name], rateAware),
+                                                     config, rateAware),
                             CreateStrategyWrapper<2>(strategy_name, true,
-                                                     config[strategy_name], rateAware),
+                                                     config, rateAware),
                             CreateStrategyWrapper<3>(strategy_name, true,
-                                                     config[strategy_name], rateAware),
+                                                     config, rateAware),
                             CreateStrategyWrapper<4>(strategy_name, true,
-                                                     config[strategy_name], rateAware),
+                                                     config, rateAware),
                             CreateStrategyWrapper<5>(strategy_name, true,
-                                                     config[strategy_name], rateAware),
+                                                     config, rateAware),
                             CreateStrategyWrapper<6>(strategy_name, true,
-                                                     config[strategy_name], rateAware),
+                                                     config, rateAware),
                             CreateStrategyWrapper<7>(strategy_name, true,
-                                                     config[strategy_name], rateAware),
+                                                     config, rateAware),
                             CreateStrategyWrapper<8>(strategy_name, true,
-                                                     config[strategy_name], rateAware),
+                                                     config, rateAware),
                             CreateStrategyWrapper<9>(strategy_name, true,
-                                                     config[strategy_name], rateAware),
+                                                     config, rateAware),
                             CreateStrategyWrapper<10>(strategy_name, true,
-                                                      config[strategy_name], rateAware)});
+                                                      config, rateAware)});
       }
       this->repeat_strategies = repeat_strategies;
     }
