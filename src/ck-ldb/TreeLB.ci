@@ -17,6 +17,12 @@ module TreeLB {
     entry void multicastIDM(IDM &mig_order, int num_pes, int _pes[num_pes]);
     entry [reductiontarget] void resumeClients(void);
     entry [reductiontarget] void reportLbTime(double times[n], int n);
+  
+    entry void resumeFromReallocCheckpoint();
+    entry void lb_done_impl();
+    entry void startCleanup();
+    entry void checkForRealloc();
+    entry void willIbekilled(std::vector<char> avail, int newnumProcessAfterRestart);
   };
 
 };

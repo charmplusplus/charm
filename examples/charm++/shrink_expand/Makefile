@@ -1,5 +1,5 @@
 -include ../../common.mk
-CHARMC = ../../../bin/charmc
+CHARMC = ../../../netlrts-linux-x86_64/bin/charmc
 
 all: client
 
