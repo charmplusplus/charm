@@ -471,7 +471,8 @@ for c in "$opt_lrts_pmi" "${opt_compiler[@]}"; do
   [[ -n "$c" ]] && builddir_extra+="-$c"
 done
 
-if [[ "$actual_triplet" = +(ofi|ucx)* && $opt_lrts_pmi == "" ]]; then
+is_ofi_ucx="+(ofi|ucx)*"
+if [[ $actual_triplet =~ $is_ofi_ucx && $opt_lrts_pmi == "" ]]; then
     opt_lrts_pmi="simplepmi"
 fi
 
