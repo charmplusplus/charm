@@ -835,6 +835,7 @@ CtvDeclare(ampiParent*, ampiPtr);
 CtvDeclare(bool, ampiInitDone);
 CtvDeclare(void*,stackBottom);
 CtvDeclare(bool, ampiFinalized);
+CkpvDeclare(bool, isMigrateToPeEnabled);
 CkpvDeclare(Builtin_kvs, bikvs);
 CkpvDeclare(int, ampiThreadLevel);
 CkpvDeclare(AmpiMsgPool, msgPool);
@@ -1079,6 +1080,12 @@ static void ampiProcInit() noexcept {
   CtvInitialize(bool,ampiFinalized);
   CtvInitialize(void*,stackBottom);
 
+  /* AMPI_Migrate_to_pe requires enabling Charm++ anytime migration, so
+   * we leave support for it off by default. Users must run with this command
+   * line option in order to enable calling it. */
+  CkpvInitialize(bool,isMigrateToPeEnabled);
+  CkpvAccess(isMigrateToPeEnabled) = false;
+
   CkpvInitialize(int, ampiThreadLevel);
   CkpvAccess(ampiThreadLevel) = MPI_THREAD_SINGLE;
 
@@ -1087,6 +1094,8 @@ static void ampiProcInit() noexcept {
 
   CkpvInitialize(AmpiMsgPool, msgPool); // pool of small AmpiMsg's, big enough for rendezvous messages
   CkpvAccess(msgPool) = AmpiMsgPool(AMPI_MSG_POOL_SIZE, AMPI_POOLED_MSG_SIZE);
+
+  CkpvAccess(isMigrateToPeEnabled) = (bool)CmiGetArgFlag(CkGetArgv(), "+ampiEnableMigrateToPe");
 
 #if AMPIMSGLOG
   char **argv=CkGetArgv();
@@ -1211,7 +1220,7 @@ static ampi *ampiInit(char **argv) noexcept
     opts=TCHARM_Attach_start(&threads,&_nchunks);
     opts.setSectionAutoDelegate(false);
     opts.setStaticInsertion(true);
-    opts.setAnytimeMigration(false);
+    opts.setAnytimeMigration(CkpvAccess(isMigrateToPeEnabled));
 
     ck::future<CkArrayID> newAmpiFuture;
     CkCallback cb(newAmpiFuture.handle());
@@ -2248,7 +2257,7 @@ CProxy_ampi ampi::createNewChildAmpiSync() noexcept {
   opts.setSectionAutoDelegate(false);
   opts.setNumInitial(0);
   opts.setStaticInsertion(false);
-  opts.setAnytimeMigration(false);
+  opts.setAnytimeMigration(CkpvAccess(isMigrateToPeEnabled));
   CkCallback initCB(CkIndex_ampi::registrationFinish(), thisProxy[thisIndex]);
   opts.setInitCallback(initCB);
 
@@ -11447,7 +11456,12 @@ CLINKAGE
 int AMPI_Migrate_to_pe(int dest)
 {
   AMPI_API("AMPI_Migrate_to_pe", dest);
-  TCHARM_Migrate_to(dest);
+  if (!CkpvAccess(isMigrateToPeEnabled) && dest != CkMyPe()) {
+    CkPrintf("WARNING: AMPI rank %d called AMPI_Migrate_to_pe(%d), but AMPI_Migrate_to_pe is not enabled! Re-run with +ampiEnableMigrateToPe to enable it.\n", getAmpiParent()->thisIndex, dest);
+  }
+  else {
+    TCHARM_Migrate_to(dest);
+  }
   return MPI_SUCCESS;
 }
 
