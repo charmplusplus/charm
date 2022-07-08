@@ -221,9 +221,14 @@ public:
   // add object loads to this processor's loads
   void assign(const Obj<N>* o);
   void assign(const Obj<N>& o);
+  void assignDim(const Obj<N>* o, const int dim);
+  void assignDim(const Obj<N>& o, const int dim);
+
   // remove object loads from this processor's loads
   void unassign(const Obj<N>* o);
   void unassign(const Obj<N>& o);
+  void unassignDim(const Obj<N>* o, const int dim);
+  void unassignDim(const Obj<N>& o, const int dim);
 
   void resetLoad();  // sets processor loads to background loads
   bool operator==(const Proc& element) const;
@@ -286,6 +291,13 @@ class Proc<N, false, multi>
   }
   inline void assign(const Obj<N>& o) { assign(&o); }
 
+  inline void assignDim(const Obj<N>* o, const int dim)
+  {
+    this->load[dim] += o->load[dim];
+    this->totalload += o->load[dim];
+  }
+  inline void assignDim(const Obj<N>& o, const int dim) { assignDim(&o, dim); }
+
   inline void unassign(const Obj<N>* o)
   {
     for (int i = 0; i < N; i++)
@@ -295,6 +307,13 @@ class Proc<N, false, multi>
     }
   }
   inline void unassign(const Obj<N>& o) { unassign(&o); }
+
+  inline void unassignDim(const Obj<N>* o, const int dim)
+  {
+    this->load[dim] -= o->load[dim];
+    this->totalload -= o->load[dim];
+  }
+  inline void unassignDim(const Obj<N>& o, const int dim) { unassignDim(&o, dim); }
 
   inline void resetLoad()
   {
@@ -341,7 +360,17 @@ void Proc<1, false>::assign(const Obj<1>* o)
   this->load += o->load;
 }
 template <>
+void Proc<1, false>::assignDim(const Obj<1>* o, const int dim)
+{
+  this->load += o->load;
+}
+template <>
 void Proc<1, false>::unassign(const Obj<1>* o)
+{
+  this->load -= o->load;
+}
+template <>
+void Proc<1, false>::unassignDim(const Obj<1>* o, const int dim)
 {
   this->load -= o->load;
 }
@@ -398,6 +427,13 @@ class Proc<N, true, multi>
   }
   inline void assign(const Obj<N>& o) { assign(&o); }
 
+  inline void assignDim(const Obj<N>* o, const int dim)
+  {
+    this->load[dim] += (o->load[dim] / speed[dim]);
+    this->totalload += (o->load[dim] / speed[dim]);
+  }
+  inline void assignDim(const Obj<N>& o, const int dim) { assignDim(&o, dim); }
+
   inline void unassign(const Obj<N>* o)
   {
     for (int i = 0; i < N; i++)
@@ -407,6 +443,13 @@ class Proc<N, true, multi>
     }
   }
   inline void unassign(const Obj<N>& o) { unassign(&o); }
+
+  inline void unassignDim(const Obj<N>* o, const int dim)
+  {
+    this->load[dim] -= (o->load[dim] / speed[dim]);
+    this->totalload -= (o->load[dim] / speed[dim]);
+  }
+  inline void unassignDim(const Obj<N>& o, const int dim) { unassignDim(&o, dim); }
 
   inline void resetLoad()
   {
@@ -454,7 +497,17 @@ void Proc<1, true>::assign(const Obj<1>* o)
   this->load += (o->load / speed[0]);
 }
 template <>
+void Proc<1, true>::assignDim(const Obj<1>* o, const int dim)
+{
+  this->load += (o->load / speed[0]);
+}
+template <>
 void Proc<1, true>::unassign(const Obj<1>* o)
+{
+  this->load -= (o->load / speed[0]);
+}
+template <>
+void Proc<1, true>::unassignDim(const Obj<1>* o, const int dim)
 {
   this->load -= (o->load / speed[0]);
 }
