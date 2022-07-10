@@ -142,10 +142,11 @@ namespace ck {
         UInt forAnyPe;  ///< Used only by newChare
         int  bype;      ///< created by this pe
       } chare;
-      struct s_group {         // NodeBocInitMsg, BocInitMsg, ForNodeBocMsg, ForBocMsg
+      struct s_group {         // NodeBocInitMsg, BocInitMsg, ForNodeBocMsg, ForBocMsg, ArrayBcastMsg, ArrayBcastFwdMsg
         CkGroupID g;           ///< GroupID
         CkNodeGroupID rednMgr; ///< Reduction manager for this group (constructor only!)
-        int epoch;             ///< "epoch" this group was created during (0--mainchare, 1--later)
+        int epoch;             ///< for init msgs, "epoch" this group was created during (0--mainchare, 1--later)
+                               ///  for arraybcast msgs, denotes send epoch from the serializer PE
         UShort arrayEp;        ///< Used only for array broadcasts
       } group;
       struct s_array{             ///< For arrays only (ArrayEltInitMsg, ForArrayEltMsg)
@@ -405,8 +406,18 @@ public:
           || getMsgtype() == ArrayBcastFwdMsg);
       type.group.g = g;
     }
-    void setGroupEpoch(int epoch) { CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg); type.group.epoch=epoch; }
-    int getGroupEpoch(void) const { CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg); return type.group.epoch; }
+    void setGroupEpoch(int epoch)
+    {
+      CkAssert(getMsgtype() == BocInitMsg || getMsgtype() == NodeBocInitMsg ||
+               getMsgtype() == ArrayBcastMsg);
+      type.group.epoch = epoch;
+    }
+    int getGroupEpoch(void) const
+    {
+      CkAssert(getMsgtype() == BocInitMsg || getMsgtype() == NodeBocInitMsg ||
+               getMsgtype() == ArrayBcastMsg || getMsgtype() == ArrayBcastFwdMsg);
+      return type.group.epoch;
+    }
     void setRednMgr(CkNodeGroupID r){ CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==ForBocMsg
           || getMsgtype()==NodeBocInitMsg || getMsgtype()==ForNodeBocMsg);
  type.group.rednMgr = r; }

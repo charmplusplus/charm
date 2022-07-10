@@ -1,6 +1,7 @@
 DIRS = \
   lb_test \
   meta_lb_test \
+  periodic_lb_broadcast_test
 
 TESTDIRS = $(DIRS)
 

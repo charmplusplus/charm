@@ -2460,7 +2460,7 @@ void Entry::genReg(XStr& str) {
   str << "  " << epIdx(0) << ";\n";
   if (isReductionTarget()) str << "  " << epIdx(0, true) << ";\n";
 
-  const char* ifNot = nullptr;
+  const char* ifNot = NULL;
   if (isCreateHere()) ifNot = "CkArray_IfNotThere_createhere";
   else if (isCreateHome()) ifNot = "CkArray_IfNotThere_createhome";
 
