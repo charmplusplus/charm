@@ -20,7 +20,10 @@
 
 extern int quietModeRequested;
 
-CreateLBFunc_Def(TempAwareRefineLB, "always assign the heaviest obj onto lightest loaded processor.")
+static void lbinit()
+{
+  LBRegisterBalancer<TempAwareRefineLB>("TempAwareRefineLB", "always assign the heaviest obj onto lightest loaded processor.");
+}
 
 #ifdef TEMP_LDB
 
@@ -91,13 +94,13 @@ static int cpufreq_sysfs_read (int proc)
         return ff;
 }
 
-void printCurrentTemperature(void *LB, double curWallTime)
+void printCurrentTemperature(void *LB)
 {
   TempAwareRefineLB *taalb = static_cast<TempAwareRefineLB *>(LB);
   int pe = CkMyPe();
   float temp = taalb->getTemp(pe % taalb->physicalCoresPerNode);
   int freq = cpufreq_sysfs_read (pe % taalb->logicalCoresPerNode);
-  fprintf(taalb->logFD, "%f, %d, %f, %d\n", curWallTime, pe, temp, freq);
+  fprintf(taalb->logFD, "%f, %d, %f, %d\n", CkWallTimer(), pe, temp, freq);
 }
 
 int getProcFreqPtr(int *freqs,int numAvail,int freq)
@@ -323,7 +326,7 @@ void TempAwareRefineLB::work(LDStats* stats)
 {
 #ifdef TEMP_LDB
 ////////////////////////////////////////////////////
-  numProcs=stats->nprocs();
+  numProcs=stats->procs.size();
   numChips=numProcs/logicalCoresPerChip;
   avgChipTemp=new float[numChips];
   if(procFreq!=NULL) delete [] procFreq;
@@ -434,7 +437,7 @@ for(int j=i*logicalCoresPerChip;j<i*logicalCoresPerChip+logicalCoresPerChip;j++)
 
 #ifndef NO_TEMP_LB
   int obj;
-  int n_pes = stats->nprocs();
+  int n_pes = stats->procs.size();
 
   //  CkPrintf("[%d] RefineLB strategy\n",CkMyPe());
 

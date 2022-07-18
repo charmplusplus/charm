@@ -14,7 +14,11 @@
 
 extern int quietModeRequested;
 
-CreateLBFunc_Def(ScotchRefineLB, "Load balancing using the Scotch graph partitioning library")
+static void lbinit()
+{
+  LBRegisterBalancer<ScotchRefineLB>("ScotchRefineLB", "Load balancing using the Scotch graph partitioning library");
+  LBTurnCommOn();
+}
 
 ScotchRefineLB::ScotchRefineLB(const CkLBOptions &opt) : CBase_ScotchRefineLB(opt) {
   lbname = "ScotchRefineLB";

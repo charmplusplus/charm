@@ -1,26 +1,26 @@
 -include ../../common.mk
 CHARMC=../../../bin/charmc $(OPTS)
 
-LINKLINE=$(CHARMC) -o pgm pgm.o -language converse++
+LINKLINE=$(CHARMC) -o cthtest pgm.o -language converse++
 
-all: pgm
+all: cthtest
 
-pgm: pgm.o
+cthtest: pgm.o
 	$(LINKLINE)
 
 pgm.o: pgm.C
 	$(CHARMC) -c pgm.C
 
-test: pgm
-	$(call run, ./pgm +p1 )
-#	-$(LINKLINE) -thread context && ./charmrun ./pgm +p1  $(TESTOPTS)&& ps -u `whoami`
-#	-$(LINKLINE) -thread pthreads -lpthread && ./charmrun ./pgm +p1  $(TESTOPTS)&& ps -u `whoami`
-#	-$(LINKLINE) -thread qt && ./charmrun ./pgm +p1  $(TESTOPTS)&& ps -u `whoami`
-#	-$(LINKLINE) -thread uJcontext && ./charmrun ./pgm +p1  $(TESTOPTS)&& ps -u `whoami`
+test: cthtest
+	$(call run, ./cthtest +p1 )
+#	-$(LINKLINE) -thread context && ./charmrun ./cthtest +p1  $(TESTOPTS)&& ps -u `whoami`
+#	-$(LINKLINE) -thread pthreads -lpthread && ./charmrun ./cthtest +p1  $(TESTOPTS)&& ps -u `whoami`
+#	-$(LINKLINE) -thread qt && ./charmrun ./cthtest +p1  $(TESTOPTS)&& ps -u `whoami`
+#	-$(LINKLINE) -thread uJcontext && ./charmrun ./cthtest +p1  $(TESTOPTS)&& ps -u `whoami`
 
 
-testp: pgm
-	$(call run, ./pgm +p$(P))
+testp: cthtest
+	$(call run, ./cthtest +p$(P))
 
 clean:
-	rm -f conv-host *.o pgm *.bak pgm.*.log pgm.sts *~ charmrun charmrun.exe pgm.exe pgm.pdb pgm.ilk
+	rm -f conv-host *.o cthtest *.bak cthtest.*.log cthtest.sts *~ charmrun charmrun.exe cthtest.exe cthtest.pdb cthtest.ilk

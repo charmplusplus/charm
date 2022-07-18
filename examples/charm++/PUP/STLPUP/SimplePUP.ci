@@ -12,9 +12,12 @@
 mainmodule SimplePUP {
   include "HeapObjectSTL.h";
   include "vector";
+  PUPable Ping;
 
   mainchare main {
     entry main(CkArgMsg *m);
+    entry void accept(std::shared_ptr<Ping> ping);
+    entry void accept(CkPointer<std::vector<Ping*>>);
   };
 
   template <class U> array [1D] SimpleArray{

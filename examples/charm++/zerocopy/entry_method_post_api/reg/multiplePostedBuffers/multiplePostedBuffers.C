@@ -85,7 +85,6 @@ class zerocopyObject : public CBase_zerocopyObject{
       idx_sdagZeroCopySent = CkIndex_zerocopyObject::sdagZeroCopySent(NULL);
       sdagCb = CkCallback(idx_sdagZeroCopySent, thisProxy[thisIndex]);
       lbReductionCb = CkCallback(CkReductionTarget(zerocopyObject, BarrierDone), thisProxy);
-      compReductionCb = CkCallback(CkReductionTarget(Main, done), mainProxy);
     }
 
     void pup(PUP::er &p){
@@ -145,7 +144,7 @@ class zerocopyObject : public CBase_zerocopyObject{
 
     void testZeroCopy(CProxy_Main mProxy){
       mainProxy = mProxy;
-
+      compReductionCb = CkCallback(CkReductionTarget(Main, done), mainProxy);
       thisProxy[thisIndex].sdagRun();
     }
 
@@ -163,9 +162,11 @@ class zerocopyObject : public CBase_zerocopyObject{
         contribute(compReductionCb);
     }
 
-    void sdagRecv(int index, int &n1, int *& ptr1, CkNcpyBufferPost *ncpyPost) {
+    void sdagRecv(int index, int n1, int *ptr1, CkNcpyBufferPost *ncpyPost) {
       int *recvBuffer = iArr1Recv + (index - 1)*n1;
-      ptr1 = recvBuffer;
+
+      CkMatchBuffer(ncpyPost, 0, (TOTAL_ITER)*thisIndex + iter);
+      CkPostBuffer(recvBuffer, n1, (TOTAL_ITER)*thisIndex + iter);
 
       CkAssert(n1 == iSize1);
 

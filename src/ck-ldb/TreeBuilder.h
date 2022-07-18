@@ -1,3 +1,5 @@
+// Author: Juan Galvez <jjgalvez@illinois.edu>
+
 #ifndef TREEBUILDER_H
 #define TREEBUILDER_H
 
@@ -438,7 +440,7 @@ public:
     if (mype == level2root)
     {
       // assumes all nodes in my group are same size
-      std::vector<int> pes_in_group(group_size * CkNodeSize(mynode));
+      std::vector<int> pes_in_group((size_t)group_size * CkNodeSize(mynode));
       std::iota(pes_in_group.begin(), pes_in_group.end(), GroupFirstPe(mygroup));
 
       NodeSetLevel* level = new NodeSetLevel(lbmgr, pes_in_group);

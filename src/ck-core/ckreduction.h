@@ -556,38 +556,9 @@ private:
 	bool isPresent(int num) const {return (bool)(num==redNo);}
 	bool isFuture(int num) const {return (bool)(num>redNo);}
 
-#if CMK_FAULT_EVAC
-	bool oldleaf;
-	bool blocked;
-	int newParent;
-	int additionalGCount,newAdditionalGCount; //gcount that gets passed to u from the node u replace
-	std::vector<int> newKids;
-	CkMsgQ<CkReductionMsg> bufferedMsgs;
-	CkMsgQ<CkReductionMsg> bufferedRemoteMsgs;
-	enum {OLDPARENT,OLDCHILDREN,NEWPARENT,LEAFPARENT};
-	int numModificationReplies;
-	int maxModificationRedNo;
-	int tempModificationRedNo;
-	bool readyDeletion;
-	bool killed;
-#endif
-	
 //Checkpointing utilities
  public:
 	virtual void pup(PUP::er &p);
-#if CMK_FAULT_EVAC
-	virtual void evacuate();
-	virtual void doneEvacuate();
-	void DeleteChild(int deletedChild);
-	void DeleteNewChild(int deletedChild);
-	void collectMaxRedNo(int maxRedNo);
-	void unblockNode(int maxRedNo);
-	void modifyTree(int code,int size,int *data);
-private:	
-	int findMaxRedNo();
-	void updateTree();
-	void clearBlockedMsgs();
-#endif
 };
 
 

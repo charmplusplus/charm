@@ -2,10 +2,14 @@
 
 # Thin wrapper around CMake to start a build with a similar command line as ./buildold
 
-set -o errexit -o nounset
+set -o errexit
+# bash < 4.4 erroneously considers empty arrays to be unset
+[[ ${BASH_VERSINFO[0]} -gt 4 ]] || [[ ${BASH_VERSINFO[0]} -eq 4 && ${BASH_VERSINFO[1]} -ge 4 ]] && set -o nounset
 
 # Determine the location of this script
 my_srcdir="$(cd -P "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
+
+full_args=("$@")
 
 # Check that CMake is available and that the version is sufficiently new
 command -v cmake >/dev/null 2>&1 && rc=$? || rc=$?
@@ -13,14 +17,14 @@ command -v cmake >/dev/null 2>&1 && rc=$? || rc=$?
 if [[ $rc -ne 0 ]]; then
   echo "Warning: CMake unavailable, running ./buildold instead."
   sleep 2
-  "$my_srcdir"/buildold "$@"
+  "$my_srcdir/buildold" "$@"
   exit $?
 fi
 
 if [[ $(uname) == "MSYS"* || $(uname) == "MINGW"* ]]; then
   echo "Warning: CMake build is not supported under MSYS, running ./buildold instead."
   sleep 2
-  "$my_srcdir"/buildold "$@"
+  "$my_srcdir/buildold" "$@"
   exit $?
 fi
 
@@ -32,7 +36,7 @@ cmake_version_full=$(cmake --version | head -1 | cut -f 3 -d' ')
 if [[ $cmake_version_major -lt 3 || ($cmake_version_major -eq 3 && $cmake_version_minor -lt 4) ]]; then
   echo "Warning: The CMake version on your system is too old (needed: 3.4.0 or later; available: $cmake_version_full), running ./buildold instead."
   sleep 2
-  "$my_srcdir"/buildold "$@"
+  "$my_srcdir/buildold" "$@"
   exit $?
 fi
 
@@ -46,13 +50,13 @@ usage()
 
 help()
 {
-  "$my_srcdir"/buildold --help
+  "$my_srcdir/buildold" --help
   exit 0
 }
 
 ############ Begin option parsing
 
-if [[ $# -eq 1 && $1 == "--help" ]]; then
+if [[ $# -eq 1 && "$1" == "--help" ]]; then
   help
 fi
 
@@ -62,26 +66,52 @@ if [[ $# -lt 2 ]]; then
 fi
 
 # Build options
-target=$1
-triplet=$2
+target="$1"
+full_triplet="$2"
+shift
+shift
+
+function parse_triplet() {
+  # Extract extra options from the full_triplet, e.g.,
+  # full_triplet='netlrts-darwin-x86_64-smp-omp'
+  # becomes actual_triplet='netlrts-darwin-x86_64' and extra_triplet_opts='smp omp'
+  all_triplets=$(cd src/arch && find . -maxdepth 1 -name '*-*' -type d | sed 's,./,,')
+  extra_triplet_opts="$full_triplet"
+  for t in $all_triplets; do
+    extra_triplet_opts=${extra_triplet_opts#$t}
+    [[ $full_triplet == $t* ]] && actual_triplet=$t
+  done
+  if [[ -z ${actual_triplet:-} ]]; then
+    echo "Error: triplet '$full_triplet' is not supported."
+    echo "Supported triplets are: ${all_triplets//$'\n'/ }"
+    exit 2
+  fi
+  return 0
+}
+
+parse_triplet
+
+extra_triplet_opts=${extra_triplet_opts//-/ }
 
 opt_ampi_error_checking=0
 opt_ampi_mpich_tests=0
 opt_ampi_only=0
+opt_arch=$(echo "$actual_triplet" | cut -f 3 -d -) # opt_arch might be empty for e.g. 'gni-crayxc'.
 opt_build_shared=0
 opt_ccs=0
 opt_charmdebug=0
 opt_controlpoint=0
 opt_cuda=0
 opt_destination=""
+opt_install_prefix=""
 opt_drone_mode=0
 opt_error_checking= #undef
-opt_extra_opts=""
-opt_incdir=""
+opt_extra_opts=()
+opt_incdir=()
 opt_lbtime_type="double"
 opt_lbuserdata=0
-opt_libdir=""
-opt_lockless=0
+opt_libdir=()
+opt_lockless_queue=0
 opt_lrts_pmi=""
 opt_mempool_cutoff=26
 opt_network=0
@@ -94,6 +124,8 @@ opt_prio_type="bitvec"
 opt_production=0
 opt_pthreads=0
 opt_pxshm=0
+opt_shmem=0
+opt_xpmem=0
 opt_qlogic=0
 opt_randomized_msgq=0
 opt_refnum_type="unsigned short"
@@ -110,7 +142,7 @@ opt_tracing_commthread=0
 opt_zlib=1
 
 # default to building ROMIO on AMPI where supported
-case "$triplet" in
+case "$actual_triplet" in
   *-win-*)
     opt_romio=0
     ;;
@@ -124,23 +156,17 @@ opt_CC=${CC:-}
 opt_CXX=${CXX:-}
 opt_FC=${FC:-}
 
-opt_compiler=""
+opt_compiler=()
 
 # Misc options
 VERBOSE=0
 ONLY_CONFIGURE=0
 FORCE=0
 
-processArgs() {
-
-shift # target
-shift # triplet
-
-while [[ $# -gt 0 ]]; do
-  arg=$1
-  shift
-  case $arg in
-  # Platform specific options
+function parse_platform_compilers() {
+  handled=1
+  case "$1" in
+    # Platform specific options
     syncft)
       opt_syncft=1
       ;;
@@ -165,220 +191,260 @@ while [[ $# -gt 0 ]]; do
     pxshm)
       opt_pxshm=1
       ;;
-    simplepmi|slurmpmi|slurmpmi2|ompipmix)
-      opt_lrts_pmi=$arg
+    simplepmi|slurmpmi|slurmpmi2|ompipmix|openpmix)
+      opt_lrts_pmi="$arg"
       ;;
     persistent)
       opt_persistent=1
       ;;
-  # Compilers
+    # Compilers
     gcc)
       opt_CC=gcc
       opt_CXX=g++
-      opt_compiler+="$arg "
+      opt_compiler+=("$arg")
       ;;
     gcc-*)
-      opt_CC=$arg
+      opt_CC="$arg"
       opt_CXX=${arg/cc/++}
-      opt_compiler+="$arg "
+      opt_compiler+=("$arg")
       ;;
     gfortran|gfortran-*)
-      opt_FC=$arg
-      opt_compiler+="$arg "
+      opt_FC="$arg"
+      opt_compiler+=("$arg")
       ;;
     clang)
       opt_CC=clang
       opt_CXX=clang++
-      opt_compiler+="$arg "
+      opt_compiler+=("$arg")
       ;;
     clang-*)
-      opt_CC=$arg
+      opt_CC="$arg"
       opt_CXX=${arg/clang/clang++}
-      opt_compiler+="$arg "
+      opt_compiler+=("$arg")
       ;;
     flang)
       opt_FC=flang
-      opt_compiler+="$arg "
+      opt_compiler+=("$arg")
+      ;;
+    icx)
+      opt_CC=icx
+      opt_CXX=icpx
+      opt_compiler+=("$arg")
       ;;
     icc|iccstatic)
       opt_CC=icc
       opt_CXX=icpc
-      opt_compiler+="$arg "
+      opt_compiler+=("$arg")
       ;;
     ifort)
       opt_FC=ifort
-      opt_compiler+="$arg "
+      opt_compiler+=("$arg")
       ;;
     xlc|xlc64)
       opt_CC=xlc_r
       opt_CXX=xlC_r
       opt_FC=xlf90_r
-      opt_compiler+="$arg "
+      opt_compiler+=("$arg")
       ;;
     pgcc|pgf90)
       echo "*** Warning: Ignoring unsupported option '$arg'."
       ;;
     msvc)
       opt_CC=msvc # fake, will be replaced below
-      opt_compiler+="$arg "
+      opt_compiler+=("$arg")
       ;;
     mpicxx)
       opt_CC=mpicc
       opt_CXX=mpicxx
       opt_FC=mpif90
-      opt_compiler+="$arg "
-      ;;
-  # Charm++ dynamic libraries
-    --no-build-shared)
-      opt_build_shared=0
-      ;;
-    --build-shared)
-      opt_build_shared=1
-      ;;
-  # Enable/disable features
-    --enable-error-checking)
-      opt_error_checking=1
-      ;;
-    --enable-ampi-error-checking)
-      opt_ampi_error_checking=1
-      ;;
-    --enable-stats)
-      opt_stats=1
-      ;;
-    --enable-tracing)
-      opt_tracing=1
-      ;;
-    --enable-tracing-commthread)
-      opt_tracing_commthread=1
-      ;;
-    --enable-task-queue)
-      opt_task_queue=1
-      ;;
-    --enable-drone-mode)
-      opt_drone_mode=1
-      ;;
-    --enable-charmdebug)
-      opt_charmdebug=1
-      ;;
-    --enable-replay)
-      opt_replay=1
-      ;;
-    --enable-ccs)
-      opt_ccs=1
-      ;;
-    --enable-controlpoint)
-      opt_controlpoint=1
-      ;;
-    --enable-lbuserdata)
-      opt_lbuserdata=1
-      ;;
-    --enable-lockless-queue)
-      opt_lockless-queue=1
-      ;;
-    --enable-shrinkexpand)
-      opt_shrinkexpand=1
-      ;;
-    --with-numa)
-      opt_numa=1
-      ;;
-    --with-lbtime-type=*)
-      opt_lbtime_type=${arg#*=}
-      ;;
-    --with-qlogic)
-      opt_qlogic=1
-      ;;
-    --with-refnum-type=*)
-      opt_refnum_type=${arg#*=}
-      ;;
-    --with-prio-type=*)
-      opt_prio_type=${arg#*=}
-      ;;
-    --enable-randomized-msgq)
-      opt_randomized_msgq=1
-      ;;
-    --with-mempool-cutoff=*)
-      opt_mempool_cutoff=${arg#*=}
-      ;;
-    --enable-ampi-mpich-tests)
-      opt_ampi_mpich_tests=1
-      ;;
-    --enable-zlib)
-      opt_zlib=1
-      ;;
-    --with-production)
-      opt_production=1
-      ;;
-    --ampi-only)
-      opt_ampi_only=1
-      ;;
-    --with-romio)
-      opt_romio=1
-      ;;
-    --without-romio)
-      opt_romio=0
-      ;;
-  # Miscellaneous options
-    -k)
-      # -k is an option for make, not for the compiler.
-      echo "*** Note: Ignoring '-k' option."
-      ;;
-    --help)
-      help
-      ;;
-    -j[0-9]*)
-      opt_parallel=$arg
-      ;;
-    -v)
-      echo "Enabling verbose mode."
-      VERBOSE=1 # Run 'make' verbosely
-      ;;
-    -vv)
-      echo "Enabling extra verbose mode."
-      VERBOSE=1 # Run 'make' verbosely
-      opt_extra_opts+="-verbose -save " # Run 'charmc' verbosely
-      ;;
-    --only-configure)
-      # Run only cmake, not make
-      ONLY_CONFIGURE=1
-      ;;
-    --force)
-      # Overwrite existing build directory
-      FORCE=1
-      ;;
-    -j)
-      opt_parallel="$arg"
-      if [[ $# -gt 0 && $1 == [0-9]* ]]; then
-        opt_parallel+="$1"
-        shift
-      fi
-      ;;
-    --destination=*)
-      opt_destination=${arg#*=}
-      ;;
-    --suffix=*)
-      opt_suffix=-${arg#*=}
-      ;;
-    --basedir=*)
-      opt_incdir+="-I${arg#*=}/include "
-      opt_libdir+="-L${arg#*=}/lib "
-      ;;
-    --libdir=*)
-      opt_libdir+="-L${arg#*=} "
-      ;;
-    --incdir=*)
-      opt_incdir+="-I${arg#*=} "
+      opt_compiler+=("$arg")
       ;;
     *)
-      echo "*** Note: Adding unknown option '$arg' to compiler flags."
-      opt_extra_opts+="$arg "
+      handled=0
       ;;
-  esac
-done
+    esac
+}
 
+function processArgs() {
+  while [[ $# -gt 0 ]]; do
+    arg="$1"
+    shift
+
+    # Platform/compiler options are handled here:
+    parse_platform_compilers "$arg"
+    [[ $handled -eq 1 ]] && continue
+
+    # Other options are handled below:
+    case "$arg" in
+    # Charm++ dynamic libraries
+      --no-build-shared)
+        opt_build_shared=0
+        ;;
+      --build-shared)
+        opt_build_shared=1
+        ;;
+    # Enable/disable features
+      --enable-error-checking)
+        opt_error_checking=1
+        ;;
+      --enable-shmem)
+        opt_shmem=1
+        ;;
+      --enable-xpmem)
+        opt_xpmem=1 # XPMEM implies SHMEM
+        opt_shmem=1
+        ;;
+      --enable-ampi-error-checking)
+        opt_ampi_error_checking=1
+        ;;
+      --enable-stats)
+        opt_stats=1
+        ;;
+      --enable-tracing)
+        opt_tracing=1
+        ;;
+      --enable-tracing-commthread)
+        opt_tracing_commthread=1
+        ;;
+      --enable-task-queue)
+        opt_task_queue=1
+        ;;
+      --enable-drone-mode)
+        opt_drone_mode=1
+        ;;
+      --enable-charmdebug)
+        opt_charmdebug=1
+        ;;
+      --enable-replay)
+        opt_replay=1
+        ;;
+      --enable-ccs)
+        opt_ccs=1
+        ;;
+      --enable-controlpoint)
+        opt_controlpoint=1
+        ;;
+      --enable-lbuserdata)
+        opt_lbuserdata=1
+        ;;
+      --enable-lockless-queue)
+        opt_lockless_queue=1
+        ;;
+      --enable-shrinkexpand)
+        opt_shrinkexpand=1
+        ;;
+      --with-numa)
+        opt_numa=1
+        ;;
+      --with-lbtime-type=*)
+        opt_lbtime_type=${arg#*=}
+        ;;
+      --with-qlogic)
+        opt_qlogic=1
+        ;;
+      --with-refnum-type=*)
+        opt_refnum_type=${arg#*=}
+        ;;
+      --with-prio-type=*)
+        opt_prio_type=${arg#*=}
+        ;;
+      --enable-randomized-msgq)
+        opt_randomized_msgq=1
+        ;;
+      --with-mempool-cutoff=*)
+        opt_mempool_cutoff=${arg#*=}
+        ;;
+      --enable-ampi-mpich-tests)
+        opt_ampi_mpich_tests=1
+        ;;
+      --enable-zlib)
+        opt_zlib=1
+        ;;
+      --with-production)
+        opt_production=1
+        ;;
+      --ampi-only)
+        opt_ampi_only=1
+        ;;
+      --with-romio)
+        opt_romio=1
+        ;;
+      --without-romio)
+        opt_romio=0
+        ;;
+    # Miscellaneous options
+      -k)
+        # -k is an option for make, not for the compiler.
+        echo "*** Note: Ignoring '-k' option."
+        ;;
+      --help)
+        help
+        ;;
+      -j[0-9]*)
+        opt_parallel=$arg
+        ;;
+      -v)
+        echo "Enabling verbose mode."
+        VERBOSE=1 # Run 'make' verbosely
+        ;;
+      -vv)
+        echo "Enabling extra verbose mode."
+        VERBOSE=1 # Run 'make' verbosely
+        opt_extra_opts+=(-verbose -save) # Run 'charmc' verbosely
+        ;;
+      --only-configure)
+        # Run only cmake, not make
+        ONLY_CONFIGURE=1
+        ;;
+      --force)
+        # Overwrite existing build directory
+        FORCE=1
+        ;;
+      -j)
+        opt_parallel="$arg"
+        if [[ $# -gt 0 && $1 == [0-9]* ]]; then
+          opt_parallel+="$1"
+          shift
+        fi
+        ;;
+      --destination=*)
+        opt_destination=${arg#*=}
+        ;;
+      --install-prefix=*)
+        opt_install_prefix=${arg#*=}
+        ;;
+      --suffix=*)
+        opt_suffix=-${arg#*=}
+        ;;
+      --basedir=*)
+        opt_incdir+=("-I${arg#*=}/include")
+        opt_libdir+=("-L${arg#*=}/lib")
+        if [[ -d "${arg#*=}/lib64" ]]; then
+          opt_libdir+=("-L${arg#*=}/lib64")
+        fi
+        ;;
+      --libdir=*)
+        opt_libdir+=("-L${arg#*=}")
+        ;;
+      --incdir=*)
+        opt_incdir+=("-I${arg#*=}")
+        ;;
+      *)
+        echo "*** Note: Adding unknown option '$arg' to compiler flags."
+        opt_extra_opts+=("$arg")
+        ;;
+    esac
+  done
 }
 
 # Process original command-line arguments
-eval processArgs "$@"
+processArgs "$@"
+
+# Also parse extra options appended to the triplet
+for arg in $extra_triplet_opts; do
+  parse_platform_compilers "$arg"
+done
+
 
 ############ End option parsing
 
@@ -401,15 +467,24 @@ for flag in opt_omp opt_smp opt_tcp opt_pthreads opt_pxshm opt_syncft opt_ooc op
   [[ $flag -eq 1 ]] && builddir_extra+="-${flag/opt_/}"
 done
 
-for c in $opt_lrts_pmi $opt_compiler; do
-  [[ -n $c ]] &&  builddir_extra+="-${c}"
+for c in "$opt_lrts_pmi" "${opt_compiler[@]}"; do
+  [[ -n "$c" ]] && builddir_extra+="-$c"
 done
 
-if [[ -n $opt_destination ]]; then
+is_ofi_ucx="^(ofi|ucx).*"
+if [[ $actual_triplet =~ $is_ofi_ucx && $opt_lrts_pmi == "" ]]; then
+    opt_lrts_pmi="simplepmi"
+fi
+
+if [[ "$actual_triplet" = ofi-cray* && -z "$opt_lrts_pmi" ]]; then
+    opt_lrts_pmi="slurmpmi2"
+fi
+
+if [[ -n "$opt_destination" ]]; then
   # Note that $builddir_extra is intentionally ignored here
-  builddir=$opt_destination$opt_suffix
+  builddir="$opt_destination$opt_suffix"
 else
-  builddir=$triplet$builddir_extra$opt_suffix
+  builddir="$actual_triplet$builddir_extra$opt_suffix"
 fi
 
 
@@ -426,7 +501,7 @@ then
   else
     echo "Removing existing data and starting over. (--force)"
   fi
-elif [[ -e "$builddir" ]]
+elif [[ -e "$builddir" && ! -e "$builddir/.spack" ]]
 then
   echo "\"$builddir\" already exists but is in an inconsistent state."
   if [[ $FORCE -eq 0 ]]
@@ -438,49 +513,58 @@ then
   fi
 fi
 
+# Install directory set-up
+if [[ -n "$opt_install_prefix" ]]
+then
+  # Install directory provided by user - Update installdir to point to it instead.
+  installdir="$opt_install_prefix"
+else
+  # Default Install directory
+  installdir="$my_srcdir/$builddir-install"
+fi
 
 # Build option setup
 
 if [[ $opt_ampi_only -eq 1 ]]; then
-    # AMPI doesn't use Charm-MPI interop or msg priorities of any kind.
+    # AMPI doesn't use Charm-MPI interop, msg priorities, non-FIFO queues, or CcdSCHEDLOOP.
     # AMPI creates O(NumVirtualRanks) chare arrays by default (for MPI_COMM_SELF),
     # so we bump up the number of bits reserved for the collection in the objid.
     opt_prio_type="char"
-    opt_extra_opts="-DCMK_NO_INTEROP=1 -DCMK_NO_MSG_PRIOS=1 -DCMK_FIFO_QUEUE_ONLY=1 -DCMK_OBJID_COLLECTION_BITS=29 $opt_extra_opts "
+    opt_extra_opts=('-DCMK_NO_INTEROP=1' '-DCMK_NO_MSG_PRIOS=1' '-DCMK_FIFO_QUEUE_ONLY=1' '-DCSD_NO_SCHEDLOOP=1' '-DCMK_OBJID_COLLECTION_BITS=29' "${opt_extra_opts[@]}")
 fi
 
-# Special handling for gni-crayxc, gni-crayxe, mpi-crayxc, mpi-crayxe
-if [[ $triplet == gni-* || $triplet == *-crayx? ]]; then
-  opt_network=$triplet
+# Special handling for gni-crayxc, gni-crayxe, mpi-crayxc, mpi-crayxe, mpi-crayshasta, ofi-crayshasta
+if [[ $actual_triplet == gni-* || $actual_triplet == *-cray* ]]; then
+  opt_network=$actual_triplet
   # Need to use Cray's compiler frontends on Cray systems
   opt_CC=cc
   opt_CXX=CC
   opt_FC=ftn
 else
-  opt_network=$(echo "$triplet" | cut -d '-' -f1)
+  opt_network=$(echo "$actual_triplet" | cut -d '-' -f1)
 fi
 
-my_os=$(echo "$triplet" | cut -d '-' -f2)
+my_os=$(echo "$actual_triplet" | cut -d '-' -f2)
 
 if [[ $opt_network == "mpi" && $my_os == "win" ]]; then
   echo "Warning: CMake build is not supported with MPI on Windows, running ./buildold instead."
   sleep 2
-  "$my_srcdir"/buildold "$@"
+  "$my_srcdir/buildold" "${full_args[@]}"
   exit $?
 fi
 
 # Special handling for Windows compiler
 if [[ $my_os == "win" && ( -z $opt_CC || $opt_CC == "msvc" ) ]]; then
   # Need to use unix2nt_cc on Windows/Cygwin
-  opt_CC=$(realpath "$my_srcdir")/src/arch/win/unix2nt_cc
-  opt_CXX=$opt_CC
+  opt_CC="$(realpath "$my_srcdir")/src/arch/win/unix2nt_cc"
+  opt_CXX="$opt_CC"
   opt_FC=
 fi
 
 [[ $opt_production -eq 0 ]] && opt_production='Debug' || opt_production='Release'
 
 if [[ $VERBOSE -eq 1 ]]; then
-  echo "Build options for $triplet:"
+  echo "Build options for $actual_triplet:"
 
   # Print selected options
   for option in ${!opt*}; do
@@ -491,29 +575,30 @@ fi
 
 # Create builddir and its contents
 
-rm -rf "$builddir"
-
-mkdir "$builddir"
-
+rm -rf "${builddir:?}"/*
+mkdir -p "$builddir"
 cd "$builddir"
 
-if [[ -n $opt_libdir ]]; then
+ConvUsr='include/conv-mach-pre.sh'
+
+if [[ ${#opt_libdir[@]} -ne 0 ]]; then
   mkdir -p include
-  echo "USER_OPTS_LD=$opt_libdir" >> include/conv-mach-pre.sh
+  echo "USER_OPTS_LD='${opt_libdir[*]}'" >> "$ConvUsr"
 fi
 
-if [[ -n $opt_incdir ]]; then
+if [[ ${#opt_incdir[@]} -ne 0 ]]; then
   mkdir -p include
-  echo "USER_OPTS_CC='$opt_incdir'" >> include/conv-mach-pre.sh
-  echo "USER_OPTS_CXX='$opt_incdir'" >> include/conv-mach-pre.sh
+  echo "USER_OPTS_CC='${opt_incdir[*]}'" >> "$ConvUsr"
+  echo "USER_OPTS_CXX='${opt_incdir[*]}'" >> "$ConvUsr"
 fi
-
 
 # Run configure step
 
 CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
   -G "Unix Makefiles" \
+  -DARCH="$opt_arch" \
   -DCMAKE_BUILD_TYPE="$opt_production" \
+  -DCMAKE_INSTALL_PREFIX="$installdir" \
   -DCMK_AMPI_ONLY="$opt_ampi_only" \
   -DCMK_AMPI_WITH_ROMIO="$opt_romio" \
   -DAMPI_ERROR_CHECKING="$opt_ampi_error_checking" \
@@ -525,10 +610,10 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
   -DCUDA="$opt_cuda" \
   -DDRONE_MODE="$opt_drone_mode" \
   -DERROR_CHECKING="$opt_error_checking" \
-  -DEXTRA_OPTS="$opt_extra_opts" \
+  -DEXTRA_OPTS="${opt_extra_opts[*]}" \
   -DLBTIME_TYPE="$opt_lbtime_type" \
   -DLBUSERDATA="$opt_lbuserdata" \
-  -DLOCKLESS_QUEUE="$opt_lockless" \
+  -DLOCKLESS_QUEUE="$opt_lockless_queue" \
   -DLRTS_PMI="$opt_lrts_pmi" \
   -DCMK_MEMPOOL_CUTOFFNUM="$opt_mempool_cutoff" \
   -DNETWORK="$opt_network" \
@@ -539,6 +624,8 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
   -DPRIO_TYPE="$opt_prio_type" \
   -DPTHREADS="$opt_pthreads" \
   -DPXSHM="$opt_pxshm" \
+  -DCMK_HAS_XPMEM="$opt_xpmem" \
+  -DCMK_USE_SHMEM="$opt_shmem" \
   -DQLOGIC="$opt_qlogic" \
   -DRANDOMIZED_MSGQ="$opt_randomized_msgq" \
   -DREFNUM_TYPE="$opt_refnum_type" \
@@ -561,5 +648,13 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
 
 [[ $VERBOSE -eq 1 ]] && export VERBOSE
 make "$opt_parallel"
+
+# Only Install if the user provides an install prefix with the 
+# `--install-prefix` option. Without this option, `make install` would be a
+# no-op.
+if [[ -n "$opt_install_prefix" ]]
+then
+  make install
+fi
 
 echo 'Build successful.'

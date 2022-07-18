@@ -19,6 +19,36 @@
 #include "allEvents.h"          //projector
 #include "register.h" // for _entryTable
 
+#include "envelope.h"
+
+// To get username
+#if defined(_WIN32) || defined(_WIN64)
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <Lmcons.h>
+#else
+#include <pwd.h>
+#endif
+
+// To get hostname
+#if defined(_WIN32) || defined(_WIN64)
+#  include <Winsock2.h>
+#else
+#  include <unistd.h>
+#  include <limits.h> // For HOST_NAME_MAX
+#endif
+
+#ifndef HOST_NAME_MAX
+// Apple seems to not adhere to POSIX and defines this non-standard variable
+// instead of HOST_NAME_MAX
+#  ifdef MAXHOSTNAMELEN
+#    define HOST_NAME_MAX MAXHOSTNAMELEN
+// Windows docs say 256 bytes (so 255 + 1 added at use) will always be sufficient
+#  else
+#    define HOST_NAME_MAX 255
+#  endif
+#endif
+
 CpvExtern(int, _traceCoreOn);   // projector
 
 #if ! CMK_TRACE_ENABLED
@@ -233,14 +263,32 @@ extern const char* const CmiCommitID;
 /** Write out the common parts of the .sts file. */
 void traceWriteSTS(FILE *stsfp,int nUserEvents) {
   fprintf(stsfp, "MACHINE \"%s\"\n",CMK_MACHINE_NAME);
-#if CMK_SMP_TRACE_COMMTHREAD
+#if CMK_SMP_TRACE_COMMTHREAD && CMK_SMP && !CMK_SMP_NO_COMMTHD
   //Assuming there's only 1 comm thread now! --Chao Mei
   //considering the extra comm thread per node
-  fprintf(stsfp, "PROCESSORS %d\n", CkNumPes()+CkNumNodes());  
-  fprintf(stsfp, "SMPMODE %d %d\n", CkMyNodeSize(), CkNumNodes());
-#else	
+  fprintf(stsfp, "PROCESSORS %d\n", CkNumPes()+CkNumNodes());
+#else
   fprintf(stsfp, "PROCESSORS %d\n", CkNumPes());
 #endif
+#if CMK_SMP
+  fprintf(stsfp, "SMPMODE %d %d\n", CkMyNodeSize(), CkNumNodes());
+#endif
+
+#if defined(_WIN32) || defined(_WIN64)
+  TCHAR username[UNLEN + 1];
+  DWORD size = UNLEN + 1;
+  if (GetUserName(username, &size))
+    fprintf(stsfp, "USERNAME \"%s\"\n", username);
+#else
+  const struct passwd* pw = getpwuid(getuid());
+  if (pw != nullptr)
+    fprintf(stsfp, "USERNAME \"%s\"\n", pw->pw_name);
+#endif
+
+  // Add 1 for null terminator
+  char hostname[HOST_NAME_MAX + 1];
+  if(gethostname(hostname, HOST_NAME_MAX + 1) == 0)
+    fprintf(stsfp, "HOSTNAME \"%s\"\n", hostname);
 
   fprintf(stsfp, "COMMANDLINE \"");
   int index = 0;
@@ -282,21 +330,21 @@ void traceWriteSTS(FILE *stsfp,int nUserEvents) {
     fprintf(stsfp, "MESSAGE %d %u\n", (int)i, (int)_msgTable[i]->size);
 }
 
-void traceCommonBeginIdle(void *proj,double curWallTime)
+void traceCommonBeginIdle(void *proj)
 {
-  ((TraceArray *)proj)->beginIdle(curWallTime);
+  ((TraceArray *)proj)->beginIdle(CkWallTimer());
 }
  
-void traceCommonEndIdle(void *proj,double curWallTime)
+void traceCommonEndIdle(void *proj)
 {
-  ((TraceArray *)proj)->endIdle(curWallTime);
+  ((TraceArray *)proj)->endIdle(CkWallTimer());
 }
 
 void TraceArray::traceBegin() {
   if (n==0) return; // No tracing modules registered.
 #if ! CMK_TRACE_IN_CHARM
-  cancel_beginIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)traceCommonBeginIdle,this);
-  cancel_endIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,(CcdVoidFn)traceCommonEndIdle,this);
+  cancel_beginIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdCondFn)traceCommonBeginIdle,this);
+  cancel_endIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,(CcdCondFn)traceCommonEndIdle,this);
 #endif
   ALLDO(traceBegin());
 }
@@ -305,8 +353,8 @@ void TraceArray::traceBeginOnCommThread() {
 #if CMK_SMP_TRACE_COMMTHREAD
   if (n==0) return; // No tracing modules registered.
 /*#if ! CMK_TRACE_IN_CHARM	
-  cancel_beginIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)traceCommonBeginIdle,this);
-  cancel_endIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,(CcdVoidFn)traceCommonEndIdle,this);
+  cancel_beginIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdCondFn)traceCommonBeginIdle,this);
+  cancel_endIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,(CcdCondFn)traceCommonEndIdle,this);
 #endif*/
   ALLDO(traceBeginOnCommThread());
 #endif
@@ -807,12 +855,61 @@ void traceEnableCCS(void)
   CkpvAccess(_traces)->traceEnableCCS();  
 }
 
-/* **CW** Support for thread listeners. This makes a call to each
-   trace module which must support the call.
-*/
-void traceAddThreadListeners(CthThread tid, envelope *e) {
-  _TRACE_ONLY(CkpvAccess(_traces)->traceAddThreadListeners(tid, e));
+struct TraceThreadListener {
+  struct CthThreadListener base;
+  int event;
+  int msgType;
+  int ep;
+  int srcPe;
+  int ml;
+  CmiObjId idx;
+};
+
+static void traceThreadListener_suspend(struct CthThreadListener *l)
+{
+  TraceThreadListener *a=(TraceThreadListener *)l;
+  /* here, we activate the appropriate trace codes for the appropriate
+     registered modules */
+  traceSuspend();
 }
+
+static void traceThreadListener_resume(struct CthThreadListener *l)
+{
+  TraceThreadListener *a=(TraceThreadListener *)l;
+  /* here, we activate the appropriate trace codes for the appropriate
+     registered modules */
+  _TRACE_BEGIN_EXECUTE_DETAILED(a->event,a->msgType,a->ep,a->srcPe,a->ml,
+				CthGetThreadID(a->base.thread), NULL);
+  a->event=-1;
+  a->srcPe=CkMyPe(); /* potential lie to migrated threads */
+  a->ml=0;
+}
+
+static void traceThreadListener_free(struct CthThreadListener *l)
+{
+  TraceThreadListener *a=(TraceThreadListener *)l;
+  delete a;
+}
+
+void traceAddThreadListeners(CthThread tid, envelope *e)
+{
+#if CMK_TRACE_ENABLED
+  /* strip essential information from the envelope */
+  TraceThreadListener *a= new TraceThreadListener;
+
+  a->base.suspend=traceThreadListener_suspend;
+  a->base.resume=traceThreadListener_resume;
+  a->base.free=traceThreadListener_free;
+  a->event=e->getEvent();
+  a->msgType=e->getMsgtype();
+  a->ep=e->getEpIdx();
+  a->srcPe=e->getSrcPe();
+  a->ml=e->getTotalsize();
+
+  CthAddListener(tid, (CthThreadListener *)a);
+#endif
+}
+
 
 #if 1
 // helper functions

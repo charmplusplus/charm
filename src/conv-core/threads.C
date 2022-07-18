@@ -148,14 +148,6 @@ CLINKAGE void *memalign(size_t align, size_t size) CMK_THROW;
 #define CthDebug(...)  //CmiPrintf(__VA_ARGS__)
 
   /**************************** Shared Base Thread Class ***********************/
-  /*
-     CMK_FAULT_EVAC
-     Moved the cmicore converse header from CthThreadBase to CthThreadToken.
-     The CthThreadToken gets enqueued in the converse queue instead of the
-     CthThread. This allows the thread to be moved out of a processor even
-     if there is an awaken call for it enqueued in the scheduler
-
-*/
 
 #define THD_MAGIC_NUM 0x12345678
 
@@ -457,6 +449,7 @@ static void *CthAllocateStack(CthThreadBase *th, int *stackSize, int useMigratab
   th->stacksize=*stackSize;
   if (!useMigratable || !CmiIsomallocEnabled()) {
     ret=malloc(*stackSize); 
+    CmiEnforce(ret != nullptr);
   } else {
     th->isMigratable = useMigratable;
 #if CMK_THREADS_ALIAS_STACK
@@ -464,7 +457,7 @@ static void *CthAllocateStack(CthThreadBase *th, int *stackSize, int useMigratab
     ret=CMK_THREADS_ALIAS_LOCATION;
 #else /* isomalloc */
     th->isomallocContext = ctx;
-    ret = CmiIsomallocContextMallocAlign(th->isomallocContext, 16, *stackSize);
+    ret = CmiIsomallocContextPermanentAllocAlign(th->isomallocContext, 16, *stackSize);
 #endif
   }
   _MEMCHECK(ret);
@@ -500,24 +493,16 @@ static void CthThreadBaseFree(CthThreadBase *th)
 
 #if CMK_THREADS_BUILD_TLS
   void * tlsptr = CmiTLSGetBuffer(&th->tlsseg);
-  if (th->isMigratable)
-  {
-    if (th->isomallocContext.opaque != nullptr)
-      CmiIsomallocContextFree(th->isomallocContext, tlsptr);
-  }
-  else
+  if (!th->isMigratable)
     CmiAlignedFree(tlsptr);
+  // else is handled by CmiIsomallocContextDelete
 #endif
 
 #if CMI_SWAPGLOBALS
   void * globalptr = th->threadGlobals.data_seg;
-  if (th->isMigratable)
-  {
-    if (th->isomallocContext.opaque != nullptr)
-      CmiIsomallocContextFree(th->isomallocContext, globalptr);
-  }
-  else
+  if (!th->isMigratable)
     free(globalptr);
+  // else is handled by CmiIsomallocContextDelete
 #endif
 
   if (th->isMigratable) {
@@ -621,7 +606,7 @@ static void CthInterceptionsCreate(CthThread th)
   {
     void * globalptr;
     if (base->isMigratable)
-      globalptr = CmiIsomallocContextMalloc(base->isomallocContext, globalsize);
+      globalptr = CmiIsomallocContextPermanentAlloc(base->isomallocContext, globalsize);
     else
       globalptr = malloc(globalsize);
     base->threadGlobals = CtgCreate(globalptr);
@@ -638,7 +623,7 @@ static void CthInterceptionsCreate(CthThread th)
   {
     void * tlsptr;
     if (base->isMigratable)
-      tlsptr = CmiIsomallocContextMallocAlign(base->isomallocContext, tlsdesc.align, tlsdesc.size);
+      tlsptr = CmiIsomallocContextPermanentAllocAlign(base->isomallocContext, tlsdesc.align, tlsdesc.size);
     else
       tlsptr = CmiAlignedAlloc(tlsdesc.align, tlsdesc.size);
     CmiTLSCreateSegUsingPtr(&CpvAccess(Cth_PE_TLS), &base->tlsseg, tlsptr);
@@ -808,8 +793,8 @@ void CthScheduledDecrement() {
     if (!B(prevCurrent))
       return;
     CthDebug("[%f][%d] scheduled before decremented: %d\n", CmiWallTimer(), CmiMyRank(), B(prevCurrent)->scheduled);
-    /* CthMainThread should have empty stack(stack == NULL) and never scheduled(scheduled == 0) */
-    if (B(prevCurrent)->stack && B(prevCurrent)->scheduled > 0) {
+    /* only decrement positive scheduled counts for non-main threads */
+    if (!CthIsMainThread(prevCurrent) && B(prevCurrent)->scheduled > 0) {
         CmiMemoryAtomicDecrement(B(prevCurrent)->scheduled, memory_order_release);
         CthDebug("[%f][%d] scheduled decremented: %d\n", CmiWallTimer(), CmiMyRank(), B(prevCurrent)->scheduled);
     }
@@ -2208,7 +2193,7 @@ CthThread CthPup(pup_er p, CthThread t)
 
 /* Functions that help debugging */
 void CthPrintThdStack(CthThread t){
-  CmiPrintf("thread=%p, base stack=%p, stack pointer=%p\n", t, t->base.stack, t->stackp);
+  CmiPrintf("thread=%p, base stack=%p, stack pointer=%p\n", (void *)t, t->base.stack, (void *)t->stackp);
 }
 #endif
 
@@ -2238,15 +2223,15 @@ char * CthPointer(CthThread t, size_t pos)
 }
 #endif
 
-#if CMK_TRACE_ENABLED
 void CthTraceResume(CthThread t)
 {
+#if CMK_TRACE_ENABLED
   traceResume(B(t)->eventID, B(t)->srcPE,&t->base.tid);
-}
 #endif
+}
 /* Functions that help debugging */
 void CthPrintThdMagic(CthThread t){
-  CmiPrintf("CthThread[%p]'s magic: %x\n", t, t->base.magic);
+  CmiPrintf("CthThread[%p]'s magic: %x\n", (void *)t, t->base.magic);
 }
 
 CmiIsomallocContext CmiIsomallocGetThreadContext(CthThread th)

@@ -50,7 +50,8 @@ class CkLBArgs
     _lb_debug = 0;
     _lb_ignoreBgLoad = _lb_syncResume = _lb_useCpuTime = false;
     _lb_printsummary = _lb_migObjOnly = false;
-    _lb_statson = _lb_traceComm = true;
+    _lb_statson = true;
+    _lb_traceComm = false;
     _lb_loop = false;
     _lb_central_pe = 0;
     _lb_maxDistPhases = 10;
@@ -122,6 +123,15 @@ typedef BaseLB* (*LBAllocFn)();
 void LBDefaultCreate(LBCreateFn f);
 
 void LBRegisterBalancer(std::string, LBCreateFn, LBAllocFn, std::string, bool shown = true);
+
+template <typename T>
+void LBRegisterBalancer(std::string name, std::string description, bool shown = true)
+{
+  LBRegisterBalancer(
+      name, [](const CkLBOptions& opts) { T::proxy_t::ckNew(opts); },
+      []() -> BaseLB* { return new T(static_cast<CkMigrateMessage*>(nullptr)); },
+      description, shown);
+}
 
 void _LBMgrInit();
 
@@ -223,10 +233,7 @@ class LBManager : public CBase_LBManager
 
   LBManager(void) { init(); }
   LBManager(CkMigrateMessage* m) : CBase_LBManager(m) { init(); }
-  ~LBManager()
-  {
-    if (avail_vector) delete[] avail_vector;
-  }
+  ~LBManager() { delete lbdb_obj; }
 
  private:
   void init();
@@ -260,10 +267,10 @@ class LBManager : public CBase_LBManager
   }
   int Migrate(LDObjHandle h, int dest) { return lbdb_obj->Migrate(h, dest); }
   void UnregisterOM(LDOMHandle omh) { lbdb_obj->UnregisterOM(omh); }
-  void RegisteringObjects(LDOMHandle omh) { lbdb_obj->RegisteringObjects(this, omh); }
+  void RegisteringObjects(LDOMHandle omh) { lbdb_obj->RegisteringObjects(omh); }
   void DoneRegisteringObjects(LDOMHandle omh)
   {
-    lbdb_obj->DoneRegisteringObjects(this, omh);
+    lbdb_obj->DoneRegisteringObjects(omh);
   }
   void ObjectStart(const LDObjHandle& h) { lbdb_obj->ObjectStart(h); }
   void ObjectStop(const LDObjHandle& h) { lbdb_obj->ObjectStop(h); }
@@ -284,8 +291,6 @@ class LBManager : public CBase_LBManager
   void CollectStatsOn(void) { lbdb_obj->CollectStatsOn(); }
   void CollectStatsOff(void) { lbdb_obj->CollectStatsOff(); }
   bool StatsOn(void) { return lbdb_obj->StatsOn(); }
-  int RunningObject(LDObjHandle* _o) const { return lbdb_obj->RunningObject(_o); }
-  const LDObjHandle* RunningObject() { return lbdb_obj->RunningObject(); }
   void ObjTime(LDObjHandle h, double walltime, double cputime)
   {
     lbdb_obj->ObjTime(h, walltime, cputime);
@@ -453,7 +458,6 @@ class LBManager : public CBase_LBManager
   }
   void RemoveLocalBarrierReceiver(LDBarrierReceiver h);
   void AtLocalBarrier(LDBarrierClient _n_c);
-  void DecreaseLocalBarrier(int c);
   void TurnOnBarrierReceiver(LDBarrierReceiver h);
   void TurnOffBarrierReceiver(LDBarrierReceiver h);
 
@@ -461,8 +465,13 @@ class LBManager : public CBase_LBManager
   void LocalBarrierOff(void);
   void ResumeClients();
   static int ProcessorSpeed();
-  inline void SetLBPeriod(double s) {}
-  inline double GetLBPeriod() { return 0; }
+  static void SetLBPeriod(double period)
+  {
+    _lb_args.lbperiod() = period;
+    // If the manager has been initialized, then start the timer
+    if (auto* const obj = LBManager::Object()) obj->setTimer();
+  }
+  static double GetLBPeriod() { return _lb_args.lbperiod(); }
 
   void SetMigrationCost(double cost);
   void SetStrategyCost(double cost);
@@ -470,29 +479,32 @@ class LBManager : public CBase_LBManager
 
  private:
   int mystep;
-  static char* avail_vector;  // processor bit vector
+  static std::vector<char> avail_vector; // processor bit vector
   static bool avail_vector_set;
   int new_ld_balancer;  // for Node 0
   MetaBalancer* metabalancer;
   int currentLBIndex;
+  bool isPeriodicQueued = false;
 
  public:
-  CkVec<BaseLB*> loadbalancers;
+  std::vector<BaseLB*> loadbalancers;
 
   std::vector<StartLBCB*> startLBFnList;
   std::vector<MigrationDoneCB*> migrationDoneCBList;
 
  public:
-  BaseLB** getLoadBalancers() { return loadbalancers.getVec(); }
+  BaseLB** getLoadBalancers() { return loadbalancers.data(); }
   int getNLoadBalancers() { return loadbalancers.size(); }
 
  public:
   static bool manualOn;
 
  public:
-  char* availVector() { return avail_vector; }
-  void get_avail_vector(char* bitmap);
-  void set_avail_vector(char* bitmap, int new_ld = -1);
+  const char *availVector() const { return avail_vector.data(); }
+  void get_avail_vector(char * bitmap) const;
+  void get_avail_vector(std::vector<char> & bitmap) const { bitmap = avail_vector; }
+  void set_avail_vector(const char * bitmap, int new_ld = -1);
+  void set_avail_vector(const std::vector<char> & bitmap, int new_ld = -1);
   int& new_lbbalancer() { return new_ld_balancer; }
 
   struct LastLBInfo
@@ -522,7 +534,9 @@ void LBTurnPredictorOn(LBPredictorFunction* model, int wind);
 void LBTurnPredictorOff();
 void LBChangePredictor(LBPredictorFunction* model);
 
-void LBSetPeriod(double second);
+// This alias remains for backwards compatibility
+CMK_DEPRECATED_MSG("Use LBManager::SetLBPeriod instead of LBSetPeriod")
+void LBSetPeriod(double period);
 
 #if CMK_LB_USER_DATA
 int LBRegisterObjUserData(int size);
@@ -538,9 +552,9 @@ inline LBManager* LBManagerObj() { return LBManager::Object(); }
 
 inline void CkStartLB() { LBManager::Object()->StartLB(); }
 
-inline void get_avail_vector(char* bitmap) { LBManagerObj()->get_avail_vector(bitmap); }
+inline void get_avail_vector(std::vector<char> & bitmap) { LBManagerObj()->get_avail_vector(bitmap); }
 
-inline void set_avail_vector(char* bitmap) { LBManagerObj()->set_avail_vector(bitmap); }
+inline void set_avail_vector(const std::vector<char> & bitmap) { LBManagerObj()->set_avail_vector(bitmap); }
 
 //  a helper class to suspend/resume load instrumentation when calling into
 //  runtime apis
@@ -551,15 +565,8 @@ class SystemLoad
   LBManager* lbmgr;
 
  public:
-  SystemLoad()
-  {
-    lbmgr = LBManagerObj();
-    objHandle = lbmgr->RunningObject();
-    if (objHandle != NULL)
-    {
-      lbmgr->ObjectStop(*objHandle);
-    }
-  }
+  SystemLoad();
+
   ~SystemLoad()
   {
     if (objHandle) lbmgr->ObjectStart(*objHandle);

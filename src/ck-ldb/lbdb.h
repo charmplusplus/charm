@@ -18,6 +18,9 @@
 #endif
 #include <inttypes.h>
 #include <list>
+#include <vector>
+
+#include "pup_stl.h"
 
 class LBManager;//Forward declaration
 
@@ -36,44 +39,48 @@ extern int _lb_version;
   /*  as OBJ_ID_SZ */
 
 #if CMK_LBDB_ON
-typedef struct {
+struct LDHandle {
   void *handle;            // pointer to LBDB
-} LDHandle;
+};
 #else
 typedef int LDHandle;
 #endif
 
-typedef struct _LDOMid {
+struct LDOMid {
   CkGroupID id;
-  bool operator==(const struct _LDOMid& omId) const {
+  bool operator==(const LDOMid& omId) const {
     return id == omId.id?true:false;
   }
-  bool operator<(const struct _LDOMid& omId) const {
+  bool operator<(const LDOMid& omId) const {
     return id < omId.id?true:false;
   }
-  bool operator!=(const struct _LDOMid& omId) const {
+  bool operator!=(const LDOMid& omId) const {
     return id == omId.id?false:true;
   }
   inline void pup(PUP::er &p);
-} LDOMid;
+};
 
-typedef struct {
+struct LDOMHandle {
 //  void *user_ptr;
   LDOMid id;
   int handle;		// index to LBOM
   inline void pup(PUP::er &p);
-} LDOMHandle;
+
+  bool operator==(const LDOMHandle &obj) const {
+    return (this->handle == obj.handle && this->id == obj.id);
+  }
+};
 
 /* LDObjKey uniquely identify one object */
-typedef struct _LDObjKey {
+struct LDObjKey {
   /// Id of the location manager for this object
   LDOMid omId;
   CmiUInt8 objId;
 public:
-  bool operator==(const _LDObjKey& obj) const {
+  bool operator==(const LDObjKey& obj) const {
     return (bool)(omId == obj.omId && objId == obj.objId);
   }
-  bool operator<(const _LDObjKey& obj) const {
+  bool operator<(const LDObjKey& obj) const {
     if (omId < obj.omId) return true;
     else if (omId == obj.omId) return objId < obj.objId;
     else return false;
@@ -83,19 +90,26 @@ public:
   inline const LDOMid &omID() const { return omId; }
   inline const CmiUInt8 &objID() const { return objId; }
   inline void pup(PUP::er &p);
-} LDObjKey;
+};
 
 typedef int LDObjIndex;
 typedef int LDOMIndex;
 
-typedef struct {
+struct LDObjHandle {
   LDOMHandle omhandle;
   CmiUInt8 id;
   LDObjIndex  handle;
   inline const LDOMid &omID() const { return omhandle.id; }
   inline const CmiUInt8 &objID() const { return id; }
   inline void pup(PUP::er &p);
-} LDObjHandle;
+  
+  inline bool operator==(const LDObjHandle &obj) const {
+    return (this == &obj) || ((this->id == obj.id) &&
+      (this->handle == obj.handle) &&
+      (this->omhandle == obj.omhandle)
+    );
+  }
+};
 
 /* defines user data layout  */
 class LBUserDataLayout {
@@ -115,37 +129,32 @@ public:
 CkpvExtern(LBUserDataLayout, lbobjdatalayout);
 
 class LBObjUserData {
-  char *data;
+  std::vector<char> data;
 public:
-  LBObjUserData() : data(NULL) {}
-
+  LBObjUserData() {
+    data.resize(CkpvAccess(lbobjdatalayout).size());
+  }
   LBObjUserData(const LBObjUserData &d) {
-    if (d.data != NULL) {
-      init();
-      memcpy(data, d.data, CkpvAccess(lbobjdatalayout).size());
-    } else {
-      data = NULL;
-    }
+    this->data = d.data;
+  }
+  LBObjUserData(LBObjUserData &&d) {
+    this->data = std::move(d.data);
   }
 
-  ~LBObjUserData() { delete [] data; }
+  ~LBObjUserData() { }
   LBObjUserData &operator = (const LBObjUserData &d) {
-    if (d.data != NULL) {
-      if (data==NULL) init();
-      memcpy(data, d.data, CkpvAccess(lbobjdatalayout).size());
-    } else if (data != NULL) {
-      delete [] data;
-      data = NULL;
-    }
+    this->data = d.data;
+    return *this;
+  }
+  LBObjUserData &operator = (LBObjUserData &&d) {
+    this->data = std::move(d.data);
     return *this;
   }
   inline void pup(PUP::er &p);
-  void *getData(int idx) { if (data==NULL) init(); return (void*)(data+idx); }
-private:
-  inline void init() { data = new char[CkpvAccess(lbobjdatalayout).size()]; }
+  void *getData(int idx) { return data.data()+idx; }
 };
 
-typedef struct {
+struct LDObjData {
   LDObjHandle handle;
   LBRealType wallTime;
 #if CMK_LB_CPUTIMER
@@ -170,22 +179,22 @@ typedef struct {
 #if CMK_LB_USER_DATA
   void* getUserData(int idx)  { return userData.getData(idx); }
 #endif
-} LDObjData;
+};
 
 /* used by load balancer */
-typedef struct {
+struct LDObjStats {
   int index;
   LDObjData data;
   int from_proc;
   int to_proc;
   inline void pup(PUP::er &p);
-} LDObjStats;
+};
 
 #define LD_PROC_MSG      1
 #define LD_OBJ_MSG       2
 #define LD_OBJLIST_MSG   3
 
-typedef struct _LDCommDesc {
+struct LDCommDesc {
   char type;
   union {
     int destProc;		/* 1:   processor level message */
@@ -228,19 +237,19 @@ typedef struct _LDCommDesc {
   	  dest.destObjs.objs[i].objID() =objid[i];
 	}
   }
-  inline bool operator==(const _LDCommDesc &obj) const;
-  inline _LDCommDesc &operator=(const _LDCommDesc &c);
+  inline bool operator==(const LDCommDesc &obj) const;
+  inline LDCommDesc &operator=(const LDCommDesc &c);
   inline void pup(PUP::er &p);
-} LDCommDesc;
+};
 
-typedef struct _LDCommData {
+struct LDCommData {
   int src_proc;			// sender can either be a proc or an obj
   LDObjKey  sender;		// 
   LDCommDesc   receiver;
   int  sendHash, recvHash;
   int messages;
   int bytes;
-  inline _LDCommData &operator=(const _LDCommData &o) {
+  inline LDCommData &operator=(const LDCommData &o) {
     if (&o == this) return *this;
     src_proc = o.src_proc;
     sender = o.sender; receiver = o.receiver;
@@ -253,7 +262,7 @@ typedef struct _LDCommData {
   inline int recv_type() const { return receiver.get_type(); }
   inline void pup(PUP::er &p);
   inline void clearHash() { sendHash = recvHash = -1; }
-} LDCommData;
+};
 
 /*
  * Callbacks from database to object managers
@@ -264,13 +273,13 @@ typedef void (*LDQueryEstLoadFn)(LDOMHandle h);
 typedef void (*LDMetaLBResumeWaitingCharesFn) (LDObjHandle handle, int lb_ideal_period);
 typedef void (*LDMetaLBCallLBOnCharesFn) (LDObjHandle handle);
 
-typedef struct {
+struct LDCallbacks {
   LDMigrateFn migrate;
   LDStatsFn setStats;
   LDQueryEstLoadFn queryEstLoad;
   LDMetaLBResumeWaitingCharesFn metaLBResumeWaitingChares;
   LDMetaLBCallLBOnCharesFn metaLBCallLBOnChares;
-} LDCallbacks;
+};
 
 /*
  * Local Barrier calls
@@ -318,16 +327,7 @@ inline void LDObjHandle::pup(PUP::er &p) {
 }
 
 inline void LBObjUserData::pup(PUP::er &p) {
-  int hasData;
-  if (!p.isUnpacking()) hasData = data != NULL;
-  p|hasData;
-  if (p.isUnpacking()) {
-    if (hasData)
-      data = new char[CkpvAccess(lbobjdatalayout).size()];
-    else
-      data = NULL;
-  }
-  if (data) p(data, CkpvAccess(lbobjdatalayout).size());
+  p|data;
 }
 
 inline void LDObjData::pup(PUP::er &p) {

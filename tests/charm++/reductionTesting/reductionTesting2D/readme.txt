@@ -21,10 +21,10 @@ arrayDimesionX -- x dimension of the 2D chare array.
 arrayDimesionY -- y dimension of the 2D chare array.
 vectorSize -- Each element of the 2D chare array, has a vector of doubles over which reduction is performed.
 			  This variable defines the size of the vector. Each vector element is initialized to its index value.
-pgm  -- executable
+reductionTesting2D  -- executable
 
 So, for example, if you want to create a 20x10 chare array with a vector size of 5, you could do the following:
-	%./charmrun +n4 +ppn8 ./pgm 20 10 5
+	%./charmrun +n4 +ppn8 ./reductionTesting2D 20 10 5
 
 
 
@@ -45,20 +45,20 @@ Input from user(arrayDimensions X and Y, vectorSize)
 				|
 				V
 Create an 2D chare array (Test2D) of the given dimension.
-Each chare element has a vector of size vectorSize, each element of which is 
+Each chare element has a vector of size vectorSize, each element of which is
 initialized to it's (the element's) index.
 				|
 				|
 				V
-Create an array of Section Proxies. 
+Create an array of Section Proxies.
 //Random things that I decided, in order create the section proxies.
 Number of array section proxies that will be created = max(arrayDimesionX, arrayDimensionY) = N.
 				|
 				|
 				V
 Each section proxy does a Multicast (calls Test2D::compute(msg)).
-A message is sent to the compute entry, which essentially helps to identify which sectoion Proxy 
-are we dealing with, on the receiving end. 
+A message is sent to the compute entry, which essentially helps to identify which sectoion Proxy
+are we dealing with, on the receiving end.
 				|
 				|
 				V

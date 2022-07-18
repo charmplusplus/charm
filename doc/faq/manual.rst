@@ -24,8 +24,7 @@ Charm++ programs do not proceed in lockstep. The flow of control is
 determined by the order in which remote method invocations occur. This
 can be controlled by the user through Structure Control Flow using
 :ref:`Structured Dagger <sec:sdag>`, or
-`Charisma <https://charm.cs.illinois.edu/research/orch>`_, or
-compiler supported higher level languages `Charj <https://charm.cs.illinois.edu/research/charj>`_.
+`Charisma <https://charm.cs.illinois.edu/research/orch>`_.
 
 Charm++ has demonstrated scalability up to hundreds of thousands of
 processors, and provides extremely advanced load balancing and object
@@ -70,7 +69,7 @@ Yes.
 Charm++ supports both shared-memory and distributed-memory machines,
 SMPs and non-SMPs. In particular, we support serial machines, Windows
 machines, Apple machines, ARM machines, clusters connected via Ethernet,
-or Infiniband, IBM Power series and BlueGene/Q, Cray XC/XE/XK series,
+or Infiniband, IBM Power series, Cray XC/XE/XK series,
 and any machine that supports MPI. We normally do our development on
 Linux workstations, and our testing on large parallel machines. Programs
 written using Charm++ will run on any supported machine.

@@ -79,6 +79,7 @@ never be excluded...
 
 #if CMK_CUDA
 #include "hapi_impl.h"
+#include "ckrdmadevice.h"
 
 extern void (*hapiInvokeCallback)(void*, void*);
 extern void CUDACallbackManager(void*, void*);
@@ -159,6 +160,8 @@ CkpvDeclare(GroupIDTable*, _groupIDTable);
 CkpvDeclare(CmiImmediateLockType, _groupTableImmLock);
 CkpvDeclare(UInt, _numGroups);
 
+CkpvDeclare(ReqTagPostMap, ncpyPostedReqMap);
+CkpvDeclare(ReqTagBufferMap, ncpyPostedBufferMap);
 CkpvDeclare(CkCoreState *, _coreState);
 
 CksvDeclare(UInt, _numNodeGroups);
@@ -167,6 +170,12 @@ CksvDeclare(GroupIDTable, _nodeGroupIDTable);
 CksvDeclare(CmiImmediateLockType, _nodeGroupTableImmLock);
 CksvDeclare(CmiNodeLock, _nodeLock);
 CksvDeclare(CmiNodeLock, _nodeZCPendingLock);
+
+CksvDeclare(ReqTagPostMap, ncpyPostedReqNodeMap);
+CksvDeclare(ReqTagBufferMap, ncpyPostedBufferNodeMap);
+CksvDeclare(CmiNodeLock, _nodeZCPostReqLock);
+CksvDeclare(CmiNodeLock, _nodeZCBufferReqLock);
+
 CksvStaticDeclare(PtrVec*,_nodeBocInitVec);
 CkpvDeclare(int, _charmEpoch);
 
@@ -195,11 +204,6 @@ void StopInteropScheduler();
 //for shrink expand cleanup
 int _ROGroupRestartHandlerIdx;
 const char* _shrinkexpand_basedir;
-#endif
-
-#if CMK_FAULT_EVAC
-CpvExtern(char *, _validProcessors);
-CkpvDeclare(char ,startedEvac);
 #endif
 
 int    _exitHandlerIdx;
@@ -237,20 +241,31 @@ bool _ringexit = 0;		    // for charm exit
 int _ringtoken = 8;
 extern int _messageBufferingThreshold;
 
-#if CMK_FAULT_EVAC
-static bool _raiseEvac=0; // whether or not to trigger the processor shutdowns
-static char *_raiseEvacFile;
-void processRaiseEvacFile(char *raiseEvacFile);
-#endif
-
 extern bool useNodeBlkMapping;
 
 extern int quietMode;
 extern int quietModeRequested;
 
-void CkCallWhenIdle(int epIdx, void* obj) {
-  auto fn = reinterpret_cast<CcdVoidFn>(_entryTable[epIdx]->call);
-  CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE, fn, obj);
+class CkWhenIdleRecord {
+  int epIdx_;
+  Chare *obj_;
+
+ public:
+  CkWhenIdleRecord(const int &epIdx, void *obj)
+  : epIdx_(epIdx), obj_(static_cast<Chare *>(obj)) {}
+
+  static void onIdle(CkWhenIdleRecord *self) {
+    CkCallstackPush(self->obj_);
+    ((CcdVoidFn)_entryTable[self->epIdx_]->call)(self->obj_, CmiWallTimer());
+    CkCallstackPop(self->obj_);
+    delete self;
+  }
+};
+
+void CkCallWhenIdle(int epIdx, void *obj) {
+  auto *record = new CkWhenIdleRecord(epIdx, obj);
+  CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE,
+                    (CcdCondFn)CkWhenIdleRecord::onIdle, record);
 }
 
 // Modules are required to register command line opts they will parse. These
@@ -335,12 +350,6 @@ static inline void _parseCommandLineOpts(char **argv)
       CkPrintf("Charm++> Program shutdown in token ring (%d).\n", _ringtoken);
     if (_ringtoken > CkNumPes())  _ringtoken = CkNumPes();
   }
-#if CMK_FAULT_EVAC
-  // if the argument +raiseevac is present then cause faults
-	if(CmiGetArgStringDesc(argv,"+raiseevac", &_raiseEvacFile,"Generates processor evacuation on random processors")){
-		_raiseEvac = 1;
-	}
-#endif
 
         if (!CmiGetArgIntDesc(argv, "+messageBufferingThreshold",
                               &_messageBufferingThreshold,
@@ -359,9 +368,9 @@ static inline void _parseCommandLineOpts(char **argv)
 	  _isNotifyChildInRed = false;
 	}
 
-	_isStaticInsertion = false;
-	if (CmiGetArgFlagDesc(argv,"+staticInsertion","Array elements are only inserted at construction")) {
-	  _isStaticInsertion = true;
+	if (CmiGetArgFlagDesc(argv,"+staticInsertion", "DEPRECATED")) {
+		CmiPrintf("WARNING: +staticInsertion has been deprecated.\n"
+		          "Static insertion is now the default behavior for arrays that are non-empty at construction.\n");
 	}
 
         useNodeBlkMapping = false;
@@ -631,9 +640,6 @@ static void _exitHandler(envelope *env)
       DEBUGF(("ReqStatMsg on %d\n", CkMyPe()));
       CkNumberHandler(_charmHandlerIdx,_discardHandler);
       CkNumberHandler(_bocHandlerIdx, _discardHandler);
-#if CMK_FAULT_EVAC
-      if(CmiNodeAlive(CkMyPe()))
-#endif
       {
 #if CMK_WITH_STATS
          _sendStats();
@@ -1152,7 +1158,7 @@ extern void _registerControlPoints(void);
 extern void _registerTraceControlPoints();
 extern void _registerExternalModules(char **argv);
 extern void _ckModuleInit(void);
-extern void _cksyncbarrierInit();
+extern void _CkSyncBarrierInit();
 extern void _loadbalancerInit();
 extern void _metabalancerInit();
 #if CMK_SMP && CMK_TASKQUEUE
@@ -1294,10 +1300,27 @@ void _sendReadonlies() {
 */
 void _initCharm(int unused_argc, char **argv)
 { 
-	int inCommThread = (CmiMyRank() == CmiMyNodeSize());
+  int inCommThread = (CmiMyRank() == CmiMyNodeSize());
 
-	DEBUGF(("[%d,%.6lf ] _initCharm started\n",CmiMyPe(),CmiWallTimer()));
-	std::set_terminate([](){ CkAbort("Unhandled C++ exception in user code.\n");});
+  DEBUGF(("[%d,%.6lf ] _initCharm started\n",CmiMyPe(),CmiWallTimer()));
+  std::set_terminate([](){
+    std::exception_ptr exptr = std::current_exception();
+    if (exptr)
+    {
+      try
+      {
+        std::rethrow_exception(exptr);
+      }
+      catch (std::exception &ex)
+      {
+        CkAbort("Unhandled C++ exception in user code: %s.\n", ex.what());
+      }
+    }
+    else
+    {
+      CkAbort("Unhandled C++ exception in user code.\n");
+    }
+  });
 
 	CkpvInitialize(size_t *, _offsets);
 	CkpvAccess(_offsets) = new size_t[32];
@@ -1319,12 +1342,8 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvInitialize(char**, Ck_argv); CkpvAccess(Ck_argv)=argv;
 	CkpvInitialize(MsgPool*, _msgPool);
 	CkpvInitialize(CkCoreState *, _coreState);
-
-#if CMK_FAULT_EVAC
-	CpvInitialize(char *,_validProcessors);
-	CkpvInitialize(char ,startedEvac);
-#endif
-	CpvInitialize(int,serializer);
+	CkpvInitialize(ReqTagPostMap, ncpyPostedReqMap);
+	CkpvInitialize(ReqTagBufferMap, ncpyPostedBufferMap);
 
 	_initChareTables();            // for checkpointable plain chares
 
@@ -1336,6 +1355,10 @@ void _initCharm(int unused_argc, char **argv)
 	CksvInitialize(CmiNodeLock, _nodeZCPendingLock);
 	CksvInitialize(PtrVec*,_nodeBocInitVec);
 	CksvInitialize(UInt,_numInitNodeMsgs);
+	CksvInitialize(ReqTagPostMap, ncpyPostedReqNodeMap);
+	CksvInitialize(ReqTagBufferMap, ncpyPostedBufferNodeMap);
+	CksvInitialize(CmiNodeLock, _nodeZCPostReqLock);
+	CksvInitialize(CmiNodeLock, _nodeZCBufferReqLock);
 	CkpvInitialize(int,_charmEpoch);
 	CkpvAccess(_charmEpoch)=0;
 	CksvInitialize(bool, _triggersSent);
@@ -1372,6 +1395,8 @@ void _initCharm(int unused_argc, char **argv)
 		CksvAccess(_nodeGroupTableImmLock) = CmiCreateImmediateLock();
 		CksvAccess(_nodeBocInitVec) = new PtrVec();
 		CksvAccess(_nodeZCPendingLock) = CmiCreateLock();
+		CksvAccess(_nodeZCPostReqLock) = CmiCreateLock();
+		CksvAccess( _nodeZCBufferReqLock) = CmiCreateLock();
 
 		CmiSetNcpyAckSize(sizeof(CkCallback));
 	}
@@ -1414,7 +1439,7 @@ void _initCharm(int unused_argc, char **argv)
 	CldRegisterEstimator((CldEstimator)_charmLoadEstimator);
 
 	_futuresModuleInit(); // part of futures implementation is a converse module
-        _cksyncbarrierInit();
+        _CkSyncBarrierInit();
 	_loadbalancerInit();
         _metabalancerInit();
 
@@ -1440,8 +1465,17 @@ void _initCharm(int unused_argc, char **argv)
 	// Set the ack handler function used for the direct nocopy api
 	CmiSetDirectNcpyAckHandler(CkRdmaDirectAckHandler);
 
+#if CMK_CUDA && CMK_GPU_COMM
+	CmiRdmaDeviceRecvInit(CkRdmaDeviceRecvHandler);
+#endif
+
+#if CMK_USE_SHMEM
+  CmiIpcInit(argv);
+#endif
+
 	// Set the ack handler function used for the entry method p2p api and entry method bcast api
 	initEMNcpyAckHandler();
+
 	/**
 	  The rank-0 processor of each node calls the 
 	  translator-generated "_register" routines. 
@@ -1575,36 +1609,6 @@ void _initCharm(int unused_argc, char **argv)
     }
 #endif
 
-
-#if CMK_FAULT_EVAC
-	CpvAccess(_validProcessors) = new char[CkNumPes()];
-	for(int vProc=0;vProc<CkNumPes();vProc++){
-		CpvAccess(_validProcessors)[vProc]=1;
-	}
-	CmiAssignOnce(&_ckEvacBcastIdx, CkRegisterHandler(_ckEvacBcast));
-	CmiAssignOnce(&_ckAckEvacIdx, CkRegisterHandler(_ckAckEvac));
-
-	CkpvAccess(startedEvac) = 0;
-	evacuate = 0;
-	CcdCallOnCondition(CcdSIGUSR1,(CcdVoidFn)CkDecideEvacPe,0);
-#endif
-	CpvAccess(serializer) = 0;
-
-
-#if CMK_FAULT_EVAC
-	if(_raiseEvac){
-		processRaiseEvacFile(_raiseEvacFile);
-		/*
-		if(CkMyPe() == 2){
-		//	CcdCallOnConditionKeep(CcdPERIODIC_10s,(CcdVoidFn)CkDecideEvacPe,0);
-			CcdCallFnAfter((CcdVoidFn)CkDecideEvacPe, 0, 10000);
-		}
-		if(CkMyPe() == 3){
-			CcdCallFnAfter((CcdVoidFn)CkDecideEvacPe, 0, 10000);
-		}*/
-	}	
-#endif
-
     if (CkMyRank() == 0) {
       TopoManager_init();
     }
@@ -1674,6 +1678,25 @@ void _initCharm(int unused_argc, char **argv)
   hapiQdProcess = QdProcess;
 #endif
 
+#if CMK_USE_SHMEM
+#if CMK_SMP
+    CmiNodeAllBarrier();
+    if (inCommThread) {
+      CmiMakeIpcManager(nullptr);
+    } else
+#endif
+    {
+      auto th = CthSelf();
+      if (CmiMyRank() == 0) {
+        CsvAccess(coreIpcManager_) = CmiMakeIpcManager(th);
+      } else {
+        CmiMakeIpcManager(th);
+      }
+      CmiAssert(CthIsSuspendable(th));
+      CthSuspend();
+    }
+#endif
+
 #if CMK_USE_PXSHM && ( CMK_CRAYXE || CMK_CRAYXC ) && CMK_SMP
       // for SMP on Cray XE6 (hopper) it seems pxshm has to be initialized
       // again after cpuaffinity is done
@@ -1734,18 +1757,17 @@ void _initCharm(int unused_argc, char **argv)
 
 		for(i=0;i<nMains;i++)  /* Create all mainchares */
 		{
-			size_t size = _chareTable[_mainTable[i]->chareIdx]->size;
-			void *obj = malloc(size);
-			_MEMCHECK(obj);
+			const auto &chareIdx = _mainTable[i]->chareIdx;
+			auto *obj = CkAllocateChare(chareIdx);
 			_mainTable[i]->setObj(obj);
 			CkpvAccess(_currentChare) = obj;
 			CkpvAccess(_currentChareType) = _mainTable[i]->chareIdx;
 			CkArgMsg *msg = (CkArgMsg *)CkAllocMsg(0, sizeof(CkArgMsg), 0, GroupDepNum{});
 			msg->argc = CmiGetArgc(argv);
 			msg->argv = argv;
-      quietMode = 0;  // allow printing any mainchare user messages
-			_entryTable[_mainTable[i]->entryIdx]->call(msg, obj);
-      if (quietModeRequested) quietMode = 1;
+			quietMode = 0;  // allow printing any mainchare user messages
+			CkInvokeEP(obj, _mainTable[i]->entryIdx, msg);
+			if (quietModeRequested) quietMode = 1;
 		}
                 _mainDone = true;
 

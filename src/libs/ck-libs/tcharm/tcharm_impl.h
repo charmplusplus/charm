@@ -208,10 +208,6 @@ class TCharm: public CBase_TCharm
 	//Block, migrate to destPE, and resume
 	CMI_WARN_UNUSED_RESULT TCharm * migrateTo(int destPE) noexcept;
 
-#if CMK_FAULT_EVAC
-	CMI_WARN_UNUSED_RESULT TCharm * evacuate() noexcept;
-#endif
-
 	//Thread finished running
 	void done(int exitcode) noexcept;
 
@@ -232,10 +228,6 @@ class TCharm: public CBase_TCharm
 	inline int getElement() const noexcept {return threadInfo.thisElement;}
 	inline int getNumElements() const noexcept {return threadInfo.numElements;}
 
-	//Start/stop load balancer measurements
-	inline void stopTiming() noexcept {ckStopTiming();}
-	inline void startTiming() noexcept {ckStartTiming();}
-
 	//Block our thread, run the scheduler, and come back
 	CMI_WARN_UNUSED_RESULT TCharm * schedule() noexcept {
 		DBG("thread schedule");
@@ -252,7 +244,9 @@ class TCharm: public CBase_TCharm
 		if (tcharm_nothreads)
 			CkAbort("Cannot make blocking calls using +tcharm_nothreads!\n");
 		#endif
-		stopTiming();
+		// tcharm does not trigger thread listeners on suspend/resume
+		// so it needs to manually start/stop timing
+		this->getCkLocRec()->stopTiming();
 		isStopped=true;
 		DBG("thread suspended");
 
@@ -270,7 +264,9 @@ class TCharm: public CBase_TCharm
 		TCharm *dis=TCharm::get();
 		TCharm::activateThread();
 		dis->isStopped=false;
-		dis->startTiming();
+		// tcharm does not trigger thread listeners on suspend/resume
+		// so it needs to manually start/stop timing
+		dis->getCkLocRec()->startTiming();
 		return dis;
 	}
 
@@ -392,6 +388,9 @@ public:
 FLINKAGE void FTN_NAME(TCHARM_USER_NODE_SETUP,tcharm_user_node_setup)(void);
 FLINKAGE void FTN_NAME(TCHARM_USER_SETUP,tcharm_user_setup)(void);
 
+/* For internal use only: semantics subject to change. */
+CLINKAGE void TCHARM_Node_Setup(int numelements);
+CLINKAGE void TCHARM_Element_Setup(int myelement, int numelements, CmiIsomallocContext ctx);
 
 #endif
 

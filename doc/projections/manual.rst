@@ -98,7 +98,11 @@ tracemode:
 
 -  ``+gz-trace``: generate gzip (if available) compressed log files.
 
--  ``+gz-no-trace``: generate regular (not compressed) log files.
+-  ``+no-gz-trace``: generate regular (uncompressed) log files.
+
+-  ``+notracenested``: a debug option. Does not resume tracing outer
+   entry methods when entry methods are nested (as can happen with
+   ``[local]`` and ``[inline]`` calls.
 
 -  ``+checknested``: a debug option. Checks if events are improperly
    nested while recorded and issue a warning immediately.
@@ -111,7 +115,7 @@ tracemode:
 Tracemode ``summary``
 ~~~~~~~~~~~~~~~~~~~~~
 
-Compile option: ``-tracemode summary``
+Link time option: ``-tracemode summary``
 
 In this tracemode, execution time across all entry points for each
 processor is partitioned into a fixed number of equally sized
@@ -1082,10 +1086,6 @@ communication characteristics:
 -  Number of messages sent externally (physically) by entry methods
 
 -  Number of bytes sent externally (physically) by entry methods
-
--  Number of hops messages travelled before being received by an
-   entry methods (available only on trace logs generated on the Bluegene
-   machine).
 
 .. figure:: fig/apoa1_512_CommTimeProfile.png
    :name: communication-time

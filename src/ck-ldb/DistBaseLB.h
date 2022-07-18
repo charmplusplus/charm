@@ -41,10 +41,8 @@ public:
     bool available;
     bool move;
 
-    int n_objs;
-    LDObjData* objData;
-    int n_comm;
-    LDCommData* commData;
+    std::vector<LDObjData> objData;
+    std::vector<LDCommData> commData;
 
     inline void clearBgLoad() {
       bg_walltime = idletime = 0.0;
@@ -57,6 +55,7 @@ public:
 protected:
   virtual void Strategy(const LDStats* const myStats);
   void ProcessMigrationDecision(LBMigrateMsg* migrateMsg);
+  void MigrationDone(int balancing);  // Call when migration is complete
 
   LDStats myStats;
   int migrates_expected;
@@ -71,7 +70,6 @@ private:
   LBMigrateMsg** mig_msgs;
 
   void AssembleStats();
-  void MigrationDone(int balancing);  // Call when migration is complete
 };
 
 #endif /* _DISTBASELB_H */

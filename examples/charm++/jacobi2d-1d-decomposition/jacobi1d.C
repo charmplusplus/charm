@@ -84,10 +84,13 @@ public:
 class Jacobi: public CBase_Jacobi {
   Jacobi_SDAG_CODE
 
+  using array2d = std::vector<std::vector<double>>;
+  using array1d = std::vector<double>;
+
 public:
 
-    double **temperature;
-    double **new_temperature;
+    array2d temperature;
+    array2d new_temperature;
     int imsg;
     int iterations;
     int neighbors;
@@ -97,23 +100,17 @@ public:
     int istart, ifinish;
 
     // Constructor, initialize values
-    Jacobi() {
-      int i,j;
-      temperature = new double*[blockDimX+2];
-      new_temperature = new double*[blockDimX+2];
-      for (i=0; i<blockDimX+2; i++) {
-        temperature[i] = new double[arrayDimY];
-        new_temperature[i] = new double[arrayDimY];
-      }
-      for (i=0; i<blockDimX+2; i++) {
-        for(j=0;j<arrayDimY; j++) {
-          temperature[i][j] = 0;
-          new_temperature[i][j] = 0;
-        }
-      }
-      converged = 0;
-      topBound = bottomBound = false;
-      neighbors = 0;
+    Jacobi()
+    : temperature(blockDimX + 2, array1d(arrayDimY, 0.0))
+    , new_temperature(blockDimX + 2, array1d(arrayDimY, 0.0))
+    , imsg(0)
+    , iterations(0)
+    , neighbors(0)
+    , max_error(0.0)
+    , converged(0)
+    , topBound(false)
+    , bottomBound(false)
+    {
       if(thisIndex == 0) {
         topBound = true;
         istart = 2;
@@ -132,24 +129,15 @@ public:
         ifinish = blockDimX+1;
       }
 
-      iterations = 0;
       constrainBC();
     }
 
     Jacobi(CkMigrateMessage* m) {}
 
-    ~Jacobi() { 
-      for (int i=0; i<blockDimX+2; i++) {
-        delete [] temperature[i];
-        delete [] new_temperature[i];
-      }
-      delete [] temperature; 
-      delete [] new_temperature; 
-    }
-
-
     void pup(PUP::er &p)
     {
+      p|temperature;
+      p|new_temperature;
       p|imsg;
       p|iterations;
       p|neighbors;
@@ -159,29 +147,10 @@ public:
       p|bottomBound;
       p|istart;
       p|ifinish;
-
-      size_t size = (blockDimX+2) * (arrayDimY);
-      if (p.isUnpacking()) {
-        temperature = new double*[blockDimX+2];
-        new_temperature = new double*[blockDimX+2];
-
-        for (int i=0; i<blockDimX+2; i++) {
-          temperature[i] = new double[arrayDimY];
-          new_temperature[i] = new double[arrayDimY];
-        }
-      }
-
-      for(int i=0;i<blockDimX+2; i++) {
-        for(int j=0;j<arrayDimY; j++) {
-          p|temperature[i][j];
-          p|new_temperature[i][j];
-        }
-      }
     }
 
     void check_and_compute() {
       double error = 0.0;
-      double **tmp;
 
       max_error = 0.0;
       for(int i=istart; i<ifinish; i++) {
@@ -195,9 +164,7 @@ public:
         }
       }
 
-      tmp = temperature;
-      temperature = new_temperature;
-      new_temperature = tmp;
+      temperature.swap(new_temperature);
     }
 
     // Enforce some boundary conditions
@@ -227,7 +194,7 @@ public:
       }
     } 
     // for debugging
-    void dumpMatrix(double **matrix)
+    void dumpMatrix(array2d const& matrix)
     {
       CkPrintf("\n\n[%d]\n",thisIndex);
       for(int i=0; i<blockDimX+2;++i)

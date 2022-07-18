@@ -29,6 +29,8 @@
 #include "stencil3d.decl.h"
 #include "TopoManager.h"
 
+#include <vector>
+
 /*readonly*/ CProxy_Main mainProxy;
 /*readonly*/ int arrayDimX;
 /*readonly*/ int arrayDimY;
@@ -137,49 +139,44 @@ class Stencil: public CBase_Stencil {
   private:
     double startTime;
 
+    using vector_t = std::vector<double>;
+
   public:
     int iterations;
     int imsg;
 
-    double *temperature;
-    double *new_temperature;
+    std::vector<double> temperature;
+    std::vector<double> new_temperature;
 
     // ghost arrays
-    double *leftGhost;
-    double *rightGhost;
-    double *topGhost;
-    double *bottomGhost;
-    double *frontGhost;
-    double *backGhost;
+    std::vector<double> leftGhost;
+    std::vector<double> rightGhost;
+    std::vector<double> topGhost;
+    std::vector<double> bottomGhost;
+    std::vector<double> frontGhost;
+    std::vector<double> backGhost;
 
     // Constructor, initialize values
-    Stencil() {
+    Stencil()
+    : iterations(0)
+    , imsg(0)
+    // allocate a three dimensional array
+    , temperature((blockDimX+2) * (blockDimY+2) * (blockDimZ+2), 0.0)
+    , new_temperature((blockDimX+2) * (blockDimY+2) * (blockDimZ+2), 0.0)
+    // Allocate ghost arrays
+    , leftGhost(blockDimY*blockDimZ)
+    , rightGhost(blockDimY*blockDimZ)
+    , topGhost(blockDimX*blockDimZ)
+    , bottomGhost(blockDimX*blockDimZ)
+    , frontGhost(blockDimX*blockDimY)
+    , backGhost(blockDimX*blockDimY)
+    {
       usesAtSync = true;
 
-      int i, j, k;
-      // allocate a three dimensional array
-      temperature = new double[(blockDimX+2) * (blockDimY+2) * (blockDimZ+2)];
-      new_temperature = new double[(blockDimX+2) * (blockDimY+2) * (blockDimZ+2)];
-
-      for(k=0; k<blockDimZ+2; ++k)
-        for(j=0; j<blockDimY+2; ++j)
-          for(i=0; i<blockDimX+2; ++i)
-            temperature[index(i, j, k)] = 0.0;
-
-      iterations = 0;
-      imsg = 0;
       constrainBC();
       // start measuring time
       if (thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0)
         startTime = CkWallTimer();
-
-      // Allocate ghost arrays
-      leftGhost   = new double[blockDimY*blockDimZ];
-      rightGhost  = new double[blockDimY*blockDimZ];
-      topGhost    = new double[blockDimX*blockDimZ];
-      bottomGhost = new double[blockDimX*blockDimZ];
-      frontGhost  = new double[blockDimX*blockDimY];
-      backGhost   = new double[blockDimX*blockDimY];
     }
 
     void pup(PUP::er &p)
@@ -187,34 +184,17 @@ class Stencil: public CBase_Stencil {
       p|startTime;
       p|iterations;
       p|imsg;
-
-      size_t size = (blockDimX+2) * (blockDimY+2) * (blockDimZ+2);
-      if (p.isUnpacking()) {
-        temperature     = new double[size];
-        new_temperature = new double[size];
-        leftGhost       = new double[blockDimY*blockDimZ];
-        rightGhost      = new double[blockDimY*blockDimZ];
-        topGhost        = new double[blockDimX*blockDimZ];
-        bottomGhost     = new double[blockDimX*blockDimZ];
-        frontGhost      = new double[blockDimX*blockDimY];
-        backGhost       = new double[blockDimX*blockDimY];
-      }
-      p(temperature, size);
-      p(new_temperature, size);
+      p|temperature;
+      p|new_temperature;
+      p|leftGhost;
+      p|rightGhost;
+      p|topGhost;
+      p|bottomGhost;
+      p|frontGhost;
+      p|backGhost;
     }
 
     Stencil(CkMigrateMessage* m) { }
-
-    ~Stencil() {
-      delete [] temperature;
-      delete [] new_temperature;
-      delete [] leftGhost;
-      delete [] rightGhost;
-      delete [] topGhost;
-      delete [] bottomGhost;
-      delete [] frontGhost;
-      delete [] backGhost;
-    }
 
     // Send ghost faces to the six neighbors
     void begin_iteration(void) {
@@ -240,25 +220,25 @@ class Stencil: public CBase_Stencil {
 
       // Send my left face
       thisProxy(wrap_x(thisIndex.x-1), thisIndex.y, thisIndex.z)
-        .receiveGhosts(iterations, RIGHT, blockDimY, blockDimZ, leftGhost);
+        .receiveGhosts(iterations, RIGHT, blockDimY, blockDimZ, leftGhost.data());
       // Send my right face
       thisProxy(wrap_x(thisIndex.x+1), thisIndex.y, thisIndex.z)
-        .receiveGhosts(iterations, LEFT, blockDimY, blockDimZ, rightGhost);
+        .receiveGhosts(iterations, LEFT, blockDimY, blockDimZ, rightGhost.data());
       // Send my bottom face
       thisProxy(thisIndex.x, wrap_y(thisIndex.y-1), thisIndex.z)
-        .receiveGhosts(iterations, TOP, blockDimX, blockDimZ, bottomGhost);
+        .receiveGhosts(iterations, TOP, blockDimX, blockDimZ, bottomGhost.data());
       // Send my top face
       thisProxy(thisIndex.x, wrap_y(thisIndex.y+1), thisIndex.z)
-        .receiveGhosts(iterations, BOTTOM, blockDimX, blockDimZ, topGhost);
+        .receiveGhosts(iterations, BOTTOM, blockDimX, blockDimZ, topGhost.data());
       // Send my front face
       thisProxy(thisIndex.x, thisIndex.y, wrap_z(thisIndex.z-1))
-        .receiveGhosts(iterations, BACK, blockDimX, blockDimY, frontGhost);
+        .receiveGhosts(iterations, BACK, blockDimX, blockDimY, frontGhost.data());
       // Send my back face
       thisProxy(thisIndex.x, thisIndex.y, wrap_z(thisIndex.z+1))
-        .receiveGhosts(iterations, FRONT, blockDimX, blockDimY, backGhost);
+        .receiveGhosts(iterations, FRONT, blockDimX, blockDimY, backGhost.data());
     }
 
-    void processGhosts(int dir, int height, int width, double gh[]) {
+    void processGhosts(int dir, int height, int width, const double* gh) {
       switch(dir) {
         case LEFT:
           for(int k=0; k<width; ++k)
@@ -301,16 +281,12 @@ class Stencil: public CBase_Stencil {
       }
     }
 
-
     void check_and_compute() {
       compute_kernel();
 
       // calculate error
       // not being done right now since we are doing a fixed no. of iterations
-      double *tmp;
-      tmp = temperature;
-      temperature = new_temperature;
-      new_temperature = tmp;
+      temperature.swap(new_temperature);
 
       constrainBC();
 
@@ -347,7 +323,9 @@ class Stencil: public CBase_Stencil {
       } else
         work = 10.0;
 
+#ifndef _MSC_VER
 #pragma unroll
+#endif
       for(int w=0; w<work; w++) {
         for(int k=1; k<blockDimZ+1; ++k)
           for(int j=1; j<blockDimY+1; ++j)

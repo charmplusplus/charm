@@ -111,8 +111,11 @@ static void recvTime(TimeMessage* msg) {
     }
   }
   if (pva(numRecv) == CmiNumNodes()) {
-    for (j = 0; j < pva(numSizes); j++)
-      pva(gavg)[j] /= (CmiNumNodes() * (CmiNumNodes() - 1));
+    if (CmiNumNodes() > 1) {
+      const double divisor = (double)(CmiNumNodes() * (CmiNumNodes() - 1));
+      for (j = 0; j < pva(numSizes); j++)
+        pva(gavg)[j] /= divisor;
+    }
     for (j = 0; j < pva(numSizes); j++) {
       CmiPrintf("%d\t\t%le\n", sizes[j].size, pva(gavg)[j]);
 

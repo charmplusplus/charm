@@ -5,6 +5,7 @@
 
 #include "converse.h"
 #include <charm++.h>
+#include <ck.h>
 #include "cksyncbarrier.h"
 
 #include "DistributedLB.h"
@@ -29,6 +30,15 @@ int _lb_predict_delay = 10;
 int _lb_predict_window = 20;
 bool _lb_psizer_on = false;
 
+SystemLoad::SystemLoad() {
+  auto *activeRec = CkActiveLocRec();
+  lbmgr = LBManagerObj();
+  if (lbmgr && activeRec) {
+    const LDObjHandle &runObj = activeRec->getLdHandle();
+    lbmgr->ObjectStop(runObj);
+  }
+}
+
 // registry class stores all load balancers linked and created at runtime
 class LBDBRegistry
 {
@@ -49,9 +59,9 @@ class LBDBRegistry
     LBDBEntry(std::string n, LBCreateFn cf, LBAllocFn af, std::string h, bool show = true)
         : name(n), cfn(cf), afn(af), help(h), shown(show){};
   };
-  CkVec<LBDBEntry> lbtables;       // a list of available LBs linked
-  CkVec<const char*> compile_lbs;  // load balancers at compile time
-  CkVec<const char*> runtime_lbs;  // load balancers at run time
+  std::vector<LBDBEntry> lbtables;       // a list of available LBs linked
+  std::vector<const char*> compile_lbs;  // load balancers at compile time
+  std::vector<const char*> runtime_lbs;  // load balancers at run time
   // map of {index in runtime_lbs, name of legacy LB to instantiate TreeLB with}
   // for use with the legacy LBs (e.g. GreedyLB -> the predefined Greedy version of TreeLB)
   std::unordered_map<int, const char*> legacy_runtime_treelbs;
@@ -60,9 +70,8 @@ class LBDBRegistry
   void displayLBs()
   {
     CmiPrintf("\nAvailable load balancers:\n");
-    for (int i = 0; i < lbtables.length(); i++)
+    for (const auto& entry : lbtables)
     {
-      LBDBEntry& entry = lbtables[i];
       if (entry.shown) CmiPrintf("* %s:\t%s\n", entry.name.c_str(), entry.help.c_str());
     }
     CmiPrintf("\n");
@@ -70,14 +79,14 @@ class LBDBRegistry
   void addEntry(std::string name, LBCreateFn fn, LBAllocFn afn, std::string help,
                 bool shown)
   {
-    lbtables.push_back(LBDBEntry(name, fn, afn, help, shown));
+    lbtables.emplace_back(name, fn, afn, help, shown);
   }
   void addCompiletimeBalancer(const char* name) { compile_lbs.push_back(name); }
   void addRuntimeBalancer(const char* name, const char* legacyLBName = nullptr)
   {
     if (legacyLBName != nullptr)
     {
-      legacy_runtime_treelbs.emplace(runtime_lbs.size(), legacyLBName);
+      legacy_runtime_treelbs.emplace((int)runtime_lbs.size(), legacyLBName);
     }
 
     runtime_lbs.push_back(name);
@@ -85,7 +94,7 @@ class LBDBRegistry
   LBCreateFn search(std::string name)
   {
     const auto index = name.find_first_of(":,");
-    for (int i = 0; i < lbtables.length(); i++)
+    for (int i = 0; i < lbtables.size(); i++)
       if (0 == lbtables[i].name.compare(0, index, name))
         return lbtables[i].cfn;
     return nullptr;
@@ -93,7 +102,7 @@ class LBDBRegistry
   LBAllocFn getLBAllocFn(std::string name)
   {
     const auto index = name.find_first_of(":,");
-    for (int i = 0; i < lbtables.length(); i++)
+    for (int i = 0; i < lbtables.size(); i++)
       if (0 == lbtables[i].name.compare(0, index, name))
         return lbtables[i].afn;
     return nullptr;
@@ -139,23 +148,21 @@ LBMgrInit::LBMgrInit(CkArgMsg* m)
   _lbmgr = CProxy_LBManager::ckNew();
 
   // runtime specified load balancer
-  if (lbRegistry.runtime_lbs.size() > 0)
+  if (!lbRegistry.runtime_lbs.empty())
   {
     for (int i = 0; i < lbRegistry.runtime_lbs.size(); i++)
     {
-      const char* balancer = lbRegistry.runtime_lbs[i];
       // If this is a legacy TreeLB, pass in the legacy LB name
       const char* legacybalancer = lbRegistry.legacy_runtime_treelbs.count(i) > 0
                                        ? lbRegistry.legacy_runtime_treelbs[i]
                                        : nullptr;
-      createLoadBalancer(balancer, legacybalancer);
+      createLoadBalancer(lbRegistry.runtime_lbs[i], legacybalancer);
     }
   }
-  else if (lbRegistry.compile_lbs.size() > 0)
+  else if (!lbRegistry.compile_lbs.empty())
   {
-    for (int i = 0; i < lbRegistry.compile_lbs.size(); i++)
+    for (const auto& balancer : lbRegistry.compile_lbs)
     {
-      const char* balancer = lbRegistry.compile_lbs[i];
       createLoadBalancer(balancer);
     }
   }
@@ -275,7 +282,7 @@ void _loadbalancerInit()
                    "The maximum number of phases that DistributedLB will attempt");
 
   // set up init value for LBPeriod time in seconds
-  // it can also be set by calling LDSetLBPeriod()
+  // it can also be set by calling LBSetPeriod/LBManager::SetLBPeriod
   CmiGetArgDoubleDesc(argv, "+LBPeriod", &_lb_args.lbperiod(),
                       "the minimum time period in seconds allowed for two consecutive "
                       "automatic load balancing");
@@ -390,9 +397,15 @@ void _loadbalancerInit()
   _lb_args.statsOn() =
       !CmiGetArgFlagDesc(argv, "+LBOff", "Turn load balancer instrumentation off");
 
-  // turn instrumentation of communicatin off at startup
-  _lb_args.traceComm() = !CmiGetArgFlagDesc(
-      argv, "+LBCommOff", "Turn load balancer instrumentation of communication off");
+  // turn instrumentation of communication on at startup
+  _lb_args.traceComm() = CmiGetArgFlagDesc(
+    argv, "+LBCommOn", "Turn load balancer instrumentation of communication on");
+
+  // +LBCommOff is deprecated as instrumentation of communication is off by default
+  bool lbcommOff = CmiGetArgFlagDesc(
+      argv, "+LBCommOff", "(No-op) Turn load balancer instrumentation of communication off");
+  if(CkMyPe()==0 && lbcommOff)
+    CmiPrintf("Warning: Ignoring the deprecated +LBCommOff option as communication is off by default.\n");
 
   // set alpha and beta
   _lb_args.alpha() = PER_MESSAGE_SEND_OVERHEAD_DEFAULT;
@@ -426,15 +439,13 @@ void _loadbalancerInit()
           LBSimulation::dumpFile, _lb_args.lbversion());
     if (_lb_args.statsOn() == 0)
       CkPrintf("CharmLB> Load balancing instrumentation is off.\n");
-    if (_lb_args.traceComm() == 0)
-      CkPrintf("CharmLB> Load balancing instrumentation for communication is off.\n");
     if (_lb_args.migObjOnly())
       CkPrintf("LB> Load balancing strategy ignores non-migratable objects.\n");
   }
 }
 
 bool LBManager::manualOn = false;
-char* LBManager::avail_vector = NULL;
+std::vector<char> LBManager::avail_vector;
 bool LBManager::avail_vector_set = false;
 CmiNodeLock avail_vector_lock;
 
@@ -444,8 +455,8 @@ void LBManager::initnodeFn()
 {
   int proc;
   int num_proc = CkNumPes();
-  avail_vector = new char[num_proc];
-  for (proc = 0; proc < num_proc; proc++) avail_vector[proc] = 1;
+  avail_vector.clear();
+  avail_vector.resize(num_proc, 1);
   avail_vector_lock = CmiCreateLock();
 
   _expectedLoad = new LBRealType[num_proc];
@@ -477,6 +488,7 @@ void LBManager::initnodeFn()
   _registerCommandLineOpt("+LBSameCpus");
   _registerCommandLineOpt("+LBUseCpuTime");
   _registerCommandLineOpt("+LBOff");
+  _registerCommandLineOpt("+LBCommOn");
   _registerCommandLineOpt("+LBCommOff");
   _registerCommandLineOpt("+MetaLB");
   _registerCommandLineOpt("+LBAlpha");
@@ -489,15 +501,28 @@ void LBManager::InvokeLB()
   {
     loadbalancers[currentLBIndex]->InvokeLB();
   }
+  else
+  {
+    ResumeClients();
+  }
 }
 
 // Called at end of each load balancing cycle
-void LBManager::periodicLB(void* in) { ((LBManager*)in)->InvokeLB(); }
+void LBManager::periodicLB(void* in)
+{
+  auto* const manager = static_cast<LBManager*>(in);
+  manager->isPeriodicQueued = false;
+  manager->InvokeLB();
+}
 
 void LBManager::setTimer()
 {
-  CcdCallFnAfterOnPE((CcdVoidFn)periodicLB, (void*)this, 1000 * _lb_args.lbperiod(),
-                     CkMyPe());
+  if (!isPeriodicQueued)
+  {
+    isPeriodicQueued = true;
+    CcdCallFnAfterOnPE((CcdVoidFn)periodicLB, (void*)this, 1000 * _lb_args.lbperiod(),
+                       CkMyPe());
+  }
 }
 
 // called my constructor
@@ -520,14 +545,16 @@ void LBManager::init(void)
 #if CMK_LBDB_ON
   if (manualOn) TurnManualLBOn();
 #endif
+  if (CkMyPe()==0 && _lb_args.traceComm() == 0)
+      CkPrintf("CharmLB> Load balancing instrumentation for communication is off.\n");
 
-  if (_lb_args.lbperiod() != -1.0)  // check if user set LBPeriod - fix later
+  if (_lb_args.lbperiod() > 0.0)
   {
     setTimer();
   }
   else
   {
-    AddLocalBarrierReceiver([this](void) { this->InvokeLB(); });
+    CkSyncBarrier::object()->addReceiver([this](void) { this->InvokeLB(); });
   }
 }
 
@@ -612,20 +639,18 @@ void LBManager::Migrated(LDObjHandle h, int waitBarrier)
 
 LBManager::LastLBInfo::LastLBInfo() { expectedLoad = _expectedLoad; }
 
-void LBManager::get_avail_vector(char* bitmap)
+void LBManager::get_avail_vector(char* bitmap) const
 {
-  CmiAssert(bitmap && avail_vector);
+  CmiAssert(bitmap);
   const int num_proc = CkNumPes();
-  for (int proc = 0; proc < num_proc; proc++)
-  {
-    bitmap[proc] = avail_vector[proc];
-  }
+  CmiAssert(num_proc <= avail_vector.size());
+  std::copy(avail_vector.begin(), avail_vector.begin() + num_proc, bitmap);
 }
 
 // new_ld == -1(default) : calcualte a new ld
 //           -2 : ignore new ld
 //           >=0: given a new ld
-void LBManager::set_avail_vector(char* bitmap, int new_ld)
+void LBManager::set_avail_vector(const char* bitmap, int new_ld)
 {
   int assigned = 0;
   const int num_proc = CkNumPes();
@@ -637,11 +662,34 @@ void LBManager::set_avail_vector(char* bitmap, int new_ld)
     new_ld_balancer = new_ld;
     assigned = 1;
   }
-  CmiAssert(bitmap && avail_vector);
+  CmiAssert(bitmap);
+  CmiAssert(num_proc <= avail_vector.size());
   for (int count = 0; count < num_proc; count++)
   {
     avail_vector[count] = bitmap[count];
     if ((bitmap[count] == 1) && !assigned)
+    {
+      new_ld_balancer = count;
+      assigned = 1;
+    }
+  }
+}
+void LBManager::set_avail_vector(const std::vector<char> & bitmap, int new_ld)
+{
+  int assigned = 0;
+  const int num_proc = CkNumPes();
+  if (new_ld == -2)
+    assigned = 1;
+  else if (new_ld >= 0)
+  {
+    CmiAssert(new_ld < num_proc);
+    new_ld_balancer = new_ld;
+    assigned = 1;
+  }
+  avail_vector = bitmap;
+  for (int count = 0; count < num_proc; count++)
+  {
+    if (bitmap[count] == 1 && !assigned)
     {
       new_ld_balancer = count;
       assigned = 1;
@@ -730,14 +778,14 @@ void LBManager::switchLoadbalancer(int switchFrom, int switchTo)
 // runtime has higher priority
 const char* LBManager::loadbalancer(int seq)
 {
-  if (lbRegistry.runtime_lbs.length())
+  if (!lbRegistry.runtime_lbs.empty())
   {
-    CmiAssert(seq < lbRegistry.runtime_lbs.length());
+    CmiAssert(seq < lbRegistry.runtime_lbs.size());
     return lbRegistry.runtime_lbs[seq];
   }
   else
   {
-    CmiAssert(seq < lbRegistry.compile_lbs.length());
+    CmiAssert(seq < lbRegistry.compile_lbs.size());
     return lbRegistry.compile_lbs[seq];
   }
 }
@@ -745,38 +793,29 @@ const char* LBManager::loadbalancer(int seq)
 void LBManager::pup(PUP::er& p)
 {
   IrrGroup::pup(p);
-  // the memory should be already allocated
-  int np;
-  if (!p.isUnpacking()) np = CkNumPes();
-  p | np;
-  // in case number of processors changes
   if (p.isUnpacking())
   {
+    // Since avail_vector is static, only unpack one of them for real in SMP mode, the
+    // rest to some tmp variable
     CmiLock(avail_vector_lock);
     if (!avail_vector_set)
     {
       avail_vector_set = true;
-      CmiAssert(avail_vector);
-      if (np > CkNumPes())
-      {
-        delete[] avail_vector;
-        avail_vector = new char[np];
-        for (int i = 0; i < np; i++) avail_vector[i] = 1;
-      }
-      p(avail_vector, np);
+      p | avail_vector;
+      // If we're restarting with more PEs, make the new ones available
+      if (avail_vector.size() < CkNumPes())
+        avail_vector.resize(CkNumPes(), 1);
     }
     else
     {
-      char* tmp_avail_vector = new char[np];
-      p(tmp_avail_vector, np);
-      delete[] tmp_avail_vector;
+      decltype(avail_vector) tmp;
+      p | tmp;
     }
     CmiUnlock(avail_vector_lock);
   }
   else
   {
-    CmiAssert(avail_vector);
-    p(avail_vector, np);
+    p | avail_vector;
   }
   p | mystep;
   if (p.isUnpacking())
@@ -854,7 +893,7 @@ void LBManager::ResumeClients()
   }
   else
   {
-    CkSyncBarrier::Object()->ResumeClients();
+    CkSyncBarrier::object()->resumeClients();
   }
 #endif
 }
@@ -912,46 +951,41 @@ void LBManager::UpdateDataAfterLB(double mLoad, double mCpuLoad, double avgLoad)
 
 LDBarrierClient LBManager::AddLocalBarrierClient(Chare* obj, std::function<void()> fn)
 {
-  return CkSyncBarrier::Object()->AddClient(obj, fn);
+  return CkSyncBarrier::object()->addClient(obj, fn);
 }
 
 void LBManager::RemoveLocalBarrierClient(LDBarrierClient h)
 {
-  CkSyncBarrier::Object()->RemoveClient(h);
+  CkSyncBarrier::object()->removeClient(h);
 }
 
 LDBarrierReceiver LBManager::AddLocalBarrierReceiver(std::function<void()> fn)
 {
-  return CkSyncBarrier::Object()->AddReceiver(fn);
+  return CkSyncBarrier::object()->addReceiver(fn);
 }
 
 void LBManager::RemoveLocalBarrierReceiver(LDBarrierReceiver h)
 {
-  CkSyncBarrier::Object()->RemoveReceiver(h);
+  CkSyncBarrier::object()->removeReceiver(h);
 }
 
 void LBManager::AtLocalBarrier(LDBarrierClient _n_c)
 {
-  if (useBarrier) CkSyncBarrier::Object()->AtBarrier(_n_c);
-}
-
-void LBManager::DecreaseLocalBarrier(int c)
-{
-  if (useBarrier) CkSyncBarrier::Object()->DecreaseBarrier(c);
+  if (useBarrier) CkSyncBarrier::object()->atBarrier(_n_c);
 }
 
 void LBManager::TurnOnBarrierReceiver(LDBarrierReceiver h)
 {
-  CkSyncBarrier::Object()->TurnOnReceiver(h);
+  CkSyncBarrier::object()->turnOnReceiver(h);
 }
 
 void LBManager::TurnOffBarrierReceiver(LDBarrierReceiver h)
 {
-  CkSyncBarrier::Object()->TurnOffReceiver(h);
+  CkSyncBarrier::object()->turnOffReceiver(h);
 }
 
-void LBManager::LocalBarrierOn(void) { CkSyncBarrier::Object()->TurnOn(); };
-void LBManager::LocalBarrierOff(void) { CkSyncBarrier::Object()->TurnOff(); };
+void LBManager::LocalBarrierOn(void) { CkSyncBarrier::object()->turnOn(); }
+void LBManager::LocalBarrierOff(void) { CkSyncBarrier::object()->turnOff(); }
 
 #if CMK_LBDB_ON
 static void work(int iter_block, volatile int* result)
@@ -1113,13 +1147,10 @@ void LBChangePredictor(LBPredictorFunction* model)
 #endif
 }
 
-void LBSetPeriod(double second)
+void LBSetPeriod(double period)
 {
 #if CMK_LBDB_ON
-  if (CkpvAccess(lbmanagerInited))
-    LBManager::Object()->SetLBPeriod(second);
-  else
-    _lb_args.lbperiod() = second;
+  LBManager::SetLBPeriod(period);
 #endif
 }
 

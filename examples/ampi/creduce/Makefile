@@ -1,29 +1,29 @@
 -include ../../common.mk
 CHARMC=../../../bin/ampicxx $(OPTS)
 
-all: pgm
+all: creduce
 
-ampi: clean pgm
+ampi: clean creduce
 
-pgm: test.C
+creduce: test.C
 	$(CHARMC) -c test.C
-	$(CHARMC) -o pgm test.o 
+	$(CHARMC) -o creduce test.o
 
 mpi: test.C
-	mpiCC -o pgm test.C $(OPTS)
+	mpiCC -o creduce test.C $(OPTS)
 
 clean:
-	rm -f *.o *.mod pgm *~ conv-host charmrun ampirun
+	rm -f *.o *.mod creduce *~ conv-host charmrun ampirun
 
-test: pgm
-	$(call run, ./pgm +p1 +vp1 )
-	$(call run, ./pgm +p1 +vp2 )
-	$(call run, ./pgm +p1 +vp4 )
-	$(call run, ./pgm +p2 +vp1 )
-	$(call run, ./pgm +p2 +vp2 )
-	$(call run, ./pgm +p2 +vp4 )
+test: creduce
+	$(call run, ./creduce +p1 +vp1 )
+	$(call run, ./creduce +p1 +vp2 )
+	$(call run, ./creduce +p1 +vp4 )
+	$(call run, ./creduce +p2 +vp1 )
+	$(call run, ./creduce +p2 +vp2 )
+	$(call run, ./creduce +p2 +vp4 )
 
-testp: pgm
-	$(call run, ./pgm +p$(P) +vp$(P) )
-	$(call run, ./pgm +p$(P) +vp$$(( $(P) * 2 )) )
-	$(call run, ./pgm +p$(P) +vp$$(( $(P) * 4 )) )
+testp: creduce
+	$(call run, ./creduce +p$(P) +vp$(P) )
+	$(call run, ./creduce +p$(P) +vp$$(( $(P) * 2 )) )
+	$(call run, ./creduce +p$(P) +vp$$(( $(P) * 4 )) )

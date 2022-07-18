@@ -32,15 +32,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#if CMK_BLUEGENEQ
-#include "TopoManager.h"
-#endif
-
-#if CMK_BLUEGENEQ
-#include "spi/include/kernel/process.h"
-#endif
-
-#if CMK_CRAYXE || CMK_CRAYXC
+#if CMK_CRAYXE || CMK_CRAYXC || CMK_CRAYEX
 extern "C" int getXTNodeID(int mpirank, int nummpiranks);
 #endif
 
@@ -68,10 +60,6 @@ typedef struct _nodeTopoMsg {
   char core[CmiMsgHeaderSizeBytes];
   int *nodes;
 } nodeTopoMsg;
-
-typedef struct _topoDoneMsg { // used for empty reduction to indicate all PEs have topo info
-  char core[CmiMsgHeaderSizeBytes];
-} topoDoneMsg;
 
 // nodeIDs[pe] is the node number of processor pe
 class CpuTopology {
@@ -170,12 +158,10 @@ namespace CpuTopoDetails {
 static nodeTopoMsg *topomsg = NULL;
 static std::map<skt_ip_t, _procInfo *> hostTable;
 
-CpvStaticDeclare(int, cpuTopoHandlerIdx);
-CpvStaticDeclare(int, cpuTopoRecvHandlerIdx);
-CpvStaticDeclare(int, topoDoneHandlerIdx);
+static int cpuTopoHandlerIdx;
+static int cpuTopoRecvHandlerIdx;
 
 static CpuTopology cpuTopo;
-static CmiNodeLock topoLock = 0; /* Not spelled 'NULL' to quiet warnings when CmiNodeLock is just 'int' */
 static int done = 0;
 static int topoDone = 0;
 static int _noip = 0;
@@ -198,6 +184,32 @@ static void printTopology(int numNodes)
     CmiPrintf("Charm++> Running on %d hosts\n", numNodes);
 }
 
+static std::atomic<bool> cpuTopoSyncHandlerDone{};
+#if CMK_SMP && !CMK_SMP_NO_COMMTHD
+extern void CommunicationServerThread(int sleepTime);
+static std::atomic<bool> cpuTopoSyncCommThreadDone{};
+#endif
+
+#if CMK_SMP && !CMK_SMP_NO_COMMTHD
+static void cpuTopoSyncWaitCommThread(std::atomic<bool> & done)
+{
+  do
+    CommunicationServerThread(5);
+  while (!done.load());
+
+  CommunicationServerThread(5);
+}
+#endif
+
+static void cpuTopoSyncWait(std::atomic<bool> & done)
+{
+  do
+    CsdSchedulePoll();
+  while (!done.load());
+
+  CsdSchedulePoll();
+}
+
 /* called on PE 0 */
 static void cpuTopoHandler(void *m)
 {
@@ -208,7 +220,7 @@ static void cpuTopoHandler(void *m)
   if (topomsg == NULL) {
     int i;
     topomsg = (nodeTopoMsg *)CmiAlloc(sizeof(nodeTopoMsg)+CmiNumPes()*sizeof(int));
-    CmiSetHandler((char *)topomsg, CpvAccess(cpuTopoRecvHandlerIdx));
+    CmiSetHandler((char *)topomsg, cpuTopoRecvHandlerIdx);
     topomsg->nodes = (int *)((char*)topomsg + sizeof(nodeTopoMsg));
     for (i=0; i<CmiNumPes(); i++) topomsg->nodes[i] = -1;
   }
@@ -244,14 +256,7 @@ static void cpuTopoHandler(void *m)
   hostTable.clear();
   CmiFree(msg);
 
-  CmiSyncBroadcastAllAndFree(sizeof(nodeTopoMsg)+CmiNumPes()*sizeof(int), (char *)topomsg);
-}
-
-/* called on PE 0 */
-static void topoDoneHandler(void *m) {
-  CmiLock(topoLock);
-  topoDone++;
-  CmiUnlock(topoLock);
+  cpuTopoSyncHandlerDone = true;
 }
 
 /* called on each processor */
@@ -260,7 +265,6 @@ static void cpuTopoRecvHandler(void *msg)
   nodeTopoMsg *m = (nodeTopoMsg *)msg;
   m->nodes = (int *)((char*)m + sizeof(nodeTopoMsg));
 
-  CmiLock(topoLock);
   if (cpuTopo.nodeIDs == NULL) {
     cpuTopo.nodeIDs = m->nodes;
     cpuTopo.sort();
@@ -268,9 +272,10 @@ static void cpuTopoRecvHandler(void *msg)
   else
     CmiFree(m);
   done++;
-  CmiUnlock(topoLock);
 
   //if (CmiMyPe() == 0) cpuTopo.print();
+
+  cpuTopoSyncHandlerDone = true;
 }
 
 // reduction function
@@ -284,7 +289,7 @@ static void * combineMessage(int *size, void *data, void **remote, int count)
   hostnameMsg *msg = (hostnameMsg *)CmiAlloc(*size);
   msg->procs = (_procInfo*)((char*)msg + sizeof(hostnameMsg));
   msg->n = nprocs;
-  CmiSetHandler((char *)msg, CpvAccess(cpuTopoHandlerIdx));
+  CmiSetHandler((char *)msg, cpuTopoHandlerIdx);
 
   int n=0;
   hostnameMsg *m = (hostnameMsg*)data;
@@ -297,20 +302,6 @@ static void * combineMessage(int *size, void *data, void **remote, int count)
     for (j=0; j<m->n; j++)
       msg->procs[n++] = m->procs[j];
   }
-  return msg;
-}
-
-// reduction function
-static void *emptyReduction(int *size, void *data, void **remote, int count)
-{
-  if (CmiMyPe() != 0) {
-    CmiLock(topoLock);
-    topoDone++;
-    CmiUnlock(topoLock);
-  }
-  *size = sizeof(topoDoneMsg);
-  topoDoneMsg *msg = (topoDoneMsg *)CmiAlloc(sizeof(topoDoneMsg));
-  CmiSetHandler((char *)msg, CpvAccess(topoDoneHandlerIdx));
   return msg;
 }
 
@@ -375,15 +366,10 @@ extern "C"  int LrtsNodeFirst(int node)
 extern "C" void LrtsInitCpuTopo(char **argv)
 {
   static skt_ip_t myip;
-  hostnameMsg  *msg;
   double startT;
  
   int obtain_flag = 1;              // default on
   int show_flag = 0;                // default not show topology
-
-  if (CmiMyRank() ==0) {
-     topoLock = CmiCreateLock();
-  }
 
 #if __FAULT__
   obtain_flag = 0;
@@ -398,17 +384,9 @@ extern "C" void LrtsInitCpuTopo(char **argv)
 					   "Show cpu topology info"))
     show_flag = 1;
 
-    {
-      CpvInitialize(int, cpuTopoHandlerIdx);
-      CpvInitialize(int, cpuTopoRecvHandlerIdx);
-      CpvInitialize(int, topoDoneHandlerIdx);
-      CpvAccess(cpuTopoHandlerIdx) =
-	CmiRegisterHandler((CmiHandler)cpuTopoHandler);
-      CpvAccess(cpuTopoRecvHandlerIdx) =
-	CmiRegisterHandler((CmiHandler)cpuTopoRecvHandler);
-      CpvAccess(topoDoneHandlerIdx) =
-	CmiRegisterHandler((CmiHandler)topoDoneHandler);
-    }
+  CmiAssignOnce(&cpuTopoHandlerIdx, CmiRegisterHandler((CmiHandler)cpuTopoHandler));
+  CmiAssignOnce(&cpuTopoRecvHandlerIdx, CmiRegisterHandler((CmiHandler)cpuTopoRecvHandler));
+
   if (!obtain_flag) {
     if (CmiMyRank() == 0) cpuTopo.sort();
     CmiNodeAllBarrier();
@@ -428,25 +406,7 @@ extern "C" void LrtsInitCpuTopo(char **argv)
       strcpy(hostname, "");
   }
 #endif
-#if CMK_BLUEGENEQ
-  if (CmiMyRank() == 0) {
-   TopoManager tmgr;
-
-    int numPes = cpuTopo.numPes = CmiNumPes();
-    cpuTopo.nodeIDs = new int[numPes];
-    CpuTopology::supported = 1;
-
-    int a, b, c, d, e, t, nid;
-    for(int i=0; i<numPes; i++) {
-      tmgr.rankToCoordinates(i, a, b, c, d, e, t);
-      nid = tmgr.coordinatesToRank(a, b, c, d, e, 0);
-      cpuTopo.nodeIDs[i] = nid;
-    }
-    cpuTopo.sort();
-    if (CmiMyPe()==0) printTopology(cpuTopo.numNodes);
-  }
-  CmiNodeAllBarrier();
-#elif CMK_CRAYXE || CMK_CRAYXC
+#if CMK_CRAYXE || CMK_CRAYXC || CMK_CRAYEX
   if(CmiMyRank() == 0) {
     int numPes = cpuTopo.numPes = CmiNumPes();
     int numNodes = CmiNumNodes();
@@ -478,79 +438,61 @@ extern "C" void LrtsInitCpuTopo(char **argv)
 
 #else
 
-  bool topoInProgress = true;
-
-  if (CmiMyPe() >= CmiNumPes()) {
-    CmiNodeAllBarrier();         // comm thread waiting
-#if CMK_MACHINE_PROGRESS_DEFINED
-    bool waitForSecondReduction = (CmiNumNodes() > 1);
-    while (topoInProgress) {
-      CmiNetworkProgress();
-      CmiLock(topoLock);
-      if (waitForSecondReduction) topoInProgress = topoDone < CmiMyNodeSize();
-      else topoInProgress = done < CmiMyNodeSize();
-      CmiUnlock(topoLock);
-    }
-#endif
-    return;    /* comm thread return */
-  }
-
-    /* get my ip address */
+  /* get my ip address */
   if (CmiMyRank() == 0)
   {
-  #if CMK_HAS_GETHOSTNAME && !CMK_BLUEGENEQ
     myip = skt_my_ip();        /* not thread safe, so only calls on rank 0 */
     // fprintf(stderr, "[%d] IP is %d.%d.%d.%d\n", CmiMyPe(), myip.data[0],myip.data[1],myip.data[2],myip.data[3]);
-  #else
-    if (!CmiMyPe())
-    CmiPrintf("CmiInitCPUTopology Warning: Can not get unique name for the compute nodes. \n");
-    _noip = 1; 
-  #endif
     cpuTopo.numPes = CmiNumPes();
   }
 
   CmiNodeAllBarrier();
-  if (_noip) return; 
-
-    /* prepare a msg to send */
-  msg = (hostnameMsg *)CmiAlloc(sizeof(hostnameMsg)+sizeof(_procInfo));
-  msg->n = 1;
-  msg->procs = (_procInfo*)((char*)msg + sizeof(hostnameMsg));
-  CmiSetHandler((char *)msg, CpvAccess(cpuTopoHandlerIdx));
-  msg->procs[0].pe = CmiMyPe();
-  msg->procs[0].ip = myip;
-  msg->procs[0].ncores = CmiNumCores();
-  msg->procs[0].rank = 0;
-  msg->procs[0].nodeID = 0;
-  CmiReduce(msg, sizeof(hostnameMsg)+sizeof(_procInfo), combineMessage);
-
-  // blocking here (wait for broadcast from PE0 to reach all PEs in this node)
-  while (topoInProgress) {
-    CsdSchedulePoll();
-    CmiLock(topoLock);
-    topoInProgress = done < CmiMyNodeSize();
-    CmiUnlock(topoLock);
+  if (_noip)
+  {
+    if (CmiMyRank() == 0) cpuTopo.sort();
+    CcdRaiseCondition(CcdTOPOLOGY_AVAIL);      // call callbacks
+    return;
   }
 
-  if (CmiNumNodes() > 1) {
-    topoDoneMsg *msg2 = (topoDoneMsg *)CmiAlloc(sizeof(topoDoneMsg));
-    CmiSetHandler((char *)msg2, CpvAccess(topoDoneHandlerIdx));
-    CmiReduce(msg2, sizeof(topoDoneMsg), emptyReduction);
-    if ((CmiMyPe() == 0) || (CmiNumSpanTreeChildren(CmiMyPe()) > 0)) {
-      // wait until everyone else has topo info
-      topoInProgress = true;
-      while (topoInProgress) {
+#if CMK_SMP && !CMK_SMP_NO_COMMTHD
+  if (CmiInCommThread())
+  {
+    cpuTopoSyncWaitCommThread(cpuTopoSyncCommThreadDone);
+  }
+  else
+#endif
+  {
+    /* prepare a msg to send */
+    hostnameMsg *msg = (hostnameMsg *)CmiAlloc(sizeof(hostnameMsg)+sizeof(_procInfo));
+    msg->n = 1;
+    msg->procs = (_procInfo*)((char*)msg + sizeof(hostnameMsg));
+    CmiSetHandler((char *)msg, cpuTopoHandlerIdx);
+    auto proc = &msg->procs[0];
+    proc->pe = CmiMyPe();
+    proc->ip = myip;
+    proc->ncores = CmiNumCores();
+    proc->rank = 0;
+    proc->nodeID = 0;
+    CmiReduce(msg, sizeof(hostnameMsg)+sizeof(_procInfo), combineMessage);
+
+    cpuTopoSyncWait(cpuTopoSyncHandlerDone);
+
+    if (CmiMyRank() == 0)
+    {
+      if (CmiMyPe() == 0)
+      {
+        CmiSyncNodeBroadcastAllAndFree(sizeof(nodeTopoMsg)+CmiNumPes()*sizeof(int), (char *)topomsg);
+
         CsdSchedulePoll();
-        CmiLock(topoLock);
-        topoInProgress = topoDone < CmiMyNodeSize();
-        CmiUnlock(topoLock);
       }
-    } else {
-      CmiLock(topoLock);
-      topoDone++;
-      CmiUnlock(topoLock);
+
+#if CMK_SMP && !CMK_SMP_NO_COMMTHD
+      cpuTopoSyncCommThreadDone = true;
+#endif
     }
   }
+
+  CmiBarrier();
 
   if (CmiMyPe() == 0) {
       CmiPrintf("Charm++> cpu topology info is gathered in %.3f seconds.\n", CmiWallTimer()-startT);

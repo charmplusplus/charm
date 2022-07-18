@@ -9,7 +9,10 @@
 
 extern int quietModeRequested;
 
-CreateLBFunc_Def(HybridBaseLB, "HybridBase load balancer")
+static void lbinit()
+{
+  LBRegisterBalancer<HybridBaseLB>("HybridBaseLB", "HybridBase load balancer");
+}
 
 class DummyMsg: public CMessage_DummyMsg 
 {
@@ -184,10 +187,12 @@ CLBStatsMsg* HybridBaseLB::AssembleStats()
   // number of pes
   msg->pe_speed = 1;
 
-  msg->n_objs = osz;
-  lbmgr->GetObjData(msg->objData);
-  msg->n_comm = csz;
-  lbmgr->GetCommData(msg->commData);
+  msg->objData.clear();
+  msg->objData.resize(osz);
+  lbmgr->GetObjData(msg->objData.data());
+  msg->commData.clear();
+  msg->commData.resize(csz);
+  lbmgr->GetCommData(msg->commData.data());
 
   return msg;
 #else
@@ -250,8 +255,11 @@ void HybridBaseLB::depositLBStatsMessage(CLBStatsMsg *m, int atlevel)
     CkAbort("HybridBaseLB> Abort!");
   }
 
+  const int n_comm = m->commData.size();
+  const int n_objs = m->objData.size();
+
   // replace real pe to relative pe number in preparation for calling Strategy()
-  for (int i=0; i<m->n_comm; i++) {
+  for (int i = 0; i < n_comm; i++) {
      LDCommData &commData = m->commData[i];
      // modify processor to be this local pe
      if (commData.from_proc()) m->commData[i].src_proc = neighborIdx;
@@ -271,10 +279,12 @@ void HybridBaseLB::depositLBStatsMessage(CLBStatsMsg *m, int atlevel)
 #endif
   procStat.pe_speed = m->pe_speed;		// important
   procStat.available = true;
-  procStat.n_objs = m->n_objs;
+  procStat.n_objs = n_objs;
 
-  statsData->n_objs += m->n_objs;
-  statsData->n_comm += m->n_comm;
+  statsData->objData.reserve(statsData->objData.size() + n_objs);
+  statsData->from_proc.reserve(statsData->from_proc.size() + n_objs);
+  statsData->to_proc.reserve(statsData->to_proc.size() + n_objs);
+  statsData->commData.reserve(statsData->commData.size() + n_comm);
 }
 
 // assmebly all stats messages from children
@@ -288,40 +298,33 @@ void HybridBaseLB::buildStats(int atlevel)
   int stats_msg_count = lData->stats_msg_count;
 
   // statsMsgsList
-  DEBUGF(("[%d] buildStats for %d nobj:%d\n", CkMyPe(), stats_msg_count, statsData->n_objs));
-  statsData->nprocs() = stats_msg_count;
-  statsData->objData.resize(statsData->n_objs);
-  statsData->commData.resize(statsData->n_comm);
-  statsData->from_proc.resize(statsData->n_objs);
-  statsData->to_proc.resize(statsData->n_objs);
+  DEBUGF(("[%d] buildStats for %d nobj:%zu\n", CkMyPe(), stats_msg_count, statsData->objData.size()));
+  statsData->procs.resize(stats_msg_count);
   int nobj = 0;
-  int nmigobj = 0;
   int ncom = 0;
   for (int n=0; n<stats_msg_count; n++) {
-     int i;
      CLBStatsMsg *msg = statsMsgsList[n];
      int pe = msg->from_pe;
-     for (i=0; i<msg->n_objs; i++) {
-         // need to map index to relative index
-         statsData->from_proc[nobj] = statsData->to_proc[nobj] = NeighborIndex(pe, atlevel);
-         statsData->objData[nobj] = msg->objData[i];
-         if (msg->objData[i].migratable) nmigobj++;
-         nobj++;
-     }
-     for (i=0; i<msg->n_comm; i++) {
-         statsData->commData[ncom] = msg->commData[i];
-         ncom++;
-     }
+     statsData->from_proc.insert(statsData->from_proc.end(), msg->objData.size(), NeighborIndex(pe, atlevel));
+     statsData->to_proc.insert(statsData->to_proc.end(), msg->objData.size(), NeighborIndex(pe, atlevel));
+     statsData->objData.insert(statsData->objData.end(), msg->objData.begin(), msg->objData.end());
+     nobj += msg->objData.size();
+
+     statsData->commData.insert(statsData->commData.end(), msg->commData.begin(), msg->commData.end());
+     ncom += msg->commData.size();
      // free the message
      delete msg;
      statsMsgsList[n]=0;
   }
+  CmiAssert(statsData->objData.size() == nobj);
+  CmiAssert(statsData->commData.size() == ncom);
+  statsData->n_migrateobjs =
+      std::count_if(statsData->objData.begin(), statsData->objData.end(),
+                    [](const LDObjData& data) { return data.migratable; });
   if (_lb_args.debug()>1) {
-      CmiPrintf("[%d] n_obj:%d migratable:%d ncom:%d at level %d at %f.\n", CkMyPe(), nobj, nmigobj, ncom, atlevel, CkWallTimer());
-  }
-  CmiAssert(statsData->n_objs == nobj);
-  CmiAssert(statsData->n_comm == ncom);
-  statsData->n_migrateobjs = nmigobj;
+    CmiPrintf("[%d] n_obj:%d migratable:%d ncom:%d at level %d at %f.\n", CkMyPe(), nobj, statsData->n_migrateobjs, ncom, atlevel, CkWallTimer());
+  } 
+
 #endif
 }
 
@@ -341,8 +344,8 @@ CLBStatsMsg * HybridBaseLB::buildCombinedLBStatsMessage(int atlevel)
 
   CLBStatsMsg* cmsg;
 
-  int osz = statsData->n_objs;
-  int csz = statsData->n_comm;
+  int osz = statsData->objData.size();
+  int csz = statsData->commData.size();
 
   int shrink = 0;
   if ((statsStrategy == SHRINK || statsStrategy == SHRINK_NULL) && atlevel == tree->numLevels()-2) 
@@ -384,8 +387,8 @@ CLBStatsMsg * HybridBaseLB::buildCombinedLBStatsMessage(int atlevel)
   cmsg->bg_cputime = 0.0;
 #endif
 
-  for (int pe=0; pe<statsData->nprocs(); pe++) {
-        struct ProcStats &procStat = statsData->procs[pe];
+  for (const auto& procStat : statsData->procs)
+  {
         cmsg->pe_speed += procStat.pe_speed;		// important
         cmsg->total_walltime += procStat.total_walltime;
         cmsg->idletime += procStat.idletime;
@@ -402,12 +405,8 @@ CLBStatsMsg * HybridBaseLB::buildCombinedLBStatsMessage(int atlevel)
 */
 
   // copy obj data
-  cmsg->n_objs = osz;
-  for (i=0; i<osz; i++)  {
-     cmsg->objData[i] = statsData->objData[i];
-  }
+  std::copy(statsData->objData.begin(), statsData->objData.begin() + osz, cmsg->objData.begin());
   // copy comm data
-  cmsg->n_comm = csz;
   for (i=0; i<csz; i++) {
      LDCommData &commData = statsData->commData[i];
      cmsg->commData[i] = commData;
@@ -490,15 +489,15 @@ void HybridBaseLB::Loadbalancing(int atlevel)
 
   // inform new objects that are from outside group
   if (atlevel < tree->numLevels()-1) {
-    for (i=0; i<statsData->n_objs; i++) {
+    for (i=0; i<statsData->objData.size(); i++) {
       CmiAssert(statsData->from_proc[i] != -1);   // ???
       if (statsData->from_proc[i] == nclients)  {    // from outside
         CmiAssert(statsData->to_proc[i] < nclients);
         int tope = lData->children[statsData->to_proc[i]];
         // comm data
-        CkVec<LDCommData> comms;
+        std::vector<LDCommData> comms;
 //        collectCommData(i, comms, atlevel);
-        thisProxy[tope].ObjMigrated(statsData->objData[i], comms.getVec(), comms.size(), atlevel-1);
+        thisProxy[tope].ObjMigrated(statsData->objData[i], comms.data(), comms.size(), atlevel-1);
       }
     }
   }
@@ -511,7 +510,7 @@ LBMigrateMsg* HybridBaseLB::Strategy(LDStats* stats)
 
   if (_lb_args.debug()>2)  {
     CkPrintf("Obj Map:\n");
-    for (int i=0; i<stats->n_objs; i++) CkPrintf("%d ", stats->to_proc[i]);
+    for (const auto& val : stats->to_proc) CkPrintf("%d ", val);
     CkPrintf("\n");
   }
 
@@ -557,18 +556,18 @@ void HybridBaseLB::ReceiveMigration(LBMigrateMsg *msg)
         // send objdata
         int obj;
         int found = 0;
-        for (obj = 0; obj<statsData->n_objs; obj++) {
+        for (obj = 0; obj<statsData->objData.size(); obj++) {
           if (move.obj.omID() == statsData->objData[obj].handle.omID() && 
             move.obj.objID() == statsData->objData[obj].handle.objID())
           {
             DEBUGF(("[%d] level: %d sending objData %d to %d. \n", CkMyPe(), atlevel, obj, move.to_pe));
 	    found = 1;
             // TODO send comm data
-            CkVec<LDCommData> comms;
+            std::vector<LDCommData> comms;
             collectCommData(obj, comms, atlevel);
 	    if (move.to_pe != -1) {
               // this object migrates to another PE of the parent domain
-              thisProxy[move.to_pe].ObjMigrated(statsData->objData[obj], comms.getVec(), comms.size(), atlevel);
+              thisProxy[move.to_pe].ObjMigrated(statsData->objData[obj], comms.data(), comms.size(), atlevel);
             }
             lData->outObjs.push_back(MigrationRecord(move.obj, lData->children[statsData->from_proc[obj]], -1));
             statsData->removeObject(obj);
@@ -639,8 +638,8 @@ void HybridBaseLB::ReceiveVectorMigration(LBVectorMigrateMsg *msg)
   lData->vector_expected  = 0;
   for (int i=0; i<msg->n_moves; i++)  {
     VectorMigrateInfo &move = msg->moves[i];
-    CkVec<LDObjData> objs;
-    CkVec<LDCommData> comms;
+    std::vector<LDObjData> objs;
+    std::vector<LDCommData> comms;
     if (move.from_pe == CkMyPe()) {
       int toPe = move.to_pe;
       double load = move.load;
@@ -651,7 +650,7 @@ void HybridBaseLB::ReceiveVectorMigration(LBVectorMigrateMsg *msg)
       if (_lb_args.debug()>1)
         CkPrintf("[%d] sending %d objects to %d at %f.\n", CkMyPe(), count, toPe, CkWallTimer());
       if (objs.size() > 0)
-        thisProxy[toPe].ObjsMigrated(objs, objs.size(), comms.getVec(), comms.size(), atlevel);
+        thisProxy[toPe].ObjsMigrated(objs, objs.size(), comms.data(), comms.size(), atlevel);
       thisProxy[toPe].TotalObjMigrated(count, atlevel);
     }
     else if (move.to_pe == CkMyPe()) {
@@ -673,9 +672,9 @@ void HybridBaseLB::ReceiveVectorMigration(LBVectorMigrateMsg *msg)
 }
 
 void HybridBaseLB::GetObjsToMigrate(int toPe, double load, LDStats *stats, int atlevel,
-    CkVec<LDCommData>& comms, CkVec<LDObjData>& objs) {
+                                    std::vector<LDCommData>& comms, std::vector<LDObjData>& objs) {
   // TODO: sort max => low
-  for (int obj=stats->n_objs-1; obj>=0; obj--) {
+  for (int obj=stats->objData.size()-1; obj>=0; obj--) {
     LDObjData &objData = stats->objData[obj];
     if (!objData.migratable) continue;
     if (objData.wallTime <= load) {
@@ -703,7 +702,7 @@ void HybridBaseLB::CreateMigrationOutObjs(int atlevel, LDStats* stats,
 }
 
 // objects arrives with only objdata
-void HybridBaseLB::ObjsMigrated(CkVec<LDObjData>&& datas, int m,
+void HybridBaseLB::ObjsMigrated(std::vector<LDObjData>&& datas, int m,
     LDCommData *cdata, int n, int atlevel)
 {
   int i;
@@ -711,14 +710,11 @@ void HybridBaseLB::ObjsMigrated(CkVec<LDObjData>&& datas, int m,
   LDStats *statsData = lData->statsData;
 
   if (statsData != NULL) {
-    CkVec<LDObjData> &oData = statsData->objData;
-
     for (i=0; i<m; i++)
     {
       // copy into LDStats
       LDObjData &data = datas[i];
-      oData.push_back(data);
-      statsData->n_objs++;
+      statsData->objData.push_back(data);
       if (data.migratable) statsData->n_migrateobjs++;
       // an incoming object to the root
       // pretend this object belongs to it
@@ -728,10 +724,7 @@ void HybridBaseLB::ObjsMigrated(CkVec<LDObjData>&& datas, int m,
 
     // copy into comm data
     if (n) {
-      CkVec<LDCommData> &cData = statsData->commData;
-      for (int i=0; i<n; i++)
-        cData.push_back(cdata[i]);
-      statsData->n_comm += n;
+      statsData->commData.insert(statsData->commData.end(), cdata, cdata + n);
       statsData->deleteCommHash();
     }
   }
@@ -796,15 +789,14 @@ void HybridBaseLB::Migrated(int waitBarrier)
 }
 
 // find sender comms
-void HybridBaseLB::collectCommData(int objIdx, CkVec<LDCommData> &comms, int atlevel)
+void HybridBaseLB::collectCommData(int objIdx, std::vector<LDCommData> &comms, int atlevel)
 {
   LevelData *lData = levelData[atlevel];
   LDStats *statsData = lData->statsData;
 
   LDObjData &objData = statsData->objData[objIdx];
 
-  for (int com=0; com<statsData->n_comm; com++) {
-    LDCommData &cdata = statsData->commData[com];
+  for (auto& cdata : statsData->commData) {
     if (cdata.from_proc()) continue;
     if (cdata.sender.objID() == objData.objID() && cdata.sender.omID() == objData.omID())
       comms.push_back(cdata);
@@ -818,11 +810,8 @@ void HybridBaseLB::ObjMigrated(LDObjData data, LDCommData *cdata, int n, int atl
   LDStats *statsData = lData->statsData;
 
   if (statsData != NULL) {
-    CkVec<LDObjData> &oData = statsData->objData;
-
     // copy into LDStats
-    oData.push_back(data);
-    statsData->n_objs++;
+    statsData->objData.push_back(data);
     if (data.migratable) statsData->n_migrateobjs++;
     // an incoming object to the root
     // pretend this object belongs to it
@@ -831,10 +820,7 @@ void HybridBaseLB::ObjMigrated(LDObjData data, LDCommData *cdata, int n, int atl
 
     // copy into comm data
     if (n) {
-      CkVec<LDCommData> &cData = statsData->commData;
-      for (int i=0; i<n; i++) 
-        cData.push_back(cdata[i]);
-      statsData->n_comm += n;
+      statsData->commData.insert(statsData->commData.end(), cdata, cdata + n);
       statsData->deleteCommHash();
     }
   }
@@ -934,7 +920,7 @@ void HybridBaseLB::CollectInfo(Location *loc, int n, int fromlevel)
    LevelData *lData = levelData[atlevel];
    lData->info_recved++;
 
-   CkVec<Location> &matchedObjs = lData->matchedObjs;
+   std::vector<Location> &matchedObjs = lData->matchedObjs;
    std::map<LDObjKey, int> &unmatchedObjs = lData->unmatchedObjs;
 
    // sort into matched and unmatched list
@@ -979,19 +965,20 @@ void HybridBaseLB::CollectInfo(Location *loc, int n, int fromlevel)
 	        CkMyPe(), atlevel, CkWallTimer());
      if (lData->parent != -1) {
        // send only unmatched ones up the tree
-       CkVec<Location> unmatchedbuf;
+       std::vector<Location> unmatchedbuf;
+       unmatchedbuf.reserve(unmatchedObjs.size());
        for(std::map<LDObjKey, int>::const_iterator it = unmatchedObjs.begin(); it != unmatchedObjs.end(); ++it)
        {
          unmatchedbuf.push_back(Location(it->first, it->second));
        }
 
-       thisProxy[lData->parent].CollectInfo(unmatchedbuf.getVec(), unmatchedbuf.size(), atlevel);
+       thisProxy[lData->parent].CollectInfo(unmatchedbuf.data(), unmatchedbuf.size(), atlevel);
      }
      else { // root
        // we should have all answers now
        CmiAssert(unmatchedObjs.size() == 0);
        // start send match list down
-       thisProxy.PropagateInfo(matchedObjs.getVec(), matchedObjs.size(), atlevel, lData->nChildren, lData->children);
+       thisProxy.PropagateInfo(matchedObjs.data(), matchedObjs.size(), atlevel, lData->nChildren, lData->children);
        lData->statsData->clear();
      }
    }
@@ -1003,8 +990,8 @@ void HybridBaseLB::PropagateInfo(Location *loc, int n, int fromlevel)
   int i, obj;
   int atlevel = fromlevel - 1;
   LevelData *lData = levelData[atlevel];
-  CkVec<Location> &matchedObjs = lData->matchedObjs;
-  //CkVec<Location> &unmatchedObjs = lData->unmatchedObjs;
+  std::vector<Location> &matchedObjs = lData->matchedObjs;
+  //std::vector<Location> &unmatchedObjs = lData->unmatchedObjs;
   std::map<LDObjKey, int> &unmatchedObjs = lData->unmatchedObjs;
 
   if (atlevel > 0) {
@@ -1045,14 +1032,14 @@ void HybridBaseLB::PropagateInfo(Location *loc, int n, int fromlevel)
     DEBUGF(("[%d] level %d PropagateInfo had %d matchedObjs. \n", CkMyPe(), atlevel, matchedObjs.size()));
 
       // send down
-    thisProxy.PropagateInfo(matchedObjs.getVec(), matchedObjs.size(), atlevel, lData->nChildren, lData->children);
+    thisProxy.PropagateInfo(matchedObjs.data(), matchedObjs.size(), atlevel, lData->nChildren, lData->children);
 
     lData->statsData->clear();
-    matchedObjs.free();
+    matchedObjs.clear();
   }
   else {  // leaf node
       // now start to migrate
-    CkVec<MigrationRecord> & outObjs = lData->outObjs;
+    std::vector<MigrationRecord> & outObjs = lData->outObjs;
     int migs = outObjs.size() + newObjs.size();
     for (i=0; i<outObjs.size(); i++) {
       if (outObjs[i].toPe == -1) {
@@ -1105,7 +1092,7 @@ void HybridBaseLB::MigrationDone(int balancing)
   // reset 
   for (int i=0; i<tree->numLevels(); i++) 
     levelData[i]->clear();
-  newObjs.free();
+  newObjs.clear();
 
   DEBUGF(("[%d] calling ResumeClients.\n", CkMyPe()));
   if (balancing && _lb_args.syncResume()) {
@@ -1165,11 +1152,11 @@ LBMigrateMsg * HybridBaseLB::createMigrateMsg(LDStats* stats)
 
   LevelData *lData = levelData[currentLevel];
 
-  CkVec<MigrateInfo*> migrateInfo;
+  std::vector<MigrateInfo*> migrateInfo;
 
   // stats contains all objects that belong to this group
   // outObjs contains objects that are migrated out
-  for (i=0; i<stats->n_objs; i++) {
+  for (i=0; i<stats->objData.size(); i++) {
     LDObjData &objData = stats->objData[i];
     int frompe = stats->from_proc[i];
     int tope = stats->to_proc[i];
@@ -1195,25 +1182,24 @@ LBMigrateMsg * HybridBaseLB::createMigrateMsg(LDStats* stats)
       migrateMe->from_pe = frompe;
       migrateMe->to_pe = tope;
       migrateMe->async_arrival = objData.asyncArrival;
-      migrateInfo.insertAtEnd(migrateMe);
+      migrateInfo.push_back(migrateMe);
     }
     else 
       CmiAssert(frompe != lData->nChildren);
   }
 
   // merge outgoing objs
-  CkVec<MigrationRecord> &outObjs = lData->outObjs;
-  for (i=0; i<outObjs.size(); i++) {
+  for (const auto& outObj : lData->outObjs) {
     MigrateInfo *migrateMe = new MigrateInfo;
-    migrateMe->obj = outObjs[i].handle;
-    migrateMe->from_pe = outObjs[i].fromPe;
+    migrateMe->obj = outObj.handle;
+    migrateMe->from_pe = outObj.fromPe;
     migrateMe->to_pe = -1;
 //    migrateMe->async_arrival = objData.asyncArrival;
-    migrateInfo.insertAtEnd(migrateMe);
+    migrateInfo.push_back(migrateMe);
   }
 
   // construct migration message
-  int migrate_count=migrateInfo.length();
+  int migrate_count=migrateInfo.size();
   DEBUGF(("[%d] level: %d has %d migrations. \n", CkMyPe(), currentLevel, migrate_count));
   // ignore avail_vector, etc for now
   //LBMigrateMsg * msg = new(migrate_count,count,count,0) LBMigrateMsg;
@@ -1228,7 +1214,8 @@ LBMigrateMsg * HybridBaseLB::createMigrateMsg(LDStats* stats)
     DEBUGF(("[%d] obj (%d %d %d %d) migrate from %d to %d\n", CkMyPe(), item->obj.objID().id[0], item->obj.objID().id[1], item->obj.objID().id[2], item->obj.objID().id[3], item->from_pe, item->to_pe));
   }
 
-  if (_lb_args.printSummary())  printSummary(stats, stats->nprocs());
+  if (_lb_args.printSummary())
+    printSummary(stats, stats->procs.size());
 
   // translate relative pe number to its real number
   for(i=0; i < migrate_count; i++) {
@@ -1250,39 +1237,6 @@ LBMigrateMsg * HybridBaseLB::createMigrateMsg(LDStats* stats)
 #else
   return NULL;
 #endif
-}
-
-// function used for any application that uses Strategy() instead of work()
-LBMigrateMsg * HybridBaseLB::createMigrateMsg(CkVec<MigrateInfo *> &migrateInfo,int count)
-{
-  int i;
-
-  // merge outgoing objs
-  LevelData *lData = levelData[currentLevel];
-  CkVec<MigrationRecord> &outObjs = lData->outObjs;
-  for (i=0; i<outObjs.size(); i++) {
-    MigrateInfo *migrateMe = new MigrateInfo;
-    migrateMe->obj = outObjs[i].handle;
-    migrateMe->from_pe = outObjs[i].fromPe;
-    migrateMe->to_pe = -1;
-    migrateInfo.insertAtEnd(migrateMe);
-  }
-
-  if (_lb_args.printSummary())  printSummary(NULL, count);
-
-  int migrate_count=migrateInfo.length();
-  // ignore avail_vector, etc for now
-  //LBMigrateMsg * msg = new(migrate_count,count,count,0) LBMigrateMsg;
-  LBMigrateMsg* msg = new(migrate_count,0,0,0) LBMigrateMsg;
-  msg->level = currentLevel;
-  msg->n_moves = migrate_count;
-  for(i=0; i < migrate_count; i++) {
-    MigrateInfo* item = migrateInfo[i];
-    msg->moves[i] = *item;
-    delete item;
-    migrateInfo[i] = 0;
-  } 
-  return msg;
 }
 
 int HybridBaseLB::NeighborIndex(int pe, int atlevel)

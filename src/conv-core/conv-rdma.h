@@ -116,22 +116,24 @@ class CmiNcpyBuffer {
   bool isRegistered;
 
   // machine specific information about the buffer
-  #ifdef __GNUC__
+  #if defined(__GNUC__) || defined(__clang__)
   #pragma GCC diagnostic push
   #pragma GCC diagnostic ignored "-Wpedantic"
   #endif
   char layerInfo[CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES];
-  #ifdef __GNUC__
+  #if defined(__GNUC__) || defined(__clang__)
   #pragma GCC diagnostic pop
   #endif
 
 #if CMK_ERROR_CHECKING
   void checkRegModeIsValid() {
-    if(regMode < CMK_BUFFER_REG || regMode > CMK_BUFFER_NOREG) CmiAbort("checkRegModeIsValid: Invalid value for regMode!\n");
+    if (regMode > CMK_BUFFER_NOREG)
+      CmiAbort("checkRegModeIsValid: Invalid value for regMode!\n");
   }
 
   void checkDeregModeIsValid() {
-    if(deregMode < CMK_BUFFER_DEREG || deregMode > CMK_BUFFER_NODEREG) CmiAbort("checkDeregModeIsValid: Invalid value for deregMode!\n");
+    if (deregMode < CMK_BUFFER_DEREG || deregMode > CMK_BUFFER_NODEREG)
+      CmiAbort("checkDeregModeIsValid: Invalid value for deregMode!\n");
   }
 #endif
 

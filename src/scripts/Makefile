@@ -60,8 +60,6 @@ PVM: converse $(L)/libpvmc.a
 AMR: charm++ LIBS
 	$(MAKE) -C libs/ck-libs/amr all
 
-FEM: ParFUM
-
 ParFUM: charm++ AMPI
 	$(MAKE) -C libs/ck-libs/ ParFUM
 
@@ -76,9 +74,6 @@ AMPI:  charm++
 
 AMPIC AMPIF: AMPI
 
-ARMCI: charm++ LIBS
-
-
 f90charm: charm++
 
 libcharm: charm++
@@ -86,9 +81,9 @@ libcharm: charm++
 
 charm4py: libcharm
 
-LIBCHARM_LIBS= libck.a libconv-core.a libconv-util.a libmemory-default.a libconv-machine.a \
-               libthreads-default.a libconv-partition.a libtmgr.a libhwloc_embedded.a \
-               libldb-rand.a libconv-ldb.a
+LIBCHARM_LIBS= libck.a libconverse.a \
+               libmemory-default.a libthreads-default.a \
+               libldb-rand.a
 
 DEFAULT_LIBS= completion NDMeshStreamer dummy pythonCCS io ckloop
 
@@ -113,11 +108,7 @@ completion: charmxi
 NDMeshStreamer: charm-core completion
 
 $(L)/libmpi-mainmodule.a: mpi-mainmodule.o
-	$(CHARMC) -o $@ $<
-
-tmgr: $(L)/libtmgr.a
-$(L)/libtmgr.a:
-	$(MAKE) -C topomanager -f Makefile_charm
+	$(CHARMC) -o $@ $^
 
 $(L)/libckmain.a: main.o
 	$(CHARMC) -o $@ $^
@@ -130,20 +121,6 @@ translators: charmxi conv-cpm
 msa: charm++
 	$(MAKE) -C libs/ck-libs/multiphaseSharedArrays
 
-jade: charm++ msa
-#	make the lib, include
-	$(MAKE) -C langs/jade
-
-
-# This should be done offline, since the user does not need to compile
-# parser files, etc.  All they need is the libjade + include files,
-# antlr.jar, jade.jar, and a few scripts which the jade target takes
-# care of.
-#jadeall: jade
-#	make parser.g -> .java files
-#	$(MAKE) -C langs/jade p
-#	make the jade.jar file
-#	$(MAKE) -C ../java/charm/jade
 
 #include TAU defs
 TAU_MAKEFILE=Make.tau
@@ -151,15 +128,13 @@ include	$(TAU_MAKEFILE) #stub-makefile
 
 #builds TAU's trace library
 Tau: 
-	echo "buliding charm trace library with support for TAU."
+	@echo "Building Charm trace library with support for TAU."
 	$(MAKE) $(L)/libtrace-Tau.a $(L)/libtrace-all.a TAU_TRACE_OBJ=libtrace-Tau.o
 
 LIBS: CONVLIBS CHARMLIBS everylb
-	echo "Built LIBS Successfully"
+	@echo "Built LIBS successfully"
 
 CHARMC=../bin/charmc $(CHARMOPTS) $(OPTS)
-
-SEQCHARMC=../bin/charmc -seq $(CHARMOPTS)
 
 NATIVECHARMC=../bin/charmc -host $(CHARMOPTS)
 
@@ -200,6 +175,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
       memory-isomalloc.h debug-conv.h debug-conv++.h conv-autoconfig.h \
       conv-common.h conv-config.sh conv-config.h conv-mach.h conv-mach.sh conv-mach-common.h \
       cmipool.h mempool.h cmiqueue.h \
+      TopoManager.h XTTorus.h topomanager_config.h \
       cmitls.h lrtslock.h conv-rdma.h conv-rdmadevice.h lrts-common.h conv-header.h
 
 # The .c files are there to be #included by clients whole
@@ -216,7 +192,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckcallback.h CkCallback.decl.h ckcallback-ccs.h 	\
 	  cksection.h ckmessage.h cklocrec.h ckmigratable.h \
 	  ckarrayindex.h ckarrayoptions.h ckarray.h cklocation.h ckmulticast.h ckreduction.h \
-	  ckcheckpoint.h ckmemcheckpoint.h ckevacuation.h ckrdma.h ckrdmadevice.h cksyncbarrier.h \
+	  ckcheckpoint.h ckmemcheckpoint.h ckrdma.h ckrdmadevice.h cksyncbarrier.h \
 	  ckobjQ.h readonly.h charm++_type_traits.h \
           $(UTILHEADERS) \
 	  waitqd.h LBDatabase.h LBManager.h MetaBalancer.h RandomForestModel.h lbdb.h $(LBHEADERS) \
@@ -258,7 +234,6 @@ basics: headers charm-version-git.h
 
 # Headers is used only for the dependencies
 headers: dirs+sources
-	$(MAKE) -C topomanager -f Makefile_charm headers
 	$(MAKE) charmxi
 	$(MAKE) headerlinks
 
@@ -327,11 +302,14 @@ endif
 	./gathertree $(SRCBASE)/arch/util/proc_management        proc_management
 	./gathertree $(SRCBASE)/util                             .
 	./gathertree $(SRCBASE)/langs                            langs
-	./gathertree $(SRCBASE)/langs/jade                       langs/jade
 	./gathertree $(SRCBASE)/arch/common                      .
 	./gathertree $(SRCBASE)/arch/$(CMK_GDIR)                 .
 	test -f $(SRCBASE)/arch/$(CMK_GDIR)/gdir_link && cat $(SRCBASE)/arch/$(CMK_GDIR)/gdir_link > .gdir.new && ./gathertree $(SRCBASE)/arch/`cat .gdir.new`      . || true
 	./gatherflat $(SRCBASE)/arch/$(CMK_VDIR)                 .
+	-./system_ln $(SRCBASE)/util/topomanager/TopoManager.h   .
+	-./system_ln $(SRCBASE)/util/topomanager/XTTorus.h       .
+	-./system_ln $(SRCBASE)/util/topomanager/TopoManager.C   .
+	-./system_ln $(SRCBASE)/util/topomanager/CrayNid.c       .
 	./gathertree $(SRCBASE)/../benchmarks                    ../benchmarks
 	./gathertree $(SRCBASE)/../examples                      ../examples
 	./gathertree $(SRCBASE)/../tests                         ../tests
@@ -456,13 +434,10 @@ THREADLIBS += \
 
 endif
 
-CVLIBS=$(L)/libconv-core.a \
+CVLIBS=$(L)/libconverse.a \
 	$(L)/conv-static.o \
-	$(L)/libconv-machine.a \
-	$(L)/libconv-util.a \
 	$(CLBLIBS) $(TRACELIBS) $(MEMLIBS) $(THREADLIBS) \
-	$(L)/libccs-client.a $(L)/libconv-partition.a $(L)/libhwloc_embedded.a \
-	$(L)/libconv-ldb.a
+	$(L)/libccs-client.a \
 
 ifeq (1,$(CMK_CAN_LINK_FORTRAN))
   CVLIBS += $(L)/libconv-utilf.a
@@ -488,14 +463,30 @@ LIBCONV_UTIL=pup_util.o pup_toNetwork.o pup_toNetwork4.o		\
 
 LIBCONV_UTILF=pup_f.o
 
+LIBCONV_PARTITION = custom_partitioner.o set_partition_params.o
+
+LIBTMGR = TopoManager.o CrayNid.o
+
 include Makefile.machine
 
-converse: charmrun-target swapglobal-target conv-cpm tmgr hwloc-target
+CONVERSE_DEPS := \
+  charmrun-target \
+  conv-cpm \
+  $(L)/libconverse.a \
 
-cpuaffinity.o $(L)/libhwloc_embedded.a $(INC)/hwloc.h $(INC)/hwloc/autogen/config.h $(INC)/hwloc/rename.h $(INC)/hwloc/bitmap.h \
+ifneq (0,$(CMK_SUPPORTS_SWAPGLOBALS))
+  CONVERSE_DEPS += swapglobal-target
+endif
+
+converse: $(CONVERSE_DEPS)
+
+cpuaffinity.o $(INC)/hwloc.h $(INC)/hwloc/autogen/config.h $(INC)/hwloc/rename.h $(INC)/hwloc/bitmap.h \
 $(INC)/hwloc/helper.h $(INC)/hwloc/inlines.h $(INC)/hwloc/diff.h $(INC)/hwloc/deprecated.h $(INC)/hwloc/export.h $(INC)/hwloc/distances.h : hwloc-target
 
-hwloc-target:  conv-autoconfig.h charm-version-git.h
+topomanager_config.h:
+	@echo "// empty" > topomanager_config.h
+
+hwloc-target: conv-autoconfig.h
 	@( cd hwloc && \
     ./configure \
     --disable-cairo \
@@ -514,20 +505,22 @@ hwloc-target:  conv-autoconfig.h charm-version-git.h
     --without-x \
     HWLOC_FLAGS="$(HWLOC_CC_FLAGS)" \
     CFLAGS="$(HWLOC_CC_FLAGS)" \
+    CXXFLAGS="$(HWLOC_CXX_FLAGS)" \
     CC="$(HWLOC_CC)" \
+    CXX="$(HWLOC_CXX)" \
     CC_FOR_BUILD="$(HWLOC_CC)" \
-    > /dev/null )
+    CPP= \
+    CXXCPP= \
+    CPPFLAGS= \
+    LDFLAGS= \
+    LIBS= \
+    > /dev/null || ( cat config.log ; exit 1 ) )
 	( $(MAKE) -C hwloc AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=: )
-	( test -e hwloc/hwloc/.libs/libhwloc_embedded.lib && cp -f hwloc/hwloc/.libs/libhwloc_embedded.lib hwloc/hwloc/.libs/libhwloc_embedded.a ) || true
-	( cp -f hwloc/hwloc/.libs/libhwloc_embedded.a $(L) )
 	( cp -f hwloc/include/hwloc.h $(INC) )
 	( cp -LRf hwloc/include/hwloc $(INC) )
-ifeq (false,$(CMK_NO_BUILD_SHARED))
-	( test -d ../lib_so && cp -f hwloc/hwloc/.libs/libhwloc_embedded.*$(CMK_SHARED_SUF)* ../lib_so/ ) || true
-endif
 	touch $@
 
-charmrun-target: hwloc-target charmrun  sockRoutines.C sockRoutines.h ccs-server.C ccs-server.h sockRoutines-seq.o $(L)/libck.a $(L)/libhwloc_embedded.a $(CVLIBS) conv-static.o
+charmrun-target: charmrun sockRoutines.C sockRoutines.h ccs-server.C ccs-server.h sockRoutines-seq.o $(L)/libck.a $(CVLIBS) conv-static.o
 	if [ -f charmrun ] ; then ( cp -f charmrun ../bin ) ; fi
 
 QUICK_THREADS: $(CVHEADERS)
@@ -543,29 +536,17 @@ endif
 CONVLIBS: converse
 	$(MAKE) -C libs convlibs
 
-$(L)/libconv-core.a: $(LIBCONV_CORE)
-	$(CHARMC) $(TAU_LIBS) -o $@ $(LIBCONV_CORE) 
-
-$(L)/libconv-partition.a: custom_partitioner.o set_partition_params.o
-	$(CHARMC) -o $@ $^
+$(L)/libconverse.a: $(LIBCONV_CORE) $(LIBCONV_UTIL) $(LIBCONV_PARTITION) $(LIBCONV_LDB) machine.o $(LIBTMGR) | hwloc-target
+	$(CHARMC) $(TAU_LIBS) -o $@ $^ $(wildcard hwloc/hwloc/*.o) $(wildcard hwloc/hwloc/*.obj)
 
 $(L)/conv-static.o: conv-static.o
 	cp -f $< $@
 
-$(L)/libconv-machine.a: machine.o
-	$(CHARMC) -o $@ $<
-
 machine.o: machine.C $(CVHEADERS)
-	$(CHARMC) -I. -o $@ $<
-
-$(L)/libconv-util.a: $(LIBCONV_UTIL)
-	$(CHARMC) -o $@ $(LIBCONV_UTIL)
+	$(CHARMC) -I. -o $@ -c $<
 
 $(L)/libconv-utilf.a: $(LIBCONV_UTILF)
 	$(CHARMC) -o $@ $(LIBCONV_UTILF)
-
-$(L)/libconv-ldb.a: $(LIBCONV_LDB)
-	$(CHARMC) -o $@ $^
 
 $(L)/libccs-client.a: ccs-client.o
 	$(CHARMC) -o $@ ccs-client.o
@@ -574,7 +555,7 @@ ccs-client.o: ccs-client.C $(CVHEADERS)
 	$(CHARMC) -DCMK_NOT_USE_CONVERSE=1 ccs-client.C
 
 sockRoutines-seq.o: sockRoutines.C $(CVHEADERS) $(UTILHEADERS)
-	$(SEQCHARMC) -DCMK_NOT_USE_CONVERSE=1 -o sockRoutines-seq.o sockRoutines.C
+	$(CHARMC) -seq -DCMK_NOT_USE_CONVERSE=1 -o sockRoutines-seq.o -c sockRoutines.C
 
 pup_f.f90: pup_f.f90.sh
 	rm -f pup_f.f90 && ./pup_f.f90.sh
@@ -615,7 +596,7 @@ MEM_DEPS=memory-gnu.C memory-gnu-internal.C converse.h conv-mach.h $(CVHEADERS)
 # $1 is the name of the module, $2 is any additional dependency beyond memory.C and $(MEM_DEPS), $3 is extra arguments to charmc
 define libmem
 $(L)/libmemory-$1.a: memory.C $$(MEM_DEPS) $2
-	$$(CHARMC) -I. -o libmemory-$1.o $3 $$<
+	$$(CHARMC) -I. -o libmemory-$1.o $3 -c $$<
 	$$(CHARMC) -I. -o $$@ $3 libmemory-$1.o
 endef
 
@@ -653,7 +634,7 @@ LIBTHREADSDEPS = $(CVHEADERS) QUICK_THREADS
 # $1 is the name of the module, $2 is any additional dependency beyond threads.C and $(LIBTHREADSDEPS), $3 is extra arguments to charmc, $4 is an option to include 'boost-context'
 define libthreads
 $(L)/libthreads-$1.a: threads.C $$(LIBTHREADSDEPS) $2
-	$$(CHARMC) -IQuickThreads -I. -o libthreads-$1.o $3 $$<
+	$$(CHARMC) -IQuickThreads -I. -o libthreads-$1.o $3 -c $$<
 ifeq (1,$$(strip $4))
 	$$(CHARMC) -IQuickThreads -I. -o $$@ $3 $$(wildcard boost-context/*.o) libthreads-$1.o
 else
@@ -687,7 +668,7 @@ $(eval $(call libthreads,uJcontext-memoryalias,uJcontext.C,-DCMK_THREADS_BUILD_J
 swapglobal-target: $(L)/libglobal-swap.a
 
 $(L)/libglobal-swap.a: global-elfgot.C $(CVHEADERS)
-	-$(CHARMC) -c global-elfgot.C -o $@ || touch $@
+	$(CHARMC) -c global-elfgot.C -o $@
 
 ###############################################################################
 #
@@ -699,7 +680,7 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
 	   msgalloc.o ckfutures.o ckIgetControl.o debug-message.o debug-charm.o ckcallback.o \
 	   cklocation.o ckmulticast.o ckarrayoptions.o ckarray.o ckreduction.o ckrdma.o ckrdmadevice.o cksyncbarrier.o \
            waitqd.o LBDatabase.o LBManager.o MetaBalancer.o weakTest.o treeTest.o forestTest.o readmodel.o lbdbf.o ckobjQ.o  \
-	   ckcheckpoint.o ckmemcheckpoint.o ckevacuation.o \
+	   ckcheckpoint.o ckmemcheckpoint.o \
            LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
 	   BaseLB.o CentralLB.o TreeLB.o HybridBaseLB.o DistBaseLB.o \
            ckgraph.o LButil.o RefinerTemp.o Refiner.o \
@@ -715,7 +696,7 @@ ifeq (1,$(CMK_CAN_LINK_FORTRAN))
 endif
 
 charm-core: converse $(CKLIBS)
-charm-target: loadbalancers default_libs $(L)/libmpi-mainmodule.a tmgr
+charm-target: loadbalancers default_libs $(L)/libmpi-mainmodule.a
 
 CHARMLIBS: charm++ CONVLIBS
 	$(MAKE) -C libs charmlibs
@@ -784,7 +765,7 @@ libtrace-Tau.o: trace-Tau.C charm++.h charm.h converse.h conv-config.h \
   LBMachineUtil.h LBManager.decl.h MetaBalancer.decl.h BaseLB.decl.h \
   CkLocation.decl.h CkMulticast.decl.h CkArray.decl.h objid.h envelope.h envelope-path.h XArraySectionReducer.h CkFutures.decl.h \
   waitqd.h waitqd.decl.h \
-  sdag.h ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h \
+  sdag.h ckcheckpoint.h CkCheckpoint.decl.h \
   trace.h trace-simple.h \
   register.h trace-common.h trace-simpleBOC.h TraceSimple.decl.h \
   TraceSimple.def.h ckregex.h

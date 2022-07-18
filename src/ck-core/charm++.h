@@ -211,6 +211,8 @@ public:
 
 #define CHARE_MAGIC    0x201201
 
+/* forward */ class CkLocRec;
+
 /**
   The base class of all parallel objects in Charm++,
   including Array Elements, Groups, and NodeGroups.
@@ -221,7 +223,9 @@ class Chare {
 #if CMK_OBJECT_QUEUE_AVAILABLE
     CkObjectMsgQ objQ;                // object message queue
 #endif
+    CkLocRec *myRec;
   public:
+    bool ckInitialized;
 #if CMK_ERROR_CHECKING
     int magic;
 #endif
@@ -255,6 +259,7 @@ class Chare {
     CHARM_INPLACE_NEW
     /// Return the type of this chare, as present in _chareTable
     virtual int ckGetChareType() const;
+    CkLocRec *getCkLocRec(void) const { return this->myRec; }
     /// Return a strdup'd array containing this object's string name.
     virtual char *ckDebugChareName(void);
     /// Place into str a copy of the id of this object up to limit bytes, return
@@ -270,6 +275,23 @@ class Chare {
     }
 #endif
 };
+
+// libraries can query this flag to
+// perform bookkeeping accordingly
+#define CMK_HAS_CKCALLSTACK 1
+
+void CkCallstackPop(Chare *obj);
+void CkCallstackPush(Chare *obj);
+void CkCallstackUnwind(Chare *obj);
+
+Chare *CkActiveObj(void);
+Chare *CkAllocateChare(int objId);
+
+static inline void CkInvokeEP(Chare *obj, const int &epIdx, void *msg) {
+  CkCallstackPush(obj);
+  _entryTable[epIdx]->call(msg, obj);
+  CkCallstackPop(obj);
+}
 
 #if CMK_HAS_IS_CONSTRUCTIBLE
 #include <type_traits>
@@ -329,6 +351,8 @@ class IrrGroup : public Chare {
 
     virtual void pup(PUP::er &p);//<- pack/unpack routine
     virtual void ckJustMigrated(void);
+    // TODO: We don't need three versions of this (undocumented) function
+    inline const CkGroupID &getGroupID(void) const {return thisgroup;}
     inline const CkGroupID &ckGetGroupID(void) const {return thisgroup;}
     inline CkGroupID CkGetGroupID(void) const {return thisgroup;}
     virtual int ckGetChareType() const;
@@ -343,11 +367,6 @@ class IrrGroup : public Chare {
     virtual void flushStates() {}
 
     virtual void CkAddThreadListeners(CthThread tid, void *msg);
-
-#if CMK_FAULT_EVAC
-		virtual void evacuate(){};
-		virtual void doneEvacuate(){};
-#endif
 };
 
 #if CMK_CHARM4PY
@@ -392,24 +411,6 @@ public:
 
 #endif
 
-// As described in http://www.gotw.ca/publications/mxc++-item-4.htm
-template<typename D, typename B>
-class IsDerivedFrom
-{
-  class No { };
-  class Yes { No no[3]; };
-
-  static Yes Test( B* ); // not defined
-  static No Test( ... ); // not defined
-
-  static void Constraints(D* p) { B* pb = p; pb = p; }
-
-public:
-  enum { Is = sizeof(Test(static_cast<D*>(0))) == sizeof(Yes) };
-
-  IsDerivedFrom() { void(*p)(D*) = Constraints; }
-};
-
 /// Base case for the infrastructure to recursively handle inheritance
 /// through CBase_foo from anything that implements X::pup(). Chare
 /// classes have generated specializations that call PUPs for their
@@ -420,13 +421,13 @@ public:
 /// The specialized templates are structs for reasons explained by
 /// http://www.gotw.ca/publications/mill17.htm
 struct CBase { };
-template <typename T, int automatic>
+template <typename T, bool automatic>
 struct recursive_pup_impl {
   void operator()(T *obj, PUP::er &p);
 };
 
 template <typename T>
-struct recursive_pup_impl<T, 1> {
+struct recursive_pup_impl<T, true> {
   void operator()(T *obj, PUP::er &p) {
     obj->parent_pup(p);
     obj->_sdag_pup(p);
@@ -435,14 +436,14 @@ struct recursive_pup_impl<T, 1> {
 };
 
 template <typename T>
-struct recursive_pup_impl<T, 0> {
+struct recursive_pup_impl<T, false> {
   void operator()(T *obj, PUP::er &p) {
     obj->T::pup(p);
   }
 };
 template <typename T>
 void recursive_pup(T *obj, PUP::er &p) {
-  recursive_pup_impl<T, IsDerivedFrom<T, CBase>::Is>()(obj, p);
+  recursive_pup_impl<T, std::is_base_of<CBase, T>::value>()(obj, p);
 }
 
 class CProxy_ArrayBase;
@@ -470,13 +471,8 @@ template <class Parent,class CProxy_Derived>
 struct CBaseT1 : Parent, virtual CBase {
   CBASE_MEMBERS;
 
-#if CMK_HAS_RVALUE_REFERENCES
   template <typename... Args>
   CBaseT1(Args&&... args) : Parent(std::forward<Args>(args)...) { thisProxy = this; }
-#else
-  template <typename... Args>
-  CBaseT1(Args... args) : Parent(args...) { thisProxy = this; }
-#endif
 
   void parent_pup(PUP::er &p) {
     recursive_pup<Parent>(this, p);
@@ -1229,7 +1225,6 @@ if(CpvAccess(networkProgressCount) >=  p)  \
 #include "waitqd.h"
 #include "sdag.h"
 #include "ckcheckpoint.h"
-#include "ckevacuation.h"
 #include "trace.h"
 #include "envelope.h"
 #include "pathHistory.h"

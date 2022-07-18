@@ -1,54 +1,54 @@
 language: cpp
 
 os: linux
-dist: xenial
+dist: focal
 
 # Necessary for Windows builds - do not convert LF to CRLF:
 git:
   autocrlf: false
 
-before_install:
-  - |
-      if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then
-        git diff --name-only $TRAVIS_COMMIT_RANGE | grep -qvE '(\.rst$)|(^doc/)' || {
-          echo "Only docs were updated, stopping build process."
-          exit
-        }
-      fi
+# before_install:
+#   - |
+#       if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then
+#         git diff --name-only $TRAVIS_COMMIT_RANGE | grep -qvE '(\.rst$)|(^doc/)' || {
+#           echo "Only docs were updated, stopping build process."
+#           exit
+#         }
+#       fi
 
 jobs:
   include:
   - os: linux
-    name: "MPI-Linux SMP"
-    dist: xenial
+    arch: arm64
+    name: "NetLRTS-Arm64"
     script:
-    - sudo apt-get update && sudo apt-get install -y mpich libmpich-dev
-    - ./build all-test mpi-linux-x86_64 smp -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla --build-shared || exit 1
-    # TODO: this should build tests with "-charm-shared". See #2735 on why this is not done currently.
-    - make -C mpi-linux-x86_64-smp/tmp test TESTOPTS="+setcpuaffinity"
-    # Disabled due to several hangs and segfaults.
-    #- make -C mpi-linux-x86_64-smp/tmp testp P=4 TESTOPTS="+setcpuaffinity ++ppn 2"
-
-  - os: osx
-    name: "NetLRTS-Darwin"
+    - sudo apt-get update
+    - sudo apt-get install -y gfortran
+    - ./build all-test netlrts-linux-arm8 -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
+    - make -C netlrts-linux-arm8/tmp test TESTOPTS="++local"
+  - os: linux
+    arch: arm64
+    name: "MPI-Arm64"
     script:
-    - ./build all-test netlrts-darwin-x86_64 -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla --build-shared || exit 1
-    # TODO: this should build tests with "-charm-shared". See #2735 on why this is not done currently.
-    - make -C netlrts-darwin-x86_64/tmp test TESTOPTS="++local"
-    - make -C netlrts-darwin-x86_64/tmp testp P=2 TESTOPTS="++local"
-
-  - os: windows
-    name: "NetLRTS-Win"
+    - sudo apt-get update
+    - sudo apt-get install -y gfortran libopenmpi-dev
+    - export OMPI_MCA_rmaps_base_oversubscribe=1
+    - ./build all-test mpi-linux-arm8 -j3 --build-shared --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
+    - make -C mpi-linux-arm8/tmp test
+  - os: linux
+    arch: ppc64le
+    name: "NetLRTS-Power"
     script:
-    - choco upgrade -y cygwin cyg-get
-    - cyg-get.bat cmake make gcc-core binutils libtool
-    - unset CC
-    - unset CXX
-    - cmd.exe //c C:\\tools\\cygwin\\bin\\bash.exe -l -c "cd build/UIUC-PPL/charm && src/arch/win/travis.sh ./build AMPI netlrts-win-x86_64 --without-romio -g --with-production -j3"
-    - cmd.exe //c C:\\tools\\cygwin\\bin\\bash.exe -l -c "cd build/UIUC-PPL/charm && src/arch/win/travis.sh make -C netlrts-win-x86_64/tests -j3"
-    # Disabled lines would extend the CI's duration too much.
-    #- cmd.exe //c C:\\tools\\cygwin\\bin\\bash.exe -l -c "cd build/UIUC-PPL/charm && src/arch/win/travis.sh make -C netlrts-win-x86_64/examples -j3"
-    - cmd.exe //c C:\\tools\\cygwin\\bin\\bash.exe -l -c "cd build/UIUC-PPL/charm && src/arch/win/travis.sh make -C netlrts-win-x86_64/benchmarks -j3"
-    - cmd.exe //c C:\\tools\\cygwin\\bin\\bash.exe -l -c "cd build/UIUC-PPL/charm && src/arch/win/travis.sh make -C netlrts-win-x86_64/tests test TESTOPTS=++local"
-    #- cmd.exe //c C:\\tools\\cygwin\\bin\\bash.exe -l -c "cd build/UIUC-PPL/charm && src/arch/win/travis.sh make -C netlrts-win-x86_64/examples test TESTOPTS=++local"
-    #- cmd.exe //c C:\\tools\\cygwin\\bin\\bash.exe -l -c "cd build/UIUC-PPL/charm && src/arch/win/travis.sh make -C netlrts-win-x86_64/benchmarks test TESTOPTS=++local"
+    - sudo apt-get update
+    - sudo apt-get install -y gfortran
+    - ./build all-test netlrts-linux-ppc64le -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
+    - make -C netlrts-linux-ppc64le/tmp test TESTOPTS="++local"
+  - os: linux
+    arch: ppc64le
+    name: "MPI-Power"
+    script:
+    - sudo apt-get update
+    - sudo apt-get install -y gfortran libopenmpi-dev
+    - export OMPI_MCA_rmaps_base_oversubscribe=1
+    - ./build all-test mpi-linux-ppc64le -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla || exit 1
+    - make -C mpi-linux-ppc64le/tmp test

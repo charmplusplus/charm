@@ -74,6 +74,7 @@ check_function_exists(_strdup HAVE__STRDUP)
 check_function_exists(asctime CMK_HAS_ASCTIME)
 check_function_exists(backtrace CMK_USE_BACKTRACE)
 check_function_exists(bindprocessor CMK_HAS_BINDPROCESSOR)
+check_function_exists(cfree CMK_HAS_CFREE)
 check_function_exists(clz HAVE_CLZ)
 check_function_exists(clzl HAVE_CLZL)
 check_symbol_exists(dlopen dlfcn.h CMK_DLL_USE_DLOPEN)
@@ -88,7 +89,6 @@ check_function_exists(ffsl HAVE_FFSL)
 check_function_exists(fls HAVE_FLS)
 check_function_exists(flsl HAVE_FLSL)
 check_function_exists(getexecname HAVE_DECL_GETEXECNAME)
-check_function_exists(gethostname CMK_HAS_GETHOSTNAME)
 check_function_exists(getifaddrs CMK_HAS_GETIFADDRS)
 check_function_exists(getpagesize HAVE_GETPAGESIZE)
 check_function_exists(getpagesize CMK_HAS_GETPAGESIZE)
@@ -108,10 +108,9 @@ check_function_exists(mmap CMK_HAS_MMAP)
 check_symbol_exists(MAP_ANON sys/mman.h CMK_HAS_MMAP_ANON)
 check_symbol_exists(MAP_NORESERVE sys/mman.h CMK_HAS_MMAP_NORESERVE)
 check_function_exists(mprotect CMK_HAS_MPROTECT)
-check_symbol_exists(MPI_Init_thread mpi.h CMK_MPI_INIT_THREAD)
 check_function_exists(mstats CMK_HAS_MSTATS)
 check_function_exists(ntohl CMK_HAS_NTOHL)
-check_function_exists(offsetof CMK_HAS_OFFSETOF)
+check_symbol_exists(offsetof stddef.h CMK_HAS_OFFSETOF)
 check_function_exists(openat HAVE_OPENAT)
 check_function_exists(poll CMK_USE_POLL)
 check_function_exists(popen CMK_HAS_POPEN)
@@ -120,6 +119,8 @@ check_symbol_exists(pthread_getaffinity_np pthread.h HAVE_DECL_PTHREAD_GETAFFINI
 check_symbol_exists(pthread_setaffinity_np pthread.h HAVE_DECL_PTHREAD_SETAFFINITY_NP)
 set(CMK_HAS_PTHREAD_SETAFFINITY ${HAVE_DECL_PTHREAD_SETAFFINITY_NP})
 check_symbol_exists(pthread_spin_lock pthread.h CMK_HAS_SPINLOCK)
+check_symbol_exists(pvalloc malloc.h CMK_HAS_PVALLOC)
+check_symbol_exists(RTLD_DEEPBIND dlfcn.h CMK_HAS_RTLD_DEEPBIND)
 check_symbol_exists(RTLD_DEFAULT dlfcn.h CMK_HAS_RTLD_DEFAULT)
 check_symbol_exists(RTLD_NEXT dlfcn.h CMK_HAS_RTLD_NEXT)
 check_function_exists(readlink CMK_HAS_READLINK)
@@ -143,17 +144,10 @@ check_function_exists(sysctl HAVE_SYSCTL)
 check_function_exists(sysctlbyname HAVE_SYSCTLBYNAME)
 check_function_exists(uname HAVE_UNAME)
 check_function_exists(usleep CMK_HAS_USLEEP)
+check_symbol_exists(valloc malloc.h CMK_HAS_VALLOC)
 
 
 # Complex tests
-
-if(CMK_WINDOWS OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-  set(CMK_CAN_GET_BINARY_PATH 1)
-elseif(${CMK_HAS_READLINK} OR ${CMK_HAS_REALPATH})
-  set(CMK_CAN_GET_BINARY_PATH 1)
-else()
-  set(CMK_CAN_GET_BINARY_PATH 0)
-endif()
 
 file(WRITE ${CMAKE_BINARY_DIR}/test_file "")
 execute_process(COMMAND cp -p test_file test_file2 ERROR_VARIABLE CP_P_OPTION_ERROR)
@@ -297,7 +291,7 @@ int main()
 " CMK_HAS_NUMACTRL)
 
 set(tmp ${CMAKE_REQUIRED_LIBRARIES})
-set(CMAKE_REQUIRED_LIBRARIES $ENV{CRAY_PMI_POST_LINK_OPTS} $ENV{CRAY_UGNI_POST_LINK_OPTS} -lugni -lpmi)
+set(CMAKE_REQUIRED_LIBRARIES $ENV{CRAY_PMI_POST_LINK_OPTS} -lpmi)
 check_c_source_compiles("
 #include <pmi.h>
 int main() {
@@ -360,26 +354,6 @@ void test()
 }
 " CMK_IBV_PORT_ATTR_HAS_LINK_LAYER)
 
-check_c_source_compiles([=[
-void main() {
-  void * m1, * m2;
-  asm volatile ("movq %%fs:0x0, %0\\n\t"
-                "movq %1, %%fs:0x0\\n\t"
-                : "=&r"(m1)
-                : "r"(m2));
-}
-]=] CMK_TLS_SWITCHING_X86_64)
-
-check_c_source_compiles([=[
-void main() {
-  void * m1, * m2;
-  asm volatile ("movl %%gs:0x0, %0\\n\t"
-                "movl %1, %%gs:0x0\\n\t"
-                : "=&r"(m1)
-                : "r"(m2));
-}
-]=] CMK_TLS_SWITCHING_X86)
-
 check_c_source_compiles("
 #include <stdint.h>
 #include <gni_pub.h>
@@ -392,12 +366,6 @@ int main() {
     return 0;
 }
 " CMK_BALANCED_INJECTION_API)
-
-if(NOT CMK_BALANCED_INJECTION_API)
-  # Since it is often checked via #ifdef, CMK_BALANCED_INJECTION_API
-  # can't be set to zero, but must be unset.
-  unset(CMK_BALANCED_INJECTION_API CACHE)
-endif()
 
 if(${CMK_BUILD_OFI} EQUAL 1)
   set(tmp ${CMAKE_REQUIRED_LIBRARIES})
@@ -421,7 +389,11 @@ check_c_source_compiles("
 #include <ucontext.h>
 struct _libc_fpstate   fpstate;
 fpregset_t *fp;
-int main() {}
+int main()
+{
+  ucontext_t context;
+  context.uc_mcontext.fpregs = 0;
+}
 " CMK_CONTEXT_FPU_POINTER)
 
 check_c_source_compiles("

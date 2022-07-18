@@ -373,8 +373,8 @@ CkMemCheckPT::CkMemCheckPT(int w)
   if(CkNumPes() > 1) {
     void pingBuddy();
     void pingCheckHandler();
-    CcdCallOnCondition(CcdPERIODIC_100ms,(CcdVoidFn)pingBuddy,NULL);
-    CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
+    CcdCallOnCondition(CcdPERIODIC_100ms,(CcdCondFn)pingBuddy,NULL);
+    CcdCallOnCondition(CcdPERIODIC_5s,(CcdCondFn)pingCheckHandler,NULL);
   }
 #endif
 #if CMK_CHKP_ALL
@@ -416,8 +416,8 @@ void CkMemCheckPT::pup(PUP::er& p)
   if(CkNumPes() > 1) {
     void pingBuddy();
     void pingCheckHandler();
-    CcdCallOnCondition(CcdPERIODIC_100ms,(CcdVoidFn)pingBuddy,NULL);
-    CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
+    CcdCallOnCondition(CcdPERIODIC_100ms,(CcdCondFn)pingBuddy,NULL);
+    CcdCallOnCondition(CcdPERIODIC_5s,(CcdCondFn)pingCheckHandler,NULL);
   }
 #endif
   }
@@ -869,16 +869,16 @@ void CkMemCheckPT::resetLB(int diepe)
 {
 #if CMK_LBDB_ON
   int i;
-  std::vector<char> bitmap(CkNumPes());
+  std::vector<char> bitmap;
   // set processor available bitmap
-  get_avail_vector(bitmap.data());
+  get_avail_vector(bitmap);
 
   for (i=0; i<failedPes.size(); i++)
     bitmap[failedPes[i]] = 0; 
   bitmap[diepe] = 0;
 
 #if CK_NO_PROC_POOL
-  set_avail_vector(bitmap.data());
+  set_avail_vector(bitmap);
 #endif
 
   // if I am the crashed pe, rebuild my failedPEs array
@@ -1061,10 +1061,11 @@ void CkMemCheckPT::gotData()
 
 void CkMemCheckPT::updateLocations(int n, CkGroupID *g, CkArrayIndex *idx, CmiUInt8 *id, int nowOnPe)
 {
-
+  // TODO: This function is not called, and no longer works with the new location
+  // management API.
   for (int i=0; i<n; i++) {
     CkLocMgr *mgr = CProxy_CkLocMgr(g[i]).ckLocalBranch();
-    mgr->updateLocation(idx[i], id[i], nowOnPe);
+    //mgr->updateLocation(idx[i], id[i], nowOnPe);
   }
 	thisProxy[nowOnPe].gotReply();
 }
@@ -1219,7 +1220,7 @@ void CkMemCheckPT::finishUp()
 #if CMK_CONVERSE_MPI	
   if (CmiMyPe() == BuddyPE(thisFailedPe)) {
     lastPingTime = CmiWallTimer();
-    CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
+    CcdCallOnCondition(CcdPERIODIC_5s,(CcdCondFn)pingCheckHandler,NULL);
   }
 #endif
 
@@ -1465,7 +1466,8 @@ static void reportChkpSeqHandler(char * m)
 {
   CmiFree(m);
   CmiResetGlobalReduceSeqID();
-  CmiResetGlobalNodeReduceSeqID();
+  if (CmiMyRank() == 0)
+    CmiResetGlobalNodeReduceSeqID();
   char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes+sizeof(int));
   int num = CpvAccess(chkpNum);
   if(CkMyNode() == CpvAccess(_crashedNode))
@@ -1707,7 +1709,7 @@ void buddyDieHandler(char *msg)
    int buddy = obj->BuddyPE(CmiMyPe());
    if (buddy == diepe)  {
      mpi_restart_crashed(diepe, newrank);
-     //CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
+     //CcdCallOnCondition(CcdPERIODIC_5s,(CcdCondFn)pingCheckHandler,NULL);
    }
 #endif
 }
@@ -1753,7 +1755,7 @@ void pingCheckHandler()
 #endif
   }
   else 
-    CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
+    CcdCallOnCondition(CcdPERIODIC_5s,(CcdCondFn)pingCheckHandler,NULL);
 #endif
 }
 
@@ -1770,7 +1772,7 @@ void pingBuddy()
     CmiGetRestartPhase(msg) = 9999;
     CmiSyncSendAndFree(buddy, CmiMsgHeaderSizeBytes+sizeof(int), (char *)msg);
   }
-  CcdCallOnCondition(CcdPERIODIC_100ms,(CcdVoidFn)pingBuddy,NULL);
+  CcdCallOnCondition(CcdPERIODIC_100ms,(CcdCondFn)pingBuddy,NULL);
 #endif
 }
 #endif

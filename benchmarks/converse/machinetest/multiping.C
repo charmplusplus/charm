@@ -49,18 +49,18 @@ CpvDeclare(double, IdleStartTime);
 CpvDeclare(double, IdleTime);
 
 //Register Idle time handlers
-void ApplIdleStart(void *, double start)
+void ApplIdleStart(void *)
 {
-  CpvAccess(IdleStartTime)= start; //CmiWallTimer();
+  CpvAccess(IdleStartTime) = CmiWallTimer();
   return;
 }
 
-void ApplIdleEnd(void *, double cur)
+void ApplIdleEnd(void *)
 {
   if(CpvAccess(IdleStartTime) < 0)
     return;
 
-  CpvAccess(IdleTime) += cur /*CmiWallTimer()*/-CpvAccess(IdleStartTime);
+  CpvAccess(IdleTime) += CmiWallTimer() - CpvAccess(IdleStartTime);
   CpvAccess(IdleStartTime)=-1;
   return;
 }

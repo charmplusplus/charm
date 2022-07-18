@@ -1,8 +1,8 @@
 /** \file ckgraph.h
+ *
  *  Author: Abhinav S Bhatele
  *  Date Created: October 29th, 2010
  *  E-mail: bhatele@illinois.edu
- *
  */
 
 /**
@@ -14,160 +14,171 @@
 #ifndef _CKGRAPH_H_
 #define _CKGRAPH_H_
 
-#include <vector>
 #include "BaseLB.h"
+#include <vector>
 
-class ProcInfo {
+class ProcInfo
+{
   friend class ProcArray;
 
-  public:
-    ProcInfo() {}
-    ProcInfo(int i, double ov, double tl, double sp, bool avail): id(i), _overhead(ov), _totalLoad(tl), _pe_speed(sp), available(avail) {}
-    inline int getProcId() { return id; }
-    inline void setProcId(int _id) { id = _id; }
-    inline double getTotalLoad() const { return _totalLoad; }
-//    inline void setTotalLoad(double load) { totalLoad = load; }
-//    inline double getOverhead() { return overhead; }
-//    inline void setOverhead(double oh) { overhead = oh; }
-    inline double &overhead() { return _overhead; }
-    inline double &totalLoad() { return _totalLoad; }
-    inline double &pe_speed() { return _pe_speed; }
-    inline bool isAvailable() { return available; }
+public:
+  ProcInfo() = default;
+  ProcInfo(int i, double ov, double tl, double sp, bool avail)
+      : id(i), _overhead(ov), _totalLoad(tl), _peSpeed(sp), available(avail)
+  {
+  }
 
-  protected:
-    int id;		// CkMyPe of the processor
-    double _overhead;	// previously called background load (bg_walltime)
-    double _totalLoad;	// includes object_load + overhead
-    double _pe_speed;	// CPU speed
-    bool available;	// if the processor is available
+  int getProcId() const { return id; }
+  void setProcId(int _id) { id = _id; }
+
+  double getTotalLoad() const { return _totalLoad; }
+  void setTotalLoad(double newLoad) { _totalLoad = newLoad; }
+
+  double getOverhead() const { return _overhead; }
+  void setOverhead(double overhead) { _overhead = overhead; }
+
+  double getPeSpeed() const { return _peSpeed; }
+  void setPeSpeed(double peSpeed) { _peSpeed = peSpeed; }
+
+  bool isAvailable() const { return available; }
+
+protected:
+  int id;             // CkMyPe of the processor
+  double _overhead;   // previously called background load (bg_walltime)
+  double _totalLoad;  // includes object_load + overhead
+  double _peSpeed;   // CPU speed
+  bool available;     // if the processor is available
 };
 
-class ProcArray {
-  public:
-    ProcArray(BaseLB::LDStats *stats);
-    ~ProcArray() { }
-    inline double getAverageLoad() { return avgLoad; }
-    void resetTotalLoad();
+class ProcArray
+{
+public:
+  ProcArray(BaseLB::LDStats* stats);
+  double getAverageLoad() const { return avgLoad; }
+  void resetTotalLoad();
 
-    // vector containing the list of processors
-    std::vector<ProcInfo> procs;
+  // vector containing the list of processors
+  std::vector<ProcInfo> procs;
 
-  protected:
-    double avgLoad;
+protected:
+  double avgLoad;
 };
 
-class Edge {
+class Edge
+{
   friend class ObjGraph;
 
-  public:
-    Edge(int _id, int _msgs, int _bytes) : id(_id), msgs(_msgs),
-      bytes(_bytes) {
-    }
-    ~Edge() { }
-    inline int getNeighborId() { return id; }
-    inline int getNumMsgs() { return msgs; }
-    inline int getNumBytes() { return bytes; }
-    inline void setNumBytes(int _bytes) { bytes = _bytes; }
+public:
+  Edge(int _id, int _msgs, int _bytes) : id(_id), msgs(_msgs), bytes(_bytes) {}
+  int getNeighborId() const { return id; }
+  int getNumMsgs() const { return msgs; }
+  int getNumBytes() const { return bytes; }
+  void setNumBytes(int _bytes) { bytes = _bytes; }
 
-  private:
-    int id;		// id of the neighbor = index of the neighbor vertex
-			// in the vector 'vertices'
-    int msgs;		// number of messages exchanged
-    int bytes;		// total number of bytes exchanged
+private:
+  int id;     // id of the neighbor = index of the neighbor vertex
+              // in the vector 'vertices'
+  int msgs;   // number of messages exchanged
+  int bytes;  // total number of bytes exchanged
 };
 
-class McastSrc {
+class McastSrc
+{
   friend class ObjGraph;
 
-  public:
-    McastSrc(int _numDest, int _msgs, int _bytes) : numDest(_numDest), msgs(_msgs),
-    bytes(_bytes) {
-    }
+public:
+  McastSrc(int _numDest, int _msgs, int _bytes)
+      : numDest(_numDest), msgs(_msgs), bytes(_bytes)
+  {
+  }
 
-    ~McastSrc() { }
+  int getNumMsgs() const { return msgs; }
+  int getNumBytes() const { return bytes; }
+  void setNumBytes(int _bytes) { bytes = _bytes; }
 
-    inline int getNumMsgs() { return msgs; }
-    inline int getNumBytes() { return bytes; }
-    inline void setNumBytes(int _bytes) { bytes = _bytes; }
+  std::vector<int> destList;
 
-    std::vector<int> destList;
-
-  private:
-    int numDest; //number of destination for this multicast
-    int msgs; // number of messages exchanged
-    int bytes; // total number of bytes exchanged
+private:
+  int numDest;  // number of destination for this multicast
+  int msgs;     // number of messages exchanged
+  int bytes;    // total number of bytes exchanged
 };
 
-class McastDest {
+class McastDest
+{
   friend class ObjGraph;
 
-  public:
-    McastDest(int _src, int _offset, int _msgs, int _bytes) : src(_src),
-    offset(_offset), msgs(_msgs), bytes(_bytes) {
-    }
+public:
+  McastDest(int _src, int _offset, int _msgs, int _bytes)
+      : src(_src), offset(_offset), msgs(_msgs), bytes(_bytes)
+  {
+  }
 
-    ~McastDest() { }
+  int getSrc() const { return src; }
+  int getOffset() const { return offset; }
+  int getNumMsgs() const { return msgs; }
+  int getNumBytes() const { return bytes; }
+  void setNumBytes(int _bytes) { bytes = _bytes; }
 
-    inline int getSrc() { return src; }
-    inline int getOffset() { return offset; }
-    inline int getNumMsgs() { return msgs; }
-    inline int getNumBytes() { return bytes; }
-    inline void setNumBytes(int _bytes) { bytes = _bytes; }
-
-  private:
-    int src; // src of multicast being received
-    int offset; //multicast list which this message belongs to
-    int msgs; // number of messages exchanged
-    int bytes; // total number of bytes exchanged
+private:
+  int src;     // src of multicast being received
+  int offset;  // multicast list which this message belongs to
+  int msgs;    // number of messages exchanged
+  int bytes;   // total number of bytes exchanged
 };
 
-class Vertex {
+class Vertex
+{
   friend class ObjGraph;
 
-  public:
-    Vertex() {}
-    Vertex(int i, double cl, bool mig, int curpe, int newpe=-1, size_t pupsize=0):
-        id(i), compLoad(cl), migratable(mig), currPe(curpe), newPe(newpe),
-        pupSize(pupsize)  {}
-    inline int getVertexId() { return id; }
-    inline double getVertexLoad() const { return compLoad; }
-    inline int getCurrentPe() { return currPe; }
-    inline int getNewPe() { return newPe; }
-    inline void setNewPe(int _newpe) { newPe = _newpe; }
-    inline bool isMigratable() { return migratable; }
+public:
+  Vertex() = default;
+  Vertex(int i, double cl, bool mig, int curpe, int newpe = -1, size_t pupsize = 0)
+      : id(i),
+        compLoad(cl),
+        migratable(mig),
+        currPe(curpe),
+        newPe(newpe),
+        pupSize(pupsize)
+  {
+  }
 
-    // list of vertices this vertex sends messages to and receives from
-    std::vector<Edge> sendToList;
-    std::vector<Edge> recvFromList;
-    std::vector<McastSrc> mcastToList;
-    std::vector<McastDest> mcastFromList;
-		double getCompLoad() {return compLoad;}
-		void setCompLoad(double s) {compLoad = s;}
-    int getCurrPe() {return currPe;}
-    void setCurrPe(int s) {currPe = s;}
+  int getVertexId() const { return id; }
+  double getVertexLoad() const { return compLoad; }
+  int getCurrentPe() const { return currPe; }
+  int getNewPe() const { return newPe; }
+  void setNewPe(int _newpe) { newPe = _newpe; }
+  bool isMigratable() const { return migratable; }
 
+  // list of vertices this vertex sends messages to and receives from
+  std::vector<Edge> sendToList;
+  std::vector<Edge> recvFromList;
+  std::vector<McastSrc> mcastToList;
+  std::vector<McastDest> mcastFromList;
+  double getCompLoad() const { return compLoad; }
+  void setCompLoad(double s) { compLoad = s; }
+  int getCurrPe() const { return currPe; }
+  void setCurrPe(int s) { currPe = s; }
 
-  private:
-    int id;		// index in the LDStats array
-    double compLoad;	// computational load (walltime in LDStats)
-    bool migratable;	// migratable or non-migratable
-    int currPe;		// current processor assignment
-    int newPe;		// new processor assignment after load balancing
-    size_t pupSize;
+private:
+  int id;           // index in the LDStats array
+  double compLoad;  // computational load (walltime in LDStats)
+  bool migratable;  // migratable or non-migratable
+  int currPe;       // current processor assignment
+  int newPe;        // new processor assignment after load balancing
+  size_t pupSize;
 };
 
+class ObjGraph
+{
+public:
+  ObjGraph(BaseLB::LDStats* stats);
+  void convertDecisions(BaseLB::LDStats* stats);
 
-class ObjGraph {
-  public:
-    ObjGraph(BaseLB::LDStats *stats);
-    ~ObjGraph() { }
-    void convertDecisions(BaseLB::LDStats *stats);
-
-    // all vertices in the graph. Each vertex corresponds to a chare
-    std::vector<Vertex> vertices;
+  // all vertices in the graph. Each vertex corresponds to a chare
+  std::vector<Vertex> vertices;
 };
 
 #endif // _CKGRAPH_H_
 
 /*@}*/
-

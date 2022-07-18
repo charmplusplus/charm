@@ -2,7 +2,7 @@
 When running the megacon test, you can skip a test by typing a
 negative-sign and the test's name on the command line.  For example,
 
-  % conv-host pgm +p4 -timer -specmsg
+  % conv-host megacon +p4 -timer -specmsg
 
 would run all the tests except the timer and specmsg tests.
 

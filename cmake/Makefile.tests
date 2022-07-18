@@ -14,16 +14,24 @@
 # $(MAKEFLAGS) will contain "s". $(SILENT) is used in Makefile.tests.common.
 SILENT:=$(findstring s,$(word 1, $(MAKEFLAGS)))
 
+# Determine the full path of the build directory
+mkfile_path:=$(abspath $(lastword $(MAKEFILE_LIST)))
+mkfile_dir:=$(dir $(mkfile_path))
+build_dir:=$(abspath $(mkfile_dir)/..)
+
+
 all: charm++
 
 charm++:
-	make -C .. -q lib/libmoduletcharm.a || make -C ..
+	@echo "=== Note: this make will not check if Charm++ source files have changed."
+	@echo "=== Please run 'make' in $(build_dir) instead."
+	@$(MAKE) -C $(build_dir) -q lib/libck.a || $(MAKE) -C $(build_dir)
 
 AMPI: charm++
-	make -C .. -q lib/libmoduleampi.a || { echo "=== You are missing the AMPI targets. Please build Charm++ with './build AMPI <...>'. ==="; exit 1; }
+	@$(MAKE) -C $(build_dir) -q lib/libmoduleampi.a || { echo "=== You are missing the AMPI targets. Please build Charm++ with './build AMPI <...>'. ==="; exit 1; }
 
 LIBS: charm++
-	make -C .. -q lib/libmoduleCkCache.a || { echo "=== You are missing the LIBS targets. Please build Charm++ with './build LIBS <...>'. ==="; exit 1; }
+	@$(MAKE) -C $(build_dir) -q lib/libmoduleCkCache.a || { echo "=== You are missing the LIBS targets. Please build Charm++ with './build LIBS <...>'. ==="; exit 1; }
 
 converse: charm++
 

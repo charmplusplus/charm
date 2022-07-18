@@ -2,7 +2,7 @@ name: NetLRTS Linux CUDA buildonly
 
 # Buildonly test, as CUDA needs an actual device to run.
 
-on: [push]
+on: pull_request
 
 jobs:
   build:

@@ -9,9 +9,30 @@
 //
 ///////////////////////////////////////
 
+class Ping;
+
 #include "SimplePUP.decl.h"
 #include <vector>
 #include <cassert>
+
+class Ping: public PUP::able {
+  PUPable_decl(Ping);
+
+  Ping(int value) : value_(value) {}
+  Ping(CkMigrateMessage *m) : PUP::able(m) { }
+  virtual ~Ping() { }
+
+  virtual void pup(PUP::er &p) override {
+    PUP::able::pup(p);
+    p | value_;
+  }
+
+  void operator()() const {
+    CkPrintf("Ping %d!\n", value_);
+  }
+
+  int value_;
+};
 
 class main : public CBase_main {
 
@@ -21,6 +42,8 @@ public:
 
   main(CkArgMsg *m);
 
+  void accept(std::shared_ptr<Ping> ping);
+  void accept(std::vector<Ping*>* pings);
 };
 
 template <typename U> class SimpleArray : public CBase_SimpleArray<U> {
@@ -33,7 +56,6 @@ template <typename U> class SimpleArray : public CBase_SimpleArray<U> {
 
   void done(){
     CkPrintf("done int %d\n",localCopy.publicInt);
-    CkExit();
   }
 
   ~SimpleArray(){}

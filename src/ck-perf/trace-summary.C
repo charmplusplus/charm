@@ -1044,7 +1044,7 @@ void TraceSummaryBOC::initCCS() {
 			 CkCallback(CkIndex_TraceSummaryBOC::ccsRequestSummaryUnsignedChar(NULL), sumProxy[0])); 
 
       CkPrintf("[%d] Setting up periodic startCollectData callback\n", CkMyPe());
-      CcdCallOnConditionKeep(CcdPERIODIC_1second, startCollectData,
+      CcdCallOnConditionKeep(CcdPERIODIC_1second, (CcdCondFn)startCollectData,
 			     (void *)this);
       summaryCcsStreaming = true;
     }
@@ -1125,7 +1125,7 @@ void TraceSummaryBOC::ccsRequestSummaryUnsignedChar(CkCcsRequestMsg *m) {
 
 
 
-void startCollectData(void *data, double currT) {
+void startCollectData(void *data) {
   CkAssert(CkMyPe() == 0);
   // CkPrintf("startCollectData()\n");
   TraceSummaryBOC *sumObj = (TraceSummaryBOC *)data;
@@ -1135,7 +1135,7 @@ void startCollectData(void *data, double currT) {
   
   double startTime = lastRequestedIndexBlock*
     collectionGranularity * indicesPerBlock;
-  int numIndicesToGet = (int)floor((currT - startTime)/
+  int numIndicesToGet = (int)floor((CmiWallTimer() - startTime)/
 				   collectionGranularity);
   int numBlocksToGet = numIndicesToGet/indicesPerBlock;
   // **TODO** consider limiting the total number of blocks each collection
@@ -1297,12 +1297,18 @@ static void CombineSummary()
       // pe 0 start the sumonly process
     CProxy_TraceSummaryBOC sumProxy(traceSummaryGID);
     sumProxy[0].startSumOnly();
-  }else if(sumDetail)
-  {
-      CProxy_TraceSummaryBOC sumProxy(traceSummaryGID);
-      sumProxy.traceSummaryParallelShutdown(-1);
   }
-  else {
+  /*
+  // This is only used for the creation of the .sumall file, but it's causing crashes with
+  // sumDetail (Assertion "inIdle == 0 && inExec == 0" failed in beginIdle)
+  else if (sumDetail)
+  {
+    CProxy_TraceSummaryBOC sumProxy(traceSummaryGID);
+    sumProxy.traceSummaryParallelShutdown(-1);
+  }
+  */
+  else
+  {
     CkContinueExit();
   }
 #else

@@ -7,7 +7,7 @@
 LBVectorMigrateMsg * VectorStrategy(BaseLB::LDStats *stats)
 {
    int i;
-   int n_pes = stats->nprocs();
+   const int n_pes = stats->procs.size();
 
    processorInfo *processors = new processorInfo[n_pes];
 
@@ -52,7 +52,7 @@ LBVectorMigrateMsg * VectorStrategy(BaseLB::LDStats *stats)
   }
 
   int done = 0;
-  CkVec<VectorMigrateInfo *> miginfo;
+  std::vector<VectorMigrateInfo *> miginfo;
   while (!done) {
     processorInfo *donor = (processorInfo *) heavyProcessors->deleteMax();
     if (!donor) break;
@@ -85,16 +85,15 @@ LBVectorMigrateMsg * VectorStrategy(BaseLB::LDStats *stats)
     }
   }
 
-  int migrate_count = miginfo.length();
+  int migrate_count = miginfo.size();
   LBVectorMigrateMsg* msg = new(migrate_count,0) LBVectorMigrateMsg;
   msg->n_moves = migrate_count;
   for(i=0; i < migrate_count; i++) {
-    VectorMigrateInfo* item = (VectorMigrateInfo*) miginfo[i];
+    VectorMigrateInfo* item = miginfo[i];
     msg->moves[i] = *item;
     if (_lb_args.debug()>1)
       CkPrintf("Processor %d => %d load: %f.\n", item->from_pe, item->to_pe, item->load);
     delete item;
-    miginfo[i] = 0;
   }
 
   if (_lb_args.debug()>1) {

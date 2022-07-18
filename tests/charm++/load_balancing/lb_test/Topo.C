@@ -1,7 +1,7 @@
 #include <math.h>
 #include <charm++.h>
 
-#if defined(_WIN32)
+#ifdef _MSC_VER
 #define strcasecmp stricmp
 #endif
 

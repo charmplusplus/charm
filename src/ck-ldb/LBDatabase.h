@@ -1,3 +1,6 @@
+#ifndef LBDATABASE_H
+#define LBDATABASE_H
+
 #include "lbdb.h"
 
 #include "LBObj.h"
@@ -7,8 +10,11 @@
 
 #include <vector>
 
+class CkSyncBarrier;
+
 class LBDatabase {
 friend class LBManager;
+private:
   LBDatabase();
   struct LBObjEntry {
     static const LDObjIndex DEFAULT_NEXT = -1;
@@ -18,20 +24,16 @@ friend class LBManager;
     LBObjEntry(LBObj* obj, LDObjIndex nextEmpty = DEFAULT_NEXT) : obj(obj), nextEmpty(nextEmpty) {}
   };
 
-private:
   std::vector<LBObjEntry> objs;
   std::vector<LBOM*> oms;
   LDObjIndex objsEmptyHead;
   int omCount;
   int omsRegistering;
-  bool obj_running;
   LBCommTable* commTable;
-  LDObjIndex runningObj; // index of the runningObj in objs
   bool statsAreOn;
   double obj_walltime;
   LBMachineUtil machineUtil;
-
-
+  CkSyncBarrier* syncBarrier;
 
 #if CMK_LB_CPUTIMER
   double obj_cputime;
@@ -54,9 +56,6 @@ public:
   }
   inline LBObj *LbObjIdx(int h) const {
     return objs[h].obj;
-  }
-  inline const LDObjHandle &RunningObj() const {
-    return objs[runningObj].obj->GetLDObjHandle();
   }
 
   inline void ObjTime(LDObjHandle h, double walltime, double cputime) {
@@ -91,7 +90,6 @@ public:
   inline void Migratable(LDObjHandle h) { LbObj(h)->SetMigratable(true); };
   inline void setPupSize(LDObjHandle h, size_t pup_size) { LbObj(h)->setPupSize(pup_size);};
   inline void UseAsyncMigrate(LDObjHandle h, bool flag) { LbObj(h)->UseAsyncMigrate(flag); };
-public:
   inline int GetCommDataSz(void) {
     if (commTable)
       return commTable->CommCount();
@@ -111,8 +109,8 @@ public:
   LDOMHandle RegisterOM(LDOMid userID, void *userptr, LDCallbacks cb);
   int Migrate(LDObjHandle h, int dest);
   void UnregisterOM(LDOMHandle omh);
-  void RegisteringObjects(LBManager *mgr, LDOMHandle omh);
-  void DoneRegisteringObjects(LBManager *mgr, LDOMHandle omh);
+  void RegisteringObjects(LDOMHandle omh);
+  void DoneRegisteringObjects(LDOMHandle omh);
   int GetObjDataSz(void);
   void GetObjData(LDObjData *data);
   void MetaLBCallLBOnChares();
@@ -130,51 +128,13 @@ public:
                LBRealType *idletime, LBRealType *bg_walltime,
                LBRealType *bg_cputime);
   const std::vector<LBObjEntry>& getObjs() {return objs;}
-/**
-     runningObj records the obj handler index so that load balancer
-     knows if an event(e.g. Send) is in an entry function or not.
-     An index is enough here because LDObjHandle can be retrieved from
-     objs array. Copying LDObjHandle is expensive.
-  */
-  inline void SetRunningObj(const LDObjHandle &_h) {
-    runningObj = _h.handle;
-    obj_running = true;
-  }
-  inline void NoRunningObj() {
-    obj_running = false;
-  }
-  inline bool ObjIsRunning() const {
-    return obj_running;
-  }
-  inline int RunningObject(LDObjHandle* _o) const {
-#if CMK_LBDB_ON
-      if (ObjIsRunning()) {
-        *_o = RunningObj();
-        return 1;
-      }
-#endif
-      return 0;
-  };
-  inline const LDObjHandle *RunningObject() const {
-#if CMK_LBDB_ON
-      if (ObjIsRunning()) {
-        return &(RunningObj());
-      }
-#endif
-      return NULL;
-  };
 
   inline void ObjectStart(const LDObjHandle &h) {
-    if (ObjIsRunning()) {
-      ObjectStop(*RunningObject());
-    }
-
-    SetRunningObj(h);
-
     if (StatsOn()) {
       LbObj(h)->StartTimer();
     }
   };
+
   inline void ObjectStop(const LDObjHandle &h) {
     LBObj* const obj = LbObj(h);
 
@@ -184,20 +144,11 @@ public:
       obj->IncrementTime(walltime, cputime);
       MeasuredObjTime(walltime, cputime);
     }
-
-    NoRunningObj();
   };
   inline const LDObjHandle &GetObjHandle(int idx) {
     return LbObjIdx(idx)->GetLDObjHandle();
   }
-  inline void CollectStatsOn(void) {
-    if (!StatsOn()) {
-      if (ObjIsRunning()) {
-        LbObj(*RunningObject())->StartTimer();
-      }
-      TurnStatsOn();
-    }
-  };
+  void CollectStatsOn(void);
   inline void CollectStatsOff(void) { TurnStatsOff(); };
   inline int  CollectingStats(void) {
   #if CMK_LBDB_ON
@@ -208,3 +159,4 @@ public:
   };
 };
 
+#endif /* LBDATABASE_H */

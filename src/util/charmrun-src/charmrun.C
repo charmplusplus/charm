@@ -231,13 +231,15 @@ static int is_quote(char c) { return (c == '\'' || c == '"'); }
 
 static void zap_newline(char *s)
 {
-  char *p = s + strlen(s) - 1;
-  if (*p == '\n')
-    *p = '\0';
-  /* in case of DOS ^m */
-  p--;
-  if (*p == '\15')
-    *p = '\0';
+  const size_t len = strlen(s);
+  if (len >= 1 && s[len-1] == '\n')
+  {
+    s[len-1] = '\0';
+
+    /* in case of DOS ^m */
+    if (len >= 2 && s[len-2] == '\r')
+      s[len-2] = '\0';
+  }
 }
 
 /* get substring from lo to hi, remove quote chars */
@@ -747,6 +749,11 @@ static int arg_charmrun_port;
 static const char *arg_shrinkexpand_basedir;
 #endif
 
+#if CMK_USE_SHMEM
+static int arg_ipc_cutoff;
+static int arg_ipc_pool_size;
+#endif
+
 #if CMK_USE_SSH
 static int arg_maxssh;
 static const char *arg_shell;
@@ -823,6 +830,11 @@ static void arg_init(int argc, const char **argv)
 
   pparam_int(&arg_requested_nodes, 0, "n", "Number of processes to create");
   pparam_int(&arg_requested_nodes, 0, "np", "Number of processes to create");
+
+#if CMK_USE_SHMEM
+  pparam_int(&arg_ipc_pool_size, -1, CMI_IPC_POOL_SIZE_ARG, CMI_IPC_POOL_SIZE_DESC);
+  pparam_int(&arg_ipc_cutoff, -1, CMI_IPC_CUTOFF_ARG, CMI_IPC_CUTOFF_DESC);
+#endif
 
   pparam_int(&arg_timeout, 60, "timeout",
              "Seconds to wait per host connection");
@@ -1183,7 +1195,7 @@ static void arg_init(int argc, const char **argv)
 #if CMK_SMP
     if (arg_requested_pes > 0 && arg_requested_nodes > 0 && arg_ppn > 0 && arg_ppn * arg_requested_nodes != arg_requested_pes)
     {
-      fprintf(stderr, "Charmrun> Error: ++np times ++ppn does not equal +p.\n");
+      fprintf(stderr, "Charmrun> Error: +n/++np %d times ++ppn %d does not equal +p %d.\n", arg_requested_nodes, arg_ppn, arg_requested_pes);
       exit(1);
     }
 
@@ -1196,14 +1208,14 @@ static void arg_init(int argc, const char **argv)
       }
       else
       {
-        fprintf(stderr, "Charmrun> Error: ++ppn (number of PEs per node) does not divide +p (number of PEs).\n");
+        fprintf(stderr, "Charmrun> Error: ++ppn %d (number of PEs per node) does not divide +p %d (number of PEs).\n", arg_ppn, arg_requested_pes);
         exit(1);
       }
     }
 #else
     if (arg_requested_pes > 0 && arg_requested_nodes > 0 && arg_requested_pes != arg_requested_nodes)
     {
-      fprintf(stderr, "Charmrun> Error: +p and ++np do not agree.\n");
+      fprintf(stderr, "Charmrun> Error: +p %d and +n/++np %d do not agree.\n", arg_requested_pes, arg_requested_nodes);
       exit(1);
     }
 #endif
@@ -4130,6 +4142,15 @@ int main(int argc, const char **argv, char **envp)
       host_table.resize(arg_requested_numhosts);
   }
 
+#if !defined(_WIN32)
+  if (arg_runscript && access(arg_runscript, X_OK))
+  {
+    fprintf(stderr, "Charmrun> Error: runscript \"%s\" is not executable: %s\n",
+            arg_runscript, strerror(errno));
+    exit(1);
+  }
+#endif
+
   if (arg_verbose)
   {
     char ips[200];
@@ -4365,17 +4386,17 @@ static void start_nodes_daemon(std::vector<nodetab_process> & process_table)
   {
     const nodetab_host * h = p.host;
 
-    char *arg_currdir_r = pathfix(arg_currdir_a, h->pathfixes);
-    strcpy(task.cwd, arg_currdir_r);
-    free(arg_currdir_r);
-    char *arg_nodeprog_r = pathextfix(arg_nodeprog_a, h->pathfixes, h->ext);
-    strcpy(task.pgm, arg_nodeprog_r);
+    char *currdir_relative = pathfix(arg_currdir_a, h->pathfixes);
+    strcpy(task.cwd, currdir_relative);
+    free(currdir_relative);
+    char *nodeprog_relative = pathextfix(arg_nodeprog_a, h->pathfixes, h->ext);
+    strcpy(task.pgm, nodeprog_relative);
 
     if (arg_verbose)
       printf("Charmrun> Starting node program %d on '%s' as %s.\n", p.nodeno,
-             h->name, arg_nodeprog_r);
-    free(arg_nodeprog_r);
-    sprintf(task.env, "NETSTART=%s", create_netstart(p.nodeno));
+             h->name, nodeprog_relative);
+    free(nodeprog_relative);
+    sprintf(task.env, "NETSTART=%.240s", create_netstart(p.nodeno));
 
     char nodeArgBuffer[5120]; /*Buffer to hold assembled program arguments*/
     char *argBuf;
@@ -4718,6 +4739,15 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
 #endif
     fprintf(f, "NETMAGIC=\"%d\";export NETMAGIC\n", getpid() & 0x7FFF);
 
+#if CMK_USE_SHMEM
+  fprintf(f,
+          CMI_IPC_POOL_SIZE_ENV_VAR "=\"%d\";export " CMI_IPC_POOL_SIZE_ENV_VAR "\n",
+          arg_ipc_pool_size);
+  fprintf(f,
+          CMI_IPC_CUTOFF_ENV_VAR "=\"%d\";export " CMI_IPC_CUTOFF_ENV_VAR "\n",
+          arg_ipc_cutoff);
+#endif
+
   if (arg_mpiexec) {
     fprintf(f, "CmiMyNode=$OMPI_COMM_WORLD_RANK\n");
     fprintf(f, "test -z \"$CmiMyNode\" && CmiMyNode=$MPIRUN_RANK\n");
@@ -4819,14 +4849,14 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
           "/usr/X11R6/bin:/usr/openwin/bin\"\n");
 
   /* find the node-program */
-  char *arg_nodeprog_r = pathextfix(arg_nodeprog_a, h->pathfixes, h->ext);
+  char *nodeprog_relative = pathextfix(arg_nodeprog_a, h->pathfixes, h->ext);
 
   /* find the current directory, relative version */
-  char *arg_currdir_r = pathfix(arg_currdir_a, h->pathfixes);
+  char *currdir_relative = pathfix(arg_currdir_a, h->pathfixes);
 
   if (arg_verbose) {
     printf("Charmrun> find the node program \"%s\" at \"%s\" for %d.\n",
-           arg_nodeprog_r, arg_currdir_r, nodeno);
+           nodeprog_relative, currdir_relative, nodeno);
   }
   if (arg_debug || arg_debug_no_pause || arg_in_xterm) {
     ssh_Find(f, h->xterm, "F_XTERM");
@@ -4856,15 +4886,15 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
     fprintf(f, "fi\n");
   }
 
-  fprintf(f, "if test ! -x \"%s\"\nthen\n", arg_nodeprog_r);
-  fprintf(f, "  Echo 'Cannot locate this node-program: %s'\n", arg_nodeprog_r);
+  fprintf(f, "if test ! -x \"%s\"\nthen\n", nodeprog_relative);
+  fprintf(f, "  Echo 'Cannot locate this node-program: %s'\n", nodeprog_relative);
   fprintf(f, "  Exit 1\n");
   fprintf(f, "fi\n");
 
-  fprintf(f, "cd \"%s\"\n", arg_currdir_r);
+  fprintf(f, "cd \"%s\"\n", currdir_relative);
   fprintf(f, "if test $? = 1\nthen\n");
   fprintf(f, "  Echo 'Cannot propagate this current directory:'\n");
-  fprintf(f, "  Echo '%s'\n", arg_currdir_r);
+  fprintf(f, "  Echo '%s'\n", currdir_relative);
   fprintf(f, "  Exit 1\n");
   fprintf(f, "fi\n");
 
@@ -4908,9 +4938,9 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
       fprintf(f, "$F_XTERM");
       fprintf(f, " -title 'Node %d (%s)' ", nodeno, h->name);
       if (strcmp(dbg, "idb") == 0)
-        fprintf(f, " -e $F_DBG \"%s\" -c /tmp/charmrun_gdb.$$ \n", arg_nodeprog_r);
+        fprintf(f, " -e $F_DBG \"%s\" -c /tmp/charmrun_gdb.$$ \n", nodeprog_relative);
       else
-        fprintf(f, " -e $F_DBG \"%s\" -x /tmp/charmrun_gdb.$$ \n", arg_nodeprog_r);
+        fprintf(f, " -e $F_DBG \"%s\" -x /tmp/charmrun_gdb.$$ \n", nodeprog_relative);
     } else if (strcmp(dbg, "lldb") == 0) {
       fprintf(f, "cat > /tmp/charmrun_lldb.$$ << END_OF_SCRIPT\n");
       fprintf(f, "platform shell -- /bin/rm -f /tmp/charmrun_lldb.$$\n");
@@ -4933,7 +4963,7 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
         fprintf(f, "\"%s\" ", arg_runscript);
       fprintf(f, "$F_XTERM");
       fprintf(f, " -title 'Node %d (%s)' ", nodeno, h->name);
-      fprintf(f, " -e $F_DBG \"%s\" -s /tmp/charmrun_lldb.$$ \n", arg_nodeprog_r);
+      fprintf(f, " -e $F_DBG \"%s\" -s /tmp/charmrun_lldb.$$ \n", nodeprog_relative);
     } else if (strcmp(dbg, "dbx") == 0) {
       fprintf(f, "cat > /tmp/charmrun_dbx.$$ << END_OF_SCRIPT\n");
       fprintf(f, "sh /bin/rm -f /tmp/charmrun_dbx.$$\n");
@@ -4955,7 +4985,7 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
         fprint_arg(f, argv);
         fprintf(f, "\' ");
       }
-      fprintf(f, "-s/tmp/charmrun_dbx.$$ %s", arg_nodeprog_r);
+      fprintf(f, "-s/tmp/charmrun_dbx.$$ %s", nodeprog_relative);
       if (arg_debug_no_pause)
         fprint_arg(f, argv);
       fprintf(f, "\n");
@@ -4971,7 +5001,7 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
     if (!arg_va_rand)
       fprintf(f, "command -v setarch >/dev/null 2>&1 && SETARCH=\"setarch `uname -m` -R \" || ");
     fprintf(f, "SETARCH=\n");
-    fprintf(f, "${SETARCH}%s", arg_nodeprog_r);
+    fprintf(f, "${SETARCH}%s", nodeprog_relative);
     fprint_arg(f, argv);
     fprintf(f, "\n");
     fprintf(f, "echo 'program exited with code '\\$?\n");
@@ -4989,7 +5019,7 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
     fprintf(f, "SETARCH=\n");
     if (arg_runscript)
       fprintf(f, "\"%s\" ", arg_runscript);
-    fprintf(f, "${SETARCH}\"%s\" ", arg_nodeprog_r);
+    fprintf(f, "${SETARCH}\"%s\" ", nodeprog_relative);
     fprint_arg(f, argv);
     if (h->nice != -100) {
       if (arg_verbose)
@@ -5008,7 +5038,7 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
                "    ldd \"%s\"\n"
                "  ) > /tmp/charmrun_err.$$ 2>&1 \n"
                "fi\n",
-            arg_nodeprog_r, arg_nodeprog_r);
+            nodeprog_relative, nodeprog_relative);
   }
 
   /* End the node-program subshell. To minimize the number
@@ -5035,7 +5065,7 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
           "  Exit 1\n"
           "fi\n");
   fprintf(f, "Exit 0\n");
-  free(arg_currdir_r);
+  free(currdir_relative);
 }
 
 /* use the command "size" to get information about the position of the ".data"
@@ -5420,7 +5450,9 @@ struct local_nodestart
     const int onewth_active = onewth_per.active();
     extra += onewth_active;
 #endif
-
+#if CMK_USE_SHMEM
+    extra += 2;
+#endif
     envp = (char **) malloc((envc + 3 + extra + 1) * sizeof(void *));
     for (int i = 0; i < envc; i++)
       envp[i] = env[i];
@@ -5475,6 +5507,14 @@ struct local_nodestart
       }
       ++n;
     }
+#endif
+#if CMK_USE_SHMEM
+    envp[envc + n] = (char *) malloc(256);
+    sprintf(envp[envc + n], CMI_IPC_POOL_SIZE_ENV_VAR "=%d", arg_ipc_pool_size);
+    ++n;
+    envp[envc + n] = (char *) malloc(256);
+    sprintf(envp[envc + n], CMI_IPC_CUTOFF_ENV_VAR "=%d", arg_ipc_cutoff);
+    ++n;
 #endif
     envp[envc + n] = 0;
 
