@@ -69,7 +69,7 @@ Yes.
 Charm++ supports both shared-memory and distributed-memory machines,
 SMPs and non-SMPs. In particular, we support serial machines, Windows
 machines, Apple machines, ARM machines, clusters connected via Ethernet,
-or Infiniband, IBM Power series and BlueGene/Q, Cray XC/XE/XK series,
+or Infiniband, IBM Power series, Cray XC/XE/XK series,
 and any machine that supports MPI. We normally do our development on
 Linux workstations, and our testing on large parallel machines. Programs
 written using Charm++ will run on any supported machine.

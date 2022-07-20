@@ -1,3 +1,5 @@
+// Author: Juan Galvez <jjgalvez@illinois.edu>
+
 #ifndef TREEBUILDER_H
 #define TREEBUILDER_H
 

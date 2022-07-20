@@ -471,12 +471,12 @@ using Requires = typename requires_impl<
 
   template <typename T, Requires<std::is_base_of<PUP::able, T>::value> = nullptr>
   inline void pup(PUP::er& p, std::unique_ptr<T>& t) {
-    T* t1 = nullptr;
+    PUP::able* t1 = nullptr;
     if (p.isUnpacking()) {
       p | t1;
-      t = std::unique_ptr<T>(t1);
+      t.reset((T*)t1);
     } else {
-      t1 = t.get();
+      t1 = (PUP::able*)t.get();
       p | t1;
     }
   }

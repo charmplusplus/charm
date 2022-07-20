@@ -1860,14 +1860,14 @@ void LrtsPostCommonInit(int everReturn)
 #if CMK_SHARED_VARS_UNAVAILABLE
   if (Cmi_netpoll) /*Repeatedly call CommServer*/
     CcdCallOnConditionKeep(CcdPERIODIC, 
-        (CcdVoidFn) CommunicationPeriodic, NULL);
+        (CcdCondFn) CommunicationPeriodic, NULL);
   else /*Only need this for retransmits*/
     CcdCallOnConditionKeep(CcdPERIODIC_10ms, 
-        (CcdVoidFn) CommunicationPeriodic, NULL);
+        (CcdCondFn) CommunicationPeriodic, NULL);
 #endif
     
   if (CmiMyRank()==0 && Cmi_charmrun_fd!=-1) {
-    CcdCallOnConditionKeep(CcdPERIODIC_10ms, (CcdVoidFn) CmiStdoutFlush, NULL);
+    CcdCallOnConditionKeep(CcdPERIODIC_10ms, (CcdCondFn) CmiStdoutFlush, NULL);
 #if CMK_SHARED_VARS_UNAVAILABLE
     if (!Cmi_asyncio) {
     /* gm cannot live with setitimer */
@@ -1908,7 +1908,7 @@ void LrtsPostCommonInit(int everReturn)
   /* Call the function to periodically call the token adapt function */
   CcdCallFnAfter((CcdVoidFn)TokenUpdatePeriodic, NULL, 2000); // magic number of 2000ms
   CcdCallOnConditionKeep(CcdPERIODIC_10s,   // magic number of PERIOD 10s
-        (CcdVoidFn) TokenUpdatePeriodic, NULL);
+        (CcdCondFn) TokenUpdatePeriodic, NULL);
 #endif
   
 #ifdef CMK_RANDOMLY_CORRUPT_MESSAGES
