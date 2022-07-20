@@ -90,10 +90,6 @@ extern void QdCreate(int);
 extern void QdProcess(int);
 #endif
 
-#if CMK_GPU_COMM
-CkpvExtern(CkCallbackPool, cb_pool);
-#endif
-
 void CkRestartMain(const char* dirname, CkArgMsg* args);
 
 #define  DEBUGF(x)     //CmiPrintf x;
@@ -1471,8 +1467,6 @@ void _initCharm(int unused_argc, char **argv)
 
 #if CMK_GPU_COMM
 	CmiChannelHandlerInit(CkChannelHandler);
-	CkpvInitialize(CkCallbackPool, cb_pool);
-	CkpvAccess(cb_pool) = CkCallbackPool();
 #if CMK_CUDA
 	CmiDeviceRecvHandlerInit(CkRdmaDeviceRecvHandler);
 #endif

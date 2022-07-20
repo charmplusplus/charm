@@ -2040,10 +2040,6 @@ void zcPupIssueRgets(CmiUInt8 id, CkLocMgr *locMgr) {
 /****************************** Channel API ******************************/
 
 #if CMK_GPU_COMM
-#define CKCALLBACK_POOL 1 // Pool CkCallback allocations
-
-CkpvDeclare(CkCallbackPool, cb_pool);
-
 CkChannel::CkChannel(int id_, const CProxyElement_ArrayBase &proxy) : CkChannel(id_) {
   peer_pe = proxy.ckLocalBranch()->lastKnown(proxy.ckGetIndex());
 }
