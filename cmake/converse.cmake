@@ -198,8 +198,8 @@ add_library(ldb-spray src/conv-ldb/cldb.spray.C ${conv-ldb-h-sources})
 
 # TopoManager
 set(tmgr-c-sources src/util/topomanager/CrayNid.c)
-set(tmgr-cxx-sources src/util/topomanager/TopoManager.C src/util/topomanager/BGQTorus.C)
-set(tmgr-h-sources src/util/topomanager/TopoManager.h ${CMAKE_BINARY_DIR}/include/topomanager_config.h src/util/topomanager/XTTorus.h src/util/topomanager/BGQTorus.h)
+set(tmgr-cxx-sources src/util/topomanager/TopoManager.C)
+set(tmgr-h-sources src/util/topomanager/TopoManager.h ${CMAKE_BINARY_DIR}/include/topomanager_config.h src/util/topomanager/XTTorus.h)
 file(WRITE ${CMAKE_BINARY_DIR}/include/topomanager_config.h "// empty\n" )
 
 # Converse

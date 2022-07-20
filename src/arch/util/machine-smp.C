@@ -396,11 +396,6 @@ static void *call_startfn(void *vindex)
   return 0;
 }
 
-#if CMK_BLUEGENEQ && !CMK_USE_LRTS
-/* pami/machine.C defines its own version of this: */
-void PerrorExit(const char*);
-#endif
-
 #if CMK_CONVERSE_PAMI
 // Array used by the 'rank 0' thread to wait for other threads using pthread_join
 pthread_t *_Cmi_mypidlist;

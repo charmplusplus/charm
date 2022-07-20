@@ -1,7 +1,8 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
-#define CMK_OFI 1
+#define CMK_CRAYEX                                         1
+#define CMK_OFI                                            1
 
 /* define the default linker, together with its options */
 #define CMK_DLL_CC   "g++ -shared -O3 -o "
@@ -56,7 +57,6 @@
 #define CMK_TIMER_USE_GETRUSAGE                            1
 #define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                0
-#define CMK_TIMER_USE_BLUEGENEL                            0
 
 /* Specifies what the processor will do when it is idle, either sleep (1) or go
    into busy waiting mode (0). In convcore.C there are a few files included if

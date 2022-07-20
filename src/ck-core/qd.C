@@ -234,7 +234,7 @@ void _qdHandler(envelope *env)
   if (_dummy_dq > 0)
     CcdCallFnAfter((CcdVoidFn)_invokeQD,(void *)msg, _dummy_dq*1000); // in ms
   else
-    CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE, (CcdVoidFn)_callWhenIdle, (void*) msg);
+    CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE, (CcdCondFn)_callWhenIdle, (void*) msg);
 }
 
 // when a message is sent or received from an immediate handler from comm

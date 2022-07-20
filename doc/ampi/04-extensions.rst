@@ -356,6 +356,13 @@ wait on any outstanding send requests before calling ``AMPI_Migrate``.
        AMPI_Migrate(AMPI_INFO_LB_SYNC);
    }
 
+``AMPI_Migrate_to_pe`` migrates the calling rank to the specified PE. 
+``AMPI_Migrate`` is preferred to users calling ``AMPI_Migrate_to_pe`` directly,
+because ``AMPI_Migrate_to_pe`` requires Charm++ support for anytime migration.
+Anytime migration requires the runtime system to buffer Charm++ broadcasts,
+which has a memory overhead. Consequently, users are required to run with
+``+ampiEnableMigrateToPe`` in order to call this extension routine.
+
 Note that migrating ranks around the cores and nodes of a system can
 change which ranks share physical resources, such as memory. A
 consequence of this is that communicators created via

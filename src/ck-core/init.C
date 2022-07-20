@@ -258,9 +258,9 @@ class CkWhenIdleRecord {
   CkWhenIdleRecord(const int &epIdx, void *obj)
   : epIdx_(epIdx), obj_(static_cast<Chare *>(obj)) {}
 
-  static void onIdle(CkWhenIdleRecord *self, double curWallTime) {
+  static void onIdle(CkWhenIdleRecord *self) {
     CkCallstackPush(self->obj_);
-    ((CcdVoidFn)_entryTable[self->epIdx_]->call)(self->obj_, curWallTime);
+    ((CcdVoidFn)_entryTable[self->epIdx_]->call)(self->obj_, CmiWallTimer());
     CkCallstackPop(self->obj_);
     delete self;
   }
@@ -269,7 +269,7 @@ class CkWhenIdleRecord {
 void CkCallWhenIdle(int epIdx, void *obj) {
   auto *record = new CkWhenIdleRecord(epIdx, obj);
   CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE,
-                    (CcdVoidFn)CkWhenIdleRecord::onIdle, record);
+                    (CcdCondFn)CkWhenIdleRecord::onIdle, record);
 }
 
 // Modules are required to register command line opts they will parse. These
