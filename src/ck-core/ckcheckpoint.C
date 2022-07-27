@@ -116,6 +116,7 @@ static void bdcastRO(void){
 	int i;
 	// Determine the size of the RODataMessage
 	PUP::sizer ps(PUP::er::IS_CHECKPOINT);
+	ps|numZerocopyROops;
 	for(i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(ps);
 
 	// Allocate and fill out the RODataMessage
