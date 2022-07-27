@@ -75,7 +75,7 @@ function parse_triplet() {
   # Extract extra options from the full_triplet, e.g.,
   # full_triplet='netlrts-darwin-x86_64-smp-omp'
   # becomes actual_triplet='netlrts-darwin-x86_64' and extra_triplet_opts='smp omp'
-  all_triplets=$(cd src/arch && find . -maxdepth 1 -name '*-*' -type d | sed 's,./,,')
+  all_triplets=$(cd $my_srcdir/src/arch && find . -maxdepth 1 -name '*-*' -type d | sed 's,./,,')
   extra_triplet_opts="$full_triplet"
   for t in $all_triplets; do
     extra_triplet_opts=${extra_triplet_opts#$t}
