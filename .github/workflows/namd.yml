@@ -3,7 +3,7 @@ name: NAMD
 on: pull_request
 
 jobs:
-  build:
+  build-and-test-namd:
     runs-on: ubuntu-latest
 
     steps:
