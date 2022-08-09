@@ -18,7 +18,7 @@ void CmiFreeBroadcastAllExceptMeFn(int size, char *msg);
 #endif
 
 // Integer used to store the ncpy ack handler idx
-static int ncpy_handler_idx, ncpy_bcastNo_handler_idx, zcpy_pup_complete_handler_idx;
+static int ncpy_handler_idx, zcpy_pup_complete_handler_idx;
 
 CkpvExtern(ReqTagPostMap, ncpyPostedReqMap);
 CkpvExtern(ReqTagBufferMap, ncpyPostedBufferMap);
@@ -1904,34 +1904,9 @@ inline void invokeCmaDirectRemoteDeregAckHandler(CkNcpyBuffer &buffInfo, ncpyHan
   CmiSyncSendAndFree(buffInfo.pe, sizeof(ncpyHandlerMsg) + implSizer.size(), (char *)msg);
 }
 
-void invokeNcpyBcastNoHandler(int serializerPe, ncpyBcastNoMsg *bcastNoMsg, int msgSize) {
-  CmiSetHandler(bcastNoMsg, ncpy_bcastNo_handler_idx);
-  CmiBecomeImmediate(bcastNoMsg);
-  CmiSyncNodeSendAndFree(CmiNodeOf(serializerPe), msgSize, (char *)bcastNoMsg);
-}
-
-inline void _ncpyBcastNoHandler(ncpyBcastNoMsg *bcastNoMsg) {
-
-  CProxy_CkArray arrProxy;
-  PUP::fromMem implP((char *)bcastNoMsg + sizeof(ncpyBcastNoMsg));
-  implP|arrProxy;
-
-  CkArray *arr = (CkArray *)CkLocalBranchOther(arrProxy.ckGetGroupID(), 0);
-  CkArrayBroadcaster *bcaster = arr->getBroadcaster();
-
-  // increment bcastNo and send back a message to broadcast from the non-zero root
-  bcaster->incBcastNo();
-
-  MsgPointerWrapper w;
-  w.msg = bcastNoMsg->ref;
-
-  arrProxy[bcastNoMsg->srcPe].sendZCBroadcast(w);
-}
-
 
 // Register converse handler for invoking ncpy ack
 void initEMNcpyAckHandler(void) {
-  ncpy_bcastNo_handler_idx = CmiRegisterHandler((CmiHandler)_ncpyBcastNoHandler);
   ncpy_handler_idx = CmiRegisterHandler((CmiHandler)_ncpyAckHandler);
 #if CMK_SMP
   zcpy_pup_complete_handler_idx = CmiRegisterHandler((CmiHandler)_zcpyPupCompleteHandler);

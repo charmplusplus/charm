@@ -580,12 +580,16 @@ static PUP_registry *PUP_getRegistry(void) {
 	return reg;
 }
 
-const PUP_regEntry *PUP_getRegEntry(const PUP::able::PUP_ID &id)
+const PUP_regEntry *PUP_getRegEntry(const PUP::able::PUP_ID &id,
+                                    const char *const name_hint = NULL)
 {
 	const PUP_regEntry *cur=(const PUP_regEntry *)(
 		PUP_getRegistry()->CkHashtable::get((const void *)&id) );
-	if (cur==NULL)
+	if (cur==NULL) {
+		if (name_hint != NULL)
+			CmiAbort("Unrecognized PUP::able::PUP_ID for %s", name_hint);
 		CmiAbort("Unrecognized PUP::able::PUP_ID. is there an unregistered module?");
+	}
 	return cur;
 }
 
@@ -623,7 +627,7 @@ void PUP::er::object(able** a)
 		} else {
 			const PUP::able::PUP_ID &id=(*a)->get_PUP_ID();
 			id.pup(*this);
-			r=PUP_getRegEntry(id);
+			r=PUP_getRegEntry(id, typeid(**a).name());
 		}
 	}
 	syncComment(PUP::sync_begin_object,r->name);

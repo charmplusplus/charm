@@ -11580,6 +11580,12 @@ For example, to build Charm++ and AMPI on top of the MPI layer with SMP, the fol
 
    $ cmake .. -DNETWORK=mpi -DSMP=on -DTARGET=AMPI
 
+Alternatively, one could also specify other ``cmake`` configuration options via the 
+``../build`` command, for example, by replacing the above ``cmake ..`` command with
+
+.. code-block:: bash
+
+   $ ../build AMPI mpi-linux-x86_64 smp
 
 Charm++ installation directories
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
