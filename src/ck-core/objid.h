@@ -53,23 +53,34 @@ class ObjID {
         ObjID(const CkGroupID gid, const CmiUInt8 eid)
             : id( ((CmiUInt8)gid.idx << (HOME_BITS + ELEMENT_BITS)) | eid)
         {
-            if ( (CmiUInt8)gid.idx > (COLLECTION_MASK >> (HOME_BITS + ELEMENT_BITS)) ) {
-              CmiPrintf("\nError> ObjID ran out of collection bits, please try re-building "
-                        "Charm++ with a higher number of collection bits using "
-                        "-DCMK_OBJID_COLLECTION_BITS=N, such that %d<N<30\n",
-                        COLLECTION_BITS);
-              // We don't generally recommend collections bits > 30, though it's possible,
-              // b/c then ObjID only has < 32 bits for the element ID.
-              CmiAbort("Attempting to create too many chare collections!");
-            }
-            if ( eid > (HOME_MASK | ELEMENT_MASK) ) {
-              CmiPrintf("\nError> ObjID ran out of element bits, please try re-building "
-                        "Charm++ with a lower number of collection bits using "
-                        "-DCMK_OBJID_COLLECTION_BITS=N, such that 3<N<%d\n",
-                        COLLECTION_BITS);
-              // We don't generally recommend collections bits <= 3 though it's possible
-              CmiAbort("Attempting to create too many chare elements!");
-            }
+          if ((CmiUInt8)gid.idx > (COLLECTION_MASK >> (HOME_BITS + ELEMENT_BITS)))
+          {
+            // We don't generally recommend collections bits > 30, though it's possible,
+            // b/c then ObjID only has < 32 bits for the element ID.
+            CmiAbort(
+                "\nError> ObjID ran out of collection bits, please try re-building "
+                "Charm++ with a higher number of collection bits using "
+                "-DCMK_OBJID_COLLECTION_BITS=N, such that %d<N<30 (gid: %" PRIx64
+                ", current limit: %" PRIx64
+                " (%u bits))\n"
+                "Attempting to create too many chare collections!",
+                COLLECTION_BITS, (CmiUInt8)gid.idx,
+                (CmiUInt8)(COLLECTION_MASK >> (HOME_BITS + ELEMENT_BITS)),
+                COLLECTION_BITS);
+          }
+          if (eid > (HOME_MASK | ELEMENT_MASK))
+          {
+            // We don't generally recommend collections bits <= 3 though it's possible
+            CmiAbort(
+                "\nError> ObjID ran out of element bits, please try re-building "
+                "Charm++ with a lower number of collection bits using "
+                "-DCMK_OBJID_COLLECTION_BITS=N, such that 3<N<%d (eid: %" PRIx64
+                ", current limit: %" PRIx64
+                " (Home: %u + Element: %u = Total: %u bits))\n"
+                "Attempting to create too many chare elements!",
+                COLLECTION_BITS, eid, (CmiUInt8)(HOME_MASK | ELEMENT_MASK), HOME_BITS,
+                ELEMENT_BITS, (HOME_BITS + ELEMENT_BITS));
+          }
         }
 
         // should tag system be query-able
