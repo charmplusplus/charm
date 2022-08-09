@@ -527,8 +527,17 @@ public:
     CkAssert(checkInBounds(idx));
     if (compressor)
     {
-      // TODO: If number of PEs doesn't fit into number of home bits, this will overflow
-      return ((CmiUInt8)homePe(idx) << CMK_OBJID_ELEMENT_BITS) + compressor->compress(idx);
+      const CmiUInt8 home = homePe(idx);
+      CmiAssertMsg(
+          home <= (ck::ObjID::masks::HOME_MASK >> ck::ObjID::bits::ELEMENT_BITS),
+          "home is too big! (home: %" PRIx64 ", max: %" PRIx64 ")", home,
+          (CmiUInt8)(ck::ObjID::masks::HOME_MASK >> ck::ObjID::bits::ELEMENT_BITS));
+      const CmiUInt8 id = (home << CMK_OBJID_ELEMENT_BITS) + compressor->compress(idx);
+      CmiAssertMsg(
+          id <= (ck::ObjID::masks::HOME_MASK | ck::ObjID::masks::ELEMENT_MASK),
+          "id is too big! (id: %" PRIx64 ", max: %" PRIx64 ")", id,
+          (CmiUInt8)(ck::ObjID::masks::HOME_MASK | ck::ObjID::masks::ELEMENT_MASK));
+      return id;
     }
     else
     {
@@ -544,8 +553,16 @@ public:
     CkAssert(checkInBounds(idx));
     if (compressor)
     {
-      // TODO: If number of PEs doesn't fit into number of home bits, this will overflow
-      id = ((CmiUInt8)homePe(idx) << CMK_OBJID_ELEMENT_BITS) + compressor->compress(idx);
+      const CmiUInt8 home = homePe(idx);
+      CmiAssertMsg(
+          home <= (ck::ObjID::masks::HOME_MASK >> ck::ObjID::bits::ELEMENT_BITS),
+          "home is too big! (home: %" PRIx64 ", max: %" PRIx64 ")", home,
+          (CmiUInt8)(ck::ObjID::masks::HOME_MASK >> ck::ObjID::bits::ELEMENT_BITS));
+      id = (home << CMK_OBJID_ELEMENT_BITS) + compressor->compress(idx);
+      CmiAssertMsg(
+          id <= (ck::ObjID::masks::HOME_MASK | ck::ObjID::masks::ELEMENT_MASK),
+          "id is too big! (id: %" PRIx64 ", max: %" PRIx64 ")", id,
+          (CmiUInt8)(ck::ObjID::masks::HOME_MASK | ck::ObjID::masks::ELEMENT_MASK));
       return true;
     }
     else
