@@ -9166,7 +9166,7 @@ Enabling GPU Support
 
 GPU support via GPU Manager and HAPI is not included by default when
 building Charm++. Use ``build`` with the ``cuda`` option to build Charm++
-with GPU support (CMake build is currently not supported), e.g.
+with GPU support (or configure CMake with ``-D CUDA=ON``), e.g.
 
 .. code-block:: bash
 
