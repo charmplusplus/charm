@@ -3,7 +3,10 @@ name: NAMD
 on: pull_request
 
 jobs:
-  build:
+  # Not named 'build' since 'build' is used by our CI for builds that must succeed before merge.
+  # Since NAMD requires a secret to download its source from Gitlab, CI builds from outside PPl
+  # always fail in this test since the secret is not available.
+  build-and-test-namd:
     runs-on: ubuntu-latest
 
     steps:

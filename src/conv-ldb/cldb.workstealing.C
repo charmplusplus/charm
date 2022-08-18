@@ -38,7 +38,7 @@ static void StealLoad(void)
 {
   int i;
   double now;
-  requestmsg msg;
+  requestmsg *msg;
   int  victim;
   int mype;
   int numpes;
@@ -51,21 +51,23 @@ static void StealLoad(void)
   now = CmiWallTimer();
 #endif
 
+  msg = (requestmsg *)CmiAlloc(sizeof(requestmsg));
+
   mype = CmiMyPe();
-  msg.from_pe = mype;
+  msg->from_pe = mype;
   numpes = CmiNumPes();
   do{
       victim = (((CrnRand()+mype)&0x7FFFFFFF)%numpes);
   }while(victim == mype);
 
-  CmiSetHandler(&msg, CpvAccess(CldAskLoadHandlerIndex));
+  CmiSetHandler(msg, CpvAccess(CldAskLoadHandlerIndex));
 #if CMK_IMMEDIATE_MSG
   /* fixme */
-  if (_steal_immediate) CmiBecomeImmediate(&msg);
+  if (_steal_immediate) CmiBecomeImmediate(msg);
 #endif
-  /* msg.to_rank = CmiRankOf(victim); */
-  msg.to_pe = victim;
-  CmiSyncSend(victim, sizeof(requestmsg),(char *)&msg);
+  /* msg->to_rank = CmiRankOf(victim); */
+  msg->to_pe = victim;
+  CmiSyncSendAndFree(victim, sizeof(requestmsg),(char *)msg);
   
 #if CMK_TRACE_ENABLED && TRACE_USEREVENTS
   traceUserBracketEvent(CpvAccess(CldData)->idleEvt, now, CmiWallTimer());
