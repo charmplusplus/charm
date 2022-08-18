@@ -32,7 +32,9 @@ static void lbinit()
   }
   LBRegisterBalancer<TreeLB>(
       "TreeLB", "Pluggable hierarchical LB with available strategies:" + o.str());
+#if CMK_SHRINK_EXPAND
   load_balancer_created = true;
+#endif
 }
 
 void TreeLB::Migrated(int waitBarrier)
