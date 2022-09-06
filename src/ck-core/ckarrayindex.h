@@ -400,6 +400,11 @@ namespace ck {
         CkAssert(thisDim < (1UL << numBits));
         eid = (eid << numBits) | thisDim;
       }
+
+      CmiAssertMsg(eid <= ck::ObjID::masks::ELEMENT_MASK,
+                   "eid is too big! (eid: %" PRIx64 ", max: %" PRIx64 ")", eid,
+                   (CmiUInt8)ck::ObjID::masks::ELEMENT_MASK);
+
       return eid;
     }
 
