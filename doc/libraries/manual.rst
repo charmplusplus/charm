@@ -853,7 +853,7 @@ The following functions comprise the interface to the library:
 
 - Starting a session:
 
-  Note there are two variants of the ```startSession`` function, a regular one
+  Note there are two variants of the ``startSession`` function, a regular one
   and one that writes a user specified chunk of data to the file at the end of a
   session.
 
