@@ -787,3 +787,126 @@ Example
 
 For example code showing how to use TRAM, see ``examples/charm++/TRAM`` and
 ``benchmarks/charm++/streamingAllToAll`` in the Charm++ repository.
+
+
+CkIO
+====
+
+Overview
+--------
+
+CkIO is a library for parallel I/O in Charm++. Currently it only supports
+writing files, not reading them. CkIO improves the performance of write
+operations by aggregating data at intermediate nodes and batching writes to
+align with the stripe size of the underlying parallel file system (such as
+Lustre). This avoids contention on the I/O nodes by using fewer messages to
+communicate with them and preventing small or non-contiguous disk operations.
+
+Under the hood, when a write is issued, the associated data is sent to the PE(s)
+corresponding to the stripe of the file the write is destined for. The data is
+then kept on that PE until enough contiguous data is collected, after which the
+entire stripe is actually written to the filesystem all in one fell swoop. The
+size and layout of stripes and the number and organization of aggregating PEs
+are available as options for the user to customize.
+
+Using CkIO
+----------
+
+CkIO is designed as a session-oriented, callback-centric library. The steps to
+using the library are as follows (each step is invoked via a callback specified
+in an earlier step):
+
+#. Open a file via ``Ck::IO::open``.
+#. Create a session for writing to the file via ``Ck::IO::startSession``
+#. Write to the file via ``Ck::IO::write``. Note that this function takes a
+   session token that is passed into the callback.
+#. When the specified amount of data for the session has been written, a
+   completion callback is invoked, from which one may start another session or
+   close the file via ``Ck::IO::close``.
+
+The following functions comprise the interface to the library:
+
+
+- Opening a file:
+
+  .. code-block:: c++
+
+     void Ck::IO::open(std::string path, CkCallback opened, Ck::IO::Options opts)
+
+  Open the given file with the options specified in ``opts``, and send a
+  ``FileReadyMsg`` (wraps a ``Ck::IO::File file``) to the ``opened`` callback
+  when the system is ready to accept session requests on that file. If the
+  specified file does not exist, it will be created.
+
+  ``Ck::IO::Options`` is a struct with the following fields:
+
+  - ``writeStripe`` - Amount of contiguous data (in bytes) to gather before
+    writing to the file (default: file system stripe size if using Lustre and
+    API provides it, otherwise 4 MB)
+  - ``peStripe`` - Amount of contiguous data to assign to each active PE
+     (default: ``4 * writeStripe``)
+  - ``activePEs`` - Number of PEs to use for I/O (default: min(32, number of
+    PEs))
+  - ``basePE`` - Index of first participating PE (default: 0)
+  - ``skipPEs`` - Gap between participating PEs (default : ``CkMyNodeSize()``)
+
+
+- Starting a session:
+
+  Note there are two variants of the ```startSession`` function, a regular one
+  and one that writes a user specified chunk of data to the file at the end of a
+  session.
+
+  .. code-block:: c++
+
+    void Ck::IO::startSession(Ck::IO::File file, size_t size, size_t offset, CkCallback ready,
+                   CkCallback complete)
+
+  Prepare to write data into ``file``, in the window defined by ``size`` and
+  ``offset`` (both specified in bytes). When the session is set up, a
+  ``SessionReadyMsg`` (wraps a ``Ck::IO::Session session``) will be sent to the
+  ``ready`` callback. When all of the data has been written and synced, an empty
+  ``CkReductionMsg`` will be sent to the ``complete`` callback.
+
+  .. code-block:: c++
+
+     void Ck::IO::startSession(Ck::IO::File file, size_t size, size_t offset, CkCallback ready,
+                    const char *commitData, size_t commitSize, size_t commitOffset,
+                    CkCallback complete)
+
+  Prepare to write data into ``file``, in the window defined by ``size`` and
+  ``offset`` (both specified in bytes). When the session is set up, a
+  ``SessionReadyMsg`` (wraps a ``Ck::IO::Session session``) will be sent to the
+  ``ready`` callback. When all of the data has been written and synced, an
+  additional write of ``commitData`` (of size ``commitSize``) will be made to
+  the file at the specified offset (``commitOffset``) to "commit" the session's
+  work. When that write has completed, an empty ``CkReductionMsg`` will be sent
+  to the ``complete`` callback.
+
+- Writing data:
+
+  .. code-block:: c++
+
+    void Ck::IO::write(Ck::IO::Session session, const char *data, size_t bytes, size_t offset)
+
+  Write the given data into the file to which ``session`` is associated. The
+  offset is relative to the file as a whole, not to the session's offset. Note
+  that ``session`` is provided as a member of the ``SessionReadyMsg`` sent to
+  the ``ready`` callback after a session has started.
+
+- Closing a file:
+
+  .. code-block:: c++
+
+    void Ck::IO::close(Ck::IO::File file, CkCallback closed)
+
+  Close a previously opened file. All sessions on that file must have already
+  signaled that they are complete. Note that ``file`` is provided as a member of
+  the ``FileReadyMsg`` sent to the ``opened`` callback after a file has been
+  opened.
+
+
+Example
+-------
+
+For example code showing how to use CkIO, see ``tests/charm++/io/``.
