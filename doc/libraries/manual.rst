@@ -817,7 +817,7 @@ using the library are as follows (each step is invoked via a callback specified
 in an earlier step):
 
 #. Open a file via ``Ck::IO::open``.
-#. Create a session for writing to the file via ``Ck::IO::startSession``
+#. Create a session for writing to the file via ``Ck::IO::startSession``.
 #. Write to the file via ``Ck::IO::write``. Note that this function takes a
    session token that is passed into the callback.
 #. When the specified amount of data for the session has been written, a
