@@ -845,7 +845,7 @@ The following functions comprise the interface to the library:
     writing to the file (default: file system stripe size if using Lustre and
     API provides it, otherwise 4 MB)
   - ``peStripe`` - Amount of contiguous data to assign to each active PE
-     (default: ``4 * writeStripe``)
+    (default: ``4 * writeStripe``)
   - ``activePEs`` - Number of PEs to use for I/O (default: min(32, number of
     PEs))
   - ``basePE`` - Index of first participating PE (default: 0)
