@@ -836,7 +836,8 @@ The following functions comprise the interface to the library:
   Open the given file with the options specified in ``opts``, and send a
   ``FileReadyMsg`` (wraps a ``Ck::IO::File file``) to the ``opened`` callback
   when the system is ready to accept session requests on that file. If the
-  specified file does not exist, it will be created.
+  specified file does not exist, it will be created. Should only be called from
+  a single PE, once per file.
 
   ``Ck::IO::Options`` is a struct with the following fields:
 
@@ -866,7 +867,8 @@ The following functions comprise the interface to the library:
   ``offset`` (both specified in bytes). When the session is set up, a
   ``SessionReadyMsg`` (wraps a ``Ck::IO::Session session``) will be sent to the
   ``ready`` callback. When all of the data has been written and synced, an empty
-  ``CkReductionMsg`` will be sent to the ``complete`` callback.
+  ``CkReductionMsg`` will be sent to the ``complete`` callback. Should only be
+  called from a single PE, once per session.
 
   .. code-block:: c++
 
@@ -881,7 +883,8 @@ The following functions comprise the interface to the library:
   additional write of ``commitData`` (of size ``commitSize``) will be made to
   the file at the specified offset (``commitOffset``) to "commit" the session's
   work. When that write has completed, an empty ``CkReductionMsg`` will be sent
-  to the ``complete`` callback.
+  to the ``complete`` callback. Should only be called from a single PE, once per
+  session.
 
 - Writing data:
 
@@ -892,7 +895,8 @@ The following functions comprise the interface to the library:
   Write the given data into the file to which ``session`` is associated. The
   offset is relative to the file as a whole, not to the session's offset. Note
   that ``session`` is provided as a member of the ``SessionReadyMsg`` sent to
-  the ``ready`` callback after a session has started.
+  the ``ready`` callback after a session has started. Can be called multiple
+  times from multiple PEs.
 
 - Closing a file:
 
@@ -903,7 +907,7 @@ The following functions comprise the interface to the library:
   Close a previously opened file. All sessions on that file must have already
   signaled that they are complete. Note that ``file`` is provided as a member of
   the ``FileReadyMsg`` sent to the ``opened`` callback after a file has been
-  opened.
+  opened. Should only be called from a single PE, once per file.
 
 
 Example
