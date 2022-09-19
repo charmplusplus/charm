@@ -49,6 +49,8 @@ int main (int argc, char **argv)
         for (i = 0; i < OLDNPROCS; i++) {
             bitmap[i] = 1;
         }
+        // kubectl cp
+        // kubectl scale
     }
     else {
         printf("Sending shrink command.\n");
@@ -66,6 +68,15 @@ int main (int argc, char **argv)
     printf("Waiting for reply...\n" );
     CcsRecvResponse(&server, cmdLen, bitmap , 180);
     printf("Reply received.\n");
+
+    char shrink_cmd[60];
+
+    if (mode == SHRINK)
+    {
+        sprintf(shrink_cmd, "kubectl scale --replicas %i -f charm.yaml", NEWNPROCS);
+        system(shrink_cmd);
+        // kubectl scale
+    }
 
     return 0;
 }
