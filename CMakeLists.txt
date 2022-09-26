@@ -73,7 +73,9 @@ if(NOT CMK_COMPILER STREQUAL "msvc")
   enable_language(Fortran OPTIONAL)
 endif()
 
-if(CMAKE_Fortran_COMPILER)
+option(ENABLE_FORTRAN "Enable Fortran" ON)
+
+if(ENABLE_FORTRAN AND CMAKE_Fortran_COMPILER)
   include(FortranCInterface)
   FortranCInterface_VERIFY()
   FortranCInterface_VERIFY(CXX)
