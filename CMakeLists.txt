@@ -31,6 +31,15 @@ project(Charm++ LANGUAGES CXX C ASM VERSION 7.0.0)
 find_package(Threads)
 find_package(OpenMP) # Do this before Fortran, in case we don't have a Fortran compiler
 
+set(CMK_BUILD_MPI 0)
+set(CMK_BUILD_ON_MPI 0)
+set(CMK_CXX_MPI_BINDINGS 1) # Always true, this just checked for a conflict with old mpich versions.
+if(${NETWORK} STREQUAL "mpi")
+  set(CMK_BUILD_MPI 1)
+  set(CMK_BUILD_ON_MPI 1)
+  find_package(MPI REQUIRED)
+endif()
+
 # We need C++11 for (almost) all targets
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -405,15 +414,6 @@ if(${NETWORK} MATCHES "gni-" OR ${NETWORK} MATCHES "ofi-cray")
   set(CMK_BUILD_CRAY 1)
 elseif(${NETWORK} MATCHES "mpi-cray")
   set(CHARM_PLATFORM "${NETWORK}")
-endif()
-
-set(CMK_BUILD_MPI 0)
-set(CMK_BUILD_ON_MPI 0)
-set(CMK_CXX_MPI_BINDINGS 1) # Always true, this just checked for a conflict with old mpich versions.
-if(${NETWORK} STREQUAL "mpi")
-  set(CMK_BUILD_MPI 1)
-  set(CMK_BUILD_ON_MPI 1)
-  find_package(MPI REQUIRED)
 endif()
 
 set(CMK_BUILD_ON_UCX 0)
