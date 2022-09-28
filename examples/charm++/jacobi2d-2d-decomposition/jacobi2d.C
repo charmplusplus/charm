@@ -89,6 +89,7 @@ public:
 
     array = CProxy_Jacobi::ckNew(num_chare_x, num_chare_y);
     // start computation
+    startTime = CkWallTimer();
     array.run();
   }
 
