@@ -61,4 +61,4 @@ private:
   void write();
 };
 
-void startCollectData(void *data, double currT);
+void startCollectData(void *data);
