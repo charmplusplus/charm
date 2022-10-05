@@ -24,7 +24,7 @@ public:
 		delete msg;
 
 	}
-
+	// standard bookkeeping for how many iterations we need to go through
 	void decrementRemaining(){
 		_num_iterations--;
 		if(!_num_iterations){
@@ -39,14 +39,16 @@ public:
 class Writer : public CBase_Writer {
 	
 public:
-	// constructor for a writer, takes in a pointer to the incoming Session
+	/**
+	 * Takes in a Session object to the current writing session. The constructor
+	 * will actually write data to the file in the incoming_session object.
+	 */
 	Writer(Ck::IO::Session incoming_session){
 		char out[11]; // 10 bytes for the message, 1 for the nullbyte
 		sprintf(out, "Writer[%d]\n", thisIndex);
 		Ck::IO::write(incoming_session, out, 10, 10*thisIndex); // writing 10 bytes starting at 10*thisIndex from the beginning of the file
 	}
 	
-	// doesn't do anything, just by convention?
 	Writer(CkMigrateMessage* m){
 	
 	}
