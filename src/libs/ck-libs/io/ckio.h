@@ -73,6 +73,14 @@ namespace Ck { namespace IO {
   /// Close a previously-opened file. All sessions on that file must have
   /// already signalled that they are complete.
   void close(File file, CkCallback closed);
+  
+  /**
+   * Prepare to read data from @arg file section specified by @arg bytes and @arg offset.
+   * This method will proceed to eagerly read all of the data in that window into memory
+   * for future read calls. After all the data is read in, the ready callback will be invoked.
+   *
+   */
+  void startReadSession(File file, size_t bytes, size_t offset, CkCallback ready);
 
   class File {
     int token;
