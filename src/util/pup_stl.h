@@ -474,9 +474,9 @@ using Requires = typename requires_impl<
     PUP::able* t1 = nullptr;
     if (p.isUnpacking()) {
       p | t1;
-      t.reset((T*)t1);
+      t.reset(dynamic_cast<T*>(t1));
     } else {
-      t1 = (PUP::able*)t.get();
+      t1 = dynamic_cast<PUP::able*>(t.get());
       p | t1;
     }
   }
