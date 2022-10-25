@@ -78,9 +78,17 @@ namespace Ck { namespace IO {
    * Prepare to read data from @arg file section specified by @arg bytes and @arg offset.
    * This method will proceed to eagerly read all of the data in that window into memory
    * for future read calls. After all the data is read in, the ready callback will be invoked.
-   *
+   * The ready callback will take in a SessionReadyMessage* that will contain the offset, the amount of bytes
+   * , and the buffer in the form of a vector<char>.
    */
   void startReadSession(File file, size_t bytes, size_t offset, CkCallback ready);
+  /**
+   * Is a method that reads data from the @arg session of length @arg bytes at offset
+   * @arg offset. After this read finishes, the @arg after_read callback is invoked, taking 
+   * a ReadCompleteMsg* which points to a vector<char> buffer, the offset, and the number of 
+   * bytes of the read.
+   * */
+  void read(Session session, size_t bytes, size_t offset, CkCallback after_read); 
 
   class File {
     int token;
@@ -130,6 +138,21 @@ namespace Ck { namespace IO {
     Session session;
     SessionReadyMsg(Session session_) : session(session_) { }
   };
+
+  class ReadCompleteMsg : public CMessage_ReadCompleteMsg {
+	public:
+	    vector<char> data;
+	    size_t offset;
+	    size_t bytes;
+
+	    ReadCompleteMsg(vector<char> buffer, size_t in_offset, size_t in_bytes) : data(buffer), offset(in_offset), bytes(in_bytes){
+
+	    }
+		
+
+  };
+
+
 
 }}
 #endif

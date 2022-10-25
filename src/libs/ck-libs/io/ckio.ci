@@ -4,6 +4,7 @@ module CkIO {
       message FileReadyMsg;
       message SessionReadyMsg;
       message SessionCommitMsg;
+      message ReadCompleteMsg; // used by the read() CkCallback 
     }
   }
 
