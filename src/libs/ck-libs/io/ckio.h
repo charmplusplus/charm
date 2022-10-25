@@ -34,6 +34,7 @@ namespace Ck { namespace IO {
       p|activePEs;
       p|basePE;
       p|skipPEs;
+      p|read_stripe;
     }
   };
 
