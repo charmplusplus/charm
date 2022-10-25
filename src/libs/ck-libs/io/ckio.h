@@ -12,7 +12,7 @@ namespace Ck { namespace IO {
   /// Users should not set anything in them.
   struct Options {
     Options()
-      : peStripe(0), writeStripe(0), activePEs(-1), basePE(-1), skipPEs(-1)
+      : peStripe(0), writeStripe(0), activePEs(-1), basePE(-1), skipPEs(-1), :read_stripe(0)
       { }
 
     /// How much contiguous data (in bytes) should be assigned to each active PE
@@ -25,6 +25,8 @@ namespace Ck { namespace IO {
     int basePE;
     /// How should active PEs be spaced out?
     int skipPEs;
+    // How many bytes each Read Session should hold
+    size_t read_stripe;
 
     void pup(PUP::er &p) {
       p|peStripe;
