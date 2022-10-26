@@ -1,0 +1,17 @@
+
+mainmodule driver{
+  extern module htram;
+  readonly CProxy_Master mainProxy;
+  readonly CProxy_Histogram histArray;
+
+  mainchare Master {
+    entry Master(CkArgMsg* msg);
+    entry [reductiontarget] void done();
+  };
+
+  group Histogram {
+    entry Histogram();
+    entry [reductiontarget] void insertSend();
+    entry void userDeliver(int val);
+  };
+};

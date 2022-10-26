@@ -1,0 +1,20 @@
+module htram{
+  readonly CProxy_HTram htramProxy;
+  readonly CProxy_HTramRecv nodeGrpProxy;
+  message HTramMessage {
+    itemT *buffer;
+    int next; 
+  };
+
+  group HTram {
+    entry HTram(CkCallback cb);
+    entry void insertValue(int value, int destPE);
+    entry void tflush(); 
+    entry void receivePerPE(HTramMessage*);
+  };
+
+  nodegroup HTramRecv {
+    entry HTramRecv();
+    entry void receive(HTramMessage*);
+  }
+};
