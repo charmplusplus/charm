@@ -170,7 +170,9 @@ public:
 //      userDeliver(0);
     }
     htram->tflush();
-    contribute(CkCallback(CkReductionTarget(TestDriver, startVerificationPhase), driverProxy));
+    //contribute(CkCallback(CkReductionTarget(TestDriver, startVerificationPhase), driverProxy));
+    if (thisIndex == 0)
+      CkStartQD(CkCallback(CkIndex_TestDriver::startVerificationPhase(), driverProxy));
   }
 
   void pregverify() {
