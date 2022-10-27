@@ -7,7 +7,7 @@ module htram{
   };
 
   group HTram {
-    entry HTram(CkCallback cb);
+    entry HTram(CkGroupID gid, CkCallback cb);
     entry void insertValue(int value, int destPE);
     entry void tflush(); 
     entry void receivePerPE(HTramMessage*);

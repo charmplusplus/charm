@@ -22,20 +22,22 @@ class HTramMessage : public CMessage_HTramMessage {
     int next; //next available slot in buffer
 };
 
-typedef void (*callback_function)(int);
+typedef void (*callback_function)(CkGroupID, void*, int);
 
 class HTram : public CBase_HTram {
   HTram_SDAG_CODE
 
   private:
     callback_function cb;
+    CkGroupID client_gid;
     CkCallback endCb;
     int myPE;
+    void* objPtr;
     HTramMessage **msgBuffers;
   public:
-    HTram(CkCallback cb);
+    HTram(CkGroupID gid, CkCallback cb);
     HTram(CkMigrateMessage* msg);
-    void setCb(void (*func)(int));
+    void setCb(void (*func)(CkGroupID, void*, int), void*);
     int getAggregatingPE(int dest_pe);
     void insertValue(int send_value, int dest_pe);
     void tflush();

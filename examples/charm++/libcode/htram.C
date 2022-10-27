@@ -1,15 +1,18 @@
 #include "htram.h"
-
-HTram::HTram(CkCallback cb){
-  endCb = cb;
+//#define DEBUG 1
+HTram::HTram(CkGroupID cgid, CkCallback ecb){
+  client_gid = cgid;
+//  cb = delivercb;
+  endCb = ecb;
   myPE = CkMyPe();
   msgBuffers = new HTramMessage*[CkNumNodes()];
   for(int i=0;i<CkNumNodes();i++)
     msgBuffers[i] = new HTramMessage();
 }
 
-void HTram::setCb(void (*func)(int)) {
+void HTram::setCb(void (*func)(CkGroupID, void*, int), void* obPtr) {
   cb = func;
+  objPtr = obPtr;
 }
 
 HTram::HTram(CkMigrateMessage* msg) {}
@@ -64,10 +67,10 @@ void HTram::receivePerPE(HTramMessage* msg) {
   int limit = msg->next;
   for(int i=0;i<limit;i++) {
     if(msg->buffer[i].destPe == myPE) {
-      cb(msg->buffer[i].payload);
+      cb(client_gid, objPtr, msg->buffer[i].payload);
     }
   }
-  contribute(endCb);
+//  contribute(endCb);
 }
 
 #include "htram.def.h"
