@@ -136,6 +136,24 @@ namespace Ck { namespace IO {
           CkAssert(files[file].complete.isInvalid());
           files[file].complete = complete;
         }
+	
+	void prepareReadSessionHelper(FileToken file, size_t bytes, size_t offset, CkCallback ready){
+		Options& opts = files[file].opts;
+		files[file].sessionID = sessionID;
+		// determine the number of reader sessions required, depending on the session size and the number of bytes per reader
+		int num_readers = 0;
+		size_t remainder = bytes % opts.read_stripe;
+		if(remainder){
+			bytes -= remainder;
+			num_readers++;
+		}
+		num_readers += (bytes / opts.read_stripe); 
+		CkArrayOptions sessionOpts(num_readers); // set the number of elements in the chare array
+		CkCallback sessionInitDone(CkIndex_Director::sessionReady(0), thisProxy);
+		sessionInitDone.setRefnum(sessionID);
+		sessionOpts.setInitCallback(sessionInitDone); // invoke the sessionInitDone callback after all the elements of the chare array are created
+		files[file].session = CProxy_ReadSession::ckNew(file, offset, bytes, sessionOpts); // create the readers
+	}
 
         void sessionComplete(FileToken token) {
           CProxy_CkArray(files[token].session.ckGetArrayID()).ckDestroy();
@@ -408,6 +426,11 @@ namespace Ck { namespace IO {
                       CkCallback ready, CkCallback complete) {
       impl::director.prepareWriteSession(file.token, bytes, offset, ready, complete);
     }
+
+    void startReadSession(File file, size_t bytes, size_t offset, CkCallback ready){
+	impl::director.prepareReadSession(file, bytes, offset, ready);
+    }
+
     void startSession(File file, size_t bytes, size_t offset, CkCallback ready,
                       const char *commitData, size_t commitBytes, size_t commitOffset,
                       CkCallback complete) {
