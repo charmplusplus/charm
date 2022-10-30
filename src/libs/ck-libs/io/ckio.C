@@ -406,6 +406,26 @@ namespace Ck { namespace IO {
           myBytesWritten += l;
         }
       };
+	
+
+
+      class ReadSession : public CBase_ReadSession {
+	private:
+
+      		const FileInfo* _file; // the pointer to the FileInfo
+		size_t _session_bytes; // number of bytes in the session
+		size_t _sesion_offset; // the offset of the session
+		size_t _my_offset;
+		size_t _my_bytes;
+	public:
+		ReadSession(FileToken file, size_t offset, size_t bytes) : _file(CkpvAccess(manager)->get(file)), _session_bytes(bytes), _session_offset(offset){
+			_my_offset = thisIndex * (_file -> opts.read_stripe) + _session_offset;
+			_my_bytes = min(_file -> opts.read_stripe, _session_offset + _session_bytes - _my_offset); // get the number of bytes owned by the session
+			CkAssert(file->fd != -1);
+			CkAssert(_my_offset >= _session_offset);
+			CkAssert(_my_offset + _my_bytes <= _session_offset + _session_bytes);
+		}	
+      };
 
       class Map : public CBase_Map {
       public:
