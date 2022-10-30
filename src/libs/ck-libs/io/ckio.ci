@@ -27,7 +27,16 @@ module CkIO_impl {
           entry void openFile(std::string name, CkCallback opened, Options opts);
           entry [reductiontarget] void fileOpened(FileToken file);
           entry [reductiontarget] void sessionComplete(FileToken file);
-
+	  
+	  entry void prepareReadSession(FileToken file, size_t bytes, size_t offset, CkCallback ready){ // the director sets up a read session
+		serial {
+			prepareReadSessionHelper(file, bytes, offset, ready);
+		}
+		when sessionReady[files[file].sessionID](CkReductionMsg* m) serial { // after the ReadSession chare array is set up, invoke the ready callback
+			delete m;
+			ready.send(new SessionReadyMsg(Session(file, bytes, offset, files[file].session));
+		}
+	  }
           entry void prepareWriteSession(FileToken file, size_t bytes, size_t offset,
                                          CkCallback ready, CkCallback complete) {
             serial {
@@ -93,6 +102,12 @@ module CkIO_impl {
           entry void forwardData(const char data[bytes], size_t bytes, size_t offset);
           entry void syncData();
         };
+	
+
+	array [1D] ReadSession {
+		entry ReadSession(FileToken file, size_t offset, size_t bytes);
+	}
+
 
         group Map : CkArrayMap
         {
