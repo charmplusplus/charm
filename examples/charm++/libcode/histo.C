@@ -59,7 +59,7 @@ public:
   void start() {
     starttime = CkWallTimer();
     //CkCallback endCb(CkIndex_TestDriver::startVerificationPhase(), thisProxy);
-    updater_array.pregenerateUpdates();
+    updater_array.preGenerateUpdates();
     //CkStartQD(endCb);
   }
 
@@ -71,7 +71,7 @@ public:
     // At the end of the second update phase, check the global table
     //  for errors in Updater::checkErrors()
     CkCallback endCb(CkIndex_Updater::checkErrors(), updater_array);
-    updater_array.pregverify();//generateUpdatesVerify();
+    updater_array.preGenerateverify();//generateUpdatesVerify();
     CkStartQD(endCb);
   }
 
@@ -120,19 +120,18 @@ public:
       pe  = indx % CkNumPes();
       pckindx[i]  =  (lindx << 16L) | (pe & 0xffff);
     }
-//    HTram* htram = htramProxy.ckLocalBranch();
-//    htram->setCb(&deliverCallback);
-
     // Contribute to a reduction to signal the end of the setup phase
     contribute(CkCallback(CkReductionTarget(TestDriver, start), driverProxy));
   }
 
   Updater(CkMigrateMessage *msg) {}
 
+#if 0
   // Communication library calls this to deliver each randomly generated key
   inline void insertData(const CmiInt8& key) {
     counts[key]++;
   }
+#endif
 
   inline void insertData2(const CmiInt8& key) {
     counts[key]--;
@@ -149,7 +148,7 @@ public:
     counts[key]--;
   }
 
-  void pregenerateUpdates() {
+  void preGenerateUpdates() {
     HTram* htram = htramProxy.ckLocalBranch();
     htram->setCb(&deliverCallback, this);
     contribute(CkCallback(CkReductionTarget(Updater, generateUpdates), thisProxy));
@@ -175,7 +174,7 @@ public:
       CkStartQD(CkCallback(CkIndex_TestDriver::startVerificationPhase(), driverProxy));
   }
 
-  void pregverify() {
+  void preGenerateverify() {
     HTram* htram = htramProxy.ckLocalBranch();
     htram->setCb(&deliverCallbackVerify, this);
     contribute(CkCallback(CkReductionTarget(Updater, generateUpdatesVerify), thisProxy));
@@ -193,6 +192,7 @@ public:
       // Submit generated key to chare owning that portion of the table
       //thisProxy(pe).insertData2(col);
       htram->insertValue(col, pe);
+      if  ((i % 10000) == 9999) CthYield();
     }
     htram->tflush();
   }

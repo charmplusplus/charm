@@ -17,11 +17,11 @@ mainmodule histo {
     entry Updater();
     // This method generates keys that index into the global table.
     // Each generated key is submitted to the communication library
-    entry [reductiontarget] void generateUpdates();
-    entry void pregenerateUpdates();
-    entry void pregverify();
+    entry [threaded,reductiontarget] void generateUpdates();
+    entry void preGenerateUpdates();
+    entry void preGenerateverify();
     entry [reductiontarget] void generateUpdatesVerify();
-    entry [aggregate] void insertData(const CmiUInt8 &key);
+//    entry [aggregate] void insertData(const CmiUInt8 &key);
     entry void insertData2(const CmiUInt8 &key);
     // Used for verification
     entry [reductiontarget] void checkErrors();
