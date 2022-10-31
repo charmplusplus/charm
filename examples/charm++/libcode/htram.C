@@ -61,6 +61,7 @@ void HTramRecv::receive(HTramMessage* agg_message) {
     HTramMessage* tmpMsg = CkReferenceMsg(agg_message);
     htramProxy[i].receivePerPE(tmpMsg);
   }
+  delete agg_message;
 }
 
 void HTram::receivePerPE(HTramMessage* msg) {
