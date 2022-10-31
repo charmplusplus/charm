@@ -58,7 +58,7 @@ void HTramRecv::receive(HTramMessage* agg_message) {
   //nodegroup //reference from group
   
   for(int i=CkNodeFirst(CkMyNode()); i < CkNodeFirst(CkMyNode())+CkNodeSize(0);i++) {
-    HTramMessage* tmpMsg = CkReference(agg_message);
+    HTramMessage* tmpMsg = CkReferenceMsg(agg_message);
     htramProxy[i].receivePerPE(tmpMsg);
   }
 }
