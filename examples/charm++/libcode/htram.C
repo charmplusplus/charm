@@ -58,9 +58,12 @@ void HTramRecv::receive(HTramMessage* agg_message) {
   //nodegroup //reference from group
   
   for(int i=CkNodeFirst(CkMyNode()); i < CkNodeFirst(CkMyNode())+CkNodeSize(0);i++) {
-    HTramMessage* tmpMsg = new HTramMessage(agg_message->next, agg_message->buffer);
+    HTramMessage* tmpMsg = CkReferenceMsg(agg_message);
+    // Needed to tell the RTS not to stop us from reusing this message
+    _SET_USED(UsrToEnv(tmpMsg), 0);
     htramProxy[i].receivePerPE(tmpMsg);
   }
+  delete agg_message;
 }
 
 void HTram::receivePerPE(HTramMessage* msg) {
