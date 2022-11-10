@@ -1,6 +1,7 @@
 #ifndef CK_IO_H
 #define CK_IO_H
 
+#include <vector>
 #include <string>
 #include <pup.h>
 #include <ckcallback.h>
@@ -12,7 +13,7 @@ namespace Ck { namespace IO {
   /// Users should not set anything in them.
   struct Options {
     Options()
-      : peStripe(0), writeStripe(0), activePEs(-1), basePE(-1), skipPEs(-1), :read_stripe(0)
+      : peStripe(0), writeStripe(0), activePEs(-1), basePE(-1), skipPEs(-1), read_stripe(0)
       { }
 
     /// How much contiguous data (in bytes) should be assigned to each active PE
@@ -94,6 +95,9 @@ namespace Ck { namespace IO {
     int token;
     friend void startSession(File file, size_t bytes, size_t offset,
                              CkCallback ready, CkCallback complete);
+
+    friend void startReadSession(File file, size_t bytes, size_t offset, CkCallback ready);
+
     friend void startSession(File file, size_t bytes, size_t offset, CkCallback ready,
                              const char *commitData, size_t commitBytes, size_t commitOffset,
                              CkCallback complete);
@@ -141,11 +145,11 @@ namespace Ck { namespace IO {
 
   class ReadCompleteMsg : public CMessage_ReadCompleteMsg {
 	public:
-	    vector<char> data;
+	    std::vector<char> data;
 	    size_t offset;
 	    size_t bytes;
 
-	    ReadCompleteMsg(vector<char> buffer, size_t in_offset, size_t in_bytes) : data(buffer), offset(in_offset), bytes(in_bytes){
+	    ReadCompleteMsg(std::vector<char> buffer, size_t in_offset, size_t in_bytes) : data(buffer), offset(in_offset), bytes(in_bytes){
 
 	    }
 		

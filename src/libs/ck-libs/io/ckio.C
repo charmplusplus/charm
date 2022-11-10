@@ -2,6 +2,8 @@
 #include <map>
 #include <algorithm>
 #include <sstream>
+#include <iostream>
+#include <fstream>
 
 typedef int FileToken;
 #include "CkIO.decl.h"
@@ -40,6 +42,7 @@ namespace Ck { namespace IO {
         int fd;
         int sessionID;
         CProxy_WriteSession session;
+	CProxy_ReadSession read_session;
         CkCallback complete;
 
         FileInfo(string name_, CkCallback opened_, Options opts_)
@@ -138,13 +141,15 @@ namespace Ck { namespace IO {
         }
 	
 	void prepareReadSessionHelper(FileToken file, size_t bytes, size_t offset, CkCallback ready){
+		size_t session_bytes = bytes; // amount of bytes in the session
+		ckout << "In prepare read session helper" << endl;
 		Options& opts = files[file].opts;
 		files[file].sessionID = sessionID;
 		// determine the number of reader sessions required, depending on the session size and the number of bytes per reader
 		int num_readers = 0;
 		size_t remainder = bytes % opts.read_stripe;
 		if(remainder){
-			bytes -= remainder;
+			// bytes -= remainder;
 			num_readers++;
 		}
 		num_readers += (bytes / opts.read_stripe); 
@@ -152,7 +157,7 @@ namespace Ck { namespace IO {
 		CkCallback sessionInitDone(CkIndex_Director::sessionReady(0), thisProxy);
 		sessionInitDone.setRefnum(sessionID);
 		sessionOpts.setInitCallback(sessionInitDone); // invoke the sessionInitDone callback after all the elements of the chare array are created
-		files[file].session = CProxy_ReadSession::ckNew(file, offset, bytes, sessionOpts); // create the readers
+		files[file].read_session = CProxy_ReadSession::ckNew(file, offset, bytes, sessionOpts); // create the readers
 	}
 
         void sessionComplete(FileToken token) {
@@ -414,16 +419,42 @@ namespace Ck { namespace IO {
 
       		const FileInfo* _file; // the pointer to the FileInfo
 		size_t _session_bytes; // number of bytes in the session
-		size_t _sesion_offset; // the offset of the session
+		size_t _session_offset; // the offset of the session
 		size_t _my_offset;
 		size_t _my_bytes;
+		std::vector<char> _buffer;
 	public:
 		ReadSession(FileToken file, size_t offset, size_t bytes) : _file(CkpvAccess(manager)->get(file)), _session_bytes(bytes), _session_offset(offset){
 			_my_offset = thisIndex * (_file -> opts.read_stripe) + _session_offset;
+			std::cout << "BYTES IN SESSION: " << _session_bytes << std::endl;
 			_my_bytes = min(_file -> opts.read_stripe, _session_offset + _session_bytes - _my_offset); // get the number of bytes owned by the session
 			CkAssert(file->fd != -1);
 			CkAssert(_my_offset >= _session_offset);
 			CkAssert(_my_offset + _my_bytes <= _session_offset + _session_bytes);
+			std::cout << thisIndex << " has to read " << _my_bytes << " from the offset " << _my_offset << "\n";
+			readData();
+		}
+
+		void readData(){
+			std::ifstream ifs(_file -> name); // open the file
+			if(ifs.fail()){ // error handling if opening the file failed
+				std::cout << "There was an error on ReadSession chare " << thisIndex << " when trying to open file " << _file -> name << std::endl;
+				CkExit();
+			}
+			ifs.seekg(_my_offset); // jump to the point where the chare should start reading
+			char* buffer = new char[_my_bytes];
+			ifs.read(buffer, _my_bytes);
+			_buffer.resize(_my_bytes);
+			for(size_t i = 0; i < _my_bytes; ++i){
+				_buffer[i] = (buffer[i]);
+			}
+			std::cout << thisIndex << " has finished reading " << _buffer.size() << " bytes\n";
+			std::cout << thisIndex << " ";
+			for(size_t i = 0; i < _my_bytes; ++i){
+				std::cout << _buffer[i];
+			}
+			std::cout << std::endl;
+			ifs.close();
 		}	
       };
 
@@ -445,10 +476,10 @@ namespace Ck { namespace IO {
     void startSession(File file, size_t bytes, size_t offset,
                       CkCallback ready, CkCallback complete) {
       impl::director.prepareWriteSession(file.token, bytes, offset, ready, complete);
-    }
+    } 
 
     void startReadSession(File file, size_t bytes, size_t offset, CkCallback ready){
-	impl::director.prepareReadSession(file, bytes, offset, ready);
+	impl::director.prepareReadSession(file.token, bytes, offset, ready);
     }
 
     void startSession(File file, size_t bytes, size_t offset, CkCallback ready,
