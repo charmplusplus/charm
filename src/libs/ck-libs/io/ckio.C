@@ -425,15 +425,16 @@ namespace Ck { namespace IO {
 
       class ReadSession : public CBase_ReadSession {
 	private:
-
+		FileToken _token; // the token of the given file
       		const FileInfo* _file; // the pointer to the FileInfo
 		size_t _session_bytes; // number of bytes in the session
 		size_t _session_offset; // the offset of the session
 		size_t _my_offset;
 		size_t _my_bytes;
 		std::vector<char> _buffer;
+		
 	public:
-		ReadSession(FileToken file, size_t offset, size_t bytes) : _file(CkpvAccess(manager)->get(file)), _session_bytes(bytes), _session_offset(offset){
+		ReadSession(FileToken file, size_t offset, size_t bytes) : _token(file), _file(CkpvAccess(manager)->get(file)), _session_bytes(bytes), _session_offset(offset){
 			_my_offset = thisIndex * (_file -> opts.read_stripe) + _session_offset;
 			std::cout << "BYTES IN SESSION: " << _session_bytes << std::endl;
 			_my_bytes = min(_file -> opts.read_stripe, _session_offset + _session_bytes - _my_offset); // get the number of bytes owned by the session
@@ -557,6 +558,7 @@ namespace Ck { namespace IO {
 				
 			_after_read.send(msg);
 			// have some method of cleaning up this chare after invoking the callback
+			delete this;
 		}
     	};
 
