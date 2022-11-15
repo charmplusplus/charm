@@ -155,7 +155,7 @@ set(optfile ${CMAKE_BINARY_DIR}/include/conv-autoconfig.h)
 file(REMOVE ${optfile})
 
 foreach (v ${_variableNames})
-    if(("${v}" MATCHES "^CMK_"  OR "${v}" MATCHES "^SIZEOF_" OR "${v}" MATCHES "^CHARM_" OR "${v}" MATCHES "^QLOGIC$") AND NOT "${v}" MATCHES "_CODE$")
+    if(("${v}" MATCHES "^CMK_"  OR "${v}" MATCHES "^SIZEOF_" OR "${v}" MATCHES "^CHARM_" OR "${v}" MATCHES "^QLOGIC$") AND NOT "${v}" MATCHES "_CODE$" AND NOT "${v}" MATCHES "^CMK_LUSTREAPI")
         if("${${v}}" STREQUAL "" OR "${${v}}" STREQUAL "FALSE")
             set(${v} 0)
         elseif("${${v}}" STREQUAL "TRUE")
