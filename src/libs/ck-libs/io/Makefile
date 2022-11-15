@@ -14,7 +14,7 @@ all: $(LIBDEST)$(LIB)
 
 $(LIB): $(LIBOBJ)
 	$(CHARMC) -o $(LIB) $(LIBOBJ)
-	echo "$(CMK_LUSTREAPI)" > $(DEP)
+#	echo "$(CMK_LUSTREAPI)" > $(DEP)
 
 headers: $(HEADERS)
 	cp $(HEADERS) $(CDIR)/include/

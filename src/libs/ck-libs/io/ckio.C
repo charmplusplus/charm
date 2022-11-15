@@ -27,6 +27,7 @@ using std::max;
 using std::map;
 using std::string;
 
+
 namespace Ck { namespace IO {
     namespace impl {
       CProxy_Director director;
@@ -67,6 +68,7 @@ namespace Ck { namespace IO {
         CProxy_Manager managers;
         int opnum, sessionID;
         Director_SDAG_CODE
+	int read_id = 0;
 
       public:
         Director(CkArgMsg *m)
@@ -140,6 +142,14 @@ namespace Ck { namespace IO {
           files[file].complete = complete;
         }
 	
+	// called by user-facing read call to facilitate the actual read
+	void read(Session session, size_t bytes, size_t offset, CkCallback after_read){
+		std::cout << "Entered the director's read\n"; // for logging purposes
+		CProxy_ReadAssembler ra = CProxy_ReadAssembler::ckNew(session, bytes, offset, after_read); // create read assemble
+		CProxy_ReadSession(session.sessionID).sendData(offset, bytes, ra); // tell every object to send data that relevant to the read
+		std::cout << "Exiting director read \n";
+	}
+		
 	void prepareReadSessionHelper(FileToken file, size_t bytes, size_t offset, CkCallback ready){
 		size_t session_bytes = bytes; // amount of bytes in the session
 		ckout << "In prepare read session helper" << endl;
@@ -411,8 +421,8 @@ namespace Ck { namespace IO {
           myBytesWritten += l;
         }
       };
-	
 
+	      
 
       class ReadSession : public CBase_ReadSession {
 	private:
@@ -428,7 +438,7 @@ namespace Ck { namespace IO {
 			_my_offset = thisIndex * (_file -> opts.read_stripe) + _session_offset;
 			std::cout << "BYTES IN SESSION: " << _session_bytes << std::endl;
 			_my_bytes = min(_file -> opts.read_stripe, _session_offset + _session_bytes - _my_offset); // get the number of bytes owned by the session
-			CkAssert(file->fd != -1);
+			CkAssert(_file -> fd != -1);
 			CkAssert(_my_offset >= _session_offset);
 			CkAssert(_my_offset + _my_bytes <= _session_offset + _session_bytes);
 			std::cout << thisIndex << " has to read " << _my_bytes << " from the offset " << _my_offset << "\n";
@@ -444,7 +454,8 @@ namespace Ck { namespace IO {
 			ifs.seekg(_my_offset); // jump to the point where the chare should start reading
 			char* buffer = new char[_my_bytes];
 			ifs.read(buffer, _my_bytes);
-			_buffer.resize(_my_bytes);
+			_buffer.resize(_my_bytes, 'z'); // resize it and init with 'z' to denote what hasn't been changed
+			_buffer.shrink_to_fit(); // get rid of any extra capacity 
 			for(size_t i = 0; i < _my_bytes; ++i){
 				_buffer[i] = (buffer[i]);
 			}
@@ -454,8 +465,43 @@ namespace Ck { namespace IO {
 				std::cout << _buffer[i];
 			}
 			std::cout << std::endl;
+			delete[] buffer;
 			ifs.close();
 		}	
+		
+		// the method by which you send your data to the ra chare
+		void sendData(size_t offset, size_t bytes, CProxy_ReadAssembler ra){
+			size_t chare_offset;
+			size_t chare_bytes;
+
+			if (offset >= (_my_offset + _my_bytes)) return; // read call starts to the right of this chare
+			
+			else if(offset + bytes <= _my_offset) return; // the read call starts to the left of this chare
+
+
+			else if(offset < _my_offset) chare_offset = _my_offset; // the start of the read is below this chare, so we should read in the current data from start of what it owns
+			else chare_offset = offset; // read offset is in the middle
+
+			ckout << "Entered the sendData method on " << thisIndex << endl;
+			size_t end_byte_chare = min(offset + bytes, _my_offset + _my_bytes); // the last byte, exclusive, this chare should read
+			size_t bytes_read = 0;
+			std::vector<char> data_to_send;
+			ckout << thisIndex << " spans: [ " << _my_offset << "," << (_my_offset + _my_bytes - 1) << endl;
+
+			size_t bytes_to_read = end_byte_chare - chare_offset; // the bytes to read
+
+			while(bytes_read < bytes_to_read){ // still bytes to read and haven't gone out of bounds
+				char data = _buffer[chare_offset - _my_offset + bytes_read]; // get the data we want
+				data_to_send.push_back(data);
+				bytes_read++;
+			}
+			ckout << "the following data is packed and ready to be sent from " << thisIndex << " with size " << data_to_send.size() << ": ";
+			for(char& ch : data_to_send){
+				ckout << ch;
+			}
+			ckout << endl;
+			ra.shareData(chare_offset, data_to_send); // send this data to the ReadAssembler
+		}
       };
 
       class Map : public CBase_Map {
@@ -467,6 +513,54 @@ namespace Ck { namespace IO {
           return 0;
         }
       };
+
+
+    // class that is used to aggregate the data for a specific read call made by the user
+    class ReadAssembler : public CBase_ReadAssembler {
+	private:
+		std::vector<char> _data_buffer; // the data buffer that is used to store the read request
+		Session _session;
+		size_t _bytes_left; // the number of bytes the user wants for a particular read
+		size_t _read_offset; // the offset they specify for their read
+		CkCallback _after_read; // the callback to invoke after the read is complete
+	public:
+		ReadAssembler(Session session, size_t bytes, size_t offset, CkCallback after_read){
+			_session = session;
+			_bytes_left = bytes;
+			_read_offset = offset;
+			_after_read = after_read;
+			_data_buffer.resize(_bytes_left, 'r'); // resize the buffer to the size of read call
+			_data_buffer.shrink_to_fit();
+			ckout << "RA Buffer init\n";
+			for(char ch : _data_buffer)
+				ckout << ch;
+			ckout << endl;
+			std::cout << "ReadAssembler built\n";
+		}
+
+		void shareData(size_t read_chare_offset, std::vector<char> data){
+			int start_idx = read_chare_offset - _read_offset; // start index for writing to _data_buffer
+			int counter = 0;
+			for(char& ch : data){ // copy over the data
+				ckout << "ReadAssembler " << read_chare_offset << " has received " << ch << endl;
+				_data_buffer[start_idx + counter] = ch;
+				ckout << "Read Assembler " << read_chare_offset << "has set " << (start_idx + counter) << " to " << _data_buffer[start_idx + counter] << endl;
+				++counter;	
+			}
+			_bytes_left -= data.size(); // decrement the number of remaining bytes to read
+			if(_bytes_left) return; // if there are bytes still to read, just return
+			char* buffer = data.data(); 
+			ckout << "Offset " << _read_offset << " belongs to Pe " << CkMyPe() << endl;
+			ReadCompleteMsg* msg = new (_data_buffer.size()) ReadCompleteMsg();
+			memcpy(msg -> data, buffer, _data_buffer.size());
+			msg -> offset= _read_offset;
+			msg -> bytes = _data_buffer.size();
+				
+			_after_read.send(msg);
+			// have some method of cleaning up this chare after invoking the callback
+		}
+    	};
+
     }
 
     void open(string name, CkCallback opened, Options opts) {
@@ -495,6 +589,13 @@ namespace Ck { namespace IO {
         CkpvAccess(manager)->write(session, data, bytes, offset);
     }
 
+    void read(Session session, size_t bytes, size_t offset, CkCallback after_read){
+	CkAssert(bytes <= session.bytes);
+	CkAssert(offset + bytes <= session.offset + session.bytes);
+	// call the director function to facilitate the actual read
+	impl::director.read(session, bytes, offset, after_read);
+    }      
+
     void close(File file, CkCallback closed) {
       impl::director.close(file.token, closed);
     }
@@ -502,6 +603,7 @@ namespace Ck { namespace IO {
     class SessionCommitMsg : public CMessage_SessionCommitMsg {
 
     };
+
   }
 }
 

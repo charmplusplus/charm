@@ -5,6 +5,7 @@
 #include <string>
 #include <pup.h>
 #include <ckcallback.h>
+#include <iostream>
 
 #include "CkIO.decl.h"
 
@@ -116,13 +117,17 @@ namespace Ck { namespace IO {
     FileReadyMsg(const File &tok) : file(tok) {}
   };
 
-  namespace impl { class Manager; }
+  namespace impl { class Manager; 
+  	class Director; // forward declare Director class as impl
+  }
 
   class Session {
     int file;
     size_t bytes, offset;
     CkArrayID sessionID;
     friend class Ck::IO::impl::Manager;
+    friend class Ck::IO::impl::Director; // this is an interesting change
+    friend void read(Session session, size_t bytes, size_t offset, CkCallback after_read);
   public:
     Session(int file_, size_t bytes_, size_t offset_,
             CkArrayID sessionID_)
@@ -145,11 +150,11 @@ namespace Ck { namespace IO {
 
   class ReadCompleteMsg : public CMessage_ReadCompleteMsg {
 	public:
-	    std::vector<char> data;
+	    char* data;
 	    size_t offset;
 	    size_t bytes;
-
-	    ReadCompleteMsg(std::vector<char> buffer, size_t in_offset, size_t in_bytes) : data(buffer), offset(in_offset), bytes(in_bytes){
+	    ReadCompleteMsg(){}
+	    ReadCompleteMsg(char* buffer, size_t in_offset, size_t in_bytes) : data(buffer), offset(in_offset), bytes(in_bytes){
 
 	    }
 		

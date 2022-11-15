@@ -4,7 +4,9 @@ module CkIO {
       message FileReadyMsg;
       message SessionReadyMsg;
       message SessionCommitMsg;
-      message ReadCompleteMsg; // used by the read() CkCallback 
+      message ReadCompleteMsg{
+		char data[];
+      }; // used by the read() CkCallback 
     }
   }
 
@@ -27,14 +29,25 @@ module CkIO_impl {
           entry void openFile(std::string name, CkCallback opened, Options opts);
           entry [reductiontarget] void fileOpened(FileToken file);
           entry [reductiontarget] void sessionComplete(FileToken file);
+	  // facilitates all of the read calls that will happen
 	  
+	  entry void read(Session session, size_t bytes, size_t offset, CkCallback after_read);
+	// this method is called by the read function by the user in order to get data
+/*
+	  entry void serveReadRequest(Session session, size_t bytes, size_t offset, CkCallback after_read){
+		serial {
+			
+		}
+
+	  };
+ */
 	  entry void prepareReadSession(FileToken file, size_t bytes, size_t offset, CkCallback ready){ // the director sets up a read session
 		serial {
 			prepareReadSessionHelper(file, bytes, offset, ready);
 		}
 		when sessionReady[files[file].sessionID](CkReductionMsg* m) serial { // after the ReadSession chare array is set up, invoke the ready callback
 			delete m;
-			ready.send(new SessionReadyMsg(Session(file, bytes, offset, files[file].session)));
+			ready.send(new SessionReadyMsg(Session(file, bytes, offset, files[file].read_session)));
 		}
 	  };
           entry void prepareWriteSession(FileToken file, size_t bytes, size_t offset,
@@ -103,12 +116,24 @@ module CkIO_impl {
           entry void syncData();
         };
 	
+	// class tht will be used to assemble a specific read call
+	chare ReadAssembler {
+		 // stores the parameters of the read call it is tasked with building
+		entry ReadAssembler(Session session, size_t bytes, size_t offset, CkCallback after_read);
+		// the method by which ReadSession objects can send their data for the read	
+		entry void shareData(size_t read_chare_offset, std::vector<char> data); 
+
+	}
 
 	array [1D] ReadSession {
 		entry ReadSession(FileToken file, size_t offset, size_t bytes);
+		// way for the ReadSession object to send bytes over to the ReadAssembler object ra when serving a specific read
+		entry void sendData(size_t offset, size_t bytes, CProxy_ReadAssembler ra); 
 	}
+	
 
-
+	
+	
         group Map : CkArrayMap
         {
           entry Map();
