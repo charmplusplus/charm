@@ -44,7 +44,7 @@ namespace Ck { namespace IO {
         int sessionID;
         CProxy_WriteSession session;
 	CProxy_ReadSession read_session;
-        CkCallback complete;
+        CkCallback complete; // used for the write session complete callback? TODO verify this is true
 
         FileInfo(string name_, CkCallback opened_, Options opts_)
           : name(name_), opened(opened_), opts(opts_), fd(-1)
@@ -68,7 +68,6 @@ namespace Ck { namespace IO {
         CProxy_Manager managers;
         int opnum, sessionID;
         Director_SDAG_CODE
-	int read_id = 0;
 
       public:
         Director(CkArgMsg *m)
