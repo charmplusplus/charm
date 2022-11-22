@@ -23,3 +23,5 @@ public:
 	}
 
 };
+
+#include "iotest.def.h"
