@@ -4,6 +4,7 @@
 class Main : public CBase_Main {
 	Main_SDAG_CODE;
 	Ck::IO::File _file; // the file that is going to be opened
+	CProxy_Reader readers; // holds the array of readers
 public:
 	Main(CkArgMsg* msg){
 		thisProxy.startReading();

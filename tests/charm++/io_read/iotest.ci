@@ -38,7 +38,7 @@ mainmodule iotest {
 
 			when startRead[0](Ck::IO::SessionReadyMsg* msg) serial {
 				CkCallback test_read_cb(CkIndex_Main::testRead(0), thisProxy);	
-				readers = CProxy_Reader::ckNew(msg -> session, 5, 10, cb,5); // create 5 readers which will each read 10 bytes and start from offset 5 i.e 0 will read bytes [5,15), etc
+				readers = CProxy_Reader::ckNew(msg -> session, 5, 10, test_read_cb,5); // create 5 readers which will each read 10 bytes and start from offset 5 i.e 0 will read bytes [5,15), etc
 
 			}
 		}
