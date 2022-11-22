@@ -1,0 +1,52 @@
+mainmodule iotest {
+	include "ckio.h";
+	
+	mainchare Main {
+		entry Main(CkArgMsg*);
+		entry void ready(Ck::IO::FileReadyMsg* msg);
+		entry void startRead(Ck::IO::SessionReadyMsg* msg);
+
+		// method that verifies the read is correct
+		entry void testRead(Ck::IO::ReadCompleteMsg* msg) {
+			serial {
+				ckout << "At offset " << msg -> offset << ":";
+				for(size_t i = 0; i < msg -> bytes; ++i){
+					ckout << msg -> data[i];
+				}
+				ckout << endl;
+			}
+
+		}
+
+		
+		entry void startReading(){
+			serial {
+				ckout << "Starting the reading\n";
+				Ck::IO::Options opts;
+				opts.read_stripe = 10; // how much each ReadSession chare will read_
+				CkCallback open_cb(CkIndex_Main::ready(NULL), thisProxy);
+				open_cb.setRefNum(0);
+				Ck::IO::open("readtest.txt", open_cb, opts);
+			}
+
+			when ready[0](Ck::IO::FileReadyMsg* msg) serial {
+				 _file = msg -> file;
+				 CkCallback start_read_session(CkIndex_Main::startRead(NULL), thisProxy);
+				 start_read_session.setRefNum(0);
+				 Ck::IO::startReadSession(_file, 100, 0, start_read_session); // load in 100 bytes from offset 0
+			}
+
+			when startRead[0](Ck::IO::SessionReadyMsg* msg) serial {
+				CkCallback test_read_cb(CkIndex_Main::testRead(0), thisProxy);	
+				readers = CProxy_Reader::ckNew(msg -> session, 5, 10, cb,5); // create 5 readers which will each read 10 bytes and start from offset 5 i.e 0 will read bytes [5,15), etc
+
+			}
+		}
+	}
+
+
+	array [1D] Reader {
+		entry Reader(Ck::IO::Session session, size_t bytes, size_t offsets, CkCallback after_read);
+	}
+
+}
