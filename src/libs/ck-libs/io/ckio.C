@@ -151,15 +151,15 @@ namespace Ck { namespace IO {
 	
 	// called by user-facing read call to facilitate the actual read
 	void read(Session session, size_t bytes, size_t offset, CkCallback after_read){
-		std::cout << "Entered the director's read\n"; // for logging purposes
+		// std::cout << "Entered the director's read\n"; // for logging purposes
 		CProxy_ReadAssembler ra = CProxy_ReadAssembler::ckNew(session, bytes, offset, after_read); // create read assemble
 		CProxy_ReadSession(session.sessionID).sendData(offset, bytes, ra); // tell every object to send data that relevant to the read
-		std::cout << "Exiting director read \n";
+		// std::cout << "Exiting director read \n";
 	}
 		
 	void prepareReadSessionHelper(FileToken file, size_t bytes, size_t offset, CkCallback ready){
 		size_t session_bytes = bytes; // amount of bytes in the session
-		ckout << "In prepare read session helper" << endl;
+		// ckout << "In prepare read session helper" << endl;
 		Options& opts = files[file].opts;
 		files[file].sessionID = sessionID;
 		// determine the number of reader sessions required, depending on the session size and the number of bytes per reader
@@ -444,12 +444,12 @@ namespace Ck { namespace IO {
 	public:
 		ReadSession(FileToken file, size_t offset, size_t bytes) : _token(file), _file(CkpvAccess(manager)->get(file)), _session_bytes(bytes), _session_offset(offset){
 			_my_offset = thisIndex * (_file -> opts.read_stripe) + _session_offset;
-			std::cout << "BYTES IN SESSION: " << _session_bytes << std::endl;
+			// std::cout << "BYTES IN SESSION: " << _session_bytes << std::endl;
 			_my_bytes = min(_file -> opts.read_stripe, _session_offset + _session_bytes - _my_offset); // get the number of bytes owned by the session
 			CkAssert(_file -> fd != -1);
 			CkAssert(_my_offset >= _session_offset);
 			CkAssert(_my_offset + _my_bytes <= _session_offset + _session_bytes);
-			std::cout << thisIndex << " has to read " << _my_bytes << " from the offset " << _my_offset << "\n";
+			// std::cout << thisIndex << " has to read " << _my_bytes << " from the offset " << _my_offset << "\n";
 			readData();
 		}
 
@@ -460,7 +460,7 @@ namespace Ck { namespace IO {
 		void readData(){
 			std::ifstream ifs(_file -> name); // open the file
 			if(ifs.fail()){ // error handling if opening the file failed
-				std::cout << "There was an error on ReadSession chare " << thisIndex << " when trying to open file " << _file -> name << std::endl;
+				std::cerr<< "There was an error on ReadSession chare " << thisIndex << " when trying to open file " << _file -> name << std::endl;
 				CkExit();
 			}
 			ifs.seekg(_my_offset); // jump to the point where the chare should start reading
@@ -471,12 +471,8 @@ namespace Ck { namespace IO {
 			for(size_t i = 0; i < _my_bytes; ++i){
 				_buffer[i] = (buffer[i]);
 			}
-			std::cout << thisIndex << " has finished reading " << _buffer.size() << " bytes\n";
-			std::cout << thisIndex << " ";
-			for(size_t i = 0; i < _my_bytes; ++i){
-				std::cout << _buffer[i];
-			}
-			std::cout << std::endl;
+			// std::cout << thisIndex << " has finished reading " << _buffer.size() << " bytes\n";
+			// std::cout << thisIndex << " ";
 			delete[] buffer;
 			ifs.close();
 		}	
@@ -494,11 +490,11 @@ namespace Ck { namespace IO {
 			else if(offset < _my_offset) chare_offset = _my_offset; // the start of the read is below this chare, so we should read in the current data from start of what it owns
 			else chare_offset = offset; // read offset is in the middle
 
-			ckout << "Entered the sendData method on " << thisIndex << endl;
+			// ckout << "Entered the sendData method on " << thisIndex << endl;
 			size_t end_byte_chare = min(offset + bytes, _my_offset + _my_bytes); // the last byte, exclusive, this chare should read
 			size_t bytes_read = 0;
 			std::vector<char> data_to_send;
-			ckout << thisIndex << " spans: [ " << _my_offset << "," << (_my_offset + _my_bytes - 1) << endl;
+			// ckout << thisIndex << " spans: [ " << _my_offset << "," << (_my_offset + _my_bytes - 1) << endl;
 
 			size_t bytes_to_read = end_byte_chare - chare_offset; // the bytes to read
 
@@ -507,11 +503,12 @@ namespace Ck { namespace IO {
 				data_to_send.push_back(data);
 				bytes_read++;
 			}
-			ckout << "the following data is packed and ready to be sent from " << thisIndex << " with size " << data_to_send.size() << ": ";
-			for(char& ch : data_to_send){
+			// ckout << "the following data is packed and ready to be sent from " << thisIndex << " with size " << data_to_send.size() << ": ";
+			/*for(char& ch : data_to_send){
 				ckout << ch;
-			}
-			ckout << endl;
+			}*/
+
+			// ckout << endl;
 			ra.shareData(chare_offset, data_to_send); // send this data to the ReadAssembler
 		}
       };
@@ -543,26 +540,28 @@ namespace Ck { namespace IO {
 			_after_read = after_read;
 			_data_buffer.resize(_bytes_left, 'r'); // resize the buffer to the size of read call
 			_data_buffer.shrink_to_fit();
-			ckout << "RA Buffer init\n";
+			// ckout << "RA Buffer init\n"; 
+			/*
 			for(char ch : _data_buffer)
 				ckout << ch;
 			ckout << endl;
 			std::cout << "ReadAssembler built\n";
+			*/
 		}
 
 		void shareData(size_t read_chare_offset, std::vector<char> data){
 			int start_idx = read_chare_offset - _read_offset; // start index for writing to _data_buffer
 			int counter = 0;
 			for(char& ch : data){ // copy over the data
-				ckout << "ReadAssembler " << read_chare_offset << " has received " << ch << endl;
+			// 	ckout << "ReadAssembler " << read_chare_offset << " has received " << ch << endl;
 				_data_buffer[start_idx + counter] = ch;
-				ckout << "Read Assembler " << read_chare_offset << "has set " << (start_idx + counter) << " to " << _data_buffer[start_idx + counter] << endl;
+		//		ckout << "Read Assembler " << read_chare_offset << "has set " << (start_idx + counter) << " to " << _data_buffer[start_idx + counter] << endl;
 				++counter;	
 			}
 			_bytes_left -= data.size(); // decrement the number of remaining bytes to read
 			if(_bytes_left) return; // if there are bytes still to read, just return
 			char* buffer = data.data(); 
-			ckout << "Offset " << _read_offset << " belongs to Pe " << CkMyPe() << endl;
+			// ckout << "Offset " << _read_offset << " belongs to Pe " << CkMyPe() << endl;
 			ReadCompleteMsg* msg = new (_data_buffer.size()) ReadCompleteMsg();
 			memcpy(msg -> data, buffer, _data_buffer.size());
 			msg -> offset= _read_offset;
