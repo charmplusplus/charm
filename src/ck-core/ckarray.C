@@ -1770,9 +1770,9 @@ void CkArray::ckDestroy()
   locMgr->setDuringDestruction(true);
 
   // ckDestroy deletes the CkMigratable, which also removes it from this vector
-  while (localElemVec.size())
+  while (!localElemVec.empty())
   {
-    localElemVec.front()->ckDestroy();
+    localElemVec.back()->ckDestroy();
   }
 
   locMgr->deleteManager(CkGroupID(thisProxy), this);
