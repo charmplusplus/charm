@@ -84,6 +84,16 @@ namespace Ck { namespace IO {
    * , and the buffer in the form of a vector<char>.
    */
   void startReadSession(File file, size_t bytes, size_t offset, CkCallback ready);
+
+  /**
+   * Used to end the current read session and will then invoke the after_end callback that takes a CkReductionMsg* with nothing in it
+   * Will effectively call ckDestroy() on the CProxy_Reader of the associated FileInfo
+   *
+   *
+   *
+   */
+  
+  void closeReadSession(Session read_session, CkCallback after_end);
   /**
    * Is a method that reads data from the @arg session of length @arg bytes at offset
    * @arg offset. After this read finishes, the @arg after_read callback is invoked, taking 

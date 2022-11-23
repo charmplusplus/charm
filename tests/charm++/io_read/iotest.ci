@@ -1,10 +1,31 @@
 mainmodule iotest {
 	include "ckio.h";
-	
+	readonly CProxy_Main mainProxy;	 // the proxy to be used
 	mainchare Main {
 		entry Main(CkArgMsg*);
 		entry void ready(Ck::IO::FileReadyMsg* msg);
 		entry void startRead(Ck::IO::SessionReadyMsg* msg);
+		
+
+		entry void postClose(CkReductionMsg* msg){
+			serial {
+				ckout << "Entered the postClose function\n";
+				sleep (5);
+				CkExit();
+			}
+		}
+	
+		entry void decrementCount() {
+			serial {
+				num_reads_done--;
+				if(!num_reads_done){
+					CkCallback cb(CkIndex_Main::postClose(0), thisProxy);
+					std::cout << "About to enter closing session\n";
+					Ck::IO::closeReadSession(current_session, cb);
+				}
+			}
+
+		}
 
 		// method that verifies the read is correct
 		entry void testRead(Ck::IO::ReadCompleteMsg* msg) {
@@ -14,6 +35,7 @@ mainmodule iotest {
 					ckout << msg -> data[i];
 				}
 				ckout << endl;
+				thisProxy.decrementCount();
 			}
 
 		}
@@ -37,6 +59,7 @@ mainmodule iotest {
 			}
 
 			when startRead[0](Ck::IO::SessionReadyMsg* msg) serial {
+				current_session = msg -> session;
 				CkCallback test_read_cb(CkIndex_Main::testRead(0), thisProxy);	
 				readers = CProxy_Reader::ckNew(msg -> session, 5, 10, test_read_cb,5); // create 5 readers which will each read 10 bytes and start from offset 5 i.e 0 will read bytes [5,15), etc
 

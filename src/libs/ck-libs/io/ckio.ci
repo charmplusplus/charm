@@ -40,7 +40,10 @@ module CkIO_impl {
 		}
 
 	  };
- */
+ */       
+	// the method used by the director which is used to close a readsession
+	  entry void closeReadSession(Session, CkCallback);
+
 	  entry void prepareReadSession(FileToken file, size_t bytes, size_t offset, CkCallback ready){ // the director sets up a read session
 		serial {
 			prepareReadSessionHelper(file, bytes, offset, ready);
@@ -129,6 +132,7 @@ module CkIO_impl {
 		entry ReadSession(FileToken file, size_t offset, size_t bytes);
 		// way for the ReadSession object to send bytes over to the ReadAssembler object ra when serving a specific read
 		entry void sendData(size_t offset, size_t bytes, CProxy_ReadAssembler ra); 
+		entry void clearBuffer();
 	}
 	
 

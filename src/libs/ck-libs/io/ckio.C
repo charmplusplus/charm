@@ -110,6 +110,14 @@ namespace Ck { namespace IO {
         void fileOpened(FileToken file) {
           files[file].opened.send(new FileReadyMsg(file));
         }
+	
+	// method called by the closeReadSession function from user	
+	void closeReadSession(Session read_session, CkCallback after_end){
+		// CProxy_ReadSession(read_session.sessionID).ckDestroy(); // call ckDestroy on the appropriate readsession
+		CProxy_ReadSession(read_session.sessionID).clearBuffer();	
+		after_end.send(CkReductionMsg::buildNew(0, NULL, CkReduction::nop)); // invoke a callback
+
+	}
 
         void prepareWriteSession_helper(FileToken file, size_t bytes, size_t offset,
                                         CkCallback ready, CkCallback complete) {
@@ -445,6 +453,10 @@ namespace Ck { namespace IO {
 			readData();
 		}
 
+		void clearBuffer() {
+			_buffer.clear(); // clears the buffer
+		}
+
 		void readData(){
 			std::ifstream ifs(_file -> name); // open the file
 			if(ifs.fail()){ // error handling if opening the file failed
@@ -576,6 +588,12 @@ namespace Ck { namespace IO {
     void startReadSession(File file, size_t bytes, size_t offset, CkCallback ready){
 	impl::director.prepareReadSession(file.token, bytes, offset, ready);
     }
+    
+
+    void closeReadSession(Session read_session, CkCallback after_end){
+	impl::director.closeReadSession(read_session, after_end); // call the director helper
+    }
+
 
     void startSession(File file, size_t bytes, size_t offset, CkCallback ready,
                       const char *commitData, size_t commitBytes, size_t commitOffset,
@@ -600,6 +618,7 @@ namespace Ck { namespace IO {
     void close(File file, CkCallback closed) {
       impl::director.close(file.token, closed);
     }
+
 
     class SessionCommitMsg : public CMessage_SessionCommitMsg {
 
