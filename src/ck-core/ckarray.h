@@ -915,7 +915,9 @@ public:
   virtual void pup(PUP::er& p);
   PUPable_decl(CkArrayBroadcaster);
 
-  virtual void ckElementStamp(int* eltInfo) { *eltInfo = bcastSendEpoch; }
+  // When a new array element is inserted, it should only receive future broadcasts, so
+  // set the object's epoch to 1 more than the max epoch we've seen so far
+  virtual void ckElementStamp(int* eltInfo) { *eltInfo = storedBcasts.getMaxEpoch() + 1; }
 
   /// Element was just created on this processor
   /// Return false if the element migrated away or deleted itself.
@@ -951,8 +953,8 @@ private:
     int headEpoch = 0;
     size_t headIndex = 0;
     size_t mask = 0x0F;
-    int curMaxEpoch = 0;
-    int oldMaxEpoch = 0;  // Max epoch at last spring cleaning
+    int curMaxEpoch = -1;
+    int oldMaxEpoch = -1;  // Max epoch at last spring cleaning
 
     int getOffset(const int epoch) const { return epoch - headEpoch; }
 
@@ -1010,6 +1012,11 @@ private:
     {
       CkAssert(hasBcast(epoch));
       return storage[(headIndex + getOffset(epoch)) & mask];
+    }
+
+    int getMaxEpoch() const
+    {
+      return curMaxEpoch;
     }
 
     void springCleaning()
