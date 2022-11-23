@@ -1697,10 +1697,12 @@ void CkArray::recvBroadcast(CkMessage* m)
     if (zc_msgtype == CMK_ZC_BCAST_RECV_DONE_MSG) {
       updateTagArray(env, localElemVec.size());
     }
-    for (unsigned int i = 0; i < len; ++i)
+    // Deliver in reverse order in case the target method destroys and removes
+    // the element from localElemVec
+    for (int i = len - 1; i >= 0; --i)
     {
       bool doFree = false;
-      if (stableLocations && i == len - 1)
+      if (stableLocations && i == 0)
         doFree = true;
       // Do not free if CMK_ZC_BCAST_RECV_DONE_MSG, since it'll be freed by the
       // first element during CMK_ZC_BCAST_ALL_DONE_MSG
