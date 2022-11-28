@@ -35,6 +35,12 @@ mainmodule iotest {
 					ckout << msg -> data[i];
 				}
 				ckout << endl;
+				char* seq_data = sequentialRead(msg -> offset, msg -> bytes);
+				for(size_t i = 0; i< msg -> bytes; ++i){
+					CkAssert(seq_data[i] == msg -> data[i]);
+				}
+				delete[] seq_data;
+
 				thisProxy.decrementCount();
 			}
 

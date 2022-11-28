@@ -1,7 +1,9 @@
 #include "iotest.decl.h"
 #include <vector>
+#include <fstream>
 
 CProxy_Main mainProxy;
+
 
 class Main : public CBase_Main {
 	Main_SDAG_CODE;
@@ -14,7 +16,19 @@ public:
 		thisProxy.startReading();
 	}
 
+	char* sequentialRead(size_t offset, size_t bytes){
+		char* buffer = new char[bytes + 1];
+		int pos = 0;
+		std::ifstream ifs("readtest.txt");
+		ifs.seekg(offset);
 
+		while(pos < bytes){
+			buffer[pos++] = ifs.get();
+		}
+		buffer[bytes] = 0;
+		ifs.close();
+		return buffer;
+	}
 
 };
 
