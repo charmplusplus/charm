@@ -223,6 +223,7 @@ MORE=""
 COMPILER=""
 LIBDIR=()
 INCDIR=()
+DISABLE_TLS=0
 ARCH=
 BUILD_SHARED=""             # default no shared lib
 WITH_PRODUCTION=
@@ -359,6 +360,10 @@ do
     ;;
     --build-shared)
     BUILD_SHARED="-build-shared"; 
+    shift
+    ;;
+    --disable-tls)
+    DISABLE_TLS=1
     shift
     ;;
     --ampi-only)
@@ -871,6 +876,10 @@ else
     echo "CMK_AMPI_WITH_ROMIO=\"0\"" >> "$ConvSh"
     echo "CMK_AMPI_WITH_ROMIO:=0" >> "$ConvMak"
     echo '#define CMK_AMPI_WITH_ROMIO 0' >> "$ConvHeader"
+fi
+
+if [ $DISABLE_TLS -eq 0 ]; then
+    OPTS=('-ftls-model=initial-exec' "${OPTS[@]}")
 fi
 
 if [[ -n "$AMPI_ONLY" ]]
