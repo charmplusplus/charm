@@ -153,7 +153,14 @@ namespace Ck { namespace IO {
 	void read(Session session, size_t bytes, size_t offset, CkCallback after_read){
 		// std::cout << "Entered the director's read\n"; // for logging purposes
 		CProxy_ReadAssembler ra = CProxy_ReadAssembler::ckNew(session, bytes, offset, after_read); // create read assemble
-		CProxy_ReadSession(session.sessionID).sendData(offset, bytes, ra); // tell every object to send data that relevant to the read
+		Options& opt = files[session.file].opts;	
+		size_t read_stripe = opt.read_stripe;
+		size_t start_idx = offset / read_stripe; // the first index that has the relevant data
+		for(size_t i = start_idx; (i * read_stripe) < (offset + bytes); ++i){
+			// tell all the chares that have data to search and send
+			//ckout << "Sending to IO node " << i << endl;
+			CProxy_ReadSession(session.sessionID)[i].sendData(offset, bytes, ra); 
+		}
 		// std::cout << "Exiting director read \n";
 	}
 		

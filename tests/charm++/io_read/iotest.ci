@@ -40,7 +40,7 @@ mainmodule iotest {
 					CkAssert(seq_data[i] == msg -> data[i]);
 				}
 				delete[] seq_data;
-
+				delete msg;	
 				thisProxy.decrementCount();
 			}
 
