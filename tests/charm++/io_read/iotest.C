@@ -15,7 +15,7 @@ public:
 	Main(CkArgMsg* msg){
 		thisProxy.startReading();
 	}
-
+	// returns a buffer of a sequential read so that the parallel read at offset with number of bytes length can be verified
 	char* sequentialRead(size_t offset, size_t bytes){
 		char* buffer = new char[bytes + 1];
 		int pos = 0;
@@ -32,7 +32,7 @@ public:
 
 };
 
-
+// object that is used to enact the parallel reads
 struct Reader : public CBase_Reader {
 
 public:
