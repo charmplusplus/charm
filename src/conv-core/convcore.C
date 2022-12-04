@@ -1722,13 +1722,14 @@ void CsdSchedulerState_new(CsdSchedulerState_t *s)
 void *CsdNextMessage(CsdSchedulerState_t *s) {
 	void *msg;
 
-s->iter++;
+	s->iter++;
 
 #if CMK_NODE_QUEUE_AVAILABLE
-	if (1 == (s->iter & (1 << s->nodeGrpFreq)) // since we use nodeGrpFreq == 0 to mean
+	if (1 == (s->iter & (1 << s->nodeGrpFreq))) // since we use nodeGrpFreq == 0 to mean
                                            // don't check NodeQ with high priority, i
-					   // value of 1 serves well as when to check it.i but we sshould avoid "%" operator
-					// note: s->nodeGrpFreq is raised to a power of  2
+					   // value of 1 serves well as when to check it. 
+					// note: s->nodeGrpFreq is raised to a power of 2, to avoid modulo operator
+	  //note: maybe nodeGrpFreq should be a global readonly (or member of some globalParams group), to avoid "s->"
 	{
 	  msg = CmiGetNonLocalNodeQ();
 	  if (NULL != msg) return msg;
