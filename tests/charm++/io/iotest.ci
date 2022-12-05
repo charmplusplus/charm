@@ -1,0 +1,61 @@
+mainmodule iotest {
+  include "ckio.h";
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void ready(Ck::IO::FileReadyMsg *m);
+
+    entry void run(int iter) {
+      serial {
+        Ck::IO::Options opts;
+        opts.peStripe = 200;
+        opts.writeStripe = 1;
+        CkCallback opened(CkIndex_Main::ready(NULL), thisProxy);
+        opened.setRefnum(iter + 0);
+        char name[20];
+        sprintf(name, "test%d", iter);
+        Ck::IO::open(name, opened, opts);
+      }
+      when ready[iter + 0](Ck::IO::FileReadyMsg *m) serial {
+        f.at(iter/4) = m->file;
+        CkCallback sessionStart(CkIndex_Main::start_write(0), thisProxy);
+        sessionStart.setRefnum(iter + 1);
+        CkCallback sessionEnd(CkIndex_Main::test_written(0), thisProxy);
+        sessionEnd.setRefnum(iter + 2);
+        std::string h = "hello\n";
+        Ck::IO::startSession(f.at(iter/4), 10*n, 0, sessionStart,
+                             h.c_str(), h.size(), 10*n,
+                             sessionEnd);
+        delete m;
+        CkPrintf("Main saw file ready\n");
+      }
+      when start_write[iter + 1](Ck::IO::SessionReadyMsg *m) serial {
+        testers = CProxy_test::ckNew(m->session, n);
+        CkPrintf("Main saw session ready\n");
+        delete m;
+      }
+      when test_written[iter + 2](CkReductionMsg *m) serial {
+        CkPrintf("Main saw write done\n");
+        delete m;
+        // Read file and validate contents
+        CkCallback cb(CkIndex_Main::closed(0), thisProxy);
+        cb.setRefnum(iter + 3);
+        Ck::IO::close(f.at(iter/4), cb);
+      }
+      when closed[iter + 3](CkReductionMsg *m) serial {
+        CkPrintf("Main saw close done\n");
+        delete m;
+        thisProxy.iterDone();
+      }
+    };
+
+    entry void start_write(Ck::IO::SessionReadyMsg *m);
+    entry void test_written(CkReductionMsg *m);
+    entry void closed(CkReductionMsg *m);
+    entry void iterDone();
+  };
+
+  array [1D] test {
+    entry test(Ck::IO::Session token);
+  }
+}
