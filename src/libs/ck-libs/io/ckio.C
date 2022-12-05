@@ -153,7 +153,7 @@ namespace Ck { namespace IO {
 	// called by user-facing read call to facilitate the actual read
 	void read(Session session, size_t bytes, size_t offset, CkCallback after_read){
 		// std::cout << "Entered the director's read\n"; // for logging purposes
-		CProxy_ReadAssembler ra = CProxy_ReadAssembler::ckNew(session, bytes, offset, after_read); // create read assemble
+		CProxy_ReadAssembler ra = CProxy_ReadAssembler::ckNew(session, bytes, offset, after_read); // create read assembler
 		Options& opt = files[session.file].opts;	
 		size_t read_stripe = opt.read_stripe;
 		size_t start_idx = offset / read_stripe; // the first index that has the relevant data
