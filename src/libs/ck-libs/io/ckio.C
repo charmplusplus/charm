@@ -44,7 +44,7 @@ namespace Ck { namespace IO {
         int sessionID;
         CProxy_WriteSession session;
 	CProxy_ReadSession read_session;
-        CkCallback complete; // used for the write session complete callback? TODO verify this is true
+        CkCallback complete; // used for the write session complete callback?
 
         FileInfo(string name_, CkCallback opened_, Options opts_)
           : name(name_), opened(opened_), opts(opts_), fd(-1)
@@ -472,16 +472,12 @@ namespace Ck { namespace IO {
 				CkExit();
 			}
 			ifs.seekg(_my_offset); // jump to the point where the chare should start reading
-			char* buffer = new char[_my_bytes];
-			ifs.read(buffer, _my_bytes);
 			_buffer.resize(_my_bytes, 'z'); // resize it and init with 'z' to denote what hasn't been changed
 			_buffer.shrink_to_fit(); // get rid of any extra capacity 
-			for(size_t i = 0; i < _my_bytes; ++i){
-				_buffer[i] = (buffer[i]);
-			}
+			char* buffer = _buffer.data(); // point to the underlying char* of the vector; does not own the array
+			ifs.read(buffer, _my_bytes);
 			// std::cout << thisIndex << " has finished reading " << _buffer.size() << " bytes\n";
 			// std::cout << thisIndex << " ";
-			delete[] buffer;
 			ifs.close();
 		}	
 		
