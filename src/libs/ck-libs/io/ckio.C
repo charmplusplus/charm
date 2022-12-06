@@ -568,7 +568,7 @@ namespace Ck { namespace IO {
 			}
 			_bytes_left -= data.size(); // decrement the number of remaining bytes to read
 			if(_bytes_left) return; // if there are bytes still to read, just return
-			char* buffer = data.data(); 
+			char* buffer = _data_buffer.data(); 
 			// ckout << "Offset " << _read_offset << " belongs to Pe " << CkMyPe() << endl;
 			ReadCompleteMsg* msg = new (_data_buffer.size()) ReadCompleteMsg();
 			memcpy(msg -> data, buffer, _data_buffer.size());
