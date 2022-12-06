@@ -113,7 +113,6 @@ namespace Ck { namespace IO {
 	
 	// method called by the closeReadSession function from user	
 	void closeReadSession(Session read_session, CkCallback after_end){
-		// CProxy_ReadSession(read_session.sessionID).ckDestroy(); // call ckDestroy on the appropriate readsession
 		CProxy_ReadSession(read_session.sessionID).ckDestroy();
 		after_end.send(CkReductionMsg::buildNew(0, NULL, CkReduction::nop)); // invoke a callback
 
