@@ -172,7 +172,6 @@ namespace Ck { namespace IO {
 		int num_readers = 0;
 		size_t remainder = bytes % opts.read_stripe;
 		if(remainder){
-			// bytes -= remainder;
 			num_readers++;
 		}
 		num_readers += (bytes / opts.read_stripe); 
