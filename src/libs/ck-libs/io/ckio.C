@@ -542,13 +542,6 @@ namespace Ck { namespace IO {
 			_after_read = after_read;
 			_data_buffer.resize(_bytes_left, 'r'); // resize the buffer to the size of read call
 			_data_buffer.shrink_to_fit();
-			// ckout << "RA Buffer init\n"; 
-			/*
-			for(char ch : _data_buffer)
-				ckout << ch;
-			ckout << endl;
-			std::cout << "ReadAssembler built\n";
-			*/
 		}
 
 		void shareData(size_t read_chare_offset, std::vector<char> data){
