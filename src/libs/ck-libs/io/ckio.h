@@ -88,9 +88,6 @@ namespace Ck { namespace IO {
   /**
    * Used to end the current read session and will then invoke the after_end callback that takes a CkReductionMsg* with nothing in it
    * Will effectively call ckDestroy() on the CProxy_Reader of the associated FileInfo
-   *
-   *
-   *
    */
   
   void closeReadSession(Session read_session, CkCallback after_end);
