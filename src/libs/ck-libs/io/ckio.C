@@ -450,12 +450,10 @@ namespace Ck { namespace IO {
 	public:
 		ReadSession(FileToken file, size_t offset, size_t bytes) : _token(file), _file(CkpvAccess(manager)->get(file)), _session_bytes(bytes), _session_offset(offset){
 			_my_offset = thisIndex * (_file -> opts.read_stripe) + _session_offset;
-			// std::cout << "BYTES IN SESSION: " << _session_bytes << std::endl;
 			_my_bytes = min(_file -> opts.read_stripe, _session_offset + _session_bytes - _my_offset); // get the number of bytes owned by the session
 			CkAssert(_file -> fd != -1);
 			CkAssert(_my_offset >= _session_offset);
 			CkAssert(_my_offset + _my_bytes <= _session_offset + _session_bytes);
-			// std::cout << thisIndex << " has to read " << _my_bytes << " from the offset " << _my_offset << "\n";
 			readData();
 		}
 
