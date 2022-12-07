@@ -492,11 +492,9 @@ namespace Ck { namespace IO {
 			else if(offset < _my_offset) chare_offset = _my_offset; // the start of the read is below this chare, so we should read in the current data from start of what it owns
 			else chare_offset = offset; // read offset is in the middle
 
-			// ckout << "Entered the sendData method on " << thisIndex << endl;
 			size_t end_byte_chare = min(offset + bytes, _my_offset + _my_bytes); // the last byte, exclusive, this chare should read
 			size_t bytes_read = 0;
 			std::vector<char> data_to_send;
-			// ckout << thisIndex << " spans: [ " << _my_offset << "," << (_my_offset + _my_bytes - 1) << endl;
 
 			size_t bytes_to_read = end_byte_chare - chare_offset; // the bytes to read
 
@@ -505,12 +503,6 @@ namespace Ck { namespace IO {
 				data_to_send.push_back(data);
 				bytes_read++;
 			}
-			// ckout << "the following data is packed and ready to be sent from " << thisIndex << " with size " << data_to_send.size() << ": ";
-			/*for(char& ch : data_to_send){
-				ckout << ch;
-			}*/
-
-			// ckout << endl;
 			ra.shareData(chare_offset, data_to_send); // send this data to the ReadAssembler
 		}
       };
