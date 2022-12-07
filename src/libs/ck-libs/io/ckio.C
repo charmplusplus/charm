@@ -468,8 +468,6 @@ namespace Ck { namespace IO {
 			_buffer.shrink_to_fit(); // get rid of any extra capacity 
 			char* buffer = _buffer.data(); // point to the underlying char* of the vector; does not own the array
 			ifs.read(buffer, _my_bytes);
-			// std::cout << thisIndex << " has finished reading " << _buffer.size() << " bytes\n";
-			// std::cout << thisIndex << " ";
 			ifs.close();
 		}	
 		
