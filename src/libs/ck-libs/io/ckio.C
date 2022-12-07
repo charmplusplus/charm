@@ -548,7 +548,6 @@ namespace Ck { namespace IO {
 			delete this;
 		}
     	};
-
     }
 
     void open(string name, CkCallback opened, Options opts) {
