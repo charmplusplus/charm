@@ -117,7 +117,7 @@ module CkIO_impl {
 		 // stores the parameters of the read call it is tasked with building
 		entry ReadAssembler(Session session, size_t bytes, size_t offset, CkCallback after_read);
 		// the method by which ReadSession objects can send their data for the read	
-		entry void shareData(size_t read_chare_offset, std::vector<char> data); 
+		entry void shareData(size_t read_chare_offset, size_t num_bytes, char data[num_bytes]); 
 
 	}
 

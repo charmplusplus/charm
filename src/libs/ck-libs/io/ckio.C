@@ -1,6 +1,7 @@
 #include <string>
 #include <map>
 #include <algorithm>
+#include <unistd.h>
 #include <sstream>
 #include <iostream>
 #include <fstream>
@@ -495,7 +496,7 @@ namespace Ck { namespace IO {
 				data_to_send.push_back(data);
 				bytes_read++;
 			}
-			ra.shareData(chare_offset, data_to_send); // send this data to the ReadAssembler
+			ra.shareData(chare_offset, data_to_send.size(), data_to_send.data()); // send this data to the ReadAssembler
 		}
       };
 
@@ -528,23 +529,31 @@ namespace Ck { namespace IO {
 			_data_buffer.shrink_to_fit();
 		}
 
-		void shareData(size_t read_chare_offset, std::vector<char> data){
+		void shareData(size_t read_chare_offset, size_t num_bytes, char* data){
 			int start_idx = read_chare_offset - _read_offset; // start index for writing to _data_buffer
-			int counter = 0;
-			for(char& ch : data){ // copy over the data
+			// copy over the data from data to the correct place in the _data_buffer
+			for(int counter = 0; counter < num_bytes; ++counter){
+				char ch = data[counter];
 				_data_buffer[start_idx + counter] = ch;
-				++counter;	
 			}
-			_bytes_left -= data.size(); // decrement the number of remaining bytes to read
+			_bytes_left -= num_bytes; // decrement the number of remaining bytes to read
+			ckout << _bytes_left << " more bytes to collect at offset " << _read_offset << endl;	
 			if(_bytes_left) return; // if there are bytes still to read, just return
 			char* buffer = _data_buffer.data(); 
+			ckout << "The buffer: ";
+			for(size_t i = 0; i < _data_buffer.size(); ++i){
+				ckout << buffer[i];
+			}
+			ckout << endl;
 			ReadCompleteMsg* msg = new (_data_buffer.size()) ReadCompleteMsg();
 			memcpy(msg -> data, buffer, _data_buffer.size());
 			msg -> offset= _read_offset;
 			msg -> bytes = _data_buffer.size();
-				
+			ckout << _read_offset << " is about to send the message \n";
 			_after_read.send(msg);
 			// have some method of cleaning up this chare after invoking the callback
+			ckout << _read_offset << " has sent the message \n";
+			// delete data;
 			delete this;
 		}
     	};
