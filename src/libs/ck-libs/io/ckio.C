@@ -461,8 +461,7 @@ namespace Ck { namespace IO {
 		void readData(){
 			std::ifstream ifs(_file -> name); // open the file
 			if(ifs.fail()){ // error handling if opening the file failed
-				std::cerr<< "There was an error on ReadSession chare " << thisIndex << " when trying to open file " << _file -> name << std::endl;
-				CkExit();
+				CkAbort("Couldn't open the file %s\n", (_file -> name).c_str());
 			}
 			ifs.seekg(_my_offset); // jump to the point where the chare should start reading
 			_buffer.resize(_my_bytes, 'z'); // resize it and init with 'z' to denote what hasn't been changed
