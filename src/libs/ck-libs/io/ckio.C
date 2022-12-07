@@ -548,15 +548,12 @@ namespace Ck { namespace IO {
 			int start_idx = read_chare_offset - _read_offset; // start index for writing to _data_buffer
 			int counter = 0;
 			for(char& ch : data){ // copy over the data
-			// 	ckout << "ReadAssembler " << read_chare_offset << " has received " << ch << endl;
 				_data_buffer[start_idx + counter] = ch;
-		//		ckout << "Read Assembler " << read_chare_offset << "has set " << (start_idx + counter) << " to " << _data_buffer[start_idx + counter] << endl;
 				++counter;	
 			}
 			_bytes_left -= data.size(); // decrement the number of remaining bytes to read
 			if(_bytes_left) return; // if there are bytes still to read, just return
 			char* buffer = _data_buffer.data(); 
-			// ckout << "Offset " << _read_offset << " belongs to Pe " << CkMyPe() << endl;
 			ReadCompleteMsg* msg = new (_data_buffer.size()) ReadCompleteMsg();
 			memcpy(msg -> data, buffer, _data_buffer.size());
 			msg -> offset= _read_offset;
