@@ -1,7 +1,7 @@
 -include ../../../common.mk
 # Makefile for load-balancing test program
 
-OPTS	= -O3 -verbose
+OPTS	= -O3
 CHARMC	= ../../../../bin/charmc $(OPTS)
 LBLIB	= -module CommonLBs
 
