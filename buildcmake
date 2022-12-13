@@ -78,7 +78,7 @@ function parse_triplet() {
   all_triplets=$(cd "$my_srcdir"/src/arch && find . -maxdepth 1 -name '*-*' -type d | sed 's,./,,')
   extra_triplet_opts="$full_triplet"
   for t in $all_triplets; do
-    extra_triplet_opts=${extra_triplet_opts#$t}
+    extra_triplet_opts=${extra_triplet_opts#"$t"}
     [[ $full_triplet == $t* ]] && actual_triplet=$t
   done
   if [[ -z ${actual_triplet:-} ]]; then
