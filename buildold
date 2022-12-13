@@ -223,7 +223,6 @@ MORE=""
 COMPILER=""
 LIBDIR=()
 INCDIR=()
-DISABLE_TLS=0
 ARCH=
 BUILD_SHARED=""             # default no shared lib
 WITH_PRODUCTION=
@@ -360,10 +359,6 @@ do
     ;;
     --build-shared)
     BUILD_SHARED="-build-shared"; 
-    shift
-    ;;
-    --disable-tls)
-    DISABLE_TLS=1
     shift
     ;;
     --ampi-only)
