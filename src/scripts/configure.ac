@@ -2595,7 +2595,7 @@ if test "$enable_tls" = "yes"
 then
     add_flag 'CMK_USER_DISABLED_TLS="0"' "tlsglobals"
 else
-    add_flag 'CMK_USER_DISABLED_TLS="1"' "glsglobals"
+    add_flag 'CMK_USER_DISABLED_TLS="1"' "tlsglobals"
     CMK_SUPPORTS_TLSGLOBALS='0'
 fi
 
