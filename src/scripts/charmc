@@ -1472,10 +1472,10 @@ if [ "$TLSGLOBALS" = "1" ]
 then
     if [[ "$CMK_SUPPORTS_TLSGLOBALS" = '0' ]]
     then
-	    if [[ "$CMK_USER_DISABLED_TLS" = '1' ]]
-	    then
+      if [[ "$CMK_USER_DISABLED_TLS" = '1' ]]
+      then
         echo "Error: Charm was built with '--disable-tls' and -tlsglobals is not available."
-	    else
+      else
         echo "Error: -tlsglobals is not supported on $CMK_VDIR"
       fi
       exit 1
