@@ -28,11 +28,8 @@ protected:
     for (int i = 0; i < N; i++)
     {
       const auto element = x[i];
-      /*
       const auto elementSq = element * element;
       sum += elementSq * elementSq;
-      */
-      sum += element * element;
     }
     return sum;
   }
@@ -44,11 +41,8 @@ protected:
     for (int i = 0; i < N; i++)
     {
       const auto element = a[i] + b[i];
-      /*
       const auto elementSq = element * element;
       sum += elementSq * elementSq;
-      */
-      sum += element * element;
     }
     return sum;
   }
