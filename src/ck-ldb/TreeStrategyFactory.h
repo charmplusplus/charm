@@ -10,6 +10,7 @@
 #include "kd.h"
 #include "orb.h"
 #include "refine.h"
+#include "treemetis.h"
 
 namespace TreeStrategy
 {
