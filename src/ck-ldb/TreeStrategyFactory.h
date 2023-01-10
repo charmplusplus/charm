@@ -19,17 +19,19 @@ namespace TreeStrategy
 // to specify it in the config file.
 // The second parameter is whether or not the constructor takes a json& config argument
 // (which some strategies to accept additional parameters from the config file)
-#define FOREACH_STRATEGY(STRATEGY)    \
-  STRATEGY(Kd, false, false)          \
-  STRATEGY(GreedyNorm, true, false)   \
-  STRATEGY(Greedy, false, false)      \
-  STRATEGY(GreedyRefine, true, false) \
-  STRATEGY(RefineA, false, false)     \
-  STRATEGY(RefineB, false, false)     \
-  STRATEGY(Random, false, false)      \
-  STRATEGY(Dummy, false, false)       \
-  STRATEGY(Rotate, false, false)      \
-  STRATEGY(ORB, false, true)
+#define FOREACH_STRATEGY(STRATEGY)     \
+  STRATEGY(Kd, false, false)           \
+  STRATEGY(GreedyNorm, true, false)    \
+  STRATEGY(Greedy, false, false)       \
+  STRATEGY(ScalarGreedy, false, false) \
+  STRATEGY(GreedyRefine, true, false)  \
+  STRATEGY(RefineA, false, false)      \
+  STRATEGY(RefineB, false, false)      \
+  STRATEGY(Random, false, false)       \
+  STRATEGY(Dummy, false, false)        \
+  STRATEGY(Rotate, false, false)       \
+  STRATEGY(ORB, false, true)           \
+  STRATEGY(Metis, false, true)
 
 #define STRINGIFYLB(_name, _, __) #_name,
 const auto LBNames = {FOREACH_STRATEGY(STRINGIFYLB)};

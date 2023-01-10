@@ -93,6 +93,35 @@ public:
   }
 };
 
+// TODO: Combine implementation with Greedy<Obj<1>>... specialization
+template <typename O, typename P, typename S>
+class ScalarGreedy : public Strategy<O, P, S>
+{
+public:
+  void solve(std::vector<O>& objs, std::vector<P>& procs, S& solution,
+             bool objsSorted)
+  {
+    if (!objsSorted) std::sort(objs.begin(), objs.end(), CmpLoadGreater<O>());
+    std::priority_queue<P, std::vector<P>, CmpLoadGreater<P>> procHeap(
+        CmpLoadGreater<P>(), procs);
+
+    for (const auto& o : objs)
+    {
+      if (_lb_args.debug() > 1)
+        CkPrintf("Obj %d, dimension %d, load %f\n", o.id, O::dimension, o.getLoad());
+
+      P p = procHeap.top();
+      procHeap.pop();
+      solution.assign(o, p);  // update solution (assumes solution updates processor load)
+      procHeap.push(p);
+
+      if (_lb_args.debug() > 1)
+        CkPrintf("Obj %d going to PE %d\n", o.id, p.id);
+    }
+  }
+};
+
+
 template <typename O, typename P>
 struct GreedySolution
 {
