@@ -991,6 +991,8 @@ private:
                     storage.begin());
           std::move(storage.begin() + oldSize, storage.begin() + oldSize + headIndex,
                     storage.begin() + oldSize - headIndex);
+          std::fill(storage.begin() + oldSize, storage.begin() + oldSize + headIndex,
+                    nullptr);
           headIndex = 0;
         }
       }
