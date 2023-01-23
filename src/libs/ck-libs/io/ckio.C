@@ -154,6 +154,7 @@ namespace Ck { namespace IO {
 		Options& opt = files[session.file].opts;	
 		size_t read_stripe = opt.read_stripe;
 		size_t start_idx = offset / read_stripe; // the first index that has the relevant data
+		// CkPrintf("Read request of %d bytes starting at %d\n", bytes, offset);
 		for(size_t i = start_idx; (i * read_stripe) < (offset + bytes); ++i){
 			// tell all the chares that have data to search and send
 			CProxy_ReadSession(session.sessionID)[i].sendData(offset, bytes, ra); 
@@ -161,6 +162,10 @@ namespace Ck { namespace IO {
 	}
 		
 	void prepareReadSessionHelper(FileToken file, size_t bytes, size_t offset, CkCallback ready){
+		if(!bytes){
+			CkPrintf("You're tryna read 0 bytes buddy\n");
+			CkAbort("You're tryna read 0 bytes. Oops.\n");
+		}
 		size_t session_bytes = bytes; // amount of bytes in the session
 		// ckout << "In prepare read session helper" << endl;
 		Options& opts = files[file].opts;
@@ -480,18 +485,20 @@ namespace Ck { namespace IO {
 			else if(offset + bytes <= _my_offset) return; // the read call starts to the left of this chare
 
 
-			else if(offset < _my_offset) chare_offset = _my_offset; // the start of the read is below this chare, so we should read in the current data from start of what it owns
+			if(offset < _my_offset) chare_offset = _my_offset; // the start of the read is below this chare, so we should read in the current data from start of what it owns
 			else chare_offset = offset; // read offset is in the middle
 
 			size_t end_byte_chare = min(offset + bytes, _my_offset + _my_bytes); // the last byte, exclusive, this chare should read
 			size_t bytes_read = 0;
-			std::vector<char> data_to_send;
 
 			size_t bytes_to_read = end_byte_chare - chare_offset; // the bytes to read
-
+			std::vector<char> data_to_send; 
+			data_to_send.resize(bytes_to_read); // the number of bytes to read to avoid the pushback function
+			data_to_send.shrink_to_fit(); // will this improve it? hopefully sending less data over network is good
+			// remoe copy, just send poitner to start of data needed
 			while(bytes_read < bytes_to_read){ // still bytes to read and haven't gone out of bounds
 				char data = _buffer[chare_offset - _my_offset + bytes_read]; // get the data we want
-				data_to_send.push_back(data);
+				data_to_send.at(bytes_read) = data;
 				bytes_read++;
 			}
 			ra.shareData(chare_offset, data_to_send.size(), data_to_send.data()); // send this data to the ReadAssembler
@@ -528,9 +535,9 @@ namespace Ck { namespace IO {
 		}
 
 		void shareData(size_t read_chare_offset, size_t num_bytes, char* data){
-			int start_idx = read_chare_offset - _read_offset; // start index for writing to _data_buffer
+			size_t start_idx = read_chare_offset - _read_offset; // start index for writing to _data_buffer
 			// copy over the data from data to the correct place in the _data_buffer
-			for(int counter = 0; counter < num_bytes; ++counter){
+			for(size_t counter = 0; counter < num_bytes; ++counter){
 				char ch = data[counter];
 				_data_buffer[start_idx + counter] = ch;
 			}
