@@ -27,6 +27,9 @@ DIRS = \
   longIdle \
   bombard \
   varTRAM \
+  dynamic_array_expansion \
+  dynamic_array_hang \
+  random_1d_amr_example \
 
 FTDIRS = \
   jacobi3d \
