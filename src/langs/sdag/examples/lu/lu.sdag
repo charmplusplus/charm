@@ -2,7 +2,7 @@ class cube
 
 sdagentry iterations (InitMessage *mesg)
 {
-  atomic {
+  serial {
     Initialization(); 
     SendMessage(xmnbr,rhs_entry_xp1,xmmsg); 
     SendMessage(xpnbr,rhs_entry_xm1,xpmsg);
@@ -12,23 +12,23 @@ sdagentry iterations (InitMessage *mesg)
     SendMessage(zpnbr,rhs_entry_zm1,zpmsg);
   }
   while(iter<maxiter) {
-    atomic { rhs_init(); }
+    serial { rhs_init(); }
     overlap {
       when rhs_entry_xm1(Boundary *xm1), 
            rhs_entry_xp1(Boundary *xp1) {
-        atomic {rhs_x(xm1,xp1);}
+        serial {rhs_x(xm1,xp1);}
       }
       when rhs_entry_ym1(Boundary *ym1), 
            rhs_entry_yp1(Boundary *yp1) {
-        atomic {rhs_y(ym1,yp1); }
+        serial {rhs_y(ym1,yp1); }
       }
       when rhs_entry_zm1(Boundary *zm1), 
            rhs_entry_yp1(Boundary *zp1) {
-        atomic {rhs_z(zm1,zp1); }
+        serial {rhs_z(zm1,zp1); }
       }
     }
     if(x==0 && y==0 && z==0) {
-      atomic {
+      serial {
         SendMessage(xpnbr,XmBoundary,xmsg);
         SendMessage(ypnbr,YmBoundary,ymsg);
         SendMessage(zpnbr,ZmBoundary,zmsg);
@@ -36,16 +36,16 @@ sdagentry iterations (InitMessage *mesg)
     }
     overlap {
       when XmBoundary(Boundary *xmmsg) {
-        atomic {CopyMessageX(xmmsg); }
+        serial {CopyMessageX(xmmsg); }
       }
       when YmBoundary(Boundary *ymmsg) {
-        atomic {CopyMessageY(ymmsg); }
+        serial {CopyMessageY(ymmsg); }
       }
       when ZmBoundary(Boundary *zmmsg) {
-        atomic {CopyMessageZ(zmmsg); }
+        serial {CopyMessageZ(zmmsg); }
       }
     }
-    atomic {
+    serial {
       blts();
       jacld();
       SendMessage(xpnbr);
@@ -53,7 +53,7 @@ sdagentry iterations (InitMessage *mesg)
       SendMessage(zpnbr);
     }
     if(x==maxx && y==maxy && z==maxz) {
-      atomic {
+      serial {
         SendMessage(xmnbr,XpBoundary,xmsg);
         SendMessage(ymnbr,YpBoundary,ymsg);
         SendMessage(zmnbr,ZpBoundary,zmsg);
@@ -61,16 +61,16 @@ sdagentry iterations (InitMessage *mesg)
     }
     overlap {
       when XpBoundary(Boundary *xmsg) {
-        atomic {CopyMessageX(xmsg); }
+        serial {CopyMessageX(xmsg); }
       }
       when YpBoundary(Boundary *ymsg) {
-        atomic {CopyMessageY(ymsg); }
+        serial {CopyMessageY(ymsg); }
       }
       when ZpBoundary(Boundary *zmsg) {
-        atomic {CopyMessageZ(zmsg); }
+        serial {CopyMessageZ(zmsg); }
       }
     }
-    atomic {
+    serial {
       buts();
       jacu();
       SendMessage(xmnbr);
