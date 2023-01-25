@@ -151,7 +151,6 @@ extern void registerCreateCallbackMsgExtCallback(void (*cb)(void*, int, int, int
 extern void registerPyReductionExtCallback(int (*cb)(char**, int*, int, char**));
 extern int CkZCBufferSizeInBytes();
 
-
 #endif
 /*********************************************************/
 /**

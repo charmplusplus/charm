@@ -345,6 +345,36 @@ struct CkReductionTypesExt {
     int external_py = CkReduction::external_py;
 };
 
+// Enum to detect type of contributors in a reduction
+typedef enum : uint8_t {
+    array=0,
+    group,
+    nodegroup
+} extContributorType;
+
+// Structure to store contribute parameters from external clients (e.g. Charm4py)
+struct CkExtContributeInfo
+{
+    int cbEpIdx;
+    int fid; // future ID (if reduction target is future)
+    void* data;
+    int numelems;
+    int dataSize;
+    CkReduction::reducerType redtype;
+    int id;                                 // arrayId or groupId
+    int *idx;                               // this is contributor index (PE for groups)
+    int ndims;                              // ensured to be 1 for groups
+    extContributorType contributorType;     // type of contributors
+};
+
+// Functions to perform reduction over contributors from external clients (e.g. Charm4py)
+void CkExtContributeToChare(void* contribute_params, int onPE, void* objPtr);
+void CkExtContributeToArray(void* contribute_params, int aid, int* idx, int ndims);
+void CkExtContributeToGroup(void* contribute_params, int gid, int pe);
+void CkExtContributeToSection(void* contribute_params, int sid_pe, int sid_cnt, int rootPE);
+
+
+
 extern "C" CkReductionTypesExt charm_reducers;
 
 #endif
