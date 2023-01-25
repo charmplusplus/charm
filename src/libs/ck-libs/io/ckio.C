@@ -492,16 +492,16 @@ namespace Ck { namespace IO {
 			size_t bytes_read = 0;
 
 			size_t bytes_to_read = end_byte_chare - chare_offset; // the bytes to read
-			std::vector<char> data_to_send; 
-			data_to_send.resize(bytes_to_read); // the number of bytes to read to avoid the pushback function
-			data_to_send.shrink_to_fit(); // will this improve it? hopefully sending less data over network is good
-			// remoe copy, just send poitner to start of data needed
-			while(bytes_read < bytes_to_read){ // still bytes to read and haven't gone out of bounds
-				char data = _buffer[chare_offset - _my_offset + bytes_read]; // get the data we want
-				data_to_send.at(bytes_read) = data;
-				bytes_read++;
-			}
-			ra.shareData(chare_offset, data_to_send.size(), data_to_send.data()); // send this data to the ReadAssembler
+			// std::vector<char> data_to_send; 
+			// data_to_send.resize(bytes_to_read); // the number of bytes to read to avoid the pushback function
+			// data_to_send.shrink_to_fit(); // will this improve it? hopefully sending less data over network is good
+			// // remoe copy, just send poitner to start of data needed
+			// while(bytes_read < bytes_to_read){ // still bytes to read and haven't gone out of bounds
+			// 	char data = _buffer[chare_offset - _my_offset + bytes_read]; // get the data we want
+			// 	data_to_send.at(bytes_read) = data;
+			// 	bytes_read++;
+			// }
+			ra.shareData(chare_offset, bytes_to_read, _buffer.data() + (chare_offset - _my_offset)); // send this data to the ReadAssembler
 		}
       };
 
@@ -537,10 +537,11 @@ namespace Ck { namespace IO {
 		void shareData(size_t read_chare_offset, size_t num_bytes, char* data){
 			size_t start_idx = read_chare_offset - _read_offset; // start index for writing to _data_buffer
 			// copy over the data from data to the correct place in the _data_buffer
-			for(size_t counter = 0; counter < num_bytes; ++counter){
-				char ch = data[counter];
-				_data_buffer[start_idx + counter] = ch;
-			}
+//			for(size_t counter = 0; counter < num_bytes; ++counter){
+			// 	char ch = data[counter];
+			// 	_data_buffer[start_idx + counter] = ch;
+			// }
+			memcpy(_data_buffer.data() + start_idx, data, num_bytes); // copying the num_bytes from data to the read buffer
 			_bytes_left -= num_bytes; // decrement the number of remaining bytes to read
 			if(_bytes_left) return; // if there are bytes still to read, just return
 			char* buffer = _data_buffer.data(); 
