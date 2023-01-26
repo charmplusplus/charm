@@ -39,7 +39,7 @@ endif()
 # Needed so that tlsglobals works correctly with --build-shared
 # See https://github.com/UIUC-PPL/charm/issues/3168 for details.
 check_cxx_compiler_flag("-ftls-model=initial-exec" CMK_COMPILER_KNOWS_FTLS_MODEL)
-if(CMK_COMPILER_KNOWS_FTLS_MODEL)
+if(CMK_COMPILER_KNOWS_FTLS_MODEL AND NOT DISABLE_TLS)
   set(OPTS_CC "${OPTS_CC} -ftls-model=initial-exec")
   set(OPTS_CXX "${OPTS_CXX} -ftls-model=initial-exec")
   set(OPTS_LD "${OPTS_LD} -ftls-model=initial-exec")

@@ -210,6 +210,12 @@ else
   add_make_flag 'CMK_TRACE_ENABLED:=1' 'tracing'
 fi
 
+AC_ARG_ENABLE([tls],
+            [AS_HELP_STRING([--enable-tls],
+              [enable tls support])],
+            [enable_tls=$enableval],
+            [enable_tls=yes])
+
 AC_ARG_ENABLE([tracing-commthread],
             [AS_HELP_STRING([--enable-tracing-commthread],
               [enable tracing communication thread])], ,
@@ -823,10 +829,13 @@ fi
 test_cxx "whether C++ compiler accepts -ftls-model=initial-exec" "yes" "no" "-ftls-model=initial-exec"
 if test $strictpass -eq 1
 then
-    add_flag 'CMK_COMPILER_KNOWS_FTLS_MODEL="1"' "tlsglobals"
-    OPTS_CC="$OPTS_CC -ftls-model=initial-exec"
-    OPTS_CXX="$OPTS_CXX -ftls-model=initial-exec"
-    OPTS_LD="$OPTS_LD -ftls-model=initial-exec"
+    if test "$enable_tls" = "yes"
+    then
+      add_flag 'CMK_COMPILER_KNOWS_FTLS_MODEL="1"' "tlsglobals"
+      OPTS_CC="$OPTS_CC -ftls-model=initial-exec"
+      OPTS_CXX="$OPTS_CXX -ftls-model=initial-exec"
+      OPTS_LD="$OPTS_LD -ftls-model=initial-exec"
+    fi
 fi
 
 # Test for a flag important for shared linking
@@ -2582,13 +2591,20 @@ then
   fi
 fi
 
+if test "$enable_tls" = "yes"
+then
+    add_flag 'CMK_USER_DISABLED_TLS="0"' "tlsglobals"
+else
+    add_flag 'CMK_USER_DISABLED_TLS="1"' "tlsglobals"
+    CMK_SUPPORTS_TLSGLOBALS='0'
+fi
+
 AC_DEFINE_UNQUOTED(CMK_SUPPORTS_SWAPGLOBALS, $CMK_SUPPORTS_SWAPGLOBALS, [whether supports swapglobals])
 add_flag "CMK_SUPPORTS_SWAPGLOBALS=$CMK_SUPPORTS_SWAPGLOBALS" 'swapglobals'
 add_make_flag "CMK_SUPPORTS_SWAPGLOBALS:=$CMK_SUPPORTS_SWAPGLOBALS" 'swapglobals'
 AC_DEFINE_UNQUOTED(CMK_SUPPORTS_TLSGLOBALS, $CMK_SUPPORTS_TLSGLOBALS, [whether supports tlsglobals])
 add_flag "CMK_SUPPORTS_TLSGLOBALS=$CMK_SUPPORTS_TLSGLOBALS" 'tlsglobals'
 add_make_flag "CMK_SUPPORTS_TLSGLOBALS:=$CMK_SUPPORTS_TLSGLOBALS" 'tlsglobals'
-
 
 #### test if has Multiprocessing.h for apple ####
 cat > $t <<EOT
