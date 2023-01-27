@@ -495,7 +495,7 @@ extern int (*ArrayElemLeaveExt)(int, int, int*, char**, int);
 extern void (*ArrayElemJoinExt)(int, int, int*, int, char*, int);
 extern void (*ArrayResumeFromSyncExtCallback)(int, int, int*);
 // TODO: this should be changed maybe (?)
-extern void (*ArrayMsgZCRecvExtCallback)(int, int, int*, int, int, int*, void *, int, char*, int);
+extern void (*ArrayMsgZCRecvExtCallback)(int, int, int*, int, int, size_t*, void *, int, char*, int);
 
 
 class ArrayElemExt : public ArrayElement
@@ -522,7 +522,7 @@ public:
     if (CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) == CMK_ZC_CHARM4PY_MSG) {
         int numZCBufs; implP | numZCBufs;
         int directCopySize; implP | directCopySize;
-        int zcBufSizes[numZCBufs];
+        size_t zcBufSizes[numZCBufs];
 
         CkNcpyBuffer *zcBufs = new CkNcpyBuffer[numZCBufs];
         for (int i = 0; i < numZCBufs; i++) {

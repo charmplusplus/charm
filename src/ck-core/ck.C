@@ -10,6 +10,8 @@ clients, including the rest of Charm++, are actually C++.
 #include "trace.h"
 #include "queueing.h"
 
+#include <utility>
+
 #include "pathHistory.h"
 
 #if CMK_LBDB_ON
@@ -2182,8 +2184,8 @@ void registerArrayMsgRecvExtCallback(void (*cb)(int, int, int *, int, int, char 
   ArrayMsgRecvExtCallback = cb;
 }
 
-void (*ArrayMsgZCRecvExtCallback)(int, int, int*, int, int, int*, void *, int, char*, int) = NULL;
-void registerArrayMsgZCRecvExtCallback(void (*cb)(int, int, int*, int, int, int*, void *, int, char*,int))
+void (*ArrayMsgZCRecvExtCallback)(int, int, int*, int, int, size_t*, void *, int, char*, int) = NULL;
+void registerArrayMsgZCRecvExtCallback(void (*cb)(int, int, int*, int, int, size_t*, void *, int, char*,int))
 {
   ArrayMsgZCRecvExtCallback = cb;
 }
@@ -2556,7 +2558,6 @@ void CkPrepareMessageWithZCData(CkMarshallMsg **dest,
                                 char **bufs,
                                 int *buf_sizes,
                                 CkNcpyBuffer *zcBufs,
-                                int *zcBufSizesInBytes,
                                 int numZCBufs
                                 )
 {
@@ -2572,7 +2573,7 @@ void CkPrepareMessageWithZCData(CkMarshallMsg **dest,
     implP | numZCBufs;
     implP | directCopySize;
     for (int i = 0; i < numZCBufs; ++i) {
-      implP | zcBufSizesInBytes[i];
+      implP | zcBufs[i].cnt;
       implP | zcBufs[i];
     }
 
@@ -2596,7 +2597,7 @@ void CkPrepareMessageWithZCData(CkMarshallMsg **dest,
     implP | numZCBufs;
     implP | directCopySize;
     for (int i = 0; i < numZCBufs; ++i) {
-      implP | zcBufSizesInBytes[i];
+      implP | zcBufs[i].cnt;
       implP | zcBufs[i];
     }
 
@@ -2613,13 +2614,13 @@ void CkPrepareMessageWithZCData(CkMarshallMsg **dest,
 void CkArrayExtSendWithZCData(int aid, int *idx, int ndims,
                               int epIdx, int num_bufs, char **bufs,
                               int *buf_sizes,
-                              long *zcBufPtrs,
-                              int *zcBufSizesInBytes,
+                              void *zc_buffers,
                               int numZCBufs
                               )
 {
   CkGroupID gId;
   gId.idx = aid;
+  std::pair<const void*, int> *zc_bufs = (std::pair<const void*, int>*) zc_buffers;
 
 
   CkArrayIndex arrIndex(ndims, idx);
@@ -2629,7 +2630,7 @@ void CkArrayExtSendWithZCData(int aid, int *idx, int ndims,
 
   CkNcpyBuffer zcBufs[numZCBufs];
   for (int i = 0; i < numZCBufs; ++i) {
-    zcBufs[i] = CkNcpyBuffer((void *) zcBufPtrs[i], zcBufSizesInBytes[i]);
+    zcBufs[i] = CkNcpyBuffer((const void *) zc_bufs[i].first, zc_bufs[i].second);
   }
 
   CkMarshallMsg *impl_msg = NULL;
@@ -2639,7 +2640,6 @@ void CkArrayExtSendWithZCData(int aid, int *idx, int ndims,
                          bufs,
                          buf_sizes,
                          zcBufs,
-                         zcBufSizesInBytes,
                          numZCBufs
                          );
 
