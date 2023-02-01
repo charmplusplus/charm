@@ -83,8 +83,8 @@ void Main::create_new_elements() {
   if (print_phase) {
     CkPrintf("Main is in phase create during iteration %i\n", iteration);
   }
-  if (iteration % main_creation_stride == 0 or
-      iteration % group_creation_stride == 0 or
+  if (iteration % main_creation_stride == 0 ||
+      iteration % group_creation_stride == 0 ||
       iteration % array_creation_stride == 0) {
     const int number_of_procs = CkNumPes();
     const int offset = iteration*number_of_procs;
