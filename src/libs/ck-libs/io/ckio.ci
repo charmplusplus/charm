@@ -32,6 +32,7 @@ module CkIO_impl {
 	  // facilitates all of the read calls that will happen
 	  
 	  entry void read(Session session, size_t bytes, size_t offset, CkCallback after_read);
+	  entry void read(Session session, size_t bytes, size_t offset, CkCallback after_read, size_t tag);
 	// this method is called by the read function by the user in order to get data
 	
 	// the method used by the director which is used to close a readsession
@@ -116,6 +117,9 @@ module CkIO_impl {
 	chare ReadAssembler {
 		 // stores the parameters of the read call it is tasked with building
 		entry ReadAssembler(Session session, size_t bytes, size_t offset, CkCallback after_read);
+		
+		// allows you to add a tag to the read request
+		entry ReadAssembler(Session session, size_t bytes, size_t offset, CkCallback after_read, size_t tag);
 		// the method by which ReadSession objects can send their data for the read	
 		entry void shareData(size_t read_chare_offset, size_t num_bytes, char data[num_bytes]); 
 

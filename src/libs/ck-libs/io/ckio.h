@@ -98,6 +98,7 @@ namespace Ck { namespace IO {
    * bytes of the read.
    * */
   void read(Session session, size_t bytes, size_t offset, CkCallback after_read); 
+  void read(Session session, size_t bytes, size_t offset, CkCallback after_read, size_t tag);
 
   class File {
     int token;
@@ -135,6 +136,7 @@ namespace Ck { namespace IO {
     friend class Ck::IO::impl::Manager;
     friend class Ck::IO::impl::Director; // this is an interesting change
     friend void read(Session session, size_t bytes, size_t offset, CkCallback after_read);
+    friend void read(Session session, size_t bytes, size_t offset, CkCallback after_read, size_t tag);
   public:
     Session(int file_, size_t bytes_, size_t offset_,
             CkArrayID sessionID_)
@@ -157,18 +159,18 @@ namespace Ck { namespace IO {
 
   class ReadCompleteMsg : public CMessage_ReadCompleteMsg {
 	public:
+	    size_t read_tag;
 	    char* data;
 	    size_t offset;
 	    size_t bytes;
 	    ReadCompleteMsg(){}
-	    ReadCompleteMsg(char* buffer, size_t in_offset, size_t in_bytes) : data(buffer), offset(in_offset), bytes(in_bytes){
+	    ReadCompleteMsg(size_t in_tag, char* buffer, size_t in_offset, size_t in_bytes) : read_tag(in_tag), data(buffer), offset(in_offset), bytes(in_bytes){
 
 	    }
 		
 
   };
 
-
-
 }}
+
 #endif

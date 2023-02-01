@@ -160,6 +160,20 @@ namespace Ck { namespace IO {
 			CProxy_ReadSession(session.sessionID)[i].sendData(offset, bytes, ra); 
 		}
 	}
+
+	// called by user-facing read call to facilitate the actual read
+	void read(Session session, size_t bytes, size_t offset, CkCallback after_read, size_t tag){
+		CProxy_ReadAssembler ra = CProxy_ReadAssembler::ckNew(session, bytes, offset, after_read, tag); // create read assembler
+		Options& opt = files[session.file].opts;	
+		size_t read_stripe = opt.read_stripe;
+		size_t start_idx = offset / read_stripe; // the first index that has the relevant data
+		// CkPrintf("Read request of %d bytes starting at %d\n", bytes, offset);
+		for(size_t i = start_idx; (i * read_stripe) < (offset + bytes); ++i){
+			// tell all the chares that have data to search and send
+			CProxy_ReadSession(session.sessionID)[i].sendData(offset, bytes, ra); 
+		}
+	}
+
 		
 	void prepareReadSessionHelper(FileToken file, size_t bytes, size_t offset, CkCallback ready){
 		if(!bytes){
@@ -489,9 +503,7 @@ namespace Ck { namespace IO {
 			else chare_offset = offset; // read offset is in the middle
 
 			size_t end_byte_chare = min(offset + bytes, _my_offset + _my_bytes); // the last byte, exclusive, this chare should read
-			size_t bytes_read = 0;
-
-			size_t bytes_to_read = end_byte_chare - chare_offset; // the bytes to read
+			size_t bytes_to_read = end_byte_chare - chare_offset;
 			// std::vector<char> data_to_send; 
 			// data_to_send.resize(bytes_to_read); // the number of bytes to read to avoid the pushback function
 			// data_to_send.shrink_to_fit(); // will this improve it? hopefully sending less data over network is good
@@ -524,6 +536,7 @@ namespace Ck { namespace IO {
 		size_t _bytes_left; // the number of bytes the user wants for a particular read
 		size_t _read_offset; // the offset they specify for their read
 		CkCallback _after_read; // the callback to invoke after the read is complete
+		size_t _read_tag = -1;
 	public:
 		ReadAssembler(Session session, size_t bytes, size_t offset, CkCallback after_read){
 			_session = session;
@@ -532,6 +545,11 @@ namespace Ck { namespace IO {
 			_after_read = after_read;
 			_data_buffer.resize(_bytes_left, 'r'); // resize the buffer to the size of read call
 			_data_buffer.shrink_to_fit();
+		}
+		
+		ReadAssembler(Session session, size_t bytes, size_t offset, CkCallback after_read, size_t tag) : 
+		ReadAssembler(session, bytes, offset, after_read) {
+			_read_tag = tag;
 		}
 
 		void shareData(size_t read_chare_offset, size_t num_bytes, char* data){
@@ -549,6 +567,7 @@ namespace Ck { namespace IO {
 			memcpy(msg -> data, buffer, _data_buffer.size());
 			msg -> offset= _read_offset;
 			msg -> bytes = _data_buffer.size();
+			msg -> read_tag = _read_tag; 
 			_after_read.send(msg);
 			// have some method of cleaning up this chare after invoking the callback
 			delete this;
@@ -593,6 +612,13 @@ namespace Ck { namespace IO {
 	CkAssert(offset + bytes <= session.offset + session.bytes);
 	// call the director function to facilitate the actual read
 	impl::director.read(session, bytes, offset, after_read);
+    }      
+
+    void read(Session session, size_t bytes, size_t offset, CkCallback after_read, size_t tag){
+	CkAssert(bytes <= session.bytes);
+	CkAssert(offset + bytes <= session.offset + session.bytes);
+	// call the director function to facilitate the actual read
+	impl::director.read(session, bytes, offset, after_read, tag);
     }      
 
     void close(File file, CkCallback closed) {
