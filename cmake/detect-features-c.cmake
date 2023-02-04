@@ -108,7 +108,6 @@ check_function_exists(mmap CMK_HAS_MMAP)
 check_symbol_exists(MAP_ANON sys/mman.h CMK_HAS_MMAP_ANON)
 check_symbol_exists(MAP_NORESERVE sys/mman.h CMK_HAS_MMAP_NORESERVE)
 check_function_exists(mprotect CMK_HAS_MPROTECT)
-check_symbol_exists(MPI_Init_thread mpi.h CMK_MPI_INIT_THREAD)
 check_function_exists(mstats CMK_HAS_MSTATS)
 check_function_exists(ntohl CMK_HAS_NTOHL)
 check_symbol_exists(offsetof stddef.h CMK_HAS_OFFSETOF)
@@ -292,7 +291,7 @@ int main()
 " CMK_HAS_NUMACTRL)
 
 set(tmp ${CMAKE_REQUIRED_LIBRARIES})
-set(CMAKE_REQUIRED_LIBRARIES $ENV{CRAY_PMI_POST_LINK_OPTS} $ENV{CRAY_UGNI_POST_LINK_OPTS} -lugni -lpmi)
+set(CMAKE_REQUIRED_LIBRARIES $ENV{CRAY_PMI_POST_LINK_OPTS} -lpmi)
 check_c_source_compiles("
 #include <pmi.h>
 int main() {

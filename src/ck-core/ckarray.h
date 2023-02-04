@@ -322,7 +322,7 @@ public:
 };
 
 // Simple C-like API:
-void CkSetMsgArrayIfNotThere(void* msg);
+void CkSetMsgArrayIfNotThere(void* msg, CkArray_IfNotThere policy = CkArray_IfNotThere_buffer);
 void CkSendMsgArray(int entryIndex, void* msg, CkArrayID aID, const CkArrayIndex& idx,
                     int opts = 0);
 void CkSendMsgArrayInline(int entryIndex, void* msg, CkArrayID aID,
@@ -624,11 +624,13 @@ public:
   void* msg;
   int ep;
   int opts;
+  unsigned int epoch;
   void pup(PUP::er& p)
   {
     pup_pointer(&p, &msg);
     p | ep;
     p | opts;
+    p | epoch;
   }
 };
 
@@ -883,7 +885,6 @@ public:
   }
 
   void incrementBcastNoAndSendBack(int srcPe, MsgPointerWrapper w);
-  void incrementBcastNo();
 
 private:
   CkArrayReducer* reducer;          // Read-only copy of default reducer
@@ -901,15 +902,6 @@ public:
 // with usage in maps' populateInitial()
 typedef CkArray CkArrMgr;
 
-struct ncpyBcastNoMsg
-{
-  char cmicore[CmiMsgHeaderSizeBytes];
-  int srcPe;
-  void* ref;
-};
-
-void invokeNcpyBcastNoHandler(int serializerPe, ncpyBcastNoMsg* bcastNoMsg, int msgSize);
-
 /*@}*/
 
 /// This arrayListener is in charge of delivering broadcasts to the array.
@@ -921,10 +913,11 @@ public:
   CkArrayBroadcaster(bool _stableLocations, bool _broadcastViaScheduler);
   CkArrayBroadcaster(CkMigrateMessage* m);
   virtual void pup(PUP::er& p);
-  virtual ~CkArrayBroadcaster();
   PUPable_decl(CkArrayBroadcaster);
 
-  virtual void ckElementStamp(int* eltInfo) { *eltInfo = getBcastNo(); }
+  // When a new array element is inserted, it should only receive future broadcasts, so
+  // set the object's epoch to 1 more than the max epoch we've seen so far
+  virtual void ckElementStamp(int* eltInfo) { *eltInfo = storedBcasts.getMaxEpoch() + 1; }
 
   /// Element was just created on this processor
   /// Return false if the element migrated away or deleted itself.
@@ -934,15 +927,15 @@ public:
   /// Return false if the element migrated away or deleted itself.
   virtual bool ckElementArriving(ArrayElement* elt) { return bringUpToDate(elt); }
 
-  void incoming(CkArrayMessage* msg);
+  void ingestIncoming(CkArrayMessage* msg);
 
-  int incrementBcastNo();
-
-  bool deliver(CkArrayMessage* bcast, ArrayElement* el, bool doFree);
-  bool deliverAlreadyDelivered(CkArrayMessage* bcast, ArrayElement* el, bool doFree);
+  bool attemptDelivery(CkArrayMessage* bcast, ArrayElement* el, bool doFree);
+  bool performDelivery(CkArrayMessage* bcast, ArrayElement* el, bool doFree);
 #if CMK_CHARM4PY
-  void deliver(CkArrayMessage* bcast, std::vector<CkMigratable*>& elements, int arrayId,
-               bool doFree);
+  void deliverAndUpdate(CkArrayMessage* bcast, std::vector<CkMigratable*>& elements,
+                        int arrayId);
+  bool performDelivery(CkArrayMessage* bcast, std::vector<CkMigratable*>& elements,
+                       int arrayId);
 #endif
 
   void springCleaning(void);
@@ -950,34 +943,141 @@ public:
   void flushState();
 
 private:
-  // Number of broadcasts received (also serial number)
-#if CMK_SMP
-  std::atomic<int> bcastNo;
-#else
-  int bcastNo;
-#endif
+  // A circular queue designed to store incoming broadcasts. Notably,
+  // it does not act like a FIFO, instead ordering and storing
+  // broadcasts by their stamped epoch.
+  class BcastQueue
+  {
+  private:
+    std::vector<CkArrayMessage*> storage{16};
+    int headEpoch = 0;
+    size_t headIndex = 0;
+    size_t mask = 0x0F;
+    int curMaxEpoch = -1;
+    int oldMaxEpoch = -1;  // Max epoch at last spring cleaning
 
-  int oldBcastNo;  // Above value last spring cleaning
-  // This queue stores old broadcasts (in case a migrant arrives
-  // and needs to be brought up to date)
-  CkQ<CkArrayMessage*> oldBcasts;
+    int getOffset(const int epoch) const { return epoch - headEpoch; }
+
+  public:
+    BcastQueue() = default;
+    BcastQueue(CkMigrateMessage* m) {}
+    ~BcastQueue()
+    {
+      for (CkArrayMessage* msg : storage)
+      {
+        if (msg != nullptr)
+          delete msg;
+      }
+    }
+
+    // Inserts msg into the slot corresponding to epoch
+    void insert(CkArrayMessage* const msg, const int epoch)
+    {
+      const int offset = getOffset(epoch);
+      if (offset >= storage.size())
+      {
+        // Size of storage is always a power of 2 to ease masking
+        const size_t oldSize = storage.size();
+        size_t newSize = oldSize * 2;
+        while (offset >= newSize) newSize *= 2;
+        storage.resize(newSize);
+        mask = newSize - 1;
+        if (headIndex != 0)
+        {
+          // Shuffle things around so that the queue starts at index 0
+          std::move(storage.begin(), storage.begin() + headIndex,
+                    storage.begin() + oldSize);
+          std::move(storage.begin() + headIndex, storage.begin() + oldSize,
+                    storage.begin());
+          std::move(storage.begin() + oldSize, storage.begin() + oldSize + headIndex,
+                    storage.begin() + oldSize - headIndex);
+          std::fill(storage.begin() + oldSize, storage.begin() + oldSize + headIndex,
+                    nullptr);
+          headIndex = 0;
+        }
+      }
+      CkAssert(storage[(headIndex + offset) & mask] == nullptr);
+      storage[(headIndex + offset) & mask] = msg;
+
+      curMaxEpoch = std::max(epoch, curMaxEpoch);
+    }
+
+    bool hasBcast(const int epoch) const
+    {
+      const int offset = getOffset(epoch);
+      if (offset < 0 || offset >= storage.size())
+        return false;
+      return storage[(headIndex + offset) & mask] != nullptr;
+    }
+
+    CkArrayMessage* getBcast(const int epoch) const
+    {
+      CkAssert(hasBcast(epoch));
+      return storage[(headIndex + getOffset(epoch)) & mask];
+    }
+
+    int getMaxEpoch() const
+    {
+      return curMaxEpoch;
+    }
+
+    void springCleaning()
+    {
+      // Remove old broadcast messages
+      const int nDelete = oldMaxEpoch - headEpoch;
+      if (nDelete > 0)
+      {
+        // DEBK((AA "Cleaning out %d old broadcasts\n" AB, nDelete));
+        for (size_t i = headIndex; i < headIndex + nDelete; i++)
+        {
+          CkArrayMessage* bcast = storage[i & mask];
+          if (bcast)
+            delete bcast;
+          storage[i & mask] = nullptr;
+        }
+        headIndex = (headIndex + nDelete) & mask;
+        headEpoch += nDelete;
+      }
+      oldMaxEpoch = std::max(oldMaxEpoch, curMaxEpoch);
+    }
+
+    void clear()
+    {
+      for (CkArrayMessage* msg : storage)
+      {
+        if (msg)
+          delete msg;
+      }
+      storage.clear();
+      storage.resize(16);
+      headIndex = 0;
+      mask = 0x0F;
+      curMaxEpoch = 0;
+      oldMaxEpoch = 0;
+    }
+
+    void pup(PUP::er& p)
+    {
+      p | headEpoch;
+      if (p.isUnpacking())
+      {
+        curMaxEpoch = headEpoch;
+        oldMaxEpoch = headEpoch;
+      }
+    }
+  };
+
+  int bcastSendEpoch = 0;
   bool stableLocations;
   bool broadcastViaScheduler;
+  // This queue stores old broadcasts (in case a migrant arrives
+  // and needs to be brought up to date)
+  BcastQueue storedBcasts;
 
   bool bringUpToDate(ArrayElement* el);
 
 public:
-#if CMK_SMP
-  int getBcastNo() const { return bcastNo.load(std::memory_order_acquire); }
-  void setBcastNo(int r) { return bcastNo.store(r, std::memory_order_release); }
-  int incBcastNo() { return bcastNo.fetch_add(1, std::memory_order_release); }
-  int decBcastNo() { return bcastNo.fetch_sub(1, std::memory_order_release); }
-#else
-  int getBcastNo() const { return bcastNo; }
-  void setBcastNo(int r) { bcastNo = r; }
-  int incBcastNo() { return bcastNo++; }
-  int decBcastNo() { return bcastNo--; }
-#endif
+  int incBcastSendEpoch() { return bcastSendEpoch++; }
 };
 
 #endif

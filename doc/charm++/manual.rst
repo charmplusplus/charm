@@ -1659,17 +1659,14 @@ and code blocks that they define. These definitions appear in the
 ``.ci`` file definition of the enclosing chare class as a ‘body’ of an
 entry method following its signature.
 
-The most basic construct in SDAG is the ``serial`` (aka the ``atomic``)
-block. Serial blocks contain sequential C++ code. They’re also called
-atomic because the code within them executes without returning control
-to the Charm++ runtime scheduler, and thus avoiding interruption from
-incoming messages. The keywords atomic and serial are synonymous, and
-you can find example programs that use atomic. However, we recommend the
-use of serial and are considering the deprecation of the atomic keyword.
-Typically serial blocks hold the code that actually deals with incoming
-messages in a ``when`` statement, or to do local operations before a
-message is sent or after it’s received. The earlier example can be
-adapted to use serial blocks as follows:
+The most basic construct in SDAG is the ``serial`` block (previously also
+denoted by ``atomic``, this usage is now deprecated). Serial blocks contain
+sequential C++ code, and the code within them executes to completion without
+returning control to the Charm++ runtime scheduler, thus avoiding interruption
+from incoming messages. Typically, serial blocks hold the code that actually
+deals with incoming messages in a ``when`` statement or performs local
+operations before a message is sent or after it is received. The earlier example
+can be adapted to use serial blocks as follows:
 
 .. code-block:: charmci
 
@@ -2029,7 +2026,7 @@ the runtime will not “commit” to this branch until the second arrives.
 If another dependency fully matches, the partial match will be ignored
 and can be used to trigger another ``when`` later in the execution.
 
-.. code-block:: c++
+.. code-block:: text
 
    case {
      when a() { }
@@ -5666,12 +5663,14 @@ then invokes it to return a result may have the following interface:
      cb.send(msg);
    }
 
-A CkCallback will accept any message type, or even NULL. The message is
+A *CkCallback* will accept any message type, even *nullptr*. The message is
 immediately sent to the user’s client function or entry point. A library
 which returns its result through a callback should have a clearly
 documented return message type. The type of the message returned by the
 library must be the same as the type accepted by the entry method
-specified in the callback.
+specified in the callback. Note that message flag(s) may be passed as an
+optional argument to “send;” for example, :code:`send(_, CK_MSG_EXPEDITED)`
+will send a message with expediency.
 
 As an alternative to “send”, the callback can be used in a *contribute*
 collective operation. This will internally invoke the “send” method on
@@ -11578,6 +11577,12 @@ For example, to build Charm++ and AMPI on top of the MPI layer with SMP, the fol
 
    $ cmake .. -DNETWORK=mpi -DSMP=on -DTARGET=AMPI
 
+Alternatively, one could also specify other ``cmake`` configuration options via the 
+``../build`` command, for example, by replacing the above ``cmake ..`` command with
+
+.. code-block:: bash
+
+   $ ../build AMPI mpi-linux-x86_64 smp
 
 Charm++ installation directories
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -12689,7 +12694,7 @@ and cannot appear as variable or entry method names in a ``.ci`` file:
 
 -  SDAG constructs
 
-   -  atomic
+   -  atomic (deprecated)
 
    -  serial
 

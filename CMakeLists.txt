@@ -810,10 +810,12 @@ if(${NETWORK} MATCHES "ucx" OR ${NETWORK} MATCHES "ofi")
       configure_file(${filename} include/ COPYONLY)
   endforeach()
 
-  # FIXME: this should be in include/proc_management/simple_pmi
-  foreach(filename ${proc_management-simple_pmi-sources})
+  if(${LRTS_PMI} MATCHES "simplepmi")
+    # FIXME: this should be in include/proc_management/simple_pmi
+    foreach(filename ${proc_management-simple_pmi-sources})
       configure_file(${filename} include/ COPYONLY)
-  endforeach()
+    endforeach()
+  endif()
 endif()
 
 # Charmxi
@@ -952,6 +954,13 @@ endif()
 
 file(APPEND ${optfile_sh} "CMK_NO_BUILD_SHARED=${CMK_NO_BUILD_SHARED}\n")
 
+if(DISABLE_TLS)
+  set(CMK_SUPPORTS_TLSGLOBALS "0")
+  set(CMK_USER_DISABLED_TLS "1")
+else()
+  set(CMK_USER_DISABLED_TLS "0")
+endif()
+
 foreach(l BUILDOPTS CMK_AMPI_WITH_ROMIO CMK_BUILD_PYTHON CMK_CAN_LINK_FORTRAN
         CMK_CHARMDEBUG CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS CMK_HAS_INT16 CMK_HAS_MMAP
         CMK_LIBJPEG CMK_MOD_EXT CMK_SUPPORTS_FSGLOBALS CMK_SUPPORTS_PIPGLOBALS
@@ -961,7 +970,7 @@ foreach(l BUILDOPTS CMK_AMPI_WITH_ROMIO CMK_BUILD_PYTHON CMK_CAN_LINK_FORTRAN
         CXX_NO_AS_NEEDED LDXX_WHOLE_ARCHIVE_PRE LDXX_WHOLE_ARCHIVE_POST
         CMK_MACOSX CMK_POST_EXE CMK_SHARED_SUF CMK_USER_SUFFIX OPTS_LD
         CMK_COMPILER_KNOWS_FVISIBILITY CMK_LINKER_KNOWS_UNDEFINED
-        CMK_SUPPORTS_MEMORY_ISOMALLOC CUDA_DIR)
+        CMK_SUPPORTS_MEMORY_ISOMALLOC CUDA_DIR CMK_USER_DISABLED_TLS)
     file(APPEND ${optfile_sh} "${l}=\"${${l}}\"\n" )
 endforeach(l)
 
