@@ -27,7 +27,8 @@ class Main : public CBase_Main {
   void begin_inserting();
   void create_new_elements();
   void done_inserting();
-  void adjust_domain();
+  void count_elements();
+  void adjust_domain(int num_elements);
   void delete_old_elements();
   void exit();
   void check_volume(const double volume);
@@ -36,6 +37,7 @@ class Main : public CBase_Main {
 class DgElement : public CBase_DgElement {
  public:
   DgElement();
+  void count_elements();
   void adjust_domain();
   void collect_data_from_children(
       std::deque<ElementId_t> sibling_ids_to_collect,

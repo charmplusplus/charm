@@ -94,8 +94,8 @@ static constexpr int maximum_refinement_level = 1;
 static const double do_something_fraction = 1.0;
 
 static constexpr bool output_iteration = true;
-static constexpr bool output_phase = false;
-static constexpr bool output_action = false;
+static constexpr bool output_phase = true;
+static constexpr bool output_action = true;
 static constexpr bool output_data = false;
 
 constexpr int two_to_the(int n) { return 1 << n; }
@@ -159,16 +159,16 @@ bool neighbor_is_my_abutting_nibling(const ElementId_t& id,
 bool check_amr_decision(Flag_t& flag, const ElementId_t& id,
                         const ElementId_t& neighbor_id,
                         const Flag_t& neighbor_flag) {
-  CkAssert(flag > -2 and flag < 2);
-  CkAssert(neighbor_flag > -2 and neighbor_flag < 2);
+  CkAssert(flag > -2 && flag < 2);
+  CkAssert(neighbor_flag > -2 && neighbor_flag < 2);
 
   // Check if desired refinement level is two or three less than that of
   // neighbor.  If so, change flag so it is within one level.
   const int desired_level = refinement_level(id) + flag;
-  CkAssert(desired_level > -1 and desired_level <= maximum_refinement_level);
+  CkAssert(desired_level > -1 && desired_level <= maximum_refinement_level);
   const int neighbor_desired_level =
       refinement_level(neighbor_id) + neighbor_flag;
-  CkAssert(neighbor_desired_level > -1 and
+  CkAssert(neighbor_desired_level > -1 &&
            neighbor_desired_level <= maximum_refinement_level);
   if (desired_level + 1 < neighbor_desired_level) {
     flag = neighbor_desired_level - 1 - refinement_level(id);
@@ -178,7 +178,7 @@ bool check_amr_decision(Flag_t& flag, const ElementId_t& id,
   // Next check if I want to join and the neighbor is either a sibling that
   // does not want to join or an abutting nibling.  If so, then change flag
   // to do nothing.
-  if (flag == -1 and ((are_siblings(id, neighbor_id) and neighbor_flag != -1) or
+  if (flag == -1 && ((are_siblings(id, neighbor_id) && neighbor_flag != -1) ||
                       neighbor_is_my_abutting_nibling(id, neighbor_id))) {
     flag = 0;
     return true;
@@ -247,7 +247,7 @@ Main::Main(CkArgMsg* msg) {
 
 // Creates the 2^L elements on the initial_refinement_level distributed
 // round-robin among the PEs
-void Main::initialize() {
+void Main::initialize() { 
   print_phase("initialize");
   dgElementProxy.initialize_initial_elements();
   CkStartQD(CkCallback(CkIndex_Main::check_neighbors(), mainProxy));
@@ -301,12 +301,18 @@ void Main::create_new_elements() {
 void Main::done_inserting() {
   print_phase("done inserting");
   dgElementProxy.doneInserting();
-  CkStartQD(CkCallback(CkIndex_Main::adjust_domain(), mainProxy));
+  CkStartQD(CkCallback(CkIndex_Main::count_elements(), mainProxy));
+}
+
+void Main::count_elements() {
+  print_phase("count elements");
+  dgElementProxy.count_elements();
 }
 
 // Initialize new elements and update the neighbors of unrefined elements
-void Main::adjust_domain() {
+void Main::adjust_domain(int num_elements) {
   print_phase("adjust domain");
+  CkPrintf("Total elements = %i\n", num_elements);
   dgElementProxy.adjust_domain();
   CkStartQD(CkCallback(CkIndex_Main::delete_old_elements(), mainProxy));
 }
@@ -339,8 +345,16 @@ DgElement::DgElement() {
   print_action("created", thisIndex);
 }
 
+void DgElement::count_elements() {
+  CkCallback cb(CkReductionTarget(Main, adjust_domain), mainProxy);;
+  int result = 1;
+  contribute(sizeof(int), &result, CkReduction::sum_int, cb);
+}
+
 // Adjusts the domain based on the final AMR decisions of each element
 void DgElement::adjust_domain() {
+  CkPrintf("Flag for %i is %i\n", thisIndex, flag_);
+
   if (flag_ == -2) {
     // this is a newly created element, do nothing
   } else if (flag_ == 1) {
@@ -355,7 +369,7 @@ void DgElement::adjust_domain() {
     // Element is neither splitting nor joining.  Update the ids of its
     // neighbors and reset/clear the AMR flags
     print_action("adjusting domain (do nothing)", thisIndex);
-    if(neighbor_flags_.count(neighbors_[0]) == 0 or
+    if(neighbor_flags_.count(neighbors_[0]) == 0 ||
        neighbor_flags_.count(neighbors_[1]) == 0) {
       CkPrintf("On Element %i, lower neighbor = %i, upper neighbor = %i \n"
 	       "Neighbor flags = ", thisIndex, neighbors_[0], neighbors_[1]);
@@ -385,6 +399,7 @@ void DgElement::collect_data_from_children(
     // I am the upper child
     parent_neighbors[1] =
         new_upper_neighbor_id(neighbors_[1], neighbor_flags_.at(neighbors_[1]));
+    CkPrintf("initialize_parent called\n");
     thisProxy[thisIndex / 2].initialize_parent(parent_neighbors);
   } else {
     // I am the lower child
@@ -415,7 +430,7 @@ void DgElement::create_new_elements() {
 }
 
 void DgElement::delete_old_elements() {
-  if (flag_ == 1 or flag_ == -1) {
+  if (flag_ == 1 || flag_ == -1) {
     print_action("deleting", thisIndex);
     thisProxy[thisIndex].ckDestroy();
   }
@@ -490,10 +505,10 @@ void DgElement::ping(const ElementId_t& pinger, const size_t index) {
   // Set pings_received to 2 if this is the second ping, to index if this
   // is the first ping. A value of -1 indicates no previous pings.
   if (index == 0) {
-    CkAssert(pings_received_ == -1 or pings_received_ == 1);
+    CkAssert(pings_received_ == -1 || pings_received_ == 1);
     ++pings_received_;
   } else {
-    CkAssert(pings_received_ == -1 or pings_received_ == 0);
+    CkAssert(pings_received_ == -1 || pings_received_ == 0);
     pings_received_ += 2;
   }
 }
@@ -502,7 +517,7 @@ void DgElement::ping(const ElementId_t& pinger, const size_t index) {
 // lower (0) or upper (1) neighbor of that neighbor
 void DgElement::ping_neighbors() {
   print_data("pinging neighbors");
-  CkAssert(neighbors_[0] > 0 and neighbors_[1] > 0);
+  CkAssert(neighbors_[0] > 0 && neighbors_[1] > 0);
   thisProxy[neighbors_[0]].ping(thisIndex, 1);
   thisProxy[neighbors_[1]].ping(thisIndex, 0);
 }
@@ -512,6 +527,7 @@ void DgElement::ping_neighbors() {
 void DgElement::send_data_to_children() {
   print_action("sending data to children", thisIndex);
   // Send data to lower child
+  CkPrintf("%i, Neighbors = %i, %i\n", thisIndex, neighbors_[0], neighbors_[1]);
   thisProxy[2 * thisIndex].initialize_child(
       new_lower_neighbor_id(neighbors_[0], neighbor_flags_.at(neighbors_[0])));
   // Send data to upper child
