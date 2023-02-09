@@ -4,6 +4,7 @@ name: Sphinx-doc
 # in doc/ is changed.
 
 on:
+  merge_group:
   pull_request:
     paths: 
       - 'doc/**'
