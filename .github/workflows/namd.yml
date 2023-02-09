@@ -1,6 +1,6 @@
 name: NAMD
 
-on: pull_request
+on: [pull_request, merge_group]
 
 jobs:
   # Not named 'build' since 'build' is used by our CI for builds that must succeed before merge.
