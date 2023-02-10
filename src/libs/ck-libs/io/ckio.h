@@ -100,6 +100,10 @@ namespace Ck { namespace IO {
   void read(Session session, size_t bytes, size_t offset, CkCallback after_read); 
   void read(Session session, size_t bytes, size_t offset, CkCallback after_read, size_t tag);
 
+// ZERO COPY READ;
+  void read(Session session, size_t bytes, size_t offset, CkCallback after_read, size_t tag, char* user_buffer);
+
+
   class File {
     int token;
     friend void startSession(File file, size_t bytes, size_t offset,

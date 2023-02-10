@@ -268,6 +268,18 @@ namespace Ck { namespace IO {
 
           return &(files[token]);
         }
+	
+	void read(Session session, size_t bytes, size_t offset, CkCallback after_read){
+		CProxy_ReadAssembler ra = CProxy_ReadAssembler::ckNew(session, bytes, offset, after_read); // create read assembler
+		Options& opt = files[session.file].opts;	
+		size_t read_stripe = opt.read_stripe;
+		size_t start_idx = offset / read_stripe; // the first index that has the relevant data
+		// CkPrintf("Read request of %d bytes starting at %d\n", bytes, offset);
+		for(size_t i = start_idx; (i * read_stripe) < (offset + bytes); ++i){
+			// tell all the chares that have data to search and send
+			CProxy_ReadSession(session.sessionID)[i].sendData(offset, bytes, ra); 
+		}
+	}
 
         void write(Session session, const char *data, size_t bytes, size_t offset) {
           Options &opts = files[session.file].opts;
@@ -611,7 +623,9 @@ namespace Ck { namespace IO {
 	CkAssert(bytes <= session.bytes);
 	CkAssert(offset + bytes <= session.offset + session.bytes);
 	// call the director function to facilitate the actual read
-	impl::director.read(session, bytes, offset, after_read);
+	// impl::director.read(session, bytes, offset, after_read);
+	 using namespace impl;
+	 CkpvAccess(manager) -> read(session, bytes, offset, after_read);
     }      
 
     void read(Session session, size_t bytes, size_t offset, CkCallback after_read, size_t tag){
