@@ -519,6 +519,21 @@ public:
     char *impl_buf = impl_msg_typed->msgBuf;
     PUP::fromMem implP(impl_buf);
 
+    if(impl_buf[4] == 'C')
+      {
+    int msgSize;
+    int epIdx;
+    int d;
+    implP | epIdx;
+
+        ArrayMsgRecvExtCallback(((CkGroupID)e->thisArrayID).idx,
+                                         int(e->thisIndexMax.getDimension()),
+                                         e->thisIndexMax.data(), epIdx,
+                                msgSize, impl_buf+sizeof(int), d);
+
+        return;
+      }
+
     if (CMI_ZC_MSGTYPE((char *)UsrToEnv(impl_msg)) == CMK_ZC_CHARM4PY_MSG) {
         int numZCBufs; implP | numZCBufs;
         int directCopySize; implP | directCopySize;

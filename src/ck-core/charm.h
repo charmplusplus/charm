@@ -259,7 +259,7 @@ These routines are implemented in ck.C.
 */
 /*@{*/
 
-typedef struct {
+typedef struct _ckChareID{
   int   onPE;
   void* objPtr;
 } CkChareID;

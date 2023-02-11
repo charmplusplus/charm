@@ -2506,6 +2506,14 @@ void CkForwardMulticastMsg(int _gid, int num_children, const int *children) {
   ((SectionManagerExt*)CkLocalBranch(gid))->forwardMulticastMsg(num_children, children);
 }
 
+void CkAllocateCharm4PyMessage(size_t size, const CkEntryOptions *opts = NULL)
+{
+  size_t marshall_msg_size = size + 3 * sizeof(int);
+
+  CkAllocateMarshallMsg(marshall_msg_size, opts);
+
+}
+
 void CkArrayExtSend(int aid, int *idx, int ndims, int epIdx, char *msg, int msgSize) {
   int marshall_msg_size = (sizeof(char)*msgSize + 3*sizeof(int));
   CkMarshallMsg *impl_msg = CkAllocateMarshallMsg(marshall_msg_size, NULL);
