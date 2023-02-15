@@ -1,7 +1,7 @@
 #include "iotest.decl.h"
 #include <vector>
 #include <fstream>
-
+#define TEST_FILE "large_test.txt"
 CProxy_Main mainProxy;
 
 
@@ -19,7 +19,7 @@ public:
 	char* sequentialRead(size_t offset, size_t bytes){
 		char* buffer = new char[bytes + 1];
 		int pos = 0;
-		std::ifstream ifs("readtest.txt");
+		std::ifstream ifs(TEST_FILE);
 		ifs.seekg(offset);
 
 		while(pos < bytes){
@@ -39,9 +39,10 @@ public:
 	Reader(Ck::IO::Session session, size_t bytes, size_t offset, CkCallback after_read){
 		size_t my_offset = offset + thisIndex * 5;
 		ckout << "My offset for reader " << thisIndex << " is " << my_offset << endl;
-		Ck::IO::read(session, bytes, my_offset, after_read); 
+		Ck::IO::read(session, bytes, my_offset, after_read, thisIndex); 
 	}
 
 };
 
 #include "iotest.def.h"
+#undef TEST_FILE

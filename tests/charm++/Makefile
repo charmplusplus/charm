@@ -16,6 +16,7 @@ DIRS = \
   startupTest \
   topology \
   io \
+  io_read \
   sparse \
   reductionTesting \
   partitions \

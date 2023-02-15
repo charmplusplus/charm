@@ -1,5 +1,6 @@
 mainmodule iotest {
 	include "ckio.h";
+	#define TEST_FILE "large_test.txt"
 	readonly CProxy_Main mainProxy;	 // the proxy to be used
 	mainchare Main {
 		entry Main(CkArgMsg*);
@@ -31,14 +32,17 @@ mainmodule iotest {
 		// method that verifies the read is correct
 		entry void testRead(Ck::IO::ReadCompleteMsg* msg) {
 			serial {
+				FILE* fp = fopen("parallel_test.out", "w+");
+				fwrite(msg -> data, 1, msg -> bytes, fp);	
+				fclose(fp);
+				fp = fopen("seq_test.out", "w+");	
+				fwrite(msg -> data, 1, msg -> bytes, fp);	
+				fclose(fp);
+
 				ckout << "At offset " << msg -> offset << ":";
-				for(size_t i = 0; i < msg -> bytes; ++i){
-					ckout << msg -> data[i];
-				}
-				ckout << endl;
 				char* seq_data = sequentialRead(msg -> offset, msg -> bytes);
 				for(size_t i = 0; i< msg -> bytes; ++i){
-					CkAssert(seq_data[i] == msg -> data[i]);
+					CkEnforce(seq_data[i] == msg -> data[i]);
 				}
 				delete[] seq_data;
 				delete msg;	
@@ -52,23 +56,24 @@ mainmodule iotest {
 			serial {
 				ckout << "Starting the reading\n";
 				Ck::IO::Options opts;
-				opts.read_stripe = 10; // how much each ReadSession chare will read_
+				opts.read_stripe = 1000 * 1024; // how much each ReadSession chare will read_
 				CkCallback open_cb(CkIndex_Main::ready(NULL), thisProxy);
 				open_cb.setRefNum(0);
-				Ck::IO::open("readtest.txt", open_cb, opts);
+				Ck::IO::open(TEST_FILE, open_cb, opts);
 			}
 			// after the open call, invoke this as the callback
 			when ready[0](Ck::IO::FileReadyMsg* msg) serial {
 				 _file = msg -> file;
 				 CkCallback start_read_session(CkIndex_Main::startRead(NULL), thisProxy);
 				 start_read_session.setRefNum(0);
-				 Ck::IO::startReadSession(_file, 100, 0, start_read_session); // load in 100 bytes from offset 0
+				 Ck::IO::startReadSession(_file, 100000000, 0, start_read_session); // load in 100 bytes from offset 0
 			}
 			// callback that is invoked after the read session is started
 			when startRead[0](Ck::IO::SessionReadyMsg* msg) serial {
 				current_session = msg -> session;
 				CkCallback test_read_cb(CkIndex_Main::testRead(0), thisProxy);	
-				readers = CProxy_Reader::ckNew(msg -> session, 23, 10, test_read_cb,5); // create 5 readers which will each read 10 bytes and start from offset 5 i.e 0 will read bytes [5,15), etc
+					
+				readers = CProxy_Reader::ckNew(msg -> session, 1024*10000, 8122, test_read_cb,5); // create 5 readers which will each read 23 bytes and start from offset 5 i.e 0 will read bytes [5,28), 1 is [10, 33).
 
 			}
 		}
@@ -80,3 +85,4 @@ mainmodule iotest {
 	}
 
 }
+#undef TEST_FILE
