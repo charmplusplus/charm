@@ -44,6 +44,9 @@ module CkIO_impl {
 		}
 		when sessionReady[files[file].sessionID](CkReductionMsg* m) serial { // after the ReadSession chare array is set up, invoke the ready callback
 			delete m;
+			double end_read_time = CkWallTimer();
+			double total_time = end_read_time - start_disk_read_timer;
+			CkPrintf("Time to read all the data from disk: %f\n", total_time);
 			ready.send(new SessionReadyMsg(Session(file, bytes, offset, files[file].read_session)));
 		}
 	  };

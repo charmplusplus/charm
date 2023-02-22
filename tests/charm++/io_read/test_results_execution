@@ -1,0 +1,21 @@
+
+Running as 4 OS processes: ./iotest
+charmrun> /bin/setarch x86_64 -R mpirun -np 4 ./iotest
+Charm++> Running on MPI library: Intel(R) MPI Library 2019 Update 9 for Linux* OS
+ (MPI standard: 3.1)
+Charm++> Level of thread support used: MPI_THREAD_SINGLE (desired: MPI_THREAD_SINGLE)
+Charm++> Running in non-SMP mode: 4 processes (PEs)
+Converse/Charm++ Commit ID: v7.1.0-devel-239-gf9ce85738
+Isomalloc> Synchronized global address space.
+CharmLB> Load balancer assumes all CPUs are same.
+Charm++> Running on 2 hosts (2 sockets x 24 cores x 2 PUs = 96-way SMP)
+Charm++> cpu topology info is gathered in 0.003 seconds.
+CharmLB> Load balancing instrumentation for communication is off.
+Starting the reading
+At offset 37:decremented the count to 4
+At offset 8779:At offset 26263:At offset 17521:At offset 35005:decremented the count to 3
+decremented the count to 2
+decremented the count to 1
+decremented the count to 0
+About to enter closing session
+[Partition 0][Node 0] End of program

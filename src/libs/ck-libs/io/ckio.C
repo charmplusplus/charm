@@ -10,6 +10,7 @@ typedef int FileToken;
 #include "CkIO_impl.decl.h"
 
 #include <sys/stat.h>
+#include <sys/mman.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <pup_stl.h>
@@ -67,6 +68,7 @@ namespace Ck { namespace IO {
         map<FileToken, impl::FileInfo> files;
         CProxy_Manager managers;
         int opnum, sessionID;
+	double start_disk_read_timer;
         Director_SDAG_CODE
 
       public:
@@ -195,6 +197,7 @@ namespace Ck { namespace IO {
 		CkCallback sessionInitDone(CkIndex_Director::sessionReady(0), thisProxy);
 		sessionInitDone.setRefnum(sessionID);
 		sessionOpts.setInitCallback(sessionInitDone); // invoke the sessionInitDone callback after all the elements of the chare array are created
+		start_disk_read_timer = CkWallTimer();
 		files[file].read_session = CProxy_ReadSession::ckNew(file, offset, bytes, sessionOpts); // create the readers
 	}
 
@@ -419,7 +422,7 @@ namespace Ck { namespace IO {
             contribute(CkCallback(CkIndex_WriteSession::syncData(), thisProxy));
         }
 
-        void syncData() {
+        void syncData(){
           int status;
           CkAssert(bufferMap.size() == 0);
 #if CMK_HAS_FDATASYNC_FUNC
@@ -472,7 +475,8 @@ namespace Ck { namespace IO {
 		size_t _session_offset; // the offset of the session
 		size_t _my_offset;
 		size_t _my_bytes;
-		std::vector<char> _buffer;
+		// std::vector<char> _buffer;
+		char* _buffer;
 		
 	public:
 		ReadSession(FileToken file, size_t offset, size_t bytes) : _token(file), _file(CkpvAccess(manager)->get(file)), _session_bytes(bytes), _session_offset(offset){
@@ -485,23 +489,33 @@ namespace Ck { namespace IO {
 		}
 
 		void clearBuffer() {
-			_buffer.clear(); // clears the buffer
+			ckout << "This is a useless method\n" << endl;
 		}
 
 		void readData(){
-			std::ifstream ifs(_file -> name); // open the file
-			if(ifs.fail()){ // error handling if opening the file failed
-				CkAbort("Couldn't open the file %s\n", (_file -> name).c_str());
+			// std::ifstream ifs(_file -> name); // open the file
+			// if(ifs.fail()){ // error handling if opening the file failed
+			// 	CkAbort("Couldn't open the file %s\n", (_file -> name).c_str());
+			// }
+			// ifs.seekg(_my_offset); // jump to the point where the chare should start reading
+			// _buffer.resize(_my_bytes, 'z'); // resize it and init with 'z' to denote what hasn't been changed
+			// _buffer.shrink_to_fit(); // get rid of any extra capacity 
+			// char* buffer = _buffer.data(); // point to the underlying char* of the vector; does not own the array
+			// ifs.read(buffer, _my_bytes);
+			// ifs.close();
+			//
+			
+			int fd = ::open(_file -> name.c_str(), O_RDONLY); 
+			_buffer = (char*)mmap(NULL, _my_bytes, PROT_READ, MAP_SHARED, fd, _my_offset);
+			if(_buffer == MAP_FAILED){
+				ckout << "MMAP FAILED IN THE READ\n";
+				CkEnforce(_buffer != MAP_FAILED);
 			}
-			ifs.seekg(_my_offset); // jump to the point where the chare should start reading
-			_buffer.resize(_my_bytes, 'z'); // resize it and init with 'z' to denote what hasn't been changed
-			_buffer.shrink_to_fit(); // get rid of any extra capacity 
-			char* buffer = _buffer.data(); // point to the underlying char* of the vector; does not own the array
-			ifs.read(buffer, _my_bytes);
-			ifs.close();
+		 	::close(fd);	
+
 		}	
 		
-		// the method by which you send your data to the ra chare
+		// the m// ethod by which you send your data to the ra chare
 		void sendData(size_t offset, size_t bytes, CProxy_ReadAssembler ra){
 			size_t chare_offset;
 			size_t chare_bytes;
@@ -525,7 +539,11 @@ namespace Ck { namespace IO {
 			// 	data_to_send.at(bytes_read) = data;
 			// 	bytes_read++;
 			// }
-			ra.shareData(chare_offset, bytes_to_read, _buffer.data() + (chare_offset - _my_offset)); // send this data to the ReadAssembler
+			ra.shareData(chare_offset, bytes_to_read, _buffer + (chare_offset - _my_offset)); // send this data to the ReadAssembler
+		}
+
+		~ReadSession(){
+			munmap(_buffer, _my_bytes);	// unmap the file to memory
 		}
       };
 
@@ -543,20 +561,21 @@ namespace Ck { namespace IO {
     // class that is used to aggregate the data for a specific read call made by the user
     class ReadAssembler : public CBase_ReadAssembler {
 	private:
-		std::vector<char> _data_buffer; // the data buffer that is used to store the read request
+		char* _data_buffer; // the data buffer that is used to store the read request
 		Session _session;
-		size_t _bytes_left; // the number of bytes the user wants for a particular read
+		ssize_t _bytes_left; // the number of bytes the user wants for a particular read
 		size_t _read_offset; // the offset they specify for their read
 		CkCallback _after_read; // the callback to invoke after the read is complete
 		size_t _read_tag = -1;
+		size_t _total_bytes;
 	public:
 		ReadAssembler(Session session, size_t bytes, size_t offset, CkCallback after_read){
+			_total_bytes = bytes;
 			_session = session;
 			_bytes_left = bytes;
 			_read_offset = offset;
 			_after_read = after_read;
-			_data_buffer.resize(_bytes_left, 'r'); // resize the buffer to the size of read call
-			_data_buffer.shrink_to_fit();
+			_data_buffer = new char[bytes]; // resize the buffer to the size of read call
 		}
 		
 		ReadAssembler(Session session, size_t bytes, size_t offset, CkCallback after_read, size_t tag) : 
@@ -571,14 +590,20 @@ namespace Ck { namespace IO {
 			// 	char ch = data[counter];
 			// 	_data_buffer[start_idx + counter] = ch;
 			// }
-			memcpy(_data_buffer.data() + start_idx, data, num_bytes); // copying the num_bytes from data to the read buffer
+			memcpy(_data_buffer + start_idx, data, num_bytes); // copying the num_bytes from data to the read buffer
 			_bytes_left -= num_bytes; // decrement the number of remaining bytes to read
+
+			#ifdef DEBUG_READS
+				CkPrintf("For read at offset %zu of %zu bytes: has %d bytes left\n", _read_offset, _total_bytes, _bytes_left);
+			#endif
+
+			CkEnforce(_bytes_left >= 0);	
 			if(_bytes_left) return; // if there are bytes still to read, just return
-			char* buffer = _data_buffer.data(); 
-			ReadCompleteMsg* msg = new (_data_buffer.size()) ReadCompleteMsg();
-			memcpy(msg -> data, buffer, _data_buffer.size());
+			char* buffer = _data_buffer;
+			ReadCompleteMsg* msg = new (_total_bytes) ReadCompleteMsg();
+			memcpy(msg -> data, buffer, _total_bytes);
 			msg -> offset= _read_offset;
-			msg -> bytes = _data_buffer.size();
+			msg -> bytes = _total_bytes;
 			msg -> read_tag = _read_tag; 
 			_after_read.send(msg);
 			// have some method of cleaning up this chare after invoking the callback
@@ -590,7 +615,6 @@ namespace Ck { namespace IO {
     void open(string name, CkCallback opened, Options opts) {
       impl::director.openFile(name, opened, opts);
     }
-
     void startSession(File file, size_t bytes, size_t offset,
                       CkCallback ready, CkCallback complete) {
       impl::director.prepareWriteSession(file.token, bytes, offset, ready, complete);
