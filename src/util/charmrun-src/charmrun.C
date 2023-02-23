@@ -4753,10 +4753,14 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
     fprintf(f, "test -z \"$CmiMyNode\" && CmiMyNode=$MPIRUN_RANK\n");
     fprintf(f, "test -z \"$CmiMyNode\" && CmiMyNode=$PMI_RANK\n");
     fprintf(f, "test -z \"$CmiMyNode\" && CmiMyNode=$PMI_ID\n");
+    fprintf(f, "test -z \"$CmiMyNode\" && CmiMyNode=$PMIX_RANK\n");
     fprintf(f, "test -z \"$CmiMyNode\" && CmiMyNode=$MP_CHILD\n");
     fprintf(f, "test -z \"$CmiMyNode\" && CmiMyNode=$SLURM_PROCID\n");
-    fprintf(f, "test -z \"$CmiMyNode\" && (Echo Could not detect rank from "
-               "environment ; Exit 1)\n");
+    fprintf(f, "if test -z \"$CmiMyNode\"\n"
+               "then\n"
+               "  Echo \"Could not detect rank from environment\"\n"
+               "  Exit 1\n"
+               "fi\n");
     fprintf(f, "export CmiMyNode\n");
   }
 #ifdef HSTART
@@ -4825,8 +4829,18 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
     fprintf(f, "test -z \"$CmiNumNodes\" && CmiNumNodes=$MP_PROCS\n");
     fprintf(f, "test -z \"$CmiNumNodes\" && CmiNumNodes=$SLURM_NTASKS\n");
     fprintf(f, "test -z \"$CmiNumNodes\" && CmiNumNodes=$SLURM_NPROCS\n");
-    fprintf(f, "test -z \"$CmiNumNodes\" && (Echo Could not detect node count "
-               "from environment ; Exit 1)\n");
+    const int processes = get_old_style_process_count();
+    fprintf(f, "test -z \"$CmiNumNodes\" && CmiNumNodes=%d\n", processes);
+    fprintf(f, "if test %d != \"$CmiNumNodes\"\n", processes);
+    fprintf(f, "then\n"
+               "  Echo \"Node count $CmiNumNodes from environment is not %d requested\"\n"
+               "  Exit 1\n"
+               "fi\n", processes);
+    fprintf(f, "if test $CmiMyNode -ge %d\n", processes);
+    fprintf(f, "then\n"
+               "  Echo \"Rank $CmiMyNode is not less than requested node count %d\"\n"
+               "  Exit 1\n"
+               "fi\n", processes);
     fprintf(f, "export CmiNumNodes\n");
   }
 #ifdef HSTART
