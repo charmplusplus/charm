@@ -27,7 +27,7 @@ using std::max;
 using std::map;
 using std::string;
 
-
+// #define DEBUG 
 namespace Ck { namespace IO {
     namespace impl {
       CProxy_Director director;
@@ -489,16 +489,20 @@ namespace Ck { namespace IO {
 		}
 
 		void readData(){
-			std::ifstream ifs(_file -> name); // open the file
-			if(ifs.fail()){ // error handling if opening the file failed
-				CkAbort("Couldn't open the file %s\n", (_file -> name).c_str());
+		//	std::ifstream ifs(_file -> name); // open the file
+		//	if(ifs.fail()){ // error handling if opening the file failed
+		//		CkAbort("Couldn't open the file %s\n", (_file -> name).c_str());
+		//	}
+		//	ifs.seekg(_my_offset); // jump to the point where the chare should start reading
+			FILE* fp = fopen(_file -> name.c_str(), "rb+"); // open the file pointer
+			if(!fp){
+				CkPrintf("Opening of the file %s went wrong\n", _file -> name.c_str());
 			}
-			ifs.seekg(_my_offset); // jump to the point where the chare should start reading
 			_buffer.resize(_my_bytes, 'z'); // resize it and init with 'z' to denote what hasn't been changed
 			_buffer.shrink_to_fit(); // get rid of any extra capacity 
 			char* buffer = _buffer.data(); // point to the underlying char* of the vector; does not own the array
-			ifs.read(buffer, _my_bytes);
-			ifs.close();
+			fread(buffer, 1, _my_bytes, fp);
+			fclose(fp);
 		}	
 		
 		// the method by which you send your data to the ra chare
@@ -525,6 +529,9 @@ namespace Ck { namespace IO {
 			// 	data_to_send.at(bytes_read) = data;
 			// 	bytes_read++;
 			// }
+			#ifdef DEBUG
+				CkPrintf("chare_offset=%zu, end_byte_chare=%zu, bytes_to_read=%zu, offset=%zu, bytes=%zu\n", chare_offset, end_byte_chare, bytes_to_read, offset, bytes);	
+			#endif
 			ra.shareData(chare_offset, bytes_to_read, _buffer.data() + (chare_offset - _my_offset)); // send this data to the ReadAssembler
 		}
       };
@@ -571,6 +578,9 @@ namespace Ck { namespace IO {
 			// 	char ch = data[counter];
 			// 	_data_buffer[start_idx + counter] = ch;
 			// }
+			#ifdef DEBUG
+				CkPrintf("shareData args: read_chare_offset=%zu, num_bytes=%zu, data=%p. start_idx = %zu\n", read_chare_offset, num_bytes, data, start_idx);
+			#endif
 			memcpy(_data_buffer.data() + start_idx, data, num_bytes); // copying the num_bytes from data to the read buffer
 			_bytes_left -= num_bytes; // decrement the number of remaining bytes to read
 			if(_bytes_left) return; // if there are bytes still to read, just return
@@ -597,6 +607,9 @@ namespace Ck { namespace IO {
     } 
 
     void startReadSession(File file, size_t bytes, size_t offset, CkCallback ready){
+	#ifdef DEBUG
+		CkPrintf("This is DEBUG for the reads\n");
+	#endif
 	impl::director.prepareReadSession(file.token, bytes, offset, ready);
     }
     
