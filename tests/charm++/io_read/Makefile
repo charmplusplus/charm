@@ -6,8 +6,7 @@ all: iotest
 iotest: iotest.ci iotest.C
 	$(CHARMC) iotest.ci
 	$(CHARMC) iotest.C -o $@ -module CkIO
-
-test: iotest
+	dd if=/dev/urandom of=large_test.txt bs=64M count=16 iflag=fullblock
 	$(call run, ./iotest +p4 4 )
 
 testp: iotest

@@ -494,14 +494,23 @@ namespace Ck { namespace IO {
 		//		CkAbort("Couldn't open the file %s\n", (_file -> name).c_str());
 		//	}
 		//	ifs.seekg(_my_offset); // jump to the point where the chare should start reading
-			FILE* fp = fopen(_file -> name.c_str(), "rb+"); // open the file pointer
+			FILE* fp = fopen(_file -> name.c_str(), "rb"); // open the file pointer
 			if(!fp){
 				CkPrintf("Opening of the file %s went wrong\n", _file -> name.c_str());
 			}
 			_buffer.resize(_my_bytes, 'z'); // resize it and init with 'z' to denote what hasn't been changed
 			_buffer.shrink_to_fit(); // get rid of any extra capacity 
 			char* buffer = _buffer.data(); // point to the underlying char* of the vector; does not own the array
-			fread(buffer, 1, _my_bytes, fp);
+			fseek(fp, _my_offset, SEEK_SET);
+			size_t num_bytes_read = fread(buffer, 1, _my_bytes, fp);
+			if(!num_bytes_read){
+				if(ferror(fp))
+					CkPrintf("Something went wrong trying to open the file %s\n", _file -> name.c_str());
+				else if (feof(fp))
+					CkPrintf("Reached the EOF\n");
+			} else if (num_bytes_read != _my_bytes) {
+				CkPrintf("Supposed to read %zu bytes, but only read %zu bytes\n", _my_bytes, num_bytes_read);
+			}
 			fclose(fp);
 		}	
 		
