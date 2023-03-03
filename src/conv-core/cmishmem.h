@@ -33,28 +33,18 @@ constexpr auto defaultTimeout = 4;
 }  // namespace ipc
 }  // namespace cmi
 
-// TODO ( find better names than src/dst? )
-#define CMK_IPC_BLOCK_FIELDS \
-  int src;                   \
-  std::uintptr_t orig;       \
-  int dst;                   \
-  std::uintptr_t next;       \
-  std::size_t size;
-
-struct CmiIpcBlock {
+struct alignas(ALIGN_BYTES) CmiIpcBlock {
+  // TODO ( find better names than src/dst? )
+public:
   // "home" rank of the block
- private:
-  class blockSizeHelper_ {
-    CMK_IPC_BLOCK_FIELDS;
-  };
-
- public:
-  CMK_IPC_BLOCK_FIELDS;
+  int src;
+  std::uintptr_t orig;
+  int dst;
+  std::uintptr_t next;
+  std::size_t size;
 
   CmiIpcBlock(std::size_t size_, std::uintptr_t orig_)
       : orig(orig_), next(cmi::ipc::nil), size(size_) {}
-
-  char padding[(sizeof(blockSizeHelper_) % ALIGN_BYTES)];
 };
 
 struct CmiIpcManager;
