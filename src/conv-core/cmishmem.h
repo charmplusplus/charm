@@ -38,8 +38,8 @@ struct alignas(ALIGN_BYTES) CmiIpcBlock {
 public:
   // "home" rank of the block
   int src;
-  std::uintptr_t orig;
   int dst;
+  std::uintptr_t orig;
   std::uintptr_t next;
   std::size_t size;
 
