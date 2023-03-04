@@ -780,14 +780,19 @@ CpvExtern(int, _curRestartPhase);      /* number of restarts */
 /** This header goes before each chunk of memory allocated with CmiAlloc. 
     See the comment in convcore.C for details on the fields.
 */
-struct
-#if !(CMK_USE_IBVERBS | CMK_USE_IBUD)
+
+#if CMK_USE_IBVERBS | CMK_USE_IBUD
+struct infiCmiChunkMetaDataStruct;
+struct infiCmiChunkMetaDataStruct* registerMultiSendMesg(char* msg, int msgSize);
+#endif
+
 // alignas is used for padding here, rather than for alignment of the
 // CmiChunkHeader itself, to ensure that the chunk following the envelope is
 // aligned relative to the start of the header.
-  alignas(ALIGN_BYTES) // If in verbs mode, align in infiCmiChunkHeader instead
+struct alignas(ALIGN_BYTES) CmiChunkHeader {
+#if CMK_USE_IBVERBS | CMK_USE_IBUD
+  struct infiCmiChunkMetaDataStruct *metaData;
 #endif
-CmiChunkHeader {
   int size;
 private:
 #if CMK_SMP
@@ -823,17 +828,6 @@ public:
   int decRef() { return ref--; }
 #endif
 };
-
-#if CMK_USE_IBVERBS | CMK_USE_IBUD
-struct infiCmiChunkMetaDataStruct;
-
-typedef struct alignas(ALIGN_BYTES) infiCmiChunkHeaderStruct {
-  struct infiCmiChunkMetaDataStruct *metaData;
-  CmiChunkHeader chunkHeader;
-} infiCmiChunkHeader;
-
-struct infiCmiChunkMetaDataStruct *registerMultiSendMesg(char *msg,int msgSize);
-#endif
 
 /* Given a user chunk m, extract the enclosing chunk header fields: */
 #define BLKSTART(m) ((CmiChunkHeader *) (((intptr_t)m) - sizeof(CmiChunkHeader)))
