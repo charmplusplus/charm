@@ -782,6 +782,9 @@ CpvExtern(int, _curRestartPhase);      /* number of restarts */
 */
 struct
 #if !(CMK_USE_IBVERBS | CMK_USE_IBUD)
+// alignas is used for padding here, rather than for alignment of the
+// CmiChunkHeader itself, to ensure that the chunk following the envelope is
+// aligned relative to the start of the header.
   alignas(ALIGN_BYTES) // If in verbs mode, align in infiCmiChunkHeader instead
 #endif
 CmiChunkHeader {

@@ -200,6 +200,9 @@ namespace ck {
   UShort epIdx;        /* Entry point to call */                               \
   ck::impl::s_attribs attribs;
 
+// alignas is used for padding here, rather than for alignment of the envelope
+// itself, to ensure that the message following the envelope is aligned relative
+// to the start of the envelope.
 class alignas(ALIGN_BYTES) envelope {
 private:
 
