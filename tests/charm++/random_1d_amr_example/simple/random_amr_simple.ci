@@ -8,15 +8,19 @@ mainmodule random_amr_simple {
   
   mainchare Main {
     entry Main(CkArgMsg* msg);
+    entry void iterate();
+    entry void init_new();
+    entry void delete_old();
   };
 
   array [1D] DgElement {
     entry DgElement();
-    entry [reductiontarget] void iterate(int nelements);
+    entry void iterate();
     entry void split();
     entry void join();
+    entry void init_new();
     entry void init_child(int itercount_);
     entry void init_parent(int itercount_);
-    entry [reductiontarget] void delete_old(int nelements);
+    entry void delete_old();
   };
 };

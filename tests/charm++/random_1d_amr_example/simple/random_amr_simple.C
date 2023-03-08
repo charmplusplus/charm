@@ -19,7 +19,22 @@ Main::Main(CkArgMsg* msg) {
     which_proc = (which_proc + 1 == number_of_procs ? 0 : which_proc + 1);
   }
   dgElementProxy.doneInserting();
-  dgElementProxy.iterate(initial_number_of_elements);
+  iterate();
+}
+
+void Main::iterate() {
+  dgElementProxy.iterate();
+  CkStartQD(CkCallback(CkIndex_Main::init_new(), mainProxy));
+}
+
+void Main::init_new() {
+  dgElementProxy.init_new();
+  CkStartQD(CkCallback(CkIndex_Main::delete_old(), mainProxy));
+}
+
+void Main::delete_old() {
+  dgElementProxy.delete_old();
+  CkStartQD(CkCallback(CkIndex_Main::iterate(), mainProxy));
 }
 
 DgElement::DgElement() {
@@ -28,9 +43,9 @@ DgElement::DgElement() {
   child_count = 0;
 }
 
-void DgElement::iterate(int nelements) {
+void DgElement::iterate() {
   if (thisIndex == 0 || thisIndex == 100)
-    CkPrintf("Iteration %i, number of elements %i\n", itercount, nelements);
+    CkPrintf("Iteration %i\n", itercount);
 
   if (itercount == 10)
     CkExit();
@@ -42,57 +57,41 @@ void DgElement::iterate(int nelements) {
   }
 }
 
+void DgElement::init_new() {
+  if (flag_ == 1) {
+    thisProxy[100 + 2 * thisIndex].init_child(itercount);
+    thisProxy[100 + 2 * thisIndex + 1].init_child(itercount);
+  } else if (flag_ == -1) {
+    thisProxy[(thisIndex - 100) / 2].init_parent(itercount);
+  }
+}
+
 void DgElement::split() {
   flag_ = 1;
   thisProxy[100 + 2 * thisIndex].insert();
   thisProxy[100 + 2 * thisIndex + 1].insert();
-  
-  thisProxy[100 + 2 * thisIndex].init_child(itercount);
-  thisProxy[100 + 2 * thisIndex + 1].init_child(itercount);
-
-  CkCallback cb(CkReductionTarget(DgElement, delete_old), dgElementProxy);;
-  int result = 1;
-  contribute(sizeof(int), &result, CkReduction::sum_int, cb);
 }
 
 void DgElement::init_child(int itercount_) {
   itercount = itercount_;
-  CkCallback cb(CkReductionTarget(DgElement, delete_old), dgElementProxy);;
-  int result = 1;
-  contribute(sizeof(int), &result, CkReduction::sum_int, cb);
 }
 
 void DgElement::join() {
   flag_ = -1;
   if (thisIndex % 2 == 0)
     thisProxy[(thisIndex - 100) / 2].insert();
-
-  thisProxy[(thisIndex - 100) / 2].init_parent(itercount);
-  
-  CkCallback cb(CkReductionTarget(DgElement, delete_old), dgElementProxy);;
-  int result = 1;
-  contribute(sizeof(int), &result, CkReduction::sum_int, cb);
 }
 
 void DgElement::init_parent(int itercount_) {
   itercount = itercount_;
   if (child_count++ == 2) {
     child_count = 0;
-    CkCallback cb(CkReductionTarget(DgElement, delete_old), dgElementProxy);;
-    int result = 1;
-    contribute(sizeof(int), &result, CkReduction::sum_int, cb);
   }
 }
 
-void DgElement::delete_old(int nelements) {
-  //if (thisIndex == 0 || thisIndex == 100)
-  //  CkPrintf("Iteration %i before delete, number of elements %i\n", itercount, nelements);
+void DgElement::delete_old() {
   if (flag_ == 1 || flag_ == -1) {
     thisProxy[thisIndex].ckDestroy();
-  } else {
-    CkCallback cb(CkReductionTarget(DgElement, iterate), dgElementProxy);;
-    int result = 1;
-    contribute(sizeof(int), &result, CkReduction::sum_int, cb);  
   }
 }
 

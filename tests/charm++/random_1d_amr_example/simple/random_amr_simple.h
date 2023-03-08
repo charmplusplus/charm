@@ -17,17 +17,21 @@ using NeighborFlags_t = std::unordered_map<ElementId_t, Flag_t>;
 class Main : public CBase_Main {
  public:
   Main(CkArgMsg* msg);
+  void iterate();
+  void init_new();
+  void delete_old();
 };
 
 class DgElement : public CBase_DgElement {
  public:
   DgElement();
-  void iterate(int nelements);
+  void iterate();
   void split();
   void join();
+  void init_new();
   void init_child(int itercount_);
   void init_parent(int itercount_);
-  void delete_old(int nelements);
+  void delete_old();
 
  private:
 
