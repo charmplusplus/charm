@@ -33,6 +33,8 @@ constexpr auto defaultTimeout = 4;
 }  // namespace ipc
 }  // namespace cmi
 
+// alignas is used for padding here, rather than for alignment of the
+// CmiIpcBlock itself.
 struct alignas(ALIGN_BYTES) CmiIpcBlock {
   // TODO ( find better names than src/dst? )
 public:
