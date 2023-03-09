@@ -222,6 +222,11 @@ static void reportMsgHistogramInfo(void);
 
 #define USE_MPI_CTRLMSG_SCHEME 0
 
+/* to use MPI_Alloc_mem inside CmiAlloc */
+#ifndef CMK_USE_MPI_ALLOC_MEM
+#define CMK_USE_MPI_ALLOC_MEM USE_MPI_CTRLMSG_SCHEME
+#endif
+
 /* Defining this macro will use MPI_Irecv instead of MPI_Recv for
  * large messages. This could save synchronization overhead caused by
  * the rzv protocol used by MPI
