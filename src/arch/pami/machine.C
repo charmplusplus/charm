@@ -720,7 +720,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     _Cmi_numnodes = configuration.value.intval;
 #if MACHINE_DEBUG_LOG
     char ln[200];
-    sprintf(ln,"debugLog.%d", _Cmi_mynode);
+    snprintf(ln, sizeof(ln), "debugLog.%d", _Cmi_mynode);
     debugLog=fopen(ln,"w");
     if (debugLog == NULL)
     {

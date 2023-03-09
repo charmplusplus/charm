@@ -41,7 +41,7 @@ static volatile int exitFlag = 0;
 static int HelperOnCore() {
 #if CMK_OS_IS_LINUX
     char fname[64];
-    sprintf(fname, "/proc/%d/task/%ld/stat", getpid(), syscall(SYS_gettid));
+    snprintf(fname, sizeof(fname), "/proc/%d/task/%ld/stat", getpid(), syscall(SYS_gettid));
     FILE *ifp = fopen(fname, "r");
     if (ifp == NULL) return -1;
     fseek(ifp, 0, SEEK_SET);

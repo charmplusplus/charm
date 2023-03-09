@@ -651,7 +651,7 @@ INLINE static CMK_TYPEDEF_UINT8 MemusagePS(void){
     CMK_TYPEDEF_UINT8 vsz=0;
     FILE *p;
     int ret;
-    sprintf(pscmd, "/bin/ps -o vsz= -p %d", getpid());
+    snprintf(pscmd, sizeof(pscmd), "/bin/ps -o vsz= -p %d", getpid());
     p = popen(pscmd, "r");
     if(p){
 	ret = fscanf(p, "%" PRIu64, &vsz);

@@ -264,7 +264,7 @@ int CthAliasCreate(int stackSize)
   char tmpName[128];
   char lastByte=0;
   int fd;
-  sprintf(tmpName,"/tmp/charmThreadStackXXXXXX");
+  snprintf(tmpName,sizeof(tmpName),"/tmp/charmThreadStackXXXXXX");
   fd=mkstemp(tmpName);
   if (fd==-1) CmiAbort("threads.C> Cannot create /tmp file to contain thread stack");
   unlink(tmpName); /* delete file when it gets closed */

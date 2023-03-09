@@ -64,8 +64,8 @@ void gengraph(int numVertices, int numConnections, int pseed, int *pes, int *npe
 
   /* make a directory */
   if (tofile && CmiMyPe() == 0) {
-  sprintf(dirname, "graph%d", globalNumVertices);
-  sprintf(dircmd, "mkdir %s", dirname);
+  snprintf(dirname, sizeof(dirname), "graph%d", globalNumVertices);
+  snprintf(dircmd, sizeof(dircmd), "mkdir %s", dirname);
   if (system(dircmd) == -1) {
     CmiAbort("CLD> call to system() failed!");
   }
@@ -447,7 +447,7 @@ static void printOut(VerticesListType *vertices)
  for (i=0; i<vertices->numVertices; i++)
    {
      /* Open graphN/graphi */
-     sprintf(filename, "graph%d/graph%d", vertices->numVertices, i);
+     snprintf(filename, sizeof(filename), "graph%d/graph%d", vertices->numVertices, i);
      fp = fopen(filename, "w");
      fprintf(fp, "%d ", vertexRecs[i].degree);
      for (j=0; j<vertexRecs[i].degree; j++)

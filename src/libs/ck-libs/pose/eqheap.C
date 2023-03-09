@@ -445,8 +445,9 @@ void EqHeap::dump()
 
 /// Dump entire heap to a string
 char *EqHeap::dumpString() {
-  char *str= new char[8192];
-  sprintf(str, "[EQHEAP: ");
+  static constexpr int strLen = 8192;
+  char *str= new char[strLen];
+  snprintf(str, strLen, "[EQHEAP: ");
   //if (top) {
   //  strcat(str, top->dumpString());
   //} else {

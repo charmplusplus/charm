@@ -146,18 +146,19 @@ class PathHistory {
   }
 
   /// Write a description of the path into the beginning of the provided buffer. The buffer ought to be large enough.
-  void printHTMLToString(char* buf) const {
+  void printHTMLToString(char* buf, int len) const {
     buf[0] = '\0';
+    int tmplen = strlen(buf);
 
-    sprintf(buf+strlen(buf), "Path Time=%lf<br>", (double)totalTime);
+    tmplen += snprintf(buf+tmplen, len - tmplen, "Path Time=%lf<br>", (double)totalTime);
     for(int i=0;i<numEpIdxs;i++){
       if(epIdxCount[i]>0){
-	sprintf(buf+strlen(buf),"EP %d count=%d<br>", i, (int)epIdxCount[i]);
+	tmplen += snprintf(buf+tmplen, len - tmplen, "EP %d count=%d<br>", i, (int)epIdxCount[i]);
       }
     }
     for(int i=0;i<numArrayIds;i++){
       if(arrayIdxCount[i]>0){
-	sprintf(buf+strlen(buf), "Array %d count=%d<br>", i, (int)arrayIdxCount[i]);
+	tmplen += snprintf(buf+tmplen, len - tmplen,  "Array %d count=%d<br>", i, (int)arrayIdxCount[i]);
       }
     }
   }

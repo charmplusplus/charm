@@ -74,7 +74,7 @@ static void meta_init(char **argv)
   const int mype = CmiMyPe();
 
   char outputname[64];
-  sprintf(outputname, "heap-replay-%d.cpp", mype);
+  snprintf(outputname, sizeof(outputname), "heap-replay-%d.cpp", mype);
   FILE * output = fopen(outputname, "w");
   if (output == nullptr)
     CmiAbort("Could not open heap-replay-%d.cpp!", mype);

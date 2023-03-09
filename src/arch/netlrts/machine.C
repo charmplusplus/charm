@@ -340,7 +340,7 @@ static void KillEveryone(const char *msg)
 static void KillEveryoneCode(int n)
 {
   char _s[100];
-  sprintf(_s, "[%d] XXX Fatal error #%d\n", CmiMyPe(), n);
+  snprintf(_s, sizeof(_s), "[%d] XXX Fatal error #%d\n", CmiMyPe(), n);
   charmrun_abort(_s);
   machine_exit(1);
 }
@@ -760,7 +760,7 @@ static void log_init(void)
 static void log_done(void)
 {
   char logname[100]; FILE *f; int i, size;
-  sprintf(logname, "log.%d", Lrts_myNode);
+  snprintf(logname, sizeof(logname), "log.%d", Lrts_myNode);
   f = fopen(logname, "w");
   if (f==0) KillEveryone("fopen problem");
   if (log_wrap) size = 50000; else size=log_pos;
@@ -780,7 +780,7 @@ void printLog(void)
       return;
   logged = 1;
   CmiPrintf("Logging: %d\n", Lrts_myNode);
-  sprintf(logname, "log.%d", Lrts_myNode);
+  snprintf(logname, sizeof(logname), "log.%d", Lrts_myNode);
   f = fopen(logname, "w");
   if (f==0) KillEveryone("fopen problem");
   for (i = 5000; i; i--)
@@ -1041,11 +1041,11 @@ CmiPrintStackTrace(0);
 	char msgBuf[80];
   	skt_set_abort(ignore_further_errors);
     if (CmiNumPartitions() == 1) {
-        sprintf(msgBuf,"Fatal error on PE %d> ",CmiMyPe());
+        snprintf(msgBuf,sizeof(msgBuf),"Fatal error on PE %d> ",CmiMyPe());
     }
     else
     {
-        sprintf(msgBuf,"Fatal error on Partition %d PE %d> ", CmiMyPartition(), CmiMyPe());
+        snprintf(msgBuf,sizeof(msgBuf),"Fatal error on Partition %d PE %d> ", CmiMyPartition(), CmiMyPe());
     }
   	ctrl_sendone_nolock("abort",msgBuf,strlen(msgBuf),s,strlen(s)+1);
   	skt_close(Cmi_charmrun_fd);
@@ -1157,7 +1157,7 @@ static void InternalPrintf(const char *f, va_list l)
   ChMessage replymsg;
   char *buffer = (char *)CmiTmpAlloc(PRINTBUFSIZE);
   CmiStdoutFlush();
-  vsprintf(buffer, f, l);
+  vsnprintf(buffer, PRINTBUFSIZE, f, l);
   if(Cmi_syncprint) {
           LOCK_IF_AVAILABLE();
   	  ctrl_sendone_nolock("printsyn", buffer,strlen(buffer)+1,NULL,0);
@@ -1176,7 +1176,7 @@ static void InternalError(const char *f, va_list l)
   ChMessage replymsg;
   char *buffer = (char *)CmiTmpAlloc(PRINTBUFSIZE);
   CmiStdoutFlush();
-  vsprintf(buffer, f, l);
+  vsnprintf(buffer, PRINTBUFSIZE, f, l);
   if(Cmi_syncprint) {
   	  ctrl_sendone_locking("printerrsyn", buffer,strlen(buffer)+1,NULL,0);
           LOCK_IF_AVAILABLE();
@@ -1801,7 +1801,7 @@ int CmiBarrierZero(void)
 
   if (CmiMyRank() == 0) {
     char str[64];
-    sprintf(str, "%d", CmiMyNodeGlobal());
+    snprintf(str, sizeof(str), "%d", CmiMyNodeGlobal());
     ctrl_sendone_locking("barrier0",str,strlen(str)+1,NULL,0);
     if (CmiMyNodeGlobal() == 0) {
       while (barrierReceived != 2) {
@@ -1932,7 +1932,7 @@ void LrtsExit(int exitcode)
   }
   else {
     char tmp[16];
-    sprintf(tmp, "%d", exitcode);
+    snprintf(tmp, sizeof(tmp), "%d", exitcode);
     Cmi_check_delay = 1.0;      /* speed up checking of charmrun */
     for(i = 0; i < CmiMyNodeSize(); i++) {
       ctrl_sendone_locking("ending",tmp,strlen(tmp)+1,NULL,0); /* this causes charmrun to go away, every PE needs to report */
@@ -2018,17 +2018,17 @@ void ConverseCleanup(void)
       ret[argc+1]="+newnumpes";
 
       char temp[50];
-      sprintf(temp,"%d", numProcessAfterRestart);
+      snprintf(temp, sizeof(temp), "%d", numProcessAfterRestart);
       ret[argc+2]=temp;
 
       ret[argc+3]="+mynewpe";
       char temp2[50];
-      sprintf(temp2,"%d", mynewpe);
+      snprintf(temp2, sizeof(temp2), "%d", mynewpe);
       ret[argc+4]=temp2;
 
       ret[argc+5]="+myoldpe";
       char temp3[50];
-      sprintf(temp3,"%d", CmiMyPe());
+      snprintf(temp3, sizeof(temp3), "%d", CmiMyPe());
       ret[argc+6]=temp3;
 
       if (restart_idx == -1) {

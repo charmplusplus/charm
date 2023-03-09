@@ -671,7 +671,7 @@ AllocationPoint * CreateAllocationTree(int *nodesCount) {
     }
   SLOT_ITERATE_END
 
-  sprintf(filename, "allocationTree_%d", CmiMyPe());
+  snprintf(filename, sizeof(filename), "allocationTree_%d", CmiMyPe());
   fd = fopen(filename, "w");
   fprintf(fd, "digraph %s {\n", filename);
   it = CkHashtableGetIterator(table);
@@ -692,7 +692,7 @@ AllocationPoint * CreateAllocationTree(int *nodesCount) {
   fprintf(fd, "}\n");
   fclose(fd);
 
-  sprintf(filename, "allocationTree_%d.tree", CmiMyPe());
+  snprintf(filename, sizeof(filename), "allocationTree_%d.tree", CmiMyPe());
   fd = fopen(filename, "w");
   printAllocationTree(root, fd, 0);
   fclose(fd);
@@ -1381,7 +1381,7 @@ static void meta_init(char **argv) {
   if (CmiMyRank()==0) {
     char buf[100];
     status("Converse -memory mode: charmdebug\n");
-    sprintf(buf, "slot size %d\n", (int)sizeof(Slot));
+    snprintf(buf, sizeof(buf), "slot size %d\n", (int)sizeof(Slot));
     status(buf);
     CmiMemoryIs_flag|=CMI_MEMORY_IS_CHARMDEBUG;
     cpdInitializeMemory = 0;

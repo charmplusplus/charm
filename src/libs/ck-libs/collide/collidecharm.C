@@ -12,7 +12,7 @@
 #  define CM_STATUS(x) ckout<<"["<<CkMyPe()<<"] C.Mgr> "<<x<<endl;
 #  define CC_STATUS(x) { \
   char buf[100]; \
-  voxName(thisIndex,buf); \
+  voxName(thisIndex,buf,sizeof(buf)); \
   ckout<<"["<<CkMyPe()<<"] "<<buf<<" Voxel> "<<x<<endl; \
 }
 
@@ -314,15 +314,15 @@ static int low23(unsigned int src)
   unsigned int offset=0x00400000u;
   return (src&loMask)-offset;
 }
-static const char * voxName(int ix,int iy,int iz,char *buf) {
+static const char * voxName(int ix,int iy,int iz,char *buf,int n) {
   int x=low23(ix);
   int y=low23(iy);
   int z=low23(iz);
-  sprintf(buf,"(%d,%d,%d)",x,y,z);
+  snprintf(buf,n,"(%d,%d,%d)",x,y,z);
   return buf;
 }
-static const char * voxName(const CkIndex3D &idx,char *buf) {
-  return voxName(idx.x,idx.y,idx.z,buf);
+static const char * voxName(const CkIndex3D &idx,char *buf,int n) {
+  return voxName(idx.x,idx.y,idx.z,buf,n);
 }
 
 
@@ -376,7 +376,7 @@ void collideMgr::sendVoxelMessage(const CollideLoc3d &dest,
     int n,CollideObjRec *obj)
 {
   char destName[200];
-  CM_STATUS("collideMgr::sendVoxelMessage to "<<voxName(dest.x,dest.y,dest.z,destName));
+  CM_STATUS("collideMgr::sendVoxelMessage to "<<voxName(dest.x,dest.y,dest.z,destName,sizeof(destName)));
   msgsSent++;
   objListMsg *msg=new objListMsg(n,obj,
       objListMsg::returnReceipt(thisgroup,CkMyPe()));

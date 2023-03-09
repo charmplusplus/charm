@@ -550,7 +550,7 @@ void CldReadNeighborData(void)
   
   if (CmiNumPes() <= 1)
     return;
-  sprintf(filename, "graph%d/graph%d", CmiNumPes(), CmiMyPe());
+  snprintf(filename, sizeof(filename), "graph%d/graph%d", CmiNumPes(), CmiMyPe());
   if ((fp = fopen(filename, "r")) == 0) 
     {
       CmiError("Error opening graph init file on PE: %d\n", CmiMyPe());

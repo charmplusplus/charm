@@ -437,29 +437,29 @@ char* ArrayElement::ckDebugChareName(void)
   switch (thisIndexMax.dimension)
   {
     case 0:
-      sprintf(buf, "%s", className);
+      snprintf(buf, sizeof(buf), "%s", className);
       break;
     case 1:
-      sprintf(buf, "%s[%d]", className, d[0]);
+      snprintf(buf, sizeof(buf), "%s[%d]", className, d[0]);
       break;
     case 2:
-      sprintf(buf, "%s(%d,%d)", className, d[0], d[1]);
+      snprintf(buf, sizeof(buf), "%s(%d,%d)", className, d[0], d[1]);
       break;
     case 3:
-      sprintf(buf, "%s(%d,%d,%d)", className, d[0], d[1], d[2]);
+      snprintf(buf, sizeof(buf), "%s(%d,%d,%d)", className, d[0], d[1], d[2]);
       break;
     case 4:
-      sprintf(buf, "%s(%hd,%hd,%hd,%hd)", className, s[0], s[1], s[2], s[3]);
+      snprintf(buf, sizeof(buf), "%s(%hd,%hd,%hd,%hd)", className, s[0], s[1], s[2], s[3]);
       break;
     case 5:
-      sprintf(buf, "%s(%hd,%hd,%hd,%hd,%hd)", className, s[0], s[1], s[2], s[3], s[4]);
+      snprintf(buf, sizeof(buf), "%s(%hd,%hd,%hd,%hd,%hd)", className, s[0], s[1], s[2], s[3], s[4]);
       break;
     case 6:
-      sprintf(buf, "%s(%hd,%hd,%hd,%hd,%hd,%hd)", className, s[0], s[1], s[2], s[3], s[4],
+      snprintf(buf, sizeof(buf), "%s(%hd,%hd,%hd,%hd,%hd,%hd)", className, s[0], s[1], s[2], s[3], s[4],
               s[5]);
       break;
     default:
-      sprintf(buf, "%s(%d,%d,%d,%d..)", className, d[0], d[1], d[2], d[3]);
+      snprintf(buf, sizeof(buf), "%s(%d,%d,%d,%d..)", className, d[0], d[1], d[2], d[3]);
       break;
   };
   return strdup(buf);

@@ -189,7 +189,7 @@ void globalStat::DOPcalc(POSE_TimeType gvt, double grt)
   for (i=0; i<gvtp; i++) gvtDOP[i] = 0;
   for (i=0; i<grtp; i++) grtDOP[i] = 0;
   for (i=0; i<CkNumPes(); i++) { // read each processor's log
-    sprintf(filename, "dop%lld.log", i);
+    snprintf(filename, sizeof(filename), "dop%lld.log", i);
     fp = fopen(filename, "r");
     if (!fp) {
       CkPrintf("Cannot open file %s... exiting.\n", filename);
