@@ -1309,9 +1309,9 @@ void CmiInitCPUAffinityUtil(void){
     CpvInitialize(void *, myProcStatFP);
     CmiLock(_smp_mutex);
 #if CMK_SMP
-    sprintf(fname, "/proc/%d/task/%ld/stat", getpid(), syscall(SYS_gettid));
+    snprintf(fname, sizeof(fname), "/proc/%d/task/%ld/stat", getpid(), syscall(SYS_gettid));
 #else
-    sprintf(fname, "/proc/%d/stat", getpid());
+    snprintf(fname, sizeof(fname), "/proc/%d/stat", getpid());
 #endif
     CpvAccess(myProcStatFP) = (void *)fopen(fname, "r");
     CmiUnlock(_smp_mutex);

@@ -175,7 +175,7 @@ static void bdcastROGroupData(void){
 void printIndex(const CkArrayIndex &idx,char *dest) {
 	const int *idxData=idx.data();
 	for (int i=0;i<idx.nInts;i++) {
-		sprintf(dest,"%s%d",i==0?"":"_", idxData[i]);
+		snprintf(dest,12,"%s%d",i==0?"":"_", idxData[i]);
 		dest+=strlen(dest);
 	}
 }

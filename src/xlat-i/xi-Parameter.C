@@ -65,7 +65,7 @@ Parameter::Parameter(int Nline, Type* Ntype, const char* Nname, const char* Narr
   if (name == NULL && !isVoid()) { /*Fabricate a unique name for this marshalled param.*/
     static int unnamedCount = 0;
     name = new char[50];
-    sprintf((char*)name, "impl_noname_%x", unnamedCount++);
+    snprintf((char*)name, 50, "impl_noname_%x", unnamedCount++);
   }
   byReference = false;
   declaredReference = false;

@@ -301,14 +301,16 @@ QualName	: IDENT
 		{ $$ = $1; }
 		| QualName ':'':' IDENT
 		{
-		  char *tmp = new char[strlen($1)+strlen($4)+3];
-		  sprintf(tmp,"%s::%s", $1, $4);
+		  int len = strlen($1)+strlen($4)+3;
+		  char *tmp = new char[len];
+		  snprintf(tmp,len,"%s::%s", $1, $4);
 		  $$ = tmp;
 		}
 		| QualName ':'':' ARRAY
 		{
-		  char *tmp = new char[strlen($1)+5+3];
-		  sprintf(tmp,"%s::array", $1);
+		  int len = strlen($1)+5+3;
+		  char *tmp = new char[len];
+		  snprintf(tmp, len, "%s::array", $1);
 		  $$ = tmp;
 		}
 		;
@@ -700,7 +702,7 @@ NodeGroup	: NODEGROUP CAttribs NamedType OptBaseList MemberEList
 ArrayIndexType	: '[' NUMBER Name ']'
 		{/*Stupid special case for [1D] indices*/
 			char *buf=new char[40];
-			sprintf(buf,"%sD",$2);
+			snprintf(buf,40,"%sD",$2);
 			$$ = new NamedType(buf); 
 		}
 		| '[' QualNamedType ']'
@@ -1067,8 +1069,9 @@ CPROGRAM_List   :  /* Empty */
 		{ $$ = $1; }
 		| CPROGRAM ',' CPROGRAM_List
 		{  /*Returned only when in_bracket*/
-			char *tmp = new char[strlen($1)+strlen($3)+3];
-			sprintf(tmp,"%s, %s", $1, $3);
+			int len = strlen($1)+strlen($3)+3;
+			char *tmp = new char[len];
+			snprintf(tmp,len,"%s, %s", $1, $3);
 			$$ = tmp;
 		}
 		;
@@ -1079,26 +1082,30 @@ CCode		: /* Empty */
 		{ $$ = $1; }
 		| CPROGRAM '[' CCode ']' CCode
 		{  /*Returned only when in_bracket*/
-			char *tmp = new char[strlen($1)+strlen($3)+strlen($5)+3];
-			sprintf(tmp,"%s[%s]%s", $1, $3, $5);
+			int len = strlen($1)+strlen($3)+strlen($5)+3;
+			char *tmp = new char[len];
+			snprintf(tmp, len, "%s[%s]%s", $1, $3, $5);
 			$$ = tmp;
 		}
 		| CPROGRAM '{' CCode '}' CCode
 		{ /*Returned only when in_braces*/
-			char *tmp = new char[strlen($1)+strlen($3)+strlen($5)+3];
-			sprintf(tmp,"%s{%s}%s", $1, $3, $5);
+			int len = strlen($1)+strlen($3)+strlen($5)+3;
+			char *tmp = new char[len];
+			snprintf(tmp, len, "%s{%s}%s", $1, $3, $5);
 			$$ = tmp;
 		}
 		| CPROGRAM '(' CPROGRAM_List ')' CCode
 		{ /*Returned only when in_braces*/
-			char *tmp = new char[strlen($1)+strlen($3)+strlen($5)+3];
-			sprintf(tmp,"%s(%s)%s", $1, $3, $5);
+			int len = strlen($1)+strlen($3)+strlen($5)+3;
+			char *tmp = new char[len];
+			snprintf(tmp, len, "%s(%s)%s", $1, $3, $5);
 			$$ = tmp;
 		}
 		|'(' CCode ')' CCode
 		{ /*Returned only when in_braces*/
-			char *tmp = new char[strlen($2)+strlen($4)+3];
-			sprintf(tmp,"(%s)%s", $2, $4);
+			int len = strlen($2)+strlen($4)+3;
+			char *tmp = new char[len];
+			snprintf(tmp, len, "(%s)%s", $2, $4);
 			$$ = tmp;
 		}
 		;

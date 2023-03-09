@@ -188,7 +188,7 @@ static int  cpufreq_sysfs_write (
                      )
 {
 char path[100];
-sprintf(path,"/sys/devices/system/cpu/cpu%d/cpufreq/scaling_setspeed",proc);
+snprintf(path,sizeof(path),"/sys/devices/system/cpu/cpu%d/cpufreq/scaling_setspeed",proc);
                 FILE *fd = fopen (path, "w");
 
                 if (!fd) {
@@ -216,7 +216,7 @@ static int cpufreq_sysfs_read (int proc)
         FILE *fd;
         char path[100];
         int i=proc;
-        sprintf(path,"/sys/devices/system/cpu/cpu%d/cpufreq/scaling_setspeed",i);
+        snprintf(path,sizeof(path),"/sys/devices/system/cpu/cpu%d/cpufreq/scaling_setspeed",i);
 
         fd = fopen (path, "r");
 
@@ -237,7 +237,7 @@ float CentralLB::getTemp(int cpu)
         char val[10];
         FILE *f;
                 char path[100];
-                sprintf(path,"/sys/devices/platform/coretemp.%d/temp1_input",cpu);
+                snprintf(path,sizeof(path),"/sys/devices/platform/coretemp.%d/temp1_input",cpu);
                 f=fopen(path,"r");
                 if (!f) {
                         printf("777 FILE OPEN ERROR file=%s\n",path);
@@ -1339,7 +1339,7 @@ void CentralLB::changeFreq(int nFreq)
 //        if(procFreq[i]!=procFreqNew[i])
         {
               char newfreq[10];
-              sprintf(newfreq,"%d",nFreq);
+              snprintf(newfreq,sizeof(newfreq),"%d",nFreq);
               cpufreq_sysfs_write(newfreq,CkMyPe()%physicalCoresPerNode);//i%physicalCoresPerNode);
 //            CkPrintf("PROC#%d freq changing from %d to %d temp=%f\n",i,procFreq[i],procFreqNew[i],procTemp[i]);
         }
@@ -1429,7 +1429,7 @@ void CentralLB::simulationWrite() {
     // here we are supposed to dump the database
     int dumpFileSize = strlen(LBSimulation::dumpFile) + 4;
     char *dumpFileName = (char *)malloc(dumpFileSize);
-    while (sprintf(dumpFileName, "%s.%d", LBSimulation::dumpFile, LBSimulation::dumpStep) >= dumpFileSize) {
+    while (snprintf(dumpFileName, dumpFileSize, "%s.%d", LBSimulation::dumpFile, LBSimulation::dumpStep) >= dumpFileSize) {
       free(dumpFileName);
       dumpFileSize+=3;
       dumpFileName = (char *)malloc(dumpFileSize);
@@ -1456,7 +1456,7 @@ void CentralLB::simulationRead() {
     // here we are supposed to read the data from the dump database
     int simFileSize = strlen(LBSimulation::dumpFile) + 4;
     char *simFileName = (char *)malloc(simFileSize);
-    while (sprintf(simFileName, "%s.%d", LBSimulation::dumpFile, LBSimulation::simStep) >= simFileSize) {
+    while (snprintf(simFileName, simFileSize, "%s.%d", LBSimulation::dumpFile, LBSimulation::simStep) >= simFileSize) {
       free(simFileName);
       simFileSize+=3;
       simFileName = (char *)malloc(simFileSize);

@@ -1365,7 +1365,7 @@ if (  MSG_STATISTIC)
 
 #if MACHINE_DEBUG_LOG
     char ln[200];
-    sprintf(ln,"debugLog.%d", _Cmi_mynode);
+    snprintf(ln,sizeof(ln),"debugLog.%d", _Cmi_mynode);
     debugLog=fopen(ln,"w");
     if (debugLog == NULL)
     {
@@ -1416,10 +1416,11 @@ if (  MSG_STATISTIC)
     Cmi_usrsched = usched;
 
     if ( CmiGetArgStringDesc(argv,"+stdout",&stdoutbase,"base filename to redirect partition stdout to") ) {
-      stdoutpath = (char *)malloc(strlen(stdoutbase) + 30);
-      sprintf(stdoutpath, stdoutbase, CmiMyPartition(), CmiMyPartition(), CmiMyPartition());
+      int len = strlen(stdoutbase) + 30;
+      stdoutpath = (char *)malloc(len);
+      snprintf(stdoutpath, len, stdoutbase, CmiMyPartition(), CmiMyPartition(), CmiMyPartition());
       if ( ! strcmp(stdoutpath, stdoutbase) ) {
-        sprintf(stdoutpath, "%s.%d", stdoutbase, CmiMyPartition());
+        snprintf(stdoutpath, len, "%s.%d", stdoutbase, CmiMyPartition());
       }
       if ( CmiMyPartition() == 0 && CmiMyNode() == 0 && !quietMode) {
         printf("Redirecting stdout to files %s through %d\n",stdoutpath,CmiNumPartitions()-1);

@@ -29,7 +29,7 @@
 #include <sys/timeb.h>
 static char* strsignal(int sig) {
   static char outbuf[32];
-  sprintf(outbuf, "%d", sig);
+  snprintf(outbuf, sizeof(outbuf), "%d", sig);
   return outbuf;
 }
 #include <process.h>
@@ -1041,7 +1041,7 @@ static void PumpMsgsBlocking(void) {
 
 #if CMK_SMP_TRACE_COMMTHREAD && CMI_MPI_TRACE_MOREDETAILED
     char tmp[32];
-    sprintf(tmp, "To proc %d", CmiNodeFirst(CmiMyNode())+CMI_DEST_RANK(msg));
+    snprintf(tmp, sizeof(tmp), "To proc %d", CmiNodeFirst(CmiMyNode())+CMI_DEST_RANK(msg));
     traceUserSuppliedBracketedNote(tmp, 30, CpvAccess(projTraceStart), CmiWallTimer());
 #endif
 
@@ -1537,8 +1537,9 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
       }
       static char s_restartaftercrash[] = "+restartaftercrash";
       restart_argv[i] = s_restartaftercrash;
-      phase_str = (char*)malloc(10);
-      sprintf(phase_str,"%d", CpvAccess(_curRestartPhase));
+      const int phase_str_len = 10;
+      phase_str = (char*)malloc(phase_str_len);
+      snprintf(phase_str, phase_str_len, "%d", CpvAccess(_curRestartPhase));
       restart_argv[i+1]=phase_str;
       restart_argv[i+2]=NULL;
       *argv = restart_argv;

@@ -210,15 +210,15 @@ SpanningTreeVertex* SpanningTreeStrategy_3dTorus_minBytesHops<Iterator,SpanningT
     int coords[4];
     int numChildren = (*firstVtx).childIndex.size();
     TopoManager_getPeCoordinates(getProcID(*firstVtx), coords);
-    offset += sprintf(dbout, "TREE: %d (%d,%d,%d) %d ", getProcID(*firstVtx), coords[0], coords[1], coords[2], numChildren);
+    offset += snprintf(dbout, sizeof(dbout), "TREE: %d (%d,%d,%d) %d ", getProcID(*firstVtx), coords[0], coords[1], coords[2], numChildren);
     for (int i=0; i < numChildren; i++) {
       Iterator rangeStart = firstVtx;
       std::advance(rangeStart,(*firstVtx).childIndex[i]);
       int childPE = getProcID(*rangeStart);
       TopoManager_getPeCoordinates(childPE, coords);
-      offset += sprintf(dbout + offset, "%d (%d,%d,%d) ", childPE, coords[0], coords[1], coords[2]);
+      offset += snprintf(dbout + offset, sizeof(dbout) - offset, "%d (%d,%d,%d) ", childPE, coords[0], coords[1], coords[2]);
     }
-    sprintf(dbout + offset, "\n");
+    snprintf(dbout + offset, sizeof(dbout) - offset, "\n");
     CkPrintf(dbout);
 #endif
     /// Return a copy of the parent in keeping with the generic interface

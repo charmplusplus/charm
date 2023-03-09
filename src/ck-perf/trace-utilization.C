@@ -196,8 +196,9 @@ void TraceUtilizationBOC::sumDetailDataCollected(CkReductionMsg *msg) {
 
 void TraceUtilization::writeSts(void) {
   // open sts file
-  char *fname = new char[strlen(CkpvAccess(traceRoot))+strlen(".util.sts")+1];
-  sprintf(fname, "%s.util.sts", CkpvAccess(traceRoot));
+  int len = strlen(CkpvAccess(traceRoot))+strlen(".util.sts")+1;
+  char *fname = new char[len];
+  snprintf(fname, len, "%s.util.sts", CkpvAccess(traceRoot));
   FILE* stsfp = fopen(fname, "w+");
   if (stsfp == 0) {
        CmiAbort("Cannot open summary sts file for writing.\n");

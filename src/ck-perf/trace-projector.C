@@ -76,8 +76,9 @@ void TraceProjector::traceClearEps(void)
 
 extern "C" void writeSts(){
 	FILE *stsfp;
-	char *fname = new char[strlen(CkpvAccess(traceRoot))+strlen(".sts")+1];
-	sprintf(fname, "%s.sts", CkpvAccess(traceRoot));
+	int len = strlen(CkpvAccess(traceRoot))+strlen(".sts")+1;
+	char *fname = new char[len];
+	snprintf(fname, len, "%s.sts", CkpvAccess(traceRoot));
 	do{
 		stsfp = fopen(fname, "w");
 	} while (!stsfp && (errno == EINTR || errno == EMFILE));
