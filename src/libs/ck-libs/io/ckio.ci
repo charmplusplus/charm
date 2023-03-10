@@ -121,7 +121,7 @@ module CkIO_impl {
 		// allows you to add a tag to the read request
 		entry ReadAssembler(Session session, size_t bytes, size_t offset, CkCallback after_read, size_t tag);
 		// the method by which ReadSession objects can send their data for the read	
-		entry void shareData(size_t read_chare_offset, size_t num_bytes, char data[num_bytes]); 
+		entry [inline] void shareData(size_t read_chare_offset, size_t num_bytes, char data[num_bytes]); 
 
 	}
 
@@ -130,6 +130,7 @@ module CkIO_impl {
 		// way for the ReadSession object to send bytes over to the ReadAssembler object ra when serving a specific read
 		entry void sendData(size_t offset, size_t bytes, CProxy_ReadAssembler ra); 
 		entry void clearBuffer();
+		entry [reductiontarget] void printTime(double time_taken);
 	}
         
 	group Map : CkArrayMap

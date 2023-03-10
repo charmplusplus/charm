@@ -481,12 +481,24 @@ namespace Ck { namespace IO {
 			CkAssert(_file -> fd != -1);
 			CkAssert(_my_offset >= _session_offset);
 			CkAssert(_my_offset + _my_bytes <= _session_offset + _session_bytes);
+			double disk_read_before = CkWallTimer(); // get the before disk_read
 			readData();
+			double disk_read_after = CkWallTimer(); // end disk time
+			double total_time = disk_read_after - disk_read_before;
+			CkCallback cb(CkReductionTarget(ReadSession, printTime), thisProxy[0]);
+			contribute(sizeof(double), &total_time, CkReduction::max_double, cb);
+			
 		}
 
 		void clearBuffer() {
 			_buffer.clear(); // clears the buffer
 		}
+
+		void printTime(double time_taken){
+			CkPrintf("The time to disk took %f seconds\n", time_taken);
+		
+		}
+
 
 		void readData(){
 		//	std::ifstream ifs(_file -> name); // open the file
@@ -512,6 +524,7 @@ namespace Ck { namespace IO {
 				CkPrintf("Supposed to read %zu bytes, but only read %zu bytes\n", _my_bytes, num_bytes_read);
 			}
 			fclose(fp);
+			
 		}	
 		
 		// the method by which you send your data to the ra chare
@@ -563,16 +576,21 @@ namespace Ck { namespace IO {
 		Session _session;
 		size_t _bytes_left; // the number of bytes the user wants for a particular read
 		size_t _read_offset; // the offset they specify for their read
+		size_t _read_size;
 		CkCallback _after_read; // the callback to invoke after the read is complete
+		ReadCompleteMsg* msg;
 		size_t _read_tag = -1;
 	public:
 		ReadAssembler(Session session, size_t bytes, size_t offset, CkCallback after_read){
 			_session = session;
 			_bytes_left = bytes;
+			_read_size = bytes;
 			_read_offset = offset;
 			_after_read = after_read;
-			_data_buffer.resize(_bytes_left, 'r'); // resize the buffer to the size of read call
-			_data_buffer.shrink_to_fit();
+			msg = new (_bytes_left) ReadCompleteMsg();
+			msg -> offset= _read_offset;
+			msg -> bytes = _data_buffer.size();
+			msg -> read_tag = _read_tag; 
 		}
 		
 		ReadAssembler(Session session, size_t bytes, size_t offset, CkCallback after_read, size_t tag) : 
@@ -590,15 +608,9 @@ namespace Ck { namespace IO {
 			#ifdef DEBUG
 				CkPrintf("shareData args: read_chare_offset=%zu, num_bytes=%zu, data=%p. start_idx = %zu\n", read_chare_offset, num_bytes, data, start_idx);
 			#endif
-			memcpy(_data_buffer.data() + start_idx, data, num_bytes); // copying the num_bytes from data to the read buffer
+			memcpy(msg -> data + start_idx, data, num_bytes); // copying the num_bytes from data to the read buffer
 			_bytes_left -= num_bytes; // decrement the number of remaining bytes to read
 			if(_bytes_left) return; // if there are bytes still to read, just return
-			char* buffer = _data_buffer.data(); 
-			ReadCompleteMsg* msg = new (_data_buffer.size()) ReadCompleteMsg();
-			memcpy(msg -> data, buffer, _data_buffer.size());
-			msg -> offset= _read_offset;
-			msg -> bytes = _data_buffer.size();
-			msg -> read_tag = _read_tag; 
 			_after_read.send(msg);
 			// have some method of cleaning up this chare after invoking the callback
 			delete this;
