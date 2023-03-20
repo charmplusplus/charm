@@ -1,5 +1,6 @@
 #include <string>
 #include <map>
+#include <unordered_set>
 #include <algorithm>
 #include <sstream>
 #include <iostream>
@@ -213,7 +214,8 @@ namespace Ck { namespace IO {
       class Manager : public CBase_Manager {
         Manager_SDAG_CODE
         int opnum;
-
+	std::unordered_set<int> _tags; // keeps track of the tags
+	int _curr_tag = 0;
       public:
         Manager()
           : opnum(0)
@@ -554,7 +556,14 @@ namespace Ck { namespace IO {
 			#ifdef DEBUG
 				CkPrintf("chare_offset=%zu, end_byte_chare=%zu, bytes_to_read=%zu, offset=%zu, bytes=%zu\n", chare_offset, end_byte_chare, bytes_to_read, offset, bytes);	
 			#endif
-			ra.shareData(chare_offset, bytes_to_read, _buffer.data() + (chare_offset - _my_offset)); // send this data to the ReadAssembler
+			CkCallback cb(CkIndex_ReadSession::zeroCopyCallback(chare_offset, CkWallTimer()), thisProxy[thisIndex]);	
+			ra.shareData(chare_offset, bytes_to_read, CkSendBuffer(_buffer.data() + (chare_offset - _my_offset)/*, cb*/)); // send this data to the ReadAssembler
+		}
+
+		void zeroCopyCallback(size_t offset, double time){
+			double end = CkWallTimer();
+			double diff = end - time;
+			CkPrintf("Zero copy with offset at %zu completed in %f seconds\n", offset, diff);
 		}
       };
 
