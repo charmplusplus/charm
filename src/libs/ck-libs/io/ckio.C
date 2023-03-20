@@ -275,10 +275,9 @@ namespace Ck { namespace IO {
 		CProxy_ReadAssembler ra = CProxy_ReadAssembler::ckNew(session, bytes, offset, after_read); // create read assembler
 		Options& opt = files[session.file].opts;	
 		size_t read_stripe = opt.read_stripe;
-		size_t start_idx = offset / read_stripe; // the first index that has the relevant data
+		size_t start_idx = (offset - session -> offset)/ read_stripe; // the first index that has the relevant data
 		// CkPrintf("Read request of %d bytes starting at %d\n", bytes, offset);
 		for(size_t i = start_idx; (i * read_stripe) < (offset + bytes); ++i){
-			// tell all the chares that have data to search and send
 			CProxy_ReadSession(session.sessionID)[i].sendData(offset, bytes, ra); 
 		}
 	}
@@ -530,7 +529,7 @@ namespace Ck { namespace IO {
 		}	
 		
 		// the method by which you send your data to the ra chare
-		void sendData(size_t offset, size_t bytes, CProxy_ReadAssembler ra){
+		void sendData(size_t offset, size_t bytes, CProxy_ReadAssembler ra, int buffer_tag){
 			size_t chare_offset;
 			size_t chare_bytes;
 
