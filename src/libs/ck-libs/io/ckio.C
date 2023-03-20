@@ -231,6 +231,15 @@ namespace Ck { namespace IO {
           CkpvInitialize(Manager*, manager);
           CkpvAccess(manager) = this;
         }
+	
+	int getTag(){
+		_tags.insert(_curr_tag);
+		return _curr_tag++;
+	}
+
+	void removeTag(int tag){
+		_tags.erase(tag);
+	}
 
         void pup(PUP::er &p) {
           p | opnum;
@@ -275,11 +284,7 @@ namespace Ck { namespace IO {
 		CProxy_ReadAssembler ra = CProxy_ReadAssembler::ckNew(session, bytes, offset, after_read); // create read assembler
 		Options& opt = files[session.file].opts;	
 		size_t read_stripe = opt.read_stripe;
-		size_t start_idx = (offset - session -> offset)/ read_stripe; // the first index that has the relevant data
-		// CkPrintf("Read request of %d bytes starting at %d\n", bytes, offset);
-		for(size_t i = start_idx; (i * read_stripe) < (offset + bytes); ++i){
-			CProxy_ReadSession(session.sessionID)[i].sendData(offset, bytes, ra); 
-		}
+		ra.serveRead(read_stripe); // actually does grunt-work of serving data
 	}
 
         void write(Session session, const char *data, size_t bytes, size_t offset) {
@@ -622,6 +627,29 @@ namespace Ck { namespace IO {
 			_after_read.send(msg);
 			// have some method of cleaning up this chare after invoking the callback
 			delete this;
+		}
+
+		void serveRead(size_t read_stripe){
+			size_t start_idx = (offset - _session -> offset)/ read_stripe; // the first index that has the relevant data
+			// CkPrintf("Read request of %d bytes starting at %d\n", bytes, offset);
+			for(size_t i = start_idx; (i * read_stripe) < (offset + bytes); ++i){
+				size_t data_idx;
+				size_t data_len;
+				if(i == start_idx){
+					data_idx = 0; // at the start of read
+					// if intrabuffer, just take read size; o/w go from offset to end of buffer chare
+					data_len = std::min((read_stripe * (i+1) + _session -> offset - offset), bytes);
+				} else {
+					data_idx = (read_stripe * i + _session -> offset - offset); // first byte of fille in buffer chare, offset from the read offset
+					data_len = std::min(read_stripe, offset + bytes - (read_stipe * i + _session -> offset));
+					// the length is gonna be the entire chare's readstripe, or what's remainig of the read
+				}
+				int tag = CkpvAccess(manager) -> getTag(); // get the next tag to be used from manager
+				// do the CkPost call
+				CkPostBuffer(_msg -> data + data_idx, data_len, tag);
+				CProxy_ReadSession(session.sessionID)[i].sendData(offset, bytes, ra, tag); 
+			}
+
 		}
     	};
     }
