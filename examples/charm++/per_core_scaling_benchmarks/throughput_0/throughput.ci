@@ -1,11 +1,9 @@
-mainmodule main {
+mainmodule throughput {
   readonly CProxy_Main mainProxy;
-  readonly CProxy_Block block;
-  readonly CProxy_PowerLogger pLog;
-
+  readonly int procMap[8];
   group PowerLogger{                                                             
     entry PowerLogger(int cores);                                                
-  };
+  };  
 
   mainchare Main {
     entry Main(CkArgMsg *m);
@@ -15,10 +13,7 @@ mainmodule main {
 
   group Block {
     entry Block(unsigned int blockSize, unsigned int iteration, CkCallback);
-//    entry [appwork] void run(CkCallback cb);
-//    entry [appwork] void run2(CkCallback cb);
     entry void run(CkCallback cb);
-    entry void run2(CkCallback cb);
   };
 
 };

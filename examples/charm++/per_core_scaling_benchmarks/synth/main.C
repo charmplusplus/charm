@@ -73,8 +73,9 @@ public:
   void ready(CkReductionMsg *msg) {
        block.run2(CkCallback(CkReductionTarget(Main, done), thisProxy));
   }
-
+  int count =0;
   void done(CkReductionMsg *msg) {
+//      if(count < 2) {count++; return;}
       CkExit();
   }
 };
@@ -98,7 +99,7 @@ class Block : public CBase_Block {
     posix_memalign((void**)&dataA, 2*1024*1024, elems*sizeof(double)); //new double[elems];
     posix_memalign((void**)&dataB, 2*1024*1024, (elems+16)*sizeof(double)); //new double[elems];
     posix_memalign((void**)&dataC, 2*1024*1024, (elems+32)*sizeof(double)); //new double[elems];
-    blockSizeD = blockSize*64;
+    blockSizeD = blockSize*84;
     dataD = new double*[blockSizeD];
     for(int i=0; i<blockSizeD; i++)
         dataD[i] = new double[blockSizeD];
@@ -112,7 +113,7 @@ class Block : public CBase_Block {
   {
     //while(1){}
     CkPrintf("[%d] Run-iter %d, ElapsedTime %f \n",CkMyPe(), curIteration, CkWallTimer()-startTime);
-    if(curIteration == 0 && CkMyPe()==0){
+    if(curIteration == 0){// && CkMyPe()==0){
         startTime=CkWallTimer();
 	    cpupower_(&startEnergy, 0);
     }
@@ -122,16 +123,16 @@ class Block : public CBase_Block {
         memops(blockSizeD, blockSizeD, dataD, 0.2);
     }
     curIteration+=10;
-    if(curIteration >= iteration && CkMyPe()==0){
+    if(curIteration >= iteration){// && CkMyPe()==0){
         double endEnergy=0,divisor=0; double mem_unit=0;
-	    cpupower_(&endEnergy, 0);
-		getpowerunit_(&divisor, &mem_unit);
+	      cpupower_(&endEnergy, 0);
+		    getpowerunit_(&divisor, &mem_unit);
         CkPrintf("[%d] DONE! ElapsedTime: %f, TotalEnergy: %f \n",CkMyPe(), CkWallTimer()-startTime, (endEnergy-startEnergy)/divisor);
-        CkExit();
-        //contribute(cb);
+        CkCallback(CkReductionTarget(Main, done), mainProxy);
+        contribute(cb);
     }
     else{
-        int r=rand()%2;
+        int r=1;//CkMyPe()%2;//curIteration%2;
         if(r)
             block[CkMyPe()].run(cb);
         else
@@ -141,24 +142,26 @@ class Block : public CBase_Block {
   void run2(CkCallback cb)
   {
     CkPrintf("[%d] Run2-iter %d, ElapsedTime %f \n",CkMyPe(), curIteration, CkWallTimer()-startTime);
-    if(curIteration == 100 && CkMyPe()==0){
+#if 0
+    if(curIteration == 100){// && CkMyPe()==0){
         startTime=CkWallTimer();
 	    cpupower_(&startEnergy, 0);
     }
+#endif
     for(int i=0; i<400; i++){
         example_dgemm(blockSize, blockSize, blockSize, 1.0, dataA, dataB, dataC);
     }
     curIteration+=10;
-    if(curIteration >= iteration && CkMyPe()==0){
+    if(curIteration >= iteration){// && CkMyPe()==0){
         double endEnergy=0,divisor=0; double mem_unit=0;
-	    cpupower_(&endEnergy, 0);
-		getpowerunit_(&divisor, &mem_unit);
+	      cpupower_(&endEnergy, 0);
+		    getpowerunit_(&divisor, &mem_unit);
         CkPrintf("[%d] DONE! ElapsedTime: %f, TotalEnergy: %f \n",CkMyPe(), CkWallTimer()-startTime, (endEnergy-startEnergy)/divisor);
-        CkExit();
-        //contribute(cb);
+        CkCallback(CkReductionTarget(Main, done), mainProxy);
+        contribute(cb);
     }
     else{
-        int r=rand()%2;
+        int r=1;//CkMyPe()%2;//curIteration%2;
         if(r)
             block[CkMyPe()].run(cb);
         else
