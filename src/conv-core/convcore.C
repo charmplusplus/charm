@@ -160,7 +160,7 @@ void CldModuleInit(char **);
 
 #include "quiescence.h"
 
-#if USE_MPI_CTRLMSG_SCHEME && CMK_CONVERSE_MPI
+#if CMK_CONVERSE_MPI && CMK_USE_MPI_ALLOC_MEM
 #include <mpi.h>
 #endif
 
@@ -3223,7 +3223,7 @@ void *CmiAlloc(int size)
   res =(char *) LrtsAlloc(size, sizeof(CmiChunkHeader));
 #elif CONVERSE_POOL
   res =(char *) CmiPoolAlloc(size+sizeof(CmiChunkHeader));
-#elif USE_MPI_CTRLMSG_SCHEME && CMK_CONVERSE_MPI
+#elif CMK_CONVERSE_MPI && CMK_USE_MPI_ALLOC_MEM
   MPI_Alloc_mem(size+sizeof(CmiChunkHeader), MPI_INFO_NULL, &res);
 #elif CMK_SMP && CMK_PPC_ATOMIC_QUEUE
   res = (char *) CmiAlloc_ppcq(size+sizeof(CmiChunkHeader));
@@ -3369,7 +3369,7 @@ void CmiFree(void *blk)
     LrtsFree(BLKSTART(parentBlk));
 #elif CONVERSE_POOL
     CmiPoolFree(BLKSTART(parentBlk));
-#elif USE_MPI_CTRLMSG_SCHEME && CMK_CONVERSE_MPI
+#elif CMK_CONVERSE_MPI && CMK_USE_MPI_ALLOC_MEM
     MPI_Free_mem(parentBlk);
 #elif CMK_SMP && CMK_PPC_ATOMIC_QUEUE
     CmiFree_ppcq(BLKSTART(parentBlk));
