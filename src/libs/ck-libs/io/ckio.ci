@@ -31,8 +31,9 @@ module CkIO_impl {
           entry [reductiontarget] void sessionComplete(FileToken file);
 	  // facilitates all of the read calls that will happen
 	  
-	  entry void read(Session session, size_t bytes, size_t offset, CkCallback after_read);
-	  entry void read(Session session, size_t bytes, size_t offset, CkCallback after_read, size_t tag);
+//	  entry void read(Session session, size_t bytes, size_t offset, CkCallback after_read);
+
+//	  entry void read(Session session, size_t bytes, size_t offset, CkCallback after_read, size_t tag);
 	// this method is called by the read function by the user in order to get data
 	
 	// the method used by the director which is used to close a readsession
@@ -44,7 +45,9 @@ module CkIO_impl {
 		}
 		when sessionReady[files[file].sessionID](CkReductionMsg* m) serial { // after the ReadSession chare array is set up, invoke the ready callback
 			delete m;
-			ready.send(new SessionReadyMsg(Session(file, bytes, offset, files[file].read_session)));
+			Session s(file, bytes, offset, files[file].read_session);
+			CProxy_ReadAssembler ra = CProxy_ReadAssembler::ckNew(s);
+			managers.addSessionReadAssemblerMapping(s, ra, ready);	
 		}
 	  };
           entry void prepareWriteSession(FileToken file, size_t bytes, size_t offset,
@@ -81,10 +84,35 @@ module CkIO_impl {
               complete.send(CkReductionMsg::buildNew(0, NULL, CkReduction::nop));
             }
           };
+
+	  entry[reductiontarget] void addSessionReadAssemblerCallback(std::pair<Ck::IO::Session, CkCallback> pair) {
+		serial {
+			CkPrintf("Finished the reduction for adding the session\n");
+			SessionReadyMsg* msg = new SessionReadyMsg(pair.first);
+			CkAssert(msg);
+			pair.second.send(msg);		
+			delete msg;
+		}
+	  };
           entry void sessionReady(CkReductionMsg *);
           entry void sessionDone(CkReductionMsg *);
           entry void close(FileToken token, CkCallback closed);
         }
+
+	// class tht will be used to assemble a specific read call
+	group ReadAssembler {
+		 // stores the parameters of the read call it is tasked with building
+		entry ReadAssembler(Session session);
+		
+			
+		// the method by which ReadSession objects can send their data for the read	
+		// when invoked, avoid a sender-side copy	
+		entry /*[inline]*/ void shareData(int read_tag, int buffer_tag, size_t read_chare_offset, size_t num_bytes, nocopypost char data[num_bytes]); 
+
+		entry void serveRead(size_t read_bytes, size_t read_offset, CkCallback after_read, size_t read_stripe); // will be used to serve the read_stripe
+
+	};
+
 
         group [migratable] Manager
         {
@@ -104,6 +132,8 @@ module CkIO_impl {
           entry void openFile(unsigned int opnum,
                               FileToken token, std::string name, Options opts);
           entry void close(unsigned int opnum, FileToken token, CkCallback closed);
+
+	  entry void addSessionReadAssemblerMapping(Session session, CProxy_ReadAssembler ra, CkCallback ready);
         };
 
         array [1D] WriteSession
@@ -113,31 +143,16 @@ module CkIO_impl {
           entry void syncData();
         };
 	
-	// class tht will be used to assemble a specific read call
-	chare ReadAssembler {
-		 // stores the parameters of the read call it is tasked with building
-		entry ReadAssembler(Session session, size_t bytes, size_t offset, CkCallback after_read);
-		
-			
-		// allows you to add a tag to the read request
-		entry ReadAssembler(Session session, size_t bytes, size_t offset, CkCallback after_read, size_t tag);
-		// the method by which ReadSession objects can send their data for the read	
-		// when invoked, avoid a sender-side copy	
-		entry /*[inline]*/ void shareData(size_t read_chare_offset, size_t num_bytes, nocopypost char data[num_bytes]); 
-
-		entry void serveRead(size_t read_stripe); // will be used to serve the read_stripe
-
-	}
 
 	array [1D] ReadSession {
 		entry ReadSession(FileToken file, size_t offset, size_t bytes);
 		// way for the ReadSession object to send bytes over to the ReadAssembler object ra when serving a specific read
-		entry void sendData(size_t offset, size_t bytes, CProxy_ReadAssembler ra, int buffer_tag); 
+		entry void sendData(int read_tag, int buffer_tag, size_t offset, size_t bytes, CProxy_ReadAssembler ra, int pe); 
 		entry void clearBuffer();
 		entry [reductiontarget] void printTime(double time_taken);
 
 		entry void zeroCopyCallback(size_t offset, double time);
-	}
+	};
         
 	group Map : CkArrayMap
         {

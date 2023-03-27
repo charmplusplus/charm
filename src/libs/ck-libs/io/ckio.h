@@ -9,6 +9,13 @@
 
 #include "CkIO.decl.h"
 
+
+struct AddSessionReadAssemblerArgs;
+
+namespace Ck { namespace IO { class Session; }}
+
+// bool operator==(const Ck::IO::Session& s1, const Ck::IO::Session& s2);
+
 namespace Ck { namespace IO {
   /// Note: The values in options are not currently a stable or working interface.
   /// Users should not set anything in them.
@@ -41,8 +48,7 @@ namespace Ck { namespace IO {
   };
 
   class File;
-  class Session;
-
+  // class ReadAssembler;
   /// Open the named file on the selected subset of PEs, and send a
   /// FileReadyMsg to the opened callback when the system is ready to accept
   /// session requests on that file.
@@ -93,7 +99,7 @@ namespace Ck { namespace IO {
   void closeReadSession(Session read_session, CkCallback after_end);
   /**
    * Is a method that reads data from the @arg session of length @arg bytes at offset
-   * @arg offset. After this read finishes, the @arg after_read callback is invoked, taking 
+   * @arg offset (in file). After this read finishes, the @arg after_read callback is invoked, taking 
    * a ReadCompleteMsg* which points to a vector<char> buffer, the offset, and the number of 
    * bytes of the read.
    * */
@@ -131,6 +137,7 @@ namespace Ck { namespace IO {
 
   namespace impl { class Manager; 
   	class Director; // forward declare Director class as impl
+	class ReadAssembler;
   }
 
   class Session {
@@ -139,8 +146,10 @@ namespace Ck { namespace IO {
     CkArrayID sessionID;
     friend class Ck::IO::impl::Manager;
     friend class Ck::IO::impl::Director; // this is an interesting change
+    friend class Ck::IO::impl::ReadAssembler;
     friend void read(Session session, size_t bytes, size_t offset, CkCallback after_read);
-    friend void read(Session session, size_t bytes, size_t offset, CkCallback after_read, size_t tag);
+    friend struct std::hash<Ck::IO::Session>;
+    // friend void read(Session session, size_t bytes, size_t offset, CkCallback after_read, size_t tag);
   public:
     Session(int file_, size_t bytes_, size_t offset_,
             CkArrayID sessionID_)
@@ -153,7 +162,18 @@ namespace Ck { namespace IO {
       p|offset;
       p|sessionID;
     }
-  };
+    
+    int getFile() const { return file;}
+
+    size_t getBytes() const { return bytes; }
+    size_t getOffset() const { return offset;}
+    CkArrayID getSessionID() const { return sessionID;}
+    bool operator==(const Ck::IO::Session& other) const{
+	return ((file == other.file) && (bytes==other.bytes) && (offset == other.offset) && (sessionID == other.sessionID));
+    }  
+};
+
+
 
   class SessionReadyMsg : public CMessage_SessionReadyMsg {
   public:
@@ -177,4 +197,7 @@ namespace Ck { namespace IO {
 
 }}
 
+
+
 #endif
+
