@@ -370,9 +370,9 @@ namespace Ck { namespace IO {
 	void addSessionReadAssemblerMapping(Session session, CProxy_ReadAssembler ra, CkCallback ready){
 		_session_to_read_assembler[session] = ra;
 		CkPrintf("ON PE=%d, is the session in the buffer: %d\n", CkMyPe(), _session_to_read_assembler.count(session));
-		CkCallback cb(CkReductionTarget(Director,addSessionReadAssemblerCallback), director);
-		auto pair = std::make_pair(session, ready);
-		contribute(sizeof(pair), &pair, CkReduction::random, cb);
+		CkCallback cb(CkIndex_Director::addSessionReadAssemblerFinished(0), director);
+		int temp = 0;
+		contribute(sizeof(temp), &temp, CkReduction::nop, cb); // effectively a barrier, makes sure every PE is done with adding session
 	}
 		
 	int getTag(){

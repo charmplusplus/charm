@@ -49,6 +49,11 @@ module CkIO_impl {
 			CProxy_ReadAssembler ra = CProxy_ReadAssembler::ckNew(s);
 			managers.addSessionReadAssemblerMapping(s, ra, ready);	
 		}
+		
+		when addSessionReadAssemblerFinished(CkReductionMsg* msg) serial {
+			ready.send(new SessionReadyMsg(Session(file, bytes, offset, files[file].read_session)));
+			delete msg;
+		}
 	  };
           entry void prepareWriteSession(FileToken file, size_t bytes, size_t offset,
                                          CkCallback ready, CkCallback complete) {
@@ -85,18 +90,10 @@ module CkIO_impl {
             }
           };
 
-	  entry[reductiontarget] void addSessionReadAssemblerCallback(std::pair<Ck::IO::Session, CkCallback> pair) {
-		serial {
-			CkPrintf("Finished the reduction for adding the session\n");
-			SessionReadyMsg* msg = new SessionReadyMsg(pair.first);
-			CkAssert(msg);
-			pair.second.send(msg);		
-			delete msg;
-		}
-	  };
           entry void sessionReady(CkReductionMsg *);
           entry void sessionDone(CkReductionMsg *);
           entry void close(FileToken token, CkCallback closed);
+	  entry void addSessionReadAssemblerFinished(CkReductionMsg* msg);
         }
 
 	// class tht will be used to assemble a specific read call
