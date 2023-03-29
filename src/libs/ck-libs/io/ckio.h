@@ -133,7 +133,9 @@ namespace Ck { namespace IO {
     FileReadyMsg(const File &tok) : file(tok) {}
   };
 
-  namespace impl { class Manager; 
+  namespace impl { 
+	class Manager; 
+	int getRDMATag();
   	class Director; // forward declare Director class as impl
 	class ReadAssembler;
   }

@@ -335,7 +335,8 @@ namespace Ck { namespace IO {
 					// the length is gonna be the entire chare's readstripe, or what's remainig of the read
 				}
 				// do the CkPost call
-				int tag = _curr_RDMA_tag++;
+				// int tag = _curr_RDMA_tag++;
+				int tag = getRDMATag(); 
 				// CkPrintf("About to post buffer with read_tag=%d, 0_copy_tag=%d on pe=%d\n", read_tag, tag, CkMyPe());
 				CkPostBuffer(msg -> data + data_idx, data_len, tag);
 				CProxy_ReadSession(_session.sessionID)[i].sendData(read_tag, tag, read_offset, bytes, thisProxy, CkMyPe()); 
@@ -351,7 +352,6 @@ namespace Ck { namespace IO {
         int opnum;
 	std::unordered_map<Session, CProxy_ReadAssembler> _session_to_read_assembler; // map used to 
 	// get the read assembler for a specific session
-	std::unordered_set<int> _tags; // keeps track of the tags
 	int _curr_tag = 0;
       public:
         Manager()
@@ -379,12 +379,7 @@ namespace Ck { namespace IO {
 	}
 		
 	int getTag(){
-		_tags.insert(_curr_tag);
 		return _curr_tag++;
-	}
-
-	void removeTag(int tag){
-		_tags.erase(tag);
 	}
 
         void pup(PUP::er &p) {
@@ -500,6 +495,10 @@ namespace Ck { namespace IO {
           return opts.basePE + (opts.activePEs-1)*opts.skipPEs;
         }
       };
+	
+      int getRDMATag() { // function to allow ReadAssembler to get the current RDMA tag on the PE
+	return CkpvAccess(manager) -> getTag();
+      }
 
       class WriteSession : public CBase_WriteSession {
         const FileInfo *file;
@@ -739,8 +738,7 @@ namespace Ck { namespace IO {
         }
       };
 
-
-    }
+    } // END OF IMPL
 
     void open(string name, CkCallback opened, Options opts) {
       impl::director.openFile(name, opened, opts);
