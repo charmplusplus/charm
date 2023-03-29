@@ -16,6 +16,8 @@ using NeighborFlags_t = std::unordered_map<ElementId_t, Flag_t>;
 
 class Main : public CBase_Main {
  public:
+  int itercount;
+
   Main(CkArgMsg* msg);
   void iterate();
   void init_new();
@@ -25,7 +27,7 @@ class Main : public CBase_Main {
 class DgElement : public CBase_DgElement {
  public:
   DgElement();
-  void iterate();
+  void iterate(int start);
   void split();
   void join();
   void init_new();

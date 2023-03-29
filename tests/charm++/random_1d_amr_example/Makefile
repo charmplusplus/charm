@@ -1,5 +1,5 @@
 -include ../../../common.mk
-CHARMC	= ../../../bin/charmc $(OPTS)
+CHARMC	= ../../../netlrts-linux-x86_64/bin/charmc $(OPTS)
 
 all: random_amr
 

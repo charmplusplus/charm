@@ -139,54 +139,6 @@ Flag_t random_flag(const int current_refinement_level) {
   return 1;
 }
 
-bool are_siblings(const ElementId_t& id, const ElementId_t& neighbor_id) {
-  CkAssert(id > 1);
-  CkAssert(neighbor_id > 1);
-  return id / 2 == neighbor_id / 2;
-}
-
-// An abutting nibling is the neighbor child of my sibling
-bool neighbor_is_my_abutting_nibling(const ElementId_t& id,
-                                     const ElementId_t& neighbor_id) {
-  CkAssert(id > 1);
-  CkAssert(neighbor_id > 1);
-  if(neighbor_id < 4) {
-    return false;
-  }
-  return neighbor_id / 4 == id / 2;
-}
-
-bool check_amr_decision(Flag_t& flag, const ElementId_t& id,
-                        const ElementId_t& neighbor_id,
-                        const Flag_t& neighbor_flag) {
-  CkAssert(flag > -2 && flag < 2);
-  CkAssert(neighbor_flag > -2 && neighbor_flag < 2);
-
-  // Check if desired refinement level is two or three less than that of
-  // neighbor.  If so, change flag so it is within one level.
-  const int desired_level = refinement_level(id) + flag;
-  CkAssert(desired_level > -1 && desired_level <= maximum_refinement_level);
-  const int neighbor_desired_level =
-      refinement_level(neighbor_id) + neighbor_flag;
-  CkAssert(neighbor_desired_level > -1 &&
-           neighbor_desired_level <= maximum_refinement_level);
-  if (desired_level + 1 < neighbor_desired_level) {
-    flag = neighbor_desired_level - 1 - refinement_level(id);
-    return true;
-  }
-
-  // Next check if I want to join and the neighbor is either a sibling that
-  // does not want to join or an abutting nibling.  If so, then change flag
-  // to do nothing.
-  if (flag == -1 && ((are_siblings(id, neighbor_id) && neighbor_flag != -1) ||
-                      neighbor_is_my_abutting_nibling(id, neighbor_id))) {
-    flag = 0;
-    return true;
-  }
-
-  return false;
-}
-
 ElementId_t new_lower_neighbor_id(const ElementId_t& old_id,
                                   const Flag_t& old_flag) {
   if (old_flag == 1) {
@@ -250,69 +202,32 @@ Main::Main(CkArgMsg* msg) {
 void Main::initialize() { 
   print_phase("initialize");
   dgElementProxy.initialize_initial_elements();
-  CkStartQD(CkCallback(CkIndex_Main::check_neighbors(), mainProxy));
-}
-
-// Requests every element of the DgElement chare array to ping its neighboring
-// elements (The interval is considered to be periodic, so the element on the
-// lower boundary of the interval is a neighbor of the element on upper boundary
-// of the interval)
-void Main::check_neighbors() {
-  print_phase("check neighbors");
-  dgElementProxy.ping_neighbors();
-  CkStartQD(CkCallback(CkIndex_Main::check_domain(), mainProxy));
-}
-
-// Requests every element to contribute the 1D volume of the interval that it
-// covers.
-void Main::check_domain() {
-  print_phase("check");
-  dgElementProxy.send_volume();
-
-  if (iteration >= number_of_iterations) {
-    CkStartQD(CkCallback(CkIndex_Main::exit(), mainProxy));
-  } else {
-    CkStartQD(CkCallback(CkIndex_Main::evaluate_amr_criteria(), mainProxy));
-  }
+  CkStartQD(CkCallback(CkIndex_Main::evaluate_amr_criteria(), mainProxy));
 }
 
 // Requests every element to decide whether to split, join, or do no refinement
 void Main::evaluate_amr_criteria() {
   ++iteration;
+  if (iteration == number_of_iterations)
+    CkStartQD(CkCallback(CkIndex_Main::exit(), mainProxy));
   print_iteration(iteration);
   print_phase("evaluate refinement criteria");
-  dgElementProxy.evaluate_refinement_criteria();
-  CkStartQD(CkCallback(CkIndex_Main::begin_inserting(), mainProxy));
-}
-
-void Main::begin_inserting() {
-  print_phase("begin inserting");
-  dgElementProxy.beginInserting();
+  dgElementProxy.evaluate_refinement_criteria(iteration);
   CkStartQD(CkCallback(CkIndex_Main::create_new_elements(), mainProxy));
 }
 
 // Creates new elements for elements that are split or joined
 void Main::create_new_elements() {
   print_phase("create new elements");
+  dgElementProxy.beginInserting();
   dgElementProxy.create_new_elements();
-  CkStartQD(CkCallback(CkIndex_Main::done_inserting(), mainProxy));
-}
-
-void Main::done_inserting() {
-  print_phase("done inserting");
   dgElementProxy.doneInserting();
-  CkStartQD(CkCallback(CkIndex_Main::count_elements(), mainProxy));
-}
-
-void Main::count_elements() {
-  print_phase("count elements");
-  dgElementProxy.count_elements();
+  CkStartQD(CkCallback(CkIndex_Main::adjust_domain(), mainProxy));
 }
 
 // Initialize new elements and update the neighbors of unrefined elements
-void Main::adjust_domain(int num_elements) {
+void Main::adjust_domain() {
   print_phase("adjust domain");
-  CkPrintf("Total elements = %i\n", num_elements);
   dgElementProxy.adjust_domain();
   CkStartQD(CkCallback(CkIndex_Main::delete_old_elements(), mainProxy));
 }
@@ -321,7 +236,7 @@ void Main::adjust_domain(int num_elements) {
 void Main::delete_old_elements() {
   print_phase("delete old elements");
   dgElementProxy.delete_old_elements();
-  CkStartQD(CkCallback(CkIndex_Main::check_neighbors(), mainProxy));
+  CkStartQD(CkCallback(CkIndex_Main::evaluate_amr_criteria(), mainProxy));
 }
 
 // Cleanly ends the executable
@@ -330,25 +245,10 @@ void Main::exit() {
   CkExit();
 }
 
-// Callback executed after all elements have contributed their volume.
-// The total volume should be 1.0
-void Main::check_volume(const double volume) {
-  print_phase("check volume");
-  if (volume != 1.0) {
-    CkAbort("Volume %f is not 1.0\n", volume);
-  }
-}
-
 // Constructor for initial elements.  All initial elements are on the
 // same refinement level
 DgElement::DgElement() {
   print_action("created", thisIndex);
-}
-
-void DgElement::count_elements() {
-  CkCallback cb(CkReductionTarget(Main, adjust_domain), mainProxy);;
-  int result = 1;
-  contribute(sizeof(int), &result, CkReduction::sum_int, cb);
 }
 
 // Adjusts the domain based on the final AMR decisions of each element
@@ -365,24 +265,6 @@ void DgElement::adjust_domain() {
     if (thisIndex % 2 == 0) {
       collect_data_from_children({thisIndex + 1}, {{0, 0}});
     }
-  } else {
-    // Element is neither splitting nor joining.  Update the ids of its
-    // neighbors and reset/clear the AMR flags
-    print_action("adjusting domain (do nothing)", thisIndex);
-    if(neighbor_flags_.count(neighbors_[0]) == 0 ||
-       neighbor_flags_.count(neighbors_[1]) == 0) {
-      CkPrintf("On Element %i, lower neighbor = %i, upper neighbor = %i \n"
-	       "Neighbor flags = ", thisIndex, neighbors_[0], neighbors_[1]);
-      for (const auto& neighbor_flag : neighbor_flags_) {
-	CkPrintf("(%i, %i) ", neighbor_flag.first, neighbor_flag.second);
-      }
-    }
-    neighbors_[0] =
-        new_lower_neighbor_id(neighbors_[0], neighbor_flags_.at(neighbors_[0]));
-    neighbors_[1] =
-        new_upper_neighbor_id(neighbors_[1], neighbor_flags_.at(neighbors_[1]));
-    flag_ = -2;
-    neighbor_flags_.clear();
   }
 }
 
@@ -399,7 +281,6 @@ void DgElement::collect_data_from_children(
     // I am the upper child
     parent_neighbors[1] =
         new_upper_neighbor_id(neighbors_[1], neighbor_flags_.at(neighbors_[1]));
-    CkPrintf("initialize_parent called\n");
     thisProxy[thisIndex / 2].initialize_parent(parent_neighbors);
   } else {
     // I am the lower child
@@ -430,7 +311,7 @@ void DgElement::create_new_elements() {
 }
 
 void DgElement::delete_old_elements() {
-  if (flag_ == 1 || flag_ == -1) {
+  if (flag_ == 1 or flag_ == -1) {
     print_action("deleting", thisIndex);
     thisProxy[thisIndex].ckDestroy();
   }
@@ -439,19 +320,9 @@ void DgElement::delete_old_elements() {
 // Evaluate the AMR criteria (for this example, randomly choose whether to
 // join, split, or remain the same).  Then communicate these decisions to
 // the neighbors of the element in case elements need to adjust their decisions
-void DgElement::evaluate_refinement_criteria() {
+void DgElement::evaluate_refinement_criteria(int iteration) {
   print_action("evaluating refinement criteria", thisIndex);
-  flag_ = random_flag(refinement_level(thisIndex));
-
-  // Actions can be executed in any order.  Check if I have already received
-  // flags from my neighbors, and if so check if my decision needs to be
-  // changed.
-  if (not neighbor_flags_.empty()) {
-    for (const auto& neighbor_id_flag : neighbor_flags_) {
-      check_amr_decision(flag_, thisIndex, neighbor_id_flag.first,
-                         neighbor_id_flag.second);
-    }
-  }
+  flag_ = iteration % 2 ? 1 : -1; //random_flag(refinement_level(thisIndex));
 
   thisProxy[neighbors_[0]].update_amr_decision(thisIndex, flag_);
   thisProxy[neighbors_[1]].update_amr_decision(thisIndex, flag_);
@@ -491,37 +362,6 @@ void DgElement::initialize_parent(
   neighbors_ = parent_neighbors;
 }
 
-// Receive a ping from a neighboring element.
-//
-// pinger is the id of the neighbor
-// index is 0 for the lower neighbor, 1 for the upper neighbor
-void DgElement::ping(const ElementId_t& pinger, const size_t index) {
-  print_action("pinged", thisIndex);
-  if (neighbors_[index] != pinger) {
-    CkPrintf("On Element %i, Neighbors %zu = %i, pinger = %i\n", thisIndex,
-	     index, neighbors_[index], pinger);
-  }
-  CkAssert(neighbors_[index] == pinger);
-  // Set pings_received to 2 if this is the second ping, to index if this
-  // is the first ping. A value of -1 indicates no previous pings.
-  if (index == 0) {
-    CkAssert(pings_received_ == -1 || pings_received_ == 1);
-    ++pings_received_;
-  } else {
-    CkAssert(pings_received_ == -1 || pings_received_ == 0);
-    pings_received_ += 2;
-  }
-}
-
-// Ping each neighboring element with my id as well as if I am the
-// lower (0) or upper (1) neighbor of that neighbor
-void DgElement::ping_neighbors() {
-  print_data("pinging neighbors");
-  CkAssert(neighbors_[0] > 0 && neighbors_[1] > 0);
-  thisProxy[neighbors_[0]].ping(thisIndex, 1);
-  thisProxy[neighbors_[1]].ping(thisIndex, 0);
-}
-
 // After splitting, send data to all the newly created child elements of this
 // element. Then delete the element.
 void DgElement::send_data_to_children() {
@@ -533,18 +373,6 @@ void DgElement::send_data_to_children() {
   // Send data to upper child
   thisProxy[2 * thisIndex + 1].initialize_child(
       new_upper_neighbor_id(neighbors_[1], neighbor_flags_.at(neighbors_[1])));
-}
-
-// Contribute the volume of the element to a reduction.  Also check that
-// the element received two pings during the check of neighbors and reset
-// ping counter.
-void DgElement::send_volume() {
-  print_data("sending volume");
-  CkAssert(pings_received_ == 2);
-  pings_received_ = -1;
-  const double volume = fraction_of_block_volume(thisIndex);
-  contribute(sizeof(double), &volume, CkReduction::sum_double,
-             CkCallback(CkReductionTarget(Main, check_volume), mainProxy));
 }
 
 // Possibly update the AMR decision of this element based on the decision of
@@ -565,39 +393,7 @@ void DgElement::send_volume() {
 void DgElement::update_amr_decision(const ElementId_t& neighbor_id,
                                     const Flag_t& neighbor_flag) {
   print_action("updating AMR decision", thisIndex);
-
-  // Actions can be executed in any order.  Therefore we need to check:
-  // - If we received flags from a neighbor multiple times, but not in the
-  //   order they were sent.  Neighbor flags should only be sent again if
-  //   they have changed to a higher priority (i.e. higher integral value of
-  //   the flag).
-  if (1 == neighbor_flags_.count(neighbor_id)) {
-    const auto previously_received_flag = neighbor_flags_.at(neighbor_id);
-    if (previously_received_flag >= neighbor_flag) {
-      print_data("Update decision (old decision)");
-      return;
-    }
-  }
-
   neighbor_flags_[neighbor_id] = neighbor_flag;
-
-  // Actions can be executed in any order.  Therefore we need to check:
-  // - If we have evaluated our own AMR decision.  If not, return.
-  if (flag_ == -2) {
-    print_data("Update decision (waiting for evaluate");
-    return;
-  }
-
-  const bool my_amr_decision_changed =
-      check_amr_decision(flag_, thisIndex, neighbor_id, neighbor_flag);
-
-  if (my_amr_decision_changed) {
-    thisProxy[neighbors_[0]].update_amr_decision(thisIndex, flag_);
-    thisProxy[neighbors_[1]].update_amr_decision(thisIndex, flag_);
-    print_data("Update decision (changed)");
-  } else {
-    print_data("Update decision (not changed)");
-  }
 }
 
 void DgElement::print_data(const std::string& action_name) {

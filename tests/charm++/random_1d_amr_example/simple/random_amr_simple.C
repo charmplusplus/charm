@@ -7,7 +7,7 @@
 /*readonly*/ CProxy_Main mainProxy;
 /*readonly*/ CProxy_DgElement dgElementProxy;
 
-constexpr int initial_number_of_elements = 10;
+constexpr int initial_number_of_elements = 1;
 
 Main::Main(CkArgMsg* msg) {
   delete msg;
@@ -19,11 +19,14 @@ Main::Main(CkArgMsg* msg) {
     which_proc = (which_proc + 1 == number_of_procs ? 0 : which_proc + 1);
   }
   dgElementProxy.doneInserting();
+  itercount = 0;
   iterate();
 }
 
 void Main::iterate() {
-  dgElementProxy.iterate();
+  dgElementProxy.beginInserting();
+  dgElementProxy.iterate(itercount++ == 0);
+  dgElementProxy.doneInserting();
   CkStartQD(CkCallback(CkIndex_Main::init_new(), mainProxy));
 }
 
@@ -38,12 +41,17 @@ void Main::delete_old() {
 }
 
 DgElement::DgElement() {
-  itercount = 0;
+  itercount = -1;
   flag_ = 0;
   child_count = 0;
 }
 
-void DgElement::iterate() {
+void DgElement::iterate(int start) {
+  if (start)
+    itercount++;
+
+  CkAssert(itercount >= 0);
+
   if (thisIndex == 0 || thisIndex == 100)
     CkPrintf("Iteration %i\n", itercount);
 
@@ -55,6 +63,7 @@ void DgElement::iterate() {
   } else {
     join();
   }
+
 }
 
 void DgElement::init_new() {

@@ -21,37 +21,27 @@ class Main : public CBase_Main {
  public:
   Main(CkArgMsg* msg);
   void initialize();
-  void check_neighbors();
-  void check_domain();
   void evaluate_amr_criteria();
-  void begin_inserting();
   void create_new_elements();
-  void done_inserting();
-  void count_elements();
-  void adjust_domain(int num_elements);
+  void adjust_domain();
   void delete_old_elements();
   void exit();
-  void check_volume(const double volume);
 };
 
 class DgElement : public CBase_DgElement {
  public:
   DgElement();
-  void count_elements();
   void adjust_domain();
   void collect_data_from_children(
       std::deque<ElementId_t> sibling_ids_to_collect,
       std::array<ElementId_t, 2> parent_neighbors);
   void create_new_elements();
   void delete_old_elements();
-  void evaluate_refinement_criteria();
+  void evaluate_refinement_criteria(int iteration);
   void initialize_child(const ElementId_t& nonsibling_neighbor_id);
   void initialize_initial_elements();
   void initialize_parent(const std::array<ElementId_t, 2>& parent_neighbors);
-  void ping(const ElementId_t& pinger, const size_t index);
-  void ping_neighbors();
   void send_data_to_children();
-  void send_volume();
   void update_amr_decision(const ElementId_t& neighbor_id,
                            const Flag_t& neighbor_flag);
 

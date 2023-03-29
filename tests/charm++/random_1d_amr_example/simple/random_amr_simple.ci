@@ -15,7 +15,7 @@ mainmodule random_amr_simple {
 
   array [1D] DgElement {
     entry DgElement();
-    entry void iterate();
+    entry void iterate(int);
     entry void split();
     entry void join();
     entry void init_new();
