@@ -10,8 +10,6 @@
 #include "CkIO.decl.h"
 
 
-struct AddSessionReadAssemblerArgs;
-
 namespace Ck { namespace IO { class Session; }}
 
 // bool operator==(const Ck::IO::Session& s1, const Ck::IO::Session& s2);

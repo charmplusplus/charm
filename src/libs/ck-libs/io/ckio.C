@@ -281,6 +281,9 @@ namespace Ck { namespace IO {
 			return _curr_read_tag - 1;
 		}
 		
+		void removeEntryFromReadTable(int tag) {
+			_read_info_buffer.erase(tag);
+		}	
 
 		void shareData(int read_tag, int buffer_tag, size_t read_chare_offset, size_t num_bytes, char* data, CkNcpyBufferPost* ncpyPost){
 			// CkPrintf("About to match buffer for read_tag=%d, buffer_tag=%d, pe=%d\n", read_tag, buffer_tag, CkMyPe());
@@ -306,7 +309,7 @@ namespace Ck { namespace IO {
 			if(info.bytes_left) return; // if there are bytes still to read, just return
 			// CkPrintf("Read with read_tag=%d, PE=%d is complete\n", read_tag, CkMyPe());
 			info.after_read.send(info.msg);
-			// have some way of cleaning up memory? ReadAssembler is now a chare array	
+			removeEntryFromReadTable(read_tag); // the read is complete; remove it from the table
 		}
 
 		void serveRead(size_t read_bytes, size_t read_offset, CkCallback after_read, size_t read_stripe){
