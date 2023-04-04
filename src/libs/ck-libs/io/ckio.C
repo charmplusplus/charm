@@ -320,8 +320,10 @@ namespace Ck { namespace IO {
 			removeEntryFromReadTable(read_tag); // the read is complete; remove it from the table
 		}
 
-		void serveRead(size_t read_bytes, size_t read_offset, CkCallback after_read, size_t read_stripe){
+		void serveRead(size_t read_bytes, size_t read_offset, CkCallback after_read, size_t read_stripe, size_t num_readers){
+			#ifdef DEBUG
 			CkPrintf("In serveRead on PE=%d\n", CkMyPe());
+			#endif
 			int read_tag = addReadToTable(read_bytes, read_offset, after_read); // create a tag for the actual read
 			// CkPrintf("Got a new read_tag=%zu for read; PE=%d\n", read_tag, CkMyPe());
 			// get the necessary info
@@ -390,7 +392,7 @@ namespace Ck { namespace IO {
 	// invoked to insert the readassembler for a specific session
 	void addSessionReadAssemblerMapping(Session session, CProxy_ReadAssembler ra, CkCallback ready){
 		_session_to_read_assembler[session] = ra;
-		CkPrintf("ON PE=%d, is the session in the buffer: %d\n", CkMyPe(), _session_to_read_assembler.count(session));
+		// CkPrintf("ON PE=%d, is the session in the buffer: %d\n", CkMyPe(), _session_to_read_assembler.count(session));
 		CkCallback cb(CkIndex_Director::addSessionReadAssemblerFinished(0), director);
 		int temp = 0;
 		contribute(sizeof(temp), &temp, CkReduction::nop, cb); // effectively a barrier, makes sure every PE is done with adding session
@@ -697,6 +699,9 @@ namespace Ck { namespace IO {
 		//		CkAbort("Couldn't open the file %s\n", (_file -> name).c_str());
 		//	}
 		//	ifs.seekg(_my_offset); // jump to the point where the chare should start reading
+			#ifdef DEBUG
+			CkPrintf("Inside the readData function on %d;\n", thisIndex);
+			#endif
 			FILE* fp = fopen(_file -> name.c_str(), "rb"); // open the file pointer
 			if(!fp){
 				CkPrintf("Opening of the file %s went wrong\n", _file -> name.c_str());
@@ -705,7 +710,13 @@ namespace Ck { namespace IO {
 			_buffer.shrink_to_fit(); // get rid of any extra capacity 
 			char* buffer = _buffer.data(); // point to the underlying char* of the vector; does not own the array
 			fseek(fp, _my_offset, SEEK_SET);
+			#ifdef DEBUG
+			CkPrintf("Starting the read\n", thisIndex);
+			#endif
 			size_t num_bytes_read = fread(buffer, 1, _my_bytes, fp);
+			#ifdef DEBUG
+			CkPrintf("Finished the read on %d\n", thisIndex);
+			#endif
 			if(!num_bytes_read){
 				if(ferror(fp))
 					CkPrintf("Something went wrong trying to open the file %s\n", _file -> name.c_str());
