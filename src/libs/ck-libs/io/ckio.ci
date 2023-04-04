@@ -156,6 +156,10 @@ module CkIO_impl {
           entry Map();
         };
       }
+	group BufferNodeMap : CkArrayMap {
+		entry BufferNodeMap();
+		entry BufferNodeMap(std::vector<int> processors);
+	};
     }
   }
 }

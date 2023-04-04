@@ -839,6 +839,31 @@ namespace Ck { namespace IO {
     class SessionCommitMsg : public CMessage_SessionCommitMsg {
 
     };
+	// used to specify which PEs to map the IO chares to
+      class BufferNodeMap : public CkArrayMap {
+	std::vector<int> _processors;
+	public:
+		BufferNodeMap(void) : CkArrayMap() {
+
+		}
+		
+		BufferNodeMap(CkMigrateMessage* m){
+
+		}
+
+		BufferNodeMap(std::vector<int> processors) : _processors(processors){}
+
+		int procNum(int arrayHd1, const CkArrayIndex& element){
+			int elem = *(int*)(element.data());
+			int idx = elem % _processors.size();
+			return _processors.at(idx);
+		}
+
+		int registerArray(CkArrayIndex& numElements,CkArrayID aid) {
+    			return 0;
+      		}
+
+    };
 
   }
 }
