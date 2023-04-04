@@ -213,17 +213,20 @@ namespace Ck { namespace IO {
 		Options& opts = files[file].opts;
 		files[file].sessionID = sessionID;
 		// determine the number of reader sessions required, depending on the session size and the number of bytes per reader
-		int num_readers = 0;
-		size_t remainder = bytes % opts.read_stripe;
-		if(remainder){
-			num_readers++;
-		}
-		num_readers += (bytes / opts.read_stripe); 
+		int num_readers = opts.num_readers;
+		// size_t remainder = bytes % opts.read_stripe;
+		// if(remainder){
+		// 	num_readers++;
+		// }
+		//
+		// CkPrintf("DEBUG: About to try the division with %zu\n", opts.num_readers);
+		// opts.read_stripe = bytes / num_readers; // get the read_stripe
+		// CkPrintf("DEBUG: successfully did the division; read_stripe=%d\n", opts.read_stripe);
 		CkArrayOptions sessionOpts(num_readers); // set the number of elements in the chare array
 		CkCallback sessionInitDone(CkIndex_Director::sessionReady(0), thisProxy);
 		sessionInitDone.setRefnum(sessionID);
 		sessionOpts.setInitCallback(sessionInitDone); // invoke the sessionInitDone callback after all the elements of the chare array are created
-		files[file].read_session = CProxy_ReadSession::ckNew(file, offset, bytes, sessionOpts); // create the readers
+		files[file].read_session = CProxy_ReadSession::ckNew(file, offset, bytes, num_readers, sessionOpts); // create the readers
 	}
 
         void sessionComplete(FileToken token) {
@@ -259,7 +262,9 @@ namespace Ck { namespace IO {
 		ReadAssembler(Session session){
 			_session = session;
 		}
-	
+		
+		
+			
 		size_t addReadToTable(size_t read_bytes, size_t read_offset, CkCallback after_read){
 			// do the initialization of the read struct
 			ReadInfo ri;
@@ -303,7 +308,7 @@ namespace Ck { namespace IO {
 			#ifdef DEBUG
 				CkPrintf("shareData args: read_chare_offset=%zu, num_bytes=%zu, data=%p. start_idx = %zu\n", read_chare_offset, num_bytes, data, start_idx);
 			#endif
-			ReadInfo info = _read_info_buffer[read_tag]; // get the struct from the buffer tag
+			ReadInfo& info = _read_info_buffer[read_tag]; // get the struct from the buffer tag
 			// memcpy(msg -> data + start_idx, data, num_bytes); // copying the num_bytes from data to the read buffer
 			info.bytes_left -= num_bytes; // decrement the number of remaining bytes to read
 			if(info.bytes_left) return; // if there are bytes still to read, just return
@@ -322,7 +327,17 @@ namespace Ck { namespace IO {
 			ReadInfo& info = _read_info_buffer[read_tag]; // get the ReadInfo object
 			ReadCompleteMsg* msg = info.msg;
 			// CkPrintf("Read request of %d bytes starting at %d\n", bytes, offset);
-			for(size_t i = start_idx; (i * read_stripe) < (read_offset + bytes); ++i){
+
+			// the entire read falls in the "extra" bytes that the last ReadSession owns
+			if(start_idx == num_readers){
+				int tag = getRDMATag(); 
+				// CkPrintf("About to post buffer with read_tag=%d, 0_copy_tag=%d on pe=%d\n", read_tag, tag, CkMyPe());
+				CkPostBuffer(msg -> data, bytes, tag);
+				CProxy_ReadSession(_session.sessionID)[start_idx - 1].sendData(read_tag, tag, read_offset, bytes, thisProxy, CkMyPe()); 
+				return;
+			}
+			// make sure to account for the last ReadSession holding potentially more data than the rest
+			for(size_t i = start_idx; (i < num_readers) && (i * read_stripe) < (read_offset + bytes); ++i){
 				size_t data_idx;
 				size_t data_len;
 				if(i == start_idx){
@@ -422,21 +437,22 @@ namespace Ck { namespace IO {
         }
 	
 	void read(Session session, size_t bytes, size_t offset, CkCallback after_read){
-		CkPrintf("manager %d just got a read request of size=%zu, offest=%zu\n", CkMyPe(), bytes, offset);
+		// CkPrintf("manager %d just got a read request of size=%zu, offest=%zu\n", CkMyPe(), bytes, offset);
 		if(!_session_to_read_assembler.count(session)){
 			CkPrintf("Why is there no session associated with read on manager %d\n", CkMyPe());
 			CkExit();
 		}
 		CProxy_ReadAssembler ra = _session_to_read_assembler[session];	
 		Options& opt = files[session.file].opts;	
-		size_t read_stripe = opt.read_stripe;
+		size_t num_readers = opt.num_readers;
+		size_t read_stripe = session.getBytes() / num_readers;
 		// CProxy_ReadAssembler(ra)[CkMyPe()].serveRead(bytes, offset, after_read,read_stripe); // actually does grunt-work of serving data
 	 	ReadAssembler* grp_ptr = ra.ckLocalBranch();
 		if(!grp_ptr){
 			CkPrintf("The pointer to the local branch is null on pe=%d\n", CkMyPe());
 			CkExit();
 		}
-	 	grp_ptr -> serveRead(bytes, offset, after_read, read_stripe);
+	 	grp_ptr -> serveRead(bytes, offset, after_read, read_stripe, num_readers);
 	}
 
         void write(Session session, const char *data, size_t bytes, size_t offset) {
@@ -635,14 +651,24 @@ namespace Ck { namespace IO {
 		size_t _my_offset;
 		size_t _my_bytes;
 		std::vector<char> _buffer;
-		
+		size_t _num_readers;	
+		size_t _read_stripe;
 	public:
-		ReadSession(FileToken file, size_t offset, size_t bytes) : _token(file), _file(CkpvAccess(manager)->get(file)), _session_bytes(bytes), _session_offset(offset){
-			_my_offset = thisIndex * (_file -> opts.read_stripe) + _session_offset;
-			_my_bytes = min(_file -> opts.read_stripe, _session_offset + _session_bytes - _my_offset); // get the number of bytes owned by the session
+		ReadSession(FileToken file, size_t offset, size_t bytes, size_t num_readers) : _token(file), _file(CkpvAccess(manager)->get(file)), _session_bytes(bytes), _session_offset(offset){
+			_num_readers = num_readers;
+			_read_stripe = bytes / num_readers;
+			_my_offset = thisIndex * (_read_stripe) + _session_offset;
+			_my_bytes = min(_read_stripe, _session_offset + _session_bytes - _my_offset); // get the number of bytes owned by the session
+			// last ReadSession array; read the remaining stuff
+			if(thisIndex == _num_readers - 1) 
+				_my_bytes = _session_offset + _session_bytes - _my_offset;
+
 			CkAssert(_file -> fd != -1);
 			CkAssert(_my_offset >= _session_offset);
 			CkAssert(_my_offset + _my_bytes <= _session_offset + _session_bytes);
+			#ifdef DEBUG
+			CkPrintf("Inside constructor of ReadSession[%d]; I own %zu bytes starting from %zu offset. about o start the readData function\n", thisIndex, _my_bytes, _my_offset);
+			#endif
 			double disk_read_before = CkWallTimer(); // get the before disk_read
 			readData();
 			double disk_read_after = CkWallTimer(); // end disk time
