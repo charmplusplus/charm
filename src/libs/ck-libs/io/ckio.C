@@ -130,7 +130,10 @@ namespace Ck { namespace IO {
             opts.basePE = 0;
           if (-1 == opts.skipPEs)
             opts.skipPEs = CkMyNodeSize();
-
+	  if(opts.num_readers == 0){
+		// CkPrintf("DEBUG: the num readers in opts struct is 0\n");
+		opts.num_readers = std::min(32, CkNumPes());
+	  } 
           files[filesOpened] = FileInfo(name, opened, opts);
           managers.openFile(opnum++, filesOpened++, name, opts);
         }
