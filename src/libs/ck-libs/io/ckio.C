@@ -206,7 +206,7 @@ namespace Ck { namespace IO {
 // 	}
 
 		
-	void prepareReadSessionHelper(FileToken file, size_t bytes, size_t offset, CkCallback ready){
+	void prepareReadSessionHelper(FileToken file, size_t bytes, size_t offset, CkCallback ready, std::vector<int> pes_to_map){
 		if(!bytes){
 			CkPrintf("You're tryna read 0 bytes buddy\n");
 			CkAbort("You're tryna read 0 bytes. Oops.\n");
@@ -226,6 +226,11 @@ namespace Ck { namespace IO {
 		// opts.read_stripe = bytes / num_readers; // get the read_stripe
 		// CkPrintf("DEBUG: successfully did the division; read_stripe=%d\n", opts.read_stripe);
 		CkArrayOptions sessionOpts(num_readers); // set the number of elements in the chare array
+		// if there is a non-empty mapping provided, do the mapping
+		if(!pes_to_map.empty()){
+			CProxy_BufferNodeMap bnm = CProxy_BufferNodeMap::ckNew(pes_to_map);
+			sessionOpts.setMap(bnm);
+		}
 		CkCallback sessionInitDone(CkIndex_Director::sessionReady(0), thisProxy);
 		sessionInitDone.setRefnum(sessionID);
 		sessionOpts.setInitCallback(sessionInitDone); // invoke the sessionInitDone callback after all the elements of the chare array are created
@@ -796,6 +801,12 @@ namespace Ck { namespace IO {
 	impl::director.prepareReadSession(file.token, bytes, offset, ready);
     }
     
+    void startReadSession(File file, size_t bytes, size_t offset, CkCallback ready, std::vector<int> pes_to_map){
+	#ifdef DEBUG
+		CkPrintf("This is DEBUG for the reads\n");
+	#endif
+	impl::director.prepareReadSession(file.token, bytes, offset, ready, pes_to_map);
+    }
 
     void closeReadSession(Session read_session, CkCallback after_end){
 	impl::director.closeReadSession(read_session, after_end); // call the director helper

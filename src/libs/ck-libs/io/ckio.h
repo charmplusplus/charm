@@ -93,6 +93,12 @@ namespace Ck { namespace IO {
   void startReadSession(File file, size_t bytes, size_t offset, CkCallback ready);
 
   /**
+ * Same as the above start session in function. However, there is an extra @arg pes_to_map. pes_to_map will contain a sequence
+ * of numbers representing pes. CkIO will map the IO Buffer chares to those pes specified in pes_to_map in a round_robin fashion.
+ */
+  void startReadSession(File file, size_t bytes, size_t offset, CkCallback ready, std::vector<int> pes_to_map);
+
+  /**
    * Used to end the current read session and will then invoke the after_end callback that takes a CkReductionMsg* with nothing in it
    * Will effectively call ckDestroy() on the CProxy_Reader of the associated FileInfo
    */
@@ -117,6 +123,7 @@ namespace Ck { namespace IO {
                              CkCallback ready, CkCallback complete);
 
     friend void startReadSession(File file, size_t bytes, size_t offset, CkCallback ready);
+    friend void startReadSession(File file, size_t bytes, size_t offset, CkCallback ready, std::vector<int> pes_to_map);
 
     friend void startSession(File file, size_t bytes, size_t offset, CkCallback ready,
                              const char *commitData, size_t commitBytes, size_t commitOffset,
