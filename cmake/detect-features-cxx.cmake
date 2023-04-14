@@ -18,7 +18,11 @@ check_include_file_cxx(regex CMK_HAS_REGEX)
 # C++ compiler flags
 # Keep in sync with UNKNOWN_FLAGS section in src/arch/win/unix2nt_cc
 
-check_cxx_compiler_flag("-mno-tls-direct-seg-refs" CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS)
+if(CHARM_CPU STREQUAL "i386" OR CHARM_CPU STREQUAL "x86_64")
+  check_cxx_compiler_flag("-mno-tls-direct-seg-refs" CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS)
+elseif()
+  set(CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS 0)
+endif()
 
 check_cxx_compiler_flag("-fvisibility=hidden" CMK_COMPILER_KNOWS_FVISIBILITY)
 

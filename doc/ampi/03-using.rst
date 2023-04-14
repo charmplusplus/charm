@@ -370,7 +370,8 @@ variables to user-level threads by changing the TLS segment register
 when context switching between user-level threads. The runtime overhead
 is that of changing a single pointer per user-level thread context
 switch. Currently, Charm++ supports it for x86/x86_64 platforms when
-using GNU compilers.
+using GNU or LLVM compilers, as well as macOS on all supported
+architectures.
 
 .. code-block:: c++
 
