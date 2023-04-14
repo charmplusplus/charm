@@ -2552,7 +2552,7 @@ add_flag "CMK_HAS_ELF_H='$pass'" "elf.h"
 
 CMK_SUPPORTS_SWAPGLOBALS='0'
 CMK_SUPPORTS_TLSGLOBALS='0'
-if [[ "$CMK_MACOSX" = '1' -a "$CMK_VDIR" = "${CMK_VDIR%x86_64}x86_64" ]]
+if [[ "$CMK_MACOSX" = '1' ]]
 then
   CMK_SUPPORTS_TLSGLOBALS='1'
 elif test $pass -eq 1
