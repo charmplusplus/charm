@@ -21,5 +21,6 @@ fi
 CMK_PIC='' # empty string: will be reset to default by conv-config.sh
 CMK_PIE='-fPIE'
 
-CMK_COMPILER='icx'
 CMK_WARNINGS_ARE_ERRORS="-Werror"
+
+CMK_COMPILER='icx'

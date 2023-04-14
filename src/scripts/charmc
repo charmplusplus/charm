@@ -1066,7 +1066,7 @@ fi
 
 PROCESSED_MODULES=()
 
-if [ "$WERROR" = "1" ]
+if [[ "$WERROR" = "1" && -n "$CMK_WARNINGS_ARE_ERRORS" ]]
 then
     OPTS+=("$CMK_WARNINGS_ARE_ERRORS")
 fi
