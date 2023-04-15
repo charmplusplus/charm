@@ -1659,17 +1659,14 @@ and code blocks that they define. These definitions appear in the
 ``.ci`` file definition of the enclosing chare class as a ‘body’ of an
 entry method following its signature.
 
-The most basic construct in SDAG is the ``serial`` (aka the ``atomic``)
-block. Serial blocks contain sequential C++ code. They’re also called
-atomic because the code within them executes without returning control
-to the Charm++ runtime scheduler, and thus avoiding interruption from
-incoming messages. The keywords atomic and serial are synonymous, and
-you can find example programs that use atomic. However, we recommend the
-use of serial and are considering the deprecation of the atomic keyword.
-Typically serial blocks hold the code that actually deals with incoming
-messages in a ``when`` statement, or to do local operations before a
-message is sent or after it’s received. The earlier example can be
-adapted to use serial blocks as follows:
+The most basic construct in SDAG is the ``serial`` block (previously also
+denoted by ``atomic``, this usage is now deprecated). Serial blocks contain
+sequential C++ code, and the code within them executes to completion without
+returning control to the Charm++ runtime scheduler, thus avoiding interruption
+from incoming messages. Typically, serial blocks hold the code that actually
+deals with incoming messages in a ``when`` statement or performs local
+operations before a message is sent or after it is received. The earlier example
+can be adapted to use serial blocks as follows:
 
 .. code-block:: charmci
 
@@ -12697,7 +12694,7 @@ and cannot appear as variable or entry method names in a ``.ci`` file:
 
 -  SDAG constructs
 
-   -  atomic
+   -  atomic (deprecated)
 
    -  serial
 

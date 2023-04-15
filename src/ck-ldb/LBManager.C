@@ -23,6 +23,8 @@ CkpvDeclare(int, _lb_obj_index);
 
 CkpvDeclare(bool, lbmanagerInited); /**< true if lbdatabase is inited */
 
+extern int quietModeRequested;
+
 // command line options
 CkLBArgs _lb_args;
 bool _lb_predict = false;
@@ -545,7 +547,7 @@ void LBManager::init(void)
 #if CMK_LBDB_ON
   if (manualOn) TurnManualLBOn();
 #endif
-  if (CkMyPe()==0 && _lb_args.traceComm() == 0)
+  if (CkMyPe()==0 && _lb_args.traceComm() == 0 && !quietModeRequested)
       CkPrintf("CharmLB> Load balancing instrumentation for communication is off.\n");
 
   if (_lb_args.lbperiod() > 0.0)

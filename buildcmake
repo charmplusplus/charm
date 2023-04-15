@@ -78,7 +78,7 @@ function parse_triplet() {
   all_triplets=$(cd "$my_srcdir"/src/arch && find . -maxdepth 1 -name '*-*' -type d | sed 's,./,,')
   extra_triplet_opts="$full_triplet"
   for t in $all_triplets; do
-    extra_triplet_opts=${extra_triplet_opts#$t}
+    extra_triplet_opts=${extra_triplet_opts#"$t"}
     [[ $full_triplet == $t* ]] && actual_triplet=$t
   done
   if [[ -z ${actual_triplet:-} ]]; then
@@ -103,6 +103,7 @@ opt_charmdebug=0
 opt_controlpoint=0
 opt_cuda=0
 opt_destination=""
+opt_disabletls=0
 opt_install_prefix=""
 opt_drone_mode=0
 opt_error_checking= #undef
@@ -410,6 +411,9 @@ function processArgs() {
       --destination=*)
         opt_destination=${arg#*=}
         ;;
+      --disable-tls)
+        opt_disabletls=1
+        ;;
       --install-prefix=*)
         opt_install_prefix=${arg#*=}
         ;;
@@ -611,6 +615,7 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
   -DCHARMDEBUG="$opt_charmdebug" \
   -DCONTROLPOINT="$opt_controlpoint" \
   -DCUDA="$opt_cuda" \
+  -DDISABLE_TLS="$opt_disabletls" \
   -DDRONE_MODE="$opt_drone_mode" \
   -DERROR_CHECKING="$opt_error_checking" \
   -DEXTRA_OPTS="${opt_extra_opts[*]}" \

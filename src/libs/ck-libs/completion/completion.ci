@@ -10,7 +10,7 @@ module completion {
     entry void start_detection(int num_producers,
                                CkCallback start, CkCallback allProduced, CkCallback finish,
                                int prio_) {
-      atomic {
+      serial {
         CkAssert(!running);
         running = true;
         prio = prio_;
@@ -20,23 +20,23 @@ module completion {
       }
 
       while (producers_done_global < producers_total) {
-        atomic {
+        serial {
           contribute(sizeof(int), &producers_done_local, CkReduction::sum_int,
                      CkCallback(CkReductionTarget(CompletionDetector, producers_done),
                                 thisgroup));
         }
-        when producers_done(int producers_done_global_) atomic {
+        when producers_done(int producers_done_global_) serial {
           producers_done_global = producers_done_global_;
         }
       }
 
-      atomic {
+      serial {
         if (CkMyPe() == 0 && !allProduced.isInvalid())
           allProduced.send();
       }
 
       while (unconsumed > 0) {
-        atomic {
+        serial {
           int counts[2];
           counts[0] = produced; // Move up to first reduction loop
           counts[1] = consumed;
@@ -44,12 +44,12 @@ module completion {
                      CkCallback(CkReductionTarget(CompletionDetector, count_consumed),
                                 thisgroup));
         }
-        when count_consumed(int produced_global, int consumed_global) atomic {
+        when count_consumed(int produced_global, int consumed_global) serial {
           unconsumed = produced_global - consumed_global;
         }
       }
 
-      atomic "completion finished" {
+      serial "completion finished" {
         init();
         CkAssert(!finish.isInvalid());
         contribute(finish);

@@ -780,31 +780,25 @@ CpvExtern(int, _curRestartPhase);      /* number of restarts */
 /** This header goes before each chunk of memory allocated with CmiAlloc. 
     See the comment in convcore.C for details on the fields.
 */
-struct CmiChunkHeader {
+
+#if CMK_USE_IBVERBS | CMK_USE_IBUD
+struct infiCmiChunkMetaDataStruct;
+struct infiCmiChunkMetaDataStruct* registerMultiSendMesg(char* msg, int msgSize);
+#endif
+
+// alignas is used for padding here, rather than for alignment of the
+// CmiChunkHeader itself, to ensure that the chunk following the envelope is
+// aligned relative to the start of the header.
+struct alignas(ALIGN_BYTES) CmiChunkHeader {
+#if CMK_USE_IBVERBS | CMK_USE_IBUD
+  struct infiCmiChunkMetaDataStruct *metaData;
+#endif
   int size;
 private:
 #if CMK_SMP
   std::atomic<int> ref;
 #else
   int ref;
-#endif
-#if ALIGN_BYTES > 8
-  #if defined(__GNUC__) || defined(__clang__)
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wpedantic"
-  #if defined(__clang__)
-  #pragma GCC diagnostic ignored "-Wunused-private-field"
-  #endif
-  #endif
-  char align[ALIGN_BYTES
-             - sizeof(int)*2
-#if (CMK_USE_IBVERBS || CMK_USE_IBUD)
-             - sizeof(void *)
-#endif
-            ];
-  #if defined(__GNUC__) || defined(__clang__)
-  #pragma GCC diagnostic pop
-  #endif
 #endif
 public:
   CmiChunkHeader() = default;
@@ -834,24 +828,6 @@ public:
   int decRef() { return ref--; }
 #endif
 };
-
-#if CMK_USE_IBVERBS | CMK_USE_IBUD
-struct infiCmiChunkMetaDataStruct;
-
-#define CMI_INFI_CHUNK_HEADER_FIELDS \
-struct infiCmiChunkMetaDataStruct *metaData;\
-CmiChunkHeader chunkHeader;
-
-struct infiCmiChunkHeaderHelper{
-  CMI_INFI_CHUNK_HEADER_FIELDS
-};
-
-typedef struct infiCmiChunkHeaderStruct{
-  CMI_INFI_CHUNK_HEADER_FIELDS
-} infiCmiChunkHeader;
-
-struct infiCmiChunkMetaDataStruct *registerMultiSendMesg(char *msg,int msgSize);
-#endif
 
 /* Given a user chunk m, extract the enclosing chunk header fields: */
 #define BLKSTART(m) ((CmiChunkHeader *) (((intptr_t)m) - sizeof(CmiChunkHeader)))

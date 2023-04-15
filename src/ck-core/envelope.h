@@ -200,13 +200,11 @@ namespace ck {
   UShort epIdx;        /* Entry point to call */                               \
   ck::impl::s_attribs attribs;
 
-class envelope {
+// alignas is used for padding here, rather than for alignment of the envelope
+// itself, to ensure that the message following the envelope is aligned relative
+// to the start of the envelope.
+class alignas(ALIGN_BYTES) envelope {
 private:
-
-    class envelopeSizeHelper {
-      CMK_ENVELOPE_FIELDS
-      CMK_ENVELOPE_FT_FIELDS
-    };
 
     #ifdef __clang__
     #pragma GCC diagnostic push
@@ -220,19 +218,6 @@ private:
 public:
 
     CMK_ENVELOPE_FT_FIELDS
-
-    #if defined(__GNUC__) || defined(__clang__)
-    #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wpedantic"
-    #if defined(__clang__)
-    #pragma GCC diagnostic ignored "-Wunused-private-field"
-    #endif
-    #endif
-    // padding to ensure ALIGN_BYTES alignment
-    UChar align[CkMsgAlignOffset(sizeof(envelopeSizeHelper))];
-    #if defined(__GNUC__) || defined(__clang__)
-    #pragma GCC diagnostic pop
-    #endif
 
     void pup(PUP::er &p);
 #if CMK_REPLAYSYSTEM || CMK_TRACE_ENABLED
