@@ -277,6 +277,10 @@ else()
   set(CMK_MULTICORE 0)
 endif()
 
+if(OMP AND NOT CMK_SMP)
+  message(FATAL_ERROR "OpenMP support requires building with SMP support (or the multicore layer).")
+endif()
+
 if(NOT ${CMK_COMPILER} STREQUAL "msvc")
   set(CMK_USE_ZLIB ${ZLIB})
 else()
@@ -910,6 +914,14 @@ add_dependencies(moduletcharmmain ck)
 add_dependencies(moduletcharm ck)
 add_dependencies(tcharm-compat ck)
 
+# OmpCharm
+if(OMP)
+  add_subdirectory(src/libs/conv-libs/openmp_llvm/runtime)
+  set(ompcharm-cxx-sources src/libs/conv-libs/openmp_llvm/runtime/ompcharm/OmpCharm.C)
+  add_library(OmpCharm ${ompcharm-cxx-sources})
+endif()
+
+# AMPI
 if(${TARGET} STREQUAL "AMPI" OR (${TARGET} STREQUAL "LIBS" AND NOT BUILD_CHANGA))
   add_subdirectory(src/libs/ck-libs/ampi)
 endif()
