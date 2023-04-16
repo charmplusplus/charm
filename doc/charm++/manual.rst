@@ -8198,30 +8198,21 @@ from zero: PEs are ranked from ``0`` to ``CmiNumPes()``, and nodes are ranked
 from ``0`` to ``CmiNumNodes()``.
 
 Charm++ provides a unified abstraction for querying topology information of
-IBM's BG/Q and Cray's XE6. The ``TopoManager`` singleton object, which can be
+Cray's XE6. The ``TopoManager`` singleton object, which can be
 used by including ``TopoManager.h``, contains the following methods:
 
 getDimNX(), getDimNY(), getDimNZ():
-   Returns the length of X, Y and Z dimensions (except BG/Q).
-
-getDimNA(), getDimNB(), getDimNC(), getDimND(), getDimNE():
-   Returns the length of A, B, C, D and E dimensions on BG/Q.
+   Returns the length of X, Y and Z dimensions.
 
 getDimNT():
    Returns the length of T dimension. TopoManager uses the T dimension to
    represent different cores that reside within a physical node.
 
 rankToCoordinates(int pe, int &x, int &y, int &z, int &t):
-   Get the coordinates of PE with rank *pe* (except BG/Q).
-
-rankToCoordinates(int pe, int &a, int &b, int &c, int &d, int &e, int &t):
-   Get the coordinates of PE with rank *pe* on BG/Q.
+   Get the coordinates of PE with rank *pe*.
 
 coordinatesToRank(int x, int y, int z, int t):
-   Returns the rank of PE with given coordinates (except BG/Q).
-
-coordinatesToRank(int a, int b, int c, int d, int e, int t):
-   Returns the rank of PE with given coordinates on BG/Q.
+   Returns the rank of PE with given coordinates.
 
 getHopsBetweenRanks(int pe1, int pe2):
    Returns the distance between the given PEs in terms of the hops count
@@ -8897,10 +8888,6 @@ this integrated library on Linux.
 
 -  Clang: 3.7 or newer
 
-You can use this integrated OpenMP with *clang* on IBM Blue Gene machines
-without special compilation flags (don't need to add -fopenmp or
--openmp on Blue Gene clang).
-
 On Linux, the OpenMP supported version of clang has been installed in
 default recently. For example, Ubuntu has been released with clang
 higher than 3.7 since 15.10. Depending on which version of clang is
@@ -9522,9 +9509,7 @@ compiler used to build charm. In the linking step, it is required to
 pass ``-mpi`` as an argument because of which *charmc* performs the
 linking for interoperation. The charm libraries, which one wants to be
 linked, should be passed using ``-module`` option. Refer to
-``examples/charm++/mpi-coexist/Makefile`` to view a working example. For
-execution on BG/Q systems, the following additional argument should be
-added to the launch command: ``-envs PAMI_CLIENTS=MPI,Converse``.
+``examples/charm++/mpi-coexist/Makefile`` to view a working example.
 
 User Driven Mode
 ~~~~~~~~~~~~~~~~

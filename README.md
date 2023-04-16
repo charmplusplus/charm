@@ -152,7 +152,7 @@ for more information:
 * `tcp` - The `netlrts-` version communicates via UDP by default. The `tcp` option
     will use TCP instead. The TCP version of Charm++ is usually slower
     than UDP, but it is more reliable.
-* `async` - For Blue Gene/Q, this option enables use of hardware communication 
+* `async` - On PAMI systems, this option enables use of hardware communication
     threads. For applications with significant communication on large
     scale, this option typically improves performance.
 * `regularpages` - On Cray systems, Charm++'s default is to use `hugepages`. This

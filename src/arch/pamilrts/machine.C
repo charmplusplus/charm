@@ -110,15 +110,9 @@ static PPCAtomicMutex *node_recv_mutex;
 
 //The random seed to pick destination context
 CMK_THREADLOCAL uint32_t r_seed = 0xdeadbeef;
-CMK_THREADLOCAL int32_t _cmi_bgq_incommthread = 0;
+CMK_THREADLOCAL int32_t _cmi_async_incommthread = 0;
 CMK_THREADLOCAL int32_t _comm_thread_id = 0;
 #endif
-
-//int CmiInCommThread () {
-//  //if (_cmi_bgq_incommthread)
-//  //printf ("CmiInCommThread: %d\n", _cmi_bgq_incommthread);
-//  return _cmi_bgq_incommthread;
-//}
 
 #if CMK_SMP && CMK_PPC_ATOMIC_QUEUE
 void LrtsSpecializedQueuePush(int pe, void  *msg) {
@@ -155,11 +149,6 @@ void LrtsSpecializedMutexRelease() {
 #endif
 
 static void CmiNetworkBarrier(int async);
-#if SPECIFIC_PCQUEUE && CMK_SMP
-#define  QUEUE_NUMS     _Cmi_mynodesize + 3
-#include "lrtsqueue.h"
-#include "memalloc.C"
-#endif
 #include "machine-lrts.h"
 #include "machine-common-core.C"
 
@@ -459,7 +448,7 @@ pami_result_t init_comm_thread (pami_context_t   context,
   rseedl |= (uint64_t)context;
   r_seed = ((uint32_t)rseedl)^((uint32_t)(rseedl >> 32));
 
-  _cmi_bgq_incommthread = 1;
+  _cmi_async_incommthread = 1;
 
   return PAMI_SUCCESS;
 }
@@ -630,17 +619,6 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 
 #if CMK_SMP
   posix_memalign((void**)&procState, 128, (_Cmi_mynodesize) * sizeof(ProcState));
-
-#if SPECIFIC_PCQUEUE
-  //if(CmiMyPe() == 0)
-  //  printf(" in L2Atomic Queue\n");
-  LRTSQueuePreInit();
-  //reserve for pe queues and node queue first
-   int actualNodeSize = 64/Kernel_ProcessCount(); 
-   CmiMemAllocInit_bgq ((char*)l2atomicbuf + 
-       (QUEUE_NUMS)*sizeof(L2AtomicState),
-       2*actualNodeSize*sizeof(L2AtomicState)); 
-#else
 
 #if CMK_PPC_ATOMIC_QUEUE
     int actualNodeSize = _Cmi_mynodesize;

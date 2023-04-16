@@ -49,7 +49,7 @@ syntax() {
   echo '  icc, iccstatic  Intel compilers (default or static linking)'
   echo '  xlc, xlc64      IBM XL compilers (with 64-bit option on architectures with 32-bit modes)'
   echo '  gcc             GNU compiler collection (on platforms where the default differs)'
-  echo '  clang           Clang C/C++ compiler (including bgclang)'
+  echo '  clang           Clang C/C++ compiler'
   echo '  icx             Intel oneAPI DPC++/C++ compiler'
   echo '  pgcc            Portland Group compilers'
   echo ''

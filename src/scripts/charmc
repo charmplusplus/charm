@@ -67,7 +67,6 @@ OPTS=()
 #Specific options
 #charm internal flag, only pass to c and cxx, not f90
 OPTS_CPP_INTERNAL=('-D__CHARMC__=1')
-OPTS_CC_GENCPM=()
 OPTS_CPP=''
 OPTS_LDRO=''
 OPTS_CC=''
@@ -1434,14 +1433,6 @@ then
 	FORTRAN_SEQ_LIBRARIES+=($CMK_F90LIBS)
 fi
 
-# GEN-CPM options
-if [ "$CMK_COMPILER" = "bgclang" ]
-then
-  OPTS_CC_GENCPM=(-x c)  # -x c is only applied for the preprocessing of the GEN-CPM files on BG/Q
-fi
-
-OPTS_CC_GENCPM=("${OPTS_CC[@]}" "${OPTS_CC_GENCPM[@]}")
-
 ############ Determine the language and libraries ##########
 
 MIDDLE_LIBS=()
@@ -1794,7 +1785,7 @@ CHARM_CXX="$CMK_CXX"
 CHARM_LD="$CMK_LD"
 CHARM_LDXX="$CMK_LDXX"
 
-CHARM_CPP_C_FLAGS=($CMK_CPP_C_FLAGS "-I$CHARMINC" $CMK_INCDIR $CMK_SYSINC "${OPTS_CC_GENCPM[@]}" "${OPTS_CPP[@]}")
+CHARM_CPP_C_FLAGS=($CMK_CPP_C_FLAGS "-I$CHARMINC" $CMK_INCDIR $CMK_SYSINC "${OPTS_CPP[@]}")
 CHARM_CC_FLAGS=($CMK_CC_FLAGS "-I$CHARMINC" $CMK_INCDIR $CMK_SYSINC "${OPTS_CPP_INTERNAL[@]}" "${OPTS_CPP[@]}" "${OPTS_CC[@]}")
 CHARM_CXX_FLAGS=($CMK_CXX_FLAGS "-I$CHARMINC" $CMK_INCDIR $CMK_SYSINC "${OPTS_CPP_INTERNAL[@]}" "${OPTS_CPP[@]}" "${OPTS_CXX[@]}")
 CHARM_LD_FLAGS=($CMK_LD_FLAGS $CMK_LINK_BINARY $CMK_LIBDIR "${OPTS_LD[@]}" "${ALL_LIBS[@]}")

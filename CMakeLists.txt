@@ -765,7 +765,7 @@ set(src-util-h-sources src/util/SSE-Double.h src/util/SSE-Float.h
     src/util/ckimage.h src/util/cklists.h src/util/ckliststring.h
     src/util/ckregex.h src/util/cksequence.h src/util/cksequence_factory.h
     src/util/cksequence_internal.h src/util/ckstatistics.h src/util/ckvector3d.h
-    src/util/cmimemcpy.h src/util/cmimemcpy_qpx.h src/util/cmirdmautils.h
+    src/util/cmirdmautils.h
     src/util/cmitls.h src/util/conv-lists.h src/util/crc32.h src/util/hilbert.h
     src/util/partitioning_strategies.h src/util/pup.h src/util/pup_c.h
     src/util/pup_cmialloc.h src/util/pup_mpi.h src/util/pup_paged.h
