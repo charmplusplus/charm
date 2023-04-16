@@ -789,8 +789,6 @@ then
   echo "For Intel's compiler please see"
   echo "https://github.com/UIUC-PPL/charm/issues/1560"
   echo "about making a suitable version of gcc/g++/libstdc++ available"
-  echo
-  echo "For Blue Gene/Q please use the Clang compiler"
   test_finish 1
 fi
 
@@ -1211,7 +1209,7 @@ test_cxx "whether C++ library has <cstdatomic> " "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_CXX0X_CSTDATOMIC, $pass, [whether C++ library has <cstdatomic>])
 fi
 
-if test $pass -ne 1 -a "$CMK_COMPILER" != "bgxlc"
+if test $pass -ne 1
 then
 	echo "Charm++ requires C++11 atomic support"
 	test_finish 1

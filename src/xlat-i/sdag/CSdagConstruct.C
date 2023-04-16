@@ -641,7 +641,6 @@ void SdagConstruct::generateTlineEndCall(XStr& op) {
 void SdagConstruct::generateEndSeq(XStr& op) {
   op << "    void* _bgParentLog = NULL;\n";
   op << "    CkElapse(0.01e-6);\n";
-  // op<<  "    BgElapse(1e-6);\n";
   generateTlineEndCall(op);
   generateTraceEndCall(op, 1);
   generateEndExec(op);

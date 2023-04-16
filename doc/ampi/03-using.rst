@@ -570,13 +570,13 @@ different schemes.
 .. _tab:portability:
 .. table:: Portability of current implementations of three privatization schemes. "Yes" means we have implemented this technique. "Maybe" indicates there are no theoretical problems, but no implementation exists. "No" indicates the technique is impossible on this platform.
 
-   ==================== ===== ====== ==== ======= === ====== ===== =====
-   Privatization Scheme Linux Mac OS BG/Q Windows x86 x86_64 PPC   ARM7
-   ==================== ===== ====== ==== ======= === ====== ===== =====
-   Manual Code Editing  Yes   Yes    Yes  Yes     Yes Yes    Yes   Yes
-   PIEglobals           Yes   No     No   No      Yes Yes    Yes   Yes
-   TLSglobals           Yes   Yes    No   Maybe   Yes Yes    Maybe Maybe
-   PiPglobals           Yes   No     No   No      Yes Yes    Yes   Yes
-   FSglobals            Yes   Yes    No   Yes     Yes Yes    Yes   Yes
-   Swapglobals          Yes   No     No   No      Yes Yes    Yes   Yes
-   ==================== ===== ====== ==== ======= === ====== ===== =====
+   ==================== ===== ====== ======= === ====== ===== =====
+   Privatization Scheme Linux Mac OS Windows x86 x86_64 PPC   ARM7
+   ==================== ===== ====== ======= === ====== ===== =====
+   Manual Code Editing  Yes   Yes    Yes     Yes Yes    Yes   Yes
+   PIEglobals           Yes   No     No      Yes Yes    Yes   Yes
+   TLSglobals           Yes   Yes    Maybe   Yes Yes    Maybe Maybe
+   PiPglobals           Yes   No     No      Yes Yes    Yes   Yes
+   FSglobals            Yes   Yes    Yes     Yes Yes    Yes   Yes
+   Swapglobals          Yes   No     No      Yes Yes    Yes   Yes
+   ==================== ===== ====== ======= === ====== ===== =====
