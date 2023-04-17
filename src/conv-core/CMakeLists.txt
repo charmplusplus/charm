@@ -65,8 +65,10 @@ if(${CMK_CHARMDEBUG})
         add_library(memory-charmdebug-mmap-slot memory.C)
         target_compile_definitions(memory-charmdebug-mmap-slot PRIVATE -DCMK_MEMORY_BUILD_CHARMDEBUG -DCPD_USE_MMAP -DCMK_SEPARATE_SLOT)
 
-        add_library(memory-hooks-charmdebug memory.C)
-        target_compile_definitions(memory-hooks-charmdebug PRIVATE -DCMK_MEMORY_BUILD_GNU_HOOKS -DCMK_MEMORY_BUILD_CHARMDEBUG)
+        if(CMK_HAS_MALLOC_HOOK)
+            add_library(memory-hooks-charmdebug memory.C)
+            target_compile_definitions(memory-hooks-charmdebug PRIVATE -DCMK_MEMORY_BUILD_GNU_HOOKS -DCMK_MEMORY_BUILD_CHARMDEBUG)
+        endif()
     endif()
 endif()
 
