@@ -45,7 +45,7 @@ void XStr::clear() {
 
 XStr& XStr::operator<<(int i) {
   char tmp[100];
-  sprintf(tmp, "%d", i);
+  snprintf(tmp, sizeof(tmp), "%d", i);
   append(tmp);
   return *this;
 }

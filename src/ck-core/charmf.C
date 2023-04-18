@@ -59,21 +59,21 @@ extern "C" void FTN_NAME(CKPRINTF, ckprintf)(const char *format, ...)
 	case 'd':
 	  i = va_arg(args, int *);
 	  temp_fmt[temp_len] = 'i'; temp_fmt[++temp_len]='\0';
-	  str_len += sprintf(str+str_len,temp_fmt,*i); 
+	  str_len += snprintf(str+str_len,std::max(0, (int)sizeof(str) - str_len),temp_fmt,*i); 
 	  ifmt++;
 	  flag=1; break; 
 	case 'e':
 	case 'f':
 	  f = va_arg(args, float *);
 	  temp_fmt[temp_len] = format[ifmt]; temp_fmt[++temp_len]='\0';
-	  str_len += sprintf(str+str_len,temp_fmt,*f); 
+	  str_len += snprintf(str+str_len,std::max(0, (int)sizeof(str) - str_len),temp_fmt,*f); 
 	  ifmt++;
 	  flag=1; break;
 	case 'E':
 	case 'F':
 	  d = va_arg(args, double *);
 	  temp_fmt[temp_len] = format[ifmt]+32; temp_fmt[++temp_len]='\0';
-	  str_len += sprintf(str+str_len,temp_fmt,*d); 
+	  str_len += snprintf(str+str_len,std::max(0, (int)sizeof(str) - str_len),temp_fmt,*d); 
 	  ifmt++;
 	  flag=1; break;
 	default:

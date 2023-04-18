@@ -1472,7 +1472,7 @@ void ampiParent::init() noexcept{
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(thisIndex)){
     char fname[128];
-    sprintf(fname, "%s.%d", msgLogFilename,thisIndex);
+    snprintf(fname, sizeof(fname), "%s.%d", msgLogFilename,thisIndex);
 #if CMK_USE_ZLIB && 0
     fMsgLog = gzopen(fname,"wb");
     toPUPer = new PUP::tozDisk(fMsgLog);
@@ -1483,7 +1483,7 @@ void ampiParent::init() noexcept{
 #endif
   }else if(msgLogRead){
     char fname[128];
-    sprintf(fname, "%s.%d", msgLogFilename,msgLogRank);
+    snprintf(fname, sizeof(fname), "%s.%d", msgLogFilename,msgLogRank);
 #if CMK_USE_ZLIB && 0
     fMsgLog = gzopen(fname,"rb");
     fromPUPer = new PUP::fromzDisk(fMsgLog);
@@ -9912,7 +9912,7 @@ AMPI_API_IMPL(int, MPI_Get_processor_name, char *name, int *resultlen)
 {
   AMPI_API_INIT("AMPI_Get_processor_name", name, resultlen);
   ampiParent *ptr = getAmpiParent();
-  sprintf(name,"AMPI_RANK[%d]_WTH[%d]",ptr->thisIndex,ptr->getMyPe());
+  snprintf(name,MPI_MAX_PROCESSOR_NAME,"AMPI_RANK[%d]_WTH[%d]",ptr->thisIndex,ptr->getMyPe());
   *resultlen = strlen(name);
   return MPI_SUCCESS;
 }

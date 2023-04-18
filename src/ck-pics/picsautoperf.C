@@ -670,7 +670,7 @@ TraceAutoPerfBOC::TraceAutoPerfBOC() {
   //--------- Projections output
   if(CkpvAccess(myParent)==-1){
     char filename[50];
-    sprintf(filename, "output.%d.pics", CkMyPe());
+    snprintf(filename, sizeof(filename), "output.%d.pics", CkMyPe());
     if(CkMyPe()==0)
       CkpvAccess(fpSummary) = fopen(filename, "w+");
     else if(PICS_collection_mode == FULL)

@@ -95,7 +95,7 @@ block::block(const char *filePrefix,int blockNo)
   char fName[1024];
   
   //Read the boundary descriptions
-  sprintf(fName,"%s%05d.bblk",filePrefix,blockNo);
+  snprintf(fName,sizeof(fName),"%s%05d.bblk",filePrefix,blockNo);
   {
     patchReader f(fName);
     double version=f.nextDouble(); f.nextLine();
@@ -132,7 +132,7 @@ block::block(const char *filePrefix,int blockNo)
   }
   
   //Read the mesh locations themselves
-  sprintf(fName,"%s%05d.mblk",filePrefix,blockNo);
+  snprintf(fName,sizeof(fName),"%s%05d.mblk",filePrefix,blockNo);
   FILE *fm=fopen(fName,"r");
   if (fm==NULL) abort("Can't open .mblk file!");
   int sizes;

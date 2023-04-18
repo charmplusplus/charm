@@ -61,9 +61,8 @@ class PathHistoryEnvelope {
   void reset();
   void print() const;
   /// Write a description of the path into the beginning of the provided buffer. The buffer ought to be large enough.
-  void printHTMLToString(char* buf) const{
-    buf[0] = '\0';
-    sprintf(buf+strlen(buf), "Path Time=%lf<br> Sender idx=%d", (double)totalTime, (int)sender_history_table_idx);
+  void printHTMLToString(char* buf, int len) const{
+    snprintf(buf, len, "Path Time=%lf<br> Sender idx=%d", (double)totalTime, (int)sender_history_table_idx);
   }
   /// The number of available EP counts 
   int getNumUsed() const;

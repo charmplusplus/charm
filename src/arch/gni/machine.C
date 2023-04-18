@@ -822,7 +822,7 @@ static void init_comm_stats(void)
   if (print_stats){
       char ln[200];
       int code = mkdir(counters_dirname, 00777);
-      sprintf(ln,"%s/statistics.%d.%d", counters_dirname, mysize, myrank);
+      snprintf(ln,sizeof(ln),"%s/statistics.%d.%d", counters_dirname, mysize, myrank);
       counterLog=fopen(ln,"w");
       if (counterLog == NULL) CmiAbort("Counter files open failed");
   }

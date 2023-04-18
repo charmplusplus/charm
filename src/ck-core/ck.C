@@ -151,7 +151,7 @@ int Chare::ckGetChareType() const {
 }
 char *Chare::ckDebugChareName(void) {
   char buf[100];
-  sprintf(buf,"Chare on pe %d at %p",CkMyPe(),(void*)this);
+  snprintf(buf,sizeof(buf),"Chare on pe %d at %p",CkMyPe(),(void*)this);
   return strdup(buf);
 }
 int Chare::ckDebugChareID(char *str, int limit) {
@@ -2720,14 +2720,14 @@ private:
         crc1 = checksum_initial(((unsigned char*)env)+CmiMsgHeaderSizeBytes, sizeof(*env)-CmiMsgHeaderSizeBytes);
         crc2 = checksum_initial(((unsigned char*)env)+sizeof(*env), env->getTotalsize()-sizeof(*env));
       }
-      curpos+=sprintf(&buffer[curpos],"%d %d %d %d %x %x %d\n",env->getSrcPe(),env->getTotalsize(),env->getEvent(), env->getMsgtype()==NodeBocInitMsg || env->getMsgtype()==ForNodeBocMsg, crc1, crc2, env->getEpIdx());
+      curpos+=snprintf(&buffer[curpos],buffer.size() - curpos,"%d %d %d %d %x %x %d\n",env->getSrcPe(),env->getTotalsize(),env->getEvent(), env->getMsgtype()==NodeBocInitMsg || env->getMsgtype()==ForNodeBocMsg, crc1, crc2, env->getEpIdx());
       if (curpos > _recplay_logsize-128) flushLog();
       if (!wasPacked) CkUnpackMessage(envptr);
     }
     return true;
   }
   virtual bool process(CthThreadToken *token,CkCoreState *ck) {
-    curpos+=sprintf(&buffer[curpos], "%d %d %d\n",CkMyPe(), -2, token->serialNo);
+    curpos+=snprintf(&buffer[curpos], buffer.size() - curpos, "%d %d %d\n",CkMyPe(), -2, token->serialNo);
     if (curpos > _recplay_logsize-128) flushLog();
     return true;
   }

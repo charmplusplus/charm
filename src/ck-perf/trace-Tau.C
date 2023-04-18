@@ -100,8 +100,8 @@ void startEntryEvent(int id)
 	  //printf("checking name4: %s", _entryTable[id]->name);
 	  //if (check.compare(name_s) != 0)
 	  //{
-	  char name [500];
-	  sprintf(name, "%s::%s::%d", _chareTable[_entryTable[id]->chareIdx]->name,
+	  char name[500];
+	  snprintf(name, sizeof(name), "%s::%s::%d", _chareTable[_entryTable[id]->chareIdx]->name,
 		  _entryTable[id]->name, id);
 	  //should this fuction be excluded from instrumentation?
 	  if (!instrumentEntity(name))

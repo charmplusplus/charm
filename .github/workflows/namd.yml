@@ -7,19 +7,24 @@ jobs:
   # Since NAMD requires a secret to download its source from Gitlab, CI builds from outside PPl
   # always fail in this test since the secret is not available.
   build-and-test-namd:
+    env:
+        namd_secret: ${{ secrets.NAMD_CI_USERNAME_TOKEN }}
     runs-on: ubuntu-20.04
 
     steps:
     - uses: actions/checkout@v2
     - name: install-prerequisites
+      if: ${{ env.namd_secret != '' }}
       run: |
         sudo apt-get update
         sudo apt-get -y install sfftw-dev
         # test build without Fortran support
         sudo apt-get -y remove gfortran
     - name: build-charm++
+      if: ${{ env.namd_secret != '' }}
       run: ./build LIBS netlrts-linux-x86_64 -g -j4 --with-production
     - name: build-namd
+      if: ${{ env.namd_secret != '' }}
       run: |
         cd ..
         git clone https://${{ secrets.NAMD_CI_USERNAME_TOKEN }}@gitlab.com/tcbgUIUC/namd.git
@@ -28,11 +33,13 @@ jobs:
         cd Linux-x86_64-g++
         make -j4
     - name: test-namd-alanin
+      if: ${{ env.namd_secret != '' }}
       run: |
         cd ../namd/Linux-x86_64-g++
         ./charmrun ++local +p2 ./namd2 src/alanin
 
     - name: Cache apoa1 files
+      if: ${{ env.namd_secret != '' }}
       id: cache-apoa1-files
       uses: actions/cache@v2.0.0
       with:
@@ -50,6 +57,7 @@ jobs:
         rm apoa1.tar.gz
 
     - name: test-namd-apoa1
+      if: ${{ env.namd_secret != '' }}
       run: |
         cd ../namd/Linux-x86_64-g++
         ./charmrun ++local +p4 ./namd2 ~/namddata/apoa1/apoa1.namd
