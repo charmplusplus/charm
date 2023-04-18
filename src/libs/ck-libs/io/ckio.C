@@ -21,6 +21,9 @@ typedef int FileToken;
 #include <unistd.h>
 #endif
 
+#include <future> // used for async
+
+
 #include "fs_parameters.h"
 
 using std::min;
@@ -660,7 +663,7 @@ namespace Ck { namespace IO {
 		size_t _session_offset; // the offset of the session
 		size_t _my_offset;
 		size_t _my_bytes;
-		std::vector<char> _buffer;
+		std::shared_future<char*> _buffer;
 		size_t _num_readers;	
 		size_t _read_stripe;
 	public:
@@ -680,7 +683,8 @@ namespace Ck { namespace IO {
 			CkPrintf("Inside constructor of ReadSession[%d]; I own %zu bytes starting from %zu offset. about o start the readData function\n", thisIndex, _my_bytes, _my_offset);
 			#endif
 			double disk_read_before = CkWallTimer(); // get the before disk_read
-			readData();
+			std::future<char*> temp_buffer = std::async(std::launch::async, &ReadSession::readData, this);
+			_buffer = temp_buffer.share();
 			double disk_read_after = CkWallTimer(); // end disk time
 			double total_time = disk_read_after - disk_read_before;
 			CkCallback cb(CkReductionTarget(ReadSession, printTime), thisProxy[0]);
@@ -689,7 +693,8 @@ namespace Ck { namespace IO {
 		}
 
 		void clearBuffer() {
-			_buffer.clear(); // clears the buffer
+			char* buffer = _buffer.get();
+			delete[] buffer;
 		}
 
 		void printTime(double time_taken){
@@ -698,7 +703,7 @@ namespace Ck { namespace IO {
 		}
 
 
-		void readData(){
+		char* readData(){
 		//	std::ifstream ifs(_file -> name); // open the file
 		//	if(ifs.fail()){ // error handling if opening the file failed
 		//		CkAbort("Couldn't open the file %s\n", (_file -> name).c_str());
@@ -711,9 +716,7 @@ namespace Ck { namespace IO {
 			if(!fp){
 				CkPrintf("Opening of the file %s went wrong\n", _file -> name.c_str());
 			}
-			_buffer.resize(_my_bytes, 'z'); // resize it and init with 'z' to denote what hasn't been changed
-			_buffer.shrink_to_fit(); // get rid of any extra capacity 
-			char* buffer = _buffer.data(); // point to the underlying char* of the vector; does not own the array
+			char* buffer = new char[_my_bytes]; 
 			fseek(fp, _my_offset, SEEK_SET);
 			#ifdef DEBUG
 			CkPrintf("Starting the read\n", thisIndex);
@@ -731,7 +734,7 @@ namespace Ck { namespace IO {
 				CkPrintf("Supposed to read %zu bytes, but only read %zu bytes\n", _my_bytes, num_bytes_read);
 			}
 			fclose(fp);
-			
+			return buffer;	
 		}	
 		
 		// the method by which you send your data to the ra chare
@@ -762,8 +765,9 @@ namespace Ck { namespace IO {
 			#ifdef DEBUG
 				CkPrintf("chare_offset=%zu, end_byte_chare=%zu, bytes_to_read=%zu, offset=%zu, bytes=%zu\n", chare_offset, end_byte_chare, bytes_to_read, offset, bytes);	
 			#endif
+			char* buffer = _buffer.get(); // future call to get
 			CkCallback cb(CkIndex_ReadSession::zeroCopyCallback(chare_offset, CkWallTimer()), thisProxy[thisIndex]);	
-			CProxy_ReadAssembler(ra)[pe].shareData(read_tag, buffer_tag, chare_offset, bytes_to_read, CkSendBuffer(_buffer.data() + (chare_offset - _my_offset)/*, cb*/)); // send this data to the ReadAssembler
+			CProxy_ReadAssembler(ra)[pe].shareData(read_tag, buffer_tag, chare_offset, bytes_to_read, CkSendBuffer(buffer + (chare_offset - _my_offset)/*, cb*/)); // send this data to the ReadAssembler
 		}
 
 		void zeroCopyCallback(size_t offset, double time){
