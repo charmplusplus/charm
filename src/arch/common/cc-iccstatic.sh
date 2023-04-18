@@ -9,6 +9,8 @@ CMK_LD="icc $ICCOPTS"
 CMK_LDXX="icpc $ICCOPTS"
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 
+CMK_WARNINGS_ARE_ERRORS="-Werror"
+
 . $CHARMINC/conv-mach-ifort.sh
 
 CMK_COMPILER='icc'

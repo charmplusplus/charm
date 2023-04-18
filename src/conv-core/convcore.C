@@ -113,10 +113,6 @@ void initQd(char **argv);
 void CmiPoolAllocInit(int numBins);
 #endif
 
-#if CMK_CONDS_USE_SPECIAL_CODE
-CmiSwitchToPEFnPtr CmiSwitchToPE;
-#endif
-
 CpvExtern(int, _traceCoreOn);   /* projector */
 void CcdModuleInit(char **);
 void CmiMemoryInit(char **);
