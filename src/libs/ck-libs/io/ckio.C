@@ -284,6 +284,7 @@ namespace Ck { namespace IO {
 			ri.read_bytes = read_bytes;
 			ri.after_read = after_read;
 			ri.msg = new(read_bytes) ReadCompleteMsg();
+			// memset(ri.msg -> data, 'r', read_bytes); UNCOMMENT IF YOU NEED SENTINEL VALUES
 			ri.msg -> offset = read_offset;
 			ri.msg -> bytes = read_bytes;
 			if(_read_info_buffer.count(_curr_read_tag) != 0){
@@ -361,12 +362,19 @@ namespace Ck { namespace IO {
 					data_idx = (read_stripe * i + _session.offset - read_offset); // first byte of fille in buffer chare, offset from the read offset
 					data_len = std::min(read_stripe, read_offset + bytes - (read_stripe * i + _session.offset));
 					// the length is gonna be the entire chare's readstripe, or what's remainig of the read
+					//
+					if(i == num_readers - 1){ // we are searching the last buffer chare; make sure to account for the extra bytes if there are any!
+						data_len = read_offset + read_bytes - (read_stripe * i + _session.offset);
+					}
 				}
 				// do the CkPost call
 				// int tag = _curr_RDMA_tag++;
 				int tag = getRDMATag(); 
 				// CkPrintf("About to post buffer with read_tag=%d, 0_copy_tag=%d on pe=%d\n", read_tag, tag, CkMyPe());
 				CkPostBuffer(msg -> data + data_idx, data_len, tag);
+				#ifdef DEBUG
+				CkPrintf("Read (offset=%zu, length=%zu) is contained on IO Buffer %zu\n", read_offset, read_bytes, i);
+				#endif
 				CProxy_ReadSession(_session.sessionID)[i].sendData(read_tag, tag, read_offset, bytes, thisProxy, CkMyPe()); 
 			}
 
@@ -459,6 +467,7 @@ namespace Ck { namespace IO {
 		Options& opt = files[session.file].opts;	
 		size_t num_readers = opt.num_readers;
 		size_t read_stripe = session.getBytes() / num_readers;
+		CkPrintf("The number of readers: %zu; read_stripe=%zu; from Manager %d\n", num_readers, read_stripe, CkMyPe());
 		// CProxy_ReadAssembler(ra)[CkMyPe()].serveRead(bytes, offset, after_read,read_stripe); // actually does grunt-work of serving data
 	 	ReadAssembler* grp_ptr = ra.ckLocalBranch();
 		if(!grp_ptr){
@@ -734,6 +743,9 @@ namespace Ck { namespace IO {
 				CkPrintf("Supposed to read %zu bytes, but only read %zu bytes\n", _my_bytes, num_bytes_read);
 			}
 			fclose(fp);
+		//	std::string s(buffer, _my_bytes);
+		//	ckout << "On buffer " << thisIndex << " the string is: ";
+		//	ckout << s.c_str() << endl;
 			return buffer;	
 		}	
 		
@@ -766,6 +778,8 @@ namespace Ck { namespace IO {
 				CkPrintf("chare_offset=%zu, end_byte_chare=%zu, bytes_to_read=%zu, offset=%zu, bytes=%zu\n", chare_offset, end_byte_chare, bytes_to_read, offset, bytes);	
 			#endif
 			char* buffer = _buffer.get(); // future call to get
+			std::string s(buffer + (chare_offset - _my_offset), bytes_to_read);
+			// CkPrintf("Buffer[%d] is sending %zu bytes with total string %s\n", thisIndex, bytes_to_read, s.c_str());
 			CkCallback cb(CkIndex_ReadSession::zeroCopyCallback(chare_offset, CkWallTimer()), thisProxy[thisIndex]);	
 			CProxy_ReadAssembler(ra)[pe].shareData(read_tag, buffer_tag, chare_offset, bytes_to_read, CkSendBuffer(buffer + (chare_offset - _my_offset)/*, cb*/)); // send this data to the ReadAssembler
 		}
