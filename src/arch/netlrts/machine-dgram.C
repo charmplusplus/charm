@@ -419,28 +419,28 @@ void printNetStatistics(void)
   unsigned int recv_ack=0, ack_pkts=0;
 
   myNode = nodes+CmiMyNode();
-  sprintf(tmpstr, "***********************************\n");
+  snprintf(tmpstr, sizeof(tmpstr), "***********************************\n");
   strcpy(statstr, tmpstr);
-  sprintf(tmpstr, "Net Statistics For Node %u\n", CmiMyNode());
+  snprintf(tmpstr, sizeof(tmpstr), "Net Statistics For Node %u\n", CmiMyNode());
   strcat(statstr, tmpstr);
-  sprintf(tmpstr, "Interrupts: %u \tProcessed: %u\n",
-                  myNode->stat_total_intr, myNode->stat_proc_intr);
+  snprintf(tmpstr, sizeof(tmpstr), "Interrupts: %u \tProcessed: %u\n",
+                   myNode->stat_total_intr, myNode->stat_proc_intr);
   strcat(statstr, tmpstr);
-  sprintf(tmpstr, "Total Msgs Sent: %u \tTotal Bytes Sent: %u\n",
-                  myNode->sent_msgs, myNode->sent_bytes);
+  snprintf(tmpstr, sizeof(tmpstr), "Total Msgs Sent: %u \tTotal Bytes Sent: %u\n",
+                   myNode->sent_msgs, myNode->sent_bytes);
   strcat(statstr, tmpstr);
-  sprintf(tmpstr, "Total Msgs Recv: %u \tTotal Bytes Recv: %u\n",
-                  myNode->recd_msgs, myNode->recd_bytes);
+  snprintf(tmpstr, sizeof(tmpstr), "Total Msgs Recv: %u \tTotal Bytes Recv: %u\n",
+                   myNode->recd_msgs, myNode->recd_bytes);
   strcat(statstr, tmpstr);
-  sprintf(tmpstr, "***********************************\n");
+  snprintf(tmpstr, sizeof(tmpstr), "***********************************\n");
   strcat(statstr, tmpstr);
-  sprintf(tmpstr, "[Num]\tSENDTO\tRESEND\tRECV\tACKSTO\tACKSFRM\tPKTACK\n");
+  snprintf(tmpstr, sizeof(tmpstr), "[Num]\tSENDTO\tRESEND\tRECV\tACKSTO\tACKSFRM\tPKTACK\n");
   strcat(statstr,tmpstr);
-  sprintf(tmpstr, "=====\t======\t======\t====\t======\t=======\t======\n");
+  snprintf(tmpstr, sizeof(tmpstr), "=====\t======\t======\t====\t======\t=======\t======\n");
   strcat(statstr,tmpstr);
   for(i=0;i<CmiNumNodes();i++) {
     OtherNode node = nodes+i;
-    sprintf(tmpstr, "[%u]\t%u\t%u\t%u\t%u\t%u\t%u\n",
+    snprintf(tmpstr, sizeof(tmpstr), "[%u]\t%u\t%u\t%u\t%u\t%u\t%u\n",
                      i, node->stat_send_pkt, node->stat_resend_pkt,
 		     node->stat_recv_pkt, node->stat_send_ack,
 		     node->stat_recv_ack, node->stat_ack_pkts);
@@ -452,12 +452,12 @@ void printNetStatistics(void)
     recv_ack += node->stat_recv_ack;
     ack_pkts += node->stat_ack_pkts;
   }
-  sprintf(tmpstr, "[TOTAL]\t%u\t%u\t%u\t%u\t%u\t%u\n",
+  snprintf(tmpstr, sizeof(tmpstr), "[TOTAL]\t%u\t%u\t%u\t%u\t%u\t%u\n",
                      send_pkt, resend_pkt,
 		     recv_pkt, send_ack,
 		     recv_ack, ack_pkts);
   strcat(statstr, tmpstr);
-  sprintf(tmpstr, "***********************************\n");
+  snprintf(tmpstr, sizeof(tmpstr), "***********************************\n");
   strcat(statstr, tmpstr);
   CmiPrintf("%s", statstr);
 }

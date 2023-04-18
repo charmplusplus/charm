@@ -199,8 +199,8 @@ static int getRSS()
   char filename[128], commands[256], retstring[128];
   int fd;
   pid = getpid();
-  sprintf(filename,"__topmem__%d", CkMyPe());
-  sprintf(commands, "export TERM=vt100; top -b -n 1 -p %d |grep %d | awk  -F' ' '{print $6}' > %s", pid,
+  snprintf(filename, sizeof(filename), "__topmem__%d", CkMyPe());
+  snprintf(commands, sizeof(commands), "export TERM=vt100; top -b -n 1 -p %d |grep %d | awk  -F' ' '{print $6}' > %s", pid,
 pid, filename);
   system(commands);
   i=0;

@@ -472,8 +472,8 @@ extern CmiNodeLock CmiMemLock_lock;
 
 
 #if CMK_PAMI_LINUX_PPC8 && CMK_ENABLE_ASYNC_PROGRESS
-extern CMK_THREADLOCAL int32_t _cmi_bgq_incommthread;
-#define CmiInCommThread()  (_cmi_bgq_incommthread)
+extern CMK_THREADLOCAL int32_t _cmi_async_incommthread;
+#define CmiInCommThread()  (_cmi_async_incommthread)
 #else
 #define CmiInCommThread()  (CmiMyRank() == CmiMyNodeSize())
 #endif
@@ -1834,12 +1834,7 @@ typedef void (*CcdVoidFn)(void *userParam,double curWallTime);
 #endif
 
 #define CcdIGNOREPE   -2
-#if CMK_CONDS_USE_SPECIAL_CODE
-typedef int (*CmiSwitchToPEFnPtr)(int pe);
-extern CmiSwitchToPEFnPtr CmiSwitchToPE;
-#else
 #define CmiSwitchToPE(pe)  pe
-#endif
 void CcdCallFnAfter(CcdVoidFn fnp, void *arg, double msecs);
 int CcdCallOnCondition(int condnum, CcdCondFn fnp, void *arg);
 int CcdCallOnConditionKeep(int condnum, CcdCondFn fnp, void *arg);

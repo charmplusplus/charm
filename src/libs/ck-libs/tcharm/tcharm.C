@@ -148,8 +148,8 @@ void TCHARM_Api_trace(const char *routineName,const char *libraryName) noexcept
 	if (!tcharm_tracelibs.isTracing(libraryName)) return;
 	TCharm *tc=CtvAccess(_curTCharm);
 	char where[100];
-	if (tc==NULL) sprintf(where,"[serial context on %d]",CkMyPe());
-	else sprintf(where,"[%p> vp %d, p %d]",(void *)tc,tc->getElement(),CkMyPe());
+	if (tc==NULL) snprintf(where,sizeof(where),"[serial context on %d]",CkMyPe());
+	else snprintf(where,sizeof(where),"[%p> vp %d, p %d]",(void *)tc,tc->getElement(),CkMyPe());
 	CmiPrintf("%s Called routine %s\n",where,routineName);
 	CmiPrintStackTrace(1);
 	CmiPrintf("\n");

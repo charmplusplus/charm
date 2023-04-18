@@ -9,7 +9,7 @@ extern "C" void StealTask() {
     ++random_rank;
 #if CMK_TRACE_ENABLED
   char s[10];
-  sprintf( s, "%d", random_rank );
+  snprintf( s, sizeof(s), "%d", random_rank );
   traceUserSuppliedBracketedNote(s, TASKQ_QUEUE_STEAL_EVENTID, _start, CmiWallTimer());
 #endif
   void* msg = TaskQueueSteal((TaskQueue)CpvAccessOther(CsdTaskQueue, random_rank));

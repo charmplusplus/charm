@@ -6,10 +6,6 @@
 #include "charm++.h"
 #include "limits.h"
 
-#if defined(_WIN32) && defined(_MSC_VER) && _MSC_VER < 1500
-#define snprintf _snprintf
-#endif
-
 /// Unique identifier for a POSE event
 class eventID 
 {
@@ -72,7 +68,6 @@ class eventID
     CmiAssert((pe >= 0) && (pe < CkNumPes())); 
     CkPrintf("%d.%d", id, pe); 
   }    
-  inline char *sdump(char *s) { sprintf(s, "%d.%d", id, pe); return s;}    
   inline char *sndump(char *s,size_t n) { snprintf(s,n,"%d.%d", id, pe); return s;}
   /// Pack/unpack/sizing operator
   inline void pup(class PUP::er &p) { p(id); p(pe); }  

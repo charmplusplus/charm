@@ -26,7 +26,7 @@ void OListConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
   }
   endMethod(defs);
 
-  sprintf(nameStr, "%s%s", CParsedFile::className->charstar(), label->charstar());
+  snprintf(nameStr, sizeof(nameStr), "%s%s", CParsedFile::className->charstar(), label->charstar());
   strcat(nameStr, "_end");
 
   generateClosureSignature(decls, defs, entry, false, "void", label, true,
@@ -79,7 +79,7 @@ void OListConstruct::propagateState(std::list<EncapState*> encap,
   stateVars->insert(stateVars->end(), plist.begin(), plist.end());
   {
     char txt[128];
-    sprintf(txt, "_co%d", nodeNum);
+    snprintf(txt, sizeof(txt), "_co%d", nodeNum);
     counter = new XStr(txt);
     sv = new CStateVar(0, "SDAG::CCounter *", 0, txt, 0, NULL, 1);
     sv->isCounter = true;

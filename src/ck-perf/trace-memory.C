@@ -76,7 +76,7 @@ inline void TraceMemory::flush() {
   firstTime = false;
   // flushing the logs
   char fname[1024];
-  sprintf(fname, "memoryLog_%d", CkMyPe());
+  snprintf(fname, sizeof(fname), "memoryLog_%d", CkMyPe());
   FILE *fp;
   do {
     fp = fopen(fname, mode);

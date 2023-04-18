@@ -69,7 +69,7 @@ public:
     CkPrintf("[%d] constructing localStat\n",CkMyPe());
 #endif
     if (pose_config.dop) {
-      sprintf(dopFileName, "dop%d.log", CkMyPe());
+      snprintf(dopFileName, sizeof(dopFileName), "dop%d.log", CkMyPe());
       dopFilePtr = fopen(dopFileName, "w");
       if (dopFilePtr == NULL) {
 	CkPrintf("ERROR: unable to open DOP file %s for writing\n", dopFileName);
