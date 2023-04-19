@@ -15,7 +15,7 @@ private:
   double dval;
   char checkString[11];
 public:
-  groupcast_BCMsg(void) { dval = 3.145; sprintf(checkString, "Broadcast!");} 
+  groupcast_BCMsg(void) { dval = 3.145; strcpy(checkString, "Broadcast!"); }
   groupcast_BCMsg(CkMigrateMessage *m) {}
   int check(void) { 
     if (strcmp("Broadcast!", checkString) == 0 && dval == 3.145)
