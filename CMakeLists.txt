@@ -22,7 +22,7 @@ message("# You can run './buildold' to use the previous build system.     #")
 message("##################################################################")
 
 if(CMAKE_VERSION VERSION_GREATER 3.12 OR CMAKE_VERSION VERSION_EQUAL 3.12)
-  cmake_policy(SET CMP0075 OLD)
+  cmake_policy(SET CMP0075 NEW)
 endif()
 
 # Fortran is optional, so don't include it in LANGUAGES here
