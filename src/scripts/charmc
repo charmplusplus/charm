@@ -791,10 +791,6 @@ do
 		PRODUCTION_MODE=false
 		;;
 
-	"-pg"|"-g"|-W*|-O*)
-		OPTS+=("$arg")
-		;;
-
 	"-fmoddir")
 		F90_MODDIR+=("$1")
 		shift
@@ -876,6 +872,12 @@ do
 		INPUT_GIVEN='1'
 		;;
 
+	# compatibility with libtool
+	-install_name|-current_version|-compatibility_version)
+		[[ -n "$POST_LANGUAGE" ]] && POST_LIBRARIES+=("-Wl,$arg,$1") || PRE_LIBRARIES+=("-Wl,$arg,$1")
+		shift
+		;;
+
 	"-whole-archive")
 		LINK_WHOLE_ARCHIVE=true
 		;;
@@ -887,6 +889,11 @@ do
 	-s)
 		ARG_OPTS_LD+=("$arg")
 		;;
+
+	"-pg"|"-g"|-W*|-O*)
+		OPTS+=("$arg")
+		;;
+
 	-no-charmrun)
 		COPY_CHARMRUN=false
 		;;
@@ -938,12 +945,6 @@ do
 		FILES=()
 		PRE_LIBRARIES=()
 		POST_LIBRARIES=()
-		;;
-
-	# compatibility with libtool
-	-install_name|-current_version|-compatibility_version)
-		OPTS+=("-Wl,$arg,$1")
-		shift
 		;;
 
 	-*|+*)
