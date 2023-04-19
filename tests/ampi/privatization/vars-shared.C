@@ -22,10 +22,10 @@ int * get_scoped_global_shared()
 #endif
 
 #if defined test_threadlocalvars
-thread_local int extern_threadlocal_shared;
+THREAD_LOCAL int extern_threadlocal_shared;
 
 #if defined test_staticvars
-thread_local static int static_threadlocal_shared;
+static THREAD_LOCAL int static_threadlocal_shared;
 int * get_static_threadlocal_shared()
 {
   return &static_threadlocal_shared;
@@ -33,7 +33,7 @@ int * get_static_threadlocal_shared()
 
 int * get_scoped_threadlocal_shared()
 {
-  thread_local static int scoped_threadlocal_shared;
+  static THREAD_LOCAL int scoped_threadlocal_shared;
   return &scoped_threadlocal_shared;
 }
 #endif
