@@ -629,7 +629,21 @@ INLINE static CMK_TYPEDEF_UINT8 MemusageMallinfo(void){
       initialize_memory_wrapper();
     mi = (*mm_impl_mallinfo)();
 #else
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+#ifdef __INTEL_COMPILER
+#pragma warning push
+#pragma warning disable 1478
+#endif
     mi = mallinfo();
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
+#ifdef __INTEL_COMPILER
+#pragma warning pop
+#endif
 #endif
     CMK_TYPEDEF_UINT8 memtotal = (CMK_TYPEDEF_UINT8) mi.uordblks;   /* malloc */
     CMK_TYPEDEF_UINT8 memtotal2 = (CMK_TYPEDEF_UINT8) mi.usmblks;   /* unused */
