@@ -30,7 +30,7 @@ public:
 struct test : public CBase_test {
   test(Ck::IO::Session token) {
     char out[11];
-    sprintf(out, "%9d\n", thisIndex);
+    snprintf(out, sizeof(out), "%9d\n", thisIndex);
     Ck::IO::write(token, out, 10, 10*thisIndex);
   }
   test(CkMigrateMessage *m) {}
