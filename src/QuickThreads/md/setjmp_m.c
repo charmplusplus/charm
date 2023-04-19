@@ -34,6 +34,11 @@ struct helpdesc { qt_helper_t *hfn; qt_t *jb; void *oldptr; void *newptr; };
 # endif
 #endif
 
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-overflow"
+#endif
+
 static void qt_args_1(qt_t *rjb, void *u, void *t,
 		      qt_userf_t *userf, qt_only_t *only)
 {
@@ -88,3 +93,7 @@ void *qt_abort(qt_helper_t *hfn, void *oldptr, void *newptr, qt_t *sp)
   SHIFTSP(sp);
   _longjmp(*(jmp_buf *)&sp, (int)(intptr_t)&help);
 }
+
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
