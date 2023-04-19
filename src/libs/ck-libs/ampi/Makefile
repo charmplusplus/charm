@@ -7,8 +7,7 @@ HEADERS=ampi.h ampif.h ampi_functions.h \
 		$(addprefix romio-stub/,mpio.h mpiof.h mpio_functions.h mpio_globals.h)
 HEADDEP=$(HEADERS) \
 		../tcharm/tcharm.h ../tcharm/tcharm_impl.h
-COMPAT=compat_ampi.o \
-       compat_ampim.o compat_ampifm.o compat_ampicm.o \
+COMPAT=compat_ampim.o compat_ampifm.o \
        compat_ampicpp.o compat_ampins.o compat_ampirs.o
 OBJS=ampi.o $(AMPIF_OBJ) ampiOneSided.o \
      ampiMisc.o ddt.o mpich-alltoall.o ampi_mpix.o ampi_noimpl.o
@@ -214,11 +213,6 @@ headers: $(HEADERS)
 compat_ampim.o: compat_ampim.C
 
 compat_ampifm.o: compat_ampifm.C
-
-compat_ampicm.o: compat_ampicm.C
-
-compat_ampi.o: compat_ampi.c
-	$(CHARMC) -c compat_ampi.c
 
 compat_ampins.o: compat_ampins.C
 	$(CHARMC) -c $<
