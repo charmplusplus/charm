@@ -19,13 +19,11 @@ DESTF=$(AMPI_LIBDIR)/$(AMPI_LIB)f.a
 COMPATLIB=$(AMPI_LIBDIR)/libampi-compat.a
 
 AMPIF_OBJ=$(AMPI_LIBDIR)/ampif.o
-AMPIFIMPL_OBJ=$(AMPI_LIBDIR)/ampifimpl.o
 AMPIMOD_OBJ=$(AMPI_LIBDIR)/ampimod.o
 
 FUNCPTR_SHIM_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_shim.o
 FUNCPTR_SHIM_MAIN_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_shim_main.o
 FUNCPTR_SHIM_FORTRAN_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_shim_fortran.o
-FUNCPTR_SHIM_FORTRAN_IMPL_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_shim_fortran_impl.o
 FUNCPTR_SHIM_FORTRAN_MOD_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_shim_fortran_mod.o
 FUNCPTR_SHIM_FORTRAN_ROMIO_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_shim_fortran_romio.o
 FUNCPTR_SHIM_FMPIMAIN_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_shim_fmpimain.o
@@ -162,10 +160,9 @@ $(DEST): $(OBJS) headers $(ROMIO)
 	cp $(AMPI_LIB).dep $(AMPI_LIBDIR)/$(AMPI_LIB).dep
 
 $(DESTF): $(OBJS) headers $(ROMIO)
-	$(CHARMC) -c ampifimpl.f90 -o $(AMPIFIMPL_OBJ)
 	$(CHARMC) -c ampimod.f90 -o $(AMPIMOD_OBJ)
 	$(CHARMC) -cpmod ../../../../include mpi.M
-	$(CHARMC) $(OBJS) $(ROMIO_OBJS) $(ROMIO_FORTRAN_OBJS) $(AMPIFIMPL_OBJ) $(AMPIMOD_OBJ) -o $@
+	$(CHARMC) $(OBJS) $(ROMIO_OBJS) $(ROMIO_FORTRAN_OBJS) $(AMPIMOD_OBJ) -o $@
 	cp $(AMPI_LIB)f.dep $(AMPI_LIBDIR)/$(AMPI_LIB)f.dep
 
 $(COMPATLIB): $(COMPAT)
@@ -259,9 +256,6 @@ $(FUNCPTR_SHIM_FMPIMAIN_OBJ): ampi_funcptr_shim_fmpimain.C | $(ROMIO)
 
 $(FUNCPTR_SHIM_FORTRAN_OBJ): ampif.C $(HEADDEP) headers | $(ROMIO)
 	$(CHARMC) -language ampi -DAMPI_USE_FUNCPTR -fPIE -shared -c $< -o $@
-
-$(FUNCPTR_SHIM_FORTRAN_IMPL_OBJ): ampifimpl.f90 $(HEADDEP) headers | $(ROMIO)
-	$(CHARMC) -language ampi -fPIE -shared -c $< -o $@
 
 $(FUNCPTR_SHIM_FORTRAN_MOD_OBJ): ampimod.f90 $(HEADDEP) headers | $(ROMIO)
 	$(CHARMC) -language ampi -fPIE -shared -c $< -o $@

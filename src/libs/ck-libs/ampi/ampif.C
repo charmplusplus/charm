@@ -3,8 +3,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <vector>
+#include <algorithm>
 
-FLINKAGE {
 #define mpi_send FTN_NAME( MPI_SEND , mpi_send )
 #define mpi_recv FTN_NAME( MPI_RECV , mpi_recv )
 #define mpi_mrecv FTN_NAME( MPI_MRECV , mpi_mrecv )
@@ -72,7 +72,7 @@ FLINKAGE {
 #define mpi_type_size_x FTN_NAME( MPI_TYPE_SIZE_X , mpi_type_size_x )
 #define mpi_type_lb FTN_NAME( MPI_TYPE_LB , mpi_type_lb )
 #define mpi_type_ub FTN_NAME( MPI_TYPE_UB , mpi_type_ub )
-/* mpi_type_set_name is defined in ampifimpl.f90, see ampif_type_set_name defined below */
+#define mpi_type_set_name FTN_NAME ( MPI_TYPE_SET_NAME , mpi_type_set_name )
 #define mpi_type_get_name FTN_NAME( MPI_TYPE_GET_NAME , mpi_type_get_name )
 #define mpi_type_create_resized FTN_NAME( MPI_TYPE_CREATE_RESIZED, mpi_type_create_resized )
 #define mpi_type_dup FTN_NAME( MPI_TYPE_DUP, mpi_type_dup )
@@ -173,7 +173,7 @@ FLINKAGE {
 #define mpi_comm_test_inter FTN_NAME( MPI_COMM_TEST_INTER , mpi_comm_test_inter )
 #define mpi_comm_remote_size FTN_NAME ( MPI_COMM_REMOTE_SIZE , mpi_comm_remote_size )
 #define mpi_comm_remote_group FTN_NAME ( MPI_COMM_REMOTE_GROUP , mpi_comm_remote_group )
-/* mpi_comm_set_name is defined in ampifimpl.f90, see ampif_comm_set_name defined below */
+#define mpi_comm_set_name FTN_NAME ( MPI_COMM_SET_NAME , mpi_comm_set_name )
 #define mpi_comm_get_name FTN_NAME ( MPI_COMM_GET_NAME , mpi_comm_get_name )
 #define mpi_comm_set_info FTN_NAME ( MPI_COMM_SET_INFO , mpi_comm_set_info )
 #define mpi_comm_get_info FTN_NAME ( MPI_COMM_GET_INFO , mpi_comm_get_info )
@@ -224,7 +224,7 @@ FLINKAGE {
 #define mpi_errhandler_free FTN_NAME( MPI_ERRHANDLER_FREE , mpi_errhandler_free )
 #define mpi_add_error_code FTN_NAME( MPI_ADD_ERROR_CODE , mpi_add_error_code )
 #define mpi_add_error_class FTN_NAME( MPI_ADD_ERROR_CLASS , mpi_add_error_class )
-/* mpi_add_error_string is defined in ampifimpl.f90, see ampif_add_error_string defined below */
+#define mpi_add_error_string FTN_NAME ( MPI_ADD_ERROR_STRING , mpi_add_error_string )
 #define mpi_error_class FTN_NAME( MPI_ERROR_CLASS , mpi_error_class )
 #define mpi_error_string FTN_NAME( MPI_ERROR_STRING , mpi_error_string )
 #define mpi_wtime FTN_NAME( MPI_WTIME , mpi_wtime )
@@ -259,7 +259,7 @@ FLINKAGE {
 #define mpi_win_get_attr  FTN_NAME ( MPI_WIN_GET_ATTR  , mpi_win_get_attr )
 #define mpi_win_set_attr  FTN_NAME ( MPI_WIN_SET_ATTR  , mpi_win_set_attr )
 #define mpi_win_get_group  FTN_NAME ( MPI_WIN_GET_GROUP  , mpi_win_get_group )
-/* mpi_win_set_name is defined in ampifimpl.f90, see ampif_win_set_name defined below */
+#define mpi_win_set_name FTN_NAME ( MPI_WIN_SET_NAME , mpi_win_set_name )
 #define mpi_win_get_name  FTN_NAME ( MPI_WIN_GET_NAME  , mpi_win_get_name )
 #define mpi_win_set_info  FTN_NAME ( MPI_WIN_SET_INFO  , mpi_win_set_info )
 #define mpi_win_get_info  FTN_NAME ( MPI_WIN_GET_INFO  , mpi_win_get_info )
@@ -287,28 +287,16 @@ FLINKAGE {
 #define mpi_compare_and_swap  FTN_NAME ( MPI_COMPARE_AND_SWAP  , mpi_compare_and_swap )
 
 #define mpi_info_create FTN_NAME ( MPI_INFO_CREATE , mpi_info_create )
-/* mpi_info_set is defined in ampifimpl.f90, see ampif_info_set defined below */
-/* mpi_info_delete is defined in ampifimpl.f90, see ampif_info_delete defined below */
-/* mpi_info_get is defined in ampifimpl.f90, see ampif_info_get defined below */
-/* mpi_info_get_valuelen is defined in ampifimpl.f90, see ampif_info_get_valuelen defined below */
+#define mpi_info_set FTN_NAME ( MPI_INFO_SET , mpi_info_set )
+#define mpi_info_delete FTN_NAME ( MPI_INFO_DELETE , mpi_info_delete )
+#define mpi_info_get FTN_NAME ( MPI_INFO_GET , mpi_info_get )
+#define mpi_info_get_valuelen FTN_NAME ( MPI_INFO_GET_VALUELEN , mpi_info_get_valuelen )
 #define mpi_info_get_nkeys FTN_NAME ( MPI_INFO_GET_NKEYS , mpi_info_get_nkeys )
 #define mpi_info_get_nthkey FTN_NAME ( MPI_INFO_GET_NTHKEYS , mpi_info_get_nthkey )
 #define mpi_info_dup FTN_NAME ( MPI_INFO_DUP , mpi_info_dup )
 #define mpi_info_free FTN_NAME ( MPI_INFO_FREE , mpi_info_free )
 
 #define mpi_pcontrol FTN_NAME ( MPI_PCONTROL , mpi_pcontrol )
-
-/* Functions that take 'const char*' arguments are wrapped by Fortran subroutines
- * defined in ampifimpl.f90. These functions should be prefixed with 'ampif_' here: */
-#define ampif_comm_set_name FTN_NAME ( AMPIF_COMM_SET_NAME , ampif_comm_set_name )
-#define ampif_type_set_name FTN_NAME ( AMPIF_TYPE_SET_NAME , ampif_type_set_name )
-#define ampif_win_set_name FTN_NAME ( AMPIF_WIN_SET_NAME , ampif_win_set_name )
-#define ampif_info_set FTN_NAME ( AMPIF_INFO_SET , ampif_info_set )
-#define ampif_info_delete FTN_NAME ( AMPIF_INFO_DELETE , ampif_info_delete )
-#define ampif_info_get FTN_NAME ( AMPIF_INFO_GET , ampif_info_get )
-#define ampif_info_get_valuelen FTN_NAME ( AMPIF_INFO_GET_VALUELEN , ampif_info_get_valuelen )
-#define ampif_add_error_string FTN_NAME ( AMPIF_ADD_ERROR_STRING , ampif_add_error_string )
-#define ampif_print FTN_NAME( AMPIF_PRINT , ampif_print )
 
 /* Extensions needed by ROMIO */
 #define mpir_status_set_bytes FTN_NAME ( MPIR_STATUS_SET_BYTES, mpir_status_set_bytes )
@@ -335,7 +323,7 @@ FLINKAGE {
 #define ampi_yield FTN_NAME ( AMPI_YIELD , ampi_yield )
 #define ampi_suspend FTN_NAME ( AMPI_SUSPEND , ampi_suspend )
 #define ampi_resume FTN_NAME ( AMPI_RESUME, ampi_resume )
-/* ampi_print is defined in ampifimpl.f90, see ampif_print defined below */
+#define ampi_print FTN_NAME( AMPI_PRINT , ampi_print )
 #define ampi_install_idle_timer FTN_NAME( AMPI_INSTALL_IDLE_TIMER , ampi_install_idle_timer )
 #define ampi_uninstall_idle_timer FTN_NAME( AMPI_UNINSTALL_IDLE_TIMER , ampi_uninstall_idle_timer )
 #define ampi_trace_begin FTN_NAME( AMPI_TRACE_BEGIN , ampi_trace_begin )
@@ -358,7 +346,9 @@ void FTN_NAME(caps, nocaps)(void *iv, void *iov, int *len, MPI_Datatype *dt){ \
 
 /* Strings passed from Fortran must be explicitly NULL terminated
  * before they are passed into AMPI. */
-static void ampif_str_f2c(char* dst, const char* src, int len) noexcept {
+template <size_t N>
+static inline void ampif_str_f2c(char (&dst)[N], const char* src, size_t src_len) noexcept {
+  size_t len = std::min(src_len, N-1);
   memcpy(dst, src, len);
   dst[len] = '\0';
 }
@@ -392,6 +382,8 @@ static void handle_MPI_IN_PLACE_f(void *& inbuf, void *& outbuf) noexcept {
   if (inbuf == NULL) inbuf = MPI_IN_PLACE;
   if (outbuf == NULL) outbuf = MPI_IN_PLACE;
 }
+
+FLINKAGE {
 
 void mpi_is_thread_main(int *flag, int *ierr) noexcept
 {
@@ -863,10 +855,10 @@ void mpi_type_ub(int* datatype, MPI_Aint* displacement, int* ierr) noexcept
   *ierr = MPI_Type_ub(*datatype, displacement);
 }
 
-void ampif_type_set_name(int* datatype, const char* name, int *nlen, int* ierr) noexcept
+void mpi_type_set_name(int* datatype, const char* name, int* ierr, long int nlen) noexcept
 {
   char tmpName[MPI_MAX_OBJECT_NAME];
-  ampif_str_f2c(tmpName, name, *nlen);
+  ampif_str_f2c(tmpName, name, nlen);
 
   *ierr = MPI_Type_set_name(*datatype, tmpName);
 }
@@ -1601,10 +1593,10 @@ void mpi_add_error_class(int *errorclass, int *ierr) noexcept
   *ierr = MPI_Add_error_class(errorclass);
 }
 
-void ampif_add_error_string(int *errorcode, const char *errorstring, int* elen, int *ierr) noexcept
+void mpi_add_error_string(int *errorcode, const char *errorstring, int *ierr, long int elen) noexcept
 {
   char tmpErrorstring[MPI_MAX_ERROR_STRING];
-  ampif_str_f2c(tmpErrorstring, errorstring, *elen);
+  ampif_str_f2c(tmpErrorstring, errorstring, elen);
 
   *ierr = MPI_Add_error_string(*errorcode, tmpErrorstring);
 }
@@ -1732,10 +1724,10 @@ void mpi_intercomm_merge(int *intercomm, int *high, int *newintracomm, int *ierr
   *ierr = MPI_Intercomm_merge(*intercomm, *high, newintracomm);
 }
 
-void ampif_comm_set_name(int *comm, const char *comm_name, int* nlen, int *ierr) noexcept
+void mpi_comm_set_name(int *comm, const char *comm_name, int *ierr, long int nlen) noexcept
 {
   char tmpName[MPI_MAX_OBJECT_NAME];
-  ampif_str_f2c(tmpName, comm_name, *nlen);
+  ampif_str_f2c(tmpName, comm_name, nlen);
 
   *ierr = MPI_Comm_set_name(*comm, tmpName);
 }
@@ -1904,10 +1896,10 @@ void mpi_win_get_group(int *win, int *group, int *ierr) noexcept
   *ierr = MPI_Win_get_group(*win, group);
 }
 
-void ampif_win_set_name(int *win, const char *name, int* nlen, int *ierr) noexcept
+void mpi_win_set_name(int *win, const char *name, int *ierr, long int nlen) noexcept
 {
   char tmpName[MPI_MAX_OBJECT_NAME];
-  ampif_str_f2c(tmpName, name, *nlen);
+  ampif_str_f2c(tmpName, name, nlen);
 
   *ierr = MPI_Win_set_name(*win, tmpName);
 }
@@ -2071,45 +2063,45 @@ void mpi_info_create(int* info, int* ierr) noexcept
   *ierr = MPI_Info_create(info);
 }
 
-void ampif_info_set(int* info, const char *key, const char *value,
-                    int *klen, int *vlen, int *ierr) noexcept
+void mpi_info_set(int* info, const char *key, const char *value,
+                    int *ierr, long int klen, long int vlen) noexcept
 {
   char tmpKey[MPI_MAX_INFO_KEY];
-  ampif_str_f2c(tmpKey, key, *klen);
+  ampif_str_f2c(tmpKey, key, klen);
 
   char tmpValue[MPI_MAX_INFO_VAL];
-  ampif_str_f2c(tmpValue, value, *vlen);
+  ampif_str_f2c(tmpValue, value, vlen);
 
   *ierr = MPI_Info_set(*info, tmpKey, tmpValue);
 }
 
-void ampif_info_delete(int* info, const char* key, int* klen, int* ierr) noexcept
+void mpi_info_delete(int* info, const char* key, int* ierr, long int klen) noexcept
 {
   char tmpKey[MPI_MAX_INFO_KEY];
-  ampif_str_f2c(tmpKey, key, *klen);
+  ampif_str_f2c(tmpKey, key, klen);
 
   *ierr = MPI_Info_delete(*info, tmpKey);
 }
 
-void ampif_info_get(int* info, const char *key, int* valuelen, char *value, int *flag,
-                    int* klen, int* ierr) noexcept
+void mpi_info_get(int* info, const char *key, char *value, int *flag,
+                    int* ierr, long int klen, long int valuelen) noexcept
 {
   char tmpKey[MPI_MAX_INFO_KEY];
-  ampif_str_f2c(tmpKey, key, *klen);
+  ampif_str_f2c(tmpKey, key, klen);
 
-  std::vector<char> tmpValue(*valuelen);
+  std::vector<char> tmpValue(valuelen);
 
-  *ierr = MPI_Info_get(*info, tmpKey, *valuelen, tmpValue.data(), flag);
+  *ierr = MPI_Info_get(*info, tmpKey, valuelen, tmpValue.data(), flag);
 
   if (*ierr == MPI_SUCCESS)
-    ampif_str_c2f(value, tmpValue.data(), *valuelen);
+    ampif_str_c2f(value, tmpValue.data(), valuelen);
 }
 
-void ampif_info_get_valuelen(int* info, const char *key, int *valuelen, int *flag,
-                             int *klen, int* ierr) noexcept
+void mpi_info_get_valuelen(int* info, const char *key, int *valuelen, int *flag,
+                             int* ierr, long int klen) noexcept
 {
   char tmpKey[MPI_MAX_INFO_KEY];
-  ampif_str_f2c(tmpKey, key, *klen);
+  ampif_str_f2c(tmpKey, key, klen);
 
   *ierr = MPI_Info_get_valuelen(*info, tmpKey, valuelen, flag);
 }
@@ -2266,10 +2258,10 @@ void ampi_resume(int *dest, int *comm, int *ierr) noexcept
   *ierr = AMPI_Resume(*dest, *comm);
 }
 
-void ampif_print(const char *str, int *len, int *ierr) noexcept
+void ampi_print(const char *str, int *ierr, long int len) noexcept
 {
   char tmpStr[MPI_MAX_ERROR_STRING];
-  ampif_str_f2c(tmpStr, str, *len);
+  ampif_str_f2c(tmpStr, str, len);
 
   *ierr = AMPI_Print(tmpStr);
 }
