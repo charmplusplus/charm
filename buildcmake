@@ -575,7 +575,7 @@ if [[ $VERBOSE -eq 1 ]]; then
 
   # Print selected options
   for option in ${!opt*}; do
-    echo "  $option = ${!option}"
+    echo "  $option = ${!option[*]:-}"
   done
 fi
 
@@ -657,7 +657,7 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
 [[ $VERBOSE -eq 1 ]] && export VERBOSE
 make "$opt_parallel"
 
-# Only Install if the user provides an install prefix with the 
+# Only Install if the user provides an install prefix with the
 # `--install-prefix` option. Without this option, `make install` would be a
 # no-op.
 if [[ -n "$opt_install_prefix" ]]
