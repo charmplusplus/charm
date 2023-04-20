@@ -87,8 +87,8 @@ class McastSrc
   friend class ObjGraph;
 
 public:
-  McastSrc(int _numDest, int _msgs, int _bytes)
-      : numDest(_numDest), msgs(_msgs), bytes(_bytes)
+  McastSrc(int _msgs, int _bytes)
+      : msgs(_msgs), bytes(_bytes)
   {
   }
 
@@ -99,7 +99,6 @@ public:
   std::vector<int> destList;
 
 private:
-  int numDest;  // number of destination for this multicast
   int msgs;     // number of messages exchanged
   int bytes;    // total number of bytes exchanged
 };

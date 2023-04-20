@@ -60,10 +60,9 @@ private:
   FILE *dopFilePtr;
 public:
   /// Basic Constructor
-  localStat(void) : whichStat(0),rollbacks(0),dos(0),undos(0),commits(0),loops(0),gvts(0),cpBytes(0),chkPts(0),maxChkPts(0),   maxGVT (0),
+  localStat(void) : whichStat(0),rollbacks(0),dos(0),undos(0),commits(0),loops(0),gvts(0),chkPts(0),maxChkPts(0),cpBytes(0),
     rollbackTime(0.0),totalTime(0.0),gvtTime(0.0),simTime(0.0),cpTime(0.0),canTime(0.0),lbTime(0.0),fcTime(0.0),
-    commTime(0.0),maxGRT(0.0),
-    maxDo(-1.0),minDo(-1.0)
+    commTime(0.0),maxDo(-1.0),minDo(-1.0),maxGVT(0),maxGRT(0.0)
   {
 #ifdef VERBOSE_DEBUG
     CkPrintf("[%d] constructing localStat\n",CkMyPe());

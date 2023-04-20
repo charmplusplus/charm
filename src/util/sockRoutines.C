@@ -124,7 +124,7 @@ by, e.g., an alarm and should be retried.
 */
 static int skt_should_retry(void)
 {
-	int isinterrupt=0,istransient=0,istimeout=0;
+	int isinterrupt=0,istransient=0;
 #if defined(_WIN32) /*Windows systems-- check Windows Sockets Error*/
 	int err=WSAGetLastError();
 	if (err==WSAEINTR) isinterrupt=1;
@@ -133,7 +133,7 @@ static int skt_should_retry(void)
 #else /*UNIX systems-- check errno*/
 	int err=errno;
 	if (err==EINTR) isinterrupt=1;
-	if (err==ETIMEDOUT) istimeout=1;
+	//int istimeout = (err==ETIMEDOUT) ? 1 : 0;
 	if (err==EAGAIN||err==ECONNREFUSED
                ||err==EWOULDBLOCK||err==ENOBUFS
                ||err==ECONNRESET

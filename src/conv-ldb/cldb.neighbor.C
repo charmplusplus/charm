@@ -95,7 +95,6 @@ static void CldEndIdle(void *dummy)
 static void CldStillIdle(void *dummy)
 {
   int i;
-  double startT;
   requestmsg msg;
   int myload;
   CldProcInfo  cldData = CpvAccess(CldData);
@@ -133,9 +132,8 @@ static void CldStillIdle(void *dummy)
 /* send some work to requested proc */
 static void CldAskLoadHandler(requestmsg *msg)
 {
-  int receiver, rank, recvIdx, i;
+  int receiver, rank, i;
   int myload = CldCountTokens();
-  double now = CmiWallTimer();
 
   /* only give you work if I have more than 1 */
   if (myload>0) {
@@ -260,7 +258,7 @@ int CldMinAvg(void)
 void CldBalance(void *dummy, double curT)
 {
   int i, j, overload, numToMove=0, avgLoad;
-  int totalUnderAvg=0, numUnderAvg=0, maxUnderAvg=0;
+  int numUnderAvg=0, maxUnderAvg=0;
 
 #if CMK_TRACE_ENABLED && TRACE_USEREVENTS
   double startT = curT;
@@ -279,7 +277,6 @@ void CldBalance(void *dummy, double curT)
     int nNeighbors = CpvAccess(numNeighbors);
     for (i=0; i<nNeighbors; i++)
       if (CpvAccess(neighbors)[i].load < avgLoad) {
-        totalUnderAvg += avgLoad-CpvAccess(neighbors)[i].load;
         if (avgLoad - CpvAccess(neighbors)[i].load > maxUnderAvg)
           maxUnderAvg = avgLoad - CpvAccess(neighbors)[i].load;
         numUnderAvg++;
@@ -377,7 +374,7 @@ void CldHandler(void *msg)
 
 void CldEnqueueGroup(CmiGroup grp, void *msg, int infofn)
 {
-  int len, queueing, priobits,i; unsigned int *prioptr;
+  int len, queueing, priobits; unsigned int *prioptr;
   CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
   CldPackFn pfn;
   ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
@@ -413,7 +410,7 @@ void CldEnqueueWithinNode(void *msg, int infofn)
 
 void CldEnqueueMulti(int npes, const int *pes, void *msg, int infofn)
 {
-  int len, queueing, priobits,i; unsigned int *prioptr;
+  int len, queueing, priobits; unsigned int *prioptr;
   CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
   CldPackFn pfn;
   ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
@@ -424,7 +421,7 @@ void CldEnqueueMulti(int npes, const int *pes, void *msg, int infofn)
   CldSwitchHandler((char *)msg, CpvAccess(CldHandlerIndex));
   CmiSetInfo(msg,infofn);
   /*
-  for(i=0;i<npes;i++) {
+  for(int i=0;i<npes;i++) {
     CmiSyncSend(pes[i], len, msg);
   }
   CmiFree(msg);

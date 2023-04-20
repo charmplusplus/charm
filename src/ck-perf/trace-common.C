@@ -867,7 +867,6 @@ struct TraceThreadListener {
 
 static void traceThreadListener_suspend(struct CthThreadListener *l)
 {
-  TraceThreadListener *a=(TraceThreadListener *)l;
   /* here, we activate the appropriate trace codes for the appropriate
      registered modules */
   traceSuspend();

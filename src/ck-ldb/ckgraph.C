@@ -68,7 +68,7 @@ ObjGraph::ObjGraph(BaseLB::LDStats *stats) {
     else if((!commData.from_proc()) && (commData.recv_type() == LD_OBJLIST_MSG)) {
       int nobjs, offset;
       const LDObjKey *objs = commData.receiver.get_destObjs(nobjs);
-      McastSrc sender(nobjs, commData.messages, commData.bytes);
+      McastSrc sender(commData.messages, commData.bytes);
 
       from = stats->getHash(commData.sender);
       offset = vertices[from].mcastToList.size();

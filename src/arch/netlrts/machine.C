@@ -1617,7 +1617,7 @@ static void node_addresses_obtain(char **argv)
  ***********************************************************************/
 int DeliverOutgoingMessage(OutgoingMsg ogm)
 {
-  int i, rank, dst; OtherNode node;
+  int rank, dst; OtherNode node;
 	
   int network = 1;
 
@@ -1630,7 +1630,6 @@ int DeliverOutgoingMessage(OutgoingMsg ogm)
 #endif
     node = nodes_by_pe[dst];
     rank = dst - node->nodestart;
-    int acqLock = 0;
     if (node->nodestart != Cmi_nodestartGlobal) {
         DeliverViaNetwork(ogm, node, rank, DGRAM_ROOTPE_MASK, 0);
     }
@@ -1789,9 +1788,7 @@ void LrtsBarrier(void)
 
 int CmiBarrierZero(void)
 {
-  int i;
   int numnodes = CmiNumNodesGlobal();
-  ChMessage msg;
 
   if (Cmi_charmrun_fd == -1) return 0;                // standalone
   if (numnodes == 1) {
@@ -2135,7 +2132,6 @@ static int net_default_skt_abort(SOCKET skt,int code,const char *msg)
 
 void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 {
-  int i;
   Cmi_netpoll = 0;
 #if CMK_NETPOLL
   Cmi_netpoll = 1;

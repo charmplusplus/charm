@@ -304,9 +304,8 @@ int TransmitDatagram(void)
 void EnqueueOutgoingDgram
         (OutgoingMsg ogm, char *ptr, int len, OtherNode node, int rank, int broot)
 {
-  int seqno, dst, src; ImplicitDgram dg;
+  int seqno, src; ImplicitDgram dg;
   src = ogm->src;
-  dst = ogm->dst;
   seqno = node->send_next;
   node->send_next = ((seqno+1)&DGRAM_SEQNO_MASK);
   MallocImplicitDgram(dg);
@@ -377,7 +376,6 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int b
  ***********************************************************************/
 void AssembleDatagram(OtherNode node, ExplicitDgram dg)
 {
-  int i;
   unsigned int size; char *msg;
   OtherNode myNode = nodes+CmiMyNodeGlobal();
   
@@ -552,7 +550,6 @@ void IntegrateAckDatagram(ExplicitDgram dg)
   OtherNode node; DgramAck *ack; ImplicitDgram idg;
   int i; unsigned int slot, rxing, dgseqno, seqno, ackseqno;
   int diff;
-  unsigned int tmp;
 
   node = nodes_by_pe[dg->srcpe];
   ack = ((DgramAck*)(dg->data));
@@ -564,7 +561,6 @@ void IntegrateAckDatagram(ExplicitDgram dg)
   node->stat_recv_ack++;
   LOG(Cmi_clock, Cmi_nodestartGlobal, 'R', node->nodestart, dg->seqno);
 
-  tmp = node->recv_ack_seqno;
   /* check that the ack being received is actually appropriate */
   if ( !((node->recv_ack_seqno >= 
 	  ((DGRAM_SEQNO_MASK >> 1) + (DGRAM_SEQNO_MASK >> 2))) &&

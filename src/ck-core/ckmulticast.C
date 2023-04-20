@@ -278,7 +278,6 @@ void _ckMulticastInit(void)
 mCastEntry::mCastEntry (mCastEntry *old): 
   numChild(0), oldc(NULL), newc(NULL), flag(COOKIE_NOTREADY), grpSec(old->isGrpSec())
 {
-  int i;
   aid = old->aid;
   parentGrp = old->parentGrp;
   allElem = old->allElem;
@@ -1099,7 +1098,6 @@ void CkMulticastMgr::sendToLocal(multicastGrpMsg *msg)
     nLocal = entry->localGrpElem;
     if(nLocal){
       DEBUGF(("[%d] send to local branch, GroupSection\n", CkMyPe()));
-      int mpe = CkMyPe();
       CkAssert(nLocal == 1);
       CProxyElement_Group ap(aid, CkMyPe());
       if (ap.ckIsDelegated()) {

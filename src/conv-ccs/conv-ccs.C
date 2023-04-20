@@ -228,7 +228,6 @@ CCS handler.
 */
 void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData)
 {
-  char *cmsg;
   int reqLen=ChMessageInt(hdr->len);
 /*Look up handler's converse ID*/
   char *handlerStr=hdr->handler;

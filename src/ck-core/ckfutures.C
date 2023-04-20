@@ -50,7 +50,7 @@ class MultiToThread: public FutureRequest {
  public:
   std::vector<void*> values;
 
-  MultiToThread(CthThread th_, const std::vector<CkFutureID>& ids_) : ids(ids_), th(th_), nRecvd(0) {
+  MultiToThread(CthThread th_, const std::vector<CkFutureID>& ids_) : th(th_), ids(ids_), nRecvd(0) {
     values.resize(ids.size());
 
     std::fill(values.begin(), values.end(), nullptr);
