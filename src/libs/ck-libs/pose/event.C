@@ -1,12 +1,9 @@
 /// Data types for events and spawned events
 #include "pose.h"
 
-/// Basic Constructor
-Event::Event() :   spawnedList(NULL),msg (NULL), cpData(NULL),
-		   serialCPdataSz(0), serialCPdata(NULL),
-		   next(NULL),prev(NULL), commitErr(0),
-		   done (0),   fnIdx(-1),  timestamp(POSE_UnsetTS),
-		   srt(0.0), svt (0)
+Event::Event() : fnIdx(-1), timestamp(POSE_UnsetTS), done(0), svt(0.0), srt(0.0),
+       commitErr(0), msg(NULL), spawnedList(NULL), cpData(NULL),
+		   serialCPdataSz(0), serialCPdata(NULL), next(NULL), prev(NULL)
 { 
 
 }

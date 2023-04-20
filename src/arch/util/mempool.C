@@ -450,7 +450,7 @@ void mempool_free(mempool_type* mptr, void* ptr_free)
 
   if (to_free->status == -1)
   {
-    large_block_header* largeblockhead = (large_block_header*)to_free->block_ptr, *temp;
+    large_block_header* largeblockhead = (large_block_header*)to_free->block_ptr;
     if (mptr->large_blocks == ((char*)largeblockhead - (char*)mptr))
     {
       mptr->large_blocks = largeblockhead->block_next;

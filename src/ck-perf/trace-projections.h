@@ -84,15 +84,15 @@ class LogEntry {
     LogEntry(unsigned char type, double time, unsigned short mIdx,
              unsigned short eIdx, int event, int pe, int msgLen,
              CmiObjId* d, double recvTime, double cpuTime)
-        : type(type),
-          time(time),
-          mIdx(mIdx),
-          eIdx(eIdx),
+        : time(time),
+          cputime(cpuTime),
+          recvTime(recvTime),
           event(event),
           pe(pe),
+          mIdx(mIdx),
+          eIdx(eIdx),
           msglen(msgLen),
-          recvTime(recvTime),
-          cputime(cpuTime)
+          type(type)
     {
       if (d != nullptr)
         id = *d;
@@ -111,7 +111,7 @@ class LogEntry {
     // Constructor for user supplied data or memory usage record
     // Shared constructor to avoid ambiguity issues (userSuppliedData is int, memUsage is
     // long)
-    LogEntry(unsigned char type, double time, long value) : type(type), time(time)
+    LogEntry(unsigned char type, double time, long value) : time(time), type(type)
     {
       CkAssert(type == USER_SUPPLIED || type == MEMORY_USAGE_CURRENT);
       switch (type)
@@ -129,7 +129,7 @@ class LogEntry {
     // event and endTime are only used for the bracketed version
     LogEntry(unsigned char type, double time, char* note, int event = 0,
              double endTime = 0)
-        : type(type), time(time), event(event), endTime(endTime), userSuppliedNote()
+        : time(time), endTime(endTime), event(event), type(type), userSuppliedNote()
     {
       CkAssert(type == USER_SUPPLIED_NOTE || type == USER_SUPPLIED_BRACKETED_NOTE);
       if (note == nullptr)
@@ -144,13 +144,13 @@ class LogEntry {
     // Constructor for multicast data
     LogEntry(unsigned char type, double time, unsigned short mIdx, unsigned short eIdx,
              int event, int pe, int msgLen, int numPe, const int* pelist)
-        : type(type),
-          time(time),
-          mIdx(mIdx),
-          eIdx(eIdx),
+        : time(time),
           event(event),
           pe(pe),
+          mIdx(mIdx),
+          eIdx(eIdx),
           msglen(msgLen),
+          type(type),
           pes(numPe)
     {
       CkAssert(type == CREATION_MULTICAST);
@@ -163,13 +163,13 @@ class LogEntry {
     // change to a variable
     LogEntry(unsigned char type, double time, unsigned short mIdx, unsigned short eIdx,
              int event, int pe, int msgLen, int numPe)
-        : type(type),
-          time(time),
-          mIdx(mIdx),
-          eIdx(eIdx),
+        : time(time),
           event(event),
           pe(pe),
+          mIdx(mIdx),
+          eIdx(eIdx),
           msglen(msgLen),
+          type(type),
           pes(numPe)
     {
       CkAssert(type == CREATION_BCAST);
@@ -178,7 +178,7 @@ class LogEntry {
     // Constructor for user event pairs
     LogEntry(unsigned char type, double time, unsigned short mIdx, int event,
              int nestedID)
-        : type(type), time(time), mIdx(mIdx), event(event), nestedID(nestedID)
+        : time(time), event(event), mIdx(mIdx), type(type), nestedID(nestedID)
     {
       CkAssert(type == USER_EVENT_PAIR || type == BEGIN_USER_EVENT_PAIR ||
                type == END_USER_EVENT_PAIR);
@@ -187,23 +187,23 @@ class LogEntry {
     // Constructor for user stats
     // TODO: Repurposes mIdx and cputime fields to store e and statTime, should clean up
     LogEntry(unsigned char type, double time, int pe, int e, double stat, double statTime)
-        : type(type), time(time), pe(pe), mIdx(e), stat(stat), cputime(statTime)
+        : time(time), cputime(statTime), pe(pe), mIdx(e), type(type), stat(stat)
     {
       CkAssert(type == USER_STAT);
     }
 
     // Copy constuctor
     LogEntry(const LogEntry& other)
-        : type(other.type),
-          time(other.time),
-          mIdx(other.mIdx),
-          eIdx(other.eIdx),
+        : time(other.time),
+          endTime(other.endTime),
+          cputime(other.cputime),
+          recvTime(other.recvTime),
           event(other.event),
           pe(other.pe),
+          mIdx(other.mIdx),
+          eIdx(other.eIdx),
           msglen(other.msglen),
-          recvTime(other.recvTime),
-          cputime(other.cputime),
-          endTime(other.endTime)
+          type(other.type)
     {
       switch (type)
       {

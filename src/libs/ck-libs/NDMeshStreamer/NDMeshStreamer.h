@@ -96,7 +96,7 @@ public:
   std::uint16_t *offsets;
   CkArrayIndex *destObjects;
 
-  MeshStreamerMessageV(int t, bool isFixedSize): numDataItems(0), msgType(t), fixedSize(isFixedSize) {
+  MeshStreamerMessageV(int t, bool isFixedSize): msgType(t), numDataItems(0), fixedSize(isFixedSize) {
     finalMsgCount = -1;
     if (!isFixedSize) {
       offsets[0] = 0;

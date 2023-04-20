@@ -722,7 +722,6 @@ void CkPupProcessorData(PUP::er &p)
 // called only on pe 0
 static bool checkpointOne(const char* dirname, CkCallback& cb, bool requestStatus){
 	CmiAssert(CkMyPe()==0);
-	char filename[1024];
 	
 	// save readonlys, and callback BTW
 	FILE* fRO = openCheckpointFile(dirname, "RO", "wb", -1);
@@ -818,7 +817,6 @@ void CkStartCheckpoint(const char* dirname, const CkCallback& cb, bool requestSt
 CkCallback globalCb;
 void CkRestartMain(const char* dirname, CkArgMsg *args){
 	int i;
-	char filename[1024];
 	
         if (CmiMyRank() == 0) {
           _inrestart = true;

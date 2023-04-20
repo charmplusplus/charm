@@ -52,7 +52,7 @@ void localStat::SendStats()
 globalStat::globalStat(void):    doAvg (0.0), doMax (0.0), rbAvg (0.0), rbMax (0.0), gvtAvg (0.0), gvtMax (0.0), simAvg (0.0), simMax (0.0), 
     cpAvg (0.0), cpMax (0.0), canAvg (0.0), canMax (0.0), lbAvg (0.0), lbMax (0.0), fcAvg (0.0), fcMax (0.0), 
     commAvg (0.0), commMax (0.0),
-    maxTime (0.0), maxDo (0.0), minDo (0.0), avgDo (0.0), GvtTime (0.0), maxGRT (0.0),
+    maxTime (0.0), minDo (0.0), maxDo (0.0), avgDo (0.0), GvtTime (0.0), maxGRT (0.0),
   cpBytes (0), reporting (0), totalDos (0), totalUndos (0), totalCommits (0), totalLoops (0), 
     totalGvts (0), maxChkPts (0), maxGVT (0)
 {

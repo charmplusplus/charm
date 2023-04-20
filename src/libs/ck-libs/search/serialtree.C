@@ -10,7 +10,7 @@
 
 
 SerialTree::SerialTree(problem *start, int height)
-: Expanded(0), SolutionHeight(0), Solution(NULL) {
+: Solution(NULL), SolutionHeight(0), Expanded(0) {
   // If this is a solution, then note that and you can cease
   if ( start->solution() ) {
     Solution = start;

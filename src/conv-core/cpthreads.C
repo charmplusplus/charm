@@ -596,7 +596,6 @@ void Cpthread_start_main(CmiStartFn fn, int argc, char **argv)
 {
   Cpthread_t pt;
   Cpthread_attr_t attrib;
-  CmiIntPtr pargc = argc;
   if (CmiMyRank()==0) {
     CmiMainFnArg * arg = (CmiMainFnArg *)malloc(sizeof(CmiMainFnArg));
 

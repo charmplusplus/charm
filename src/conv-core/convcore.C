@@ -1043,7 +1043,6 @@ double CmiInitTime(void)
 
 void CmiTimerInit(char **argv)
 {
-  struct rusage ru;
   CpvInitialize(double, inittime_virtual);
 
   int tmptime = CmiGetArgFlagDesc(argv,"+useAbsoluteTime", "Use system's absolute time as wallclock time.");
@@ -1065,6 +1064,7 @@ if(CmiMyRank() == 0) /* initialize only  once */
 #ifndef RUSAGE_WHO
     CpvAccess(inittime_virtual) = inittime_wallclock;
 #else
+    struct rusage ru;
     getrusage(RUSAGE_WHO, &ru); 
     CpvAccess(inittime_virtual) =
       (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
@@ -1097,8 +1097,6 @@ double CmiCpuTimer(void)
   return currenttime - CpvAccess(inittime_virtual);
 #endif
 }
-
-static double lastT = -1.0;
 
 double CmiWallTimer(void)
 {
@@ -1787,9 +1785,9 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
 
 
 void *CsdNextLocalNodeMessage(CsdSchedulerState_t *s) {
-	void *msg;
 #if CMK_NODE_QUEUE_AVAILABLE
 	/*#warning "CsdNextMessage: CMK_NODE_QUEUE_AVAILABLE" */
+	void *msg;
 	/*if (NULL!=(msg=CmiGetNonLocalNodeQ())) return msg;*/
 	if (!CqsEmpty(s->nodeQ))
 	{

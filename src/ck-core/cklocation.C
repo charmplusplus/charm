@@ -920,7 +920,6 @@ public:
   {
     int flati = 0;
     int myInt;
-    int dest;
     if (amaps[arrayHdl]->_nelems.dimension == 0)
     {
       return RRMap::procNum(arrayHdl, i);
@@ -1385,9 +1384,7 @@ public:
 
   void populateInitial(int arrayHdl, CkArrayOptions& options, void* ctorMsg, CkArray* mgr)
   {
-    CkArrayIndex start = options.getStart();
     CkArrayIndex end = options.getEnd();
-    CkArrayIndex step = options.getStep();
     // Try to load the configuration from command line argument
     CkAssert(haveConfigurableRRMap());
     ConfigurableRRMapLoader& loader = CkpvAccess(myConfigRRMapState);
@@ -2400,10 +2397,10 @@ void CkLocCache::insert(CmiUInt8 id, int epoch)
 
 /*************************** LocMgr: CREATION *****************************/
 CkLocMgr::CkLocMgr(CkArrayOptions opts)
-    : idCounter(1),
+    : bounds(opts.getBounds()),
+      idCounter(1),
       thisProxy(thisgroup),
-      thislocalproxy(thisgroup, CkMyPe()),
-      bounds(opts.getBounds())
+      thislocalproxy(thisgroup, CkMyPe())
 {
   DEBC((AA "Creating new location manager %d\n" AB, thisgroup));
 
@@ -3072,7 +3069,6 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
   CkLocRec* rec =
       createLocal(idx, true, msg->ignoreArrival, false /* home told on departure */, msg->epoch);
 
-  envelope* env = UsrToEnv(msg);
   CmiAssert(CpvAccess(newZCPupGets).empty());  // Ensure that vector is empty
   // Create the new elements as we unpack the message
   pupElementsFor(p, rec, CkElementCreation_migrate);

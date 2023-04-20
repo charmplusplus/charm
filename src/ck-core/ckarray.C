@@ -801,8 +801,9 @@ void CProxySection_ArrayBase::pup(PUP::er& p)
  * ensures that up to the limit of available bits, array IDs can be represented
  * as part of a compound fixed-size ID for their elements.
  */
-struct CkCreateArrayAsyncMsg : public CMessage_CkCreateArrayAsyncMsg
+class CkCreateArrayAsyncMsg : public CMessage_CkCreateArrayAsyncMsg
 {
+ public:
   int ctor;
   CkCallback cb;
   CkArrayOptions opts;
