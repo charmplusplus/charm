@@ -10,18 +10,18 @@
 
 void CldMultipleSendPrio(int pe, int numToSend, int rank, int immed);
 
-typedef struct CldProcInfo_s {
+typedef struct CldDataInfo_s {
   int    askEvt;		/* user event for askLoad */
   int    askNoEvt;		/* user event for askNoLoad */
   int    idleEvt;		/* user event for idle balancing */
-} *CldProcInfo;
+} *CldDataInfo;
 
 static int WS_Threshold = -1;
 static int _steal_prio = 0;
 static int _stealonly1 = 0;
 static int _steal_immediate = 0;
 
-CpvStaticDeclare(CldProcInfo, CldData);
+CpvStaticDeclare(CldDataInfo, CldData);
 CpvStaticDeclare(int, CldAskLoadHandlerIndex);
 CpvStaticDeclare(int, CldAckNoTaskHandlerIndex);
 CpvStaticDeclare(int, isStealing);
@@ -319,12 +319,12 @@ void CldNodeEnqueue(int node, void *msg, int infofn)
 
 void CldGraphModuleInit(char **argv)
 {
-  CpvInitialize(CldProcInfo, CldData);
+  CpvInitialize(CldDataInfo, CldData);
   CpvInitialize(int, CldAskLoadHandlerIndex);
   CpvInitialize(int, CldAckNoTaskHandlerIndex);
   CpvInitialize(int, CldBalanceHandlerIndex);
 
-  CpvAccess(CldData) = (CldProcInfo)CmiAlloc(sizeof(struct CldProcInfo_s));
+  CpvAccess(CldData) = (CldDataInfo)CmiAlloc(sizeof(struct CldDataInfo_s));
 #if CMK_TRACE_ENABLED
   CpvAccess(CldData)->askEvt = traceRegisterUserEvent("CldAskLoad", -1);
   CpvAccess(CldData)->idleEvt = traceRegisterUserEvent("StealLoad", -1);

@@ -286,10 +286,10 @@ static void AddEdges(VerticesListType *graph, EdgeListType *EdgeList, int numVer
 }
 
 
-void fillAdjArray(Edge *edges, VerticesListType *vlist, int numVertices, int numEdges);
+void fillAdjArray(ConvEdge *edges, VerticesListType *vlist, int numVertices, int numEdges);
 void sortAdjArrays(VerticesListType *vlist);
 static void sort(int *adj, int fromIndex, int toIndex);
-void countDegrees(Edge *edges, Vertex *vertRecs, int numVertices, int numEdges);
+void countDegrees(ConvEdge *edges, ConvVertex *vertRecs, int numVertices, int numEdges);
 
 VerticesListType * 
 InitVertices(EdgeListType * EdgeList, int numVertices, int numEdges)
@@ -305,7 +305,7 @@ InitVertices(EdgeListType * EdgeList, int numVertices, int numEdges)
   vlist = (VerticesListType *) malloc(sizeof(VerticesListType));
   _MEMCHECK(vlist);
   vlist->numVertices = numVertices;
-  vlist->vertexArray = (Vertex *) malloc(numVertices*sizeof(Vertex));
+  vlist->vertexArray = (ConvVertex *) malloc(numVertices*sizeof(ConvVertex));
   _MEMCHECK(vlist->vertexArray);
   vlist->adjArray = (int *) malloc(2*numEdges*sizeof(int)); 
                     /* as each edge is entered twice */
@@ -316,7 +316,7 @@ InitVertices(EdgeListType * EdgeList, int numVertices, int numEdges)
   return(vlist);
 }
 
-void countDegrees(Edge *edges, Vertex *vertRecs, int numVertices, int numEdges)
+void countDegrees(ConvEdge *edges, ConvVertex *vertRecs, int numVertices, int numEdges)
 { /* initialize the degrees of all vertices to 0. 
      Traverse the edge list, incrementing the degree of the 2 nodes for each edge.
      */
@@ -338,11 +338,11 @@ void countDegrees(Edge *edges, Vertex *vertRecs, int numVertices, int numEdges)
    }
 }
 
-void fillAdjArray(Edge *edges, VerticesListType *vlist, int numVertices, int numEdges)
+void fillAdjArray(ConvEdge *edges, VerticesListType *vlist, int numVertices, int numEdges)
 { /* Insert each edge <x,y> as an entry y in x's adj list, and vice versa. */
   int i, x,y;
  int * adj;
- Vertex * vertexRecs;
+ ConvVertex * vertexRecs;
 
  adj = vlist->adjArray;
  vertexRecs = vlist->vertexArray;
@@ -418,7 +418,7 @@ static void copyOut(VerticesListType *vertices, int *npe, int *pes)
 { 
  int i;
  int * adj;
- Vertex * vertexRecs;
+ ConvVertex * vertexRecs;
  
  adj = vertices->adjArray;
  vertexRecs = vertices->vertexArray;
@@ -437,7 +437,7 @@ static void copyOut(VerticesListType *vertices, int *npe, int *pes)
 static void printOut(VerticesListType *vertices)
 {int i,j;
  int * adj;
- Vertex * vertexRecs;
+ ConvVertex * vertexRecs;
  FILE *fp;
  char filename[40];
  
@@ -460,7 +460,7 @@ static void printOut(VerticesListType *vertices)
 static void initGraph(VerticesListType *graph)
 { int i;
   graph->numVertices = globalNumVertices;
-  graph->vertexArray = (Vertex *) malloc(globalNumVertices*sizeof(Vertex));
+  graph->vertexArray = (ConvVertex *) malloc(globalNumVertices*sizeof(ConvVertex));
   _MEMCHECK(graph->vertexArray);
   graph->adjArray = (int *) malloc(2*globalNumEdges*sizeof(int));
   _MEMCHECK(graph->adjArray);

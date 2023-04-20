@@ -64,12 +64,12 @@ protected:
   double avgLoad;
 };
 
-class Edge
+class CkEdge
 {
   friend class ObjGraph;
 
 public:
-  Edge(int _id, int _msgs, int _bytes) : id(_id), msgs(_msgs), bytes(_bytes) {}
+  CkEdge(int _id, int _msgs, int _bytes) : id(_id), msgs(_msgs), bytes(_bytes) {}
   int getNeighborId() const { return id; }
   int getNumMsgs() const { return msgs; }
   int getNumBytes() const { return bytes; }
@@ -126,13 +126,13 @@ private:
   int bytes;   // total number of bytes exchanged
 };
 
-class Vertex
+class CkVertex
 {
   friend class ObjGraph;
 
 public:
-  Vertex() = default;
-  Vertex(int i, double cl, bool mig, int curpe, int newpe = -1, size_t pupsize = 0)
+  CkVertex() = default;
+  CkVertex(int i, double cl, bool mig, int curpe, int newpe = -1, size_t pupsize = 0)
       : id(i),
         compLoad(cl),
         migratable(mig),
@@ -150,8 +150,8 @@ public:
   bool isMigratable() const { return migratable; }
 
   // list of vertices this vertex sends messages to and receives from
-  std::vector<Edge> sendToList;
-  std::vector<Edge> recvFromList;
+  std::vector<CkEdge> sendToList;
+  std::vector<CkEdge> recvFromList;
   std::vector<McastSrc> mcastToList;
   std::vector<McastDest> mcastFromList;
   double getCompLoad() const { return compLoad; }
@@ -175,7 +175,7 @@ public:
   void convertDecisions(BaseLB::LDStats* stats);
 
   // all vertices in the graph. Each vertex corresponds to a chare
-  std::vector<Vertex> vertices;
+  std::vector<CkVertex> vertices;
 };
 
 #endif // _CKGRAPH_H_
