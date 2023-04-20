@@ -29,7 +29,6 @@ FUNCPTR_SHIM_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_shim.o
 FUNCPTR_SHIM_MAIN_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_shim_main.o
 FUNCPTR_SHIM_FORTRAN_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_shim_fortran.o
 FUNCPTR_SHIM_FORTRAN_MOD_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_shim_fortran_mod.o
-FUNCPTR_SHIM_FORTRAN_ROMIO_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_shim_fortran_romio.o
 FUNCPTR_SHIM_FMPIMAIN_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_shim_fmpimain.o
 FUNCPTR_LOADER_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_loader.o
 FUNCPTR_LOADER_STUB_OBJ=$(AMPI_LIBDIR)/ampi_funcptr_loader_stub.o
@@ -74,19 +73,9 @@ ifeq ($(CMK_AMPI_WITH_ROMIO),1)
     romio/mpi-io/glue/default \
     romio/mpi-io/glue \
 
-  ROMIO_FORTRAN_OBJ_DIRS := \
-    romio/mpi-io/fortran \
-
   ROMIO_OBJS = \
     $(foreach o,o obj, \
       $(foreach d,$(ROMIO_OBJ_DIRS), \
-        $(wildcard $d/*.$o) \
-      ) \
-    )
-
-  ROMIO_FORTRAN_OBJS = \
-    $(foreach o,o obj, \
-      $(foreach d,$(ROMIO_FORTRAN_OBJ_DIRS), \
         $(wildcard $d/*.$o) \
       ) \
     )
@@ -151,9 +140,6 @@ $(ROMIO_MAKEFILE): pre-headers
 
 $(ROMIO): $(ROMIO_MAKEFILE)
 	$(MAKE) -C romio AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=:
-ifeq (1,$(CMK_CAN_LINK_FORTRAN))
-	cp romio/mpi-io/fortran/romio_fortran$(obj_suf) $(FUNCPTR_SHIM_FORTRAN_ROMIO_OBJ)
-endif
 	@echo "ROMIO built successfully"
 
 romio-target: $(ROMIO)
@@ -172,7 +158,7 @@ $(DEST): $(OBJS) headers $(ROMIO)
 $(DESTF): $(OBJS) headers $(ROMIO)
 	$(CHARMC) -c ampimod.f90 -o $(AMPIMOD_OBJ)
 	$(CHARMC) -cpmod ../../../../include mpi.M
-	$(CHARMC) $(OBJS) $(ROMIO_OBJS) $(ROMIO_FORTRAN_OBJS) $(AMPIMOD_OBJ) -o $@
+	$(CHARMC) $(OBJS) $(ROMIO_OBJS) $(AMPIMOD_OBJ) -o $@
 	cp $(AMPI_LIB)f.dep $(AMPI_LIBDIR)/$(AMPI_LIB)f.dep
 
 $(COMPATLIB): $(COMPAT)
