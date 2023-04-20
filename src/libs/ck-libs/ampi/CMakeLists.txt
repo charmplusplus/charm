@@ -1,6 +1,6 @@
 set(ampi-cxx-sources ampi.C ampiMisc.C ampiOneSided.C ampif.C ddt.C mpich-alltoall.C ampi_mpix.C ampi_noimpl.C)
 
-set(ampi-f90-sources ampifimpl.f90 ampimod.f90)
+set(ampi-f90-sources ampimod.f90)
 
 set(ampi-h-sources ampi.h ampi-interoperate.h ampif.h ampiimpl.h ddt.h ampi_functions.h ampi_funcptr.h ampi_funcptr_loader.h
                    romio-stub/mpio_functions.h romio-stub/mpio.h romio-stub/mpio_globals.h romio-stub/mpiof.h)
@@ -55,15 +55,6 @@ if(CMK_CAN_LINK_FORTRAN)
     add_custom_command(TARGET ampi_funcptr_shim_fortran
         POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_funcptr_shim_fortran.dir/ampif.C.o ${CMAKE_BINARY_DIR}/lib/ampi_funcptr_shim_fortran.o
-        VERBATIM
-    )
-
-    add_library(ampi_funcptr_shim_fortran_impl ampifimpl.f90)
-    target_compile_options(ampi_funcptr_shim_fortran_impl PRIVATE -language ampi -fPIE -shared)
-    add_dependencies(ampi_funcptr_shim_fortran_impl moduleampi moduleampif)
-    add_custom_command(TARGET ampi_funcptr_shim_fortran_impl
-        POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampi_funcptr_shim_fortran_impl.dir/ampifimpl.f90.o ${CMAKE_BINARY_DIR}/lib/ampi_funcptr_shim_fortran_impl.o
         VERBATIM
     )
 
@@ -469,18 +460,14 @@ if(CMK_CAN_LINK_FORTRAN)
 
     add_library(ampif OBJECT ampif.C)
     target_compile_options(ampif PRIVATE -I${CMAKE_BINARY_DIR}/include/ampi/)
-    add_library(ampifimpl OBJECT ampifimpl.f90)
-    target_compile_options(ampifimpl PRIVATE -I${CMAKE_BINARY_DIR}/include/ampi/)
     add_library(ampimod OBJECT ampimod.f90)
     target_compile_options(ampimod PRIVATE -I${CMAKE_BINARY_DIR}/include/ampi/)
     add_dependencies(ampif ck)
-    add_dependencies(ampifimpl ck)
     add_dependencies(ampimod ck)
-    add_dependencies(moduleampif ampif ampifimpl ampimod)
+    add_dependencies(moduleampif ampif ampimod)
     add_custom_command(TARGET moduleampif
         POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampif.dir/ampif.C.o ${CMAKE_BINARY_DIR}/lib/ampif.o
-        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampifimpl.dir/ampifimpl.f90.o ${CMAKE_BINARY_DIR}/lib/ampifimpl.o
         COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/ampimod.dir/ampimod.f90.o ${CMAKE_BINARY_DIR}/lib/ampimod.o
         COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/mpi.mod ${CMAKE_BINARY_DIR}/include/
         VERBATIM
