@@ -402,9 +402,10 @@ static ppdeffind pparam_find(const char *lname)
       return {def, 1};
 
     static const char no_prefix[] = "no-";
-    if (strncmp(no_prefix, lname, sizeof(no_prefix)-1) == 0)
+    static constexpr size_t no_prefix_len = sizeof(no_prefix)-1;
+    if (strlen(lname) > no_prefix_len && strncmp(no_prefix, lname, no_prefix_len) == 0)
     {
-      if (strcmp(def->lname, lname + (sizeof(no_prefix)-1)) == 0)
+      if (strcmp(def->lname, lname + no_prefix_len) == 0)
         return {def, 0};
     }
   }
