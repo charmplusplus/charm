@@ -28,7 +28,7 @@
 #define SPLIT_MULTICAST  1
 
 // maximum number of fragments into which a message can be broken
-// NOTE: CkReductionMsg::{nFrags,fragNo} and reductionInfo::npProcessed are int8_t,
+// NOTE: CkReductionMsg::{nFrags,fragNo} and sectionRedInfo::npProcessed are int8_t,
 //       which has a maximum value of 127.
 #define MAXFRAGS 100
 
@@ -46,7 +46,7 @@ typedef unsigned char byte;
  * An instance of this class is stored in every mCastEntry object making it possible
  * to track redn operations on a per section basis all along the spanning tree.
  */
-class reductionInfo {
+class sectionRedInfo {
     public:
         /// Number of local array elements which have contributed a given fragment
         int lcount [MAXFRAGS];
@@ -70,7 +70,7 @@ class reductionInfo {
         reductionMsgs futureMsgs;
 
     public:
-        reductionInfo(): npProcessed(0),
+        sectionRedInfo(): npProcessed(0),
                          storedCallback(NULL),
                          storedClientParam(NULL),
                          redNo(0) {
@@ -156,7 +156,7 @@ class mCastEntry
         /// Old spanning tree
         SectionLocation   oldtree;
         // for reduction
-        reductionInfo red;
+        sectionRedInfo red;
         //
         char needRebuild;
     private:
@@ -1322,7 +1322,7 @@ void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType
 
 CkReductionMsg* CkMulticastMgr::combineFrags (CkSectionInfo& id, 
                                               mCastEntry* entry,
-                                              reductionInfo& redInfo) {
+                                              sectionRedInfo& redInfo) {
   int8_t i;
   int dataSize = 0;
   int8_t nFrags   = redInfo.msgs[0][0]->nFrags;
@@ -1372,7 +1372,7 @@ CkReductionMsg* CkMulticastMgr::combineFrags (CkSectionInfo& id,
 
 
 void CkMulticastMgr::reduceFragment (int index, CkSectionInfo& id,
-                                     mCastEntry* entry, reductionInfo& redInfo,
+                                     mCastEntry* entry, sectionRedInfo& redInfo,
                                      int currentTreeUp) {
 
     CProxy_CkMulticastMgr  mCastGrp(thisgroup);
@@ -1525,7 +1525,7 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
     }
 
     /// Grab the locally stored redn info
-    reductionInfo &redInfo = entry->red;
+    sectionRedInfo &redInfo = entry->red;
 
 
     DEBUGF(("[%d] RecvRedMsg, entry: %p, lcount: %d, cccount: %d, #localelems: %d, #children: %zu \n", CkMyPe(), (void *)entry, redInfo.lcount[msg->fragNo], redInfo.ccount[msg->fragNo], entry->getNumLocalElems(), entry->children.size()));

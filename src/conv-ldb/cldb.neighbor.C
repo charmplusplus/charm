@@ -16,21 +16,21 @@
 static int  LBPeriod = PERIOD;                 /* time to call load balancing */
 static int  overload_threshold = MAXOVERLOAD;
 
-typedef struct CldProcInfo_s {
+typedef struct CldDataInfo_s {
   double lastCheck;
   int    sent;			/* flag to disable idle work request */
   int    balanceEvt;		/* user event for balancing */
   int    updateLoadEvt; 
   int    idleEvt;		/* user event for idle balancing */
   int    idleprocEvt;		/* user event for processing idle req */
-} *CldProcInfo;
+} *CldDataInfo;
 
 extern char *_lbtopo;			/* topology name string */
 int _lbsteal = 0;                       /* work stealing flag */
 
 extern "C" void gengraph(int, int, int, int *, int *);
 
-CpvStaticDeclare(CldProcInfo, CldData);
+CpvStaticDeclare(CldDataInfo, CldData);
 CpvStaticDeclare(int, CldLoadResponseHandlerIndex);
 CpvStaticDeclare(int, CldAskLoadHandlerIndex);
 CpvStaticDeclare(int, MinLoad);
@@ -72,7 +72,7 @@ void putPool(loadmsg *msg)
 
 void LoadNotifyFn(int l)
 {
-  CldProcInfo  cldData = CpvAccess(CldData);
+  CldDataInfo  cldData = CpvAccess(CldData);
   cldData->sent = 0;
 }
 
@@ -97,7 +97,7 @@ static void CldStillIdle(void *dummy)
   int i;
   requestmsg msg;
   int myload;
-  CldProcInfo  cldData = CpvAccess(CldData);
+  CldDataInfo  cldData = CpvAccess(CldData);
 
   double now = CmiWallTimer();
   double lt = cldData->lastCheck;
@@ -162,7 +162,7 @@ static void CldAskLoadHandler(requestmsg *msg)
 #if CMK_TRACE_ENABLED && TRACE_USEREVENTS
     /* this is dangerous since projections logging is not thread safe */
     {
-    CldProcInfo  cldData = CpvAccessOther(CldData, rank);
+    CldDataInfo  cldData = CpvAccessOther(CldData, rank);
     traceUserBracketEvent(cldData->idleprocEvt, now, CmiWallTimer());
     }
 #endif
@@ -628,7 +628,7 @@ static void topo_callback(void)
 
 void CldGraphModuleInit(char **argv)
 {
-  CpvInitialize(CldProcInfo, CldData);
+  CpvInitialize(CldDataInfo, CldData);
   CpvInitialize(int, numNeighbors);
   CpvInitialize(int, MinLoad);
   CpvInitialize(int, Mindex);
@@ -641,7 +641,7 @@ void CldGraphModuleInit(char **argv)
   CpvInitialize(int, CldAskLoadHandlerIndex);
 
   CpvAccess(start) = -1;
-  CpvAccess(CldData) = (CldProcInfo)CmiAlloc(sizeof(struct CldProcInfo_s));
+  CpvAccess(CldData) = (CldDataInfo)CmiAlloc(sizeof(struct CldDataInfo_s));
   CpvAccess(CldData)->lastCheck = -1;
   CpvAccess(CldData)->sent = 0;
 #if CMK_TRACE_ENABLED
