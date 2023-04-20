@@ -317,14 +317,14 @@ skt_ip_t skt_innode_lookup_ip(const char *name)
 }
 
 /*Write as dotted decimal*/
-char *skt_print_ip(char *dest,skt_ip_t addr)
+char *skt_print_ip(char *dest,int len,skt_ip_t addr)
 {
   char *o=dest;
-  int i;
+  int i, tmplen = 0;
   for (i=0;i<sizeof(addr);i++) {
     const char *trail=".";
     if (i==sizeof(addr)-1) trail=""; /*No trailing separator dot*/
-    sprintf(o,"%d%s",(int)addr.data[i],trail);
+    tmplen += snprintf(o,len - tmplen,"%d%s",(int)addr.data[i],trail);
     o+=strlen(o);
   }
   return dest;

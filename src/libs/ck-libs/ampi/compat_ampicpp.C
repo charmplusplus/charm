@@ -1,5 +1,8 @@
 /* prototype for C++ main routines without args, as in autoconf tests */
-int AMPI_Main_cpp(void)
+
+#include "charm-api.h"
+
+CLINKAGE int AMPI_Main_noargs(void)
 {
 	return 0;
 }

@@ -6,10 +6,6 @@ DIRS = aggregateRandomAccessArray \
 
 TESTDIRS = $(DIRS)
 
-ifeq ($(CMK_COMPILER),bgxlc)
-  TESTDIRS =
-endif
-
 all: $(foreach i,$(DIRS),build-$i)
 
 test: $(foreach i,$(TESTDIRS),test-$i)

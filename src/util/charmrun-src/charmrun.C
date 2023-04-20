@@ -147,7 +147,7 @@ static const char *mylogin(void)
     char cmd[16];
     char uname[64];
     FILE *p;
-    sprintf(cmd, "id -u -n");
+    snprintf(cmd, sizeof(cmd), "id -u -n");
     p = popen(cmd, "r");
     if (p) {
       if (fscanf(p, "%63s", uname) != 1) {
@@ -200,7 +200,7 @@ static char *pathfix(const char *path, pathfixlist fixes)
       char *offs = strstr(buffer, l->s1);
       if (offs) {
         offs[0] = 0;
-        sprintf(buf2, "%s%s%s", buffer, l->s2, offs + len);
+        snprintf(buf2, sizeof(buf2), "%s%s%s", buffer, l->s2, offs + len);
         strcpy(buffer, buf2);
         mod = 1;
       }
@@ -336,7 +336,7 @@ static char *getenv_display()
   if (p == 0)
     return NULL;
   if ((e[0] == ':') || (strncmp(e, "unix:", 5) == 0)) {
-    sprintf(result, "%s:%s", skt_print_ip(ipBuf, skt_my_ip()), p + 1);
+    snprintf(result, sizeof(result), "%s:%s", skt_print_ip(ipBuf, 200, skt_my_ip()), p + 1);
   } else
     strcpy(result, e);
   return result;
@@ -526,15 +526,15 @@ static const char *pparam_getdef(ppdef def)
   static char result[100];
   switch (def->type) {
   case 'i':
-    sprintf(result, "%d", *def->where.i);
+    snprintf(result, sizeof(result), "%d", *def->where.i);
     return result;
   case 'r':
-    sprintf(result, "%f", *def->where.r);
+    snprintf(result, sizeof(result), "%f", *def->where.r);
     return result;
   case 's':
     return *def->where.s ? *def->where.s : "";
   case 'f':
-    sprintf(result, *def->where.f ? "true" : "false");
+    snprintf(result, sizeof(result), *def->where.f ? "true" : "false");
     return result;
   }
   return NULL;
@@ -589,7 +589,7 @@ static int pparam_parseopt()
   }
   /* handle + by itself - an error */
   if (opt[1] == 0) {
-    sprintf(pparam_error, "Illegal option +\n");
+    snprintf(pparam_error, sizeof(pparam_error), "Illegal option +\n");
     return -1;
   }
   /* look up option definition */
@@ -606,7 +606,7 @@ static int pparam_parseopt()
   }
   if (deffind.def == nullptr) {
     if (opt[1] == '+') {
-      sprintf(pparam_error, "Option %s not recognized.", opt);
+      snprintf(pparam_error, sizeof(pparam_error), "Option %s not recognized.", opt);
       return -1;
     } else {
       /*Unrecognized single '+' option-- skip it.*/
@@ -617,7 +617,7 @@ static int pparam_parseopt()
   auto def = deffind.def;
   /* handle flag-options */
   if ((def->type == 'f') && (opt[1] != '+') && (opt[2] != '\0')) {
-    sprintf(pparam_error, "Option %s should not include a value", opt);
+    snprintf(pparam_error, sizeof(pparam_error), "Option %s should not include a value", opt);
     return -1;
   }
   if (def->type == 'f') {
@@ -633,13 +633,13 @@ static int pparam_parseopt()
   } else
     opt += 2;
   if ((opt == nullptr) || (opt[0] == '\0')) {
-    sprintf(pparam_error, "%s must be followed by a value.", optname);
+    snprintf(pparam_error, sizeof(pparam_error), "%s must be followed by a value.", optname);
     return -1;
   }
   int ok = pparam_setdef(def, opt);
   pparam_delarg(pparam_pos);
   if (ok < 0) {
-    sprintf(pparam_error, "Illegal value for %s", optname);
+    snprintf(pparam_error, sizeof(pparam_error), "Illegal value for %s", optname);
     return -1;
   }
   return 0;
@@ -1102,7 +1102,7 @@ static void arg_init(int argc, const char **argv)
     /*Absolute path to node-program*/
     arg_nodeprog_a = argv[1];
   } else {
-    sprintf(buf, "%s%s%s", arg_currdir_a, DIRSEP, arg_nodeprog_r);
+    snprintf(buf, sizeof(buf), "%s%s%s", arg_currdir_a, DIRSEP, arg_nodeprog_r);
     arg_nodeprog_a = strdup(buf);
   }
   if (arg_scalable_start) {
@@ -1282,7 +1282,7 @@ static char *nodetab_file_find()
   nodetab_tempName = strdup(buffer);
 #else /*UNIX*/
   if (getenv("HOME")) {
-    sprintf(buffer, "%s/.nodelist", getenv("HOME"));
+    snprintf(buffer, sizeof(buffer), "%s/.nodelist", getenv("HOME"));
   }
 #endif
   if (!probefile(buffer)) {
@@ -1622,7 +1622,7 @@ static void nodeinfo_populate(nodetab_process & p)
   p.dataport = dataport;
   if (arg_verbose) {
     char ips[200];
-    skt_print_ip(ips, i.IP);
+    skt_print_ip(ips, sizeof(ips), i.IP);
     printf("Charmrun> client %d connected (IP=%s data_port=%d)\n", node, ips,
            dataport);
   }
@@ -2373,13 +2373,13 @@ static int req_handle_realloc(ChMessage *msg, SOCKET fd)
   int index = 0;
 
   char sp_buffer[50]; // newP buffer
-  sprintf(sp_buffer, "%d", newP);
+  snprintf(sp_buffer, sizeof(sp_buffer), "%d", newP);
 
   char sp_buffer1[50]; // oldP buffer
-  sprintf(sp_buffer1, "%d", oldP);
+  snprintf(sp_buffer1, sizeof(sp_buffer1), "%d", oldP);
 
   char sp_buffer2[6]; // charmrun port
-  sprintf(sp_buffer2, "%d", server_port);
+  snprintf(sp_buffer2, sizeof(sp_buffer2), "%d", server_port);
 
   /* Check that shrink expand parameters don't already exist */
 
@@ -3981,7 +3981,7 @@ static void req_start_server(void)
     /*Use symbolic host name as charmrun address*/
     gethostname(server_addr, sizeof(server_addr));
   else
-    skt_print_ip(server_addr, ip);
+    skt_print_ip(server_addr, sizeof(server_addr), ip);
 
 #if CMK_SHRINK_EXPAND
   server_port = arg_charmrun_port;
@@ -4156,7 +4156,7 @@ int main(int argc, const char **argv, char **envp)
     char ips[200];
     for (const nodetab_host * h : host_table)
     {
-      skt_print_ip(ips, h->ip);
+      skt_print_ip(ips, sizeof(ips), h->ip);
       printf("Charmrun> added host \"%s\", IP:%s\n", h->name, ips);
     }
   }
@@ -4351,11 +4351,11 @@ static char *create_netstart(int node)
   static char dest[1536];
   int port = 0;
   if (arg_mpiexec)
-    sprintf(dest, "$CmiMyNode %s %d %d %d", server_addr, server_port,
-            getpid() & 0x7FFF, port);
+    snprintf(dest, sizeof(dest), "$CmiMyNode %s %d %d %d", server_addr, server_port,
+             getpid() & 0x7FFF, port);
   else
-    sprintf(dest, "%d %s %d %d %d", node, server_addr, server_port,
-            getpid() & 0x7FFF, port);
+    snprintf(dest, sizeof(dest), "%d %s %d %d %d", node, server_addr, server_port,
+             getpid() & 0x7FFF, port);
   return dest;
 }
 
@@ -4396,14 +4396,14 @@ static void start_nodes_daemon(std::vector<nodetab_process> & process_table)
       printf("Charmrun> Starting node program %d on '%s' as %s.\n", p.nodeno,
              h->name, nodeprog_relative);
     free(nodeprog_relative);
-    sprintf(task.env, "NETSTART=%.240s", create_netstart(p.nodeno));
+    snprintf(task.env, DAEMON_MAXENV, "NETSTART=%.240s", create_netstart(p.nodeno));
 
     char nodeArgBuffer[5120]; /*Buffer to hold assembled program arguments*/
     char *argBuf;
     if (h->nice != -100) {
       if (arg_verbose)
         printf("Charmrun> +nice %d\n", h->nice);
-      sprintf(nodeArgBuffer, "%s +nice %d", argBuffer, h->nice);
+      snprintf(nodeArgBuffer, sizeof(nodeArgBuffer), "%s +nice %d", argBuffer, h->nice);
       argBuf = nodeArgBuffer;
     } else
       argBuf = argBuffer;
@@ -4753,10 +4753,14 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
     fprintf(f, "test -z \"$CmiMyNode\" && CmiMyNode=$MPIRUN_RANK\n");
     fprintf(f, "test -z \"$CmiMyNode\" && CmiMyNode=$PMI_RANK\n");
     fprintf(f, "test -z \"$CmiMyNode\" && CmiMyNode=$PMI_ID\n");
+    fprintf(f, "test -z \"$CmiMyNode\" && CmiMyNode=$PMIX_RANK\n");
     fprintf(f, "test -z \"$CmiMyNode\" && CmiMyNode=$MP_CHILD\n");
     fprintf(f, "test -z \"$CmiMyNode\" && CmiMyNode=$SLURM_PROCID\n");
-    fprintf(f, "test -z \"$CmiMyNode\" && (Echo Could not detect rank from "
-               "environment ; Exit 1)\n");
+    fprintf(f, "if test -z \"$CmiMyNode\"\n"
+               "then\n"
+               "  Echo \"Could not detect rank from environment\"\n"
+               "  Exit 1\n"
+               "fi\n");
     fprintf(f, "export CmiMyNode\n");
   }
 #ifdef HSTART
@@ -4825,8 +4829,18 @@ static void ssh_script(FILE *f, const nodetab_process & p, const char **argv)
     fprintf(f, "test -z \"$CmiNumNodes\" && CmiNumNodes=$MP_PROCS\n");
     fprintf(f, "test -z \"$CmiNumNodes\" && CmiNumNodes=$SLURM_NTASKS\n");
     fprintf(f, "test -z \"$CmiNumNodes\" && CmiNumNodes=$SLURM_NPROCS\n");
-    fprintf(f, "test -z \"$CmiNumNodes\" && (Echo Could not detect node count "
-               "from environment ; Exit 1)\n");
+    const int processes = get_old_style_process_count();
+    fprintf(f, "test -z \"$CmiNumNodes\" && CmiNumNodes=%d\n", processes);
+    fprintf(f, "if test %d != \"$CmiNumNodes\"\n", processes);
+    fprintf(f, "then\n"
+               "  Echo \"Node count $CmiNumNodes from environment is not %d requested\"\n"
+               "  Exit 1\n"
+               "fi\n", processes);
+    fprintf(f, "if test $CmiMyNode -ge %d\n", processes);
+    fprintf(f, "then\n"
+               "  Echo \"Rank $CmiMyNode is not less than requested node count %d\"\n"
+               "  Exit 1\n"
+               "fi\n", processes);
     fprintf(f, "export CmiNumNodes\n");
   }
 #ifdef HSTART
@@ -5083,8 +5097,9 @@ static void read_global_segments_size()
   sshargv.push_back(h->name);
   sshargv.push_back("-l");
   sshargv.push_back(h->login);
-  char *tmp = (char *) malloc(sizeof(char) * 9 + strlen(arg_nodeprog_r));
-  sprintf(tmp, "size -A %s", arg_nodeprog_r);
+  int tmplen = 9 + strlen(arg_nodeprog_r);
+  char *tmp = (char *) malloc(tmplen);
+  snprintf(tmp, tmplen, "size -A %s", arg_nodeprog_r);
   sshargv.push_back(tmp);
   sshargv.push_back((const char *) NULL);
 
@@ -5122,8 +5137,9 @@ static void open_gdb_info()
   sshargv.push_back(h->name);
   sshargv.push_back("-l");
   sshargv.push_back(h->login);
-  char *tmp = (char *) malloc(sizeof(char) * 8 + strlen(arg_nodeprog_r));
-  sprintf(tmp, "gdb -q %s", arg_nodeprog_r);
+  int tmplen = 8 + strlen(arg_nodeprog_r);
+  char *tmp = (char *) malloc(tmplen);
+  snprintf(tmp, tmplen, "gdb -q %s", arg_nodeprog_r);
   sshargv.push_back(tmp);
   sshargv.push_back((const char *) NULL);
 
@@ -5179,7 +5195,7 @@ static void start_next_level_charmruns()
 
   const char *nodeprog_name = strrchr(arg_nodeprog_a, '/');
   static char buf[1024];
-  sprintf(buf, "%.*s%s%s", (int)(nodeprog_name-arg_nodeprog_a), arg_nodeprog_a, DIRSEP, "charmrun");
+  snprintf(buf, sizeof(buf), "%.*s%s%s", (int)(nodeprog_name-arg_nodeprog_a), arg_nodeprog_a, DIRSEP, "charmrun");
   arg_nodeprog_a = strdup(buf);
 
   int nextIndex = 0;
@@ -5191,11 +5207,11 @@ static void start_next_level_charmruns()
 
     FILE *f;
     char startScript[200];
-    sprintf(startScript, "/tmp/charmrun.%d.%d", getpid(), p.procno);
+    snprintf(startScript, sizeof(startScript), "/tmp/charmrun.%d.%d", getpid(), p.procno);
     f = fopen(startScript, "w");
     if (f == NULL) {
       /* now try current directory */
-      sprintf(startScript, "charmrun.%d.%d", getpid(), p.procno);
+      snprintf(startScript, sizeof(startScript), "charmrun.%d.%d", getpid(), p.procno);
       f = fopen(startScript, "w");
       if (f == NULL) {
         fprintf(stderr, "Charmrun> Can not write file %s!\n", startScript);
@@ -5215,11 +5231,11 @@ static void start_next_level_charmruns()
 static void start_one_node_ssh(nodetab_process & p, const char ** argv)
 {
   char startScript[200];
-  sprintf(startScript, "/tmp/charmrun.%d.%d", getpid(), p.nodeno);
+  snprintf(startScript, sizeof(startScript), "/tmp/charmrun.%d.%d", getpid(), p.nodeno);
   FILE *f = fopen(startScript, "w");
   if (f == NULL) {
     /* now try current directory */
-    sprintf(startScript, "charmrun.%d.%d", getpid(), p.nodeno);
+    snprintf(startScript, sizeof(startScript), "charmrun.%d.%d", getpid(), p.nodeno);
     f = fopen(startScript, "w");
     if (f == NULL) {
       fprintf(stderr, "Charmrun> Can not write file %s!\n", startScript);
@@ -5260,7 +5276,7 @@ static int ssh_fork_one(nodetab_process & p, const char *startScript)
   char npes[24];
   if ( ! arg_mpiexec_no_n ) {
     sshargv.push_back("-n");
-    sprintf(npes, "%d", processes);
+    snprintf(npes, sizeof(npes), "%d", processes);
     sshargv.push_back(npes);
   }
   sshargv.push_back((char *) startScript);
@@ -5291,12 +5307,12 @@ static int ssh_fork_one(nodetab_process & p, const char *startScript)
 static void start_nodes_mpiexec()
 {
   char startScript[200];
-  sprintf(startScript, "./charmrun.%d", getpid());
+  snprintf(startScript, sizeof(startScript), "./charmrun.%d", getpid());
   FILE *f = fopen(startScript, "w");
   chmod(startScript, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IROTH);
   if (f == NULL) {
     /* now try current directory */
-    sprintf(startScript, "./charmrun.%d", getpid());
+    snprintf(startScript, sizeof(startScript), "./charmrun.%d", getpid());
     f = fopen(startScript, "w");
     if (f == NULL) {
       fprintf(stderr, "Charmrun> Can not write file %s!\n", startScript);
@@ -5436,6 +5452,8 @@ struct local_nodestart
   int persona;
 #endif
 
+  static constexpr int envLen = 256;
+
   local_nodestart(const char ** extra_argv = nullptr)
   {
     char ** env = main_envp;
@@ -5456,28 +5474,28 @@ struct local_nodestart
     envp = (char **) malloc((envc + 3 + extra + 1) * sizeof(void *));
     for (int i = 0; i < envc; i++)
       envp[i] = env[i];
-    envp[envc] = (char *) malloc(256);
-    envp[envc + 1] = (char *) malloc(256);
+    envp[envc] = (char *) malloc(envLen);
+    envp[envc + 1] = (char *) malloc(envLen);
     envp[envc + 2] = strdup("FROM_CHARMRUN=1");
     n = 3;
     // cpu affinity hints
     using Unit = typename TopologyRequest::Unit;
     if (proc_active)
     {
-      envp[envc + n] = (char *) malloc(256);
+      envp[envc + n] = (char *) malloc(envLen);
       switch (proc_per.unit())
       {
         case Unit::Host:
-          sprintf(envp[envc + n], "CmiProcessPerHost=%d", proc_per.host);
+          snprintf(envp[envc + n], envLen, "CmiProcessPerHost=%d", proc_per.host);
           break;
         case Unit::Socket:
-          sprintf(envp[envc + n], "CmiProcessPerSocket=%d", proc_per.socket);
+          snprintf(envp[envc + n], envLen, "CmiProcessPerSocket=%d", proc_per.socket);
           break;
         case Unit::Core:
-          sprintf(envp[envc + n], "CmiProcessPerCore=%d", proc_per.core);
+          snprintf(envp[envc + n], envLen, "CmiProcessPerCore=%d", proc_per.core);
           break;
         case Unit::PU:
-          sprintf(envp[envc + n], "CmiProcessPerPU=%d", proc_per.pu);
+          snprintf(envp[envc + n], envLen, "CmiProcessPerPU=%d", proc_per.pu);
           break;
         default:
           break;
@@ -5487,20 +5505,20 @@ struct local_nodestart
 #if CMK_SMP
     if (onewth_active)
     {
-      envp[envc + n] = (char *) malloc(256);
+      envp[envc + n] = (char *) malloc(envLen);
       switch (onewth_per.unit())
       {
         case Unit::Host:
-          sprintf(envp[envc + n], "CmiOneWthPerHost=%d", 1);
+          snprintf(envp[envc + n], envLen, "CmiOneWthPerHost=%d", 1);
           break;
         case Unit::Socket:
-          sprintf(envp[envc + n], "CmiOneWthPerSocket=%d", 1);
+          snprintf(envp[envc + n], envLen, "CmiOneWthPerSocket=%d", 1);
           break;
         case Unit::Core:
-          sprintf(envp[envc + n], "CmiOneWthPerCore=%d", 1);
+          snprintf(envp[envc + n], envLen, "CmiOneWthPerCore=%d", 1);
           break;
         case Unit::PU:
-          sprintf(envp[envc + n], "CmiOneWthPerPU=%d", 1);
+          snprintf(envp[envc + n], envLen, "CmiOneWthPerPU=%d", 1);
           break;
         default:
           break;
@@ -5509,11 +5527,11 @@ struct local_nodestart
     }
 #endif
 #if CMK_USE_SHMEM
-    envp[envc + n] = (char *) malloc(256);
-    sprintf(envp[envc + n], CMI_IPC_POOL_SIZE_ENV_VAR "=%d", arg_ipc_pool_size);
+    envp[envc + n] = (char *) malloc(envLen);
+    snprintf(envp[envc + n], envLen, CMI_IPC_POOL_SIZE_ENV_VAR "=%d", arg_ipc_pool_size);
     ++n;
-    envp[envc + n] = (char *) malloc(256);
-    sprintf(envp[envc + n], CMI_IPC_CUTOFF_ENV_VAR "=%d", arg_ipc_cutoff);
+    envp[envc + n] = (char *) malloc(envLen);
+    snprintf(envp[envc + n], envLen, CMI_IPC_CUTOFF_ENV_VAR "=%d", arg_ipc_cutoff);
     ++n;
 #endif
     envp[envc + n] = 0;
@@ -5612,8 +5630,8 @@ struct local_nodestart
   {
     if (arg_verbose)
       printf("Charmrun> start %d node program on localhost.\n", p.nodeno);
-    sprintf(envp[envc], "NETSTART=%s", create_netstart(p.nodeno));
-    sprintf(envp[envc + 1], "CmiNumNodes=%d", 0);
+    snprintf(envp[envc], envLen, "NETSTART=%s", create_netstart(p.nodeno));
+    snprintf(envp[envc + 1], envLen, "CmiNumNodes=%d", 0);
 
 #if CMK_HAS_POSIX_SPAWN
     // We need posix_spawn on macOS because it is the only way to disable ASLR at runtime.
@@ -5734,7 +5752,7 @@ static void restart_node(nodetab_process & p)
   const char ** added_restart_argv = restart_argv + i;
   restart_argv[i] = "+restartaftercrash";
   char phase_str[10];
-  sprintf(phase_str, "%d", ++current_restart_phase);
+  snprintf(phase_str, sizeof(phase_str), "%d", ++current_restart_phase);
   restart_argv[i + 1] = phase_str;
   restart_argv[i + 2] = "+restartisomalloc";
   restart_argv[i + 3] = NULL;

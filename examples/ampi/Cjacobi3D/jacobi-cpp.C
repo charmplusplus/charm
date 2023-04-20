@@ -5,8 +5,6 @@
 #include "charm++.h"
 #endif
 
-#define BGPRINTF(x)
-
 int DIM, DIMX, DIMY, DIMZ, NX, NY, NZ;
 
 class chunk {
@@ -241,7 +239,6 @@ int main(int ac, char** av)
   starttime = MPI_Wtime();
 
   for(iter=1; iter<=niter; iter++) {
-    BGPRINTF("interation starts at %f\n");
     maxerr = 0.0;
 
     cp->copyout();

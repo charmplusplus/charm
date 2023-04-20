@@ -472,8 +472,8 @@ extern CmiNodeLock CmiMemLock_lock;
 
 
 #if CMK_PAMI_LINUX_PPC8 && CMK_ENABLE_ASYNC_PROGRESS
-extern CMK_THREADLOCAL int32_t _cmi_bgq_incommthread;
-#define CmiInCommThread()  (_cmi_bgq_incommthread)
+extern CMK_THREADLOCAL int32_t _cmi_async_incommthread;
+#define CmiInCommThread()  (_cmi_async_incommthread)
 #else
 #define CmiInCommThread()  (CmiMyRank() == CmiMyNodeSize())
 #endif
@@ -780,31 +780,25 @@ CpvExtern(int, _curRestartPhase);      /* number of restarts */
 /** This header goes before each chunk of memory allocated with CmiAlloc. 
     See the comment in convcore.C for details on the fields.
 */
-struct CmiChunkHeader {
+
+#if CMK_USE_IBVERBS | CMK_USE_IBUD
+struct infiCmiChunkMetaDataStruct;
+struct infiCmiChunkMetaDataStruct* registerMultiSendMesg(char* msg, int msgSize);
+#endif
+
+// alignas is used for padding here, rather than for alignment of the
+// CmiChunkHeader itself, to ensure that the chunk following the envelope is
+// aligned relative to the start of the header.
+struct alignas(ALIGN_BYTES) CmiChunkHeader {
+#if CMK_USE_IBVERBS | CMK_USE_IBUD
+  struct infiCmiChunkMetaDataStruct *metaData;
+#endif
   int size;
 private:
 #if CMK_SMP
   std::atomic<int> ref;
 #else
   int ref;
-#endif
-#if ALIGN_BYTES > 8
-  #if defined(__GNUC__) || defined(__clang__)
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wpedantic"
-  #if defined(__clang__)
-  #pragma GCC diagnostic ignored "-Wunused-private-field"
-  #endif
-  #endif
-  char align[ALIGN_BYTES
-             - sizeof(int)*2
-#if (CMK_USE_IBVERBS || CMK_USE_IBUD)
-             - sizeof(void *)
-#endif
-            ];
-  #if defined(__GNUC__) || defined(__clang__)
-  #pragma GCC diagnostic pop
-  #endif
 #endif
 public:
   CmiChunkHeader() = default;
@@ -834,24 +828,6 @@ public:
   int decRef() { return ref--; }
 #endif
 };
-
-#if CMK_USE_IBVERBS | CMK_USE_IBUD
-struct infiCmiChunkMetaDataStruct;
-
-#define CMI_INFI_CHUNK_HEADER_FIELDS \
-struct infiCmiChunkMetaDataStruct *metaData;\
-CmiChunkHeader chunkHeader;
-
-struct infiCmiChunkHeaderHelper{
-  CMI_INFI_CHUNK_HEADER_FIELDS
-};
-
-typedef struct infiCmiChunkHeaderStruct{
-  CMI_INFI_CHUNK_HEADER_FIELDS
-} infiCmiChunkHeader;
-
-struct infiCmiChunkMetaDataStruct *registerMultiSendMesg(char *msg,int msgSize);
-#endif
 
 /* Given a user chunk m, extract the enclosing chunk header fields: */
 #define BLKSTART(m) ((CmiChunkHeader *) (((intptr_t)m) - sizeof(CmiChunkHeader)))
@@ -1099,18 +1075,12 @@ void __CmiEnforceMsgHelper(const char* expr, const char* fileName,
                                        __CMK_XSTRING(__LINE__)),     \
                     0)))
 
-#define _CmiEnforceMsg(expr, msg, ...)                                                  \
-  ((void)((expr)                                                                        \
-              ? 0                                                                       \
-              : (__CmiEnforceMsgHelper(__CMK_STRING(expr), __FILE__,                    \
-                                       __CMK_XSTRING(__LINE__), msg "%s", __VA_ARGS__), \
+#define CmiEnforceMsg(expr, ...)                                              \
+  ((void)((expr)                                                              \
+              ? 0                                                             \
+              : (__CmiEnforceMsgHelper(__CMK_STRING(expr), __FILE__,          \
+                                       __CMK_XSTRING(__LINE__), __VA_ARGS__), \
                  0)))
-
-// Very much a hack, but necessary to support the case when no arguments are given to the
-// format string. Append an empty string so that __VA_ARGS__ is never empty in the above
-// _CmiEnforceMsg macro and add a dummy "%s" to the end of the format string there to eat
-// it.
-#define CmiEnforceMsg(expr, ...) _CmiEnforceMsg(expr, __VA_ARGS__, "")
 
 #if !CMK_ERROR_CHECKING
 #  define CmiAssert(expr) ((void)0)
@@ -1858,12 +1828,7 @@ typedef void (*CcdVoidFn)(void *userParam,double curWallTime);
 #endif
 
 #define CcdIGNOREPE   -2
-#if CMK_CONDS_USE_SPECIAL_CODE
-typedef int (*CmiSwitchToPEFnPtr)(int pe);
-extern CmiSwitchToPEFnPtr CmiSwitchToPE;
-#else
 #define CmiSwitchToPE(pe)  pe
-#endif
 void CcdCallFnAfter(CcdVoidFn fnp, void *arg, double msecs);
 int CcdCallOnCondition(int condnum, CcdCondFn fnp, void *arg);
 int CcdCallOnConditionKeep(int condnum, CcdCondFn fnp, void *arg);

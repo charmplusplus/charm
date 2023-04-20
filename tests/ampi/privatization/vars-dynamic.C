@@ -23,11 +23,11 @@ CLINKAGE CMI_EXPORT int * get_scoped_global_dynamic()
 #endif
 
 #if defined test_threadlocalvars
-thread_local extern CMI_EXPORT int extern_threadlocal_dynamic;
-thread_local int extern_threadlocal_dynamic;
+extern THREAD_LOCAL CMI_EXPORT int extern_threadlocal_dynamic;
+THREAD_LOCAL int extern_threadlocal_dynamic;
 
 #if defined test_staticvars
-thread_local static int static_threadlocal_dynamic;
+static THREAD_LOCAL int static_threadlocal_dynamic;
 CLINKAGE CMI_EXPORT int * get_static_threadlocal_dynamic()
 {
   return &static_threadlocal_dynamic;
@@ -35,7 +35,7 @@ CLINKAGE CMI_EXPORT int * get_static_threadlocal_dynamic()
 
 CLINKAGE CMI_EXPORT int * get_scoped_threadlocal_dynamic()
 {
-  thread_local static int scoped_threadlocal_dynamic;
+  static THREAD_LOCAL int scoped_threadlocal_dynamic;
   return &scoped_threadlocal_dynamic;
 }
 #endif

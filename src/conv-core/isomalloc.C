@@ -647,7 +647,7 @@ static int try_largest_mmap_region(memRegion_t * destRegion)
   pid_t pid = getpid();
   {
     char s[128];
-    sprintf(s, "cat /proc/%d/maps", pid);
+    snprintf(s, sizeof(s), "cat /proc/%d/maps", pid);
     system(s);
   }
 #endif

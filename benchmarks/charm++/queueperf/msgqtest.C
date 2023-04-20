@@ -2,8 +2,6 @@
 #include <cstdlib>
 #include <vector>
 
-using std::sprintf;
-
 #include "main.decl.h"
 #include "msgq.h"
 

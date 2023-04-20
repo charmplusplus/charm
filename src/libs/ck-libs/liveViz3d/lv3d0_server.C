@@ -438,7 +438,7 @@ static void LV3D_save_init(void) {
 	}
 	
 	char fName[1024];
-	sprintf(fName,LV3D_copy_view_src,CkMyPe());
+	snprintf(fName,sizeof(fName),LV3D_copy_view_src,CkMyPe());
 	FILE *f=fopen(fName,"wb");
 	if (f==NULL) CmiAbort("Couldn't create save view file!\n");
 	CkpvAccess(LV3D_save_views)=f;
@@ -486,9 +486,9 @@ static void LV3D_save_finish(void) {
 	CkpvAccess(LV3D_save_views)=0;
 	if (LV3D_copy_view_dest) { /* Copy view file to dest directory */
 		char fSrc[1024], fDest[1024], cmd[2048];
-		sprintf(fSrc,LV3D_copy_view_src,CkMyPe());
-		sprintf(fDest,LV3D_copy_view_dest,CkMyPe());
-		sprintf(cmd,"cp '%s' '%s' && rm '%s'", fSrc,fDest, fSrc);
+		snprintf(fSrc,sizeof(fSrc),LV3D_copy_view_src,CkMyPe());
+		snprintf(fDest,sizeof(fDest),LV3D_copy_view_dest,CkMyPe());
+		snprintf(cmd,sizeof(cmd),"cp '%s' '%s' && rm '%s'", fSrc,fDest, fSrc);
 		CkPrintf("Copying views file from %s to %s\n",fSrc,fDest);
 		system(cmd);
 		CkPrintf("Views file copied.\n");
@@ -531,7 +531,7 @@ static void printStats(void *rednMsg) {
 	//  of this horrible "print to a file and read it back" business.
 	
 	char tmpFileName[100];
-	sprintf(tmpFileName,"/tmp/stats.%d.%d",CkMyPe(),(int)getpid());
+	snprintf(tmpFileName,sizeof(tmpFileName),"/tmp/stats.%d.%d",CkMyPe(),(int)getpid());
 	FILE *f=fopen(tmpFileName,"w");
 	int len=0; void *buf=0;
 	if (f!=NULL) {

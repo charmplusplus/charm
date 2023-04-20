@@ -5,8 +5,8 @@ set(ampi-f90-sources ampifimpl.f90 ampimod.f90)
 set(ampi-h-sources ampi.h ampi-interoperate.h ampif.h ampiimpl.h ddt.h ampi_functions.h ampi_funcptr.h ampi_funcptr_loader.h
                    romio-stub/mpio_functions.h romio-stub/mpio.h romio-stub/mpio_globals.h romio-stub/mpiof.h)
 
-add_library(ampi-compat compat_ampi.c
-       compat_ampim.C compat_ampifm.C compat_ampicm.C
+add_library(ampi-compat
+       compat_ampim.C compat_ampifm.C
        compat_ampicpp.C compat_ampins.C compat_ampirs.C)
 
 

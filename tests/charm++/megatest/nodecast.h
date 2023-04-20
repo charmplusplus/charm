@@ -14,7 +14,7 @@ class nodecast_BCMsg : public CMessage_nodecast_BCMsg {
 private:
   char checkString[11];
 public:
-  nodecast_BCMsg(void) { sprintf(checkString, "Broadcast!");} 
+  nodecast_BCMsg(void) { strcpy(checkString, "Broadcast!"); }
   int check(void) { 
     if (strcmp("Broadcast!", checkString) == 0)
       return 1;

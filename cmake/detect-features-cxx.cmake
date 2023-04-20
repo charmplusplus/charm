@@ -18,7 +18,11 @@ check_include_file_cxx(regex CMK_HAS_REGEX)
 # C++ compiler flags
 # Keep in sync with UNKNOWN_FLAGS section in src/arch/win/unix2nt_cc
 
-check_cxx_compiler_flag("-mno-tls-direct-seg-refs" CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS)
+if(CHARM_CPU STREQUAL "i386" OR CHARM_CPU STREQUAL "x86_64")
+  check_cxx_compiler_flag("-mno-tls-direct-seg-refs" CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS)
+elseif()
+  set(CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS 0)
+endif()
 
 check_cxx_compiler_flag("-fvisibility=hidden" CMK_COMPILER_KNOWS_FVISIBILITY)
 
@@ -39,7 +43,7 @@ endif()
 # Needed so that tlsglobals works correctly with --build-shared
 # See https://github.com/UIUC-PPL/charm/issues/3168 for details.
 check_cxx_compiler_flag("-ftls-model=initial-exec" CMK_COMPILER_KNOWS_FTLS_MODEL)
-if(CMK_COMPILER_KNOWS_FTLS_MODEL)
+if(CMK_COMPILER_KNOWS_FTLS_MODEL AND NOT DISABLE_TLS)
   set(OPTS_CC "${OPTS_CC} -ftls-model=initial-exec")
   set(OPTS_CXX "${OPTS_CXX} -ftls-model=initial-exec")
   set(OPTS_LD "${OPTS_LD} -ftls-model=initial-exec")
