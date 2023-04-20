@@ -165,7 +165,6 @@ configure_file(libmoduleampif.dep ${CMAKE_BINARY_DIR}/lib COPYONLY)
 
 # ROMIO
 set(romio-objects)
-set(romio-fortran-objects)
 if(CMK_AMPI_WITH_ROMIO)
     set(romio_dir ${CMAKE_BINARY_DIR}/src/libs/ck-libs/ampi/romio-prefix/src/romio)
 
@@ -348,17 +347,12 @@ if(CMK_AMPI_WITH_ROMIO)
 
     if(CMK_CAN_LINK_FORTRAN)
         set(romio_f77 yes)
-
-        set(romio-fortran-objects
-            ${romio_dir}/mpi-io/fortran/romio_fortran${obj_suf}
-        )
     else()
         set(romio_f77 no)
     endif()
 
     set_source_files_properties(
         ${romio-objects}
-        ${romio-fortran-objects}
         PROPERTIES
         EXTERNAL_OBJECT true
         GENERATED true
@@ -410,14 +404,6 @@ if(CMK_AMPI_WITH_ROMIO)
         LIST_SEPARATOR ^^
     )
 
-    if(CMK_CAN_LINK_FORTRAN)
-        add_custom_command(TARGET romio
-            POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy ${romio_dir}/mpi-io/fortran/romio_fortran${obj_suf} ${CMAKE_BINARY_DIR}/lib/ampi_funcptr_shim_fortran_romio.o
-            VERBATIM
-        )
-    endif()
-
     add_dependencies(ampi_funcptr_shim romio)
     add_dependencies(ampi_funcptr_shim_main romio)
     add_dependencies(ampi_funcptr_loader romio)
@@ -453,7 +439,6 @@ if(CMK_CAN_LINK_FORTRAN)
         ${ampi-cxx-sources}
         ${ampi-h-sources}
         ${romio-objects}
-        ${romio-fortran-objects}
     )
     target_compile_options(moduleampif PRIVATE -DAMPI_NO_UNIMPLEMENTED_WARNINGS -I${CMAKE_BINARY_DIR}/include/ampi/)
     add_dependencies(moduleampif moduletcharm ck)
