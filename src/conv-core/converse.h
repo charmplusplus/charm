@@ -1103,7 +1103,7 @@ extern void  CcdCallBacks(void);
 #else
 CpvExtern(int, _ccd_numchecks);
 CpvExtern(int, _ccd_heaplen);
-#define CsdPeriodic() do{ if (CpvAccess(_ccd_heaplen) > 0 && CpvAccess(_ccd_numchecks)-- <= 0) CcdCallBacks(); } while(0)
+#define CsdPeriodic() do{ if (CpvAccess(_ccd_numchecks)-- <= 0) CcdCallBacks(); } while(0)
 #define CsdResetPeriodic()    CpvAccess(_ccd_numchecks) = 0
 #endif
 
