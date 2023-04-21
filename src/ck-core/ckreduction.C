@@ -1616,7 +1616,7 @@ CkReductionMsg* CkReduction::tupleReduction_fn(int num_messages, CkReductionMsg*
     {
       CkReduction::tupleElement* reductions = (CkReduction::tupleElement*)(tuple_data[message_idx]);
       CkReduction::tupleElement& element = reductions[reduction_idx];
-      DEB_TUPLE(("    msg %d, sf=%d, length=%d : { dataSize=%lu, data=%p, reducer=%d },\n",
+      DEB_TUPLE(("    msg %d, sf=%d, length=%d : { dataSize=%zu, data=%p, reducer=%d },\n",
                  message_idx, messages[message_idx]->sourceFlag, messages[message_idx]->getLength(), element.dataSize, element.data, element.reducer));
 
       reducerType = element.reducer;

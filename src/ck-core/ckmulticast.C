@@ -787,7 +787,7 @@ void CkMulticastMgr::childrenReady(mCastEntry *entry)
     entry->setReady();
     CProxy_CkMulticastMgr  mCastGrp(thisgroup);
 
-    DEBUGF(("[%d] childrenReady entry %p groupsection?: %d,  Arrayelems: %lu, GroupElems: %lu, redNo: %d\n", CkMyPe(), entry, entry->isGrpSec(), entry->allElem.size(), entry->allGrpElem.size(), entry->red.redNo));
+    DEBUGF(("[%d] childrenReady entry %p groupsection?: %d,  Arrayelems: %zu, GroupElems: %zu, redNo: %d\n", CkMyPe(), entry, entry->isGrpSec(), entry->allElem.size(), entry->allGrpElem.size(), entry->red.redNo));
 
     if (entry->hasParent()) 
         mCastGrp[entry->parentGrp.get_pe()].recvCookie(entry->parentGrp, CkSectionInfo(entry->getAid(), entry));
@@ -872,7 +872,7 @@ void CkMulticastMgr::resetCookie(CkSectionInfo s)
 
 void CkMulticastMgr::SimpleSend(int ep,void *m, CkArrayID a, CkSectionID &sid, int opts)
 {
-  DEBUGF(("[%d] SimpleSend: nElems: %lu\n", CkMyPe(), sid._elems.size()));
+  DEBUGF(("[%d] SimpleSend: nElems: %zu\n", CkMyPe(), sid._elems.size()));
     // set an invalid cookie since we don't have it
   ((multicastGrpMsg *)m)->_cookie = CkSectionInfo(-1, NULL, 0, a);
   for (int i=0; i< sid._elems.size()-1; i++) {
@@ -1528,7 +1528,7 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
     reductionInfo &redInfo = entry->red;
 
 
-    DEBUGF(("[%d] RecvRedMsg, entry: %p, lcount: %d, cccount: %d, #localelems: %d, #children: %lu \n", CkMyPe(), (void *)entry, redInfo.lcount[msg->fragNo], redInfo.ccount[msg->fragNo], entry->getNumLocalElems(), entry->children.size()));
+    DEBUGF(("[%d] RecvRedMsg, entry: %p, lcount: %d, cccount: %d, #localelems: %d, #children: %zu \n", CkMyPe(), (void *)entry, redInfo.lcount[msg->fragNo], redInfo.ccount[msg->fragNo], entry->getNumLocalElems(), entry->children.size()));
 
     //-------------------------------------------------------------------------
     /// If you've received a msg from a previous redn, something has gone horribly wrong somewhere!
