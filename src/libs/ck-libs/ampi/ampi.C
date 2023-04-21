@@ -5997,7 +5997,7 @@ CMI_WARN_UNUSED_RESULT ampiParent* ampiParent::waitall(int count, MPI_Request re
     }
   }
 
-  MSG_ORDER_DEBUG(CkPrintf("[%d] MPI_Waitall called with count %d, blocking on completion of %d requests\n", ptr->thisIndex, count, numBlockedReqs));
+  MSG_ORDER_DEBUG(CkPrintf("[%d] MPI_Waitall called with count %d, blocking on completion of %d requests\n", pptr->thisIndex, count, numBlockedReqs));
 
   // If any requests are incomplete, block until all have been completed
   if (numBlockedReqs > 0) {
