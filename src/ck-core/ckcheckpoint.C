@@ -27,9 +27,6 @@ void noopit(const char*, ...)
 //#define DEBCHK   CkPrintf
 #define DEBCHK noopit
 
-#define DEBUGC(x) x
-//#define DEBUGC(x) 
-
 #define SUBDIR_SIZE 256
 
 CkGroupID _sysChkptWriteMgr;

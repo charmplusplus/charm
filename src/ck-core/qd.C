@@ -59,7 +59,7 @@ static inline void _bcastQD1(QdState* state, QdMsg *msg)
   msg->setPhase(0);
   state->propagate(msg);
   msg->setPhase(1);
-  DEBUGP(("[%d] _bcastQD1: State: getCreated:%d getProcessed:%d\n", CmiMyPe(), state->getCreated(), state->getProcessed()));
+  DEBUGP(("[%d] _bcastQD1: State: getCreated:%lld getProcessed:%lld\n", CmiMyPe(), state->getCreated(), state->getProcessed()));
 #if !CMK_MULTICORE
 /*
   QdState *comm_state;
@@ -129,14 +129,14 @@ static inline void _handlePhase1(QdState *state, QdMsg *msg)
       _bcastQD2(state, msg);
       break;
     case 1 :
-      DEBUGP(("[%d] msg: getCreated:%d getProcessed:%d\n", CmiMyPe(), msg->getCreated(), msg->getProcessed()));
+      DEBUGP(("[%d] msg: getCreated:%lld getProcessed:%lld\n", CmiMyPe(), msg->getCreated(), msg->getProcessed()));
         // add children's counters
       state->subtreeCreate(msg->getCreated());
       state->subtreeProcess(msg->getProcessed());
       state->reported();
       if(state->allReported()) {
         if(CmiMyPe()==0) {
-          DEBUGP(("ALL: %p getCCreated:%d getCProcessed:%d\n", state, state->getCCreated(), state->getCProcessed()));
+          DEBUGP(("ALL: %p getCCreated:%lld getCProcessed:%lld\n", state, state->getCCreated(), state->getCProcessed()));
           if(state->getCCreated()==state->getCProcessed()) {
             if(state->oldCount == state->getCProcessed()) {// counts unchanged in second round
               _bcastQD2(state, msg);    // almost reached, one pass to make sure
