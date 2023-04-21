@@ -40,7 +40,7 @@ struct helpdesc { qt_helper_t *hfn; qt_t *jb; void *oldptr; void *newptr; };
 static TLS_SPECIFIER void * pbuf[MAXTABLE] = {0};
 static TLS_SPECIFIER int    pcounter = 1;
 
-#ifdef __GNUC__
+#if __GNUC__ && !__clang__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wstringop-overflow"
 #endif
@@ -116,6 +116,6 @@ void *qt_abort(qt_helper_t *hfn, void *oldptr, void *newptr, qt_t *sp)
   longjmp(*(jmp_buf *)&sp, push_buf((void *)&help));
 }
 
-#ifdef __GNUC__
+#if __GNUC__ && !__clang__
 #pragma GCC diagnostic pop
 #endif
