@@ -4,7 +4,12 @@ CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
 HEADERS=ampi.h ampif.h ampi_functions.h \
 		ampi-interoperate.h ampiimpl.h ampi.decl.h ddt.h \
-		$(addprefix romio-stub/,mpio.h mpiof.h mpio_functions.h mpio_globals.h)
+		$(addprefix romio-stub/,mpio_globals.h)
+ROMIO_HEADERS:=$(addprefix romio/include/,mpio.h mpiof.h mpio_functions.h)
+ROMIO_STUB_HEADERS:=$(addprefix romio-stub/,mpio.h mpiof.h mpio_functions.h)
+ifneq ($(CMK_AMPI_WITH_ROMIO),1)
+  HEADERS+= $(ROMIO_STUB_HEADERS)
+endif
 HEADDEP=$(HEADERS) \
 		../tcharm/tcharm.h ../tcharm/tcharm_impl.h
 COMPAT=compat_ampim.o compat_ampifm.o \
@@ -113,6 +118,7 @@ all: $(MAJOR_TARGETS) $(COMPATLIB) $(ROMIO)
 
 $(ROMIO): headers
 	@echo "Building ROMIO"
+	cp $(ROMIO_STUB_HEADERS) $(CDIR)/include/
 	cd romio && \
 		./configure \
 		--disable-aio \
@@ -141,8 +147,7 @@ $(ROMIO): headers
 		USER_CFLAGS="$(OPTS) $(ROMIO_FLAGS)" \
 		USER_FFLAGS="$(OPTS) $(ROMIO_FLAGS)" \
 		|| ( cat config.log ; exit 1 )
-
-	cp romio/include/mpio.h romio/include/mpiof.h romio/include/mpio_functions.h $(CDIR)/include
+	cp $(ROMIO_HEADERS) $(CDIR)/include/
 	$(MAKE) -C romio AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=:
 ifeq (1,$(CMK_CAN_LINK_FORTRAN))
 	cp romio/mpi-io/fortran/romio_fortran$(obj_suf) $(FUNCPTR_SHIM_FORTRAN_ROMIO_OBJ)
@@ -217,33 +222,33 @@ compat_ampins.o: compat_ampins.C
 compat_ampirs.o: compat_ampirs.C
 	$(CHARMC) -c $<
 
-ampi_mpix.o: ampi_mpix.C $(HEADDEP) headers
+ampi_mpix.o: ampi_mpix.C $(HEADDEP) headers | $(ROMIO)
 
-ampi_noimpl.o: ampi_noimpl.C $(HEADDEP) headers
+ampi_noimpl.o: ampi_noimpl.C $(HEADDEP) headers | $(ROMIO)
 	$(CHARMC) -c $< -DAMPI_NO_UNIMPLEMENTED_WARNINGS
 
 compat_ampicpp.o: compat_ampicpp.C
 	$(CHARMC) -c compat_ampicpp.C
 
-ampi.o: ampi.C $(HEADDEP) headers
+ampi.o: ampi.C $(HEADDEP) headers | $(ROMIO)
 	$(CHARMC) -c ampi.C
 
-$(AMPIF_OBJ): ampif.C $(HEADDEP) headers
+$(AMPIF_OBJ): ampif.C $(HEADDEP) headers | $(ROMIO)
 	$(CHARMC) -c $< -o $@
 
-ampiOneSided.o: ampiOneSided.C ampiimpl.h $(HEADDEP) headers
+ampiOneSided.o: ampiOneSided.C ampiimpl.h $(HEADDEP) headers | $(ROMIO)
 	$(CHARMC) -c ampiOneSided.C
 
-ampiMisc.o: ampiMisc.C ampiimpl.h $(HEADDEP) headers
+ampiMisc.o: ampiMisc.C ampiimpl.h $(HEADDEP) headers | $(ROMIO)
 	$(CHARMC) -c ampiMisc.C
 
-mpich-alltoall.o: mpich-alltoall.C $(HEADDEP) headers
+mpich-alltoall.o: mpich-alltoall.C $(HEADDEP) headers | $(ROMIO)
 	$(CHARMC) -c mpich-alltoall.C
 
-ampi.decl.h ampi.def.h: ampi.ci
+ampi.decl.h ampi.def.h: ampi.ci | $(ROMIO)
 	$(CHARMC) ampi.ci
 
-ddt.o: ddt.C ddt.h $(HEADDEP) headers
+ddt.o: ddt.C ddt.h $(HEADDEP) headers | $(ROMIO)
 
 $(FUNCPTR_SHIM_OBJ): ampi_funcptr_shim.C $(HEADDEP) headers | $(ROMIO)
 	$(CHARMC) -language ampi -DAMPI_USE_FUNCPTR -DAMPI_NO_UNIMPLEMENTED_WARNINGS -fPIE -shared -c $< -o $@
