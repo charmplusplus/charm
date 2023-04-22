@@ -3,7 +3,11 @@ set(ampi-cxx-sources ampi.C ampiMisc.C ampiOneSided.C ampif.C ddt.C mpich-alltoa
 set(ampi-f90-sources ampimod.f90)
 
 set(ampi-h-sources ampi.h ampi-interoperate.h ampif.h ampiimpl.h ddt.h ampi_functions.h ampi_funcptr.h ampi_funcptr_loader.h
-                   romio-stub/mpio_functions.h romio-stub/mpio.h romio-stub/mpio_globals.h romio-stub/mpiof.h)
+                   romio-stub/mpio_globals.h)
+
+if(NOT CMK_AMPI_WITH_ROMIO)
+    set(ampi-h-sources ${ampi-h-sources} romio-stub/mpio_functions.h romio-stub/mpio.h romio-stub/mpiof.h)
+endif()
 
 add_library(ampi-compat
        compat_ampim.C compat_ampifm.C
@@ -368,6 +372,9 @@ if(CMK_AMPI_WITH_ROMIO)
     include(ExternalProject)
     ExternalProject_Add(romio
         URL ${CMAKE_CURRENT_SOURCE_DIR}/romio
+        CONFIGURE_COMMAND cp -f ${CMAKE_CURRENT_SOURCE_DIR}/romio-stub/mpio.h ${CMAKE_BINARY_DIR}/include/ &&
+        CONFIGURE_COMMAND cp -f ${CMAKE_CURRENT_SOURCE_DIR}/romio-stub/mpiof.h ${CMAKE_BINARY_DIR}/include/ &&
+        CONFIGURE_COMMAND cp -f ${CMAKE_CURRENT_SOURCE_DIR}/romio-stub/mpio_functions.h ${CMAKE_BINARY_DIR}/include/ &&
         CONFIGURE_COMMAND cd ${romio_dir} &&
             ./configure
             --disable-aio
@@ -478,6 +485,8 @@ endif()
 if(CMK_AMPI_WITH_ROMIO)
     add_dependencies(moduleampi romio)
     if(CMK_CAN_LINK_FORTRAN)
+        add_dependencies(ampif romio)
+        add_dependencies(ampimod romio)
         add_dependencies(moduleampif romio)
     endif()
 endif()
