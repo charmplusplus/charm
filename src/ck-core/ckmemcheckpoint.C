@@ -109,7 +109,7 @@ static bool checkpointed = false;
 // name of the kill file that contains processes to be killed 
 char *killFile;                                               
 // flag for the kill file         
-int killFlag=0;
+bool killFlag;
 // variable for storing the killing time
 double killTime=0.0;
 #endif

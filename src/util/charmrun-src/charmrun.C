@@ -5631,7 +5631,7 @@ struct local_nodestart
   {
     if (arg_verbose)
       printf("Charmrun> start %d node program on localhost.\n", p.nodeno);
-    snprintf(envp[envc], envLen, "NETSTART=%s", create_netstart(p.nodeno));
+    snprintf(envp[envc], envLen, "NETSTART=%.240s", create_netstart(p.nodeno));
     snprintf(envp[envc + 1], envLen, "CmiNumNodes=%d", 0);
 
 #if CMK_HAS_POSIX_SPAWN
