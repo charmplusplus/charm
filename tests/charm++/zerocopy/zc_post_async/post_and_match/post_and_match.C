@@ -135,7 +135,7 @@ class arr : public CBase_arr {
 
     void recv_zerocopy(int *buffer, size_t size, bool isBcast) {
       CkAssert(size == SIZE);
-      verifyValuesWithConstant(destBuffer, SIZE, CONSTANT);
+      verifyValuesWithConstant(buffer, SIZE, CONSTANT);
 
       if(isBcast) {
         CkCallback doneCb = CkCallback(CkReductionTarget(tester, bcastDone), chareProxy);
@@ -193,9 +193,9 @@ class grp : public CBase_grp {
 
     void recv_zerocopy(int *buffer1, size_t size1, int *buffer2, size_t size2, bool isBcast ) {
       CkAssert(size1 == SIZE);
-      verifyValuesWithConstant(destBuffer1, SIZE, CONSTANT);
+      verifyValuesWithConstant(buffer1, SIZE, CONSTANT);
       CkAssert(size2 == SIZE);
-      verifyValuesWithConstant(destBuffer2, SIZE, CONSTANT);
+      verifyValuesWithConstant(buffer2, SIZE, CONSTANT);
 
       if(isBcast) {
         CkCallback doneCb = CkCallback(CkReductionTarget(tester, bcastDone), chareProxy);
@@ -248,7 +248,7 @@ class nodegrp : public CBase_nodegrp {
 
     void recv_zerocopy(int *buffer, size_t size, bool isBcast) {
       CkAssert(size == SIZE);
-      verifyValuesWithConstant(destBuffer, SIZE, CONSTANT);
+      verifyValuesWithConstant(buffer, SIZE, CONSTANT);
 
       if(isBcast) {
         CkCallback doneCb = CkCallback(CkReductionTarget(tester, bcastDone), chareProxy);
