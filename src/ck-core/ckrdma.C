@@ -2064,11 +2064,15 @@ void CkPostBufferInternal(void *destBuffer, size_t destSize, int tag) {
 void CkPostNodeBufferInternal(void *destBuffer, size_t destSize, int tag) {
 
   // check if tag exists in posted req node table
+  CmiLock(CksvAccess(_nodeZCPostReqLock));
   auto iter = CksvAccess(ncpyPostedReqNodeMap).find(tag);
+  CmiUnlock(CksvAccess(_nodeZCPostReqLock));
 
   if(iter == CksvAccess(ncpyPostedReqNodeMap).end()) {
 
+    CmiLock(CksvAccess(_nodeZCBufferReqLock));
     auto iter2 = CksvAccess(ncpyPostedBufferNodeMap).find(tag);
+    CmiUnlock(CksvAccess(_nodeZCBufferReqLock));
 
     if(iter2 == CksvAccess(ncpyPostedBufferNodeMap).end()) { // not found, insert into ncpyPostedBufferNodeMap
       CkPostedBuffer postedBuff;
