@@ -367,7 +367,7 @@ if(CMK_AMPI_WITH_ROMIO)
     # Compile ROMIO with the same flags as AMPI
     get_target_property(CK_CFLAGS ck COMPILE_OPTIONS)
     string(REPLACE ";" " " CK_CFLAGS "${CK_CFLAGS}")
-    set(ROMIO_FLAGS "${CK_CFLAGS} -DAMPI_NO_UNIMPLEMENTED_WARNINGS -standalone -fPIC")
+    set(ROMIO_FLAGS "${CK_CFLAGS} -DAMPI_NO_UNIMPLEMENTED_WARNINGS -seq -fPIC")
 
     include(ExternalProject)
     ExternalProject_Add(romio
@@ -417,13 +417,6 @@ if(CMK_AMPI_WITH_ROMIO)
             VERBATIM
         )
     endif()
-
-    # Since we link a program with charmc as part of ROMIO's configure,
-    # we need all libraries built at this point.
-    add_dependencies(romio ck modulecompletion
-        converse conv-static ldb-rand
-        memory-os-isomalloc memory-default threads-default ckmain
-        ckqt moduleNDMeshStreamer ckhello)
 
     add_dependencies(ampi_funcptr_shim romio)
     add_dependencies(ampi_funcptr_shim_main romio)
