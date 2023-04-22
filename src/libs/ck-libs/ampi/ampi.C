@@ -11709,6 +11709,8 @@ int AMPI_GPU_Iinvoke_wr(hapiWorkRequest *to_call, MPI_Request *request)
   CkCallback cb(&AMPI_GPU_complete, newreq);
   hapiWorkRequestSetCallback(to_call, &cb);
   hapiEnqueue(to_call);
+
+  return MPI_SUCCESS;
 }
 
 /* Submit GPU request that will be notified of completion once the previous
@@ -11725,6 +11727,8 @@ int AMPI_GPU_Iinvoke(cudaStream_t stream, MPI_Request *request)
   // A callback that completes the corresponding request
   CkCallback cb(&AMPI_GPU_complete, newreq);
   hapiAddCallback(stream, &cb, nullptr);
+
+  return MPI_SUCCESS;
 }
 
 CLINKAGE
