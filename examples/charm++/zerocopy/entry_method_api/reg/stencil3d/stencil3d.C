@@ -363,9 +363,6 @@ class Stencil: public CBase_Stencil {
       } else
         work = 10.0;
 
-#ifndef _MSC_VER
-#pragma unroll
-#endif
       for(int w=0; w<work; w++) {
         for(int k=1; k<blockDimZ+1; ++k)
           for(int j=1; j<blockDimY+1; ++j)
