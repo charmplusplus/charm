@@ -44,6 +44,10 @@ foreach(in_f ${ci-files})
         set(ci-output ControlPointsNoTrace.decl.h)
     elseif(${in_f} MATCHES src/ck-core/mpi-mainmodule.ci)
         set(ci-output mpi_main.decl.h)
+    elseif(${in_f} MATCHES src/libs/ck-libs/sparseContiguousReducer/cksparsecontiguousreducer.ci)
+        set(ci-output CkSparseContiguousReducer.decl.h)
+    elseif(${in_f} MATCHES src/libs/ck-libs/sparseReducer/cksparsereducer.ci)
+        set(ci-output CkSparseReducer.decl.h)
     elseif(${in_f} MATCHES src/libs/ck-libs/multiphaseSharedArrays/msa-DistPageMgr.ci)
         set(ci-output msa.decl.h)
     elseif(${in_f} MATCHES src/libs/ck-libs/pythonCCS/charmdebug-python.ci)
@@ -70,6 +74,9 @@ foreach(in_f ${ci-files})
         set(ci-output TMR_Interface.decl.h)
     elseif(${in_f} MATCHES src/libs/ck-libs/pmaf/chunk.ci)
         set(ci-output PMAF.decl.h)
+    elseif(${in_f} MATCHES src/libs/ck-libs/pmaf/pgm.ci)
+        # set(ci-output Pgm.decl.h) # disabled ; should be renamed ; not needed during LIBS build
+        continue()
     elseif(${in_f} MATCHES src/ck-perf/trace-Tau.ci)
         set(ci-output TraceTau.decl.h)
     elseif(${in_f} MATCHES src/ck-perf/trace-summary.ci)
@@ -84,6 +91,12 @@ foreach(in_f ${ci-files})
     else()
         # ci filename equal to module name
         get_filename_component(ci-output ${in_f} NAME_WE)
+
+        # avoid ._* files on macOS:
+        if(ci-output STREQUAL "")
+            continue()
+        endif()
+
         string(APPEND ci-output ".decl.h")
     endif()
 
