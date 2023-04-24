@@ -72,55 +72,6 @@ fi
 ])dnl
 
 dnl/*D
-dnl PAC_PROG_MAKE_ALLOWS_COMMENTS - Check whether comments are allowed in 
-dnl   shell commands in a makefile
-dnl
-dnl Synopsis:
-dnl PAC_PROG_MAKE_ALLOWS_COMMENTS([false text])
-dnl
-dnl Output Effect:
-dnl Issues a warning message if comments are not allowed in a makefile.
-dnl Executes the argument if one is given.
-dnl
-dnl Notes:
-dnl Some versions of OSF V3 make do not all comments in action commands.
-dnl
-dnl See Also:
-dnl  PAC_PROG_MAKE
-dnl D*/
-dnl
-AC_DEFUN([PAC_PROG_MAKE_ALLOWS_COMMENTS],[
-AC_CACHE_CHECK([whether make allows comments in actions],
-pac_cv_prog_make_allows_comments,[
-AC_REQUIRE([PAC_PROG_MAKE_PROGRAM])
-# This is needed for Mac OSX 10.5
-rm -rf conftest.dSYM
-rm -f conftest
-cat > conftest <<.
-SHELL=/bin/sh
-ALL:
-	@# This is a valid comment!
-	@echo "success"
-.
-pac_str=`$MAKE -f conftest 2>&1`
-# This is needed for Mac OSX 10.5
-rm -rf conftest.dSYM
-rm -f conftest 
-if test "$pac_str" != "success" ; then
-    pac_cv_prog_make_allows_comments="no"
-else
-    pac_cv_prog_make_allows_comments="yes"
-fi
-])
-if test "$pac_cv_prog_make_allows_comments" = "no" ; then
-    AC_MSG_WARN([Your make does not allow comments in target code.
-Using this make may cause problems when building programs.
-You should consider using gnumake instead.])
-    ifelse([$1],,[$1])
-fi
-])dnl
-
-dnl/*D
 dnl PAC_PROG_MAKE_VPATH - Check whether make supports source-code paths.
 dnl
 dnl Synopsis:
@@ -302,7 +253,6 @@ AC_DEFUN([PAC_PROG_MAKE],[
 PAC_PROG_MAKE_PROGRAM
 PAC_PROG_MAKE_CLOCK_SKEW
 PAC_PROG_MAKE_INCLUDE
-PAC_PROG_MAKE_ALLOWS_COMMENTS
 PAC_PROG_MAKE_VPATH
 AC_SUBST(SET_CFLAGS)
 dnl AM_IGNORE(SET_CFLAGS)
