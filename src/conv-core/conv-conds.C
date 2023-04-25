@@ -53,6 +53,16 @@ typedef struct _ccd_cblist {
 } ccd_cblist;
 
 
+/*Make sure this matches the CcdPERIODIC_* list in converse.h*/
+#define CCD_PERIODIC_MAX (CcdPERIODIC_LAST - CcdPERIODIC_FIRST)
+const static double periodicCallInterval[CCD_PERIODIC_MAX]=
+{0.001, 0.010, 0.100, 1.0, 5.0, 10.0, 60.0, 2*60.0, 5*60.0, 10*60.0, 3600.0, 12*3600.0, 24*3600.0};
+
+/* Cond callbacks that use the above time intervals for their condition are considered "timed" */
+static bool isTimed(int condnum) {
+  return (condnum >= CcdPERIODIC_FIRST && condnum < CcdPERIODIC_LAST);
+}
+
 
 /** Initialize a list of callbacks. Alloc memory, set counters etc. */
 static void init_cblist(ccd_cblist *l, unsigned int ml)
@@ -97,7 +107,7 @@ static void expand_cblist(ccd_cblist *l, unsigned int ml)
 
 
 /** Remove element referred to by given list index idx. */
-static void remove_elem(ccd_cblist *l, int idx)
+static void remove_elem(ccd_cblist *l, int condnum, int idx)
 {
   ccd_cblist_elem *e = l->elems;
   /* remove lidx from the busy list */
@@ -116,25 +126,26 @@ static void remove_elem(ccd_cblist *l, int idx)
     e[e[idx].next].prev = idx;
   l->first_free = idx;
   l->len--;
+  if (isTimed(condnum)) CpvAccess(_ccd_num_timed_cond_cbs)--;
 }
 
 
 
 /** Remove n elements from the beginning of the list. */
-static void remove_n_elems(ccd_cblist *l, int n)
+static void remove_n_elems(ccd_cblist *l, int condnum, int n)
 {
   int i;
   if(n==0 || (l->len < n))
     return;
   for(i=0;i<n;i++) {
-    remove_elem(l, l->first);
+    remove_elem(l, condnum, l->first);
   }
 }
 
 
 
 /** Append callback to the given cblist, and return the index. */
-static int append_elem(ccd_cblist *l, CcdCondFn fn, void *arg, int pe)
+static int append_elem(ccd_cblist *l, int condnum, CcdCondFn fn, void *arg, int pe)
 {
   int idx;
   ccd_cblist_elem *e;
@@ -154,6 +165,7 @@ static int append_elem(ccd_cblist *l, CcdCondFn fn, void *arg, int pe)
   e[idx].cb.arg = arg;
   e[idx].cb.pe = pe;
   l->len++;
+  if (isTimed(condnum)) CpvAccess(_ccd_num_timed_cond_cbs)++;
   return idx;
 }
 
@@ -187,7 +199,7 @@ static void call_cblist_keep(ccd_cblist *l)
  * registered from other callbacks) are ignored. 
  * @note: It is illegal to cancel callbacks from within ccd callbacks.
  */
-static void call_cblist_remove(ccd_cblist *l)
+static void call_cblist_remove(ccd_cblist *l, int condnum)
 {
   int len = l->len;
   /* reentrant */
@@ -199,7 +211,7 @@ static void call_cblist_remove(ccd_cblist *l)
     int unused = CmiSwitchToPE(old);
     idx = l->elems[idx].next;
   }
-  remove_n_elems(l,len);
+  remove_n_elems(l,condnum,len);
   l->flag = false;
 }
 
@@ -222,11 +234,6 @@ CpvStaticDeclare(ccd_cond_callbacks, conds);
 
 // Default resolution of .005 seconds aka 5 milliseconds
 #define CCD_DEFAULT_RESOLUTION 5.0e-3
-
-/*Make sure this matches the CcdPERIODIC_* list in converse.h*/
-#define CCD_PERIODIC_MAX 13
-const static double periodicCallInterval[CCD_PERIODIC_MAX]=
-{0.001, 0.010, 0.100, 1.0, 5.0, 10.0, 60.0, 2*60.0, 5*60.0, 10*60.0, 3600.0, 12*3600.0, 24*3600.0};
 
 /**
  * List of periodic callbacks maintained by the scheduler
@@ -263,9 +270,19 @@ typedef struct {
 CpvStaticDeclare(ccd_heap_elem*, ccd_heap); 
 /** The length of the callback heap */
 CpvDeclare(int, _ccd_heaplen);
+/** The number of timer-based condition callbacks */
+CpvDeclare(int, _ccd_num_timed_cond_cbs);
 /** The max allowed length of the callback heap */
 CpvStaticDeclare(int, ccd_heapmaxlen);
 
+
+/**
+ * How many CBs are timer-based? The scheduler can call this to check
+ * if it needs to call CcdCallBacks or not.
+ */
+int CcdNumTimerCBs(void) {
+  return (CpvAccess(_ccd_heaplen) + CpvAccess(_ccd_num_timed_cond_cbs));
+}
 
 
 /** Swap two elements on the heap */
@@ -421,10 +438,12 @@ void CcdModuleInit(char **ignored)
    CpvInitialize(ccd_cond_callbacks, conds);
    CpvInitialize(ccd_periodic_callbacks, pcb);
    CpvInitialize(int, _ccd_heaplen);
+   CpvInitialize(int, _ccd_num_timed_cond_cbs);
    CpvInitialize(int, ccd_heapmaxlen);
    CpvInitialize(int, _ccd_numchecks);
 
    CpvAccess(_ccd_heaplen) = 0;
+   CpvAccess(_ccd_num_timed_cond_cbs) = 0;
    CpvAccess(ccd_heapmaxlen) = MAXTIMERHEAPENTRIES;
    CpvAccess(ccd_heap) = 
      (ccd_heap_elem*) malloc(sizeof(ccd_heap_elem)*2*(MAXTIMERHEAPENTRIES + 1));
@@ -457,7 +476,7 @@ void CcdModuleInit(char **ignored)
 int CcdCallOnCondition(int condnum, CcdCondFn fnp, void *arg)
 {
   CmiAssert(condnum < MAXNUMCONDS);
-  return append_elem(&(CpvAccess(conds).condcb[condnum]), fnp, arg, CcdIGNOREPE);
+  return append_elem(&(CpvAccess(conds).condcb[condnum]), condnum, fnp, arg, CcdIGNOREPE);
 } 
 
 /** 
@@ -467,7 +486,7 @@ int CcdCallOnCondition(int condnum, CcdCondFn fnp, void *arg)
 int CcdCallOnConditionOnPE(int condnum, CcdCondFn fnp, void *arg, int pe)
 {
   CmiAssert(condnum < MAXNUMCONDS);
-  return append_elem(&(CpvAccess(conds).condcb[condnum]), fnp, arg, pe);
+  return append_elem(&(CpvAccess(conds).condcb[condnum]), condnum, fnp, arg, pe);
 } 
 
 /**
@@ -477,7 +496,7 @@ int CcdCallOnConditionOnPE(int condnum, CcdCondFn fnp, void *arg, int pe)
 int CcdCallOnConditionKeep(int condnum, CcdCondFn fnp, void *arg)
 {
   CmiAssert(condnum < MAXNUMCONDS);
-  return append_elem(&(CpvAccess(conds).condcb_keep[condnum]), fnp, arg, CcdIGNOREPE);
+  return append_elem(&(CpvAccess(conds).condcb_keep[condnum]), condnum, fnp, arg, CcdIGNOREPE);
 } 
 
 /**
@@ -487,7 +506,7 @@ int CcdCallOnConditionKeep(int condnum, CcdCondFn fnp, void *arg)
 int CcdCallOnConditionKeepOnPE(int condnum, CcdCondFn fnp, void *arg, int pe)
 {
   CmiAssert(condnum < MAXNUMCONDS);
-  return append_elem(&(CpvAccess(conds).condcb_keep[condnum]), fnp, arg, pe);
+  return append_elem(&(CpvAccess(conds).condcb_keep[condnum]), condnum, fnp, arg, pe);
 } 
 
 
@@ -497,7 +516,7 @@ int CcdCallOnConditionKeepOnPE(int condnum, CcdCondFn fnp, void *arg, int pe)
 void CcdCancelCallOnCondition(int condnum, int idx)
 {
   CmiAssert(condnum < MAXNUMCONDS);
-  remove_elem(&(CpvAccess(conds).condcb[condnum]), idx);
+  remove_elem(&(CpvAccess(conds).condcb[condnum]), condnum, idx);
 }
 
 
@@ -507,7 +526,7 @@ void CcdCancelCallOnCondition(int condnum, int idx)
 void CcdCancelCallOnConditionKeep(int condnum, int idx)
 {
   CmiAssert(condnum < MAXNUMCONDS);
-  remove_elem(&(CpvAccess(conds).condcb_keep[condnum]), idx);
+  remove_elem(&(CpvAccess(conds).condcb_keep[condnum]), condnum, idx);
 }
 
 
@@ -539,7 +558,7 @@ void CcdCallFnAfter(CcdVoidFn fnp, void *arg, double deltaT)
 void CcdRaiseCondition(int condnum)
 {
   CmiAssert(condnum < MAXNUMCONDS);
-  call_cblist_remove(&CpvAccess(conds).condcb[condnum]);
+  call_cblist_remove(&CpvAccess(conds).condcb[condnum],condnum);
   call_cblist_keep(&CpvAccess(conds).condcb_keep[condnum]);
 }
 
@@ -630,7 +649,7 @@ void CcdCallBacks(void)
   
   for (i=0;i<CCD_PERIODIC_MAX;i++) 
     if (o->nextCall[i]<=curWallTime) {
-      CcdRaiseCondition(CcdPERIODIC+i);
+      CcdRaiseCondition(CcdPERIODIC_FIRST+i);
       o->nextCall[i]=curWallTime+periodicCallInterval[i];
     }
     else 
