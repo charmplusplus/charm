@@ -2771,6 +2771,10 @@ void CkLocMgr::removeFromTable(const CmiUInt8 id)
     CkAbort("CkLocMgr::removeFromTable called on invalid index!");
 #endif
   hash.erase(id);
+  // Don't erase this during migration because the entry will be updated to reflect
+  // the new location by calling recordEmigration
+  if (!duringMigration)
+    cache->erase(id);
 #if CMK_ERROR_CHECKING
   // Make sure it's really gone
   if (NULL != elementNrec(id))
