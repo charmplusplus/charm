@@ -131,11 +131,11 @@ private:
 	} section;
 #else
 	struct s_section {
-                CkArrayIndex *_elems;
-                int *pelist;
-		CkSectionInfo::CkSectionInfoStruct sinfo;
-                int _nElems;
-                int npes;
+		CkArrayIndex *_elems;
+		int *pelist;
+		CkSectionInfo sinfo;
+		int _nElems;
+		int npes;
 		int ep;
 		CMK_REFNUM_TYPE refnum; // Reference number to set on the message
 		bool hasRefnum;
@@ -145,9 +145,8 @@ private:
 	struct s_ccsReply {
 		CcsDelayedReply reply;
 	} ccsReply;
-	//callbackData(){memset(this,0,sizeof(callbackData));}
-	//callbackData()=default;
-	//constructor()=default;
+
+	callbackData() { memset(this, 0, sizeof(callbackData)); }
 	};
 
 public:
