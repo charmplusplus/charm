@@ -18,21 +18,16 @@ namespace SDAG {
     void packClosure(PUP::er& p) { p | continuations; p | hasRefnum; p | refnum; }
     void init() { continuations = 1; hasRefnum = false; refnum = 0; }
     virtual ~Closure() { }
+
     // Handles refnum setting for generated code by allowing calls to setRefnum
-    // regardless of the type of the first parameter to an entry method
-    // TODO: With C++11 support, remove overloading in favor of enable_if
-    template <typename T>
-    inline void setRefnum(T t) {}
-    inline void setRefnum(char c) { hasRefnum = true; refnum = c; }
-    inline void setRefnum(int i) { hasRefnum = true; refnum = i; }
-    inline void setRefnum(short s) { hasRefnum = true; refnum = s; }
-    inline void setRefnum(long l) { hasRefnum = true; refnum = l; }
-    inline void setRefnum(unsigned char c) { hasRefnum = true; refnum = c; }
-    inline void setRefnum(unsigned int i) { hasRefnum = true; refnum = i; }
-    inline void setRefnum(unsigned short s) { hasRefnum = true; refnum = s; }
-    inline void setRefnum(unsigned long l) { hasRefnum = true; refnum = l; }
-    inline void setRefnum(float f) { hasRefnum = true; refnum = f; }
-    inline void setRefnum(double d) { hasRefnum = true; refnum = d; }
+    // regardless of the type of the first parameter to an entry method.
+    // Refnums are arithmetic types only.
+    template< typename T, typename std::enable_if< std::is_arithmetic< T >::value, bool >::type = true >
+    void setRefnum(T t) { hasRefnum = true; refnum = t; }
+
+    template< typename T, typename std::enable_if< !std::is_arithmetic< T >::value, bool >::type = true >
+    void setRefnum(T t) {}
+
     void unsetRefnum() { hasRefnum = false; refnum = 0; }
   };
 }
