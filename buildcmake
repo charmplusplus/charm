@@ -241,6 +241,10 @@ function parse_platform_compilers() {
       opt_FC=ifort
       opt_compiler+=("$arg")
       ;;
+    ifx)
+      opt_FC=ifx
+      opt_compiler+=("$arg")
+      ;;
     xlc|xlc64)
       opt_CC=xlc_r
       opt_CXX=xlC_r
