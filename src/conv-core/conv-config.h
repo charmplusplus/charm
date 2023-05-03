@@ -147,12 +147,14 @@
 #ifdef __cplusplus
 #include <new>
 #endif
+#ifndef CMI_CACHE_LINE_SIZE
 #ifdef __cpp_lib_hardware_interference_size
 # define CMI_CACHE_LINE_SIZE std::hardware_destructive_interference_size
-#elif CMK_PPC64
+#elif CMK_PPC64 || (defined __APPLE__ && defined __arm64__)
 # define CMI_CACHE_LINE_SIZE 128
 #else
 # define CMI_CACHE_LINE_SIZE 64
+#endif
 #endif
 
 /* Without stdint.h, CMK_TYPEDEF_(U)INT{2,4,8} must be defined in the
