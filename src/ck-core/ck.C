@@ -870,7 +870,6 @@ void _createGroup(CkGroupID groupID, envelope *env)
   _CHECK_USED(env);
   _SET_USED(env, 1);
   int epIdx = env->getEpIdx();
-  int gIdx = _entryTable[epIdx]->chareIdx;
   env->setGroupNum(groupID);
   env->setSrcPe(CkMyPe());
   env->setGroupEpoch(CkpvAccess(_charmEpoch));
@@ -1175,10 +1174,6 @@ IrrGroup *lookupGroupAndBufferIfNotThere(CkCoreState *ck,envelope *env,const CkG
 
 static inline void _deliverForBocMsg(CkCoreState *ck,int epIdx,envelope *env,IrrGroup *obj)
 {
-#if CMK_SMP
-  unsigned short int msgType = CMI_ZC_MSGTYPE(env); // store msgType as msg could be freed
-#endif
-
   _invokeEntry(epIdx,env,obj);
 
   _STATS_RECORD_PROCESS_BRANCH_1();
@@ -1188,7 +1183,6 @@ static inline void _processForBocMsg(CkCoreState *ck,envelope *env)
 {
   if(isGroupDepUnsatisfied(ck, env))
     return;
-  CkGroupID groupID =  env->getGroupNum();
   IrrGroup *obj = _lookupGroupAndBufferIfNotThere(ck,env,env->getGroupNum());
   if(obj) {
     ck->process(); // ck->process() updates mProcessed count used in QD
@@ -1279,7 +1273,6 @@ static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
     // First see if we already have a direct pointer to the object
     _SET_USED(env, 0);
     ck->process(); // ck->process() updates mProcessed count used in QD
-    int opts = 0;
     if (msg->array_hops()>1) {
       CProxy_ArrayBase(env->getArrayMgr()).ckLocMgr()->multiHop(msg);
     }
@@ -1813,7 +1806,7 @@ static inline envelope *_prepareImmediateMsgBranch(int eIdx,void *msg,CkGroupID 
 static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
                   int pe=CLD_BROADCAST_ALL, int opts = 0)
 {
-  int numPes;
+  int numPes = 1;
   envelope *env;
     if (opts & CK_MSG_IMMEDIATE) {
         env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForBocMsg);
@@ -1879,7 +1872,7 @@ void CkSendMsgBranchImmediate(int eIdx, void *msg, int destPE, CkGroupID gID)
   }
   //Can't inline-- send the usual way
   envelope *env = UsrToEnv(msg);
-  int numPes;
+  int numPes = 1;
   _TRACE_ONLY(numPes = (destPE==CLD_BROADCAST_ALL?CkNumPes():1));
   env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForBocMsg);
   _TRACE_CREATION_N(env, numPes);
@@ -2034,7 +2027,7 @@ void CkSendMsgNodeBranchImmediate(int eIdx, void *msg, int node, CkGroupID gID)
   }
   //Can't inline-- send the usual way
   envelope *env = UsrToEnv(msg);
-  int numPes;
+  int numPes = 1;
   _TRACE_ONLY(numPes = (node==CLD_BROADCAST_ALL?CkNumNodes():1));
   env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
   _TRACE_CREATION_N(env, numPes);
@@ -2164,10 +2157,8 @@ void CkArrayManagerDeliver(int pe,void *msg, int opts) {
 }
 
 class ElementDestroyer : public CkLocIterator {
-private:
-        CkLocMgr *locMgr;
 public:
-        ElementDestroyer(CkLocMgr* mgr_):locMgr(mgr_){};
+        ElementDestroyer(CkLocMgr* mgr_){}
         void addLocation(CkLocation &loc) {
 	  loc.destroyAll();
         }

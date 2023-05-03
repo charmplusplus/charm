@@ -1148,11 +1148,10 @@ void AMPI_threadstart(void *data)
   CtvAccess(stackBottom) = &argv;
 
   int ret = 0;
-  // Only one of the following four main functions actually runs application code,
+  // Only one of the following main functions actually runs application code,
   // the others are stubs provided by compat_ampi*.
-  ret += AMPI_Main_cpp();
-  ret += AMPI_Main_cpp(argc,argv);
-  ret += AMPI_Main_c(argc,argv);
+  ret += AMPI_Main_noargs();
+  ret += AMPI_Main(argc,argv);
   FTN_NAME(MPI_MAIN,mpi_main)(); // returns void
   AMPI_Exit(ret);
 }
@@ -5998,7 +5997,7 @@ CMI_WARN_UNUSED_RESULT ampiParent* ampiParent::waitall(int count, MPI_Request re
     }
   }
 
-  MSG_ORDER_DEBUG(CkPrintf("[%d] MPI_Waitall called with count %d, blocking on completion of %d requests\n", ptr->thisIndex, count, numBlockedReqs));
+  MSG_ORDER_DEBUG(CkPrintf("[%d] MPI_Waitall called with count %d, blocking on completion of %d requests\n", pptr->thisIndex, count, numBlockedReqs));
 
   // If any requests are incomplete, block until all have been completed
   if (numBlockedReqs > 0) {
@@ -11710,6 +11709,8 @@ int AMPI_GPU_Iinvoke_wr(hapiWorkRequest *to_call, MPI_Request *request)
   CkCallback cb(&AMPI_GPU_complete, newreq);
   hapiWorkRequestSetCallback(to_call, &cb);
   hapiEnqueue(to_call);
+
+  return MPI_SUCCESS;
 }
 
 /* Submit GPU request that will be notified of completion once the previous
@@ -11726,6 +11727,8 @@ int AMPI_GPU_Iinvoke(cudaStream_t stream, MPI_Request *request)
   // A callback that completes the corresponding request
   CkCallback cb(&AMPI_GPU_complete, newreq);
   hapiAddCallback(stream, &cb, nullptr);
+
+  return MPI_SUCCESS;
 }
 
 CLINKAGE
@@ -11767,13 +11770,9 @@ void TCHARM_Element_Setup(int myelement, int numelements, CmiIsomallocContext ct
 #if defined _WIN32 || CMK_DLL_USE_DLOPEN
 static ampi_maintype AMPI_Main_Get_C(SharedObject myexe)
 {
-  auto AMPI_Main_cpp_ptr = (ampi_maintype)dlsym(myexe, "AMPI_Main_cpp");
-  if (AMPI_Main_cpp_ptr)
-    return AMPI_Main_cpp_ptr;
-
-  auto AMPI_Main_c_ptr = (ampi_maintype)dlsym(myexe, "AMPI_Main_c");
-  if (AMPI_Main_c_ptr)
-    return AMPI_Main_c_ptr;
+  auto AMPI_Main_noargs_ptr = (ampi_maintype)dlsym(myexe, "AMPI_Main_noargs");
+  if (AMPI_Main_noargs_ptr)
+    return AMPI_Main_noargs_ptr;
 
   auto AMPI_Main_ptr = (ampi_maintype)dlsym(myexe, "AMPI_Main");
   if (AMPI_Main_ptr)

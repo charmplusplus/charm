@@ -507,7 +507,7 @@ void CldMultipleSendPrio(int pe, int numToSend, int rank, int immed)
 void CldSimpleMultipleSend(int pe, int numToSend, int rank)
 {
   char *msg;
-  int len, queueing, priobits, *msgSizes, i, numSent, done=0;
+  int len, queueing, priobits, i, done=0;
   unsigned int *prioptr;
   CldInfoFn ifn;
   CldPackFn pfn;
@@ -515,7 +515,6 @@ void CldSimpleMultipleSend(int pe, int numToSend, int rank)
   if (numToSend == 0)
     return;
 
-  numSent = 0;
   while (!done) {
     for (i=0; i<numToSend; i++) {
       CldGetTokenFromRank(&msg, rank);

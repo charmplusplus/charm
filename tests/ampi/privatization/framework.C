@@ -20,10 +20,10 @@ void print_test(int & test, int & rank, const char * name)
     printf("Test " test_format ": %s\n", test, name);
 }
 
-void print_test_fortran(int & test, int & rank, const char * name, int name_len)
+void print_test_fortran(int & test, int & rank, const char * name, long int name_len)
 {
   if (rank == 0)
-    printf("Test " test_format ": %.*s\n", test, name_len, name);
+    printf("Test " test_format ": %.*s\n", test, (int)name_len, name);
 }
 
 

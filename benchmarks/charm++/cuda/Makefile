@@ -1,5 +1,5 @@
 DIRS = \
-  direct \
+  gpudirect \
 
 TESTDIRS = $(DIRS)
 

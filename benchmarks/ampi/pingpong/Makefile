@@ -5,17 +5,19 @@ MPIOPTS=-O3
 CHARMC=../../../bin/ampicxx $(OPTS)
 MPICC=mpicc $(MPIOPTS) # Should use 'cc' instead of 'mpicc' on Cray systems
 
-#all : pingpong-2way.c
-#	$(CHARMC) pingpong-2way.c -o pingpong
-#	$(MPICC) pingpong-2way.c -o pingpong-mpi
+all: pingpong
 
-all : pingpong-1way.c
-	$(CHARMC) pingpong-1way.c -o pingpong
-#	$(MPICC) pingpong-1way.c -o pingpong-mpi
+pingpong: pingpong-1way.c
+	$(CHARMC) $^ -o $@
+#	$(MPICC) $^ -o $@-mpi
 
-pipe: pingpong-pipeline.c
-	$(CHARMC) pingpong-pipeline.c -o pingpong-pipe
-	$(MPICC) pingpong-pipeline.c -o pingpong-pipe-mpi
+pongpong-2way: pingpong-2way.c
+	$(CHARMC) $^ -o $@
+#	$(MPICC) $^ -o $@-mpi
+
+pingpong-pipeline: pingpong-pipeline.c
+	$(CHARMC) $^ -o $@
+#	$(MPICC) $^ -o $@-mpi
 
 test: all
 	$(call run, +p1 ./pingpong 16 1048576 100 10 1 +vp2)
@@ -34,5 +36,5 @@ ifeq ($(CMK_USE_CMA),1)
 endif
 
 clean:
-	rm -rf charmrun conv-host moduleinit* *.o pingpong pingpong pingpong-mpi pingpong-pipe pingpong-pipe-mpi *~ *.sts core ampirun
+	rm -rf charmrun conv-host moduleinit* *.o pingpong pingpong-mpi pingpong-2way pingpong-2way-mpi pingpong-pipeline pingpong-pipeline-mpi *~ *.sts core ampirun
 

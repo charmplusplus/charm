@@ -22,7 +22,7 @@ message("# You can run './buildold' to use the previous build system.     #")
 message("##################################################################")
 
 if(CMAKE_VERSION VERSION_GREATER 3.12 OR CMAKE_VERSION VERSION_EQUAL 3.12)
-  cmake_policy(SET CMP0075 OLD)
+  cmake_policy(SET CMP0075 NEW)
 endif()
 
 # Fortran is optional, so don't include it in LANGUAGES here
@@ -30,6 +30,15 @@ project(Charm++ LANGUAGES CXX C ASM VERSION 7.0.0)
 
 find_package(Threads)
 find_package(OpenMP) # Do this before Fortran, in case we don't have a Fortran compiler
+
+set(CMK_BUILD_MPI 0)
+set(CMK_BUILD_ON_MPI 0)
+set(CMK_CXX_MPI_BINDINGS 1) # Always true, this just checked for a conflict with old mpich versions.
+if(${NETWORK} STREQUAL "mpi")
+  set(CMK_BUILD_MPI 1)
+  set(CMK_BUILD_ON_MPI 1)
+  find_package(MPI REQUIRED)
+endif()
 
 # We need C++11 for (almost) all targets
 set(CMAKE_CXX_STANDARD 11)
@@ -73,7 +82,9 @@ if(NOT CMK_COMPILER STREQUAL "msvc")
   enable_language(Fortran OPTIONAL)
 endif()
 
-if(CMAKE_Fortran_COMPILER)
+option(ENABLE_FORTRAN "Enable Fortran" ON)
+
+if(ENABLE_FORTRAN AND CMAKE_Fortran_COMPILER)
   include(FortranCInterface)
   FortranCInterface_VERIFY()
   FortranCInterface_VERIFY(CXX)
@@ -411,15 +422,6 @@ if(${NETWORK} MATCHES "gni-" OR ${NETWORK} MATCHES "ofi-cray")
   set(CMK_BUILD_CRAY 1)
 elseif(${NETWORK} MATCHES "mpi-cray")
   set(CHARM_PLATFORM "${NETWORK}")
-endif()
-
-set(CMK_BUILD_MPI 0)
-set(CMK_BUILD_ON_MPI 0)
-set(CMK_CXX_MPI_BINDINGS 1) # Always true, this just checked for a conflict with old mpich versions.
-if(${NETWORK} STREQUAL "mpi")
-  set(CMK_BUILD_MPI 1)
-  set(CMK_BUILD_ON_MPI 1)
-  find_package(MPI REQUIRED)
 endif()
 
 set(CMK_BUILD_ON_UCX 0)

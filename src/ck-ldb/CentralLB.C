@@ -285,7 +285,6 @@ void CentralLB::BuildStatsMsg()
   const int osz = lbmgr->GetObjDataSz();
   const int csz = lbmgr->GetCommDataSz();
 
-  int npes = CkNumPes();
   CLBStatsMsg* msg = new CLBStatsMsg(osz, csz);
   _MEMCHECK(msg);
   msg->from_pe = CkMyPe();
@@ -415,7 +414,6 @@ void CentralLB::buildStats()
 // used when USE_REDUCTION = 1
 void CentralLB::depositData(CLBStatsMsg *m)
 {
-  int i;
   if (m == NULL) return;
 
   const int n_objs = m->objData.size();
@@ -672,7 +670,6 @@ void CentralLB::ApplyDecision() {
 
   DEBUGF(("[%d]calling recv migration\n",CkMyPe()));
 
-  envelope *env = UsrToEnv(migrateMsg);
 #if CMK_SCATTER_LB_RESULTS
   InitiateScatter(migrateMsg);
 #else
@@ -1652,7 +1649,6 @@ CLBStatsMsg::~CLBStatsMsg() {
 }
 
 void CLBStatsMsg::pup(PUP::er &p) {
-  int i;
   p|from_pe;
   p|pe_speed;
   p|total_walltime;

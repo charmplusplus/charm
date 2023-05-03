@@ -453,7 +453,7 @@ void TraceLogger::add(int lID, int eID, double timestamp, int iLen, int* iData, 
   new (&pool[numEntries]) TraceEntry(lID, eID, timestamp, iLen, iData, sLen, sData);
   numEntries = numEntries+1;
 if(numEntries>= poolSize) {
-    double writeTime = TraceCoreTimer();
+    //double writeTime = TraceCoreTimer();
     isWriting = true;
     if(binary) writeBinary();
 	else 	   write();

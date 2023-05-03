@@ -12,7 +12,7 @@
 CLINKAGE void print_test(int & test, int & rank, const char * name);
 
 #define print_test_fortran FTN_NAME(PRINT_TEST_FORTRAN, print_test_fortran)
-FLINKAGE void print_test_fortran(int & test, int & rank, const char * name, int name_len);
+FLINKAGE void print_test_fortran(int & test, int & rank, const char * name, long int name_len);
 
 #define test_privatization FTN_NAME(TEST_PRIVATIZATION, test_privatization)
 FLINKAGE void test_privatization(int & failed, int & test, int & rank, int & my_wth, int & operation, int & global);

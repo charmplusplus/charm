@@ -159,11 +159,12 @@ public:
     p | pings;
     p | migrations;
     p | initialProc;
-    if (p.isUnpacking())
-    {
-      ++migrations;
-      contribute(CkCallback(CkReductionTarget(Main, migrated), mainProxy));
-    }
+  }
+
+  void ckJustMigrated()
+  {
+    ++migrations;
+    contribute(CkCallback(CkReductionTarget(Main, migrated), mainProxy));
   }
 };
 
