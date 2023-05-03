@@ -6,10 +6,6 @@ OBJS = ataTest.o
 
 TARGET = ataTest
 
-ifeq ($(CMK_COMPILER),bgxlc)
-  TARGET =
-endif
-
 all: $(TARGET)
 test: $(foreach i,$(TARGET),test-$i)
 

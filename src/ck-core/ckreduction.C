@@ -203,7 +203,7 @@ CkReductionMgr::CkReductionMgr()
   barrier_nSource=0;
   barrier_nContrib=barrier_nRemote=0;
 
-  DEBR((AA "In reductionMgr constructor at %d \n" AB,this));
+  DEBR((AA "In reductionMgr constructor at %p \n" AB,this));
 }
 
 CkReductionMgr::CkReductionMgr(CkMigrateMessage *m) :CkGroupInitCallback(m)
@@ -219,7 +219,7 @@ CkReductionMgr::CkReductionMgr(CkMigrateMessage *m) :CkGroupInitCallback(m)
   nContrib=nRemote=0;
   is_inactive = false;
   maxStartRequest=0;
-  DEBR((AA "In reductionMgr migratable constructor at %d \n" AB,this));
+  DEBR((AA "In reductionMgr migratable constructor at %p \n" AB,this));
 
   barrier_gCount=0;
   barrier_nSource=0;
@@ -600,7 +600,7 @@ void CkReductionMgr::addContribution(CkReductionMsg *m)
     DEBR((AA "Contributor gives early contribution-- for #%d\n" AB,m->redNo));
     futureMsgs.enq(m);
   } else {// An ordinary contribution
-    DEBR((AA "Recv'd local contribution %d for #%d at %d\n" AB,nContrib,m->redNo,this));
+    DEBR((AA "Recv'd local contribution %d for #%d at %p\n" AB,nContrib,m->redNo,this));
    // CkPrintf("[%d] Local Contribution for %d in Mesg %d at %.6f\n",CkMyPe(),redNo,m->redNo,CmiWallTimer());
     startReduction(m->redNo,CkMyPe());
     msgs.enq(m);
@@ -1616,7 +1616,7 @@ CkReductionMsg* CkReduction::tupleReduction_fn(int num_messages, CkReductionMsg*
     {
       CkReduction::tupleElement* reductions = (CkReduction::tupleElement*)(tuple_data[message_idx]);
       CkReduction::tupleElement& element = reductions[reduction_idx];
-      DEB_TUPLE(("    msg %d, sf=%d, length=%d : { dataSize=%d, data=%p, reducer=%d },\n",
+      DEB_TUPLE(("    msg %d, sf=%d, length=%d : { dataSize=%zu, data=%p, reducer=%d },\n",
                  message_idx, messages[message_idx]->sourceFlag, messages[message_idx]->getLength(), element.dataSize, element.data, element.reducer));
 
       reducerType = element.reducer;
@@ -1979,7 +1979,7 @@ void NodeGroup::pup(PUP::er &p)
 //CK_REDUCTION_CLIENT_DEF(CProxy_NodeGroup,(CkNodeReductionMgr *)CkLocalBranch(_ck_gid));
 
 void CProxy_NodeGroup::ckSetReductionClient(CkCallback *cb) const {
-  DEBR(("in CksetReductionClient for CProxy_NodeGroup %d\n",CkLocalNodeBranch(_ck_gid)));
+  DEBR(("in CksetReductionClient for CProxy_NodeGroup %p\n",CkLocalNodeBranch(_ck_gid)));
  ((CkNodeReductionMgr *)CkLocalNodeBranch(_ck_gid))->ckSetReductionClient(cb);
   //ckLocalNodeBranch()->ckSetReductionClient(cb);
  }
@@ -2018,7 +2018,7 @@ CkNodeReductionMgr::CkNodeReductionMgr()//Constructor
 
   creating=false;
   interrupt = false;
-  DEBR((AA "In NodereductionMgr constructor at %d \n" AB,this));
+  DEBR((AA "In NodereductionMgr constructor at %p\n" AB,this));
 }
 
 CkNodeReductionMgr::~CkNodeReductionMgr()
@@ -2052,7 +2052,7 @@ void CkNodeReductionMgr::flushStates()
 //Add the given client function.  Overwrites any previous client.
 void CkNodeReductionMgr::ckSetReductionClient(CkCallback *cb)
 {
-  DEBR((AA "Setting reductionClient in NodeReductionMgr %d at %d\n" AB,cb,this));
+  DEBR((AA "Setting reductionClient in NodeReductionMgr %p at %p\n" AB,cb,this));
   if(cb->isInvalid()){
   	DEBR((AA "Invalid Callback passed to setReductionClient in nodeReductionMgr\n" AB));
   }else{
@@ -2162,7 +2162,7 @@ void CkNodeReductionMgr::doAddContribution(CkReductionMsg *m){
 		DEBR((AA "Contributor gives early node contribution-- for #%d\n" AB,m->redNo));
 		futureMsgs.enq(m);
 	} else {// An ordinary contribution
-		DEBR((AA "Recv'd local node contribution %d for #%d at %d\n" AB,nContrib,m->redNo,this));
+		DEBR((AA "Recv'd local node contribution %d for #%d at %p\n" AB,nContrib,m->redNo,this));
 		//    CmiPrintf("[%d,%d] Redcv'd Local Contribution for redNo %d number %d at %0.6f \n",CkMyNode(),CkMyPe(),m->redNo,nContrib+1,CkWallTimer());
 		startReduction(m->redNo,CkMyNode());
 		msgs.enq(m);
@@ -2189,7 +2189,7 @@ void CkNodeReductionMgr::LateMigrantMsg(CkReductionMsg *m){
 //		CkPrintf("[%d,%d] NodeGroup %d> Latemigrant gives early node contribution %d in redNo %d\n",CkMyNode(),CkMyPe(),thisgroup.idx,m->redNo,redNo);
 		futureLateMigrantMsgs.enq(m);
 	} else {// An ordinary contribution
-		DEBR((AA "Recv'd late migrant contribution %d for #%d at %d\n" AB,nContrib,m->redNo,this));
+		DEBR((AA "Recv'd late migrant contribution %d for #%d at %p\n" AB,nContrib,m->redNo,this));
 //		CkPrintf("[%d,%d] NodeGroup %d> Latemigrant contribution %d in redNo %d\n",CkMyNode(),CkMyPe(),thisgroup.idx,m->redNo,redNo);
 		msgs.enq(m);
 		finishReduction();

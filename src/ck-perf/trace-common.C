@@ -136,7 +136,7 @@ static void traceCommonInit(char **argv)
 
   char subdir[20];
   if(CmiNumPartitions() > 1) {
-    sprintf(subdir, "prj.part%d%s", CmiMyPartition(), PATHSEPSTR);
+    snprintf(subdir, sizeof(subdir), "prj.part%d%s", CmiMyPartition(), PATHSEPSTR);
   } else {
     subdir[0]='\0';
   }
@@ -867,7 +867,6 @@ struct TraceThreadListener {
 
 static void traceThreadListener_suspend(struct CthThreadListener *l)
 {
-  TraceThreadListener *a=(TraceThreadListener *)l;
   /* here, we activate the appropriate trace codes for the appropriate
      registered modules */
   traceSuspend();

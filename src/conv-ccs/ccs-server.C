@@ -301,7 +301,7 @@ static CcsSecMan *CcsSecMan_default(const char *authFile)
 		  authFile);
     exit(1);
   }
-  while (NULL!=fgets(line,200,secFile)) {
+  while (NULL!=fgets(line,sizeof(line),secFile)) {
     int level;
     char key[200]; /*Secret key, in ASCII hex*/
     int nItems=sscanf(line,"%d%s",&level,key);
@@ -353,7 +353,7 @@ void CcsServer_new(skt_ip_t *ret_ip,int *use_port,const char *authFile)
   ip=skt_my_ip();
   ccs_server_fd=skt_server(&port);
   printf("ccs: %s\nccs: Server IP = %s, Server port = %u $\n", 
-           CMK_CCS_VERSION, skt_print_ip(ip_str,ip), port);
+           CMK_CCS_VERSION, skt_print_ip(ip_str,sizeof(ip_str),ip), port);
   fflush(stdout);
   if (ret_ip!=NULL) *ret_ip=ip;
   if (use_port!=NULL) *use_port=port;
@@ -421,14 +421,14 @@ int CcsServer_recvRequest(CcsImplHeader *hdr,void **reqData)
   CCSDBG(("CCS Receiving connection...\n"));
   fd=skt_accept(ccs_server_fd,&ip,&port);
 
-  CCSDBG(("CCS   Connected to IP=%s, port=%d...\n",skt_print_ip(ip_str,ip),port));
+  CCSDBG(("CCS   Connected to IP=%s, port=%d...\n",skt_print_ip(ip_str,sizeof(ip_str),ip),port));
   hdr->attr.ip=ip;
   hdr->attr.port=ChMessageInt_new(port);
 
   if (0==CcsServer_recvRequestData(fd,hdr,reqData))
   {
     fprintf(stdout,"During CCS Client IP:port (%s:%d) processing.\n",
-	    skt_print_ip(ip_str,ip),
+	    skt_print_ip(ip_str,sizeof(ip_str),ip),
 	    port);
     skt_close(fd);
     ret=0;
@@ -547,7 +547,7 @@ void print_fw_handler(char *msg) {
 void print_node0(const char *format, va_list args) {
   char buffer[MAX_PRINT_BUF_SIZE];
   int len;
-  if ((len=vsnprintf(buffer, MAX_PRINT_BUF_SIZE, format, args)) >= MAX_PRINT_BUF_SIZE) CmiAbort("CmiPrintf: printing buffer too long\n");
+  if ((len=vsnprintf(buffer, sizeof(buffer), format, args)) >= MAX_PRINT_BUF_SIZE) CmiAbort("CmiPrintf: printing buffer too long\n");
   if (CmiMyPe() == 0) {
     /* We are the print server, just concatenate the printed string */
     write_stdio_duplicate(buffer);

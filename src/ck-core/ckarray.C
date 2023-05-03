@@ -437,29 +437,29 @@ char* ArrayElement::ckDebugChareName(void)
   switch (thisIndexMax.dimension)
   {
     case 0:
-      sprintf(buf, "%s", className);
+      snprintf(buf, sizeof(buf), "%s", className);
       break;
     case 1:
-      sprintf(buf, "%s[%d]", className, d[0]);
+      snprintf(buf, sizeof(buf), "%s[%d]", className, d[0]);
       break;
     case 2:
-      sprintf(buf, "%s(%d,%d)", className, d[0], d[1]);
+      snprintf(buf, sizeof(buf), "%s(%d,%d)", className, d[0], d[1]);
       break;
     case 3:
-      sprintf(buf, "%s(%d,%d,%d)", className, d[0], d[1], d[2]);
+      snprintf(buf, sizeof(buf), "%s(%d,%d,%d)", className, d[0], d[1], d[2]);
       break;
     case 4:
-      sprintf(buf, "%s(%hd,%hd,%hd,%hd)", className, s[0], s[1], s[2], s[3]);
+      snprintf(buf, sizeof(buf), "%s(%hd,%hd,%hd,%hd)", className, s[0], s[1], s[2], s[3]);
       break;
     case 5:
-      sprintf(buf, "%s(%hd,%hd,%hd,%hd,%hd)", className, s[0], s[1], s[2], s[3], s[4]);
+      snprintf(buf, sizeof(buf), "%s(%hd,%hd,%hd,%hd,%hd)", className, s[0], s[1], s[2], s[3], s[4]);
       break;
     case 6:
-      sprintf(buf, "%s(%hd,%hd,%hd,%hd,%hd,%hd)", className, s[0], s[1], s[2], s[3], s[4],
+      snprintf(buf, sizeof(buf), "%s(%hd,%hd,%hd,%hd,%hd,%hd)", className, s[0], s[1], s[2], s[3], s[4],
               s[5]);
       break;
     default:
-      sprintf(buf, "%s(%d,%d,%d,%d..)", className, d[0], d[1], d[2], d[3]);
+      snprintf(buf, sizeof(buf), "%s(%d,%d,%d,%d..)", className, d[0], d[1], d[2], d[3]);
       break;
   };
   return strdup(buf);
@@ -801,8 +801,9 @@ void CProxySection_ArrayBase::pup(PUP::er& p)
  * ensures that up to the limit of available bits, array IDs can be represented
  * as part of a compound fixed-size ID for their elements.
  */
-struct CkCreateArrayAsyncMsg : public CMessage_CkCreateArrayAsyncMsg
+class CkCreateArrayAsyncMsg : public CMessage_CkCreateArrayAsyncMsg
 {
+ public:
   int ctor;
   CkCallback cb;
   CkArrayOptions opts;
@@ -1697,10 +1698,12 @@ void CkArray::recvBroadcast(CkMessage* m)
     if (zc_msgtype == CMK_ZC_BCAST_RECV_DONE_MSG) {
       updateTagArray(env, localElemVec.size());
     }
-    for (unsigned int i = 0; i < len; ++i)
+    // Deliver in reverse order in case the target method destroys and removes
+    // the element from localElemVec
+    for (int i = len - 1; i >= 0; --i)
     {
       bool doFree = false;
-      if (stableLocations && i == len - 1)
+      if (stableLocations && i == 0)
         doFree = true;
       // Do not free if CMK_ZC_BCAST_RECV_DONE_MSG, since it'll be freed by the
       // first element during CMK_ZC_BCAST_ALL_DONE_MSG
@@ -1768,9 +1771,9 @@ void CkArray::ckDestroy()
   locMgr->setDuringDestruction(true);
 
   // ckDestroy deletes the CkMigratable, which also removes it from this vector
-  while (localElemVec.size())
+  while (!localElemVec.empty())
   {
-    localElemVec.front()->ckDestroy();
+    localElemVec.back()->ckDestroy();
   }
 
   locMgr->deleteManager(CkGroupID(thisProxy), this);

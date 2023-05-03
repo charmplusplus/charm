@@ -25,6 +25,7 @@ DIRS = \
   zerocopy \
   within_node_bcast \
   longIdle \
+  periodic \
   bombard \
   varTRAM \
 

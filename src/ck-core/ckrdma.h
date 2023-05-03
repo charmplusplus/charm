@@ -35,7 +35,7 @@ struct NcpyBcastRecvPeerAckInfo;
 // BCAST_RECV mode is used for EM BCAST Send API
 enum class ncpyEmApiMode : char { P2P_SEND, BCAST_SEND, P2P_RECV, BCAST_RECV };
 
-class CkNcpyBufferPost;
+struct CkNcpyBufferPost;
 
 struct NcpyBcastRecvPeerAckInfo{
   envelope *msg;

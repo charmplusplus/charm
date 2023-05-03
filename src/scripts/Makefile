@@ -42,6 +42,8 @@ else
   HWLOC_SHARED := no
 endif
 
+HWLOC_MAKEFILE=hwloc/Makefile
+
 all: charm++ LIBS AMPI TSM SM PVM everylb
 
 
@@ -69,7 +71,10 @@ MBLOCKC: charm++ LIBS
 
 MBLOCKF: MBLOCKC
 
-AMPI:  charm++
+romio-target: conv-autoconfig.h
+	$(MAKE) -C libs/ck-libs/ampi/ romio-target
+
+AMPI: charm++ | romio-target
 	$(MAKE) -C libs/ck-libs/ ampi
 
 AMPIC AMPIF: AMPI
@@ -184,7 +189,7 @@ UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwo
 	pup_c_functions.h \
 	ckimage.h ckdll.h ckhashtable.h ckbitvector.h cklists.h ckliststring.h \
 	cksequence.h ckstatistics.h ckvector3d.h conv-lists.h ckcomplex.h \
-	sockRoutines.h sockRoutines.C cmimemcpy.h simd.h SSE-Double.h SSE-Float.h \
+	sockRoutines.h sockRoutines.C simd.h SSE-Double.h SSE-Float.h \
 	crc32.h ckBIconfig.h rand48_replacement.h ckregex.h spanningTree.h json.hpp json_fwd.hpp cmirdmautils.h
 
 CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
@@ -481,12 +486,12 @@ endif
 converse: $(CONVERSE_DEPS)
 
 cpuaffinity.o $(INC)/hwloc.h $(INC)/hwloc/autogen/config.h $(INC)/hwloc/rename.h $(INC)/hwloc/bitmap.h \
-$(INC)/hwloc/helper.h $(INC)/hwloc/inlines.h $(INC)/hwloc/diff.h $(INC)/hwloc/deprecated.h $(INC)/hwloc/export.h $(INC)/hwloc/distances.h : hwloc-target
+$(INC)/hwloc/helper.h $(INC)/hwloc/inlines.h $(INC)/hwloc/diff.h $(INC)/hwloc/deprecated.h $(INC)/hwloc/export.h $(INC)/hwloc/distances.h : $(HWLOC_MAKEFILE)
 
 topomanager_config.h:
 	@echo "// empty" > topomanager_config.h
 
-hwloc-target: conv-autoconfig.h
+$(HWLOC_MAKEFILE): conv-autoconfig.h
 	@( cd hwloc && \
     ./configure \
     --disable-cairo \
@@ -515,9 +520,11 @@ hwloc-target: conv-autoconfig.h
     LDFLAGS= \
     LIBS= \
     > /dev/null || ( cat config.log ; exit 1 ) )
-	( $(MAKE) -C hwloc AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=: )
 	( cp -f hwloc/include/hwloc.h $(INC) )
 	( cp -LRf hwloc/include/hwloc $(INC) )
+
+hwloc-target: $(HWLOC_MAKEFILE)
+	( $(MAKE) -C hwloc AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=: )
 	touch $@
 
 charmrun-target: charmrun sockRoutines.C sockRoutines.h ccs-server.C ccs-server.h sockRoutines-seq.o $(L)/libck.a $(CVLIBS) conv-static.o

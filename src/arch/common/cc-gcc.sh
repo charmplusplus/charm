@@ -14,6 +14,8 @@ CMK_LIBS="$CMK_LIBS -lckqt"
 CMK_PIC='-fPIC'
 CMK_PIE='' # empty string: will be reset to default by conv-config.sh
 
+CMK_WARNINGS_ARE_ERRORS="-Werror"
+
 if [ "$CMK_MACOSX" ]; then
   if [ -z "$CMK_COMPILER_SUFFIX" ]; then
     # find real gcc (not Apple's clang) in $PATH on darwin, works with homebrew/macports

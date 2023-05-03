@@ -229,8 +229,6 @@ void CmiNcpyBuffer::cmaPut(CmiNcpyBuffer &destination) {
 
 void CmiNcpyBuffer::rdmaPut(CmiNcpyBuffer &destination, int ackSize, char *srcAck, char *destAck) {
 
-  int layerInfoSize = CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES;
-
   if(regMode == CMK_BUFFER_UNREG) {
     // register it because it is required for RPUT
     CmiSetRdmaBufferInfo(layerInfo + CmiGetRdmaCommonInfoSize(), ptr, cnt, regMode);

@@ -508,7 +508,7 @@ public:
   Barrier& operator=(const Barrier&) = delete;
 
   explicit Barrier(unsigned int count)
-      : curCount(count), barrierCount(count), curSense(true)
+      : curSense(true), curCount(count), barrierCount(count)
   {
   }
 

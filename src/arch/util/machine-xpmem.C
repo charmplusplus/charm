@@ -634,7 +634,7 @@ void createRecvXpmemAndSems(sharedBufData **bufs,char **bufNames){
 
         int fd;
         char fname[128];
-        sprintf(fname, ".xpmem.%d", xpmemContext->nodestart+xpmemContext->noderank);
+        snprintf(fname, sizeof(fname), ".xpmem.%d", xpmemContext->nodestart+xpmemContext->noderank);
         fd = open(fname, O_CREAT|O_WRONLY, S_IRUSR|S_IWUSR);
         if (fd == -1) {
           CmiAbort("createShmObjectsAndSems failed");
@@ -660,7 +660,7 @@ void createSendXpmemAndSems(sharedBufData **bufs,char **bufNames)
                 __s64 segid;
                  char fname[128];
                  int fd;
-                 sprintf(fname, ".xpmem.%d", xpmemContext->nodestart+i);
+                 snprintf(fname, sizeof(fname), ".xpmem.%d", xpmemContext->nodestart+i);
                  fd = open(fname, O_RDONLY);
                  if (fd == -1) {
                      CmiAbort("createShmObjectsAndSems failed");
@@ -690,7 +690,7 @@ void createSendXpmemAndSems(sharedBufData **bufs,char **bufNames)
 void removeXpmemFiles(void)
 {
         char fname[64];
-        sprintf(fname, ".xpmem.%d", xpmemContext->nodestart+xpmemContext->noderank);
+        snprintf(fname, sizeof(fname), ".xpmem.%d", xpmemContext->nodestart+xpmemContext->noderank);
         unlink(fname);
 }
 

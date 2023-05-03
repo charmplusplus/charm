@@ -17,7 +17,7 @@ runCmd()
   "$@"
 }
 
-while [ $# -gt 0 ]
+while [[ $# -ne 0 ]]
 do
 	case "$1" in
 	+p|++p|+ppn|++ppn)
@@ -85,7 +85,7 @@ do
 		shift
 		;;
 	*)
-		if [ -z "$cmd" ]; then
+		if [[ -z "$cmd" ]]; then
 			cmd="$1"
 		else
 			args+=("$1")
@@ -97,16 +97,16 @@ done
 
 [[ $QUIET -eq 1 ]] && args+=(++quiet)
 
-if [ "$DEBUG" = '1' ] || [ "$DEBUG_NO_PAUSE" = '1' ]
+if [[ "$DEBUG" = '1' || "$DEBUG_NO_PAUSE" = '1' ]]
 then
-  if [ -z "$DEBUGGER" ]
+  if [[ -z "$DEBUGGER" ]]
   then
-    [ "$(uname -s 2>/dev/null)" = 'Darwin' ] && DEBUGGER='lldb' || DEBUGGER='gdb'
+    [[ "$(uname -s 2>/dev/null)" = 'Darwin' ]] && DEBUGGER='lldb' || DEBUGGER='gdb'
   fi
 
   DEBUG_RUN=(-ex r)
   DEBUG_POSTFIX='--args'
-  if [ "$DEBUGGER" = 'lldb' ]
+  if [[ "$DEBUGGER" = 'lldb' ]]
   then
     DEBUG_RUN=(-o r)
     DEBUG_POSTFIX='--'

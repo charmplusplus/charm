@@ -113,10 +113,6 @@ void initQd(char **argv);
 void CmiPoolAllocInit(int numBins);
 #endif
 
-#if CMK_CONDS_USE_SPECIAL_CODE
-CmiSwitchToPEFnPtr CmiSwitchToPE;
-#endif
-
 CpvExtern(int, _traceCoreOn);   /* projector */
 void CcdModuleInit(char **);
 void CmiMemoryInit(char **);
@@ -160,7 +156,7 @@ void CldModuleInit(char **);
 
 #include "quiescence.h"
 
-#if USE_MPI_CTRLMSG_SCHEME && CMK_CONVERSE_MPI
+#if CMK_CONVERSE_MPI && CMK_USE_MPI_ALLOC_MEM
 #include <mpi.h>
 #endif
 
@@ -1047,7 +1043,6 @@ double CmiInitTime(void)
 
 void CmiTimerInit(char **argv)
 {
-  struct rusage ru;
   CpvInitialize(double, inittime_virtual);
 
   int tmptime = CmiGetArgFlagDesc(argv,"+useAbsoluteTime", "Use system's absolute time as wallclock time.");
@@ -1069,6 +1064,7 @@ if(CmiMyRank() == 0) /* initialize only  once */
 #ifndef RUSAGE_WHO
     CpvAccess(inittime_virtual) = inittime_wallclock;
 #else
+    struct rusage ru;
     getrusage(RUSAGE_WHO, &ru); 
     CpvAccess(inittime_virtual) =
       (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
@@ -1101,8 +1097,6 @@ double CmiCpuTimer(void)
   return currenttime - CpvAccess(inittime_virtual);
 #endif
 }
-
-static double lastT = -1.0;
 
 double CmiWallTimer(void)
 {
@@ -1791,9 +1785,9 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
 
 
 void *CsdNextLocalNodeMessage(CsdSchedulerState_t *s) {
-	void *msg;
 #if CMK_NODE_QUEUE_AVAILABLE
 	/*#warning "CsdNextMessage: CMK_NODE_QUEUE_AVAILABLE" */
+	void *msg;
 	/*if (NULL!=(msg=CmiGetNonLocalNodeQ())) return msg;*/
 	if (!CqsEmpty(s->nodeQ))
 	{
@@ -2280,11 +2274,7 @@ void CsdInit(char **argv)
 void CmiSyncVectorSend(int destPE, int n, int *sizes, char **msgs) {
   int total;
   char *mesg;
-#if CMK_USE_IBVERBS
-  VECTOR_COMPACT(total, mesg, n, sizes, msgs,sizeof(infiCmiChunkHeader));
-#else
   VECTOR_COMPACT(total, mesg, n, sizes, msgs,sizeof(CmiChunkHeader));
-#endif	
   CmiSyncSendAndFree(destPE, total, mesg);
 }
 
@@ -3227,7 +3217,7 @@ void *CmiAlloc(int size)
   res =(char *) LrtsAlloc(size, sizeof(CmiChunkHeader));
 #elif CONVERSE_POOL
   res =(char *) CmiPoolAlloc(size+sizeof(CmiChunkHeader));
-#elif USE_MPI_CTRLMSG_SCHEME && CMK_CONVERSE_MPI
+#elif CMK_CONVERSE_MPI && CMK_USE_MPI_ALLOC_MEM
   MPI_Alloc_mem(size+sizeof(CmiChunkHeader), MPI_INFO_NULL, &res);
 #elif CMK_SMP && CMK_PPC_ATOMIC_QUEUE
   res = (char *) CmiAlloc_ppcq(size+sizeof(CmiChunkHeader));
@@ -3373,7 +3363,7 @@ void CmiFree(void *blk)
     LrtsFree(BLKSTART(parentBlk));
 #elif CONVERSE_POOL
     CmiPoolFree(BLKSTART(parentBlk));
-#elif USE_MPI_CTRLMSG_SCHEME && CMK_CONVERSE_MPI
+#elif CMK_CONVERSE_MPI && CMK_USE_MPI_ALLOC_MEM
     MPI_Free_mem(parentBlk);
 #elif CMK_SMP && CMK_PPC_ATOMIC_QUEUE
     CmiFree_ppcq(BLKSTART(parentBlk));
@@ -3575,11 +3565,11 @@ void infi_freeMultipleSend(void *msgWhole)
       /*unreg meta, free meta, move the ptr */
       /* note these weird little things are not pooled */
       /* do NOT free the message here, we are only a part of this buffer*/
-      infiCmiChunkHeader *ch = (infiCmiChunkHeader *)((char *)msgWhole + offset);
-      char *msg = (char *)msgWhole + offset + sizeof(infiCmiChunkHeader);
-      int msgSize=ch->chunkHeader.size; /* Size of user portion of message (plus padding at end) */
+      CmiChunkHeader *ch = (CmiChunkHeader *)((char *)msgWhole + offset);
+      char *msg = (char *)msgWhole + offset + sizeof(CmiChunkHeader);
+      int msgSize=ch->size; /* Size of user portion of message (plus padding at end) */
       infi_unregAndFreeMeta(ch->metaData);
-      offset+= sizeof(infiCmiChunkHeader) + msgSize;
+      offset+= sizeof(CmiChunkHeader) + msgSize;
     }
 }
 #endif
@@ -3591,23 +3581,15 @@ static void _CmiMultipleSend(unsigned int destPE, int len, int sizes[], char *ms
   int m; /* Outgoing message */
 
   CmiInitMsgHeader(header.convHeader, sizeof(CmiMultipleSendHeader));
-#if CMK_USE_IBVERBS
-  infiCmiChunkHeader *msgHdr;
-#else
   CmiChunkHeader *msgHdr; /* Chunk headers for each message */
-#endif
-	
+
   double pad = 0; /* padding required */
   int vecLen; /* Number of pieces in outgoing message vector */
   int *vecSizes; /* Sizes of each piece we're sending out. */
   char **vecPtrs; /* Pointers to each piece we're sending out. */
   int vec; /* Entry we're currently filling out in above array */
 	
-#if CMK_USE_IBVERBS
-  msgHdr = (infiCmiChunkHeader *)CmiTmpAlloc(len * sizeof(infiCmiChunkHeader));
-#else
   msgHdr = (CmiChunkHeader *)CmiTmpAlloc(len * sizeof(CmiChunkHeader));
-#endif
 	
   /* Allocate memory for the outgoing vector*/
   vecLen=1+3*len; /* Header and 3 parts per message */
@@ -3629,22 +3611,16 @@ static void _CmiMultipleSend(unsigned int destPE, int len, int sizes[], char *ms
          | CmiChunkHeader | Message data | Message padding | ...next message entry ...
   */
   for (m=0;m<len;m++) {
-#if CMK_USE_IBVERBS
-    msgHdr[m].chunkHeader.size=roundUpSize(sizes[m]); /* Size of message and padding */
-    msgHdr[m].chunkHeader.setRef(0); /* Reference count will be filled out on receive side */
-    msgHdr[m].metaData=NULL;
-#else
     msgHdr[m].size=roundUpSize(sizes[m]); /* Size of message and padding */
     msgHdr[m].setRef(0); /* Reference count will be filled out on receive side */
-#endif		
+
+#if CMK_USE_IBVERBS
+    msgHdr[m].metaData=NULL;
+#endif
     
     /* First send the message's CmiChunkHeader (for use on receive side) */
-#if CMK_USE_IBVERBS
-    vecSizes[vec]=sizeof(infiCmiChunkHeader);
-#else
-    vecSizes[vec]=sizeof(CmiChunkHeader); 
-#endif		
-		vecPtrs[vec]=(char *)&msgHdr[m];
+    vecSizes[vec]=sizeof(CmiChunkHeader);
+    vecPtrs[vec]=(char *)&msgHdr[m];
     vec++;
     
     /* Now send the actual message data */
@@ -3704,26 +3680,17 @@ static void CmiMultiMsgHandler(char *msgWhole)
   int offset=sizeof(CmiMultipleSendHeader);
   int m;
   for (m=0;m<len;m++) {
-#if CMK_USE_IBVERBS
-    infiCmiChunkHeader *ch=(infiCmiChunkHeader *)(msgWhole+offset);
-    char *msg=(msgWhole+offset+sizeof(infiCmiChunkHeader));
-    int msgSize=ch->chunkHeader.size; /* Size of user portion of message (plus padding at end) */
-    ch->chunkHeader.setRef(msgWhole-msg);
-    ch->metaData =  registerMultiSendMesg(msg,msgSize);
-#else
     CmiChunkHeader *ch=(CmiChunkHeader *)(msgWhole+offset);
     char *msg=(msgWhole+offset+sizeof(CmiChunkHeader));
     int msgSize=ch->size; /* Size of user portion of message (plus padding at end) */
     ch->setRef(msgWhole-msg);
-#endif		
+#if CMK_USE_IBVERBS
+    ch->metaData =  registerMultiSendMesg(msg,msgSize);
+#endif
     /* Link new message to owner via a negative ref pointer */
     CmiReference(msg); /* Follows link & increases reference count of *msgWhole* */
     CmiSyncSendAndFree(CmiMyPe(), msgSize, msg);
-#if CMK_USE_IBVERBS
-    offset+= sizeof(infiCmiChunkHeader) + msgSize;
-#else
     offset+= sizeof(CmiChunkHeader) + msgSize;
-#endif		
   }
   /* Release our reference to the whole message.  The message will
      only actually be deleted once all its sub-messages are free'd as well. */
