@@ -1,8 +1,8 @@
 version: 2.1
 jobs:
-  NetLRTS:
+  NetLRTS-x86_64:
     machine:
-      image: ubuntu-2004:202201-01
+      image: ubuntu-2004:2022.04.1
 
     steps:
       - checkout
@@ -33,9 +33,9 @@ jobs:
           name: TestP P=2
           command: make -C netlrts-linux-x86_64/tmp testp P=2 TESTOPTS="++local"
 
-  NetLRTS-smp:
+  NetLRTS-x86_64-SMP:
     machine:
-      image: ubuntu-2004:202201-01
+      image: ubuntu-2004:2022.04.1
 
     steps:
       - checkout
@@ -66,9 +66,118 @@ jobs:
           name: TestP P=4 PPN=2
           command: make -C netlrts-linux-x86_64-smp/tmp testp P=4 TESTOPTS="++local +setcpuaffinity +CmiSleepOnIdle ++ppn 2"
 
+  NetLRTS-ARM64:
+    machine:
+      image: ubuntu-2004:2022.04.1
+    resource_class: arm.medium
+
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - ccache-arm64-{{ arch }}-{{ .Branch }}
+            - ccache-arm64-{{ arch }}-main
+            - ccache-arm64-{{ arch }}
+      - run:
+          name: CCache
+          command: |
+            sudo apt update
+            sudo apt -y install ccache
+            ccache --show-stats
+            ccache --max-size=1.0G
+      - run:
+          name: Build
+          command: |
+            export PATH=/usr/lib/ccache:${PATH}
+            ./build all-test netlrts-linux-arm8 -j2 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla
+      - save_cache:
+          key: "ccache-arm64-{{ arch }}-{{ .Branch }}-{{ epoch }}"
+          paths: [ "/home/circleci/.ccache" ]
+      - run:
+          name: Test
+          command: make -C netlrts-linux-arm8/tmp test TESTOPTS="++local"
+      - run:
+          name: TestP P=2
+          command: make -C netlrts-linux-arm8/tmp testp P=2 TESTOPTS="++local"
+
+  NetLRTS-ARM64-SMP:
+    machine:
+      image: ubuntu-2004:2022.04.1
+    resource_class: arm.medium
+
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - ccache-arm64-smp-{{ arch }}-{{ .Branch }}
+            - ccache-arm64-smp-{{ arch }}-main
+            - ccache-arm64-smp-{{ arch }}
+      - run:
+          name: CCache
+          command: |
+            sudo apt update
+            sudo apt -y install ccache
+            ccache --show-stats
+            ccache --max-size=1.0G
+      - run:
+          name: Build
+          command: |
+            export PATH=/usr/lib/ccache:${PATH}
+            ./build all-test netlrts-linux-arm8 smp -j2 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla
+      - save_cache:
+          key: "ccache-arm64-smp-{{ arch }}-{{ .Branch }}-{{ epoch }}"
+          paths: [ "/home/circleci/.ccache" ]
+      - run:
+          name: Test
+          command: make -C netlrts-linux-arm8-smp/tmp test TESTOPTS="++local +setcpuaffinity +CmiSleepOnIdle"
+      - run:
+          name: TestP P=4 PPN=2
+          command: make -C netlrts-linux-arm8-smp/tmp testp P=4 TESTOPTS="++local +setcpuaffinity +CmiSleepOnIdle ++ppn 2"
+
+  MPI-ARM64:
+    machine:
+      image: ubuntu-2004:2022.04.1
+    resource_class: arm.medium
+
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - ccache-mpi-arm64-{{ arch }}-{{ .Branch }}
+            - ccache-mpi-arm64-{{ arch }}-main
+            - ccache-mpi-arm64-{{ arch }}
+      - run:
+          name: CCache
+          command: |
+            sudo apt update
+            sudo apt -y install ccache libopenmpi-dev
+            ccache --show-stats
+            ccache --max-size=1.0G
+      - run:
+          name: Build
+          command: |
+            export PATH=/usr/lib/ccache:${PATH}
+            ./build all-test mpi-linux-arm8 -j2 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla
+      - save_cache:
+          key: "ccache-mpi-arm64-{{ arch }}-{{ .Branch }}-{{ epoch }}"
+          paths: [ "/home/circleci/.ccache" ]
+      - run:
+          name: Test
+          command: |
+            export OMPI_MCA_rmaps_base_oversubscribe=1
+            make -C mpi-linux-arm8/tmp test
+      - run:
+          name: TestP P=2
+          command: |
+            export OMPI_MCA_rmaps_base_oversubscribe=1
+            make -C mpi-linux-arm8/tmp testp P=2
+
 workflows:
   version: 2
   build:
     jobs:
-      - NetLRTS
-      - NetLRTS-smp
+      - NetLRTS-x86_64
+      - NetLRTS-x86_64-SMP
+      - NetLRTS-ARM64
+      - NetLRTS-ARM64-SMP
+      - MPI-ARM64
