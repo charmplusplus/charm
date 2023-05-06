@@ -467,7 +467,6 @@ namespace Ck { namespace IO {
 		Options& opt = files[session.file].opts;	
 		size_t num_readers = opt.num_readers;
 		size_t read_stripe = session.getBytes() / num_readers;
-		CkPrintf("The number of readers: %zu; read_stripe=%zu; from Manager %d\n", num_readers, read_stripe, CkMyPe());
 		// CProxy_ReadAssembler(ra)[CkMyPe()].serveRead(bytes, offset, after_read,read_stripe); // actually does grunt-work of serving data
 	 	ReadAssembler* grp_ptr = ra.ckLocalBranch();
 		if(!grp_ptr){
@@ -778,9 +777,7 @@ namespace Ck { namespace IO {
 				CkPrintf("chare_offset=%zu, end_byte_chare=%zu, bytes_to_read=%zu, offset=%zu, bytes=%zu\n", chare_offset, end_byte_chare, bytes_to_read, offset, bytes);	
 			#endif
 			char* buffer = _buffer.get(); // future call to get
-			std::string s(buffer + (chare_offset - _my_offset), bytes_to_read);
 			// CkPrintf("Buffer[%d] is sending %zu bytes with total string %s\n", thisIndex, bytes_to_read, s.c_str());
-			CkCallback cb(CkIndex_ReadSession::zeroCopyCallback(chare_offset, CkWallTimer()), thisProxy[thisIndex]);	
 			CProxy_ReadAssembler(ra)[pe].shareData(read_tag, buffer_tag, chare_offset, bytes_to_read, CkSendBuffer(buffer + (chare_offset - _my_offset)/*, cb*/)); // send this data to the ReadAssembler
 		}
 
