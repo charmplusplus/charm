@@ -1,4 +1,4 @@
 # These packages are need to build the documentation with sphinx.
 
 pygments>=2.4.0
-sphinx>4
+sphinx>=6
