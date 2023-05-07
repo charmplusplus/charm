@@ -1,4 +1,4 @@
-name: MPI Linux SMP
+name: MPI Linux
 
 on: [pull_request, merge_group]
 
@@ -13,9 +13,11 @@ jobs:
     - name: install-prerequisites
       run: sudo apt-get update && sudo apt-get install -y mpich libmpich-dev
     - name: build
-      run: ./build all-test mpi-linux-x86_64 smp --build-shared --with-production --enable-error-checking --enable-lbuserdata -j2 -g -Werror=vla
+      run: ./build all-test mpi-linux-x86_64 --build-shared --with-production --enable-error-checking --enable-lbuserdata -j2 -g -Werror=vla
       # TODO: this should build tests with "-charm-shared". See #2735 on why this is not done currently.
     - name: test
-      run: make -C mpi-linux-x86_64-smp/tmp test TESTOPTS="+setcpuaffinity"
-    - name: testp
-      run: make -C mpi-linux-x86_64-smp/tmp testp P=4 TESTOPTS="+setcpuaffinity ++ppn 2"
+      run: make -C mpi-linux-x86_64/tmp test
+    - name: testp P=2
+      run: make -C mpi-linux-x86_64/tmp testp P=2
+    - name: testp P=3
+      run: make -C mpi-linux-x86_64/tmp testp P=3

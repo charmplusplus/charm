@@ -1,0 +1,23 @@
+name: Multicore Linux
+
+on: [pull_request, merge_group]
+
+jobs:
+  build:
+    timeout-minutes: 120
+
+    runs-on: ubuntu-20.04
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: build
+      run: ./build all-test multicore-linux-x86_64 --build-shared --with-production --enable-error-checking --enable-lbuserdata -j2 -g -Werror=vla
+      # TODO: this should build tests with "-charm-shared". See #2735 on why this is not done currently.
+    - name: test
+      run: make -C multicore-linux-x86_64/tmp test TESTOPTS="+setcpuaffinity"
+    - name: testp P=2
+      run: make -C multicore-linux-x86_64/tmp testp TESTOPTS="+setcpuaffinity" P=2
+    - name: testp P=3
+      run: make -C multicore-linux-x86_64/tmp testp TESTOPTS="+setcpuaffinity" P=3
+    - name: testp P=4
+      run: make -C multicore-linux-x86_64/tmp testp TESTOPTS="+setcpuaffinity" P=4

@@ -1,0 +1,21 @@
+name: MPI Darwin SMP
+
+on: [pull_request, merge_group]
+
+jobs:
+  build:
+    timeout-minutes: 120
+
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: install-prerequisites
+      run: brew update && brew install mpich
+    - name: build
+      run: ./build all-test mpi-darwin-x86_64 smp --build-shared --with-production --enable-error-checking --enable-lbuserdata -j2 -g -Werror=vla
+      # TODO: this should build tests with "-charm-shared". See #2735 on why this is not done currently.
+    - name: test
+      run: make -C mpi-darwin-x86_64-smp/tmp test
+    - name: testp
+      run: make -C mpi-darwin-x86_64-smp/tmp testp P=4 TESTOPTS="++ppn 2"

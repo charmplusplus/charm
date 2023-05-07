@@ -1,27 +1,23 @@
-name: Multicore Darwin tracing
+name: Multicore Darwin
 
 on: [pull_request, merge_group]
 
 jobs:
   build:
-    timeout-minutes: 60
+    timeout-minutes: 120
 
     runs-on: macos-latest
 
     steps:
     - uses: actions/checkout@v2
     - name: build
-      run: ./build LIBS multicore-darwin-x86_64 -g -j3 --with-production --enable-tracing
+      run: ./build all-test multicore-darwin-x86_64 --build-shared --with-production --enable-error-checking --enable-lbuserdata -j2 -g -Werror=vla
+      # TODO: this should build tests with "-charm-shared". See #2735 on why this is not done currently.
     - name: test
-      run: |
-        make -C multicore-darwin-x86_64/tmp all-test -j3 OPTS="-g -tracemode projections"
-        make -C multicore-darwin-x86_64/tmp test
-    - name: projections
-      run: |
-        git clone https://github.com/UIUC-PPL/projections
-        cd projections
-        make
-        proj=$PWD/bin/projections
-        cd ..
-        files=$(find . -name *.sts)
-        for f in $files; do echo $f; pushd .; cd $(dirname $f); $proj --exit $(basename $f); popd; done
+      run: make -C multicore-darwin-x86_64/tmp test TESTOPTS="+setcpuaffinity"
+    - name: testp P=2
+      run: make -C multicore-darwin-x86_64/tmp testp TESTOPTS="+setcpuaffinity" P=2
+    - name: testp P=3
+      run: make -C multicore-darwin-x86_64/tmp testp TESTOPTS="+setcpuaffinity" P=3
+    - name: testp P=4
+      run: make -C multicore-darwin-x86_64/tmp testp TESTOPTS="+setcpuaffinity" P=4
