@@ -2553,14 +2553,14 @@ void mpi_file_get_view(MPI_Fint *fh, MPI_Offset *disp, MPI_Fint *etype, MPI_Fint
 
   tmpreplen = strlen(tmprep);
   if (tmpreplen <= str_len) {
-    ADIOI_Strncpy(datarep, tmprep, tmpreplen);
+    memcpy(datarep, tmprep, tmpreplen);
 
     /* blank pad the remaining space */
     for (i=tmpreplen; i<str_len; i++) datarep[i] = ' ';
   }
   else {
     /* not enough space */
-    ADIOI_Strncpy(datarep, tmprep, str_len);
+    memcpy(datarep, tmprep, str_len);
     /* this should be flagged as an error. */
     *ierr = MPI_ERR_UNKNOWN;
   }
