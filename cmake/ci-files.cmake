@@ -77,8 +77,6 @@ foreach(in_f ${ci-files})
     elseif(${in_f} MATCHES src/libs/ck-libs/pmaf/pgm.ci)
         # set(ci-output Pgm.decl.h) # disabled ; should be renamed ; not needed during LIBS build
         continue()
-    elseif(${in_f} MATCHES src/ck-perf/trace-Tau.ci)
-        set(ci-output TraceTau.decl.h)
     elseif(${in_f} MATCHES src/ck-perf/trace-summary.ci)
         set(ci-output TraceSummary.decl.h)
     elseif(${in_f} MATCHES src/ck-perf/trace-simple.ci)

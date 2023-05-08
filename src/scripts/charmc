@@ -133,9 +133,6 @@ ROSE_OMP_TLS_GLOBALS="no"
 PRINT_BUILDING_BLOCKS=""
 NOABORT=""
 
-TAU_MAKEFILE=Make.tau
-TAU_TRACE_MPI=1
-
 MPI_INTEROPERATE=""
 NO_MAIN_MODULE=""
 NO_MAIN=""
@@ -509,9 +506,6 @@ do
 			Warning "Warning: Duplicate tracemode $1 ignored"
 		fi
 		shift
-		;;
-	"-no-trace-mpi")
-		TAU_TRACE_MPI=0
 		;;
 
 	"-swapglobal"|"-swapglobals")
@@ -1379,22 +1373,9 @@ then
     CMK_XIOPTS+=" -count-tokens"
 fi
 
-if [[ "$CMK_WITH_TAU" = 'true' ]]
-then
-  echo "include $TAU_MAKEFILE" > _make.tau.tmp
-  echo "print-%:; @echo \$(\$*)" >> _make.tau.tmp
-  TAU_LIBS="$(make --no-print-directory -f _make.tau.tmp print-TAU_LIBS)"
-  TAU_MPI_LIBS="$(make --no-print-directory -f _make.tau.tmp print-TAU_MPI_LIBS)"
-  TAU_MPI_FLIBS="$(make --no-print-directory -f _make.tau.tmp print-TAU_MPI_FLIBS)"
-  TAU_DEFS="$(make --no-print-directory -f _make.tau.tmp print-TAU_DEFS)"
-  TAU_INCLUDE="$(make --no-print-directory -f _make.tau.tmp print-TAU_INCLUDE)"
-
-  rm -f _make.tau.tmp
-fi
-
 #Add generic options to the compiler- and linker-options
-OPTS_CC=("${OPTS[@]}" $TAU_DEFS $TAU_INCLUDE "${OPTS_CC[@]}")
-OPTS_CXX=("${OPTS[@]}" $TAU_DEFS $TAU_INCLUDE "${OPTS_CXX[@]}")
+OPTS_CC=("${OPTS[@]}" "${OPTS_CC[@]}")
+OPTS_CXX=("${OPTS[@]}" "${OPTS_CXX[@]}")
 OPTS_F90=("${OPTS[@]}" "${OPTS_F90[@]}")
 OPTS_LD=("${OPTS[@]}" "${OPTS_LD[@]}")
 
@@ -1632,21 +1613,6 @@ MAKE_LD="0"
 
 CORE_LIBS=(-lconverse "${TRACE_OBJ[@]}" -lm)
 
-# get TAU stub makefile variables
-if [[ "$CMK_WITH_TAU" = 'true' ]]
-then
-  echo "include $TAU_MAKEFILE" > _make.tau.tmp
-  echo "print-%:; @echo \$(\$*)" >> _make.tau.tmp
-  TAU_LIBS="$(make --no-print-directory -f _make.tau.tmp print-TAU_LIBS)"
-  TAU_MPI_LIBS="$(make --no-print-directory -f _make.tau.tmp print-TAU_MPI_LIBS)"
-  TAU_MPI_FLIBS="$(make --no-print-directory -f _make.tau.tmp print-TAU_MPI_FLIBS)"
-  TAU_DEFS="$(make --no-print-directory -f _make.tau.tmp print-TAU_DEFS)"
-  TAU_INCLUDE="$(make --no-print-directory -f _make.tau.tmp print-TAU_INCLUDE)"
-
-  rm -f _make.tau.tmp
-fi
-# done getting TAU variables
-
 if [[ "$BUILD_SHARE" = '0' && "$USER_INITIATED_SHARED" = '0' ]]
 then
        MIDDLE_LIBS=("${MEM_OBJ[@]}" "${THREAD_OBJ[@]}" "${MIDDLE_LIBS[@]}")
@@ -1663,10 +1629,6 @@ case "$PARADIGM" in
 		MIDDLE_LIBS=(-lckmainf "${MIDDLE_LIBS[@]}")
 		F90_MAIN="1"
 	fi
-	if [[ "$TAU_TRACE_MPI" = '1' ]]
-	then
-		TAU_LIBS="$TAU_MPI_FLIBS $TAU_LIBS"
-	fi
 	;;
 "charm"|"charm++"|"f90charm")
 	MAKE_LDXX="1"
@@ -1681,10 +1643,6 @@ case "$PARADIGM" in
 		then
 			MIDDLE_LIBS=(-lckmain "${MIDDLE_LIBS[@]}")
 		fi
-	fi
-	if [[ "$TAU_TRACE_MPI" = '1' ]]
-	then
-		TAU_LIBS="$TAU_MPI_LIBS $TAU_LIBS"
 	fi
 	;;
 "converse"|"converse++")
@@ -1742,11 +1700,6 @@ then
   ALL_LIBS+=(-lstdc++)
 fi
 
-if [[ "$TRACE_WITH_TAU" = '1' ]]
-then
-	echo "Linking with the TAU libraries: $TAU_LIBS"
-	ALL_LIBS+=("$TAU_LIBS")
-fi
 Debugf "All libraries are: ${ALL_LIBS[*]}"
 
 # preserve this variable in its state here for use later
@@ -2261,9 +2214,6 @@ then
         elif [[ "$trace" = "simple" ]]
         then
           echo "  extern void _registerTraceSimple();" >> "$modInitSrc"
-        elif [[ "$trace" = "Tau" ]]
-        then
-          echo "  extern void _registerTraceTau();" >> "$modInitSrc"
         elif [[ "$trace" = "utilization" ]]
         then
           echo "  extern void _registerTraceUtilization();" >> "$modInitSrc"
@@ -2299,10 +2249,6 @@ then
         elif [[ "$trace" = "projections" ]]
         then
           echo "  _registerTraceProjections();" >> "$modInitSrc"
-        elif [[ "$trace" = "Tau" ]]
-        then
-          TRACE_WITH_TAU=1
-          echo "  _registerTraceTau();" >> "$modInitSrc"
         elif [[ "$trace" = "simple" ]]
         then
           echo "  _registerTraceSimple();" >> "$modInitSrc"

@@ -127,15 +127,6 @@ msa: charm++
 	$(MAKE) -C libs/ck-libs/multiphaseSharedArrays
 
 
-#include TAU defs
-TAU_MAKEFILE=Make.tau
-include	$(TAU_MAKEFILE) #stub-makefile
-
-#builds TAU's trace library
-Tau: 
-	@echo "Building Charm trace library with support for TAU."
-	$(MAKE) $(L)/libtrace-Tau.a $(L)/libtrace-all.a TAU_TRACE_OBJ=libtrace-Tau.o
-
 LIBS: CONVLIBS CHARMLIBS everylb
 	@echo "Built LIBS successfully"
 
@@ -217,7 +208,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  DistBaseLB.decl.h \
           HybridBaseLB.decl.h EveryLB.decl.h CommonLBs.decl.h \
           TraceSummary.decl.h TraceAutoPerf.decl.h TraceProjections.decl.h \
-          TraceSimple.decl.h TraceControlPoints.decl.h TraceTau.decl.h \
+          TraceSimple.decl.h TraceControlPoints.decl.h \
 	  TraceUtilization.decl.h \
 	  ControlPoints.decl.h PathHistory.decl.h \
 	  pathHistory.h envelope-path.h \
@@ -340,7 +331,7 @@ endif
 ###############################################################################
 #
 # Converse Libraries
-# 
+#
 ###############################################################################
 CLBLIBS=$(L)/libldb-rand.a $(L)/libldb-spray.a   $(L)/libldb-workstealing.a  $(L)/libldb-neighbor.a $(L)/libldb-none.a $(L)/libldb-test.a
 
@@ -544,7 +535,7 @@ CONVLIBS: converse
 	$(MAKE) -C libs convlibs
 
 $(L)/libconverse.a: $(LIBCONV_CORE) $(LIBCONV_UTIL) $(LIBCONV_PARTITION) $(LIBCONV_LDB) machine.o $(LIBTMGR) | hwloc-target
-	$(CHARMC) $(TAU_LIBS) -o $@ $^ $(wildcard hwloc/hwloc/*.o) $(wildcard hwloc/hwloc/*.obj)
+	$(CHARMC) -o $@ $^ $(wildcard hwloc/hwloc/*.o) $(wildcard hwloc/hwloc/*.obj)
 
 $(L)/conv-static.o: conv-static.o
 	cp -f $< $@
@@ -592,7 +583,7 @@ $(L)/libldb-spray.a: cldb.spray.C $(CVHEADERS)
 #	$(CHARMC) -o $@ cldb.prioritycentralized.C
 
 #//$(L)/libldb-prioritycentralizedopt.a: cldb.prioritycentralizedopt.c cldb.prioritycentralizedopt.h  $(CVHEADERS)
-#//	$(CHARMC) -o $@ cldb.prioritycentralizedopt.c 
+#//	$(CHARMC) -o $@ cldb.prioritycentralizedopt.c
 
 $(L)/libldb-test.a: cldb.test.C $(CVHEADERS)
 	$(CHARMC) -o $@ cldb.test.C
@@ -708,7 +699,7 @@ charm-target: loadbalancers default_libs $(L)/libmpi-mainmodule.a
 CHARMLIBS: charm++ CONVLIBS
 	$(MAKE) -C libs charmlibs
 
-$(L)/libck.a: $(LIBCK_CORE) 
+$(L)/libck.a: $(LIBCK_CORE)
 	$(CHARMC) -o $@ $(LIBCK_CORE)
 
 ## Fortran
@@ -758,32 +749,6 @@ LIBTRACE_SIMPLE=trace-simple.o
 $(L)/libtrace-simple.a: $(LIBTRACE_SIMPLE)
 	$(CHARMC) -o $@ $(LIBTRACE_SIMPLE)
 
-libtrace-Tau.o: trace-Tau.C charm++.h charm.h converse.h conv-config.h \
-  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h \
-  conv-mach-ifort.h pup_c.h conv-cpm.h conv-cpath.h conv-qd.h \
-  pup_c_functions.h \
-  conv-random.h conv-lists.h conv-trace.h persistent.h debug-conv.h pup.h \
-  middle.h middle-conv.h cklists.h ckbitvector.h ckstream.h init.h \
-  ckhashtable.h debug-charm.h CkMarshall.decl.h cksection.h ckcallback.h \
-  conv-ccs.h sockRoutines.h ccs-server.h ckobjQ.h ckreduction.h \
-  CkReduction.decl.h cksyncbarrier.h CkSyncBarrier.decl.h \
-  ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h ckarray.h cklocrec.h ckmigratable.h \
-  cklocation.h ckmulticast.h LBDatabase.h LBManager.h MetaBalancer.h RandomForestModel.h lbdb.h LBObj.h LBOM.h LBComm.h \
-  LBMachineUtil.h LBManager.decl.h MetaBalancer.decl.h BaseLB.decl.h \
-  CkLocation.decl.h CkMulticast.decl.h CkArray.decl.h objid.h envelope.h envelope-path.h XArraySectionReducer.h CkFutures.decl.h \
-  waitqd.h waitqd.decl.h \
-  sdag.h ckcheckpoint.h CkCheckpoint.decl.h \
-  trace.h trace-simple.h \
-  register.h trace-common.h trace-simpleBOC.h TraceSimple.decl.h \
-  TraceSimple.def.h ckregex.h
-	$(CHARMC) -c -I. $(TAU_INCLUDE) $(TAU_DEFS) trace-Tau.C -o libtrace-Tau.o
-
-tau_selective.o: $(TAUROOT)/utils/tau_selective.cpp 
-	$(CHARMC) -I$(TAUROOT)/utils -DTAU_DYNINST $(TAUROOT)/utils/tau_selective.cpp
-
-$(L)/libtrace-Tau.a: $(TAU_TRACE_OBJ) tau_selective.o
-	$(CHARMC) $(TAU_LIBS) -o $@ $(TAU_TRACE_OBJ) tau_selective.o $(TAU_TRACE_OBJ)
-
 LIBTRACE_COUNT=trace-counter.o
 $(L)/libtrace-counter.a: $(LIBTRACE_COUNT)
 	$(CHARMC) -o $@ $(LIBTRACE_COUNT)
@@ -793,7 +758,7 @@ $(L)/libtrace-memory.a: $(LIBTRACE_MEMORY)
 	$(CHARMC) -o $@ $(LIBTRACE_MEMORY)
 
 LIBTRACE_ALL=trace-all.o trace-projections.o trace-controlPoints.o picstreenode.o picsdecisiontree.o picsautoperfAPI.o picsautoperf.o trace-perf.o trace-summary.o trace-simple.o  \
-$(TAU_TRACE_OBJ) trace-projector.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o trace-memory.o trace-utilization.o
+    trace-projector.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o trace-memory.o trace-utilization.o
 
 $(L)/libtrace-all.a: $(LIBTRACE_ALL)
 	$(CHARMC) -o $@ $(LIBTRACE_ALL)
@@ -818,7 +783,7 @@ $(LIBTRACE_FOR): tracef_f.f90
 TRACE_OBJS =  trace-projections.o trace-controlPoints.o picstreenode.o picsdecisiontree.o trace-perf.o picsautoperfAPI.o picsautoperf.o trace-summary.o  trace-simple.o \
 	      trace-counter.o trace-utilization.o	\
 	      trace-projector.o trace-converse.o trace-all.o \
-          trace-memory.o 
+          trace-memory.o
 
 ###############################################################################
 #

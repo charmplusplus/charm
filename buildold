@@ -27,7 +27,6 @@ syntax() {
   echo '  LIBS            compile additional parallel libraries with Charm++ core'
   echo '  charm4py        compile shared library version of Charm++ for charm4py'
   echo '  msa             build Multiphase Shared Arrays(MSA) library'
-  echo '  Tau             build the TAU tracing library for generating TAU performance data' 
   echo '  ChaNGa          compile Charm++ core and necessary libraries for ChaNGa'
   echo '  everylb         compile EveryLB suite of load balancing strategies'
   echo ''
@@ -114,7 +113,6 @@ syntax() {
   echo "  --with-lbtime-type  specify real type for the load balancing timers"
   echo "  --destination=DIR   build Charm++ inside DIR, by default the destination is <version>"
   echo "  --suffix=DIR        append DIR to the destination directory of the Charm++ build"
-  echo "  --tau-makefile=FILE Specify which TAU stub makefile to use"
   fi
   echo ''
   echo '<charmc-options>: normal compiler options e.g. -g -optimize -save -verbose'
@@ -134,7 +132,6 @@ syntax() {
   echo '  ./build charm++ mpi-linux-x86_64 --incdir /usr/local/mpich/include --libdir /usr/local/mpich/lib -optimize'
   echo '   or in short,'
   echo '  ./build charm++ mpi-linux-x86_64 --basedir /usr/local/mpich -optimize'
-  echo '  ./build Tau --tau-makefile=/usr/local/packages/TAU/x86_64/lib/Makefile.tau-mpi'
   echo ''
   echo 'Note: This script:'
   echo ' 1. Creates directories <destination> and <destination>/tmp'
@@ -167,7 +164,7 @@ printOption() {
 #         echo "Checking for $prefix in $dir"
           files="$(cd "$dir"; ls $prefix-*.h 2>/dev/null)"
           opts+=" $(echo "$files" | sed 's/'$prefix'-\([^.]*\).h/\1/g')"
-    done 
+    done
     tmp=.tmp.$$
     rm -f "$tmp"; touch "$tmp"
     for o in $opts
@@ -197,7 +194,7 @@ TestIfCompiler() {
   for dir in "${OPT_DIRS[@]}"
   do
     [[ -f "$dir/cc-$compilerName.sh" ]] && return 1
-  done  
+  done
   return 0
 }
 
@@ -206,8 +203,8 @@ TestIfOption() {
   do
     [[ -f "$dir/conv-mach-$1.h" ]] && return 1
   done
-  
-  echo "Error> option: $1 is not supported in this version!"; 
+
+  echo "Error> option: $1 is not supported in this version!";
   printOption
 }
 
@@ -228,7 +225,6 @@ BUILD_SHARED=""             # default no shared lib
 WITH_PRODUCTION=
 DESTINATION=""
 DESTINATION_SUFFIX=""
-TAU_MAKEFILE=""
 QUIET=""
 BUILD_OMP=0
 ONLY_CONFIGURE=
@@ -358,7 +354,7 @@ do
     shift
     ;;
     --build-shared)
-    BUILD_SHARED="-build-shared"; 
+    BUILD_SHARED="-build-shared";
     shift
     ;;
     --ampi-only)
@@ -371,7 +367,7 @@ do
     WITH_ROMIO=""; shift
     ;;
     --with-production)
-    WITH_PRODUCTION="true" 
+    WITH_PRODUCTION="true"
     shift
     ;;
     --with-*)
@@ -398,14 +394,6 @@ do
     ;;
     --suffix=*)
     DESTINATION_SUFFIX="${1#--suffix=}"
-    shift
-    ;;
-    --tau-makefile)
-    TAU_MAKEFILE=$1
-    shift
-    ;;
-    --tau-makefile=*)
-    TAU_MAKEFILE="${1#--tau-makefile=}"
     shift
     ;;
     --quiet)
@@ -443,7 +431,7 @@ do
     MAKEOPTS+=("$1")
     shift;
     ;;
-    -*) 
+    -*)
         # Compiler option (like -g or -Dfoo), copy it over
         OPTS+=("$1")
         shift
@@ -507,11 +495,11 @@ if [[ "$ARCH" = 'net' ]]; then
   exit 1;
 fi
 
-#Check if building verbs on Omni-Path 
+#Check if building verbs on Omni-Path
 if [[ "$ARCH" = 'verbs' ]] && type /usr/sbin/opafabricinfo >/dev/null 2>&1; then
   echo "WARNING: Detected Omni-Path diagnostic tools.";
   echo "Verbs on Omni-Path architectures is not well supported: please use an OFI build instead.";
-fi 
+fi
 
 if [[ -z "$MAKE" ]]
 then
@@ -661,23 +649,6 @@ then
     CONFIG_OPTS=(--disable-controlpoint --disable-tracing --disable-tracing-commthread --disable-charmdebug --disable-replay --disable-error-checking --disable-stats "${CONFIG_OPTS[@]}")
 fi
 
-# build with Tau
-WITH_TAU=0
-if [[ "$PROGRAM" = 'Tau' ]]
-then
-  Echo "TAU>>>> makefile config option: $TAU_MAKEFILE"
-  if [[ -n "$TAU_MAKEFILE" && -f "$TAU_MAKEFILE" ]]
-  then
-    #Setting up TAU trace library:
-    Echo "TAU>>>> configuring with this TAU makefile: $TAU_MAKEFILE"
-
-          WITH_TAU=1
-  else
-    Echo "TAU>>>> ERROR could not find Makefile: $TAU_MAKEFILE, ignored"
-          TAU_MAKEFILE=""
-  fi
-fi
-
 if [[ "$PROGRAM" = 'ChaNGa' ]]
 then
   #Setting lbuserdata when the build is ChaNGa
@@ -798,7 +769,6 @@ else
 touch "$DESTINATION/tmp/Make.lb"
 fi
 "$DESTINATION/tmp/system_ln" "$srcbase/scripts/Makefile" "$DESTINATION/tmp/Makefile"
-"$DESTINATION/tmp/system_ln" "$srcbase/scripts/Make.tau" "$DESTINATION/tmp/Make.tau"
 "$DESTINATION/tmp/system_ln" "$srcbase/scripts/Make.gpu" "$DESTINATION/tmp/Make.gpu"
 touch "$DESTINATION/tmp/Makefile.machine"
 touch "$DESTINATION/tmp/Make.extlib"
@@ -893,21 +863,6 @@ fi
 if [[ -n "$WITH_PRODUCTION" ]]
 then
     echo '#define CMK_OPTIMIZE 1' >> "$ConvHeader"
-fi
-
-if [[ $WITH_TAU -eq 1 ]]
-then
-    [[ -z "$TAU_MAKEFILE" ]] && TAU_MAKEFILE='Make.tau'
-    SED_CHARMC="s@TAU_MAKEFILE=\(.*\)@TAU_MAKEFILE=$TAU_MAKEFILE@"
-
-    sed -e "$SED_CHARMC" "$srcbaseabs/scripts/Makefile" > .Makefile.$$ && cp .Makefile.$$ "$srcbaseabs/scripts/Makefile" && rm -f .Makefile.$$
-    sed -e "$SED_CHARMC" "$srcbaseabs/scripts/charmc" > .charmc.$$ && cp .charmc.$$ "$srcbaseabs/scripts/charmc" && rm -f .charmc.$$
-
-    echo "#define CMK_WITH_TAU               1" >> "$ConvHeader"
-    echo "#define pthread_create             tau_pthread_create" >> "$ConvHeader"
-    echo "#define pthread_exit               tau_pthread_exit" >> "$ConvHeader"
-
-    echo "CMK_WITH_TAU=\"true\"" >> "$ConvSh"
 fi
 
 CMK_VDIR="$BASEVERSION"
