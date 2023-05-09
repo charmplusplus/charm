@@ -58,6 +58,9 @@ typedef struct _ccd_cblist {
 const static double periodicCallInterval[CCD_PERIODIC_MAX]=
 {0.001, 0.010, 0.100, 1.0, 5.0, 10.0, 60.0, 2*60.0, 5*60.0, 10*60.0, 3600.0, 12*3600.0, 24*3600.0};
 
+/** The number of timer-based condition callbacks */
+CpvDeclare(int, _ccd_num_timed_cond_cbs);
+
 /* Cond callbacks that use the above time intervals for their condition are considered "timed" */
 static bool isTimed(int condnum) {
   return (condnum >= CcdPERIODIC_FIRST && condnum < CcdPERIODIC_LAST);
@@ -270,8 +273,6 @@ typedef struct {
 CpvStaticDeclare(ccd_heap_elem*, ccd_heap); 
 /** The length of the callback heap */
 CpvDeclare(int, _ccd_heaplen);
-/** The number of timer-based condition callbacks */
-CpvDeclare(int, _ccd_num_timed_cond_cbs);
 /** The max allowed length of the callback heap */
 CpvStaticDeclare(int, ccd_heapmaxlen);
 
