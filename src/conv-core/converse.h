@@ -1096,11 +1096,11 @@ typedef void (*CmiStartFn)(int argc, char **argv);
   @addtogroup ConverseScheduler
   @{
 */
+extern void  CcdCallBacks(void);
 #if CSD_NO_PERIODIC
 #define CsdPeriodic()
 #define CsdResetPeriodic()
 #else
-extern void  CcdCallBacks(void);
 extern int CcdNumTimerCBs(void);
 CpvExtern(int, _ccd_numchecks);
 CpvExtern(int, _ccd_heaplen);
