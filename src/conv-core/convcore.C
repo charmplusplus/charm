@@ -2203,11 +2203,17 @@ void CsdInit(char **argv)
   CsvAccess(idleThreadsCnt) = 0;
 #endif
   if (CmiMyPe() == 0) {
+    #if CMK_SMP && CMK_LOCKLESS_QUEUE
+      CmiPrintf("Charm++> Using lockless concurrent queue.\n");
+    #endif
+    #if CMK_SMP && CMK_TASKQUEUE
+      CmiPrintf("Charm++> Work stealing task queue support is enabled.\n");
+    #endif
     #if CMK_USE_STL_MSGQ
-      CmiPrintf("Charm++> Using STL-based msgQ.\n");
+      CmiPrintf("Charm++> Using STL-based message queue optimized for non-bitvec priority types.\n");
     #endif
     #if CMK_RANDOMIZED_MSGQ
-      CmiPrintf("Charm++> Using randomized msgQ. Priorities will not be respected!\n");
+      CmiPrintf("Charm++> Using randomized message queue. Priorities will not be respected!\n");
     #elif CMK_NO_MSG_PRIOS
       CmiPrintf("Charm++> Message priorities have been turned off and will not be respected.\n");
     #endif
