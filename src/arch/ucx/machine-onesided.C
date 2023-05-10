@@ -100,7 +100,7 @@ void UcxRmaOp(NcpyOperationInfo *ncpyOpInfo, int op)
             op, ncpyOpInfo->srcPe, ncpyOpInfo->destPe, ncpyOpInfo->srcSize,
             ncpyOpInfo->destSize, dstInfo->packedRkey, srcInfo->memh, dstInfo->memh);
 
-#if CMK_SMP
+#if CMK_SMP && !CMK_SMP_COMMTHD_RECV_ONLY
     if(CmiMyRank() != CmiMyNodeSize()) { // worker thread
 
       // Push a UcxPendingRequest to post the GET or PUT operation from the comm thread

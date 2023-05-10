@@ -1,4 +1,5 @@
 #define CMK_SMP						                       1
+#define CMK_SMP_COMMTHD_RECV_ONLY                          1
 
 #undef CMK_SHARED_VARS_UNAVAILABLE
 #undef CMK_SHARED_VARS_POSIX_THREADS_SMP

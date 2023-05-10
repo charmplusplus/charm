@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string>
+#include <vector>
 
 #include "converse.h"
 #include "cmirdmautils.h"
@@ -94,10 +95,15 @@ typedef struct UcxRequest
 typedef struct UcxContext
 {
     ucp_context_h     context;
-    ucp_worker_h      worker;
+#if CMK_SMP_COMMTHD_RECV_ONLY
+    ucp_worker_h      *workers;
+    ucp_ep_h          **eps;
+#else
+    ucp_worker_h      workers;
     ucp_ep_h          *eps;
+#endif
     UcxRequest        **rxReqs;
-#if CMK_SMP
+#if CMK_SMP && !CMK_SMP_COMMTHD_RECV_ONLY
     PCQueue           txQueue;
 #endif
     int               eagerSize;
@@ -180,7 +186,7 @@ void UcxRequestInit(void *request)
 #endif
 }
 
-static void UcxInitEps(int numNodes, int myId)
+static void UcxInitEps(int numNodes, int myId, int nodeSize)
 {
     size_t addrlen;
     ucp_address_t *address;
@@ -202,10 +208,23 @@ static void UcxInitEps(int numNodes, int myId)
     keys = (char*)CmiAlloc(maxkey);
     CmiEnforce(keys);
 
-    ucxCtx.eps = (ucp_ep_h*)CmiAlloc(sizeof(ucp_ep_h)*numNodes);
+#if CMK_SMP_COMMTHD_RECV_ONLY
+    ucxCtx.eps = (ucp_ep_h**)CmiAlloc(sizeof(ucp_ep_h*)*(nodeSize + 1));
     CmiEnforce(ucxCtx.eps);
 
+    for (int i = 0; i < nodeSize + 1; i++) {
+        ucxCtx.eps[i] = (ucp_ep_h*) CmiAlloc(sizeof(ucp_ep_h)*numNodes);
+    }
+#else
+    ucxCtx.eps = (ucp_ep_h*) CmiAlloc(sizeof(ucp_ep_h)*numNodes);
+#endif
+
+    // publish only the address of comm thread worker to kvs
+#if CMK_SMP_COMMTHD_RECV_ONLY
+    status = ucp_worker_get_address(ucxCtx.workers[nodeSize], &address, &addrlen);
+#else
     status = ucp_worker_get_address(ucxCtx.worker, &address, &addrlen);
+#endif
     UCX_CHECK_STATUS(status, "UcxInitEps: ucp_worker_get_address error");
     CmiEnforce(addrlen < std::numeric_limits<int>::max()); //address should fit to int
 
@@ -233,39 +252,55 @@ static void UcxInitEps(int numNodes, int myId)
     ret = runtime_barrier();
     UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_barrier");
 
+#if CMK_SMP_COMMTHD_RECV_ONLY
+    ucp_worker_release_address(ucxCtx.workers[nodeSize], address);
+#else
     ucp_worker_release_address(ucxCtx.worker, address);
+#endif
 
-    for (i = 0; i < numNodes; ++i) {
-        peer = (i + myId) % numNodes;
+#if CMK_SMP_COMMTHD_RECV_ONLY
+    for(int tid = 0; tid < nodeSize + 1; tid++) {
+#endif
+        for (i = 0; i < numNodes; ++i) {
+            peer = (i + myId) % numNodes;
 
-        ret = snprintf(keys, maxkey, "UCX-size-%d", peer);
-        UCX_CHECK_RET(ret, "UcxInitEps: snprintf error", (ret <= 0));
-        ret = runtime_kvs_get(keys, &parts, sizeof(parts), peer);
-        UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_kvs_get error");
-
-        remoteAddr = (char*)CmiAlloc(addrlen);
-        CmiEnforce(remoteAddr);
-
-        addrp = remoteAddr;
-        len   = addrlen;
-        for (j = 0; j < parts; ++j) {
-            partLen = std::min(maxval, len);
-            ret = snprintf(keys, maxkey, "UCX-%d-%d", peer, j);
+            ret = snprintf(keys, maxkey, "UCX-size-%d", peer);
             UCX_CHECK_RET(ret, "UcxInitEps: snprintf error", (ret <= 0));
-            ret = runtime_kvs_get(keys, addrp, partLen, peer);
+            ret = runtime_kvs_get(keys, &parts, sizeof(parts), peer);
             UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_kvs_get error");
-            addrp += maxval;
-            len   -= maxval;
+
+            remoteAddr = (char*)CmiAlloc(addrlen);
+            CmiEnforce(remoteAddr);
+
+            addrp = remoteAddr;
+            len   = addrlen;
+            for (j = 0; j < parts; ++j) {
+                partLen = std::min(maxval, len);
+                ret = snprintf(keys, maxkey, "UCX-%d-%d", peer, j);
+                UCX_CHECK_RET(ret, "UcxInitEps: snprintf error", (ret <= 0));
+                ret = runtime_kvs_get(keys, addrp, partLen, peer);
+                UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_kvs_get error");
+                addrp += maxval;
+                len   -= maxval;
+            }
+
+            eParams.field_mask = UCP_EP_PARAM_FIELD_REMOTE_ADDRESS;
+            eParams.address    = (const ucp_address_t*)remoteAddr;
+
+#if CMK_SMP_COMMTHD_RECV_ONLY
+            status = ucp_ep_create(ucxCtx.workers[tid], &eParams, &ucxCtx.eps[tid][peer]);
+            UCX_CHECK_STATUS(status, "ucp_ep_create failed");
+            UCX_LOG(4, "Connecting to %d (ep %p)", peer, ucxCtx.eps[tid][peer]);
+#else
+            status = ucp_ep_create(ucxCtx.worker, &eParams, &ucxCtx.eps[peer]);
+            UCX_CHECK_STATUS(status, "ucp_ep_create failed");
+            UCX_LOG(4, "Connecting to %d (ep %p)", peer, ucxCtx.eps[peer]);
+#endif
+            CmiFree(remoteAddr);
         }
-
-        eParams.field_mask = UCP_EP_PARAM_FIELD_REMOTE_ADDRESS;
-        eParams.address    = (const ucp_address_t*)remoteAddr;
-
-        status = ucp_ep_create(ucxCtx.worker, &eParams, &ucxCtx.eps[peer]);
-        UCX_CHECK_STATUS(status, "ucp_ep_create failed");
-        UCX_LOG(4, "Connecting to %d (ep %p)", peer, ucxCtx.eps[peer]);
-        CmiFree(remoteAddr);
+#if CMK_SMP_COMMTHD_RECV_ONLY
     }
+#endif
 
     CmiFree(keys);
 }
@@ -307,8 +342,18 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     // Create UCP worker
     wParams.field_mask  = UCP_WORKER_PARAM_FIELD_THREAD_MODE;
     wParams.thread_mode = UCS_THREAD_MODE_SINGLE;
+    
+#if CMK_SMP_COMMTHD_RECV_ONLY
+    int nodeSize = CmiMyNodeSize();
+    ucxCtx.workers = (ucp_worker_h*) CmiAlloc((nodeSize + 1) * sizeof(ucp_worker_h));
+    for (int i = 0; i < nodeSize + 1; i++) {
+        status = ucp_worker_create(ucxCtx.context, &wParams, &ucxCtx.workers[i]);
+        UCX_CHECK_STATUS(status, "ucp_worker_create");
+    }
+#else
     status = ucp_worker_create(ucxCtx.context, &wParams, &ucxCtx.worker);
     UCX_CHECK_STATUS(status, "ucp_worker_create");
+#endif
 
     ucxCtx.numRxReqs = UCX_MSG_NUM_RX_REQS;
     if (CmiGetArgInt(*argv, "+ucx_num_rx_reqs", &ucxCtx.numRxReqs)) {
@@ -324,15 +369,22 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     CmiGetArgInt(*argv, "+ucx_rndv_thresh", &thresh);
     ucxCtx.eagerSize = std::max(LrtsGetMaxNcpyOperationInfoSize(), thresh);
 
-    UcxInitEps(*numNodes, *myNodeID);
+    UcxInitEps(*numNodes, *myNodeID, nodeSize);
 
     UcxPrepostRxBuffers();
 
     // Ensure connects completion
+#if CMK_SMP_COMMTHD_RECV_ONLY
+    for (int i = 0; i < nodeSize + 1; i++) {
+        status = ucp_worker_flush(ucxCtx.workers[i]);
+        UCX_CHECK_STATUS(status, "ucp_worker_flush");
+    }
+#else
     status = ucp_worker_flush(ucxCtx.worker);
     UCX_CHECK_STATUS(status, "ucp_worker_flush");
+#endif
 
-#if CMK_SMP
+#if CMK_SMP && !CMK_SMP_COMMTHD_RECV_ONLY
     ucxCtx.txQueue = PCQueueCreate();
 #endif
 
@@ -352,16 +404,22 @@ static inline UcxRequest* UcxPostRxReqInternal(ucp_tag_t tag, size_t size,
     UcxRequest *req;
 
     if (tag == UCX_MSG_TAG_EAGER) {
-        req = (UcxRequest*)ucp_tag_recv_nb(ucxCtx.worker, buf,
-                                           ucxCtx.eagerSize,
-                                           ucp_dt_make_contig(1), tag,
-                                           UCX_MSG_TAG_MASK,
-                                           UcxRxReqCompleted);
+        req = (UcxRequest*)ucp_tag_recv_nb(
+#if CMK_SMP_COMMTHD_RECV_ONLY
+            ucxCtx.workers[CmiMyRank()], 
+#else
+            ucxCtx.worker, 
+#endif
+            buf, ucxCtx.eagerSize, ucp_dt_make_contig(1), tag, UCX_MSG_TAG_MASK, UcxRxReqCompleted);
     } else {
         CmiEnforce(tag == UCX_MSG_TAG_PROBE);
-        req = (UcxRequest*)ucp_tag_msg_recv_nb(ucxCtx.worker, buf, size,
-                                               ucp_dt_make_contig(1), msg,
-                                               UcxRxReqCompleted);
+        req = (UcxRequest*)ucp_tag_msg_recv_nb(
+#if CMK_SMP_COMMTHD_RECV_ONLY
+            ucxCtx.workers[CmiMyRank()], 
+#else
+            ucxCtx.worker,
+#endif
+            buf, size, ucp_dt_make_contig(1), msg, UcxRxReqCompleted);
     }
 
     CmiEnforce(!UCS_PTR_IS_ERR(req));
@@ -555,7 +613,7 @@ inline void* UcxSendMsg(int destNode, int destPE, int size, char *msg,
 
     UCX_LOG(3, "destNode=%i destPE=%i size=%i msg=%p, tag=%" PRIu64,
             destNode, destPE, size, msg, tag);
-#if CMK_SMP
+#if CMK_SMP && !CMK_SMP_COMMTHD_RECV_ONLY
     UcxPendingRequest *req = (UcxPendingRequest*)CmiAlloc(sizeof(UcxPendingRequest));
     req->msgBuf = msg;
     req->size   = size;
@@ -567,6 +625,18 @@ inline void* UcxSendMsg(int destNode, int destPE, int size, char *msg,
     UCX_LOG(3, " --> (PE=%i) enq msg (queue depth=%i), dNode %i, size %i",
             CmiMyPe(), PCQueueLength(ucxCtx.txQueue), destNode, size);
     PCQueuePush(ucxCtx.txQueue, (char *)req);
+#elif CMK_SMP && CMK_SMP_COMMTHD_RECV_ONLY
+    UcxRequest *req;
+
+    req = (UcxRequest*)ucp_tag_send_nb(
+        ucxCtx.eps[CmiMyRank()][destNode],
+        msg, size, ucp_dt_make_contig(1), sTag, cb);
+    if (!UCS_PTR_IS_PTR(req)) {
+        CmiEnforce(!UCS_PTR_IS_ERR(req));
+        return NULL;
+    }
+
+    req->msgBuf = msg;
 #else
     UcxRequest *req;
 
@@ -615,7 +685,7 @@ void LrtsPostCommonInit(int everReturn)
     UCX_LOG(2, "LrtsPostCommonInit");
 }
 
-#if CMK_SMP
+#if CMK_SMP && !CMK_SMP_COMMTHD_RECV_ONLY
 static inline int ProcessTxQueue()
 {
     UcxPendingRequest *req;
@@ -703,19 +773,28 @@ void LrtsAdvanceCommunication(int whileidle)
     int cnt;
 
     do {
+#if CMK_SMP_COMMTHD_RECV_ONLY
+       cnt = ucp_worker_progress(ucxCtx.workers[CmiMyRank()]);
+#else
        cnt = ucp_worker_progress(ucxCtx.worker);
+#endif
 
        // Probe with full tag mask to avoid long traversing thru unexpected
        // queue of eager messages (messages with non-full mask added to the
        // same unexpected queue)
-       msg = ucp_tag_probe_nb(ucxCtx.worker, UCX_MSG_TAG_PROBE,
-                              UCX_MSG_TAG_MASK_FULL, 1, &info);
+       msg = ucp_tag_probe_nb(
+#if CMK_SMP_COMMTHD_RECV_ONLY
+        ucxCtx.workers[CmiMyRank()],
+#else
+        ucxCtx.worker,
+#endif 
+        UCX_MSG_TAG_PROBE, UCX_MSG_TAG_MASK_FULL, 1, &info);
        if (msg != NULL) {
            UCX_LOG(3, "Got msg %p, len %zu\n", msg, info.length);
            UcxPostRxReq(UCX_MSG_TAG_PROBE, info.length, msg);
        }
 
-#if CMK_SMP
+#if CMK_SMP && !CMK_SMP_COMMTHD_RECV_ONLY
        cnt += ProcessTxQueue();
 #endif
     } while (cnt);
@@ -743,16 +822,28 @@ void LrtsExit(int exitcode)
     for (i = 0; i < ucxCtx.numRxReqs; ++i) {
         req = ucxCtx.rxReqs[i];
         CmiFree(req->msgBuf);
+#if CMK_SMP_COMMTHD_RECV_ONLY
+        ucp_request_cancel(ucxCtx.workers[CmiMyNodeSize()], req);
+#else
         ucp_request_cancel(ucxCtx.worker, req);
+#endif
         ucp_request_free(req);
     }
 
+#if CMK_SMP_COMMTHD_RECV_ONLY
+    for (i = 0; i < CmiMyNodeSize() + 1; i++) {
+        ucp_worker_destroy(ucxCtx.workers[i]);
+        CmiFree(ucxCtx.eps[i]);
+    }
+    CmiFree(ucxCtx.workers);
+#else
     ucp_worker_destroy(ucxCtx.worker);
+#endif
     ucp_cleanup(ucxCtx.context);
 
     CmiFree(ucxCtx.eps);
     CmiFree(ucxCtx.rxReqs);
-#if CMK_SMP
+#if CMK_SMP && !CMK_SMP_COMMTHD_RECV_ONLY
     PCQueueDestroy(ucxCtx.txQueue);
 #endif
 
