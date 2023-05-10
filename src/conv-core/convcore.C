@@ -2202,14 +2202,31 @@ void CsdInit(char **argv)
   CsvInitialize(CmiMemoryAtomicUInt, idleThreadsCnt);
   CsvAccess(idleThreadsCnt) = 0;
 #endif
-   #if CMK_USE_STL_MSGQ
-   if (CmiMyPe() == 0) CmiPrintf("Charm++> Using STL-based msgQ:\n");
-   #endif
-   #if CMK_RANDOMIZED_MSGQ
-   if (CmiMyPe() == 0) CmiPrintf("Charm++> Using randomized msgQ. Priorities will not be respected!\n");
-   #elif CMK_NO_MSG_PRIOS
-   if (CmiMyPe() == 0) CmiPrintf("Charm++> Message priorities have been turned off and will not be respected.\n");
-   #endif
+  if (CmiMyPe() == 0) {
+    #if CMK_USE_STL_MSGQ
+      CmiPrintf("Charm++> Using STL-based msgQ.\n");
+    #endif
+    #if CMK_RANDOMIZED_MSGQ
+      CmiPrintf("Charm++> Using randomized msgQ. Priorities will not be respected!\n");
+    #elif CMK_NO_MSG_PRIOS
+      CmiPrintf("Charm++> Message priorities have been turned off and will not be respected.\n");
+    #endif
+    #if CMK_FIFO_QUEUE_ONLY
+      CmiPrintf("Charm++> Non-FIFO message queueing support is disabled.\n");
+    #endif
+    #if CMK_NO_INTEROP
+      CmiPrintf("Charm++> MPI-interop support is disabled.\n");
+    #endif
+    #if CSD_NO_SCHEDLOOP
+      CmiPrintf("Charm++> CcdSCHEDLOOP conditional CcdCallback support is disabled.\n");
+    #endif
+    #if CSD_NO_PERIODIC
+      CmiPrintf("Charm++> Periodic CcdCallback support is disabled.\n");
+    #endif
+    #if CSD_NO_IDLE_TRACING
+      CmiPrintf("Charm++> Idle tracing support is disabled.\n");
+    #endif
+  }
 
 #if CMK_OBJECT_QUEUE_AVAILABLE
   CpvInitialize(Queue, CsdObjQueue);
