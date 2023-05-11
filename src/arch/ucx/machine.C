@@ -337,7 +337,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     cParams.mt_workers_shared = 0;
 #if CMK_SMP_COMMTHD_RECV_ONLY
     cParams.estimated_num_eps = (*numNodes) * (CmiMyNodeSize() + 1);
-    ucx.contexts = (ucp_context_h*) CmiAlloc((CmiMyNodeSize() + 1) * sizeof(ucp_context_h))
+    ucxCtx.contexts = (ucp_context_h*) CmiAlloc((CmiMyNodeSize() + 1) * sizeof(ucp_context_h))
 #else
     cParams.estimated_num_eps = *numNodes;
 #endif
