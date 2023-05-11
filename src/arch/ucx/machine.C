@@ -334,7 +334,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     cParams.request_init      = UcxRequestInit;
     cParams.mt_workers_shared = 0;
 #if CMK_SMP_COMMTHD_RECV_ONLY
-    cParams.estimated_num_eps = (*numNodes) * (nodeSize + 1);
+    cParams.estimated_num_eps = (*numNodes) * (CmiMyNodeSize() + 1);
 #else
     cParams.estimated_num_eps = *numNodes;
 #endif
