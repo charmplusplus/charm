@@ -96,9 +96,11 @@ typedef struct UcxContext
 {
     ucp_context_h     context;
 #if CMK_SMP_COMMTHD_RECV_ONLY
+    ucp_context_h     *contexts;
     ucp_worker_h      *workers;
     ucp_ep_h          **eps;
 #else
+    ucp_context_h     context;
     ucp_worker_h      workers;
     ucp_ep_h          *eps;
 #endif
@@ -335,13 +337,17 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     cParams.mt_workers_shared = 0;
 #if CMK_SMP_COMMTHD_RECV_ONLY
     cParams.estimated_num_eps = (*numNodes) * (CmiMyNodeSize() + 1);
+    ucx.contexts = (ucp_context_h*) CmiAlloc((CmiMyNodeSize() + 1) * sizeof(ucp_context_h))
 #else
     cParams.estimated_num_eps = *numNodes;
 #endif
 
-    status = ucp_init(&cParams, config, &ucxCtx.context);
+    for (int i = 0; i < CmiMyNodeSize() + 1; i++) {
+        status = ucp_init(&cParams, config, &ucxCtx.contexts[i]);
+        UCX_CHECK_STATUS(status, "ucp_init");
+    }
+
     ucp_config_release(config);
-    UCX_CHECK_STATUS(status, "ucp_init");
 
     // Create UCP worker
     wParams.field_mask  = UCP_WORKER_PARAM_FIELD_THREAD_MODE;
@@ -351,7 +357,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     int nodeSize = CmiMyNodeSize();
     ucxCtx.workers = (ucp_worker_h*) CmiAlloc((nodeSize + 1) * sizeof(ucp_worker_h));
     for (int i = 0; i < nodeSize + 1; i++) {
-        status = ucp_worker_create(ucxCtx.context, &wParams, &ucxCtx.workers[i]);
+        status = ucp_worker_create(ucxCtx.contexts[i], &wParams, &ucxCtx.workers[i]);
         UCX_CHECK_STATUS(status, "ucp_worker_create");
     }
 #else
@@ -840,10 +846,12 @@ void LrtsExit(int exitcode)
         CmiFree(ucxCtx.eps[i]);
     }
     CmiFree(ucxCtx.workers);
+    for (i = 0; i < CmiMyNodeSize() + 1; i++)
+        ucp_cleanup(ucxCtx.contexts[i]);
 #else
     ucp_worker_destroy(ucxCtx.worker);
-#endif
     ucp_cleanup(ucxCtx.context);
+#endif
 
     CmiFree(ucxCtx.eps);
     CmiFree(ucxCtx.rxReqs);
