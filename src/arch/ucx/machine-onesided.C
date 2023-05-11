@@ -118,7 +118,11 @@ void UcxRmaOp(NcpyOperationInfo *ncpyOpInfo, int op)
 #endif
 
     if (op == UCX_RMA_OP_PUT) {
+#if CMK_SMP_COMMTHD_RECV_ONLY
+        ep     = ucxCtx.eps[CmiMyRank()][CmiNodeOf(ncpyOpInfo->destPe)];
+#else
         ep     = ucxCtx.eps[CmiNodeOf(ncpyOpInfo->destPe)];
+#endif
         status = ucp_ep_rkey_unpack(ep, dstInfo->packedRkey, &rkey);
         UCX_CHECK_STATUS(status, "ucp_ep_rkey_unpack");
 
@@ -129,7 +133,11 @@ void UcxRmaOp(NcpyOperationInfo *ncpyOpInfo, int op)
     } else {
         CmiEnforce(op == UCX_RMA_OP_GET);
 
+#if CMK_SMP_COMMTHD_RECV_ONLY
+        ep = ucxCtx.eps[CmiMyRank()][CmiNodeOf(ncpyOpInfo->srcPe)];
+#else
         ep = ucxCtx.eps[CmiNodeOf(ncpyOpInfo->srcPe)];
+#endif
         status = ucp_ep_rkey_unpack(ep, srcInfo->packedRkey, &rkey);
         UCX_CHECK_STATUS(status, "ucp_ep_rkey_unpack");
 
