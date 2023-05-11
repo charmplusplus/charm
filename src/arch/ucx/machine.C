@@ -333,7 +333,11 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     cParams.tag_sender_mask   = 0ul;
     cParams.request_init      = UcxRequestInit;
     cParams.mt_workers_shared = 0;
+#if CMK_SMP_COMMTHD_RECV_ONLY
+    cParams.estimated_num_eps = (*numNodes) * (nodeSize + 1);
+#else
     cParams.estimated_num_eps = *numNodes;
+#endif
 
     status = ucp_init(&cParams, config, &ucxCtx.context);
     ucp_config_release(config);
