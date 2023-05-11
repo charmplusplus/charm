@@ -1,6 +1,8 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
+#define CMK_ARM                                            1
+#define CMK_64BIT                                          1
 #define CMK_SMP                                            1
 #define CMK_MULTICORE                                      1
 
@@ -47,9 +49,6 @@
 #define CMK_TIMER_USE_GETRUSAGE                            1
 #define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                0
-
-
-#define CMK_64BIT                                          1
 
 
 #define CMK_DEBUG_MODE					   0
