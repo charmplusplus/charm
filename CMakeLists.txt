@@ -524,7 +524,7 @@ if(${TARGET} STREQUAL "all-test")
         ampi_funcptr_loader ampi_funcptr_loader_stub
         converse conv-static ldb-rand
         memory-os-isomalloc memory-default threads-default ckmain moduletcharmmain
-        ckqt tcharm-compat moduleNDMeshStreamer
+        ckqt tcharm-compat
         create_symlinks moduleCkCache trace-converse moduleCommonLBs
         moduleTreeLB moduleCkMulticast moduleCkIO conv-cpm memory-os-wrapper
         threads-default-tls ldb-neighbor ldb-workstealing
@@ -875,25 +875,6 @@ foreach(file ${ckloop-h-files})
   configure_file(${file} ${CMAKE_BINARY_DIR}/include COPYONLY)
 endforeach(file)
 
-# NDMeshStreamer
-file(GLOB moduleNDMeshStreamer-h-sources src/libs/ck-libs/NDMeshStreamer/*.h)
-set(moduleNDMeshStreamer-cxx-sources src/libs/ck-libs/NDMeshStreamer/NDMeshStreamer.C)
-add_library(moduleNDMeshStreamer ${moduleNDMeshStreamer-cxx-sources}
-    ${moduleNDMeshStreamer-h-sources}
-    ${CMAKE_BINARY_DIR}/include/NDMeshStreamer.decl.h)
-target_include_directories(moduleNDMeshStreamer PUBLIC .
-    ../../../util/topomanager ../../../ck-ldb ../../../ck-perf ../../../ck-cp
-    ../completion)
-
-add_dependencies(moduleNDMeshStreamer ck)
-
-foreach(filename ${moduleNDMeshStreamer-h-sources})
-  configure_file(${filename} ${CMAKE_BINARY_DIR}/include/ COPYONLY)
-endforeach()
-
-configure_file(src/libs/ck-libs/NDMeshStreamer/libmoduleNDMeshStreamer.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
-
-
 # TCharm
 file(GLOB tcharm-c-sources src/libs/ck-libs/tcharm/*.c)
 file(GLOB tcharm-h-sources src/libs/ck-libs/tcharm/*.h)
@@ -933,7 +914,7 @@ endif()
 add_executable(ckhello ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.C)
 add_dependencies(ckhello ck ldb-rand memory-default threads-default conv-static
   converse ckmain ckqt
-  moduleNDMeshStreamer modulecompletion)
+  modulecompletion)
 
 # Create conv-mach-opt.sh
 set(optfile_sh ${CMAKE_BINARY_DIR}/include/conv-mach-opt.sh)

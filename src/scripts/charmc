@@ -1718,7 +1718,7 @@ then
   ALL_LIBS=("${LANG_LIBS[@]}" "${PRE_LIBRARIES[@]}" "${MIDDLE_LIBS[@]}" "${BAL_OBJ[@]}" $CMK_LIBS "${POST_LIBRARIES[@]}")
   case "$PARADIGM" in
   "charm"|"charm++"|"f90charm")
-    ALL_LIBS+=(-lmoduleNDMeshStreamer -lmodulecompletion)
+    ALL_LIBS+=(-lmodulecompletion)
     ;;
   esac
 else

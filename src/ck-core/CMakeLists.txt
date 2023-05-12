@@ -38,7 +38,6 @@ set(ck-h-sources XArraySectionReducer.h charm++.h charm++_type_traits.h
 
 set(ldb-cxx-sources
     ../ck-ldb/CommonLBs.C  ../ck-ldb/DistributedLB.C
-    ../ck-ldb/EveryLB.C
     ../ck-ldb/LButil.C
     ../ck-ldb/RecBipartLB.C
     ../ck-ldb/Refiner.C ../ck-ldb/RefinerTemp.C
@@ -53,7 +52,7 @@ set(ldb-h-sources ../ck-ldb/BaseLB.h ../ck-ldb/CentralLBMsg.h
     ../ck-ldb/LBComm.h
     ../ck-ldb/LBDatabase.h ../ck-ldb/LBManager.h ../ck-ldb/LBMachineUtil.h ../ck-ldb/LBOM.h
     ../ck-ldb/LBObj.h ../ck-ldb/LBSimulation.h
-    ../ck-ldb/MetaBalancer.h ../ck-ldb/MetisLB.h
+    ../ck-ldb/MetaBalancer.h
     ../ck-ldb/RandomForestModel.h
     ../ck-ldb/RecBipartLB.h
     ../ck-ldb/Refiner.h
@@ -73,27 +72,6 @@ add_library(ck ${ck-cxx-sources} ${ck-h-sources} ${all-ci-outputs})
 add_library(ckmain main.C)
 add_dependencies(ckmain ck)
 
-# CommonLBs used to be a subset of EveryLB, but they were unified as
-# part of the LB refactor. However, maintain both targets for
-# backwards compatibility and for possible future divergence.
-add_library(moduleCommonLBs ${ldb-cxx-sources} ${ldb-h-sources} ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h)
-add_library(moduleEveryLB ${ldb-cxx-sources} ${ldb-h-sources} ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h)
-configure_file(../ck-ldb/libmoduleCommonLBs.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
-configure_file(../ck-ldb/libmoduleEveryLB.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
-add_dependencies(moduleCommonLBs ck ckmetis)
-add_dependencies(moduleEveryLB ck ckmetis)
-
-add_library(moduleMetisLB ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h)
-
-add_subdirectory(${CMAKE_SOURCE_DIR}/src/libs/ck-libs/metis/libmetis ${CMAKE_BINARY_DIR}/src/libs/ck-libs/metis/libmetis) # defines "ckmetis" target
-
-target_include_directories(ckmetis PRIVATE ${CMAKE_SOURCE_DIR}/src/libs/ck-libs/metis/GKlib )
-target_include_directories(moduleMetisLB PRIVATE ${CMAKE_SOURCE_DIR}/src/libs/ck-libs/metis/libmetis)
-target_include_directories(moduleCommonLBs PRIVATE ${CMAKE_SOURCE_DIR}/src/libs/ck-libs/metis/libmetis)
-target_include_directories(moduleEveryLB PRIVATE ${CMAKE_SOURCE_DIR}/src/libs/ck-libs/metis/libmetis)
-
-add_dependencies(moduleMetisLB ck ckmetis)
-
 # Single LBs
 add_library(moduleDistributedLB ../ck-ldb/DistributedLB.C)
 add_dependencies(moduleDistributedLB ck)
@@ -109,17 +87,6 @@ add_custom_target(ScotchLB DEPENDS moduleScotchLB)
 # Only for backwards compatibility
 add_library(moduleCkMulticast ../libs/ck-libs/dummy/ckdummy.C)
 configure_file(../libs/ck-libs/dummy/ckdummy.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
-
-# CkIO
-add_library(moduleCkIO ../libs/ck-libs/io/ckio.C ../libs/ck-libs/io/fs_parameters.c ../libs/ck-libs/io/ckio.h)
-add_dependencies(moduleCkIO ck)
-configure_file(../libs/ck-libs/io/ckio.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
-
-if(CMK_LUSTREAPI)
-    file(WRITE ${CMAKE_BINARY_DIR}/lib/libmoduleCkIO.dep "${CMK_LUSTREAPI}\n")
-else()
-    file(WRITE ${CMAKE_BINARY_DIR}/lib/libmoduleCkIO.dep "\n")
-endif()
 
 foreach(filename ${ck-h-sources} ${ldb-h-sources})
     configure_file(${filename} ${CMAKE_BINARY_DIR}/include/ COPYONLY)

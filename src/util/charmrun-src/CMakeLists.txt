@@ -12,6 +12,6 @@ target_link_libraries(charmrun PRIVATE -seq)
 
 target_include_directories(charmrun PRIVATE ../../conv-ccs ..) # for ccs-auth.c sockRoutines.c
 
-add_dependencies(charmrun ck converse ckqt moduleNDMeshStreamer ckmain memory-default threads-default ldb-rand modulecompletion conv-static)
-add_dependencies(charmd ck converse ckqt moduleNDMeshStreamer ckmain memory-default threads-default ldb-rand modulecompletion conv-static)
-add_dependencies(charmd_faceless ck converse ckqt moduleNDMeshStreamer ckmain memory-default threads-default ldb-rand modulecompletion conv-static)
+add_dependencies(charmrun ck converse ckqt ckmain memory-default threads-default ldb-rand modulecompletion conv-static)
+add_dependencies(charmd ck converse ckqt ckmain memory-default threads-default ldb-rand modulecompletion conv-static)
+add_dependencies(charmd_faceless ck converse ckqt ckmain memory-default threads-default ldb-rand modulecompletion conv-static)
