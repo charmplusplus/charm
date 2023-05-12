@@ -1,9 +1,0 @@
-/// Temporal memory management
-/* Allows for the storage and reuse of timestamped memory blocks. */
-module memory_temporal {
-  readonly CkGroupID TempMemID;
-
-  group [migratable] TimePool {
-    entry TimePool();
-  };
-};

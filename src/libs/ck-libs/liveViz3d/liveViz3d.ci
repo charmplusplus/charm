@@ -1,5 +1,0 @@
-module liveViz3d {
-	extern module lv3d0;
-	extern module lv3d1;
-	extern module liveViz;
-};

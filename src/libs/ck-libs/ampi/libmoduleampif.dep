@@ -1,1 +1,0 @@
--module tcharm -flibs -lampi-compat -lconv-utilf
