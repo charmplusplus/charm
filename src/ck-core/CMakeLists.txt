@@ -84,10 +84,6 @@ configure_file(../ck-ldb/libmoduleScotchLB.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY
 add_dependencies(moduleScotchLB ck)
 add_custom_target(ScotchLB DEPENDS moduleScotchLB)
 
-# Only for backwards compatibility
-add_library(moduleCkMulticast ../libs/ck-libs/dummy/ckdummy.C)
-configure_file(../libs/ck-libs/dummy/ckdummy.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
-
 foreach(filename ${ck-h-sources} ${ldb-h-sources})
     configure_file(${filename} ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 endforeach()
