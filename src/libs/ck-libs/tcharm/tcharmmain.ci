@@ -1,6 +1,0 @@
-module tcharmmain {
-  mainchare TCharmMain {
-    entry TCharmMain(CkArgMsg *);
-    initnode void nodeInit();
-  };
-};

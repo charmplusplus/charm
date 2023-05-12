@@ -1716,11 +1716,6 @@ fi
 if [[ -z "$STANDALONE" ]]
 then
   ALL_LIBS=("${LANG_LIBS[@]}" "${PRE_LIBRARIES[@]}" "${MIDDLE_LIBS[@]}" "${BAL_OBJ[@]}" $CMK_LIBS "${POST_LIBRARIES[@]}")
-  case "$PARADIGM" in
-  "charm"|"charm++"|"f90charm")
-    ALL_LIBS+=(-lmodulecompletion)
-    ;;
-  esac
 else
   ALL_LIBS=("${USER_PRE_LIBRARIES[@]}" "${USER_POST_LIBRARIES[@]}")
 fi

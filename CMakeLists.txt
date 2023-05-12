@@ -519,7 +519,7 @@ include(cmake/ci-files.cmake)
 if(${TARGET} STREQUAL "all-test")
   add_custom_target(all-test ALL COMMAND $(MAKE) -C ${CMAKE_BINARY_DIR}/tmp all-test
         COMMENT "Building all-test. This will take several minutes.")
-  add_dependencies(all-test moduleampi ampi-compat ck modulecompletion
+  add_dependencies(all-test moduleampi ampi-compat ck
         ampi_funcptr_shim ampi_funcptr_shim_main
         ampi_funcptr_loader ampi_funcptr_loader_stub
         converse conv-static ldb-rand
@@ -848,12 +848,6 @@ if(TRACING)
   add_subdirectory(src/ck-pics)
 endif()
 
-set(modulecompletion-h-sources src/libs/ck-libs/completion/completion.h)
-set(modulecompletion-cxx-sources src/libs/ck-libs/completion/completion.C)
-add_library(modulecompletion ${modulecompletion-cxx-sources} ${modulecompletion-h-sources} )
-configure_file(src/libs/ck-libs/completion/completion.h include/ COPYONLY)
-add_dependencies(modulecompletion ck)
-
 # Charmrun + testrun
 if(${CMK_BUILD_CHARMRUN})
   add_subdirectory(src/util/charmrun-src)
@@ -866,36 +860,8 @@ configure_file(src/scripts/testrun bin/ COPYONLY)
 # Charm++ libraries
 
 # CkLoop
-set(ckloop-cxx-files src/libs/ck-libs/ckloop/CkLoop.C)
-set(ckloop-h-files src/libs/ck-libs/ckloop/CkLambda.h src/libs/ck-libs/ckloop/CkLoopAPI.h src/libs/ck-libs/ckloop/CkLoop.h)
-add_library(moduleCkLoop ${ckloop-cxx-files} ${ckloop-h-files} ${CMAKE_BINARY_DIR}/include/CkLoop.decl.h)
-add_dependencies(moduleCkLoop ck)
-
-foreach(file ${ckloop-h-files})
-  configure_file(${file} ${CMAKE_BINARY_DIR}/include COPYONLY)
-endforeach(file)
 
 # TCharm
-file(GLOB tcharm-c-sources src/libs/ck-libs/tcharm/*.c)
-file(GLOB tcharm-h-sources src/libs/ck-libs/tcharm/*.h)
-add_library(moduletcharm src/libs/ck-libs/tcharm/tcharm.C ${tcharm-h-sources} ${CMAKE_BINARY_DIR}/include/tcharm.decl.h)
-add_library(moduletcharmmain src/libs/ck-libs/tcharm/tcharmmain.C ${CMAKE_BINARY_DIR}/include/tcharm.decl.h ${CMAKE_BINARY_DIR}/include/tcharmmain.decl.h)
-add_library(tcharm-compat ${tcharm-c-sources} ${CMAKE_BINARY_DIR}/include/tcharm.decl.h ${CMAKE_BINARY_DIR}/include/tcharmmain.decl.h)
-
-configure_file(src/libs/ck-libs/tcharm/libmoduletcharm.dep     ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
-configure_file(src/libs/ck-libs/tcharm/libmoduletcharmmain.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
-
-foreach(f ${tcharm-h-sources})
-    configure_file(${f} ${CMAKE_BINARY_DIR}/include COPYONLY)
-endforeach(f)
-
-add_dependencies(moduletcharmmain ck)
-add_dependencies(moduletcharm ck)
-add_dependencies(tcharm-compat ck)
-
-if(${TARGET} STREQUAL "AMPI" OR (${TARGET} STREQUAL "LIBS" AND NOT BUILD_CHANGA))
-  add_subdirectory(src/libs/ck-libs/ampi)
-endif()
 
 # Charm4py
 if(${TARGET} STREQUAL "charm4py")
@@ -913,8 +879,7 @@ endif()
 # Check that we are able to build and link an executable
 add_executable(ckhello ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.C)
 add_dependencies(ckhello ck ldb-rand memory-default threads-default conv-static
-  converse ckmain ckqt
-  modulecompletion)
+  converse ckmain ckqt)
 
 # Create conv-mach-opt.sh
 set(optfile_sh ${CMAKE_BINARY_DIR}/include/conv-mach-opt.sh)
