@@ -250,9 +250,7 @@ static void ccd_heap_update(double curWallTime)
 {
   auto & h = CpvAccess(ccd_heap);
 
-  std::vector<ccd_periodic_callback> expired;
-
-  /* Pull out all expired heap entries */
+  // Execute all expired heap entries
   while (!h.empty())
   {
     const ccd_heap_elem & e = h.top();
@@ -260,17 +258,10 @@ static void ccd_heap_update(double curWallTime)
     if (e.time >= curWallTime)
       break;
 
-    expired.emplace_back(std::move(e.cb));
+    const ccd_periodic_callback cb = std::move(e.cb);
 
     h.pop();
-  }
 
-  /* Now execute those heap entries.  This must be
-     separated from the removal phase because executing
-     an entry may change the heap. 
-  */
-  for (const ccd_periodic_callback & cb : expired)
-  {
     int old = CmiSwitchToPE(cb.pe);
     (*(cb.fn))(cb.arg, curWallTime);
     int unused = CmiSwitchToPE(old);
