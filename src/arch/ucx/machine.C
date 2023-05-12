@@ -231,6 +231,7 @@ static void UcxInitEps(int numNodes, int myId, int nodeSize)
     CmiEnforce(addrlen < std::numeric_limits<int>::max()); //address should fit to int
 
     parts = (addrlen / maxval) + 1;
+    CkPrintf("Address length = %i, parts = %i\n", addrlen, parts);
 
     // Publish number of address parts at first
     ret = snprintf(keys, maxkey, "UCX-size-%d", myId);
