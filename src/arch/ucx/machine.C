@@ -351,7 +351,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 
     // Create UCP worker
     wParams.field_mask  = UCP_WORKER_PARAM_FIELD_THREAD_MODE;
-    wParams.thread_mode = UCS_THREAD_MODE_MULTIPLE;
+    wParams.thread_mode = UCS_THREAD_MODE_MULTI;
     
 #if CMK_SMP_COMMTHD_RECV_ONLY
     int nodeSize = CmiMyNodeSize();
