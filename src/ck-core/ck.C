@@ -10,7 +10,7 @@ clients, including the rest of Charm++, are actually C++.
 #include "trace.h"
 #include "queueing.h"
 
-#include "pathHistory.h"
+//#include "pathHistory.h"
 
 #if CMK_LBDB_ON
 #include "LBManager.h"

@@ -1,6 +1,4 @@
 set(ck-cxx-sources
-    ../ck-cp/API-generator/cp_effects.C ../ck-cp/arrayRedistributor.C
-    ../ck-cp/controlPoints.C ../ck-cp/pathHistory.C
     ../ck-ldb/BaseLB.C ../ck-ldb/CentralLB.C
     ../ck-ldb/CentralPredictor.C ../ck-ldb/ckgraph.C
     ../ck-ldb/ckheap.C ../ck-ldb/ckset.C
@@ -36,8 +34,7 @@ set(ck-h-sources XArraySectionReducer.h charm++.h charm++_type_traits.h
     ckobjQ.h ckrdma.h ckrdmadevice.h ckreduction.h cksection.h
     ckstream.h cksyncbarrier.h debug-charm.h envelope-path.h envelope.h init.h
     middle-conv.h middle.h mpi-interoperate.h objid.h qd.h
-    readonly.h register.h sdag.h stats.h waitqd.h ../ck-ldb/CentralLB.h
-    ../ck-cp/arrayRedistributor.h ../ck-cp/controlPoints.h ../ck-cp/controlPointsf.h ../ck-cp/pathHistory.h ../ck-cp/API-generator/cp_effects.h)
+    readonly.h register.h sdag.h stats.h waitqd.h ../ck-ldb/CentralLB.h)
 
 set(ldb-cxx-sources
     ../ck-ldb/CommonLBs.C  ../ck-ldb/DistributedLB.C
@@ -128,8 +125,8 @@ foreach(filename ${ck-h-sources} ${ldb-h-sources})
     configure_file(${filename} ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 endforeach()
 
-target_include_directories(ck PRIVATE . ../ck-ldb ../ck-perf ../ck-cp ../util/topomanager ../conv-perf)
-target_include_directories(ckmain PRIVATE . ../ck-ldb ../ck-perf ../ck-cp ../util/topomanager)
+target_include_directories(ck PRIVATE . ../ck-ldb ../ck-perf ../util/topomanager ../conv-perf)
+target_include_directories(ckmain PRIVATE . ../ck-ldb ../ck-perf ../util/topomanager)
 
 # Fortran interface
 if(CMK_CAN_LINK_FORTRAN)

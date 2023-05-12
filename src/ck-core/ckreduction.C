@@ -52,7 +52,7 @@ waits for the migrant contributions to straggle in.
 #include "charm++.h"
 #include "ck.h"
 
-#include "pathHistory.h"
+//#include "pathHistory.h"
 
 #if CMK_DEBUG_REDUCTIONS
 //Debugging messages:
