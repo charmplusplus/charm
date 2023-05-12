@@ -1,3 +1,0 @@
-module ParFUM_TOPS{
-  initproc void _initConfigurableCPUGPUMap(void);
-};
