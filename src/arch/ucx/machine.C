@@ -236,7 +236,7 @@ static void UcxInitEps(int numNodes, int myId, int nodeSize)
     ret = snprintf(keys, maxkey, "UCX-size-%d", myId);
     UCX_CHECK_RET(ret, "UcxInitEps: snprintf error", (ret <= 0));
     ret = runtime_kvs_put(keys, &parts, sizeof(parts));
-    UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_kvs_put error");
+    UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_kvs_put error for num parts");
 
     addrp = (char*)address;
     len   = (int)addrlen;
@@ -245,7 +245,7 @@ static void UcxInitEps(int numNodes, int myId, int nodeSize)
         ret = snprintf(keys, maxkey, "UCX-%d-%d", myId, i);
         UCX_CHECK_RET(ret, "UcxInitEps: snprintf error", (ret <= 0));
         ret = runtime_kvs_put(keys, addrp, partLen);
-        UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_kvs_put error");
+        UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_kvs_put error for a part");
         addrp += partLen;
         len   -= partLen;
     }
@@ -351,7 +351,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 
     // Create UCP worker
     wParams.field_mask  = UCP_WORKER_PARAM_FIELD_THREAD_MODE;
-    wParams.thread_mode = UCS_THREAD_MODE_SINGLE;
+    wParams.thread_mode = UCS_THREAD_MODE_MULTIPLE;
     
 #if CMK_SMP_COMMTHD_RECV_ONLY
     int nodeSize = CmiMyNodeSize();
