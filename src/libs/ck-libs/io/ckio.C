@@ -21,21 +21,28 @@ typedef int FileToken;
 #include <unistd.h>
 #endif
 
+#include <chrono>
 #include <future> // used for async
 
-
 #include "fs_parameters.h"
+
+#if _cplusplus
+	#warn("we are using C++\n")
+#endif
+
 
 using std::min;
 using std::max;
 using std::map;
-using std::string;
-
+using std::string; 
+using namespace std::chrono;
 /*bool operator==(const Ck::IO::Session& s1, const Ck::IO::Session& s2) {
 	return (s1.getFile() == s2.getFile()) && (s1.getBytes() == s2.getBytes()) && (s1.getOffset() == s2.getOffset()) && (s1.getSessionID() == s2.getSessionID());
 }
 */
 
+#define IO_TIMEOUT std::chrono::microseconds(25)
+#define IO_THREADS_PER_PE 4
 
 // FROM STACKEXCHANGE: https://stackoverflow.com/questions/19195183/how-to-properly-hash-the-custom-struct
 template <class T>
@@ -697,7 +704,6 @@ namespace Ck { namespace IO {
 			double total_time = disk_read_after - disk_read_before;
 			CkCallback cb(CkReductionTarget(ReadSession, printTime), thisProxy[0]);
 			contribute(sizeof(double), &total_time, CkReduction::max_double, cb);
-			
 		}
 
 		void clearBuffer() {
@@ -776,6 +782,11 @@ namespace Ck { namespace IO {
 			#ifdef DEBUG
 				CkPrintf("chare_offset=%zu, end_byte_chare=%zu, bytes_to_read=%zu, offset=%zu, bytes=%zu\n", chare_offset, end_byte_chare, bytes_to_read, offset, bytes);	
 			#endif
+			while(_buffer.wait_for(IO_TIMEOUT) != std::future_status::ready){
+				// figure out how to suspend threads
+				CthYield(); // will suspend thread, let the Charm RTS reschedule it
+			}
+
 			char* buffer = _buffer.get(); // future call to get
 			// CkPrintf("Buffer[%d] is sending %zu bytes with total string %s\n", thisIndex, bytes_to_read, s.c_str());
 			CProxy_ReadAssembler(ra)[pe].shareData(read_tag, buffer_tag, chare_offset, bytes_to_read, CkSendBuffer(buffer + (chare_offset - _my_offset)/*, cb*/)); // send this data to the ReadAssembler
