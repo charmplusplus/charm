@@ -55,7 +55,7 @@
 #define CMK_DEBUG_MODE					   0 
 #define CMK_WEB_MODE                                       1
 
-#define CMK_LBDB_ON					   1
+#define CMK_LBDB_ON					   0
 
 
 #endif

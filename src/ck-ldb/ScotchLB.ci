@@ -1,8 +1,0 @@
-module ScotchLB {
-  extern module CentralLB;
-  initnode void lbinit (void);
-
-  group [migratable] ScotchLB : CentralLB {
-    entry void ScotchLB(const CkLBOptions &);
-  };
-};

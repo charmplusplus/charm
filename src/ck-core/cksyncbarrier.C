@@ -36,6 +36,7 @@ void CkSyncBarrier::reset()
 // Since AtSync() is global across all registered objects, the epoch is valid across PEs.
 // The incoming client might have called AtSync() before it gets migrated in, so track it
 // and check the barrier if necessary.
+#if LBDB_ON
 LDBarrierClient CkSyncBarrier::addClient(Chare* chare, std::function<void()> fn,
                                          int epoch)
 {
@@ -66,7 +67,8 @@ void CkSyncBarrier::removeClient(LDBarrierClient c)
   if (on && !startedAtSync && atCount >= clients.size())
     thisProxy[thisIndex].checkBarrier();
 }
-
+#endif
+#if LBDB_ON
 LDBarrierReceiver CkSyncBarrier::addReceiverHelper(std::function<void()> fn,
                                                    std::list<LBReceiver*>& receiverList)
 {
@@ -122,6 +124,7 @@ void CkSyncBarrier::atBarrier(LDBarrierClient c)
 
   checkBarrier();
 }
+#endif
 
 // Whenever a PE triggers the barrier, send a kick through the system to tell PEs without
 // any AtSync elements on them to also trigger the barrier.

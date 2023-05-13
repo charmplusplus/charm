@@ -277,14 +277,18 @@ public:
 
     PROCESS_MACRO(Message,envelope*);
     PROCESS_MACRO(Thread,CthThreadToken);
+#if CMK_LBDB_ON
     PROCESS_MACRO(LBMessage,LBMigrateMsg*);
+#endif
 
 #undef PROCESS_MACRO
 protected:
     /** These are used internally by this class to call the correct subclass method */
 	virtual bool process(envelope **env,CkCoreState *ck) =0;
 	virtual bool process(CthThreadToken *token, CkCoreState *ck) {return true;}
+#if CMK_LBDB_ON
 	virtual bool process(LBMigrateMsg **msg, CkCoreState *ck) {return true;}
+#endif
 public:
     inline void setNext(CkMessageWatcher *w) { next = w; }
 };
@@ -336,7 +340,9 @@ CkpvExtern(CkCoreState *, _coreState);
 CkLocRec *CkActiveLocRec(void);
 #endif // CMK_LBDB_ON
 
+#if CMK_LBDB_ON
 void CpdHandleLBMessage(LBMigrateMsg **msg);
+#endif
 void CkMessageWatcherInit(char **argv,CkCoreState *ck);
 
 extern void _processHandler(void *converseMsg,CkCoreState *ck);

@@ -1757,7 +1757,9 @@ void CkMigratable::pup(PUP::er& p)
   {
     if (p.isPacking())
     {
+#if CMK_LBDB_ON
       epoch = (*ldBarrierHandle)->epoch;
+#endif
     }
     p | epoch;
   }
@@ -1890,11 +1892,13 @@ void CkMigratable::recvLBPeriod(void* data)
   local_state = DECIDED;
 }
 
+#if CMK_LBDB_ON
 void CkMigratable::metaLBCallLB()
 {
   if (usesAtSync)
     myRec->getSyncBarrier()->atBarrier(ldBarrierHandle);
 }
+#endif
 
 void CkMigratable::ckFinishConstruction(int epoch)
 {
@@ -1906,11 +1910,13 @@ void CkMigratable::ckFinishConstruction(int epoch)
   if (barrierRegistered)
     return;
   DEBL((AA "Registering barrier client for %s\n" AB, idx2str(thisIndexMax)));
+#if CMK_LBDB_ON
   if (usesAtSync)
   {
     ldBarrierHandle = myRec->getSyncBarrier()->addClient(
         this, [=]() { this->ResumeFromSyncHelper(); }, epoch);
   }
+#endif
   barrierRegistered = true;
 }
 
@@ -1946,11 +1952,13 @@ void CkMigratable::AtSync(int waitForMigration)
       myRec->getMetaBalancer()->SetCharePupSize(ps.size());
   }
 
+#if CMK_LBDB_ON
   if (!_lb_args.metaLbOn())
   {
     myRec->getSyncBarrier()->atBarrier(ldBarrierHandle);
     return;
   }
+#endif
 
   // When MetaBalancer is turned on
 

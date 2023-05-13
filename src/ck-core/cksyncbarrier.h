@@ -4,8 +4,9 @@
 #include <utility>
 
 #include "CkSyncBarrier.decl.h"
+#if LBDB_ON
 #include "lbdb.h"
-
+#endif
 extern CkGroupID _syncBarrier;
 
 class CkSyncBarrierInit : public Chare
@@ -72,10 +73,12 @@ private:
   void reset();
   static void callReceiverList(const std::list<LBReceiver*>& receiverList);
 
+#if LBDB_ON
   static LDBarrierReceiver addReceiverHelper(std::function<void()> fn,
                                              std::list<LBReceiver*>& receiverList);
   static void removeReceiverHelper(LDBarrierReceiver r,
                                    std::list<LBReceiver*>& receiverList);
+#endif
 
 public:
   CkSyncBarrier() { init(); };
@@ -98,7 +101,7 @@ public:
 
   void checkBarrier();
   void kick(int kickEpoch, int sourceNode, int sourcePe);
-
+#if LBDB_ON
   LDBarrierClient addClient(Chare* chare, std::function<void()> fn, int epoch = -1);
   template <typename T>
   inline LDBarrierClient addClient(T* obj, void (T::*method)(), int epoch = -1)
@@ -107,9 +110,10 @@ public:
   }
 
   void removeClient(LDBarrierClient c);
-
+#endif
   // A receiver is a callback function that is called when all of the clients on this PE
   // reach this barrier
+#if LBDB_ON
   LDBarrierReceiver addReceiver(std::function<void()> fn);
   template <typename T>
   inline LDBarrierReceiver addReceiver(T* obj, void (T::*method)())
@@ -144,6 +148,7 @@ public:
   static void turnOnReceiver(LDBarrierReceiver r);
   static void turnOffReceiver(LDBarrierReceiver r);
   void atBarrier(LDBarrierClient c);
+#endif
   void turnOn()
   {
     on = true;

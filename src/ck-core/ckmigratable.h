@@ -21,8 +21,10 @@ protected:
   bool barrierRegistered;//True iff barrier handle below is set
 
 private: //Load balancer state:
+#if CMK_LBDB_ON
   LDBarrierClient ldBarrierHandle;//Transient (not migrated)
   LDBarrierReceiver ldBarrierRecvHandle;//Transient (not migrated)
+#endif
 public:
   CkArrayIndex thisIndexMax;
 
@@ -101,7 +103,7 @@ public:
   void setMigratable(int migratable)  { }
   void setPupSize(size_t obj_pup_size) { }
 public:
-  void ckFinishConstruction(int epoch) { }
+  void ckFinishConstruction(int epoch = -1) { }
 #endif
 
 #if CMK_OUT_OF_CORE

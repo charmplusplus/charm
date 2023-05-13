@@ -46,10 +46,10 @@ public:
 };
 
 /* Utility */
-//#if CMK_LBDB_ON
+#if CMK_LBDB_ON
 #include "LBManager.h"
 #include "MetaBalancer.h"
-//#endif
+#endif
 
 // Forward declarations
 class CkArray;

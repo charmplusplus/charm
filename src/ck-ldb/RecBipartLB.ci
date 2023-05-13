@@ -1,8 +1,0 @@
-module RecBipartLB {
-  extern module CentralLB;
-  initnode void lbinit (void);
-
-  group [migratable] RecBipartLB : CentralLB {
-    entry void RecBipartLB(const CkLBOptions &);
-  };
-};

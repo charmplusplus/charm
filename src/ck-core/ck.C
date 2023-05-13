@@ -2654,7 +2654,9 @@ int _recplay_logsize = 1024*1024;
 CkMessageWatcher::~CkMessageWatcher() { if (next!=NULL) delete next;}
 
 #include "trace-common.h" /* For traceRoot and traceRootBaseLength */
+#if CMK_LBDB_ON
 #include "BaseLB.h" /* For LBMigrateMsg message */
+#endif
 
 #if CMK_REPLAYSYSTEM
 static FILE *openReplayFile(const char *prefix, const char *suffix, const char *permissions) {
@@ -2722,7 +2724,8 @@ private:
     if (curpos > _recplay_logsize-128) flushLog();
     return true;
   }
-  
+ 
+#if CMK_LBDB_ON 
   virtual bool process(LBMigrateMsg **msg,CkCoreState *ck) {
     FILE *f;
     if (firstOpen) f = openReplayFile("ckreplay_",".lb","w");
@@ -2736,6 +2739,7 @@ private:
     }
     return true;
   }
+#endif
 };
 
 class CkMessageDetailRecorder : public CkMessageWatcher {
@@ -2944,6 +2948,7 @@ private:
 	  }
 	}
 
+#if CMK_LBDB_ON
 	virtual bool process(LBMigrateMsg **msg,CkCoreState *ck) {
 	  if (lbFile == NULL) lbFile = openReplayFile("ckreplay_",".lb","r");
 	  if (lbFile != NULL) {
@@ -2958,6 +2963,7 @@ private:
 	  }
 	  return true;
 	}
+#endif
 };
 
 class CkMessageDetailReplay : public CkMessageWatcher {
@@ -3049,12 +3055,14 @@ void CthResumeNormalThreadDebug(CthThreadToken* token)
 #endif
 }
 
+#if CMK_LBDB_ON
 void CpdHandleLBMessage(LBMigrateMsg **msg) {
   CkCoreState *ck = CkpvAccess(_coreState);
   if (ck->watcher!=NULL) {
     ck->watcher->processLBMessage(msg, ck);
   }
 }
+#endif
 
 
 #include "ckliststring.h"

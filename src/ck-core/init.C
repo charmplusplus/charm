@@ -1148,9 +1148,9 @@ static void _nullFn(void *, void *)
   CmiAbort("Null-Method Called. Program may have Unregistered Module!!\n");
 }
 
-extern void _registerLBManager(void);
-extern void _registerTreeLevel(void);
-extern void _registerMetaBalancer(void);
+//extern void _registerLBManager(void);
+//extern void _registerTreeLevel(void);
+//extern void _registerMetaBalancer(void);
 extern void _registerPathHistory(void);
 #if CMK_WITH_CONTROLPOINT
 extern void _registerControlPoints(void);
@@ -1159,8 +1159,8 @@ extern void _registerTraceControlPoints();
 extern void _registerExternalModules(char **argv);
 extern void _ckModuleInit(void);
 extern void _CkSyncBarrierInit();
-extern void _loadbalancerInit();
-extern void _metabalancerInit();
+//extern void _loadbalancerInit();
+//extern void _metabalancerInit();
 #if CMK_SMP && CMK_TASKQUEUE
 extern void _taskqInit();
 #endif
@@ -1440,8 +1440,8 @@ void _initCharm(int unused_argc, char **argv)
 
 	_futuresModuleInit(); // part of futures implementation is a converse module
         _CkSyncBarrierInit();
-	_loadbalancerInit();
-        _metabalancerInit();
+//	_loadbalancerInit();
+//        _metabalancerInit();
 
 #if CMK_SMP
 	if (CmiMyRank() == 0) {
@@ -1513,9 +1513,9 @@ void _initCharm(int unused_argc, char **argv)
 		_registerCkFutures();
 		_registerCkArray();
 		_registerCkSyncBarrier();
-		_registerLBManager();
-		_registerTreeLevel();
-    _registerMetaBalancer();
+		//_registerLBManager();
+		//_registerTreeLevel();
+    //_registerMetaBalancer();
 		_registerCkCallback();
 		_registerwaitqd();
 		_registerCkCheckpoint();
