@@ -538,7 +538,7 @@ void CcdCancelCallOnConditionKeep(int condnum, int idx)
 void CcdCallFnAfterOnPE(CcdVoidFn fnp, void *arg, double deltaT, int pe)
 {
     double ctime  = CmiWallTimer();
-    double tcall = ctime + deltaT/1000.0;
+    double tcall = ctime + deltaT * (1.0/1000.0);
     ccd_heap_insert(tcall, fnp, arg, pe);
 } 
 
