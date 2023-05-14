@@ -1,1 +1,0 @@
-#define REGULARPAGE 1

@@ -1,8 +1,0 @@
-. $CHARMINC/cc-gcc.sh
-
-#CMK_DEFS="$CMK_DEFS -DHAVE_USR_INCLUDE_MALLOC_H=1 "
-
-CMK_XIOPTS=''
-CMK_CXX_OPTIMIZE='-O3'
-
-CMK_QT='generic64-light'
