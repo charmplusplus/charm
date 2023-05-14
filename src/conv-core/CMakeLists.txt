@@ -156,14 +156,3 @@ endif()
 add_executable(conv-cpm ../xlatcpm/conv-cpm.C)
 target_compile_options(conv-cpm PRIVATE -host)
 set_target_properties(conv-cpm PROPERTIES LINK_FLAGS "-host -language c++")
-
-add_library(tsm EXCLUDE_FROM_ALL ../langs/simplemsg/simplemsg.C ../langs/simplemsg/simplemsg.h)
-add_library(sm EXCLUDE_FROM_ALL ../langs/simplemsg/sm.C ../langs/simplemsg/sm.h )
-
-add_library(pvmc EXCLUDE_FROM_ALL ../langs/pvmc/pvmc_buf.C ../langs/pvmc/pvmc_comm.C ../langs/pvmc/pvmc_conv.C ../langs/pvmc/pvmc_main.C ../langs/pvmc/pvmc_pack.C ../langs/pvmc/pvmc_groups.C)
-
-
-configure_file(../langs/pvmc/pvmc.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
-configure_file(../langs/pvmc/pvm3.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
-configure_file(../langs/simplemsg/sm.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
-configure_file(../langs/simplemsg/simplemsg.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
