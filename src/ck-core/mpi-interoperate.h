@@ -3,7 +3,7 @@
 
 #include "converse.h"
 #include "ck.h"
-#include "trace.h"
+//#include "trace.h"
 
 #if CMK_CONVERSE_MPI
 #include <mpi.h>

@@ -1519,7 +1519,7 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage* msg, int ep, int opts) const
   else
   {
     // Broadcast message via serializer node
-    _TRACE_CREATION_DETAILED(UsrToEnv(msg), ep);
+   //_TRACE_CREATION_DETAILED(UsrToEnv(msg), ep);
     static constexpr int serializer = 0;
     int skipsched = opts & CK_MSG_EXPEDITED;
     CProxy_CkArray ap(_aid);
@@ -1795,7 +1795,7 @@ void CkArray::sendMsg(CkArrayMessage* msg, const CkArrayIndex& idx, CkDeliver_t 
 {
   envelope* env = UsrToEnv(msg);
   env->setMsgtype(ForArrayEltMsg);
-  _TRACE_CREATION_DETAILED(env, msg->array_ep());
+ //_TRACE_CREATION_DETAILED(env, msg->array_ep());
 
   CmiUInt8 id;
   if (locMgr->lookupID(idx, id))

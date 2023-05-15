@@ -1,6 +1,5 @@
 set(ck-cxx-sources
-    ../ck-perf/trace-common.C ../ck-perf/trace-controlPoints.C
-    ../ck-perf/tracec.C ../ck-perf/tracef.C ../conv-perf/charmProjections.C
+    ../conv-perf/charmProjections.C
     ../util/ckbitvector.C ../util/ckregex.C
     ck.C ckarray.C ckarrayoptions.C ckcallback.C
     ckcheckpoint.C ckfutures.C ckIgetControl.C

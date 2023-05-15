@@ -7,7 +7,7 @@ the bindings are written to the C language, although most
 clients, including the rest of Charm++, are actually C++.
 */
 #include "ck.h"
-#include "trace.h"
+//#include "trace.h"
 #include "queueing.h"
 
 //#include "pathHistory.h"
@@ -185,7 +185,7 @@ static void CkChareThreadListener_free(CkThreadListener *l) {
 /// This method is called before starting a [threaded] entry method.
 void Chare::CkAddThreadListeners(CthThread th, void *msg) {
   CthSetThreadID(th, thishandle.onPE, (int)(((char *)thishandle.objPtr)-(char *)0), 0);
-  traceAddThreadListeners(th, UsrToEnv(msg));
+  //traceAddThreadListeners(th, UsrToEnv(msg));
 
   auto *l = new CkChareThreadListener(this);
   l->suspend = CkChareThreadListener_suspend;
@@ -715,13 +715,13 @@ static inline void _invokeEntry(int epIdx,envelope *env,void *obj)
 
 #if CMK_TRACE_ENABLED 
   if (_entryTable[epIdx]->traceEnabled) {
-    _TRACE_BEGIN_EXECUTE(env, obj);
+   //_TRACE_BEGIN_EXECUTE(env, obj);
     if(_entryTable[epIdx]->appWork)
-        _TRACE_BEGIN_APPWORK();
+       //_TRACE_BEGIN_APPWORK();
     _invokeEntryNoTrace(epIdx,env,obj);
     if(_entryTable[epIdx]->appWork)
-        _TRACE_END_APPWORK();
-    _TRACE_END_EXECUTE();
+       //_TRACE_END_APPWORK();
+   //_TRACE_END_EXECUTE();
   }
   else
 #endif
@@ -756,7 +756,7 @@ void CkCreateChare(int cIdx, int eIdx, void *msg, CkChareID *pCid, int destPE)
   env->setByPe(CkMyPe());
   env->setSrcPe(CkMyPe());
   CmiSetHandler(env, _charmHandlerIdx);
-  _TRACE_CREATION_1(env);
+ //_TRACE_CREATION_1(env);
   CpvAccess(_qd)->create();
   _STATS_RECORD_CREATE_CHARE_1();
   _SET_USED(env, 1);
@@ -765,7 +765,7 @@ void CkCreateChare(int cIdx, int eIdx, void *msg, CkChareID *pCid, int destPE)
   else
     env->setForAnyPE(0);
   _CldEnqueue(destPE, env, _infoIdx);
-  _TRACE_CREATION_DONE(1);
+ //_TRACE_CREATION_DONE(1);
 }
 
 inline void CkReadyEntry(TableEntry &entry, bool nodeLevel) {
@@ -963,9 +963,9 @@ CkGroupID CkCreateGroup(int cIdx, int eIdx, void *msg)
   env->setMsgtype(BocInitMsg);
   env->setEpIdx(eIdx);
   env->setSrcPe(CkMyPe());
-  _TRACE_CREATION_N(env, CkNumPes());
+ //_TRACE_CREATION_N(env, CkNumPes());
   CkGroupID gid = _groupCreate(env);
-  _TRACE_CREATION_DONE(1);
+ //_TRACE_CREATION_DONE(1);
   return gid;
 }
 
@@ -976,9 +976,9 @@ CkGroupID CkCreateNodeGroup(int cIdx, int eIdx, void *msg)
   env->setMsgtype(NodeBocInitMsg);
   env->setEpIdx(eIdx);
   env->setSrcPe(CkMyPe());
-  _TRACE_CREATION_N(env, CkNumNodes());
+ //_TRACE_CREATION_N(env, CkNumNodes());
   CkGroupID gid = _nodeGroupCreate(env);
-  _TRACE_CREATION_DONE(1);
+ //_TRACE_CREATION_DONE(1);
   return gid;
 }
 
@@ -1439,9 +1439,9 @@ void CkPackMessage(envelope **pEnv)
     short int zcMsgType = CMI_ZC_MSGTYPE(env);
     if(zcMsgType == CMK_ZC_SEND_DONE_MSG) // Store buffer pointers as offsets
       CkPackRdmaPtrs(((CkMarshallMsg *)msg)->msgBuf);
-    _TRACE_BEGIN_PACK();
+   //_TRACE_BEGIN_PACK();
     msg = _msgTable[env->getMsgIdx()]->pack(msg);
-    _TRACE_END_PACK();
+   //_TRACE_END_PACK();
     env=UsrToEnv(msg);
     env->setPacked(1);
     *pEnv = env;
@@ -1454,9 +1454,9 @@ void CkUnpackMessage(envelope **pEnv)
   int msgIdx = env->getMsgIdx();
   if(env->isPacked()) {
     void *msg = EnvToUsr(env);
-    _TRACE_BEGIN_UNPACK();
+   //_TRACE_BEGIN_UNPACK();
     msg = _msgTable[msgIdx]->unpack(msg);
-    _TRACE_END_UNPACK();
+   //_TRACE_END_UNPACK();
     env=UsrToEnv(msg);
     env->setPacked(0);
     short int zcMsgType = CMI_ZC_MSGTYPE(env);
@@ -1725,7 +1725,7 @@ void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid, int opts)
   // VidBlock was not yet filled). The problem is that the creation was never
   // traced later when the VidBlock was filled. One solution is to trace the
   // creation here, the other to trace it in VidBlock->msgDeliver().
-  _TRACE_CREATION_1(env);
+ //_TRACE_CREATION_1(env);
   if (destPE!=-1) {
     CpvAccess(_qd)->create();
     if (opts & CK_MSG_SKIP_OR_IMM)
@@ -1733,7 +1733,7 @@ void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid, int opts)
     else
       _CldEnqueue(destPE, env, _infoIdx);
   }
-  _TRACE_CREATION_DONE(1);
+ //_TRACE_CREATION_DONE(1);
 }
 
 void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid, int opts)
@@ -1822,13 +1822,13 @@ static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
           env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
     }
 
-  _TRACE_ONLY(numPes = (pe==CLD_BROADCAST_ALL?CkNumPes():1));
-  _TRACE_CREATION_N(env, numPes);
+ //_TRACE_ONLY(numPes = (pe==CLD_BROADCAST_ALL?CkNumPes():1));
+ //_TRACE_CREATION_N(env, numPes);
   if (opts & CK_MSG_SKIP_OR_IMM)
     _noCldEnqueue(pe, env);
   else
     _skipCldEnqueue(pe, env, _infoIdx);
-  _TRACE_CREATION_DONE(1);
+ //_TRACE_CREATION_DONE(1);
 }
 
 static inline void _sendMsgBranchWithinNode(int eIdx, void *msg, CkGroupID gID)
@@ -1843,9 +1843,9 @@ static inline void _sendMsgBranchWithinNode(int eIdx, void *msg, CkGroupID gID)
   } else {
     CkAbort("Bad message type %i\n", UsrToEnv(msg)->getMsgtype());
   }
-  _TRACE_CREATION_N(env, CmiMyNodeSize());
+ //_TRACE_CREATION_N(env, CmiMyNodeSize());
   _CldEnqueueWithinNode(env, _infoIdx);
-  _TRACE_CREATION_DONE(1);  // since it only creates one creation event.
+ //_TRACE_CREATION_DONE(1);  // since it only creates one creation event.
 }
 
 static inline void _processBocBcastMsg(CkCoreState* ck, envelope* env) {
@@ -1857,9 +1857,9 @@ static inline void _sendMsgBranchMulti(int eIdx, void *msg, CkGroupID gID,
                            int npes, const int *pes)
 {
   envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
-  _TRACE_CREATION_MULTICAST(env, npes, pes);
+ //_TRACE_CREATION_MULTICAST(env, npes, pes);
   _CldEnqueueMulti(npes, pes, env, _infoIdx);
-  _TRACE_CREATION_DONE(1); 	// since it only creates one creation event.
+ //_TRACE_CREATION_DONE(1); 	// since it only creates one creation event.
 }
 
 void CkSendMsgBranchImmediate(int eIdx, void *msg, int destPE, CkGroupID gID)
@@ -1873,13 +1873,13 @@ void CkSendMsgBranchImmediate(int eIdx, void *msg, int destPE, CkGroupID gID)
   //Can't inline-- send the usual way
   envelope *env = UsrToEnv(msg);
   int numPes = 1;
-  _TRACE_ONLY(numPes = (destPE==CLD_BROADCAST_ALL?CkNumPes():1));
+ //_TRACE_ONLY(numPes = (destPE==CLD_BROADCAST_ALL?CkNumPes():1));
   env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForBocMsg);
-  _TRACE_CREATION_N(env, numPes);
+ //_TRACE_CREATION_N(env, numPes);
   _noCldEnqueue(destPE, env);
   _STATS_RECORD_SEND_BRANCH_1();
   CkpvAccess(_coreState)->create();
-  _TRACE_CREATION_DONE(1);
+ //_TRACE_CREATION_DONE(1);
 #else
   // no support for immediate message, send inline
   CkSendMsgBranchInline(eIdx, msg, destPE, gID);
@@ -1930,9 +1930,9 @@ void CkSendMsgBranchMultiImmediate(int eIdx,void *msg,CkGroupID gID,int npes,con
 {
 #if CMK_IMMEDIATE_MSG && ! CMK_SMP
   envelope *env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForBocMsg);
-  _TRACE_CREATION_MULTICAST(env, npes, pes);
+ //_TRACE_CREATION_MULTICAST(env, npes, pes);
   _noCldEnqueueMulti(npes, pes, env);
-  _TRACE_CREATION_DONE(1);      // since it only creates one creation event.
+ //_TRACE_CREATION_DONE(1);      // since it only creates one creation event.
 #else
   _sendMsgBranchMulti(eIdx, msg, gID, npes, pes);
   CpvAccess(_qd)->create(-npes);
@@ -1964,9 +1964,9 @@ void CkSendMsgBranchGroup(int eIdx,void *msg,CkGroupID gID,CmiGroup grp, int opt
     // normal mesg
   envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
   CmiLookupGroup(grp, &npes, &pes);
-  _TRACE_CREATION_MULTICAST(env, npes, pes);
+ //_TRACE_CREATION_MULTICAST(env, npes, pes);
   _CldEnqueueGroup(grp, env, _infoIdx);
-  _TRACE_CREATION_DONE(1); 	// since it only creates one creation event.
+ //_TRACE_CREATION_DONE(1); 	// since it only creates one creation event.
   _STATS_RECORD_SEND_BRANCH_N(npes);
   CpvAccess(_qd)->create(npes);
 }
@@ -1997,24 +1997,24 @@ static inline void _sendMsgNodeBranch(int eIdx, void *msg, CkGroupID gID,
         env = _prepareMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
     }
   numPes = (node==CLD_BROADCAST_ALL?CkNumNodes():1);
-  _TRACE_CREATION_N(env, numPes);
+ //_TRACE_CREATION_N(env, numPes);
   if (opts & CK_MSG_SKIP_OR_IMM) {
     _noCldNodeEnqueue(node, env);
   }
   else
     _CldNodeEnqueue(node, env, _infoIdx);
-  _TRACE_CREATION_DONE(1);
+ //_TRACE_CREATION_DONE(1);
 }
 
 static inline void _sendMsgNodeBranchMulti(int eIdx, void *msg, CkGroupID gID,
                            int npes, const int *nodes)
 {
   envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
-  _TRACE_CREATION_N(env, npes);
+ //_TRACE_CREATION_N(env, npes);
   for (int i=0; i<npes; i++) {
     _CldNodeEnqueue(nodes[i], env, _infoIdx);
   }
-  _TRACE_CREATION_DONE(1);  // since it only creates one creation event.
+ //_TRACE_CREATION_DONE(1);  // since it only creates one creation event.
 }
 
 void CkSendMsgNodeBranchImmediate(int eIdx, void *msg, int node, CkGroupID gID)
@@ -2028,13 +2028,13 @@ void CkSendMsgNodeBranchImmediate(int eIdx, void *msg, int node, CkGroupID gID)
   //Can't inline-- send the usual way
   envelope *env = UsrToEnv(msg);
   int numPes = 1;
-  _TRACE_ONLY(numPes = (node==CLD_BROADCAST_ALL?CkNumNodes():1));
+ //_TRACE_ONLY(numPes = (node==CLD_BROADCAST_ALL?CkNumNodes():1));
   env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
-  _TRACE_CREATION_N(env, numPes);
+ //_TRACE_CREATION_N(env, numPes);
   _noCldNodeEnqueue(node, env);
   _STATS_RECORD_SEND_BRANCH_1();
   CkpvAccess(_coreState)->create();
-  _TRACE_CREATION_DONE(1);
+ //_TRACE_CREATION_DONE(1);
 #else
   // no support for immediate message, send inline
   CkSendMsgNodeBranchInline(eIdx, msg, node, gID);
@@ -2653,7 +2653,7 @@ int _recplay_logsize = 1024*1024;
 
 CkMessageWatcher::~CkMessageWatcher() { if (next!=NULL) delete next;}
 
-#include "trace-common.h" /* For traceRoot and traceRootBaseLength */
+//#include "trace-common.h" /* For traceRoot and traceRootBaseLength */
 #if CMK_LBDB_ON
 #include "BaseLB.h" /* For LBMigrateMsg message */
 #endif

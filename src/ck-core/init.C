@@ -65,7 +65,7 @@ never be excluded...
 
 #include "ckcheckpoint.h"
 #include "ck.h"
-#include "trace.h"
+//#include "trace.h"
 #include "ckrdma.h"
 #include "CkCheckpoint.decl.h"
 #include "ckmulticast.h"
@@ -1117,7 +1117,7 @@ void CkExit(int exitcode)
   CmiSetHandler(env, _exitHandlerIdx);
   CmiSyncSendAndFree(0, env->getTotalsize(), (char *)env);
 
-  _TRACE_END_EXECUTE();
+ //_TRACE_END_EXECUTE();
   //Wait for stats, which will call ConverseExit when finished:
 	if(!CharmLibInterOperate)
   CsdScheduler(-1);
@@ -1593,7 +1593,7 @@ void _initCharm(int unused_argc, char **argv)
 	_TRACE_BEGIN_COMPUTATION();	
 #else
  	if (!inCommThread) {
-	  _TRACE_BEGIN_COMPUTATION();
+	 //_TRACE_BEGIN_COMPUTATION();
 	}
 #endif
 

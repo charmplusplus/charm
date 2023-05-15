@@ -219,7 +219,7 @@ void CkSyncBarrier::checkBarrier()
 
     if (atBarrier)
     {
-      _TRACE_END_PHASE();
+     //_TRACE_END_PHASE();
       startedAtSync = true;
       curEpoch++;
       // Propagate kick message to trigger barrier on PEs that don't have any AtSync
