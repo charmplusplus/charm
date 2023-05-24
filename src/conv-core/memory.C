@@ -639,7 +639,21 @@ INLINE static CMK_TYPEDEF_UINT8 MemusageMallinfo(void){
       initialize_memory_wrapper();
     mi = (*mm_impl_mallinfo)();
 #else
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+#ifdef __INTEL_COMPILER
+#pragma warning push
+#pragma warning disable 1478
+#endif
     mi = mallinfo();
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
+#ifdef __INTEL_COMPILER
+#pragma warning pop
+#endif
 #endif
     CMK_TYPEDEF_UINT8 memtotal = (CMK_TYPEDEF_UINT8) mi.uordblks;   /* malloc */
     CMK_TYPEDEF_UINT8 memtotal2 = (CMK_TYPEDEF_UINT8) mi.usmblks;   /* unused */
@@ -661,7 +675,7 @@ INLINE static CMK_TYPEDEF_UINT8 MemusagePS(void){
     CMK_TYPEDEF_UINT8 vsz=0;
     FILE *p;
     int ret;
-    sprintf(pscmd, "/bin/ps -o vsz= -p %d", getpid());
+    snprintf(pscmd, sizeof(pscmd), "/bin/ps -o vsz= -p %d", getpid());
     p = popen(pscmd, "r");
     if(p){
 	ret = fscanf(p, "%" PRIu64, &vsz);

@@ -190,7 +190,7 @@ void TraceControlPoints::free(void *where, int size) {
 
 void TraceControlPoints::traceClose(void)
 {
-  // Print out some performance counters on BG/P
+  // Print out some performance counters where available
   CProxy_TraceControlPointsBOC myProxy(traceControlPointsGID);
 
     

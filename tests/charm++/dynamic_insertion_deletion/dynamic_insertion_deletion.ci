@@ -1,0 +1,30 @@
+// Distributed under the MIT License.
+// See LICENSE.txt for details.
+
+mainmodule dynamic_insertion_deletion {
+
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_DgElement dgElementProxy;
+  mainchare Main {
+    entry Main(CkArgMsg* msg);
+    entry void initialize();
+    entry void check_domain();
+    entry void build_proc_map();
+    entry void add_proc_to_map(const ElementId_t& id, const int proc);
+    entry void create_new_elements();
+    entry void delete_old_elements();
+    entry void ping_elements();
+    entry void remove_proc_from_map(const ElementId_t& id, const int proc);
+    entry void exit();
+    entry [reductiontarget] void check_volume(const double volume);
+  };
+
+  array [1D] DgElement {
+    entry DgElement(const size_t iteration);
+    entry void create_new_elements(const size_t iteration);
+    entry void delete_old_elements(const size_t iteration);
+    entry void send_volume(const size_t iteration);
+    entry void send_proc_to_main(const size_t iteration);
+    entry void receive_ping(const size_t iteration);
+  };
+};

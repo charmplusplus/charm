@@ -113,13 +113,22 @@ $1-f90: $1-framework.o $1-test-f90.o
 lib$1-%-cxx.so: $1-%-cxx-so.o
 	$$(AMPICC) -o $$@ $$(OPTS_$1_cxx) -shared -fvisibility=hidden -standalone $$^
 
-$1-%.o $1-%-cxx.o: %.C
+$1-%.o: %.C
 	$$(AMPICC) -o $$@ $$(OPTS_$1_cxx) -Dprivatization_method=$1 $$(foreach i,$$(FEATURES_$1_cxx),-Dtest_$$i) -c $$<
 
-$1-%-so.o $1-%-cxx-so.o: %.C
+$1-%-cxx.o: %.C
+	$$(AMPICC) -o $$@ $$(OPTS_$1_cxx) -Dprivatization_method=$1 $$(foreach i,$$(FEATURES_$1_cxx),-Dtest_$$i) -c $$<
+
+$1-%-so.o: %.C
 	$$(AMPICC) -o $$@ $$(OPTS_$1_cxx) -Dprivatization_method=$1 $$(foreach i,$$(FEATURES_$1_cxx),-Dtest_$$i) -shared -fvisibility=hidden -c $$<
 
-$1-%.o $1-%-f90.o: %.f90
+$1-%-cxx-so.o: %.C
+	$$(AMPICC) -o $$@ $$(OPTS_$1_cxx) -Dprivatization_method=$1 $$(foreach i,$$(FEATURES_$1_cxx),-Dtest_$$i) -shared -fvisibility=hidden -c $$<
+
+$1-%.o: %.f90
+	$$(AMPIF90) -o $$@ $$(OPTS_$1_f90) -c $$<
+
+$1-%-f90.o: %.f90
 	$$(AMPIF90) -o $$@ $$(OPTS_$1_f90) -c $$<
 
 # test

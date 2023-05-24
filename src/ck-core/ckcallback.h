@@ -131,11 +131,11 @@ private:
 	} section;
 #else
 	struct s_section {
-                CkArrayIndex *_elems;
-                int *pelist;
-		CkSectionInfo::CkSectionInfoStruct sinfo;
-                int _nElems;
-                int npes;
+		CkArrayIndex *_elems;
+		int *pelist;
+		CkSectionInfo sinfo;
+		int _nElems;
+		int npes;
 		int ep;
 		CMK_REFNUM_TYPE refnum; // Reference number to set on the message
 		bool hasRefnum;
@@ -145,9 +145,8 @@ private:
 	struct s_ccsReply {
 		CcsDelayedReply reply;
 	} ccsReply;
-	//callbackData(){memset(this,0,sizeof(callbackData));}
-	//callbackData()=default;
-	//constructor()=default;
+
+	callbackData() { memset(this, 0, sizeof(callbackData)); }
 	};
 
 public:
@@ -486,7 +485,7 @@ public:
  * It takes the given message and handles it appropriately.
  * After the send(), this callback is finished and cannot be reused.
  */
-	void send(void *msg=NULL) const;
+	void send(void *msg=NULL,int opts=0) const;
 	
 /**
  * Send this data, formatted as a CkDataMsg, back to the caller.
@@ -534,6 +533,28 @@ public:
                   CkAbort("Tried to set a refnum on a callback not directed at an entry method");
                 }
         }
+
+    // returns target EP's index (if one exists)
+    int epIndex(void) const {
+        switch (type) {
+            case isendChare:
+            case sendChare:
+                return d.chare.ep;
+            case isendGroup:
+            case sendGroup:
+            case isendNodeGroup:
+            case sendNodeGroup:
+            case bcastNodeGroup:
+            case bcastGroup:
+                return d.group.ep;
+            case isendArray:
+            case sendArray:
+            case bcastArray:
+                return d.array.ep;
+            default:
+                return -1;
+        }
+    }
 };
 //PUPbytes(CkCallback) //FIXME: write a real pup routine
 

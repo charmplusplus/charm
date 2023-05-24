@@ -22,7 +22,7 @@ message("# You can run './buildold' to use the previous build system.     #")
 message("##################################################################")
 
 if(CMAKE_VERSION VERSION_GREATER 3.12 OR CMAKE_VERSION VERSION_EQUAL 3.12)
-  cmake_policy(SET CMP0075 OLD)
+  cmake_policy(SET CMP0075 NEW)
 endif()
 
 # Fortran is optional, so don't include it in LANGUAGES here
@@ -30,6 +30,15 @@ project(Charm++ LANGUAGES CXX C ASM VERSION 7.0.0)
 
 find_package(Threads)
 find_package(OpenMP) # Do this before Fortran, in case we don't have a Fortran compiler
+
+set(CMK_BUILD_MPI 0)
+set(CMK_BUILD_ON_MPI 0)
+set(CMK_CXX_MPI_BINDINGS 1) # Always true, this just checked for a conflict with old mpich versions.
+if(${NETWORK} STREQUAL "mpi")
+  set(CMK_BUILD_MPI 1)
+  set(CMK_BUILD_ON_MPI 1)
+  find_package(MPI REQUIRED)
+endif()
 
 # We need C++11 for (almost) all targets
 set(CMAKE_CXX_STANDARD 11)
@@ -73,7 +82,9 @@ if(NOT CMK_COMPILER STREQUAL "msvc")
   enable_language(Fortran OPTIONAL)
 endif()
 
-if(CMAKE_Fortran_COMPILER)
+option(ENABLE_FORTRAN "Enable Fortran" ON)
+
+if(ENABLE_FORTRAN AND CMAKE_Fortran_COMPILER)
   include(FortranCInterface)
   FortranCInterface_VERIFY()
   FortranCInterface_VERIFY(CXX)
@@ -403,15 +414,6 @@ if(${NETWORK} MATCHES "gni-" OR ${NETWORK} MATCHES "ofi-cray")
   set(CMK_BUILD_CRAY 1)
 elseif(${NETWORK} MATCHES "mpi-cray")
   set(CHARM_PLATFORM "${NETWORK}")
-endif()
-
-set(CMK_BUILD_MPI 0)
-set(CMK_BUILD_ON_MPI 0)
-set(CMK_CXX_MPI_BINDINGS 1) # Always true, this just checked for a conflict with old mpich versions.
-if(${NETWORK} STREQUAL "mpi")
-  set(CMK_BUILD_MPI 1)
-  set(CMK_BUILD_ON_MPI 1)
-  find_package(MPI REQUIRED)
 endif()
 
 set(CMK_BUILD_ON_UCX 0)
@@ -765,7 +767,7 @@ set(src-util-h-sources src/util/SSE-Double.h src/util/SSE-Float.h
     src/util/ckimage.h src/util/cklists.h src/util/ckliststring.h
     src/util/ckregex.h src/util/cksequence.h src/util/cksequence_factory.h
     src/util/cksequence_internal.h src/util/ckstatistics.h src/util/ckvector3d.h
-    src/util/cmimemcpy.h src/util/cmimemcpy_qpx.h src/util/cmirdmautils.h
+    src/util/cmirdmautils.h
     src/util/cmitls.h src/util/conv-lists.h src/util/crc32.h src/util/hilbert.h
     src/util/partitioning_strategies.h src/util/pup.h src/util/pup_c.h
     src/util/pup_cmialloc.h src/util/pup_mpi.h src/util/pup_paged.h
@@ -810,10 +812,12 @@ if(${NETWORK} MATCHES "ucx" OR ${NETWORK} MATCHES "ofi")
       configure_file(${filename} include/ COPYONLY)
   endforeach()
 
-  # FIXME: this should be in include/proc_management/simple_pmi
-  foreach(filename ${proc_management-simple_pmi-sources})
+  if(${LRTS_PMI} MATCHES "simplepmi")
+    # FIXME: this should be in include/proc_management/simple_pmi
+    foreach(filename ${proc_management-simple_pmi-sources})
       configure_file(${filename} include/ COPYONLY)
-  endforeach()
+    endforeach()
+  endif()
 endif()
 
 # Charmxi
@@ -952,6 +956,13 @@ endif()
 
 file(APPEND ${optfile_sh} "CMK_NO_BUILD_SHARED=${CMK_NO_BUILD_SHARED}\n")
 
+if(DISABLE_TLS)
+  set(CMK_SUPPORTS_TLSGLOBALS "0")
+  set(CMK_USER_DISABLED_TLS "1")
+else()
+  set(CMK_USER_DISABLED_TLS "0")
+endif()
+
 foreach(l BUILDOPTS CMK_AMPI_WITH_ROMIO CMK_BUILD_PYTHON CMK_CAN_LINK_FORTRAN
         CMK_CHARMDEBUG CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS CMK_HAS_INT16 CMK_HAS_MMAP
         CMK_LIBJPEG CMK_MOD_EXT CMK_SUPPORTS_FSGLOBALS CMK_SUPPORTS_PIPGLOBALS
@@ -961,7 +972,7 @@ foreach(l BUILDOPTS CMK_AMPI_WITH_ROMIO CMK_BUILD_PYTHON CMK_CAN_LINK_FORTRAN
         CXX_NO_AS_NEEDED LDXX_WHOLE_ARCHIVE_PRE LDXX_WHOLE_ARCHIVE_POST
         CMK_MACOSX CMK_POST_EXE CMK_SHARED_SUF CMK_USER_SUFFIX OPTS_LD
         CMK_COMPILER_KNOWS_FVISIBILITY CMK_LINKER_KNOWS_UNDEFINED
-        CMK_SUPPORTS_MEMORY_ISOMALLOC CUDA_DIR)
+        CMK_SUPPORTS_MEMORY_ISOMALLOC CUDA_DIR CMK_USER_DISABLED_TLS)
     file(APPEND ${optfile_sh} "${l}=\"${${l}}\"\n" )
 endforeach(l)
 

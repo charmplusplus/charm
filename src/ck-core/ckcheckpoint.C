@@ -27,9 +27,6 @@ void noopit(const char*, ...)
 //#define DEBCHK   CkPrintf
 #define DEBCHK noopit
 
-#define DEBUGC(x) x
-//#define DEBUGC(x) 
-
 #define SUBDIR_SIZE 256
 
 CkGroupID _sysChkptWriteMgr;
@@ -116,6 +113,8 @@ static void bdcastRO(void){
 	int i;
 	// Determine the size of the RODataMessage
 	PUP::sizer ps(PUP::er::IS_CHECKPOINT);
+	UInt numZerocopyROopsSize; // only used for sizing.
+	ps|numZerocopyROopsSize;
 	for(i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(ps);
 
 	// Allocate and fill out the RODataMessage
@@ -173,7 +172,7 @@ static void bdcastROGroupData(void){
 void printIndex(const CkArrayIndex &idx,char *dest) {
 	const int *idxData=idx.data();
 	for (int i=0;i<idx.nInts;i++) {
-		sprintf(dest,"%s%d",i==0?"":"_", idxData[i]);
+		snprintf(dest,12,"%s%d",i==0?"":"_", idxData[i]);
 		dest+=strlen(dest);
 	}
 }
@@ -720,7 +719,6 @@ void CkPupProcessorData(PUP::er &p)
 // called only on pe 0
 static bool checkpointOne(const char* dirname, CkCallback& cb, bool requestStatus){
 	CmiAssert(CkMyPe()==0);
-	char filename[1024];
 	
 	// save readonlys, and callback BTW
 	FILE* fRO = openCheckpointFile(dirname, "RO", "wb", -1);
@@ -816,7 +814,6 @@ void CkStartCheckpoint(const char* dirname, const CkCallback& cb, bool requestSt
 CkCallback globalCb;
 void CkRestartMain(const char* dirname, CkArgMsg *args){
 	int i;
-	char filename[1024];
 	
         if (CmiMyRank() == 0) {
           _inrestart = true;

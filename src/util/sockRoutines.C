@@ -124,7 +124,7 @@ by, e.g., an alarm and should be retried.
 */
 static int skt_should_retry(void)
 {
-	int isinterrupt=0,istransient=0,istimeout=0;
+	int isinterrupt=0,istransient=0;
 #if defined(_WIN32) /*Windows systems-- check Windows Sockets Error*/
 	int err=WSAGetLastError();
 	if (err==WSAEINTR) isinterrupt=1;
@@ -133,7 +133,7 @@ static int skt_should_retry(void)
 #else /*UNIX systems-- check errno*/
 	int err=errno;
 	if (err==EINTR) isinterrupt=1;
-	if (err==ETIMEDOUT) istimeout=1;
+	//int istimeout = (err==ETIMEDOUT) ? 1 : 0;
 	if (err==EAGAIN||err==ECONNREFUSED
                ||err==EWOULDBLOCK||err==ENOBUFS
                ||err==ECONNRESET
@@ -317,14 +317,14 @@ skt_ip_t skt_innode_lookup_ip(const char *name)
 }
 
 /*Write as dotted decimal*/
-char *skt_print_ip(char *dest,skt_ip_t addr)
+char *skt_print_ip(char *dest,int len,skt_ip_t addr)
 {
   char *o=dest;
-  int i;
+  int i, tmplen = 0;
   for (i=0;i<sizeof(addr);i++) {
     const char *trail=".";
     if (i==sizeof(addr)-1) trail=""; /*No trailing separator dot*/
-    sprintf(o,"%d%s",(int)addr.data[i],trail);
+    tmplen += snprintf(o,len - tmplen,"%d%s",(int)addr.data[i],trail);
     o+=strlen(o);
   }
   return dest;

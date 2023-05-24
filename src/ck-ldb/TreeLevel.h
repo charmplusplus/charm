@@ -220,8 +220,8 @@ class StrategyWrapper : public IStrategyWrapper
         : n_moves(nmoves),
           num_incoming(num_incoming),
           loc(loc),
-          foreign_obj_id_start(foreign_obj_id_start),
-          obj_local_ids(obj_local_ids)
+          obj_local_ids(obj_local_ids),
+          foreign_obj_id_start(foreign_obj_id_start)
     {
     }
 
@@ -624,7 +624,9 @@ class RootLevel : public LevelLogic
       migMsg->n_moves = 0;
       std::fill(migMsg->num_incoming, migMsg->num_incoming + nPes, 0);
 
+#if DEBUG__TREE_LB_L1
       double t0 = CkWallTimer();
+#endif
       wrapper->prepStrategy(nObjs, nPes, stats_msgs, migMsg);
       wrapper->runStrategy(migMsg);
       if (current_strategy == wrappers.size() - 1)
@@ -1101,7 +1103,9 @@ class NodeLevel : public LevelLogic
     migMsg->n_moves = 0;
     std::fill(migMsg->num_incoming, migMsg->num_incoming + total_npes, 0);
 
+#if DEBUG__TREE_LB_L2
     double t0 = CkWallTimer();
+#endif
     wrapper->prepStrategy(nObjs, nPes, stats_msgs, migMsg);
     wrapper->runStrategy(migMsg);
 #if DEBUG__TREE_LB_L2
@@ -1228,8 +1232,9 @@ class PELevel : public LevelLogic
       }
     }
 
-    LBRealType t1, t2, t3, t4, bg_walltime;
+    LBRealType t1, t2, t3, bg_walltime;
 #if CMK_LB_CPUTIMER
+    LBRealType t4;
     lbmgr->GetTime(&t1, &t2, &t3, &bg_walltime, &t4);
 #else
     lbmgr->GetTime(&t1, &t2, &t3, &bg_walltime, &bg_walltime);

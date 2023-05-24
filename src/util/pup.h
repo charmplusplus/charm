@@ -555,6 +555,7 @@ class fromDisk : public disk {
 class toTextUtil : public er {
  private:
   char *cur; /*Current output buffer*/
+  size_t maxCount; /*Max length of cur buffer*/
   int level; /*Indentation distance*/
   void beginEnv(const char *type,int n=0);
   void endEnv(const char *type);
@@ -562,7 +563,7 @@ class toTextUtil : public er {
   void endLine(void);
  protected:
   virtual char *advance(char *cur)=0; /*Consume current buffer and return next*/
-  toTextUtil(unsigned int inType,char *buf);
+  toTextUtil(unsigned int inType,char *buf,size_t len);
   toTextUtil(const toTextUtil &p);		//You don't want to copy
   void operator=(const toTextUtil &p);		// You don't want to copy
  public:
@@ -578,8 +579,10 @@ class toTextUtil : public er {
 };
 /* Return the number of characters, including terminating NULL */
 class sizerText : public toTextUtil {
+ public:
+  static constexpr int lineLen = 1000;
  private:
-  char line[1000];
+  char line[lineLen];
   size_t charCount; /*Total characters seen so far (not including NULL) */
  protected:
   virtual char *advance(char *cur);
@@ -593,10 +596,11 @@ class toText : public toTextUtil {
  private:
   char *buf;
   size_t charCount; /*Total characters written so far (not including NULL) */
+  size_t maxCount; /*Max length of buf*/
  protected:
   virtual char *advance(char *cur);
  public:
-  toText(char *outStr);
+  toText(char *outStr, size_t len);
   toText(const toText &p);			//You don't want to copy
   void operator=(const toText &p);		// You don't want to copy
   size_t size(void) const {return charCount+1; /*add NULL*/ }

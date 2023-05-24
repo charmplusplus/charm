@@ -64,8 +64,9 @@ void TraceCore::RegisterLanguage(int lID, const char* ln)
 	maxlID = lID;
   }
   lIDList[numLangs] = lID;
-  lNames[numLangs] = new char[strlen(ln)+1];
-  sprintf(lNames[numLangs],"%s",ln);
+  int len = strlen(ln)+1;
+  lNames[numLangs] = new char[len];
+  snprintf(lNames[numLangs],len,"%s",ln);
   numLangs++;
 
  }
@@ -125,8 +126,9 @@ void TraceCore::startPtc(){
 	if(traceCoreOn ==0){
 		return;
 	}
-	char *str = new char[strlen(CpvAccess(_traceCoreRoot))+strlen(".ptc")+1];
-	sprintf(str,"%s.ptc",CpvAccess(_traceCoreRoot));
+	int len = strlen(CpvAccess(_traceCoreRoot))+strlen(".ptc")+1;
+	char *str = new char[len];
+	snprintf(str,len,"%s.ptc",CpvAccess(_traceCoreRoot));
 	fpPtc = fopen(str,"w");
 	if(fpPtc == NULL){
 		CmiAbort("Can't generate Ptc file");
@@ -319,8 +321,9 @@ TraceLogger::TraceLogger(char* program, int b):
     fName[lID]=NULL;
   }
 
-  pgm = new char[strlen(program)+1];
-  sprintf(pgm, "%s", program);
+  int len = strlen(program)+1;
+  pgm = new char[len];
+  snprintf(pgm, len, "%s", program);
   numEntries = 0;
   isWriting = false;
   buffer = NULL;
@@ -352,12 +355,14 @@ void TraceLogger::RegisterLanguage(int lID, const char* ln)
 {
 	numLangs++;
 
-	lName[lID] = new char[strlen(ln)+1];
-	sprintf(lName[lID], "%s", ln);
+	int len = strlen(ln)+1;
+	lName[lID] = new char[len];
+	snprintf(lName[lID], len, "%s", ln);
 
-	char pestr[10]; sprintf(pestr, "%d", CmiMyPe());
-	fName[lID] = new char[strlen(pgm)+1+strlen(pestr)+1+strlen(ln)+strlen(".log")+10];
-	sprintf(fName[lID], "%s.%s.%s.log", pgm, pestr, ln);
+	char pestr[10]; snprintf(pestr, sizeof(pestr), "%d", CmiMyPe());
+	int fname_len = strlen(pgm)+1+strlen(pestr)+1+strlen(ln)+strlen(".log")+10;
+	fName[lID] = new char[fname_len];
+	snprintf(fName[lID], fname_len, "%s.%s.%s.log", pgm, pestr, ln);
 
 	// my debug code - schak
 	//CmiPrintf("%s at %d in %d \n",fName[lID],lID,fName[lID]);
@@ -448,7 +453,7 @@ void TraceLogger::add(int lID, int eID, double timestamp, int iLen, int* iData, 
   new (&pool[numEntries]) TraceEntry(lID, eID, timestamp, iLen, iData, sLen, sData);
   numEntries = numEntries+1;
 if(numEntries>= poolSize) {
-    double writeTime = TraceCoreTimer();
+    //double writeTime = TraceCoreTimer();
     isWriting = true;
     if(binary) writeBinary();
 	else 	   write();

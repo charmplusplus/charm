@@ -575,8 +575,10 @@ class ampiTopology {
   virtual void pup(PUP::er &p) noexcept =0;
   virtual int getType() const noexcept =0;
   virtual void dup(ampiTopology* topo) noexcept =0;
+  virtual std::vector<int> &getnbors() noexcept =0;
   virtual const std::vector<int> &getnbors() const noexcept =0;
   virtual void setnbors(const std::vector<int> &nbors_) noexcept =0;
+  virtual void sortnbors(CProxy_ampi arrProxy, std::vector<int> &nbors_) noexcept;
 
   virtual const std::vector<int> &getdims() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
   virtual const std::vector<int> &getperiods() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
@@ -637,6 +639,7 @@ class ampiCartTopology final : public ampiTopology {
   inline const std::vector<int> &getdims() const noexcept {return dims;}
   inline const std::vector<int> &getperiods() const noexcept {return periods;}
   inline int getndims() const noexcept {return ndims;}
+  inline std::vector<int> &getnbors() noexcept {return nbors;}
   inline const std::vector<int> &getnbors() const noexcept {return nbors;}
 
   inline void setdims(const std::vector<int> &d) noexcept {dims = d; dims.shrink_to_fit();}
@@ -672,6 +675,7 @@ class ampiGraphTopology final : public ampiTopology {
   inline int getnvertices() const noexcept {return nvertices;}
   inline const std::vector<int> &getindex() const noexcept {return index;}
   inline const std::vector<int> &getedges() const noexcept {return edges;}
+  inline std::vector<int> &getnbors() noexcept {return nbors;}
   inline const std::vector<int> &getnbors() const noexcept {return nbors;}
 
   inline void setnvertices(int nv) noexcept {nvertices = nv;}
@@ -723,6 +727,7 @@ class ampiDistGraphTopology final : public ampiTopology {
   inline const std::vector<int> &getDestWeights() const noexcept {return destWeights;}
   inline bool areSourcesWeighted() const noexcept {return sourcesWeighted;}
   inline bool areDestsWeighted() const noexcept {return destsWeighted;}
+  inline std::vector<int> &getnbors() noexcept {return nbors;}
   inline const std::vector<int> &getnbors() const noexcept {return nbors;}
 
   inline void setAreSourcesWeighted(bool v) noexcept {sourcesWeighted = v ? 1 : 0;}
@@ -2881,6 +2886,8 @@ class ampi final : public CBase_ampi {
   inline int getIndexForRank(int r) const noexcept {return myComm->getIndexForRank(r);}
   inline int getIndexForRemoteRank(int r) const noexcept {return myComm->getIndexForRemoteRank(r);}
   void findNeighbors(MPI_Comm comm, int rank, std::vector<int>& neighbors) const noexcept;
+  inline void sortNeighborsByLocality(std::vector<int>& nbors) noexcept { myComm->getTopology()->sortnbors(thisProxy, nbors); }
+  inline std::vector<int>& getNeighbors() noexcept { return myComm->getTopology()->getnbors(); }
   inline const std::vector<int>& getNeighbors() const noexcept { return myComm->getTopology()->getnbors(); }
   inline bool opIsCommutative(MPI_Op op) const noexcept { return parent->opIsCommutative(op); }
   inline MPI_User_function* op2User_function(MPI_Op op) const noexcept { return parent->op2User_function(op); }

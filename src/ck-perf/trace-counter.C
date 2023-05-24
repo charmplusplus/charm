@@ -423,16 +423,16 @@ FILE* CountLogPool::openFile(int phase) {
   const static int strSize = 10;
   char pestr[strSize+1];
   char phasestr[strSize+1];
-  snprintf(pestr, strSize, "%d", CmiMyPe());
+  snprintf(pestr, sizeof(pestr), "%d", CmiMyPe());
   pestr[strSize] = '\0';
   int len = strlen(CpvAccess(_logName)) + strlen("phase.count.") + 2*strSize + 1;
   char* fname = new char[len+1];  _MEMCHECK(fname);
   if (phase >= 0) { 
-    snprintf(phasestr, strSize, "%d", phase);
+    snprintf(phasestr, sizeof(phasestr), "%d", phase);
     phasestr[strSize] = '\0';
-    sprintf(fname, "%s.phase%s.%s.count", CpvAccess(_logName), phasestr, pestr); 
+    snprintf(fname, len+1, "%s.phase%s.%s.count", CpvAccess(_logName), phasestr, pestr); 
   }
-  else { sprintf(fname, "%s.%s.count", CpvAccess(_logName), pestr); }
+  else { snprintf(fname, len+1, "%s.%s.count", CpvAccess(_logName), pestr); }
   FILE* fp = NULL;
   DEBUGF(("%d/%d DEBUG: TRACE: %s:%d\n", CmiMyPe(), CmiNumPes(), fname, errno));
   do {
@@ -471,16 +471,16 @@ void CountLogPool::writeSts(int phase)
   char phasestr[strSize+1];
   int _numEntries=_entryTable.size();
   // add strSize for phase number
-  char *fname = 
-    new char[strlen(CpvAccess(_logName))+strlen(".count.sts")+strSize];
+  int len = strlen(CpvAccess(_logName))+strlen(".count.sts")+strSize;
+  char *fname = new char[len];
   _MEMCHECK(fname);
   if (phase < 0 && lastPhase_ >= 0) { phase = lastPhase_; }
   if (phase >= 0) { 
-    snprintf(phasestr, strSize, "%d", phase);
+    snprintf(phasestr, sizeof(phasestr), "%d", phase);
     phasestr[strSize] = '\0';
-    sprintf(fname, "%s.phase%s.count.sts", CpvAccess(_logName), phasestr); 
+    snprintf(fname, len, "%s.phase%s.count.sts", CpvAccess(_logName), phasestr); 
   } 
-  else { sprintf(fname, "%s.count.sts", CpvAccess(_logName)); }
+  else { snprintf(fname, len, "%s.count.sts", CpvAccess(_logName)); }
   FILE *sts = fopen(fname, "w+");
   // DEBUGF(("%d/%d DEBUG: File: %s \n", CmiMyPe(), CmiNumPes(), fname));
   if(sts==0)
@@ -1205,7 +1205,7 @@ void TraceCounter::printHelp()
 
   // create a format so that all the str line up 
   char format[64];
-  snprintf(format, 64, "    %%2d  %%-%ds  %%s\n", argStrSize_);
+  snprintf(format, sizeof(format), "    %%2d  %%-%ds  %%s\n", argStrSize_);
 
   CounterArg* help = firstArg_;
   while (help != NULL) {

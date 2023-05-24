@@ -54,14 +54,6 @@ public:
 // Forward declarations
 class CkArray;
 class ArrayElement;
-// What to do if an entry method is invoked on
-// an array element that does not (yet) exist:
-typedef enum : uint8_t
-{
-  CkArray_IfNotThere_buffer = 0,      // Wait for it to be created
-  CkArray_IfNotThere_createhere = 1,  // Make it on sending Pe
-  CkArray_IfNotThere_createhome = 2   // Make it on (a) home Pe
-} CkArray_IfNotThere;
 
 /// How to do a message delivery:
 typedef enum : uint8_t
@@ -535,8 +527,17 @@ public:
     CkAssert(checkInBounds(idx));
     if (compressor)
     {
-      // TODO: If number of PEs doesn't fit into number of home bits, this will overflow
-      return (homePe(idx) << CMK_OBJID_ELEMENT_BITS) + compressor->compress(idx);
+      const CmiUInt8 home = homePe(idx);
+      CmiAssertMsg(
+          home <= (ck::ObjID::masks::HOME_MASK >> ck::ObjID::bits::ELEMENT_BITS),
+          "home is too big! (home: %" PRIx64 ", max: %" PRIx64 ")", home,
+          (CmiUInt8)(ck::ObjID::masks::HOME_MASK >> ck::ObjID::bits::ELEMENT_BITS));
+      const CmiUInt8 id = (home << CMK_OBJID_ELEMENT_BITS) + compressor->compress(idx);
+      CmiAssertMsg(
+          id <= (ck::ObjID::masks::HOME_MASK | ck::ObjID::masks::ELEMENT_MASK),
+          "id is too big! (id: %" PRIx64 ", max: %" PRIx64 ")", id,
+          (CmiUInt8)(ck::ObjID::masks::HOME_MASK | ck::ObjID::masks::ELEMENT_MASK));
+      return id;
     }
     else
     {
@@ -552,8 +553,16 @@ public:
     CkAssert(checkInBounds(idx));
     if (compressor)
     {
-      // TODO: If number of PEs doesn't fit into number of home bits, this will overflow
-      id = (homePe(idx) << CMK_OBJID_ELEMENT_BITS) + compressor->compress(idx);
+      const CmiUInt8 home = homePe(idx);
+      CmiAssertMsg(
+          home <= (ck::ObjID::masks::HOME_MASK >> ck::ObjID::bits::ELEMENT_BITS),
+          "home is too big! (home: %" PRIx64 ", max: %" PRIx64 ")", home,
+          (CmiUInt8)(ck::ObjID::masks::HOME_MASK >> ck::ObjID::bits::ELEMENT_BITS));
+      id = (home << CMK_OBJID_ELEMENT_BITS) + compressor->compress(idx);
+      CmiAssertMsg(
+          id <= (ck::ObjID::masks::HOME_MASK | ck::ObjID::masks::ELEMENT_MASK),
+          "id is too big! (id: %" PRIx64 ", max: %" PRIx64 ")", id,
+          (CmiUInt8)(ck::ObjID::masks::HOME_MASK | ck::ObjID::masks::ELEMENT_MASK));
       return true;
     }
     else

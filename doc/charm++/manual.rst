@@ -1659,17 +1659,14 @@ and code blocks that they define. These definitions appear in the
 ``.ci`` file definition of the enclosing chare class as a ‘body’ of an
 entry method following its signature.
 
-The most basic construct in SDAG is the ``serial`` (aka the ``atomic``)
-block. Serial blocks contain sequential C++ code. They’re also called
-atomic because the code within them executes without returning control
-to the Charm++ runtime scheduler, and thus avoiding interruption from
-incoming messages. The keywords atomic and serial are synonymous, and
-you can find example programs that use atomic. However, we recommend the
-use of serial and are considering the deprecation of the atomic keyword.
-Typically serial blocks hold the code that actually deals with incoming
-messages in a ``when`` statement, or to do local operations before a
-message is sent or after it’s received. The earlier example can be
-adapted to use serial blocks as follows:
+The most basic construct in SDAG is the ``serial`` block (previously also
+denoted by ``atomic``, this usage is now deprecated). Serial blocks contain
+sequential C++ code, and the code within them executes to completion without
+returning control to the Charm++ runtime scheduler, thus avoiding interruption
+from incoming messages. Typically, serial blocks hold the code that actually
+deals with incoming messages in a ``when`` statement or performs local
+operations before a message is sent or after it is received. The earlier example
+can be adapted to use serial blocks as follows:
 
 .. code-block:: charmci
 
@@ -2029,7 +2026,7 @@ the runtime will not “commit” to this branch until the second arrives.
 If another dependency fully matches, the partial match will be ignored
 and can be used to trigger another ``when`` later in the execution.
 
-.. code-block:: c++
+.. code-block:: text
 
    case {
      when a() { }
@@ -5666,12 +5663,14 @@ then invokes it to return a result may have the following interface:
      cb.send(msg);
    }
 
-A CkCallback will accept any message type, or even NULL. The message is
+A *CkCallback* will accept any message type, even *nullptr*. The message is
 immediately sent to the user’s client function or entry point. A library
 which returns its result through a callback should have a clearly
 documented return message type. The type of the message returned by the
 library must be the same as the type accepted by the entry method
-specified in the callback.
+specified in the callback. Note that message flag(s) may be passed as an
+optional argument to “send;” for example, :code:`send(_, CK_MSG_EXPEDITED)`
+will send a message with expediency.
 
 As an alternative to “send”, the callback can be used in a *contribute*
 collective operation. This will internally invoke the “send” method on
@@ -8199,30 +8198,21 @@ from zero: PEs are ranked from ``0`` to ``CmiNumPes()``, and nodes are ranked
 from ``0`` to ``CmiNumNodes()``.
 
 Charm++ provides a unified abstraction for querying topology information of
-IBM's BG/Q and Cray's XE6. The ``TopoManager`` singleton object, which can be
+Cray's XE6. The ``TopoManager`` singleton object, which can be
 used by including ``TopoManager.h``, contains the following methods:
 
 getDimNX(), getDimNY(), getDimNZ():
-   Returns the length of X, Y and Z dimensions (except BG/Q).
-
-getDimNA(), getDimNB(), getDimNC(), getDimND(), getDimNE():
-   Returns the length of A, B, C, D and E dimensions on BG/Q.
+   Returns the length of X, Y and Z dimensions.
 
 getDimNT():
    Returns the length of T dimension. TopoManager uses the T dimension to
    represent different cores that reside within a physical node.
 
 rankToCoordinates(int pe, int &x, int &y, int &z, int &t):
-   Get the coordinates of PE with rank *pe* (except BG/Q).
-
-rankToCoordinates(int pe, int &a, int &b, int &c, int &d, int &e, int &t):
-   Get the coordinates of PE with rank *pe* on BG/Q.
+   Get the coordinates of PE with rank *pe*.
 
 coordinatesToRank(int x, int y, int z, int t):
-   Returns the rank of PE with given coordinates (except BG/Q).
-
-coordinatesToRank(int a, int b, int c, int d, int e, int t):
-   Returns the rank of PE with given coordinates on BG/Q.
+   Returns the rank of PE with given coordinates.
 
 getHopsBetweenRanks(int pe1, int pe2):
    Returns the distance between the given PEs in terms of the hops count
@@ -8898,10 +8888,6 @@ this integrated library on Linux.
 
 -  Clang: 3.7 or newer
 
-You can use this integrated OpenMP with *clang* on IBM Blue Gene machines
-without special compilation flags (don't need to add -fopenmp or
--openmp on Blue Gene clang).
-
 On Linux, the OpenMP supported version of clang has been installed in
 default recently. For example, Ubuntu has been released with clang
 higher than 3.7 since 15.10. Depending on which version of clang is
@@ -9180,7 +9166,7 @@ Enabling GPU Support
 
 GPU support via GPU Manager and HAPI is not included by default when
 building Charm++. Use ``build`` with the ``cuda`` option to build Charm++
-with GPU support (CMake build is currently not supported), e.g.
+with GPU support (or configure CMake with ``-D CUDA=ON``), e.g.
 
 .. code-block:: bash
 
@@ -9523,9 +9509,7 @@ compiler used to build charm. In the linking step, it is required to
 pass ``-mpi`` as an argument because of which *charmc* performs the
 linking for interoperation. The charm libraries, which one wants to be
 linked, should be passed using ``-module`` option. Refer to
-``examples/charm++/mpi-coexist/Makefile`` to view a working example. For
-execution on BG/Q systems, the following additional argument should be
-added to the launch command: ``-envs PAMI_CLIENTS=MPI,Converse``.
+``examples/charm++/mpi-coexist/Makefile`` to view a working example.
 
 User Driven Mode
 ~~~~~~~~~~~~~~~~
@@ -11578,6 +11562,12 @@ For example, to build Charm++ and AMPI on top of the MPI layer with SMP, the fol
 
    $ cmake .. -DNETWORK=mpi -DSMP=on -DTARGET=AMPI
 
+Alternatively, one could also specify other ``cmake`` configuration options via the 
+``../build`` command, for example, by replacing the above ``cmake ..`` command with
+
+.. code-block:: bash
+
+   $ ../build AMPI mpi-linux-x86_64 smp
 
 Charm++ installation directories
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -12689,7 +12679,7 @@ and cannot appear as variable or entry method names in a ``.ci`` file:
 
 -  SDAG constructs
 
-   -  atomic
+   -  atomic (deprecated)
 
    -  serial
 

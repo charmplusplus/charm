@@ -32,7 +32,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#if CMK_CRAYXE || CMK_CRAYXC
+#if CMK_CRAYXE || CMK_CRAYXC || CMK_CRAYEX
 extern "C" int getXTNodeID(int mpirank, int nummpiranks);
 #endif
 
@@ -163,7 +163,6 @@ static int cpuTopoRecvHandlerIdx;
 
 static CpuTopology cpuTopo;
 static int done = 0;
-static int topoDone = 0;
 static int _noip = 0;
 
 }
@@ -406,7 +405,7 @@ extern "C" void LrtsInitCpuTopo(char **argv)
       strcpy(hostname, "");
   }
 #endif
-#if CMK_CRAYXE || CMK_CRAYXC
+#if CMK_CRAYXE || CMK_CRAYXC || CMK_CRAYEX
   if(CmiMyRank() == 0) {
     int numPes = cpuTopo.numPes = CmiNumPes();
     int numNodes = CmiNumNodes();
