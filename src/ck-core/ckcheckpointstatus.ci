@@ -1,3 +1,0 @@
-module CkCheckpointStatus{
-  message CkCheckpointStatusMsg;
-};

@@ -154,7 +154,6 @@ set(conv-util-cxx-sources
     src/util/pup_toNetwork4.C
     src/util/pup_util.C
     src/util/pup_xlater.C
-    src/util/spanningTree.C
 )
 
 if(CMK_CAN_LINK_FORTRAN)
@@ -169,10 +168,6 @@ endif()
 add_custom_command(OUTPUT pup_f.f90 COMMAND ${CMAKE_SOURCE_DIR}/src/util/pup_f.f90.sh > /dev/null)
 
 # conv-partition
-set(conv-partition-cxx-sources
-    src/util/custom_partitioner.C
-    src/util/set_partition_params.C
-)
 
 # conv-ldb
 set(conv-ldb-cxx-sources

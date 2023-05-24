@@ -880,11 +880,13 @@ void create_topoaware_partitions(void) {
   _Cmi_numpes = _Cmi_numnodes * _Cmi_mynodesize;
   
   TopoManager_init();
+#if 0
   if(_partitionInfo.scheme == 100) {
     createCustomPartitions(numparts_bak, _partitionInfo.partitionSize, _partitionInfo.nodeMap);       
   } else {
     TopoManager_createPartitions(_partitionInfo.scheme, numparts_bak, _partitionInfo.nodeMap);
   }
+#endif
   TopoManager_free();
   
   _partitionInfo.type = type_bak;
@@ -957,7 +959,7 @@ static void create_partition_map( char **argv)
   _partitionInfo.scheme = 0;
   _partitionInfo.isTopoaware = 0;
 
-  setDefaultPartitionParams();
+  //setDefaultPartitionParams();
 
   if(!CmiGetArgIntDesc(argv,"+partitions", &_partitionInfo.numPartitions,"number of partitions")) {
     CmiGetArgIntDesc(argv,"+replicas", &_partitionInfo.numPartitions,"number of partitions");

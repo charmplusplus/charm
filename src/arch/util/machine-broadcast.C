@@ -3,7 +3,7 @@
 **/
 
 #define CONVERSE_MACHINE_BROADCAST_C_
-#include "spanningTree.h"
+//#include "spanningTree.h"
 
 CmiCommHandle CmiSendNetworkFunc(int destPE, int size, char *msg, int mode);
 
@@ -162,7 +162,7 @@ static void SendSpanningChildren(int size, char *msg, int rankToAssign, int star
         children    = _topoTree->children;
         //CmiPrintf("[%d][%d] SendSpanningChildren child count%d \n", CmiMyPe(), CmiMyNode(), child_count);
       } else {
-        get_topo_tree_nbs(startNode, &parent, &child_count, &children);
+        //get_topo_tree_nbs(startNode, &parent, &child_count, &children);
       }
       for (i=0; i < child_count; i++) {
         int nd = children[i];

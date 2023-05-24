@@ -773,8 +773,7 @@ set(src-util-h-sources src/util/SSE-Double.h src/util/SSE-Float.h
     src/util/pup_cmialloc.h src/util/pup_mpi.h src/util/pup_paged.h
     src/util/pup_stl.h src/util/pup_toNetwork.h src/util/pup_toNetwork4.h
     src/util/pupf.h src/util/rand48_replacement.h src/util/random_sequence.h
-    src/util/simd.h src/util/sockRoutines.h src/util/spanningTree.h
-    src/util/spanningTreeStrategy.h src/util/spanningTreeVertex.h
+    src/util/simd.h src/util/sockRoutines.h
     src/util/strided_sequence.h src/util/treeStrategy_3dTorus_minBytesHops.h
     src/util/treeStrategy_3dTorus_minHops.h
     src/util/treeStrategy_nodeAware_minBytes.h
@@ -873,8 +872,8 @@ endif()
 
 # Check that we are able to build and link an executable
 add_executable(ckhello ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.C)
-add_dependencies(ckhello ck ldb-rand memory-default threads-default conv-static
-  converse ckmain ckqt)
+add_dependencies(ckhello ldb-rand memory-default threads-default conv-static
+  converse ckqt)
 
 # Create conv-mach-opt.sh
 set(optfile_sh ${CMAKE_BINARY_DIR}/include/conv-mach-opt.sh)
@@ -1000,7 +999,7 @@ set(OS_RELEASE "${OS_RELEASE} (${CMAKE_SYSTEM_NAME} ${CMAKE_SYSTEM_VERSION}, ${C
 
 cmake_host_system_information(RESULT MY_HOSTNAME QUERY FQDN)
 
-get_target_property(MAIN_CFLAGS ck COMPILE_OPTIONS)
+#get_target_property(MAIN_CFLAGS ck COMPILE_OPTIONS)
 string(REPLACE ";" " " MAIN_CFLAGS "${MAIN_CFLAGS}")
 
 if(NOT opts_enabled)

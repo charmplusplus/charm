@@ -1,5 +1,0 @@
-module CkMarshall {
-  message CkMarshallMsg {
-        char msgBuf[];
-  };
-};
