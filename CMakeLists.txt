@@ -820,8 +820,8 @@ if(${NETWORK} MATCHES "ucx" OR ${NETWORK} MATCHES "ofi")
 endif()
 
 # Charmxi
-add_subdirectory(src/xlat-i)
-add_dependencies(charmxi create_symlinks)
+#add_subdirectory(src/xlat-i)
+#add_dependencies(charmxi create_symlinks)
 
 # Hwloc
 include(cmake/hwloc.cmake)
@@ -871,10 +871,6 @@ if(${TARGET} STREQUAL "charm4py")
 endif()
 
 # Check that we are able to build and link an executable
-add_executable(ckhello ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.C)
-add_dependencies(ckhello memory-default threads-default conv-static
-  converse ckqt)
-
 # Create conv-mach-opt.sh
 set(optfile_sh ${CMAKE_BINARY_DIR}/include/conv-mach-opt.sh)
 
