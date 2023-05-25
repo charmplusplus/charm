@@ -522,12 +522,12 @@ if(${TARGET} STREQUAL "all-test")
   add_dependencies(all-test moduleampi ampi-compat ck
         ampi_funcptr_shim ampi_funcptr_shim_main
         ampi_funcptr_loader ampi_funcptr_loader_stub
-        converse conv-static ldb-rand
+        converse conv-static
         memory-os-isomalloc memory-default threads-default ckmain moduletcharmmain
         ckqt tcharm-compat
         create_symlinks moduleCkCache trace-converse moduleCommonLBs
         moduleTreeLB moduleCkMulticast moduleCkIO conv-cpm memory-os-wrapper
-        threads-default-tls ldb-neighbor ldb-workstealing
+        threads-default-tls
         modulecollidecharm modulecollide memory-os memory-os-isomalloc)
   if(CMK_HAS_MMAP)
     add_dependencies(all-test memory-gnu-isomalloc)
@@ -865,14 +865,14 @@ if(${TARGET} STREQUAL "charm4py")
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
   add_library(charm SHARED empty.cpp)
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib_so)
-  target_link_libraries(charm ck converse memory-default threads-default ldb-rand "-Llib/ -standalone -whole-archive -c++stl -shared")
+  target_link_libraries(charm ck converse memory-default threads-default "-Llib/ -standalone -whole-archive -c++stl -shared")
 
   add_dependencies(charm hwloc)
 endif()
 
 # Check that we are able to build and link an executable
 add_executable(ckhello ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.C)
-add_dependencies(ckhello ldb-rand memory-default threads-default conv-static
+add_dependencies(ckhello memory-default threads-default conv-static
   converse ckqt)
 
 # Create conv-mach-opt.sh

@@ -4093,7 +4093,7 @@ void ConverseCommonInit(char **argv)
 
   CrnInit();
   CmiInitImmediateMsg();
-  CldModuleInit(argv);
+  //CldModuleInit(argv);
 
   CmiIsomallocInit(argv);
 
@@ -4117,7 +4117,7 @@ void ConverseCommonExit(void)
   CmiFlush(stdout);  /* end of program, always flush */
 #endif
 
-  seedBalancerExit();
+  //seedBalancerExit();
   //EmergencyExit();
 }
 

@@ -169,27 +169,6 @@ add_custom_command(OUTPUT pup_f.f90 COMMAND ${CMAKE_SOURCE_DIR}/src/util/pup_f.f
 
 # conv-partition
 
-# conv-ldb
-set(conv-ldb-cxx-sources
-    src/conv-ldb/cldb.C
-    src/conv-ldb/topology.C
-    src/conv-ldb/edgelist.C
-    src/conv-ldb/generate.C
-)
-
-set(conv-ldb-h-sources
-    src/conv-ldb/cldb.h
-    src/conv-ldb/graphdefs.h
-    src/conv-ldb/topology.h
-)
-
-add_library(ldb-none src/conv-ldb/cldb.none.C ${conv-ldb-h-sources})
-add_library(ldb-test src/conv-ldb/cldb.test.C ${conv-ldb-h-sources})
-add_library(ldb-rand src/conv-ldb/cldb.rand.C ${conv-ldb-h-sources})
-add_library(ldb-neighbor src/conv-ldb/cldb.neighbor.C src/conv-ldb/cldb.neighbor.h ${conv-ldb-h-sources})
-add_library(ldb-workstealing src/conv-ldb/cldb.workstealing.C src/conv-ldb/cldb.workstealing.h ${conv-ldb-h-sources})
-add_library(ldb-spray src/conv-ldb/cldb.spray.C ${conv-ldb-h-sources})
-# add_library(ldb-prioritycentralized src/conv-ldb/cldb.prioritycentralized.C src/conv-ldb/cldb.prioritycentralized.h ${conv-ldb-h-sources})
 
 # TopoManager
 set(tmgr-c-sources src/util/topomanager/CrayNid.c)
@@ -210,8 +189,6 @@ add_library(converse
     ${conv-util-cxx-sources}
     ${conv-util-h-sources}
     ${conv-partition-cxx-sources}
-    ${conv-ldb-cxx-sources}
-    ${conv-ldb-h-sources}
     src/arch/${GDIR}/machine.C
     ${tmgr-c-sources}
     ${tmgr-cxx-sources}
@@ -226,7 +203,6 @@ foreach(filename
     ${conv-ccs-h-sources}
     ${conv-perf-h-sources}
     ${conv-util-h-sources}
-    ${conv-ldb-h-sources}
     ${tmgr-h-sources}
 )
     configure_file(${filename} ${CMAKE_BINARY_DIR}/include/ COPYONLY)
@@ -234,7 +210,7 @@ endforeach()
 
 target_include_directories(converse PRIVATE src/arch/util) # for machine*.*
 target_include_directories(converse PRIVATE src/util) # for sockRoutines.C
-target_include_directories(converse PRIVATE src/conv-core src/util/topomanager src/ck-ldb src/ck-perf src/ck-cp)
+target_include_directories(converse PRIVATE src/conv-core src/util/topomanager)
 
 # conv-static
 add_library(conv-static OBJECT src/conv-core/conv-static.c)

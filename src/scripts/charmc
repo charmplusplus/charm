@@ -1572,8 +1572,6 @@ fi
 
 Debug "Finished with TRACEMODE=${TRACEMODE[*]} and BALANCE=$BALANCE..."
 
-BAL_OBJ=("-lldb-$BALANCE" -lconverse)
-
 # Check for valid choice of MEMORY
 
 # Set the default expansions of unprefixed variants
@@ -2186,30 +2184,6 @@ then
 for trace in "${TRACEMODE[@]}"; do
     [[ ! -r "$CHARMLIB/libtrace-$trace.a" ]] && Abort "charmc : No such tracemode $trace"
 done
-fi
-
-BAL_EXT="$(getExtension "$BALANCE")"
-if [[ -z "$BAL_EXT" ]]; then
-  # Balance has no extension-- is a library reference
-  if [[ -f "${CHARMLIB}/libldb-$BALANCE.a" ]]; then
-    BAL_OBJ_FILE="${CHARMLIB}/libldb-$BALANCE.a"
-  else
-    BAL_OBJ_FILE="${CHARMLIBSO}/libldb-$BALANCE.so"
-  fi
-else
-  # Balance has some extension-- must be a .o or .a file
-  BAL_OBJ_FILE="$BALANCE"
-fi
-
-if [[ ! -r "$BAL_OBJ_FILE" ]]
-then
-	if [[ "$BALANCE" = "$BAL_OBJ_FILE" ]]
-	then
-		Abort "Could not find load balancer object $BAL_OBJ_FILE"
-	else
-		(cd "$CHARMLIB" ; ls -al libldb-*)
-		Abort "Unknown load balancer $BALANCE / $BAL_OBJ_FILE"
-	fi
 fi
 
 if [[ -f "${CHARMLIB}/libmemory-${MEMORY}.a" ]]; then
