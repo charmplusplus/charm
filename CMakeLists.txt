@@ -774,10 +774,7 @@ set(src-util-h-sources src/util/SSE-Double.h src/util/SSE-Float.h
     src/util/pup_stl.h src/util/pup_toNetwork.h src/util/pup_toNetwork4.h
     src/util/pupf.h src/util/rand48_replacement.h src/util/random_sequence.h
     src/util/simd.h src/util/sockRoutines.h
-    src/util/strided_sequence.h src/util/treeStrategy_3dTorus_minBytesHops.h
-    src/util/treeStrategy_3dTorus_minHops.h
-    src/util/treeStrategy_nodeAware_minBytes.h
-    src/util/treeStrategy_nodeAware_minGens.h src/util/treeStrategy_topoUnaware.h
+    src/util/strided_sequence.h
     src/util/uFcontext.h src/util/uJcontext.h src/util/valgrind.h
     src/util/vector2d.h)
 
