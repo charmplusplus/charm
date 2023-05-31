@@ -11,11 +11,6 @@ set(ck-h-sources
     register.h
     debug-charm.h)
 
-set(ldb-cxx-sources)
-
-set(ldb-h-sources
-    ../util/json.hpp ../util/json_fwd.hpp)
-
 include(${CMAKE_SOURCE_DIR}/cmake/ci-files.cmake)
 
 #add_library(ck ${ck-cxx-sources} ${ck-h-sources} ${all-ci-outputs})

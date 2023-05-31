@@ -145,8 +145,6 @@ set(conv-util-cxx-sources
     src/util/ckhashtable.C
     src/util/ckimage.C
     src/util/conv-lists.C
-    src/util/hilbert.C
-    src/util/partitioning_strategies.C
     src/util/pup_c.C
     src/util/pup_cmialloc.C
     src/util/pup_paged.C
@@ -171,10 +169,6 @@ add_custom_command(OUTPUT pup_f.f90 COMMAND ${CMAKE_SOURCE_DIR}/src/util/pup_f.f
 
 
 # TopoManager
-set(tmgr-c-sources src/util/topomanager/CrayNid.c)
-set(tmgr-cxx-sources src/util/topomanager/TopoManager.C)
-set(tmgr-h-sources src/util/topomanager/TopoManager.h ${CMAKE_BINARY_DIR}/include/topomanager_config.h src/util/topomanager/XTTorus.h)
-file(WRITE ${CMAKE_BINARY_DIR}/include/topomanager_config.h "// empty\n" )
 
 # Converse
 add_library(converse

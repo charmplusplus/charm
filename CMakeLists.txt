@@ -768,8 +768,8 @@ set(src-util-h-sources src/util/SSE-Double.h src/util/SSE-Float.h
     src/util/ckregex.h src/util/cksequence.h src/util/cksequence_factory.h
     src/util/cksequence_internal.h src/util/ckstatistics.h src/util/ckvector3d.h
     src/util/cmirdmautils.h
-    src/util/cmitls.h src/util/conv-lists.h src/util/crc32.h src/util/hilbert.h
-    src/util/partitioning_strategies.h src/util/pup.h src/util/pup_c.h
+    src/util/cmitls.h src/util/conv-lists.h
+    src/util/pup.h src/util/pup_c.h
     src/util/pup_cmialloc.h src/util/pup_mpi.h src/util/pup_paged.h
     src/util/pup_stl.h src/util/pup_toNetwork.h src/util/pup_toNetwork4.h
     src/util/pupf.h src/util/rand48_replacement.h src/util/random_sequence.h

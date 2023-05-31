@@ -857,9 +857,9 @@ if (  MSG_STATISTIC)
 #define strtok_r(x,y,z) strtok(x,y)
 #endif
 
-#include "TopoManager.h"
-extern "C" void createCustomPartitions(int numparts, int *partitionSize, int *nodeMap);
-extern "C" void setDefaultPartitionParams(void);
+//#include "TopoManager.h"
+//extern "C" void createCustomPartitions(int numparts, int *partitionSize, int *nodeMap);
+//extern "C" void setDefaultPartitionParams(void);
 
 void create_topoaware_partitions(void) {
   int i, j, numparts_bak;
@@ -879,7 +879,7 @@ void create_topoaware_partitions(void) {
 
   _Cmi_numpes = _Cmi_numnodes * _Cmi_mynodesize;
   
-  TopoManager_init();
+  //TopoManager_init();
 #if 0
   if(_partitionInfo.scheme == 100) {
     createCustomPartitions(numparts_bak, _partitionInfo.partitionSize, _partitionInfo.nodeMap);       
@@ -887,7 +887,7 @@ void create_topoaware_partitions(void) {
     TopoManager_createPartitions(_partitionInfo.scheme, numparts_bak, _partitionInfo.nodeMap);
   }
 #endif
-  TopoManager_free();
+  //TopoManager_free();
   
   _partitionInfo.type = type_bak;
   _partitionInfo.numPartitions = numparts_bak;

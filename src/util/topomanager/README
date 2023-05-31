@@ -1,9 +1,0 @@
-Library for topology discovery.
-
-On Cray systems:
-make -f Makefile_Cray
-
-For example and test, see topomanager_test.C
-To build test:
-> make -f Makefile_ARCH test
-where ARCH is the system architecture
