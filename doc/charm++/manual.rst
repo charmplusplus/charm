@@ -1,4 +1,4 @@
-=======================================
+x1=======================================
 The Charm++ Parallel Programming System
 =======================================
 
@@ -8710,6 +8710,38 @@ every node to the shared-memory multithreading runtime will waste
 computational power because those dedicated cores are not utilized at
 all during most of the application's execution time. This case indicates
 the necessity of a unified runtime supporting both types of parallelism.
+
+
+Tass with StealQ for within-node load balancing
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Converse, the underlying scheduling-and-communication system for Charm++, supports a steal queue as abuild time option,
+which can be used to create tasks so that they can be executed by any PE within a logical node (i.e. a process),
+in SMP mode.
+To use this feature, you need an option --enable-task-queue while *building* Charm++ initially.
+Tasks are fired with the call CsdTaskEnqueue(m) where m is a pointer to a Converse message, which is different
+(and simpler and shorter) than a Charm++ message. It is simply a struct with an initial set of bytes
+(CmiMsgHeaderSizeBytes bytes) reserved for system information. You must also write a handler that has the code
+to execute the task and register with the system using CmiRegisterHandler called during system initialization.
+(use *initcall* or *moduleinit* methods). Typically, it is also necessary to have a synchronization object that
+can take action (such as a callback) when all the tasks
+arising recursively from a set of fired objects, so you know when they are all done.
+
+An example program illustrating this feature is in pgms/tasksAndRing, which illustrates concurrent execution
+of tasks with regular Charm++ messages. Another example that illustrates the utility of tasks
+for within-node load balancing is in pgms/testTasks.
+
+
+The task queue is Cilk-style (specifically  the so called "THE") queue, which aims to minimize inter-PE interactions.
+Each PE has its own task queue, annd the Converse scheduler polls this regularly. But only when the PE is completely
+idle (no tasks and no other messages to process) does it steal tasks from other PE's queues. Efficiency of this method
+requires that you try to divide the tasks recursively. (E.g. if you are processing a large array A[0:N], you may
+want to fire tasks each responsible for range A[x:y] and each subdividing that range further (and enqueuing 2 tasks)
+until some minimal tasks size is reached, when the handler will just do the work instead of firing subtasks.
+This method is prefered to firing many
+small subtasks at once, because it minimizes the number of steals, and therefore associated synchronization overheads.
+
+
 
 CkLoop library
 ~~~~~~~~~~~~~~
