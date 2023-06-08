@@ -8729,7 +8729,8 @@ to execute the task and register with the system using CmiRegisterHandler called
 can take action (such as a callback) when all the tasks
 arising recursively from a set of fired objects, so you know when they are all done.
 
-An example program illustrating this feature is in https://github.com/UIUC-PPL/pgms/tasksAndRing,
+An example program illustrating this feature is in
+https://github.com/UIUC-PPL/pgms/tree/main/charm%2B%2B/tasksWithRing,
 which illustrates concurrent execution
 of tasks with regular Charm++ messages. Another example that illustrates the utility of tasks
 for within-node load balancing is in pgms/testTasks.
