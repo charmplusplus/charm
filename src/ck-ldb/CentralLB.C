@@ -8,6 +8,7 @@
 #include <charm++.h>
 #include "ck.h"
 #include "envelope.h"
+#include "ckgraph.h"
 #include "CentralLB.h"
 #include "LBSimulation.h"
 
@@ -1285,6 +1286,41 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats)
   strat_start_time = CkWallTimer();
   if (_lb_args.debug() && (CkMyPe() == cur_ld_balancer))
     CkPrintf("CharmLB> %s: PE [%d] strategy starting at %f\n", lbname, cur_ld_balancer, strat_start_time);
+
+  ObjGraph *ogr = new ObjGraph(stats);
+  CkPrintf("Comm graph data:\n");
+  CkPrintf("\nNum vertices = %d", ogr->vertices.size());
+  double maxLoad = 0.0;
+  int numEdges = 0;
+  long numVertices = ogr->vertices.size();
+  /** remove duplicate edges from recvFrom */
+  for (auto& vertex : ogr->vertices)
+  {
+    for (auto& outEdge : vertex.sendToList)
+    {
+      const auto nId = outEdge.getNeighborId();
+      auto& inList = vertex.recvFromList;
+
+      // Partition the incoming edges into {not from vertex nId}, {from vertex nId}
+      const auto it = std::partition(inList.begin(), inList.end(), [nId](const CkEdge& e) {
+        return e.getNeighborId() != nId;
+      });
+      // Add the bytes received from vertex nId to the outgoing edge to nId, and then
+      // remove those incoming edges
+      std::for_each(it, inList.end(), [&outEdge](const CkEdge& e) {
+        outEdge.setNumBytes(outEdge.getNumBytes() + e.getNumBytes());
+      });
+      inList.erase(it, inList.end());
+    }
+  }
+
+  for (const auto& vertex : ogr->vertices)
+  {
+    maxLoad = std::max(maxLoad, vertex.getVertexLoad());
+    numEdges += vertex.sendToList.size() + vertex.recvFromList.size();
+  }
+  CkPrintf("\nNum edges = %d, max load = %lf\n", numEdges, maxLoad);
+
 
   work(stats);
 
