@@ -81,7 +81,7 @@ namespace Ck { namespace IO {
         int fd;
         int sessionID;
         CProxy_WriteSession session;
-	CProxy_ReadSession read_session;
+	CProxy_BufferChares read_session;
         CkCallback complete; // used for the write session complete callback?
 
         FileInfo(string name_, CkCallback opened_, Options opts_)
@@ -154,7 +154,7 @@ namespace Ck { namespace IO {
 	
 	// method called by the closeReadSession function from user	
 	void closeReadSession(Session read_session, CkCallback after_end){
-		CProxy_ReadSession(read_session.sessionID).ckDestroy();
+		CProxy_BufferChares(read_session.sessionID).ckDestroy();
 		after_end.send(CkReductionMsg::buildNew(0, NULL, CkReduction::nop)); // invoke a callback
 
 	}
@@ -211,7 +211,7 @@ namespace Ck { namespace IO {
 // 		// CkPrintf("Read request of %d bytes starting at %d\n", bytes, offset);
 // 		for(size_t i = start_idx; (i * read_stripe) < (offset + bytes); ++i){
 // 			// tell all the chares that have data to search and send
-// 			CProxy_ReadSession(session.sessionID)[i].sendData(offset, bytes, ra); 
+// 			CProxy_BufferChares(session.sessionID)[i].sendData(offset, bytes, ra); 
 // 		}
 // 	}
 
@@ -244,7 +244,7 @@ namespace Ck { namespace IO {
 		CkCallback sessionInitDone(CkIndex_Director::sessionReady(0), thisProxy);
 		sessionInitDone.setRefnum(sessionID);
 		sessionOpts.setInitCallback(sessionInitDone); // invoke the sessionInitDone callback after all the elements of the chare array are created
-		files[file].read_session = CProxy_ReadSession::ckNew(file, offset, bytes, num_readers, sessionOpts); // create the readers
+		files[file].read_session = CProxy_BufferChares::ckNew(file, offset, bytes, num_readers, sessionOpts); // create the readers
 	}
 
         void sessionComplete(FileToken token) {
@@ -360,16 +360,16 @@ namespace Ck { namespace IO {
 			ReadCompleteMsg* msg = info.msg;
 			// CkPrintf("Read request of %d bytes starting at %d\n", bytes, offset);
 
-			// the entire read falls in the "extra" bytes that the last ReadSession owns
+			// the entire read falls in the "extra" bytes that the last BufferChares owns
 			if(start_idx == num_readers){
 				int tag = getRDMATag(); 
 				// CkPrintf("About to post buffer with read_tag=%d, 0_copy_tag=%d on pe=%d\n", read_tag, tag, CkMyPe());
 				CkPostBuffer(msg -> data, bytes, tag);
 				// CkPrintf("NEW: data_idx=0, data_len=%zu, PE=%d\n", bytes, CkMyPe());
-				CProxy_ReadSession(_session.sessionID)[start_idx - 1].sendData(read_tag, tag, read_offset, bytes, thisProxy, CkMyPe()); 
+				CProxy_BufferChares(_session.sessionID)[start_idx - 1].sendData(read_tag, tag, read_offset, bytes, thisProxy, CkMyPe()); 
 				return;
 			}
-			// make sure to account for the last ReadSession holding potentially more data than the rest
+			// make sure to account for the last BufferChares holding potentially more data than the rest
 			for(size_t i = start_idx; (i < num_readers) && (i * read_stripe) < (read_offset + bytes); ++i){
 				size_t data_idx;
 				size_t data_len;
@@ -400,7 +400,7 @@ namespace Ck { namespace IO {
 				#ifdef DEBUG
 				CkPrintf("Read (offset=%zu, length=%zu) is contained on IO Buffer %zu\n", read_offset, read_bytes, i);
 				#endif
-				CProxy_ReadSession(_session.sessionID)[i].sendData(read_tag, tag, read_offset, read_bytes, thisProxy, CkMyPe()); 
+				CProxy_BufferChares(_session.sessionID)[i].sendData(read_tag, tag, read_offset, read_bytes, thisProxy, CkMyPe()); 
 			}
 
 		}
@@ -688,7 +688,7 @@ namespace Ck { namespace IO {
 
 	      
 
-      class ReadSession : public CBase_ReadSession {
+      class BufferChares : public CBase_BufferChares {
 	private:
 		FileToken _token; // the token of the given file
       		const FileInfo* _file; // the pointer to the FileInfo
@@ -700,12 +700,12 @@ namespace Ck { namespace IO {
 		size_t _num_readers;	
 		size_t _read_stripe;
 	public:
-		ReadSession(FileToken file, size_t offset, size_t bytes, size_t num_readers) : _token(file), _file(CkpvAccess(manager)->get(file)), _session_bytes(bytes), _session_offset(offset){
+		BufferChares(FileToken file, size_t offset, size_t bytes, size_t num_readers) : _token(file), _file(CkpvAccess(manager)->get(file)), _session_bytes(bytes), _session_offset(offset){
 			_num_readers = num_readers;
 			_read_stripe = bytes / num_readers;
 			_my_offset = thisIndex * (_read_stripe) + _session_offset;
 			_my_bytes = min(_read_stripe, _session_offset + _session_bytes - _my_offset); // get the number of bytes owned by the session
-			// last ReadSession array; read the remaining stuff
+			// last BufferChares array; read the remaining stuff
 			if(thisIndex == _num_readers - 1) 
 				_my_bytes = _session_offset + _session_bytes - _my_offset;
 
@@ -713,14 +713,14 @@ namespace Ck { namespace IO {
 			CkAssert(_my_offset >= _session_offset);
 			CkAssert(_my_offset + _my_bytes <= _session_offset + _session_bytes);
 			#ifdef DEBUG
-			CkPrintf("Inside constructor of ReadSession[%d]; I own %zu bytes starting from %zu offset. about o start the readData function\n", thisIndex, _my_bytes, _my_offset);
+			CkPrintf("Inside constructor of BufferChares[%d]; I own %zu bytes starting from %zu offset. about o start the readData function\n", thisIndex, _my_bytes, _my_offset);
 			#endif
 			double disk_read_before = CkWallTimer(); // get the before disk_read
-			std::future<char*> temp_buffer = std::async(std::launch::async, &ReadSession::readData, this);
+			std::future<char*> temp_buffer = std::async(std::launch::async, &BufferChares::readData, this);
 			_buffer = temp_buffer.share();
 			double disk_read_after = CkWallTimer(); // end disk time
 			double total_time = disk_read_after - disk_read_before;
-			CkCallback cb(CkReductionTarget(ReadSession, printTime), thisProxy[0]);
+			CkCallback cb(CkReductionTarget(BufferChares, printTime), thisProxy[0]);
 			contribute(sizeof(double), &total_time, CkReduction::max_double, cb);
 		}
 
@@ -775,7 +775,7 @@ namespace Ck { namespace IO {
 		
 		// the method by which you send your data to the ra chare
 		void sendData(int read_tag, int buffer_tag, size_t offset, size_t bytes, CProxy_ReadAssembler ra, int pe){
-			// CkPrintf("sending data for read)tag=%d and buffer_tag=%d from ReadSession[%d]\n", read_tag, buffer_tag, thisIndex);
+			// CkPrintf("sending data for read)tag=%d and buffer_tag=%d from BufferChares[%d]\n", read_tag, buffer_tag, thisIndex);
 			size_t chare_offset;
 			size_t chare_bytes;
 
