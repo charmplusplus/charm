@@ -291,7 +291,7 @@ namespace Ck { namespace IO {
 			ri.read_bytes = read_bytes;
 			ri.after_read = after_read;
 			ri.msg = new(read_bytes) ReadCompleteMsg();
-			// memset(ri.msg -> data, 'r', read_bytes); UNCOMMENT IF YOU NEED SENTINEL VALUES
+			// memset(ri.msg -> data, 'r', read_bytes); // UNCOMMENT IF YOU NEED SENTINEL VALUES
 			ri.msg -> offset = read_offset;
 			ri.msg -> bytes = read_bytes;
 			if(_read_info_buffer.count(_curr_read_tag) != 0){
@@ -328,6 +328,17 @@ namespace Ck { namespace IO {
 				CkPrintf("shareData args: read_chare_offset=%zu, num_bytes=%zu, data=%p. start_idx = %zu\n", read_chare_offset, num_bytes, data, start_idx);
 			#endif
 			ReadInfo& info = _read_info_buffer[read_tag]; // get the struct from the buffer tag
+			// if(CkMyPe() == 287) CkPrintf("On PE[%d]: num_bytes=%zu\n", CkMyPe(), num_bytes);
+			// size_t read_offset = info.read_offset;
+			// size_t start_idx = read_chare_offset - read_offset;
+			// size_t r_counter = 0;
+			// for(size_t i = 0; i < num_bytes; ++i){
+			// 	if(info.msg -> data[i + start_idx] != data[i]) CkPrintf("Discrepancy on line 335: info.msg -> data[%d]=%d, data[%d]=%d\n", i, int(info.msg -> data[i]), i, int(data[i]));
+			// 	CkEnforce(info.msg -> data[i + start_idx] == data[i]);
+			// 	if(data[i] == 'r')
+			// 		r_counter++;
+			// }
+			// CkPrintf("PE %zu: The number of r's seen: %zu\n", CkMyPe(), r_counter);
 			// memcpy(msg -> data + start_idx, data, num_bytes); // copying the num_bytes from data to the read buffer
 			info.bytes_left -= num_bytes; // decrement the number of remaining bytes to read
 			if(info.bytes_left) return; // if there are bytes still to read, just return
@@ -354,6 +365,7 @@ namespace Ck { namespace IO {
 				int tag = getRDMATag(); 
 				// CkPrintf("About to post buffer with read_tag=%d, 0_copy_tag=%d on pe=%d\n", read_tag, tag, CkMyPe());
 				CkPostBuffer(msg -> data, bytes, tag);
+				// CkPrintf("NEW: data_idx=0, data_len=%zu, PE=%d\n", bytes, CkMyPe());
 				CProxy_ReadSession(_session.sessionID)[start_idx - 1].sendData(read_tag, tag, read_offset, bytes, thisProxy, CkMyPe()); 
 				return;
 			}
@@ -365,6 +377,10 @@ namespace Ck { namespace IO {
 					data_idx = 0; // at the start of read
 					// if intrabuffer, just take read size; o/w go from offset to end of buffer chare
 					data_len = std::min((read_stripe * (i+1) + _session.offset - read_offset), bytes);
+					if(i == num_readers - 1){ // the read is contained entirely in data of the last buffer chare; make sure to account for the extra bytes if there are any!
+						data_len = read_bytes;
+					}
+					// CkPrintf("NEW: data_idx=%zu, data_len=%zu, PE=%d\n", data_idx, data_len, CkMyPe());
 				} else {
 					data_idx = (read_stripe * i + _session.offset - read_offset); // first byte of fille in buffer chare, offset from the read offset
 					data_len = std::min(read_stripe, read_offset + bytes - (read_stripe * i + _session.offset));
@@ -373,16 +389,18 @@ namespace Ck { namespace IO {
 					if(i == num_readers - 1){ // we are searching the last buffer chare; make sure to account for the extra bytes if there are any!
 						data_len = read_offset + read_bytes - (read_stripe * i + _session.offset);
 					}
+					// CkPrintf("NEW: data_idx=%zu, data_len=%zu, PE=%d\n", data_idx, data_len, CkMyPe());
 				}
 				// do the CkPost call
 				// int tag = _curr_RDMA_tag++;
 				int tag = getRDMATag(); 
 				// CkPrintf("About to post buffer with read_tag=%d, 0_copy_tag=%d on pe=%d\n", read_tag, tag, CkMyPe());
+				// if(CkMyPe() == 287) CkPrintf("Pe[%d]: data_idx=%zu, data_len=%zu\n", CkMyPe(), data_idx, data_len);
 				CkPostBuffer(msg -> data + data_idx, data_len, tag);
 				#ifdef DEBUG
 				CkPrintf("Read (offset=%zu, length=%zu) is contained on IO Buffer %zu\n", read_offset, read_bytes, i);
 				#endif
-				CProxy_ReadSession(_session.sessionID)[i].sendData(read_tag, tag, read_offset, bytes, thisProxy, CkMyPe()); 
+				CProxy_ReadSession(_session.sessionID)[i].sendData(read_tag, tag, read_offset, read_bytes, thisProxy, CkMyPe()); 
 			}
 
 		}
@@ -730,6 +748,7 @@ namespace Ck { namespace IO {
 			if(!fp){
 				CkPrintf("Opening of the file %s went wrong\n", _file -> name.c_str());
 			}
+			
 			char* buffer = new char[_my_bytes]; 
 			fseek(fp, _my_offset, SEEK_SET);
 			#ifdef DEBUG
@@ -770,6 +789,8 @@ namespace Ck { namespace IO {
 
 			size_t end_byte_chare = min(offset + bytes, _my_offset + _my_bytes); // the last byte, exclusive, this chare should read
 			size_t bytes_to_read = end_byte_chare - chare_offset;
+			//if(thisIndex == 287 || thisIndex == 286)
+			//	CkPrintf("From Buffer[%d]: chare_offset=%zu, bytes_to_read = %zu\n", thisIndex, chare_offset, bytes_to_read);
 			// std::vector<char> data_to_send; 
 			// data_to_send.resize(bytes_to_read); // the number of bytes to read to avoid the pushback function
 			// data_to_send.shrink_to_fit(); // will this improve it? hopefully sending less data over network is good
