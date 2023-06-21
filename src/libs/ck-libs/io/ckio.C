@@ -36,10 +36,6 @@ using std::max;
 using std::map;
 using std::string; 
 using namespace std::chrono;
-/*bool operator==(const Ck::IO::Session& s1, const Ck::IO::Session& s2) {
-	return (s1.getFile() == s2.getFile()) && (s1.getBytes() == s2.getBytes()) && (s1.getOffset() == s2.getOffset()) && (s1.getSessionID() == s2.getSessionID());
-}
-*/
 
 #define IO_TIMEOUT std::chrono::microseconds(25)
 #define IO_THREADS_PER_PE 4
@@ -189,32 +185,6 @@ namespace Ck { namespace IO {
           files[file].complete = complete;
         }
 	
-// // 	// called by user-facing read call to facilitate the actual read
-// 	void read(Session session, size_t bytes, size_t offset, CkCallback after_read){
-// 		CProxy_ReadAssembler ra = CProxy_ReadAssembler::ckNew(session, bytes, offset, after_read); // create read assembler
-// 		Options& opt = files[session.file].opts;	
-// 		size_t read_stripe = opt.read_stripe;
-// 		size_t start_idx = offset / read_stripe; // the first index that has the relevant data
-// 		// CkPrintf("Read request of %d bytes starting at %d\n", bytes, offset);
-// 		for(size_t i = start_idx; (i * read_stripe) < (offset + bytes); ++i){
-// 			// tell all the chares that have data to search and send
-// 			CProxy_ReadSession(session.sessionID)[i].sendData(offset, bytes, ra); 
-// 		}
-// 	}
-// 
-// 	// called by user-facing read call to facilitate the actual read
-// 	void read(Session session, size_t bytes, size_t offset, CkCallback after_read, size_t tag){
-// 		CProxy_ReadAssembler ra = CProxy_ReadAssembler::ckNew(session, bytes, offset, after_read, tag); // create read assembler
-// 		Options& opt = files[session.file].opts;	
-// 		size_t read_stripe = opt.read_stripe;
-// 		size_t start_idx = offset / read_stripe; // the first index that has the relevant data
-// 		// CkPrintf("Read request of %d bytes starting at %d\n", bytes, offset);
-// 		for(size_t i = start_idx; (i * read_stripe) < (offset + bytes); ++i){
-// 			// tell all the chares that have data to search and send
-// 			CProxy_BufferChares(session.sessionID)[i].sendData(offset, bytes, ra); 
-// 		}
-// 	}
-
 		
 	void prepareReadSessionHelper(FileToken file, size_t bytes, size_t offset, CkCallback ready, std::vector<int> pes_to_map){
 		if(!bytes){
@@ -227,14 +197,6 @@ namespace Ck { namespace IO {
 		files[file].sessionID = sessionID;
 		// determine the number of reader sessions required, depending on the session size and the number of bytes per reader
 		int num_readers = opts.num_readers;
-		// size_t remainder = bytes % opts.read_stripe;
-		// if(remainder){
-		// 	num_readers++;
-		// }
-		//
-		// CkPrintf("DEBUG: About to try the division with %zu\n", opts.num_readers);
-		// opts.read_stripe = bytes / num_readers; // get the read_stripe
-		// CkPrintf("DEBUG: successfully did the division; read_stripe=%d\n", opts.read_stripe);
 		CkArrayOptions sessionOpts(num_readers); // set the number of elements in the chare array
 		// if there is a non-empty mapping provided, do the mapping
 		if(!pes_to_map.empty()){
@@ -291,7 +253,6 @@ namespace Ck { namespace IO {
 			ri.read_bytes = read_bytes;
 			ri.after_read = after_read;
 			ri.msg = new(read_bytes) ReadCompleteMsg();
-			// memset(ri.msg -> data, 'r', read_bytes); // UNCOMMENT IF YOU NEED SENTINEL VALUES
 			ri.msg -> offset = read_offset;
 			ri.msg -> bytes = read_bytes;
 			if(_read_info_buffer.count(_curr_read_tag) != 0){
@@ -299,9 +260,7 @@ namespace Ck { namespace IO {
 				CkExit();
 			}
 			_read_info_buffer[_curr_read_tag] = ri; // put the readinfo struct in the table
-			// CkPrintf("On PE=%d, just allocated read_tag=%zu for new read\n", CkMyPe(), _curr_tag);
 			_curr_read_tag++;
-			// CkPrintf("New tag: %d. Returning %d\n", _curr_tag, _curr_tag - 1);
 			return _curr_read_tag - 1;
 		}
 		
@@ -310,39 +269,18 @@ namespace Ck { namespace IO {
 		}	
 
 		void shareData(int read_tag, int buffer_tag, size_t read_chare_offset, size_t num_bytes, char* data, CkNcpyBufferPost* ncpyPost){
-			// CkPrintf("About to match buffer for read_tag=%d, buffer_tag=%d, pe=%d\n", read_tag, buffer_tag, CkMyPe());
 			ncpyPost[0].regMode = CK_BUFFER_REG;
 			ncpyPost[0].deregMode = CK_BUFFER_DEREG;
 			CkMatchBuffer(ncpyPost, 0, buffer_tag);
-			// CkPrintf("Successfully matched buffer for read_tag=%d, buffer_tag=%d, pe=%d\n", read_tag, buffer_tag, CkMyPe());
 		}
 		
 		void shareData(int read_tag, int buffer_tag, size_t read_chare_offset, size_t num_bytes, char* data){
-			// size_t start_idx = read_chare_offset - _read_offset; // start index for writing to _data_buffer
-			// copy over the data from data to the correct place in the _data_buffer
-//			for(size_t counter = 0; counter < num_bytes; ++counter){
-			// 	char ch = data[counter];
-			// 	_data_buffer[start_idx + counter] = ch;
-			// }
 			#ifdef DEBUG
 				CkPrintf("shareData args: read_chare_offset=%zu, num_bytes=%zu, data=%p. start_idx = %zu\n", read_chare_offset, num_bytes, data, start_idx);
 			#endif
 			ReadInfo& info = _read_info_buffer[read_tag]; // get the struct from the buffer tag
-			// if(CkMyPe() == 287) CkPrintf("On PE[%d]: num_bytes=%zu\n", CkMyPe(), num_bytes);
-			// size_t read_offset = info.read_offset;
-			// size_t start_idx = read_chare_offset - read_offset;
-			// size_t r_counter = 0;
-			// for(size_t i = 0; i < num_bytes; ++i){
-			// 	if(info.msg -> data[i + start_idx] != data[i]) CkPrintf("Discrepancy on line 335: info.msg -> data[%d]=%d, data[%d]=%d\n", i, int(info.msg -> data[i]), i, int(data[i]));
-			// 	CkEnforce(info.msg -> data[i + start_idx] == data[i]);
-			// 	if(data[i] == 'r')
-			// 		r_counter++;
-			// }
-			// CkPrintf("PE %zu: The number of r's seen: %zu\n", CkMyPe(), r_counter);
-			// memcpy(msg -> data + start_idx, data, num_bytes); // copying the num_bytes from data to the read buffer
 			info.bytes_left -= num_bytes; // decrement the number of remaining bytes to read
 			if(info.bytes_left) return; // if there are bytes still to read, just return
-			// CkPrintf("Read with read_tag=%d, PE=%d is complete\n", read_tag, CkMyPe());
 			info.after_read.send(info.msg);
 			removeEntryFromReadTable(read_tag); // the read is complete; remove it from the table
 		}
@@ -352,20 +290,16 @@ namespace Ck { namespace IO {
 			CkPrintf("In serveRead on PE=%d\n", CkMyPe());
 			#endif
 			int read_tag = addReadToTable(read_bytes, read_offset, after_read); // create a tag for the actual read
-			// CkPrintf("Got a new read_tag=%zu for read; PE=%d\n", read_tag, CkMyPe());
 			// get the necessary info
 			size_t bytes = read_bytes;
 			size_t start_idx = (read_offset - _session.offset)/ read_stripe; // the first index that has the relevant data
 			ReadInfo& info = _read_info_buffer[read_tag]; // get the ReadInfo object
 			ReadCompleteMsg* msg = info.msg;
-			// CkPrintf("Read request of %d bytes starting at %d\n", bytes, offset);
 
 			// the entire read falls in the "extra" bytes that the last BufferChares owns
 			if(start_idx == num_readers){
 				int tag = getRDMATag(); 
-				// CkPrintf("About to post buffer with read_tag=%d, 0_copy_tag=%d on pe=%d\n", read_tag, tag, CkMyPe());
 				CkPostBuffer(msg -> data, bytes, tag);
-				// CkPrintf("NEW: data_idx=0, data_len=%zu, PE=%d\n", bytes, CkMyPe());
 				CProxy_BufferChares(_session.sessionID)[start_idx - 1].sendData(read_tag, tag, read_offset, bytes, thisProxy, CkMyPe()); 
 				return;
 			}
@@ -380,7 +314,6 @@ namespace Ck { namespace IO {
 					if(i == num_readers - 1){ // the read is contained entirely in data of the last buffer chare; make sure to account for the extra bytes if there are any!
 						data_len = read_bytes;
 					}
-					// CkPrintf("NEW: data_idx=%zu, data_len=%zu, PE=%d\n", data_idx, data_len, CkMyPe());
 				} else {
 					data_idx = (read_stripe * i + _session.offset - read_offset); // first byte of fille in buffer chare, offset from the read offset
 					data_len = std::min(read_stripe, read_offset + bytes - (read_stripe * i + _session.offset));
@@ -389,13 +322,9 @@ namespace Ck { namespace IO {
 					if(i == num_readers - 1){ // we are searching the last buffer chare; make sure to account for the extra bytes if there are any!
 						data_len = read_offset + read_bytes - (read_stripe * i + _session.offset);
 					}
-					// CkPrintf("NEW: data_idx=%zu, data_len=%zu, PE=%d\n", data_idx, data_len, CkMyPe());
 				}
 				// do the CkPost call
-				// int tag = _curr_RDMA_tag++;
 				int tag = getRDMATag(); 
-				// CkPrintf("About to post buffer with read_tag=%d, 0_copy_tag=%d on pe=%d\n", read_tag, tag, CkMyPe());
-				// if(CkMyPe() == 287) CkPrintf("Pe[%d]: data_idx=%zu, data_len=%zu\n", CkMyPe(), data_idx, data_len);
 				CkPostBuffer(msg -> data + data_idx, data_len, tag);
 				#ifdef DEBUG
 				CkPrintf("Read (offset=%zu, length=%zu) is contained on IO Buffer %zu\n", read_offset, read_bytes, i);
@@ -433,7 +362,6 @@ namespace Ck { namespace IO {
 	// invoked to insert the readassembler for a specific session
 	void addSessionReadAssemblerMapping(Session session, CProxy_ReadAssembler ra, CkCallback ready){
 		_session_to_read_assembler[session] = ra;
-		// CkPrintf("ON PE=%d, is the session in the buffer: %d\n", CkMyPe(), _session_to_read_assembler.count(session));
 		CkCallback cb(CkIndex_Director::addSessionReadAssemblerFinished(0), director);
 		int temp = 0;
 		contribute(sizeof(temp), &temp, CkReduction::nop, cb); // effectively a barrier, makes sure every PE is done with adding session
@@ -483,7 +411,6 @@ namespace Ck { namespace IO {
         }
 	
 	void read(Session session, size_t bytes, size_t offset, CkCallback after_read){
-		// CkPrintf("manager %d just got a read request of size=%zu, offest=%zu\n", CkMyPe(), bytes, offset);
 		if(!_session_to_read_assembler.count(session)){
 			CkPrintf("Why is there no session associated with read on manager %d\n", CkMyPe());
 			CkExit();
@@ -492,7 +419,6 @@ namespace Ck { namespace IO {
 		Options& opt = files[session.file].opts;	
 		size_t num_readers = opt.num_readers;
 		size_t read_stripe = session.getBytes() / num_readers;
-		// CProxy_ReadAssembler(ra)[CkMyPe()].serveRead(bytes, offset, after_read,read_stripe); // actually does grunt-work of serving data
 	 	ReadAssembler* grp_ptr = ra.ckLocalBranch();
 		if(!grp_ptr){
 			CkPrintf("The pointer to the local branch is null on pe=%d\n", CkMyPe());
@@ -736,11 +662,6 @@ namespace Ck { namespace IO {
 
 
 		char* readData(){
-		//	std::ifstream ifs(_file -> name); // open the file
-		//	if(ifs.fail()){ // error handling if opening the file failed
-		//		CkAbort("Couldn't open the file %s\n", (_file -> name).c_str());
-		//	}
-		//	ifs.seekg(_my_offset); // jump to the point where the chare should start reading
 			#ifdef DEBUG
 			CkPrintf("Inside the readData function on %d;\n", thisIndex);
 			#endif
@@ -767,15 +688,11 @@ namespace Ck { namespace IO {
 				CkPrintf("Supposed to read %zu bytes, but only read %zu bytes\n", _my_bytes, num_bytes_read);
 			}
 			fclose(fp);
-		//	std::string s(buffer, _my_bytes);
-		//	ckout << "On buffer " << thisIndex << " the string is: ";
-		//	ckout << s.c_str() << endl;
 			return buffer;	
 		}	
 		
 		// the method by which you send your data to the ra chare
 		void sendData(int read_tag, int buffer_tag, size_t offset, size_t bytes, CProxy_ReadAssembler ra, int pe){
-			// CkPrintf("sending data for read)tag=%d and buffer_tag=%d from BufferChares[%d]\n", read_tag, buffer_tag, thisIndex);
 			size_t chare_offset;
 			size_t chare_bytes;
 
@@ -789,17 +706,6 @@ namespace Ck { namespace IO {
 
 			size_t end_byte_chare = min(offset + bytes, _my_offset + _my_bytes); // the last byte, exclusive, this chare should read
 			size_t bytes_to_read = end_byte_chare - chare_offset;
-			//if(thisIndex == 287 || thisIndex == 286)
-			//	CkPrintf("From Buffer[%d]: chare_offset=%zu, bytes_to_read = %zu\n", thisIndex, chare_offset, bytes_to_read);
-			// std::vector<char> data_to_send; 
-			// data_to_send.resize(bytes_to_read); // the number of bytes to read to avoid the pushback function
-			// data_to_send.shrink_to_fit(); // will this improve it? hopefully sending less data over network is good
-			// // remoe copy, just send poitner to start of data needed
-			// while(bytes_read < bytes_to_read){ // still bytes to read and haven't gone out of bounds
-			// 	char data = _buffer[chare_offset - _my_offset + bytes_read]; // get the data we want
-			// 	data_to_send.at(bytes_read) = data;
-			// 	bytes_read++;
-			// }
 			#ifdef DEBUG
 				CkPrintf("chare_offset=%zu, end_byte_chare=%zu, bytes_to_read=%zu, offset=%zu, bytes=%zu\n", chare_offset, end_byte_chare, bytes_to_read, offset, bytes);	
 			#endif
@@ -809,7 +715,6 @@ namespace Ck { namespace IO {
 			}
 
 			char* buffer = _buffer.get(); // future call to get
-			// CkPrintf("Buffer[%d] is sending %zu bytes with total string %s\n", thisIndex, bytes_to_read, s.c_str());
 			CProxy_ReadAssembler(ra)[pe].shareData(read_tag, buffer_tag, chare_offset, bytes_to_read, CkSendBuffer(buffer + (chare_offset - _my_offset)/*, cb*/)); // send this data to the ReadAssembler
 		}
 
@@ -882,12 +787,6 @@ namespace Ck { namespace IO {
 	 CkpvAccess(manager) -> read(session, bytes, offset, after_read);
     }      
 
-   //  void read(Session session, size_t bytes, size_t offset, CkCallback after_read, size_t tag){
-   //      CkAssert(bytes <= session.bytes);
-   //      CkAssert(offset + bytes <= session.offset + session.bytes);
-   //      // call the director function to facilitate the actual read
-   //      impl::director.read(session, bytes, offset, after_read, tag);
-   //  }      
 
     void close(File file, CkCallback closed) {
       impl::director.close(file.token, closed);
