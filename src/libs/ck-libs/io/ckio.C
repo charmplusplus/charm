@@ -185,7 +185,12 @@ namespace Ck { namespace IO {
           files[file].complete = complete;
         }
 	
-		
+	/**
+ * prepareReadSessionHelper does all of the heavy lifting when trying to create the read session
+ * it is responsible for creating the BufferChares, who then proceed to read in their data asynchronously
+ * the pes_to_map could be empty or with items; if it's empty, the user didn't provide a desired mapping, so the RTS will map how it likes
+ * otherwise, it will round-robin on the pes in the pes_to_map vector when assigning BufferChares to pes 
+ */		
 	void prepareReadSessionHelper(FileToken file, size_t bytes, size_t offset, CkCallback ready, std::vector<int> pes_to_map){
 		if(!bytes){
 			CkPrintf("You're tryna read 0 bytes buddy\n");
@@ -221,8 +226,11 @@ namespace Ck { namespace IO {
         }
       };
 
-	 // Stores information about a particular read
-      struct ReadInfo {
+     	/**
+	 * struct that keeps track of meta information of a particular read request
+	 * is used for the zero copy and the callback to be invoked by CkIO after read is complete
+	 * */
+	struct ReadInfo {
 		size_t bytes_left; // the number of bytes the user wants for a particular read
 		size_t read_bytes;
 		size_t read_offset; // the offset they specify for their read
@@ -232,6 +240,7 @@ namespace Ck { namespace IO {
 		size_t read_tag = -1;
       };
     // class that is used to aggregate the data for a specific read call made by the user
+    // is responsible for collecting data for a specific read and correctly ordering it to return to the user
     class ReadAssembler : public CBase_ReadAssembler {
 	private:
 		Session _session;
@@ -244,7 +253,10 @@ namespace Ck { namespace IO {
 		}
 		
 		
-			
+		/*
+		 * This function adds the read request to the _read_info_buffer table
+		 * which maps a tag to a ReadInfo struct
+		 */
 		size_t addReadToTable(size_t read_bytes, size_t read_offset, CkCallback after_read){
 			// do the initialization of the read struct
 			ReadInfo ri;
@@ -267,7 +279,13 @@ namespace Ck { namespace IO {
 		void removeEntryFromReadTable(int tag) {
 			_read_info_buffer.erase(tag);
 		}	
-
+		
+		/**
+		 * This is the entry method used in order to
+		 * send the data from the BufferChares to the ReadAssembler;
+		 * Called by the BufferChares
+		 * First one is the registration method called for Zero-copy, second method is the actual logic
+		 * */
 		void shareData(int read_tag, int buffer_tag, size_t read_chare_offset, size_t num_bytes, char* data, CkNcpyBufferPost* ncpyPost){
 			ncpyPost[0].regMode = CK_BUFFER_REG;
 			ncpyPost[0].deregMode = CK_BUFFER_DEREG;
@@ -284,7 +302,12 @@ namespace Ck { namespace IO {
 			info.after_read.send(info.msg);
 			removeEntryFromReadTable(read_tag); // the read is complete; remove it from the table
 		}
-
+		
+		/**
+		 * function used by the manageer::read in order to take care of 
+		 * requesting data from BufferChares, storing reads in the table,
+		 * as well as other read infrastructure
+		 */
 		void serveRead(size_t read_bytes, size_t read_offset, CkCallback after_read, size_t read_stripe, size_t num_readers){
 			#ifdef DEBUG
 			CkPrintf("In serveRead on PE=%d\n", CkMyPe());
@@ -410,6 +433,7 @@ namespace Ck { namespace IO {
           return &(files[token]);
         }
 	
+	// used by manager to handle a read request from its own PE
 	void read(Session session, size_t bytes, size_t offset, CkCallback after_read){
 		if(!_session_to_read_assembler.count(session)){
 			CkPrintf("Why is there no session associated with read on manager %d\n", CkMyPe());
@@ -418,7 +442,9 @@ namespace Ck { namespace IO {
 		CProxy_ReadAssembler ra = _session_to_read_assembler[session];	
 		Options& opt = files[session.file].opts;	
 		size_t num_readers = opt.num_readers;
+		// the number of bytes each BufferChare owns, exlcuding the bytes that aren't available
 		size_t read_stripe = session.getBytes() / num_readers;
+		// get the readassembler on this PE
 	 	ReadAssembler* grp_ptr = ra.ckLocalBranch();
 		if(!grp_ptr){
 			CkPrintf("The pointer to the local branch is null on pe=%d\n", CkMyPe());
@@ -613,7 +639,14 @@ namespace Ck { namespace IO {
       };
 
 	      
-
+	/**
+	 * These are the designated readers that go to disk
+	 * and get the data. They are also responsible for holding on 
+	 * to the data and are who give copies of the data to 
+	 * the ReadAssemblers who need to satisfy read requests.
+	 * The number of BufferChares is configurable in the Options struct
+	 * when the user sets up their read session.
+	 */
       class BufferChares : public CBase_BufferChares {
 	private:
 		FileToken _token; // the token of the given file
@@ -649,7 +682,7 @@ namespace Ck { namespace IO {
 			CkCallback cb(CkReductionTarget(BufferChares, printTime), thisProxy[0]);
 			contribute(sizeof(double), &total_time, CkReduction::max_double, cb);
 		}
-
+		// deprecated function; not used any longer
 		void clearBuffer() {
 			char* buffer = _buffer.get();
 			delete[] buffer;
@@ -660,7 +693,13 @@ namespace Ck { namespace IO {
 		
 		}
 
-
+		/**
+		 * This function is launched in a separate thread
+		 * in order to allow the reads to disk to be parallelized
+		 * which allows other work to be done. This also stores the 
+		 * segment read in memory. In the future, could Potentially explore not storing in memory,
+		 * and instead going to disk on-demand (what MPI does)
+		 */
 		char* readData(){
 			#ifdef DEBUG
 			CkPrintf("Inside the readData function on %d;\n", thisIndex);
@@ -691,7 +730,10 @@ namespace Ck { namespace IO {
 			return buffer;	
 		}	
 		
-		// the method by which you send your data to the ra chare
+		/**
+		 * Method invoked by the ReadAssembler in order to request from the 
+		 * BufferChare data.. Note that offset and bytes are with respect to the overall file itself
+		 */
 		void sendData(int read_tag, int buffer_tag, size_t offset, size_t bytes, CProxy_ReadAssembler ra, int pe){
 			size_t chare_offset;
 			size_t chare_bytes;
@@ -717,7 +759,7 @@ namespace Ck { namespace IO {
 			char* buffer = _buffer.get(); // future call to get
 			CProxy_ReadAssembler(ra)[pe].shareData(read_tag, buffer_tag, chare_offset, bytes_to_read, CkSendBuffer(buffer + (chare_offset - _my_offset)/*, cb*/)); // send this data to the ReadAssembler
 		}
-
+		// deprecated; could be useful for debugging and profiling purposes
 		void zeroCopyCallback(size_t offset, double time){
 			double end = CkWallTimer();
 			double diff = end - time;
@@ -781,8 +823,6 @@ namespace Ck { namespace IO {
     void read(Session session, size_t bytes, size_t offset, CkCallback after_read){
 	CkAssert(bytes <= session.bytes);
 	CkAssert(offset + bytes <= session.offset + session.bytes);
-	// call the director function to facilitate the actual read
-	// impl::director.read(session, bytes, offset, after_read);
 	 using namespace impl;
 	 CkpvAccess(manager) -> read(session, bytes, offset, after_read);
     }      
