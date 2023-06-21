@@ -20268,15 +20268,15 @@ else $as_nop
 
 fi
 
+    # Disabled for Charm++ due to https://github.com/UIUC-PPL/charm/issues/2606
     # hwloc 2.0+ requires a C99 compliant compiler
     # AC_PROG_CC_C99 obsolete, detected inside AC_PROG_CC, since autoconf 2.70
 
     # The C99 result of AC_PROG_CC>=2.70 or AC_PROG_CC_C99 is stored in ac_cv_prog_cc_c99
-    if test "x$ac_cv_prog_cc_c99" = xno ; then
-        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: hwloc requires a C99 compiler" >&5
-printf "%s\n" "$as_me: WARNING: hwloc requires a C99 compiler" >&2;}
-        as_fn_error $? "Aborting." "$LINENO" 5
-    fi
+    #if test "x$ac_cv_prog_cc_c99" = xno ; then
+    #    AC_MSG_WARN([hwloc requires a C99 compiler])
+    #    AC_MSG_ERROR([Aborting.])
+    #fi
 
     # GCC specifics.
 

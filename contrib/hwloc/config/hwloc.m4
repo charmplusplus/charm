@@ -162,14 +162,15 @@ EOF])
           [AC_DEFINE([HWLOC_SYM_TRANSFORM], [0])],
           [AC_DEFINE([HWLOC_SYM_TRANSFORM], [1])])
 
+    # Disabled for Charm++ due to https://github.com/UIUC-PPL/charm/issues/2606
     # hwloc 2.0+ requires a C99 compliant compiler
     # AC_PROG_CC_C99 obsolete, detected inside AC_PROG_CC, since autoconf 2.70
     m4_version_prereq([2.70], [], [AC_PROG_CC_C99])
     # The C99 result of AC_PROG_CC>=2.70 or AC_PROG_CC_C99 is stored in ac_cv_prog_cc_c99
-    if test "x$ac_cv_prog_cc_c99" = xno ; then
-        AC_MSG_WARN([hwloc requires a C99 compiler])
-        AC_MSG_ERROR([Aborting.])
-    fi
+    #if test "x$ac_cv_prog_cc_c99" = xno ; then
+    #    AC_MSG_WARN([hwloc requires a C99 compiler])
+    #    AC_MSG_ERROR([Aborting.])
+    #fi
 
     # GCC specifics.
     _HWLOC_C_COMPILER_VENDOR([hwloc_c_vendor])
