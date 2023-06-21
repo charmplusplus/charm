@@ -1,4 +1,4 @@
-# Copyright © 2009-2020 Inria.  All rights reserved.
+# Copyright © 2009-2021 Inria.  All rights reserved.
 # Copyright © 2009      Université Bordeaux
 # Copyright © 2009-2014 Cisco Systems, Inc.  All rights reserved.
 # See COPYING in top-level directory.
@@ -34,6 +34,7 @@ endif
 DIST_SUBDIRS = $(SUBDIRS)
 if HWLOC_BUILD_STANDALONE
 DIST_SUBDIRS += contrib/windows
+EXTRA_DIST += contrib/windows-cmake
 if !BUILD_NETLOC
 DIST_SUBDIRS += netloc
 endif
