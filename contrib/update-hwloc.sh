@@ -39,6 +39,7 @@ DIST_SUBDIRS_AUTOMAKE=(
 
 # Directories that can simply be removed.
 EXTRA_DIST=(
+  contrib/windows-cmake
 )
 
 # Files that need a zero-byte stub to be present for autotools to succeed.
@@ -59,13 +60,13 @@ DIST_STUB=(
   utils/hwloc/test-hwloc-diffpatch.sh.in
   utils/hwloc/test-hwloc-distrib.sh.in
   utils/hwloc/test-hwloc-info.sh.in
+  utils/hwloc/test-build-custom-topology.sh.in
   utils/hwloc/test-fake-plugin.sh.in
   utils/hwloc/test-parsing-flags.sh.in
   utils/hwloc/test-hwloc-dump-hwdata/test-hwloc-dump-hwdata.sh.in
   utils/lstopo/test-lstopo.sh.in
   utils/lstopo/test-lstopo-shmem.sh.in
   utils/netloc/infiniband/netloc_ib_gather_raw.in
-  contrib/windows/test-windows-version.sh.in
   tests/netloc/tests.sh.in
   utils/lstopo/lstopo-windows.c
   utils/lstopo/lstopo-android.c
