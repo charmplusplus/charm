@@ -1,5 +1,5 @@
 /*
- * Copyright © 2019-2020 Inria.  All rights reserved.
+ * Copyright © 2019-2022 Inria.  All rights reserved.
  * See COPYING in top-level directory.
  */
 
@@ -95,18 +95,60 @@ enum hwloc_memattr_id_e {
    * Best bandwidth nodes are nodes with <b>higher bandwidth</b>.
    * The corresponding attribute flags are ::HWLOC_MEMATTR_FLAG_HIGHER_FIRST
    * and ::HWLOC_MEMATTR_FLAG_NEED_INITIATOR.
+   *
+   * This is the average bandwidth for read and write accesses. If the platform
+   * provides individual read and write bandwidths but no explicit average value,
+   * hwloc computes and returns the average.
    */
   HWLOC_MEMATTR_ID_BANDWIDTH = 2,
+
+  /** \brief "ReadBandwidth".
+   * The Read bandwidth is returned in MiB/s, as seen from the given initiator location.
+   * Best bandwidth nodes are nodes with <b>higher bandwidth</b>.
+   * The corresponding attribute flags are ::HWLOC_MEMATTR_FLAG_HIGHER_FIRST
+   * and ::HWLOC_MEMATTR_FLAG_NEED_INITIATOR.
+   */
+  HWLOC_MEMATTR_ID_READ_BANDWIDTH = 4,
+
+  /** \brief "WriteBandwidth".
+   * The Write bandwidth is returned in MiB/s, as seen from the given initiator location.
+   * Best bandwidth nodes are nodes with <b>higher bandwidth</b>.
+   * The corresponding attribute flags are ::HWLOC_MEMATTR_FLAG_HIGHER_FIRST
+   * and ::HWLOC_MEMATTR_FLAG_NEED_INITIATOR.
+   */
+  HWLOC_MEMATTR_ID_WRITE_BANDWIDTH = 5,
 
   /** \brief "Latency".
    * The latency is returned as nanoseconds, as seen from the given initiator location.
    * Best latency nodes are nodes with <b>smaller latency</b>.
    * The corresponding attribute flags are ::HWLOC_MEMATTR_FLAG_LOWER_FIRST
    * and ::HWLOC_MEMATTR_FLAG_NEED_INITIATOR.
+   *
+   * This is the average latency for read and write accesses. If the platform
+   * provides individual read and write latencies but no explicit average value,
+   * hwloc computes and returns the average.
    */
-  HWLOC_MEMATTR_ID_LATENCY = 3
+  HWLOC_MEMATTR_ID_LATENCY = 3,
 
-  /* TODO read vs write, persistence? */
+  /** \brief "ReadLatency".
+   * The Read latency is returned as nanoseconds, as seen from the given initiator location.
+   * Best latency nodes are nodes with <b>smaller latency</b>.
+   * The corresponding attribute flags are ::HWLOC_MEMATTR_FLAG_LOWER_FIRST
+   * and ::HWLOC_MEMATTR_FLAG_NEED_INITIATOR.
+   */
+  HWLOC_MEMATTR_ID_READ_LATENCY = 6,
+
+  /** \brief "WriteLatency".
+   * The Write latency is returned as nanoseconds, as seen from the given initiator location.
+   * Best latency nodes are nodes with <b>smaller latency</b>.
+   * The corresponding attribute flags are ::HWLOC_MEMATTR_FLAG_LOWER_FIRST
+   * and ::HWLOC_MEMATTR_FLAG_NEED_INITIATOR.
+   */
+  HWLOC_MEMATTR_ID_WRITE_LATENCY = 7,
+
+  /* TODO persistence? */
+
+  HWLOC_MEMATTR_ID_MAX /**< \private Sentinel value */
 };
 
 /** \brief A memory attribute identifier.
@@ -354,7 +396,7 @@ hwloc_memattr_register(hwloc_topology_t topology,
  * \p flags must be \c 0 for now.
  *
  * \note The initiator \p initiator should be of type ::HWLOC_LOCATION_TYPE_CPUSET
- * when refering to accesses performed by CPU cores.
+ * when referring to accesses performed by CPU cores.
  * ::HWLOC_LOCATION_TYPE_OBJECT is currently unused internally by hwloc,
  * but users may for instance use it to provide custom information about
  * host memory accesses performed by GPUs.
@@ -398,7 +440,7 @@ hwloc_memattr_set_value(hwloc_topology_t topology,
  * values.
  *
  * \note The initiator \p initiator should be of type ::HWLOC_LOCATION_TYPE_CPUSET
- * when refering to accesses performed by CPU cores.
+ * when referring to accesses performed by CPU cores.
  * ::HWLOC_LOCATION_TYPE_OBJECT is currently unused internally by hwloc,
  * but users may for instance use it to provide custom information about
  * host memory accesses performed by GPUs.
@@ -408,7 +450,7 @@ hwloc_memattr_get_targets(hwloc_topology_t topology,
                           hwloc_memattr_id_t attribute,
                           struct hwloc_location *initiator,
                           unsigned long flags,
-                          unsigned *nrp, hwloc_obj_t *targets, hwloc_uint64_t *values);
+                          unsigned *nr, hwloc_obj_t *targets, hwloc_uint64_t *values);
 
 /** \brief Return the initiators that have values for a given attribute for a specific target NUMA node.
  *
