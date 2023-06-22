@@ -182,6 +182,20 @@
 #  define CMK_DEPRECATED
 #endif
 
+#if __has_builtin(__builtin_expect) || \
+  (defined __GNUC__ && __GNUC__ >= 3) || \
+  (defined __INTEL_COMPILER && __INTEL_COMPILER >= 800) || \
+  (defined __ibmxl__ && __ibmxl_version__ >= 10) || \
+  (defined __xlC__ && __xlC__ >= (10 << 8)) || \
+  (defined _CRAYC && _RELEASE_MAJOR >= 8) || \
+  defined __clang__
+# define CMI_LIKELY(x)   __builtin_expect(!!(x),1)
+# define CMI_UNLIKELY(x) __builtin_expect(!!(x),0)
+#else
+# define CMI_LIKELY(x)   (x)
+# define CMI_UNLIKELY(x) (x)
+#endif
+
 /* Paste the tokens x and y together, without any space between them.
    The ANSI C way to do this is the bizarre ## "token-pasting" 
    preprocessor operator.
