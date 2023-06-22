@@ -34,9 +34,6 @@
 #define CMK_MACH_SPECIALIZED_QUEUE        (CMK_SMP && CMK_PPC_ATOMIC_QUEUE)
 #define CMK_MACH_SPECIALIZED_MUTEX        (CMK_SMP && CMK_PPC_ATOMIC_MUTEX)
 
-#define CMI_LIKELY(x)    (__builtin_expect(x,1))
-#define CMI_UNLIKELY(x)  (__builtin_expect(x,0))
-
 char *ALIGN_32(char *p) {
   return((char *)((((unsigned long)p)+0x1f) & (~0x1FUL)));
 }

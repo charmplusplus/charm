@@ -41,9 +41,6 @@ FILE *debugLog = NULL;
 #include "PPCAtomicMutex.h"
 #endif
 
-#define CMI_LIKELY(x)    (__builtin_expect(x,1))
-#define CMI_UNLIKELY(x)  (__builtin_expect(x,0))
-
 char *ALIGN_32(char *p) {
   return((char *)((((unsigned long)p)+0x1f) & (~0x1FUL)));
 }
