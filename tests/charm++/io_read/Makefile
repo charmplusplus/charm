@@ -3,6 +3,8 @@ CHARMC=../../../bin/charmc $(OPTS)
 
 all: iotest
 
+test: iotest
+
 iotest: iotest.ci iotest.C
 	$(CHARMC) iotest.ci
 	$(CHARMC) iotest.C -o $@ -module CkIO
