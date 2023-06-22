@@ -1084,13 +1084,13 @@ void __CmiEnforceMsgHelper(const char* expr, const char* fileName,
 			   const char* lineNum, const char* msg, ...);
 
 #define CmiEnforce(expr)                                             \
-  ((void)((expr) ? 0                                                 \
+  ((void)(CMI_LIKELY(expr) ? 0                                       \
                  : (__CmiEnforceHelper(__CMK_STRING(expr), __FILE__, \
                                        __CMK_XSTRING(__LINE__)),     \
                     0)))
 
 #define CmiEnforceMsg(expr, ...)                                              \
-  ((void)((expr)                                                              \
+  ((void)(CMI_LIKELY(expr)                                                    \
               ? 0                                                             \
               : (__CmiEnforceMsgHelper(__CMK_STRING(expr), __FILE__,          \
                                        __CMK_XSTRING(__LINE__), __VA_ARGS__), \
