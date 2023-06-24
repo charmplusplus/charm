@@ -670,7 +670,7 @@ TraceAutoPerfBOC::TraceAutoPerfBOC() {
   //--------- Projections output
   if(CkpvAccess(myParent)==-1){
     char filename[50];
-    sprintf(filename, "output.%d.pics", CkMyPe());
+    snprintf(filename, sizeof(filename), "output.%d.pics", CkMyPe());
     if(CkMyPe()==0)
       CkpvAccess(fpSummary) = fopen(filename, "w+");
     else if(PICS_collection_mode == FULL)
@@ -687,7 +687,7 @@ TraceAutoPerfInit::TraceAutoPerfInit(CkArgMsg* args)
   isPeriodicalAnalysis = CmiGetArgFlagDesc(argv,"+auto-pics","start performance analysis periodically");
   isIdleAnalysis = CmiGetArgFlagDesc(argv,"+idleAnalysis","start performance analysis when idle");
   if(isIdleAnalysis){
-    CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)startAnalysisonIdle, NULL);
+    CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdCondFn)startAnalysisonIdle, NULL);
     CcdCallFnAfterOnPE((CcdVoidFn)autoPerfReset, NULL, 10, CmiMyPe());
   }
   isPerfDumpOn = true; 

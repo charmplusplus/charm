@@ -153,18 +153,10 @@ CpvDeclare(mempool_type*, mempool);
 
 static inline int process_completion_queue();
 
-#ifdef HAVE_BUILTIN_EXPECT
-#  define unlikely(x_) __builtin_expect(!!(x_),0)
-#  define likely(x_)   __builtin_expect(!!(x_),1)
-#else
-#  define unlikely(x_) (x_)
-#  define likely(x_)   (x_)
-#endif
-
 #define ALIGNED_ALLOC(ptr, size)                                        \
   do {                                                                  \
       int pm_ret = posix_memalign((void**)(&ptr), CACHELINE_LEN, size); \
-      if (unlikely((pm_ret != 0) || !ptr))                              \
+      if (CMI_UNLIKELY((pm_ret != 0) || !ptr))                          \
       {                                                                 \
           CmiAbort("posix_memalign: ret %d", pm_ret);                   \
       }                                                                 \
@@ -175,7 +167,7 @@ static inline int process_completion_queue();
         intmax_t _ret;                                  \
         do {                                            \
             _ret = func;                                \
-            if (likely(_ret == 0)) break;               \
+            if (CMI_LIKELY(_ret == 0)) break;           \
             if (_ret != -FI_EAGAIN) {                   \
                 CmiAbort("OFI_RETRY: ret %jd\n", _ret); \
             }                                           \
@@ -1231,6 +1223,13 @@ int process_completion_queue()
             }
             MACHSTATE2(3, "POLL: error is %d (ret=%d)\n", error.err, ret);
             CmiPrintf("POLL: error is %d (ret=%d)\n", error.err, ret);
+            const char* strerror = fi_cq_strerror(context.cq, error.prov_errno, error.err_data, nullptr, 0);
+            if (strerror == nullptr)
+            {
+                CmiAbort("can't retrieve error string");
+            }
+            MACHSTATE1(3, "POLL: error string is \"%s\"\n", strerror);
+            CmiPrintf("POLL: error string is \"%s\"\n", strerror);
         }
         CmiAbort("Polling error");
     }
@@ -1633,7 +1632,7 @@ int fill_av_ofi(int myid,
                            OFI_OP_NAMES,
                            &epnames_contexts[i]);
             if (ret) {
-                CmiAbort("OFI::LrtsInit::fi_tsend error");
+                CmiAbort("OFI::LrtsInit::fi_tsend error (+ofi_runtime_tcp may be needed)");
             }
         }
 

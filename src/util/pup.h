@@ -555,6 +555,7 @@ class fromDisk : public disk {
 class toTextUtil : public er {
  private:
   char *cur; /*Current output buffer*/
+  size_t maxCount; /*Max length of cur buffer*/
   int level; /*Indentation distance*/
   void beginEnv(const char *type,int n=0);
   void endEnv(const char *type);
@@ -562,7 +563,7 @@ class toTextUtil : public er {
   void endLine(void);
  protected:
   virtual char *advance(char *cur)=0; /*Consume current buffer and return next*/
-  toTextUtil(unsigned int inType,char *buf);
+  toTextUtil(unsigned int inType,char *buf,size_t len);
   toTextUtil(const toTextUtil &p);		//You don't want to copy
   void operator=(const toTextUtil &p);		// You don't want to copy
  public:
@@ -578,8 +579,10 @@ class toTextUtil : public er {
 };
 /* Return the number of characters, including terminating NULL */
 class sizerText : public toTextUtil {
+ public:
+  static constexpr int lineLen = 1000;
  private:
-  char line[1000];
+  char line[lineLen];
   size_t charCount; /*Total characters seen so far (not including NULL) */
  protected:
   virtual char *advance(char *cur);
@@ -593,10 +596,11 @@ class toText : public toTextUtil {
  private:
   char *buf;
   size_t charCount; /*Total characters written so far (not including NULL) */
+  size_t maxCount; /*Max length of buf*/
  protected:
   virtual char *advance(char *cur);
  public:
-  toText(char *outStr);
+  toText(char *outStr, size_t len);
   toText(const toText &p);			//You don't want to copy
   void operator=(const toText &p);		// You don't want to copy
   size_t size(void) const {return charCount+1; /*add NULL*/ }
@@ -769,6 +773,9 @@ public:
 	virtual const PUP_ID &get_PUP_ID(void) const=0;
 };
 
+template <typename T, bool PUPable = std::is_base_of<PUP::able, T>::value>
+struct ptr_helper;
+
 #define SINGLE_ARG(...) __VA_ARGS__
 
 //Declarations which create routines implemeting the | operator.
@@ -906,26 +913,15 @@ class CkPointer {
 	void operator=(CkPointer<T> &&) = delete;
 protected:
 	T *peek(void) {return ptr;}
+	CkPointer(T *src, T *alloc): allocated(alloc), ptr(src) {}
 public:
 	/// Used on the send side, and does *not* delete the object.
-	CkPointer(T *src)  ///< Marshall this object.
-	{ 
-		allocated=0; //Don't ever delete src
-		ptr=src;
-	}
-	CkPointer(CkPointer<T> &&src)
-	{
-		allocated = src.allocated;
-		ptr = src.ptr;
-
-		src.allocated = nullptr;
-		src.ptr = nullptr;
-	}
-	
+	CkPointer(T *src): CkPointer(src, nullptr) {}
 	/// Begin completely empty: used on marshalling recv side.
-	CkPointer(void) { 
-		ptr=allocated=0;
-	}
+	CkPointer(void): CkPointer(nullptr, nullptr) {}
+	/// Move constructor (copy src fields, then invalidate)
+	CkPointer(CkPointer<T> &&src): CkPointer(src.ptr, src.allocated)
+	{ src.allocated = src.ptr = nullptr; }
 	
 	~CkPointer() { if (allocated) delete allocated; }
 	
@@ -934,16 +930,9 @@ public:
 	inline operator T* () { allocated=0; return ptr; }
 	
 	inline void pup(PUP::er &p) {
-		bool ptrWasNull=(ptr==0);
-		
-		PUP::able *ptr_able=ptr; // T must inherit from PUP::able!
-		p|ptr_able; //Pack as a PUP::able *
-		ptr=(T *)ptr_able;
-		
-		if (ptrWasNull) 
-		{ //PUP just allocated a new object for us-- 
-		  // make sure it gets deleted eventually.
-			allocated=ptr;
+		PUP::ptr_helper<T>()(p, ptr);
+		if (p.isUnpacking()) {
+			allocated = ptr;
 		}
 	}
 	friend inline void operator|(PUP::er &p,CkPointer<T> &v) {v.pup(p);}
@@ -1104,6 +1093,47 @@ PUP_BUILTIN_SUPPORT(CmiUInt16)
 #define PUPv(field,len) \
   do{  if (p.hasComments()) p.comment(#field); PUParray(p,field,len); } while(0)
 
+namespace PUP {
+template <typename T>
+struct ptr_helper<T, true> {
+  inline void operator()(PUP::er &p, T *&t) const {
+    bool is_nullptr = nullptr == t;
+    p | is_nullptr;
+    if (!is_nullptr) {
+      PUP::able *t_able = static_cast<PUP::able *>(t);
+      p | t_able;
+      if (p.isUnpacking()) t = static_cast<T *>(t_able);
+    }
+  }
+};
+
+template <typename T>
+struct ptr_helper<T, false> {
+  inline void operator()(PUP::er &p, T *&t) const {
+    bool is_nullptr = nullptr == t;
+    p | is_nullptr;
+    if (!is_nullptr) {
+      if (p.isUnpacking()) {
+        initialize_ptr(t);
+      }
+      p | *t;
+    }
+  }
+
+ protected:
+  template <typename U>
+  inline typename std::enable_if<std::is_constructible<U, reconstruct>::value>::type
+  initialize_ptr(U *&u) const {
+    u = new U(reconstruct());
+  }
+
+  template <typename U>
+  inline typename std::enable_if<!std::is_constructible<U, reconstruct>::value>::type
+  initialize_ptr(U *&u) const {
+    u = new U();
+  }
+};
+}
 
 #endif //def __CK_PUP_H
 

@@ -24,8 +24,8 @@ template <class T>
 class CkSTLHelper {
 protected:
     //Copy nEl elements from src into dest
-    void elementCopy(T *dest,const T *src,int nEl) {
-      for (int i=0;i<nEl;i++) dest[i]=src[i];
+    void elementCopy(T *dest,const T *src,size_t nEl) {
+      for (size_t i=0;i<nEl;i++) dest[i]=src[i];
     }
 };
 
@@ -187,7 +187,7 @@ class CkVec : private CkSTLHelper<T> {
     T *block; //Elements of vector
     size_t blklen; //Allocated size of block (STL capacity) 
     size_t len; //Number of used elements in block (STL size; <= capacity)
-    void makeBlock(int blklen_,int len_) {
+    void makeBlock(size_t blklen_,size_t len_) {
        if (blklen_==0) block=NULL; //< saves 1-byte allocations
        else {
          block=new T[blklen_];
@@ -208,8 +208,8 @@ class CkVec : private CkSTLHelper<T> {
     CkVec(): block(NULL), blklen(0), len(0) {}
     ~CkVec() { freeBlock(); }
     CkVec(const this_type &src) {copyFrom(src);}
-    CkVec(int size) { makeBlock(size,size); } 
-    CkVec(int size, int used) { makeBlock(size,used); } 
+    CkVec(size_t size) { makeBlock(size,size); }
+    CkVec(size_t size, size_t used) { makeBlock(size,used); }
     CkVec(const CkSkipInitialization &skip) {/* don't initialize */}
     this_type &operator=(const this_type &src) {
       freeBlock();
@@ -298,7 +298,7 @@ class CkVec : private CkSTLHelper<T> {
  
 //PUP routine help:
     //Only pup the length of this vector, which is returned:
-    int pupbase(PUP::er &p) {
+    size_t pupbase(PUP::er &p) {
        size_t l=len;
        p(l);
        if (p.isUnpacking()) resize(l); 
@@ -313,24 +313,22 @@ class CkVec : private CkSTLHelper<T> {
      }
 #endif
 
-		inline void quickSort(){
-		  q_sort(0, len - 1,128);
-		}
-
-		inline void quickSort(int changeOverSize){
+		inline void quickSort(size_t changeOverSize = 128){
+			if (len <= 1)
+				return;
 			q_sort(0,len-1,changeOverSize);
 		}
 		
 
-		inline void q_sort(int left, int right,int changeOverSize){
-		  int l_hold, r_hold;
-			int pivot;
+		inline void q_sort(size_t left, size_t right,size_t changeOverSize){
+			size_t l_hold, r_hold;
+			size_t pivot;
 			
 			if(left >= right)
 				return;
 			
 			//swap the center element with the left one
-			int mid =  (left+right)/2;
+			size_t mid = (left+right)/2;
 			T temp = block[mid];
 			block[mid] = block[left];
 			block[left] = temp;
@@ -367,9 +365,9 @@ class CkVec : private CkSTLHelper<T> {
     		q_sort(pivot+1, right,changeOverSize);
 		}
 
-		inline void bubbleSort(int left,int right){
-			for(int i=left;i<=right;i++){
-				for(int j=i+1;j<=right;j++){
+		inline void bubbleSort(size_t left,size_t right){
+			for(size_t i=left;i<=right;i++){
+				for(size_t j=i+1;j<=right;j++){
 					if(block[i] >= block[j]){
 						T val = block[i];
 						block[i] = block[j];
@@ -664,7 +662,7 @@ class CkCompactVec : private CkSTLHelper<T> {
     size_t len; // total number of used elements in block, including ones before offset
     size_t offset;      // global seqno of the first element in the block
     size_t lastnull;    // the array index of the biggest consecutive NULLs
-    void makeBlock(int blklen_,int len_,int offset_=0,int lastnull_=sentinel) {
+    void makeBlock(size_t blklen_, size_t len_, size_t offset_ = 0, size_t lastnull_ = sentinel) {
        if (blklen_==0) block=NULL; //< saves 1-byte allocations
        else {
          block=new T[blklen_];
@@ -687,8 +685,8 @@ class CkCompactVec : private CkSTLHelper<T> {
     CkCompactVec(): block(NULL), blklen(0), len(0), offset(0), lastnull(sentinel) {}
     ~CkCompactVec() { freeBlock(); }
     CkCompactVec(const this_type &src) {copyFrom(src);}
-    CkCompactVec(int size) { makeBlock(size,size); } 
-    CkCompactVec(int size, int used) { makeBlock(size,used); } 
+    CkCompactVec(size_t size) { makeBlock(size,size); }
+    CkCompactVec(size_t size, size_t used) { makeBlock(size,used); }
     CkCompactVec(const CkSkipInitialization &skip) {/* don't initialize */}
     this_type &operator=(const this_type &src) {
       freeBlock();
@@ -805,7 +803,7 @@ class CkCompactVec : private CkSTLHelper<T> {
  
 //PUP routine help:
     //Only pup the length of this vector, which is returned:
-    int pupbase(PUP::er &p) {
+    size_t pupbase(PUP::er &p) {
        size_t l=len;
        p(l);
        if (p.isUnpacking()) resize(l); 

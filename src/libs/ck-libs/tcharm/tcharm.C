@@ -58,6 +58,9 @@ static char* mapping = NULL;
 CsvDeclare(funcmap*, tcharm_funcmap);
 #endif
 
+// circumstances that need special handling so that node setup runs on pthread 0:
+#define TCHARM_NODESETUP_COMMTHD (CMK_CONVERSE_MPI && CMK_SMP && !CMK_SMP_NO_COMMTHD)
+
 void TCharm::nodeInit()
 {
   static bool tcharm_nodeinit_has_been_called;
@@ -72,18 +75,25 @@ void TCharm::nodeInit()
   }
 #endif
 
-  // Assumes no anytime migration and only static insertion
-  _isAnytimeMigration = false;
-  _isStaticInsertion = true;
-
   char **argv = CkGetArgv();
   nChunks = CkNumPes();
   CmiGetArgIntDesc(argv, "-vp", &nChunks, "Set the total number of virtual processors");
   CmiGetArgIntDesc(argv, "+vp", &nChunks, nullptr);
+
+#if !TCHARM_NODESETUP_COMMTHD
+  TCHARM_Node_Setup(nChunks);
+#endif
 }
 
 void TCharm::procInit()
 {
+#if TCHARM_NODESETUP_COMMTHD
+  if (CmiInCommThread())
+    TCHARM_Node_Setup(nChunks);
+
+  CmiNodeAllBarrier();
+#endif
+
   CtvInitialize(TCharm *,_curTCharm);
   CtvAccess(_curTCharm)=NULL;
   tcharm_initted=true;
@@ -138,8 +148,8 @@ void TCHARM_Api_trace(const char *routineName,const char *libraryName) noexcept
 	if (!tcharm_tracelibs.isTracing(libraryName)) return;
 	TCharm *tc=CtvAccess(_curTCharm);
 	char where[100];
-	if (tc==NULL) sprintf(where,"[serial context on %d]",CkMyPe());
-	else sprintf(where,"[%p> vp %d, p %d]",(void *)tc,tc->getElement(),CkMyPe());
+	if (tc==NULL) snprintf(where,sizeof(where),"[serial context on %d]",CkMyPe());
+	else snprintf(where,sizeof(where),"[%p> vp %d, p %d]",(void *)tc,tc->getElement(),CkMyPe());
 	CmiPrintf("%s Called routine %s\n",where,routineName);
 	CmiPrintStackTrace(1);
 	CmiPrintf("\n");
@@ -187,10 +197,14 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
   {
     if (tcharm_nomig) { /*Nonmigratable version, for debugging*/
       tid=CthCreate((CthVoidFn)startTCharmThread,initMsg,initMsg->opts.stackSize);
+      TCHARM_Element_Setup(thisIndex, initMsg->numElements, CmiIsomallocContext{});
     } else {
-      CmiIsomallocContext heapContext = CmiIsomallocContextCreate(thisIndex, initMsg->numElements);
+      // add one to numElements so that pieglobals can have some scratch space
+      CmiIsomallocContext heapContext = CmiIsomallocContextCreate(thisIndex, initMsg->numElements+1);
       tid = CthCreateMigratable((CthVoidFn)startTCharmThread,initMsg,initMsg->opts.stackSize, heapContext);
-      CmiIsomallocContextEnableRandomAccess(heapContext);
+      TCHARM_Element_Setup(thisIndex, initMsg->numElements, heapContext);
+      if (heapContext.opaque != nullptr)
+        CmiIsomallocContextEnableRandomAccess(heapContext);
     }
   }
   CtvAccessOther(tid,_curTCharm)=this;
@@ -636,8 +650,6 @@ FLINKAGE void FTN_NAME(TCHARM_CREATE_DATA,tcharm_create_data)
 		  void *threadData,int *threadDataLen)
 { TCHARM_Create_data(*nThreads,threadFn,threadData,*threadDataLen); }
 
-CkGroupID CkCreatePropMap();
-
 static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
 {
   CkArrayOptions opts(msg->numElements);
@@ -667,10 +679,11 @@ static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
     opts.setMap(mapID);
   } else if(0 == strcmp(mapping,"PROP_MAP")) {
     CkPrintf("TCharm> using PROP_MAP\n");
-    mapID = CkCreatePropMap();
+    mapID = CProxy_PropMap::ckNew();
     opts.setMap(mapID);
   }
   opts.setStaticInsertion(true);
+  opts.setAnytimeMigration(false);
   opts.setSectionAutoDelegate(false);
   return CProxy_TCharm::ckNew(msg,opts);
 }

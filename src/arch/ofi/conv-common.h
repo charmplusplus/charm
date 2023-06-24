@@ -14,8 +14,7 @@
 #define CMK_CMIPRINTF_IS_A_BUILTIN                         0
 
 /* define the converse headers. For most of the purposes, only the UNIQUE header
-   needs to be modified, the others will follow. BLUEGENE may need to be
-   adapted.
+   needs to be modified, the others will follow.
 
    In particular, the fields "hdl", "xhdl" and "info" must be always present in
    the extended header, since they are directly accessed in converse.h */
@@ -23,7 +22,7 @@
  * - startid, redID
  * - rank is needed by broadcast
  */
-#define CMK_MSG_HEADER_UNIQUE    CmiUInt4 size; CmiUInt2 rank,hdl,xhdl,info,redID; CmiInt4 root; CmiUInt1 zcMsgType:4, cmaMsgType:2, nokeep:1;
+#define CMK_MSG_HEADER_UNIQUE    CmiUInt4 size; CmiInt4 root; CmiUInt2 rank,hdl,xhdl,info,redID; CmiUInt1 zcMsgType:4, cmaMsgType:2, nokeep:1;
 
 #define CMK_MSG_HEADER_BASIC  CMK_MSG_HEADER_EXT
 #define CMK_MSG_HEADER_EXT            { CMK_MSG_HEADER_UNIQUE }

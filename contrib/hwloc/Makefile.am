@@ -1,4 +1,4 @@
-# Copyright © 2009-2020 Inria.  All rights reserved.
+# Copyright © 2009-2021 Inria.  All rights reserved.
 # Copyright © 2009      Université Bordeaux
 # Copyright © 2009-2014 Cisco Systems, Inc.  All rights reserved.
 # See COPYING in top-level directory.
@@ -14,7 +14,8 @@ ACLOCAL_AMFLAGS = -I ./config
 EXTRA_DIST = \
         README VERSION COPYING AUTHORS \
         config/hwloc_get_version.sh \
-        config/distscript.sh
+        config/distscript.sh \
+        config/libtool-big-sur-fixup.patch
 
 SUBDIRS = include hwloc
 
@@ -33,6 +34,7 @@ endif
 DIST_SUBDIRS = $(SUBDIRS)
 if HWLOC_BUILD_STANDALONE
 DIST_SUBDIRS += contrib/windows
+EXTRA_DIST += contrib/windows-cmake
 if !BUILD_NETLOC
 DIST_SUBDIRS += netloc
 endif

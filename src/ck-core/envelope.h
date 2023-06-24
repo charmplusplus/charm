@@ -61,9 +61,8 @@ class PathHistoryEnvelope {
   void reset();
   void print() const;
   /// Write a description of the path into the beginning of the provided buffer. The buffer ought to be large enough.
-  void printHTMLToString(char* buf) const{
-    buf[0] = '\0';
-    sprintf(buf+strlen(buf), "Path Time=%lf<br> Sender idx=%d", (double)totalTime, (int)sender_history_table_idx);
+  void printHTMLToString(char* buf, int len) const{
+    snprintf(buf, len, "Path Time=%lf<br> Sender idx=%d", (double)totalTime, (int)sender_history_table_idx);
   }
   /// The number of available EP counts 
   int getNumUsed() const;
@@ -142,10 +141,11 @@ namespace ck {
         UInt forAnyPe;  ///< Used only by newChare
         int  bype;      ///< created by this pe
       } chare;
-      struct s_group {         // NodeBocInitMsg, BocInitMsg, ForNodeBocMsg, ForBocMsg
+      struct s_group {         // NodeBocInitMsg, BocInitMsg, ForNodeBocMsg, ForBocMsg, ArrayBcastMsg, ArrayBcastFwdMsg
         CkGroupID g;           ///< GroupID
         CkNodeGroupID rednMgr; ///< Reduction manager for this group (constructor only!)
-        int epoch;             ///< "epoch" this group was created during (0--mainchare, 1--later)
+        int epoch;             ///< for init msgs, "epoch" this group was created during (0--mainchare, 1--later)
+                               ///  for arraybcast msgs, denotes send epoch from the serializer PE
         UShort arrayEp;        ///< Used only for array broadcasts
       } group;
       struct s_array{             ///< For arrays only (ArrayEltInitMsg, ForArrayEltMsg)
@@ -199,13 +199,11 @@ namespace ck {
   UShort epIdx;        /* Entry point to call */                               \
   ck::impl::s_attribs attribs;
 
-class envelope {
+// alignas is used for padding here, rather than for alignment of the envelope
+// itself, to ensure that the message following the envelope is aligned relative
+// to the start of the envelope.
+class alignas(ALIGN_BYTES) envelope {
 private:
-
-    class envelopeSizeHelper {
-      CMK_ENVELOPE_FIELDS
-      CMK_ENVELOPE_FT_FIELDS
-    };
 
     #ifdef __clang__
     #pragma GCC diagnostic push
@@ -219,19 +217,6 @@ private:
 public:
 
     CMK_ENVELOPE_FT_FIELDS
-
-    #if defined(__GNUC__) || defined(__clang__)
-    #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wpedantic"
-    #if defined(__clang__)
-    #pragma GCC diagnostic ignored "-Wunused-private-field"
-    #endif
-    #endif
-    // padding to ensure ALIGN_BYTES alignment
-    UChar align[CkMsgAlignOffset(sizeof(envelopeSizeHelper))];
-    #if defined(__GNUC__) || defined(__clang__)
-    #pragma GCC diagnostic pop
-    #endif
 
     void pup(PUP::er &p);
 #if CMK_REPLAYSYSTEM || CMK_TRACE_ENABLED
@@ -405,8 +390,18 @@ public:
           || getMsgtype() == ArrayBcastFwdMsg);
       type.group.g = g;
     }
-    void setGroupEpoch(int epoch) { CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg); type.group.epoch=epoch; }
-    int getGroupEpoch(void) const { CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==NodeBocInitMsg); return type.group.epoch; }
+    void setGroupEpoch(int epoch)
+    {
+      CkAssert(getMsgtype() == BocInitMsg || getMsgtype() == NodeBocInitMsg ||
+               getMsgtype() == ArrayBcastMsg);
+      type.group.epoch = epoch;
+    }
+    int getGroupEpoch(void) const
+    {
+      CkAssert(getMsgtype() == BocInitMsg || getMsgtype() == NodeBocInitMsg ||
+               getMsgtype() == ArrayBcastMsg || getMsgtype() == ArrayBcastFwdMsg);
+      return type.group.epoch;
+    }
     void setRednMgr(CkNodeGroupID r){ CkAssert(getMsgtype()==BocInitMsg || getMsgtype()==ForBocMsg
           || getMsgtype()==NodeBocInitMsg || getMsgtype()==ForNodeBocMsg);
  type.group.rednMgr = r; }

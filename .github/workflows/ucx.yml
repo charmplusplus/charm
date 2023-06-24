@@ -1,12 +1,12 @@
-name: UCX 1.9.0 Linux
+name: UCX Linux
 
-on: pull_request
+on: [pull_request, merge_group]
 
 jobs:
   build:
     timeout-minutes: 60
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
     - uses: actions/checkout@v1
@@ -19,15 +19,7 @@ jobs:
     - name: install-prerequisites
       run: |
         sudo apt-get update
-        sudo apt-get install libevent-dev libhwloc-dev
-    - name: build-ucx
-      run: |
-        git clone --recursive --depth 1 --shallow-submodules --branch v1.9.0 https://github.com/openucx/ucx.git
-        cd ucx
-        ./autogen.sh
-        ./contrib/configure-release --disable-numa --without-java
-        make -j4
-        sudo make install
+        sudo apt-get install libucx-dev libevent-dev libhwloc-dev
     - name: build-openpmix
       run: |
         wget https://github.com/openpmix/openpmix/releases/download/v3.1.5/pmix-3.1.5.tar.gz

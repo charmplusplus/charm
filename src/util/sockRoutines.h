@@ -22,10 +22,10 @@
  *   - return the IP address of the given machine (DNS or dotted decimal).
  *     Returns 0 on failure.
  *
- * char *skt_print_ip(char *dest,skt_ip_t addr)
+ * char *skt_print_ip(char *dest,int len,skt_ip_t addr)
  *   - Print the given IP address to the given destination as
- *     dotted decimal.  Dest must be at least 130 bytes long,
- *     and will be returned.
+ *     dotted decimal.  Dest len must be at least 130 bytes,
+ *     and dest will be returned.
  *
  * int skt_ip_match(skt_ip_t a,skt_ip_t b)
  *   - Return 1 if the given IP addresses are identical.
@@ -163,7 +163,7 @@ skt_ip_t skt_lookup_ip(const char *name);
 skt_ip_t skt_innode_my_ip(void); /* inner node version */
 skt_ip_t skt_innode_lookup_ip(const char *name);
 
-char *skt_print_ip(char *dest, skt_ip_t addr);
+char *skt_print_ip(char *dest, int len, skt_ip_t addr);
 int skt_ip_match(skt_ip_t a, skt_ip_t b);
 struct sockaddr_in skt_build_addr(skt_ip_t IP, int port);
 

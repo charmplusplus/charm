@@ -16,21 +16,21 @@
 static int  LBPeriod = PERIOD;                 /* time to call load balancing */
 static int  overload_threshold = MAXOVERLOAD;
 
-typedef struct CldProcInfo_s {
+typedef struct CldDataInfo_s {
   double lastCheck;
   int    sent;			/* flag to disable idle work request */
   int    balanceEvt;		/* user event for balancing */
   int    updateLoadEvt; 
   int    idleEvt;		/* user event for idle balancing */
   int    idleprocEvt;		/* user event for processing idle req */
-} *CldProcInfo;
+} *CldDataInfo;
 
 extern char *_lbtopo;			/* topology name string */
 int _lbsteal = 0;                       /* work stealing flag */
 
 extern "C" void gengraph(int, int, int, int *, int *);
 
-CpvStaticDeclare(CldProcInfo, CldData);
+CpvStaticDeclare(CldDataInfo, CldData);
 CpvStaticDeclare(int, CldLoadResponseHandlerIndex);
 CpvStaticDeclare(int, CldAskLoadHandlerIndex);
 CpvStaticDeclare(int, MinLoad);
@@ -72,7 +72,7 @@ void putPool(loadmsg *msg)
 
 void LoadNotifyFn(int l)
 {
-  CldProcInfo  cldData = CpvAccess(CldData);
+  CldDataInfo  cldData = CpvAccess(CldData);
   cldData->sent = 0;
 }
 
@@ -92,15 +92,14 @@ static void CldEndIdle(void *dummy)
   CpvAccess(CldData)->lastCheck = -1;
 }
 
-static void CldStillIdle(void *dummy, double curT)
+static void CldStillIdle(void *dummy)
 {
   int i;
-  double startT;
   requestmsg msg;
   int myload;
-  CldProcInfo  cldData = CpvAccess(CldData);
+  CldDataInfo  cldData = CpvAccess(CldData);
 
-  double now = curT;
+  double now = CmiWallTimer();
   double lt = cldData->lastCheck;
   /* only ask for work every 20ms */
   if (cldData->sent && (lt!=-1 && now-lt< PERIOD*0.001)) return;
@@ -133,9 +132,8 @@ static void CldStillIdle(void *dummy, double curT)
 /* send some work to requested proc */
 static void CldAskLoadHandler(requestmsg *msg)
 {
-  int receiver, rank, recvIdx, i;
+  int receiver, rank, i;
   int myload = CldCountTokens();
-  double now = CmiWallTimer();
 
   /* only give you work if I have more than 1 */
   if (myload>0) {
@@ -164,7 +162,7 @@ static void CldAskLoadHandler(requestmsg *msg)
 #if CMK_TRACE_ENABLED && TRACE_USEREVENTS
     /* this is dangerous since projections logging is not thread safe */
     {
-    CldProcInfo  cldData = CpvAccessOther(CldData, rank);
+    CldDataInfo  cldData = CpvAccessOther(CldData, rank);
     traceUserBracketEvent(cldData->idleprocEvt, now, CmiWallTimer());
     }
 #endif
@@ -260,7 +258,7 @@ int CldMinAvg(void)
 void CldBalance(void *dummy, double curT)
 {
   int i, j, overload, numToMove=0, avgLoad;
-  int totalUnderAvg=0, numUnderAvg=0, maxUnderAvg=0;
+  int numUnderAvg=0, maxUnderAvg=0;
 
 #if CMK_TRACE_ENABLED && TRACE_USEREVENTS
   double startT = curT;
@@ -279,7 +277,6 @@ void CldBalance(void *dummy, double curT)
     int nNeighbors = CpvAccess(numNeighbors);
     for (i=0; i<nNeighbors; i++)
       if (CpvAccess(neighbors)[i].load < avgLoad) {
-        totalUnderAvg += avgLoad-CpvAccess(neighbors)[i].load;
         if (avgLoad - CpvAccess(neighbors)[i].load > maxUnderAvg)
           maxUnderAvg = avgLoad - CpvAccess(neighbors)[i].load;
         numUnderAvg++;
@@ -377,7 +374,7 @@ void CldHandler(void *msg)
 
 void CldEnqueueGroup(CmiGroup grp, void *msg, int infofn)
 {
-  int len, queueing, priobits,i; unsigned int *prioptr;
+  int len, queueing, priobits; unsigned int *prioptr;
   CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
   CldPackFn pfn;
   ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
@@ -413,7 +410,7 @@ void CldEnqueueWithinNode(void *msg, int infofn)
 
 void CldEnqueueMulti(int npes, const int *pes, void *msg, int infofn)
 {
-  int len, queueing, priobits,i; unsigned int *prioptr;
+  int len, queueing, priobits; unsigned int *prioptr;
   CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
   CldPackFn pfn;
   ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
@@ -424,7 +421,7 @@ void CldEnqueueMulti(int npes, const int *pes, void *msg, int infofn)
   CldSwitchHandler((char *)msg, CpvAccess(CldHandlerIndex));
   CmiSetInfo(msg,infofn);
   /*
-  for(i=0;i<npes;i++) {
+  for(int i=0;i<npes;i++) {
     CmiSyncSend(pes[i], len, msg);
   }
   CmiFree(msg);
@@ -550,7 +547,7 @@ void CldReadNeighborData(void)
   
   if (CmiNumPes() <= 1)
     return;
-  sprintf(filename, "graph%d/graph%d", CmiNumPes(), CmiMyPe());
+  snprintf(filename, sizeof(filename), "graph%d/graph%d", CmiNumPes(), CmiMyPe());
   if ((fp = fopen(filename, "r")) == 0) 
     {
       CmiError("Error opening graph init file on PE: %d\n", CmiMyPe());
@@ -631,7 +628,7 @@ static void topo_callback(void)
 
 void CldGraphModuleInit(char **argv)
 {
-  CpvInitialize(CldProcInfo, CldData);
+  CpvInitialize(CldDataInfo, CldData);
   CpvInitialize(int, numNeighbors);
   CpvInitialize(int, MinLoad);
   CpvInitialize(int, Mindex);
@@ -644,7 +641,7 @@ void CldGraphModuleInit(char **argv)
   CpvInitialize(int, CldAskLoadHandlerIndex);
 
   CpvAccess(start) = -1;
-  CpvAccess(CldData) = (CldProcInfo)CmiAlloc(sizeof(struct CldProcInfo_s));
+  CpvAccess(CldData) = (CldDataInfo)CmiAlloc(sizeof(struct CldDataInfo_s));
   CpvAccess(CldData)->lastCheck = -1;
   CpvAccess(CldData)->sent = 0;
 #if CMK_TRACE_ENABLED
@@ -698,7 +695,7 @@ void CldGraphModuleInit(char **argv)
 #endif
     CldBalancePeriod(NULL, CmiWallTimer());
 */
-    CcdCallOnCondition(CcdTOPOLOGY_AVAIL, (CcdVoidFn)topo_callback, NULL);
+    CcdCallOnCondition(CcdTOPOLOGY_AVAIL, (CcdCondFn)topo_callback, NULL);
 
   }
 
@@ -716,9 +713,9 @@ void CldGraphModuleInit(char **argv)
   if (_lbsteal) {
   /* register idle handlers - when idle, keep asking work from neighbors */
   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
-      (CcdVoidFn) CldBeginIdle, NULL);
+      (CcdCondFn) CldBeginIdle, NULL);
   CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,
-      (CcdVoidFn) CldStillIdle, NULL);
+      (CcdCondFn) CldStillIdle, NULL);
     if (CmiMyPe() == 0) 
       CmiPrintf("Charm++> Work stealing is enabled. \n");
   }

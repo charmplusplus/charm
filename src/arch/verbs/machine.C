@@ -332,7 +332,7 @@ static void KillEveryone(const char *msg)
 static void KillEveryoneCode(int n)
 {
   char _s[100];
-  sprintf(_s, "[%d] Fatal error #%d\n", CmiMyPe(), n);
+  snprintf(_s, sizeof(_s), "[%d] Fatal error #%d\n", CmiMyPe(), n);
   charmrun_abort(_s);
   machine_exit(1);
 }
@@ -727,7 +727,7 @@ static void log_init(void)
 static void log_done(void)
 {
   char logname[100]; FILE *f; int i, size;
-  sprintf(logname, "log.%d", Lrts_myNode);
+  snprintf(logname, sizeof(logname), "log.%d", Lrts_myNode);
   f = fopen(logname, "w");
   if (f==0) KillEveryone("fopen problem");
   if (log_wrap) size = 50000; else size=log_pos;
@@ -747,7 +747,7 @@ void printLog(void)
       return;
   logged = 1;
   CmiPrintf("Logging: %d\n", Lrts_myNode);
-  sprintf(logname, "log.%d", Lrts_myNode);
+  snprintf(logname, sizeof(logname), "log.%d", Lrts_myNode);
   f = fopen(logname, "w");
   if (f==0) KillEveryone("fopen problem");
   for (i = 5000; i; i--)
@@ -997,11 +997,11 @@ CmiPrintStackTrace(0);
 	char msgBuf[80];
   	skt_set_abort(ignore_further_errors);
     if (CmiNumPartitions() == 1) {
-        sprintf(msgBuf,"Fatal error on PE %d> ",CmiMyPe());
+        snprintf(msgBuf,sizeof(msgBuf),"Fatal error on PE %d> ",CmiMyPe());
     }
     else
     {
-        sprintf(msgBuf,"Fatal error on Partition %d PE %d> ", CmiMyPartition(), CmiMyPe());
+        snprintf(msgBuf,sizeof(msgBuf),"Fatal error on Partition %d PE %d> ", CmiMyPartition(), CmiMyPe());
     }
   	ctrl_sendone_nolock("abort",msgBuf,strlen(msgBuf),s,strlen(s)+1);
   }
@@ -1100,7 +1100,7 @@ static void InternalPrintf(const char *f, va_list l)
   ChMessage replymsg;
   char *buffer = (char *)CmiTmpAlloc(PRINTBUFSIZE);
   CmiStdoutFlush();
-  vsprintf(buffer, f, l);
+  vsnprintf(buffer, PRINTBUFSIZE, f, l);
   if(Cmi_syncprint) {
           LOCK_IF_AVAILABLE();
   	  ctrl_sendone_nolock("printsyn", buffer,strlen(buffer)+1,NULL,0);
@@ -1119,7 +1119,7 @@ static void InternalError(const char *f, va_list l)
   ChMessage replymsg;
   char *buffer = (char *)CmiTmpAlloc(PRINTBUFSIZE);
   CmiStdoutFlush();
-  vsprintf(buffer, f, l);
+  vsnprintf(buffer, PRINTBUFSIZE, f, l);
   if(Cmi_syncprint) {
   	  ctrl_sendone_locking("printerrsyn", buffer,strlen(buffer)+1,NULL,0);
           LOCK_IF_AVAILABLE();
@@ -1798,7 +1798,7 @@ int CmiBarrierZero(void)
 
   if (CmiMyRank() == 0) {
     char str[64];
-    sprintf(str, "%d", CmiMyNodeGlobal());
+    snprintf(str, sizeof(str), "%d", CmiMyNodeGlobal());
     ctrl_sendone_locking("barrier0",str,strlen(str)+1,NULL,0);
     if (CmiMyNodeGlobal() == 0) {
       while (barrierReceived != 2) {
@@ -1860,14 +1860,14 @@ void LrtsPostCommonInit(int everReturn)
 #if CMK_SHARED_VARS_UNAVAILABLE
   if (Cmi_netpoll) /*Repeatedly call CommServer*/
     CcdCallOnConditionKeep(CcdPERIODIC, 
-        (CcdVoidFn) CommunicationPeriodic, NULL);
+        (CcdCondFn) CommunicationPeriodic, NULL);
   else /*Only need this for retransmits*/
     CcdCallOnConditionKeep(CcdPERIODIC_10ms, 
-        (CcdVoidFn) CommunicationPeriodic, NULL);
+        (CcdCondFn) CommunicationPeriodic, NULL);
 #endif
     
   if (CmiMyRank()==0 && Cmi_charmrun_fd!=-1) {
-    CcdCallOnConditionKeep(CcdPERIODIC_10ms, (CcdVoidFn) CmiStdoutFlush, NULL);
+    CcdCallOnConditionKeep(CcdPERIODIC_10ms, (CcdCondFn) CmiStdoutFlush, NULL);
 #if CMK_SHARED_VARS_UNAVAILABLE
     if (!Cmi_asyncio) {
     /* gm cannot live with setitimer */
@@ -1908,7 +1908,7 @@ void LrtsPostCommonInit(int everReturn)
   /* Call the function to periodically call the token adapt function */
   CcdCallFnAfter((CcdVoidFn)TokenUpdatePeriodic, NULL, 2000); // magic number of 2000ms
   CcdCallOnConditionKeep(CcdPERIODIC_10s,   // magic number of PERIOD 10s
-        (CcdVoidFn) TokenUpdatePeriodic, NULL);
+        (CcdCondFn) TokenUpdatePeriodic, NULL);
 #endif
   
 #ifdef CMK_RANDOMLY_CORRUPT_MESSAGES
@@ -1929,7 +1929,7 @@ void LrtsExit(int exitcode)
     exit(exitcode); /*Standalone version-- just leave*/
   } else {
     char tmp[16];
-    sprintf(tmp, "%d", exitcode);
+    snprintf(tmp, sizeof(tmp), "%d", exitcode);
     Cmi_check_delay = 1.0;      /* speed up checking of charmrun */
     for(i = 0; i < CmiMyNodeSize(); i++) {
       ctrl_sendone_locking("ending",tmp,strlen(tmp)+1,NULL,0); /* this causes charmrun to go away, every PE needs to report */

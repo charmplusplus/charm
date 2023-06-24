@@ -59,6 +59,7 @@ extern int quietModeRequested;
 static void lbinit()
 {
   LBRegisterBalancer<ZoltanLB>("ZoltanLB", "Use Zoltan(tm) to partition object graph");
+  LBTurnCommOn();
 }
 
 ZoltanLB::ZoltanLB(const CkLBOptions &opt): CBase_ZoltanLB(opt)
@@ -186,7 +187,7 @@ void ZoltanLB::work(LDStats* stats)
   rc = Zoltan_Initialize(0, NULL, &ver);
   zz = Zoltan_Create(MPI_COMM_WORLD);
   char global_parts[10];
-  sprintf(global_parts, "%d", numPes);
+  snprintf(global_parts, sizeof(global_parts), "%d", numPes);
 
   Zoltan_Set_Param(zz, "DEBUG_LEVEL", "0");
   Zoltan_Set_Param(zz, "LB_METHOD", "HYPERGRAPH");   /* partitioning method */

@@ -50,7 +50,8 @@ class CkLBArgs
     _lb_debug = 0;
     _lb_ignoreBgLoad = _lb_syncResume = _lb_useCpuTime = false;
     _lb_printsummary = _lb_migObjOnly = false;
-    _lb_statson = _lb_traceComm = true;
+    _lb_statson = true;
+    _lb_traceComm = false;
     _lb_loop = false;
     _lb_central_pe = 0;
     _lb_maxDistPhases = 10;
@@ -290,8 +291,6 @@ class LBManager : public CBase_LBManager
   void CollectStatsOn(void) { lbdb_obj->CollectStatsOn(); }
   void CollectStatsOff(void) { lbdb_obj->CollectStatsOff(); }
   bool StatsOn(void) { return lbdb_obj->StatsOn(); }
-  int RunningObject(LDObjHandle* _o) const { return lbdb_obj->RunningObject(_o); }
-  const LDObjHandle* RunningObject() { return lbdb_obj->RunningObject(); }
   void ObjTime(LDObjHandle h, double walltime, double cputime)
   {
     lbdb_obj->ObjTime(h, walltime, cputime);
@@ -466,8 +465,13 @@ class LBManager : public CBase_LBManager
   void LocalBarrierOff(void);
   void ResumeClients();
   static int ProcessorSpeed();
-  inline void SetLBPeriod(double s) {}
-  inline double GetLBPeriod() { return 0; }
+  static void SetLBPeriod(double period)
+  {
+    _lb_args.lbperiod() = period;
+    // If the manager has been initialized, then start the timer
+    if (auto* const obj = LBManager::Object()) obj->setTimer();
+  }
+  static double GetLBPeriod() { return _lb_args.lbperiod(); }
 
   void SetMigrationCost(double cost);
   void SetStrategyCost(double cost);
@@ -480,6 +484,7 @@ class LBManager : public CBase_LBManager
   int new_ld_balancer;  // for Node 0
   MetaBalancer* metabalancer;
   int currentLBIndex;
+  bool isPeriodicQueued = false;
 
  public:
   std::vector<BaseLB*> loadbalancers;
@@ -529,7 +534,9 @@ void LBTurnPredictorOn(LBPredictorFunction* model, int wind);
 void LBTurnPredictorOff();
 void LBChangePredictor(LBPredictorFunction* model);
 
-void LBSetPeriod(double second);
+// This alias remains for backwards compatibility
+CMK_DEPRECATED_MSG("Use LBManager::SetLBPeriod instead of LBSetPeriod")
+void LBSetPeriod(double period);
 
 #if CMK_LB_USER_DATA
 int LBRegisterObjUserData(int size);
@@ -558,15 +565,8 @@ class SystemLoad
   LBManager* lbmgr;
 
  public:
-  SystemLoad()
-  {
-    lbmgr = LBManagerObj();
-    objHandle = lbmgr->RunningObject();
-    if (objHandle != NULL)
-    {
-      lbmgr->ObjectStop(*objHandle);
-    }
-  }
+  SystemLoad();
+
   ~SystemLoad()
   {
     if (objHandle) lbmgr->ObjectStart(*objHandle);

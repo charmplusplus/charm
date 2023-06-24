@@ -664,13 +664,16 @@ private:
 			char s[2048];
 			s[0] = '\0';
 			for(std::set<int>::iterator iter = simplexIndices.begin(); iter != simplexIndices.end(); ++iter){
-				sprintf(s+strlen(s), "%d: ", *iter);
+				int slen = strlen(s);
+				snprintf(s+slen, sizeof(s)-slen, "%d: ", *iter);
 
 				for(std::map<std::string,int>::iterator citer = allData.phases[*iter]->controlPoints.begin(); citer != allData.phases[*iter]->controlPoints.end(); ++citer){
-					sprintf(s+strlen(s), " %d", citer->second);
+					slen = strlen(s);
+					snprintf(s+slen, sizeof(s)-slen, " %d", citer->second);
 				}
 
-				sprintf(s+strlen(s), "\n");
+				slen = strlen(s);
+				snprintf(s+slen, sizeof(s)-slen, "\n");
 			}
 			CkPrintf("Current simplex is:\n%s\n", s);
 		}

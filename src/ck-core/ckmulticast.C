@@ -28,7 +28,7 @@
 #define SPLIT_MULTICAST  1
 
 // maximum number of fragments into which a message can be broken
-// NOTE: CkReductionMsg::{nFrags,fragNo} and reductionInfo::npProcessed are int8_t,
+// NOTE: CkReductionMsg::{nFrags,fragNo} and sectionRedInfo::npProcessed are int8_t,
 //       which has a maximum value of 127.
 #define MAXFRAGS 100
 
@@ -46,7 +46,7 @@ typedef unsigned char byte;
  * An instance of this class is stored in every mCastEntry object making it possible
  * to track redn operations on a per section basis all along the spanning tree.
  */
-class reductionInfo {
+class sectionRedInfo {
     public:
         /// Number of local array elements which have contributed a given fragment
         int lcount [MAXFRAGS];
@@ -70,7 +70,7 @@ class reductionInfo {
         reductionMsgs futureMsgs;
 
     public:
-        reductionInfo(): npProcessed(0),
+        sectionRedInfo(): npProcessed(0),
                          storedCallback(NULL),
                          storedClientParam(NULL),
                          redNo(0) {
@@ -156,7 +156,7 @@ class mCastEntry
         /// Old spanning tree
         SectionLocation   oldtree;
         // for reduction
-        reductionInfo red;
+        sectionRedInfo red;
         //
         char needRebuild;
     private:
@@ -199,7 +199,7 @@ class mCastEntry
         inline CkArrayID getAid() { return aid; }
         inline int hasOldtree() { return oldtree.entry != NULL; }
         inline void print() {
-            CmiPrintf("[%d] mCastEntry: %p, numChild: %d pe: %d flag: %d asm_msg:%p asm_fill:%d\n", CkMyPe(), this, numChild, pe, flag, asm_msg, asm_fill);
+            CmiPrintf("[%d] mCastEntry: %p, numChild: %d pe: %d flag: %d asm_msg:%p asm_fill:%d\n", CkMyPe(), (void *)this, numChild, pe, flag, (void *)asm_msg, asm_fill);
         }
 };
 
@@ -278,7 +278,6 @@ void _ckMulticastInit(void)
 mCastEntry::mCastEntry (mCastEntry *old): 
   numChild(0), oldc(NULL), newc(NULL), flag(COOKIE_NOTREADY), grpSec(old->isGrpSec())
 {
-  int i;
   aid = old->aid;
   parentGrp = old->parentGrp;
   allElem = old->allElem;
@@ -575,7 +574,7 @@ void CkMulticastMgr::initGrpCookie(CkSectionInfo s)
    DEBUGF(("init: %d elems %p\n", n, s.get_val()));
    // Create and initialize a setup message
    multicastSetupMsg *msg = new (0, n, 0) multicastSetupMsg;
-   DEBUGF(("[%d] initGrpCookie: msg->arrIdx:%p, msg->lastKnown: %p \n", CkMyPe(), msg->arrIdx, msg->lastKnown));
+   DEBUGF(("[%d] initGrpCookie: msg->arrIdx: %p\n", CkMyPe(), msg->arrIdx));
    msg->nIdx = n;
    msg->parent = CkSectionInfo(entry->getAid());
    msg->rootSid = s;
@@ -788,7 +787,7 @@ void CkMulticastMgr::childrenReady(mCastEntry *entry)
     entry->setReady();
     CProxy_CkMulticastMgr  mCastGrp(thisgroup);
 
-    DEBUGF(("[%d] childrenReady entry %p groupsection?: %d,  Arrayelems: %d, GroupElems: %d, redNo: %d\n", CkMyPe(), entry, entry->isGrpSec(), entry->allElem.size(), entry->allGrpElem.size(), entry->red.redNo));
+    DEBUGF(("[%d] childrenReady entry %p groupsection?: %d,  Arrayelems: %zu, GroupElems: %zu, redNo: %d\n", CkMyPe(), entry, entry->isGrpSec(), entry->allElem.size(), entry->allGrpElem.size(), entry->red.redNo));
 
     if (entry->hasParent()) 
         mCastGrp[entry->parentGrp.get_pe()].recvCookie(entry->parentGrp, CkSectionInfo(entry->getAid(), entry));
@@ -873,7 +872,7 @@ void CkMulticastMgr::resetCookie(CkSectionInfo s)
 
 void CkMulticastMgr::SimpleSend(int ep,void *m, CkArrayID a, CkSectionID &sid, int opts)
 {
-  DEBUGF(("[%d] SimpleSend: nElems:%d\n", CkMyPe(), sid._elems.size()));
+  DEBUGF(("[%d] SimpleSend: nElems: %zu\n", CkMyPe(), sid._elems.size()));
     // set an invalid cookie since we don't have it
   ((multicastGrpMsg *)m)->_cookie = CkSectionInfo(-1, NULL, 0, a);
   for (int i=0; i< sid._elems.size()-1; i++) {
@@ -1099,7 +1098,6 @@ void CkMulticastMgr::sendToLocal(multicastGrpMsg *msg)
     nLocal = entry->localGrpElem;
     if(nLocal){
       DEBUGF(("[%d] send to local branch, GroupSection\n", CkMyPe()));
-      int mpe = CkMyPe();
       CkAssert(nLocal == 1);
       CProxyElement_Group ap(aid, CkMyPe());
       if (ap.ckIsDelegated()) {
@@ -1324,7 +1322,7 @@ void CkMulticastMgr::contribute(int dataSize,void *data,CkReduction::reducerType
 
 CkReductionMsg* CkMulticastMgr::combineFrags (CkSectionInfo& id, 
                                               mCastEntry* entry,
-                                              reductionInfo& redInfo) {
+                                              sectionRedInfo& redInfo) {
   int8_t i;
   int dataSize = 0;
   int8_t nFrags   = redInfo.msgs[0][0]->nFrags;
@@ -1374,7 +1372,7 @@ CkReductionMsg* CkMulticastMgr::combineFrags (CkSectionInfo& id,
 
 
 void CkMulticastMgr::reduceFragment (int index, CkSectionInfo& id,
-                                     mCastEntry* entry, reductionInfo& redInfo,
+                                     mCastEntry* entry, sectionRedInfo& redInfo,
                                      int currentTreeUp) {
 
     CProxy_CkMulticastMgr  mCastGrp(thisgroup);
@@ -1527,22 +1525,22 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
     }
 
     /// Grab the locally stored redn info
-    reductionInfo &redInfo = entry->red;
+    sectionRedInfo &redInfo = entry->red;
 
 
-    DEBUGF(("[%d] RecvRedMsg, entry: %p, lcount: %d, cccount: %d, #localelems: %d, #children: %d \n", CkMyPe(), entry, redInfo.lcount[msg->fragNo], redInfo.ccount[msg->fragNo], entry->getNumLocalElems(), entry->children.size()));
+    DEBUGF(("[%d] RecvRedMsg, entry: %p, lcount: %d, cccount: %d, #localelems: %d, #children: %zu \n", CkMyPe(), (void *)entry, redInfo.lcount[msg->fragNo], redInfo.ccount[msg->fragNo], entry->getNumLocalElems(), entry->children.size()));
 
     //-------------------------------------------------------------------------
     /// If you've received a msg from a previous redn, something has gone horribly wrong somewhere!
     if (msg->redNo < redInfo.redNo) {
-        CmiPrintf("[%d] msg redNo:%d, msg:%p, entry:%p redno:%d\n", CkMyPe(), msg->redNo, msg, entry, redInfo.redNo);
+        CmiPrintf("[%d] msg redNo:%d, msg:%p, entry:%p redno:%d\n", CkMyPe(), msg->redNo, (void *)msg, (void *)entry, redInfo.redNo);
         CmiAbort("CkMulticast received a reduction msg with redNo less than the current redn number. Should never happen! \n");
     }
 
     //-------------------------------------------------------------------------
     /// If the current tree is not yet ready or if you've received a msg for a future redn, buffer the msg
     if (entry->notReady() || msg->redNo > redInfo.redNo) {
-        DEBUGF(("[%d] Future redmsgs, buffered! msg:%p entry:%p ready:%d msg red:%d sys redno:%d\n", CkMyPe(), msg, entry, entry->notReady(), msg->redNo, redInfo.redNo));
+        DEBUGF(("[%d] Future redmsgs, buffered! msg:%p entry:%p ready:%d msg red:%d sys redno:%d\n", CkMyPe(), (void *)msg, (void *)entry, entry->notReady(), msg->redNo, redInfo.redNo));
         redInfo.futureMsgs.push_back(msg);
         return;
     }

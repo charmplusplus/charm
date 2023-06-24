@@ -1,0 +1,42 @@
+mainmodule random_amr {
+
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_DgElement dgElementProxy;
+  
+  mainchare Main {
+    entry Main(CkArgMsg* msg);
+    entry void initialize();
+    entry void check_neighbors();
+    entry void check_domain();
+    entry void evaluate_amr_criteria();
+    entry void begin_inserting();
+    entry void create_new_elements();
+    entry void done_inserting();
+    entry void count_elements();
+    entry [reductiontarget] void adjust_domain(int num_elements);
+    entry void delete_old_elements();
+    entry void exit();
+    entry [reductiontarget] void check_volume(const double volume);
+  };
+
+  array [1D] DgElement {
+    entry DgElement();
+    entry void count_elements();
+    entry void adjust_domain();
+    entry void collect_data_from_children(
+        std::deque<ElementId_t> sibling_ids_to_collect,
+        std::array<ElementId_t, 2>& parent_neighbors);
+    entry void create_new_elements(); 
+    entry void delete_old_elements();
+    entry void ping(const ElementId_t& pinger, const size_t index);	
+    entry void evaluate_refinement_criteria();
+    entry void initialize_child(const ElementId_t& nonsibling_neighbor_id);
+    entry void initialize_initial_elements();
+    entry void initialize_parent(std::array<ElementId_t, 2>& parent_neighbors);
+    entry void ping_neighbors();
+    entry void send_data_to_children();
+    entry void send_volume();
+    entry void update_amr_decision(const ElementId_t& neighbor_id,
+                                   const Flag_t& neighbor_flag);
+  };
+};

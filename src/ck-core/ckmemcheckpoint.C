@@ -109,7 +109,7 @@ static bool checkpointed = false;
 // name of the kill file that contains processes to be killed 
 char *killFile;                                               
 // flag for the kill file         
-int killFlag=0;
+bool killFlag;
 // variable for storing the killing time
 double killTime=0.0;
 #endif
@@ -302,7 +302,6 @@ public:
   }
   inline void updateBuffer(CkArrayCheckPTMessage *data) 
   {
-    double t = CmiWallTimer();
     // unpack it
     envelope *env = UsrToEnv(data);
     CkUnpackMessage(&env);
@@ -317,7 +316,6 @@ public:
     bud2 = data->bud2;
     len = data->len;
     delete data;
-    //DEBUGF("[%d] updateBuffer took %f seconds. \n", CkMyPe(), CmiWallTimer()-t);
   }
   inline CkArrayCheckPTMessage * getCopy()	// get a copy of checkpoint
   {
@@ -373,8 +371,8 @@ CkMemCheckPT::CkMemCheckPT(int w)
   if(CkNumPes() > 1) {
     void pingBuddy();
     void pingCheckHandler();
-    CcdCallOnCondition(CcdPERIODIC_100ms,(CcdVoidFn)pingBuddy,NULL);
-    CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
+    CcdCallOnCondition(CcdPERIODIC_100ms,(CcdCondFn)pingBuddy,NULL);
+    CcdCallOnCondition(CcdPERIODIC_5s,(CcdCondFn)pingCheckHandler,NULL);
   }
 #endif
 #if CMK_CHKP_ALL
@@ -416,8 +414,8 @@ void CkMemCheckPT::pup(PUP::er& p)
   if(CkNumPes() > 1) {
     void pingBuddy();
     void pingCheckHandler();
-    CcdCallOnCondition(CcdPERIODIC_100ms,(CcdVoidFn)pingBuddy,NULL);
-    CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
+    CcdCallOnCondition(CcdPERIODIC_100ms,(CcdCondFn)pingBuddy,NULL);
+    CcdCallOnCondition(CcdPERIODIC_5s,(CcdCondFn)pingCheckHandler,NULL);
   }
 #endif
   }
@@ -610,7 +608,6 @@ void CkMemCheckPT::startArrayCheckpoint(){
 	CkArrayCheckPTMessage * msg = new (packSize,0) CkArrayCheckPTMessage;
 	msg->len = size;
 	msg->cp_flag = true;
-	int budPEs[2];
 	msg->bud1=CkMyPe();
 	msg->bud2=ChkptOnPe(CkMyPe());
 	{
@@ -981,8 +978,6 @@ void CkMemCheckPT::resetReductionMgr()
 // recover the lost buddies
 void CkMemCheckPT::recoverBuddies()
 {
-  int idx;
-  int len = ckTable.size();
   // ready to flush reduction manager
   // cannot be CkMemCheckPT::restart because destroy will modify states
   double curTime = CmiWallTimer();
@@ -996,7 +991,8 @@ void CkMemCheckPT::recoverBuddies()
   // recover buddies
   expectCount = 0;
 #if !CMK_CHKP_ALL
-  for (idx=0; idx<len; idx++) {
+  int len = ckTable.size();
+  for (int idx=0; idx<len; idx++) {
     CkCheckPTInfo *entry = ckTable[idx];
     if (entry->pNo == thisFailedPe) {
 #if CK_NO_PROC_POOL
@@ -1061,10 +1057,11 @@ void CkMemCheckPT::gotData()
 
 void CkMemCheckPT::updateLocations(int n, CkGroupID *g, CkArrayIndex *idx, CmiUInt8 *id, int nowOnPe)
 {
-
+  // TODO: This function is not called, and no longer works with the new location
+  // management API.
   for (int i=0; i<n; i++) {
     CkLocMgr *mgr = CProxy_CkLocMgr(g[i]).ckLocalBranch();
-    mgr->updateLocation(idx[i], id[i], nowOnPe);
+    //mgr->updateLocation(idx[i], id[i], nowOnPe);
   }
 	thisProxy[nowOnPe].gotReply();
 }
@@ -1073,7 +1070,6 @@ void CkMemCheckPT::updateLocations(int n, CkGroupID *g, CkArrayIndex *idx, CmiUI
 void CkMemCheckPT::recoverArrayElements()
 {
   double curTime = CmiWallTimer();
-  int len = ckTable.size();
   //DEBUGF("[%d] CkMemCheckPT ----- %s len: %d in %f seconds \n",CkMyPe(), stage, len, curTime-startTime);
   stage = (char *)"recoverArrayElements";
   if (CkMyPe() == thisFailedPe)
@@ -1089,6 +1085,7 @@ void CkMemCheckPT::recoverArrayElements()
 #endif
 
 #if !CMK_CHKP_ALL
+  int len = ckTable.size();
   for (int idx=0; idx<len; idx++)
   {
     CkCheckPTInfo *entry = ckTable[idx];
@@ -1178,14 +1175,13 @@ void CkMemCheckPT::recoverAll(CkArrayCheckPTMessage * msg,std::vector<CkGroupID>
 			p|idx;
                         p|id;
 			CkLocMgr * mgr = (CkLocMgr *)CkpvAccess(_groupTable)->find(gID).getObj();
-    			int homePe = mgr->homePe(idx);
 #if !STREAMING_INFORMHOME && CK_NO_PROC_POOL
 			mgr->resume(idx, id, p, true, true);
 #else
 			mgr->resume(idx, id, p, false, true);
 #endif
 #if STREAMING_INFORMHOME && CK_NO_PROC_POOL
-			homePe = mgr->homePe(idx);
+			int homePe = mgr->homePe(idx);
 			if (homePe != CkMyPe()) {
 			  gmap[homePe].push_back(gID);
 			  imap[homePe].push_back(idx);
@@ -1219,7 +1215,7 @@ void CkMemCheckPT::finishUp()
 #if CMK_CONVERSE_MPI	
   if (CmiMyPe() == BuddyPE(thisFailedPe)) {
     lastPingTime = CmiWallTimer();
-    CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
+    CcdCallOnCondition(CcdPERIODIC_5s,(CcdCondFn)pingCheckHandler,NULL);
   }
 #endif
 
@@ -1465,7 +1461,8 @@ static void reportChkpSeqHandler(char * m)
 {
   CmiFree(m);
   CmiResetGlobalReduceSeqID();
-  CmiResetGlobalNodeReduceSeqID();
+  if (CmiMyRank() == 0)
+    CmiResetGlobalNodeReduceSeqID();
   char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes+sizeof(int));
   int num = CpvAccess(chkpNum);
   if(CkMyNode() == CpvAccess(_crashedNode))
@@ -1707,7 +1704,7 @@ void buddyDieHandler(char *msg)
    int buddy = obj->BuddyPE(CmiMyPe());
    if (buddy == diepe)  {
      mpi_restart_crashed(diepe, newrank);
-     //CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
+     //CcdCallOnCondition(CcdPERIODIC_5s,(CcdCondFn)pingCheckHandler,NULL);
    }
 #endif
 }
@@ -1753,7 +1750,7 @@ void pingCheckHandler()
 #endif
   }
   else 
-    CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
+    CcdCallOnCondition(CcdPERIODIC_5s,(CcdCondFn)pingCheckHandler,NULL);
 #endif
 }
 
@@ -1770,7 +1767,7 @@ void pingBuddy()
     CmiGetRestartPhase(msg) = 9999;
     CmiSyncSendAndFree(buddy, CmiMsgHeaderSizeBytes+sizeof(int), (char *)msg);
   }
-  CcdCallOnCondition(CcdPERIODIC_100ms,(CcdVoidFn)pingBuddy,NULL);
+  CcdCallOnCondition(CcdPERIODIC_100ms,(CcdCondFn)pingBuddy,NULL);
 #endif
 }
 #endif

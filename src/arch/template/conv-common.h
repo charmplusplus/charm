@@ -9,8 +9,7 @@
 #define CMK_CMIPRINTF_IS_A_BUILTIN                         0
 
 /* define the converse headers. For most of the purposes, only the UNIQUE header
-   needs to be modified, the others will follow. BLUEGENE may need to be
-   adapted.
+   needs to be modified, the others will follow.
 
    In particular, the fields "hdl", "xhdl" and "info" must be always present in
    the extended header, since they are directly accessed in converse.h */

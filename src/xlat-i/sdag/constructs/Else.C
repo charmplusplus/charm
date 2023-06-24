@@ -16,7 +16,7 @@ void ElseConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
   endMethod(defs);
 
   // trace
-  sprintf(nameStr, "%s%s", CParsedFile::className->charstar(), label->charstar());
+  snprintf(nameStr, sizeof(nameStr), "%s%s", CParsedFile::className->charstar(), label->charstar());
   strcat(nameStr, "_end");
   generateClosureSignature(decls, defs, entry, false, "void", label, true,
                            encapStateChild);

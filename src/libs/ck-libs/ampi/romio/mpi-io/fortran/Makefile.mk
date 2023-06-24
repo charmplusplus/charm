@@ -7,7 +7,9 @@
 
 if BUILD_F77_BINDINGS
 
-romio_mpi_sources +=              \
+# romio_mpi_sources += mpi-io/fortran/romio_fortran.c
+
+disabled_romio_mpi_sources =              \
     mpi-io/fortran/closef.c       \
     mpi-io/fortran/deletef.c      \
     mpi-io/fortran/fsyncf.c       \

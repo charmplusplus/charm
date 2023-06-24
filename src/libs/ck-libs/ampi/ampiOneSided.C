@@ -226,14 +226,14 @@ int ampi::winPut(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank
 #if AMPI_RDMA_IMPL
     else if (orgtotalsize >= AMPI_RDMA_THRESHOLD) {
       AmpiRequestList& reqs = getReqs();
-      SendReq* ampiReq = parent->reqPool.newReq<SendReq>(orgtype, myComm.getComm(), getDDT());
+      SendReq* ampiReq = parent->reqPool.newReq<SendReq>(orgtype, myComm->getComm(), getDDT());
       MPI_Request req = reqs.insert(ampiReq);
       CkCallback completedSendCB(CkIndex_ampi::completedRdmaSend(NULL), thisProxy[thisIndex], true/*inline*/);
       completedSendCB.setRefnum(req);
       thisProxy[rank].winRemotePut(orgtotalsize, CkSendBuffer(orgaddr, completedSendCB), orgcnt, orgtype,
                                    targdisp, targcnt, targtype, win->index);
       parent = ampiReq->wait(parent, MPI_STATUS_IGNORE);
-      parent->getReqs().free(req, parent->getDDT());
+      parent->getReqs().freeNonPersReq(parent, req);
     }
 #endif
     else {
@@ -411,14 +411,14 @@ int ampi::winAccumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype, i
 #if AMPI_RDMA_IMPL
     else if (ddt->isContig() && orgtotalsize >= AMPI_RDMA_THRESHOLD) {
       AmpiRequestList& reqs = getReqs();
-      SendReq* ampiReq = parent->reqPool.newReq<SendReq>(orgtype, myComm.getComm(), getDDT());
+      SendReq* ampiReq = parent->reqPool.newReq<SendReq>(orgtype, myComm->getComm(), getDDT());
       MPI_Request req = reqs.insert(ampiReq);
       CkCallback completedSendCB(CkIndex_ampi::completedRdmaSend(NULL), thisProxy[thisIndex], true/*inline*/);
       completedSendCB.setRefnum(req);
       thisProxy[rank].winRemoteAccumulate(orgtotalsize, CkSendBuffer(orgaddr, completedSendCB), orgcnt,
                                           orgtype, targdisp, targcnt, targtype,  op, win->index);
       parent = ampiReq->wait(parent, MPI_STATUS_IGNORE);
-      parent->getReqs().free(req, parent->getDDT());
+      parent->getReqs().freeNonPersReq(parent, req);
     }
 #endif
     else {
@@ -474,14 +474,14 @@ int ampi::winGetAccumulate(const void *orgaddr, int orgcnt, MPI_Datatype orgtype
 #if AMPI_RDMA_IMPL
     else if (orgtotalsize >= AMPI_RDMA_THRESHOLD) {
       AmpiRequestList& reqs = getReqs();
-      SendReq* ampiReq = parent->reqPool.newReq<SendReq>(orgtype, myComm.getComm(), getDDT());
+      SendReq* ampiReq = parent->reqPool.newReq<SendReq>(orgtype, myComm->getComm(), getDDT());
       MPI_Request req = reqs.insert(ampiReq);
       CkCallback completedSendCB(CkIndex_ampi::completedRdmaSend(NULL), thisProxy[thisIndex], true/*inline*/);
       completedSendCB.setRefnum(req);
       msg = thisProxy[rank].winRemoteGetAccumulate(orgtotalsize, CkSendBuffer(orgaddr, completedSendCB), orgcnt,
                                                    orgtype, targdisp, targcnt, targtype, op, win->index);
       parent = ampiReq->wait(parent, MPI_STATUS_IGNORE);
-      parent->getReqs().free(req, parent->getDDT());
+      parent->getReqs().freeNonPersReq(parent, req);
     }
 #endif
     else {
@@ -663,11 +663,11 @@ void ampi::winRemoteUnlock(int winIndex, int requestRank) noexcept {
 }
 
 MPI_Win ampi::createWinInstance(void *base, MPI_Aint size, int disp_unit, MPI_Info info) noexcept {
-  AMPI_DEBUG("     Creating win obj {%d, %p}\n ", myComm.getComm(), base);
-  win_obj *newobj = new win_obj((char*)(NULL), base, size, disp_unit, myComm.getComm());
+  AMPI_DEBUG("     Creating win obj {%d, %p}\n ", myComm->getComm(), base);
+  win_obj *newobj = new win_obj((char*)(NULL), base, size, disp_unit, myComm->getComm());
   winObjects.push_back(newobj);
-  WinStruct *newwin = new WinStruct(myComm.getComm(),winObjects.size()-1);
-  AMPI_DEBUG("     Creating MPI_WIN at (%p) with {%d, %ld}\n", &newwin, myComm.getComm(), winObjects.size()-1);
+  WinStruct *newwin = new WinStruct(myComm->getComm(),winObjects.size()-1);
+  AMPI_DEBUG("     Creating MPI_WIN at (%p) with {%d, %ld}\n", &newwin, myComm->getComm(), winObjects.size()-1);
   return (parent->addWinStruct(newwin));
 }
 
@@ -766,8 +766,13 @@ AMPI_API_IMPL(int, MPI_Win_allocate, MPI_Aint size, int disp_unit, MPI_Info info
 // MPI_Win object deleted LOCALLY on all processes when the call returns
 AMPI_API_IMPL(int, MPI_Win_free, MPI_Win *win)
 {
-  AMPI_API("AMPI_Win_free", win);
-  if(win==NULL) { return ampiErrhandler("AMPI_Win_free", MPI_ERR_WIN); }
+  if (win == nullptr)
+  {
+    AMPI_API("AMPI_Win_free", win);
+    return ampiErrhandler("AMPI_Win_free", MPI_ERR_WIN);
+  }
+
+  AMPI_API("AMPI_Win_free", win, *win);
 
   ampiParent *parent = getAmpiParent();
   WinStruct *winStruct = parent->getWinStruct(*win);
@@ -1450,7 +1455,7 @@ AMPI_API_IMPL(int, MPI_Win_create_keyval, MPI_Win_copy_attr_function *copy_fn,
 
 AMPI_API_IMPL(int, MPI_Win_free_keyval, int *keyval)
 {
-  AMPI_API("AMPI_Win_free_keyval", keyval);
+  AMPI_API("AMPI_Win_free_keyval", keyval, *keyval);
   return MPI_Comm_free_keyval(keyval);
 }
 

@@ -125,6 +125,12 @@ static void shmCleanup();
 static void ipcHandleCreate();
 static void ipcHandleOpen();
 
+#ifndef HAPI_CUDA_CALLBACK
+#if CSD_NO_SCHEDLOOP
+#  error please disable CSD_NO_SCHEDLOOP to use HAPI
+#endif
+#endif
+
 // Called by all PEs in Charm++ layer init
 void hapiInit(char** argv) {
   if (!CmiInCommThread()) {
@@ -139,8 +145,15 @@ void hapiInit(char** argv) {
 
 #ifndef HAPI_CUDA_CALLBACK
     // Register polling function to be invoked at every scheduler loop
-    CcdCallOnConditionKeep(CcdSCHEDLOOP, hapiPollEvents, NULL);
+    CcdCallOnConditionKeep(CcdSCHEDLOOP, (CcdCondFn)hapiPollEvents, NULL);
 #endif
+  }
+
+  CmiNodeAllBarrier();
+
+  if (CmiInCommThread()) {
+    // FIXME: Comm. thread sets its device to be the same as worker thread 0
+    cudaSetDevice(CsvAccess(gpu_manager).comm_thread_device);
   }
 
   shmInit();
@@ -319,6 +332,9 @@ static void hapiMapping(char** argv) {
 #if CMK_SMP
   CmiUnlock(csv_gpu_manager.device_mapping_lock);
 #endif
+
+  // Comm. thread will set its device to the same one as worker thread 0
+  if (CmiMyRank() == 0) csv_gpu_manager.comm_thread_device = cpv_my_device;
 
   // Check if user opted in to POSIX shared memory optimizations for
   // inter-process GPU messaging
@@ -1365,7 +1381,7 @@ void hapiClearInstrument() {
 // all successive completed events in the queue starting from the front.
 // TODO Maybe we should make one pass of all events in the queue instead,
 // since there might be completed events later in the queue.
-void hapiPollEvents(void* param, double cur_time) {
+void hapiPollEvents(void* param) {
 #ifndef HAPI_CUDA_CALLBACK
   if (CpvAccess(n_hapi_events) <= 0) return;
 

@@ -22,7 +22,7 @@ class Ping: public PUP::able {
   Ping(CkMigrateMessage *m) : PUP::able(m) { }
   virtual ~Ping() { }
 
-  virtual void pup(PUP::er &p) override {
+  virtual void pup(PUP::er &p) {
     PUP::able::pup(p);
     p | value_;
   }
@@ -43,7 +43,7 @@ public:
   main(CkArgMsg *m);
 
   void accept(std::shared_ptr<Ping> ping);
-
+  void accept(std::vector<Ping*>* pings);
 };
 
 template <typename U> class SimpleArray : public CBase_SimpleArray<U> {
@@ -56,7 +56,6 @@ template <typename U> class SimpleArray : public CBase_SimpleArray<U> {
 
   void done(){
     CkPrintf("done int %d\n",localCopy.publicInt);
-    CkExit();
   }
 
   ~SimpleArray(){}

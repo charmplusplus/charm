@@ -18,7 +18,7 @@
 #define LOAD_WEIGHT 0.1
 #define PRIOR_WEIGHT 0.1
 
-CpvDeclare(CldProcInfo, CldData);
+CpvDeclare(CldDataInfo, CldData);
 extern char *_lbtopo;			/* topology name string */
 int _lbsteal = 0;                       /* work stealing flag */
 
@@ -33,7 +33,7 @@ CpvDeclare(void*, CldRequestQueue);
 
 void LoadNotifyFn(int l)
 {
-  CldProcInfo  cldData = CpvAccess(CldData);
+  CldDataInfo  cldData = CpvAccess(CldData);
   cldData->sent = 0;
 }
 
@@ -205,7 +205,7 @@ static void CldEndIdle(void *dummy)
     CpvAccess(CldData)->lastCheck = -1;
 }
 
-static void CldStillIdle(void *dummy, double curT)
+static void CldStillIdle(void *dummy)
 {
     if(CmiMyPe() == 0) 
     {
@@ -223,8 +223,8 @@ static void CldStillIdle(void *dummy, double curT)
     int i;
     double startT;
     requestmsg msg;
-    CldProcInfo  cldData = CpvAccess(CldData);
-    double now = curT;
+    CldDataInfo  cldData = CpvAccess(CldData);
+    double now = CmiWallTimer();
     double lt = cldData->lastCheck;
    
     cldData->load  = 0;
@@ -247,7 +247,7 @@ static void CldStillIdle(void *dummy, double curT)
 void CldReadytoExec(void *msg)
 {
 
-    CldProcInfo  cldData = CpvAccess(CldData);
+    CldDataInfo  cldData = CpvAccess(CldData);
     CldRestoreHandler((char *)msg);
     CmiHandleMessage(msg);
     cldData->load = cldData->load - 1;
@@ -271,7 +271,7 @@ void HigherPriorityWork(void *msg)
     CldPackFn pfn;
     int len, queueing, priobits; 
     unsigned int *prioptr;
-    CldProcInfo  cldData = CpvAccess(CldData);
+    CldDataInfo  cldData = CpvAccess(CldData);
     ifn = (CldInfoFn)CmiHandlerToFunction(CmiGetInfo(msg));
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
     CldRestoreHandler((char *)msg);
@@ -365,8 +365,8 @@ void CldEnqueueGroup(CmiGroup grp, void *msg, int infofn)
 void  CldOtherInit()
 {
 
-  CpvInitialize(CldProcInfo, CldData);
-  CpvAccess(CldData) = (CldProcInfo)CmiAlloc(sizeof(struct CldProcInfo_s));
+  CpvInitialize(CldDataInfo, CldData);
+  CpvAccess(CldData) = (CldDataInfo)CmiAlloc(sizeof(struct CldDataInfo_s));
   CpvAccess(CldData)->lastCheck = -1;
   CpvAccess(CldData)->sent = 0;
   CpvAccess(CldData)->load = 0;
@@ -375,11 +375,11 @@ void  CldOtherInit()
   if (_lbsteal) {
   /* register idle handlers - when idle, keep asking work from neighbors */
   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
-      (CcdVoidFn) CldBeginIdle, NULL);
+      (CcdCondFn) CldBeginIdle, NULL);
   CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,
-      (CcdVoidFn) CldStillIdle, NULL);
+      (CcdCondFn) CldStillIdle, NULL);
   CcdCallOnConditionKeep(CcdPROCESSOR_END_IDLE,
-      (CcdVoidFn) CldEndIdle, NULL);
+      (CcdCondFn) CldEndIdle, NULL);
     if (CmiMyPe() == 0) 
       CmiPrintf("Charm++> Work stealing is enabled. \n");
   }

@@ -9,16 +9,16 @@
 
 
 problem::problem()
-: Priority(),
+: PUP::able(),
   Root(1),
-  PUP::able()
+  Priority()
 {
 }
 
 problem::problem(const problem &p)
-: Priority(p.Priority),
+: PUP::able(p),
   Root(p.Root),
-  PUP::able(p)
+  Priority(p.Priority)
 {
 }
 

@@ -18,7 +18,7 @@ char *SRentry::dumpString() {
 }
 
 /// Basic constructor
-SRtable::SRtable() : offset(0), b(0), size_b(0), numOverflow(0), overflow(NULL), end_overflow(NULL), ofSends(0), ofRecvs(0)
+SRtable::SRtable() : offset(0), b(0), size_b(0), ofSends(0), ofRecvs(0), overflow(NULL), end_overflow(NULL), numOverflow(0)
 { 
   int i;
   for (i=0; i<MAX_B; i++) {

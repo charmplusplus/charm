@@ -1,5 +1,5 @@
 /*
- * Copyright © 2019-2020 Inria.  All rights reserved.
+ * Copyright © 2019-2022 Inria.  All rights reserved.
  * See COPYING in top-level directory.
  */
 
@@ -54,9 +54,10 @@ extern "C" {
  * Attribute values for these nodes, if any, may then be obtained with
  * hwloc_memattr_get_value() and manually compared with the desired criteria.
  *
- * \note The API also supports specific objects as initiator.
- * This might for instance be used in the future when describing the
- * performance of accesses from a GPU to some memory targets.
+ * \note The API also supports specific objects as initiator,
+ * but it is currently not used internally by hwloc.
+ * Users may for instance use it to provide custom performance
+ * values for host memory accesses performed by GPUs.
  *
  * \note The interface actually also accepts targets that are not NUMA nodes.
  * @{
@@ -94,18 +95,60 @@ enum hwloc_memattr_id_e {
    * Best bandwidth nodes are nodes with <b>higher bandwidth</b>.
    * The corresponding attribute flags are ::HWLOC_MEMATTR_FLAG_HIGHER_FIRST
    * and ::HWLOC_MEMATTR_FLAG_NEED_INITIATOR.
+   *
+   * This is the average bandwidth for read and write accesses. If the platform
+   * provides individual read and write bandwidths but no explicit average value,
+   * hwloc computes and returns the average.
    */
   HWLOC_MEMATTR_ID_BANDWIDTH = 2,
+
+  /** \brief "ReadBandwidth".
+   * The Read bandwidth is returned in MiB/s, as seen from the given initiator location.
+   * Best bandwidth nodes are nodes with <b>higher bandwidth</b>.
+   * The corresponding attribute flags are ::HWLOC_MEMATTR_FLAG_HIGHER_FIRST
+   * and ::HWLOC_MEMATTR_FLAG_NEED_INITIATOR.
+   */
+  HWLOC_MEMATTR_ID_READ_BANDWIDTH = 4,
+
+  /** \brief "WriteBandwidth".
+   * The Write bandwidth is returned in MiB/s, as seen from the given initiator location.
+   * Best bandwidth nodes are nodes with <b>higher bandwidth</b>.
+   * The corresponding attribute flags are ::HWLOC_MEMATTR_FLAG_HIGHER_FIRST
+   * and ::HWLOC_MEMATTR_FLAG_NEED_INITIATOR.
+   */
+  HWLOC_MEMATTR_ID_WRITE_BANDWIDTH = 5,
 
   /** \brief "Latency".
    * The latency is returned as nanoseconds, as seen from the given initiator location.
    * Best latency nodes are nodes with <b>smaller latency</b>.
    * The corresponding attribute flags are ::HWLOC_MEMATTR_FLAG_LOWER_FIRST
    * and ::HWLOC_MEMATTR_FLAG_NEED_INITIATOR.
+   *
+   * This is the average latency for read and write accesses. If the platform
+   * provides individual read and write latencies but no explicit average value,
+   * hwloc computes and returns the average.
    */
-  HWLOC_MEMATTR_ID_LATENCY = 3
+  HWLOC_MEMATTR_ID_LATENCY = 3,
 
-  /* TODO read vs write, persistence? */
+  /** \brief "ReadLatency".
+   * The Read latency is returned as nanoseconds, as seen from the given initiator location.
+   * Best latency nodes are nodes with <b>smaller latency</b>.
+   * The corresponding attribute flags are ::HWLOC_MEMATTR_FLAG_LOWER_FIRST
+   * and ::HWLOC_MEMATTR_FLAG_NEED_INITIATOR.
+   */
+  HWLOC_MEMATTR_ID_READ_LATENCY = 6,
+
+  /** \brief "WriteLatency".
+   * The Write latency is returned as nanoseconds, as seen from the given initiator location.
+   * Best latency nodes are nodes with <b>smaller latency</b>.
+   * The corresponding attribute flags are ::HWLOC_MEMATTR_FLAG_LOWER_FIRST
+   * and ::HWLOC_MEMATTR_FLAG_NEED_INITIATOR.
+   */
+  HWLOC_MEMATTR_ID_WRITE_LATENCY = 7,
+
+  /* TODO persistence? */
+
+  HWLOC_MEMATTR_ID_MAX /**< \private Sentinel value */
 };
 
 /** \brief A memory attribute identifier.
@@ -121,21 +164,24 @@ hwloc_memattr_get_by_name(hwloc_topology_t topology,
                           hwloc_memattr_id_t *id);
 
 
+/** \brief Type of location. */
+enum hwloc_location_type_e {
+  /** \brief Location is given as a cpuset, in the location cpuset union field. \hideinitializer */
+  HWLOC_LOCATION_TYPE_CPUSET = 1,
+  /** \brief Location is given as an object, in the location object union field. \hideinitializer */
+  HWLOC_LOCATION_TYPE_OBJECT = 0
+};
+
 /** \brief Where to measure attributes from. */
 struct hwloc_location {
   /** \brief Type of location. */
-  enum hwloc_location_type_e {
-    /** \brief Location is given as an object, in the location object union field. */
-    HWLOC_LOCATION_TYPE_OBJECT = 0,
-    /** \brief Location is given as an cpuset, in the location cpuset union field. */
-    HWLOC_LOCATION_TYPE_CPUSET = 1
-  } type;
+  enum hwloc_location_type_e type;
   /** \brief Actual location. */
   union hwloc_location_u {
-    /** \brief Location as an object, when the location type is HWLOC_LOCATION_TYPE_OBJECT. */
-    hwloc_obj_t object;
-    /** \brief Location as a cpuset, when the location type is HWLOC_LOCATION_TYPE_CPUSET. */
+    /** \brief Location as a cpuset, when the location type is ::HWLOC_LOCATION_TYPE_CPUSET. */
     hwloc_cpuset_t cpuset;
+    /** \brief Location as an object, when the location type is ::HWLOC_LOCATION_TYPE_OBJECT. */
+    hwloc_obj_t object;
   } location;
 };
 
@@ -145,17 +191,20 @@ enum hwloc_local_numanode_flag_e {
   /** \brief Select NUMA nodes whose locality is larger than the given cpuset.
    * For instance, if a single PU (or its cpuset) is given in \p initiator,
    * select all nodes close to the package that contains this PU.
+   * \hideinitializer
    */
   HWLOC_LOCAL_NUMANODE_FLAG_LARGER_LOCALITY = (1UL<<0),
 
   /** \brief Select NUMA nodes whose locality is smaller than the given cpuset.
    * For instance, if a package (or its cpuset) is given in \p initiator,
    * also select nodes that are attached to only a half of that package.
+   * \hideinitializer
    */
   HWLOC_LOCAL_NUMANODE_FLAG_SMALLER_LOCALITY = (1UL<<1),
 
   /** \brief Select all NUMA nodes in the topology.
-   * \p initiator is ignored.
+   * The initiator \p initiator is ignored.
+   * \hideinitializer
    */
   HWLOC_LOCAL_NUMANODE_FLAG_ALL = (1UL<<2)
 };
@@ -166,7 +215,7 @@ enum hwloc_local_numanode_flag_e {
  * the given \p location. More nodes may be selected if additional flags
  * are given as a OR'ed set of ::hwloc_local_numanode_flag_e.
  *
- * If location is given as an explicit object, its CPU set is used
+ * If \p location is given as an explicit object, its CPU set is used
  * to find NUMA nodes with the corresponding locality.
  * If the object does not have a CPU set (e.g. I/O object), the CPU
  * parent (where the I/O object is attached) is used.
@@ -205,6 +254,12 @@ hwloc_get_local_numanode_objs(hwloc_topology_t topology,
  * location \p initiator is ignored and may be \c NULL.
  *
  * \p flags must be \c 0 for now.
+ *
+ * \note The initiator \p initiator should be of type ::HWLOC_LOCATION_TYPE_CPUSET
+ * when refering to accesses performed by CPU cores.
+ * ::HWLOC_LOCATION_TYPE_OBJECT is currently unused internally by hwloc,
+ * but users may for instance use it to provide custom information about
+ * host memory accesses performed by GPUs.
  */
 HWLOC_DECLSPEC int
 hwloc_memattr_get_value(hwloc_topology_t topology,
@@ -232,6 +287,12 @@ hwloc_memattr_get_value(hwloc_topology_t topology,
  * \p flags must be \c 0 for now.
  *
  * If there are no matching targets, \c -1 is returned with \p errno set to \c ENOENT;
+ *
+ * \note The initiator \p initiator should be of type ::HWLOC_LOCATION_TYPE_CPUSET
+ * when refering to accesses performed by CPU cores.
+ * ::HWLOC_LOCATION_TYPE_OBJECT is currently unused internally by hwloc,
+ * but users may for instance use it to provide custom information about
+ * host memory accesses performed by GPUs.
  */
 HWLOC_DECLSPEC int
 hwloc_memattr_get_best_target(hwloc_topology_t topology,
@@ -333,6 +394,12 @@ hwloc_memattr_register(hwloc_topology_t topology,
  * for instance the cpuset.
  *
  * \p flags must be \c 0 for now.
+ *
+ * \note The initiator \p initiator should be of type ::HWLOC_LOCATION_TYPE_CPUSET
+ * when referring to accesses performed by CPU cores.
+ * ::HWLOC_LOCATION_TYPE_OBJECT is currently unused internally by hwloc,
+ * but users may for instance use it to provide custom information about
+ * host memory accesses performed by GPUs.
  */
 HWLOC_DECLSPEC int
 hwloc_memattr_set_value(hwloc_topology_t topology,
@@ -371,13 +438,19 @@ hwloc_memattr_set_value(hwloc_topology_t topology,
  * rather than for application queries. Applications should rather select useful
  * NUMA nodes with hwloc_get_local_numanode_objs() and then look at their attribute
  * values.
+ *
+ * \note The initiator \p initiator should be of type ::HWLOC_LOCATION_TYPE_CPUSET
+ * when referring to accesses performed by CPU cores.
+ * ::HWLOC_LOCATION_TYPE_OBJECT is currently unused internally by hwloc,
+ * but users may for instance use it to provide custom information about
+ * host memory accesses performed by GPUs.
  */
 HWLOC_DECLSPEC int
 hwloc_memattr_get_targets(hwloc_topology_t topology,
                           hwloc_memattr_id_t attribute,
                           struct hwloc_location *initiator,
                           unsigned long flags,
-                          unsigned *nrp, hwloc_obj_t *targets, hwloc_uint64_t *values);
+                          unsigned *nr, hwloc_obj_t *targets, hwloc_uint64_t *values);
 
 /** \brief Return the initiators that have values for a given attribute for a specific target NUMA node.
  *

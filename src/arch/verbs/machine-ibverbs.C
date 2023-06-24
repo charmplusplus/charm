@@ -306,13 +306,12 @@ struct infiOtherNodeData{
 Memory management structures and types
 *****************/
 
-struct infiCmiChunkHeaderStruct;
 
 typedef struct infiCmiChunkMetaDataStruct {
 	struct ibv_mr *key;
 	int poolIdx;
 	void *nextBuf;
-	struct infiCmiChunkHeaderStruct *owner;
+	struct CmiChunkHeader *owner;
 	int count;
 
 #if THREAD_MULTI_POOL
@@ -323,14 +322,14 @@ typedef struct infiCmiChunkMetaDataStruct {
 
 
 
-#define METADATAFIELD(m) (((infiCmiChunkHeader *)m)[-1].metaData)
+#define METADATAFIELD(m) (((CmiChunkHeader *)m)[-1].metaData)
 
 #if CMK_ONESIDED_IMPL
 #include "machine-onesided.h"
 #endif
 
 typedef struct {
-	int size;//without infiCmiChunkHeader
+	int size;//without CmiChunkHeader
 	void *startBuf;
 	int count;
 } infiCmiChunkPool;
@@ -2439,8 +2438,8 @@ Register memory for a part of a received multisend message
 *************/
 infiCmiChunkMetaData *registerMultiSendMesg(char *msg,int size){
 	infiCmiChunkMetaData *metaData = (infiCmiChunkMetaData *)malloc(sizeof(infiCmiChunkMetaData));
-	char *res=msg-sizeof(infiCmiChunkHeader);
-	metaData->key = ibv_reg_mr(context->pd,res,(size+sizeof(infiCmiChunkHeader)),IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
+	char *res=msg-sizeof(CmiChunkHeader);
+	metaData->key = ibv_reg_mr(context->pd,res,(size+sizeof(CmiChunkHeader)),IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
 #if CMK_IBVERBS_STATS
 	numCurReg++;
 	numReg++;
@@ -2460,7 +2459,7 @@ infiCmiChunkMetaData *registerMultiSendMesg(char *msg,int size){
 static inline void fillBufferPools(void){
 	int nodeSize, poolIdx, thread;
 	infiCmiChunkMetaData *metaData;		
-	infiCmiChunkHeader *hdr;
+	CmiChunkHeader *hdr;
 	int allocSize;
 	int count=1;
 	int i;
@@ -2479,15 +2478,15 @@ static inline void fillBufferPools(void){
 			}else{
 				count = 1;
 			}
-			posix_memalign((void **)&res, ALIGN_BYTES, (allocSize+sizeof(infiCmiChunkHeader))*count);
-			hdr = (infiCmiChunkHeader *)res;
-			key = ibv_reg_mr(context->pd,res,(allocSize+sizeof(infiCmiChunkHeader))*count,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
+			posix_memalign((void **)&res, ALIGN_BYTES, (allocSize+sizeof(CmiChunkHeader))*count);
+			hdr = (CmiChunkHeader *)res;
+			key = ibv_reg_mr(context->pd,res,(allocSize+sizeof(CmiChunkHeader))*count,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
 			CmiAssert(key != NULL);
 #if CMK_IBVERBS_STATS
 		numCurReg++;
 		numReg++;
 #endif
-			res += sizeof(infiCmiChunkHeader);
+			res += sizeof(CmiChunkHeader);
 			for(i=0;i<count;i++){
 				metaData = METADATAFIELD(res) = (infiCmiChunkMetaData *)malloc(sizeof(infiCmiChunkMetaData));
 				metaData->key = key;
@@ -2497,16 +2496,16 @@ static inline void fillBufferPools(void){
 				if(i == 0){
 					metaData->owner->metaData->count = count;
 					metaData->nextBuf = NULL;
-                                        infiCmiChunkPools[thread][poolIdx].startBuf =  res - sizeof(infiCmiChunkHeader);
+                                        infiCmiChunkPools[thread][poolIdx].startBuf =  res - sizeof(CmiChunkHeader);
                                         infiCmiChunkPools[thread][poolIdx].count++;
 				}else{
-					void *startBuf = res - sizeof(infiCmiChunkHeader);
+					void *startBuf = res - sizeof(CmiChunkHeader);
 					metaData->nextBuf = infiCmiChunkPools[thread][poolIdx].startBuf;
 					infiCmiChunkPools[thread][poolIdx].startBuf = startBuf;
 					infiCmiChunkPools[thread][poolIdx].count++;
 				}
 				if(i != count-1){
-					res += (allocSize+sizeof(infiCmiChunkHeader));
+					res += (allocSize+sizeof(CmiChunkHeader));
 				}
 			}
 		}
@@ -2549,7 +2548,7 @@ static inline void *getInfiCmiChunkThread(int dataSize){
 
 	if((poolIdx < INFINUMPOOLS && infiCmiChunkPools[CmiMyRank()][poolIdx].startBuf == NULL) || poolIdx >= INFINUMPOOLS){
 		infiCmiChunkMetaData *metaData;		
-		infiCmiChunkHeader *hdr;
+		CmiChunkHeader *hdr;
 		int allocSize;
 		int count=1;
 		int i;
@@ -2566,11 +2565,11 @@ static inline void *getInfiCmiChunkThread(int dataSize){
 		if(poolIdx < blockThreshold){
 			count = blockAllocRatio;
 		}
-		posix_memalign((void **)&res, ALIGN_BYTES, (allocSize+sizeof(infiCmiChunkHeader))*count);
+		posix_memalign((void **)&res, ALIGN_BYTES, (allocSize+sizeof(CmiChunkHeader))*count);
 		_MEMCHECK(res);
-		hdr = (infiCmiChunkHeader *)res;
+		hdr = (CmiChunkHeader *)res;
 		
-		key = ibv_reg_mr(context->pd,res,(allocSize+sizeof(infiCmiChunkHeader))*count,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
+		key = ibv_reg_mr(context->pd,res,(allocSize+sizeof(CmiChunkHeader))*count,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
 	        if(key == NULL)
                     CmiAbort("ibv_reg_mr failed to pin memory\n");
 #if CMK_IBVERBS_STATS
@@ -2578,7 +2577,7 @@ static inline void *getInfiCmiChunkThread(int dataSize){
 		numReg++;
 #endif
 		
-		origres = (res += sizeof(infiCmiChunkHeader));
+		origres = (res += sizeof(CmiChunkHeader));
 
 		for(i=0;i<count;i++){
 			metaData = METADATAFIELD(res) = (infiCmiChunkMetaData *)malloc(sizeof(infiCmiChunkMetaData));
@@ -2592,14 +2591,14 @@ static inline void *getInfiCmiChunkThread(int dataSize){
 				metaData->owner->metaData->count = count;
 				metaData->nextBuf = NULL;
 			}else{
-				void *startBuf = res - sizeof(infiCmiChunkHeader);
+				void *startBuf = res - sizeof(CmiChunkHeader);
 				metaData->nextBuf = infiCmiChunkPools[CmiMyRank()][poolIdx].startBuf;
 				infiCmiChunkPools[CmiMyRank()][poolIdx].startBuf = startBuf;
 				infiCmiChunkPools[CmiMyRank()][poolIdx].count++;
 				
 			}
 			if(i != count-1){
-				res += (allocSize+sizeof(infiCmiChunkHeader));
+				res += (allocSize+sizeof(CmiChunkHeader));
 			}
 	  }	
 		
@@ -2612,7 +2611,7 @@ static inline void *getInfiCmiChunkThread(int dataSize){
 		infiCmiChunkMetaData *metaData;				
 	
 		res = (char *)infiCmiChunkPools[CmiMyRank()][poolIdx].startBuf;
-		res += sizeof(infiCmiChunkHeader);
+		res += sizeof(CmiChunkHeader);
 
 		MACHSTATE2(2,"Reusing old pool %d buf %p",poolIdx,res);
 		metaData = METADATAFIELD(res);
@@ -2652,7 +2651,7 @@ static inline void *getInfiCmiChunk(int dataSize){
         MACHSTATE2(2,"getInfiCmiChunk for size %d in poolIdx %d",dataSize,poolIdx);
         if((poolIdx < INFINUMPOOLS && infiCmiChunkPools[poolIdx].startBuf == NULL) || poolIdx >= INFINUMPOOLS){
                 infiCmiChunkMetaData *metaData;
-                infiCmiChunkHeader *hdr;
+                CmiChunkHeader *hdr;
                 int allocSize;
                 int count=1;
                 int i;
@@ -2669,16 +2668,16 @@ static inline void *getInfiCmiChunk(int dataSize){
                 if(poolIdx < blockThreshold){
                         count = blockAllocRatio;
                 }
-                posix_memalign((void **)&res, ALIGN_BYTES, (allocSize+sizeof(infiCmiChunkHeader))*count);
-                hdr = (infiCmiChunkHeader *)res;
+                posix_memalign((void **)&res, ALIGN_BYTES, (allocSize+sizeof(CmiChunkHeader))*count);
+                hdr = (CmiChunkHeader *)res;
 
-                key = ibv_reg_mr(context->pd,res,(allocSize+sizeof(infiCmiChunkHeader))*count,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
+                key = ibv_reg_mr(context->pd,res,(allocSize+sizeof(CmiChunkHeader))*count,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
                 CmiAssert(key != NULL);
 #if CMK_IBVERBS_STATS
 		numCurReg++;
 		numReg++;
 #endif
-                origres = (res += sizeof(infiCmiChunkHeader));
+                origres = (res += sizeof(CmiChunkHeader));
 
                 for(i=0;i<count;i++){
                         metaData = METADATAFIELD(res) = (infiCmiChunkMetaData *)malloc(sizeof(infiCmiChunkMetaData));
@@ -2690,14 +2689,14 @@ static inline void *getInfiCmiChunk(int dataSize){
                                 metaData->owner->metaData->count = count;
                                 metaData->nextBuf = NULL;
                         }else{
-                                void *startBuf = res - sizeof(infiCmiChunkHeader);
+                                void *startBuf = res - sizeof(CmiChunkHeader);
                                 metaData->nextBuf = infiCmiChunkPools[poolIdx].startBuf;
                                 infiCmiChunkPools[poolIdx].startBuf = startBuf;
                                 infiCmiChunkPools[poolIdx].count++;
 
                         }
                         if(i != count-1){
-                                res += (allocSize+sizeof(infiCmiChunkHeader));
+                                res += (allocSize+sizeof(CmiChunkHeader));
                         }
           }
 
@@ -2710,7 +2709,7 @@ static inline void *getInfiCmiChunk(int dataSize){
                 infiCmiChunkMetaData *metaData;
 
                 res = (char *)infiCmiChunkPools[poolIdx].startBuf;
-                res += sizeof(infiCmiChunkHeader);
+                res += sizeof(CmiChunkHeader);
 
                 MACHSTATE2(2,"Reusing old pool %d buf %p",poolIdx,res);
                 metaData = METADATAFIELD(res);
@@ -2738,8 +2737,7 @@ void * infi_CmiAlloc(int size){
 	numAlloc++;
 #endif
         if (Cmi_charmrun_fd == -1) {
-          posix_memalign((void **)&res, ALIGN_BYTES, size + sizeof(void*));
-          res += sizeof(void*);
+          posix_memalign((void **)&res, ALIGN_BYTES, size);
           return res;
 	}
 #if THREAD_MULTI_POOL
@@ -2782,8 +2780,7 @@ void infi_CmiFreeDirect(void *ptr){
 /*      if(size > firstBinSize){*/
         infiCmiChunkMetaData *metaData;
         int poolIdx;
-        //there is a infiniband specific header
-        freePtr = (char *)ptr - sizeof(infiCmiChunkHeader);
+        freePtr = (char *)ptr - sizeof(CmiChunkHeader);
         metaData = METADATAFIELD(ptr);
         poolIdx = metaData->poolIdx;
 	infiCmiChunkPool *pool = infiCmiChunkPools[CmiMyRank()] + poolIdx;
@@ -2846,14 +2843,13 @@ void infi_CmiFree(void *ptr){
 
 	MACHSTATE(3,"Freeing");
 
-        if (Cmi_charmrun_fd == -1) { char *res = (char *)ptr; res -= sizeof(void*); free(res); return; }
+        if (Cmi_charmrun_fd == -1) { free(ptr); return; }
         ptr = (char *)ptr + sizeof(CmiChunkHeader);
         size = SIZEFIELD (ptr);
 /*      if(size > firstBinSize){*/
 	infiCmiChunkMetaData *metaData;
         int poolIdx;
-        //there is a infiniband specific header
-        freePtr = (char *)ptr - sizeof(infiCmiChunkHeader);
+        freePtr = (char *)ptr - sizeof(CmiChunkHeader);
         metaData = METADATAFIELD(ptr);
         poolIdx = metaData->poolIdx;
 
@@ -2897,8 +2893,7 @@ void infi_CmiFree(void *ptr){
 /*	if(size > firstBinSize){*/
 		infiCmiChunkMetaData *metaData;
 		int poolIdx;
-		//there is a infiniband specific header
-		freePtr = (char*)ptr - sizeof(infiCmiChunkHeader);
+		freePtr = (char*)ptr - sizeof(CmiChunkHeader);
 		metaData = METADATAFIELD(ptr);
 		poolIdx = metaData->poolIdx;
 		if(poolIdx == INFIMULTIPOOL){

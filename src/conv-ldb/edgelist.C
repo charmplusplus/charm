@@ -12,7 +12,7 @@ EdgeListType * InitEdgeList(int E)
   edgesRec = (EdgeListType *) malloc(sizeof(EdgeListType));
   _MEMCHECK(edgesRec);
   edgesRec->next = 0;
-  edgesRec->edges = (Edge *) malloc(E*sizeof(Edge));
+  edgesRec->edges = (ConvEdge *) malloc(E*sizeof(ConvEdge));
   _MEMCHECK(edgesRec->edges);
   return(edgesRec);
 }
@@ -38,7 +38,7 @@ void addEdge(VerticesListType *graph, EdgeListType * EdgeList, int v, int w)
 void printEdges(EdgeListType *EdgeList)
 {
  int i;
- Edge * edges;
+ ConvEdge * edges;
  edges = EdgeList->edges;
  for (i=0; i< (EdgeList->next ); i++)
    {printf("%d\t%d\n", edges[i].node1, edges[i].node2);

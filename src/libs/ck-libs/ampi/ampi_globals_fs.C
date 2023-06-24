@@ -23,9 +23,17 @@
 # include <sys/types.h>
 # include <sys/wait.h>
 # include <errno.h>
+# if CMK_HAS_POSIX_SPAWN
+#  ifndef _GNU_SOURCE
+#   define _GNU_SOURCE
+#  endif
+#  include <spawn.h>
+extern char **environ;
+# endif
 #endif
 
 #include <string>
+#include <vector>
 #include <atomic>
 
 static void fs_copy(const char * src, const char * dst)
@@ -47,11 +55,33 @@ static void fs_copy(const char * src, const char * dst)
     CkAbort(abortmsg);
   }
 #else
+  const char * const params[] = { "/bin/cp", src, dst, nullptr };
+#if CMK_HAS_POSIX_SPAWN
+  posix_spawnattr_t attr;
+  short flags;
+  posix_spawnattr_init(&attr);
+  posix_spawnattr_getflags(&attr, &flags);
+#ifdef POSIX_SPAWN_USEVFORK
+  flags |= POSIX_SPAWN_USEVFORK;
+#endif
+  posix_spawnattr_setflags(&attr, flags);
+
+  pid_t pid;
+  int ret = posix_spawn(&pid, params[0], nullptr, &attr, const_cast<char * const *>(params), environ);
+
+  posix_spawnattr_destroy(&attr);
+
+  if (ret != 0)
+  {
+    CkError("ERROR> posix_spawn(): %s\n", strerror(ret));
+    CkAbort(abortmsg);
+  }
+#else
   pid_t pid = fork();
   if (pid == 0)
   {
-    execl("/bin/cp", "/bin/cp", src, dst, NULL);
-    CkError("ERROR> execl(): %s\n", strerror(errno));
+    execv(params[0], const_cast<char * const *>(params));
+    CkError("ERROR> execv(): %s\n", strerror(errno));
     CkAbort(abortmsg);
   }
   else if (pid < 0)
@@ -59,6 +89,7 @@ static void fs_copy(const char * src, const char * dst)
     CkError("ERROR> fork(): %s\n", strerror(errno));
     CkAbort(abortmsg);
   }
+#endif
   else
   {
     int status;
@@ -69,36 +100,43 @@ static void fs_copy(const char * src, const char * dst)
 #endif
 }
 
-static std::atomic<size_t> rank_count{};
-
-int main(int argc, char ** argv)
+struct rankstruct
 {
-  const size_t myrank = rank_count++;
-  if (CmiMyNode() == 0 && myrank == 0 && !quietModeRequested)
+  ampi_mainstruct mainstruct;
+  SharedObject exe;
+};
+
+static std::vector<rankstruct> rankdata;
+
+void AMPI_Node_Setup(int numranks)
+{
+  if (CmiMyNode() == 0 && !quietModeRequested)
     CmiPrintf("AMPI> Using fsglobals privatization method.\n");
 
-  SharedObject myexe;
+  AMPI_FuncPtr_Transport funcptrs{};
+  if (AMPI_FuncPtr_Pack(&funcptrs, sizeof(funcptrs)))
+    CkAbort("Globals runtime linking pack failed due to mismatch!");
 
-  // copy the user binary for this rank on the filesystem and open it
+  static const char exe_suffix[] = STRINGIFY(CMK_POST_EXE);
+  static const char user_suffix[] = STRINGIFY(CMK_USER_SUFFIX);
+  static const char so_suffix[] = "." STRINGIFY(CMK_SHARED_SUF);
+  static constexpr size_t exe_suffix_len = sizeof(exe_suffix)-1;
+  std::string src{ampi_binary_path};
+  if (exe_suffix_len > 0)
   {
-    static const char exe_suffix[] = STRINGIFY(CMK_POST_EXE);
-    static const char user_suffix[] = STRINGIFY(CMK_USER_SUFFIX);
-    static const char so_suffix[] = "." STRINGIFY(CMK_SHARED_SUF);
-    static constexpr size_t exe_suffix_len = sizeof(exe_suffix)-1;
+    size_t pos = src.length() - exe_suffix_len;
+    if (!src.compare(pos, exe_suffix_len, exe_suffix))
+      src.resize(pos);
+  }
+  src += user_suffix;
+  std::string dst_template{src};
+  src += so_suffix;
 
-    std::string src{ampi_binary_path};
-    if (exe_suffix_len > 0)
-    {
-      size_t pos = src.length() - exe_suffix_len;
-      if (!src.compare(pos, exe_suffix_len, exe_suffix))
-        src.resize(pos);
-    }
-    src += user_suffix;
-
-    std::string dst{src};
-
-    src += so_suffix;
-
+  // copy the user binary for each rank on the filesystem and open it
+  rankdata.resize(numranks);
+  for (int myrank = 0; myrank < numranks; ++myrank)
+  {
+    std::string dst{dst_template};
     dst += '.';
     dst += std::to_string(myrank);
     dst += so_suffix;
@@ -107,14 +145,34 @@ int main(int argc, char ** argv)
     if (access(dststr, R_OK) != 0)
       fs_copy(src.c_str(), dststr);
 
-    myexe = dlopen(dststr, RTLD_NOW|RTLD_LOCAL);
-  }
+    SharedObject myexe = dlopen(dststr, RTLD_NOW|RTLD_LOCAL);
 
-  if (myexe == nullptr)
-  {
-    CkError("dlopen error: %s\n", dlerror());
-    CkAbort("Could not open fsglobals user program!");
-  }
+    if (myexe == nullptr)
+    {
+      CkError("dlmopen error: %s\n", dlerror());
+      CkAbort("Could not open pipglobals user program!");
+    }
 
-  return AMPI_FuncPtr_Loader(myexe, argc, argv);
+    auto unpack = AMPI_FuncPtr_Unpack_Locate(myexe);
+    if (unpack != nullptr)
+    {
+      if (unpack(&funcptrs, sizeof(funcptrs)))
+        CkAbort("Globals runtime linking unpack failed due to mismatch!");
+    }
+
+    rankdata[myrank].exe = myexe;
+    rankdata[myrank].mainstruct = AMPI_Main_Get(myexe);
+  }
+}
+
+// separate function so that setting a breakpoint is straightforward
+static int ampi_fsglobals(int argc, char ** argv)
+{
+  const size_t myrank = TCHARM_Element();
+  return AMPI_Main_Dispatch(rankdata[myrank].mainstruct, argc, argv);
+}
+
+int main(int argc, char ** argv)
+{
+  return ampi_fsglobals(argc, argv);
 }

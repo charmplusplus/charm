@@ -4,13 +4,13 @@ name: Verbs Linux Buildonly Tarball
 # Also test packaging a tarball and building from it.
 # Since it is buildonly, test both build and buildold with the tarball.
 
-on: pull_request
+on: [pull_request, merge_group]
 
 jobs:
   build:
     timeout-minutes: 45
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
 
     steps:
     - uses: actions/checkout@v1

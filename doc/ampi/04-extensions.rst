@@ -356,6 +356,13 @@ wait on any outstanding send requests before calling ``AMPI_Migrate``.
        AMPI_Migrate(AMPI_INFO_LB_SYNC);
    }
 
+``AMPI_Migrate_to_pe`` migrates the calling rank to the specified PE. 
+``AMPI_Migrate`` is preferred to users calling ``AMPI_Migrate_to_pe`` directly,
+because ``AMPI_Migrate_to_pe`` requires Charm++ support for anytime migration.
+Anytime migration requires the runtime system to buffer Charm++ broadcasts,
+which has a memory overhead. Consequently, users are required to run with
+``+ampiEnableMigrateToPe`` in order to call this extension routine.
+
 Note that migrating ranks around the cores and nodes of a system can
 change which ranks share physical resources, such as memory. A
 consequence of this is that communicators created via
@@ -470,14 +477,28 @@ for this get request including the data buffer. Finally,
 Compute Resource Awareness
 --------------------------
 
-AMPI provides a set of built-in attributes on all communicators and
-windows to find the number of the worker thread, process, or host that a
-rank is currently running on, as well as the total number of worker
-threads, processes, and hosts in the job. We define a worker thread to
+AMPI provides a set of built-in attributes on all communicators to find
+the number of the worker thread or process that a rank is currently
+running on, its home worker thread, as well as the total number of
+worker threads and processes in the job. We define a worker thread to
 be a thread on which one of more AMPI ranks are scheduled. We define a
 process here as an operating system process, which may contain one or
-more worker threads. The built-in attributes are ``AMPI_MY_WTH``,
-``AMPI_MY_PROCESS``, ``AMPI_NUM_WTHS``, and ``AMPI_NUM_PROCESSES``.
+more worker threads. The built-in attributes are listed in the following table:
+
++------------------------+-------------------------------------------------+
+| Attribute              | Defintion                                       |
++========================+=================================================+
+| ``AMPI_MY_WTH``        | Worker thread the rank is currently running on. |
++------------------------+-------------------------------------------------+
+| ``AMPI_MY_PROCESS``    | OS process the rank is currently running on.    |
++------------------------+-------------------------------------------------+
+| ``AMPI_NUM_WTHS``      | Number of worker threads in the application.    |
++------------------------+-------------------------------------------------+
+| ``AMPI_NUM_PROCESSES`` | Number of OS processes in the application.      |
++------------------------+-------------------------------------------------+
+| ``AMPI_MY_HOME_WTH``   | Home worker thread of the rank.                 |
++------------------------+-------------------------------------------------+
+
 These attributes are accessible from any rank by calling
 ``MPI_Comm_get_attr``, such as:
 

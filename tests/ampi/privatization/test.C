@@ -1,155 +1,264 @@
-// Global Variable Privatization Test - Framework
+// Global Variable Privatization Test - C++
 
-#ifndef __STDC_FORMAT_MACROS
-# define __STDC_FORMAT_MACROS
-#endif
-#ifndef __STDC_LIMIT_MACROS
-# define __STDC_LIMIT_MACROS
-#endif
-#include <stdint.h>
-#include <inttypes.h>
 #include <stdio.h>
 #include "mpi.h"
+#include "framework.h"
 #include "test.h"
 
+#if defined test_dynamiclib
+# include <dlfcn.h>
+#endif
 
 
-void print_test(int & test, int & rank, const char * name)
+#if defined test_globalvars
+static int * get_extern_global_static()
 {
-  if (rank == 0)
-    printf("Test " test_format ": %s\n", test, name);
+  return &extern_global_static;
 }
-
-void print_test_fortran(int & test, int & rank, const char * name, int name_len)
+#endif
+#if defined test_threadlocalvars
+static int * get_extern_threadlocal_static()
 {
-  if (rank == 0)
-    printf("Test " test_format ": %.*s\n", test, name_len, name);
+  return &extern_threadlocal_static;
 }
+#endif
 
-
-static int print_test_result(int test, int rank, int my_wth, void * ptr, const char * name, int result)
+#if defined test_sharedlib
+#if defined test_globalvars
+static int * get_extern_global_shared()
 {
-  printf(test_format " - [%d](%d) - 0x%012" PRIxPTR " - %s - %s\n",
-         test, rank, my_wth, (uintptr_t)ptr, name, result ? "passed" : "failed");
-  return !result;
+  return &extern_global_shared;
 }
-
-void test_privatization(int & failed, int & test, int & rank, int & my_wth, int & operation, int & global)
+#endif
+#if defined test_threadlocalvars
+static int * get_extern_threadlocal_shared()
 {
-  MPI_Barrier(MPI_COMM_WORLD);
+  return &extern_threadlocal_shared;
+}
+#endif
+#endif
 
-  if (operation == 0)
+
+void perform_test_batch(int & failed, int & test, int & rank, int & my_wth, int & operation)
+{
+#if defined test_dynamiclib
+
+#if defined test_globalvars
+  int * extern_global_dynamic_ptr = nullptr;
+#if defined test_staticvars
+  int_ptr_accessor get_static_global_dynamic_ptr = nullptr;
+  int_ptr_accessor get_scoped_global_dynamic_ptr = nullptr;
+#endif
+#endif
+#if defined test_threadlocalvars
+  int * extern_threadlocal_dynamic_ptr = nullptr;
+#if defined test_staticvars
+  int_ptr_accessor get_static_threadlocal_dynamic_ptr = nullptr;
+  int_ptr_accessor get_scoped_threadlocal_dynamic_ptr = nullptr;
+#endif
+#endif
+
+  void * dynamiclib = dlopen("lib" privatization_method_str "-vars-dynamic-cxx.so", RTLD_NOW);
+  if (!dynamiclib)
   {
-    global = 0;
-
-    MPI_Barrier(MPI_COMM_WORLD);
-
-    if (rank == 0)
-      global = 1;
-
-    MPI_Barrier(MPI_COMM_WORLD);
-
-    failed += print_test_result(test, rank, my_wth, &global, "single write", global == (rank == 0 ? 1 : 0));
-
-    MPI_Barrier(MPI_COMM_WORLD);
-
-    global = 0;
-
-    MPI_Barrier(MPI_COMM_WORLD);
-
-    global = rank;
-
-    MPI_Barrier(MPI_COMM_WORLD);
-
-    failed += print_test_result(test, rank, my_wth, &global, "many write", global == rank);
+    fprintf(stderr, "dlopen failed: %s\n", dlerror());
   }
-  else if (operation == 1)
+  else
   {
-    failed += print_test_result(test, rank, my_wth, &global, "migration", global == rank);
+#if defined test_globalvars
+    extern_global_dynamic_ptr = (int *)dlsym(dynamiclib, "extern_global_dynamic");
+    if (!extern_global_dynamic_ptr)
+      fprintf(stderr, "dlsym failed: %s\n", dlerror());
+#if defined test_staticvars
+    get_static_global_dynamic_ptr = (int_ptr_accessor)dlsym(dynamiclib, "get_static_global_dynamic");
+    if (!get_static_global_dynamic_ptr)
+      fprintf(stderr, "dlsym failed: %s\n", dlerror());
+    get_scoped_global_dynamic_ptr = (int_ptr_accessor)dlsym(dynamiclib, "get_scoped_global_dynamic");
+    if (!get_scoped_global_dynamic_ptr)
+      fprintf(stderr, "dlsym failed: %s\n", dlerror());
+#endif
+#endif
+#if defined test_threadlocalvars
+    extern_threadlocal_dynamic_ptr = (int *)dlsym(dynamiclib, "extern_threadlocal_dynamic");
+    if (!extern_threadlocal_dynamic_ptr)
+      fprintf(stderr, "dlsym failed: %s\n", dlerror());
+#if defined test_staticvars
+    get_static_threadlocal_dynamic_ptr = (int_ptr_accessor)dlsym(dynamiclib, "get_static_threadlocal_dynamic");
+    if (!get_static_threadlocal_dynamic_ptr)
+      fprintf(stderr, "dlsym failed: %s\n", dlerror());
+    get_scoped_threadlocal_dynamic_ptr = (int_ptr_accessor)dlsym(dynamiclib, "get_scoped_threadlocal_dynamic");
+    if (!get_scoped_threadlocal_dynamic_ptr)
+      fprintf(stderr, "dlsym failed: %s\n", dlerror());
+#endif
+#endif
   }
+#endif
 
-  MPI_Barrier(MPI_COMM_WORLD);
 
-  ++test;
+#if defined test_globalvars
+  print_test(test, rank, "extern global, static linkage");
+  test_privatization(failed, test, rank, my_wth, operation, *get_extern_global_static());
+#if defined test_staticvars
+  print_test(test, rank, "static global, static linkage");
+  test_privatization(failed, test, rank, my_wth, operation, *get_static_global_static());
+  print_test(test, rank, "scoped global, static linkage");
+  test_privatization(failed, test, rank, my_wth, operation, *get_scoped_global_static());
+#endif
+#endif
+#if defined test_threadlocalvars
+  print_test(test, rank, "extern thread-local, static linkage");
+  test_privatization(failed, test, rank, my_wth, operation, *get_extern_threadlocal_static());
+#if defined test_staticvars
+  print_test(test, rank, "static thread-local, static linkage");
+  test_privatization(failed, test, rank, my_wth, operation, *get_static_threadlocal_static());
+  print_test(test, rank, "scoped thread-local, static linkage");
+  test_privatization(failed, test, rank, my_wth, operation, *get_scoped_threadlocal_static());
+#endif
+#endif
+
+#if defined test_sharedlib
+#if defined test_globalvars
+  print_test(test, rank, "extern global, shared linkage");
+  test_privatization(failed, test, rank, my_wth, operation, *get_extern_global_shared());
+#if defined test_staticvars
+  print_test(test, rank, "static global, shared linkage");
+  test_privatization(failed, test, rank, my_wth, operation, *get_static_global_shared());
+  print_test(test, rank, "scoped global, shared linkage");
+  test_privatization(failed, test, rank, my_wth, operation, *get_scoped_global_shared());
+#endif
+#endif
+#if defined test_threadlocalvars
+  print_test(test, rank, "extern thread-local, shared linkage");
+  test_privatization(failed, test, rank, my_wth, operation, *get_extern_threadlocal_shared());
+#if defined test_staticvars
+  print_test(test, rank, "static thread-local, shared linkage");
+  test_privatization(failed, test, rank, my_wth, operation, *get_static_threadlocal_shared());
+  print_test(test, rank, "scoped thread-local, shared linkage");
+  test_privatization(failed, test, rank, my_wth, operation, *get_scoped_threadlocal_shared());
+#endif
+#endif
+#endif
+
+#if defined test_dynamiclib
+#if defined test_globalvars
+  print_test(test, rank, "extern global, dynamic linkage");
+  if (extern_global_dynamic_ptr)
+    test_privatization(failed, test, rank, my_wth, operation, *extern_global_dynamic_ptr);
+  else
+    test_skip(test, rank);
+#if defined test_staticvars
+  print_test(test, rank, "static global, dynamic linkage");
+  if (get_static_global_dynamic_ptr)
+    test_privatization(failed, test, rank, my_wth, operation, *get_static_global_dynamic_ptr());
+  else
+    test_skip(test, rank);
+  print_test(test, rank, "scoped global, dynamic linkage");
+  if (get_scoped_global_dynamic_ptr)
+    test_privatization(failed, test, rank, my_wth, operation, *get_scoped_global_dynamic_ptr());
+  else
+    test_skip(test, rank);
+#endif
+#endif
+#if defined test_threadlocalvars
+  print_test(test, rank, "extern thread-local, dynamic linkage");
+  if (extern_threadlocal_dynamic_ptr)
+    test_privatization(failed, test, rank, my_wth, operation, *extern_threadlocal_dynamic_ptr);
+  else
+    test_skip(test, rank);
+#if defined test_staticvars
+  print_test(test, rank, "static thread-local, dynamic linkage");
+  if (get_static_threadlocal_dynamic_ptr)
+    test_privatization(failed, test, rank, my_wth, operation, *get_static_threadlocal_dynamic_ptr());
+  else
+    test_skip(test, rank);
+  print_test(test, rank, "scoped thread-local, dynamic linkage");
+  if (get_scoped_threadlocal_dynamic_ptr)
+    test_privatization(failed, test, rank, my_wth, operation, *get_scoped_threadlocal_dynamic_ptr());
+  else
+    test_skip(test, rank);
+#endif
+#endif
+#endif
+
+#if defined test_dynamiclib
+  dlclose(dynamiclib);
+#endif
 }
 
-void test_skip(int & test, int & rank)
+
+#if defined test_migration
+#if defined test_globalvars
+extern int global_myrank;
+int global_myrank;
+#endif
+#if defined test_threadlocalvars
+extern THREAD_LOCAL int threadlocal_myrank;
+THREAD_LOCAL int threadlocal_myrank;
+#endif
+#endif
+
+static void privatization_about_to_migrate()
 {
-  MPI_Barrier(MPI_COMM_WORLD);
-
-  if (rank == 0)
-    printf(test_format " - skipped\n", test);
-
-  MPI_Barrier(MPI_COMM_WORLD);
-
-  ++test;
-}
-
-
-static void perform_test_batch_dispatch(int & failed, int & test, int & rank, int & my_wth, int & operation)
-{
-  if (rank == 0)
-    printf("Beginning round of testing.\n");
-
-  perform_test_batch(failed, test, rank, my_wth, operation);
-
-  if (rank == 0)
-    printf("Round of testing complete.\n");
-}
-
-void privatization_test_framework(void)
-{
-  int rank;            /* process id */
-  int p;               /* number of processes */
+  int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  MPI_Comm_size(MPI_COMM_WORLD, &p);
-
-  int * my_wth_ptr;
-  int flag;
-  MPI_Comm_get_attr(MPI_COMM_WORLD, AMPI_MY_WTH, &my_wth_ptr, &flag);
-  int my_wth = *my_wth_ptr;
-
-  int test = 1;
-  int operation;
-
-  int failed_before = 0;
-  operation = 0;
-  perform_test_batch_dispatch(failed_before, test, rank, my_wth, operation);
+  printf("[%d] About to migrate.\n", rank);
 
 #if defined test_migration
-  if (rank == 0)
-    printf("Requesting migration.\n");
-
-  AMPI_Migrate(AMPI_INFO_LB_SYNC);
-
-  int failed_migration = 0;
-  operation = 1;
-  perform_test_batch_dispatch(failed_migration, test, rank, my_wth, operation);
-#endif
-
-  int failed_after = 0;
-  operation = 0;
-  perform_test_batch_dispatch(failed_after, test, rank, my_wth, operation);
-
-  if (failed_before != failed_after)
-    printf("[%d](%d) Migration caused a test inconsistency.\n", rank, my_wth);
-
-  int failed = failed_before + failed_after;
-#if defined test_migration
-  failed += failed_migration;
-#endif
-  int total_failures = 0;
-  MPI_Reduce(&failed, &total_failures, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
-
-  if (rank == 0)
+#if defined test_globalvars
+  if (rank != global_myrank)
   {
-    if (total_failures > 0)
-      printf("%d tests failed.\n", total_failures);
-    else
-      printf("All tests passed.\n");
+    printf("[%d] Globals incorrect when about to migrate!\n", rank);
   }
+#endif
+#if defined test_threadlocalvars
+  if (rank != threadlocal_myrank)
+  {
+    printf("[%d] Thread-locals incorrect when about to migrate!\n", rank);
+  }
+#endif
+#endif
+}
+static void privatization_just_migrated()
+{
+  int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  printf("[%d] Just migrated.\n", rank);
 
+#if defined test_migration
+#if defined test_globalvars
+  if (rank != global_myrank)
+  {
+    printf("[%d] Globals incorrect when just migrated!\n", rank);
+  }
+#endif
+#if defined test_threadlocalvars
+  if (rank != threadlocal_myrank)
+  {
+    printf("[%d] Thread-locals incorrect when just migrated!\n", rank);
+  }
+#endif
+#endif
+}
 
-  if (total_failures > 0)
-    MPI_Abort(MPI_COMM_WORLD, 1);
+int main(int argc, char **argv)
+{
+  MPI_Init(&argc, &argv);
+
+#if defined test_migration
+#if defined test_globalvars
+  MPI_Comm_rank(MPI_COMM_WORLD, &global_myrank);
+#endif
+#if defined test_threadlocalvars
+  MPI_Comm_rank(MPI_COMM_WORLD, &threadlocal_myrank);
+#endif
+#endif
+
+  AMPI_Register_about_to_migrate(privatization_about_to_migrate);
+  AMPI_Register_just_migrated(privatization_just_migrated);
+
+  privatization_test_framework();
+
+  MPI_Finalize();
+
+  return 0;
 }

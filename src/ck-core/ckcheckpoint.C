@@ -27,21 +27,26 @@ void noopit(const char*, ...)
 //#define DEBCHK   CkPrintf
 #define DEBCHK noopit
 
-#define DEBUGC(x) x
-//#define DEBUGC(x) 
-
 #define SUBDIR_SIZE 256
 
 CkGroupID _sysChkptWriteMgr;
 CkGroupID _sysChkptMgr;
 
-typedef struct _GroupInfo{
-        CkGroupID gID;
-        int MigCtor;
-        char name[256];
-        bool present;
-} GroupInfo;
-PUPbytes(GroupInfo)
+struct GroupInfo
+{
+  CkGroupID gID;
+  int MigCtor;
+  std::string name;
+  bool present;
+
+  void pup(PUP::er& p)
+  {
+    p | gID;
+    p | MigCtor;
+    p | name;
+    p | present;
+  }
+};
 
 bool _inrestart = false;
 bool _restarted = false;
@@ -108,6 +113,8 @@ static void bdcastRO(void){
 	int i;
 	// Determine the size of the RODataMessage
 	PUP::sizer ps(PUP::er::IS_CHECKPOINT);
+	UInt numZerocopyROopsSize; // only used for sizing.
+	ps|numZerocopyROopsSize;
 	for(i=0;i<_readonlyTable.size();i++) _readonlyTable[i]->pupData(ps);
 
 	// Allocate and fill out the RODataMessage
@@ -165,7 +172,7 @@ static void bdcastROGroupData(void){
 void printIndex(const CkArrayIndex &idx,char *dest) {
 	const int *idxData=idx.data();
 	for (int i=0;i<idx.nInts;i++) {
-		sprintf(dest,"%s%d",i==0?"":"_", idxData[i]);
+		snprintf(dest,12,"%s%d",i==0?"":"_", idxData[i]);
 		dest+=strlen(dest);
 	}
 }
@@ -432,18 +439,17 @@ void CkPupMainChareData(PUP::er &p, CkArgMsg *args)
 	int nMains=_mainTable.size();
 	DEBCHK("[%d] CkPupMainChareData %s: nMains = %d\n", CkMyPe(),p.typeString(),nMains);
 	for(int i=0;i<nMains;i++){  /* Create all mainchares */
-		ChareInfo *entry = _chareTable[_mainTable[i]->chareIdx];
+		const auto& chareIdx = _mainTable[i]->chareIdx;
+		ChareInfo *entry = _chareTable[chareIdx];
 		int entryMigCtor = entry->getMigCtor();
 		if(entryMigCtor!=-1) {
 			Chare* obj;
 			if (p.isUnpacking()) {
-				int size = entry->size;
-				DEBCHK("MainChare PUP'ed: name = %s, idx = %d, size = %d\n", entry->name, i, size);
-				obj = (Chare*)malloc(size);
-				_MEMCHECK(obj);
+				DEBCHK("MainChare PUP'ed: name = %s, idx = %d, size = %d\n", entry->name, i, entry->size);
+				obj = CkAllocateChare(chareIdx);
 				_mainTable[i]->setObj(obj);
 				//void *m = CkAllocSysMsg();
-				_entryTable[entryMigCtor]->call(args, obj);
+				CkInvokeEP(obj, entryMigCtor, args);
 			}
 			else 
 			 	obj = (Chare *)_mainTable[i]->getObj();
@@ -564,11 +570,11 @@ static void CkPupPerPlaceData(PUP::er &p, GroupIDTable *idTable, GroupTable *obj
       TableEntry ent = objectTable->find(tmpInfo[i].gID);
       tmpInfo[i].present = ent.getObj() != NULL;
       tmpInfo[i].MigCtor = _chareTable[ent.getcIdx()]->migCtor;
-      strncpy(tmpInfo[i].name,_chareTable[ent.getcIdx()]->name,255);
+      tmpInfo[i].name = _chareTable[ent.getcIdx()]->name;
       //CkPrintf("[%d] CkPupPerPlaceData: %s group %s \n", CkMyPe(), p.typeString(), tmpInfo[i].name);
 
       if(tmpInfo[i].MigCtor==-1) {
-        CkAbort("(Node)Group %s needs a migration constructor and PUP'er routine for restart.\n", tmpInfo[i].name);
+        CkAbort("(Node)Group %s needs a migration constructor and PUP'er routine for restart.\n", tmpInfo[i].name.c_str());
       }
     }
   }
@@ -583,7 +589,7 @@ static void CkPupPerPlaceData(PUP::er &p, GroupIDTable *idTable, GroupTable *obj
     if (p.isUnpacking()) {
       int eIdx = tmpInfo[i].MigCtor;
       if (eIdx == -1) {
-        CkPrintf("[%d] ERROR> (Node)Group %s's migration constructor is not defined!\n", CkMyPe(), tmpInfo[i].name);
+        CkPrintf("[%d] ERROR> (Node)Group %s's migration constructor is not defined!\n", CkMyPe(), tmpInfo[i].name.c_str());
         CkAbort("Abort");
       }
       void *m = CkAllocSysMsg();
@@ -713,7 +719,6 @@ void CkPupProcessorData(PUP::er &p)
 // called only on pe 0
 static bool checkpointOne(const char* dirname, CkCallback& cb, bool requestStatus){
 	CmiAssert(CkMyPe()==0);
-	char filename[1024];
 	
 	// save readonlys, and callback BTW
 	FILE* fRO = openCheckpointFile(dirname, "RO", "wb", -1);
@@ -809,7 +814,6 @@ void CkStartCheckpoint(const char* dirname, const CkCallback& cb, bool requestSt
 CkCallback globalCb;
 void CkRestartMain(const char* dirname, CkArgMsg *args){
 	int i;
-	char filename[1024];
 	
         if (CmiMyRank() == 0) {
           _inrestart = true;

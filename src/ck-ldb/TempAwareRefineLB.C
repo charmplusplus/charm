@@ -33,7 +33,7 @@ static int cpufreq_sysfs_write (
                      )
 {
 char path[100];
-sprintf(path,"/sys/devices/system/cpu/cpu%d/cpufreq/scaling_setspeed",proc);
+snprintf(path,sizeof(path),"/sys/devices/system/cpu/cpu%d/cpufreq/scaling_setspeed",proc);
                 FILE *fd = fopen (path, "w");
 
                 if (!fd) {
@@ -60,7 +60,7 @@ float TempAwareRefineLB::getTemp(int cpu)
         char val[10];
         FILE *f;
                 char path[100];
-                sprintf(path,"/sys/devices/platform/coretemp.%d/temp1_input",cpu);
+                snprintf(path,sizeof(path),"/sys/devices/platform/coretemp.%d/temp1_input",cpu);
                 f=fopen(path,"r");
                 if (!f) {
                         printf("777 FILE OPEN ERROR file=%s\n",path);
@@ -78,7 +78,7 @@ static int cpufreq_sysfs_read (int proc)
         FILE *fd;
         char path[100];
         int i=proc;
-        sprintf(path,"/sys/devices/system/cpu/cpu%d/cpufreq/scaling_setspeed",i);
+        snprintf(path,sizeof(path),"/sys/devices/system/cpu/cpu%d/cpufreq/scaling_setspeed",i);
 
         fd = fopen (path, "r");
 
@@ -94,13 +94,13 @@ static int cpufreq_sysfs_read (int proc)
         return ff;
 }
 
-void printCurrentTemperature(void *LB, double curWallTime)
+void printCurrentTemperature(void *LB)
 {
   TempAwareRefineLB *taalb = static_cast<TempAwareRefineLB *>(LB);
   int pe = CkMyPe();
   float temp = taalb->getTemp(pe % taalb->physicalCoresPerNode);
   int freq = cpufreq_sysfs_read (pe % taalb->logicalCoresPerNode);
-  fprintf(taalb->logFD, "%f, %d, %f, %d\n", curWallTime, pe, temp, freq);
+  fprintf(taalb->logFD, "%f, %d, %f, %d\n", CkWallTimer(), pe, temp, freq);
 }
 
 int getProcFreqPtr(int *freqs,int numAvail,int freq)
@@ -181,7 +181,7 @@ freqs[12] = 1333000;
   for(int i=0;i<CkNumPes();i++)
   {
         char newfreq[10];
-        sprintf(newfreq,"%d",freqs[0]);
+        snprintf(newfreq,sizeof(newfreq),"%d",freqs[0]);
 	cpufreq_sysfs_write(newfreq,i%physicalCoresPerNode);	
 	procFreqPtr[i]=0;
   }
@@ -248,7 +248,7 @@ void TempAwareRefineLB::changeFreq(int nFreq)
 //        if(procFreq[i]!=procFreqNew[i])
         {
               char newfreq[10];
-              sprintf(newfreq,"%d",nFreq);
+              snprintf(newfreq,sizeof(newfreq),"%d",nFreq);
               cpufreq_sysfs_write(newfreq,CkMyPe()%physicalCoresPerNode);//i%physicalCoresPerNode);
 //            CkPrintf("PROC#%d freq changing from %d to %d temp=%f\n",i,procFreq[i],procFreqNew[i],procTemp[i]);
         }

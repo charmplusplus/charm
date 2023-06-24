@@ -1,9 +1,9 @@
 # Charm++
 
-[![Build Status](https://travis-ci.org/UIUC-PPL/charm.svg?branch=master)](https://travis-ci.org/UIUC-PPL/charm)
+[![Build Status](https://travis-ci.org/UIUC-PPL/charm.svg?branch=main)](https://travis-ci.org/UIUC-PPL/charm)
 [![Documentation Status](https://readthedocs.org/projects/charm/badge/?version=latest)](https://charm.readthedocs.io/en/latest/?badge=latest)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3370873.svg)](https://doi.org/10.5281/zenodo.3370873)
-[![CDash](https://img.shields.io/badge/CDash-dashboard-blue)](https://my.cdash.org/index.php?project=Charm%2B%2B)
+
 
 ## Introduction
 Charm++ is a message-passing parallel language and runtime system.
@@ -94,7 +94,6 @@ of the `<options>` below.
 | `mpi-linux-x86_64`        | Linux   | MPI           | GNU compiler                          |
 | `multicore-linux-x86_64`  | Linux   | Shared memory | GNU compiler                          |
 | `multicore-darwin-x86_64` | macOS   | Shared memory | Clang C++ compiler                    |
-| `pamilrts-bluegeneq`      | CNK     | PAMI          | BGClang C++ compiler                  |
 | `gni-crayxc`              | Linux   | GNI           | CC (whatever PrgEnv module is loaded) |
 | `gni-crayxe`              | Linux   | GNI           | CC (whatever PrgEnv module is loaded) |
 | `verbs-linux-x86_64`      | Linux   | IB Verbs      | GNU compiler                          |
@@ -120,7 +119,6 @@ To choose `<version>`, your choice is determined by two options:
     * `linux-x86_64`: Linux with AMD64 64-bit x86 instructions
     * `win-x86_64`: MS Windows with MS Visual C++ compiler
     * `darwin-x86_64`: Apple macOS
-    * `bluegeneq`:IBM Blue Gene/Q
     * `cray{xe/xc}`: Cray XE/XC Supercomputer
     * `linux-ppc64le`: POWER/PowerPC
 
@@ -154,7 +152,7 @@ for more information:
 * `tcp` - The `netlrts-` version communicates via UDP by default. The `tcp` option
     will use TCP instead. The TCP version of Charm++ is usually slower
     than UDP, but it is more reliable.
-* `async` - For Blue Gene/Q, this option enables use of hardware communication 
+* `async` - On PAMI systems, this option enables use of hardware communication
     threads. For applications with significant communication on large
     scale, this option typically improves performance.
 * `regularpages` - On Cray systems, Charm++'s default is to use `hugepages`. This
@@ -173,7 +171,7 @@ for more information:
          
      will give:
     
-      Supported compilers: clang craycc gcc icc iccstatic msvc pgcc xlc xlc64
+      Supported compilers: clang craycc gcc icc iccstatic msvc pgcc xlc xlc64 icx
       Supported options: common cuda flang gfortran ifort local nolb omp ooc papi perftools persistent pgf90 pxshm smp syncft sysvshm tcp tsan
 
 
@@ -191,7 +189,6 @@ and run
 * `charm++`  The basic Charm++ language
 * `AMPI`     An implementation of MPI on top of Charm++
 * `LIBS`    Charm++, AMPI, and other libraries built on top of them
-* `Tau`      TAU's performance profiling/tracing
 
 `<version>` is described above in the "How to choose a `<version>`" section.
 
@@ -358,6 +355,6 @@ Seonmyeong Bak, Karthik Senthil, Juan Galvez, Michael Robson, Raghavendra
 Kanakagiri, and Venkatasubrahmanian Narayanan. Current developers include
 Eric Bohm, Ronak Buch, Eric Mikida, Sam White, Nitin Bhat, Kavitha
 Chandrasekar, Jaemin Choi, Matthias Diener, Evan Ramos, Justin Szaday,
-and Zane Fink.
+Zane Fink, and Pathikrit Ghosh.
 
-Copyright (C) 1989-2020 Regents of the University of Illinois
+Copyright (C) 1989-2023 Regents of the University of Illinois

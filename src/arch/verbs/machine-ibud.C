@@ -32,7 +32,7 @@
 #define INFIDUMMYPACKET 64
 #define INFIBARRIERPACKET 128
 
-#define METADATAFIELD(m) (((infiCmiChunkHeader *)m)[-1].metaData)
+#define METADATAFIELD(m) (((CmiChunkHeader *)m)[-1].metaData)
 
 
 enum ibv_mtu mtu = IBV_MTU_2048;
@@ -137,7 +137,7 @@ typedef struct infiCmiChunkMetaDataStruct {
         struct ibv_mr *key;
         int poolIdx;
         void *nextBuf;
-        struct infiCmiChunkHeaderStruct *owner;
+        struct CmiChunkHeader *owner;
         int count;
 } infiCmiChunkMetaData;
 
@@ -147,15 +147,6 @@ struct infiBufferPool{
     struct infiBufferPool *next;
 };
 
-
-/*
-typedef struct infiCmiChunkHeaderStruct{
-	struct infiCmiChunkMetaDataStruct *metaData;
-	CmiChunkHeader chunkHeader;
-} infiCmiChunkHeader;
-
-struct infiCmiChunkMetaDataStruct *registerMultiSendMesg(char *msg,int msgSize);
-*/
 
 // FIXME: temp for error reading
 static const char *const __ibv_wc_status_str[] = {
@@ -190,7 +181,7 @@ const char *ibv_wc_status_str(enum ibv_wc_status status) {
 
 /***** BEGIN MEMORY MANAGEMENT STUFF *****/
 typedef struct {
-        int size;//without infiCmiChunkHeader
+        int size;//without CmiChunkHeader
         void *startBuf;
         int count;
 } infiCmiChunkPool;
@@ -237,7 +228,7 @@ static inline void *getInfiCmiChunk(int dataSize){
 	MACHSTATE2(2,"getInfiCmiChunk for size %d in poolIdx %d",dataSize,poolIdx);
         if((poolIdx < INFINUMPOOLS && infiCmiChunkPools[poolIdx].startBuf == NULL) || poolIdx >= INFINUMPOOLS){
                 infiCmiChunkMetaData *metaData;
-                infiCmiChunkHeader *hdr;
+                CmiChunkHeader *hdr;
                 int allocSize;
                 int count=1;
                 int i;
@@ -255,13 +246,13 @@ static inline void *getInfiCmiChunk(int dataSize){
                 if(poolIdx < blockThreshold){
                         count = blockAllocRatio;
                 }
-                res = malloc((allocSize+sizeof(infiCmiChunkHeader))*count);
+                res = malloc((allocSize+sizeof(CmiChunkHeader))*count);
                 hdr = res;
 
-                key = ibv_reg_mr(context->pd,res,(allocSize+sizeof(infiCmiChunkHeader))*count,IBV_ACCESS_LOCAL_WRITE);
+                key = ibv_reg_mr(context->pd,res,(allocSize+sizeof(CmiChunkHeader))*count,IBV_ACCESS_LOCAL_WRITE);
                 CmiAssert(key != NULL);
 
-                origres = (res += sizeof(infiCmiChunkHeader));
+                origres = (res += sizeof(CmiChunkHeader));
 
                 for(i=0;i<count;i++){
                         metaData = METADATAFIELD(res) = malloc(sizeof(infiCmiChunkMetaData));
@@ -273,14 +264,14 @@ static inline void *getInfiCmiChunk(int dataSize){
                                 metaData->owner->metaData->count = count;
                                 metaData->nextBuf = NULL;
                         }else{
-                                void *startBuf = res - sizeof(infiCmiChunkHeader);
+                                void *startBuf = res - sizeof(CmiChunkHeader);
                                 metaData->nextBuf = infiCmiChunkPools[poolIdx].startBuf;
                                 infiCmiChunkPools[poolIdx].startBuf = startBuf;
                                 infiCmiChunkPools[poolIdx].count++;
 
                         }
                         if(i != count-1){
-                                res += (allocSize+sizeof(infiCmiChunkHeader));
+                                res += (allocSize+sizeof(CmiChunkHeader));
                         }
                 }
                 MACHSTATE3(2,"AllocSize %d buf %p key %p",allocSize,res,metaData->key);
@@ -291,7 +282,7 @@ static inline void *getInfiCmiChunk(int dataSize){
                 infiCmiChunkMetaData *metaData;
 
                 res = infiCmiChunkPools[poolIdx].startBuf;
-                res += sizeof(infiCmiChunkHeader);
+                res += sizeof(CmiChunkHeader);
 
                 MACHSTATE2(2,"Reusing old pool %d buf %p",poolIdx,res);
                 metaData = METADATAFIELD(res);
@@ -337,8 +328,7 @@ void infi_CmiFree(void *ptr){
 	#endif
 	ptr += sizeof(CmiChunkHeader);
 	size = SIZEFIELD (ptr);
-	//there is a infiniband specific header
-	freePtr = ptr - sizeof(infiCmiChunkHeader);
+	freePtr = ptr - sizeof(CmiChunkHeader);
 	metaData = METADATAFIELD(ptr);
 	poolIdx = metaData->poolIdx;
 	if(poolIdx == INFIMULTIPOOL){

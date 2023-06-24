@@ -307,11 +307,11 @@ void SumLogPool::write(void)
   // CmiPrintf("TRACE: %s:%d\n", fname, errno);
   if (!sumonly) {
     char pestr[10];
-    sprintf(pestr, "%d", CkMyPe());
+    snprintf(pestr, sizeof(pestr), "%d", CkMyPe());
     int len = strlen(pgm) + strlen(".sumd.") + strlen(pestr) + 1;
     char *fname = new char[len+1];
     
-    sprintf(fname, "%s.%s.sum", pgm, pestr);
+    snprintf(fname, len+1, "%s.%s.sum", pgm, pestr);
     do {
       fp = fopen(fname, "w+");
     } while (!fp && errno == EINTR);
@@ -321,7 +321,7 @@ void SumLogPool::write(void)
     }
     
     if (sumDetail) {
-      sprintf(fname, "%s.%s.sumd", pgm, pestr);
+      snprintf(fname, len+1, "%s.%s.sumd", pgm, pestr);
       do {
 	sdfp = fopen(fname, "w+");
       } while (!sdfp && errno == EINTR);
@@ -482,9 +482,10 @@ void SumLogPool::write(void)
 void SumLogPool::writeSts(void)
 {
     // open sts file
+  int len = strlen(CkpvAccess(traceRoot))+strlen(".sum.sts")+1;
   char *fname = 
-       new char[strlen(CkpvAccess(traceRoot))+strlen(".sum.sts")+1];
-  sprintf(fname, "%s.sum.sts", CkpvAccess(traceRoot));
+       new char[len];
+  snprintf(fname, len, "%s.sum.sts", CkpvAccess(traceRoot));
   stsfp = fopen(fname, "w+");
   //CmiPrintf("File: %s \n", fname);
   if (stsfp == 0) {
@@ -1002,8 +1003,9 @@ void TraceSummaryBOC::sumData(double *sumData, int totalsize) {
     UInt    epNums  = CkpvAccess(_trace)->pool()->getEpInfoSize();
     UInt    numBins = totalsize/epNums;  
     int     numEntries = epNums - NUM_DUMMY_EPS - 1; 
-    char    *fname = new char[strlen(CkpvAccess(traceRoot))+strlen(".sumall")+1];
-    sprintf(fname, "%s.sumall", CkpvAccess(traceRoot));
+    int     len = strlen(CkpvAccess(traceRoot))+strlen(".sumall")+1;
+    char    *fname = new char[len];
+    snprintf(fname, len, "%s.sumall", CkpvAccess(traceRoot));
     FILE *sumfp = fopen(fname, "w+");
     delete [] fname;
     fprintf(sumfp, "ver:%3.1f cpu:%d numIntervals:%d numEPs:%d intervalSize:%e\n",
@@ -1044,7 +1046,7 @@ void TraceSummaryBOC::initCCS() {
 			 CkCallback(CkIndex_TraceSummaryBOC::ccsRequestSummaryUnsignedChar(NULL), sumProxy[0])); 
 
       CkPrintf("[%d] Setting up periodic startCollectData callback\n", CkMyPe());
-      CcdCallOnConditionKeep(CcdPERIODIC_1second, startCollectData,
+      CcdCallOnConditionKeep(CcdPERIODIC_1second, (CcdCondFn)startCollectData,
 			     (void *)this);
       summaryCcsStreaming = true;
     }
@@ -1125,7 +1127,7 @@ void TraceSummaryBOC::ccsRequestSummaryUnsignedChar(CkCcsRequestMsg *m) {
 
 
 
-void startCollectData(void *data, double currT) {
+void startCollectData(void *data) {
   CkAssert(CkMyPe() == 0);
   // CkPrintf("startCollectData()\n");
   TraceSummaryBOC *sumObj = (TraceSummaryBOC *)data;
@@ -1135,7 +1137,7 @@ void startCollectData(void *data, double currT) {
   
   double startTime = lastRequestedIndexBlock*
     collectionGranularity * indicesPerBlock;
-  int numIndicesToGet = (int)floor((currT - startTime)/
+  int numIndicesToGet = (int)floor((CmiWallTimer() - startTime)/
 				   collectionGranularity);
   int numBlocksToGet = numIndicesToGet/indicesPerBlock;
   // **TODO** consider limiting the total number of blocks each collection
@@ -1241,8 +1243,9 @@ void TraceSummaryBOC::write(void)
 {
   unsigned int j;
 
-  char *fname = new char[strlen(CkpvAccess(traceRoot))+strlen(".sum")+1];
-  sprintf(fname, "%s.sum", CkpvAccess(traceRoot));
+  int len = strlen(CkpvAccess(traceRoot))+strlen(".sum")+1;
+  char *fname = new char[len];
+  snprintf(fname, len, "%s.sum", CkpvAccess(traceRoot));
   FILE *sumfp = fopen(fname, "w+");
   //CmiPrintf("File: %s \n", fname);
   if(sumfp == 0)
@@ -1297,12 +1300,18 @@ static void CombineSummary()
       // pe 0 start the sumonly process
     CProxy_TraceSummaryBOC sumProxy(traceSummaryGID);
     sumProxy[0].startSumOnly();
-  }else if(sumDetail)
-  {
-      CProxy_TraceSummaryBOC sumProxy(traceSummaryGID);
-      sumProxy.traceSummaryParallelShutdown(-1);
   }
-  else {
+  /*
+  // This is only used for the creation of the .sumall file, but it's causing crashes with
+  // sumDetail (Assertion "inIdle == 0 && inExec == 0" failed in beginIdle)
+  else if (sumDetail)
+  {
+    CProxy_TraceSummaryBOC sumProxy(traceSummaryGID);
+    sumProxy.traceSummaryParallelShutdown(-1);
+  }
+  */
+  else
+  {
     CkContinueExit();
   }
 #else

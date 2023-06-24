@@ -1,6 +1,8 @@
 #include "fs_parameters.h"
 #include "charm.h"
 
+#define DEFAULT_STRIPE_SIZE 4*1024*1024
+
 #if CMK_HAS_LUSTREFS
 #include <lustre/lustreapi.h>
 #include <lustre/lustre_user.h>
@@ -42,18 +44,24 @@ size_t CkGetFileStripeSize(const char *filename) {
     free(filenameCopy);
   }
 
-  if (rc != 0) {
+  size_t stripeSize = DEFAULT_STRIPE_SIZE;
+
+  if (rc != 0 || lump->lmm_stripe_size <= 0) {
     CkPrintf("[CkIO] Cannot extract lustre file stripe size for %s, using default of 4 MB\n", filename);
-    return 4 * 1024 * 1024;
+  }
+  else {
+    stripeSize = lump->lmm_stripe_size;
   }
 
-  return lump->lmm_stripe_size;
+  free(lump);
+
+  return stripeSize;
 }
 
 #else
 
 size_t CkGetFileStripeSize(const char *filename) {
-  return 4 * 1024 * 1024;
+  return DEFAULT_STRIPE_SIZE;
 }
 
 #endif

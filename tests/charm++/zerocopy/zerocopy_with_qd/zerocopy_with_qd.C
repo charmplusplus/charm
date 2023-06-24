@@ -142,11 +142,13 @@ class Main : public CBase_Main {
     void zcSrcCompleted(CkDataMsg *m) {
       srcCompletedCounter++;
       DEBUG(CkPrintf("[%d][%d][%d] srcCompleted:%d, completed:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), srcCompletedCounter, CkGetRefNum(m));)
+      delete m;
     }
 
     void zcDestCompleted(CkDataMsg *m) {
       destCompletedCounter++;
       DEBUG(CkPrintf("[%d][%d][%d] destCompleted:%d, completed:%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), destCompletedCounter, CkGetRefNum(m));)
+      delete m;
     }
 };
 
@@ -253,11 +255,15 @@ class testArr : public CBase_testArr {
       }
     }
 
-    void recvEmPostApiBuffer(char *&buff1, int &size1, char *&buff2, int &size2, char *&buff3, int &size3, CkNcpyBufferPost *ncpyPost) {
+    void recvEmPostApiBuffer(char *buff1, int size1, char *buff2, int size2, char *buff3, int size3, CkNcpyBufferPost *ncpyPost) {
       // use member variable buffers (buff1, buff2, buff3) as recipient buffers
-      buff1 = this->buff1;
-      buff2 = this->buff2;
-      buff3 = this->buff3;
+      CkMatchBuffer(ncpyPost, 0, thisIndex*3);
+      CkMatchBuffer(ncpyPost, 1, thisIndex*3 + 1);
+      CkMatchBuffer(ncpyPost, 2, thisIndex*3 + 2);
+
+      CkPostBuffer(this->buff1, size1, thisIndex*3);
+      CkPostBuffer(this->buff2, size2, thisIndex*3 + 1);
+      CkPostBuffer(this->buff3, size3, thisIndex*3 + 2);
     }
 
     void recvEmPostApiBuffer(char *buff1, int size1, char *buff2, int size2, char *buff3, int size3) {

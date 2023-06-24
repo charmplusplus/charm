@@ -164,19 +164,16 @@ static DWORD WINAPI call_startfn(LPVOID vindex)
   ConverseRunPE(0);
 
   if(CharmLibInterOperate) {
-    while(1) {
-      if(!_cleanUp.load()) {
-        StartInteropScheduler();
-        CmiNodeAllBarrier();
-      } else {
-        if (CmiMyRank() == CmiMyNodeSize()) {
-          while (ckExitComplete.load() == 0) { CommunicationServerThread(5); }
-        } else {
-          CsdScheduler(-1);
-          CmiNodeAllBarrier();
-        }
-        break;
-      }
+    while(!_cleanUp.load()) {
+      StartInteropScheduler();
+      CmiNodeAllBarrier();
+    }
+
+    if (CmiMyRank() == CmiMyNodeSize()) {
+      while (ckExitComplete.load() == 0) { CommunicationServerThread(5); }
+    } else {
+      CsdScheduler(-1);
+      CmiNodeAllBarrier();
     }
   }
 
@@ -373,19 +370,16 @@ static void *call_startfn(void *vindex)
   ConverseRunPE(0);
 
   if(CharmLibInterOperate) {
-    while(1) {
-      if(!_cleanUp.load()) {
-        StartInteropScheduler();
-        CmiNodeAllBarrier();
-      } else {
-        if (CmiMyRank() == CmiMyNodeSize()) {
-          while (ckExitComplete.load() == 0) { CommunicationServerThread(5); }
-        } else { 
-          CsdScheduler(-1);
-          CmiNodeAllBarrier();
-        }
-        break;
-      }
+    while(!_cleanUp.load()) {
+      StartInteropScheduler();
+      CmiNodeAllBarrier();
+    }
+
+    if (CmiMyRank() == CmiMyNodeSize()) {
+      while (ckExitComplete.load() == 0) { CommunicationServerThread(5); }
+    } else {
+      CsdScheduler(-1);
+      CmiNodeAllBarrier();
     }
   }
 
@@ -401,11 +395,6 @@ static void *call_startfn(void *vindex)
 #endif  
   return 0;
 }
-
-#if CMK_BLUEGENEQ && !CMK_USE_LRTS
-/* pami/machine.C defines its own version of this: */
-void PerrorExit(const char*);
-#endif
 
 #if CMK_CONVERSE_PAMI
 // Array used by the 'rank 0' thread to wait for other threads using pthread_join
@@ -519,7 +508,7 @@ public:
   Barrier& operator=(const Barrier&) = delete;
 
   explicit Barrier(unsigned int count)
-      : curCount(count), barrierCount(count), curSense(true)
+      : curSense(true), curCount(count), barrierCount(count)
   {
   }
 

@@ -33,6 +33,9 @@ Misc:
   https://charm.readthedocs.io/en/latest/charm++/manual.html#installation-with-cmake
   for more information.
 
+- Charm++'s development branch has been renamed from 'master' to 'main'. Please see
+  https://github.com/UIUC-PPL/charm/pull/3303 for details.
+
 - We have adopted GitHub discussions
   (https://github.com/UIUC-PPL/charm/discussions) as the preferred
   venue for Charm++ questions and discussions instead of the
@@ -42,6 +45,9 @@ Misc:
 
 - Charm++ now runs on the new Apple M1 chips with the targets:
   multicore-darwin-arm8, netlrts-darwin-arm8, and mpi-darwin-arm8.
+
+- Charm++ now runs on the new Cray Shasta machines with the targets (in beta):
+  ofi-crayshasta, and mpi-crayshasta.
 
 - The BigSim emulator has been removed from Charm++.
 
@@ -109,8 +115,7 @@ Charm++ Features & Fixes:
 
 - Added several new benchmarks and tests.
 
-- Bounded number of hops messages can take when chares frequently
-  migrate.
+- Fixed bug where out-of-order migration updates may cause a hang.
 
 Adaptive MPI:
 
