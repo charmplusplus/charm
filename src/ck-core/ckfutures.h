@@ -77,10 +77,9 @@ namespace {
     future(const future<T> &other) { handle_ = other.handle_; }
 
     static T unmarshall_value(void *msg) {
-      auto msg = static_cast<ck::marshall_msg>(msg);
-      T result;
-      ck::unmarshall(msg, result);
-      return result;
+      PUP::detail::TemporaryObjectHolder<T> holder;
+      ck::unmarshall(static_cast<ck::marshall_msg>(msg), holder);
+      return holder.t;
     }
 
     T get() const {
