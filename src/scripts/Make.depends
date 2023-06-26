@@ -4,7 +4,7 @@ BaseLB.o: BaseLB.C charm++.h charm.h converse.h conv-header.h \
  conv-mach.h conv-mach-opt.h lrts-common.h cmiqueue.h pup_c.h \
  pup_c_functions.h lrtslock.h queueing.h conv-cpm.h conv-cpath.h \
  conv-qd.h conv-random.h conv-lists.h conv-trace.h persistent.h \
- cmirdmautils.h debug-conv.h conv-rdma.h pup.h middle.h middle-conv.h \
+ cmirdmautils.h debug-conv.h conv-rdma.h pup.h \
  cklists.h pup_stl.h conv-config.h ckbitvector.h ckstream.h init.h \
  charm-api.h ckhashtable.h ckrdma.h envelope.h pup.h charm.h middle.h \
  cklists.h objid.h charm.h converse.h pup.h ckcallback.h cksection.h \
@@ -1458,7 +1458,7 @@ mempool.o: mempool.C converse.h conv-header.h conv-config.h \
  conv-lists.h conv-trace.h persistent.h cmirdmautils.h debug-conv.h \
  mempool.h
 
-middle-ccs.o: middle-ccs.C middle.h conv-config.h conv-autoconfig.h \
+middle-ccs.o: middle-ccs.C conv-config.h conv-autoconfig.h \
  conv-common.h conv-mach-common.h conv-mach.h conv-mach-opt.h \
  lrts-common.h middle-conv.h converse.h conv-header.h cmiqueue.h pup_c.h \
  pup_c_functions.h lrtslock.h queueing.h conv-cpm.h conv-cpath.h \

@@ -7,7 +7,6 @@ set(ck-cxx-sources
 
 set(ck-h-sources
     charm-api.h charm.h
-    middle-conv.h middle.h
     register.h
     debug-charm.h)
 
