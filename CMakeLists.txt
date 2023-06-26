@@ -840,12 +840,6 @@ endif()
 add_subdirectory(src/ck-core)
 
 # Charmrun + testrun
-if(${CMK_BUILD_CHARMRUN})
-  add_subdirectory(src/util/charmrun-src)
-  add_dependencies(charmrun create_symlinks)
-else()
-  configure_file(${CHARMRUN_DIR}/charmrun ${CMAKE_BINARY_DIR}/bin COPYONLY)
-endif()
 configure_file(src/scripts/testrun bin/ COPYONLY)
 
 # Charm++ libraries
