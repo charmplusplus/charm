@@ -48,13 +48,13 @@ done
 
 #if ppn is zero, don't do division test
 if [[ $ppn -eq 0 ]] ; then
-    time ./charmrun "$@"
+    time mpirun "$@"
 else #division test
     #check if p divides ppn
     m=$((p % ppn))
     if [[ $p -ne 0 && $m -eq 0 ]] ; then
       #if it divides run the test
-      time ./charmrun "$@"
+      time mpirun "$@"
     else
       #if it does not divide, give a warning and do not run
       echo "Warning: ppn does not divide p. Skipping the test."
