@@ -114,6 +114,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
 
 #if defined __cplusplus
@@ -1025,48 +1026,19 @@ char *CmiPrintDate(void);
 #define CsdEnqueue(x)         (CqsEnqueueFifo((Queue)CpvAccess(CsdSchedQueue),(x)))
 #define CsdEmpty()            (CqsEmpty((Queue)CpvAccess(CsdSchedQueue)))
 #define CsdLength()           (CqsLength((Queue)CpvAccess(CsdSchedQueue)))
-#if CMK_CMIPRINTF_IS_A_BUILTIN /* these are implemented in machine.C */
+
 #if defined __GNUC__ || defined __clang__
 __attribute__ ((format (printf, 1, 2)))
 #endif
-void  CmiPrintf(const char *, ...);
+int CmiPrintf(const char *, ...);
 #if defined __GNUC__ || defined __clang__
 __attribute__ ((format (printf, 1, 2)))
 #endif
-void  CmiError(const char *, ...);
+int CmiError(const char *, ...);
 #if defined __GNUC__ || defined __clang__
 __attribute__ ((format (scanf, 1, 2)))
 #endif
-int   CmiScanf(const char *, ...);
-/* CmiFlush is disabled in this case */
-#define CmiFlush(stream) 
-
-#else /* standard definitions */
-
-#include <stdio.h>
-
-/*
- * I made vprintf functions for CmiPrintf and CmiError, but on the
- * O2K, there is no equivalent vscanf!
-
- #define CmiPrintf printf
- #define CmiError  printf
-*/
-#include <stdarg.h>
-
-#if defined __GNUC__ || defined __clang__
-__attribute__ ((format (printf, 1, 2)))
-#endif
-void  CmiPrintf(const char *format, ...);
-#if defined __GNUC__ || defined __clang__
-__attribute__ ((format (printf, 1, 2)))
-#endif
-void  CmiError(const char *format, ...);
-/* CmiFlush works only when CMK_CMIPRINTF_IS_A_BUILTIN is false */
-#define CmiFlush(stream)  fflush(stream);
-#define CmiScanf  scanf
-
-#endif
+int CmiScanf(const char *, ...);
 
 #if defined(__STDC__) || defined(__cplusplus)
 #define __CMK_STRING(x) #x

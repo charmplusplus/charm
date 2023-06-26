@@ -1422,7 +1422,7 @@ Input/Output
 
 .. code-block:: c++
 
-  void CmiPrintf(char *format, arg1, arg2, ...)
+  int CmiPrintf(const char *format, ...)
 
 This function does an atomic ``printf()`` on ``stdout``. On machine with
 host, this is implemented on top of the messaging layer using
@@ -1430,7 +1430,7 @@ asynchronous sends.
 
 .. code-block:: c++
 
-  int CmiScanf(char *format, void *arg1, void *arg2, ...)
+  int CmiScanf(const char *format, ...)
 
 This function performs an atomic ``scanf`` from ``stdin``. The
 processor, on which the caller resides, blocks for input. On machines
@@ -1439,7 +1439,7 @@ asynchronous send and blocking receive.
 
 .. code-block:: c++
 
-  void CmiError(char *format, arg1, arg2, ...)
+  int CmiError(const char *format, ...)
 
 This function does an atomic ``printf()`` on ``stderr``. On machines
 with host, this is implemented on top of the messaging layer using

@@ -532,7 +532,7 @@ int check_stdio_header(CcsImplHeader *hdr) {
   return 1;
 }
 
-#if ! CMK_CMIPRINTF_IS_A_BUILTIN
+#if !CMK_USE_LRTS_STDIO
 #define MAX_PRINT_BUF_SIZE 8192
 int print_fw_handler_idx;
 

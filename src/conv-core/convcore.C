@@ -211,14 +211,12 @@ CpvDeclare(int,BlocksAllocated);
 
 #define MAX_HANDLERS 512
 
-#if ! CMK_CMIPRINTF_IS_A_BUILTIN
 CpvDeclare(int,expIOFlushFlag);
 #if CMI_IO_BUFFER_EXPLICIT
 /* 250k not too large depending on how slow terminal IO is */
 #define DEFAULT_IO_BUFFER_SIZE 250000
 CpvDeclare(char*,explicitIOBuffer);
 CpvDeclare(int,expIOBufferSize);
-#endif
 #endif
 
 #if CMK_NODE_QUEUE_AVAILABLE
@@ -266,6 +264,15 @@ void* LrtsAlloc(int, int);
 void* LrtsRdmaAlloc(int, int);
 void  LrtsFree(void*);
 void  LrtsRdmaFree(void*);
+#endif
+
+#if CMK_USE_LRTS_STDIO
+int LrtsPrintf(const char *, va_list);
+int LrtsError(const char *, va_list);
+int LrtsScanf(const char *, va_list);
+int LrtsUsePrintf(void);
+int LrtsUseError(void);
+int LrtsUseScanf(void);
 #endif
 
 CpvStaticDeclare(int, cmiMyPeIdle);
@@ -3830,9 +3837,7 @@ static void CIdleTimeoutInit(char **argv)
 
 void CrnInit(void);
 void CmiIsomallocInit(char **argv);
-#if ! CMK_CMIPRINTF_IS_A_BUILTIN
 void CmiIOInit(char **argv);
-#endif
 
 /* defined in cpuaffinity.C */
 void CmiInitCPUAffinityUtil(void);
@@ -4018,9 +4023,7 @@ void ConverseCommonInit(char **argv)
   CpvAccess(_curRestartPhase)=1;
   CmiArgInit(argv);
   CmiMemoryInit(argv);
-#if ! CMK_CMIPRINTF_IS_A_BUILTIN
   CmiIOInit(argv);
-#endif
   if (CmiMyPe() == 0)
   {
     CmiPrintf("Converse/Charm++ Commit ID: %s\n", CmiCommitID);
@@ -4137,7 +4140,7 @@ void ConverseCommonExit(void)
 #endif
 
 #if CMI_IO_BUFFER_EXPLICIT
-  CmiFlush(stdout);  /* end of program, always flush */
+  fflush(stdout);  /* end of program, always flush */
 #endif
 
   seedBalancerExit();
@@ -4154,7 +4157,6 @@ void ConverseCommonExit(void)
  * severe overheads (and hence limiting scaling) for applications like 
  * NAMD.
  */
-#if ! CMK_CMIPRINTF_IS_A_BUILTIN
 void CmiIOInit(char **argv) {
   CpvInitialize(int, expIOFlushFlag);
 #if CMI_IO_BUFFER_EXPLICIT
@@ -4196,23 +4198,30 @@ void CmiIOInit(char **argv) {
 						"User Controls IO Flush");
 #endif
 }
-#endif
 
-#if ! CMK_CMIPRINTF_IS_A_BUILTIN
-
-void CmiPrintf(const char *format, ...)
+int CmiPrintf(const char *format, ...)
 {
-  if (quietMode) return;
+  if (quietMode) return 0;
+  int ret;
   CpdSystemEnter();
   {
   va_list args;
   va_start(args,format);
-  vfprintf(stdout,format, args);
-  if (CpvInitialized(expIOFlushFlag) && !CpvAccess(expIOFlushFlag)) {
-    CmiFlush(stdout);
+#if CMK_USE_LRTS_STDIO
+  if (LrtsUsePrintf())
+  {
+    ret = LrtsPrintf(format, args);
+  }
+  else
+#endif
+  {
+    ret = vprintf(format, args);
+    if (CpvInitialized(expIOFlushFlag) && !CpvAccess(expIOFlushFlag)) {
+      fflush(stdout);
+    }
   }
   va_end(args);
-#if CMK_CCS_AVAILABLE && CMK_CMIPRINTF_IS_A_BUILTIN
+#if CMK_CCS_AVAILABLE && !CMK_USE_LRTS_STDIO
   if (cmiArgDebugFlag && CmiMyRank()==0) {
     va_start(args,format);
     print_node0(format, args);
@@ -4221,18 +4230,29 @@ void CmiPrintf(const char *format, ...)
 #endif
   }
   CpdSystemExit();
+  return ret;
 }
 
-void CmiError(const char *format, ...)
+int CmiError(const char *format, ...)
 {
+  int ret;
   CpdSystemEnter();
   {
   va_list args;
   va_start(args,format);
-  vfprintf(stderr,format, args);
-  CmiFlush(stderr);  /* stderr is always flushed */
+#if CMK_USE_LRTS_STDIO
+  if (LrtsUseError())
+  {
+    ret = LrtsError(format, args);
+  }
+  else
+#endif
+  {
+    ret = vfprintf(stderr, format, args);
+    fflush(stderr);  /* stderr is always flushed */
+  }
   va_end(args);
-#if CMK_CCS_AVAILABLE && CMK_CMIPRINTF_IS_A_BUILTIN
+#if CMK_CCS_AVAILABLE && !CMK_USE_LRTS_STDIO
   if (cmiArgDebugFlag && CmiMyRank()==0) {
     va_start(args,format);
     print_node0(format, args);
@@ -4241,9 +4261,31 @@ void CmiError(const char *format, ...)
 #endif
   }
   CpdSystemExit();
+  return ret;
 }
 
+int CmiScanf(const char *format, ...)
+{
+  int ret;
+  CpdSystemEnter();
+  {
+  va_list args;
+  va_start(args,format);
+#if CMK_USE_LRTS_STDIO
+  if (LrtsUseScanf())
+  {
+    ret = LrtsScanf(format, args);
+  }
+  else
 #endif
+  {
+    ret = vscanf(format, args);
+  }
+  va_end(args);
+  }
+  CpdSystemExit();
+  return ret;
+}
 
 void __CmiEnforceHelper(const char* expr, const char* fileName, const char* lineNum)
 {

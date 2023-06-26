@@ -518,7 +518,7 @@ void CcsInit(char **argv)
 
   CmiAssignOnce(&rep_fw_handler_idx, CmiRegisterHandler((CmiHandler)rep_fw_handler));
 #if NODE_0_IS_CONVHOST
-#if ! CMK_CMIPRINTF_IS_A_BUILTIN
+#if !CMK_USE_LRTS_STDIO
   CmiAssignOnce(&print_fw_handler_idx, CmiRegisterHandler((CmiHandler)print_fw_handler));
 #endif
   {
