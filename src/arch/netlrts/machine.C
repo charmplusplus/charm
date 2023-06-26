@@ -178,26 +178,6 @@
 #define _GNU_SOURCE 1
 #include <stdarg.h> /*<- was <varargs.h>*/
 
-#define CMK_USE_PRINTF_HACK 0
-#if CMK_USE_PRINTF_HACK
-/*HACK: turn printf into CmiPrintf, by just defining our own
-external symbol "printf".  This may be more trouble than it's worth,
-since the only advantage is that it works properly with +syncprint.
-
-This version *won't* work with fprintf(stdout,...) or C++ or Fortran I/O,
-because they don't call printf.  Has to be defined up here because we probably 
-haven't properly guessed this compiler's prototype for "printf".
-*/
-static void InternalPrintf(const char *f, va_list l);
-int printf(const char *fmt, ...) {
-	int nChar;
-	va_list p; va_start(p, fmt);
-        InternalPrintf(fmt,p);
-	va_end(p);
-	return 10;
-}
-#endif
-
 
 #include "converse.h"
 #include "cmirdmautils.h"
@@ -1146,18 +1126,20 @@ void CcsImpl_reply(CcsImplHeader *hdr,int repLen,const void *repData)
 }
 #endif
 
+#if CMK_USE_LRTS_STDIO
 /*****************************************************************************
  *
- * CmiPrintf, CmiError, CmiScanf
+ * LrtsPrintf, LrtsError, LrtsScanf
  *
  *****************************************************************************/
 static void InternalWriteToTerminal(int isStdErr,const char *str,int len);
-static void InternalPrintf(const char *f, va_list l)
+
+int LrtsPrintf(const char *f, va_list l)
 {
   ChMessage replymsg;
   char *buffer = (char *)CmiTmpAlloc(PRINTBUFSIZE);
   CmiStdoutFlush();
-  vsnprintf(buffer, PRINTBUFSIZE, f, l);
+  int ret = vsnprintf(buffer, PRINTBUFSIZE, f, l);
   if(Cmi_syncprint) {
           LOCK_IF_AVAILABLE();
   	  ctrl_sendone_nolock("printsyn", buffer,strlen(buffer)+1,NULL,0);
@@ -1169,14 +1151,15 @@ static void InternalPrintf(const char *f, va_list l)
   }
   InternalWriteToTerminal(0,buffer,strlen(buffer));
   CmiTmpFree(buffer);
+  return ret;
 }
 
-static void InternalError(const char *f, va_list l)
+int LrtsError(const char *f, va_list l)
 {
   ChMessage replymsg;
   char *buffer = (char *)CmiTmpAlloc(PRINTBUFSIZE);
   CmiStdoutFlush();
-  vsnprintf(buffer, PRINTBUFSIZE, f, l);
+  int ret = vsnprintf(buffer, PRINTBUFSIZE, f, l);
   if(Cmi_syncprint) {
   	  ctrl_sendone_locking("printerrsyn", buffer,strlen(buffer)+1,NULL,0);
           LOCK_IF_AVAILABLE();
@@ -1188,15 +1171,16 @@ static void InternalError(const char *f, va_list l)
   }
   InternalWriteToTerminal(1,buffer,strlen(buffer));
   CmiTmpFree(buffer);
+  return ret;
 }
 
-static int InternalScanf(char *fmt, va_list l)
+int LrtsScanf(const char *fmt, va_list l)
 {
   ChMessage replymsg;
   char *ptr[20];
   char *p; int nargs, i;
   nargs=0;
-  p=fmt;
+  p = const_cast<char *>(fmt);
   while (*p) {
     if ((p[0]=='%')&&(p[1]=='*')) { p+=2; continue; }
     if ((p[0]=='%')&&(p[1]=='%')) { p+=2; continue; }
@@ -1206,72 +1190,35 @@ static int InternalScanf(char *fmt, va_list l)
   if (nargs > 18) KillEveryone("CmiScanf only does 18 args.\n");
   for (i=0; i<nargs; i++) ptr[i]=va_arg(l, char *);
   CmiLock(Cmi_scanf_mutex);
-  if (Cmi_charmrun_fd!=-1)
-  {/*Send charmrun the format string*/
-        ctrl_sendone_locking("scanf", fmt, strlen(fmt)+1,NULL,0);
-        /*Wait for the reply (characters to scan) from charmrun*/
-        LOCK_IF_AVAILABLE();
-        ChMessage_recv(Cmi_charmrun_fd,&replymsg);
-        i = sscanf((char*)replymsg.data, fmt,
-                     ptr[ 0], ptr[ 1], ptr[ 2], ptr[ 3], ptr[ 4], ptr[ 5],
-                     ptr[ 6], ptr[ 7], ptr[ 8], ptr[ 9], ptr[10], ptr[11],
-                     ptr[12], ptr[13], ptr[14], ptr[15], ptr[16], ptr[17]);
-        ChMessage_free(&replymsg);
-        UNLOCK_IF_AVAILABLE();
-  } else
-  {/*Just do the scanf normally*/
-        i=scanf(fmt, ptr[ 0], ptr[ 1], ptr[ 2], ptr[ 3], ptr[ 4], ptr[ 5],
-                     ptr[ 6], ptr[ 7], ptr[ 8], ptr[ 9], ptr[10], ptr[11],
-                     ptr[12], ptr[13], ptr[14], ptr[15], ptr[16], ptr[17]);
-  }
+  /*Send charmrun the format string*/
+  ctrl_sendone_locking("scanf", fmt, strlen(fmt)+1,NULL,0);
+  /*Wait for the reply (characters to scan) from charmrun*/
+  LOCK_IF_AVAILABLE();
+  ChMessage_recv(Cmi_charmrun_fd,&replymsg);
+  i = sscanf((char*)replymsg.data, fmt,
+               ptr[ 0], ptr[ 1], ptr[ 2], ptr[ 3], ptr[ 4], ptr[ 5],
+               ptr[ 6], ptr[ 7], ptr[ 8], ptr[ 9], ptr[10], ptr[11],
+               ptr[12], ptr[13], ptr[14], ptr[15], ptr[16], ptr[17]);
+  ChMessage_free(&replymsg);
+  UNLOCK_IF_AVAILABLE();
   CmiUnlock(Cmi_scanf_mutex);
   return i;
 }
-#if CMK_CMIPRINTF_IS_A_BUILTIN
 
-/*New stdarg.h declarations*/
-void CmiPrintf(const char *fmt, ...)
+int LrtsUsePrintf()
 {
-  if (quietMode) return;
-  CpdSystemEnter();
-  {
-  va_list p; va_start(p, fmt);
-  if (Cmi_charmrun_fd!=-1 && _writeToStdout)
-    InternalPrintf(fmt, p);
-  else
-    vfprintf(stdout,fmt,p);
-  va_end(p);
-  }
-  CpdSystemExit();
+  return Cmi_charmrun_fd != -1 && _writeToStdout;
 }
 
-void CmiError(const char *fmt, ...)
+int LrtsUseError()
 {
-  CpdSystemEnter();
-  {
-  va_list p; va_start (p, fmt);
-  if (Cmi_charmrun_fd!=-1)
-    InternalError(fmt, p);
-  else
-    vfprintf(stderr,fmt,p);
-  va_end(p);
-  }
-  CpdSystemExit();
+  return Cmi_charmrun_fd != -1;
 }
 
-int CmiScanf(const char *fmt, ...)
+int LrtsUseScanf()
 {
-  int i;
-  CpdSystemEnter();
-  {
-  va_list p; va_start(p, fmt);
-  i = InternalScanf((char *)fmt, p);
-  va_end(p);
-  }
-  CpdSystemExit();
-  return i;
+  return Cmi_charmrun_fd != -1;
 }
-
 #endif
 
 /***************************************************************************

@@ -260,18 +260,21 @@ int CmiBarrier(void);
 int CmiBarrierZero(void);
 
 
-/** PRINTF FUNCTIONS
+/** STDIO FUNCTIONS
 
- * Default code is provided in convcore.C but for particular architectures they
- * can be reimplemented. At present only netlrts- versions reimplement them.
+ * Default code is provided in convcore.C but for particular machine layers they
+ * can branch to custom reimplementations.
 
  */
 
-#if CMK_CMIPRINTF_IS_A_BUILTIN
+#if CMK_USE_LRTS_STDIO
 
-void CmiPrintf(const char *, ...);
-void CmiError(const char *, ...);
-int  CmiScanf(const char *, ...);
+int LrtsPrintf(const char *, va_list);
+int LrtsError(const char *, va_list);
+int LrtsScanf(const char *, va_list);
+int LrtsUsePrintf(void);
+int LrtsUseError(void);
+int LrtsUseScanf(void);
 
 #endif
 

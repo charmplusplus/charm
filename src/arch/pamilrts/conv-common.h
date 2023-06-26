@@ -5,7 +5,7 @@
 #define CMK_HAS_PARTITION                                  1
 #define CMK_HAS_INTEROP                                    1
 
-#define CMK_CMIPRINTF_IS_A_BUILTIN                         0
+#define CMK_USE_LRTS_STDIO                                 0
 
 #define CMK_HANDLE_SIGUSR                                  1
 
