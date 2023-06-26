@@ -1,7 +1,7 @@
 //#include "debug-conv.h"
 #include "pup.h"
 
-#include "register.h"
+//#include "register.h"
 
 #ifndef DEBUG_CONV_PLUSPLUS_H
 #define DEBUG_CONV_PLUSPLUS_H
@@ -63,7 +63,7 @@ public:
     (itemsFn)(itemsParam,(pup_er *)&p,&req);
   }
 };
-
+#ifdef _REGISTER_H
 /**
   A typical CpdList accessor: length is stored at some fixed 
    location in memory, path is a constant string, and the 
@@ -101,5 +101,5 @@ public:
           }
         }
 };
-
+#endif
 #endif

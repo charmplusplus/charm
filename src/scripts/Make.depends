@@ -8,7 +8,7 @@ BaseLB.o: BaseLB.C charm++.h charm.h converse.h conv-header.h \
  cklists.h pup_stl.h conv-config.h ckbitvector.h ckstream.h init.h \
  charm-api.h ckhashtable.h ckrdma.h envelope.h pup.h charm.h middle.h \
  cklists.h objid.h charm.h converse.h pup.h ckcallback.h cksection.h \
- ckarrayindex.h objid.h conv-ccs.h sockRoutines.h ccs-server.h register.h \
+ ckarrayindex.h objid.h conv-ccs.h sockRoutines.h ccs-server.h \
  debug-conv++.h simd.h ckmessage.h CkMarshall.decl.h sdag.h \
  pup_stl.h envelope.h ckrdmadevice.h conv-rdmadevice.h \
  ckobjQ.h ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \

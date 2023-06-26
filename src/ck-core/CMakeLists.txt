@@ -6,8 +6,8 @@ set(ck-cxx-sources
 )
 
 set(ck-h-sources
-    charm-api.h charm.h
-    register.h)
+    charm-api.h charm.h)
+
 
 include(${CMAKE_SOURCE_DIR}/cmake/ci-files.cmake)
 
