@@ -6,7 +6,7 @@
 #include "traceCoreCommon.h"
 #include "charmEvents.h"
 #include "ck.h"
-//#include "trace-common.h" // for _threadEP
+#include "trace-common.h" // for _threadEP
 
 #if CMK_TRACE_ENABLED
 CtvStaticDeclare(int,curThreadEvent);

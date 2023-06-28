@@ -175,7 +175,7 @@ void traceAddThreadListeners(CthThread tid, struct envelope *env);
 #endif
 
 void seedBalancerExit(void);
-//void EmergencyExit(void);
+void EmergencyExit(void);
 
 //int cur_restart_phase = 1;      /* checkpointing/restarting phase counter */
 CpvDeclare(int,_curRestartPhase);
@@ -4117,8 +4117,8 @@ void ConverseCommonExit(void)
   CmiFlush(stdout);  /* end of program, always flush */
 #endif
 
-  //seedBalancerExit();
-  //EmergencyExit();
+//  seedBalancerExit();
+  EmergencyExit();
 }
 
 

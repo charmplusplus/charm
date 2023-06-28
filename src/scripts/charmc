@@ -1687,7 +1687,7 @@ case "$PARADIGM" in
 	;;
 "converse"|"converse++")
 	MAKE_LDXX="1"
-	MIDDLE_LIBS=(-lconverse "${MIDDLE_LIBS[@]}" "${CORE_LIBS[@]}")
+	MIDDLE_LIBS=(-lconverse "${MIDDLE_LIBS[@]}" "${CORE_LIBS[@]}" -ltrace-converse)
 	;;
 "c"|"C"|"c++"|"C++"|"f90"|"f77")
   ;;
