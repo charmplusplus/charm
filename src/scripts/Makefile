@@ -184,7 +184,7 @@ UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwo
 	pup_c_functions.h \
 	ckhashtable.h ckbitvector.h cklists.h \
 	conv-lists.h \
-	sockRoutines.h sockRoutines.C simd.h \
+	sockRoutines.h sockRoutines.C \
 	crc32.h rand48_replacement.h spanningTree.h json.hpp json_fwd.hpp cmirdmautils.h
 
 CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \

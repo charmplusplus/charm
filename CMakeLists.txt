@@ -771,7 +771,7 @@ set(src-util-h-sources
     src/util/pup_cmialloc.h src/util/pup_mpi.h src/util/pup_paged.h
     src/util/pup_stl.h src/util/pup_toNetwork.h src/util/pup_toNetwork4.h
     src/util/pupf.h src/util/rand48_replacement.h 
-    src/util/simd.h src/util/sockRoutines.h
+    src/util/sockRoutines.h
     src/util/uFcontext.h src/util/uJcontext.h src/util/valgrind.h)
 
 
