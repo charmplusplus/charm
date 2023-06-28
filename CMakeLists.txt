@@ -835,6 +835,11 @@ endif()
 
 # Charm++
 add_subdirectory(src/ck-core)
+add_subdirectory(src/ck-perf)
+
+if(TRACING)
+  add_subdirectory(src/ck-pics)
+endif()
 
 # Charmrun + testrun
 configure_file(src/scripts/testrun bin/ COPYONLY)
