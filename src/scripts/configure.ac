@@ -1981,12 +1981,6 @@ EOT
 test_cxx "whether has setpriority" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_SETPRIORITY, $pass, [whether the setpriority exists])
 
-#### test for system ###
-cat > $t <<EOT
-#include "ckdll_system.C"
-EOT
-test_cxx "whether to use signal-safe system() " "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_SIGSAFE_SYSTEM, $pass, [whether to use signal-safe system()])
 
 ### test sched_setaffinity ####
 cat > $tc <<EOT
@@ -2118,28 +2112,6 @@ esac
 if test $skip_dl -eq 0 
 then
 
-cat > $t <<EOT
-#include "ckdll_dlopen.C"
-int main() {
-	CkDll dll("foo.so");
-	return 0;
-}
-EOT
-test_link "whether dlopen links without $dl_opt" "yes" "no" ""
-noldl=$pass
-test_link "whether dlopen links with $dl_opt" "yes" "no" "$dl_opt"
-if test $pass -eq 1
-then 
-#dlopen requires -ldl: add it to our link line
-	add_flag CMK_LIBS='"$CMK_LIBS '$dl_opt'"' "dlopen"
-fi
-
-if test $pass -eq 1 -o $noldl -eq 1
-then
-	CMK_HAS_DLOPEN='1'
-# One version or another of dlopen worked: compile it in
-	AC_DEFINE_UNQUOTED(CMK_DLL_USE_DLOPEN, 1, [dlopen])
-fi
 
 cat > $tc <<EOT
 #ifndef _GNU_SOURCE
@@ -2284,14 +2256,6 @@ AC_DEFINE_UNQUOTED(CMK_SUPPORTS_PIEGLOBALS, $CMK_SUPPORTS_PIEGLOBALS, [whether s
 add_flag "CMK_SUPPORTS_PIEGLOBALS=$CMK_SUPPORTS_PIEGLOBALS" 'PIE globals'
 add_make_flag "CMK_SUPPORTS_PIEGLOBALS:=$CMK_SUPPORTS_PIEGLOBALS" 'PIE globals'
 
-#### check if getProcAddress works ####
-cat > $t <<EOT
-#include "ckdll_win32.C"
-EOT
-test_cxx "whether getProcAddress works" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_DLL_USE_WIN32, $pass, [whether getProcAddress works])
-
-fi    # end of skip_dl
 
 #### check if socklen_t exists ####
 cat > $t <<EOT

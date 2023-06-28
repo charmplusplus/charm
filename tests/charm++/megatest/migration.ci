@@ -1,7 +1,0 @@
-module migration {
- array [1D] mig_Element {
-    entry mig_Element();
-    entry void arrive(void);
-    entry void done(void);
-  };
-};

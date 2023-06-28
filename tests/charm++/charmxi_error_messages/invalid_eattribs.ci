@@ -1,6 +1,0 @@
-mainmodule m {
-  mainchare A {
-    entry A();
-    entry {} void fun();
-  };
-};

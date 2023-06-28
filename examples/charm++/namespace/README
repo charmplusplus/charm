@@ -1,5 +1,0 @@
-This is a demonstration of using namespaces and inheritance in Charm++.
-The base class A is created in namespace Base, and a class B in namespace
-Base::Derived is derived from A. Class C in the global namespace inherits from
-B. The main chare, Driver, instantiates objects of types B and C.
-

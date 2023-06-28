@@ -1,6 +1,0 @@
-@namepub_tests@namepubf 2
-spawnf 1
-@F77SPAWNARGTEST@spawnargvf 1
-@namepub_tests@connaccf 2
-@F77SPAWNARGTEST@spawnmultf 1
-spawnmult2f 2

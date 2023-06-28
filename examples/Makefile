@@ -4,16 +4,12 @@
 OPTS += $(OPTSATBUILDTIME)
 
 DIRS = \
-  charm++ \
   converse \
-  ampi \
-  collide \
+
 
 TESTDIRS = $(DIRS)
 
 TESTPDIRS = \
-  charm++ \
-  ampi \
 
 all: $(foreach i,$(DIRS),build-$i)
 
@@ -39,5 +35,3 @@ $(foreach i,$(DIRS),testp-$i):
 $(foreach i,$(DIRS),clean-$i):
 	$(MAKE) -C $(subst clean-,,$@) clean OPTS='$(OPTS)'
 
-test-AMPI: test-ampi
-test-charm: test-charm++

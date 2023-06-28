@@ -1,5 +1,0 @@
-mainmodule m {
-    mainchare c {
-        entry [python] void foo();
-    }
-}

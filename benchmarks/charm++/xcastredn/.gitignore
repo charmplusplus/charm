@@ -1,9 +1,0 @@
-# Ignore compilation artifacts
-*.[oad]
-*.decl.h
-*.def.h
-*.di
-charmrun
-testReduction
-nodelist
-

@@ -1,8 +1,0 @@
-module m {
-    chare a {
-        entry [sync] a();
-    }
-    chare b {
-        entry [sync] void b();
-    }
-}

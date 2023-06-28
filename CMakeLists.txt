@@ -761,22 +761,19 @@ configure_file(src/arch/util/machine-smp.h                   include/ COPYONLY)
 configure_file(src/arch/util/pcqueue.h                       include/ COPYONLY)
 configure_file(src/util/pup_c_functions.h                    include/ COPYONLY)
 
-set(src-util-h-sources src/util/SSE-Double.h src/util/SSE-Float.h
-    src/util/ck128bitHash.h src/util/ckBIconfig.h src/util/ckbitvector.h
-    src/util/ckcomplex.h src/util/ckdll.h src/util/ckhashtable.h
-    src/util/ckimage.h src/util/cklists.h src/util/ckliststring.h
-    src/util/ckregex.h src/util/cksequence.h src/util/cksequence_factory.h
-    src/util/cksequence_internal.h src/util/ckstatistics.h src/util/ckvector3d.h
+set(src-util-h-sources 
+    src/util/ck128bitHash.h src/util/ckbitvector.h
+    src/util/ckhashtable.h
+    src/util/cklists.h 
     src/util/cmirdmautils.h
     src/util/cmitls.h src/util/conv-lists.h
     src/util/pup.h src/util/pup_c.h
     src/util/pup_cmialloc.h src/util/pup_mpi.h src/util/pup_paged.h
     src/util/pup_stl.h src/util/pup_toNetwork.h src/util/pup_toNetwork4.h
-    src/util/pupf.h src/util/rand48_replacement.h src/util/random_sequence.h
+    src/util/pupf.h src/util/rand48_replacement.h 
     src/util/simd.h src/util/sockRoutines.h
-    src/util/strided_sequence.h
-    src/util/uFcontext.h src/util/uJcontext.h src/util/valgrind.h
-    src/util/vector2d.h)
+    src/util/uFcontext.h src/util/uJcontext.h src/util/valgrind.h)
+
 
 foreach(filename ${src-util-h-sources})
     configure_file(${filename} include/ COPYONLY)

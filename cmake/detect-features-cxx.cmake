@@ -148,12 +148,6 @@ public:
 int main() {}
 " CMK_MULTIPLE_DELETE)
 
-file(READ ${CMAKE_SOURCE_DIR}/src/util/ckdll_system.C ckdll_system)
-check_cxx_source_compiles("${ckdll_system}\n int main(){}" CMK_SIGSAFE_SYSTEM)
-
-file(READ ${CMAKE_SOURCE_DIR}/src/util/ckdll_win32.C ckdll_win32)
-check_cxx_source_compiles("${ckdll_win32}\n int main(){}" CMK_DLL_USE_WIN32)
-
 check_cxx_source_compiles("
 #include <cstddef>
 int main() {

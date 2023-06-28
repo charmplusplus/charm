@@ -1,8 +1,0 @@
-mainmodule hello {
-  readonly int chunkSize;
-
-  array [1D] Hello {
-    entry Hello();
-    entry void SayHi(int a, double b, int n, int arr[n]);
-  };        	
-};

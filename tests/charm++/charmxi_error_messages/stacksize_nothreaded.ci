@@ -1,5 +1,0 @@
-mainmodule m {
-    mainchare c {
-        entry void foo() stacksize=512;
-    }
-}

@@ -141,9 +141,7 @@ set(conv-util-cxx-sources
     src/util/cmirdmautils.C
     src/util/crc32.C
     src/util/sockRoutines.C
-    src/util/ckdll.C
     src/util/ckhashtable.C
-    src/util/ckimage.C
     src/util/conv-lists.C
     src/util/pup_c.C
     src/util/pup_cmialloc.C

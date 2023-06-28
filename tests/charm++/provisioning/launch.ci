@@ -1,7 +1,0 @@
-mainmodule launch
-{
-  mainchare Main
-  {
-    entry Main(CkArgMsg *m);
-  }
-}

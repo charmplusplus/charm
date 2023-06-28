@@ -1,7 +1,0 @@
-mainmodule m {
-  initcall void boohoo(void);
-  mainchare A {
-    entry A();
-    entry void fun();
-  };
-};

@@ -182,10 +182,10 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
 # This is a bit unusual, but makes client linking simpler.
 UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwork4.h pup_paged.h pup_cmialloc.h\
 	pup_c_functions.h \
-	ckimage.h ckdll.h ckhashtable.h ckbitvector.h cklists.h ckliststring.h \
-	cksequence.h ckstatistics.h ckvector3d.h conv-lists.h ckcomplex.h \
-	sockRoutines.h sockRoutines.C simd.h SSE-Double.h SSE-Float.h \
-	crc32.h ckBIconfig.h rand48_replacement.h ckregex.h spanningTree.h json.hpp json_fwd.hpp cmirdmautils.h
+	ckhashtable.h ckbitvector.h cklists.h \
+	conv-lists.h \
+	sockRoutines.h sockRoutines.C simd.h \
+	crc32.h rand48_replacement.h spanningTree.h json.hpp json_fwd.hpp cmirdmautils.h
 
 CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckmarshall.h ckfutures.h ckIgetControl.h debug-charm.h\
@@ -456,7 +456,7 @@ LIBCONV_LDB = topology.o generate.o edgelist.o
 
 LIBCONV_UTIL=pup_util.o pup_toNetwork.o pup_toNetwork4.o		\
 	pup_xlater.o pup_c.o pup_paged.o pup_cmialloc.o			\
-	ckimage.o ckdll.o ckhashtable.o sockRoutines.o			\
+	ckhashtable.o sockRoutines.o			\
 	conv-lists.o persist-comm.o mempool.o \
 	crc32.o  lz4.o partitioning_strategies.o hilbert.o \
 	spanningTree.o cmirdmautils.o

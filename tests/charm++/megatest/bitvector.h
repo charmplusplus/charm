@@ -1,2 +1,0 @@
-#include "bitvector.decl.h"
-
