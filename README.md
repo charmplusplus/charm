@@ -258,6 +258,7 @@ netlrts-linux-x86_64/
 ```
 
 ## Building a Program
+
 To make a sample program, `cd` into `examples/charm++/NQueen/`.
 This program solves the _n_ queens problem-- find how many ways there
 are to arrange _n_ queens on an _n_ x _n_ chess board such that none may
@@ -268,6 +269,7 @@ executable named `nqueen`.
 
 
 ## Running a Program
+
 Following the previous example, to run the program on two processors, type
 
      $ ./charmrun +p2 ./nqueen 12 6
@@ -338,7 +340,9 @@ To open a pull request, create a fork of the Charm++ repo in your own space
 GitHub provides a detailed tutorial on creating pull requests 
 (https://docs.github.com/en/pull-requests/collaborating-with-pull-requests). 
 
-Our wiki also contains additional information about pull requests
+Each pull request must pass code review and CI tests before it can be merged by someone on
+the core development team.
+Our wiki contains additional information about pull requests
 (https://github.com/UIUC-PPL/charm/wiki/Working-with-Pull-Requests).
 
 
