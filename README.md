@@ -6,6 +6,7 @@
 
 
 ## Introduction
+
 Charm++ is a message-passing parallel language and runtime system.
 It is implemented as a set of libraries for C++, is efficient,
 and is portable to a wide variety of parallel machines.
@@ -13,6 +14,7 @@ Source code is provided, and non-commercial use is free.
 
 
 ## Getting the Latest Source
+
 You can use anonymous Git access to obtain the latest Charm++ source
 code, as follows:
 
@@ -20,7 +22,9 @@ code, as follows:
 
 
 ## Build Configuration
+
 ### Quick Start:
+
 First-time users are encouraged to run the top-level `build` script and follow its lead:
     
     $ ./build
@@ -36,6 +40,7 @@ script takes several command line options to compile Charm++. The command line s
 For detailed help messages, pass `-h` or `--help` to the build script.
 
 ### Required:
+
 `<target>` specifies the parts of Charm++ to compile.  The most often used
 `<target>` is `charm++`, which will compile the key Charm++ executables and
 runtime libraries.  Other common targets are `AMPI` and `LIBS`, which build
@@ -44,6 +49,7 @@ Adaptive MPI and Charm++ and all of its libraries, respectively.
   "How to choose a `<version>`" below for details.
 
 ### Optional:
+
 `<options>` defines more detailed information of the compilations, including
 compilers, features to support, etc.  See "How to choose `<options>`"
 below.
@@ -128,6 +134,7 @@ Your Charm++ version is made by concatenating the options, e.g.:
 
 
 ### How to choose `<options>`:
+
 `<version>` above defines the most important OS, CPU, and communication of
 your machine.
 
@@ -176,6 +183,7 @@ for more information:
 
 
 ## Building the Source
+
 If you have downloaded a binary version of Charm++, you can skip
 this step -- Charm++ should already be compiled.
 
@@ -303,6 +311,7 @@ However, for best performance, you should launch one node program per processor.
 
 
 ## Building Dynamic Libraries
+
 In order to compile Charm++ into dynamic libraries, one needs to specify the
 `--build-shared` option to the Charm `./build` script. Charm++'s dynamic
 libraries are compiled into the `lib_so/` directory. Typically, they are
@@ -317,6 +326,20 @@ For example:
 You can then run the program as usual.
 Note that linking against Charm++ dynamic libraries produces much smaller
 binaries and takes much less linking time.
+
+
+## Contributing
+
+The recommended way to contribute to Charm++ development is to open a pull request (PR) on GitHub.
+To open a pull request, create a fork of the Charm++ repo in your own space
+(if you already have a fork, make sure is it up-to-date), and then create a new branch off of the
+`main` branch.
+
+GitHub provides a detailed tutorial on creating pull requests 
+(https://docs.github.com/en/pull-requests/collaborating-with-pull-requests). 
+
+Our wiki also contains additional information about pull requests
+(https://github.com/UIUC-PPL/charm/wiki/Working-with-Pull-Requests).
 
 
 ## For More Information
@@ -334,6 +357,7 @@ please create an issue or discussion on our GitHub, https://github.com/UIUC-PPL/
 
 
 ## Authors
+
 Charm++ was created and is maintained by the Parallel Programming Lab,
 in the Computer Science department at the University of Illinois at
 Urbana-Champaign.  Our managing professor is Dr. L.V. Kale; students
