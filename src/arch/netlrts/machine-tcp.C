@@ -315,7 +315,7 @@ static void IntegrateMessageDatagram(char **msg, int len)
   int size;
   
   if (len >= DGRAM_HEADER_SIZE) {
-    DgramHeaderBreak(*msg, rank, srcpe, magic, seqno, broot);
+    DgramHeaderBreak((const DgramHeader *)*msg, rank, srcpe, magic, seqno, broot);
     if (magic == (Cmi_charmrun_pid&DGRAM_MAGIC_MASK)) {
       OtherNode node = nodes_by_pe[srcpe];
       newmsg = node->asm_msg;

@@ -20,10 +20,6 @@
 #include <infiniband/verbs.h>
 #endif
 
-#define DGRAM_HEADER_SIZE 8
-
-#define CmiMsgNext(msg) (*((void**)(msg)))
-
 #define DGRAM_ROOTPE_MASK   (0xFFFFu)
 #define DGRAM_SRCPE_MASK    (0xFFFF)
 #define DGRAM_MAGIC_MASK    (0xFF)
@@ -48,14 +44,14 @@ typedef struct {
         unsigned int rootpe:16; /* broadcast root processor */
 } DgramHeader;
 
-
-/* the window size needs to be Cmi_window_size + sizeof(unsigned int) bytes) */
-typedef struct { DgramHeader head; char window[1024]; } DgramAck;
+#define DGRAM_HEADER_SIZE (sizeof(DgramHeader))
+static_assert(DGRAM_HEADER_SIZE == 4 * sizeof(uint16_t),
+  "DgramHeader must be equivalent to 4x uint16_t");
 
 unsigned char computeCheckSum(unsigned char *data, int len);
 
 #define DgramHeaderMake(ptr, dstrank_, srcpe_, magic_, seqno_, root_) { \
-   DgramHeader *header = (DgramHeader *)(ptr);	\
+   DgramHeader * header = (ptr); \
    header->seqno = seqno_; \
    header->srcpe = srcpe_; \
    header->dstrank = dstrank_; \
@@ -64,7 +60,7 @@ unsigned char computeCheckSum(unsigned char *data, int len);
 }
 
 #define DgramHeaderBreak(ptr, dstrank_, srcpe_, magic_, seqno_, root_) { \
-   DgramHeader *header = (DgramHeader *)(ptr);	\
+   const DgramHeader * header = (ptr); \
    seqno_ = header->seqno; \
    srcpe_ = header->srcpe; \
    dstrank_ = header->dstrank; \
@@ -160,9 +156,6 @@ static void extract_args(char **argv)
   Cmi_comm_periodic_delay=(int)(1000*Cmi_delay_retransmit);
   if (Cmi_comm_periodic_delay>60) Cmi_comm_periodic_delay=60;
   Cmi_comm_clock_delay=(int)(1000*Cmi_ack_delay);
-  if (sizeof(DgramHeader)!=DGRAM_HEADER_SIZE) {
-    CmiAbort("DatagramHeader in machine-dgram.C is the wrong size!\n");
-  }
 }
 
 
