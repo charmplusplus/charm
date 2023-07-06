@@ -115,12 +115,10 @@ void TransmitAckDatagram(OtherNode node)
 {
   DgramAck ack; int i, seqno, slot; ExplicitDgram dg;
   int retval;
-  
-  DgramHeader *head;
 
   seqno = node->recv_next;
   MACHSTATE2(3,"  TransmitAckDgram [seq %d to 'pe' %d]",seqno,node->nodestart)
-  DgramHeaderMake(&ack, DGRAM_ACKNOWLEDGE, Cmi_nodestartGlobal, Cmi_net_magic, seqno, 0);
+  DgramHeaderMake(&ack.head, DGRAM_ACKNOWLEDGE, Cmi_nodestartGlobal, Cmi_net_magic, seqno, 0);
   LOG(Cmi_clock, Cmi_nodestartGlobal, 'A', node->nodestart, seqno);
   for (i=0; i<Cmi_window_size; i++) {
     slot = seqno % Cmi_window_size;
@@ -133,8 +131,7 @@ void TransmitAckDatagram(OtherNode node)
   node->send_ack_seqno = ((node->send_ack_seqno + 1) & DGRAM_SEQNO_MASK);
   retval = (-1);
 #if CMK_ERROR_CHECKING
-  head = (DgramHeader *)(&ack);
-  head->magic ^= computeCheckSum((unsigned char*)&ack, DGRAM_HEADER_SIZE + Cmi_window_size + sizeof(unsigned int));
+  ack.head.magic ^= computeCheckSum((unsigned char*)&ack, DGRAM_HEADER_SIZE + Cmi_window_size + sizeof(unsigned int));
 #endif
   while(retval==(-1))
     retval = sendto(dataskt, (char *)&ack,
@@ -654,7 +651,7 @@ void ReceiveDatagram(void)
 #endif
 
   if (ok >= DGRAM_HEADER_SIZE) {
-    DgramHeaderBreak(dg->data, dg->rank, dg->srcpe, magic, dg->seqno, dg->broot);
+    DgramHeaderBreak((const DgramHeader *)dg->data, dg->rank, dg->srcpe, magic, dg->seqno, dg->broot);
     MACHSTATE3(2,"  recv dgram [seq %d, for rank %d, from pe %d]",
 	       dg->seqno,dg->rank,dg->srcpe)
 #if CMK_ERROR_CHECKING

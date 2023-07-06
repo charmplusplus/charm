@@ -1302,7 +1302,7 @@ void DeliverViaNetwork(OutgoingMsg ogm, OtherNode node, int rank, unsigned int b
 	MACHSTATE3(3,"Sending ogm %p of size %d to %d",ogm,size,node->infiData->nodeNo);
 	//First packet has dgram header, other packets dont
 	
-  DgramHeaderMake(data, rank, ogm->src, Cmi_charmrun_pid, 1, broot);
+	DgramHeaderMake((DgramHeader *)data, rank, ogm->src, Cmi_charmrun_pid, 1, broot);
 	
 	CMI_MSG_SIZE(ogm->data)=ogm->size;
 
@@ -1690,8 +1690,8 @@ static inline void processMessage(int nodeNo,int len,char *msg,const int toBuffe
 		{
 			int size;
 			int rank, srcpe, seqno, magic, i;
-			unsigned int broot;
-			DgramHeaderBreak(msg, rank, srcpe, magic, seqno, broot);
+			int broot;
+			DgramHeaderBreak((const DgramHeader *)msg, rank, srcpe, magic, seqno, broot);
 			size = CMI_MSG_SIZE(msg);
 			MACHSTATE2(3,"START of a new message from node %d of total size %d",nodeNo,size);
 //			CmiAssert(size > 0);
@@ -2096,9 +2096,9 @@ static inline  void processRdmaWC(struct ibv_wc *rdmaWC,const int toBuffer){
 	{
 		int size;
 		int rank, srcpe, seqno, magic, i;
-		unsigned int broot;
+		int broot;
 		char *msg = buffer->buf;
-		DgramHeaderBreak(msg, rank, srcpe, magic, seqno, broot);
+		DgramHeaderBreak((const DgramHeader *)msg, rank, srcpe, magic, seqno, broot);
 		size = CMI_MSG_SIZE(msg);
 /*		CmiAssert(size == buffer->size);*/
 		handoverMessage(buffer->buf,size,rank,broot,toBuffer);
