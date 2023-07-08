@@ -136,9 +136,9 @@ namespace Ck { namespace IO {
             opts.basePE = 0;
           if (-1 == opts.skipPEs)
             opts.skipPEs = CkMyNodeSize();
-	  if(opts.num_readers == 0){
+	  if(opts.numReaders == 0){
 		// CkPrintf("DEBUG: the num readers in opts struct is 0\n");
-		opts.num_readers = std::min(32, CkNumPes());
+		opts.numReaders = std::min(32, CkNumPes());
 	  } 
           files[filesOpened] = FileInfo(name, opened, opts);
           managers.openFile(opnum++, filesOpened++, name, opts);
@@ -201,7 +201,7 @@ namespace Ck { namespace IO {
 		Options& opts = files[file].opts;
 		files[file].sessionID = sessionID;
 		// determine the number of reader sessions required, depending on the session size and the number of bytes per reader
-		int num_readers = opts.num_readers;
+		int num_readers = opts.numReaders;
 		CkArrayOptions sessionOpts(num_readers); // set the number of elements in the chare array
 		// if there is a non-empty mapping provided, do the mapping
 		if(!pes_to_map.empty()){
@@ -441,7 +441,7 @@ namespace Ck { namespace IO {
 		}
 		CProxy_ReadAssembler ra = _session_to_read_assembler[session];	
 		Options& opt = files[session.file].opts;	
-		size_t num_readers = opt.num_readers;
+		size_t num_readers = opt.numReaders;
 		// the number of bytes each BufferChare owns, exlcuding the bytes that aren't available
 		size_t read_stripe = session.getBytes() / num_readers;
 		// get the readassembler on this PE
@@ -658,6 +658,7 @@ namespace Ck { namespace IO {
 		std::shared_future<char*> _buffer;
 		size_t _num_readers;	
 		size_t _read_stripe;
+
 	public:
 		BufferChares(FileToken file, size_t offset, size_t bytes, size_t num_readers) : _token(file), _file(CkpvAccess(manager)->get(file)), _session_bytes(bytes), _session_offset(offset){
 			_num_readers = num_readers;
@@ -679,20 +680,17 @@ namespace Ck { namespace IO {
 			_buffer = temp_buffer.share();
 			double disk_read_after = CkWallTimer(); // end disk time
 			double total_time = disk_read_after - disk_read_before;
+			#ifdef DEBUG
 			CkCallback cb(CkReductionTarget(BufferChares, printTime), thisProxy[0]);
 			contribute(sizeof(double), &total_time, CkReduction::max_double, cb);
-		}
-		// deprecated function; not used any longer
-		void clearBuffer() {
-			char* buffer = _buffer.get();
-			delete[] buffer;
+			#endif
 		}
 
+		#ifdef DEBUG
 		void printTime(double time_taken){
 			CkPrintf("The time to disk took %f seconds\n", time_taken);
-		
 		}
-
+		#endif
 		/**
 		 * This function is launched in a separate thread
 		 * in order to allow the reads to disk to be parallelized

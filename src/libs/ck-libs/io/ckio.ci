@@ -29,12 +29,6 @@ module CkIO_impl {
           entry void openFile(std::string name, CkCallback opened, Options opts);
           entry [reductiontarget] void fileOpened(FileToken file);
           entry [reductiontarget] void sessionComplete(FileToken file);
-	  // facilitates all of the read calls that will happen
-	  
-//	  entry void read(Session session, size_t bytes, size_t offset, CkCallback after_read);
-
-//	  entry void read(Session session, size_t bytes, size_t offset, CkCallback after_read, size_t tag);
-	// this method is called by the read function by the user in order to get data
 	
 	// the method used by the director which is used to close a readsession
 	  entry void closeReadSession(Session, CkCallback);
@@ -126,7 +120,7 @@ module CkIO_impl {
 			
 		// the method by which ReadSession objects can send their data for the read	
 		// when invoked, avoid a sender-side copy	
-		entry /*[inline]*/ void shareData(int read_tag, int buffer_tag, size_t read_chare_offset, size_t num_bytes, nocopypost char data[num_bytes]); 
+		entry void shareData(int read_tag, int buffer_tag, size_t read_chare_offset, size_t num_bytes, nocopypost char data[num_bytes]); 
 
 		entry void serveRead(size_t read_bytes, size_t read_offset, CkCallback after_read, size_t read_stripe, size_t num_readers); // will be used to serve the read_stripe
 
@@ -167,8 +161,9 @@ module CkIO_impl {
 		entry BufferChares(FileToken file, size_t offset, size_t bytes, size_t num_readers);
 		// way for the BufferChares object to send bytes over to the ReadAssembler object ra when serving a specific read
 		entry [threaded] void sendData(int read_tag, int buffer_tag, size_t offset, size_t bytes, CProxy_ReadAssembler ra, int pe);
-		entry void clearBuffer();
+#ifdef DEBUG
 		entry [reductiontarget] void printTime(double time_taken);
+#endif
 
 		entry void zeroCopyCallback(size_t offset, double time);
 	};
