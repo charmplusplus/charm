@@ -49,7 +49,7 @@ mainmodule iotest {
 			serial {
 				ckout << "Starting the reading\n";
 				Ck::IO::Options opts;
-				opts.num_readers = 3;
+				opts.numReaders = 3;
 				CkCallback open_cb(CkIndex_Main::ready(NULL), thisProxy);
 				open_cb.setRefNum(0);
 				Ck::IO::open(TEST_FILE, open_cb, opts);
