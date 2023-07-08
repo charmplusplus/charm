@@ -32,13 +32,6 @@ mainmodule iotest {
 		// method that verifies the read is correct
 		entry void testRead(Ck::IO::ReadCompleteMsg* msg) {
 			serial {
-//				FILE* fp = fopen("parallel_test.out", "w+");
-//				fwrite(msg -> data, 1, msg -> bytes, fp);	
-//				fclose(fp);
-//				fp = fopen("seq_test.out", "w+");	
-//				fwrite(msg -> data, 1, msg -> bytes, fp);	
-//				fclose(fp);
-
 				ckout << "At offset " << msg -> offset << ":";
 				char* seq_data = sequentialRead(msg -> offset, msg -> bytes);
 				for(size_t i = 0; i< msg -> bytes; ++i){
