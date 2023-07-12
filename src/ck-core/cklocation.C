@@ -2402,7 +2402,7 @@ CkLocMgr::CkLocMgr(CkArrayOptions opts)
       thisProxy(thisgroup),
       thislocalproxy(thisgroup, CkMyPe())
 {
-  DEBC((AA "Creating new location manager %d\n" AB, thisgroup));
+  DEBC((AA "Creating new location manager %d\n" AB, thisgroup.idx));
 
   duringMigration = false;
 
@@ -2788,11 +2788,11 @@ void CkLocMgr::multiHop(CkArrayMessage* msg)
   CK_MAGICNUMBER_CHECK
   int srcPe = msg->array_getSrcPe();
   if (srcPe == CkMyPe())
-    DEB((AA "Odd routing: local element %u is %d hops away!\n" AB,
+    DEB((AA "Odd routing: local element %" PRIu64 " is %d hops away!\n" AB,
          msg->array_element_id(), msg->array_hops()));
   else
   {  // Send a routing message letting original sender know new element location
-    DEBS((AA "Sending update back to %d for element %u\n" AB, srcPe,
+    DEBS((AA "Sending update back to %d for element %" PRIu64 "\n" AB, srcPe,
           msg->array_element_id()));
     cache->requestLocation(msg->array_element_id(), srcPe);
   }
