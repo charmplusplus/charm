@@ -1527,13 +1527,15 @@ void ampiParent::setUserJustMigratedFn(MPI_MigrateFn f) noexcept {
 
 void ampiParent::ckAboutToMigrate() noexcept {
   if (userAboutToMigrateFn) {
+    const auto oldTCharm = CtvAccess(_curTCharm);
+    const auto oldAMPI = CtvAccess(ampiPtr);
     CtvAccess(_curTCharm) = thread;
     CtvAccess(ampiPtr) = this;
     const int old = CthInterceptionsTemporarilyActivateStart(thread->getThread());
     (*userAboutToMigrateFn)();
     CthInterceptionsTemporarilyActivateEnd(thread->getThread(), old);
-    CtvAccess(_curTCharm) = nullptr;
-    CtvAccess(ampiPtr) = nullptr;
+    CtvAccess(_curTCharm) = oldTCharm;
+    CtvAccess(ampiPtr) = oldAMPI;
   }
 }
 
@@ -1546,13 +1548,15 @@ void ampiParent::ckJustMigrated() noexcept {
 void ampiParent::resumeAfterMigration() noexcept {
   if (didMigrate && userJustMigratedFn) {
     didMigrate = false;
+    const auto oldTCharm = CtvAccess(_curTCharm);
+    const auto oldAMPI = CtvAccess(ampiPtr);
     CtvAccess(_curTCharm) = thread;
     CtvAccess(ampiPtr) = this;
     const int old = CthInterceptionsTemporarilyActivateStart(thread->getThread());
     (*userJustMigratedFn)();
     CthInterceptionsTemporarilyActivateEnd(thread->getThread(), old);
-    CtvAccess(_curTCharm) = nullptr;
-    CtvAccess(ampiPtr) = nullptr;
+    CtvAccess(_curTCharm) = oldTCharm;
+    CtvAccess(ampiPtr) = oldAMPI;
   }
 
   thread->start();
