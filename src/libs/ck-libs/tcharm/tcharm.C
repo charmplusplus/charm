@@ -181,7 +181,7 @@ static void startTCharmThread(TCharmInitMsg *msg)
        TCHARM_Thread_data_start_fn threadFn = getTCharmThreadFunction(msg->threadFn);
 	threadFn(msg->data);
 	TCharm::deactivateThread();
-	CtvAccess(_curTCharm)->done(0);
+	TCharm::getNULL()->done(0);
 }
 
 TCharm::TCharm(TCharmInitMsg *initMsg_)
@@ -276,7 +276,7 @@ void TCharm::pup(PUP::er &p) {
   // Set up TCHARM context for use during user's pup routines:
   if(isStopped) {
     CtvAccess(_curTCharm)=this;
-    activateThread();
+    activateThread(this);
   }
 
   s.seek(0);

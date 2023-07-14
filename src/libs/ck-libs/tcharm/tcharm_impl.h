@@ -262,7 +262,7 @@ class TCharm: public CBase_TCharm
 		 * from this point onward, you'll cause heap corruption if
 		 * we're resuming from migration!  (OSL 2003/9/23) */
 		TCharm *dis=TCharm::get();
-		TCharm::activateThread();
+		TCharm::activateThread(dis);
 		dis->isStopped=false;
 		// tcharm does not trigger thread listeners on suspend/resume
 		// so it needs to manually start/stop timing
@@ -298,13 +298,16 @@ class TCharm: public CBase_TCharm
 
 	//Entering thread context: turn stuff on
 	static void activateThread() noexcept {
-		TCharm *tc = CtvAccess(_curTCharm);
+		TCharm *tc = getNULL();
+		activateThread(tc);
+	}
+	static void activateThread(TCharm *tc) noexcept {
 		if (tc != nullptr)
 			CthInterceptionsDeactivatePop(tc->getThread());
 	}
 	//Leaving this thread's context: turn stuff back off
 	static void deactivateThread() noexcept {
-		TCharm *tc = CtvAccess(_curTCharm);
+		TCharm *tc = getNULL();
 		if (tc != nullptr)
 			CthInterceptionsDeactivatePush(tc->getThread());
 	}
