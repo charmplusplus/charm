@@ -137,6 +137,10 @@
 #ifndef __has_builtin
 # define __has_builtin(x) 0  // Compatibility with non-clang compilers.
 #endif
+#ifndef __has_attribute
+# define __has_attribute(x) 0  // Compatibility with non-clang compilers.
+#endif
+
 #if (defined __GNUC__ || __has_builtin(__builtin_unreachable)) && !defined _CRAYC
 // Technically GCC 4.5 is the minimum for this feature, but we require C++11.
 # define CMI_UNREACHABLE_SECTION(...) __builtin_unreachable()
@@ -195,6 +199,19 @@
 #else
 # define CMI_LIKELY(x)   (x)
 # define CMI_UNLIKELY(x) (x)
+#endif
+
+#if __has_attribute(noinline) || \
+  defined __GNUC__ || \
+  defined __INTEL_COMPILER || \
+  defined __ibmxl__ || defined __xlC__
+# define CMI_NOINLINE __attribute__((noinline))
+#elif defined _MSC_VER
+# define CMI_NOINLINE __declspec(noinline)
+#elif defined __PGI
+# define CMI_NOINLINE _Pragma("noinline")
+#else
+# define CMI_NOINLINE
 #endif
 
 /* Paste the tokens x and y together, without any space between them.
