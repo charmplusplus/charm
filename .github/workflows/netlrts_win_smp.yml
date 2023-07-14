@@ -1,0 +1,29 @@
+name: NetLRTS Windows SMP
+
+on: [pull_request, merge_group]
+
+jobs:
+  build:
+    timeout-minutes: 360
+
+    runs-on: windows-latest
+
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: git mingw-w64-x86_64-toolchain mingw-w64-x86_64-libtool mingw-w64-x86_64-cmake make libtool autoconf automake
+    - name: build
+      run: |
+        . src/arch/win/vsenv.sh
+        ./build AMPI netlrts-win-x86_64 smp --with-production -j2
+        make -C netlrts-win-x86_64-smp/tests -j2
+    - name: test
+      run: |
+        make -C netlrts-win-x86_64-smp/tests test TESTOPTS="++local"
