@@ -222,7 +222,7 @@ class TCharm: public CBase_TCharm
 #endif
 		return c;
 	}
-	inline static TCharm *getNULL() noexcept {return CtvAccess(_curTCharm);}
+	static CMI_NOINLINE TCharm *getNULL() noexcept {return CtvAccess(_curTCharm);}
 	inline CthThread getThread() noexcept {return tid;}
 	inline const CProxy_TCharm &getProxy() const noexcept {return threadInfo.tProxy;}
 	inline int getElement() const noexcept {return threadInfo.thisElement;}
