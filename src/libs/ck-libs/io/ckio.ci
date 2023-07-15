@@ -164,7 +164,7 @@ module CkIO_impl {
 #ifdef DEBUG
 		entry [reductiontarget] void printTime(double time_taken);
 #endif
-
+		entry[reductiontarget] void getTimeToDisk(double time);
 		entry void zeroCopyCallback(size_t offset, double time);
 	};
         

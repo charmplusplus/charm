@@ -658,6 +658,7 @@ namespace Ck { namespace IO {
 		std::shared_future<char*> _buffer;
 		size_t _num_readers;	
 		size_t _read_stripe;
+		double _time_to_disk;
 
 	public:
 		BufferChares(FileToken file, size_t offset, size_t bytes, size_t num_readers) : _token(file), _file(CkpvAccess(manager)->get(file)), _session_bytes(bytes), _session_offset(offset){
@@ -712,7 +713,12 @@ namespace Ck { namespace IO {
 			#ifdef DEBUG
 			CkPrintf("Starting the read\n", thisIndex);
 			#endif
+			double start_read = CkWallTimer();
 			size_t num_bytes_read = fread(buffer, 1, _my_bytes, fp);
+			_time_to_disk = CkWallTimer() - start_read;
+			CkCallback cb(CkReductionTarget(BufferChares, getTimeToDisk), thisProxy[0]);
+
+			contribute(sizeof(double), &_time_to_disk, CkReduction::max_double, cb); 
 			#ifdef DEBUG
 			CkPrintf("Finished the read on %d\n", thisIndex);
 			#endif
@@ -728,6 +734,9 @@ namespace Ck { namespace IO {
 			return buffer;	
 		}	
 		
+		void getTimeToDisk(double time_taken){
+			CkPrintf("Time taken to go to disk: %f\n", time_taken);
+		}	
 		/**
 		 * Method invoked by the ReadAssembler in order to request from the 
 		 * BufferChare data.. Note that offset and bytes are with respect to the overall file itself
