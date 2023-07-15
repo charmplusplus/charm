@@ -138,7 +138,7 @@ namespace Ck { namespace IO {
             opts.skipPEs = CkMyNodeSize();
 	  if(opts.numReaders == 0){
 		// CkPrintf("DEBUG: the num readers in opts struct is 0\n");
-		opts.numReaders = std::min(32, CkNumPes());
+		opts.numReaders = std::min(CmiNumNodes(), CkNumPes());
 	  } 
           files[filesOpened] = FileInfo(name, opened, opts);
           managers.openFile(opnum++, filesOpened++, name, opts);
