@@ -1148,11 +1148,10 @@ void AMPI_threadstart(void *data)
   CtvAccess(stackBottom) = &argv;
 
   int ret = 0;
-  // Only one of the following four main functions actually runs application code,
+  // Only one of the following main functions actually runs application code,
   // the others are stubs provided by compat_ampi*.
-  ret += AMPI_Main_cpp();
-  ret += AMPI_Main_cpp(argc,argv);
-  ret += AMPI_Main_c(argc,argv);
+  ret += AMPI_Main_noargs();
+  ret += AMPI_Main(argc,argv);
   FTN_NAME(MPI_MAIN,mpi_main)(); // returns void
   AMPI_Exit(ret);
 }
@@ -1472,7 +1471,7 @@ void ampiParent::init() noexcept{
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(thisIndex)){
     char fname[128];
-    sprintf(fname, "%s.%d", msgLogFilename,thisIndex);
+    snprintf(fname, sizeof(fname), "%s.%d", msgLogFilename,thisIndex);
 #if CMK_USE_ZLIB && 0
     fMsgLog = gzopen(fname,"wb");
     toPUPer = new PUP::tozDisk(fMsgLog);
@@ -1483,7 +1482,7 @@ void ampiParent::init() noexcept{
 #endif
   }else if(msgLogRead){
     char fname[128];
-    sprintf(fname, "%s.%d", msgLogFilename,msgLogRank);
+    snprintf(fname, sizeof(fname), "%s.%d", msgLogFilename,msgLogRank);
 #if CMK_USE_ZLIB && 0
     fMsgLog = gzopen(fname,"rb");
     fromPUPer = new PUP::fromzDisk(fMsgLog);
@@ -1528,13 +1527,15 @@ void ampiParent::setUserJustMigratedFn(MPI_MigrateFn f) noexcept {
 
 void ampiParent::ckAboutToMigrate() noexcept {
   if (userAboutToMigrateFn) {
+    const auto oldTCharm = CtvAccess(_curTCharm);
+    const auto oldAMPI = CtvAccess(ampiPtr);
     CtvAccess(_curTCharm) = thread;
     CtvAccess(ampiPtr) = this;
     const int old = CthInterceptionsTemporarilyActivateStart(thread->getThread());
     (*userAboutToMigrateFn)();
     CthInterceptionsTemporarilyActivateEnd(thread->getThread(), old);
-    CtvAccess(_curTCharm) = nullptr;
-    CtvAccess(ampiPtr) = nullptr;
+    CtvAccess(_curTCharm) = oldTCharm;
+    CtvAccess(ampiPtr) = oldAMPI;
   }
 }
 
@@ -1547,13 +1548,15 @@ void ampiParent::ckJustMigrated() noexcept {
 void ampiParent::resumeAfterMigration() noexcept {
   if (didMigrate && userJustMigratedFn) {
     didMigrate = false;
+    const auto oldTCharm = CtvAccess(_curTCharm);
+    const auto oldAMPI = CtvAccess(ampiPtr);
     CtvAccess(_curTCharm) = thread;
     CtvAccess(ampiPtr) = this;
     const int old = CthInterceptionsTemporarilyActivateStart(thread->getThread());
     (*userJustMigratedFn)();
     CthInterceptionsTemporarilyActivateEnd(thread->getThread(), old);
-    CtvAccess(_curTCharm) = nullptr;
-    CtvAccess(ampiPtr) = nullptr;
+    CtvAccess(_curTCharm) = oldTCharm;
+    CtvAccess(ampiPtr) = oldAMPI;
   }
 
   thread->start();
@@ -2460,6 +2463,13 @@ void ampi::commCreatePhase1(int nextComm, int commType) noexcept {
 }
 
 /* Virtual topology communicator creation */
+void ampiTopology::sortnbors(CProxy_ampi arrProxy, std::vector<int> &nbors_) noexcept {
+  if (nbors_.size() > 1) {
+    // Sort neighbors so that non-PE-local ranks are before PE-local ranks, so that
+    // we can overlap non-local messages with local ones which happen inline
+    std::partition(nbors_.begin(), nbors_.end(), [&](int idx) { return !arrProxy[idx].ckLocal(); } );
+  }
+}
 
 // 0-dimensional cart comm: rank 0 creates a dup of COMM_SELF with topo info.
 MPI_Comm ampi::cartCreate0D() noexcept {
@@ -5991,7 +6001,7 @@ CMI_WARN_UNUSED_RESULT ampiParent* ampiParent::waitall(int count, MPI_Request re
     }
   }
 
-  MSG_ORDER_DEBUG(CkPrintf("[%d] MPI_Waitall called with count %d, blocking on completion of %d requests\n", ptr->thisIndex, count, numBlockedReqs));
+  MSG_ORDER_DEBUG(CkPrintf("[%d] MPI_Waitall called with count %d, blocking on completion of %d requests\n", pptr->thisIndex, count, numBlockedReqs));
 
   // If any requests are incomplete, block until all have been completed
   if (numBlockedReqs > 0) {
@@ -9012,7 +9022,8 @@ AMPI_API_IMPL(int, MPI_Neighbor_alltoall, const void* sendbuf, int sendcount, MP
   if (ptr->getSize() == 1)
     return copyDatatype(sendtype, sendcount, recvtype, recvcount, sendbuf, recvbuf);
 
-  const std::vector<int>& neighbors = ptr->getNeighbors();
+  std::vector<int>& neighbors = ptr->getNeighbors();
+  ptr->sortNeighborsByLocality(neighbors);
   int num_neighbors = neighbors.size();
   int itemsize = getDDT()->getSize(sendtype) * sendcount;
   int extent = getDDT()->getExtent(recvtype) * recvcount;
@@ -9067,7 +9078,8 @@ AMPI_API_IMPL(int, MPI_Ineighbor_alltoall, const void* sendbuf, int sendcount, M
     return copyDatatype(sendtype, sendcount, recvtype, recvcount, sendbuf, recvbuf);
   }
 
-  const std::vector<int>& neighbors = ptr->getNeighbors();
+  std::vector<int>& neighbors = ptr->getNeighbors();
+  ptr->sortNeighborsByLocality(neighbors);
   int num_neighbors = neighbors.size();
   int itemsize = getDDT()->getSize(sendtype) * sendcount;
   int extent = getDDT()->getExtent(recvtype) * recvcount;
@@ -9117,7 +9129,8 @@ AMPI_API_IMPL(int, MPI_Neighbor_alltoallv, const void* sendbuf, const int *sendc
   if (ptr->getSize() == 1)
     return copyDatatype(sendtype, sendcounts[0], recvtype, recvcounts[0], sendbuf, recvbuf);
 
-  const std::vector<int>& neighbors = ptr->getNeighbors();
+  std::vector<int>& neighbors = ptr->getNeighbors();
+  ptr->sortNeighborsByLocality(neighbors);
   int num_neighbors = neighbors.size();
   int itemsize = getDDT()->getSize(sendtype);
   int extent = getDDT()->getExtent(recvtype);
@@ -9173,7 +9186,8 @@ AMPI_API_IMPL(int, MPI_Ineighbor_alltoallv, const void* sendbuf, const int *send
     return copyDatatype(sendtype, sendcounts[0], recvtype, recvcounts[0], sendbuf, recvbuf);
   }
 
-  const std::vector<int>& neighbors = ptr->getNeighbors();
+  std::vector<int>& neighbors = ptr->getNeighbors();
+  ptr->sortNeighborsByLocality(neighbors);
   int num_neighbors = neighbors.size();
   int itemsize = getDDT()->getSize(sendtype);
   int extent = getDDT()->getExtent(recvtype);
@@ -9223,7 +9237,8 @@ AMPI_API_IMPL(int, MPI_Neighbor_alltoallw, const void* sendbuf, const int *sendc
   if (ptr->getSize() == 1)
     return copyDatatype(sendtypes[0], sendcounts[0], recvtypes[0], recvcounts[0], sendbuf, recvbuf);
 
-  const std::vector<int>& neighbors = ptr->getNeighbors();
+  std::vector<int>& neighbors = ptr->getNeighbors();
+  ptr->sortNeighborsByLocality(neighbors);
   int num_neighbors = neighbors.size();
 
   std::vector<MPI_Request> reqs(num_neighbors*2);
@@ -9277,7 +9292,8 @@ AMPI_API_IMPL(int, MPI_Ineighbor_alltoallw, const void* sendbuf, const int *send
     return copyDatatype(sendtypes[0], sendcounts[0], recvtypes[0], recvcounts[0], sendbuf, recvbuf);
   }
 
-  const std::vector<int>& neighbors = ptr->getNeighbors();
+  std::vector<int>& neighbors = ptr->getNeighbors();
+  ptr->sortNeighborsByLocality(neighbors);
   int num_neighbors = neighbors.size();
 
   // use an ATAReq to non-block the caller and get a request ptr
@@ -9325,7 +9341,8 @@ AMPI_API_IMPL(int, MPI_Neighbor_allgather, const void* sendbuf, int sendcount, M
   if (ptr->getSize() == 1)
     return copyDatatype(sendtype, sendcount, recvtype, recvcount, sendbuf, recvbuf);
 
-  const std::vector<int>& neighbors = ptr->getNeighbors();
+  std::vector<int>& neighbors = ptr->getNeighbors();
+  ptr->sortNeighborsByLocality(neighbors);
   int num_neighbors = neighbors.size();
 
   int extent = getDDT()->getExtent(recvtype) * recvcount;
@@ -9379,7 +9396,8 @@ AMPI_API_IMPL(int, MPI_Ineighbor_allgather, const void* sendbuf, int sendcount, 
     return copyDatatype(sendtype, sendcount, recvtype, recvcount, sendbuf, recvbuf);
   }
 
-  const std::vector<int>& neighbors = ptr->getNeighbors();
+  std::vector<int>& neighbors = ptr->getNeighbors();
+  ptr->sortNeighborsByLocality(neighbors);
   int num_neighbors = neighbors.size();
 
   // use an ATAReq to non-block the caller and get a request ptr
@@ -9428,7 +9446,8 @@ AMPI_API_IMPL(int, MPI_Neighbor_allgatherv, const void* sendbuf, int sendcount, 
   if (ptr->getSize() == 1)
     return copyDatatype(sendtype, sendcount, recvtype, recvcounts[0], sendbuf, recvbuf);
 
-  const std::vector<int>& neighbors = ptr->getNeighbors();
+  std::vector<int>& neighbors = ptr->getNeighbors();
+  ptr->sortNeighborsByLocality(neighbors);
   int num_neighbors = neighbors.size();
   int extent = getDDT()->getExtent(recvtype);
   std::vector<MPI_Request> reqs(num_neighbors*2);
@@ -9480,7 +9499,8 @@ AMPI_API_IMPL(int, MPI_Ineighbor_allgatherv, const void* sendbuf, int sendcount,
     return copyDatatype(sendtype, sendcount, recvtype, recvcounts[0], sendbuf, recvbuf);
   }
 
-  const std::vector<int>& neighbors = ptr->getNeighbors();
+  std::vector<int>& neighbors = ptr->getNeighbors();
+  ptr->sortNeighborsByLocality(neighbors);
   int num_neighbors = neighbors.size();
 
   // use an ATAReq to non-block the caller and get a request ptr
@@ -9895,7 +9915,7 @@ AMPI_API_IMPL(int, MPI_Get_processor_name, char *name, int *resultlen)
 {
   AMPI_API_INIT("AMPI_Get_processor_name", name, resultlen);
   ampiParent *ptr = getAmpiParent();
-  sprintf(name,"AMPI_RANK[%d]_WTH[%d]",ptr->thisIndex,ptr->getMyPe());
+  snprintf(name,MPI_MAX_PROCESSOR_NAME,"AMPI_RANK[%d]_WTH[%d]",ptr->thisIndex,ptr->getMyPe());
   *resultlen = strlen(name);
   return MPI_SUCCESS;
 }
@@ -11693,6 +11713,8 @@ int AMPI_GPU_Iinvoke_wr(hapiWorkRequest *to_call, MPI_Request *request)
   CkCallback cb(&AMPI_GPU_complete, newreq);
   hapiWorkRequestSetCallback(to_call, &cb);
   hapiEnqueue(to_call);
+
+  return MPI_SUCCESS;
 }
 
 /* Submit GPU request that will be notified of completion once the previous
@@ -11709,6 +11731,8 @@ int AMPI_GPU_Iinvoke(cudaStream_t stream, MPI_Request *request)
   // A callback that completes the corresponding request
   CkCallback cb(&AMPI_GPU_complete, newreq);
   hapiAddCallback(stream, &cb, nullptr);
+
+  return MPI_SUCCESS;
 }
 
 CLINKAGE
@@ -11750,13 +11774,9 @@ void TCHARM_Element_Setup(int myelement, int numelements, CmiIsomallocContext ct
 #if defined _WIN32 || CMK_DLL_USE_DLOPEN
 static ampi_maintype AMPI_Main_Get_C(SharedObject myexe)
 {
-  auto AMPI_Main_cpp_ptr = (ampi_maintype)dlsym(myexe, "AMPI_Main_cpp");
-  if (AMPI_Main_cpp_ptr)
-    return AMPI_Main_cpp_ptr;
-
-  auto AMPI_Main_c_ptr = (ampi_maintype)dlsym(myexe, "AMPI_Main_c");
-  if (AMPI_Main_c_ptr)
-    return AMPI_Main_c_ptr;
+  auto AMPI_Main_noargs_ptr = (ampi_maintype)dlsym(myexe, "AMPI_Main_noargs");
+  if (AMPI_Main_noargs_ptr)
+    return AMPI_Main_noargs_ptr;
 
   auto AMPI_Main_ptr = (ampi_maintype)dlsym(myexe, "AMPI_Main");
   if (AMPI_Main_ptr)

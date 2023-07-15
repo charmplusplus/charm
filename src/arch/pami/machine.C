@@ -41,9 +41,6 @@ FILE *debugLog = NULL;
 #include "PPCAtomicMutex.h"
 #endif
 
-#define CMI_LIKELY(x)    (__builtin_expect(x,1))
-#define CMI_UNLIKELY(x)  (__builtin_expect(x,0))
-
 char *ALIGN_32(char *p) {
   return((char *)((((unsigned long)p)+0x1f) & (~0x1FUL)));
 }
@@ -155,7 +152,7 @@ static PPCAtomicMutex *node_recv_mutex;
 #if CMK_SMP && !CMK_MULTICORE
 //The random seed to pick destination context
 CMK_THREADLOCAL uint32_t r_seed = 0xdeadbeef;
-CMK_THREADLOCAL int32_t _cmi_bgq_incommthread = 0;
+CMK_THREADLOCAL int32_t _cmi_async_incommthread = 0;
 CMK_THREADLOCAL int32_t _comm_thread_id = 0;
 #endif
 
@@ -575,7 +572,7 @@ pami_result_t init_comm_thread (pami_context_t   context,
   rseedl |= (uint64_t)context;
   r_seed = ((uint32_t)rseedl)^((uint32_t)(rseedl >> 32));
 
-  _cmi_bgq_incommthread = 1;
+  _cmi_async_incommthread = 1;
 
   return PAMI_SUCCESS;
 }
@@ -720,7 +717,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     _Cmi_numnodes = configuration.value.intval;
 #if MACHINE_DEBUG_LOG
     char ln[200];
-    sprintf(ln,"debugLog.%d", _Cmi_mynode);
+    snprintf(ln, sizeof(ln), "debugLog.%d", _Cmi_mynode);
     debugLog=fopen(ln,"w");
     if (debugLog == NULL)
     {

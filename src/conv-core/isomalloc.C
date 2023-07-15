@@ -647,7 +647,7 @@ static int try_largest_mmap_region(memRegion_t * destRegion)
   pid_t pid = getpid();
   {
     char s[128];
-    sprintf(s, "cat /proc/%d/maps", pid);
+    snprintf(s, sizeof(s), "cat /proc/%d/maps", pid);
     system(s);
   }
 #endif
@@ -797,11 +797,10 @@ static void CmiIsomallocInitExtent(char ** argv)
     {
       memRange_t start = CMIALIGN((uintptr_t)freeRegion.start, division_size);
       memRange_t end = CMIALIGN((uintptr_t)freeRegion.start + freeRegion.len - (division_size-1), division_size);
-      memRange_t len = end - start;
       IsoRegion.s = start;
       IsoRegion.e = end;
       DEBUG_PRINT("[%d] Isomalloc memory region: 0x%zx - 0x%zx (%zu gigs)\n", CmiMyPe(),
-                  start, end, len/gig);
+                  start, end, (end - start)/gig);
     }
   }
 
@@ -1135,7 +1134,7 @@ struct isommap
 
 #include "memory-gnu-internal.C"
 
-struct isomalloc_dlmalloc : dlmalloc_impl
+struct isomalloc_dlmalloc final : dlmalloc_impl
 {
   isomalloc_dlmalloc(uint8_t * s, uint8_t * e)
     : backend{s, e}, arena{}
@@ -1951,12 +1950,12 @@ struct Isomempool
   static_assert(minimum_empty_region_size >= sizeof(RegionHeader), "regions must allow space for a header");
 
   Isomempool(uint8_t * s, uint8_t * e)
-    : empty_tree{}, first_region{}, last_region{}, backend{s, e}
+    : backend{s, e}, empty_tree{}, first_region{}, last_region{}
   {
     IMP_DBG("[%d][%p] Isomempool::Isomempool(%p, %p)\n", CmiMyPe(), (void *)this, s, e);
   }
   Isomempool(PUP::reconstruct pr)
-    : empty_tree{pr}, backend{pr}
+    : backend{pr}, empty_tree{pr}
   {
     IMP_DBG("[%d][%p] Isomempool::Isomempool(PUP::reconstruct)\n", CmiMyPe(), (void *)this);
   }

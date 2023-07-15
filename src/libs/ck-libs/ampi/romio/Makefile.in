@@ -105,19 +105,18 @@ host_triplet = @host@
 @BUILD_ROMIO_EMBEDDED_FALSE@am__append_3 = \
 @BUILD_ROMIO_EMBEDDED_FALSE@	mpi-io/glue/large_count.c
 
-@BUILD_F77_BINDINGS_TRUE@am__append_4 = mpi-io/fortran/romio_fortran.c
 
 # not used in MPICH, we use generalized requests instead
-@BUILD_MPIO_REQUEST_TRUE@am__append_5 = $(mpio_request_sources)
+@BUILD_MPIO_REQUEST_TRUE@am__append_4 = $(mpio_request_sources)
 
 # not used in MPICH
-@BUILD_MPIO_ERRHAN_TRUE@am__append_6 = $(mpio_request_sources)
-@BUILD_AD_GPFS_TRUE@am__append_7 = \
+@BUILD_MPIO_ERRHAN_TRUE@am__append_5 = $(mpio_request_sources)
+@BUILD_AD_GPFS_TRUE@am__append_6 = \
 @BUILD_AD_GPFS_TRUE@    adio/ad_gpfs/ad_gpfs_aggrs.h                                         \
 @BUILD_AD_GPFS_TRUE@    adio/ad_gpfs/ad_gpfs.h                                               \
 @BUILD_AD_GPFS_TRUE@    adio/ad_gpfs/ad_gpfs_tuning.h
 
-@BUILD_AD_GPFS_TRUE@am__append_8 = \
+@BUILD_AD_GPFS_TRUE@am__append_7 = \
 @BUILD_AD_GPFS_TRUE@    adio/ad_gpfs/ad_gpfs_aggrs.c                                         \
 @BUILD_AD_GPFS_TRUE@    adio/ad_gpfs/ad_gpfs_close.c                                         \
 @BUILD_AD_GPFS_TRUE@    adio/ad_gpfs/ad_gpfs_flush.c                                         \
@@ -128,22 +127,22 @@ host_triplet = @host@
 @BUILD_AD_GPFS_TRUE@    adio/ad_gpfs/ad_gpfs_rdcoll.c                                        \
 @BUILD_AD_GPFS_TRUE@    adio/ad_gpfs/ad_gpfs_wrcoll.c
 
-@BUILD_AD_BG_TRUE@am__append_9 = \
+@BUILD_AD_BG_TRUE@am__append_8 = \
 @BUILD_AD_BG_TRUE@    adio/ad_gpfs/bg/ad_bg_aggrs.h                                         \
 @BUILD_AD_BG_TRUE@    adio/ad_gpfs/bg/ad_bg_pset.h
 
-@BUILD_AD_BG_TRUE@am__append_10 = \
+@BUILD_AD_BG_TRUE@am__append_9 = \
 @BUILD_AD_BG_TRUE@    adio/ad_gpfs/bg/ad_bg_aggrs.c                                         \
 @BUILD_AD_BG_TRUE@    adio/ad_gpfs/bg/ad_bg_pset.c 
 
-@BUILD_AD_PE_TRUE@am__append_11 = \
+@BUILD_AD_PE_TRUE@am__append_10 = \
 @BUILD_AD_PE_TRUE@    adio/ad_gpfs/pe/ad_pe_aggrs.h
 
-@BUILD_AD_PE_TRUE@am__append_12 = \
+@BUILD_AD_PE_TRUE@am__append_11 = \
 @BUILD_AD_PE_TRUE@    adio/ad_gpfs/pe/ad_pe_aggrs.c
 
-@BUILD_AD_GRIDFTP_TRUE@am__append_13 = adio/ad_gridftp/ad_gridftp.h
-@BUILD_AD_GRIDFTP_TRUE@am__append_14 = \
+@BUILD_AD_GRIDFTP_TRUE@am__append_12 = adio/ad_gridftp/ad_gridftp.h
+@BUILD_AD_GRIDFTP_TRUE@am__append_13 = \
 @BUILD_AD_GRIDFTP_TRUE@    adio/ad_gridftp/ad_gridftp_close.c    \
 @BUILD_AD_GRIDFTP_TRUE@    adio/ad_gridftp/ad_gridftp_open.c     \
 @BUILD_AD_GRIDFTP_TRUE@    adio/ad_gridftp/ad_gridftp_read.c     \
@@ -157,8 +156,8 @@ host_triplet = @host@
 @BUILD_AD_GRIDFTP_TRUE@    adio/ad_gridftp/globus_routines.c     \
 @BUILD_AD_GRIDFTP_TRUE@    adio/ad_gridftp/ad_gridftp_features.c
 
-@BUILD_AD_HFS_TRUE@am__append_15 = adio/ad_hfs/ad_hfs.h
-@BUILD_AD_HFS_TRUE@am__append_16 = \
+@BUILD_AD_HFS_TRUE@am__append_14 = adio/ad_hfs/ad_hfs.h
+@BUILD_AD_HFS_TRUE@am__append_15 = \
 @BUILD_AD_HFS_TRUE@    adio/ad_hfs/ad_hfs_read.c   \
 @BUILD_AD_HFS_TRUE@    adio/ad_hfs/ad_hfs_open.c   \
 @BUILD_AD_HFS_TRUE@    adio/ad_hfs/ad_hfs_write.c  \
@@ -166,8 +165,8 @@ host_triplet = @host@
 @BUILD_AD_HFS_TRUE@    adio/ad_hfs/ad_hfs_resize.c \
 @BUILD_AD_HFS_TRUE@    adio/ad_hfs/ad_hfs.c
 
-@BUILD_AD_LUSTRE_TRUE@am__append_17 = adio/ad_lustre/ad_lustre.h
-@BUILD_AD_LUSTRE_TRUE@am__append_18 = \
+@BUILD_AD_LUSTRE_TRUE@am__append_16 = adio/ad_lustre/ad_lustre.h
+@BUILD_AD_LUSTRE_TRUE@am__append_17 = \
 @BUILD_AD_LUSTRE_TRUE@    adio/ad_lustre/ad_lustre.c           \
 @BUILD_AD_LUSTRE_TRUE@    adio/ad_lustre/ad_lustre_open.c      \
 @BUILD_AD_LUSTRE_TRUE@    adio/ad_lustre/ad_lustre_rwcontig.c  \
@@ -176,8 +175,8 @@ host_triplet = @host@
 @BUILD_AD_LUSTRE_TRUE@    adio/ad_lustre/ad_lustre_hints.c     \
 @BUILD_AD_LUSTRE_TRUE@    adio/ad_lustre/ad_lustre_aggregate.c
 
-@BUILD_AD_NFS_TRUE@am__append_19 = adio/ad_nfs/ad_nfs.h
-@BUILD_AD_NFS_TRUE@am__append_20 = \
+@BUILD_AD_NFS_TRUE@am__append_18 = adio/ad_nfs/ad_nfs.h
+@BUILD_AD_NFS_TRUE@am__append_19 = \
 @BUILD_AD_NFS_TRUE@    adio/ad_nfs/ad_nfs_read.c     \
 @BUILD_AD_NFS_TRUE@    adio/ad_nfs/ad_nfs_open.c     \
 @BUILD_AD_NFS_TRUE@    adio/ad_nfs/ad_nfs_write.c    \
@@ -192,8 +191,8 @@ host_triplet = @host@
 @BUILD_AD_NFS_TRUE@    adio/ad_nfs/ad_nfs_resize.c   \
 @BUILD_AD_NFS_TRUE@    adio/ad_nfs/ad_nfs_features.c
 
-@BUILD_AD_PANFS_TRUE@am__append_21 = adio/ad_panfs/ad_panfs.h
-@BUILD_AD_PANFS_TRUE@am__append_22 = \
+@BUILD_AD_PANFS_TRUE@am__append_20 = adio/ad_panfs/ad_panfs.h
+@BUILD_AD_PANFS_TRUE@am__append_21 = \
 @BUILD_AD_PANFS_TRUE@    adio/ad_panfs/ad_panfs.c        \
 @BUILD_AD_PANFS_TRUE@    $(panfs_open)                   \
 @BUILD_AD_PANFS_TRUE@    adio/ad_panfs/ad_panfs_hints.c  \
@@ -201,8 +200,8 @@ host_triplet = @host@
 @BUILD_AD_PANFS_TRUE@    adio/ad_panfs/ad_panfs_resize.c \
 @BUILD_AD_PANFS_TRUE@    adio/ad_panfs/ad_panfs_write.c
 
-@BUILD_AD_PFS_TRUE@am__append_23 = adio/ad_pfs/ad_pfs.h
-@BUILD_AD_PFS_TRUE@am__append_24 = \
+@BUILD_AD_PFS_TRUE@am__append_22 = adio/ad_pfs/ad_pfs.h
+@BUILD_AD_PFS_TRUE@am__append_23 = \
 @BUILD_AD_PFS_TRUE@    adio/ad_pfs/ad_pfs_read.c   \
 @BUILD_AD_PFS_TRUE@    adio/ad_pfs/ad_pfs_open.c   \
 @BUILD_AD_PFS_TRUE@    adio/ad_pfs/ad_pfs_write.c  \
@@ -215,8 +214,8 @@ host_triplet = @host@
 @BUILD_AD_PFS_TRUE@    adio/ad_pfs/ad_pfs_hints.c  \
 @BUILD_AD_PFS_TRUE@    adio/ad_pfs/ad_pfs.c
 
-@BUILD_AD_PIOFS_TRUE@am__append_25 = adio/ad_piofs/ad_piofs.h
-@BUILD_AD_PIOFS_TRUE@am__append_26 = \
+@BUILD_AD_PIOFS_TRUE@am__append_24 = adio/ad_piofs/ad_piofs.h
+@BUILD_AD_PIOFS_TRUE@am__append_25 = \
 @BUILD_AD_PIOFS_TRUE@    adio/ad_piofs/ad_piofs_read.c  \
 @BUILD_AD_PIOFS_TRUE@    adio/ad_piofs/ad_piofs_open.c  \
 @BUILD_AD_PIOFS_TRUE@    adio/ad_piofs/ad_piofs_write.c \
@@ -224,8 +223,8 @@ host_triplet = @host@
 @BUILD_AD_PIOFS_TRUE@    adio/ad_piofs/ad_piofs_hints.c \
 @BUILD_AD_PIOFS_TRUE@    adio/ad_piofs/ad_piofs.c
 
-@BUILD_AD_PVFS_TRUE@am__append_27 = adio/ad_pvfs/ad_pvfs.h
-@BUILD_AD_PVFS_TRUE@am__append_28 = \
+@BUILD_AD_PVFS_TRUE@am__append_26 = adio/ad_pvfs/ad_pvfs.h
+@BUILD_AD_PVFS_TRUE@am__append_27 = \
 @BUILD_AD_PVFS_TRUE@    adio/ad_pvfs/ad_pvfs_close.c  \
 @BUILD_AD_PVFS_TRUE@    adio/ad_pvfs/ad_pvfs_read.c   \
 @BUILD_AD_PVFS_TRUE@    adio/ad_pvfs/ad_pvfs_open.c   \
@@ -237,11 +236,11 @@ host_triplet = @host@
 @BUILD_AD_PVFS_TRUE@    adio/ad_pvfs/ad_pvfs_delete.c \
 @BUILD_AD_PVFS_TRUE@    adio/ad_pvfs/ad_pvfs.c
 
-@BUILD_AD_PVFS2_TRUE@am__append_29 = adio/ad_pvfs2/ad_pvfs2.h \
+@BUILD_AD_PVFS2_TRUE@am__append_28 = adio/ad_pvfs2/ad_pvfs2.h \
 @BUILD_AD_PVFS2_TRUE@		  adio/ad_pvfs2/ad_pvfs2_io.h \
 @BUILD_AD_PVFS2_TRUE@		  adio/ad_pvfs2/ad_pvfs2_common.h
 
-@BUILD_AD_PVFS2_TRUE@am__append_30 = \
+@BUILD_AD_PVFS2_TRUE@am__append_29 = \
 @BUILD_AD_PVFS2_TRUE@    adio/ad_pvfs2/ad_pvfs2_close.c              \
 @BUILD_AD_PVFS2_TRUE@    adio/ad_pvfs2/ad_pvfs2_read.c               \
 @BUILD_AD_PVFS2_TRUE@    adio/ad_pvfs2/ad_pvfs2_open.c               \
@@ -260,15 +259,15 @@ host_triplet = @host@
 @BUILD_AD_PVFS2_TRUE@    adio/ad_pvfs2/ad_pvfs2_write_list_classic.c \
 @BUILD_AD_PVFS2_TRUE@    adio/ad_pvfs2/ad_pvfs2_features.c
 
-@BUILD_AD_SFS_TRUE@am__append_31 = adio/ad_sfs/ad_sfs.h
-@BUILD_AD_SFS_TRUE@am__append_32 = \
+@BUILD_AD_SFS_TRUE@am__append_30 = adio/ad_sfs/ad_sfs.h
+@BUILD_AD_SFS_TRUE@am__append_31 = \
 @BUILD_AD_SFS_TRUE@    adio/ad_sfs/ad_sfs_open.c  \
 @BUILD_AD_SFS_TRUE@    adio/ad_sfs/ad_sfs_fcntl.c \
 @BUILD_AD_SFS_TRUE@    adio/ad_sfs/ad_sfs_flush.c \
 @BUILD_AD_SFS_TRUE@    adio/ad_sfs/ad_sfs.c
 
-@BUILD_AD_TESTFS_TRUE@am__append_33 = adio/ad_testfs/ad_testfs.h
-@BUILD_AD_TESTFS_TRUE@am__append_34 = \
+@BUILD_AD_TESTFS_TRUE@am__append_32 = adio/ad_testfs/ad_testfs.h
+@BUILD_AD_TESTFS_TRUE@am__append_33 = \
 @BUILD_AD_TESTFS_TRUE@    adio/ad_testfs/ad_testfs_close.c  \
 @BUILD_AD_TESTFS_TRUE@    adio/ad_testfs/ad_testfs_read.c   \
 @BUILD_AD_TESTFS_TRUE@    adio/ad_testfs/ad_testfs_rdcoll.c \
@@ -287,13 +286,13 @@ host_triplet = @host@
 @BUILD_AD_TESTFS_TRUE@    adio/ad_testfs/ad_testfs_delete.c \
 @BUILD_AD_TESTFS_TRUE@    adio/ad_testfs/ad_testfs.c
 
-@BUILD_AD_UFS_TRUE@am__append_35 = adio/ad_ufs/ad_ufs.h
-@BUILD_AD_UFS_TRUE@am__append_36 = \
+@BUILD_AD_UFS_TRUE@am__append_34 = adio/ad_ufs/ad_ufs.h
+@BUILD_AD_UFS_TRUE@am__append_35 = \
 @BUILD_AD_UFS_TRUE@    adio/ad_ufs/ad_ufs.c      \
 @BUILD_AD_UFS_TRUE@    adio/ad_ufs/ad_ufs_open.c
 
-@BUILD_AD_XFS_TRUE@am__append_37 = adio/ad_xfs/ad_xfs.h
-@BUILD_AD_XFS_TRUE@am__append_38 = \
+@BUILD_AD_XFS_TRUE@am__append_36 = adio/ad_xfs/ad_xfs.h
+@BUILD_AD_XFS_TRUE@am__append_37 = \
 @BUILD_AD_XFS_TRUE@    adio/ad_xfs/ad_xfs.c        \
 @BUILD_AD_XFS_TRUE@    adio/ad_xfs/ad_xfs_fcntl.c  \
 @BUILD_AD_XFS_TRUE@    adio/ad_xfs/ad_xfs_hints.c  \
@@ -302,8 +301,8 @@ host_triplet = @host@
 @BUILD_AD_XFS_TRUE@    adio/ad_xfs/ad_xfs_resize.c \
 @BUILD_AD_XFS_TRUE@    adio/ad_xfs/ad_xfs_write.c
 
-@BUILD_AD_ZOIDFS_TRUE@am__append_39 = adio/ad_zoidfs/ad_zoidfs.h adio/ad_zoidfs/ad_zoidfs_common.h
-@BUILD_AD_ZOIDFS_TRUE@am__append_40 = \
+@BUILD_AD_ZOIDFS_TRUE@am__append_38 = adio/ad_zoidfs/ad_zoidfs.h adio/ad_zoidfs/ad_zoidfs_common.h
+@BUILD_AD_ZOIDFS_TRUE@am__append_39 = \
 @BUILD_AD_ZOIDFS_TRUE@    adio/ad_zoidfs/ad_zoidfs.c            \
 @BUILD_AD_ZOIDFS_TRUE@    adio/ad_zoidfs/ad_zoidfs_close.c      \
 @BUILD_AD_ZOIDFS_TRUE@    adio/ad_zoidfs/ad_zoidfs_common.c     \
@@ -322,7 +321,7 @@ host_triplet = @host@
 # convenience lib to permit adding the special "-D..." argument for all objects.
 # MPICH will then link in both convenience library into libmpi, since it
 # won't work very well the other way around.
-@BUILD_PROFILING_LIB_TRUE@@BUILD_ROMIO_EMBEDDED_TRUE@am__append_41 = libpromio.la
+@BUILD_PROFILING_LIB_TRUE@@BUILD_ROMIO_EMBEDDED_TRUE@am__append_40 = libpromio.la
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/confdb/aclocal_cc.m4 \
@@ -384,31 +383,29 @@ am__installdirs = "$(DESTDIR)$(libdir)" "$(DESTDIR)$(includedir)" \
 	"$(DESTDIR)$(includedir)"
 LTLIBRARIES = $(lib_LTLIBRARIES) $(noinst_LTLIBRARIES)
 libpromio_la_LIBADD =
-am__libpromio_la_SOURCES_DIST = mpi-io/fortran/romio_fortran.c \
-	mpi-io/close.c mpi-io/delete.c mpi-io/file_c2f.c \
-	mpi-io/file_f2c.c mpi-io/fsync.c mpi-io/get_amode.c \
-	mpi-io/get_atom.c mpi-io/get_bytoff.c mpi-io/get_errh.c \
-	mpi-io/get_extent.c mpi-io/get_group.c mpi-io/get_info.c \
-	mpi-io/get_posn.c mpi-io/get_posn_sh.c mpi-io/get_size.c \
-	mpi-io/get_view.c mpi-io/ioreq_c2f.c mpi-io/ioreq_f2c.c \
-	mpi-io/iread.c mpi-io/iread_all.c mpi-io/iread_at.c \
-	mpi-io/iread_atall.c mpi-io/iread_sh.c mpi-io/iwrite.c \
-	mpi-io/iwrite_all.c mpi-io/iwrite_at.c mpi-io/iwrite_atall.c \
-	mpi-io/iwrite_sh.c mpi-io/open.c mpi-io/prealloc.c \
-	mpi-io/rd_atallb.c mpi-io/rd_atalle.c mpi-io/read.c \
-	mpi-io/read_all.c mpi-io/read_allb.c mpi-io/read_alle.c \
-	mpi-io/read_at.c mpi-io/read_atall.c mpi-io/read_ord.c \
-	mpi-io/read_ordb.c mpi-io/read_orde.c mpi-io/read_sh.c \
-	mpi-io/register_datarep.c mpi-io/seek.c mpi-io/seek_sh.c \
-	mpi-io/set_atom.c mpi-io/set_errh.c mpi-io/set_info.c \
-	mpi-io/set_size.c mpi-io/set_view.c mpi-io/wr_atallb.c \
-	mpi-io/wr_atalle.c mpi-io/write.c mpi-io/write_all.c \
-	mpi-io/write_allb.c mpi-io/write_alle.c mpi-io/write_at.c \
-	mpi-io/write_atall.c mpi-io/write_ord.c mpi-io/write_ordb.c \
-	mpi-io/write_orde.c mpi-io/write_sh.c
+am__libpromio_la_SOURCES_DIST = mpi-io/close.c mpi-io/delete.c \
+	mpi-io/file_c2f.c mpi-io/file_f2c.c mpi-io/fsync.c \
+	mpi-io/get_amode.c mpi-io/get_atom.c mpi-io/get_bytoff.c \
+	mpi-io/get_errh.c mpi-io/get_extent.c mpi-io/get_group.c \
+	mpi-io/get_info.c mpi-io/get_posn.c mpi-io/get_posn_sh.c \
+	mpi-io/get_size.c mpi-io/get_view.c mpi-io/ioreq_c2f.c \
+	mpi-io/ioreq_f2c.c mpi-io/iread.c mpi-io/iread_all.c \
+	mpi-io/iread_at.c mpi-io/iread_atall.c mpi-io/iread_sh.c \
+	mpi-io/iwrite.c mpi-io/iwrite_all.c mpi-io/iwrite_at.c \
+	mpi-io/iwrite_atall.c mpi-io/iwrite_sh.c mpi-io/open.c \
+	mpi-io/prealloc.c mpi-io/rd_atallb.c mpi-io/rd_atalle.c \
+	mpi-io/read.c mpi-io/read_all.c mpi-io/read_allb.c \
+	mpi-io/read_alle.c mpi-io/read_at.c mpi-io/read_atall.c \
+	mpi-io/read_ord.c mpi-io/read_ordb.c mpi-io/read_orde.c \
+	mpi-io/read_sh.c mpi-io/register_datarep.c mpi-io/seek.c \
+	mpi-io/seek_sh.c mpi-io/set_atom.c mpi-io/set_errh.c \
+	mpi-io/set_info.c mpi-io/set_size.c mpi-io/set_view.c \
+	mpi-io/wr_atallb.c mpi-io/wr_atalle.c mpi-io/write.c \
+	mpi-io/write_all.c mpi-io/write_allb.c mpi-io/write_alle.c \
+	mpi-io/write_at.c mpi-io/write_atall.c mpi-io/write_ord.c \
+	mpi-io/write_ordb.c mpi-io/write_orde.c mpi-io/write_sh.c
 am__dirstamp = $(am__leading_dot)dirstamp
-@BUILD_F77_BINDINGS_TRUE@am__objects_1 = mpi-io/fortran/libpromio_la-romio_fortran.lo
-am__objects_2 = $(am__objects_1) mpi-io/libpromio_la-close.lo \
+am__objects_1 = mpi-io/libpromio_la-close.lo \
 	mpi-io/libpromio_la-delete.lo mpi-io/libpromio_la-file_c2f.lo \
 	mpi-io/libpromio_la-file_f2c.lo mpi-io/libpromio_la-fsync.lo \
 	mpi-io/libpromio_la-get_amode.lo \
@@ -462,8 +459,8 @@ am__objects_2 = $(am__objects_1) mpi-io/libpromio_la-close.lo \
 	mpi-io/libpromio_la-write_ordb.lo \
 	mpi-io/libpromio_la-write_orde.lo \
 	mpi-io/libpromio_la-write_sh.lo
-@BUILD_PROFILING_LIB_TRUE@@BUILD_ROMIO_EMBEDDED_FALSE@am_libpromio_la_OBJECTS = $(am__objects_2)
-@BUILD_PROFILING_LIB_TRUE@@BUILD_ROMIO_EMBEDDED_TRUE@am_libpromio_la_OBJECTS = $(am__objects_2)
+@BUILD_PROFILING_LIB_TRUE@@BUILD_ROMIO_EMBEDDED_FALSE@am_libpromio_la_OBJECTS = $(am__objects_1)
+@BUILD_PROFILING_LIB_TRUE@@BUILD_ROMIO_EMBEDDED_TRUE@am_libpromio_la_OBJECTS = $(am__objects_1)
 libpromio_la_OBJECTS = $(am_libpromio_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -471,28 +468,27 @@ am__v_lt_0 = --silent
 am__v_lt_1 = 
 @BUILD_PROFILING_LIB_TRUE@@BUILD_ROMIO_EMBEDDED_TRUE@am_libpromio_la_rpath =
 libromio_la_LIBADD =
-am__libromio_la_SOURCES_DIST = mpi-io/fortran/romio_fortran.c \
-	mpi-io/close.c mpi-io/delete.c mpi-io/file_c2f.c \
-	mpi-io/file_f2c.c mpi-io/fsync.c mpi-io/get_amode.c \
-	mpi-io/get_atom.c mpi-io/get_bytoff.c mpi-io/get_errh.c \
-	mpi-io/get_extent.c mpi-io/get_group.c mpi-io/get_info.c \
-	mpi-io/get_posn.c mpi-io/get_posn_sh.c mpi-io/get_size.c \
-	mpi-io/get_view.c mpi-io/ioreq_c2f.c mpi-io/ioreq_f2c.c \
-	mpi-io/iread.c mpi-io/iread_all.c mpi-io/iread_at.c \
-	mpi-io/iread_atall.c mpi-io/iread_sh.c mpi-io/iwrite.c \
-	mpi-io/iwrite_all.c mpi-io/iwrite_at.c mpi-io/iwrite_atall.c \
-	mpi-io/iwrite_sh.c mpi-io/open.c mpi-io/prealloc.c \
-	mpi-io/rd_atallb.c mpi-io/rd_atalle.c mpi-io/read.c \
-	mpi-io/read_all.c mpi-io/read_allb.c mpi-io/read_alle.c \
-	mpi-io/read_at.c mpi-io/read_atall.c mpi-io/read_ord.c \
-	mpi-io/read_ordb.c mpi-io/read_orde.c mpi-io/read_sh.c \
-	mpi-io/register_datarep.c mpi-io/seek.c mpi-io/seek_sh.c \
-	mpi-io/set_atom.c mpi-io/set_errh.c mpi-io/set_info.c \
-	mpi-io/set_size.c mpi-io/set_view.c mpi-io/wr_atallb.c \
-	mpi-io/wr_atalle.c mpi-io/write.c mpi-io/write_all.c \
-	mpi-io/write_allb.c mpi-io/write_alle.c mpi-io/write_at.c \
-	mpi-io/write_atall.c mpi-io/write_ord.c mpi-io/write_ordb.c \
-	mpi-io/write_orde.c mpi-io/write_sh.c \
+am__libromio_la_SOURCES_DIST = mpi-io/close.c mpi-io/delete.c \
+	mpi-io/file_c2f.c mpi-io/file_f2c.c mpi-io/fsync.c \
+	mpi-io/get_amode.c mpi-io/get_atom.c mpi-io/get_bytoff.c \
+	mpi-io/get_errh.c mpi-io/get_extent.c mpi-io/get_group.c \
+	mpi-io/get_info.c mpi-io/get_posn.c mpi-io/get_posn_sh.c \
+	mpi-io/get_size.c mpi-io/get_view.c mpi-io/ioreq_c2f.c \
+	mpi-io/ioreq_f2c.c mpi-io/iread.c mpi-io/iread_all.c \
+	mpi-io/iread_at.c mpi-io/iread_atall.c mpi-io/iread_sh.c \
+	mpi-io/iwrite.c mpi-io/iwrite_all.c mpi-io/iwrite_at.c \
+	mpi-io/iwrite_atall.c mpi-io/iwrite_sh.c mpi-io/open.c \
+	mpi-io/prealloc.c mpi-io/rd_atallb.c mpi-io/rd_atalle.c \
+	mpi-io/read.c mpi-io/read_all.c mpi-io/read_allb.c \
+	mpi-io/read_alle.c mpi-io/read_at.c mpi-io/read_atall.c \
+	mpi-io/read_ord.c mpi-io/read_ordb.c mpi-io/read_orde.c \
+	mpi-io/read_sh.c mpi-io/register_datarep.c mpi-io/seek.c \
+	mpi-io/seek_sh.c mpi-io/set_atom.c mpi-io/set_errh.c \
+	mpi-io/set_info.c mpi-io/set_size.c mpi-io/set_view.c \
+	mpi-io/wr_atallb.c mpi-io/wr_atalle.c mpi-io/write.c \
+	mpi-io/write_all.c mpi-io/write_allb.c mpi-io/write_alle.c \
+	mpi-io/write_at.c mpi-io/write_atall.c mpi-io/write_ord.c \
+	mpi-io/write_ordb.c mpi-io/write_orde.c mpi-io/write_sh.c \
 	mpi-io/glue/default/mpio_file.c mpi-io/glue/default/mpio_err.c \
 	mpi-io/glue/mpich/mpio_file.c mpi-io/glue/mpich/mpio_err.c \
 	mpi-io/glue/large_count.c mpi-io/mpich_fileutil.c \
@@ -626,17 +622,15 @@ am__libromio_la_SOURCES_DIST = mpi-io/fortran/romio_fortran.c \
 	adio/common/hint_fns.c adio/common/ad_threaded_io.c \
 	adio/common/p2p_aggregation.c \
 	adio/common/onesided_aggregation.c adio/common/utils.c
-@BUILD_F77_BINDINGS_TRUE@am__objects_3 =  \
-@BUILD_F77_BINDINGS_TRUE@	mpi-io/fortran/romio_fortran.lo
-am__objects_4 = $(am__objects_3) mpi-io/close.lo mpi-io/delete.lo \
-	mpi-io/file_c2f.lo mpi-io/file_f2c.lo mpi-io/fsync.lo \
-	mpi-io/get_amode.lo mpi-io/get_atom.lo mpi-io/get_bytoff.lo \
-	mpi-io/get_errh.lo mpi-io/get_extent.lo mpi-io/get_group.lo \
-	mpi-io/get_info.lo mpi-io/get_posn.lo mpi-io/get_posn_sh.lo \
-	mpi-io/get_size.lo mpi-io/get_view.lo mpi-io/ioreq_c2f.lo \
-	mpi-io/ioreq_f2c.lo mpi-io/iread.lo mpi-io/iread_all.lo \
-	mpi-io/iread_at.lo mpi-io/iread_atall.lo mpi-io/iread_sh.lo \
-	mpi-io/iwrite.lo mpi-io/iwrite_all.lo mpi-io/iwrite_at.lo \
+am__objects_2 = mpi-io/close.lo mpi-io/delete.lo mpi-io/file_c2f.lo \
+	mpi-io/file_f2c.lo mpi-io/fsync.lo mpi-io/get_amode.lo \
+	mpi-io/get_atom.lo mpi-io/get_bytoff.lo mpi-io/get_errh.lo \
+	mpi-io/get_extent.lo mpi-io/get_group.lo mpi-io/get_info.lo \
+	mpi-io/get_posn.lo mpi-io/get_posn_sh.lo mpi-io/get_size.lo \
+	mpi-io/get_view.lo mpi-io/ioreq_c2f.lo mpi-io/ioreq_f2c.lo \
+	mpi-io/iread.lo mpi-io/iread_all.lo mpi-io/iread_at.lo \
+	mpi-io/iread_atall.lo mpi-io/iread_sh.lo mpi-io/iwrite.lo \
+	mpi-io/iwrite_all.lo mpi-io/iwrite_at.lo \
 	mpi-io/iwrite_atall.lo mpi-io/iwrite_sh.lo mpi-io/open.lo \
 	mpi-io/prealloc.lo mpi-io/rd_atallb.lo mpi-io/rd_atalle.lo \
 	mpi-io/read.lo mpi-io/read_all.lo mpi-io/read_allb.lo \
@@ -649,19 +643,19 @@ am__objects_4 = $(am__objects_3) mpi-io/close.lo mpi-io/delete.lo \
 	mpi-io/write_all.lo mpi-io/write_allb.lo mpi-io/write_alle.lo \
 	mpi-io/write_at.lo mpi-io/write_atall.lo mpi-io/write_ord.lo \
 	mpi-io/write_ordb.lo mpi-io/write_orde.lo mpi-io/write_sh.lo
-@MPIO_GLUE_DEFAULT_TRUE@am__objects_5 =  \
+@MPIO_GLUE_DEFAULT_TRUE@am__objects_3 =  \
 @MPIO_GLUE_DEFAULT_TRUE@	mpi-io/glue/default/mpio_file.lo \
 @MPIO_GLUE_DEFAULT_TRUE@	mpi-io/glue/default/mpio_err.lo
-@MPIO_GLUE_MPICH_TRUE@am__objects_6 = mpi-io/glue/mpich/mpio_file.lo \
+@MPIO_GLUE_MPICH_TRUE@am__objects_4 = mpi-io/glue/mpich/mpio_file.lo \
 @MPIO_GLUE_MPICH_TRUE@	mpi-io/glue/mpich/mpio_err.lo
-@BUILD_ROMIO_EMBEDDED_FALSE@am__objects_7 =  \
+@BUILD_ROMIO_EMBEDDED_FALSE@am__objects_5 =  \
 @BUILD_ROMIO_EMBEDDED_FALSE@	mpi-io/glue/large_count.lo
-am__objects_8 = mpi-io/iotest.lo mpi-io/iotestall.lo \
+am__objects_6 = mpi-io/iotest.lo mpi-io/iotestall.lo \
 	mpi-io/iotestany.lo mpi-io/iotestsome.lo mpi-io/iowait.lo \
 	mpi-io/iowaitall.lo mpi-io/iowaitany.lo mpi-io/iowaitsome.lo
-@BUILD_MPIO_REQUEST_TRUE@am__objects_9 = $(am__objects_8)
-@BUILD_MPIO_ERRHAN_TRUE@am__objects_10 = $(am__objects_8)
-@BUILD_AD_GPFS_TRUE@am__objects_11 = adio/ad_gpfs/ad_gpfs_aggrs.lo \
+@BUILD_MPIO_REQUEST_TRUE@am__objects_7 = $(am__objects_6)
+@BUILD_MPIO_ERRHAN_TRUE@am__objects_8 = $(am__objects_6)
+@BUILD_AD_GPFS_TRUE@am__objects_9 = adio/ad_gpfs/ad_gpfs_aggrs.lo \
 @BUILD_AD_GPFS_TRUE@	adio/ad_gpfs/ad_gpfs_close.lo \
 @BUILD_AD_GPFS_TRUE@	adio/ad_gpfs/ad_gpfs_flush.lo \
 @BUILD_AD_GPFS_TRUE@	adio/ad_gpfs/ad_gpfs_tuning.lo \
@@ -670,10 +664,10 @@ am__objects_8 = mpi-io/iotest.lo mpi-io/iotestall.lo \
 @BUILD_AD_GPFS_TRUE@	adio/ad_gpfs/ad_gpfs_hints.lo \
 @BUILD_AD_GPFS_TRUE@	adio/ad_gpfs/ad_gpfs_rdcoll.lo \
 @BUILD_AD_GPFS_TRUE@	adio/ad_gpfs/ad_gpfs_wrcoll.lo
-@BUILD_AD_BG_TRUE@am__objects_12 = adio/ad_gpfs/bg/ad_bg_aggrs.lo \
+@BUILD_AD_BG_TRUE@am__objects_10 = adio/ad_gpfs/bg/ad_bg_aggrs.lo \
 @BUILD_AD_BG_TRUE@	adio/ad_gpfs/bg/ad_bg_pset.lo
-@BUILD_AD_PE_TRUE@am__objects_13 = adio/ad_gpfs/pe/ad_pe_aggrs.lo
-@BUILD_AD_GRIDFTP_TRUE@am__objects_14 =  \
+@BUILD_AD_PE_TRUE@am__objects_11 = adio/ad_gpfs/pe/ad_pe_aggrs.lo
+@BUILD_AD_GRIDFTP_TRUE@am__objects_12 =  \
 @BUILD_AD_GRIDFTP_TRUE@	adio/ad_gridftp/ad_gridftp_close.lo \
 @BUILD_AD_GRIDFTP_TRUE@	adio/ad_gridftp/ad_gridftp_open.lo \
 @BUILD_AD_GRIDFTP_TRUE@	adio/ad_gridftp/ad_gridftp_read.lo \
@@ -686,20 +680,20 @@ am__objects_8 = mpi-io/iotest.lo mpi-io/iotestall.lo \
 @BUILD_AD_GRIDFTP_TRUE@	adio/ad_gridftp/ad_gridftp.lo \
 @BUILD_AD_GRIDFTP_TRUE@	adio/ad_gridftp/globus_routines.lo \
 @BUILD_AD_GRIDFTP_TRUE@	adio/ad_gridftp/ad_gridftp_features.lo
-@BUILD_AD_HFS_TRUE@am__objects_15 = adio/ad_hfs/ad_hfs_read.lo \
+@BUILD_AD_HFS_TRUE@am__objects_13 = adio/ad_hfs/ad_hfs_read.lo \
 @BUILD_AD_HFS_TRUE@	adio/ad_hfs/ad_hfs_open.lo \
 @BUILD_AD_HFS_TRUE@	adio/ad_hfs/ad_hfs_write.lo \
 @BUILD_AD_HFS_TRUE@	adio/ad_hfs/ad_hfs_fcntl.lo \
 @BUILD_AD_HFS_TRUE@	adio/ad_hfs/ad_hfs_resize.lo \
 @BUILD_AD_HFS_TRUE@	adio/ad_hfs/ad_hfs.lo
-@BUILD_AD_LUSTRE_TRUE@am__objects_16 = adio/ad_lustre/ad_lustre.lo \
+@BUILD_AD_LUSTRE_TRUE@am__objects_14 = adio/ad_lustre/ad_lustre.lo \
 @BUILD_AD_LUSTRE_TRUE@	adio/ad_lustre/ad_lustre_open.lo \
 @BUILD_AD_LUSTRE_TRUE@	adio/ad_lustre/ad_lustre_rwcontig.lo \
 @BUILD_AD_LUSTRE_TRUE@	adio/ad_lustre/ad_lustre_wrcoll.lo \
 @BUILD_AD_LUSTRE_TRUE@	adio/ad_lustre/ad_lustre_wrstr.lo \
 @BUILD_AD_LUSTRE_TRUE@	adio/ad_lustre/ad_lustre_hints.lo \
 @BUILD_AD_LUSTRE_TRUE@	adio/ad_lustre/ad_lustre_aggregate.lo
-@BUILD_AD_NFS_TRUE@am__objects_17 = adio/ad_nfs/ad_nfs_read.lo \
+@BUILD_AD_NFS_TRUE@am__objects_15 = adio/ad_nfs/ad_nfs_read.lo \
 @BUILD_AD_NFS_TRUE@	adio/ad_nfs/ad_nfs_open.lo \
 @BUILD_AD_NFS_TRUE@	adio/ad_nfs/ad_nfs_write.lo \
 @BUILD_AD_NFS_TRUE@	adio/ad_nfs/ad_nfs_done.lo \
@@ -712,17 +706,17 @@ am__objects_8 = mpi-io/iotest.lo mpi-io/iotestall.lo \
 @BUILD_AD_NFS_TRUE@	adio/ad_nfs/ad_nfs.lo \
 @BUILD_AD_NFS_TRUE@	adio/ad_nfs/ad_nfs_resize.lo \
 @BUILD_AD_NFS_TRUE@	adio/ad_nfs/ad_nfs_features.lo
-@BUILD_PANFS_OPEN6_FALSE@am__objects_18 =  \
+@BUILD_PANFS_OPEN6_FALSE@am__objects_16 =  \
 @BUILD_PANFS_OPEN6_FALSE@	adio/ad_panfs/ad_panfs_open.lo
-@BUILD_PANFS_OPEN6_TRUE@am__objects_18 =  \
+@BUILD_PANFS_OPEN6_TRUE@am__objects_16 =  \
 @BUILD_PANFS_OPEN6_TRUE@	adio/ad_panfs/ad_panfs_open6.lo
-@BUILD_AD_PANFS_TRUE@am__objects_19 = adio/ad_panfs/ad_panfs.lo \
-@BUILD_AD_PANFS_TRUE@	$(am__objects_18) \
+@BUILD_AD_PANFS_TRUE@am__objects_17 = adio/ad_panfs/ad_panfs.lo \
+@BUILD_AD_PANFS_TRUE@	$(am__objects_16) \
 @BUILD_AD_PANFS_TRUE@	adio/ad_panfs/ad_panfs_hints.lo \
 @BUILD_AD_PANFS_TRUE@	adio/ad_panfs/ad_panfs_read.lo \
 @BUILD_AD_PANFS_TRUE@	adio/ad_panfs/ad_panfs_resize.lo \
 @BUILD_AD_PANFS_TRUE@	adio/ad_panfs/ad_panfs_write.lo
-@BUILD_AD_PFS_TRUE@am__objects_20 = adio/ad_pfs/ad_pfs_read.lo \
+@BUILD_AD_PFS_TRUE@am__objects_18 = adio/ad_pfs/ad_pfs_read.lo \
 @BUILD_AD_PFS_TRUE@	adio/ad_pfs/ad_pfs_open.lo \
 @BUILD_AD_PFS_TRUE@	adio/ad_pfs/ad_pfs_write.lo \
 @BUILD_AD_PFS_TRUE@	adio/ad_pfs/ad_pfs_done.lo \
@@ -733,13 +727,13 @@ am__objects_8 = mpi-io/iotest.lo mpi-io/iotestall.lo \
 @BUILD_AD_PFS_TRUE@	adio/ad_pfs/ad_pfs_flush.lo \
 @BUILD_AD_PFS_TRUE@	adio/ad_pfs/ad_pfs_hints.lo \
 @BUILD_AD_PFS_TRUE@	adio/ad_pfs/ad_pfs.lo
-@BUILD_AD_PIOFS_TRUE@am__objects_21 = adio/ad_piofs/ad_piofs_read.lo \
+@BUILD_AD_PIOFS_TRUE@am__objects_19 = adio/ad_piofs/ad_piofs_read.lo \
 @BUILD_AD_PIOFS_TRUE@	adio/ad_piofs/ad_piofs_open.lo \
 @BUILD_AD_PIOFS_TRUE@	adio/ad_piofs/ad_piofs_write.lo \
 @BUILD_AD_PIOFS_TRUE@	adio/ad_piofs/ad_piofs_fcntl.lo \
 @BUILD_AD_PIOFS_TRUE@	adio/ad_piofs/ad_piofs_hints.lo \
 @BUILD_AD_PIOFS_TRUE@	adio/ad_piofs/ad_piofs.lo
-@BUILD_AD_PVFS_TRUE@am__objects_22 = adio/ad_pvfs/ad_pvfs_close.lo \
+@BUILD_AD_PVFS_TRUE@am__objects_20 = adio/ad_pvfs/ad_pvfs_close.lo \
 @BUILD_AD_PVFS_TRUE@	adio/ad_pvfs/ad_pvfs_read.lo \
 @BUILD_AD_PVFS_TRUE@	adio/ad_pvfs/ad_pvfs_open.lo \
 @BUILD_AD_PVFS_TRUE@	adio/ad_pvfs/ad_pvfs_write.lo \
@@ -749,7 +743,7 @@ am__objects_8 = mpi-io/iotest.lo mpi-io/iotestall.lo \
 @BUILD_AD_PVFS_TRUE@	adio/ad_pvfs/ad_pvfs_hints.lo \
 @BUILD_AD_PVFS_TRUE@	adio/ad_pvfs/ad_pvfs_delete.lo \
 @BUILD_AD_PVFS_TRUE@	adio/ad_pvfs/ad_pvfs.lo
-@BUILD_AD_PVFS2_TRUE@am__objects_23 = adio/ad_pvfs2/ad_pvfs2_close.lo \
+@BUILD_AD_PVFS2_TRUE@am__objects_21 = adio/ad_pvfs2/ad_pvfs2_close.lo \
 @BUILD_AD_PVFS2_TRUE@	adio/ad_pvfs2/ad_pvfs2_read.lo \
 @BUILD_AD_PVFS2_TRUE@	adio/ad_pvfs2/ad_pvfs2_open.lo \
 @BUILD_AD_PVFS2_TRUE@	adio/ad_pvfs2/ad_pvfs2_write.lo \
@@ -766,11 +760,11 @@ am__objects_8 = mpi-io/iotest.lo mpi-io/iotestall.lo \
 @BUILD_AD_PVFS2_TRUE@	adio/ad_pvfs2/ad_pvfs2_io_dtype.lo \
 @BUILD_AD_PVFS2_TRUE@	adio/ad_pvfs2/ad_pvfs2_write_list_classic.lo \
 @BUILD_AD_PVFS2_TRUE@	adio/ad_pvfs2/ad_pvfs2_features.lo
-@BUILD_AD_SFS_TRUE@am__objects_24 = adio/ad_sfs/ad_sfs_open.lo \
+@BUILD_AD_SFS_TRUE@am__objects_22 = adio/ad_sfs/ad_sfs_open.lo \
 @BUILD_AD_SFS_TRUE@	adio/ad_sfs/ad_sfs_fcntl.lo \
 @BUILD_AD_SFS_TRUE@	adio/ad_sfs/ad_sfs_flush.lo \
 @BUILD_AD_SFS_TRUE@	adio/ad_sfs/ad_sfs.lo
-@BUILD_AD_TESTFS_TRUE@am__objects_25 =  \
+@BUILD_AD_TESTFS_TRUE@am__objects_23 =  \
 @BUILD_AD_TESTFS_TRUE@	adio/ad_testfs/ad_testfs_close.lo \
 @BUILD_AD_TESTFS_TRUE@	adio/ad_testfs/ad_testfs_read.lo \
 @BUILD_AD_TESTFS_TRUE@	adio/ad_testfs/ad_testfs_rdcoll.lo \
@@ -788,16 +782,16 @@ am__objects_8 = mpi-io/iotest.lo mpi-io/iotestall.lo \
 @BUILD_AD_TESTFS_TRUE@	adio/ad_testfs/ad_testfs_hints.lo \
 @BUILD_AD_TESTFS_TRUE@	adio/ad_testfs/ad_testfs_delete.lo \
 @BUILD_AD_TESTFS_TRUE@	adio/ad_testfs/ad_testfs.lo
-@BUILD_AD_UFS_TRUE@am__objects_26 = adio/ad_ufs/ad_ufs.lo \
+@BUILD_AD_UFS_TRUE@am__objects_24 = adio/ad_ufs/ad_ufs.lo \
 @BUILD_AD_UFS_TRUE@	adio/ad_ufs/ad_ufs_open.lo
-@BUILD_AD_XFS_TRUE@am__objects_27 = adio/ad_xfs/ad_xfs.lo \
+@BUILD_AD_XFS_TRUE@am__objects_25 = adio/ad_xfs/ad_xfs.lo \
 @BUILD_AD_XFS_TRUE@	adio/ad_xfs/ad_xfs_fcntl.lo \
 @BUILD_AD_XFS_TRUE@	adio/ad_xfs/ad_xfs_hints.lo \
 @BUILD_AD_XFS_TRUE@	adio/ad_xfs/ad_xfs_open.lo \
 @BUILD_AD_XFS_TRUE@	adio/ad_xfs/ad_xfs_read.lo \
 @BUILD_AD_XFS_TRUE@	adio/ad_xfs/ad_xfs_resize.lo \
 @BUILD_AD_XFS_TRUE@	adio/ad_xfs/ad_xfs_write.lo
-@BUILD_AD_ZOIDFS_TRUE@am__objects_28 = adio/ad_zoidfs/ad_zoidfs.lo \
+@BUILD_AD_ZOIDFS_TRUE@am__objects_26 = adio/ad_zoidfs/ad_zoidfs.lo \
 @BUILD_AD_ZOIDFS_TRUE@	adio/ad_zoidfs/ad_zoidfs_close.lo \
 @BUILD_AD_ZOIDFS_TRUE@	adio/ad_zoidfs/ad_zoidfs_common.lo \
 @BUILD_AD_ZOIDFS_TRUE@	adio/ad_zoidfs/ad_zoidfs_delete.lo \
@@ -809,15 +803,15 @@ am__objects_8 = mpi-io/iotest.lo mpi-io/iotestall.lo \
 @BUILD_AD_ZOIDFS_TRUE@	adio/ad_zoidfs/ad_zoidfs_features.lo \
 @BUILD_AD_ZOIDFS_TRUE@	adio/ad_zoidfs/ad_zoidfs_read_list.lo \
 @BUILD_AD_ZOIDFS_TRUE@	adio/ad_zoidfs/ad_zoidfs_write_list.lo
-am__objects_29 = $(am__objects_5) $(am__objects_6) $(am__objects_7) \
+am__objects_27 = $(am__objects_3) $(am__objects_4) $(am__objects_5) \
 	mpi-io/mpich_fileutil.lo mpi-io/mpir-mpioinit.lo \
-	mpi-io/mpiu_greq.lo mpi-io/mpiu_external32.lo $(am__objects_9) \
-	$(am__objects_10) $(am__objects_11) $(am__objects_12) \
-	$(am__objects_13) $(am__objects_14) $(am__objects_15) \
-	$(am__objects_16) $(am__objects_17) $(am__objects_19) \
-	$(am__objects_20) $(am__objects_21) $(am__objects_22) \
-	$(am__objects_23) $(am__objects_24) $(am__objects_25) \
-	$(am__objects_26) $(am__objects_27) $(am__objects_28) \
+	mpi-io/mpiu_greq.lo mpi-io/mpiu_external32.lo $(am__objects_7) \
+	$(am__objects_8) $(am__objects_9) $(am__objects_10) \
+	$(am__objects_11) $(am__objects_12) $(am__objects_13) \
+	$(am__objects_14) $(am__objects_15) $(am__objects_17) \
+	$(am__objects_18) $(am__objects_19) $(am__objects_20) \
+	$(am__objects_21) $(am__objects_22) $(am__objects_23) \
+	$(am__objects_24) $(am__objects_25) $(am__objects_26) \
 	adio/common/ad_aggregate.lo adio/common/ad_aggregate_new.lo \
 	adio/common/ad_close.lo adio/common/ad_coll_build_req_new.lo \
 	adio/common/ad_coll_exch_new.lo adio/common/ad_darray.lo \
@@ -852,12 +846,12 @@ am__objects_29 = $(am__objects_5) $(am__objects_6) $(am__objects_7) \
 	adio/common/hint_fns.lo adio/common/ad_threaded_io.lo \
 	adio/common/p2p_aggregation.lo \
 	adio/common/onesided_aggregation.lo adio/common/utils.lo
-am__objects_30 =
-@BUILD_ROMIO_EMBEDDED_FALSE@am_libromio_la_OBJECTS = $(am__objects_4) \
-@BUILD_ROMIO_EMBEDDED_FALSE@	$(am__objects_29) \
-@BUILD_ROMIO_EMBEDDED_FALSE@	$(am__objects_30)
-@BUILD_ROMIO_EMBEDDED_TRUE@am_libromio_la_OBJECTS = $(am__objects_4) \
-@BUILD_ROMIO_EMBEDDED_TRUE@	$(am__objects_29) $(am__objects_30)
+am__objects_28 =
+@BUILD_ROMIO_EMBEDDED_FALSE@am_libromio_la_OBJECTS = $(am__objects_2) \
+@BUILD_ROMIO_EMBEDDED_FALSE@	$(am__objects_27) \
+@BUILD_ROMIO_EMBEDDED_FALSE@	$(am__objects_28)
+@BUILD_ROMIO_EMBEDDED_TRUE@am_libromio_la_OBJECTS = $(am__objects_2) \
+@BUILD_ROMIO_EMBEDDED_TRUE@	$(am__objects_27) $(am__objects_28)
 libromio_la_OBJECTS = $(am_libromio_la_OBJECTS)
 @BUILD_ROMIO_EMBEDDED_FALSE@am_libromio_la_rpath = -rpath $(libdir)
 @BUILD_ROMIO_EMBEDDED_TRUE@am_libromio_la_rpath =
@@ -1257,12 +1251,12 @@ noinst_HEADERS = mpi-io/mpioimpl.h mpi-io/mpioprof.h \
 	adio/include/mpio_error.h adio/include/mpipr.h \
 	adio/include/mpiu_greq.h adio/include/nopackage.h \
 	adio/include/mpiu_external32.h adio/include/hint_fns.h \
-	$(am__append_7) $(am__append_9) $(am__append_11) \
-	$(am__append_13) $(am__append_15) $(am__append_17) \
-	$(am__append_19) $(am__append_21) $(am__append_23) \
-	$(am__append_25) $(am__append_27) $(am__append_29) \
-	$(am__append_31) $(am__append_33) $(am__append_35) \
-	$(am__append_37) $(am__append_39)
+	$(am__append_6) $(am__append_8) $(am__append_10) \
+	$(am__append_12) $(am__append_14) $(am__append_16) \
+	$(am__append_18) $(am__append_20) $(am__append_22) \
+	$(am__append_24) $(am__append_26) $(am__append_28) \
+	$(am__append_30) $(am__append_32) $(am__append_34) \
+	$(am__append_36) $(am__append_38)
 
 # ------------------------------------------------------------------------
 # when building under MPICH we must be able to find mpi.h
@@ -1287,40 +1281,40 @@ doc1_src_txt =
 # In MPICH these will have an MPI_ and a PMPI_ version.  Other implementations
 # (like OMPI) only want these to be MPI_ routines, possibly with some
 # name-shifting prefix.
-romio_mpi_sources = $(am__append_4) mpi-io/close.c mpi-io/delete.c \
-	mpi-io/file_c2f.c mpi-io/file_f2c.c mpi-io/fsync.c \
-	mpi-io/get_amode.c mpi-io/get_atom.c mpi-io/get_bytoff.c \
-	mpi-io/get_errh.c mpi-io/get_extent.c mpi-io/get_group.c \
-	mpi-io/get_info.c mpi-io/get_posn.c mpi-io/get_posn_sh.c \
-	mpi-io/get_size.c mpi-io/get_view.c mpi-io/ioreq_c2f.c \
-	mpi-io/ioreq_f2c.c mpi-io/iread.c mpi-io/iread_all.c \
-	mpi-io/iread_at.c mpi-io/iread_atall.c mpi-io/iread_sh.c \
-	mpi-io/iwrite.c mpi-io/iwrite_all.c mpi-io/iwrite_at.c \
-	mpi-io/iwrite_atall.c mpi-io/iwrite_sh.c mpi-io/open.c \
-	mpi-io/prealloc.c mpi-io/rd_atallb.c mpi-io/rd_atalle.c \
-	mpi-io/read.c mpi-io/read_all.c mpi-io/read_allb.c \
-	mpi-io/read_alle.c mpi-io/read_at.c mpi-io/read_atall.c \
-	mpi-io/read_ord.c mpi-io/read_ordb.c mpi-io/read_orde.c \
-	mpi-io/read_sh.c mpi-io/register_datarep.c mpi-io/seek.c \
-	mpi-io/seek_sh.c mpi-io/set_atom.c mpi-io/set_errh.c \
-	mpi-io/set_info.c mpi-io/set_size.c mpi-io/set_view.c \
-	mpi-io/wr_atallb.c mpi-io/wr_atalle.c mpi-io/write.c \
-	mpi-io/write_all.c mpi-io/write_allb.c mpi-io/write_alle.c \
-	mpi-io/write_at.c mpi-io/write_atall.c mpi-io/write_ord.c \
-	mpi-io/write_ordb.c mpi-io/write_orde.c mpi-io/write_sh.c
+romio_mpi_sources = mpi-io/close.c mpi-io/delete.c mpi-io/file_c2f.c \
+	mpi-io/file_f2c.c mpi-io/fsync.c mpi-io/get_amode.c \
+	mpi-io/get_atom.c mpi-io/get_bytoff.c mpi-io/get_errh.c \
+	mpi-io/get_extent.c mpi-io/get_group.c mpi-io/get_info.c \
+	mpi-io/get_posn.c mpi-io/get_posn_sh.c mpi-io/get_size.c \
+	mpi-io/get_view.c mpi-io/ioreq_c2f.c mpi-io/ioreq_f2c.c \
+	mpi-io/iread.c mpi-io/iread_all.c mpi-io/iread_at.c \
+	mpi-io/iread_atall.c mpi-io/iread_sh.c mpi-io/iwrite.c \
+	mpi-io/iwrite_all.c mpi-io/iwrite_at.c mpi-io/iwrite_atall.c \
+	mpi-io/iwrite_sh.c mpi-io/open.c mpi-io/prealloc.c \
+	mpi-io/rd_atallb.c mpi-io/rd_atalle.c mpi-io/read.c \
+	mpi-io/read_all.c mpi-io/read_allb.c mpi-io/read_alle.c \
+	mpi-io/read_at.c mpi-io/read_atall.c mpi-io/read_ord.c \
+	mpi-io/read_ordb.c mpi-io/read_orde.c mpi-io/read_sh.c \
+	mpi-io/register_datarep.c mpi-io/seek.c mpi-io/seek_sh.c \
+	mpi-io/set_atom.c mpi-io/set_errh.c mpi-io/set_info.c \
+	mpi-io/set_size.c mpi-io/set_view.c mpi-io/wr_atallb.c \
+	mpi-io/wr_atalle.c mpi-io/write.c mpi-io/write_all.c \
+	mpi-io/write_allb.c mpi-io/write_alle.c mpi-io/write_at.c \
+	mpi-io/write_atall.c mpi-io/write_ord.c mpi-io/write_ordb.c \
+	mpi-io/write_orde.c mpi-io/write_sh.c
 
 # regular old source files that implement ROMIO, such as ADIO code
 
 # non-MPI/PMPI sources that will be included in libromio
 romio_other_sources = $(am__append_1) $(am__append_2) $(am__append_3) \
 	mpi-io/mpich_fileutil.c mpi-io/mpir-mpioinit.c \
-	mpi-io/mpiu_greq.c mpi-io/mpiu_external32.c $(am__append_5) \
-	$(am__append_6) $(am__append_8) $(am__append_10) \
-	$(am__append_12) $(am__append_14) $(am__append_16) \
-	$(am__append_18) $(am__append_20) $(am__append_22) \
-	$(am__append_24) $(am__append_26) $(am__append_28) \
-	$(am__append_30) $(am__append_32) $(am__append_34) \
-	$(am__append_36) $(am__append_38) $(am__append_40) \
+	mpi-io/mpiu_greq.c mpi-io/mpiu_external32.c $(am__append_4) \
+	$(am__append_5) $(am__append_7) $(am__append_9) \
+	$(am__append_11) $(am__append_13) $(am__append_15) \
+	$(am__append_17) $(am__append_19) $(am__append_21) \
+	$(am__append_23) $(am__append_25) $(am__append_27) \
+	$(am__append_29) $(am__append_31) $(am__append_33) \
+	$(am__append_35) $(am__append_37) $(am__append_39) \
 	adio/common/ad_aggregate.c adio/common/ad_aggregate_new.c \
 	adio/common/ad_close.c adio/common/ad_coll_build_req_new.c \
 	adio/common/ad_coll_exch_new.c adio/common/ad_darray.c \
@@ -1363,6 +1357,8 @@ glue_sources =
 # ------------------------------------------------------------------------
 SUBDIRS = 
 DIST_SUBDIRS = test test-internal
+
+# romio_mpi_sources += mpi-io/fortran/romio_fortran.c
 @BUILD_F77_BINDINGS_TRUE@disabled_romio_mpi_sources = \
 @BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/closef.c       \
 @BUILD_F77_BINDINGS_TRUE@    mpi-io/fortran/deletef.c      \
@@ -1440,7 +1436,7 @@ mpio_request_sources = \
 # Build a libtool convenience library that the enclosing MPI implementation can
 # use by adding it to the right _LIBADD variable.
 @BUILD_ROMIO_EMBEDDED_TRUE@noinst_LTLIBRARIES = libromio.la \
-@BUILD_ROMIO_EMBEDDED_TRUE@	$(am__append_41)
+@BUILD_ROMIO_EMBEDDED_TRUE@	$(am__append_40)
 @BUILD_ROMIO_EMBEDDED_FALSE@libromio_la_SOURCES = $(romio_mpi_sources) $(romio_other_sources) $(glue_sources)
 @BUILD_ROMIO_EMBEDDED_TRUE@libromio_la_SOURCES = $(romio_mpi_sources) $(romio_other_sources) $(glue_sources)
 @BUILD_PROFILING_LIB_TRUE@@BUILD_ROMIO_EMBEDDED_FALSE@libpromio_la_SOURCES = $(romio_mpi_sources)
@@ -1585,15 +1581,6 @@ clean-noinstLTLIBRARIES:
 	  echo rm -f $${locs}; \
 	  rm -f $${locs}; \
 	}
-mpi-io/fortran/$(am__dirstamp):
-	@$(MKDIR_P) mpi-io/fortran
-	@: > mpi-io/fortran/$(am__dirstamp)
-mpi-io/fortran/$(DEPDIR)/$(am__dirstamp):
-	@$(MKDIR_P) mpi-io/fortran/$(DEPDIR)
-	@: > mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-mpi-io/fortran/libpromio_la-romio_fortran.lo:  \
-	mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
 mpi-io/$(am__dirstamp):
 	@$(MKDIR_P) mpi-io
 	@: > mpi-io/$(am__dirstamp)
@@ -1727,8 +1714,6 @@ mpi-io/libpromio_la-write_sh.lo: mpi-io/$(am__dirstamp) \
 
 libpromio.la: $(libpromio_la_OBJECTS) $(libpromio_la_DEPENDENCIES) $(EXTRA_libpromio_la_DEPENDENCIES) 
 	$(AM_V_CCLD)$(LINK) $(am_libpromio_la_rpath) $(libpromio_la_OBJECTS) $(libpromio_la_LIBADD) $(LIBS)
-mpi-io/fortran/romio_fortran.lo: mpi-io/fortran/$(am__dirstamp) \
-	mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
 mpi-io/close.lo: mpi-io/$(am__dirstamp) \
 	mpi-io/$(DEPDIR)/$(am__dirstamp)
 mpi-io/delete.lo: mpi-io/$(am__dirstamp) \
@@ -2481,8 +2466,6 @@ mostlyclean-compile:
 	-rm -f adio/common/*.lo
 	-rm -f mpi-io/*.$(OBJEXT)
 	-rm -f mpi-io/*.lo
-	-rm -f mpi-io/fortran/*.$(OBJEXT)
-	-rm -f mpi-io/fortran/*.lo
 	-rm -f mpi-io/glue/*.$(OBJEXT)
 	-rm -f mpi-io/glue/*.lo
 	-rm -f mpi-io/glue/default/*.$(OBJEXT)
@@ -2839,8 +2822,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@mpi-io/$(DEPDIR)/write_ordb.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@mpi-io/$(DEPDIR)/write_orde.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@mpi-io/$(DEPDIR)/write_sh.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/libpromio_la-romio_fortran.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mpi-io/fortran/$(DEPDIR)/romio_fortran.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@mpi-io/glue/$(DEPDIR)/large_count.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@mpi-io/glue/default/$(DEPDIR)/mpio_err.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@mpi-io/glue/default/$(DEPDIR)/mpio_file.Plo@am__quote@
@@ -2870,13 +2851,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LTCOMPILE) -c -o $@ $<
-
-mpi-io/fortran/libpromio_la-romio_fortran.lo: mpi-io/fortran/romio_fortran.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/fortran/libpromio_la-romio_fortran.lo -MD -MP -MF mpi-io/fortran/$(DEPDIR)/libpromio_la-romio_fortran.Tpo -c -o mpi-io/fortran/libpromio_la-romio_fortran.lo `test -f 'mpi-io/fortran/romio_fortran.c' || echo '$(srcdir)/'`mpi-io/fortran/romio_fortran.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) mpi-io/fortran/$(DEPDIR)/libpromio_la-romio_fortran.Tpo mpi-io/fortran/$(DEPDIR)/libpromio_la-romio_fortran.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mpi-io/fortran/romio_fortran.c' object='mpi-io/fortran/libpromio_la-romio_fortran.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mpi-io/fortran/libpromio_la-romio_fortran.lo `test -f 'mpi-io/fortran/romio_fortran.c' || echo '$(srcdir)/'`mpi-io/fortran/romio_fortran.c
 
 mpi-io/libpromio_la-close.lo: mpi-io/close.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpromio_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mpi-io/libpromio_la-close.lo -MD -MP -MF mpi-io/$(DEPDIR)/libpromio_la-close.Tpo -c -o mpi-io/libpromio_la-close.lo `test -f 'mpi-io/close.c' || echo '$(srcdir)/'`mpi-io/close.c
@@ -3336,7 +3310,6 @@ clean-libtool:
 	-rm -rf adio/ad_zoidfs/.libs adio/ad_zoidfs/_libs
 	-rm -rf adio/common/.libs adio/common/_libs
 	-rm -rf mpi-io/.libs mpi-io/_libs
-	-rm -rf mpi-io/fortran/.libs mpi-io/fortran/_libs
 	-rm -rf mpi-io/glue/.libs mpi-io/glue/_libs
 	-rm -rf mpi-io/glue/default/.libs mpi-io/glue/default/_libs
 	-rm -rf mpi-io/glue/mpich/.libs mpi-io/glue/mpich/_libs
@@ -3752,8 +3725,6 @@ distclean-generic:
 	-rm -f adio/common/$(am__dirstamp)
 	-rm -f mpi-io/$(DEPDIR)/$(am__dirstamp)
 	-rm -f mpi-io/$(am__dirstamp)
-	-rm -f mpi-io/fortran/$(DEPDIR)/$(am__dirstamp)
-	-rm -f mpi-io/fortran/$(am__dirstamp)
 	-rm -f mpi-io/glue/$(DEPDIR)/$(am__dirstamp)
 	-rm -f mpi-io/glue/$(am__dirstamp)
 	-rm -f mpi-io/glue/default/$(DEPDIR)/$(am__dirstamp)
@@ -3771,7 +3742,7 @@ clean-am: clean-generic clean-libLTLIBRARIES clean-libtool \
 
 distclean: distclean-recursive
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
-	-rm -rf adio/ad_gpfs/$(DEPDIR) adio/ad_gpfs/bg/$(DEPDIR) adio/ad_gpfs/pe/$(DEPDIR) adio/ad_gridftp/$(DEPDIR) adio/ad_hfs/$(DEPDIR) adio/ad_lustre/$(DEPDIR) adio/ad_nfs/$(DEPDIR) adio/ad_panfs/$(DEPDIR) adio/ad_pfs/$(DEPDIR) adio/ad_piofs/$(DEPDIR) adio/ad_pvfs/$(DEPDIR) adio/ad_pvfs2/$(DEPDIR) adio/ad_sfs/$(DEPDIR) adio/ad_testfs/$(DEPDIR) adio/ad_ufs/$(DEPDIR) adio/ad_xfs/$(DEPDIR) adio/ad_zoidfs/$(DEPDIR) adio/common/$(DEPDIR) mpi-io/$(DEPDIR) mpi-io/fortran/$(DEPDIR) mpi-io/glue/$(DEPDIR) mpi-io/glue/default/$(DEPDIR) mpi-io/glue/mpich/$(DEPDIR)
+	-rm -rf adio/ad_gpfs/$(DEPDIR) adio/ad_gpfs/bg/$(DEPDIR) adio/ad_gpfs/pe/$(DEPDIR) adio/ad_gridftp/$(DEPDIR) adio/ad_hfs/$(DEPDIR) adio/ad_lustre/$(DEPDIR) adio/ad_nfs/$(DEPDIR) adio/ad_panfs/$(DEPDIR) adio/ad_pfs/$(DEPDIR) adio/ad_piofs/$(DEPDIR) adio/ad_pvfs/$(DEPDIR) adio/ad_pvfs2/$(DEPDIR) adio/ad_sfs/$(DEPDIR) adio/ad_testfs/$(DEPDIR) adio/ad_ufs/$(DEPDIR) adio/ad_xfs/$(DEPDIR) adio/ad_zoidfs/$(DEPDIR) adio/common/$(DEPDIR) mpi-io/$(DEPDIR) mpi-io/glue/$(DEPDIR) mpi-io/glue/default/$(DEPDIR) mpi-io/glue/mpich/$(DEPDIR)
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-hdr distclean-libtool distclean-tags
@@ -3819,7 +3790,7 @@ installcheck-am:
 maintainer-clean: maintainer-clean-recursive
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
 	-rm -rf $(top_srcdir)/autom4te.cache
-	-rm -rf adio/ad_gpfs/$(DEPDIR) adio/ad_gpfs/bg/$(DEPDIR) adio/ad_gpfs/pe/$(DEPDIR) adio/ad_gridftp/$(DEPDIR) adio/ad_hfs/$(DEPDIR) adio/ad_lustre/$(DEPDIR) adio/ad_nfs/$(DEPDIR) adio/ad_panfs/$(DEPDIR) adio/ad_pfs/$(DEPDIR) adio/ad_piofs/$(DEPDIR) adio/ad_pvfs/$(DEPDIR) adio/ad_pvfs2/$(DEPDIR) adio/ad_sfs/$(DEPDIR) adio/ad_testfs/$(DEPDIR) adio/ad_ufs/$(DEPDIR) adio/ad_xfs/$(DEPDIR) adio/ad_zoidfs/$(DEPDIR) adio/common/$(DEPDIR) mpi-io/$(DEPDIR) mpi-io/fortran/$(DEPDIR) mpi-io/glue/$(DEPDIR) mpi-io/glue/default/$(DEPDIR) mpi-io/glue/mpich/$(DEPDIR)
+	-rm -rf adio/ad_gpfs/$(DEPDIR) adio/ad_gpfs/bg/$(DEPDIR) adio/ad_gpfs/pe/$(DEPDIR) adio/ad_gridftp/$(DEPDIR) adio/ad_hfs/$(DEPDIR) adio/ad_lustre/$(DEPDIR) adio/ad_nfs/$(DEPDIR) adio/ad_panfs/$(DEPDIR) adio/ad_pfs/$(DEPDIR) adio/ad_piofs/$(DEPDIR) adio/ad_pvfs/$(DEPDIR) adio/ad_pvfs2/$(DEPDIR) adio/ad_sfs/$(DEPDIR) adio/ad_testfs/$(DEPDIR) adio/ad_ufs/$(DEPDIR) adio/ad_xfs/$(DEPDIR) adio/ad_zoidfs/$(DEPDIR) adio/common/$(DEPDIR) mpi-io/$(DEPDIR) mpi-io/glue/$(DEPDIR) mpi-io/glue/default/$(DEPDIR) mpi-io/glue/mpich/$(DEPDIR)
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 

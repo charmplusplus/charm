@@ -11,6 +11,6 @@ mainmodule vartest {
     entry engine();
     entry engine(int,int,int);
     entry void simulate();
-    entry [aggregate(bufferSize : 2048, numDimensions : 2, thresholdNumer : 1, thresholdDenom : 2, cutoffNumer : 1, cutoffDenom : 2)] void ping(std::vector<int>);
+    entry [aggregate(bufferSize : 2048, numDimensions : 2, thresholdNumer : 1, thresholdDenom : 2, cutoffNumer : 1, cutoffDenom : 2)] void ping(const std::vector<int>&);
   };
 };

@@ -29,7 +29,7 @@
 #include <sys/timeb.h>
 static char* strsignal(int sig) {
   static char outbuf[32];
-  sprintf(outbuf, "%d", sig);
+  snprintf(outbuf, sizeof(outbuf), "%d", sig);
   return outbuf;
 }
 #include <process.h>
@@ -221,6 +221,11 @@ static void reportMsgHistogramInfo(void);
 #endif
 
 #define USE_MPI_CTRLMSG_SCHEME 0
+
+/* to use MPI_Alloc_mem inside CmiAlloc */
+#ifndef CMK_USE_MPI_ALLOC_MEM
+#define CMK_USE_MPI_ALLOC_MEM USE_MPI_CTRLMSG_SCHEME
+#endif
 
 /* Defining this macro will use MPI_Irecv instead of MPI_Recv for
  * large messages. This could save synchronization overhead caused by
@@ -1036,7 +1041,7 @@ static void PumpMsgsBlocking(void) {
 
 #if CMK_SMP_TRACE_COMMTHREAD && CMI_MPI_TRACE_MOREDETAILED
     char tmp[32];
-    sprintf(tmp, "To proc %d", CmiNodeFirst(CmiMyNode())+CMI_DEST_RANK(msg));
+    snprintf(tmp, sizeof(tmp), "To proc %d", CmiNodeFirst(CmiMyNode())+CMI_DEST_RANK(msg));
     traceUserSuppliedBracketedNote(tmp, 30, CpvAccess(projTraceStart), CmiWallTimer());
 #endif
 
@@ -1411,12 +1416,16 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     largv = *argv;
 
     if(!CharmLibInterOperate || userDrivenMode) {
+#if MPI_VERSION >= 3
       /* Create our communicator, with info hints (such as us not requiring
        * message ordering) to enable possible MPI runtime optimizations. */
       MPI_Info hints;
       MPI_Info_create(&hints);
       MPI_Info_set(hints, "mpi_assert_allow_overtaking", "true");
       MPI_Comm_dup_with_info(MPI_COMM_WORLD, hints, &charmComm);
+#else
+      MPI_Comm_dup(MPI_COMM_WORLD, &charmComm);
+#endif
     }
 
     MPI_Comm_size(charmComm, numNodes);
@@ -1532,8 +1541,9 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
       }
       static char s_restartaftercrash[] = "+restartaftercrash";
       restart_argv[i] = s_restartaftercrash;
-      phase_str = (char*)malloc(10);
-      sprintf(phase_str,"%d", CpvAccess(_curRestartPhase));
+      const int phase_str_len = 10;
+      phase_str = (char*)malloc(phase_str_len);
+      snprintf(phase_str, phase_str_len, "%d", CpvAccess(_curRestartPhase));
       restart_argv[i+1]=phase_str;
       restart_argv[i+2]=NULL;
       *argv = restart_argv;

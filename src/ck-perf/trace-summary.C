@@ -307,11 +307,11 @@ void SumLogPool::write(void)
   // CmiPrintf("TRACE: %s:%d\n", fname, errno);
   if (!sumonly) {
     char pestr[10];
-    sprintf(pestr, "%d", CkMyPe());
+    snprintf(pestr, sizeof(pestr), "%d", CkMyPe());
     int len = strlen(pgm) + strlen(".sumd.") + strlen(pestr) + 1;
     char *fname = new char[len+1];
     
-    sprintf(fname, "%s.%s.sum", pgm, pestr);
+    snprintf(fname, len+1, "%s.%s.sum", pgm, pestr);
     do {
       fp = fopen(fname, "w+");
     } while (!fp && errno == EINTR);
@@ -321,7 +321,7 @@ void SumLogPool::write(void)
     }
     
     if (sumDetail) {
-      sprintf(fname, "%s.%s.sumd", pgm, pestr);
+      snprintf(fname, len+1, "%s.%s.sumd", pgm, pestr);
       do {
 	sdfp = fopen(fname, "w+");
       } while (!sdfp && errno == EINTR);
@@ -482,9 +482,10 @@ void SumLogPool::write(void)
 void SumLogPool::writeSts(void)
 {
     // open sts file
+  int len = strlen(CkpvAccess(traceRoot))+strlen(".sum.sts")+1;
   char *fname = 
-       new char[strlen(CkpvAccess(traceRoot))+strlen(".sum.sts")+1];
-  sprintf(fname, "%s.sum.sts", CkpvAccess(traceRoot));
+       new char[len];
+  snprintf(fname, len, "%s.sum.sts", CkpvAccess(traceRoot));
   stsfp = fopen(fname, "w+");
   //CmiPrintf("File: %s \n", fname);
   if (stsfp == 0) {
@@ -1002,8 +1003,9 @@ void TraceSummaryBOC::sumData(double *sumData, int totalsize) {
     UInt    epNums  = CkpvAccess(_trace)->pool()->getEpInfoSize();
     UInt    numBins = totalsize/epNums;  
     int     numEntries = epNums - NUM_DUMMY_EPS - 1; 
-    char    *fname = new char[strlen(CkpvAccess(traceRoot))+strlen(".sumall")+1];
-    sprintf(fname, "%s.sumall", CkpvAccess(traceRoot));
+    int     len = strlen(CkpvAccess(traceRoot))+strlen(".sumall")+1;
+    char    *fname = new char[len];
+    snprintf(fname, len, "%s.sumall", CkpvAccess(traceRoot));
     FILE *sumfp = fopen(fname, "w+");
     delete [] fname;
     fprintf(sumfp, "ver:%3.1f cpu:%d numIntervals:%d numEPs:%d intervalSize:%e\n",
@@ -1241,8 +1243,9 @@ void TraceSummaryBOC::write(void)
 {
   unsigned int j;
 
-  char *fname = new char[strlen(CkpvAccess(traceRoot))+strlen(".sum")+1];
-  sprintf(fname, "%s.sum", CkpvAccess(traceRoot));
+  int len = strlen(CkpvAccess(traceRoot))+strlen(".sum")+1;
+  char *fname = new char[len];
+  snprintf(fname, len, "%s.sum", CkpvAccess(traceRoot));
   FILE *sumfp = fopen(fname, "w+");
   //CmiPrintf("File: %s \n", fname);
   if(sumfp == 0)

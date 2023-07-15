@@ -781,8 +781,8 @@ AC_MSG_RESULT([$FILE_SYSTEM])
 
 if test -n "$file_system_nfs" ; then
     AC_DEFINE(ROMIO_NFS,1,[Define for ROMIO with NFS])
-    AC_MSG_WARN([File locks may not work with NFS.  See the Installation and
-users manual for instructions on testing and if necessary fixing this])
+#     AC_MSG_WARN([File locks may not work with NFS.  See the Installation and
+# users manual for instructions on testing and if necessary fixing this])
 fi
 
 if test -n "$file_system_panfs"; then

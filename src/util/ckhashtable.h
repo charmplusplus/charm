@@ -437,9 +437,9 @@ as a fast key like this:
 template <class T> class CkHashtableAdaptorT {
 	T val;
 public:
-	CkHashtableAdaptorT<T>(const T &v):val(v) {}
+	CkHashtableAdaptorT(const T &v):val(v) {}
 	/**added to allow pup to do Key k while unPacking*/
-	CkHashtableAdaptorT<T>(){}
+	CkHashtableAdaptorT(){}
 	operator T & () {return val;}
 	operator const T & () const {return val;}
 	inline CkHashCode hash(void) const 

@@ -43,7 +43,11 @@ CLINKAGE int getXTNodeID(int mpirank, int nummpiranks)
 #if CMK_HAS_PMI_GET_NID	/* if it is a XT4/5 or XE */
   PMI_Get_nid(mpirank, &nid);
 #else
+#if CMK_CRAYEX
+#error "Cannot get network topology information on a Cray build. Load the cray-pmi module and then rebuild"
+#else
 #error "Cannot get network topology information on a Cray build. Swap current module xt-mpt with xt-mpt/5.0.0 or higher and xt-asyncpe with xt-asyncpe/4.0 or higher and then rebuild"
+#endif
 #endif
 
   return nid;

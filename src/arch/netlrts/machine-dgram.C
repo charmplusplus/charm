@@ -15,10 +15,6 @@
  * @{
  */
 
-#define DGRAM_HEADER_SIZE 8
-
-#define CmiMsgNext(msg) (*((void**)(msg)))
-
 #define DGRAM_ROOTPE_MASK   (0xFFFFu)
 #define DGRAM_SRCPE_MASK    (0xFFFF)
 #define DGRAM_MAGIC_MASK    (0xFF)
@@ -43,6 +39,9 @@ typedef struct {
         unsigned int rootpe:16; /* broadcast root processor */
 } DgramHeader;
 
+#define DGRAM_HEADER_SIZE (sizeof(DgramHeader))
+static_assert(DGRAM_HEADER_SIZE == 4 * sizeof(uint16_t),
+  "DgramHeader must be equivalent to 4x uint16_t");
 
 /* the window size needs to be Cmi_window_size + sizeof(unsigned int) bytes) */
 typedef struct { DgramHeader head; char window[1024]; } DgramAck;
@@ -50,7 +49,7 @@ typedef struct { DgramHeader head; char window[1024]; } DgramAck;
 unsigned char computeCheckSum(unsigned char *data, int len);
 
 #define DgramHeaderMake(ptr, dstrank_, srcpe_, magic_, seqno_, root_) { \
-   DgramHeader *header = (DgramHeader *)(ptr);	\
+   DgramHeader * header = (ptr); \
    header->seqno = seqno_; \
    header->srcpe = srcpe_; \
    header->dstrank = dstrank_; \
@@ -59,7 +58,7 @@ unsigned char computeCheckSum(unsigned char *data, int len);
 }
 
 #define DgramHeaderBreak(ptr, dstrank_, srcpe_, magic_, seqno_, root_) { \
-   DgramHeader *header = (DgramHeader *)(ptr);	\
+   const DgramHeader * header = (ptr); \
    seqno_ = header->seqno; \
    srcpe_ = header->srcpe; \
    dstrank_ = header->dstrank; \
@@ -155,9 +154,6 @@ static void extract_args(char **argv)
   Cmi_comm_periodic_delay=(int)(1000*Cmi_delay_retransmit);
   if (Cmi_comm_periodic_delay>60) Cmi_comm_periodic_delay=60;
   Cmi_comm_clock_delay=(int)(1000*Cmi_ack_delay);
-  if (sizeof(DgramHeader)!=DGRAM_HEADER_SIZE) {
-    CmiAbort("DatagramHeader in machine-dgram.C is the wrong size!\n");
-  }
 }
 
 
@@ -419,28 +415,28 @@ void printNetStatistics(void)
   unsigned int recv_ack=0, ack_pkts=0;
 
   myNode = nodes+CmiMyNode();
-  sprintf(tmpstr, "***********************************\n");
+  snprintf(tmpstr, sizeof(tmpstr), "***********************************\n");
   strcpy(statstr, tmpstr);
-  sprintf(tmpstr, "Net Statistics For Node %u\n", CmiMyNode());
+  snprintf(tmpstr, sizeof(tmpstr), "Net Statistics For Node %u\n", CmiMyNode());
   strcat(statstr, tmpstr);
-  sprintf(tmpstr, "Interrupts: %u \tProcessed: %u\n",
-                  myNode->stat_total_intr, myNode->stat_proc_intr);
+  snprintf(tmpstr, sizeof(tmpstr), "Interrupts: %u \tProcessed: %u\n",
+                   myNode->stat_total_intr, myNode->stat_proc_intr);
   strcat(statstr, tmpstr);
-  sprintf(tmpstr, "Total Msgs Sent: %u \tTotal Bytes Sent: %u\n",
-                  myNode->sent_msgs, myNode->sent_bytes);
+  snprintf(tmpstr, sizeof(tmpstr), "Total Msgs Sent: %u \tTotal Bytes Sent: %u\n",
+                   myNode->sent_msgs, myNode->sent_bytes);
   strcat(statstr, tmpstr);
-  sprintf(tmpstr, "Total Msgs Recv: %u \tTotal Bytes Recv: %u\n",
-                  myNode->recd_msgs, myNode->recd_bytes);
+  snprintf(tmpstr, sizeof(tmpstr), "Total Msgs Recv: %u \tTotal Bytes Recv: %u\n",
+                   myNode->recd_msgs, myNode->recd_bytes);
   strcat(statstr, tmpstr);
-  sprintf(tmpstr, "***********************************\n");
+  snprintf(tmpstr, sizeof(tmpstr), "***********************************\n");
   strcat(statstr, tmpstr);
-  sprintf(tmpstr, "[Num]\tSENDTO\tRESEND\tRECV\tACKSTO\tACKSFRM\tPKTACK\n");
+  snprintf(tmpstr, sizeof(tmpstr), "[Num]\tSENDTO\tRESEND\tRECV\tACKSTO\tACKSFRM\tPKTACK\n");
   strcat(statstr,tmpstr);
-  sprintf(tmpstr, "=====\t======\t======\t====\t======\t=======\t======\n");
+  snprintf(tmpstr, sizeof(tmpstr), "=====\t======\t======\t====\t======\t=======\t======\n");
   strcat(statstr,tmpstr);
   for(i=0;i<CmiNumNodes();i++) {
     OtherNode node = nodes+i;
-    sprintf(tmpstr, "[%u]\t%u\t%u\t%u\t%u\t%u\t%u\n",
+    snprintf(tmpstr, sizeof(tmpstr), "[%u]\t%u\t%u\t%u\t%u\t%u\t%u\n",
                      i, node->stat_send_pkt, node->stat_resend_pkt,
 		     node->stat_recv_pkt, node->stat_send_ack,
 		     node->stat_recv_ack, node->stat_ack_pkts);
@@ -452,12 +448,12 @@ void printNetStatistics(void)
     recv_ack += node->stat_recv_ack;
     ack_pkts += node->stat_ack_pkts;
   }
-  sprintf(tmpstr, "[TOTAL]\t%u\t%u\t%u\t%u\t%u\t%u\n",
+  snprintf(tmpstr, sizeof(tmpstr), "[TOTAL]\t%u\t%u\t%u\t%u\t%u\t%u\n",
                      send_pkt, resend_pkt,
 		     recv_pkt, send_ack,
 		     recv_ack, ack_pkts);
   strcat(statstr, tmpstr);
-  sprintf(tmpstr, "***********************************\n");
+  snprintf(tmpstr, sizeof(tmpstr), "***********************************\n");
   strcat(statstr, tmpstr);
   CmiPrintf("%s", statstr);
 }

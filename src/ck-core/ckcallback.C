@@ -186,7 +186,7 @@ CkCallback::CkCallback(int ep,CProxySection_ArrayBase &sectElt,bool forceInline)
       type=bcastSection; // forceInline currently ignored
       d.section.ep=ep; 
       CkSectionID secID=sectElt.ckGetSectionID(0); 
-      d.section.sinfo = secID._cookie.info;
+      d.section.sinfo = secID._cookie;
       d.section._elems = secID._elems.data();
       d.section._nElems = secID._elems.size();
       d.section.pelist = secID.pelist.data();
@@ -201,7 +201,7 @@ CkCallback::CkCallback(int ep, CkSectionID &id) {
 #endif
       type=bcastSection;
       d.section.ep=ep;
-      d.section.sinfo = id._cookie.info;
+      d.section.sinfo = id._cookie;
       d.section._elems = id._elems.data();
       d.section._nElems = id._elems.size();
       d.section.pelist = id.pelist.data();

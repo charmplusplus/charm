@@ -338,8 +338,6 @@ struct TopoManagerWrapper {
     if ( PARTITION_TOPOLOGY_VERBOSE && CmiMyNodeGlobal() == 0 )
       printf("sorting %d(%d) %d(%d) %d(%d)\n", sortdims[0], tlens[4]>>3, sortdims[1], tlens[3]>>3, sortdims[2], tlens[2]>>3);
     std::sort(node_begin,node_end,node_sortop_topo(*this,sortdims));
-    int *nodes = node_begin;
-    int nnodes = node_end - node_begin;
   }
 };
 

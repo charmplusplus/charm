@@ -483,7 +483,7 @@ char *eventQueue::dumpString() {
 #if USE_LONG_TIMESTAMPS
     snprintf(tempStr, PVT_DEBUG_BUFFER_LINE_LENGTH, "%lld[%u.%d.%d]", e->timestamp, e->evID.id, e->evID.getPE(), e->done);
 #else
-    sprintf(tempStr, PVT_DEBUG_BUFFER_LINE_LENGTH, "%d[%u.%d.%d]", e->timestamp, e->evID.id, e->evID.getPE(), e->done);
+    snprintf(tempStr, PVT_DEBUG_BUFFER_LINE_LENGTH, "%d[%u.%d.%d]", e->timestamp, e->evID.id, e->evID.getPE(), e->done);
 #endif
     strncat(str, tempStr, 32);
 

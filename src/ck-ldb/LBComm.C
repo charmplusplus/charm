@@ -101,15 +101,16 @@ bool LBCommData::equal(const LBCommData &d2) const
 
 int LBCommData::compute_key()
 {
-  int kstring[80];
-  char* kptr = (char*)((void*)(&(kstring[0])));
+  char kstring[320];
+  char* kptr = &kstring[0];
+  int* kintarr = (int*)((void*)(&kstring[0]));
   int pcount;
 
   if (from_proc()) {
-    pcount = sprintf(kptr,"%d",src_proc);
+    pcount = snprintf(kptr,sizeof(kstring),"%d",src_proc);
     kptr += pcount;
   } else {
-    pcount = sprintf(kptr,"%d%" PRIu64 "",srcObj.omID().id.idx,
+    pcount = snprintf(kptr,sizeof(kstring),"%d%" PRIu64 "",srcObj.omID().id.idx,
 		     srcObj.id);
     kptr += pcount;
   }
@@ -117,11 +118,11 @@ int LBCommData::compute_key()
   //CmiAssert(destObj.get_type() == LD_OBJ_MSG);
   switch (destObj.get_type()) {
   case LD_PROC_MSG:
-       pcount += sprintf(kptr,"%d", destObj.proc());
+       pcount += snprintf(kptr, sizeof(kstring) - pcount, "%d", destObj.proc());
        break;
   case LD_OBJ_MSG: {
        LDObjKey &destKey = destObj.get_destObj();
-       pcount += sprintf(kptr,"%d%" PRIu64 "XXXXXXXX",destKey.omID().id.idx,
+       pcount += snprintf(kptr, sizeof(kstring) - pcount, "%d%" PRIu64 "XXXXXXXX",destKey.omID().id.idx,
 		    destKey.objID());
        pcount -= 8;  /* The 'X's insure that the next few bytes are fixed */
        break;
@@ -130,7 +131,7 @@ int LBCommData::compute_key()
        int len;
        const LDObjKey *destKeys = destObj.get_destObjs(len);
        CmiAssert(len>0);
-       pcount += sprintf(kptr,"%d%" PRIu64 "XXXXXXXX",destKeys[0].omID().id.idx,
+       pcount += snprintf(kptr, sizeof(kstring) - pcount, "%d%" PRIu64 "XXXXXXXX",destKeys[0].omID().id.idx,
 		    destKeys[0].objID());
        pcount -= 8;  /* The 'X's insure that the next few bytes are fixed */
        break;
@@ -138,8 +139,8 @@ int LBCommData::compute_key()
   }
 
   int k=-1;
-  for(int i=0; i < (pcount+3)/4; i++)
-    k ^= kstring[i];
+  for(int i=0; i < (pcount+sizeof(int)-1)/sizeof(int); i++)
+    k ^= kintarr[i];
 
   // CmiPrintf("New key %d, %s\n",k,kstring);
 

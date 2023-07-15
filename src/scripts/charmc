@@ -13,9 +13,9 @@ export FROM_CHARMC='1'
 
 # Filter extra cmake arguments
 # This has no effect when building Charm++ without cmake
-if [ "$1" = "@CMAKE_C_COMPILER@" ]; then shift; fi
-if [ "$1" = "@CMAKE_CXX_COMPILER@" ]; then shift; fi
-if [ "$1" = "@CMAKE_Fortran_COMPILER@" ]; then shift; fi
+if [[ "$1" = "@CMAKE_C_COMPILER@" ]]; then shift; fi
+if [[ "$1" = "@CMAKE_CXX_COMPILER@" ]]; then shift; fi
+if [[ "$1" = "@CMAKE_Fortran_COMPILER@" ]]; then shift; fi
 
 # Avoid mpicc using these variables, particularly during configure phases.
 unset -v CC
@@ -67,13 +67,14 @@ OPTS=()
 #Specific options
 #charm internal flag, only pass to c and cxx, not f90
 OPTS_CPP_INTERNAL=('-D__CHARMC__=1')
-OPTS_CC_GENCPM=()
 OPTS_CPP=''
 OPTS_LDRO=''
 OPTS_CC=''
 OPTS_CXX=''
 OPTS_F90=''
 OPTS_LD=''
+# Additional options specified by the user
+ARG_OPTS=()
 ARG_OPTS_CPP=()
 ARG_OPTS_LDRO=()
 ARG_OPTS_CC=()
@@ -134,9 +135,6 @@ ROSE_OMP_TLS_GLOBALS="no"
 PRINT_BUILDING_BLOCKS=""
 NOABORT=""
 
-TAU_MAKEFILE=Make.tau
-TAU_TRACE_MPI=1
-
 MPI_INTEROPERATE=""
 NO_MAIN_MODULE=""
 NO_MAIN=""
@@ -181,15 +179,15 @@ printUsage() {
     echo "and Charm++ programs.  The flags generally match those of cc or f77."
     echo "  Other options that are not listed here will be passed directly to the"
     echo "underlying compiler and/or linker."
-    echo "Parallel Programming Lab, UIUC, 2020."
-    echo $*
+    echo "Parallel Programming Lab, UIUC, 2023."
+    echo "$@"
     exit 1
 }
 
 # End blows away the temporary files (unless SAVE is true) and exits
 # Args: <exit code>
 End() {
-    if [ -z "$SAVE" ]
+    if [[ -z "$SAVE" ]]
 	then
         for FILE in "${FILES[@]}"
         do
@@ -200,7 +198,7 @@ End() {
             $RM "$MYTMP.i" "$MYTMP.$CMK_CPP_SUFFIX"
         done
         $RM core "${DELETE[@]}"
-	if [ -z "$SKIP_MODULEINIT" -a -n "$modInitObj" ]
+	if [[ -z "$SKIP_MODULEINIT" && -n "$modInitObj" ]]
 	then
 	    DoNoErrCheck $RM "$modInitSrc" "$modInitObj" > /dev/null 2>&1
 	fi
@@ -278,11 +276,11 @@ joinChar()
 }
 
 Debugf() {
-	[ -n "$VERBOSE" ] && echo "charmc>" $@
+	[[ -n "$VERBOSE" ]] && echo "charmc>" "$@"
 }
 
 Debug() {
-    if [ -n "$DEBUG_SCRIPT" ]
+    if [[ -n "$DEBUG_SCRIPT" ]]
     then
 	echo
 	echo "------- Charmc Debugging info: $* -------"
@@ -302,9 +300,9 @@ Debug() {
 notInList() {
 	search=$1
 	shift
-	while [ $# -gt 0 ]
+	while [[ $# -gt 0 ]]
 	do
-		if [ "$search" = "$1" ]
+		if [[ "$search" = "$1" ]]
 		then
 			# It's already in there-- fail
 			return 1
@@ -330,7 +328,7 @@ TEMP_BASE="/tmp/charmc_tmp.$$"
 
 # Try to find CHARMBIN by looking in directory where charmc is
 findCharmBin() {
-if [ -z "$CHARMBIN" ]
+if [[ -z "$CHARMBIN" ]]
 then
 	SCRIPT="$1"
 	CHARMBIN="$(dirname "$SCRIPT")"
@@ -343,7 +341,7 @@ filterLegacyLB()
     local module="$1"
     local warningOn="$2"
     case "$module" in GreedyLB|GreedyRefineLB|RefineLB|RandCentLB|DummyLB|RotateLB)
-        if [ "$warningOn" = "1" ]; then
+        if [[ "$warningOn" = '1' ]]; then
             Warning "Warning: $module is now part of TreeLB. To use it, you must also pass +balancer $module at runtime."
         fi
 	module="TreeLB"
@@ -373,7 +371,7 @@ CHARMDIR="$(getAbsPath "$CHARMBIN/..")"
 CHARMLIB="$CHARMDIR/lib"
 CHARMINC="$CHARMDIR/include"
 CHARMLIBSO=
-if test -d "$CHARMDIR/lib_so"
+if [[ -d "$CHARMDIR/lib_so" ]]
 then
   CHARMLIBSO="$CHARMDIR/lib_so"
 fi
@@ -386,10 +384,10 @@ fi
 #
 ##############################################################################
 
-[ $# -eq 0 ] && printUsage "Error: No arguments given."
+[[ $# -eq 0 ]] && printUsage "Error: No arguments given."
 
 processArgs() {
-while [ ! $# -eq 0 ]
+while [[ $# -ne 0 ]]
 do
 	arg="$1"
 	shift
@@ -404,7 +402,7 @@ do
 		# Make sure these compiler options are passed through even if no
 		# file to compile is specified
 		PASSTHROUGH_COMPILER_OPTIONS+=("$arg")
-		OPTS+=("$arg")
+		ARG_OPTS+=("$arg")
 		;;
 
 	"-machine")
@@ -510,9 +508,6 @@ do
 			Warning "Warning: Duplicate tracemode $1 ignored"
 		fi
 		shift
-		;;
-	"-no-trace-mpi")
-		TAU_TRACE_MPI=0
 		;;
 
 	"-swapglobal"|"-swapglobals")
@@ -651,7 +646,7 @@ do
 # Run preprocessor only
 		PREPROCESS="yes"
 		SKIPLINK="yes"
-		OPTS+=("$arg")
+		ARG_OPTS+=("$arg")
 		;;
         "-preprocess")
 # Run preprocessor as an extra step, continue after preprocessing
@@ -664,25 +659,25 @@ do
 	"-P"|"-S")
 # Run preprocessor/assembler only
 		SKIPLINK="yes"
-		OPTS+=("$arg")
+		ARG_OPTS+=("$arg")
 		;;
 #------ Dependency generation ---------
 	"-M" | "-MM" | "-MMD" | "-MG" | "-MD")
 		SKIPLINK="yes"
-		OPTS+=("$arg")
+		ARG_OPTS+=("$arg")
 		GENDEPENDS="yes"
 		;;
 	"-MF" | "-MT" | "-MQ")	#-MP will pass through automatically
-		OPTS+=("$arg" "$1")
+		ARG_OPTS+=("$arg" "$1")
 		shift
 		;;
 #--------------------------------------
     "-count-tokens")
-		OPTS+=("$arg")
+		ARG_OPTS+=("$arg")
         COUNTTOKENS="yes"
         ;;
 	"-default-to-aout")
-		if [ "$EXPLICIT_OBJECT $EXPLICIT_COMPILATION" = "no no" ]
+		if [[ "$EXPLICIT_OBJECT $EXPLICIT_COMPILATION" = 'no no' ]]
 		then
 		      OBJECT="a.out"
 		fi
@@ -692,7 +687,7 @@ do
                 exit 0
                 ;;
 	"-c")
-		if [ "$EXPLICIT_OBJECT" = "no" ]
+		if [[ "$EXPLICIT_OBJECT" = 'no' ]]
 		then
 		      OBJECT=""
 		fi
@@ -731,12 +726,12 @@ do
 	@*.rsp)
 		# Pass through response files (*.rsp) to the compiler.
 		# See https://github.com/UIUC-PPL/charm/issues/2617 for details.
-		OPTS+=("$arg")
+		ARG_OPTS+=("$arg")
 		;;
 	*.tbd)
 		# Pass through text-based libraries (*.tbd) on MacOS.
 		# See https://github.com/UIUC-PPL/charm/issues/3045 for details.
-		OPTS+=("$arg")
+		ARG_OPTS+=("$arg")
 		;;
 	-D*|-I*)
 		ARG_OPTS_CPP+=("$arg")
@@ -760,7 +755,7 @@ do
 
 	-LANG*)
 		Warning "passing unrecognized option $arg to all compilers and linkers"
-		OPTS+=("$arg")
+		ARG_OPTS+=("$arg")
 		;;
 	-shared|-G)
 		USER_INITIATED_SHARED='1'
@@ -790,10 +785,6 @@ do
 		;;
 	"-no-production")
 		PRODUCTION_MODE=false
-		;;
-
-	"-pg"|"-g"|-W*|-O*)
-		OPTS+=("$arg")
 		;;
 
 	"-fmoddir")
@@ -877,6 +868,12 @@ do
 		INPUT_GIVEN='1'
 		;;
 
+	# compatibility with libtool
+	-install_name|-current_version|-compatibility_version)
+		[[ -n "$POST_LANGUAGE" ]] && POST_LIBRARIES+=("-Wl,$arg,$1") || PRE_LIBRARIES+=("-Wl,$arg,$1")
+		shift
+		;;
+
 	"-whole-archive")
 		LINK_WHOLE_ARCHIVE=true
 		;;
@@ -888,6 +885,11 @@ do
 	-s)
 		ARG_OPTS_LD+=("$arg")
 		;;
+
+	"-pg"|"-g"|-W*|-O*)
+		ARG_OPTS+=("$arg")
+		;;
+
 	-no-charmrun)
 		COPY_CHARMRUN=false
 		;;
@@ -941,18 +943,12 @@ do
 		POST_LIBRARIES=()
 		;;
 
-	# compatibility with libtool
-	-install_name|-current_version|-compatibility_version)
-		OPTS+=("-Wl,$arg,$1")
-		shift
-		;;
-
 	-*|+*)
 #		Warning "passing unrecognized option $arg to all compilers and linkers"
-		OPTS+=("$arg")
+		ARG_OPTS+=("$arg")
 		;;
 	*.*)
-		[ -n "$VERBOSE" ] && echo "Adding file $arg..."
+		[[ -n "$VERBOSE" ]] && echo "Adding file $arg..."
 		FILES+=("$arg")
 		INPUT_GIVEN="1"
 		;;
@@ -960,7 +956,7 @@ do
 	*)
 #		printUsage  "Error: Unrecognized argument $arg"
 #		Warning "passing unrecognized option $arg to all compilers and linkers"
-		OPTS+=("$arg")
+		ARG_OPTS+=("$arg")
 		;;
 	esac
 done
@@ -973,7 +969,7 @@ processArgs "$@"
 
 # Do not skip linking if user explicitly specified an output file
 # This allows generating dependencies while compiling
-if [ "$GENDEPENDS" = "yes" -a "$EXPLICIT_OBJECT" = "yes" ]; then
+if [[ "$GENDEPENDS" = 'yes' && "$EXPLICIT_OBJECT" = 'yes' ]]; then
 	SKIPLINK=""
 fi
 
@@ -996,9 +992,9 @@ do
 		fi
 
 		# Handle new object files
-		if [ -n "$BASEO" -a -n "$OBJECT" ]
+		if [[ -n "$BASEO" && -n "$OBJECT" ]]
 		then
-			if [ "$OBJECT" != "$BASEO" ]
+			if [[ "$OBJECT" != "$BASEO" ]]
 			then
 				DELETE+=("$BASEO")
 			fi
@@ -1031,22 +1027,24 @@ Debug "Read config script, setting defaults..."
 Debug "Setting vars..."
 
 # above this point, these OPTS_* are strings; below, they are arrays
-OPTS_CPP=($OPTS_CPP "${ARG_OPTS_CPP[@]}")
-OPTS_LDRO=($OPTS_LDRO "${ARG_OPTS_LDRO[@]}")
-OPTS_CC=($OPTS_CC "${ARG_OPTS_CC[@]}")
-OPTS_CXX=($OPTS_CXX "${ARG_OPTS_CXX[@]}")
-OPTS_F90=($OPTS_F90 "${ARG_OPTS_F90[@]}")
-OPTS_LD=($OPTS_LD "${ARG_OPTS_LD[@]}")
+OPTS_CPP=($OPTS_CPP)
+OPTS_LDRO=($OPTS_LDRO)
+OPTS_CC=($OPTS_CC)
+OPTS_CXX=($OPTS_CXX)
+OPTS_F90=($OPTS_F90)
+OPTS_LD=($OPTS_LD)
 
-if [ "$USE_BUILD_OPTIONS" = "1" ]
+OPTS_LDRO+=("${ARG_OPTS_LDRO[@]}")
+
+if [[ "$USE_BUILD_OPTIONS" = '1' ]]
 then
-	[ -n "$VERBOSE" ] && echo "Charmc applying build time options: $BUILDOPTS"
+	[[ -n "$VERBOSE" ]] && echo "Charmc applying build time options: $BUILDOPTS"
 	OPTS+=($BUILDOPTS)
 fi
 
 # If we are debugging, add "-g -O0" to the C/C++ flags
-if [ -n "$CHARMDEBUG" -a -z "$SEQUENTIAL" -a -z "$NATIVE" ]; then
-       if [ -n "$CMK_BUILD_PYTHON" ]; then
+if [[ -n "$CHARMDEBUG" && -z "$SEQUENTIAL" && -z "$NATIVE" ]]; then
+       if [[ -n "$CMK_BUILD_PYTHON" ]]; then
          	AddModules PythonCCS charmdebug_python
 		POST_LIBRARIES+=("-lpython$CMK_BUILD_PYTHON")
    	fi
@@ -1060,55 +1058,55 @@ fi
 # character all the way to the linker command can be difficult, so we provide
 # this option as a convenience and a failsafe.
 # Additionally, some platforms do not need any special parameters.
-if [ -n "$RPATH_ORIGIN" -a "$CMK_MACOSX" != "1" -a "$CMK_COMPILER" != "msvc" ]; then
+if [[ -n "$RPATH_ORIGIN" && "$CMK_MACOSX" != '1' && "$CMK_COMPILER" != "msvc" ]]; then
   OPTS_LD+=("-Wl,-rpath,\$ORIGIN")
 fi
 
 PROCESSED_MODULES=()
 
-if [ "$WERROR" = "1" ]
+if [[ "$WERROR" = '1' && -n "$CMK_WARNINGS_ARE_ERRORS" ]]
 then
     OPTS+=("$CMK_WARNINGS_ARE_ERRORS")
 fi
 
 # If the user has asked for the latest language standards (C11 or CPP11)
-if [ "$USE_NEW_STD" = "1" ]
+if [[ "$USE_NEW_STD" = '1' ]]
 then
     # and if configure confirmed that the underlying compiler knows abt C11, enable it
-    if [ "$CMK_COMPILER_KNOWS_C11" = "1" ]
+    if [[ "$CMK_COMPILER_KNOWS_C11" = '1' ]]
     then
         OPTS_CC+=("$CMK_ENABLE_C11")
     fi
 fi
 
-if [ "$ROSE_OMP_TLS_GLOBALS" = "yes" ]
+if [[ "$ROSE_OMP_TLS_GLOBALS" = 'yes' ]]
 then
     USE_OPENMP="yes"
     TLSGLOBALS="1"
 
-    if [ ! -x "$CMK_ROSE_OMP_TOOL" ]
+    if [[ ! -x "$CMK_ROSE_OMP_TOOL" ]]
     then
 	Abort "The environment variable CMK_ROSE_OMP_TOOL must contain the path to a built binary of the ROSE OpenMP variable privatization tool"
     fi
 fi
 
-if [ "$USE_OPENMP" = "yes" -o "$CMK_OMP" = "1" -a -z "$SEQUENTIAL" -a -z "$NATIVE" ]
+if [[ ( "$USE_OPENMP" = 'yes' || "$CMK_OMP" = '1' ) && -z "$SEQUENTIAL" && -z "$NATIVE" ]]
 then
-    if [ "$CMK_HAS_OPENMP" != "1" ]
+    if [[ "$CMK_HAS_OPENMP" != '1' ]]
     then
       echo "Error: OpenMP is unavailable!"
       exit 1
     fi
-    [ -n "$VERBOSE" ] && echo OpenMP support enabled
+    [[ -n "$VERBOSE" ]] && echo OpenMP support enabled
     OPTS_CC+=("$CMK_C_OPENMP")
     OPTS_CXX+=("$CMK_C_OPENMP")
     OPTS_F90+=("$CMK_F_OPENMP")
     OPTS_LD+=("$CMK_LD_OPENMP")
 else
-    [ -n "$VERBOSE" ] && echo OpenMP support not enabled
+    [[ -n "$VERBOSE" ]] && echo OpenMP support not enabled
 fi
 
-if [ "$TLSGLOBALS" = "1" ]
+if [[ "$TLSGLOBALS" = '1' ]]
 then
     TLSGLOBALS_OPTS=()
     [[ "$CMK_COMPILER_KNOWS_FTLS_MODEL" = '1' ]] && TLSGLOBALS_OPTS+=('-ftls-model=initial-exec')
@@ -1134,7 +1132,7 @@ findModuleDep() {
 # HACK: add modules to both ends of library list, to avoid
 #  undefined symbol CkRegisterMainModule when it's in a module file.
 	POST_LIBRARIES+=("-lmodule$M")
-	if [ "$M" = "PythonCCS" ]
+	if [[ "$M" = "PythonCCS" ]]
             then
             LINK_PYTHON=1
         fi
@@ -1146,7 +1144,7 @@ findModuleDep() {
 		d="$dir/libmodule$M.dep"
 		[[ -r "$d" ]] && dep="$d"
 	done
-	if [ -r "$dep" ]
+	if [[ -r "$dep" ]]
 	then
 		# Add the module dependencies in this file
 		# Debugf "Adding module" $M "dependencies from" $dep
@@ -1181,7 +1179,7 @@ Debugf "----------- Module dependency search complete ------------"
 ##############################################################################
 
 
-if [ "$BUILD_SHARE" = '1' -o "$USER_INITIATED_SHARED" = '1' ]
+if [[ "$BUILD_SHARE" = '1' || "$USER_INITIATED_SHARED" = '1' ]]
 then
 	USE_PIC="1"
 fi
@@ -1222,7 +1220,7 @@ then
        OPTS_LD+=("$USE_UNDEFINED_DYNAMIC")
 fi
 
-if [ "$BUILD_SHARE" = "1" -a "$USER_INITIATED_SHARED" = '0' ]
+if [[ "$BUILD_SHARE" = '1' && "$USER_INITIATED_SHARED" = '0' ]]
 then
 	# ignore BUILD_SHARE if the target is not .a or .so
 	case "$OBJECT" in
@@ -1233,7 +1231,7 @@ then
 	*.so|*.so.*|*.sl|*.dylib|*.dylib.*)
 		OPTS_LD+=($CMK_LD_SHARED "${OPTS_LDRO[@]}")
 		[[ -n "$CHARMLIBSO" ]] && OPTS_LD+=("-L$CHARMLIBSO")
-		if [ "$CMK_MACOSX" = "1" -a -z "$STANDALONE" ]; then
+		if [[ "$CMK_MACOSX" = '1' && -z "$STANDALONE" ]]; then
 			fname="$(basename "$OBJECT")"
 			OPTS_LD+=("-Wl,-install_name,$CHARMLIBSO/$fname")
 		fi
@@ -1244,49 +1242,49 @@ then
 	esac
 fi
 
-if [ -n "$OVERRIDE_CC" ]
+if [[ -n "$OVERRIDE_CC" ]]
 then
     CMK_CC="$OVERRIDE_CC"
 fi
 Debug "set 2"
-if [ -n "$OVERRIDE_CXX" ]
+if [[ -n "$OVERRIDE_CXX" ]]
 then
     CMK_CXX="$OVERRIDE_CXX"
 fi
 
-if [ -n "$OVERRIDE_F90" ]
+if [[ -n "$OVERRIDE_F90" ]]
 then
     CMK_CF90="$OVERRIDE_F90"
 fi
 
-if [ -n "$OVERRIDE_LD" ]
+if [[ -n "$OVERRIDE_LD" ]]
 then
     CMK_LD="$OVERRIDE_LD"
 fi
 
-if [ -n "$OVERRIDE_LDXX" ]
+if [[ -n "$OVERRIDE_LDXX" ]]
 then
     CMK_LDXX="$OVERRIDE_LDXX"
 fi
 
-if [ -n "$USE_RELIABLE_CC" ]
+if [[ -n "$USE_RELIABLE_CC" ]]
 then
 	CMK_CC="$CMK_CC_RELIABLE"
 fi
 
-if [ -n "$USE_FASTEST_CC" ]
+if [[ -n "$USE_FASTEST_CC" ]]
 then
     CMK_CC="$CMK_CC_FASTEST"
 fi
 
-if [ -n "$USE_F77" ]
+if [[ -n "$USE_F77" ]]
 then
     CMK_CF90="$CMK_CF77"
     CMK_CF90_FIXED="$CMK_CF77"
     CMK_F90LIBS="$CMK_F77LIBS"
 fi
 
-if [ -n "$CMK_F90_MODINC" ]
+if [[ -n "$CMK_F90_MODINC" ]]
 then
     CMK_CF90_MODINC="$CMK_F90_MODINC"
 else
@@ -1301,12 +1299,12 @@ then
     done
 fi
 
-if [ -n "$CMK_F90_USE_MODDIR" ]
+if [[ -n "$CMK_F90_USE_MODDIR" ]]
 then
     CMK_CF90+=" $CMK_CF90_MODINC $CHARMINC $CMK_SYSINC"
 fi
 
-if [ -n "$SEQUENTIAL" ]
+if [[ -n "$SEQUENTIAL" ]]
 then
     CMK_CC="$CMK_SEQ_CC"
     CMK_LD="$CMK_SEQ_LD"
@@ -1322,7 +1320,7 @@ then
     CMK_LDXX_FLAGS="$CMK_SEQ_LDXX_FLAGS"
 fi
 
-if [ -n "$NATIVE" ]
+if [[ -n "$NATIVE" ]]
 then
     CMK_CC="$CMK_NATIVE_CC"
     CMK_LD="$CMK_NATIVE_LD"
@@ -1335,19 +1333,19 @@ then
     CMK_LDXX_FLAGS="$CMK_NATIVE_LDXX_FLAGS"
 fi
 
-if [ -n "$PREPROCESS" ]
+if [[ -n "$PREPROCESS" ]]
 then
     CMK_CF90="$CMK_FPP"
 fi
 
-if [ -n "$PURIFY" ]
+if [[ -n "$PURIFY" ]]
 then
     CMK_LD="purify $CMK_LD"
     CMK_LDXX="purify $CMK_LDXX"
 fi
 
 Debug "set 4"
-if [ "$OPTIMIZE_MODE" = "true" ]
+if [[ "$OPTIMIZE_MODE" = 'true' ]]
 then
     OPTS_CC=($CMK_C_OPTIMIZE "${OPTS_CC[@]}")
     OPTS_CXX=($CMK_CXX_OPTIMIZE "${OPTS_CXX[@]}")
@@ -1356,7 +1354,7 @@ then
 fi
 
 # Pick up per-architecture production mode settings
-if [ "$PRODUCTION_MODE" = "true" ]
+if [[ "$PRODUCTION_MODE" = 'true' ]]
 then
     OPTS_CC=($CMK_PRODUCTION $CMK_C_PRODUCTION "${OPTS_CC[@]}")
     OPTS_CXX=($CMK_PRODUCTION $CMK_CXX_PRODUCTION "${OPTS_CXX[@]}")
@@ -1364,39 +1362,28 @@ then
     OPTS_LD=($CMK_PRODUCTION $CMK_C_PRODUCTION "${OPTS_LD[@]}")
 fi
 
-if [ -n "$XI_INTERNAL" ]
+if [[ -n "$XI_INTERNAL" ]]
 then
     CMK_XIOPTS+=" -intrinsic"
 fi
 
-if [ "$GENDEPENDS" = "yes" ]
+if [[ "$GENDEPENDS" = 'yes' ]]
 then
     CMK_XIOPTS+=" -M"
 fi
 
-if [ "$COUNTTOKENS" = "yes" ]
+if [[ "$COUNTTOKENS" = 'yes' ]]
 then
     CMK_XIOPTS+=" -count-tokens"
 fi
 
-if test "$CMK_WITH_TAU" = "true"
-then
-  echo "include $TAU_MAKEFILE" > _make.tau.tmp
-  echo "print-%:; @echo \$(\$*)" >> _make.tau.tmp
-  TAU_LIBS="$(make --no-print-directory -f _make.tau.tmp print-TAU_LIBS)"
-  TAU_MPI_LIBS="$(make --no-print-directory -f _make.tau.tmp print-TAU_MPI_LIBS)"
-  TAU_MPI_FLIBS="$(make --no-print-directory -f _make.tau.tmp print-TAU_MPI_FLIBS)"
-  TAU_DEFS="$(make --no-print-directory -f _make.tau.tmp print-TAU_DEFS)"
-  TAU_INCLUDE="$(make --no-print-directory -f _make.tau.tmp print-TAU_INCLUDE)"
-
-  rm -f _make.tau.tmp
-fi
+OPTS_CPP+=("${ARG_OPTS_CPP[@]}")
 
 #Add generic options to the compiler- and linker-options
-OPTS_CC=("${OPTS[@]}" $TAU_DEFS $TAU_INCLUDE "${OPTS_CC[@]}")
-OPTS_CXX=("${OPTS[@]}" $TAU_DEFS $TAU_INCLUDE "${OPTS_CXX[@]}")
-OPTS_F90=("${OPTS[@]}" "${OPTS_F90[@]}")
-OPTS_LD=("${OPTS[@]}" "${OPTS_LD[@]}")
+OPTS_CC=("${OPTS[@]}" "${OPTS_CC[@]}" "${ARG_OPTS[@]}" "${ARG_OPTS_CC[@]}")
+OPTS_CXX=("${OPTS[@]}" "${OPTS_CXX[@]}" "${ARG_OPTS[@]}" "${ARG_OPTS_CXX[@]}")
+OPTS_F90=("${OPTS[@]}" "${OPTS_F90[@]}" "${ARG_OPTS[@]}" "${ARG_OPTS_F90[@]}")
+OPTS_LD=("${OPTS[@]}" "${OPTS_LD[@]}" "${ARG_OPTS[@]}" "${ARG_OPTS_LD[@]}")
 
 ##############################################################################
 #
@@ -1405,23 +1392,23 @@ OPTS_LD=("${OPTS[@]}" "${OPTS_LD[@]}")
 ##############################################################################
 Debug "Checking language..."
 
-[ -z "$LANGUAGE" -a -n "$SEQUENTIAL" ] && LANGUAGE='c++'
-[ -z "$PARADIGM" -a -n "$LANGUAGE" ] && PARADIGM="$LANGUAGE"
-[ -z "$PARADIGM" ] && PARADIGM="charm++"
+[[ -z "$LANGUAGE" && -n "$SEQUENTIAL" ]] && LANGUAGE='c++'
+[[ -z "$PARADIGM" && -n "$LANGUAGE" ]] && PARADIGM="$LANGUAGE"
+[[ -z "$PARADIGM" ]] && PARADIGM="charm++"
 
 case "$LANGUAGE" in
 "c"|"C"|"c++"|"C++")
-	[ -z "$SEQUENTIAL" -a -z "$NATIVE" ] && Abort "Language $LANGUAGE is for sequential programs"
+	[[ -z "$SEQUENTIAL" && -z "$NATIVE" ]] && Abort "Language $LANGUAGE is for sequential programs"
 	;;
 esac
 
-if [ $USE_F77_LIBRARIES = "1" ]
+if [[ "$USE_F77_LIBRARIES" = '1' ]]
 then
 	CMK_SYSLIBS+=" $CMK_F77LIBS"
 	FORTRAN_SEQ_LIBRARIES+=($CMK_F77LIBS)
 fi
 
-if [ $USE_F90_LIBRARIES = "1" ]
+if [[ "$USE_F90_LIBRARIES" = '1' ]]
 then
 
 	if [[ ! -r "$CHARMLIB/libconv-utilf.a" ]]
@@ -1433,14 +1420,6 @@ then
 	CMK_SYSLIBS+=" $CMK_F90LIBS"
 	FORTRAN_SEQ_LIBRARIES+=($CMK_F90LIBS)
 fi
-
-# GEN-CPM options
-if [ "$CMK_COMPILER" = "bgclang" ]
-then
-  OPTS_CC_GENCPM=(-x c)  # -x c is only applied for the preprocessing of the GEN-CPM files on BG/Q
-fi
-
-OPTS_CC_GENCPM=("${OPTS_CC[@]}" "${OPTS_CC_GENCPM[@]}")
 
 ############ Determine the language and libraries ##########
 
@@ -1458,36 +1437,41 @@ case "$PARADIGM" in
 	;;
 esac
 
-if [ "$AMPIMAIN" != "" ]
+if [[ -n "$AMPIMAIN" ]]
 then
 	OBJECTFILES=("$CHARMLIB/lib$AMPIMAIN.o" "${OBJECTFILES[@]}")
 fi
 
-if [ -n "$AMPI" ]
+if [[ -n "$AMPI" ]]
 then
   CMK_SYSINC="-I$CHARMINC/ampi $CMK_SYSINC"
 fi
 
-if [ "$TLSGLOBALS" = "1" ]
+if [[ "$TLSGLOBALS" = '1' ]]
 then
     if [[ "$CMK_SUPPORTS_TLSGLOBALS" = '0' ]]
     then
-      echo "Error: -tlsglobals is not supported on $CMK_VDIR"
+      if [[ "$CMK_USER_DISABLED_TLS" = '1' ]]
+      then
+        echo "Error: Charm was built with '--disable-tls' and -tlsglobals is not available."
+      else
+        echo "Error: -tlsglobals is not supported on $CMK_VDIR"
+      fi
       exit 1
     elif [[ "$CMK_SUPPORTS_TLSGLOBALS" = '2' ]]
     then
       echo "Warning: -tlsglobals may not work with compilers that do not recognize -mno-tls-direct-seg-refs."
     fi
 
-    if [ "$CMK_HAS_ELF_H" != '1' -a "$CMK_MACOSX" != '1' ]
+    if [[ "$CMK_HAS_ELF_H" != '1' && "$CMK_MACOSX" != '1' ]]
     then
       echo "Warning: -tlsglobals requires elf.h"
     fi
 fi
 
-if [ "$SWAPGLOBALS" = "1" ]
+if [[ "$SWAPGLOBALS" = '1' ]]
 then
-	if [ "$CMK_HAS_ELF_H" != "1" ]
+	if [[ "$CMK_HAS_ELF_H" != '1' ]]
 	then
 		echo "Error: -swapglobals requires elf.h"
 		exit 1
@@ -1507,7 +1491,7 @@ then
 		echo 'https://charm.cs.illinois.edu/gerrit/gitweb?p=libbfd-patches.git;a=tree;f=swapglobals'
 	fi
 
-	if [ "$CMK_SMP" = "1" ]
+	if [[ "$CMK_SMP" = '1' ]]
 	then
 		echo "Error: -swapglobals is not supported on SMP builds of Charm++/AMPI"
 		exit 1
@@ -1523,7 +1507,7 @@ then
 
 	MIDDLE_LIBS=(-lglobal-swap "${MIDDLE_LIBS[@]}")
 fi
-if [ "$SWAPGLOBALS" = "2" ]
+if [[ "$SWAPGLOBALS" = '2' ]]
 then
 	echo "-copyglobals option is no longer supported by Charm++/AMPI"
 	exit 1
@@ -1531,7 +1515,7 @@ fi
 
 
 # dummy main module
-if [ "$MPI_INTEROPERATE" != "" -a "$NO_MAIN_MODULE" = "" ]
+if [[ -n "$MPI_INTEROPERATE" && -z "$NO_MAIN_MODULE" ]]
 then
 	POST_LIBRARIES=(-lmpi-mainmodule "${POST_LIBRARIES[@]}")
 fi
@@ -1589,7 +1573,7 @@ case "$MEMORY" in
     ;;
 esac
 
-if [[ "$CMK_SUPPORTS_MEMORY_ISOMALLOC" != '1' ]] && [[ "$MEMORY" = "${MEMORY%isomalloc}isomalloc" ]]
+if [[ "$CMK_SUPPORTS_MEMORY_ISOMALLOC" != '1' && "$MEMORY" = "${MEMORY%isomalloc}isomalloc" ]]
 then
   Abort "Error: -memory isomalloc is not supported on this platform."
 fi
@@ -1605,11 +1589,11 @@ esac
 
 # Check for valid choice of THREAD
 
-if [ "$CHARM_SHARED" = "1" -a -n "$CMK_LD_SHARED_THREAD" -a "$THREAD" = "default" ]
+if [[ "$CHARM_SHARED" = '1' && -n "$CMK_LD_SHARED_THREAD" && "$THREAD" = "default" ]]
 then
   THREAD="$CMK_LD_SHARED_THREAD"
 fi
-if [ "$TLSGLOBALS"  = "1" ]
+if [[ "$TLSGLOBALS" = '1' ]]
 then
   THREAD="${THREAD%-tls}-tls"
 fi
@@ -1635,22 +1619,7 @@ MAKE_LD="0"
 
 CORE_LIBS=(-lconverse "${TRACE_OBJ[@]}" -lm)
 
-# get TAU stub makefile variables
-if test "$CMK_WITH_TAU" = "true"
-then
-  echo "include $TAU_MAKEFILE" > _make.tau.tmp
-  echo "print-%:; @echo \$(\$*)" >> _make.tau.tmp
-  TAU_LIBS="$(make --no-print-directory -f _make.tau.tmp print-TAU_LIBS)"
-  TAU_MPI_LIBS="$(make --no-print-directory -f _make.tau.tmp print-TAU_MPI_LIBS)"
-  TAU_MPI_FLIBS="$(make --no-print-directory -f _make.tau.tmp print-TAU_MPI_FLIBS)"
-  TAU_DEFS="$(make --no-print-directory -f _make.tau.tmp print-TAU_DEFS)"
-  TAU_INCLUDE="$(make --no-print-directory -f _make.tau.tmp print-TAU_INCLUDE)"
-
-  rm -f _make.tau.tmp
-fi
-# done getting TAU variables
-
-if [ "$BUILD_SHARE" = '0' -a "$USER_INITIATED_SHARED" = '0' ]
+if [[ "$BUILD_SHARE" = '0' && "$USER_INITIATED_SHARED" = '0' ]]
 then
        MIDDLE_LIBS=("${MEM_OBJ[@]}" "${THREAD_OBJ[@]}" "${MIDDLE_LIBS[@]}")
 fi
@@ -1661,33 +1630,25 @@ case "$PARADIGM" in
 "f90charm")
 	MAKE_LDXX="1"
 	MIDDLE_LIBS=(-lck "${MIDDLE_LIBS[@]}" "${CORE_LIBS[@]}")
-	if [ -z "$NO_MAIN" ]
+	if [[ -z "$NO_MAIN" ]]
 	then
 		MIDDLE_LIBS=(-lckmainf "${MIDDLE_LIBS[@]}")
 		F90_MAIN="1"
-	fi
-	if [ "$TAU_TRACE_MPI" = "1" ]
-	then
-		TAU_LIBS="$TAU_MPI_FLIBS $TAU_LIBS"
 	fi
 	;;
 "charm"|"charm++"|"f90charm")
 	MAKE_LDXX="1"
 	MIDDLE_LIBS=(-lck "${MIDDLE_LIBS[@]}" "${CORE_LIBS[@]}")
-	if [ -z "$NO_MAIN" ]
+	if [[ -z "$NO_MAIN" ]]
 	then
-		if [ -n "$AMPIF" ]
+		if [[ -n "$AMPIF" ]]
 		then
 			MIDDLE_LIBS=(-lckmainf "${MIDDLE_LIBS[@]}")
 			F90_MAIN="1"
-		elif [ -z "$AMPIMAIN" ]
+		elif [[ -z "$AMPIMAIN" ]]
 		then
 			MIDDLE_LIBS=(-lckmain "${MIDDLE_LIBS[@]}")
 		fi
-	fi
-	if [ "$TAU_TRACE_MPI" = "1" ]
-	then
-		TAU_LIBS="$TAU_MPI_LIBS $TAU_LIBS"
 	fi
 	;;
 "converse"|"converse++")
@@ -1701,14 +1662,14 @@ case "$PARADIGM" in
 	;;
 esac
 
-if [ "$BUILD_SHARE" = '0' -a "$USER_INITIATED_SHARED" = '0' ]
+if [[ "$BUILD_SHARE" = '0' && "$USER_INITIATED_SHARED" = '0' ]]
 then
 	MIDDLE_LIBS+=("${MEM_OBJ[@]}" "${THREAD_OBJ[@]}")
 fi
 
-if [ "$CHARM_SHARED" = "1" ]
+if [[ "$CHARM_SHARED" = '1' ]]
 then
-  [ -z "$CHARMLIBSO" ] &&  Abort "Charm++ lib_so directory not found!"
+  [[ -z "$CHARMLIBSO" ]] &&  Abort "Charm++ lib_so directory not found!"
   # build user executable/shared lib linking with charm .so
   OPTS_LD+=("$CMK_LD_LIBRARY_PATH")
   LANG_LIBS=("-L$CHARMLIBSO")
@@ -1716,7 +1677,7 @@ else
   LANG_LIBS=("-L$CHARMLIB")
 fi
 
-if [ -z "$STANDALONE" ]
+if [[ -z "$STANDALONE" ]]
 then
   ALL_LIBS=("${LANG_LIBS[@]}" "${PRE_LIBRARIES[@]}" "${MIDDLE_LIBS[@]}" "${BAL_OBJ[@]}" $CMK_LIBS "${POST_LIBRARIES[@]}")
   case "$PARADIGM" in
@@ -1728,28 +1689,23 @@ else
   ALL_LIBS=("${USER_PRE_LIBRARIES[@]}" "${USER_POST_LIBRARIES[@]}")
 fi
 
-if [ -n "$LINK_WHOLE_ARCHIVE" ]
+if [[ -n "$LINK_WHOLE_ARCHIVE" ]]
 then
   ALL_LIBS=("$CXX_NO_AS_NEEDED" "$LDXX_WHOLE_ARCHIVE_PRE" "${ALL_LIBS[@]}" "$LDXX_WHOLE_ARCHIVE_POST")
 fi
 
 ALL_LIBS+=($CMK_SYSLIBS)
 
-if [ "$BUILD_SHARE" = '0' -a "$USER_INITIATED_SHARED" = '0' ]
+if [[ "$BUILD_SHARE" = '0' && "$USER_INITIATED_SHARED" = '0' ]]
 then
   ALL_LIBS+=("$CHARMLIB/conv-static.o")
 fi
 
-if [ -n "$LINK_CXX_STL" ]
+if [[ -n "$LINK_CXX_STL" ]]
 then
   ALL_LIBS+=(-lstdc++)
 fi
 
-if [ "$TRACE_WITH_TAU" = 1 ]
-then
-	echo "Linking with the TAU libraries: $TAU_LIBS"
-	ALL_LIBS+=("$TAU_LIBS")
-fi
 Debugf "All libraries are: ${ALL_LIBS[*]}"
 
 # preserve this variable in its state here for use later
@@ -1761,16 +1717,16 @@ fi
 
 ALL_LIBS=("${OBJECTFILES[@]}" "${ALL_LIBS[@]}")
 
-if [ -n "$F90_MAIN" ]
+if [[ -n "$F90_MAIN" ]]
 then
 # for_main needs to be placed at beginning
 	CMK_LD_FLAGS="$CMK_F90MAINLIBS $CMK_LD_FLAGS"
 	CMK_LDXX_FLAGS="$CMK_F90MAINLIBS $CMK_LDXX_FLAGS"
 fi
 
-if [ -n "$F90_MAIN" -o "$USE_F90_LIBRARIES" = '1' ]
+if [[ -n "$F90_MAIN" || "$USE_F90_LIBRARIES" = '1' ]]
 then
-  if [ "$CMK_CAN_LINK_FORTRAN" != '1' ]
+  if [[ "$CMK_CAN_LINK_FORTRAN" != '1' ]]
   then
     echo "Error: Configure testing was unable to link a Fortran program."
     exit 1
@@ -1789,7 +1745,7 @@ CHARM_CXX="$CMK_CXX"
 CHARM_LD="$CMK_LD"
 CHARM_LDXX="$CMK_LDXX"
 
-CHARM_CPP_C_FLAGS=($CMK_CPP_C_FLAGS "-I$CHARMINC" $CMK_INCDIR $CMK_SYSINC "${OPTS_CC_GENCPM[@]}" "${OPTS_CPP[@]}")
+CHARM_CPP_C_FLAGS=($CMK_CPP_C_FLAGS "-I$CHARMINC" $CMK_INCDIR $CMK_SYSINC "${OPTS_CC[@]}" "${OPTS_CPP[@]}")
 CHARM_CC_FLAGS=($CMK_CC_FLAGS "-I$CHARMINC" $CMK_INCDIR $CMK_SYSINC "${OPTS_CPP_INTERNAL[@]}" "${OPTS_CPP[@]}" "${OPTS_CC[@]}")
 CHARM_CXX_FLAGS=($CMK_CXX_FLAGS "-I$CHARMINC" $CMK_INCDIR $CMK_SYSINC "${OPTS_CPP_INTERNAL[@]}" "${OPTS_CPP[@]}" "${OPTS_CXX[@]}")
 CHARM_LD_FLAGS=($CMK_LD_FLAGS $CMK_LINK_BINARY $CMK_LIBDIR "${OPTS_LD[@]}" "${ALL_LIBS[@]}")
@@ -1802,7 +1758,7 @@ CHARM_LDXX_FLAGS=($CMK_LDXX_FLAGS $CMK_LINK_BINARY $CMK_LIBDIR "${OPTS_LD[@]}" "
 #
 ########################################################################
 
-if [ -n "$PRINT_BUILDING_BLOCKS" ]
+if [[ -n "$PRINT_BUILDING_BLOCKS" ]]
 then
 	for i in CHARM_CC CHARM_CXX CHARM_LD CHARM_LDXX CHARMBIN CHARMINC CHARMLIB CHARMLIBSO
 	do
@@ -1918,16 +1874,16 @@ do
 
         case "$FILE_EXT" in
         .c|.s|.S|.asm|.C|.cc|.cxx|.cpp|.c++|.cu|.f|.F|.f90|.F90|.fpp|.FPP|.f77|.F77)
-		[ $VERBOSE ] && echo "Compiling $FILE"
+		[[ -n "$VERBOSE" ]] && echo "Compiling $FILE"
 		DoNoErrCheck $RM "$BASEO" "$(stripExtension "$BASEO").f.o"
         esac
 
-	if [ ! -z "$SKIPLINK" ]
+	if [[ -n "$SKIPLINK" ]]
 	then
 		DESTO=()
 	fi
 
-	if [ "$ROSE_OMP_TLS_GLOBALS" = "yes" ]
+	if [[ "$ROSE_OMP_TLS_GLOBALS" = 'yes' ]]
 	then
 	    case "$FILE" in
 		*.c)
@@ -1954,7 +1910,7 @@ do
 	*.ci)
                 XIOPTS=($CMK_XIOPTS)
                 [[ "$PARADIGM" = "f90charm" ]] && XIOPTS+=(-f90)
-                if [ "$PREPROCESS_CI" = "yes" ]
+                if [[ "$PREPROCESS_CI" = 'yes' ]]
                 then
 		  runCmd $CMK_CPP_CHARM "${OPTS_CPP[@]}" "$FILE" | runCmd "$CHARMBIN/charmxi" "${XIOPTS[@]}" -orig-file "$FILE"
                 else
@@ -1963,36 +1919,36 @@ do
 		;;
 	*.c|*.s|*.S|*.asm)
 		runCmd $CHARM_CC "${CHARM_CC_FLAGS[@]}" -c "$FILE" "${DESTO[@]}"
-		if [ "$Do_res" -ne 0 ]
+		if [[ "$Do_res" -ne 0 ]]
 		then
 		    touch "$BASEO"
 		fi
 		;;
 	*.C|*.cc|*.cxx|*.cpp|*.c++|*.cu)
-                if [ -n "$NATIVE" ]
+                if [[ -n "$NATIVE" ]]
                 then
                     runCmd $CMK_NATIVE_CXX $CMK_NATIVE_CXX_FLAGS "-I$CHARMINC" $CMK_SYSINC "${OPTS_CPP_INTERNAL[@]}" "${OPTS_CPP[@]}" -c "$FILE" "${DESTO[@]}"
                 else
                     runCmd $CHARM_CXX "${CHARM_CXX_FLAGS[@]}" -c "$FILE" "${DESTO[@]}"
                 fi
-		if [ "$Do_res" -ne 0 ]
+		if [[ "$Do_res" -ne 0 ]]
 		then
 		    touch "$BASEO"
 		fi
 		;;
 	*.f|*.F|*.f77|*.F77)
-		test -z "$CMK_CF90_FIXED" && Abort "No F90 compiler (CMK_CF90_FIXED) defined"
+		[[ -z "$CMK_CF90_FIXED" ]] && Abort "No F90 compiler (CMK_CF90_FIXED) defined"
 		runCmd $CMK_CF90_FIXED "-I$CHARMINC" $CMK_SYSINC "${OPTS_CPP[@]}" "${OPTS_F90[@]}" -c "$FILE" "${DESTO[@]}"
-		if [ "$Do_res" -ne 0 ]
+		if [[ "$Do_res" -ne 0 ]]
 		then
 		    touch "$BASEO"
 		fi
 		;;
 	*.f90|*.F90|*.fpp|*.FPP)
-		test -z "$CMK_CF90" && Abort "No F90 compiler (CMK_CF90) defined"
+		[[ -z "$CMK_CF90" ]] && Abort "No F90 compiler (CMK_CF90) defined"
 		[[ -z "$PREPROCESS" ]] && OPTS_F90+=(-c)
 		runCmd $CMK_CF90 "-I$CHARMINC" $CMK_SYSINC "${OPTS_CPP[@]}" "${OPTS_F90[@]}" "$FILE" "${DESTO[@]}"
-		if [ "$Do_res" -ne 0 ]
+		if [[ "$Do_res" -ne 0 ]]
 		then
 		    touch "$BASEO"
 		fi
@@ -2028,41 +1984,41 @@ MakeSO() {
 	Debugf "Running ldro..."
 	DoNoErrCheck $RM "$OBJECT"
 	# convert to absolute path if required
-	if test -n "$CMK_LD_SHARED_ABSOLUTE_PATH"
+	if [[ -n "$CMK_LD_SHARED_ABSOLUTE_PATH" ]]
 	then
 	dir="$(dirname "$OBJECT")"
 	fname="$(basename "$OBJECT")"
 	dir="$(cd "$dir"; pwd)"
 	OBJECT="$dir/$fname"
 	fi
-	if test "$MAKE_LD" = '1'
+	if [[ "$MAKE_LD" = '1' ]]
 	then
 	  soTool="$CMK_LD $CMK_LD_FLAGS"
 	else
 	  soTool="$CMK_LDXX $CMK_LDXX_FLAGS"
 	fi
-	if [ -n "$STANDALONE" ]
+	if [[ -n "$STANDALONE" ]]
 	then
 	  soLibs=("${USER_PRE_LIBRARIES[@]}" "${USER_POST_LIBRARIES[@]}")
 	else
 	  soLibs=("${PRE_LIBRARIES[@]}" "${POST_LIBRARIES[@]}")
-	  [[ "$CMK_MACOSX" = "1" ]] && OPTS_LD+=("-Wl,-install_name,$CHARMLIBSO/$fname")
+	  [[ "$CMK_MACOSX" = '1' ]] && OPTS_LD+=("-Wl,-install_name,$CHARMLIBSO/$fname")
 	fi
-	if [ -n "$LINK_WHOLE_ARCHIVE" ]
+	if [[ -n "$LINK_WHOLE_ARCHIVE" ]]
 	then
 	  soLibs=("$CXX_NO_AS_NEEDED" "$LDXX_WHOLE_ARCHIVE_PRE" "${soLibs[@]}" "$LDXX_WHOLE_ARCHIVE_POST")
 	fi
 	soLibs+=($CMK_SYSLIBS)
-	if [ -n "$LINK_CXX_STL" ]
+	if [[ -n "$LINK_CXX_STL" ]]
 	then
 	  soLibs+=(-lstdc++)
 	fi
 	soCmd=($soTool $CMK_LIBDIR -o "$OBJECT" "${OPTS_LD[@]}" "${OPTS_LDRO[@]}" "${OBJECTFILES[@]}" "${soLibs[@]}" $CMK_LD_SHARED_LIBS)
 	DoNoErrCheck "${soCmd[@]}"
 	Do_res=$?
-	if [ $Do_res -ne 0 ]
+	if [[ $Do_res -ne 0 ]]
 	then
-	    if [ -n "$NOABORT" ]
+	    if [[ -n "$NOABORT" ]]
 	    then
 		touch "$OBJECT"
 	    else
@@ -2078,7 +2034,7 @@ MakeSO() {
 	Copyobj
 }
 
-if [ -z "$OBJECT" -o ! -z "$SKIPLINK" ]
+if [[ -z "$OBJECT" || -n "$SKIPLINK" ]]
 then
 	[[ ${#PASSTHROUGH_COMPILER_OPTIONS[@]} -ne 0 ]] && $CHARM_CXX "${PASSTHROUGH_COMPILER_OPTIONS[@]}"
 # We have no target object, or are playing preprocessor tricks-- just end
@@ -2088,18 +2044,18 @@ fi
 
 Debug "About to link..."
 
-if [ "$INPUT_GIVEN" != "1" ]
+if [[ "$INPUT_GIVEN" != '1' ]]
 then
     Abort "Trying to link, but no object files or library archives were specified"
 fi
 
 # if interoperate dont create the library now, wait to collect all info
-if [ "$MPI_INTEROPERATE" = "" ]
+if [[ -z "$MPI_INTEROPERATE" ]]
 then
 case "$OBJECT" in
 *.so|*.so.*|*.sl|*.dylib|*.dylib.*)
 # Make shared library
-	if [ "$BUILD_SHARE" = '1' -a "$USER_INITIATED_SHARED" = '0' ]
+	if [[ "$BUILD_SHARE" = '1' && "$USER_INITIATED_SHARED" = '0' ]]
 	then
 	  	MakeSO
 	fi
@@ -2107,12 +2063,12 @@ case "$OBJECT" in
 *.a)
 # Make regular (.a, non-shared) library
 	# in case building charm so, build .so under lib_so as well # Gengbin
-	if [ "$BUILD_SHARE" = "1" -a "$USER_INITIATED_SHARED" = '0' ]
+	if [[ "$BUILD_SHARE" = '1' && "$USER_INITIATED_SHARED" = '0' ]]
 	then
 	  COPY_EXIT=""
 	  OBJECT_SAVE="$OBJECT"
 	  COPYTO_SAVE="$COPYTO"
-	  if [ -z "$COPYTO" ]
+	  if [[ -z "$COPYTO" ]]
 	  then
 	    DESTDIR="$(echo "$OBJECT" | sed -e 's,lib/[^/]*\.a$,lib_so,')"
 	    OBJECT="$(echo "$OBJECT" | sed -e 's,lib/\([^/]*\)\.a$,lib_so/\1.a,')"
@@ -2159,7 +2115,7 @@ fi
 # check if we're linking a sequential object
 case "$LANGUAGE" in
 "c"|"C"|"f90"|"f77")
-        if [ -n "$NATIVE" ]
+        if [[ -n "$NATIVE" ]]
  	then
 	  runCmd $CMK_NATIVE_LD $CMK_NATIVE_LD_FLAGS "${OPTS_LD[@]}" -o "$OBJECT" "${OBJECTFILES[@]}" \
 		"-L$CHARMLIB" "${USER_PRE_LIBRARIES[@]}" $CMK_NATIVE_LIBS "${USER_POST_LIBRARIES[@]}"
@@ -2170,7 +2126,7 @@ case "$LANGUAGE" in
 	Copyobj
 	;;
 "c++"|"C++")
-        if [ -n "$NATIVE" ]
+        if [[ -n "$NATIVE" ]]
  	then
 	  runCmd $CMK_NATIVE_LDXX $CMK_NATIVE_LDXX_FLAGS "${OPTS_LD[@]}" -o "$OBJECT" "${OBJECTFILES[@]}" \
 		"-L$CHARMLIB" "${USER_PRE_LIBRARIES[@]}" $CMK_NATIVE_LIBS "${USER_POST_LIBRARIES[@]}"
@@ -2189,19 +2145,17 @@ esac
 #
 ##############################################################################
 
-# [ -r $CHARMLIB/libtrace-projections.a ] || Abort "trace libraries not installed.  Is Charm++ built properly?"
-
 if [[ ${#TRACEMODE[@]} -ne 0 ]]
 then
 for trace in "${TRACEMODE[@]}"; do
-    [ ! -r "$CHARMLIB/libtrace-$trace.a" ] && Abort "charmc : No such tracemode $trace"
+    [[ ! -r "$CHARMLIB/libtrace-$trace.a" ]] && Abort "charmc : No such tracemode $trace"
 done
 fi
 
 BAL_EXT="$(getExtension "$BALANCE")"
-if [ -z "$BAL_EXT" ]; then
+if [[ -z "$BAL_EXT" ]]; then
   # Balance has no extension-- is a library reference
-  if [ -f "${CHARMLIB}/libldb-$BALANCE.a" ]; then
+  if [[ -f "${CHARMLIB}/libldb-$BALANCE.a" ]]; then
     BAL_OBJ_FILE="${CHARMLIB}/libldb-$BALANCE.a"
   else
     BAL_OBJ_FILE="${CHARMLIBSO}/libldb-$BALANCE.so"
@@ -2211,9 +2165,9 @@ else
   BAL_OBJ_FILE="$BALANCE"
 fi
 
-if [ ! -r "$BAL_OBJ_FILE" ]
+if [[ ! -r "$BAL_OBJ_FILE" ]]
 then
-	if [ "$BALANCE" = "$BAL_OBJ_FILE" ]
+	if [[ "$BALANCE" = "$BAL_OBJ_FILE" ]]
 	then
 		Abort "Could not find load balancer object $BAL_OBJ_FILE"
 	else
@@ -2222,7 +2176,7 @@ then
 	fi
 fi
 
-if [ -f "${CHARMLIB}/libmemory-${MEMORY}.a" ]; then
+if [[ -f "${CHARMLIB}/libmemory-${MEMORY}.a" ]]; then
   MEM_OBJ_FILE="${CHARMLIB}/libmemory-${MEMORY}.a"
 else
   MEM_OBJ_FILE="${CHARMLIBSO}/libmemory-${MEMORY}.so"
@@ -2234,7 +2188,7 @@ then
   Abort "charmc : No such memory mode $MEMORY"
 fi
 
-if [ -f "${CHARMLIB}/libthreads-${THREAD}.a" ]; then
+if [[ -f "${CHARMLIB}/libthreads-${THREAD}.a" ]]; then
   THREAD_OBJ_FILE="${CHARMLIB}/libthreads-${THREAD}.a"
 else
   THREAD_OBJ_FILE="${CHARMLIBSO}/libthreads-${THREAD}.so"
@@ -2249,7 +2203,7 @@ fi
 
 ################# Build the module initialization function ##################
 
-if [ -z "$SKIP_MODULEINIT" ]
+if [[ -z "$SKIP_MODULEINIT" ]]
 then
     DoNoErrCheck $RM "$modInitSrc" "$modInitObj" > /dev/null 2>&1
 
@@ -2266,9 +2220,6 @@ then
         elif [[ "$trace" = "simple" ]]
         then
           echo "  extern void _registerTraceSimple();" >> "$modInitSrc"
-        elif [[ "$trace" = "Tau" ]]
-        then
-          echo "  extern void _registerTraceTau();" >> "$modInitSrc"
         elif [[ "$trace" = "utilization" ]]
         then
           echo "  extern void _registerTraceUtilization();" >> "$modInitSrc"
@@ -2294,7 +2245,7 @@ then
     fi
     echo "void _registerExternalModules(char **argv) { (void)argv;" >> "$modInitSrc"
     for module in "${MODULES[@]}"; do
-        [ -n "$VERBOSE" ] && echo "Adding registration for module $module"
+        [[ -n "$VERBOSE" ]] && echo "Adding registration for module $module"
         echo "  _register$module();" >> "$modInitSrc"
     done
     for trace in "${TRACEMODE[@]}"; do
@@ -2304,10 +2255,6 @@ then
         elif [[ "$trace" = "projections" ]]
         then
           echo "  _registerTraceProjections();" >> "$modInitSrc"
-        elif [[ "$trace" = "Tau" ]]
-        then
-          TRACE_WITH_TAU=1
-          echo "  _registerTraceTau();" >> "$modInitSrc"
         elif [[ "$trace" = "simple" ]]
         then
           echo "  _registerTraceSimple();" >> "$modInitSrc"
@@ -2340,7 +2287,7 @@ then
     # creating projections
     echo "void _createTraces(char **argv) { (void)argv;" >> "$modInitSrc"
     for trace in "${TRACEMODE[@]}"; do
-        [ -n "$VERBOSE" ] && echo "Adding registration for trace $trace"
+        [[ -n "$VERBOSE" ]] && echo "Adding registration for trace $trace"
         echo "extern void _createTrace$trace(char **argv);" >> "$modInitSrc"
         echo "_createTrace$trace(argv);" >> "$modInitSrc"
     done
@@ -2358,13 +2305,13 @@ fi
 Debug "About to perform final link..."
 
 #currently only support creation of .a
-if [ "$MPI_INTEROPERATE" != "" ]
+if [[ -n "$MPI_INTEROPERATE" ]]
 then
 case "$OBJECT" in
 *.a)
 	# in case building charm so, build .so under lib_so as well # Gengbin
 	DoNoErrCheck $RM "$OBJECT"
-	if [ -z "$SKIP_MODULEINIT" ]
+	if [[ -z "$SKIP_MODULEINIT" ]]
 	then
 		runCmd $CMK_AR "$OBJECT" "${OBJECTFILES[@]}" "$modInitObj"
 	fi
@@ -2381,8 +2328,8 @@ case "$OBJECT" in
 esac
 fi
 
-[ "$MAKE_LDXX" = "1" ] && runCmd $CHARM_LDXX "${CHARM_LDXX_FLAGS[@]}" -o "$OBJECT"
-[ "$MAKE_LD" = "1" ] && runCmd $CHARM_LD "${CHARM_LD_FLAGS[@]}" -o "$OBJECT"
+[[ "$MAKE_LDXX" = '1' ]] && runCmd $CHARM_LDXX "${CHARM_LDXX_FLAGS[@]}" -o "$OBJECT"
+[[ "$MAKE_LD" = '1' ]] && runCmd $CHARM_LD "${CHARM_LD_FLAGS[@]}" -o "$OBJECT"
 
 ########################################################################
 #
@@ -2390,7 +2337,7 @@ fi
 #
 ########################################################################
 
-if test "$COPY_CHARMRUN" = "true"
+if [[ "$COPY_CHARMRUN" = 'true' ]]
 then
   targ="charmrun$CMK_POST_EXE"
   [[ ! -x "$CHARMBIN/$targ" && -n "$CMK_POST_EXE" ]] && targ=charmrun

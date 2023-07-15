@@ -1659,17 +1659,14 @@ and code blocks that they define. These definitions appear in the
 ``.ci`` file definition of the enclosing chare class as a ‘body’ of an
 entry method following its signature.
 
-The most basic construct in SDAG is the ``serial`` (aka the ``atomic``)
-block. Serial blocks contain sequential C++ code. They’re also called
-atomic because the code within them executes without returning control
-to the Charm++ runtime scheduler, and thus avoiding interruption from
-incoming messages. The keywords atomic and serial are synonymous, and
-you can find example programs that use atomic. However, we recommend the
-use of serial and are considering the deprecation of the atomic keyword.
-Typically serial blocks hold the code that actually deals with incoming
-messages in a ``when`` statement, or to do local operations before a
-message is sent or after it’s received. The earlier example can be
-adapted to use serial blocks as follows:
+The most basic construct in SDAG is the ``serial`` block (previously also
+denoted by ``atomic``, this usage is now deprecated). Serial blocks contain
+sequential C++ code, and the code within them executes to completion without
+returning control to the Charm++ runtime scheduler, thus avoiding interruption
+from incoming messages. Typically, serial blocks hold the code that actually
+deals with incoming messages in a ``when`` statement or performs local
+operations before a message is sent or after it is received. The earlier example
+can be adapted to use serial blocks as follows:
 
 .. code-block:: charmci
 
@@ -8201,30 +8198,21 @@ from zero: PEs are ranked from ``0`` to ``CmiNumPes()``, and nodes are ranked
 from ``0`` to ``CmiNumNodes()``.
 
 Charm++ provides a unified abstraction for querying topology information of
-IBM's BG/Q and Cray's XE6. The ``TopoManager`` singleton object, which can be
+Cray's XE6. The ``TopoManager`` singleton object, which can be
 used by including ``TopoManager.h``, contains the following methods:
 
 getDimNX(), getDimNY(), getDimNZ():
-   Returns the length of X, Y and Z dimensions (except BG/Q).
-
-getDimNA(), getDimNB(), getDimNC(), getDimND(), getDimNE():
-   Returns the length of A, B, C, D and E dimensions on BG/Q.
+   Returns the length of X, Y and Z dimensions.
 
 getDimNT():
    Returns the length of T dimension. TopoManager uses the T dimension to
    represent different cores that reside within a physical node.
 
 rankToCoordinates(int pe, int &x, int &y, int &z, int &t):
-   Get the coordinates of PE with rank *pe* (except BG/Q).
-
-rankToCoordinates(int pe, int &a, int &b, int &c, int &d, int &e, int &t):
-   Get the coordinates of PE with rank *pe* on BG/Q.
+   Get the coordinates of PE with rank *pe*.
 
 coordinatesToRank(int x, int y, int z, int t):
-   Returns the rank of PE with given coordinates (except BG/Q).
-
-coordinatesToRank(int a, int b, int c, int d, int e, int t):
-   Returns the rank of PE with given coordinates on BG/Q.
+   Returns the rank of PE with given coordinates.
 
 getHopsBetweenRanks(int pe1, int pe2):
    Returns the distance between the given PEs in terms of the hops count
@@ -8723,6 +8711,42 @@ computational power because those dedicated cores are not utilized at
 all during most of the application's execution time. This case indicates
 the necessity of a unified runtime supporting both types of parallelism.
 
+
+Stealable Tasks for within-node load balancing
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Converse, the underlying scheduling-and-communication system for Charm++, supports a
+*work-stealing task queue* (steal queue for bervity) as a build time option,
+which can be used to create tasks so that
+they can be executed by any PE
+within a logical node (i.e. a process), in SMP mode.
+To use this feature, you need an option --enable-task-queue while *building* Charm++ initially.
+Tasks are fired with the call CsdTaskEnqueue(m) where m is a pointer to a Converse message, which is different
+(and simpler and shorter) than a Charm++ message. It is simply a struct with an initial set of bytes
+(CmiMsgHeaderSizeBytes bytes) reserved for system information. You must also write a handler that has the code
+to execute the task and register with the system using CmiRegisterHandler called during system initialization.
+(use *initproc* or *moduleinit* methods). Typically, it is also necessary to have a synchronization object that
+can take action (such as a callback) when all the tasks
+arising recursively from a set of fired objects, so you know when they are all done.
+
+An example program illustrating this feature is in
+https://github.com/UIUC-PPL/pgms/tree/main/charm%2B%2B/tasksWithRing,
+which illustrates concurrent execution
+of tasks with regular Charm++ messages. Another example that illustrates the utility of tasks
+for within-node load balancing is in pgms/testTasks.
+
+
+The task queue implementation itself is a Cilk-style (specifically  the so called "THE") steal queue, which aims to minimize inter-PE interactions.
+Each PE has its own task queue, and the Converse scheduler polls its own queue regularly. But only when the PE is completely
+idle (no tasks and no other messages to process) does it steal tasks from queues of other PE's within the same process.
+This limits the overhead of checking other PE's queues. Efficiency of this method
+requires that you try to divide the tasks recursively. (E.g. if you are processing a large array A[0:N], you may
+want to fire tasks each responsible for range A[x:y] and each subdividing that range further (and enqueuing 2 tasks)
+until some minimal tasks size is reached, when the handler will just do the work instead of firing subtasks.
+This method is preferred to firing many
+small subtasks at once, because it minimizes the number of steals, and therefore associated synchronization overheads.
+
+
 CkLoop library
 ~~~~~~~~~~~~~~
 
@@ -8899,10 +8923,6 @@ this integrated library on Linux.
 -  ICC: 15.0 or newer
 
 -  Clang: 3.7 or newer
-
-You can use this integrated OpenMP with *clang* on IBM Blue Gene machines
-without special compilation flags (don't need to add -fopenmp or
--openmp on Blue Gene clang).
 
 On Linux, the OpenMP supported version of clang has been installed in
 default recently. For example, Ubuntu has been released with clang
@@ -9182,7 +9202,7 @@ Enabling GPU Support
 
 GPU support via GPU Manager and HAPI is not included by default when
 building Charm++. Use ``build`` with the ``cuda`` option to build Charm++
-with GPU support (CMake build is currently not supported), e.g.
+with GPU support (or configure CMake with ``-D CUDA=ON``), e.g.
 
 .. code-block:: bash
 
@@ -9525,9 +9545,7 @@ compiler used to build charm. In the linking step, it is required to
 pass ``-mpi`` as an argument because of which *charmc* performs the
 linking for interoperation. The charm libraries, which one wants to be
 linked, should be passed using ``-module`` option. Refer to
-``examples/charm++/mpi-coexist/Makefile`` to view a working example. For
-execution on BG/Q systems, the following additional argument should be
-added to the launch command: ``-envs PAMI_CLIENTS=MPI,Converse``.
+``examples/charm++/mpi-coexist/Makefile`` to view a working example.
 
 User Driven Mode
 ~~~~~~~~~~~~~~~~
@@ -12697,7 +12715,7 @@ and cannot appear as variable or entry method names in a ``.ci`` file:
 
 -  SDAG constructs
 
-   -  atomic
+   -  atomic (deprecated)
 
    -  serial
 

@@ -22,7 +22,7 @@ class synctest_SyncSendMsg : public CMessage_synctest_SyncSendMsg {
 private:
   char checkString[6];
 public:
-  synctest_SyncSendMsg(void) { sprintf(checkString, "Sync!");} 
+  synctest_SyncSendMsg(void) { strcpy(checkString, "Sync!"); }
   int check(void) { 
     if (strcmp("Sync!", checkString) == 0)
       return 1;
