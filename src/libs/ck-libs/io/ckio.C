@@ -735,7 +735,7 @@ namespace Ck { namespace IO {
 		}	
 		
 		void getTimeToDisk(double time_taken){
-			CkPrintf("Time taken to go to disk: %f\n", time_taken);
+			CkPrintf("DISK_TIME: %f\n", time_taken);
 		}	
 		/**
 		 * Method invoked by the ReadAssembler in order to request from the 
