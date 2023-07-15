@@ -20,7 +20,7 @@ public:
 	char* sequentialRead(size_t offset, size_t bytes){
 		char* buffer = new char[bytes + 1];
 		int pos = 0;
-		std::ifstream ifs(TEST_FILE);
+		std::ifstream ifs(TEST_FILE, std::ios::in | std::ios::binary);
 		ifs.seekg(offset);
 
 		while(pos < bytes){
