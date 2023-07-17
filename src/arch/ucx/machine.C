@@ -245,8 +245,9 @@ static void UcxInitEps(int numNodes, int myId, int nodeSize)
         partLen = std::min(maxval, len);
         ret = snprintf(keys, maxkey, "UCX-%d-%d", myId, i);
         UCX_CHECK_RET(ret, "UcxInitEps: snprintf error", (ret <= 0));
+        CmiPrintf("Putting part %i\n", i);
         ret = runtime_kvs_put(keys, addrp, partLen);
-        UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_kvs_put error for a part");
+        UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_kvs_put error for part");
         addrp += partLen;
         len   -= partLen;
     }
