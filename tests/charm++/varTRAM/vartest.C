@@ -67,7 +67,8 @@ public:
   void simulate() {
     for (int j = 0;j != N-1;++j) {
       for (int k = 0;k != msgcount;++k) {
-        auto temp = rand();
+        std::vector<int> temp;
+        randvec(temp);
         thisProxy[(thisIndex+j+1)%N].ping(temp);
         result1 = std::accumulate(temp.begin(),temp.end(),result1);
       }
@@ -75,7 +76,7 @@ public:
     contribute(sizeof(int), &result1, CkReduction::sum_int, CkCallback(CkReductionTarget(main,startsum), mainProxy));
   }
 
-  void ping(std::vector<int> val) {
+  void ping(const std::vector<int>& val) {
     result2 = std::accumulate(val.begin(),val.end(),result2);
     ++iter;
     if (iter == (N-1)*msgcount) {
@@ -83,17 +84,15 @@ public:
     }
   }
 
-  std::vector<int> rand() {
+  void randvec(std::vector<int>& gener) {
     //int length=lambda/4;
     std::uniform_int_distribution<> gen1(lambda/8,3*lambda/8);
     int length = gen1(mt);
+    gener.resize(length);
     std::uniform_int_distribution<> gen2(0,373);
-    std::vector<int> gener(gen1(mt));
-    gener.reserve(gen1(mt));
     for(auto& g : gener) {
       g = gen2(mt);
     }
-    return gener;
   }
 };
 

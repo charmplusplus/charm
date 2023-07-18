@@ -114,6 +114,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
 
 #if defined __cplusplus
@@ -136,6 +137,10 @@
 #ifndef __has_builtin
 # define __has_builtin(x) 0  // Compatibility with non-clang compilers.
 #endif
+#ifndef __has_attribute
+# define __has_attribute(x) 0  // Compatibility with non-clang compilers.
+#endif
+
 #if (defined __GNUC__ || __has_builtin(__builtin_unreachable)) && !defined _CRAYC
 // Technically GCC 4.5 is the minimum for this feature, but we require C++11.
 # define CMI_UNREACHABLE_SECTION(...) __builtin_unreachable()
@@ -180,6 +185,33 @@
 #else
 #  define CMK_DEPRECATED_MSG(x)
 #  define CMK_DEPRECATED
+#endif
+
+#if __has_builtin(__builtin_expect) || \
+  (defined __GNUC__ && __GNUC__ >= 3) || \
+  (defined __INTEL_COMPILER && __INTEL_COMPILER >= 800) || \
+  (defined __ibmxl__ && __ibmxl_version__ >= 10) || \
+  (defined __xlC__ && __xlC__ >= (10 << 8)) || \
+  (defined _CRAYC && _RELEASE_MAJOR >= 8) || \
+  defined __clang__
+# define CMI_LIKELY(x)   __builtin_expect(!!(x),1)
+# define CMI_UNLIKELY(x) __builtin_expect(!!(x),0)
+#else
+# define CMI_LIKELY(x)   (x)
+# define CMI_UNLIKELY(x) (x)
+#endif
+
+#if __has_attribute(noinline) || \
+  defined __GNUC__ || \
+  defined __INTEL_COMPILER || \
+  defined __ibmxl__ || defined __xlC__
+# define CMI_NOINLINE __attribute__((noinline))
+#elif defined _MSC_VER
+# define CMI_NOINLINE __declspec(noinline)
+#elif defined __PGI
+# define CMI_NOINLINE _Pragma("noinline")
+#else
+# define CMI_NOINLINE
 #endif
 
 /* Paste the tokens x and y together, without any space between them.
@@ -472,8 +504,8 @@ extern CmiNodeLock CmiMemLock_lock;
 
 
 #if CMK_PAMI_LINUX_PPC8 && CMK_ENABLE_ASYNC_PROGRESS
-extern CMK_THREADLOCAL int32_t _cmi_bgq_incommthread;
-#define CmiInCommThread()  (_cmi_bgq_incommthread)
+extern CMK_THREADLOCAL int32_t _cmi_async_incommthread;
+#define CmiInCommThread()  (_cmi_async_incommthread)
 #else
 #define CmiInCommThread()  (CmiMyRank() == CmiMyNodeSize())
 #endif
@@ -780,31 +812,25 @@ CpvExtern(int, _curRestartPhase);      /* number of restarts */
 /** This header goes before each chunk of memory allocated with CmiAlloc. 
     See the comment in convcore.C for details on the fields.
 */
-struct CmiChunkHeader {
+
+#if CMK_USE_IBVERBS | CMK_USE_IBUD
+struct infiCmiChunkMetaDataStruct;
+struct infiCmiChunkMetaDataStruct* registerMultiSendMesg(char* msg, int msgSize);
+#endif
+
+// alignas is used for padding here, rather than for alignment of the
+// CmiChunkHeader itself, to ensure that the chunk following the envelope is
+// aligned relative to the start of the header.
+struct alignas(ALIGN_BYTES) CmiChunkHeader {
+#if CMK_USE_IBVERBS | CMK_USE_IBUD
+  struct infiCmiChunkMetaDataStruct *metaData;
+#endif
   int size;
 private:
 #if CMK_SMP
   std::atomic<int> ref;
 #else
   int ref;
-#endif
-#if ALIGN_BYTES > 8
-  #if defined(__GNUC__) || defined(__clang__)
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wpedantic"
-  #if defined(__clang__)
-  #pragma GCC diagnostic ignored "-Wunused-private-field"
-  #endif
-  #endif
-  char align[ALIGN_BYTES
-             - sizeof(int)*2
-#if (CMK_USE_IBVERBS || CMK_USE_IBUD)
-             - sizeof(void *)
-#endif
-            ];
-  #if defined(__GNUC__) || defined(__clang__)
-  #pragma GCC diagnostic pop
-  #endif
 #endif
 public:
   CmiChunkHeader() = default;
@@ -834,24 +860,6 @@ public:
   int decRef() { return ref--; }
 #endif
 };
-
-#if CMK_USE_IBVERBS | CMK_USE_IBUD
-struct infiCmiChunkMetaDataStruct;
-
-#define CMI_INFI_CHUNK_HEADER_FIELDS \
-struct infiCmiChunkMetaDataStruct *metaData;\
-CmiChunkHeader chunkHeader;
-
-struct infiCmiChunkHeaderHelper{
-  CMI_INFI_CHUNK_HEADER_FIELDS
-};
-
-typedef struct infiCmiChunkHeaderStruct{
-  CMI_INFI_CHUNK_HEADER_FIELDS
-} infiCmiChunkHeader;
-
-struct infiCmiChunkMetaDataStruct *registerMultiSendMesg(char *msg,int msgSize);
-#endif
 
 /* Given a user chunk m, extract the enclosing chunk header fields: */
 #define BLKSTART(m) ((CmiChunkHeader *) (((intptr_t)m) - sizeof(CmiChunkHeader)))
@@ -1035,48 +1043,19 @@ char *CmiPrintDate(void);
 #define CsdEnqueue(x)         (CqsEnqueueFifo((Queue)CpvAccess(CsdSchedQueue),(x)))
 #define CsdEmpty()            (CqsEmpty((Queue)CpvAccess(CsdSchedQueue)))
 #define CsdLength()           (CqsLength((Queue)CpvAccess(CsdSchedQueue)))
-#if CMK_CMIPRINTF_IS_A_BUILTIN /* these are implemented in machine.C */
+
 #if defined __GNUC__ || defined __clang__
 __attribute__ ((format (printf, 1, 2)))
 #endif
-void  CmiPrintf(const char *, ...);
+int CmiPrintf(const char *, ...);
 #if defined __GNUC__ || defined __clang__
 __attribute__ ((format (printf, 1, 2)))
 #endif
-void  CmiError(const char *, ...);
+int CmiError(const char *, ...);
 #if defined __GNUC__ || defined __clang__
 __attribute__ ((format (scanf, 1, 2)))
 #endif
-int   CmiScanf(const char *, ...);
-/* CmiFlush is disabled in this case */
-#define CmiFlush(stream) 
-
-#else /* standard definitions */
-
-#include <stdio.h>
-
-/*
- * I made vprintf functions for CmiPrintf and CmiError, but on the
- * O2K, there is no equivalent vscanf!
-
- #define CmiPrintf printf
- #define CmiError  printf
-*/
-#include <stdarg.h>
-
-#if defined __GNUC__ || defined __clang__
-__attribute__ ((format (printf, 1, 2)))
-#endif
-void  CmiPrintf(const char *format, ...);
-#if defined __GNUC__ || defined __clang__
-__attribute__ ((format (printf, 1, 2)))
-#endif
-void  CmiError(const char *format, ...);
-/* CmiFlush works only when CMK_CMIPRINTF_IS_A_BUILTIN is false */
-#define CmiFlush(stream)  fflush(stream);
-#define CmiScanf  scanf
-
-#endif
+int CmiScanf(const char *, ...);
 
 #if defined(__STDC__) || defined(__cplusplus)
 #define __CMK_STRING(x) #x
@@ -1094,23 +1073,17 @@ void __CmiEnforceMsgHelper(const char* expr, const char* fileName,
 			   const char* lineNum, const char* msg, ...);
 
 #define CmiEnforce(expr)                                             \
-  ((void)((expr) ? 0                                                 \
+  ((void)(CMI_LIKELY(expr) ? 0                                       \
                  : (__CmiEnforceHelper(__CMK_STRING(expr), __FILE__, \
                                        __CMK_XSTRING(__LINE__)),     \
                     0)))
 
-#define _CmiEnforceMsg(expr, msg, ...)                                                  \
-  ((void)((expr)                                                                        \
-              ? 0                                                                       \
-              : (__CmiEnforceMsgHelper(__CMK_STRING(expr), __FILE__,                    \
-                                       __CMK_XSTRING(__LINE__), msg "%s", __VA_ARGS__), \
+#define CmiEnforceMsg(expr, ...)                                              \
+  ((void)(CMI_LIKELY(expr)                                                    \
+              ? 0                                                             \
+              : (__CmiEnforceMsgHelper(__CMK_STRING(expr), __FILE__,          \
+                                       __CMK_XSTRING(__LINE__), __VA_ARGS__), \
                  0)))
-
-// Very much a hack, but necessary to support the case when no arguments are given to the
-// format string. Append an empty string so that __VA_ARGS__ is never empty in the above
-// _CmiEnforceMsg macro and add a dummy "%s" to the end of the format string there to eat
-// it.
-#define CmiEnforceMsg(expr, ...) _CmiEnforceMsg(expr, __VA_ARGS__, "")
 
 #if !CMK_ERROR_CHECKING
 #  define CmiAssert(expr) ((void)0)
@@ -1131,9 +1104,14 @@ extern void  CcdCallBacks(void);
 #define CsdPeriodic()
 #define CsdResetPeriodic()
 #else
+extern int CcdNumTimerCBs(void);
 CpvExtern(int, _ccd_numchecks);
-CpvExtern(int, _ccd_heaplen);
-#define CsdPeriodic() do{ if (CpvAccess(_ccd_heaplen) > 0 && CpvAccess(_ccd_numchecks)-- <= 0) CcdCallBacks(); } while(0)
+#define CsdPeriodic() \
+  do{ \
+    if ((CcdNumTimerCBs() > 0) && (CpvAccess(_ccd_numchecks)-- <= 0)) { \
+      CcdCallBacks(); \
+    } \
+  } while(0);
 #define CsdResetPeriodic()    CpvAccess(_ccd_numchecks) = 0
 #endif
 
@@ -1815,34 +1793,36 @@ typedef void (*CcdCondFn)(void *userParam);
 typedef void (*CcdVoidFn)(void *userParam,double curWallTime);
 
 /*CPU conditions*/
-#define CcdPROCESSOR_BEGIN_BUSY 0
-#define CcdPROCESSOR_END_IDLE 0 /*Synonym*/
-#define CcdPROCESSOR_BEGIN_IDLE 1
-#define CcdPROCESSOR_END_BUSY 1 /*Synonym*/
-#define CcdPROCESSOR_STILL_IDLE 2
-#define CcdPROCESSOR_LONG_IDLE 3
+#define CcdSCHEDLOOP            0
+#define CcdPROCESSOR_BEGIN_BUSY 1
+#define CcdPROCESSOR_END_IDLE   1 /*Synonym*/
+#define CcdPROCESSOR_BEGIN_IDLE 2
+#define CcdPROCESSOR_END_BUSY   2 /*Synonym*/
+#define CcdPROCESSOR_STILL_IDLE 3
+#define CcdPROCESSOR_LONG_IDLE  4
 
 /*Periodic calls*/
-#define CcdPERIODIC           4 /*every few ms*/
-#define CcdPERIODIC_10ms      5 /*every 10ms (100Hz)*/
-#define CcdPERIODIC_100ms     6 /*every 100ms (10Hz)*/
-#define CcdPERIODIC_1second   7 /*every second*/
-#define CcdPERIODIC_1s        7 /*every second*/
-#define CcdPERIODIC_5s        8 /*every second*/
-#define CcdPERIODIC_5seconds  8 /*every second*/
-#define CcdPERIODIC_10second  9 /*every 10 seconds*/
-#define CcdPERIODIC_10seconds 9 /*every 10 seconds*/
-#define CcdPERIODIC_10s       9 /*every 10 seconds*/
-#define CcdPERIODIC_1minute  10 /*every minute*/
-#define CcdPERIODIC_2minute  11 /*every 2 minute*/
-#define CcdPERIODIC_5minute  12 /*every 5 minute*/
-#define CcdPERIODIC_10minute 13 /*every 10 minutes*/
-#define CcdPERIODIC_1hour    14 /*every hour*/
-#define CcdPERIODIC_12hour   15 /*every 12 hours*/
-#define CcdPERIODIC_1day     16 /*every day*/
+#define CcdPERIODIC_FIRST     5 /*first periodic value*/
+#define CcdPERIODIC           5 /*every few ms*/
+#define CcdPERIODIC_10ms      6 /*every 10ms (100Hz)*/
+#define CcdPERIODIC_100ms     7 /*every 100ms (10Hz)*/
+#define CcdPERIODIC_1second   8 /*every second*/
+#define CcdPERIODIC_1s        8 /*every second*/
+#define CcdPERIODIC_5s        9 /*every second*/
+#define CcdPERIODIC_5seconds  9 /*every second*/
+#define CcdPERIODIC_10second  10 /*every 10 seconds*/
+#define CcdPERIODIC_10seconds 10 /*every 10 seconds*/
+#define CcdPERIODIC_10s       10 /*every 10 seconds*/
+#define CcdPERIODIC_1minute   11 /*every minute*/
+#define CcdPERIODIC_2minute   12 /*every 2 minute*/
+#define CcdPERIODIC_5minute   13 /*every 5 minute*/
+#define CcdPERIODIC_10minute  14 /*every 10 minutes*/
+#define CcdPERIODIC_1hour     15 /*every hour*/
+#define CcdPERIODIC_12hour    16 /*every 12 hours*/
+#define CcdPERIODIC_1day      17 /*every day*/
+#define CcdPERIODIC_LAST      18 /*last periodic value +1*/
 
 /*Other conditions*/
-#define CcdSCHEDLOOP         17
 #define CcdQUIESCENCE        18
 #define CcdTOPOLOGY_AVAIL    19
 #define CcdSIGUSR1           20
@@ -1858,12 +1838,7 @@ typedef void (*CcdVoidFn)(void *userParam,double curWallTime);
 #endif
 
 #define CcdIGNOREPE   -2
-#if CMK_CONDS_USE_SPECIAL_CODE
-typedef int (*CmiSwitchToPEFnPtr)(int pe);
-extern CmiSwitchToPEFnPtr CmiSwitchToPE;
-#else
 #define CmiSwitchToPE(pe)  pe
-#endif
 void CcdCallFnAfter(CcdVoidFn fnp, void *arg, double msecs);
 int CcdCallOnCondition(int condnum, CcdCondFn fnp, void *arg);
 int CcdCallOnConditionKeep(int condnum, CcdCondFn fnp, void *arg);

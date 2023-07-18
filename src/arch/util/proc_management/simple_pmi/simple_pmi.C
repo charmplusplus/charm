@@ -786,7 +786,7 @@ static int PMII_getmaxes( int *kvsname_max, int *keylen_max, int *vallen_max )
             PMIU_getval( "pmi_version", buf, PMIU_MAXLINE );
             PMIU_getval( "pmi_subversion", buf1, PMIU_MAXLINE );
 	    MPL_snprintf(errmsg, PMIU_MAXLINE, 
-			  "pmi_version mismatch; client=%d.%d mgr=%s.%s",
+			  "pmi_version mismatch; client=%d.%d mgr=%s.%.960s",
 			  PMI_VERSION, PMI_SUBVERSION, buf, buf1 );
 	    PMI_Abort( -1, errmsg );
         }

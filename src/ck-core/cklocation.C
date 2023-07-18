@@ -920,7 +920,6 @@ public:
   {
     int flati = 0;
     int myInt;
-    int dest;
     if (amaps[arrayHdl]->_nelems.dimension == 0)
     {
       return RRMap::procNum(arrayHdl, i);
@@ -1385,9 +1384,7 @@ public:
 
   void populateInitial(int arrayHdl, CkArrayOptions& options, void* ctorMsg, CkArray* mgr)
   {
-    CkArrayIndex start = options.getStart();
     CkArrayIndex end = options.getEnd();
-    CkArrayIndex step = options.getStep();
     // Try to load the configuration from command line argument
     CkAssert(haveConfigurableRRMap());
     ConfigurableRRMapLoader& loader = CkpvAccess(myConfigRRMapState);
@@ -2420,12 +2417,12 @@ void CkLocCache::insert(CmiUInt8 id, int epoch)
 
 /*************************** LocMgr: CREATION *****************************/
 CkLocMgr::CkLocMgr(CkArrayOptions opts)
-    : idCounter(1),
+    : bounds(opts.getBounds()),
+      idCounter(1),
       thisProxy(thisgroup),
-      thislocalproxy(thisgroup, CkMyPe()),
-      bounds(opts.getBounds())
+      thislocalproxy(thisgroup, CkMyPe())
 {
-  DEBC((AA "Creating new location manager %d\n" AB, thisgroup));
+  DEBC((AA "Creating new location manager %d\n" AB, thisgroup.idx));
 
   duringMigration = false;
 
@@ -2794,6 +2791,10 @@ void CkLocMgr::removeFromTable(const CmiUInt8 id)
     CkAbort("CkLocMgr::removeFromTable called on invalid index!");
 #endif
   hash.erase(id);
+  // Don't erase this during migration because the entry will be updated to reflect
+  // the new location by calling recordEmigration
+  if (!duringMigration)
+    cache->erase(id);
 #if CMK_ERROR_CHECKING
   // Make sure it's really gone
   if (NULL != elementNrec(id))
@@ -2807,11 +2808,11 @@ void CkLocMgr::multiHop(CkArrayMessage* msg)
   CK_MAGICNUMBER_CHECK
   int srcPe = msg->array_getSrcPe();
   if (srcPe == CkMyPe())
-    DEB((AA "Odd routing: local element %u is %d hops away!\n" AB,
+    DEB((AA "Odd routing: local element %" PRIu64 " is %d hops away!\n" AB,
          msg->array_element_id(), msg->array_hops()));
   else
   {  // Send a routing message letting original sender know new element location
-    DEBS((AA "Sending update back to %d for element %u\n" AB, srcPe,
+    DEBS((AA "Sending update back to %d for element %" PRIu64 "\n" AB, srcPe,
           msg->array_element_id()));
     cache->requestLocation(msg->array_element_id(), srcPe);
   }
@@ -3092,7 +3093,6 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
   CkLocRec* rec =
       createLocal(idx, true, msg->ignoreArrival, false /* home told on departure */, msg->epoch);
 
-  envelope* env = UsrToEnv(msg);
   CmiAssert(CpvAccess(newZCPupGets).empty());  // Ensure that vector is empty
   // Create the new elements as we unpack the message
   pupElementsFor(p, rec, CkElementCreation_migrate);

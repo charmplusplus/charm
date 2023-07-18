@@ -243,15 +243,9 @@ _deq CqsPrioqGetDeq(_prioq pq, unsigned int priobits, unsigned int *priodata)
   unsigned int prioints = (priobits+CINTBITS-1)/CINTBITS;
   unsigned int hashval, i;
   int heappos; 
-  _prioqelt *heap, pe, next, parent;
+  _prioqelt *heap, pe, next;
   _prio pri;
-  int mem_cmp_res;
-  unsigned int pri_bits_cmp;
-  static int cnt_nilesh=0;
 
-#ifdef FASTQ
-  /*  printf("Hi I'm here %d\n",cnt_nilesh++); */
-#endif
   /* Scan for priority in hash-table, and return it if present */
   hashval = priobits;
   for (i=0; i<prioints; i++) hashval ^= priodata[i];
@@ -262,7 +256,9 @@ _deq CqsPrioqGetDeq(_prioq pq, unsigned int priobits, unsigned int *priodata)
       if (memcmp(priodata, pe->pri.data, sizeof(int)*prioints)==0)
 	return &(pe->data);
 #else
-  parent=NULL;
+  _prioqelt *parent=NULL;
+  int mem_cmp_res;
+  unsigned int pri_bits_cmp;
   for(pe=pq->hashtab[hashval]; pe; )
   {
     parent=pe;
@@ -344,10 +340,6 @@ _deq CqsPrioqGetDeq(_prioq pq, unsigned int priobits, unsigned int *priodata)
   }
   heap[heappos] = pe;
 
-#ifdef FASTQ
-  /*  printf("Hi I'm here222\n"); */
-#endif
-  
   return &(pe->data);
 }
 
@@ -358,14 +350,12 @@ void *CqsPrioqDequeue(_prioq pq)
   _prioqelt pe, old; void *data;
   int heappos, heapnext;
   _prioqelt *heap = pq->heap;
+#if FASTQ
   int left_child;
   _prioqelt temp1_ht_right, temp1_ht_left, temp1_ht_parent;
   _prioqelt *temp1_ht_handle;
-  static int cnt_nilesh1=0;
-
-#ifdef FASTQ
-  /*  printf("Hi I'm here too!! %d\n",cnt_nilesh1++); */
 #endif
+
   if (pq->heapnext==1) return 0;
   pe = heap[1];
   data = CqsDeqDequeue(&(pe->data));
@@ -944,7 +934,6 @@ int CqsRemoveSpecificDeq(_deq q, const void *msgPtr){
 */
 int CqsRemoveSpecificPrioq(_prioq q, const void *msgPtr){
   void **head, **tail;
-  void **result;
   int i;
   _prioqelt pe;
 

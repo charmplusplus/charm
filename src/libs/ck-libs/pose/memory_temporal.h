@@ -229,8 +229,8 @@ class TimePool : public Group {
 
   void clean_up(); // Move old defunct SuperBlocks to not_in_use list
  public:
-  TimePool() : min_time(POSE_UnsetTS), last_in_use(NULL), first_in_use(NULL), 
-    not_in_use(NULL), not_in_use_sz(0) {}
+  TimePool() : last_in_use(NULL), first_in_use(NULL),
+    not_in_use(NULL), not_in_use_sz(0), min_time(POSE_UnsetTS) {}
   TimePool(CkMigrateMessage *msg) : Group(msg) {}
   ~TimePool();
   void pup(PUP::er &p) {}

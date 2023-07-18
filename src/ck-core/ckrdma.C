@@ -15,10 +15,11 @@ void CmiFreeBroadcastAllExceptMeFn(int size, char *msg);
 
 #if CMK_SMP
 /*readonly*/ extern CProxy_ckcallback_group _ckcallbackgroup;
+static int zcpy_pup_complete_handler_idx;
 #endif
 
 // Integer used to store the ncpy ack handler idx
-static int ncpy_handler_idx, zcpy_pup_complete_handler_idx;
+static int ncpy_handler_idx;
 
 CkpvExtern(ReqTagPostMap, ncpyPostedReqMap);
 CkpvExtern(ReqTagBufferMap, ncpyPostedBufferMap);
@@ -927,9 +928,6 @@ void CkRdmaIssueRgets(envelope *env, void **arrPtrs, int *arrSizes, int arrayInd
 
   layerInfoSize = CMK_COMMON_NOCOPY_DIRECT_BYTES + CMK_NOCOPY_DIRECT_BYTES;
 
-  std::vector<int> *tagArray = ncpyEmInfo->tagArray;
-  NcpyBcastRecvPeerAckInfo *peerAckInfo = ncpyEmInfo->peerAckInfo;
-
   PUP::toMem p((void *)(((CkMarshallMsg *)EnvToUsr(env))->msgBuf));
   PUP::fromMem up((void *)((CkMarshallMsg *)EnvToUsr(env))->msgBuf);
   up|numops;
@@ -1259,7 +1257,6 @@ void CkRdmaEMBcastAckHandler(void *ack) {
       envelope *myMsg = (envelope *)(bcastInterimAckInfo->msg);
 
       CkUnpackMessage(&myMsg);
-      CmiSpanningTreeInfo &t = *(getSpanningTreeInfo(getRootNode(myMsg)));
       CkPackMessage(&myMsg);
 
       if(bcastInterimAckInfo->isRecv)  { // bcast post api
@@ -1267,7 +1264,6 @@ void CkRdmaEMBcastAckHandler(void *ack) {
 #if CMK_REG_REQUIRED
         deregisterMemFromMsg(myMsg, true);
 #endif
-        CkArray *mgr = NULL;
         CMI_ZC_MSGTYPE(myMsg) = CMK_ZC_BCAST_RECV_DONE_MSG;
 
         CkUnpackMessage(&myMsg); // DO NOT REMOVE THIS
@@ -1535,9 +1531,6 @@ void CkReplaceSourcePtrsInBcastMsg(envelope *prevEnv, envelope *env, void *bcast
 /****************************** Zerocopy BCAST EM POST API Functions ***********************/
 
 void processBcastRecvEmApiCompletion(NcpyEmInfo *ncpyEmInfo, int destPe) {
-
-  envelope *myEnv = (envelope *)(ncpyEmInfo->msg);
-
   // Send message to all peer elements on this PE
   // Send a message to the worker thread
 #if CMK_SMP
@@ -2071,11 +2064,15 @@ void CkPostBufferInternal(void *destBuffer, size_t destSize, int tag) {
 void CkPostNodeBufferInternal(void *destBuffer, size_t destSize, int tag) {
 
   // check if tag exists in posted req node table
+  CmiLock(CksvAccess(_nodeZCPostReqLock));
   auto iter = CksvAccess(ncpyPostedReqNodeMap).find(tag);
+  CmiUnlock(CksvAccess(_nodeZCPostReqLock));
 
   if(iter == CksvAccess(ncpyPostedReqNodeMap).end()) {
 
+    CmiLock(CksvAccess(_nodeZCBufferReqLock));
     auto iter2 = CksvAccess(ncpyPostedBufferNodeMap).find(tag);
+    CmiUnlock(CksvAccess(_nodeZCBufferReqLock));
 
     if(iter2 == CksvAccess(ncpyPostedBufferNodeMap).end()) { // not found, insert into ncpyPostedBufferNodeMap
       CkPostedBuffer postedBuff;
@@ -2184,7 +2181,6 @@ void setPostStruct(CkNcpyBufferPost *ncpyPost, int index, CkNcpyBuffer &buffObj,
 
 void updateTagArray(envelope *env, int localElems) {
   int numops = 0;
-  int bufsize = 0;
   int rootNode;
   PUP::fromMem up((void *)((CkMarshallMsg *)EnvToUsr(env))->msgBuf);
   up|numops;
@@ -2219,7 +2215,6 @@ void setPosted(std::vector<int> *tagArray, envelope *env, CmiUInt8 elemIndex, in
   int localIndex = -1;
   if(env->getMsgtype() == ArrayBcastFwdMsg) {
     CkArray *mgr = getArrayMgrFromMsg(env);
-    int arraySize = mgr->getNumLocalElems();
     localIndex = mgr->getEltLocalIndex(elemIndex);
     tagArray[CmiMyRank()][localIndex * numops + opIndex] = 0;
   } else {
@@ -2233,7 +2228,6 @@ bool isUnposted(std::vector<int> *tagArray, envelope *env, CmiUInt8 elemIndex, i
   int localIndex = -1;
   if(env->getMsgtype() == ArrayBcastFwdMsg) {
     CkArray *mgr = getArrayMgrFromMsg(env);
-    int arraySize = mgr->getNumLocalElems();
     localIndex = mgr->getEltLocalIndex(elemIndex);
     return (tagArray[CmiMyRank()][localIndex * numops + opIndex] == -1);
   } else {
@@ -2250,7 +2244,6 @@ void *extractStoredBuffer(std::vector<int> *tagArray, envelope *env, CmiUInt8 el
   // Retrieve tag
   if(env->getMsgtype() == ArrayBcastFwdMsg) {
     CkArray *mgr = getArrayMgrFromMsg(env);
-    int arraySize = mgr->getNumLocalElems();
     localIndex = mgr->getEltLocalIndex(elemIndex);
     tag = tagArray[CmiMyRank()][localIndex * numops + opIndex];
 
@@ -2524,7 +2517,6 @@ int CkPerformRget(CkNcpyBufferPost &post, void *destBuffer, int destSize) {
       }
 
     } else if(env->getMsgtype() == ForBocMsg) {
-      int localIndex = CmiMyRank();
       (post.ncpyEmInfo->tagArray)[CmiMyRank()][post.opIndex] = post.tag;
 
       if(post.ncpyEmInfo->counter == numops) {

@@ -1,11 +1,11 @@
 
 #define CMK_CMIDELIVERS_USE_COMMON_CODE                    1
 
-#define CMK_CMIPRINTF_IS_A_BUILTIN                         0
+#define CMK_USE_LRTS_STDIO                                 0
 
 #define CMK_HANDLE_SIGUSR                                  1
 
-#define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, hdl,xhdl,info, stratid; unsigned char cksum, magic; int root, size; CmiUInt2 redID, padding; CmiUInt1 cmaMsgType:2, nokeep:1;
+#define CMK_MSG_HEADER_EXT_    int root, size; CmiUInt2 rank, hdl,xhdl,info, stratid, redID, padding; unsigned char cksum, magic; CmiUInt1 cmaMsgType:2, nokeep:1;
 
 #define CMK_MSG_HEADER_BASIC  CMK_MSG_HEADER_EXT
 #define CMK_MSG_HEADER_EXT    { CMK_MSG_HEADER_EXT_ }

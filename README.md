@@ -6,6 +6,7 @@
 
 
 ## Introduction
+
 Charm++ is a message-passing parallel language and runtime system.
 It is implemented as a set of libraries for C++, is efficient,
 and is portable to a wide variety of parallel machines.
@@ -13,6 +14,7 @@ Source code is provided, and non-commercial use is free.
 
 
 ## Getting the Latest Source
+
 You can use anonymous Git access to obtain the latest Charm++ source
 code, as follows:
 
@@ -20,7 +22,9 @@ code, as follows:
 
 
 ## Build Configuration
+
 ### Quick Start:
+
 First-time users are encouraged to run the top-level `build` script and follow its lead:
     
     $ ./build
@@ -36,6 +40,7 @@ script takes several command line options to compile Charm++. The command line s
 For detailed help messages, pass `-h` or `--help` to the build script.
 
 ### Required:
+
 `<target>` specifies the parts of Charm++ to compile.  The most often used
 `<target>` is `charm++`, which will compile the key Charm++ executables and
 runtime libraries.  Other common targets are `AMPI` and `LIBS`, which build
@@ -44,6 +49,7 @@ Adaptive MPI and Charm++ and all of its libraries, respectively.
   "How to choose a `<version>`" below for details.
 
 ### Optional:
+
 `<options>` defines more detailed information of the compilations, including
 compilers, features to support, etc.  See "How to choose `<options>`"
 below.
@@ -128,6 +134,7 @@ Your Charm++ version is made by concatenating the options, e.g.:
 
 
 ### How to choose `<options>`:
+
 `<version>` above defines the most important OS, CPU, and communication of
 your machine.
 
@@ -152,7 +159,7 @@ for more information:
 * `tcp` - The `netlrts-` version communicates via UDP by default. The `tcp` option
     will use TCP instead. The TCP version of Charm++ is usually slower
     than UDP, but it is more reliable.
-* `async` - For Blue Gene/Q, this option enables use of hardware communication 
+* `async` - On PAMI systems, this option enables use of hardware communication
     threads. For applications with significant communication on large
     scale, this option typically improves performance.
 * `regularpages` - On Cray systems, Charm++'s default is to use `hugepages`. This
@@ -176,6 +183,7 @@ for more information:
 
 
 ## Building the Source
+
 If you have downloaded a binary version of Charm++, you can skip
 this step -- Charm++ should already be compiled.
 
@@ -189,7 +197,6 @@ and run
 * `charm++`  The basic Charm++ language
 * `AMPI`     An implementation of MPI on top of Charm++
 * `LIBS`    Charm++, AMPI, and other libraries built on top of them
-* `Tau`      TAU's performance profiling/tracing
 
 `<version>` is described above in the "How to choose a `<version>`" section.
 
@@ -251,6 +258,7 @@ netlrts-linux-x86_64/
 ```
 
 ## Building a Program
+
 To make a sample program, `cd` into `examples/charm++/NQueen/`.
 This program solves the _n_ queens problem-- find how many ways there
 are to arrange _n_ queens on an _n_ x _n_ chess board such that none may
@@ -261,6 +269,7 @@ executable named `nqueen`.
 
 
 ## Running a Program
+
 Following the previous example, to run the program on two processors, type
 
      $ ./charmrun +p2 ./nqueen 12 6
@@ -304,6 +313,7 @@ However, for best performance, you should launch one node program per processor.
 
 
 ## Building Dynamic Libraries
+
 In order to compile Charm++ into dynamic libraries, one needs to specify the
 `--build-shared` option to the Charm `./build` script. Charm++'s dynamic
 libraries are compiled into the `lib_so/` directory. Typically, they are
@@ -318,6 +328,22 @@ For example:
 You can then run the program as usual.
 Note that linking against Charm++ dynamic libraries produces much smaller
 binaries and takes much less linking time.
+
+
+## Contributing
+
+The recommended way to contribute to Charm++ development is to open a pull request (PR) on GitHub.
+To open a pull request, create a fork of the Charm++ repo in your own space
+(if you already have a fork, make sure is it up-to-date), and then create a new branch off of the
+`main` branch.
+
+GitHub provides a detailed tutorial on creating pull requests 
+(https://docs.github.com/en/pull-requests/collaborating-with-pull-requests). 
+
+Each pull request must pass code review and CI tests before it can be merged by someone on
+the core development team.
+Our wiki contains additional information about pull requests
+(https://github.com/UIUC-PPL/charm/wiki/Working-with-Pull-Requests).
 
 
 ## For More Information
@@ -335,6 +361,7 @@ please create an issue or discussion on our GitHub, https://github.com/UIUC-PPL/
 
 
 ## Authors
+
 Charm++ was created and is maintained by the Parallel Programming Lab,
 in the Computer Science department at the University of Illinois at
 Urbana-Champaign.  Our managing professor is Dr. L.V. Kale; students
@@ -358,4 +385,4 @@ Eric Bohm, Ronak Buch, Eric Mikida, Sam White, Nitin Bhat, Kavitha
 Chandrasekar, Jaemin Choi, Matthias Diener, Evan Ramos, Justin Szaday,
 Zane Fink, and Pathikrit Ghosh.
 
-Copyright (C) 1989-2020 Regents of the University of Illinois
+Copyright (C) 1989-2023 Regents of the University of Illinois

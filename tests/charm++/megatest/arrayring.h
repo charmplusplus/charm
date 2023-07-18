@@ -8,7 +8,7 @@ class arrayMessage : public CMessage_arrayMessage {
   char data[7];
 public:
   int iter;
-  arrayMessage(void) { sprintf(data, "Array!"); iter = 0; };
+  arrayMessage(void) { strcpy(data, "Array!"); iter = 0; }
   int check(void) { return !strcmp(data, "Array!"); }
 };
 

@@ -1,0 +1,15 @@
+mainmodule periodic {
+
+  readonly CProxy_main mProxy;
+  readonly CProxy_testGroup gProxy;
+
+  mainchare main {
+    entry main(CkArgMsg *msg);
+    entry [reductiontarget] void done();
+  }
+
+  group testGroup {
+    entry testGroup(int max);
+    entry void testPeriodic();
+  }
+};

@@ -59,7 +59,7 @@ idaStarWorker::idaStarWorker(
   CkGroupID master,
   problem *issue, int maxdepth,
   int charesize, int serialdist
-) : Master(master), Issue(issue), Waiting(0), Solver(NULL), Solution(NULL) {
+) : Master(master), Issue(issue), Solution(NULL), Solver(NULL), Waiting(0) {
   // If we're out of our depth, abort
   if ( maxdepth < issue->depth() + issue->depthToSolution() ) {
     ChildFinished(0);
@@ -196,11 +196,12 @@ idaStarGroup::idaStarGroup(problem *issue,
 		 int startdepth, int maxdepth, int stride, int window,
 		 int charesize, int serialdist,
 		 CkCallback finished)
-: CharesExpanded(0), NodesExpanded(0), Running(0), Issue(issue),
-  ChareSize(charesize), SerialDist(serialdist),
+: NodesExpanded(0), CharesExpanded(0), Issue(issue), Solution(NULL),
+  BestSolutionDepth(maxdepth), Finished(finished),
   StartDepth(startdepth), CurrentDepth(startdepth),
   MaxDepth(maxdepth), Stride(stride),
-  BestSolutionDepth(maxdepth), Solution(NULL), Finished(finished) {
+  Running(0), ChareSize(charesize), SerialDist(serialdist)
+{
   // Everyone in the group gets the stuff to do, but only the one on
   // processor zero is actually going to run it.
   Issue->Root = 1;

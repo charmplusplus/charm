@@ -65,7 +65,7 @@ Parameter::Parameter(int Nline, Type* Ntype, const char* Nname, const char* Narr
   if (name == NULL && !isVoid()) { /*Fabricate a unique name for this marshalled param.*/
     static int unnamedCount = 0;
     name = new char[50];
-    sprintf((char*)name, "impl_noname_%x", unnamedCount++);
+    snprintf((char*)name, 50, "impl_noname_%x", unnamedCount++);
   }
   byReference = false;
   declaredReference = false;
@@ -765,6 +765,9 @@ void Parameter::copyFromPostedPtrs(XStr& str, bool isSDAGGen, bool device, int &
         str << " sizeof(" << dt << ") * "<< arrLen << ".t)\n";
       str << "          CkAbort(\"Size of the posted buffer > Size of the source buffer \");\n";
 
+      str << "        if(ncpyBuffer_" << name << "_ptr == nullptr)\n";
+      str << "          CkAbort(\"Post Entry Method either doesn't call CkMatchBuffer or doesn't post the buffer by initializing the reference to the pointer for " << name << "\");\n";
+
       str << "        memcpy(" << "ncpyBuffer_" << name << "_ptr,";
       if(isSDAGGen)
         str << "genClosure->";
@@ -797,7 +800,7 @@ void Parameter::storePostedRdmaPtrs(XStr& str, bool isSDAGGen, bool device, int 
 
     if (hostPath) {
       str << "      if(ncpyBuffer_" << name << "_ptr == nullptr)\n";
-      str << "        CkAbort(\"Post Entry Method either doesn't call CkMatchBuffer or doesn't post the buffer by initializing the reference to the pointer for " << name << " \");\n";
+      str << "        CkAbort(\"Post Entry Method either doesn't call CkMatchBuffer or doesn't post the buffer by initializing the reference to the pointer for " << name << "\");\n";
       str << "      buffPtrs[" << count << "] = (void *)" << "ncpyBuffer_";
       str << name << "_ptr;\n";
       if(isSDAGGen)

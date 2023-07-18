@@ -13,7 +13,7 @@ mainmodule iotest {
         CkCallback opened(CkIndex_Main::ready(NULL), thisProxy);
         opened.setRefnum(iter + 0);
         char name[20];
-        sprintf(name, "test%d", iter);
+        snprintf(name, sizeof(name), "test%d", iter);
         Ck::IO::open(name, opened, opts);
       }
       when ready[iter + 0](Ck::IO::FileReadyMsg *m) serial {

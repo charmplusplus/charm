@@ -1314,13 +1314,15 @@ static const char *idx2str(const CkArrayIndex &ind) {
   if (ind.dimension <= 3) {
     for (int i=0;i<ind.nInts;i++) {
       if (i>0) strcat(retBuf,";");
-      sprintf(&retBuf[strlen(retBuf)],"%d",ind.data()[i]);
+      const int retBufLen = strlen(retBuf);
+      snprintf(&retBuf[retBufLen],sizeof(retBuf)-retBufLen,"%d",ind.data()[i]);
     }
   } else {
     const short int *idx = (const short int*)ind.data();
     for (int i=0;i<ind.dimension;i++) {
       if (i>0) strcat(retBuf,";");
-      sprintf(&retBuf[strlen(retBuf)],"%hd",idx[i]);
+      const int retBufLen = strlen(retBuf);
+      snprintf(&retBuf[retBufLen],sizeof(retBuf)-retBufLen,"%hd",idx[i]);
     }
   }
   return retBuf;

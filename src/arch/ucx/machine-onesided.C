@@ -29,7 +29,7 @@ inline void UcxMemMap(UcxRdmaInfo *info, void *ptr, int size)
     memcpy(info->packedRkey, rbuf, rkeySize);
 
     ucp_rkey_buffer_release(rbuf);
-    UCX_LOG(4, " key packed, size %ld, buf %p memh %d",
+    UCX_LOG(4, " key packed, size %ld, buf %p memh %p",
             rkeySize, info->packedRkey, info->memh);
 }
 
@@ -79,7 +79,7 @@ void LrtsDeregisterMem(const void *ptr, void *info, int pe, unsigned short int m
     ucs_status_t status;
     UcxRdmaInfo *ucxInfo = (UcxRdmaInfo*)info;
 
-    UCX_LOG(4, " %p, PE %d, info %p, memh %d", ptr, pe, ucxInfo, ucxInfo->memh);
+    UCX_LOG(4, " %p, PE %d, info %p, memh %p", ptr, pe, ucxInfo, ucxInfo->memh);
 
     if ((mode != CMK_BUFFER_NOREG) && (ucxInfo->memh)) {
         status = ucp_mem_unmap(ucxCtx.context, ucxInfo->memh);
@@ -96,7 +96,7 @@ void UcxRmaOp(NcpyOperationInfo *ncpyOpInfo, int op)
     ucp_rkey_h rkey;
     ucp_ep_h ep;
 
-    UCX_LOG(4, "RmaOp: op %d, (srcPE %d destPE %d) (srcSize %d destSize %d) dest rbuf %p, Smemh %d Dmemh %d",
+    UCX_LOG(4, "RmaOp: op %d, (srcPE %d destPE %d) (srcSize %zu destSize %zu) dest rbuf %p, Smemh %p Dmemh %p",
             op, ncpyOpInfo->srcPe, ncpyOpInfo->destPe, ncpyOpInfo->srcSize,
             ncpyOpInfo->destSize, dstInfo->packedRkey, srcInfo->memh, dstInfo->memh);
 
@@ -163,7 +163,7 @@ void LrtsIssueRget(NcpyOperationInfo *ncpyOpInfo)
                    ncpyOpInfo->ncpyOpInfoSize, (char*)ncpyOpInfo,
                    UCX_RMA_TAG_REG_AND_SEND_BACK, UcxRmaSendCompleted);
 
-        UCX_LOG(4, "Sending PUT REQ to %d, mem size %d", ncpyOpInfo->srcPe,ncpyOpInfo->srcSize);
+        UCX_LOG(4, "Sending PUT REQ to %d, mem size %zu", ncpyOpInfo->srcPe,ncpyOpInfo->srcSize);
     }
 }
 
@@ -177,7 +177,7 @@ void LrtsIssueRput(NcpyOperationInfo *ncpyOpInfo)
     UcxSendMsg(CmiNodeOf(ncpyOpInfo->destPe), ncpyOpInfo->destPe,
                ncpyOpInfo->ncpyOpInfoSize, (char*)ncpyOpInfo,
                UCX_RMA_TAG_GET, UcxRmaSendCompleted);
-    UCX_LOG(4, "Sending Get REQ to %d, mem size %d", ncpyOpInfo->destPe,ncpyOpInfo->srcSize);
+    UCX_LOG(4, "Sending Get REQ to %d, mem size %zu", ncpyOpInfo->destPe,ncpyOpInfo->srcSize);
 }
 
 void LrtsInvokeRemoteDeregAckHandler(int pe, NcpyOperationInfo *ncpyOpInfo)

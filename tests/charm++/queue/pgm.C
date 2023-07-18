@@ -5,7 +5,6 @@
 
 using std::cerr;
 using std::endl;
-using std::sprintf;
 
 #include "queueing.h"
 #include "main.decl.h"

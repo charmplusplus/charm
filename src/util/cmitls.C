@@ -49,6 +49,13 @@ extern int quietModeRequested;
 # define CMK_TLS_X86_MOV "movl"
 # define CMK_TLS_X86_REG "gs"
 # define CMK_TLS_X86_WIDTH "4"
+#elif defined __aarch64__
+# define CMK_TLS_ARM64
+# ifdef __APPLE__
+#  define CMK_TLS_ARM64_REG "tpidrro_el0"
+# else
+#  define CMK_TLS_ARM64_REG "tpidr_el0"
+# endif
 #else
 # define CMK_TLS_SWITCHING_UNAVAILABLE
 #endif
@@ -67,6 +74,12 @@ void* getTLSForKey(size_t key)
   asm volatile (CMK_TLS_X86_MOV " %%" CMK_TLS_X86_REG ":0x0(,%1," CMK_TLS_X86_WIDTH "), %0\n"
                 : "=&r"(ptr)
                 : "r"(key));
+#elif defined CMK_TLS_ARM64
+  void ** block;
+  asm volatile ("mrs %0, " CMK_TLS_ARM64_REG "\n"
+                "and %0, %0, #-8\n"
+                : "=&r"(block));
+  ptr = block[key];
 #endif
   return ptr;
 }
@@ -77,6 +90,12 @@ void setTLSForKey(size_t key, void* newptr)
   asm volatile (CMK_TLS_X86_MOV " %0, %%" CMK_TLS_X86_REG ":0x0(,%1," CMK_TLS_X86_WIDTH ")\n"
                 :
                 : "r"(newptr), "r"(key));
+#elif defined CMK_TLS_ARM64
+  void ** block;
+  asm volatile ("mrs %0, " CMK_TLS_ARM64_REG "\n"
+                "and %0, %0, #-8\n"
+                : "=&r"(block));
+  block[key] = newptr;
 #endif
 }
 
@@ -93,6 +112,9 @@ void* getTLS()
 #if defined CMK_TLS_X86
   asm volatile (CMK_TLS_X86_MOV " %%" CMK_TLS_X86_REG ":0x0, %0\n"
                 : "=&r"(ptr));
+#elif defined CMK_TLS_ARM64
+  asm volatile ("mrs %0, " CMK_TLS_ARM64_REG "\n"
+                : "=&r"(ptr));
 #endif
   return ptr;
 }
@@ -101,6 +123,10 @@ void setTLS(void* newptr)
 {
 #if defined CMK_TLS_X86
   asm volatile (CMK_TLS_X86_MOV " %0, %%" CMK_TLS_X86_REG ":0x0\n"
+                :
+                : "r"(newptr));
+#elif defined CMK_TLS_ARM64
+  asm volatile ("msr " CMK_TLS_ARM64_REG ", %0\n"
                 :
                 : "r"(newptr));
 #endif

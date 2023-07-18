@@ -135,7 +135,7 @@ static void SendSpanningChildren(int size, char *msg, int rankToAssign, int star
 #if CMK_BROADCAST_SPANNING_TREE
     // copying is deferred via _copyMsgOrRef in case no sends are generated
     char* copy = nullptr;
-    int i, oldRank;
+    int i;
 
     /* first send msgs to other nodes */
     CmiAssert(startNode >=0 &&  startNode<CmiNumNodes());
@@ -184,7 +184,7 @@ static void SendHyperCube(int size,  char *msg, int rankToAssign, int startNode)
 #if CMK_BROADCAST_HYPERCUBE
     // copying is deferred via _copyMsgOrRef in case no sends are generated
     char* copy = nullptr;
-    int i, cnt, tmp, relDist, oldRank;
+    int i, cnt, tmp, relDist;
     const int dims=CmiNodesDim;
 
     /* first send msgs to other nodes */
@@ -271,7 +271,6 @@ static void SendHyperCubeNode(int size, char *msg) {
 #if USE_COMMON_SYNC_BCAST
 /* Functions regarding broadcat op that sends to every one else except me */
 void CmiSyncBroadcastFn1(int size, char *msg) {
-    int i, mype;
 
 #if CMI_QD
     CQdCreate(CpvAccess(cQdState), CmiNumPes()-1);
@@ -286,11 +285,11 @@ void CmiSyncBroadcastFn1(int size, char *msg) {
     CMI_SET_BROADCAST_ROOT(msg, CmiMyNode()+1);
     SendHyperCubeProc(size, msg);
 #else
-    mype = CmiMyPe();
+    int mype = CmiMyPe();
     #if CMK_SMP
     /* In SMP, this function may be called from comm thread with a larger pe */
     if(mype >= _Cmi_numpes){
-	for(i=0; i<_Cmi_numpes; i++)
+	for(int i=0; i<_Cmi_numpes; i++)
 		CmiSyncSendFn(i, size, msg);
 	return;
     }
@@ -302,8 +301,6 @@ void CmiSyncBroadcastFn1(int size, char *msg) {
     for ( i=0; i<mype; i++ )
         CmiSyncSendFn(i, size, msg) ;
 #endif
-
-    /*CmiPrintf("In  SyncBroadcast broadcast\n");*/
 }
 
 void CmiSyncBroadcastFn(int size, char *msg) {
@@ -348,8 +345,6 @@ CmiCommHandle CmiAsyncBroadcastAllFn(int size, char *msg) {
 #if CMK_NODE_QUEUE_AVAILABLE
 #if USE_COMMON_SYNC_BCAST
 void CmiSyncNodeBroadcastFn(int size, char *msg) {
-    int mynode = CmiMyNode();
-    int i;
 #if CMI_QD
     CQdCreate(CpvAccess(cQdState), CmiNumNodes()-1);
 #endif
@@ -360,9 +355,10 @@ void CmiSyncNodeBroadcastFn(int size, char *msg) {
     CMI_SET_BROADCAST_ROOT(msg, -CmiMyNode()-1);
     SendHyperCubeNode(size, msg);
 #else
-    for (i=mynode+1; i<CmiNumNodes(); i++)
+    int mynode = CmiMyNode();
+    for (int i=mynode+1; i<CmiNumNodes(); i++)
         CmiSyncNodeSendFn(i, size, msg);
-    for (i=0; i<mynode; i++)
+    for (int i=0; i<mynode; i++)
         CmiSyncNodeSendFn(i, size, msg);
 #endif
 }

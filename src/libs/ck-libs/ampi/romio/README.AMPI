@@ -10,6 +10,9 @@ ROMIO integrated into AMPI:
 * Configure tests that build MPI executables have been changed to only
   compile object files, breaking a circular dependency between ROMIO and the
   rest of AMPI. See confdb/aclocal_romio.m4.
+* The "Your make does not allow comments in target code" and "File locks may
+  not work with NFS" warnings generated during the configure step have been
+  disabled as being spurious.
 * Used MPI_Info_* calls from AMPI, and darray calls from ROMIO.
 * Set -DHAVE_STATUS_SET_BYTES in configure and configure.in, and
   add status setting call in adio/common/status_setb.c

@@ -72,7 +72,7 @@ static inline int MPL_strncpy(char *dest, const char *src, size_t n)
 {
     char *d_ptr = dest;
     const char *s_ptr = src;
-    register int i;
+    int i;
 
     if (n == 0)
         return 0;
@@ -126,7 +126,7 @@ static inline int MPL_strnapp(char *dest, const char *src, size_t n)
 {
     char *d_ptr = dest;
     const char *s_ptr = src;
-    register int i;
+    int i;
 
     /* Get to the end of dest */
     i = (int) n;

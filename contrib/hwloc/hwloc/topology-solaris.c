@@ -1,6 +1,6 @@
 /*
  * Copyright © 2009 CNRS
- * Copyright © 2009-2020 Inria.  All rights reserved.
+ * Copyright © 2009-2022 Inria.  All rights reserved.
  * Copyright © 2009-2011 Université Bordeaux
  * Copyright © 2011 Cisco Systems, Inc.  All rights reserved.
  * Copyright © 2011      Oracle and/or its affiliates.  All rights reserved.
@@ -493,6 +493,9 @@ hwloc_look_lgrp(struct hwloc_topology *topology, struct hwloc_disc_status *dstat
     dstatus->flags |= HWLOC_DISC_STATUS_FLAG_GOT_ALLOWED_RESOURCES;
   }
 
+  if (topology->flags & HWLOC_TOPOLOGY_FLAG_NO_DISTANCES)
+    need_distances = 0;
+
   cookie = lgrp_init(LGRP_VIEW_OS);
   if (cookie == LGRP_COOKIE_NONE)
     {
@@ -639,7 +642,8 @@ hwloc_look_kstat(struct hwloc_topology *topology)
 
       if (kstat_read(kc, ksp, NULL) == -1)
 	{
-	  fprintf(stderr, "kstat_read failed for CPU%u: %s\n", cpuid, strerror(errno));
+          if (hwloc_hide_errors() < 2)
+            fprintf(stderr, "hwloc/solaris: kstat_read failed for CPU%u: %s\n", cpuid, strerror(errno));
 	  continue;
 	}
 
@@ -696,10 +700,12 @@ hwloc_look_kstat(struct hwloc_topology *topology)
 	stat = (kstat_named_t *) kstat_data_lookup(ksp, (char *) "chip_id");
 	if (!stat)
 	  {
-	    if (Lpkg_num)
-	      fprintf(stderr, "could not read package id for CPU%u: %s\n", cpuid, strerror(errno));
-	    else
+	    if (Lpkg_num) {
+              if (hwloc_hide_errors() < 2)
+                fprintf(stderr, "hwloc/solaris: could not read package id for CPU%u: %s\n", cpuid, strerror(errno));
+            } else {
 	      hwloc_debug("could not read package id for CPU%u: %s\n", cpuid, strerror(errno));
+            }
 	    look_chips = 0;
 	    continue;
 	  }
@@ -719,7 +725,8 @@ hwloc_look_kstat(struct hwloc_topology *topology)
 	    break;
 #endif
 	  default:
-	    fprintf(stderr, "chip_id type %u unknown\n", (unsigned) stat->data_type);
+            if (hwloc_hide_errors() < 2)
+              fprintf(stderr, "hwloc/solaris: chip_id type %u unknown\n", (unsigned) stat->data_type);
 	    look_chips = 0;
 	    continue;
 	}
@@ -746,10 +753,12 @@ hwloc_look_kstat(struct hwloc_topology *topology)
 	stat = (kstat_named_t *) kstat_data_lookup(ksp, (char *) "core_id");
 	if (!stat)
 	  {
-	    if (Lcore_num)
-	      fprintf(stderr, "could not read core id for CPU%u: %s\n", cpuid, strerror(errno));
-	    else
+	    if (Lcore_num) {
+              if (hwloc_hide_errors() < 2)
+                fprintf(stderr, "hwloc/solaris: could not read core id for CPU%u: %s\n", cpuid, strerror(errno));
+            } else {
 	      hwloc_debug("could not read core id for CPU%u: %s\n", cpuid, strerror(errno));
+            }
 	    look_cores = 0;
 	    continue;
 	  }
@@ -769,7 +778,8 @@ hwloc_look_kstat(struct hwloc_topology *topology)
 	    break;
 #endif
 	  default:
-	    fprintf(stderr, "core_id type %u unknown\n", (unsigned) stat->data_type);
+            if (hwloc_hide_errors() < 2)
+              fprintf(stderr, "hwloc/solaris: core_id type %u unknown\n", (unsigned) stat->data_type);
 	    look_cores = 0;
 	    continue;
 	}
@@ -797,7 +807,8 @@ hwloc_look_kstat(struct hwloc_topology *topology)
 
     } else if (!strcmp("pg_hw_perf", ksp->ks_module)) {
       if (kstat_read(kc, ksp, NULL) == -1) {
-	fprintf(stderr, "kstat_read failed for module %s name %s instance %d: %s\n", ksp->ks_module, ksp->ks_name, ksp->ks_instance, strerror(errno));
+        if (hwloc_hide_errors() < 2)
+          fprintf(stderr, "hwloc/solaris: kstat_read failed for module %s name %s instance %d: %s\n", ksp->ks_module, ksp->ks_name, ksp->ks_instance, strerror(errno));
 	continue;
       }
       stat = (kstat_named_t *) kstat_data_lookup(ksp, (char *) "cpus");

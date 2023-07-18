@@ -1,12 +1,12 @@
 name: NetLRTS Linux SyncFT
 
-on: pull_request
+on: [pull_request, merge_group]
 
 jobs:
   build:
     timeout-minutes: 90
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
 
     steps:
     - uses: actions/checkout@v1

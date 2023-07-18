@@ -770,11 +770,11 @@ public:
     nb = 0;
     int *nodePeList; 
     int numpes;
-    int rank = CmiPhysicalRank(mype);
     int node = CmiPhysicalNodeID(mype);
-    int _ppn_ = CmiNumPesOnPhysicalNode(node);
     CmiGetPesOnPhysicalNode(node, &nodePeList, &numpes); 
 #ifdef YHDEBUG
+    int rank = CmiPhysicalRank(mype);
+    int _ppn_ = CmiNumPesOnPhysicalNode(node);
     CmiPrintf(" PE[%d] ppn=%d, NumOfNodes=%d, rank=%d, node=%d, numpes=%d\n", mype, _ppn_, NumOfNodes, rank, node, numpes);
 #endif   
     for(int i=0; i<numpes; i++)

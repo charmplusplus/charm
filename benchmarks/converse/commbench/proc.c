@@ -24,12 +24,12 @@ static void doTrials(ProcMsg* msg) {
   int i, success = 0;
   int total = msg->success;
   double x, y;
-  CrnStream stream;
 
-  CrnInitStream(&stream, CmiMyPe(), 0);
+  CrnSrand(0);
   for (i = 0; i < total; i++) {
-    x = CrnDouble(&stream) - 0.5;
-    y = CrnDouble(&stream) - 0.5;
+    x = CrnDrand() - 0.5;
+    y = CrnDrand() - 0.5;
+
     if ((x * x + y * y) <= 0.25) success++;
   }
   msg->success = success;

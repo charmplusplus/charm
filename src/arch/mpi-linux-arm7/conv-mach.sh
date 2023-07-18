@@ -1,7 +1,6 @@
 . $CHARMINC/cc-mpiopts.sh
 
 CMK_XIOPTS=''
-CMK_WARNINGS_ARE_ERRORS='-Werror'
 CMK_CXX_OPTIMIZE='-O3'
 
 CMK_QT='generic64-light'

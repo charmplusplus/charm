@@ -13,7 +13,7 @@ static int numTests = 0;
 static void sendImmediate(int destNode,int iter) {
   immediateMsg *msg=(immediateMsg *)CmiAlloc(sizeof(immediateMsg));
   msg->iter=iter;
-  sprintf(msg->data, "Array!");
+  strcpy(msg->data, "Array!");
   CmiSetHandler(msg, immediatering_startHandlerIdx);
 #if 1 /* Use immediate converse message */
   CmiBecomeImmediate(msg);

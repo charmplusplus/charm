@@ -7,14 +7,14 @@ ppn=0
 IFS=' ' read -r -a array <<< "$*"
 for i in "${array[@]}"
 do
-  if [ $ppn_found -eq 1 ] ; then
+  if [[ $ppn_found -eq 1 ]] ; then
     ppn=$i
     #echo "FOUND ppn:" $i
     break
   fi
   if [[ $i == *"ppn"* ]]; then
     ppn=$(echo "$i" | cut -d'n' -f 2)
-    if [ -z "$ppn" ]
+    if [[ -z "$ppn" ]]
     then
         ppn_found=1
     else
@@ -30,14 +30,14 @@ p_found=0
 IFS=' ' read -r -a array <<< "$*"
 for i in "${array[@]}"
 do
-  if [ $p_found -eq 1 ] ; then
+  if [[ $p_found -eq 1 ]] ; then
     p=$i
     #echo "FOUND p:" $p
     break
   fi
   if [[ $i == "+p"* ]]; then
     p=$(echo "$i" | cut -d'p' -f 2)
-    if [ -z "$p" ]
+    if [[ -z "$p" ]]
     then
         p_found=1
     else

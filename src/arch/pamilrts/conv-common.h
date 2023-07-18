@@ -5,15 +5,15 @@
 #define CMK_HAS_PARTITION                                  1
 #define CMK_HAS_INTEROP                                    1
 
-#define CMK_CMIPRINTF_IS_A_BUILTIN                         0
+#define CMK_USE_LRTS_STDIO                                 0
 
 #define CMK_HANDLE_SIGUSR                                  1
 
 //#define  DELTA_COMPRESS                                     1
 #if DELTA_COMPRESS
-#define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, hdl,xhdl,info; unsigned char cksum, magic; int root, size; CmiUInt2 redID, padding; CmiUInt4 compressStart; CmiUInt2 compress_flag,xxhdl; CmiUInt8 persistRecvHandler; CmiUInt1 zcMsgType:4, cmaMsgType:2, nokeep:1;
+#define CMK_MSG_HEADER_EXT_    CmiUInt8 persistRecvHandler; CmiUInt4 compressStart; int root, size; CmiUInt2 rank, hdl,xhdl,info,redID,padding,compress_flag,xxhdl; unsigned char cksum, magic; CmiUInt1 zcMsgType:4, cmaMsgType:2, nokeep:1;
 #else
-#define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, hdl,xhdl,info; unsigned char cksum, magic; int root, size; CmiUInt2 redID, padding; CmiUInt1 zcMsgType:4, cmaMsgType:2, nokeep:1;
+#define CMK_MSG_HEADER_EXT_    int root, size; CmiUInt2 rank, hdl,xhdl,info,redID,padding; unsigned char cksum, magic; CmiUInt1 zcMsgType:4, cmaMsgType:2, nokeep:1;
 #endif
 
 #define CMK_MSG_HEADER_BASIC  CMK_MSG_HEADER_EXT
