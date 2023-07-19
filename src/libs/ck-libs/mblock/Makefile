@@ -1,7 +1,11 @@
 CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
+-include $(CDIR)/include/conv-mach-opt.mak
 
-HEADERS=mblock.h mblockf.h
+HEADERS=mblock.h
+ifeq (1,$(CMK_CAN_LINK_FORTRAN))
+  HEADERS += mblockf.h
+endif
 HEADDEP=$(HEADERS) patch.h gridutil.h mblock_impl.h \
         mblock.decl.h mblock.def.h
 OBJS=mblock.o patch.o

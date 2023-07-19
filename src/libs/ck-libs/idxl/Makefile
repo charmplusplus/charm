@@ -1,7 +1,11 @@
 CDIR=../../../..
 AMPICC=$(CDIR)/bin/ampicxx $(OPTS)
+-include $(CDIR)/include/conv-mach-opt.mak
 
-HEADERS=idxlc.h idxlf.h idxl.h idxl_layout.h idxl_comm.h
+HEADERS=idxlc.h idxl.h idxl_layout.h idxl_comm.h
+ifeq (1,$(CMK_CAN_LINK_FORTRAN))
+  HEADERS += idxlf.h
+endif
 HEADDEP=$(HEADERS)
 OBJS=idxl.o idxl_layout.o idxl_comm.o idxl_api.o
 DEST=$(CDIR)/lib/libidxl.a
