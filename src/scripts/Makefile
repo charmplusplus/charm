@@ -488,10 +488,12 @@ $(HWLOC_MAKEFILE): conv-autoconfig.h
     --disable-cairo \
     --disable-cuda \
     --disable-gl \
+    --disable-levelzero \
     --disable-libxml2 \
     --disable-nvml \
     --disable-opencl \
     --disable-pci \
+    --disable-rsmi \
     --disable-libudev \
     --disable-visibility \
     --enable-embedded-mode \
