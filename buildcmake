@@ -106,6 +106,7 @@ opt_destination=""
 opt_disabletls=0
 opt_install_prefix=""
 opt_drone_mode=0
+opt_enable_fortran=1
 opt_error_checking= #undef
 opt_extra_opts=()
 opt_incdir=()
@@ -418,6 +419,9 @@ function processArgs() {
       --disable-tls)
         opt_disabletls=1
         ;;
+      --disable-fortran)
+        opt_enable_fortran=0
+        ;;
       --install-prefix=*)
         opt_install_prefix=${arg#*=}
         ;;
@@ -621,6 +625,7 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
   -DCUDA="$opt_cuda" \
   -DDISABLE_TLS="$opt_disabletls" \
   -DDRONE_MODE="$opt_drone_mode" \
+  -DENABLE_FORTRAN=$opt_enable_fortran \
   -DERROR_CHECKING="$opt_error_checking" \
   -DEXTRA_OPTS="${opt_extra_opts[*]}" \
   -DLBTIME_TYPE="$opt_lbtime_type" \
