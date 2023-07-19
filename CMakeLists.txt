@@ -77,12 +77,12 @@ else()
   message(FATAL_ERROR "Unknown compiler ${CMAKE_CXX_COMPILER_ID}")
 endif()
 
+option(ENABLE_FORTRAN "Enable Fortran" ON)
+
 # No Fortran support with MSVC
-if(NOT CMK_COMPILER STREQUAL "msvc")
+if(NOT CMK_COMPILER STREQUAL "msvc" AND ENABLE_FORTRAN)
   enable_language(Fortran OPTIONAL)
 endif()
-
-option(ENABLE_FORTRAN "Enable Fortran" ON)
 
 if(ENABLE_FORTRAN AND CMAKE_Fortran_COMPILER)
   include(FortranCInterface)
@@ -1192,7 +1192,7 @@ install(
   DESTINATION .)
 endif()
 
-#install all executables
+# install all executables
 install(
   DIRECTORY ${CMAKE_BINARY_DIR}/bin
   DESTINATION .
