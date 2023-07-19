@@ -176,12 +176,16 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
 
 # The .c files are there to be #included by clients whole
 # This is a bit unusual, but makes client linking simpler.
-UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwork4.h pup_paged.h pup_cmialloc.h\
+UTILHEADERS=pup.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwork4.h pup_paged.h pup_cmialloc.h \
 	pup_c_functions.h \
 	ckimage.h ckdll.h ckhashtable.h ckbitvector.h cklists.h ckliststring.h \
 	cksequence.h ckstatistics.h ckvector3d.h conv-lists.h ckcomplex.h \
 	sockRoutines.h sockRoutines.C simd.h SSE-Double.h SSE-Float.h \
 	crc32.h ckBIconfig.h rand48_replacement.h ckregex.h spanningTree.h json.hpp json_fwd.hpp cmirdmautils.h
+
+ifeq (1,$(CMK_CAN_LINK_FORTRAN))
+  UTILHEADERS += pupf.h
+endif
 
 CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckmarshall.h ckfutures.h ckIgetControl.h debug-charm.h\
@@ -213,13 +217,17 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  ControlPoints.decl.h PathHistory.decl.h \
 	  pathHistory.h envelope-path.h \
 	  XArraySectionReducer.h \
-          controlPoints.h controlPointsf.h arrayRedistributor.h cp_effects.h register.h stats.h   \
+          controlPoints.h arrayRedistributor.h cp_effects.h register.h stats.h   \
 	  cksequence_internal.h cksequence_factory.h random_sequence.h strided_sequence.h \
 	  mpi-interoperate.h mpi_main.decl.h  \
 			trace-perf.h picsdefs.h  picsautoperf.h picstreenode.h \
 			picsdecisiontree.h \
 	    picsautoperfAPI.h picsautoperfAPIC.h \
 	  $(CVHEADERS)
+
+ifeq (1,$(CMK_CAN_LINK_FORTRAN))
+  CKHEADERS += controlPointsf.h
+endif
 
 ALLHEADERS=$(CKHEADERS) \
     simplemsg.h sm.h pvmc.h pvm3.h sdag.h vector2d.h \

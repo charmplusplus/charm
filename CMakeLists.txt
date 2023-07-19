@@ -772,7 +772,7 @@ set(src-util-h-sources src/util/SSE-Double.h src/util/SSE-Float.h
     src/util/partitioning_strategies.h src/util/pup.h src/util/pup_c.h
     src/util/pup_cmialloc.h src/util/pup_mpi.h src/util/pup_paged.h
     src/util/pup_stl.h src/util/pup_toNetwork.h src/util/pup_toNetwork4.h
-    src/util/pupf.h src/util/rand48_replacement.h src/util/random_sequence.h
+    src/util/rand48_replacement.h src/util/random_sequence.h
     src/util/simd.h src/util/sockRoutines.h src/util/spanningTree.h
     src/util/spanningTreeStrategy.h src/util/spanningTreeVertex.h
     src/util/strided_sequence.h src/util/treeStrategy_3dTorus_minBytesHops.h
@@ -781,6 +781,13 @@ set(src-util-h-sources src/util/SSE-Double.h src/util/SSE-Float.h
     src/util/treeStrategy_nodeAware_minGens.h src/util/treeStrategy_topoUnaware.h
     src/util/uFcontext.h src/util/uJcontext.h src/util/valgrind.h
     src/util/vector2d.h)
+
+if(CMK_CAN_LINK_FORTRAN)
+    set(src-util-h-sources
+        ${src-util-h-sources}
+        src/util/pupf.h
+    )
+endif()
 
 foreach(filename ${src-util-h-sources})
     configure_file(${filename} include/ COPYONLY)
@@ -896,7 +903,17 @@ configure_file(src/libs/ck-libs/NDMeshStreamer/libmoduleNDMeshStreamer.dep ${CMA
 
 # TCharm
 file(GLOB tcharm-c-sources src/libs/ck-libs/tcharm/*.c)
-file(GLOB tcharm-h-sources src/libs/ck-libs/tcharm/*.h)
+set(tcharm-h-sources
+    src/libs/ck-libs/tcharm/tcharm.h
+    src/libs/ck-libs/tcharm/tcharm_impl.h
+    src/libs/ck-libs/tcharm/tcharmc.h
+)
+if(CMK_CAN_LINK_FORTRAN)
+    set(tcharm-h-sources
+        ${tcharm-h-sources}
+        src/libs/ck-libs/tcharm/tcharmf.h
+    )
+endif()
 add_library(moduletcharm src/libs/ck-libs/tcharm/tcharm.C ${tcharm-h-sources} ${CMAKE_BINARY_DIR}/include/tcharm.decl.h)
 add_library(moduletcharmmain src/libs/ck-libs/tcharm/tcharmmain.C ${CMAKE_BINARY_DIR}/include/tcharm.decl.h ${CMAKE_BINARY_DIR}/include/tcharmmain.decl.h)
 add_library(tcharm-compat ${tcharm-c-sources} ${CMAKE_BINARY_DIR}/include/tcharm.decl.h ${CMAKE_BINARY_DIR}/include/tcharmmain.decl.h)

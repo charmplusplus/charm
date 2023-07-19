@@ -15,16 +15,19 @@ add_library(modulemsa multiphaseSharedArrays/msa.h multiphaseSharedArrays/msa-co
 add_dependencies(modulemsa ck)
 
 # collide
-set(collide-h-sources collide/collide_util.h collide/bbox.h
-    collide/collide_cfg.h collide/collidecharm.h collide/collidec.h
-    collide/collidef.h collide/collidecharm_impl.h collide/collide_serial.h
-    collide/collide_buffers.h)
+set(collide-h-sources-public
+    collide/collide_util.h collide/bbox.h collide/collide_cfg.h
+    collide/collide_buffers.h collide/collidecharm.h collide/collidec.h
+)
+if(CMK_CAN_LINK_FORTRAN)
+    set(collide-h-sources-public ${collide-h-sources-public} collide/collidef.h)
+endif()
+set(collide-h-sources ${collide-h-sources-public}
+    collide/collidef.h collide/collidecharm_impl.h collide/collide_serial.h)
 set(collide-cxx-sources collide/collide_util.C collide/collide_serial.C
 collide/collidecharm.C collide/collide_buffers.C)
 
-foreach(file collide/collide_util.h collide/bbox.h collide/collide_cfg.h
-    collide/collide_buffers.h collide/collidecharm.h collide/collidec.h
-    collide/collidef.h)
+foreach(file ${collide-h-sources-public})
     configure_file(${file} ${CMAKE_BINARY_DIR}/include COPYONLY)
 endforeach(file)
 configure_file(collide/libmodulecollide.dep ${CMAKE_BINARY_DIR}/lib COPYONLY)
@@ -34,13 +37,17 @@ add_dependencies(modulecollide ck)
 add_dependencies(modulecollidecharm ck)
 
 # mblock
+set(mblock-h-sources mblock/mblock.h
+    mblock/patch.h mblock/gridutil.h mblock/mblock_impl.h)
 configure_file(mblock/libmodulemblock.dep ${CMAKE_BINARY_DIR}/lib COPYONLY)
 configure_file(mblock/mblock.h  ${CMAKE_BINARY_DIR}/include COPYONLY)
-configure_file(mblock/mblockf.h  ${CMAKE_BINARY_DIR}/include COPYONLY)
+if(CMK_CAN_LINK_FORTRAN)
+    set(mblock-h-sources ${mblock-h-sources} mblock/mblockf.h)
+    configure_file(mblock/mblockf.h  ${CMAKE_BINARY_DIR}/include COPYONLY)
+endif()
 
 add_library(modulemblock mblock/mblock.C mblock/patch.C
-mblock/compat_driver.c mblock/compat_fdriver.c mblock/mblock.h
-mblock/mblockf.h mblock/patch.h mblock/gridutil.h mblock/mblock_impl.h)
+mblock/compat_driver.c mblock/compat_fdriver.c ${mblock-h-sources})
 add_dependencies(modulemblock ck)
 
 # barrier
@@ -50,7 +57,9 @@ add_dependencies(modulebarrier ck)
 
 # irecv
 configure_file(irecv/receiver.h  ${CMAKE_BINARY_DIR}/include COPYONLY)
-configure_file(irecv/receiverf.h  ${CMAKE_BINARY_DIR}/include COPYONLY)
+if(CMK_CAN_LINK_FORTRAN)
+    configure_file(irecv/receiverf.h  ${CMAKE_BINARY_DIR}/include COPYONLY)
+endif()
 add_library(irecv irecv/receiver.C irecv/receiver.h)
 add_dependencies(irecv ck)
 
@@ -118,7 +127,10 @@ configure_file(pose/libmodulepose.dep ${CMAKE_BINARY_DIR}/lib/libmoduleseqpose.d
 
 # idxl
 if(NOT BUILD_CHANGA)
-  set(idxl-h-sources idxl/idxlc.h idxl/idxlf.h idxl/idxl.h idxl/idxl_layout.h idxl/idxl_comm.h)
+  set(idxl-h-sources idxl/idxlc.h idxl/idxl.h idxl/idxl_layout.h idxl/idxl_comm.h)
+  if(CMK_CAN_LINK_FORTRAN)
+    set(idxl-h-sources ${idxl-h-sources} idxl/idxlf.h)
+  endif()
   set(idxl-cxx-sources idxl/idxl.C idxl/idxl_layout.C idxl/idxl_comm.C idxl/idxl_api.C)
   add_library(idxl ${idxl-h-sources} ${idxl-cxx-sources})
   add_dependencies(idxl ck moduleampi)
