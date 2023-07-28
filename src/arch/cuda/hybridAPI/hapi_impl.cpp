@@ -1120,6 +1120,7 @@ static void createPool(int *n_buffers, int n_slots, std::vector<BufferPool> &poo
     }
 
     pools[i].head = previous;
+    pools[i].chunk = pinned_chunk;
 #ifdef HAPI_MEMPOOL_DEBUG
     pools[i].num = num_buffers;
 #endif
@@ -1127,10 +1128,12 @@ static void createPool(int *n_buffers, int n_slots, std::vector<BufferPool> &poo
 }
 
 static void releasePool(std::vector<BufferPool> &pools){
+  int device;
+  hapiCheck(cudaGetDevice(&device));
   for (int i = 0; i < pools.size(); i++) {
-    BufferPoolHeader* hdr = pools[i].head;
-    if (hdr != NULL) {
-      hapiCheck(cudaFreeHost((void*)hdr));
+    void* chunk = pools[i].chunk;
+    if (chunk != NULL) {
+      hapiCheck(cudaFreeHost(chunk));
     }
   }
   pools.clear();
@@ -1154,6 +1157,7 @@ static int findPool(size_t size){
       return -1;
     }
     newpool.size = size;
+    newpool.chunk = (void *)newpool.head;
 #ifdef HAPI_MEMPOOL_DEBUG
     newpool.num = 1;
 #endif
