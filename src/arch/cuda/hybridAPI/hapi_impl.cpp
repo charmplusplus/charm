@@ -312,6 +312,8 @@ static void hapiMapping(char** argv) {
   switch (map_type) {
     case Mapping::Block:
       cpv_my_device = my_rank / csv_gpu_manager.pes_per_device;
+      if(cpv_my_device >= csv_gpu_manager.device_count)
+          cpv_my_device = csv_gpu_manager.device_count - 1;
       if (my_rank % csv_gpu_manager.pes_per_device == 0) cpv_device_rep = true;
       break;
     case Mapping::RoundRobin:
