@@ -206,6 +206,7 @@ static void UcxInitEps(int numNodes, int myId, int nodeSize)
     // Reduce maxval value, because with PMI1 it has to fit cmd + key + value
     maxval -= 48;
     CmiEnforce(maxval > 0);
+    CmiPrintf("Max val = %d\n", maxval);
 
     keys = (char*)CmiAlloc(maxkey);
     CmiEnforce(keys);
@@ -241,6 +242,14 @@ static void UcxInitEps(int numNodes, int myId, int nodeSize)
 
     addrp = (char*)address;
     len   = (int)addrlen;
+    
+    // TEST
+    char testchar[maxval - 1];
+    ret = snprintf(keys, maxkey, "TEST");
+    UCX_CHECK_RET(ret, "TEST UcxInitEps: snprintf error", (ret <= 0));
+    ret = runtime_kvs_put(keys, testchar, maxval - 1);
+    UCX_CHECK_PMI_RET(ret, "TEST UcxInitEps: runtime_kvs_put error");
+    
     for (i = 0; i < parts; ++i) {
         partLen = std::min(maxval, len);
         ret = snprintf(keys, maxkey, "UCX-%d-%d", myId, i);
