@@ -252,8 +252,15 @@ function parse_platform_compilers() {
       opt_FC=xlf90_r
       opt_compiler+=("$arg")
       ;;
-    pgcc|pgf90)
-      echo "*** Warning: Ignoring unsupported option '$arg'."
+    pgcc)
+      opt_CC=pgcc
+      command -v pgc++ >/dev/null 2>&1 && opt_CXX=pgc++ || opt_CXX=pgCC
+      opt_FC=pgf90
+      opt_compiler+=("$arg")
+      ;;
+    pgf90)
+      opt_FC=pgf90
+      opt_compiler+=("$arg")
       ;;
     msvc)
       opt_CC=msvc # fake, will be replaced below
@@ -263,6 +270,16 @@ function parse_platform_compilers() {
       opt_CC=mpicc
       opt_CXX=mpicxx
       opt_FC=mpif90
+      opt_compiler+=("$arg")
+      ;;
+    nvc|nvhpc)
+      opt_CC=nvc
+      opt_CXX=nvc++
+      opt_FC=nvfortran
+      opt_compiler+=("$arg")
+      ;;
+    nvfortran)
+      opt_FC=nvfortran
       opt_compiler+=("$arg")
       ;;
     *)

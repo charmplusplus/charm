@@ -32,10 +32,11 @@ CMK_CF77="pgf77 "
 CMK_CF90="pgf90 "
 CMK_CF90_FIXED="$CMK_CF90 -Mfixed "
 f90libdir="."
-f90bindir=`command -v pgf90 2>/dev/null`
-if test -n "$f90bindir"
+f90bin=`command -v pgf90 2>/dev/null`
+PG_DIR="`dirname $f90bin`/.."
+if test -n "$PG_DIR"
 then
-  f90libdir="$f90bindir/../lib"
+  f90libdir="$PG_DIR/lib"
 fi
 CMK_F90LIBS="-L$f90libdir  -lpgf90 -lpgf90_rpm1 -lpgf902 -lpgf90rtl -lpgftnrtl "
 CMK_F90_USE_MODDIR=""
