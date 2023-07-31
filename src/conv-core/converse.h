@@ -629,11 +629,17 @@ for each processor in the node.
     do {                                                               \
       CmiMemLock();                                                    \
       if (!(CMK_TAG(Cpv_inited_,v))) {                                 \
-        CMK_TAG(Cpv_addr_,v) = CpvInit_Alloc(t*, 1+CmiMyNodeSize());   \
+        t** cpvinitobj = CpvInit_Alloc(t*, 1+CmiMyNodeSize());         \
+        CMK_TAG(Cpv_addr_,v) = cpvinitobj;                             \
         CMK_TAG(Cpv_inited_,v) = 1;                                    \
+        CmiMemUnlock();                                                \
+        _MEMCHECK(cpvinitobj);                                         \
       }                                                                \
-      CmiMemUnlock();                                                  \
-      CMK_TAG(Cpv_,v) = CpvInit_Alloc_scalar(t);                       \
+      else                                                             \
+        CmiMemUnlock();                                                \
+      t* cpvobj = CpvInit_Alloc_scalar(t);                             \
+      _MEMCHECK(cpvobj);                                               \
+      CMK_TAG(Cpv_,v) = cpvobj;                                        \
       CMK_TAG(Cpv_addr_,v)[CmiMyRank()] = CMK_TAG(Cpv_,v);             \
     } while(0)
 #define CpvInitialized(v) (0!=CMK_TAG(Cpv_,v))
@@ -662,9 +668,9 @@ for each processor in the node.
 		       while (!CpvInitialized(v)) { CMK_CPV_IS_SMP ; CmiMemoryReadFence(); } \
        } else { \
                t* tmp = CpvInit_Alloc(t,1+CmiMyNodeSize());\
+               _MEMCHECK(tmp); \
                CmiMemoryWriteFence();   \
                CMK_TAG(Cpv_,v)=tmp;   \
-	       /* CMK_TAG(Cpv_,v)=CpvInit_Alloc(t,1+CmiMyNodeSize()); */\
        } \
     } while(0)
 #define CpvInitialized(v) (0!=CMK_TAG(Cpv_,v))
@@ -1776,13 +1782,13 @@ __attribute__ ((format (printf, 1, 2)))
 #endif
 void CmiAbort(const char *msg, ...);
 
-void CmiOutOfMemory(int nBytes);
+CMK_NORETURN void CmiOutOfMemory(int nBytes);
 
 #if CMK_MEMCHECK_OFF
 #define _MEMCHECK(p) do{}while(0)
 #else
 #define _MEMCHECK(p) do { \
-                         if ((p)==0) CmiOutOfMemory(-1);\
+                         if (CMI_UNLIKELY((p)==0)) CmiOutOfMemory(-1);\
                      } while(0)
 #endif
 
