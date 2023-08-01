@@ -394,6 +394,9 @@ if(CMK_AMPI_WITH_ROMIO)
     get_target_property(CK_CFLAGS ck COMPILE_OPTIONS)
     string(REPLACE ";" " " CK_CFLAGS "${CK_CFLAGS}")
     set(ROMIO_FLAGS "${CK_CFLAGS} -DAMPI_NO_UNIMPLEMENTED_WARNINGS -seq -fPIC")
+    if (CUDA)
+        set(ROMIO_FLAGS "-I${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES} ${ROMIO_FLAGS}")
+    endif()
 
     include(ExternalProject)
     ExternalProject_Add(romio
