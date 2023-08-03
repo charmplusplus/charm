@@ -332,16 +332,27 @@ endif()
 
 # Check for Python
 # PythonCCS requires Python v2.x and is the only target that uses this
-# With CMake 3.12+ we could use FindPython() here
 set(CMK_HAS_PYTHON 0)
 set(CMK_PYTHON_VERSION "")
 set(CMK_BUILD_PYTHON "")
 
-set(Python_ADDITIONAL_VERSIONS 2)
-find_package(PythonInterp)
+if(CMAKE_VERSION VERSION_GREATER 3.12 OR CMAKE_VERSION VERSION_EQUAL 3.12)
+  find_package(Python2 COMPONENTS Interpreter)
+  if(Python2_FOUND)
+    set(CMK_PYTHON_VERSION_MAJOR ${Python2_VERSION_MAJOR})
+    set(CMK_PYTHON_VERSION_MINOR ${Python2_VERSION_MINOR})
+  endif()
+else()
+  set(Python_ADDITIONAL_VERSIONS 2)
+  find_package(PythonInterp)
+  if(PYTHONINTERP_FOUND)
+    set(CMK_PYTHON_VERSION_MAJOR ${PYTHON_VERSION_MAJOR})
+    set(CMK_PYTHON_VERSION_MINOR ${PYTHON_VERSION_MINOR})
+  endif()
+endif()
 
-if(PYTHONINTERP_FOUND)
-  set(__MY_PYTHON_VER "${PYTHON_VERSION_MAJOR}.${PYTHON_VERSION_MINOR}")
+if(CMK_PYTHON_VERSION_MAJOR)
+  set(__MY_PYTHON_VER "${CMK_PYTHON_VERSION_MAJOR}.${CMK_PYTHON_VERSION_MINOR}")
   check_include_file(python${__MY_PYTHON_VER}/Python.h __MY_HAS_PYTHONH)
   if(__MY_HAS_PYTHONH)
     set(CMK_HAS_PYTHON 1)
