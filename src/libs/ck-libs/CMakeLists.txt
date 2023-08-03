@@ -168,7 +168,7 @@ add_custom_command(
 # pythonCCS
 
 if(CMK_BUILD_PYTHON)
-  if(PYTHON_VERSION_MAJOR EQUAL 2) # pythonCCS needs Python 2.x
+  if(CMK_PYTHON_VERSION_MAJOR EQUAL 2) # pythonCCS needs Python 2.x
     set(pythonCCS-h-sources pythonCCS/PythonCCS.h pythonCCS/PythonCCS-client.h)
 
     file(GENERATE OUTPUT ${CMAKE_BINARY_DIR}/include/pythonIncludes.h CONTENT
