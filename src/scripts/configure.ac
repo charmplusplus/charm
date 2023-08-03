@@ -2684,7 +2684,7 @@ fi
 fi
 
 #### test if Python headers are installed ####
-PYTHON_VERSION=`python -V 2>&1 | awk {'print $2'} | awk -F. {'print $1"."$2'}`
+PYTHON_VERSION=`python2 -V 2>&1 | awk {'print $2'} | awk -F. {'print $1"."$2'}`
 cat > $t <<EOT
 #include "python${PYTHON_VERSION}/Python.h"
 #include "python${PYTHON_VERSION}/compile.h"
