@@ -263,6 +263,21 @@ else
   AC_DEFINE_UNQUOTED(CMK_DRONE_MODE, 1, [enable drone mode])
 fi
 
+AC_ARG_ENABLE([ccs],
+            [AS_HELP_STRING([--enable-ccs],
+              [enable CCS])], ,
+            [enable_ccs=yes])
+
+if test "$enable_ccs" = "no" -o "$CMK_CCS_AVAILABLE" = '0'
+then
+  Echo "CCS is disabled"
+  AC_DEFINE_UNQUOTED(CMK_CCS_AVAILABLE, 0, [disable ccs])
+  CMK_CCS_AVAILABLE='0'
+else
+  Echo "CCS is enabled"
+  AC_DEFINE_UNQUOTED(CMK_CCS_AVAILABLE, 1, [enable ccs])
+fi
+
 AC_ARG_ENABLE([charmdebug],
             [AS_HELP_STRING([--enable-charmdebug],
               [enable charmDebug])], ,
@@ -300,20 +315,6 @@ else
     Echo "Charm record/replay is enabled"
     AC_DEFINE_UNQUOTED(CMK_REPLAYSYSTEM, 1, [enable replay])
   fi
-fi
-
-AC_ARG_ENABLE([ccs],
-            [AS_HELP_STRING([--enable-ccs],
-              [enable CCS])], ,
-            [enable_ccs=yes])
-
-if test "$enable_ccs" = "no" -o "$CMK_CCS_AVAILABLE" = '0'
-then
-  Echo "CCS is disabled" 
-  AC_DEFINE_UNQUOTED(CMK_CCS_AVAILABLE, 0, [disable ccs])
-else
-  Echo "CCS is enabled" 
-  AC_DEFINE_UNQUOTED(CMK_CCS_AVAILABLE, 1, [enable ccs])
 fi
 
 AC_ARG_ENABLE([controlpoint],
