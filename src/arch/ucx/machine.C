@@ -212,12 +212,12 @@ static void UcxInitEps(int numNodes, int myId, int nodeSize)
     CmiEnforce(keys);
 
 #if CMK_SMP_COMMTHD_RECV_ONLY
-    ucxCtx.eps = (ucp_ep_h**)CmiAlloc(sizeof(ucp_ep_h*)*(nodeSize + 1));
-    CmiEnforce(ucxCtx.eps);
+    //ucxCtx.eps = (ucp_ep_h**)CmiAlloc(sizeof(ucp_ep_h*)*(nodeSize + 1));
+    //CmiEnforce(ucxCtx.eps);
 
-    for (int i = 0; i < nodeSize + 1; i++) {
-        ucxCtx.eps[i] = (ucp_ep_h*) CmiAlloc(sizeof(ucp_ep_h)*numNodes);
-    }
+    //for (int i = 0; i < nodeSize + 1; i++) {
+    //    ucxCtx.eps[i] = (ucp_ep_h*) CmiAlloc(sizeof(ucp_ep_h)*numNodes);
+    //}
 #else
     ucxCtx.eps = (ucp_ep_h*) CmiAlloc(sizeof(ucp_ep_h)*numNodes);
 #endif
