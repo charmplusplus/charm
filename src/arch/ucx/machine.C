@@ -244,10 +244,11 @@ static void UcxInitEps(int numNodes, int myId, int nodeSize)
     len   = (int)addrlen;
     
     // TEST
-    char testchar[maxval - 1];
+    char testchar[1];
+    testchar[0] = 'a';
     ret = snprintf(keys, maxkey, "TEST");
     UCX_CHECK_RET(ret, "TEST UcxInitEps: snprintf error", (ret <= 0));
-    ret = runtime_kvs_put(keys, testchar, maxval - 1);
+    ret = runtime_kvs_put(keys, testchar, 1);
     UCX_CHECK_PMI_RET(ret, "TEST UcxInitEps: runtime_kvs_put error");
     
     for (i = 0; i < parts; ++i) {
