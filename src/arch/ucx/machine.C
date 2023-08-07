@@ -212,12 +212,12 @@ static void UcxInitEps(int numNodes, int myId, int nodeSize)
     CmiEnforce(keys);
 
 #if CMK_SMP_COMMTHD_RECV_ONLY
-    //ucxCtx.eps = (ucp_ep_h**)CmiAlloc(sizeof(ucp_ep_h*)*(nodeSize + 1));
-    //CmiEnforce(ucxCtx.eps);
+    ucxCtx.eps = (ucp_ep_h**)CmiAlloc(sizeof(ucp_ep_h*)*(nodeSize + 1));
+    CmiEnforce(ucxCtx.eps);
 
-    //for (int i = 0; i < nodeSize + 1; i++) {
-    //    ucxCtx.eps[i] = (ucp_ep_h*) CmiAlloc(sizeof(ucp_ep_h)*numNodes);
-    //}
+    for (int i = 0; i < nodeSize + 1; i++) {
+        ucxCtx.eps[i] = (ucp_ep_h*) CmiAlloc(sizeof(ucp_ep_h)*numNodes);
+    }
 #else
     ucxCtx.eps = (ucp_ep_h*) CmiAlloc(sizeof(ucp_ep_h)*numNodes);
 #endif
@@ -244,12 +244,12 @@ static void UcxInitEps(int numNodes, int myId, int nodeSize)
     len   = (int)addrlen;
     
     // TEST
-    char testchar[1];
+    /*char testchar[1];
     testchar[0] = 'a';
     ret = snprintf(keys, maxkey, "TEST");
     UCX_CHECK_RET(ret, "TEST UcxInitEps: snprintf error", (ret <= 0));
     ret = runtime_kvs_put(keys, testchar, 1);
-    UCX_CHECK_PMI_RET(ret, "TEST UcxInitEps: runtime_kvs_put error");
+    UCX_CHECK_PMI_RET(ret, "TEST UcxInitEps: runtime_kvs_put error");*/
     
     for (i = 0; i < parts; ++i) {
         partLen = std::min(maxval, len);
