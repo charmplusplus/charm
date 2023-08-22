@@ -681,7 +681,7 @@ inline void* UcxSendMsg(int destNode, int destPE, int size, char *msg,
  */
 CmiCommHandle LrtsSendFunc(int destNode, int destPE, int size, char *msg, int mode)
 {
-
+    CmiPrintf("Send called\n");
     void *req;
 
     CmiSetMsgSize(msg, size);
