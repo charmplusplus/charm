@@ -790,6 +790,7 @@ static inline int ProcessTxQueue()
 
 void LrtsAdvanceCommunication(int whileidle)
 {
+    CmiPrintf("Advance comm called\n");
     ucp_tag_message_h msg;
     ucp_tag_recv_info_t info;
     int cnt;
