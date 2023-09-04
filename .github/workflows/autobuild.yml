@@ -6,6 +6,13 @@ on:
     # FIXME: For testing:
     - cron: '30 04 * * *'
 
+
+# Cancel in progress CI runs when a new run targeting the same PR or branch/tag is triggered.
+# https://stackoverflow.com/questions/66335225/how-to-cancel-previous-runs-in-the-pr-when-you-push-new-commitsupdate-the-curre
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
 jobs:
   Delta:
     timeout-minutes: 60
