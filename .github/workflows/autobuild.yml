@@ -1,0 +1,23 @@
+name: Autobuild
+
+on:
+  schedule:
+    - cron: '15 06 * * *' # UTC 6:15am, corresponds to 00:15 CST or 01:15 CDT
+
+jobs:
+  Delta:
+    timeout-minutes: 60
+
+    runs-on: delta
+    name: Delta
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        ref: autobuild
+    - name: build
+      run: |
+        echo "Running autobuild on delta"
+        hostname
+        uname -a
+        lsb_release -a
