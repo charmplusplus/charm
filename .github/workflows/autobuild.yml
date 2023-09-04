@@ -2,9 +2,10 @@ name: Autobuild
 
 on:
   schedule:
-    # - cron: '15 06 * * *' # UTC 6:15am, corresponds to 00:15 CST or 01:15 CDT
-    # FIXME: For testing:
-    - cron: '30 04 * * *'
+    - cron: '15 06 * * *' # UTC 6:15am, corresponds to 00:15 CST or 01:15 CDT
+  push:
+    paths:
+      - '.github/workflows/autobuild.yml'
 
 
 # Cancel in progress CI runs when a new run targeting the same PR or branch/tag is triggered.
