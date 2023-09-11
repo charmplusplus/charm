@@ -694,6 +694,7 @@ CmiCommHandle LrtsSendFunc(int destNode, int destPE, int size, char *msg, int mo
         return NULL;
     }
 
+    CmiPrintf("Send done\n");
     return (CmiCommHandle)req;
 }
 
