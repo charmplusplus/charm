@@ -653,6 +653,7 @@ inline void* UcxSendMsg(int destNode, int destPE, int size, char *msg,
     req = (UcxRequest*)ucp_tag_send_nb(
         ucxCtx.eps[CmiMyRank()][destNode],
         msg, size, ucp_dt_make_contig(1), sTag, cb);
+    CmiPrintf("Tag send call done\n");
     if (!UCS_PTR_IS_PTR(req)) {
         CmiEnforce(!UCS_PTR_IS_ERR(req));
         return NULL;
