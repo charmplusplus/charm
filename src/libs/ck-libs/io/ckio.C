@@ -125,6 +125,7 @@ namespace Ck { namespace IO {
 
           CkArrayOptions sessionOpts(numStripes);
           sessionOpts.setStaticInsertion(true);
+          sessionOpts.setAnytimeMigration(false);
 
           CkCallback sessionInitDone(CkIndex_Director::sessionReady(NULL), thisProxy);
           sessionInitDone.setRefnum(sessionID);
