@@ -157,7 +157,7 @@ namespace Ck { namespace IO {
     friend class Ck::IO::impl::Manager;
     friend class Ck::IO::impl::Director; // this is an interesting change
     friend class Ck::IO::impl::ReadAssembler;
-    friend void read(Session session, size_t bytes, size_t offset, CkCallback after_read);
+    friend void read(Session session, size_t bytes, size_t offset, char* data, CkCallback after_read);
     friend struct std::hash<Ck::IO::Session>;
     // friend void read(Session session, size_t bytes, size_t offset, CkCallback after_read, size_t tag);
   public:
