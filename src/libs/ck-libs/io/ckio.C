@@ -696,29 +696,6 @@ namespace Ck { namespace IO {
 		}
 		#endif
 
-		#ifdef CMK_CONVERSE_MPI
-#include <mpi.h>
-		char* readDataMPI(){
-			char* buffer = new char[_my_bytes]; 
-			MPI_File file;
-			MPI_Offset offset = _my_offset; // Set the desired offset in bytes
-			MPI_Status status;
-			MPI_File_open(MPI_COMM_WORLD, _file -> name.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &file);
-			MPI_File_set_view(file, _my_offset, MPI_CHAR, MPI_CHAR, "native", MPI_INFO_NULL);
-			int read_res = MPI_File_read(file, buffer, _my_bytes, MPI_CHAR, &status);
-			if(read_res != MPI_SUCCESS){
-				CkPrintf("Something went wrong when %d was reading using MPI I/O\n", thisIndex);
-			}
-			MPI_File_close(&file);
-			size_t read_count;
-			MPI_Get_count(&status, MPI_CHAR, &read_count);
-			if(read_count != _bytes){
-				CkPrintf("CkIO didn't read the correct amount of bytes on %d. Read %zu bytes when supposed to read %zu\n", thisIndex, read_count, _bytes);
-			}
-			return buffer;
-		}
-		#endif		
-
 		char* readDataPOSIX(){
 			char* buffer = new char[_my_bytes]; 
 			FILE* fp = fopen(_file -> name.c_str(), "rb"); // open the file pointer
@@ -753,11 +730,7 @@ namespace Ck { namespace IO {
 		 * and instead going to disk on-demand (what MPI does)
 		 */
 		char* readData(){
-			#ifdef CMK_CONVERSE_MPI
-			return readDataMPI();
-			#else
 			return readDataPOSIX();
-			#endif
 		}	
 		
 		/**
