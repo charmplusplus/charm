@@ -4,9 +4,9 @@ module CkIO {
       message FileReadyMsg;
       message SessionReadyMsg;
       message SessionCommitMsg;
-      message ReadCompleteMsg{
-		char data[];
-      }; // used by the read() CkCallback 
+      message ReadCompleteMsg;
+		// char data[];
+       // used by the read() CkCallback 
     }
   }
 
@@ -121,8 +121,6 @@ module CkIO_impl {
 		// the method by which ReadSession objects can send their data for the read	
 		// when invoked, avoid a sender-side copy	
 		entry void shareData(int read_tag, int buffer_tag, size_t read_chare_offset, size_t num_bytes, nocopypost char data[num_bytes]); 
-
-		entry void serveRead(size_t read_bytes, size_t read_offset, CkCallback after_read, size_t read_stripe, size_t num_readers); // will be used to serve the read_stripe
 
 	};
 

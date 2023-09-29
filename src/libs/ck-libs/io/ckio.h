@@ -110,7 +110,7 @@ namespace Ck { namespace IO {
    * a ReadCompleteMsg* which points to a vector<char> buffer, the offset, and the number of 
    * bytes of the read.
    * */
-  void read(Session session, size_t bytes, size_t offset, CkCallback after_read); 
+  void read(Session session, size_t bytes, size_t offset, char* data, CkCallback after_read); 
   void read(Session session, size_t bytes, size_t offset, CkCallback after_read, size_t tag);
 
 // ZERO COPY READ;
@@ -194,11 +194,10 @@ namespace Ck { namespace IO {
   class ReadCompleteMsg : public CMessage_ReadCompleteMsg {
 	public:
 	    size_t read_tag;
-	    char* data;
 	    size_t offset;
 	    size_t bytes;
 	    ReadCompleteMsg(){}
-	    ReadCompleteMsg(size_t in_tag, char* buffer, size_t in_offset, size_t in_bytes) : read_tag(in_tag), data(buffer), offset(in_offset), bytes(in_bytes){
+	    ReadCompleteMsg(size_t in_tag, size_t in_offset, size_t in_bytes) : read_tag(in_tag), offset(in_offset), bytes(in_bytes){
 
 	    }
 		

@@ -1,5 +1,3 @@
-#include <string>
-#include <map>
 #include <unordered_set>
 #include <algorithm>
 #include <sstream>
@@ -238,6 +236,7 @@ namespace Ck { namespace IO {
 		CkCallback after_read; // the callback to invoke after the read is complete
 		ReadCompleteMsg* msg;
 		size_t read_tag = -1;
+		char* data = 0;
       };
     // class that is used to aggregate the data for a specific read call made by the user
     // is responsible for collecting data for a specific read and correctly ordering it to return to the user
@@ -257,14 +256,15 @@ namespace Ck { namespace IO {
 		 * This function adds the read request to the _read_info_buffer table
 		 * which maps a tag to a ReadInfo struct
 		 */
-		size_t addReadToTable(size_t read_bytes, size_t read_offset, CkCallback after_read){
+		size_t addReadToTable(size_t read_bytes, size_t read_offset, char* data, CkCallback after_read){
 			// do the initialization of the read struct
 			ReadInfo ri;
 			ri.bytes_left = read_bytes;
 			ri.read_offset = read_offset;
 			ri.read_bytes = read_bytes;
 			ri.after_read = after_read;
-			ri.msg = new(read_bytes) ReadCompleteMsg();
+			ri.data  = data;
+			ri.msg = new ReadCompleteMsg();
 			ri.msg -> offset = read_offset;
 			ri.msg -> bytes = read_bytes;
 			if(_read_info_buffer.count(_curr_read_tag) != 0){
@@ -308,11 +308,11 @@ namespace Ck { namespace IO {
 		 * requesting data from BufferChares, storing reads in the table,
 		 * as well as other read infrastructure
 		 */
-		void serveRead(size_t read_bytes, size_t read_offset, CkCallback after_read, size_t read_stripe, size_t num_readers){
+		void serveRead(size_t read_bytes, size_t read_offset, char* data, CkCallback after_read, size_t read_stripe, size_t num_readers){
 			#ifdef DEBUG
 			CkPrintf("In serveRead on PE=%d\n", CkMyPe());
 			#endif
-			int read_tag = addReadToTable(read_bytes, read_offset, after_read); // create a tag for the actual read
+			int read_tag = addReadToTable(read_bytes, read_offset, data, after_read); // create a tag for the actual read
 			// get the necessary info
 			size_t bytes = read_bytes;
 			size_t start_idx = (read_offset - _session.offset)/ read_stripe; // the first index that has the relevant data
@@ -322,8 +322,11 @@ namespace Ck { namespace IO {
 			// the entire read falls in the "extra" bytes that the last BufferChares owns
 			if(start_idx == num_readers){
 				int tag = getRDMATag(); 
-				CkPostBuffer(msg -> data, bytes, tag);
+				CkPostBuffer(info.data, bytes, tag);
+				CkPrintf("Just posting buffer with tag=%d and of length %zu starting from %zu on PE=%d\n", tag, bytes, 0, CkMyPe());
 				CProxy_BufferChares(_session.sessionID)[start_idx - 1].sendData(read_tag, tag, read_offset, bytes, thisProxy, CkMyPe()); 
+#include <string>
+#include <map>
 				return;
 			}
 			// make sure to account for the last BufferChares holding potentially more data than the rest
@@ -348,7 +351,8 @@ namespace Ck { namespace IO {
 				}
 				// do the CkPost call
 				int tag = getRDMATag(); 
-				CkPostBuffer(msg -> data + data_idx, data_len, tag);
+				CkPrintf("Just Posting buffer with tag=%d and of length %zu starting from %zu on PE=%d\n", tag, data_len, data_idx, CkMyPe());
+				CkPostBuffer(info.data + data_idx, data_len, tag);
 				#ifdef DEBUG
 				CkPrintf("Read (offset=%zu, length=%zu) is contained on IO Buffer %zu\n", read_offset, read_bytes, i);
 				#endif
@@ -434,7 +438,7 @@ namespace Ck { namespace IO {
         }
 	
 	// used by manager to handle a read request from its own PE
-	void read(Session session, size_t bytes, size_t offset, CkCallback after_read){
+	void read(Session session, size_t bytes, size_t offset, char* data, CkCallback after_read){
 		if(!_session_to_read_assembler.count(session)){
 			CkPrintf("Why is there no session associated with read on manager %d\n", CkMyPe());
 			CkExit();
@@ -450,7 +454,7 @@ namespace Ck { namespace IO {
 			CkPrintf("The pointer to the local branch is null on pe=%d\n", CkMyPe());
 			CkExit();
 		}
-	 	grp_ptr -> serveRead(bytes, offset, after_read, read_stripe, num_readers);
+	 	grp_ptr -> serveRead(bytes, offset, data, after_read, read_stripe, num_readers);
 	}
 
         void write(Session session, const char *data, size_t bytes, size_t offset) {
@@ -691,23 +695,37 @@ namespace Ck { namespace IO {
 			CkPrintf("The time to disk took %f seconds\n", time_taken);
 		}
 		#endif
-		/**
-		 * This function is launched in a separate thread
-		 * in order to allow the reads to disk to be parallelized
-		 * which allows other work to be done. This also stores the 
-		 * segment read in memory. In the future, could Potentially explore not storing in memory,
-		 * and instead going to disk on-demand (what MPI does)
-		 */
-		char* readData(){
-			#ifdef DEBUG
-			CkPrintf("Inside the readData function on %d;\n", thisIndex);
-			#endif
+
+		#ifdef CMK_CONVERSE_MPI
+#include <mpi.h>
+		char* readDataMPI(){
+			char* buffer = new char[_my_bytes]; 
+			MPI_File file;
+			MPI_Offset offset = _my_offset; // Set the desired offset in bytes
+			MPI_Status status;
+			MPI_File_open(MPI_COMM_WORLD, _file -> name.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &file);
+			MPI_File_set_view(file, _my_offset, MPI_CHAR, MPI_CHAR, "native", MPI_INFO_NULL);
+			int read_res = MPI_File_read(file, buffer, _my_bytes, MPI_CHAR, &status);
+			if(read_res != MPI_SUCCESS){
+				CkPrintf("Something went wrong when %d was reading using MPI I/O\n", thisIndex);
+			}
+			MPI_File_close(&file);
+			size_t read_count;
+			MPI_Get_count(&status, MPI_CHAR, &read_count);
+			if(read_count != _bytes){
+				CkPrintf("CkIO didn't read the correct amount of bytes on %d. Read %zu bytes when supposed to read %zu\n", thisIndex, read_count, _bytes);
+			}
+			return buffer;
+		}
+		#endif		
+
+		char* readDataPOSIX(){
+			char* buffer = new char[_my_bytes]; 
 			FILE* fp = fopen(_file -> name.c_str(), "rb"); // open the file pointer
 			if(!fp){
 				CkPrintf("Opening of the file %s went wrong\n", _file -> name.c_str());
 			}
 			
-			char* buffer = new char[_my_bytes]; 
 			fseek(fp, _my_offset, SEEK_SET);
 			#ifdef DEBUG
 			CkPrintf("Starting the read\n", thisIndex);
@@ -726,6 +744,20 @@ namespace Ck { namespace IO {
 			}
 			fclose(fp);
 			return buffer;	
+		}
+		/**
+		 * This function is launched in a separate thread
+		 * in order to allow the reads to disk to be parallelized
+		 * which allows other work to be done. This also stores the 
+		 * segment read in memory. In the future, could Potentially explore not storing in memory,
+		 * and instead going to disk on-demand (what MPI does)
+		 */
+		char* readData(){
+			#ifdef CMK_CONVERSE_MPI
+			return readDataMPI();
+			#else
+			return readDataPOSIX();
+			#endif
 		}	
 		
 		/**
@@ -755,6 +787,7 @@ namespace Ck { namespace IO {
 			}
 
 			char* buffer = _buffer.get(); // future call to get
+			CkPrintf("[sendData]: buffer_tag=%d, offset in data = %zd, len=%zu\n", buffer_tag, (chare_offset - _my_offset), bytes_to_read);
 			CProxy_ReadAssembler(ra)[pe].shareData(read_tag, buffer_tag, chare_offset, bytes_to_read, CkSendBuffer(buffer + (chare_offset - _my_offset)/*, cb*/)); // send this data to the ReadAssembler
 		}
 		// deprecated; could be useful for debugging and profiling purposes
@@ -818,11 +851,11 @@ namespace Ck { namespace IO {
         CkpvAccess(manager)->write(session, data, bytes, offset);
     }
 
-    void read(Session session, size_t bytes, size_t offset, CkCallback after_read){
+    void read(Session session, size_t bytes, size_t offset, char* data, CkCallback after_read){
 	CkAssert(bytes <= session.bytes);
 	CkAssert(offset + bytes <= session.offset + session.bytes);
 	 using namespace impl;
-	 CkpvAccess(manager) -> read(session, bytes, offset, after_read);
+	 CkpvAccess(manager) -> read(session, bytes, offset, data, after_read);
     }      
 
 
