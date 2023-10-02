@@ -799,6 +799,8 @@ void LrtsAdvanceCommunication(int whileidle)
     ucp_tag_recv_info_t info;
     int cnt;
 
+    CmiPrintf("comm thread rank = %i\n", CmiMyRank());
+
     do {
 #if CMK_SMP_COMMTHD_RECV_ONLY
        cnt = ucp_worker_progress(ucxCtx.workers[CmiMyRank()]);
