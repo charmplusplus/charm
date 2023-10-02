@@ -367,6 +367,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     
 #if CMK_SMP_COMMTHD_RECV_ONLY
     int nodeSize = CmiMyNodeSize();
+    CmiPrintf("Node size = %i\n", nodeSize);
     ucxCtx.workers = (ucp_worker_h*) CmiAlloc((nodeSize + 1) * sizeof(ucp_worker_h));
     for (int i = 0; i < nodeSize + 1; i++) {
         status = ucp_worker_create(ucxCtx.contexts[i], &wParams, &ucxCtx.workers[i]);
