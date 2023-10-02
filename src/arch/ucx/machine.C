@@ -697,6 +697,7 @@ CmiCommHandle LrtsSendFunc(int destNode, int destPE, int size, char *msg, int mo
     }
 
     CmiPrintf("Send done\n");
+    ucp_worker_progress(ucxCtx.workers[CmiMyRank()]);
     return (CmiCommHandle)req;
 }
 
