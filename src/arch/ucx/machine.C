@@ -634,8 +634,8 @@ inline void* UcxSendMsg(int destNode, int destPE, int size, char *msg,
 
     sTag |= tag;
 
-    UCX_LOG(53, "destNode=%i destPE=%i size=%i msg=%p, tag=%" PRIu64,
-            destNode, destPE, size, msg, tag);
+    UCX_LOG(53, "destNode=%i destPE=%i size=%i eagerSize=%i, msg=%p, tag=%" PRIu64,
+            destNode, destPE, size, ucxCtx.eagerSize, msg, tag);
 #if CMK_SMP && !CMK_SMP_COMMTHD_RECV_ONLY
     UcxPendingRequest *req = (UcxPendingRequest*)CmiAlloc(sizeof(UcxPendingRequest));
     req->msgBuf = msg;
