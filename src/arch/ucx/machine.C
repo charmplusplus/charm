@@ -634,7 +634,7 @@ inline void* UcxSendMsg(int destNode, int destPE, int size, char *msg,
 
     sTag |= tag;
 
-    UCX_LOG(3, "destNode=%i destPE=%i size=%i msg=%p, tag=%" PRIu64,
+    UCX_LOG(53, "destNode=%i destPE=%i size=%i msg=%p, tag=%" PRIu64,
             destNode, destPE, size, msg, tag);
 #if CMK_SMP && !CMK_SMP_COMMTHD_RECV_ONLY
     UcxPendingRequest *req = (UcxPendingRequest*)CmiAlloc(sizeof(UcxPendingRequest));
@@ -654,7 +654,7 @@ inline void* UcxSendMsg(int destNode, int destPE, int size, char *msg,
     req = (UcxRequest*)ucp_tag_send_nb(
         ucxCtx.eps[CmiMyRank()][destNode],
         msg, size, ucp_dt_make_contig(1), sTag, cb);
-    CmiPrintf("Tag send call done\n");
+    //CmiPrintf("Tag send call done\n");
     if (!UCS_PTR_IS_PTR(req)) {
         CmiEnforce(!UCS_PTR_IS_ERR(req));
         return NULL;
@@ -674,7 +674,7 @@ inline void* UcxSendMsg(int destNode, int destPE, int size, char *msg,
     req->msgBuf = msg;
 #endif
 
-    CmiPrintf("Print just before return\n");
+    //CmiPrintf("Print just before return\n");
     return req;
 }
 
@@ -684,7 +684,7 @@ inline void* UcxSendMsg(int destNode, int destPE, int size, char *msg,
  */
 CmiCommHandle LrtsSendFunc(int destNode, int destPE, int size, char *msg, int mode)
 {
-    CmiPrintf("Send called\n");
+    UCX_LOG(53, "Send called");
     void *req;
 
     CmiSetMsgSize(msg, size);
@@ -695,14 +695,14 @@ CmiCommHandle LrtsSendFunc(int destNode, int destPE, int size, char *msg, int mo
     CmiPrintf("UcxSendMsg done, check\n");
     if (req == NULL) {
         /* Request completed in place or error occured */
-        CmiPrintf("Sent msg %p (len %d) inline", msg, size);
-        UCX_LOG(3, "Sent msg %p (len %d) inline", msg, size);
+        //CmiPrintf("Sent msg %p (len %d) inline", msg, size);
+        UCX_LOG(53, "Sent msg %p (len %d) inline", msg, size);
         ucp_worker_progress(ucxCtx.workers[CmiMyRank()]);
         CmiFree(msg);
         return NULL;
     }
 
-    CmiPrintf("Send done\n");
+    UCX_LOG(53, "Send done");
     ucp_worker_progress(ucxCtx.workers[CmiMyRank()]);
     return (CmiCommHandle)req;
 }
