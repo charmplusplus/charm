@@ -694,6 +694,7 @@ CmiCommHandle LrtsSendFunc(int destNode, int destPE, int size, char *msg, int mo
         /* Request completed in place or error occured */
         UCX_LOG(3, "Sent msg %p (len %d) inline", msg, size);
         CmiPrintf("Sent msg %p (len %d) inline", msg, size);
+        ucp_worker_progress(ucxCtx.workers[CmiMyRank()]);
         CmiFree(msg);
         return NULL;
     }
