@@ -688,6 +688,8 @@ CmiCommHandle LrtsSendFunc(int destNode, int destPE, int size, char *msg, int mo
 
     CmiSetMsgSize(msg, size);
 
+    raise(SIGTRAP);
+
     req = UcxSendMsg(destNode, destPE, size, msg, 0ul, UcxTxReqCompleted);
     CmiPrintf("UcxSendMsg done\n");
     if (req == NULL) {
