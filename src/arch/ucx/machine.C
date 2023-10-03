@@ -49,7 +49,7 @@
 #define UCX_RMA_TAG_MASK                (UCS_MASK(UCX_TAG_RMA_BITS) << UCX_TAG_MSG_BITS)
 #define UCX_MSG_TAG_MASK_FULL           0xffffffffffffffffUL
 
-#define UCX_LOG_PRIO 50 // Disabled by default
+#define UCX_LOG_PRIO 0 // Disabled by default
 
 enum {
     UCX_SEND_OP,        // Regular Send using UcxSendMsg
@@ -304,7 +304,7 @@ static void UcxInitEps(int numNodes, int myId, int nodeSize)
 #if CMK_SMP_COMMTHD_RECV_ONLY
             status = ucp_ep_create(ucxCtx.workers[tid], &eParams, &ucxCtx.eps[tid][peer]);
             UCX_CHECK_STATUS(status, "ucp_ep_create failed");
-            UCX_LOG(4, "Connecting to %d (ep %p)", peer, ucxCtx.eps[tid][peer]);
+            UCX_LOG(54, "Connecting to %d (ep %p)", peer, ucxCtx.eps[tid][peer]);
 #else
             status = ucp_ep_create(ucxCtx.worker, &eParams, &ucxCtx.eps[peer]);
             UCX_CHECK_STATUS(status, "ucp_ep_create failed");
