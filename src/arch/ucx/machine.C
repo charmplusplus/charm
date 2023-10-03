@@ -655,6 +655,13 @@ inline void* UcxSendMsg(int destNode, int destPE, int size, char *msg,
         ucxCtx.eps[CmiMyRank()][destNode],
         msg, size, ucp_dt_make_contig(1), sTag, cb);
     //CmiPrintf("Tag send call done\n");
+
+    ucs_status_t status = UCS_PTR_STATUS(req);
+    while (status == UCS_INPROGRESS) {
+        ucp_worker_progress(ucxCtx.workers[CmiMyRank()]);
+        status = UCS_PTR_STATUS(req);
+    }
+
     if (!UCS_PTR_IS_PTR(req)) {
         CmiEnforce(!UCS_PTR_IS_ERR(req));
         return NULL;
