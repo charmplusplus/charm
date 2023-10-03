@@ -693,6 +693,7 @@ CmiCommHandle LrtsSendFunc(int destNode, int destPE, int size, char *msg, int mo
     if (req == NULL) {
         /* Request completed in place or error occured */
         UCX_LOG(3, "Sent msg %p (len %d) inline", msg, size);
+        CmiPrintf("Sent msg %p (len %d) inline", msg, size);
         CmiFree(msg);
         return NULL;
     }
@@ -798,8 +799,6 @@ void LrtsAdvanceCommunication(int whileidle)
     ucp_tag_message_h msg;
     ucp_tag_recv_info_t info;
     int cnt;
-
-    CmiPrintf("comm thread rank = %i\n", CmiMyRank());
 
     do {
 #if CMK_SMP_COMMTHD_RECV_ONLY
