@@ -674,6 +674,7 @@ inline void* UcxSendMsg(int destNode, int destPE, int size, char *msg,
     req->msgBuf = msg;
 #endif
 
+    CmiPrintf("Print just before return\n");
     return req;
 }
 
