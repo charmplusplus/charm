@@ -822,8 +822,7 @@ void LrtsAdvanceCommunication(int whileidle)
 #endif 
         UCX_MSG_TAG_PROBE, UCX_MSG_TAG_MASK_FULL, 1, &info);
        if (msg != NULL) {
-           UCX_LOG(3, "Got msg %p, len %zu\n", msg, info.length);
-           CmiPrintf("Got msg %p, len %zu\n", msg, info.length);
+           UCX_LOG(53, "Got msg %p, len %zu\n", msg, info.length);
            UcxPostRxReq(UCX_MSG_TAG_PROBE, info.length, msg);
        }
 
