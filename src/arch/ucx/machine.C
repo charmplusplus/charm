@@ -688,10 +688,10 @@ CmiCommHandle LrtsSendFunc(int destNode, int destPE, int size, char *msg, int mo
 
     CmiSetMsgSize(msg, size);
 
-    raise(SIGTRAP);
+    //raise(SIGTRAP);
 
     req = UcxSendMsg(destNode, destPE, size, msg, 0ul, UcxTxReqCompleted);
-    CmiPrintf("UcxSendMsg done\n");
+    CmiPrintf("UcxSendMsg done, check\n");
     if (req == NULL) {
         /* Request completed in place or error occured */
         UCX_LOG(3, "Sent msg %p (len %d) inline", msg, size);
