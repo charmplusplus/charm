@@ -25,35 +25,8 @@
 extern "C" double CmiWallTimer();
 #endif
 
-#ifdef HAPI_TRACE
-#define QUEUE_SIZE_INIT 128
-extern "C" int traceRegisterUserEvent(const char* x, int e);
-extern "C" void traceUserBracketEvent(int e, double beginT, double endT);
-
-typedef struct gpuEventTimer {
-  int stage;
-  double cmi_start_time;
-  double cmi_end_time;
-  int event_type;
-  const char* trace_name;
-} gpuEventTimer;
-#endif
-
 static void createPool(int *nbuffers, int n_slots, std::vector<BufferPool> &pools);
 static void releasePool(std::vector<BufferPool> &pools);
-
-// Event stages used for profiling.
-enum WorkRequestStage{
-  DataSetup        = 1,
-  KernelExecution  = 2,
-  DataCleanup      = 3
-};
-
-enum ProfilingStage{
-  GpuMemSetup   = 8800,
-  GpuKernelExec = 8801,
-  GpuMemCleanup = 8802
-};
 
 #ifdef HAPI_CUDA_CALLBACK
 struct hapiCallbackMessage {

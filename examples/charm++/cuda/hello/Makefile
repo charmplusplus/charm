@@ -2,7 +2,7 @@
 CHARMC = ../../../../bin/charmc $(USE_WR) $(OPTS)
 
 # use deprecated hapiWorkRequest for GPU offloading
-USE_WR = #-DUSE_WR
+USE_WR = #-DUSE_WR -DHAPI_TRACE
 
 # set CUDATOOLKIT_HOME to the CUDA toolkit directory
 CUDATOOLKIT_HOME ?= /usr/local/cuda
