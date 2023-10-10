@@ -5,7 +5,7 @@ on:
     - cron: '01 05 * * *' # UTC, corresponds to 00:01 CDT
 
 jobs:
-  might:
+  delta:
     timeout-minutes: 120
 
     runs-on: delta
