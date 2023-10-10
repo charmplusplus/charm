@@ -6,7 +6,7 @@
 /* readonly */ int nElements;
 /* readonly */ CProxy_Hello arr;
 
-extern void kernelSetup(cudaStream_t stream, void* cb);
+extern void kernelSetup(cudaStream_t stream, const CkCallback& cb);
 
 /* mainchare */
 class Main : public CBase_Main {
@@ -66,9 +66,9 @@ class Hello : public CBase_Hello {
         thisIndex, CkMyPe(), device, prop.name);
 
     CkArrayIndex1D myIndex = CkArrayIndex1D(thisIndex);
-    CkCallback* cb = new CkCallback(CkIndex_Hello::pass(), myIndex, thisArrayID);
+    CkCallback cb(CkIndex_Hello::pass(), myIndex, thisArrayID);
 
-    kernelSetup(stream, (void*)cb);
+    kernelSetup(stream, cb);
   }
 
   void pass() {
