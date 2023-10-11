@@ -2,9 +2,11 @@ name: Autobuild
 
 on:
   schedule:
+    # Run the build as part of a fixed nightly schedule
     - cron: '15 06 * * *' # UTC 6:15am, corresponds to 00:15 CST or 01:15 CDT
   push:
     paths:
+      # Also run the build when this file gets modified as part of a PR
       - '.github/workflows/autobuild.yml'
 
 
@@ -19,13 +21,21 @@ jobs:
     timeout-minutes: 60
 
     runs-on: delta
-    name: Delta
+    name: Delta mpi-linux-x86_64  # Could test various builds (e.g., MPI, UCX, ...) via a build matrix
 
     steps:
     - uses: actions/checkout@v3
-    - name: build
+    - name: Host info
       run: |
         echo "Running autobuild on delta"
         hostname
         uname -a
         lsb_release -a
+    - name: build
+      run: |
+        cd ~/autobuild
+        ./build_local mpi-linux-x86_64
+    - name: results
+      run: |
+        cat ~/autobuild/messages/mpi-linux-x86_64
+        # Could add email notification here, e.g. via https://github.com/marketplace/actions/send-email
