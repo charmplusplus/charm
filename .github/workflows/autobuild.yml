@@ -23,8 +23,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-      with:
-        ref: autobuild
     - name: build
       run: |
         echo "Running autobuild on delta"
