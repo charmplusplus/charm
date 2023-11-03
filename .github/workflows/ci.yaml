@@ -268,7 +268,7 @@ jobs:
           src/arch/mpi-win-x86_64/charmrun \
 
   spack:
-    name: ${{ matrix.os }}
+    name: spack_${{ matrix.os }}
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -283,7 +283,7 @@ jobs:
         cd ..
         git clone --depth 1 https://github.com/spack/spack
         cd spack
-        [[ $(uname) == "Linux" ]] && sudo apt-get install -y gfortran gfortran-7 gfortran-8 gfortran-9 gfortran-10
+        [[ $(uname) == "Linux" ]] && sudo apt-get install -y gfortran
 
         # Use this branch for testing, not main
         sed -i -e 's,="main",="${{ github.head_ref }}",' var/spack/repos/builtin/packages/charmpp/package.py
