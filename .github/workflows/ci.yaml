@@ -72,7 +72,7 @@ jobs:
   cuda_netlrts-linux-x86_64_buildonly:
     # Buildonly test, as CUDA needs an actual device to run.
     timeout-minutes: 45
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04  # FIXME: ubuntu-latest does not work
     steps:
     - uses: actions/checkout@v4
     - name: build
@@ -152,7 +152,7 @@ jobs:
     # Since NAMD requires a secret to download its source from Gitlab, CI builds from outside PPL
     # always fail in this test since the secret is not available.
     env:
-        namd_secret: ${{ secrets.NAMD_CI_USERNAME_TOKEN }}
+      namd_secret: ${{ secrets.NAMD_CI_USERNAME_TOKEN }}
     runs-on: ubuntu-latest
 
     steps:
@@ -216,7 +216,7 @@ jobs:
       # TODO: this should build tests with "-charm-shared". See #2735 on why this is not done currently.
     - name: test
       run: make -C netlrts-darwin-x86_64/tmp test TESTOPTS="++local"
-    - name: testp
+    - name: testp P=2
       run: make -C netlrts-darwin-x86_64/tmp testp P=2 TESTOPTS="++local"
 
   netlrts-linux-i386:
@@ -234,8 +234,34 @@ jobs:
       # TODO: this should build tests with "-charm-shared". See #2735 on why this is not done currently.
     - name: test
       run: make -C netlrts-linux-i386/tmp test TESTOPTS="++local"
-    - name: testp
+    - name: testp P=2
       run: make -C netlrts-linux-i386/tmp testp P=2 TESTOPTS="++local"
+
+  netlrts-linux-x86_64:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: build
+      run: ./build all-test netlrts-linux-x86_64 --with-production --enable-error-checking --enable-lbuserdata -j3 -g -Werror=vla
+      # TODO: this should build tests with "-charm-shared". See #2735 on why this is not done currently.
+    - name: test
+      run: make -C netlrts-linux-x86_64/tmp test TESTOPTS="++local"
+    - name: testp P=2
+      run: make -C netlrts-linux-x86_64/tmp testp P=2 TESTOPTS="++local"
+
+  netlrts-linux-x86_64_smp:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: build
+      run: ./build all-test netlrts-linux-x86_64 smp --with-production --enable-error-checking --enable-lbuserdata -j3 -g -Werror=vla
+      # TODO: this should build tests with "-charm-shared". See #2735 on why this is not done currently.
+    - name: test
+      run: make -C netlrts-linux-x86_64-smp/tmp test TESTOPTS="++local +setcpuaffinity +CmiSleepOnIdle"
+    - name: testp P=4 PPN=2
+      run: make -C netlrts-linux-x86_64-smp/tmp testp P=4 TESTOPTS="++local +setcpuaffinity +CmiSleepOnIdle ++ppn 2"
 
   netlrts-linux-x86_64_syncft:
     timeout-minutes: 90
