@@ -1,0 +1,408 @@
+name: CI
+
+on: [pull_request, merge_group]
+
+# Cancel in progress CI runs when a new run targeting the same PR or branch/tag is triggered.
+# https://stackoverflow.com/questions/66335225/how-to-cancel-previous-runs-in-the-pr-when-you-push-new-commitsupdate-the-curre
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  buildold_netlrts-linux-x86_64:
+    timeout-minutes: 90
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Run build
+      run: ./buildold all-test netlrts-linux-x86_64 -g -j4 --with-production
+    - name: test
+      run: make -C netlrts-linux-x86_64/tmp test TESTOPTS="++local"
+    - name: testp P=2
+      run: make -C netlrts-linux-x86_64/tmp testp TESTOPTS="++local" P=2
+    - name: testp P=3
+      run: make -C netlrts-linux-x86_64/tmp testp TESTOPTS="++local" P=3
+
+  changa_netlrts-linux-x86_64:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: build-charm++
+      run: ./build ChaNGa netlrts-linux-x86_64 -g -j4 --with-production
+    - name: build-changa
+      run: |
+        git clone https://github.com/N-bodyshop/utility
+        git clone https://github.com/N-bodyshop/changa
+        cd changa
+        ./configure
+        make -j4
+    - name: test-changa
+      run: |
+        cd changa/teststep
+        make test
+
+  charm4py_netlrts-linux-x86_64_tcp:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: build-charm++
+      run: |
+        git fetch --unshallow # Need full repo for 'git describe' used by charm4py
+        ./build charm4py netlrts-linux-x86_64 tcp -g -j4 --with-production
+    - name: build-charm4py
+      run: |
+        pip3 install setuptools 'cython<3' cffi greenlet numpy
+        git clone https://github.com/UIUC-PPL/charm4py
+        export PYTHONPATH="$PWD/charm4py"
+
+        mkdir -p charm4py/charm_src/charm/bin && cp bin/charmrun charm4py/charm_src/charm/bin
+        mkdir -p charm4py/charm_src/charm/lib && cp lib/libcharm.so charm4py/charm_src/charm/lib
+        mkdir -p charm4py/charm_src/charm/include && cp -r -L include/* charm4py/charm_src/charm/include
+
+        cd charm4py
+        export CHARM4PY_BUILD_CFFI=1
+        python3 setup.py build_ext --inplace
+    - name: test-charm4py
+      run: |
+        export PYTHONPATH="$PWD/charm4py"
+        export CHARM4PY_TEST_NUM_PROCESSES=2
+        cd charm4py
+        python3 auto_test.py
+
+  cuda_netlrts-linux-x86_64_buildonly:
+    # Buildonly test, as CUDA needs an actual device to run.
+    timeout-minutes: 45
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: build
+      run: |
+        sudo apt-get update
+        sudo apt-get -y install nvidia-cuda-toolkit
+        ./build all-test netlrts-linux-x86_64 cuda -j4 -g
+        export CUDATOOLKIT_HOME=/usr # TODO: make this unnecessary
+        make -j4 -C netlrts-linux-x86_64-cuda/examples/charm++/cuda OPTS="-g"
+        make -j4 -C netlrts-linux-x86_64-cuda/examples/ampi/cuda OPTS="-g"
+
+  doc:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    -
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+    - name: Install prerequisites
+      run: pip3 install sphinx sphinx_rtd_theme
+    - name: Run sphinx
+      run: |
+        cd doc
+        make html
+
+  mpi-linux-x86_64:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: install-prerequisites
+      run: sudo apt-get update && sudo apt-get install -y mpich libmpich-dev
+    - name: build
+      run: ./build all-test mpi-linux-x86_64 smp --build-shared --with-production --enable-error-checking --enable-lbuserdata -j3 -g -Werror=vla
+      # TODO: this should build tests with "-charm-shared". See #2735 on why this is not done currently.
+    - name: test
+      run: make -C mpi-linux-x86_64-smp/tmp test TESTOPTS="+setcpuaffinity"
+    # Disabled due to several hangs and segfaults.
+    #- name: testp
+    #  run: make -C mpi-linux-x86_64-smp/tmp testp P=4 TESTOPTS="+setcpuaffinity ++ppn 2"
+
+  mpi-linux-x86_64_syncft:
+    timeout-minutes: 90
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: install-prerequisites
+      run: sudo apt-get update && sudo apt-get install -y mpich libmpich-dev
+    - name: build
+      run: ./build all-test mpi-linux-x86_64 syncft -j2 -g
+    - name: test
+      run: make -C mpi-linux-x86_64-syncft/tmp mpisyncfttest
+
+  multicore-darwin-x86_64_projections:
+    timeout-minutes: 60
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: build
+      run: ./build LIBS multicore-darwin-x86_64 -g -j3 --with-production --enable-tracing
+    - name: test
+      run: |
+        make -C multicore-darwin-x86_64/tmp all-test -j3 OPTS="-g -tracemode projections"
+        make -C multicore-darwin-x86_64/tmp test
+    - name: projections
+      run: |
+        git clone https://github.com/UIUC-PPL/projections
+        cd projections
+        make
+        proj=$PWD/bin/projections
+        cd ..
+        files=$(find . -name *.sts)
+        for f in $files; do echo $f; pushd .; cd $(dirname $f); $proj --exit $(basename $f); popd; done
+
+  namd_netlrts-linux-x86_64:
+    # Since NAMD requires a secret to download its source from Gitlab, CI builds from outside PPL
+    # always fail in this test since the secret is not available.
+    env:
+        namd_secret: ${{ secrets.NAMD_CI_USERNAME_TOKEN }}
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: install-prerequisites
+      if: ${{ env.namd_secret != '' }}
+      run: |
+        sudo apt-get update
+        sudo apt-get -y install sfftw-dev
+        # test build without Fortran support
+        sudo apt-get -y remove gfortran
+    - name: build-charm++
+      if: ${{ env.namd_secret != '' }}
+      run: ./build LIBS netlrts-linux-x86_64 -g -j4 --with-production
+    - name: build-namd
+      if: ${{ env.namd_secret != '' }}
+      run: |
+        cd ..
+        git clone https://${{ secrets.NAMD_CI_USERNAME_TOKEN }}@gitlab.com/tcbgUIUC/namd.git
+        cd namd
+        ./config Linux-x86_64-g++ --charm-base ../charm --charm-arch netlrts-linux-x86_64 --without-tcl
+        cd Linux-x86_64-g++
+        make -j4
+    - name: test-namd-alanin
+      if: ${{ env.namd_secret != '' }}
+      run: |
+        cd ../namd/Linux-x86_64-g++
+        ./charmrun ++local +p2 ./namd2 src/alanin
+
+    - name: Cache apoa1 files
+      if: ${{ env.namd_secret != '' }}
+      id: cache-apoa1-files
+      uses: actions/cache@v3
+      with:
+        path: ~/namddata/apoa1
+        key: namd-apoa1-files
+    - name: Download apoa1 files
+      if: steps.cache-apoa1-files.outputs.cache-hit != 'true'
+      run: |
+        mkdir -p ~/namddata
+        cd ~/namddata
+        wget http://www.ks.uiuc.edu/Research/namd/utilities/apoa1.tar.gz
+        tar xzf apoa1.tar.gz
+        sed -i 's,500,250,' apoa1/apoa1.namd # Reduce number of steps
+        sed -i 's,/usr/tmp,/tmp,' apoa1/apoa1.namd # Change output prefix
+        rm apoa1.tar.gz
+
+    - name: test-namd-apoa1
+      if: ${{ env.namd_secret != '' }}
+      run: |
+        cd ../namd/Linux-x86_64-g++
+        ./charmrun ++local +p4 ./namd2 ~/namddata/apoa1/apoa1.namd
+
+  netlrts-darwin-x86_64:
+    timeout-minutes: 60
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: build
+      run: ./build all-test netlrts-darwin-x86_64 --build-shared --with-production --enable-error-checking --enable-lbuserdata -j3 -g -Werror=vla
+      # TODO: this should build tests with "-charm-shared". See #2735 on why this is not done currently.
+    - name: test
+      run: make -C netlrts-darwin-x86_64/tmp test TESTOPTS="++local"
+    - name: testp
+      run: make -C netlrts-darwin-x86_64/tmp testp P=2 TESTOPTS="++local"
+
+  netlrts-linux-i386:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: install-prerequisites
+      run: |
+        sudo dpkg --add-architecture i386
+        sudo apt-get update
+        sudo apt-get install -y gcc-multilib g++-multilib gfortran-multilib zlib1g-dev:i386 libjpeg-dev:i386
+    - name: build
+      run: ./build all-test netlrts-linux-i386 --build-shared --with-production --enable-error-checking --enable-lbuserdata -j3 -g -Werror=vla
+      # TODO: this should build tests with "-charm-shared". See #2735 on why this is not done currently.
+    - name: test
+      run: make -C netlrts-linux-i386/tmp test TESTOPTS="++local"
+    - name: testp
+      run: make -C netlrts-linux-i386/tmp testp P=2 TESTOPTS="++local"
+
+  netlrts-linux-x86_64_syncft:
+    timeout-minutes: 90
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: build
+      run: ./build all-test netlrts-linux-x86_64 syncft -j2 -g
+    - name: test
+      run: make -C netlrts-linux-x86_64-syncft/tmp syncfttest TESTOPTS="++local"
+
+  shellcheck:
+    # See https://github.com/koalaman/shellcheck/wiki
+    # for explanations of ShellCheck error codes
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: ShellCheck
+      run: |
+        # TODO: add more scripts
+        shellcheck \
+          build \
+          buildcmake \
+          package-tarball.sh \
+          relink.script \
+          src/scripts/commitid.sh \
+          src/scripts/testrun \
+          src/arch/multicore/charmrun \
+          src/arch/mpi-win-x86_64/charmrun \
+
+  spack:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install Spack
+      run: |
+        cd ..
+        git clone --depth 1 https://github.com/spack/spack
+        cd spack
+        [[ $(uname) == "Linux" ]] && sudo apt-get install -y gfortran gfortran-7 gfortran-8 gfortran-9 gfortran-10
+
+        # Use this branch for testing, not main
+        sed -i -e 's,="main",="${{ github.head_ref }}",' var/spack/repos/builtin/packages/charmpp/package.py
+
+        # Use a fork, not the main repo
+        # If in merge_group mode, the branch should be created in the main repo
+        if [[ ${{ github.event_name }} == 'pull_request' ]]; then
+          sed -i -e 's,UIUC-PPL/charm.git,${{github.event.pull_request.head.repo.full_name}},' var/spack/repos/builtin/packages/charmpp/package.py
+        fi
+
+        # Compile with debug symbols
+        sed -i -e 's,build(target,options.append("-g"); build(target,' var/spack/repos/builtin/packages/charmpp/package.py
+
+        # Add +setcpuaffinity option to TESTOPTS
+        sed -i -e 's,\+\+local,++local +setcpuaffinity,' var/spack/repos/builtin/packages/charmpp/package.py
+
+        # No need for automake/autoconf
+        sed -i -e '/automake/d' var/spack/repos/builtin/packages/charmpp/package.py
+        sed -i -e '/autoconf/d' var/spack/repos/builtin/packages/charmpp/package.py
+
+    - name: Build Charm++
+      run: |
+        cd ../spack
+        source share/spack/setup-env.sh
+        spack compiler find
+        spack compiler list
+        spack install --test root charmpp@main
+
+  ucx-linux-x86_64_openpmix:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    # Uncomment the lines below to set up a tmate session for debugging.
+    # See https://github.com/marketplace/actions/debugging-with-tmate for details.
+    # This can't be enabled all the time as the tmate session will wait for a user to connect before running
+    # the build.
+    #- name: Tmate session for debugging
+    #  uses: mxschmitt/action-tmate@v2
+    - name: install-prerequisites
+      run: |
+        sudo apt-get update
+        sudo apt-get install libucx-dev libevent-dev libhwloc-dev
+    - name: build-openpmix
+      run: |
+        wget https://github.com/openpmix/openpmix/releases/download/v3.1.5/pmix-3.1.5.tar.gz
+        tar -xf pmix-3.1.5.tar.gz
+        cd pmix-3.1.5
+        ./configure
+        make -j4
+        sudo make install
+    # OpenMPI is needed to launch Charm++ programs with the UCX backend
+    - name: build-ompi
+      run: |
+        wget https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.5.tar.gz
+        tar -xf openmpi-4.0.5.tar.gz
+        cd openmpi-4.0.5
+        ./configure --enable-mca-no-build=btl-uct --with-pmix=/usr/local
+        make -j4
+        sudo make install
+    - name: build
+      run: ./build all-test ucx-linux-x86_64 openpmix -g -j4 --with-production
+    - name: test
+      run: |
+        export PATH=/usr/local/bin:$PATH
+        export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+        export OMPI_MCA_rmaps_base_oversubscribe=1
+        make -C ucx-linux-x86_64-openpmix/tests test
+        make -C ucx-linux-x86_64-openpmix/examples test
+
+  verbs-linux-x86_64_smp:
+    # Buildonly test, as the machine layer needs an actual device to run.
+    # Also test packaging a tarball and building from it.
+    # Since it is buildonly, test both build and buildold with the tarball.
+    timeout-minutes: 45
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: install-prerequisites
+      run: |
+        sudo apt-get update
+        sudo apt-get -y install libibverbs-dev
+    - name: package-tarball
+      run: |
+        ./package-tarball.sh
+        cd ..
+        tar -xzf charm/charm-*.tar.gz
+    - name: build-smp
+      run: |
+        cd ../charm-*
+        # TODO: this should build tests with "-charm-shared". See #2735 on why this is not done currently.
+        ./build all-test verbs-linux-x86_64 smp -j4 -g --build-shared
+    - name: buildold-nonsmp
+      run: |
+        cd ../charm-*
+        # TODO: this should build tests with "-charm-shared". See #2735 on why this is not done currently.
+        ./buildold all-test verbs-linux-x86_64 -j4 -g --build-shared
+
+  netlrts-win-x86_64_mingw64:
+    timeout-minutes: 90
+
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+    - uses: actions/checkout@v4
+    - uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: git mingw-w64-x86_64-toolchain mingw-w64-x86_64-libtool mingw-w64-x86_64-cmake make libtool autoconf automake
+    - name: build
+      run: |
+        . src/arch/win/vsenv.sh
+        ./build AMPI netlrts-win-x86_64 --with-production -j2
+        make -C netlrts-win-x86_64/tests -j2
+    - name: test
+      run: |
+        make -C netlrts-win-x86_64/tests test TESTOPTS="++local"
+
