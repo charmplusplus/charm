@@ -1,6 +1,5 @@
 #!/bin/bash -l
-#SBATCH -N 2
-#SBATCH -n 32
+#SBATCH -N 1
 #SBATCH -t 02:00:00
 #SBATCH -J autobuild
 #SBATCH -o $output
@@ -13,6 +12,7 @@
 set -x
 module load libfabric; module load cmake
 ./build all-test $target --with-production --enable-error-checking -j16 -g
+make -C $target/tmp test TESTOPTS+="+setcpuaffinity"
 #cd $testdir
 #$make clean
 #$make -C ../tests $target OPTS="$flags" TESTOPTS="$testopts" $maketestopts
