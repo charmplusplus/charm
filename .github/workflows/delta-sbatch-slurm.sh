@@ -11,7 +11,7 @@
 #SBATCH -A mzu-delta-cpu
 #cd $indir
 module load libfabric; module load cmake
-./build all-test $target -j8 $flags
+./build all-test $target --with-production --enable-error-checking -j16 -g
 #cd $testdir
 #$make clean
 #$make -C ../tests $target OPTS="$flags" TESTOPTS="$testopts" $maketestopts
