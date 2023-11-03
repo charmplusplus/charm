@@ -27,15 +27,19 @@ jobs:
     - uses: actions/checkout@v3
     - name: Host info
       run: |
+        set -x
         echo "Running autobuild on delta"
         hostname
         uname -a
         lsb_release -a
+        pwd
     - name: build
       run: |
-        cd ~/autobuild
-        ./build_local mpi-linux-x86_64
+        set -x
+        export target="mpi-linux-x86_64"
+        srun -A mzu-delta-cpu --partition=cpu-interactive .github/workflows/delta-sbatch-slurm.sh
     - name: results
       run: |
-        cat ~/autobuild/messages/mpi-linux-x86_64
+        # this is incorrect now:
+        ## cat ~/autobuild/messages/mpi-linux-x86_64
         # Could add email notification here, e.g. via https://github.com/marketplace/actions/send-email
