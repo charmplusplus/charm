@@ -309,7 +309,7 @@ jobs:
         cd ..
         git clone --depth 1 https://github.com/spack/spack
         cd spack
-        [[ $(uname) == "Linux" ]] && sudo apt-get install -y gfortran gfortran-10
+        [[ $(uname) == "Linux" ]] && sudo apt-get install -y gfortran gfortran-13
 
         # Use this branch for testing, not main
         sed -i -e 's,="main",="${{ github.head_ref }}",' var/spack/repos/builtin/packages/charmpp/package.py
