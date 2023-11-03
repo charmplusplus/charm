@@ -11,7 +11,7 @@
 #SBATCH -A mzu-delta-cpu
 #cd $indir
 module load libfabric; module load cmake
-./build all-test -j8 $target $flags
+./build all-test $target -j8 $flags
 #cd $testdir
 #$make clean
 #$make -C ../tests $target OPTS="$flags" TESTOPTS="$testopts" $maketestopts
