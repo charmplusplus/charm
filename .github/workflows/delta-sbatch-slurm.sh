@@ -6,9 +6,11 @@
 #SBATCH -o $output
 #SBATCH -e $output
 #SBATCH -p regular
-#SBATCH --partition=cpu
+#SBATCH --partition=cpu-interactive
+#SBATCH --pty bash
 #SBATCH -A mzu-delta-cpu
 cd $indir
+./build LIBS -j8 $target $flags
 cd $testdir
 module load libfabric; module load cmake
 #$make clean
