@@ -37,7 +37,7 @@ jobs:
       run: |
         set -x
         export target="mpi-linux-x86_64"
-        srun -A mzu-delta-cpu --cpus-per-task=128 --mem=16g --nodes=2 --partition=cpu-interactive .github/workflows/delta-sbatch-slurm.sh
+        srun -A mzu-delta-cpu --cpus-per-task=128 --mem=16g --nodes=1 --partition=cpu-interactive .github/workflows/delta-sbatch-slurm.sh
     - name: results
       run: |
         # this is incorrect now:
