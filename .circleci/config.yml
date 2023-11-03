@@ -1,71 +1,5 @@
 version: 2.1
 jobs:
-  NetLRTS-x86_64:
-    machine:
-      image: ubuntu-2004:2022.04.1
-
-    steps:
-      - checkout
-      - restore_cache:
-          keys:
-            - ccache-{{ arch }}-{{ .Branch }}
-            - ccache-{{ arch }}-main
-            - ccache-{{ arch }}
-      - run:
-          name: CCache
-          command: |
-            sudo apt update
-            sudo apt -y install ccache
-            ccache --show-stats
-            ccache --max-size=1.0G
-      - run:
-          name: Build
-          command: |
-            export PATH=/usr/lib/ccache:${PATH}
-            ./build all-test netlrts-linux-x86_64 -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla
-      - save_cache:
-          key: "ccache-{{ arch }}-{{ .Branch }}-{{ epoch }}"
-          paths: [ "/home/circleci/.ccache" ]
-      - run:
-          name: Test
-          command: make -C netlrts-linux-x86_64/tmp test TESTOPTS="++local"
-      - run:
-          name: TestP P=2
-          command: make -C netlrts-linux-x86_64/tmp testp P=2 TESTOPTS="++local"
-
-  NetLRTS-x86_64-SMP:
-    machine:
-      image: ubuntu-2004:2022.04.1
-
-    steps:
-      - checkout
-      - restore_cache:
-          keys:
-            - ccache-smp-{{ arch }}-{{ .Branch }}
-            - ccache-smp-{{ arch }}-main
-            - ccache-smp-{{ arch }}
-      - run:
-          name: CCache
-          command: |
-            sudo apt update
-            sudo apt -y install ccache
-            ccache --show-stats
-            ccache --max-size=1.0G
-      - run:
-          name: Build
-          command: |
-            export PATH=/usr/lib/ccache:${PATH}
-            ./build all-test netlrts-linux-x86_64 smp -j3 --with-production --enable-error-checking --enable-lbuserdata -g -Werror=vla
-      - save_cache:
-          key: "ccache-smp-{{ arch }}-{{ .Branch }}-{{ epoch }}"
-          paths: [ "/home/circleci/.ccache" ]
-      - run:
-          name: Test
-          command: make -C netlrts-linux-x86_64-smp/tmp test TESTOPTS="++local +setcpuaffinity +CmiSleepOnIdle"
-      - run:
-          name: TestP P=4 PPN=2
-          command: make -C netlrts-linux-x86_64-smp/tmp testp P=4 TESTOPTS="++local +setcpuaffinity +CmiSleepOnIdle ++ppn 2"
-
   NetLRTS-ARM64:
     machine:
       image: ubuntu-2004:2022.04.1
@@ -176,8 +110,6 @@ workflows:
   version: 2
   build:
     jobs:
-      - NetLRTS-x86_64
-      - NetLRTS-x86_64-SMP
       - NetLRTS-ARM64
       - NetLRTS-ARM64-SMP
       - MPI-ARM64
