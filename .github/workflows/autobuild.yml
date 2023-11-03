@@ -8,6 +8,7 @@ on:
     paths:
       # Also run the build when this file gets modified as part of a PR
       - '.github/workflows/autobuild.yml'
+      - '.github/workflows/delta-sbatch-slurm.sh'
 
 
 # Cancel in progress CI runs when a new run targeting the same PR or branch/tag is triggered.
