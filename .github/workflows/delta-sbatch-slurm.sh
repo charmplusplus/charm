@@ -10,6 +10,7 @@
 #SBATCH --pty bash
 #SBATCH -A mzu-delta-cpu
 #cd $indir
+set -x
 module load libfabric; module load cmake
 ./build all-test $target --with-production --enable-error-checking -j16 -g
 #cd $testdir
