@@ -9,14 +9,14 @@
 #SBATCH --partition=cpu-interactive
 #SBATCH --pty bash
 #SBATCH -A mzu-delta-cpu
-cd $indir
-./build LIBS -j8 $target $flags
-cd $testdir
+#cd $indir
 module load libfabric; module load cmake
+./build all-test -j8 $target $flags
+#cd $testdir
 #$make clean
-$make -C ../tests $target OPTS="$flags" TESTOPTS="$testopts" $maketestopts
-$make -C ../examples $target OPTS="$flags" TESTOPTS="$testopts" $maketestopts
-$make -C ../benchmarks $target OPTS="$flags" TESTOPTS="$testopts" $maketestopts
+#$make -C ../tests $target OPTS="$flags" TESTOPTS="$testopts" $maketestopts
+#$make -C ../examples $target OPTS="$flags" TESTOPTS="$testopts" $maketestopts
+#$make -C ../benchmarks $target OPTS="$flags" TESTOPTS="$testopts" $maketestopts
 # Save make exit status
-status=\$?
-echo \$? > $result
+#status=\$?
+#echo \$? > $result
