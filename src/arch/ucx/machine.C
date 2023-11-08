@@ -731,9 +731,6 @@ void LrtsExit(int exitcode)
 
     CmiFree(ucxCtx.eps);
     CmiFree(ucxCtx.rxReqs);
-#if CMK_SMP
-    PCQueueDestroy(ucxCtx.txQueue);
-#endif
 
     if(!CharmLibInterOperate || userDrivenMode) {
         ret = runtime_barrier();
