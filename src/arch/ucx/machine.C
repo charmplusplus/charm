@@ -95,7 +95,7 @@ typedef struct UcxContext
 {
     ucp_context_h     context;
     ucp_worker_h      worker;
-    ucp_ep_h          *eps;
+    ucp_ep_h          **eps;
     UcxRequest        **rxReqs;
 #if CMK_SMP
     PCQueue           txQueue;
@@ -202,8 +202,12 @@ static void UcxInitEps(int numNodes, int myId)
     keys = (char*)CmiAlloc(maxkey);
     CmiEnforce(keys);
 
-    ucxCtx.eps = (ucp_ep_h*)CmiAlloc(sizeof(ucp_ep_h)*numNodes);
+    int nodeSize = CmiMyNodeSize();
+    ucxCtx.eps = (ucp_ep_h**)CmiAlloc(sizeof(ucp_ep_h*)*nodeSize);
     CmiEnforce(ucxCtx.eps);
+
+    for (int i = 0; i < nodeSize; i++)
+        ucxCtx.eps[i] = (ucp_ep_h*)CmiAlloc(sizeof(ucp_ep_h)*numNodes);
 
     status = ucp_worker_get_address(ucxCtx.worker, &address, &addrlen);
     UCX_CHECK_STATUS(status, "UcxInitEps: ucp_worker_get_address error");
@@ -261,8 +265,10 @@ static void UcxInitEps(int numNodes, int myId)
         eParams.field_mask = UCP_EP_PARAM_FIELD_REMOTE_ADDRESS;
         eParams.address    = (const ucp_address_t*)remoteAddr;
 
-        status = ucp_ep_create(ucxCtx.worker, &eParams, &ucxCtx.eps[peer]);
-        UCX_CHECK_STATUS(status, "ucp_ep_create failed");
+        for (j = 0; j < nodeSize; j++) {
+            status = ucp_ep_create(ucxCtx.worker, &eParams, &ucxCtx.eps[j][peer]);
+            UCX_CHECK_STATUS(status, "ucp_ep_create failed");
+        }
         UCX_LOG(4, "Connecting to %d (ep %p)", peer, ucxCtx.eps[peer]);
         CmiFree(remoteAddr);
     }
@@ -554,7 +560,7 @@ inline void* UcxSendMsg(int destNode, int destPE, int size, char *msg,
 
     UcxRequest *req;
 
-    req = (UcxRequest*)ucp_tag_send_nb(ucxCtx.eps[destNode], msg, size,
+    req = (UcxRequest*)ucp_tag_send_nb(ucxCtx.eps[CmiMyRank()][destNode], msg, size,
                                        ucp_dt_make_contig(1), sTag, cb);
     if (!UCS_PTR_IS_PTR(req)) {
         CmiEnforce(!UCS_PTR_IS_ERR(req));
@@ -608,7 +614,7 @@ static inline int ProcessTxQueue()
     {
         if(req->op == UCX_SEND_OP) { // Regular Message
             ucs_status_ptr_t status_ptr;
-            status_ptr = ucp_tag_send_nb(ucxCtx.eps[req->dNode], req->msgBuf,
+            status_ptr = ucp_tag_send_nb(ucxCtx.eps[CmiMyRank()][req->dNode], req->msgBuf,
                                          req->size, ucp_dt_make_contig(1),
                                          req->tag, req->cb);
 
