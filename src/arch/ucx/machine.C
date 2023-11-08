@@ -306,7 +306,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 
     // Create UCP worker
     wParams.field_mask  = UCP_WORKER_PARAM_FIELD_THREAD_MODE;
-    wParams.thread_mode = UCS_THREAD_MODE_SINGLE;
+    wParams.thread_mode = UCS_THREAD_MODE_MULTI;
     status = ucp_worker_create(ucxCtx.context, &wParams, &ucxCtx.worker);
     UCX_CHECK_STATUS(status, "ucp_worker_create");
 
@@ -331,10 +331,6 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     // Ensure connects completion
     status = ucp_worker_flush(ucxCtx.worker);
     UCX_CHECK_STATUS(status, "ucp_worker_flush");
-
-#if CMK_SMP
-    ucxCtx.txQueue = PCQueueCreate();
-#endif
 
     UCX_LOG(5, "Initialized: preposted reqs %d, rndv thresh %d\n",
             ucxCtx.numRxReqs, ucxCtx.eagerSize);
@@ -555,19 +551,7 @@ inline void* UcxSendMsg(int destNode, int destPE, int size, char *msg,
 
     UCX_LOG(3, "destNode=%i destPE=%i size=%i msg=%p, tag=%" PRIu64,
             destNode, destPE, size, msg, tag);
-#if CMK_SMP
-    UcxPendingRequest *req = (UcxPendingRequest*)CmiAlloc(sizeof(UcxPendingRequest));
-    req->msgBuf = msg;
-    req->size   = size;
-    req->tag    = sTag;
-    req->dNode  = destNode;
-    req->cb     = cb;
-    req->op     = UCX_SEND_OP;   // Mark this request as a regular message (UCX_SEND_OP)
 
-    UCX_LOG(3, " --> (PE=%i) enq msg (queue depth=%i), dNode %i, size %i",
-            CmiMyPe(), PCQueueLength(ucxCtx.txQueue), destNode, size);
-    PCQueuePush(ucxCtx.txQueue, (char *)req);
-#else
     UcxRequest *req;
 
     req = (UcxRequest*)ucp_tag_send_nb(ucxCtx.eps[destNode], msg, size,
@@ -578,7 +562,6 @@ inline void* UcxSendMsg(int destNode, int destPE, int size, char *msg,
     }
 
     req->msgBuf = msg;
-#endif
 
     return req;
 }
@@ -714,10 +697,6 @@ void LrtsAdvanceCommunication(int whileidle)
            UCX_LOG(3, "Got msg %p, len %zu\n", msg, info.length);
            UcxPostRxReq(UCX_MSG_TAG_PROBE, info.length, msg);
        }
-
-#if CMK_SMP
-       cnt += ProcessTxQueue();
-#endif
     } while (cnt);
 }
 
