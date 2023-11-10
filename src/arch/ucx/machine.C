@@ -30,6 +30,8 @@
 #include "runtime-pmix.C"
 #endif
 
+#define CMK_SMP_NO_COMMTHD CMK_SMP
+
 #define CmiSetMsgSize(msg, sz)    ((((CmiMsgHeaderBasic *)msg)->size) = (sz))
 
 #define UCX_MSG_PROBE_THRESH            32768
@@ -38,6 +40,7 @@
 #define UCX_TAG_MSG_BITS                4
 #define UCX_TAG_RMA_BITS                4
 #define UCX_TAG_PE_BITS                 32
+#define UCX_TAG_RANK_OFFSET             12
 #define UCX_MSG_TAG_EAGER               UCS_BIT(0)
 #define UCX_MSG_TAG_PROBE               UCS_BIT(1)
 #define UCX_MSG_TAG_DEVICE              UCS_BIT(2)
@@ -96,7 +99,7 @@ typedef struct UcxContext
     ucp_context_h     context;
     ucp_worker_h      worker;
     ucp_ep_h          *eps;
-    UcxRequest        **rxReqs;
+    UcxRequest        ***rxReqs;
 #if CMK_SMP
     PCQueue           txQueue;
 #endif
@@ -347,14 +350,14 @@ static inline UcxRequest* UcxPostRxReqInternal(ucp_tag_t tag, size_t size,
     void *buf = CmiAlloc(size);
     UcxRequest *req;
 
-    if (tag == UCX_MSG_TAG_EAGER) {
+    if (tag & UCX_MSG_TAG_MASK == UCX_MSG_TAG_EAGER) {
         req = (UcxRequest*)ucp_tag_recv_nb(ucxCtx.worker, buf,
                                            ucxCtx.eagerSize,
                                            ucp_dt_make_contig(1), tag,
-                                           UCX_MSG_TAG_MASK,
+                                           UCX_MSG_TAG_MASK_FULL,
                                            UcxRxReqCompleted);
     } else {
-        CmiEnforce(tag == UCX_MSG_TAG_PROBE);
+        CmiEnforce(tag & UCX_MSG_TAG_MASK == UCX_MSG_TAG_PROBE);
         req = (UcxRequest*)ucp_tag_msg_recv_nb(ucxCtx.worker, buf, size,
                                                ucp_dt_make_contig(1), msg,
                                                UcxRxReqCompleted);
@@ -386,10 +389,10 @@ static inline UcxRequest* UcxPostRxReq(ucp_tag_t tag, size_t size,
         if (req->completed) {
             UCX_REQUEST_FREE(req);
 
-            if (tag & UCX_MSG_TAG_EAGER) {
-                req = UcxPostRxReqInternal(UCX_MSG_TAG_EAGER, ucxCtx.eagerSize, NULL);
+            if ((tag & UCX_MSG_TAG_MASK) & UCX_MSG_TAG_EAGER) {
+                req = UcxPostRxReqInternal(tag, ucxCtx.eagerSize, NULL);
                 req->idx = idx;
-                ucxCtx.rxReqs[idx] = req;
+                ucxCtx.rxReqs[CmiMyRank()][idx] = req;
             } else {
                 return NULL;
             }
@@ -410,11 +413,13 @@ static inline UcxRequest* UcxHandleRxReq(UcxRequest *request, char *rxBuf,
 
     UCX_REQUEST_FREE(request);
 
-    if (tag & UCX_MSG_TAG_EAGER) {
-        ucxCtx.rxReqs[idx]      = UcxPostRxReq(UCX_MSG_TAG_EAGER,
+    int rank = CmiMyRank();
+    ucp_tag_t rankTag = rank << UCX_TAG_RANK_OFFSET;
+    if ((tag & UCX_MSG_TAG_MASK) & UCX_MSG_TAG_EAGER) {
+        ucxCtx.rxReqs[rank][idx]      = UcxPostRxReq(rankTag | UCX_MSG_TAG_EAGER,
                                                ucxCtx.eagerSize, NULL);
-        ucxCtx.rxReqs[idx]->idx = idx;
-        return ucxCtx.rxReqs[idx];
+        ucxCtx.rxReqs[rank][idx]->idx = idx;
+        return ucxCtx.rxReqs[rank][idx];
     }
 
     return NULL;
@@ -514,11 +519,15 @@ static void UcxPrepostRxBuffers()
 {
     int i;
 
-    ucxCtx.rxReqs = (UcxRequest**)CmiAlloc(sizeof(UcxRequest*) * ucxCtx.numRxReqs);
+    ucxCtx.rxReqs = (UcxRequest***)CmiAlloc(sizeof(UcxRequest**) * CmiMyNodeSize());
 
-    for (i = 0; i < ucxCtx.numRxReqs; i++) {
-        ucxCtx.rxReqs[i] = UcxPostRxReq(UCX_MSG_TAG_EAGER, ucxCtx.eagerSize, NULL);
-        ucxCtx.rxReqs[i]->idx = i;
+    for (int rank = 0; rank < CmiMyNodeSize(); rank++) {
+        ucxCtx.rxReqs[rank] = (UcxRequest**) CmiAlloc(sizeof(UcxRequest*) * ucxCtx.numRxReqs);
+        for (i = 0; i < ucxCtx.numRxReqs; i++) {
+            ucp_tag_t rankTag = rank << UCX_TAG_RANK_OFFSET;
+            ucxCtx.rxReqs[rank][i] = UcxPostRxReq(rankTag | UCX_MSG_TAG_EAGER, ucxCtx.eagerSize, NULL);
+            ucxCtx.rxReqs[rank][i]->idx = i;
+        }    
     }
     UCX_LOG(3, "UCX: preposted %d rx requests", ucxCtx.numRxReqs);
 }
@@ -545,7 +554,7 @@ inline void* UcxSendMsg(int destNode, int destPE, int size, char *msg,
     sTag  = (size > ucxCtx.eagerSize) ? UCX_MSG_TAG_PROBE : UCX_MSG_TAG_EAGER;
 
     // Auxilliary messages (which add bits to the tag) should use eager.
-    CmiEnforce((tag == 0ul) || (sTag == UCX_MSG_TAG_EAGER));
+    //CmiEnforce((tag == 0ul) || (sTag == UCX_MSG_TAG_EAGER));
 
     sTag |= tag;
 
@@ -577,7 +586,7 @@ CmiCommHandle LrtsSendFunc(int destNode, int destPE, int size, char *msg, int mo
 
     CmiSetMsgSize(msg, size);
 
-    req = UcxSendMsg(destNode, destPE, size, msg, 0ul, UcxTxReqCompleted);
+    req = UcxSendMsg(destNode, destPE, size, msg, CmiRankOf(destPE) << UCX_TAG_RANK_OFFSET, UcxTxReqCompleted);
     if (req == NULL) {
         /* Request completed in place or error occured */
         UCX_LOG(3, "Sent msg %p (len %d) inline", msg, size);
@@ -691,11 +700,12 @@ void LrtsAdvanceCommunication(int whileidle)
        // Probe with full tag mask to avoid long traversing thru unexpected
        // queue of eager messages (messages with non-full mask added to the
        // same unexpected queue)
-       msg = ucp_tag_probe_nb(ucxCtx.worker, UCX_MSG_TAG_PROBE,
+       ucp_tag_t rankTag = CmiMyRank() << UCX_TAG_RANK_OFFSET;
+       msg = ucp_tag_probe_nb(ucxCtx.worker, UCX_MSG_TAG_PROBE | rankTag,
                               UCX_MSG_TAG_MASK_FULL, 1, &info);
        if (msg != NULL) {
            UCX_LOG(3, "Got msg %p, len %zu\n", msg, info.length);
-           UcxPostRxReq(UCX_MSG_TAG_PROBE, info.length, msg);
+           UcxPostRxReq(UCX_MSG_TAG_PROBE | rankTag, info.length, msg);
        }
     } while (cnt);
 }
