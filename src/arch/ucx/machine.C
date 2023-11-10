@@ -729,12 +729,13 @@ void LrtsExit(int exitcode)
 
     LrtsAdvanceCommunication(0);
 
-    for (i = 0; i < ucxCtx.numRxReqs; ++i) {
-        req = ucxCtx.rxReqs[i];
-        CmiFree(req->msgBuf);
-        ucp_request_cancel(ucxCtx.worker, req);
-        ucp_request_free(req);
-    }
+    for (int rank = 0; rank < CmiMyNodeSize(); rank++)
+        for (i = 0; i < ucxCtx.numRxReqs; ++i) {
+            req = ucxCtx.rxReqs[rank][i];
+            CmiFree(req->msgBuf);
+            ucp_request_cancel(ucxCtx.worker, req);
+            ucp_request_free(req);
+        }
 
     ucp_worker_destroy(ucxCtx.worker);
     ucp_cleanup(ucxCtx.context);
