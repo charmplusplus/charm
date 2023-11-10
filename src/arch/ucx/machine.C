@@ -53,6 +53,8 @@
 
 #define UCX_LOG_PRIO 50 // Disabled by default
 
+#define UcxApplyMask(t)         ((t) & UCX_MSG_TAG_MASK)
+
 enum {
     UCX_SEND_OP,        // Regular Send using UcxSendMsg
     UCX_RMA_OP_PUT,     // RMA Put operation using UcxRmaOp
@@ -350,14 +352,16 @@ static inline UcxRequest* UcxPostRxReqInternal(ucp_tag_t tag, size_t size,
     void *buf = CmiAlloc(size);
     UcxRequest *req;
 
-    if (tag & UCX_MSG_TAG_MASK == UCX_MSG_TAG_EAGER) {
+    if (UcxApplyMask(tag) == UCX_MSG_TAG_EAGER) {
         req = (UcxRequest*)ucp_tag_recv_nb(ucxCtx.worker, buf,
                                            ucxCtx.eagerSize,
                                            ucp_dt_make_contig(1), tag,
                                            UCX_MSG_TAG_MASK_FULL,
                                            UcxRxReqCompleted);
     } else {
-        CmiEnforce(tag & UCX_MSG_TAG_MASK == UCX_MSG_TAG_PROBE);
+        if (UcxApplyMask(tag) != UCX_MSG_TAG_PROBE)
+            CmiPrintf("Tag is %" PRIu64 " with mask is %" PRIu64 "\n", tag, UcxApplyMask(tag));
+        CmiEnforce(UcxApplyMask(tag) == UCX_MSG_TAG_PROBE);
         req = (UcxRequest*)ucp_tag_msg_recv_nb(ucxCtx.worker, buf, size,
                                                ucp_dt_make_contig(1), msg,
                                                UcxRxReqCompleted);
@@ -389,7 +393,7 @@ static inline UcxRequest* UcxPostRxReq(ucp_tag_t tag, size_t size,
         if (req->completed) {
             UCX_REQUEST_FREE(req);
 
-            if ((tag & UCX_MSG_TAG_MASK) & UCX_MSG_TAG_EAGER) {
+            if (UcxApplyMask(tag) & UCX_MSG_TAG_EAGER) {
                 req = UcxPostRxReqInternal(tag, ucxCtx.eagerSize, NULL);
                 req->idx = idx;
                 ucxCtx.rxReqs[CmiMyRank()][idx] = req;
@@ -415,7 +419,7 @@ static inline UcxRequest* UcxHandleRxReq(UcxRequest *request, char *rxBuf,
 
     int rank = CmiMyRank();
     ucp_tag_t rankTag = rank << UCX_TAG_RANK_OFFSET;
-    if ((tag & UCX_MSG_TAG_MASK) & UCX_MSG_TAG_EAGER) {
+    if (UcxApplyMask(tag) & UCX_MSG_TAG_EAGER) {
         ucxCtx.rxReqs[rank][idx]      = UcxPostRxReq(rankTag | UCX_MSG_TAG_EAGER,
                                                ucxCtx.eagerSize, NULL);
         ucxCtx.rxReqs[rank][idx]->idx = idx;
@@ -729,13 +733,15 @@ void LrtsExit(int exitcode)
 
     LrtsAdvanceCommunication(0);
 
-    for (int rank = 0; rank < CmiMyNodeSize(); rank++)
+    for (int rank = 0; rank < CmiMyNodeSize(); rank++) {
         for (i = 0; i < ucxCtx.numRxReqs; ++i) {
             req = ucxCtx.rxReqs[rank][i];
             CmiFree(req->msgBuf);
             ucp_request_cancel(ucxCtx.worker, req);
             ucp_request_free(req);
         }
+        CmiFree(ucxCtx.rxReqs[rank]);
+    }
 
     ucp_worker_destroy(ucxCtx.worker);
     ucp_cleanup(ucxCtx.context);
