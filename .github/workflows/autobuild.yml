@@ -36,9 +36,9 @@ jobs:
         pwd
     - name: build
       run: |
-        set -x
+        set -ex
         export target="mpi-linux-x86_64"
-        srun -A mzu-delta-cpu --cpus-per-task=128 --mem=16g --nodes=1 --partition=cpu-interactive .github/workflows/delta-sbatch-slurm.sh
+        .github/workflows/jobmonitor.sh .github/workflows/delta-sbatch-slurm.sh
     - name: results
       run: |
         # this is incorrect now:
