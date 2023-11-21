@@ -57,8 +57,9 @@ do
             cat $result
             echo "======================================================================================================"
         fi
-        # Delete result, script, output and error
-        rm -f $result $output
+	# mv result and output to result.latest
+	mv $result result.latest
+	mv $output output.latest
         exit $status
     fi
 # The job is still queued or running-- print status and wait

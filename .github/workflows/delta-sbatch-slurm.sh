@@ -3,7 +3,7 @@
 #SBATCH -n 64
 #SBATCH -o %j.output
 #SBATCH -e %j.output
-#SBATCH -t 0:30:00
+#SBATCH -t 1:00:00
 #SBATCH -J autobuild
 #SBATCH -p cpu
 #SBATCH -A mzu-delta-cpu
