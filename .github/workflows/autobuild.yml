@@ -41,6 +41,10 @@ jobs:
         .github/workflows/jobmonitor.sh .github/workflows/delta-sbatch-slurm.sh
     - name: results
       run: |
-        # this is incorrect now:
-        ## cat ~/autobuild/messages/mpi-linux-x86_64
-        # Could add email notification here, e.g. via https://github.com/marketplace/actions/send-email
+      if grep '0' results.latest
+      then
+	echo "Success"
+      else
+	echo "Failure"
+      fi	
+      # should also https://github.com/marketplace/actions/send-email
