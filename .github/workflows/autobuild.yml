@@ -43,8 +43,8 @@ jobs:
       run: |
       if grep '0' results.latest
       then
-	echo "Success"
+        echo "Success"
       else
-	echo "Failure"
+        echo "Failure"
       fi	
       # should also https://github.com/marketplace/actions/send-email
