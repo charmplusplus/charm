@@ -41,10 +41,10 @@ jobs:
         .github/workflows/jobmonitor.sh .github/workflows/delta-sbatch-slurm.sh
     - name: results
       run: |
-      if grep '0' results.latest
-      then
-        echo "Success"
-      else
-        echo "Failure"
-      fi	
-      # should also https://github.com/marketplace/actions/send-email
+        if grep '0' results.latest
+        then
+          echo "Success"
+        else
+          echo "Failure"
+        fi	
+        # should also https://github.com/marketplace/actions/send-email
