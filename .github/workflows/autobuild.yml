@@ -41,7 +41,7 @@ jobs:
         .github/workflows/jobmonitor.sh .github/workflows/delta-sbatch-slurm.sh
     - name: results
       run: |
-        if grep '0' results.latest
+        if grep '0' result.latest
         then
           echo "Success"
         else
