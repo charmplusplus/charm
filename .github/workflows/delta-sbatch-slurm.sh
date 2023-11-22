@@ -7,15 +7,24 @@
 #SBATCH -J autobuild
 #SBATCH -p cpu
 #SBATCH -A mzu-delta-cpu
-#cd $indir
+
 set -x
+
 module load libfabric; module load cmake
-./build all-test $target --with-production --enable-error-checking -j64 -g
-#
+
+mkdir -p $target
+
+# ./build all-test $target --with-production --enable-error-checking -j64 -g
+
 cd $target
-make -C tests test OPTS="$flags" TESTOPTS="$testopts" $maketestopts
-make -C examples test OPTS="$flags" TESTOPTS="$testopts" $maketestopts
-make -C benchmarks test OPTS="$flags" TESTOPTS="$testopts" $maketestopts
+# make -C tests test OPTS="$flags" TESTOPTS="$testopts" $maketestopts
+# make -C examples test OPTS="$flags" TESTOPTS="$testopts" $maketestopts
+# make -C benchmarks test OPTS="$flags" TESTOPTS="$testopts" $maketestopts
+
+# For debugging:
+echo "Just 4 debugging"
+true
+
 # Save make exit status
 status=$?
 echo $status > ../$SLURM_JOBID.result

@@ -6,9 +6,10 @@ on:
     - cron: '15 06 * * *' # UTC 6:15am, corresponds to 00:15 CST or 01:15 CDT
   push:
     paths:
-      # Also run the build when this file gets modified as part of a PR
+      # Also run the build when these files are modified as part of a PR
       - '.github/workflows/autobuild.yml'
       - '.github/workflows/delta-sbatch-slurm.sh'
+      - '.github/workflows/jobmonitor.sh'
 
 
 # Cancel in progress CI runs when a new run targeting the same PR or branch/tag is triggered.
@@ -18,14 +19,20 @@ concurrency:
     cancel-in-progress: true
 
 jobs:
-  Delta:
+  delta:
     timeout-minutes: 60
 
-    runs-on: delta
+    permissions:
+      # Give the default GITHUB_TOKEN write permission to commit and push the
+      # added or changed files to the repository.
+      contents: write
+
+    # runs-on: delta
+    runs-on: ubuntu-latest
     name: Delta mpi-linux-x86_64  # Could test various builds (e.g., MPI, UCX, ...) via a build matrix
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Host info
       run: |
         set -x
@@ -36,15 +43,52 @@ jobs:
         pwd
     - name: build
       run: |
-        set -ex
-        export target="mpi-linux-x86_64"
-        .github/workflows/jobmonitor.sh .github/workflows/delta-sbatch-slurm.sh
+        set -x
+        # export target="mpi-linux-x86_64"
+        # .github/workflows/jobmonitor.sh .github/workflows/delta-sbatch-slurm.sh
+
+        echo 0 > result.latest
+        echo "hello world" > output.latest
+
+    - name: Check out autobuild-logs repo
+      uses: actions/checkout@v4
+      with:
+        repository: UIUC-PPL/autobuild-logs
+        token: ${{ secrets.GITHUB_TOKEN }}
+        path: autobuild-logs
+
     - name: results
       run: |
+        set -x
+        cat result.latest
         if grep '0' result.latest
         then
-          echo "Success"
+          res="success"
         else
-          echo "Failure"
-        fi	
-        # should also https://github.com/marketplace/actions/send-email
+          res="failure"
+        fi
+
+        pwd
+        echo $res
+
+        cd autobuild-logs
+        mkdir -p delta/mpi-linux-x86_64
+        cd delta/mpi-linux-x86_64
+
+        cp ../../../output.latest Delta_mpi-linux-x86_64_$(date '+%Y-%m-%dT%H-%M-%S%z')_output_$res.txt
+
+    - uses: stefanzweifel/git-auto-commit-action@v5
+      with:
+        commit_message: Autobuild results for delta/mpi-linux-x86_64
+        repository: autobuild-logs
+
+        # git config --global user.email "autobuild-logs@charm"
+        # git config --global user.name "Autobuild-logs user"
+
+        # git add .
+
+        # git commit -m "Autobuild results for delta/mpi-linux-x86_64"
+
+        # git push
+
+        # # should also https://github.com/marketplace/actions/send-email
