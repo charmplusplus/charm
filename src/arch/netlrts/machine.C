@@ -178,26 +178,6 @@
 #define _GNU_SOURCE 1
 #include <stdarg.h> /*<- was <varargs.h>*/
 
-#define CMK_USE_PRINTF_HACK 0
-#if CMK_USE_PRINTF_HACK
-/*HACK: turn printf into CmiPrintf, by just defining our own
-external symbol "printf".  This may be more trouble than it's worth,
-since the only advantage is that it works properly with +syncprint.
-
-This version *won't* work with fprintf(stdout,...) or C++ or Fortran I/O,
-because they don't call printf.  Has to be defined up here because we probably 
-haven't properly guessed this compiler's prototype for "printf".
-*/
-static void InternalPrintf(const char *f, va_list l);
-int printf(const char *fmt, ...) {
-	int nChar;
-	va_list p; va_start(p, fmt);
-        InternalPrintf(fmt,p);
-	va_end(p);
-	return 10;
-}
-#endif
-
 
 #include "converse.h"
 #include "cmirdmautils.h"
@@ -340,7 +320,7 @@ static void KillEveryone(const char *msg)
 static void KillEveryoneCode(int n)
 {
   char _s[100];
-  sprintf(_s, "[%d] XXX Fatal error #%d\n", CmiMyPe(), n);
+  snprintf(_s, sizeof(_s), "[%d] XXX Fatal error #%d\n", CmiMyPe(), n);
   charmrun_abort(_s);
   machine_exit(1);
 }
@@ -760,7 +740,7 @@ static void log_init(void)
 static void log_done(void)
 {
   char logname[100]; FILE *f; int i, size;
-  sprintf(logname, "log.%d", Lrts_myNode);
+  snprintf(logname, sizeof(logname), "log.%d", Lrts_myNode);
   f = fopen(logname, "w");
   if (f==0) KillEveryone("fopen problem");
   if (log_wrap) size = 50000; else size=log_pos;
@@ -780,7 +760,7 @@ void printLog(void)
       return;
   logged = 1;
   CmiPrintf("Logging: %d\n", Lrts_myNode);
-  sprintf(logname, "log.%d", Lrts_myNode);
+  snprintf(logname, sizeof(logname), "log.%d", Lrts_myNode);
   f = fopen(logname, "w");
   if (f==0) KillEveryone("fopen problem");
   for (i = 5000; i; i--)
@@ -1041,11 +1021,11 @@ CmiPrintStackTrace(0);
 	char msgBuf[80];
   	skt_set_abort(ignore_further_errors);
     if (CmiNumPartitions() == 1) {
-        sprintf(msgBuf,"Fatal error on PE %d> ",CmiMyPe());
+        snprintf(msgBuf,sizeof(msgBuf),"Fatal error on PE %d> ",CmiMyPe());
     }
     else
     {
-        sprintf(msgBuf,"Fatal error on Partition %d PE %d> ", CmiMyPartition(), CmiMyPe());
+        snprintf(msgBuf,sizeof(msgBuf),"Fatal error on Partition %d PE %d> ", CmiMyPartition(), CmiMyPe());
     }
   	ctrl_sendone_nolock("abort",msgBuf,strlen(msgBuf),s,strlen(s)+1);
   	skt_close(Cmi_charmrun_fd);
@@ -1146,18 +1126,20 @@ void CcsImpl_reply(CcsImplHeader *hdr,int repLen,const void *repData)
 }
 #endif
 
+#if CMK_USE_LRTS_STDIO
 /*****************************************************************************
  *
- * CmiPrintf, CmiError, CmiScanf
+ * LrtsPrintf, LrtsError, LrtsScanf
  *
  *****************************************************************************/
 static void InternalWriteToTerminal(int isStdErr,const char *str,int len);
-static void InternalPrintf(const char *f, va_list l)
+
+int LrtsPrintf(const char *f, va_list l)
 {
   ChMessage replymsg;
   char *buffer = (char *)CmiTmpAlloc(PRINTBUFSIZE);
   CmiStdoutFlush();
-  vsprintf(buffer, f, l);
+  int ret = vsnprintf(buffer, PRINTBUFSIZE, f, l);
   if(Cmi_syncprint) {
           LOCK_IF_AVAILABLE();
   	  ctrl_sendone_nolock("printsyn", buffer,strlen(buffer)+1,NULL,0);
@@ -1169,14 +1151,15 @@ static void InternalPrintf(const char *f, va_list l)
   }
   InternalWriteToTerminal(0,buffer,strlen(buffer));
   CmiTmpFree(buffer);
+  return ret;
 }
 
-static void InternalError(const char *f, va_list l)
+int LrtsError(const char *f, va_list l)
 {
   ChMessage replymsg;
   char *buffer = (char *)CmiTmpAlloc(PRINTBUFSIZE);
   CmiStdoutFlush();
-  vsprintf(buffer, f, l);
+  int ret = vsnprintf(buffer, PRINTBUFSIZE, f, l);
   if(Cmi_syncprint) {
   	  ctrl_sendone_locking("printerrsyn", buffer,strlen(buffer)+1,NULL,0);
           LOCK_IF_AVAILABLE();
@@ -1188,15 +1171,16 @@ static void InternalError(const char *f, va_list l)
   }
   InternalWriteToTerminal(1,buffer,strlen(buffer));
   CmiTmpFree(buffer);
+  return ret;
 }
 
-static int InternalScanf(char *fmt, va_list l)
+int LrtsScanf(const char *fmt, va_list l)
 {
   ChMessage replymsg;
   char *ptr[20];
   char *p; int nargs, i;
   nargs=0;
-  p=fmt;
+  p = const_cast<char *>(fmt);
   while (*p) {
     if ((p[0]=='%')&&(p[1]=='*')) { p+=2; continue; }
     if ((p[0]=='%')&&(p[1]=='%')) { p+=2; continue; }
@@ -1206,72 +1190,35 @@ static int InternalScanf(char *fmt, va_list l)
   if (nargs > 18) KillEveryone("CmiScanf only does 18 args.\n");
   for (i=0; i<nargs; i++) ptr[i]=va_arg(l, char *);
   CmiLock(Cmi_scanf_mutex);
-  if (Cmi_charmrun_fd!=-1)
-  {/*Send charmrun the format string*/
-        ctrl_sendone_locking("scanf", fmt, strlen(fmt)+1,NULL,0);
-        /*Wait for the reply (characters to scan) from charmrun*/
-        LOCK_IF_AVAILABLE();
-        ChMessage_recv(Cmi_charmrun_fd,&replymsg);
-        i = sscanf((char*)replymsg.data, fmt,
-                     ptr[ 0], ptr[ 1], ptr[ 2], ptr[ 3], ptr[ 4], ptr[ 5],
-                     ptr[ 6], ptr[ 7], ptr[ 8], ptr[ 9], ptr[10], ptr[11],
-                     ptr[12], ptr[13], ptr[14], ptr[15], ptr[16], ptr[17]);
-        ChMessage_free(&replymsg);
-        UNLOCK_IF_AVAILABLE();
-  } else
-  {/*Just do the scanf normally*/
-        i=scanf(fmt, ptr[ 0], ptr[ 1], ptr[ 2], ptr[ 3], ptr[ 4], ptr[ 5],
-                     ptr[ 6], ptr[ 7], ptr[ 8], ptr[ 9], ptr[10], ptr[11],
-                     ptr[12], ptr[13], ptr[14], ptr[15], ptr[16], ptr[17]);
-  }
+  /*Send charmrun the format string*/
+  ctrl_sendone_locking("scanf", fmt, strlen(fmt)+1,NULL,0);
+  /*Wait for the reply (characters to scan) from charmrun*/
+  LOCK_IF_AVAILABLE();
+  ChMessage_recv(Cmi_charmrun_fd,&replymsg);
+  i = sscanf((char*)replymsg.data, fmt,
+               ptr[ 0], ptr[ 1], ptr[ 2], ptr[ 3], ptr[ 4], ptr[ 5],
+               ptr[ 6], ptr[ 7], ptr[ 8], ptr[ 9], ptr[10], ptr[11],
+               ptr[12], ptr[13], ptr[14], ptr[15], ptr[16], ptr[17]);
+  ChMessage_free(&replymsg);
+  UNLOCK_IF_AVAILABLE();
   CmiUnlock(Cmi_scanf_mutex);
   return i;
 }
-#if CMK_CMIPRINTF_IS_A_BUILTIN
 
-/*New stdarg.h declarations*/
-void CmiPrintf(const char *fmt, ...)
+int LrtsUsePrintf()
 {
-  if (quietMode) return;
-  CpdSystemEnter();
-  {
-  va_list p; va_start(p, fmt);
-  if (Cmi_charmrun_fd!=-1 && _writeToStdout)
-    InternalPrintf(fmt, p);
-  else
-    vfprintf(stdout,fmt,p);
-  va_end(p);
-  }
-  CpdSystemExit();
+  return Cmi_charmrun_fd != -1 && _writeToStdout;
 }
 
-void CmiError(const char *fmt, ...)
+int LrtsUseError()
 {
-  CpdSystemEnter();
-  {
-  va_list p; va_start (p, fmt);
-  if (Cmi_charmrun_fd!=-1)
-    InternalError(fmt, p);
-  else
-    vfprintf(stderr,fmt,p);
-  va_end(p);
-  }
-  CpdSystemExit();
+  return Cmi_charmrun_fd != -1;
 }
 
-int CmiScanf(const char *fmt, ...)
+int LrtsUseScanf()
 {
-  int i;
-  CpdSystemEnter();
-  {
-  va_list p; va_start(p, fmt);
-  i = InternalScanf((char *)fmt, p);
-  va_end(p);
-  }
-  CpdSystemExit();
-  return i;
+  return Cmi_charmrun_fd != -1;
 }
-
 #endif
 
 /***************************************************************************
@@ -1617,7 +1564,7 @@ static void node_addresses_obtain(char **argv)
  ***********************************************************************/
 int DeliverOutgoingMessage(OutgoingMsg ogm)
 {
-  int i, rank, dst; OtherNode node;
+  int rank, dst; OtherNode node;
 	
   int network = 1;
 
@@ -1630,7 +1577,6 @@ int DeliverOutgoingMessage(OutgoingMsg ogm)
 #endif
     node = nodes_by_pe[dst];
     rank = dst - node->nodestart;
-    int acqLock = 0;
     if (node->nodestart != Cmi_nodestartGlobal) {
         DeliverViaNetwork(ogm, node, rank, DGRAM_ROOTPE_MASK, 0);
     }
@@ -1789,9 +1735,7 @@ void LrtsBarrier(void)
 
 int CmiBarrierZero(void)
 {
-  int i;
   int numnodes = CmiNumNodesGlobal();
-  ChMessage msg;
 
   if (Cmi_charmrun_fd == -1) return 0;                // standalone
   if (numnodes == 1) {
@@ -1801,7 +1745,7 @@ int CmiBarrierZero(void)
 
   if (CmiMyRank() == 0) {
     char str[64];
-    sprintf(str, "%d", CmiMyNodeGlobal());
+    snprintf(str, sizeof(str), "%d", CmiMyNodeGlobal());
     ctrl_sendone_locking("barrier0",str,strlen(str)+1,NULL,0);
     if (CmiMyNodeGlobal() == 0) {
       while (barrierReceived != 2) {
@@ -1932,7 +1876,7 @@ void LrtsExit(int exitcode)
   }
   else {
     char tmp[16];
-    sprintf(tmp, "%d", exitcode);
+    snprintf(tmp, sizeof(tmp), "%d", exitcode);
     Cmi_check_delay = 1.0;      /* speed up checking of charmrun */
     for(i = 0; i < CmiMyNodeSize(); i++) {
       ctrl_sendone_locking("ending",tmp,strlen(tmp)+1,NULL,0); /* this causes charmrun to go away, every PE needs to report */
@@ -2018,17 +1962,17 @@ void ConverseCleanup(void)
       ret[argc+1]="+newnumpes";
 
       char temp[50];
-      sprintf(temp,"%d", numProcessAfterRestart);
+      snprintf(temp, sizeof(temp), "%d", numProcessAfterRestart);
       ret[argc+2]=temp;
 
       ret[argc+3]="+mynewpe";
       char temp2[50];
-      sprintf(temp2,"%d", mynewpe);
+      snprintf(temp2, sizeof(temp2), "%d", mynewpe);
       ret[argc+4]=temp2;
 
       ret[argc+5]="+myoldpe";
       char temp3[50];
-      sprintf(temp3,"%d", CmiMyPe());
+      snprintf(temp3, sizeof(temp3), "%d", CmiMyPe());
       ret[argc+6]=temp3;
 
       if (restart_idx == -1) {
@@ -2135,7 +2079,6 @@ static int net_default_skt_abort(SOCKET skt,int code,const char *msg)
 
 void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 {
-  int i;
   Cmi_netpoll = 0;
 #if CMK_NETPOLL
   Cmi_netpoll = 1;

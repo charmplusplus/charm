@@ -119,7 +119,6 @@ void pathHistoryManager::traceCriticalPathBackStepByStep(pathInformationMsg *msg
 void pathHistoryManager::broadcastCriticalPathProjections(pathInformationMsg *msg){
 
   CkPrintf("[%d] Received broadcast of critical path\n", CkMyPe());
-  int me = CkMyPe();
   int intersectsLocalPE = false;
 
   // Create user events for critical path
@@ -208,9 +207,9 @@ void automaticallySetMessagePriority(envelope *env){
     case ForBocMsg:
     case ArrayEltInitMsg:
         {        
-          const int arr = env->getArrayMgrIdx();
           const int count = criticalPathForPriorityCounts.count(ep);
 #if DEBUG
+          const int arr = env->getArrayMgrIdx();
           CkPrintf("[%d] destination array,ep occurs %d times along stored critical path\n", CkMyPe(), count);
 #endif
       	
@@ -257,7 +256,6 @@ void pathHistoryManager::saveCriticalPathForPriorities(pathInformationMsg *msg){
     
     PathHistoryTableEntry &e = msg->history[i];
     
-//#if 1 
 #if DEBUG
     if(CkMyPe() == 0){
         char name[100];
@@ -276,6 +274,7 @@ void pathHistoryManager::saveCriticalPathForPriorities(pathInformationMsg *msg){
       criticalPathForPriorityCounts[e.local_ep] = 1;  
   }
 
+#if DEBUG
   // print out the list just for debugging purposes
   if(CkMyPe() == 0){
     std::map< int, int>::iterator iter;
@@ -283,12 +282,10 @@ void pathHistoryManager::saveCriticalPathForPriorities(pathInformationMsg *msg){
       int epidx = iter->first;
       const int c = iter->second;
 
-#if DEBUG
       CkPrintf("[%d] On critical path EP %d occurs %d times\n", CkMyPe(), epidx, c);
-#endif
-
     }
   }
+#endif
 }
 
 /// Add an entry for this path history into the table, and write the corresponding information into the outgoing envelope

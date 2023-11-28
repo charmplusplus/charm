@@ -15,7 +15,7 @@ class immMessage : public CMessage_immMessage {
   char data[7];
 public:
   int iter;
-  immMessage(void) { sprintf(data, "Array!"); iter = 0; };
+  immMessage(void) { strcpy(data, "Array!"); iter = 0; }
   int check(void) { return !strcmp(data, "Array!"); }
 };
 

@@ -163,7 +163,6 @@ static int cpuTopoRecvHandlerIdx;
 
 static CpuTopology cpuTopo;
 static int done = 0;
-static int topoDone = 0;
 static int _noip = 0;
 
 }

@@ -2,8 +2,6 @@
 #include <stdlib.h>
 #include "mpi.h"
 
-#define BGPRINTF(x)
-
 #define DIMX 100
 #define DIMY 100
 #define DIMZ 100
@@ -117,7 +115,6 @@ int main(int ac, char** av)
   starttime = MPI_Wtime();
 
   for(iter=1; iter<=niter; iter++) {
-    BGPRINTF("interation starts at %f\n");
     maxerr = 0.0;
     copyout(cp.sbxm, cp.t, 1, 1, 1, DIMY, 1, DIMZ);
     copyout(cp.sbxp, cp.t, DIMX, DIMX, 1, DIMY, 1, DIMZ);

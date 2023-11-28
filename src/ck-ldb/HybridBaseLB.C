@@ -1040,7 +1040,6 @@ void HybridBaseLB::PropagateInfo(Location *loc, int n, int fromlevel)
   else {  // leaf node
       // now start to migrate
     std::vector<MigrationRecord> & outObjs = lData->outObjs;
-    int migs = outObjs.size() + newObjs.size();
     for (i=0; i<outObjs.size(); i++) {
       if (outObjs[i].toPe == -1) {
         for (obj=0; obj<n; obj++) {
@@ -1083,8 +1082,6 @@ void HybridBaseLB::PropagateInfo(Location *loc, int n, int fromlevel)
 void HybridBaseLB::MigrationDone(int balancing)
 {
 #if CMK_LBDB_ON
-  LevelData *lData = levelData[0];
-
   DEBUGF(("[%d] HybridBaseLB::MigrationDone!\n", CkMyPe()));
 
   lbmgr->incStep();

@@ -75,10 +75,10 @@ function parse_triplet() {
   # Extract extra options from the full_triplet, e.g.,
   # full_triplet='netlrts-darwin-x86_64-smp-omp'
   # becomes actual_triplet='netlrts-darwin-x86_64' and extra_triplet_opts='smp omp'
-  all_triplets=$(cd "$my_srcdir"/src/arch && find . -maxdepth 1 -name '*-*' -type d | sed 's,./,,')
+  all_triplets=$(cd "$my_srcdir/src/arch" && find . -maxdepth 1 -name '*-*' -type d | sed 's,./,,')
   extra_triplet_opts="$full_triplet"
   for t in $all_triplets; do
-    extra_triplet_opts=${extra_triplet_opts#$t}
+    extra_triplet_opts=${extra_triplet_opts#"$t"}
     [[ $full_triplet == $t* ]] && actual_triplet=$t
   done
   if [[ -z ${actual_triplet:-} ]]; then
@@ -103,8 +103,10 @@ opt_charmdebug=0
 opt_controlpoint=0
 opt_cuda=0
 opt_destination=""
+opt_disabletls=0
 opt_install_prefix=""
 opt_drone_mode=0
+opt_enable_fortran=1
 opt_error_checking= #undef
 opt_extra_opts=()
 opt_incdir=()
@@ -240,14 +242,25 @@ function parse_platform_compilers() {
       opt_FC=ifort
       opt_compiler+=("$arg")
       ;;
+    ifx)
+      opt_FC=ifx
+      opt_compiler+=("$arg")
+      ;;
     xlc|xlc64)
       opt_CC=xlc_r
       opt_CXX=xlC_r
       opt_FC=xlf90_r
       opt_compiler+=("$arg")
       ;;
-    pgcc|pgf90)
-      echo "*** Warning: Ignoring unsupported option '$arg'."
+    pgcc)
+      opt_CC=pgcc
+      command -v pgc++ >/dev/null 2>&1 && opt_CXX=pgc++ || opt_CXX=pgCC
+      opt_FC=pgf90
+      opt_compiler+=("$arg")
+      ;;
+    pgf90)
+      opt_FC=pgf90
+      opt_compiler+=("$arg")
       ;;
     msvc)
       opt_CC=msvc # fake, will be replaced below
@@ -257,6 +270,16 @@ function parse_platform_compilers() {
       opt_CC=mpicc
       opt_CXX=mpicxx
       opt_FC=mpif90
+      opt_compiler+=("$arg")
+      ;;
+    nvc|nvhpc)
+      opt_CC=nvc
+      opt_CXX=nvc++
+      opt_FC=nvfortran
+      opt_compiler+=("$arg")
+      ;;
+    nvfortran)
+      opt_FC=nvfortran
       opt_compiler+=("$arg")
       ;;
     *)
@@ -410,6 +433,12 @@ function processArgs() {
       --destination=*)
         opt_destination=${arg#*=}
         ;;
+      --disable-tls)
+        opt_disabletls=1
+        ;;
+      --disable-fortran)
+        opt_enable_fortran=0
+        ;;
       --install-prefix=*)
         opt_install_prefix=${arg#*=}
         ;;
@@ -471,13 +500,16 @@ for c in "$opt_lrts_pmi" "${opt_compiler[@]}"; do
   [[ -n "$c" ]] && builddir_extra+="-$c"
 done
 
+# Use slurmpmi2 by default for ofi builds on Cray platforms (e.g. Cray
+# Shasta/EX) since it matches the interface of cray-pmi
+if [[ "$actual_triplet" = ofi-cray* && -z "$opt_lrts_pmi" ]]; then
+    opt_lrts_pmi="slurmpmi2"
+fi
+
+# Default to using simplepmi on non-Cray OFI platforms
 is_ofi_ucx="^(ofi|ucx).*"
 if [[ $actual_triplet =~ $is_ofi_ucx && $opt_lrts_pmi == "" ]]; then
     opt_lrts_pmi="simplepmi"
-fi
-
-if [[ "$actual_triplet" = ofi-cray* && -z "$opt_lrts_pmi" ]]; then
-    opt_lrts_pmi="slurmpmi2"
 fi
 
 if [[ -n "$opt_destination" ]]; then
@@ -568,7 +600,7 @@ if [[ $VERBOSE -eq 1 ]]; then
 
   # Print selected options
   for option in ${!opt*}; do
-    echo "  $option = ${!option}"
+    echo "  $option = ${!option[*]:-}"
   done
 fi
 
@@ -608,7 +640,9 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
   -DCHARMDEBUG="$opt_charmdebug" \
   -DCONTROLPOINT="$opt_controlpoint" \
   -DCUDA="$opt_cuda" \
+  -DDISABLE_TLS="$opt_disabletls" \
   -DDRONE_MODE="$opt_drone_mode" \
+  -DENABLE_FORTRAN=$opt_enable_fortran \
   -DERROR_CHECKING="$opt_error_checking" \
   -DEXTRA_OPTS="${opt_extra_opts[*]}" \
   -DLBTIME_TYPE="$opt_lbtime_type" \
@@ -649,7 +683,7 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
 [[ $VERBOSE -eq 1 ]] && export VERBOSE
 make "$opt_parallel"
 
-# Only Install if the user provides an install prefix with the 
+# Only Install if the user provides an install prefix with the
 # `--install-prefix` option. Without this option, `make install` would be a
 # no-op.
 if [[ -n "$opt_install_prefix" ]]

@@ -22,7 +22,7 @@ class Ping: public PUP::able {
   Ping(CkMigrateMessage *m) : PUP::able(m) { }
   virtual ~Ping() { }
 
-  virtual void pup(PUP::er &p) override {
+  virtual void pup(PUP::er &p) {
     PUP::able::pup(p);
     p | value_;
   }

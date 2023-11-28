@@ -1,8 +1,9 @@
 -include ../../common.mk
 CHARMDIR = ../../..
+-include $(CHARMDIR)/include/conv-mach-opt.mak
 CHARMC = $(CHARMDIR)/bin/charmc $(OPTS)
 INCL = -I/usr/include/python/
-LIBS = -lpthread -lutil -ldl -lm -lpython2.5
+LIBS = -lpthread -lutil -ldl -lm -lpython$(CMK_BUILD_PYTHON)
 INCLC = -I$(CHARMDIR)/include/
 MODULES = -module PythonCCS -module charmdebug_python
 PYMODULE = $(CHARMDIR)/lib/libmodulePythonCCS.a
@@ -19,7 +20,7 @@ server.decl.h: server.ci $(PYMODULE) $(CHARMDIR)/bin/charmxi
 	$(CHARMC) $<
 
 client: client.C
-	g++ $(INCLC) $(OPTS) -o $@ $^ $(PYMODULE)
+	$(CHARMC) -seq $(INCLC) $(OPTS) -o $@ $^ $(PYMODULE) -lccs-client
 
 clean:
 	rm -f *.decl.h *.def.h *.o server client charmrun *~

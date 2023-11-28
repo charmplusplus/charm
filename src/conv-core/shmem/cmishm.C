@@ -37,7 +37,7 @@ static std::pair<int, ipc_shared_*> openShared_(int node) {
   // generate a name for this pe
   auto slen = snprintf(NULL, 0, CMI_SHARED_FMT, (std::size_t)CsvAccess(node_pid), node);
   auto name = new char[slen];
-  sprintf(name, CMI_SHARED_FMT, (std::size_t)CsvAccess(node_pid), node);
+  snprintf(name, slen, CMI_SHARED_FMT, (std::size_t)CsvAccess(node_pid), node);
   DEBUGP(("%d> opening share %s\n", CmiMyPe(), name));
   // try opening the share exclusively
   auto fd = shm_open(name, O_CREAT | O_EXCL | O_RDWR, 0666);
@@ -90,7 +90,7 @@ struct CmiIpcManager : public ipc_metadata_ {
         auto slen =
             snprintf(NULL, 0, CMI_SHARED_FMT, (std::size_t)CsvAccess(node_pid), proc);
         auto name = new char[slen];
-        sprintf(name, CMI_SHARED_FMT, (std::size_t)CsvAccess(node_pid), proc);
+        snprintf(name, slen, CMI_SHARED_FMT, (std::size_t)CsvAccess(node_pid), proc);
         shm_unlink(name);
         delete[] name;
       }

@@ -14,11 +14,13 @@
    PythonIterator needs to be coherent across client and server.
 */
 
-#include "converse.h"
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <netinet/in.h>
+
+typedef uint32_t CmiUInt4;
 
 /* This class is empty, and should be reimplemented by the user */
 class PythonIterator {

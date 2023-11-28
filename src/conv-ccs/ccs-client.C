@@ -68,7 +68,7 @@ static void printSvr(CcsServer *svr)
 {
   char ipBuf[200];
   int i;
-  DEBUGF(("hostIP: %s\n", skt_print_ip(ipBuf,svr->hostIP)));
+  DEBUGF(("hostIP: %s\n", skt_print_ip(ipBuf,sizeof(ipBuf),svr->hostIP)));
   DEBUGF(("hostPort: %d\n", svr->hostPort));
   DEBUGF(("authentication: %d\n", svr->isAuth));
   DEBUGF(("replyFd: %d\n", svr->replyFd));

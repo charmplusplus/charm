@@ -95,10 +95,10 @@ test::distrib(void)
   {
     char *str = new char[1024];
     char stmp[32];
-    sprintf(str, "Distrib: ");
+    strcpy(str, "Distrib: ");
     for(i=0;i<numrecd;i++)
     {
-      sprintf(stmp, "%d=>%d ", i, cp[i]);
+      snprintf(stmp, sizeof(stmp), "%d=>%d ", i, cp[i]);
       strcat(str, stmp);
     }
     CkPrintf("%s\n", str);

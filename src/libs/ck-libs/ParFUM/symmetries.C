@@ -458,7 +458,6 @@ FLINKAGE void FTN_NAME(FEM_SET_SYM_NODES,fem_set_sym_nodes)
   const int a2bPoints=aPoints;
 
 
-static CrnStream rs;
 
 void print(const char *str) {
 	printf("%s",str);
@@ -470,7 +469,7 @@ void print(const CkVector3d &src,int digits=3) {
 
 //Return random number on [0,max]
 double randVal(double max) {
-	return max*CrnDouble(&rs);
+	return max*CrnDrand();
 }
 CkVector3d randVec(const CkVector3d &scale) {
 	return CkVector3d(randVal(scale.x),randVal(scale.y),randVal(scale.z));
@@ -537,7 +536,6 @@ void testUnion(int n,int *parent) {
 int main(int argc,char *argv[])
 {
   CkPrintf("init called\n");
-  CrnInitStream(&rs,0,0);
   int facesA[nFaces*nPer],facesB[nFaces*nPer];
   const int nPoints=aPoints+bPoints;
   CkVector3d pts[nPoints];

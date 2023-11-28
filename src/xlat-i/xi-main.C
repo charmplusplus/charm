@@ -43,7 +43,7 @@ void ReservedWord(int token, int fCol, int lCol) {
       break;
     }
   }
-  sprintf(text, "Reserved word '%s' used as an identifier", word);
+  snprintf(text, sizeof(text), "Reserved word '%s' used as an identifier", word);
   xi::pretty_msg("error", text, fCol, lCol);
   yyerror(text);
 }

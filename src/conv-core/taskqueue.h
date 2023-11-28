@@ -61,7 +61,6 @@ inline static void* TaskQueuePop(TaskQueue Q) { // Pop happens in the same worke
 
 inline static void* TaskQueueSteal(TaskQueue Q) {
   taskq_idx h, t;
-  void *task;
   while (1) {
     h = Q->head;
     t = Q->tail;

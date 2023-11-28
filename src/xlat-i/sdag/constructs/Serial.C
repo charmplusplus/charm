@@ -76,13 +76,13 @@ void SerialConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
 void SerialConstruct::generateTrace() {
   char traceText[1024];
   if (traceName) {
-    sprintf(traceText, "%s_%s", CParsedFile::className->charstar(),
-            traceName->charstar());
+    snprintf(traceText, sizeof(traceText), "%s_%s", CParsedFile::className->charstar(),
+             traceName->charstar());
     // remove blanks
     for (unsigned int i = 0; i < strlen(traceText); i++)
       if (traceText[i] == ' ' || traceText[i] == '\t') traceText[i] = '_';
   } else {
-    sprintf(traceText, "%s%s", CParsedFile::className->charstar(), label->charstar());
+    snprintf(traceText, sizeof(traceText), "%s%s", CParsedFile::className->charstar(), label->charstar());
   }
   traceName = new XStr(traceText);
 

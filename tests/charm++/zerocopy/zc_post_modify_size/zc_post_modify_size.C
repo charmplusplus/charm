@@ -92,16 +92,16 @@ class arr : public CBase_arr {
 
     void recv_zerocopy(int *buffer, size_t size, bool isBcast) {
       if(isBcast) {
-        verifyValuesWithConstant(destBuffer, SIZE/2, CONSTANT);
-        verifyValuesWithIndex(destBuffer, SIZE, SIZE/2);
+        verifyValuesWithConstant(buffer, SIZE/2, CONSTANT);
+        verifyValuesWithIndex(buffer, SIZE, SIZE/2);
 
         CkCallback doneCb = CkCallback(CkReductionTarget(tester, bcastDone), chareProxy);
         contribute(doneCb);
 
         delete [] destBuffer;
       } else {
-        verifyValuesWithConstant(destBuffer, SIZE/4, CONSTANT);
-        verifyValuesWithIndex(destBuffer, SIZE, SIZE/4);
+        verifyValuesWithConstant(buffer, SIZE/4, CONSTANT);
+        verifyValuesWithIndex(buffer, SIZE, SIZE/4);
 
         chareProxy.p2pDone();
       }
@@ -128,16 +128,16 @@ class grp : public CBase_grp {
 
     void recv_zerocopy(int *buffer, size_t size, bool isBcast) {
       if(isBcast) {
-        verifyValuesWithConstant(destBuffer, SIZE/2, CONSTANT);
-        verifyValuesWithIndex(destBuffer, SIZE, SIZE/2);
+        verifyValuesWithConstant(buffer, SIZE/2, CONSTANT);
+        verifyValuesWithIndex(buffer, SIZE, SIZE/2);
 
         CkCallback doneCb = CkCallback(CkReductionTarget(tester, bcastDone), chareProxy);
         contribute(doneCb);
 
         delete [] destBuffer;
       } else {
-        verifyValuesWithConstant(destBuffer, SIZE/4, CONSTANT);
-        verifyValuesWithIndex(destBuffer, SIZE, SIZE/4);
+        verifyValuesWithConstant(buffer, SIZE/4, CONSTANT);
+        verifyValuesWithIndex(buffer, SIZE, SIZE/4);
 
         chareProxy.p2pDone();
       }
@@ -152,7 +152,7 @@ class nodegrp : public CBase_nodegrp {
       assignValuesToIndex(destBuffer, SIZE/2);
     }
 
-    void recv_zerocopy(int *buffer, size_t &size, bool isBcast, CkNcpyBufferPost *ncpyPost) {
+    void recv_zerocopy(int *buffer, size_t size, bool isBcast, CkNcpyBufferPost *ncpyPost) {
       CkMatchBuffer(ncpyPost, 0, arrSize + CkNumPes() + thisIndex);
 
       if(isBcast) {
@@ -164,15 +164,15 @@ class nodegrp : public CBase_nodegrp {
 
     void recv_zerocopy(int *buffer, size_t size, bool isBcast) {
       if(isBcast) {
-        verifyValuesWithConstant(destBuffer, SIZE/2, CONSTANT);
+        verifyValuesWithConstant(buffer, SIZE/2, CONSTANT);
 
         CkCallback doneCb = CkCallback(CkReductionTarget(tester, bcastDone), chareProxy);
         contribute(doneCb);
 
         delete [] destBuffer;
       } else {
-        verifyValuesWithConstant(destBuffer, SIZE/4, CONSTANT);
-        verifyValuesWithIndex(destBuffer, SIZE/2, SIZE/4);
+        verifyValuesWithConstant(buffer, SIZE/4, CONSTANT);
+        verifyValuesWithIndex(buffer, SIZE/2, SIZE/4);
 
         chareProxy.p2pDone();
       }

@@ -114,19 +114,19 @@ CkCppInterpreter::CkCppInterpreter(const char *cppCode,const char *inclPath)
 
 /*Write the c++ code to a temporary file:*/
 	char sourceFile[256];
-	sprintf(sourceFile,"%s/ckSharedLib_%d_%d_%p.%s",
+	snprintf(sourceFile,sizeof(sourceFile),"%s/ckSharedLib_%d_%d_%p.%s",
 		CMK_SCRATCH_PATH,randA,randB,(void*)this,"cpp");
 	FILE *f=fopen(sourceFile,"w"); if (f==NULL) return;
 	fputs(cppCode,f);
 	fclose(f);
 
 /*Allocate a spot for the library file:*/
-	sprintf(libraryFile,"%s/ckSharedLib_%d_%d_%p%s",
+	snprintf(libraryFile,sizeof(libraryFile),"%s/ckSharedLib_%d_%d_%p%s",
 		CMK_SCRATCH_PATH,randA,randB,(void*)this,CkDll::extension);
 	
 //Compile the .cpp file into a .dll:
 	char compilerCmd[1024];
-	sprintf(compilerCmd,"%s%s %s %s%s",
+	snprintf(compilerCmd,sizeof(compilerCmd),"%s%s %s %s%s",
 		CMK_DLL_CC, libraryFile, sourceFile,
 		inclPath!=NULL?CMK_DLL_INC:"",inclPath!=NULL?inclPath:"");
 	
@@ -144,7 +144,7 @@ CkCppInterpreter::CkCppInterpreter(const char *cppCode,const char *inclPath)
 	// HIDEOUS HACK: playing silly games with filename:
 	//    CC source -o foo.so
 	//    CC foo.so -o foo.sop
-	sprintf(compilerCmd,"%s%sp %s",
+	snprintf(compilerCmd,sizeof(compilerCmd),"%s%sp %s",
 		CMK_DLL_LINK, libraryFile, libraryFile);
 	compilerRet=CkSystem(compilerCmd);
 	unlink(libraryFile);

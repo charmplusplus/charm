@@ -23,6 +23,13 @@
 # include <sys/types.h>
 # include <sys/wait.h>
 # include <errno.h>
+# if CMK_HAS_POSIX_SPAWN
+#  ifndef _GNU_SOURCE
+#   define _GNU_SOURCE
+#  endif
+#  include <spawn.h>
+extern char **environ;
+# endif
 #endif
 
 #include <string>
@@ -48,11 +55,33 @@ static void fs_copy(const char * src, const char * dst)
     CkAbort(abortmsg);
   }
 #else
+  const char * const params[] = { "/bin/cp", src, dst, nullptr };
+#if CMK_HAS_POSIX_SPAWN
+  posix_spawnattr_t attr;
+  short flags;
+  posix_spawnattr_init(&attr);
+  posix_spawnattr_getflags(&attr, &flags);
+#ifdef POSIX_SPAWN_USEVFORK
+  flags |= POSIX_SPAWN_USEVFORK;
+#endif
+  posix_spawnattr_setflags(&attr, flags);
+
+  pid_t pid;
+  int ret = posix_spawn(&pid, params[0], nullptr, &attr, const_cast<char * const *>(params), environ);
+
+  posix_spawnattr_destroy(&attr);
+
+  if (ret != 0)
+  {
+    CkError("ERROR> posix_spawn(): %s\n", strerror(ret));
+    CkAbort(abortmsg);
+  }
+#else
   pid_t pid = fork();
   if (pid == 0)
   {
-    execl("/bin/cp", "/bin/cp", src, dst, nullptr);
-    CkError("ERROR> execl(): %s\n", strerror(errno));
+    execv(params[0], const_cast<char * const *>(params));
+    CkError("ERROR> execv(): %s\n", strerror(errno));
     CkAbort(abortmsg);
   }
   else if (pid < 0)
@@ -60,6 +89,7 @@ static void fs_copy(const char * src, const char * dst)
     CkError("ERROR> fork(): %s\n", strerror(errno));
     CkAbort(abortmsg);
   }
+#endif
   else
   {
     int status;

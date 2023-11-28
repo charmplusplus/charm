@@ -273,7 +273,6 @@ class Jacobi: public CBase_Jacobi {
     void doStep(void) {
       if (thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0 && iterations % PRINT_FREQ == 0) {
           CkPrintf("Start of iteration %d at %f\n", iterations,CmiWallTimer());
-          //BgPrintf("BgPrint> Start of iteration at %f\n");
       }
       iterations++;
 	imsg++;

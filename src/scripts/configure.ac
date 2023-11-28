@@ -7,11 +7,11 @@
 # Increment the second and third digits when making a minor feature release
 # Increment the first digit when making a major feature release
 
-AC_INIT([Charm++], [70000], [charm@cs.illinois.edu], [charm], [https://charm.cs.illinois.edu/])
+AC_INIT([Charm++],[70000],[charm@cs.illinois.edu],[charm],[https://charm.cs.illinois.edu/])
 
 AC_CONFIG_SRCDIR(./Makefile)
 
-AC_CONFIG_HEADER(conv-autoconfig.h)
+AC_CONFIG_HEADERS([conv-autoconfig.h])
 
 AC_CONFIG_COMMANDS([config-cleanup],
                    [sed -i -e 's:^#define\s\+PACKAGE://&:' conv-autoconfig.h])
@@ -210,6 +210,12 @@ else
   add_make_flag 'CMK_TRACE_ENABLED:=1' 'tracing'
 fi
 
+AC_ARG_ENABLE([tls],
+            [AS_HELP_STRING([--enable-tls],
+              [enable tls support])],
+            [enable_tls=$enableval],
+            [enable_tls=yes])
+
 AC_ARG_ENABLE([tracing-commthread],
             [AS_HELP_STRING([--enable-tracing-commthread],
               [enable tracing communication thread])], ,
@@ -257,6 +263,21 @@ else
   AC_DEFINE_UNQUOTED(CMK_DRONE_MODE, 1, [enable drone mode])
 fi
 
+AC_ARG_ENABLE([ccs],
+            [AS_HELP_STRING([--enable-ccs],
+              [enable CCS])], ,
+            [enable_ccs=yes])
+
+if test "$enable_ccs" = "no" -o "$CMK_CCS_AVAILABLE" = '0'
+then
+  Echo "CCS is disabled"
+  AC_DEFINE_UNQUOTED(CMK_CCS_AVAILABLE, 0, [disable ccs])
+  CMK_CCS_AVAILABLE='0'
+else
+  Echo "CCS is enabled"
+  AC_DEFINE_UNQUOTED(CMK_CCS_AVAILABLE, 1, [enable ccs])
+fi
+
 AC_ARG_ENABLE([charmdebug],
             [AS_HELP_STRING([--enable-charmdebug],
               [enable charmDebug])], ,
@@ -294,20 +315,6 @@ else
     Echo "Charm record/replay is enabled"
     AC_DEFINE_UNQUOTED(CMK_REPLAYSYSTEM, 1, [enable replay])
   fi
-fi
-
-AC_ARG_ENABLE([ccs],
-            [AS_HELP_STRING([--enable-ccs],
-              [enable CCS])], ,
-            [enable_ccs=yes])
-
-if test "$enable_ccs" = "no" -o "$CMK_CCS_AVAILABLE" = '0'
-then
-  Echo "CCS is disabled" 
-  AC_DEFINE_UNQUOTED(CMK_CCS_AVAILABLE, 0, [disable ccs])
-else
-  Echo "CCS is enabled" 
-  AC_DEFINE_UNQUOTED(CMK_CCS_AVAILABLE, 1, [enable ccs])
 fi
 
 AC_ARG_ENABLE([controlpoint],
@@ -783,8 +790,6 @@ then
   echo "For Intel's compiler please see"
   echo "https://github.com/UIUC-PPL/charm/issues/1560"
   echo "about making a suitable version of gcc/g++/libstdc++ available"
-  echo
-  echo "For Blue Gene/Q please use the Clang compiler"
   test_finish 1
 fi
 
@@ -823,10 +828,13 @@ fi
 test_cxx "whether C++ compiler accepts -ftls-model=initial-exec" "yes" "no" "-ftls-model=initial-exec"
 if test $strictpass -eq 1
 then
-    add_flag 'CMK_COMPILER_KNOWS_FTLS_MODEL="1"' "tlsglobals"
-    OPTS_CC="$OPTS_CC -ftls-model=initial-exec"
-    OPTS_CXX="$OPTS_CXX -ftls-model=initial-exec"
-    OPTS_LD="$OPTS_LD -ftls-model=initial-exec"
+    if test "$enable_tls" = "yes"
+    then
+      add_flag 'CMK_COMPILER_KNOWS_FTLS_MODEL="1"' "tlsglobals"
+      OPTS_CC="$OPTS_CC -ftls-model=initial-exec"
+      OPTS_CXX="$OPTS_CXX -ftls-model=initial-exec"
+      OPTS_LD="$OPTS_LD -ftls-model=initial-exec"
+    fi
 fi
 
 # Test for a flag important for shared linking
@@ -1202,7 +1210,7 @@ test_cxx "whether C++ library has <cstdatomic> " "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_CXX0X_CSTDATOMIC, $pass, [whether C++ library has <cstdatomic>])
 fi
 
-if test $pass -ne 1 -a "$CMK_COMPILER" != "bgxlc"
+if test $pass -ne 1
 then
 	echo "Charm++ requires C++11 atomic support"
 	test_finish 1
@@ -2545,7 +2553,7 @@ add_flag "CMK_HAS_ELF_H='$pass'" "elf.h"
 
 CMK_SUPPORTS_SWAPGLOBALS='0'
 CMK_SUPPORTS_TLSGLOBALS='0'
-if [[ "$CMK_MACOSX" = '1' -a "$CMK_VDIR" = "${CMK_VDIR%x86_64}x86_64" ]]
+if [[ "$CMK_MACOSX" = '1' ]]
 then
   CMK_SUPPORTS_TLSGLOBALS='1'
 elif test $pass -eq 1
@@ -2582,13 +2590,20 @@ then
   fi
 fi
 
+if test "$enable_tls" = "yes"
+then
+    add_flag 'CMK_USER_DISABLED_TLS="0"' "tlsglobals"
+else
+    add_flag 'CMK_USER_DISABLED_TLS="1"' "tlsglobals"
+    CMK_SUPPORTS_TLSGLOBALS='0'
+fi
+
 AC_DEFINE_UNQUOTED(CMK_SUPPORTS_SWAPGLOBALS, $CMK_SUPPORTS_SWAPGLOBALS, [whether supports swapglobals])
 add_flag "CMK_SUPPORTS_SWAPGLOBALS=$CMK_SUPPORTS_SWAPGLOBALS" 'swapglobals'
 add_make_flag "CMK_SUPPORTS_SWAPGLOBALS:=$CMK_SUPPORTS_SWAPGLOBALS" 'swapglobals'
 AC_DEFINE_UNQUOTED(CMK_SUPPORTS_TLSGLOBALS, $CMK_SUPPORTS_TLSGLOBALS, [whether supports tlsglobals])
 add_flag "CMK_SUPPORTS_TLSGLOBALS=$CMK_SUPPORTS_TLSGLOBALS" 'tlsglobals'
 add_make_flag "CMK_SUPPORTS_TLSGLOBALS:=$CMK_SUPPORTS_TLSGLOBALS" 'tlsglobals'
-
 
 #### test if has Multiprocessing.h for apple ####
 cat > $t <<EOT
@@ -2669,7 +2684,7 @@ fi
 fi
 
 #### test if Python headers are installed ####
-PYTHON_VERSION=`python -V 2>&1 | awk {'print $2'} | awk -F. {'print $1"."$2'}`
+PYTHON_VERSION=`python2 -V 2>&1 | awk {'print $2'} | awk -F. {'print $1"."$2'}`
 cat > $t <<EOT
 #include "python${PYTHON_VERSION}/Python.h"
 #include "python${PYTHON_VERSION}/compile.h"

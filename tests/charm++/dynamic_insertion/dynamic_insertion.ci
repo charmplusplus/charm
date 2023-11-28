@@ -1,0 +1,28 @@
+mainmodule dynamic_insertion {
+
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_DgElement dgElementProxy;
+  mainchare Main {
+    entry Main(CkArgMsg* msg);
+    entry void initialize();
+    entry void create_new_elements();
+    entry void ping_elements();
+    entry void exit();
+    entry [reductiontarget] void check_sum(int sum);    
+    entry void begin_array_insertion();
+    entry void end_array_insertion();
+  };
+
+  group DgGroup {
+    entry DgGroup();
+    entry void begin_array_insertion();
+    entry void end_array_insertion();
+    entry void create_new_element(int iteration, int new_id);
+  };  
+
+  array [1D] DgElement {
+    entry DgElement(int iteration);
+    entry void ping(int iteration);
+    entry void create_new_element(int iteration, int new_id);
+  };
+};

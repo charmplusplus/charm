@@ -23,7 +23,7 @@ class SpawnedEvent {
   SpawnedEvent() : objIdx(-1), timestamp(POSE_UnsetTS),next(NULL){ }
   /// Initializing constructor
   SpawnedEvent(int idx, eventID e, POSE_TimeType ts, SpawnedEvent *n) 
-    :objIdx (idx), evID(e),  timestamp(ts), next(n)
+    :objIdx (idx), timestamp(ts), evID(e), next(n)
     {
     }
   /// Pack/unpack/sizing operator

@@ -273,15 +273,16 @@ void LBSimulation::PrintSimulationResults()
 void LBSimulation::PrintDecisions(LBMigrateMsg *m, char *simFileName,
 				  int peCount)
 {
-  char *resultFile = (char *)malloc((strlen(simFileName) +
-				     strlen("results") + 2)*sizeof(char));
-  sprintf(resultFile,"%s.results", simFileName);
+  int len = (strlen(simFileName) + strlen("results") + 2)*sizeof(char);
+  char *resultFile = (char *)malloc(len);
+  snprintf(resultFile, len, "%s.results", simFileName);
   FILE *f = fopen(resultFile, "w");
   fprintf(f, "%d %d\n", peCount, m->n_moves); // header
   for (int i=0; i<m->n_moves; i++) {
     fprintf(f, "%" PRIu64 " ", m->moves[i].obj.id);
     fprintf(f, "%d\n",m->moves[i].to_pe);
   }
+  fclose(f);
 }
 
 void LBSimulation::PrintDifferences(LBSimulation *realSim, BaseLB::LDStats *stats)
