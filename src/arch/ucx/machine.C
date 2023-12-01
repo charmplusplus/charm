@@ -280,7 +280,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     ucs_status_t status;
     int ret;
 
-    if (CmiGetArgFlag(largv, "+comm_thread_only_recv")) {
+    if (CmiGetArgFlag(*argv, "+comm_thread_only_recv")) {
 #if CMK_SMP
       Cmi_smp_mode_setting = COMM_THREAD_ONLY_RECV;
 #else
@@ -567,7 +567,7 @@ inline void* UcxSendMsg(int destNode, int destPE, int size, char *msg,
 
 #if CMK_SMP
     if (Cmi_smp_mode_setting == COMM_THREAD_SEND_RECV) {
-        UcxPendingRequest *req = (UcxPendingRequest*)CmiAlloc(sizeof(UcxPendingRequest));
+        UcxPendingRequest* req = (UcxPendingRequest*)CmiAlloc(sizeof(UcxPendingRequest));
         req->msgBuf = msg;
         req->size   = size;
         req->tag    = sTag;
@@ -578,10 +578,9 @@ inline void* UcxSendMsg(int destNode, int destPE, int size, char *msg,
         UCX_LOG(3, " --> (PE=%i) enq msg (queue depth=%i), dNode %i, size %i",
                 CmiMyPe(), PCQueueLength(ucxCtx.txQueue), destNode, size);
         PCQueuePush(ucxCtx.txQueue, (char *)req);
+        return req;
     } else {
-        UcxRequest *req;
-
-        req = (UcxRequest*)ucp_tag_send_nb(ucxCtx.eps[destNode], msg, size,
+        UcxRequest* req = (UcxRequest*)ucp_tag_send_nb(ucxCtx.eps[destNode], msg, size,
                                         ucp_dt_make_contig(1), sTag, cb);
         if (!UCS_PTR_IS_PTR(req)) {
             CmiEnforce(!UCS_PTR_IS_ERR(req));
@@ -589,11 +588,10 @@ inline void* UcxSendMsg(int destNode, int destPE, int size, char *msg,
         }
 
         req->msgBuf = msg;
+        return req;
     }
 #else
-    UcxRequest *req;
-
-    req = (UcxRequest*)ucp_tag_send_nb(ucxCtx.eps[destNode], msg, size,
+    UcxRequest* req = (UcxRequest*)ucp_tag_send_nb(ucxCtx.eps[destNode], msg, size,
                                        ucp_dt_make_contig(1), sTag, cb);
     if (!UCS_PTR_IS_PTR(req)) {
         CmiEnforce(!UCS_PTR_IS_ERR(req));
@@ -601,9 +599,8 @@ inline void* UcxSendMsg(int destNode, int destPE, int size, char *msg,
     }
 
     req->msgBuf = msg;
-#endif
-
     return req;
+#endif
 }
 
 /**
