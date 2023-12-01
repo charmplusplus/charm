@@ -280,6 +280,14 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     ucs_status_t status;
     int ret;
 
+    if (CmiGetArgFlag(largv, "+comm_thread_only_recv")) {
+#if CMK_SMP
+      Cmi_smp_mode_setting = COMM_THREAD_ONLY_RECV;
+#else
+      CmiAbort("+comm_thread_only_recv option can only be used with SMP version of Charm++");
+#endif
+    }
+
     ret = runtime_init(myNodeID, numNodes);
     UCX_CHECK_PMI_RET(ret, "runtime_init");
 
@@ -331,6 +339,11 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     // Ensure connects completion
     status = ucp_worker_flush(ucxCtx.worker);
     UCX_CHECK_STATUS(status, "ucp_worker_flush");
+
+#if CMK_SMP
+    if (Cmi_smp_mode_setting == COMM_THREAD_SEND_RECV)
+        ucxCtx.txQueue = PCQueueCreate();
+#endif
 
     UCX_LOG(5, "Initialized: preposted reqs %d, rndv thresh %d\n",
             ucxCtx.numRxReqs, ucxCtx.eagerSize);
@@ -552,6 +565,32 @@ inline void* UcxSendMsg(int destNode, int destPE, int size, char *msg,
     UCX_LOG(3, "destNode=%i destPE=%i size=%i msg=%p, tag=%" PRIu64,
             destNode, destPE, size, msg, tag);
 
+#if CMK_SMP
+    if (Cmi_smp_mode_setting == COMM_THREAD_SEND_RECV) {
+        UcxPendingRequest *req = (UcxPendingRequest*)CmiAlloc(sizeof(UcxPendingRequest));
+        req->msgBuf = msg;
+        req->size   = size;
+        req->tag    = sTag;
+        req->dNode  = destNode;
+        req->cb     = cb;
+        req->op     = UCX_SEND_OP;   // Mark this request as a regular message (UCX_SEND_OP)
+
+        UCX_LOG(3, " --> (PE=%i) enq msg (queue depth=%i), dNode %i, size %i",
+                CmiMyPe(), PCQueueLength(ucxCtx.txQueue), destNode, size);
+        PCQueuePush(ucxCtx.txQueue, (char *)req);
+    } else {
+        UcxRequest *req;
+
+        req = (UcxRequest*)ucp_tag_send_nb(ucxCtx.eps[destNode], msg, size,
+                                        ucp_dt_make_contig(1), sTag, cb);
+        if (!UCS_PTR_IS_PTR(req)) {
+            CmiEnforce(!UCS_PTR_IS_ERR(req));
+            return NULL;
+        }
+
+        req->msgBuf = msg;
+    }
+#else
     UcxRequest *req;
 
     req = (UcxRequest*)ucp_tag_send_nb(ucxCtx.eps[destNode], msg, size,
@@ -562,6 +601,7 @@ inline void* UcxSendMsg(int destNode, int destPE, int size, char *msg,
     }
 
     req->msgBuf = msg;
+#endif
 
     return req;
 }
@@ -696,7 +736,12 @@ void LrtsAdvanceCommunication(int whileidle)
        if (msg != NULL) {
            UCX_LOG(3, "Got msg %p, len %zu\n", msg, info.length);
            UcxPostRxReq(UCX_MSG_TAG_PROBE, info.length, msg);
-       }
+        }
+    
+#if CMK_SMP
+        if (Cmi_smp_mode_setting == COMM_THREAD_SEND_RECV)
+            cnt += ProcessTxQueue();
+#endif
     } while (cnt);
 }
 
@@ -731,6 +776,10 @@ void LrtsExit(int exitcode)
 
     CmiFree(ucxCtx.eps);
     CmiFree(ucxCtx.rxReqs);
+#if CMK_SMP
+    if (Cmi_smp_mode_setting == COMM_THREAD_SEND_RECV)
+        PCQueueDestroy(ucxCtx.txQueue);
+#endif
 
     if(!CharmLibInterOperate || userDrivenMode) {
         ret = runtime_barrier();
