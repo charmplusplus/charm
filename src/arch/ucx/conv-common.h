@@ -93,4 +93,4 @@
 /* UCX machine layer supports GPU-aware communication */
 #define CMK_GPU_COMM                   1
 
-#define CMK_SMP_NO_COMMTHD
+#define CMK_SMP_NO_COMMTHD             1
