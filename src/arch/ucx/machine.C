@@ -299,6 +299,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
         UCX_CHECK_PMI_RET(ret, "runtime_init");
     }
 
+    CmiPrintf("First barrier %i, %i\n", CmiMyNode(), CmiMyRank());
     CmiNodeBarrier();
 
     status = ucp_config_read("Charm++", NULL, &config);
