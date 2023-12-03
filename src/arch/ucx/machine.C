@@ -625,7 +625,7 @@ static inline int ProcessTxQueue()
     {
         if(req->op == UCX_SEND_OP) { // Regular Message
             ucs_status_ptr_t status_ptr;
-            status_ptr = ucp_tag_send_nb(ucxCtx.eps[req->dNode], req->msgBuf,
+            status_ptr = ucp_tag_send_nb(ucxCtx.eps[CmiMyRank()][req->dNode], req->msgBuf,
                                          req->size, ucp_dt_make_contig(1),
                                          req->tag, req->cb);
 
