@@ -19,10 +19,9 @@ mainmodule jacobi3d {
   array [3D] Jacobi {
     entry Jacobi(void);
     entry void receiveGhosts(int ref, int dir, int w, int h, double gh[w*h]);
-    entry [reductiontarget] void recvConvergeResult(bool result);
 
     entry void run() {
-      while (!converged && iterations<maxiterations) {
+      while (iterations<maxiterations) {
         serial "begin_iteration" {
           begin_iteration();
         }
@@ -34,17 +33,9 @@ mainmodule jacobi3d {
 
         serial "compute" { 
           check_and_compute();
-        }
-        serial "compute_converge" {
-          bool conv = (max_error <= THRESHOLD);
-          CkCallback cb(CkReductionTarget(Jacobi, recvConvergeResult), thisProxy);
-          contribute(sizeof(bool), &conv, CkReduction::logical_and_bool, cb);
-        }
-        when recvConvergeResult(bool result) serial "check_converge"{
-          converged = result;
-           if ((result || iterations>=maxiterations) &&
+           if ((iterations>=maxiterations) &&
                thisIndex.x + thisIndex.y + thisIndex.z == 0) mainProxy.done(iterations);
-      }
+        }
       }
     };
   };

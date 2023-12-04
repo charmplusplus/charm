@@ -325,7 +325,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     wParams.field_mask  = UCP_WORKER_PARAM_FIELD_THREAD_MODE;
     wParams.thread_mode = UCS_THREAD_MODE_SINGLE;
 
-    ucxCtx.workers = (ucp_worker_h*) CmiAlloc(CmiNodeSize() * sizeof(ucp_worker_h));
+    ucxCtx.workers = (ucp_worker_h*) CmiAlloc(CmiMyNodeSize() * sizeof(ucp_worker_h));
     
     for (int i = 0; i < CmiMyNodeSize(); i++) {
         status = ucp_worker_create(ucxCtx.context, &wParams, &ucxCtx.workers[i]);
@@ -747,7 +747,7 @@ void LrtsExit(int exitcode)
     LrtsAdvanceCommunication(0);
 
     for (i = 0; i < ucxCtx.numRxReqs; ++i) {
-        req = ucxCtx.rxReqs[i];
+        req = ucxCtx.rxReqs[CmiMyRank()][i];
         CmiFree(req->msgBuf);
         ucp_request_cancel(ucxCtx.workers[CmiMyRank()], req);
         ucp_request_free(req);
