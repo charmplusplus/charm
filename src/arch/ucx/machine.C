@@ -215,7 +215,7 @@ static void UcxInitEps(int numPes, int myId)
         parts = (addrlen / maxval) + 1;
 
         // Publish number of address parts at first
-        ret = snprintf(keys, maxkey, "UCX-size-%d", myId);
+        ret = snprintf(keys, maxkey, "UCX-size-%d", myId * CmiMyNodeSize() + rank);
         UCX_CHECK_RET(ret, "UcxInitEps: snprintf error", (ret <= 0));
         ret = runtime_kvs_put(keys, &parts, sizeof(parts));
         UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_kvs_put error");
@@ -224,7 +224,7 @@ static void UcxInitEps(int numPes, int myId)
         len   = (int)addrlen;
         for (i = 0; i < parts; ++i) {
             partLen = std::min(maxval, len);
-            ret = snprintf(keys, maxkey, "UCX-%d-%d", myId, i);
+            ret = snprintf(keys, maxkey, "UCX-%d-%d", myId * CmiMyNodeSize() + rank, i);
             UCX_CHECK_RET(ret, "UcxInitEps: snprintf error", (ret <= 0));
             ret = runtime_kvs_put(keys, addrp, partLen);
             UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_kvs_put error");
@@ -346,7 +346,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     CmiGetArgInt(*argv, "+ucx_rndv_thresh", &thresh);
     ucxCtx.eagerSize = std::max(LrtsGetMaxNcpyOperationInfoSize(), thresh);
 
-    UcxInitEps(CmiNumPes(), CmiMyPe());
+    UcxInitEps(CmiMyNodeSize() * *numNodes, *myNodeID);
 
     UcxPrepostRxBuffers();
 
