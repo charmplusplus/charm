@@ -96,7 +96,7 @@ typedef struct UcxContext
     ucp_context_h     context;
     ucp_worker_h      *workers;
     ucp_ep_h          **eps;
-    UcxRequest        **rxReqs;
+    UcxRequest        ***rxReqs;
 #if CMK_SMP
     PCQueue           txQueue;
 #endif
@@ -202,78 +202,78 @@ static void UcxInitEps(int numPes, int myId)
     keys = (char*)CmiAlloc(maxkey);
     CmiEnforce(keys);
 
-    if (CmiMyRank() == 0) {
-        ucxCtx.eps = (ucp_ep_h**)CmiAlloc(sizeof(ucp_ep_h*)*CmiMyNodeSize());
-        CmiEnforce(ucxCtx.eps);
-    }
+    ucxCtx.eps = (ucp_ep_h**)CmiAlloc(sizeof(ucp_ep_h*)*CmiMyNodeSize());
+    CmiEnforce(ucxCtx.eps);
 
-    CmiNodeBarrier();
+    for (int rank = 0; rank < CmiMyNodeSize(); rank++) {
+        ucxCtx.eps[rank] = (ucp_ep_h*)CmiAlloc(sizeof(ucp_ep_h)*numPes);
 
-    ucxCtx.eps[CmiMyRank()] = (ucp_ep_h*)CmiAlloc(sizeof(ucp_ep_h)*numPes);;
+        status = ucp_worker_get_address(ucxCtx.workers[rank], &address, &addrlen);
+        UCX_CHECK_STATUS(status, "UcxInitEps: ucp_worker_get_address error");
+        CmiEnforce(addrlen < std::numeric_limits<int>::max()); //address should fit to int
 
-    status = ucp_worker_get_address(ucxCtx.workers[CmiMyRank()], &address, &addrlen);
-    UCX_CHECK_STATUS(status, "UcxInitEps: ucp_worker_get_address error");
-    CmiEnforce(addrlen < std::numeric_limits<int>::max()); //address should fit to int
+        parts = (addrlen / maxval) + 1;
 
-    parts = (addrlen / maxval) + 1;
-
-    // Publish number of address parts at first
-    ret = snprintf(keys, maxkey, "UCX-size-%d", myId);
-    UCX_CHECK_RET(ret, "UcxInitEps: snprintf error", (ret <= 0));
-    ret = runtime_kvs_put(keys, &parts, sizeof(parts));
-    UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_kvs_put error");
-
-    addrp = (char*)address;
-    len   = (int)addrlen;
-    for (i = 0; i < parts; ++i) {
-        partLen = std::min(maxval, len);
-        ret = snprintf(keys, maxkey, "UCX-%d-%d", myId, i);
+        // Publish number of address parts at first
+        ret = snprintf(keys, maxkey, "UCX-size-%d", myId);
         UCX_CHECK_RET(ret, "UcxInitEps: snprintf error", (ret <= 0));
-        ret = runtime_kvs_put(keys, addrp, partLen);
+        ret = runtime_kvs_put(keys, &parts, sizeof(parts));
         UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_kvs_put error");
-        addrp += partLen;
-        len   -= partLen;
+
+        addrp = (char*)address;
+        len   = (int)addrlen;
+        for (i = 0; i < parts; ++i) {
+            partLen = std::min(maxval, len);
+            ret = snprintf(keys, maxkey, "UCX-%d-%d", myId, i);
+            UCX_CHECK_RET(ret, "UcxInitEps: snprintf error", (ret <= 0));
+            ret = runtime_kvs_put(keys, addrp, partLen);
+            UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_kvs_put error");
+            addrp += partLen;
+            len   -= partLen;
+        }
+
+        ucp_worker_release_address(ucxCtx.workers[rank], address);
     }
 
     // Ensure that all nodes published their worker addresses
     ret = runtime_barrier();
     UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_barrier");
 
-    ucp_worker_release_address(ucxCtx.workers[CmiMyRank()], address);
+    for (int rank = 0; rank < CmiMyNodeSize(); rank++) {
+        for (i = 0; i < numPes; ++i) {
+            peer = (i + myId) % numPes;
 
-    for (i = 0; i < numPes; ++i) {
-        peer = (i + myId) % numPes;
-
-        ret = snprintf(keys, maxkey, "UCX-size-%d", peer);
-        UCX_CHECK_RET(ret, "UcxInitEps: snprintf error", (ret <= 0));
-        ret = runtime_kvs_get(keys, &parts, sizeof(parts), peer);
-        UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_kvs_get error");
-
-        remoteAddr = (char*)CmiAlloc(addrlen);
-        CmiEnforce(remoteAddr);
-
-        addrp = remoteAddr;
-        len   = addrlen;
-        for (j = 0; j < parts; ++j) {
-            partLen = std::min(maxval, len);
-            ret = snprintf(keys, maxkey, "UCX-%d-%d", peer, j);
+            ret = snprintf(keys, maxkey, "UCX-size-%d", peer);
             UCX_CHECK_RET(ret, "UcxInitEps: snprintf error", (ret <= 0));
-            ret = runtime_kvs_get(keys, addrp, partLen, peer);
+            ret = runtime_kvs_get(keys, &parts, sizeof(parts), peer);
             UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_kvs_get error");
-            addrp += maxval;
-            len   -= maxval;
+
+            remoteAddr = (char*)CmiAlloc(addrlen);
+            CmiEnforce(remoteAddr);
+
+            addrp = remoteAddr;
+            len   = addrlen;
+            for (j = 0; j < parts; ++j) {
+                partLen = std::min(maxval, len);
+                ret = snprintf(keys, maxkey, "UCX-%d-%d", peer, j);
+                UCX_CHECK_RET(ret, "UcxInitEps: snprintf error", (ret <= 0));
+                ret = runtime_kvs_get(keys, addrp, partLen, peer);
+                UCX_CHECK_PMI_RET(ret, "UcxInitEps: runtime_kvs_get error");
+                addrp += maxval;
+                len   -= maxval;
+            }
+
+            eParams.field_mask = UCP_EP_PARAM_FIELD_REMOTE_ADDRESS;
+            eParams.address    = (const ucp_address_t*)remoteAddr;
+
+            status = ucp_ep_create(ucxCtx.workers[rank], &eParams, &ucxCtx.eps[rank][peer]);
+            UCX_CHECK_STATUS(status, "ucp_ep_create failed");
+            UCX_LOG(4, "Connecting to %d (ep %p)", peer, ucxCtx.eps[rank][peer]);
+            CmiFree(remoteAddr);
         }
 
-        eParams.field_mask = UCP_EP_PARAM_FIELD_REMOTE_ADDRESS;
-        eParams.address    = (const ucp_address_t*)remoteAddr;
-
-        status = ucp_ep_create(ucxCtx.workers[CmiMyRank()], &eParams, &ucxCtx.eps[CmiMyRank()][peer]);
-        UCX_CHECK_STATUS(status, "ucp_ep_create failed");
-        UCX_LOG(4, "Connecting to %d (ep %p)", peer, ucxCtx.eps[CmiMyRank()][peer]);
-        CmiFree(remoteAddr);
+        CmiFree(keys);
     }
-
-    CmiFree(keys);
 }
 
 // Should be called for every node (not PE)
@@ -294,13 +294,11 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #endif
     }
 
-    if (CmiMyRank() == 0) {
-        ret = runtime_init(myNodeID, numNodes);
-        UCX_CHECK_PMI_RET(ret, "runtime_init");
-    }
+    ret = runtime_init(myNodeID, numNodes);
+    UCX_CHECK_PMI_RET(ret, "runtime_init");
 
-    CmiPrintf("First barrier %i, %i\n", CmiMyNode(), CmiMyRank());
-    CmiNodeBarrier();
+    //CmiPrintf("First barrier %i, %i\n", CmiMyNode(), CmiMyRank());
+    //CmiNodeBarrier();
 
     status = ucp_config_read("Charm++", NULL, &config);
     UCX_CHECK_STATUS(status, "ucp_config_read");
@@ -326,10 +324,13 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     // Create UCP worker
     wParams.field_mask  = UCP_WORKER_PARAM_FIELD_THREAD_MODE;
     wParams.thread_mode = UCS_THREAD_MODE_SINGLE;
-    
-    status = ucp_worker_create(ucxCtx.context, &wParams, &ucxCtx.workers[CmiMyRank()]);
-    UCX_CHECK_STATUS(status, "ucp_worker_create");
 
+    ucxCtx.workers = (ucp_worker_h*) CmiAlloc(CmiNodeSize() * sizeof(ucp_worker_h));
+    
+    for (int i = 0; i < CmiMyNodeSize(); i++) {
+        status = ucp_worker_create(ucxCtx.context, &wParams, &ucxCtx.workers[i]);
+        UCX_CHECK_STATUS(status, "ucp_worker_create");           
+    }
 
     ucxCtx.numRxReqs = UCX_MSG_NUM_RX_REQS;
     if (CmiGetArgInt(*argv, "+ucx_num_rx_reqs", &ucxCtx.numRxReqs)) {
@@ -350,8 +351,10 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     UcxPrepostRxBuffers();
 
     // Ensure connects completion
-    status = ucp_worker_flush(ucxCtx.workers[CmiMyRank()]);
-    UCX_CHECK_STATUS(status, "ucp_worker_flush");
+    for (int i = 0; i < CmiMyNodeSize(); i++) {
+        status = ucp_worker_flush(ucxCtx.workers[CmiMyRank()]);
+        UCX_CHECK_STATUS(status, "ucp_worker_flush");
+    }
 
     UCX_LOG(5, "Initialized: preposted reqs %d, rndv thresh %d\n",
             ucxCtx.numRxReqs, ucxCtx.eagerSize);
@@ -362,21 +365,21 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #endif
 }
 
-static inline UcxRequest* UcxPostRxReqInternal(ucp_tag_t tag, size_t size,
+static inline UcxRequest* UcxPostRxReqInternal(int rank, ucp_tag_t tag, size_t size,
                                                ucp_tag_message_h msg)
 {
     void *buf = CmiAlloc(size);
     UcxRequest *req;
 
     if (tag == UCX_MSG_TAG_EAGER) {
-        req = (UcxRequest*)ucp_tag_recv_nb(ucxCtx.workers[CmiMyRank()], buf,
+        req = (UcxRequest*)ucp_tag_recv_nb(ucxCtx.workers[rank], buf,
                                            ucxCtx.eagerSize,
                                            ucp_dt_make_contig(1), tag,
                                            UCX_MSG_TAG_MASK,
                                            UcxRxReqCompleted);
     } else {
         CmiEnforce(tag == UCX_MSG_TAG_PROBE);
-        req = (UcxRequest*)ucp_tag_msg_recv_nb(ucxCtx.workers[CmiMyRank()], buf, size,
+        req = (UcxRequest*)ucp_tag_msg_recv_nb(ucxCtx.workers[rank], buf, size,
                                                ucp_dt_make_contig(1), msg,
                                                UcxRxReqCompleted);
     }
@@ -397,10 +400,10 @@ static inline UcxRequest* UcxPostRxReqInternal(ucp_tag_t tag, size_t size,
     return req;
 }
 
-static inline UcxRequest* UcxPostRxReq(ucp_tag_t tag, size_t size,
+static inline UcxRequest* UcxPostRxReq(int rank, ucp_tag_t tag, size_t size,
                                        ucp_tag_message_h msg)
 {
-    UcxRequest *req = UcxPostRxReqInternal(tag, size, msg);
+    UcxRequest *req = UcxPostRxReqInternal(rank, tag, size, msg);
     int idx = req->idx;
 
     do {
@@ -408,9 +411,9 @@ static inline UcxRequest* UcxPostRxReq(ucp_tag_t tag, size_t size,
             UCX_REQUEST_FREE(req);
 
             if (tag & UCX_MSG_TAG_EAGER) {
-                req = UcxPostRxReqInternal(UCX_MSG_TAG_EAGER, ucxCtx.eagerSize, NULL);
+                req = UcxPostRxReqInternal(rank, UCX_MSG_TAG_EAGER, ucxCtx.eagerSize, NULL);
                 req->idx = idx;
-                ucxCtx.rxReqs[idx] = req;
+                ucxCtx.rxReqs[rank][idx] = req;
             } else {
                 return NULL;
             }
@@ -432,10 +435,10 @@ static inline UcxRequest* UcxHandleRxReq(UcxRequest *request, char *rxBuf,
     UCX_REQUEST_FREE(request);
 
     if (tag & UCX_MSG_TAG_EAGER) {
-        ucxCtx.rxReqs[idx]      = UcxPostRxReq(UCX_MSG_TAG_EAGER,
-                                               ucxCtx.eagerSize, NULL);
-        ucxCtx.rxReqs[idx]->idx = idx;
-        return ucxCtx.rxReqs[idx];
+        ucxCtx.rxReqs[CmiMyRank()][idx] = UcxPostRxReq(CmiMyRank(), UCX_MSG_TAG_EAGER,
+                                                       ucxCtx.eagerSize, NULL);
+        ucxCtx.rxReqs[CmiMyRank()][idx]->idx = idx;
+        return ucxCtx.rxReqs[CmiMyRank()][idx];
     }
 
     return NULL;
@@ -535,11 +538,17 @@ static void UcxPrepostRxBuffers()
 {
     int i;
 
-    ucxCtx.rxReqs = (UcxRequest**)CmiAlloc(sizeof(UcxRequest*) * ucxCtx.numRxReqs);
+    ucxCtx.rxReqs = (UcxRequest***)CmiAlloc(sizeof(UcxRequest**) * CmiMyNodeSize());
 
-    for (i = 0; i < ucxCtx.numRxReqs; i++) {
-        ucxCtx.rxReqs[i] = UcxPostRxReq(UCX_MSG_TAG_EAGER, ucxCtx.eagerSize, NULL);
-        ucxCtx.rxReqs[i]->idx = i;
+    for (i = 0; i < CmiMyNodeSize(); i++) {
+        ucxCtx.rxReqs[i] = (UcxRequest**)CmiAlloc(sizeof(UcxRequest*) * ucxCtx.numRxReqs);
+    }
+
+    for (int rank = 0; rank < CmiMyNodeSize(); rank++) {
+        for (i = 0; i < ucxCtx.numRxReqs; i++) {
+            ucxCtx.rxReqs[rank][i] = UcxPostRxReq(CmiMyRank(), UCX_MSG_TAG_EAGER, ucxCtx.eagerSize, NULL);
+            ucxCtx.rxReqs[rank][i]->idx = i;
+        }
     }
     UCX_LOG(3, "UCX: preposted %d rx requests", ucxCtx.numRxReqs);
 }
@@ -713,7 +722,7 @@ void LrtsAdvanceCommunication(int whileidle)
                               UCX_MSG_TAG_MASK_FULL, 1, &info);
        if (msg != NULL) {
            UCX_LOG(3, "Got msg %p, len %zu\n", msg, info.length);
-           UcxPostRxReq(UCX_MSG_TAG_PROBE, info.length, msg);
+           UcxPostRxReq(CmiMyRank(), UCX_MSG_TAG_PROBE, info.length, msg);
         }
     } while (cnt);
 }
@@ -750,7 +759,7 @@ void LrtsExit(int exitcode)
     CmiFree(ucxCtx.eps[CmiMyRank()]);
     CmiFree(ucxCtx.rxReqs);
 
-    CmiNodeBarrier();
+    //CmiNodeBarrier();
 
     CmiFree(ucxCtx.eps);
 
