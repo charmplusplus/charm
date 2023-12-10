@@ -48,7 +48,7 @@
 #define UCX_RMA_TAG_MASK                (UCS_MASK(UCX_TAG_RMA_BITS) << UCX_TAG_MSG_BITS)
 #define UCX_MSG_TAG_MASK_FULL           0xffffffffffffffffUL
 
-#define UCX_LOG_PRIO 50 // Disabled by default
+#define UCX_LOG_PRIO 0 // Disabled by default
 
 enum {
     UCX_SEND_OP,        // Regular Send using UcxSendMsg
@@ -241,7 +241,8 @@ static void UcxInitEps(int numPes, int myId)
 
     for (int rank = 0; rank < CmiMyNodeSize(); rank++) {
         for (i = 0; i < numPes; ++i) {
-            peer = (i + myId) % numPes;
+            //peer = (i + myId) % numPes;
+            peer = i;
 
             ret = snprintf(keys, maxkey, "UCX-size-%d", peer);
             UCX_CHECK_RET(ret, "UcxInitEps: snprintf error", (ret <= 0));
