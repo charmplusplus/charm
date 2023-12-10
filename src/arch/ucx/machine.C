@@ -583,7 +583,7 @@ inline void* UcxSendMsg(int destNode, int destPE, int size, char *msg,
     UCX_LOG(3, "destNode=%i destPE=%i size=%i msg=%p, tag=%" PRIu64,
             destNode, destPE, size, msg, tag);
 
-    UcxRequest* req = (UcxRequest*)ucp_tag_send_nb(ucxCtx.eps[CmiMyRank()][destNode], msg, size,
+    UcxRequest* req = (UcxRequest*)ucp_tag_send_nb(ucxCtx.eps[CmiMyRank()][destPE], msg, size,
                                        ucp_dt_make_contig(1), sTag, cb);
     if (!UCS_PTR_IS_PTR(req)) {
         CmiEnforce(!UCS_PTR_IS_ERR(req));
