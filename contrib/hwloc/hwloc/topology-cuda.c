@@ -49,10 +49,13 @@ static unsigned hwloc_cuda_cores_per_MP(int major, int minor)
     case 8:
       switch (minor) {
         case 0: return 64;
-        case 7: /* 8.7 is not documented yet, assume it's like 8.6 below */
-        case 6: return 128;
+        case 6:
+        case 7:
+        case 9: return 128;
       }
       break;
+    case 9:
+      return 128;
   }
   hwloc_debug("unknown compute capability %d.%d, disabling core display.\n", major, minor);
   return 0;
@@ -80,7 +83,7 @@ hwloc_cuda_discover(struct hwloc_backend *backend, struct hwloc_disc_status *dst
 
   cures = cudaGetDeviceCount(&nb);
   if (cures) {
-    if (cures != cudaErrorNoDevice && !hwloc_hide_errors()) {
+    if (cures != cudaErrorNoDevice && HWLOC_SHOW_ALL_ERRORS()) {
       const char *error = cudaGetErrorString(cures);
       fprintf(stderr, "hwloc/cuda: Failed to get number of devices with cudaGetDeviceCount(): %s\n", error);
     }
