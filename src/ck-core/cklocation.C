@@ -91,7 +91,7 @@ void UpdateLocation(MigrateInfo& migData)
 
   CkLocMgr* localLocMgr = (CkLocMgr*)CkLocalBranch(locMgrGid);
   // CkLocMgr only uses element IDs, so extract just that part from the ObjID
-  localLocMgr->updateLocation(ck::ObjID(migData.obj.id).getElementID(), migData.to_pe);
+  localLocMgr->informHome((CkArrayIndex)ck::ObjID(migData.obj.id).getElementID(), migData.to_pe);//updateLocation(ck::ObjID(migData.obj.id).getElementID(), migData.to_pe);
 }
 #  endif
 
@@ -2752,7 +2752,7 @@ bool CkLocMgr::addElement(CkArrayID mgr, const CkArrayIndex& idx, CkMigratable* 
       DEBC((AA "Global location broadcast for new element idx %s "
                "assigned to %d \n" AB,
             idx2str(idx), CkMyPe()));
-      thisProxy.updateLocation(id, CkMyPe());
+      thisProxy.informHome(idx,CkMyPe());//updateLocation(id, CkMyPe());
     }
 #endif
   }
@@ -3506,7 +3506,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   DEBM((AA "Global location update. idx %s "
            "assigned to %d \n" AB,
         idx2str(idx), toPe));
-  thisProxy.updateLocation(id, toPe);
+  thisProxy.informHome(idx, toPe);//updateLocation(id, toPe);
 #endif
 
   CK_MAGICNUMBER_CHECK
