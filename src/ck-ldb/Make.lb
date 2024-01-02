@@ -4,6 +4,7 @@ COMMON_LDBS=\
    DistributedLB \
    MetisLB \
    RecBipartLB \
+   DisableCoreLB \
    manager.o
 
 ALL_LDBS=\
@@ -11,6 +12,7 @@ ALL_LDBS=\
    DistributedLB \
    MetisLB \
    RecBipartLB \
+   DisableCoreLB \
    manager.o
 
 $(L)/libmoduleTreeLB.a:
@@ -25,11 +27,8 @@ LBHEADERS += MetisLB.h MetisLB.decl.h
 $(L)/libmoduleRecBipartLB.a:
 LBHEADERS += RecBipartLB.h RecBipartLB.decl.h
 
-$(L)/libmoduleScotchLB.a:
-LBHEADERS += ScotchLB.h ScotchLB.decl.h
-
-$(L)/libmoduleTempAwareRefineLB.a:
-LBHEADERS += TempAwareRefineLB.h TempAwareRefineLB.decl.h
+$(L)/libmoduleDisableCoreLB.a:
+LBHEADERS += DisableCoreLB.h DisableCoreLB.decl.h
 
 # used for make depends
 ALL_LB_OBJS=EveryLB.o \
@@ -38,20 +37,21 @@ ALL_LB_OBJS=EveryLB.o \
     DistributedLB.o \
     MetisLB.o \
     RecBipartLB.o \
-    ScotchLB.o \
-    TempAwareRefineLB.o \
+    DisableCoreLB.o \
 # EveryLB dependecies
 EVERYLB_DEPS=EveryLB.o \
     TreeLB.o \
     DistributedLB.o \
     MetisLB.o \
     RecBipartLB.o \
+    DisableCoreLB.o \
 # CommonLBs dependencies
 COMMONLBS_DEPS=CommonLBs.o \
     TreeLB.o \
     DistributedLB.o \
     MetisLB.o \
     RecBipartLB.o \
+    DisableCoreLB.o \
     manager.o \
 
 $(L)/libmoduleEveryLB.a: $(EVERYLB_DEPS)

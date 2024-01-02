@@ -432,6 +432,7 @@ void _loadbalancerInit()
 
 bool LBManager::manualOn = false;
 std::vector<char> LBManager::avail_vector;
+int LBManager::active_ppn;
 bool LBManager::avail_vector_set = false;
 CmiNodeLock avail_vector_lock;
 
@@ -621,6 +622,14 @@ void LBManager::Migrated(LDObjHandle h, int waitBarrier)
 }
 
 LBManager::LastLBInfo::LastLBInfo() { expectedLoad = _expectedLoad; }
+
+void LBManager::set_active_pes(int ppn) {
+  active_ppn = ppn;
+}
+
+int LBManager::get_active_pes() {
+  return active_ppn;
+}
 
 void LBManager::get_avail_vector(char* bitmap) const
 {

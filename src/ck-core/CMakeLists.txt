@@ -40,7 +40,7 @@ set(ck-h-sources XArraySectionReducer.h charm++.h charm++_type_traits.h
     ../ck-cp/arrayRedistributor.h ../ck-cp/controlPoints.h ../ck-cp/controlPointsf.h ../ck-cp/pathHistory.h ../ck-cp/API-generator/cp_effects.h)
 
 set(ldb-cxx-sources
-    ../ck-ldb/CommonLBs.C  ../ck-ldb/DistributedLB.C
+    ../ck-ldb/CommonLBs.C  ../ck-ldb/DistributedLB.C ../ck-ldb/DisableCoreLB.C
     ../ck-ldb/EveryLB.C
     ../ck-ldb/LButil.C
     ../ck-ldb/RecBipartLB.C
@@ -51,7 +51,7 @@ set(ldb-cxx-sources
 
 
 set(ldb-h-sources ../ck-ldb/BaseLB.h ../ck-ldb/CentralLBMsg.h
-    ../ck-ldb/DistBaseLB.h ../ck-ldb/DistributedLB.h
+    ../ck-ldb/DistBaseLB.h ../ck-ldb/DistributedLB.h ../ck-ldb/DisableCoreLB.h
     ../ck-ldb/HybridBaseLB.h ../ck-ldb/HybridLBMsg.h
     ../ck-ldb/LBComm.h
     ../ck-ldb/LBDatabase.h ../ck-ldb/LBManager.h ../ck-ldb/LBMachineUtil.h ../ck-ldb/LBOM.h
@@ -100,6 +100,8 @@ add_dependencies(moduleMetisLB ck ckmetis)
 # Single LBs
 add_library(moduleDistributedLB ../ck-ldb/DistributedLB.C)
 add_dependencies(moduleDistributedLB ck)
+add_library(moduleDisableCoreLB ../ck-ldb/DisableCoreLB.C)
+add_dependencies(moduleDisableCoreLB ck)
 add_library(moduleTreeLB ../ck-ldb/TreeLB.C)
 add_dependencies(moduleTreeLB ck)
 add_library(moduleRecBipartLB ../ck-ldb/RecBipartLB.C ../ck-ldb/RecBipartLB.h)

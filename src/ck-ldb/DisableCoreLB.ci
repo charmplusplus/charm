@@ -1,0 +1,9 @@
+module DisableCoreLB {
+
+extern module CentralLB;
+initnode void lbinit(void);
+group [migratable] DisableCoreLB : CentralLB {
+  entry void DisableCoreLB(const CkLBOptions &);  
+};
+
+};

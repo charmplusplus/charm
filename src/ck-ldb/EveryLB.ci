@@ -5,6 +5,7 @@ module EveryLB {
   extern module DistributedLB;
   extern module MetisLB;
   extern module RecBipartLB;
+  extern module DisableCoreLB;
 
   initnode void initEveryLB(void);
 };

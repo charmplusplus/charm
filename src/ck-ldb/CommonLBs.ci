@@ -5,6 +5,7 @@ module CommonLBs {
   extern module DistributedLB;
   extern module MetisLB;
   extern module RecBipartLB;
+  extern module DisableCoreLB;
 
   initnode void initCommonLBs(void);
 };

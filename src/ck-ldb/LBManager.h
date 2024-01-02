@@ -481,6 +481,7 @@ class LBManager : public CBase_LBManager
  private:
   int mystep;
   static std::vector<char> avail_vector; // processor bit vector
+  static int active_ppn;
   static bool avail_vector_set;
   int new_ld_balancer;  // for Node 0
   MetaBalancer* metabalancer;
@@ -506,6 +507,8 @@ class LBManager : public CBase_LBManager
   void get_avail_vector(std::vector<char> & bitmap) const { bitmap = avail_vector; }
   void set_avail_vector(const char * bitmap, int new_ld = -1);
   void set_avail_vector(const std::vector<char> & bitmap, int new_ld = -1);
+  void set_active_pes(int ppn);
+  int get_active_pes();
   int& new_lbbalancer() { return new_ld_balancer; }
 
   struct LastLBInfo
@@ -556,6 +559,10 @@ inline void CkStartLB() { LBManager::Object()->StartLB(); }
 inline void get_avail_vector(std::vector<char> & bitmap) { LBManagerObj()->get_avail_vector(bitmap); }
 
 inline void set_avail_vector(const std::vector<char> & bitmap) { LBManagerObj()->set_avail_vector(bitmap); }
+
+inline void set_active_pes(int ppn) { LBManagerObj()->set_active_pes(ppn); }
+inline int get_active_pes() { return LBManagerObj()->get_active_pes(); }
+
 
 //  a helper class to suspend/resume load instrumentation when calling into
 //  runtime apis

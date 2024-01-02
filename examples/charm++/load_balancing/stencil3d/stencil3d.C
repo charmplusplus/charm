@@ -219,6 +219,8 @@ class Stencil: public CBase_Stencil {
     // Send ghost faces to the six neighbors
     void begin_iteration(void) {
       iterations++;
+      if(iterations==1)
+        set_active_pes(CkNodeSize(CkMyNode())/2); //TODO:set per PE
 
       for(int k=0; k<blockDimZ; ++k)
         for(int j=0; j<blockDimY; ++j) {
