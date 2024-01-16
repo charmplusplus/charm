@@ -1595,9 +1595,16 @@ else
         test_finish 1
       fi
     else
-      echo "Error: -lfabric not working, $PSM_COMPAT_DIR not found"
-      echo "Pass '--basedir=/path/to/dir/' if -lfabric is located in a different directory"
-      test_finish 1
+      CMK_LIBFABRIC_LIBONLY=`pkg-config --libs-only-l libfabric`
+      if test $CMK_LIBFABRIC_LIBONLY = "-lfabric"
+      then
+	  test_linkc "whether pkg-config fabric" "ok" "no" "-lfabric"
+      else
+	  echo "Error: -lfabric not working, $PSM_COMPAT_DIR not found, pkg-config libfabric not working"
+	  echo "Pass '--basedir=/path/to/dir/' if -lfabric is located in a different directory"
+	  test_finish 1
+      fi
+
     fi
   fi
 fi
