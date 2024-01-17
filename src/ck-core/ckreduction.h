@@ -675,6 +675,7 @@ private:
 	bool startRequested;//Should we start the next reduction when creation finished?
       bool is_inactive;//Is it inactive
 	int gcount;//=el't created here - el't deleted here
+  int orig_gcount;
 	int lcount;//Number of local contributors
 	int maxStartRequest; // the highest future ReductionStarting message received
 

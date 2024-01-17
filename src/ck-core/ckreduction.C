@@ -193,7 +193,7 @@ CkReductionMgr::CkReductionMgr()
   inProgress=false;
   creating=false;
   startRequested=false;
-  gcount=lcount=0;
+  gcount=orig_gcount=lcount=0;
   nContrib=nRemote=0;
   is_inactive = false;
   maxStartRequest=0;
@@ -215,7 +215,7 @@ CkReductionMgr::CkReductionMgr(CkMigrateMessage *m) :CkGroupInitCallback(m)
   inProgress=false;
   creating=false;
   startRequested=false;
-  gcount=lcount=0;
+  gcount=orig_gcount=lcount=0;
   nContrib=nRemote=0;
   is_inactive = false;
   maxStartRequest=0;
@@ -288,6 +288,7 @@ void CkReductionMgr::contributorStamped(contributorInfo *ci)
   DEBR((AA "Contributor %p stamped\n" AB,ci));
   //There is another contributor
   gcount++;
+  orig_gcount++;
   if (inProgress)
   {
     ci->redNo=redNo+1;//Created *during* reduction => contribute to *next* reduction
@@ -326,6 +327,7 @@ void CkReductionMgr::contributorDied(contributorInfo *ci)
   DEBR((AA "Contributor %p(%d) died\n" AB,ci,ci->redNo));
   //We lost a contributor
   gcount--;
+  orig_gcount--;
 
   if (ci->redNo<redNo)
   {//Must have been migrating during reductions-- root is waiting for his
@@ -1060,7 +1062,16 @@ int CkReductionMgr::treeParent(void) //My parent Node
 }
 int CkReductionMgr::treeKids(void)//Number of children in tree
 {
-  return numKids;
+  int retval = numKids;
+  if(get_active_pes() < CkNodeSize(CkMyNode())) {
+    if(CkMyPe() == 0) {
+      int idleCount = CkNodeSize(CkMyNode()) - get_active_pes();
+      gcount = orig_gcount + idleCount*orig_gcount;
+    }
+    retval = numKids-CkNodeSize(CkMyNode())+get_active_pes();
+  }
+  if(CkMyPe()==0) CkPrintf("\nreturn val = %d, numKids = %d, CkNodeSize(CkMyNode()) = %d, active_pes = %d", retval, numKids, CkNodeSize(CkMyNode()), get_active_pes());
+  return retval;
 }
 
 
