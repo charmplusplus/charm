@@ -3502,7 +3502,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   cache->recordEmigration(id, toPe);
   informHome(idx, toPe);
 
-#if !CMK_LBDB_ON && CMK_GLOBAL_LOCATION_UPDATE
+#if CMK_GLOBAL_LOCATION_UPDATE
   DEBM((AA "Global location update. idx %s "
            "assigned to %d \n" AB,
         idx2str(idx), toPe));
