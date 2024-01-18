@@ -239,6 +239,7 @@ class LBManager : public CBase_LBManager
   void InvokeLB();
 
  public:
+  void wakeupPEs();
   LBDatabase* getLBDB() { return lbdb_obj; }
   inline static LBManager* Object()
   {

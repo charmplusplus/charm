@@ -93,6 +93,7 @@ public:
   void pup(PUP::er &p);
 
   void SetPESpeed(int);
+  void wakeupPEs();
   int GetPESpeed();
   inline void setConcurrent(bool c) { concurrent = c; }
 

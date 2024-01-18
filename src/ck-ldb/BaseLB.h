@@ -156,6 +156,7 @@ public:
   virtual void flushStates();
 //  virtual void AtSync(void) {  CmiAbort("AtSync not implemented"); } // Everything is at the PE barrier
   virtual void InvokeLB(void) { CmiAbort("InvokeLB not implemented"); }
+  virtual void wakeupPEs(void) {CmiAbort("wakeupPEs not implemented"); }
   virtual void Migrated(int waitBarrier=1) { CmiAbort("Migrated not implemented"); }
 
   CkGroupID getGroupID() {return thisgroup;}

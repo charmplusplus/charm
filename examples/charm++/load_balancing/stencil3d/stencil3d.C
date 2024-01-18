@@ -327,8 +327,12 @@ class Stencil: public CBase_Stencil {
       elems++;
       if(elems == num_chare_x*num_chare_y*num_chare_z) {
         elems = 0;
+        CkPrintf("\nCalling doStep"); fflush(stdout);
         thisProxy.doStep();
       }
+    }
+    void DonePgm() {
+      contribute(CkCallback(CkReductionTarget(Main, report), mainProxy));
     }
     void check_and_compute() {
       compute_kernel();
@@ -348,9 +352,15 @@ class Stencil: public CBase_Stencil {
         fflush(stdout);
       }
 
-      if(iterations == MAX_ITER)
-        contribute(CkCallback(CkReductionTarget(Main, report), mainProxy));
-      else {
+      if(iterations == MAX_ITER) {
+        if(thisIndex.x==0 && thisIndex.y==0 && thisIndex.z==0) {
+          CkCallback cb(CkIndex_Stencil::DonePgm(), thisProxy);
+          CkStartQD(cb);
+          set_active_pes(CkNodeSize(CkMyNode()));
+          getLBMgr()->wakeupPEs();
+        }
+      //  contribute(CkCallback(CkReductionTarget(Main, report), mainProxy));
+      } else {
         if(thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0)
           startTime = CkWallTimer();
         if(iterations % LBPERIOD_ITER == 0 && iterations < 20)
@@ -374,12 +384,6 @@ class Stencil: public CBase_Stencil {
       int index = thisIndex.x + thisIndex.y*num_chare_x + thisIndex.z*num_chare_x*num_chare_y;
       int numChares = num_chare_x * num_chare_y * num_chare_z;
       double work = 100.0;
-
-      if(index >= numChares*0.2 && index <=numChares*0.8) {
-        work = work * ((double)index/(double)numChares) + (double)itno;
-        // CkPrintf("[%d][%d][%d] %d %d %f\n", thisIndex.x, thisIndex.y, thisIndex.z, index, itno, work);
-      } else
-        work = 10.0;
 
 #ifndef _MSC_VER
 #pragma unroll

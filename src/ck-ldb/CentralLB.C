@@ -131,6 +131,13 @@ int CentralLB::GetPESpeed()
   return myspeed;
 }
 
+void CentralLB::wakeupPEs(){
+  std::lock_guard<std::mutex> lk(m_shutoff);
+  ready_pthreads = 1;
+  cv_shutoff.notify_all();
+  CkPrintf("\nTried notifying from PE-%d", CkMyPe());
+}
+
 void CentralLB::InvokeLB()
 {
 #if CMK_LBDB_ON
@@ -1195,6 +1202,28 @@ void CentralLB::ResumeClients(int balancing)
     }
   }
 #endif
+#if 1
+  if(lbmgr->step() > 2) {
+        //set_active_pes(CkNodeSize(CkMyNode())/2);
+        if(CkMyPe() >= get_active_pes()) {
+          std::unique_lock<std::mutex> lk(m_shutoff);
+          CkPrintf("\n----------------------------------------------------------------------------------\n");
+          CkPrintf("\nCalling cv.wait on PE-%d", CkMyPe());
+          //ready_pthreads = false;
+          cv_shutoff.wait(lk, []{return ready_pthreads == 1;});//sleep(10000);
+          CkPrintf("\n----------------------------------------------------------------------------------\n");
+          CkPrintf("\nWaking up %d", CkMyPe()); fflush(stdout);
+        } else{
+/*
+          std::lock_guard<std::mutex> lk(m_shutoff);
+          ready_pthreads = 1;
+          cv_shutoff.notify_all();
+          CkPrintf("\nTried notifying from PE-%d", CkMyPe());
+*/
+        }
+      }
+#endif
+
 }
 
 /*
@@ -1234,13 +1263,6 @@ void CentralLB::CheckMigrationComplete()
     if (!(_lb_args.metaLbOn() && _lb_args.metaLbModelDir() != nullptr))
       lbmgr->nextLoadbalancer(seqno);
   }
-#endif
-#if 1 
-  if(lbmgr->step() > 2) {
-        //set_active_pes(CkNodeSize(CkMyNode())/2);
-        if(CkMyPe() >= get_active_pes())
-          sleep(10000);
-      }
 #endif
 }
 

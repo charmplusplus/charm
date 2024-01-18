@@ -1081,7 +1081,7 @@ CkQ<CkExitFn> _CkExitFnVec;
 // When compiled, #defines in charm.h rename this function to "realCkExit".
 void CkExit(int exitcode)
 {
-  DEBUGF(("[%d] CkExit called \n",CkMyPe()));
+  CkPrintf("[%d] CkExit called \n",CkMyPe());
     // always send to PE 0
 
   // Store exit code for use in ConverseExit

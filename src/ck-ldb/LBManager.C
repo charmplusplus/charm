@@ -481,6 +481,14 @@ void LBManager::initnodeFn()
   _registerCommandLineOpt("+LBBeta");
 }
 
+void LBManager::wakeupPEs()
+{
+  if (loadbalancers.size() > 0)
+  {
+    loadbalancers[0]->wakeupPEs();
+  }
+}
+
 void LBManager::InvokeLB()
 {
   if (loadbalancers.size() > 0)
