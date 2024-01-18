@@ -187,8 +187,14 @@ class Stencil: public CBase_Stencil {
       backGhost   = new double[blockDimX*blockDimY];
     }
 
+    void StartResume() {
+      CkPrintf("\ninside startResum");
+      thisProxy.doStep();
+    }
     void ProcessAtSync(){
       set_active_pes(CkNodeSize(CkMyNode())/2);
+      CkCallback cb(CkIndex_Stencil::StartResume(), thisProxy(0,0,0));
+//      CkStartQD(cb);
       thisProxy.doAtSync();
     }
 
@@ -339,6 +345,7 @@ class Stencil: public CBase_Stencil {
       if(thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0) {
         double endTime = CkWallTimer();
         CkPrintf("[%d] Time per iteration: %f %f\n", iterations, (endTime - startTime), endTime);
+        fflush(stdout);
       }
 
       if(iterations == MAX_ITER)
@@ -353,9 +360,9 @@ class Stencil: public CBase_Stencil {
           }
         }
         else {
-//          thisProxy(0,0,0).endIter();
-          CkPrintf("\nContributed by chare %d,%d,%d",thisIndex.x, thisIndex.y, thisIndex.z);
-          contribute(CkCallback(CkReductionTarget(Stencil, doStep), thisProxy));
+          thisProxy(0,0,0).endIter();
+          CkPrintf("\nContributed by chare %d,%d,%d",thisIndex.x, thisIndex.y, thisIndex.z);fflush(stdout);
+//          contribute(CkCallback(CkReductionTarget(Stencil, doStep), thisProxy));
         }
       }
     }
@@ -409,7 +416,11 @@ class Stencil: public CBase_Stencil {
     }
 
     void ResumeFromSync() {
-      thisProxy[thisIndex].doStep();
+      CkPrintf("\nResume from Sync %d,%d,%d", thisIndex.x, thisIndex.y, thisIndex.z); fflush(stdout);
+      if(iterations<15)
+        thisProxy[thisIndex].doStep();
+      else
+        thisProxy(0,0,0).endIter();
     }
 };
 

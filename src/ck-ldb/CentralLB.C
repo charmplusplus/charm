@@ -946,8 +946,8 @@ void CentralLB::fake_reduction() {
     acks = 0;
     thisProxy.ProcessMigrationDecision();
   }
-}     
-       
+}
+
 void CentralLB::fake_reduction2() {
   if(++acks2 == CkNodeSize(CkMyNode())) {
     acks2 = 0;

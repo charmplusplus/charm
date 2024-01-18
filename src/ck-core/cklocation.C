@@ -2746,7 +2746,7 @@ bool CkLocMgr::addElement(CkArrayID mgr, const CkArrayIndex& idx, CkMigratable* 
   {
     // This is the first we've heard of the element -- add a new local record
     rec = createLocal(idx, false, false, true);
-#if CMK_GLOBAL_LOCATION_UPDATE
+#if 1//CMK_GLOBAL_LOCATION_UPDATE
     if (homePe(idx) != CkMyPe())
     {
       DEBC((AA "Global location broadcast for new element idx %s "
@@ -3504,7 +3504,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   cache->recordEmigration(id, toPe);
   informHome(idx, toPe);
 
-#if CMK_GLOBAL_LOCATION_UPDATE
+#if 1//CMK_GLOBAL_LOCATION_UPDATE
   DEBM((AA "Global location update. idx %s "
            "assigned to %d \n" AB,
         idx2str(idx), toPe));

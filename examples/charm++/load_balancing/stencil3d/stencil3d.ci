@@ -25,6 +25,7 @@ mainmodule stencil3d {
     entry void ProcessAtSync();
     entry void doAtSync();
     entry void endIter();
+    entry void StartResume();
 
     entry [reductiontarget] void doStep() {
       serial "begin_iteration" {
