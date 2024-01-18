@@ -19,7 +19,7 @@
 #define USE_REDUCTION         0
 #define USE_LDB_SPANNING_TREE 0
 #else
-#define USE_REDUCTION         1
+#define USE_REDUCTION         0
 #define USE_LDB_SPANNING_TREE 1
 #endif
 
@@ -72,6 +72,7 @@ void CentralLB::initLB(const CkLBOptions &opt)
     turnOff();
 
   stats_msg_count = 0;
+  acks = acks2 = 0;
   statsMsgsList = NULL;
   statsData = NULL;
 
@@ -931,9 +932,27 @@ void CentralLB::ReceiveMigration(LBScatterMsg *m) {
 #if CMK_MEM_CHECKPOINT
   CkResetInLdb();
 #endif
+#if 0
   contribute(CkCallback(CkReductionTarget(CentralLB, ProcessMigrationDecision),
               thisProxy));
+#else
+  thisProxy[0].fake_reduction();
+#endif
+        
+}         
 
+void CentralLB::fake_reduction() {
+  if(++acks == CkNodeSize(CkMyNode())) {
+    acks = 0;
+    thisProxy.ProcessMigrationDecision();
+  }
+}     
+       
+void CentralLB::fake_reduction2() {
+  if(++acks2 == CkNodeSize(CkMyNode())) {
+    acks2 = 0;
+    thisProxy.ProcessReceiveMigration();
+  }
 }
 
 void CentralLB::ReceiveMigration(LBMigrateMsg *m)
@@ -948,8 +967,12 @@ void CentralLB::ReceiveMigration(LBMigrateMsg *m)
 #if CMK_MEM_CHECKPOINT
   CkResetInLdb();
 #endif
+#if 0
   contribute(CkCallback(CkReductionTarget(CentralLB, ProcessReceiveMigration),
               thisProxy));
+#else
+  thisProxy[0].fake_reduction2();
+#endif
 }
 
 void CentralLB::ProcessMigrationDecision() {
@@ -1211,6 +1234,13 @@ void CentralLB::CheckMigrationComplete()
     if (!(_lb_args.metaLbOn() && _lb_args.metaLbModelDir() != nullptr))
       lbmgr->nextLoadbalancer(seqno);
   }
+#endif
+#if 1 
+  if(lbmgr->step() > 2) {
+        //set_active_pes(CkNodeSize(CkMyNode())/2);
+        if(CkMyPe() >= get_active_pes())
+          sleep(10000);
+      }
 #endif
 }
 

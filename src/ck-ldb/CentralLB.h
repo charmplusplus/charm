@@ -126,6 +126,9 @@ public:
   void MigrationDoneImpl (int );
   void WillIbekilled(std::vector<char> avail, int);
   void StartCleanup();
+  void fake_reduction();
+  void fake_reduction2();
+  int acks, acks2;
 
   // manual start load balancing
   inline void StartLB() { thisProxy.ProcessAtSync(); }

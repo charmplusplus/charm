@@ -36,6 +36,8 @@ group [migratable] CentralLB : BaseLB {
   entry void MigrationDoneImpl(int);
   entry void WillIbekilled(std::vector <char> avail, int);
   entry void StartCleanup();
+  entry void fake_reduction();
+  entry void fake_reduction2();
 };
 
 };

@@ -22,6 +22,9 @@ mainmodule stencil3d {
     entry void begin_iteration(void);
     entry void receiveGhosts(int iter, int dir, int height, int width,
         double ghosts[height*width]);
+    entry void ProcessAtSync();
+    entry void doAtSync();
+    entry void endIter();
 
     entry [reductiontarget] void doStep() {
       serial "begin_iteration" {

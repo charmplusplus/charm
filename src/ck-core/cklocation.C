@@ -2752,7 +2752,9 @@ bool CkLocMgr::addElement(CkArrayID mgr, const CkArrayIndex& idx, CkMigratable* 
       DEBC((AA "Global location broadcast for new element idx %s "
                "assigned to %d \n" AB,
             idx2str(idx), CkMyPe()));
-      thisProxy.informHome(idx,CkMyPe());//updateLocation(id, CkMyPe());
+//      thisProxy.informHome(idx,CkMyPe());//updateLocation(id, CkMyPe());
+      for(int i=0;i<CkNumPes();i++)
+        thisProxy[i].updateLocation(idx, cache->getLocationEntry(id));
     }
 #endif
   }
@@ -3506,7 +3508,9 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   DEBM((AA "Global location update. idx %s "
            "assigned to %d \n" AB,
         idx2str(idx), toPe));
-  thisProxy.informHome(idx, toPe);//updateLocation(id, toPe);
+  for(int i=0;i<CkNumPes();i++)
+        thisProxy[i].updateLocation(idx, cache->getLocationEntry(id));
+//  thisProxy.informHome(idx, toPe);//updateLocation(id, toPe);
 #endif
 
   CK_MAGICNUMBER_CHECK

@@ -117,6 +117,9 @@ class Main : public CBase_Main {
 
       // Create new array of worker chares
       array = CProxy_Stencil::ckNew(num_chare_x, num_chare_y, num_chare_z);
+      set_active_pes(CkNodeSize(CkMyNode()));
+      CkCallback cb(CkIndex_Stencil::ProcessAtSync(), array(0,0,0));
+      CkStartQD(cb);
 
       //Start the computation
       array.doStep();
@@ -140,6 +143,7 @@ class Stencil: public CBase_Stencil {
   public:
     int iterations;
     int imsg;
+    int elems;
 
     double *temperature;
     double *new_temperature;
@@ -155,6 +159,7 @@ class Stencil: public CBase_Stencil {
     // Constructor, initialize values
     Stencil() {
       usesAtSync = true;
+      elems = 0;
 
       int i, j, k;
       // allocate a three dimensional array
@@ -182,11 +187,21 @@ class Stencil: public CBase_Stencil {
       backGhost   = new double[blockDimX*blockDimY];
     }
 
+    void ProcessAtSync(){
+      set_active_pes(CkNodeSize(CkMyNode())/2);
+      thisProxy.doAtSync();
+    }
+
+    void doAtSync() {
+      AtSync();
+    }
+
     void pup(PUP::er &p)
     {
       p|startTime;
       p|iterations;
       p|imsg;
+      p|elems;
 
       size_t size = (blockDimX+2) * (blockDimY+2) * (blockDimZ+2);
       if (p.isUnpacking()) {
@@ -219,8 +234,6 @@ class Stencil: public CBase_Stencil {
     // Send ghost faces to the six neighbors
     void begin_iteration(void) {
       iterations++;
-      if(iterations==1)
-        set_active_pes(CkNodeSize(CkMyNode())); //TODO:set per PE
 
       for(int k=0; k<blockDimZ; ++k)
         for(int j=0; j<blockDimY; ++j) {
@@ -304,6 +317,13 @@ class Stencil: public CBase_Stencil {
     }
 
 
+    void endIter() {
+      elems++;
+      if(elems == num_chare_x*num_chare_y*num_chare_z) {
+        elems = 0;
+        thisProxy.doStep();
+      }
+    }
     void check_and_compute() {
       compute_kernel();
 
@@ -326,12 +346,17 @@ class Stencil: public CBase_Stencil {
       else {
         if(thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0)
           startTime = CkWallTimer();
-        if(iterations % LBPERIOD_ITER == 0)
+        if(iterations % LBPERIOD_ITER == 0 && iterations < 20)
         {
-          AtSync();
+          if(!(iterations == 15)) {
+            AtSync();
+          }
         }
-        else
+        else {
+//          thisProxy(0,0,0).endIter();
+          CkPrintf("\nContributed by chare %d,%d,%d",thisIndex.x, thisIndex.y, thisIndex.z);
           contribute(CkCallback(CkReductionTarget(Stencil, doStep), thisProxy));
+        }
       }
     }
 
