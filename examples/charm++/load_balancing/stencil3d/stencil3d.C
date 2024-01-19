@@ -356,6 +356,13 @@ class Stencil: public CBase_Stencil {
         double endTime = CkWallTimer();
         CkPrintf("[%d] Time per iteration: %f %f\n", iterations, (endTime - startTime), endTime);
         fflush(stdout);
+
+        int wpn = 3;
+        if(iterations == 12 || iterations == 17) {
+          if(iterations == 17)
+            wpn = 2;
+          report_time(wpn, (endTime - startTime));
+        }
       }
 
       if(iterations == MAX_ITER) {

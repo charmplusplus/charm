@@ -433,6 +433,7 @@ void _loadbalancerInit()
 bool LBManager::manualOn = false;
 std::vector<char> LBManager::avail_vector;
 int LBManager::active_ppn;
+std::unordered_map<int,double> LBManager::ppn_time;
 bool LBManager::avail_vector_set = false;
 CmiNodeLock avail_vector_lock;
 
@@ -637,6 +638,10 @@ void LBManager::set_active_pes(int ppn) {
 
 int LBManager::get_active_pes() {
   return active_ppn;
+}
+
+void LBManager::report_time(int wpn, double time) {
+  ppn_time[wpn] = time;
 }
 
 void LBManager::get_avail_vector(char* bitmap) const

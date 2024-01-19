@@ -509,6 +509,8 @@ class LBManager : public CBase_LBManager
   void set_avail_vector(const char * bitmap, int new_ld = -1);
   void set_avail_vector(const std::vector<char> & bitmap, int new_ld = -1);
   void set_active_pes(int ppn);
+  static std::unordered_map<int, double> ppn_time;
+  void report_time(int wpn, double time);
   int get_active_pes();
   int& new_lbbalancer() { return new_ld_balancer; }
 
@@ -563,6 +565,8 @@ inline void set_avail_vector(const std::vector<char> & bitmap) { LBManagerObj()-
 
 inline void set_active_pes(int ppn) { LBManagerObj()->set_active_pes(ppn); }
 inline int get_active_pes() { return LBManagerObj()->get_active_pes(); }
+
+inline void report_time(int wpn, double time) { LBManagerObj()->report_time(wpn, time); }
 
 
 //  a helper class to suspend/resume load instrumentation when calling into
