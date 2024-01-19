@@ -192,9 +192,15 @@ class Stencil: public CBase_Stencil {
       thisProxy.doStep();
     }
     void ProcessAtSync(){
-      set_active_pes(CkNodeSize(CkMyNode())/2);
+      if(iterations == 10) {
+        set_active_pes(CkNodeSize(CkMyNode())/2+1);
+        CkCallback cb(CkIndex_Stencil::ProcessAtSync(), thisProxy[thisIndex]);
+        CkStartQD(cb);
+      } else if(iterations==15)
+        set_active_pes(CkNodeSize(CkMyNode())/2);
       CkCallback cb(CkIndex_Stencil::StartResume(), thisProxy(0,0,0));
 //      CkStartQD(cb);
+      CkPrintf("\n----Calling AtSync");
       thisProxy.doAtSync();
     }
 
@@ -365,7 +371,7 @@ class Stencil: public CBase_Stencil {
           startTime = CkWallTimer();
         if(iterations % LBPERIOD_ITER == 0 && iterations < 20)
         {
-          if(!(iterations == 15)) {
+          if(!(iterations == 15 || iterations == 10)) {
             AtSync();
           }
         }
