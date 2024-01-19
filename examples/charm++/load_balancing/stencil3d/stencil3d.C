@@ -68,6 +68,11 @@ int myrand(int numpes) {
 #define BACK             6
 #define DIVIDEBY7        0.14285714285714285714
 
+#define CONFIG_ITERS 20 //Not used for now
+#define CONFIG_COUNT 3
+#define CONFIG_INTERVAL 5 //Same as LB Period for now
+#define WPN_LIST (int[]){3, 2, 1}
+
 /** \class Main
  *
  */
@@ -144,6 +149,8 @@ class Stencil: public CBase_Stencil {
     int iterations;
     int imsg;
     int elems;
+    int config_step;
+    int wpn;
 
     double *temperature;
     double *new_temperature;
@@ -160,6 +167,8 @@ class Stencil: public CBase_Stencil {
     Stencil() {
       usesAtSync = true;
       elems = 0;
+      config_step = 0;
+      wpn = WPN_LIST[config_step];
 
       int i, j, k;
       // allocate a three dimensional array
@@ -192,14 +201,12 @@ class Stencil: public CBase_Stencil {
       thisProxy.doStep();
     }
     void ProcessAtSync(){
-      if(iterations == 10) {
-        set_active_pes(CkNodeSize(CkMyNode())/2+1);
+      set_active_pes(wpn);//CkNodeSize(CkMyNode())/2+1);
+      if(config_step < CONFIG_COUNT)
+      {
         CkCallback cb(CkIndex_Stencil::ProcessAtSync(), thisProxy[thisIndex]);
         CkStartQD(cb);
-      } else if(iterations==15)
-        set_active_pes(CkNodeSize(CkMyNode())/2);
-      CkCallback cb(CkIndex_Stencil::StartResume(), thisProxy(0,0,0));
-//      CkStartQD(cb);
+      }
       CkPrintf("\n----Calling AtSync");
       thisProxy.doAtSync();
     }
@@ -214,6 +221,8 @@ class Stencil: public CBase_Stencil {
       p|iterations;
       p|imsg;
       p|elems;
+      p|config_step;
+      p|wpn;
 
       size_t size = (blockDimX+2) * (blockDimY+2) * (blockDimZ+2);
       if (p.isUnpacking()) {
@@ -352,17 +361,11 @@ class Stencil: public CBase_Stencil {
 
       constrainBC();
 
+      double endTime;
       if(thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0) {
-        double endTime = CkWallTimer();
+        endTime = CkWallTimer();
         CkPrintf("[%d] Time per iteration: %f %f\n", iterations, (endTime - startTime), endTime);
         fflush(stdout);
-
-        int wpn = 3;
-        if(iterations == 12 || iterations == 17) {
-          if(iterations == 17)
-            wpn = 2;
-          report_time(wpn, (endTime - startTime));
-        }
       }
 
       if(iterations == MAX_ITER) {
@@ -374,13 +377,18 @@ class Stencil: public CBase_Stencil {
         }
       //  contribute(CkCallback(CkReductionTarget(Main, report), mainProxy));
       } else {
-        if(thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0)
-          startTime = CkWallTimer();
-        if(iterations % LBPERIOD_ITER == 0 && iterations < 20)
-        {
-          if(!(iterations == 15 || iterations == 10)) {
-            AtSync();
+
+        if(thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0) {
+          if(iterations % CONFIG_INTERVAL == 3 && config_step < CONFIG_COUNT) {
+            wpn = WPN_LIST[config_step];
+            report_time(wpn, (endTime - startTime));
           }
+          startTime = CkWallTimer();
+        }
+        if(iterations % CONFIG_INTERVAL == 0 && config_step++ < CONFIG_COUNT)
+        {
+          CkPrintf("\niterations %d mod %d = 0, config_step = %d", iterations, CONFIG_INTERVAL, config_step-1);
+          ;//Do nothing, wait for QD
         }
         else {
           thisProxy(0,0,0).endIter();
