@@ -511,6 +511,7 @@ class LBManager : public CBase_LBManager
   void set_active_pes(int ppn);
   static std::unordered_map<int, double> ppn_time;
   void report_time(int wpn, double time);
+  int get_best_wpn();
   int get_active_pes();
   int& new_lbbalancer() { return new_ld_balancer; }
 
@@ -567,6 +568,7 @@ inline void set_active_pes(int ppn) { LBManagerObj()->set_active_pes(ppn); }
 inline int get_active_pes() { return LBManagerObj()->get_active_pes(); }
 
 inline void report_time(int wpn, double time) { LBManagerObj()->report_time(wpn, time); }
+inline int get_best_wpn() { return LBManagerObj()->get_best_wpn(); }
 
 
 //  a helper class to suspend/resume load instrumentation when calling into

@@ -73,6 +73,8 @@ int myrand(int numpes) {
 #define CONFIG_INTERVAL 5 //Same as LB Period for now
 #define WPN_LIST (int[]){3, 2, 1}
 
+//#define DEBUG_ST
+
 /** \class Main
  *
  */
@@ -168,7 +170,7 @@ class Stencil: public CBase_Stencil {
       usesAtSync = true;
       elems = 0;
       config_step = 0;
-      wpn = WPN_LIST[config_step];
+      wpn = CkNodeSize(CkMyNode());
 
       int i, j, k;
       // allocate a three dimensional array
@@ -202,12 +204,14 @@ class Stencil: public CBase_Stencil {
     }
     void ProcessAtSync(){
       set_active_pes(wpn);//CkNodeSize(CkMyNode())/2+1);
-      if(config_step < CONFIG_COUNT)
+      if(config_step <= CONFIG_COUNT)
       {
         CkCallback cb(CkIndex_Stencil::ProcessAtSync(), thisProxy[thisIndex]);
         CkStartQD(cb);
       }
+#if DEBUG_ST
       CkPrintf("\n----Calling AtSync");
+#endif
       thisProxy.doAtSync();
     }
 
@@ -342,7 +346,9 @@ class Stencil: public CBase_Stencil {
       elems++;
       if(elems == num_chare_x*num_chare_y*num_chare_z) {
         elems = 0;
+#if DEBUG_ST
         CkPrintf("\nCalling doStep"); fflush(stdout);
+#endif
         thisProxy.doStep();
       }
     }
@@ -380,19 +386,25 @@ class Stencil: public CBase_Stencil {
 
         if(thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0) {
           if(iterations % CONFIG_INTERVAL == 3 && config_step < CONFIG_COUNT) {
-            wpn = WPN_LIST[config_step];
             report_time(wpn, (endTime - startTime));
           }
           startTime = CkWallTimer();
         }
-        if(iterations % CONFIG_INTERVAL == 0 && config_step++ < CONFIG_COUNT)
+        if(iterations % CONFIG_INTERVAL == 0 && config_step < CONFIG_COUNT)
         {
+          wpn = WPN_LIST[config_step++];
+#if DEBUG_ST
           CkPrintf("\niterations %d mod %d = 0, config_step = %d", iterations, CONFIG_INTERVAL, config_step-1);
+#endif
           ;//Do nothing, wait for QD
-        }
-        else {
+        } else if(iterations % CONFIG_INTERVAL == 0 && config_step++ == CONFIG_COUNT){
+          CkPrintf("\nBest configuration was found to be %d", get_best_wpn());
+          wpn = get_best_wpn();
+        } else {
           thisProxy(0,0,0).endIter();
+#if DEBUG_ST
           CkPrintf("\nContributed by chare %d,%d,%d",thisIndex.x, thisIndex.y, thisIndex.z);fflush(stdout);
+#endif
 //          contribute(CkCallback(CkReductionTarget(Stencil, doStep), thisProxy));
         }
       }
@@ -441,10 +453,13 @@ class Stencil: public CBase_Stencil {
     }
 
     void ResumeFromSync() {
+#if DEBUG_ST
       CkPrintf("\nResume from Sync %d,%d,%d", thisIndex.x, thisIndex.y, thisIndex.z); fflush(stdout);
-      if(iterations<15)
-        thisProxy[thisIndex].doStep();
-      else
+#endif
+
+//      if(iterations<15)
+//        thisProxy[thisIndex].doStep();
+//      else
         thisProxy(0,0,0).endIter();
     }
 };

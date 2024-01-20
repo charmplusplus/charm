@@ -1187,6 +1187,12 @@ void CentralLB::ResumeClients()
   ResumeClients(1);
 }
 
+#define _GNU_SOURCE
+#include <sched.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
 void CentralLB::ResumeClients(int balancing)
 {
 #if CMK_LBDB_ON
@@ -1203,7 +1209,7 @@ void CentralLB::ResumeClients(int balancing)
   }
 #endif
 #if 1
-  if(lbmgr->step() > 2) {
+  if(lbmgr->step() > 3) {
         //set_active_pes(CkNodeSize(CkMyNode())/2);
         if(CkMyPe() >= get_active_pes()) {
           std::unique_lock<std::mutex> lk(m_shutoff);
@@ -1221,6 +1227,16 @@ void CentralLB::ResumeClients(int balancing)
           CkPrintf("\nTried notifying from PE-%d", CkMyPe());
 */
         }
+      } else{
+#if 0
+        if(CkMyPe() >= get_active_pes()) {
+          int core_id = CkNodeSize(CkMyNode())-1;
+          cpu_set_t cpuset;
+          CPU_ZERO(&cpuset);
+          CPU_SET(core_id, &cpuset);
+          pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+        }
+#endif
       }
 #endif
 

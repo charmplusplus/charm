@@ -642,6 +642,19 @@ int LBManager::get_active_pes() {
 
 void LBManager::report_time(int wpn, double time) {
   ppn_time[wpn] = time;
+  CkPrintf("\nEntered time for wpn %d = %lf s", wpn, ppn_time[wpn]);
+}
+
+int LBManager::get_best_wpn() {
+  double min_time = 100.0;
+  int wpn = -1;
+  for (auto entry = ppn_time.begin(); entry != ppn_time.end(); entry++) {
+    if(min_time > entry->second) {
+      min_time = entry->second;
+      wpn = entry->first;
+    }
+  }
+  return wpn;
 }
 
 void LBManager::get_avail_vector(char* bitmap) const
