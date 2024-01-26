@@ -3,6 +3,7 @@
 #include <sstream>
 #include <iostream>
 #include <fstream>
+#include <time.h>
 
 typedef int FileToken;
 #include "CkIO.decl.h"
@@ -200,6 +201,7 @@ namespace Ck { namespace IO {
 		files[file].sessionID = sessionID;
 		// determine the number of reader sessions required, depending on the session size and the number of bytes per reader
 		int num_readers = opts.numReaders;
+		
 		CkArrayOptions sessionOpts(num_readers); // set the number of elements in the chare array
 		// if there is a non-empty mapping provided, do the mapping
 		if(!pes_to_map.empty()){
@@ -209,6 +211,7 @@ namespace Ck { namespace IO {
 		CkCallback sessionInitDone(CkIndex_Director::sessionReady(0), thisProxy);
 		sessionInitDone.setRefnum(sessionID);
 		sessionOpts.setInitCallback(sessionInitDone); // invoke the sessionInitDone callback after all the elements of the chare array are created
+		//CkPrintf("Launching read session with %d buffer chares.\n", num_readers);
 		files[file].read_session = CProxy_BufferChares::ckNew(file, offset, bytes, num_readers, sessionOpts); // create the readers
 	}
 
@@ -323,7 +326,7 @@ namespace Ck { namespace IO {
 			if(start_idx == num_readers){
 				int tag = getRDMATag(); 
 				CkPostBuffer(info.data, bytes, tag);
-				CkPrintf("Just posting buffer with tag=%d and of length %zu starting from %zu on PE=%d\n", tag, bytes, 0, CkMyPe());
+				//CkPrintf("Just posting buffer with tag=%d and of length %zu starting from %zu on PE=%d\n", tag, bytes, 0, CkMyPe());
 				CProxy_BufferChares(_session.sessionID)[start_idx - 1].sendData(read_tag, tag, read_offset, bytes, thisProxy, CkMyPe()); 
 #include <string>
 #include <map>
@@ -351,7 +354,7 @@ namespace Ck { namespace IO {
 				}
 				// do the CkPost call
 				int tag = getRDMATag(); 
-				CkPrintf("Just Posting buffer with tag=%d and of length %zu starting from %zu on PE=%d\n", tag, data_len, data_idx, CkMyPe());
+				//CkPrintf("Just Posting buffer with tag=%d and of length %zu starting from %zu on PE=%d\n", tag, data_len, data_idx, CkMyPe());
 				CkPostBuffer(info.data + data_idx, data_len, tag);
 				#ifdef DEBUG
 				CkPrintf("Read (offset=%zu, length=%zu) is contained on IO Buffer %zu\n", read_offset, read_bytes, i);
@@ -660,6 +663,7 @@ namespace Ck { namespace IO {
 		size_t _my_offset;
 		size_t _my_bytes;
 		std::shared_future<char*> _buffer;
+
 		size_t _num_readers;	
 		size_t _read_stripe;
 
@@ -689,6 +693,12 @@ namespace Ck { namespace IO {
 			contribute(sizeof(double), &total_time, CkReduction::max_double, cb);
 			#endif
 		}
+	
+	~BufferChares() {
+	  
+	  delete _buffer.get();
+	  
+	}
 
 		#ifdef DEBUG
 		void printTime(double time_taken){
@@ -697,7 +707,9 @@ namespace Ck { namespace IO {
 		#endif
 
 		char* readDataPOSIX(){
-			char* buffer = new char[_my_bytes]; 
+
+		  char *buffer = new char[_my_bytes];
+			
 			FILE* fp = fopen(_file -> name.c_str(), "rb"); // open the file pointer
 			if(!fp){
 				CkPrintf("Opening of the file %s went wrong\n", _file -> name.c_str());
@@ -707,7 +719,11 @@ namespace Ck { namespace IO {
 			#ifdef DEBUG
 			CkPrintf("Starting the read\n", thisIndex);
 			#endif
+			clock_t start_time = clock();
 			size_t num_bytes_read = fread(buffer, 1, _my_bytes, fp);
+			clock_t end_time = clock();
+
+			CkPrintf("Buffer chare %d reading %d bytes on PE %d and node %d in %fms.\n", thisIndex, _my_bytes, CkMyPe(), CkMyNode(), (double (end_time - start_time) / CLOCKS_PER_SEC * 1000));
 			#ifdef DEBUG
 			CkPrintf("Finished the read on %d\n", thisIndex);
 			#endif
@@ -759,8 +775,9 @@ namespace Ck { namespace IO {
 				CthYield(); // will suspend thread, let the Charm RTS reschedule it
 			}
 
+
 			char* buffer = _buffer.get(); // future call to get
-			CkPrintf("[sendData]: buffer_tag=%d, offset in data = %zd, len=%zu\n", buffer_tag, (chare_offset - _my_offset), bytes_to_read);
+			//CkPrintf("[sendData]: buffer_tag=%d, offset in data = %zd, len=%zu\n", buffer_tag, (chare_offset - _my_offset), bytes_to_read);
 			CProxy_ReadAssembler(ra)[pe].shareData(read_tag, buffer_tag, chare_offset, bytes_to_read, CkSendBuffer(buffer + (chare_offset - _my_offset)/*, cb*/)); // send this data to the ReadAssembler
 		}
 		// deprecated; could be useful for debugging and profiling purposes
