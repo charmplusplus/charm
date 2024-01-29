@@ -1,5 +1,5 @@
 -include ../../../common.mk
-OPTS	= -O3
+OPTS	= -O3 -I${TACC_PAPI_INC}
 CHARMC	= ../../../../bin/charmc $(OPTS)
 
 OBJS = stencil3d.o
@@ -7,7 +7,7 @@ OBJS = stencil3d.o
 all: stencil3d
 
 stencil3d: $(OBJS)
-	$(CHARMC) -language charm++ -module CommonLBs -o stencil3d $(OBJS)
+	$(CHARMC) -language charm++ -L${TACC_PAPI_LIB} -lpapi -module CommonLBs -o stencil3d $(OBJS)
 
 projections: $(OBJS)
 	$(CHARMC) -language charm++ -module CommonLBs -tracemode projections -lz -o stencil3d.prj $(OBJS)
@@ -29,6 +29,7 @@ test: stencil3d
 	$(call run, +p4 ./stencil3d 64 32 +balancer GreedyLB +LBDebug 1 )
 	$(call run, +p4 ./stencil3d 64 32 +balancer GreedyRefineLB +LBDebug 1 )
 	$(call run, +p4 ./stencil3d 64 32 +balancer DistributedLB +LBDebug 1 )
+	$(call run, +p4 ./stencil3d 64 32 +balancer MetisLB +LBDebug 1 )
 
 
 testp: stencil3d
@@ -36,3 +37,4 @@ testp: stencil3d
 	$(call run, +p$(P) ./stencil3d $$(( $(P) * 8 )) 4 +balancer GreedyLB +LBDebug 1 )
 	$(call run, +p$(P) ./stencil3d $$(( $(P) * 8 )) 4 +balancer GreedyRefineLB +LBDebug 1 )
 	$(call run, +p$(P) ./stencil3d $$(( $(P) * 8 )) 4 +balancer DistributedLB +LBDebug 1 )
+	$(call run, +p$(P) ./stencil3d $$(( $(P) * 8 )) 4 +balancer MetisLB +LBDebug 1 )

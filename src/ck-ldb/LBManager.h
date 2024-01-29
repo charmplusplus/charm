@@ -483,6 +483,7 @@ class LBManager : public CBase_LBManager
   int mystep;
   static std::vector<char> avail_vector; // processor bit vector
   static int active_ppn;
+  static int active_redn_ppn;
   static bool avail_vector_set;
   int new_ld_balancer;  // for Node 0
   MetaBalancer* metabalancer;
@@ -509,10 +510,12 @@ class LBManager : public CBase_LBManager
   void set_avail_vector(const char * bitmap, int new_ld = -1);
   void set_avail_vector(const std::vector<char> & bitmap, int new_ld = -1);
   void set_active_pes(int ppn);
+  void set_active_redn_pes(int ppn);
   static std::unordered_map<int, double> ppn_time;
   void report_time(int wpn, double time);
   int get_best_wpn();
   int get_active_pes();
+  int get_active_redn_pes();
   int& new_lbbalancer() { return new_ld_balancer; }
 
   struct LastLBInfo
@@ -566,6 +569,9 @@ inline void set_avail_vector(const std::vector<char> & bitmap) { LBManagerObj()-
 
 inline void set_active_pes(int ppn) { LBManagerObj()->set_active_pes(ppn); }
 inline int get_active_pes() { return LBManagerObj()->get_active_pes(); }
+
+inline void set_active_redn_pes(int ppn) { LBManagerObj()->set_active_redn_pes(ppn); }
+inline int get_active_redn_pes() { return LBManagerObj()->get_active_redn_pes(); }
 
 inline void report_time(int wpn, double time) { LBManagerObj()->report_time(wpn, time); }
 inline int get_best_wpn() { return LBManagerObj()->get_best_wpn(); }

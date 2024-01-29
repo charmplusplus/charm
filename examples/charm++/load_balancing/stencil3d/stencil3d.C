@@ -29,7 +29,18 @@
 #include "stencil3d.decl.h"
 #include "TopoManager.h"
 
+#include <vector>
+
+#define PAPI_INST
+
+#ifdef PAPI_INST
+#include "papi.h"
+#endif
+
 /*readonly*/ CProxy_Main mainProxy;
+#ifdef PAPI_INST
+/*readonly*/ CProxy_PAPI_grp papi_arr;
+#endif
 /*readonly*/ int arrayDimX;
 /*readonly*/ int arrayDimY;
 /*readonly*/ int arrayDimZ;
@@ -58,7 +69,7 @@ int myrand(int numpes) {
 #define index(a,b,c)    ((a)+(b)*(blockDimX+2)+(c)*(blockDimX+2)*(blockDimY+2))
 
 #define MAX_ITER         100
-#define LBPERIOD_ITER    5     // LB is called every LBPERIOD_ITER number of program iterations
+#define LBPERIOD_ITER    150     // LB is called every LBPERIOD_ITER number of program iterations
 #define CHANGELOAD       30
 #define LEFT             1
 #define RIGHT            2
@@ -68,13 +79,6 @@ int myrand(int numpes) {
 #define BACK             6
 #define DIVIDEBY7        0.14285714285714285714
 
-#define CONFIG_ITERS 20 //Not used for now
-#define CONFIG_COUNT 3
-#define CONFIG_INTERVAL 5 //Same as LB Period for now
-#define WPN_LIST (int[]){3, 2, 1}
-
-//#define DEBUG_ST
-
 /** \class Main
  *
  */
@@ -83,6 +87,7 @@ class Main : public CBase_Main {
     CProxy_Stencil array;
 
     Main(CkArgMsg* m) {
+      set_active_pes(CkNodeSize(CkMyNode()));
       if ( (m->argc != 3) && (m->argc != 7) ) {
         CkPrintf("%s [array_size] [block_size]\n", m->argv[0]);
         CkPrintf("OR %s [array_size_X] [array_size_Y] [array_size_Z] [block_size_X] [block_size_Y] [block_size_Z]\n", m->argv[0]);
@@ -122,12 +127,27 @@ class Main : public CBase_Main {
       CkPrintf("Array Dimensions: %d %d %d\n", arrayDimX, arrayDimY, arrayDimZ);
       CkPrintf("Block Dimensions: %d %d %d\n", blockDimX, blockDimY, blockDimZ);
 
-      // Create new array of worker chares
-      array = CProxy_Stencil::ckNew(num_chare_x, num_chare_y, num_chare_z);
-      set_active_pes(CkNodeSize(CkMyNode()));
-      CkCallback cb(CkIndex_Stencil::ProcessAtSync(), array(0,0,0));
-      CkStartQD(cb);
+#ifdef PAPI_INST
+      int retval;
 
+      retval=PAPI_library_init(PAPI_VER_CURRENT);
+      if (retval!=PAPI_VER_CURRENT) {
+        fprintf(stderr,"Error initializing PAPI!\n");
+      }
+
+      if (PAPI_thread_init(pthread_self) != PAPI_OK) {
+        perror("PAPI_thread_init");
+      }
+      // Create new array of worker chares
+      papi_arr = CProxy_PAPI_grp::ckNew();
+#endif
+
+      array = CProxy_Stencil::ckNew(num_chare_x, num_chare_y, num_chare_z);
+//      CProxy_BlockNodeMap map = CProxy_BlockNodeMap::ckNew(num_chare_x);
+//      CkArrayOptions opts(num_chare_x, num_chare_y, num_chare_z);
+//      opts.setMap(map);
+
+//      array = CProxy_Stencil::ckNew(opts);
       //Start the computation
       array.doStep();
     }
@@ -138,6 +158,71 @@ class Main : public CBase_Main {
     }
 };
 
+#ifdef PAPI_INST
+
+class PAPI_grp: public CBase_PAPI_grp {
+  int eventset, result;
+  long long values[6];
+  public:
+  PAPI_grp() {
+    eventset=PAPI_NULL;
+    result = PAPI_register_thread();
+    if ( result != PAPI_OK ) {
+      printf("Error register thread!\n");
+    }
+
+    result=PAPI_create_eventset(&eventset);
+    if (result!=PAPI_OK) {
+      printf("Error PAPI create eventset: %s\n",PAPI_strerror(result));
+    }
+
+    result=PAPI_add_named_event(eventset,"PAPI_TOT_INS");
+    if (result!=PAPI_OK) {
+      printf("Error PAPI add_event %s\n",
+        PAPI_strerror(result));
+    }
+
+    result=PAPI_add_named_event(eventset,"PAPI_TOT_CYC");
+    if (result!=PAPI_OK) {
+      printf("Error PAPI add_event %s\n",
+        PAPI_strerror(result));
+    }
+
+    result=PAPI_add_named_event(eventset,"PAPI_RES_STL");//PAPI_L3_TCA");
+    if (result!=PAPI_OK) {
+      printf("Error PAPI add_event %s\n",
+        PAPI_strerror(result));
+    }
+
+    result=PAPI_add_named_event(eventset,"PAPI_MEM_WCY");//PAPI_LST_INS");
+    if (result!=PAPI_OK) {
+      printf("Error PAPI add_event %s\n",
+        PAPI_strerror(result));
+    }
+#if 1
+    result=PAPI_add_named_event(eventset,"PAPI_L3_TCM");
+    if (result!=PAPI_OK) {
+      printf("Error PAPI add_event %s\n",
+        PAPI_strerror(result));
+    }
+    result=PAPI_add_named_event(eventset,"PAPI_L3_TCM");
+    if (result!=PAPI_OK) {
+      printf("Error PAPI add_event %s\n",
+        PAPI_strerror(result));
+    }
+#endif
+
+  }
+  void start() {
+    PAPI_start(eventset);
+  }
+  void stop() {
+    PAPI_stop(eventset,values);
+    printf("Total instructions %lld, Total cycles %lld, Stalled cycles %lld misses %lld,%lld,%lld\n",values[0],values[1], values[2], values[3],values[4],values[5]);
+  }
+};
+#endif
+
 /** \class Stencil
  *
  */
@@ -146,77 +231,51 @@ class Stencil: public CBase_Stencil {
   Stencil_SDAG_CODE
   private:
     double startTime;
-
+    double start10;
+    using vector_t = std::vector<double>;
+#ifdef PAPI_INST
+    PAPI_grp *papi;
+#endif
   public:
     int iterations;
     int imsg;
-    int elems;
-    int config_step;
-    int wpn;
 
-    double *temperature;
-    double *new_temperature;
+    std::vector<double> temperature;
+    std::vector<double> new_temperature;
 
     // ghost arrays
-    double *leftGhost;
-    double *rightGhost;
-    double *topGhost;
-    double *bottomGhost;
-    double *frontGhost;
-    double *backGhost;
+    std::vector<double> leftGhost;
+    std::vector<double> rightGhost;
+    std::vector<double> topGhost;
+    std::vector<double> bottomGhost;
+    std::vector<double> frontGhost;
+    std::vector<double> backGhost;
 
     // Constructor, initialize values
-    Stencil() {
+    Stencil()
+    : iterations(0)
+    , imsg(0)
+    // allocate a three dimensional array
+    , temperature((blockDimX+2) * (blockDimY+2) * (blockDimZ+2), 0.0)
+    , new_temperature((blockDimX+2) * (blockDimY+2) * (blockDimZ+2), 0.0)
+    // Allocate ghost arrays
+    , leftGhost(blockDimY*blockDimZ)
+    , rightGhost(blockDimY*blockDimZ)
+    , topGhost(blockDimX*blockDimZ)
+    , bottomGhost(blockDimX*blockDimZ)
+    , frontGhost(blockDimX*blockDimY)
+    , backGhost(blockDimX*blockDimY)
+    {
       usesAtSync = true;
-      elems = 0;
-      config_step = 0;
-      wpn = CkNodeSize(CkMyNode());
-
-      int i, j, k;
-      // allocate a three dimensional array
-      temperature = new double[(blockDimX+2) * (blockDimY+2) * (blockDimZ+2)];
-      new_temperature = new double[(blockDimX+2) * (blockDimY+2) * (blockDimZ+2)];
-
-      for(k=0; k<blockDimZ+2; ++k)
-        for(j=0; j<blockDimY+2; ++j)
-          for(i=0; i<blockDimX+2; ++i)
-            temperature[index(i, j, k)] = 0.0;
-
-      iterations = 0;
-      imsg = 0;
+#ifdef PAPI_INST
+      papi = papi_arr.ckLocalBranch();
+#endif
+      //CkPrintf("\nMy (%d,%d,%d) PE=%d", thisIndex.x, thisIndex.y, thisIndex.z, CkMyPe());
       constrainBC();
       // start measuring time
-      if (thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0)
+      if (thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0) {
         startTime = CkWallTimer();
-
-      // Allocate ghost arrays
-      leftGhost   = new double[blockDimY*blockDimZ];
-      rightGhost  = new double[blockDimY*blockDimZ];
-      topGhost    = new double[blockDimX*blockDimZ];
-      bottomGhost = new double[blockDimX*blockDimZ];
-      frontGhost  = new double[blockDimX*blockDimY];
-      backGhost   = new double[blockDimX*blockDimY];
-    }
-
-    void StartResume() {
-      CkPrintf("\ninside startResum");
-      thisProxy.doStep();
-    }
-    void ProcessAtSync(){
-      set_active_pes(wpn);//CkNodeSize(CkMyNode())/2+1);
-      if(config_step <= CONFIG_COUNT)
-      {
-        CkCallback cb(CkIndex_Stencil::ProcessAtSync(), thisProxy[thisIndex]);
-        CkStartQD(cb);
       }
-#if DEBUG_ST
-      CkPrintf("\n----Calling AtSync");
-#endif
-      thisProxy.doAtSync();
-    }
-
-    void doAtSync() {
-      AtSync();
     }
 
     void pup(PUP::er &p)
@@ -224,37 +283,18 @@ class Stencil: public CBase_Stencil {
       p|startTime;
       p|iterations;
       p|imsg;
-      p|elems;
-      p|config_step;
-      p|wpn;
-
-      size_t size = (blockDimX+2) * (blockDimY+2) * (blockDimZ+2);
-      if (p.isUnpacking()) {
-        temperature     = new double[size];
-        new_temperature = new double[size];
-        leftGhost       = new double[blockDimY*blockDimZ];
-        rightGhost      = new double[blockDimY*blockDimZ];
-        topGhost        = new double[blockDimX*blockDimZ];
-        bottomGhost     = new double[blockDimX*blockDimZ];
-        frontGhost      = new double[blockDimX*blockDimY];
-        backGhost       = new double[blockDimX*blockDimY];
-      }
-      p(temperature, size);
-      p(new_temperature, size);
+      p|start10;
+      p|temperature;
+      p|new_temperature;
+      p|leftGhost;
+      p|rightGhost;
+      p|topGhost;
+      p|bottomGhost;
+      p|frontGhost;
+      p|backGhost;
     }
 
     Stencil(CkMigrateMessage* m) { }
-
-    ~Stencil() {
-      delete [] temperature;
-      delete [] new_temperature;
-      delete [] leftGhost;
-      delete [] rightGhost;
-      delete [] topGhost;
-      delete [] bottomGhost;
-      delete [] frontGhost;
-      delete [] backGhost;
-    }
 
     // Send ghost faces to the six neighbors
     void begin_iteration(void) {
@@ -277,28 +317,29 @@ class Stencil: public CBase_Stencil {
           frontGhost[j*blockDimX+i] = temperature[index(i+1, j+1, 1)];
           backGhost[j*blockDimX+i] = temperature[index(i+1, j+1, blockDimZ)];
         }
-
+#if 1
       // Send my left face
       thisProxy(wrap_x(thisIndex.x-1), thisIndex.y, thisIndex.z)
-        .receiveGhosts(iterations, RIGHT, blockDimY, blockDimZ, leftGhost);
+        .receiveGhosts(iterations, RIGHT, blockDimY, blockDimZ, leftGhost.data());
       // Send my right face
       thisProxy(wrap_x(thisIndex.x+1), thisIndex.y, thisIndex.z)
-        .receiveGhosts(iterations, LEFT, blockDimY, blockDimZ, rightGhost);
+        .receiveGhosts(iterations, LEFT, blockDimY, blockDimZ, rightGhost.data());
       // Send my bottom face
       thisProxy(thisIndex.x, wrap_y(thisIndex.y-1), thisIndex.z)
-        .receiveGhosts(iterations, TOP, blockDimX, blockDimZ, bottomGhost);
+        .receiveGhosts(iterations, TOP, blockDimX, blockDimZ, bottomGhost.data());
       // Send my top face
       thisProxy(thisIndex.x, wrap_y(thisIndex.y+1), thisIndex.z)
-        .receiveGhosts(iterations, BOTTOM, blockDimX, blockDimZ, topGhost);
+        .receiveGhosts(iterations, BOTTOM, blockDimX, blockDimZ, topGhost.data());
       // Send my front face
       thisProxy(thisIndex.x, thisIndex.y, wrap_z(thisIndex.z-1))
-        .receiveGhosts(iterations, BACK, blockDimX, blockDimY, frontGhost);
+        .receiveGhosts(iterations, BACK, blockDimX, blockDimY, frontGhost.data());
       // Send my back face
       thisProxy(thisIndex.x, thisIndex.y, wrap_z(thisIndex.z+1))
-        .receiveGhosts(iterations, FRONT, blockDimX, blockDimY, backGhost);
+        .receiveGhosts(iterations, FRONT, blockDimX, blockDimY, backGhost.data());
+#endif
     }
 
-    void processGhosts(int dir, int height, int width, double gh[]) {
+    void processGhosts(int dir, int height, int width, const double* gh) {
       switch(dir) {
         case LEFT:
           for(int k=0; k<width; ++k)
@@ -341,82 +382,62 @@ class Stencil: public CBase_Stencil {
       }
     }
 
-
-    void endIter() {
-      elems++;
-      if(elems == num_chare_x*num_chare_y*num_chare_z) {
-        elems = 0;
-#if DEBUG_ST
-        CkPrintf("\nCalling doStep"); fflush(stdout);
-#endif
-        thisProxy.doStep();
-      }
-    }
-    void DonePgm() {
-      contribute(CkCallback(CkReductionTarget(Main, report), mainProxy));
-    }
     void check_and_compute() {
+      if(iterations == 10 && thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0){
+        start10 = CkWallTimer();
+      }
+
+
+      double start_local;
+      if(iterations>50 && iterations==70){// && thisIndex.x == 0 && thisIndex.z == 0){
+#ifdef PAPI_INST
+        papi->start();
+#endif
+        start_local = CkWallTimer();
+      }
+
       compute_kernel();
 
+      if(iterations>50 && iterations==70){// && thisIndex.x == 0 && thisIndex.z == 0){
+        CkPrintf("\nTime for kernel = %lfs", CkWallTimer()-start_local);
+#ifdef PAPI_INST
+        papi->stop();
+#endif
+      }
       // calculate error
       // not being done right now since we are doing a fixed no. of iterations
-      double *tmp;
-      tmp = temperature;
-      temperature = new_temperature;
-      new_temperature = tmp;
+      temperature.swap(new_temperature);
 
       constrainBC();
 
-      double endTime;
       if(thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0) {
-        endTime = CkWallTimer();
+        double endTime = CkWallTimer();
+        if(iterations== 50) {
+            CkPrintf("\nTime for 50 iterations = %lf\n", endTime-start10);
+        }
         CkPrintf("[%d] Time per iteration: %f %f\n", iterations, (endTime - startTime), endTime);
-        fflush(stdout);
       }
 
-      if(iterations == MAX_ITER) {
-        if(thisIndex.x==0 && thisIndex.y==0 && thisIndex.z==0) {
-          CkCallback cb(CkIndex_Stencil::DonePgm(), thisProxy);
-          CkStartQD(cb);
-          set_active_pes(CkNodeSize(CkMyNode()));
-          getLBMgr()->wakeupPEs();
-        }
-      //  contribute(CkCallback(CkReductionTarget(Main, report), mainProxy));
-      } else {
-
-        if(thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0) {
-          if(iterations % CONFIG_INTERVAL == 3 && config_step < CONFIG_COUNT) {
-            report_time(wpn, (endTime - startTime));
-          }
+      if(iterations == MAX_ITER)
+        contribute(CkCallback(CkReductionTarget(Main, report), mainProxy));
+      else {
+        if(thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0)
           startTime = CkWallTimer();
-        }
-        if(iterations % CONFIG_INTERVAL == 0 && config_step < CONFIG_COUNT)
+        if(iterations % LBPERIOD_ITER == 0)
         {
-          wpn = WPN_LIST[config_step++];
-#if DEBUG_ST
-          CkPrintf("\niterations %d mod %d = 0, config_step = %d", iterations, CONFIG_INTERVAL, config_step-1);
-#endif
-          ;//Do nothing, wait for QD
-        } else if(iterations % CONFIG_INTERVAL == 0 && config_step++ == CONFIG_COUNT){
-          CkPrintf("\nBest configuration was found to be %d", get_best_wpn());
-          wpn = get_best_wpn();
-        } else {
-          thisProxy(0,0,0).endIter();
-#if DEBUG_ST
-          CkPrintf("\nContributed by chare %d,%d,%d",thisIndex.x, thisIndex.y, thisIndex.z);fflush(stdout);
-#endif
-//          contribute(CkCallback(CkReductionTarget(Stencil, doStep), thisProxy));
+          AtSync();
         }
+        else
+          contribute(CkCallback(CkReductionTarget(Stencil, doStep), thisProxy));
       }
     }
 
     // Check to see if we have received all neighbor values yet
     // If all neighbor values have been received, we update our values and proceed
     void compute_kernel() {
-      int itno = (int)ceil((double)iterations/(double)CHANGELOAD) * 5;
       int index = thisIndex.x + thisIndex.y*num_chare_x + thisIndex.z*num_chare_x*num_chare_y;
       int numChares = num_chare_x * num_chare_y * num_chare_z;
-      double work = 100.0;
+      double work = 300.0;//32.0;//16.0;//24.0;//1.0;//24.0;//1.0;//24.0;
 
 #ifndef _MSC_VER
 #pragma unroll
@@ -453,15 +474,24 @@ class Stencil: public CBase_Stencil {
     }
 
     void ResumeFromSync() {
-#if DEBUG_ST
-      CkPrintf("\nResume from Sync %d,%d,%d", thisIndex.x, thisIndex.y, thisIndex.z); fflush(stdout);
-#endif
-
-//      if(iterations<15)
-//        thisProxy[thisIndex].doStep();
-//      else
-        thisProxy(0,0,0).endIter();
+      thisProxy[thisIndex].doStep();
     }
 };
 
+class BlockNodeMap : public CkArrayMap {
+public:
+  int nx, ny, nz;
+  BlockNodeMap(int chare_dim) {
+    nx = ny = nz = chare_dim;
+  }
+  BlockNodeMap(CkMigrateMessage* m){}
+  int registerArray(CkArrayIndex& numElements,CkArrayID aid) {
+    return 0;
+  }
+  int procNum(int /*arrayHdl*/,const CkArrayIndex &idx) {
+    int elem = idx.data()[0]*(nz)+ idx.data()[1]*(nz*ny)+ idx.data()[2];
+    int penum = (elem%(CkNumPes()/2));
+    return penum;
+  }
+};
 #include "stencil3d.def.h"

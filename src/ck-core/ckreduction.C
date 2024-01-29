@@ -1063,14 +1063,16 @@ int CkReductionMgr::treeParent(void) //My parent Node
 int CkReductionMgr::treeKids(void)//Number of children in tree
 {
   int retval = numKids;
-  if(get_active_pes() < CkNodeSize(CkMyNode())) {
+#if 1
+  if(get_active_redn_pes() < CkNodeSize(CkMyNode())) {
     if(CkMyPe() == 0) {
-      int idleCount = CkNodeSize(CkMyNode()) - get_active_pes();
+      int idleCount = CkNodeSize(CkMyNode()) - get_active_redn_pes();
       gcount = orig_gcount + idleCount*orig_gcount;
     }
-    retval = numKids-CkNodeSize(CkMyNode())+get_active_pes();
+    retval = numKids-CkNodeSize(CkMyNode())+get_active_redn_pes();
   }
-  if(CkMyPe()==0) CkPrintf("\nreturn val = %d, numKids = %d, CkNodeSize(CkMyNode()) = %d, active_pes = %d", retval, numKids, CkNodeSize(CkMyNode()), get_active_pes());
+#endif
+//  if(CkMyPe()==0) CkPrintf("\nreturn val = %d, numKids = %d, CkNodeSize(CkMyNode()) = %d, active_pes = %d", retval, numKids, CkNodeSize(CkMyNode()), get_active_pes());
   return retval;
 }
 

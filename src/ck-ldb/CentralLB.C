@@ -10,6 +10,8 @@
 #include "envelope.h"
 #include "CentralLB.h"
 #include "LBSimulation.h"
+#include <mutex>
+#include <condition_variable>
 
 #define  DEBUGF(x)       // CmiPrintf x;
 #define  DEBUG(x)        // x;
@@ -42,6 +44,11 @@ extern char *_shrinkexpand_basedir;
 int numProcessAfterRestart;
 int mynewpe=0;
 #endif
+
+static int ready_pthreads = 0;
+static std::mutex m_shutoff;
+static std::condition_variable cv_shutoff;
+
 CkGroupID loadbalancer;
 int * lb_ptr;
 bool load_balancer_created;
@@ -1209,7 +1216,8 @@ void CentralLB::ResumeClients(int balancing)
   }
 #endif
 #if 1
-  if(lbmgr->step() > 3) {
+  if(lbmgr->step() > 4) {
+        set_active_redn_pes(8);
         //set_active_pes(CkNodeSize(CkMyNode())/2);
         if(CkMyPe() >= get_active_pes()) {
           std::unique_lock<std::mutex> lk(m_shutoff);
@@ -1228,9 +1236,20 @@ void CentralLB::ResumeClients(int balancing)
 */
         }
       } else{
-#if 0
+#if 1
         if(CkMyPe() >= get_active_pes()) {
-          int core_id = CkNodeSize(CkMyNode())-1;
+          int core_id = 86;//85;//CkNodeSize(CkMyNode())-2;
+
+//          if(lbmgr->step() > 3)
+//            core_id = 45;
+
+          CkPrintf("\nSetting to core id =%d",core_id);
+          cpu_set_t cpuset;
+          CPU_ZERO(&cpuset);
+          CPU_SET(core_id, &cpuset);
+          pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+        } else {
+          int core_id = CkMyPe()*2+1;//45;//CkNodeSize(CkMyNode())-2;
           cpu_set_t cpuset;
           CPU_ZERO(&cpuset);
           CPU_SET(core_id, &cpuset);

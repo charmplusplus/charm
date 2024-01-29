@@ -15,10 +15,6 @@ typedef std::vector<CkZeroPtr<envelope> > PtrVec;
 // Map to store object index and number of pending rdma ops
 typedef std::unordered_map<CmiUInt8, CmiUInt1> ObjNumRdmaOpsMap;
 
-static int ready_pthreads = 0;
-static std::mutex m_shutoff;
-static std::condition_variable cv_shutoff;
-
 class IrrGroup;
 class TableEntry {
     IrrGroup *obj;
