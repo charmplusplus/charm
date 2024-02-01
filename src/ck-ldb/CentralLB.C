@@ -348,7 +348,7 @@ void CentralLB::SendStats()
 #if CMK_LBDB_ON
   CmiAssert(statsMsg != NULL);
   reduction_started = false;
-
+  //CkPrintf("\nPE-%d sending at %lf ", CkMyPe(), CkWallTimer());
 #if USE_LDB_SPANNING_TREE
   if(CkNumPes()>1024)
   {
@@ -1157,7 +1157,19 @@ void CentralLB::MigrationDone(int balancing)
 }
 void CentralLB::MigrationDoneImpl (int balancing)
 {
+if((CkMyPe() >= get_active_pes() && get_active_pes() < 24) || (CkMyPe() >=24 && CkMyPe() >= get_active_pes() && CkMyPe() <36)) {
+            int core_id = 47;
+            if(CkMyPe()%10 == 0) core_id = 45;
+            else if(CkMyPe()%10 == 1) core_id = 43;
+            else if(CkMyPe()%10 == 2) core_id = 41;
+            else if(CkMyPe()%10 == 2) core_id = 39;
+            else if(CkMyPe()%10 == 2) core_id = 37;
 
+            cpu_set_t cpuset;
+            CPU_ZERO(&cpuset);
+            CPU_SET(core_id, &cpuset);
+            pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+          }
 #if CMK_LBDB_ON
   migrates_completed = 0;
   migrates_expected = -1;
@@ -1216,7 +1228,7 @@ void CentralLB::ResumeClients(int balancing)
   }
 #endif
 #if 1
-  if(lbmgr->step() > 4) {
+  if(false){//lbmgr->step() > 10) {
         set_active_redn_pes(8);
         //set_active_pes(CkNodeSize(CkMyNode())/2);
         if(CkMyPe() >= get_active_pes()) {
@@ -1224,6 +1236,7 @@ void CentralLB::ResumeClients(int balancing)
           CkPrintf("\n----------------------------------------------------------------------------------\n");
           CkPrintf("\nCalling cv.wait on PE-%d", CkMyPe());
           //ready_pthreads = false;
+          ready_pthreads = 0;
           cv_shutoff.wait(lk, []{return ready_pthreads == 1;});//sleep(10000);
           CkPrintf("\n----------------------------------------------------------------------------------\n");
           CkPrintf("\nWaking up %d", CkMyPe()); fflush(stdout);
@@ -1236,7 +1249,7 @@ void CentralLB::ResumeClients(int balancing)
 */
         }
       } else{
-#if 1
+#if 0
         if(CkMyPe() >= get_active_pes()) {
           int core_id = 86;//85;//CkNodeSize(CkMyNode())-2;
 
@@ -1254,6 +1267,74 @@ void CentralLB::ResumeClients(int balancing)
           CPU_ZERO(&cpuset);
           CPU_SET(core_id, &cpuset);
           pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+        }
+#else
+#define ENABLE_SLEEP
+#ifdef ENABLE_SLEEP
+        set_active_redn_pes(get_active_pes());
+#endif
+        if(CkMyPe() >= get_active_pes()) {
+#if 0
+          int core_id = CkMyPe();
+          if(core_id%2 !=0) core_id +=47;
+#endif
+          int core_id = 47; /*91;//43;//4;
+          if(CkMyPe() >= 28) core_id = 93;//6;
+          if(CkMyPe() >= 34) core_id = 95;//8;
+*/
+          if(get_active_pes() < 24) {
+            int core_id = 47;
+            if(CkMyPe()%10 == 0) core_id = 45;
+            else if(CkMyPe()%10 == 1) core_id = 43;
+            else if(CkMyPe()%10 == 2) core_id = 41;
+            else if(CkMyPe()%10 == 2) core_id = 39;
+            else if(CkMyPe()%10 == 2) core_id = 37;
+            cpu_set_t cpuset;
+            CPU_ZERO(&cpuset);
+            CPU_SET(core_id, &cpuset);
+            pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+          }
+        
+#ifdef ENABLE_SLEEP
+          std::unique_lock<std::mutex> lk(m_shutoff);
+//          CkPrintf("\n----------------------------------------------------------------------------------\n");
+//          CkPrintf("\nCalling cv.wait on PE-%d", CkMyPe());
+          ready_pthreads = 0;
+          cv_shutoff.wait(lk, []{return ready_pthreads == 1;});//sleep(10000);
+//          CkPrintf("\n----------------------------------------------------------------------------------\n");
+//          CkPrintf("\nWaking up %d", CkMyPe()); fflush(stdout);
+#endif
+#if 1
+          //int 
+          core_id = CkMyPe()*2+1;//45;//CkNodeSize(CkMyNode())-2;
+          //if(CkMyPe() >= get_active_pes())
+          //  core_id = 47;
+/*
+          if(CkMyPe() > get_active_pes() && CkMyPe() >= 24 && CkMyPe() <36) {
+            core_id = 47;
+            if(CkMyPe()%10 == 0) core_id = 45;
+            else if(CkMyPe()%10 == 1) core_id = 43;
+            else if(CkMyPe()%10 == 2) core_id = 41;
+          }
+*/
+          if(CkMyPe() > get_active_pes() && core_id > 47 && core_id < 73)
+            core_id += 24;
+
+//          CkPrintf("\nSetting PE-%d to core%d", CkMyPe(), core_id);
+          cpu_set_t cpuset;
+          CPU_ZERO(&cpuset);
+          CPU_SET(core_id, &cpuset);
+          pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+#endif
+
+        } else {
+#if 1 //critical for expand
+          int core_id = CkMyPe()*2+1;//45;//CkNodeSize(CkMyNode())-2;
+          cpu_set_t cpuset;
+          CPU_ZERO(&cpuset);
+          CPU_SET(core_id, &cpuset);
+          pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+#endif
         }
 #endif
       }

@@ -1063,7 +1063,7 @@ int CkReductionMgr::treeParent(void) //My parent Node
 int CkReductionMgr::treeKids(void)//Number of children in tree
 {
   int retval = numKids;
-#if 1
+#if 0
   if(get_active_redn_pes() < CkNodeSize(CkMyNode())) {
     if(CkMyPe() == 0) {
       int idleCount = CkNodeSize(CkMyNode()) - get_active_redn_pes();

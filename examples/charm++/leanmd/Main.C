@@ -31,7 +31,8 @@ Main::Main(CkArgMsg* m) {
   int cur_arg = 1;
 
   CkPrintf("\nInput Parameters...\n");
-
+  set_active_pes(CkNodeSize(CkMyNode()));
+  set_active_redn_pes(CkNodeSize(CkMyNode()));
   //read user parameters
   //number of cells in each dimension
   if (m->argc > cur_arg) {

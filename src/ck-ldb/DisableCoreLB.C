@@ -33,15 +33,16 @@ void DisableCoreLB::work(LDStats* stats)
 {
   //Shrink only
   int newPpn = get_active_pes();
-
+  CkPrintf("\n newPpn = %d", newPpn);
   int  obj, objCount, pe;
-  int n_pes = newPpn;//stats->nprocs();
+  int n_pes = newPpn;//stats->nprocs();//newPpn;//stats->nprocs();
   int *map = new int[n_pes];
 
   std::vector<ProcInfo>  procs;
   for(pe = 0; pe < n_pes; pe++) {
     map[pe] = -1;
-    if (stats->procs[pe].available) {
+    //if (stats->procs[pe].available) 
+    {
       map[pe] = procs.size();
       procs.push_back(ProcInfo(pe, stats->procs[pe].bg_walltime, 0.0, stats->procs[pe].pe_speed, true));
     }
@@ -51,20 +52,34 @@ void DisableCoreLB::work(LDStats* stats)
   for (obj = 0; obj < stats->objData.size(); obj++)
   {
       LDObjData &oData = stats->objData[obj];
-      if (!oData.migratable)  {
+#if 0
+      if (!oData.migratable)
+      {
         int pe = stats->from_proc[obj];
         pe = map[pe];
         if (pe==-1)
           CmiAbort("DisableCoreLB: nonmigratable object on an unavail processor!\n");
         procs[pe].setTotalLoad( procs[pe].getTotalLoad() + oData.wallTime);
       }
+#endif
   }
   delete [] map;
 
   // Add the overhead to the total load 
   for (pe = 0; pe<procs.size(); pe++) {
-    procs[pe].setTotalLoad(procs[pe].getTotalLoad() + procs[pe].getOverhead());
+//    procs[pe].setTotalLoad(procs[pe].getTotalLoad() + procs[pe].getOverhead());
+//    procs[pe].setTotalLoad(0.0);
+//    procs[pe].setOverhead(0.0);
+#if 1 //for stencil remove stale overload when expanding
+    if(pe > 0 && procs[pe].getTotalLoad() > procs[0].getTotalLoad()*1.1) {
+        procs[pe].setTotalLoad(procs[0].getTotalLoad());
+        procs[pe].setOverhead(procs[0].getOverhead());
+    }
+#endif
+    CkPrintf("\nProc %d load  = %lf", pe, procs[pe].getTotalLoad() + procs[pe].getOverhead());
   }
+
+//  procs.resize(get_active_pes());
 
   // build object array
   std::vector<Vertex> objs;
