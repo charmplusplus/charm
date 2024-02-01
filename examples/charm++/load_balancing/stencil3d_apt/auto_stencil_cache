@@ -1,0 +1,1067 @@
+c506-094[skx](1051)$ numactl -N 1 -m 1 ./stencil3d 384 256 256 64 64 64 ++ppn 48 +pemap 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39,41,43,45,47,49,51,53,55,57,59,61,63,65,67,69,71,73,75,77,79,81,83,85,87,89,91,93,95 +balancer DisableCoreLB +LBDebug 1
+Charm++: standalone mode (not using charmrun)
+Charm++> Running in Multicore mode: 48 threads (PEs)
+Converse/Charm++ Commit ID: v7.0.0-11-gba62c6c1b
+CharmLB> Verbose level 1, load balancing period: -1 seconds
+CharmLB> Load balancer assumes all CPUs are same.
+Charm++> cpu affinity enabled. 
+Charm++> cpuaffinity PE-core map (OS indices): 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39,41,43,45,47,49,51,53,55,57,59,61,63,65,67,69,71,73,75,77,79,81,83,85,87,89,91,93,95
+Charm++> Running on 1 hosts (2 sockets x 24 cores x 2 PUs = 96-way SMP)
+Charm++> cpu topology info is gathered in 0.004 seconds.
+
+STENCIL COMPUTATION WITH BARRIERS
+Running Stencil on 48 processors with (6, 4, 4) chares
+Array Dimensions: 384 256 256
+Block Dimensions: 64 64 64
+                                            [3] Time per iteration: 1.745450 3.649454
+[4] Time per iteration: 1.711067 5.360521
+[5] Time per iteration: 1.730269 7.090790
+  Package 0:
+    energy-cores Energy Consumed: 0.000000 Joules, Power = 0.000000 W
+    energy-pkg Energy Consumed: 148.602295 Joules, Power = 43.006857 W
+    energy-ram Energy Consumed: 25.422653 Joules, Power = 7.357547 W
+  Package 1:
+    energy-cores Energy Consumed: 0.000000 Joules, Power = 0.000000 W
+    energy-pkg Energy Consumed: 500.769409 Joules, Power = 144.927227 W
+    energy-ram Energy Consumed: 76.792480 Joules, Power = 22.224443 W
+
+
+[6] avg_sum (0.000000) += 1.723481[6] Time per iteration: 1.723481 8.814272
+
+[7] avg_sum (1.723481) += 1.733614[7] Time per iteration: 1.733614 10.547886
+
+[8] avg_sum (3.457095) += 1.730657
+Entered time for wpn 48 = 1.729251 (1.729251)s
+Setting active pes = 24[8] Time per iteration: 1.730657 12.278543
+[9] Time per iteration: 1.737178 14.015721
+[10] Time per iteration: 1.725347 15.741068
+
+CharmLB> DisableCoreLB: PE [0] step 0 starting at 17.470247 Memory: 452.626831 MB
+CharmLB> DisableCoreLB: PE [0] strategy starting at 17.482047
+
+ newPpn = 24
+Proc 0 load  = 0.246566
+Proc 1 load  = 0.142370
+Proc 2 load  = 0.145453
+Proc 3 load  = 0.145168
+Proc 4 load  = 0.134450
+Proc 5 load  = 0.144479
+Proc 6 load  = 0.140557
+Proc 7 load  = 0.142481
+Proc 8 load  = 0.138232
+Proc 9 load  = 0.137670
+Proc 10 load  = 0.144379
+Proc 11 load  = 0.147296
+Proc 12 load  = 0.146183
+Proc 13 load  = 0.144150
+Proc 14 load  = 0.143010
+Proc 15 load  = 0.144472
+Proc 16 load  = 0.141043
+Proc 17 load  = 0.141951
+Proc 18 load  = 0.141870
+Proc 19 load  = 0.138179
+Proc 20 load  = 0.138903
+Proc 21 load  = 0.146058
+Proc 22 load  = 0.141411
+Proc 23 load  = 0.148371[0] 95 objects migrating.
+CharmLB> DisableCoreLB: PE [0] Memory: LBManager: 37 KB CentralLB: 56 KB
+CharmLB> DisableCoreLB: PE [0] #Objects migrating: 95, LBMigrateMsg size: 0.00 MB
+CharmLB> DisableCoreLB: PE [0] strategy finished at 17.483700 duration 0.001654 s
+CharmLB> DisableCoreLB: PE [0] step 0 finished at 17.521045 duration 0.050798 s
+
+[11] Time per iteration: 1.729032 17.470100
+[12] Time per iteration: 1.443585 18.913685
+[13] Time per iteration: 1.469963 20.383648
+[14] Time per iteration: 1.462723 21.846370
+[15] Time per iteration: 1.509524 23.355894
+  Package 0:
+    energy-cores Energy Consumed: 0.000000 Joules, Power = 0.000000 W
+    energy-pkg Energy Consumed: 130.693115 Joules, Power = 43.528100 W
+    energy-ram Energy Consumed: 22.079514 Joules, Power = 7.353710 W
+  Package 1:
+    energy-cores Energy Consumed: 0.000000 Joules, Power = 0.000000 W
+    energy-pkg Energy Consumed: 444.426392 Joules, Power = 148.018786 W
+    energy-ram Energy Consumed: 63.024857 Joules, Power = 20.990794 W
+
+
+[16] avg_sum (0.000000) += 1.399965[16] Time per iteration: 1.399965 24.755859
+
+[17] avg_sum (1.399965) += 1.555865[17] Time per iteration: 1.555865 26.311724
+
+[18] avg_sum (2.955830) += 1.423268
+Entered time for wpn 24 = 1.459699 (1.459699)s
+0.269552/1.729251 = 0.155878, skip_over = 1nxt = 3
+Setting active pes = 16[18] Time per iteration: 1.423268 27.734992
+[19] Time per iteration: 1.662248 29.397239
+[20] Time per iteration: 1.670457 31.067697
+
+Tried notifying from PE-4
+CharmLB> DisableCoreLB: PE [0] step 1 starting at 32.613341 Memory: 453.005722 MB
+CharmLB> DisableCoreLB: PE [0] strategy starting at 32.704461
+
+ newPpn = 16
+Proc 0 load  = 0.016745
+Proc 1 load  = 0.012698
+Proc 2 load  = 0.003771
+Proc 3 load  = 0.004431
+Proc 4 load  = 0.016745
+Proc 5 load  = 0.015696
+Proc 6 load  = 0.012161
+Proc 7 load  = 0.003512
+Proc 8 load  = 0.003788
+Proc 9 load  = 0.003158
+Proc 10 load  = 0.012570
+Proc 11 load  = 0.013566
+Proc 12 load  = 0.012703
+Proc 13 load  = 0.003150
+Proc 14 load  = 0.017677
+Proc 15 load  = 0.013179[0] 91 objects migrating.
+CharmLB> DisableCoreLB: PE [0] Memory: LBManager: 37 KB CentralLB: 57 KB
+CharmLB> DisableCoreLB: PE [0] #Objects migrating: 91, LBMigrateMsg size: 0.00 MB
+CharmLB> DisableCoreLB: PE [0] strategy finished at 32.705247 duration 0.000786 s
+CharmLB> DisableCoreLB: PE [0] step 1 finished at 32.819290 duration 0.205949 s
+
+[21] Time per iteration: 1.545401 32.613098
+[22] Time per iteration: 1.426066 34.039164
+[23] Time per iteration: 1.162301 35.201465
+[24] Time per iteration: 1.248978 36.450444
+[25] Time per iteration: 1.158368 37.608812
+  Package 0:
+    energy-cores Energy Consumed: 0.000000 Joules, Power = 0.000000 W
+    energy-pkg Energy Consumed: 116.108276 Joules, Power = 48.417524 W
+    energy-ram Energy Consumed: 17.650742 Joules, Power = 7.360416 W
+  Package 1:
+    energy-cores Energy Consumed: 0.000000 Joules, Power = 0.000000 W
+    energy-pkg Energy Consumed: 358.585693 Joules, Power = 149.531386 W
+    energy-ram Energy Consumed: 48.703033 Joules, Power = 20.309321 W
+
+
+[26] avg_sum (0.000000) += 1.236735[26] Time per iteration: 1.236735 38.845546
+
+[27] avg_sum (1.236735) += 1.151168[27] Time per iteration: 1.151168 39.996714
+
+[28] avg_sum (2.387903) += 1.252201
+Entered time for wpn 16 = 1.213368 (1.213368)s
+0.246331/1.459699 = 0.168755, skip_over = 1nxt = 4
+Setting active pes = 12[28] Time per iteration: 1.252201 41.248915
+[29] Time per iteration: 1.180767 42.429682
+[30] Time per iteration: 1.225264 43.654946
+
+Tried notifying from PE-14
+CharmLB> DisableCoreLB: PE [0] step 2 starting at 44.844004 Memory: 453.112976 MB
+CharmLB> DisableCoreLB: PE [0] strategy starting at 44.968033
+
+ newPpn = 12
+Proc 0 load  = 0.005665
+Proc 1 load  = 0.005665
+Proc 2 load  = 0.003075
+Proc 3 load  = 0.003360
+Proc 4 load  = 0.003351
+Proc 5 load  = 0.005665
+Proc 6 load  = 0.004115
+Proc 7 load  = 0.004940
+Proc 8 load  = 0.005665
+Proc 9 load  = 0.005665
+Proc 10 load  = 0.003671
+Proc 11 load  = 0.005665[0] 91 objects migrating.
+CharmLB> DisableCoreLB: PE [0] Memory: LBManager: 37 KB CentralLB: 57 KB
+CharmLB> DisableCoreLB: PE [0] #Objects migrating: 91, LBMigrateMsg size: 0.00 MB
+CharmLB> DisableCoreLB: PE [0] strategy finished at 44.968296 duration 0.000263 s
+CharmLB> DisableCoreLB: PE [0] step 2 finished at 45.119544 duration 0.275540 s
+
+[31] Time per iteration: 1.188920 44.843866
+[32] Time per iteration: 1.342231 46.186096
+[33] Time per iteration: 1.095784 47.281880
+[34] Time per iteration: 1.079446 48.361326
+[35] Time per iteration: 1.082749 49.444075
+  Package 0:
+    energy-cores Energy Consumed: 0.000000 Joules, Power = 0.000000 W
+    energy-pkg Energy Consumed: 108.888000 Joules, Power = 49.702928 W
+    energy-ram Energy Consumed: 16.110275 Joules, Power = 7.353683 W
+  Package 1:
+    energy-cores Energy Consumed: 0.000000 Joules, Power = 0.000000 W
+    energy-pkg Energy Consumed: 327.452271 Joules, Power = 149.468597 W
+    energy-ram Energy Consumed: 41.278152 Joules, Power = 18.841792 W
+
+
+[36] avg_sum (0.000000) += 1.110368[36] Time per iteration: 1.110368 50.554443
+
+[37] avg_sum (1.110368) += 1.089932[37] Time per iteration: 1.089932 51.644375
+
+[38] avg_sum (2.200300) += 1.121553
+Entered time for wpn 12 = 1.107285 (1.107285)s
+0.106083/1.213368 = 0.087429, skip_over = 0nxt = 2
+Setting active pes = 20[38] Time per iteration: 1.121553 52.765929
+[39] Time per iteration: 1.085130 53.851059
+[40] Time per iteration: 1.161369 55.012428
+
+Tried notifying from PE-11
+CharmLB> DisableCoreLB: PE [0] step 3 starting at 56.124523 Memory: 453.217224 MB
+CharmLB> DisableCoreLB: PE [0] strategy starting at 56.262073
+
+ newPpn = 20
+Proc 0 load  = 0.004460
+Proc 1 load  = 0.003972
+Proc 2 load  = 0.004460
+Proc 3 load  = 0.004460
+Proc 4 load  = 0.004460
+Proc 5 load  = 0.004460
+Proc 6 load  = 0.003639
+Proc 7 load  = 0.004460
+Proc 8 load  = 0.003797
+Proc 9 load  = 0.003722
+Proc 10 load  = 0.004460
+Proc 11 load  = 0.004460
+Proc 12 load  = 0.004460
+Proc 13 load  = 0.004460
+Proc 14 load  = 0.004460
+Proc 15 load  = 0.004460
+Proc 16 load  = 0.004460
+Proc 17 load  = 0.004460
+Proc 18 load  = 0.004460
+Proc 19 load  = 0.004460[0] 92 objects migrating.
+CharmLB> DisableCoreLB: PE [0] Memory: LBManager: 38 KB CentralLB: 57 KB
+CharmLB> DisableCoreLB: PE [0] #Objects migrating: 92, LBMigrateMsg size: 0.00 MB
+CharmLB> DisableCoreLB: PE [0] strategy finished at 56.262386 duration 0.000313 s
+CharmLB> DisableCoreLB: PE [0] step 3 finished at 56.434586 duration 0.310063 s
+
+[41] Time per iteration: 1.112008 56.124436
+[42] Time per iteration: 1.694469 57.818905
+[43] Time per iteration: 1.290422 59.109326
+[44] Time per iteration: 1.313378 60.422704
+[45] Time per iteration: 1.321849 61.744553
+  Package 0:
+    energy-cores Energy Consumed: 0.000000 Joules, Power = 0.000000 W
+    energy-pkg Energy Consumed: 166.157043 Joules, Power = 63.587890 W
+    energy-ram Energy Consumed: 19.256180 Joules, Power = 7.369292 W
+  Package 1:
+    energy-cores Energy Consumed: 0.000000 Joules, Power = 0.000000 W
+    energy-pkg Energy Consumed: 390.741150 Joules, Power = 149.535672 W
+    energy-ram Energy Consumed: 55.621857 Joules, Power = 21.286347 W
+
+
+[46] avg_sum (0.000000) += 1.297490[46] Time per iteration: 1.297490 63.042043
+
+[47] avg_sum (1.297490) += 1.305140[47] Time per iteration: 1.305140 64.347183
+
+[48] avg_sum (2.602630) += 1.247293
+Entered time for wpn 20 = 1.283307 (1.283307)s
+0.176023/1.107285 = 0.158968, skip_over = 1nxt = -1
+Setting active pes = 20[48] Time per iteration: 1.247293 65.594475
+[49] Time per iteration: 1.371163 66.965638
+[50] Time per iteration: 1.293402 68.259040
+
+Best configuration was found to be 12
+Tried notifying from PE-18
+CharmLB> DisableCoreLB: PE [0] step 4 starting at 69.510592 Memory: 453.395218 MB
+CharmLB> DisableCoreLB: PE [0] strategy starting at 69.619110
+
+ newPpn = 12
+Proc 0 load  = 0.005175
+Proc 1 load  = 0.003095
+Proc 2 load  = 0.003114
+Proc 3 load  = 0.003160
+Proc 4 load  = 0.003173
+Proc 5 load  = 0.002938
+Proc 6 load  = 0.005175
+Proc 7 load  = 0.003549
+Proc 8 load  = 0.003255
+Proc 9 load  = 0.003299
+Proc 10 load  = 0.003001
+Proc 11 load  = 0.005175[0] 92 objects migrating.
+CharmLB> DisableCoreLB: PE [0] Memory: LBManager: 37 KB CentralLB: 57 KB
+CharmLB> DisableCoreLB: PE [0] #Objects migrating: 92, LBMigrateMsg size: 0.00 MB
+CharmLB> DisableCoreLB: PE [0] strategy finished at 69.619325 duration 0.000216 s
+CharmLB> DisableCoreLB: PE [0] step 4 finished at 69.764796 duration 0.254204 s
+
+[51] Time per iteration: 1.251337 69.510377
+[52] Time per iteration: 1.357395 70.867772
+[53] Time per iteration: 1.101134 71.968906
+[54] Time per iteration: 1.103638 73.072544
+[55] Time per iteration: 1.113536 74.186080
+  Package 0:
+    energy-cores Energy Consumed: 0.000000 Joules, Power = 0.000000 W
+    energy-pkg Energy Consumed: 141.357727 Joules, Power = 63.596493 W
+    energy-ram Energy Consumed: 16.368896 Joules, Power = 7.364326 W
+  Package 1:
+    energy-cores Energy Consumed: 0.000000 Joules, Power = 0.000000 W
+    energy-pkg Energy Consumed: 330.509521 Joules, Power = 148.695418 W
+    energy-ram Energy Consumed: 42.246292 Joules, Power = 19.006503 W
+
+
+[56] avg_sum (0.000000) += 1.116955[56] Time per iteration: 1.116955 75.303035
+
+[57] avg_sum (1.116955) += 1.108376[57] Time per iteration: 1.108376 76.411411
+
+[58] avg_sum (2.225331) += 1.086731[58] Time per iteration: 1.086731 77.498142
+[59] Time per iteration: 1.112313 78.610456
+[60] Time per iteration: 1.096633 79.707088
+[2] Time per iteration: 0.000000 0.000000
+[3] Time per iteration: 0.000000 0.000000
+[4] Time per iteration: 0.000000 0.000000
+[5] Time per iteration: 0.000000 0.000000
+[6] Time per iteration: 0.000000 0.000000
+[7] Time per iteration: 0.000000 0.000000
+[8] Time per iteration: 0.000000 0.000000
+[9] Time per iteration: 0.000000 0.000000
+[10] Time per iteration: 0.000000 0.000000
+[11] Time per iteration: 0.000000 0.000000
+[12] Time per iteration: 0.000000 0.000000
+[13] Time per iteration: 0.000000 0.000000
+[14] Time per iteration: 0.000000 0.000000
+[15] Time per iteration: 0.000000 0.000000
+[16] Time per iteration: 0.000000 0.000000
+[17] Time per iteration: 0.000000 0.000000
+[18] Time per iteration: 0.000000 0.000000
+[19] Time per iteration: 0.000000 0.000000
+[20] Time per iteration: 0.000000 0.000000
+[21] Time per iteration: 0.000000 0.000000
+[22] Time per iteration: 0.000000 0.000000
+[23] Time per iteration: 0.000000 0.000000
+[24] Time per iteration: 0.000000 0.000000
+[25] Time per iteration: 0.000000 0.000000
+[26] Time per iteration: 0.000000 0.000000
+[27] Time per iteration: 0.000000 0.000000
+[28] Time per iteration: 0.000000 0.000000
+[29] Time per iteration: 0.000000 0.000000
+[30] Time per iteration: 0.000000 0.000000
+[31] Time per iteration: 0.000000 0.000000
+[32] Time per iteration: 0.000000 0.000000
+[33] Time per iteration: 0.000000 0.000000
+[34] Time per iteration: 0.000000 0.000000
+[35] Time per iteration: 0.000000 0.000000
+[36] Time per iteration: 0.000000 0.000000
+[37] Time per iteration: 0.000000 0.000000
+[38] Time per iteration: 0.000000 0.000000
+[39] Time per iteration: 0.000000 0.000000
+[40] Time per iteration: 0.000000 0.000000
+[41] Time per iteration: 0.000000 0.000000
+[42] Time per iteration: 0.000000 0.000000
+[43] Time per iteration: 0.000000 0.000000
+[44] Time per iteration: 0.000000 0.000000
+[45] Time per iteration: 0.000000 0.000000
+[46] Time per iteration: 0.000000 0.000000
+[47] Time per iteration: 0.000000 0.000000
+[48] Time per iteration: 0.000000 0.000000
+[49] Time per iteration: 0.000000 0.000000
+[50] Time per iteration: 0.000000 0.000000
+[51] Time per iteration: 0.000000 0.000000
+[52] Time per iteration: 0.000000 0.000000
+[53] Time per iteration: 0.000000 0.000000
+[54] Time per iteration: 0.000000 0.000000
+[55] Time per iteration: 0.000000 0.000000
+[56] Time per iteration: 0.000000 0.000000
+[57] Time per iteration: 0.000000 0.000000
+[58] Time per iteration: 0.000000 0.000000
+[59] Time per iteration: 0.000000 0.000000
+[60] Time per iteration: 0.000000 0.000000
+
+^[[A^C
+c506-094[skx](1052)$ numactl -N 1 -m 1 ./stencil3d 384 256 256 64 64 64 ++ppn 48 +pemap 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39,41,43,45,47,49,51,53,55,57,59,61,63,65,67,69,71,73,75,77,79,81,83,85,87,89,91,93,95 +balancer DisableCoreLB +LBDebug 1
+Charm++: standalone mode (not using charmrun)
+Charm++> Running in Multicore mode: 48 threads (PEs)
+Converse/Charm++ Commit ID: v7.0.0-11-gba62c6c1b
+CharmLB> Verbose level 1, load balancing period: -1 seconds
+CharmLB> Load balancer assumes all CPUs are same.
+Charm++> cpu affinity enabled. 
+Charm++> cpuaffinity PE-core map (OS indices): 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39,41,43,45,47,49,51,53,55,57,59,61,63,65,67,69,71,73,75,77,79,81,83,85,87,89,91,93,95
+Charm++> Running on 1 hosts (2 sockets x 24 cores x 2 PUs = 96-way SMP)
+Charm++> cpu topology info is gathered in 0.004 seconds.
+
+STENCIL COMPUTATION WITH BARRIERS
+Running Stencil on 48 processors with (6, 4, 4) chares
+Array Dimensions: 384 256 256
+Block Dimensions: 64 64 64
+                                            [3] Time per iteration: 1.737214 3.633988
+[4] Time per iteration: 1.727580 5.361567
+[5] Time per iteration: 1.723980 7.085547
+  Package 0:
+    energy-cores Energy Consumed: 0.000000 Joules, Power = 0.000000 W
+    energy-pkg Energy Consumed: 145.594971 Joules, Power = 42.286397 W
+    energy-ram Energy Consumed: 25.316498 Joules, Power = 7.352888 W
+  Package 1:
+    energy-cores Energy Consumed: 0.000000 Joules, Power = 0.000000 W
+    energy-pkg Energy Consumed: 501.954163 Joules, Power = 145.786856 W
+    energy-ram Energy Consumed: 76.438263 Joules, Power = 22.200621 W
+
+
+[6] avg_sum (0.000000) += 1.729653[6] Time per iteration: 1.729653 8.815200
+
+[7] avg_sum (1.729653) += 1.718756[7] Time per iteration: 1.718756 10.533956
+
+[8] avg_sum (3.448409) += 1.735405
+Entered time for wpn 48 = 1.727938 (1.727938)s
+Setting active pes = 24[8] Time per iteration: 1.735405 12.269361
+[9] Time per iteration: 1.717896 13.987257
+[10] Time per iteration: 1.738716 15.725973
+
+CharmLB> DisableCoreLB: PE [0] step 0 starting at 17.445378 Memory: 452.627274 MB
+CharmLB> DisableCoreLB: PE [0] strategy starting at 17.459998
+
+ newPpn = 24
+Proc 0 load  = 0.245203
+Proc 1 load  = 0.142489
+Proc 2 load  = 0.147005
+Proc 3 load  = 0.145806
+Proc 4 load  = 0.143076
+Proc 5 load  = 0.145727
+Proc 6 load  = 0.142803
+Proc 7 load  = 0.143697
+Proc 8 load  = 0.143697
+Proc 9 load  = 0.144806
+Proc 10 load  = 0.143833
+Proc 11 load  = 0.142109
+Proc 12 load  = 0.141512
+Proc 13 load  = 0.146083
+Proc 14 load  = 0.144313
+Proc 15 load  = 0.145148
+Proc 16 load  = 0.142023
+Proc 17 load  = 0.143346
+Proc 18 load  = 0.144722
+Proc 19 load  = 0.140564
+Proc 20 load  = 0.142384
+Proc 21 load  = 0.140451
+Proc 22 load  = 0.145110
+Proc 23 load  = 0.144561[0] 94 objects migrating.
+CharmLB> DisableCoreLB: PE [0] Memory: LBManager: 37 KB CentralLB: 56 KB
+CharmLB> DisableCoreLB: PE [0] #Objects migrating: 94, LBMigrateMsg size: 0.00 MB
+CharmLB> DisableCoreLB: PE [0] strategy finished at 17.461685 duration 0.001687 s
+CharmLB> DisableCoreLB: PE [0] step 0 finished at 17.493683 duration 0.048305 s
+
+[11] Time per iteration: 1.719165 17.445138
+[12] Time per iteration: 1.453660 18.898799
+[13] Time per iteration: 1.519263 20.418062
+[14] Time per iteration: 1.743713 22.161775
+[15] Time per iteration: 1.430875 23.592649
+  Package 0:
+    energy-cores Energy Consumed: 0.000000 Joules, Power = 0.000000 W
+    energy-pkg Energy Consumed: 129.831604 Joules, Power = 42.542635 W
+    energy-ram Energy Consumed: 22.452896 Joules, Power = 7.357264 W
+  Package 1:
+    energy-cores Energy Consumed: 0.000000 Joules, Power = 0.000000 W
+    energy-pkg Energy Consumed: 452.642029 Joules, Power = 148.319699 W
+    energy-ram Energy Consumed: 63.342514 Joules, Power = 20.755789 W
+
+
+[16] avg_sum (0.000000) += 1.535409[16] Time per iteration: 1.535409 25.128058
+
+[17] avg_sum (1.535409) += 1.511726[17] Time per iteration: 1.511726 26.639784
+
+[18] avg_sum (3.047135) += 1.705559
+Entered time for wpn 24 = 1.584231 (1.584231)s
+0.143707/1.727938 = 0.083166, skip_over = 0nxt = 2
+Setting active pes = 20[18] Time per iteration: 1.705559 28.345343
+[19] Time per iteration: 1.384194 29.729537
+[20] Time per iteration: 1.581723 31.311260
+
+Tried notifying from PE-21
+CharmLB> DisableCoreLB: PE [0] step 1 starting at 32.941990 Memory: 453.004242 MB
+CharmLB> DisableCoreLB: PE [0] strategy starting at 33.166419
+
+ newPpn = 20
+Proc 0 load  = 0.005942
+Proc 1 load  = 0.005942
+Proc 2 load  = 0.004486
+Proc 3 load  = 0.006375
+Proc 4 load  = 0.005942
+Proc 5 load  = 0.003478
+Proc 6 load  = 0.005942
+Proc 7 load  = 0.003620
+Proc 8 load  = 0.005942
+Proc 9 load  = 0.005164
+Proc 10 load  = 0.005942
+Proc 11 load  = 0.003304
+Proc 12 load  = 0.005942
+Proc 13 load  = 0.005147
+Proc 14 load  = 0.005942
+Proc 15 load  = 0.005942
+Proc 16 load  = 0.005942
+Proc 17 load  = 0.005942
+Proc 18 load  = 0.005942
+Proc 19 load  = 0.003735[0] 91 objects migrating.
+CharmLB> DisableCoreLB: PE [0] Memory: LBManager: 37 KB CentralLB: 57 KB
+CharmLB> DisableCoreLB: PE [0] #Objects migrating: 91, LBMigrateMsg size: 0.00 MB
+CharmLB> DisableCoreLB: PE [0] strategy finished at 33.167320 duration 0.000900 s
+CharmLB> DisableCoreLB: PE [0] step 1 finished at 33.335988 duration 0.393998 s
+
+[21] Time per iteration: 1.630593 32.941853
+[22] Time per iteration: 1.704471 34.646324
+[23] Time per iteration: 1.297754 35.944078
+[24] Time per iteration: 1.308983 37.253061
+[25] Time per iteration: 1.299894 38.552955
+  Package 0:
+    energy-cores Energy Consumed: 0.000000 Joules, Power = 0.000000 W
+    energy-pkg Energy Consumed: 110.791321 Joules, Power = 42.595089 W
+    energy-ram Energy Consumed: 19.133148 Joules, Power = 7.355975 W
+  Package 1:
+    energy-cores Energy Consumed: 0.000000 Joules, Power = 0.000000 W
+    energy-pkg Energy Consumed: 388.929443 Joules, Power = 149.528720 W
+    energy-ram Energy Consumed: 55.650101 Joules, Power = 21.395367 W
+
+
+[26] avg_sum (0.000000) += 1.302816[26] Time per iteration: 1.302816 39.855772
+
+[27] avg_sum (1.302816) += 1.286994[27] Time per iteration: 1.286994 41.142765
+
+[28] avg_sum (2.589810) += 1.310169
+Entered time for wpn 20 = 1.299993 (1.299993)s
+0.284238/1.584231 = 0.179417, skip_over = 1nxt = 4
+Setting active pes = 12[28] Time per iteration: 1.310169 42.452935
+[29] Time per iteration: 1.295196 43.748131
+[30] Time per iteration: 1.302412 45.050543
+
+Tried notifying from PE-3
+CharmLB> DisableCoreLB: PE [0] step 2 starting at 46.355912 Memory: 453.116104 MB
+CharmLB> DisableCoreLB: PE [0] strategy starting at 46.460423
+
+ newPpn = 12
+Proc 0 load  = 0.005439
+Proc 1 load  = 0.003655
+Proc 2 load  = 0.003185
+Proc 3 load  = 0.005439
+Proc 4 load  = 0.003884
+Proc 5 load  = 0.004108
+Proc 6 load  = 0.004879
+Proc 7 load  = 0.003387
+Proc 8 load  = 0.005439
+Proc 9 load  = 0.005439
+Proc 10 load  = 0.003425
+Proc 11 load  = 0.005264[0] 93 objects migrating.
+CharmLB> DisableCoreLB: PE [0] Memory: LBManager: 37 KB CentralLB: 57 KB
+CharmLB> DisableCoreLB: PE [0] #Objects migrating: 93, LBMigrateMsg size: 0.00 MB
+CharmLB> DisableCoreLB: PE [0] strategy finished at 46.460695 duration 0.000272 s
+CharmLB> DisableCoreLB: PE [0] step 2 finished at 46.607242 duration 0.251330 s
+
+[31] Time per iteration: 1.305222 46.355765
+[32] Time per iteration: 1.317650 47.673415
+[33] Time per iteration: 1.116040 48.789455
+[34] Time per iteration: 1.070639 49.860094
+[35] Time per iteration: 1.126371 50.986465
+  Package 0:
+    energy-cores Energy Consumed: 0.000000 Joules, Power = 0.000000 W
+    energy-pkg Energy Consumed: 93.754395 Joules, Power = 42.521331 W
+    energy-ram Energy Consumed: 16.235031 Joules, Power = 7.363230 W
+  Package 1:
+    energy-cores Energy Consumed: 0.000000 Joules, Power = 0.000000 W
+    energy-pkg Energy Consumed: 329.279114 Joules, Power = 149.341120 W
+    energy-ram Energy Consumed: 41.554962 Joules, Power = 18.846821 W
+
+
+[36] avg_sum (0.000000) += 1.056700[36] Time per iteration: 1.056700 52.043166
+
+[37] avg_sum (1.056700) += 1.137499[37] Time per iteration: 1.137499 53.180665
+
+[38] avg_sum (2.194199) += 1.042218
+Entered time for wpn 12 = 1.078806 (1.078806)s
+0.221187/1.299993 = 0.170145, skip_over = 1nxt = 5
+Setting active pes = 8[38] Time per iteration: 1.042218 54.222883
+[39] Time per iteration: 1.130469 55.353352
+[40] Time per iteration: 1.045026 56.398378
+
+Tried notifying from PE-4
+CharmLB> DisableCoreLB: PE [0] step 3 starting at 57.519392 Memory: 453.223816 MB
+CharmLB> DisableCoreLB: PE [0] strategy starting at 57.661390
+
+ newPpn = 8
+Proc 0 load  = 0.004791
+Proc 1 load  = 0.003564
+Proc 2 load  = 0.004791
+Proc 3 load  = 0.004791
+Proc 4 load  = 0.004791
+Proc 5 load  = 0.004791
+Proc 6 load  = 0.004791
+Proc 7 load  = 0.004791[0] 88 objects migrating.
+CharmLB> DisableCoreLB: PE [0] Memory: LBManager: 38 KB CentralLB: 57 KB
+CharmLB> DisableCoreLB: PE [0] #Objects migrating: 88, LBMigrateMsg size: 0.00 MB
+CharmLB> DisableCoreLB: PE [0] strategy finished at 57.661539 duration 0.000149 s
+CharmLB> DisableCoreLB: PE [0] step 3 finished at 57.835949 duration 0.316557 s
+
+[41] Time per iteration: 1.120924 57.519302
+[42] Time per iteration: 1.591005 59.110306
+[43] Time per iteration: 1.191875 60.302182
+[44] Time per iteration: 1.295767 61.597949
+[45] Time per iteration: 1.193478 62.791427
+  Package 0:
+    energy-cores Energy Consumed: 0.000000 Joules, Power = 0.000000 W
+    energy-pkg Energy Consumed: 122.099243 Joules, Power = 48.772007 W
+    energy-ram Energy Consumed: 18.441269 Joules, Power = 7.366284 W
+  Package 1:
+    energy-cores Energy Consumed: 0.000000 Joules, Power = 0.000000 W
+    energy-pkg Energy Consumed: 353.898621 Joules, Power = 141.363251 W
+    energy-ram Energy Consumed: 31.384766 Joules, Power = 12.536507 W
+
+
+[46] avg_sum (0.000000) += 1.318736[46] Time per iteration: 1.318736 64.110163
+
+[47] avg_sum (1.318736) += 1.195020[47] Time per iteration: 1.195020 65.305183
+
+[48] avg_sum (2.513756) += 1.306195
+Entered time for wpn 8 = 1.273317 (1.273317)s
+0.194511/1.078806 = 0.180302, skip_over = 1nxt = -1
+Setting active pes = 8[48] Time per iteration: 1.306195 66.611378
+[49] Time per iteration: 1.196369 67.807747
+[50] Time per iteration: 1.304627 69.112373
+
+Best configuration was found to be 8
+Tried notifying from PE-5
+CharmLB> DisableCoreLB: PE [0] step 4 starting at 70.307852 Memory: 453.331146 MB
+CharmLB> DisableCoreLB: PE [0] strategy starting at 70.462428
+
+ newPpn = 8
+Proc 0 load  = 0.004885
+Proc 1 load  = 0.004885
+Proc 2 load  = 0.004885
+Proc 3 load  = 0.004885
+Proc 4 load  = 0.004885
+Proc 5 load  = 0.005010
+Proc 6 load  = 0.003478
+Proc 7 load  = 0.003547[0] 85 objects migrating.
+CharmLB> DisableCoreLB: PE [0] Memory: LBManager: 38 KB CentralLB: 56 KB
+CharmLB> DisableCoreLB: PE [0] #Objects migrating: 85, LBMigrateMsg size: 0.00 MB
+CharmLB> DisableCoreLB: PE [0] strategy finished at 70.462553 duration 0.000124 s
+CharmLB> DisableCoreLB: PE [0] step 4 finished at 70.655606 duration 0.347753 s
+
+[51] Time per iteration: 1.195340 70.307714
+[52] Time per iteration: 1.589953 71.897667
+[53] Time per iteration: 1.190676 73.088343
+[54] Time per iteration: 1.235505 74.323848
+[55] Time per iteration: 1.195000 75.518848
+  Package 0:
+    energy-cores Energy Consumed: 0.000000 Joules, Power = 0.000000 W
+    energy-pkg Energy Consumed: 104.396790 Joules, Power = 42.937878 W
+    energy-ram Energy Consumed: 17.880127 Joules, Power = 7.354007 W
+  Package 1:
+    energy-cores Energy Consumed: 0.000000 Joules, Power = 0.000000 W
+    energy-pkg Energy Consumed: 347.111267 Joules, Power = 142.765129 W
+    energy-ram Energy Consumed: 30.409454 Joules, Power = 12.507257 W
+
+
+[56] avg_sum (0.000000) += 1.240492[56] Time per iteration: 1.240492 76.759341
+
+[57] avg_sum (1.240492) += 1.186599[57] Time per iteration: 1.186599 77.945940
+
+[58] avg_sum (2.427092) += 1.239800[58] Time per iteration: 1.239800 79.185740
+[59] Time per iteration: 1.189819 80.375560
+[60] Time per iteration: 1.243996 81.619556
+[2] Time per iteration: 0.000000 0.000000
+[3] Time per iteration: 0.000000 0.000000
+[4] Time per iteration: 0.000000 0.000000
+[5] Time per iteration: 0.000000 0.000000
+[6] Time per iteration: 0.000000 0.000000
+[7] Time per iteration: 0.000000 0.000000
+[8] Time per iteration: 0.000000 0.000000
+[9] Time per iteration: 0.000000 0.000000
+[10] Time per iteration: 0.000000 0.000000
+[11] Time per iteration: 0.000000 0.000000
+[12] Time per iteration: 0.000000 0.000000
+[13] Time per iteration: 0.000000 0.000000
+[14] Time per iteration: 0.000000 0.000000
+[15] Time per iteration: 0.000000 0.000000
+[16] Time per iteration: 0.000000 0.000000
+[17] Time per iteration: 0.000000 0.000000
+[18] Time per iteration: 0.000000 0.000000
+[19] Time per iteration: 0.000000 0.000000
+[20] Time per iteration: 0.000000 0.000000
+[21] Time per iteration: 0.000000 0.000000
+[22] Time per iteration: 0.000000 0.000000
+[23] Time per iteration: 0.000000 0.000000
+[24] Time per iteration: 0.000000 0.000000
+[25] Time per iteration: 0.000000 0.000000
+[26] Time per iteration: 0.000000 0.000000
+[27] Time per iteration: 0.000000 0.000000
+[28] Time per iteration: 0.000000 0.000000
+[29] Time per iteration: 0.000000 0.000000
+[30] Time per iteration: 0.000000 0.000000
+[31] Time per iteration: 0.000000 0.000000
+[32] Time per iteration: 0.000000 0.000000
+[33] Time per iteration: 0.000000 0.000000
+[34] Time per iteration: 0.000000 0.000000
+[35] Time per iteration: 0.000000 0.000000
+[36] Time per iteration: 0.000000 0.000000
+[37] Time per iteration: 0.000000 0.000000
+[38] Time per iteration: 0.000000 0.000000
+[39] Time per iteration: 0.000000 0.000000
+[40] Time per iteration: 0.000000 0.000000
+[41] Time per iteration: 0.000000 0.000000
+[42] Time per iteration: 0.000000 0.000000
+[43] Time per iteration: 0.000000 0.000000
+[44] Time per iteration: 0.000000 0.000000
+[45] Time per iteration: 0.000000 0.000000
+[46] Time per iteration: 0.000000 0.000000
+[47] Time per iteration: 0.000000 0.000000
+[48] Time per iteration: 0.000000 0.000000
+[49] Time per iteration: 0.000000 0.000000
+[50] Time per iteration: 0.000000 0.000000
+[51] Time per iteration: 0.000000 0.000000
+[52] Time per iteration: 0.000000 0.000000
+[53] Time per iteration: 0.000000 0.000000
+[54] Time per iteration: 0.000000 0.000000
+[55] Time per iteration: 0.000000 0.000000
+[56] Time per iteration: 0.000000 0.000000
+[57] Time per iteration: 0.000000 0.000000
+[58] Time per iteration: 0.000000 0.000000
+[59] Time per iteration: 0.000000 0.000000
+[60] Time per iteration: 0.000000 0.000000
+
+^C
+c506-094[skx](1053)$ vi papi.C
+c506-094[skx](1054)$ numactl -N 1 -m 1 ./stencil3d 384 256 256 64 64 64 ++ppn 48 +pemap 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39,41,43,45,47,49,51,53,55,57,59,61,63,65,67,69,71,73,75,77,79,81,83,85,87,89,91,93,95 +balancer DisableCoreLB +LBDebug 1
+Charm++: standalone mode (not using charmrun)
+Charm++> Running in Multicore mode: 48 threads (PEs)
+Converse/Charm++ Commit ID: v7.0.0-11-gba62c6c1b
+CharmLB> Verbose level 1, load balancing period: -1 seconds
+CharmLB> Load balancer assumes all CPUs are same.
+Charm++> cpu affinity enabled. 
+Charm++> cpuaffinity PE-core map (OS indices): 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39,41,43,45,47,49,51,53,55,57,59,61,63,65,67,69,71,73,75,77,79,81,83,85,87,89,91,93,95
+Charm++> Running on 1 hosts (2 sockets x 24 cores x 2 PUs = 96-way SMP)
+Charm++> cpu topology info is gathered in 0.004 seconds.
+
+STENCIL COMPUTATION WITH BARRIERS
+Running Stencil on 48 processors with (6, 4, 4) chares
+Array Dimensions: 384 256 256
+Block Dimensions: 64 64 64
+                                            [3] Time per iteration: 1.748134 3.632975
+[4] Time per iteration: 1.722322 5.355298
+[5] Time per iteration: 1.734490 7.089788
+  Package 0:
+    energy-cores Energy Consumed: 0.000000 Joules, Power = 0.000000 W
+    energy-pkg Energy Consumed: 147.709717 Joules, Power = 42.863043 W
+    energy-ram Energy Consumed: 25.346405 Joules, Power = 7.355129 W
+  Package 1:
+    energy-cores Energy Consumed: 0.000000 Joules, Power = 0.000000 W
+    energy-pkg Energy Consumed: 499.848877 Joules, Power = 145.048304 W
+    energy-ram Energy Consumed: 76.430573 Joules, Power = 22.178953 W
+
+
+[6] avg_sum (0.000000) += 1.723846[6] Time per iteration: 1.723846 8.813634
+
+[7] avg_sum (1.723846) += 1.721678[7] Time per iteration: 1.721678 10.535312
+
+[8] avg_sum (3.445524) += 1.726283
+Entered time for wpn 48 = 1.723936 (1.723936)s
+Setting active pes = 24[8] Time per iteration: 1.726283 12.261595
+[9] Time per iteration: 1.729559 13.991154
+[10] Time per iteration: 1.723696 15.714850
+
+CharmLB> DisableCoreLB: PE [0] step 0 starting at 17.438998 Memory: 452.627258 MB
+CharmLB> DisableCoreLB: PE [0] strategy starting at 17.455634
+
+ newPpn = 24
+Proc 0 load  = 0.237371
+Proc 1 load  = 0.141452
+Proc 2 load  = 0.144812
+Proc 3 load  = 0.137902
+Proc 4 load  = 0.145333
+Proc 5 load  = 0.140989
+Proc 6 load  = 0.140814
+Proc 7 load  = 0.142548
+Proc 8 load  = 0.134612
+Proc 9 load  = 0.143067
+Proc 10 load  = 0.146824
+Proc 11 load  = 0.140813
+Proc 12 load  = 0.140150
+Proc 13 load  = 0.141061
+Proc 14 load  = 0.143550
+Proc 15 load  = 0.138109
+Proc 16 load  = 0.139164
+Proc 17 load  = 0.138916
+Proc 18 load  = 0.142920
+Proc 19 load  = 0.141452
+Proc 20 load  = 0.141582
+Proc 21 load  = 0.146042
+Proc 22 load  = 0.142576
+Proc 23 load  = 0.139491[0] 94 objects migrating.
+CharmLB> DisableCoreLB: PE [0] Memory: LBManager: 37 KB CentralLB: 56 KB
+CharmLB> DisableCoreLB: PE [0] #Objects migrating: 94, LBMigrateMsg size: 0.00 MB
+CharmLB> DisableCoreLB: PE [0] strategy finished at 17.457618 duration 0.001984 s
+CharmLB> DisableCoreLB: PE [0] step 0 finished at 17.492812 duration 0.053814 s
+
+[11] Time per iteration: 1.723963 17.438813
+[12] Time per iteration: 1.451711 18.890525
+[13] Time per iteration: 1.633590 20.524115
+[14] Time per iteration: 1.434139 21.958254
+[15] Time per iteration: 1.553776 23.512030
+  Package 0:
+    energy-cores Energy Consumed: 0.000000 Joules, Power = 0.000000 W
+    energy-pkg Energy Consumed: 128.496521 Joules, Power = 43.105109 W
+    energy-ram Energy Consumed: 21.933334 Joules, Power = 7.357699 W
+  Package 1:
+    energy-cores Energy Consumed: 0.000000 Joules, Power = 0.000000 W
+    energy-pkg Energy Consumed: 442.969116 Joules, Power = 148.597270 W
+    energy-ram Energy Consumed: 62.707932 Joules, Power = 21.035840 W
+
+
+[16] avg_sum (0.000000) += 1.401687[16] Time per iteration: 1.401687 24.913716
+
+[17] avg_sum (1.401687) += 1.509154[17] Time per iteration: 1.509154 26.422870
+
+[18] avg_sum (2.910841) += 1.523599
+Entered time for wpn 24 = 1.478146 (1.478146)s
+0.245789/1.723936 = 0.142575, skip_over = 0nxt = 2
+Setting active pes = 20[18] Time per iteration: 1.523599 27.946469
+[19] Time per iteration: 1.513619 29.460088
+[20] Time per iteration: 1.458518 30.918606
+
+Tried notifying from PE-8
+CharmLB> DisableCoreLB: PE [0] step 1 starting at 32.625346 Memory: 453.005615 MB
+CharmLB> DisableCoreLB: PE [0] strategy starting at 32.718939
+
+ newPpn = 20
+Proc 0 load  = 0.008857
+Proc 1 load  = 0.004552
+Proc 2 load  = 0.003791
+Proc 3 load  = 0.004333
+Proc 4 load  = 0.003078
+Proc 5 load  = 0.004461
+Proc 6 load  = 0.003112
+Proc 7 load  = 0.003585
+Proc 8 load  = 0.008857
+Proc 9 load  = 0.008857
+Proc 10 load  = 0.004572
+Proc 11 load  = 0.008857
+Proc 12 load  = 0.004468
+Proc 13 load  = 0.004329
+Proc 14 load  = 0.008857
+Proc 15 load  = 0.008857
+Proc 16 load  = 0.005547
+Proc 17 load  = 0.004441
+Proc 18 load  = 0.004470
+Proc 19 load  = 0.008857[0] 92 objects migrating.
+CharmLB> DisableCoreLB: PE [0] Memory: LBManager: 37 KB CentralLB: 57 KB
+CharmLB> DisableCoreLB: PE [0] #Objects migrating: 92, LBMigrateMsg size: 0.00 MB
+CharmLB> DisableCoreLB: PE [0] strategy finished at 32.720193 duration 0.001253 s
+CharmLB> DisableCoreLB: PE [0] step 1 finished at 32.843803 duration 0.218457 s
+
+[21] Time per iteration: 1.706634 32.625240
+[22] Time per iteration: 1.460969 34.086209
+[23] Time per iteration: 1.360740 35.446950
+[24] Time per iteration: 1.275159 36.722109
+[25] Time per iteration: 1.328908 38.051017
+  Package 0:
+    energy-cores Energy Consumed: 0.000000 Joules, Power = 0.000000 W
+    energy-pkg Energy Consumed: 114.781677 Joules, Power = 44.081755 W
+    energy-ram Energy Consumed: 19.143036 Joules, Power = 7.351858 W
+  Package 1:
+    energy-cores Energy Consumed: 0.000000 Joules, Power = 0.000000 W
+    energy-pkg Energy Consumed: 389.577332 Joules, Power = 149.616670 W
+    energy-ram Energy Consumed: 55.515656 Joules, Power = 21.320716 W
+
+
+[26] avg_sum (0.000000) += 1.298584[26] Time per iteration: 1.298584 39.349601
+
+[27] avg_sum (1.298584) += 1.316301[27] Time per iteration: 1.316301 40.665902
+
+[28] avg_sum (2.614885) += 1.284208
+Entered time for wpn 20 = 1.299698 (1.299698)s
+0.178449/1.478146 = 0.120725, skip_over = 0nxt = 3
+Setting active pes = 16[28] Time per iteration: 1.284208 41.950110
+[29] Time per iteration: 1.316741 43.266851
+[30] Time per iteration: 1.307362 44.574213
+
+Tried notifying from PE-10
+CharmLB> DisableCoreLB: PE [0] step 2 starting at 45.857455 Memory: 453.117371 MB
+CharmLB> DisableCoreLB: PE [0] strategy starting at 46.230309
+
+ newPpn = 16
+Proc 0 load  = 0.005060
+Proc 1 load  = 0.003190
+Proc 2 load  = 0.003121
+Proc 3 load  = 0.003212
+Proc 4 load  = 0.005060
+Proc 5 load  = 0.003022
+Proc 6 load  = 0.005060
+Proc 7 load  = 0.005060
+Proc 8 load  = 0.003854
+Proc 9 load  = 0.005060
+Proc 10 load  = 0.005060
+Proc 11 load  = 0.004015
+Proc 12 load  = 0.003593
+Proc 13 load  = 0.003940
+Proc 14 load  = 0.003347
+Proc 15 load  = 0.004096[0] 92 objects migrating.
+CharmLB> DisableCoreLB: PE [0] Memory: LBManager: 37 KB CentralLB: 57 KB
+CharmLB> DisableCoreLB: PE [0] #Objects migrating: 92, LBMigrateMsg size: 0.00 MB
+CharmLB> DisableCoreLB: PE [0] strategy finished at 46.230619 duration 0.000310 s
+CharmLB> DisableCoreLB: PE [0] step 2 finished at 46.361281 duration 0.503826 s
+
+[31] Time per iteration: 1.283109 45.857322
+[32] Time per iteration: 1.611730 47.469052
+[33] Time per iteration: 1.183489 48.652542
+[34] Time per iteration: 1.238866 49.891408
+[35] Time per iteration: 1.258518 51.149926
+  Package 0:
+    energy-cores Energy Consumed: 0.000000 Joules, Power = 0.000000 W
+    energy-pkg Energy Consumed: 114.296143 Joules, Power = 47.834627 W
+    energy-ram Energy Consumed: 17.571747 Joules, Power = 7.354036 W
+  Package 1:
+    energy-cores Energy Consumed: 0.000000 Joules, Power = 0.000000 W
+    energy-pkg Energy Consumed: 356.377563 Joules, Power = 149.149283 W
+    energy-ram Energy Consumed: 48.604294 Joules, Power = 20.341616 W
+
+
+[36] avg_sum (0.000000) += 1.218682[36] Time per iteration: 1.218682 52.368609
+
+[37] avg_sum (1.218682) += 1.124384[37] Time per iteration: 1.124384 53.492992
+
+[38] avg_sum (2.343066) += 1.306604
+Entered time for wpn 16 = 1.216557 (1.216557)s
+0.083141/1.299698 = 0.063970, skip_over = 0nxt = 4
+Setting active pes = 12[38] Time per iteration: 1.306604 54.799596
+[39] Time per iteration: 1.132123 55.931719
+[40] Time per iteration: 1.287630 57.219349
+
+Tried notifying from PE-7
+CharmLB> DisableCoreLB: PE [0] step 3 starting at 58.371469 Memory: 453.229889 MB
+CharmLB> DisableCoreLB: PE [0] strategy starting at 58.595312
+
+ newPpn = 12
+Proc 0 load  = 0.005972
+Proc 1 load  = 0.004475
+Proc 2 load  = 0.004704
+Proc 3 load  = 0.005972
+Proc 4 load  = 0.005439
+Proc 5 load  = 0.003649
+Proc 6 load  = 0.005972
+Proc 7 load  = 0.005972
+Proc 8 load  = 0.003612
+Proc 9 load  = 0.003046
+Proc 10 load  = 0.003433
+Proc 11 load  = 0.004767[0] 91 objects migrating.
+CharmLB> DisableCoreLB: PE [0] Memory: LBManager: 37 KB CentralLB: 57 KB
+CharmLB> DisableCoreLB: PE [0] #Objects migrating: 91, LBMigrateMsg size: 0.00 MB
+CharmLB> DisableCoreLB: PE [0] strategy finished at 58.595563 duration 0.000251 s
+CharmLB> DisableCoreLB: PE [0] step 3 finished at 58.881895 duration 0.510426 s
+
+[41] Time per iteration: 1.152022 58.371371
+[42] Time per iteration: 1.611282 59.982653
+[43] Time per iteration: 1.062317 61.044970
+[44] Time per iteration: 1.151561 62.196531
+[45] Time per iteration: 1.072627 63.269159
+  Package 0:
+    energy-cores Energy Consumed: 0.000000 Joules, Power = 0.000000 W
+    energy-pkg Energy Consumed: 96.675293 Joules, Power = 43.853506 W
+    energy-ram Energy Consumed: 16.199280 Joules, Power = 7.348260 W
+  Package 1:
+    energy-cores Energy Consumed: 0.000000 Joules, Power = 0.000000 W
+    energy-pkg Energy Consumed: 329.653992 Joules, Power = 149.536481 W
+    energy-ram Energy Consumed: 41.474884 Joules, Power = 18.813691 W
+
+
+[46] avg_sum (0.000000) += 1.134396[46] Time per iteration: 1.134396 64.403555
+
+[47] avg_sum (1.134396) += 1.071832[47] Time per iteration: 1.071832 65.475387
+
+[48] avg_sum (2.206228) += 1.130523
+Entered time for wpn 12 = 1.112250 (1.112250)s
+0.104306/1.216557 = 0.085739, skip_over = 0nxt = 5
+Setting active pes = 8[48] Time per iteration: 1.130523 66.605909
+[49] Time per iteration: 1.089274 67.695183
+[50] Time per iteration: 1.129769 68.824952
+
+Best configuration was found to be 12
+Tried notifying from PE-11
+CharmLB> DisableCoreLB: PE [0] step 4 starting at 69.898552 Memory: 453.328568 MB
+CharmLB> DisableCoreLB: PE [0] strategy starting at 70.195302
+
+ newPpn = 12
+Proc 0 load  = 0.015984
+Proc 1 load  = 0.005718
+Proc 2 load  = 0.005278
+Proc 3 load  = 0.003462
+Proc 4 load  = 0.005877
+Proc 5 load  = 0.003502
+Proc 6 load  = 0.003565
+Proc 7 load  = 0.003931
+Proc 8 load  = 0.003407
+Proc 9 load  = 0.003785
+Proc 10 load  = 0.008655
+Proc 11 load  = 0.005878[0] 90 objects migrating.
+CharmLB> DisableCoreLB: PE [0] Memory: LBManager: 38 KB CentralLB: 57 KB
+CharmLB> DisableCoreLB: PE [0] #Objects migrating: 90, LBMigrateMsg size: 0.00 MB
+CharmLB> DisableCoreLB: PE [0] strategy finished at 70.195527 duration 0.000225 s
+CharmLB> DisableCoreLB: PE [0] step 4 finished at 70.376482 duration 0.477931 s
+
+[51] Time per iteration: 1.073398 69.898350
+[52] Time per iteration: 1.502927 71.401277
+[53] Time per iteration: 1.116619 72.517896
+[54] Time per iteration: 1.036657 73.554552
+[55] Time per iteration: 1.114423 74.668975
+  Package 0:
+    energy-cores Energy Consumed: 0.000000 Joules, Power = 0.000000 W
+    energy-pkg Energy Consumed: 94.653748 Joules, Power = 43.781686 W
+    energy-ram Energy Consumed: 15.901642 Joules, Power = 7.355236 W
+  Package 1:
+    energy-cores Energy Consumed: 0.000000 Joules, Power = 0.000000 W
+    energy-pkg Energy Consumed: 323.069824 Joules, Power = 149.434565 W
+    energy-ram Energy Consumed: 41.059753 Joules, Power = 18.992013 W
+
+
+[56] avg_sum (0.000000) += 1.047476[56] Time per iteration: 1.047476 75.716451
+
+[57] avg_sum (1.047476) += 1.117473[57] Time per iteration: 1.117473 76.833925
+
+[58] avg_sum (2.164950) += 1.028375[58] Time per iteration: 1.028375 77.862299
+[59] Time per iteration: 1.126900 78.989200
+[2] Time per iteration: 0.000000 0.000000
+[3] Time per iteration: 0.000000 0.000000
+[4] Time per iteration: 0.000000 0.000000
+[5] Time per iteration: 0.000000 0.000000
+[6] Time per iteration: 0.000000 0.000000
+[7] Time per iteration: 0.000000 0.000000
+[8] Time per iteration: 0.000000 0.000000
+[9] Time per iteration: 0.000000 0.000000
+[10] Time per iteration: 0.000000 0.000000
+[11] Time per iteration: 0.000000 0.000000
+[12] Time per iteration: 0.000000 0.000000
+[13] Time per iteration: 0.000000 0.000000
+[14] Time per iteration: 0.000000 0.000000
+[15] Time per iteration: 0.000000 0.000000
+[16] Time per iteration: 0.000000 0.000000
+[17] Time per iteration: 0.000000 0.000000
+[18] Time per iteration: 0.000000 0.000000
+[19] Time per iteration: 0.000000 0.000000
+[20] Time per iteration: 0.000000 0.000000
+[21] Time per iteration: 0.000000 0.000000
+[22] Time per iteration: 0.000000 0.000000
+[23] Time per iteration: 0.000000 0.000000
+[24] Time per iteration: 0.000000 0.000000
+[25] Time per iteration: 0.000000 0.000000
+[26] Time per iteration: 0.000000 0.000000
+[27] Time per iteration: 0.000000 0.000000
+[28] Time per iteration: 0.000000 0.000000
+[29] Time per iteration: 0.000000 0.000000
+[30] Time per iteration: 0.000000 0.000000
+[31] Time per iteration: 0.000000 0.000000
+[32] Time per iteration: 0.000000 0.000000
+[33] Time per iteration: 0.000000 0.000000
+[34] Time per iteration: 0.000000 0.000000
+[35] Time per iteration: 0.000000 0.000000
+[36] Time per iteration: 0.000000 0.000000
+[37] Time per iteration: 0.000000 0.000000
+[38] Time per iteration: 0.000000 0.000000
+[39] Time per iteration: 0.000000 0.000000
+[40] Time per iteration: 0.000000 0.000000
+[41] Time per iteration: 0.000000 0.000000
+[42] Time per iteration: 0.000000 0.000000
+[43] Time per iteration: 0.000000 0.000000
+[44] Time per iteration: 0.000000 0.000000
+[45] Time per iteration: 0.000000 0.000000
+[46] Time per iteration: 0.000000 0.000000
+[47] Time per iteration: 0.000000 0.000000
+[48] Time per iteration: 0.000000 0.000000
+[49] Time per iteration: 0.000000 0.000000
+[50] Time per iteration: 0.000000 0.000000
+[51] Time per iteration: 0.000000 0.000000
+[52] Time per iteration: 0.000000 0.000000
+[53] Time per iteration: 0.000000 0.000000
+[54] Time per iteration: 0.000000 0.000000
+[55] Time per iteration: 0.000000 0.000000
+[56] Time per iteration: 0.000000 0.000000
+[57] Time per iteration: 0.000000 0.000000
+[58] Time per iteration: 0.000000 0.000000
+[59] Time per iteration: 0.000000 0.000000
+[60] Time per iteration: 0.000000 0.000000
+
+Tried notifying from PE-4[60] Time per iteration: 1.031015 80.020215
+^C
+

@@ -1,0 +1,683 @@
+c506-022[skx](1059)$ numactl -N 1 -m 1 ./stencil3d 384 256 256 64 64 64 ++ppn 48 +pemap 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39,41,43,45,47,49,51,53,55,57,59,61,63,65,67,69,71,73,75,77,79,81,83,85,87,89,91,93,95 +balancer DisableCoreLB
+Charm++: standalone mode (not using charmrun)
+Charm++> Running in Multicore mode: 48 threads (PEs)
+Converse/Charm++ Commit ID: v7.0.0-12-g2ee27f44c
+CharmLB> Load balancer assumes all CPUs are same.
+Charm++> cpu affinity enabled. 
+Charm++> cpuaffinity PE-core map (OS indices): 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39,41,43,45,47,49,51,53,55,57,59,61,63,65,67,69,71,73,75,77,79,81,83,85,87,89,91,93,95
+Charm++> Running on 1 hosts (2 sockets x 24 cores x 2 PUs = 96-way SMP)
+Charm++> cpu topology info is gathered in 0.004 seconds.
+
+STENCIL COMPUTATION WITH BARRIERS
+Running Stencil on 48 processors with (6, 4, 4) chares
+Array Dimensions: 384 256 256
+Block Dimensions: 64 64 64
+                                              [3] Time per iteration: 1.737400 3.630454
+[4] Time per iteration: 1.720893 5.351347
+[5] Time per iteration: 1.731451 7.082797
+
+[6] avg_sum (0.000000) += 1.734400[6] Time per iteration: 1.734400 8.817198
+
+[7] avg_sum (1.734400) += 1.723654[7] Time per iteration: 1.723654 10.540852
+
+[8] avg_sum (3.458054) += 1.730829
+Entered time for wpn 48 = 1.729628 (1.729628)s
+Setting active pes = 24[8] Time per iteration: 1.730829 12.271681
+[9] Time per iteration: 1.726650 13.998331
+[10] Time per iteration: 1.735328 15.733659
+
+ newPpn = 24
+Proc 0 load  = 0.117403
+Proc 1 load  = 0.070616
+Proc 2 load  = 0.072298
+Proc 3 load  = 0.073377
+Proc 4 load  = 0.070490
+Proc 5 load  = 0.071560
+Proc 6 load  = 0.072423
+Proc 7 load  = 0.071518
+Proc 8 load  = 0.071683
+Proc 9 load  = 0.071491
+Proc 10 load  = 0.069984
+Proc 11 load  = 0.072222
+Proc 12 load  = 0.072573
+Proc 13 load  = 0.070120
+Proc 14 load  = 0.073024
+Proc 15 load  = 0.073928
+Proc 16 load  = 0.074003
+Proc 17 load  = 0.070208
+Proc 18 load  = 0.069402
+Proc 19 load  = 0.070458
+Proc 20 load  = 0.072261
+Proc 21 load  = 0.072189
+Proc 22 load  = 0.072241
+Proc 23 load  = 0.072151[11] Time per iteration: 1.720033 17.453692
+[12] Time per iteration: 1.450643 18.904335
+[13] Time per iteration: 1.492258 20.396593
+[14] Time per iteration: 1.661469 22.058062
+[15] Time per iteration: 1.401066 23.459128
+
+[16] avg_sum (0.000000) += 1.504427[16] Time per iteration: 1.504427 24.963555
+
+[17] avg_sum (1.504427) += 1.627920[17] Time per iteration: 1.627920 26.591475
+
+[18] avg_sum (3.132347) += 1.403485
+Entered time for wpn 24 = 1.511944 (1.511944)s
+0.217684/1.729628 = 0.125856, skip_over = 0, dir=go_lowernxt = 2
+Setting active pes = 20[18] Time per iteration: 1.403485 27.994960
+[19] Time per iteration: 1.482518 29.477478
+
+Tried notifying from PE-14
+Setting PE-41 to core83
+Setting PE-42 to core85
+Setting PE-46 to core93
+Setting PE-45 to core91
+Setting PE-31 to core63
+Setting PE-28 to core57
+Setting PE-36 to core73
+Setting PE-33 to core67
+Setting PE-32 to core65
+Setting PE-44 to core89
+Setting PE-39 to core79
+Setting PE-38 to core77
+Setting PE-35 to core71
+Setting PE-24 to core49
+Setting PE-34 to core69
+Setting PE-47 to core95
+Setting PE-37 to core75
+Setting PE-27 to core55
+Setting PE-30 to core61
+Setting PE-26 to core53
+Setting PE-29 to core59
+Setting PE-40 to core81
+Setting PE-25 to core51
+Setting PE-43 to core87[20] Time per iteration: 1.424815 30.902293
+
+ newPpn = 20
+Proc 0 load  = 0.002956
+Proc 1 load  = 0.006677
+Proc 2 load  = 0.006153
+Proc 3 load  = 0.006661
+Proc 4 load  = 0.001849
+Proc 5 load  = 0.002048
+Proc 6 load  = 0.006752
+Proc 7 load  = 0.001975
+Proc 8 load  = 0.006187
+Proc 9 load  = 0.006467
+Proc 10 load  = 0.007569
+Proc 11 load  = 0.005774
+Proc 12 load  = 0.002035
+Proc 13 load  = 0.009131
+Proc 14 load  = 0.004076
+Proc 15 load  = 0.001932
+Proc 16 load  = 0.006449
+Proc 17 load  = 0.008412
+Proc 18 load  = 0.001843
+Proc 19 load  = 0.001906[21] Time per iteration: 1.771228 32.673521
+[22] Time per iteration: 1.471997 34.145517
+[23] Time per iteration: 1.278170 35.423687
+[24] Time per iteration: 1.299058 36.722745
+[25] Time per iteration: 1.297254 38.019999
+
+[26] avg_sum (0.000000) += 1.328604[26] Time per iteration: 1.328604 39.348603
+
+[27] avg_sum (1.328604) += 1.283775[27] Time per iteration: 1.283775 40.632379
+
+[28] avg_sum (2.612379) += 1.243877
+Entered time for wpn 20 = 1.285419 (1.285419)s
+0.226525/1.511944 = 0.149824, skip_over = 0, dir=go_lowernxt = 3
+Setting active pes = 16[28] Time per iteration: 1.243877 41.876256
+[29] Time per iteration: 1.344560 43.220816
+[30] Time per iteration: 1.330586 44.551402
+
+Tried notifying from PE-2
+Setting PE-32 to core65
+Setting PE-42 to core85
+Setting PE-26 to core53
+Setting PE-25 to core51
+Setting PE-29 to core59
+Setting PE-33 to core67
+Setting PE-37 to core75
+Setting PE-27 to core55
+Setting PE-28 to core57
+Setting PE-47 to core95
+Setting PE-34 to core69
+Setting PE-38 to core77
+Setting PE-39 to core79
+Setting PE-36 to core73
+Setting PE-44 to core89
+Setting PE-43 to core87
+Setting PE-35 to core71
+Setting PE-46 to core93
+Setting PE-45 to core91
+Setting PE-31 to core63
+Setting PE-30 to core61
+Setting PE-24 to core49
+Setting PE-40 to core81
+Setting PE-41 to core83
+Setting PE-21 to core43
+Setting PE-22 to core45
+Setting PE-20 to core41
+Setting PE-23 to core47
+ newPpn = 16
+Proc 0 load  = 0.003548
+Proc 1 load  = 0.001848
+Proc 2 load  = 0.005535
+Proc 3 load  = 0.003622
+Proc 4 load  = 0.003410
+Proc 5 load  = 0.008287
+Proc 6 load  = 0.003553
+Proc 7 load  = 0.002363
+Proc 8 load  = 0.001621
+Proc 9 load  = 0.003053
+Proc 10 load  = 0.008937
+Proc 11 load  = 0.003645
+Proc 12 load  = 0.007459
+Proc 13 load  = 0.006424
+Proc 14 load  = 0.010153
+Proc 15 load  = 0.001677[31] Time per iteration: 2.008030 46.559432
+[32] Time per iteration: 1.262046 47.821478
+[33] Time per iteration: 1.130187 48.951665
+[34] Time per iteration: 1.259430 50.211095
+[35] Time per iteration: 1.068385 51.279480
+
+[36] avg_sum (0.000000) += 1.299734[36] Time per iteration: 1.299734 52.579214
+
+[37] avg_sum (1.299734) += 1.142872[37] Time per iteration: 1.142872 53.722086
+
+[38] avg_sum (2.442606) += 1.266104
+Entered time for wpn 16 = 1.236237 (1.236237)s
+0.049182/1.285419 = 0.038262, skip_over = 0, dir=go_lowernxt = 4
+Setting active pes = 12[38] Time per iteration: 1.266104 54.988190
+[39] Time per iteration: 1.023098 56.011289
+[40] Time per iteration: 1.400747 57.412036
+
+Tried notifying from PE-10
+Setting PE-42 to core85
+Setting PE-40 to core81
+Setting PE-31 to core63
+Setting PE-24 to core49
+Setting PE-25 to core51
+Setting PE-29 to core59
+Setting PE-36 to core73
+Setting PE-34 to core69
+Setting PE-37 to core75
+Setting PE-35 to core71
+Setting PE-39 to core79
+Setting PE-38 to core77
+Setting PE-43 to core87
+Setting PE-45 to core91
+Setting PE-28 to core57
+Setting PE-47 to core95
+Setting PE-44 to core89
+Setting PE-46 to core93
+Setting PE-33 to core67
+Setting PE-27 to core55
+Setting PE-23 to core47
+Setting PE-21 to core43
+Setting PE-22 to core45
+Setting PE-20 to core41
+Setting PE-41 to core83
+Setting PE-26 to core53
+Setting PE-32 to core65
+Setting PE-30 to core61
+Setting PE-18 to core37
+Setting PE-16 to core33
+Setting PE-19 to core39
+Setting PE-17 to core35
+ newPpn = 12
+Proc 0 load  = 0.008536
+Proc 1 load  = 0.005149
+Proc 2 load  = 0.005782
+Proc 3 load  = 0.002007
+Proc 4 load  = 0.001889
+Proc 5 load  = 0.002446
+Proc 6 load  = 0.007331
+Proc 7 load  = 0.001764
+Proc 8 load  = 0.001570
+Proc 9 load  = 0.005554
+Proc 10 load  = 0.007202
+Proc 11 load  = 0.008095[41] Time per iteration: 1.041341 58.453377
+[42] Time per iteration: 1.843889 60.297266
+[43] Time per iteration: 1.026187 61.323453
+[44] Time per iteration: 1.126451 62.449904
+[45] Time per iteration: 1.014639 63.464543
+
+[46] avg_sum (0.000000) += 1.136667[46] Time per iteration: 1.136667 64.601210
+
+[47] avg_sum (1.136667) += 1.037775[47] Time per iteration: 1.037775 65.638985
+
+[48] avg_sum (2.174441) += 1.120605
+Entered time for wpn 12 = 1.098349 (1.098349)s
+0.137888/1.236237 = 0.111538, skip_over = 0, dir=go_lowernxt = 5
+Setting active pes = 8[48] Time per iteration: 1.120605 66.759590
+[49] Time per iteration: 1.025666 67.785256
+[50] Time per iteration: 1.143082 68.928338
+
+Tried notifying from PE-2
+Setting PE-23 to core47
+Setting PE-21 to core43
+Setting PE-20 to core41
+Setting PE-22 to core45
+Setting PE-31 to core63
+Setting PE-40 to core81
+Setting PE-32 to core65
+Setting PE-41 to core83
+Setting PE-30 to core61
+Setting PE-42 to core85
+Setting PE-19 to core39
+Setting PE-17 to core35
+Setting PE-26 to core53
+Setting PE-18 to core37
+Setting PE-16 to core33
+Setting PE-27 to core55
+Setting PE-29 to core59
+Setting PE-28 to core57
+Setting PE-25 to core51
+Setting PE-34 to core69
+Setting PE-33 to core67
+Setting PE-36 to core73
+Setting PE-38 to core77
+Setting PE-35 to core71
+Setting PE-47 to core95
+Setting PE-37 to core75
+Setting PE-43 to core87
+Setting PE-39 to core79
+Setting PE-46 to core93
+Setting PE-24 to core49
+Setting PE-44 to core89
+Setting PE-45 to core91
+Setting PE-13 to core27
+Setting PE-12 to core25
+Setting PE-14 to core29
+Setting PE-15 to core31
+ newPpn = 8
+Proc 0 load  = 0.003310
+Proc 1 load  = 0.005132
+Proc 2 load  = 0.002892
+Proc 3 load  = 0.007013
+Proc 4 load  = 0.001782
+Proc 5 load  = 0.003171
+Proc 6 load  = 0.001808
+Proc 7 load  = 0.002778[51] Time per iteration: 2.000414 70.928752
+[52] Time per iteration: 2.323219 73.251971
+[53] Time per iteration: 1.375451 74.627422
+[54] Time per iteration: 1.288202 75.915624
+[55] Time per iteration: 1.356550 77.272175
+
+[56] avg_sum (0.000000) += 1.297147[56] Time per iteration: 1.297147 78.569322
+
+[57] avg_sum (1.297147) += 1.383656[57] Time per iteration: 1.383656 79.952978
+
+[58] avg_sum (2.680804) += 1.265300
+Entered time for wpn 8 = 1.315368 (1.315368)s
+0.217019/1.098349 = 0.197586, skip_over = 1, dir=go_highernxt = -1
+Setting active pes = 8[58] Time per iteration: 1.265300 81.218278
+[59] Time per iteration: 1.372813 82.591091
+[60] Time per iteration: 1.272467 83.863558
+
+Best configuration was found to be 12
+Tried notifying from PE-3
+Setting PE-21 to core43
+Setting PE-12 to core25
+Setting PE-20 to core41
+Setting PE-31 to core63
+Setting PE-23 to core47
+Setting PE-22 to core45
+Setting PE-30 to core61
+Setting PE-41 to core83
+Setting PE-32 to core65
+Setting PE-40 to core81
+Setting PE-42 to core85
+Setting PE-14 to core29
+Setting PE-16 to core33
+Setting PE-17 to core35
+Setting PE-19 to core39
+Setting PE-15 to core31
+Setting PE-18 to core37
+Setting PE-26 to core53
+Setting PE-13 to core27
+Setting PE-25 to core51
+Setting PE-24 to core49
+Setting PE-28 to core57
+Setting PE-29 to core59
+Setting PE-27 to core55
+Setting PE-33 to core67
+Setting PE-37 to core75
+Setting PE-35 to core71
+Setting PE-36 to core73
+Setting PE-34 to core69
+Setting PE-38 to core77
+Setting PE-39 to core79
+Setting PE-43 to core87
+Setting PE-45 to core91
+Setting PE-46 to core93
+Setting PE-47 to core95
+Setting PE-44 to core89
+Setting PE-10 to core21
+Setting PE-9 to core19
+Setting PE-8 to core17
+Setting PE-11 to core23
+ newPpn = 12
+Proc 0 load  = 0.002522
+Proc 1 load  = 0.002260
+Proc 2 load  = 0.004034
+Proc 3 load  = 0.002636
+Proc 4 load  = 0.008501
+Proc 5 load  = 0.010521
+Proc 6 load  = 0.009102
+Proc 7 load  = 0.002862
+Proc 8 load  = 12.822925
+Proc 9 load  = 12.824907
+Proc 10 load  = 12.824941
+Proc 11 load  = 12.816982[61] Time per iteration: 4.456206 88.319764
+[62] Time per iteration: 2.917186 91.236951
+[63] Time per iteration: 1.105389 92.342340
+[64] Time per iteration: 1.014272 93.356612
+[65] Time per iteration: 1.112630 94.469242
+
+[66] avg_sum (0.000000) += 1.021815[66] Time per iteration: 1.021815 95.491057
+
+[67] avg_sum (1.021815) += 1.198969[67] Time per iteration: 1.198969 96.690025
+
+[68] avg_sum (2.220783) += 1.039869[68] Time per iteration: 1.039869 97.729895
+[69] Time per iteration: 1.173941 98.903836
+[70] Time per iteration: 1.043279 99.947115
+[71] Time per iteration: 1.170783 101.117898
+[72] Time per iteration: 1.034112 102.152010
+[73] Time per iteration: 1.181516 103.333526
+[74] Time per iteration: 1.051198 104.384725
+[75] Time per iteration: 1.174459 105.559183
+
+[76] avg_sum (3.260652) += 0.998468[76] Time per iteration: 0.998468 106.557651
+
+[77] avg_sum (4.259120) += 1.209948[77] Time per iteration: 1.209948 107.767599
+
+[78] avg_sum (5.469069) += 1.039371[78] Time per iteration: 1.039371 108.806971
+[79] Time per iteration: 1.179060 109.986031
+[80] Time per iteration: 1.010370 110.996401
+[81] Time per iteration: 1.196672 112.193073
+[82] Time per iteration: 1.050365 113.243438
+[83] Time per iteration: 1.167487 114.410925
+[84] Time per iteration: 1.043676 115.454601
+[85] Time per iteration: 1.176950 116.631551
+
+[86] avg_sum (6.508440) += 1.026753[86] Time per iteration: 1.026753 117.658304
+
+[87] avg_sum (7.535193) += 1.199631[87] Time per iteration: 1.199631 118.857935
+
+[88] avg_sum (8.734824) += 1.047587[88] Time per iteration: 1.047587 119.905523
+[89] Time per iteration: 1.178992 121.084515
+[90] Time per iteration: 0.996177 122.080692
+[91] Time per iteration: 1.208741 123.289433
+[92] Time per iteration: 1.036472 124.325905
+[93] Time per iteration: 1.185081 125.510986
+[94] Time per iteration: 1.024882 126.535868
+[95] Time per iteration: 1.188344 127.724212
+
+[96] avg_sum (9.782412) += 1.048471[96] Time per iteration: 1.048471 128.772683
+
+[97] avg_sum (10.830883) += 1.184205[97] Time per iteration: 1.184205 129.956888
+
+[98] avg_sum (12.015087) += 1.000232[98] Time per iteration: 1.000232 130.957120
+[99] Time per iteration: 1.211896 132.169016
+[100] Time per iteration: 1.022168 133.191184
+[101] Time per iteration: 1.202639 134.393823
+[102] Time per iteration: 1.019530 135.413354
+[103] Time per iteration: 1.179770 136.593124
+[104] Time per iteration: 1.023909 137.617033
+[105] Time per iteration: 1.179118 138.796150
+
+[106] avg_sum (13.015319) += 1.031572[106] Time per iteration: 1.031572 139.827722
+
+[107] avg_sum (14.046891) += 1.176203[107] Time per iteration: 1.176203 141.003926
+
+[108] avg_sum (15.223095) += 1.029854[108] Time per iteration: 1.029854 142.033780
+[109] Time per iteration: 1.176953 143.210733
+[110] Time per iteration: 1.027738 144.238471
+[111] Time per iteration: 1.179785 145.418256
+[112] Time per iteration: 1.033156 146.451412
+[113] Time per iteration: 1.190028 147.641439
+[114] Time per iteration: 1.029627 148.671066
+[115] Time per iteration: 1.188284 149.859350
+
+[116] avg_sum (16.252949) += 1.028628[116] Time per iteration: 1.028628 150.887979
+
+[117] avg_sum (17.281577) += 1.182340[117] Time per iteration: 1.182340 152.070319
+
+[118] avg_sum (18.463918) += 1.033887[118] Time per iteration: 1.033887 153.104207
+[119] Time per iteration: 1.175234 154.279441
+[120] Time per iteration: 1.024954 155.304395
+[121] Time per iteration: 1.185109 156.489504
+[122] Time per iteration: 1.032072 157.521576
+[123] Time per iteration: 1.172116 158.693692
+[124] Time per iteration: 1.042744 159.736436
+[125] Time per iteration: 1.164350 160.900786
+
+[126] avg_sum (19.497805) += 1.051088[126] Time per iteration: 1.051088 161.951874
+
+[127] avg_sum (20.548893) += 1.150514[127] Time per iteration: 1.150514 163.102388
+
+[128] avg_sum (21.699407) += 1.055646[128] Time per iteration: 1.055646 164.158034
+[129] Time per iteration: 1.156280 165.314315
+[130] Time per iteration: 1.057168 166.371482
+[131] Time per iteration: 1.154672 167.526154
+[132] Time per iteration: 1.062492 168.588646
+[133] Time per iteration: 1.148949 169.737595
+[134] Time per iteration: 1.047633 170.785227
+[135] Time per iteration: 1.179132 171.964359
+
+[136] avg_sum (22.755053) += 1.045724[136] Time per iteration: 1.045724 173.010084
+
+[137] avg_sum (23.800778) += 1.163751[137] Time per iteration: 1.163751 174.173834
+
+[138] avg_sum (24.964529) += 1.044291[138] Time per iteration: 1.044291 175.218126
+[139] Time per iteration: 1.175280 176.393406
+[140] Time per iteration: 1.048483 177.441889
+[141] Time per iteration: 1.168215 178.610104
+[142] Time per iteration: 1.054295 179.664399
+[143] Time per iteration: 1.157887 180.822285
+[144] Time per iteration: 1.054822 181.877108
+[145] Time per iteration: 1.160129 183.037236
+
+[146] avg_sum (26.008820) += 1.046165[146] Time per iteration: 1.046165 184.083402
+
+[147] avg_sum (27.054985) += 1.169172[147] Time per iteration: 1.169172 185.252573
+
+[148] avg_sum (28.224157) += 1.053437[148] Time per iteration: 1.053437 186.306011
+[149] Time per iteration: 1.167555 187.473565
+[150] Time per iteration: 1.052393 188.525959
+[151] Time per iteration: 1.164295 189.690253
+[152] Time per iteration: 1.053420 190.743674
+[153] Time per iteration: 1.165677 191.909351
+[154] Time per iteration: 1.048362 192.957712
+[155] Time per iteration: 1.168345 194.126057
+
+[156] avg_sum (29.277594) += 1.049918[156] Time per iteration: 1.049918 195.175975
+
+[157] avg_sum (30.327512) += 1.170013[157] Time per iteration: 1.170013 196.345988
+
+[158] avg_sum (31.497525) += 1.052364[158] Time per iteration: 1.052364 197.398352
+[159] Time per iteration: 1.168929 198.567280
+[160] Time per iteration: 1.053983 199.621264
+[161] Time per iteration: 1.162009 200.783272
+[162] Time per iteration: 1.051510 201.834783
+[163] Time per iteration: 1.171141 203.005923
+[164] Time per iteration: 1.052278 204.058202
+[165] Time per iteration: 1.163278 205.221479
+
+[166] avg_sum (32.549889) += 1.049694[166] Time per iteration: 1.049694 206.271173
+
+[167] avg_sum (33.599583) += 1.174453[167] Time per iteration: 1.174453 207.445626
+
+[168] avg_sum (34.774036) += 1.056398[168] Time per iteration: 1.056398 208.502024
+[169] Time per iteration: 1.160830 209.662855
+[170] Time per iteration: 1.048559 210.711413
+[171] Time per iteration: 1.175363 211.886776
+[172] Time per iteration: 1.052315 212.939091
+[173] Time per iteration: 1.163603 214.102694
+[174] Time per iteration: 1.044869 215.147564
+[175] Time per iteration: 1.171665 216.319229
+
+[176] avg_sum (35.830434) += 1.047528[176] Time per iteration: 1.047528 217.366757
+
+[177] avg_sum (36.877962) += 1.168693[177] Time per iteration: 1.168693 218.535450
+
+[178] avg_sum (38.046655) += 1.054697[178] Time per iteration: 1.054697 219.590147
+[179] Time per iteration: 1.162777 220.752924
+[180] Time per iteration: 1.046843 221.799767
+[181] Time per iteration: 1.172892 222.972659
+[182] Time per iteration: 1.048135 224.020794
+[183] Time per iteration: 1.162750 225.183544
+[184] Time per iteration: 1.052877 226.236421
+[185] Time per iteration: 1.172300 227.408720
+
+[186] avg_sum (39.101352) += 1.063460[186] Time per iteration: 1.063460 228.472180
+
+[187] avg_sum (40.164812) += 1.149818[187] Time per iteration: 1.149818 229.621998
+
+[188] avg_sum (41.314630) += 1.021507[188] Time per iteration: 1.021507 230.643505
+[189] Time per iteration: 1.190655 231.834161
+[190] Time per iteration: 1.037928 232.872089
+[191] Time per iteration: 1.179021 234.051109
+[192] Time per iteration: 1.023664 235.074773
+[193] Time per iteration: 1.196027 236.270800
+[194] Time per iteration: 1.073417 237.344218
+[195] Time per iteration: 1.227888 238.572106
+
+[196] avg_sum (42.336137) += 1.102652[196] Time per iteration: 1.102652 239.674758
+
+[197] avg_sum (43.438789) += 1.243315[197] Time per iteration: 1.243315 240.918072
+
+[198] avg_sum (44.682104) += 1.110831[198] Time per iteration: 1.110831 242.028904
+[199] Time per iteration: 1.243194 243.272097
+[200] Time per iteration: 1.121276 244.393373
+[201] Time per iteration: 1.232936 245.626309
+[202] Time per iteration: 1.121342 246.747651
+[203] Time per iteration: 1.218877 247.966528
+[204] Time per iteration: 1.096529 249.063057
+[205] Time per iteration: 1.256879 250.319936
+
+[206] avg_sum (45.792935) += 1.114825[206] Time per iteration: 1.114825 251.434761
+
+[207] avg_sum (46.907760) += 1.217668[207] Time per iteration: 1.217668 252.652429
+
+[208] avg_sum (48.125428) += 1.094461[208] Time per iteration: 1.094461 253.746890
+[209] Time per iteration: 1.251948 254.998838
+[210] Time per iteration: 1.114332 256.113170
+[211] Time per iteration: 1.226681 257.339850
+[212] Time per iteration: 1.114485 258.454336
+[213] Time per iteration: 1.222947 259.677283
+[214] Time per iteration: 1.104702 260.781985
+[215] Time per iteration: 1.236506 262.018491
+
+[216] avg_sum (49.219889) += 1.118667[216] Time per iteration: 1.118667 263.137159
+
+[217] avg_sum (50.338556) += 1.209343[217] Time per iteration: 1.209343 264.346502
+
+[218] avg_sum (51.547900) += 1.126828[218] Time per iteration: 1.126828 265.473331
+[219] Time per iteration: 1.203218 266.676549
+[220] Time per iteration: 1.128801 267.805350
+[221] Time per iteration: 1.202515 269.007865
+[222] Time per iteration: 1.143469 270.151335
+[223] Time per iteration: 1.205083 271.356418
+[224] Time per iteration: 1.143659 272.500076
+[225] Time per iteration: 1.201944 273.702020
+
+[226] avg_sum (52.674728) += 1.142597[226] Time per iteration: 1.142597 274.844617
+
+[227] avg_sum (53.817325) += 1.204545[227] Time per iteration: 1.204545 276.049162
+
+[228] avg_sum (55.021870) += 1.142810[228] Time per iteration: 1.142810 277.191972
+[229] Time per iteration: 1.201806 278.393778
+[230] Time per iteration: 1.136830 279.530608
+[231] Time per iteration: 1.201022 280.731629
+[232] Time per iteration: 1.143310 281.874939
+[233] Time per iteration: 1.199617 283.074556
+[234] Time per iteration: 1.141010 284.215565
+[235] Time per iteration: 1.222429 285.437994
+
+[236] avg_sum (56.164681) += 1.121288[236] Time per iteration: 1.121288 286.559283
+
+[237] avg_sum (57.285969) += 1.205250[237] Time per iteration: 1.205250 287.764532
+
+[238] avg_sum (58.491219) += 1.145260[238] Time per iteration: 1.145260 288.909792
+[239] Time per iteration: 1.220589 290.130381
+[240] Time per iteration: 1.119684 291.250065
+[241] Time per iteration: 1.200274 292.450339
+[242] Time per iteration: 1.146739 293.597078
+[243] Time per iteration: 1.221813 294.818891
+[244] Time per iteration: 1.117700 295.936591
+[245] Time per iteration: 1.199472 297.136063
+
+[246] avg_sum (59.636478) += 1.150273[246] Time per iteration: 1.150273 298.286336
+
+[247] avg_sum (60.786752) += 1.197038[247] Time per iteration: 1.197038 299.483374
+
+[248] avg_sum (61.983789) += 1.139546[248] Time per iteration: 1.139546 300.622920
+[249] Time per iteration: 1.196605 301.819525
+[250] Time per iteration: 1.146721 302.966246
+[251] Time per iteration: 1.176977 304.143223
+[252] Time per iteration: 1.106651 305.249874
+[253] Time per iteration: 1.164052 306.413926
+[254] Time per iteration: 1.106360 307.520285
+[255] Time per iteration: 1.170720 308.691005
+
+[256] avg_sum (63.123336) += 1.099593[256] Time per iteration: 1.099593 309.790598
+
+[257] avg_sum (64.222929) += 1.171000[257] Time per iteration: 1.171000 310.961599
+
+[258] avg_sum (65.393929) += 1.099364[258] Time per iteration: 1.099364 312.060962
+[259] Time per iteration: 1.178013 313.238975
+[260] Time per iteration: 1.103829 314.342805
+[261] Time per iteration: 1.170183 315.512988
+[262] Time per iteration: 1.106618 316.619606
+[263] Time per iteration: 1.174533 317.794139
+[264] Time per iteration: 1.103263 318.897402
+[265] Time per iteration: 1.177118 320.074520
+
+[266] avg_sum (66.493293) += 1.106577[266] Time per iteration: 1.106577 321.181097
+
+[267] avg_sum (67.599870) += 1.172097[267] Time per iteration: 1.172097 322.353194
+
+[268] avg_sum (68.771967) += 1.091158[268] Time per iteration: 1.091158 323.444352
+[269] Time per iteration: 1.159705 324.604057
+[270] Time per iteration: 1.092659 325.696716
+[271] Time per iteration: 1.163598 326.860314
+[272] Time per iteration: 1.091079 327.951393
+[273] Time per iteration: 1.167288 329.118681
+[274] Time per iteration: 1.078570 330.197251
+[275] Time per iteration: 1.164350 331.361601
+
+[276] avg_sum (69.863125) += 1.087337[276] Time per iteration: 1.087337 332.448938
+
+[277] avg_sum (70.950461) += 1.163325[277] Time per iteration: 1.163325 333.612262
+
+[278] avg_sum (72.113786) += 1.069554[278] Time per iteration: 1.069554 334.681816
+[279] Time per iteration: 1.170299 335.852115
+[280] Time per iteration: 1.081580 336.933695
+[281] Time per iteration: 1.173474 338.107169
+[282] Time per iteration: 1.079776 339.186945
+[283] Time per iteration: 1.163920 340.350865
+[284] Time per iteration: 1.104694 341.455559
+[285] Time per iteration: 1.148265 342.603824
+
+[286] avg_sum (73.183340) += 1.107155[286] Time per iteration: 1.107155 343.710978
+
+[287] avg_sum (74.290495) += 1.150664[287] Time per iteration: 1.150664 344.861643
+
+[288] avg_sum (75.441159) += 1.118194[288] Time per iteration: 1.118194 345.979837
+[289] Time per iteration: 1.136869 347.116706
+[290] Time per iteration: 1.116215 348.232921
+[291] Time per iteration: 1.154645 349.387565
+[292] Time per iteration: 1.095808 350.483373
+[293] Time per iteration: 1.143557 351.626930
+[294] Time per iteration: 1.106343 352.733273
+[295] Time per iteration: 1.143542 353.876815
+
+[296] avg_sum (76.559353) += 1.122300[296] Time per iteration: 1.122300 354.999115
+
+[297] avg_sum (77.681653) += 1.182242[297] Time per iteration: 1.182242 356.181357
+
+[298] avg_sum (78.863895) += 1.094254[298] Time per iteration: 1.094254 357.275612
+[299] Time per iteration: 1.138607 358.414219
+[300] Time per iteration: 1.089780 359.503999

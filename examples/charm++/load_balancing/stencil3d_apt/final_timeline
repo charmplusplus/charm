@@ -1,0 +1,857 @@
+c506-022[skx](1079)$ numactl -N 1 -m 1 ./stencil3d 384 256 256 64 64 64 ++ppn 48 +pemap 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39,41,43,45,47,49,51,53,55,57,59,61,63,65,67,69,71,73,75,77,79,81,83,85,87,89,91,93,95 +balancer DisableCoreLB +LBDebug 1 
+Charm++: standalone mode (not using charmrun)
+Charm++> Running in Multicore mode: 48 threads (PEs)
+Converse/Charm++ Commit ID: v7.0.0-12-g2ee27f44c
+CharmLB> Verbose level 1, load balancing period: -1 seconds
+CharmLB> Load balancer assumes all CPUs are same.
+Charm++> cpu affinity enabled. 
+Charm++> cpuaffinity PE-core map (OS indices): 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39,41,43,45,47,49,51,53,55,57,59,61,63,65,67,69,71,73,75,77,79,81,83,85,87,89,91,93,95
+Charm++> Running on 1 hosts (2 sockets x 24 cores x 2 PUs = 96-way SMP)
+Charm++> cpu topology info is gathered in 0.004 seconds.
+
+STENCIL COMPUTATION WITH BARRIERS
+Running Stencil on 48 processors with (6, 4, 4) chares
+Array Dimensions: 384 256 256
+Block Dimensions: 64 64 64
+                                            [3] Time per iteration: 1.730564 3.631915 stamp 4.500323
+[4] Time per iteration: 1.741820 5.373735 stamp 6.239689
+[5] Time per iteration: 1.722878 7.096613 stamp 7.967022
+
+[6] avg_sum (0.000000) += 1.734492[6] Time per iteration: 1.734492 8.831105 stamp 9.705462
+
+[7] avg_sum (1.734492) += 1.760549[7] Time per iteration: 1.760549 10.591654 stamp 11.449001
+
+[8] avg_sum (3.495041) += 1.711172
+Entered time for wpn 48 = 1.735404 (1.735404)s
+Setting active pes = 24[8] Time per iteration: 1.711172 12.302826 stamp 13.190302
+[9] Time per iteration: 1.747798 14.050624 stamp 14.923430
+[10] Time per iteration: 1.743890 15.794514 stamp 16.667954
+
+Tried notifying from PE-0
+CharmLB> DisableCoreLB: PE [0] step 0 starting at 17.542547 Memory: 452.610626 MB
+CharmLB> DisableCoreLB: PE [0] strategy starting at 17.547757
+
+ newPpn = 24
+Proc 0 load  = 0.122691
+Proc 1 load  = 0.072686
+Proc 2 load  = 0.071675
+Proc 3 load  = 0.071454
+Proc 4 load  = 0.071086
+Proc 5 load  = 0.070926
+Proc 6 load  = 0.069828
+Proc 7 load  = 0.070569
+Proc 8 load  = 0.070307
+Proc 9 load  = 0.072270
+Proc 10 load  = 0.072324
+Proc 11 load  = 0.070035
+Proc 12 load  = 0.070407
+Proc 13 load  = 0.071174
+Proc 14 load  = 0.072353
+Proc 15 load  = 0.069196
+Proc 16 load  = 0.070077
+Proc 17 load  = 0.071563
+Proc 18 load  = 0.069387
+Proc 19 load  = 0.072241
+Proc 20 load  = 0.071832
+Proc 21 load  = 0.069053
+Proc 22 load  = 0.071338
+Proc 23 load  = 0.072839[0] 95 objects migrating.
+CharmLB> DisableCoreLB: PE [0] Memory: LBManager: 37 KB CentralLB: 56 KB
+CharmLB> DisableCoreLB: PE [0] #Objects migrating: 95, LBMigrateMsg size: 0.00 MB
+CharmLB> DisableCoreLB: PE [0] strategy finished at 17.549598 duration 0.001841 s
+
+-----------Setting QD for AtSyncCharmLB> DisableCoreLB: PE [0] step 0 finished at 17.586262 duration 0.043715 s
+
+[11] Time per iteration: 1.738209 17.532722 stamp 17.965698
+[12] Time per iteration: 1.478159 19.010881 stamp 19.517429
+[13] Time per iteration: 1.555629 20.566511 stamp 21.024260
+[14] Time per iteration: 1.512735 22.079246 stamp 22.611703
+[15] Time per iteration: 1.582299 23.661545 stamp 24.026174
+
+[16] avg_sum (0.000000) += 1.417216[16] Time per iteration: 1.417216 25.078761 stamp 25.631761
+
+[17] avg_sum (1.417216) += 1.601794[17] Time per iteration: 1.601794 26.680556 stamp 27.135216
+
+[18] avg_sum (3.019011) += 1.507164
+Entered time for wpn 24 = 1.508725 (1.508725)s
+0.226679/1.735404 = 0.130621, skip_over = 0, dir=go_lowernxt = 2
+Setting active pes = 16[18] Time per iteration: 1.507164 28.187720 stamp 28.614828
+[19] Time per iteration: 1.477290 29.665009 stamp 30.072840
+[20] Time per iteration: 1.462610 31.127619 stamp 31.533287
+
+Tried notifying from PE-14
+CharmLB> DisableCoreLB: PE [0] step 1 starting at 32.641427 Memory: 452.928848 MB
+CharmLB> DisableCoreLB: PE [0] strategy starting at 32.672464
+
+ newPpn = 16
+Proc 0 load  = 0.008244
+Proc 1 load  = 0.001997
+Proc 2 load  = 0.006101
+Proc 3 load  = 0.009408
+Proc 4 load  = 0.001973
+Proc 5 load  = 0.006307
+Proc 6 load  = 0.009188
+Proc 7 load  = 0.001993
+Proc 8 load  = 0.002089
+Proc 9 load  = 0.001535
+Proc 10 load  = 0.001782
+Proc 11 load  = 0.001712
+Proc 12 load  = 0.008293
+Proc 13 load  = 0.006466
+Proc 14 load  = 0.032016
+Proc 15 load  = 0.001960[0] 92 objects migrating.
+CharmLB> DisableCoreLB: PE [0] Memory: LBManager: 37 KB CentralLB: 57 KB
+CharmLB> DisableCoreLB: PE [0] #Objects migrating: 92, LBMigrateMsg size: 0.00 MB
+CharmLB> DisableCoreLB: PE [0] strategy finished at 32.673197 duration 0.000733 s
+
+-----------Setting QD for AtSyncCharmLB> DisableCoreLB: PE [0] step 1 finished at 32.716735 duration 0.075308 s
+
+[21] Time per iteration: 1.456540 32.584159 stamp 32.932773
+[22] Time per iteration: 1.357709 33.941867 stamp 34.152308
+[23] Time per iteration: 1.201412 35.143279 stamp 35.363455
+[24] Time per iteration: 1.242694 36.385973 stamp 36.594306
+[25] Time per iteration: 1.199642 37.585615 stamp 37.800834
+
+[26] avg_sum (0.000000) += 1.209991[26] Time per iteration: 1.209991 38.795606 stamp 39.010947
+
+[27] avg_sum (1.209991) += 1.204614[27] Time per iteration: 1.204614 40.000220 stamp 40.217456
+
+[28] avg_sum (2.414605) += 1.218806
+Entered time for wpn 16 = 1.211137 (1.211137)s
+0.297588/1.508725 = 0.197245, skip_over = 1, dir=go_lowernxt = 4
+Setting active pes = 8[28] Time per iteration: 1.218806 41.219026 stamp 41.437249
+[29] Time per iteration: 1.195585 42.414611 stamp 42.644364
+[30] Time per iteration: 1.241133 43.655744 stamp 43.865627
+
+Tried notifying from PE-9
+CharmLB> DisableCoreLB: PE [0] step 2 starting at 44.857061 Memory: 453.008911 MB
+CharmLB> DisableCoreLB: PE [0] strategy starting at 44.935936
+
+ newPpn = 8
+Proc 0 load  = 0.008989
+Proc 1 load  = 0.003118
+Proc 2 load  = 0.001809
+Proc 3 load  = 0.008811
+Proc 4 load  = 0.006526
+Proc 5 load  = 0.001508
+Proc 6 load  = 0.002257
+Proc 7 load  = 0.001802[0] 90 objects migrating.
+CharmLB> DisableCoreLB: PE [0] Memory: LBManager: 37 KB CentralLB: 57 KB
+CharmLB> DisableCoreLB: PE [0] #Objects migrating: 90, LBMigrateMsg size: 0.00 MB
+CharmLB> DisableCoreLB: PE [0] strategy finished at 44.936646 duration 0.000710 s
+
+-----------Setting QD for AtSyncCharmLB> DisableCoreLB: PE [0] step 2 finished at 44.993902 duration 0.136842 s
+
+[31] Time per iteration: 1.194024 44.849768 stamp 45.116255
+[32] Time per iteration: 1.466641 46.316410 stamp 46.529040
+[33] Time per iteration: 1.367535 47.683945 stamp 47.835644
+[34] Time per iteration: 1.351527 49.035471 stamp 49.223917
+[35] Time per iteration: 1.337236 50.372707 stamp 50.540938
+
+[36] avg_sum (0.000000) += 1.371205[36] Time per iteration: 1.371205 51.743912 stamp 51.945987
+
+[37] avg_sum (1.371205) += 1.348673[37] Time per iteration: 1.348673 53.092585 stamp 53.263148
+
+[38] avg_sum (2.719878) += 1.367330
+Entered time for wpn 8 = 1.362403 (1.362403)s
+0.151266/1.211137 = 0.124896, skip_over = 0, dir=go_lowernxt = 3
+Setting active pes = 12[38] Time per iteration: 1.367330 54.459915 stamp 54.666023
+[39] Time per iteration: 1.352918 55.812833 stamp 55.980639
+[40] Time per iteration: 1.368871 57.181705 stamp 57.378117
+
+Tried notifying from PE-3
+CharmLB> DisableCoreLB: PE [0] step 3 starting at 58.580403 Memory: 453.074966 MB
+CharmLB> DisableCoreLB: PE [0] strategy starting at 58.662107
+
+ newPpn = 12
+Proc 0 load  = 0.012477
+Proc 1 load  = 0.006404
+Proc 2 load  = 0.003472
+Proc 3 load  = 0.009258
+Proc 4 load  = 0.007256
+Proc 5 load  = 0.012545
+Proc 6 load  = 0.010499
+Proc 7 load  = 0.009652
+Proc 8 load  = 13.694708
+Proc 9 load  = 13.694233
+Proc 10 load  = 13.692225
+Proc 11 load  = 13.694433[0] 88 objects migrating.
+CharmLB> DisableCoreLB: PE [0] Memory: LBManager: 38 KB CentralLB: 56 KB
+CharmLB> DisableCoreLB: PE [0] #Objects migrating: 88, LBMigrateMsg size: 0.00 MB
+CharmLB> DisableCoreLB: PE [0] strategy finished at 58.662957 duration 0.000851 s
+
+-----------Setting QD for AtSyncCharmLB> DisableCoreLB: PE [0] step 3 finished at 58.702934 duration 0.122532 s
+
+[41] Time per iteration: 1.349521 58.531225 stamp 58.842957
+[42] Time per iteration: 1.180969 59.712194 stamp 59.943590
+[43] Time per iteration: 1.171497 60.883691 stamp 61.003677
+[44] Time per iteration: 1.022735 61.906426 stamp 62.121316
+[45] Time per iteration: 1.147952 63.054378 stamp 63.191873
+
+[46] avg_sum (0.000000) += 1.051265[46] Time per iteration: 1.051265 64.105643 stamp 64.311112
+
+[47] avg_sum (1.051265) += 1.143085[47] Time per iteration: 1.143085 65.248729 stamp 65.379535
+
+[48] avg_sum (2.194351) += 1.011667
+Entered time for wpn 12 = 1.068673 (1.068673)s
+0.293730/1.362403 = 0.215597, skip_over = 1, dir=go_lowernxt = -1
+Setting active pes = 12[48] Time per iteration: 1.011667 66.260396 stamp 66.492519
+[49] Time per iteration: 1.182691 67.443087 stamp 67.570361
+[50] Time per iteration: 1.030129 68.473216 stamp 68.687464
+
+Tried notifying from PE-11
+CharmLB> DisableCoreLB: PE [0] step 4 starting at 69.640071 Memory: 453.130356 MB
+CharmLB> DisableCoreLB: PE [0] strategy starting at 69.700254
+
+ newPpn = 12
+Proc 0 load  = 0.002485
+Proc 1 load  = 0.001820
+Proc 2 load  = 0.001751
+Proc 3 load  = 0.001660
+Proc 4 load  = 0.001599
+Proc 5 load  = 0.001614
+Proc 6 load  = 0.001771
+Proc 7 load  = 0.001870
+Proc 8 load  = 0.005167
+Proc 9 load  = 0.004650
+Proc 10 load  = 0.005056
+Proc 11 load  = 0.006322[0] 89 objects migrating.
+CharmLB> DisableCoreLB: PE [0] Memory: LBManager: 38 KB CentralLB: 57 KB
+CharmLB> DisableCoreLB: PE [0] #Objects migrating: 89, LBMigrateMsg size: 0.00 MB
+CharmLB> DisableCoreLB: PE [0] strategy finished at 69.701435 duration 0.001180 s
+
+-----------Setting QD for AtSyncCharmLB> DisableCoreLB: PE [0] step 4 finished at 69.733376 duration 0.093306 s
+
+[51] Time per iteration: 1.166716 69.639932 stamp 69.856210
+[52] Time per iteration: 1.119598 70.759530 stamp 70.954410
+[53] Time per iteration: 1.139332 71.898862 stamp 72.018758
+[54] Time per iteration: 1.019721 72.918584 stamp 73.125222
+[55] Time per iteration: 1.162073 74.080656 stamp 74.208254
+
+[56] avg_sum (0.000000) += 1.013107[56] Time per iteration: 1.013107 75.093763 stamp 75.311363
+
+[57] avg_sum (1.013107) += 1.150037[57] Time per iteration: 1.150037 76.243800 stamp 76.369326
+
+[58] avg_sum (2.163143) += 1.027337
+Entered time for wpn 12 = 1.063493 (1.063493)s
+0.005179/1.068673 = 0.004846, skip_over = 0, dir=go_lowernxt = -1
+Setting active pes = 12[58] Time per iteration: 1.027337 77.271136 stamp 77.474168
+[59] Time per iteration: 1.141463 78.412599 stamp 78.553785
+[60] Time per iteration: 1.038339 79.450938 stamp 79.635585
+[61] Time per iteration: 1.121132 80.572070 stamp 80.692769
+[62] Time per iteration: 1.019209 81.591279 stamp 81.800585
+[63] Time per iteration: 1.152267 82.743546 stamp 82.863384
+[64] Time per iteration: 1.013196 83.756742 stamp 83.968306
+[65] Time per iteration: 1.154678 84.911419 stamp 85.055736
+
+[66] avg_sum (0.000000) += 1.060227[66] Time per iteration: 1.060227 85.971646 stamp 86.140224
+
+[67] avg_sum (1.060227) += 1.102345[67] Time per iteration: 1.102345 87.073991 stamp 87.214745
+
+[68] avg_sum (2.162572) += 1.027211[68] Time per iteration: 1.027211 88.101203 stamp 88.306714
+[69] Time per iteration: 1.146882 89.248085 stamp 89.388248
+[70] Time per iteration: 1.027554 90.275639 stamp 90.467284
+[71] Time per iteration: 1.141644 91.417283 stamp 91.535839
+[72] Time per iteration: 1.025560 92.442843 stamp 92.651764
+[73] Time per iteration: 1.134325 93.577168 stamp 93.697912
+[74] Time per iteration: 1.026957 94.604125 stamp 94.815484
+[75] Time per iteration: 1.154987 95.759112 stamp 95.877230
+
+[76] avg_sum (3.189783) += 1.019750[76] Time per iteration: 1.019750 96.778862 stamp 96.992839
+
+[77] avg_sum (4.209533) += 1.148083[77] Time per iteration: 1.148083 97.926945 stamp 98.047344
+
+[78] avg_sum (5.357616) += 1.029698[78] Time per iteration: 1.029698 98.956642 stamp 99.145758
+[79] Time per iteration: 1.137193 100.093835 stamp 100.213656
+[80] Time per iteration: 1.018882 101.112717 stamp 101.326341
+[81] Time per iteration: 1.161115 102.273832 stamp 102.393004
+[82] Time per iteration: 1.030324 103.304156 stamp 103.507634
+[83] Time per iteration: 1.143382 104.447538 stamp 104.566657
+[84] Time per iteration: 1.029200 105.476738 stamp 105.684953
+[85] Time per iteration: 1.134273 106.611011 stamp 106.732870
+
+[86] avg_sum (6.387314) += 1.029154[86] Time per iteration: 1.029154 107.640165 stamp 107.848446
+
+[87] avg_sum (7.416467) += 1.131394[87] Time per iteration: 1.131394 108.771559 stamp 108.893747
+
+[88] avg_sum (8.547861) += 1.019870[88] Time per iteration: 1.019870 109.791429 stamp 110.004880
+[89] Time per iteration: 1.141470 110.932899 stamp 111.080853
+[90] Time per iteration: 1.031539 111.964437 stamp 112.158492
+[91] Time per iteration: 1.130638 113.095075 stamp 113.216767
+[92] Time per iteration: 1.037877 114.132952 stamp 114.316578
+[93] Time per iteration: 1.141926 115.274877 stamp 115.416223
+[94] Time per iteration: 1.054603 116.329480 stamp 116.502519
+[95] Time per iteration: 1.103658 117.433138 stamp 117.581801
+
+[96] avg_sum (9.567731) += 1.031049[96] Time per iteration: 1.031049 118.464188 stamp 118.661057
+
+[97] avg_sum (10.598780) += 1.147504[97] Time per iteration: 1.147504 119.611692 stamp 119.732064
+
+[98] avg_sum (11.746284) += 1.027443[98] Time per iteration: 1.027443 120.639134 stamp 120.826386
+[99] Time per iteration: 1.145795 121.784929 stamp 121.904460
+[100] Time per iteration: 1.025287 122.810217 stamp 123.003217
+[101] Time per iteration: 1.150703 123.960920 stamp 124.087792
+[102] Time per iteration: 1.061534 125.022454 stamp 125.225973
+[103] Time per iteration: 1.180067 126.202521 stamp 126.349054
+[104] Time per iteration: 1.072023 127.274544 stamp 127.469859
+[105] Time per iteration: 1.167712 128.442256 stamp 128.589142
+
+[106] avg_sum (12.773727) += 1.067364[106] Time per iteration: 1.067364 129.509620 stamp 129.714774
+
+[107] avg_sum (13.841091) += 1.180458[107] Time per iteration: 1.180458 130.690079 stamp 130.835332
+
+[108] avg_sum (15.021549) += 1.062449[108] Time per iteration: 1.062449 131.752528 stamp 131.963319
+[109] Time per iteration: 1.175495 132.928023 stamp 133.074478
+[110] Time per iteration: 1.061321 133.989344 stamp 134.196374
+[111] Time per iteration: 1.172709 135.162053 stamp 135.289346
+[112] Time per iteration: 1.062827 136.224879 stamp 136.429115
+[113] Time per iteration: 1.163211 137.388090 stamp 137.527410
+[114] Time per iteration: 1.073015 138.461106 stamp 138.662328
+[115] Time per iteration: 1.158863 139.619968 stamp 139.754010
+
+[116] avg_sum (16.083998) += 1.077107[116] Time per iteration: 1.077107 140.697076 stamp 140.901959
+
+[117] avg_sum (17.161106) += 1.176003[117] Time per iteration: 1.176003 141.873078 stamp 142.000421
+
+[118] avg_sum (18.337108) += 1.057548[118] Time per iteration: 1.057548 142.930626 stamp 143.141287
+[119] Time per iteration: 1.180426 144.111052 stamp 144.257624
+[120] Time per iteration: 1.062498 145.173551 stamp 145.382693
+[121] Time per iteration: 1.166366 146.339917 stamp 146.477823
+[122] Time per iteration: 1.073721 147.413638 stamp 147.622130
+[123] Time per iteration: 1.179807 148.593445 stamp 148.742797
+[124] Time per iteration: 1.073964 149.667410 stamp 149.862245
+[125] Time per iteration: 1.152434 150.819844 stamp 150.976988
+
+[126] avg_sum (19.394656) += 1.077527[126] Time per iteration: 1.077527 151.897371 stamp 152.110773
+
+[127] avg_sum (20.472183) += 1.172870[127] Time per iteration: 1.172870 153.070241 stamp 153.195127
+
+[128] avg_sum (21.645054) += 1.061890[128] Time per iteration: 1.061890 154.132132 stamp 154.339872
+[129] Time per iteration: 1.174054 155.306185 stamp 155.431754
+[130] Time per iteration: 1.065842 156.372027 stamp 156.582787
+[131] Time per iteration: 1.181113 157.553141 stamp 157.699741
+[132] Time per iteration: 1.066571 158.619712 stamp 158.824100
+[133] Time per iteration: 1.181298 159.801010 stamp 159.926332
+[134] Time per iteration: 1.069514 160.870523 stamp 161.080689
+[135] Time per iteration: 1.173535 162.044058 stamp 162.168460
+
+[136] avg_sum (22.706944) += 1.052163[136] Time per iteration: 1.052163 163.096221 stamp 163.307664
+
+[137] avg_sum (23.759107) += 1.171277[137] Time per iteration: 1.171277 164.267498 stamp 164.406498
+
+[138] avg_sum (24.930384) += 1.080580[138] Time per iteration: 1.080580 165.348079 stamp 165.547414
+[139] Time per iteration: 1.168346 166.516424 stamp 166.646997
+[140] Time per iteration: 1.061707 167.578131 stamp 167.806400
+[141] Time per iteration: 1.197284 168.775415 stamp 168.899746
+[142] Time per iteration: 1.065043 169.840458 stamp 170.046262
+[143] Time per iteration: 1.179172 171.019630 stamp 171.145044
+[144] Time per iteration: 1.060298 172.079928 stamp 172.293085
+[145] Time per iteration: 1.180161 173.260090 stamp 173.405767
+
+[146] avg_sum (26.010964) += 1.070113[146] Time per iteration: 1.070113 174.330203 stamp 174.529573
+
+[147] avg_sum (27.081077) += 1.156505[147] Time per iteration: 1.156505 175.486707 stamp 175.640049
+
+[148] avg_sum (28.237582) += 1.076994[148] Time per iteration: 1.076994 176.563701 stamp 176.766562
+[149] Time per iteration: 1.180751 177.744452 stamp 177.889490
+[150] Time per iteration: 1.067934 178.812385 stamp 179.010277
+[151] Time per iteration: 1.178137 179.990522 stamp 180.136496
+[152] Time per iteration: 1.072982 181.063504 stamp 181.259571
+[153] Time per iteration: 1.156214 182.219718 stamp 182.363333
+[154] Time per iteration: 1.050128 183.269846 stamp 183.479075
+[155] Time per iteration: 1.159611 184.429457 stamp 184.572752
+
+[156] avg_sum (29.314576) += 1.064211[156] Time per iteration: 1.064211 185.493668 stamp 185.682506
+
+[157] avg_sum (30.378787) += 1.157533[157] Time per iteration: 1.157533 186.651201 stamp 186.793700
+
+[158] avg_sum (31.536320) += 1.062013[158] Time per iteration: 1.062013 187.713215 stamp 187.905720
+[159] Time per iteration: 1.166736 188.879950 stamp 189.001507
+[160] Time per iteration: 1.045961 189.925912 stamp 190.129366
+[161] Time per iteration: 1.166550 191.092462 stamp 191.235413
+[162] Time per iteration: 1.043185 192.135647 stamp 192.344609
+[163] Time per iteration: 1.166042 193.301689 stamp 193.444774
+[164] Time per iteration: 1.046841 194.348530 stamp 194.543912
+[165] Time per iteration: 1.170528 195.519058 stamp 195.640340
+
+[166] avg_sum (32.598334) += 1.055343[166] Time per iteration: 1.055343 196.574401 stamp 196.773979
+
+[167] avg_sum (33.653676) += 1.169197[167] Time per iteration: 1.169197 197.743598 stamp 197.887095
+
+[168] avg_sum (34.822873) += 1.047206[168] Time per iteration: 1.047206 198.790803 stamp 199.003781
+[169] Time per iteration: 1.173172 199.963975 stamp 200.086683
+[170] Time per iteration: 1.045390 201.009365 stamp 201.219008
+[171] Time per iteration: 1.184958 202.194324 stamp 202.317481
+[172] Time per iteration: 1.054687 203.249011 stamp 203.461699
+[173] Time per iteration: 1.172723 204.421733 stamp 204.544744
+[174] Time per iteration: 1.067875 205.489608 stamp 205.666907
+[175] Time per iteration: 1.142400 206.632008 stamp 206.777648
+
+[176] avg_sum (35.870078) += 1.086186[176] Time per iteration: 1.086186 207.718195 stamp 207.877900
+
+[177] avg_sum (36.956265) += 1.139456[177] Time per iteration: 1.139456 208.857650 stamp 208.978288
+
+[178] avg_sum (38.095720) += 1.035565[178] Time per iteration: 1.035565 209.893215 stamp 210.123962
+[179] Time per iteration: 1.201711 211.094926 stamp 211.216377
+[180] Time per iteration: 1.051925 212.146852 stamp 212.345867
+[181] Time per iteration: 1.171166 213.318018 stamp 213.454127
+[182] Time per iteration: 1.054675 214.372693 stamp 214.567616
+[183] Time per iteration: 1.160908 215.533601 stamp 215.669167
+[184] Time per iteration: 1.072187 216.605788 stamp 216.787521
+[185] Time per iteration: 1.135031 217.740820 stamp 217.869448
+
+[186] avg_sum (39.131285) += 1.056304[186] Time per iteration: 1.056304 218.797123 stamp 218.972336
+
+[187] avg_sum (40.187589) += 1.133195[187] Time per iteration: 1.133195 219.930318 stamp 220.073200
+
+[188] avg_sum (41.320784) += 1.065707[188] Time per iteration: 1.065707 220.996025 stamp 221.161461
+[189] Time per iteration: 1.110964 222.106989 stamp 222.236465
+[190] Time per iteration: 1.051186 223.158174 stamp 223.344284
+[191] Time per iteration: 1.142848 224.301023 stamp 224.433562
+[192] Time per iteration: 1.041892 225.342915 stamp 225.537059
+[193] Time per iteration: 1.136323 226.479237 stamp 226.633426
+[194] Time per iteration: 1.084475 227.563713 stamp 227.753475
+[195] Time per iteration: 1.147488 228.711201 stamp 228.846081
+
+[196] avg_sum (42.386490) += 1.056121[196] Time per iteration: 1.056121 229.767322 stamp 229.949657
+
+[197] avg_sum (43.442611) += 1.136508[197] Time per iteration: 1.136508 230.903830 stamp 231.053186
+
+[198] avg_sum (44.579120) += 1.087902[198] Time per iteration: 1.087902 231.991733 stamp 232.159313
+[199] Time per iteration: 1.120401 233.112134 stamp 233.241793
+[200] Time per iteration: 1.055816 234.167950 stamp 234.344757
+[201] Time per iteration: 1.125463 235.293412 stamp 235.424819
+[202] Time per iteration: 1.046006 236.339419 stamp 236.522673
+[203] Time per iteration: 1.129733 237.469151 stamp 237.586146
+[204] Time per iteration: 1.027657 238.496809 stamp 238.699238
+[205] Time per iteration: 1.147595 239.644404 stamp 239.779168
+
+[206] avg_sum (45.667022) += 1.056969[206] Time per iteration: 1.056969 240.701373 stamp 240.874559
+
+[207] avg_sum (46.723991) += 1.117460[207] Time per iteration: 1.117460 241.818833 stamp 241.960807
+
+[208] avg_sum (47.841451) += 1.049891[208] Time per iteration: 1.049891 242.868724 stamp 243.042998
+[209] Time per iteration: 1.114697 243.983421 stamp 244.109406
+[210] Time per iteration: 1.053867 245.037288 stamp 245.220777
+[211] Time per iteration: 1.122525 246.159813 stamp 246.294378
+[212] Time per iteration: 1.064168 247.223980 stamp 247.398241
+[213] Time per iteration: 1.112058 248.336038 stamp 248.454358
+[214] Time per iteration: 1.046737 249.382775 stamp 249.557893
+[215] Time per iteration: 1.101386 250.484160 stamp 250.620790
+
+[216] avg_sum (48.891342) += 1.073818[216] Time per iteration: 1.073818 251.557979 stamp 251.742264
+
+[217] avg_sum (49.965160) += 1.120442[217] Time per iteration: 1.120442 252.678421 stamp 252.797368
+
+[218] avg_sum (51.085602) += 1.057514[218] Time per iteration: 1.057514 253.735935 stamp 253.908643
+[219] Time per iteration: 1.110022 254.845957 stamp 254.967320
+[220] Time per iteration: 1.055693 255.901650 stamp 256.081050
+[221] Time per iteration: 1.120336 257.021986 stamp 257.151292
+[222] Time per iteration: 1.056638 258.078624 stamp 258.284016
+[223] Time per iteration: 1.145954 259.224578 stamp 259.341460
+[224] Time per iteration: 1.049054 260.273632 stamp 260.460014
+[225] Time per iteration: 1.117923 261.391555 stamp 261.510411
+
+[226] avg_sum (52.143116) += 1.048773[226] Time per iteration: 1.048773 262.440328 stamp 262.631051
+
+[227] avg_sum (53.191889) += 1.128081[227] Time per iteration: 1.128081 263.568408 stamp 263.686074
+
+[228] avg_sum (54.319969) += 1.046786[228] Time per iteration: 1.046786 264.615194 stamp 264.804494
+[229] Time per iteration: 1.118282 265.733476 stamp 265.848045
+[230] Time per iteration: 1.048151 266.781627 stamp 266.967077
+[231] Time per iteration: 1.112822 267.894449 stamp 268.009823
+[232] Time per iteration: 1.047621 268.942070 stamp 269.138063
+[233] Time per iteration: 1.136045 270.078114 stamp 270.194686
+[234] Time per iteration: 1.049719 271.127834 stamp 271.313189
+[235] Time per iteration: 1.109589 272.237422 stamp 272.365577
+
+[236] avg_sum (55.366755) += 1.063050[236] Time per iteration: 1.063050 273.300472 stamp 273.490302
+
+[237] avg_sum (56.429805) += 1.130538[237] Time per iteration: 1.130538 274.431010 stamp 274.544178
+
+[238] avg_sum (57.560343) += 1.033898[238] Time per iteration: 1.033898 275.464908 stamp 275.657752
+[239] Time per iteration: 1.117615 276.582523 stamp 276.718542
+[240] Time per iteration: 1.056065 277.638588 stamp 277.828380
+[241] Time per iteration: 1.119951 278.758539 stamp 278.878314
+[242] Time per iteration: 1.050768 279.809307 stamp 279.989139
+[243] Time per iteration: 1.100974 280.910282 stamp 281.032714
+[244] Time per iteration: 1.058772 281.969053 stamp 282.151042
+[245] Time per iteration: 1.116245 283.085298 stamp 283.210513
+
+[246] avg_sum (58.594241) += 1.060999[246] Time per iteration: 1.060999 284.146297 stamp 284.331622
+
+[247] avg_sum (59.655240) += 1.121791[247] Time per iteration: 1.121791 285.268089 stamp 285.386245
+
+[248] avg_sum (60.777031) += 1.046379[248] Time per iteration: 1.046379 286.314468 stamp 286.508214
+[249] Time per iteration: 1.180160 287.494628 stamp 287.607554
+[250] Time per iteration: 1.042354 288.536982 stamp 288.725794
+[251] Time per iteration: 1.127697 289.664679 stamp 289.795673
+[252] Time per iteration: 1.036951 290.701631 stamp 290.893176
+[253] Time per iteration: 1.134448 291.836079 stamp 291.968419
+[254] Time per iteration: 1.050778 292.886857 stamp 293.072093
+[255] Time per iteration: 1.118148 294.005005 stamp 294.120765
+
+[256] avg_sum (61.823411) += 1.039766[256] Time per iteration: 1.039766 295.044771 stamp 295.235886
+
+[257] avg_sum (62.863176) += 1.118855[257] Time per iteration: 1.118855 296.163626 stamp 296.299641
+
+[258] avg_sum (63.982031) += 1.056572[258] Time per iteration: 1.056572 297.220197 stamp 297.401275
+[259] Time per iteration: 1.115955 298.336153 stamp 298.452191
+[260] Time per iteration: 1.048377 299.384529 stamp 299.561762
+[261] Time per iteration: 1.109697 300.494226 stamp 300.611572
+[262] Time per iteration: 1.047468 301.541694 stamp 301.724320
+[263] Time per iteration: 1.105521 302.647216 stamp 302.776193
+[264] Time per iteration: 1.070297 303.717513 stamp 303.889744
+[265] Time per iteration: 1.101620 304.819133 stamp 304.945696
+
+[266] avg_sum (65.038603) += 1.063417[266] Time per iteration: 1.063417 305.882550 stamp 306.058675
+
+[267] avg_sum (66.102020) += 1.100470[267] Time per iteration: 1.100470 306.983020 stamp 307.106999
+
+[268] avg_sum (67.202490) += 1.048351[268] Time per iteration: 1.048351 308.031371 stamp 308.223779
+[269] Time per iteration: 1.116549 309.147920 stamp 309.266855
+[270] Time per iteration: 1.049367 310.197287 stamp 310.378753
+[271] Time per iteration: 1.103338 311.300625 stamp 311.422884
+[272] Time per iteration: 1.050289 312.350914 stamp 312.542900
+[273] Time per iteration: 1.124857 313.475771 stamp 313.590363
+[274] Time per iteration: 1.046599 314.522370 stamp 314.704324
+[275] Time per iteration: 1.118132 315.640502 stamp 315.773097
+
+[276] avg_sum (68.250841) += 1.049587[276] Time per iteration: 1.049587 316.690088 stamp 316.871190
+
+[277] avg_sum (69.300428) += 1.122124[277] Time per iteration: 1.122124 317.812212 stamp 317.925150
+
+[278] avg_sum (70.422551) += 1.043100[278] Time per iteration: 1.043100 318.855312 stamp 319.041479
+[279] Time per iteration: 1.114175 319.969487 stamp 320.086549
+[280] Time per iteration: 1.072250 321.041737 stamp 321.206579
+[281] Time per iteration: 1.095512 322.137250 stamp 322.252212
+[282] Time per iteration: 1.047994 323.185243 stamp 323.368473
+[283] Time per iteration: 1.114510 324.299753 stamp 324.432019
+[284] Time per iteration: 1.059018 325.358771 stamp 325.535236
+[285] Time per iteration: 1.119742 326.478513 stamp 326.600402
+
+[286] avg_sum (71.465652) += 1.061271[286] Time per iteration: 1.061271 327.539784 stamp 327.710115
+
+[287] avg_sum (72.526922) += 1.099334[287] Time per iteration: 1.099334 328.639118 stamp 328.759737
+
+[288] avg_sum (73.626257) += 1.032752[288] Time per iteration: 1.032752 329.671870 stamp 329.863367
+[289] Time per iteration: 1.113157 330.785027 stamp 330.912186
+[290] Time per iteration: 1.060735 331.845762 stamp 332.028427
+[291] Time per iteration: 1.119718 332.965480 stamp 333.080625
+[292] Time per iteration: 1.041092 334.006572 stamp 334.198713
+[293] Time per iteration: 1.118195 335.124766 stamp 335.243200
+[294] Time per iteration: 1.047597 336.172364 stamp 336.355392
+[295] Time per iteration: 1.111365 337.283729 stamp 337.412149
+
+[296] avg_sum (74.659009) += 1.062002[296] Time per iteration: 1.062002 338.345731 stamp 338.534915
+
+[297] avg_sum (75.721011) += 1.132827[297] Time per iteration: 1.132827 339.478558 stamp 339.589085
+
+[298] avg_sum (76.853838) += 1.042213[298] Time per iteration: 1.042213 340.520771 stamp 340.719308
+[299] Time per iteration: 1.139011 341.659783 stamp 341.789387
+[300] Time per iteration: 1.050859 342.710642 stamp 342.915004
+[2] Time per iteration: 0.000000 0.000000
+[3] Time per iteration: 0.000000 0.000000
+[4] Time per iteration: 0.000000 0.000000
+[5] Time per iteration: 0.000000 0.000000
+[6] Time per iteration: 0.000000 0.000000
+[7] Time per iteration: 0.000000 0.000000
+[8] Time per iteration: 0.000000 0.000000
+[9] Time per iteration: 0.000000 0.000000
+[10] Time per iteration: 0.000000 0.000000
+[11] Time per iteration: 0.000000 0.000000
+[12] Time per iteration: 0.000000 0.000000
+[13] Time per iteration: 0.000000 0.000000
+[14] Time per iteration: 0.000000 0.000000
+[15] Time per iteration: 0.000000 0.000000
+[16] Time per iteration: 0.000000 0.000000
+[17] Time per iteration: 0.000000 0.000000
+[18] Time per iteration: 0.000000 0.000000
+[19] Time per iteration: 0.000000 0.000000
+[20] Time per iteration: 0.000000 0.000000
+[21] Time per iteration: 0.000000 0.000000
+[22] Time per iteration: 0.000000 0.000000
+[23] Time per iteration: 0.000000 0.000000
+[24] Time per iteration: 0.000000 0.000000
+[25] Time per iteration: 0.000000 0.000000
+[26] Time per iteration: 0.000000 0.000000
+[27] Time per iteration: 0.000000 0.000000
+[28] Time per iteration: 0.000000 0.000000
+[29] Time per iteration: 0.000000 0.000000
+[30] Time per iteration: 0.000000 0.000000
+[31] Time per iteration: 0.000000 0.000000
+[32] Time per iteration: 0.000000 0.000000
+[33] Time per iteration: 0.000000 0.000000
+[34] Time per iteration: 0.000000 0.000000
+[35] Time per iteration: 0.000000 0.000000
+[36] Time per iteration: 0.000000 0.000000
+[37] Time per iteration: 0.000000 0.000000
+[38] Time per iteration: 0.000000 0.000000
+[39] Time per iteration: 0.000000 0.000000
+[40] Time per iteration: 0.000000 0.000000
+[41] Time per iteration: 0.000000 0.000000
+[42] Time per iteration: 0.000000 0.000000
+[43] Time per iteration: 0.000000 0.000000
+[44] Time per iteration: 0.000000 0.000000
+[45] Time per iteration: 0.000000 0.000000
+[46] Time per iteration: 0.000000 0.000000
+[47] Time per iteration: 0.000000 0.000000
+[48] Time per iteration: 0.000000 0.000000
+[49] Time per iteration: 0.000000 0.000000
+[50] Time per iteration: 0.000000 0.000000
+[51] Time per iteration: 0.000000 0.000000
+[52] Time per iteration: 0.000000 0.000000
+[53] Time per iteration: 0.000000 0.000000
+[54] Time per iteration: 0.000000 0.000000
+[55] Time per iteration: 0.000000 0.000000
+[56] Time per iteration: 0.000000 0.000000
+[57] Time per iteration: 0.000000 0.000000
+[58] Time per iteration: 0.000000 0.000000
+[59] Time per iteration: 0.000000 0.000000
+[60] Time per iteration: 0.000000 0.000000
+[61] Time per iteration: 0.000000 0.000000
+[62] Time per iteration: 0.000000 0.000000
+[63] Time per iteration: 0.000000 0.000000
+[64] Time per iteration: 0.000000 0.000000
+[65] Time per iteration: 0.000000 0.000000
+[66] Time per iteration: 0.000000 0.000000
+[67] Time per iteration: 0.000000 0.000000
+[68] Time per iteration: 0.000000 0.000000
+[69] Time per iteration: 0.000000 0.000000
+[70] Time per iteration: 0.000000 0.000000
+[71] Time per iteration: 0.000000 0.000000
+[72] Time per iteration: 0.000000 0.000000
+[73] Time per iteration: 0.000000 0.000000
+[74] Time per iteration: 0.000000 0.000000
+[75] Time per iteration: 0.000000 0.000000
+[76] Time per iteration: 0.000000 0.000000
+[77] Time per iteration: 0.000000 0.000000
+[78] Time per iteration: 0.000000 0.000000
+[79] Time per iteration: 0.000000 0.000000
+[80] Time per iteration: 0.000000 0.000000
+[81] Time per iteration: 0.000000 0.000000
+[82] Time per iteration: 0.000000 0.000000
+[83] Time per iteration: 0.000000 0.000000
+[84] Time per iteration: 0.000000 0.000000
+[85] Time per iteration: 0.000000 0.000000
+[86] Time per iteration: 0.000000 0.000000
+[87] Time per iteration: 0.000000 0.000000
+[88] Time per iteration: 0.000000 0.000000
+[89] Time per iteration: 0.000000 0.000000
+[90] Time per iteration: 0.000000 0.000000
+[91] Time per iteration: 0.000000 0.000000
+[92] Time per iteration: 0.000000 0.000000
+[93] Time per iteration: 0.000000 0.000000
+[94] Time per iteration: 0.000000 0.000000
+[95] Time per iteration: 0.000000 0.000000
+[96] Time per iteration: 0.000000 0.000000
+[97] Time per iteration: 0.000000 0.000000
+[98] Time per iteration: 0.000000 0.000000
+[99] Time per iteration: 0.000000 0.000000
+[100] Time per iteration: 0.000000 0.000000
+[101] Time per iteration: 0.000000 0.000000
+[102] Time per iteration: 0.000000 0.000000
+[103] Time per iteration: 0.000000 0.000000
+[104] Time per iteration: 0.000000 0.000000
+[105] Time per iteration: 0.000000 0.000000
+[106] Time per iteration: 0.000000 0.000000
+[107] Time per iteration: 0.000000 0.000000
+[108] Time per iteration: 0.000000 0.000000
+[109] Time per iteration: 0.000000 0.000000
+[110] Time per iteration: 0.000000 0.000000
+[111] Time per iteration: 0.000000 0.000000
+[112] Time per iteration: 0.000000 0.000000
+[113] Time per iteration: 0.000000 0.000000
+[114] Time per iteration: 0.000000 0.000000
+[115] Time per iteration: 0.000000 0.000000
+[116] Time per iteration: 0.000000 0.000000
+[117] Time per iteration: 0.000000 0.000000
+[118] Time per iteration: 0.000000 0.000000
+[119] Time per iteration: 0.000000 0.000000
+[120] Time per iteration: 0.000000 0.000000
+[121] Time per iteration: 0.000000 0.000000
+[122] Time per iteration: 0.000000 0.000000
+[123] Time per iteration: 0.000000 0.000000
+[124] Time per iteration: 0.000000 0.000000
+[125] Time per iteration: 0.000000 0.000000
+[126] Time per iteration: 0.000000 0.000000
+[127] Time per iteration: 0.000000 0.000000
+[128] Time per iteration: 0.000000 0.000000
+[129] Time per iteration: 0.000000 0.000000
+[130] Time per iteration: 0.000000 0.000000
+[131] Time per iteration: 0.000000 0.000000
+[132] Time per iteration: 0.000000 0.000000
+[133] Time per iteration: 0.000000 0.000000
+[134] Time per iteration: 0.000000 0.000000
+[135] Time per iteration: 0.000000 0.000000
+[136] Time per iteration: 0.000000 0.000000
+[137] Time per iteration: 0.000000 0.000000
+[138] Time per iteration: 0.000000 0.000000
+[139] Time per iteration: 0.000000 0.000000
+[140] Time per iteration: 0.000000 0.000000
+[141] Time per iteration: 0.000000 0.000000
+[142] Time per iteration: 0.000000 0.000000
+[143] Time per iteration: 0.000000 0.000000
+[144] Time per iteration: 0.000000 0.000000
+[145] Time per iteration: 0.000000 0.000000
+[146] Time per iteration: 0.000000 0.000000
+[147] Time per iteration: 0.000000 0.000000
+[148] Time per iteration: 0.000000 0.000000
+[149] Time per iteration: 0.000000 0.000000
+[150] Time per iteration: 0.000000 0.000000
+[151] Time per iteration: 0.000000 0.000000
+[152] Time per iteration: 0.000000 0.000000
+[153] Time per iteration: 0.000000 0.000000
+[154] Time per iteration: 0.000000 0.000000
+[155] Time per iteration: 0.000000 0.000000
+[156] Time per iteration: 0.000000 0.000000
+[157] Time per iteration: 0.000000 0.000000
+[158] Time per iteration: 0.000000 0.000000
+[159] Time per iteration: 0.000000 0.000000
+[160] Time per iteration: 0.000000 0.000000
+[161] Time per iteration: 0.000000 0.000000
+[162] Time per iteration: 0.000000 0.000000
+[163] Time per iteration: 0.000000 0.000000
+[164] Time per iteration: 0.000000 0.000000
+[165] Time per iteration: 0.000000 0.000000
+[166] Time per iteration: 0.000000 0.000000
+[167] Time per iteration: 0.000000 0.000000
+[168] Time per iteration: 0.000000 0.000000
+[169] Time per iteration: 0.000000 0.000000
+[170] Time per iteration: 0.000000 0.000000
+[171] Time per iteration: 0.000000 0.000000
+[172] Time per iteration: 0.000000 0.000000
+[173] Time per iteration: 0.000000 0.000000
+[174] Time per iteration: 0.000000 0.000000
+[175] Time per iteration: 0.000000 0.000000
+[176] Time per iteration: 0.000000 0.000000
+[177] Time per iteration: 0.000000 0.000000
+[178] Time per iteration: 0.000000 0.000000
+[179] Time per iteration: 0.000000 0.000000
+[180] Time per iteration: 0.000000 0.000000
+[181] Time per iteration: 0.000000 0.000000
+[182] Time per iteration: 0.000000 0.000000
+[183] Time per iteration: 0.000000 0.000000
+[184] Time per iteration: 0.000000 0.000000
+[185] Time per iteration: 0.000000 0.000000
+[186] Time per iteration: 0.000000 0.000000
+[187] Time per iteration: 0.000000 0.000000
+[188] Time per iteration: 0.000000 0.000000
+[189] Time per iteration: 0.000000 0.000000
+[190] Time per iteration: 0.000000 0.000000
+[191] Time per iteration: 0.000000 0.000000
+[192] Time per iteration: 0.000000 0.000000
+[193] Time per iteration: 0.000000 0.000000
+[194] Time per iteration: 0.000000 0.000000
+[195] Time per iteration: 0.000000 0.000000
+[196] Time per iteration: 0.000000 0.000000
+[197] Time per iteration: 0.000000 0.000000
+[198] Time per iteration: 0.000000 0.000000
+[199] Time per iteration: 0.000000 0.000000
+[200] Time per iteration: 0.000000 0.000000
+[201] Time per iteration: 0.000000 0.000000
+[202] Time per iteration: 0.000000 0.000000
+[203] Time per iteration: 0.000000 0.000000
+[204] Time per iteration: 0.000000 0.000000
+[205] Time per iteration: 0.000000 0.000000
+[206] Time per iteration: 0.000000 0.000000
+[207] Time per iteration: 0.000000 0.000000
+[208] Time per iteration: 0.000000 0.000000
+[209] Time per iteration: 0.000000 0.000000
+[210] Time per iteration: 0.000000 0.000000
+[211] Time per iteration: 0.000000 0.000000
+[212] Time per iteration: 0.000000 0.000000
+[213] Time per iteration: 0.000000 0.000000
+[214] Time per iteration: 0.000000 0.000000
+[215] Time per iteration: 0.000000 0.000000
+[216] Time per iteration: 0.000000 0.000000
+[217] Time per iteration: 0.000000 0.000000
+[218] Time per iteration: 0.000000 0.000000
+[219] Time per iteration: 0.000000 0.000000
+[220] Time per iteration: 0.000000 0.000000
+[221] Time per iteration: 0.000000 0.000000
+[222] Time per iteration: 0.000000 0.000000
+[223] Time per iteration: 0.000000 0.000000
+[224] Time per iteration: 0.000000 0.000000
+[225] Time per iteration: 0.000000 0.000000
+[226] Time per iteration: 0.000000 0.000000
+[227] Time per iteration: 0.000000 0.000000
+[228] Time per iteration: 0.000000 0.000000
+[229] Time per iteration: 0.000000 0.000000
+[230] Time per iteration: 0.000000 0.000000
+[231] Time per iteration: 0.000000 0.000000
+[232] Time per iteration: 0.000000 0.000000
+[233] Time per iteration: 0.000000 0.000000
+[234] Time per iteration: 0.000000 0.000000
+[235] Time per iteration: 0.000000 0.000000
+[236] Time per iteration: 0.000000 0.000000
+[237] Time per iteration: 0.000000 0.000000
+[238] Time per iteration: 0.000000 0.000000
+[239] Time per iteration: 0.000000 0.000000
+[240] Time per iteration: 0.000000 0.000000
+[241] Time per iteration: 0.000000 0.000000
+[242] Time per iteration: 0.000000 0.000000
+[243] Time per iteration: 0.000000 0.000000
+[244] Time per iteration: 0.000000 0.000000
+[245] Time per iteration: 0.000000 0.000000
+[246] Time per iteration: 0.000000 0.000000
+[247] Time per iteration: 0.000000 0.000000
+[248] Time per iteration: 0.000000 0.000000
+[249] Time per iteration: 0.000000 0.000000
+[250] Time per iteration: 0.000000 0.000000
+[251] Time per iteration: 0.000000 0.000000
+[252] Time per iteration: 0.000000 0.000000
+[253] Time per iteration: 0.000000 0.000000
+[254] Time per iteration: 0.000000 0.000000
+[255] Time per iteration: 0.000000 0.000000
+[256] Time per iteration: 0.000000 0.000000
+[257] Time per iteration: 0.000000 0.000000
+[258] Time per iteration: 0.000000 0.000000
+[259] Time per iteration: 0.000000 0.000000
+[260] Time per iteration: 0.000000 0.000000
+[261] Time per iteration: 0.000000 0.000000
+[262] Time per iteration: 0.000000 0.000000
+[263] Time per iteration: 0.000000 0.000000
+[264] Time per iteration: 0.000000 0.000000
+[265] Time per iteration: 0.000000 0.000000
+[266] Time per iteration: 0.000000 0.000000
+[267] Time per iteration: 0.000000 0.000000
+[268] Time per iteration: 0.000000 0.000000
+[269] Time per iteration: 0.000000 0.000000
+[270] Time per iteration: 0.000000 0.000000
+[271] Time per iteration: 0.000000 0.000000
+[272] Time per iteration: 0.000000 0.000000
+[273] Time per iteration: 0.000000 0.000000
+[274] Time per iteration: 0.000000 0.000000
+[275] Time per iteration: 0.000000 0.000000
+[276] Time per iteration: 0.000000 0.000000
+[277] Time per iteration: 0.000000 0.000000
+[278] Time per iteration: 0.000000 0.000000
+[279] Time per iteration: 0.000000 0.000000
+[280] Time per iteration: 0.000000 0.000000
+[281] Time per iteration: 0.000000 0.000000
+[282] Time per iteration: 0.000000 0.000000
+[283] Time per iteration: 0.000000 0.000000
+[284] Time per iteration: 0.000000 0.000000
+[285] Time per iteration: 0.000000 0.000000
+[286] Time per iteration: 0.000000 0.000000
+[287] Time per iteration: 0.000000 0.000000
+[288] Time per iteration: 0.000000 0.000000
+[289] Time per iteration: 0.000000 0.000000
+[290] Time per iteration: 0.000000 0.000000
+[291] Time per iteration: 0.000000 0.000000
+[292] Time per iteration: 0.000000 0.000000
+[293] Time per iteration: 0.000000 0.000000
+[294] Time per iteration: 0.000000 0.000000
+[295] Time per iteration: 0.000000 0.000000
+[296] Time per iteration: 0.000000 0.000000
+[297] Time per iteration: 0.000000 0.000000
+[298] Time per iteration: 0.000000 0.000000
+[299] Time per iteration: 0.000000 0.000000
+[300] Time per iteration: 0.000000 0.000000
+
+Tried notifying from PE-4
+Tried notifying from PE-4
+----Calling AtSync[0] CkExit called 
+[Partition 0][Node 0] End of program
+
