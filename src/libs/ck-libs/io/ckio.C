@@ -63,7 +63,7 @@ struct std::hash<Ck::IO::Session>
 };
 
 // #define DEBUG
-// #define MYDEBUG
+//#define MYDEBUG
 namespace Ck
 {
 namespace IO
@@ -135,7 +135,7 @@ class Director : public CBase_Director
 
   void openFile(string name, CkCallback opened, Options opts)
   {
-    CkPrintf("open file in director.\n");
+    //CkPrintf("open file in director.\n");
     if (0 == opts.writeStripe)
       opts.writeStripe = CkGetFileStripeSize(name.c_str());
     if (0 == opts.peStripe)
@@ -151,9 +151,9 @@ class Director : public CBase_Director
       // CkPrintf("DEBUG: the num readers in opts struct is 0\n");
       opts.numReaders = std::min(CmiNumNodes(), CkNumPes());
     }
-    CkPrintf("About to create mapping.\n");
+    //    CkPrintf("About to create mapping.\n");
     files[filesOpened] = FileInfo(name, opened, opts);
-    CkPrintf("Mapping created on director.\n");
+    //    CkPrintf("Mapping created on director.\n");
     managers.openFile(opnum++, filesOpened++, name, opts);
   }
 
@@ -236,7 +236,7 @@ class Director : public CBase_Director
     sessionOpts.setInitCallback(
         sessionInitDone);  // invoke the sessionInitDone callback after all the elements
                            // of the chare array are created
-    CkPrintf("Launching read session with %d buffer chares.\n", num_readers);
+    //    CkPrintf("Launching read session with %d buffer chares.\n", num_readers);
     files[file].read_session = CProxy_BufferChares::ckNew(
         file, offset, bytes, num_readers, sessionOpts);  // create the readers
   }
@@ -354,7 +354,7 @@ public:
   void serveRead(size_t read_bytes, size_t read_offset, char* data, CkCallback after_read,
                  size_t read_stripe, size_t num_readers)
   {
-    CkPrintf("In serveRead on PE=%d\n", CkMyPe());
+    //CkPrintf("In serveRead on PE=%d\n", CkMyPe());
 
     int read_tag = addReadToTable(read_bytes, read_offset, data,
                                   after_read);  // create a tag for the actual read
@@ -372,8 +372,8 @@ public:
       CkPostBuffer(info.data, bytes, tag);
       // CkPrintf("Just posting buffer with tag=%d and of length %zu starting from %zu on
       // PE=%d\n", tag, bytes, 0, CkMyPe());
-      CkPrintf("Calling sendData from myPE %d to buffer chare %d.\n", CkMyPe(),
-               start_idx - 1);
+      //CkPrintf("Calling sendData from myPE %d to buffer chare %d.\n", CkMyPe(),
+      //               start_idx - 1);
       CProxy_BufferChares(_session.sessionID)[start_idx - 1].sendData(
           read_tag, tag, read_offset, bytes, thisProxy, CkMyPe());
 #include <map>
@@ -424,7 +424,7 @@ public:
       CkPrintf("Read (offset=%zu, length=%zu) is contained on IO Buffer %zu\n",
                read_offset, read_bytes, i);
 #endif
-      CkPrintf("Calling sendData from myPE %d to buffer chare %d.\n", CkMyPe(), i);
+      //CkPrintf("Calling sendData from myPE %d to buffer chare %d.\n", CkMyPe(), i);
       CProxy_BufferChares(_session.sessionID)[i].sendData(
           read_tag, tag, read_offset, read_bytes, thisProxy, CkMyPe());
     }
@@ -775,17 +775,16 @@ public:
     CkAssert(_my_offset >= _session_offset);
     CkAssert(_my_offset + _my_bytes <= _session_offset + _session_bytes);
 
-    CkPrintf(
-        "Inside constructor of BufferChares[%d]; I own %zu bytes starting from %zu "
-        "offset. about o start the readData function\n",
-        thisIndex, _my_bytes, _my_offset);
+    //CkPrintf(        "Inside constructor of BufferChares[%d]; I own %zu bytes starting from %zu "
+    // "offset. about o start the readData function\n",
+    //  thisIndex, _my_bytes, _my_offset);
 
     double disk_read_before = CkWallTimer();  // get the before disk_read
     std::future<char*> temp_buffer =
         std::async(std::launch::async, &BufferChares::readData, this);
 
-    CkPrintf("Status of temp_buffer: %d.\n", temp_buffer.valid());
-    CkPrintf("Sharing future to _buffer (%p) on chare %d.\n", _buffer, thisIndex);
+    //    CkPrintf("Status of temp_buffer: %d.\n", temp_buffer.valid());
+    //    CkPrintf("Sharing future to _buffer (%p) on chare %d.\n", _buffer, thisIndex);
     _buffer = temp_buffer.share();
     double disk_read_after = CkWallTimer();  // end disk time
     double total_time = disk_read_after - disk_read_before;
@@ -798,10 +797,10 @@ public:
 
   ~BufferChares()
   {
-    CkPrintf("Buffer chare destructor.\n");
+    //    CkPrintf("Buffer chare destructor.\n");
     // CkPrintf("Freeing buffer with %p.\n", _buffer.get());
-    // delete _buffer.get();
-    CkPrintf("Buffer freed.\n");
+    delete _buffer.get();
+    //    CkPrintf("Buffer freed.\n");
   }
 
   void printTime(double time_taken)
@@ -811,8 +810,11 @@ public:
 
   char* readDataPOSIX()
   {
+#ifdef MYDEBUG
+    CkPrintf("Allocating buffer of size %lu on buffer chares %d\n", _my_bytes, thisIndex);
+#endif
     char* buffer = new char[_my_bytes];
-    CkPrintf("Allocating buffer on chare %d at addr %p.\n", thisIndex, buffer);
+    //    CkPrintf("Allocating buffer on chare %d at addr %p.\n", thisIndex, buffer);
 
     int fd = open64(_file->name.c_str(), O_RDONLY);  // open the file pointer
     if (fd == -1)
@@ -835,8 +837,8 @@ public:
 
 #ifdef MYDEBUG
     CkPrintf("Buffer chare %d reading %d bytes on PE %d and node %d in %fms.\n",
-             thisIndex, _my_bytes, CkMyPe(), CkMyNode(),
-             (double(end_time - start_time) / CLOCKS_PER_SEC * 1000));
+	     thisIndex, _my_bytes, CkMyPe(), CkMyNode(),
+	     (double(end_time - start_time) / CLOCKS_PER_SEC * 1000));
     CkPrintf("Finished the read on %d\n", thisIndex);
 #endif
 
@@ -901,10 +903,10 @@ public:
       CthYield();  // will suspend thread, let the Charm RTS reschedule it
     }
 
-    CkPrintf("Validity of _buffer future in sendData: %d.\n", _buffer.valid());
-    CkPrintf("Getting buffer in sendData on chare %d.\n", thisIndex);
+    //CkPrintf("Validity of _buffer future in sendData: %d.\n", _buffer.valid());
+    //CkPrintf("Getting buffer in sendData on chare %d.\n", thisIndex);
     char* buffer = _buffer.get();  // future call to get
-    CkPrintf("sendData got buffer on chare %d with addr %p.\n", thisIndex, buffer);
+    //CkPrintf("sendData got buffer on chare %d with addr %p.\n", thisIndex, buffer);
 
     // CkPrintf("[sendData]: buffer_tag=%d, offset in data = %zd, len=%zu\n", buffer_tag,
     // (chare_offset - _my_offset), bytes_to_read);
@@ -935,8 +937,8 @@ public:
 
 void open(string name, CkCallback opened, Options opts)
 {
-  CkPrintf("Open local.\n");
-  impl::director.sayHi();
+  //CkPrintf("Open local.\n");
+  //impl::director.sayHi();
   impl::director.openFile(name, opened, opts);
 }
 
