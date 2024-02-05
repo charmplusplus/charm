@@ -63,7 +63,7 @@ struct std::hash<Ck::IO::Session>
 };
 
 // #define DEBUG
-//#define MYDEBUG
+#define MYDEBUG
 namespace Ck
 {
 namespace IO
@@ -904,10 +904,13 @@ public:
     }
 
     //CkPrintf("Validity of _buffer future in sendData: %d.\n", _buffer.valid());
-    //CkPrintf("Getting buffer in sendData on chare %d.\n", thisIndex);
+#ifdef MYDEBUG
+    CkPrintf("Getting buffer in sendData on chare %d.\n", thisIndex);
+#endif
     char* buffer = _buffer.get();  // future call to get
-    //CkPrintf("sendData got buffer on chare %d with addr %p.\n", thisIndex, buffer);
-
+#ifdef MYDEBUG
+    CkPrintf("sendData got buffer on chare %d with addr %p.\n", thisIndex, buffer);
+#endif
     // CkPrintf("[sendData]: buffer_tag=%d, offset in data = %zd, len=%zu\n", buffer_tag,
     // (chare_offset - _my_offset), bytes_to_read);
     CProxy_ReadAssembler(ra)[pe].shareData(
@@ -937,8 +940,11 @@ public:
 
 void open(string name, CkCallback opened, Options opts)
 {
-  //CkPrintf("Open local.\n");
-  //impl::director.sayHi();
+#ifdef MYDEBUG
+  CkPrintf("Open local.\n");
+  impl::director.sayHi();
+#endif
+  
   impl::director.openFile(name, opened, opts);
 }
 
