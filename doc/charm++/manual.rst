@@ -8452,7 +8452,7 @@ mode. For example:
 
 .. code-block:: bash
 
-     $ ./charmrun hello +p4 +restart log
+     $ ./charmrun hello ++n 4 +restart log
 
 Restarting is the reverse process of checkpointing. Charm++ allows
 restarting the old checkpoint on a different number of physical
@@ -8481,7 +8481,7 @@ After a failure, the system may contain fewer or more processors. Once
 the failed components have been repaired, some processors may become
 available again. Therefore, the user may need the flexibility to restart
 on a different number of processors than in the checkpointing phase.
-This is allowable by giving a different ``+pN`` option at runtime. One
+This is allowable by giving a different ``++n N`` option at runtime. One
 thing to note is that the new load distribution might differ from the
 previous one at checkpoint time, so running a load balancer (see
 Section :numref:`loadbalancing`) after restart is suggested.
@@ -8618,9 +8618,9 @@ it stores them in the local disk. The checkpoint files are named
 Users can pass the runtime option ``+ftc_disk`` to activate this mode. For
 example:
 
-.. code-block:: c++
+.. code-block:: bash
 
-      ./charmrun hello +p8 +ftc_disk
+      ./charmrun hello ++n 8 +ftc_disk
 
 Building Instructions
 ^^^^^^^^^^^^^^^^^^^^^
@@ -8629,7 +8629,7 @@ In order to have the double local-storage checkpoint/restart
 functionality available, the parameter ``syncft`` must be provided at
 build time:
 
-.. code-block:: c++
+.. code-block:: bash
 
       ./build charm++ netlrts-linux-x86_64 syncft
 
@@ -8656,7 +8656,7 @@ name:
 
 .. code-block:: bash
 
-   $ ./charmrun hello +p8 +kill_file <file>
+   $ ./charmrun hello ++n 8 +kill_file <file>
 
 An example of this usage can be found in the ``syncfttest`` targets in
 ``tests/charm++/jacobi3d``.
@@ -9967,7 +9967,7 @@ program
 
 .. code-block:: bash
 
-   $ ./charmrun pgm +p1000 +balancer RandCentLB +LBDump 2 +LBDumpSteps 4 +LBDumpFile lbsim.dat
+   $ ./charmrun pgm ++n 1000 +balancer RandCentLB +LBDump 2 +LBDumpSteps 4 +LBDumpFile lbsim.dat
 
 This will collect data on files lbsim.dat.2,3,4,5. We can use this data
 to analyze the performance of various centralized strategies using:
@@ -11330,7 +11330,7 @@ used, and a port number to listen the shrink/expand commands:
 
 .. code-block:: bash
 
-   	$ ./charmrun +p4 ./jacobi2d 200 20 +balancer GreedyLB ++nodelist ./mynodelistfile ++server ++server-port 1234
+   	$ ./charmrun ++n 4 ./jacobi2d 200 20 +balancer GreedyLB ++nodelist ./mynodelistfile ++server ++server-port 1234
 
 The CCS client to send shrink/expand commands needs to specify the
 hostname, port number, the old(current) number of processor and the
@@ -11988,7 +11988,7 @@ To run a Charm++ program named “pgm” on four processors, type:
 
 .. code-block:: bash
 
-   $ charmrun pgm +p4
+   $ charmrun pgm ++n 4
 
 Execution on platforms which use platform specific launchers, (i.e.,
 **aprun**, **ibrun**), can proceed without charmrun, or charmrun can be
@@ -12122,7 +12122,7 @@ advanced options are available:
 ``++p N``
    Total number of processing elements to create. In SMP mode, this
    refers to worker threads (where
-   :math:`\texttt{n} * \texttt{ppn} = \texttt{p}`), otherwise it refers
+   :math:`\texttt{n} \times \texttt{ppn} = \texttt{p}`), otherwise it refers
    to processes (:math:`\texttt{n} = \texttt{p}`). The default is 1. Use
    of ``++p`` is discouraged in favor of ``++processPer*`` (and
    ``++oneWthPer*`` in SMP mode) where desirable, or ``++n`` (and
@@ -12230,7 +12230,7 @@ The remaining options cover details of process launch and connectivity:
 
    .. code-block:: bash
 
-      $ ./charmrun +p4 ./pgm 100 2 3 ++runscript ./set_env_script
+      $ ./charmrun ++n 4 ./pgm 100 2 3 ++runscript ./set_env_script
 
    In this case, ``set_env_script`` is invoked on each node. **Note:** When this
    is provided, ``charmrun`` will not invoke the program directly, instead only
@@ -12526,7 +12526,7 @@ nodes than there are hosts in the group, it will reuse hosts. Thus,
 
 .. code-block:: bash
 
-   $ charmrun pgm ++nodegroup kale-sun +p6
+   $ charmrun pgm ++nodegroup kale-sun ++n 6
 
 uses hosts (charm, dp, grace, dagger, charm, dp) respectively as nodes
 (0, 1, 2, 3, 4, 5).
@@ -12536,7 +12536,7 @@ Thus, if one specifies
 
 .. code-block:: bash
 
-   $ charmrun pgm +p4
+   $ charmrun pgm ++n 4
 
 it will use “localhost” four times. “localhost” is a Unix trick; it
 always find a name for whatever machine you’re on.
@@ -13237,7 +13237,7 @@ of the above incantation, for various kinds of process launchers:
 
 .. code-block:: bash
 
-   $ ./charmrun +p2 `which valgrind` --log-file=VG.out.%p --trace-children=yes ./application_name ...application arguments...
+   $ ./charmrun ++n 2 `which valgrind` --log-file=VG.out.%p --trace-children=yes ./application_name ...application arguments...
    $ aprun -n 2 `which valgrind` --log-file=VG.out.%p --trace-children=yes ./application_name ...application arguments...
 
 The first adaptation is to use :literal:`\`which valgrind\`` to obtain a
