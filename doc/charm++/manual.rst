@@ -12400,20 +12400,29 @@ like:
 
    $ ./charmrun ++ppn 3 +p6 +pemap 1-3,5-7 +commap 0,4 ./app <args>
 
-This will create two logical nodes/OS processes (2 = 6 PEs/3 PEs per
-node), each with three worker threads/PEs (``++ppn 3``). The worker
-threads/PEs will be mapped thusly: PE 0 to core 1, PE 1 to core 2, PE 2
-to core 3 and PE 4 to core 5, PE 5 to core 6, and PE 6 to core 7.
-PEs/worker threads 0-2 compromise the first logical node and 3-5 are the
-second logical node. Additionally, the communication threads will be
-mapped to core 0, for the communication thread of the first logical
-node, and to core 4, for the communication thread of the second logical
-node.
-
 Please keep in mind that ``+p`` always specifies the total number of PEs
 created by Charm++, regardless of mode (the same number as returned by
-``CkNumPes()``). The ``+p`` option does not include the communication
-thread, there will always be exactly one of those per logical node.
+``CkNumPes()``). So this will create two logical nodes/OS processes
+(2 = 6 PEs/3 PEs per node), each with three worker threads/PEs
+(``++ppn 3``).
+
+We recommend using ``++n``, especially with ``++ppn``. Recall
+that :math:`\texttt{n} \times \texttt{ppn} = \texttt{p}`. So the example becomes:
+
+.. code-block:: bash
+
+   $ ./charmrun ++ppn 3 ++n 2 +pemap 1-3,5-7 +commap 0,4 ./app <args>
+
+The worker threads/PEs will be mapped thusly: PE 0 to
+core 1, PE 1 to core 2, PE 2 to core 3 and PE 4 to core 5, PE 5 to
+core 6, and PE 6 to core 7 (``+pemap``). PEs/worker threads 0-2
+compromise the first logical node and 3-5 are the second logical node.
+Additionally, the communication threads will be mapped to core 0, for
+the communication thread of the first logical node, and to core 4,
+for the communication thread of the second logical node (``+commap``).
+
+Note that the ``+p`` option does not include the communication
+thread. There will always be exactly one of those per logical node.
 
 Multicore Options
 ^^^^^^^^^^^^^^^^^
