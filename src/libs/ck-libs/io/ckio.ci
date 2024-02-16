@@ -177,9 +177,9 @@ group[migratable] Manager
 		entry BufferChares(FileToken file, size_t offset, size_t bytes, size_t num_readers);
 		// way for the BufferChares object to send bytes over to the ReadAssembler object ra when serving a specific read
 		entry [threaded] void sendData(int read_tag, int buffer_tag, size_t offset, size_t bytes, CProxy_ReadAssembler ra, int pe);
-#ifdef DEBUG
+
 		entry [reductiontarget] void printTime(double time_taken);
-#endif
+
 
 		entry void zeroCopyCallback(size_t offset, double time);
 	};
