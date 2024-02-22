@@ -3037,6 +3037,7 @@ int main(void)
 }
 EOT
 test_linkc "whether OpenMP is supported" "yes" "no" "$CMK_C_OPENMP"
+AC_DEFINE_UNQUOTED(CMK_HAS_OPENMP, $pass, [whether OpenMP is supported])
 add_flag "CMK_HAS_OPENMP='$pass'" "OpenMP"
 add_make_flag "CMK_HAS_OPENMP:=$pass" "OpenMP"
 
