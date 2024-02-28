@@ -1,7 +1,7 @@
 dnl -*- Autoconf -*-
 dnl
-dnl Copyright © 2009-2022 Inria.  All rights reserved.
-dnl Copyright © 2009-2012, 2015-2017, 2020 Université Bordeaux
+dnl Copyright © 2009-2023 Inria.  All rights reserved.
+dnl Copyright © 2009-2012, 2015-2017, 2020, 2023 Université Bordeaux
 dnl Copyright © 2004-2005 The Trustees of Indiana University and Indiana
 dnl                         University Research and Technology
 dnl                         Corporation.  All rights reserved.
@@ -1278,8 +1278,14 @@ char nvmlInit ();
         AC_MSG_NOTICE([assuming ROCm is installed in standard directories ...])
       fi fi fi
       if test "x$rocm_dir" != x; then
-         HWLOC_RSMI_CPPFLAGS="-I$rocm_dir/rocm_smi/include/"
-         HWLOC_RSMI_LDFLAGS="-L$rocm_dir/rocm_smi/lib/"
+         if test -d "$rocm_dir/include/rocm_smi"; then
+           HWLOC_RSMI_CPPFLAGS="-I$rocm_dir/include/"
+           HWLOC_RSMI_LDFLAGS="-L$rocm_dir/lib/"
+         else
+           # ROCm <5.2 only used its own rocm_smi/{include,lib} directories
+           HWLOC_RSMI_CPPFLAGS="-I$rocm_dir/rocm_smi/include/"
+           HWLOC_RSMI_LDFLAGS="-L$rocm_dir/rocm_smi/lib/"
+	 fi
       fi
 
       hwloc_rsmi_happy=yes
@@ -1365,8 +1371,14 @@ return clGetDeviceIDs(0, 0, 0, NULL, NULL);
         HWLOC_OPENCL_CPPFLAGS="$HWLOC_CUDA_COMMON_CPPFLAGS"
         HWLOC_OPENCL_LDFLAGS="$HWLOC_CUDA_COMMON_LDFLAGS"
         if test "x$rocm_dir" != x; then
-           HWLOC_OPENCL_CPPFLAGS="$HWLOC_OPENCL_CPPFLAGS -I$rocm_dir/opencl/include/"
-           HWLOC_OPENCL_LDFLAGS="$HWLOC_OPENCL_LDFLAGS -L$rocm_dir/opencl/lib/"
+	   if test -d "$rocm_dir/include/CL"; then
+             HWLOC_OPENCL_CPPFLAGS="$HWLOC_OPENCL_CPPFLAGS -I$rocm_dir/include/"
+             HWLOC_OPENCL_LDFLAGS="$HWLOC_OPENCL_LDFLAGS -L$rocm_dir/lib/"
+	   else
+             # ROCm <5.2 only used its own opencl/{include,lib} directories
+	     HWLOC_OPENCL_CPPFLAGS="$HWLOC_OPENCL_CPPFLAGS -I$rocm_dir/opencl/include/"
+             HWLOC_OPENCL_LDFLAGS="$HWLOC_OPENCL_LDFLAGS -L$rocm_dir/opencl/lib/"
+	   fi
         fi
         tmp_save_CPPFLAGS="$CPPFLAGS"
         CPPFLAGS="$CPPFLAGS $HWLOC_OPENCL_CPPFLAGS"
@@ -1409,6 +1421,7 @@ return clGetDeviceIDs(0, 0, 0, NULL, NULL);
       HWLOC_PKG_CHECK_MODULES([LEVELZERO], [libze_loader], [zesDevicePciGetProperties], [level_zero/zes_api.h],
                               [hwloc_levelzero_happy=yes
                                HWLOC_LEVELZERO_REQUIRES=libze_loader
+			       AC_CHECK_LIB([ze_loader], [zesInit], [AC_DEFINE(HWLOC_HAVE_ZESINIT, 1, [Define to 1 if zesInit is available])])
 			       AC_CHECK_LIB([ze_loader], [zeDevicePciGetPropertiesExt], [AC_DEFINE(HWLOC_HAVE_ZEDEVICEPCIGETPROPERTIESEXT, 1, [Define to 1 if zeDevicePciGetPropertiesExt is available])])
                               ], [hwloc_levelzero_happy=no])
       if test x$hwloc_levelzero_happy = xno; then
@@ -1419,6 +1432,7 @@ return clGetDeviceIDs(0, 0, 0, NULL, NULL);
               AC_CHECK_LIB([ze_loader],
 	                   [zesDevicePciGetProperties],
 	                   [HWLOC_LEVELZERO_LIBS="-lze_loader"
+			    AC_CHECK_LIB([ze_loader], [zesInit], [AC_DEFINE(HWLOC_HAVE_ZESINIT, 1, [Define to 1 if zesInit is available])])
 			    AC_CHECK_LIB([ze_loader], [zeDevicePciGetPropertiesExt], [AC_DEFINE(HWLOC_HAVE_ZEDEVICEPCIGETPROPERTIESEXT, 1, [Define to 1 if zeDevicePciGetPropertiesExt is available])])
                            ], [hwloc_levelzero_happy=no])
             ], [hwloc_levelzero_happy=no])
@@ -1850,13 +1864,9 @@ AC_DEFUN([HWLOC_DO_AM_CONDITIONALS],[
         AM_CONDITIONAL([HWLOC_XML_LIBXML_BUILD_STATIC], [test "x$hwloc_xml_libxml_component" = "xstatic"])
 
         AM_CONDITIONAL([HWLOC_HAVE_CXX], [test "x$hwloc_have_cxx" = "xyes"])
+        AM_CONDITIONAL([HWLOC_CROSS_COMPILING], [test "x$cross_compiling" = "xyes"])
     ])
     hwloc_did_am_conditionals=yes
-
-    # For backwards compatibility (i.e., packages that only call
-    # HWLOC_DO_AM_CONDITIONS, not NETLOC DO_AM_CONDITIONALS), we also have to
-    # do the netloc AM conditionals here
-    NETLOC_DO_AM_CONDITIONALS
 ])dnl
 
 #-----------------------------------------------------------------------
