@@ -1912,7 +1912,8 @@ do
                 [[ "$PARADIGM" = "f90charm" ]] && XIOPTS+=(-f90)
                 if [[ "$PREPROCESS_CI" = 'yes' ]]
                 then
-		  runCmd $CMK_CPP_CHARM "${OPTS_CPP[@]}" "$FILE" | runCmd "$CHARMBIN/charmxi" "${XIOPTS[@]}" -orig-file "$FILE"
+		  runCmd $CMK_CPP_CHARM "${OPTS_CPP[@]}" "$FILE"  "$MYTMP.i"
+		  runCmd "$CHARMBIN/charmxi" "${XIOPTS[@]}" -orig-file "$FILE" "$MYTMP.i"
                 else
 		  runCmd "$CHARMBIN/charmxi" "${XIOPTS[@]}" "$FILE"
                 fi
