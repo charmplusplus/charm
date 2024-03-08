@@ -321,10 +321,6 @@ AddModules() {
     done
 }
 
-# TEMP_BASE is appended with this script's process ID (PID),
-# so multiple charmcs can run in parallel without overwriting
-# each other's temporary files.
-TEMP_BASE="/tmp/charmc_tmp.$$"
 
 # Try to find CHARMBIN by looking in directory where charmc is
 findCharmBin() {
