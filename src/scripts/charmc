@@ -192,7 +192,7 @@ End() {
         for FILE in "${FILES[@]}"
         do
             #BASE="$(stripExtension "$FILE")"
-            MYTMP="$(basename "$FILE").TMP"
+            MYTMP="$(basename "$FILE").$$.TMP"
             $RM "$MYTMP.P.C" "$MYTMP.cpp" "$MYTMP.space" "$MYTMP.xlat" "$MYTMP.o"
             $RM "$MYTMP.c" "$MYTMP.c.0.h" "$MYTMP.c.1.h" "$MYTMP.c.2.h"
             $RM "$MYTMP.i" "$MYTMP.$CMK_CPP_SUFFIX"
@@ -1832,7 +1832,7 @@ Debug "Preprocessing GEN-CPM files"
 for FILE in "${GENCPM[@]}"
 do
 	BASE="$(stripExtension "$FILE")"
-	MYTMP="$(basename "$FILE").TMP"
+	MYTMP="$(basename "$FILE").$$.TMP"
 	DELETE+=("$MYTMP.c" "$MYTMP.i")
 	DoNoErrCheck $RM "$BASE.cpm.h" "$MYTMP.c"
 	runCmd touch "$BASE.cpm.h"
@@ -1855,7 +1855,7 @@ numFiles="${#FILES[@]}"
 for FILE in "${FILES[@]}"
 do
 	BASE="$(stripExtension "$(basename "$FILE")")"
-	MYTMP="$(basename "$FILE").TMP"
+	MYTMP="$(basename "$FILE").$$.TMP"
 	FILE_EXT="$(getExtension "$FILE")"
 	BASEO="$BASE.o"
 	DESTO=(-o "$BASEO")
