@@ -34,7 +34,6 @@ module CkIO_impl
 
     /// Serialize setting up each file through this chare, so that all PEs
     /// have the same sequence
-    entry void sayHi();
 
     entry void openFile(std::string name, CkCallback opened, Options opts);
     entry[reductiontarget] void fileOpened(FileToken file);

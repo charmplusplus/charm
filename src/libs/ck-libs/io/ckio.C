@@ -36,8 +36,16 @@ using std::min;
 using std::string;
 using namespace std::chrono;
 
-#define IO_TIMEOUT std::chrono::microseconds(1000)
-#define IO_THREADS_PER_PE 4
+#define IO_THREADS_PER_PE 4  // TODO: this is unused?
+
+// #define CALLAFTER
+// #define BUFFER_TIMEOUT_MS .1
+
+#define YIELD
+#define IO_TIMEOUT std::chrono::microseconds(25)
+
+// TODO: cleanup debug macros
+// #define DEBUG
 
 // FROM STACKEXCHANGE:
 // https://stackoverflow.com/questions/19195183/how-to-properly-hash-the-custom-struct
@@ -48,6 +56,7 @@ inline void hash_combine(std::size_t& s, const T& v)
   s ^= h(v) + 0x9e3779b9 + (s << 6) + (s >> 2);
 }
 
+// TODO: what is this
 // HASH FOR SESSION
 template <>
 struct std::hash<Ck::IO::Session>
@@ -62,19 +71,16 @@ struct std::hash<Ck::IO::Session>
   }
 };
 
-// #define DEBUG
-//#define MYDEBUG
-//#define YIELD
 namespace Ck
 {
 namespace IO
 {
 namespace impl
 {
-  CProxy_Director director;
-  CkpvDeclare(Manager*, manager);
-  clock_t read_session_start;
-  clock_t read_session_end;
+CProxy_Director director;
+CkpvDeclare(Manager*, manager);
+clock_t read_session_start;
+clock_t read_session_end;
 }  // namespace impl
 
 namespace impl
@@ -121,12 +127,13 @@ class Director : public CBase_Director
   }
 
   Director(CkMigrateMessage* m) : CBase_Director(m) {}
+
+  // TODO: remove?
   ~Director() { CkPrintf("Destroying the director\n"); }
 
-  void sayHi() { CkPrintf("Director says hi.\n"); }
   void pup(PUP::er& p)
   {
-    // FIXME: All files must be closed across checkpoint/restart
+    // TODO: All files must be closed across checkpoint/restart
     if (files.size() != 0)
       CkAbort("CkIO: All files must be closed across checkpoint/restart");
 
@@ -138,7 +145,8 @@ class Director : public CBase_Director
 
   void openFile(string name, CkCallback opened, Options opts)
   {
-    //CkPrintf("open file in director.\n");
+    // TODO: put print statements in DEBUG macro
+    // CkPrintf("open file in director.\n");
     if (0 == opts.writeStripe)
       opts.writeStripe = CkGetFileStripeSize(name.c_str());
     if (0 == opts.peStripe)
@@ -179,6 +187,7 @@ class Director : public CBase_Director
 
     int numStripes = 0;
     size_t bytesLeft = bytes, delta = opts.peStripe - offset % opts.peStripe;
+
     // Align to stripe boundary
     if (offset % opts.peStripe != 0 && delta < bytesLeft)
     {
@@ -213,9 +222,9 @@ class Director : public CBase_Director
   void prepareReadSessionHelper(FileToken file, size_t bytes, size_t offset,
                                 CkCallback ready, std::vector<int> pes_to_map)
   {
+    // TODO: DEBUG print statments
     if (!bytes)
     {
-      CkPrintf("You're tryna read 0 bytes buddy\n");
       CkAbort("You're tryna read 0 bytes. Oops.\n");
     }
     size_t session_bytes = bytes;  // amount of bytes in the session
@@ -239,10 +248,7 @@ class Director : public CBase_Director
     sessionOpts.setInitCallback(
         sessionInitDone);  // invoke the sessionInitDone callback after all the elements
                            // of the chare array are created
-#ifdef MYDEBUG
-    //CkPrintf("Launching read session with %d buffer chares.\n", num_readers);
-    read_session_start = clock();
-#endif
+
     files[file].read_session = CProxy_BufferChares::ckNew(
         file, offset, bytes, num_readers, sessionOpts);  // create the readers
   }
@@ -339,6 +345,7 @@ public:
   void shareData(int read_tag, int buffer_tag, size_t read_chare_offset, size_t num_bytes,
                  char* data)
   {
+    // TODO: cleanup DEBUG
 #ifdef DEBUG
     CkPrintf("shareData args: read_chare_offset=%zu, num_bytes=%zu, data=%p.\n",
              read_chare_offset, num_bytes, data);
@@ -359,7 +366,8 @@ public:
   void serveRead(size_t read_bytes, size_t read_offset, char* data, CkCallback after_read,
                  size_t read_stripe, size_t num_readers)
   {
-    //CkPrintf("In serveRead on PE=%d\n", CkMyPe());
+    // TODO: cleanup print statements and DEBUG
+    // CkPrintf("In serveRead on PE=%d\n", CkMyPe());
 
     int read_tag = addReadToTable(read_bytes, read_offset, data,
                                   after_read);  // create a tag for the actual read
@@ -377,7 +385,7 @@ public:
       CkPostBuffer(info.data, bytes, tag);
       // CkPrintf("Just posting buffer with tag=%d and of length %zu starting from %zu on
       // PE=%d\n", tag, bytes, 0, CkMyPe());
-      //CkPrintf("Calling sendData from myPE %d to buffer chare %d.\n", CkMyPe(),
+      // CkPrintf("Calling sendData from myPE %d to buffer chare %d.\n", CkMyPe(),
       //               start_idx - 1);
       CProxy_BufferChares(_session.sessionID)[start_idx - 1].sendData(
           read_tag, tag, read_offset, bytes, thisProxy, CkMyPe());
@@ -429,7 +437,7 @@ public:
       CkPrintf("Read (offset=%zu, length=%zu) is contained on IO Buffer %zu\n",
                read_offset, read_bytes, i);
 #endif
-      //CkPrintf("Calling sendData from myPE %d to buffer chare %d.\n", CkMyPe(), i);
+      // CkPrintf("Calling sendData from myPE %d to buffer chare %d.\n", CkMyPe(), i);
       CProxy_BufferChares(_session.sessionID)[i].sendData(
           read_tag, tag, read_offset, read_bytes, thisProxy, CkMyPe());
     }
@@ -440,8 +448,8 @@ class Manager : public CBase_Manager
 {
   Manager_SDAG_CODE int opnum;
   std::unordered_map<Session, CProxy_ReadAssembler>
-      _session_to_read_assembler;  // map used to
-  // get the read assembler for a specific session
+      _session_to_read_assembler;  // map used to get the read assembler for a specific
+                                   // session
   int _curr_tag = 0;
 
 public:
@@ -476,7 +484,7 @@ public:
   {
     p | opnum;
 
-    // FIXME: All files must be closed across checkpoint/restart
+    // TODO: All files must be closed across checkpoint/restart
     if (files.size() != 0)
       CkAbort("CkIO: All files must be closed across checkpoint/restart");
   }
@@ -537,12 +545,7 @@ public:
       CkPrintf("The pointer to the local branch is null on pe=%d\n", CkMyPe());
       CkExit();
     }
-    
-#ifdef MYDEBUG
-    //CkPrintf("Serving read to %d readers.\n", num_readers);
-#endif
 
-    
     grp_ptr->serveRead(bytes, offset, data, after_read, read_stripe, num_readers);
   }
 
@@ -786,12 +789,13 @@ public:
     CkAssert(_my_offset >= _session_offset);
     CkAssert(_my_offset + _my_bytes <= _session_offset + _session_bytes);
 
-    //CkPrintf(        "Inside constructor of BufferChares[%d]; I own %zu bytes starting from %zu "
-    // "offset. about o start the readData function\n",
-    //  thisIndex, _my_bytes, _my_offset);
+    // CkPrintf(        "Inside constructor of BufferChares[%d]; I own %zu bytes starting
+    // from %zu "
+    //  "offset. about o start the readData function\n",
+    //   thisIndex, _my_bytes, _my_offset);
 
+    // TODO: wrap in DEBUG?
     double disk_read_start_ck = CkWallTimer();  // get the before disk_read
-    clock_t disk_read_start = clock();
 
     std::future<char*> temp_buffer =
         std::async(std::launch::async, &BufferChares::readData, this);
@@ -800,14 +804,12 @@ public:
     //    CkPrintf("Sharing future to _buffer (%p) on chare %d.\n", _buffer, thisIndex);
     _buffer = temp_buffer.share();
 
-    clock_t disk_read_end = clock();
-    double disk_read_end_ck = CkWallTimer(); 
-
-    double total_time_ms = (double(disk_read_end - disk_read_start) / CLOCKS_PER_SEC * 1000);
+    double disk_read_end_ck = CkWallTimer();
     double total_time_ms_ck = (disk_read_end_ck - disk_read_start_ck) * 1000;
 
-    //CkPrintf("Clock read time: %f, CkWallTimer read time: %f\n", total_time_ms, total_time_ms_ck);
-    
+    // CkPrintf("Clock read time: %f, CkWallTimer read time: %f\n", total_time_ms,
+    // total_time_ms_ck);
+
 #ifdef DEBUG
     CkCallback cb(CkReductionTarget(BufferChares, printTime), thisProxy[0]);
     contribute(sizeof(double), &total_time_ms, CkReduction::max_double, cb);
@@ -822,18 +824,21 @@ public:
     //    CkPrintf("Buffer freed.\n");
   }
 
+  // TODO: useful for debugging?
   void printTime(double time_taken)
   {
     clock_t buffer_read_done = clock();
-    double total = (double(buffer_read_done - read_session_start) / CLOCKS_PER_SEC * 1000); 
-    CkPrintf("The time to disk took %fms on the max chare and %f since read session start.\n", time_taken, total);
+    double total =
+        (double(buffer_read_done - read_session_start) / CLOCKS_PER_SEC * 1000);
+    CkPrintf(
+        "The time to disk took %fms on the max chare and %f since read session start.\n",
+        time_taken, total);
   }
+  /*
 
+  */
   char* readDataPOSIX()
   {
-#ifdef MYDEBUG
-    //CkPrintf("Allocating buffer of size %lu on buffer chares %d\n", _my_bytes, thisIndex);
-#endif
     char* buffer = new char[_my_bytes];
     //    CkPrintf("Allocating buffer on chare %d at addr %p.\n", thisIndex, buffer);
 
@@ -848,23 +853,7 @@ public:
       CkPrintf("Lseek buffer chare failed.\n");
     }
 
-#ifdef MYDEBUG
-    traceRegisterUserEvent("Starting read", 3);
-    traceBeginUserBracketEvent(3);
-
-#endif
-    clock_t start_time = clock();
     size_t num_bytes_read = ::read(fd, buffer, (int)_my_bytes);
-    clock_t end_time = clock();
-
-#ifdef MYDEBUG
-    traceEndUserBracketEvent(3);
-    CkPrintf("Clock time of read: %f\n", double(end_time - start_time) / CLOCKS_PER_SEC * 1000);
-    //CkPrintf("Buffer chare %d reading %d bytes on PE %d and node %d in %fms.\n",
-    //	     thisIndex, _my_bytes, CkMyPe(), CkMyNode(),
-    //	     (double(end_time - start_time) / CLOCKS_PER_SEC * 1000));
-
-#endif
 
     if (!num_bytes_read)
     {
@@ -922,6 +911,14 @@ public:
         chare_offset, end_byte_chare, bytes_to_read, offset, bytes);
 #endif
 
+#ifdef CALLAFTER
+    while (_buffer.wait_for(std::chrono::microseconds(0)) != std::future_status::ready)
+    {
+      CcdCallFnAfter((CcdVoidFn)CthAwaken, CthSelf(),
+                     BUFFER_TIMEOUT_MS);  // timeout in ms
+      CthSuspend();
+    }
+#endif
 
 #ifdef YIELD
     while (_buffer.wait_for(IO_TIMEOUT) != std::future_status::ready)
@@ -930,13 +927,8 @@ public:
       CthYield();  // will suspend thread, let the Charm RTS reschedule it
     }
 #endif
-    
 
-    //CkPrintf("Validity of _buffer future in sendData: %d.\n", _buffer.valid());
-#ifdef MYDEBUG
-    traceRegisterUserEvent("Read received.", 10);
-    traceUserEvent(10);
-#endif
+    // CkPrintf("Validity of _buffer future in sendData: %d.\n", _buffer.valid());
     char* buffer = _buffer.get();  // future call to get
 #ifdef DEBUG
     CkPrintf("sendData got buffer on chare %d with addr %p.\n", thisIndex, buffer);
@@ -972,9 +964,8 @@ void open(string name, CkCallback opened, Options opts)
 {
 #ifdef DEBUG
   CkPrintf("Open local.\n");
-  impl::director.sayHi();
 #endif
-  
+
   impl::director.openFile(name, opened, opts);
 }
 
@@ -986,18 +977,12 @@ void startSession(File file, size_t bytes, size_t offset, CkCallback ready,
 
 void startReadSession(File file, size_t bytes, size_t offset, CkCallback ready)
 {
-#ifdef DEBUG
-  CkPrintf("This is DEBUG for the reads\n");
-#endif
   impl::director.prepareReadSession(file.token, bytes, offset, ready);
 }
 
 void startReadSession(File file, size_t bytes, size_t offset, CkCallback ready,
                       std::vector<int> pes_to_map)
 {
-#ifdef DEBUG
-  CkPrintf("This is DEBUG for the reads\n");
-#endif
   impl::director.prepareReadSession(file.token, bytes, offset, ready, pes_to_map);
 }
 
@@ -1026,10 +1011,6 @@ void read(Session session, size_t bytes, size_t offset, char* data, CkCallback a
   CkAssert(offset + bytes <= session.offset + session.bytes);
   using namespace impl;
 
-#ifdef MYDEBUG
-  traceRegisterUserEvent("Manager starting handling read requests", 2);
-  traceUserEvent(2);
-#endif
   CkpvAccess(manager)->read(session, bytes, offset, data, after_read);
 }
 
