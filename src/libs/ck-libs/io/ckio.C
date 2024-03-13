@@ -345,14 +345,14 @@ public:
    * as well as other read infrastructure
    */
   void serveRead(size_t read_bytes, size_t read_offset, char* data, CkCallback after_read,
-                 size_t read_stripe, size_t num_readers)
+                 size_t read_stride, size_t num_readers)
   {
     int read_tag = addReadToTable(read_bytes, read_offset, data,
                                   after_read);  // create a tag for the actual read
     // get the necessary info
     size_t bytes = read_bytes;
     size_t start_idx = (read_offset - _session.offset) /
-                       read_stripe;  // the first index that has the relevant data
+                       read_stride;  // the first index that has the relevant data
     ReadInfo& info = _read_info_buffer[read_tag];  // get the ReadInfo object
     ReadCompleteMsg* msg = info.msg;
 
@@ -368,7 +368,7 @@ public:
     // make sure to account for the last BufferChares holding potentially more data than
     // the rest
     for (size_t i = start_idx;
-         (i < num_readers) && (i * read_stripe) < (read_offset + bytes); ++i)
+         (i < num_readers) && (i * read_stride) < (read_offset + bytes); ++i)
     {
       size_t data_idx;
       size_t data_len;
@@ -377,7 +377,7 @@ public:
         data_idx = 0;  // at the start of read
         // if intrabuffer, just take read size; o/w go from offset to end of buffer chare
         data_len =
-            std::min((read_stripe * (i + 1) + _session.offset - read_offset), bytes);
+            std::min((read_stride * (i + 1) + _session.offset - read_offset), bytes);
         if (i == num_readers - 1)
         {  // the read is contained entirely in data of the last buffer chare; make sure
            // to account for the extra bytes if there are any!
@@ -386,18 +386,18 @@ public:
       }
       else
       {
-        data_idx = (read_stripe * i + _session.offset -
+        data_idx = (read_stride * i + _session.offset -
                     read_offset);  // first byte of fille in buffer chare, offset from the
                                    // read offset
-        data_len = std::min(read_stripe,
-                            read_offset + bytes - (read_stripe * i + _session.offset));
+        data_len = std::min(read_stride,
+                            read_offset + bytes - (read_stride * i + _session.offset));
         // the length is gonna be the entire chare's readstripe, or what's remainig of the
         // read
         //
         if (i == num_readers - 1)
         {  // we are searching the last buffer chare; make sure to account for the extra
            // bytes if there are any!
-          data_len = read_offset + read_bytes - (read_stripe * i + _session.offset);
+          data_len = read_offset + read_bytes - (read_stride * i + _session.offset);
         }
       }
       // do the CkPost call
@@ -502,7 +502,7 @@ public:
     size_t num_readers = opt.numReaders;
     // the number of bytes each BufferChare owns, exlcuding the bytes that aren't
     // available
-    size_t read_stripe = session.getBytes() / num_readers;
+    size_t read_stride = session.getBytes() / num_readers;
     // get the readassembler on this PE
     ReadAssembler* grp_ptr = ra.ckLocalBranch();
     if (!grp_ptr)
@@ -510,7 +510,7 @@ public:
       CkPrintf("The pointer to the local branch is null on pe=%d\n", CkMyPe());
       CkExit();
     }
-    grp_ptr->serveRead(bytes, offset, data, after_read, read_stripe, num_readers);
+    grp_ptr->serveRead(bytes, offset, data, after_read, read_stride, num_readers);
   }
 
   void write(Session session, const char* data, size_t bytes, size_t offset)
@@ -730,7 +730,7 @@ private:
   std::shared_future<char*> _buffer;
 
   size_t _num_readers;
-  size_t _read_stripe;
+  size_t _read_stride;
 
 public:
   BufferChares(FileToken file, size_t offset, size_t bytes, size_t num_readers)
@@ -740,9 +740,9 @@ public:
         _session_offset(offset)
   {
     _num_readers = num_readers;
-    _read_stripe = bytes / num_readers;
-    _my_offset = thisIndex * (_read_stripe) + _session_offset;
-    _my_bytes = min(_read_stripe,
+    _read_stride = bytes / num_readers;
+    _my_offset = thisIndex * (_read_stride) + _session_offset;
+    _my_bytes = min(_read_stride,
                     _session_offset + _session_bytes -
                         _my_offset);  // get the number of bytes owned by the session
     // last BufferChares array; read the remaining stuff

@@ -19,7 +19,7 @@ namespace Ck { namespace IO {
   /// Users should not set anything in them.
   struct Options {
     Options()
-      : peStripe(0), writeStripe(0), activePEs(-1), basePE(-1), skipPEs(-1), read_stripe(0), numReaders(0)
+      : peStripe(0), writeStripe(0), activePEs(-1), basePE(-1), skipPEs(-1), read_stride(0), numReaders(0)
       { }
 
     /// How much contiguous data (in bytes) should be assigned to each active PE
@@ -33,7 +33,7 @@ namespace Ck { namespace IO {
     /// How should active PEs be spaced out?
     int skipPEs;
     // How many bytes each Read Session should hold
-    size_t read_stripe;
+    size_t read_stride;
     // How many IO buffers should there be
     size_t numReaders;
 
@@ -43,7 +43,7 @@ namespace Ck { namespace IO {
       p|activePEs;
       p|basePE;
       p|skipPEs;
-      p|read_stripe;
+      p|read_stride;
       p | numReaders;
     }
   };
