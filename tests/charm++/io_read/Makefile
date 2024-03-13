@@ -19,7 +19,7 @@ test: iotest
 
 testp: iotest
 	$(call run, ./iotest +p$(P) $(N_BUFFER_CHARES) $(FILESIZE) $(N_READERS) 1 $(FILENAME))
-	$(call run, ./iotest +p$(P) $(2 * $(N_BUFFER_CHARES)) $(FILESIZE) $(4 * $(N_READERS)) 1 $(FILENAME))
+	$(call run, ./iotest +p$(P) $$((2 * $(N_BUFFER_CHARES))) $(FILESIZE) $$((4 * $(N_READERS))) 1 $(FILENAME))
 
 #smptest: iotest
 #	$(call run, ./iotest +p2 ++ppn 2 4)
