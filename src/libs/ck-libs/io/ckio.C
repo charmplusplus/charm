@@ -38,16 +38,9 @@ using std::min;
 using std::string;
 using namespace std::chrono;
 
+#define BUFFER_TIMEOUT_MS 0.1
 #define IO_THREADS_PER_PE 4  // TODO: this is unused?
-
-// #define CALLAFTER
-// #define BUFFER_TIMEOUT_MS .1
-
-#define YIELD
 #define IO_TIMEOUT std::chrono::microseconds(25)
-
-// TODO: cleanup debug macros
-// #define DEBUG
 
 // FROM STACKEXCHANGE:
 // https://stackoverflow.com/questions/19195183/how-to-properly-hash-the-custom-struct
@@ -130,8 +123,7 @@ class Director : public CBase_Director
 
   Director(CkMigrateMessage* m) : CBase_Director(m) {}
 
-  // TODO: remove?
-  ~Director() { CkPrintf("Destroying the director\n"); }
+  ~Director() {}
 
   void pup(PUP::er& p)
   {
@@ -219,13 +211,11 @@ class Director : public CBase_Director
   void prepareReadSessionHelper(FileToken file, size_t bytes, size_t offset,
                                 CkCallback ready, std::vector<int> pes_to_map)
   {
-    // TODO: DEBUG print statments
     if (!bytes)
     {
       CkAbort("You're tryna read 0 bytes. Oops.\n");
     }
     size_t session_bytes = bytes;  // amount of bytes in the session
-    // ckout << "In prepare read session helper" << endl;
     Options& opts = files[file].opts;
     files[file].sessionID = sessionID;
     // determine the number of reader sessions required, depending on the session size and
@@ -775,7 +765,7 @@ public:
 
   ~BufferChares()
   {
-    delete _buffer.get();
+    delete[] _buffer.get();
   }
 
   // TODO: useful for debugging?

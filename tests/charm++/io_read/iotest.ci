@@ -1,81 +1,140 @@
-mainmodule iotest {
-	include "ckio.h";
-	#define TEST_FILE "readtest.txt"
-	readonly CProxy_Main mainProxy;	 // the proxy to be used
-	mainchare Main {
-		entry Main(CkArgMsg*);
-		entry void ready(Ck::IO::FileReadyMsg* msg);
-		entry void startRead(Ck::IO::SessionReadyMsg* msg);
-		
+mainmodule iotest
+{
+  include "ckio.h";
 
-		entry void postClose(CkReductionMsg* msg){
-			serial {
-				ckout << "Entered the postClose function\n";
-				// sleep (5);
-				CkExit();
-			}
-		}
-	
-		entry void decrementCount() {
-			serial {
-				num_reads_done--;
-				ckout << "decremented the count to " << num_reads_done << endl;
-				if(!num_reads_done){
-					CkCallback cb(CkIndex_Main::postClose(0), thisProxy);
-					std::cout << "About to enter closing session\n";
-					Ck::IO::closeReadSession(current_session, cb);
-				}
-			}
+  mainchare Main
+  {
+    entry Main(CkArgMsg * m);
+    entry void ready(Ck::IO::FileReadyMsg * m);
 
-		}
+    entry void run()
+    {
+      for (i = 0; i < iters; i++)
+      {
+        serial
+        {
+          CkPrintf("-------ROUND %d-------\n", i);
+          Ck::IO::Options opts;
 
-		// method that verifies the read is correct
-		entry void testRead(Ck::IO::ReadCompleteMsg* msg) {
-			serial {
-				ckout << "At offset " << msg -> offset << ":";
-				char* seq_data = sequentialRead(msg -> offset, msg -> bytes);
-				for(size_t i = 0; i< msg -> bytes; ++i){
-					CkEnforce(seq_data[i] == msg -> data[i]);
-				}
-				delete[] seq_data;
-				delete msg;	
-				thisProxy.decrementCount();
-			}
+          opts.numReaders = numBufChares;
 
-		}
+          CkCallback opened(CkIndex_Main::ready(NULL), thisProxy);
 
-		
-		entry void startReading(){
-			serial {
-				ckout << "Starting the reading\n";
-				Ck::IO::Options opts;
-				opts.numReaders = 3;
-				CkCallback open_cb(CkIndex_Main::ready(NULL), thisProxy);
-				open_cb.setRefNum(0);
-				Ck::IO::open(TEST_FILE, open_cb, opts);
-			}
-			// after the open call, invoke this as the callback
-			when ready[0](Ck::IO::FileReadyMsg* msg) serial {
-				 _file = msg -> file;
-				 CkCallback start_read_session(CkIndex_Main::startRead(NULL), thisProxy);
-				 start_read_session.setRefNum(0);
-				 Ck::IO::startReadSession(_file, 100, 0, start_read_session); // load in 100 bytes from offset 0
-			}
-			// callback that is invoked after the read session is started
-			when startRead[0](Ck::IO::SessionReadyMsg* msg) serial {
-				current_session = msg -> session;
-				CkCallback test_read_cb(CkIndex_Main::testRead(0), thisProxy);	
-					
-				readers = CProxy_Reader::ckNew(msg -> session, 10, 0, test_read_cb, 10); // create 5 readers which will each read 23 bytes and start from offset 5 i.e 0 will read bytes [5,28), 1 is [10, 33).
+          std::string roundfile = filename;
+          char name[50];
+          // convert filename to char array name
+          strcpy(name, roundfile.c_str());
 
-			}
-		}
-	}
+          CkPrintf("Starting timers and opening file: %s\n", name);
 
+          start_time = CkWallTimer();
+          Ck::IO::open(name, opened, opts);
+        }
+        when ready(Ck::IO::FileReadyMsg * m) serial
+        {
+          f = m->file;
 
-	array [1D] Reader {
-		entry Reader(Ck::IO::Session session, size_t bytes, size_t offsets, CkCallback after_read);
-	}
+          // stage1_time = double(clock() - start_time_clock) / CLOCKS_PER_SEC * 1000;
 
+          // CkPrintf("STAGE 1: Finished in %fms\n", stage1_time);
+          // CkPrintf("STAGE 2: Starting session\n");
+
+          // stage2_start = clock();
+
+          CkCallback sessionStart(CkIndex_Main::start_read(0), thisProxy);
+          Ck::IO::startReadSession(f, fileSize, 0, sessionStart);
+
+          delete m;
+        }
+        when start_read(Ck::IO::SessionReadyMsg * m) serial
+        {
+          // clock_t stage2_end = clock();
+          // stage2_time = ((double(stage2_end - stage2_start) / CLOCKS_PER_SEC * 1000));
+
+          // CkPrintf("STAGE 2: Finished in %fms\n", stage2_time);
+          // CkPrintf("STAGE 3: Starting read.\n");
+
+          // stage3_start = clock();
+          size_t sizeToRead = fileSize / n; // only works if fileSize is a multiple of n
+          session = m->session;
+	  //CkPrintf("About to spawn testers with filename %s...\n", filename.c_str());
+          testers = CProxy_Test::ckNew(m->session, sizeToRead, filename, n);
+	  //CkPrintf("Went passed the spawning call\n");
+          delete m;
+        }
+
+        when test_read(CkReductionMsg * m) serial
+        {
+          // clock_t end_time_clock = clock();
+
+          // clock_t stage3_end = clock();
+
+          // stage3_time = ((double(stage3_end - stage3_start) / CLOCKS_PER_SEC * 1000));
+
+          // CkPrintf("STAGE 3: Finished in %fms\n", stage3_time);
+
+          // double tp = fileSize / ((double(end_time - start_time) / CLOCKS_PER_SEC * 1000)) / (1024 * 1024);
+
+          // CkPrintf("STAGE 4: Summarizing read and closing file.\n");
+
+          double totalTime = CkWallTimer() - start_time;
+          CkPrintf("Total time = %fms\n", totalTime);
+          //  CkPrintf("Stage1 = %f ms, Stage2 = %f ms, Stage3 = %f ms\n", stage1_time, stage2_time, stage3_time);
+
+          allTimes[i] = totalTime;
+
+          CkCallback cb(CkIndex_Main::sessionClosed(0), thisProxy);
+          Ck::IO::closeReadSession(session, cb);
+
+          delete m;
+        }
+
+        when sessionClosed(CkReductionMsg * m)
+            serial
+        {
+          // CkPrintf("STAGE 5: Session closed successfully. Cleaning up testers\n");
+          CkCallback closedCb(CkIndex_Main::closed(0), thisProxy);
+
+          Ck::IO::close(f, closedCb);
+          testers.ckDestroy();
+          delete m;
+        }
+        when closed(CkReductionMsg * m)
+            serial
+        {
+          delete m;
+          // CkPrintf("STAGE 6: Closed complete.\n");
+        }
+      }
+
+      serial
+      {
+        CkPrintf("-----SUMMARY------\n");
+        CkPrintf("Times: [%f", allTimes[0]);
+        double sum = allTimes[0];
+        for (int i = 1; i < iters; i++)
+        {
+          CkPrintf(", %f", allTimes[i]);
+          sum += allTimes[i];
+        }
+        CkPrintf("]\n");
+
+        CkPrintf("Average total time: %f ms\n", sum / iters);
+
+        CkExit();
+      }
+    };
+
+    entry void start_read(Ck::IO::SessionReadyMsg * m);
+    entry void test_read(CkReductionMsg * m);
+    entry void closed(CkReductionMsg * m);
+    entry void sessionClosed(CkReductionMsg * m);
+    entry void iterDone();
+  };
+
+  array[1D] Test
+  {
+    entry Test(Ck::IO::Session token, size_t bytesToRead, std::string filename);
+    entry void readDone(Ck::IO::ReadCompleteMsg * m);
+  }
 }
-#undef TEST_FILE

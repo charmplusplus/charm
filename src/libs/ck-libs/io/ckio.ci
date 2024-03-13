@@ -178,9 +178,6 @@ group[migratable] Manager
 		entry [threaded] void sendData(int read_tag, int buffer_tag, size_t offset, size_t bytes, CProxy_ReadAssembler ra, int pe);
 
 		entry [reductiontarget] void printTime(double time_taken);
-
-
-		entry void zeroCopyCallback(size_t offset, double time);
 	};
         
 	group Map :

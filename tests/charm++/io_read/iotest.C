@@ -1,49 +1,120 @@
 #include "iotest.decl.h"
 #include <vector>
-#include <fstream>
-#define TEST_FILE "readtest.txt"
-#define NUM_READERS 10
-CProxy_Main mainProxy;
+#include <time.h>
+#include <assert.h>
+#include <iostream>
+CProxy_Main mainproxy;
+std::string global_fname;
+class Main : public CBase_Main
+{
+  Main_SDAG_CODE
 
+      CProxy_Test testers;
+  int n;
 
-class Main : public CBase_Main {
-	Main_SDAG_CODE;
-	Ck::IO::File _file; // the file that is going to be opened
-	CProxy_Reader readers; // holds the array of readers
-	size_t num_reads_done = NUM_READERS; // initialize the number of reads to 10 and count down
-	Ck::IO::Session current_session;
+  Ck::IO::Session session;
+  Ck::IO::File f;
+
+  size_t fileSize;
+  int i;
+  int iters;
+  double allTimes[10];
+  double avgTime;
+  double avg1;
+  double avg2;
+  double avg3;
+
+  double start_time;
+  // clock_t start_time_clock;
+  // clock_t stage3_start;
+  // clock_t stage2_start;
+
+  // double stage1_time;
+  // double stage2_time;
+  // double stage3_time;
+
+  int numBufChares;
+  int numBufRemaining;
+  std::string filename;
+
 public:
-	Main(CkArgMsg* msg){
-		thisProxy.startReading();
-	}
-	// returns a buffer of a sequential read so that the parallel read at offset with number of bytes length can be verified
-	char* sequentialRead(size_t offset, size_t bytes){
-		char* buffer = new char[bytes + 1];
-		int pos = 0;
-		std::ifstream ifs(TEST_FILE, std::ios::in | std::ios::binary);
-		ifs.seekg(offset);
+  Main(CkArgMsg *m)
+  {
+    numBufChares = atoi(m->argv[1]); // arg 1 = number of buffer chares
 
-		while(pos < bytes){
-			buffer[pos++] = ifs.get();
-		}
-		buffer[bytes] = 0;
-		ifs.close();
-		return buffer;
-	}
+    fileSize = atoi(m->argv[2]);// file size = arg 2
 
+    n = atoi(m->argv[3]); // arg 3 = number of readers
+
+    iters = atoi(m->argv[4]); // arg 4 = number of test iterations
+
+    std::string fn(m->argv[5]);
+    filename = fn;
+    global_fname = fn;
+    CkPrintf("Reached this point ig\n");
+    mainproxy = thisProxy;
+    thisProxy.run(); // open files
+    delete m;
+  }
+
+  void iterDone()
+  {
+    CkExit();
+  }
 };
 
-// object that is used to enact the parallel reads
-struct Reader : public CBase_Reader {
+class Test : public CBase_Test
+{
+  char *dataBuffer;
+  int size;
+  std::string _fname;
 
 public:
-	Reader(Ck::IO::Session session, size_t bytes, size_t offset, CkCallback after_read){
-		size_t my_offset = offset + thisIndex * 10; // the offset to read at; note that it is 10 because the test file is 100 bytes and there are 10 readers, so each reader will read 10 bytes
-		ckout << "My offset for reader " << thisIndex << " is " << my_offset << endl;
-		Ck::IO::read(session, bytes, my_offset, after_read); 
-	}
+  Test(Ck::IO::Session token, size_t bytesToRead, std::string filename)
+  {
+    CkPrintf("Inside the constructor of tester %d\n", thisIndex);
+    _fname = filename; 
+    CkCallback sessionEnd(CkIndex_Test::readDone(0), thisProxy[thisIndex]);
+    try
+    {
+      dataBuffer = new char[bytesToRead];
+    }
+    catch (const std::bad_alloc &e)
+    {
+      CkPrintf("ERROR: Data buffer malloc of %zu bytes in Test chare %d failed.\n", bytesToRead, thisIndex);
+      CkExit();
+    }
+    size = bytesToRead;
+    Ck::IO::read(token, bytesToRead, bytesToRead * thisIndex, dataBuffer, sessionEnd);
+  }
 
+  Test(CkMigrateMessage *m) {}
+
+  void readDone(Ck::IO::ReadCompleteMsg *m)
+  {
+    CkCallback done(CkIndex_Main::test_read(0), mainproxy);
+    FILE* fp = fopen(_fname.c_str(), "r");
+    if(!fp){
+	CkPrintf("FILE* is null on %d for file %s\n", thisIndex, _fname.c_str());
+    }
+    CkPrintf("On reader[%d], Tryin to seek to %zu\n", thisIndex, (m -> offset));
+    int ret = fseek(fp, m -> offset, SEEK_SET);
+    if(ret){
+	CkPrintf("Something didn't return correctly in the fseek\n");
+    }
+    char* verify_buffer = new char[m -> bytes];
+    fread(verify_buffer, 1, m -> bytes, fp);
+    for(int i = 0; i < size; ++i){
+	if(verify_buffer[i] != dataBuffer[i]) {
+		CkPrintf("From reader %d, offset=%d, bytes=%d, verify_buuffer[%d]=%c, dataBuffer[%d]=%c\n", thisIndex, (m -> offset), (m -> bytes), i, verify_buffer[i], i, dataBuffer[i]);
+	} 
+	assert(verify_buffer[i] == dataBuffer[i]);
+    }
+    delete[] verify_buffer;
+    delete[] dataBuffer;
+    CkPrintf("Index %d is now done with the reads...\n", thisIndex);
+    contribute(done);
+  }
 };
 
 #include "iotest.def.h"
-#undef TEST_FILE
