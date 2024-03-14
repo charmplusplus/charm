@@ -13,17 +13,17 @@ iotest: iotest.ci iotest.C
 	$(CHARMC) iotest.C -o $@ -module CkIO
 
 test: iotest
-	# dd if=/dev/urandom of=large_test.txt bs=64M count=16 iflag=fullblock
-	$(call run, ./iotest +p2 $(N_BUFFER_CHARES) $(FILESIZE) $(N_READERS) 1 $(FILENAME))
-	$(call run, ./iotest +p4 $(N_BUFFER_CHARES) $(FILESIZE) $(N_READERS) 1 $(FILENAME))
+	#dd if=/dev/urandom of=large_test.txt bs=64M count=16 iflag=fullblock
+	$(call run, ./iotest +p2 $(N_BUFFER_CHARES) $(FILESIZE) $(N_READERS) $(FILENAME))
+	$(call run, ./iotest +p4 $(N_BUFFER_CHARES) $(FILESIZE) $(N_READERS) $(FILENAME))
 
 testp: iotest
-	$(call run, ./iotest +p$(P) $(N_BUFFER_CHARES) $(FILESIZE) $(N_READERS) 1 $(FILENAME))
-	$(call run, ./iotest +p$(P) $$((2 * $(N_BUFFER_CHARES))) $(FILESIZE) $$((4 * $(N_READERS))) 1 $(FILENAME))
+	$(call run, ./iotest +p$(P) $(N_BUFFER_CHARES) $(FILESIZE) $(N_READERS)$(FILENAME))
+	$(call run, ./iotest +p$(P) $$((2 * $(N_BUFFER_CHARES))) $(FILESIZE) $$((4 * $(N_READERS))) $(FILENAME))
 
-#smptest: iotest
-#	$(call run, ./iotest +p2 ++ppn 2 4)
-#	$(call run, ./iotest +p4 ++ppn 2 4)
+smptest: iotest
+	$(call run, ./iotest +p2 ++ppn 2 $(N_BUFFER_CHARES) $(FILESIZE) $(N_READERS) $(FILENAME))
+	$(call run, ./iotest +p4 ++ppn 2 $(N_BUFFER_CHARES) $(FILESIZE) $(N_READERS) $(FILENAME))
 
 clean:
 	rm -f *.o *.decl.h *.def.h iotest test*
