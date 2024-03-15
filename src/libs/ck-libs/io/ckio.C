@@ -21,10 +21,10 @@ typedef int FileToken;
 #  include <unistd.h>
 #endif
 
-#include <map>
-#include <string>
 #include <chrono>
 #include <future>  // used for async
+#include <map>
+#include <string>
 
 #include "fs_parameters.h"
 
@@ -38,9 +38,9 @@ using std::min;
 using std::string;
 using namespace std::chrono;
 
-#define BUFFER_TIMEOUT_MS 0.1
-#define IO_THREADS_PER_PE 4  // TODO: this is unused?
-#define IO_TIMEOUT std::chrono::microseconds(25)
+// #define BUFFER_TIMEOUT_MS 0.1
+// #define IO_THREADS_PER_PE 4  // TODO: this is unused?
+// #define IO_TIMEOUT std::chrono::microseconds(25)
 
 // FROM STACKEXCHANGE:
 // https://stackoverflow.com/questions/19195183/how-to-properly-hash-the-custom-struct
@@ -720,11 +720,10 @@ public:
  */
 class BufferChares : public CBase_BufferChares
 {
-private:
-  FileToken _token;        // the token of the given file
-  const FileInfo* _file;   // the pointer to the FileInfo
-  size_t _session_bytes;   // number of bytes in the session
-  size_t _session_offset;  // the offset of the session
+  BufferChares_SDAG_CODE private : FileToken _token;  // the token of the given file
+  const FileInfo* _file;                              // the pointer to the FileInfo
+  size_t _session_bytes;                              // number of bytes in the session
+  size_t _session_offset;                             // the offset of the session
   size_t _my_offset;
   size_t _my_bytes;
   std::shared_future<char*> _buffer;
@@ -761,11 +760,25 @@ public:
 
     double disk_read_end_ck = CkWallTimer();
     double total_time_ms_ck = (disk_read_end_ck - disk_read_start_ck) * 1000;
+
+    thisProxy[thisIndex].monitorRead();
   }
 
-  ~BufferChares()
+  ~BufferChares() { delete[] _buffer.get(); }
+
+  void monitorRead()
   {
-    delete[] _buffer.get();
+    while (_buffer.wait_for(std::chrono::microseconds(0)) != std::future_status::ready)
+    {
+      // "Call after" implementation
+      // CcdCallFnAfter((CcdVoidFn)CthAwaken, CthSelf(),
+      //                BUFFER_TIMEOUT_MS);  // timeout in ms
+      // CthSuspend();
+
+      CthYield();
+    }
+
+    thisProxy[thisIndex].bufferReady();
   }
 
   // TODO: useful for debugging?
@@ -824,8 +837,8 @@ public:
    * BufferChare data.. Note that offset and bytes are with respect to the overall file
    * itself
    */
-  void sendData(int read_tag, int buffer_tag, size_t offset, size_t bytes,
-                CProxy_ReadAssembler ra, int pe)
+  void sendDataHandler(int read_tag, int buffer_tag, size_t offset, size_t bytes,
+                       CProxy_ReadAssembler ra, int pe)
   {
     size_t chare_offset;
     size_t chare_bytes;
@@ -847,12 +860,7 @@ public:
         min(offset + bytes,
             _my_offset + _my_bytes);  // the last byte, exclusive, this chare should read
     size_t bytes_to_read = end_byte_chare - chare_offset;
-    while (_buffer.wait_for(std::chrono::microseconds(0)) != std::future_status::ready)
-    {
-      CcdCallFnAfter((CcdVoidFn)CthAwaken, CthSelf(),
-                     BUFFER_TIMEOUT_MS);  // timeout in ms
-      CthSuspend();
-    }
+
     char* buffer = _buffer.get();  // future call to get
     CProxy_ReadAssembler(ra)[pe].shareData(
         read_tag, buffer_tag, chare_offset, bytes_to_read,
