@@ -3,7 +3,6 @@
 #include <iostream>
 #include <sstream>
 #include <time.h>
-#include <unistd.h>
 #include <unordered_set>
 
 typedef int FileToken;
