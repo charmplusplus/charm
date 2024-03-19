@@ -2,11 +2,18 @@ set(ampi-cxx-sources ampi.C ampiMisc.C ampiOneSided.C ampif.C ddt.C mpich-alltoa
 
 set(ampi-f90-sources ampimod.f90)
 
-set(ampi-h-sources ampi.h ampi-interoperate.h ampif.h ampiimpl.h ddt.h ampi_functions.h ampi_funcptr.h ampi_funcptr_loader.h
+set(ampi-h-sources ampi.h ampi-interoperate.h ampiimpl.h ddt.h ampi_functions.h ampi_funcptr.h ampi_funcptr_loader.h
                    romio-stub/mpio_globals.h)
 
+if(CMK_CAN_LINK_FORTRAN)
+    set(ampi-h-sources ${ampi-h-sources} ampif.h)
+endif()
+
 if(NOT CMK_AMPI_WITH_ROMIO)
-    set(ampi-h-sources ${ampi-h-sources} romio-stub/mpio_functions.h romio-stub/mpio.h romio-stub/mpiof.h)
+    set(ampi-h-sources ${ampi-h-sources} romio-stub/mpio_functions.h romio-stub/mpio.h)
+    if(CMK_CAN_LINK_FORTRAN)
+        set(ampi-h-sources ${ampi-h-sources} romio-stub/mpiof.h)
+    endif()
 endif()
 
 add_library(ampi-compat
@@ -119,18 +126,22 @@ configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/ampicc         @ONLY)
 configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/               @ONLY)
 configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/ampicxx        @ONLY)
 configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/ampic++        @ONLY)
-configure_file(ampif77       ${CMAKE_BINARY_DIR}/bin/               COPYONLY)
-configure_file(ampif90       ${CMAKE_BINARY_DIR}/bin/               COPYONLY)
-configure_file(ampif90       ${CMAKE_BINARY_DIR}/bin/ampifort       COPYONLY)
+if(CMK_CAN_LINK_FORTRAN)
+    configure_file(ampif77       ${CMAKE_BINARY_DIR}/bin/               COPYONLY)
+    configure_file(ampif90       ${CMAKE_BINARY_DIR}/bin/               COPYONLY)
+    configure_file(ampif90       ${CMAKE_BINARY_DIR}/bin/ampifort       COPYONLY)
+endif()
 configure_file(ampirun       ${CMAKE_BINARY_DIR}/bin/               COPYONLY)
 configure_file(ampirun       ${CMAKE_BINARY_DIR}/bin/ampiexec       COPYONLY)
 configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/mpicc.ampi     @ONLY)
 configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/mpiCC.ampi     @ONLY)
 configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/mpicxx.ampi    @ONLY)
 configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/mpic++.ampi    @ONLY)
-configure_file(ampif77       ${CMAKE_BINARY_DIR}/bin/mpif77.ampi    COPYONLY)
-configure_file(ampif90       ${CMAKE_BINARY_DIR}/bin/mpif90.ampi    COPYONLY)
-configure_file(ampif90       ${CMAKE_BINARY_DIR}/bin/mpifort.ampi   COPYONLY)
+if(CMK_CAN_LINK_FORTRAN)
+    configure_file(ampif77       ${CMAKE_BINARY_DIR}/bin/mpif77.ampi    COPYONLY)
+    configure_file(ampif90       ${CMAKE_BINARY_DIR}/bin/mpif90.ampi    COPYONLY)
+    configure_file(ampif90       ${CMAKE_BINARY_DIR}/bin/mpifort.ampi   COPYONLY)
+endif()
 configure_file(ampirun       ${CMAKE_BINARY_DIR}/bin/mpirun.ampi    COPYONLY)
 configure_file(ampirun       ${CMAKE_BINARY_DIR}/bin/mpiexec.ampi   COPYONLY)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/bin/ampi/)
@@ -138,9 +149,11 @@ configure_file(pathstub.sh   ${CMAKE_BINARY_DIR}/bin/ampi/mpicc     COPYONLY)
 configure_file(pathstub.sh   ${CMAKE_BINARY_DIR}/bin/ampi/mpiCC     COPYONLY)
 configure_file(pathstub.sh   ${CMAKE_BINARY_DIR}/bin/ampi/mpicxx    COPYONLY)
 configure_file(pathstub.sh   ${CMAKE_BINARY_DIR}/bin/ampi/mpic++    COPYONLY)
-configure_file(pathstub.sh   ${CMAKE_BINARY_DIR}/bin/ampi/mpif77    COPYONLY)
-configure_file(pathstub.sh   ${CMAKE_BINARY_DIR}/bin/ampi/mpif90    COPYONLY)
-configure_file(pathstub.sh   ${CMAKE_BINARY_DIR}/bin/ampi/mpifort   COPYONLY)
+if(CMK_CAN_LINK_FORTRAN)
+    configure_file(pathstub.sh   ${CMAKE_BINARY_DIR}/bin/ampi/mpif77    COPYONLY)
+    configure_file(pathstub.sh   ${CMAKE_BINARY_DIR}/bin/ampi/mpif90    COPYONLY)
+    configure_file(pathstub.sh   ${CMAKE_BINARY_DIR}/bin/ampi/mpifort   COPYONLY)
+endif()
 configure_file(pathstub.sh   ${CMAKE_BINARY_DIR}/bin/ampi/mpirun    COPYONLY)
 configure_file(pathstub.sh   ${CMAKE_BINARY_DIR}/bin/ampi/mpiexec   COPYONLY)
 
@@ -160,7 +173,9 @@ foreach(file ${ampi-h-sources})
 endforeach(file)
 
 configure_file(libmoduleampi.dep  ${CMAKE_BINARY_DIR}/lib COPYONLY)
-configure_file(libmoduleampif.dep ${CMAKE_BINARY_DIR}/lib COPYONLY)
+if(CMK_CAN_LINK_FORTRAN)
+    configure_file(libmoduleampif.dep ${CMAKE_BINARY_DIR}/lib COPYONLY)
+endif()
 
 
 # ROMIO
@@ -345,10 +360,27 @@ if(CMK_AMPI_WITH_ROMIO)
         ${romio_dir}/mpi-io/write_sh${obj_suf}
     )
 
+    set(romio_stub_headers
+        ${CMAKE_CURRENT_SOURCE_DIR}/romio-stub/mpio.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/romio-stub/mpio_functions.h
+    )
+    set(romio_headers
+        ${romio_dir}/include/mpio.h
+        ${romio_dir}/include/mpio_functions.h
+    )
+
     if(CMK_CAN_LINK_FORTRAN)
-        set(romio_f77 yes)
+        set(romio_enable_fortran yes)
+        set(romio_stub_headers
+            ${romio_stub_headers}
+            ${CMAKE_CURRENT_SOURCE_DIR}/romio-stub/mpiof.h
+        )
+        set(romio_headers
+            ${romio_headers}
+            ${romio_dir}/include/mpiof.h
+        )
     else()
-        set(romio_f77 no)
+        set(romio_enable_fortran no)
     endif()
 
     set_source_files_properties(
@@ -366,13 +398,12 @@ if(CMK_AMPI_WITH_ROMIO)
     include(ExternalProject)
     ExternalProject_Add(romio
         URL ${CMAKE_CURRENT_SOURCE_DIR}/romio
-        CONFIGURE_COMMAND cp -f ${CMAKE_CURRENT_SOURCE_DIR}/romio-stub/mpio.h ${CMAKE_BINARY_DIR}/include/ &&
-        CONFIGURE_COMMAND cp -f ${CMAKE_CURRENT_SOURCE_DIR}/romio-stub/mpiof.h ${CMAKE_BINARY_DIR}/include/ &&
-        CONFIGURE_COMMAND cp -f ${CMAKE_CURRENT_SOURCE_DIR}/romio-stub/mpio_functions.h ${CMAKE_BINARY_DIR}/include/ &&
+        CONFIGURE_COMMAND cp -f ${romio_stub_headers} ${CMAKE_BINARY_DIR}/include/ &&
         CONFIGURE_COMMAND cd ${romio_dir} &&
             ./configure
             --disable-aio
-            --enable-f77=${romio_f77}
+            --enable-f77=${romio_enable_fortran}
+            --enable-f90=${romio_enable_fortran}
             --enable-static=yes
             --enable-shared=no
             --disable-weak-symbols
@@ -396,9 +427,7 @@ if(CMK_AMPI_WITH_ROMIO)
             USER_CFLAGS=${ROMIO_FLAGS}
             USER_FFLAGS=${ROMIO_FLAGS}
             > /dev/null
-        COMMAND cp -f ${romio_dir}/include/mpio.h ${CMAKE_BINARY_DIR}/include/
-        COMMAND cp -f ${romio_dir}/include/mpiof.h ${CMAKE_BINARY_DIR}/include/
-        COMMAND cp -f ${romio_dir}/include/mpio_functions.h ${CMAKE_BINARY_DIR}/include/
+        COMMAND cp -f ${romio_headers} ${CMAKE_BINARY_DIR}/include/
         BUILD_COMMAND $(MAKE) -C ${romio_dir} AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=: V=$(VERBOSE)
         INSTALL_COMMAND ""
         LIST_SEPARATOR ^^

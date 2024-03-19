@@ -154,7 +154,21 @@ fi
 
 if [[ $LOCAL -eq 1 ]]
 then
-  runCmd "${args[@]}" +p "$nodes"
+    runCmd "${args[@]}" +p "$nodes"
+elif [[ -n "$SLURM_JOB_ID" ]]
+then
+    #use srun
+    # srun in a cray-shasta environment should support --mpi=cray-shasta regardless, the question here is how this charm was built
+    # assume built with craype  if that is loaded
+    craype=`module -t list craype | grep craype`
+    if [[ $? -eq 0 ]]
+    then
+	runCmd srun --mpi=cray_shasta -n "$nodes" "${args[@]}"
+    else
+ 	#someday this should be pmix, but our pmix launcher needs some work
+	# on machines like NCSA Delta this is the most robust solution known to me
+	runCmd srun --mpi=pmi2 -n "$nodes" "${args[@]}"
+    fi	
 elif [[ -n "$PBS_NODEFILE" ]]
 then
 # we are in a job shell
@@ -187,7 +201,7 @@ then
 elif [[ -n "$LSB_HOSTS" ]]
 then
 # Tungsten
-  runCmd cmpirun -lsf -poll -no_smp -gm_long 200000 "${args[@]}"
+    runCmd cmpirun -lsf -poll -no_smp -gm_long 200000 "${args[@]}"
 elif [[ -n "$PBS_QUEUE" || -n "$LSF_QUEUE" ]]
 then
 # Interactive mode: create, and submit a batch job

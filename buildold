@@ -35,7 +35,7 @@ syntax() {
   ( cd "$src" ; ls -1 | egrep -v '(^mpi$)|(^netlrts?$)|(^multicore$)|(^util$)|(^common$)|(^win$)|(^gni$)|(^pami(lrts)?$)|(^verbs$)|(^ofi$)|(^ucx$)|(^template$)|(^cuda$)' | pr -3 -t )
   echo ''
   echo '<options>: compiler and platform specific options'
-  echo 'icc iccstatic xlc xlc64 gcc clang icx pgcc cc mpicxx'
+  echo 'icc iccstatic xlc xlc64 gcc clang icx pgcc cc mpicxx nvhpc'
   echo 'help smp omp tcp ooc syncft papi pthreads'
   echo '--incdir --libdir --basedir --build-shared --destination --suffix -j'
   if [[ "$more" = '1' ]]
@@ -51,6 +51,7 @@ syntax() {
   echo '  clang           Clang C/C++ compiler'
   echo '  icx             Intel oneAPI DPC++/C++ compiler'
   echo '  pgcc            Portland Group compilers'
+  echo '  nvhpc           NVIDIA HPC compiler'
   echo ''
   echo 'Choose an alternative fortran compiler (only one option is allowed from this section):'
   echo '  gfortran        GNU Fortran compiler'
@@ -58,6 +59,7 @@ syntax() {
   echo '  xlf             IBM XL Fortran compiler'
   echo '  ifort           Intel Fortran compiler'
   echo "  pgf90           Portland Group Fortran compiler"
+  echo "  nvfortran       NVIDIA HPC Fortran compiler"
   echo ''
   echo 'Platform specific options (choose multiple if apply):'
   echo '  smp             support for SMP, multithreaded charm on each node'

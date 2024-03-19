@@ -10,7 +10,7 @@
 # - the buildcmake script
 # - files in cmake/
 
-cmake_minimum_required(VERSION 3.4)
+cmake_minimum_required(VERSION 3.4...3.5)
 
 # Print warning
 message("##################################################################")
@@ -23,6 +23,10 @@ message("##################################################################")
 
 if(CMAKE_VERSION VERSION_GREATER 3.12 OR CMAKE_VERSION VERSION_EQUAL 3.12)
   cmake_policy(SET CMP0075 NEW)
+
+  if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.17)
+    cmake_policy(SET CMP0102 NEW)
+  endif()
 endif()
 
 # Fortran is optional, so don't include it in LANGUAGES here
@@ -68,6 +72,8 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Cray")
   set(CMK_COMPILER craycc)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "PGI")
   set(CMK_COMPILER pgcc)
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "NVHPC")
+  set(CMK_COMPILER nvhpc)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "XL")
   # FIXME: No support for 32-bit XLC
   set(CMK_COMPILER xlc64)
@@ -77,12 +83,12 @@ else()
   message(FATAL_ERROR "Unknown compiler ${CMAKE_CXX_COMPILER_ID}")
 endif()
 
+option(ENABLE_FORTRAN "Enable Fortran" ON)
+
 # No Fortran support with MSVC
-if(NOT CMK_COMPILER STREQUAL "msvc")
+if(NOT CMK_COMPILER STREQUAL "msvc" AND ENABLE_FORTRAN)
   enable_language(Fortran OPTIONAL)
 endif()
-
-option(ENABLE_FORTRAN "Enable Fortran" ON)
 
 if(ENABLE_FORTRAN AND CMAKE_Fortran_COMPILER)
   include(FortranCInterface)
@@ -326,16 +332,27 @@ endif()
 
 # Check for Python
 # PythonCCS requires Python v2.x and is the only target that uses this
-# With CMake 3.12+ we could use FindPython() here
 set(CMK_HAS_PYTHON 0)
 set(CMK_PYTHON_VERSION "")
 set(CMK_BUILD_PYTHON "")
 
-set(Python_ADDITIONAL_VERSIONS 2)
-find_package(PythonInterp)
+if(CMAKE_VERSION VERSION_GREATER 3.12 OR CMAKE_VERSION VERSION_EQUAL 3.12)
+  find_package(Python2 COMPONENTS Interpreter)
+  if(Python2_FOUND)
+    set(CMK_PYTHON_VERSION_MAJOR ${Python2_VERSION_MAJOR})
+    set(CMK_PYTHON_VERSION_MINOR ${Python2_VERSION_MINOR})
+  endif()
+else()
+  set(Python_ADDITIONAL_VERSIONS 2)
+  find_package(PythonInterp)
+  if(PYTHONINTERP_FOUND)
+    set(CMK_PYTHON_VERSION_MAJOR ${PYTHON_VERSION_MAJOR})
+    set(CMK_PYTHON_VERSION_MINOR ${PYTHON_VERSION_MINOR})
+  endif()
+endif()
 
-if(PYTHONINTERP_FOUND)
-  set(__MY_PYTHON_VER "${PYTHON_VERSION_MAJOR}.${PYTHON_VERSION_MINOR}")
+if(CMK_PYTHON_VERSION_MAJOR)
+  set(__MY_PYTHON_VER "${CMK_PYTHON_VERSION_MAJOR}.${CMK_PYTHON_VERSION_MINOR}")
   check_include_file(python${__MY_PYTHON_VER}/Python.h __MY_HAS_PYTHONH)
   if(__MY_HAS_PYTHONH)
     set(CMK_HAS_PYTHON 1)
@@ -587,11 +604,13 @@ set(CMK_ENABLE_C11   ${CMAKE_C11_EXTENSION_COMPILE_OPTION})
 
 # Use -std=gnu++11 if available
 if(NOT "${CMAKE_CXX11_EXTENSION_COMPILE_OPTION}" STREQUAL "")
-  set(OPTS_CXX "${OPTS_CXX} ${CMAKE_CXX11_EXTENSION_COMPILE_OPTION}")
-  set(CMK_ENABLE_CPP11 ${CMAKE_CXX11_EXTENSION_COMPILE_OPTION})
+  string(REPLACE ";" " " MY_CMAKE_CXX11_EXTENSION_COMPILE_OPTION "${CMAKE_CXX11_EXTENSION_COMPILE_OPTION}")
+  set(OPTS_CXX "${OPTS_CXX} ${MY_CMAKE_CXX11_EXTENSION_COMPILE_OPTION}")
+  set(CMK_ENABLE_CPP11 ${MY_CMAKE_CXX11_EXTENSION_COMPILE_OPTION})
 else()
-  set(OPTS_CXX "${OPTS_CXX} ${CMAKE_CXX11_STANDARD_COMPILE_OPTION}")
-  set(CMK_ENABLE_CPP11 ${CMAKE_CXX11_STANDARD_COMPILE_OPTION})
+  string(REPLACE ";" " " MY_CMAKE_CXX11_STANDARD_COMPILE_OPTION "${CMAKE_CXX11_STANDARD_COMPILE_OPTION}")
+  set(OPTS_CXX "${OPTS_CXX} ${MY_CMAKE_CXX11_STANDARD_COMPILE_OPTION}")
+  set(CMK_ENABLE_CPP11 ${MY_CMAKE_CXX11_STANDARD_COMPILE_OPTION})
 endif()
 
 set(CMK_CC ${CMAKE_C_COMPILER})
@@ -617,6 +636,8 @@ configure_file(src/arch/common/cc-craycc.h                   include/ COPYONLY)
 configure_file(src/arch/common/cc-craycc.sh                  include/ COPYONLY)
 configure_file(src/arch/common/cc-msvc.h                     include/ COPYONLY)
 configure_file(src/arch/common/cc-msvc.sh                    include/ COPYONLY)
+configure_file(src/arch/common/cc-nvhpc.sh                   include/ COPYONLY)
+configure_file(src/arch/common/cc-nvhpc.h                    include/ COPYONLY)
 configure_file(src/arch/common/cc-pgcc.h                     include/ COPYONLY)
 configure_file(src/arch/common/cc-pgcc.sh                    include/ COPYONLY)
 configure_file(src/arch/common/cc-icc.sh                     include/ COPYONLY)
@@ -644,6 +665,8 @@ configure_file(src/arch/common/conv-mach-ifort.sh            include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-ifort.h             include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-nolb.h              include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-nolb.sh             include/ COPYONLY)
+configure_file(src/arch/common/conv-mach-nvfortran.sh        include/ COPYONLY)
+configure_file(src/arch/common/conv-mach-nvfortran.h         include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-omp.sh              include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-omp.h               include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-ooc.h               include/ COPYONLY)
@@ -670,9 +693,19 @@ if(CUDA)
     configure_file(${file} include/ COPYONLY)
   endforeach()
 
-  find_package(CUDA REQUIRED)
-  set(CUDA_DIR ${CUDA_TOOLKIT_ROOT_DIR})
+  if(CMAKE_VERSION VERSION_GREATER 3.17 OR CMAKE_VERSION VERSION_EQUAL 3.17)
+    find_package(CUDAToolkit REQUIRED)
+    set(CMAKE_CUDA_COMPILER "${CUDAToolkit_NVCC_EXECUTABLE}")
+    enable_language(CUDA)
+    set(CUDA_DIR "${CUDAToolkit_TARGET_DIR}")
+  else()
+    find_package(CUDA REQUIRED)
+    set(CUDA_DIR "${CUDA_TOOLKIT_ROOT_DIR}")
+  endif()
   add_library(cudahybridapi ${hybridAPI-cxx-sources})
+  if(TRACING)
+    target_compile_definitions(cudahybridapi PRIVATE HAPI_TRACE)
+  endif()
 endif()
 
 if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-pxshm.sh)
@@ -772,7 +805,7 @@ set(src-util-h-sources src/util/SSE-Double.h src/util/SSE-Float.h
     src/util/partitioning_strategies.h src/util/pup.h src/util/pup_c.h
     src/util/pup_cmialloc.h src/util/pup_mpi.h src/util/pup_paged.h
     src/util/pup_stl.h src/util/pup_toNetwork.h src/util/pup_toNetwork4.h
-    src/util/pupf.h src/util/rand48_replacement.h src/util/random_sequence.h
+    src/util/rand48_replacement.h src/util/random_sequence.h
     src/util/simd.h src/util/sockRoutines.h src/util/spanningTree.h
     src/util/spanningTreeStrategy.h src/util/spanningTreeVertex.h
     src/util/strided_sequence.h src/util/treeStrategy_3dTorus_minBytesHops.h
@@ -781,6 +814,13 @@ set(src-util-h-sources src/util/SSE-Double.h src/util/SSE-Float.h
     src/util/treeStrategy_nodeAware_minGens.h src/util/treeStrategy_topoUnaware.h
     src/util/uFcontext.h src/util/uJcontext.h src/util/valgrind.h
     src/util/vector2d.h)
+
+if(CMK_CAN_LINK_FORTRAN)
+    set(src-util-h-sources
+        ${src-util-h-sources}
+        src/util/pupf.h
+    )
+endif()
 
 foreach(filename ${src-util-h-sources})
     configure_file(${filename} include/ COPYONLY)
@@ -896,7 +936,17 @@ configure_file(src/libs/ck-libs/NDMeshStreamer/libmoduleNDMeshStreamer.dep ${CMA
 
 # TCharm
 file(GLOB tcharm-c-sources src/libs/ck-libs/tcharm/*.c)
-file(GLOB tcharm-h-sources src/libs/ck-libs/tcharm/*.h)
+set(tcharm-h-sources
+    src/libs/ck-libs/tcharm/tcharm.h
+    src/libs/ck-libs/tcharm/tcharm_impl.h
+    src/libs/ck-libs/tcharm/tcharmc.h
+)
+if(CMK_CAN_LINK_FORTRAN)
+    set(tcharm-h-sources
+        ${tcharm-h-sources}
+        src/libs/ck-libs/tcharm/tcharmf.h
+    )
+endif()
 add_library(moduletcharm src/libs/ck-libs/tcharm/tcharm.C ${tcharm-h-sources} ${CMAKE_BINARY_DIR}/include/tcharm.decl.h)
 add_library(moduletcharmmain src/libs/ck-libs/tcharm/tcharmmain.C ${CMAKE_BINARY_DIR}/include/tcharm.decl.h ${CMAKE_BINARY_DIR}/include/tcharmmain.decl.h)
 add_library(tcharm-compat ${tcharm-c-sources} ${CMAKE_BINARY_DIR}/include/tcharm.decl.h ${CMAKE_BINARY_DIR}/include/tcharmmain.decl.h)
@@ -1192,7 +1242,7 @@ install(
   DESTINATION .)
 endif()
 
-#install all executables
+# install all executables
 install(
   DIRECTORY ${CMAKE_BINARY_DIR}/bin
   DESTINATION .
