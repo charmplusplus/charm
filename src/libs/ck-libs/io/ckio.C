@@ -7,6 +7,7 @@
 #include <unordered_set>
 
 typedef int FileToken;
+
 #include "CkIO.decl.h"
 #include "CkIO_impl.decl.h"
 
@@ -21,10 +22,10 @@ typedef int FileToken;
 #  include <unistd.h>
 #endif
 
-#include <map>
-#include <string>
 #include <chrono>
 #include <future>  // used for async
+#include <map>
+#include <string>
 
 #include "fs_parameters.h"
 
@@ -199,7 +200,6 @@ class Director : public CBase_Director
     CkAssert(files[file].complete.isInvalid());
     files[file].complete = complete;
   }
-
 
   /**
    * prepareReadSessionHelper does all of the heavy lifting when trying to create the read
@@ -764,10 +764,7 @@ public:
     double total_time_ms_ck = (disk_read_end_ck - disk_read_start_ck) * 1000;
   }
 
-  ~BufferChares()
-  {
-    delete[] _buffer.get();
-  }
+  ~BufferChares() { delete[] _buffer.get(); }
 
   // TODO: useful for debugging?
   void printTime(double time_taken)
@@ -787,26 +784,24 @@ public:
     char* buffer = new char[_my_bytes];
     //    CkPrintf("Allocating buffer on chare %d at addr %p.\n", thisIndex, buffer);
 
-    int fd = open64(_file->name.c_str(), O_RDONLY);  // open the file pointer
+    int fd = ::open(_file->name.c_str(), O_RDONLY, S_IRUSR | S_IWUSR);
+
     if (fd == -1)
     {
       CkPrintf("Opening of the file %s went wrong\n", _file->name.c_str());
     }
 
-    if (lseek64(fd, _my_offset, SEEK_SET) == -1)
+    if (lseek(fd, _my_offset, SEEK_SET) == -1)
     {
       CkPrintf("Lseek buffer chare failed.\n");
     }
 
     size_t num_bytes_read = ::read(fd, buffer, (int)_my_bytes);
-    if (!num_bytes_read)
+
+    if (num_bytes_read != _my_bytes)
     {
-      CkPrintf("Didn't read anything?.\n");
-    }
-    else if (num_bytes_read != _my_bytes)
-    {
-      CkPrintf("Supposed to read %zu bytes, but only read %zu bytes\n", _my_bytes,
-               num_bytes_read);
+      CkAbort("CKIO Reader: supposed to read %zu bytes, but only read %zu bytes\n",
+              _my_bytes, num_bytes_read);
     }
     ::close(fd);
     return buffer;
