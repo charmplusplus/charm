@@ -787,12 +787,12 @@ public:
 
     if (fd == -1)
     {
-      CkPrintf("Opening of the file %s went wrong\n", _file->name.c_str());
+      CkAbort("Opening of the file %s went wrong\n", _file->name.c_str());
     }
 
     if (lseek(fd, _my_offset, SEEK_SET) == -1)
     {
-      CkPrintf("Lseek buffer chare failed.\n");
+      CkAbort("Lseek buffer chare failed.\n");
     }
 
     size_t num_bytes_read = ::read(fd, buffer, (int)_my_bytes);
