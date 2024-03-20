@@ -778,6 +778,38 @@ public:
   /*
 
   */
+#if defined(_WIN32)
+  char* readDataWIN32()
+  {
+    char* buffer = new char[_my_bytes];
+    //    CkPrintf("Allocating buffer on chare %d at addr %p.\n", thisIndex, buffer);
+
+    int fd = _open(_file->name.c_str(), O_RDONLY, NULL);
+
+    if (fd == -1)
+    {
+      CkAbort("Opening of the file %s went wrong\n", _file->name.c_str());
+    }
+
+    if (_lseek(fd, _my_offset, SEEK_SET) == -1)
+    {
+      CkAbort("Lseek buffer chare failed.\n");
+    }
+
+    size_t num_bytes_read = _read(fd, buffer, (int)_my_bytes);
+
+    if (num_bytes_read != _my_bytes)
+    {
+      CkAbort("CKIO Reader: supposed to read %zu bytes, but only read %zu bytes\n",
+              _my_bytes, num_bytes_read);
+    }
+
+    _close(fd);
+
+    return buffer;
+  }
+#endif  // if defined(_WIN32)
+
   char* readDataPOSIX()
   {
     char* buffer = new char[_my_bytes];
@@ -802,7 +834,9 @@ public:
       CkAbort("CKIO Reader: supposed to read %zu bytes, but only read %zu bytes\n",
               _my_bytes, num_bytes_read);
     }
+
     ::close(fd);
+
     return buffer;
   }
   /**
@@ -812,7 +846,15 @@ public:
    * segment read in memory. In the future, could Potentially explore not storing in
    * memory, and instead going to disk on-demand (what MPI does)
    */
-  char* readData() { return readDataPOSIX(); }
+
+  char* readData()
+  {
+#if defined(_WIN32)
+    return readDataWIN32();
+#else
+    return readDataPOSIX();
+#endif
+  }
 
   /**
    * Method invoked by the ReadAssembler in order to request from the
@@ -833,8 +875,8 @@ public:
 
     if (offset < _my_offset)
       chare_offset =
-          _my_offset;  // the start of the read is below this chare, so we should read in
-                       // the current data from start of what it owns
+          _my_offset;  // the start of the read is below this chare, so we should read
+                       // in the current data from start of what it owns
     else
       chare_offset = offset;  // read offset is in the middle
 
