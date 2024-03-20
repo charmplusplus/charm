@@ -783,7 +783,7 @@ public:
     char* buffer = new char[_my_bytes];
     //    CkPrintf("Allocating buffer on chare %d at addr %p.\n", thisIndex, buffer);
 
-    int fd = ::open(_file->name.c_str(), O_RDONLY, S_IRUSR | S_IWUSR);
+    int fd = ::open(_file->name.c_str(), O_RDONLY, NULL);
 
     if (fd == -1)
     {
