@@ -784,7 +784,7 @@ public:
     char* buffer = new char[_my_bytes];
     //    CkPrintf("Allocating buffer on chare %d at addr %p.\n", thisIndex, buffer);
 
-    int fd = _open(_file->name.c_str(), O_RDONLY, NULL);
+    int fd = _open(_file->name.c_str(), O_RDONLY | O_BINARY, NULL);
 
     if (fd == -1)
     {
