@@ -2,6 +2,8 @@
 #define _CKFUTURES_H_
 
 #include "charm.h"
+#include "converse.h"
+#include "ckobjectstore.h"
 
 #ifdef __cplusplus
 #include "ckmarshall.h"
@@ -18,6 +20,9 @@ These routines are implemented in ckfutures.C.
 
 /* forward declare */
 struct CkArrayID;
+
+typedef std::unordered_map<uint64_t, CkFuture> FutureMap;
+CsvDeclare(FutureMap, futuresWaiting);
 
 #ifdef __cplusplus
 extern "C" {
@@ -67,11 +72,12 @@ namespace {
 
   template <typename T> class future {
     CkFuture handle_;
+    bool requested_;
 
   public:
     using value_type = T;
 
-    future() { handle_ = CkCreateFuture(); }
+    future() { handle_ = CkCreateFuture(); requested_ = false; }
     future(PUP::reconstruct) { }
     future(const CkFuture &handle): handle_(handle) { }
     future(const future<T> &other) { handle_ = other.handle_; }
@@ -88,6 +94,27 @@ namespace {
         reject_non_local();
       }
       return unmarshall_value(CkWaitFuture(handle_));
+    }
+
+    T request_object() {
+      CkObjectStore* localStore = objectStoreProxy.ckLocalBranch();
+      char* obj = localStore->lookupObject(handle_.objId);
+      if (obj)
+        return static_cast<T>(obj);
+      else if (!requested_)
+      {
+        // FIXME first check if I have the location of the object, avoid sending a message for location
+        objectStoreProxy[handle_.objId % CkNumNodes()].requestLocationObject(handle_.objId, CkMyNode());
+        requested_ = true;
+        // Add this to the futures waiting table, what if multiple threads do this at the same time?
+        CsvAccess(futuresWaiting)[objId] = handle_;
+        return get();
+      }
+    }
+
+    void create_object(T &object) {
+      CkObjectStore* localStore = objectStoreProxy.ckLocalBranch();
+      localStore->createObject(objId, sizeof(object), static_cast<char*>(object));
     }
 
     void set(const T &value) {
@@ -110,7 +137,11 @@ namespace {
       }
       CkReleaseFuture(handle_);
     }
-    void pup(PUP::er &p) { p | handle_; }
+    void pup(PUP::er &p) { 
+      p | handle_;
+      if (p.isUnpacking())
+        requested_ = false;
+    }
 
     inline bool operator==(const future<T>& other) const {
       return (this->handle_.id == other.handle_.id) &&

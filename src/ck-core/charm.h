@@ -443,13 +443,20 @@ typedef CMK_REFNUM_TYPE CkFutureID;
 typedef struct _ckFuture {
   CkFutureID id;
   int        pe;
+  uint64_t   objId;
 #ifdef __cplusplus
   public:
-    void pup(PUP::er &p) { p(id); p(pe); }
+    void pup(PUP::er &p) { 
+      p(id); 
+      p(pe);
+      if (p.isUnpacking())
+        objId = (((uint64_t) pe) << 32) | id;
+    }
 
     bool operator==(const _ckFuture& other) const {
       return this->id == other.id && this->pe == other.pe;
     }
+
 #endif
 } CkFuture;
 

@@ -1,0 +1,16 @@
+module ckobjectstore {
+    readonly CProxy_CkObjectStore objectStoreProxy;
+
+    nodegroup CkObjectStore {
+        entry CkObjectStore(int numStores);
+
+        entry void updateLocation(ObjectId objId, int pe);
+        entry void updateLocation(ObjectId objId, std::vector<int> pes);
+
+        entry void requestLocationObject(ObjectId objId, int requestingPe);
+        entry void requestLocation(ObjectId objId, int requestingPe);
+        entry void receiveRemoteObject(ObjectId obj_id, int size, char obj[size]);
+        entry void requestObject(ObjectId objId, int requestingPe);
+        entry void requestObject(ObjectId objId, std::vector<int> requestingPes);
+    }
+}

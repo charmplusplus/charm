@@ -263,6 +263,7 @@ CkFuture CkCreateFuture(void)
   CkFuture fut;
   fut.id = createFuture();
   fut.pe = CkMyPe();
+  fut.objId = (((uint64_t) fut.pe) << 32) | fut.id;
   return fut;
 }
 
