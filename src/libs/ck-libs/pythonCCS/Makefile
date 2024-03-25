@@ -1,4 +1,4 @@
-CDIR=../../../..
+include ../common.mk
 -include $(CDIR)/include/conv-mach-opt.mak
 OPTS=-g -Wall
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
@@ -33,7 +33,7 @@ PythonCCS.o: PythonCCS.C $(HEADDEP)
 	$(CHARMC) -c $(FLAGS) PythonCCS.C
 
 PythonCCS-client.o: PythonCCS-client.C $(HEADDEP)
-	$(CHARMC) -c $(FLAGS) PythonCCS-client.C
+	$(CHARMC) -seq -c $(FLAGS) PythonCCS-client.C
 
 PythonCCS.decl.h PythonCCS.def.h: PythonCCS.ci
 	$(CHARMXI) PythonCCS.ci

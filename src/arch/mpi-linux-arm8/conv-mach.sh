@@ -27,12 +27,16 @@ CMK_NATIVE_LDXX_FLAGS="$CMK_NATIVE_FLAGS"
 # Fortran
 CMK_CXX_IS_GCC=`$MPICXX -V 2>&1 | grep 'g++' `
 CMK_CXX_IS_ICC=`$MPICXX -V 2>&1 | grep Intel `
+CMK_CXX_IS_NVHPC=`$MPICXX -V 2>&1 | grep 'nvc++' `
 if test -n "$CMK_CXX_IS_GCC"
 then
     . $CHARMINC/conv-mach-gfortran.sh
 elif test -n "$CMK_CXX_IS_ICC"
 then
     . $CHARMINC/conv-mach-ifort.sh
+elif test -n "$CMK_CXX_IS_NVHPC"
+then
+    . $CHARMINC/conv-mach-nvfortran.sh
 fi
 
 CMK_COMPILER='mpicc'

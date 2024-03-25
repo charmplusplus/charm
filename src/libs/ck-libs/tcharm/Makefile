@@ -1,8 +1,11 @@
 include ../common.mk
+-include $(CDIR)/include/conv-mach-opt.mak
 
 HEADERS=$(CDIR)/include/tcharm_impl.h $(CDIR)/include/tcharm.h \
-        $(CDIR)/include/tcharmc.h $(CDIR)/include/tcharmf.h \
-        $(CDIR)/include/tcharm.decl.h
+        $(CDIR)/include/tcharmc.h $(CDIR)/include/tcharm.decl.h
+ifeq (1,$(CMK_CAN_LINK_FORTRAN))
+  HEADERS += $(CDIR)/include/tcharmf.h
+endif
 OBJS=tcharm.o
 COMPAT=compat_uns.o compat_us.o compat_funs.o compat_fus.o compat_regmm.o \
        compat_ns.o compat_es.o

@@ -282,6 +282,7 @@ void LBSimulation::PrintDecisions(LBMigrateMsg *m, char *simFileName,
     fprintf(f, "%" PRIu64 " ", m->moves[i].obj.id);
     fprintf(f, "%d\n",m->moves[i].to_pe);
   }
+  fclose(f);
 }
 
 void LBSimulation::PrintDifferences(LBSimulation *realSim, BaseLB::LDStats *stats)

@@ -2,10 +2,17 @@ CDIR := $(shell cd ../../../.. && pwd)
 -include $(CDIR)/include/conv-mach-opt.mak
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
-PRE_HEADERS=ampi.h ampif.h ampi_functions.h $(addprefix romio-stub/,mpio_globals.h)
+PRE_HEADERS=ampi.h ampi_functions.h $(addprefix romio-stub/,mpio_globals.h)
+ifeq (1,$(CMK_CAN_LINK_FORTRAN))
+  PRE_HEADERS += ampif.h
+endif
 HEADERS=$(PRE_HEADERS) ampi-interoperate.h ampiimpl.h ampi.decl.h ddt.h
-ROMIO_HEADERS:=$(addprefix romio/include/,mpio.h mpiof.h mpio_functions.h)
-ROMIO_STUB_HEADERS:=$(addprefix romio-stub/,mpio.h mpiof.h mpio_functions.h)
+ROMIO_HEADER_FILES := mpio.h mpio_functions.h
+ifeq (1,$(CMK_CAN_LINK_FORTRAN))
+  ROMIO_HEADER_FILES += mpiof.h
+endif
+ROMIO_HEADERS:=$(addprefix romio/include/,$(ROMIO_HEADER_FILES))
+ROMIO_STUB_HEADERS:=$(addprefix romio-stub/,$(ROMIO_HEADER_FILES))
 ifneq ($(CMK_AMPI_WITH_ROMIO),1)
   HEADERS+= $(ROMIO_STUB_HEADERS)
 endif
@@ -98,9 +105,9 @@ endif
 MAJOR_TARGETS := AMPI
 ifeq (1,$(CMK_CAN_LINK_FORTRAN))
   MAJOR_TARGETS += AMPIF
-  ROMIO_F77 := yes
+  ROMIO_ENABLE_FORTRAN := yes
 else
-  ROMIO_F77 := no
+  ROMIO_ENABLE_FORTRAN := no
 endif
 
 all: $(MAJOR_TARGETS) $(COMPATLIB) $(ROMIO)
@@ -111,7 +118,8 @@ $(ROMIO_MAKEFILE): pre-headers
 	cd romio && \
 		./configure \
 		--disable-aio \
-		--enable-f77=$(ROMIO_F77) \
+		--enable-f77=$(ROMIO_ENABLE_FORTRAN) \
+		--enable-f90=$(ROMIO_ENABLE_FORTRAN) \
 		--enable-static=yes \
 		--enable-shared=no \
 		--disable-weak-symbols \
@@ -168,24 +176,30 @@ pre-headers: $(PRE_HEADERS) ampiCC ampif77 ampif90 ampirun pathstub.sh nm_global
 	# Put AMPI's mpi.h in a separate directory to support the MPI machine layer and MPI interop
 	mkdir -p $(CDIR)/include/ampi/
 	cp ampi.h $(CDIR)/include/ampi/mpi.h
+ifeq (1,$(CMK_CAN_LINK_FORTRAN))
 	cp ampif.h $(CDIR)/include/mpif.h
+endif
 	cp $(PRE_HEADERS) $(CDIR)/include/
 	cp ampiCC $(CDIR)/bin/ampicc
 	cp ampiCC $(CDIR)/bin/ampiCC
 	cp ampiCC $(CDIR)/bin/ampicxx
 	cp ampiCC $(CDIR)/bin/ampic++
+ifeq (1,$(CMK_CAN_LINK_FORTRAN))
 	cp ampif77 $(CDIR)/bin/ampif77
 	cp ampif90 $(CDIR)/bin/ampif90
 	cp ampif90 $(CDIR)/bin/ampifort
+endif
 	cp ampirun $(CDIR)/bin/ampirun
 	cp ampirun $(CDIR)/bin/ampiexec
 	cp ampiCC $(CDIR)/bin/mpicc.ampi
 	cp ampiCC $(CDIR)/bin/mpiCC.ampi
 	cp ampiCC $(CDIR)/bin/mpicxx.ampi
 	cp ampiCC $(CDIR)/bin/mpic++.ampi
+ifeq (1,$(CMK_CAN_LINK_FORTRAN))
 	cp ampif77 $(CDIR)/bin/mpif77.ampi
 	cp ampif90 $(CDIR)/bin/mpif90.ampi
 	cp ampif90 $(CDIR)/bin/mpifort.ampi
+endif
 	cp ampirun $(CDIR)/bin/mpirun.ampi
 	cp ampirun $(CDIR)/bin/mpiexec.ampi
 	mkdir -p $(CDIR)/bin/ampi/
@@ -193,9 +207,11 @@ pre-headers: $(PRE_HEADERS) ampiCC ampif77 ampif90 ampirun pathstub.sh nm_global
 	cp pathstub.sh $(CDIR)/bin/ampi/mpiCC
 	cp pathstub.sh $(CDIR)/bin/ampi/mpicxx
 	cp pathstub.sh $(CDIR)/bin/ampi/mpic++
+ifeq (1,$(CMK_CAN_LINK_FORTRAN))
 	cp pathstub.sh $(CDIR)/bin/ampi/mpif77
 	cp pathstub.sh $(CDIR)/bin/ampi/mpif90
 	cp pathstub.sh $(CDIR)/bin/ampi/mpifort
+endif
 	cp pathstub.sh $(CDIR)/bin/ampi/mpirun
 	cp pathstub.sh $(CDIR)/bin/ampi/mpiexec
 	cp nm_globals.sh $(CDIR)/bin/nm_globals.sh

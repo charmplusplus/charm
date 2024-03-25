@@ -1130,9 +1130,9 @@ public:
 
     char *cpdatafile;
     if( CmiGetArgStringDesc(args->argv, "+CPDataFilename", &cpdatafile, "Specify control point data file to save/load") ){
-      sprintf(CPDataFilename, "%s", cpdatafile);
+      snprintf(CPDataFilename, sizeof(CPDataFilename), "%s", cpdatafile);
     } else {
-      sprintf(CPDataFilename, "controlPointData.txt");
+      strcpy(CPDataFilename, "controlPointData.txt");
     }
 
 

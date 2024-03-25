@@ -298,6 +298,7 @@ void CmiOutOfMemory(int nBytes)
   if (memory_lifeRaft) free(memory_lifeRaft);
   if (nBytes>0) CmiAbort("Could not malloc() %d bytes--are we out of memory? (used :%.3fMB)",nBytes,CmiMemoryUsage()/1000000.0);
   else CmiAbort("Could not malloc()--are we out of memory? (used: %.3fMB)", CmiMemoryUsage()/1000000.0);
+  CMI_NORETURN_FUNCTION_END
 }
 
 /* Global variables keeping track of the status of the system (mostly used by charmdebug) */

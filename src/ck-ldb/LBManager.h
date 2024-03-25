@@ -6,6 +6,8 @@
 #ifndef LBMANAGER_H
 #define LBMANAGER_H
 
+#include <cassert>
+
 #include "LBDatabase.h"
 #include "json_fwd.hpp"
 using json = nlohmann::json;
@@ -99,15 +101,24 @@ class CkLBOptions
 {
  private:
   int seqno;  // for centralized lb, the seqno
-  const char* legacyName;
+  std::string legacyName;
  public:
-  CkLBOptions() : seqno(-1), legacyName(nullptr) {}
-  CkLBOptions(int s) : seqno(s), legacyName(nullptr) {}
-  CkLBOptions(int s, const char* legacyName) : seqno(s), legacyName(legacyName) {}
+  CkLBOptions() : seqno(-1), legacyName() {}
+  CkLBOptions(int s) : seqno(s), legacyName() {}
+  CkLBOptions(int s, const char* legacyName) : seqno(s), legacyName(legacyName ? legacyName : "") {}
   int getSeqNo() const { return seqno; }
-  const char* getLegacyName() const { return legacyName; }
+  bool hasLegacyName() const { return !legacyName.empty(); }
+  const char* getLegacyName() const {
+    assert(hasLegacyName());
+    return legacyName.c_str();
+  }
+
+  void pup(PUP::er& p)
+  {
+    p | seqno;
+    p | legacyName;
+  }
 };
-PUPbytes(CkLBOptions)
 
 #include "LBManager.decl.h"
 
@@ -377,7 +388,7 @@ class LBManager : public CBase_LBManager
   void RemoveStartLBFn(int handle);
 
   void StartLB();
-  
+
   template <typename T>
   inline int AddMigrationDoneFn(T* obj, void (T::*method)(void))
   {

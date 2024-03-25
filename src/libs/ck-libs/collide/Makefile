@@ -1,7 +1,11 @@
 include ../common.mk
+-include $(CDIR)/include/conv-mach-opt.mak
 
 HEADERS=collide_util.h bbox.h collide_cfg.h collide_buffers.h \
-  collidecharm.h collidec.h collidef.h collidecharm.decl.h
+  collidecharm.h collidec.h collidecharm.decl.h
+ifeq (1,$(CMK_CAN_LINK_FORTRAN))
+  HEADERS += collidef.h
+endif
 
 HEADDEP=$(HEADERS) collidecharm_impl.h \
   collide_serial.h collide_buffers.h collide_cfg.h \

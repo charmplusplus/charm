@@ -554,6 +554,7 @@ void CldReadNeighborData(void)
       return;
     }
   if (fscanf(fp, "%d", &CpvAccess(numNeighbors)) != 1) {
+    fclose(fp);
     CmiAbort("CLD> reading neighbor data failed!");
   }
   CpvAccess(neighbors) = 
@@ -562,6 +563,7 @@ void CldReadNeighborData(void)
   pes = (int *)calloc(CpvAccess(numNeighbors), sizeof(int));
   for (i=0; i<CpvAccess(numNeighbors); i++) {
     if (fscanf(fp, "%d", &(CpvAccess(neighbors)[i].pe)) != 1) {
+      fclose(fp);
       CmiAbort("CLD> reading neighbor data failed!");
     }
     pes[i] = CpvAccess(neighbors)[i].pe;

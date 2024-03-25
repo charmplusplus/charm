@@ -27,14 +27,12 @@
 //#include "queueing.h"
 #include <unistd.h>
 
-
+#include "ck.h"
+CkpvDeclare(DebugEntryTable, _debugEntryTable);
 
 #if CMK_CHARMDEBUG && CMK_CCS_AVAILABLE && !defined(_WIN32)
 
-#include "ck.h"
-
 CkpvDeclare(int, skipBreakpoint); /* This is a counter of how many breakpoints we should skip */
-CkpvDeclare(DebugEntryTable, _debugEntryTable);
 CpdPersistentChecker persistentCheckerUselessClass;
 
 void resetAllCRC();

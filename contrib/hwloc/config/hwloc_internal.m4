@@ -1,6 +1,6 @@
 dnl -*- Autoconf -*-
 dnl
-dnl Copyright © 2010-2022 Inria.  All rights reserved.
+dnl Copyright © 2010-2023 Inria.  All rights reserved.
 dnl Copyright © 2009, 2011 Université Bordeaux
 dnl Copyright © 2004-2005 The Trustees of Indiana University and Indiana
 dnl                         University Research and Technology
@@ -406,32 +406,19 @@ EOF
     fi
     AC_SUBST(HWLOC_PS_LIBS)
 
+    AC_CHECK_FUNCS([isatty])
+    AC_CHECK_FUNCS([tcgetpgrp])
+
     AC_CHECK_HEADERS([time.h], [
       AC_CHECK_FUNCS([clock_gettime])
     ])
 
-    AC_ARG_VAR([ARCHIVEMOUNT], [Location of the archivemount program (for loading archive topology in tools)])
-    AC_PATH_TOOL([ARCHIVEMOUNT], [archivemount])
-    if test "x$ARCHIVEMOUNT" != x; then
-      AC_DEFINE_UNQUOTED([HWLOC_ARCHIVEMOUNT_PATH], ["$ARCHIVEMOUNT"], [Define to the location of the archivemount program])
-    fi
-
     # Only generate this if we're building the utilities
-    # Even the netloc library Makefile is here because
-    # we don't embed libnetloc yet, it's useless without tools
     AC_CONFIG_FILES(
         hwloc_config_prefix[utils/Makefile]
         hwloc_config_prefix[utils/hwloc/Makefile]
         hwloc_config_prefix[utils/lstopo/Makefile]
         hwloc_config_prefix[hwloc.pc]
-
-        hwloc_config_prefix[netloc/Makefile]
-        hwloc_config_prefix[utils/netloc/infiniband/Makefile]
-        hwloc_config_prefix[utils/netloc/draw/Makefile]
-        hwloc_config_prefix[utils/netloc/scotch/Makefile]
-        hwloc_config_prefix[utils/netloc/mpi/Makefile]
-        hwloc_config_prefix[netloc.pc]
-        hwloc_config_prefix[netlocscotch.pc]
    )
 ])dnl
 
@@ -528,14 +515,11 @@ int foo(void) {
         hwloc_config_prefix[utils/hwloc/test-hwloc-dump-hwdata/test-hwloc-dump-hwdata.sh]
         hwloc_config_prefix[utils/lstopo/test-lstopo.sh]
         hwloc_config_prefix[utils/lstopo/test-lstopo-shmem.sh]
-        hwloc_config_prefix[utils/netloc/infiniband/netloc_ib_gather_raw]
         hwloc_config_prefix[contrib/hwloc-ps.www/Makefile]
         hwloc_config_prefix[contrib/systemd/Makefile]
         hwloc_config_prefix[contrib/completion/Makefile]
         hwloc_config_prefix[contrib/misc/Makefile]
         hwloc_config_prefix[contrib/windows/Makefile]
-        hwloc_config_prefix[tests/netloc/Makefile]
-        hwloc_config_prefix[tests/netloc/tests.sh]
     )
 
     AC_CONFIG_COMMANDS([chmoding-scripts], [chmod +x] \
@@ -559,9 +543,7 @@ int foo(void) {
       hwloc_config_prefix[utils/hwloc/test-parsing-flags.sh] \
       hwloc_config_prefix[utils/hwloc/test-hwloc-dump-hwdata/test-hwloc-dump-hwdata.sh] \
       hwloc_config_prefix[utils/lstopo/test-lstopo.sh] \
-      hwloc_config_prefix[utils/lstopo/test-lstopo-shmem.sh] \
-      hwloc_config_prefix[utils/netloc/infiniband/netloc_ib_gather_raw] \
-      hwloc_config_prefix[tests/netloc/tests.sh])
+      hwloc_config_prefix[utils/lstopo/test-lstopo-shmem.sh])
 
     # These links are only needed in standalone mode.  It would
     # be nice to m4 foreach this somehow, but whenever I tried

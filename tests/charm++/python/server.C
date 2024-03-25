@@ -72,7 +72,7 @@ MyArray::MyArray () {mynumber = thisIndex+1000;}
 
 MyArray::MyArray (CkMigrateMessage *msg) {}
 
-void MyArray::run(CkCallback &cb) {
+void MyArray::run(const CkCallback &cb) {
 //  CkPrintf("[%d] in run %d\n",thisIndex,mynumber);
    double _startTime = CmiWallTimer();
 

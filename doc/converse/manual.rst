@@ -2135,7 +2135,7 @@ CCS: Client-Side
 A CCS client connects to a CCS server, asks a server PE to execute a
 pre-registered handler, and receives the response data. The CCS client
 may be written in any language (see CCS network protocol, below), but a
-C interface (files “ccs-client.c” and “ccs-client.h”) and Java interface
+C interface (files "ccs-client.C" and "ccs-client.h") and Java interface
 (file “CcsServer.java”) are available in the charm include directory.
 
 The C routines use the skt_abort error-reporting strategy; see
