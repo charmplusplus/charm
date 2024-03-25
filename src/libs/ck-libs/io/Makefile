@@ -18,6 +18,7 @@ $(LIB): $(LIBOBJ)
 
 headers: $(HEADERS)
 	cp $(HEADERS) $(CDIR)/include/
+	touch headers
 
 ckio.o: ckio.C headers
 	$(CHARMC) -c $<
