@@ -92,6 +92,7 @@ function parse_triplet() {
 parse_triplet
 
 extra_triplet_opts=${extra_triplet_opts//-/ }
+opt_build_ofi=0
 opt_cxi=0
 opt_ampi_error_checking=0
 opt_ampi_mpich_tests=0
