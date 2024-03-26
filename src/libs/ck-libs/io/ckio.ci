@@ -8,7 +8,6 @@ module CkIO
   message SessionReadyMsg;
   message SessionCommitMsg;
   message ReadCompleteMsg;
-  // char data[];
   // used by the read() CkCallback
   }  // namespace IO
   }  // namespace Ck

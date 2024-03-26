@@ -12,8 +12,6 @@
 
 namespace Ck { namespace IO { class Session; }}
 
-// bool operator==(const Ck::IO::Session& s1, const Ck::IO::Session& s2);
-
 namespace Ck { namespace IO {
   /// Note: The values in options are not currently a stable or working interface.
   /// Users should not set anything in them.
@@ -155,11 +153,10 @@ namespace Ck { namespace IO {
     size_t bytes, offset;
     CkArrayID sessionID;
     friend class Ck::IO::impl::Manager;
-    friend class Ck::IO::impl::Director; // this is an interesting change
+    friend class Ck::IO::impl::Director; 
     friend class Ck::IO::impl::ReadAssembler;
     friend void read(Session session, size_t bytes, size_t offset, char* data, CkCallback after_read);
     friend struct std::hash<Ck::IO::Session>;
-    // friend void read(Session session, size_t bytes, size_t offset, CkCallback after_read, size_t tag);
   public:
     Session(int file_, size_t bytes_, size_t offset_,
             CkArrayID sessionID_)

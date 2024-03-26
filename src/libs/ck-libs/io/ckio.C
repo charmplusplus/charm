@@ -38,10 +38,6 @@ using std::min;
 using std::string;
 using namespace std::chrono;
 
-// #define BUFFER_TIMEOUT_MS 0.1
-// #define IO_THREADS_PER_PE 4  // TODO: this is unused?
-// #define IO_TIMEOUT std::chrono::microseconds(25)
-
 // FROM STACKEXCHANGE:
 // https://stackoverflow.com/questions/19195183/how-to-properly-hash-the-custom-struct
 template <class T>
@@ -51,7 +47,6 @@ inline void hash_combine(std::size_t& s, const T& v)
   s ^= h(v) + 0x9e3779b9 + (s << 6) + (s >> 2);
 }
 
-// TODO: what is this
 // HASH FOR SESSION
 template <>
 struct std::hash<Ck::IO::Session>
@@ -781,7 +776,7 @@ public:
     thisProxy[thisIndex].bufferReady();
   }
 
-  // TODO: useful for debugging?
+  // can be used for debugging
   void printTime(double time_taken)
   {
     clock_t buffer_read_done = clock();
@@ -791,9 +786,7 @@ public:
         "The time to disk took %fms on the max chare and %f since read session start.\n",
         time_taken, total);
   }
-  /*
 
-  */
 #if defined(_WIN32)
   char* readDataWIN32()
   {
@@ -825,11 +818,9 @@ public:
     return buffer;
   }
 #endif  // if defined(_WIN32)
-
   char* readDataPOSIX()
   {
     char* buffer = new char[_my_bytes];
-    //    CkPrintf("Allocating buffer on chare %d at addr %p.\n", thisIndex, buffer);
 
     int fd = ::open(_file->name.c_str(), O_RDONLY, NULL);
 
