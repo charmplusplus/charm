@@ -324,8 +324,8 @@ typedef struct OFIRmaHeader {
     uint64_t len;
     uint64_t key;
     uint64_t mr;
-    int      nodeNo;
     uint64_t orig_msg;
+    int      nodeNo;
 } OFIRmaHeader;
 
 /**
