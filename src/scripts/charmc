@@ -1119,7 +1119,7 @@ findModuleDep() {
 	PROCESSED_MODULES+=("$M")
 	PRE_LIBRARIES=("-lmodule$M" "${PRE_LIBRARIES[@]}")
 
-	if [[ "$M" == 'CkLoop' && "$CMK_SMP" != '1' && "$CMK_WINDOWS" != '1' ]]; then
+	if [[ ("$M" == 'CkLoop' || "$M" == 'CkIO')&& "$CMK_SMP" != '1' && "$CMK_WINDOWS" != '1' ]]; then
 		# CkLoop depends on pthreads in non-SMP, non-Windows machines,
 		# so make sure it is linked.
 		POST_LIBRARIES+=(-pthread)
