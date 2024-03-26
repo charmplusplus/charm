@@ -180,7 +180,7 @@ jobs:
       if: ${{ env.namd_secret != '' }}
       run: |
         cd ../namd/Linux-x86_64-g++
-        ./charmrun ++local +p2 ./namd2 src/alanin
+        ./charmrun ++local +p2 ./namd3 src/alanin
 
     - name: Cache apoa1 files
       if: ${{ env.namd_secret != '' }}
@@ -204,7 +204,7 @@ jobs:
       if: ${{ env.namd_secret != '' }}
       run: |
         cd ../namd/Linux-x86_64-g++
-        ./charmrun ++local +p4 ./namd2 ~/namddata/apoa1/apoa1.namd
+        ./charmrun ++local +p4 ./namd3 ~/namddata/apoa1/apoa1.namd
 
   netlrts-darwin-x86_64:
     timeout-minutes: 60
