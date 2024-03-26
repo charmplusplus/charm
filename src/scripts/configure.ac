@@ -1561,6 +1561,18 @@ add_make_flag "CMK_HAS_MALLOC_HOOK:=$pass" 'whether has __malloc_hook'
 #### test if we can build OFI ####
 if test "$CMK_BUILD_OFI" = 1
 then
+    CMK_LIBFABRIC_INC=`pkg-config --cflags libfabric`
+    if test "$?" = 0
+    then
+        add_flag CMK_INCDIR='"$CMK_INCDIR $CMK_LIBFABRIC_INC"' "libfabric inc"
+	CMK_INCDIR="$CMK_INCDIR $CMK_LIBFABRIC_INC"
+    fi
+    CMK_LIBFABRIC_LIBS=`pkg-config --libs libfabric`
+    if test "$?" = 0
+    then
+	add_flag CMK_LIBCDIR='"$CMK_LIBDIR $CMK_LIBFABRIC_LIBONLY"' "libfabric lib"
+	CMK_LIBDIR="$CMK_LIBDIR $CMK_LIBFABRIC_LIB"
+    fi
 cat > $tc <<EOT
 #include <rdma/fabric.h>
 int main(int argc, char **argv)
@@ -1596,8 +1608,8 @@ else
       fi
     else
       CMK_LIBFABRIC_LIBONLY=`pkg-config --libs-only-l libfabric`
-      if test $CMK_LIBFABRIC_LIBONLY = "-lfabric"
-      then
+       if test "$?" = 0
+       then
 	  test_linkc "whether pkg-config fabric" "ok" "no" "-lfabric"
       else
 	  echo "Error: -lfabric not working, $PSM_COMPAT_DIR not found, pkg-config libfabric not working"
@@ -1609,6 +1621,27 @@ else
   fi
 fi
 
+fi
+
+#### If we can build OFI, test if we can also build CXI ####
+if test "$BUILD_OFI" = 1
+then
+# get path info
+    CMK_LIBFABRIC_LIBONLY=`pkg-config --libs-only-l libfabric`
+    CMK_LIBFABRIC_INC=`pkg-config --cflags libfabric`
+    cat > $t <<EOT
+#include <rdma/fabric.h>
+#include <rdma/fi_cxi_ext.h>
+int main(int argc, char **argv)
+{
+  struct fi_info *providers;
+  int ret = fi_getinfo(FI_VERSION(1,0), NULL, NULL, 0ULL, NULL, &providers);
+  return 0;
+}
+EOT
+	test_cxx "whether build on CXI" "yes" "no"
+	AC_DEFINE_UNQUOTED(CMK_CXI, $strictpass, [build CXI.])
+	BUILD_CXI=$strictpass
 fi
 
 #### test if we can build UCX ####

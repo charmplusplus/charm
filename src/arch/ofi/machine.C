@@ -180,8 +180,6 @@ CpvStaticDeclare(double, projTraceStart);
 #include "runtime-pmix.C"
 #endif
 
-/* this should be set for us during the build, but cmake confounds again */
-#define CMK_CXI 1
 #if CMK_CXI
   /** use mempools in CXI to aggregate FI_MR_ENDPOINT registration reqs into big blocks */
 #define oneMB (1024ll*1024)
