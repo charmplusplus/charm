@@ -1,3 +1,8 @@
+
+// if FI_MR_VIRT_ADDR is not enabled, then we use offset from the
+// registered address which would be a 0 offset in this case.
+#define DETERMINE_OFFSET(x) ((FI_MR_SCALABLE == context.mr_mode) || ( FI_MR_VIRT_ADDR & context.mr_mode)==0) ? 0 : (const char*)((x))
+
 void registerDirectMemory(void *info, const void *addr, int size) {
   CmiOfiRdmaPtr_t *rdmaInfo = (CmiOfiRdmaPtr_t *)info;
   uint64_t requested_key = 0;
@@ -150,9 +155,7 @@ void process_onesided_reg_and_put(struct fi_cq_tagged_entry *e, OFIRequest *req)
                        ncpyOpInfo->srcSize);
 
   ncpyOpInfo->isSrcRegistered = 1; // Set isSrcRegistered to 1 after registration
-  // if FI_MR_VIRT_ADDR is not enabled, then we use offset from the
-  // registered address which would be a 0 offset in this case.
-  const char *rbuf  = ((FI_MR_SCALABLE == context.mr_mode) || ( FI_MR_VIRT_ADDR & context.mr_mode)==0) ? 0 : (const char*)(ncpyOpInfo->destPtr);
+  const char *rbuf  = DETERMINE_OFFSET(ncpyOpInfo->destPtr);
 
   // Allocate a completion object for tracking write completion and ack handling
   CmiOfiRdmaComp_t* rdmaComp = (CmiOfiRdmaComp_t *)malloc(sizeof(CmiOfiRdmaComp_t));
@@ -190,9 +193,7 @@ void process_onesided_reg_and_get(struct fi_cq_tagged_entry *e, OFIRequest *req)
                        ncpyOpInfo->destSize);
 
   ncpyOpInfo->isDestRegistered = 1; // Set isDestRegistered to 1 after registration
-  // if FI_MR_VIRT_ADDR is not enabled, then we use offset from the
-  // registered address which would be a 0 offset in this case.
-  const char *rbuf  = ((FI_MR_SCALABLE == context.mr_mode) || ( FI_MR_VIRT_ADDR & context.mr_mode)==0) ? 0 : (const char*)(ncpyOpInfo->srcPtr);
+  const char *rbuf  = DETERMINE_OFFSET(ncpyOpInfo->srcPtr);
 
   // Allocate a completion object for tracking write completion and ack handling
   CmiOfiRdmaComp_t* rdmaComp = (CmiOfiRdmaComp_t *)malloc(sizeof(CmiOfiRdmaComp_t));
@@ -264,9 +265,7 @@ void LrtsIssueRget(NcpyOperationInfo *ncpyOpInfo) {
     CmiOfiRdmaPtr_t *dest_info = (CmiOfiRdmaPtr_t *)((char *)ncpyOpInfo->destLayerInfo + CmiGetRdmaCommonInfoSize());
     CmiOfiRdmaPtr_t *src_info = (CmiOfiRdmaPtr_t *)((char *)ncpyOpInfo->srcLayerInfo + CmiGetRdmaCommonInfoSize());
 
-    // if FI_MR_VIRT_ADDR is not enabled, then we use offset from the
-    // registered address which would be a 0 offset in this case.
-    const char *rbuf  = ((FI_MR_SCALABLE == context.mr_mode) || ( FI_MR_VIRT_ADDR & context.mr_mode)==0) ? 0 : (const char*)(ncpyOpInfo->srcPtr);
+    const char *rbuf  = DETERMINE_OFFSET(ncpyOpInfo->srcPtr);
 
     // Allocate a completion object for tracking read completion and ack handling
     CmiOfiRdmaComp_t* rdmaComp = (CmiOfiRdmaComp_t *)malloc(sizeof(CmiOfiRdmaComp_t));
@@ -326,9 +325,7 @@ void LrtsIssueRput(NcpyOperationInfo *ncpyOpInfo) {
     CmiOfiRdmaPtr_t *dest_info = (CmiOfiRdmaPtr_t *)((char *)(ncpyOpInfo->destLayerInfo) + CmiGetRdmaCommonInfoSize());
     CmiOfiRdmaPtr_t *src_info = (CmiOfiRdmaPtr_t *)((char *)(ncpyOpInfo->srcLayerInfo) + CmiGetRdmaCommonInfoSize());
 
-    // if FI_MR_VIRT_ADDR is not enabled, then we use offset from the
-    // registered address which would be a 0 offset in this case.
-    const char *rbuf  = ((FI_MR_SCALABLE == context.mr_mode) || ( FI_MR_VIRT_ADDR & context.mr_mode)==0) ? 0 : (const char*)(ncpyOpInfo->destPtr);
+    const char *rbuf  = DETERMINE_OFFSET(ncpyOpInfo->destPtr);
 
     // Allocate a completion object for tracking write completion and ack handling
     CmiOfiRdmaComp_t* rdmaComp = (CmiOfiRdmaComp_t *)malloc(sizeof(CmiOfiRdmaComp_t));
