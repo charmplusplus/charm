@@ -23,7 +23,7 @@ There are three options here for synchronization:
 #include <errno.h>
 #include <signal.h>
 #include <sys/ioctl.h>
-#if CMK_OFI_CXI
+#if CMK_CXI
 #include <pmi_cray.h>
 #endif
 #include "xpmem.h"
@@ -39,7 +39,7 @@ There are three options here for synchronization:
 /* Default to using fences */
 #define XPMEM_FENCE 1
 #endif
-#if CMK_OFI_CXI
+#if CMK_CXI
 #define CmiGetMsgSize(msg)  ((((CmiMsgHeaderBasic *)msg)->size))
 #endif
 #define MEMDEBUG(x) //x
