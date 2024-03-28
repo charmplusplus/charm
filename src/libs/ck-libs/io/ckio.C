@@ -988,7 +988,70 @@ public:
   }
 
   int registerArray(CkArrayIndex& numElements, CkArrayID aid) { return 0; }
+
 };
+FileReader::FileReader(Ck::IO::Session session) : _session_token(session), _offset(session.offset), _num_bytes(session.bytes)  {}
+
+FileReader& FileReader::read(char* buffer, size_t num_bytes_to_read){
+	if(_eofbit){ // no more bytes to read
+		_gcount = 0;
+		return *this;
+	}
+	// TODO: incorporate checking the buffer into this code
+	size_t bytes_to_read = std::min(num_bytes_to_read, (_offset + _num_bytes - _curr_pos));
+	ReadCompleteMsg* read_msg;
+	Ck::IO::read(_session_token, bytes_to_read, _curr_pos, buffer, CkCallbackResumeThread((void*&) read_msg));
+	// below will not get executed until the read is done
+	_curr_pos += (read_msg -> bytes);
+	if(_curr_pos >= (_offset + _num_bytes)) {
+		_eofbit = true; // ran out of data to read
+		_curr_pos = _offset + _num_bytes;
+	}
+	_gcount = read_msg -> bytes;
+	return *this;
+ }
+
+size_t FileReader::tellg() { return _curr_pos;}
+
+FileReader& FileReader::seekg(size_t pos){
+	_curr_pos = pos;
+	if(_curr_pos < _offset){
+		_curr_pos = _offset;
+		_eofbit = false;
+	} else if (_curr_pos >= (_offset + _num_bytes)) {
+		_curr_pos = _offset + _num_bytes;
+		_eofbit = true;
+	}
+	_eofbit = false;
+	return *this;
+  }
+
+bool FileReader::eof() { return _eofbit;}
+
+size_t FileReader::gcount() { return _gcount; }
+
+FileReaderBuffer::FileReaderBuffer(){
+	_buffer = new char[_buff_capacity];
+}
+
+FileReaderBuffer::FileReaderBuffer(size_t buff_size){
+	_buff_capacity = buff_capacity;
+	_buffer = new char[_buff_capacity];
+}
+
+void FileReaderBuffer::setBuffer(size_t offset, size_t num_bytes, char* data){
+	_offset = offset;
+	_buffer_size = std::min(_buff_capacity, num_bytes);
+	std::memcpy(_buffer, data, _buffer_size); // copy the first section of bytes
+}
+
+size_t FileReaderBuffer::getFromBuffer(size_t offset, size_t num_bytes, char* buffer){
+	if(offset < _offset || offset >= (_offset + _buffer_size)) return 0; // the buffer has nothing of relevance
+	size_t cached_len = std::min(offset + num_bytes, _offset + _buff_size) - offset;
+	std::memcpy(buffer, _buffer, cached_len);
+	return cached_len;
+}
+
 
 }  // namespace IO
 }  // namespace Ck
