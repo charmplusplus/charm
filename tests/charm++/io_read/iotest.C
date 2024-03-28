@@ -47,6 +47,7 @@ public:
 class Test : public CBase_Test
 {
   char* dataBuffer;
+  char* file_reader_buffer;
   int size;
   std::string _fname;
 
@@ -55,10 +56,32 @@ public:
   {
     CkPrintf("Inside the constructor of tester %d\n", thisIndex);
     _fname = filename;
+    thisProxy[thisIndex].testMethod(token, bytesToRead);
+    //CkCallback sessionEnd(CkIndex_Test::readDone(0), thisProxy[thisIndex]);
+    //try
+    //{
+    //  dataBuffer = new char[bytesToRead];
+    //  file_reader_buffer = new char[bytesToRead];
+    //}
+    //catch (const std::bad_alloc& e)
+    //{
+    //  CkPrintf("ERROR: Data buffer malloc of %zu bytes in Test chare %d failed.\n",
+    //           bytesToRead, thisIndex);
+    //  CkExit();
+    //}
+    //size = bytesToRead;
+    //Ck::IO::FileReader fr(token);
+    //fr.seekg(bytesToRead * thisIndex); // seek to the correct place in the file
+    //fr.read(file_reader_buffer, size); // hopefully this will return the same data as Ck::IO::read
+    //Ck::IO::read(token, bytesToRead, bytesToRead * thisIndex, dataBuffer, sessionEnd);
+  }
+
+  void testMethod(Ck::IO::Session token, size_t bytesToRead){
     CkCallback sessionEnd(CkIndex_Test::readDone(0), thisProxy[thisIndex]);
     try
     {
       dataBuffer = new char[bytesToRead];
+      file_reader_buffer = new char[bytesToRead];
     }
     catch (const std::bad_alloc& e)
     {
@@ -67,6 +90,10 @@ public:
       CkExit();
     }
     size = bytesToRead;
+    Ck::IO::FileReader fr(token);
+    fr.seekg(bytesToRead * thisIndex); // seek to the correct place in the file
+    fr.read(file_reader_buffer, size); // hopefully this will return the same data as Ck::IO::read
+    CkPrintf("the FileReader::read function on tester[%d] is done with first character=%c\n", thisIndex, file_reader_buffer[0]);
     Ck::IO::read(token, bytesToRead, bytesToRead * thisIndex, dataBuffer, sessionEnd);
   }
 
@@ -101,9 +128,11 @@ public:
             thisIndex, (m->offset), (m->bytes), i, verify_buffer[i], i, dataBuffer[i]);
       }
       assert(verify_buffer[i] == dataBuffer[i]);
+      assert(verify_buffer[i] == file_reader_buffer[i]);
     }
     delete[] verify_buffer;
     delete[] dataBuffer;
+    delete[] file_reader_buffer;
     CkPrintf("Index %d is now done with the reads...\n", thisIndex);
     contribute(done);
   }
