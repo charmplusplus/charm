@@ -3,9 +3,7 @@
 
 #include <ckcallback.h>
 #include <iostream>
-#include <pup.h>
-#include <string>
-#include <vector>
+#include <cstring>
 
 #include "CkIO.decl.h"
 
@@ -52,8 +50,8 @@ namespace Ck { namespace IO {
       p | numReaders;
     }
   };
+
   class FileReader;
-  class FileReaderBuffer;
 
   class File;
   // class ReadAssembler;
@@ -232,6 +230,20 @@ void startSession(File file, size_t bytes, size_t offset, CkCallback ready,
 
   };
   
+  class FileReaderBuffer {
+	size_t _buff_capacity = 4096; // the size of the buffer array
+	size_t _buff_size = 0; // the number of valid elements in the array
+	ssize_t _offset = 0; // the offset byte
+	char* _buffer;
+	bool is_dirty = true;
+
+public:
+	FileReaderBuffer();
+	FileReaderBuffer(size_t buff_capacity);
+	~FileReaderBuffer();
+	void setBuffer(size_t offset, size_t num_bytes, char* data); // writes the data to the buffer
+	size_t getFromBuffer(size_t offset, size_t num_bytes, char* buffer);
+  };
   
   class FileReader {
 		  Session _session_token;
@@ -239,6 +251,7 @@ void startSession(File file, size_t bytes, size_t offset, CkCallback ready,
 		  size_t _offset, _num_bytes;
 		  bool _eofbit = false;
 		  size_t _gcount = 0; 
+		  FileReaderBuffer _data_cache;
 	public:
 		FileReader(Ck::IO::Session session);
 		/* In order to use the read functionality, make sure 
@@ -253,18 +266,6 @@ void startSession(File file, size_t bytes, size_t offset, CkCallback ready,
 		size_t gcount();
   };
 
-  class FileReaderBuffer {
-	size_t _buff_capacity = 4096; // the size of the buffer array
-	size_t _buff_size = 0; // the number of valid elements in the array
-	size_t _offset = -1; // the offset byte
-	char* _buffer;
-
-public:
-	FileReaderBuffer();
-	FileReader(size_t buff_capacity)
-	void setBuffer(size_t offset, size_t num_bytes, char* data); // writes the data to the buffer
-	size_t getFromBuffer(size_t offset, size_t num_bytes, char* buffer);
-  };
 
 /**
  * Same as the above start session in function. However, there is an extra @arg

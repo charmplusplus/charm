@@ -997,17 +997,37 @@ FileReader& FileReader::read(char* buffer, size_t num_bytes_to_read){
 		_gcount = 0;
 		return *this;
 	}
-	// TODO: incorporate checking the buffer into this code
-	size_t bytes_to_read = std::min(num_bytes_to_read, (_offset + _num_bytes - _curr_pos));
+	size_t amt_from_cache = _data_cache.getFromBuffer(_curr_pos, num_bytes_to_read, buffer); // get whatever data the cache has for us
+	_curr_pos += amt_from_cache;
+	if(amt_from_cache == num_bytes_to_read){
+		return *this;
+	}
+	size_t bytes_to_read_left = num_bytes_to_read - amt_from_cache;
+	size_t bytes_to_read = std::min(std::max(bytes_to_read_left, size_t(4096)), (_offset + _num_bytes - _curr_pos)); // if the read is too small, get more data to store in the buffer
+	if(!bytes_to_read){
+		return *this;
+	}
+	char* tmp_data_buff = new char[bytes_to_read]; // temporary buffer that will hold all the data
 	ReadCompleteMsg* read_msg;
-	Ck::IO::read(_session_token, bytes_to_read, _curr_pos, buffer, CkCallbackResumeThread((void*&) read_msg));
+	Ck::IO::read(_session_token, bytes_to_read, _curr_pos, tmp_data_buff, CkCallbackResumeThread((void*&) read_msg));
 	// below will not get executed until the read is done
-	_curr_pos += (read_msg -> bytes);
+	size_t bytes_read = read_msg -> bytes;
+	if(bytes_read > bytes_to_read_left){
+		// if I read more bytes than what was left to read, that means I have extra bytes that the buffer can use
+		_data_cache.setBuffer(_curr_pos, bytes_read, tmp_data_buff);
+		_curr_pos += bytes_to_read_left;
+		std::memcpy(buffer + amt_from_cache, tmp_data_buff, bytes_to_read_left);
+	} else {
+		// too many bytes, nothing to actually cache
+		_curr_pos += bytes_read;
+		std::memcpy(buffer + amt_from_cache, tmp_data_buff, bytes_read);
+	}
+	delete[] tmp_data_buff;
 	if(_curr_pos >= (_offset + _num_bytes)) {
 		_eofbit = true; // ran out of data to read
 		_curr_pos = _offset + _num_bytes;
 	}
-	_gcount = read_msg -> bytes;
+	_gcount = std::min(bytes_read, bytes_to_read_left);
 	return *this;
  }
 
@@ -1034,22 +1054,30 @@ FileReaderBuffer::FileReaderBuffer(){
 	_buffer = new char[_buff_capacity];
 }
 
-FileReaderBuffer::FileReaderBuffer(size_t buff_size){
+FileReaderBuffer::FileReaderBuffer(size_t buff_capacity){
 	_buff_capacity = buff_capacity;
 	_buffer = new char[_buff_capacity];
 }
 
 void FileReaderBuffer::setBuffer(size_t offset, size_t num_bytes, char* data){
+	is_dirty = false;
 	_offset = offset;
-	_buffer_size = std::min(_buff_capacity, num_bytes);
-	std::memcpy(_buffer, data, _buffer_size); // copy the first section of bytes
+	_buff_size = std::min(_buff_capacity, num_bytes);
+	std::memcpy(_buffer, data, _buff_size); // copy the first section of bytes
 }
 
 size_t FileReaderBuffer::getFromBuffer(size_t offset, size_t num_bytes, char* buffer){
-	if(offset < _offset || offset >= (_offset + _buffer_size)) return 0; // the buffer has nothing of relevance
+
+	if(is_dirty || offset < _offset || offset >= (_offset + _buff_size)) {
+		return 0; // the buffer has nothing of relevance
+	}
 	size_t cached_len = std::min(offset + num_bytes, _offset + _buff_size) - offset;
-	std::memcpy(buffer, _buffer, cached_len);
+	std::memcpy(buffer, _buffer + (offset - _offset), cached_len);
 	return cached_len;
+}
+
+FileReaderBuffer::~FileReaderBuffer(){
+	delete[] _buffer;
 }
 
 
