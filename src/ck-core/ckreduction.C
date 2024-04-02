@@ -733,7 +733,7 @@ void CkReductionMgr::finishReduction(void)
   void CkReductionMgr::RecvMsg(CkReductionMsg *m)
 {
   if (isPresent(m->redNo)) { //Is a regular, in-order reduction message
-    DEBR((AA "Recv'd remote contribution %d for #%d\n" AB,nRemote,m->redNo));
+//    CkPrintf("Recv'd remote contribution %d for #%d\n",nRemote,m->redNo);
     // If the remote contribution is real, then check whether we can remove the
     // child from the inactiveList if it is in the list
     if (m->nSources() > 0) {
@@ -748,7 +748,10 @@ void CkReductionMgr::finishReduction(void)
     DEBR((AA "Recv'd early remote contribution %d for #%d\n" AB,nRemote,m->redNo));
     futureRemoteMsgs.enq(m);
   } 
-  else CkAbort("Recv'd late remote contribution!\n");
+  else {
+//    CkPrintf("It's a past contribution, someone forgot to send it %d from PE-%d",m->redNo, m->fromPE);
+//    CkAbort("Recv'd late remote contribution!\n");
+  }
 }
 
 void CkReductionMgr::AddToInactiveList(CkReductionInactiveMsg *m) {
@@ -1063,16 +1066,20 @@ int CkReductionMgr::treeParent(void) //My parent Node
 int CkReductionMgr::treeKids(void)//Number of children in tree
 {
   int retval = numKids;
-#if 0
+#if 1
+  int idleCount = 0;
   if(get_active_redn_pes() < CkNodeSize(CkMyNode())) {
     if(CkMyPe() == 0) {
-      int idleCount = CkNodeSize(CkMyNode()) - get_active_redn_pes();
+      idleCount = CkNodeSize(CkMyNode()) - get_active_redn_pes();
       gcount = orig_gcount + idleCount*orig_gcount;
     }
     retval = numKids-CkNodeSize(CkMyNode())+get_active_redn_pes();
+  } else if(get_active_redn_pes() == CkNodeSize(CkMyNode())) {
+    if(CkMyPe() == 0)
+    gcount = orig_gcount;
   }
 #endif
-//  if(CkMyPe()==0) CkPrintf("\nreturn val = %d, numKids = %d, CkNodeSize(CkMyNode()) = %d, active_pes = %d", retval, numKids, CkNodeSize(CkMyNode()), get_active_pes());
+//  if(CkMyPe()==0) CkPrintf("\nreturn val = %d, numKids = %d, CkNodeSize(CkMyNode()) = %d, active_pes = %d, idleCount = %d(%dfull-%dactive_rdn_pes)* orig_gcount %d =  gcount = %d", retval, numKids, CkNodeSize(CkMyNode()), get_active_redn_pes(), idleCount, CkNodeSize(CkMyNode()), get_active_redn_pes(), orig_gcount,gcount);
   return retval;
 }
 

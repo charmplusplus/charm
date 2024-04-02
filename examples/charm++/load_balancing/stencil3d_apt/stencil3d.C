@@ -79,6 +79,9 @@ int myrand(int numpes) {
 //#define WPN_LIST (int[]){24,8,12}
 //#define DEBUG_ST
 
+#define NO_REDUCTION 0
+#define WORK_ITER 300//600
+
 /** \class Main
  *
  */
@@ -92,7 +95,7 @@ class Main : public CBase_Main {
         CkPrintf("OR %s [array_size_X] [array_size_Y] [array_size_Z] [block_size_X] [block_size_Y] [block_size_Z]\n", m->argv[0]);
         CkAbort("Abort");
       }
-
+      CkPrintf("\nNo reduction = %d, work iter = %d", NO_REDUCTION, WORK_ITER);
       // store the main proxy
       mainProxy = thisProxy;
 
@@ -221,7 +224,8 @@ class Stencil: public CBase_Stencil {
       thisProxy.doStep();
     }
     void ProcessAtSync(){
-      getLBMgr()->wakeupPEs();
+//      getLBMgr()->wakeupPEs();
+      //set_active_redn_pes(papi->wpn);
 #if 1
 //      set_active_pes(papi->wpn);//CkNodeSize(CkMyNode())/2+1);
 //      if(papi->config_step <= CONFIG_COUNT)
@@ -233,7 +237,7 @@ class Stencil: public CBase_Stencil {
 #if 1//DEBUG_ST
       CkPrintf("\n----Calling AtSync");
 #endif
-      thisProxy.doAtSync();
+//      thisProxy.doAtSync();
     }
 
     void doAtSync() {
@@ -382,6 +386,7 @@ class Stencil: public CBase_Stencil {
         CkPrintf("\nCalling doStep"); fflush(stdout);
 #endif
         getLBMgr()->wakeupPEs();
+//        set_active_redn_pes(papi->wpn);
         thisProxy.doAtSync();
       }
     }
@@ -409,6 +414,7 @@ class Stencil: public CBase_Stencil {
       }
       if(CkMyPe()==0) {
         if(papi->iter == iterations-1 ) {
+#define ENERGY
 #ifdef ENERGY
           if(iterations%10==4/*34*//*24*/) papi->start_energy(CkWallTimer());
           if(iterations%10==6/*36*//*26*/) papi->stop_energy(CkWallTimer());
@@ -450,10 +456,11 @@ class Stencil: public CBase_Stencil {
               papi->wpn = WPN_LIST[idx];//papi->config_step++];
               papi->config_step++;
               if(iterations > 40 && iterations< 50) { 
-                papi->wpn = papi->get_best_ppn();
+                papi->wpn = 48;//47;//36;//24;//48;//papi->get_best_ppn();
                 set_active_pes(papi->wpn);
-              }else
-              set_active_pes(papi->wpn);
+              }else {
+                set_active_pes(papi->wpn);
+              }
               CkPrintf("\nSetting active pes = %d", papi->wpn);
             }
 
@@ -498,11 +505,14 @@ class Stencil: public CBase_Stencil {
           thisProxy.doAtSync(); */
           thisProxy(0,0,0).endIterAtSync();
         } else {
+#if NO_REDUCTION
           thisProxy(0,0,0).endIter();
 #if DEBUG_ST
           CkPrintf("\nContributed by chare %d,%d,%d",thisIndex.x, thisIndex.y, thisIndex.z);fflush(stdout);
 #endif
-//          contribute(CkCallback(CkReductionTarget(Stencil, doStep), thisProxy));
+#else
+          contribute(CkCallback(CkReductionTarget(Stencil, doStep), thisProxy));
+#endif
         }
       }
     }
@@ -512,7 +522,7 @@ class Stencil: public CBase_Stencil {
     void compute_kernel() {
       int index = thisIndex.x + thisIndex.y*num_chare_x + thisIndex.z*num_chare_x*num_chare_y;
       int numChares = num_chare_x * num_chare_y * num_chare_z;
-      double work = 300.0;//200.0;//400.0;//200.0;
+      double work = WORK_ITER;//600;//300.0;//200.0;//400.0;//200.0;
 
 #ifndef _MSC_VER
 #pragma unroll

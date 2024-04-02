@@ -33,12 +33,13 @@ void DisableCoreLB::work(LDStats* stats)
 {
   //Shrink only
   int newPpn = get_active_pes();
+//  set_active_redn_pes(get_active_pes());
   CkPrintf("\n newPpn = %d", newPpn);
   int  obj, objCount, pe;
   int n_pes = newPpn;//stats->nprocs();//newPpn;//stats->nprocs();
   int *map = new int[n_pes];
 
-  std::vector<ProcInfo>  procs;
+  std::vector<ProcInfo>  procs;//(newPpn);
   for(pe = 0; pe < n_pes; pe++) {
     map[pe] = -1;
     //if (stats->procs[pe].available) 
@@ -70,16 +71,16 @@ void DisableCoreLB::work(LDStats* stats)
 //    procs[pe].setTotalLoad(procs[pe].getTotalLoad() + procs[pe].getOverhead());
 //    procs[pe].setTotalLoad(0.0);
 //    procs[pe].setOverhead(0.0);
-#if 1 //for stencil remove stale overload when expanding
+#if 0 //for stencil remove stale overload when expanding
     if(pe > 0 && procs[pe].getTotalLoad() > procs[0].getTotalLoad()*1.1) {
         procs[pe].setTotalLoad(procs[0].getTotalLoad());
         procs[pe].setOverhead(procs[0].getOverhead());
     }
 #endif
-    CkPrintf("\nProc %d load  = %lf", pe, procs[pe].getTotalLoad() + procs[pe].getOverhead());
+//    CkPrintf("\nProc %d load  = %lf", pe, procs[pe].getTotalLoad() + procs[pe].getOverhead());
   }
 
-//  procs.resize(get_active_pes());
+  procs.resize(get_active_pes());
 
   // build object array
   std::vector<Vertex> objs;
@@ -102,7 +103,7 @@ void DisableCoreLB::work(LDStats* stats)
   make_heap(procs.begin(), procs.end(), DisableCoreLB::ProcLoadGreater());
 
   if (_lb_args.debug()>1)
-    CkPrintf("[%d] In DisableCoreLB strategy\n",CkMyPe());
+    CkPrintf("[%d] In DisableCoreLB strategy [PE-count = %d]\n",CkMyPe(), newPpn);
 
     // greedy algorithm
   int nmoves = 0;

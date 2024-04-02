@@ -1,5 +1,7 @@
 mainmodule matmul {
+  #define INTV 4
   readonly CProxy_Main mainProxy;
+  readonly CProxy_PAPI_grp papi_arr;
   mainchare Main {
     entry Main(CkArgMsg *m);
     entry [reductiontarget] void done();
@@ -7,15 +9,10 @@ mainmodule matmul {
 
   array [2D] Block {
     entry Block(bool randomInit, unsigned int blockSize, unsigned int numBlocks);
-    entry void pdgemmSendInput(CProxy_Block output, bool aOrB) {
-      serial {
-        if (aOrB)
-          output((thisIndex.x-thisIndex.y+numBlocks)%numBlocks, thisIndex.y).inputA(0, data, blockSize, blockSize);
-        else
-          output(thisIndex.x, (thisIndex.y-thisIndex.x+numBlocks)%numBlocks).inputB(0, data, blockSize, blockSize);
-      }
-    };
-
+    entry void doBeforeAtSync();
+    entry [reductiontarget] void resume();
+    entry [reductiontarget] void resume0();
+    entry [reductiontarget] void doAtSync();
     entry void pdgemmRun(double alpha, CkCallback done) {
       forall [block] (0:numBlocks-1,1) {
         when
@@ -23,14 +20,12 @@ mainmodule matmul {
           inputB[block](int blockIdB, double blockB[KB*N], unsigned int KB, unsigned int N)
           serial {
           CkAssert(KA == KB);
-
           // This DGEMM makes no attempt at optimization. For
           // benchmarking, it should be replaced with a library
           // call. The local version is kept for easy portability.
           example_dgemm(M, N, KA,
                         alpha,
                         blockA, blockB, data);
-
           if (blockIdA != numBlocks) {
             int destX = (thisIndex.x + 1) % numBlocks;
             int destY = thisIndex.y;
@@ -44,10 +39,40 @@ mainmodule matmul {
         }
       }
       serial {
-        contribute(done);
+        //CkPrintf("\nChare[%d,%d] updating iter = %d", thisIndex.x, thisIndex.y, iteration);
+        papi->iter = iteration++;
+        if(CkMyPe()==0 && papi->wakeup == 0 && papi->iter%INTV==0) {
+          CkPrintf("\n iter = %d", papi->iter);
+          papi->wakeup = 1;
+          set_active_pes(WPN_LIST[papi->iter/INTV]);
+          CkPrintf("\n---Setting to wpn = %d", WPN_LIST[papi->iter/INTV]);
+          if(papi->iter > 3)getLBMgr()->wakeupPEs();
+        }
+//        CkPrintf("\nChare[%d,%d] calling AtSync", thisIndex.x, thisIndex.y); fflush(stdout);
+          if(papi->iter%INTV==0 && papi->iter > 3) {
+           thisProxy(0,0).doBeforeAtSync();
+//contribute(CkCallback(CkReductionTarget(Block,doAtSync), thisProxy));
+          } else
+       //     thisProxy(0,0).resume();
+          contribute(CkCallback(CkReductionTarget(Block,resume0), thisProxy(0,0)));
+ //       AtSync();//contribute(done);//AtSync();//contribute(done);
+        //contribute(done);
       }
     };
     entry void inputA(int blockIdA, double blockA[M*KA], unsigned int M, unsigned int KA);
     entry void inputB(int blockIdB, double blockB[KB*N], unsigned int KB, unsigned int N);
+
+    entry void pdgemmSendInput(CProxy_Block output, bool aOrB) {
+      serial {
+//        CkPrintf("\n[%d,%d] sending input ", thisIndex.x, thisIndex.y);
+        if (aOrB)
+          output((thisIndex.x-thisIndex.y+numBlocks)%numBlocks, thisIndex.y).inputA(0, inpA_data, blockSize, blockSize);
+        else
+          output(thisIndex.x, (thisIndex.y-thisIndex.x+numBlocks)%numBlocks).inputB(0, inpB_data, blockSize, blockSize);
+      }
+    };
+  };
+  group PAPI_grp {
+    entry PAPI_grp(void);
   };
 };

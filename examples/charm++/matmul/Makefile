@@ -3,13 +3,14 @@ CHARMC=../../../bin/charmc
 
 CXX=$(CHARMC)
 CXXFLAGS=$(OPTS)
+OPTS  = -O3 -I${TACC_PAPI_INC} -xCORE-AVX512
 
 BINARY=matmul
 
 all: $(BINARY)
 
 $(BINARY): matmul.o
-	$(CHARMC) -o $@ $< $(OPTS)
+	$(CHARMC) -L${TACC_PAPI_LIB} -lpapi -module CommonLBs -o $@ $^ $(OPTS)
 
 matmul.o: matmul.C matmul.decl.h
 matmul.decl.h: matmul.ci

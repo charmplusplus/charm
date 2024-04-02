@@ -142,7 +142,7 @@ void CentralLB::wakeupPEs(){
   std::lock_guard<std::mutex> lk(m_shutoff);
   ready_pthreads = 1;
   cv_shutoff.notify_all();
-  CkPrintf("\nTried notifying from PE-%d", CkMyPe());
+  CkPrintf("\nTried notifying from PE-%d", CkMyPe()); fflush(stdout);
 }
 
 void CentralLB::InvokeLB()
@@ -1157,14 +1157,16 @@ void CentralLB::MigrationDone(int balancing)
 }
 void CentralLB::MigrationDoneImpl (int balancing)
 {
-if((CkMyPe() >= get_active_pes() && get_active_pes() < 24) || (CkMyPe() >=24 && CkMyPe() >= get_active_pes() && CkMyPe() <36)) {
+if(CkMyPe() >= get_active_pes()){// && get_active_pes() < 24) || (CkMyPe() >=24 && CkMyPe() >= get_active_pes() && CkMyPe() <36)) {
             int core_id = 47;
-            if(CkMyPe()%10 == 0) core_id = 45;
-            else if(CkMyPe()%10 == 1) core_id = 43;
-            else if(CkMyPe()%10 == 2) core_id = 41;
-            else if(CkMyPe()%10 == 2) core_id = 39;
-            else if(CkMyPe()%10 == 2) core_id = 37;
 
+            if(CkMyPe()%10 > 5) core_id = 45;
+/*
+            else if(CkMyPe()%10 == 1) core_id = 52;
+            else if(CkMyPe()%10 == 2) core_id = 54;
+            else if(CkMyPe()%10 == 2) core_id = 56;
+            else if(CkMyPe()%10 == 2) core_id = 58;
+*/
             cpu_set_t cpuset;
             CPU_ZERO(&cpuset);
             CPU_SET(core_id, &cpuset);
@@ -1269,30 +1271,32 @@ void CentralLB::ResumeClients(int balancing)
           pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
         }
 #else
-#define ENABLE_SLEEP
+//#define ENABLE_SLEEP
 #ifdef ENABLE_SLEEP
-        set_active_redn_pes(get_active_pes());
+        //set_active_redn_pes(get_active_pes());
 #endif
         if(CkMyPe() >= get_active_pes()) {
 #if 0
           int core_id = CkMyPe();
           if(core_id%2 !=0) core_id +=47;
 #endif
+          cpu_set_t cpuset;
           int core_id = 47; /*91;//43;//4;
           if(CkMyPe() >= 28) core_id = 93;//6;
           if(CkMyPe() >= 34) core_id = 95;//8;
 */
           if(get_active_pes() < 24) {
-            int core_id = 47;
-            if(CkMyPe()%10 == 0) core_id = 45;
-            else if(CkMyPe()%10 == 1) core_id = 43;
-            else if(CkMyPe()%10 == 2) core_id = 41;
-            else if(CkMyPe()%10 == 2) core_id = 39;
-            else if(CkMyPe()%10 == 2) core_id = 37;
-            cpu_set_t cpuset;
+#if 0
+            int core_id = 52;
+            if(CkMyPe()%10 == 0) core_id = 58;
+            else if(CkMyPe()%10 == 1) core_id = 60;//43;
+            else if(CkMyPe()%10 == 2) core_id = 62;//41;
+//            else if(CkMyPe()%10 == 2) core_id = 39;
+
             CPU_ZERO(&cpuset);
             CPU_SET(core_id, &cpuset);
             pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+#endif
           }
         
 #ifdef ENABLE_SLEEP
@@ -1304,7 +1308,7 @@ void CentralLB::ResumeClients(int balancing)
 //          CkPrintf("\n----------------------------------------------------------------------------------\n");
 //          CkPrintf("\nWaking up %d", CkMyPe()); fflush(stdout);
 #endif
-#if 1
+#if 0
           //int 
           core_id = CkMyPe()*2+1;//45;//CkNodeSize(CkMyNode())-2;
           //if(CkMyPe() >= get_active_pes())
@@ -1317,8 +1321,10 @@ void CentralLB::ResumeClients(int balancing)
             else if(CkMyPe()%10 == 2) core_id = 41;
           }
 */
+#if 0
           if(CkMyPe() > get_active_pes() && core_id > 47 && core_id < 73)
             core_id += 24;
+#endif
 
 //          CkPrintf("\nSetting PE-%d to core%d", CkMyPe(), core_id);
           cpu_set_t cpuset;

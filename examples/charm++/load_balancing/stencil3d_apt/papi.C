@@ -276,7 +276,7 @@ int get_best_ppn() {
   for (auto it : ppn_time) {
     double diff = abs(min-it.second);
     double add = false;
-    if(diff/min < 0.1) add = true;
+    if(diff/min < 0.05) add = true;
     if(add)
       min_wpn.push_back(it.first);
     else if(it.second < min) {
