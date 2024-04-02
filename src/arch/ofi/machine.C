@@ -34,10 +34,10 @@
  *
  *  2) CXI supporting endpoint must be selected for in fi_getinfo
  *
- *  3) CXI is not optimized for within node communication, so process
- *  to process schemes, i.e., XPMEM or CMA are on by default and we
- *  would not expect disabling them to be functional, let alone
- *  optimal.
+ *  3) CXI is reportedly not optimized for within node communication,
+ *  so process to process schemes, i.e., XPMEM or CMA should be
+ *  pursued. However, the current implementations have not been shown
+ *  to be robust and performant, so they are not enabled by default.
  *
  *  4) Memory requirements add tracking for the memory registration
  *  key. This is kept in a prefix header for each allocated buffer.
