@@ -261,8 +261,13 @@ class FileReader
   bool _eofbit = false;
   size_t _gcount = 0;
   FileReaderBuffer _data_cache;
+  bool _status = true;
 
 public:
+  std::ios_base::seekdir end = std::ios_base::end;
+  std::ios_base::seekdir cur = std::ios_base::cur;
+  std::ios_base::seekdir beg = std::ios_base::beg;
+
   FileReader(Ck::IO::Session session);
   /* In order to use the read functionality, make sure
    * that this function is being called in a threaded entry method
@@ -272,8 +277,12 @@ public:
   FileReader& read(char* buffer, size_t num_bytes_to_read);
   size_t tellg();
   FileReader& seekg(size_t pos);
+  FileReader& seekg(size_t pos, std::ios_base::seekdir dir);
+
   bool eof();
   size_t gcount();
+
+  bool operator!() const;
 };
 
 }  // namespace IO
