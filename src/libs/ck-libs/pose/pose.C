@@ -60,12 +60,12 @@ void POSE_init(int IDflag, int ET) // can specify both
     CkPrintf("POSE DOP analysis enabled...deleting dop log files...\n");
     char fName[32];
     for (int i = 0; i < CkNumPes(); i++) {
-      sprintf(fName, "dop%d.log", i);
+      snprintf(fName, sizeof(fName), "dop%d.log", i);
       unlink(fName);
     }
-    sprintf(fName, "dop_mod.out");
+    snprintf(fName, sizeof(fName), "dop_mod.out");
     unlink(fName);
-    sprintf(fName, "dop_sim.out");
+    snprintf(fName, sizeof(fName), "dop_sim.out");
     unlink(fName);
   }
   POSE_inactDetect = IDflag;

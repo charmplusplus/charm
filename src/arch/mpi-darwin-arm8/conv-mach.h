@@ -1,6 +1,7 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
+#define CMK_ARM                                            1
 #define CMK_64BIT                                          1
 #define CMK_CONVERSE_MPI                                   1
 

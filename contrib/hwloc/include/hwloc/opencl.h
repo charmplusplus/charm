@@ -1,5 +1,5 @@
 /*
- * Copyright © 2012-2021 Inria.  All rights reserved.
+ * Copyright © 2012-2023 Inria.  All rights reserved.
  * Copyright © 2013, 2018 Université Bordeaux.  All right reserved.
  * See COPYING in top-level directory.
  */
@@ -69,6 +69,9 @@ typedef union {
 /** \brief Return the domain, bus and device IDs of the OpenCL device \p device.
  *
  * Device \p device must match the local machine.
+ *
+ * \return 0 on success.
+ * \return -1 on error, for instance if device information could not be found.
  */
 static __hwloc_inline int
 hwloc_opencl_get_device_pci_busid(cl_device_id device,
@@ -113,7 +116,7 @@ hwloc_opencl_get_device_pci_busid(cl_device_id device,
 /** \brief Get the CPU set of processors that are physically
  * close to OpenCL device \p device.
  *
- * Return the CPU set describing the locality of the OpenCL device \p device.
+ * Store in \p set the CPU-set describing the locality of the OpenCL device \p device.
  *
  * Topology \p topology and device \p device must match the local machine.
  * I/O devices detection and the OpenCL component are not needed in the topology.
@@ -126,6 +129,9 @@ hwloc_opencl_get_device_pci_busid(cl_device_id device,
  * This function is currently only implemented in a meaningful way for
  * Linux with the AMD or NVIDIA OpenCL implementation; other systems will simply
  * get a full cpuset.
+ *
+ * \return 0 on success.
+ * \return -1 on error, for instance if the device could not be found.
  */
 static __hwloc_inline int
 hwloc_opencl_get_device_cpuset(hwloc_topology_t topology __hwloc_attribute_unused,
@@ -162,10 +168,10 @@ hwloc_opencl_get_device_cpuset(hwloc_topology_t topology __hwloc_attribute_unuse
 /** \brief Get the hwloc OS device object corresponding to the
  * OpenCL device for the given indexes.
  *
- * Return the OS device object describing the OpenCL device
+ * \return The hwloc OS device object describing the OpenCL device
  * whose platform index is \p platform_index,
  * and whose device index within this platform if \p device_index.
- * Return NULL if there is none.
+ * \return \c NULL if there is none.
  *
  * The topology \p topology does not necessarily have to match the current
  * machine. For instance the topology may be an XML import of a remote host.
@@ -192,8 +198,9 @@ hwloc_opencl_get_device_osdev_by_index(hwloc_topology_t topology,
 
 /** \brief Get the hwloc OS device object corresponding to OpenCL device \p deviceX.
  *
- * Use OpenCL device attributes to find the corresponding hwloc OS device object.
- * Return NULL if there is none or if useful attributes are not available.
+ * \return The hwloc OS device object corresponding to the given OpenCL device \p device.
+ * \return \c NULL if none could be found, for instance
+ * if required OpenCL attributes are not available.
  *
  * This function currently only works on AMD and NVIDIA OpenCL devices that support
  * relevant OpenCL extensions. hwloc_opencl_get_device_osdev_by_index()

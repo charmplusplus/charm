@@ -53,7 +53,7 @@ void ForestModel::readModel(const char* dir) {
 
   char buffer[PATH_MAX];
   char linebuffer[LINE_SIZE];
-  sprintf(buffer, "%s/big_leafdist.txt.gz", dir);
+  snprintf(buffer, sizeof(buffer), "%s/big_leafdist.txt.gz", dir);
   pFile = gzopen(buffer, "r");
 
   if (pFile == NULL) CkAbort("\nUnable to open model files.\n");
@@ -75,7 +75,7 @@ void ForestModel::readModel(const char* dir) {
   }
   gzclose(pFile);
 
-  sprintf(buffer, "%s/big_weakmodel.txt.gz", dir);
+  snprintf(buffer, sizeof(buffer), "%s/big_weakmodel.txt.gz", dir);
   pFile = gzopen(buffer, "r");
 
   if (pFile == NULL) CkAbort("\nUnable to open model files.\n");

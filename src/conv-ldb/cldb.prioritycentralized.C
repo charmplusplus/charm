@@ -18,7 +18,7 @@
 #define LOAD_WEIGHT 0.1
 #define PRIOR_WEIGHT 0.1
 
-CpvDeclare(CldProcInfo, CldData);
+CpvDeclare(CldDataInfo, CldData);
 extern char *_lbtopo;			/* topology name string */
 int _lbsteal = 0;                       /* work stealing flag */
 
@@ -33,7 +33,7 @@ CpvDeclare(void*, CldRequestQueue);
 
 void LoadNotifyFn(int l)
 {
-  CldProcInfo  cldData = CpvAccess(CldData);
+  CldDataInfo  cldData = CpvAccess(CldData);
   cldData->sent = 0;
 }
 
@@ -223,7 +223,7 @@ static void CldStillIdle(void *dummy)
     int i;
     double startT;
     requestmsg msg;
-    CldProcInfo  cldData = CpvAccess(CldData);
+    CldDataInfo  cldData = CpvAccess(CldData);
     double now = CmiWallTimer();
     double lt = cldData->lastCheck;
    
@@ -247,7 +247,7 @@ static void CldStillIdle(void *dummy)
 void CldReadytoExec(void *msg)
 {
 
-    CldProcInfo  cldData = CpvAccess(CldData);
+    CldDataInfo  cldData = CpvAccess(CldData);
     CldRestoreHandler((char *)msg);
     CmiHandleMessage(msg);
     cldData->load = cldData->load - 1;
@@ -271,7 +271,7 @@ void HigherPriorityWork(void *msg)
     CldPackFn pfn;
     int len, queueing, priobits; 
     unsigned int *prioptr;
-    CldProcInfo  cldData = CpvAccess(CldData);
+    CldDataInfo  cldData = CpvAccess(CldData);
     ifn = (CldInfoFn)CmiHandlerToFunction(CmiGetInfo(msg));
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
     CldRestoreHandler((char *)msg);
@@ -365,8 +365,8 @@ void CldEnqueueGroup(CmiGroup grp, void *msg, int infofn)
 void  CldOtherInit()
 {
 
-  CpvInitialize(CldProcInfo, CldData);
-  CpvAccess(CldData) = (CldProcInfo)CmiAlloc(sizeof(struct CldProcInfo_s));
+  CpvInitialize(CldDataInfo, CldData);
+  CpvAccess(CldData) = (CldDataInfo)CmiAlloc(sizeof(struct CldDataInfo_s));
   CpvAccess(CldData)->lastCheck = -1;
   CpvAccess(CldData)->sent = 0;
   CpvAccess(CldData)->load = 0;

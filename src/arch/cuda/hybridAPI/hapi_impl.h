@@ -33,6 +33,7 @@ typedef struct _bufferPoolHeader {
 typedef struct _bufferPool {
   BufferPoolHeader *head;
   size_t size;
+  void *chunk;
 #ifdef HAPI_MEMPOOL_DEBUG
   int num;
 #endif

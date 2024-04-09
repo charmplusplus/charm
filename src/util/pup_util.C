@@ -648,34 +648,36 @@ void PUP::toTextUtil::endLine(void) {
 }
 void PUP::toTextUtil::beginEnv(const char *type,int n)
 {
-  char *o=beginLine();
-  sprintf(o,"begin "); o+=strlen(o);
-  sprintf(o,type,n); o+=strlen(o);
-  sprintf(o," {\n");
+  char * const begin=beginLine();
+  char *o=begin;
+  snprintf(o,maxCount,"begin "); o+=strlen(o);
+  snprintf(o,maxCount - (o-begin),type,n); o+=strlen(o);
+  snprintf(o,maxCount - (o-begin)," {\n");
   endLine();
   level++;
 }
 void PUP::toTextUtil::endEnv(const char *type)
 {
   level--;
-  sprintf(beginLine(),"} end %s;\n",type);
+  snprintf(beginLine(),maxCount,"} end %s;\n",type);
   endLine();
 }
-PUP::toTextUtil::toTextUtil(unsigned int inType,char *buf)
+PUP::toTextUtil::toTextUtil(unsigned int inType,char *buf,size_t len)
   :er(inType)
 {
   cur=buf;
+  maxCount=len;
   level=0;
 }
 
 void PUP::toTextUtil::comment(const char *message)
 {
-  sprintf(beginLine(),"//%s\n",message); endLine();
+  snprintf(beginLine(),maxCount,"//%s\n",message); endLine();
 }
 
 void PUP::toTextUtil::synchronize(unsigned int m)
 {
-  sprintf(beginLine(),"sync=0x%08x\n",m); endLine();
+  snprintf(beginLine(),maxCount,"sync=0x%08x\n",m); endLine();
 #if 0 /* text people don't care this much about synchronization */
   char *o=beginLine();
   sprintf(o,"sync=");o+=strlen(o);
@@ -702,38 +704,40 @@ void PUP::toTextUtil::pup_buffer(void *&p,size_t n, size_t itemSize, dataType t,
 void PUP::toTextUtil::bytes(void *p,size_t n,size_t itemSize,dataType t) {
   if (t==Tchar) 
   { /*Character data is written out directly (rather than numerically)*/
-    char *o=beginLine();
-    sprintf(o,"string=");o+=strlen(o);
+    char * const begin=beginLine();
+    char *o=begin;
+    snprintf(o,maxCount,"string=");o+=strlen(o);
     *o++='\"'; /*Leading quote*/
     /*Copy each character, possibly escaped*/
     const char *c=(const char *)p;
     for (size_t i=0;i<n;i++) {
       if (c[i]=='\n') {
-	sprintf(o,"\\n");o+=strlen(o);
+	snprintf(o,maxCount - (o-begin),"\\n");o+=strlen(o);
       } else if (iscntrl(c[i])) {
-	sprintf(o,"\\x%02X",(unsigned char)c[i]);o+=strlen(o);
+	snprintf(o,maxCount - (o-begin),"\\x%02X",(unsigned char)c[i]);o+=strlen(o);
       } else if (c[i]=='\\' || c[i]=='\"') {
-	sprintf(o,"\\%c",c[i]);o+=strlen(o);
+	snprintf(o,maxCount - (o-begin),"\\%c",c[i]);o+=strlen(o);
       } else
 	*o++=c[i];
     }
     /*Add trailing quote and newline*/
-    sprintf(o,"\";\n");o+=strlen(o);
+    snprintf(o,maxCount - (o-begin),"\";\n");o+=strlen(o);
     endLine();
   } else if (t==Tbyte || t==Tuchar)
   { /*Byte data is written out in hex (rather than decimal) */
     beginEnv("byte %d",n);
     const unsigned char *c=(const unsigned char *)p;
-    char *o=beginLine();
+    char * const begin=beginLine();
+    char *o=begin;
     for (size_t i=0;i<n;i++) {
-      sprintf(o,"%02X ",c[i]);o+=strlen(o);
+      snprintf(o,maxCount - (o-begin),"%02X ",c[i]);o+=strlen(o);
       if (i%25==24 && (i+1!=n)) 
       { /* This line is too long-- wrap it */
-	sprintf(o,"\n"); o+=strlen(o);
+	snprintf(o,maxCount - (o-begin),"\n"); o+=strlen(o);
 	endLine(); o=beginLine();
       }
     }
-    sprintf(o,"\n");
+    snprintf(o,maxCount - (o-begin),"\n");
     endLine();
     endEnv("byte");
   }
@@ -741,25 +745,25 @@ void PUP::toTextUtil::bytes(void *p,size_t n,size_t itemSize,dataType t) {
   { /*Ordinary number-- write out in decimal */
     if (n!=1) beginEnv("array %d",n);
     for (size_t i=0;i<n;i++) {
-      char *o=beginLine();
+      char * const o=beginLine();
       switch(t) {
-      case Tshort: sprintf(o,"short=%d;\n",((short *)p)[i]); break;
-      case Tushort: sprintf(o,"ushort=%u;\n",((unsigned short *)p)[i]); break;
-      case Tint: sprintf(o,"int=%d;\n",((int *)p)[i]); break;
-      case Tuint: sprintf(o,"uint=%u;\n",((unsigned int *)p)[i]); break;
-      case Tlong: sprintf(o,"long=%ld;\n",((long *)p)[i]); break;
-      case Tulong: sprintf(o,"ulong=%lu;\n",((unsigned long *)p)[i]); break;
-      case Tfloat: sprintf(o,"float=%.7g;\n",((float *)p)[i]); break;
-      case Tdouble: sprintf(o,"double=%.15g;\n",((double *)p)[i]); break;
-      case Tbool: sprintf(o,"bool=%s;\n",((bool *)p)[i]?"true":"false"); break;
+      case Tshort: snprintf(o,maxCount,"short=%d;\n",((short *)p)[i]); break;
+      case Tushort: snprintf(o,maxCount,"ushort=%u;\n",((unsigned short *)p)[i]); break;
+      case Tint: snprintf(o,maxCount,"int=%d;\n",((int *)p)[i]); break;
+      case Tuint: snprintf(o,maxCount,"uint=%u;\n",((unsigned int *)p)[i]); break;
+      case Tlong: snprintf(o,maxCount,"long=%ld;\n",((long *)p)[i]); break;
+      case Tulong: snprintf(o,maxCount,"ulong=%lu;\n",((unsigned long *)p)[i]); break;
+      case Tfloat: snprintf(o,maxCount,"float=%.7g;\n",((float *)p)[i]); break;
+      case Tdouble: snprintf(o,maxCount,"double=%.15g;\n",((double *)p)[i]); break;
+      case Tbool: snprintf(o,maxCount,"bool=%s;\n",((bool *)p)[i]?"true":"false"); break;
 #if CMK_LONG_DOUBLE_DEFINED
-      case Tlongdouble: sprintf(o,"longdouble=%Lg;\n",((long double *)p)[i]);break;
+      case Tlongdouble: snprintf(o,maxCount,"longdouble=%Lg;\n",((long double *)p)[i]);break;
 #endif
 #ifdef CMK_PUP_LONG_LONG
-      case Tlonglong: sprintf(o,"longlong=%lld;\n",((CMK_PUP_LONG_LONG *)p)[i]);break;
-      case Tulonglong: sprintf(o,"ulonglong=%llu;\n",((unsigned CMK_PUP_LONG_LONG *)p)[i]);break;
+      case Tlonglong: snprintf(o,maxCount,"longlong=%lld;\n",((CMK_PUP_LONG_LONG *)p)[i]);break;
+      case Tulonglong: snprintf(o,maxCount,"ulonglong=%llu;\n",((unsigned CMK_PUP_LONG_LONG *)p)[i]);break;
 #endif
-      case Tpointer: sprintf(o,"pointer=%p;\n",((void **)p)[i]); break;
+      case Tpointer: snprintf(o,maxCount,"pointer=%p;\n",((void **)p)[i]); break;
       default: CmiAbort("Unrecognized pup type code!");
       }
       endLine();
@@ -781,7 +785,7 @@ char *PUP::sizerText::advance(char *cur) {
 }
 
 PUP::sizerText::sizerText(void)
-  :toTextUtil(IS_SIZING+IS_COMMENTS,line),charCount(0) { }
+  :toTextUtil(IS_SIZING+IS_COMMENTS,line,sizerText::lineLen),charCount(0) { }
 
 //Text packer
 char *PUP::toText::advance(char *cur) {
@@ -789,8 +793,8 @@ char *PUP::toText::advance(char *cur) {
   return buf+charCount;
 }
 
-PUP::toText::toText(char *outBuf)
-  :toTextUtil(IS_PACKING+IS_COMMENTS,outBuf),buf(outBuf),charCount(0) { }
+PUP::toText::toText(char *outBuf, size_t len)
+  :toTextUtil(IS_PACKING+IS_COMMENTS,outBuf,len),buf(outBuf),charCount(0) { }
 
 /************** To/from text FILE ****************/
 void PUP::toTextFile::pup_buffer(void *&p,size_t n,size_t itemSize,dataType t) {

@@ -192,8 +192,8 @@ extern int global_myrank;
 int global_myrank;
 #endif
 #if defined test_threadlocalvars
-thread_local extern int threadlocal_myrank;
-thread_local int threadlocal_myrank;
+extern THREAD_LOCAL int threadlocal_myrank;
+THREAD_LOCAL int threadlocal_myrank;
 #endif
 #endif
 

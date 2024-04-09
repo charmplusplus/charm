@@ -38,7 +38,6 @@ double Model::weakTest(const DataMatrix& X) const {
   // X is NxD
   double final_yhat = 1.0;
   int N = X.num_rows;
-  int D = X.num_cols;
 #ifdef DEBUG_RF
   if (classifierID == 2.0)
     printf("\nTesting on weakmodel r1[%d], r2[%d], w[%lf,%lf,%lf]\n", r1, r2, w[0], w[1],

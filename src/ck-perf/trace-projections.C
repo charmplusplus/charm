@@ -207,21 +207,23 @@ void LogPool::createFile(const char *fix)
   }
 
   char* filenameLastPart = strrchr(pgmname, PATHSEP) + 1; // Last occurrence of path separator
-  char *pathPlusFilePrefix = new char[1024];
+  static constexpr int pathPlusFilePrefixLen = 1024;
+  char *pathPlusFilePrefix = new char[pathPlusFilePrefixLen];
  
   if(nSubdirs > 0){
     int sd = CkMyPe() % nSubdirs;
-    char *subdir = new char[1024];
-    sprintf(subdir, "%s.projdir.%d", pgmname, sd);
+    static constexpr int subdirLen = 1024;
+    char *subdir = new char[subdirLen];
+    snprintf(subdir, subdirLen, "%s.projdir.%d", pgmname, sd);
     CmiMkdir(subdir);
-    sprintf(pathPlusFilePrefix, "%s%c%s%s", subdir, PATHSEP, filenameLastPart, fix);
+    snprintf(pathPlusFilePrefix, pathPlusFilePrefixLen, "%s%c%s%s", subdir, PATHSEP, filenameLastPart, fix);
     delete[] subdir;
   } else {
-    sprintf(pathPlusFilePrefix, "%s%s", pgmname, fix);
+    snprintf(pathPlusFilePrefix, pathPlusFilePrefixLen, "%s%s", pgmname, fix);
   }
 
   char pestr[10];
-  sprintf(pestr, "%d", CkMyPe());
+  snprintf(pestr, sizeof(pestr), "%d", CkMyPe());
 #if CMK_USE_ZLIB
   int len;
   if(compressed)
@@ -235,13 +237,13 @@ void LogPool::createFile(const char *fix)
   fname = new char[len];
 #if CMK_USE_ZLIB
   if(compressed) {
-    sprintf(fname, "%s.%s.log.gz", pathPlusFilePrefix,pestr);
+    snprintf(fname, len, "%s.%s.log.gz", pathPlusFilePrefix,pestr);
   }
   else {
-    sprintf(fname, "%s.%s.log", pathPlusFilePrefix, pestr);
+    snprintf(fname, len, "%s.%s.log", pathPlusFilePrefix, pestr);
   }
 #else
-  sprintf(fname, "%s.%s.log", pathPlusFilePrefix, pestr);
+  snprintf(fname, len, "%s.%s.log", pathPlusFilePrefix, pestr);
 #endif
   fileCreated = true;
   delete[] pathPlusFilePrefix;
@@ -257,8 +259,9 @@ void LogPool::createSts(const char *fix)
   }
 
   // create the sts file
-  char *fname = new char[strlen(CkpvAccess(traceRoot))+strlen(fix)+strlen(".sts")+2];
-  sprintf(fname, "%s%s.sts", CkpvAccess(traceRoot), fix);
+  int len = strlen(CkpvAccess(traceRoot))+strlen(fix)+strlen(".sts")+2;
+  char *fname = new char[len];
+  snprintf(fname, len, "%s%s.sts", CkpvAccess(traceRoot), fix);
   do
     {
       stsfp = fopen(fname, "w");
@@ -273,9 +276,10 @@ void LogPool::createSts(const char *fix)
 void LogPool::createRC()
 {
   // create the projections rc file.
+  int len = strlen(CkpvAccess(traceRoot))+strlen(".projrc")+1;
   fname = 
-    new char[strlen(CkpvAccess(traceRoot))+strlen(".projrc")+1];
-  sprintf(fname, "%s.projrc", CkpvAccess(traceRoot));
+    new char[len];
+  snprintf(fname, len, "%s.projrc", CkpvAccess(traceRoot));
   do {
     rcfp = fopen(fname, "w");
   } while (!rcfp && (errno == EINTR || errno == EMFILE));
@@ -460,8 +464,9 @@ void LogPool::writeStatis(void)
 {
     
    // create the statis file
-  char *fname = new char[strlen(CkpvAccess(traceRoot))+strlen(".statis")+10];
-  sprintf(fname, "%s.%d.statis", CkpvAccess(traceRoot), CkMyPe());
+  int len = strlen(CkpvAccess(traceRoot))+strlen(".statis")+10;
+  char *fname = new char[len];
+  snprintf(fname, len, "%s.%d.statis", CkpvAccess(traceRoot), CkMyPe());
   do
   {
       statisfp = fopen(fname, "w");

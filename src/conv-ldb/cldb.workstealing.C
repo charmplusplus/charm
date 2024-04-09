@@ -10,19 +10,18 @@
 
 void CldMultipleSendPrio(int pe, int numToSend, int rank, int immed);
 
-typedef struct CldProcInfo_s {
+typedef struct CldDataInfo_s {
   int    askEvt;		/* user event for askLoad */
   int    askNoEvt;		/* user event for askNoLoad */
   int    idleEvt;		/* user event for idle balancing */
-} *CldProcInfo;
+} *CldDataInfo;
 
 static int WS_Threshold = -1;
 static int _steal_prio = 0;
 static int _stealonly1 = 0;
 static int _steal_immediate = 0;
-static int workstealingproactive = 0;
 
-CpvStaticDeclare(CldProcInfo, CldData);
+CpvStaticDeclare(CldDataInfo, CldData);
 CpvStaticDeclare(int, CldAskLoadHandlerIndex);
 CpvStaticDeclare(int, CldAckNoTaskHandlerIndex);
 CpvStaticDeclare(int, isStealing);
@@ -36,7 +35,6 @@ const char *CldGetStrategy(void)
 
 static void StealLoad(void)
 {
-  int i;
   double now;
   requestmsg *msg;
   int  victim;
@@ -92,7 +90,7 @@ static void CldBeginIdle(void *dummy)
 /* send some work to requested proc */
 static void CldAskLoadHandler(requestmsg *msg)
 {
-  int receiver, rank, recvIdx, i;
+  int receiver, rank;
   int myload, sendLoad;
   double now;
   /* int myload = CldLoad(); */
@@ -201,7 +199,7 @@ void CldBalanceHandler(void *msg)
 
 void CldEnqueueGroup(CmiGroup grp, void *msg, int infofn)
 {
-  int len, queueing, priobits,i; unsigned int *prioptr;
+  int len, queueing, priobits; unsigned int *prioptr;
   CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
   CldPackFn pfn;
   ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
@@ -237,7 +235,7 @@ void CldEnqueueWithinNode(void *msg, int infofn)
 
 void CldEnqueueMulti(int npes, const int *pes, void *msg, int infofn)
 {
-  int len, queueing, priobits,i; unsigned int *prioptr;
+  int len, queueing, priobits; unsigned int *prioptr;
   CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
   CldPackFn pfn;
   ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
@@ -252,7 +250,7 @@ void CldEnqueueMulti(int npes, const int *pes, void *msg, int infofn)
 
 void CldEnqueue(int pe, void *msg, int infofn)
 {
-  int len, queueing, priobits, avg; unsigned int *prioptr;
+  int len, queueing, priobits; unsigned int *prioptr;
   CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
   CldPackFn pfn;
 
@@ -291,7 +289,7 @@ void CldEnqueue(int pe, void *msg, int infofn)
 
 void CldNodeEnqueue(int node, void *msg, int infofn)
 {
-  int len, queueing, priobits, pe, avg; unsigned int *prioptr;
+  int len, queueing, priobits, pe; unsigned int *prioptr;
   CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
   CldPackFn pfn;
   if ((node == CLD_ANYWHERE) && (CmiNumPes() > 1)) {
@@ -321,12 +319,12 @@ void CldNodeEnqueue(int node, void *msg, int infofn)
 
 void CldGraphModuleInit(char **argv)
 {
-  CpvInitialize(CldProcInfo, CldData);
+  CpvInitialize(CldDataInfo, CldData);
   CpvInitialize(int, CldAskLoadHandlerIndex);
   CpvInitialize(int, CldAckNoTaskHandlerIndex);
   CpvInitialize(int, CldBalanceHandlerIndex);
 
-  CpvAccess(CldData) = (CldProcInfo)CmiAlloc(sizeof(struct CldProcInfo_s));
+  CpvAccess(CldData) = (CldDataInfo)CmiAlloc(sizeof(struct CldDataInfo_s));
 #if CMK_TRACE_ENABLED
   CpvAccess(CldData)->askEvt = traceRegisterUserEvent("CldAskLoad", -1);
   CpvAccess(CldData)->idleEvt = traceRegisterUserEvent("StealLoad", -1);

@@ -3,6 +3,12 @@
 
 #include "charm-api.h"
 
+#if defined _MSC_VER
+# define THREAD_LOCAL __declspec(thread)
+#else
+# define THREAD_LOCAL __thread
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -17,7 +23,7 @@ int * get_scoped_global_static();
 #endif
 #endif
 #if defined test_threadlocalvars
-thread_local extern int extern_threadlocal_static;
+extern THREAD_LOCAL int extern_threadlocal_static;
 #if defined test_staticvars
 int * get_static_threadlocal_static();
 int * get_scoped_threadlocal_static();
@@ -33,7 +39,7 @@ CMI_EXPORT int * get_scoped_global_shared();
 #endif
 #endif
 #if defined test_threadlocalvars
-thread_local extern CMI_EXPORT int extern_threadlocal_shared;
+extern THREAD_LOCAL CMI_EXPORT int extern_threadlocal_shared;
 #if defined test_staticvars
 CMI_EXPORT int * get_static_threadlocal_shared();
 CMI_EXPORT int * get_scoped_threadlocal_shared();

@@ -3,10 +3,9 @@
  *  Date Created: March 19th, 2007
  *
  *  This would be the top level interface for all topology managers we
- *  will write for different machines (Cray, IBM ... for tori, meshes ...)
- *  Currently we have functionality for Blue Gene, Cray XT/XE, and
- *  non-topo machines.
- *
+ *  will write for specific machines.
+ *  Currently we have functionality for Cray XT/XE,
+ *  and non-topo machines.
  */
 
 #ifndef _TOPO_MANAGER_H_

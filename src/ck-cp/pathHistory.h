@@ -167,9 +167,8 @@ public:
     }
 
     /// Write a description of the path into the beginning of the provided buffer. The buffer ought to be large enough.
-  void printHTMLToString(char* buf) const{
-      buf[0] = '\0';
-      sprintf(buf+strlen(buf), "MergeablePathHistory time=%lf send pe=%d idx=%d timeEntryStarted=%lf", (double)preceding_path_time, (int)sender_pe, (int)sender_history_table_idx, (double)timeEntryMethodStarted);
+  void printHTMLToString(char* buf, int len) const{
+      snprintf(buf, len, "MergeablePathHistory time=%lf send pe=%d idx=%d timeEntryStarted=%lf", (double)preceding_path_time, (int)sender_pe, (int)sender_history_table_idx, (double)timeEntryMethodStarted);
   }
 
   void setDebug100(){

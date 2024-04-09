@@ -105,7 +105,7 @@ int main()
     
     curTime=time(NULL);
     fprintf(logfile,"Connection from IP %s, port %d at %s",
-	    skt_print_ip(ip_str,remoteIP),remotePortNumber,
+	    skt_print_ip(ip_str,sizeof(ip_str),remoteIP),remotePortNumber,
 	    ctime(&curTime));
     fflush(logfile);
     

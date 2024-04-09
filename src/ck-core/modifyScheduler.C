@@ -40,7 +40,7 @@ void CqsIncreasePriorityForEntryMethod(Queue q, const int entrymethod){
 
 #if CMK_TRACE_ENABLED
 	char traceStr[64];
-	sprintf(traceStr, "Replacing %p in message queue with NULL", removedMsgPtr);
+	snprintf(traceStr, sizeof(traceStr), "Replacing %p in message queue with NULL", removedMsgPtr);
 	traceUserSuppliedNote(traceStr);
 #endif
     }
@@ -67,7 +67,7 @@ void CqsIncreasePriorityForMemCriticalEntries(Queue q){
 
 #if CMK_TRACE_ENABLED
 	char traceStr[64];
-	sprintf(traceStr, "Replacing %p in message queue with NULL", removedMsgPtr);
+	snprintf(traceStr, sizeof(traceStr), "Replacing %p in message queue with NULL", removedMsgPtr);
 	traceUserSuppliedNote(traceStr);
 #endif
     }

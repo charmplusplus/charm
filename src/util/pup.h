@@ -45,7 +45,10 @@ class bar {
     PUPn(f); // <- automatically calls foo::pup
     PUPn(nArr);
     if (p.isUnpacking()) // <- must allocate array on other side.
+    {
       arr=new double[nArr];
+      _MEMCHECK(arr);
+    }
     PUPv(arr,nArr); // <- special syntax for arrays of simple types
   }
 };
@@ -555,6 +558,7 @@ class fromDisk : public disk {
 class toTextUtil : public er {
  private:
   char *cur; /*Current output buffer*/
+  size_t maxCount; /*Max length of cur buffer*/
   int level; /*Indentation distance*/
   void beginEnv(const char *type,int n=0);
   void endEnv(const char *type);
@@ -562,7 +566,7 @@ class toTextUtil : public er {
   void endLine(void);
  protected:
   virtual char *advance(char *cur)=0; /*Consume current buffer and return next*/
-  toTextUtil(unsigned int inType,char *buf);
+  toTextUtil(unsigned int inType,char *buf,size_t len);
   toTextUtil(const toTextUtil &p);		//You don't want to copy
   void operator=(const toTextUtil &p);		// You don't want to copy
  public:
@@ -578,8 +582,10 @@ class toTextUtil : public er {
 };
 /* Return the number of characters, including terminating NULL */
 class sizerText : public toTextUtil {
+ public:
+  static constexpr int lineLen = 1000;
  private:
-  char line[1000];
+  char line[lineLen];
   size_t charCount; /*Total characters seen so far (not including NULL) */
  protected:
   virtual char *advance(char *cur);
@@ -593,10 +599,11 @@ class toText : public toTextUtil {
  private:
   char *buf;
   size_t charCount; /*Total characters written so far (not including NULL) */
+  size_t maxCount; /*Max length of buf*/
  protected:
   virtual char *advance(char *cur);
  public:
-  toText(char *outStr);
+  toText(char *outStr, size_t len);
   toText(const toText &p);			//You don't want to copy
   void operator=(const toText &p);		// You don't want to copy
   size_t size(void) const {return charCount+1; /*add NULL*/ }
@@ -816,7 +823,9 @@ public:\
 #define PUPable_decl_inside_template(className)	\
 private: \
     static PUP::able* call_PUP_constructor(void) { \
-        return new className((CkMigrateMessage *)0);}			\
+        className* pupobj = new className((CkMigrateMessage*)0); \
+        _MEMCHECK(pupobj); \
+        return pupobj; } \
     static PUP::able::PUP_ID my_PUP_ID;\
 public: \
     virtual const PUP::able::PUP_ID &get_PUP_ID(void) const { \
@@ -827,7 +836,9 @@ public: \
 #define PUPable_decl_inside_base_template(baseClassName, className)            \
 private:                                                                       \
     static PUP::able *call_PUP_constructor(void) {                             \
-        return new className((CkMigrateMessage *)0);                           \
+        className* pupobj = new className((CkMigrateMessage*)0); \
+        _MEMCHECK(pupobj); \
+        return pupobj; \
     }                                                                          \
     static PUP::able::PUP_ID my_PUP_ID;                                        \
                                                                                \
@@ -850,7 +861,9 @@ public:                                                                        \
      template<templateParameters> inline void operator|(PUP::er &p,className* &a) { \
          PUP::able *pa=a;  p(&pa);  a=(className *)pa; } \
      template<templateParameters> PUP::able *className::call_PUP_constructor(void) { \
-         return new className((CkMigrateMessage *)0);}			\
+         className* pupobj = new className((CkMigrateMessage*)0); \
+         _MEMCHECK(pupobj); \
+         return pupobj; } \
      template<templateParameters> const PUP::able::PUP_ID &className::get_PUP_ID(void) const { \
          return className::my_PUP_ID; }					\
      template<templateParameters> void className::register_PUP_ID(const char* name) { \
@@ -866,8 +879,10 @@ public:\
 
 //Definitions to include exactly once at file scope
 #define PUPable_def(className) \
-	PUP::able *className::call_PUP_constructor(void) \
-		{ return new className((CkMigrateMessage *)0);}\
+	PUP::able *className::call_PUP_constructor(void) { \
+		className* pupobj = new className((CkMigrateMessage*)0); \
+		_MEMCHECK(pupobj); \
+		return pupobj; } \
 	const PUP::able::PUP_ID &className::get_PUP_ID(void) const\
 		{ return className::my_PUP_ID; }\
 	PUP::able::PUP_ID className::my_PUP_ID;\

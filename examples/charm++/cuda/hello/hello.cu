@@ -9,7 +9,7 @@ void runHello(struct hapiWorkRequest* wr, cudaStream_t kernel_stream,
   helloKernel<<<wr->grid_dim, wr->block_dim, wr->shared_mem, kernel_stream>>>();
 }
 
-void kernelSetup(cudaStream_t stream, void* cb) {
+void kernelSetup(cudaStream_t stream, const CkCallback& cb) {
 #ifdef USE_WR
   // DEPRECATED
   hapiWorkRequest* wr = hapiCreateWorkRequest();

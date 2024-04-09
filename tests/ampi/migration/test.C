@@ -55,9 +55,11 @@ int main(int argc, char **argv)
       for (int i=0; i<p; i++) {
         if (fscanf(mapf, "%d\n", &init_pes[i]) != 1) {
           printf("Unrecognized mapfile formatting!\n");
+          fclose(mapf);
           MPI_Abort(MPI_COMM_WORLD, 1);
         }
       }
+      fclose(mapf);
 
       MPI_Scatter(init_pes.data(), 1, MPI_INT, &my_init_pe, 1, MPI_INT, 0, MPI_COMM_WORLD);
     }

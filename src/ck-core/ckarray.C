@@ -236,7 +236,7 @@ void ArrayElement::initBasics(void)
 #ifdef _PIPELINED_ALLREDUCE_
   allredMgr = NULL;
 #endif
-  DEBC((AA "Inserting %llu into PE level hashtable\n" AB, ckGetID().getID()));
+  DEBC((AA "Inserting %" PRIu64 " into PE level hashtable\n" AB, ckGetID().getID()));
   CkpvAccess(array_objs)[ckGetID().getID()] = this;
 }
 
@@ -395,7 +395,7 @@ ArrayElement::~ArrayElement()
     return; /* Just saving to disk--don't trash anything. */
 #endif
   // Erase from PE level hashtable for quick receives
-  DEBC((AA "Removing %llu from PE level hashtable\n" AB, ckGetID().getID()));
+  DEBC((AA "Removing %" PRIu64 " from PE level hashtable\n" AB, ckGetID().getID()));
   CkpvAccess(array_objs).erase(ckGetID().getID());
   // To detect use-after-delete:
   thisArray = (CkArray*)(intptr_t)0xDEADa7a1;
@@ -437,29 +437,29 @@ char* ArrayElement::ckDebugChareName(void)
   switch (thisIndexMax.dimension)
   {
     case 0:
-      sprintf(buf, "%s", className);
+      snprintf(buf, sizeof(buf), "%s", className);
       break;
     case 1:
-      sprintf(buf, "%s[%d]", className, d[0]);
+      snprintf(buf, sizeof(buf), "%s[%d]", className, d[0]);
       break;
     case 2:
-      sprintf(buf, "%s(%d,%d)", className, d[0], d[1]);
+      snprintf(buf, sizeof(buf), "%s(%d,%d)", className, d[0], d[1]);
       break;
     case 3:
-      sprintf(buf, "%s(%d,%d,%d)", className, d[0], d[1], d[2]);
+      snprintf(buf, sizeof(buf), "%s(%d,%d,%d)", className, d[0], d[1], d[2]);
       break;
     case 4:
-      sprintf(buf, "%s(%hd,%hd,%hd,%hd)", className, s[0], s[1], s[2], s[3]);
+      snprintf(buf, sizeof(buf), "%s(%hd,%hd,%hd,%hd)", className, s[0], s[1], s[2], s[3]);
       break;
     case 5:
-      sprintf(buf, "%s(%hd,%hd,%hd,%hd,%hd)", className, s[0], s[1], s[2], s[3], s[4]);
+      snprintf(buf, sizeof(buf), "%s(%hd,%hd,%hd,%hd,%hd)", className, s[0], s[1], s[2], s[3], s[4]);
       break;
     case 6:
-      sprintf(buf, "%s(%hd,%hd,%hd,%hd,%hd,%hd)", className, s[0], s[1], s[2], s[3], s[4],
+      snprintf(buf, sizeof(buf), "%s(%hd,%hd,%hd,%hd,%hd,%hd)", className, s[0], s[1], s[2], s[3], s[4],
               s[5]);
       break;
     default:
-      sprintf(buf, "%s(%d,%d,%d,%d..)", className, d[0], d[1], d[2], d[3]);
+      snprintf(buf, sizeof(buf), "%s(%d,%d,%d,%d..)", className, d[0], d[1], d[2], d[3]);
       break;
   };
   return strdup(buf);
@@ -801,8 +801,9 @@ void CProxySection_ArrayBase::pup(PUP::er& p)
  * ensures that up to the limit of available bits, array IDs can be represented
  * as part of a compound fixed-size ID for their elements.
  */
-struct CkCreateArrayAsyncMsg : public CMessage_CkCreateArrayAsyncMsg
+class CkCreateArrayAsyncMsg : public CMessage_CkCreateArrayAsyncMsg
 {
+ public:
   int ctor;
   CkCallback cb;
   CkArrayOptions opts;
