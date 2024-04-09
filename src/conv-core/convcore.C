@@ -1657,7 +1657,7 @@ void CsdSchedulerState_new(CsdSchedulerState_t *s)
 #if CMK_NODE_QUEUE_AVAILABLE
 	s->nodeQ=CsvAccess(CsdNodeQueue);
 	s->nodeLock=CsvAccess(CsdNodeQueueLock);
-	s->nodeGrpFreq =2; // check node queue once in 4 (2^2) iterations. 
+	s->nodeGrpFreq=4; 
 #endif
 #if CMK_GRID_QUEUE_AVAILABLE
 	s->gridQ=CpvAccess(CsdGridQueue);
@@ -1726,11 +1726,9 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
 	s->iter++;
 
 #if CMK_NODE_QUEUE_AVAILABLE
-	if (1 == (s->iter & (1 << s->nodeGrpFreq))) // since we use nodeGrpFreq == 0 to mean
-                                           // don't check NodeQ with high priority, i
-					   // value of 1 serves well as when to check it. 
-					// note: s->nodeGrpFreq is raised to a power of 2, to avoid modulo operator
-	  //note: maybe nodeGrpFreq should be a global readonly (or member of some globalParams group), to avoid "s->"
+ // we use nodeGrpFreq == 0 to mean
+ // don't check NodeQ with high priority
+ if (s->nodeGrpFreq && (0 == (s->iter % s->nodeGrpFreq)))
 	{
 	  msg = CmiGetNonLocalNodeQ();
 	  if (NULL != msg) return msg;
