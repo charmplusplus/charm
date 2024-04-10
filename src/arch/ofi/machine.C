@@ -167,7 +167,9 @@ CpvStaticDeclare(double, projTraceStart);
 
 /* Runtime to exchange EP addresses during LrtsInit() */
 /* someday, we'll update to pmix, today is not that day */
+#if CMK_CXI
 #define CMK_USE_CRAYPMI2 1
+#endif
 #if CMK_USE_CRAYPMI2
 #include "runtime-craypmi2.C"
 #elif CMK_USE_CRAYPMI
@@ -179,12 +181,12 @@ CpvStaticDeclare(double, projTraceStart);
 #elif CMK_USE_PMIX
 #include "runtime-pmix.C"
 #endif
-
+#define ALIGN64(x)       (size_t)((~63)&((x)+63))
 #if CMK_CXI
   /** use mempools in CXI to aggregate FI_MR_ENDPOINT registration reqs into big blocks */
 #define oneMB (1024ll*1024)
 #define oneGB (1024ll*1024*1024)
-#define ALIGN64(x)       (size_t)((~63)&((x)+63))
+
 #define ALIGNHUGEPAGE(x)   (size_t)((~(_tlbpagesize-1))&((x)+_tlbpagesize-1))
 
 #define USE_MEMPOOL 1
@@ -203,9 +205,6 @@ static CmiInt8 ONE_SEG  =  4*oneMB;
 static CmiInt8 BIG_MSG  =  8*oneMB;
 static CmiInt8 ONE_SEG  =  2*oneMB;
 #endif
-
-
-#if USE_MEMPOOL
 
 void* LrtsPoolAlloc(int n_bytes);
 
@@ -231,7 +230,8 @@ void* LrtsPoolAlloc(int n_bytes);
 
 
 CpvDeclare(mempool_type*, mempool);
-
+#else
+#define ALIGNBUF sizeof(CmiChunkHeader)
 #endif /* USE_MEMPOOL */
 
 #define CmiSetMsgSize(msg, sz)  ((((CmiMsgHeaderBasic *)msg)->size) = (sz))
@@ -519,7 +519,7 @@ void my_free_huge_pages(void *ptr, int size)
 #include "machine-onesided.h"
 #endif
 
-
+#if CMK_CXI
 /* transformed from cpuaffinity.C due to our need to parse the same
  sort of arg string, but having to do so before CmiNumPesGlobal (and
  similar quantities) have been defined
@@ -613,6 +613,7 @@ static int search_map(char *mapstring, int pe)
   free(mapstr);
   return i;
 }
+#endif
 
 /* ### Beginning of Machine-startup Related Functions ### */
 void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
@@ -1996,7 +1997,6 @@ void *alloc_mempool_block(size_t *size, mem_handle_t *mem_hndl, int expand_flag)
     posix_memalign(&pool,ALIGNBUF,*size);
     ofi_reg_bind_enable(pool, *size, mem_hndl,&context);
     MACHSTATE4(3, "alloc_mempool_block ptr %p mr %p key %lu inkey %d\n", pool, *mem_hndl, fi_mr_key(*mem_hndl) , context.mr_counter-1);
-#endif
     return pool;
 }
 
@@ -2177,7 +2177,6 @@ void LrtsFree(void *msg)
     CmiAbort("OFI: mempool lower boundary violation");
   else
     size = ALIGN64(size);
-#endif
   if(size>=BIG_MSG)
     {
 #if LARGEPAGE
@@ -2191,24 +2190,22 @@ void LrtsFree(void *msg)
       free((char *)msg-sizeof(out_of_pool_header));
 #else
       free((char*)msg);
-#endif
-#endif
+#endif //CXI
+
+#endif //LARGEPAGE
     }
   else
     {
-#if USE_MEMPOOL
-      // all this alignedbuf stuff is nuts, CmiFree gave us the right pointer
 #if CMK_SMP
-      //      mempool_free_thread(aligned_addr + sizeof(mempool_header));
       mempool_free_thread(msg);
 #else
-      //      mempool_free(CpvAccess(mempool), aligned_addr + sizeof(mempool_header));
       mempool_free(CpvAccess(mempool), msg);
 #endif /* CMK_SMP */
+    }
 #else
       free(aligned_addr);
 #endif /* USE_MEMPOOL */
-    }
+
 }
 
 void LrtsExit(int exitcode)
@@ -2651,6 +2648,7 @@ static int ofi_reg_bind_enable(const void *buf,
 	else{
 	  MACHSTATE3(3, "fi_mr_reg success: %d buf %p mr %lu\n", ret, buf, fi_mr_key(*mr));
 	}
+#if CMK_CXI
 	ret = fi_mr_bind(*mr, (struct fid *)context->ep, 0);
 	if (ret) {
             MACHSTATE1(3, "fi_mr_bind error: %d\n", ret);
@@ -2674,6 +2672,7 @@ static int ofi_reg_bind_enable(const void *buf,
 	  {
 	    MACHSTATE2(3, "fi_mr_enable success: %d mr %lu\n", ret, fi_mr_key(*mr));
 	  }
+#endif
 #if CMK_SMP_TRACE_COMMTHREAD
 	endT = CmiWallTimer();
 	if (postInit==1 && ((endT-startT>=TRACE_THRESHOLD))) traceUserBracketEvent(event_reg_bind_enable, startT, endT);

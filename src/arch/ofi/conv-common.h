@@ -91,7 +91,7 @@
 #define CMK_USE_PMI                                     1
 #define CMK_USE_PMI2                                    0
 #define CMK_USE_PMIX                                    0
-#define CMK_USE_CRAYPMI                                 1
+#define CMK_USE_CRAYPMI                                 0
 /*
  * Use Simple client-side implementation of PMI.
  * Valid only for CMK_USE_PMI.
