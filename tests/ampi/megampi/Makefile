@@ -20,7 +20,7 @@ test: megampi
 	$(call run, ./megampi +p1 +vp4 +balancer RandCentLB)
 	$(call run, ./megampi +p2 +vp2 +balancer RandCentLB)
 	$(call run, ./megampi +p2 +vp4 +balancer RandCentLB)
-	$(call run, ./megampi +p2 +vp1 +balancer RandCentLB)
+	$(call run, ./megampi +p2 +vp8 +balancer RandCentLB)
 
 testp: megampi
 	$(call run, ./megampi +p$(P) +vp$(P) )
