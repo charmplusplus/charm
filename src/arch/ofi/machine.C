@@ -2617,7 +2617,7 @@ int fill_av(int myid,
 }
 
 //! convenience function to do registration, binding and enabling in one go
-// primarily for OFI_CXI to support FI_MR_ENDPOINT, but it has no
+// primarily for CXI to support FI_MR_ENDPOINT, but it has no
 // CXI specific dependencies
 static int ofi_reg_bind_enable(const void *buf,
 			       size_t len, struct fid_mr **mr, OFIContext *context)

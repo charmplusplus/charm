@@ -245,7 +245,7 @@ void LrtsIssueRget(NcpyOperationInfo *ncpyOpInfo) {
     req->data.short_msg = ncpyOpInfo;
     // in CXI we cannot just send this unregistered thing
     //
-#if CMK_OFI_CXI
+#if CMK_CXI
         ofi_register_and_send(ncpyOpInfo,
              ncpyOpInfo->ncpyOpInfoSize,
              CmiNodeOf(ncpyOpInfo->srcPe),
@@ -307,7 +307,7 @@ void LrtsIssueRput(NcpyOperationInfo *ncpyOpInfo) {
     req->size     = ncpyOpInfo->ncpyOpInfoSize;
     req->callback = send_short_callback;
     req->data.short_msg = ncpyOpInfo;
-#if CMK_OFI_CXI
+#if CMK_CXI
     ofi_register_and_send(ncpyOpInfo,
 			  ncpyOpInfo->ncpyOpInfoSize,
 			  CmiNodeOf(ncpyOpInfo->destPe),
