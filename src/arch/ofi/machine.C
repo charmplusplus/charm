@@ -133,7 +133,7 @@ CpvStaticDeclare(double, projTraceStart);
 /* ======= This where we define the macros for the 0-99 special MRs ====== */
 
 #define OFI_POSTED_RECV_MR_KEY 0
-#define CMK_SMP_SENDQ 1
+#define CMK_SMP_SENDQ 0
 /* =======End of Definitions of Performance-Specific Macros =======*/
 
 
@@ -184,9 +184,8 @@ CpvStaticDeclare(double, projTraceStart);
 #define ALIGN64(x)       (size_t)((~63)&((x)+63))
 #if CMK_CXI
   /** use mempools in CXI to aggregate FI_MR_ENDPOINT registration reqs into big blocks */
-#define oneMB (1024ll*1024)
-#define oneGB (1024ll*1024*1024)
-
+#define ONE_MB (1024ll*1024)
+#define ALIGN64(x)       (size_t)((~63)&((x)+63))
 #define ALIGNHUGEPAGE(x)   (size_t)((~(_tlbpagesize-1))&((x)+_tlbpagesize-1))
 
 #define USE_MEMPOOL 1
@@ -199,22 +198,35 @@ static int _tlbpagesize = 4096;
 #if USE_MEMPOOL
 #if LARGEPAGE
 // separate pool of memory mapped huge pages
-static CmiInt8 BIG_MSG  =  16*oneMB;
-static CmiInt8 ONE_SEG  =  4*oneMB;
+static CmiInt8 BIG_MSG  =  16 * ONE_MB;
 #else
-static CmiInt8 BIG_MSG  =  8*oneMB;
-static CmiInt8 ONE_SEG  =  2*oneMB;
+static CmiInt8 BIG_MSG  =  2 * ONE_MB;
 #endif
 
 void* LrtsPoolAlloc(int n_bytes);
 
 #include "mempool.h"
+#if CMK_SMP
+// nothing to do here
+#else
+//minimal per process memory pool use for nonsmp mode
+#define USE_SMALL_BASE_POOL_DEFAULTS 1
+#endif
+
+#if USE_SMALL_BASE_POOL_DEFAULTS
+#define MEMPOOL_INIT_SIZE_MB_DEFAULT   1
+#define MEMPOOL_EXPAND_SIZE_MB_DEFAULT 4
+#define MEMPOOL_MAX_SIZE_MB_DEFAULT    16
+#define MEMPOOL_LB_DEFAULT             0
+#define MEMPOOL_RB_DEFAULT             32*ONE_MB
+#else
 #define MEMPOOL_INIT_SIZE_MB_DEFAULT   4
-#define MEMPOOL_EXPAND_SIZE_MB_DEFAULT 20
-#define MEMPOOL_MAX_SIZE_MB_DEFAULT    32
+#define MEMPOOL_EXPAND_SIZE_MB_DEFAULT 16
+#define MEMPOOL_MAX_SIZE_MB_DEFAULT    512
 #define MEMPOOL_LB_DEFAULT             0
 #define MEMPOOL_RB_DEFAULT             134217728
-#define ONE_MB                         1048576
+#endif
+
 #define ALIGNBUF (sizeof(mempool_header)+sizeof(CmiChunkHeader))
 #define   GetMempoolBlockPtr(x)   MEMPOOL_GetBlockPtr(MEMPOOL_GetMempoolHeader(x,ALIGNBUF))
 #define   GetMempoolPtr(x)        MEMPOOL_GetMempoolPtr(MEMPOOL_GetMempoolHeader(x,ALIGNBUF))
@@ -238,7 +250,7 @@ CpvDeclare(mempool_type*, mempool);
 #define CmiGetMsgSize(msg)  ((((CmiMsgHeaderBasic *)msg)->size))
 
 #define CACHELINE_LEN 64
-
+#if CMK_SMP
 #define OFI_NUM_RECV_REQS_DEFAULT    8
 #define OFI_NUM_RECV_REQS_MAX        4096
 
@@ -247,6 +259,16 @@ CpvDeclare(mempool_type*, mempool);
 
 #define OFI_CQ_ENTRIES_COUNT_DEFAULT 8
 #define OFI_CQ_ENTRIES_COUNT_MAX     1024
+#else
+#define OFI_NUM_RECV_REQS_DEFAULT    4
+#define OFI_NUM_RECV_REQS_MAX        64
+
+#define OFI_EAGER_MAXSIZE_DEFAULT    65536
+#define OFI_EAGER_MAXSIZE_MAX        1048576
+
+#define OFI_CQ_ENTRIES_COUNT_DEFAULT 4
+#define OFI_CQ_ENTRIES_COUNT_MAX     64
+#endif
 
 #define OFI_USE_INJECT_DEFAULT       1
 
