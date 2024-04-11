@@ -1811,7 +1811,7 @@ static inline
 void process_long_send_ack(struct fi_cq_tagged_entry *e, OFIRequest *req)
 {
     /**
-     * An OFIRmaAck was received; Close memory region and free original msg.
+     * An OFIRmaAck was received; free original msg.
      */
 
     struct fid *mr=NULL;
@@ -1823,7 +1823,6 @@ void process_long_send_ack(struct fi_cq_tagged_entry *e, OFIRequest *req)
     MACHSTATE(3, "OFI::process_long_send_ack");
     mr = (struct fid*)req->data.rma_ack->mr;
     CmiAssert(mr);
-    //    fi_close(mr);
 
     msg = (char *)req->data.rma_ack->src_msg;
     MACHSTATE2(3, "OFI::process_long_send_ack for msg %p mr %p",msg, mr);
@@ -2033,7 +2032,7 @@ void LrtsPreCommonInit(int everReturn)
 {
     MACHSTATE(2, "OFI::LrtsPreCommonInit {");
 
-    //    PRINT_THREAD_INFO();
+    PRINT_THREAD_INFO();
 
 #if USE_MEMPOOL
     CpvInitialize(mempool_type*, mempool);
