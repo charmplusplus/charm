@@ -154,6 +154,8 @@ option(SMP "Enable shared-memory communication within a single multi-processor m
 option(OMP "Enable OpenMP support in Charm++" OFF)
 option(TCP "use TCP sockets for communication (only for netlrts)" OFF)
 option(PTHREADS "compile with pthreads Converse threads" OFF)
+
+# Slingshot-11 specific, off by default, auto enabled if support is found
 option(CXI "Enable CXI (Cassini/Slingshot-11) extensions to OFI" OFF)
 
 # Advanced options:
