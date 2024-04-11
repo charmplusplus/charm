@@ -1792,7 +1792,7 @@ void process_long_recv(struct fi_cq_tagged_entry *e, OFIRequest *req)
                           chunk_size,
 			    fi_mr_desc(long_msg->mr),
                           nodeNo,
-                          rmsg,
+                          rbuf,
                           rkey,
                           &rma_req->context));
 	remaining  -= chunk_size;
