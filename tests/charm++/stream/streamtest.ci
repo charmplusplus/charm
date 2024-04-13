@@ -1,0 +1,7 @@
+mainmodule streamtest
+{
+	include "stream.h";
+	mainchare Main {
+		entry Main(CkArgMsg* m);
+	};
+}

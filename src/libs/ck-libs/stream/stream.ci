@@ -1,0 +1,33 @@
+module CkStream
+{
+	namespace Ck
+	{
+	namespace Stream
+	{
+		initnode _registerCkStream_impl();	
+	}
+	}
+}
+
+module CkStream_impl
+{
+	include "stream.h";
+	namespace Ck{
+	namespace Stream{
+	namespace impl {
+		readonly CProxy_Starter starter; // responsible for creating the group - do I need this here? idk
+		mainchare[migratable] Starter 
+		{
+			entry Starter(CkArgMsg* m);
+			entry void starterHello();
+				
+		}
+
+		group[migratable] StreamManager 
+		{
+			entry StreamManager();
+		}
+	}
+	}
+	}	
+}
