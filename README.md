@@ -165,7 +165,7 @@ for more information:
 * `regularpages` - On Cray systems, Charm++'s default is to use `hugepages`. This
     option disables `hugepages`, and uses regular `malloc` for messages.
 * `persistent` - On Cray systems, this option enables use of persistent mode for
-    communication.
+* `cxi` - On HPE Slingshot-11 systems, this option enables use of Cassini extensions for communication.  Usually autodetected and enabled where available.
 * `pxshm` - Use POSIX Shared Memory for communication between Charm++ processes
     within a shared-memory host.
 * `syncft` - Enable in-memory fault tolerance support in Charm++.
