@@ -3,5 +3,17 @@ mainmodule streamtest
 	include "stream.h";
 	mainchare Main {
 		entry Main(CkArgMsg* m);
+		entry void streamMade(Ck::Stream::StreamIdMessage* msg) {
+			serial {
+				size_t id = msg -> id;
+				CkPrintf("Got the stream id: %d\n", id);
+				// CkExit();
+				sleep(1);
+				for(int i = 0; i < 100; ++i){
+					Ck::Stream::put(id, &id, sizeof(int), 1);
+				}
+				Ck::Stream::flushLocalStream(id);
+			}
+		};
 	};
 }

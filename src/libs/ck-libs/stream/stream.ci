@@ -14,18 +14,45 @@ module CkStream_impl
 	include "stream.h";
 	namespace Ck{
 	namespace Stream{
+
+	message StreamIdMessage {
+			size_t id;
+	};
+
 	namespace impl {
+		message DeliverStreamBytesMsg {
+			char data[];
+			size_t num_bytes;
+			StreamToken stream_id; 
+		};
+		
+
 		readonly CProxy_Starter starter; // responsible for creating the group - do I need this here? idk
 		mainchare[migratable] Starter 
 		{
 			entry Starter(CkArgMsg* m);
-			entry void starterHello();
+			entry void starterHello(); // this is a dummy function
+			entry[reductiontarget] void streamCreated(int stream_token);
+			entry void createNewStream(CkCallback cb) {
+				serial {
+					size_t token_to_use = _curr_stream_token_id++;
+					stream_managers.initializeStream(token_to_use);
+				}
+				when streamCreated(int stream_token) serial {
+					CkPrintf("We made it to the streamCreated part baby\n");
+					StreamIdMessage* msg = new StreamIdMessage();	
+					msg -> id = stream_token;
+					cb.send(msg);
+				}
+			};
 				
 		}
 
 		group[migratable] StreamManager 
 		{
 			entry StreamManager();
+			entry void initializeStream(int id);
+			entry void recvData(DeliverStreamBytesMsg* in_msg);
 		}
 	}
 	}

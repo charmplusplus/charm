@@ -4,13 +4,10 @@
 
 class Main : public CBase_Main {
 public:
+	Main_SDAG_CODE
 	Main(CkArgMsg* m){
 		delete m;
-		CkPrintf("Main program chare created\n");
-		Ck::Stream::dummyFunction();
-		sleep(10);
-		CkPrintf("Main chare has finished sleeping, hopefully initial program has been completed\n");
-		CkExit();
+		Ck::Stream::createNewStream(CkCallback(CkIndex_Main::streamMade(0), thisProxy));
 	}
 };
 #include "streamtest.def.h"
