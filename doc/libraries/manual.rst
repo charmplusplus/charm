@@ -973,10 +973,10 @@ The following functions comprise the interface to the library for parallel file 
 
     void read(Session session, size_t bytes, size_t offset, char* data, CkCallback after_read);
 
-   This method is invoked to read data from the read session. If the data is not yet available, this request
-   will be buffered until the Buffer Chares can respond with the requested data. After the read finishes, the 
-   after_read callback is invoked taking a ReadCompleteMsg* which points to a vector<char> buffer, the offset,
-   and the number of bytes of the read.
+  This method is invoked to read data from the read session. If the data is not yet available, this request
+  will be buffered until the Buffer Chares can respond with the requested data. After the read finishes, the 
+  after_read callback is invoked taking a ReadCompleteMsg* which points to a vector<char> buffer, the offset,
+  and the number of bytes of the read.
 
   .. code-block:: c++
 
