@@ -13490,6 +13490,16 @@ Acknowledgements
 
 -  Zheng Shao
 
+-  Maya Taylor
+
+-  Aditya Bhosale
+
+-  Mathew Jacob
+
+-  Tom Vander Aa
+
+-  Thomas Quinn.
+   
 .. [1]
    “Threaded” or “synchronous” methods are different. But even they do
    not lead to pre-emption; only to cooperative multi-threading

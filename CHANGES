@@ -1,5 +1,21 @@
 This file describes the most significant changes. For more detail, use
 'git log' on a clone of the charm repository.
+================================================================================
+What's new in Charm++ 7.1.0
+================================================================================
+
+This is a feature release, with the following major changes:
+
+Highlights:
+
+- The CkIO library has been enhanced to support both input and output.
+ <insert more details here>
+
+- The OFI layer has been extended to support the CXI (Cassini)
+  extensions for Slingshot-11.  This can be accessed by adding the cxi
+  parameter to the build line and allows for greatly improved
+  performance on machines such as (Frontier, Perlmutter, Delta) at
+  larger node counts.
 
 ===============================================================================
 What's new in Charm++ 7.0.1
