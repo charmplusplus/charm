@@ -816,7 +816,7 @@ are available as options for the user to customize.
 CkIO Input
 ----------
 
-The CkIO input library similarly aggregates read requests for a single file via an intermediate layer of chares, called "Buffer Chares." The number of Buffer Chares should be chosen to read from the file system with optimal granularity. Currently, the choice of the number of Buffer Bhares must be made by the user (via the Options parameter, discussed below), considering factors such as file size, number of PEs, and number of nodes.
+The CkIO input library similarly aggregates read requests for a single file via an intermediate layer of chares, called "Buffer Chares." The number of Buffer Chares should be chosen to read from the file system with optimal granularity. Currently, the choice of the number of Buffer Chares must be made by the user (via the Options parameter, discussed below), considering factors such as file size, number of PEs, and number of nodes.
 
 Using CkIO
 ----------
