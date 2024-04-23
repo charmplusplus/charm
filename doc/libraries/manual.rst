@@ -824,7 +824,7 @@ Using CkIO
 CkIO is designed as a session-oriented, callback-centric library. The steps to
 using the library are different for input and output, but follow the same basic structure:
 
-#. Open a file via ``Ck::IO::open``.
+#. Open a file via ``Ck::IO::open``. Note that at the lowest level CkIO uses POSIX seek, read, and write (or the Microsoft equivalent for Windows) and therefore must only be used on seek-able file types. 
 #. Create a session for writing to the file via ``Ck::IO::startSession`` or create a session for reading from a file via ``Ck::IO::startReadSession``.
 #. Write or read via ``Ck::IO::write`` or ``Ck::IO::read``. Note that these function take a
    session token that is passed into the callback, which should refer to the current session.
