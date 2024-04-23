@@ -826,7 +826,7 @@ using the library are different for input and output, but follow the same basic 
 
 #. Open a file via ``Ck::IO::open``.
 #. Create a session for writing to the file via ``Ck::IO::startSession`` or create a session for reading from a file via ``Ck::IO::startReadSession``.
-#. Write or read via ``Ck::IO::write`` or ``Ck::IO::write``. Note that these function take a
+#. Write or read via ``Ck::IO::write`` or ``Ck::IO::read``. Note that these function take a
    session token that is passed into the callback, which should refer to the current session.
 #. In the case of a read session, the session must be closed manually when the read is complete via ``Ck::IO::closeReadSession``
 #. When the specified amount of data for the session has been written or a read session has been closed, a
@@ -967,8 +967,6 @@ The following functions comprise the interface to the library for parallel file 
 
 - Reading data:
 
-  Note there are three variants of the ``read`` call.
-
   .. code-block:: c++
 
     void read(Session session, size_t bytes, size_t offset, char* data, CkCallback after_read);
@@ -978,13 +976,6 @@ The following functions comprise the interface to the library for parallel file 
   after_read callback is invoked taking a ReadCompleteMsg* which points to a vector<char> buffer, the offset,
   and the number of bytes of the read.
 
-  .. code-block:: c++
-
-    void read(Session session, size_t bytes, size_t offset, char* data, CkCallback after_read, size_t tag);
-
-  .. code-block:: c++
-
-    void read(Session session, size_t bytes, size_t offset, char* data, CkCallback after_read, size_t tag, char* user_buffer);
 
 - Closing a file:
 
@@ -996,6 +987,7 @@ The following functions comprise the interface to the library for parallel file 
   been closed. Note that ``file`` is provided as a member of
   the ``FileReadyMsg`` sent to the ``opened`` callback after a file has been
   opened. This method should only be called from a single PE, once per file.
+
 
 Examples
 --------

@@ -26,13 +26,7 @@ namespace IO
 struct Options
 {
   Options()
-      : peStripe(0),
-        writeStripe(0),
-        activePEs(-1),
-        basePE(-1),
-        skipPEs(-1),
-        read_stride(0),
-        numReaders(0)
+      : peStripe(0), writeStripe(0), activePEs(-1), basePE(-1), skipPEs(-1), numReaders(0)
   {
   }
 
@@ -46,8 +40,6 @@ struct Options
   int basePE;
   /// How should active PEs be spaced out?
   int skipPEs;
-  // How many bytes each Read Session should hold
-  size_t read_stride;
   // How many IO buffers should there be
   size_t numReaders;
 
@@ -58,7 +50,6 @@ struct Options
     p | activePEs;
     p | basePE;
     p | skipPEs;
-    p | read_stride;
     p | numReaders;
   }
 };
@@ -101,8 +92,9 @@ void close(File file, CkCallback closed);
 /**
  * Prepare to read data from @arg file section specified by @arg bytes and @arg offset.
  * On starting the session, the buffer chares begin eagerly reading all requested data
- * into memory. The ready callback is invoked once these reads have been initiated (but
- * they are not guaranteed to be complete at this point).
+ * into memory. The ready callback is invoked once all buffer chares have been created and
+ * their reads have been initiated (but the reads are not guaranteed to be complete at
+ * this point).
  */
 void startReadSession(File file, size_t bytes, size_t offset, CkCallback ready);
 
@@ -129,12 +121,6 @@ void closeReadSession(Session read_session, CkCallback after_end);
  * */
 void read(Session session, size_t bytes, size_t offset, char* data,
           CkCallback after_read);
-void read(Session session, size_t bytes, size_t offset, CkCallback after_read,
-          size_t tag);
-
-// ZERO COPY READ;
-void read(Session session, size_t bytes, size_t offset, CkCallback after_read, size_t tag,
-          char* user_buffer);
 
 class File
 {
