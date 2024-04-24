@@ -11,12 +11,20 @@ module CkStream
 
 module CkStream_impl
 {
+	include "streamtoken.h";
 	include "stream.h";
 	namespace Ck{
 	namespace Stream{
 
+
 	message StreamIdMessage {
 			size_t id;
+	};
+	// the message that interacts with user
+	message StreamDeliveryMsg {
+			char data[];
+			size_t num_bytes;
+			StreamToken stream_id; 
 	};
 
 	namespace impl {
@@ -45,6 +53,7 @@ module CkStream_impl
 					cb.send(msg);
 				}
 			};
+			entry void addRegisteredPE(StreamToken, size_t);
 				
 		}
 
@@ -53,6 +62,8 @@ module CkStream_impl
 			entry StreamManager();
 			entry void initializeStream(int id);
 			entry void recvData(DeliverStreamBytesMsg* in_msg);
+			entry void addRegisteredPE(StreamToken, size_t pe);
+			entry void clearBufferedDeliveryMsg(StreamToken token);
 		}
 	}
 	}

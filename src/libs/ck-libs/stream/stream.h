@@ -1,12 +1,15 @@
 #ifndef CK_STREAM_H
 #define CK_STREAM_H
-
-#include <iostream>
-#include <cstring>
 #include "CkStream.decl.h"
 #include "CkStream_impl.decl.h"
 
-typedef size_t StreamToken;
+#include <iostream>
+#include <cstring>
+#include <queue>
+#include <vector>
+
+
+// typedef size_t StreamToken;
 
 namespace Ck { namespace Stream {
 	void dummyFunction();
@@ -16,9 +19,33 @@ namespace Ck { namespace Stream {
 	void createNewStream(CkCallback cb);
 	// flush the buffer of the local stream
 	void flushLocalStream(StreamToken stream);
+	// extract data from stream
+	void get(StreamToken stream, size_t elem_size, size_t num_elems, CkCallback cb);
 	namespace impl {
+		// used when buffering the request
+		struct GetRequest {
+			size_t requested_bytes;
+			CkCallback cb;
+			GetRequest(size_t, CkCallback);
+		};
+
+		struct StreamMetaData {
+			std::vector<size_t> _registered_pes;
+		};
+		class DeliverStreamBytesMsg;
+		class CMessage_DeliverStreamBytesMsg;
+		// used to organize incoming data entries to be served to user
+		struct InData {
+			DeliverStreamBytesMsg* _msg;
+			char* curr;
+			size_t num_bytes_rem;
+			InData(DeliverStreamBytesMsg* msg, size_t num_bytes);
+			void freeData();
+		};
+
 		// message to send data to stream managers and whatnot
-		class DeliverStreamBytesMsg : public CMessage_DeliverStreamBytesMsg{
+		class DeliverStreamBytesMsg;
+		class DeliverStreamBytesMsg : public CMessage_DeliverStreamBytesMsg {
 		public:
 			char* data;
 			size_t num_bytes;
@@ -31,15 +58,20 @@ namespace Ck { namespace Stream {
 		};
 		// used by StreamManagers to organize the data of multiple streams
 		class StreamBuffers {
-			char* _in_buffer; // the buffer for incoming data; once filled, just drop extra data
-			char* _out_buffer; // the buffer for outgoing data
+			char* _in_buffer; // the buffer for incoming data; once filled, just drop extra data; (_in_buffer is used for the data going out; I should rename this at some point
+			std::deque<InData> _out_buffer; // the buffer for outgoing data
+			std::deque<GetRequest> _buffered_reqs;
+			std::deque<DeliverStreamBytesMsg*> _msg_out_buffer;
 			size_t _in_buffer_capacity= 4 * 1024 * 1024;
 			size_t _out_buffer_capacity= 4 * 1024 * 1024;
 			size_t _in_buffer_size = 0;
 			size_t _out_buffer_size = 0;
 			size_t _stream_id= 0;
+			std::vector<size_t> _registered_pes;
+			bool _registered_pe = false;
 			void _sendOutBuffer(char* data, size_t size);
-			size_t _pickTargetPE();
+			ssize_t _pickTargetPE();
+
 		public:
 			StreamBuffers(); // used by the hashmap
 			StreamBuffers(size_t stream_id);
@@ -47,6 +79,12 @@ namespace Ck { namespace Stream {
 			void insertToStream(char* data, size_t num_bytes);
 			void flushOutBuffer();
 			void flushOutBuffer(char* extra_data, size_t extra_bytes);
+			void addToRecvBuffer(DeliverStreamBytesMsg* data);
+			void fulfillRequest(GetRequest& gr);
+			void handleGetRequest(GetRequest gr);
+			void pushBackRegisteredPE(size_t pe);
+			size_t numBufferedDeliveryMsg();
+			void popFrontMsgOutBuffer();
 		};
 
 
@@ -56,6 +94,14 @@ namespace Ck { namespace Stream {
 		StreamToken id;
 		StreamIdMessage() {}
 		StreamIdMessage(StreamToken id_in) : id(id_in){}
+	};
+
+	class StreamDeliveryMsg: public CMessage_StreamDeliveryMsg {
+		public:
+			StreamToken stream_id;
+			char *data;
+			size_t num_bytes;
+			StreamDeliveryMsg(StreamToken id) : stream_id(id) {}
 	};
 	
 }}

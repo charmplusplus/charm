@@ -10,10 +10,26 @@ mainmodule streamtest
 				// CkExit();
 				sleep(1);
 				for(int i = 0; i < 100; ++i){
-					Ck::Stream::put(id, &id, sizeof(int), 1);
+					size_t brudda = i + id;
+					Ck::Stream::put(id, &brudda, sizeof(size_t), 1);
 				}
 				Ck::Stream::flushLocalStream(id);
+				sleep(3);
+				for(int i = 0; i < 4; ++i){
+					Ck::Stream::get(id, sizeof(size_t), 25, CkCallback(CkIndex_Main::recvData(0), thisProxy));
+				}
 			}
 		};
+		entry void recvData(Ck::Stream::StreamDeliveryMsg* msg){
+			serial {
+				size_t* data = (size_t*)(msg -> data);
+				size_t num_ints = msg -> num_bytes / sizeof(size_t);
+				for(int i = 0; i < num_ints; ++i){
+					CkPrintf("%d,", data[i]);
+				}
+				CkPrintf("\n");
+			}
+		};
+
 	};
 }
