@@ -101,8 +101,9 @@ public:
 	size_t og_pos= fr.tellg();
 	fr.seekg(100000000000000);
 	CkAssert(fr.eof());
-	fr.seekg(og_pos);
+	fr.seekg(10);
 	CkAssert(fr.eof() == false);
+	fr.seekg(og_pos);
 	fr.seekg(1, std::ios_base::cur); 
 	CkAssert(fr.tellg() == og_pos + 1); // test that the seekg with different offset worked
 	fr.seekg(0, std::ios_base::end);
