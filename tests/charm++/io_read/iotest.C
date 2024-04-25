@@ -93,8 +93,23 @@ public:
     Ck::IO::FileReader fr(token);
     fr.seekg(bytesToRead * thisIndex); // seek to the correct place in the file
     fr.read(file_reader_buffer, size); // hopefully this will return the same data as Ck::IO::read
+	CkAssert(fr.gcount() == size); // makes sure that the gcount is correct
+	CkAssert(fr.tellg() == (size + bytesToRead * thisIndex)); // make sure that the tellg points to the correct place in the stream
     CkPrintf("the FileReader::read function on tester[%d] is done with first character=%c\n", thisIndex, file_reader_buffer[0]);
     Ck::IO::read(token, bytesToRead, bytesToRead * thisIndex, dataBuffer, sessionEnd);
+	// test that the eof works
+	size_t og_pos= fr.tellg();
+	fr.seekg(100000000000000);
+	CkAssert(fr.eof());
+	fr.seekg(og_pos);
+	CkAssert(fr.eof() == false);
+	fr.seekg(1, std::ios_base::cur); 
+	CkAssert(fr.tellg() == og_pos + 1); // test that the seekg with different offset worked
+	fr.seekg(0, std::ios_base::end);
+	CkAssert(fr.eof()); // seeked to the end of file, make sure that the flag is on
+	fr.seekg(og_pos, std::ios_base::beg);
+	CkAssert(fr.tellg() == og_pos);
+	CkAssert(fr.eof() == false);
   }
 
   Test(CkMigrateMessage* m) {}
