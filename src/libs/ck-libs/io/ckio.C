@@ -1017,7 +1017,7 @@ FileReader& FileReader::read(char* buffer, size_t num_bytes_to_read)
   }
   size_t bytes_to_read_left = num_bytes_to_read - amt_from_cache;
   size_t bytes_to_read = std::min(
-      std::max(bytes_to_read_left, size_t(4096)),
+      std::max(bytes_to_read_left, _data_cache.capacity()),
       (_offset + _num_bytes -
        _curr_pos));  // if the read is too small, get more data to store in the buffer
   if (!bytes_to_read)
@@ -1058,7 +1058,7 @@ FileReader& FileReader::read(char* buffer, size_t num_bytes_to_read)
 // overload ! operator on filereader object
 bool FileReader::operator!() const
 {
-  CkPrintf("In overwritten operator\n");
+  // CkPrintf("In overwritten operator\n");
   return false;
 }
 
@@ -1105,6 +1105,7 @@ FileReader& FileReader::seekg(size_t pos)
   {
     _curr_pos = _offset + _num_bytes;
     _eofbit = true;
+	return *this;
   }
   _eofbit = false;
   return *this;
@@ -1139,6 +1140,10 @@ size_t FileReaderBuffer::getFromBuffer(size_t offset, size_t num_bytes, char* bu
   size_t cached_len = std::min(offset + num_bytes, _offset + _buff_size) - offset;
   std::memcpy(buffer, _buffer + (offset - _offset), cached_len);
   return cached_len;
+}
+
+size_t FileReaderBuffer::capacity() {
+	return _buff_capacity;
 }
 
 FileReaderBuffer::~FileReaderBuffer() { delete[] _buffer; }
