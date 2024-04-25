@@ -8,6 +8,11 @@ This is a feature release, with the following major changes:
 
 Highlights:
 
+- The License has changed to Apache 2.0 with LLVM exception.  This
+  change to a popular Open Source license is intended to simplify use,
+  collaboration, and greater community involvement in the development
+  of Charm++.
+
 - The CkIO library has been enhanced to support both input and output.
  <insert more details here>
 
