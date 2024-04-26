@@ -250,7 +250,7 @@ class FileReaderBuffer
 {
   size_t _buff_capacity = 4096;  // the size of the buffer array
   size_t _buff_size = 0;         // the number of valid elements in the array
-  ssize_t _offset = 0;           // the offset byte
+  size_t _offset = 0;           // the offset byte
   char* _buffer;
   bool is_dirty = true;
 
