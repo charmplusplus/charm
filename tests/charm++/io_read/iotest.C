@@ -57,23 +57,6 @@ public:
     CkPrintf("Inside the constructor of tester %d\n", thisIndex);
     _fname = filename;
     thisProxy[thisIndex].testMethod(token, bytesToRead);
-    //CkCallback sessionEnd(CkIndex_Test::readDone(0), thisProxy[thisIndex]);
-    //try
-    //{
-    //  dataBuffer = new char[bytesToRead];
-    //  file_reader_buffer = new char[bytesToRead];
-    //}
-    //catch (const std::bad_alloc& e)
-    //{
-    //  CkPrintf("ERROR: Data buffer malloc of %zu bytes in Test chare %d failed.\n",
-    //           bytesToRead, thisIndex);
-    //  CkExit();
-    //}
-    //size = bytesToRead;
-    //Ck::IO::FileReader fr(token);
-    //fr.seekg(bytesToRead * thisIndex); // seek to the correct place in the file
-    //fr.read(file_reader_buffer, size); // hopefully this will return the same data as Ck::IO::read
-    //Ck::IO::read(token, bytesToRead, bytesToRead * thisIndex, dataBuffer, sessionEnd);
   }
 
   void testMethod(Ck::IO::Session token, size_t bytesToRead){
@@ -98,20 +81,25 @@ public:
     CkPrintf("the FileReader::read function on tester[%d] is done with first character=%c\n", thisIndex, file_reader_buffer[0]);
     Ck::IO::read(token, bytesToRead, bytesToRead * thisIndex, dataBuffer, sessionEnd);
 	// test that the eof works
-	size_t og_pos= fr.tellg();
-	fr.seekg(100000000000000);
+	testFileReader(fr);
+  }
+
+  void testFileReader(Ck::IO::FileReader& fr){
+	size_t og_pos = fr.tellg();
+	fr.seekg(100000000000000); // way beyond the bounds of read session, should trigger eof
 	CkAssert(fr.eof());
-	fr.seekg(10);
+	fr.seekg(5);
 	CkAssert(fr.eof() == false);
-	fr.seekg(og_pos);
 	fr.seekg(1, std::ios_base::cur); 
-	CkAssert(fr.tellg() == og_pos + 1); // test that the seekg with different offset worked
+	CkAssert(fr.tellg() == 6); // test that the seekg with different offset worked
 	fr.seekg(0, std::ios_base::end);
 	CkAssert(fr.eof()); // seeked to the end of file, make sure that the flag is on
-	fr.seekg(og_pos, std::ios_base::beg);
-	CkAssert(fr.tellg() == og_pos);
-	CkAssert(fr.eof() == false);
+	fr.seekg(6, std::ios_base::beg);
+	CkAssert(fr.tellg() == 6);
+	fr.seekg(og_pos);
   }
+
+
 
   Test(CkMigrateMessage* m) {}
 
