@@ -67,6 +67,8 @@ namespace Ck { namespace Stream {
 			size_t _in_buffer_size = 0;
 			size_t _out_buffer_size = 0;
 			size_t _stream_id= 0;
+			size_t _coordinator_pe = 0;
+			size_t _num_sent_messages = 0;
 			std::vector<size_t> _registered_pes;
 			bool _registered_pe = false;
 			void _sendOutBuffer(char* data, size_t size);
@@ -75,7 +77,9 @@ namespace Ck { namespace Stream {
 		public:
 			StreamBuffers(); // used by the hashmap
 			StreamBuffers(size_t stream_id);
+			StreamBuffers(size_t stream_id, size_t coordinator_pe);
 			StreamBuffers(size_t stream_id, size_t in_buffer_capacity, size_t out_buffer_capacity);
+			StreamBuffers(size_t stream_id, size_t coordinator_pe, size_t in_buffer_capacity, size_t out_buffer_capacity);
 			void insertToStream(char* data, size_t num_bytes);
 			void flushOutBuffer();
 			void flushOutBuffer(char* extra_data, size_t extra_bytes);
@@ -86,7 +90,15 @@ namespace Ck { namespace Stream {
 			size_t numBufferedDeliveryMsg();
 			void popFrontMsgOutBuffer();
 		};
-
+		
+		class StreamCoordinator {
+			StreamMetaData _meta_data; // contains the metadata of the stream
+			StreamToken _stream;
+		public:
+			StreamCoordinator();
+			StreamCoordinator(StreamToken stream);
+			void registerThisPE(size_t pe);
+		};
 
 	}
 	class StreamIdMessage: public CMessage_StreamIdMessage {

@@ -31,6 +31,7 @@ namespace Ck { namespace Stream {
 		class Starter : public CBase_Starter {
 			CProxy_StreamManager stream_managers;
 			size_t _curr_stream_token_id = 0;
+			size_t _curr_stream_coordinator = 0;
 			std::unordered_map<StreamToken, StreamMetaData> _meta_data;
 			Starter_SDAG_CODE
 		public:
@@ -62,6 +63,7 @@ namespace Ck { namespace Stream {
 
 		class StreamManager : public CBase_StreamManager {
 			std::unordered_map<StreamToken, StreamBuffers> _stream_table;
+			std::unordered_map<StreamToken, StreamCoordinator> _stream_coordinators;
 			bool _registered_receive = false; // is this PE have a reader on it
 			std::vector<size_t> _pes_to_send_to; // a list of valid pes to send to	
 			StreamManager_SDAG_CODE
@@ -77,7 +79,10 @@ namespace Ck { namespace Stream {
 					// do I bother populating this?
 				}
 				
-
+				void registerPEWithCoordinator(StreamToken stream, size_t pe){
+					_stream_coordinators[stream].registerThisPE(pe); // register PE with the coordinator
+				}
+				
 				void addRegisteredPE(StreamToken token, size_t pe){
 					StreamBuffers& sb = _stream_table[token];
 					if(pe != CkMyPe()) 
@@ -107,9 +112,9 @@ namespace Ck { namespace Stream {
 					CkPrintf("StreamManager %d says hello!\n", CkMyPe());
 				}
 
-				void initializeStream(int id){
-					_stream_table[id] = StreamBuffers(id);
-					CkPrintf("On %d, we created stream %d\n", CkMyPe(), id);
+				void initializeStream(int id, size_t coordinator_pe){
+					_stream_table[id] = StreamBuffers(id, coordinator_pe);
+					CkPrintf("On %d, we created stream %d with coordinator=%d\n", CkMyPe(), id, coordinator_pe);
 					contribute(sizeof(id), &id, CkReduction::max_int, CkCallback(CkReductionTarget(Starter, streamCreated), starter));
 				}
 
@@ -148,8 +153,22 @@ namespace Ck { namespace Stream {
 			_in_buffer = new char[_in_buffer_capacity];
 		}
 
+		StreamBuffers::StreamBuffers(size_t stream_id, size_t coordinator_pe){
+			_stream_id = stream_id;
+			_coordinator_pe = coordinator_pe;
+			_in_buffer = new char[_in_buffer_capacity];
+		}
+
 		StreamBuffers::StreamBuffers(size_t stream_id, size_t in_buffer_capacity, size_t out_buffer_capacity){
 			_stream_id = stream_id;
+			_in_buffer_capacity = in_buffer_capacity;
+			_out_buffer_capacity = out_buffer_capacity;
+			_in_buffer = new char[_in_buffer_capacity];
+		}
+
+		StreamBuffers::StreamBuffers(size_t stream_id, size_t coordinator_pe, size_t in_buffer_capacity, size_t out_buffer_capacity){
+			_stream_id = stream_id;
+			_coordinator_pe = coordinator_pe;
 			_in_buffer_capacity = in_buffer_capacity;
 			_out_buffer_capacity = out_buffer_capacity;
 			_in_buffer = new char[_in_buffer_capacity];
@@ -195,6 +214,7 @@ namespace Ck { namespace Stream {
 			// insert sending code here
 			CkpvAccess(stream_manager) -> sendDeliverMsg(msg, target_pe);
 			_in_buffer_size = 0;
+			_num_sent_messages++;
 		}
 
 		ssize_t StreamBuffers::_pickTargetPE(){
@@ -216,7 +236,8 @@ namespace Ck { namespace Stream {
 		void StreamBuffers::handleGetRequest(GetRequest gr){
 			if(!_registered_pe){
 				_registered_pe = true;
-				starter.addRegisteredPE(_stream_id, CkMyPe()); // tell coordinator + all the other PEs
+				// tell this stream's coordinator
+				CkpvAccess(stream_manager) -> registerPEWithCoordinator(_stream_id, CkMyPe()); // tell coordinator + all the other PEs
 			}
 			if((gr.requested_bytes > _out_buffer_size) || !_buffered_reqs.empty()){
 				_buffered_reqs.push_back(gr);
@@ -291,6 +312,15 @@ namespace Ck { namespace Stream {
 
 		size_t StreamBuffers::numBufferedDeliveryMsg(){
 			return _msg_out_buffer.size();
+		}
+
+		StreamCoordinator::StreamCoordinator() = default;
+		
+		StreamCoordinator::StreamCoordinator(StreamToken stream) : _stream(stream) {}
+
+		void StreamCoordinator::registerThisPE(size_t pe){
+				_meta_data._registered_pes.push_back(pe);
+				CkpvAccess(stream_manager) -> addRegisteredPE(_stream, pe);
 		}
 
 		inline void impl_put(StreamToken stream, void* data, size_t elem_size, size_t num_elems){

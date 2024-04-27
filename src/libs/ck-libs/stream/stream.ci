@@ -44,7 +44,8 @@ module CkStream_impl
 			entry void createNewStream(CkCallback cb) {
 				serial {
 					size_t token_to_use = _curr_stream_token_id++;
-					stream_managers.initializeStream(token_to_use);
+					size_t coordinator_to_use = (_curr_stream_coordinator++) % (CkNumPes());
+					stream_managers.initializeStream(token_to_use, coordinator_to_use);
 				}
 				when streamCreated(int stream_token) serial {
 					CkPrintf("We made it to the streamCreated part baby\n");
@@ -60,10 +61,12 @@ module CkStream_impl
 		group[migratable] StreamManager 
 		{
 			entry StreamManager();
-			entry void initializeStream(int id);
+			entry void initializeStream(int id, size_t coordinator_pe);
 			entry void recvData(DeliverStreamBytesMsg* in_msg);
 			entry void addRegisteredPE(StreamToken, size_t pe);
 			entry void clearBufferedDeliveryMsg(StreamToken token);
+			entry void registerPEWithCoordinator(StreamToken, size_t);
+			
 		}
 	}
 	}
