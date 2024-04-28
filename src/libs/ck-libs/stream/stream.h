@@ -2,6 +2,7 @@
 #define CK_STREAM_H
 #include "CkStream.decl.h"
 #include "CkStream_impl.decl.h"
+#include "stream_msg_counter.h"
 
 #include <iostream>
 #include <cstring>
@@ -21,6 +22,8 @@ namespace Ck { namespace Stream {
 	void flushLocalStream(StreamToken stream);
 	// extract data from stream
 	void get(StreamToken stream, size_t elem_size, size_t num_elems, CkCallback cb);
+	// closing the write side of a stream
+	void closeWriteStream(StreamToken);
 	namespace impl {
 		// used when buffering the request
 		struct GetRequest {
@@ -49,6 +52,7 @@ namespace Ck { namespace Stream {
 		public:
 			char* data;
 			size_t num_bytes;
+			size_t sender_pe;
 			StreamToken stream_id;
 			DeliverStreamBytesMsg(){}
 			DeliverStreamBytesMsg(char* in_data, size_t in_num_bytes){
@@ -68,9 +72,9 @@ namespace Ck { namespace Stream {
 			size_t _out_buffer_size = 0;
 			size_t _stream_id= 0;
 			size_t _coordinator_pe = 0;
-			size_t _num_sent_messages = 0;
 			std::vector<size_t> _registered_pes;
 			bool _registered_pe = false;
+			StreamMessageCounter _counter;
 			void _sendOutBuffer(char* data, size_t size);
 			ssize_t _pickTargetPE();
 
@@ -89,6 +93,11 @@ namespace Ck { namespace Stream {
 			void pushBackRegisteredPE(size_t pe);
 			size_t numBufferedDeliveryMsg();
 			void popFrontMsgOutBuffer();
+			size_t coordinator();
+			bool isStreamClosed();
+			void setStreamClosed();
+			void insertAck(size_t);
+			bool allAcked();
 		};
 		
 		class StreamCoordinator {

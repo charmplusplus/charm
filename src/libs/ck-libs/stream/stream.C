@@ -122,6 +122,10 @@ namespace Ck { namespace Stream {
 					StreamBuffers& buffer = _stream_table[stream];	
 					buffer.insertToStream((char*) data, elem_size * num_elems);
 				}
+				
+				void sendAck(StreamToken stream, size_t pe, size_t num_messages){
+					thisProxy[pe].ackWrites(stream, num_messages);
+				}
 
 				void recvData(DeliverStreamBytesMsg* in_msg){
 					CkPrintf("Stream Manager %d received data for stream %d\n", CkMyPe(), in_msg -> stream_id);
@@ -141,6 +145,33 @@ namespace Ck { namespace Stream {
 					thisProxy[target_pe].recvData(in_msg);
 				}
 
+				void tellCoordinatorCloseWrite(StreamToken stream){
+					CkPrintf("Coordinator on PE=%d starting the close process for stream=%d...\n", CkMyPe(), stream);
+					StreamBuffers& sb = _stream_table[stream];
+					size_t pe = sb.coordinator();
+					thisProxy[pe].startCloseWriteStream(stream);
+				}
+
+				void startCloseWriteStream(StreamToken token){
+					CkPrintf("PE=%d will initiate the closing process on all PEs for stream=%d\n", CkMyPe(), token);
+					thisProxy.initiateWriteStreamClose(token);
+				}
+
+				void initiateWriteStreamClose(StreamToken token){
+					CkPrintf("Stream Manager %d received a close request for stream=%d\n", CkMyPe(), token);
+					StreamBuffers& sb = _stream_table[token];
+					sb.setStreamClosed();
+				}
+
+				void ackWrites(StreamToken stream, size_t num_messages){
+					StreamBuffers& sb = _stream_table[stream];
+					sb.insertAck(num_messages);
+					if(sb.allAcked()){
+						CkPrintf("All of pe=%d messages for stream=%d have been acked\n", CkMyPe(), stream);
+					}
+
+				}
+
 		};
 
 		void dummyImplFunction(){
@@ -148,30 +179,55 @@ namespace Ck { namespace Stream {
 		}
 		StreamBuffers::StreamBuffers() = default;
 
-		StreamBuffers::StreamBuffers(size_t stream_id){
+		StreamBuffers::StreamBuffers(size_t stream_id) : _counter(stream_id){
 			_stream_id = stream_id;
 			_in_buffer = new char[_in_buffer_capacity];
 		}
 
-		StreamBuffers::StreamBuffers(size_t stream_id, size_t coordinator_pe){
+		StreamBuffers::StreamBuffers(size_t stream_id, size_t coordinator_pe) : _counter(stream_id){
 			_stream_id = stream_id;
 			_coordinator_pe = coordinator_pe;
 			_in_buffer = new char[_in_buffer_capacity];
 		}
 
-		StreamBuffers::StreamBuffers(size_t stream_id, size_t in_buffer_capacity, size_t out_buffer_capacity){
+		StreamBuffers::StreamBuffers(size_t stream_id, size_t in_buffer_capacity, size_t out_buffer_capacity) : _counter(stream_id){
 			_stream_id = stream_id;
 			_in_buffer_capacity = in_buffer_capacity;
 			_out_buffer_capacity = out_buffer_capacity;
 			_in_buffer = new char[_in_buffer_capacity];
 		}
 
-		StreamBuffers::StreamBuffers(size_t stream_id, size_t coordinator_pe, size_t in_buffer_capacity, size_t out_buffer_capacity){
+		StreamBuffers::StreamBuffers(size_t stream_id, size_t coordinator_pe, size_t in_buffer_capacity, size_t out_buffer_capacity) : _counter(stream_id) {
 			_stream_id = stream_id;
 			_coordinator_pe = coordinator_pe;
 			_in_buffer_capacity = in_buffer_capacity;
 			_out_buffer_capacity = out_buffer_capacity;
 			_in_buffer = new char[_in_buffer_capacity];
+		}
+
+		void StreamBuffers::insertAck(size_t acks){
+			_counter.addWriteAck(acks);
+		}
+
+		bool StreamBuffers::allAcked(){
+			return 	_counter.allAcked();
+		}
+
+		bool StreamBuffers::isStreamClosed(){
+			return _counter.isStreamClosed();
+		}
+
+		void StreamBuffers::setStreamClosed(){
+			flushOutBuffer();
+			_counter.setStreamWriteClosed();
+			// check if all of my messages have been acked already
+			if(allAcked()){
+				CkPrintf("For stream=%d on pe=%d, All of my messages have been acked!\n", _stream_id, CkMyPe());
+			}
+		}
+
+		size_t StreamBuffers::coordinator() {
+			return _coordinator_pe;
 		}
 
 		void StreamBuffers::flushOutBuffer(){
@@ -204,6 +260,7 @@ namespace Ck { namespace Stream {
 		void StreamBuffers::_sendOutBuffer(char* data, size_t size){
 			DeliverStreamBytesMsg* msg = new (size) DeliverStreamBytesMsg(data,size);
 			msg -> stream_id = _stream_id;
+			msg -> sender_pe = CkMyPe();
 			ssize_t target_pe = _pickTargetPE();
 			if(target_pe == -1){
 				CkPrintf("no valid pes to deliver message to, buffering send\n");
@@ -214,7 +271,7 @@ namespace Ck { namespace Stream {
 			// insert sending code here
 			CkpvAccess(stream_manager) -> sendDeliverMsg(msg, target_pe);
 			_in_buffer_size = 0;
-			_num_sent_messages++;
+			_counter.addSentMessage();
 		}
 
 		ssize_t StreamBuffers::_pickTargetPE(){
@@ -260,7 +317,9 @@ namespace Ck { namespace Stream {
 		}
 
 		void StreamBuffers::addToRecvBuffer(DeliverStreamBytesMsg* data){
+			
 			size_t num_bytes = data -> num_bytes;
+			_counter.processIncomingMessage(data -> sender_pe);
 			if(!_out_buffer_capacity || ((_out_buffer_size + num_bytes) <= _out_buffer_capacity)){
 				_out_buffer.push_back(InData(data, num_bytes));
 				_out_buffer_size += num_bytes;
@@ -323,6 +382,43 @@ namespace Ck { namespace Stream {
 				CkpvAccess(stream_manager) -> addRegisteredPE(_stream, pe);
 		}
 
+		StreamMessageCounter::StreamMessageCounter() = default;
+
+		StreamMessageCounter::StreamMessageCounter(StreamToken stream) : _stream(stream) {}
+
+		bool StreamMessageCounter::isStreamClosed() {
+			return _stream_write_closed;
+		}
+
+		void StreamMessageCounter::setStreamWriteClosed(){
+			_stream_write_closed = true;
+			for(auto& p : _counter){
+				size_t pe = p.first;	
+				CkpvAccess(stream_manager) -> sendAck(_stream, pe, p.second);
+			}
+		}
+
+		void StreamMessageCounter::processIncomingMessage(size_t incoming_pe){
+			if(_stream_write_closed){
+				CkPrintf("Invoke some entry method to acknowledge stuff\n");
+				return;
+			}
+			_counter[incoming_pe]++;
+			CkPrintf("Incremented the counter for %d\n", incoming_pe);
+		}
+
+		void StreamMessageCounter::addWriteAck(size_t num_messages){
+			_write_acks++;
+		}
+
+		bool StreamMessageCounter::allAcked(){
+			return _num_sent_messages == _write_acks;
+		}
+
+		void StreamMessageCounter::addSentMessage() {
+			_num_sent_messages++;
+		}
+
 		inline void impl_put(StreamToken stream, void* data, size_t elem_size, size_t num_elems){
 			CkpvAccess(stream_manager) -> putToStream(stream, data, elem_size, num_elems);		
 		}
@@ -334,6 +430,10 @@ namespace Ck { namespace Stream {
 			GetRequest gr(elem_size * num_elems, cb);
 			CkpvAccess(stream_manager) -> serveGetRequest(stream, gr);
 			return;
+		}
+
+		inline void impl_closeWriteStream(StreamToken stream){
+			CkpvAccess(stream_manager) -> tellCoordinatorCloseWrite(stream);
 		}
 	}
 	void dummyFunction(){
@@ -357,6 +457,11 @@ namespace Ck { namespace Stream {
 
 	void get(StreamToken stream, size_t elem_size, size_t num_elems, CkCallback cb){
 		impl::impl_get(stream, elem_size, num_elems, cb);
+	}
+
+	void closeWriteStream(StreamToken stream){
+		impl::impl_closeWriteStream(stream);
+		return;
 	}
 
 

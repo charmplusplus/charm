@@ -8,7 +8,7 @@ DEP = $(CDIR)/lib/libmodule$(MODULE).dep
 LIBOBJ = stream.o 
 
 GENHEADERS = $(MODULE).decl.h $(MODULE).def.h $(MODULE)_impl.decl.h $(MODULE)_impl.def.h
-HEADERS = stream.h streamtoken.h $(GENHEADERS)
+HEADERS = stream.h streamtoken.h stream_msg_counter.h $(GENHEADERS)
 
 all: $(LIBDEST)$(LIB)
 

@@ -14,6 +14,7 @@ mainmodule streamtest
 					Ck::Stream::put(id, &brudda, sizeof(size_t), 1);
 				}
 				Ck::Stream::flushLocalStream(id);
+				Ck::Stream::closeWriteStream(id);
 				sleep(3);
 				for(int i = 0; i < 4; ++i){
 					Ck::Stream::get(id, sizeof(size_t), 25, CkCallback(CkIndex_Main::recvData(0), thisProxy));
