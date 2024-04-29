@@ -98,6 +98,7 @@ namespace Ck { namespace Stream {
 			void setStreamClosed();
 			void insertAck(size_t);
 			bool allAcked();
+			void clearBufferedGetRequests();
 		};
 		
 		class StreamCoordinator {
@@ -110,6 +111,11 @@ namespace Ck { namespace Stream {
 		};
 
 	}
+
+	enum class StreamStatus {
+		STREAM_OK,
+		STREAM_CLOSED,
+	};
 	class StreamIdMessage: public CMessage_StreamIdMessage {
 	public:
 		StreamToken id;
@@ -122,6 +128,8 @@ namespace Ck { namespace Stream {
 			StreamToken stream_id;
 			char *data;
 			size_t num_bytes;
+			StreamStatus status;
+
 			StreamDeliveryMsg(StreamToken id) : stream_id(id) {}
 	};
 	
