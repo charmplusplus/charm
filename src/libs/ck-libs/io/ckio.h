@@ -128,7 +128,7 @@ void closeReadSession(Session read_session, CkCallback after_end);
 /**
  * Is a method that reads data from the @arg session of length @arg bytes at offset
  * @arg offset (in file). After this read finishes, the @arg after_read callback is
- * invoked, taking a ReadCompleteMsg* which points to a vector<char> buffer, the offset,
+ * invoked, taking a ReadCompleteMsg* which points to a char* buffer, the offset,
  * and the number of bytes of the read.
  * */
 void read(Session session, size_t bytes, size_t offset, char* data,
@@ -238,19 +238,19 @@ public:
 /**
  * This is used by the FileReader in order to try to minimize
  * the number of networks calls made during a read. Instead
- * of calling Ck::IO::read repeatedly and each call has only a 
+ * of calling Ck::IO::read repeatedly and each call has only a
  * small amount of data, the FileReader will make a Ck::IO::read
- * call with a larger amount of data and store that data in the 
+ * call with a larger amount of data and store that data in the
  * FileReaderBuffer. This way, if the FileReader is making small
  * read calls, the data will hopefully already be in the buffer,
  * which prevents superfluous messages. This is NOT a user facing
- * class and should not be used by the user. 
+ * class and should not be used by the user.
  */
 class FileReaderBuffer
 {
   size_t _buff_capacity = 4096;  // the size of the buffer array
   size_t _buff_size = 0;         // the number of valid elements in the array
-  size_t _offset = 0;           // the offset byte
+  size_t _offset = 0;            // the offset byte
   char* _buffer;
   bool is_dirty = true;
 
@@ -270,9 +270,9 @@ public:
    */
   void setBuffer(size_t offset, size_t num_bytes,
                  char* data);  // writes the data to the buffer
-  /** 
+  /**
    * This data checks whether, given a request specified by @arg offset
-   * and @arg num_bytes, can use some of its cached data to fulfill the 
+   * and @arg num_bytes, can use some of its cached data to fulfill the
    * request. This method changes the @arg buffer.
    *
    * @arg offset: the offset in the session the read request is.
@@ -291,10 +291,10 @@ public:
  * The Ck:IO equivalent to std::ifstream. If the user
  * doesn't want to write callbacks after a lot of reads,
  * or the user is making a series of very small sequential
- * reads, this abstraction will make it very easy. FileReader 
- * uses caching in order to try and minimize the number of 
+ * reads, this abstraction will make it very easy. FileReader
+ * uses caching in order to try and minimize the number of
  * extraneous network calls made during a series of read requests.
- * This class should be used in threaded entry methods. 
+ * This class should be used in threaded entry methods.
  */
 class FileReader
 {
@@ -316,8 +316,8 @@ public:
   FileReader(Ck::IO::Session session);
   /**
    * Perform a request of size @arg num_bytes_to_read, with
-   * an offset of wherever the FileReader is in the stream. 
-   * It will write the result to @arg buffer. 
+   * an offset of wherever the FileReader is in the stream.
+   * It will write the result to @arg buffer.
    *
    * @arg buffer: the location where the read will be written to
    * @arg num_bytes_to_read: the number of bytes to read
@@ -327,26 +327,26 @@ public:
    * Returns the current position in the file the FileReader
    * is i.e te next byte the read will start.
    *
-   * @return size_t: the position the FileReader is at in the 
+   * @return size_t: the position the FileReader is at in the
    * 				 file
    */
   size_t tellg();
   /**
-   * Seeks to a position in the file for the FileReader from the 
+   * Seeks to a position in the file for the FileReader from the
    * beginning of the read session. If the seek goes beyond the end of
    * the read session, it will set the internal position to be one byte
    * further than the end of session and the eof flag will be set.
-   * 
+   *
    * @arg pos: the position in the session wrt the beginning of
    * 		   the session to seek to.
    */
   FileReader& seekg(size_t pos);
   /**
-   * Seeks to a position in the file for the FileReader wrt the 
-   * @arg dir specifies. If the seek goes beyond the end of the 
+   * Seeks to a position in the file for the FileReader wrt the
+   * @arg dir specifies. If the seek goes beyond the end of the
    * read session, it will set the internal position to be one byte
    * further than the end of session and the eof flag will be set.
-   * 
+   *
    * @arg pos: the position in the session wrt what @arg dir
    * 		   the session to seek to.
    * @arg dir: Where to seek with respect to. If dir=std::ios_base::beg,
@@ -368,7 +368,7 @@ public:
    */
   size_t gcount();
   /**
-   * Will return true if the FileReader is on a bad file. 
+   * Will return true if the FileReader is on a bad file.
    * Currently this always returns false because we assume
    * that the Session points to a good file.
    *

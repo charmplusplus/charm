@@ -974,7 +974,7 @@ The following functions comprise the interface to the library for parallel file 
   This method is invoked to read data asynchronously from the read session. This method returns immediately to the caller, but the 
   read is only guaranteed complete once the callback ``after_read`` is called. Internally, the read request is buffered
   until the Buffer Chares can respond with the requested data. After the read finishes, the 
-  after_read callback is invoked taking a ReadCompleteMsg* which points to a vector<char> buffer, the offset,
+  after_read callback is invoked taking a ReadCompleteMsg* which points to a char* buffer, the offset,
   and the number of bytes of the read.
 
 
