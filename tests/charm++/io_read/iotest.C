@@ -73,6 +73,8 @@ public:
                bytesToRead, thisIndex);
       CkExit();
     }
+
+    // setup and read using Ck::IO::FileReader
     size = bytesToRead;
     Ck::IO::FileReader fr(token);
     fr.seekg(bytesToRead * thisIndex);  // seek to the correct place in the file
@@ -85,9 +87,11 @@ public:
     CkPrintf(
         "the FileReader::read function on tester[%d] is done with first character=%c\n",
         thisIndex, file_reader_buffer[0]);
-    Ck::IO::read(token, bytesToRead, bytesToRead * thisIndex, dataBuffer, sessionEnd);
-    // test that the eof works
+
     testFileReader(fr);
+
+    // read using plain Ck::IO::Read
+    Ck::IO::read(token, bytesToRead, bytesToRead * thisIndex, dataBuffer, sessionEnd);
   }
 
   void testFileReader(Ck::IO::FileReader& fr)
