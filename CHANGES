@@ -13,8 +13,13 @@ Highlights:
   collaboration, and greater community involvement in the development
   of Charm++.
 
-- The CkIO library has been enhanced to support both input and output.
- <insert more details here>
+- The CkIO library (previously only supporting file output) has been
+  enhanced to support file input. The input layer enables two-phase,
+  collective input from a single file via the an array of buffer chares,
+  which read from the file system and buffer data until the application 
+  requests it. As of this release, the number of buffer chares is 
+  not automated by CkIO, and the user is responsible for selecting 
+  the input decomposition for best performance.
 
 - The OFI layer has been extended to support the CXI (Cassini)
   extensions for Slingshot-11.  This can be accessed by adding the cxi
