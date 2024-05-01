@@ -51,7 +51,7 @@ jobs:
         ./build charm4py netlrts-linux-x86_64 tcp -g -j4 --with-production
     - name: build-charm4py
       run: |
-        pip3 install setuptools 'cython<3' cffi greenlet numpy
+        pip3 install setuptools cython cffi greenlet numpy torch torchvision
         git clone https://github.com/UIUC-PPL/charm4py
         export PYTHONPATH="$PWD/charm4py"
 
