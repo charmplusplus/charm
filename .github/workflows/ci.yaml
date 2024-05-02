@@ -129,7 +129,7 @@ jobs:
 
   multicore-darwin-x86_64_projections:
     timeout-minutes: 60
-    runs-on: macos-latest
+    runs-on: macos-12
     steps:
     - uses: actions/checkout@v4
     - name: build
@@ -147,6 +147,28 @@ jobs:
         cd ..
         files=$(find . -name *.sts)
         for f in $files; do echo $f; pushd .; cd $(dirname $f); $proj --exit $(basename $f); popd; done
+
+  # FIXME: disabled since tests don't pass
+  # multicore-darwin-arm8_projections:
+  #   timeout-minutes: 60
+  #   runs-on: macos-latest
+  #   steps:
+  #   - uses: actions/checkout@v4
+  #   - name: build
+  #     run: ./build LIBS multicore-darwin-arm8 -g -j3 --with-production --enable-tracing
+  #   - name: test
+  #     run: |
+  #       make -C multicore-darwin-arm8/tmp all-test -j3 OPTS="-g -tracemode projections"
+  #       make -C multicore-darwin-arm8/tmp test
+  #   - name: projections
+  #     run: |
+  #       git clone https://github.com/UIUC-PPL/projections
+  #       cd projections
+  #       make
+  #       proj=$PWD/bin/projections
+  #       cd ..
+  #       files=$(find . -name *.sts)
+  #       for f in $files; do echo $f; pushd .; cd $(dirname $f); $proj --exit $(basename $f); popd; done
 
   namd_netlrts-linux-x86_64:
     # Since NAMD requires a secret to download its source from Gitlab, CI builds from outside PPL
@@ -208,7 +230,7 @@ jobs:
 
   netlrts-darwin-x86_64:
     timeout-minutes: 60
-    runs-on: macos-latest
+    runs-on: macos-12
     steps:
     - uses: actions/checkout@v4
     - name: build
@@ -218,6 +240,20 @@ jobs:
       run: make -C netlrts-darwin-x86_64/tmp test TESTOPTS="++local"
     - name: testp P=2
       run: make -C netlrts-darwin-x86_64/tmp testp P=2 TESTOPTS="++local"
+
+  # FIXME: disabled since tests don't pass
+  # netlrts-darwin-arm8:
+  #   timeout-minutes: 60
+  #   runs-on: macos-latest
+  #   steps:
+  #   - uses: actions/checkout@v4
+  #   - name: build
+  #     run: ./build all-test netlrts-darwin-arm8 --build-shared --with-production --enable-error-checking --enable-lbuserdata -j3 -g -Werror=vla
+  #     # TODO: this should build tests with "-charm-shared". See #2735 on why this is not done currently.
+  #   - name: test
+  #     run: make -C netlrts-darwin-arm8/tmp test TESTOPTS="++local"
+  #   - name: testp P=2
+  #     run: make -C netlrts-darwin-arm8/tmp testp P=2 TESTOPTS="++local"
 
   netlrts-linux-i386:
     timeout-minutes: 60
@@ -300,7 +336,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-12]
 
     steps:
     - uses: actions/checkout@v4
