@@ -1667,7 +1667,6 @@ void CsdSchedulerState_new(CsdSchedulerState_t *s)
 	s->taskQ = CpvAccess(CsdTaskQueue);
 	s->suspendedTaskQ = CpvAccess(CmiSuspendedTaskQueue);
 #endif
-
 }
 
 
