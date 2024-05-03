@@ -1655,9 +1655,10 @@ void CsdSchedulerState_new(CsdSchedulerState_t *s)
 	s->schedQ=CpvAccess(CsdSchedQueue);
 	s->localCounter=&(CpvAccess(CsdLocalCounter));
 #if CMK_NODE_QUEUE_AVAILABLE
-	s->nodeQ=CsvAccess(CsdNodeQueue);
-	s->nodeLock=CsvAccess(CsdNodeQueueLock);
-	s->nodeGrpFreq=4; 
+  s->nodeQ=CsvAccess(CsdNodeQueue);
+  s->nodeLock=CsvAccess(CsdNodeQueueLock);
+  s->nodeGrpFreq=4; 
+  s->iter = 0;
 #endif
 #if CMK_GRID_QUEUE_AVAILABLE
 	s->gridQ=CpvAccess(CsdGridQueue);
