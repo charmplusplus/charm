@@ -1129,7 +1129,7 @@ typedef struct {
   void *localQ;
   Queue nodeQ;
   Queue schedQ;
-  unsigned short iter; // counting number of sched iterations (hopefully of for it to roll over	 
+  unsigned short iter; // counting number of sched iterations
   unsigned short nodeGrpFreq; // call nodegroup queue once every nodeGrpFreq iterations with high prio 
 	// should add a function to change this from the program for advanced users. One obstacle: 
         // it is inside a struct that is on stack, and so not accessible for standalone functions. Need to
