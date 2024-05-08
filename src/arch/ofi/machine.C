@@ -907,6 +907,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #endif //verbose
 
 #if CMK_CXI
+    OFI_INFO("OFI CXI extensions enabled\n");
   if ((context.mr_mode & FI_MR_ENDPOINT)==0)
     CmiAbort("OFI::LrtsInit::Unsupported MR mode FI_MR_ENDPOINT");
 #else
@@ -2006,7 +2007,9 @@ void *alloc_mempool_block(size_t *size, mem_handle_t *mem_hndl, int expand_flag)
 
 void free_mempool_block(void *ptr, mem_handle_t mem_hndl)
 {
+     MACHSTATE3(3, "free_mempool_block ptr %p mr %p key %lu\n", ptr, mem_hndl, fi_mr_key(mem_hndl));
     free(ptr);
+    fi_close( (struct fid *) mem_hndl);
 }
 
 #endif
@@ -2646,7 +2649,8 @@ static int ofi_reg_bind_enable(const void *buf,
 	if (ret) {
             MACHSTATE1(3, "fi_mr_reg error: %d\n", ret);
 	    char errstring[100];
-	    snprintf(errstring, 100, "fi_mr_reg error: %d", ret);
+	    const char* fi_errstring=fi_strerror(ret);
+	    snprintf(errstring, 100, "fi_mr_reg error: %d %s", ret, fi_errstring);
             CmiAbort(errstring);
         }
 	else{
@@ -2657,7 +2661,8 @@ static int ofi_reg_bind_enable(const void *buf,
 	if (ret) {
             MACHSTATE1(3, "fi_mr_bind error: %d\n", ret);
 	    char errstring[100];
-	    snprintf(errstring, 100, "fi_mr_bind error: %d", ret);
+	    const char* fi_errstring=fi_strerror(ret);
+	    snprintf(errstring, 100, "fi_mr_bind error: %d %s", ret,fi_errstring);	    
             CmiAbort(errstring);
         }
 	else
@@ -2668,8 +2673,9 @@ static int ofi_reg_bind_enable(const void *buf,
 	ret = fi_mr_enable(*mr);
 	if (ret) {
             MACHSTATE1(3, "fi_mr_enable error: %d\n", ret);
-	    char errstring[100];
-	    snprintf(errstring, 100, "fi_mr_enable error: %d", ret);
+	    char errstring[120];
+	    const char* fi_errstring=fi_strerror(ret);
+	    snprintf(errstring, 120, "[%d] fi_mr_enable error: %d handle %lu addr %p len 0x%lX %s", CmiMyPe(), ret,*mr, buf, len, fi_errstring);	    
             CmiAbort(errstring);
         }
 	else
