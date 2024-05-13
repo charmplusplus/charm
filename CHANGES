@@ -1,7 +1,7 @@
 This file describes the most significant changes. For more detail, use
 'git log' on a clone of the charm repository.
 ================================================================================
-What's new in Charm++ 7.1.0
+What's new in Charm++ 8.0.0
 ================================================================================
 
 This is a feature release, with the following major changes:
@@ -11,7 +11,7 @@ Highlights:
 - The License has changed to Apache 2.0 with LLVM exception.  This
   change to a popular Open Source license is intended to simplify use,
   collaboration, and greater community involvement in the development
-  of Charm++.
+  of Charm++. The NOTICE file contains the pertinent disclaimers.
 
 - The CkIO library (previously only supporting file output) has been
   enhanced to support file input. The input layer enables two-phase,
@@ -25,7 +25,32 @@ Highlights:
   extensions for Slingshot-11.  This can be accessed by adding the cxi
   parameter to the build line and allows for greatly improved
   performance on machines such as (Frontier, Perlmutter, Delta) at
-  larger node counts.
+  larger node counts.  Adding cxi as a build parameter is not
+  necessary on most Slingshot-11 installations, as it will be
+  autodetected.
+
+- Added support for NVIDIA's nvc/nvfortran compilers and Intel's new
+  icx/ifx compilers.
+
+- Fixed a bug in location management when doing dynamic insertion and
+  deletion of chare array elements.
+
+- Deprecated the "atomic" keyword in SDAG code (in favor of "serial").
+
+- Added support for TLSglobals on Apple ARM systems and the ability to
+  disable TLSglobals support at build-time.
+
+- Performance optimizations for node group broadcasts.
+
+- Added CMI-SHMEM module for optimizing small/medium-sized messages
+  between processes on the same host.
+
+- Fixed demand creation via ckcallback::send and enabled passing
+  options to ckcallback::send.
+
+- Improved portability and usability of AMPI's automatic global
+  variable privatization methods.
+
 
 ================================================================================
 What's new in Charm++ 7.0.0
