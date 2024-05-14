@@ -1,6 +1,20 @@
 This file describes the most significant changes. For more detail, use
 'git log' on a clone of the charm repository.
 
+===============================================================================
+What's new in Charm++ 7.0.1
+================================================================================
+
+This is a change license only release, with the following change:
+
+Highlights:
+
+- The License has changed to Apache 2.0 with LLVM exception.  This
+  change to a popular Open Source license is intended to simplify use,
+  collaboration, and greater community involvement in the development
+  of Charm++. The NOTICE file contains the pertinent disclaimers.
+
+
 ================================================================================
 What's new in Charm++ 7.0.0
 ================================================================================
