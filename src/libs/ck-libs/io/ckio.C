@@ -812,7 +812,7 @@ public:
 #endif  // if defined(_WIN32)
   void readDataPOSIX()
   {
-    CkPrintf("Allocating buffer\n");
+    // CkPrintf("Allocating buffer\n");
     _buffer = new char[_my_bytes];
 
     int fd = ::open(_file->name.c_str(), O_RDONLY, NULL);
@@ -836,9 +836,9 @@ public:
     }
 
     ::close(fd);
-    CkPrintf("Calling bufferReady\n");
+    // CkPrintf("Calling bufferReady\n");
 
-    thisProxy.bufferReady();
+    thisProxy[thisIndex].bufferReady();
   }
   /**
    * This function is launched in a separate thread
