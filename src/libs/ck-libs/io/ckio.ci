@@ -178,7 +178,7 @@ group[migratable] Manager
     entry void sendData(int read_tag, int buffer_tag, size_t offset, size_t bytes, CProxy_ReadAssembler ra, int pe);
 
     entry void sendDataHandler(int read_tag, int buffer_tag, size_t offset, size_t bytes, CProxy_ReadAssembler ra, int pe);
-    entry  [threaded] void monitorRead();
+    //entry  [threaded] void monitorRead();
 
     entry void bufferReady() {
          while (true) {

@@ -721,7 +721,7 @@ class BufferChares : public CBase_BufferChares
   size_t _session_offset;                             // the offset of the session
   size_t _my_offset;
   size_t _my_bytes;
-  std::shared_future<char*> _buffer;
+  char* _buffer;
 
   size_t _num_readers;
   size_t _read_stride;
@@ -748,33 +748,25 @@ public:
     CkAssert(_my_offset + _my_bytes <= _session_offset + _session_bytes);
     double disk_read_start_ck = CkWallTimer();  // get the before disk_read
 
-    std::future<char*> temp_buffer =
-        std::async(std::launch::async, &BufferChares::readData, this);
-
-    _buffer = temp_buffer.share();
-
-    double disk_read_end_ck = CkWallTimer();
-    double total_time_ms_ck = (disk_read_end_ck - disk_read_start_ck) * 1000;
-
-    thisProxy[thisIndex].monitorRead();
+    std::async(std::launch::async, &BufferChares::readData, this);
   }
 
-  ~BufferChares() { delete[] _buffer.get(); }
+  ~BufferChares() { delete[] _buffer; }
 
-  void monitorRead()
-  {
-    while (_buffer.wait_for(std::chrono::microseconds(0)) != std::future_status::ready)
-    {
-      // "Call after" implementation
-      // CcdCallFnAfter((CcdVoidFn)CthAwaken, CthSelf(),
-      //                BUFFER_TIMEOUT_MS);  // timeout in ms
-      // CthSuspend();
+  // void monitorRead()
+  // {
+  //   while (_buffer.wait_for(std::chrono::microseconds(0)) != std::future_status::ready)
+  //   {
+  //     // "Call after" implementation
+  //     // CcdCallFnAfter((CcdVoidFn)CthAwaken, CthSelf(),
+  //     //                BUFFER_TIMEOUT_MS);  // timeout in ms
+  //     // CthSuspend();
 
-      CthYield();
-    }
+  //     CthYield();
+  //   }
 
-    thisProxy[thisIndex].bufferReady();
-  }
+  //   thisProxy[thisIndex].bufferReady();
+  // }
 
   // can be used for debugging
   void printTime(double time_taken)
@@ -818,9 +810,10 @@ public:
     return buffer;
   }
 #endif  // if defined(_WIN32)
-  char* readDataPOSIX()
+  void readDataPOSIX()
   {
-    char* buffer = new char[_my_bytes];
+    CkPrintf("Allocating buffer\n");
+    _buffer = new char[_my_bytes];
 
     int fd = ::open(_file->name.c_str(), O_RDONLY, NULL);
 
@@ -834,7 +827,7 @@ public:
       CkAbort("Lseek buffer chare failed.\n");
     }
 
-    size_t num_bytes_read = ::read(fd, buffer, (int)_my_bytes);
+    size_t num_bytes_read = ::read(fd, _buffer, (int)_my_bytes);
 
     if (num_bytes_read != _my_bytes)
     {
@@ -843,8 +836,9 @@ public:
     }
 
     ::close(fd);
+    CkPrintf("Calling bufferReady\n");
 
-    return buffer;
+    thisProxy.bufferReady();
   }
   /**
    * This function is launched in a separate thread
@@ -854,7 +848,7 @@ public:
    * memory, and instead going to disk on-demand (what MPI does)
    */
 
-  char* readData()
+  void readData()
   {
 #if defined(_WIN32)
     return readDataWIN32();
@@ -892,10 +886,10 @@ public:
             _my_offset + _my_bytes);  // the last byte, exclusive, this chare should read
     size_t bytes_to_read = end_byte_chare - chare_offset;
 
-    char* buffer = _buffer.get();  // future call to get
+    // har* buffer = _buffer.get();  // future call to get
     CProxy_ReadAssembler(ra)[pe].shareData(
         read_tag, buffer_tag, chare_offset, bytes_to_read,
-        CkSendBuffer(buffer +
+        CkSendBuffer(_buffer +
                      (chare_offset -
                       _my_offset) /*, cb*/));  // send this data to the ReadAssembler
   }
