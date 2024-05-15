@@ -813,8 +813,8 @@ public:
   void readDataPOSIX()
   {
     // CkPrintf("Allocating buffer\n");
-    traceRegisterUserEvent("Alloocation and input", 20);  // on PE 0
-    double critStart = CmiWallTimer();                    // start time
+    // traceRegisterUserEvent("Alloocation and input", 20);  // on PE 0
+    // double critStart = CmiWallTimer();  // start time
 
     _buffer = new char[_my_bytes];
 
@@ -840,7 +840,7 @@ public:
 
     ::close(fd);
     // CkPrintf("Calling bufferReady\n");
-    traceUserBracketEvent(20, critStart, CmiWallTimer());
+    // traceUserBracketEvent(20, critStart, CmiWallTimer());
 
     thisProxy[thisIndex].bufferReady();
   }
