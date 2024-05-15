@@ -748,7 +748,8 @@ public:
     CkAssert(_my_offset + _my_bytes <= _session_offset + _session_bytes);
     double disk_read_start_ck = CkWallTimer();  // get the before disk_read
 
-    std::async(std::launch::async, &BufferChares::readData, this);
+    // std::async(std::launch::async, &BufferChares::readData, this);
+    std::thread(&BufferChares::readData, this).detach();
   }
 
   ~BufferChares() { delete[] _buffer; }
@@ -780,9 +781,9 @@ public:
   }
 
 #if defined(_WIN32)
-  char* readDataWIN32()
+  void readDataWIN32()
   {
-    char* buffer = new char[_my_bytes];
+    _buffer = new char[_my_bytes];
     //    CkPrintf("Allocating buffer on chare %d at addr %p.\n", thisIndex, buffer);
 
     int fd = _open(_file->name.c_str(), O_RDONLY | O_BINARY, NULL);
@@ -806,8 +807,7 @@ public:
     }
 
     _close(fd);
-
-    return buffer;
+    thisProxy[thisIndex].bufferReady();
   }
 #endif  // if defined(_WIN32)
   void readDataPOSIX()
