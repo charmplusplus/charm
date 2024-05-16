@@ -973,7 +973,7 @@ fi
 AC_ARG_WITH([mempool-cutoff],
             [AS_HELP_STRING([--with-mempool-cutoff=N],
                             [exponent of the maximum power of two to use for bin sizes in the mempool])],
-            [], [with_mempool_cutoff=26])
+            [], [with_mempool_cutoff=28])
 
 if test "$((6 < $with_mempool_cutoff && $with_mempool_cutoff < 32))" = '1'
 then

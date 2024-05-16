@@ -200,29 +200,22 @@ static int _tlbpagesize = 4096;
 // separate pool of memory mapped huge pages
 static CmiInt8 BIG_MSG  =  16 * ONE_MB;
 #else
-static CmiInt8 BIG_MSG  =  2 * ONE_MB;
+static CmiInt8 BIG_MSG  =  16 * ONE_MB;
 #endif
 
 void* LrtsPoolAlloc(int n_bytes);
 
 #include "mempool.h"
 #if CMK_SMP
-// nothing to do here
-#else
-//minimal per process memory pool use for nonsmp mode
-#define USE_SMALL_BASE_POOL_DEFAULTS 1
-#endif
-
-#if USE_SMALL_BASE_POOL_DEFAULTS
-#define MEMPOOL_INIT_SIZE_MB_DEFAULT   1
-#define MEMPOOL_EXPAND_SIZE_MB_DEFAULT 4
-#define MEMPOOL_MAX_SIZE_MB_DEFAULT    16
-#define MEMPOOL_LB_DEFAULT             0
-#define MEMPOOL_RB_DEFAULT             32*ONE_MB
-#else
-#define MEMPOOL_INIT_SIZE_MB_DEFAULT   4
-#define MEMPOOL_EXPAND_SIZE_MB_DEFAULT 16
+#define MEMPOOL_INIT_SIZE_MB_DEFAULT   64
+#define MEMPOOL_EXPAND_SIZE_MB_DEFAULT 64
 #define MEMPOOL_MAX_SIZE_MB_DEFAULT    512
+#define MEMPOOL_LB_DEFAULT             0
+#define MEMPOOL_RB_DEFAULT             134217728
+#else
+#define MEMPOOL_INIT_SIZE_MB_DEFAULT   128
+#define MEMPOOL_EXPAND_SIZE_MB_DEFAULT 128
+#define MEMPOOL_MAX_SIZE_MB_DEFAULT    256
 #define MEMPOOL_LB_DEFAULT             0
 #define MEMPOOL_RB_DEFAULT             134217728
 #endif
@@ -239,7 +232,7 @@ void* LrtsPoolAlloc(int n_bytes);
 #define   GetBaseAllocPtr(x) GetMempoolBlockPtr(x)
 #define   GetMemOffsetFromBase(x) ((char*)(x) - (char *) GetBaseAllocPtr(x))
 
-
+void* LrtsPoolAlloc(int n_bytes);
 
 CpvDeclare(mempool_type*, mempool);
 #else
@@ -250,8 +243,8 @@ CpvDeclare(mempool_type*, mempool);
 #define CmiGetMsgSize(msg)  ((((CmiMsgHeaderBasic *)msg)->size))
 
 #define CACHELINE_LEN 64
-#if CMK_SMP
-#define OFI_NUM_RECV_REQS_DEFAULT    8
+
+#define OFI_NUM_RECV_REQS_DEFAULT    16
 #define OFI_NUM_RECV_REQS_MAX        4096
 
 #define OFI_EAGER_MAXSIZE_DEFAULT    65536
@@ -259,16 +252,6 @@ CpvDeclare(mempool_type*, mempool);
 
 #define OFI_CQ_ENTRIES_COUNT_DEFAULT 8
 #define OFI_CQ_ENTRIES_COUNT_MAX     1024
-#else
-#define OFI_NUM_RECV_REQS_DEFAULT    4
-#define OFI_NUM_RECV_REQS_MAX        64
-
-#define OFI_EAGER_MAXSIZE_DEFAULT    65536
-#define OFI_EAGER_MAXSIZE_MAX        1048576
-
-#define OFI_CQ_ENTRIES_COUNT_DEFAULT 4
-#define OFI_CQ_ENTRIES_COUNT_MAX     64
-#endif
 
 #define OFI_USE_INJECT_DEFAULT       1
 
@@ -924,6 +907,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #endif //verbose
 
 #if CMK_CXI
+    OFI_INFO("OFI CXI extensions enabled\n");
   if ((context.mr_mode & FI_MR_ENDPOINT)==0)
     CmiAbort("OFI::LrtsInit::Unsupported MR mode FI_MR_ENDPOINT");
 #else
@@ -2023,7 +2007,9 @@ void *alloc_mempool_block(size_t *size, mem_handle_t *mem_hndl, int expand_flag)
 
 void free_mempool_block(void *ptr, mem_handle_t mem_hndl)
 {
+     MACHSTATE3(3, "free_mempool_block ptr %p mr %p key %lu\n", ptr, mem_hndl, fi_mr_key(mem_hndl));
     free(ptr);
+    fi_close( (struct fid *) mem_hndl);
 }
 
 #endif
@@ -2663,7 +2649,8 @@ static int ofi_reg_bind_enable(const void *buf,
 	if (ret) {
             MACHSTATE1(3, "fi_mr_reg error: %d\n", ret);
 	    char errstring[100];
-	    snprintf(errstring, 100, "fi_mr_reg error: %d", ret);
+	    const char* fi_errstring=fi_strerror(ret);
+	    snprintf(errstring, 100, "fi_mr_reg error: %d %s", ret, fi_errstring);
             CmiAbort(errstring);
         }
 	else{
@@ -2674,7 +2661,8 @@ static int ofi_reg_bind_enable(const void *buf,
 	if (ret) {
             MACHSTATE1(3, "fi_mr_bind error: %d\n", ret);
 	    char errstring[100];
-	    snprintf(errstring, 100, "fi_mr_bind error: %d", ret);
+	    const char* fi_errstring=fi_strerror(ret);
+	    snprintf(errstring, 100, "fi_mr_bind error: %d %s", ret,fi_errstring);	    
             CmiAbort(errstring);
         }
 	else
@@ -2685,8 +2673,9 @@ static int ofi_reg_bind_enable(const void *buf,
 	ret = fi_mr_enable(*mr);
 	if (ret) {
             MACHSTATE1(3, "fi_mr_enable error: %d\n", ret);
-	    char errstring[100];
-	    snprintf(errstring, 100, "fi_mr_enable error: %d", ret);
+	    char errstring[120];
+	    const char* fi_errstring=fi_strerror(ret);
+	    snprintf(errstring, 120, "[%d] fi_mr_enable error: %d handle %lu addr %p len 0x%lX %s", CmiMyPe(), ret,*mr, buf, len, fi_errstring);	    
             CmiAbort(errstring);
         }
 	else
