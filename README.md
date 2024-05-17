@@ -387,4 +387,4 @@ Mikida, Sam White, Kavitha Chandrasekar, Jaemin Choi, Matthias Diener,
 Evan Ramos, Zane Fink, Pathikrit Ghosh, Maya Taylor, Aditya Bhosale,
 Mathew Jacob, Tom Vander Aa, and Thomas Quinn.
 
-Copyright (C) 1989-2024 Regents of the University of Illinois
+Copyright (C) 1989-2024 University of Illinois Board of Trustees
