@@ -353,7 +353,7 @@ jobs:
         # Use a fork, not the main repo
         # If in merge_group mode, the branch should be created in the main repo
         if [[ ${{ github.event_name }} == 'pull_request' ]]; then
-          sed -i -e 's,UIUC-PPL/charm.git,${{github.event.pull_request.head.repo.full_name}},' var/spack/repos/builtin/packages/charmpp/package.py
+          sed -i -e 's,charmplusplus/charm.git,${{github.event.pull_request.head.repo.full_name}},' var/spack/repos/builtin/packages/charmpp/package.py
         fi
 
         # Compile with debug symbols
