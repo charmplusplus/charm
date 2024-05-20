@@ -15,7 +15,7 @@ Highlights:
 
 - The CkIO library (previously only supporting file output) has been
   enhanced to support file input. The input layer enables two-phase,
-  collective input from a single file via the an array of buffer chares,
+  collective input from a single file via an array of buffer chares,
   which read from the file system and buffer data until the application 
   requests it. As of this release, the number of buffer chares is 
   not automated by CkIO, and the user is responsible for selecting 
