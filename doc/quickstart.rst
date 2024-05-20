@@ -17,7 +17,7 @@ To download the development version of Charm++, run:
 
 .. code-block:: console
 
-   $ git clone https://github.com/UIUC-PPL/charm
+   $ git clone https://github.com/charmplusplus/charm
 
 
 To build Charm++, use the following commands:

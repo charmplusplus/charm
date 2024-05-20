@@ -721,12 +721,12 @@ do
 		;;
 	@*.rsp)
 		# Pass through response files (*.rsp) to the compiler.
-		# See https://github.com/UIUC-PPL/charm/issues/2617 for details.
+		# See https://github.com/charmplusplus/charm/issues/2617 for details.
 		ARG_OPTS+=("$arg")
 		;;
 	*.tbd)
 		# Pass through text-based libraries (*.tbd) on MacOS.
-		# See https://github.com/UIUC-PPL/charm/issues/3045 for details.
+		# See https://github.com/charmplusplus/charm/issues/3045 for details.
 		ARG_OPTS+=("$arg")
 		;;
 	-D*|-I*)

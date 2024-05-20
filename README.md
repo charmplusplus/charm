@@ -1,6 +1,6 @@
 # Charm++
 
-[![Build Status](https://travis-ci.org/UIUC-PPL/charm.svg?branch=main)](https://travis-ci.org/UIUC-PPL/charm)
+[![Build Status](https://travis-ci.org/charmplusplus/charm.svg?branch=main)](https://travis-ci.org/charmplusplus/charm)
 [![Documentation Status](https://readthedocs.org/projects/charm/badge/?version=latest)](https://charm.readthedocs.io/en/latest/?badge=latest)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3370873.svg)](https://doi.org/10.5281/zenodo.3370873)
 
@@ -18,7 +18,7 @@ Source code is provided, and non-commercial use is free.
 You can use anonymous Git access to obtain the latest Charm++ source
 code, as follows:
 
-     $ git clone https://github.com/UIUC-PPL/charm
+     $ git clone https://github.com/charmplusplus/charm
 
 
 ## Build Configuration
@@ -343,7 +343,7 @@ GitHub provides a detailed tutorial on creating pull requests
 Each pull request must pass code review and CI tests before it can be merged by someone on
 the core development team.
 Our wiki contains additional information about pull requests
-(https://github.com/UIUC-PPL/charm/wiki/Working-with-Pull-Requests).
+(https://github.com/charmplusplus/charm/wiki/Working-with-Pull-Requests).
 
 
 ## For More Information
@@ -357,7 +357,7 @@ The UIUC Parallel Programming Laboratory web page, with information
 on past and present research, is at https://charm.cs.illinois.edu
 
 For questions, comments, suggestions, improvements, or bug reports,
-please create an issue or discussion on our GitHub, https://github.com/UIUC-PPL/charm
+please create an issue or discussion on our GitHub, https://github.com/charmplusplus/charm
 
 
 ## Authors

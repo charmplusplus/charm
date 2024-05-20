@@ -51,6 +51,8 @@ Highlights:
 - Improved portability and usability of AMPI's automatic global
   variable privatization methods.
 
+- Transferred organization ownership of the repository on github from
+  UIUC-PPL to charmplusplus.
 
 ===============================================================================
 What's new in Charm++ 7.0.1
@@ -99,10 +101,10 @@ Misc:
   for more information.
 
 - Charm++'s development branch has been renamed from 'master' to 'main'. Please see
-  https://github.com/UIUC-PPL/charm/pull/3303 for details.
+  https://github.com/charmplusplus/charm/pull/3303 for details.
 
 - We have adopted GitHub discussions
-  (https://github.com/UIUC-PPL/charm/discussions) as the preferred
+  (https://github.com/charmplusplus/charm/discussions) as the preferred
   venue for Charm++ questions and discussions instead of the
   charm@cs.illinois.edu mailing list.
 
@@ -244,7 +246,7 @@ Misc:
 
 - We have moved bug/issue tracking from Redmine to GitHub, and code
   review from Gerrit to GitHub. Our GitHub repository is at:
-  https://github.com/UIUC-PPL/charm .
+  https://github.com/charmplusplus/charm .
   
 - As a preview feature, Charm++ can now be built with CMake (version 3.4 or higher).
   To try it, you can replace your `./build` command with `./buildcmake`, which supports
@@ -265,10 +267,10 @@ Known Issues:
 
 - Recent InfiniBand machines crash in SMP builds due to problems in the verbs layer implementation.
   Users are recommended to use UCX for the time being if possible.
-  (https://github.com/UIUC-PPL/charm/issues/2532)
+  (https://github.com/charmplusplus/charm/issues/2532)
   
 - UCX sometimes hangs/crashes on Frontera.
-  (https://github.com/UIUC-PPL/charm/issues/2635, https://github.com/UIUC-PPL/charm/issues/2636)
+  (https://github.com/charmplusplus/charm/issues/2635, https://github.com/charmplusplus/charm/issues/2636)
 
 Charm++ Features & Fixes:
 
