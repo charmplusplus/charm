@@ -1,10 +1,28 @@
 #include "iotest.decl.h"
 #include <assert.h>
 #include <iostream>
+#include <fstream>
 #include <time.h>
 #include <vector>
+#include <string>
 CProxy_Main mainproxy;
 std::string global_fname;
+
+
+void testGetNewLine(Ck::IO::Session session, std::string fname){
+	Ck::IO::FileReader fr(session);
+	std::ifstream ifs(fname, std::ifstream::in);
+	std::string s1;
+	std::string s2;
+	while(std::getline(ifs, s1)){
+		Ck::IO::getline(fr, s2);	
+		CkAssert(s1 == s2);
+	}
+	CkAssert(fr.eof());
+	CkPrintf("All of the lines using Ck::IO::getline matched up!");
+
+}
+
 class Main : public CBase_Main
 {
   Main_SDAG_CODE
@@ -151,5 +169,4 @@ public:
     contribute(done);
   }
 };
-
 #include "iotest.def.h"

@@ -377,6 +377,7 @@ public:
   bool operator!() const;
 };
 
+  FileReader& getline(FileReader&, std::string); 
 }  // namespace IO
 }  // namespace Ck
 

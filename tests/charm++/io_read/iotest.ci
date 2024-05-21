@@ -1,6 +1,7 @@
 mainmodule iotest
 {
   include "ckio.h";
+  include "iotest.h";
 
   mainchare Main
   {
@@ -31,7 +32,6 @@ mainmodule iotest
 
     CkCallback sessionStart(CkIndex_Main::start_read(0), thisProxy);
     Ck::IO::startReadSession(f, fileSize, 0, sessionStart);
-
     delete m;
   }
   when start_read(Ck::IO::SessionReadyMsg * m) serial
@@ -39,6 +39,7 @@ mainmodule iotest
     size_t sizeToRead = fileSize / n;  // only works if fileSize is a multiple of n
     session = m->session;
     testers = CProxy_Test::ckNew(m->session, sizeToRead, filename, n);
+	testGetNewLine(session, filename);
     delete m;
   }
 
