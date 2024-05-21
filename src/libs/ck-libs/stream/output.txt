@@ -1,0 +1,76 @@
+stream.C:66:44: error: two or more data types in declaration of 'type name'
+   66 |                         std::unordered_map<StreamToken StreamCoordinator> _stream_coordinators;
+      |                                            ^~~~~~~~~~~
+stream.C:66:73: error: wrong number of template arguments (1, should be at least 2)
+   66 |                         std::unordered_map<StreamToken StreamCoordinator> _stream_coordinators;
+      |                                                                         ^
+In file included from /sw/spack/deltas11-2023-03/apps/linux-rhel8-x86_64/gcc-8.5.0/gcc-11.4.0-yycklku/lib/gcc/x86_64-pc-linux-gnu/11.4.0/../../../../include/c++/11.4.0/unordered_map:47,
+                 from /u/jacob1/charm/include/pup_stl.h:34,
+                 from /u/jacob1/charm/include/cklists.h:6,
+                 from /u/jacob1/charm/include/charm++.h:24,
+                 from CkStream.decl.h:3,
+                 from stream.h:3,
+                 from stream.C:1:
+/sw/spack/deltas11-2023-03/apps/linux-rhel8-x86_64/gcc-8.5.0/gcc-11.4.0-yycklku/lib/gcc/x86_64-pc-linux-gnu/11.4.0/../../../../include/c++/11.4.0/bits/unordered_map.h:102:11: note: provided for 'template<class _Key, class _Tp, class _Hash, class _Pred, class _Alloc> class std::unordered_map'
+  102 |     class unordered_map
+      |           ^~~~~~~~~~~~~
+stream.C: In member function 'void Ck::Stream::impl::StreamManager::registerPEWithCoordinator(StreamToken, size_t)':
+stream.C:83:61: error: invalid types 'int[StreamToken {aka long unsigned int}]' for array subscript
+   83 |                                         _stream_coordinators[stream].registerThisPE(pe); // register PE with the coordinator
+      |                                                             ^
+stream.C: In member function 'void Ck::Stream::impl::StreamManager::initializeStream(int, size_t)':
+stream.C:116:79: error: 'pe' was not declared in this scope
+  116 |                                         _stream_table[id] = StreamBuffers(id, pe);
+      |                                                                               ^~
+stream.C: In member function 'void Ck::Stream::impl::StreamManager::addReigsteredPE(StreamToken, size_t)':
+stream.C:146:33: error: expected ';' before '}' token
+  146 |                                 }
+      |                                 ^
+stream.C: In member function 'void Ck::Stream::impl::StreamBuffers::_sendOutBuffer(char*, size_t)':
+stream.C:215:25: error: '_num_sent_messages' was not declared in this scope; did you mean '_num_send_messages'?
+  215 |                         _num_sent_messages++;
+      |                         ^~~~~~~~~~~~~~~~~~
+      |                         _num_send_messages
+In file included from /u/jacob1/charm/include/charm.h:8,
+                 from /u/jacob1/charm/include/charm++.h:9,
+                 from CkStream.decl.h:3,
+                 from stream.h:3,
+                 from stream.C:1:
+stream.C: In member function 'void Ck::Stream::impl::StreamBuffers::handleGetRequest(Ck::Stream::impl::GetRequest)':
+/u/jacob1/charm/include/converse.h:417:30: error: 'Cpv_manager_' was not declared in this scope
+  417 | #define CpvAccess(v) CMK_TAG(Cpv_,v)[_Cmi_myrank]
+      |                              ^~~~
+/u/jacob1/charm/include/converse.h:223:22: note: in definition of macro 'CMK_TAG'
+  223 | #define CMK_TAG(x,y) x##y##_
+      |                      ^
+/u/jacob1/charm/include/middle-conv.h:11:25: note: in expansion of macro 'CpvAccess'
+   11 | #define CkpvAccess      CpvAccess
+      |                         ^~~~~~~~~
+stream.C:238:33: note: in expansion of macro 'CkpvAccess'
+  238 |                                 CkpvAccess(manager) -> registerPEWithCoordinator(_stream_id, CkMyPe()); // tell coordinator + all the other PEs
+      |                                 ^~~~~~~~~~
+stream.C: In member function 'void Ck::Stream::impl::StreamCoordinator::registerThisPE(size_t)':
+stream.C:320:44: error: 'token' was not declared in this scope
+  320 |                                 _meta_data[token]._registered_pes.push_back(pe);
+      |                                            ^~~~~
+In file included from /u/jacob1/charm/include/charm.h:8,
+                 from /u/jacob1/charm/include/charm++.h:9,
+                 from CkStream.decl.h:3,
+                 from stream.h:3,
+                 from stream.C:1:
+/u/jacob1/charm/include/converse.h:417:30: error: 'Cpv_manager_' was not declared in this scope
+  417 | #define CpvAccess(v) CMK_TAG(Cpv_,v)[_Cmi_myrank]
+      |                              ^~~~
+/u/jacob1/charm/include/converse.h:223:22: note: in definition of macro 'CMK_TAG'
+  223 | #define CMK_TAG(x,y) x##y##_
+      |                      ^
+/u/jacob1/charm/include/middle-conv.h:11:25: note: in expansion of macro 'CpvAccess'
+   11 | #define CkpvAccess      CpvAccess
+      |                         ^~~~~~~~~
+stream.C:321:33: note: in expansion of macro 'CkpvAccess'
+  321 |                                 CkpvAccess(manager) -> addRegisteredPE(_stream, pe);
+      |                                 ^~~~~~~~~~
+Fatal Error by charmc in directory /u/jacob1/charm/src/libs/ck-libs/stream
+   Command /sw/spack/deltas11-2023-03/apps/linux-rhel8-zen3/gcc-11.4.0/openmpi-4.1.6-lranp74/bin/mpic++ -DCMK_GFORTRAN -DMPICH_SKIP_MPICXX -DOMPI_SKIP_MPICXX -I/u/jacob1/charm/include -D__CHARMC__=1 -U_FORTIFY_SOURCE -fno-stack-protector -fno-lifetime-dse -ftls-model=initial-exec -std=gnu++11 -c stream.C -o stream.o returned error code 1
+charmc exiting...
+make: *** [Makefile:23: stream.o] Error 1

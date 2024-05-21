@@ -1,0 +1,382 @@
+
+Running as 4 OS processes: streamtest
+charmrun> /usr/bin/setarch x86_64 -R mpirun -np 4 streamtest
+
+======================   ALLOCATED NODES   ======================
+	cn040: flags=0x11 slots=4 max_slots=0 slots_inuse=0 state=UP
+=================================================================
+Charm++> Running on MPI library: Open MPI v4.1.6, package: Open MPI svcdeltaswmgt@dt-login04.delta.ncsa.illinois.edu Distribution, ident: 4.1.6, repo rev: v4.1.6, Sep 30, 2023 (MPI standard: 3.1)
+Charm++> Level of thread support used: MPI_THREAD_SINGLE (desired: MPI_THREAD_SINGLE)
+Charm++> Running in non-SMP mode: 4 processes (PEs)
+Converse/Charm++ Commit ID: v7.1.0-devel-353-g9f1bba253
+Isomalloc> Synchronized global address space.
+CharmLB> Load balancer assumes all CPUs are same.
+Charm++> Running on 1 hosts (2 sockets x 8 cores x 1 PUs = 16-way SMP)
+Charm++> cpu topology info is gathered in 0.002 seconds.
+CharmLB> Load balancing instrumentation for communication is off.
+The starter is alive
+Stream Manager created on PE=0
+Stream Manager created on PE=2
+On 0, we created stream 0 with coordinator=0
+Stream Manager created on PE=3
+Stream Manager created on PE=1
+On 2, we created stream 0 with coordinator=0
+On 3, we created stream 0 with coordinator=0
+On 1, we created stream 0 with coordinator=0
+We made it to the streamCreated part baby
+Got the stream id: 0
+Stream Manager 0 has no valid pes to deliver message to, buffering send
+Producer 0 has written 10 size_t to the stream...
+Stream Manager 2 has no valid pes to deliver message to, buffering send
+Producer 2 has written 10 size_t to the stream...
+Stream Manager 1 has no valid pes to deliver message to, buffering send
+Producer 1 has written 10 size_t to the stream...
+Stream Manager 3 has no valid pes to deliver message to, buffering send
+Producer 3 has written 10 size_t to the stream...
+just received a addRegisteredPE call to add 0 on PE=2
+Time to clear out the buffered DeliverStreamBytesMsg to be delivered from PE=2
+Number of elements in _msg_out_buffer: 1
+Sending to 0 from 2 in popFrontMsgOutBuffer
+just received a addRegisteredPE call to add 0 on PE=0
+Time to clear out the buffered DeliverStreamBytesMsg to be delivered from PE=0
+Coordinator on PE=0 starting the close process for stream=0...
+just received a addRegisteredPE call to add 0 on PE=3
+Time to clear out the buffered DeliverStreamBytesMsg to be delivered from PE=3
+Number of elements in _msg_out_buffer: 1
+Sending to 0 from 0 in popFrontMsgOutBuffer
+PE=0 will initiate the closing process on all PEs for stream=0
+just received a addRegisteredPE call to add 1 on PE=2
+Number of elements in _msg_out_buffer: 1
+Stream Manager 0 received data for stream 0
+Just before delete
+StreamManager 0 Incremented the counter for 2
+Just added 80 bytes to the recv stream of token=0 on pe=0
+just received a addRegisteredPE call to add 0 on PE=1
+Time to clear out the buffered DeliverStreamBytesMsg to be delivered from PE=1
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=0, allAcked()=1, Number of bytes copied=8, requested byte=8
+Sending to 0 from 3 in popFrontMsgOutBuffer
+Stream Manager 2 received a close request for stream=0
+On PE=2, number_sent_messages=1, _write_acks=0
+just received a addRegisteredPE call to add 1 on PE=3
+Stream Manager 3 received a close request for stream=0
+On PE=3, number_sent_messages=1, _write_acks=0
+Stream Manager 0 received data for stream 0
+Just before delete
+Just added 80 bytes to the recv stream of token=0 on pe=0
+20,
+issuing another get request...
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=0, allAcked()=1, Number of bytes copied=8, requested byte=8
+just received a addRegisteredPE call to add 1 on PE=1
+Time to clear out the buffered DeliverStreamBytesMsg to be delivered from PE=1
+Number of elements in _msg_out_buffer: 1
+Sending to 0 from 1 in popFrontMsgOutBuffer
+The msg out buffer is empty; not doing anything
+Stream Manager 1 received a close request for stream=0
+On PE=1, number_sent_messages=1, _write_acks=0
+Stream Manager 0 received data for stream 0
+Just before delete
+StreamManager 0 Incremented the counter for 3
+Just added 80 bytes to the recv stream of token=0 on pe=0
+On PE=2, I am incrementing the _write_acks by 1
+On PE=2, number_sent_messages=1, _write_acks=1
+All of pe=2 messages for stream=0 have been acked
+just received a addRegisteredPE call to add 1 on PE=0
+Stream Manager 0 received a close request for stream=0
+PE=0 sending 1 acks to PE=3
+PE=0 sending 1 acks to PE=2
+On PE=0, number_sent_messages=0, _write_acks=0
+For stream=0 on pe=0, All of my messages have been acked!
+31,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+Stream Manager 0 received data for stream 0
+Just before delete
+PE=1 will now ack PE=10391320 because the stream is already closed...
+Just added 80 bytes to the recv stream of token=0 on pe=0
+32,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+33,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+34,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+35,
+issuing another get request...
+On PE=3, I am incrementing the _write_acks by 1
+On PE=3, number_sent_messages=1, _write_acks=1
+All of pe=3 messages for stream=0 have been acked
+On PE=1, I am incrementing the _write_acks by 1
+On PE=1, number_sent_messages=1, _write_acks=1
+All of pe=1 messages for stream=0 have been acked
+On PE=1, number_sent_messages=1, _write_acks=1
+----DEBUG---- about to fulfill a request!
+On PE=1, number_sent_messages=1, _write_acks=1
+Marking the stream as closed now...
+
+Consumer 1 has received the done signal and consumed 0 size_t...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+36,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+37,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+38,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+39,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+10,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+11,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+12,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+13,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+14,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+15,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+16,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+17,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+18,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+19,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+30,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+31,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+32,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+33,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+34,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+35,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+36,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+37,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+38,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+39,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+10,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+11,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+12,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+13,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+14,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+15,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+16,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+17,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+18,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+On PE=0, number_sent_messages=0, _write_acks=0
+isStreamClosed()=1, allAcked()=1, Number of bytes copied=8, requested byte=8
+19,
+issuing another get request...
+On PE=0, number_sent_messages=0, _write_acks=0
+----DEBUG---- about to fulfill a request!
+On PE=0, number_sent_messages=0, _write_acks=0
+Marking the stream as closed now...
+
+Consumer 0 has received the done signal and consumed 40 size_t...
