@@ -157,10 +157,19 @@ class Director : public CBase_Director
   // method called by the closeReadSession function from user
   void closeReadSession(Session read_session, CkCallback after_end)
   {
+    CkPrintf("Read session id: %d\n", read_session.sessionID);
+    CkPrintf("Printing manager test\n");
+    managers.testprint(0);
+
     CProxy_BufferChares(read_session.sessionID).ckDestroy();
 
+    CkPrintf("Reduction messgae\n");
+    CkReductionMsg::buildNew(0, NULL, CkReduction::nop);
+
+    CkPrintf("sending\n");
     after_end.send(
         CkReductionMsg::buildNew(0, NULL, CkReduction::nop));  // invoke a callback
+    managers.testprint(2);
   }
 
   void prepareWriteSession_helper(FileToken file, size_t bytes, size_t offset,
@@ -185,7 +194,6 @@ class Director : public CBase_Director
     CkArrayOptions sessionOpts(numStripes);
     sessionOpts.setStaticInsertion(true);
     sessionOpts.setAnytimeMigration(false);
-	      
 
     CkCallback sessionInitDone(CkIndex_Director::sessionReady(NULL), thisProxy);
     sessionInitDone.setRefnum(sessionID);
@@ -245,6 +253,9 @@ class Director : public CBase_Director
 
   void close(FileToken token, CkCallback closed)
   {
+    CkPrintf("in director close: calling manager testprint and close with %d, %d\n",
+             opnum, token);
+    managers.testprint(1);
     managers.close(opnum++, token, closed);
     files.erase(token);
   }
@@ -320,6 +331,7 @@ public:
   void shareData(int read_tag, int buffer_tag, size_t read_chare_offset, size_t num_bytes,
                  char* data, CkNcpyBufferPost* ncpyPost)
   {
+    CkPrintf("Sharing data on pe=%d\n", CkMyPe());
     ncpyPost[0].regMode = CK_BUFFER_REG;
     ncpyPost[0].deregMode = CK_BUFFER_DEREG;
     CkMatchBuffer(ncpyPost, 0, buffer_tag);
@@ -328,6 +340,8 @@ public:
   void shareData(int read_tag, int buffer_tag, size_t read_chare_offset, size_t num_bytes,
                  char* data)
   {
+    CkPrintf("Sharing data on pe=%d\n", CkMyPe());
+
     ReadInfo& info = _read_info_buffer[read_tag];  // get the struct from the buffer tag
     info.bytes_left -= num_bytes;  // decrement the number of remaining bytes to read
     if (info.bytes_left)
@@ -536,6 +550,7 @@ public:
 
   void doClose(FileToken token, CkCallback closed)
   {
+    CkPrintf("In doclose\n");
     int fd = files[token].fd;
     if (fd != -1)
     {
@@ -724,6 +739,7 @@ class BufferChares : public CBase_BufferChares
   size_t _my_offset;
   size_t _my_bytes;
   std::shared_future<char*> _buffer;
+  char* buffer;
 
   size_t _num_readers;
   size_t _read_stride;
@@ -750,18 +766,21 @@ public:
     CkAssert(_my_offset + _my_bytes <= _session_offset + _session_bytes);
     double disk_read_start_ck = CkWallTimer();  // get the before disk_read
 
-    std::future<char*> temp_buffer =
-        std::async(std::launch::async, &BufferChares::readData, this);
+    // std::future<char*> temp_buffer =
+    //     std::async(std::launch::async, &BufferChares::readData, this);
+    buffer = readData();
 
-    _buffer = temp_buffer.share();
+    //_buffer = temp_buffer.share();
+    // thisProxy[thisIndex].monitorRead();
 
-    double disk_read_end_ck = CkWallTimer();
-    double total_time_ms_ck = (disk_read_end_ck - disk_read_start_ck) * 1000;
-
-    thisProxy[thisIndex].monitorRead();
+    CkCallback cb(CkReductionTarget(BufferChares, allReadsDone), thisProxy);
+    contribute(cb);
   }
 
-  ~BufferChares() { delete[] _buffer.get(); }
+  ~BufferChares()
+  {
+    // delete[] _buffer.get();
+  }
 
   void monitorRead()
   {
@@ -779,14 +798,10 @@ public:
   }
 
   // can be used for debugging
-  void printTime(double time_taken)
+  void allReadsDone()
   {
-    clock_t buffer_read_done = clock();
-    double total =
-        (double(buffer_read_done - read_session_start) / CLOCKS_PER_SEC * 1000);
-    CkPrintf(
-        "The time to disk took %fms on the max chare and %f since read session start.\n",
-        time_taken, total);
+    CkPrintf("All reads done on chare %d\n", thisIndex);
+    thisProxy[thisIndex].bufferReady();
   }
 
 #if defined(_WIN32)
@@ -884,8 +899,8 @@ public:
 
     if (offset < _my_offset)
       chare_offset =
-          _my_offset;  // the start of the read is below this chare, so we should read
-                       // in the current data from start of what it owns
+          _my_offset;  // the start of the read is below this chare, so we should
+                       // read in the current data from start of what it owns
     else
       chare_offset = offset;  // read offset is in the middle
 
@@ -894,7 +909,7 @@ public:
             _my_offset + _my_bytes);  // the last byte, exclusive, this chare should read
     size_t bytes_to_read = end_byte_chare - chare_offset;
 
-    char* buffer = _buffer.get();  // future call to get
+    // char* buffer = _buffer.get();  // future call to get
     CProxy_ReadAssembler(ra)[pe].shareData(
         read_tag, buffer_tag, chare_offset, bytes_to_read,
         CkSendBuffer(buffer +

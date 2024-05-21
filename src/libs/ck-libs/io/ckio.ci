@@ -142,6 +142,10 @@ group ReadAssembler
 group[migratable] Manager
 {
   entry Manager();
+  entry void testprint(int pos)
+  {
+    serial { CkPrintf("in manager from pos %d\n", pos); }
+  }
   entry void run()
   {
     while (true)
@@ -151,7 +155,8 @@ group[migratable] Manager
                                      FileToken token, std::string name, Options opts)
                   serial { prepareFile(token, name, opts); }
                 when close[opnum](unsigned int opnum_, FileToken token, CkCallback closed)
-                  serial { doClose(token, closed); }
+                  serial { CkPrintf("in manager close\n");
+                  doClose(token, closed); }
               }
               serial { opnum++; }
             }
@@ -183,12 +188,15 @@ group[migratable] Manager
     entry void bufferReady() {
          while (true) {
             when sendData(int read_tag, int buffer_tag, size_t offset, size_t bytes, CProxy_ReadAssembler ra, int pe) {
-              serial{thisProxy[thisIndex].sendDataHandler(read_tag, buffer_tag, offset, bytes, ra, pe);}
+            
+              serial{
+                CkPrintf("Sending data from %d to %d\n", thisIndex, pe);
+                thisProxy[thisIndex].sendDataHandler(read_tag, buffer_tag, offset, bytes, ra, pe);}
             }         
          }
     }
 
-		entry [reductiontarget] void printTime(double time_taken);
+		entry [reductiontarget] void allReadsDone();
 	};
         
 	group Map :
