@@ -157,19 +157,11 @@ class Director : public CBase_Director
   // method called by the closeReadSession function from user
   void closeReadSession(Session read_session, CkCallback after_end)
   {
-    CkPrintf("Read session id: %d\n", read_session.sessionID);
-    CkPrintf("Printing manager test\n");
-    managers.testprint(0);
-
     CProxy_BufferChares(read_session.sessionID).ckDestroy();
-
-    CkPrintf("Reduction messgae\n");
     CkReductionMsg::buildNew(0, NULL, CkReduction::nop);
 
-    CkPrintf("sending\n");
     after_end.send(
         CkReductionMsg::buildNew(0, NULL, CkReduction::nop));  // invoke a callback
-    managers.testprint(2);
   }
 
   void prepareWriteSession_helper(FileToken file, size_t bytes, size_t offset,
@@ -253,9 +245,6 @@ class Director : public CBase_Director
 
   void close(FileToken token, CkCallback closed)
   {
-    CkPrintf("in director close: calling manager testprint and close with %d, %d\n",
-             opnum, token);
-    managers.testprint(1);
     managers.close(opnum++, token, closed);
     files.erase(token);
   }
@@ -331,7 +320,6 @@ public:
   void shareData(int read_tag, int buffer_tag, size_t read_chare_offset, size_t num_bytes,
                  char* data, CkNcpyBufferPost* ncpyPost)
   {
-    CkPrintf("Sharing data on pe=%d\n", CkMyPe());
     ncpyPost[0].regMode = CK_BUFFER_REG;
     ncpyPost[0].deregMode = CK_BUFFER_DEREG;
     CkMatchBuffer(ncpyPost, 0, buffer_tag);
@@ -340,8 +328,6 @@ public:
   void shareData(int read_tag, int buffer_tag, size_t read_chare_offset, size_t num_bytes,
                  char* data)
   {
-    CkPrintf("Sharing data on pe=%d\n", CkMyPe());
-
     ReadInfo& info = _read_info_buffer[read_tag];  // get the struct from the buffer tag
     info.bytes_left -= num_bytes;  // decrement the number of remaining bytes to read
     if (info.bytes_left)
@@ -550,7 +536,6 @@ public:
 
   void doClose(FileToken token, CkCallback closed)
   {
-    CkPrintf("In doclose\n");
     int fd = files[token].fd;
     if (fd != -1)
     {
