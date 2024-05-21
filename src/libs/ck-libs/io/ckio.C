@@ -158,7 +158,6 @@ class Director : public CBase_Director
   void closeReadSession(Session read_session, CkCallback after_end)
   {
     CProxy_BufferChares(read_session.sessionID).ckDestroy();
-    CkReductionMsg::buildNew(0, NULL, CkReduction::nop);
 
     after_end.send(
         CkReductionMsg::buildNew(0, NULL, CkReduction::nop));  // invoke a callback
