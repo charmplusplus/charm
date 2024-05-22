@@ -16,7 +16,12 @@ void testGetNewLine(Ck::IO::Session session, std::string fname){
 	std::string s2;
 	while(std::getline(ifs, s1)){
 		Ck::IO::getline(fr, s2);	
-		CkAssert(s1 == s2);
+		std::cout << "s1: " << s1 << "; s2: " << s2 << ";end of comparison line\n";
+		CkEnforce(s1 == s2);
+		if(s1 != s2){
+			CkPrintf("s1 and s2 are not equal.\n");
+			CkAbort("it's cooked");
+		}
 	}
 	CkAssert(fr.eof());
 	CkPrintf("All of the lines using Ck::IO::getline matched up!");

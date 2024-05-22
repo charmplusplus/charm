@@ -1148,15 +1148,15 @@ size_t FileReaderBuffer::capacity() {
 
 FileReaderBuffer::~FileReaderBuffer() { delete[] _buffer; }
 
-FileReader& getline(FileReader& fr, std::string res){
+FileReader& getline(FileReader& fr, std::string& res){
 	res.erase();
 	char next_c;
 	while(!fr.eof()){
 		fr.read(&next_c, 1);
-		res += (next_c);
 		if(next_c == '\n'){
 			return fr;
 		}
+		res += (next_c);
 	}
 	return fr;
 }
