@@ -23,7 +23,8 @@ void testGetNewLine(Ck::IO::Session session, std::string fname){
 			CkAbort("it's cooked");
 		}
 	}
-	CkAssert(fr.eof());
+	CkPrintf("%d, filereader_pos=%d\n", ifs.eof(), fr.tellg());
+	CkEnforce(fr.eof());
 	CkPrintf("All of the lines using Ck::IO::getline matched up!");
 
 }

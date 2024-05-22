@@ -1013,7 +1013,12 @@ FileReader& FileReader::read(char* buffer, size_t num_bytes_to_read)
   _curr_pos += amt_from_cache;
   if (amt_from_cache == num_bytes_to_read)
   {
-    return *this;
+  	if(_curr_pos >= (_offset + _num_bytes)){
+		_eofbit = true;
+		_curr_pos = _offset + _num_bytes;
+	}
+	_gcount = amt_from_cache;
+  	return *this;
   }
   size_t bytes_to_read_left = num_bytes_to_read - amt_from_cache;
   size_t bytes_to_read = std::min(
