@@ -7,7 +7,7 @@
 # Increment the second and third digits when making a minor feature release
 # Increment the first digit when making a major feature release
 
-AC_INIT([Charm++],[70000],[charm@cs.illinois.edu],[charm],[https://charm.cs.illinois.edu/])
+AC_INIT([Charm++],[80000],[charm@cs.illinois.edu],[charm],[https://charm.cs.illinois.edu/])
 
 AC_CONFIG_SRCDIR(./Makefile)
 
@@ -724,7 +724,7 @@ AC_MSG_CHECKING("Sequential C++ compiler as")
 AC_MSG_RESULT("$CMK_SEQ_CXX")
 
 # Needed to avoid migratable threads failing the stack check
-# See https://github.com/UIUC-PPL/charm/pull/3174 for details.
+# See https://github.com/charmplusplus/charm/pull/3174 for details.
 test_link "whether compiler accepts -fno-stack-protector" "ok" "no" "-fno-stack-protector"
 if test $strictpass -eq 1
 then
@@ -788,7 +788,7 @@ then
   echo "Charm++ requires C++11 support, but doesn't know the flag to enable it"
   echo
   echo "For Intel's compiler please see"
-  echo "https://github.com/UIUC-PPL/charm/issues/1560"
+  echo "https://github.com/charmplusplus/charm/issues/1560"
   echo "about making a suitable version of gcc/g++/libstdc++ available"
   test_finish 1
 fi
@@ -824,7 +824,7 @@ then
 fi
 
 # Needed so that tlsglobals works correctly with --build-shared
-# See https://github.com/UIUC-PPL/charm/issues/3168 for details.
+# See https://github.com/charmplusplus/charm/issues/3168 for details.
 test_cxx "whether C++ compiler accepts -ftls-model=initial-exec" "yes" "no" "-ftls-model=initial-exec"
 if test $strictpass -eq 1
 then

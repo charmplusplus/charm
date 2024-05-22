@@ -1,6 +1,6 @@
 # Charm++
 
-[![Build Status](https://travis-ci.org/UIUC-PPL/charm.svg?branch=main)](https://travis-ci.org/UIUC-PPL/charm)
+[![Build Status](https://travis-ci.org/charmplusplus/charm.svg?branch=main)](https://travis-ci.org/charmplusplus/charm)
 [![Documentation Status](https://readthedocs.org/projects/charm/badge/?version=latest)](https://charm.readthedocs.io/en/latest/?badge=latest)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3370873.svg)](https://doi.org/10.5281/zenodo.3370873)
 
@@ -18,7 +18,7 @@ Source code is provided, and non-commercial use is free.
 You can use anonymous Git access to obtain the latest Charm++ source
 code, as follows:
 
-     $ git clone https://github.com/UIUC-PPL/charm
+     $ git clone https://github.com/charmplusplus/charm
 
 
 ## Build Configuration
@@ -343,7 +343,7 @@ GitHub provides a detailed tutorial on creating pull requests
 Each pull request must pass code review and CI tests before it can be merged by someone on
 the core development team.
 Our wiki contains additional information about pull requests
-(https://github.com/UIUC-PPL/charm/wiki/Working-with-Pull-Requests).
+(https://github.com/charmplusplus/charm/wiki/Working-with-Pull-Requests).
 
 
 ## For More Information
@@ -357,7 +357,7 @@ The UIUC Parallel Programming Laboratory web page, with information
 on past and present research, is at https://charm.cs.illinois.edu
 
 For questions, comments, suggestions, improvements, or bug reports,
-please create an issue or discussion on our GitHub, https://github.com/UIUC-PPL/charm
+please create an issue or discussion on our GitHub, https://github.com/charmplusplus/charm
 
 
 ## Authors
@@ -365,24 +365,26 @@ please create an issue or discussion on our GitHub, https://github.com/UIUC-PPL/
 Charm++ was created and is maintained by the Parallel Programming Lab,
 in the Computer Science department at the University of Illinois at
 Urbana-Champaign.  Our managing professor is Dr. L.V. Kale; students
-and staff have included (in rough time order) Wennie Shu, Kevin Nomura, Wayne
-Fenton, Balkrishna Ramkumar, Vikram Saletore, Amitabh B. Sinha, Manish
-Gupta, Attila Gursoy, Nimish Shah, Sanjeev Krishnan, Jayant DeSouza,
-Parthasarathy Ramachandran, Jeff Wright, Michael Lang, Jackie Wang,
-Fang Hu, Michael Denardo, Joshua Yelon, Narain Jagathesan, Zehra Sura,
-Krishnan Varadarajan, Sameer Paranjpye, Milind Bhandarkar, Robert Brunner,
-Terry Wilmarth, Gengbin Zheng, Orion Lawlor, Celso Mendes, Karthik Mahesh,
-Neelam Saboo, Greg Koenig, Sameer Kumar, Sayantan Chakravorty, Chao Huang,
-Chee Lee, Fillipo Gioachin, Isaac Dooley, Abhinav Bhatele, Aaron Becker,
-Ryan Mokos, Ramprasad Venkataraman, Gagan Gupta, Pritish Jetley, Lukasz
+and staff have included (in rough time order) Wennie Shu, Kevin
+Nomura, Wayne Fenton, Balkrishna Ramkumar, Vikram Saletore, Amitabh
+B. Sinha, Manish Gupta, Attila Gursoy, Nimish Shah, Sanjeev Krishnan,
+Jayant DeSouza, Parthasarathy Ramachandran, Jeff Wright, Michael Lang,
+Jackie Wang, Fang Hu, Michael Denardo, Joshua Yelon, Narain
+Jagathesan, Zehra Sura, Krishnan Varadarajan, Sameer Paranjpye, Milind
+Bhandarkar, Robert Brunner, Terry Wilmarth, Gengbin Zheng, Orion
+Lawlor, Celso Mendes, Karthik Mahesh, Neelam Saboo, Greg Koenig,
+Sameer Kumar, Sayantan Chakravorty, Chao Huang, Chee Lee, Fillipo
+Gioachin, Isaac Dooley, Abhinav Bhatele, Aaron Becker, Ryan Mokos,
+Ramprasad Venkataraman, Gagan Gupta, Pritish Jetley, Lukasz
 Wesolowski, Esteban Meneses, Chao Mei, David Kunzman, Osman Sarood,
 Abhishek Gupta, Yanhua Sun, Ehsan Totoni, Akhil Langer, Cyril Bordage,
 Harshit Dokania, Prateek Jindal, Jonathan Lifflander, Xiang Ni,
 Harshitha Menon, Nikhil Jain, Vipul Harsh, Bilge Acun, Phil Miller,
-Seonmyeong Bak, Karthik Senthil, Juan Galvez, Michael Robson, Raghavendra
-Kanakagiri, and Venkatasubrahmanian Narayanan. Current developers include
-Eric Bohm, Ronak Buch, Eric Mikida, Sam White, Nitin Bhat, Kavitha
-Chandrasekar, Jaemin Choi, Matthias Diener, Evan Ramos, Justin Szaday,
-Zane Fink, and Pathikrit Ghosh.
+Seonmyeong Bak, Karthik Senthil, Juan Galvez, Michael Robson,
+Raghavendra Kanakagiri, Venkatasubrahmanian Narayanan. Nitin Bhat, and
+Justin Szaday. Current developers include: Eric Bohm, Ronak Buch, Eric
+Mikida, Sam White, Kavitha Chandrasekar, Jaemin Choi, Matthias Diener,
+Evan Ramos, Zane Fink, Pathikrit Ghosh, Maya Taylor, Aditya Bhosale,
+Mathew Jacob, Tom Vander Aa, and Thomas Quinn.
 
-Copyright (C) 1989-2023 Regents of the University of Illinois
+Copyright (C) 1989-2024 University of Illinois Board of Trustees

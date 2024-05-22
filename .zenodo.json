@@ -6,7 +6,10 @@
             "orcid": "0000-0001-9673-8445", 
             "affiliation": "University of Illinois", 
             "name": "Laxmikant Kale"
-        }, 
+        },
+	{
+	    "name": "Tom Vander Aa"
+	},
         {
             "name": "Bilge Acun"
         }, 
@@ -96,7 +99,10 @@
         }, 
         {
             "name": "Chao Huang"
-        }, 
+        },
+	{
+	    "name": "Mathew Jacob"
+	},
         {
             "name": "Narain Jagathesan"
         }, 
@@ -174,7 +180,10 @@
         }, 
         {
             "name": "Sameer Paranjpye"
-        }, 
+        },
+	{
+	    "name" : "Thomas Quinn"
+	}
         {
             "name": "Parthasarathy Ramachandran"
         }, 
@@ -216,7 +225,10 @@
         }, 
         {
             "name": "Justin Szaday"
-        }, 
+        },
+	{
+	    "name": "Maya Taylor"
+	}
         {
             "name": "Ehsan Totoni"
         }, 

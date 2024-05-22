@@ -16,7 +16,7 @@ cmake_minimum_required(VERSION 3.4...3.5)
 message("##################################################################")
 message("# The CMake build system may not support advanced build options. #")
 message("# Please let us know if you experience any problems by opening   #")
-message("# an issue on our GitHub (https://github.com/UIUC-PPL/charm),    #")
+message("# an issue on our GitHub (https://github.com/charmplusplus/charm)#")
 message("# with the below configuration information.                      #")
 message("# You can run './buildold' to use the previous build system.     #")
 message("##################################################################")
@@ -30,7 +30,7 @@ if(CMAKE_VERSION VERSION_GREATER 3.12 OR CMAKE_VERSION VERSION_EQUAL 3.12)
 endif()
 
 # Fortran is optional, so don't include it in LANGUAGES here
-project(Charm++ LANGUAGES CXX C ASM VERSION 7.0.0)
+project(Charm++ LANGUAGES CXX C ASM VERSION 8.0.0)
 
 find_package(Threads)
 find_package(OpenMP) # Do this before Fortran, in case we don't have a Fortran compiler
