@@ -1723,34 +1723,32 @@ void CsdSchedulerState_new(CsdSchedulerState_t *s)
 void *CsdNextMessage(CsdSchedulerState_t *s) {
 	void *msg;
 
-	s->iter++;
+  if ((*(s->localCounter))-- > 0) {
+    /* This avoids a race condition with migration detected by megatest*/
+    msg = CdsFifo_Dequeue(s->localQ);
+    if (msg != NULL) {
+#if CMI_QD
+        CpvAccess(cQdState)->mProcessed++;
+#endif
+        return msg;
+    }
+    CqsDequeue(s->schedQ, (void**)&msg);
+    if (msg != NULL)
+      return msg;
+  }
 
 #if CMK_NODE_QUEUE_AVAILABLE
- // we use nodeGrpFreq == 0 to mean
- // don't check NodeQ with high priority
- if (s->nodeGrpFreq && (0 == (s->iter % s->nodeGrpFreq)))
-	{
+  s->iter++;
+  // we use nodeGrpFreq == 0 to mean
+  // don't check NodeQ with high priority
+  if (s->nodeGrpFreq && (0 == (s->iter % s->nodeGrpFreq))) {
 	  msg = CmiGetNonLocalNodeQ();
 	  if (NULL != msg) return msg;
 	}
 #endif
-        if((*(s->localCounter))-- >0)
-	  {
-              /* This avoids a race condition with migration detected by megatest*/
-              msg=CdsFifo_Dequeue(s->localQ);
-              if (msg!=NULL)
-		{
-#if CMI_QD
-		  CpvAccess(cQdState)->mProcessed++;
-#endif
-		  return msg;	    
-		}
-              CqsDequeue(s->schedQ,(void **)&msg);
-              if (msg!=NULL) return msg;
-	  }
-	
+
 	*(s->localCounter)=CsdLocalMax;
-	if ( NULL!=(msg=CmiGetNonLocal()) || 
+	if ( NULL!=(msg=CmiGetNonLocal()) ||
 	     NULL!=(msg=CdsFifo_Dequeue(s->localQ)) ) {
 #if CMI_QD
             CpvAccess(cQdState)->mProcessed++;
