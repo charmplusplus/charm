@@ -162,7 +162,7 @@ EOF])
           [AC_DEFINE([HWLOC_SYM_TRANSFORM], [0])],
           [AC_DEFINE([HWLOC_SYM_TRANSFORM], [1])])
 
-    # Disabled for Charm++ due to https://github.com/UIUC-PPL/charm/issues/2606
+    # Disabled for Charm++ due to https://github.com/charmplusplus/charm/issues/2606
     # hwloc 2.0+ requires a C99 compliant compiler
     # AC_PROG_CC_C99 obsolete, detected inside AC_PROG_CC, since autoconf 2.70
     m4_version_prereq([2.70], [], [AC_PROG_CC_C99])

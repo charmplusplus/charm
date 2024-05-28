@@ -1129,8 +1129,8 @@ typedef struct {
   void *localQ;
   Queue nodeQ;
   Queue schedQ;
-  unsigned short iter; // counting number of sched iterations (hopefully of for it to roll over	 
-  unsigned short nodeGrpFreq; // call nodegroup queue once every nodeGrpFreq iterations with high prio
+  unsigned short iter;
+  unsigned short nodeGrpFreq;
   int *localCounter;
 #if CMK_OBJECT_QUEUE_AVAILABLE
   Queue objQ;

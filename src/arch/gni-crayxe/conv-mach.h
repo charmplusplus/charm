@@ -93,7 +93,7 @@ extended header must contain also another field called "pn" (phase number).
 */
 
 #undef CMK_ONESIDED_IMPL
-// Disable CMK_ONESIDED_IMPL until bug https://github.com/UIUC-PPL/charm/issues/2589 is fixed
+// Disable CMK_ONESIDED_IMPL until bug https://github.com/charmplusplus/charm/issues/2589 is fixed
 #define CMK_ONESIDED_IMPL                                  0
 
 #endif

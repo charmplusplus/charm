@@ -5,7 +5,7 @@
 if test -z "$USER_OPTS_LD"
 then
     CMK_INCDIR="-I/usr/include/"
-    CMK_LIBDIR="-L/usr/lib64/"
+#    CMK_LIBDIR="-L/usr/lib64/"
 fi
 
 CMK_LIBS="$CMK_LIBS -lfabric"
