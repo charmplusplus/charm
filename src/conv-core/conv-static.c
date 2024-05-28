@@ -4,7 +4,7 @@
 #include <stddef.h>
 
 /* __executable_start has symbol visibility type STV_HIDDEN */
-/* https://github.com/UIUC-PPL/charm/issues/1893 */
+/* https://github.com/charmplusplus/charm/issues/1893 */
 extern void* CmiExecutableStart;
 #if CMK_HAS_EXECUTABLE_START
 extern char __executable_start;

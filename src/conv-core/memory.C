@@ -1275,7 +1275,7 @@ void CmiFreeAligned(void* ptr) {
 
 
 // Replace remaining symbols found in glibc's malloc.o to avoid linker errors
-// See: https://github.com/UIUC-PPL/charm/issues/1325
+// See: https://github.com/charmplusplus/charm/issues/1325
 
 #if (CMK_MEMORY_BUILD_OS && CMK_MEMORY_BUILD_OS_WRAPPED && !CMK_MEMORY_BUILD_GNU_HOOKS) || !CMK_MEMORY_BUILD_OS
 
