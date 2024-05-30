@@ -1505,7 +1505,7 @@ void Entry::genIndexDecls(XStr& str) {
         << "(void* impl_msg, void* impl_obj);";
   } else {
     str << templateSpecLine << "\n    static void _call_" << epStr()
-        << "(void* impl_obj, double time);";
+        << "(void* impl_obj);";
   }
   str << templateSpecLine << "\n    static void _call_sdag_" << epStr()
       << "(void* impl_msg, void* impl_obj);";
@@ -2282,7 +2282,7 @@ void Entry::genDefs(XStr& str) {
   // Generate the call-method body
   if (isWhenIdle()) {
     str << makeDecl("void") << "::_call_" << epStr()
-        << "(void* impl_obj_void, double time)\n";
+        << "(void* impl_obj_void)\n";
     str << "{\n";
   } else {
     str << makeDecl("void") << "::_call_" << epStr()
@@ -2312,7 +2312,7 @@ void Entry::genDefs(XStr& str) {
     str << postCall;
     if (isThreaded() && param->isMarshalled()) str << "  delete impl_msg_typed;\n";
   } else if (isWhenIdle()) {
-    str << "  bool res = impl_obj->" << name << "(time);\n";
+    str << "  bool res = impl_obj->" << name << "();\n";
     str << "  if (res) CkCallWhenIdle(idx_" << epStr() << "(), impl_obj);\n";
   } else {
     str << "  CkAbort(\"This method should never be called as it refers to a LOCAL entry "
