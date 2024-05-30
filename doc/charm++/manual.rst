@@ -1,7 +1,7 @@
 =======================================
 The Charm++ Parallel Programming System
 =======================================
-
+ 
 .. contents::
    :depth: 3
 
