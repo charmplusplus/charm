@@ -2,7 +2,7 @@ version: 2.1
 jobs:
   NetLRTS-ARM64:
     machine:
-      image: ubuntu-2004:2022.04.1
+      image: ubuntu-2204:edge
     resource_class: arm.medium
 
     steps:
@@ -36,7 +36,7 @@ jobs:
 
   NetLRTS-ARM64-SMP:
     machine:
-      image: ubuntu-2004:2022.04.1
+      image: ubuntu-2204:edge
     resource_class: arm.medium
 
     steps:
@@ -70,7 +70,7 @@ jobs:
 
   MPI-ARM64:
     machine:
-      image: ubuntu-2004:2022.04.1
+      image: ubuntu-2204:edge
     resource_class: arm.medium
 
     steps:
