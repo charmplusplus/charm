@@ -1751,10 +1751,10 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
 	if ( NULL!=(msg=CmiGetNonLocal()) ||
 	     NULL!=(msg=CdsFifo_Dequeue(s->localQ)) ) {
 #if CMI_QD
-            CpvAccess(cQdState)->mProcessed++;
+		CpvAccess(cQdState)->mProcessed++;
 #endif
-            return msg;
-        }
+		return msg;
+  }
 #if CMK_GRID_QUEUE_AVAILABLE
 	/*#warning "CsdNextMessage: CMK_GRID_QUEUE_AVAILABLE" */
 	CqsDequeue (s->gridQ, (void **) &msg);
