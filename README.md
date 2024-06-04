@@ -385,6 +385,6 @@ Raghavendra Kanakagiri, Venkatasubrahmanian Narayanan. Nitin Bhat, and
 Justin Szaday. Current developers include: Eric Bohm, Ronak Buch, Eric
 Mikida, Sam White, Kavitha Chandrasekar, Jaemin Choi, Matthias Diener,
 Evan Ramos, Zane Fink, Pathikrit Ghosh, Maya Taylor, Aditya Bhosale,
-Mathew Jacob, Tom Vander Aa, and Thomas Quinn.
+Mathew Jacob, Tom Vander Aa, Thomas Quinn, and Ritvik Rao.
 
 Copyright (C) 1989-2024 University of Illinois Board of Trustees

@@ -1,7 +1,7 @@
 =======================================
 The Charm++ Parallel Programming System
 =======================================
-
+ 
 .. contents::
    :depth: 3
 
@@ -13498,7 +13498,10 @@ Acknowledgements
 
 -  Tom Vander Aa
 
--  Thomas Quinn.
+-  Thomas Quinn
+
+-  Ritvik Rao   
+
    
 .. [1]
    “Threaded” or “synchronous” methods are different. But even they do
