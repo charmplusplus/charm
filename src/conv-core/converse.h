@@ -1129,6 +1129,7 @@ typedef struct {
   void *localQ;
   Queue nodeQ;
   Queue schedQ;
+  unsigned short iter;
   int *localCounter;
 #if CMK_OBJECT_QUEUE_AVAILABLE
   Queue objQ;

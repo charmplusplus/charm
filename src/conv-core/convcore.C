@@ -1720,6 +1720,14 @@ void CsdSchedulerState_new(CsdSchedulerState_t *s)
  */
 void *CsdNextMessage(CsdSchedulerState_t *s) {
 	void *msg;
+  s->iter++;
+  #if CMK_NODE_QUEUE_AVAILABLE
+  if(s->iter%4==0) //every 4 scheduler messages
+  {
+	  msg = CmiGetNonLocalNodeQ();
+	  if (NULL != msg) return msg;
+	}
+  #endif
 	if((*(s->localCounter))-- >0)
 	  {
               /* This avoids a race condition with migration detected by megatest*/
