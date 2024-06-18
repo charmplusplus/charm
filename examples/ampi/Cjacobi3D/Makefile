@@ -1,7 +1,7 @@
 -include ../../common.mk
 -include ../../../include/conv-mach-opt.mak
 CHARMBASE=../../../
-CHARMC=../../../bin/ampicxx $(OPTS)
+CHARMC=../../../netlrts-linux-x86_64/bin/ampicxx $(OPTS)
 TOKENS=6
 
 -include $(CHARMBASE)/include/conv-mach-opt.mak
@@ -12,6 +12,7 @@ AMPI_TARGETS := \
   jacobi \
   jacobi.pup \
   jacobi-get \
+  jacobi.pie
 
 ifeq (1,$(CMK_SUPPORTS_TLSGLOBALS))
   AMPI_TARGETS += jacobi.tls
@@ -46,6 +47,10 @@ jacobi.iso: jacobi.C
 jacobi.tls: jacobi.C
 	$(CHARMC) -c -tlsglobals jacobi.C -o jacobi.tls.o
 	$(CHARMC) -o jacobi.tls jacobi.tls.o -tlsglobals
+
+jacobi.pie: jacobi-pie.C
+	$(CHARMC) -c -pieglobals jacobi-pie.C -o jacobi.pie.o
+	$(CHARMC) -o jacobi.pie jacobi.pie.o -pieglobals
 
 jacobi.rose: jacobi.C
 	$(CHARMC) -roseomptlsglobals -o jacobi.rose.o -c $<
@@ -93,5 +98,5 @@ endif
 
 
 clean:
-	rm -f *.o jacobi *~ moduleinit.C charmrun conv-host jacobi-cpp jacobi.iso jacobi-get jacobi.tls ampirun
+	rm -f *.o jacobi *~ moduleinit.C charmrun conv-host jacobi-cpp jacobi.iso jacobi-get jacobi.tls jacobi.pie ampirun
 	rm -rf 40 80 120

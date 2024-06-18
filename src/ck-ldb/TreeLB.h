@@ -6,6 +6,7 @@
 #include "BaseLB.h"
 #include "TreeLB.decl.h"
 #include "json.hpp"
+#include "manager.h"
 #include <vector>
 using json = nlohmann::json;
 
@@ -139,8 +140,18 @@ class TreeLB : public CBase_TreeLB
   {
     loadConfigFile(opts);
     init(opts);
+#if CMK_SHRINK_EXPAND
+	manager_init();
+#endif
   }
-  TreeLB(CkMigrateMessage* m) : CBase_TreeLB(m) {}
+
+  TreeLB(CkMigrateMessage* m) : CBase_TreeLB(m) 
+  {
+#if CMK_SHRINK_EXPAND
+		manager_init();
+#endif
+  }
+
   virtual ~TreeLB();
 
   void pup(PUP::er& p);
@@ -179,6 +190,16 @@ class TreeLB : public CBase_TreeLB
   void resumeClients();
 
   void reportLbTime(double* times, int n);
+
+  void resumeFromReallocCheckpoint();
+
+  void lb_done_impl();
+
+  void startCleanup();
+
+  void checkForRealloc();
+
+  void willIbekilled(std::vector<char> avail, int newnumProcessAfterRestart);
 
  private:
   void init(const CkLBOptions& opts);

@@ -37,14 +37,13 @@ extern "C" void charmrun_realloc(char *s);
 extern char willContinue;
 extern realloc_state pending_realloc_state;
 extern char * se_avail_vector;
-extern "C" int mynewpe;
+extern int mynewpe;
 extern char *_shrinkexpand_basedir;
-int numProcessAfterRestart;
-int mynewpe=0;
+extern int numProcessAfterRestart;
 #endif
 CkGroupID loadbalancer;
 int * lb_ptr;
-bool load_balancer_created;
+extern bool load_balancer_created;
 
 static void lbinit()
 {
@@ -1070,8 +1069,8 @@ void CentralLB::CheckForRealloc(){
 
 void CentralLB::ResumeFromReallocCheckpoint(){
 #if CMK_SHRINK_EXPAND
-    std::vector<char> avail(se_avail_vector.begin(), se_avail_vector.begin() + CkNumPes());
-    se_avail_vector.clear();
+    std::vector<char> avail(se_avail_vector, se_avail_vector + CkNumPes());
+    free(se_avail_vector);
     thisProxy.WillIbekilled(avail, numProcessAfterRestart);
 #endif
 }

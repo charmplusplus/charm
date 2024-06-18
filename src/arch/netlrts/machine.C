@@ -251,7 +251,7 @@ int _kq = -1;
 #if CMK_SHRINK_EXPAND
 extern void resumeAfterRealloc(void);
 extern char willContinue;
-extern int mynewpe;
+int mynewpe=0;
 extern int numProcessAfterRestart;
 CcsDelayedReply shrinkExpandreplyToken;
 extern char *_shrinkexpand_basedir;
