@@ -627,7 +627,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #else
     size_t size = (_Cmi_mynodesize + 6*actualNodeSize + 1)
       * sizeof(PPCAtomicState);
-#endif
+#endif //3
 
     void *atomic_buf;
     PPC_AtomicCounterAllocate(&atomic_buf, size);
@@ -654,10 +654,9 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 
 #if CMK_PPC_ATOMIC_MUTEX
     node_recv_mutex = PPCAtomicMutexInit(atomic_start, sizeof(PPCAtomicMutex));
-#endif
 #endif //End of CMK_PPC_ATOMIC_MUTEX
 
-#endif //End of SPECIFIC_PCQUEUE
+#endif //End of CMK_PPC_ATOMIC_QUEUE
 
 #endif //End of CMK_SMP
 
