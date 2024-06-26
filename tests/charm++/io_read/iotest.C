@@ -5,23 +5,28 @@
 #include <time.h>
 #include <vector>
 #include <string>
+#include <unistd.h>
+
 CProxy_Main mainproxy;
 std::string global_fname;
 
-
 void testGetNewLine(Ck::IO::Session session, std::string fname){
+	size_t num_lines_read = 0;
 	Ck::IO::FileReader fr(session);
 	std::ifstream ifs(fname, std::ifstream::in);
 	std::string s1;
 	std::string s2;
 	while(std::getline(ifs, s1)){
 		Ck::IO::getline(fr, s2);	
-		std::cout << "s1: " << s1 << "; s2: " << s2 << ";end of comparison line\n";
+		num_lines_read++;
+		CkPrintf("just read %zu lines. Current position in file is %zu.\n", num_lines_read, fr.tellg());
+		std::cout << " s1: " << s1 << "; s2: " << s2 << ";end of comparison line\n";
 		CkEnforce(s1 == s2);
 		if(s1 != s2){
 			CkPrintf("s1 and s2 are not equal.\n");
 			CkAbort("it's cooked");
 		}
+		sleep(0.5);
 	}
 	CkPrintf("%d, filereader_pos=%d\n", ifs.eof(), fr.tellg());
 	CkEnforce(fr.eof());

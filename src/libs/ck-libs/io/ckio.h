@@ -3,6 +3,7 @@
 
 #include <ckcallback.h>
 #include <cstring>
+#include <deque>
 #include <iostream>
 #include <pup.h>
 #include <string>
@@ -22,6 +23,14 @@ namespace Ck
 {
 namespace IO
 {
+
+struct LineRecord {
+	std::string line;
+	long start_byte;
+	long end_byte;
+	size_t num_bytes_consumed;
+};
+
 /// Note: The values in options are not currently a stable or working interface.
 /// Users should not set anything in them.
 struct Options
@@ -248,7 +257,7 @@ public:
  */
 class FileReaderBuffer
 {
-  size_t _buff_capacity = 4096;  // the size of the buffer array
+  size_t _buff_capacity = 1024 * 1024 * 1024;  // the size of the buffer array
   size_t _buff_size = 0;         // the number of valid elements in the array
   size_t _offset = 0;            // the offset byte
   char* _buffer;
@@ -304,12 +313,17 @@ class FileReader
   bool _eofbit = false;
   size_t _gcount = 0;
   FileReaderBuffer _data_cache;
+  std::deque<LineRecord> _records;
   bool _status = true;
+  size_t num_read_reqs = 0;
+  size_t full_cache_hits = 0;
 
 public:
   std::ios_base::seekdir end = std::ios_base::end;
   std::ios_base::seekdir cur = std::ios_base::cur;
   std::ios_base::seekdir beg = std::ios_base::beg;
+  // use to print stats about the FileReader
+  void printStats();
   /**
    * @arg Session: the session token the FileReader will use
    */
@@ -375,6 +389,14 @@ public:
    * @return bool: false
    */
   bool operator!() const;
+
+  /**
+   * Used by the getline function
+   *
+   */
+   std::string getline();
+
+   
 };
 
   FileReader& getline(FileReader&, std::string&); 

@@ -1003,6 +1003,7 @@ FileReader::FileReader(Ck::IO::Session session)
 
 FileReader& FileReader::read(char* buffer, size_t num_bytes_to_read)
 {
+  num_read_reqs++;
   if (_eofbit)
   {  // no more bytes to read
     _gcount = 0;
@@ -1013,11 +1014,13 @@ FileReader& FileReader::read(char* buffer, size_t num_bytes_to_read)
   _curr_pos += amt_from_cache;
   if (amt_from_cache == num_bytes_to_read)
   {
+  	
   	if(_curr_pos >= (_offset + _num_bytes)){
 		_eofbit = true;
 		_curr_pos = _offset + _num_bytes;
 	}
 	_gcount = amt_from_cache;
+	full_cache_hits++;
   	return *this;
   }
   size_t bytes_to_read_left = num_bytes_to_read - amt_from_cache;
@@ -1032,9 +1035,12 @@ FileReader& FileReader::read(char* buffer, size_t num_bytes_to_read)
   char* tmp_data_buff =
       new char[bytes_to_read];  // temporary buffer that will hold all the data
   ReadCompleteMsg* read_msg;
+  double start = CkWallTimer();
   Ck::IO::read(_session_token, bytes_to_read, _curr_pos, tmp_data_buff,
                CkCallbackResumeThread((void*&)read_msg));
   // below will not get executed until the read is done
+  double end = CkWallTimer();
+  CkPrintf("To read %zu bytes from %zu, it took %f seconds\n", bytes_to_read, _curr_pos, (end - start));
   size_t bytes_read = read_msg->bytes;
   if (bytes_read > bytes_to_read_left)
   {
@@ -1153,17 +1159,83 @@ size_t FileReaderBuffer::capacity() {
 
 FileReaderBuffer::~FileReaderBuffer() { delete[] _buffer; }
 
+void FileReader::printStats(){
+	CkPrintf("Number of read requests: %zu; Number of cache hits: %zu\n", num_read_reqs, full_cache_hits);
+}
+
 FileReader& getline(FileReader& fr, std::string& res){
-	res.erase();
-	char next_c;
-	while(!fr.eof()){
-		fr.read(&next_c, 1);
-		if(next_c == '\n'){
-			return fr;
-		}
-		res += (next_c);
-	}
+	std::string next_line = fr.getline();
+	res = next_line;
+	std::cout << res << std::endl;
 	return fr;
+	//char next_c;
+	//while(!fr.eof()){
+	//	fr.read(&next_c, 1);
+	//	if(next_c == '\n'){
+	//		return fr;
+	//	}
+	//	res += (next_c);
+	//}
+	//return fr;
+}
+
+std::string FileReader::getline(){
+	size_t temp_pos = _curr_pos;
+	// check the cache and if you already have th next line
+	while(!_records.empty()){
+		LineRecord record = _records.front();
+		_records.pop_front();
+		if(record.start_byte <= temp_pos && temp_pos < record.end_byte){
+			std::string res = record.line.substr(temp_pos - record.start_byte);	
+			_curr_pos += record.num_bytes_consumed; // make sure we add an extra byte for the newline that we consumed
+			return res;
+		}
+	}
+	// missed in the record cache, manually find it 
+	std::string curr_line;
+	size_t num_lines = 0;
+	size_t curr_start = temp_pos;
+	while(!_eofbit){
+		char buffer[4 * 1024 * 1024];	
+		this -> read(buffer, 4 * 1024 * 1024);
+		size_t num_bytes_read = gcount();
+		if(num_bytes_read == 0) break;
+		for(int i = 0; i < num_bytes_read; ++i){
+			if(buffer[i] == '\n'){
+				// the record creation
+				LineRecord record;
+				record.line = curr_line;
+				record.start_byte = curr_start;
+				record.end_byte = curr_start + record.line.size();
+				record.num_bytes_consumed = curr_line.size() + 1;
+				_records.push_back(record);
+				curr_line.clear();
+				num_lines++;
+				curr_start = temp_pos + record.num_bytes_consumed;
+			} else {
+				curr_line += buffer[i];
+			}
+		}
+		// reached the end of the buffer; if we have no new lines, continue searching 
+		if(num_lines > 0) break;
+	}
+	if(_eofbit & gcount()){
+		LineRecord record;
+		record.line = curr_line;
+		record.start_byte = curr_start;
+		record.end_byte = curr_start + record.line.size();
+		record.num_bytes_consumed = curr_line.size();
+		_records.push_back(record);
+	}
+	// either went through the remaining file and no new lines, or we have a newline to return
+	seekg(temp_pos);
+	if(_records.empty()){
+		return std::string();
+	}
+	LineRecord front_record = _records.front();
+	_records.pop_front();
+	seekg(temp_pos + front_record.num_bytes_consumed); // add an extra line for the new lien
+	return front_record.line; 
 }
 
 }  // namespace IO
