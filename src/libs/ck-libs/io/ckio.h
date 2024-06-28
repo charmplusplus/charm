@@ -8,6 +8,7 @@
 #include <pup.h>
 #include <string>
 #include <vector>
+#include <queue>
 
 #include "CkIO.decl.h"
 
@@ -313,7 +314,7 @@ class FileReader
   bool _eofbit = false;
   size_t _gcount = 0;
   FileReaderBuffer _data_cache;
-  std::deque<LineRecord> _records;
+  std::queue<LineRecord> _records;
   bool _status = true;
   size_t num_read_reqs = 0;
   size_t full_cache_hits = 0;

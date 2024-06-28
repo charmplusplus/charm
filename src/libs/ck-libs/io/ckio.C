@@ -883,6 +883,8 @@ public:
     size_t chare_offset;
     size_t chare_bytes;
 
+    //ckout << "Check if read is right or left" << endl;
+    //ckout << "Bytes: " << bytes << endl;
     if (offset >= (_my_offset + _my_bytes))
       return;  // read call starts to the right of this chare
 
@@ -901,7 +903,10 @@ public:
             _my_offset + _my_bytes);  // the last byte, exclusive, this chare should read
     size_t bytes_to_read = end_byte_chare - chare_offset;
 
-    char* buffer = _buffer.get();  // future call to get
+    //ckout << "Call get on buffer" << endl;
+    //char* buffer = _buffer.get();  // future call to get
+    auto buffer = _buffer.get(); 
+    //ckout << "Share data" << endl;
     CProxy_ReadAssembler(ra)[pe].shareData(
         read_tag, buffer_tag, chare_offset, bytes_to_read,
         CkSendBuffer(buffer +
@@ -1166,7 +1171,7 @@ void FileReader::printStats(){
 FileReader& getline(FileReader& fr, std::string& res){
 	std::string next_line = fr.getline();
 	res = next_line;
-	std::cout << res << std::endl;
+	//std::cout << res << std::endl;
 	return fr;
 	//char next_c;
 	//while(!fr.eof()){
@@ -1184,11 +1189,16 @@ std::string FileReader::getline(){
 	// check the cache and if you already have th next line
 	while(!_records.empty()){
 		LineRecord record = _records.front();
-		_records.pop_front();
+		_records.pop();
+    //ckout << "This record: " << record.line.c_str() << endl;
+    //ckout << "Begin: " << record.start_byte << endl;
+    //ckout << "End: " << record.end_byte << endl;
+    //ckout << "Bytes consumed: " << record.num_bytes_consumed << endl;
 		if(record.start_byte <= temp_pos && temp_pos < record.end_byte){
-			std::string res = record.line.substr(temp_pos - record.start_byte);	
-			_curr_pos += record.num_bytes_consumed; // make sure we add an extra byte for the newline that we consumed
-			return res;
+      std::string res = record.line;
+			//_curr_pos += record.num_bytes_consumed; // make sure we add an extra byte for the newline that we consumed;
+			seekg(temp_pos + record.num_bytes_consumed);
+      return res;
 		}
 	}
 	// missed in the record cache, manually find it 
@@ -1204,28 +1214,33 @@ std::string FileReader::getline(){
 			if(buffer[i] == '\n'){
 				// the record creation
 				LineRecord record;
+        //CkPrintf("Current line: %s\n", curr_line.c_str());
 				record.line = curr_line;
 				record.start_byte = curr_start;
 				record.end_byte = curr_start + record.line.size();
 				record.num_bytes_consumed = curr_line.size() + 1;
-				_records.push_back(record);
+        //ckout << "Adding to record: " << record.line.c_str() << endl;
+				_records.push(record);
 				curr_line.clear();
 				num_lines++;
-				curr_start = temp_pos + record.num_bytes_consumed;
+				curr_start += record.num_bytes_consumed;
 			} else {
-				curr_line += buffer[i];
+				curr_line.push_back(buffer[i]);
 			}
 		}
 		// reached the end of the buffer; if we have no new lines, continue searching 
 		if(num_lines > 0) break;
 	}
-	if(_eofbit & gcount()){
+  if(_eofbit) ckout << "EOF found" << endl;
+	if(_eofbit && gcount()){
+    ckout << "End of file" << endl;
 		LineRecord record;
 		record.line = curr_line;
 		record.start_byte = curr_start;
 		record.end_byte = curr_start + record.line.size();
 		record.num_bytes_consumed = curr_line.size();
-		_records.push_back(record);
+    ckout << "Last line: " << record.line.c_str() << endl;
+		_records.push(record);
 	}
 	// either went through the remaining file and no new lines, or we have a newline to return
 	seekg(temp_pos);
@@ -1233,8 +1248,11 @@ std::string FileReader::getline(){
 		return std::string();
 	}
 	LineRecord front_record = _records.front();
-	_records.pop_front();
+	_records.pop();
 	seekg(temp_pos + front_record.num_bytes_consumed); // add an extra line for the new lien
+  //ckout << "Returning: " << front_record.line.c_str() << endl;
+  //ckout << "Current position at end of getline, cache miss: " << _curr_pos << endl;
+  //ckout << "Next record: " << _records.front().line.c_str() << endl;
 	return front_record.line; 
 }
 
