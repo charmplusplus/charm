@@ -12,7 +12,7 @@ Test::Test() {
 
 void Test::registerIdleWork() {
     CkPrintf("[TEST] Registering Idle Work.\n");
-    CkCallWhenIdle(CkIndex_Test::idleProgress(0), this);
+    CkCallWhenIdle(CkIndex_Test::idleProgress(), this);
 }
 
 bool Test::idleProgress() {

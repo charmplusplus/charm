@@ -1,5 +1,58 @@
 This file describes the most significant changes. For more detail, use
 'git log' on a clone of the charm repository.
+================================================================================
+What's new in Charm++ 8.0.0
+================================================================================
+
+This is a feature release, with the following major changes:
+
+Highlights:
+
+- The License has changed to Apache 2.0 with LLVM exception.  This
+  change to a popular Open Source license is intended to simplify use,
+  collaboration, and greater community involvement in the development
+  of Charm++. The NOTICE file contains the pertinent disclaimers.
+
+- The CkIO library (previously only supporting file output) has been
+  enhanced to support file input. The input layer enables two-phase,
+  collective input from a single file via an array of buffer chares,
+  which read from the file system and buffer data until the application 
+  requests it. As of this release, the number of buffer chares is 
+  not automated by CkIO, and the user is responsible for selecting 
+  the input decomposition for best performance.
+
+- The OFI layer has been extended to support the CXI (Cassini)
+  extensions for Slingshot-11.  This can be accessed by adding the cxi
+  parameter to the build line and allows for greatly improved
+  performance on machines such as (Frontier, Perlmutter, Delta) at
+  larger node counts.  Adding cxi as a build parameter is not
+  necessary on most Slingshot-11 installations, as it will be
+  autodetected.
+
+- Added support for NVIDIA's nvc/nvfortran compilers and Intel's new
+  icx/ifx compilers.
+
+- Fixed a bug in location management when doing dynamic insertion and
+  deletion of chare array elements.
+
+- Deprecated the "atomic" keyword in SDAG code (in favor of "serial").
+
+- Added support for TLSglobals on Apple ARM systems and the ability to
+  disable TLSglobals support at build-time.
+
+- Performance optimizations for node group broadcasts.
+
+- Added CMI-SHMEM module for optimizing small/medium-sized messages
+  between processes on the same host.
+
+- Fixed demand creation via ckcallback::send and enabled passing
+  options to ckcallback::send.
+
+- Improved portability and usability of AMPI's automatic global
+  variable privatization methods.
+
+- Transferred organization ownership of the repository on github from
+  UIUC-PPL to charmplusplus. 
 
 ===============================================================================
 What's new in Charm++ 7.0.1
@@ -48,10 +101,10 @@ Misc:
   for more information.
 
 - Charm++'s development branch has been renamed from 'master' to 'main'. Please see
-  https://github.com/UIUC-PPL/charm/pull/3303 for details.
+  https://github.com/charmplusplus/charm/pull/3303 for details.
 
 - We have adopted GitHub discussions
-  (https://github.com/UIUC-PPL/charm/discussions) as the preferred
+  (https://github.com/charmplusplus/charm/discussions) as the preferred
   venue for Charm++ questions and discussions instead of the
   charm@cs.illinois.edu mailing list.
 
@@ -193,7 +246,7 @@ Misc:
 
 - We have moved bug/issue tracking from Redmine to GitHub, and code
   review from Gerrit to GitHub. Our GitHub repository is at:
-  https://github.com/UIUC-PPL/charm .
+  https://github.com/charmplusplus/charm .
   
 - As a preview feature, Charm++ can now be built with CMake (version 3.4 or higher).
   To try it, you can replace your `./build` command with `./buildcmake`, which supports
@@ -214,10 +267,10 @@ Known Issues:
 
 - Recent InfiniBand machines crash in SMP builds due to problems in the verbs layer implementation.
   Users are recommended to use UCX for the time being if possible.
-  (https://github.com/UIUC-PPL/charm/issues/2532)
+  (https://github.com/charmplusplus/charm/issues/2532)
   
 - UCX sometimes hangs/crashes on Frontera.
-  (https://github.com/UIUC-PPL/charm/issues/2635, https://github.com/UIUC-PPL/charm/issues/2636)
+  (https://github.com/charmplusplus/charm/issues/2635, https://github.com/charmplusplus/charm/issues/2636)
 
 Charm++ Features & Fixes:
 

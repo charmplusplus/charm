@@ -1,7 +1,7 @@
 =======================================
 The Charm++ Parallel Programming System
 =======================================
-
+ 
 .. contents::
    :depth: 3
 
@@ -8728,7 +8728,7 @@ can take action (such as a callback) when all the tasks
 arising recursively from a set of fired objects, so you know when they are all done.
 
 An example program illustrating this feature is in
-https://github.com/UIUC-PPL/pgms/tree/main/charm%2B%2B/tasksWithRing,
+https://github.com/charmplusplus/pgms/tree/main/charm%2B%2B/tasksWithRing,
 which illustrates concurrent execution
 of tasks with regular Charm++ messages. Another example that illustrates the utility of tasks
 for within-node load balancing is in pgms/testTasks.
@@ -11422,7 +11422,7 @@ Charm++ can be downloaded using one of the following methods:
 
 -  From source archive - The latest development version of Charm++ can
    be downloaded from our source archive using *git clone
-   https://github.com/UIUC-PPL/charm*.
+   https://github.com/charmplusplus/charm*.
 
 If you download the source code from the website, you will have to
 unpack it using a tool capable of extracting gzip’d tar files, such as
@@ -13488,6 +13488,19 @@ Acknowledgements
 
 -  Zheng Shao
 
+-  Maya Taylor
+
+-  Aditya Bhosale
+
+-  Mathew Jacob
+
+-  Tom Vander Aa
+
+-  Thomas Quinn
+
+-  Ritvik Rao   
+
+   
 .. [1]
    “Threaded” or “synchronous” methods are different. But even they do
    not lead to pre-emption; only to cooperative multi-threading
