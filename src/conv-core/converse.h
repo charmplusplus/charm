@@ -1259,6 +1259,7 @@ void     CmiLookupGroup(CmiGroup grp, int *npes, int **pes);
 }
 
 void CmiPushPE(int, void*);
+void CmiPushPEExtern(int, void*);
 #if CMK_OMP
 void          CmiSuspendedTaskEnqueue(int targetRank, void *msg);
 void      *   CmiSuspendedTaskPop(void);

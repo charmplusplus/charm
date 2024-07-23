@@ -549,7 +549,8 @@ static void CUDACallback(void *data) {
   // send message to the original PE
   char *conv_msg = (char*)data;
   int dstRank = *((int *)(conv_msg + CmiMsgHeaderSizeBytes));
-  CmiPushPE(dstRank, conv_msg);
+
+  CmiPushPEExtern(dstRank, conv_msg);
 }
 
 enum CallbackStage {

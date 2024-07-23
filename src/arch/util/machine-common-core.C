@@ -250,6 +250,7 @@ static void SendToPeers(int size, char *msg);
 
 
 void CmiPushPE(int rank, void *msg);
+void CmiPushPEExtern(int rank, void *msg);
 
 #if CMK_NODE_QUEUE_AVAILABLE
 void CmiPushNode(void *msg);
@@ -475,6 +476,39 @@ void CmiPushPE(int rank,void *msg) {
 #endif
     CmiIdleLock_addMessage(&cs->idle);
     MACHSTATE1(3,"} Pushing message into rank %d's queue done",rank);
+}
+
+void CmiPushPEExtern(int rank, void* msg)
+{
+  CmiState cs = CmiGetStateN(rank);
+  MACHSTATE2(3, "Pushing message from external source into rank %d's queue %p{", rank,
+             cs->recv);
+
+#if CMK_IMMEDIATE_MSG
+  if (CmiIsImmediate(msg))
+  {
+    MACHSTATE(3, "[Extern] Push Immediate Message begin{");
+    CMI_DEST_RANK(msg) = rank;
+    CmiPushImmediateMsg(msg);
+    MACHSTATE(3, "[Extern] Push Immediate Message end}");
+    return;
+  }
+#endif
+
+#if CMK_MACH_SPECIALIZED_QUEUE
+  LrtsSpecializedQueuePush(rank, msg);
+#elif CMK_SMP_MULTIQ
+  CMIQueuePush(cs->recv[CmiGetState()->myGrpIdx],
+               (char*)msg);  // TODO: CmiGetState() usage here is unsafe/incorrect
+#else
+  CMIQueuePush(cs->recv, (char*)msg);
+#endif
+
+#if CMK_SHARED_VARS_POSIX_THREADS_SMP
+  if (_Cmi_sleepOnIdle)
+#endif
+    CmiIdleLock_addMessage(&cs->idle);
+  MACHSTATE1(3, "} Pushing message into rank %d's queue done", rank);
 }
 
 #if CMK_OMP
