@@ -817,6 +817,20 @@ TopologyRequest proc_per;
 TopologyRequest onewth_per;
 int auto_provision;
 
+#define BLOCK 1000
+
+void print_nodelist(){
+    FILE *f=fopen("/etc/mpi/hostfile","r");
+    char c;
+    c = fgetc(f); 
+    while (c != EOF) {
+      printf ("%c", c); 
+      c = fgetc(f); 
+    } 
+    fclose(f);
+}
+
+
 static void arg_init(int argc, const char **argv)
 {
   static char buf[1024];
@@ -965,6 +979,8 @@ static void arg_init(int argc, const char **argv)
   if (arg_shrinkexpand) {
     arg_requested_pes = arg_realloc_pes;
     printf("\n \nCharmrun> %d Reallocated pes\n \n", arg_requested_pes);
+
+    print_nodelist();
   }
 #endif
 
