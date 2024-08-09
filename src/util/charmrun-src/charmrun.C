@@ -32,6 +32,11 @@
 #include <utility>
 #include <algorithm>
 
+#include <regex>
+#include <iostream>
+#include <fstream>
+#include <string>
+
 #if defined(_WIN32)
 /*Win32 has screwy names for the standard UNIX calls:*/
 #define getcwd _getcwd
@@ -779,6 +784,7 @@ static int arg_server_port = 0;
 static const char *arg_server_auth = NULL;
 static int replay_single = 0;
 
+static const char* new_hostfile = "/etc/mpi/hostfileScaled";
 
 struct TopologyRequest
 {
@@ -820,7 +826,7 @@ int auto_provision;
 #define BLOCK 1000
 
 void print_nodelist(){
-    FILE *f=fopen("/etc/mpi/hostfile","r");
+    FILE *f=fopen("/etc/mpi/hostfileScaled","r");
     char c;
     c = fgetc(f); 
     while (c != EOF) {
@@ -830,6 +836,40 @@ void print_nodelist(){
     fclose(f);
 }
 
+void write_hostfile(int numProcesses) 
+{
+    std::ifstream infile("/etc/mpi/hostfile");
+    std::string sLine;
+    getline(infile, sLine);
+    printf("Line = %s\n", sLine.c_str());
+    std::regex rgx("host (.*)-worker-(\\d+)\\.(.*) \\+\\+cpus (\\d+)");
+    std::smatch match;
+    char hostStr[200];
+
+    if (std::regex_search(sLine, match, rgx))
+    {
+        std::string name = match[1];
+        std::string suffix = match[3];
+        int slots = std::stoi(match[4]);
+
+        infile.close();
+
+        std::ofstream outfile("/etc/mpi/hostfileScaled");
+
+        for (int i = 0; i < numProcesses; i++)
+        {
+            sprintf(hostStr, "host %s-worker-%i.%s ++cpus %i\n", name.c_str(), i, suffix.c_str(), slots);
+            printf("Writing: %s\n", hostStr);
+            outfile << hostStr;
+        }
+
+        outfile.close();
+    }
+    else
+    {
+        printf("Error parsing hostfile regex\n");
+    }
+}
 
 static void arg_init(int argc, const char **argv)
 {
@@ -978,9 +1018,11 @@ static void arg_init(int argc, const char **argv)
 #if CMK_SHRINK_EXPAND
   if (arg_shrinkexpand) {
     arg_requested_pes = arg_realloc_pes;
+    //arg_nodelist = "/etc/mpi/hostfileScaled";
+    write_hostfile(arg_requested_pes);
     printf("\n \nCharmrun> %d Reallocated pes\n \n", arg_requested_pes);
-
     print_nodelist();
+    //arg_nodelist = new_hostfile;
   }
 #endif
 
