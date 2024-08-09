@@ -12,6 +12,10 @@
 #include "CentralLB.h"
 #include "converse.h"
 #include "conv-ccs.h"
+#include <regex>
+#include <iostream>
+#include <fstream>
+#include <string>
 
 #if CMK_SHRINK_EXPAND
 realloc_state pending_realloc_state;
@@ -22,9 +26,50 @@ extern "C" char willContinue;
 char willContinue;
 #endif
 bool load_balancer_created;
+
+void write_hostfile(int numProcesses) 
+{
+    std::ifstream infile("/etc/mpi/hostfile");
+
+    if (infile.good())
+    {
+        std::string sLine;
+        getline(infile, sLine);
+        std::regex rgx("host (.*)-worker-(\\d) ++cpus (\\d)");
+        std::smatch match;
+        char hostStr[200];
+
+        if (std::regex_search(sLine, match, rgx, std::regex_constants::match_default))
+        {
+            std::string name = match[0];
+            int slots = std::stoi(match[2]);
+
+            infile.close();
+
+            std::ofstream outfile("/etc/mpi/hostfile");
+
+            for (int i = 0; i < numProcesses; i++)
+            {
+                sprintf(hostStr, "host %s-worker-%i ++cpus %i\n", name.c_str(), i, slots);
+                outfile << hostStr;
+            }
+        }
+        else
+        {
+            printf("Error parsing hostfile regex\n");
+        }
+    }
+    else
+    {
+        printf("Error opening hostfile\n");
+    }
+
+}
+
 static void handler(char *bit_map)
 {
 #if CMK_SHRINK_EXPAND
+    printf("Charm> Rescaling called!\n");
     shrinkExpandreplyToken = CcsDelayReply();
     bit_map += CmiMsgHeaderSizeBytes;
     pending_realloc_state = REALLOC_MSG_RECEIVED;
@@ -36,6 +81,8 @@ static void handler(char *bit_map)
     LBManagerObj()->get_avail_vector(se_avail_vector);
 
     numProcessAfterRestart = *((int *)(bit_map + CkNumPes()));
+
+    write_hostfile(numProcessAfterRestart);
 #endif
 }
 
