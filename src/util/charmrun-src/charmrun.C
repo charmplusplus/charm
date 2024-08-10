@@ -784,7 +784,6 @@ static int arg_server_port = 0;
 static const char *arg_server_auth = NULL;
 static int replay_single = 0;
 
-static const char* new_hostfile = "/etc/mpi/hostfileScaled";
 
 struct TopologyRequest
 {
@@ -826,7 +825,7 @@ int auto_provision;
 #define BLOCK 1000
 
 void print_nodelist(){
-    FILE *f=fopen("/etc/mpi/hostfileScaled","r");
+    FILE *f=fopen("/etc/mpi/hostfile","r");
     char c;
     c = fgetc(f); 
     while (c != EOF) {
@@ -854,7 +853,7 @@ void write_hostfile(int numProcesses)
 
         infile.close();
 
-        std::ofstream outfile("/etc/mpi/hostfileScaled");
+        std::ofstream outfile("/etc/mpi/hostfile");
 
         for (int i = 0; i < numProcesses; i++)
         {
@@ -1018,11 +1017,10 @@ static void arg_init(int argc, const char **argv)
 #if CMK_SHRINK_EXPAND
   if (arg_shrinkexpand) {
     arg_requested_pes = arg_realloc_pes;
-    //arg_nodelist = "/etc/mpi/hostfileScaled";
     write_hostfile(arg_requested_pes);
     printf("\n \nCharmrun> %d Reallocated pes\n \n", arg_requested_pes);
+
     print_nodelist();
-    //arg_nodelist = new_hostfile;
   }
 #endif
 
