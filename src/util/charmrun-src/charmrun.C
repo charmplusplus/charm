@@ -1038,10 +1038,7 @@ static void arg_init(int argc, const char **argv)
   saved_argv = (char **) malloc(sizeof(char *) * (saved_argc));
   for (int i = 0; i < saved_argc; i++) {
     //  MACHSTATE1(2,"Parameters %s",Cmi_argvcopy[i]);
-    if (strcmp(saved_argv[i], "+nodelist") == 0)
-      strcpy(saved_argv[i], "/app/hostfile");
-    else
-      saved_argv[i] = (char *) argv[i];
+    saved_argv[i] = (char *) argv[i];
   }
 #endif
 
@@ -1067,7 +1064,7 @@ static void arg_init(int argc, const char **argv)
     //wait_hostfile(arg_requested_nodes);
     printf("\n \nCharmrun> %d Reallocated pes\n \n", arg_requested_pes);
     print_nodelist();
-    //arg_nodelist = new_hostfile;
+    arg_nodelist = new_hostfile;
   }
 #endif
 
