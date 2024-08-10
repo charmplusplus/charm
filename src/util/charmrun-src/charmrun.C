@@ -784,6 +784,7 @@ static int arg_server_port = 0;
 static const char *arg_server_auth = NULL;
 static int replay_single = 0;
 
+static const char* new_hostfile = "/etc/mpi/hostfileScaled";
 
 struct TopologyRequest
 {
@@ -863,6 +864,8 @@ void write_hostfile(int numProcesses)
         }
 
         outfile.close();
+
+        print_nodelist();
     }
     else
     {
@@ -1017,10 +1020,11 @@ static void arg_init(int argc, const char **argv)
 #if CMK_SHRINK_EXPAND
   if (arg_shrinkexpand) {
     arg_requested_pes = arg_realloc_pes;
+    //arg_nodelist = "/etc/mpi/hostfileScaled";
     write_hostfile(arg_requested_pes);
     printf("\n \nCharmrun> %d Reallocated pes\n \n", arg_requested_pes);
-
     print_nodelist();
+    //arg_nodelist = new_hostfile;
   }
 #endif
 
