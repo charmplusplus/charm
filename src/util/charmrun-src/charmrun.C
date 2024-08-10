@@ -826,7 +826,7 @@ int auto_provision;
 #define BLOCK 1000
 
 void print_nodelist(){
-    FILE *f=fopen("/etc/mpi/hostfile","r");
+    FILE *f=fopen("/app/hostfile","r");
     char c;
     c = fgetc(f); 
     while (c != EOF) {
@@ -836,9 +836,46 @@ void print_nodelist(){
     fclose(f);
 }
 
+int count_num_slots()
+{
+  std::ifstream infile("/app/hostfile");
+  std::string sLine;
+  
+  std::regex rgx("host (.*)-worker-(\\d+)\\.(.*) \\+\\+cpus (\\d+)");
+  std::smatch match;
+  int total_slots = 0;
+
+  printf("Counting slots in hostfile\n");
+
+  while(getline(infile, sLine))
+  {
+    if (std::regex_search(sLine, match, rgx))
+    {
+      total_slots += std::stoi(match[4]);
+    }
+    else
+    {
+      printf("Error parsing hostfile regex\n");
+      return 0;
+    }
+  }
+  printf("Total slots = %d\n", total_slots);
+  std::cout << std::flush;
+  return total_slots;
+}
+
+void wait_hostfile(int numProcs)
+{
+  int i = 0;
+  while (count_num_slots() != numProcs) 
+  {
+    sleep(1 << i++);
+  }
+}
+
 void write_hostfile(int numProcesses) 
 {
-    std::ifstream infile("/etc/mpi/hostfile");
+    std::ifstream infile("/app/hostfile");
     std::string sLine;
     getline(infile, sLine);
     printf("Line = %s\n", sLine.c_str());
@@ -854,7 +891,7 @@ void write_hostfile(int numProcesses)
 
         infile.close();
 
-        std::ofstream outfile("/etc/mpi/hostfile");
+        std::ofstream outfile("/app/hostfile");
 
         for (int i = 0; i < numProcesses; i++)
         {
@@ -863,6 +900,7 @@ void write_hostfile(int numProcesses)
             outfile << hostStr;
         }
 
+        outfile.flush();
         outfile.close();
 
         print_nodelist();
@@ -1022,6 +1060,8 @@ static void arg_init(int argc, const char **argv)
     arg_requested_pes = arg_realloc_pes;
     //arg_nodelist = "/etc/mpi/hostfileScaled";
     write_hostfile(arg_requested_pes);
+    printf("Waiting\n");
+    //wait_hostfile(arg_requested_nodes);
     printf("\n \nCharmrun> %d Reallocated pes\n \n", arg_requested_pes);
     print_nodelist();
     //arg_nodelist = new_hostfile;
