@@ -784,7 +784,7 @@ static int arg_server_port = 0;
 static const char *arg_server_auth = NULL;
 static int replay_single = 0;
 
-static const char* new_hostfile = "/app/hostfile";
+static char* new_hostfile = "/app/hostfile";
 
 struct TopologyRequest
 {
@@ -875,10 +875,11 @@ void wait_hostfile(int numProcs)
 
 void write_hostfile(int numProcesses) 
 {
-    std::ifstream infile("/app/hostfile");
+    std::ifstream infile("/etc/mpi/hostfile");
     std::string sLine;
     getline(infile, sLine);
     printf("Line = %s\n", sLine.c_str());
+    std::cout << std::flush;
     std::regex rgx("host (.*)-worker-(\\d+)\\.(.*) \\+\\+cpus (\\d+)");
     std::smatch match;
     char hostStr[200];
@@ -1036,9 +1037,19 @@ static void arg_init(int argc, const char **argv)
   /* move it to a function */
   saved_argc = argc;
   saved_argv = (char **) malloc(sizeof(char *) * (saved_argc));
+  std::cout << "Printing args\n" << std::flush;
   for (int i = 0; i < saved_argc; i++) {
+    printf("%s\n", argv[i]);
+    std::cout << std::flush;
     //  MACHSTATE1(2,"Parameters %s",Cmi_argvcopy[i]);
-    saved_argv[i] = (char *) argv[i];
+    if (strcmp(argv[i], "/etc/mpi/hostfile") == 0)
+    {
+      std::cout << "Saving nodelist arg" << std::endl << std::flush;
+      saved_argv[i] = (char*) malloc(14);
+      strcpy(saved_argv[i], "/app/hostfile");
+    }
+    else
+      saved_argv[i] = (char *) argv[i];
   }
 #endif
 
@@ -1064,7 +1075,7 @@ static void arg_init(int argc, const char **argv)
     //wait_hostfile(arg_requested_nodes);
     printf("\n \nCharmrun> %d Reallocated pes\n \n", arg_requested_pes);
     print_nodelist();
-    arg_nodelist = new_hostfile;
+    //arg_nodelist = new_hostfile;
   }
 #endif
 
