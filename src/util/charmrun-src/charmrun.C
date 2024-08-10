@@ -784,7 +784,7 @@ static int arg_server_port = 0;
 static const char *arg_server_auth = NULL;
 static int replay_single = 0;
 
-static const char* new_hostfile = "/etc/mpi/hostfileScaled";
+static const char* new_hostfile = "/app/hostfile";
 
 struct TopologyRequest
 {
@@ -838,7 +838,7 @@ void print_nodelist(){
 
 int count_num_slots()
 {
-  std::ifstream infile("/app/hostfile");
+  std::ifstream infile("/etc/mpi/hostfile");
   std::string sLine;
   
   std::regex rgx("host (.*)-worker-(\\d+)\\.(.*) \\+\\+cpus (\\d+)");
@@ -1038,7 +1038,10 @@ static void arg_init(int argc, const char **argv)
   saved_argv = (char **) malloc(sizeof(char *) * (saved_argc));
   for (int i = 0; i < saved_argc; i++) {
     //  MACHSTATE1(2,"Parameters %s",Cmi_argvcopy[i]);
-    saved_argv[i] = (char *) argv[i];
+    if (strcmp(saved_argv[i], "+nodelist") == 0)
+      strcpy(saved_argv[i], "/app/hostfile");
+    else
+      saved_argv[i] = (char *) argv[i];
   }
 #endif
 
@@ -1060,7 +1063,7 @@ static void arg_init(int argc, const char **argv)
     arg_requested_pes = arg_realloc_pes;
     //arg_nodelist = "/etc/mpi/hostfileScaled";
     write_hostfile(arg_requested_pes);
-    printf("Waiting\n");
+    //printf("Waiting\n");
     //wait_hostfile(arg_requested_nodes);
     printf("\n \nCharmrun> %d Reallocated pes\n \n", arg_requested_pes);
     print_nodelist();
