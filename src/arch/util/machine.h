@@ -43,7 +43,7 @@
    Turning MACHINE_DEBUG on can lead to problems like strange 
 	 hangs because of horible stuff like printfs inside SIGIO */
 
-#define MACHINE_DEBUG 1
+#define MACHINE_DEBUG 0
 #if MACHINE_DEBUG
 /**Controls amount of debug messages: 1 (the lowest priority) is 
 extremely verbose, 2 shows most procedure entrance/exits, 
@@ -51,7 +51,7 @@ extremely verbose, 2 shows most procedure entrance/exits,
 Displaying lower priority messages doesn't stop higher priority ones.
 */
 #define MACHINE_DEBUG_PRIO 1
-#define MACHINE_DEBUG_LOG 1 /**Controls whether output goes to log file*/
+#define MACHINE_DEBUG_LOG 0 /**Controls whether output goes to log file*/
 
 extern FILE *debugLog;
 # define MACHSTATE_I(prio,args) if ((debugLog)&&(prio)>=MACHINE_DEBUG_PRIO) {\
