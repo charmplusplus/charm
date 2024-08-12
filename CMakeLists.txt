@@ -993,6 +993,10 @@ if(${TARGET} STREQUAL "charm4py")
     target_link_libraries(charm ck converse memory-default threads-default ldb-rand "-Llib/ -standalone -whole-archive -c++stl -shared")
   endif()
 
+  if (${BUILD_CUDA})
+    target_link_libraries(charm cudart cudahybridapi)
+  endif()
+
   add_dependencies(charm hwloc)
 endif()
 
