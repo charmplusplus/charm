@@ -1395,10 +1395,10 @@ static void open_charmrun_socket(void)
   dataskt=skt_datagram(&dataport, Cmi_os_buffer_size);
 #endif
   MACHSTATE2(5,"skt_connect at dataskt:%d Cmi_charmrun_port:%d",dataskt, Cmi_charmrun_port);
-  printf("skt_connect at dataskt:%d Cmi_charmrun_port:%d",dataskt, Cmi_charmrun_port);
+  CmiPrintf("skt_connect at dataskt:%d Cmi_charmrun_port:%d",dataskt, Cmi_charmrun_port);
   Cmi_charmrun_fd = skt_connect(Cmi_charmrun_IP, Cmi_charmrun_port, 1800);
   MACHSTATE2(5,"Opened connection to charmrun at socket %d, dataport=%d", Cmi_charmrun_fd, dataport);
-  printf("Opened connection to charmrun at socket %d, dataport=%d", Cmi_charmrun_fd, dataport);
+  CmiPrintf("Opened connection to charmrun at socket %d, dataport=%d", Cmi_charmrun_fd, dataport);
   skt_tcp_no_nagle(Cmi_charmrun_fd);
 }
 
@@ -1456,7 +1456,7 @@ static void send_singlenodeinfo(void)
      use non-locking version */
   ctrl_sendone_nolock("initnode", (const char *)&me, sizeof(me), NULL, 0);
   MACHSTATE1(5, "send initnode - dataport:%d", dataport);
-  printf("send initnode - dataport:%d", dataport);
+  CmiPrintf("send initnode - dataport:%d", dataport);
 
   MACHSTATE(3, "initnode sent");
 }
@@ -2082,6 +2082,7 @@ static int net_default_skt_abort(SOCKET skt,int code,const char *msg)
 
 void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 {
+  CmiPrintf("LrtsInit called\n");
   Cmi_netpoll = 0;
 #if CMK_NETPOLL
   Cmi_netpoll = 1;
