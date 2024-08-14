@@ -8,6 +8,8 @@
 #ifndef __PATCH_H__
 #define __PATCH_H__
 
+#include <pup_stl.h>
+
 /** \class Main
  *
  */
@@ -47,8 +49,8 @@ class Patch : public CBase_Patch {
 
     void start();
     void createComputes();
-    void updateParticles(std::vector<Particle>);
-    void updateForces(std::vector<Particle>);
+    void updateParticles(const std::vector<Particle> &);
+    void updateForces(const std::vector<Particle> &);
     void limitVelocity(Particle &p);
     Particle& wrapAround(Particle &p);
 #ifdef RUN_LIVEVIZ
