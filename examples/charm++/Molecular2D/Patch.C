@@ -177,7 +177,7 @@ void Patch::start() {
 }
 
 // Function to update forces coming from a compute
-void Patch::updateForces(CkVec<Particle> &updates) {
+void Patch::updateForces(CkVec<Particle> updates) {
   int i, x, y, x1, y1;
   CkVec<Particle> outgoing[NUM_NEIGHBORS];
 
@@ -270,7 +270,7 @@ void Patch::checkNextStep(){
 
 // Function that receives a set of particles and updates the 
 // forces of them into the local set
-void Patch::updateParticles(CkVec<Particle> &updates) {
+void Patch::updateParticles(CkVec<Particle> updates) {
   updateCount++;
 
   for( int i=0; i < updates.length(); i++) {
