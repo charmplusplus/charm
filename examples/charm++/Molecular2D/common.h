@@ -7,7 +7,7 @@
 #ifndef __COMMON_H__
 #define __COMMON_H__
 
-#include "pup.h"
+#include "pup_stl.h"
 
 #define DEFAULT_MASS		1
 #define DEFAULT_DELTA		0.005

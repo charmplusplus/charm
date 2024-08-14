@@ -26,8 +26,8 @@ class Main : public CBase_Main {
  */
 class Patch : public CBase_Patch {
   private:
-    CkVec<Particle> particles;
-    CkVec<Particle> incomingParticles;
+    std::vector<Particle> particles;
+    std::vector<Particle> incomingParticles;
     int forceCount;		// to count the returns from interactions
     int stepCount;		// to count the number of steps, and decide when to stop
     int updateCount;
@@ -47,8 +47,8 @@ class Patch : public CBase_Patch {
 
     void start();
     void createComputes();
-    void updateParticles(CkVec<Particle>);
-    void updateForces(CkVec<Particle>);
+    void updateParticles(std::vector<Particle>);
+    void updateForces(std::vector<Particle>);
     void limitVelocity(Particle &p);
     Particle& wrapAround(Particle &p);
 #ifdef RUN_LIVEVIZ
