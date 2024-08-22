@@ -1706,7 +1706,14 @@ static inline int _prepareImmediateMsg(int eIdx,void *msg,const CkChareID *pCid)
   }
   return destPE;
 }
-
+void CkPushPEExtern(int entryIdx, void *msg, const CkChareID *pCid)
+{
+  envelope *env = UsrToEnv(msg);
+  int destPE=_prepareMsg(entryIdx,msg,pCid);
+  if (destPE != -1) {
+    CmiPushPE(destPE, env);
+  }
+}
 void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid, int opts)
 {
   if (opts & CK_MSG_INLINE) {
@@ -2522,7 +2529,7 @@ void CkChareExtSend(int onPE, void *objPtr, int epIdx, char *msg, int msgSize) {
   chareID.onPE = onPE;
   chareID.objPtr = objPtr;
 
-  CkSendMsg(epIdx, impl_msg, &chareID);
+  CkPushPEExtern(epIdx, impl_msg, &chareID);
 }
 
 void CkChareExtSend_multi(int onPE, void *objPtr, int epIdx, int num_bufs, char **bufs, int *buf_sizes) {
