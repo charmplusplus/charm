@@ -77,6 +77,10 @@ class threadCollideMgr : public CBase_threadCollideMgr
     contrib[chunkNo]=NULL;
   }
 
+  /// Aditya Pandare: not sure why this is needed
+  /// Placeholder: Call this client function on processor 0:
+  void setClient(CollisionClientFn, void *) {}
+
   /// collideClient interface (called by voxels)
   /// Splits up collisions by destination PE
   void collisions(ArrayElement *src,int step,CollisionList &colls);

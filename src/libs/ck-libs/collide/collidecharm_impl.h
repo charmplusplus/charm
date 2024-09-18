@@ -125,6 +125,7 @@ class syncReductionMgr : public CBase_syncReductionMgr
   public:
   int getStepCount(void) const {return stepCount;}
   syncReductionMgr();
+  syncReductionMgr(CkMigrateMessage* m);
 
   //Called by parent-- will you contribute?
   void childProd(int stepCount);
@@ -172,10 +173,28 @@ class collideMgr : public CBase_collideMgr
   collideMgr(const CollideGrid3d &gridMap,
       const CProxy_collideClient &client,
       const CProxy_collideVoxel &voxels);
+  collideMgr(CkMigrateMessage* m);
+
+  void pup(PUP::er &p) {
+    p | thisproxy;
+    //p | steps;
+    p | voxelProxy;
+    p | gridMap;
+    p | client;
+    //p | nContrib;
+    //p | contribCount;
+    //p | msgsSent;
+    //p | msgsRecvd;
+  };
 
   //Maintain contributor registration count
   void registerContributor(int chunkNo);
   void unregisterContributor(int chunkNo);
+
+  // Reinitialize collideClient's state on restart
+  void reinitClient(
+    CollisionClientFn clientFn,
+    void *clientParam );
 
   //Clients call this to contribute their objects
   void contribute(int chunkNo,
@@ -225,6 +244,10 @@ class serialCollideClient : public collideClient {
   public:
   serialCollideClient(void);
   serialCollideClient(CkCallback clientCb_);
+  serialCollideClient(CkMigrateMessage *m);
+  void pup(PUP::er &p) {
+    p | useCb;
+  }
 
   /// Call this client function on processor 0:
   void setClient(CollisionClientFn clientFn,void *clientParam);
