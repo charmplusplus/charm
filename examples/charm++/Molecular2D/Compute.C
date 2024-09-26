@@ -36,7 +36,7 @@ Compute::Compute() {
 Compute::Compute(CkMigrateMessage *msg) { }
   
 // Function to receive vector of particles
-void Compute::interact(CkVec<Particle> particles, int x, int y ) {
+void Compute::interact(std::vector<Particle> particles, int x, int y ) {
 
   int i;
 
@@ -61,10 +61,10 @@ void Compute::interact(CkVec<Particle> particles, int x, int y ) {
 }
 
 // Function to compute all the interactions between pairs of particles in two sets
-void Compute::interact(CkVec<Particle> &first, CkVec<Particle> &second){
+void Compute::interact(std::vector<Particle> &first, std::vector<Particle> &second){
   int i, j;
-  for(i = 0; i < first.length(); i++)
-    for(j = 0; j < second.length(); j++)
+  for(i = 0; i < first.size(); i++)
+    for(j = 0; j < second.size(); j++)
       interact(first[i], second[j]);
 }
 

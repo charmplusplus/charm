@@ -2199,7 +2199,8 @@ PUP STL Container Objects
 If the variable is from the C++ Standard Template Library, you can
 include operator\ ``|``\ ’s for STL containers such as vector, map, set,
 list, pair, and string, templated on anything, by including the header
-“pup_stl.h”.
+“pup_stl.h” or <pup_stl.h>. This header should be placed in the .h or
+the .C/.cpp file in the project, and not in the .ci file.
 
 See ``examples/charm++/PUP/STLPUP``
 
