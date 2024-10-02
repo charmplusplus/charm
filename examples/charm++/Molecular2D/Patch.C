@@ -177,15 +177,15 @@ void Patch::start() {
 }
 
 // Function to update forces coming from a compute
-void Patch::updateForces(CkVec<Particle> &updates) {
+void Patch::updateForces(const std::vector<Particle> &updates) {
   int i, x, y, x1, y1;
-  CkVec<Particle> outgoing[NUM_NEIGHBORS];
+  std::vector<Particle> outgoing[NUM_NEIGHBORS];
 
   // incrementing the counter for receiving updates
   forceCount++;
 
   // updating force information
-  for(i = 0; i < updates.length(); i++){
+  for(i = 0; i < updates.size(); i++){
     particles[i].fx += updates[i].fx;
     particles[i].fy += updates[i].fy;
   }
@@ -202,11 +202,11 @@ void Patch::updateForces(CkVec<Particle> &updates) {
     x = thisIndex.x;
     y = thisIndex.y;
 
-    for(i=0; i<particles.length(); i++) {
+    for(i=0; i<particles.size(); i++) {
       migrateToPatch(particles[i], x1, y1);
       if(x1 !=0 || y1!=0) {
 	outgoing[(x1+1)*NBRS_Y + (y1+1)].push_back(wrapAround(particles[i]));
-	particles.remove(i);
+	particles.erase(particles.begin() + i);
       }
     }
    
@@ -248,9 +248,9 @@ void Patch::checkNextStep(){
     stepCount++;
 
     // adding new elements
-    for (i = 0; i < incomingParticles.length(); i++)
+    for (i = 0; i < incomingParticles.size(); i++)
       particles.push_back(incomingParticles[i]);
-    incomingParticles.removeAll();
+    incomingParticles.clear();
 
     if (thisIndex.x==0 && thisIndex.y==0 && stepCount%10==0) {
       timer = CkWallTimer();
@@ -270,10 +270,10 @@ void Patch::checkNextStep(){
 
 // Function that receives a set of particles and updates the 
 // forces of them into the local set
-void Patch::updateParticles(CkVec<Particle> &updates) {
+void Patch::updateParticles(const std::vector<Particle> &updates) {
   updateCount++;
 
-  for( int i=0; i < updates.length(); i++) {
+  for( int i=0; i < updates.size(); i++) {
     incomingParticles.push_back(updates[i]);
   }
 
@@ -291,7 +291,7 @@ void Patch::updateProperties() {
   int i;
   double xDisp, yDisp;
 	
-  for(i = 0; i < particles.length(); i++) {
+  for(i = 0; i < particles.size(); i++) {
     // applying kinetic equations
     particles[i].ax = particles[i].fx / DEFAULT_MASS;
     particles[i].ay = particles[i].fy / DEFAULT_MASS;
@@ -362,7 +362,7 @@ void Patch::requestNextFrame(liveVizRequestMsg *lvmsg) {
     for(int j=0; j<myWidthPx; ++j)
       color_pixel(intensity,myWidthPx,myHeightPx,j,i,0,0,0);	// black background
 
-  for (int i=0; i < particles.length(); i++ ) {
+  for (int i=0; i < particles.size(); i++ ) {
     int xpos = (int)((particles[i].x /(double) (patchSize*patchArrayDimX)) * wdes) - sx;
     int ypos = (int)((particles[i].y /(double) (patchSize*patchArrayDimY)) * hdes) - sy;
 
@@ -394,7 +394,7 @@ void Patch::print(){
   CkPrintf("*****************************************************\n");
   CkPrintf("Patch (%d, %d)\n", thisIndex.x, thisIndex.y);
 
-  for(i=0; i < particles.length(); i++)
+  for(i=0; i < particles.size(); i++)
     CkPrintf("Patch (%d,%d) %-5d %7.4f %7.4f \n", thisIndex.x, thisIndex.y, i, particles[i].x, particles[i].y);
   CkPrintf("*****************************************************\n");
 #endif
