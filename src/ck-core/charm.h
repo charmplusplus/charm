@@ -8,6 +8,10 @@
 #include "converse.h"
 #include <sys/types.h> /* for size_t */
 
+#if CMK_CHARM4PY && CMK_CUDA
+#include <cuda_runtime.h>
+#endif
+
 #ifdef __cplusplus
 #include "conv-rdma.h"
 #include "pup.h"
@@ -509,6 +513,11 @@ extern void CkSummary_StartPhase(int);
 extern int CkDisableTracing(int epIdx);
 extern void CkEnableTracing(int epIdx);
 extern void CkCallWhenIdle(int epIdx, void* obj);
+
+
+#if CMK_CHARM4PY
+extern void CkHapiAddCallback(cudaStream_t stream, void* cb, void* cb_msg);
+#endif
 
 #ifdef __cplusplus
 }
