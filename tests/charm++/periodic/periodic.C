@@ -15,7 +15,7 @@
  * this tests CcdCallOnConditionKeep.
  */
 #ifndef CALL_FN_AFTER
-#define CALL_FN_AFTER 1
+#define CALL_FN_AFTER 0
 #endif
 
 CProxy_main mProxy;
@@ -34,7 +34,11 @@ class main : public CBase_main {
     delete msg;
 
     mProxy = thisProxy;
+    #ifdef CALL_FN_AFTER
     startTime = CkWallTimer();
+    #else
+    startTime = 0.0;
+    #endif
     gProxy = CProxy_testGroup::ckNew(COUNTER_MAX);
     CkPrintf("Testing Converse periodic callbacks on %d PEs for %d seconds\n",
              CkNumPes(), COUNTER_MAX);
