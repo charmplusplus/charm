@@ -15,7 +15,7 @@
  * this tests CcdCallOnConditionKeep.
  */
 #ifndef CALL_FN_AFTER
-#define CALL_FN_AFTER 0
+#define CALL_FN_AFTER 1
 #endif
 
 CProxy_main mProxy;
