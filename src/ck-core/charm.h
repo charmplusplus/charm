@@ -516,7 +516,7 @@ extern void CkCallWhenIdle(int epIdx, void* obj);
 
 
 #if CMK_CHARM4PY
-extern void CkHapiAddCallback(cudaStream_t stream, void* cb, void* cb_msg);
+extern void CkHapiAddCallback(long stream, void (*cb)(void*, void*), void* cb_msg);
 #endif
 
 #ifdef __cplusplus

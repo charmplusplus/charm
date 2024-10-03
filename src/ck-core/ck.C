@@ -50,12 +50,13 @@ extern int _defaultObjectQ;
 
 
 #include "hapi.h"
-
-
-void CkHapiAddCallback(cudaStream_t stream, void *fn, void* cb_msg) 
+void CkHapiAddCallback(long stream, void (*cb)(void*, void*), void* cb_msg) 
 {
-  CkPrintf("CkHapiAddCallback is not implemented yet, but its being called!\n");
-  hapiAddCallback(stream, (CkCallback*)fn, cb_msg);
+  
+  cudaStream_t stream_ptr = (cudaStream_t)stream;
+  CkCallback callback(cb, cb_msg);
+  
+  hapiAddCallback(stream_ptr, callback, cb_msg);
 }
 
 void _initChareTables()
