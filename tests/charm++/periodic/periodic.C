@@ -34,7 +34,7 @@ class main : public CBase_main {
     delete msg;
 
     mProxy = thisProxy;
-    #ifdef CALL_FN_AFTER
+    #if CALL_FN_AFTER
     startTime = CkWallTimer();
     #else
     startTime = 0.0;
