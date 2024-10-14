@@ -341,6 +341,7 @@ inline void LDObjData::pup(PUP::er &p) {
   p|minWall;
   p|maxWall;
 #endif
+  p|position;
   p|migratable;
   if (_lb_version > -1) p|asyncArrival;
 #if CMK_LB_USER_DATA
