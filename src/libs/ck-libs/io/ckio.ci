@@ -1,76 +1,151 @@
-module CkIO {
-
-  namespace Ck { namespace IO {
-      message FileReadyMsg;
-      message SessionReadyMsg;
-      message SessionCommitMsg;
-    }
-  }
+module CkIO
+{
+  namespace Ck
+  {
+  namespace IO
+  {
+  message FileReadyMsg;
+  message SessionReadyMsg;
+  message SessionCommitMsg;
+  message ReadCompleteMsg;
+  // used by the read() CkCallback
+  }  // namespace IO
+  }  // namespace Ck
 
   initnode _registerCkIO_impl();
 };
 
-module CkIO_impl {
+module CkIO_impl
+{
   include "ckio.h";
 
-  namespace Ck { namespace IO {
-      namespace impl {
-        readonly CProxy_Director director;
+  namespace Ck
+  {
+  namespace IO
+  {
+  namespace impl
+  {
+  readonly CProxy_Director director;
 
-        mainchare [migratable] Director
-        {
-          entry Director(CkArgMsg *);
+  mainchare[migratable] Director
+  {
+    entry Director(CkArgMsg*);
 
-          /// Serialize setting up each file through this chare, so that all PEs
-          /// have the same sequence
-          entry void openFile(std::string name, CkCallback opened, Options opts);
-          entry [reductiontarget] void fileOpened(FileToken file);
-          entry [reductiontarget] void sessionComplete(FileToken file);
+    /// Serialize setting up each file through this chare, so that all PEs
+    /// have the same sequence
 
-          entry void prepareWriteSession(FileToken file, size_t bytes, size_t offset,
-                                         CkCallback ready, CkCallback complete) {
-            serial {
-              prepareWriteSession_helper(file, bytes, offset, ready, complete);
-            }
-            when sessionReady[files[file].sessionID](CkReductionMsg *m) serial {
-              delete m;
-              ready.send(new SessionReadyMsg(Session(file, bytes, offset,
-                                                     files[file].session)));
-            }
-          };
-          entry void prepareWriteSession(FileToken file, size_t bytes, size_t offset,
-                                         CkCallback ready, const char commitData[commitBytes],
-                                         size_t commitBytes, size_t commitOffset,
-                                         CkCallback complete) {
-            serial {
-              CkCallback committed(CkIndex_Director::sessionDone(NULL), thisProxy);
-              committed.setRefnum(++sessionID);
-              prepareWriteSession_helper(file, bytes, offset, ready, committed);
-            }
-            when sessionReady[files[file].sessionID](CkReductionMsg *m) serial {
-              delete m;
-              ready.send(new SessionReadyMsg(Session(file, bytes, offset,
-                                                     files[file].session)));
-            }
-            when sessionDone[files[file].sessionID](CkReductionMsg *m) serial {
-              delete m;
-              impl::FileInfo* info = CkpvAccess(manager)->get(file);
-              CmiInt8 ret = CmiPwrite(info->fd, commitData, commitBytes, commitOffset);
-              if (ret != commitBytes)
-                fatalError("Commit write failed", info->name);
-              complete.send(CkReductionMsg::buildNew(0, NULL, CkReduction::nop));
-            }
-          };
-          entry void sessionReady(CkReductionMsg *);
-          entry void sessionDone(CkReductionMsg *);
-          entry void close(FileToken token, CkCallback closed);
-        }
+    entry void openFile(std::string name, CkCallback opened, Options opts);
+    entry[reductiontarget] void fileOpened(FileToken file);
+    entry[reductiontarget] void sessionComplete(FileToken file);
 
-        group [migratable] Manager
-        {
-          entry Manager();
-          entry void run() {
-            while (true) {
+    // the method used by the director which is used to close a readsession
+    entry void closeReadSession(Session, CkCallback);
+
+    entry void prepareReadSession(FileToken file, size_t bytes, size_t offset,
+                                  CkCallback ready){
+        // the director sets up a read session
+        serial{prepareReadSessionHelper(file, bytes, offset, ready, std::vector<int>());
+  }
+  when sessionReady[files[file].sessionID](CkReductionMsg* m) serial
+  {  // after the ReadSession chare array is set up, invoke the ready callback
+    delete m;
+    Session s(file, bytes, offset, files[file].read_session);
+    CProxy_ReadAssembler ra = CProxy_ReadAssembler::ckNew(s);
+    managers.addSessionReadAssemblerMapping(s, ra, ready);
+  }
+
+  when addSessionReadAssemblerFinished(CkReductionMsg* msg) serial
+  {
+    ready.send(
+        new SessionReadyMsg(Session(file, bytes, offset, files[file].read_session)));
+    delete msg;
+  }
+
+  };  // namespace impl
+
+  entry void prepareReadSession(FileToken file, size_t bytes, size_t offset,
+                                CkCallback ready, std::vector<int> pes_to_map){
+      serial{prepareReadSessionHelper(file, bytes, offset, ready, pes_to_map);
+  }  // namespace IO
+
+  when sessionReady[files[file].sessionID](CkReductionMsg* m) serial
+  {  // after the ReadSession chare array is set up, invoke the ready callback
+    delete m;
+    Session s(file, bytes, offset, files[file].read_session);
+    CProxy_ReadAssembler ra = CProxy_ReadAssembler::ckNew(s);
+    managers.addSessionReadAssemblerMapping(s, ra, ready);
+  }
+
+  when addSessionReadAssemblerFinished(CkReductionMsg* msg) serial
+  {
+    ready.send(
+        new SessionReadyMsg(Session(file, bytes, offset, files[file].read_session)));
+    delete msg;
+  }
+
+  };  // namespace Ck
+
+  entry void prepareWriteSession(FileToken file, size_t bytes, size_t offset,
+                                 CkCallback ready, CkCallback complete){
+      serial{prepareWriteSession_helper(file, bytes, offset, ready, complete);
+}
+when sessionReady[files[file].sessionID](CkReductionMsg* m) serial
+{
+  delete m;
+  ready.send(new SessionReadyMsg(Session(file, bytes, offset, files[file].session)));
+}
+}
+;
+entry void prepareWriteSession(FileToken file, size_t bytes, size_t offset,
+                               CkCallback ready, const char commitData[commitBytes],
+                               size_t commitBytes, size_t commitOffset,
+                               CkCallback complete){
+    serial{CkCallback committed(CkIndex_Director::sessionDone(NULL), thisProxy);
+committed.setRefnum(++sessionID);
+prepareWriteSession_helper(file, bytes, offset, ready, committed);
+}
+when sessionReady[files[file].sessionID](CkReductionMsg* m) serial
+{
+  delete m;
+  ready.send(new SessionReadyMsg(Session(file, bytes, offset, files[file].session)));
+}
+when sessionDone[files[file].sessionID](CkReductionMsg* m) serial
+{
+  delete m;
+  impl::FileInfo* info = CkpvAccess(manager)->get(file);
+  CmiInt8 ret = CmiPwrite(info->fd, commitData, commitBytes, commitOffset);
+  if (ret != commitBytes)
+    fatalError("Commit write failed", info->name);
+  complete.send(CkReductionMsg::buildNew(0, NULL, CkReduction::nop));
+}
+}
+;
+
+entry void sessionReady(CkReductionMsg*);
+entry void sessionDone(CkReductionMsg*);
+entry void close(FileToken token, CkCallback closed);
+entry void addSessionReadAssemblerFinished(CkReductionMsg* msg);
+}
+
+// class tht will be used to assemble a specific read call
+group ReadAssembler
+{
+  // stores the parameters of the read call it is tasked with building
+  entry ReadAssembler(Session session);
+
+  // the method by which ReadSession objects can send their data for the read
+  // when invoked, avoid a sender-side copy
+  entry void shareData(int read_tag, int buffer_tag, size_t read_chare_offset,
+                       size_t num_bytes, nocopypost char data[num_bytes]);
+};
+
+group[migratable] Manager
+{
+  entry Manager();
+  entry void run()
+  {
+    while (true)
+    {
               case {
                 when openFile[opnum](unsigned int opnum_,
                                      FileToken token, std::string name, Options opts)
@@ -84,6 +159,8 @@ module CkIO_impl {
           entry void openFile(unsigned int opnum,
                               FileToken token, std::string name, Options opts);
           entry void close(unsigned int opnum, FileToken token, CkCallback closed);
+
+	  entry void addSessionReadAssemblerMapping(Session session, CProxy_ReadAssembler ra, CkCallback ready);
         };
 
         array [1D] WriteSession
@@ -92,12 +169,36 @@ module CkIO_impl {
           entry void forwardData(const char data[bytes], size_t bytes, size_t offset);
           entry void syncData();
         };
+	
 
-        group Map : CkArrayMap
-        {
-          entry Map();
-        };
-      }
+	array [1D] BufferChares{
+		entry BufferChares(FileToken file, size_t offset, size_t bytes, size_t num_readers);
+		// way for the BufferChares object to send bytes over to the ReadAssembler object ra when serving a specific read
+    
+    entry void sendData(int read_tag, int buffer_tag, size_t offset, size_t bytes, CProxy_ReadAssembler ra, int pe);
+
+    entry void sendDataHandler(int read_tag, int buffer_tag, size_t offset, size_t bytes, CProxy_ReadAssembler ra, int pe);
+    entry  [threaded] void monitorRead();
+
+    entry void bufferReady() {
+         while (true) {
+            when sendData(int read_tag, int buffer_tag, size_t offset, size_t bytes, CProxy_ReadAssembler ra, int pe) {
+              serial{thisProxy[thisIndex].sendDataHandler(read_tag, buffer_tag, offset, bytes, ra, pe);}
+            }         
+         }
     }
+
+		entry [reductiontarget] void printTime(double time_taken);
+	};
+        
+	group Map :
+                CkArrayMap { entry Map(); };
+    }
+    group BufferNodeMap : CkArrayMap
+    {
+      entry BufferNodeMap();
+      entry BufferNodeMap(std::vector<int> processors);
+    };
   }
+}
 }

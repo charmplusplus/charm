@@ -27,14 +27,12 @@
 //#include "queueing.h"
 #include <unistd.h>
 
-
+#include "ck.h"
+CkpvDeclare(DebugEntryTable, _debugEntryTable);
 
 #if CMK_CHARMDEBUG && CMK_CCS_AVAILABLE && !defined(_WIN32)
 
-#include "ck.h"
-
 CkpvDeclare(int, skipBreakpoint); /* This is a counter of how many breakpoints we should skip */
-CkpvDeclare(DebugEntryTable, _debugEntryTable);
 CpdPersistentChecker persistentCheckerUselessClass;
 
 void resetAllCRC();
@@ -336,7 +334,11 @@ public:
     p((char*)elt,size);
   }
 };
-
+#if CMK_OFI
+// EJB TODO the fix for this belongs elsewhere, but this is ok for now
+#undef CMK_HAS_GET_MYADDRESS
+#define CMK_HAS_GET_MYADDRESS 0
+#endif
 #if CMK_HAS_GET_MYADDRESS
 #include <rpc/rpc.h>
 #endif

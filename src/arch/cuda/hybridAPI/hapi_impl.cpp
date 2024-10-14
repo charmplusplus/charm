@@ -25,35 +25,8 @@
 extern "C" double CmiWallTimer();
 #endif
 
-#ifdef HAPI_TRACE
-#define QUEUE_SIZE_INIT 128
-extern "C" int traceRegisterUserEvent(const char* x, int e);
-extern "C" void traceUserBracketEvent(int e, double beginT, double endT);
-
-typedef struct gpuEventTimer {
-  int stage;
-  double cmi_start_time;
-  double cmi_end_time;
-  int event_type;
-  const char* trace_name;
-} gpuEventTimer;
-#endif
-
 static void createPool(int *nbuffers, int n_slots, std::vector<BufferPool> &pools);
 static void releasePool(std::vector<BufferPool> &pools);
-
-// Event stages used for profiling.
-enum WorkRequestStage{
-  DataSetup        = 1,
-  KernelExecution  = 2,
-  DataCleanup      = 3
-};
-
-enum ProfilingStage{
-  GpuMemSetup   = 8800,
-  GpuKernelExec = 8801,
-  GpuMemCleanup = 8802
-};
 
 #ifdef HAPI_CUDA_CALLBACK
 struct hapiCallbackMessage {
@@ -312,6 +285,8 @@ static void hapiMapping(char** argv) {
   switch (map_type) {
     case Mapping::Block:
       cpv_my_device = my_rank / csv_gpu_manager.pes_per_device;
+      if(cpv_my_device >= csv_gpu_manager.device_count)
+          cpv_my_device = csv_gpu_manager.device_count - 1;
       if (my_rank % csv_gpu_manager.pes_per_device == 0) cpv_device_rep = true;
       break;
     case Mapping::RoundRobin:
@@ -1118,6 +1093,7 @@ static void createPool(int *n_buffers, int n_slots, std::vector<BufferPool> &poo
     }
 
     pools[i].head = previous;
+    pools[i].chunk = pinned_chunk;
 #ifdef HAPI_MEMPOOL_DEBUG
     pools[i].num = num_buffers;
 #endif
@@ -1125,10 +1101,12 @@ static void createPool(int *n_buffers, int n_slots, std::vector<BufferPool> &poo
 }
 
 static void releasePool(std::vector<BufferPool> &pools){
+  int device;
+  hapiCheck(cudaGetDevice(&device));
   for (int i = 0; i < pools.size(); i++) {
-    BufferPoolHeader* hdr = pools[i].head;
-    if (hdr != NULL) {
-      hapiCheck(cudaFreeHost((void*)hdr));
+    void* chunk = pools[i].chunk;
+    if (chunk != NULL) {
+      hapiCheck(cudaFreeHost(chunk));
     }
   }
   pools.clear();
@@ -1152,6 +1130,7 @@ static int findPool(size_t size){
       return -1;
     }
     newpool.size = size;
+    newpool.chunk = (void *)newpool.head;
 #ifdef HAPI_MEMPOOL_DEBUG
     newpool.num = 1;
 #endif

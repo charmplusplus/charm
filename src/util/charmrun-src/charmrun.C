@@ -1872,7 +1872,7 @@ static int req_ccs_reply_fw(ChMessage *msg, SOCKET srcFd)
 }
 
 #else
-static int req_ccs_reply_fw(ChMessage *msg, SOCKET srcFd) {}
+static inline void req_ccs_connect() { }
 #endif /*CMK_CCS_AVAILABLE*/
 
 /****************************************************************************
@@ -2158,7 +2158,9 @@ static int req_handle_print(ChMessage *msg, SOCKET fd)
 {
   checkPrintfError(printf("%s", msg->data));
   checkPrintfError(fflush(stdout));
+#if CMK_CCS_AVAILABLE
   write_stdio_duplicate(msg->data);
+#endif
   return REQ_OK;
 }
 
@@ -2166,7 +2168,9 @@ static int req_handle_printerr(ChMessage *msg, SOCKET fd)
 {
   fprintf(stderr, "%s", msg->data);
   fflush(stderr);
+#if CMK_CCS_AVAILABLE
   write_stdio_duplicate(msg->data);
+#endif
   return REQ_OK;
 }
 
@@ -2174,7 +2178,9 @@ static int req_handle_printsyn(ChMessage *msg, SOCKET fd)
 {
   checkPrintfError(printf("%s", msg->data));
   checkPrintfError(fflush(stdout));
+#if CMK_CCS_AVAILABLE
   write_stdio_duplicate(msg->data);
+#endif
 #ifdef HSTART
   if (arg_hierarchical_start)
     req_reply_child(fd, "printdone", "", 1);
@@ -2188,7 +2194,9 @@ static int req_handle_printerrsyn(ChMessage *msg, SOCKET fd)
 {
   fprintf(stderr, "%s", msg->data);
   fflush(stderr);
+#if CMK_CCS_AVAILABLE
   write_stdio_duplicate(msg->data);
+#endif
 #ifdef HSTART
   if (arg_hierarchical_start)
     req_reply_child(fd, "printdone", "", 1);

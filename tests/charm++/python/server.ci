@@ -14,7 +14,7 @@ mainmodule server {
 
 	array [1D] MyArray {
 		entry MyArray();
-		entry void run(CkCallback &cb);
+		entry void run(const CkCallback &cb);
 	}
 
 }

@@ -1,6 +1,7 @@
 
 add_library(ccs-client ../conv-ccs/ccs-client.C ../conv-ccs/ccs-client.h)
 target_include_directories(ccs-client PRIVATE ../util)
+configure_file(../conv-ccs/ccs-client.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 
 add_library(memory-default memory.C)
 target_compile_definitions(memory-default PRIVATE -DCMK_MEMORY_BUILD_DEFAULT)

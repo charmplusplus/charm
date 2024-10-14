@@ -5,6 +5,7 @@
 #ifndef __CCS_CLIENT_H_
 #define __CCS_CLIENT_H_
 
+#define CMK_NOT_USE_CONVERSE 1
 #include "sockRoutines.h"
 #include "ccs-auth.h"
 

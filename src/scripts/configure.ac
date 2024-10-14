@@ -7,7 +7,7 @@
 # Increment the second and third digits when making a minor feature release
 # Increment the first digit when making a major feature release
 
-AC_INIT([Charm++],[70000],[charm@cs.illinois.edu],[charm],[https://charm.cs.illinois.edu/])
+AC_INIT([Charm++],[80001],[charm@cs.illinois.edu],[charm],[https://charm.cs.illinois.edu/])
 
 AC_CONFIG_SRCDIR(./Makefile)
 
@@ -263,6 +263,21 @@ else
   AC_DEFINE_UNQUOTED(CMK_DRONE_MODE, 1, [enable drone mode])
 fi
 
+AC_ARG_ENABLE([ccs],
+            [AS_HELP_STRING([--enable-ccs],
+              [enable CCS])], ,
+            [enable_ccs=yes])
+
+if test "$enable_ccs" = "no" -o "$CMK_CCS_AVAILABLE" = '0'
+then
+  Echo "CCS is disabled"
+  AC_DEFINE_UNQUOTED(CMK_CCS_AVAILABLE, 0, [disable ccs])
+  CMK_CCS_AVAILABLE='0'
+else
+  Echo "CCS is enabled"
+  AC_DEFINE_UNQUOTED(CMK_CCS_AVAILABLE, 1, [enable ccs])
+fi
+
 AC_ARG_ENABLE([charmdebug],
             [AS_HELP_STRING([--enable-charmdebug],
               [enable charmDebug])], ,
@@ -300,20 +315,6 @@ else
     Echo "Charm record/replay is enabled"
     AC_DEFINE_UNQUOTED(CMK_REPLAYSYSTEM, 1, [enable replay])
   fi
-fi
-
-AC_ARG_ENABLE([ccs],
-            [AS_HELP_STRING([--enable-ccs],
-              [enable CCS])], ,
-            [enable_ccs=yes])
-
-if test "$enable_ccs" = "no" -o "$CMK_CCS_AVAILABLE" = '0'
-then
-  Echo "CCS is disabled" 
-  AC_DEFINE_UNQUOTED(CMK_CCS_AVAILABLE, 0, [disable ccs])
-else
-  Echo "CCS is enabled" 
-  AC_DEFINE_UNQUOTED(CMK_CCS_AVAILABLE, 1, [enable ccs])
 fi
 
 AC_ARG_ENABLE([controlpoint],
@@ -723,7 +724,7 @@ AC_MSG_CHECKING("Sequential C++ compiler as")
 AC_MSG_RESULT("$CMK_SEQ_CXX")
 
 # Needed to avoid migratable threads failing the stack check
-# See https://github.com/UIUC-PPL/charm/pull/3174 for details.
+# See https://github.com/charmplusplus/charm/pull/3174 for details.
 test_link "whether compiler accepts -fno-stack-protector" "ok" "no" "-fno-stack-protector"
 if test $strictpass -eq 1
 then
@@ -787,7 +788,7 @@ then
   echo "Charm++ requires C++11 support, but doesn't know the flag to enable it"
   echo
   echo "For Intel's compiler please see"
-  echo "https://github.com/UIUC-PPL/charm/issues/1560"
+  echo "https://github.com/charmplusplus/charm/issues/1560"
   echo "about making a suitable version of gcc/g++/libstdc++ available"
   test_finish 1
 fi
@@ -823,7 +824,7 @@ then
 fi
 
 # Needed so that tlsglobals works correctly with --build-shared
-# See https://github.com/UIUC-PPL/charm/issues/3168 for details.
+# See https://github.com/charmplusplus/charm/issues/3168 for details.
 test_cxx "whether C++ compiler accepts -ftls-model=initial-exec" "yes" "no" "-ftls-model=initial-exec"
 if test $strictpass -eq 1
 then
@@ -972,7 +973,7 @@ fi
 AC_ARG_WITH([mempool-cutoff],
             [AS_HELP_STRING([--with-mempool-cutoff=N],
                             [exponent of the maximum power of two to use for bin sizes in the mempool])],
-            [], [with_mempool_cutoff=26])
+            [], [with_mempool_cutoff=28])
 
 if test "$((6 < $with_mempool_cutoff && $with_mempool_cutoff < 32))" = '1'
 then
@@ -1560,6 +1561,18 @@ add_make_flag "CMK_HAS_MALLOC_HOOK:=$pass" 'whether has __malloc_hook'
 #### test if we can build OFI ####
 if test "$CMK_BUILD_OFI" = 1
 then
+    CMK_LIBFABRIC_INC=`pkg-config --cflags libfabric`
+    if test "$?" = 0
+    then
+        add_flag CMK_INCDIR='"$CMK_INCDIR $CMK_LIBFABRIC_INC"' "libfabric inc"
+	CMK_INCDIR="$CMK_INCDIR $CMK_LIBFABRIC_INC"
+    fi
+    CMK_LIBFABRIC_LIBS=`pkg-config --libs libfabric`
+    if test "$?" = 0
+    then
+	add_flag CMK_LIBCDIR='"$CMK_LIBDIR $CMK_LIBFABRIC_LIBONLY"' "libfabric lib"
+	CMK_LIBDIR="$CMK_LIBDIR $CMK_LIBFABRIC_LIB"
+    fi
 cat > $tc <<EOT
 #include <rdma/fabric.h>
 int main(int argc, char **argv)
@@ -1594,13 +1607,41 @@ else
         test_finish 1
       fi
     else
-      echo "Error: -lfabric not working, $PSM_COMPAT_DIR not found"
-      echo "Pass '--basedir=/path/to/dir/' if -lfabric is located in a different directory"
-      test_finish 1
+      CMK_LIBFABRIC_LIBONLY=`pkg-config --libs-only-l libfabric`
+       if test "$?" = 0
+       then
+	  test_linkc "whether pkg-config fabric" "ok" "no" "-lfabric"
+      else
+	  echo "Error: -lfabric not working, $PSM_COMPAT_DIR not found, pkg-config libfabric not working"
+	  echo "Pass '--basedir=/path/to/dir/' if -lfabric is located in a different directory"
+	  test_finish 1
+      fi
+
     fi
   fi
 fi
 
+fi
+
+#### If we can build OFI, test if we can also build CXI ####
+if test "$BUILD_OFI" = 1
+then
+# get path info
+    CMK_LIBFABRIC_LIBONLY=`pkg-config --libs-only-l libfabric`
+    CMK_LIBFABRIC_INC=`pkg-config --cflags libfabric`
+    cat > $t <<EOT
+#include <rdma/fabric.h>
+#include <rdma/fi_cxi_ext.h>
+int main(int argc, char **argv)
+{
+  struct fi_info *providers;
+  int ret = fi_getinfo(FI_VERSION(1,0), NULL, NULL, 0ULL, NULL, &providers);
+  return 0;
+}
+EOT
+	test_cxx "whether build on CXI" "yes" "no"
+	AC_DEFINE_UNQUOTED(CMK_CXI, $strictpass, [build CXI.])
+	BUILD_CXI=$strictpass
 fi
 
 #### test if we can build UCX ####
@@ -2683,7 +2724,7 @@ fi
 fi
 
 #### test if Python headers are installed ####
-PYTHON_VERSION=`python -V 2>&1 | awk {'print $2'} | awk -F. {'print $1"."$2'}`
+PYTHON_VERSION=`python2 -V 2>&1 | awk {'print $2'} | awk -F. {'print $1"."$2'}`
 cat > $t <<EOT
 #include "python${PYTHON_VERSION}/Python.h"
 #include "python${PYTHON_VERSION}/compile.h"

@@ -6,7 +6,7 @@ Frequently Asked Questions
    :depth: 3
 
 For answers to questions not on this list, please create an issue or discussion
-on our `GitHub <https://github.com/UIUC-PPL/charm>`_.
+on our `GitHub <https://github.com/charmplusplus/charm>`_.
 
 Big Questions
 =============
@@ -120,7 +120,7 @@ and AMPI.
 I have a suggestion/feature request/bug report. Who should I send it to?
 ------------------------------------------------------------------------
 
-Please open an issue or discussion on our `GitHub <https://github.com/UIUC-PPL/charm>`_.
+Please open an issue or discussion on our `GitHub <https://github.com/charmplusplus/charm>`_.
 We are always glad to get feedback on our software.
 
 Installation and Usage
@@ -143,7 +143,7 @@ How do I compile Charm++?
 -------------------------
 
 Run the interactive build script ``./build`` with no extra arguments If
-this fails, please open an issue on our `GitHub <https://github.com/UIUC-PPL/charm>`_
+this fails, please open an issue on our `GitHub <https://github.com/charmplusplus/charm>`_
 with the problem. Include the build line used (this is
 saved automatically in ``smart-build.log``)
 
@@ -153,7 +153,7 @@ choose the closest architecture, and then you may have to modify the
 associated conf-mach.sh and conv-mach.h files in src/arch to point to
 your desired compilers and options. If you develop a significantly
 different platform, please open a pull request on our
-`GitHub <https://github.com/UIUC-PPL/charm>`_
+`GitHub <https://github.com/charmplusplus/charm>`_
 with the modified files so we can include it in the distribution.
 
 How do I compile AMPI?
@@ -1121,7 +1121,7 @@ Charm Debug.
 
 .. code-block:: bash
 
-   $ git clone git@github.com:UIUC-PPL/ccs_tools
+   $ git clone git@github.com:charmplusplus/ccs_tools
    $ cd ccs_tools
    $ ant
 

@@ -795,11 +795,15 @@ CkIO
 Overview
 --------
 
-CkIO is a library for parallel I/O in Charm++. Currently it only supports
-writing files, not reading them. CkIO improves the performance of write
+CkIO is a library for parallel I/O in Charm++. It supports both reading and writing via two independent library components which both involve aggregation. The CkIO abstraction helps get the best performance out of the parallel file system and avoid contention on I/O nodes, while supporting any user-level chare decomposition. 
+
+CkIO Output
+-----------
+
+The CkIO output library improves the performance of write
 operations by aggregating data at intermediate nodes and batching writes to
 align with the stripe size of the underlying parallel file system (such as
-Lustre). This avoids contention on the I/O nodes by using fewer messages to
+Lustre). This helps avoid contention on the I/O nodes by using fewer messages to
 communicate with them and preventing small or non-contiguous disk operations.
 
 Under the hood, when a write is issued, the associated data is sent to the PE(s)
@@ -809,22 +813,30 @@ entire stripe is actually written to the filesystem all in one fell swoop. The
 size and layout of stripes and the number and organization of aggregating PEs
 are available as options for the user to customize.
 
+CkIO Input
+----------
+
+The CkIO input library similarly aggregates read requests for a single file via an intermediate layer of chares, called "Buffer Chares." The number of Buffer Chares should be chosen to read from the file system with optimal granularity. Currently, the choice of the number of Buffer Chares must be made by the user (via the Options parameter, discussed below), considering factors such as file size, number of PEs, and number of nodes.
+
 Using CkIO
 ----------
 
 CkIO is designed as a session-oriented, callback-centric library. The steps to
-using the library are as follows (each step is invoked via a callback specified
-in an earlier step):
+using the library are different for input and output, but follow the same basic structure:
 
-#. Open a file via ``Ck::IO::open``.
-#. Create a session for writing to the file via ``Ck::IO::startSession``.
-#. Write to the file via ``Ck::IO::write``. Note that this function takes a
-   session token that is passed into the callback.
-#. When the specified amount of data for the session has been written, a
+#. Open a file via ``Ck::IO::open``. Note that at the lowest level CkIO uses POSIX seek, read, and write (or the Microsoft equivalent for Windows) and therefore must only be used on seek-able file types. 
+#. Create a session for writing to the file via ``Ck::IO::startSession`` or create a session for reading from a file via ``Ck::IO::startReadSession``.
+#. Write or read via ``Ck::IO::write`` or ``Ck::IO::read``. Note that these function take a
+   session token that is passed into the callback, which should refer to the current session.
+#. In the case of a read session, the session must be closed manually when the read is complete via ``Ck::IO::closeReadSession``
+#. When the specified amount of data for the session has been written or a read session has been closed, a
    completion callback is invoked, from which one may start another session or
-   close the file via ``Ck::IO::close``.
+   close the file via ``Ck::IO::close`` (same call for writing or reading).
 
-The following functions comprise the interface to the library:
+Parallel Output API
+~~~~~~~~~~~~~~~~~~~
+
+The following functions comprise the interface to the library for parallel file output:
 
 
 - Opening a file:
@@ -839,7 +851,7 @@ The following functions comprise the interface to the library:
   specified file does not exist, it will be created. Should only be called from
   a single PE, once per file.
 
-  ``Ck::IO::Options`` is a struct with the following fields:
+  ``Ck::IO::Options`` is a struct with the following output-relevant fields:
 
   - ``writeStripe`` - Amount of contiguous data (in bytes) to gather before
     writing to the file (default: file system stripe size if using Lustre and
@@ -852,7 +864,7 @@ The following functions comprise the interface to the library:
   - ``skipPEs`` - Gap between participating PEs (default : ``CkMyNodeSize()``)
 
 
-- Starting a session:
+- Starting a write session:
 
   Note there are two variants of the ``startSession`` function, a regular one
   and one that writes a user specified chunk of data to the file at the end of a
@@ -909,8 +921,78 @@ The following functions comprise the interface to the library:
   the ``FileReadyMsg`` sent to the ``opened`` callback after a file has been
   opened. Should only be called from a single PE, once per file.
 
+Parallel Input API
+~~~~~~~~~~~~~~~~~~
 
-Example
--------
+The following functions comprise the interface to the library for parallel file input:
 
-For example code showing how to use CkIO, see ``tests/charm++/io/``.
+
+- Opening a file:
+
+  .. code-block:: c++
+
+     void Ck::IO::open(std::string path, CkCallback opened, Ck::IO::Options opts)
+
+  Open the given file with the options specified in ``opts``, and send a
+  ``FileReadyMsg`` (wraps a ``Ck::IO::File file``) to the ``opened`` callback
+  when the system is ready to accept session requests on that file. If the
+  specified file does not exist, it will be created. Should only be called from
+  a single PE, once per file.
+
+  ``Ck::IO::Options`` is a struct with the following input-relevant fields:
+
+  - ``numReaders`` - number of Buffer Chares, or aggregators. The user should chose this number to optimally decompose the read. Typically, chosing the number of Buffer Chares to be the number of PEs performs well.
+
+
+- Starting a read session:
+
+  Note there are two variants of the ``startReadSession`` function, a regular one and a variant which takes an additional argument allowing the user to map Buffer Chares to specified PEs in a round-robin fashion.
+
+  .. code-block:: c++
+
+    void startReadSession(File file, size_t bytes, size_t offset, CkCallback ready)
+
+  Prepare to read data from ``file``, in the window defined by ``size`` and
+  ``offset`` (both specified in bytes). On starting the session, the buffer 
+  chares begin eagerly reading all requested data into memory. The ready callback 
+  is invoked once these reads have been initiated (but they are not guaranteed to be complete at this point).
+
+  .. code-block:: c++
+
+    void startReadSession(File file, size_t bytes, size_t offset, CkCallback ready, std::vector<int> pes_to_map)
+
+  This function is similar to the previous one, but the extra argument pes_to_map allows the user to specify a list of PEs to map the Buffer Chares to. 
+  This argument should contain a sequence of numbers representing pes. The Buffer Chares will be mapped to the PEs in a round-robin fashion. 
+  This can be useful when the user has a specific decomposition in mind for the read.
+
+- Reading data:
+
+  .. code-block:: c++
+
+    void read(Session session, size_t bytes, size_t offset, char* data, CkCallback after_read);
+
+  This method is invoked to read data asynchronously from the read session. This method returns immediately to the caller, but the 
+  read is only guaranteed complete once the callback ``after_read`` is called. Internally, the read request is buffered
+  until the Buffer Chares can respond with the requested data. After the read finishes, the 
+  after_read callback is invoked taking a ReadCompleteMsg* which points to a vector<char> buffer, the offset,
+  and the number of bytes of the read.
+
+
+- Closing a file:
+
+  .. code-block:: c++
+
+    void Ck::IO::close(Ck::IO::File file, CkCallback closed)
+
+  Close a previously-opened file. All read sessions on that file must have already
+  been closed. Note that ``file`` is provided as a member of
+  the ``FileReadyMsg`` sent to the ``opened`` callback after a file has been
+  opened. This method should only be called from a single PE, once per file.
+
+
+Examples
+--------
+
+For example code showing how to use CkIO for output, see ``tests/charm++/io/``.
+
+For example code showing how to use CkIO for input, see ``tests/charm++/io_read/``.

@@ -298,6 +298,7 @@ void CmiOutOfMemory(int nBytes)
   if (memory_lifeRaft) free(memory_lifeRaft);
   if (nBytes>0) CmiAbort("Could not malloc() %d bytes--are we out of memory? (used :%.3fMB)",nBytes,CmiMemoryUsage()/1000000.0);
   else CmiAbort("Could not malloc()--are we out of memory? (used: %.3fMB)", CmiMemoryUsage()/1000000.0);
+  CMI_NORETURN_FUNCTION_END
 }
 
 /* Global variables keeping track of the status of the system (mostly used by charmdebug) */
@@ -1274,7 +1275,7 @@ void CmiFreeAligned(void* ptr) {
 
 
 // Replace remaining symbols found in glibc's malloc.o to avoid linker errors
-// See: https://github.com/UIUC-PPL/charm/issues/1325
+// See: https://github.com/charmplusplus/charm/issues/1325
 
 #if (CMK_MEMORY_BUILD_OS && CMK_MEMORY_BUILD_OS_WRAPPED && !CMK_MEMORY_BUILD_GNU_HOOKS) || !CMK_MEMORY_BUILD_OS
 

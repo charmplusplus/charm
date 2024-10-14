@@ -3460,7 +3460,9 @@ static void CmiTmpSetup(CmiTmpBuf_t *b) {
 
 void *CmiTmpAlloc(int size) {
   if (!CpvInitialized(CmiTmpBuf)) {
-    return malloc(size);
+    void* buf = malloc(size);
+    _MEMCHECK(buf);
+    return buf;
   }
   else { /* regular case */
     CmiTmpBuf_t *b=&CpvAccess(CmiTmpBuf);
@@ -3469,7 +3471,11 @@ void *CmiTmpAlloc(int size) {
       if (b->max==0) /* We're just uninitialized */
         CmiTmpSetup(b);
       else /* We're really out of space! */
-        return malloc(size);
+      {
+        void* buf = malloc(size);
+        _MEMCHECK(buf);
+        return buf;
+      }
     }
     t=b->buf+b->cur;
     b->cur+=size;

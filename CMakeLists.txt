@@ -10,23 +10,27 @@
 # - the buildcmake script
 # - files in cmake/
 
-cmake_minimum_required(VERSION 3.4)
+cmake_minimum_required(VERSION 3.4...3.5)
 
 # Print warning
 message("##################################################################")
 message("# The CMake build system may not support advanced build options. #")
 message("# Please let us know if you experience any problems by opening   #")
-message("# an issue on our GitHub (https://github.com/UIUC-PPL/charm),    #")
+message("# an issue on our GitHub (https://github.com/charmplusplus/charm)#")
 message("# with the below configuration information.                      #")
 message("# You can run './buildold' to use the previous build system.     #")
 message("##################################################################")
 
 if(CMAKE_VERSION VERSION_GREATER 3.12 OR CMAKE_VERSION VERSION_EQUAL 3.12)
   cmake_policy(SET CMP0075 NEW)
+
+  if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.17)
+    cmake_policy(SET CMP0102 NEW)
+  endif()
 endif()
 
 # Fortran is optional, so don't include it in LANGUAGES here
-project(Charm++ LANGUAGES CXX C ASM VERSION 7.0.0)
+project(Charm++ LANGUAGES CXX C ASM VERSION 8.0.1)
 
 find_package(Threads)
 find_package(OpenMP) # Do this before Fortran, in case we don't have a Fortran compiler
@@ -68,6 +72,8 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Cray")
   set(CMK_COMPILER craycc)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "PGI")
   set(CMK_COMPILER pgcc)
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "NVHPC")
+  set(CMK_COMPILER nvhpc)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "XL")
   # FIXME: No support for 32-bit XLC
   set(CMK_COMPILER xlc64)
@@ -77,12 +83,12 @@ else()
   message(FATAL_ERROR "Unknown compiler ${CMAKE_CXX_COMPILER_ID}")
 endif()
 
+option(ENABLE_FORTRAN "Enable Fortran" ON)
+
 # No Fortran support with MSVC
-if(NOT CMK_COMPILER STREQUAL "msvc")
+if(NOT CMK_COMPILER STREQUAL "msvc" AND ENABLE_FORTRAN)
   enable_language(Fortran OPTIONAL)
 endif()
-
-option(ENABLE_FORTRAN "Enable Fortran" ON)
 
 if(ENABLE_FORTRAN AND CMAKE_Fortran_COMPILER)
   include(FortranCInterface)
@@ -149,6 +155,9 @@ option(OMP "Enable OpenMP support in Charm++" OFF)
 option(TCP "use TCP sockets for communication (only for netlrts)" OFF)
 option(PTHREADS "compile with pthreads Converse threads" OFF)
 
+# Slingshot-11 specific, off by default, auto enabled if support is found
+option(CXI "Enable CXI (Cassini/Slingshot-11) extensions to OFI" OFF)
+
 # Advanced options:
 option(OOC "Compile with out of core support" OFF)
 option(SYNCFT "Compile with Charm++ fault tolerance support" OFF)
@@ -205,7 +214,7 @@ option(CUDA                "Build with CUDA support" OFF)
 option(PXSHM               "Build with PXSHM" OFF)
 
 # LRTS PMI options
-set(LRTS_PMI "" CACHE STRING "PMI type for UCX and OFI layers, can be one of simplepmi, slurmpmi, slurmpmi2, ompipmix, or openpmix")
+set(LRTS_PMI "" CACHE STRING "PMI type for UCX and OFI layers, can be one of simplepmi, slurmpmi, slurmpmi2, slurmpmi2cray, ompipmix, or openpmix")
 
 set(EXTRA_OPTS "" CACHE STRING "Extra flags to pass to compilers.")
 
@@ -326,16 +335,27 @@ endif()
 
 # Check for Python
 # PythonCCS requires Python v2.x and is the only target that uses this
-# With CMake 3.12+ we could use FindPython() here
 set(CMK_HAS_PYTHON 0)
 set(CMK_PYTHON_VERSION "")
 set(CMK_BUILD_PYTHON "")
 
-set(Python_ADDITIONAL_VERSIONS 2)
-find_package(PythonInterp)
+if(CMAKE_VERSION VERSION_GREATER 3.12 OR CMAKE_VERSION VERSION_EQUAL 3.12)
+  find_package(Python2 COMPONENTS Interpreter)
+  if(Python2_FOUND)
+    set(CMK_PYTHON_VERSION_MAJOR ${Python2_VERSION_MAJOR})
+    set(CMK_PYTHON_VERSION_MINOR ${Python2_VERSION_MINOR})
+  endif()
+else()
+  set(Python_ADDITIONAL_VERSIONS 2)
+  find_package(PythonInterp)
+  if(PYTHONINTERP_FOUND)
+    set(CMK_PYTHON_VERSION_MAJOR ${PYTHON_VERSION_MAJOR})
+    set(CMK_PYTHON_VERSION_MINOR ${PYTHON_VERSION_MINOR})
+  endif()
+endif()
 
-if(PYTHONINTERP_FOUND)
-  set(__MY_PYTHON_VER "${PYTHON_VERSION_MAJOR}.${PYTHON_VERSION_MINOR}")
+if(CMK_PYTHON_VERSION_MAJOR)
+  set(__MY_PYTHON_VER "${CMK_PYTHON_VERSION_MAJOR}.${CMK_PYTHON_VERSION_MINOR}")
   check_include_file(python${__MY_PYTHON_VER}/Python.h __MY_HAS_PYTHONH)
   if(__MY_HAS_PYTHONH)
     set(CMK_HAS_PYTHON 1)
@@ -422,10 +442,9 @@ if(${NETWORK} STREQUAL "ucx")
 endif()
 
 set(CMK_BUILD_OFI 0)
-if(${NETWORK} STREQUAL "ofi")
+if(${NETWORK} MATCHES "ofi")
   set(CMK_BUILD_OFI 1)
 endif()
-
 
 set(CMK_ERROR_CHECKING ${ERROR_CHECKING})
 set(CMK_LOCKLESS_QUEUE 0)
@@ -457,7 +476,7 @@ if (NOT CMAKE_BUILD_TYPE)
 endif()
 
 if (NOT CMK_MEMPOOL_CUTOFFNUM)
-  set(CMK_MEMPOOL_CUTOFFNUM 26)
+  set(CMK_MEMPOOL_CUTOFFNUM 28)
 endif()
 
 set(CMK_OPTIMIZE 0)
@@ -515,6 +534,7 @@ endif()
 
 include(cmake/detect-features.cmake)
 include(cmake/ci-files.cmake)
+
 
 if(${TARGET} STREQUAL "all-test")
   add_custom_target(all-test ALL COMMAND $(MAKE) -C ${CMAKE_BINARY_DIR}/tmp all-test
@@ -587,11 +607,13 @@ set(CMK_ENABLE_C11   ${CMAKE_C11_EXTENSION_COMPILE_OPTION})
 
 # Use -std=gnu++11 if available
 if(NOT "${CMAKE_CXX11_EXTENSION_COMPILE_OPTION}" STREQUAL "")
-  set(OPTS_CXX "${OPTS_CXX} ${CMAKE_CXX11_EXTENSION_COMPILE_OPTION}")
-  set(CMK_ENABLE_CPP11 ${CMAKE_CXX11_EXTENSION_COMPILE_OPTION})
+  string(REPLACE ";" " " MY_CMAKE_CXX11_EXTENSION_COMPILE_OPTION "${CMAKE_CXX11_EXTENSION_COMPILE_OPTION}")
+  set(OPTS_CXX "${OPTS_CXX} ${MY_CMAKE_CXX11_EXTENSION_COMPILE_OPTION}")
+  set(CMK_ENABLE_CPP11 ${MY_CMAKE_CXX11_EXTENSION_COMPILE_OPTION})
 else()
-  set(OPTS_CXX "${OPTS_CXX} ${CMAKE_CXX11_STANDARD_COMPILE_OPTION}")
-  set(CMK_ENABLE_CPP11 ${CMAKE_CXX11_STANDARD_COMPILE_OPTION})
+  string(REPLACE ";" " " MY_CMAKE_CXX11_STANDARD_COMPILE_OPTION "${CMAKE_CXX11_STANDARD_COMPILE_OPTION}")
+  set(OPTS_CXX "${OPTS_CXX} ${MY_CMAKE_CXX11_STANDARD_COMPILE_OPTION}")
+  set(CMK_ENABLE_CPP11 ${MY_CMAKE_CXX11_STANDARD_COMPILE_OPTION})
 endif()
 
 set(CMK_CC ${CMAKE_C_COMPILER})
@@ -617,6 +639,8 @@ configure_file(src/arch/common/cc-craycc.h                   include/ COPYONLY)
 configure_file(src/arch/common/cc-craycc.sh                  include/ COPYONLY)
 configure_file(src/arch/common/cc-msvc.h                     include/ COPYONLY)
 configure_file(src/arch/common/cc-msvc.sh                    include/ COPYONLY)
+configure_file(src/arch/common/cc-nvhpc.sh                   include/ COPYONLY)
+configure_file(src/arch/common/cc-nvhpc.h                    include/ COPYONLY)
 configure_file(src/arch/common/cc-pgcc.h                     include/ COPYONLY)
 configure_file(src/arch/common/cc-pgcc.sh                    include/ COPYONLY)
 configure_file(src/arch/common/cc-icc.sh                     include/ COPYONLY)
@@ -644,6 +668,8 @@ configure_file(src/arch/common/conv-mach-ifort.sh            include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-ifort.h             include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-nolb.h              include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-nolb.sh             include/ COPYONLY)
+configure_file(src/arch/common/conv-mach-nvfortran.sh        include/ COPYONLY)
+configure_file(src/arch/common/conv-mach-nvfortran.h         include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-omp.sh              include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-omp.h               include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-ooc.h               include/ COPYONLY)
@@ -670,9 +696,29 @@ if(CUDA)
     configure_file(${file} include/ COPYONLY)
   endforeach()
 
-  find_package(CUDA REQUIRED)
-  set(CUDA_DIR ${CUDA_TOOLKIT_ROOT_DIR})
+  if(CMAKE_VERSION VERSION_GREATER 3.17 OR CMAKE_VERSION VERSION_EQUAL 3.17)
+    find_package(CUDAToolkit REQUIRED)
+    set(CMAKE_CUDA_COMPILER "${CUDAToolkit_NVCC_EXECUTABLE}")
+    enable_language(CUDA)
+    set(CUDA_DIR "${CUDAToolkit_TARGET_DIR}")
+  else()
+    find_package(CUDA REQUIRED)
+    set(CUDA_DIR "${CUDA_TOOLKIT_ROOT_DIR}")
+  endif()
   add_library(cudahybridapi ${hybridAPI-cxx-sources})
+  if(TRACING)
+    target_compile_definitions(cudahybridapi PRIVATE HAPI_TRACE)
+  endif()
+endif()
+
+if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-cxi.sh)
+  configure_file(src/arch/${VDIR}/conv-mach-cxi.sh         include/ COPYONLY)
+  configure_file(src/arch/${VDIR}/conv-mach-cxi.h          include/ COPYONLY)
+endif()
+
+if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-slurmpmi2cray.sh)
+  configure_file(src/arch/${VDIR}/conv-mach-slurmpmi2cray.sh         include/ COPYONLY)
+  configure_file(src/arch/${VDIR}/conv-mach-slurmpmi2cray.h          include/ COPYONLY)
 endif()
 
 if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-pxshm.sh)
@@ -772,7 +818,7 @@ set(src-util-h-sources src/util/SSE-Double.h src/util/SSE-Float.h
     src/util/partitioning_strategies.h src/util/pup.h src/util/pup_c.h
     src/util/pup_cmialloc.h src/util/pup_mpi.h src/util/pup_paged.h
     src/util/pup_stl.h src/util/pup_toNetwork.h src/util/pup_toNetwork4.h
-    src/util/pupf.h src/util/rand48_replacement.h src/util/random_sequence.h
+    src/util/rand48_replacement.h src/util/random_sequence.h
     src/util/simd.h src/util/sockRoutines.h src/util/spanningTree.h
     src/util/spanningTreeStrategy.h src/util/spanningTreeVertex.h
     src/util/strided_sequence.h src/util/treeStrategy_3dTorus_minBytesHops.h
@@ -781,6 +827,13 @@ set(src-util-h-sources src/util/SSE-Double.h src/util/SSE-Float.h
     src/util/treeStrategy_nodeAware_minGens.h src/util/treeStrategy_topoUnaware.h
     src/util/uFcontext.h src/util/uJcontext.h src/util/valgrind.h
     src/util/vector2d.h)
+
+if(CMK_CAN_LINK_FORTRAN)
+    set(src-util-h-sources
+        ${src-util-h-sources}
+        src/util/pupf.h
+    )
+endif()
 
 foreach(filename ${src-util-h-sources})
     configure_file(${filename} include/ COPYONLY)
@@ -792,6 +845,8 @@ if(${NETWORK} MATCHES "ucx" OR ${NETWORK} MATCHES "ofi")
   # file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/proc_management/simple_pmi)
 
   set(proc_management-sources
+  src/arch/util/proc_management/runtime-craypmi2.C
+  src/arch/util/proc_management/runtime-craypmi.C
   src/arch/util/proc_management/runtime-pmi.C
   src/arch/util/proc_management/runtime-pmix.C
   src/arch/util/proc_management/runtime-codec.h
@@ -896,7 +951,17 @@ configure_file(src/libs/ck-libs/NDMeshStreamer/libmoduleNDMeshStreamer.dep ${CMA
 
 # TCharm
 file(GLOB tcharm-c-sources src/libs/ck-libs/tcharm/*.c)
-file(GLOB tcharm-h-sources src/libs/ck-libs/tcharm/*.h)
+set(tcharm-h-sources
+    src/libs/ck-libs/tcharm/tcharm.h
+    src/libs/ck-libs/tcharm/tcharm_impl.h
+    src/libs/ck-libs/tcharm/tcharmc.h
+)
+if(CMK_CAN_LINK_FORTRAN)
+    set(tcharm-h-sources
+        ${tcharm-h-sources}
+        src/libs/ck-libs/tcharm/tcharmf.h
+    )
+endif()
 add_library(moduletcharm src/libs/ck-libs/tcharm/tcharm.C ${tcharm-h-sources} ${CMAKE_BINARY_DIR}/include/tcharm.decl.h)
 add_library(moduletcharmmain src/libs/ck-libs/tcharm/tcharmmain.C ${CMAKE_BINARY_DIR}/include/tcharm.decl.h ${CMAKE_BINARY_DIR}/include/tcharmmain.decl.h)
 add_library(tcharm-compat ${tcharm-c-sources} ${CMAKE_BINARY_DIR}/include/tcharm.decl.h ${CMAKE_BINARY_DIR}/include/tcharmmain.decl.h)
@@ -924,7 +989,11 @@ if(${TARGET} STREQUAL "charm4py")
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
   add_library(charm SHARED empty.cpp)
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib_so)
-  target_link_libraries(charm ck converse memory-default threads-default ldb-rand "-Llib/ -standalone -whole-archive -c++stl -shared")
+  if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    target_link_libraries(charm ck converse memory-default threads-default ldb-rand "-Llib/ -standalone -all_load -c++stl -shared")
+  else()
+    target_link_libraries(charm ck converse memory-default threads-default ldb-rand "-Llib/ -standalone -whole-archive -c++stl -shared")
+  endif()
 
   add_dependencies(charm hwloc)
 endif()
@@ -963,6 +1032,12 @@ else()
   set(CMK_USER_DISABLED_TLS "0")
 endif()
 
+
+if(CMK_BUILD_ON_CXI)
+	set(CMK_CXI 1)
+	set(CXI ON)
+endif()
+
 foreach(l BUILDOPTS CMK_AMPI_WITH_ROMIO CMK_BUILD_PYTHON CMK_CAN_LINK_FORTRAN
         CMK_CHARMDEBUG CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS CMK_HAS_INT16 CMK_HAS_MMAP
         CMK_LIBJPEG CMK_MOD_EXT CMK_SUPPORTS_FSGLOBALS CMK_SUPPORTS_PIPGLOBALS
@@ -972,7 +1047,7 @@ foreach(l BUILDOPTS CMK_AMPI_WITH_ROMIO CMK_BUILD_PYTHON CMK_CAN_LINK_FORTRAN
         CXX_NO_AS_NEEDED LDXX_WHOLE_ARCHIVE_PRE LDXX_WHOLE_ARCHIVE_POST
         CMK_MACOSX CMK_POST_EXE CMK_SHARED_SUF CMK_USER_SUFFIX OPTS_LD
         CMK_COMPILER_KNOWS_FVISIBILITY CMK_LINKER_KNOWS_UNDEFINED
-        CMK_SUPPORTS_MEMORY_ISOMALLOC CUDA_DIR CMK_USER_DISABLED_TLS)
+        CMK_SUPPORTS_MEMORY_ISOMALLOC CUDA_DIR CMK_USER_DISABLED_TLS CMK_CXI)
     file(APPEND ${optfile_sh} "${l}=\"${${l}}\"\n" )
 endforeach(l)
 
@@ -993,7 +1068,7 @@ set(optfile_h ${CMAKE_BINARY_DIR}/include/conv-mach-opt.h)
 
 file(WRITE  ${optfile_h} "/* Build-time options header, automatically generated by cmake. */\n")
 foreach(l CMK_AMPI_WITH_ROMIO CMK_OPTIMIZE CMK_AMPI_ONLY CMK_POST_EXE CMK_SHARED_SUF
-        CMK_USER_SUFFIX)
+        CMK_USER_SUFFIX CMK_CXI)
     file(APPEND ${optfile_h} "#define ${l} ${${l}}\n")
 endforeach(l)
 
@@ -1015,12 +1090,13 @@ foreach(l CUDA_DIR BUILD_CUDA CMK_AMPI_WITH_ROMIO CMK_MACOSX CMK_BUILD_PYTHON
         CMK_SMP CMK_SUPPORTS_FSGLOBALS CMK_SUPPORTS_PIPGLOBALS CMK_SUPPORTS_PIEGLOBALS
         CMK_SUPPORTS_SWAPGLOBALS CMK_SUPPORTS_TLSGLOBALS CMK_HAS_OPENMP
         CMK_TRACE_ENABLED CMK_USE_LRTS CMK_VDIR OPTSATBUILDTIME CMK_AMPI_ONLY CMK_WINDOWS
-        CMK_USE_CMA CMK_USER_SUFFIX CMK_CAN_LINK_FORTRAN CMK_SUPPORTS_MEMORY_ISOMALLOC)
+        CMK_USE_CMA CMK_USER_SUFFIX CMK_CAN_LINK_FORTRAN CMK_SUPPORTS_MEMORY_ISOMALLOC
+	CMK_CXI)
     file(APPEND ${optfile_mak} "${l}:=${${l}}\n" )
 endforeach(l)
 
 # Add options
-foreach(opt SMP OMP TCP PTHREADS SYNCFT PXSHM PERSISTENT OOC CUDA PAPI)
+foreach(opt SMP OMP TCP PTHREADS SYNCFT PXSHM PERSISTENT OOC CUDA PAPI CXI)
     if(${opt})
         string(TOLOWER ${opt} optl)
         file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/conv-mach-${optl}.sh\n")
@@ -1028,7 +1104,6 @@ foreach(opt SMP OMP TCP PTHREADS SYNCFT PXSHM PERSISTENT OOC CUDA PAPI)
         set(opts_enabled "${opts_enabled}${opt} ")
     endif()
 endforeach()
-
 # Options that need no .h/.sh additions
 foreach(opt TRACING TRACING_COMMTHREAD ERROR_CHECKING LBUSERDATA QLOGIC
   BUILD_SHARED TASK_QUEUE DRONE_MODE LOCKLESS_QUEUE CHARMDEBUG CCS CONTROLPOINT
@@ -1109,6 +1184,7 @@ message("  CMake:           ${CMAKE_COMMAND} [${CMAKE_VERSION}]")
 message("  Charmc flags:    ${MAIN_CFLAGS}")
 message("  Enabled options: ${opts_enabled}")
 message("==============================")
+
 
 # Make symlinks
 if(CMK_WINDOWS)
@@ -1192,7 +1268,7 @@ install(
   DESTINATION .)
 endif()
 
-#install all executables
+# install all executables
 install(
   DIRECTORY ${CMAKE_BINARY_DIR}/bin
   DESTINATION .

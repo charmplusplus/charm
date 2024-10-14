@@ -192,7 +192,7 @@ End() {
         for FILE in "${FILES[@]}"
         do
             #BASE="$(stripExtension "$FILE")"
-            MYTMP="$(basename "$FILE").TMP"
+            MYTMP="$(basename "$FILE").$$.TMP"
             $RM "$MYTMP.P.C" "$MYTMP.cpp" "$MYTMP.space" "$MYTMP.xlat" "$MYTMP.o"
             $RM "$MYTMP.c" "$MYTMP.c.0.h" "$MYTMP.c.1.h" "$MYTMP.c.2.h"
             $RM "$MYTMP.i" "$MYTMP.$CMK_CPP_SUFFIX"
@@ -321,10 +321,6 @@ AddModules() {
     done
 }
 
-# TEMP_BASE is appended with this script's process ID (PID),
-# so multiple charmcs can run in parallel without overwriting
-# each other's temporary files.
-TEMP_BASE="/tmp/charmc_tmp.$$"
 
 # Try to find CHARMBIN by looking in directory where charmc is
 findCharmBin() {
@@ -725,12 +721,12 @@ do
 		;;
 	@*.rsp)
 		# Pass through response files (*.rsp) to the compiler.
-		# See https://github.com/UIUC-PPL/charm/issues/2617 for details.
+		# See https://github.com/charmplusplus/charm/issues/2617 for details.
 		ARG_OPTS+=("$arg")
 		;;
 	*.tbd)
 		# Pass through text-based libraries (*.tbd) on MacOS.
-		# See https://github.com/UIUC-PPL/charm/issues/3045 for details.
+		# See https://github.com/charmplusplus/charm/issues/3045 for details.
 		ARG_OPTS+=("$arg")
 		;;
 	-D*|-I*)
@@ -1123,7 +1119,7 @@ findModuleDep() {
 	PROCESSED_MODULES+=("$M")
 	PRE_LIBRARIES=("-lmodule$M" "${PRE_LIBRARIES[@]}")
 
-	if [[ "$M" == 'CkLoop' && "$CMK_SMP" != '1' && "$CMK_WINDOWS" != '1' ]]; then
+	if [[ ("$M" == 'CkLoop' || "$M" == 'CkIO')&& "$CMK_SMP" != '1' && "$CMK_WINDOWS" != '1' ]]; then
 		# CkLoop depends on pthreads in non-SMP, non-Windows machines,
 		# so make sure it is linked.
 		POST_LIBRARIES+=(-pthread)
@@ -1832,7 +1828,7 @@ Debug "Preprocessing GEN-CPM files"
 for FILE in "${GENCPM[@]}"
 do
 	BASE="$(stripExtension "$FILE")"
-	MYTMP="$(basename "$FILE").TMP"
+	MYTMP="$(basename "$FILE").$$.TMP"
 	DELETE+=("$MYTMP.c" "$MYTMP.i")
 	DoNoErrCheck $RM "$BASE.cpm.h" "$MYTMP.c"
 	runCmd touch "$BASE.cpm.h"
@@ -1855,7 +1851,7 @@ numFiles="${#FILES[@]}"
 for FILE in "${FILES[@]}"
 do
 	BASE="$(stripExtension "$(basename "$FILE")")"
-	MYTMP="$(basename "$FILE").TMP"
+	MYTMP="$(basename "$FILE").$$.TMP"
 	FILE_EXT="$(getExtension "$FILE")"
 	BASEO="$BASE.o"
 	DESTO=(-o "$BASEO")
@@ -1912,7 +1908,8 @@ do
                 [[ "$PARADIGM" = "f90charm" ]] && XIOPTS+=(-f90)
                 if [[ "$PREPROCESS_CI" = 'yes' ]]
                 then
-		  runCmd $CMK_CPP_CHARM "${OPTS_CPP[@]}" "$FILE" | runCmd "$CHARMBIN/charmxi" "${XIOPTS[@]}" -orig-file "$FILE"
+		  runCmd $CMK_CPP_CHARM "${OPTS_CPP[@]}" "$FILE"  "$MYTMP.i"
+		  runCmd "$CHARMBIN/charmxi" "${XIOPTS[@]}" -orig-file "$FILE" "$MYTMP.i"
                 else
 		  runCmd "$CHARMBIN/charmxi" "${XIOPTS[@]}" "$FILE"
                 fi

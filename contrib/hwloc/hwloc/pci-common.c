@@ -153,7 +153,7 @@ hwloc_pci_discovery_prepare(struct hwloc_topology *topology)
 	  }
 	  free(buffer);
 	} else {
-          if (hwloc_hide_errors() < 2)
+          if (HWLOC_SHOW_CRITICAL_ERRORS())
             fprintf(stderr, "hwloc/pci: Ignoring HWLOC_PCI_LOCALITY file `%s' too large (%lu bytes)\n",
                     env, (unsigned long) st.st_size);
 	}
@@ -340,7 +340,7 @@ hwloc_pci_add_object(struct hwloc_obj *parent, struct hwloc_obj **parent_io_firs
     }
     case HWLOC_PCI_BUSID_EQUAL: {
       static int reported = 0;
-      if (!reported && hwloc_hide_errors() < 2) {
+      if (!reported && HWLOC_SHOW_CRITICAL_ERRORS()) {
         fprintf(stderr, "*********************************************************\n");
         fprintf(stderr, "* hwloc %s received invalid PCI information.\n", HWLOC_VERSION);
         fprintf(stderr, "*\n");
@@ -481,6 +481,13 @@ hwloc__pci_find_busid_parent_quirk(struct hwloc_topology *topology,
   }
 
   if (topology->pci_locality_quirks & HWLOC_PCI_LOCALITY_QUIRK_CRAY_EX235A) {
+    /* AMD Trento has xGMI ports connected to individual CCDs (8 cores + L3)
+     * instead of NUMA nodes (pairs of CCDs within Trento) as is usual in AMD EPYC CPUs.
+     * This is not described by the ACPI tables, hence we need to manually hardwire
+     * the xGMI locality for the (currently single) server that currently uses that CPU.
+     * It's not clear if ACPI tables can/will ever be fixed (would require one initiator
+     * proximity domain per CCD), or if Linux can/will work around the issue.
+     */
     if (busid->domain == 0) {
       if (busid->bus >= 0xd0 && busid->bus <= 0xd1) {
         hwloc_bitmap_set_range(cpuset, 0, 7);
@@ -567,7 +574,7 @@ hwloc__pci_find_busid_parent(struct hwloc_topology *topology, struct hwloc_pcide
     if (env) {
       static int reported = 0;
       if (!topology->pci_has_forced_locality && !reported) {
-        if (!hwloc_hide_errors())
+        if (HWLOC_SHOW_ALL_ERRORS())
           fprintf(stderr, "hwloc/pci: Environment variable %s is deprecated, please use HWLOC_PCI_LOCALITY instead.\n", env);
 	reported = 1;
       }
@@ -1032,6 +1039,7 @@ hwloc_pci_class_string(unsigned short class_id)
       switch (class_id) {
 	case 0x0500: return "RAM";
 	case 0x0501: return "Flash";
+        case 0x0502: return "CXLMem";
       }
       return "Memory";
     case 0x06:

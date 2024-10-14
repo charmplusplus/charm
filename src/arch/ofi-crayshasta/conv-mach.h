@@ -75,7 +75,12 @@
 
 #define CMK_64BIT                      1
 #define CMK_AMD64                      1
-
+#ifdef CMK_HAS_GET_MYADDRESS
+#undef CMK_HAS_GET_MYADDRESS
+#define CMK_HAS_GET_MYADDRESS 0
+#else
+#define CMK_HAS_GET_MYADDRESS 0
+#endif
 /* Other possible definitions:
 
 In fault tolerant architectures, CK_MEM_CHECKPOINT can be set. In this case the
@@ -83,7 +88,7 @@ extended header must contain also another field called "pn" (phase number).
 
 */
 
-/* Use PMI2 by default on Cray systems with cray-pmi */
-#include "conv-mach-slurmpmi2.h"
+/* Use PMI2 with cray extensions by default on Cray systems with cray-pmi */
+#include "conv-mach-slurmpmi2cray.h"
 
 #endif
