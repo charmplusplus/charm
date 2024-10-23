@@ -647,7 +647,7 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
   -DCCS="$opt_ccs" \
   -DCHARMDEBUG="$opt_charmdebug" \
   -DCONTROLPOINT="$opt_controlpoint" \
-  -DCUDA="$opt_cuda" \
+  -DBUILD_CUDA="$opt_cuda" \
   -DDISABLE_TLS="$opt_disabletls" \
   -DDRONE_MODE="$opt_drone_mode" \
   -DENABLE_FORTRAN=$opt_enable_fortran \
