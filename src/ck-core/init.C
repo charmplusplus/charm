@@ -139,10 +139,12 @@ int   _infoIdx;
 int   _charmHandlerIdx;
 int   _initHandlerIdx;
 int   _roRestartHandlerIdx;
+int   _shrinkExpandRestartHandlerIdx;
 int   _bocHandlerIdx;
 int   _qdHandlerIdx;
 int   _qdCommHandlerIdx;
 int   _triggerHandlerIdx;
+
 bool  _mainDone = false;
 CksvDeclare(bool, _triggersSent);
 
@@ -1429,6 +1431,7 @@ void _initCharm(int unused_argc, char **argv)
 #if CMK_SHRINK_EXPAND
 	// for shrink expand cleanup
 	CmiAssignOnce(&_ROGroupRestartHandlerIdx, CkRegisterHandler(_ROGroupRestartHandler));
+	CmiAssignOnce(&_shrinkExpandRestartHandlerIdx, CkRegisterHandler(CkRecvGroupROData));
 #endif
 
 	_infoIdx = CldRegisterInfoFn((CldInfoFn)_infoFn);

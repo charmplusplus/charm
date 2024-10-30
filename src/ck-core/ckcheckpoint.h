@@ -41,6 +41,9 @@ restarting of Charm++ programs. ...
     }	\
   }
 
+
+//int   _shrinkExpandRestartHandlerIdx;
+
 // utility functions to pup system global tables
 void CkPupROData(PUP::er &p);
 void CkPupMainChareData(PUP::er &p, CkArgMsg *args);
@@ -50,6 +53,7 @@ void CkPupNodeGroupData(PUP::er &p);
 void CkPupArrayElementsData(PUP::er &p, int notifyListeners=1);
 void CkPupProcessorData(PUP::er &p);
 void CkRemoveArrayElements();
+void CkRecvGroupROData(char* msg);
 //void CkTestArrayElements();
 
 // If writersPerNode <= 0 the number of writers is unchanged, if > 0, then set to
