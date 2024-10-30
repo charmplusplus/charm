@@ -12,8 +12,6 @@ clients, including the rest of Charm++, are actually C++.
 
 #include "pathHistory.h"
 
-
-
 #if CMK_LBDB_ON
 #include "LBManager.h"
 #endif // CMK_LBDB_ON
@@ -47,17 +45,6 @@ int CkIndex_Group::__idx;
 int CkIndex_ArrayBase::__idx=-1;
 
 extern int _defaultObjectQ;
-
-
-#include "hapi.h"
-void CkHapiAddCallback(long stream, void (*cb)(void*, void*), int fid) 
-{
-  
-  cudaStream_t stream_ptr = (cudaStream_t)stream;
-  CkCallback callback(cb, (void *) fid);
-  
-  hapiAddCallback(stream_ptr, callback, NULL);
-}
 
 void _initChareTables()
 {
@@ -2649,6 +2636,18 @@ void CkArrayExtSend_multi(int aid, int *idx, int ndims, int epIdx, int num_bufs,
     CkBroadcastMsgArray(epIdx, impl_amsg, gId, 0);
   }
 }
+
+
+#if CMK_CUDA
+#include "hapi.h"
+void CkHapiAddCallback(long stream, void (*cb)(void*, void*), int fid) 
+{
+  cudaStream_t stream_ptr = (cudaStream_t)stream;
+  CkCallback callback(cb, (void *) fid);
+  
+  hapiAddCallback(stream_ptr, callback, NULL);
+}
+#endif // CMK_CUDA
 
 #endif
 

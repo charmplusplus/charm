@@ -1370,7 +1370,7 @@ void hapiPollEvents(void* param) {
     queue.pop(); // TODO: investigate possible race condition with charm4py futures - temporarily resolved by popping here
     if (cudaEventQuery(hev.event) == cudaSuccess) {
       // invoke Charm++ callback if one was given
-      hev.cb.send(hev.cb_msg); 
+      hev.cb.send(hev.cb_msg);
 
       // clean up hapiWorkRequest
       if (hev.wr) {
