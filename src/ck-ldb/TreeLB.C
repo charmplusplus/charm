@@ -10,17 +10,6 @@
 #include "json.hpp"
 
 extern int quietModeRequested;
-#if CMK_SHRINK_EXPAND
-extern "C" void charmrun_realloc(char *s);
-extern char willContinue;
-extern realloc_state pending_realloc_state;
-extern char * se_avail_vector;
-extern "C" int mynewpe;
-extern char *_shrinkexpand_basedir;
-extern int numProcessAfterRestart;
-extern bool load_balancer_created;
-extern int mynewpe;
-#endif
 
 static void lbinit()
 {
@@ -32,9 +21,6 @@ static void lbinit()
   }
   LBRegisterBalancer<TreeLB>(
       "TreeLB", "Pluggable hierarchical LB with available strategies:" + o.str());
-#if CMK_SHRINK_EXPAND
-  load_balancer_created = true;
-#endif
 }
 
 void TreeLB::Migrated(int waitBarrier)
@@ -514,74 +500,22 @@ void TreeLB::migrateObjects(const IDM& mig_order)
 
 void TreeLB::checkForRealloc()
 {
-#if CMK_SHRINK_EXPAND
-  if(pending_realloc_state == REALLOC_MSG_RECEIVED) 
-  {
-    pending_realloc_state = REALLOC_IN_PROGRESS; //in progress
-    CkPrintf("Load balancer invoking charmrun to handle reallocation on pe %d\n", CkMyPe());
-    double end_lb_time = CkWallTimer();
-    //CkPrintf("CharmLB> %s: PE [%d] step %d finished at %f duration %f s\n\n",
-    //    lbname, cur_ld_balancer, step()-1, end_lb_time,	end_lb_time-start_lb_time);
-    // do checkpoint
-    CkCallback cb(CkIndex_TreeLB::resumeFromReallocCheckpoint(), thisProxy[0]);
-    CkStartCheckpoint(_shrinkexpand_basedir, cb);
-  }
-  else
-  {
-    thisProxy.lb_done_impl();
-  }
-#endif
 }
 
 void TreeLB::resumeFromReallocCheckpoint()
 {
-#if CMK_SHRINK_EXPAND
-  std::vector<char> avail(se_avail_vector, se_avail_vector + CkNumPes());
-  free(se_avail_vector);
-  thisProxy.willIbekilled(avail, numProcessAfterRestart);
-#endif
 }
 
-#if CMK_SHRINK_EXPAND
-int getNewPeNumber(std::vector<char> avail)
-{
-  int mype = CkMyPe();
-  int count =0;
-  for (int i =0; i <mype; i++)
-  {
-    if(avail[i] == 0) count++;
-  }
-  return (mype - count);
-}
-#endif
 
-void TreeLB::willIbekilled(std::vector<char> avail, int newnumProcessAfterRestart){
-#if CMK_SHRINK_EXPAND
-  numProcessAfterRestart = newnumProcessAfterRestart;
-  mynewpe = getNewPeNumber(avail);
-  willContinue = avail[CkMyPe()];
-  CkCallback cb(CkIndex_TreeLB::startCleanup(), thisProxy[0]);
-  contribute(cb);
-#endif
-}
+void TreeLB::willIbekilled(std::vector<char> avail, int newnumProcessAfterRestart){}
 
 void TreeLB::startCleanup()
 {
-#if CMK_SHRINK_EXPAND
-  CkCleanup();
-#endif
 }
 
 void TreeLB::lb_done()
 {
-#if CMK_SHRINK_EXPAND
-  // barrier to check for reallocation
-  CkCallback cb(CkIndex_TreeLB::checkForRealloc(), thisProxy[0]);
-  contribute(cb);
-  return;
-#else
     lb_done_impl();
-#endif
 }
 
 void TreeLB::lb_done_impl()

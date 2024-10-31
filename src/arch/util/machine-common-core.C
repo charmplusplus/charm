@@ -1946,6 +1946,7 @@ static char *CopyMsg(char *msg, int len) {
         CmiAbort("Error: out of memory in machine layer\n");
     }
 #endif
+    // FIXME shouldn't this be len+header size??
     memcpy(copy, msg, len);
     return copy;
 }
