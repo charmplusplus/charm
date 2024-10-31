@@ -858,6 +858,7 @@ void CkRecvGroupROData(char* msg)
     }
   }
 #endif
+  CmiFree(msg);
 
 	// for each location, restore arrays
 	//DEBCHK("[%d]Trying to find location manager\n",CkMyPe());
@@ -870,7 +871,7 @@ void CkRecvGroupROData(char* msg)
 	      CkPupArrayElementsData(p);
 	      CmiFclose(datFile);
             }
-	  }
+	}
 
   _inrestart = false;
 
