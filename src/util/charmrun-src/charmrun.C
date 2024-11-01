@@ -1045,8 +1045,9 @@ static void arg_init(int argc, const char **argv)
     if (strcmp(argv[i], "/etc/mpi/hostfile") == 0)
     {
       std::cout << "Saving nodelist arg" << std::endl << std::flush;
-      saved_argv[i] = (char*) malloc(14);
-      strcpy(saved_argv[i], "/app/hostfile");
+      std::string new_filename = "/app/hostfile";
+      saved_argv[i] = (char*) malloc(new_filename.length() + 1);
+      strcpy(saved_argv[i], new_filename.c_str());
     }
     else
       saved_argv[i] = (char *) argv[i];
