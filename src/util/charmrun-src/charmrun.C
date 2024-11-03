@@ -784,8 +784,6 @@ static int arg_server_port = 0;
 static const char *arg_server_auth = NULL;
 static int replay_single = 0;
 
-static char* new_hostfile = "/app/hostfile";
-
 struct TopologyRequest
 {
   int host, socket, core, pu;
@@ -822,8 +820,6 @@ struct TopologyRequest
 TopologyRequest proc_per;
 TopologyRequest onewth_per;
 int auto_provision;
-
-#define BLOCK 1000
 
 void print_nodelist(){
     FILE *f=fopen("/app/hostfile","r");
