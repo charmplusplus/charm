@@ -1033,10 +1033,7 @@ static void arg_init(int argc, const char **argv)
   /* move it to a function */
   saved_argc = argc;
   saved_argv = (char **) malloc(sizeof(char *) * (saved_argc));
-  std::cout << "Printing args\n" << std::flush;
   for (int i = 0; i < saved_argc; i++) {
-    printf("%s\n", argv[i]);
-    std::cout << std::flush;
     //  MACHSTATE1(2,"Parameters %s",Cmi_argvcopy[i]);
     /*if (strcmp(argv[i], "/etc/mpi/hostfile") == 0)
     {
