@@ -32,10 +32,10 @@
 #include <utility>
 #include <algorithm>
 
-/*#include <regex>
+#include <regex>
 #include <iostream>
 #include <fstream>
-#include <string>*/
+#include <string>
 
 #if defined(_WIN32)
 /*Win32 has screwy names for the standard UNIX calls:*/
@@ -821,7 +821,7 @@ TopologyRequest proc_per;
 TopologyRequest onewth_per;
 int auto_provision;
 
-/*void print_nodelist(){
+void print_nodelist(){
     FILE *f=fopen("/app/hostfile","r");
     char c;
     c = fgetc(f); 
@@ -906,7 +906,7 @@ void write_hostfile(int numProcesses)
     {
         printf("Error parsing hostfile regex\n");
     }
-}*/
+}
 
 static void arg_init(int argc, const char **argv)
 {
@@ -1035,14 +1035,14 @@ static void arg_init(int argc, const char **argv)
   saved_argv = (char **) malloc(sizeof(char *) * (saved_argc));
   for (int i = 0; i < saved_argc; i++) {
     //  MACHSTATE1(2,"Parameters %s",Cmi_argvcopy[i]);
-    /*if (strcmp(argv[i], "/etc/mpi/hostfile") == 0)
+    if (strcmp(argv[i], "/etc/mpi/hostfile") == 0)
     {
       std::cout << "Saving nodelist arg" << std::endl << std::flush;
       std::string new_filename = "/app/hostfile";
       saved_argv[i] = (char*) malloc(new_filename.length() + 1);
       strcpy(saved_argv[i], new_filename.c_str());
     }
-    else*/
+    else
       saved_argv[i] = (char *) argv[i];
   }
 #endif
@@ -1064,7 +1064,7 @@ static void arg_init(int argc, const char **argv)
   if (arg_shrinkexpand) {
     arg_requested_pes = arg_realloc_pes;
     //arg_nodelist = "/etc/mpi/hostfileScaled";
-    //write_hostfile(arg_requested_pes);
+    write_hostfile(arg_requested_pes);
     //printf("Waiting\n");
     //wait_hostfile(arg_requested_nodes);
     //printf("\n \nCharmrun> %d Reallocated pes\n \n", arg_requested_pes);
