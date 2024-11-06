@@ -140,10 +140,16 @@ class TreeLB : public CBase_TreeLB
   {
     loadConfigFile(opts);
     init(opts);
+#if CMK_SHRINK_EXPAND
+	  manager_init();
+#endif
   }
 
   TreeLB(CkMigrateMessage* m) : CBase_TreeLB(m) 
   {
+#if CMK_SHRINK_EXPAND
+		manager_init();
+#endif
   }
 
   virtual ~TreeLB();
