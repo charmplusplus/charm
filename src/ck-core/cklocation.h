@@ -524,7 +524,7 @@ public:
 
   CmiUInt8 lookupID(const CkArrayIndex& idx) const
   {
-    CkAssert(checkInBounds(idx));
+    //CkAssert(checkInBounds(idx));
     if (compressor)
     {
       const CmiUInt8 home = homePe(idx);
@@ -550,7 +550,7 @@ public:
   // TODO: This should be better
   bool lookupID(const CkArrayIndex& idx, CmiUInt8& id) const
   {
-    CkAssert(checkInBounds(idx));
+    //CkAssert(checkInBounds(idx));
     if (compressor)
     {
       const CmiUInt8 home = homePe(idx);

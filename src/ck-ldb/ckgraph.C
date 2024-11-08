@@ -17,19 +17,32 @@ ProcArray::ProcArray(BaseLB::LDStats *stats) {
   const int numPes = stats->procs.size();
   // fill the processor array
   procs.resize(numPes);
+  availPeMap.resize(numPes);
+  std::fill(availPeMap.data(), availPeMap.data() + numPes, -1);
 
   // Loop through the LDStats structure, copying data into this array and calculating
   //   the average 'totalLoad' of all the PEs
+  availProcSize = 0;
   avgLoad = 0.0;
+  int currAvailPe = 0;
   for(int pe = 0; pe < numPes; pe++) {
     procs[pe].id        = stats->procs[pe].pe;
     procs[pe].setOverhead(stats->procs[pe].bg_walltime);
     procs[pe].setTotalLoad(stats->procs[pe].total_walltime - stats->procs[pe].idletime);
     procs[pe].available = stats->procs[pe].available;
+    availProcSize += (procs[pe].available ? 1 : 0);
     avgLoad += procs[pe].getTotalLoad();
+    if (!procs[pe].available)
+      currAvailPe++;
+    availPeMap[pe] = currAvailPe++;
 //		CkPrintf("PE%d overhead:%f totalLoad:%f \n",pe,procs[pe].overhead(),procs[pe].totalLoad());
   }
   avgLoad /= numPes;
+}
+
+void ProcArray::reassignPeMapToAvailable(std::vector<int32_t> &pemap) {
+  for (int i = 0; i < pemap.size(); i++)
+    pemap[i] = availPeMap[pemap[i]];
 }
 
 void ProcArray::resetTotalLoad() {

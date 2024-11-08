@@ -56,9 +56,12 @@ public:
   ProcArray(BaseLB::LDStats* stats);
   double getAverageLoad() const { return avgLoad; }
   void resetTotalLoad();
+  void reassignPeMapToAvailable(std::vector<int32_t> &pemap);
 
   // vector containing the list of processors
   std::vector<ProcInfo> procs;
+  std::vector<int> availPeMap;
+  int availProcSize;
 
 protected:
   double avgLoad;

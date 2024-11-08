@@ -152,8 +152,10 @@ void MetisLB::work(LDStats* stats)
   // ubvec: of size ncon to indicate allowed load imbalance tolerance (> 1.0)
   // options: array of options; edgecut: stores the edgecut; pemap: mapping
   METIS_PartGraphRecursive(&numVertices, &ncon, xadj.data(), adjncy.data(), vwgt.data(),
-                           vsize, adjwgt.data(), &numPes, tpwgts, ubvec.data(),
+                           vsize, adjwgt.data(), &parr->availProcSize, tpwgts, ubvec.data(),
                            options.data(), &edgecut, pemap.data());
+
+  parr->reassignPeMapToAvailable(pemap);
 
   if (_lb_args.debug() >= 1)
   {
