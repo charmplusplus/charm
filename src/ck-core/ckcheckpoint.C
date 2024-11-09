@@ -863,14 +863,16 @@ void CkRecvGroupROData(char* msg)
 	// for each location, restore arrays
 	//DEBCHK("[%d]Trying to find location manager\n",CkMyPe());
 	DEBCHK("[%d]Number of PE: %d -> %d\n",CkMyPe(),_numPes,CkNumPes());
-	if(CkMyPe() < _numPes) 	// in normal range: restore, otherwise, do nothing
-          for (int i=0; i<_numPes;i++) {
-            if (i%CkNumPes() == CkMyPe()) {
-              FILE *datFile = openCheckpointFile(dirname.c_str(), "arr", "rb", i);
-	      PUP::fromDisk  p(datFile, PUP::er::IS_CHECKPOINT);
-	      CkPupArrayElementsData(p);
-	      CmiFclose(datFile);
-            }
+	if(CkMyPe() < _numPes) {	// in normal range: restore, otherwise, do nothing
+    //for (int i=0; i<_numPes;i++) {
+    //  if (i%CkNumPes() == CkMyPe()) {
+          int i = CkMyPe();
+          FILE *datFile = openCheckpointFile(dirname.c_str(), "arr", "rb", i);
+          PUP::fromDisk  p(datFile, PUP::er::IS_CHECKPOINT);
+          CkPupArrayElementsData(p);
+          CmiFclose(datFile);
+        //}
+      //}
 	}
 
   _inrestart = false;
