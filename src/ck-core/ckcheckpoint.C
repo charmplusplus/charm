@@ -650,25 +650,25 @@ void CkPupArrayElementsData(PUP::er &p, int notifyListeners)
 	if (!p.isUnpacking())
 	{
 	  // let CkLocMgr iterate over and store every array element
-          CKLOCMGR_LOOP(ElementCheckpointer chk(mgr, p); mgr->iterate(chk););
-        }
+    CKLOCMGR_LOOP(ElementCheckpointer chk(mgr, p); mgr->iterate(chk););
+  }
 	else {
 	  // loop and create all array elements ourselves
 	  //CkPrintf("total chare array cnts: %d\n", numElements);
 	  for (int i=0; i<numElements; i++) {
-		CkGroupID gID;
-		CkArrayIndex idx;
-                CmiUInt8 id;
-		p|gID;
-                p|idx;
-                p|id;
-		CkLocMgr *mgr = (CkLocMgr*)CkpvAccess(_groupTable)->find(gID).getObj();
-		if (notifyListeners){
-		  mgr->resume(idx, id, p, true);
-		}
-                else{
-		  mgr->restore(idx, id, p);
-		}
+      CkGroupID gID;
+      CkArrayIndex idx;
+      CmiUInt8 id;
+      p|gID;
+      p|idx;
+      p|id;
+      CkPrintf("Unpacked dim = %i: %s\n", idx.dimension, idx2str(idx));
+      CkLocMgr *mgr = (CkLocMgr*)CkpvAccess(_groupTable)->find(gID).getObj();
+      if (notifyListeners){
+        mgr->resume(idx, id, p, true);
+      } else{
+        mgr->restore(idx, id, p);
+      }
 	  }
 	}
 	// finish up
