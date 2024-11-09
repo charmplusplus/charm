@@ -97,14 +97,15 @@ private:
 public:
         ElementCheckpointer(CkLocMgr* mgr_, PUP::er &p_):locMgr(mgr_),p(p_){};
         void addLocation(CkLocation &loc) {
-                CkArrayIndex idx=loc.getIndex();
-		CkGroupID gID = locMgr->ckGetGroupID();
-                CmiUInt8 id = loc.getID();
-		p|gID;	    // store loc mgr's GID as well for easier restore
-                p|idx;
-                p|id;
-	        p|loc;
-		//CkPrintf("[%d] addLocation: ", CkMyPe()), idx.print();
+          CkArrayIndex idx=loc.getIndex();
+          CkPrintf("[%d] Packing index dim = %i, %s\n", CkMyPe(), idx.dimension, idx2str(idx));
+          CkGroupID gID = locMgr->ckGetGroupID();
+          CmiUInt8 id = loc.getID();
+          p|gID;	    // store loc mgr's GID as well for easier restore
+          p|idx;
+          p|id;
+          p|loc;
+		      //CkPrintf("[%d] addLocation: ", CkMyPe()), idx.print();
         }
 };
 
@@ -662,7 +663,7 @@ void CkPupArrayElementsData(PUP::er &p, int notifyListeners)
       p|gID;
       p|idx;
       p|id;
-      CkPrintf("Unpacked dim = %i: %s\n", idx.dimension, idx2str(idx));
+      CkPrintf("[%d] Unpacked dim = %i: %s\n", CkMyPe(), idx.dimension, idx2str(idx));
       CkLocMgr *mgr = (CkLocMgr*)CkpvAccess(_groupTable)->find(gID).getObj();
       if (notifyListeners){
         mgr->resume(idx, id, p, true);
