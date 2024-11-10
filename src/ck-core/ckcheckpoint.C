@@ -380,11 +380,17 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _reque
   }
 
   // DEBCHK("[%d]CkCheckpointMgr::Checkpoint called dirname={%s}\n",CkMyPe(),dirname);
-  FILE* datFile = openCheckpointFile(dirname, "arr", "wb", CkMyPe());
-  PUP::toDisk p(datFile, PUP::er::IS_CHECKPOINT);
-  CkPupArrayElementsData(p);
-  if (p.checkError()) success = false;
-  if (CmiFclose(datFile) != 0) success = false;
+  //std::vector<char> avail_vector;
+  //get_avail_vector(avail_vector);
+  //if (pending_realloc_state == REALLOC_IN_PROGRESS && static_cast<bool>(avail_vector[CkMyPe()]))
+  //{
+    //printf("[%d] Writing array checkpoint\n", CkMyPe());
+    FILE* datFile = openCheckpointFile(dirname, "arr", "wb", CkMyPe());
+    PUP::toDisk p(datFile, PUP::er::IS_CHECKPOINT);
+    CkPupArrayElementsData(p);
+    if (p.checkError()) success = false;
+    if (CmiFclose(datFile) != 0) success = false;
+  //}
 
 #if ! CMK_DISABLE_SYNC
 #if CMK_HAS_SYNC_FUNC

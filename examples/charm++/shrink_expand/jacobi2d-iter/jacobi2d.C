@@ -97,8 +97,8 @@ void report(int completed_iteration) {
 			CkPrintf("Program Done! avg_it:%.6f\n",(CkWallTimer()-stTime)/iterations);
             CkExit();
         } else {
-            if(iterations%1==0) CkPrintf("starting new iteration; iteration %d time: %.6lf time/itr::%.6f\n", iterations, CkWallTimer()-stTime,(CkWallTimer()-stTime)/iterations);
-            CkPrintf("Memory Usage: %ld bytes \n", CmiMemoryUsage());
+            if(iterations%100==0) CkPrintf("starting new iteration; iteration %d time: %.6lf time/itr::%.6f\n", iterations, CkWallTimer()-stTime,(CkWallTimer()-stTime)/iterations);
+            //CkPrintf("Memory Usage: %ld bytes \n", CmiMemoryUsage());
             recieve_count=0;
             iterations++;
             // Call begin_iteration on all worker chares in array
