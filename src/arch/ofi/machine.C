@@ -696,6 +696,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 	* should not be considered predictive of proximity.  That
 	* relationship has to be detected by other means.
 
+
 	* 2. HWLOC doesn't have a hwloc_get_closest_nic because... NIC
 	* doesn't even rate an object type in their ontology, let
 	* alone get first class treatment.  Given that PCI devices
@@ -714,7 +715,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 	* do *not* have such convenient labeling as something special
 	* needs to happen to get their linuxfs utilities to inject
 	* that derived information into your topology object.  As an
-	* interim solution we allow the user to map their cxi[0..3]
+	* interim solution we allow the user to map their cxi[0..7]
 	* selection using command line arguments.
 
 	* 2b. Likewise the 1:1 relationship we assume here between
@@ -741,6 +742,8 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 	* CPU nodes.  The user could easily be confused, so we can't
 	* rely on them telling us.  This has to be determined at
 	* run time.
+
+	* 6. Aurora can apparently go up to cxi7.
 	*/
 
   char *cximap=NULL;
@@ -814,7 +817,18 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
       ///      short hsnOrder[numcxi]={2,1,3,0};
       if(numcxi==4)
 	{
-	  short hsnOrder[4]= {1,3,0,2};
+	  short hsnOrder[8]= {1,1,3,3,0,0,2,2};
+	  if(myRank%quad>numcxi)
+	    {
+	      CmiPrintf("Error: myrank %d quad %d myrank/quad %n",myRank,quad, myRank/quad);
+	      CmiAbort("cxi mapping failure");
+	    }
+	  myNet=hsnOrder[myRank%quad];
+	}
+      else if(numcxi==8)
+	{
+	  // no idea if this is a good ordering
+	  short hsnOrder[8]= {0,1,2,3,4,5,6,7};
 	  if(myRank%quad>numcxi)
 	    {
 	      CmiPrintf("Error: myrank %d quad %d myrank/quad %n",myRank,quad, myRank/quad);
