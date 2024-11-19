@@ -9,6 +9,7 @@
 #include "cksyncbarrier.h"
 
 #include "DistributedLB.h"
+#include "DiffusionLB.h"
 #include "LBManager.h"
 #include "LBSimulation.h"
 #include "TreeLB.h"
@@ -209,6 +210,7 @@ void _loadbalancerInit()
       lbNames.push_back("Greedy");
       lbNames.push_back("GreedyRefine");
       lbNames.push_back("DistributedLB");
+      lbNames.push_back("DiffusionLB");
       lbNames.push_back("Refine");
       lbNames.push_back("Hybrid");
       lbNames.push_back("MetisLB");
@@ -750,7 +752,7 @@ void LBManager::nextLoadbalancer(int seq)
 // switch strategy
 void LBManager::switchLoadbalancer(int switchFrom, int switchTo)
 {
-  if (lbNames[switchTo] != "DistributedLB" && lbNames[switchTo] != "MetisLB")
+  if (lbNames[switchTo] != "DistributedLB" && lbNames[switchTo] != "MetisLB" && lbNames[switchTo] != "DiffusionLB")
   {
     json config;
     if (lbNames[switchTo] == "Hybrid")

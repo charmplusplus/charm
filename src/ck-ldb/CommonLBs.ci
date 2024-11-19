@@ -3,6 +3,7 @@
 module CommonLBs {
   extern module TreeLB;
   extern module DistributedLB;
+  extern module DiffusionLB;
   extern module MetisLB;
   extern module RecBipartLB;
 

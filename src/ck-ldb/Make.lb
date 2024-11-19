@@ -2,6 +2,7 @@
 COMMON_LDBS=\
    TreeLB \
    DistributedLB \
+   DiffusionLB \
    MetisLB \
    RecBipartLB \
    manager.o
@@ -9,6 +10,7 @@ COMMON_LDBS=\
 ALL_LDBS=\
    TreeLB \
    DistributedLB \
+   DiffusionLB \
    MetisLB \
    RecBipartLB \
    manager.o
@@ -18,6 +20,9 @@ LBHEADERS += TreeLB.h TreeLB.decl.h
 
 $(L)/libmoduleDistributedLB.a:
 LBHEADERS += DistributedLB.h DistributedLB.decl.h
+
+$(L)/libmoduleDiffusionLB.a:
+LBHEADERS += DiffusionLB.h DiffusionLB.decl.h
 
 $(L)/libmoduleMetisLB.a:
 LBHEADERS += MetisLB.h MetisLB.decl.h
@@ -36,6 +41,7 @@ ALL_LB_OBJS=EveryLB.o \
     CommonLBs.o \
     TreeLB.o \
     DistributedLB.o \
+    DiffusionLB.o \
     MetisLB.o \
     RecBipartLB.o \
     ScotchLB.o \
@@ -44,12 +50,14 @@ ALL_LB_OBJS=EveryLB.o \
 EVERYLB_DEPS=EveryLB.o \
     TreeLB.o \
     DistributedLB.o \
+    DiffusionLB.o \
     MetisLB.o \
     RecBipartLB.o \
 # CommonLBs dependencies
 COMMONLBS_DEPS=CommonLBs.o \
     TreeLB.o \
     DistributedLB.o \
+    DiffusionLB.o \
     MetisLB.o \
     RecBipartLB.o \
     manager.o \

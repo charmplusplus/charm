@@ -316,13 +316,6 @@ class Stencil: public CBase_Stencil {
       int index = thisIndex.x + thisIndex.y*num_chare_x + thisIndex.z*num_chare_x*num_chare_y;
       int numChares = num_chare_x * num_chare_y * num_chare_z;
       double work = 100.0;
-
-      if(index >= numChares*0.2 && index <=numChares*0.8) {
-        work = work * ((double)index/(double)numChares) + (double)itno;
-        // CkPrintf("[%d][%d][%d] %d %d %f\n", thisIndex.x, thisIndex.y, thisIndex.z, index, itno, work);
-      } else
-        work = 10.0;
-
       for(int w=0; w<work; w++) {
         for(int k=1; k<blockDimZ+1; ++k)
           for(int j=1; j<blockDimY+1; ++j)

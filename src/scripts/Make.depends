@@ -96,8 +96,8 @@ CommonLBs.o: CommonLBs.C LBManager.h LBDatabase.h lbdb.h converse.h \
  CkCheckpointStatus.decl.h trace.h pathHistory.h \
  PathHistory.decl.h ckcallback-ccs.h CkCallback.decl.h BaseLB.decl.h \
  CommonLBs.decl.h charm++.h envelope.h sdag.h TreeLB.decl.h idm.h \
- BaseLB.decl.h DistributedLB.decl.h DistBaseLB.decl.h LBManager.decl.h \
- CommonLBs.def.h
+ BaseLB.decl.h DistributedLB.decl.h DiffusionLB.decl.h DistBaseLB.decl.h \
+ LBManager.decl.h CommonLBs.def.h
 
 DistBaseLB.o: DistBaseLB.C BaseLB.h LBManager.h LBDatabase.h lbdb.h \
  converse.h conv-header.h conv-config.h conv-autoconfig.h conv-common.h \
@@ -146,6 +146,30 @@ DistributedLB.o: DistributedLB.C DistributedLB.h DistBaseLB.h BaseLB.h \
  CkCallback.decl.h BaseLB.decl.h DistBaseLB.decl.h DistributedLB.decl.h \
  ckheap.h elements.h ckset.h DistributedLB.def.h
 
+DiffusionLB.o: DiffusionLB.C Heap_helper.C Neighbor_list.C Helper.C DiffusionLB.h DistBaseLB.h BaseLB.h \
+ LBManager.h LBDatabase.h lbdb.h converse.h conv-header.h conv-config.h \
+ conv-autoconfig.h conv-common.h conv-mach-common.h conv-mach.h \
+ conv-mach-opt.h lrts-common.h cmiqueue.h pup_c.h pup_c_functions.h \
+ lrtslock.h queueing.h conv-cpm.h conv-cpath.h conv-qd.h conv-random.h \
+ conv-lists.h conv-trace.h persistent.h cmirdmautils.h debug-conv.h \
+ charm.h conv-rdma.h pup.h middle.h middle-conv.h LBObj.h LBOM.h LBComm.h \
+ LBMachineUtil.h json_fwd.hpp LBManager.decl.h charm++.h cklists.h \
+ pup_stl.h conv-config.h ckbitvector.h ckstream.h init.h charm-api.h \
+ ckhashtable.h ckrdma.h envelope.h pup.h charm.h middle.h cklists.h \
+ objid.h charm.h converse.h pup.h ckcallback.h cksection.h ckarrayindex.h \
+ objid.h conv-ccs.h sockRoutines.h ccs-server.h register.h debug-charm.h \
+ debug-conv++.h simd.h ckmessage.h CkMarshall.decl.h sdag.h pup_stl.h \
+ envelope.h debug-charm.h ckrdmadevice.h conv-rdmadevice.h ckobjQ.h \
+ ckreduction.h CkReduction.decl.h ckmemcheckpoint.h \
+ CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h MetaBalancer.h \
+ RandomForestModel.h MetaBalancer.decl.h CkLocation.decl.h \
+ ckarrayoptions.h ckmulticast.h CkMulticast.decl.h cklocrec.h \
+ ckmigratable.h CkArray.decl.h ckfutures.h CkFutures.decl.h waitqd.h \
+ waitqd.decl.h ckcheckpoint.h ckcallback.h CkCheckpointStatus.decl.h \
+ trace.h pathHistory.h PathHistory.decl.h ckcallback-ccs.h \
+ CkCallback.decl.h BaseLB.decl.h DistBaseLB.decl.h DiffusionLB.decl.h \
+ ckheap.h elements.h ckset.h DiffusionLB.def.h
+
 EveryLB.o: EveryLB.C LBManager.h LBDatabase.h lbdb.h converse.h \
  conv-header.h conv-config.h conv-autoconfig.h conv-common.h \
  conv-mach-common.h conv-mach.h conv-mach-opt.h lrts-common.h cmiqueue.h \
@@ -168,9 +192,9 @@ EveryLB.o: EveryLB.C LBManager.h LBDatabase.h lbdb.h converse.h \
  CkCheckpointStatus.decl.h trace.h pathHistory.h \
  PathHistory.decl.h ckcallback-ccs.h CkCallback.decl.h BaseLB.decl.h \
  EveryLB.decl.h charm++.h envelope.h sdag.h TreeLB.decl.h idm.h \
- BaseLB.decl.h DistributedLB.decl.h DistBaseLB.decl.h LBManager.decl.h \
- MetisLB.decl.h CentralLB.decl.h CentralLBMsg.h RecBipartLB.decl.h \
- EveryLB.def.h
+ BaseLB.decl.h DistributedLB.decl.h DiffusionLB.decl.h DistBaseLB.decl.h \
+ LBManager.decl.h MetisLB.decl.h CentralLB.decl.h CentralLBMsg.h \
+ RecBipartLB.decl.h EveryLB.def.h
 
 HybridBaseLB.o: HybridBaseLB.C HybridBaseLB.h charm++.h charm.h \
  converse.h conv-header.h conv-config.h conv-autoconfig.h conv-common.h \
@@ -272,9 +296,9 @@ LBManager.o: LBManager.C converse.h conv-header.h conv-config.h \
  waitqd.decl.h ckcheckpoint.h ckcallback.h CkCheckpointStatus.decl.h \
  trace.h conv-trace.h pathHistory.h PathHistory.decl.h \
  ckcallback-ccs.h CkCallback.decl.h cksyncbarrier.h CkSyncBarrier.decl.h \
- charm++.h envelope.h sdag.h lbdb.h DistributedLB.h DistBaseLB.h BaseLB.h \
+ charm++.h envelope.h sdag.h lbdb.h DistributedLB.h DiffusionLB.h DistBaseLB.h BaseLB.h \
  LBManager.h DistBaseLB.decl.h LBManager.decl.h BaseLB.decl.h \
- DistributedLB.decl.h ckheap.h LBSimulation.h CentralLB.h \
+ DistributedLB.decl.h DiffusionLB.decl.h ckheap.h LBSimulation.h CentralLB.h \
  CentralLB.decl.h CentralLBMsg.h pup_stl.h manager.h TreeLB.h \
  TreeLB.decl.h idm.h json.hpp topology.h LBManager.def.h
 

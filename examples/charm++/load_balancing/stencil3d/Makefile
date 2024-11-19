@@ -1,6 +1,8 @@
 -include ../../../common.mk
 OPTS	= -O3
-CHARMC	= ../../../../bin/charmc $(OPTS)
+#CHARMC	=  ../../../../netlrts-linux-x86_64/bin/charmc $(OPTS)
+CHARMC= ../../../../bin/charmc $(OPTS)
+##ofi-linux-x86_64-cxi-slurmpmi2cray-smp/bin/charmc $(OPTS)
 
 OBJS = stencil3d.o
 
