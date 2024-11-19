@@ -7,6 +7,7 @@ module DiffusionLB {
   group [migratable] DiffusionLB : DistBaseLB {
     entry void DiffusionLB(const CkLBOptions &);
     entry void AddNeighbor(int node);
+    entry [reductiontarget] void statsAssembled();
     entry[reductiontarget] void findNeighbors(int do_again);
     entry void doneNborExng();
     entry[expedited] void proposeNbor(int nborId);
@@ -29,35 +30,7 @@ module DiffusionLB {
     entry void PseudoLoad(int itr, double load, int node); 
     entry void CallResumeClients();
     entry void PrintDebugMessage(int len, double result[len]);
-    entry void notifyNeighbor(int isNbor, int node) {
-//inc neighbor count upto 2xK
-    serial {
-      int toAdd = 0;
-      
-      if(isNbor) {
-        toAdd = 1;
-        for(int k=0;k<neighborCount;k++)
-          if(nbors[k] == node) {
-            toAdd = 0;
-            break;
-          }
-      }
 
-      if(toAdd) {
-        CkPrintf("\n[PE-%d]Adding %dth nbor node %d to me", CkMyPe(), neighborCount,node);
-//        if(neighborCount<NUM_NEIGHBORS)
-          nbors[neighborCount++] = node;
-      }
-      notif++;
-      if(notif == CkNumNodes()) {
-        for(int k=0;k<neighborCount;k++)
-          CkPrintf("\n[PE-%d], my largest comm %dth neighbors are %d\n", CkMyPe(), k, nbors[k]);
-        notif = 0;
-        doneNborExng();
-      }
-    }
-    };
-    
     entry void diffuse_scalar() {
 
         //TODO: Currently fixed iterations
@@ -66,10 +39,10 @@ module DiffusionLB {
             serial "Send loadInfo" {
                 if(CkMyPe()==0)
                   CkPrintf("\n---------------------------------------------------------------------------------------------\n");
-//                CkPrintf("\n[Node-%d], sendToNeighbors.size = %lu", CkMyNode(), neighborCount);
+                CkPrintf("\n[Node-%d], sendToNeighbors.size = %lu", thisNode, neighborCount);
                 for(int i = 0; i < neighborCount; i++) {
-                    CkPrintf("\n[%d] itr-%d Sending load info to node-%d \n", CkMyPe(), itr, sendToNeighbors[i]);
-                    thisProxy[CkNodeFirst(sendToNeighbors[i])].ReceiveLoadInfo(itr, my_load, CkMyNode());
+                    CkPrintf("\n[%d] itr-%d Sending load info to node-%d \n", thisNode, itr, sendToNeighbors[i]);
+                    thisProxy[sendToNeighbors[i]*nodeSize].ReceiveLoadInfo(itr, my_load, CkMyNode());
                 }         
                  
             }

@@ -36,6 +36,7 @@ public:
     void findNeighbors(int do_again);
     void proposeNbor(int nborId);
     void okayNbor(int agree, int nborId);
+    void statsAssembled();
     void startStrategy();
 //    void notifyNeighbor(int isNbor, int node);
     void doneNborExng();
@@ -71,7 +72,7 @@ private:
     int temp_itr;
     int pick;
     int notif;
-    int statsReceived;
+    int statsReceived, rank0_acks;
     int loadReceived;
     int do_again = 1;
     int round, requests_sent;

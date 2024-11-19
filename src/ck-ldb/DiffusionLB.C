@@ -27,7 +27,7 @@
 #define DEBUGF(x) CmiPrintf x;
 #define DEBUGR(x) /*CmiPrintf x*/;
 #define DEBUGL(x) CmiPrintf x;
-#define ITERATIONS 4
+#define ITERATIONS 40
 
 #define NUM_NEIGHBORS 4
 
@@ -50,6 +50,8 @@ DiffusionLB::DiffusionLB(const CkLBOptions &opt) : CBase_DiffusionLB(opt) {
   edgeCount = 0;
   edge_indices.reserve(100);
   round = 0;
+  statsReceived = 0;
+  rank0_acks = 0;
 #if CMK_LBDB_ON
   lbname = "DiffusionLB";
   if (CkMyPe() == 0)
@@ -64,6 +66,7 @@ DiffusionLB::DiffusionLB(const CkLBOptions &opt) : CBase_DiffusionLB(opt) {
     statsList = new CLBStatsMsg*[nodeSize];
     nodeStats = new BaseLB::LDStats(nodeSize);
     numObjects.resize(nodeSize);
+    prefixObjects.resize(nodeSize);
     pe_load.resize(nodeSize);
   }
 #endif
@@ -98,9 +101,14 @@ void DiffusionLB::Strategy(const DistBaseLB::LDStats* const stats) {
   marshmsg = new CkMarshalledCLBStatsMessage(statsmsg);
   thisProxy[rank0PE].ReceiveStats(*marshmsg);
   if(CkMyPe() != rank0PE) {
-    CkCallback cb(CkReductionTarget(DiffusionLB, findNeighbors), thisProxy);
-    contribute(sizeof(int), &do_again, CkReduction::max_int, cb);
+    CkCallback cb(CkReductionTarget(DiffusionLB, statsAssembled), thisProxy);
+    contribute(cb);
   }
+}
+
+void DiffusionLB::statsAssembled() {
+  if(CkMyPe() == rank0PE)
+    findNeighbors(1);
 }
 
 void DiffusionLB::AddNeighbor(int node) {
@@ -157,15 +165,18 @@ void DiffusionLB::ReceiveStats(CkMarshalledCLBStatsMessage &&data)
   {
     // build LDStats
     BuildStats();
-    CkCallback cb(CkReductionTarget(DiffusionLB, findNeighbors), thisProxy);
-    contribute(sizeof(int), &do_again, CkReduction::max_int, cb);
+    CkCallback cb(CkReductionTarget(DiffusionLB, statsAssembled), thisProxy);
+    contribute(cb);
     statsReceived = 0;
   }
 #endif  
 }
 
 void DiffusionLB::startStrategy(){
-  thisProxy[CkMyPe()].diffuse_scalar();
+  if(++rank0_acks < numNodes) return;
+  CkPrintf("\nIn startStrategy()");
+  for(int i=0;i<numNodes;i++)
+    thisProxy[i*nodeSize].diffuse_scalar();
 }
 
 double DiffusionLB::avgNborLoad() {
@@ -358,7 +369,7 @@ void DiffusionLB::LoadBalancing() {
         if(nborIdx == -1)
           nborIdx = EXT_IDX;//Store in last index if it is external bytes going to
 //        non-immediate neighbors? -q
-        if(fromNode == CkMyNode()/*peNodes[rank0PE]*/) {//ensure bytes are going from my node? -q
+        if(fromNode == thisNode/*peNodes[rank0PE]*/) {//ensure bytes are going from my node? -q
           int fromObj = nodeStats->getHash(from);
           CkPrintf("[%d] GRD Load Balancing from obj %d and pos %d\n", CkMyPe(), fromObj, nborIdx);
           objectComms[fromObj][nborIdx] += commData.bytes;
@@ -495,7 +506,7 @@ void DiffusionLB::LoadBalancing() {
           CkPrintf("[%d] GRD: Load Balancing object load %f to node %d and from pe %d and objID %d\n", CkMyPe(), currLoad, node, initPE, objId);
           // TODO: Change this to directly send the load to zeroth PE
           //thisProxy[nodes[node]].LoadTransfer(currLoad, initPE, objId);
-          thisProxy[CkNodeFirst(CkMyNode())].LoadMetaInfo(nodeStats->objData[v_id].handle, currLoad);
+          thisProxy[thisNode*nodeSize].LoadMetaInfo(nodeStats->objData[v_id].handle, currLoad);
           thisProxy[initPE].LoadReceived(objId, CkNodeFirst(node));
           my_loadAfterTransfer -= currLoad;
           int myPos = 0;//neighborPos[peNodes[rank0PE]];

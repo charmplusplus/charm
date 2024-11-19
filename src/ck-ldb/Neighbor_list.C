@@ -66,8 +66,7 @@ void DiffusionLB::findNeighbors(int do_again)
     toSendLoad.resize(neighborCount);
     toReceiveLoad.resize(neighborCount);
 
-    CkCallback cb(CkIndex_DiffusionLB::startStrategy(), thisProxy);
-    contribute(cb);
+    thisProxy[0].startStrategy();
     return;
   }
   int potentialNb = 0;
@@ -79,7 +78,7 @@ void DiffusionLB::findNeighbors(int do_again)
     while (potentialNb < nborsNeeded && pick < NUM_NEIGHBORS + numNodes-1)
     {
       int potentialNbor = nbors[pick++]; // rand() % numNodes;
-      CkPrintf("\npotentialNbor node=%d(pe=%d)", potentialNbor, potentialNbor*nodeSize); fflush(stdout);
+      CkPrintf("\n[Node-%d] potentialNbor node=%d(pe=%d)", thisNode, potentialNbor, potentialNbor*nodeSize); fflush(stdout);
       if (thisNode != potentialNbor &&
           std::find(sendToNeighbors.begin(), sendToNeighbors.end(), potentialNbor) == sendToNeighbors.end())
       {
@@ -92,8 +91,11 @@ void DiffusionLB::findNeighbors(int do_again)
   else
   {
     int do_again = 0;
+    findNeighbors(do_again);
+/*
     CkCallback cb(CkReductionTarget(DiffusionLB, findNeighbors), thisProxy);
     contribute(sizeof(int), &do_again, CkReduction::max_int, cb);
+*/
   }
 
 }
@@ -144,13 +146,13 @@ void DiffusionLB::proposeNbor(int nborId)
   {
     agree = 1;
     sendToNeighbors.push_back(nborId);
-    DEBUGL(("\nNode-%d, round =%d Agreeing and adding %d ", thisIndex, round, nborId));
+    DEBUGL(("\nNode-%d, round =%d Agreeing and adding %d ", thisNode, round, nborId));
   }
   else
   {
-    DEBUGL(("\nNode-%d, round =%d Rejecting %d ", thisIndex, round, nborId));
+    DEBUGL(("\nNode-%d, round =%d Rejecting %d ", thisNode, round, nborId));
   }
-  thisProxy[nborId].okayNbor(agree, thisIndex);
+  thisProxy[nborId*nodeSize].okayNbor(agree, thisNode);
 }
 
 void DiffusionLB::okayNbor(int agree, int nborId)
@@ -166,11 +168,14 @@ void DiffusionLB::okayNbor(int agree, int nborId)
     return;
 
   int do_again = 0;
-  if (sendToNeighbors.size() < NUM_NEIGHBORS)
+  if (sendToNeighbors.size() < NUM_NEIGHBORS || round < 100)
     do_again = 1;
   round++;
+  findNeighbors(do_again);
+/*
   CkCallback cb(CkReductionTarget(DiffusionLB, findNeighbors), thisProxy);
   contribute(sizeof(int), &do_again, CkReduction::max_int, cb);
+*/
 }
 
 #if 0
