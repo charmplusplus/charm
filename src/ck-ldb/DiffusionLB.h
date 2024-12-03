@@ -32,14 +32,12 @@ public:
     void MigratedHelper(LDObjHandle h, int waitBarrier);
     void Migrated(LDObjHandle h, int waitBarrier=1);
     void createCommList();
-    void AddNeighbor(int node);
-    void findNeighbors(int do_again);
+    void findNBors(int do_again);
     void proposeNbor(int nborId);
     void okayNbor(int agree, int nborId);
     void statsAssembled();
     void startStrategy();
-//    void notifyNeighbor(int isNbor, int node);
-    void doneNborExng();
+    void next_phase(int val);
     void sortArr(long arr[], int n, int *nbors);
 
     //void ReceiveLoadInfo(int itr, double load, int node);
@@ -49,6 +47,7 @@ public:
     //void LoadTransfer(double load, int initPE, int objId);
     void LoadReceived(int objId, int fromPE);
     //void PseudoLoad(int itr, double load, int node);    
+    void LoadBalancing();
 
     //void MigrationInfo(int to, int from);
 
@@ -76,7 +75,7 @@ private:
     int loadReceived;
     int do_again = 1;
     int round, requests_sent;
-    int thisNode;
+    int myNodeId;
     int *nbors;
     CLBStatsMsg* statsmsg;
     CkMarshalledCLBStatsMessage *marshmsg;
@@ -88,13 +87,11 @@ private:
     std::vector<double> pe_load;
     std::vector<double> pe_loadBefore;
     
-    std::vector<int> neighbors; // Neighbors which the node uses to make load balancing decisions
     std::vector<double> loadNeighbors;
     std::vector<int> sendToNeighbors; // Neighbors to which curr node has to send load.
-    int toSend;
-    std::unordered_map<int, int> neighborPos;  // nodes position in the neighbors vector
+
     int neighborCount;
-    std::unordered_map<int, int> neighborPosReceive;  // nodes position in the neighbors vector
+    int acks, max;
     std::vector<double> toSendLoad;
     std::vector<double> toReceiveLoad;
     int edgeCount;
@@ -190,12 +187,10 @@ private:
     void InitializeObjHeap(BaseLB::LDStats *stats, int* obj_arr,int size, int* gain_val);
     
     // topo aware neighbors are populated.
-    void ComputeNeighbors();
     double  avgNborLoad();
     double averagePE();
     int findNborIdx(int node);
     void PseudoLoadBalancing();
-    void LoadBalancing();
     CLBStatsMsg* AssembleStats();
     void AddToList(CLBStatsMsg* m, int rank);
     void BuildStats();

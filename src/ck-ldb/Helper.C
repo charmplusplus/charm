@@ -56,13 +56,13 @@ void DiffusionLB::BuildStats() {
     nodeStats->from_proc.clear();
     nodeStats->to_proc.clear();
     nodeStats->commData.clear();
+
     int prev = 0;
-#if 0
     for(int i = 0; i < nodeSize; i++) {
         prefixObjects[i] = prev + numObjects[i];
         prev = prefixObjects[i];
     }
-#endif
+
     nodeStats->objData.resize(n_objs);
     nodeStats->from_proc.resize(n_objs);
     nodeStats->to_proc.resize(n_objs);
