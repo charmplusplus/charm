@@ -1,0 +1,13 @@
+mainmodule fib {
+    message ValueMsg;
+
+    mainchare Main {
+        entry Main(CkArgMsg* m);
+        entry void run(int n);
+    };
+
+    chare Fib {
+        entry Fib(int n, CkFuture f);
+        entry void run(int n, CkFuture f);
+    };
+};
