@@ -2540,7 +2540,9 @@ static inline void *getInfiCmiChunkThread(int dataSize){
 			if(!PCQueueEmpty(queuePool[CmiMyRank()][i])){
 				for(j = 0; j < PCQueueLength(queuePool[CmiMyRank()][i]); j++){
 					pointer = (void *)PCQueuePop(queuePool[CmiMyRank()][i]);
-					infi_CmiFreeDirect(pointer);	
+					// Check because queue might actually be empty
+					if(pointer != NULL)
+					    infi_CmiFreeDirect(pointer);
 				}
 			}
 		}	
@@ -2570,8 +2572,12 @@ static inline void *getInfiCmiChunkThread(int dataSize){
 		hdr = (CmiChunkHeader *)res;
 		
 		key = ibv_reg_mr(context->pd,res,(allocSize+sizeof(CmiChunkHeader))*count,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
-	        if(key == NULL)
+                if(key == NULL) {
+                    CmiError("Failed to allocate %d messages in pool %d\n", count, poolIdx);
+                    CmiError("Consider increasing IBVBlockAllocRatio (currently %d) or IBVBlockThreshold (currently %d)\n",
+                              blockAllocRatio, blockThreshold);
                     CmiAbort("ibv_reg_mr failed to pin memory\n");
+		}
 #if CMK_IBVERBS_STATS
 		numCurReg++;
 		numReg++;
@@ -2672,7 +2678,12 @@ static inline void *getInfiCmiChunk(int dataSize){
                 hdr = (CmiChunkHeader *)res;
 
                 key = ibv_reg_mr(context->pd,res,(allocSize+sizeof(CmiChunkHeader))*count,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
-                CmiAssert(key != NULL);
+                if(key == NULL) {
+                    CmiError("Failed to allocate %d messages in pool %d\n", count, poolIdx);
+                    CmiError("Consider increasing IBVBlockAllocRatio (currently %d) or IBVBlockThreshold (currently %d)\n",
+                              blockAllocRatio, blockThreshold);
+                    CmiAbort("ibv_reg_mr failed to pin memory\n");
+		}
 #if CMK_IBVERBS_STATS
 		numCurReg++;
 		numReg++;

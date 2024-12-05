@@ -661,7 +661,7 @@ for the 6D array.
 
 .. code-block:: c++
 
-     void getIndex_cellpairs(CkVec<CkArrayIndex6D>& vec) {
+     void getIndex_cellpairs(std::vector<CkArrayIndex6D>& vec) {
        int i,j,k,l,m,n;
        for(i=0;i<N;i++)
          for(j=0;j<N;j++)

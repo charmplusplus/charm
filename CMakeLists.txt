@@ -209,8 +209,7 @@ endif()
 option(BUILD_SHARED        "Build Charm++ dynamic libraries" OFF)
 
 # Other options
-option(CUDA                "Build with CUDA support" OFF)
-
+option(BUILD_CUDA          "Build with CUDA support" OFF)
 option(PXSHM               "Build with PXSHM" OFF)
 
 # LRTS PMI options
@@ -224,8 +223,6 @@ string(REPLACE ";" " " MY_EXTRA_OPTS "${MY_EXTRA_OPTS}")
 set(OPTS "${OPTS} ${MY_EXTRA_OPTS}")
 set(OPTSATBUILDTIME "${OPTSATBUILDTIME} ${MY_EXTRA_OPTS}")
 
-# We need both BUILD_CUDA and CUDA
-set(BUILD_CUDA ${CUDA})
 
 # Also build shared Charm++ libraries in lib_so/
 if(BUILD_SHARED)
@@ -689,7 +686,8 @@ configure_file(src/scripts/conv-config.sh                    include/ COPYONLY)
 configure_file(src/arch/${VDIR}/conv-mach.sh                 include/ COPYONLY)
 
 set(CUDA_DIR "")
-if(CUDA)
+if(BUILD_CUDA)
+  
   file(GLOB_RECURSE hybridAPI-h-sources ${CMAKE_SOURCE_DIR}/src/arch/cuda/*.h)
   file(GLOB_RECURSE hybridAPI-cxx-sources ${CMAKE_SOURCE_DIR}/src/arch/cuda/*.cpp)
   foreach(file ${hybridAPI-h-sources})
@@ -995,6 +993,10 @@ if(${TARGET} STREQUAL "charm4py")
     target_link_libraries(charm ck converse memory-default threads-default ldb-rand "-Llib/ -standalone -whole-archive -c++stl -shared")
   endif()
 
+  if (${BUILD_CUDA})
+    target_link_libraries(charm cudart cudahybridapi)
+  endif()
+
   add_dependencies(charm hwloc)
 endif()
 
@@ -1096,6 +1098,7 @@ foreach(l CUDA_DIR BUILD_CUDA CMK_AMPI_WITH_ROMIO CMK_MACOSX CMK_BUILD_PYTHON
 endforeach(l)
 
 # Add options
+set(CUDA ${BUILD_CUDA}) # need CUDA to match conv-mach file name
 foreach(opt SMP OMP TCP PTHREADS SYNCFT PXSHM PERSISTENT OOC CUDA PAPI CXI)
     if(${opt})
         string(TOLOWER ${opt} optl)

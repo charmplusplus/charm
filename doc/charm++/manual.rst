@@ -2199,7 +2199,8 @@ PUP STL Container Objects
 If the variable is from the C++ Standard Template Library, you can
 include operator\ ``|``\ ’s for STL containers such as vector, map, set,
 list, pair, and string, templated on anything, by including the header
-“pup_stl.h”.
+“pup_stl.h” or <pup_stl.h>. This header should be placed in the .h or
+the .C/.cpp file in the project, and not in the .ci file.
 
 See ``examples/charm++/PUP/STLPUP``
 
@@ -4655,11 +4656,9 @@ avoid copies and behaves like a regular Charm++ entry method invocation.
 
 There are three APIs that provide zero copy semantics in Charm++:
 
--  Zero Copy Direct API
-
--  Zero Copy Entry Method Send API
-
--  Zero Copy Entry Method Post API
+- `Zero Copy Direct API <#zero-copy-direct-api>`__
+- `Zero Copy Entry Method Send API <#zero-copy-entry-method-send-api>`__
+- `Zero Copy Entry Method Post API <#zero-copy-entry-method-post-api>`__
 
 Zero Copy Direct API
 ^^^^^^^^^^^^^^^^^^^^
