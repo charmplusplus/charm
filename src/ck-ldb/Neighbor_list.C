@@ -58,8 +58,9 @@ void DiffusionLB::findNBors(int do_again) {
     toSendLoad.resize(neighborCount);
     toReceiveLoad.resize(neighborCount);
 
-    CkCallback cb(CkReductionTarget(DiffusionLB, startStrategy/*startDiffusion*/), thisProxy);
-    contribute(cb);
+    thisProxy[0].startStrategy();
+//    CkCallback cb(CkReductionTarget(DiffusionLB, startStrategy/*startDiffusion*/), thisProxy);
+//    contribute(cb);
 
     return;
   }
@@ -68,6 +69,10 @@ void DiffusionLB::findNBors(int do_again) {
   if(nborsNeeded > 0) {
     while(potentialNb < nborsNeeded) {
       int potentialNbor = nbors[pick++];//rand() % numNodes;
+      if(potentialNbor == -1) {
+        thisProxy[0].next_phase(0);
+        return;
+      }
       if(myNodeId != potentialNbor &&
           std::find(sendToNeighbors.begin(), sendToNeighbors.end(), potentialNbor) == sendToNeighbors.end()) {
         requests_sent++;

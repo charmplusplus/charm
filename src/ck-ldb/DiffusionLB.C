@@ -98,7 +98,7 @@ void DiffusionLB::Strategy(const DistBaseLB::LDStats* const stats) {
   }
   if (CkMyPe() == 0) {
     CkCallback cb(CkIndex_DiffusionLB::LoadBalancing(), thisProxy);
-//    CkStartQD(cb);
+    CkStartQD(cb);
   }
   statsmsg = AssembleStats();
   if(statsmsg == NULL)
@@ -164,10 +164,8 @@ void DiffusionLB::ReceiveStats(CkMarshalledCLBStatsMessage &&data)
 }
 
 void DiffusionLB::startStrategy(){
-  CkPrintf("\nIn startStrategy()"); fflush(stdout);
-  return;
   if(++rank0_acks < numNodes) return;
-//  CkPrintf("\nIn startStrategy()");
+  CkPrintf("\nIn startStrategy()");
   for(int i=0;i<numNodes;i++)
     thisProxy[i*nodeSize].diffuse_scalar();
 }
@@ -251,7 +249,7 @@ void DiffusionLB::PseudoLoadBalancing() {
       thisIterToSend[i] = 0.0;
 #endif
     int nbor_node = sendToNeighbors[i];
-    thisProxy[nbor_node*nodeSize].PseudoLoad(itr, 0.0/*thisIterToSend[i]*/, myNodeId);
+    thisProxy[nbor_node*nodeSize].PseudoLoad(itr, thisIterToSend[i], myNodeId);
   }
 }
 
@@ -268,10 +266,11 @@ void DiffusionLB::LoadBalancing() {
   if(CkMyPe() != rank0PE) return;
   if (CkMyPe() == 0) {
     CkCallback cb(CkIndex_DiffusionLB::DoneNodeLB(), thisProxy);
-    CkStartQD(cb);
+//    CkStartQD(cb);
   }
   int n_objs = nodeStats->objData.size();
   CkPrintf("[%d] GRD: Load Balancing w objects size = %d \n", CkMyPe(), n_objs);
+  fflush(stdout);
 
 //  Iterate over the comm data and for each object, store its comm bytes
 //  to other neighbor nodes and own node.
@@ -292,10 +291,12 @@ void DiffusionLB::LoadBalancing() {
 
   for(int i = 0; i < n_objs; i++) {
 //    CkPrintf("\nPE-%d objid= %" PRIu64 ", vrtx id=%d", CkMyPe(), nodeStats->objData[i].objID(), objs[i].getVertexId());
-    objectComms[i].resize(neighborCount+1);
-    for(int j = 0; j < neighborCount+1; j++)
+    objectComms[i].resize(neighborCount+2);
+    for(int j = 0; j < neighborCount+2; j++)
       objectComms[i][j] = 0;
   }
+
+#if 0
 
   // TODO: Set objectComms to zero initially
   int obj = 0;
@@ -342,7 +343,7 @@ void DiffusionLB::LoadBalancing() {
       }
     }
     } // end for
-
+#endif
     // calculate the gain value, initialize the heap.
     internalAfter = internalBefore;
     externalAfter = externalBefore;
@@ -397,7 +398,6 @@ void DiffusionLB::LoadBalancing() {
       int counter = 0;
       CkPrintf("\n[PE-%d] my_loadAfterTransfer = %lf, actualSend=%d\n", CkMyPe(),my_loadAfterTransfer,actualSend);
 
-      //return;
       while(my_loadAfterTransfer > 0 && actualSend > 0) {
         counter++;
         //pop the object id with the least gain (i.e least internal comm compared to ext comm)
@@ -441,20 +441,22 @@ void DiffusionLB::LoadBalancing() {
           CkPrintf("\n[PE-%d] maxi = %d", CkMyPe(), maxi);
           
         if(maxi != -1) {
-#if 1
           migrates++;
           internalAfter -= comm[maxi];
           internalAfter += comm[maxi];
           externalAfter += comm[maxi];
           externalAfter -= comm[maxi];
-          int node = nbors[maxi];
+
+          int node = sendToNeighbors[maxi];
           toSendLoad[maxi] -= currLoad;
           if(toSendLoad[maxi] < threshold && balanced[maxi] == true) {
             balanced[maxi] = false;
             actualSend--;
           }
           totalSent += currLoad;
+/*
           objs[v_id].setCurrPe(-1); 
+
           // object Id changes to relative position in PE when passed to function getPENumber.
           int objId = objs_cpy[v_id].getVertexId();
           if(objId != v_id) {
@@ -469,13 +471,13 @@ void DiffusionLB::LoadBalancing() {
           CkPrintf("[%d] GRD: Load Balancing object load %f to node %d and from pe %d and objID %d\n", CkMyPe(), currLoad, node, initPE, objId);
           // TODO: Change this to directly send the load to zeroth PE
           //thisProxy[nodes[node]].LoadTransfer(currLoad, initPE, objId);
-          thisProxy[myNodeId*nodeSize].LoadMetaInfo(nodeStats->objData[v_id].handle, currLoad);
-          thisProxy[initPE].LoadReceived(objId, CkNodeFirst(node));
+//          thisProxy[myNodeId*nodeSize].LoadMetaInfo(nodeStats->objData[v_id].handle, currLoad);
+//          thisProxy[initPE].LoadReceived(objId, CkNodeFirst(node));
           my_loadAfterTransfer -= currLoad;
           int myPos = 0;//neighborPos[peNodes[rank0PE]];
           loadNeighbors[myPos] -= currLoad;
-          loadNeighbors[maxi] += currLoad;   
-#endif
+          loadNeighbors[maxi] += currLoad;
+*/
         }
         else {
           CkPrintf("[%d] maxi is negative currLoad %f \n", CkMyPe(), currLoad);

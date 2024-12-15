@@ -74,7 +74,7 @@ module DiffusionLB {
 
             for(temp_itr = 0; temp_itr < sendToNeighbors.size(); temp_itr++) {
                 when PseudoLoad[itr](int itr, double load, int node) serial {
-                    if(load > 0)
+                    //if(load > 0)
                         CkPrintf("[%d] GRD itr %d : Pseudo load received %f from node %d \n",
                                           CkMyPe(), itr, load, node);
                     my_load += load;
@@ -94,7 +94,7 @@ module DiffusionLB {
             actualSend = 0;
             // Only if this node should send load, call load balancing
             if(res || _lb_args.debug()) {
-//                LoadBalancing();
+                //LoadBalancing();
             }
 //            DoneNodeLB();
             my_load = my_loadAfterTransfer;
