@@ -116,28 +116,6 @@ void DiffusionLB::statsAssembled() {
   if(CkMyPe() == rank0PE)
     findNBors(1);
 }
-/*
-void DiffusionLB::sortArr(long arr[], int n, int *nbors)
-{
- 
-  vector<std::pair<long, int> > vp;
-
-  // Inserting element in pair vector
-  // to keep track of previous indexes
-  for (int i = 0; i < n; ++i) {
-      vp.push_back(std::make_pair(arr[i], i));
-  }
-
-  // Sorting pair vector
-  sort(vp.begin(), vp.end());
-  int found = 0;
-  for(int i=0;i<CkNumNodes();i++)
-    if(CkMyNode()!=vp[i].second) //Ideally we shouldn't need to check this
-      nbors[found++] = vp[i].second;
-  if(found == 0)
-    CkPrintf("\nPE-%d Error!!!!!", CkMyPe());
-}
-*/
 
 void DiffusionLB::ReceiveStats(CkMarshalledCLBStatsMessage &&data)
 {
@@ -260,241 +238,44 @@ int DiffusionLB::findNborIdx(int node) {
   return -1;
 }
 
-#define SELF_IDX NUM_NEIGHBORS
-#define EXT_IDX NUM_NEIGHBORS+1
 void DiffusionLB::LoadBalancing() {
   if(CkMyPe() != rank0PE) return;
   if (CkMyPe() == 0) {
-    CkCallback cb(CkIndex_DiffusionLB::DoneNodeLB(), thisProxy);
+//    CkCallback cb(CkIndex_DiffusionLB::DoneNodeLB(), thisProxy);
 //    CkStartQD(cb);
   }
   int n_objs = nodeStats->objData.size();
   CkPrintf("[%d] GRD: Load Balancing w objects size = %d \n", CkMyPe(), n_objs);
   fflush(stdout);
-
-//  Iterate over the comm data and for each object, store its comm bytes
-//  to other neighbor nodes and own node.
-
-  //objectComms maintains the comm bytes for each object on this node
-  //with the neighboring node
-  //we also maintain comm within this node and comm bytes outside
-  //(of this node and neighboring nodes)
-  vector<vector<int>> objectComms(n_objs);
-//  objectComms.resize(n_objs);
-
-  if(gain_val != NULL)
-      delete[] gain_val;
-  gain_val = new int[n_objs];
-  memset(gain_val, -1, n_objs);
-
-  CkPrintf("\n[PE-%d] n_objs=%d", CkMyPe(), n_objs);
-
-  for(int i = 0; i < n_objs; i++) {
-//    CkPrintf("\nPE-%d objid= %" PRIu64 ", vrtx id=%d", CkMyPe(), nodeStats->objData[i].objID(), objs[i].getVertexId());
-    objectComms[i].resize(neighborCount+2);
-    for(int j = 0; j < neighborCount+2; j++)
-      objectComms[i][j] = 0;
+  int i = 0;
+  while(my_loadAfterTransfer > 0) {
+    double currLoad = objs[i].getVertexLoad();
+    CkPrintf("\n[Node-%d] Can offload object with load %lf", CkMyNode(), objs[i].getVertexLoad());
+    int k = 0;
+    for(;k<neighborCount;k++) {
+      if(toSendLoad[k] > 0) break;
+    }
+    if(k == neighborCount) break;
+    toSendLoad[k] -= currLoad;
+    my_loadAfterTransfer -= currLoad;
+    int v_id = i;
+    int objId = objs[v_id].getVertexId();
+    int rank = GetPENumber(objId);
+    int node = sendToNeighbors[k];
+    int donorPE = rank0PE + rank;
+//    thisProxy[myNodeId*nodeSize].LoadMetaInfo(nodeStats->objData[v_id].handle, currLoad);
+    thisProxy[donorPE].LoadReceived(objId, CkNodeFirst(node));
+    i++;
   }
-
-#if 0
-
-  // TODO: Set objectComms to zero initially
-  int obj = 0;
-  for(int edge = 0; edge < nodeStats->commData.size(); edge++) {
-    LDCommData &commData = nodeStats->commData[edge];
-    // ensure that the message is not from a processor but from an object
-    // and that the type is an object to object message
-    if( (!commData.from_proc()) && (commData.recv_type()==LD_OBJ_MSG) ) {
-      LDObjKey from = commData.sender;
-      LDObjKey to = commData.receiver.get_destObj();
-      int fromNode = CkMyNode();//peNodes[rank0PE]; //Originating from my node? - q
-
-      // Check the possible values of lastKnown.
-      int toPE = commData.receiver.lastKnown();
-      int toNode = CkNodeOf(toPE);
-      //store internal bytes in the last index pos ? -q
-      if(fromNode == toNode) {
-//        int pos = neighborPos[toNode];
-        int nborIdx = SELF_IDX;// why self id?
-        int fromObj = nodeStats->getHash(from);
-        int toObj = nodeStats->getHash(to);
-        //DEBUGR(("[%d] GRD Load Balancing from obj %d and to obj %d and total objects %d\n", CkMyPe(), fromObj, toObj, nodeStats->n_objs));
-        objectComms[fromObj][nborIdx] += commData.bytes;
-        // lastKnown PE value can be wrong.
-        if(toObj != -1) {
-          objectComms[toObj][nborIdx] += commData.bytes; 
-          internalBefore += commData.bytes;
-        }
-        else
-          externalBefore += commData.bytes;
-      }
-      else { // External communication? - q
-        externalBefore += commData.bytes;
-        int nborIdx = findNborIdx(toNode);
-        if(nborIdx == -1)
-          nborIdx = EXT_IDX;//Store in last index if it is external bytes going to
-//        non-immediate neighbors? -q
-        if(fromNode == myNodeId/*peNodes[rank0PE]*/) {//ensure bytes are going from my node? -q
-          int fromObj = nodeStats->getHash(from);
-          CkPrintf("[%d] GRD Load Balancing from obj %d and pos %d\n", CkMyPe(), fromObj, nborIdx);
-          objectComms[fromObj][nborIdx] += commData.bytes;
-          obj++;
-        }
-      }
-    }
-    } // end for
-#endif
-    // calculate the gain value, initialize the heap.
-    internalAfter = internalBefore;
-    externalAfter = externalBefore;
-    double threshold = THRESHOLD*avgLoadNeighbor/100.0;
-
-    actualSend = 0;
-    balanced.resize(toSendLoad.size());
-    for(int i = 0; i < toSendLoad.size(); i++) {
-      balanced[i] = false;
-      if(toSendLoad[i] > 0) {
-        balanced[i] = true;
-        actualSend++;
-      }
-    }
-
-    if(actualSend > 0) {
-
-      if(obj_arr != NULL)
-        delete[] obj_arr;
-
-      obj_arr = new int[n_objs];
-
-      for(int i = 0; i < n_objs; i++) {
-        int sum_bytes = 0;
-        //comm bytes with all neighbors
-        vector<int> comm_w_nbors = objectComms[i];
-        obj_arr[i] = i;
-        //compute the sume of bytes of all comms for this obj
-        for(int j = 0; j < comm_w_nbors.size(); j++)
-            sum_bytes += comm_w_nbors[j];
-
-        //This gives higher gain value to objects that have within node communication
-        gain_val[i] = 2*objectComms[i][SELF_IDX] - sum_bytes;
-      }
-
-      // T1: create a heap based on gain values, and its position also.
-      obj_heap.clear();
-      heap_pos.clear();
-//      objs.clear();
-
-      obj_heap.resize(n_objs);
-      heap_pos.resize(n_objs);
- //     objs.resize(n_objs);
-      std::vector<CkVertex> objs_cpy = objs;
-
-      //Creating a minheap of objects based on gain value
-      InitializeObjHeap(nodeStats, obj_arr, n_objs, gain_val); 
-
-      // T2: Actual load balancingDecide which node it should go, based on object comm data structure. Let node be n
-      int v_id;
-      double totalSent = 0;
-      int counter = 0;
-      CkPrintf("\n[PE-%d] my_loadAfterTransfer = %lf, actualSend=%d\n", CkMyPe(),my_loadAfterTransfer,actualSend);
-
-      while(my_loadAfterTransfer > 0 && actualSend > 0) {
-        counter++;
-        //pop the object id with the least gain (i.e least internal comm compared to ext comm)
-
-        if(CkMyPe()==0)
-          for(int ii=0;ii<n_objs;ii++)
-            CkPrintf("\ngain_val[%d] = %d", ii, gain_val[ii]);
-
-        v_id = heap_pop(obj_heap, ObjCompareOperator(&objs, gain_val), heap_pos);
-        
-        CkPrintf("\n On PE-%d, popped v_id = %d", CkMyPe(), v_id);
-   
-        /*If the heap becomes empty*/
-        if(v_id==-1)          
-            break;
-        double currLoad = objs_cpy[v_id].getVertexLoad();
-#if 1
-        if(!objs[v_id].isMigratable()) {
-          CkPrintf("not migratable \n");
-          continue;
-        }
-#endif
-        vector<int> comm = objectComms[v_id];
-        int maxComm = 0;
-        int maxi = -1;
-#if 1
-        // TODO: Get the object vs communication cost ratio and work accordingly.
-        for(int i = 0 ; i < neighborCount; i++) {
-            
-          // TODO: if not underloaded continue
-          if(toSendLoad[i] > 0 && currLoad <= toSendLoad[i]+threshold) {
-            if(i!=SELF_IDX && (maxi == -1 || maxComm < comm[i])) {
-                maxi = i;
-               maxComm = comm[i];
-            }
-          }
-        }
-#endif
-
-//        if(CkMyPe()==0)
-          CkPrintf("\n[PE-%d] maxi = %d", CkMyPe(), maxi);
-          
-        if(maxi != -1) {
-          migrates++;
-          internalAfter -= comm[maxi];
-          internalAfter += comm[maxi];
-          externalAfter += comm[maxi];
-          externalAfter -= comm[maxi];
-
-          int node = sendToNeighbors[maxi];
-          toSendLoad[maxi] -= currLoad;
-          if(toSendLoad[maxi] < threshold && balanced[maxi] == true) {
-            balanced[maxi] = false;
-            actualSend--;
-          }
-          totalSent += currLoad;
-/*
-          objs[v_id].setCurrPe(-1); 
-
-          // object Id changes to relative position in PE when passed to function getPENumber.
-          int objId = objs_cpy[v_id].getVertexId();
-          if(objId != v_id) {
-              CkPrintf("\n%d!=%d", objId, v_id);fflush(stdout);
-              CmiAbort("objectIds dont match \n");
-          }
-          int rank = GetPENumber(objId);
-          migratedFrom[rank]++;
-          int initPE = rank0PE + rank;
-          pe_load[rank] -= currLoad;
-          numObjects[rank]--;
-          CkPrintf("[%d] GRD: Load Balancing object load %f to node %d and from pe %d and objID %d\n", CkMyPe(), currLoad, node, initPE, objId);
-          // TODO: Change this to directly send the load to zeroth PE
-          //thisProxy[nodes[node]].LoadTransfer(currLoad, initPE, objId);
-//          thisProxy[myNodeId*nodeSize].LoadMetaInfo(nodeStats->objData[v_id].handle, currLoad);
-//          thisProxy[initPE].LoadReceived(objId, CkNodeFirst(node));
-          my_loadAfterTransfer -= currLoad;
-          int myPos = 0;//neighborPos[peNodes[rank0PE]];
-          loadNeighbors[myPos] -= currLoad;
-          loadNeighbors[maxi] += currLoad;
-*/
-        }
-        else {
-          CkPrintf("[%d] maxi is negative currLoad %f \n", CkMyPe(), currLoad);
-        } 
-      } //end of while
-      CkPrintf("[%d] GRD: Load Balancing total load sent during LoadBalancing %f actualSend %d myloadB %f v_id %d counter %d nobjs %lu \n",
-          CkMyPe(), totalSent, actualSend, my_loadAfterTransfer, v_id, counter, nodeStats->objData.size());
-      for (int i = 0; i < neighborCount; i++) {
-        CkPrintf("[%d] GRD: Load Balancing total load sent during LoadBalancing toSendLoad %f node %d\n", CkMyPe(), toSendLoad[i], nbors[i]);
-        }
-      }//end of if
+  if (CkMyPe() == 0) {
+    CkCallback cb(CkIndex_DiffusionLB::MigrationEnded(), thisProxy);
+    CkStartQD(cb);
+  }
 }
 
 // Load is sent from overloaded to underloaded nodes, now we should load balance the PE's within the node
 void DiffusionLB::DoneNodeLB() {
   entered = false;
-  return;
   if(CkMyPe() == rank0PE) {
     DEBUGR(("[%d] GRD: DoneNodeLB \n", CkMyPe()));
     double avgPE = averagePE();
@@ -551,7 +332,7 @@ void DiffusionLB::DoneNodeLB() {
           continue;
       }
       migratedFrom[pe]++;
-      DEBUGR(("[%d] GRD Intranode: Transfer obj %f from %d of load %f to %d of load %f avg %f and threshold %f \n", CkMyPe(), maxObj->load, pe, pe_load[pe], minPE->Id, minPE->load, avgPE, threshold));
+      CkPrintf("[%d] GRD Intranode: Transfer obj %f from %d of load %f to %d of load %f avg %f and threshold %f \n", CkMyPe(), maxObj->load, pe, pe_load[pe], minPE->Id, minPE->load, avgPE, threshold);
       thisProxy[pe + rank0PE].LoadReceived(objId, rank0PE+minPE->Id);
 
       pe_load[minPE->Id] += maxObj->load;
@@ -577,7 +358,7 @@ void DiffusionLB::DoneNodeLB() {
   // This QD is essential because, before the actual migration starts, load should be divided amongs intra node PE's.
     if (CkMyPe() == 0) {
       CkCallback cb(CkIndex_DiffusionLB::MigrationEnded(), thisProxy);
-      CkStartQD(cb);
+//      CkStartQD(cb);
     }
     /*for(int i = 0; i < nodeSize; i++) {
       thisProxy[rank0PE + i].MigrationInfo(migratedTo[i], migratedFrom[i]);
@@ -608,7 +389,7 @@ void DiffusionLB::LoadReceived(int objId, int from0PE) {
     CmiAbort("this object does not exist \n");
   }
   MigrateInfo* migrateMe = new MigrateInfo;
-  migrateMe->obj = myStats->objData[objId].handle;
+  migrateMe->obj = nodeStats->objData[objId].handle;
   migrateMe->from_pe = CkMyPe();
   migrateMe->to_pe = from0PE;
   //migrateMe->async_arrival = myStats->objData[objId].asyncArrival;
@@ -619,11 +400,13 @@ void DiffusionLB::LoadReceived(int objId, int from0PE) {
 }
 
 void DiffusionLB::MigrationEnded() {
+    if(CkMyPe()!=rank0PE) return;
     // TODO: not deleted
     entered = true;
     DEBUGR(("[%d] GRD Migration Ended total_migrates %d total_migratesActual %d \n", CkMyPe(), total_migrates, total_migratesActual));
     msg = new(total_migrates,CkNumPes(),CkNumPes(),0) LBMigrateMsg;
-    msg->n_moves = total_migrates;
+    msg->n_moves = migrateInfo.size();//total_migrates;
+
     for(int i=0; i < total_migrates; i++) {
       MigrateInfo* item = (MigrateInfo*) migrateInfo[i];
       msg->moves[i] = *item;
@@ -631,21 +414,23 @@ void DiffusionLB::MigrationEnded() {
       migrateInfo[i] = 0;
     }
     migrateInfo.clear();
-    
+
     // Migrate messages from me to elsewhere
     for(int i=0; i < msg->n_moves; i++) {
         MigrateInfo& move = msg->moves[i];
         const int me = CkMyPe();
         if (move.from_pe == me && move.to_pe != me) {
-	        lbmgr->Migrate(move.obj,move.to_pe);
+          
+          CkPrintf("\n[PE-%d] Moving obj%d from PE %d to PE %d", me, move.obj.id, move.from_pe, move.to_pe);
+//	        lbmgr->Migrate(move.obj,move.to_pe);
         } else if (move.from_pe != me) {
 	        CkPrintf("[%d] error, strategy wants to move from %d to  %d\n",
-		    me,move.from_pe,move.to_pe);
+		    me,move.from_pe,move.to_pe); fflush(stdout);
         }
     }
     if (CkMyPe() == 0) {
         CkCallback cb(CkIndex_DiffusionLB::MigrationDone(), thisProxy);
-        CkStartQD(cb);
+//        CkStartQD(cb);
     }
 }
 
@@ -671,8 +456,8 @@ void DiffusionLB::CascadingMigration(LDObjHandle h, double load) {
                 balanced[minNode] = false;
                 actualSend--; 
             }
-            thisProxy[CkNodeFirst(nbors[minNode])].LoadMetaInfo(h, load);
-	        lbmgr->Migrate(h,CkNodeFirst(nbors[minNode]));
+            thisProxy[CkNodeFirst(sendToNeighbors[minNode])].LoadMetaInfo(h, load);
+	        lbmgr->Migrate(h,CkNodeFirst(sendToNeighbors[minNode]));
         }
             
     }
@@ -795,69 +580,14 @@ void DiffusionLB::MigrationDone() {
         end_lb_time = CkWallTimer();
         CkPrintf("Strategy Time %f \n", end_lb_time - start_lb_time);
     }
-    
-    if(CkMyPe() == rank0PE) {
-        double minLoadB = pe_loadBefore[0];
-        double maxLoadB = pe_loadBefore[0];
-        double sumBefore = 0.0;
-        double minLoadA = pe_load[0];
-        double maxLoadA = pe_load[0];
-        double sumAfter = 0.0;
-        double maxPEB = rank0PE;
-        double maxPEA = rank0PE;
-        double minPEB = rank0PE;
-        double minPEA = rank0PE;
-        if (_lb_args.debug()) {
-            for(int i = 0; i < nodeSize; i++) {
-                CkPrintf("[%d] GRD: load of PE before: %f after: %f\n",CkMyPe()+i, pe_loadBefore[i], pe_load[i] );
-                if(minLoadB > pe_loadBefore[i]) {
-                    minLoadB = pe_loadBefore[i];
-                    minPEB = rank0PE + i;
-                }
-                if(maxLoadB < pe_loadBefore[i]) {
-                    maxLoadB = pe_loadBefore[i];
-                    maxPEB = rank0PE+i;
-                }
-                sumBefore += pe_loadBefore[i];
-                if(minLoadA > pe_load[i]) {
-                    minLoadA = pe_load[i];
-                    minPEA = rank0PE + i;
-                }
-                if(maxLoadA < pe_load[i]) {
-                    maxLoadA = pe_load[i];
-                    maxPEA = rank0PE + i;
-                }
-                sumAfter += pe_load[i];
-            }
-            double loads[15];
-            loads[0] = maxLoadB;
-            loads[1] = minLoadB;
-            loads[2] = sumBefore;
-            loads[3] = maxLoadA;
-            loads[4] = minLoadA;
-            loads[5] = sumAfter;
-            loads[6] = internalBefore;
-            loads[7] = externalBefore;
-            loads[8] = internalAfter;
-            loads[9] = externalAfter;
-            loads[10] = migrates;
-            loads[11] = minPEB;
-            loads[12] = maxPEB;
-            loads[13] = minPEA;
-            loads[14] = maxPEA;
-            DEBUGL(("[%d] PE's %f %f %f %f \n", CkMyPe(), minPEB, maxPEB, minPEA, maxPEA));
-            thisProxy[0].PrintDebugMessage(15, loads);
-        }
-    
-        nodeStats->objData.clear();
-        nodeStats->commData.clear();
-        for(int i = 0; i < nodeSize; i++) {
-            pe_load[i] = 0;
-            pe_loadBefore[i] = 0;
-            numObjects[i] = 0;
-            migratedTo[i] = 0;
-            migratedFrom[i] = 0;
-        }
+    //nodeStats->objData.clear();
+    //nodeStats->commData.clear();
+    for(int i = 0; i < nodeSize; i++) {
+        pe_load[i] = 0;
+        pe_loadBefore[i] = 0;
+        numObjects[i] = 0;
+        migratedTo[i] = 0;
+        migratedFrom[i] = 0;
     }
 
   // Increment to next step

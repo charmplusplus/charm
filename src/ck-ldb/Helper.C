@@ -87,6 +87,7 @@ void DiffusionLB::BuildStats() {
         for (i = 0; i < msg->objData.size(); i++) {
             nodeStats->from_proc[nobj] = nodeStats->to_proc[nobj] = start + pe;
             nodeStats->objData[nobj] = msg->objData[i];
+            CkPrintf("\n[InitNode-%d] obj =%d", CkMyNode(), msg->objData[i].handle.id);
             LDObjData &oData = nodeStats->objData[nobj];
 //            CkPrintf("\n[PE-%d]Adding vertex id %d", CkMyPe(), nobj);
             objs[nobj] = CkVertex(nobj, oData.wallTime, nodeStats->objData[nobj].migratable, nodeStats->from_proc[nobj]);
