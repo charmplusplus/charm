@@ -404,25 +404,26 @@ void DiffusionLB::MigrationEnded() {
     // TODO: not deleted
     entered = true;
     DEBUGR(("[%d] GRD Migration Ended total_migrates %d total_migratesActual %d \n", CkMyPe(), total_migrates, total_migratesActual));
-    msg = new(total_migrates,CkNumPes(),CkNumPes(),0) LBMigrateMsg;
+    msg = new(migrateInfo.size()/*total_migrates*/,CkNumPes(),CkNumPes(),0) LBMigrateMsg;
     msg->n_moves = migrateInfo.size();//total_migrates;
+    msg->moves = new  MigrateInfo[migrateInfo.size()];
 
     for(int i=0; i < total_migrates; i++) {
       MigrateInfo* item = (MigrateInfo*) migrateInfo[i];
-      msg->moves[i] = *item;
-      delete item;
-      migrateInfo[i] = 0;
+//      msg->moves[i] = *item;
+//      delete item;
+//      migrateInfo[i] = 0;
     }
-    migrateInfo.clear();
-
+//    migrateInfo.clear();
+//    return;
     // Migrate messages from me to elsewhere
     for(int i=0; i < msg->n_moves; i++) {
-        MigrateInfo& move = msg->moves[i];
+        MigrateInfo& move = *((MigrateInfo*) migrateInfo[i]);//msg->moves[i];
         const int me = CkMyPe();
         if (move.from_pe == me && move.to_pe != me) {
           
           CkPrintf("\n[PE-%d] Moving obj%d from PE %d to PE %d", me, move.obj.id, move.from_pe, move.to_pe);
-//	        lbmgr->Migrate(move.obj,move.to_pe);
+	        lbmgr->Migrate(move.obj,move.to_pe);
         } else if (move.from_pe != me) {
 	        CkPrintf("[%d] error, strategy wants to move from %d to  %d\n",
 		    me,move.from_pe,move.to_pe); fflush(stdout);
@@ -430,7 +431,7 @@ void DiffusionLB::MigrationEnded() {
     }
     if (CkMyPe() == 0) {
         CkCallback cb(CkIndex_DiffusionLB::MigrationDone(), thisProxy);
-//        CkStartQD(cb);
+        CkStartQD(cb);
     }
 }
 
@@ -582,6 +583,7 @@ void DiffusionLB::MigrationDone() {
     }
     //nodeStats->objData.clear();
     //nodeStats->commData.clear();
+/*
     for(int i = 0; i < nodeSize; i++) {
         pe_load[i] = 0;
         pe_loadBefore[i] = 0;
@@ -589,7 +591,7 @@ void DiffusionLB::MigrationDone() {
         migratedTo[i] = 0;
         migratedFrom[i] = 0;
     }
-
+*/
   // Increment to next step
   lbmgr->incStep();
   if(finalBalancing)
