@@ -45,8 +45,8 @@ static void lbinit()
 using std::vector;
 
 DiffusionLB::DiffusionLB(const CkLBOptions &opt) : CBase_DiffusionLB(opt) {
-  myNodeId = CkMyNode();
-  nodeSize = CkNodeSize(myNodeId);
+  nodeSize = CkNodeSize(0);//2;//CkNodeSize(myNodeId);
+  myNodeId = CkMyPe()/nodeSize;
   acks = 0;
   max = 0;
   edgeCount = 0;
@@ -60,10 +60,10 @@ DiffusionLB::DiffusionLB(const CkLBOptions &opt) : CBase_DiffusionLB(opt) {
       CkPrintf("[%d] Diffusion created\n",CkMyPe());
   if (_lb_args.statsOn()) lbmgr->CollectStatsOn();
   thisProxy = CProxy_DiffusionLB(thisgroup);
-  numNodes = CkNumNodes();
+  numNodes = CkNumPes()/nodeSize;//CkNumNodes();
   myStats = new DistBaseLB::LDStats;
 
-  rank0PE = CkNodeFirst(CkMyNode());
+  rank0PE = myNodeId*nodeSize;//CkNodeFirst(CkMyNode());
   if(CkMyPe() == rank0PE) {
     statsList = new CLBStatsMsg*[nodeSize];
     nodeStats = new BaseLB::LDStats(nodeSize);
@@ -264,7 +264,7 @@ void DiffusionLB::LoadBalancing() {
     int node = sendToNeighbors[k];
     int donorPE = rank0PE + rank;
 //    thisProxy[myNodeId*nodeSize].LoadMetaInfo(nodeStats->objData[v_id].handle, currLoad);
-    thisProxy[donorPE].LoadReceived(objId, CkNodeFirst(node));
+    thisProxy[donorPE].LoadReceived(objId, node*nodeSize/*CkNodeFirst(node)*/);
     i++;
   }
   if (CkMyPe() == 0) {
@@ -389,7 +389,7 @@ void DiffusionLB::LoadReceived(int objId, int from0PE) {
     CmiAbort("this object does not exist \n");
   }
   MigrateInfo* migrateMe = new MigrateInfo;
-  migrateMe->obj = nodeStats->objData[objId].handle;
+  migrateMe->obj = myStats->objData[objId].handle;
   migrateMe->from_pe = CkMyPe();
   migrateMe->to_pe = from0PE;
   //migrateMe->async_arrival = myStats->objData[objId].asyncArrival;
@@ -457,8 +457,8 @@ void DiffusionLB::CascadingMigration(LDObjHandle h, double load) {
                 balanced[minNode] = false;
                 actualSend--; 
             }
-            thisProxy[CkNodeFirst(sendToNeighbors[minNode])].LoadMetaInfo(h, load);
-	        lbmgr->Migrate(h,CkNodeFirst(sendToNeighbors[minNode]));
+            thisProxy[sendToNeighbors[minNode]*nodeSize/*CkNodeFirst(sendToNeighbors[minNode])*/].LoadMetaInfo(h, load);
+	        lbmgr->Migrate(h, sendToNeighbors[minNode]*nodeSize/*CkNodeFirst(sendToNeighbors[minNode])*/);
         }
             
     }

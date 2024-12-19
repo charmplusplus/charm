@@ -94,9 +94,9 @@ void DiffusionLB::findNBors(int do_again) {
 void DiffusionLB::next_phase(int val) {
   acks++;
   if(val > max) max = val;
-  if(acks == CkNumNodes()) {
+  if(acks == numNodes) {
     acks = 0;
-    for(int i=0;i<CkNumNodes();i++)
+    for(int i=0;i<numNodes;i++)
       thisProxy[i*nodeSize].findNBors(max);
     max = 0;
   }
