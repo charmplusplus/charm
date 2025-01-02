@@ -607,7 +607,7 @@ void DiffusionLB::MigrationDone() {
     lbmgr->ClearLoads();
 
   // if sync resume invoke a barrier
-  if(!_lb_args.debug() || CkMyPe() != rank0PE) {
+//  if(!_lb_args.debug() || CkMyPe() != rank0PE) {
   if (finalBalancing && _lb_args.syncResume()) {
     CkCallback cb(CkIndex_DiffusionLB::ResumeClients((CkReductionMsg*)(NULL)), 
         thisProxy);
@@ -615,7 +615,7 @@ void DiffusionLB::MigrationDone() {
   }
   else 
     thisProxy [CkMyPe()].ResumeClients(finalBalancing);
-  }
+//  }
 #endif
 }
 
