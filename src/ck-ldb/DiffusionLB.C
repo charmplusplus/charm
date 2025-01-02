@@ -25,7 +25,7 @@
 #include "Helper.C"
 
 #define DEBUGF(x) CmiPrintf x;
-#define DEBUGR(x) /*CmiPrintf x*/;
+#define DEBUGR(x) CmiPrintf x;
 #define DEBUGL(x) CmiPrintf x;
 #define ITERATIONS 40
 
@@ -45,7 +45,7 @@ static void lbinit()
 using std::vector;
 
 DiffusionLB::DiffusionLB(const CkLBOptions &opt) : CBase_DiffusionLB(opt) {
-  nodeSize = CkNodeSize(0);//2;//CkNodeSize(myNodeId);
+  nodeSize = CkNodeSize(0);
   myNodeId = CkMyPe()/nodeSize;
   acks = 0;
   max = 0;
@@ -69,6 +69,8 @@ DiffusionLB::DiffusionLB(const CkLBOptions &opt) : CBase_DiffusionLB(opt) {
     nodeStats = new BaseLB::LDStats(nodeSize);
     numObjects.resize(nodeSize);
     prefixObjects.resize(nodeSize);
+    migratedTo.resize(nodeSize);
+    migratedFrom.resize(nodeSize);
     pe_load.resize(nodeSize);
   }
 #endif
@@ -241,8 +243,16 @@ int DiffusionLB::findNborIdx(int node) {
 void DiffusionLB::LoadBalancing() {
   if(CkMyPe() != rank0PE) return;
   if (CkMyPe() == 0) {
-//    CkCallback cb(CkIndex_DiffusionLB::DoneNodeLB(), thisProxy);
-//    CkStartQD(cb);
+    CkCallback cb(CkIndex_DiffusionLB::DoneNodeLB(), thisProxy);
+    CkStartQD(cb);
+  }
+  balanced.resize(neighborCount);
+  for(int i = 0; i < neighborCount; i++) {
+    balanced[i] = false;
+    if(toSendLoad[i] > 0) {
+      balanced[i] = true;
+      actualSend++;
+    }
   }
   int n_objs = nodeStats->objData.size();
   CkPrintf("[%d] GRD: Load Balancing w objects size = %d \n", CkMyPe(), n_objs);
@@ -259,17 +269,18 @@ void DiffusionLB::LoadBalancing() {
     toSendLoad[k] -= currLoad;
     my_loadAfterTransfer -= currLoad;
     int v_id = i;
+    objs[v_id].setCurrPe(-1);
     int objId = objs[v_id].getVertexId();
     int rank = GetPENumber(objId);
     int node = sendToNeighbors[k];
     int donorPE = rank0PE + rank;
-//    thisProxy[myNodeId*nodeSize].LoadMetaInfo(nodeStats->objData[v_id].handle, currLoad);
+    thisProxy[myNodeId*nodeSize].LoadMetaInfo(nodeStats->objData[v_id].handle, currLoad);
     thisProxy[donorPE].LoadReceived(objId, node*nodeSize/*CkNodeFirst(node)*/);
     i++;
   }
   if (CkMyPe() == 0) {
-    CkCallback cb(CkIndex_DiffusionLB::MigrationEnded(), thisProxy);
-    CkStartQD(cb);
+//    CkCallback cb(CkIndex_DiffusionLB::MigrationEnded(), thisProxy);
+//    CkStartQD(cb);
   }
 }
 
@@ -277,7 +288,7 @@ void DiffusionLB::LoadBalancing() {
 void DiffusionLB::DoneNodeLB() {
   entered = false;
   if(CkMyPe() == rank0PE) {
-    DEBUGR(("[%d] GRD: DoneNodeLB \n", CkMyPe()));
+    CkPrintf("[%d] GRD: DoneNodeLB \n", CkMyPe());
     double avgPE = averagePE();
 
     // Create a max heap and min heap for pe loads
@@ -332,7 +343,7 @@ void DiffusionLB::DoneNodeLB() {
           continue;
       }
       migratedFrom[pe]++;
-      CkPrintf("[%d] GRD Intranode: Transfer obj %f from %d of load %f to %d of load %f avg %f and threshold %f \n", CkMyPe(), maxObj->load, pe, pe_load[pe], minPE->Id, minPE->load, avgPE, threshold);
+      CkPrintf("[%d] GRD Intranode: Transfer obj %d (handle %d) from %d of load %f to %d of load %f avg %f and threshold %f \n", CkMyPe(), maxObj->Id, myStats->objData[objId].handle, pe, pe_load[pe], minPE->Id, minPE->load, avgPE, threshold);
       thisProxy[pe + rank0PE].LoadReceived(objId, rank0PE+minPE->Id);
 
       pe_load[minPE->Id] += maxObj->load;
@@ -358,7 +369,7 @@ void DiffusionLB::DoneNodeLB() {
   // This QD is essential because, before the actual migration starts, load should be divided amongs intra node PE's.
     if (CkMyPe() == 0) {
       CkCallback cb(CkIndex_DiffusionLB::MigrationEnded(), thisProxy);
-//      CkStartQD(cb);
+      CkStartQD(cb);
     }
     /*for(int i = 0; i < nodeSize; i++) {
       thisProxy[rank0PE + i].MigrationInfo(migratedTo[i], migratedFrom[i]);
@@ -396,7 +407,7 @@ void DiffusionLB::LoadReceived(int objId, int from0PE) {
   migrateInfo.push_back(migrateMe);
   total_migrates++;
   entered = false;
-  CkPrintf("[%d] GRD Load Received objId %d  with load %f and toPE %d total_migrates %d total_migratesActual %d migrates_expected %d migrates_completed %d\n", CkMyPe(), objId, myStats->objData[objId].wallTime, from0PE, total_migrates, total_migratesActual, migrates_expected, migrates_completed);
+  CkPrintf("[%d] GRD Load Received objId %d (handle %d)  with load %f and toPE %d total_migrates %d total_migratesActual %d migrates_expected %d migrates_completed %d\n", CkMyPe(), objId, myStats->objData[objId].handle,  myStats->objData[objId].wallTime, from0PE, total_migrates, total_migratesActual, migrates_expected, migrates_completed);
 }
 
 void DiffusionLB::MigrationEnded() {
@@ -407,10 +418,11 @@ void DiffusionLB::MigrationEnded() {
     msg = new(migrateInfo.size()/*total_migrates*/,CkNumPes(),CkNumPes(),0) LBMigrateMsg;
     msg->n_moves = migrateInfo.size();//total_migrates;
     msg->moves = new  MigrateInfo[migrateInfo.size()];
+    total_migrates = msg->n_moves;
 
     for(int i=0; i < total_migrates; i++) {
       MigrateInfo* item = (MigrateInfo*) migrateInfo[i];
-//      msg->moves[i] = *item;
+      msg->moves[i] = *item;
 //      delete item;
 //      migrateInfo[i] = 0;
     }
@@ -435,47 +447,45 @@ void DiffusionLB::MigrationEnded() {
     }
 }
 
-//What does Cascading migrations do?
 void DiffusionLB::CascadingMigration(LDObjHandle h, double load) {
     double threshold = THRESHOLD*avgLoadNeighbor/100.0;
-    int minNode = -1;
+    int minNode = 0;
     int myPos = 0;//neighborPos[CkNodeOf(rank0PE)];
+    CkPrintf("[%d] GRD Cascading Migration actualSend %d to node %d\n", CkMyPe(), actualSend, nbors[minNode]);
     if(actualSend > 0) {
-        double minLoad;
-        // Send to max underloaded node
-        for(int i = 0; i < neighborCount; i++) {
-            if(balanced[i] == true && load <= toSendLoad[i] && (minNode == -1 || minLoad < toSendLoad[i])) {
-                minNode = i;
-                minLoad = toSendLoad[i];
-            }
+      double minLoad;
+      // Send to max underloaded node
+      for(int i = 0; i < neighborCount; i++) {
+        if(balanced[i] == true && load <= toSendLoad[i] && (minNode == -1 || minLoad < toSendLoad[i])) {
+          minNode = i;
+          minLoad = toSendLoad[i];
         }
-        DEBUGR(("[%d] GRD Cascading Migration actualSend %d to node %d\n", CkMyPe(), actualSend, nbors[minNode]));
-        if(minNode != -1 && minNode != myPos) {
-            // Send load info to receiving load
-            toSendLoad[minNode] -= load;
-            if(toSendLoad[minNode] < threshold && balanced[minNode] == true) {
-                balanced[minNode] = false;
-                actualSend--; 
-            }
-            thisProxy[sendToNeighbors[minNode]*nodeSize/*CkNodeFirst(sendToNeighbors[minNode])*/].LoadMetaInfo(h, load);
-	        lbmgr->Migrate(h, sendToNeighbors[minNode]*nodeSize/*CkNodeFirst(sendToNeighbors[minNode])*/);
+      }
+      if(minNode != -1 && minNode != myPos) {
+          // Send load info to receiving load
+        toSendLoad[minNode] -= load;
+        if(toSendLoad[minNode] < threshold && balanced[minNode] == true) {
+          balanced[minNode] = false;
+          actualSend--;
         }
-            
+        thisProxy[sendToNeighbors[minNode]*nodeSize/*CkNodeFirst(sendToNeighbors[minNode])*/].LoadMetaInfo(h, load);
+        lbmgr->Migrate(h, sendToNeighbors[minNode]*nodeSize/*CkNodeFirst(sendToNeighbors[minNode])*/);
+      }
     }
     if(actualSend <= 0 || minNode == myPos || minNode == -1) {
-        int minRank = -1;
-        double minLoad = 0;
-        for(int i = 0; i < nodeSize; i++) {
-            if(minRank == -1 || pe_load[i] < minLoad) {
-                minRank = i;
-                minLoad = pe_load[i];
-            }
+      int minRank = -1;
+      double minLoad = 0;
+      for(int i = 0; i < nodeSize; i++) {
+        if(minRank == -1 || pe_load[i] < minLoad) {
+          minRank = i;
+          minLoad = pe_load[i];
         }
-        DEBUGR(("[%d] GRD Cascading Migration actualSend %d sending to rank %d \n", CkMyPe(), actualSend, minRank));
-        pe_load[minRank] += load;
-        if(minRank > 0) {
-	        lbmgr->Migrate(h, rank0PE+minRank);
-        }
+      }
+      DEBUGR(("[%d] GRD Cascading Migration actualSend %d sending to rank %d \n", CkMyPe(), actualSend, minRank));
+      pe_load[minRank] += load;
+      if(minRank > 0) {
+        lbmgr->Migrate(h, rank0PE+minRank);
+      }
     }
 }
 
@@ -586,7 +596,6 @@ void DiffusionLB::MigrationDone() {
 /*
     for(int i = 0; i < nodeSize; i++) {
         pe_load[i] = 0;
-        pe_loadBefore[i] = 0;
         numObjects[i] = 0;
         migratedTo[i] = 0;
         migratedFrom[i] = 0;
