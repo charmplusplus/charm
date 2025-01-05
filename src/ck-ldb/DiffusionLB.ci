@@ -91,7 +91,7 @@ module DiffusionLB {
         // Calculate the aggregate load that has to be sent.
         serial {
             bool res = AggregateToSend();
-            actualSend = 0;
+            loadReceivers = 0;
             // Only if this node should send load, call load balancing
             if(res || _lb_args.debug()) {
                 //LoadBalancing();

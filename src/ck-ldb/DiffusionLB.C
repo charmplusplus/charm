@@ -240,6 +240,8 @@ int DiffusionLB::findNborIdx(int node) {
   return -1;
 }
 
+#define SELF_IDX NUM_NEIGHBORS
+#define EXT_IDX NUM_NEIGHBORS+1
 void DiffusionLB::LoadBalancing() {
   if(CkMyPe() != rank0PE) return;
   if (CkMyPe() == 0) {
@@ -251,10 +253,116 @@ void DiffusionLB::LoadBalancing() {
     balanced[i] = false;
     if(toSendLoad[i] > 0) {
       balanced[i] = true;
-      actualSend++;
+      loadReceivers++;
     }
   }
+
   int n_objs = nodeStats->objData.size();
+
+  objectComms.resize(n_objs);
+  gain_val = new int[n_objs];
+  memset(gain_val, 100, n_objs);
+
+  for(int i = 0; i < n_objs; i++) {
+    objectComms[i].resize(NUM_NEIGHBORS+2);
+    for(int j = 0; j < NUM_NEIGHBORS+2; j++)
+      objectComms[i][j] = 0;
+  }
+
+#if 1
+  int obj = 0;
+  for(int edge = 0; edge < nodeStats->commData.size(); edge++) {
+    LDCommData &commData = nodeStats->commData[edge];
+    // ensure that the message is not from a processor but from an object
+    // and that the type is an object to object message
+    if( (!commData.from_proc()) && (commData.recv_type()==LD_OBJ_MSG) ) {
+      LDObjKey from = commData.sender;
+      LDObjKey to = commData.receiver.get_destObj();
+      int fromNode = myNodeId;
+
+      // Check the possible values of lastKnown.
+      int toPE = commData.receiver.lastKnown();
+      int toNode = toPE/nodeSize;
+      //store internal bytes in the last index pos ? -q
+      if(fromNode == toNode) {
+//        int pos = neighborPos[toNode];
+        int nborIdx = SELF_IDX;// why self id?
+        int fromObj = nodeStats->getHash(from);
+        int toObj = nodeStats->getHash(to);
+        //DEBUGR(("[%d] GRD Load Balancing from obj %d and to obj %d and total objects %d\n", CkMyPe(), fromObj, toObj, nodeStats->n_objs));
+        objectComms[fromObj][nborIdx] += commData.bytes;
+        // lastKnown PE value can be wrong.
+        if(toObj != -1) {
+          objectComms[toObj][nborIdx] += commData.bytes;
+          internalBefore += commData.bytes;
+        }
+        else
+          externalBefore += commData.bytes;
+      }
+      else { // External communication? - q
+        externalBefore += commData.bytes;
+        int nborIdx = findNborIdx(toNode);
+        if(nborIdx == -1)
+          nborIdx = EXT_IDX;//Store in last index if it is external bytes going to
+//        non-immediate neighbors? -q
+        if(fromNode == myNodeId/*peNodes[rank0PE]*/) {//ensure bytes are going from my node? -q
+          int fromObj = nodeStats->getHash(from);
+          CkPrintf("[%d] GRD Load Balancing from obj %d and pos %d\n", CkMyPe(), fromObj, nborIdx);
+          objectComms[fromObj][nborIdx] += commData.bytes;
+          obj++;
+        }
+      }
+    }
+  } // end for
+#endif
+
+    loadReceivers = 0;
+    balanced.resize(toSendLoad.size());
+    for(int i = 0; i < toSendLoad.size(); i++) {
+      balanced[i] = false;
+      if(toSendLoad[i] > 0) {
+        balanced[i] = true;
+        loadReceivers++;
+      }
+    }
+
+    if(loadReceivers > 0) {
+
+      if(obj_arr != NULL)
+        delete[] obj_arr;
+
+      obj_arr = new int[n_objs];
+
+      for(int i = 0; i < n_objs; i++) {
+        int sum_bytes = 0;
+        //comm bytes with all neighbors
+        vector<int> comm_w_nbors = objectComms[i];
+        obj_arr[i] = i;
+        //compute the sume of bytes of all comms for this obj
+        for(int j = 0; j < comm_w_nbors.size(); j++)
+            sum_bytes += comm_w_nbors[j];
+
+        //This gives higher gain value to objects that have within node communication
+        gain_val[i] = 2*objectComms[i][SELF_IDX] - sum_bytes;
+      }
+
+      // T1: create a heap based on gain values, and its position also.
+      obj_heap.clear();
+      heap_pos.clear();
+//      objs.clear();
+
+      obj_heap.resize(n_objs);
+      heap_pos.resize(n_objs);
+ //     objs.resize(n_objs);
+      std::vector<CkVertex> objs_cpy = objs;
+      InitializeObjHeap(nodeStats, obj_arr, n_objs, gain_val);
+
+      // T2: Actual load balancingDecide which node it should go, based on object comm data structure. Let node be n
+      int v_id;
+      double totalSent = 0;
+      int counter = 0;
+  }
+
   CkPrintf("[%d] GRD: Load Balancing w objects size = %d \n", CkMyPe(), n_objs);
   fflush(stdout);
   int i = 0;
@@ -268,7 +376,9 @@ void DiffusionLB::LoadBalancing() {
     if(k == neighborCount) break;
     toSendLoad[k] -= currLoad;
     my_loadAfterTransfer -= currLoad;
-    int v_id = i;
+//    int v_id = i;
+    int v_id = heap_pop(obj_heap, ObjCompareOperator(&objs, gain_val), heap_pos);
+    CkPrintf("\nNode-%d, obj id %d", myNodeId, v_id);
     objs[v_id].setCurrPe(-1);
     int objId = objs[v_id].getVertexId();
     int rank = GetPENumber(objId);
@@ -451,8 +561,8 @@ void DiffusionLB::CascadingMigration(LDObjHandle h, double load) {
     double threshold = THRESHOLD*avgLoadNeighbor/100.0;
     int minNode = 0;
     int myPos = 0;//neighborPos[CkNodeOf(rank0PE)];
-    CkPrintf("[%d] GRD Cascading Migration actualSend %d to node %d\n", CkMyPe(), actualSend, nbors[minNode]);
-    if(actualSend > 0) {
+    CkPrintf("[%d] GRD Cascading Migration loadReceivers %d to node %d\n", CkMyPe(), loadReceivers, nbors[minNode]);
+    if(loadReceivers > 0) {
       double minLoad;
       // Send to max underloaded node
       for(int i = 0; i < neighborCount; i++) {
@@ -466,13 +576,13 @@ void DiffusionLB::CascadingMigration(LDObjHandle h, double load) {
         toSendLoad[minNode] -= load;
         if(toSendLoad[minNode] < threshold && balanced[minNode] == true) {
           balanced[minNode] = false;
-          actualSend--;
+          loadReceivers--;
         }
         thisProxy[sendToNeighbors[minNode]*nodeSize/*CkNodeFirst(sendToNeighbors[minNode])*/].LoadMetaInfo(h, load);
         lbmgr->Migrate(h, sendToNeighbors[minNode]*nodeSize/*CkNodeFirst(sendToNeighbors[minNode])*/);
       }
     }
-    if(actualSend <= 0 || minNode == myPos || minNode == -1) {
+    if(loadReceivers <= 0 || minNode == myPos || minNode == -1) {
       int minRank = -1;
       double minLoad = 0;
       for(int i = 0; i < nodeSize; i++) {
@@ -481,7 +591,7 @@ void DiffusionLB::CascadingMigration(LDObjHandle h, double load) {
           minLoad = pe_load[i];
         }
       }
-      DEBUGR(("[%d] GRD Cascading Migration actualSend %d sending to rank %d \n", CkMyPe(), actualSend, minRank));
+      DEBUGR(("[%d] GRD Cascading Migration loadReceivers %d sending to rank %d \n", CkMyPe(), loadReceivers, minRank));
       pe_load[minRank] += load;
       if(minRank > 0) {
         lbmgr->Migrate(h, rank0PE+minRank);

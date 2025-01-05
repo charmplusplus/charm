@@ -125,7 +125,7 @@ private:
 //    std::unordered_map<int, int> peNodes;
 //    std::vector<int> nodes;
 
-    int actualSend;
+    int loadReceivers;
     std::vector<bool> balanced;
     
     // migration
@@ -137,6 +137,8 @@ private:
     LBMigrateMsg* msg;
     std::vector<int> migratedTo;
     std::vector<int> migratedFrom;
+    std::vector<CkVertex> objects;
+    std::vector<std::vector<int>> objectComms;
     bool entered;
     int finalBalancing;
 
