@@ -815,34 +815,34 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 
 
       ///      short hsnOrder[numcxi]={2,1,3,0};
-      if(numcxi==4)
+      if(numcxi == 4)
 	{
-	  short hsnOrder[8]= {1,1,3,3,0,0,2,2};
-	  if(myRank%quad>numcxi)
+	  short hsnOrder[4]= {1,3,0,2};
+	  if(myRank % quad > numcxi)
 	    {
 	      CmiPrintf("Error: myrank %d quad %d myrank/quad %n",myRank,quad, myRank/quad);
 	      CmiAbort("cxi mapping failure");
 	    }
-	  myNet=hsnOrder[myRank%quad];
+	  myNet = hsnOrder[myRank % quad];
 	}
-      else if(numcxi==8)
+      else if(numcxi == 8)
 	{
-	  // no idea if this is a good ordering
+	  // this appears to be a good ordering on aurora
 	  short hsnOrder[8]= {0,1,2,3,4,5,6,7};
-	  if(myRank%quad>numcxi)
+	  if(myRank % quad > numcxi)
 	    {
 	      CmiPrintf("Error: myrank %d quad %d myrank/quad %n",myRank,quad, myRank/quad);
 	      CmiAbort("cxi mapping failure");
 	    }
-	  myNet=hsnOrder[myRank%quad];
+	  myNet = hsnOrder[myRank % quad];
 	}
       else
 	{
-	  CmiAssert(numcxi==1);
-	  //theoretically there are cases other than 4 and 1, but
+	  CmiAssert(numcxi == 1);
+	  //theoretically there are cases other than 8, 4 and 1, but
 	  //until someone sights such an incrayptid on a machine floor,
 	  //we're just going to assume they don't exist.
-	  myNet=0;
+	  myNet = 0;
 	}
     }
   snprintf(myDomainName,5, "cxi%d", myNet);
