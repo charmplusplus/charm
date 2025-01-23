@@ -426,7 +426,6 @@ if(CMK_AMPI_WITH_ROMIO)
             TEST_F77=${CMAKE_BINARY_DIR}/bin/ampif77
             USER_CFLAGS=${ROMIO_FLAGS}
             USER_FFLAGS=${ROMIO_FLAGS}
-            > /dev/null
         COMMAND cp -f ${romio_headers} ${CMAKE_BINARY_DIR}/include/
         BUILD_COMMAND $(MAKE) -C ${romio_dir} AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=: V=$(VERBOSE)
         INSTALL_COMMAND ""
