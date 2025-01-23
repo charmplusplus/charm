@@ -184,7 +184,7 @@ AMPI_CUSTOM_FUNC(int, MPI_Type_create_subarray, int ndims, const int array_of_si
 /* Section 4.14.5 */
 AMPI_CUSTOM_FUNC(int, MPI_Type_create_darray, int size, int rank, int ndims, const int array_of_gsizes[],
                            const int array_of_distribs[], const int array_of_dargs[],
-                           const int array_of_psizes, int order, MPI_Datatype oldtype,
+                           const int array_of_psizes[], int order, MPI_Datatype oldtype,
                            MPI_Datatype *newtype)
 #endif
 
