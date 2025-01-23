@@ -365,8 +365,9 @@ jobs:
         # No need for automake/autoconf
         sed -i -e '/automake/d' var/spack/repos/builtin/packages/charmpp/package.py
         sed -i -e '/autoconf/d' var/spack/repos/builtin/packages/charmpp/package.py
-    - install dependencies for spack	
+    - name: install dependencies before spack	
       run : |
+
         sudo apt-get install -y libncurses-dev pkgconf zlib1g-dev gcc-14 g++-14 gfortran-14 libdb-dev diffutils libreadline-dev nghttp2 perl openssl bzip2 libgdbm-dev curl cmake file
 
     - name: Build Charm++
