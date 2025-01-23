@@ -23719,7 +23719,7 @@ $as_echo_n "checking if a simple MPI program compiles and links... " >&6; }
   rm -f mpitest.c
   cat > mpitest.c <<EOF
 #include "mpi.h"
-     main(int argc, char **argv)
+     int main(int argc, char **argv)
      {
          MPI_Init(&argc,&argv);
          MPI_Finalize();
