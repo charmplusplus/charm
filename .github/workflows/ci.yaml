@@ -373,7 +373,7 @@ jobs:
         spack compiler find
         spack compiler list
         spack spec charmpp@main
-        spack install --test root charmpp@main
+        spack install -j2 --test root charmpp@main
 
   ucx-linux-x86_64_openpmix:
     timeout-minutes: 60
