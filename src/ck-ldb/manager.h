@@ -13,6 +13,8 @@
 
 void manager_init(void);
 
+void rescale(char* bit_map);
+
 #endif
 
 /*@}*/

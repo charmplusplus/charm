@@ -34,9 +34,11 @@ ProcArray::ProcArray(BaseLB::LDStats *stats) {
     avgLoad += procs[pe].getTotalLoad();
     if (!procs[pe].available)
       currAvailPe++;
-    availPeMap[pe] = currAvailPe++;
+    if (currAvailPe < numPes)
+      availPeMap[pe] = currAvailPe++;
 //		CkPrintf("PE%d overhead:%f totalLoad:%f \n",pe,procs[pe].overhead(),procs[pe].totalLoad());
   }
+  availPeMap.resize(availProcSize);
   avgLoad /= numPes;
 }
 

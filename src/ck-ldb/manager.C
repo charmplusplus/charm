@@ -42,6 +42,11 @@ static void handler(char *bit_map)
 #endif
 }
 
+void rescale(char* bit_map)
+{
+    handler(bit_map);
+}
+
 void manager_init(){
 #if CMK_SHRINK_EXPAND
     static int inited = 0;
