@@ -1,4 +1,4 @@
-CDIR=../../../..
+CDIR=../../..
 -include $(CDIR)/include/conv-mach-opt.mak
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
