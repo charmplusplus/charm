@@ -500,9 +500,10 @@ sendingRequest:
 	}
 
 	void getRecord(StreamToken stream, CkCallback cb) {
-		impl::GetRecordRequest* state = new impl::GetRecordRequest(cb);
-		CkCallback intermediate_cb((void(*)(void*, void*))impl::impl_getRecordCb, state);
-		impl::impl_get(stream, sizeof(size_t), 1, intermediate_cb);
+		StreamDeliveryMsg* msg;
+		impl::impl_get(stream, sizeof(size_t), 1, CkCallbackResumeThread(void*&)msg);
+		size_t record_size = *(size_t*)msg->data;
+		impl::impl_get(stream, sizeof(char), record_size, 1, cb);
 	}
 
 	void closeWriteStream(StreamToken stream){
