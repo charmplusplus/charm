@@ -17,7 +17,7 @@ namespace Ck { namespace Stream {
 	// API to insert into the stream
 	void put(StreamToken stream, void* data, size_t elem_size, size_t num_elems);
 	// Insert record into stream
-	void putRecord(StreamTokens stream, void* data, size_t data_size);
+	void putRecord(StreamToken stream, void* data, size_t data_size);
 	// create a new stream, with the callback taking a message returning the StreamToken
 	void createNewStream(CkCallback cb);
 	// flush the buffer of the local stream
@@ -29,10 +29,6 @@ namespace Ck { namespace Stream {
 	// closing the write side of a stream
 	void closeWriteStream(StreamToken);
 	namespace impl {
-		struct GetRecordRequest{
-			CkCallback cb;
-			GetRecordRequest(CkCallback);
-		}
 		// used when buffering the request
 		struct GetRequest {
 			size_t requested_bytes;

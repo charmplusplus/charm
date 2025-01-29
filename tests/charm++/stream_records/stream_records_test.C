@@ -18,9 +18,11 @@ class Producers : public CBase_Producers {
 public:
 	Producers(StreamToken stream){
 				_stream = stream;
+
 				for(int i = 0; i < 10; ++i){
-					size_t brudda = i + 10 * thisIndex;
-					Ck::Stream::put(_stream, &brudda, sizeof(size_t), 1);
+					std::string record = generateRandomString();
+                    CkPrintf("Created: s%s\n", record.c_str());
+					Ck::Stream::putRecord(_stream, (void*)record.c_str(), sizeof(char) * record.size() + 1);
 				}
 				Ck::Stream::flushLocalStream(_stream);
 				CkPrintf("Producer %d has written %d size_t to the stream...\n", thisIndex, 10);
@@ -30,16 +32,31 @@ public:
 	void doneWriting(){
 		Ck::Stream::closeWriteStream(_stream);
 	}
+
+    std::string generateRandomString() {
+        const std::string characters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        std::random_device rd;
+        std::mt19937 generator(rd());  
+        std::uniform_int_distribution<> lengthDistribution(5, 20);
+        std::uniform_int_distribution<> distribution(0, characters.size() - 1);
+        size_t length = lengthDistribution(generator);
+        std::string randomString;
+        for (size_t i = 0; i < length; ++i) {
+            randomString += characters[distribution(generator)];
+        }
+        return randomString;
+        // CkPrintf("i'm here lmao\n");
+    }
 };
 
 class Consumers : public CBase_Consumers {
 	StreamToken _stream;
-	size_t _num_ints_received = 0;
+	size_t _num_bytes_received = 0;
 public:
 	Consumers_SDAG_CODE
 	Consumers(StreamToken stream) {
 		_stream = stream;	
-		Ck::Stream::get(_stream, sizeof(size_t), 1, CkCallback(CkIndex_Consumers::recvData(0), thisProxy[thisIndex]));
+		Ck::Stream::getRecord(_stream, CkCallback(CkIndex_Consumers::recvData(0), thisProxy[thisIndex]));
 	}
 };
 #include "streamtest.def.h"

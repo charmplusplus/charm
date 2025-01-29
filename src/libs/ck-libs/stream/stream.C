@@ -18,10 +18,6 @@ namespace Ck { namespace Stream {
 			cb = cb_in;
 		}
 
-		GetRecordRequest::GetRecordRequest(CkCallback cb_in) {
-			cb = cb_in;
-		}
-
 		InData::InData(DeliverStreamBytesMsg* msg, size_t num_bytes){
 			_msg = msg;
 			curr = msg -> data;
@@ -454,14 +450,6 @@ sendingRequest:
 			return;
 		}
 
-		inline void impl_getRecordCb(void* param, void* msg) {
-			GetRecordRequest* state = (GetRecordRequest*)(param);
-			StreamDeliveryMsg* recv_msg = (StreamDeliveryMsg*)(msg);
-			size_t record_size = *(size_t *)(recv_msg->data);
-			impl::impl_get(recv_msg->stream_id, record_size, 1, state->cb);
-			delete msg;
-		}
-
 		inline void impl_closeWriteStream(StreamToken stream){
 			CkpvAccess(stream_manager) -> tellCoordinatorCloseWrite(stream);
 		}
@@ -485,8 +473,8 @@ sendingRequest:
 		size_t total_size = sizeof(size_t) + data_size;
 
 		char* record_buffer = new char[total_size];
-		std::memcpy(record_buffer, &dataSize, sizeof(size_t));
-		std::memcpy(record_buffer + sizeof(size_t), data, dataSize);
+		std::memcpy(record_buffer, &data_size, sizeof(size_t));
+		std::memcpy(record_buffer + sizeof(size_t), data, data_size);
 
 		impl::impl_put(stream, record_buffer, sizeof(char), total_size);
 	}
@@ -501,9 +489,9 @@ sendingRequest:
 
 	void getRecord(StreamToken stream, CkCallback cb) {
 		StreamDeliveryMsg* msg;
-		impl::impl_get(stream, sizeof(size_t), 1, CkCallbackResumeThread(void*&)msg);
+		impl::impl_get(stream, sizeof(size_t), 1, CkCallbackResumeThread((void*&)msg));
 		size_t record_size = *(size_t*)msg->data;
-		impl::impl_get(stream, sizeof(char), record_size, 1, cb);
+		impl::impl_get(stream, sizeof(char), record_size, cb);
 	}
 
 	void closeWriteStream(StreamToken stream){
