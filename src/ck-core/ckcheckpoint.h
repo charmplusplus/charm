@@ -69,7 +69,15 @@ int  CkCountArrayElements();
 #endif
 
 #if CMK_SHRINK_EXPAND
-enum realloc_state : uint8_t { NO_REALLOC=0, REALLOC_MSG_RECEIVED=1, REALLOC_IN_PROGRESS=2 };
+enum realloc_state : uint8_t 
+{
+  NO_REALLOC=0, 
+  SHRINK_MSG_RECEIVED=1, 
+  EXPAND_MSG_RECEIVED=2,
+  SHRINK_IN_PROGRESS=3,
+  EXPAND_IN_PROGRESS=4
+};
+
 extern realloc_state pending_realloc_state;
 extern CkGroupID _lbmgr;
 #endif

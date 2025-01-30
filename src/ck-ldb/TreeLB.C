@@ -515,9 +515,9 @@ void TreeLB::migrateObjects(const IDM& mig_order)
 void TreeLB::checkForRealloc()
 {
 #if CMK_SHRINK_EXPAND
-  if(pending_realloc_state == REALLOC_MSG_RECEIVED) 
+  if(pending_realloc_state == EXPAND_MSG_RECEIVED) 
   {
-    pending_realloc_state = REALLOC_IN_PROGRESS; //in progress
+    pending_realloc_state = EXPAND_IN_PROGRESS; //in progress
     CkPrintf("Load balancer invoking charmrun to handle reallocation on pe %d\n", CkMyPe());
     double end_lb_time = CkWallTimer();
     //CkPrintf("CharmLB> %s: PE [%d] step %d finished at %f duration %f s\n\n",

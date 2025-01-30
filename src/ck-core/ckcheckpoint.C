@@ -333,10 +333,13 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _reque
 	bool success = true;
 	if (CkMyPe() == 0) {
 #if CMK_SHRINK_EXPAND
-    if (pending_realloc_state == REALLOC_IN_PROGRESS) {
+    if (pending_realloc_state == SHRINK_IN_PROGRESS) {
       // After restarting from this AtSync checkpoint, resume execution along the
       // normal path (i.e. whatever the user defined as ResumeFromSync.)
       CkCallback resumeFromSyncCB(CkIndex_LBManager::ResumeClients(), _lbmgr);
+      success &= checkpointOne(dirname, resumeFromSyncCB, requestStatus);
+    } else if (pending_realloc_state == EXPAND_IN_PROGRESS) {
+      CkCallback resumeFromSyncCB(CkIndex_LBManager::StartLB(), _lbmgr);
       success &= checkpointOne(dirname, resumeFromSyncCB, requestStatus);
     } else
 #endif

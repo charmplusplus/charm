@@ -30,7 +30,12 @@ static void handler(char *bit_map)
     printf("Charm> Rescaling called!\n");
     shrinkExpandreplyToken = CcsDelayReply();
     bit_map += CmiMsgHeaderSizeBytes;
-    pending_realloc_state = REALLOC_MSG_RECEIVED;
+    numProcessAfterRestart = *((int *)(bit_map + CkNumPes()));
+    
+    if (numProcessAfterRestart > CkNumPes())
+        pending_realloc_state = EXPAND_MSG_RECEIVED;
+    else
+        pending_realloc_state = SHRINK_MSG_RECEIVED;
 
     if((CkMyPe() == 0) && (load_balancer_created))
     LBManagerObj()->set_avail_vector(bit_map);
@@ -38,7 +43,6 @@ static void handler(char *bit_map)
     se_avail_vector = (char *)malloc(sizeof(char) * CkNumPes());
     LBManagerObj()->get_avail_vector(se_avail_vector);
 
-    numProcessAfterRestart = *((int *)(bit_map + CkNumPes()));
 #endif
 }
 
