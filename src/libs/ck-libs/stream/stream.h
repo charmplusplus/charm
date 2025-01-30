@@ -66,8 +66,8 @@ namespace Ck { namespace Stream {
 		};
 		// used by StreamManagers to organize the data of multiple streams
 		class StreamBuffers {
-			char* _in_buffer; // the buffer for incoming data; once filled, just drop extra data; (_in_buffer is used for the data going out; I should rename this at some point
-			std::deque<InData> _out_buffer; // the buffer for outgoing data
+			char* _in_buffer; // the buffer for incoming data; once filled, just drop extra data; (_in_buffer is used for the data going out; I should rename this at some point). This is what the setters push to.
+			std::deque<InData> _out_buffer; // the buffer for outgoing data, this is the buffer that the getters pull from
 			std::deque<GetRequest> _buffered_reqs;
 			std::deque<DeliverStreamBytesMsg*> _msg_out_buffer;
 			size_t _in_buffer_capacity= 4 * 1024 * 1024;

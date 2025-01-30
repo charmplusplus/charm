@@ -127,10 +127,13 @@ namespace Ck { namespace Stream {
 				}
 
 				void recvData(DeliverStreamBytesMsg* in_msg){
+					CkPrintf("recv msg contents: num_bytes: %d\n", in_msg->num_bytes);
+
 					StreamBuffers& buff = _stream_table[in_msg -> stream_id];
 					char* temp_data = in_msg -> data;
-					delete in_msg;
 					buff.addToRecvBuffer(in_msg);
+					// delete in_msg;
+
 				}
 
 				void flushLocalStream(StreamToken stream){
@@ -139,6 +142,8 @@ namespace Ck { namespace Stream {
 				}
 
 				inline void sendDeliverMsg(DeliverStreamBytesMsg* in_msg, ssize_t target_pe){
+					CkPrintf("sendDeliverMsg msg contents: num_bytes: %d\n", in_msg->num_bytes);
+
 					thisProxy[target_pe].recvData(in_msg);
 				}
 
@@ -251,16 +256,23 @@ namespace Ck { namespace Stream {
 			char* bigger_buffer = new char[_in_buffer_size + extra_bytes];
 			std::memcpy(bigger_buffer, _in_buffer, _in_buffer_size);
 			std::memcpy(bigger_buffer + _in_buffer_size, extra_data, extra_bytes);
+			// for (int i = 0; i < 4; ++i) {
+			// 	CkPrintf("Shit in Bigger_buffer: %zu\n", ((size_t*)bigger_buffer)[i]);
+			// }
 			_sendOutBuffer(bigger_buffer, _in_buffer_size + extra_bytes);
 			delete[] bigger_buffer;
 		}
 
 		void StreamBuffers::_sendOutBuffer(char* data, size_t size){
 			DeliverStreamBytesMsg* msg = new (size) DeliverStreamBytesMsg(data,size);
+			CkPrintf("sendOutBuffer msg contents: data: %zu, num_bytes: %d\n", *((size_t*)data + 1), msg->num_bytes);
+
 			msg -> stream_id = _stream_id;
 			msg -> sender_pe = CkMyPe();
 			ssize_t target_pe = _pickTargetPE();
+			CkPrintf("sender_pe: %d, target_pe: %d\n", CkMyPe(), target_pe);
 			if(target_pe == -1){
+				CkPrintf("Sending to local pe\n");
 				_msg_out_buffer.push_back(msg);
 				_in_buffer_size = 0;
 				return;
@@ -294,8 +306,11 @@ namespace Ck { namespace Stream {
 				CkpvAccess(stream_manager) -> registerPEWithCoordinator(_stream_id, CkMyPe()); // tell coordinator + all the other PEs
 			}
 			if((gr.requested_bytes > _out_buffer_size) || !_buffered_reqs.empty()){
+				CkPrintf("pushing back bc not enough data, data has not arrived, requested_bytes=%d, out_buffer_size=%d\n", gr.requested_bytes, _out_buffer_size);
 				_buffered_reqs.push_back(gr);
 			} else {
+				CkPrintf("fulfilling req\n");
+
 				fulfillRequest(gr);
 			}
 		}
@@ -314,20 +329,24 @@ namespace Ck { namespace Stream {
 		}
 
 		void StreamBuffers::addToRecvBuffer(DeliverStreamBytesMsg* data){
-			
 			size_t num_bytes = data -> num_bytes;
 			_counter.processIncomingMessage(data -> sender_pe);
 			if(!_out_buffer_capacity || ((_out_buffer_size + num_bytes) <= _out_buffer_capacity)){
+				CkPrintf("-- addToRecvBuffer === PE#%d, Adding to out buffer size, out_buffer_size=%d, num_bytes=%d\n", CkMyPe(), _out_buffer_size, num_bytes);
 				_out_buffer.push_back(InData(data, num_bytes));
 				_out_buffer_size += num_bytes;
 			} else {
 				CkPrintf("capacity has been reached on the recv buffer, so dropping incoming message\n");
 			}
+			CkPrintf("In addToRecvBuffer, attempting to process buffered reqs\n");
 			while(!_out_buffer.empty() && !_buffered_reqs.empty()){ // keep fulfilling buffered requests in FIFO order
+				CkPrintf("Processing shit\n");
 				GetRequest& gr = _buffered_reqs.front();
 				if(gr.requested_bytes > _out_buffer_size){
+					CkPrintf("Breaking out of addToRecvBuffer, requested_bytes=%d, _out_buffer_size=%d\n", gr.requested_bytes, _out_buffer_size);
 					break;
 				}
+				// we know there are enough bytes in the stream to fulfill the request
 				GetRequest curr_req = gr;
 				_buffered_reqs.pop_front();
 				fulfillRequest(curr_req);
@@ -345,6 +364,7 @@ namespace Ck { namespace Stream {
 			res = new (num_bytes_requested) StreamDeliveryMsg(_stream_id);
 
 			while(!_out_buffer.empty() && (num_bytes_copied != num_bytes_requested)){ // the request hasn't been fulfilled and ther's still data to copy
+				CkPrintf("////// is out buffer empty=%d, num_bytes_copied=%d, num_bytes_reqed=%d\n", _out_buffer.empty(), num_bytes_copied, num_bytes_requested);
 				InData& front = _out_buffer.front();
 				size_t bytes_rem = num_bytes_requested - num_bytes_copied;
 				if(front.num_bytes_rem > bytes_rem){
@@ -355,16 +375,20 @@ namespace Ck { namespace Stream {
 				} else {
 					std::memcpy((res -> data + num_bytes_copied), front.curr, front.num_bytes_rem);
 					num_bytes_copied += (front.num_bytes_rem);
+
 					// delete this buffer at the front of the queue 
 					front.freeData();
 					_out_buffer.pop_front();
 				}
 			}
+			_out_buffer_size -= num_bytes_copied;
 sendingRequest:
 			// copied all of the data we could
 			res -> num_bytes = num_bytes_copied;
-			if(isStreamClosed() && allAcked() && (gr.requested_bytes != num_bytes_copied)){
+			CkPrintf("+++++++++ out_buffer_size: %d\n", _out_buffer_size);
+			if(isStreamClosed() && allAcked() && (gr.requested_bytes != num_bytes_copied) && !_out_buffer_size){
 				res -> status = StreamStatus::STREAM_CLOSED;
+				CkPrintf("Stream has been closed: out_buffer_size=%d\n", _out_buffer_size);
 			} else {
 				res -> status = StreamStatus::STREAM_OK;
 			}

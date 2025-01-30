@@ -17,6 +17,7 @@ class Producers : public CBase_Producers {
 	StreamToken _stream;
 public:
 	Producers(StreamToken stream){
+				CkPrintf("size of size_t: %d\n", sizeof(size_t));
 				_stream = stream;
 				for(int i = 0; i < 10; ++i){
 					size_t brudda = i + 10 * thisIndex;
@@ -39,6 +40,8 @@ public:
 	Consumers_SDAG_CODE
 	Consumers(StreamToken stream) {
 		_stream = stream;	
+        CkPrintf("fuck streamtst\n");
+
 		Ck::Stream::get(_stream, sizeof(size_t), 1, CkCallback(CkIndex_Consumers::recvData(0), thisProxy[thisIndex]));
 	}
 };

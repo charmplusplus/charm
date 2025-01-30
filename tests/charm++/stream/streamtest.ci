@@ -24,11 +24,13 @@ mainmodule streamtest
 		entry Consumers(StreamToken stream);
 		entry void recvData(Ck::Stream::StreamDeliveryMsg* msg){
 			serial {
+				CkPrintf("Shit\n");
 				size_t* data = (size_t*)(msg -> data);
 				size_t num_ints = msg -> num_bytes / sizeof(size_t);
 				_num_ints_received += num_ints;
+				CkPrintf("On PE#%d: num_bytes=%d, num_ints_recv=%d\n", CkMyPe(), msg->num_bytes, _num_ints_received);
 				for(int i = 0; i < num_ints; ++i){
-					CkPrintf("Received: %d,", data[i]);
+					CkPrintf("Received: %zu,", data[i]);
 				}
 				CkPrintf("\n");
 				if(msg -> status == Ck::Stream::StreamStatus::STREAM_OK) {

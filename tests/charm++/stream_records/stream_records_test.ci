@@ -35,6 +35,7 @@ mainmodule streamtest
 				} else {
 					CkPrintf("Consumer %d has received the done signal and consumed %d size_t...\n", thisIndex, _num_bytes_received);
 				}
+                delete msg;
 			}
 		};
 	}
