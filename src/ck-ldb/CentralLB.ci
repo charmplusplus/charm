@@ -35,7 +35,7 @@ group [migratable] CentralLB : BaseLB {
   entry void ResumeFromReallocCheckpoint();
   entry void MigrationDoneImpl(int);
   entry void WillIbekilled(std::vector <char> avail, int);
-  entry void StartCleanup();
+  entry [reductiontarget] void StartCleanup();
 };
 
 };
