@@ -26,8 +26,8 @@ using std::ostringstream;
 void noopit(const char*, ...)
 {}
 
-#define DEBCHK   CkPrintf
-//#define DEBCHK noopit
+//#define DEBCHK   CkPrintf
+#define DEBCHK noopit
 
 #define SUBDIR_SIZE 256
 
