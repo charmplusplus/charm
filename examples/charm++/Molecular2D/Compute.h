@@ -13,18 +13,18 @@
 class Compute : public CBase_Compute {
   private:
     int cellCount;  // to count the number of interact() calls
-    CkVec<Particle> bufferedParticles;
+    std::vector<Particle> bufferedParticles;
     int bufferedX;
     int bufferedY;
 
-    void interact(CkVec<Particle> &first, CkVec<Particle> &second);
+    void interact(std::vector<Particle> &first, std::vector<Particle> &second);
     void interact(Particle &first, Particle &second);
 
   public:
     Compute();
     Compute(CkMigrateMessage *msg);
 
-    void interact(CkVec<Particle> particles, int i, int j);
+    void interact(std::vector<Particle> particles, int i, int j);
 
 };
 
