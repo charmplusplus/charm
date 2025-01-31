@@ -4,6 +4,7 @@
 #include "streamtoken.h"
 namespace Ck { namespace Stream { namespace impl {
 class StreamMessageCounter{
+	// counting the number of message received from a PE
 	std::unordered_map<size_t, size_t> _counter;
 	size_t _num_sent_messages = 0;
 	size_t _write_acks = 0;

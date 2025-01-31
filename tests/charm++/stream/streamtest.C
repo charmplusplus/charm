@@ -19,12 +19,14 @@ public:
 	Producers(StreamToken stream){
 				CkPrintf("size of size_t: %d\n", sizeof(size_t));
 				_stream = stream;
+				size_t num_bytes_written = 0;
 				for(int i = 0; i < 10; ++i){
 					size_t brudda = i + 10 * thisIndex;
 					Ck::Stream::put(_stream, &brudda, sizeof(size_t), 1);
+					num_bytes_written += sizeof(size_t);
 				}
 				Ck::Stream::flushLocalStream(_stream);
-				CkPrintf("Producer %d has written %d size_t to the stream...\n", thisIndex, 10);
+				CkPrintf("Producer %d has written %d bytes to the stream...\n", thisIndex, num_bytes_written);
 				contribute(CkCallback(CkReductionTarget(Producers, doneWriting), thisProxy[0]));
 	}
 
@@ -40,7 +42,7 @@ public:
 	Consumers_SDAG_CODE
 	Consumers(StreamToken stream) {
 		_stream = stream;	
-        CkPrintf("fuck streamtst\n");
+        CkPrintf("PE %d: Calling Get\n", CkMyPe());
 
 		Ck::Stream::get(_stream, sizeof(size_t), 1, CkCallback(CkIndex_Consumers::recvData(0), thisProxy[thisIndex]));
 	}

@@ -1,5 +1,5 @@
 Charmrun> scalable start enabled. 
-Charmrun> started all node programs in 0.158 seconds.
+Charmrun> started all node programs in 0.021 seconds.
 Charm++> Running in non-SMP mode: 4 processes (PEs)
 Converse/Charm++ Commit ID: v7.1.0-devel-351-g10566fbe9
 Isomalloc> Synchronized global address space.
@@ -11,349 +11,184 @@ CharmLB> Load balancing instrumentation for communication is off.
 The starter is alive
 Stream Manager created on PE=0
 On 0, we created stream 0 with coordinator=0
-Stream Manager created on PE=1
-On 1, we created stream 0 with coordinator=0
 Stream Manager created on PE=2
+Stream Manager created on PE=1
+On 2, we created stream 0 with coordinator=0
+On 1, we created stream 0 with coordinator=0
 Stream Manager created on PE=3
 On 3, we created stream 0 with coordinator=0
-On 2, we created stream 0 with coordinator=0
 We made it to the streamCreated part baby
 Got the stream id: 0
 size of size_t: 8
 sendOutBuffer msg contents: data: 1, num_bytes: 80
 sender_pe: 0, target_pe: -1
 Sending to local pe
-Producer 0 has written 10 size_t to the stream...
-fuck streamtst
+Producer 0 has written 80 bytes to the stream...
+PE 0: Calling Get
 pushing back bc not enough data, data has not arrived, requested_bytes=8, out_buffer_size=0
-size of size_t: 8
-size of size_t: 8
-sendOutBuffer msg contents: data: 31, num_bytes: 80
-sender_pe: 3, target_pe: -1
+sendDeliverMsg msg contents: num_bytes: 80
+PE 0: recv msg contents: num_bytes: 80
 size of size_t: 8
 sendOutBuffer msg contents: data: 11, num_bytes: 80
 sender_pe: 1, target_pe: -1
+size of size_t: 8
+-- addToRecvBuffer === PE#0, Adding to out buffer size, out_buffer_size=80, num_bytes=80
+size of size_t: 8
+In addToRecvBuffer, attempting to process buffered reqs
+PE 0: Servicing a buffered GetRequest
 Sending to local pe
-Sending to local pe
-Producer 3 has written 10 size_t to the stream...
-Producer 1 has written 10 size_t to the stream...
+Producer 1 has written 80 bytes to the stream...
 sendOutBuffer msg contents: data: 21, num_bytes: 80
 sender_pe: 2, target_pe: -1
 Sending to local pe
-Producer 2 has written 10 size_t to the stream...
-sendDeliverMsg msg contents: num_bytes: 80
-recv msg contents: num_bytes: 80
--- addToRecvBuffer === PE#0, Adding to out buffer size, out_buffer_size=0, num_bytes=80
-In addToRecvBuffer, attempting to process buffered reqs
-Processing shit
+Producer 2 has written 80 bytes to the stream...
+sendOutBuffer msg contents: data: 31, num_bytes: 80
+sender_pe: 3, target_pe: -1
+Sending to local pe
+Producer 3 has written 80 bytes to the stream...
 ////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 72
+PE 0: _num_sent_messages=0, _write_acks=0
++++++++++ out_buffer_size: 72, gr.requested_bytes=8, num_bytes_copied=8, isStreamClosed= 0, allAcked= 1
 Shit
 On PE#0: num_bytes=8, num_ints_recv=1
 Received: 0,
-issuing another get request...
+PE 0: Calling Get again
 fulfilling req
 ////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 64
+PE 0: _num_sent_messages=0, _write_acks=0
++++++++++ out_buffer_size: 64, gr.requested_bytes=8, num_bytes_copied=8, isStreamClosed= 0, allAcked= 1
 Shit
 On PE#0: num_bytes=8, num_ints_recv=2
 Received: 1,
-issuing another get request...
+PE 0: Calling Get again
 fulfilling req
 ////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 56
+PE 0: _num_sent_messages=0, _write_acks=0
++++++++++ out_buffer_size: 56, gr.requested_bytes=8, num_bytes_copied=8, isStreamClosed= 0, allAcked= 1
 Shit
 On PE#0: num_bytes=8, num_ints_recv=3
 Received: 2,
-issuing another get request...
+PE 0: Calling Get again
 fulfilling req
 ////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 48
+PE 0: _num_sent_messages=0, _write_acks=0
++++++++++ out_buffer_size: 48, gr.requested_bytes=8, num_bytes_copied=8, isStreamClosed= 0, allAcked= 1
 Shit
 On PE#0: num_bytes=8, num_ints_recv=4
 Received: 3,
-issuing another get request...
+PE 0: Calling Get again
 fulfilling req
 ////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 40
-fuck streamtst
-pushing back bc not enough data, data has not arrived, requested_bytes=8, out_buffer_size=0
-sendDeliverMsg msg contents: num_bytes: 80
+PE 0: _num_sent_messages=0, _write_acks=0
++++++++++ out_buffer_size: 40, gr.requested_bytes=8, num_bytes_copied=8, isStreamClosed= 0, allAcked= 1
 Shit
 On PE#0: num_bytes=8, num_ints_recv=5
 Received: 4,
-issuing another get request...
+PE 0: Calling Get again
 fulfilling req
 ////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 32
+PE 0: _num_sent_messages=0, _write_acks=0
++++++++++ out_buffer_size: 32, gr.requested_bytes=8, num_bytes_copied=8, isStreamClosed= 0, allAcked= 1
+PE 1: Calling Get
+pushing back bc not enough data, data has not arrived, requested_bytes=8, out_buffer_size=0
 Coordinator on PE=0 starting the close process for stream=0...
 Shit
 On PE#0: num_bytes=8, num_ints_recv=6
 Received: 5,
-issuing another get request...
+PE 0: Calling Get again
 fulfilling req
 ////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 24
+PE 0: _num_sent_messages=0, _write_acks=0
++++++++++ out_buffer_size: 24, gr.requested_bytes=8, num_bytes_copied=8, isStreamClosed= 0, allAcked= 1
 PE=0 will initiate the closing process on all PEs for stream=0
+sendDeliverMsg msg contents: num_bytes: 80
+sendDeliverMsg msg contents: num_bytes: 80
+sendDeliverMsg msg contents: num_bytes: 80
 Shit
 On PE#0: num_bytes=8, num_ints_recv=7
 Received: 6,
-issuing another get request...
-sendDeliverMsg msg contents: num_bytes: 80
-sendDeliverMsg msg contents: num_bytes: 80
+PE 0: Calling Get again
 fulfilling req
 ////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 16
+PE 0: _num_sent_messages=0, _write_acks=0
++++++++++ out_buffer_size: 16, gr.requested_bytes=8, num_bytes_copied=8, isStreamClosed= 0, allAcked= 1
 Shit
 On PE#0: num_bytes=8, num_ints_recv=8
 Received: 7,
-issuing another get request...
+PE 0: Calling Get again
 fulfilling req
 ////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 8
+PE 0: _num_sent_messages=0, _write_acks=0
++++++++++ out_buffer_size: 8, gr.requested_bytes=8, num_bytes_copied=8, isStreamClosed= 0, allAcked= 1
 Stream Manager 0 received a close request for stream=0
+[[[[[[ Write side is closed on PE#0
+PE 0: _num_sent_messages=0, _write_acks=0
 For stream=0 on pe=0, All of my messages have been acked!
 Shit
 On PE#0: num_bytes=8, num_ints_recv=9
 Received: 8,
-issuing another get request...
+PE 0: Calling Get again
 fulfilling req
+PE 0: _num_sent_messages=0, _write_acks=0
 ////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 0
+Stream Manager 1 received a close request for stream=0
+[[[[[[ Write side is closed on PE#1
+PE 1: _num_sent_messages=1, _write_acks=0
+PE 0: _num_sent_messages=0, _write_acks=0
++++++++++ out_buffer_size: 0, gr.requested_bytes=8, num_bytes_copied=8, isStreamClosed= 1, allAcked= 1
+PE 0: _num_sent_messages=0, _write_acks=0
+???????? PE[0] stream closed stats: out_buffer_size: 0, gr.requested_bytes=8, num_bytes_copied=8 
+???? PE[0] stream closed message info: 0, 8
+Stream has been closed: out_buffer_size=0
 Shit
 On PE#0: num_bytes=8, num_ints_recv=10
 Received: 9,
-issuing another get request...
-pushing back bc not enough data, data has not arrived, requested_bytes=8, out_buffer_size=0
-recv msg contents: num_bytes: 80
--- addToRecvBuffer === PE#0, Adding to out buffer size, out_buffer_size=0, num_bytes=80
-In addToRecvBuffer, attempting to process buffered reqs
-Stream Manager 1 received a close request for stream=0
 Stream Manager 2 received a close request for stream=0
-Stream Manager 3 received a close request for stream=0
-All of pe=3 messages for stream=0 have been acked
-Processing shit
-////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 72
-Shit
-On PE#0: num_bytes=8, num_ints_recv=11
-Received: 30,
-issuing another get request...
-fulfilling req
-////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
+[[[[[[ Write side is closed on PE#2
+PE 2: _num_sent_messages=1, _write_acks=0
+PE #2, calling ackWrites, which calls insertAck with 1 acks
+PE #2, calling insertAck with 1 ack
+On PE[2], addWriteAck called with num message [1]
+PE 2: _num_sent_messages=1, _write_acks=1
 All of pe=2 messages for stream=0 have been acked
-+++++++++ out_buffer_size: 64
-recv msg contents: num_bytes: 80
--- addToRecvBuffer === PE#0, Adding to out buffer size, out_buffer_size=64, num_bytes=80
+Stream Manager 3 received a close request for stream=0
+[[[[[[ Write side is closed on PE#3
+PE 3: _num_sent_messages=1, _write_acks=0
+PE #3, calling ackWrites, which calls insertAck with 1 acks
+PE #3, calling insertAck with 1 ack
+On PE[3], addWriteAck called with num message [1]
+PE 3: _num_sent_messages=1, _write_acks=1
+All of pe=3 messages for stream=0 have been acked
+Consumer 0 has received the done signal and consumed 10 size_t...
+PE 0: recv msg contents: num_bytes: 80
+On PE[0], _stream_write_closed is True, going to sendAck from me to source_pe [2]
+sendAck on source PE[0]: sending destination PE[2] acks for 1 messages
+-- addToRecvBuffer === PE#0, Adding to out buffer size, out_buffer_size=80, num_bytes=80
 In addToRecvBuffer, attempting to process buffered reqs
-Shit
-On PE#0: num_bytes=8, num_ints_recv=12
-Received: 31,
-issuing another get request...
-fulfilling req
+PE 0: recv msg contents: num_bytes: 80
+On PE[0], _stream_write_closed is True, going to sendAck from me to source_pe [3]
+sendAck on source PE[0]: sending destination PE[3] acks for 1 messages
+-- addToRecvBuffer === PE#0, Adding to out buffer size, out_buffer_size=160, num_bytes=80
+PE #1, calling ackWrites, which calls insertAck with 1 acks
+PE #1, calling insertAck with 1 ack
+On PE[1], addWriteAck called with num message [1]
+PE 1: _num_sent_messages=1, _write_acks=1
 All of pe=1 messages for stream=0 have been acked
-+++++++++ out_buffer_size: 0
+PE 1: _num_sent_messages=1, _write_acks=1
+]]]]]] Short circuiting on PE 1
+PE 1: _num_sent_messages=1, _write_acks=1
++++++++++ out_buffer_size: 0, gr.requested_bytes=8, num_bytes_copied=0, isStreamClosed= 1, allAcked= 1
+PE 1: _num_sent_messages=1, _write_acks=1
+In addToRecvBuffer, attempting to process buffered reqs
+PE 0: recv msg contents: num_bytes: 80
+On PE[0], _stream_write_closed is True, going to sendAck from me to source_pe [1]
+sendAck on source PE[0]: sending destination PE[1] acks for 1 messages
+-- addToRecvBuffer === PE#0, Adding to out buffer size, out_buffer_size=240, num_bytes=80
+In addToRecvBuffer, attempting to process buffered reqs
+???????? PE[1] stream closed stats: out_buffer_size: 0, gr.requested_bytes=8, num_bytes_copied=0 
+???? PE[1] stream closed message info: 0, 0
 Stream has been closed: out_buffer_size=0
 Shit
 On PE#1: num_bytes=0, num_ints_recv=0
 
 Consumer 1 has received the done signal and consumed 0 size_t...
-////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 136
-recv msg contents: num_bytes: 80
--- addToRecvBuffer === PE#0, Adding to out buffer size, out_buffer_size=136, num_bytes=80
-In addToRecvBuffer, attempting to process buffered reqs
-Shit
-On PE#0: num_bytes=8, num_ints_recv=13
-Received: 32,
-issuing another get request...
-fulfilling req
-////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 208
-Shit
-On PE#0: num_bytes=8, num_ints_recv=14
-Received: 33,
-issuing another get request...
-fulfilling req
-////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 200
-Shit
-On PE#0: num_bytes=8, num_ints_recv=15
-Received: 34,
-issuing another get request...
-fulfilling req
-////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 192
-Shit
-On PE#0: num_bytes=8, num_ints_recv=16
-Received: 35,
-issuing another get request...
-fulfilling req
-////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 184
-Shit
-On PE#0: num_bytes=8, num_ints_recv=17
-Received: 36,
-issuing another get request...
-fulfilling req
-////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 176
-Shit
-On PE#0: num_bytes=8, num_ints_recv=18
-Received: 37,
-issuing another get request...
-fulfilling req
-////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 168
-Shit
-On PE#0: num_bytes=8, num_ints_recv=19
-Received: 38,
-issuing another get request...
-fulfilling req
-////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 160
-Shit
-On PE#0: num_bytes=8, num_ints_recv=20
-Received: 39,
-issuing another get request...
-fulfilling req
-////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 152
-Shit
-On PE#0: num_bytes=8, num_ints_recv=21
-Received: 20,
-issuing another get request...
-fulfilling req
-////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 144
-Shit
-On PE#0: num_bytes=8, num_ints_recv=22
-Received: 21,
-issuing another get request...
-fulfilling req
-////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 136
-Shit
-On PE#0: num_bytes=8, num_ints_recv=23
-Received: 22,
-issuing another get request...
-fulfilling req
-////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 128
-Shit
-On PE#0: num_bytes=8, num_ints_recv=24
-Received: 23,
-issuing another get request...
-fulfilling req
-////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 120
-Shit
-On PE#0: num_bytes=8, num_ints_recv=25
-Received: 24,
-issuing another get request...
-fulfilling req
-////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 112
-Shit
-On PE#0: num_bytes=8, num_ints_recv=26
-Received: 25,
-issuing another get request...
-fulfilling req
-////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 104
-Shit
-On PE#0: num_bytes=8, num_ints_recv=27
-Received: 26,
-issuing another get request...
-fulfilling req
-////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 96
-Shit
-On PE#0: num_bytes=8, num_ints_recv=28
-Received: 27,
-issuing another get request...
-fulfilling req
-////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 88
-Shit
-On PE#0: num_bytes=8, num_ints_recv=29
-Received: 28,
-issuing another get request...
-fulfilling req
-////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 80
-Shit
-On PE#0: num_bytes=8, num_ints_recv=30
-Received: 29,
-issuing another get request...
-fulfilling req
-////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 72
-Shit
-On PE#0: num_bytes=8, num_ints_recv=31
-Received: 10,
-issuing another get request...
-fulfilling req
-////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 64
-Shit
-On PE#0: num_bytes=8, num_ints_recv=32
-Received: 11,
-issuing another get request...
-fulfilling req
-////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 56
-Shit
-On PE#0: num_bytes=8, num_ints_recv=33
-Received: 12,
-issuing another get request...
-fulfilling req
-////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 48
-Shit
-On PE#0: num_bytes=8, num_ints_recv=34
-Received: 13,
-issuing another get request...
-fulfilling req
-////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 40
-Shit
-On PE#0: num_bytes=8, num_ints_recv=35
-Received: 14,
-issuing another get request...
-fulfilling req
-////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 32
-Shit
-On PE#0: num_bytes=8, num_ints_recv=36
-Received: 15,
-issuing another get request...
-fulfilling req
-////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 24
-Shit
-On PE#0: num_bytes=8, num_ints_recv=37
-Received: 16,
-issuing another get request...
-fulfilling req
-////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 16
-Shit
-On PE#0: num_bytes=8, num_ints_recv=38
-Received: 17,
-issuing another get request...
-fulfilling req
-////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 8
-Shit
-On PE#0: num_bytes=8, num_ints_recv=39
-Received: 18,
-issuing another get request...
-fulfilling req
-////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
-+++++++++ out_buffer_size: 0
-Shit
-On PE#0: num_bytes=8, num_ints_recv=40
-Received: 19,
-issuing another get request...
-pushing back bc not enough data, data has not arrived, requested_bytes=8, out_buffer_size=0

@@ -1,0 +1,353 @@
+Charmrun> scalable start enabled. 
+Charmrun> started all node programs in 0.019 seconds.
+Charm++> Running in non-SMP mode: 4 processes (PEs)
+Converse/Charm++ Commit ID: v7.1.0-devel-351-g10566fbe9
+Isomalloc> Synchronized global address space.
+Charm++> scheduler running in netpoll mode.
+CharmLB> Load balancer assumes all CPUs are same.
+Charm++> Running on 1 hosts (1 sockets x 12 cores x 1 PUs = 12-way SMP)
+Charm++> cpu topology info is gathered in 0.000 seconds.
+CharmLB> Load balancing instrumentation for communication is off.
+The starter is alive
+Stream Manager created on PE=0
+On 0, we created stream 0 with coordinator=0
+Stream Manager created on PE=2
+On 2, we created stream 0 with coordinator=0
+Stream Manager created on PE=3
+Stream Manager created on PE=1
+On 1, we created stream 0 with coordinator=0
+On 3, we created stream 0 with coordinator=0
+We made it to the streamCreated part baby
+Got the stream id: 0
+size of size_t: 8
+sendOutBuffer msg contents: data: 1, num_bytes: 80
+sender_pe: 0, target_pe: -1
+Sending to local pe
+Producer 0 has written 10 size_t to the stream...
+fuck streamtst
+pushing back bc not enough data, data has not arrived, requested_bytes=8, out_buffer_size=0
+size of size_t: 8
+sendOutBuffer msg contents: data: 11, num_bytes: 80
+size of size_t: 8
+sender_pe: 1, target_pe: -1
+size of size_t: 8
+Sending to local pe
+Producer 1 has written 10 size_t to the stream...
+sendOutBuffer msg contents: data: 21, num_bytes: 80
+sender_pe: 2, target_pe: -1
+Sending to local pe
+sendOutBuffer msg contents: data: 31, num_bytes: 80
+Producer 2 has written 10 size_t to the stream...
+sender_pe: 3, target_pe: -1
+Sending to local pe
+Producer 3 has written 10 size_t to the stream...
+sendDeliverMsg msg contents: num_bytes: 80
+recv msg contents: num_bytes: 80
+-- addToRecvBuffer === PE#0, Adding to out buffer size, out_buffer_size=0, num_bytes=80
+In addToRecvBuffer, attempting to process buffered reqs
+Processing shit
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 72, gr.requested_bytes=8, num_bytes_copied=8 
+Shit
+On PE#0: num_bytes=8, num_ints_recv=1
+Received: 0,
+issuing another get request...
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 64, gr.requested_bytes=8, num_bytes_copied=8 
+Shit
+On PE#0: num_bytes=8, num_ints_recv=2
+Received: 1,
+issuing another get request...
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 56, gr.requested_bytes=8, num_bytes_copied=8 
+Shit
+On PE#0: num_bytes=8, num_ints_recv=3
+Received: 2,fuck streamtst
+pushing back bc not enough data, data has not arrived, requested_bytes=8, out_buffer_size=0
+
+issuing another get request...
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 48, gr.requested_bytes=8, num_bytes_copied=8 
+Shit
+On PE#0: num_bytes=8, num_ints_recv=4
+Received: 3,
+issuing another get request...
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 40, gr.requested_bytes=8, num_bytes_copied=8 
+sendDeliverMsg msg contents: num_bytes: 80
+recv msg contents: num_bytes: 80
+-- addToRecvBuffer === PE#1, Adding to out buffer size, out_buffer_size=0, num_bytes=80
+In addToRecvBuffer, attempting to process buffered reqs
+Processing shit
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 72, gr.requested_bytes=8, num_bytes_copied=8 
+Shit
+On PE#1: num_bytes=8, num_ints_recv=1
+Received: 10,sendDeliverMsg msg contents: num_bytes: 80
+sendDeliverMsg msg contents: num_bytes: 80
+Shit
+On PE#0: num_bytes=8, num_ints_recv=5
+Received: 4,
+issuing another get request...
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 32, gr.requested_bytes=8, num_bytes_copied=8 
+Coordinator on PE=0 starting the close process for stream=0...
+Shit
+
+issuing another get request...
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 64, gr.requested_bytes=8, num_bytes_copied=8 
+Shit
+On PE#1: num_bytes=8, num_ints_recv=2
+Received: 11,
+issuing another get request...
+On PE#0: num_bytes=8, num_ints_recv=6
+Received: 5,
+issuing another get request...
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 24, gr.requested_bytes=8, num_bytes_copied=8 
+PE=0 will initiate the closing process on all PEs for stream=0
+Shit
+On PE#0: num_bytes=8, num_ints_recv=7
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 56, gr.requested_bytes=8, num_bytes_copied=8 
+Shit
+On PE#1: num_bytes=8, num_ints_recv=3
+Received: 12,
+issuing another get request...
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
+Received: 6,
+issuing another get request...
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 16, gr.requested_bytes=8, num_bytes_copied=8 
+Shit
+On PE#0: num_bytes=8, num_ints_recv=8
+Received: 7,
++++++++++ out_buffer_size: 48, gr.requested_bytes=8, num_bytes_copied=8 
+Shit
+On PE#1: num_bytes=8, num_ints_recv=4
+Received: 13,
+issuing another get request...
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 40, gr.requested_bytes=8, num_bytes_copied=8 
+Shit
+issuing another get request...
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 8, gr.requested_bytes=8, num_bytes_copied=8 
+Stream Manager 0 received a close request for stream=0
+For stream=0 on pe=0, All of my messages have been acked!
+recv msg contents: num_bytes: 80
+-- addToRecvBuffer === PE#0, Adding to out buffer size, out_buffer_size=8, num_bytes=80
+In addToRecvBuffer, attempting to process buffered reqs
+recv msg contents: num_bytes: 80
+On PE#1: num_bytes=8, num_ints_recv=5
+Received: 14,
+issuing another get request...
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 32, gr.requested_bytes=8, num_bytes_copied=8 
+Shit
+On PE#1: num_bytes=8, num_ints_recv=6
+Received: 15,Stream Manager 2 received a close request for stream=0
+All of pe=2 messages for stream=0 have been acked
+Stream Manager 3 received a close request for stream=0
+All of pe=3 messages for stream=0 have been acked
+-- addToRecvBuffer === PE#0, Adding to out buffer size, out_buffer_size=88, num_bytes=80
+In addToRecvBuffer, attempting to process buffered reqs
+Shit
+On PE#0: num_bytes=8, num_ints_recv=9
+Received: 8,
+issuing another get request...
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 160, gr.requested_bytes=8, num_bytes_copied=8 
+
+issuing another get request...
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 24, gr.requested_bytes=8, num_bytes_copied=8 
+Shit
+On PE#1: num_bytes=8, num_ints_recv=7
+Received: 16,
+issuing another get request...
+Shit
+On PE#0: num_bytes=8, num_ints_recv=10
+Received: 9,
+issuing another get request...
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 152, gr.requested_bytes=8, num_bytes_copied=8 
+Shit
+On PE#0: num_bytes=8, num_ints_recv=11
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 16, gr.requested_bytes=8, num_bytes_copied=8 
+Shit
+On PE#1: num_bytes=8, num_ints_recv=8
+Received: 17,
+issuing another get request...
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
+Received: 20,
+issuing another get request...
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 144, gr.requested_bytes=8, num_bytes_copied=8 
+Shit
+On PE#0: num_bytes=8, num_ints_recv=12
+Received: 21,
++++++++++ out_buffer_size: 8, gr.requested_bytes=8, num_bytes_copied=8 
+Shit
+On PE#1: num_bytes=8, num_ints_recv=9
+Received: 18,
+issuing another get request...
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 0, gr.requested_bytes=8, num_bytes_copied=8 
+Shit
+issuing another get request...
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 136, gr.requested_bytes=8, num_bytes_copied=8 
+Shit
+On PE#0: num_bytes=8, num_ints_recv=13
+Received: 22,
+issuing another get request...
+fulfilling req
+On PE#1: num_bytes=8, num_ints_recv=10
+Received: 19,
+issuing another get request...
+pushing back bc not enough data, data has not arrived, requested_bytes=8, out_buffer_size=0
+Stream Manager 1 received a close request for stream=0
+For stream=0 on pe=1, All of my messages have been acked!
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 128, gr.requested_bytes=8, num_bytes_copied=8 
+Shit
+On PE#0: num_bytes=8, num_ints_recv=14
+Received: 23,
+issuing another get request...
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 120, gr.requested_bytes=8, num_bytes_copied=8 
+Shit
+On PE#0: num_bytes=8, num_ints_recv=15
+Received: 24,
+issuing another get request...
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 112, gr.requested_bytes=8, num_bytes_copied=8 
+Shit
+On PE#0: num_bytes=8, num_ints_recv=16
+Received: 25,
+issuing another get request...
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 104, gr.requested_bytes=8, num_bytes_copied=8 
+Shit
+On PE#0: num_bytes=8, num_ints_recv=17
+Received: 26,
+issuing another get request...
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 96, gr.requested_bytes=8, num_bytes_copied=8 
+Shit
+On PE#0: num_bytes=8, num_ints_recv=18
+Received: 27,
+issuing another get request...
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 88, gr.requested_bytes=8, num_bytes_copied=8 
+Shit
+On PE#0: num_bytes=8, num_ints_recv=19
+Received: 28,
+issuing another get request...
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 80, gr.requested_bytes=8, num_bytes_copied=8 
+Shit
+On PE#0: num_bytes=8, num_ints_recv=20
+Received: 29,
+issuing another get request...
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 72, gr.requested_bytes=8, num_bytes_copied=8 
+Shit
+On PE#0: num_bytes=8, num_ints_recv=21
+Received: 30,
+issuing another get request...
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 64, gr.requested_bytes=8, num_bytes_copied=8 
+Shit
+On PE#0: num_bytes=8, num_ints_recv=22
+Received: 31,
+issuing another get request...
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 56, gr.requested_bytes=8, num_bytes_copied=8 
+Shit
+On PE#0: num_bytes=8, num_ints_recv=23
+Received: 32,
+issuing another get request...
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 48, gr.requested_bytes=8, num_bytes_copied=8 
+Shit
+On PE#0: num_bytes=8, num_ints_recv=24
+Received: 33,
+issuing another get request...
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 40, gr.requested_bytes=8, num_bytes_copied=8 
+Shit
+On PE#0: num_bytes=8, num_ints_recv=25
+Received: 34,
+issuing another get request...
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 32, gr.requested_bytes=8, num_bytes_copied=8 
+Shit
+On PE#0: num_bytes=8, num_ints_recv=26
+Received: 35,
+issuing another get request...
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 24, gr.requested_bytes=8, num_bytes_copied=8 
+Shit
+On PE#0: num_bytes=8, num_ints_recv=27
+Received: 36,
+issuing another get request...
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 16, gr.requested_bytes=8, num_bytes_copied=8 
+Shit
+On PE#0: num_bytes=8, num_ints_recv=28
+Received: 37,
+issuing another get request...
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 8, gr.requested_bytes=8, num_bytes_copied=8 
+Shit
+On PE#0: num_bytes=8, num_ints_recv=29
+Received: 38,
+issuing another get request...
+fulfilling req
+////// is out buffer empty=0, num_bytes_copied=0, num_bytes_reqed=8
++++++++++ out_buffer_size: 0, gr.requested_bytes=8, num_bytes_copied=8 
+Shit
+On PE#0: num_bytes=8, num_ints_recv=30
+Received: 39,
+issuing another get request...
+pushing back bc not enough data, data has not arrived, requested_bytes=8, out_buffer_size=0

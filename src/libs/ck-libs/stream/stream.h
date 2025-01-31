@@ -76,6 +76,7 @@ namespace Ck { namespace Stream {
 			size_t _out_buffer_size = 0;
 			size_t _stream_id= 0;
 			size_t _coordinator_pe = 0;
+			size_t _amount_data_sent = 0;
 			std::vector<size_t> _registered_pes;
 			bool _registered_pe = false;
 			StreamMessageCounter _counter;
@@ -103,14 +104,18 @@ namespace Ck { namespace Stream {
 			void insertAck(size_t);
 			bool allAcked();
 			void clearBufferedGetRequests();
+
 		};
 		
 		class StreamCoordinator {
 			StreamMetaData _meta_data; // contains the metadata of the stream
 			StreamToken _stream;
+			std::unordered_map<size_t, std::unordered_map<size_t, size_t>> _bytes_written; //stream_id -> pe -> bytes written
+
 		public:
 			StreamCoordinator();
 			StreamCoordinator(StreamToken stream);
+			void tellCoordinatorLifetimeBytesWritten(StreamToken stream_id, size_t origin_pe, size_t bytes_written);
 			void registerThisPE(size_t pe);
 		};
 

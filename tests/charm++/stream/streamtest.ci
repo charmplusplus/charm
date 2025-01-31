@@ -34,7 +34,7 @@ mainmodule streamtest
 				}
 				CkPrintf("\n");
 				if(msg -> status == Ck::Stream::StreamStatus::STREAM_OK) {
-					CkPrintf("issuing another get request...\n");
+					CkPrintf("PE %d: Calling Get again\n", CkMyPe());
 					Ck::Stream::get(_stream, sizeof(size_t), 1, CkCallback(CkIndex_Consumers::recvData(0), thisProxy[thisIndex]));
 				} else {
 					CkPrintf("Consumer %d has received the done signal and consumed %d size_t...\n", thisIndex, _num_ints_received);

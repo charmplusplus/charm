@@ -10,7 +10,7 @@ namespace Ck { namespace Stream {
 	namespace impl {
 		CProxy_Starter starter;
 		CkpvDeclare(StreamManager*, stream_manager);
-	}
+	} 
 	namespace impl {
 
 		GetRequest::GetRequest(size_t bytes_req, CkCallback cb_in){
@@ -122,18 +122,18 @@ namespace Ck { namespace Stream {
 					buffer.insertToStream((char*) data, elem_size * num_elems);
 				}
 				
-				void sendAck(StreamToken stream, size_t pe, size_t num_messages){
-					thisProxy[pe].ackWrites(stream, num_messages);
+				void sendAck(StreamToken stream, size_t dest_pe, size_t num_messages){
+					CkPrintf("sendAck on source PE[%d]: sending destination PE[%d] acks for %d messages\n", CkMyPe(), dest_pe, num_messages);
+					thisProxy[dest_pe].ackWrites(stream, num_messages);
 				}
 
 				void recvData(DeliverStreamBytesMsg* in_msg){
-					CkPrintf("recv msg contents: num_bytes: %d\n", in_msg->num_bytes);
+					CkPrintf("PE %d: recv msg contents: num_bytes: %d\n", CkMyPe(), in_msg->num_bytes);
 
 					StreamBuffers& buff = _stream_table[in_msg -> stream_id];
 					char* temp_data = in_msg -> data;
 					buff.addToRecvBuffer(in_msg);
-					// delete in_msg;
-
+					// delete in_msg; send should free this
 				}
 
 				void flushLocalStream(StreamToken stream){
@@ -165,8 +165,14 @@ namespace Ck { namespace Stream {
 					sb.setStreamClosed();
 				}
 
+				void tellCoordinatorLifetimeBytesWritten(StreamToken stream_id, size_t origin_pe, size_t bytes_written) {
+					StreamCoordinator sc = _stream_coordinators[stream_id];
+					sc.tellCoordinatorLifetimeBytesWritten(stream_id, origin_pe, bytes_written);
+				} 
+
 				void ackWrites(StreamToken stream, size_t num_messages){
 					StreamBuffers& sb = _stream_table[stream];
+					CkPrintf("PE #%d, calling ackWrites, which calls insertAck with %d acks\n", CkMyPe(), num_messages);
 					sb.insertAck(num_messages);
 					if(sb.isStreamClosed() && sb.allAcked()){
 						CkPrintf("All of pe=%d messages for stream=%d have been acked\n", CkMyPe(), stream);
@@ -209,6 +215,7 @@ namespace Ck { namespace Stream {
 		}
 
 		void StreamBuffers::insertAck(size_t acks){
+			CkPrintf("PE #%d, calling insertAck with %d ack\n", CkMyPe(), acks);
 			_counter.addWriteAck(acks);
 		}
 
@@ -223,6 +230,9 @@ namespace Ck { namespace Stream {
 		void StreamBuffers::setStreamClosed(){
 			flushOutBuffer();
 			_counter.setStreamWriteClosed();
+			// tell coordinator how much data we have sent in our lifetime
+
+
 			// check if all of my messages have been acked already
 			if(allAcked()){
 				CkPrintf("For stream=%d on pe=%d, All of my messages have been acked!\n", _stream_id, CkMyPe());
@@ -281,6 +291,7 @@ namespace Ck { namespace Stream {
 			CkpvAccess(stream_manager) -> sendDeliverMsg(msg, target_pe);
 			_in_buffer_size = 0;
 			_counter.addSentMessage();
+			_amount_data_sent += size;
 		}
 
 		ssize_t StreamBuffers::_pickTargetPE(){
@@ -332,20 +343,20 @@ namespace Ck { namespace Stream {
 			size_t num_bytes = data -> num_bytes;
 			_counter.processIncomingMessage(data -> sender_pe);
 			if(!_out_buffer_capacity || ((_out_buffer_size + num_bytes) <= _out_buffer_capacity)){
-				CkPrintf("-- addToRecvBuffer === PE#%d, Adding to out buffer size, out_buffer_size=%d, num_bytes=%d\n", CkMyPe(), _out_buffer_size, num_bytes);
 				_out_buffer.push_back(InData(data, num_bytes));
 				_out_buffer_size += num_bytes;
+				CkPrintf("-- addToRecvBuffer === PE#%d, Adding to out buffer size, out_buffer_size=%d, num_bytes=%d\n", CkMyPe(), _out_buffer_size, num_bytes);
 			} else {
 				CkPrintf("capacity has been reached on the recv buffer, so dropping incoming message\n");
 			}
 			CkPrintf("In addToRecvBuffer, attempting to process buffered reqs\n");
 			while(!_out_buffer.empty() && !_buffered_reqs.empty()){ // keep fulfilling buffered requests in FIFO order
-				CkPrintf("Processing shit\n");
 				GetRequest& gr = _buffered_reqs.front();
 				if(gr.requested_bytes > _out_buffer_size){
-					CkPrintf("Breaking out of addToRecvBuffer, requested_bytes=%d, _out_buffer_size=%d\n", gr.requested_bytes, _out_buffer_size);
+					CkPrintf("PE %d: Breaking out of addToRecvBuffer as there is not enough data to serve more buffered getRequests, requested_bytes=%d, _out_buffer_size=%d\n", CkMyPe(), gr.requested_bytes, _out_buffer_size);
 					break;
 				}
+				CkPrintf("PE %d: Servicing a buffered GetRequest\n", CkMyPe());
 				// we know there are enough bytes in the stream to fulfill the request
 				GetRequest curr_req = gr;
 				_buffered_reqs.pop_front();
@@ -358,6 +369,7 @@ namespace Ck { namespace Stream {
 			size_t num_bytes_requested = std::min(gr.requested_bytes, _out_buffer_size);
 			StreamDeliveryMsg* res;
 			if(isStreamClosed() && allAcked() && _out_buffer.empty()){
+				CkPrintf("]]]]]] Short circuiting on PE %d\n", CkMyPe());
 				res = new(0) StreamDeliveryMsg(_stream_id); // avoid allocating useless memory
 				goto sendingRequest;
 			}
@@ -385,9 +397,11 @@ namespace Ck { namespace Stream {
 sendingRequest:
 			// copied all of the data we could
 			res -> num_bytes = num_bytes_copied;
-			CkPrintf("+++++++++ out_buffer_size: %d\n", _out_buffer_size);
-			if(isStreamClosed() && allAcked() && (gr.requested_bytes != num_bytes_copied) && !_out_buffer_size){
+			CkPrintf("+++++++++ out_buffer_size: %d, gr.requested_bytes=%d, num_bytes_copied=%d, isStreamClosed= %d, allAcked= %d\n", _out_buffer_size, gr.requested_bytes, num_bytes_copied, isStreamClosed(), allAcked());
+			if(isStreamClosed() && allAcked() && !_out_buffer_size){
 				res -> status = StreamStatus::STREAM_CLOSED;
+				CkPrintf("???????? PE[%d] stream closed stats: out_buffer_size: %d, gr.requested_bytes=%d, num_bytes_copied=%d \n", CkMyPe(), _out_buffer_size, gr.requested_bytes, num_bytes_copied);
+				CkPrintf("???? PE[%d] stream closed message info: %zu, %d\n", CkMyPe(), res -> stream_id, res -> num_bytes);
 				CkPrintf("Stream has been closed: out_buffer_size=%d\n", _out_buffer_size);
 			} else {
 				res -> status = StreamStatus::STREAM_OK;
@@ -417,10 +431,17 @@ sendingRequest:
 		
 		StreamCoordinator::StreamCoordinator(StreamToken stream) : _stream(stream) {}
 
+		void StreamCoordinator::tellCoordinatorLifetimeBytesWritten(StreamToken stream_id, size_t origin_pe, size_t bytes_written) {
+			(_bytes_written[stream_id])[origin_pe] += bytes_written;
+		}
+		
+		
 		void StreamCoordinator::registerThisPE(size_t pe){
 				_meta_data._registered_pes.push_back(pe);
 				CkpvAccess(stream_manager) -> broadcastAddThisPE(_stream, pe);
 		}
+
+
 
 		StreamMessageCounter::StreamMessageCounter() = default;
 
@@ -431,6 +452,7 @@ sendingRequest:
 		}
 
 		void StreamMessageCounter::setStreamWriteClosed(){
+			CkPrintf("[[[[[[ Write side is closed on PE#%d\n", CkMyPe());
 			_stream_write_closed = true;
 			for(auto& p : _counter){
 				size_t pe = p.first;	
@@ -438,22 +460,28 @@ sendingRequest:
 			}
 		}
 
-		void StreamMessageCounter::processIncomingMessage(size_t incoming_pe){
+		void StreamMessageCounter::processIncomingMessage(size_t sender_pe){
+			if(sender_pe == CkMyPe())
+				return;
+			// we know that it is from a remote PE, thus we should ack if required / keep track of incoming messages
 			if(_stream_write_closed){
-				CkpvAccess(stream_manager) -> sendAck(_stream, incoming_pe, 1); // I have received 1 new message 
+				CkPrintf("On PE[%d], _stream_write_closed is True, going to sendAck from me to source_pe [%d]\n", CkMyPe(), sender_pe);
+	
+				CkpvAccess(stream_manager) -> sendAck(_stream, sender_pe, 1); // I have received 1 new message 
 				return;
 			}
-			if(incoming_pe != CkMyPe()) {// no need to ack messages that aren't hitting the network and going to the same core
-				_counter[incoming_pe]++;
-			}
-
+			CkPrintf("On PE[%d], incrememting the messages sent from source_pe [%d]\n", CkMyPe(), sender_pe);
+			_counter[sender_pe]++;
 		}
 
 		void StreamMessageCounter::addWriteAck(size_t num_messages){
+			CkPrintf("On PE[%d], addWriteAck called with num message [%d]\n", CkMyPe(), num_messages);
+
 			_write_acks+=num_messages;
 		}
 
 		bool StreamMessageCounter::allAcked(){
+			CkPrintf("PE %d: _num_sent_messages=%d, _write_acks=%d\n", CkMyPe(), _num_sent_messages, _write_acks);
 			return _num_sent_messages == _write_acks;
 		}
 
