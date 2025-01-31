@@ -1078,6 +1078,7 @@ void CentralLB::CheckForRealloc(){
 
 void CentralLB::ResumeFromReallocCheckpoint(){
 #if CMK_SHRINK_EXPAND
+    CkPrintf("Resumed from realloc\n");
     std::vector<char> avail(se_avail_vector, se_avail_vector + CkNumPes());
     free(se_avail_vector);
     thisProxy.WillIbekilled(avail, numProcessAfterRestart);
