@@ -134,7 +134,8 @@ void CentralLB::InvokeLB()
 #if CMK_SHRINK_EXPAND
   if (pending_realloc_state == EXPAND_MSG_RECEIVED) {
     // for expand, first checkpoint restart then load balance
-    CheckForRealloc();
+    if (CkMyPe() == 0)
+      CheckForRealloc();
   } else
 #endif
   {
@@ -1108,9 +1109,11 @@ void CentralLB::WillIbekilled(std::vector<char> avail, int newnumProcessAfterRes
 
 void CentralLB::StartCleanup(){
 #if CMK_SHRINK_EXPAND
-		CkCleanup();
+  CkPrintf("Starting cleanup\n");
+	CkCleanup();
 #endif
 }
+
 void CentralLB::MigrationDone(int balancing)
 {
 #if CMK_SHRINK_EXPAND
