@@ -98,7 +98,7 @@ public:
         ElementCheckpointer(CkLocMgr* mgr_, PUP::er &p_):locMgr(mgr_),p(p_){};
         void addLocation(CkLocation &loc) {
           CkArrayIndex idx=loc.getIndex();
-          CkPrintf("[%d] Packing index dim = %i, %s\n", CkMyPe(), idx.dimension, idx2str(idx));
+          //CkPrintf("[%d] Packing index dim = %i, %s\n", CkMyPe(), idx.dimension, idx2str(idx));
           CkGroupID gID = locMgr->ckGetGroupID();
           CmiUInt8 id = loc.getID();
           p|gID;	    // store loc mgr's GID as well for easier restore
