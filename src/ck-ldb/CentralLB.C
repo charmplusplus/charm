@@ -1103,7 +1103,7 @@ void CentralLB::WillIbekilled(std::vector<char> avail, int newnumProcessAfterRes
  numProcessAfterRestart = newnumProcessAfterRestart;
  mynewpe =  GetNewPeNumber(avail);
  willContinue = avail[CkMyPe()];
- CkPrintf("Sending start cleanup reduction\n");
+ CkPrintf("PE%i> Sending start cleanup reduction\n", CkMyPe());
  CkCallback cb(CkIndex_CentralLB::StartCleanup(), thisProxy[0]);
  contribute(cb);
 #endif
