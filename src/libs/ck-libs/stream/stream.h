@@ -31,7 +31,7 @@ namespace Ck { namespace Stream {
 			CkCallback cb;
 			GetRequest(size_t, CkCallback);
 		};
-
+		// keep this struct here in case we need to trakc more metadata in the future
 		struct StreamMetaData {
 			std::vector<size_t> _registered_pes;
 		};
@@ -62,14 +62,15 @@ namespace Ck { namespace Stream {
 		};
 		// used by StreamManagers to organize the data of multiple streams
 		class StreamBuffers {
-			char* _in_buffer; // the buffer for incoming data; once filled, just drop extra data; (_in_buffer is used for the data going out; I should rename this at some point
-			std::deque<InData> _out_buffer; // the buffer for outgoing data
-			std::deque<GetRequest> _buffered_reqs;
-			std::deque<DeliverStreamBytesMsg*> _msg_out_buffer;
-			size_t _in_buffer_capacity= 4 * 1024 * 1024;
-			size_t _out_buffer_capacity= 4 * 1024 * 1024;
-			size_t _in_buffer_size = 0;
-			size_t _out_buffer_size = 0;
+			char* _put_buffer;
+			std::deque<InData> _get_buffer; // the buffer for outgoing data
+			std::deque<GetRequest> _buffered_gets; // buffered get requests
+			// the messages that need to be sent
+			std::deque<DeliverStreamBytesMsg*> _buffered_msg_to_deliver;
+			// size of buffer for data to be sent out to OTHER PEs (from puts)
+			size_t _put_buffer_capacity=  4 * 1024 * 1024;
+			size_t _put_buffer_size = 0;
+			size_t _get_buffer_size = 0;
 			size_t _stream_id= 0;
 			size_t _coordinator_pe = 0;
 			std::vector<size_t> _registered_pes;
@@ -92,12 +93,13 @@ namespace Ck { namespace Stream {
 			void handleGetRequest(GetRequest gr);
 			void pushBackRegisteredPE(size_t pe);
 			size_t numBufferedDeliveryMsg();
+			// just create the message from given info
+			DeliverStreamBytesMsg* createDeliveryBytesStreamMsg();
+			DeliverStreamBytesMsg* createDeliveryBytesStreamMsg(char* extra_data, size_t extra_bytes);
 			void popFrontMsgOutBuffer();
 			size_t coordinator();
 			bool isStreamClosed();
 			void setStreamClosed();
-			void insertAck(size_t);
-			bool allAcked();
 			void clearBufferedGetRequests();
 		};
 		
