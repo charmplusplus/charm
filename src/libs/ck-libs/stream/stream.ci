@@ -55,6 +55,7 @@ module CkStream_impl
 				}
 			};
 			entry void addRegisteredPE(StreamToken, size_t);
+			entry void tellManagersExpectedReceives(CkReductionMsg* msg);
 				
 		}
 
@@ -68,6 +69,7 @@ module CkStream_impl
 			entry void registerPEWithCoordinator(StreamToken, size_t);
 			entry void startCloseWriteStream(StreamToken token);
 			entry void initiateWriteStreamClose(StreamToken token);
+			entry void expectedReceivesUponClose(StreamToken token, size_t);
 		}
 	}
 	}

@@ -71,7 +71,7 @@ namespace Ck { namespace Stream {
 			size_t _put_buffer_capacity=  4 * 1024 * 1024;
 			size_t _put_buffer_size = 0;
 			size_t _get_buffer_size = 0;
-			size_t _stream_id= 0;
+			StreamToken _stream_id= 0;
 			size_t _coordinator_pe = 0;
 			std::vector<size_t> _registered_pes;
 			bool _registered_pe = false;
@@ -101,6 +101,7 @@ namespace Ck { namespace Stream {
 			bool isStreamClosed();
 			void setStreamClosed();
 			void clearBufferedGetRequests();
+			void setExpectedReceivesUponClose(size_t num_messages_to_receive);
 		};
 		
 		class StreamCoordinator {

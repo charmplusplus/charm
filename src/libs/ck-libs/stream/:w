@@ -59,18 +59,6 @@ namespace Ck { namespace Stream {
 				stream_managers.addRegisteredPE(token, pe);
 			}
 
-			void tellManagersExpectedReceives(CkReductionMsg* msg){
-				CkReduction::tupleElements* results;
-				int numReductions;
-				msg -> toTuple(&results, &numReductions);
-				double* totalMessageSentToPEs = (double*)results[0].data;
-				StreamToken st = *((size_t*)results[1].data);
-				for(int i = 0; i < CkNumPes(); ++i){
-					// invoke some entry method
-					stream_managers[i].expectedReceivesUponClose(token, size_t(totalMessageSentToPEs));
-				}
-			}
-
 		};
 
 		class StreamManager : public CBase_StreamManager {
@@ -89,14 +77,8 @@ namespace Ck { namespace Stream {
 				}
 
 				StreamManager(CkMigrateMessage* m) : CBase_StreamManager(m) {}
-
   				void pup(PUP::er& p){
 					// do I bother populating this?
-				}
-
-				void expectedReceivesUponClose(StreamToken token, size_t num_messages_to_receive){
-					StreamBuffers& sb = _stream_table[token];
-					stream_buffer.setExpectedReceivesUponClose(num_messages_to_receive);
 				}
 
 				void initializeStream(int id, size_t coordinator_pe){
@@ -182,31 +164,17 @@ namespace Ck { namespace Stream {
 		bool StreamBuffers::isStreamClosed(){
 			return _counter.isStreamClosed();
 		}
-		
-		void StreamBuffers::setExpectedReceivesUponClose(size_t num_messages_to_receive){
-			_counter.setExpectedReceives(num_messages_to_receive);
-			// if we have already received the numbero f messages, we just mark ourselves as closed
-			if(_counter.receivedAllData()){
-				CkPrintf("On PE[%d], the StreamManager has received all %zu messages\n", CkMyPe(), num_messages_to_receive);
-			}
-		}
 
 		void StreamBuffers::setStreamClosed(){
 			flushOutBuffer();
 			// send the coordinator how many bytes were sent
 			double* sent_arr = _counter.getSentCounterArray();
-			// original type is size_t, but changing it to int for the reducer. Do I need to do this?
-			int st = _stream_id;
 			// make a tuple reduction
 			CkReduction::tupleElement tupleRedn[] = {
-				CkReduction::tupleElement(CkNumPes() * sizeof(double), sent_arr, CkReduction::sum_int),
-				CkReduction::tupleElement(CkNumPes() * sizeof(StreamToken), &st, CkReduction::max_int)
+				CkReduction::tupleElement(CkNumPes() * sizeof(size_t), sent_arr, CkReduction::sum_int);
 			}
-			int tuple_size = 2;
-			CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tupleRedn, tuple_size);
-			CkCallback cb(CkIndex_Starter::tellManagersExpectedReceives(0), starter);
-			msg -> setCallback(cb);
-			contribute(msg);
+			// contribute this array to the global coordinator; "how do I pass a streamtoken as an argument as well?
+			contribute(sizeof(size_t) * CkNumPes(), sent_arr, CkReduction::sum_int, CkCallback(CkReductionTarget(Starter, tellManagersExpectedReceives), starter));
 		}
 
 		size_t StreamBuffers::coordinator() {
@@ -319,9 +287,6 @@ namespace Ck { namespace Stream {
 			InData in_data(data, data -> num_bytes);
 			_get_buffer.push_back(in_data);
 			_get_buffer_size += data -> num_bytes;
-			if(_counter.receivedAllData()){
-				CkPrintf("On PE[%d], the StreamManager has received all %zu messages\n", CkMyPe(), num_messages_to_receive);
-			}
 			// process all the buffered get requests when new data comes in
 			clearBufferedGetRequests();
 		}
@@ -351,11 +316,11 @@ namespace Ck { namespace Stream {
 			// we now have all the data, now we send it
 			_get_buffer_size -= num_bytes_copied;
 			res -> num_bytes = num_bytes_copied;
-			// if we know no more data is coming in, received all the data we should, and nothing left in buffer, mark stream as closed in the message
-			if(_counter.receivedAllData() && !_get_buffer_size){
-				res -> status = StreamStatus::STREAM_CLOSED;
-			} else {
+			// do some logic here to mark if the stream is closed or not
+			if(true){
 				res -> status = StreamStatus::STREAM_OK;
+			} else {
+				res -> status = StreamStatus::STREAM_CLOSED;
 			}
 			cb.send(res);
 		}
@@ -364,7 +329,7 @@ namespace Ck { namespace Stream {
 			// clear all of the buffered get requests when enough data comes in to serve the head of queue
 			while(!_buffered_gets.empty()){
 				GetRequest& fr = _buffered_gets.front();
-				if(!_counter.receivedAllData() && _get_buffer_size < fr.requested_bytes) return; // not enough bytes to satisfy front of queue
+				if(_buffered_gets.size() < fr.requested_bytes) return; // not enough bytes to satisfy front of queue
 				_buffered_gets.pop();
 				fulfillRequest(fr);
 			}
@@ -389,25 +354,6 @@ namespace Ck { namespace Stream {
 		StreamMessageCounter::StreamMessageCounter() = default;
 
 		StreamMessageCounter::StreamMessageCounter(StreamToken stream) : _stream(stream) {}
-
-		void StreamMessageCounter::setExpectedReceives(size_t num_expected_receives){
-			_close_initiated = true;
-			_number_of_expected_receives = num_expected_receives;
-		}
-
-		bool StreamMessageCounter::receivedAllData(){
-			size_t total_received_messages = totalReceivedMessages();
-			return _close_initiated && (total_received_messages == _number_of_expected_receives);
-		}
-
-		size_t StreamMessageCounter::totalReceivedMessages(){
-			size_t sum = 0;
-			for(auto& p: _received_counter){
-				sum += p.second;
-			}
-			return sum;
-		}
-
 
 		double* StreamMessageCounter::getSentCounterArray(){
 			double* sent_arr = new size_t[CkNumPes()];
@@ -458,7 +404,6 @@ namespace Ck { namespace Stream {
 			CkpvAccess(stream_manager) -> tellCoordinatorCloseWrite(stream);
 		}
 	}
-
 	void dummyFunction(){
 		impl::dummyImplFunction();
 		std::cout << "about to try execute starterHello()\n";
