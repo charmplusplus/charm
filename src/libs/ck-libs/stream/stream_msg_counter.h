@@ -14,22 +14,23 @@ class StreamMessageCounter{
 public:
 	StreamMessageCounter();
 	StreamMessageCounter(StreamToken);
-	bool isStreamClosed();
 	void setStreamWriteClosed();
 	// given a source PE and the number of bytes, track the incoming message
 	void processIncomingMessage(size_t, size_t);
 	// given a destination PE and the number of bytes, track the outgoing message
 	void processOutgoingMessage(size_t, size_t);
 	// gets the sent counters in array format
-	size_t* getSentCounterArray();
+	u_long* getSentCounterArray();
 	// gets the received counters in array format
-	size_t* getReceivedCounterArray();
+	u_long* getReceivedCounterArray();
 	// method that sums everything in receive array
 	size_t totalReceivedMessages();
 	// determines if we have received all the data we should && stream is trying to be closed
 	bool receivedAllData();
 
-	// 
+	size_t getNumberOfExpectedReceives();
+
+	// set the number of receive messages we should expect after all messages on this pe have arrived 
 	void setExpectedReceives(size_t);
 	
 };

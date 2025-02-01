@@ -148,6 +148,7 @@ namespace Ck { namespace Stream {
 
 		};
 
+		// TODO: Can we get rid of this?
 		void dummyImplFunction(){
 			CkpvAccess(stream_manager)-> sayHello();	
 		}
@@ -155,28 +156,28 @@ namespace Ck { namespace Stream {
 
 		StreamBuffers::StreamBuffers(size_t stream_id) : _counter(stream_id){
 			_stream_id = stream_id;
-			_put_buffer = new char[_in_buffer_capacity];
+			_put_buffer = new char[_put_buffer_capacity];
 		}
 
 		StreamBuffers::StreamBuffers(size_t stream_id, size_t coordinator_pe) : _counter(stream_id){
 			_stream_id = stream_id;
 			_coordinator_pe = coordinator_pe;
-			_put_buffer = new char[_in_buffer_capacity];
+			_put_buffer = new char[_put_buffer_capacity];
 		}
 
 		StreamBuffers::StreamBuffers(size_t stream_id, size_t in_buffer_capacity, size_t out_buffer_capacity) : _counter(stream_id){
 			_stream_id = stream_id;
 			_put_buffer_capacity = in_buffer_capacity;
-			_out_buffer_capacity = out_buffer_capacity;
-			_put_buffer = new char[_in_buffer_capacity];
+			_get_buffer_capacity = out_buffer_capacity;
+			_put_buffer = new char[_put_buffer_capacity];
 		}
 
 		StreamBuffers::StreamBuffers(size_t stream_id, size_t coordinator_pe, size_t in_buffer_capacity, size_t out_buffer_capacity) : _counter(stream_id) {
 			_stream_id = stream_id;
 			_coordinator_pe = coordinator_pe;
-			_in_buffer_capacity = in_buffer_capacity;
-			_out_buffer_capacity = out_buffer_capacity;
-			_put_buffer = new char[_in_buffer_capacity];
+			_put_buffer_capacity = in_buffer_capacity;
+			_get_buffer_capacity = out_buffer_capacity;
+			_put_buffer = new char[_put_buffer_capacity];
 		}
 
 		bool StreamBuffers::isStreamClosed(){
@@ -194,14 +195,14 @@ namespace Ck { namespace Stream {
 		void StreamBuffers::setStreamClosed(){
 			flushOutBuffer();
 			// send the coordinator how many bytes were sent
-			double* sent_arr = _counter.getSentCounterArray();
+			u_long* sent_arr = _counter.getSentCounterArray();
 			// original type is size_t, but changing it to int for the reducer. Do I need to do this?
 			int st = _stream_id;
 			// make a tuple reduction
 			CkReduction::tupleElement tupleRedn[] = {
 				CkReduction::tupleElement(CkNumPes() * sizeof(double), sent_arr, CkReduction::sum_int),
 				CkReduction::tupleElement(CkNumPes() * sizeof(StreamToken), &st, CkReduction::max_int)
-			}
+			};
 			int tuple_size = 2;
 			CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tupleRedn, tuple_size);
 			CkCallback cb(CkIndex_Starter::tellManagersExpectedReceives(0), starter);
@@ -215,7 +216,7 @@ namespace Ck { namespace Stream {
 
 		void StreamBuffers::flushOutBuffer(){
 			if(!_put_buffer_size) return;
-			DeliverStreamBytesMsg* msg = createDeliveryBytesStreamMsg()
+			DeliverStreamBytesMsg* msg = createDeliverBytesStreamMsg();
 			_sendOutBuffer(msg);	
 		}
 
@@ -240,14 +241,14 @@ namespace Ck { namespace Stream {
 			_sendOutBuffer(msg);
 		}
 
-		DeliverStreamBytesMsg* createDeliveryBytesStreamMsg(){
-			DeliverStreamBytesMsg* msg = new (_put_buffer_size) DeliverStreamBytesMsg(_put_buffer,_put_buffer_size);
+		DeliverStreamBytesMsg* StreamBuffers::createDeliverBytesStreamMsg(){
+			DeliverStreamBytesMsg* msg = new (_put_buffer_size) DeliverStreamBytesMsg(_put_buffer, _put_buffer_size);
 			msg -> stream_id = _stream_id;
 			msg -> sender_pe = CkMyPe();
 			return msg;
 		}
 
-		DeliverStreamBytesMsg* createDeliverBytesStreamMsg(char* extra_data, size_t extra_bytes){
+		DeliverStreamBytesMsg* StreamBuffers::createDeliverBytesStreamMsg(char* extra_data, size_t extra_bytes){
 			size_t total_size = extra_bytes + _put_buffer_size;
 			DeliverStreamBytesMsg* msg = new (total_size) DeliverStreamBytesMsg();
 			std::memcpy(msg -> data, _put_buffer, _put_buffer_size);
@@ -319,8 +320,9 @@ namespace Ck { namespace Stream {
 			InData in_data(data, data -> num_bytes);
 			_get_buffer.push_back(in_data);
 			_get_buffer_size += data -> num_bytes;
+
 			if(_counter.receivedAllData()){
-				CkPrintf("On PE[%d], the StreamManager has received all %zu messages\n", CkMyPe(), num_messages_to_receive);
+				CkPrintf("On PE[%d], the StreamManager has received all %zu messages\n", CkMyPe(), _counter.getNumberOfExpectedReceives());
 			}
 			// process all the buffered get requests when new data comes in
 			clearBufferedGetRequests();
@@ -390,10 +392,15 @@ namespace Ck { namespace Stream {
 
 		StreamMessageCounter::StreamMessageCounter(StreamToken stream) : _stream(stream) {}
 
+		size_t StreamMessageCounter::getNumberOfExpectedReceives() {
+			return _number_of_expected_receives;
+		}
+
 		void StreamMessageCounter::setExpectedReceives(size_t num_expected_receives){
 			_close_initiated = true;
 			_number_of_expected_receives = num_expected_receives;
 		}
+
 
 		bool StreamMessageCounter::receivedAllData(){
 			size_t total_received_messages = totalReceivedMessages();
@@ -408,25 +415,21 @@ namespace Ck { namespace Stream {
 			return sum;
 		}
 
-
-		double* StreamMessageCounter::getSentCounterArray(){
-			double* sent_arr = new size_t[CkNumPes()];
+		// This will depend on if we reall
+		u_long* StreamMessageCounter::getSentCounterArray() {
+			u_long* sent_arr = new u_long[CkNumPes()];
 			for(int i = 0; i < CkNumPes(); ++i){
 				sent_arr[i] = _sent_counter[i];
 			}
 			return sent_arr;
 		}
 
-		double* StreamMessageCounter::getReceivedCounterArray(){
-			double* received_arr = new size_t[CkNumPes()];
+		u_long* StreamMessageCounter::getReceivedCounterArray(){
+			u_long* received_arr = new u_long[CkNumPes()];
 			for(int i = 0; i < CkNumPes(); ++i){
 				received_arr[i] = _received_counter[i];
 			}
 			return received_arr;
-		}
-
-		bool StreamMessageCounter::isStreamClosed() {
-			return _stream_write_closed;
 		}
 
 		void StreamMessageCounter::setStreamWriteClosed(){
@@ -434,7 +437,7 @@ namespace Ck { namespace Stream {
 		}
 
 		void StreamMessageCounter::processIncomingMessage(size_t num_bytes, size_t src_pe){
-			_received_counter[incoming_pe] += num_bytes;
+			_received_counter[src_pe] += num_bytes;
 		}
 
 		void StreamMessageCounter::processOutgoingMessage(size_t num_bytes, size_t dest_pe){
@@ -455,7 +458,7 @@ namespace Ck { namespace Stream {
 		}
 
 		inline void impl_closeWriteStream(StreamToken stream){
-			CkpvAccess(stream_manager) -> tellCoordinatorCloseWrite(stream);
+			CkpvAccess(stream_manager) -> initiateWriteStreamClose(stream);
 		}
 	}
 

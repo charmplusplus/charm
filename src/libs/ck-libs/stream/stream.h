@@ -68,7 +68,8 @@ namespace Ck { namespace Stream {
 			// the messages that need to be sent
 			std::deque<DeliverStreamBytesMsg*> _buffered_msg_to_deliver;
 			// size of buffer for data to be sent out to OTHER PEs (from puts)
-			size_t _put_buffer_capacity=  4 * 1024 * 1024;
+			size_t _put_buffer_capacity=  4 * 1024 * 1024; // Note: Old code had in = put and out = get
+			size_t _get_buffer_capacity=  4 * 1024 * 1024;
 			size_t _put_buffer_size = 0;
 			size_t _get_buffer_size = 0;
 			StreamToken _stream_id= 0;
@@ -77,6 +78,7 @@ namespace Ck { namespace Stream {
 			bool _registered_pe = false;
 			StreamMessageCounter _counter;
 			void _sendOutBuffer(char* data, size_t size);
+			void _sendOutBuffer(DeliverStreamBytesMsg*);
 			ssize_t _pickTargetPE();
 
 		public:
@@ -90,12 +92,12 @@ namespace Ck { namespace Stream {
 			void flushOutBuffer(char* extra_data, size_t extra_bytes);
 			void addToRecvBuffer(DeliverStreamBytesMsg* data);
 			void fulfillRequest(GetRequest& gr);
-			void handleGetRequest(GetRequest gr);
+			void handleGetRequest(GetRequest& gr);
 			void pushBackRegisteredPE(size_t pe);
 			size_t numBufferedDeliveryMsg();
 			// just create the message from given info
-			DeliverStreamBytesMsg* createDeliveryBytesStreamMsg();
-			DeliverStreamBytesMsg* createDeliveryBytesStreamMsg(char* extra_data, size_t extra_bytes);
+			DeliverStreamBytesMsg* createDeliverBytesStreamMsg();
+			DeliverStreamBytesMsg* createDeliverBytesStreamMsg(char* extra_data, size_t extra_bytes);
 			void popFrontMsgOutBuffer();
 			size_t coordinator();
 			bool isStreamClosed();
