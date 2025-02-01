@@ -17,6 +17,12 @@ test: iotest
 	$(call run, ./iotest +p2 $(N_BUFFER_CHARES) $(FILESIZE) $(N_READERS) $(FILENAME))
 	$(call run, ./iotest +p4 $(N_BUFFER_CHARES) $(FILESIZE) $(N_READERS) $(FILENAME))
 
+
+test_local: iotest
+	#dd if=/dev/urandom of=large_test.txt bs=64M count=16 iflag=fullblock
+	$(call run, ./iotest +p2 $(N_BUFFER_CHARES) $(FILESIZE) $(N_READERS) $(FILENAME)) ++local
+	$(call run, ./iotest +p4 $(N_BUFFER_CHARES) $(FILESIZE) $(N_READERS) $(FILENAME)) ++local
+
 testp: iotest
 	$(call run, ./iotest +p$(P) $(N_BUFFER_CHARES) $(FILESIZE) $(N_READERS) $(FILENAME))
 	$(call run, ./iotest +p$(P) $$((2 * $(N_BUFFER_CHARES))) $(FILESIZE) $$((4 * $(N_READERS))) $(FILENAME))
