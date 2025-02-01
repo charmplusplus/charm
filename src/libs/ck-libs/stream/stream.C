@@ -231,7 +231,7 @@ namespace Ck { namespace Stream {
 			flushOutBuffer();
 			_counter.setStreamWriteClosed();
 			// tell coordinator how much data we have sent in our lifetime
-
+			CProxy_StreamManager[coordinator()].tellCoordinatorLifetimeBytesWritten()
 
 			// check if all of my messages have been acked already
 			if(allAcked()){
