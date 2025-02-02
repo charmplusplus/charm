@@ -32,6 +32,8 @@ public:
 
 	// set the number of receive messages we should expect after all messages on this pe have arrived 
 	void setExpectedReceives(size_t);
+	bool isCloseFlagSet();
+	void setCloseFlag();
 	
 };
 

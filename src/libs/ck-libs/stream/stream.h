@@ -98,12 +98,13 @@ namespace Ck { namespace Stream {
 			// just create the message from given info
 			DeliverStreamBytesMsg* createDeliverBytesStreamMsg();
 			DeliverStreamBytesMsg* createDeliverBytesStreamMsg(char* extra_data, size_t extra_bytes);
+			void clearBufferedDeliveryMsg();
 			void popFrontMsgOutBuffer();
 			size_t coordinator();
-			bool isStreamClosed();
-			void setStreamClosed();
+			CkReductionMsg* setStreamClosed();
 			void clearBufferedGetRequests();
 			void setExpectedReceivesUponClose(size_t num_messages_to_receive);
+			void setCloseFlag();
 		};
 		
 		class StreamCoordinator {
