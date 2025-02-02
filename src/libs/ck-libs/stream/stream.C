@@ -219,8 +219,11 @@ namespace Ck { namespace Stream {
 			_counter.setExpectedReceives(num_messages_to_receive);
 			// if we have already received the numbero f messages, we just mark ourselves as closed
 			if(_counter.receivedAllData()){
-				CkPrintf("On PE[%d], the StreamManager has received all %zu messages\n", CkMyPe(), num_messages_to_receive);
+				CkPrintf("On PE[%d], from within setExpectedReceivesUponClose, the StreamManager has received all %zu messages. Currently %d get requests buffered...\n", CkMyPe(), num_messages_to_receive, _buffered_gets.size());
+			} else {
+				CkPrintf("On PE[%d], the StreamManager has not receieved all %zu bytes; has only receieved %zu bytes\n", CkMyPe(), num_messages_to_receive, _counter.totalReceivedMessages());
 			}
+			clearBufferedGetRequests();
 		}
 
 		CkReductionMsg* StreamBuffers::setStreamClosed(){
@@ -375,9 +378,10 @@ namespace Ck { namespace Stream {
 			InData in_data(data, data -> num_bytes);
 			_get_buffer.push_back(in_data);
 			_get_buffer_size += data -> num_bytes;
+			CkPrintf("PROCESS THE INCOMING MESSAGE: PE[%d] has receieved %d bytes from %d. Total bytes received: %zu\n", CkMyPe(), data -> num_bytes, data -> sender_pe, _counter.totalReceivedMessages());
 
 			if(_counter.receivedAllData()){
-				CkPrintf("On PE[%d], the StreamManager has received all %zu messages\n", CkMyPe(), _counter.getNumberOfExpectedReceives());
+				CkPrintf("On PE[%d], within addToRecvBuffer, the StreamManager has received all %zu messages. Currently %d get requests buffered...\n", CkMyPe(), _counter.getNumberOfExpectedReceives(), _buffered_gets.size());
 			}
 			// process all the buffered get requests when new data comes in
 			clearBufferedGetRequests();
@@ -431,7 +435,11 @@ namespace Ck { namespace Stream {
 			// clear all of the buffered get requests when enough data comes in to serve the head of queue
 			while(!_buffered_gets.empty()){
 				GetRequest& fr = _buffered_gets.front();
-				if(!_counter.receivedAllData() && _get_buffer_size < fr.requested_bytes) return; // not enough bytes to satisfy front of queue
+				if(!_counter.receivedAllData() && _get_buffer_size < fr.requested_bytes){// not enough bytes to satisfy front of queue
+					CkPrintf("clearBufferedGetRequeests on PE[%d]: returning early from clearBufferedGetRequsts: _counter.receivedAllData()=%d, _get_buffer_size=%zu\n", CkMyPe(), _counter.receivedAllData(), _get_buffer_size);
+					return;
+				}
+				CkPrintf("on PE[%d], fulfilling a get request..\n");
 				_buffered_gets.pop_front();
 				fulfillRequest(fr);
 			}
@@ -514,7 +522,7 @@ namespace Ck { namespace Stream {
 		}
 
 		void StreamMessageCounter::processIncomingMessage(size_t num_bytes, size_t src_pe){
-			if(_sent_counter.count(src_pe)){
+			if(_received_counter.count(src_pe)){
 				_received_counter[src_pe] += num_bytes;
 			} else {
 				_received_counter[src_pe] = num_bytes;

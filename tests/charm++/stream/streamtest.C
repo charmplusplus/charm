@@ -40,6 +40,7 @@ public:
 	Consumers_SDAG_CODE
 	Consumers(StreamToken stream) {
 		_stream = stream;	
+		CkPrintf("DEBUG CONSUMERS: CONSUMER[%d] is on PE[%zu]\n", thisIndex, CkMyPe());
 		Ck::Stream::get(_stream, sizeof(size_t), 1, CkCallback(CkIndex_Consumers::recvData(0), thisProxy[thisIndex]));
 	}
 };
