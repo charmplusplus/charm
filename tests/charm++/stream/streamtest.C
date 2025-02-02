@@ -24,10 +24,14 @@ public:
 				}
 				Ck::Stream::flushLocalStream(_stream);
 				CkPrintf("Producer %d has written %d size_t to the stream...\n", thisIndex, 10);
-				contribute(CkCallback(CkReductionTarget(Producers, doneWriting), thisProxy[0]));
+				CkPrintf("WARNING: NOT USING CALLBACK FOR DONEWRITING\n", thisIndex, 10);
+				
+				doneWriting();
+				// contribute(CkCallback(CkReductionTarget(Producers, doneWriting), thisProxy[0]));
 	}
 
 	void doneWriting(){
+		CkPrintf("IN TEST: PRODUCERS ARE DONE WRITING. CALLING closeWriteStream\n");
 		Ck::Stream::closeWriteStream(_stream);
 	}
 };

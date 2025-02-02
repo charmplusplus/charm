@@ -13,65 +13,65 @@ module CkStream_impl
 {
 	include "streamtoken.h";
 	include "stream.h";
-	namespace Ck{
-	namespace Stream{
+	namespace Ck {
+		namespace Stream {
 
-	// how the user gets the result from a createNewStream
-	message StreamIdMessage {
-			size_t id;
-	};
-	// the message that interacts with user
-	message StreamDeliveryMsg {
-			char data[];
-			size_t num_bytes;
-			StreamToken stream_id; 
-	};
-
-	namespace impl {
-		message DeliverStreamBytesMsg {
-			char data[];
-			size_t num_bytes;
-			StreamToken stream_id; 
-		};
-		
-
-		readonly CProxy_Starter starter; // responsible for creating the group - do I need this here? idk
-		mainchare[migratable] Starter 
-		{
-			entry Starter(CkArgMsg* m);
-			entry void starterHello(); // this is a dummy function
-			entry[reductiontarget] void streamCreated(int stream_token);
-			entry void createNewStream(CkCallback cb) {
-				serial {
-					size_t token_to_use = _curr_stream_token_id++;
-					size_t coordinator_to_use = (_curr_stream_coordinator++) % (CkNumPes());
-					stream_managers.initializeStream(token_to_use, coordinator_to_use);
-				}
-				when streamCreated(int stream_token) serial {
-					CkPrintf("We made it to the streamCreated part baby\n");
-					StreamIdMessage* msg = new StreamIdMessage();	
-					msg -> id = stream_token;
-					cb.send(msg);
-				}
+			// how the user gets the result from a createNewStream
+			message StreamIdMessage {
+					size_t id;
 			};
-			entry void addRegisteredPE(StreamToken, size_t);
-			entry void tellManagersExpectedReceives(CkReductionMsg* msg);
-				
-		}
+			// the message that interacts with user
+			message StreamDeliveryMsg {
+					char data[];
+					size_t num_bytes;
+					StreamToken stream_id; 
+			};
 
-		group[migratable] StreamManager 
-		{
-			entry StreamManager();
-			entry void initializeStream(int id, size_t coordinator_pe);
-			entry void recvPutBufferFromPE(DeliverStreamBytesMsg* in_msg);
-			entry void addRegisteredPE(StreamToken, size_t pe);
-			// entry void clearBufferedDeliveryMsg(StreamToken token);
-			// entry void registerPEWithCoordinator(StreamToken, size_t);
-			entry void startCloseWriteStream(StreamToken token);
-			entry void initiateWriteStreamClose(StreamToken token);
-			entry void expectedReceivesUponClose(StreamToken token, size_t);
+			namespace impl {
+				message DeliverStreamBytesMsg {
+					char data[];
+					size_t num_bytes;
+					StreamToken stream_id; 
+				};
+				
+
+				readonly CProxy_Starter starter; // responsible for creating the group - do I need this here? idk
+				mainchare[migratable] Starter 
+				{
+					entry Starter(CkArgMsg* m);
+					entry void starterHello(); // this is a dummy function
+					entry[reductiontarget] void streamCreated(int stream_token);
+					entry void createNewStream(CkCallback cb) {
+						serial {
+							size_t token_to_use = _curr_stream_token_id++;
+							size_t coordinator_to_use = (_curr_stream_coordinator++) % (CkNumPes());
+							stream_managers.initializeStream(token_to_use, coordinator_to_use);
+						}
+						when streamCreated(int stream_token) serial {
+							CkPrintf("We made it to the streamCreated part baby\n");
+							StreamIdMessage* msg = new StreamIdMessage();	
+							msg -> id = stream_token;
+							cb.send(msg);
+						}
+					};
+					entry void addRegisteredPE(StreamToken, size_t);
+					entry void tellManagersExpectedReceives(CkReductionMsg* msg);
+						
+				}
+
+				group[migratable] StreamManager 
+				{
+					entry StreamManager();
+					entry void initializeStream(int id, size_t coordinator_pe);
+					entry void recvPutBufferFromPE(DeliverStreamBytesMsg* in_msg);
+					entry void addRegisteredPE(StreamToken, size_t pe);
+					// entry void clearBufferedDeliveryMsg(StreamToken token);
+					// entry void registerPEWithCoordinator(StreamToken, size_t);
+					entry void startCloseWriteStream(StreamToken token);
+					entry void initiateWriteStreamClose(StreamToken token);
+					entry void expectedReceivesUponClose(StreamToken token, size_t);
+				}
+			}
 		}
-	}
-	}
 	}	
 }

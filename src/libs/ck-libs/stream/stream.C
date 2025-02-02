@@ -65,10 +65,15 @@ namespace Ck { namespace Stream {
 				msg -> toTuple(&results, &numReductions);
 				double* totalMessageSentToPEs = (double*)results[0].data;
 				StreamToken st = *((size_t*)results[1].data);
+				// TODO: broadcast????
 				for(int i = 0; i < CkNumPes(); ++i){
 					// invoke some entry method
 					stream_managers[i].expectedReceivesUponClose(st, size_t(totalMessageSentToPEs));
 				}
+			}
+
+			void tellManagerToContributeForClosing(StreamToken stream_id, size_t pe, u_long* bytes_sent_arr) {
+				stream_managers[pe].contributeToClosingReduction(stream_id, bytes_sent_arr);
 			}
 
 		};
@@ -148,6 +153,21 @@ namespace Ck { namespace Stream {
 					local_buffer.handleGetRequest(gr);
 				}
 
+				// TODO: give this a better name; This function is invoked from StreamBuffers:setStreamClosed(). It reduces to Starter::tellManagersExpectedReceives
+				void contributeToClosingReduction(StreamToken stream_id, u_long* bytes_sent_arr) {
+					CkReduction::tupleElement tupleRedn[] = {
+						CkReduction::tupleElement(CkNumPes() * sizeof(double), bytes_sent_arr, CkReduction::sum_int),
+						CkReduction::tupleElement(CkNumPes() * sizeof(StreamToken), &stream_id, CkReduction::max_int)
+					};
+					int tuple_size = 2;
+					CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tupleRedn, tuple_size);
+					CkCallback cb(CkIndex_Starter::tellManagersExpectedReceives(0), starter); // This calls StreamManager::expectedReceivesUponClose
+					msg -> setCallback(cb);
+					CkPrintf("PE %d: StreamManager::contributeToClosingReduction; contributing\n", CkMyPe());
+
+					contribute(msg);
+				}
+
 		};
 
 		// TODO: Can we get rid of this?
@@ -193,21 +213,27 @@ namespace Ck { namespace Stream {
 		}
 
 		void StreamBuffers::setStreamClosed(){
+			CkPrintf("PE %d: setStreamClosed; Invoked.\n", CkMyPe());
+
 			flushOutBuffer();
-			// send the coordinator how many bytes were sent
-			u_long* sent_arr = _counter.getSentCounterArray();
-			// original type is size_t, but changing it to int for the reducer. Do I need to do this?
-			int st = _stream_id;
-			// make a tuple reduction
-			CkReduction::tupleElement tupleRedn[] = {
-				CkReduction::tupleElement(CkNumPes() * sizeof(double), sent_arr, CkReduction::sum_int),
-				CkReduction::tupleElement(CkNumPes() * sizeof(StreamToken), &st, CkReduction::max_int)
-			};
-			int tuple_size = 2;
-			CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tupleRedn, tuple_size);
-			CkCallback cb(CkIndex_Starter::tellManagersExpectedReceives(0), starter); // This calls StreamManager::expectedReceivesUponClose
-			msg -> setCallback(cb);
-			contribute(msg);
+			starter.tellManagerToContributeForClosing(_stream_id, CkMyPe(), _counter.getSentCounterArray());
+			// below logic moved to StreamManager::contributeToClosingReduction
+
+
+			// // send the coordinator how many bytes were sent
+			// u_long* sent_arr = _counter.getSentCounterArray();
+			// // original type is size_t, but changing it to int for the reducer. Do I need to do this?
+			// int st = _stream_id;
+			// // make a tuple reduction
+			// CkReduction::tupleElement tupleRedn[] = {
+			// 	CkReduction::tupleElement(CkNumPes() * sizeof(double), sent_arr, CkReduction::sum_int),
+			// 	CkReduction::tupleElement(CkNumPes() * sizeof(StreamToken), &st, CkReduction::max_int)
+			// };
+			// int tuple_size = 2;
+			// CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tupleRedn, tuple_size);
+			// CkCallback cb(CkIndex_Starter::tellManagersExpectedReceives(0), starter); // This calls StreamManager::expectedReceivesUponClose
+			// msg -> setCallback(cb);
+			// contribute(msg);
 		}
 
 		size_t StreamBuffers::coordinator() {
@@ -291,6 +317,7 @@ namespace Ck { namespace Stream {
 		}
 
 		void StreamBuffers::handleGetRequest(GetRequest& gr){
+			CkPrintf("PE %d: StreamBuffer::handleGetRequest; Arrived\n", CkMyPe());
 			if (!_registered_pe) {
 				_registered_pe = true;
 				starter.addRegisteredPE(_stream_id, CkMyPe());
@@ -298,6 +325,7 @@ namespace Ck { namespace Stream {
 			// if the stream is closed, we do something? f
 			// if we don't have enough data, then we say "fuck" and buffer it (assuming the stream isn't closed)
 			if(_get_buffer_size < gr.requested_bytes) {
+				CkPrintf("PE %d: StreamBuffer::handleGetRequest; We don't have enough data yet. Buffering get request.\n", CkMyPe());
 				_buffered_gets.push_back(gr);	
 				return;
 			}
@@ -334,6 +362,8 @@ namespace Ck { namespace Stream {
 		// this is called if the stream is closed and we have buffered requests
 		// or we have a request and enough data to serve it
 		void StreamBuffers::fulfillRequest(GetRequest& gr){
+			CkPrintf("PE %d: StreamBuffer::fulfillRequest. Invoked.\n", CkMyPe());
+
 			size_t num_bytes_to_copy = std::min(gr.requested_bytes, _get_buffer_size);
 			size_t num_bytes_copied = 0;
 			// we already know that we have enough data to satisfy stuff
@@ -347,24 +377,29 @@ namespace Ck { namespace Stream {
 						_get_buffer.pop_front();
 				} else {
 					std::memcpy(res -> data + num_bytes_copied, front.curr + front.num_bytes_rem, num_bytes_to_copy);
-					num_bytes_to_copy -= num_bytes_to_copy;
+					// num_bytes_to_copy -= num_bytes_to_copy;
 					num_bytes_copied += num_bytes_to_copy;
 					front.curr += num_bytes_to_copy;
 					front.num_bytes_rem -= num_bytes_to_copy;
+					CkPrintf("PE %d: StreamBuffer::fulfillRequest. Breaking loop: gr.reqd_bytes: %d, _get_buffer_size: %d, num_bytes_copied: %d, _get_buffer.size(): %d\n", CkMyPe(), gr.requested_bytes, _get_buffer_size, num_bytes_copied, _get_buffer.size());
+					
 					break;
 				}
+				CkPrintf("PE %d: StreamBuffer::fulfillRequest. In while loop: gr.reqd_bytes: %d, _get_buffer_size: %d, num_bytes_copied: %d, _get_buffer.size(): %d\n", CkMyPe(), gr.requested_bytes, _get_buffer_size, num_bytes_copied, _get_buffer.size());
+
 			}
 			// we now have all the data, now we send it
 			_get_buffer_size -= num_bytes_copied;
 			res -> num_bytes = num_bytes_copied;
+			CkPrintf("PE %d: StreamBuffer::fulfillRequest. After fulfilling stats: gr.reqd_bytes: %d, _get_buffer_size: %d, num_bytes_copied: %d, _get_buffer.size(): %d\n", CkMyPe(), gr.requested_bytes, _get_buffer_size, num_bytes_copied, _get_buffer.size());
+
 			// if we know no more data is coming in, received all the data we should, and nothing left in buffer, mark stream as closed in the message
 			if(_counter.receivedAllData() && !_get_buffer_size){
 				res -> status = StreamStatus::STREAM_CLOSED;
 			} else {
 				res -> status = StreamStatus::STREAM_OK;
 			}
-			CkCallback cb = gr.cb;
-			cb.send(res);
+			gr.cb.send(res);
 		}
 
 
