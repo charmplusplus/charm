@@ -150,6 +150,7 @@ namespace Ck { namespace Stream {
 				
 				// used to actually close the stream buffer by creating the reduction to send to the Starter
 				void closeStreamBuffer(StreamToken token){
+					CkPrintf("PE[%d] has invoked the closeStreamBuffer method...\n", CkMyPe());
 					StreamBuffers& sb = _stream_table[token];
 					CkReductionMsg* msg = sb.setStreamClosed();
 					contribute(msg);
@@ -199,6 +200,10 @@ namespace Ck { namespace Stream {
 		}
 
 		void StreamBuffers::clearBufferedDeliveryMsg(){
+			if(_buffered_msg_to_deliver.empty()){
+				CkPrintf("clearBufferedDeliverMsg was called when there's nothing there in the queue...\n");
+				return;
+			}
 			while(!_buffered_msg_to_deliver.empty()){
 				popFrontMsgOutBuffer();
 			}
@@ -210,6 +215,7 @@ namespace Ck { namespace Stream {
 		}
 		
 		void StreamBuffers::setExpectedReceivesUponClose(size_t num_messages_to_receive){
+			CkPrintf("inside setExpectedReceivesUponClose on PE[%d]\n", CkMyPe());
 			_counter.setExpectedReceives(num_messages_to_receive);
 			// if we have already received the numbero f messages, we just mark ourselves as closed
 			if(_counter.receivedAllData()){
@@ -337,6 +343,9 @@ namespace Ck { namespace Stream {
 
 			}
 			// if the stream is closed, we do something?
+			if(_counter.receivedAllData()){
+
+			}
 			// if we don't have enough data, then we say "fuck" and buffer it (assuming the stream isn't closed)
 			if(_get_buffer_size < gr.requested_bytes) {
 				_buffered_gets.push_back(gr);	
@@ -362,7 +371,7 @@ namespace Ck { namespace Stream {
 
 		void StreamBuffers::addToRecvBuffer(DeliverStreamBytesMsg* data){
 			// wrap it in a InData object and then push to the get_queue
-			_counter.processIncomingMessage(data -> sender_pe, data -> num_bytes);
+			_counter.processIncomingMessage(data -> num_bytes, data -> sender_pe);
 			InData in_data(data, data -> num_bytes);
 			_get_buffer.push_back(in_data);
 			_get_buffer_size += data -> num_bytes;
@@ -376,6 +385,7 @@ namespace Ck { namespace Stream {
 		// this is called if the stream is closed and we have buffered requests
 		// or we have a request and enough data to serve it
 		void StreamBuffers::fulfillRequest(GetRequest& gr){
+			CkPrintf("in fulfillRequest: gr.requested_bytes=%zu, _get_buffer_size=%zu\n", gr.requested_bytes, _get_buffer_size);
 			size_t num_bytes_to_copy = std::min(gr.requested_bytes, _get_buffer_size);
 			CkPrintf("about to fulfill a request where num_bytes_to_copy=%zu\n", num_bytes_to_copy);
 			size_t num_bytes_copied = 0;
@@ -387,14 +397,18 @@ namespace Ck { namespace Stream {
 			while(!_get_buffer.empty()) {
 				InData& front = _get_buffer.front();
 				if(front.num_bytes_rem <= num_bytes_to_copy){
-						std::memcpy(res -> data + num_bytes_copied, front.curr + front.num_bytes_rem, front.num_bytes_rem);
+						CkPrintf("fulfillRequest true branch: front.num_bytes_rem=%zu, num_bytes_to_copy=%zu\n", front.num_bytes_rem, num_bytes_to_copy);
+						std::memcpy(res -> data + num_bytes_copied, front.curr, front.num_bytes_rem);
 						num_bytes_copied += front.num_bytes_rem;
 						num_bytes_to_copy -= front.num_bytes_rem;
 						_get_buffer.pop_front();
 				} else {
-					std::memcpy(res -> data + num_bytes_copied, front.curr + front.num_bytes_rem, num_bytes_to_copy);
-					num_bytes_to_copy -= num_bytes_to_copy;
+					CkPrintf("fulfillRequest else branch: front.num_bytes_rem=%zu, num_bytes_to_copy=%zu\n", front.num_bytes_rem, num_bytes_to_copy);
+					std::memcpy(res -> data + num_bytes_copied, front.curr, num_bytes_to_copy);
+					CkPrintf("fulfill else branch before: num_bytes_copied=%zu\n", num_bytes_copied);
 					num_bytes_copied += num_bytes_to_copy;
+					CkPrintf("fulfill else branch after: num_bytes_copied=%zu\n", num_bytes_copied);
+					num_bytes_to_copy -= num_bytes_to_copy;
 					front.curr += num_bytes_to_copy;
 					front.num_bytes_rem -= num_bytes_to_copy;
 					break;
