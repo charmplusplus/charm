@@ -60,14 +60,14 @@ namespace Ck { namespace Stream {
 			}
 
 			void tellManagersExpectedReceives(CkReductionMsg* msg){
-				CkReduction::tupleElements* results;
+				CkReduction::tupleElement* results;
 				int numReductions;
 				msg -> toTuple(&results, &numReductions);
 				double* totalMessageSentToPEs = (double*)results[0].data;
 				StreamToken st = *((size_t*)results[1].data);
 				for(int i = 0; i < CkNumPes(); ++i){
 					// invoke some entry method
-					stream_managers[i].expectedReceivesUponClose(token, size_t(totalMessageSentToPEs));
+					stream_managers[i].expectedReceivesUponClose(st, size_t(totalMessageSentToPEs));
 				}
 			}
 
@@ -96,7 +96,7 @@ namespace Ck { namespace Stream {
 
 				void expectedReceivesUponClose(StreamToken token, size_t num_messages_to_receive){
 					StreamBuffers& sb = _stream_table[token];
-					stream_buffer.setExpectedReceivesUponClose(num_messages_to_receive);
+					sb.setExpectedReceivesUponClose(num_messages_to_receive);
 				}
 
 				void initializeStream(int id, size_t coordinator_pe){
@@ -123,7 +123,7 @@ namespace Ck { namespace Stream {
 
 				inline void sendDeliverMsg(DeliverStreamBytesMsg* msg_to_send, ssize_t target_pe){
 					// invoke the entry method for sending "in_msg" to the correct PE
-					thisProxy[target_pe].recvData(msg_to_send);
+					thisProxy[target_pe].recvPutBufferFromPE(msg_to_send);
 				}
 
 				void startCloseWriteStream(StreamToken token){
@@ -138,7 +138,9 @@ namespace Ck { namespace Stream {
 				}
 
 				void addRegisteredPE(StreamToken stream, size_t pe){
-					// TODO:
+					StreamBuffers& sb = _stream_table[stream];
+					sb.pushBackRegisteredPE(pe);
+					sb.clearBufferedDeliveryMsg();
 				}
 
 				void serveGetRequest(StreamToken stream, GetRequest& gr){
@@ -149,9 +151,11 @@ namespace Ck { namespace Stream {
 		};
 
 		// TODO: Can we get rid of this?
-		void dummyImplFunction(){
-			CkpvAccess(stream_manager)-> sayHello();	
-		}
+		// void dummyImplFunction(){
+		// 	CkpvAccess(stream_manager)-> sayHello();	
+		// }
+
+
 		StreamBuffers::StreamBuffers() = default;
 
 		StreamBuffers::StreamBuffers(size_t stream_id) : _counter(stream_id){
@@ -179,10 +183,6 @@ namespace Ck { namespace Stream {
 			_get_buffer_capacity = out_buffer_capacity;
 			_put_buffer = new char[_put_buffer_capacity];
 		}
-
-		bool StreamBuffers::isStreamClosed(){
-			return _counter.isStreamClosed();
-		}
 		
 		void StreamBuffers::setExpectedReceivesUponClose(size_t num_messages_to_receive){
 			_counter.setExpectedReceives(num_messages_to_receive);
@@ -205,7 +205,7 @@ namespace Ck { namespace Stream {
 			};
 			int tuple_size = 2;
 			CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tupleRedn, tuple_size);
-			CkCallback cb(CkIndex_Starter::tellManagersExpectedReceives(0), starter);
+			CkCallback cb(CkIndex_Starter::tellManagersExpectedReceives(0), starter); // This calls StreamManager::expectedReceivesUponClose
 			msg -> setCallback(cb);
 			contribute(msg);
 		}
@@ -291,7 +291,11 @@ namespace Ck { namespace Stream {
 		}
 
 		void StreamBuffers::handleGetRequest(GetRequest& gr){
-			// if the stream is closed, we do something?
+			if (!_registered_pe) {
+				_registered_pe = true;
+				starter.addRegisteredPE(_stream_id, CkMyPe());
+			}
+			// if the stream is closed, we do something? f
 			// if we don't have enough data, then we say "fuck" and buffer it (assuming the stream isn't closed)
 			if(_get_buffer_size < gr.requested_bytes) {
 				_buffered_gets.push_back(gr);	
@@ -359,16 +363,24 @@ namespace Ck { namespace Stream {
 			} else {
 				res -> status = StreamStatus::STREAM_OK;
 			}
+			CkCallback cb = gr.cb;
 			cb.send(res);
 		}
 
+
 		void StreamBuffers::clearBufferedGetRequests(){
-			// clear all of the buffered get requests when enough data comes in to serve the head of queue
 			while(!_buffered_gets.empty()){
 				GetRequest& fr = _buffered_gets.front();
 				if(!_counter.receivedAllData() && _get_buffer_size < fr.requested_bytes) return; // not enough bytes to satisfy front of queue
-				_buffered_gets.pop();
+				_buffered_gets.pop_front();
 				fulfillRequest(fr);
+			}
+		}
+
+		// TODO: make it so it injects the message such that at first if one pe is registered, not all messages will go to this one pe
+		void StreamBuffers::clearBufferedDeliveryMsg() {
+			while(!_buffered_msg_to_deliver.empty()) {
+				popFrontMsgOutBuffer();
 			}
 		}
 
@@ -385,7 +397,7 @@ namespace Ck { namespace Stream {
 		StreamCoordinator::StreamCoordinator(StreamToken stream) : _stream(stream) {}
 
 		void StreamCoordinator::registerThisPE(size_t pe){
-				_meta_data._registered_pes.push_back(pe);
+			_meta_data._registered_pes.push_back(pe);
 		}
 
 		StreamMessageCounter::StreamMessageCounter() = default;
@@ -395,9 +407,9 @@ namespace Ck { namespace Stream {
 		size_t StreamMessageCounter::getNumberOfExpectedReceives() {
 			return _number_of_expected_receives;
 		}
-
+		
 		void StreamMessageCounter::setExpectedReceives(size_t num_expected_receives){
-			_close_initiated = true;
+			setStreamWriteClosed();
 			_number_of_expected_receives = num_expected_receives;
 		}
 
@@ -432,8 +444,9 @@ namespace Ck { namespace Stream {
 			return received_arr;
 		}
 
+
 		void StreamMessageCounter::setStreamWriteClosed(){
-				// TODO:
+			_close_initiated = true;
 		}
 
 		void StreamMessageCounter::processIncomingMessage(size_t num_bytes, size_t src_pe){
@@ -463,7 +476,7 @@ namespace Ck { namespace Stream {
 	}
 
 	void dummyFunction(){
-		impl::dummyImplFunction();
+		// impl::dummyImplFunction();
 		std::cout << "about to try execute starterHello()\n";
 		impl::starter.starterHello();
 		std::cout << "should have finished starterHello()\n";

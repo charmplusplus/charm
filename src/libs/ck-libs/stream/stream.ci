@@ -65,8 +65,8 @@ module CkStream_impl
 			entry void initializeStream(int id, size_t coordinator_pe);
 			entry void recvPutBufferFromPE(DeliverStreamBytesMsg* in_msg);
 			entry void addRegisteredPE(StreamToken, size_t pe);
-			entry void clearBufferedDeliveryMsg(StreamToken token);
-			entry void registerPEWithCoordinator(StreamToken, size_t);
+			// entry void clearBufferedDeliveryMsg(StreamToken token);
+			// entry void registerPEWithCoordinator(StreamToken, size_t);
 			entry void startCloseWriteStream(StreamToken token);
 			entry void initiateWriteStreamClose(StreamToken token);
 			entry void expectedReceivesUponClose(StreamToken token, size_t);

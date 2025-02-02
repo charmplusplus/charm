@@ -103,6 +103,7 @@ namespace Ck { namespace Stream {
 			bool isStreamClosed();
 			void setStreamClosed();
 			void clearBufferedGetRequests();
+			void clearBufferedDeliveryMsg();
 			void setExpectedReceivesUponClose(size_t num_messages_to_receive);
 		};
 		
