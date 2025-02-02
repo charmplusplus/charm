@@ -1,0 +1,148 @@
+Charmrun> scalable start enabled. 
+Charmrun> started all node programs in 0.178 seconds.
+Charm++> Running in non-SMP mode: 1 processes (PEs)
+Converse/Charm++ Commit ID: v7.1.0-devel-351-g10566fbe9
+Charm++> scheduler running in netpoll mode.
+CharmLB> Load balancer assumes all CPUs are same.
+Charm++> Running on 1 hosts (1 sockets x 12 cores x 1 PUs = 12-way SMP)
+Charm++> cpu topology info is gathered in 0.000 seconds.
+CharmLB> Load balancing instrumentation for communication is off.
+The starter is alive
+Stream Manager created on PE=0
+On 0, we created stream 0 with coordinator=0
+We made it to the streamCreated part baby
+Got the stream id: 0
+Producer 0 has written 10 size_t to the stream...
+IN TEST: PRODUCERS ARE DONE WRITING. CALLING closeWriteStream
+Stream Manager 0 received a close request for stream=0
+PE 0: setStreamClosed; Invoked.
+PE 0: StreamManager::contributeToClosingReduction; contributing
+Producer 1 has written 10 size_t to the stream...
+IN TEST: PRODUCERS ARE DONE WRITING. CALLING closeWriteStream
+Stream Manager 0 received a close request for stream=0
+PE 0: setStreamClosed; Invoked.
+PE 0: StreamManager::contributeToClosingReduction; contributing
+PE 0: StreamBuffer::handleGetRequest; Arrived
+PE 0: StreamBuffer::handleGetRequest; We don't have enough data yet. Buffering get request.
+PE 0: StreamBuffer::fulfillRequest. Invoked.
+PE 0: StreamBuffer::fulfillRequest. Breaking loop: gr.reqd_bytes: 8, _get_buffer_size: 80, num_bytes_copied: 8, _get_buffer.size(): 1
+PE 0: StreamBuffer::fulfillRequest. After fulfilling stats: gr.reqd_bytes: 8, _get_buffer_size: 72, num_bytes_copied: 8, _get_buffer.size(): 1
+Received: 0,
+issuing another get request...
+PE 0: StreamBuffer::handleGetRequest; Arrived
+PE 0: StreamBuffer::fulfillRequest. Invoked.
+PE 0: StreamBuffer::fulfillRequest. Breaking loop: gr.reqd_bytes: 8, _get_buffer_size: 152, num_bytes_copied: 8, _get_buffer.size(): 2
+PE 0: StreamBuffer::fulfillRequest. After fulfilling stats: gr.reqd_bytes: 8, _get_buffer_size: 144, num_bytes_copied: 8, _get_buffer.size(): 2
+Received: 0,
+issuing another get request...
+PE 0: StreamBuffer::handleGetRequest; Arrived
+PE 0: StreamBuffer::fulfillRequest. Invoked.
+PE 0: StreamBuffer::fulfillRequest. Breaking loop: gr.reqd_bytes: 8, _get_buffer_size: 144, num_bytes_copied: 8, _get_buffer.size(): 2
+PE 0: StreamBuffer::fulfillRequest. After fulfilling stats: gr.reqd_bytes: 8, _get_buffer_size: 136, num_bytes_copied: 8, _get_buffer.size(): 2
+Received: 0,
+issuing another get request...
+PE 0: StreamBuffer::handleGetRequest; Arrived
+PE 0: StreamBuffer::fulfillRequest. Invoked.
+PE 0: StreamBuffer::fulfillRequest. Breaking loop: gr.reqd_bytes: 8, _get_buffer_size: 136, num_bytes_copied: 8, _get_buffer.size(): 2
+PE 0: StreamBuffer::fulfillRequest. After fulfilling stats: gr.reqd_bytes: 8, _get_buffer_size: 128, num_bytes_copied: 8, _get_buffer.size(): 2
+Received: 0,
+issuing another get request...
+PE 0: StreamBuffer::handleGetRequest; Arrived
+PE 0: StreamBuffer::fulfillRequest. Invoked.
+PE 0: StreamBuffer::fulfillRequest. Breaking loop: gr.reqd_bytes: 8, _get_buffer_size: 128, num_bytes_copied: 8, _get_buffer.size(): 2
+PE 0: StreamBuffer::fulfillRequest. After fulfilling stats: gr.reqd_bytes: 8, _get_buffer_size: 120, num_bytes_copied: 8, _get_buffer.size(): 2
+Received: 0,
+issuing another get request...
+PE 0: StreamBuffer::handleGetRequest; Arrived
+PE 0: StreamBuffer::fulfillRequest. Invoked.
+PE 0: StreamBuffer::fulfillRequest. Breaking loop: gr.reqd_bytes: 8, _get_buffer_size: 120, num_bytes_copied: 8, _get_buffer.size(): 2
+PE 0: StreamBuffer::fulfillRequest. After fulfilling stats: gr.reqd_bytes: 8, _get_buffer_size: 112, num_bytes_copied: 8, _get_buffer.size(): 2
+Received: 0,
+issuing another get request...
+PE 0: StreamBuffer::handleGetRequest; Arrived
+PE 0: StreamBuffer::fulfillRequest. Invoked.
+PE 0: StreamBuffer::fulfillRequest. Breaking loop: gr.reqd_bytes: 8, _get_buffer_size: 112, num_bytes_copied: 8, _get_buffer.size(): 2
+PE 0: StreamBuffer::fulfillRequest. After fulfilling stats: gr.reqd_bytes: 8, _get_buffer_size: 104, num_bytes_copied: 8, _get_buffer.size(): 2
+Received: 0,
+issuing another get request...
+PE 0: StreamBuffer::handleGetRequest; Arrived
+PE 0: StreamBuffer::fulfillRequest. Invoked.
+PE 0: StreamBuffer::fulfillRequest. Breaking loop: gr.reqd_bytes: 8, _get_buffer_size: 104, num_bytes_copied: 8, _get_buffer.size(): 2
+PE 0: StreamBuffer::fulfillRequest. After fulfilling stats: gr.reqd_bytes: 8, _get_buffer_size: 96, num_bytes_copied: 8, _get_buffer.size(): 2
+Received: 0,
+issuing another get request...
+PE 0: StreamBuffer::handleGetRequest; Arrived
+PE 0: StreamBuffer::fulfillRequest. Invoked.
+PE 0: StreamBuffer::fulfillRequest. Breaking loop: gr.reqd_bytes: 8, _get_buffer_size: 96, num_bytes_copied: 8, _get_buffer.size(): 2
+PE 0: StreamBuffer::fulfillRequest. After fulfilling stats: gr.reqd_bytes: 8, _get_buffer_size: 88, num_bytes_copied: 8, _get_buffer.size(): 2
+Received: 0,
+issuing another get request...
+PE 0: StreamBuffer::handleGetRequest; Arrived
+PE 0: StreamBuffer::fulfillRequest. Invoked.
+PE 0: StreamBuffer::fulfillRequest. In while loop: gr.reqd_bytes: 8, _get_buffer_size: 88, num_bytes_copied: 8, _get_buffer.size(): 1
+PE 0: StreamBuffer::fulfillRequest. Breaking loop: gr.reqd_bytes: 8, _get_buffer_size: 88, num_bytes_copied: 8, _get_buffer.size(): 1
+PE 0: StreamBuffer::fulfillRequest. After fulfilling stats: gr.reqd_bytes: 8, _get_buffer_size: 80, num_bytes_copied: 8, _get_buffer.size(): 1
+Received: 0,
+issuing another get request...
+PE 0: StreamBuffer::handleGetRequest; Arrived
+PE 0: StreamBuffer::fulfillRequest. Invoked.
+PE 0: StreamBuffer::fulfillRequest. Breaking loop: gr.reqd_bytes: 8, _get_buffer_size: 80, num_bytes_copied: 8, _get_buffer.size(): 1
+PE 0: StreamBuffer::fulfillRequest. After fulfilling stats: gr.reqd_bytes: 8, _get_buffer_size: 72, num_bytes_copied: 8, _get_buffer.size(): 1
+Received: 2127952,
+issuing another get request...
+PE 0: StreamBuffer::handleGetRequest; Arrived
+PE 0: StreamBuffer::fulfillRequest. Invoked.
+PE 0: StreamBuffer::fulfillRequest. Breaking loop: gr.reqd_bytes: 8, _get_buffer_size: 72, num_bytes_copied: 8, _get_buffer.size(): 1
+PE 0: StreamBuffer::fulfillRequest. After fulfilling stats: gr.reqd_bytes: 8, _get_buffer_size: 64, num_bytes_copied: 8, _get_buffer.size(): 1
+Received: 2127952,
+issuing another get request...
+PE 0: StreamBuffer::handleGetRequest; Arrived
+PE 0: StreamBuffer::fulfillRequest. Invoked.
+PE 0: StreamBuffer::fulfillRequest. Breaking loop: gr.reqd_bytes: 8, _get_buffer_size: 64, num_bytes_copied: 8, _get_buffer.size(): 1
+PE 0: StreamBuffer::fulfillRequest. After fulfilling stats: gr.reqd_bytes: 8, _get_buffer_size: 56, num_bytes_copied: 8, _get_buffer.size(): 1
+Received: 2127952,
+issuing another get request...
+PE 0: StreamBuffer::handleGetRequest; Arrived
+PE 0: StreamBuffer::fulfillRequest. Invoked.
+PE 0: StreamBuffer::fulfillRequest. Breaking loop: gr.reqd_bytes: 8, _get_buffer_size: 56, num_bytes_copied: 8, _get_buffer.size(): 1
+PE 0: StreamBuffer::fulfillRequest. After fulfilling stats: gr.reqd_bytes: 8, _get_buffer_size: 48, num_bytes_copied: 8, _get_buffer.size(): 1
+Received: 2127952,
+issuing another get request...
+PE 0: StreamBuffer::handleGetRequest; Arrived
+PE 0: StreamBuffer::fulfillRequest. Invoked.
+PE 0: StreamBuffer::fulfillRequest. Breaking loop: gr.reqd_bytes: 8, _get_buffer_size: 48, num_bytes_copied: 8, _get_buffer.size(): 1
+PE 0: StreamBuffer::fulfillRequest. After fulfilling stats: gr.reqd_bytes: 8, _get_buffer_size: 40, num_bytes_copied: 8, _get_buffer.size(): 1
+Received: 2127952,
+issuing another get request...
+PE 0: StreamBuffer::handleGetRequest; Arrived
+PE 0: StreamBuffer::fulfillRequest. Invoked.
+PE 0: StreamBuffer::fulfillRequest. Breaking loop: gr.reqd_bytes: 8, _get_buffer_size: 40, num_bytes_copied: 8, _get_buffer.size(): 1
+PE 0: StreamBuffer::fulfillRequest. After fulfilling stats: gr.reqd_bytes: 8, _get_buffer_size: 32, num_bytes_copied: 8, _get_buffer.size(): 1
+Received: 2127952,
+issuing another get request...
+PE 0: StreamBuffer::handleGetRequest; Arrived
+PE 0: StreamBuffer::fulfillRequest. Invoked.
+PE 0: StreamBuffer::fulfillRequest. Breaking loop: gr.reqd_bytes: 8, _get_buffer_size: 32, num_bytes_copied: 8, _get_buffer.size(): 1
+PE 0: StreamBuffer::fulfillRequest. After fulfilling stats: gr.reqd_bytes: 8, _get_buffer_size: 24, num_bytes_copied: 8, _get_buffer.size(): 1
+Received: 2127952,
+issuing another get request...
+PE 0: StreamBuffer::handleGetRequest; Arrived
+PE 0: StreamBuffer::fulfillRequest. Invoked.
+PE 0: StreamBuffer::fulfillRequest. Breaking loop: gr.reqd_bytes: 8, _get_buffer_size: 24, num_bytes_copied: 8, _get_buffer.size(): 1
+PE 0: StreamBuffer::fulfillRequest. After fulfilling stats: gr.reqd_bytes: 8, _get_buffer_size: 16, num_bytes_copied: 8, _get_buffer.size(): 1
+Received: 2127952,
+issuing another get request...
+PE 0: StreamBuffer::handleGetRequest; Arrived
+PE 0: StreamBuffer::fulfillRequest. Invoked.
+PE 0: StreamBuffer::fulfillRequest. Breaking loop: gr.reqd_bytes: 8, _get_buffer_size: 16, num_bytes_copied: 8, _get_buffer.size(): 1
+PE 0: StreamBuffer::fulfillRequest. After fulfilling stats: gr.reqd_bytes: 8, _get_buffer_size: 8, num_bytes_copied: 8, _get_buffer.size(): 1
+Received: 2127952,
+issuing another get request...
+PE 0: StreamBuffer::handleGetRequest; Arrived
+PE 0: StreamBuffer::fulfillRequest. Invoked.
+PE 0: StreamBuffer::fulfillRequest. In while loop: gr.reqd_bytes: 8, _get_buffer_size: 8, num_bytes_copied: 8, _get_buffer.size(): 0
+PE 0: StreamBuffer::fulfillRequest. After fulfilling stats: gr.reqd_bytes: 8, _get_buffer_size: 0, num_bytes_copied: 8, _get_buffer.size(): 0
+Received: 2127952,
+issuing another get request...
+PE 0: StreamBuffer::handleGetRequest; Arrived
+PE 0: StreamBuffer::handleGetRequest; We don't have enough data yet. Buffering get request.
