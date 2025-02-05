@@ -16,12 +16,16 @@ namespace Ck { namespace Stream {
 	void dummyFunction();
 	// API to insert into the stream
 	void put(StreamToken stream, void* data, size_t elem_size, size_t num_elems);
+	
+	void putRecord(StreamToken stream, void* data, size_t data_size);
 	// create a new stream, with the callback taking a message returning the StreamToken
 	void createNewStream(CkCallback cb);
 	// flush the buffer of the local stream
 	void flushLocalStream(StreamToken stream);
 	// extract data from stream
 	void get(StreamToken stream, size_t elem_size, size_t num_elems, CkCallback cb);
+	
+	void getRecord(StreamToken stream, CkCallback cb);
 	// closing the write side of a stream
 	void closeWriteStream(StreamToken);
 	namespace impl {

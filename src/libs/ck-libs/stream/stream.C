@@ -593,12 +593,30 @@ namespace Ck { namespace Stream {
 		impl::impl_put(stream, data, elem_size, num_elems);
 	}
 
+	void putRecord(StreamToken stream, void* data, size_t data_size) {
+		size_t total_size = sizeof(size_t) + data_size;
+
+		char* record_buffer = new char[total_size];
+		std::memcpy(record_buffer, &data_size, sizeof(size_t));
+		std::memcpy(record_buffer + sizeof(size_t), data, data_size);
+
+		impl::impl_put(stream, record_buffer, sizeof(char), total_size);
+	}
+
 	void flushLocalStream(StreamToken stream){
 		impl::impl_flushLocalStream(stream);
 	}
 
 	void get(StreamToken stream, size_t elem_size, size_t num_elems, CkCallback cb){
 		impl::impl_get(stream, elem_size, num_elems, cb);
+	}
+
+	// This function must be invoked by a threaded entry method
+	void getRecord(StreamToken stream, CkCallback cb) {
+		StreamDeliveryMsg* msg;
+		impl::impl_get(stream, sizeof(size_t), 1, CkCallbackResumeThread((void*&)msg));
+		size_t record_size = *(size_t*)msg->data;
+		impl::impl_get(stream, sizeof(char), record_size, cb);
 	}
 
 	void closeWriteStream(StreamToken stream){
