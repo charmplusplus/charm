@@ -1,0 +1,76 @@
+mainmodule streamtest
+{
+	include "stream.h";
+	mainchare Main {
+		entry Main(CkArgMsg* m);
+		entry void producerMiddleStreamMade(Ck::Stream::StreamIdMessage* msg) {
+			serial {
+				size_t id = msg -> id;
+				CkPrintf("Got the producer->middle stream id: %d\n", id);
+				
+				producers = CProxy_Producers::ckNew(1);
+				producers.setOutputStreamId(id);
+				middle = CProxy_Middle::ckNew(1);
+				middle.setInputStreamId(id);
+				Ck::Stream::createNewStream(CkCallback(CkIndex_Main::middleConsumerStreamMade(0), thisProxy));
+			}
+		};
+
+		entry void middleConsumerStreamMade(Ck::Stream::StreamIdMessage* msg) {
+			serial {
+				size_t id = msg -> id;
+				CkPrintf("Got the middle->consumer stream id: %d\n", id);
+				middle.setOutputStreamId(id);
+				consumers = CProxy_Consumers::ckNew(1);
+				consumers.setInputStreamId(id);
+			}
+		};
+	};
+
+	array[1D] Producers {
+		entry Producers();
+		entry void setOutputStreamId(StreamToken stream);
+		entry [reductiontarget] void doneWriting();
+	};
+
+	array[1D] Middle {
+		entry Middle();
+		entry void setInputStreamId(StreamToken stream);
+		entry void setOutputStreamId(StreamToken stream);
+
+		entry void recvData(Ck::Stream::StreamDeliveryMsg* msg){
+			serial {
+				CkPrintf("Middle: In %d, Out %d\n", input_stream, output_stream);
+				char* data = (char*)(msg -> data);
+				_num_bytes_received += msg -> num_bytes;
+				if (msg -> num_bytes != 0) {
+					CkPrintf("Middle received: %s of length %d", data, strlen(data));
+					CkPrintf("\n");
+					Ck::Stream::putRecord(output_stream, data, sizeof(char) * strlen(data) + 1);
+					Ck::Stream::flushLocalStream(output_stream);
+				}
+
+				if(msg -> status == Ck::Stream::StreamStatus::STREAM_OK) {
+					Ck::Stream::getRecord(input_stream, CkCallback(CkIndex_Middle::recvData(0), thisProxy[thisIndex]));
+				} else {
+					CkPrintf("Middle %d has received the done signal and consumed %d bytes...\n", thisIndex, _num_bytes_received);
+				//	Ck::Stream::closeWriteStream(input_stream);
+				}
+			}
+		};
+	}
+
+	array[1D] Consumers {
+		entry Consumers();
+		entry void setInputStreamId(StreamToken stream);
+		entry [threaded] void beginWork();
+
+		entry [threaded] void recvData(Ck::Stream::StreamDeliveryMsg* msg);
+		entry [reductiontarget] void finishReading() {
+			serial {
+				CkPrintf("All consumers done reading!\n");
+				CkExit(0);
+			}
+		}
+	}
+}
