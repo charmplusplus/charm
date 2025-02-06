@@ -30,6 +30,14 @@ public:
 
 	size_t getNumberOfExpectedReceives();
 
+	void printSentCounter() {
+		CkPrintf("++++ BEGIN PRINT SENT COUNTER\n");
+		for(auto &p : _sent_counter) {
+			CkPrintf("PE %d: %d\n", p.first, p.second);
+		}
+		CkPrintf("++++ END PRINT SENT COUNTER\n");
+	}
+
 	// set the number of receive messages we should expect after all messages on this pe have arrived 
 	void setExpectedReceives(size_t);
 	bool isCloseFlagSet();

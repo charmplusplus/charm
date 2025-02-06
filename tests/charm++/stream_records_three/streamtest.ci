@@ -46,7 +46,7 @@ mainmodule streamtest
 				if (msg -> num_bytes != 0) {
 					CkPrintf("Middle received: %s of length %d", data, strlen(data));
 					CkPrintf("\n");
-					Ck::Stream::putRecord(output_stream, data, sizeof(char) * strlen(data) + 1);
+					//Ck::Stream::putRecord(output_stream, data, sizeof(char) * strlen(data) + 1);
 					Ck::Stream::flushLocalStream(output_stream);
 				}
 
@@ -54,7 +54,6 @@ mainmodule streamtest
 					Ck::Stream::getRecord(input_stream, CkCallback(CkIndex_Middle::recvData(0), thisProxy[thisIndex]));
 				} else {
 					CkPrintf("Middle %d has received the done signal and consumed %d bytes...\n", thisIndex, _num_bytes_received);
-				//	Ck::Stream::closeWriteStream(input_stream);
 				}
 			}
 		};

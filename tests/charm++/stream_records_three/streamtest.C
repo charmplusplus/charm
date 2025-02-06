@@ -3,7 +3,7 @@
 #include <time.h>
 
 #define INVALID_STREAM_NO 99999999
-#define NUM_REQUESTS 1
+#define NUM_REQUESTS 100
 
 class Main : public CBase_Main {
 	CProxy_Producers producers;
@@ -43,6 +43,7 @@ public:
 	}
 
 	void doneWriting(){
+		CkPrintf("Producers are done, closing stream id %d\n", output_stream);
 		Ck::Stream::closeWriteStream(output_stream);
 	}
 
