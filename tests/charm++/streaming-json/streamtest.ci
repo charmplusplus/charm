@@ -1,0 +1,70 @@
+mainmodule streamtest
+{
+	include "stream.h";
+	mainchare Main {
+		entry Main(CkArgMsg* m);
+		entry void readersValidatorsStreamMade(Ck::Stream::StreamIdMessage* msg);
+		entry void validatorsFiltersStreamMade(Ck::Stream::StreamIdMessage* msg);
+		entry void filtersTransformersStreamMade(Ck::Stream::StreamIdMessage* msg);
+		entry void transformersWritersStreamMade(Ck::Stream::StreamIdMessage* msg);
+
+	};
+	array[1D] Readers {
+		entry Readers();
+		entry Readers(int num_records, std::string records_str, CProxy_Main mainProxy);
+		entry void setOutputStreamId(StreamToken output_id);
+		entry void beginWork();
+	}
+
+	array[1D] Validators {
+		entry Validators(CProxy_Main mainProxy);
+		entry void setOutputStreamId(StreamToken output_id);
+		entry void setInputStreamId(StreamToken input_id);
+		entry void beginWork();
+		entry [threaded] void recvData(Ck::Stream::StreamDeliveryMsg* msg);
+		entry [reductiontarget] void finishedTask() {
+			serial {
+				CkPrintf("Validators all done!\n");
+			}
+		};
+	}
+
+	array[1D] Filters {
+		entry Filters(CProxy_Main mainProxy);
+		entry void setOutputStreamId(StreamToken output_id);
+		entry void setInputStreamId(StreamToken input_id);
+		entry void beginWork();
+		entry [threaded] void recvData(Ck::Stream::StreamDeliveryMsg* msg);
+		entry [reductiontarget] void finishedTask() {
+			serial {
+				CkPrintf("Filters all done!\n");
+			}
+		};
+	}
+
+	array[1D] Transformers {
+		entry Transformers(CProxy_Main mainProxy);
+		entry void setOutputStreamId(StreamToken output_id);
+		entry void setInputStreamId(StreamToken input_id);
+		entry void beginWork();
+		entry [threaded] void recvData(Ck::Stream::StreamDeliveryMsg* msg);
+		entry [reductiontarget] void finishedTask() {
+			serial {
+				CkPrintf("Transformers all done!\n");
+			}
+		};
+	}
+
+
+	array[1D] Writers {
+		entry Writers(CProxy_Main mainProxy);
+		entry void setInputStreamId(StreamToken input_id);
+		entry void beginWork();
+		entry [threaded] void recvData(Ck::Stream::StreamDeliveryMsg* msg);
+		entry [reductiontarget] void finishedTask() {
+			serial {
+				CkPrintf("Writers all done!\n");
+			}
+		};
+	}
+}
