@@ -7,7 +7,7 @@ mainmodule streamtest
 			serial {
 				size_t id = msg -> id;
 				CkPrintf("Got the stream id: %d\n", id);
-				// CkExit();
+				
 				producers = CProxy_Producers::ckNew(id, 4);
 				consumers = CProxy_Consumers::ckNew(id, 2);
 			}

@@ -381,11 +381,11 @@ namespace Ck { namespace Stream {
 		void StreamBuffers::addToRecvBuffer(DeliverStreamBytesMsg* data){
 			// wrap it in a InData object and then push to the get_queue
 			// DEBUG PRINT
-// 			CkPrintf("--- PE #%d: In addToRecvBuffer:", CkMyPe());
-			for (int i = 0; i < data->num_bytes / sizeof(size_t); ++i) {
-// 				CkPrintf("%zu, ", ((size_t*)data->data)[i]);
-			}
-// 			CkPrintf("-----\n");
+			// CkPrintf("--- PE #%d: In addToRecvBuffer:", CkMyPe());
+			// for (int i = 0; i < data->num_bytes / sizeof(size_t); ++i) {
+			// 	CkPrintf("%zu, ", ((size_t*)data->data)[i]);
+			// }
+			// CkPrintf("-----\n");
 
 
 			_counter.processIncomingMessage(data -> num_bytes, data -> sender_pe);
@@ -594,11 +594,18 @@ namespace Ck { namespace Stream {
 	}
 
 	void putRecord(StreamToken stream, void* data, size_t data_size) {
+// 		CkPrintf("-=-=-=-=-=-=-ODFHUSEIRVSEOIRUYSOEIRUVIOEPir=-=\n");
+
 		size_t total_size = sizeof(size_t) + data_size;
+// 		CkPrintf("%d\n", total_size);
 
 		char* record_buffer = new char[total_size];
 		std::memcpy(record_buffer, &data_size, sizeof(size_t));
 		std::memcpy(record_buffer + sizeof(size_t), data, data_size);
+		size_t* tmp = (size_t*)record_buffer;
+// 		CkPrintf("record buffer size: %zu\n", tmp[0]);
+		
+// 		CkPrintf("record buffer: %s\n", record_buffer + sizeof(size_t));
 
 		impl::impl_put(stream, record_buffer, sizeof(char), total_size);
 	}
@@ -615,8 +622,9 @@ namespace Ck { namespace Stream {
 	void getRecord(StreamToken stream, CkCallback cb) {
 		StreamDeliveryMsg* msg;
 		impl::impl_get(stream, sizeof(size_t), 1, CkCallbackResumeThread((void*&)msg));
-		size_t record_size = *(size_t*)msg->data;
-		impl::impl_get(stream, sizeof(char), record_size, cb);
+		size_t* record_size = (size_t*)msg->data;
+// 		CkPrintf("-----gettingRecord size %d\n", record_size[0]);
+		impl::impl_get(stream, sizeof(char), record_size[0], cb);
 	}
 
 	void closeWriteStream(StreamToken stream){
