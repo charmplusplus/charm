@@ -38,6 +38,7 @@ namespace Ck { namespace Stream {
 		// keep this struct here in case we need to trakc more metadata in the future
 		struct StreamMetaData {
 			std::vector<size_t> _registered_pes;
+			bool close_buffered;
 		};
 		class DeliverStreamBytesMsg;
 		class CMessage_DeliverStreamBytesMsg;

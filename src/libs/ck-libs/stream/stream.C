@@ -60,9 +60,20 @@ namespace Ck { namespace Stream {
 				CkExit();
 			}
 
+			void startWriteStreamClose(StreamToken stream) {
+				StreamMetaData& metadata = _meta_data[stream];
+				if (metadata._registered_pes.empty()) {
+					metadata.close_buffered = true;	
+					return;
+				}
+				stream_managers.initiateWriteStreamClose(stream);
+			}
+
 			void addRegisteredPE(StreamToken token, size_t pe){
-				_meta_data[token]._registered_pes.push_back(pe);
-				stream_managers.addRegisteredPE(token, pe);
+				StreamMetaData& metadata = _meta_data[token];
+				metadata._registered_pes.push_back(pe);
+				stream_managers.addRegisteredPE(token, pe, metadata.close_buffered);
+				metadata.close_buffered = false;
 			}
 
 			void tellManagersExpectedReceives(CkReductionMsg* msg){
@@ -76,6 +87,10 @@ namespace Ck { namespace Stream {
 // 					CkPrintf("From global starter, PE[%d] should expected %zu messages\n", i, totalMessageSentToPEs[i]);
 					stream_managers[i].expectedReceivesUponClose(st, size_t(totalMessageSentToPEs[i]));
 				}
+			}
+
+			void processBufferedCloseStream(StreamToken token) {
+				stream_managers.initiateWriteStreamClose(token);
 			}
 
 		};
@@ -161,12 +176,16 @@ namespace Ck { namespace Stream {
 					contribute(msg);
 				}
 
-				void addRegisteredPE(StreamToken stream, size_t pe){
+				void addRegisteredPE(StreamToken stream, size_t pe, bool close_buffered) {
 					StreamBuffers& sb = _stream_table[stream];
 					sb.pushBackRegisteredPE(pe);
 // 					CkPrintf("From StreamManager[%d], just added pe=%zu\n", CkMyPe(), pe);
 					// TODO: change this to do message injection instead of just emptying the entire buffered delivery messages
 					sb.clearBufferedDeliveryMsg();		
+					if (close_buffered) {
+						// do a reduction to someone
+						contribute(sizeof(stream), &stream, CkReduction::max_int, CkCallback(CkReductionTarget(Starter, processBufferedCloseStream), starter));
+					}
 				}
 
 				void serveGetRequest(StreamToken stream, GetRequest& gr){
@@ -448,7 +467,7 @@ namespace Ck { namespace Stream {
 			_get_buffer_size -= num_bytes_copied;
 			res -> num_bytes = num_bytes_copied;
 			// if we know no more data is coming in, received all the data we should, and nothing left in buffer, mark stream as closed in the message
-// 			CkPrintf("From PE[%d], num_bytes_copied=%d, res -> num_bytes=%d, _counter.receivedAllData()=%d, _get_buffer_size=%d\n", CkMyPe(), num_bytes_copied, res -> num_bytes, _counter.receivedAllData(), _get_buffer_size);
+			CkPrintf("From PE[%d], on stream %d, num_bytes_copied=%d, res -> num_bytes=%d, _counter.receivedAllData()=%d, _get_buffer_size=%d\n", CkMyPe(), _stream_id, num_bytes_copied, res -> num_bytes, _counter.receivedAllData(), _get_buffer_size);
 			if(_counter.receivedAllData() && !_get_buffer_size){
 				res -> status = StreamStatus::STREAM_CLOSED;
 			} else {
@@ -581,7 +600,8 @@ namespace Ck { namespace Stream {
 
 		inline void impl_closeWriteStream(StreamToken stream){
 // 			CkPrintf("called for a close to the stream...\n");
-			CkpvAccess(stream_manager) -> startWriteStreamClose(stream);
+			// CkpvAccess(stream_manager) -> startWriteStreamClose(stream);
+			starter.startWriteStreamClose(stream);
 		}
 	}
 

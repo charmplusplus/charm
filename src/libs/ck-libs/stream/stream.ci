@@ -40,7 +40,7 @@ module CkStream_impl
 		{
 			entry Starter(CkArgMsg* m);
 			entry void starterHello(); // this is a dummy function
-			entry[reductiontarget] void streamCreated(int stream_token);
+			entry [reductiontarget] void streamCreated(int stream_token);
 			entry void createNewStream(CkCallback cb) {
 				serial {
 					size_t token_to_use = _curr_stream_token_id++;
@@ -54,8 +54,10 @@ module CkStream_impl
 					cb.send(msg);
 				}
 			};
+			entry void startWriteStreamClose(StreamToken token);
 			entry void addRegisteredPE(StreamToken, size_t);
 			entry void tellManagersExpectedReceives(CkReductionMsg* msg);
+			entry [reductiontarget] void processBufferedCloseStream(StreamToken);
 				
 		}
 
@@ -64,7 +66,7 @@ module CkStream_impl
 			entry StreamManager();
 			entry void initializeStream(int id, size_t coordinator_pe);
 			entry void recvPutBufferFromPE(DeliverStreamBytesMsg* in_msg);
-			entry void addRegisteredPE(StreamToken, size_t pe);
+			entry void addRegisteredPE(StreamToken, size_t pe, bool);
 			entry void clearBufferedDeliveryMsg(StreamToken token);
 			//entry void startCloseWriteStream(StreamToken token);
 			entry void initiateWriteStreamClose(StreamToken token);
