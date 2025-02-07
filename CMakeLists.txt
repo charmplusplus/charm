@@ -596,9 +596,8 @@ if(NOT CMK_AMPI_ONLY)
   set(CMK_AMPI_ONLY 0)
 endif()
 
-if(NOT DEFINED CMK_AMPI_WITH_ROMIO)
-  set(CMK_AMPI_WITH_ROMIO 1)
-endif()
+#disable ROMIO due to GCC 14 cascade of failures
+set(CMK_AMPI_WITH_ROMIO 0)
 
 set(CMK_ENABLE_C11   ${CMAKE_C11_EXTENSION_COMPILE_OPTION})
 

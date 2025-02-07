@@ -270,13 +270,13 @@ shift
 
 OPT_DIRS=("$src/$BASEVERSION" "$src/$ARCH" "$src/common")
 
-# default to building ROMIO on AMPI where supported
+# default to not building ROMIO due to GCC 14 cascade failures
 case "$BASEVERSION" in
   *-win-*)
     WITH_ROMIO=''
     ;;
   *)
-    WITH_ROMIO='true'
+    WITH_ROMIO=''
     ;;
 esac
 
