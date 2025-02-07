@@ -101,7 +101,7 @@ jobs:
 
   mpi-linux-x86_64:
     timeout-minutes: 90
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04  #  ubuntu-latest does not work
     steps:
     - uses: actions/checkout@v4
     - name: install-prerequisites
@@ -117,7 +117,7 @@ jobs:
 
   mpi-linux-x86_64_syncft:
     timeout-minutes: 90
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04  #  ubuntu-latest does not work
     steps:
     - uses: actions/checkout@v4
     - name: install-prerequisites
@@ -377,7 +377,7 @@ jobs:
 
   ucx-linux-x86_64_openpmix:
     timeout-minutes: 60
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v1
     # Uncomment the lines below to set up a tmate session for debugging.
