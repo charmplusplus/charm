@@ -372,13 +372,12 @@ namespace Ck { namespace Stream {
 			}
 			// if the stream is closed, we do something?
 			if(_counter.receivedAllData()){
-// 				CkPrintf("From PE[%d], receivedAllData\n", CkMyPe());
-
+ 				CkPrintf("From PE[%d], receivedAllData\n", CkMyPe());
 			}
 			// if we don't have enough data, then we say "fuck" and buffer it (assuming the stream isn't closed)
 			if(!_counter.receivedAllData() && _get_buffer_size < gr.requested_bytes) {
 				_buffered_gets.push_back(gr);	
-// 				CkPrintf("From PE[%d], buffering a get request with %d requested bytes...\n", CkMyPe(), gr.requested_bytes);
+ 				CkPrintf("From PE[%d], buffering a get request with %d requested bytes...\n", CkMyPe(), gr.requested_bytes);
 				return;
 			}
 			// if we have enough data, then we fullfill the request
@@ -423,38 +422,57 @@ namespace Ck { namespace Stream {
 		// this is called if the stream is closed and we have buffered requests
 		// or we have a request and enough data to serve it
 		void StreamBuffers::fulfillRequest(GetRequest& gr){
+			if(gr.get_record){
+				// get sizeof(size_t) bytes, then proceed as normal
+				size_t* size = new size_t();
+				ExtractedData size_of_record = extractFromGetBuffer((char*)(size), sizeof(size_t));
+				if(size_of_record.num_bytes_copied != sizeof(size_t)){
+					CkPrintf("PANIC: size_of_record.num_bytes_copied = %zu, which != %zu\n", size_of_record.num_bytes_copied, sizeof(size_t));
+				}
+				CkPrintf("for the get record request, making the gr.requested_bytes=%zu\n", *size);
+				gr.requested_bytes = *size;
+			}
 			// debugPrintPutBuffer();
 // 			CkPrintf("+++++++++++++\n");
 // 			CkPrintf("PE #%d: in fulfillRequest: gr.requested_bytes=%zu, _get_buffer_size=%zu, _buffered_gets.size():%zu\n", CkMyPe(), gr.requested_bytes, _get_buffer_size, _buffered_gets.size());
 			size_t num_bytes_to_copy = std::min(gr.requested_bytes, _get_buffer_size);
-// 			CkPrintf("about to fulfill a request where num_bytes_to_copy=%zu\n", num_bytes_to_copy);
-			size_t num_bytes_copied = 0;
 			// we already know that we have enough data to satisfy stuff
 			StreamDeliveryMsg* res = new (num_bytes_to_copy) StreamDeliveryMsg(_stream_id);
+			if(_get_buffer.empty()){
+// 				CkPrintf("FUCK SHIT BALLZ\n");
+			}
+			ExtractedData extracted_data = extractFromGetBuffer(res -> data, num_bytes_to_copy);
+// 			CkPrintf("After: _buffered_gets.size():%zu\n", _buffered_gets.size());
+			// we now have all the data, now we send it
+			res -> num_bytes = extracted_data.num_bytes_copied;
+			_counter.debugIncrementGetBytesCounter(extracted_data.num_bytes_copied);
+			// if we know no more data is coming in, received all the data we should, and nothing left in buffer, mark stream as closed in the message
+			CkPrintf("From PE[%d], on stream %d, num_bytes_copied=%d, res -> num_bytes=%d, _counter.receivedAllData()=%d, _get_buffer_size=%d\n", CkMyPe(), _stream_id, extracted_data.num_bytes_copied, res -> num_bytes, _counter.receivedAllData(), _get_buffer_size);
+			if(_counter.receivedAllData() && !_get_buffer_size){
+				res -> status = StreamStatus::STREAM_CLOSED;
+				_counter.debugPrintAllFinal();
+			} else {
+				res -> status = StreamStatus::STREAM_OK;
+			}
+			gr.cb.send(res);
+		}
+
+		ExtractedData StreamBuffers::extractFromGetBuffer(char* ret_buffer, size_t bytes_to_copy){
+			size_t num_bytes_to_copy = std::min(bytes_to_copy, _get_buffer_size);
+// 			CkPrintf("about to fulfill a request where num_bytes_to_copy=%zu\n", num_bytes_to_copy);
+			size_t num_bytes_copied = 0;
 			if(_get_buffer.empty()){
 // 				CkPrintf("FUCK SHIT BALLZ\n");
 			}
 			while(!_get_buffer.empty()) {
 				InData& front = _get_buffer.front();
 				if(front.num_bytes_rem <= num_bytes_to_copy){
-// 						CkPrintf("fulfillRequest true branch: front.num_bytes_rem=%zu, num_bytes_to_copy=%zu\n", front.num_bytes_rem, num_bytes_to_copy);
-// 						CkPrintf("--- PE #%d: printing out remaining contents fo front (InData):", CkMyPe());
-						for (int i = 0; i < front.num_bytes_rem / sizeof(size_t); ++i) {
-// 							CkPrintf("%zu, ", ((size_t*)front.curr)[i]);
-						}
-// 						CkPrintf("-----\n");
-						std::memcpy(res -> data + num_bytes_copied, front.curr, front.num_bytes_rem);
+						std::memcpy(ret_buffer + num_bytes_copied, front.curr, front.num_bytes_rem);
 						num_bytes_copied += front.num_bytes_rem;
 						num_bytes_to_copy -= front.num_bytes_rem;
 						_get_buffer.pop_front();
 				} else {
-// 					CkPrintf("fulfillRequest else branch: front.num_bytes_rem=%zu, num_bytes_to_copy=%zu\n", front.num_bytes_rem, num_bytes_to_copy);
-// 					CkPrintf("--- PE #%d: printing out remaining contents fo front (InData):", CkMyPe());
-					for (int i = 0; i < front.num_bytes_rem / sizeof(size_t); ++i) {
-// 						CkPrintf("%zu, ", ((size_t*)front.curr)[i]);
-					}
-// 					CkPrintf("-----\n");
-					std::memcpy(res -> data + num_bytes_copied, front.curr, num_bytes_to_copy);
+					std::memcpy(ret_buffer + num_bytes_copied, front.curr, num_bytes_to_copy);
 // 					CkPrintf("fulfill else branch before: num_bytes_copied=%zu\n", num_bytes_copied);
 					num_bytes_copied += num_bytes_to_copy;
 // 					CkPrintf("fulfill else branch after: num_bytes_copied=%zu\n", num_bytes_copied);
@@ -464,20 +482,14 @@ namespace Ck { namespace Stream {
 					break;
 				}
 			}
-// 			CkPrintf("After: _buffered_gets.size():%zu\n", _buffered_gets.size());
 			// we now have all the data, now we send it
 			_get_buffer_size -= num_bytes_copied;
-			res -> num_bytes = num_bytes_copied;
+			// the return value storing the buffer with the data and the 
+			ExtractedData ret;
+			ret.buffer = ret_buffer;
+			ret.num_bytes_copied = num_bytes_copied;
 			_counter.debugIncrementGetBytesCounter(num_bytes_copied);
-			// if we know no more data is coming in, received all the data we should, and nothing left in buffer, mark stream as closed in the message
-			CkPrintf("From PE[%d], on stream %d, num_bytes_copied=%d, res -> num_bytes=%d, _counter.receivedAllData()=%d, _get_buffer_size=%d\n", CkMyPe(), _stream_id, num_bytes_copied, res -> num_bytes, _counter.receivedAllData(), _get_buffer_size);
-			if(_counter.receivedAllData() && !_get_buffer_size){
-				res -> status = StreamStatus::STREAM_CLOSED;
-				_counter.debugPrintAllFinal();
-			} else {
-				res -> status = StreamStatus::STREAM_OK;
-			}
-			gr.cb.send(res);
+			return ret;
 		}
 
 		void StreamBuffers::clearBufferedGetRequests(){
@@ -602,6 +614,13 @@ namespace Ck { namespace Stream {
 			return;
 		}
 
+		inline void impl_getRecord(StreamToken stream, CkCallback cb){
+			GetRequest gr(sizeof(size_t), cb);
+			// explicitly mark this as a get record operation
+			gr.get_record = true;
+			CkpvAccess(stream_manager) -> serveGetRequest(stream, gr);
+		}
+
 		inline void impl_closeWriteStream(StreamToken stream){
 // 			CkPrintf("called for a close to the stream...\n");
 			// CkpvAccess(stream_manager) -> startWriteStreamClose(stream);
@@ -635,13 +654,8 @@ namespace Ck { namespace Stream {
 		impl::impl_get(stream, elem_size, num_elems, cb);
 	}
 
-	// This function must be invoked by a threaded entry method
 	void getRecord(StreamToken stream, CkCallback cb) {
-		StreamDeliveryMsg* msg;
-		impl::impl_get(stream, sizeof(size_t), 1, CkCallbackResumeThread((void*&)msg));
-		size_t record_size = *(size_t*)msg->data;
-		CkPrintf("getRecord, record to be fetch is %d\n", record_size);
-		impl::impl_get(stream, sizeof(char), record_size, cb);
+		impl::impl_getRecord(stream, cb);
 	}
 
 	void closeWriteStream(StreamToken stream){

@@ -1,11 +1,11 @@
 Charmrun> scalable start enabled. 
-Charmrun> started all node programs in 0.163 seconds.
+Charmrun> started all node programs in 0.029 seconds.
 Charm++> Running in non-SMP mode: 2 processes (PEs)
-Converse/Charm++ Commit ID: v7.1.0-devel-351-g10566fbe9
+Converse/Charm++ Commit ID: v7.1.0-devel-356-g3a0281b7d
 Isomalloc> Synchronized global address space.
 Charm++> scheduler running in netpoll mode.
 CharmLB> Load balancer assumes all CPUs are same.
-Charm++> Running on 1 hosts (1 sockets x 12 cores x 1 PUs = 12-way SMP)
+Charm++> Running on 1 hosts (1 sockets x 8 cores x 1 PUs = 8-way SMP)
 Charm++> cpu topology info is gathered in 0.000 seconds.
 CharmLB> Load balancing instrumentation for communication is off.
 We made it to the streamCreated part baby
@@ -20,112 +20,113 @@ WARNING: put buffer size is 0 but put buffer is not empty
 Index 0: 0 of size 2, total size 50
 Debug: Done printing put buffer
 Producer 0 has written 5 records to the stream 0...
-Created: 5 with total size 2
-Created: 6 with total size 2
-Created: 7 with total size 2
-From PE[0], on stream 0, num_bytes_copied=8, res -> num_bytes=8, _counter.receivedAllData()=0, _get_buffer_size=42
-getRecord, record to be fetch is 2
-Created: 8 with total size 2
-Created: 9 with total size 2
+From PE[0], buffering a get request with 8 requested bytes...
+From PE[0], buffering a get request with 8 requested bytes...
+for the get record request, making the gr.requested_bytes=2
 From PE[0], on stream 0, num_bytes_copied=2, res -> num_bytes=2, _counter.receivedAllData()=0, _get_buffer_size=40
-From PE[0], on stream 0, num_bytes_copied=8, res -> num_bytes=8, _counter.receivedAllData()=0, _get_buffer_size=32
-getRecord, record to be fetch is 2
+for the get record request, making the gr.requested_bytes=2
 From PE[0], on stream 0, num_bytes_copied=2, res -> num_bytes=2, _counter.receivedAllData()=0, _get_buffer_size=30
 Middle 1, recvData invoked. msg->num_bytes=2
 Middle received: 0 of length 1
-From PE[0], on stream 0, num_bytes_copied=8, res -> num_bytes=8, _counter.receivedAllData()=0, _get_buffer_size=22
-getRecord, record to be fetch is 2
-From PE[0], on stream 0, num_bytes_copied=2, res -> num_bytes=2, _counter.receivedAllData()=0, _get_buffer_size=20
+for the get record request, making the gr.requested_bytes=2
+Created: 5 with total size 2
+Created: 6 with total size 2
+Created: 7 with total size 2
+Created: 8 with total size 2
+Created: 9 with total size 2
 Debug: Put Buffer Print called on stream 0
 WARNING: put buffer size is 0 but put buffer is not empty
 Index 0: 5 of size 2, total size 50
 Debug: Done printing put buffer
 Producer 1 has written 5 records to the stream 0...
+From PE[0], on stream 0, num_bytes_copied=2, res -> num_bytes=2, _counter.receivedAllData()=0, _get_buffer_size=20
 Middle 0, recvData invoked. msg->num_bytes=2
 Middle received: 1 of length 1
-From PE[0], on stream 0, num_bytes_copied=8, res -> num_bytes=8, _counter.receivedAllData()=0, _get_buffer_size=12
-getRecord, record to be fetch is 2
+for the get record request, making the gr.requested_bytes=2
 From PE[0], on stream 0, num_bytes_copied=2, res -> num_bytes=2, _counter.receivedAllData()=0, _get_buffer_size=10
 Middle 1, recvData invoked. msg->num_bytes=2
 Middle received: 2 of length 1
-From PE[0], on stream 0, num_bytes_copied=8, res -> num_bytes=8, _counter.receivedAllData()=0, _get_buffer_size=2
-getRecord, record to be fetch is 2
+for the get record request, making the gr.requested_bytes=2
+From PE[1], buffering a get request with 8 requested bytes...
+From PE[1], buffering a get request with 8 requested bytes...
+PANIC: size_of_record.num_bytes_copied = 0, which != 8
+for the get record request, making the gr.requested_bytes=0
+From PE[1], on stream 0, num_bytes_copied=0, res -> num_bytes=0, _counter.receivedAllData()=1, _get_buffer_size=0
+DEBUG: Printing Total Bytes Fulfilled of stream 0 on PE 1: 0
+DEBUG: Printing Received Counter of stream 0 on PE 1
+DEBUG: Done Printing Received Buffer
+DEBUG: Printing Sent Counter of stream 0 on PE 1
+s PE 1: 0
 From PE[0], on stream 0, num_bytes_copied=2, res -> num_bytes=2, _counter.receivedAllData()=0, _get_buffer_size=0
+Producers are done, closing stream id 0. Sent 10 records.
 Middle 0, recvData invoked. msg->num_bytes=2
 Middle received: 3 of length 1
+for the get record request, making the gr.requested_bytes=2
+From PE[0], on stream 0, num_bytes_copied=2, res -> num_bytes=2, _counter.receivedAllData()=0, _get_buffer_size=40
 Middle 1, recvData invoked. msg->num_bytes=2
 Middle received: 4 of length 1
-Producers are done, closing stream id 0. Sent 10 records.
-From PE[0], on stream 0, num_bytes_copied=8, res -> num_bytes=8, _counter.receivedAllData()=0, _get_buffer_size=42
-From PE[0], on stream 0, num_bytes_copied=8, res -> num_bytes=8, _counter.receivedAllData()=0, _get_buffer_size=34
-getRecord, record to be fetch is 2
-From PE[0], on stream 0, num_bytes_copied=2, res -> num_bytes=2, _counter.receivedAllData()=0, _get_buffer_size=32
-getRecord, record to be fetch is 131125
+s PE 0: 50
+DEBUG: Done Printing Sent Buffer
+PANIC: size_of_record.num_bytes_copied = 0, which != 8
+for the get record request, making the gr.requested_bytes=0
+From PE[1], on stream 0, num_bytes_copied=0, res -> num_bytes=0, _counter.receivedAllData()=1, _get_buffer_size=0
+DEBUG: Printing Total Bytes Fulfilled of stream 0 on PE 1: 0
+DEBUG: Printing Received Counter of stream 0 on PE 1
+DEBUG: Done Printing Received Buffer
+DEBUG: Printing Sent Counter of stream 0 on PE 1
+s PE 1: 0
+for the get record request, making the gr.requested_bytes=2
+From PE[0], on stream 0, num_bytes_copied=2, res -> num_bytes=2, _counter.receivedAllData()=0, _get_buffer_size=30
 Middle 0, recvData invoked. msg->num_bytes=2
-Middle received:  of length 0
-From PE[0], on stream 0, num_bytes_copied=8, res -> num_bytes=8, _counter.receivedAllData()=0, _get_buffer_size=24
-getRecord, record to be fetch is 131126
-From PE[0], on stream 0, num_bytes_copied=24, res -> num_bytes=24, _counter.receivedAllData()=1, _get_buffer_size=0
-DEBUG: Printing Total Bytes Fulfilled of stream 0 on PE 0: 100
-DEBUG: Printing Received Counter of stream 0 on PE 0
-r PE 1: 50
-r PE 0: 50
-DEBUG: Done Printing Received Buffer
-DEBUG: Printing Sent Counter of stream 0 on PE 0
-s PE 1: 0
-s PE 0: 50
-DEBUG: Done Printing Sent Buffer
-From PE[0], on stream 0, num_bytes_copied=0, res -> num_bytes=0, _counter.receivedAllData()=1, _get_buffer_size=0
-DEBUG: Printing Total Bytes Fulfilled of stream 0 on PE 0: 100
-DEBUG: Printing Received Counter of stream 0 on PE 0
-r PE 1: 50
-r PE 0: 50
-DEBUG: Done Printing Received Buffer
-DEBUG: Printing Sent Counter of stream 0 on PE 0
-s PE 1: 0
-s PE 0: 50
-DEBUG: Done Printing Sent Buffer
-From PE[1], on stream 0, num_bytes_copied=0, res -> num_bytes=0, _counter.receivedAllData()=1, _get_buffer_size=0
-DEBUG: Printing Total Bytes Fulfilled of stream 0 on PE 1: 0
-DEBUG: Printing Received Counter of stream 0 on PE 1
-DEBUG: Done Printing Received Buffer
-DEBUG: Printing Sent Counter of stream 0 on PE 1
-s PE 1: 0
-s PE 0: 50
-DEBUG: Done Printing Sent Buffer
-getRecord, record to be fetch is 0
-From PE[1], on stream 0, num_bytes_copied=0, res -> num_bytes=0, _counter.receivedAllData()=1, _get_buffer_size=0
-Middle 1, recvData invoked. msg->num_bytes=24
-Middle received:  of length 0
-Middle 1 has received the done signal and consumed 30 bytes, made 4 getRecord invocations...
-Middle 0, recvData invoked. msg->num_bytes=0
-Middle 0 has received the done signal and consumed 6 bytes, made 4 getRecord invocations...
-DEBUG: Printing Total Bytes Fulfilled of stream 0 on PE 1: 0
-DEBUG: Printing Received Counter of stream 0 on PE 1
-DEBUG: Done Printing Received Buffer
-DEBUG: Printing Sent Counter of stream 0 on PE 1
-s PE 1: 0
-s PE 0: 50
-DEBUG: Done Printing Sent Buffer
-From PE[1], on stream 0, num_bytes_copied=0, res -> num_bytes=0, _counter.receivedAllData()=1, _get_buffer_size=0
-DEBUG: Printing Total Bytes Fulfilled of stream 0 on PE 1: 0
-DEBUG: Printing Received Counter of stream 0 on PE 1
-Middle is done: Processed 7 records
-DEBUG: Done Printing Received Buffer
-DEBUG: Printing Sent Counter of stream 0 on PE 1
-s PE 1: 0
-s PE 0: 50
-DEBUG: Done Printing Sent Buffer
-getRecord, record to be fetch is 0
-From PE[1], on stream 0, num_bytes_copied=0, res -> num_bytes=0, _counter.receivedAllData()=1, _get_buffer_size=0
-DEBUG: Printing Total Bytes Fulfilled of stream 0 on PE 1: 0
-DEBUG: Printing Received Counter of stream 0 on PE 1
-DEBUG: Done Printing Received Buffer
-DEBUG: Printing Sent Counter of stream 0 on PE 1
-s PE 1: 0
+Middle received: 5 of length 1
+for the get record request, making the gr.requested_bytes=2
+From PE[0], on stream 0, num_bytes_copied=2, res -> num_bytes=2, _counter.receivedAllData()=0, _get_buffer_size=20
+Middle 1, recvData invoked. msg->num_bytes=2
+Middle received: 6 of length 1
 s PE 0: 50
 DEBUG: Done Printing Sent Buffer
 Middle 3, recvData invoked. msg->num_bytes=0
 Middle 3 has received the done signal and consumed 0 bytes, made 1 getRecord invocations...
 Middle 2, recvData invoked. msg->num_bytes=0
 Middle 2 has received the done signal and consumed 0 bytes, made 1 getRecord invocations...
+for the get record request, making the gr.requested_bytes=2
+From PE[0], on stream 0, num_bytes_copied=2, res -> num_bytes=2, _counter.receivedAllData()=0, _get_buffer_size=10
+Middle 0, recvData invoked. msg->num_bytes=2
+Middle received: 7 of length 1
+for the get record request, making the gr.requested_bytes=2
+From PE[0], on stream 0, num_bytes_copied=2, res -> num_bytes=2, _counter.receivedAllData()=0, _get_buffer_size=0
+Middle 1, recvData invoked. msg->num_bytes=2
+Middle received: 8 of length 1
+From PE[0], buffering a get request with 8 requested bytes...
+Middle 0, recvData invoked. msg->num_bytes=2
+Middle received: 9 of length 1
+From PE[0], buffering a get request with 8 requested bytes...
+PANIC: size_of_record.num_bytes_copied = 0, which != 8
+for the get record request, making the gr.requested_bytes=0
+From PE[0], on stream 0, num_bytes_copied=0, res -> num_bytes=0, _counter.receivedAllData()=1, _get_buffer_size=0
+DEBUG: Printing Total Bytes Fulfilled of stream 0 on PE 0: 120
+DEBUG: Printing Received Counter of stream 0 on PE 0
+r PE 1: 50
+r PE 0: 50
+DEBUG: Done Printing Received Buffer
+DEBUG: Printing Sent Counter of stream 0 on PE 0
+s PE 1: 0
+s PE 0: 50
+DEBUG: Done Printing Sent Buffer
+PANIC: size_of_record.num_bytes_copied = 0, which != 8
+for the get record request, making the gr.requested_bytes=0
+From PE[0], on stream 0, num_bytes_copied=0, res -> num_bytes=0, _counter.receivedAllData()=1, _get_buffer_size=0
+DEBUG: Printing Total Bytes Fulfilled of stream 0 on PE 0: 120
+DEBUG: Printing Received Counter of stream 0 on PE 0
+r PE 1: 50
+r PE 0: 50
+DEBUG: Done Printing Received Buffer
+DEBUG: Printing Sent Counter of stream 0 on PE 0
+s PE 1: 0
+s PE 0: 50
+DEBUG: Done Printing Sent Buffer
+Middle 1, recvData invoked. msg->num_bytes=0
+Middle 1 has received the done signal and consumed 10 bytes, made 6 getRecord invocations...
+Middle 0, recvData invoked. msg->num_bytes=0
+Middle 0 has received the done signal and consumed 10 bytes, made 6 getRecord invocations...
+Middle is done: Processed 10 records
