@@ -1,9 +1,10 @@
 #include "streamtest.decl.h"
 #include <iostream>
 #include <time.h>
+#include <stdio.h>
 
 #define INVALID_STREAM_NO 99999999
-#define NUM_REQUESTS 10
+#define NUM_REQUESTS 5
 
 class Main : public CBase_Main {
 	CProxy_Producers producers;
@@ -35,9 +36,16 @@ public:
 		if (output_stream == INVALID_STREAM_NO) return;
 		for(int i = 0; i < NUM_REQUESTS; ++i){
             ++count;
-			std::string record = generateRandomString();
-			CkPrintf("Created: %s\n", record.c_str());
-			Ck::Stream::putRecord(output_stream, (void*)record.c_str(), sizeof(char) * record.size() + 1);
+            char buf[2];
+            buf[1] = 0; //null terminal
+			// std::string record = generateRandomString();
+			// CkPrintf("Created: %s\n", record.c_str());
+			// Ck::Stream::putRecord(output_stream, (void*)record.c_str(), sizeof(char) * record.size() + 1);
+            int record = NUM_REQUESTS * thisIndex + i;
+            sprintf(buf, "%d", record);
+			CkPrintf("Created: %s with total size %d\n", buf, sizeof(char) * strlen(buf) + 1);
+			Ck::Stream::putRecord(output_stream, buf, sizeof(char) * strlen(buf) + 1);
+
 		}
 		Ck::Stream::flushLocalStream(output_stream);
 		CkPrintf("Producer %d has written %d records to the stream %d...\n", thisIndex, NUM_REQUESTS, output_stream);
@@ -62,13 +70,15 @@ public:
         }
         return randomString;
     }
+
 };
 
 class Middle : public CBase_Middle {
 	StreamToken input_stream = INVALID_STREAM_NO;
 	StreamToken output_stream = INVALID_STREAM_NO;
 	size_t _num_bytes_received = 0;
-    size_t count;
+    size_t count = 0;
+    size_t get_record_count = 0;
 public:
 	Middle_SDAG_CODE
 	Middle() {
@@ -86,7 +96,9 @@ public:
 	}
 
 	void beginWork() {
-		if (input_stream == INVALID_STREAM_NO || output_stream == INVALID_STREAM_NO) return;
+		// if (input_stream == INVALID_STREAM_NO || output_stream == INVALID_STREAM_NO) return;
+		if (input_stream == INVALID_STREAM_NO) return;
+        get_record_count++;
 		Ck::Stream::getRecord(input_stream, CkCallback(CkIndex_Middle::recvData(0), thisProxy[thisIndex]));
 	}
 };
@@ -116,8 +128,8 @@ public:
 		CkPrintf("Consumer: In %d\n", input_stream);
 		char* data = (char*)(msg -> data);
 		_num_bytes_received += msg -> num_bytes;
+        ++count;
 		if (msg -> num_bytes != 0) {
-            ++count;
 			CkPrintf("Consumer received on stream id %d: %s\n", input_stream, data);
 			CkPrintf("\n");
 		} else {

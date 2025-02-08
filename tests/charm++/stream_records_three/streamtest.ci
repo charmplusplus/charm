@@ -8,11 +8,11 @@ mainmodule streamtest
 				size_t id = msg -> id;
 				CkPrintf("Got the producer->middle stream id: %d\n", id);
 				
-				producers = CProxy_Producers::ckNew(10);
+				producers = CProxy_Producers::ckNew(2);
 				producers.setOutputStreamId(id);
-				middle = CProxy_Middle::ckNew(50);
+				middle = CProxy_Middle::ckNew(4);
 				middle.setInputStreamId(id);
-				Ck::Stream::createNewStream(CkCallback(CkIndex_Main::middleConsumerStreamMade(0), thisProxy));
+				// Ck::Stream::createNewStream(CkCallback(CkIndex_Main::middleConsumerStreamMade(0), thisProxy));
 			}
 		};
 
@@ -40,21 +40,22 @@ mainmodule streamtest
 
 		entry void recvData(Ck::Stream::StreamDeliveryMsg* msg){
 			serial {
-				CkPrintf("Middle: In %d, Out %d\n", input_stream, output_stream);
+				CkPrintf("Middle %d, recvData invoked. msg->num_bytes=%d\n", thisIndex, msg->num_bytes);
 				char* data = (char*)(msg -> data);
 				_num_bytes_received += msg -> num_bytes;
 				if (msg -> num_bytes != 0) {
                     ++count;
 					CkPrintf("Middle received: %s of length %d", data, strlen(data));
 					CkPrintf("\n");
-					Ck::Stream::putRecord(output_stream, data, sizeof(char) * strlen(data) + 1);
+					// Ck::Stream::putRecord(output_stream, data, sizeof(char) * strlen(data) + 1);
 					Ck::Stream::flushLocalStream(output_stream);
 				} 
 
 				if(msg -> status == Ck::Stream::StreamStatus::STREAM_OK) {
+                    get_record_count++;
 					Ck::Stream::getRecord(input_stream, CkCallback(CkIndex_Middle::recvData(0), thisProxy[thisIndex]));
 				} else {
-					CkPrintf("Middle %d has received the done signal and consumed %d bytes...\n", thisIndex, _num_bytes_received);
+					CkPrintf("Middle %d has received the done signal and consumed %d bytes, made %d getRecord invocations...\n", thisIndex, _num_bytes_received, get_record_count);
                     CkCallback cb = CkCallback(CkReductionTarget(Middle, finished), thisProxy[0]);
                     contribute(sizeof(count), &count, CkReduction::sum_int, cb);
 				}

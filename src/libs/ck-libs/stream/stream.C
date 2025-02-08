@@ -286,6 +286,7 @@ namespace Ck { namespace Stream {
 			DeliverStreamBytesMsg* msg = createDeliverBytesStreamMsg();
 // 			CkPrintf("StreamBuffers::flushOutBuffer sending out message\n");
 			_sendOutBuffer(msg);	
+			debugPrintPutBuffer();
 		}
 
 		void StreamBuffers::popFrontMsgOutBuffer(){
@@ -422,6 +423,7 @@ namespace Ck { namespace Stream {
 		// this is called if the stream is closed and we have buffered requests
 		// or we have a request and enough data to serve it
 		void StreamBuffers::fulfillRequest(GetRequest& gr){
+			// debugPrintPutBuffer();
 // 			CkPrintf("+++++++++++++\n");
 // 			CkPrintf("PE #%d: in fulfillRequest: gr.requested_bytes=%zu, _get_buffer_size=%zu, _buffered_gets.size():%zu\n", CkMyPe(), gr.requested_bytes, _get_buffer_size, _buffered_gets.size());
 			size_t num_bytes_to_copy = std::min(gr.requested_bytes, _get_buffer_size);
@@ -466,10 +468,12 @@ namespace Ck { namespace Stream {
 			// we now have all the data, now we send it
 			_get_buffer_size -= num_bytes_copied;
 			res -> num_bytes = num_bytes_copied;
+			_counter.debugIncrementGetBytesCounter(num_bytes_copied);
 			// if we know no more data is coming in, received all the data we should, and nothing left in buffer, mark stream as closed in the message
 			CkPrintf("From PE[%d], on stream %d, num_bytes_copied=%d, res -> num_bytes=%d, _counter.receivedAllData()=%d, _get_buffer_size=%d\n", CkMyPe(), _stream_id, num_bytes_copied, res -> num_bytes, _counter.receivedAllData(), _get_buffer_size);
 			if(_counter.receivedAllData() && !_get_buffer_size){
 				res -> status = StreamStatus::STREAM_CLOSED;
+				_counter.debugPrintAllFinal();
 			} else {
 				res -> status = StreamStatus::STREAM_OK;
 			}
@@ -636,6 +640,7 @@ namespace Ck { namespace Stream {
 		StreamDeliveryMsg* msg;
 		impl::impl_get(stream, sizeof(size_t), 1, CkCallbackResumeThread((void*&)msg));
 		size_t record_size = *(size_t*)msg->data;
+		CkPrintf("getRecord, record to be fetch is %d\n", record_size);
 		impl::impl_get(stream, sizeof(char), record_size, cb);
 	}
 

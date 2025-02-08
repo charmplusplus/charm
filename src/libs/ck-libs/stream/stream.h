@@ -110,6 +110,24 @@ namespace Ck { namespace Stream {
 			void clearBufferedGetRequests();
 			void setExpectedReceivesUponClose(size_t num_messages_to_receive);
 			void setCloseFlag();
+			void debugPrintPutBuffer() {
+				CkPrintf("Debug: Put Buffer Print called on stream %d\n", _stream_id);
+				if (_put_buffer_size == 0 ^ _buffered_msg_to_deliver.empty()) {
+					CkPrintf("WARNING: put buffer size is %d but put buffer is %s\n", _put_buffer_size, (_buffered_msg_to_deliver.empty() ? "empty" : "not empty"));
+				};
+				int count = 0;
+				if (_buffered_msg_to_deliver.empty()) {
+					CkPrintf("Put Buffer is empty; there is nothing to print\n");
+				} else {
+					for (auto& msg : _buffered_msg_to_deliver) {
+						CkPrintf("Index %d: %s of size %d, total size %d\n", count, msg->data + sizeof(size_t), ((size_t*)msg->data)[0], msg->num_bytes);
+						++count;
+					}
+				}
+				CkPrintf("Debug: Done printing put buffer\n");
+
+
+			}
 		};
 		
 		class StreamCoordinator {
