@@ -23,11 +23,6 @@ namespace Ck { namespace Stream {
 			_msg = msg;
 			curr = msg -> data;
 			num_bytes_rem = num_bytes;
-// 			CkPrintf("--- PE #%d: Constructing InData Object:", CkMyPe());
-			for (int i = 0; i < num_bytes / sizeof(size_t); ++i) {
-// 				CkPrintf("%zu, ", ((size_t*)msg->data)[i]);
-			}
-// 			CkPrintf("-----\n");
 		}
 		
 		void InData::freeData(){
@@ -44,25 +39,28 @@ namespace Ck { namespace Stream {
 			Starter(CkArgMsg* m){
 				srand(time(NULL));   // Initialization, should only be called once.
 				delete m;
-// 				CkPrintf("The starter is alive\n");
 				starter = thisProxy;
 				stream_managers = CProxy_StreamManager::ckNew();
 			}
 
 			Starter(CkMigrateMessage* m) : CBase_Starter(m) {}
-  			void pup(PUP::er& p){
 
-			}
+  			void pup(PUP::er& p) {}
 
-			void starterHello(){
-// 				CkPrintf("Hello from the starter chare of CkStream!\n");
-// 				std::cout << "this is a print from the std::cout library\n";
-				CkExit();
+			void startWriteStreamClose(StreamToken stream) {
+				StreamMetaData& metadata = _meta_data[stream];
+				if (metadata._registered_pes.empty()) {
+					metadata.close_buffered = true;	
+					return;
+				}
+				stream_managers.initiateWriteStreamClose(stream);
 			}
 
 			void addRegisteredPE(StreamToken token, size_t pe){
-				_meta_data[token]._registered_pes.push_back(pe);
-				stream_managers.addRegisteredPE(token, pe);
+				StreamMetaData& metadata = _meta_data[token];
+				metadata._registered_pes.push_back(pe);
+				stream_managers.addRegisteredPE(token, pe, metadata.close_buffered);
+				metadata.close_buffered = false;
 			}
 
 			void tellManagersExpectedReceives(CkReductionMsg* msg){
@@ -72,10 +70,12 @@ namespace Ck { namespace Stream {
 				ulong* totalMessageSentToPEs = (ulong*)results[0].data;
 				StreamToken st = *((size_t*)results[1].data);
 				for(int i = 0; i < CkNumPes(); ++i){
-					// invoke some entry method
-// 					CkPrintf("From global starter, PE[%d] should expected %zu messages\n", i, totalMessageSentToPEs[i]);
 					stream_managers[i].expectedReceivesUponClose(st, size_t(totalMessageSentToPEs[i]));
 				}
+			}
+
+			void processBufferedCloseStream(StreamToken token) {
+				stream_managers.initiateWriteStreamClose(token);
 			}
 
 		};
@@ -90,7 +90,6 @@ namespace Ck { namespace Stream {
 			StreamManager_SDAG_CODE
 		public:
 				StreamManager(){
-// 					CkPrintf("Stream Manager created on PE=%d\n", CkMyPe());
 					CkpvInitialize(StreamManager*, stream_manager);
 					CkpvAccess(stream_manager) = this;
 				}
@@ -106,9 +105,7 @@ namespace Ck { namespace Stream {
 					sb.clearBufferedDeliveryMsg();	
 				}
 
-  				void pup(PUP::er& p){
-					// do I bother populating this?
-				}
+  				void pup(PUP::er& p) {}
 
 				void expectedReceivesUponClose(StreamToken token, size_t num_messages_to_receive){
 					StreamBuffers& sb = _stream_table[token];
@@ -117,7 +114,6 @@ namespace Ck { namespace Stream {
 
 				void initializeStream(int id, size_t coordinator_pe){
 					_stream_table[id] = StreamBuffers(id, coordinator_pe);
-// 					CkPrintf("On %d, we created stream %d with coordinator=%d\n", CkMyPe(), id, coordinator_pe);
 					contribute(sizeof(id), &id, CkReduction::max_int, CkCallback(CkReductionTarget(Starter, streamCreated), starter));
 				}
 
@@ -143,11 +139,9 @@ namespace Ck { namespace Stream {
 				}
 
 				void initiateWriteStreamClose(StreamToken token){
-// 					CkPrintf("Stream Manager %d received a close request for stream=%d\n", CkMyPe(), token);
 					StreamBuffers& sb = _stream_table[token];
 					sb.setCloseFlag();
 					if(sb.numBufferedDeliveryMsg()){
-// 						CkPrintf("there are still messages that are buffered that have to be delivered on PE %d\n", CkMyPe());	
 						return;
 					}
 					closeStreamBuffer(token);
@@ -155,18 +149,19 @@ namespace Ck { namespace Stream {
 				
 				// used to actually close the stream buffer by creating the reduction to send to the Starter
 				void closeStreamBuffer(StreamToken token){
-// 					CkPrintf("PE[%d] has invoked the closeStreamBuffer method...\n", CkMyPe());
 					StreamBuffers& sb = _stream_table[token];
 					CkReductionMsg* msg = sb.setStreamClosed();
 					contribute(msg);
 				}
 
-				void addRegisteredPE(StreamToken stream, size_t pe){
+				void addRegisteredPE(StreamToken stream, size_t pe, bool close_buffered) {
 					StreamBuffers& sb = _stream_table[stream];
 					sb.pushBackRegisteredPE(pe);
-// 					CkPrintf("From StreamManager[%d], just added pe=%zu\n", CkMyPe(), pe);
 					// TODO: change this to do message injection instead of just emptying the entire buffered delivery messages
 					sb.clearBufferedDeliveryMsg();		
+					if (close_buffered) {
+						contribute(sizeof(stream), &stream, CkReduction::max_int, CkCallback(CkReductionTarget(Starter, processBufferedCloseStream), starter));
+					}
 				}
 
 				void serveGetRequest(StreamToken stream, GetRequest& gr){
@@ -205,42 +200,27 @@ namespace Ck { namespace Stream {
 		}
 
 		void StreamBuffers::clearBufferedDeliveryMsg(){
-			if(_buffered_msg_to_deliver.empty()){
-// 				CkPrintf("clearBufferedDeliverMsg was called when there's nothing there in the queue...\n");
-				return;
-			}
+			if(_buffered_msg_to_deliver.empty()) return;
+
 			while(!_buffered_msg_to_deliver.empty()){
 				popFrontMsgOutBuffer();
 			}
 			// if the closing process has begun but was waiting on sending all the buffered messages, resume the closing process
 			if(_counter.isCloseFlagSet()){
-// 				CkPrintf("clearBufferedDeliveryMsg: the stream closed flag is set, so we can proceed with the stream closing operations\n");
 				CkpvAccess(stream_manager) -> closeStreamBuffer(_stream_id);
 			}
 		}
 		
 		void StreamBuffers::setExpectedReceivesUponClose(size_t num_messages_to_receive){
-// 			CkPrintf("inside setExpectedReceivesUponClose on PE[%d]\n", CkMyPe());
 			_counter.setExpectedReceives(num_messages_to_receive);
 			// if we have already received the numbero f messages, we just mark ourselves as closed
-			if(_counter.receivedAllData()){
-// 				CkPrintf("On PE[%d], from within setExpectedReceivesUponClose, the StreamManager has received all %zu messages. Currently %d get requests buffered...\n", CkMyPe(), num_messages_to_receive, _buffered_gets.size());
-			} else {
-// 				CkPrintf("On PE[%d], the StreamManager has not receieved all %zu bytes; has only receieved %zu bytes\n", CkMyPe(), num_messages_to_receive, _counter.totalReceivedMessages());
-			}
 			clearBufferedGetRequests();
 		}
 
 		CkReductionMsg* StreamBuffers::setStreamClosed(){
-// 			CkPrintf("flush on PE[%d] has started...\n", CkMyPe());
 			flushOutBuffer();
-// 			CkPrintf("flush on PE[%d] has finished\n", CkMyPe());
 			// send the coordinator how many bytes were sent
 			u_long* sent_arr = _counter.getSentCounterArray();
-			// print out the stuff
-			for(int i = 0; i < CkNumPes(); ++i){
-// 				CkPrintf("DEBUG CLOSING: From PE[%d], sent_arr[%d]=%zu\n", CkMyPe(), i, sent_arr[i]);
-			}
 			// original type is size_t, but changing it to int for the reducer. Do I need to do this?
 			ulong st = _stream_id;
 			// make a tuple reduction
@@ -260,25 +240,18 @@ namespace Ck { namespace Stream {
 		}
 
 		void StreamBuffers::flushOutBuffer(){
-			if(!_put_buffer_size) {
-// 				CkPrintf("StreamBuffers::flushOutBuffer returning because put_buffer_size is 0\n");
-				return;
-			}
+			if(!_put_buffer_size) return;
+
 			DeliverStreamBytesMsg* msg = createDeliverBytesStreamMsg();
-// 			CkPrintf("StreamBuffers::flushOutBuffer sending out message\n");
 			_sendOutBuffer(msg);	
 		}
 
 		void StreamBuffers::popFrontMsgOutBuffer(){
-			if(_buffered_msg_to_deliver.empty()){
-				return;
-			}
+			if(_buffered_msg_to_deliver.empty()) return;
+
 			DeliverStreamBytesMsg* msg = _buffered_msg_to_deliver.front();
 			_buffered_msg_to_deliver.pop_front();
 			ssize_t target_pe = _pickTargetPE();
-			if (target_pe == -1){
-// 				CkPrintf("how are we able to have -1 as a target_pe when the popFrontMessage method is invoked...\n");
-			}
 			size_t num_bytes = msg -> num_bytes;
 			CkpvAccess(stream_manager) -> sendDeliverMsg(msg, target_pe);
 			_counter.processOutgoingMessage(num_bytes, target_pe);
@@ -312,17 +285,13 @@ namespace Ck { namespace Stream {
 			ssize_t target_pe = _pickTargetPE();
 			if(target_pe == -1){
 				// no one to send data to
-// 				CkPrintf("buffering the data now...\n");
 				_buffered_msg_to_deliver.push_back(msg);
 				_put_buffer_size = 0;
 				return;
 			}
 			// insert sending code here
-// 			CkPrintf("processOutgoingMessage about to begin...\n");
 			_counter.processOutgoingMessage(msg -> num_bytes, target_pe);
-// 			CkPrintf("processOutgoingMessage complete. Starting sendDeliverMsg...\n");
 			CkpvAccess(stream_manager) -> sendDeliverMsg(msg, target_pe);
-// 			CkPrintf("sendDeliverMsg is complete.\n");
 			_put_buffer_size = 0;
 		}
 
@@ -340,7 +309,6 @@ namespace Ck { namespace Stream {
 					return _registered_pes[(rand() % _registered_pes.size())];
 				}
 			}
-
 		}
 
 		void StreamBuffers::handleGetRequest(GetRequest& gr){
@@ -352,13 +320,10 @@ namespace Ck { namespace Stream {
 			}
 			// if the stream is closed, we do something?
 			if(_counter.receivedAllData()){
-// 				CkPrintf("From PE[%d], receivedAllData\n", CkMyPe());
-
 			}
 			// if we don't have enough data, then we say "fuck" and buffer it (assuming the stream isn't closed)
 			if(!_counter.receivedAllData() && _get_buffer_size < gr.requested_bytes) {
 				_buffered_gets.push_back(gr);	
-// 				CkPrintf("From PE[%d], buffering a get request with %d requested bytes...\n", CkMyPe(), gr.requested_bytes);
 				return;
 			}
 			// if we have enough data, then we fullfill the request
@@ -380,75 +345,29 @@ namespace Ck { namespace Stream {
 
 		void StreamBuffers::addToRecvBuffer(DeliverStreamBytesMsg* data){
 			// wrap it in a InData object and then push to the get_queue
-			// DEBUG PRINT
-// 			CkPrintf("--- PE #%d: In addToRecvBuffer:", CkMyPe());
-			for (int i = 0; i < data->num_bytes / sizeof(size_t); ++i) {
-// 				CkPrintf("%zu, ", ((size_t*)data->data)[i]);
-			}
-// 			CkPrintf("-----\n");
-
-
 			_counter.processIncomingMessage(data -> num_bytes, data -> sender_pe);
 			InData in_data(data, data -> num_bytes);
 			_get_buffer.push_back(in_data);
 			_get_buffer_size += data -> num_bytes;
-// 			CkPrintf("PROCESS THE INCOMING MESSAGE: PE[%d] has receieved %d bytes from %d. Total bytes received: %zu\n", CkMyPe(), data -> num_bytes, data -> sender_pe, _counter.totalReceivedMessages());
-
-			if(_counter.receivedAllData()){
-// 				CkPrintf("On PE[%d], within addToRecvBuffer, the StreamManager has received all %zu messages. Currently %d get requests buffered...\n", CkMyPe(), _counter.getNumberOfExpectedReceives(), _buffered_gets.size());
-			}
 			// process all the buffered get requests when new data comes in
 			clearBufferedGetRequests();
 		}
 		// this is called if the stream is closed and we have buffered requests
 		// or we have a request and enough data to serve it
 		void StreamBuffers::fulfillRequest(GetRequest& gr){
-// 			CkPrintf("+++++++++++++\n");
-// 			CkPrintf("PE #%d: in fulfillRequest: gr.requested_bytes=%zu, _get_buffer_size=%zu, _buffered_gets.size():%zu\n", CkMyPe(), gr.requested_bytes, _get_buffer_size, _buffered_gets.size());
+			if(gr.get_record){
+				// get sizeof(size_t) bytes, then proceed as normal
+				size_t* size = new size_t();
+				ExtractedData size_of_record = extractFromGetBuffer((char*)(size), sizeof(size_t));
+				gr.requested_bytes = *size;
+			}
 			size_t num_bytes_to_copy = std::min(gr.requested_bytes, _get_buffer_size);
-// 			CkPrintf("about to fulfill a request where num_bytes_to_copy=%zu\n", num_bytes_to_copy);
-			size_t num_bytes_copied = 0;
 			// we already know that we have enough data to satisfy stuff
 			StreamDeliveryMsg* res = new (num_bytes_to_copy) StreamDeliveryMsg(_stream_id);
-			if(_get_buffer.empty()){
-// 				CkPrintf("FUCK SHIT BALLZ\n");
-			}
-			while(!_get_buffer.empty()) {
-				InData& front = _get_buffer.front();
-				if(front.num_bytes_rem <= num_bytes_to_copy){
-// 						CkPrintf("fulfillRequest true branch: front.num_bytes_rem=%zu, num_bytes_to_copy=%zu\n", front.num_bytes_rem, num_bytes_to_copy);
-// 						CkPrintf("--- PE #%d: printing out remaining contents fo front (InData):", CkMyPe());
-						for (int i = 0; i < front.num_bytes_rem / sizeof(size_t); ++i) {
-// 							CkPrintf("%zu, ", ((size_t*)front.curr)[i]);
-						}
-// 						CkPrintf("-----\n");
-						std::memcpy(res -> data + num_bytes_copied, front.curr, front.num_bytes_rem);
-						num_bytes_copied += front.num_bytes_rem;
-						num_bytes_to_copy -= front.num_bytes_rem;
-						_get_buffer.pop_front();
-				} else {
-// 					CkPrintf("fulfillRequest else branch: front.num_bytes_rem=%zu, num_bytes_to_copy=%zu\n", front.num_bytes_rem, num_bytes_to_copy);
-// 					CkPrintf("--- PE #%d: printing out remaining contents fo front (InData):", CkMyPe());
-					for (int i = 0; i < front.num_bytes_rem / sizeof(size_t); ++i) {
-// 						CkPrintf("%zu, ", ((size_t*)front.curr)[i]);
-					}
-// 					CkPrintf("-----\n");
-					std::memcpy(res -> data + num_bytes_copied, front.curr, num_bytes_to_copy);
-// 					CkPrintf("fulfill else branch before: num_bytes_copied=%zu\n", num_bytes_copied);
-					num_bytes_copied += num_bytes_to_copy;
-// 					CkPrintf("fulfill else branch after: num_bytes_copied=%zu\n", num_bytes_copied);
-					front.curr += num_bytes_to_copy;
-					front.num_bytes_rem -= num_bytes_to_copy;
-					num_bytes_to_copy -= num_bytes_to_copy;
-					break;
-				}
-			}
-// 			CkPrintf("After: _buffered_gets.size():%zu\n", _buffered_gets.size());
+			ExtractedData extracted_data = extractFromGetBuffer(res -> data, num_bytes_to_copy);
 			// we now have all the data, now we send it
-			_get_buffer_size -= num_bytes_copied;
-			res -> num_bytes = num_bytes_copied;
+			res -> num_bytes = extracted_data.num_bytes_copied;
 			// if we know no more data is coming in, received all the data we should, and nothing left in buffer, mark stream as closed in the message
-// 			CkPrintf("From PE[%d], num_bytes_copied=%d, res -> num_bytes=%d, _counter.receivedAllData()=%d, _get_buffer_size=%d\n", CkMyPe(), num_bytes_copied, res -> num_bytes, _counter.receivedAllData(), _get_buffer_size);
 			if(_counter.receivedAllData() && !_get_buffer_size){
 				res -> status = StreamStatus::STREAM_CLOSED;
 			} else {
@@ -457,15 +376,41 @@ namespace Ck { namespace Stream {
 			gr.cb.send(res);
 		}
 
+		ExtractedData StreamBuffers::extractFromGetBuffer(char* ret_buffer, size_t bytes_to_copy){
+			size_t num_bytes_to_copy = std::min(bytes_to_copy, _get_buffer_size);
+			size_t num_bytes_copied = 0;
+			while(!_get_buffer.empty()) {
+				InData& front = _get_buffer.front();
+				if(front.num_bytes_rem <= num_bytes_to_copy){
+						std::memcpy(ret_buffer + num_bytes_copied, front.curr, front.num_bytes_rem);
+						num_bytes_copied += front.num_bytes_rem;
+						num_bytes_to_copy -= front.num_bytes_rem;
+						_get_buffer.pop_front();
+				} else {
+					std::memcpy(ret_buffer + num_bytes_copied, front.curr, num_bytes_to_copy);
+					num_bytes_copied += num_bytes_to_copy;
+					front.curr += num_bytes_to_copy;
+					front.num_bytes_rem -= num_bytes_to_copy;
+					num_bytes_to_copy -= num_bytes_to_copy;
+					break;
+				}
+			}
+			// we now have all the data, now we send it
+			_get_buffer_size -= num_bytes_copied;
+			// the return value storing the buffer with the data and the 
+			ExtractedData ret;
+			ret.buffer = ret_buffer;
+			ret.num_bytes_copied = num_bytes_copied;
+			return ret;
+		}
+
 		void StreamBuffers::clearBufferedGetRequests(){
 			// clear all of the buffered get requests when enough data comes in to serve the head of queue
 			while(!_buffered_gets.empty()){
 				GetRequest& fr = _buffered_gets.front();
 				if(!_counter.receivedAllData() && _get_buffer_size < fr.requested_bytes){// not enough bytes to satisfy front of queue
-// 					CkPrintf("clearBufferedGetRequeests on PE[%d]: returning early from clearBufferedGetRequsts: _counter.receivedAllData()=%d, _get_buffer_size=%zu\n", CkMyPe(), _counter.receivedAllData(), _get_buffer_size);
 					return;
 				}
-// 				CkPrintf("on PE[%d], fulfilling a get request..\n");
 				_buffered_gets.pop_front();
 				fulfillRequest(fr);
 			}
@@ -488,7 +433,7 @@ namespace Ck { namespace Stream {
 		StreamCoordinator::StreamCoordinator(StreamToken stream) : _stream(stream) {}
 
 		void StreamCoordinator::registerThisPE(size_t pe){
-				_meta_data._registered_pes.push_back(pe);
+			_meta_data._registered_pes.push_back(pe);
 		}
 
 		StreamMessageCounter::StreamMessageCounter() = default;
@@ -543,10 +488,6 @@ namespace Ck { namespace Stream {
 			return received_arr;
 		}
 
-		void StreamMessageCounter::setStreamWriteClosed(){
-				// TODO:
-		}
-
 		void StreamMessageCounter::processIncomingMessage(size_t num_bytes, size_t src_pe){
 			if(_received_counter.count(src_pe)){
 				_received_counter[src_pe] += num_bytes;
@@ -560,9 +501,6 @@ namespace Ck { namespace Stream {
 				_sent_counter[dest_pe] = _sent_counter[dest_pe] + num_bytes;
 			} else {
 				_sent_counter[dest_pe] = num_bytes;
-			}
-			for(auto& p: _sent_counter){
-// 				CkPrintf("_sent_counter[%zu]=%zu\n", p.first, p.second);
 			}
 		}
 
@@ -579,9 +517,15 @@ namespace Ck { namespace Stream {
 			return;
 		}
 
+		inline void impl_getRecord(StreamToken stream, CkCallback cb){
+			GetRequest gr(sizeof(size_t), cb);
+			// explicitly mark this as a get record operation
+			gr.get_record = true;
+			CkpvAccess(stream_manager) -> serveGetRequest(stream, gr);
+		}
+
 		inline void impl_closeWriteStream(StreamToken stream){
-// 			CkPrintf("called for a close to the stream...\n");
-			CkpvAccess(stream_manager) -> startWriteStreamClose(stream);
+			starter.startWriteStreamClose(stream);
 		}
 	}
 
@@ -611,12 +555,8 @@ namespace Ck { namespace Stream {
 		impl::impl_get(stream, elem_size, num_elems, cb);
 	}
 
-	// This function must be invoked by a threaded entry method
 	void getRecord(StreamToken stream, CkCallback cb) {
-		StreamDeliveryMsg* msg;
-		impl::impl_get(stream, sizeof(size_t), 1, CkCallbackResumeThread((void*&)msg));
-		size_t record_size = *(size_t*)msg->data;
-		impl::impl_get(stream, sizeof(char), record_size, cb);
+		impl::impl_getRecord(stream, cb);
 	}
 
 	void closeWriteStream(StreamToken stream){

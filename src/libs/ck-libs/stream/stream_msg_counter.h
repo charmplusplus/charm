@@ -2,16 +2,20 @@
 #include <unordered_map>
 
 #include "streamtoken.h"
-namespace Ck { namespace Stream { namespace impl {
-class StreamMessageCounter{
-	// keep track of how many bytes were sent to each PE in the stream 
+namespace Ck {
+namespace Stream {
+namespace impl {
+class StreamMessageCounter {
+	// keep track of how many bytes were sent to each PE in the stream
 	std::unordered_map<size_t, size_t> _sent_counter;
 	// keep track of how many bytes were received by each PE in the stream
 	std::unordered_map<size_t, size_t> _received_counter;
 	StreamToken _stream = 0;
+	size_t _num_bytes_get = 0;
 	size_t _number_of_expected_receives = 0;
 	bool _close_initiated = false;
-public:
+
+	public:
 	StreamMessageCounter();
 	StreamMessageCounter(StreamToken);
 	void setStreamWriteClosed();
@@ -30,11 +34,12 @@ public:
 
 	size_t getNumberOfExpectedReceives();
 
-	// set the number of receive messages we should expect after all messages on this pe have arrived 
+	// set the number of receive messages we should expect after all messages on this pe have arrived
 	void setExpectedReceives(size_t);
 	bool isCloseFlagSet();
 	void setCloseFlag();
-	
 };
 
-}}}
+}  // namespace impl
+}  // namespace Stream
+}  // namespace Ck

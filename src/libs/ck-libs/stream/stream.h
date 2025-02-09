@@ -31,13 +31,21 @@ namespace Ck { namespace Stream {
 	namespace impl {
 		// used when buffering the request
 		struct GetRequest {
+			// when this flag is true, we request sizeof(size_t) bytes first, then invoke a new fulfill request
+			bool get_record = false;
 			size_t requested_bytes;
 			CkCallback cb;
 			GetRequest(size_t, CkCallback);
 		};
+		// returned when extracting data from the get buffer on get requests
+		struct ExtractedData {
+			char* buffer = 0;
+			size_t num_bytes_copied;
+		};
 		// keep this struct here in case we need to trakc more metadata in the future
 		struct StreamMetaData {
 			std::vector<size_t> _registered_pes;
+			bool close_buffered;
 		};
 		class DeliverStreamBytesMsg;
 		class CMessage_DeliverStreamBytesMsg;
@@ -96,6 +104,7 @@ namespace Ck { namespace Stream {
 			void flushOutBuffer(char* extra_data, size_t extra_bytes);
 			void addToRecvBuffer(DeliverStreamBytesMsg* data);
 			void fulfillRequest(GetRequest& gr);
+			ExtractedData extractFromGetBuffer(char* ret_buffer, size_t bytes_to_copy);
 			void handleGetRequest(GetRequest& gr);
 			void pushBackRegisteredPE(size_t pe);
 			size_t numBufferedDeliveryMsg();
