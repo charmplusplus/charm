@@ -16,24 +16,36 @@ namespace Ck { namespace Stream {
 	void dummyFunction();
 	// API to insert into the stream
 	void put(StreamToken stream, void* data, size_t elem_size, size_t num_elems);
+	
+	void putRecord(StreamToken stream, void* data, size_t data_size);
 	// create a new stream, with the callback taking a message returning the StreamToken
 	void createNewStream(CkCallback cb);
 	// flush the buffer of the local stream
 	void flushLocalStream(StreamToken stream);
 	// extract data from stream
 	void get(StreamToken stream, size_t elem_size, size_t num_elems, CkCallback cb);
+	
+	void getRecord(StreamToken stream, CkCallback cb);
 	// closing the write side of a stream
 	void closeWriteStream(StreamToken);
 	namespace impl {
 		// used when buffering the request
 		struct GetRequest {
+			// when this flag is true, we request sizeof(size_t) bytes first, then invoke a new fulfill request
+			bool get_record = false;
 			size_t requested_bytes;
 			CkCallback cb;
 			GetRequest(size_t, CkCallback);
 		};
-
+		// returned when extracting data from the get buffer on get requests
+		struct ExtractedData {
+			char* buffer = 0;
+			size_t num_bytes_copied;
+		};
+		// keep this struct here in case we need to trakc more metadata in the future
 		struct StreamMetaData {
 			std::vector<size_t> _registered_pes;
+			bool close_buffered;
 		};
 		class DeliverStreamBytesMsg;
 		class CMessage_DeliverStreamBytesMsg;
@@ -62,20 +74,23 @@ namespace Ck { namespace Stream {
 		};
 		// used by StreamManagers to organize the data of multiple streams
 		class StreamBuffers {
-			char* _in_buffer; // the buffer for incoming data; once filled, just drop extra data; (_in_buffer is used for the data going out; I should rename this at some point
-			std::deque<InData> _out_buffer; // the buffer for outgoing data
-			std::deque<GetRequest> _buffered_reqs;
-			std::deque<DeliverStreamBytesMsg*> _msg_out_buffer;
-			size_t _in_buffer_capacity= 4 * 1024 * 1024;
-			size_t _out_buffer_capacity= 4 * 1024 * 1024;
-			size_t _in_buffer_size = 0;
-			size_t _out_buffer_size = 0;
-			size_t _stream_id= 0;
+			char* _put_buffer;
+			std::deque<InData> _get_buffer; // the buffer for outgoing data
+			std::deque<GetRequest> _buffered_gets; // buffered get requests
+			// the messages that need to be sent
+			std::deque<DeliverStreamBytesMsg*> _buffered_msg_to_deliver;
+			// size of buffer for data to be sent out to OTHER PEs (from puts)
+			size_t _put_buffer_capacity=  4 * 1024 * 1024; // Note: Old code had in = put and out = get
+			size_t _get_buffer_capacity=  4 * 1024 * 1024;
+			size_t _put_buffer_size = 0;
+			size_t _get_buffer_size = 0;
+			StreamToken _stream_id= 0;
 			size_t _coordinator_pe = 0;
 			std::vector<size_t> _registered_pes;
 			bool _registered_pe = false;
 			StreamMessageCounter _counter;
 			void _sendOutBuffer(char* data, size_t size);
+			void _sendOutBuffer(DeliverStreamBytesMsg*);
 			ssize_t _pickTargetPE();
 
 		public:
@@ -89,16 +104,20 @@ namespace Ck { namespace Stream {
 			void flushOutBuffer(char* extra_data, size_t extra_bytes);
 			void addToRecvBuffer(DeliverStreamBytesMsg* data);
 			void fulfillRequest(GetRequest& gr);
-			void handleGetRequest(GetRequest gr);
+			ExtractedData extractFromGetBuffer(char* ret_buffer, size_t bytes_to_copy);
+			void handleGetRequest(GetRequest& gr);
 			void pushBackRegisteredPE(size_t pe);
 			size_t numBufferedDeliveryMsg();
+			// just create the message from given info
+			DeliverStreamBytesMsg* createDeliverBytesStreamMsg();
+			DeliverStreamBytesMsg* createDeliverBytesStreamMsg(char* extra_data, size_t extra_bytes);
+			void clearBufferedDeliveryMsg();
 			void popFrontMsgOutBuffer();
 			size_t coordinator();
-			bool isStreamClosed();
-			void setStreamClosed();
-			void insertAck(size_t);
-			bool allAcked();
+			CkReductionMsg* setStreamClosed();
 			void clearBufferedGetRequests();
+			void setExpectedReceivesUponClose(size_t num_messages_to_receive);
+			void setCloseFlag();
 		};
 		
 		class StreamCoordinator {

@@ -1,0 +1,52 @@
+mainmodule streamtest
+{
+	include "stream.h";
+	mainchare Main {
+		entry Main(CkArgMsg* m);
+		entry void streamMade(Ck::Stream::StreamIdMessage* msg) {
+			serial {
+				size_t id = msg -> id;
+				CkPrintf("Got the stream id: %d\n", id);
+				// CkExit();
+				producers = CProxy_Producers::ckNew(id, 4);
+				consumers = CProxy_Consumers::ckNew(id, 2);
+			}
+		};
+
+	};
+
+	array[1D] Producers {
+		entry Producers(StreamToken stream);
+		entry [reductiontarget] void doneWriting();
+	};
+
+	array[1D] Consumers {
+		entry Consumers(StreamToken stream);
+		entry void recvData(Ck::Stream::StreamDeliveryMsg* msg){
+			serial {
+				char* data = (char*)(msg -> data);
+				// size_t num_bytes = msg -> num_bytes;
+				_num_bytes_received += msg -> num_bytes;
+				if (msg -> num_bytes != 0) {
+					CkPrintf("Received: %s", data);
+					CkPrintf("\n");
+				}
+				if(msg -> status == Ck::Stream::StreamStatus::STREAM_OK) {
+					CkPrintf("issuing another get request...\n");
+					Ck::Stream::getRecord(_stream, CkCallback(CkIndex_Consumers::recvData(0), thisProxy[thisIndex]));
+				} else {
+					CkPrintf("Consumer %d has received the done signal and consumed %d bytes...\n", thisIndex, _num_bytes_received);
+					CkCallback cb = CkCallback(CkReductionTarget(Consumers, finishReading), thisProxy[0]);
+					contribute(cb);
+				}
+			}
+		};
+
+		entry [reductiontarget] void finishReading() {
+			serial {
+				CkPrintf("All consumers done reading!\n");
+				CkExit(0);
+			}
+		}
+	}
+}

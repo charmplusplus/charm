@@ -18,12 +18,13 @@ class Producers : public CBase_Producers {
 public:
 	Producers(StreamToken stream){
 				_stream = stream;
+				CkPrintf("Producer[%d] is on PE=%d\n", thisIndex, CkMyPe());
 				for(int i = 0; i < 10; ++i){
 					size_t brudda = i + 10 * thisIndex;
 					Ck::Stream::put(_stream, &brudda, sizeof(size_t), 1);
 				}
 				Ck::Stream::flushLocalStream(_stream);
-				CkPrintf("Producer %d has written %d size_t to the stream...\n", thisIndex, 10);
+				CkPrintf("Producer %d has written %d size_t to the stream, which is %d total bytes...\n", thisIndex, 10, 10 * sizeof(size_t));
 				contribute(CkCallback(CkReductionTarget(Producers, doneWriting), thisProxy[0]));
 	}
 
@@ -39,6 +40,7 @@ public:
 	Consumers_SDAG_CODE
 	Consumers(StreamToken stream) {
 		_stream = stream;	
+		CkPrintf("DEBUG CONSUMERS: CONSUMER[%d] is on PE[%zu]\n", thisIndex, CkMyPe());
 		Ck::Stream::get(_stream, sizeof(size_t), 1, CkCallback(CkIndex_Consumers::recvData(0), thisProxy[thisIndex]));
 	}
 };
