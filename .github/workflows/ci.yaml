@@ -332,14 +332,16 @@ jobs:
           src/arch/mpi-win-x86_64/charmrun \
 
   spack:
-    name: spack_${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+    name: spack_ubuntu_latest
+    runs-on: ubuntu_latest
 
-    strategy:
-      fail-fast: false
-      matrix:
-#        os: [ubuntu-latest, macos-13]
-        os: [ubuntu-latest]
+# until we fix macos, just do ubuntu
+#    name: spack_${{ matrix.os }}
+#    runs-on: ${{ matrix.os }}
+#    strategy:
+#      fail-fast: false
+#      matrix:
+#        os: [ubuntu-latest]
 
     steps:
     - uses: actions/checkout@v4
