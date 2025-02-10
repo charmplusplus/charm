@@ -333,7 +333,7 @@ jobs:
 
   spack_ubuntu-latest:
     #removed macos target and branch protection until macos ci testing is fixed
-    runs-on: ubuntu_latest
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
     - uses: actions/checkout@v4
