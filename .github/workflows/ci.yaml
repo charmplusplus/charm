@@ -24,7 +24,7 @@ jobs:
       run: make -C netlrts-linux-x86_64/tmp testp TESTOPTS="++local" P=3
 
   changa_netlrts-linux-x86_64:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04  #  ubuntu-latest does not work \_(ツ)_/
     steps:
     - uses: actions/checkout@v4
     - name: build-charm++
