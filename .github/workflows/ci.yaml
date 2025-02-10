@@ -332,6 +332,7 @@ jobs:
           src/arch/mpi-win-x86_64/charmrun \
 
   spack-ubuntu-latest:
+    #removed macos target and branch protection until macos ci testing is fixed
     runs-on: ubuntu_latest
     timeout-minutes: 60
     steps:
