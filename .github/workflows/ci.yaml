@@ -144,10 +144,10 @@ jobs:
         git clone https://github.com/UIUC-PPL/projections
         cd projections
         make
-#        proj=$PWD/bin/projections
-#        cd ..
-#        files=$(find . -name *.sts)
-#        for f in $files; do echo $f; pushd .; cd $(dirname $f); $proj --exit $(basename $f); popd; done
+  #    proj=$PWD/bin/projections
+  #      cd ..
+  #      files=$(find . -name *.sts)
+  #      for f in $files; do echo $f; pushd .; cd $(dirname $f); $proj --exit $(basename $f); popd; done
 
   # FIXME: disabled since tests don't pass
   # multicore-darwin-arm8_projections:
@@ -238,10 +238,10 @@ jobs:
     - name: build-only
       run: ./build all-test netlrts-darwin-x86_64 --build-shared --with-production --enable-error-checking --enable-lbuserdata -j3 -g -Werror=vla
       # TODO: this should build tests with "-charm-shared". See #2735 on why this is not done currently.
-#    - name: test
-#      run: make -C netlrts-darwin-x86_64/tmp test TESTOPTS="++local"
-#    - name: testp P=2
-#      run: make -C netlrts-darwin-x86_64/tmp testp P=2 TESTOPTS="++local"
+  #    - name: test
+  #      run: make -C netlrts-darwin-x86_64/tmp test TESTOPTS="++local"
+  #    - name: testp P=2
+  #      run: make -C netlrts-darwin-x86_64/tmp testp P=2 TESTOPTS="++local"
 
   # FIXME: disabled since tests don't pass
   # netlrts-darwin-arm8:
@@ -334,14 +334,6 @@ jobs:
   spack:
     name: spack_ubuntu_latest
     runs-on: ubuntu_latest
-
-# until we fix macos, just do ubuntu
-#    name: spack_${{ matrix.os }}
-#    runs-on: ${{ matrix.os }}
-#    strategy:
-#      fail-fast: false
-#      matrix:
-#        os: [ubuntu-latest]
 
     steps:
     - uses: actions/checkout@v4
