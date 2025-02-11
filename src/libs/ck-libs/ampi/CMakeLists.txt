@@ -2,7 +2,9 @@ set(ampi-cxx-sources ampi.C ampiMisc.C ampiOneSided.C ampif.C ddt.C mpich-alltoa
 
 set(ampi-f90-sources ampimod.f90)
 #disable ROMIO due to GCC 14 cascade of failures
-set(CMK_AMPI_WITH_ROMIO 0)
+if(NOT DEFINED CMK_AMPI_WITH_ROMIO)
+       set(CMK_AMPI_WITH_ROMIO 0)
+endif()       
 
 
 set(ampi-h-sources ampi.h ampi-interoperate.h ampiimpl.h ddt.h ampi_functions.h ampi_funcptr.h ampi_funcptr_loader.h
