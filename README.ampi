@@ -92,5 +92,10 @@ prefixed with AMPI_:
     * AMPI_Get_command_argument returns an argument from the command line
       to a Fortran AMPI program.
 
+MPI-IO is support is available via our port of the ROMIO library. however:
+    * ROMIO is not built by default due to the fact that the current port is
+      incompatible with GCC 14 and beyond.  Add --with-romio to your
+      build line to enable MPI-IO support via ROMIO.
+
 Note that AMPI defines a preprocessor symbol "AMPI" so that user codes can
 check for AMPI's presence at compile time using "#ifdef AMPI".
