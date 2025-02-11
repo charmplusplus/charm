@@ -144,13 +144,13 @@ opt_tracing= #undef
 opt_tracing_commthread=0
 opt_zlib=1
 
-# default to building ROMIO on AMPI where supported
+# default to not building ROMIO on AMPI due to GCC 14 cascade failures
 case "$actual_triplet" in
   *-win-*)
     opt_romio=0
     ;;
   *)
-    opt_romio=1
+    opt_romio=0
     ;;
 esac
 
