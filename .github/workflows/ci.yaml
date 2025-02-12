@@ -29,18 +29,17 @@ jobs:
     - uses: actions/checkout@v4
     - name: build-charm++
       run: ./build ChaNGa netlrts-linux-x86_64 -g -j4 --with-production
-    - name: build-only-changa
+    - name: build-changa
       run: |
         git clone https://github.com/N-bodyshop/utility
         git clone https://github.com/N-bodyshop/changa
         cd changa
         ./configure
         make -j4
-# make changa test build only until someone can fix it	
-#    - name: test-changa
-#      run: |
-#        cd changa/teststep
-#        make test
+    - name: test-changa
+      run: |
+        cd changa/teststep
+        make test
 
   charm4py_netlrts-linux-x86_64_tcp:
     runs-on: ubuntu-latest
