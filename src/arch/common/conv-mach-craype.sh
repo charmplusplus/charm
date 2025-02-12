@@ -1,3 +1,6 @@
+CMK_BUILD_CRAY=1
+
+CMK_CRAY_NOGNI=1
 
 PGCC=`CC -V 2>&1 | grep pgCC`
 ICPC=`CC -V 2>&1 | grep Intel`
