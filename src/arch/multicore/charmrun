@@ -40,7 +40,6 @@ do
 	+n[0-9]*)
 		printf "Charmrun> Error: Multicore builds only support single-node runs.\n"
 		exit 1
-		shift
 		;;
 	++quiet)
 		QUIET=1
