@@ -349,6 +349,10 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _reque
       success &= checkpointOne(dirname, cb, requestStatus);
     }
   }
+  
+#if CMK_SHRINK_EXPAND
+  pending_realloc_state = NO_REALLOC;
+#endif
 
 #ifndef CMK_CHARE_USE_PTR
   // only create chare checkpoint file if this PE actually has data

@@ -1067,19 +1067,18 @@ void CentralLB::CheckForLB() {
 // We assume that bit vector would have been aptly set async by either scheduler or charmrun.
 void CentralLB::CheckForRealloc(){
 #if CMK_SHRINK_EXPAND
-   if(pending_realloc_state == EXPAND_MSG_RECEIVED || pending_realloc_state == SHRINK_MSG_RECEIVED) {
-        pending_realloc_state = EXPAND_MSG_RECEIVED ? EXPAND_IN_PROGRESS : SHRINK_IN_PROGRESS; //in progress
-        CkPrintf("Load balancer invoking charmrun to handle reallocation on pe %d\n", CkMyPe());
-        double end_lb_time = CkWallTimer();
-        CkPrintf("CharmLB> %s: PE [%d] step %d finished at %f duration %f s\n\n",
-            lbname, cur_ld_balancer, step()-1, end_lb_time,	end_lb_time-start_lb_time);
-        // do checkpoint
-        CkCallback cb(CkIndex_CentralLB::ResumeFromReallocCheckpoint(), thisProxy[0]);
-        CkStartCheckpoint(_shrinkexpand_basedir, cb);
-    }
-    else{
-        thisProxy.MigrationDoneImpl(1);
-    }
+  if(pending_realloc_state == EXPAND_MSG_RECEIVED || pending_realloc_state == SHRINK_MSG_RECEIVED) {
+    pending_realloc_state = (pending_realloc_state == EXPAND_MSG_RECEIVED) ? EXPAND_IN_PROGRESS : SHRINK_IN_PROGRESS; //in progress
+    CkPrintf("Load balancer invoking charmrun to handle reallocation on pe %d\n", CkMyPe());
+    double end_lb_time = CkWallTimer();
+    CkPrintf("CharmLB> %s: PE [%d] step %d finished at %f duration %f s\n\n",
+        lbname, cur_ld_balancer, step()-1, end_lb_time,	end_lb_time-start_lb_time);
+    // do checkpoint
+    CkCallback cb(CkIndex_CentralLB::ResumeFromReallocCheckpoint(), thisProxy[0]);
+    CkStartCheckpoint(_shrinkexpand_basedir, cb);
+  } else {
+    thisProxy.MigrationDoneImpl(1);
+  }
 #endif
 }
 
