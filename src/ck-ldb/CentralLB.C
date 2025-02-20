@@ -129,32 +129,32 @@ int CentralLB::GetPESpeed()
   return myspeed;
 }
 
+void CentralLB::CallLB()
+{
+  #if CMK_LBDB_ON
+  DEBUGF(("[%d] CentralLB AtSync step %d!!!!!\n",CkMyPe(),step()));
+#if CMK_MEM_CHECKPOINT	
+  CkSetInLdb();
+#endif
+
+  // if num of processor is only 1, nothing should happen
+  if (!QueryBalanceNow(step()) || CkNumPes() == 1) {
+    MigrationDone(0);
+    return;
+  }
+  {
+    thisProxy [CkMyPe()].ProcessAtSync();
+  }
+#endif
+}
+
 void CentralLB::InvokeLB()
 {
 #if CMK_SHRINK_EXPAND
-  if (pending_realloc_state == EXPAND_MSG_RECEIVED) {
-    // for expand, first checkpoint restart then load balance
-    if (CkMyPe() == 0)
-      CheckForRealloc();
-  } else
+  contribute(CkCallback(CkReductionTarget(CentralLB, CheckForLB), thisProxy[0]));
+#else
+  CallLB();
 #endif
-  {
-#if CMK_LBDB_ON
-    DEBUGF(("[%d] CentralLB AtSync step %d!!!!!\n",CkMyPe(),step()));
-#if CMK_MEM_CHECKPOINT	
-    CkSetInLdb();
-#endif
-
-    // if num of processor is only 1, nothing should happen
-    if (!QueryBalanceNow(step()) || CkNumPes() == 1) {
-      MigrationDone(0);
-      return;
-    }
-    {
-      thisProxy [CkMyPe()].ProcessAtSync();
-    }
-#endif
-  }
 }
 
 void CentralLB::ProcessAtSync()
@@ -1057,6 +1057,13 @@ void CentralLB::ProcessReceiveMigration()
 #endif
 }
 
+void CentralLB::CheckForLB() {
+  if (pending_realloc_state == EXPAND_MSG_RECEIVED)
+    CheckForRealloc();
+  else
+    thisProxy.CallLB();
+}
+
 // We assume that bit vector would have been aptly set async by either scheduler or charmrun.
 void CentralLB::CheckForRealloc(){
 #if CMK_SHRINK_EXPAND
@@ -1111,8 +1118,8 @@ void CentralLB::WillIbekilled(std::vector<char> avail, int newnumProcessAfterRes
 
 void CentralLB::StartCleanup(){
 #if CMK_SHRINK_EXPAND
-  CkAbort("FLAG\n");
-  CkPrintf("Starting cleanup\n");
+  //CkAbort("FLAG\n");
+  //CkPrintf("Starting cleanup\n");
 	CkCleanup();
 #endif
 }

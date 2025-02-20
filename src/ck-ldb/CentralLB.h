@@ -96,6 +96,7 @@ public:
   int GetPESpeed();
   inline void setConcurrent(bool c) { concurrent = c; }
 
+  void CallLB();
   void InvokeLB(); // Everything is at the PE barrier
   void ProcessAtSync(void); // Receive a message from AtSync to avoid
                             // making projections output look funny
@@ -121,6 +122,7 @@ public:
   void MissMigrate(int waitForBarrier);
 
   //Shrink-Expand related functions
+  void CheckForLB();
   void CheckForRealloc ();
   void ResumeFromReallocCheckpoint();
   void MigrationDoneImpl (int );

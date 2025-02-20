@@ -585,6 +585,7 @@ void LBManager::RemoveStartLBFn(int handle)
 
 void LBManager::StartLB()
 {
+  CkPrintf("Start LB called\n");
   if (startLBFn_count == 0)
   {
     CmiAbort("StartLB is not supported in this LB");

@@ -334,12 +334,14 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _reque
 	if (CkMyPe() == 0) {
 #if CMK_SHRINK_EXPAND
     if (pending_realloc_state == SHRINK_IN_PROGRESS) {
+      CkPrintf("Shrink in progress on PE%i\n", CkMyPe());
       // After restarting from this AtSync checkpoint, resume execution along the
       // normal path (i.e. whatever the user defined as ResumeFromSync.)
       CkCallback resumeFromSyncCB(CkIndex_LBManager::ResumeClients(), _lbmgr);
       success &= checkpointOne(dirname, resumeFromSyncCB, requestStatus);
     } else if (pending_realloc_state == EXPAND_IN_PROGRESS) {
-      CkCallback resumeFromSyncCB(CkIndex_LBManager::StartLB(), _lbmgr);
+      CkPrintf("Expand in progress on PE%i\n", CkMyPe());
+      CkCallback resumeFromSyncCB(CkIndex_LBManager::StartLB(), CProxy_LBManager(_lbmgr)[0]);
       success &= checkpointOne(dirname, resumeFromSyncCB, requestStatus);
     } else
 #endif

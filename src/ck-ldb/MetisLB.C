@@ -85,12 +85,19 @@ void MetisLB::work(LDStats* stats)
   std::vector<idx_t> adjwgt(numEdges);
 
   int edgeNum = 0;
-  const double ratio = 256.0 / maxLoad;
+  double ratio;
+  if (maxLoad == 0)
+    ratio = 0;
+  else
+    ratio = 256.0 / maxLoad;
 
   for (int i = 0; i < numVertices; i++)
   {
     xadj[i] = edgeNum;
-    vwgt[i] = (int)ceil(ogr->vertices[i].getVertexLoad() * ratio);
+    if (ogr->vertices[i].getVertexLoad() == 0 && ratio == 0)
+      vwgt[i] = 1;
+    else
+      vwgt[i] = (int)ceil(ogr->vertices[i].getVertexLoad() * ratio);
     for (const auto& outEdge : ogr->vertices[i].sendToList)
     {
       adjncy[edgeNum] = outEdge.getNeighborId();
