@@ -1395,8 +1395,10 @@ static void open_charmrun_socket(void)
   dataskt=skt_datagram(&dataport, Cmi_os_buffer_size);
 #endif
   MACHSTATE2(5,"skt_connect at dataskt:%d Cmi_charmrun_port:%d",dataskt, Cmi_charmrun_port);
+  //printf("skt_connect at dataskt:%d Cmi_charmrun_port:%d",dataskt, Cmi_charmrun_port);
   Cmi_charmrun_fd = skt_connect(Cmi_charmrun_IP, Cmi_charmrun_port, 1800);
   MACHSTATE2(5,"Opened connection to charmrun at socket %d, dataport=%d", Cmi_charmrun_fd, dataport);
+  //printf("Opened connection to charmrun at socket %d, dataport=%d", Cmi_charmrun_fd, dataport);
   skt_tcp_no_nagle(Cmi_charmrun_fd);
 }
 
@@ -1454,6 +1456,8 @@ static void send_singlenodeinfo(void)
      use non-locking version */
   ctrl_sendone_nolock("initnode", (const char *)&me, sizeof(me), NULL, 0);
   MACHSTATE1(5, "send initnode - dataport:%d", dataport);
+  //fprintf(stderr, "send initnode - dataport:%d", dataport);
+  //fflush(stderr);
 
   MACHSTATE(3, "initnode sent");
 }
@@ -2153,7 +2157,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 
     /* NOTE: can not acutally call timer before timerInit ! GZ */
 #if CMK_SHRINK_EXPAND
-  MACHSTATE3(2,"After reorg  %d %d %d \n", Cmi_oldpe, Lrts_myNode, Lrts_numNodes);
+  CmiPrintf("After reorg  %d %d %d \n", Cmi_oldpe, Lrts_myNode, Lrts_numNodes);
 #endif
   MACHSTATE2(5,"Init: (netpoll=%d), (idlepoll=%d)",Cmi_netpoll,Cmi_idlepoll);
 

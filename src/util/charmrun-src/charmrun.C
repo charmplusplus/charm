@@ -1700,6 +1700,7 @@ static void nodeinfo_add(const ChSingleNodeinfo *in, nodetab_process & p)
     fprintf(stderr, "Charmrun> Warning: Process #%d received ChSingleNodeInfo #%d\n", p.nodeno, node);
 
   p.info = in->info;
+  fprintf(stderr, "Charmrun> client %d added -> dataport = %d\n", node, ChMessageInt(p.info.dataport));
   p.num_pus = ChMessageInt(in->num_pus);
   p.num_cores = ChMessageInt(in->num_cores);
   p.num_sockets = ChMessageInt(in->num_sockets);
@@ -2066,7 +2067,6 @@ static int req_handle_initnode(ChMessage *msg, nodetab_process & p)
     fprintf(stderr, "Charmrun: possibly because: %s.\n", msg->data);
     exit(1);
   }
-
   nodeinfo_add((ChSingleNodeinfo *) msg->data, p);
   return REQ_OK;
 }
