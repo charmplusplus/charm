@@ -314,16 +314,17 @@ void CentralLB::BuildStatsMsg()
   msg->pe_speed = myspeed;
 #endif
 
-  DEBUGF(("Processor %d Total time (wall,cpu) = %f %f Idle = %f Bg = %f %f\n", CkMyPe(),msg->total_walltime,msg->total_cputime,msg->idletime,msg->bg_walltime,msg->bg_cputime));
+  DEBUGF(("Processor %d Total time (wall,cpu) = %f Idle = %f Bg = %f\n", CkMyPe(),msg->total_walltime,msg->idletime,msg->bg_walltime));
 
   msg->objData.resize(osz);
   lbmgr->GetObjData(msg->objData.data());
   msg->commData.resize(csz);
   lbmgr->GetCommData(msg->commData.data());
 //  lbmgr->ClearLoads();
-  DEBUGF(("PE %d BuildStatsMsg %d objs, %d comm\n",CkMyPe(),msg->n_objs,msg->n_comm));
+  DEBUGF(("PE %d BuildStatsMsg %d objs, %d comm\n",CkMyPe(),msg->objData.size(),msg->commData.size()));
 
   if(CkMyPe() == cur_ld_balancer) {
+    int count_avail = 0;
     lbmgr->get_avail_vector(msg->avail_vector);
     msg->next_lb = LBManagerObj()->new_lbbalancer();
   }

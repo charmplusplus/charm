@@ -15,6 +15,7 @@
 
 ProcArray::ProcArray(BaseLB::LDStats *stats) {
   const int numPes = stats->procs.size();
+
   // fill the processor array
   procs.resize(numPes);
   availPeMap.resize(numPes);

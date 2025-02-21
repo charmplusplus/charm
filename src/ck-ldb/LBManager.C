@@ -806,8 +806,8 @@ void LBManager::pup(PUP::er& p)
       avail_vector_set = true;
       p | avail_vector;
       // If we're restarting with more PEs, make the new ones available
-      if (avail_vector.size() < CkNumPes())
-        avail_vector.resize(CkNumPes(), 1);
+      //if (avail_vector.size() < CkNumPes())
+      avail_vector.resize(CkNumPes(), 1);
     }
     else
     {

@@ -38,7 +38,7 @@ static void handler(char *bit_map)
         pending_realloc_state = SHRINK_MSG_RECEIVED;
 
     if((CkMyPe() == 0) && (load_balancer_created))
-    LBManagerObj()->set_avail_vector(bit_map);
+    LBManagerObj()->set_avail_vector(bit_map, 0);
 
     se_avail_vector = (char *)malloc(sizeof(char) * CkNumPes());
     LBManagerObj()->get_avail_vector(se_avail_vector);
