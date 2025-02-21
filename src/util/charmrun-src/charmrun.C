@@ -25,6 +25,7 @@
 #include <sys/stat.h>
 
 #include <unordered_map>
+#include <unordered_set>
 #include <map>
 #include <string>
 #include <vector>
@@ -365,6 +366,8 @@ static char *getenv_display_no_tamper()
 static unsigned int server_port;
 static char server_addr[1024]; /* IP address or hostname of charmrun*/
 static SOCKET server_fd;
+
+static std::unordered_set<int> node_set;
 /*****************************************************************************
  *                                                                           *
  * PPARAM - obtaining "program parameters" from the user.                    *
@@ -1700,7 +1703,8 @@ static void nodeinfo_add(const ChSingleNodeinfo *in, nodetab_process & p)
     fprintf(stderr, "Charmrun> Warning: Process #%d received ChSingleNodeInfo #%d\n", p.nodeno, node);
 
   p.info = in->info;
-  fprintf(stderr, "Charmrun> client %d added -> dataport = %d\n", node, ChMessageInt(p.info.dataport));
+  fprintf(stdout, "Charmrun> client %d added -> dataport = %d\n", node, ChMessageInt(p.info.dataport));
+  fflush(stdout);
   p.num_pus = ChMessageInt(in->num_pus);
   p.num_cores = ChMessageInt(in->num_cores);
   p.num_sockets = ChMessageInt(in->num_sockets);
@@ -3286,6 +3290,8 @@ static SOCKET errorcheck_one_client_connect(void)
 
   const SOCKET req_client = skt_accept(server_fd, &clientIP, &clientPort);
 
+  //printf("clientPort = %d\n", clientPort);
+
   /* FIXME: will this ever be triggered? It seems the skt_abort handler here is
    *        'client_connect_problem', which calls exit(1), so we'd exit
    *        in skt_accept. */
@@ -3420,6 +3426,7 @@ static void req_set_client_connect(std::vector<nodetab_process> & process_table,
 #endif
 
   int finished = 0;
+  printf("Count = %d\n", count);
   while (finished < count)
   {
 /* check server socket for messages */
@@ -3432,6 +3439,9 @@ static void req_set_client_connect(std::vector<nodetab_process> & process_table,
 
       curclientend++;
     }
+    fprintf(stdout, "open_sockets.size() = %d, clientstart,end=%d, %d\n", open_sockets.size(), 
+      curclientstart, curclientend);
+    fflush(stdout);
 #endif
     /* check appropriate clients for messages */
     while (!open_sockets.empty())
@@ -3445,6 +3455,15 @@ static void req_set_client_connect(std::vector<nodetab_process> & process_table,
         ChMessage_recv(req_client, &msg);
 
         int nodeNo = ChMessageInt(((ChSingleNodeinfo *)msg.data)->nodeNo);
+
+        if (node_set.find(nodeNo) != node_set.end())
+        {
+          printf("Charmrun> node %d is already in the node set\n", nodeNo);
+          continue;
+        }
+
+        node_set.insert(nodeNo);
+
         nodetab_process & p = get_process_for_nodeno(process_table, nodeNo);
         p.req_client = req_client;
 
