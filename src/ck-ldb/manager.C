@@ -45,6 +45,8 @@ void realloc(char* reallocMsg)
 
         se_avail_vector = (char *)malloc(sizeof(char) * CkNumPes());
         LBManagerObj()->get_avail_vector(se_avail_vector);
+
+        free(reallocMsg);
     }
 }
 
@@ -54,6 +56,35 @@ static void handler(char *bit_map)
     printf("Charm> Rescaling called!\n");
     shrinkExpandreplyToken = CcsDelayReply();
     bit_map += CmiMsgHeaderSizeBytes;
+    realloc(bit_map);
+#endif
+}
+
+static void realloc_handler(char *msg)
+{
+#if CMK_SHRINK_EXPAND
+    printf("Charm> Rescaling called!\n");
+    shrinkExpandreplyToken = CcsDelayReply();
+    msg += CmiMsgHeaderSizeBytes;
+    bool isExpand = *((bool *)msg);
+    int numPes = *((int *)(msg + sizeof(bool)));
+    char* bit_map = (char *)malloc(CkNumPes() + sizeof(int));
+    if (isExpand)
+    {
+        for (int i = 0; i < CkNumPes(); i++) {
+            bit_map[i] = 1;
+        }
+    }
+    else
+    {
+        for (int i = 0; i < CkNumPes(); i++) {
+            if (i < numPes)
+                bit_map[i] = 1;
+            else
+                bit_map[i] = 0;
+        }
+    }
+    memcpy(&bit_map[CkNumPes()], &numPes, sizeof(int));
     realloc(bit_map);
 #endif
 }
@@ -69,6 +100,7 @@ void manager_init(){
     willContinue = 0;
     if (inited) return;
     CcsRegisterHandler("set_bitmap", (CmiHandler) handler);
+    CcsRegisterHandler("realloc", (CmiHandler) realloc_handler);
     inited = 1;
     pending_realloc_state = NO_REALLOC;
 #endif
