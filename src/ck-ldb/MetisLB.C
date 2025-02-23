@@ -159,9 +159,13 @@ void MetisLB::work(LDStats* stats)
   // ubvec: of size ncon to indicate allowed load imbalance tolerance (> 1.0)
   // options: array of options; edgecut: stores the edgecut; pemap: mapping
   CkPrintf("Metis partitioning in %i partitions\n", parr->availProcSize);
-  METIS_PartGraphRecursive(&numVertices, &ncon, xadj.data(), adjncy.data(), vwgt.data(),
-                           vsize, adjwgt.data(), &parr->availProcSize, tpwgts, ubvec.data(),
-                           options.data(), &edgecut, pemap.data());
+  
+  if (parr->availProcSize > 1)
+    METIS_PartGraphRecursive(&numVertices, &ncon, xadj.data(), adjncy.data(), vwgt.data(),
+                            vsize, adjwgt.data(), &parr->availProcSize, tpwgts, ubvec.data(),
+                            options.data(), &edgecut, pemap.data());
+  else
+    pemap.resize(numVertices, 0);
 
   CkPrintf("Original PE map\n");
   for (int i = 0; i < pemap.size(); i++)

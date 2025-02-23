@@ -150,6 +150,7 @@ void CentralLB::CallLB()
 
 void CentralLB::InvokeLB()
 {
+  lbmgr->lb_in_progress = true;
 #if CMK_SHRINK_EXPAND
   contribute(CkCallback(CkReductionTarget(CentralLB, CheckForLB), thisProxy[0]));
 #else
@@ -1135,6 +1136,7 @@ void CentralLB::MigrationDone(int balancing)
     MigrationDoneImpl(balancing);
 #endif
 }
+
 void CentralLB::MigrationDoneImpl (int balancing)
 {
 
@@ -1187,6 +1189,10 @@ void CentralLB::ResumeClients(int balancing)
             future_migrates_expected == future_migrates_completed) {
       CheckMigrationComplete();
     }
+
+    lbmgr->lb_in_progress = false;
+    if (CkMyPe() == 0)
+      lbmgr->callRealloc();
   }
 #endif
 }

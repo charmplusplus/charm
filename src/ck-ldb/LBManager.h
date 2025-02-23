@@ -96,6 +96,8 @@ extern bool _lb_psizer_on;
 #define PredictorPrintf \
   if (PREDICT_DEBUG) CmiPrintf
 
+extern void realloc(char*);
+
 // used in constructor of all load balancers
 class CkLBOptions
 {
@@ -239,8 +241,12 @@ class LBManager : public CBase_LBManager
 
   int startLBFn_count;
 
+  char* reallocBuffer;
+
  public:
   int chare_count;
+  bool lb_in_progress;
+
 
   LBManager(void) { init(); }
   LBManager(CkMigrateMessage* m) : CBase_LBManager(m) { init(); }
@@ -263,6 +269,23 @@ class LBManager : public CBase_LBManager
 
   void configureTreeLB(const char* json_str);
   void configureTreeLB(json& config);
+
+  void bufferRealloc(char* bitmap)
+  {
+    int size = CkNumPes() + sizeof(int);
+    reallocBuffer = (char*)malloc(size);
+    memcpy(reallocBuffer, bitmap, size);
+  }
+
+  void callRealloc()
+  {
+    if (reallocBuffer != nullptr)
+    {
+      realloc(reallocBuffer);
+      free(reallocBuffer);
+      reallocBuffer = nullptr;
+    }
+  }
 
   /*
    * Calls from object managers to load database

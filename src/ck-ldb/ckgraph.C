@@ -31,6 +31,7 @@ ProcArray::ProcArray(BaseLB::LDStats *stats) {
     procs[pe].setOverhead(stats->procs[pe].bg_walltime);
     procs[pe].setTotalLoad(stats->procs[pe].total_walltime - stats->procs[pe].idletime);
     procs[pe].available = stats->procs[pe].available;
+    //CkPrintf("%i avail = %d\n", pe, procs[pe].available);
     availProcSize += (procs[pe].available ? 1 : 0);
     avgLoad += procs[pe].getTotalLoad();
     if (!procs[pe].available)

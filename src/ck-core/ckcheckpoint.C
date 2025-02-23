@@ -678,7 +678,7 @@ void CkPupArrayElementsData(PUP::er &p, int notifyListeners)
       p|gID;
       p|idx;
       p|id;
-      CkPrintf("[%d] Unpacked dim = %i: %s\n", CkMyPe(), idx.dimension, idx2str(idx));
+      //CkPrintf("[%d] Unpacked dim = %i: %s\n", CkMyPe(), idx.dimension, idx2str(idx));
       CkLocMgr *mgr = (CkLocMgr*)CkpvAccess(_groupTable)->find(gID).getObj();
       if (notifyListeners){
         mgr->resume(idx, id, p, true);

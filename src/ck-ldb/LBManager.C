@@ -536,6 +536,7 @@ void LBManager::init(void)
   metabalancer = nullptr;
   lbdb_obj = new LBDatabase();
   currentLBIndex = 0;
+  reallocBuffer = nullptr;
 #if CMK_LB_CPUTIMER
   obj_cputime = 0;
 #endif

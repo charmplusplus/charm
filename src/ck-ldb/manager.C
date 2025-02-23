@@ -24,25 +24,37 @@ char willContinue;
 #endif
 bool load_balancer_created;
 
+void realloc(char* reallocMsg)
+{
+    numProcessAfterRestart = *((int *)(reallocMsg + CkNumPes()));
+
+    if (LBManagerObj()->lb_in_progress)
+    {
+        CkPrintf("Charm> Rescaling called while load balancing is in progress!\n");
+        LBManagerObj()->bufferRealloc(reallocMsg);
+    }
+    else
+    {
+        if (numProcessAfterRestart > CkNumPes())
+            pending_realloc_state = EXPAND_MSG_RECEIVED;
+        else
+            pending_realloc_state = SHRINK_MSG_RECEIVED;
+
+        if((CkMyPe() == 0) && (load_balancer_created))
+        LBManagerObj()->set_avail_vector(reallocMsg, 0);
+
+        se_avail_vector = (char *)malloc(sizeof(char) * CkNumPes());
+        LBManagerObj()->get_avail_vector(se_avail_vector);
+    }
+}
+
 static void handler(char *bit_map)
 {
 #if CMK_SHRINK_EXPAND
     printf("Charm> Rescaling called!\n");
     shrinkExpandreplyToken = CcsDelayReply();
     bit_map += CmiMsgHeaderSizeBytes;
-    numProcessAfterRestart = *((int *)(bit_map + CkNumPes()));
-    
-    if (numProcessAfterRestart > CkNumPes())
-        pending_realloc_state = EXPAND_MSG_RECEIVED;
-    else
-        pending_realloc_state = SHRINK_MSG_RECEIVED;
-
-    if((CkMyPe() == 0) && (load_balancer_created))
-    LBManagerObj()->set_avail_vector(bit_map, 0);
-
-    se_avail_vector = (char *)malloc(sizeof(char) * CkNumPes());
-    LBManagerObj()->get_avail_vector(se_avail_vector);
-
+    realloc(bit_map);
 #endif
 }
 
