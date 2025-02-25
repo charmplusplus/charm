@@ -166,11 +166,6 @@ void MetisLB::work(LDStats* stats)
                             options.data(), &edgecut, pemap.data());
   else
     pemap.resize(numVertices, 0);
-
-  CkPrintf("Original PE map\n");
-  for (int i = 0; i < pemap.size(); i++)
-    CkPrintf("%i, ", pemap[i]);
-  CkPrintf("\n");
   
   parr->reassignPeMapToAvailable(pemap);
 

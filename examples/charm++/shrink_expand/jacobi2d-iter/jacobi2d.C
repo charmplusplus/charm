@@ -96,6 +96,7 @@ void report(int completed_iteration) {
         if (iterations == total_iterations || CkWallTimer()-stTime>=3000000) {
 			CkPrintf("Program Done! avg_it:%.6f\n",(CkWallTimer()-stTime)/iterations);
             CkExit();
+            //exit(0);
         } else {
             if(iterations%100==0) CkPrintf("starting new iteration; iteration %d time: %.6lf time/itr::%.6f\n", iterations, CkWallTimer()-stTime,(CkWallTimer()-stTime)/iterations);
             //CkPrintf("Memory Usage: %ld bytes \n", CmiMemoryUsage());
@@ -169,14 +170,14 @@ public:
     // Perform one iteration of work
     // The first step is to send the local state to the neighbors
     void begin_iteration(void) {
-        if (iteration %50 ==0 && useLB ) {
+        if (iteration %200 ==0 && useLB ) {
             useLB = 0;
             if(thisIndex.x==0 && thisIndex.y==0) CkPrintf("PROC#%d Calling LBD --------------------- iteration=%d\n",CkMyPe(),iteration);
             AtSync();
         } else {
 
         useLB=1;
-        if(thisIndex.x==0 && thisIndex.y==0) CkPrintf("PROC#%d started --------------------- iteration=%d\n",CkMyPe(),iteration);
+        //if(thisIndex.x==0 && thisIndex.y==0) CkPrintf("PROC#%d started --------------------- iteration=%d\n",CkMyPe(),iteration);
 				iteration++;
         // Copy left column and right column into temporary arrays
         array1d left_edge(block_height);

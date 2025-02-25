@@ -282,7 +282,6 @@ class LBManager : public CBase_LBManager
     if (reallocBuffer != nullptr)
     {
       realloc(reallocBuffer);
-      free(reallocBuffer);
       reallocBuffer = nullptr;
     }
   }

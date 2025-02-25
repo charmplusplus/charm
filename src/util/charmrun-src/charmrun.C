@@ -3426,7 +3426,6 @@ static void req_set_client_connect(std::vector<nodetab_process> & process_table,
 #endif
 
   int finished = 0;
-  printf("Count = %d\n", count);
   while (finished < count)
   {
 /* check server socket for messages */
@@ -3439,9 +3438,9 @@ static void req_set_client_connect(std::vector<nodetab_process> & process_table,
 
       curclientend++;
     }
-    fprintf(stdout, "open_sockets.size() = %d, clientstart,end=%d, %d\n", open_sockets.size(), 
-      curclientstart, curclientend);
-    fflush(stdout);
+    //fprintf(stdout, "open_sockets.size() = %d, clientstart,end=%d, %d\n", open_sockets.size(), 
+    //  curclientstart, curclientend);
+    //fflush(stdout);
 #endif
     /* check appropriate clients for messages */
     while (!open_sockets.empty())

@@ -21,8 +21,9 @@ int main (int argc, char **argv)
 
     // Create a CcsServer and connect to the given hostname and port
     CcsServer server;
-    char host[BUF], *bitmap;
-    int i, port, cmdLen, mode;
+    char host[BUF], *msg;
+    int i, port, cmdLen;
+    bool isExpand;
 
     sprintf(host, "%s", argv[1]);
     sscanf(argv[2], "%d", &port);
@@ -30,41 +31,28 @@ int main (int argc, char **argv)
     sscanf(argv[4], "%d", &NEWNPROCS);
 
     if( NEWNPROCS > OLDNPROCS)
-        mode = EXPAND;
+        isExpand = true;
     else if(OLDNPROCS > NEWNPROCS)
-        mode = SHRINK;
+        isExpand = false;
     else{
-        printf("Error: Old and new PE number is the same!\n");
+        printf("1");
         return 0;
     }
-    printf("Connecting to server %s %d\n", host, port);
-    CcsConnect(&server, host, port, NULL);
-    printf("Connected to server\n");
-
-    cmdLen = OLDNPROCS * sizeof(char) + sizeof(int) + sizeof(char);
-    bitmap = (char *) malloc(cmdLen);
-
-    if (mode == EXPAND) {
-        printf("Sending expand command.\n");
-        for (i = 0; i < OLDNPROCS; i++) {
-            bitmap[i] = 1;
-        }
+    //printf("Connecting to server %s %d\n", host, port);
+    if (CcsConnect(&server, host, port, NULL) == -1) {
+        printf("0");
+        return 0;
     }
-    else {
-        printf("Sending shrink command.\n");
-        for (i = 0; i < OLDNPROCS; i++) {
-            if (i < NEWNPROCS)
-                bitmap[i] = 1;
-            else
-                bitmap[i] = 0;
-        }
-    }
-    memcpy(&bitmap[OLDNPROCS], &NEWNPROCS, sizeof(int));
-    bitmap[OLDNPROCS+sizeof(int)] = '\0';
-    CcsSendRequest(&server, "set_bitmap", 0, cmdLen, bitmap);
+    //printf("Connected to server\n");
+
+    cmdLen = sizeof(int) + sizeof(bool);
+    msg = (char *) malloc(cmdLen);
+    memcpy(msg, &isExpand, sizeof(bool));
+    memcpy(&msg[sizeof(bool)], &NEWNPROCS, sizeof(int));
+    CcsSendRequest(&server, "realloc", 0, cmdLen, msg);
 
     printf("Waiting for reply...\n" );
-    CcsRecvResponse(&server, cmdLen, bitmap , 180);
+    CcsRecvResponse(&server, cmdLen, msg , 180);
     printf("Reply received.\n");
 
     return 0;
