@@ -60,7 +60,7 @@ set(ldb-h-sources ../ck-ldb/BaseLB.h ../ck-ldb/CentralLBMsg.h
     ../ck-ldb/LBComm.h
     ../ck-ldb/LBDatabase.h ../ck-ldb/LBManager.h ../ck-ldb/LBMachineUtil.h ../ck-ldb/LBOM.h
     ../ck-ldb/LBObj.h ../ck-ldb/LBSimulation.h
-    ../ck-ldb/MetaBalancer.h ../ck-ldb/MetisLB.h
+    ../ck-ldb/MetaBalancer.h ../ck-ldb/MetisLB.h ../ck-ldb/GreedyCentralLB.h
     ../ck-ldb/RandomForestModel.h
     ../ck-ldb/RecBipartLB.h
     ../ck-ldb/Refiner.h
@@ -83,8 +83,8 @@ add_dependencies(ckmain ck)
 # CommonLBs used to be a subset of EveryLB, but they were unified as
 # part of the LB refactor. However, maintain both targets for
 # backwards compatibility and for possible future divergence.
-add_library(moduleCommonLBs ${ldb-cxx-sources} ${ldb-h-sources} ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h)
-add_library(moduleEveryLB ${ldb-cxx-sources} ${ldb-h-sources} ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h)
+add_library(moduleCommonLBs ${ldb-cxx-sources} ${ldb-h-sources} ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h ../ck-ldb/GreedyCentralLB.C ../ck-ldb/GreedyCentralLB.h)
+add_library(moduleEveryLB ${ldb-cxx-sources} ${ldb-h-sources} ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h ../ck-ldb/GreedyCentralLB.C ../ck-ldb/GreedyCentralLB.h)
 configure_file(../ck-ldb/libmoduleCommonLBs.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
 configure_file(../ck-ldb/libmoduleEveryLB.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
 add_dependencies(moduleCommonLBs ck ckmetis)
@@ -108,6 +108,8 @@ add_library(moduleTreeLB ../ck-ldb/TreeLB.C)
 add_dependencies(moduleTreeLB ck)
 add_library(moduleRecBipartLB ../ck-ldb/RecBipartLB.C ../ck-ldb/RecBipartLB.h)
 add_dependencies(moduleRecBipartLB ck)
+add_library(moduleGreedyCentralLB ../ck-ldb/GreedyCentralLB.C ../ck-ldb/GreedyCentralLB.h)
+add_dependencies(moduleGreedyCentralLB ck)
 add_library(moduleScotchLB EXCLUDE_FROM_ALL ../ck-ldb/ScotchLB.C ../ck-ldb/ScotchLB.h)
 configure_file(../ck-ldb/libmoduleScotchLB.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
 add_dependencies(moduleScotchLB ck)

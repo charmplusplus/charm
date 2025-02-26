@@ -1062,8 +1062,10 @@ void CentralLB::ProcessReceiveMigration()
 void CentralLB::CheckForLB() {
   if (pending_realloc_state == EXPAND_MSG_RECEIVED)
     CheckForRealloc();
-  else
+  else if (pending_realloc_state == SHRINK_MSG_RECEIVED)
     thisProxy.CallLB();
+  else
+    thisProxy.ResumeClients(0);
 }
 
 // We assume that bit vector would have been aptly set async by either scheduler or charmrun.
@@ -1190,10 +1192,10 @@ void CentralLB::ResumeClients(int balancing)
       CheckMigrationComplete();
     }
 
-    lbmgr->lb_in_progress = false;
     if (CkMyPe() == 0)
       lbmgr->callRealloc();
   }
+  lbmgr->lb_in_progress = false;
 #endif
 }
 

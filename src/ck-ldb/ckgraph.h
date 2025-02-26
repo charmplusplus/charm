@@ -17,6 +17,9 @@
 #include "BaseLB.h"
 #include <vector>
 
+#define MAX(a,b) ((a)>(b)?(a):(b))
+#define MIN(a,b) ((a)<(b)?(a):(b))
+
 class ProcInfo
 {
   friend class ProcArray;
@@ -146,7 +149,7 @@ public:
   }
 
   int getVertexId() const { return id; }
-  double getVertexLoad() const { return compLoad; }
+  double getVertexLoad() const { return MAX(compLoad, 0.1); }
   int getCurrentPe() const { return currPe; }
   int getNewPe() const { return newPe; }
   void setNewPe(int _newpe) { newPe = _newpe; }

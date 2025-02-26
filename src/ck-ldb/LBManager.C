@@ -212,6 +212,7 @@ void _loadbalancerInit()
       lbNames.push_back("Refine");
       lbNames.push_back("Hybrid");
       lbNames.push_back("MetisLB");
+      lbNames.push_back("GreedyCentralLB");
       if (CkMyPe() == 0)
       {
         if (CmiGetArgStringDesc(argv, "+balancer", &balancer, "Use this load balancer"))
@@ -752,7 +753,7 @@ void LBManager::nextLoadbalancer(int seq)
 // switch strategy
 void LBManager::switchLoadbalancer(int switchFrom, int switchTo)
 {
-  if (lbNames[switchTo] != "DistributedLB" && lbNames[switchTo] != "MetisLB")
+  if (lbNames[switchTo] != "DistributedLB" && lbNames[switchTo] != "MetisLB" && lbNames[switchTo] != "GreedyCentralLB")
   {
     json config;
     if (lbNames[switchTo] == "Hybrid")
