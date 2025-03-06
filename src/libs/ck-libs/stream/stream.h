@@ -57,7 +57,13 @@ namespace Ck { namespace Stream {
 			DeliverStreamBytesMsg* _msg;
 			char* curr;
 			size_t num_bytes_rem;
+			size_t* msg_ref_counter = 0;
 			InData(DeliverStreamBytesMsg* msg, size_t num_bytes);
+			~InData();
+			InData(InData&& other);
+			InData& operator=(InData&& other);
+			InData(const InData& other) = delete;
+			InData& operator=(const InData& other) = delete;
 			void freeData();
 		};
 

@@ -23,6 +23,46 @@ namespace Ck { namespace Stream {
 			_msg = msg;
 			curr = msg -> data;
 			num_bytes_rem = num_bytes;
+			msg_ref_counter = new size_t(1);
+		}
+
+		//InData::InData(const InData& other){
+		//	_msg = other._msg;
+		//	curr = other.curr;
+		//	num_bytes_rem = other.num_bytes_rem;
+		//	msg_ref_counter = other.msg_ref_counter;
+		//	*msg_ref_counter += 1;
+		//}
+		InData::InData(InData&& other){
+			_msg = other._msg;
+			curr = other.curr;
+			num_bytes_rem = other.num_bytes_rem;
+			msg_ref_counter = other.msg_ref_counter;
+			// no longer owns the delivery message
+			other._msg = nullptr;
+			other.msg_ref_counter = 0;
+		}
+
+		InData::~InData(){
+			if(msg_ref_counter){
+				*msg_ref_counter -= 1;
+				if(*msg_ref_counter == 0){
+					delete msg_ref_counter;
+					freeData();
+				} 
+			}
+		}
+
+		InData& InData::operator=(InData&& other){
+			if(&other == this) return *this;
+			_msg = other._msg;
+			curr = other.curr;
+			num_bytes_rem = other.num_bytes_rem;
+			msg_ref_counter = other.msg_ref_counter;
+			// no longer owns the delivery message
+			other._msg = nullptr;
+			other.msg_ref_counter = 0;
+			return *this;		
 		}
 		
 		void InData::freeData(){
@@ -347,7 +387,7 @@ namespace Ck { namespace Stream {
 			// wrap it in a InData object and then push to the get_queue
 			_counter.processIncomingMessage(data -> num_bytes, data -> sender_pe);
 			InData in_data(data, data -> num_bytes);
-			_get_buffer.push_back(in_data);
+			_get_buffer.push_back(std::move(in_data));
 			_get_buffer_size += data -> num_bytes;
 			// process all the buffered get requests when new data comes in
 			clearBufferedGetRequests();
