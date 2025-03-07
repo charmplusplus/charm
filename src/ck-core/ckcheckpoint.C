@@ -912,6 +912,7 @@ void CkRecvGroupROData(char* msg)
 }
 
 void CkRestartMain(const char* dirname, CkArgMsg *args){
+  double startTime = CmiWallTimer();
 	int i;
 	
   if (CmiMyRank() == 0) {
@@ -975,6 +976,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
   
     //CkPrintf("PE %i at barrier\n", CkMyPe());
     //CmiBarrier();
+    CkPrintf("Restore from disk finished in %fs\n", CmiWallTimer() - startTime);
   }
 
    	//_initDone();
