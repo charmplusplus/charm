@@ -455,7 +455,7 @@ void CkPupROData(PUP::er &p)
 void CkPupMainChareData(PUP::er &p, CkArgMsg *args)
 {
 	int nMains=_mainTable.size();
-	DEBCHK("[%d] CkPupMainChareData %s: nMains = %d\n", CkMyPe(),p.typeString(),nMains);
+	//CkPrintf("[%d] CkPupMainChareData %s: nMains = %d\n", CkMyPe(),p.typeString(),nMains);
 	for(int i=0;i<nMains;i++){  /* Create all mainchares */
 		const auto& chareIdx = _mainTable[i]->chareIdx;
 		ChareInfo *entry = _chareTable[chareIdx];
@@ -463,11 +463,14 @@ void CkPupMainChareData(PUP::er &p, CkArgMsg *args)
 		if(entryMigCtor!=-1) {
 			Chare* obj;
 			if (p.isUnpacking()) {
-				DEBCHK("MainChare PUP'ed: name = %s, idx = %d, size = %d\n", entry->name, i, entry->size);
+				//CkPrintf("MainChare PUP'ed: name = %s, idx = %d, size = %d\n", entry->name, i, entry->size);
 				obj = CkAllocateChare(chareIdx);
+        //CkPrintf("Allocated mainchare %s\n", entry->name);
 				_mainTable[i]->setObj(obj);
+        //CkPrintf("Set mainchare %s\n", entry->name);
 				//void *m = CkAllocSysMsg();
 				CkInvokeEP(obj, entryMigCtor, args);
+        //CkPrintf("Invoked migration constructor for mainchare %s\n", entry->name);
 			}
 			else 
 			 	obj = (Chare *)_mainTable[i]->getObj();
@@ -909,10 +912,14 @@ void CkRecvGroupROData(char* msg)
 	}
   
   if (CmiMyRank() == 0) CkMemCheckPT::inRestarting = false;
+
+  if (CmiMyPe() == 0) {
+    CkPrintf("Restore from disk finished in %fs, sending out the cb...\n", CmiWallTimer() - chkptStartTimer);
+  }
 }
 
 void CkRestartMain(const char* dirname, CkArgMsg *args){
-  double startTime = CmiWallTimer();
+  chkptStartTimer = CmiWallTimer();
 	int i;
 	
   if (CmiMyRank() == 0) {
@@ -976,7 +983,6 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
   
     //CkPrintf("PE %i at barrier\n", CkMyPe());
     //CmiBarrier();
-    CkPrintf("Restore from disk finished in %fs\n", CmiWallTimer() - startTime);
   }
 
    	//_initDone();
