@@ -146,7 +146,7 @@ DistributedLB.o: DistributedLB.C DistributedLB.h DistBaseLB.h BaseLB.h \
  CkCallback.decl.h BaseLB.decl.h DistBaseLB.decl.h DistributedLB.decl.h \
  ckheap.h elements.h ckset.h DistributedLB.def.h
 
-DiffusionLB.o: DiffusionLB.C Heap_helper.C Neighbor_list.C Helper.C DiffusionLB.h DistBaseLB.h BaseLB.h \
+DiffusionLB.o: DiffusionLB.C Heap_helper.C DiffusionNeighbors.C DiffusionHelper.C DiffusionLB.h DistBaseLB.h BaseLB.h \
  LBManager.h LBDatabase.h lbdb.h converse.h conv-header.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach-common.h conv-mach.h \
  conv-mach-opt.h lrts-common.h cmiqueue.h pup_c.h pup_c_functions.h \
