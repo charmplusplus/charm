@@ -167,39 +167,6 @@ void DiffusionLB::startStrategy()
   for (int i = 0; i < numNodes; i++) thisProxy[i * nodeSize].pseudolb_rounds();
 }
 
-double DiffusionLB::avgNborLoad()
-{
-  double sum = 0.0;
-
-  for (int i = 0; i < neighborCount; i++) sum += loadNeighbors[i];
-  return sum / neighborCount;
-}
-
-int DiffusionLB::GetPENumber(int& obj_id)
-{
-  int i = 0;
-  for (i = 0; i < nodeSize; i++)
-  {
-    if (obj_id < prefixObjects[i])
-    {
-      int prevAgg = 0;
-      if (i != 0)
-        prevAgg = prefixObjects[i - 1];
-      obj_id = obj_id - prevAgg;
-      break;
-    }
-  }
-  return i;
-}
-
-// TODO: remove
-bool DiffusionLB::AggregateToSend()
-{
-  bool res = false;
-  for (int i = 0; i < neighborCount; i++) toSendLoad[i] -= toReceiveLoad[i];
-  return res;
-}
-
 void DiffusionLB::InitializeObjHeap(BaseLB::LDStats* stats, int* obj_arr, int n,
                                     int* gain_val)
 {
@@ -260,14 +227,6 @@ void DiffusionLB::PseudoLoadBalancing()
     int nbor_node = sendToNeighbors[i];
     thisProxy[nbor_node * nodeSize].PseudoLoad(itr, thisIterToSend[i], myNodeId);
   }
-}
-
-int DiffusionLB::findNborIdx(int node)
-{
-  for (int i = 0; i < sendToNeighbors.size(); i++)
-    if (sendToNeighbors[i] == node)
-      return i;
-  return -1;
 }
 
 #define SELF_IDX NUM_NEIGHBORS
@@ -564,22 +523,6 @@ void DiffusionLB::WithinNodeLB()
       CkStartQD(cb);
     }
   }
-}
-
-double DiffusionLB::averagePE()
-{
-  double avg = 0.0;
-  for (int i = 0; i < nodeSize; i++) avg += pe_load[i];
-  avg /= nodeSize;
-  return avg;
-}
-
-int DiffusionLB::FindObjectHandle(LDObjHandle h)
-{
-  for (int i = 0; i < objectHandles.size(); i++)
-    if (objectHandles[i].id == h.id)
-      return i;
-  return -1;
 }
 
 // Create a migrate message for this obj from resident PE to rank0PE

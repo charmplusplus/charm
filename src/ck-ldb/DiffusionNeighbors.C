@@ -88,7 +88,7 @@ void DiffusionLB::createCommList()
       LDObjKey from = commData.sender;
       LDObjKey to = commData.receiver.get_destObj();
 
-      int fromobj = nodeStats->getHash(from);
+      int fromobj = nodeStats->getHash(from);  // this replaces the simulator get_obj_idx
       int toobj = nodeStats->getHash(to);
 
       if (fromobj == -1 || toobj == -1)
@@ -102,9 +102,15 @@ void DiffusionLB::createCommList()
         ebytes[toNode] += commData.bytes;
     }
   }
+
+  // initialize cost per neighbor (cost is a misnomer: higher cost is better neighbor)
+  // TODO: note that this cost can be zero... is this okay?
+  // for (int i = 0; i < numNodes; i++)
+  // {
+  //   cost_for_neighbor[i] = ebytes[i];
+  // }
+
   sortArr(ebytes, numNodes, nbors);
-  //  for(int i=0;i<numNodes-1;i++)
-  //  CkPrintf("\n[Node-%d]Potential Neighbors List = Node-%d", myNodeId, nbors[i]);
 }
 
 void DiffusionLB::next_phase(int val)

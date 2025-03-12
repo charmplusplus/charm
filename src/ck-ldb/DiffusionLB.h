@@ -170,31 +170,30 @@ private:
   int migrates;      // number of objects migrated across node
   int migratesNode;  // number of objects migrated within node
 
+  // helper functions
+  CLBStatsMsg* AssembleStats();
+  void AddToList(CLBStatsMsg* m, int rank);
+  void BuildStats();
+  int findNborIdx(int node);
+  bool AggregateToSend();
+  double avgNborLoad();
+
+  // state helpers
+  int GetPENumber(int& obj_id);
+  double averagePE();
+
   // Cascading migrations
   std::vector<LDObjHandle> objectHandles;
   std::vector<double> objectLoads;
   int FindObjectHandle(LDObjHandle h);
   void CascadingMigration(LDObjHandle h, double load);
 
-  // helper functions
-  bool preprocessingDone;
-  int GetPENumber(int& obj_id);
-  void preprocess(const int explore_limit);
-  bool AggregateToSend();
-
+  // main functions
   void Strategy(const DistBaseLB::LDStats* const stats);
+  void PseudoLoadBalancing();
 
   // Heap functions
   void InitializeObjHeap(BaseLB::LDStats* stats, int* obj_arr, int size, int* gain_val);
-
-  // topo aware neighbors are populated.
-  double avgNborLoad();
-  double averagePE();
-  int findNborIdx(int node);
-  void PseudoLoadBalancing();
-  CLBStatsMsg* AssembleStats();
-  void AddToList(CLBStatsMsg* m, int rank);
-  void BuildStats();
 };
 
 #endif /* _DistributedLB_H_ */

@@ -104,7 +104,7 @@ module DiffusionLB
       // Calculate the aggregate load that has to be sent.
       serial "Aggregate load"
       {
-        // bool res = AggregateToSend();
+        AggregateToSend();
         for (int i = 0; i < neighborCount; i++) toSendLoad[i] -= toReceiveLoad[i];
         loadReceivers = 0;
         // my_load = my_loadAfterTransfer;
