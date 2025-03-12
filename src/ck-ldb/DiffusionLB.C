@@ -74,8 +74,6 @@ DiffusionLB::DiffusionLB(const CkLBOptions& opt) : CBase_DiffusionLB(opt)
     nodeStats = new BaseLB::LDStats(nodeSize);
     numObjects.resize(nodeSize);
     prefixObjects.resize(nodeSize);
-    migratedTo.resize(nodeSize);
-    migratedFrom.resize(nodeSize);
     pe_load.resize(nodeSize);
   }
 #endif
@@ -100,6 +98,8 @@ DiffusionLB::~DiffusionLB()
 // Main entry point for the load balancer
 void DiffusionLB::Strategy(const DistBaseLB::LDStats* const stats)
 {
+  total_migrates = 0;
+
   if (CkMyPe() == 0 && _lb_args.debug() >= 1)
   {
     double start_time = CmiWallTimer();
@@ -107,7 +107,7 @@ void DiffusionLB::Strategy(const DistBaseLB::LDStats* const stats)
   }
   if (CkMyPe() == 0)
   {
-    CkCallback cb(CkIndex_DiffusionLB::LoadBalancing(), thisProxy);
+    CkCallback cb(CkIndex_DiffusionLB::AcrossNodeLB(), thisProxy);
     CkStartQD(cb);
   }
   statsmsg = AssembleStats();
@@ -272,15 +272,15 @@ int DiffusionLB::findNborIdx(int node)
 
 #define SELF_IDX NUM_NEIGHBORS
 #define EXT_IDX NUM_NEIGHBORS + 1
-/* On completion, waits for QD then calls DONENODELB*/
-void DiffusionLB::LoadBalancing()
+/* On completion, waits for QD then calls WITHINNODELB*/
+void DiffusionLB::AcrossNodeLB()
 {
   if (CkMyPe() != rank0PE)
     return;
   if (CkMyPe() == 0)
   {
     CkPrintf("--------STARTING LB--------\n");
-    CkCallback cb(CkIndex_DiffusionLB::DoneNodeLB(), thisProxy);
+    CkCallback cb(CkIndex_DiffusionLB::WithinNodeLB(), thisProxy);
     CkStartQD(cb);
   }
   balanced.resize(neighborCount);
@@ -307,6 +307,7 @@ void DiffusionLB::LoadBalancing()
   }
 
 #if 1
+  // build object comms
   int obj = 0;
   for (int edge = 0; edge < nodeStats->commData.size(); edge++)
   {
@@ -372,6 +373,7 @@ void DiffusionLB::LoadBalancing()
     }
   }
 
+  // build obj heap from gain values
   if (loadReceivers > 0)
   {
     if (obj_arr != NULL)
@@ -379,6 +381,7 @@ void DiffusionLB::LoadBalancing()
 
     obj_arr = new int[n_objs];
 
+    // compute gain vals
     for (int i = 0; i < n_objs; i++)
     {
       int sum_bytes = 0;
@@ -435,15 +438,11 @@ void DiffusionLB::LoadBalancing()
     int rank = GetPENumber(objId);
     int node = sendToNeighbors[k];
     int donorPE = rank0PE + rank;
+
     thisProxy[myNodeId * nodeSize].LoadMetaInfo(nodeStats->objData[v_id].handle,
                                                 currLoad);
     thisProxy[donorPE].LoadReceived(objId, node * nodeSize /*CkNodeFirst(node)*/);
     i++;
-  }
-  if (CkMyPe() == 0)
-  {
-    //    CkCallback cb(CkIndex_DiffusionLB::MigrationEnded(), thisProxy);
-    //    CkStartQD(cb);
   }
 }
 
@@ -457,12 +456,11 @@ void DiffusionLB::LoadBalancing()
  * - create maxheap of objects (using ckheap) sorted by load
  * - iterate through objects in maxheap and offload based on minheap (via LoadReceived)
  * */
-void DiffusionLB::DoneNodeLB()
+void DiffusionLB::WithinNodeLB()
 {
   if (thisIndex == 0)
     CkPrintf("--------LOAD BALANCING DONE - STARTING WITHIN NODE BALANCE--------\n");
 
-  entered = false;
   if (CkMyPe() == rank0PE)
   {
     // CkPrintf("[%d] GRD: DoneNodeLB \n", CkMyPe());
@@ -531,12 +529,10 @@ void DiffusionLB::DoneNodeLB()
         delete maxObj;
         continue;
       }
-      migratedFrom[pe]++;
 
       thisProxy[pe + rank0PE].LoadReceived(objId, rank0PE + minPE->Id);
 
       pe_load[minPE->Id] += maxObj->load;
-      migratedTo[minPE->Id]++;
       pe_load[pe] -= maxObj->load;
       if (pe_load[minPE->Id] < avgPE)
       {
@@ -564,7 +560,7 @@ void DiffusionLB::DoneNodeLB()
     // divided amongs intra node PE's.
     if (CkMyPe() == 0)
     {
-      CkCallback cb(CkIndex_DiffusionLB::MigrationEnded(), thisProxy);
+      CkCallback cb(CkIndex_DiffusionLB::ProcessMigrations(), thisProxy);
       CkStartQD(cb);
     }
   }
@@ -598,58 +594,61 @@ void DiffusionLB::LoadReceived(int objId, int from0PE)
   // migrateMe->async_arrival = myStats->objData[objId].asyncArrival;
   migrateInfo.push_back(migrateMe);
   total_migrates++;
-  entered = false;
 }
 
-void DiffusionLB::MigrationEnded()
+void DiffusionLB::ProcessMigrations()
 {
   if (thisIndex == 0)
-    CkPrintf("--------WITHIN NODE BALANCE DONE - IN MIGRATION ENDED--------\n");
-  if (CkMyPe() != rank0PE)
-    return;
-  // TODO: not deleted
-  entered = true;
+    CkPrintf("--------PROCESS MIGRATIONS--------\n", total_migrates);
 
-  msg =
-      new (migrateInfo.size() /*total_migrates*/, CkNumPes(), CkNumPes(), 0) LBMigrateMsg;
-  msg->n_moves = migrateInfo.size();  // total_migrates;
-  msg->moves = new MigrateInfo[migrateInfo.size()];
-  total_migrates = msg->n_moves;
+  // if (CkMyPe() != rank0PE)
+  //   return;
 
+  // SAME AS IN PACKANDSENDMIGRATEMSGS
+  LBMigrateMsg* msg = new (total_migrates, CkNumPes(), CkNumPes(), 0) LBMigrateMsg;
+  msg->n_moves = total_migrates;
   for (int i = 0; i < total_migrates; i++)
   {
     MigrateInfo* item = (MigrateInfo*)migrateInfo[i];
     msg->moves[i] = *item;
-    //      delete item;
-    //      migrateInfo[i] = 0;
+    delete item;
+    migrateInfo[i] = 0;
   }
-  //    migrateInfo.clear();
-  //    return;
-  // Migrate messages from me to elsewhere
+  migrateInfo.clear();
+
+  CkPrintf("PE %d doing %d migrates\n", CkMyPe(), total_migrates);
+
+  // SAME AS IN PROCESSMIGRATIONDECISION
+  const int me = CkMyPe();
   for (int i = 0; i < msg->n_moves; i++)
   {
-    MigrateInfo& move = *((MigrateInfo*)migrateInfo[i]);  // msg->moves[i];
-    const int me = CkMyPe();
-    if (move.from_pe == me && move.to_pe != me)
+    MigrateInfo& move = msg->moves[i];
+    if (move.from_pe == me)
     {
+      if (move.to_pe == me)
+      {
+        CkAbort("[%i] Error, attempting to migrate object myself to myself\n", CkMyPe());
+      }
       lbmgr->Migrate(move.obj, move.to_pe);
     }
     else if (move.from_pe != me)
     {
-      CkPrintf("[%d] error, strategy wants to move from %d to  %d\n", me, move.from_pe,
+      CkPrintf("[%d] Error, strategy wants to move from %d to  %d\n", me, move.from_pe,
                move.to_pe);
-      fflush(stdout);
+      CkAbort("Trying to move objs not on my PE\n");
     }
   }
+
   if (CkMyPe() == 0)
   {
-    CkCallback cb(CkIndex_DiffusionLB::MigrationDone(), thisProxy);
+    CkCallback cb(CkIndex_DiffusionLB::MigrationDoneWrapper(), thisProxy);
     CkStartQD(cb);
   }
 }
 
 void DiffusionLB::CascadingMigration(LDObjHandle h, double load)
 {
+  CkAbort("CASCADING: we don't understand this implementation yet\n");
   double threshold = THRESHOLD * avgLoadNeighbor / 100.0;
   int minNode = 0;
   int myPos = 0;  // neighborPos[CkNodeOf(rank0PE)];
@@ -706,9 +705,12 @@ void DiffusionLB::CascadingMigration(LDObjHandle h, double load)
 
 // When load balancing, remove object handle from your list, since it is about to be
 // migrated
+/* LoadMetaInfo is called on the receiver with the object that will be migrated to it (via
+ * a MigrateMe in  LoadReceived). It is only called when migrating at the node level. Not
+ * sure why the receiver would already have this handle though...*/
 void DiffusionLB::LoadMetaInfo(LDObjHandle h, double load)
 {
-  int idx = FindObjectHandle(h);
+  int idx = FindObjectHandle(h);  // if object is in my handles
   if (idx == -1)
   {
     objectHandles.push_back(h);
@@ -724,163 +726,178 @@ void DiffusionLB::LoadMetaInfo(LDObjHandle h, double load)
   }
 }
 
-void DiffusionLB::Migrated(LDObjHandle h, int waitBarrier)
+// void DiffusionLB::Migrated(LDObjHandle h, int waitBarrier)
+// {
+//   if (CkMyPe() == rank0PE)
+//   {
+//     thisProxy[CkMyPe()].MigratedHelper(h, waitBarrier);
+//   }
+// }
+
+// void DiffusionLB::MigratedHelper(LDObjHandle h, int waitBarrier)
+// {
+//   // CkPrintf("[%d] GRD Migrated migrates_completed %d migrates_expected %d \n",
+//   CkMyPe(),
+//   //          migrates_completed, migrates_expected);
+//   int idx = FindObjectHandle(h);
+//   if (idx == -1)
+//   {
+//     objectHandles.push_back(h);
+//     objectLoads.push_back(-1);
+//   }
+//   else
+//   {
+//     CascadingMigration(h, objectLoads[idx]);
+//     objectHandles[idx] = objectHandles[objectHandles.size() - 1];
+//     objectLoads[idx] = objectLoads[objectLoads.size() - 1];
+//     objectHandles.pop_back();
+//     objectLoads.pop_back();
+//   }
+// }
+
+// void DiffusionLB::PrintDebugMessage(int len, double* result)
+// {
+//   avgB += result[2];
+//   if (result[0] > maxB)
+//   {
+//     maxB = result[0];
+//     maxPEB = (int)result[12];
+//   }
+//   if (minB == -1 || result[1] < minB)
+//   {
+//     minB = result[1];
+//     minPEB = (int)result[11];
+//   }
+//   avgA += result[5];
+//   if (result[3] > maxA)
+//   {
+//     maxA = result[3];
+//     maxPEA = (int)result[14];
+//   }
+//   if (minA == -1 || result[4] < minA)
+//   {
+//     minA = result[4];
+//     minPEA = (int)result[13];
+//   }
+//   internalBeforeFinal += result[6];
+//   externalBeforeFinal += result[7];
+//   internalAfterFinal += result[8];
+//   externalAfterFinal += result[9];
+//   migrates += result[10];
+
+//   receivedStats++;
+//   CkPrintf("\nPrints on PE %d, receivedStats = %d\n", CkMyPe(), receivedStats);
+//   if (receivedStats == numNodes)
+//   {
+//     receivedStats = 0;
+//     avgB = avgB / CkNumPes();
+//     avgA = avgA / CkNumPes();
+//     CkPrintf("Max PE load before %f(%d), after %f(%d) \n", maxB, maxPEB, maxA, maxPEA);
+//     CkPrintf("Min PE load before %f(%d), after %f(%d) \n", minB, minPEB, minA, minPEA);
+//     CkPrintf("Avg PE load before %f, after %f \n", avgB, avgA);
+//     CkPrintf("Internal Communication before %f, after %f \n", internalBeforeFinal,
+//              internalAfterFinal);
+//     CkPrintf("External communication before %f, after %f \n", externalBeforeFinal,
+//              externalAfterFinal);
+//     CkPrintf("Number of migrations across nodes %d \n", migrates);
+//     for (int i = 0; i < numNodes; i++)
+//     {
+//       CkPrintf("\nnodes[%d] = %d", i, i);
+//       thisProxy[i /*nodes[i]*/].CallResumeClients();
+//     }
+//   }
+//   fflush(stdout);
+// }
+
+// TODO: same as DistBaseLB::MigrationDone
+void DiffusionLB::MigrationDoneWrapper()
 {
-  if (CkMyPe() == rank0PE)
-  {
-    thisProxy[CkMyPe()].MigratedHelper(h, waitBarrier);
-  }
+  // ProcessMigrationDecision(msg);
+  int balancing = 1;
+  MigrationDone(balancing);  // call DistBaseLB version
 }
 
-void DiffusionLB::MigratedHelper(LDObjHandle h, int waitBarrier)
-{
-  // CkPrintf("[%d] GRD Migrated migrates_completed %d migrates_expected %d \n", CkMyPe(),
-  //          migrates_completed, migrates_expected);
-  int idx = FindObjectHandle(h);
-  if (idx == -1)
-  {
-    objectHandles.push_back(h);
-    objectLoads.push_back(-1);
-  }
-  else
-  {
-    CascadingMigration(h, objectLoads[idx]);
-    objectHandles[idx] = objectHandles[objectHandles.size() - 1];
-    objectLoads[idx] = objectLoads[objectLoads.size() - 1];
-    objectHandles.pop_back();
-    objectLoads.pop_back();
-  }
-}
+// void DiffusionLB::MigrationDone()
+// {
+//   lb_started = false;  // TODO: this should remain private to DistBaseLB
+// #if CMK_LBDB_ON
+//   migrates_completed = 0;
+//   total_migrates = 0;
+//   migrates_expected = -1;
+//   total_migratesActual = -1;
+//   avgLoadNeighbor = 0;
+//   // myStats->objData = NULL;
+//   //  myStats->objData.erase();
+//   //  delete[] myStats->objData;
+//   //  myStats->commData.erase();
+//   //  delete[] myStats->commData;
+//   //  myStats->commData = NULL;
+//   if (CkMyPe() == 0)
+//   {
+//     end_lb_time = CkWallTimer();
+//     CkPrintf("Strategy Time %f \n", end_lb_time - start_lb_time);
+//   }
+//   // nodeStats->objData.clear();
+//   // nodeStats->commData.clear();
+//   /*
+//       for(int i = 0; i < nodeSize; i++) {
+//           pe_load[i] = 0;
+//           numObjects[i] = 0;
+//           migratedTo[i] = 0;
+//           migratedFrom[i] = 0;
+//       }
+//   */
+//   // Increment to next step
+//   finalBalancing = 1;
+//   lbmgr->incStep();
+//   if (finalBalancing)
+//     lbmgr->ClearLoads();
 
-void DiffusionLB::PrintDebugMessage(int len, double* result)
-{
-  avgB += result[2];
-  if (result[0] > maxB)
-  {
-    maxB = result[0];
-    maxPEB = (int)result[12];
-  }
-  if (minB == -1 || result[1] < minB)
-  {
-    minB = result[1];
-    minPEB = (int)result[11];
-  }
-  avgA += result[5];
-  if (result[3] > maxA)
-  {
-    maxA = result[3];
-    maxPEA = (int)result[14];
-  }
-  if (minA == -1 || result[4] < minA)
-  {
-    minA = result[4];
-    minPEA = (int)result[13];
-  }
-  internalBeforeFinal += result[6];
-  externalBeforeFinal += result[7];
-  internalAfterFinal += result[8];
-  externalAfterFinal += result[9];
-  migrates += result[10];
+//   // if sync resume invoke a barrier
+//   //  if(!_lb_args.debug() || CkMyPe() != rank0PE) {
+//   if (finalBalancing && _lb_args.syncResume())
+//   {
+//     CkPrintf("Resume clients reduction\n");
+//     CkCallback cb(CkIndex_DiffusionLB::ResumeClients((CkReductionMsg*)(NULL)),
+//     thisProxy); contribute(0, NULL, CkReduction::sum_int, cb);
+//   }
+//   else
+//   {
+//     CkPrintf("Calling resume clients directly with finalBalancing %d\n",
+//     finalBalancing); thisProxy[CkMyPe()].ResumeClients(finalBalancing);
+//   }
+// //  }
+// #endif
+// }
 
-  receivedStats++;
-  CkPrintf("\nPrints on PE %d, receivedStats = %d\n", CkMyPe(), receivedStats);
-  if (receivedStats == numNodes)
-  {
-    receivedStats = 0;
-    avgB = avgB / CkNumPes();
-    avgA = avgA / CkNumPes();
-    CkPrintf("Max PE load before %f(%d), after %f(%d) \n", maxB, maxPEB, maxA, maxPEA);
-    CkPrintf("Min PE load before %f(%d), after %f(%d) \n", minB, minPEB, minA, minPEA);
-    CkPrintf("Avg PE load before %f, after %f \n", avgB, avgA);
-    CkPrintf("Internal Communication before %f, after %f \n", internalBeforeFinal,
-             internalAfterFinal);
-    CkPrintf("External communication before %f, after %f \n", externalBeforeFinal,
-             externalAfterFinal);
-    CkPrintf("Number of migrations across nodes %d \n", migrates);
-    for (int i = 0; i < numNodes; i++)
-    {
-      CkPrintf("\nnodes[%d] = %d", i, i);
-      thisProxy[i /*nodes[i]*/].CallResumeClients();
-    }
-  }
-  fflush(stdout);
-}
+// void DiffusionLB::ResumeClients(CkReductionMsg* msg)
+// {
+//   ResumeClients(1);
+//   delete msg;
+// }
 
-void DiffusionLB::MigrationDone()
-{
-  lb_started = false;  // TODO: this should remain private to DistBaseLB
-#if CMK_LBDB_ON
-  migrates_completed = 0;
-  total_migrates = 0;
-  migrates_expected = -1;
-  total_migratesActual = -1;
-  avgLoadNeighbor = 0;
-  // myStats->objData = NULL;
-  //  myStats->objData.erase();
-  //  delete[] myStats->objData;
-  //  myStats->commData.erase();
-  //  delete[] myStats->commData;
-  //  myStats->commData = NULL;
-  if (CkMyPe() == 0)
-  {
-    end_lb_time = CkWallTimer();
-    CkPrintf("Strategy Time %f \n", end_lb_time - start_lb_time);
-  }
-  // nodeStats->objData.clear();
-  // nodeStats->commData.clear();
-  /*
-      for(int i = 0; i < nodeSize; i++) {
-          pe_load[i] = 0;
-          numObjects[i] = 0;
-          migratedTo[i] = 0;
-          migratedFrom[i] = 0;
-      }
-  */
-  // Increment to next step
-  lbmgr->incStep();
-  if (finalBalancing)
-    lbmgr->ClearLoads();
+// void DiffusionLB::CallResumeClients()
+// {
+//   CmiAssert(_lb_args.debug());
+//   CkPrintf("[%d] GRD: Call Resume clients \n", CkMyPe());
+//   thisProxy[CkMyPe()].ResumeClients(finalBalancing);
+// }
 
-  // if sync resume invoke a barrier
-  //  if(!_lb_args.debug() || CkMyPe() != rank0PE) {
-  if (finalBalancing && _lb_args.syncResume())
-  {
-    CkCallback cb(CkIndex_DiffusionLB::ResumeClients((CkReductionMsg*)(NULL)), thisProxy);
-    contribute(0, NULL, CkReduction::sum_int, cb);
-  }
-  else
-    thisProxy[CkMyPe()].ResumeClients(finalBalancing);
-//  }
-#endif
-}
+// // TODO: this is the same function as DistBaseLB::ResumeClients
+// void DiffusionLB::ResumeClients(int balancing)
+// {
+// #if CMK_LBDB_ON
 
-void DiffusionLB::ResumeClients(CkReductionMsg* msg)
-{
-  ResumeClients(1);
-  delete msg;
-}
+//   if (CkMyPe() == 0 && balancing)
+//   {
+//     double end_lb_time = CkWallTimer();
+//     if (_lb_args.debug())
+//       CkPrintf("%s> step %d finished at %f duration %f memory usage: %f\n", lbName(),
+//                step() - 1, end_lb_time, end_lb_time /*- strat_start_time*/,
+//                CmiMemoryUsage() / (1024.0 * 1024.0));
+//   }
 
-void DiffusionLB::CallResumeClients()
-{
-  CmiAssert(_lb_args.debug());
-  CkPrintf("[%d] GRD: Call Resume clients \n", CkMyPe());
-  thisProxy[CkMyPe()].ResumeClients(finalBalancing);
-}
-
-void DiffusionLB::ResumeClients(int balancing)
-{
-#if CMK_LBDB_ON
-
-  if (CkMyPe() == 0 && balancing)
-  {
-    double end_lb_time = CkWallTimer();
-    if (_lb_args.debug())
-      CkPrintf("%s> step %d finished at %f duration %f memory usage: %f\n", lbName(),
-               step() - 1, end_lb_time, end_lb_time /*- strat_start_time*/,
-               CmiMemoryUsage() / (1024.0 * 1024.0));
-  }
-
-  lbmgr->ResumeClients();
-#endif
-}
+//   lbmgr->ResumeClients();
+// #endif
+// }
 #include "DiffusionLB.def.h"

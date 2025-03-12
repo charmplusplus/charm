@@ -30,8 +30,8 @@ public:
   DiffusionLB(CkMigrateMessage* m);
   ~DiffusionLB();
 
-  void MigratedHelper(LDObjHandle h, int waitBarrier);
-  void Migrated(LDObjHandle h, int waitBarrier = 1);
+  // void MigratedHelper(LDObjHandle h, int waitBarrier);
+  // void Migrated(LDObjHandle h, int waitBarrier = 1);
   void createCommList();
   void findNBors(int do_again);
   void findNBorsRound(int do_again);
@@ -44,24 +44,24 @@ public:
   void sortArr(long arr[], int n, int* nbors);
 
   // void ReceiveLoadInfo(int itr, double load, int node);
-  void MigrationDone();  // Call when migration is complete
+  void MigrationDoneWrapper();  // Call when migration is complete
   void ReceiveStats(CkMarshalledCLBStatsMessage&& data);
 
   // void LoadTransfer(double load, int initPE, int objId);
   void LoadReceived(int objId, int fromPE);
   // void PseudoLoad(int itr, double load, int node);
-  void LoadBalancing();
+  void AcrossNodeLB();
 
   // void MigrationInfo(int to, int from);
 
   // TODO: Can be made private or not entry methods as well.
-  void MigrationEnded();
-  void DoneNodeLB();
+  void ProcessMigrations();
+  void WithinNodeLB();
 
-  void ResumeClients(CkReductionMsg* msg);
-  void ResumeClients(int balancing);
-  void CallResumeClients();
-  void PrintDebugMessage(int len, double* result);
+  // void ResumeClients(CkReductionMsg* msg);
+  // void ResumeClients(int balancing);
+  // void CallResumeClients();
+  // void PrintDebugMessage(int len, double* result);
   void LoadMetaInfo(LDObjHandle h, double load);
 
 protected:
@@ -135,12 +135,10 @@ private:
   int migrates_completed;
   int migrates_expected;
   std::vector<MigrateInfo*> migrateInfo;
-  LBMigrateMsg* msg;
   std::vector<int> migratedTo;
   std::vector<int> migratedFrom;
   std::vector<CkVertex> objects;
   std::vector<std::vector<int>> objectComms;
-  bool entered;
   int finalBalancing;  // TODO get rid of this
 
   // stats

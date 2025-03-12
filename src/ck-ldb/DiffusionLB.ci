@@ -20,28 +20,40 @@ module DiffusionLB
     entry void ReceiveStats(CkMarshalledCLBStatsMessage data);
     // entry void LoadTransfer(double load, int initPE, int objId);
     entry void LoadReceived(int objId, int fromPE);
-    entry void LoadBalancing();
+    entry void AcrossNodeLB();
     entry[reductiontarget] void startStrategy();
     // entry [reductiontarget] void DoneNodeLB();
-    entry void MigratedHelper(LDObjHandle h, int waitBarrier);
-    entry void MigrationEnded();
+    // entry void MigratedHelper(LDObjHandle h, int waitBarrier);
+    entry void ProcessMigrations();
     entry void next_phase(int val);
     entry void LoadMetaInfo(LDObjHandle h, double load);
-    entry void MigrationDone();  // Call when migration is complete
-    entry void DoneNodeLB();
+    entry void MigrationDoneWrapper();  // Call when migration is complete
+    entry void WithinNodeLB();
 
     // entry void MigrationInfo(int to, int from);
-    entry void ResumeClients(CkReductionMsg * msg);
-    entry void ResumeClients(int balancing);
+    // entry void ResumeClients(CkReductionMsg * msg);
+    // entry void ResumeClients(int balancing);
 
     entry void PseudoLoad(int itr, double load, int node);
-    entry void CallResumeClients();
-    entry void PrintDebugMessage(int len, double result[len]);
+    // entry void CallResumeClients();
+    // entry void PrintDebugMessage(int len, double result[len]);
 
     entry void pseudolb_rounds()
     {
       serial
       {
+        std::string neighborsStr;
+        for (int i = 0; i < neighborCount; i++)
+        {
+          neighborsStr += std::to_string(sendToNeighbors[i]);
+          if (i < neighborCount - 1)
+          {
+            neighborsStr += ", ";
+          }
+        }
+
+        CkPrintf("Node %d has neighbors: %s\n", myNodeId, neighborsStr.c_str());
+
         loadNeighbors.resize(neighborCount);
         toSendLoad.resize(neighborCount, 0);
         toReceiveLoad.resize(neighborCount);
