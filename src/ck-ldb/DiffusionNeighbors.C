@@ -1,13 +1,178 @@
 /* Pick NUM_NEIGHBORS in random */
 /*readonly*/ bool centroid;
 
+#include <assert.h>
+
 /* Entry point for neighbor building. Only rank0PEs call findNBors*/
 void DiffusionLB::findNBors(int do_again)
 {
-  round++;
-  createCommList();
+  if (thisIndex != rank0PE)
+  {
+    return;
+  }
 
-  thisProxy[0].startFirstRound();  // tell rank 0 that this comm list is done
+  if (numNodes == 1)
+  {
+    CkPrintf("One node only - no neighbors\n");
+    thisProxy[0].startStrategy();
+    return;
+  }
+
+  // DEBUGL(("\nNode-%d, round =%d, sendToNeighbors.size() = %d", thisIndex, round,
+  //         sendToNeighbors.size()));
+  if (round == 0)
+  {
+    cost_for_neighbor = {};  // dictionary of nbor keys to cost
+    createCommList();
+  }
+
+  mstVisitedPes.clear();
+  round = 0;
+  rank0_barrier_counter = 0;
+
+  // initialize vars for mst
+  best_weight = 0;
+  best_from = -1;
+  best_to = 0;
+
+  all_tos_negative = 1;
+
+  visited = false;
+
+  buildMSTinRounds(best_weight, best_from, best_to);
+  // findRemainingNbors(0);
+}
+
+void DiffusionLB::buildMSTinRounds(double best_weight, int best_from, int best_to)
+{
+  // correctness checks for reduction input
+  // note: if from = -1, this is fine because this is how we initialize the graph
+  // TODO: optimization: remove the first round of this algo and just start with node 0 in
+  // the graph
+
+  // CkPrintf("Node-%d: best_to = %d, best_from = %d, best_weight = %f\n", thisIndex,
+  //          best_to, best_from, best_weight);
+
+  int to = best_to;
+  int from = best_from;
+
+  assert(thisIndex != rank0PE);
+
+  assert(to != from);
+  assert(to != -1);
+
+  // initiator is new node added to graph
+  // assert that to is not already in graph
+  if (myNodeId == to)
+  {
+    visited = true;
+    if (from != -1)
+    {
+      // this check ensures that during the first round (when to = 0, from = -1), we don't
+      // add -1 to the neighbors
+      assert(from % nodeSize == 0);  // assert that from is a rank0PE
+      sendToNeighbors.push_back(from);
+    }
+  }
+
+  if (myNodeId == from)
+  {
+    visited = true;
+    sendToNeighbors.push_back(to);
+  }
+
+  mstVisitedPes.push_back(to);
+
+  if (mstVisitedPes.size() == numNodes)
+  {
+    // all nodes have been visited, MST is complete
+    int do_again = 1;
+    assert(visited);
+    assert(std::find(mstVisitedPes.begin(), mstVisitedPes.end(), nbor) !=
+           mstVisitedPes.end());
+
+    assert(sendToNeighbors.size() >= 1);
+
+    mstVisitedPes.clear();
+
+    thisProxy[0].startFirstRound();
+    return;
+  }
+
+  // if (mstVisitedPes.size() == numNodes)
+  // {
+  //   // all nodes have been visited, MST is complete
+  //   int do_again = 1;
+  //   CkPrintf(
+  //       "MST IS BUILT ON %d with numneighbors = %d, numnodes = %d, mstVisitedPes.size =
+  //       "
+  //       "%d\n",
+  //       myNodeId, sendToNeighbors.size(), numNodes, mstVisitedPes.size());
+  //   CkExit();
+  //   // thisProxy[0].startFirstRound();
+  // }
+
+  // find best new edge to add, based on cost
+  double newNbor = -1;
+  double newParent = -1;
+  double newweight = 0;  // TODO: cost is a misnomer, we want to maximize the cost
+
+  // check if thisIndex is in mstVisitedPes
+  if (visited)
+  {
+    // node in visited set
+    // pick best edge (it is best because nbors are sorted by preference)
+    for (int id = 0; id < numNodes; id++)
+    {
+      int nbor = nbors[id];
+
+      if (std::find(mstVisitedPes.begin(), mstVisitedPes.end(), nbor) ==
+              mstVisitedPes.end() &&
+          nbor != myNodeId && nbor < numNodes && nbor >= 0)
+      {
+        newNbor = nbor;
+        newParent = myNodeId;
+        newweight = cost_for_neighbor[newNbor];
+        break;
+      }
+    }
+  }
+
+  thisProxy[0].next_MSTphase(newweight, newParent, newNbor);
+}
+
+void DiffusionLB::next_MSTphase(double newweight, int newparent, int newto)
+{
+  acks++;
+
+  if (newto >= 0)
+    all_tos_negative = 0;
+
+  if (newto == -1 && newparent == -1)  // this edge is invalid, no contribution
+
+    if (newweight >=
+        best_weight)  // TODO: this shouldn't really have to be >=... whats wrong?
+    {
+      best_weight = newweight;
+      best_to = newto;
+      best_from = newparent;
+    }
+
+  if (acks == numNodes)
+  {
+    assert(!all_tos_negative);  // all inputs should never have invalid edges
+    assert(best_from != best_to);
+
+    acks = 0;
+    all_tos_negative = 1;
+
+    for (int i = 0; i < numNodes; i++)
+      thisProxy[i * nodeSize].buildMSTinRounds(best_weight, best_from, best_to);
+
+    best_weight = 0;
+    best_from = -1;
+    best_to = -1;
+  }
 }
 
 /* Custom reduction: wait until all rank0PEs have completed comm list building, then start
@@ -18,19 +183,18 @@ void DiffusionLB::startFirstRound()
   if (rank0_barrier_counter == numNodes)
   {
     rank0_barrier_counter = 0;
+    CkPrintf("MST is built. Begin finding remaining neighbors.\n");
     for (int i = 0; i < numNodes; i++) thisProxy[i * nodeSize].findNBorsRound(1);
   }
 }
 
 void DiffusionLB::findNBorsRound(int do_again)
 {
+  assert(thisIndex % nodeSize == 0);  // only node managers should call this
   requests_sent = 0;
   if (!do_again || round == 100)
   {
     neighborCount = sendToNeighbors.size();
-    std::string nbor_nodes;
-
-    // CkPrintf("\n[Node-%d] NumNeighbors: %d\n", myNodeId, neighborCount);
     thisProxy[0].startStrategy();
 
     return;
@@ -42,19 +206,20 @@ void DiffusionLB::findNBorsRound(int do_again)
     while (potentialNb < nborsNeeded)
     {
       int potentialNbor = nbors[pick++];  // rand() % numNodes;
-      if (potentialNbor == -1)
-      {
-        thisProxy[0].next_phase(0);
-        return;
-      }
       if (myNodeId != potentialNbor &&
           std::find(sendToNeighbors.begin(), sendToNeighbors.end(), potentialNbor) ==
-              sendToNeighbors.end())
+              sendToNeighbors.end() &&
+          potentialNbor < numNodes && potentialNbor >= 0)
       {
+        // CkPrintf("Node-%d sending request round =%d, potentialNbor = %d\n", thisIndex,
+        // round, potentialNbor);
         requests_sent++;
-        // CkPrintf("\n[Node-%d] sending a request to node-%d", myNodeId, potentialNbor);
-        thisProxy[potentialNbor * nodeSize].proposeNbor(myNodeId);
+        thisProxy[potentialNbor].proposeNbor(myNodeId);
         potentialNb++;
+      }
+      else
+      {
+        CkAbort("NOT ENOUGH POTENTIAL NEIGHBORS: try adjusting NUM_NEIGHBORS\n");
       }
     }
   }
@@ -105,10 +270,10 @@ void DiffusionLB::createCommList()
 
   // initialize cost per neighbor (cost is a misnomer: higher cost is better neighbor)
   // TODO: note that this cost can be zero... is this okay?
-  // for (int i = 0; i < numNodes; i++)
-  // {
-  //   cost_for_neighbor[i] = ebytes[i];
-  // }
+  for (int i = 0; i < numNodes; i++)
+  {
+    cost_for_neighbor[i] = ebytes[i];
+  }
 
   sortArr(ebytes, numNodes, nbors);
 }
@@ -128,11 +293,6 @@ void DiffusionLB::next_phase(int val)
 
 void DiffusionLB::proposeNbor(int nborId)
 {
-  if (round == 0)
-  {
-    round++;
-    createCommList();
-  }
   int agree = 0;
   if ((NUM_NEIGHBORS - sendToNeighbors.size()) - requests_sent > 0 &&
       sendToNeighbors.size() < NUM_NEIGHBORS &&
@@ -141,11 +301,6 @@ void DiffusionLB::proposeNbor(int nborId)
   {
     agree = 1;
     sendToNeighbors.push_back(nborId);
-    // DEBUGL(("\nNode-%d, round =%d Agreeing and adding %d ", myNodeId, round, nborId));
-  }
-  else
-  {
-    // DEBUGL(("\nNode-%d, round =%d Rejecting %d ", myNodeId, round, nborId));
   }
   thisProxy[nborId * nodeSize].okayNbor(agree, myNodeId);
 }
@@ -167,13 +322,9 @@ void DiffusionLB::okayNbor(int agree, int nborId)
   if (sendToNeighbors.size() < NUM_NEIGHBORS)
     do_again = 1;
   round++;
-  thisProxy[0].next_phase(do_again);
-  /*
-    CkCallback cb(CkReductionTarget(DiffusionLB, findNBors), thisProxy);
-    contribute(sizeof(int), &do_again, CkReduction::max_int, cb);
-  */
-}
 
+  thisProxy[0].next_phase(do_again);
+}
 void DiffusionLB::sortArr(long arr[], int n, int* nbors)
 {
   std::vector<std::pair<long, int> > vp;
@@ -190,6 +341,6 @@ void DiffusionLB::sortArr(long arr[], int n, int* nbors)
   for (int i = 0; i < numNodes; i++)
     if (myNodeId != vp[i].second)  // Ideally we shouldn't need to check this
       nbors[found++] = vp[i].second;
-  if (found == 0)
+  if (found == 0 && numNodes > 1)
     CkAbort("Error: No neighbors found on %d\n", CmiMyPe());
 }

@@ -154,7 +154,9 @@ void DiffusionLB::ReceiveStats(CkMarshalledCLBStatsMessage&& data)
 void DiffusionLB::statsAssembled()
 {
   if (CkMyPe() == rank0PE)
+  {
     findNBors(1);
+  }
 }
 
 void DiffusionLB::startStrategy()
@@ -163,7 +165,7 @@ void DiffusionLB::startStrategy()
     return;
 
   rank0_barrier_counter = 0;
-  CkPrintf("--------NEIGHBOR SELECTION COMPLETE - STARTING PSEUDO LB ROUNDS--------\n");
+  CkPrintf("--------NEIGHBOR SELECTION COMPLETE--------\n");
   for (int i = 0; i < numNodes; i++) thisProxy[i * nodeSize].pseudolb_rounds();
 }
 
@@ -238,7 +240,7 @@ void DiffusionLB::AcrossNodeLB()
     return;
   if (CkMyPe() == 0)
   {
-    CkPrintf("--------STARTING LB--------\n");
+    CkPrintf("--------STARTING ACROSS NODE LB--------\n");
     CkCallback cb(CkIndex_DiffusionLB::WithinNodeLB(), thisProxy);
     CkStartQD(cb);
   }
@@ -418,7 +420,7 @@ void DiffusionLB::AcrossNodeLB()
 void DiffusionLB::WithinNodeLB()
 {
   if (thisIndex == 0)
-    CkPrintf("--------LOAD BALANCING DONE - STARTING WITHIN NODE BALANCE--------\n");
+    CkPrintf("--------STARTING WITHIN NODE LB--------\n");
 
   if (CkMyPe() == rank0PE)
   {
@@ -541,12 +543,6 @@ void DiffusionLB::LoadReceived(int objId, int from0PE)
 
 void DiffusionLB::ProcessMigrations()
 {
-  if (thisIndex == 0)
-    CkPrintf("--------PROCESS MIGRATIONS--------\n", total_migrates);
-
-  // if (CkMyPe() != rank0PE)
-  //   return;
-
   // SAME AS IN PACKANDSENDMIGRATEMSGS
   LBMigrateMsg* msg = new (total_migrates, CkNumPes(), CkNumPes(), 0) LBMigrateMsg;
   msg->n_moves = total_migrates;

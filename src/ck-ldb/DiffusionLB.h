@@ -47,6 +47,9 @@ public:
   void MigrationDoneWrapper();  // Call when migration is complete
   void ReceiveStats(CkMarshalledCLBStatsMessage&& data);
 
+  void buildMSTinRounds(double best_weight, int best_from, int best_to);
+  void next_MSTphase(double newcost, int newparent, int newto);
+
   // void LoadTransfer(double load, int initPE, int objId);
   void LoadReceived(int objId, int fromPE);
   // void PseudoLoad(int itr, double load, int node);
@@ -90,12 +93,22 @@ private:
   std::vector<int> sendToNeighbors;  // Neighbors to which curr node has to send load.
   int* nbors;
 
+  std::vector<int> mstVisitedPes;
+  std::unordered_map<int, double> cost_for_neighbor;
+
+  double best_weight;
+  int best_from;
+  int best_to;
+  int all_tos_negative;
+
+  bool visited;
+
   // phase 2: pseudo load balancing
   std::vector<double> toSendLoad;
   std::vector<double> toReceiveLoad;
   std::vector<double> loadNeighbors;
   double avgLoadNeighbor;  // Average load of the neighbor group
-  int my_pseudo_load;
+  double my_pseudo_load;
 
   // aggregate load received
   int itr;  // iteration count

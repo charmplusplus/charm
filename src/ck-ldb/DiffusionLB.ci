@@ -30,6 +30,9 @@ module DiffusionLB
     entry void MigrationDoneWrapper();  // Call when migration is complete
     entry void WithinNodeLB();
 
+    entry void buildMSTinRounds(double best_weight, int best_parent, int best_to);
+    entry void next_MSTphase(double newcost, int newparent, int newto);
+
     // entry void MigrationInfo(int to, int from);
     // entry void ResumeClients(CkReductionMsg * msg);
     // entry void ResumeClients(int balancing);
@@ -54,9 +57,9 @@ module DiffusionLB
 
         CkPrintf("Node %d has neighbors: %s\n", myNodeId, neighborsStr.c_str());
 
-        loadNeighbors.resize(neighborCount);
+        loadNeighbors.resize(neighborCount, 0);
         toSendLoad.resize(neighborCount, 0);
-        toReceiveLoad.resize(neighborCount);
+        toReceiveLoad.resize(neighborCount, 0);
 
         my_pseudo_load = my_load;
       }
@@ -104,10 +107,9 @@ module DiffusionLB
       // Calculate the aggregate load that has to be sent.
       serial "Aggregate load"
       {
-        AggregateToSend();
+        // AggregateToSend(); this duplicates the blow line
         for (int i = 0; i < neighborCount; i++) toSendLoad[i] -= toReceiveLoad[i];
         loadReceivers = 0;
-        // my_load = my_loadAfterTransfer;
       }
     }
   };
