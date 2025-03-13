@@ -208,3 +208,112 @@ bool DiffusionLB::AggregateToSend()
   for (int i = 0; i < neighborCount; i++) toSendLoad[i] -= toReceiveLoad[i];
   return res;
 }
+
+void DiffusionLB::buildObjComms(int n_objs)
+{
+  objectComms.resize(n_objs);
+  for (int i = 0; i < n_objs; i++)
+  {
+    objectComms[i].resize(NUM_NEIGHBORS + 2);
+    for (int j = 0; j < NUM_NEIGHBORS + 2; j++) objectComms[i][j] = 0;
+  }
+
+  // build object comms
+  for (int edge = 0; edge < nodeStats->commData.size(); edge++)
+  {
+    LDCommData& commData = nodeStats->commData[edge];
+    // ensure that the message is not from a processor but from an object
+    // and that the type is an object to object message
+    if ((!commData.from_proc()) && (commData.recv_type() == LD_OBJ_MSG))
+    {
+      LDObjKey from = commData.sender;
+      LDObjKey to = commData.receiver.get_destObj();
+      int fromNode = myNodeId;
+
+      int toPE = commData.receiver.lastKnown();
+      int toNode = toPE / nodeSize;
+
+      // // remnants from simulator
+      // int fromobj = get_obj_idx(from.objID());
+      // int toobj = get_obj_idx(to.objID());
+
+      // if (fromobj == -1 || toobj == -1)
+      //   continue;
+      // store internal bytes in the last index pos ? -q
+      if (fromNode == toNode)
+      {
+        // internal communication
+        int nborIdx = SELF_IDX;  // self ID at end of NUM_NEIGHBORS
+        int fromObj = nodeStats->getHash(from);
+        int toObj = nodeStats->getHash(to);
+
+        CkAssert(fromObj != -1 && fromObj < nobjs);
+        objectComms[fromObj][nborIdx] += commData.bytes;
+        // lastKnown PE value can be wrong.
+        if (toObj != -1 && toObj < n_objs)
+          objectComms[toObj][nborIdx] += commData.bytes;
+        else
+          CkPrintf(
+              "ERROR (MAYBE): toObj %d not found in objectComms, but we are "
+              "destination\n",
+              toObj);
+      }
+      else
+      {  // External communication
+        int nborIdx = findNborIdx(toNode);
+        if (nborIdx == -1)
+        {
+          // object comm might be to a neighbor that we didn't decide on
+          nborIdx = EXT_IDX;  // Store in last index if it is external bytes going to
+                              // non-immediate neighbors
+        }
+
+        int fromObj = nodeStats->getHash(from);
+        // CkPrintf("[%d] GRD Load Balancing from obj %d and pos %d\n", CkMyPe(), fromObj,
+        // nborIdx);
+        if (fromObj != -1 && fromObj < n_objs)
+          objectComms[fromObj][nborIdx] += commData.bytes;
+      }
+    }
+  }  // end for
+}
+
+// simple gain values, based only on internal comm
+void DiffusionLB::buildGainValues(int n_objs)
+{
+  for (int i = 0; i < n_objs; i++)
+  {
+    int sum_bytes = 0;
+    // comm bytes with all neighbors
+    std::vector<int> comm_w_nbors = objectComms[i];
+    // compute the sume of bytes of all comms for this obj
+    for (int j = 0; j < comm_w_nbors.size(); j++) sum_bytes += comm_w_nbors[j];
+    gain_val[i] = 2 * objectComms[i][SELF_IDX] - sum_bytes;  // gain val is only
+  }
+}
+
+void DiffusionLB::buildGainValuesNbor(int n_objs, int nbor)
+{
+  for (int i = 0; i < n_objs; i++) gain_val[i] = -objectComms[i][nbor];
+}
+
+int DiffusionLB::getBestNeighbor()
+{
+  int bestNeighbor = -1;
+  for (int i = 0; i < neighborCount; i++)
+  {
+    if (toSendLoad[i] > 0)
+    {
+      bestNeighbor = i;
+      break;
+    }
+  }
+  return bestNeighbor;
+}
+
+int DiffusionLB::getBestObject(int nbor)
+{
+  int v_id = heap_pop(obj_heap, ObjCompareOperator(&objs, gain_val), heap_pos);
+
+  return v_id;
+}

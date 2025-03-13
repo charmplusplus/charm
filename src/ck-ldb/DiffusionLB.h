@@ -12,11 +12,17 @@
 #include "ckheap.h"
 #include "topology.h"
 
+#include "Heap_helper.C"
+
 #include <queue>
 #include <unordered_map>
 #include <vector>
 
 #include "DiffusionLB.decl.h"
+
+#define SELF_IDX NUM_NEIGHBORS
+#define EXT_IDX NUM_NEIGHBORS + 1
+#define NUM_NEIGHBORS 2
 
 void CreateDiffusionLB();
 
@@ -43,28 +49,18 @@ public:
   void next_phase(int val);
   void sortArr(long arr[], int n, int* nbors);
 
-  // void ReceiveLoadInfo(int itr, double load, int node);
   void MigrationDoneWrapper();  // Call when migration is complete
   void ReceiveStats(CkMarshalledCLBStatsMessage&& data);
 
   void buildMSTinRounds(double best_weight, int best_from, int best_to);
   void next_MSTphase(double newcost, int newparent, int newto);
 
-  // void LoadTransfer(double load, int initPE, int objId);
   void LoadReceived(int objId, int fromPE);
-  // void PseudoLoad(int itr, double load, int node);
   void AcrossNodeLB();
 
-  // void MigrationInfo(int to, int from);
-
-  // TODO: Can be made private or not entry methods as well.
   void ProcessMigrations();
   void WithinNodeLB();
 
-  // void ResumeClients(CkReductionMsg* msg);
-  // void ResumeClients(int balancing);
-  // void CallResumeClients();
-  // void PrintDebugMessage(int len, double* result);
   void LoadMetaInfo(LDObjHandle h, double load);
 
 protected:
@@ -102,6 +98,7 @@ private:
   int all_tos_negative;
 
   bool visited;
+  int pick;
 
   // phase 2: pseudo load balancing
   std::vector<double> toSendLoad;
@@ -110,11 +107,18 @@ private:
   double avgLoadNeighbor;  // Average load of the neighbor group
   double my_pseudo_load;
 
-  // aggregate load received
-  int itr;  // iteration count
+  int pseudo_itr;  // iteration count
   int temp_itr;
-  int pick;
-  int notif;
+
+  // phase 3: across node LB
+  void buildObjComms(int nobjs);
+  void buildGainValues(int nobjs);
+  void buildGainValuesNbor(int nobjs, int nbor);
+
+  int getBestNeighbor();
+  int getBestObject(int nbor);
+
+  // aggregate load received
   int statsReceived;
   int loadReceived;
   int do_again = 1;
@@ -133,7 +137,6 @@ private:
   // const DistBaseLB::LDStats* statsData;
 
   // heap
-  int* obj_arr;
   int* gain_val;
   std::vector<CkVertex> objs;
   std::vector<int> obj_heap;  // TODO: replace with ckheap
@@ -172,11 +175,11 @@ private:
   int minPEA;
   // communication
   double internalBefore;
-  double externalBefore;
+  double externalBefore;  // TODO: not used?
   double internalAfter;
   double externalAfter;
   double internalBeforeFinal;
-  double externalBeforeFinal;
+  double externalBeforeFinal;  // TODO: not used?
   double internalAfterFinal;
   double externalAfterFinal;
   int receivedStats;
@@ -206,7 +209,7 @@ private:
   void PseudoLoadBalancing();
 
   // Heap functions
-  void InitializeObjHeap(BaseLB::LDStats* stats, int* obj_arr, int size, int* gain_val);
+  void InitializeObjHeap(int size);
 };
 
 #endif /* _DistributedLB_H_ */

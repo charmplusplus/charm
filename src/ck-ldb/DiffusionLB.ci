@@ -64,22 +64,22 @@ module DiffusionLB
         my_pseudo_load = my_load;
       }
       // TODO: Currently fixed iterations
-      for (itr = 0; itr < ITERATIONS; itr++)
+      for (pseudo_itr = 0; pseudo_itr < ITERATIONS; pseudo_itr++)
       {
         // Send its load
         serial "Communicate load info"
         {
           for (int i = 0; i < neighborCount; i++)
           {
-            thisProxy[sendToNeighbors[i] * nodeSize].ReceiveLoadInfo(itr, my_pseudo_load,
-                                                                     myNodeId);
+            thisProxy[sendToNeighbors[i] * nodeSize].ReceiveLoadInfo(
+                pseudo_itr, my_pseudo_load, myNodeId);
           }
         }
 
         // Wait for all its neighbors load
         for (temp_itr = 0; temp_itr < sendToNeighbors.size(); temp_itr++)
         {
-          when ReceiveLoadInfo[itr](int itr, double load, int node) serial
+          when ReceiveLoadInfo[pseudo_itr](int itr, double load, int node) serial
           {
             int pos = findNborIdx(node);
             loadNeighbors[pos] = load;
@@ -95,7 +95,7 @@ module DiffusionLB
 
         for (temp_itr = 0; temp_itr < sendToNeighbors.size(); temp_itr++)
         {
-          when PseudoLoad[itr](int itr, double load, int node) serial
+          when PseudoLoad[pseudo_itr](int itr, double load, int node) serial
           {
             my_pseudo_load += load;
             int pos = findNborIdx(node);
