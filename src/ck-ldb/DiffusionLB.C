@@ -48,8 +48,6 @@ DiffusionLB::DiffusionLB(const CkLBOptions& opt) : CBase_DiffusionLB(opt)
   myNodeId = CkMyPe() / nodeSize;
   acks = 0;
   max = 0;
-  edgeCount = 0;
-  edge_indices.reserve(100);
   round = 0;
   statsReceived = 0;
   rank0_barrier_counter = 0;

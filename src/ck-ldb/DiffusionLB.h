@@ -69,21 +69,28 @@ protected:
 private:
   CProxy_DiffusionLB thisProxy;
 
-  // phase 0: set up stats structures
+  // phase 0: set up stats structures --------------------------------
   CLBStatsMsg* statsmsg;
   CkMarshalledCLBStatsMessage* marshmsg;
   CLBStatsMsg** statsList;  // used in DiffusionHelper
   BaseLB::LDStats* nodeStats;
   DistBaseLB::LDStats* myStats;
 
-  // general info
+  int statsReceived;
+
+  std::vector<int> numObjects;
+  std::vector<int> prefixObjects;
+  std::vector<double> pe_load;
+
+  // general state --------------------------------
   double my_load;
   double my_loadAfterTransfer;
   int rank0PE;
   int nodeSize;
   int numNodes;
+  int myNodeId;
 
-  // phase 1: build neighbor list
+  // phase 1: build neighbor list --------------------------------
   int rank0_barrier_counter;
   int neighborCount;
   std::vector<int> sendToNeighbors;  // Neighbors to which curr node has to send load.
@@ -99,8 +106,12 @@ private:
 
   bool visited;
   int pick;
+  int round;
+  int requests_sent;
+  int acks, max;
 
-  // phase 2: pseudo load balancing
+  // phase 2: pseudo load balancing --------------------------------
+  void PseudoLoadBalancing();
   std::vector<double> toSendLoad;
   std::vector<double> toReceiveLoad;
   std::vector<double> loadNeighbors;
@@ -110,7 +121,7 @@ private:
   int pseudo_itr;  // iteration count
   int temp_itr;
 
-  // phase 3: across node LB
+  // phase 3: across node LB --------------------------------
   void buildObjComms(int nobjs);
   void buildGainValues(int nobjs);
   void buildGainValuesNbor(int nobjs, int nbor);
@@ -118,98 +129,42 @@ private:
   int getBestNeighbor();
   int getBestObject(int nbor);
 
-  // aggregate load received
-  int statsReceived;
-  int loadReceived;
-  int do_again = 1;
-  int round, requests_sent;
-  int myNodeId;
-
-  std::vector<int> numObjects;
-  std::vector<int> prefixObjects;
-  std::vector<double> pe_load;
-  std::vector<double> pe_loadBefore;
-
-  int acks, max;
-
-  int edgeCount;
-  std::vector<int> edge_indices;
-  // const DistBaseLB::LDStats* statsData;
-
-  // heap
   int* gain_val;
+  int loadReceivers;
+
+  std::vector<std::vector<int>> objectComms;
+
+  // heap things
   std::vector<CkVertex> objs;
   std::vector<int> obj_heap;  // TODO: replace with ckheap
   std::vector<int> heap_pos;
+  void InitializeObjHeap(int size);
+  std::vector<CkVertex> objects;  // this is only used to pass in to ObjCompareOperator,
+                                  // but not initialzied??
 
-  int loadReceivers;
-  std::vector<bool> balanced;
-
-  // migration
-  int total_migrates;
-  int total_migratesActual;
-  int migrates_completed;
-  int migrates_expected;
-  std::vector<MigrateInfo*> migrateInfo;
-  std::vector<int> migratedTo;
-  std::vector<int> migratedFrom;
-  std::vector<CkVertex> objects;
-  std::vector<std::vector<int>> objectComms;
-  int finalBalancing;  // TODO get rid of this
-
-  // stats
-  double strat_end_time;
-  double start_lb_time;
-  double end_lb_time;
-  // debug messages vars and functions.
-  // load
-  double maxB;
-  double minB;
-  double avgB;
-  double maxA;
-  double minA;
-  double avgA;
-  int maxPEB;
-  int maxPEA;
-  int minPEB;
-  int minPEA;
-  // communication
-  double internalBefore;
-  double externalBefore;  // TODO: not used?
-  double internalAfter;
-  double externalAfter;
-  double internalBeforeFinal;
-  double externalBeforeFinal;  // TODO: not used?
-  double internalAfterFinal;
-  double externalAfterFinal;
-  int receivedStats;
-  int migrates;      // number of objects migrated across node
-  int migratesNode;  // number of objects migrated within node
-
-  // helper functions
-  CLBStatsMsg* AssembleStats();
-  void AddToList(CLBStatsMsg* m, int rank);
-  void BuildStats();
-  int findNborIdx(int node);
-  bool AggregateToSend();
-  double avgNborLoad();
-
-  // state helpers
-  int GetPENumber(int& obj_id);
+  // phase 4: within node LB --------------------------------
   double averagePE();
 
-  // Cascading migrations
+  // phase 5: migration --------------------------------
+  std::vector<MigrateInfo*> migrateInfo;
+  int total_migrates;
+
+  // main entry point
+  void Strategy(const DistBaseLB::LDStats* const stats);
+
+  // helper functions
+  int findNborIdx(int node);
+  double avgNborLoad();  // used in pseudoLB only
+  int GetPENumber(int& obj_id);
+  void BuildStats();
+  CLBStatsMsg* AssembleStats();
+  void AddToList(CLBStatsMsg* m, int rank);
+
+  // Cascading migrations / not used (because cascading migration doesn't make sense?)
   std::vector<LDObjHandle> objectHandles;
   std::vector<double> objectLoads;
   int FindObjectHandle(LDObjHandle h);
   void CascadingMigration(LDObjHandle h, double load);
-
-  // main functions
-  void Strategy(const DistBaseLB::LDStats* const stats);
-  void PseudoLoadBalancing();
-
-  // Heap functions
-  void InitializeObjHeap(int size);
 };
 
 #endif /* _DistributedLB_H_ */

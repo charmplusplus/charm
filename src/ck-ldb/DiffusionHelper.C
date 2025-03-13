@@ -99,11 +99,8 @@ void DiffusionLB::BuildStats()
       objs[nobj] = CkVertex(nobj, oData.wallTime, nodeStats->objData[nobj].migratable,
                             nodeStats->from_proc[nobj]);
       my_load += msg->objData[i].wallTime;
-
       pe_load[pe] += msg->objData[i].wallTime;
-#if 0
-            pe_loadBefore[pe] += msg->objData[i].wallTime;
-#endif
+
       /*TODO Keys LDObjKey key;
       key.omID() = msg->objData[i].handle.omID;
       key.objID() =  msg->objData[i].handle.objID;
@@ -200,13 +197,6 @@ double DiffusionLB::avgNborLoad()
 
   for (int i = 0; i < neighborCount; i++) sum += loadNeighbors[i];
   return sum / neighborCount;
-}
-
-bool DiffusionLB::AggregateToSend()
-{
-  bool res = false;
-  for (int i = 0; i < neighborCount; i++) toSendLoad[i] -= toReceiveLoad[i];
-  return res;
 }
 
 void DiffusionLB::buildObjComms(int n_objs)
