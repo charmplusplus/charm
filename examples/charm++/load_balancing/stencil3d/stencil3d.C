@@ -173,6 +173,10 @@ class Stencil: public CBase_Stencil {
     {
       usesAtSync = true;
 
+    std::vector<LBRealType> centroid = {(LBRealType)thisIndex.x, (LBRealType)thisIndex.y,
+                                        (LBRealType)thisIndex.z};
+    setObjPosition(centroid);
+
       constrainBC();
       // start measuring time
       if (thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0)

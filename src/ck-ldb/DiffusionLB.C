@@ -214,8 +214,8 @@ void DiffusionLB::PseudoLoadBalancing()
     if (totalOverload > 0 && totalUnderLoad > 0 && thisIterToSend[i] > 0)
     {
       //      DEBUGL2(("[%d] GRD: Pseudo Load Balancing Sending, iteration %d node
-      //      %d(pe-%d) toSend %lf totalToSend %lf\n", CkMyPe(), itr, sendToNeighbors[i],
-      //      CkNodeFirst(sendToNeighbors[i]), thisIterToSend[i],
+      //      %d(pe-%d) toSend %lf totalToSend %lf\n", CkMyPe(), itr,
+      //      sendToNeighbors[i], CkNodeFirst(sendToNeighbors[i]), thisIterToSend[i],
       //      (thisIterToSend[i]*totalOverload)/totalUnderLoad));
       thisIterToSend[i] *= totalOverload / totalUnderLoad;
       toSendLoad[i] += thisIterToSend[i];
@@ -257,7 +257,14 @@ void DiffusionLB::AcrossNodeLB()
   memset(gain_val, 100, n_objs);
 
   // build object comms
+  // DiffusionMetric* metric =
+  //     new MetricCommEI(nodeStats, myNodeId, nodeSize, neighborCount, toSendLoad);
+
+  DiffusionMetric* metric = new MetricComm(nodeStats, myNodeId, nodeSize, neighborCount,
+                                           toSendLoad, sendToNeighbors);
+
   buildObjComms(n_objs);
+
   loadReceivers = std::count_if(toSendLoad.begin(), toSendLoad.end(),
                                 [](double load) { return load > 0; });
 
@@ -274,22 +281,36 @@ void DiffusionLB::AcrossNodeLB()
   if (loadReceivers > 0)
   {
     // compute gain vals
-    buildGainValues(n_objs);
+    // buildGainValues(n_objs);
 
-    // T1: create a heap based on gain values, and its position also.
-    InitializeObjHeap(n_objs);
+    // // T1: create a heap based on gain values, and its position also.
+    // InitializeObjHeap(n_objs);
 
     while (my_loadAfterTransfer > 0)
     {
-      int nborId = getBestNeighbor();
+      // int nborId = getBestNeighbor();
+      int nborId = metric->getBestNeighbor();  // this is causing cascading???
+
+      // CkAssert(nborId == test_nborId);
+      //  CkAssert(nborId == testnbor);
 
       if (nborId == -1)
         break;  // no more neighbors to send to
 
-      int v_id = getBestObject(nborId);
+      int v_id = metric->popBestObject(nborId);
 
-      if (v_id == -1)
-        CkAbort("Error: objId is -1\n");
+      assert(nodeStats->objData[v_id].migratable);
+
+      // int v_id = getBestObject(nborId);
+
+      // CkPrintf("Object ids: %d %d\n", v_id, test_v_id);
+      // CkPrintf("Gain values: %d %d\n", gain_val[v_id], gain_val[test_v_id]);
+      //  doesn't pick same object, becuase of
+      //   underlying heap imp (if objects have same gain)
+
+      // CkPrintf("Picking object %d with gain %d for neighbor %d\n", v_id,
+      // gain_val[v_id],
+      //          nborId);
 
       double currLoad = objs[v_id].getVertexLoad();
       objs[v_id].setCurrPe(-1);
@@ -309,6 +330,8 @@ void DiffusionLB::AcrossNodeLB()
 
       toSendLoad[nborId] -= currLoad;
       my_loadAfterTransfer -= currLoad;
+
+      metric->updateState(v_id, nborId);  // update state to keep track of migrations
 
       LDObjHandle objHandle = nodeStats->objData[v_id].handle;
       thisProxy[destPE].LoadMetaInfo(objHandle, currLoad);
@@ -341,8 +364,8 @@ void DiffusionLB::AcrossNodeLB()
 }
 
 /* Load has been logically sent from overloaded to underloaded nodes in LoadBalance().
- * we should load balance the PE's within the node. This function should only be called by
- * rank0PE.
+ * Now we should load balance the PE's within the node. This function should only be
+ * called by rank0PE.
  *
  * At a high level, this does the following:
  * - find overloaded and underloaded PEs on my node
@@ -450,8 +473,10 @@ void DiffusionLB::WithinNodeLB()
       delete maxObj;
     }
 
+    // TODO: submit to print stats
     // This QD is essential because, before the actual migration starts, load should be
     // divided amongs intra node PE's.
+
     if (CkMyPe() == 0)
     {
       CkCallback cb(CkIndex_DiffusionLB::ProcessMigrations(), thisProxy);
@@ -576,9 +601,9 @@ void DiffusionLB::CascadingMigration(LDObjHandle h, double load)
 
 // When load balancing, remove object handle from your list, since it is about to be
 // migrated
-/* LoadMetaInfo is called on the receiver with the object that will be migrated to it (via
- * a MigrateMe in  LoadReceived). It is only called when migrating at the node level. Not
- * sure why the receiver would already have this handle though...*/
+/* LoadMetaInfo is called on the receiver with the object that will be migrated to it
+ * (via a MigrateMe in  LoadReceived). It is only called when migrating at the node
+ * level. Not sure why the receiver would already have this handle though...*/
 void DiffusionLB::LoadMetaInfo(LDObjHandle h, double load)
 {
   int idx = FindObjectHandle(h);  // if object is in my handles

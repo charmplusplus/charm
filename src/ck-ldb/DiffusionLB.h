@@ -12,6 +12,7 @@
 #include "ckheap.h"
 #include "topology.h"
 
+#include "DiffusionMetric.h"
 #include "Heap_helper.C"
 
 #include <queue>
