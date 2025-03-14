@@ -128,7 +128,9 @@ void DiffusionLB::buildMSTinRounds(double best_weight, int best_from, int best_t
 
       if (std::find(mstVisitedPes.begin(), mstVisitedPes.end(), nbor) ==
               mstVisitedPes.end() &&
-          nbor != myNodeId && nbor < numNodes && nbor >= 0)
+          nbor != myNodeId && nbor < numNodes && nbor >= 0 &&
+          sendToNeighbors.size() < NUM_NEIGHBORS  // dont build too many nieghbors
+      )
       {
         newNbor = nbor;
         newParent = myNodeId;
@@ -148,20 +150,27 @@ void DiffusionLB::next_MSTphase(double newweight, int newparent, int newto)
   if (newto >= 0)
     all_tos_negative = 0;
 
-  if (newto == -1 && newparent == -1)  // this edge is invalid, no contribution
+  // if (newto == -1 && newparent == -1)
+  //   // this edge is invalid, no contribution
 
-    if (newweight >=
-        best_weight)  // TODO: this shouldn't really have to be >=... whats wrong?
-    {
-      best_weight = newweight;
-      best_to = newto;
-      best_from = newparent;
-    }
+  if (newweight >= best_weight &&
+      (newto != -1))  // TODO: this shouldn't really have to be >=... whats wrong?
+  {
+    best_weight = newweight;
+    best_to = newto;
+    best_from = newparent;
+  }
 
   if (acks == numNodes)
   {
     assert(!all_tos_negative);  // all inputs should never have invalid edges
-    assert(best_from != best_to);
+
+    if (best_to == best_from)
+    {
+      CkAbort("ERROR: MST can't add any more edges... Try adjusting NUM_NEIGHBORS\n");
+    }
+
+    CkPrintf("Adding MST edge from %d to %d\n", best_from, best_to);
 
     acks = 0;
     all_tos_negative = 1;
@@ -241,7 +250,7 @@ void DiffusionLB::createCommList()
   long ebytes[numNodes];
   std::fill_n(ebytes, numNodes, 0);
 
-  nbors = new int[NUM_NEIGHBORS + numNodes];
+  nbors = new int[numNodes];
   for (int i = 0; i < numNodes; i++) nbors[i] = -1;
 
   sendToNeighbors.clear();
@@ -339,8 +348,12 @@ void DiffusionLB::sortArr(long arr[], int n, int* nbors)
   reverse(vp.begin(), vp.end());
   int found = 0;
   for (int i = 0; i < numNodes; i++)
-    if (myNodeId != vp[i].second)  // Ideally we shouldn't need to check this
+    if (myNodeId != vp[i].second)
+    {
+      assert(vp[i].second != myNodeId);
+      // Ideally we shouldn't need to check this
       nbors[found++] = vp[i].second;
+    }
   if (found == 0 && numNodes > 1)
     CkAbort("Error: No neighbors found on %d\n", CmiMyPe());
 }
