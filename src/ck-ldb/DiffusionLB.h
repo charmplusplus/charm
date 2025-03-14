@@ -20,6 +20,8 @@
 
 #include "DiffusionLB.decl.h"
 
+#include "DiffusionJSON.h"
+
 #define SELF_IDX NUM_NEIGHBORS
 #define EXT_IDX NUM_NEIGHBORS + 1
 #define NUM_NEIGHBORS 2
@@ -51,6 +53,10 @@ public:
 
   void MigrationDoneWrapper();  // Call when migration is complete
   void ReceiveStats(CkMarshalledCLBStatsMessage&& data);
+  void ReceiveFinalStats(std::vector<bool> isMigratable, std::vector<int> from_proc,
+                         std::vector<int> to_proc, std::vector<LDCommData> commData,
+                         int n_migrateobjs,
+                         std::vector<std::vector<LBRealType>> positions);
 
   void buildMSTinRounds(double best_weight, int best_from, int best_to);
   void next_MSTphase(double newcost, int newparent, int newto);
@@ -75,6 +81,8 @@ private:
   CLBStatsMsg** statsList;  // used in DiffusionHelper
   BaseLB::LDStats* nodeStats;
   DistBaseLB::LDStats* myStats;
+
+  BaseLB::LDStats* fullStats;
 
   int statsReceived;
 

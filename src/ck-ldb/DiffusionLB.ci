@@ -16,6 +16,11 @@ module DiffusionLB
     entry[expedited] void proposeNbor(int nborId);
     entry[expedited] void okayNbor(int agree, int nborId);
 
+    entry void ReceiveFinalStats(std::vector<bool> isMigratable,
+                                 std::vector<int> from_proc, std::vector<int> to_proc,
+                                 std::vector<LDCommData> commData, int n_migrateobjs,
+                                 std::vector<std::vector<LBRealType>> positions);
+
     entry void ReceiveLoadInfo(int itr, double load, int node);
     entry void ReceiveStats(CkMarshalledCLBStatsMessage data);
     // entry void LoadTransfer(double load, int initPE, int objId);

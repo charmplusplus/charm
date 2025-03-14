@@ -71,6 +71,10 @@ DiffusionLB::DiffusionLB(const CkLBOptions& opt) : CBase_DiffusionLB(opt)
     prefixObjects.resize(nodeSize);
     pe_load.resize(nodeSize);
   }
+  if (CkMyPe() == 0)
+  {
+    fullStats = new BaseLB::LDStats(CkNumPes());
+  }
 #endif
 }
 
@@ -257,6 +261,15 @@ void DiffusionLB::AcrossNodeLB()
   loadReceivers = std::count_if(toSendLoad.begin(), toSendLoad.end(),
                                 [](double load) { return load > 0; });
 
+  // iterate through objects and set from_pe and to_pe correctly
+  for (int i = 0; i < n_objs; i++)
+  {
+    int from = nodeStats->from_proc[i];
+    CkAssert(from < CkNumPes() && from >= 0);
+    // todo also assert from is on this node?
+    nodeStats->to_proc[i] = -1;  // negative one if not migrated
+  }
+
   // build obj heap from gain values
   if (loadReceivers > 0)
   {
@@ -286,6 +299,13 @@ void DiffusionLB::AcrossNodeLB()
       int node = sendToNeighbors[nborId];
       int donorPE = rank0PE + rank;
       int destPE = node * nodeSize;  // send to rank0PE of dest node
+      CkAssert(destPE != donorPE);   // if this is hit, our neighbor choice is not working
+
+      if (nodeStats->from_proc[v_id] != donorPE)
+        CkPrintf(
+            "ERROR: not sure if this is supposed to work, but from_proc[%d] = %d, "
+            "donorPE = %d\n",
+            v_id, nodeStats->from_proc[v_id], donorPE);
 
       toSendLoad[nborId] -= currLoad;
       my_loadAfterTransfer -= currLoad;
@@ -293,11 +313,34 @@ void DiffusionLB::AcrossNodeLB()
       LDObjHandle objHandle = nodeStats->objData[v_id].handle;
       thisProxy[destPE].LoadMetaInfo(objHandle, currLoad);
       thisProxy[donorPE].LoadReceived(objId, destPE);
+
+      nodeStats->to_proc[v_id] = destPE;
     }
   }
+
+  std::vector<bool> isMigratable(n_objs);
+  for (int i = 0; i < n_objs; i++)
+  {
+    isMigratable[i] = nodeStats->objData[i].migratable;
+  }
+
+  std::vector<std::vector<LBRealType>> positions(n_objs);
+  for (int i = 0; i < n_objs; i++)
+  {
+    int size = nodeStats->objData[i].position.size();
+    positions[i].resize(size);
+    for (int j = 0; j < size; j++)
+    {
+      positions[i][j] = nodeStats->objData[i].position[j];
+    }
+  }
+
+  thisProxy[0].ReceiveFinalStats(isMigratable, nodeStats->from_proc, nodeStats->to_proc,
+                                 nodeStats->commData, nodeStats->n_migrateobjs,
+                                 positions);
 }
 
-/* Load has been logically sent from overloaded to underloaded nodes in LoadBalance(). Now
+/* Load has been logically sent from overloaded to underloaded nodes in LoadBalance().
  * we should load balance the PE's within the node. This function should only be called by
  * rank0PE.
  *

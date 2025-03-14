@@ -93,6 +93,7 @@ void DiffusionLB::BuildStats()
     for (i = 0; i < msg->objData.size(); i++)
     {
       nodeStats->from_proc[nobj] = nodeStats->to_proc[nobj] = start + pe;
+
       nodeStats->objData[nobj] = msg->objData[i];
       LDObjData& oData = nodeStats->objData[nobj];
       //            CkPrintf("\n[PE-%d]Adding vertex id %d", CkMyPe(), nobj);
@@ -304,6 +305,44 @@ int DiffusionLB::getBestNeighbor()
 int DiffusionLB::getBestObject(int nbor)
 {
   int v_id = heap_pop(obj_heap, ObjCompareOperator(&objs, gain_val), heap_pos);
-
   return v_id;
+}
+
+// all nodes call this to send final stats to 0. For printing to JSON
+// TODO: this is broken rn, because of BaseLB::LDStats pup problems
+void DiffusionLB::ReceiveFinalStats(std::vector<bool> isMigratable,
+                                    std::vector<int> from_proc, std::vector<int> to_proc,
+                                    std::vector<LDCommData> commData, int n_migrateobjs,
+                                    std::vector<std::vector<LBRealType>> positions)
+{
+  CkAssert(thisIndex == 0);
+
+  // store the message
+  statsReceived++;
+
+  int oldSize = fullStats->objData.size();
+
+  fullStats->objData.resize(fullStats->objData.size() + isMigratable.size());
+  fullStats->commData.resize(fullStats->commData.size() + commData.size());
+  fullStats->n_migrateobjs += n_migrateobjs;
+
+  for (int i = 0; i < isMigratable.size(); i++)
+  {
+    fullStats->objData[i + oldSize].migratable = isMigratable[i];
+
+    int poslen = positions[i].size();
+    for (int j = 0; j < poslen; j++)
+    {
+      fullStats->objData[i + oldSize].position.push_back(positions[i][j]);
+    }
+  }
+
+  fullStats->from_proc.insert(fullStats->from_proc.end(), from_proc.begin(),
+                              from_proc.end());
+  fullStats->to_proc.insert(fullStats->to_proc.end(), to_proc.begin(), to_proc.end());
+
+  if (statsReceived == numNodes)
+  {
+    LBwriteStatsMsgs(fullStats);
+  }
 }
