@@ -21,6 +21,7 @@ module DiffusionLB
                                  std::vector<LDCommData> commData, int n_migrateobjs,
                                  std::vector<std::vector<LBRealType>> positions);
 
+    entry void ReceiveCentroid(int node, std::vector<LBRealType> centroid);
     entry void ReceiveLoadInfo(int itr, double load, int node);
     entry void ReceiveStats(CkMarshalledCLBStatsMessage data);
     // entry void LoadTransfer(double load, int initPE, int objId);
@@ -46,6 +47,77 @@ module DiffusionLB
     // entry void CallResumeClients();
     // entry void PrintDebugMessage(int len, double result[len]);
 
+    entry void createCentroidList()
+    {
+      serial
+      {
+        // nbors = new int[numNodes];
+        nborCentroids.resize(numNodes);
+        nborDistances.resize(numNodes);
+
+        int position_dim = 0;
+        if (nodeStats->objData.size() > 0)
+        {
+          position_dim = nodeStats->objData[0].position.size();
+        }
+
+        // initialize centroid structures
+        myCentroid.resize(position_dim, 0);
+        for (int nbor = 0; nbor < numNodes; nbor++)
+        {
+          // nbors[nbor] = nbor;
+          nborCentroids[nbor].resize(position_dim, 0);
+        }
+
+        // compute my own centroid
+        for (int objIdx = 0; objIdx < nodeStats->objData.size(); objIdx++)
+        {
+          LDObjData& objData = nodeStats->objData[objIdx];
+          std::vector<LBRealType> position = nodeStats->objData[objIdx].position;
+
+          for (int i = 0; i < position_dim; i++)
+          {
+            myCentroid[i] += objData.position[i];
+          }
+          // store centroid
+        }
+
+        for (int i = 0; i < position_dim; i++) myCentroid[i] /= nodeStats->objData.size();
+
+        thisProxy.ReceiveCentroid(myNodeId, myCentroid);
+      }
+
+      for (centReceiveNode = 0; centReceiveNode < numNodes; centReceiveNode++)
+      {
+        when ReceiveCentroid(int node, std::vector<LBRealType> centroid) serial
+        {
+          position_dim = 3;
+          double dist = 0;
+          for (int i = 0; i < position_dim; i++)
+          {
+            nborCentroids[node][i] = centroid[i];
+          }
+
+          for (int i = 0; i < position_dim; i++)
+          {
+            dist += (myCentroid[i] - centroid[i]) * (myCentroid[i] - centroid[i]);
+          }
+          dist = sqrt(dist);
+
+          if (node != myNodeId)
+          {
+            nborDistances[node] = dist;
+          }
+          else
+          {
+            nborDistances[node] = 10000;
+          }
+        }
+      }
+
+      // serial { pairedSort(nbors, nborDistances); }
+    }
+
     entry void pseudolb_rounds()
     {
       serial
@@ -68,6 +140,7 @@ module DiffusionLB
 
         my_pseudo_load = my_load;
       }
+
       // TODO: Currently fixed iterations
       for (pseudo_itr = 0; pseudo_itr < ITERATIONS; pseudo_itr++)
       {

@@ -260,7 +260,11 @@ void DiffusionLB::AcrossNodeLB()
   // DiffusionMetric* metric =
   //     new MetricCommEI(nodeStats, myNodeId, nodeSize, neighborCount, toSendLoad);
 
-  DiffusionMetric* metric = new MetricComm(nodeStats, myNodeId, nodeSize, neighborCount,
+  // neighborCount,
+  //                                          toSendLoad, sendToNeighbors);
+
+  DiffusionMetric* metric =
+      new MetricCentroid(nborCentroids, nborDistances, myCentroid, nodeStats, myNodeId,
                                            toSendLoad, sendToNeighbors);
 
   buildObjComms(n_objs);

@@ -99,6 +99,13 @@ private:
   int numNodes;
   int myNodeId;
 
+  // centroid setup --------------------------------
+  std::vector<std::vector<LBRealType>> nborCentroids;
+  std::vector<double> nborDistances;
+  std::vector<LBRealType> myCentroid;
+  int position_dim;
+  int centReceiveNode;
+
   // phase 1: build neighbor list --------------------------------
   int rank0_barrier_counter;
   int neighborCount;

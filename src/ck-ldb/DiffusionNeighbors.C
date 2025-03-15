@@ -24,6 +24,9 @@ void DiffusionLB::findNBors(int do_again)
   {
     cost_for_neighbor = {};  // dictionary of nbor keys to cost
     createCommList();
+    thisProxy[thisIndex]
+        .createCentroidList();  // this is SDAG!! only works here because the result isn't
+                                // used until LB across nodes
   }
 
   mstVisitedPes.clear();

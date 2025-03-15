@@ -260,4 +260,132 @@ public:
     toSendLoad[destNbor] -= nodeStats->objData[objId].wallTime;
   }
 };
+
+class MetricCentroid : public DiffusionMetric
+{
+private:
+  std::vector<std::vector<LBRealType>> nborCentroids;
+  std::vector<std::vector<LBRealType>> objPosition;
+
+  std::vector<double> nborDistances;
+  std::vector<LBRealType> myCentroid;
+  int position_dim;
+
+  std::vector<double> toSendLoad;  // comm outward to each neighbor
+  BaseLB::LDStats* nodeStats;
+
+  std::vector<int> sendToNeighbors;
+  std::vector<bool> objAvailable;
+
+  std::vector<std::vector<double>> objNborDistances;
+
+  int n_objs;
+  int neighborCount;
+  int myNodeId;
+
+  int computeDistance(std::vector<LBRealType> objPos,
+                      std::vector<LBRealType> nborCentroid)
+  {
+    double distance = 0;
+    for (int i = 0; i < position_dim; i++)
+    {
+      distance += (objPos[i] - nborCentroid[i]) * (objPos[i] - nborCentroid[i]);
+    }
+    return distance;
+  }
+
+public:
+  MetricCentroid(std::vector<std::vector<double>> nborCentroids,
+                 std::vector<double> nborDistances, std::vector<LBRealType> myCentroid,
+                 BaseLB::LDStats* ns, int nodeId, std::vector<double> tSL,
+                 std::vector<int> sendToNbrs)
+      : nodeStats(ns),
+        myNodeId(nodeId),
+        nborCentroids(nborCentroids),
+        myCentroid(myCentroid),
+        nborDistances(nborDistances),
+        toSendLoad(tSL),
+        sendToNeighbors(sendToNbrs)
+  {
+    position_dim = myCentroid.size();
+    neighborCount = nborCentroids.size();
+    n_objs = ns->objData.size();
+
+    objAvailable.resize(n_objs, true);
+    objPosition.resize(n_objs);
+    objNborDistances.resize(n_objs);
+
+    for (int i = 0; i < n_objs; i++)
+    {
+      objPosition[i].resize(position_dim);
+      for (int j = 0; j < position_dim; j++)
+      {
+        objPosition[i][j] = ns->objData[i].position[j];
+      }
+
+      objNborDistances[i].resize(neighborCount);
+      for (int j = 0; j < neighborCount; j++)
+      {
+        objNborDistances[i][j] = computeDistance(objPosition[i], nborCentroids[j]);
+      }
+    }
+
+    CkPrintf("Metric on %d has centroid %f %f %f\n", myNodeId, myCentroid[0],
+             myCentroid[1], myCentroid[2]);
+
+    for (int i = 0; i < neighborCount; i++)
+    {
+      CkPrintf("Neighbor %d has centroid %f %f %f\n", i, nborCentroids[i][0],
+               nborCentroids[i][1], nborCentroids[i][2]);
+    }
+  }
+
+  ~MetricCentroid() {}
+
+  int popBestObject(int nbor) override
+  {
+    // find index of object with max internal comm
+    double minDistance = std::numeric_limits<double>::max();
+    int bestObject = -1;
+
+    for (int i = 0; i < n_objs; i++)
+    {
+      int testDistance = objNborDistances[i][nbor];  // computeDistance(
+
+      if (testDistance < minDistance && objAvailable[i] &&
+          (nodeStats->objData[i].migratable == true))
+      {
+        minDistance = testDistance;
+        bestObject = i;
+      }
+    }
+
+    if (bestObject != -1)
+    {
+      objAvailable[bestObject] = false;
+    }
+    return bestObject;
+  }
+
+  int getBestNeighbor() override
+  {
+    int bestNeighbor = -1;
+
+    for (int i = 0; i < neighborCount; i++)
+    {
+      if (toSendLoad[i] > 0)
+      {
+        bestNeighbor = i;
+        break;
+      }
+    }
+    return bestNeighbor;
+  }
+
+  void updateState(int objId, int destNbor)
+  {
+    toSendLoad[destNbor] -= nodeStats->objData[objId].wallTime;
+  }
+};
+
 #endif  // DIFFUSIONMETRIC_H
