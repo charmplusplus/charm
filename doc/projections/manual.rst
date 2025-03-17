@@ -1087,10 +1087,6 @@ communication characteristics:
 
 -  Number of bytes sent externally (physically) by entry methods
 
--  Number of hops messages travelled before being received by an
-   entry methods (available only on trace logs generated on the Bluegene
-   machine).
-
 .. figure:: fig/apoa1_512_CommTimeProfile.png
    :name: communication-time
    :width: 4in
@@ -1727,9 +1723,6 @@ Known Issues
 
 This section lists known issues and bugs with the Projections framework
 that we have not resolved at this time.
-
--  Charm++ scheduler idle time is known to be incorrectly recorded on
-   the BG/L machine at IBM TJ Watson.
 
 -  End-of-Run analysis techniques (while tracing applications) are
    currently known to hang for applications that make multiple calls to

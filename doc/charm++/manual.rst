@@ -1,7 +1,7 @@
 =======================================
 The Charm++ Parallel Programming System
 =======================================
-
+ 
 .. contents::
    :depth: 3
 
@@ -24,7 +24,7 @@ checkpoints.
 Charm++ is a production-quality parallel programming system used by
 multiple applications in science and engineering on supercomputers as
 well as smaller clusters around the world. Currently the parallel
-platforms supported by Charm++ are the IBM BlueGene/Q and OpenPOWER
+platforms supported by Charm++ are OpenPOWER
 systems, Cray XE, XK, and XC systems, Omni-Path and Infiniband clusters,
 single workstations and networks of workstations (including x86 (running
 Linux, Windows, MacOS)), etc. The communication protocols and
@@ -1659,17 +1659,14 @@ and code blocks that they define. These definitions appear in the
 ``.ci`` file definition of the enclosing chare class as a ‘body’ of an
 entry method following its signature.
 
-The most basic construct in SDAG is the ``serial`` (aka the ``atomic``)
-block. Serial blocks contain sequential C++ code. They’re also called
-atomic because the code within them executes without returning control
-to the Charm++ runtime scheduler, and thus avoiding interruption from
-incoming messages. The keywords atomic and serial are synonymous, and
-you can find example programs that use atomic. However, we recommend the
-use of serial and are considering the deprecation of the atomic keyword.
-Typically serial blocks hold the code that actually deals with incoming
-messages in a ``when`` statement, or to do local operations before a
-message is sent or after it’s received. The earlier example can be
-adapted to use serial blocks as follows:
+The most basic construct in SDAG is the ``serial`` block (previously also
+denoted by ``atomic``, this usage is now deprecated). Serial blocks contain
+sequential C++ code, and the code within them executes to completion without
+returning control to the Charm++ runtime scheduler, thus avoiding interruption
+from incoming messages. Typically, serial blocks hold the code that actually
+deals with incoming messages in a ``when`` statement or performs local
+operations before a message is sent or after it is received. The earlier example
+can be adapted to use serial blocks as follows:
 
 .. code-block:: charmci
 
@@ -2029,7 +2026,7 @@ the runtime will not “commit” to this branch until the second arrives.
 If another dependency fully matches, the partial match will be ignored
 and can be used to trigger another ``when`` later in the execution.
 
-.. code-block:: c++
+.. code-block:: text
 
    case {
      when a() { }
@@ -2202,7 +2199,8 @@ PUP STL Container Objects
 If the variable is from the C++ Standard Template Library, you can
 include operator\ ``|``\ ’s for STL containers such as vector, map, set,
 list, pair, and string, templated on anything, by including the header
-“pup_stl.h”.
+“pup_stl.h” or <pup_stl.h>. This header should be placed in the .h or
+the .C/.cpp file in the project, and not in the .ci file.
 
 See ``examples/charm++/PUP/STLPUP``
 
@@ -4395,8 +4393,7 @@ whenidle
    priority or speculative) in the absence of other work. ``whenidle``
    entry methods must return a ``bool`` value, indicating whether the
    entry method should be called when the processor is idle again, and
-   accept a ``double`` argument representing the current timestamp. An
-   example can be found in ``examples/charm++/whenidle``.
+   take no arguments. An example can be found in ``examples/charm++/whenidle``.
 
 python
    entry methods are enabled to be called from python scripts as
@@ -4659,11 +4656,9 @@ avoid copies and behaves like a regular Charm++ entry method invocation.
 
 There are three APIs that provide zero copy semantics in Charm++:
 
--  Zero Copy Direct API
-
--  Zero Copy Entry Method Send API
-
--  Zero Copy Entry Method Post API
+- `Zero Copy Direct API <#zero-copy-direct-api>`__
+- `Zero Copy Entry Method Send API <#zero-copy-entry-method-send-api>`__
+- `Zero Copy Entry Method Post API <#zero-copy-entry-method-post-api>`__
 
 Zero Copy Direct API
 ^^^^^^^^^^^^^^^^^^^^
@@ -5302,7 +5297,6 @@ used.
    ============================= =============== ====================== =============== ========== ==========
    Machine                       Network         Build Architecture     Intra Processor Intra Host Inter Host
    ============================= =============== ====================== =============== ========== ==========
-   Blue Gene/Q (Vesta)           PAMI            ``pamilrts-bluegeneq`` 4 MB            32 KB      256 KB
    Cray XC30 (Edison)            Aries           ``gni-crayxc``         1 MB            2 MB       2 MB
    Cray XC30 (Edison)            Aries           ``mpi-crayxc``         256 KB          8 KB       32 KB
    Dell Cluster (Golub)          Infiniband      ``verbs-linux-x86_64`` 128 KB          2 MB       1 MB
@@ -5322,8 +5316,8 @@ Unlike the Zero Copy Entry Method Send API, this API should be used when the use
 to receive the data in a user posted buffer, which is allocated and managed by the user.
 
 The posting of the receiver buffer happens at an object level, where each recipient object,
-for example, a chare array element or a group element or nodegroup element posts a receiver
-buffer using a special version of the entry method.
+for example, a chare array element or a group element or nodegroup element matches the received
+source buffer with a receiver buffer using tag matching.
 
 To send an array using the Zero Copy Post API, specify the array
 parameter in the .ci file with the nocopypost specifier.
@@ -5341,40 +5335,90 @@ Zero Copy Entry Method Send API and can be referenced from the previous section.
 we will highlight the differences between the two APIs and demonstrate the usage of the Post API
 on the receiver side.
 
-As previously mentioned, the Zero Copy Entry Method Post API posts user buffers to receive the
+As previously mentioned, the Zero Copy Entry Method Post API matches and posts user buffers to receive the
 data sent by the sender. This is done using a special overloaded version of the recipient
 entry method, called Post entry method. The overloaded function has all the entry method parameters
-and an additional ``CkNcpyBufferPost`` array parameter at the end of the signature. Additionally, the
-entry method parameters are specified as references instead of values. Inside this post entry method,
-the received references can be initialized by the user. The pointer reference is assigned to a user
-allocated buffer, i.e. the buffer in which the user wishes to receive the data. The size variable
-reference could be assigned to a value (or variable) that represents the size of the data of that type
-that needs to be received. If this reference variable is not assigned inside the post entry method, the size specified
-at the sender in the CkSendBuffer wrapper will be used as the default size. The post entry method also
-allows the receiver to specify the memory registration mode and the memory de-registration mode.
-This is done by indexing the ncpyPost array and assigning the ``regMode`` and ``deregMode`` parameters
-present inside each array element of the ``CkNcpyBufferPost`` array. When the network memory
+and an additional ``CkNcpyBufferPost`` array parameter at the end of the signature. Inside this post
+entry method, the user is required to make calls to ``CkMatchBuffer`` to specify the association between
+the received source buffer and a user provided integer tag. Additionally, for every ``CkMatchBuffer`` call,
+the user is also required to make a corresponding ``CkPostBuffer`` call with the same tag to specify the association
+between that tag and a receiver buffer. Note that the ``CkMatchBuffer`` call should always be made inside
+the Post Entry Method, whereas the ``CkPostBuffer`` call can be made from anywhere in the program whenever the
+receiver is ready to post a buffer. The Post Entry method executes on the arrival of the metadata message, and
+the ``CkPostBuffer`` call for receiving those buffers can be executed before, after, or inside the Post Entry Method.
+However, it is important to note that it is required that both the ``CkMatchBuffer`` and ``CkPostBuffer`` calls are made
+on the same PE.
+
+The post entry method also allows the receiver to specify the memory registration mode and the memory
+de-registration mode. This is done by indexing the ncpyPost array and assigning the ``regMode`` and ``deregMode``
+parameters present inside each array element of the ``CkNcpyBufferPost`` array. When the network memory
 registration mode is unassigned by the user, the default ``CK_BUFFER_REG`` regMode is used. Similarly, when
 the de-registration mode is unassigned by the user, the default ``CK_BUFFER_DEREG`` deregMode is used.
+It is important to ensure that the ``CkMatchBuffer`` call is made after setting the ``regMode`` and/or ``deregMode``
+parameters.
 
-For the entry method ``foo`` specified with a nocopypost specifier, the resulting post function defined
+For the entry method ``foo`` specified with a nocopypost specifier, the resulting post entry method defined
 in the .C file will be:
 
 .. code-block:: c++
 
-   void foo (int &size, int *& arr, CkNcpyBufferPost *ncpyPost) {
-     arr = myBuffer;      // myBuffer is a user allocated buffer
-
-     size = 2000;         // 2000 ints need to be received.
+   void foo (int size, int *arr, CkNcpyBufferPost *ncpyPost) {
 
      ncpyPost[0].regMode = CK_BUFFER_REG; // specify the regMode for the 0th pointer
 
      ncpyPost[0].deregMode = CK_BUFFER_DEREG; // specify the deregMode for the 0th pointer
+
+     CkMatchBuffer(ncpyPost, 0, 22);
    }
 
-In addition to the post entry method, the regular entry method also needs to be defined
-as in the case of the Entry Method Send API, where the nocopypost parameter is being received
-as a pointer as shown below:
+As seen in the above example, the ``CkMatchBuffer`` call associates the 0th source buffer with tag 22.
+It has the following signature:
+
+.. code-block:: c++
+
+   template <typename T>
+   void CkMatchBuffer(CkNcpyBufferPost *post, int index, int tag);
+
+It takes three parameters, the passed ``CkNcpyBufferPost`` pointer, index, and tag.
+The first parameter is always the ``CkNcpyBufferPost`` parameter received in the
+Post Entry Method. The second parameter is the index of the nocopypost buffer among the nocopypost buffers sent
+in the entry method, starting with 0. For example, for 1 nocopypost buffer sent in the entry method, the index will
+always be 0. For 2 nocopypost buffers, the index will be 0 for the first buffer and 1 for the second buffer. For n
+buffers, it will be 0 for the first buffer, 1 for the second buffer, 2 for the third buffer up to (n-1) for the nth buffer.
+The third parameter is a user provided integer tag (22 in this case), used to associate the 0th source buffer of this
+entry method with tag 22.
+
+In order to post a buffer when ready, the user has to also call ``CkPostBuffer`` with the same tag (22) to associate
+the tag (22) with a receiver or destination buffer. As mentioned earlier, this function can be called at any time the user
+is ready to post a buffer. The following code illustrates the usage of ``CkPostBuffer``, which is called in a function
+when the user is ready to supply a destination buffer.
+
+.. code-block:: c++
+
+   void readyToPost() {
+     CkPostBuffer(myBuffer, mySize, 22);
+   }
+
+As seen in the above example, the ``CkPostBuffer`` call has the following signature:
+
+.. code-block:: c++
+
+   template <typename T>
+   void CkPostBuffer(T *buffer, size_t size, int tag);
+
+It takes three parameters, the destination buffer pointer, the size of the destination buffer and a tag.
+The first parameter is the destination buffer pointer where the user wants the source data. The second parameter
+is the size of the destination buffer. Note that this size should be always smaller than or equal to the size of the source buffer.
+The third parameter is the same user provided integer tag (22 in this case) that was used in the corresponding ``CkMatchBuffer``
+call inside the Post Entry Method.
+
+It is important to associate a unique tag with the ``CkMatchBuffer`` and ``CkPostBuffer`` calls for a single buffer on that PE.
+Using the same tag on the PE when the RDMA transfer is in progress triggers an abort from the runtime system because
+the same tag cannot be used to denote two different buffers in the internal PE-level data structures.
+
+After the execution of the Post Entry Method with the ``CkMatchBuffer`` calls and corresponding ``CkPostBuffer`` calls,
+the regular entry method is executed to signal the completion of all zero copy transfers into the posted receiver buffers.
+The regular entry method needs to be defined as in the case of the Entry Method Send API as shown below:
 
 .. code-block:: c++
 
@@ -5397,15 +5441,25 @@ In the .C file, we define a post entry method and a regular entry method:
 .. code-block:: c++
 
   // post entry method
-  void foo(int *& arr1, int & size1, char *& arr2, int & size2, CkNcpyBufferPost *ncpyPost) {
+  void foo(int *arr1, int size1, char *arr2, int size2, CkNcpyBufferPost *ncpyPost) {
 
-    arr1 = myBuffer1;
     ncpyPost[0].regMode = CK_BUFFER_UNREG;
     ncpyPost[0].deregMode = CK_BUFFER_DEREG;
+    CkMatchBuffer(ncpyPost, 0, 60);
 
-    arr2 = myBuffer2; // myBuffer2 is allocated using CkRdmaAlloc
-    ncpyPost[1].regMode = CK_BUFFER_PREREG;
+    ncpyPost[1].regMode = CK_BUFFER_PREREG; // myBuffer2 is allocated using CkRdmaAlloc
     ncpyPost[1].deregMode = CK_BUFFER_NODEREG;
+    CkMatchBuffer(ncpyPost, 1, 61);
+  }
+
+  void otherFn1() {
+    // somewhere else in the code
+    CkPostBuffer(myBuffer1, mySize1, 60);
+  }
+
+  void otherFn2() {
+    // somewhere else in the code
+    CkPostBuffer(myBuffer2, mySize2, 61);
   }
 
   // regular entry method
@@ -5420,10 +5474,19 @@ It is important to note that the ``CkNcpyBufferPost`` array has as many elements
 number of ``nocopypost`` parameters in the entry method declaration in the .ci file. For
 n nocopypost parameters, the ``CkNcpyBufferPost`` array is indexed by 0 to n-1.
 
-This API for point to point communication is demonstrated in
-``examples/charm++/zerocopy/entry_method_post_api`` and
-for broadcast operations, the usage of this API is
-demonstrated in ``examples/charm++/zerocopy/entry_method_bcast_post_api``.
+This API for point to point communication and broadcast is demonstrated in
+``tests/charm++/zerocopy/zc_post_async``.
+
+In addition to the PE-level match and post buffers as described above, there are node-level
+variants of the same methods called ``CkMatchNodeBuffer`` and ``CkPostNodeBuffer``. They
+have the exact same signature but are applicable for node-level matching operations that
+are often useful for node groups. The node equivalent match and post buffers allows two
+different PEs of the same node to call ``CkMatchNodeBuffer`` and ``CkPostNodeBuffer``.
+Similar to the PE-level API, it is important to associate a unique tag with the
+``CkMatchNodeBuffer`` and ``CkPostNodeBuffer`` calls for a single buffer on that node.
+Using the same tag on the node when the RDMA transfer is in progress triggers an abort
+from the runtime system because the same tag cannot be used to denote two different buffers
+in the internal node-level data structures.
 
 Similar to the Zero Copy Entry Method Send API, it should be noted that calls to
 entry methods with nocopypost specified parameters are currently supported for
@@ -5599,12 +5662,14 @@ then invokes it to return a result may have the following interface:
      cb.send(msg);
    }
 
-A CkCallback will accept any message type, or even NULL. The message is
+A *CkCallback* will accept any message type, even *nullptr*. The message is
 immediately sent to the user’s client function or entry point. A library
 which returns its result through a callback should have a clearly
 documented return message type. The type of the message returned by the
 library must be the same as the type accepted by the entry method
-specified in the callback.
+specified in the callback. Note that message flag(s) may be passed as an
+optional argument to “send;” for example, :code:`send(_, CK_MSG_EXPEDITED)`
+will send a message with expediency.
 
 As an alternative to “send”, the callback can be used in a *contribute*
 collective operation. This will internally invoke the “send” method on
@@ -5612,6 +5677,19 @@ the callback when the contribute operation has finished.
 
 For examples of how to use the various callback types, please see
 ``tests/charm++/megatest/callback.C``
+
+In addition to the above mechanisms for invoking a callback, it is possible
+that a library may want to accept a callback which broadcasts to a group
+or nodegroup, but then handles the exact logic for the broadcast manually.
+For example, if the data is already distributed across compute elements we
+can avoid performing the actual broadcast, or if we want to send different
+data to each member of the group. To accomplish this, users can invoke
+
+``void CkCallback::transformBcastToLocalElem(int elem = -1);``
+
+This will convert a callback that is broadcast to a group or nodegroup into
+a point-to-point callback for a particular element of the group (the local
+element if no element is passed).
 
 .. _sec:ckcallbackresumethread:
 
@@ -8119,30 +8197,21 @@ from zero: PEs are ranked from ``0`` to ``CmiNumPes()``, and nodes are ranked
 from ``0`` to ``CmiNumNodes()``.
 
 Charm++ provides a unified abstraction for querying topology information of
-IBM's BG/Q and Cray's XE6. The ``TopoManager`` singleton object, which can be
+Cray's XE6. The ``TopoManager`` singleton object, which can be
 used by including ``TopoManager.h``, contains the following methods:
 
 getDimNX(), getDimNY(), getDimNZ():
-   Returns the length of X, Y and Z dimensions (except BG/Q).
-
-getDimNA(), getDimNB(), getDimNC(), getDimND(), getDimNE():
-   Returns the length of A, B, C, D and E dimensions on BG/Q.
+   Returns the length of X, Y and Z dimensions.
 
 getDimNT():
    Returns the length of T dimension. TopoManager uses the T dimension to
    represent different cores that reside within a physical node.
 
 rankToCoordinates(int pe, int &x, int &y, int &z, int &t):
-   Get the coordinates of PE with rank *pe* (except BG/Q).
-
-rankToCoordinates(int pe, int &a, int &b, int &c, int &d, int &e, int &t):
-   Get the coordinates of PE with rank *pe* on BG/Q.
+   Get the coordinates of PE with rank *pe*.
 
 coordinatesToRank(int x, int y, int z, int t):
-   Returns the rank of PE with given coordinates (except BG/Q).
-
-coordinatesToRank(int a, int b, int c, int d, int e, int t):
-   Returns the rank of PE with given coordinates on BG/Q.
+   Returns the rank of PE with given coordinates.
 
 getHopsBetweenRanks(int pe1, int pe2):
    Returns the distance between the given PEs in terms of the hops count
@@ -8641,6 +8710,42 @@ computational power because those dedicated cores are not utilized at
 all during most of the application's execution time. This case indicates
 the necessity of a unified runtime supporting both types of parallelism.
 
+
+Stealable Tasks for within-node load balancing
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Converse, the underlying scheduling-and-communication system for Charm++, supports a
+*work-stealing task queue* (steal queue for bervity) as a build time option,
+which can be used to create tasks so that
+they can be executed by any PE
+within a logical node (i.e. a process), in SMP mode.
+To use this feature, you need an option --enable-task-queue while *building* Charm++ initially.
+Tasks are fired with the call CsdTaskEnqueue(m) where m is a pointer to a Converse message, which is different
+(and simpler and shorter) than a Charm++ message. It is simply a struct with an initial set of bytes
+(CmiMsgHeaderSizeBytes bytes) reserved for system information. You must also write a handler that has the code
+to execute the task and register with the system using CmiRegisterHandler called during system initialization.
+(use *initproc* or *moduleinit* methods). Typically, it is also necessary to have a synchronization object that
+can take action (such as a callback) when all the tasks
+arising recursively from a set of fired objects, so you know when they are all done.
+
+An example program illustrating this feature is in
+https://github.com/charmplusplus/pgms/tree/main/charm%2B%2B/tasksWithRing,
+which illustrates concurrent execution
+of tasks with regular Charm++ messages. Another example that illustrates the utility of tasks
+for within-node load balancing is in pgms/testTasks.
+
+
+The task queue implementation itself is a Cilk-style (specifically  the so called "THE") steal queue, which aims to minimize inter-PE interactions.
+Each PE has its own task queue, and the Converse scheduler polls its own queue regularly. But only when the PE is completely
+idle (no tasks and no other messages to process) does it steal tasks from queues of other PE's within the same process.
+This limits the overhead of checking other PE's queues. Efficiency of this method
+requires that you try to divide the tasks recursively. (E.g. if you are processing a large array A[0:N], you may
+want to fire tasks each responsible for range A[x:y] and each subdividing that range further (and enqueuing 2 tasks)
+until some minimal tasks size is reached, when the handler will just do the work instead of firing subtasks.
+This method is preferred to firing many
+small subtasks at once, because it minimizes the number of steals, and therefore associated synchronization overheads.
+
+
 CkLoop library
 ~~~~~~~~~~~~~~
 
@@ -8817,10 +8922,6 @@ this integrated library on Linux.
 -  ICC: 15.0 or newer
 
 -  Clang: 3.7 or newer
-
-You can use this integrated OpenMP with *clang* on IBM Blue Gene machines
-without special compilation flags (don't need to add -fopenmp or
--openmp on Blue Gene clang).
 
 On Linux, the OpenMP supported version of clang has been installed in
 default recently. For example, Ubuntu has been released with clang
@@ -9100,7 +9201,7 @@ Enabling GPU Support
 
 GPU support via GPU Manager and HAPI is not included by default when
 building Charm++. Use ``build`` with the ``cuda`` option to build Charm++
-with GPU support (CMake build is currently not supported), e.g.
+with GPU support (or configure CMake with ``-D CUDA=ON``), e.g.
 
 .. code-block:: bash
 
@@ -9443,9 +9544,7 @@ compiler used to build charm. In the linking step, it is required to
 pass ``-mpi`` as an argument because of which *charmc* performs the
 linking for interoperation. The charm libraries, which one wants to be
 linked, should be passed using ``-module`` option. Refer to
-``examples/charm++/mpi-coexist/Makefile`` to view a working example. For
-execution on BG/Q systems, the following additional argument should be
-added to the launch command: ``-envs PAMI_CLIENTS=MPI,Converse``.
+``examples/charm++/mpi-coexist/Makefile`` to view a working example.
 
 User Driven Mode
 ~~~~~~~~~~~~~~~~
@@ -10976,6 +11075,36 @@ superclass to do the final delivery after you’ve sent your messages.
 Experimental Features
 =====================
 
+SHMEM
+---------
+Charm++ SHMEM is an experimental module that aims to add
+fast IPC to any machine layer. Each process opens a shared segment
+containing an MPSC queue and a memory pool. Processes can allocate "blocks"
+of memory from their peers' pools, and "push" them onto their MPSC queue.
+This is mechanically similar to the PXSHM layer, but SHMEM uses
+"address-free" atomics for synchronization instead of memory fences and the
+like. The C++ standardization committee recommends that C++ atomics should
+be address-free, i.e., ordering is enforced no matter which virtual address
+is used to access a physical address; however, this is not guaranteed.
+In practice, most modern compilers comply with this suggestion, but please
+alert us if you encounter synchronization issues!
+
+To build with SHMEM, pass ``--enable-shmem`` (to use PXSHM) or
+``--enable-xpmem`` (to use XPMEM) as command-line options to a Charm++ build;
+only CMake builds are supported at this time. Charm++ currently has a cutoff
+for using SHMEM, after which it falls back to conventional messaging. This
+decision accommodates SHMEM's bounded pool, and potentially more efficient
+IPC mechanisms exist for "large" messages (e.g., the ZeroCopy API). One can
+alter these behaviors with the command line options ``++ipcpoolsize`` and
+``++ipccutoff``, which change the size of the shared pool of memory and
+message size cutoff (in bytes), respectively. For example, this command
+will run ``a.out`` with a 128MB IPC pool size and a 256KB message cutoff:
+``./charmrun ++local ++auto-provision ./a.out ++ipcpoolsize $((128*1024*1024)) ++ipccutoff $((256*1024))``
+
+Note, Charm++ maintains and polls its own SHMEM IPC manager. Libraries can
+instantiate their own IPC manager if they require custom IPC behaviors. For
+details, please consult the notes in ``cmishmem.h``.
+
 .. _sec:controlpoint:
 
 Control Point Automatic Tuning
@@ -11294,7 +11423,7 @@ Charm++ can be downloaded using one of the following methods:
 
 -  From source archive - The latest development version of Charm++ can
    be downloaded from our source archive using *git clone
-   https://github.com/UIUC-PPL/charm*.
+   https://github.com/charmplusplus/charm*.
 
 If you download the source code from the website, you will have to
 unpack it using a tool capable of extracting gzip’d tar files, such as
@@ -11320,7 +11449,7 @@ where,
 
 ``TARGET ARCHITECTURE``
    is the machine architecture one wants to build for such as
-   *netlrts-linux-x86_64*, *pamilrts-bluegeneq* etc.
+   *netlrts-linux-x86_64*, *multicore-darwin-arm8* etc.
 
 ``OPTIONS``
    are additional options to the build process, e.g. *smp* is used to
@@ -11372,11 +11501,10 @@ appropriate choices for the build one wants to perform.
    MPI with 64 bit Windows                                          ``./build charm++ mpi-win-x86_64 --with-production -j8``
    Net with 64 bit macOS (x86_64)                                   ``./build charm++ netlrts-darwin-x86_64 --with-production -j8``
    Net with 64 bit macOS (ARM64)                                    ``./build charm++ netlrts-darwin-arm8 --with-production -j8``
-   Blue Gene/Q (bgclang compilers)                                  ``./build charm++ pami-bluegeneq --with-production -j8``
-   Blue Gene/Q (bgclang compilers)                                  ``./build charm++ pamilrts-bluegeneq --with-production -j8``
    Cray XE6                                                         ``./build charm++ gni-crayxe --with-production -j8``
    Cray XK7                                                         ``./build charm++ gni-crayxe-cuda --with-production -j8``
    Cray XC40                                                        ``./build charm++ gni-crayxc --with-production -j8``
+   Cray Shasta                                                      ``./build charm++ ofi-crayshasta --with-production -j8``
    ================================================================ =====================================================================
 
 As mentioned earlier, one can also build Charm++ using the precompiled
@@ -11469,6 +11597,12 @@ For example, to build Charm++ and AMPI on top of the MPI layer with SMP, the fol
 
    $ cmake .. -DNETWORK=mpi -DSMP=on -DTARGET=AMPI
 
+Alternatively, one could also specify other ``cmake`` configuration options via the 
+``../build`` command, for example, by replacing the above ``cmake ..`` command with
+
+.. code-block:: bash
+
+   $ ../build AMPI mpi-linux-x86_64 smp
 
 Charm++ installation directories
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -11752,7 +11886,7 @@ The following command-line options are available to users of charmc:
    always. This option causes charmc to switch to the most reliable
    compiler, regardless of whether it produces slow code or not.
 
-``-language {converse|charm++|ampi|fem|f90charm}``:
+``-language {converse|charm++|ampi|f90charm}``:
    When linking with charmc, one must specify the “language”. This is
    just a way to help charmc include the right libraries. Pick the
    “language” according to this table:
@@ -11884,6 +12018,13 @@ using the ``++verbose`` option to help diagnose the issue. (See the
 Parameters that function as boolean flags within Charmrun (taking no
 other parameters) can be prefixed with "no-" to negate their effect.
 For example, ``++no-scalable-start``.
+
+.. note::
+
+   When running on OFI platforms such as Cray Shasta, the OFI runtime parameter
+   ``+ofi_runtime_tcp`` may be required. By default, the exchange of EP names at
+   startup is done via both PMI and OFI. With this flag, it is only done via
+   PMI.
 
 .. _command line options:
 
@@ -12082,15 +12223,19 @@ The remaining options cover details of process launch and connectivity:
    Print help messages
 
 ``++runscript``
-   Script to run node-program with. The specified run script is invoked
-   with the node program and parameter. For example:
+   Script to run program with. The specified run script is invoked with the
+   given program and arguments as parameters. This is useful for loading modules
+   or setting up an environment prior the running the program. For example:
 
    .. code-block:: bash
 
       $ ./charmrun +p4 ./pgm 100 2 3 ++runscript ./set_env_script
 
-   In this case, the ``set_env_script`` is invoked on each node before
-   launching ``pgm``.
+   In this case, ``set_env_script`` is invoked on each node. **Note:** When this
+   is provided, ``charmrun`` will not invoke the program directly, instead only
+   invoking the script with the program name and program arguments passed in as
+   script parameters; thus, ``set_env_script`` should generally end with ``$*``
+   to actually start the program.
 
 ``++xterm``
    Which xterm to use
@@ -12569,7 +12714,7 @@ and cannot appear as variable or entry method names in a ``.ci`` file:
 
 -  SDAG constructs
 
-   -  atomic
+   -  atomic (deprecated)
 
    -  serial
 
@@ -13344,6 +13489,19 @@ Acknowledgements
 
 -  Zheng Shao
 
+-  Maya Taylor
+
+-  Aditya Bhosale
+
+-  Mathew Jacob
+
+-  Tom Vander Aa
+
+-  Thomas Quinn
+
+-  Ritvik Rao   
+
+   
 .. [1]
    “Threaded” or “synchronous” methods are different. But even they do
    not lead to pre-emption; only to cooperative multi-threading

@@ -20,10 +20,12 @@ ExternalProject_Add(hwloc
         --disable-cairo \
         --disable-cuda \
         --disable-gl \
+        --disable-levelzero \
         --disable-libxml2 \
         --disable-nvml \
         --disable-opencl \
         --disable-pci \
+        --disable-rsmi \
         --disable-libudev \
         --disable-visibility \
         --enable-embedded-mode \
@@ -80,8 +82,6 @@ if(CMK_MACOSX)
   set(hwloc-objects "${hwloc-objects};${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/topology-darwin.o")
 elseif(CMK_WINDOWS)
   set(hwloc-objects "${hwloc-objects};${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/topology-windows.obj")
-elseif(CMK_BLUEGENEQ)
-  set(hwloc-objects "${hwloc-objects};${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/topology-bgq.o")
 else() # Linux
   set(hwloc-objects "${hwloc-objects};${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/topology-linux.o")
   set(hwloc-objects "${hwloc-objects};${CMAKE_BINARY_DIR}/hwloc-prefix/src/hwloc-build/hwloc/topology-hardwired.o")

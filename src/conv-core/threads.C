@@ -264,7 +264,7 @@ int CthAliasCreate(int stackSize)
   char tmpName[128];
   char lastByte=0;
   int fd;
-  sprintf(tmpName,"/tmp/charmThreadStackXXXXXX");
+  snprintf(tmpName,sizeof(tmpName),"/tmp/charmThreadStackXXXXXX");
   fd=mkstemp(tmpName);
   if (fd==-1) CmiAbort("threads.C> Cannot create /tmp file to contain thread stack");
   unlink(tmpName); /* delete file when it gets closed */
@@ -1567,16 +1567,8 @@ CthThread CthCreate(CthVoidFn fn, void *arg, int size)
     }
   }
 
-  /* **CWL** Am assuming Gengbin left this unchanged because the macro
-     re-definition of pthread_create would not happen before this part of
-     the code. If the assumption is not true, then we can simply replace
-     this hash-if with the else portion.
-     */
-#if CMK_WITH_TAU
-  r = tau_pthread_create(&(result->self), &attr, CthOnly, (void*) result);
-#else
   r = pthread_create(&(result->self), &attr, CthOnly, (void*) result);
-#endif
+
   if (0 != r) {
     CmiPrintf("pthread_create failed with %d\n", r);
     CmiAbort("CthCreate failed to created a new pthread\n");
@@ -2193,7 +2185,7 @@ CthThread CthPup(pup_er p, CthThread t)
 
 /* Functions that help debugging */
 void CthPrintThdStack(CthThread t){
-  CmiPrintf("thread=%p, base stack=%p, stack pointer=%p\n", t, t->base.stack, t->stackp);
+  CmiPrintf("thread=%p, base stack=%p, stack pointer=%p\n", (void *)t, t->base.stack, (void *)t->stackp);
 }
 #endif
 
@@ -2231,7 +2223,7 @@ void CthTraceResume(CthThread t)
 }
 /* Functions that help debugging */
 void CthPrintThdMagic(CthThread t){
-  CmiPrintf("CthThread[%p]'s magic: %x\n", t, t->base.magic);
+  CmiPrintf("CthThread[%p]'s magic: %x\n", (void *)t, t->base.magic);
 }
 
 CmiIsomallocContext CmiIsomallocGetThreadContext(CthThread th)

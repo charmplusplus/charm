@@ -10,7 +10,7 @@ ForConstruct::ForConstruct(IntExprConstruct* decl, IntExprConstruct* pred,
 }
 
 void ForConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
-  sprintf(nameStr, "%s%s", CParsedFile::className->charstar(), label->charstar());
+  snprintf(nameStr, sizeof(nameStr), "%s%s", CParsedFile::className->charstar(), label->charstar());
 
   generateClosureSignature(decls, defs, entry, false, "void", label, false, encapState);
 
@@ -35,7 +35,7 @@ void ForConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
   endMethod(defs);
 
   // trace
-  sprintf(nameStr, "%s%s", CParsedFile::className->charstar(), label->charstar());
+  snprintf(nameStr, sizeof(nameStr), "%s%s", CParsedFile::className->charstar(), label->charstar());
   strcat(nameStr, "_end");
 
   generateClosureSignature(decls, defs, entry, false, "void", label, true,

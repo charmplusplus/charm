@@ -14,6 +14,8 @@
 #include <string>
 #include <algorithm>
 
+#include "charm.h"
+#include "converse.h"
 #include "trace.h"
 #include "trace-common.h"
 #include "ckhashtable.h"
@@ -49,12 +51,6 @@ class LogEntry {
     unsigned short mIdx;
     unsigned short eIdx;
     int msglen;
-    int nestedID; // Nested thread ID, e.g. virtual AMPI rank number
-    CmiObjId   id;
-    std::vector<int> pes;
-    unsigned long memUsage;
-    double stat;	//Used for storing User Stats
-    std::string userSuppliedNote;
 
     // this is taken out so as to provide a placeholder value for non-PAPI
     // versions (whose value is *always* zero).
@@ -62,98 +58,199 @@ class LogEntry {
 #if CMK_HAS_COUNTER_PAPI
     LONG_LONG_PAPI papiValues[NUMPAPIEVENTS];
 #endif
-    std::string fName;
-    int userSuppliedData;
     unsigned char type;
 
+    union
+    {
+      // MEMORY_USAGE_CURRENT
+      unsigned long memUsage;
+      // USER_STAT
+      double stat;
+      // USER_EVENT_PAIR, BEGIN_USER_EVENT_PAIR, END_USER_EVENT_PAIR
+      int nestedID;
+      // USER_SUPPLIED
+      int userSuppliedData;
+      // USER_SUPPLIED_NOTE, USER_SUPPLIED_BRACKETED_NOTE
+      std::string userSuppliedNote;
+      // CREATION_BCAST, CREATION_MULTICAST
+      std::vector<int> pes;
+      // All others
+      CmiObjId id;
+    };
+
   public:
-    
-    LogEntry() {
-    }
+    LogEntry() : type(INVALID) {}
 
-    LogEntry(double tm, unsigned char t, unsigned short m=0, 
-	     unsigned short e=0, int ev=0, int p=0, int ml=0, 
-	     CmiObjId *d=NULL, double rt=0., double cputm=0., int numPe=0, double statVal=0., int _nestedID=0) {
-      type = t; mIdx = m; eIdx = e; event = ev; pe = p; 
-      time = tm; msglen = ml; nestedID=_nestedID;
-      if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=id.id[3]=0; };
-      recvTime = rt; cputime = cputm;
+    LogEntry(unsigned char type, double time, unsigned short mIdx,
+             unsigned short eIdx, int event, int pe, int msgLen,
+             CmiObjId* d, double recvTime, double cpuTime)
+        : time(time),
+          cputime(cpuTime),
+          recvTime(recvTime),
+          event(event),
+          pe(pe),
+          mIdx(mIdx),
+          eIdx(eIdx),
+          msglen(msgLen),
+          type(type)
+    {
+      if (d != nullptr)
+        id = *d;
+      else
+      {
+        std::fill(id.id, id.id + OBJ_ID_SZ, 0);
+      }
       // initialize for papi as well as non papi versions.
-#if CMK_HAS_COUNTER_PAPI
-      //numPapiEvents = NUMPAPIEVENTS;
-#else
-      //numPapiEvents = 0;
-#endif
-      pes.resize(numPe);
-      stat=statVal;
+#  if CMK_HAS_COUNTER_PAPI
+      // numPapiEvents = NUMPAPIEVENTS;
+#  else
+      // numPapiEvents = 0;
+#  endif
     }
 
-    LogEntry(double _time,unsigned char _type,unsigned short _funcID,
-	     int _lineNum,char *_fileName){
-      time = _time;
-      type = _type;
-      mIdx = _funcID;
-      event = _lineNum;
-      setFName(_fileName);
+    // Constructor for user supplied data or memory usage record
+    // Shared constructor to avoid ambiguity issues (userSuppliedData is int, memUsage is
+    // long)
+    LogEntry(unsigned char type, double time, long value) : time(time), type(type)
+    {
+      CkAssert(type == USER_SUPPLIED || type == MEMORY_USAGE_CURRENT);
+      switch (type)
+      {
+        case USER_SUPPLIED:
+          userSuppliedData = (int)value;
+          break;
+        case MEMORY_USAGE_CURRENT:
+          memUsage = value;
+          break;
+      }
     }
 
-    // Constructor for User Supplied Data
-    LogEntry(double _time,unsigned char _type, int value,
-	     int _lineNum,char *_fileName){
-      time = _time;
-      type = _type;
-      userSuppliedData = value;
-      setFName(_fileName);
+    // Constructor for user supplied note and bracketed user supplied note,
+    // event and endTime are only used for the bracketed version
+    LogEntry(unsigned char type, double time, char* note, int event = 0,
+             double endTime = 0)
+        : time(time), endTime(endTime), event(event), type(type), userSuppliedNote()
+    {
+      CkAssert(type == USER_SUPPLIED_NOTE || type == USER_SUPPLIED_BRACKETED_NOTE);
+      if (note == nullptr)
+      {
+        return;
+      }
+      userSuppliedNote = note;
+      std::replace(userSuppliedNote.begin(), userSuppliedNote.end(), '\n', ' ');
+      std::replace(userSuppliedNote.begin(), userSuppliedNote.end(), '\r', ' ');
     }
-
-    // Constructor for User Supplied Data
-    LogEntry(double _time,unsigned char _type, char* note,
-	     int _lineNum,char *_fileName){
-      time = _time;
-      type = _type;
-      setFName(_fileName);
-      if(note != NULL)
-	setUserSuppliedNote(note);
-    }
-
-
-   // Constructor for bracketed user supplied note
-    LogEntry(double bt, double et, unsigned char _type, char *note, int eventID){
-      time = bt;
-      endTime = et;
-      type = _type;
-      event = eventID;
-      if(note != NULL)
-	setUserSuppliedNote(note);
-    }
-
 
     // Constructor for multicast data
-    LogEntry(double tm, unsigned short m, unsigned short e, int ev, int p,
-	     int ml, CmiObjId *d, double rt, int numPe, const int *pelist){
-
-      type = CREATION_MULTICAST; 
-      mIdx = m; 
-      eIdx = e; 
-      event = ev; 
-      pe = p; 
-      time = tm; 
-      msglen = ml;
-      
-      if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=id.id[3]=-1; };
-      recvTime = rt; 
+    LogEntry(unsigned char type, double time, unsigned short mIdx, unsigned short eIdx,
+             int event, int pe, int msgLen, int numPe, const int* pelist)
+        : time(time),
+          event(event),
+          pe(pe),
+          mIdx(mIdx),
+          eIdx(eIdx),
+          msglen(msgLen),
+          type(type),
+          pes(numPe)
+    {
+      CkAssert(type == CREATION_MULTICAST);
       if (pelist != nullptr)
         pes.assign(pelist, pelist + numPe);
-      else
-        pes.resize(numPe);
     }
 
-    void setFName(char *_fileName){
-      if(_fileName == NULL){
-        fName.clear();
-      }else{
-        fName = _fileName;
-      }	
+    // Constructor for creation broadcast
+    // TODO: Resizing the pes vector to just store the size wastes a lot of memory,
+    // change to a variable
+    LogEntry(unsigned char type, double time, unsigned short mIdx, unsigned short eIdx,
+             int event, int pe, int msgLen, int numPe)
+        : time(time),
+          event(event),
+          pe(pe),
+          mIdx(mIdx),
+          eIdx(eIdx),
+          msglen(msgLen),
+          type(type),
+          pes(numPe)
+    {
+      CkAssert(type == CREATION_BCAST);
+    }
+
+    // Constructor for user event pairs
+    LogEntry(unsigned char type, double time, unsigned short mIdx, int event,
+             int nestedID)
+        : time(time), event(event), mIdx(mIdx), type(type), nestedID(nestedID)
+    {
+      CkAssert(type == USER_EVENT_PAIR || type == BEGIN_USER_EVENT_PAIR ||
+               type == END_USER_EVENT_PAIR);
+    }
+
+    // Constructor for user stats
+    // TODO: Repurposes mIdx and cputime fields to store e and statTime, should clean up
+    LogEntry(unsigned char type, double time, int pe, int e, double stat, double statTime)
+        : time(time), cputime(statTime), pe(pe), mIdx(e), type(type), stat(stat)
+    {
+      CkAssert(type == USER_STAT);
+    }
+
+    // Copy constuctor
+    LogEntry(const LogEntry& other)
+        : time(other.time),
+          endTime(other.endTime),
+          cputime(other.cputime),
+          recvTime(other.recvTime),
+          event(other.event),
+          pe(other.pe),
+          mIdx(other.mIdx),
+          eIdx(other.eIdx),
+          msglen(other.msglen),
+          type(other.type)
+    {
+      switch (type)
+      {
+        case MEMORY_USAGE_CURRENT:
+          memUsage = other.memUsage;
+          break;
+        case USER_STAT:
+          stat = other.stat;
+          break;
+        case USER_EVENT_PAIR:
+        case BEGIN_USER_EVENT_PAIR:
+        case END_USER_EVENT_PAIR:
+          nestedID = other.nestedID;
+          break;
+        case USER_SUPPLIED:
+          userSuppliedData = other.userSuppliedData;
+          break;
+        case USER_SUPPLIED_NOTE:
+        case USER_SUPPLIED_BRACKETED_NOTE:
+          new (&userSuppliedNote) std::string(other.userSuppliedNote);
+          break;
+        case CREATION_BCAST:
+        case CREATION_MULTICAST:
+          new (&pes) std::vector<int>(other.pes);
+          break;
+        default:
+          id = other.id;
+          break;
+      }
+    }
+
+    ~LogEntry()
+    {
+      // Needed to call the destructors below
+      using namespace std;
+      // Destroy the field in the union if needed
+      switch (type)
+      {
+        case USER_SUPPLIED_NOTE:
+        case USER_SUPPLIED_BRACKETED_NOTE:
+          userSuppliedNote.~string();
+          break;
+        case CREATION_BCAST:
+        case CREATION_MULTICAST:
+          pes.~vector<int>();
+          break;
+      }
     }
 
     // complementary function for adding papi data
@@ -162,29 +259,6 @@ class LogEntry {
    	memcpy(papiValues, papiVals, sizeof(LONG_LONG_PAPI)*CkpvAccess(numEvents));
 #endif
     }
-   
-    void setUserSuppliedData(int data){
-      userSuppliedData = data;
-    }
-
-    void setUserSuppliedNote(char *note){
-      if (note == nullptr) {
-        userSuppliedNote.clear();
-        return;
-      }
-      userSuppliedNote = note;
-      std::replace(userSuppliedNote.begin(), userSuppliedNote.end(), '\n', ' ');
-      std::replace(userSuppliedNote.begin(), userSuppliedNote.end(), '\r', ' ');
-    }
-	
-
-    /// A constructor for a memory usage record
-    LogEntry(unsigned char _type, double _time, long _memUsage) {
-      time = _time;
-      type = _type;
-      memUsage = _memUsage;
-    }
-
 
     void *operator new(size_t s) {void*ret=malloc(s);_MEMCHECK(ret);return ret;}
     void *operator new(size_t, void *ptr) { return ptr; }
@@ -200,8 +274,6 @@ class LogEntry {
     }
 
     void pup(PUP::er &p);
-    ~LogEntry(){
-    }
 };
 
 class TraceProjections;
@@ -226,12 +298,10 @@ class LogPool {
 #if CMK_USE_ZLIB
     bool compressed;
 #endif
-    unsigned int poolSize;
-    unsigned int numEntries;
     unsigned int lastCreationEvent;
     int numPhases;
     int nSubdirs;
-    LogEntry *pool;
+    std::vector<LogEntry> pool;
     FILE *fp;
     FILE *deltafp;
     FILE *stsfp;
@@ -316,32 +386,32 @@ class LogPool {
 
     void add(unsigned char type, unsigned short mIdx, unsigned short eIdx,
 	     double time, int event, int pe, int ml=0, CmiObjId* id=0, 
-	     double recvT=0.0, double cpuT=0.0, int numPe=0, double statVal=0.0);
+	     double recvT=0.0, double cpuT=0.0);
 
     // complementary function to set papi info to current log entry
     // must be called after an add()
-    void addPapi(LONG_LONG_PAPI *papVals) {
-      pool[numEntries-1].addPapi(papVals);
-    }
+    void addPapi(LONG_LONG_PAPI* papVals) { pool.back().addPapi(papVals); }
 
 	/** add a record for a user supplied piece of data */
 	void addUserSupplied(int data);
 	/* Creates LogEntry for stat. Called by Trace-projections updateStat functions*/
-        void updateStat(unsigned char type,int e, double cputime,double time,double stat, int pe);
+	void addUserStat(double time, int pe, int e, double stat, double statTime);
 	/** add a record for a user supplied piece of data */
 	void addUserSuppliedNote(char *note);
 
         void addUserBracketEventNestedID(unsigned char type, double time,
                                          UShort mIdx, int event, int nestedID);
 
-
-	void add(unsigned char type,double time,unsigned short funcID,int lineNum,char *fileName);
-  
-  	void addMemoryUsage(unsigned char type,double time,double memUsage);
+  	void addMemoryUsage(double time, double memUsage);
 	void addUserSuppliedBracketedNote(char *note, int eventID, double bt, double et);
 
-    void addCreationMulticast(unsigned short mIdx,unsigned short eIdx,double time,int event,int pe, int ml=0, CmiObjId* id=0, double recvT=0., int numPe=0, const int *pelist=NULL);
-    void flushLogBuffer();
+    void addCreationBroadcast(unsigned short mIdx, unsigned short eIdx, double time,
+                              int event, int pe, int ml, int numPe);
+    void addCreationMulticast(unsigned short mIdx, unsigned short eIdx, double time,
+                              int event, int pe, int ml, int numPe,
+                              const int* pelist = nullptr);
+
+    void flushLogBuffer(bool force = false);
     void postProcessLog();
 
     void setWriteData(bool b){
@@ -349,8 +419,12 @@ class LogPool {
     }
     void modLastEntryTimestamp(double ts);
 
-    void setNewStartTime() {
-      for(UInt i=0; i<numEntries; i++) pool[i].setNewStartTime(globalStartTime);
+    void setNewStartTime()
+    {
+      for (auto& entry : pool)
+      {
+        entry.setNewStartTime(globalStartTime);
+      }
     }
 };
 

@@ -12,12 +12,6 @@
 #include "malloc.h"
 #include <algorithm>
 
-#if CMK_BLUEGENEQ
-#include <hwi/include/bqc/A2_inlines.h>
-#include "spi/include/kernel/process.h"
-#include "spi/include/kernel/memory.h"
-#endif
-
 #include "pami.h"
 #include "pami_sys.h"
 
@@ -40,9 +34,6 @@
 #define CMK_MACH_SPECIALIZED_QUEUE        (CMK_SMP && CMK_PPC_ATOMIC_QUEUE)
 #define CMK_MACH_SPECIALIZED_MUTEX        (CMK_SMP && CMK_PPC_ATOMIC_MUTEX)
 
-#define CMI_LIKELY(x)    (__builtin_expect(x,1))
-#define CMI_UNLIKELY(x)  (__builtin_expect(x,0))
-
 char *ALIGN_32(char *p) {
   return((char *)((((unsigned long)p)+0x1f) & (~0x1FUL)));
 }
@@ -60,13 +51,8 @@ char *ALIGN_32(char *p) {
 #define CMI_PAMI_ACK_DISPATCH             9
 #define CMI_PAMI_DISPATCH                10
 
-#if CMK_BLUEGENEQ
-#define SHORT_CUTOFF   128
-#define EAGER_CUTOFF   4096
-#else
 #define SHORT_CUTOFF   7680
 #define EAGER_CUTOFF   16384
-#endif
 
 #if CMK_PERSISTENT_COMM
 #include "machine-persistent.h"
@@ -121,15 +107,9 @@ static PPCAtomicMutex *node_recv_mutex;
 
 //The random seed to pick destination context
 CMK_THREADLOCAL uint32_t r_seed = 0xdeadbeef;
-CMK_THREADLOCAL int32_t _cmi_bgq_incommthread = 0;
+CMK_THREADLOCAL int32_t _cmi_async_incommthread = 0;
 CMK_THREADLOCAL int32_t _comm_thread_id = 0;
 #endif
-
-//int CmiInCommThread () {
-//  //if (_cmi_bgq_incommthread)
-//  //printf ("CmiInCommThread: %d\n", _cmi_bgq_incommthread);
-//  return _cmi_bgq_incommthread;
-//}
 
 #if CMK_SMP && CMK_PPC_ATOMIC_QUEUE
 void LrtsSpecializedQueuePush(int pe, void  *msg) {
@@ -166,11 +146,6 @@ void LrtsSpecializedMutexRelease() {
 #endif
 
 static void CmiNetworkBarrier(int async);
-#if SPECIFIC_PCQUEUE && CMK_SMP
-#define  QUEUE_NUMS     _Cmi_mynodesize + 3
-#include "lrtsqueue.h"
-#include "memalloc.C"
-#endif
 #include "machine-lrts.h"
 #include "machine-common-core.C"
 
@@ -205,13 +180,8 @@ volatile int outstanding_recvs [MAX_NUM_CONTEXTS];
 //#define THREADS_PER_CONTEXT 2
 //#define LTPS                1 //Log Threads Per Context (TPS)
 //#else
-#if CMK_BLUEGENEQ
-#define THREADS_PER_CONTEXT 4
-#define LTPS                2 //Log Threads Per Context (TPS)
-#else
 #define THREADS_PER_CONTEXT 1
 #define LTPS                0 //Log Threads Per Context (TPS)
-#endif //endif CMK_BLUEGENEQ
 
 #define  MY_CONTEXT_ID() (CmiMyRank() >> LTPS)
 #define  MY_CONTEXT()    (cmi_pami_contexts[CmiMyRank() >> LTPS])
@@ -392,22 +362,6 @@ void rzv_recv_done   (pami_context_t     ctxt,
     void             * clientdata, 
     pami_result_t      result); 
 
-#if CMK_BLUEGENEQ
-//approx sleep command
-size_t mysleep_iter = 0;
-void mysleep (unsigned long cycles) {
-  unsigned long start = GetTimeBase();
-  unsigned long end = start + cycles;
-
-  while (start < end) {
-    mysleep_iter ++;
-    start = GetTimeBase();
-  }
-
-  return;
-}
-#endif
-
 static void * test_buf;
 volatile int coll_barrier_flag = 0;
 //typedef pami_result_t (*pamix_proc_memalign_fn) (void**, size_t, size_t, const char*);
@@ -491,7 +445,7 @@ pami_result_t init_comm_thread (pami_context_t   context,
   rseedl |= (uint64_t)context;
   r_seed = ((uint32_t)rseedl)^((uint32_t)(rseedl >> 32));
 
-  _cmi_bgq_incommthread = 1;
+  _cmi_async_incommthread = 1;
 
   return PAMI_SUCCESS;
 }
@@ -642,24 +596,6 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
         options);      
   }
 
-#if CMK_BLUEGENEQ
-  size_t bytes_out;
-  void * buf = malloc(sizeof(long));    
-  uint32_t retval;
-  Kernel_MemoryRegion_t k_mregion;
-  retval = Kernel_CreateMemoryRegion (&k_mregion, buf, sizeof(long));
-  assert(retval==0);  
-  for (i = 0; i < _n; ++i) {
-    cmi_pami_memregion[i].baseVA = k_mregion.BaseVa;
-    PAMI_Memregion_create (cmi_pami_contexts[i],
-        k_mregion.BaseVa,
-        k_mregion.Bytes,
-        &bytes_out,
-        &cmi_pami_memregion[i].mregion);
-  }
-  free(buf);
-#endif
-
   //fprintf(stderr, "%d Initializing Converse PAMI machine Layer on %d tasks\n", _Cmi_mynode, _Cmi_numnodes);
 
   init_barrier();
@@ -681,23 +617,8 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #if CMK_SMP
   posix_memalign((void**)&procState, 128, (_Cmi_mynodesize) * sizeof(ProcState));
 
-#if SPECIFIC_PCQUEUE
-  //if(CmiMyPe() == 0)
-  //  printf(" in L2Atomic Queue\n");
-  LRTSQueuePreInit();
-  //reserve for pe queues and node queue first
-   int actualNodeSize = 64/Kernel_ProcessCount(); 
-   CmiMemAllocInit_bgq ((char*)l2atomicbuf + 
-       (QUEUE_NUMS)*sizeof(L2AtomicState),
-       2*actualNodeSize*sizeof(L2AtomicState)); 
-#else
-
 #if CMK_PPC_ATOMIC_QUEUE
-#if CMK_BLUEGENEQ
-    int actualNodeSize = 64/Kernel_ProcessCount();
-#else
     int actualNodeSize = _Cmi_mynodesize;
-#endif
 
 #if CMK_PPC_ATOMIC_MUTEX
     //Allocate for PPC Atomic Mutex as well
@@ -706,7 +627,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #else
     size_t size = (_Cmi_mynodesize + 6*actualNodeSize + 1)
       * sizeof(PPCAtomicState);
-#endif
+#endif //3
 
     void *atomic_buf;
     PPC_AtomicCounterAllocate(&atomic_buf, size);
@@ -733,10 +654,9 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 
 #if CMK_PPC_ATOMIC_MUTEX
     node_recv_mutex = PPCAtomicMutexInit(atomic_start, sizeof(PPCAtomicMutex));
-#endif
 #endif //End of CMK_PPC_ATOMIC_MUTEX
 
-#endif //End of SPECIFIC_PCQUEUE
+#endif //End of CMK_PPC_ATOMIC_QUEUE
 
 #endif //End of CMK_SMP
 
@@ -780,10 +700,8 @@ void LrtsDrainResources(void)
 
 void LrtsExit(int exitcode)
 {
-#if !CMK_BLUEGENEQ
   CmiBarrier();
   CmiBarrier();
-#endif
 
   int rank0 = 0, i = 0;
   CmiBarrier();
@@ -824,25 +742,6 @@ INLINE_KEYWORD void LrtsStillIdle(void) {}
 
 void LrtsNotifyIdle(void)
 {
-#if CMK_BLUEGENEQ && CMK_SMP && CMK_PAMI_MULTI_CONTEXT
-#if !CMK_ENABLE_ASYNC_PROGRESS && SPECIFIC_QUEUE  
-  //Wait on the atomic queue to get a message with very low core
-  //overheads. One thread calls advance more frequently
-  ////spin wait for 2-4us when idle
-  ////process node queue messages every 10us
-  ////Idle cores will only use one LMQ slot and an int sum
-  CmiState cs = CmiGetStateN(rank);
-  if ((CmiMyRank()% THREADS_PER_CONTEXT) == 0)
-  {LRTSQueueSpinWait(CmiMyRecvQueue(), 
-			    10);}
-  else
-#endif
-#if 0 && SPECIFIC_QUEUE && CMK_NODE_QUEUE_AVAILABLE 
-  { LRTSQueueSpinWait(CmiMyRecvQueue(), 
-			    1000);
-  }
-#endif
-#endif
 }
 pami_result_t machine_send_handoff (pami_context_t context, void *msg);
 void  machine_send       (pami_context_t      context, 
@@ -961,9 +860,6 @@ void  machine_send       (pami_context_t      context,
     CmiPAMIRzv_t   rzv;
     rzv.bytes       = size;
     rzv.buffer      = msg;
-#if CMK_BLUEGENEQ
-    rzv.offset      = (size_t)msg - (size_t)cmi_pami_memregion[0].baseVA;
-#else
     rzv.offset      = (size_t)msg;
     size_t bytes_out;
     pami_memregion_t mregion;
@@ -973,20 +869,14 @@ void  machine_send       (pami_context_t      context,
                            size,
                            &bytes_out,
                            &mregion);
-#endif
     rzv.dst_context = dst_context;
 
     pami_send_immediate_t parameters;
     parameters.dispatch        = CMI_PAMI_RZV_DISPATCH;
     parameters.header.iov_base = &rzv;
     parameters.header.iov_len  = sizeof(rzv);
-#if CMK_BLUEGENEQ
-    parameters.data.iov_base   = &cmi_pami_memregion[0].mregion;      
-    parameters.data.iov_len    = sizeof(pami_memregion_t);
-#else
     parameters.data.iov_base   = NULL;
     parameters.data.iov_len    = 0;
-#endif
     parameters.dest = target;
 
     if(to_lock)
@@ -1119,28 +1009,6 @@ void rzv_pkt_dispatch (pami_context_t       context,
   rzv_recv->src_ep     = origin;
   rzv_recv->src_buffer = rzv_hdr->buffer;
 
-#if CMK_BLUEGENEQ
-  CmiAssert (pipe_addr != NULL);
-  pami_memregion_t *mregion = (pami_memregion_t *) pipe_addr;
-  CmiAssert (pipe_size == sizeof(pami_memregion_t));
-
-  //Rzv inj fifos are on the 17th core shared by all contexts
-  pami_rget_simple_t  rget;
-  rget.rma.dest    = origin;
-  rget.rma.bytes   = rzv_hdr->bytes;
-  rget.rma.cookie  = rzv_recv;
-  rget.rma.done_fn = rzv_recv_done;
-  rget.rma.hints.buffer_registered = PAMI_HINT_ENABLE;
-  rget.rma.hints.use_rdma = PAMI_HINT_ENABLE;
-  rget.rdma.local.mr      = &cmi_pami_memregion[rzv_hdr->dst_context].mregion;  
-  rget.rdma.local.offset  = (size_t)buffer - 
-    (size_t)cmi_pami_memregion[rzv_hdr->dst_context].baseVA;
-  rget.rdma.remote.mr     = mregion; //from message payload
-  rget.rdma.remote.offset = rzv_hdr->offset;
-
-  //printf ("starting rget\n");
-  PAMI_Rget (context, &rget);  
-#else
   size_t bytes_out;
   pami_memregion_t mregion;
   //In use for PAMI_Get
@@ -1163,7 +1031,6 @@ void rzv_pkt_dispatch (pami_context_t       context,
   get.addr.local = buffer;
   get.addr.remote = (void*)rzv_hdr->offset;
   PAMI_Get(context, &get);
-#endif
 }
 
 void ack_pkt_dispatch (pami_context_t       context,   
@@ -1478,10 +1345,6 @@ void init_barrier () {
   init_barrier_libcoll();
 #endif
 }
-
-#if CMK_BLUEGENEQ
-#include "cmimemcpy_qpx.h"
-#endif
 
 #if CMK_PERSISTENT_COMM
 #include "machine-persistent.C"

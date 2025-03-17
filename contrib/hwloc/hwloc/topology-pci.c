@@ -1,6 +1,6 @@
 /*
  * Copyright © 2009 CNRS
- * Copyright © 2009-2020 Inria.  All rights reserved.
+ * Copyright © 2009-2023 Inria.  All rights reserved.
  * Copyright © 2009-2011, 2013 Université Bordeaux
  * Copyright © 2014-2018 Cisco Systems, Inc.  All rights reserved.
  * Copyright © 2015      Research Organization for Information Science
@@ -146,12 +146,6 @@ hwloc_look_pci(struct hwloc_backend *backend, struct hwloc_disc_status *dstatus)
   struct pci_device *pcidev;
   struct pci_id_match m;
 
-  m.subvendor_id = PCI_MATCH_ANY;
-  m.subdevice_id = PCI_MATCH_ANY;
-  m.device_class = 0;
-  m.device_class_mask = 0;
-  m.match_data = 0;
-
   hwloc_topology_get_type_filter(topology, HWLOC_OBJ_PCI_DEVICE, &pfilter);
   hwloc_topology_get_type_filter(topology, HWLOC_OBJ_BRIDGE, &bfilter);
   if (bfilter == HWLOC_TYPE_FILTER_KEEP_NONE
@@ -166,6 +160,12 @@ hwloc_look_pci(struct hwloc_backend *backend, struct hwloc_disc_status *dstatus)
 
   hwloc_debug("%s", "\nScanning PCI buses...\n");
 
+  m.subvendor_id = PCI_MATCH_ANY;
+  m.subdevice_id = PCI_MATCH_ANY;
+  m.device_class = 0;
+  m.device_class_mask = 0;
+  m.match_data = 0;
+
   /* pciaccess isn't thread-safe. it uses a single global variable that doesn't have
    * refcounting, and is dynamically reallocated when vendor/device names are needed, etc.
    */
@@ -175,8 +175,8 @@ hwloc_look_pci(struct hwloc_backend *backend, struct hwloc_disc_status *dstatus)
   ret = pci_system_init();
   if (ret) {
     HWLOC_PCIACCESS_UNLOCK();
-    if (!hwloc_hide_errors())
-      fprintf(stderr, "PCI: Failed to initialize libpciaccess with pci_system_init(): %d (%s)\n",
+    if (HWLOC_SHOW_ALL_ERRORS())
+      fprintf(stderr, "hwloc/pci: Failed to initialize libpciaccess with pci_system_init(): %d (%s)\n",
               ret, strerror(errno));
     return -1;
   }
@@ -205,8 +205,8 @@ hwloc_look_pci(struct hwloc_backend *backend, struct hwloc_disc_status *dstatus)
 #ifndef HWLOC_HAVE_32BITS_PCI_DOMAIN
     if (domain > 0xffff) {
       static int warned = 0;
-      if (!warned && !hwloc_hide_errors())
-	fprintf(stderr, "Ignoring PCI device with non-16bit domain.\nPass --enable-32bits-pci-domain to configure to support such devices\n(warning: it would break the library ABI, don't enable unless really needed).\n");
+      if (!warned && HWLOC_SHOW_ALL_ERRORS())
+	fprintf(stderr, "hwloc/pci: Ignoring PCI device with non-16bit domain.\nPass --enable-32bits-pci-domain to configure to support such devices\n(warning: it would break the library ABI, don't enable unless really needed).\n");
       warned = 1;
       continue;
     }
@@ -222,6 +222,7 @@ hwloc_look_pci(struct hwloc_backend *backend, struct hwloc_disc_status *dstatus)
 
     /* bridge or pci dev? */
     type = hwloc_pcidisc_check_bridge_type(device_class, config_space_cache);
+    /* only HWLOC_OBJ_BRIDGE for bridges to-PCI */
     if (type == HWLOC_OBJ_BRIDGE) {
       if (hwloc_pcidisc_find_bridge_buses(domain, bus, dev, func,
 					  &secondary_bus, &subordinate_bus,
@@ -231,17 +232,13 @@ hwloc_look_pci(struct hwloc_backend *backend, struct hwloc_disc_status *dstatus)
 
     /* filtered? */
     if (type == HWLOC_OBJ_PCI_DEVICE) {
-      enum hwloc_type_filter_e filter;
-      hwloc_topology_get_type_filter(topology, HWLOC_OBJ_PCI_DEVICE, &filter);
-      if (filter == HWLOC_TYPE_FILTER_KEEP_NONE)
+      if (pfilter == HWLOC_TYPE_FILTER_KEEP_NONE)
 	continue;
-      if (filter == HWLOC_TYPE_FILTER_KEEP_IMPORTANT
+      if (pfilter == HWLOC_TYPE_FILTER_KEEP_IMPORTANT
 	  && !hwloc_filter_check_pcidev_subtype_important(device_class))
 	continue;
     } else if (type == HWLOC_OBJ_BRIDGE) {
-      enum hwloc_type_filter_e filter;
-      hwloc_topology_get_type_filter(topology, HWLOC_OBJ_BRIDGE, &filter);
-      if (filter == HWLOC_TYPE_FILTER_KEEP_NONE)
+      if (bfilter == HWLOC_TYPE_FILTER_KEEP_NONE)
 	continue;
       /* HWLOC_TYPE_FILTER_KEEP_IMPORTANT filtered later in the core */
     }
@@ -310,6 +307,7 @@ hwloc_look_pci(struct hwloc_backend *backend, struct hwloc_disc_status *dstatus)
 
     /* bridge specific attributes */
     if (type == HWLOC_OBJ_BRIDGE) {
+      /* assumes this is a Bridge to-PCI */
       struct hwloc_bridge_attr_s *battr = &obj->attr->bridge;
       battr->upstream_type = HWLOC_OBJ_BRIDGE_PCI;
       battr->downstream_type = HWLOC_OBJ_BRIDGE_PCI;

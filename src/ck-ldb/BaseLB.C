@@ -296,7 +296,7 @@ void BaseLB::LDStats::normalize_speed() {
 void BaseLB::LDStats::print()
 {
 #if CMK_LBDB_ON
-  int i;
+  int i = 0;
   CkPrintf("------------- Processor Data: %zu -------------\n", procs.size());
   for (const auto& proc : procs)
   {

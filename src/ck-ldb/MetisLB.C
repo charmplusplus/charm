@@ -20,6 +20,7 @@ extern int quietModeRequested;
 static void lbinit()
 {
   LBRegisterBalancer<MetisLB>("MetisLB", "Use Metis(tm) to partition object graph");
+  LBTurnCommOn();
 }
 
 MetisLB::MetisLB(const CkLBOptions& opt) : CBase_MetisLB(opt)
@@ -55,12 +56,12 @@ void MetisLB::work(LDStats* stats)
       auto& inList = vertex.recvFromList;
 
       // Partition the incoming edges into {not from vertex nId}, {from vertex nId}
-      const auto it = std::partition(inList.begin(), inList.end(), [nId](const Edge& e) {
+      const auto it = std::partition(inList.begin(), inList.end(), [nId](const CkEdge& e) {
         return e.getNeighborId() != nId;
       });
       // Add the bytes received from vertex nId to the outgoing edge to nId, and then
       // remove those incoming edges
-      std::for_each(it, inList.end(), [&outEdge](const Edge& e) {
+      std::for_each(it, inList.end(), [&outEdge](const CkEdge& e) {
         outEdge.setNumBytes(outEdge.getNumBytes() + e.getNumBytes());
       });
       inList.erase(it, inList.end());

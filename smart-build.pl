@@ -112,28 +112,7 @@ if($arch_os eq "darwin") {
 }
 
 
-# check for BG/Q
-
-if($skip_choosing eq "false"){
-  my $BGQ_FLOOR = $ENV{'BGQ_FLOOR'};
-  if (not defined $BGQ_FLOOR) {
-    $BGQ_FLOOR = "/bgsys/drivers/ppcfloor";
-  }
-
-  my $bgq_found = system("which \"$BGQ_FLOOR/gnu-linux/bin/powerpc64-bgq-linux-cpp\" 2>/dev/null") / 256;
-
-  if ($bgq_found == 0) {
-    print "\nI found that you have a Blue Gene/Q toolchain available in your path.\nDo you want to build Charm++ targeting BG/Q? [Y/n]: ";
-    my $p = promptUserYN();
-    if($p eq "yes" || $p eq "default") {
-      $arch = "pamilrts-bluegeneq";
-      $skip_choosing = "true";
-    }
-  }
-}
-
-
-# check for GNI
+# check for Cray
 
 if($skip_choosing eq "false"){
   my $craycc_found = index(`which CC 2>/dev/null`, "/opt/cray/") != -1;
@@ -143,11 +122,23 @@ if($skip_choosing eq "false"){
     $PE_PRODUCT_LIST = "";
   }
 
+  my $CRAYPE_NETWORK_TARGET = $ENV{'CRAYPE_NETWORK_TARGET'};
+  if (not defined $CRAYPE_NETWORK_TARGET) {
+    $CRAYPE_NETWORK_TARGET = "";
+  }
+
   my $CRAY_UGNI_found = index(":$PE_PRODUCT_LIST:", ":CRAY_UGNI:") != -1;
 
   my $gni_found = $craycc_found || $CRAY_UGNI_found;
 
-  if ($gni_found) {
+  if ($CRAYPE_NETWORK_TARGET eq "ofi") {
+    print "\nI found that you have a Cray environment.\nDo you want to build Charm++ targeting Cray Shasta? [Y/n]: ";
+    my $p = promptUserYN();
+    if($p eq "yes" || $p eq "default") {
+                  $arch = "ofi-crayshasta";
+                  $skip_choosing = "true";
+    }
+  } elsif ($gni_found) {
     my $CRAYPE_INTERLAGOS_found = index(":$PE_PRODUCT_LIST:", ":CRAYPE_INTERLAGOS:") != -1;
     if ($CRAYPE_INTERLAGOS_found) {
       print "\nI found that you have a Cray environment with Interlagos processors.\nDo you want to build Charm++ targeting Cray XE? [Y/n]: ";
@@ -279,10 +270,9 @@ Choose an interconnect from below: [1-10]
 	 2) Infiniband (verbs)
 	 3) Cray XE, XK
 	 4) Cray XC
-	 5) Blue Gene/Q
-	 6) Intel Omni-Path (ofi)
-	 7) PAMI
-	 8) UCX
+	 5) Intel Omni-Path (ofi)
+	 6) PAMI
+	 7) UCX
 
 EOF
 
@@ -301,15 +291,12 @@ EOF
 	        $arch = "gni-crayxc";
 	        last;
 	  } elsif($line eq "5"){
-		$arch = "pamilrts-bluegeneq";
-		last;
-	  } elsif($line eq "6"){
 		$converse_network_type = "ofi";
 		last;
-	  } elsif($line eq "7"){
+	  } elsif($line eq "6"){
 		$converse_network_type = "pamilrts";
 		last;
-	  } elsif($line eq "8"){
+	  } elsif($line eq "7"){
 		$converse_network_type = "ucx";
 		last;
 	  } else {
@@ -402,7 +389,7 @@ if ($counter != 1) {
 #================ Choose Compiler =================================
 
 # Lookup list of compilers
-my $cs = `$dirname/build charm++ $arch help 2>&1 | grep "Supported compilers"`;
+my $cs = `$dirname/buildold charm++ $arch help 2>&1 | grep "Supported compilers"`;
 # prune away beginning of the line
 $cs =~ m/Supported compilers: (.*)/;
 $cs = $1;
@@ -594,7 +581,7 @@ print << "EOF";
 What do you want to build?
 	1) Charm++ [default] (choose this if you are building NAMD)
 	2) Charm++ and AMPI
-	3) Charm++, AMPI, ParFUM, FEM and other libraries
+	3) Charm++, AMPI, ParFUM and other libraries
 
 EOF
 

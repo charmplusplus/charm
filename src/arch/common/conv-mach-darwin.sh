@@ -7,7 +7,7 @@ CMK_XIOPTS=''
 
 CMK_CC_FLAGS="$CMK_CC_FLAGS -fPIC -dynamic -fno-common "
 CMK_CXX_FLAGS="$CMK_CXX_FLAGS -fPIC -dynamic -fno-common -stdlib=libc++ "
-CMK_LDXX_FLAGS="$CMK_LDXX_FLAGS -multiply_defined suppress -stdlib=libc++ "
+CMK_LDXX_FLAGS="$CMK_LDXX_FLAGS -framework Foundation -framework IOKit -multiply_defined suppress -stdlib=libc++ "
 
 # setting for shared lib
 CMK_SHARED_SUF="dylib"

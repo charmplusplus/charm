@@ -36,31 +36,27 @@ class Parameter {
   friend class ParamList;
   void pup(XStr& str);
   void pupArray(XStr& str);
-  void pupRdma(XStr& str, bool genRdma, bool device);
+  void pupRdma(XStr& str, bool device);
   void copyPtr(XStr& str);
   void check();
   void checkPointer(Type* dt);
   void marshallArraySizes(XStr& str, Type* dt);
   void marshallRegArraySizes(XStr& str);
-  void marshallRdmaParameters(XStr& str, bool genRdma);
+  void marshallRdmaParameters(XStr& str);
   void prepareToDeviceCommBuffer(XStr& str, int& index);
   void marshallDeviceRdmaParameters(XStr& str, int& index);
   void marshallArrayData(XStr& str);
-  void marshallRdmaArrayData(XStr& str);
   void beginUnmarshall(XStr& str);
   void beginUnmarshallArray(XStr& str);
-  void beginUnmarshallRdma(XStr& str, bool genRdma, bool device);
+  void beginUnmarshallRdma(XStr& str, bool device);
   void beginUnmarshallSDAGRdma(XStr& str);
   void beginUnmarshallSDAGCall(XStr& str);
-  void beginUnmarshallSDAGCallRdma(XStr& str, bool genRdma, bool device);
+  void beginUnmarshallSDAGCallRdma(XStr& str, bool device);
   void unmarshallArrayData(XStr& str);
   void unmarshallRegArrayData(XStr& str);
-  void unmarshallRdmaArrayData(XStr& str, bool genRegArray);
-  void adjustUnmarshalledRdmaPtrsSDAG(XStr& str, bool genRdma, bool device);
+  void adjustUnmarshalledRdmaPtrsSDAG(XStr& str, bool device);
   void unmarshallRegArrayDataSDAG(XStr& str);
-  void unmarshallRdmaArrayDataSDAG(XStr& str);
   void unmarshallRegArrayDataSDAGCall(XStr& str);
-  void unmarshallRdmaArrayDataSDAGCall(XStr& str);
   void pupAllValues(XStr& str);
 
  public:
@@ -93,7 +89,11 @@ class Parameter {
   void setGivenName(const char* s) { given_name = s; }
   const char* getName(void) const { return name; }
   void printMsg(XStr& str);
-  void storePostedRdmaPtrs(XStr& str, bool genRdma, bool isSDAGGen, bool device, int &count);
+  void storePostedRdmaPtrs(XStr& str, bool isSDAGGen, bool device, int &count);
+  void setupPostedPtrs(XStr& str, bool isSDAGGen, bool device, int &count);
+  void copyFromPostedPtrs(XStr& str, bool isSDAGGen, bool device, int &count);
+  void extractPostedPtrs(XStr& str, bool isSDAGGen, bool isPrimary, bool device, int &count);
+  void printPeerAckInfo(XStr& str, bool isSDAGGen, bool device, int &count);
   int operator==(const Parameter& parm) const;
 
   // DMK - Added for accelerator options
@@ -116,18 +116,19 @@ class ParamList {
   typedef int (Parameter::*pred_t)(void) const;
   int orEach(pred_t f);
   typedef void (Parameter::*fn_t)(XStr& str);
-  typedef void (Parameter::*rdmafn_t)(XStr& str, bool genRegArray);
-  typedef void (Parameter::*rdmarecvfn_t)(XStr& str, bool genRdma, bool isSDAGGen, int &count);
-  typedef void (Parameter::*rdmaheterofn_t)(XStr& str, bool genRdma, bool device);
-  typedef void (Parameter::*rdmaheterocountfn_t)(XStr& str, bool genRdma, bool isSDAGGen, bool device, int &count);
+  typedef void (Parameter::*rdmabasicfn_t)(XStr& str, bool isSDAGGen, int &count);
+  typedef void (Parameter::*rdmafn_t)(XStr& str, bool isSDAGGen, bool isPrimary, bool device);
+  typedef void (Parameter::*rdmacountfn_t)(XStr& str, bool isSDAGGen, bool isPrimary, bool device, int &count);
+  typedef void (Parameter::*rdmaheterofn_t)(XStr& str, bool device);
+  typedef void (Parameter::*rdmaheterocountfn_t)(XStr& str, bool isSDAGGen, bool device, int &count);
   typedef void (Parameter::*rdmadevicefn_t)(XStr& str, int& index);
   void callEach(fn_t f, XStr& str);
-  void callEach(rdmafn_t f, XStr& str, bool genRegArray);
-  void callEach(rdmarecvfn_t f, XStr& str, bool genRdma, bool isSDAGGen);
-  void callEach(rdmarecvfn_t f, XStr& str, bool genRdma, bool isSDAGGen, int &count);
-  void callEach(rdmaheterofn_t f, XStr& str, bool genRdma, bool device);
-  void callEach(rdmaheterocountfn_t f, XStr& str, bool genRdma, bool isSDAGGen, bool device);
-  void callEach(rdmaheterocountfn_t f, XStr& str, bool genRdma, bool isSDAGGen, bool device, int& count);
+  void callEach(rdmabasicfn_t f, XStr& str, bool isSDAGGen, int &count);
+  void callEach(rdmafn_t f, XStr& str, bool isSDAGGen, bool isPrimary, bool device);
+  void callEach(rdmacountfn_t f, XStr& str, bool isSDAGGen, bool isPrimary, bool device, int &count);
+  void callEach(rdmaheterofn_t f, XStr& str, bool device);
+  void callEach(rdmaheterocountfn_t f, XStr& str, bool isSDAGGen, bool device);
+  void callEach(rdmaheterocountfn_t f, XStr& str, bool isSDAGGen, bool device, int& count);
   void callEach(rdmadevicefn_t f, XStr& str, int& index);
   void encloseFlag(XStr& str);
   bool manyPointers;
@@ -189,6 +190,10 @@ class ParamList {
   int operator==(ParamList& plist);
   void checkParamList();
   void storePostedRdmaPtrs(XStr& str, bool isSDAGGen);
+  void setupPostedPtrs(XStr& str, bool isSDAGGen);
+  void copyFromPostedPtrs(XStr& str, bool isSDAGGen);
+  void extractPostedPtrs(XStr& str, bool isSDAGGen, bool isPrimary, bool device);
+  void printPeerAckInfo(XStr& str, bool isSDAGGen);
 };
 
 }  // namespace xi

@@ -20,13 +20,13 @@ inline void LBMachineUtil::IdleEnd(double curWallTime)
   }
 }
 
-void LBMachineUtil::staticIdleStart(LBMachineUtil* obj,double curWallTime)
+void LBMachineUtil::staticIdleStart(LBMachineUtil* obj)
 {
-  obj->IdleStart(curWallTime);
+  obj->IdleStart(CkWallTimer());
 }
-void LBMachineUtil::staticIdleEnd(LBMachineUtil* obj,double curWallTime)
+void LBMachineUtil::staticIdleEnd(LBMachineUtil* obj)
 {
-  obj->IdleEnd(curWallTime);
+  obj->IdleEnd(CkWallTimer());
 }
 
 LBMachineUtil::LBMachineUtil()
@@ -51,9 +51,9 @@ void LBMachineUtil::StatsOn()
 
   if (state == off) {
     cancel_idleStart=CcdCallOnConditionKeep(
-	 CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)staticIdleStart,(void *)this);
+	 CcdPROCESSOR_BEGIN_IDLE,(CcdCondFn)staticIdleStart,(void *)this);
     cancel_idleEnd=CcdCallOnConditionKeep(
-         CcdPROCESSOR_END_IDLE,(CcdVoidFn)staticIdleEnd,(void *)this);
+         CcdPROCESSOR_END_IDLE,(CcdCondFn)staticIdleEnd,(void *)this);
     state = on;
   }
 

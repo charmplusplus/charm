@@ -70,7 +70,6 @@ CkpvDeclare(int, traceOnPe);
 CkpvDeclare(char*, traceRoot);
 CkpvDeclare(char*, partitionRoot);
 CkpvDeclare(int, traceRootBaseLength);
-CkpvDeclare(char*, selective);
 CkpvDeclare(bool, verbose);
 bool outlierAutomatic;
 bool findOutliers;
@@ -136,7 +135,7 @@ static void traceCommonInit(char **argv)
 
   char subdir[20];
   if(CmiNumPartitions() > 1) {
-    sprintf(subdir, "prj.part%d%s", CmiMyPartition(), PATHSEPSTR);
+    snprintf(subdir, sizeof(subdir), "prj.part%d%s", CmiMyPartition(), PATHSEPSTR);
   } else {
     subdir[0]='\0';
   }
@@ -176,33 +175,6 @@ static void traceCommonInit(char **argv)
     strcat(CkpvAccess(traceRoot), argv[0]);
   }
   CkpvAccess(traceRootBaseLength)  +=  strlen(subdir);
-	/* added for TAU trace module. */
-  char *cwd;
-  CkpvInitialize(char*, selective);
-  if (CmiGetArgStringDesc(argv, "+selective", &temproot, "TAU's selective instrumentation file")) {
-    // Trying to decide if the traceroot path is absolute or not. If it is not
-    // then create an absolute pathname for it.
-    if (temproot[0] != PATHSEP) {
-      cwd = GETCWD(NULL,0);
-      root = (char *)malloc(strlen(cwd)+strlen(temproot)+2);
-      strcpy(root, cwd);
-      strcat(root, PATHSEPSTR);
-      strcat(root, temproot);
-    } else {
-      root = (char *)malloc(strlen(temproot)+1);
-      strcpy(root,temproot);
-    }
-    CkpvAccess(selective) = (char *) malloc(strlen(root)+1);
-    _MEMCHECK(CkpvAccess(selective));
-    strcpy(CkpvAccess(selective), root);
-    if (CkMyPe() == 0) 
-      CmiPrintf("Trace: selective: %s\n", CkpvAccess(selective));
-  }
-  else {
-    CkpvAccess(selective) = (char *) malloc(3);
-    _MEMCHECK(CkpvAccess(selective));
-    strcpy(CkpvAccess(selective), "");
-  }
 
   outlierAutomatic = true;
   findOutliers = false;
@@ -330,21 +302,21 @@ void traceWriteSTS(FILE *stsfp,int nUserEvents) {
     fprintf(stsfp, "MESSAGE %d %u\n", (int)i, (int)_msgTable[i]->size);
 }
 
-void traceCommonBeginIdle(void *proj,double curWallTime)
+void traceCommonBeginIdle(void *proj)
 {
-  ((TraceArray *)proj)->beginIdle(curWallTime);
+  ((TraceArray *)proj)->beginIdle(CkWallTimer());
 }
  
-void traceCommonEndIdle(void *proj,double curWallTime)
+void traceCommonEndIdle(void *proj)
 {
-  ((TraceArray *)proj)->endIdle(curWallTime);
+  ((TraceArray *)proj)->endIdle(CkWallTimer());
 }
 
 void TraceArray::traceBegin() {
   if (n==0) return; // No tracing modules registered.
 #if ! CMK_TRACE_IN_CHARM
-  cancel_beginIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)traceCommonBeginIdle,this);
-  cancel_endIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,(CcdVoidFn)traceCommonEndIdle,this);
+  cancel_beginIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdCondFn)traceCommonBeginIdle,this);
+  cancel_endIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,(CcdCondFn)traceCommonEndIdle,this);
 #endif
   ALLDO(traceBegin());
 }
@@ -353,8 +325,8 @@ void TraceArray::traceBeginOnCommThread() {
 #if CMK_SMP_TRACE_COMMTHREAD
   if (n==0) return; // No tracing modules registered.
 /*#if ! CMK_TRACE_IN_CHARM	
-  cancel_beginIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)traceCommonBeginIdle,this);
-  cancel_endIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,(CcdVoidFn)traceCommonEndIdle,this);
+  cancel_beginIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdCondFn)traceCommonBeginIdle,this);
+  cancel_endIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,(CcdCondFn)traceCommonEndIdle,this);
 #endif*/
   ALLDO(traceBeginOnCommThread());
 #endif
@@ -865,7 +837,6 @@ struct TraceThreadListener {
 
 static void traceThreadListener_suspend(struct CthThreadListener *l)
 {
-  TraceThreadListener *a=(TraceThreadListener *)l;
   /* here, we activate the appropriate trace codes for the appropriate
      registered modules */
   traceSuspend();

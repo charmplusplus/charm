@@ -27,14 +27,12 @@
 //#include "queueing.h"
 #include <unistd.h>
 
-
+#include "ck.h"
+CkpvDeclare(DebugEntryTable, _debugEntryTable);
 
 #if CMK_CHARMDEBUG && CMK_CCS_AVAILABLE && !defined(_WIN32)
 
-#include "ck.h"
-
 CkpvDeclare(int, skipBreakpoint); /* This is a counter of how many breakpoints we should skip */
-CkpvDeclare(DebugEntryTable, _debugEntryTable);
 CpdPersistentChecker persistentCheckerUselessClass;
 
 void resetAllCRC();
@@ -336,7 +334,11 @@ public:
     p((char*)elt,size);
   }
 };
-
+#if CMK_OFI
+// EJB TODO the fix for this belongs elsewhere, but this is ok for now
+#undef CMK_HAS_GET_MYADDRESS
+#define CMK_HAS_GET_MYADDRESS 0
+#endif
 #if CMK_HAS_GET_MYADDRESS
 #include <rpc/rpc.h>
 #endif
@@ -496,7 +498,7 @@ public:
     if (CmiGetHandler(msg)==_charmHandlerIdx) {isCharm=1; type="Local Charm";}
     if (CmiGetXHandler(msg)==_charmHandlerIdx) {isCharm=1; type="Network Charm";}
     if (curObj < 0) type="Conditional";
-    sprintf(name,"%s %d: %s (%d)","Message",curObj,type,CmiGetHandler(msg));
+    snprintf(name,sizeof(name),"%s %d: %s (%d)","Message",curObj,type,CmiGetHandler(msg));
     p(name, strlen(name));
 
     if (isCharm)
@@ -524,7 +526,7 @@ class CpdList_message : public CpdListAccessor {
     char name[128];
     if (CmiGetHandler(env)==_charmHandlerIdx) {type="Local Charm";}
     if (CmiGetXHandler(env)==_charmHandlerIdx) {type="Network Charm";}
-    sprintf(name,"%s 0: %s (%d)","Message",type,CmiGetHandler(env));
+    snprintf(name,sizeof(name),"%s 0: %s (%d)","Message",type,CmiGetHandler(env));
     p(name, strlen(name));
     p.comment("charmMsg");
     p.synchronize(PUP::sync_begin_object);
@@ -1002,7 +1004,7 @@ void CpdStartGdb(void)
   if (CpvAccess(displayArgument) != NULL)
   {
      /*CmiPrintf("MY NODE IS %d  and process id is %d\n", CmiMyPe(), getpid());*/
-     sprintf(gdbScript, "/tmp/cpdstartgdb.%d.%d", getpid(), CmiMyPe());
+     snprintf(gdbScript, sizeof(gdbScript), "/tmp/cpdstartgdb.%d.%d", getpid(), CmiMyPe());
      f = fopen(gdbScript, "w");
      fprintf(f,"#!/bin/sh\n");
      fprintf(f,"cat > /tmp/start_gdb.$$ << END_OF_SCRIPT\n");

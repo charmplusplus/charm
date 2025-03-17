@@ -22,14 +22,14 @@ mainmodule Patch {
     entry Patch();
     entry void start();
     entry void createComputes();
-    entry void updateForces(CkVec<Particle> particles);
-    entry void updateParticles(CkVec<Particle> updates);
+    entry void updateForces(const std::vector<Particle> &particles);
+    entry void updateParticles(const std::vector<Particle> &updates);
     // entry void requestNextFrame(liveVizRequestMsg *m);
   };
 
   array [4D] Compute {
     entry Compute();
-    entry void interact(CkVec<Particle>, int i, int j);
+    entry void interact(std::vector<Particle>, int i, int j);
   };
 
 };

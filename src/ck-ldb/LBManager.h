@@ -6,6 +6,8 @@
 #ifndef LBMANAGER_H
 #define LBMANAGER_H
 
+#include <cassert>
+
 #include "LBDatabase.h"
 #include "json_fwd.hpp"
 using json = nlohmann::json;
@@ -50,7 +52,8 @@ class CkLBArgs
     _lb_debug = 0;
     _lb_ignoreBgLoad = _lb_syncResume = _lb_useCpuTime = false;
     _lb_printsummary = _lb_migObjOnly = false;
-    _lb_statson = _lb_traceComm = true;
+    _lb_statson = true;
+    _lb_traceComm = false;
     _lb_loop = false;
     _lb_central_pe = 0;
     _lb_maxDistPhases = 10;
@@ -98,15 +101,24 @@ class CkLBOptions
 {
  private:
   int seqno;  // for centralized lb, the seqno
-  const char* legacyName;
+  std::string legacyName;
  public:
-  CkLBOptions() : seqno(-1), legacyName(nullptr) {}
-  CkLBOptions(int s) : seqno(s), legacyName(nullptr) {}
-  CkLBOptions(int s, const char* legacyName) : seqno(s), legacyName(legacyName) {}
+  CkLBOptions() : seqno(-1), legacyName() {}
+  CkLBOptions(int s) : seqno(s), legacyName() {}
+  CkLBOptions(int s, const char* legacyName) : seqno(s), legacyName(legacyName ? legacyName : "") {}
   int getSeqNo() const { return seqno; }
-  const char* getLegacyName() const { return legacyName; }
+  bool hasLegacyName() const { return !legacyName.empty(); }
+  const char* getLegacyName() const {
+    assert(hasLegacyName());
+    return legacyName.c_str();
+  }
+
+  void pup(PUP::er& p)
+  {
+    p | seqno;
+    p | legacyName;
+  }
 };
-PUPbytes(CkLBOptions)
 
 #include "LBManager.decl.h"
 
@@ -290,8 +302,6 @@ class LBManager : public CBase_LBManager
   void CollectStatsOn(void) { lbdb_obj->CollectStatsOn(); }
   void CollectStatsOff(void) { lbdb_obj->CollectStatsOff(); }
   bool StatsOn(void) { return lbdb_obj->StatsOn(); }
-  int RunningObject(LDObjHandle* _o) const { return lbdb_obj->RunningObject(_o); }
-  const LDObjHandle* RunningObject() { return lbdb_obj->RunningObject(); }
   void ObjTime(LDObjHandle h, double walltime, double cputime)
   {
     lbdb_obj->ObjTime(h, walltime, cputime);
@@ -378,7 +388,7 @@ class LBManager : public CBase_LBManager
   void RemoveStartLBFn(int handle);
 
   void StartLB();
-  
+
   template <typename T>
   inline int AddMigrationDoneFn(T* obj, void (T::*method)(void))
   {
@@ -566,15 +576,8 @@ class SystemLoad
   LBManager* lbmgr;
 
  public:
-  SystemLoad()
-  {
-    lbmgr = LBManagerObj();
-    objHandle = lbmgr->RunningObject();
-    if (objHandle != NULL)
-    {
-      lbmgr->ObjectStop(*objHandle);
-    }
-  }
+  SystemLoad();
+
   ~SystemLoad()
   {
     if (objHandle) lbmgr->ObjectStart(*objHandle);

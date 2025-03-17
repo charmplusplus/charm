@@ -15,7 +15,7 @@ private:
   double dval;
   char checkString[11];
 public:
-  groupmulti_BCMsg(void) { dval = 3.145; sprintf(checkString, "Multicast!");} 
+  groupmulti_BCMsg(void) { dval = 3.145; strcpy(checkString, "Multicast!"); }
   groupmulti_BCMsg(CkMigrateMessage *m) {}
   int check(void) { 
     if (strcmp("Multicast!", checkString) == 0 && dval == 3.145)

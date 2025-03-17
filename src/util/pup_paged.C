@@ -9,8 +9,9 @@ pup_pagetable *getNewPagetable(char *fName){
 	_pagetable->table = NULL;
 	_pagetable->tailtable = NULL;
 	_pagetable->maxblk=0;
-	_pagetable->fName = new char[strlen(fName)+20];
-	sprintf(_pagetable->fName,"%s_%d.dat",fName,CmiMyPe());
+        int len = strlen(fName)+20;
+	_pagetable->fName = new char[len];
+	snprintf(_pagetable->fName,len,"%s_%d.dat",fName,CmiMyPe());
 	_pagetable->fp = fopen(_pagetable->fName,"wb");
 	fclose(_pagetable->fp);
 	_pagetable->fp = fopen(_pagetable->fName,"r+b");

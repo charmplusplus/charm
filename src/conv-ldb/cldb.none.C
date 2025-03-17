@@ -29,7 +29,7 @@ void CldHandler(char *msg)
 
 void CldEnqueueGroup(CmiGroup grp, void *msg, int infofn)
 {
-  int len, queueing, priobits,i; unsigned int *prioptr;
+  int len, queueing, priobits; unsigned int *prioptr;
   CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
   CldPackFn pfn;
   ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
@@ -65,7 +65,7 @@ void CldEnqueueWithinNode(void *msg, int infofn)
 
 void CldEnqueueMulti(int npes, const int *pes, void *msg, int infofn)
 {
-  int len, queueing, priobits,i; unsigned int *prioptr;
+  int len, queueing, priobits; unsigned int *prioptr;
   CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
   CldPackFn pfn;
   ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
@@ -77,7 +77,7 @@ void CldEnqueueMulti(int npes, const int *pes, void *msg, int infofn)
   CmiSetInfo(msg,infofn);
 
   /*
-  for(i=0;i<npes;i++) {
+  for(int i=0;i<npes;i++) {
     CmiSyncSend(pes[i], len, msg);
   }
   CmiFree(msg);

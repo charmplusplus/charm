@@ -1,9 +1,0 @@
-mainmodule Pgm {
-  extern module TriangularMesh;
-  readonly CkChareID mainhandle;
-  
-  mainchare main {
-    entry main(CkArgMsg *);
-    entry [threaded] void performRefinements();
-  };
-};

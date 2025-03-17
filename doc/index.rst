@@ -4,9 +4,9 @@ Charm++ Documentation
 
 
 - Charm++ Tutorial: https://charmplusplus.org/tutorial/
-- Charm++ Development: https://github.com/UIUC-PPL/charm
+- Charm++ Development: https://github.com/charmplusplus/charm
 - Nightly regression tests: https://charm.cs.illinois.edu/autobuild/cur/
-- Charm++ discussion: https://github.com/UIUC-PPL/charm/discussions
+- Charm++ discussion: https://github.com/charmplusplus/charm/discussions
 
 
 .. toctree::
@@ -27,9 +27,6 @@ Charm++ Documentation
    :numbered:
 
    tcharm/manual
-   fem/manual
-   ifem/manual
-   netfem/manual
    mblock/manual
    pose/manual
 

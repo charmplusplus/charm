@@ -212,7 +212,7 @@ static void CpdList_ccs_list_items_txt(char *msg)
     }
     char *buf=new char[bufLen];
     { 
-      PUP::toText p(buf); pupCpd(p,acc,req);
+      PUP::toText p(buf, bufLen); pupCpd(p,acc,req);
       if (p.size()!=bufLen)
 	CmiError("ERROR! Sizing/packing length mismatch for %s list pup function!\n",
 		acc->getPath());
@@ -438,14 +438,15 @@ static void CWeb_Deliver(void)
   if (hasApplet) {
     WEBDEBUG(("CWeb_Deliver to applet\n"));
     /*Send the performance data off to the applet*/
-    char *reply=(char *)malloc(6+14*CmiNumPes()*CWebNoOfFns);
-    sprintf(reply,"perf");
+    int reply_len = 6+14+CmiNumPes()*CWebNoOfFns;
+    char *reply=(char *)malloc(reply_len);
+    snprintf(reply,reply_len,"perf");
   
     for(i=0; i<CmiNumPes(); i++){
       for (j=0;j<CWebNoOfFns;j++)
       {
         char buf[20];
-        sprintf(buf," %d",collectedValues[i]->perfData[j]);
+        snprintf(buf,sizeof(buf)," %d",collectedValues[i]->perfData[j]);
         strcat(reply,buf);
       }
     }
@@ -562,7 +563,7 @@ CpvStaticDeclare(CWebModeStats *,cwebStats);
 
 /* Called to begin a collection interval
 */
-static void usageReset(CWebModeStats *stats,double curWallTime)
+static void usageReset(CWebModeStats *stats, double curWallTime)
 {
    stats->beginTime=curWallTime;
    stats->usedTime = 0.;
@@ -570,17 +571,17 @@ static void usageReset(CWebModeStats *stats,double curWallTime)
 
 /* Called when processor becomes busy
 */
-static void usageStart(CWebModeStats *stats,double curWallTime)
+static void usageStart(CWebModeStats *stats)
 {
-   stats->startTime  = curWallTime;
+   stats->startTime  = CmiWallTimer();
    stats->PROCESSING = 1;
 }
 
 /* Called when processor becomes idle
 */
-static void usageStop(CWebModeStats *stats,double curWallTime)
+static void usageStop(CWebModeStats *stats)
 {
-   stats->usedTime   += curWallTime - stats->startTime;
+   stats->usedTime   += CmiWallTimer() - stats->startTime;
    stats->PROCESSING = 0;
 }
 
@@ -593,10 +594,10 @@ static void initUsage()
    CpvInitialize(CWebModeStats *, cwebStats);
    CWebModeStats *stats=new CWebModeStats;
    CpvAccess(cwebStats)=stats;
-   usageReset(stats,CmiWallTimer());
-   usageStart(stats,CmiWallTimer());
-   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,(CcdVoidFn)usageStart,stats);
-   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)usageStop,stats);    
+   usageReset(stats, CmiWallTimer());
+   usageStart(stats);
+   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,(CcdCondFn)usageStart,stats);
+   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdCondFn)usageStop,stats);
 }
 
 static int getUsage(void)
@@ -608,7 +609,7 @@ static int getUsage(void)
 
    if(stats->PROCESSING)
    { /* Lock in current CPU usage */
-      usageStop(stats,time); usageStart(stats,time);
+      usageStop(stats); usageStart(stats);
    }
    if(totalTime > 0.)
       usage = (int)(0.5 + 100 *stats->usedTime/totalTime);

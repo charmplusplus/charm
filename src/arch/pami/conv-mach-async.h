@@ -2,10 +2,6 @@
 
 #undef CMK_MSG_HEADER_EXT_ 
 
-#if CMK_BLUEGENEQ
-#define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, hdl,xhdl,info, stratid; unsigned char cksum, magic; int root, size, dstnode; CmiUInt2 redID, padding; char work[6*sizeof(void *)]; CmiUInt1 cmaMsgType:2, nokeep:1;
-#else
-#define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, hdl,xhdl,info, stratid; unsigned char cksum, magic; int root, size, dstnode; CmiUInt2 redID, padding; char work[8*sizeof(void *)]; CmiUInt1 cmaMsgType:2, nokeep:1;
-#endif
+#define CMK_MSG_HEADER_EXT_    int root, size, dstnode; CmiUInt2 rank, hdl,xhdl,info, stratid; unsigned char cksum, magic, redID, padding; char work[8*sizeof(void *)]; CmiUInt1 cmaMsgType:2, nokeep:1;
 
 

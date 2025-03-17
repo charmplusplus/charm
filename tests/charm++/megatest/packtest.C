@@ -38,16 +38,6 @@ packtest_Msg * packtest_Msg::unpack(void *buf)
 
 packtest_Btest::packtest_Btest(void)
 {
-/*
-  static CrnStream str;
-  static int flag = 0;
-  if (0 == flag) {
-    CrnInitStream(&str, (int)this, 0);
-    flag = 1;
-  }
-  // seed needs to be set only once
-*/
-
   if(CkMyPe()==0) {
     packtest_Msg *msg = new packtest_Msg;
 

@@ -110,7 +110,6 @@ unsigned int crc32_update(unsigned char *data, int len, unsigned int previous) {
   return ~result;
 }
 
-static unsigned char checksum3[4] = {0, 0, 0, 0xFF};
 static unsigned char checksum_array[7] = {0xFF, 0xFF, 0xFF, 0, 0, 0, 0};
 
 unsigned int checksum_update(unsigned char *data, int len, unsigned int previous) {

@@ -16,6 +16,7 @@ DIRS = \
   startupTest \
   topology \
   io \
+  io_read \
   sparse \
   reductionTesting \
   partitions \
@@ -25,8 +26,14 @@ DIRS = \
   zerocopy \
   within_node_bcast \
   longIdle \
+  periodic \
   bombard \
   varTRAM \
+  dynamic_insertion \
+  dynamic_insertion_deletion \
+  amr_1d_random \
+  amr_1d_simple \
+  anytime_migration \
 
 FTDIRS = \
   jacobi3d \
@@ -40,6 +47,7 @@ NONSCALEDIRS = \
   sdag \
   sparse \
   charmxi_parsing \
+  anytime_migration \
 
 TESTPDIRS = $(filter-out $(NONSCALEDIRS),$(TESTDIRS))
 

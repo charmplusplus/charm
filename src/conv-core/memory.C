@@ -298,6 +298,7 @@ void CmiOutOfMemory(int nBytes)
   if (memory_lifeRaft) free(memory_lifeRaft);
   if (nBytes>0) CmiAbort("Could not malloc() %d bytes--are we out of memory? (used :%.3fMB)",nBytes,CmiMemoryUsage()/1000000.0);
   else CmiAbort("Could not malloc()--are we out of memory? (used: %.3fMB)", CmiMemoryUsage()/1000000.0);
+  CMI_NORETURN_FUNCTION_END
 }
 
 /* Global variables keeping track of the status of the system (mostly used by charmdebug) */
@@ -629,7 +630,21 @@ INLINE static CMK_TYPEDEF_UINT8 MemusageMallinfo(void){
       initialize_memory_wrapper();
     mi = (*mm_impl_mallinfo)();
 #else
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+#ifdef __INTEL_COMPILER
+#pragma warning push
+#pragma warning disable 1478
+#endif
     mi = mallinfo();
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
+#ifdef __INTEL_COMPILER
+#pragma warning pop
+#endif
 #endif
     CMK_TYPEDEF_UINT8 memtotal = (CMK_TYPEDEF_UINT8) mi.uordblks;   /* malloc */
     CMK_TYPEDEF_UINT8 memtotal2 = (CMK_TYPEDEF_UINT8) mi.usmblks;   /* unused */
@@ -651,7 +666,7 @@ INLINE static CMK_TYPEDEF_UINT8 MemusagePS(void){
     CMK_TYPEDEF_UINT8 vsz=0;
     FILE *p;
     int ret;
-    sprintf(pscmd, "/bin/ps -o vsz= -p %d", getpid());
+    snprintf(pscmd, sizeof(pscmd), "/bin/ps -o vsz= -p %d", getpid());
     p = popen(pscmd, "r");
     if(p){
 	ret = fscanf(p, "%" PRIu64, &vsz);
@@ -680,19 +695,6 @@ static CMK_TYPEDEF_UINT8 MemusageWindows(void){
 }
 #endif
 
-#if CMK_BLUEGENEQ
-#include <spi/include/kernel/memory.h>
-INLINE static CMK_TYPEDEF_UINT8 MemusageBGQ(void){
-  uint64_t heapUsed;
-  Kernel_GetMemorySize(KERNEL_MEMSIZE_HEAP, &heapUsed);
-  return (CMK_TYPEDEF_UINT8)heapUsed;
-}
-#else
-static CMK_TYPEDEF_UINT8 MemusageBGQ(void){
-    return 0;
-}
-#endif
-
 typedef CMK_TYPEDEF_UINT8 (*CmiMemUsageFn)(void);
 
 /* this structure defines the order of testing for memory usage functions */
@@ -700,7 +702,6 @@ struct CmiMemUsageStruct {
     CmiMemUsageFn  fn;
     const char *name;
 } memtest_order[] = {
-    {MemusageBGQ, "BlueGene/Q"},
     {MemusageWindows, "Windows"},
     {MemusageMstats, "Mstats"},
     {MemusageMallinfo, "Mallinfo"},
@@ -1274,7 +1275,7 @@ void CmiFreeAligned(void* ptr) {
 
 
 // Replace remaining symbols found in glibc's malloc.o to avoid linker errors
-// See: https://github.com/UIUC-PPL/charm/issues/1325
+// See: https://github.com/charmplusplus/charm/issues/1325
 
 #if (CMK_MEMORY_BUILD_OS && CMK_MEMORY_BUILD_OS_WRAPPED && !CMK_MEMORY_BUILD_GNU_HOOKS) || !CMK_MEMORY_BUILD_OS
 

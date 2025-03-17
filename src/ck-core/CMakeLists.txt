@@ -29,7 +29,7 @@ set(ck-cxx-sources
 )
 
 set(ck-h-sources XArraySectionReducer.h charm++.h charm++_type_traits.h
-    charm-api.h charm.h charmf.h ck.h ckIgetControl.h ckarray.h ckarrayindex.h
+    charm-api.h charm.h ck.h ckIgetControl.h ckarray.h ckarrayindex.h
     ckarrayoptions.h ckcallback-ccs.h ckcallback.h ckcheckpoint.h
     ckmarshall.h ckfutures.h cklocation.h cklocrec.h
     ckmemcheckpoint.h ckmessage.h ckmigratable.h ckmulticast.h
@@ -37,7 +37,11 @@ set(ck-h-sources XArraySectionReducer.h charm++.h charm++_type_traits.h
     ckstream.h cksyncbarrier.h debug-charm.h envelope-path.h envelope.h init.h
     middle-conv.h middle.h mpi-interoperate.h objid.h qd.h
     readonly.h register.h sdag.h stats.h waitqd.h ../ck-ldb/CentralLB.h
-    ../ck-cp/arrayRedistributor.h ../ck-cp/controlPoints.h ../ck-cp/controlPointsf.h ../ck-cp/pathHistory.h ../ck-cp/API-generator/cp_effects.h)
+    ../ck-cp/arrayRedistributor.h ../ck-cp/controlPoints.h ../ck-cp/pathHistory.h ../ck-cp/API-generator/cp_effects.h)
+
+if(CMK_CAN_LINK_FORTRAN)
+    set(ck-h-sources ${ck-h-sources} charmf.h ../ck-cp/controlPointsf.h)
+endif()
 
 set(ldb-cxx-sources
     ../ck-ldb/CommonLBs.C  ../ck-ldb/DistributedLB.C

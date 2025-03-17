@@ -1,3 +1,5 @@
+// Author: Juan Galvez <jjgalvez@illinois.edu>
+
 #include "TreeBuilder.h"  // TODO this can be deleted if we change it so that LBManager instantiates the builders
 #include "TreeLB.h"
 #include "TreeStrategyFactory.h"
@@ -29,7 +31,7 @@ void TreeLB::loadConfigFile(const CkLBOptions& opts)
 {
   config.clear();
   std::ifstream ifs(_lb_args.treeLBFile(), std::ifstream::in);
-  if (opts.getLegacyName() != nullptr)
+  if (opts.hasLegacyName())
   {
     // support legacy mode, e.g. map "+GreedyLB" to PE_Root tree using Greedy
     // use 2-level tree

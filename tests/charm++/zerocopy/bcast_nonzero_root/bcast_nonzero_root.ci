@@ -6,6 +6,7 @@ mainmodule bcast_nonzero_root
   readonly CProxy_nodegrp ngProxy;
   readonly CProxy_tester testerProxy;
   readonly CProxy_main mProxy;
+  readonly int arrSize;
 
   mainchare main
   {

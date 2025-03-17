@@ -1,0 +1,84 @@
+mainmodule iotest
+{
+  include "ckio.h";
+
+  mainchare Main
+  {
+    entry Main(CkArgMsg * m);
+    entry void ready(Ck::IO::FileReadyMsg * m);
+
+    entry void run(){
+
+        serial{Ck::IO::Options opts;
+
+    opts.numReaders = numBufChares;
+
+    CkCallback opened(CkIndex_Main::ready(NULL), thisProxy);
+
+    std::string roundfile = filename;
+    char name[50];
+    // convert filename to char array name
+    strcpy(name, roundfile.c_str());
+
+    CkPrintf("Starting timer and opening file: %s\n", name);
+
+    start_time = CkWallTimer();
+    Ck::IO::open(name, opened, opts);
+  }
+  when ready(Ck::IO::FileReadyMsg * m) serial
+  {
+    f = m->file;
+
+    CkCallback sessionStart(CkIndex_Main::start_read(0), thisProxy);
+    Ck::IO::startReadSession(f, fileSize, 0, sessionStart);
+
+    delete m;
+  }
+  when start_read(Ck::IO::SessionReadyMsg * m) serial
+  {
+    size_t sizeToRead = fileSize / n;  // only works if fileSize is a multiple of n
+    session = m->session;
+    testers = CProxy_Test::ckNew(m->session, sizeToRead, filename, n);
+    delete m;
+  }
+
+  when test_read(CkReductionMsg * m) serial
+  {
+    double totalTime = CkWallTimer() - start_time;
+    CkPrintf("Total time = %fms\n", totalTime);
+
+    CkCallback cb(CkIndex_Main::sessionClosed(0), thisProxy);
+    Ck::IO::closeReadSession(session, cb);
+
+    delete m;
+  }
+
+  when sessionClosed(CkReductionMsg * m) serial
+  {
+    CkCallback closedCb(CkIndex_Main::closed(0), thisProxy);
+
+    Ck::IO::close(f, closedCb);
+    testers.ckDestroy();
+    delete m;
+  }
+  when closed(CkReductionMsg * m) serial
+  {
+    delete m;
+    CkExit();
+  }
+};
+
+entry void start_read(Ck::IO::SessionReadyMsg* m);
+entry void test_read(CkReductionMsg* m);
+entry void closed(CkReductionMsg* m);
+entry void sessionClosed(CkReductionMsg* m);
+entry void iterDone();
+}
+;
+
+array[1D] Test
+{
+  entry Test(Ck::IO::Session token, size_t bytesToRead, std::string filename);
+  entry void readDone(Ck::IO::ReadCompleteMsg * m);
+}
+}

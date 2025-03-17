@@ -169,11 +169,7 @@ CpvDeclare(void*, CmiLocalQueue);
 
 enum MACHINE_SMP_MODE {
     INVALID_MODE,
-#if CMK_BLUEGENEQ
     COMM_THREAD_SEND_RECV = 0,
-#else 
-    COMM_THREAD_SEND_RECV = 0,
-#endif
     COMM_THREAD_ONLY_RECV, /* work threads will do the send */
     COMM_WORK_THREADS_SEND_RECV, /* work and comm threads do the both send/recv */
     COMM_THREAD_NOT_EXIST /* work threads will do both send and recv */
@@ -645,7 +641,6 @@ INLINE_KEYWORD CmiCommHandle CmiSendNetworkFunc(int destPE, int size, char *msg,
 //the generic function that replaces the older one
 CmiCommHandle CmiInterSendNetworkFunc(int destPE, int partition, int size, char *msg, int mode)
 {
-        int rank;
         int destLocalNode = CmiNodeOf(destPE); 
         int destNode = CmiGetNodeGlobal(destLocalNode,partition); 
 
@@ -719,9 +714,9 @@ void CmiInterFreeSendFn(int destPE, int partition, int size, char *msg) {
 #endif
     } 
     else {
-        int destNode = CmiNodeOf(destPE);
         int destRank = CmiRankOf(destPE);
 #if CMK_SMP
+        int destNode = CmiNodeOf(destPE);
         if (CmiMyNode()==destNode && partition == CmiMyPartition()) {
             CmiPushPE(destRank, msg);
 #if CMK_PERSISTENT_COMM
@@ -954,7 +949,7 @@ void CmiSetCustomPartitioning(void) {
 static void create_partition_map( char **argv)
 {
   char* token, *tptr;
-  int i, flag;
+  int i;
   
   _partitionInfo.numPartitions = 1; 
   _partitionInfo.type = PARTITION_DEFAULT;
@@ -1209,8 +1204,6 @@ void check_and_set_queue_parameters()
 
 /* ##### Beginning of Functions Related with Machine Startup ##### */
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret) {
-    int _ii;
-    int tmp;
     //handle output to files for partition if requested
     char *stdoutbase,*stdoutpath;
 
@@ -1350,7 +1343,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 #if CMK_WITH_STATS
 if (  MSG_STATISTIC)
 {
-    for(_ii=0; _ii<22; _ii++)
+    for(int _ii=0; _ii<22; _ii++)
         msg_histogram[_ii] = 0;
 }
 #endif
@@ -1369,7 +1362,7 @@ if (  MSG_STATISTIC)
 
 #if MACHINE_DEBUG_LOG
     char ln[200];
-    sprintf(ln,"debugLog.%d", _Cmi_mynode);
+    snprintf(ln,sizeof(ln),"debugLog.%d", _Cmi_mynode);
     debugLog=fopen(ln,"w");
     if (debugLog == NULL)
     {
@@ -1420,10 +1413,11 @@ if (  MSG_STATISTIC)
     Cmi_usrsched = usched;
 
     if ( CmiGetArgStringDesc(argv,"+stdout",&stdoutbase,"base filename to redirect partition stdout to") ) {
-      stdoutpath = (char *)malloc(strlen(stdoutbase) + 30);
-      sprintf(stdoutpath, stdoutbase, CmiMyPartition(), CmiMyPartition(), CmiMyPartition());
+      int len = strlen(stdoutbase) + 30;
+      stdoutpath = (char *)malloc(len);
+      snprintf(stdoutpath, len, stdoutbase, CmiMyPartition(), CmiMyPartition(), CmiMyPartition());
       if ( ! strcmp(stdoutpath, stdoutbase) ) {
-        sprintf(stdoutpath, "%s.%d", stdoutbase, CmiMyPartition());
+        snprintf(stdoutpath, len, "%s.%d", stdoutbase, CmiMyPartition());
       }
       if ( CmiMyPartition() == 0 && CmiMyNode() == 0 && !quietMode) {
         printf("Redirecting stdout to files %s through %d\n",stdoutpath,CmiNumPartitions()-1);
@@ -1500,7 +1494,7 @@ if (  MSG_STATISTIC)
     /* CmiTimerInit(); */
 #if CMK_BROADCAST_HYPERCUBE
     /* CmiNodesDim = ceil(log2(CmiNumNodes)) except when #nodes is 1*/
-    tmp = CmiNumNodes()-1;
+    int tmp = CmiNumNodes()-1;
     CmiNodesDim = 0;
     while (tmp>0) {
         CmiNodesDim++;
@@ -1584,12 +1578,12 @@ static void ConverseRunPE(int everReturn) {
 #if CMK_SMP
     {
       CmiIdleState *sidle=CmiNotifyGetState();
-      CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)CmiNotifyBeginIdle,(void *)sidle);
-      CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyStillIdle,(void *)sidle);
+      CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdCondFn)CmiNotifyBeginIdle,(void *)sidle);
+      CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdCondFn)CmiNotifyStillIdle,(void *)sidle);
     }
 #else
-    CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)CmiNotifyBeginIdle, NULL);
-    CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyStillIdle, NULL);
+    CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdCondFn)CmiNotifyBeginIdle, NULL);
+    CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdCondFn)CmiNotifyStillIdle, NULL);
 #endif
 
 
@@ -1622,7 +1616,6 @@ static void ConverseRunPE(int everReturn) {
 
 /* ##### Beginning of Functions Related with Machine Running ##### */
 static INLINE_KEYWORD void AdvanceCommunication(int whenidle) {
-    int doProcessBcast = 1;
 
 #if CMK_USE_PXSHM
     CommunicationServerPxshm();
@@ -1631,9 +1624,17 @@ static INLINE_KEYWORD void AdvanceCommunication(int whenidle) {
     CommunicationServerXpmem();
 #endif
 
+#if CMK_USE_SHMEM
+    CmiIpcBlock* block;
+    if ((block = CmiPopIpcBlock(CsvAccess(coreIpcManager_)))) {
+      CmiDeliverIpcBlockMsg(block);
+    }
+#endif
+
     LrtsAdvanceCommunication(whenidle);
 
 #if CMK_OFFLOAD_BCAST_PROCESS
+    int doProcessBcast = 1;
 #if CMK_SMP_NO_COMMTHD
     /*FIXME: only asks rank 0 to process bcast msgs, so perf may suffer*/
     if (CmiMyRank()) doProcessBcast = 0;
@@ -1684,7 +1685,6 @@ void CommunicationServerThread(int sleepTime) {
 }
 
 void ConverseExit(int exitcode) {
-    int i;
     if (quietModeRequested) quietMode = 1;
 #if !CMK_SMP || CMK_SMP_NO_COMMTHD
     LrtsDrainResources();
@@ -1699,7 +1699,7 @@ void ConverseExit(int exitcode) {
 #if CMK_WITH_STATS
 if (MSG_STATISTIC)
 {
-    for(i=0; i<22; i++)
+    for(int i=0; i<22; i++)
     {
         CmiPrintf("[MSG PE:%d]", CmiMyPe());
         if(msg_histogram[i] >0)
@@ -1714,7 +1714,7 @@ if (MSG_STATISTIC)
       CmiPrintf("[Partition %d][Node %d] End of program\n",CmiMyPartition(),CmiMyNode());
 #endif
 
-#if !CMK_SMP || CMK_BLUEGENEQ || CMK_PAMI_LINUX_PPC8
+#if !CMK_SMP || CMK_PAMI_LINUX_PPC8
 #if CMK_USE_PXSHM
     CmiExitPxshm();
 #endif

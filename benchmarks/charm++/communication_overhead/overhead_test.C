@@ -14,10 +14,10 @@ int nCycles = 100; // Number of iterations for each message size
 
 CProxy_TestDriver testDriverProxy;
 
-void idleStartHandler(void *timingGroupObj, double start);
-void idleEndHandler(void *timingGroupObj, double cur);
-void idleStartHandlerArray(void *timingGroupObj, double start);
-void idleEndHandlerArray(void *timingGroupObj, double cur);
+void idleStartHandler(void *timingGroupObj);
+void idleEndHandler(void *timingGroupObj);
+void idleStartHandlerArray(void *timingGroupObj);
+void idleEndHandlerArray(void *timingGroupObj);
 
 class SimpleMessage: public CMessage_SimpleMessage {
 public:
@@ -357,28 +357,28 @@ public:
 
 };
 
-void idleStartHandler(void *timingGroupObj, double start) {
+void idleStartHandler(void *timingGroupObj) {
   CommunicationGroup *localInstance = (CommunicationGroup *) timingGroupObj;
-  localInstance->startIdleTime = start;
+  localInstance->startIdleTime = CkWallTimer();
 }
 
-void idleEndHandler(void *timingGroupObj, double cur) {
+void idleEndHandler(void *timingGroupObj) {
   CommunicationGroup *localInstance = (CommunicationGroup *) timingGroupObj;
   if(localInstance->startIdleTime > 0) {
-    localInstance->iterationIdleTime += cur - localInstance->startIdleTime;
+    localInstance->iterationIdleTime += CkWallTimer() - localInstance->startIdleTime;
     localInstance->startIdleTime = -1;
   }
 }
 
-void idleStartHandlerArray(void *timingGroupObj, double start) {
+void idleStartHandlerArray(void *timingGroupObj) {
   CommunicationArray *localInstance = (CommunicationArray *) timingGroupObj;
-  localInstance->startIdleTime = start;
+  localInstance->startIdleTime = CkWallTimer();
 }
 
-void idleEndHandlerArray(void *timingGroupObj, double cur) {
+void idleEndHandlerArray(void *timingGroupObj) {
   CommunicationArray *localInstance = (CommunicationArray *) timingGroupObj;
   if(localInstance->startIdleTime > 0) {
-    localInstance->iterationIdleTime += cur - localInstance->startIdleTime;
+    localInstance->iterationIdleTime += CkWallTimer() - localInstance->startIdleTime;
     localInstance->startIdleTime = -1;
   }
 }

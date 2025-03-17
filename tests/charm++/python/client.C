@@ -1,6 +1,5 @@
 #include <stdlib.h>
 #include "ccs-client.h"
-#include "ccs-client.c"
 #include "PythonCCS-client.h"
 #include <string.h>
 #include <string>
@@ -60,12 +59,15 @@ int main (int argc, char** argv) {
 
   if (useGroups > 0) {
     MyIterator *myIter = new MyIterator(htonl(4));
-    printf("size: %d (%d)\n",myIter->size(),sizeof(*myIter));
-    wrapper = new PythonExecute((char*)code.c_str(), "metodo", myIter);
-    pythonString = "CpdPythonGroup";
+    printf("size: %d (%zu)\n",myIter->size(),sizeof(*myIter));
+    static char s_metodo[] = "metodo";
+    wrapper = new PythonExecute(const_cast<char*>(code.c_str()), s_metodo, myIter);
+    static char s_CpdPythonGroup[] = "CpdPythonGroup";
+    pythonString = s_CpdPythonGroup;
   } else {
-    wrapper = new PythonExecute((char*)code.c_str());
-    pythonString = "pyCode";
+    wrapper = new PythonExecute(const_cast<char*>(code.c_str()));
+    static char s_pyCode[] = "pyCode";
+    pythonString = s_pyCode;
   }
 
   wrapper->setHighLevel(true);

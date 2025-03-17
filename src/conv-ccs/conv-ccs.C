@@ -228,7 +228,6 @@ CCS handler.
 */
 void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData)
 {
-  char *cmsg;
   int reqLen=ChMessageInt(hdr->len);
 /*Look up handler's converse ID*/
   char *handlerStr=hdr->handler;
@@ -519,7 +518,7 @@ void CcsInit(char **argv)
 
   CmiAssignOnce(&rep_fw_handler_idx, CmiRegisterHandler((CmiHandler)rep_fw_handler));
 #if NODE_0_IS_CONVHOST
-#if ! CMK_CMIPRINTF_IS_A_BUILTIN
+#if !CMK_USE_LRTS_STDIO
   CmiAssignOnce(&print_fw_handler_idx, CmiRegisterHandler((CmiHandler)print_fw_handler));
 #endif
   {
@@ -532,7 +531,7 @@ void CcsInit(char **argv)
      if (CmiMyPe()==0)
     {/*Create and occasionally poll on a CCS server port*/
       CcsServer_new(NULL,&ccs_serverPort,ccs_serverAuth);
-      CcdCallOnConditionKeep(CcdPERIODIC,(CcdVoidFn)CcsServerCheck,NULL);
+      CcdCallOnConditionKeep(CcdPERIODIC,(CcdCondFn)CcsServerCheck,NULL);
     }
   }
 #endif

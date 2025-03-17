@@ -1,11 +1,12 @@
 # Charm++
 
-[![Build Status](https://travis-ci.org/UIUC-PPL/charm.svg?branch=main)](https://travis-ci.org/UIUC-PPL/charm)
+[![Build Status](https://travis-ci.org/charmplusplus/charm.svg?branch=main)](https://travis-ci.org/charmplusplus/charm)
 [![Documentation Status](https://readthedocs.org/projects/charm/badge/?version=latest)](https://charm.readthedocs.io/en/latest/?badge=latest)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3370873.svg)](https://doi.org/10.5281/zenodo.3370873)
-[![CDash](https://img.shields.io/badge/CDash-dashboard-blue)](https://my.cdash.org/index.php?project=Charm%2B%2B)
+
 
 ## Introduction
+
 Charm++ is a message-passing parallel language and runtime system.
 It is implemented as a set of libraries for C++, is efficient,
 and is portable to a wide variety of parallel machines.
@@ -13,14 +14,17 @@ Source code is provided, and non-commercial use is free.
 
 
 ## Getting the Latest Source
+
 You can use anonymous Git access to obtain the latest Charm++ source
 code, as follows:
 
-     $ git clone https://github.com/UIUC-PPL/charm
+     $ git clone https://github.com/charmplusplus/charm
 
 
 ## Build Configuration
+
 ### Quick Start:
+
 First-time users are encouraged to run the top-level `build` script and follow its lead:
     
     $ ./build
@@ -36,6 +40,7 @@ script takes several command line options to compile Charm++. The command line s
 For detailed help messages, pass `-h` or `--help` to the build script.
 
 ### Required:
+
 `<target>` specifies the parts of Charm++ to compile.  The most often used
 `<target>` is `charm++`, which will compile the key Charm++ executables and
 runtime libraries.  Other common targets are `AMPI` and `LIBS`, which build
@@ -44,6 +49,7 @@ Adaptive MPI and Charm++ and all of its libraries, respectively.
   "How to choose a `<version>`" below for details.
 
 ### Optional:
+
 `<options>` defines more detailed information of the compilations, including
 compilers, features to support, etc.  See "How to choose `<options>`"
 below.
@@ -94,7 +100,6 @@ of the `<options>` below.
 | `mpi-linux-x86_64`        | Linux   | MPI           | GNU compiler                          |
 | `multicore-linux-x86_64`  | Linux   | Shared memory | GNU compiler                          |
 | `multicore-darwin-x86_64` | macOS   | Shared memory | Clang C++ compiler                    |
-| `pamilrts-bluegeneq`      | CNK     | PAMI          | BGClang C++ compiler                  |
 | `gni-crayxc`              | Linux   | GNI           | CC (whatever PrgEnv module is loaded) |
 | `gni-crayxe`              | Linux   | GNI           | CC (whatever PrgEnv module is loaded) |
 | `verbs-linux-x86_64`      | Linux   | IB Verbs      | GNU compiler                          |
@@ -120,7 +125,6 @@ To choose `<version>`, your choice is determined by two options:
     * `linux-x86_64`: Linux with AMD64 64-bit x86 instructions
     * `win-x86_64`: MS Windows with MS Visual C++ compiler
     * `darwin-x86_64`: Apple macOS
-    * `bluegeneq`:IBM Blue Gene/Q
     * `cray{xe/xc}`: Cray XE/XC Supercomputer
     * `linux-ppc64le`: POWER/PowerPC
 
@@ -130,6 +134,7 @@ Your Charm++ version is made by concatenating the options, e.g.:
 
 
 ### How to choose `<options>`:
+
 `<version>` above defines the most important OS, CPU, and communication of
 your machine.
 
@@ -154,13 +159,13 @@ for more information:
 * `tcp` - The `netlrts-` version communicates via UDP by default. The `tcp` option
     will use TCP instead. The TCP version of Charm++ is usually slower
     than UDP, but it is more reliable.
-* `async` - For Blue Gene/Q, this option enables use of hardware communication 
+* `async` - On PAMI systems, this option enables use of hardware communication
     threads. For applications with significant communication on large
     scale, this option typically improves performance.
 * `regularpages` - On Cray systems, Charm++'s default is to use `hugepages`. This
     option disables `hugepages`, and uses regular `malloc` for messages.
 * `persistent` - On Cray systems, this option enables use of persistent mode for
-    communication.
+* `cxi` - On HPE Slingshot-11 systems, this option enables use of Cassini extensions for communication.  Usually autodetected and enabled where available.
 * `pxshm` - Use POSIX Shared Memory for communication between Charm++ processes
     within a shared-memory host.
 * `syncft` - Enable in-memory fault tolerance support in Charm++.
@@ -173,11 +178,12 @@ for more information:
          
      will give:
     
-      Supported compilers: clang craycc gcc icc iccstatic msvc pgcc xlc xlc64
+      Supported compilers: clang craycc gcc icc iccstatic msvc pgcc xlc xlc64 icx
       Supported options: common cuda flang gfortran ifort local nolb omp ooc papi perftools persistent pgf90 pxshm smp syncft sysvshm tcp tsan
 
 
 ## Building the Source
+
 If you have downloaded a binary version of Charm++, you can skip
 this step -- Charm++ should already be compiled.
 
@@ -191,7 +197,6 @@ and run
 * `charm++`  The basic Charm++ language
 * `AMPI`     An implementation of MPI on top of Charm++
 * `LIBS`    Charm++, AMPI, and other libraries built on top of them
-* `Tau`      TAU's performance profiling/tracing
 
 `<version>` is described above in the "How to choose a `<version>`" section.
 
@@ -253,6 +258,7 @@ netlrts-linux-x86_64/
 ```
 
 ## Building a Program
+
 To make a sample program, `cd` into `examples/charm++/NQueen/`.
 This program solves the _n_ queens problem-- find how many ways there
 are to arrange _n_ queens on an _n_ x _n_ chess board such that none may
@@ -263,6 +269,7 @@ executable named `nqueen`.
 
 
 ## Running a Program
+
 Following the previous example, to run the program on two processors, type
 
      $ ./charmrun +p2 ./nqueen 12 6
@@ -306,6 +313,7 @@ However, for best performance, you should launch one node program per processor.
 
 
 ## Building Dynamic Libraries
+
 In order to compile Charm++ into dynamic libraries, one needs to specify the
 `--build-shared` option to the Charm `./build` script. Charm++'s dynamic
 libraries are compiled into the `lib_so/` directory. Typically, they are
@@ -322,6 +330,22 @@ Note that linking against Charm++ dynamic libraries produces much smaller
 binaries and takes much less linking time.
 
 
+## Contributing
+
+The recommended way to contribute to Charm++ development is to open a pull request (PR) on GitHub.
+To open a pull request, create a fork of the Charm++ repo in your own space
+(if you already have a fork, make sure is it up-to-date), and then create a new branch off of the
+`main` branch.
+
+GitHub provides a detailed tutorial on creating pull requests 
+(https://docs.github.com/en/pull-requests/collaborating-with-pull-requests). 
+
+Each pull request must pass code review and CI tests before it can be merged by someone on
+the core development team.
+Our wiki contains additional information about pull requests
+(https://github.com/charmplusplus/charm/wiki/Working-with-Pull-Requests).
+
+
 ## For More Information
 
 The Charm++ documentation is at https://charm.readthedocs.io/
@@ -333,31 +357,34 @@ The UIUC Parallel Programming Laboratory web page, with information
 on past and present research, is at https://charm.cs.illinois.edu
 
 For questions, comments, suggestions, improvements, or bug reports,
-please create an issue or discussion on our GitHub, https://github.com/UIUC-PPL/charm
+please create an issue or discussion on our GitHub, https://github.com/charmplusplus/charm
 
 
 ## Authors
+
 Charm++ was created and is maintained by the Parallel Programming Lab,
 in the Computer Science department at the University of Illinois at
 Urbana-Champaign.  Our managing professor is Dr. L.V. Kale; students
-and staff have included (in rough time order) Wennie Shu, Kevin Nomura, Wayne
-Fenton, Balkrishna Ramkumar, Vikram Saletore, Amitabh B. Sinha, Manish
-Gupta, Attila Gursoy, Nimish Shah, Sanjeev Krishnan, Jayant DeSouza,
-Parthasarathy Ramachandran, Jeff Wright, Michael Lang, Jackie Wang,
-Fang Hu, Michael Denardo, Joshua Yelon, Narain Jagathesan, Zehra Sura,
-Krishnan Varadarajan, Sameer Paranjpye, Milind Bhandarkar, Robert Brunner,
-Terry Wilmarth, Gengbin Zheng, Orion Lawlor, Celso Mendes, Karthik Mahesh,
-Neelam Saboo, Greg Koenig, Sameer Kumar, Sayantan Chakravorty, Chao Huang,
-Chee Lee, Fillipo Gioachin, Isaac Dooley, Abhinav Bhatele, Aaron Becker,
-Ryan Mokos, Ramprasad Venkataraman, Gagan Gupta, Pritish Jetley, Lukasz
+and staff have included (in rough time order) Wennie Shu, Kevin
+Nomura, Wayne Fenton, Balkrishna Ramkumar, Vikram Saletore, Amitabh
+B. Sinha, Manish Gupta, Attila Gursoy, Nimish Shah, Sanjeev Krishnan,
+Jayant DeSouza, Parthasarathy Ramachandran, Jeff Wright, Michael Lang,
+Jackie Wang, Fang Hu, Michael Denardo, Joshua Yelon, Narain
+Jagathesan, Zehra Sura, Krishnan Varadarajan, Sameer Paranjpye, Milind
+Bhandarkar, Robert Brunner, Terry Wilmarth, Gengbin Zheng, Orion
+Lawlor, Celso Mendes, Karthik Mahesh, Neelam Saboo, Greg Koenig,
+Sameer Kumar, Sayantan Chakravorty, Chao Huang, Chee Lee, Fillipo
+Gioachin, Isaac Dooley, Abhinav Bhatele, Aaron Becker, Ryan Mokos,
+Ramprasad Venkataraman, Gagan Gupta, Pritish Jetley, Lukasz
 Wesolowski, Esteban Meneses, Chao Mei, David Kunzman, Osman Sarood,
 Abhishek Gupta, Yanhua Sun, Ehsan Totoni, Akhil Langer, Cyril Bordage,
 Harshit Dokania, Prateek Jindal, Jonathan Lifflander, Xiang Ni,
 Harshitha Menon, Nikhil Jain, Vipul Harsh, Bilge Acun, Phil Miller,
-Seonmyeong Bak, Karthik Senthil, Juan Galvez, Michael Robson, Raghavendra
-Kanakagiri, and Venkatasubrahmanian Narayanan. Current developers include
-Eric Bohm, Ronak Buch, Eric Mikida, Sam White, Nitin Bhat, Kavitha
-Chandrasekar, Jaemin Choi, Matthias Diener, Evan Ramos, Justin Szaday,
-Zane Fink, and Pathikrit Ghosh.
+Seonmyeong Bak, Karthik Senthil, Juan Galvez, Michael Robson,
+Raghavendra Kanakagiri, Venkatasubrahmanian Narayanan. Nitin Bhat, and
+Justin Szaday. Current developers include: Eric Bohm, Ronak Buch, Eric
+Mikida, Sam White, Kavitha Chandrasekar, Jaemin Choi, Matthias Diener,
+Evan Ramos, Zane Fink, Pathikrit Ghosh, Maya Taylor, Aditya Bhosale,
+Mathew Jacob, Tom Vander Aa, Thomas Quinn, and Ritvik Rao.
 
-Copyright (C) 1989-2020 Regents of the University of Illinois
+Copyright (C) 1989-2024 University of Illinois Board of Trustees

@@ -9,25 +9,25 @@ module CkArray {
   group [migratable] CkArray : CkReductionMgr {
     entry CkArray(CkArrayOptions opts, CkMarshalledMessage ctorMsg);
 
-    // Insertion
-    entry [inline] void insertElement(CkMarshalledMessage, CkArrayIndex,
-        int listenerData[CK_ARRAYLISTENER_MAXLEN]);
+    //Insertion
+    entry [inline] void insertElement(CkMarshalledMessage, CkArrayIndex, int listenerData[CK_ARRAYLISTENER_MAXLEN]);
     entry [inline] void demandCreateElement(const CkArrayIndex &idx, int ctor);
+    entry [expedited] void requestDemandCreation(const CkArrayIndex& idx, int ctor, int pe);
     entry void remoteBeginInserting(void);
     entry void sendZCBroadcast(MsgPointerWrapper p);
     entry void remoteDoneInserting(void);
 
     //Broadcast
-    entry void sendBroadcast(CkMessage *);
+    entry [inline] void sendBroadcast(CkMessage *);
     entry void recvBroadcast(CkMessage *);
     entry void recvBroadcastViaTree(CkMessage *);
-    entry [expedited] void sendExpeditedBroadcast(CkMessage *);
+    entry [inline, expedited] void sendExpeditedBroadcast(CkMessage *);
     entry [expedited] void recvExpeditedBroadcast(CkMessage *);
     entry [expedited] void incrementBcastNoAndSendBack(int srcPe, MsgPointerWrapper p);
     entry [nokeep] void recvNoKeepBroadcast(CkMessage *);
-    entry void sendNoKeepBroadcast(CkMessage *);
+    entry [inline] void sendNoKeepBroadcast(CkMessage *);
     entry [expedited,nokeep] void recvNoKeepExpeditedBroadcast(CkMessage *);
-    entry [expedited] void sendNoKeepExpeditedBroadcast(CkMessage *);
+    entry [inline, expedited] void sendNoKeepExpeditedBroadcast(CkMessage *);
 
     entry void ckDestroy();
   };

@@ -82,7 +82,7 @@ void ForallConstruct::propagateState(std::list<EncapState*> encap,
 
   {
     char txt[128];
-    sprintf(txt, "_cf%d", nodeNum);
+    snprintf(txt, sizeof(txt), "_cf%d", nodeNum);
     counter = new XStr(txt);
     sv = new CStateVar(0, "SDAG::CCounter *", 0, txt, 0, NULL, 1);
     sv->isCounter = true;

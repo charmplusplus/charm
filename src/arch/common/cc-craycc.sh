@@ -6,6 +6,6 @@
 #      Further tinkering should be done only as necessary and tested thoroughly.  
 
 #verify that cc is actually the cray compiler, otherwise bail
-CRAYCC_test=`cc -V 2>&1 >/dev/null | grep 'Version' | awk -F' ' '{print $1; exit}'`
+CRAYCC_test=`cc -v 2>&1 >/dev/null | grep -i 'version' | awk -F' ' '{print $1; exit}'`
 test -z "$CRAYCC_test" && echo "cc is not CrayCC, check your modules!" && exit 1
 test "$CRAYCC_test" != "Cray"  && echo "cc is not CrayCC, check your modules!" && exit 1

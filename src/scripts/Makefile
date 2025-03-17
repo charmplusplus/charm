@@ -42,6 +42,8 @@ else
   HWLOC_SHARED := no
 endif
 
+HWLOC_MAKEFILE=hwloc/Makefile
+
 all: charm++ LIBS AMPI TSM SM PVM everylb
 
 
@@ -60,8 +62,6 @@ PVM: converse $(L)/libpvmc.a
 AMR: charm++ LIBS
 	$(MAKE) -C libs/ck-libs/amr all
 
-FEM: ParFUM
-
 ParFUM: charm++ AMPI
 	$(MAKE) -C libs/ck-libs/ ParFUM
 
@@ -71,7 +71,10 @@ MBLOCKC: charm++ LIBS
 
 MBLOCKF: MBLOCKC
 
-AMPI:  charm++
+romio-target: conv-autoconfig.h
+	$(MAKE) -C libs/ck-libs/ampi/ romio-target
+
+AMPI: charm++ | romio-target
 	$(MAKE) -C libs/ck-libs/ ampi
 
 AMPIC AMPIF: AMPI
@@ -79,7 +82,7 @@ AMPIC AMPIF: AMPI
 f90charm: charm++
 
 libcharm: charm++
-	cd $(L) ; $(CHARMC) -standalone -whole-archive -c++stl -shared -o libcharm.so $(LIBCHARM_LIBS)
+	cd $(L) ; $(CHARMC) -standalone -whole-archive -c++stl -shared -o libcharm.$(CMK_SHARED_SUF) $(LIBCHARM_LIBS)
 
 charm4py: libcharm
 
@@ -123,15 +126,6 @@ translators: charmxi conv-cpm
 msa: charm++
 	$(MAKE) -C libs/ck-libs/multiphaseSharedArrays
 
-
-#include TAU defs
-TAU_MAKEFILE=Make.tau
-include	$(TAU_MAKEFILE) #stub-makefile
-
-#builds TAU's trace library
-Tau: 
-	@echo "Building Charm trace library with support for TAU."
-	$(MAKE) $(L)/libtrace-Tau.a $(L)/libtrace-all.a TAU_TRACE_OBJ=libtrace-Tau.o
 
 LIBS: CONVLIBS CHARMLIBS everylb
 	@echo "Built LIBS successfully"
@@ -177,17 +171,21 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
       memory-isomalloc.h debug-conv.h debug-conv++.h conv-autoconfig.h \
       conv-common.h conv-config.sh conv-config.h conv-mach.h conv-mach.sh conv-mach-common.h \
       cmipool.h mempool.h cmiqueue.h \
-      TopoManager.h BGQTorus.h XTTorus.h topomanager_config.h \
+      TopoManager.h XTTorus.h topomanager_config.h \
       cmitls.h lrtslock.h conv-rdma.h conv-rdmadevice.h lrts-common.h conv-header.h
 
 # The .c files are there to be #included by clients whole
 # This is a bit unusual, but makes client linking simpler.
-UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwork4.h pup_paged.h pup_cmialloc.h\
+UTILHEADERS=pup.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwork4.h pup_paged.h pup_cmialloc.h \
 	pup_c_functions.h \
 	ckimage.h ckdll.h ckhashtable.h ckbitvector.h cklists.h ckliststring.h \
 	cksequence.h ckstatistics.h ckvector3d.h conv-lists.h ckcomplex.h \
-	sockRoutines.h sockRoutines.C cmimemcpy.h simd.h SSE-Double.h SSE-Float.h \
+	sockRoutines.h sockRoutines.C simd.h SSE-Double.h SSE-Float.h \
 	crc32.h ckBIconfig.h rand48_replacement.h ckregex.h spanningTree.h json.hpp json_fwd.hpp cmirdmautils.h
+
+ifeq (1,$(CMK_CAN_LINK_FORTRAN))
+  UTILHEADERS += pupf.h
+endif
 
 CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckmarshall.h ckfutures.h ckIgetControl.h debug-charm.h\
@@ -214,18 +212,22 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  DistBaseLB.decl.h \
           HybridBaseLB.decl.h EveryLB.decl.h CommonLBs.decl.h \
           TraceSummary.decl.h TraceAutoPerf.decl.h TraceProjections.decl.h \
-          TraceSimple.decl.h TraceControlPoints.decl.h TraceTau.decl.h \
+          TraceSimple.decl.h TraceControlPoints.decl.h \
 	  TraceUtilization.decl.h \
 	  ControlPoints.decl.h PathHistory.decl.h \
 	  pathHistory.h envelope-path.h \
 	  XArraySectionReducer.h \
-          controlPoints.h controlPointsf.h arrayRedistributor.h cp_effects.h register.h stats.h   \
+          controlPoints.h arrayRedistributor.h cp_effects.h register.h stats.h   \
 	  cksequence_internal.h cksequence_factory.h random_sequence.h strided_sequence.h \
 	  mpi-interoperate.h mpi_main.decl.h  \
 			trace-perf.h picsdefs.h  picsautoperf.h picstreenode.h \
 			picsdecisiontree.h \
 	    picsautoperfAPI.h picsautoperfAPIC.h \
 	  $(CVHEADERS)
+
+ifeq (1,$(CMK_CAN_LINK_FORTRAN))
+  CKHEADERS += controlPointsf.h
+endif
 
 ALLHEADERS=$(CKHEADERS) \
     simplemsg.h sm.h pvmc.h pvm3.h sdag.h vector2d.h \
@@ -309,10 +311,8 @@ endif
 	test -f $(SRCBASE)/arch/$(CMK_GDIR)/gdir_link && cat $(SRCBASE)/arch/$(CMK_GDIR)/gdir_link > .gdir.new && ./gathertree $(SRCBASE)/arch/`cat .gdir.new`      . || true
 	./gatherflat $(SRCBASE)/arch/$(CMK_VDIR)                 .
 	-./system_ln $(SRCBASE)/util/topomanager/TopoManager.h   .
-	-./system_ln $(SRCBASE)/util/topomanager/BGQTorus.h      .
 	-./system_ln $(SRCBASE)/util/topomanager/XTTorus.h       .
 	-./system_ln $(SRCBASE)/util/topomanager/TopoManager.C   .
-	-./system_ln $(SRCBASE)/util/topomanager/BGQTorus.C      .
 	-./system_ln $(SRCBASE)/util/topomanager/CrayNid.c       .
 	./gathertree $(SRCBASE)/../benchmarks                    ../benchmarks
 	./gathertree $(SRCBASE)/../examples                      ../examples
@@ -339,7 +339,7 @@ endif
 ###############################################################################
 #
 # Converse Libraries
-# 
+#
 ###############################################################################
 CLBLIBS=$(L)/libldb-rand.a $(L)/libldb-spray.a   $(L)/libldb-workstealing.a  $(L)/libldb-neighbor.a $(L)/libldb-none.a $(L)/libldb-test.a
 
@@ -469,7 +469,7 @@ LIBCONV_UTILF=pup_f.o
 
 LIBCONV_PARTITION = custom_partitioner.o set_partition_params.o
 
-LIBTMGR = TopoManager.o CrayNid.o BGQTorus.o
+LIBTMGR = TopoManager.o CrayNid.o
 
 include Makefile.machine
 
@@ -485,21 +485,23 @@ endif
 converse: $(CONVERSE_DEPS)
 
 cpuaffinity.o $(INC)/hwloc.h $(INC)/hwloc/autogen/config.h $(INC)/hwloc/rename.h $(INC)/hwloc/bitmap.h \
-$(INC)/hwloc/helper.h $(INC)/hwloc/inlines.h $(INC)/hwloc/diff.h $(INC)/hwloc/deprecated.h $(INC)/hwloc/export.h $(INC)/hwloc/distances.h : hwloc-target
+$(INC)/hwloc/helper.h $(INC)/hwloc/inlines.h $(INC)/hwloc/diff.h $(INC)/hwloc/deprecated.h $(INC)/hwloc/export.h $(INC)/hwloc/distances.h : $(HWLOC_MAKEFILE)
 
 topomanager_config.h:
 	@echo "// empty" > topomanager_config.h
 
-hwloc-target: conv-autoconfig.h
+$(HWLOC_MAKEFILE): conv-autoconfig.h
 	@( cd hwloc && \
     ./configure \
     --disable-cairo \
     --disable-cuda \
     --disable-gl \
+    --disable-levelzero \
     --disable-libxml2 \
     --disable-nvml \
     --disable-opencl \
     --disable-pci \
+    --disable-rsmi \
     --disable-libudev \
     --disable-visibility \
     --enable-embedded-mode \
@@ -519,9 +521,11 @@ hwloc-target: conv-autoconfig.h
     LDFLAGS= \
     LIBS= \
     > /dev/null || ( cat config.log ; exit 1 ) )
-	( $(MAKE) -C hwloc AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=: )
 	( cp -f hwloc/include/hwloc.h $(INC) )
 	( cp -LRf hwloc/include/hwloc $(INC) )
+
+hwloc-target: $(HWLOC_MAKEFILE)
+	( $(MAKE) -C hwloc AUTOCONF=: AUTOHEADER=: AUTOMAKE=: ACLOCAL=: )
 	touch $@
 
 charmrun-target: charmrun sockRoutines.C sockRoutines.h ccs-server.C ccs-server.h sockRoutines-seq.o $(L)/libck.a $(CVLIBS) conv-static.o
@@ -541,7 +545,7 @@ CONVLIBS: converse
 	$(MAKE) -C libs convlibs
 
 $(L)/libconverse.a: $(LIBCONV_CORE) $(LIBCONV_UTIL) $(LIBCONV_PARTITION) $(LIBCONV_LDB) machine.o $(LIBTMGR) | hwloc-target
-	$(CHARMC) $(TAU_LIBS) -o $@ $^ $(wildcard hwloc/hwloc/*.o) $(wildcard hwloc/hwloc/*.obj)
+	$(CHARMC) -o $@ $^ $(wildcard hwloc/hwloc/*.o) $(wildcard hwloc/hwloc/*.obj)
 
 $(L)/conv-static.o: conv-static.o
 	cp -f $< $@
@@ -589,7 +593,7 @@ $(L)/libldb-spray.a: cldb.spray.C $(CVHEADERS)
 #	$(CHARMC) -o $@ cldb.prioritycentralized.C
 
 #//$(L)/libldb-prioritycentralizedopt.a: cldb.prioritycentralizedopt.c cldb.prioritycentralizedopt.h  $(CVHEADERS)
-#//	$(CHARMC) -o $@ cldb.prioritycentralizedopt.c 
+#//	$(CHARMC) -o $@ cldb.prioritycentralizedopt.c
 
 $(L)/libldb-test.a: cldb.test.C $(CVHEADERS)
 	$(CHARMC) -o $@ cldb.test.C
@@ -705,7 +709,7 @@ charm-target: loadbalancers default_libs $(L)/libmpi-mainmodule.a
 CHARMLIBS: charm++ CONVLIBS
 	$(MAKE) -C libs charmlibs
 
-$(L)/libck.a: $(LIBCK_CORE) 
+$(L)/libck.a: $(LIBCK_CORE)
 	$(CHARMC) -o $@ $(LIBCK_CORE)
 
 ## Fortran
@@ -755,32 +759,6 @@ LIBTRACE_SIMPLE=trace-simple.o
 $(L)/libtrace-simple.a: $(LIBTRACE_SIMPLE)
 	$(CHARMC) -o $@ $(LIBTRACE_SIMPLE)
 
-libtrace-Tau.o: trace-Tau.C charm++.h charm.h converse.h conv-config.h \
-  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h \
-  conv-mach-ifort.h pup_c.h conv-cpm.h conv-cpath.h conv-qd.h \
-  pup_c_functions.h \
-  conv-random.h conv-lists.h conv-trace.h persistent.h debug-conv.h pup.h \
-  middle.h middle-conv.h cklists.h ckbitvector.h ckstream.h init.h \
-  ckhashtable.h debug-charm.h CkMarshall.decl.h cksection.h ckcallback.h \
-  conv-ccs.h sockRoutines.h ccs-server.h ckobjQ.h ckreduction.h \
-  CkReduction.decl.h cksyncbarrier.h CkSyncBarrier.decl.h \
-  ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h ckarray.h cklocrec.h ckmigratable.h \
-  cklocation.h ckmulticast.h LBDatabase.h LBManager.h MetaBalancer.h RandomForestModel.h lbdb.h LBObj.h LBOM.h LBComm.h \
-  LBMachineUtil.h LBManager.decl.h MetaBalancer.decl.h BaseLB.decl.h \
-  CkLocation.decl.h CkMulticast.decl.h CkArray.decl.h objid.h envelope.h envelope-path.h XArraySectionReducer.h CkFutures.decl.h \
-  waitqd.h waitqd.decl.h \
-  sdag.h ckcheckpoint.h CkCheckpoint.decl.h \
-  trace.h trace-simple.h \
-  register.h trace-common.h trace-simpleBOC.h TraceSimple.decl.h \
-  TraceSimple.def.h ckregex.h
-	$(CHARMC) -c -I. $(TAU_INCLUDE) $(TAU_DEFS) trace-Tau.C -o libtrace-Tau.o
-
-tau_selective.o: $(TAUROOT)/utils/tau_selective.cpp 
-	$(CHARMC) -I$(TAUROOT)/utils -DTAU_DYNINST $(TAUROOT)/utils/tau_selective.cpp
-
-$(L)/libtrace-Tau.a: $(TAU_TRACE_OBJ) tau_selective.o
-	$(CHARMC) $(TAU_LIBS) -o $@ $(TAU_TRACE_OBJ) tau_selective.o $(TAU_TRACE_OBJ)
-
 LIBTRACE_COUNT=trace-counter.o
 $(L)/libtrace-counter.a: $(LIBTRACE_COUNT)
 	$(CHARMC) -o $@ $(LIBTRACE_COUNT)
@@ -790,7 +768,7 @@ $(L)/libtrace-memory.a: $(LIBTRACE_MEMORY)
 	$(CHARMC) -o $@ $(LIBTRACE_MEMORY)
 
 LIBTRACE_ALL=trace-all.o trace-projections.o trace-controlPoints.o picstreenode.o picsdecisiontree.o picsautoperfAPI.o picsautoperf.o trace-perf.o trace-summary.o trace-simple.o  \
-$(TAU_TRACE_OBJ) trace-projector.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o trace-memory.o trace-utilization.o
+    trace-projector.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o trace-memory.o trace-utilization.o
 
 $(L)/libtrace-all.a: $(LIBTRACE_ALL)
 	$(CHARMC) -o $@ $(LIBTRACE_ALL)
@@ -815,7 +793,7 @@ $(LIBTRACE_FOR): tracef_f.f90
 TRACE_OBJS =  trace-projections.o trace-controlPoints.o picstreenode.o picsdecisiontree.o trace-perf.o picsautoperfAPI.o picsautoperf.o trace-summary.o  trace-simple.o \
 	      trace-counter.o trace-utilization.o	\
 	      trace-projector.o trace-converse.o trace-all.o \
-          trace-memory.o 
+          trace-memory.o
 
 ###############################################################################
 #

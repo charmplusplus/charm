@@ -75,10 +75,10 @@ function parse_triplet() {
   # Extract extra options from the full_triplet, e.g.,
   # full_triplet='netlrts-darwin-x86_64-smp-omp'
   # becomes actual_triplet='netlrts-darwin-x86_64' and extra_triplet_opts='smp omp'
-  all_triplets=$(cd src/arch && find . -maxdepth 1 -name '*-*' -type d | sed 's,./,,')
+  all_triplets=$(cd "$my_srcdir/src/arch" && find . -maxdepth 1 -name '*-*' -type d | sed 's,./,,')
   extra_triplet_opts="$full_triplet"
   for t in $all_triplets; do
-    extra_triplet_opts=${extra_triplet_opts#$t}
+    extra_triplet_opts=${extra_triplet_opts#"$t"}
     [[ $full_triplet == $t* ]] && actual_triplet=$t
   done
   if [[ -z ${actual_triplet:-} ]]; then
@@ -92,7 +92,8 @@ function parse_triplet() {
 parse_triplet
 
 extra_triplet_opts=${extra_triplet_opts//-/ }
-
+opt_build_ofi=0
+opt_cxi=0
 opt_ampi_error_checking=0
 opt_ampi_mpich_tests=0
 opt_ampi_only=0
@@ -103,7 +104,10 @@ opt_charmdebug=0
 opt_controlpoint=0
 opt_cuda=0
 opt_destination=""
+opt_disabletls=0
+opt_install_prefix=""
 opt_drone_mode=0
+opt_enable_fortran=1
 opt_error_checking= #undef
 opt_extra_opts=()
 opt_incdir=()
@@ -123,6 +127,8 @@ opt_prio_type="bitvec"
 opt_production=0
 opt_pthreads=0
 opt_pxshm=0
+opt_shmem=0
+opt_xpmem=0
 opt_qlogic=0
 opt_randomized_msgq=0
 opt_refnum_type="unsigned short"
@@ -138,13 +144,13 @@ opt_tracing= #undef
 opt_tracing_commthread=0
 opt_zlib=1
 
-# default to building ROMIO on AMPI where supported
+# default to not building ROMIO on AMPI due to GCC 14 cascade failures
 case "$actual_triplet" in
   *-win-*)
     opt_romio=0
     ;;
   *)
-    opt_romio=1
+    opt_romio=0
     ;;
 esac
 
@@ -170,6 +176,9 @@ function parse_platform_compilers() {
     cuda)
       opt_cuda=1
       ;;
+    cxi)
+      opt_cxi=1
+      ;;
     smp)
       opt_smp=1
       ;;
@@ -188,7 +197,7 @@ function parse_platform_compilers() {
     pxshm)
       opt_pxshm=1
       ;;
-    simplepmi|slurmpmi|slurmpmi2|ompipmix|openpmix)
+    simplepmi|slurmpmi|slurmpmi2|ompipmix|openpmix|slurmpmi2cray)
       opt_lrts_pmi="$arg"
       ;;
     persistent)
@@ -223,6 +232,11 @@ function parse_platform_compilers() {
       opt_FC=flang
       opt_compiler+=("$arg")
       ;;
+    icx)
+      opt_CC=icx
+      opt_CXX=icpx
+      opt_compiler+=("$arg")
+      ;;
     icc|iccstatic)
       opt_CC=icc
       opt_CXX=icpc
@@ -232,14 +246,25 @@ function parse_platform_compilers() {
       opt_FC=ifort
       opt_compiler+=("$arg")
       ;;
+    ifx)
+      opt_FC=ifx
+      opt_compiler+=("$arg")
+      ;;
     xlc|xlc64)
       opt_CC=xlc_r
       opt_CXX=xlC_r
       opt_FC=xlf90_r
       opt_compiler+=("$arg")
       ;;
-    pgcc|pgf90)
-      echo "*** Warning: Ignoring unsupported option '$arg'."
+    pgcc)
+      opt_CC=pgcc
+      command -v pgc++ >/dev/null 2>&1 && opt_CXX=pgc++ || opt_CXX=pgCC
+      opt_FC=pgf90
+      opt_compiler+=("$arg")
+      ;;
+    pgf90)
+      opt_FC=pgf90
+      opt_compiler+=("$arg")
       ;;
     msvc)
       opt_CC=msvc # fake, will be replaced below
@@ -249,6 +274,16 @@ function parse_platform_compilers() {
       opt_CC=mpicc
       opt_CXX=mpicxx
       opt_FC=mpif90
+      opt_compiler+=("$arg")
+      ;;
+    nvc|nvhpc)
+      opt_CC=nvc
+      opt_CXX=nvc++
+      opt_FC=nvfortran
+      opt_compiler+=("$arg")
+      ;;
+    nvfortran)
+      opt_FC=nvfortran
       opt_compiler+=("$arg")
       ;;
     *)
@@ -278,6 +313,13 @@ function processArgs() {
     # Enable/disable features
       --enable-error-checking)
         opt_error_checking=1
+        ;;
+      --enable-shmem)
+        opt_shmem=1
+        ;;
+      --enable-xpmem)
+        opt_xpmem=1 # XPMEM implies SHMEM
+        opt_shmem=1
         ;;
       --enable-ampi-error-checking)
         opt_ampi_error_checking=1
@@ -395,12 +437,24 @@ function processArgs() {
       --destination=*)
         opt_destination=${arg#*=}
         ;;
+      --disable-tls)
+        opt_disabletls=1
+        ;;
+      --disable-fortran)
+        opt_enable_fortran=0
+        ;;
+      --install-prefix=*)
+        opt_install_prefix=${arg#*=}
+        ;;
       --suffix=*)
         opt_suffix=-${arg#*=}
         ;;
       --basedir=*)
         opt_incdir+=("-I${arg#*=}/include")
         opt_libdir+=("-L${arg#*=}/lib")
+        if [[ -d "${arg#*=}/lib64" ]]; then
+          opt_libdir+=("-L${arg#*=}/lib64")
+        fi
         ;;
       --libdir=*)
         opt_libdir+=("-L${arg#*=}")
@@ -442,13 +496,29 @@ fi
 
 # Append certain features and compilers to the end of $builddir
 builddir_extra=""
-for flag in opt_omp opt_smp opt_tcp opt_pthreads opt_pxshm opt_syncft opt_ooc opt_persistent opt_cuda; do
+for flag in opt_omp opt_smp opt_tcp opt_pthreads opt_pxshm opt_syncft opt_ooc opt_persistent opt_cuda opt_cxi; do
   [[ $flag -eq 1 ]] && builddir_extra+="-${flag/opt_/}"
 done
 
 for c in "$opt_lrts_pmi" "${opt_compiler[@]}"; do
   [[ -n "$c" ]] && builddir_extra+="-$c"
 done
+
+if [[ "$actual_triplet" = ofi* ]]; then
+    opt_build_ofi=1
+fi
+
+# Use slurmpmi2cray by default for ofi builds on Cray platforms (e.g. Cray
+# Shasta/EX) to access cray extentions to PMI from cray-pmi
+if [[ "$actual_triplet" = ofi-cray* && -z "$opt_lrts_pmi" ]]; then
+    opt_lrts_pmi="slurmpmi2cray"
+fi
+
+# Default to using simplepmi on non-Cray OFI platforms
+is_ofi_ucx="^(ofi|ucx).*"
+if [[ $actual_triplet =~ $is_ofi_ucx && $opt_lrts_pmi == "" ]]; then
+    opt_lrts_pmi="simplepmi"
+fi
 
 if [[ -n "$opt_destination" ]]; then
   # Note that $builddir_extra is intentionally ignored here
@@ -483,19 +553,28 @@ then
   fi
 fi
 
+# Install directory set-up
+if [[ -n "$opt_install_prefix" ]]
+then
+  # Install directory provided by user - Update installdir to point to it instead.
+  installdir="$opt_install_prefix"
+else
+  # Default Install directory
+  installdir="$my_srcdir/$builddir-install"
+fi
 
 # Build option setup
 
 if [[ $opt_ampi_only -eq 1 ]]; then
-    # AMPI doesn't use Charm-MPI interop or msg priorities of any kind.
+    # AMPI doesn't use Charm-MPI interop, msg priorities, non-FIFO queues, or CcdSCHEDLOOP.
     # AMPI creates O(NumVirtualRanks) chare arrays by default (for MPI_COMM_SELF),
     # so we bump up the number of bits reserved for the collection in the objid.
     opt_prio_type="char"
-    opt_extra_opts=('-DCMK_NO_INTEROP=1' '-DCMK_NO_MSG_PRIOS=1' '-DCMK_FIFO_QUEUE_ONLY=1' '-DCMK_OBJID_COLLECTION_BITS=29' "${opt_extra_opts[@]}")
+    opt_extra_opts=('-DCMK_NO_INTEROP=1' '-DCMK_NO_MSG_PRIOS=1' '-DCMK_FIFO_QUEUE_ONLY=1' '-DCSD_NO_SCHEDLOOP=1' '-DCMK_OBJID_COLLECTION_BITS=29' "${opt_extra_opts[@]}")
 fi
 
-# Special handling for gni-crayxc, gni-crayxe, mpi-crayxc, mpi-crayxe
-if [[ $actual_triplet == gni-* || $actual_triplet == *-crayx? ]]; then
+# Special handling for gni-crayxc, gni-crayxe, mpi-crayxc, mpi-crayxe, mpi-crayshasta, ofi-crayshasta
+if [[ $actual_triplet == gni-* || $actual_triplet == *-cray* ]]; then
   opt_network=$actual_triplet
   # Need to use Cray's compiler frontends on Cray systems
   opt_CC=cc
@@ -529,7 +608,7 @@ if [[ $VERBOSE -eq 1 ]]; then
 
   # Print selected options
   for option in ${!opt*}; do
-    echo "  $option = ${!option}"
+    echo "  $option = ${!option[*]:-}"
   done
 fi
 
@@ -553,13 +632,13 @@ if [[ ${#opt_incdir[@]} -ne 0 ]]; then
   echo "USER_OPTS_CXX='${opt_incdir[*]}'" >> "$ConvUsr"
 fi
 
-
 # Run configure step
 
 CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
   -G "Unix Makefiles" \
   -DARCH="$opt_arch" \
   -DCMAKE_BUILD_TYPE="$opt_production" \
+  -DCMAKE_INSTALL_PREFIX="$installdir" \
   -DCMK_AMPI_ONLY="$opt_ampi_only" \
   -DCMK_AMPI_WITH_ROMIO="$opt_romio" \
   -DAMPI_ERROR_CHECKING="$opt_ampi_error_checking" \
@@ -568,8 +647,10 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
   -DCCS="$opt_ccs" \
   -DCHARMDEBUG="$opt_charmdebug" \
   -DCONTROLPOINT="$opt_controlpoint" \
-  -DCUDA="$opt_cuda" \
+  -DBUILD_CUDA="$opt_cuda" \
+  -DDISABLE_TLS="$opt_disabletls" \
   -DDRONE_MODE="$opt_drone_mode" \
+  -DENABLE_FORTRAN=$opt_enable_fortran \
   -DERROR_CHECKING="$opt_error_checking" \
   -DEXTRA_OPTS="${opt_extra_opts[*]}" \
   -DLBTIME_TYPE="$opt_lbtime_type" \
@@ -585,6 +666,8 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
   -DPRIO_TYPE="$opt_prio_type" \
   -DPTHREADS="$opt_pthreads" \
   -DPXSHM="$opt_pxshm" \
+  -DCMK_HAS_XPMEM="$opt_xpmem" \
+  -DCMK_USE_SHMEM="$opt_shmem" \
   -DQLOGIC="$opt_qlogic" \
   -DRANDOMIZED_MSGQ="$opt_randomized_msgq" \
   -DREFNUM_TYPE="$opt_refnum_type" \
@@ -598,6 +681,8 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
   -DTCP="$opt_tcp" \
   -DTRACING="$opt_tracing" \
   -DTRACING_COMMTHREAD="$opt_tracing_commthread" \
+  -DCXI="$opt_cxi" \
+  -DCMK_BUILD_OFI="$opt_build_ofi" \
   -DZLIB="$opt_zlib"
 
 
@@ -607,5 +692,13 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
 
 [[ $VERBOSE -eq 1 ]] && export VERBOSE
 make "$opt_parallel"
+
+# Only Install if the user provides an install prefix with the
+# `--install-prefix` option. Without this option, `make install` would be a
+# no-op.
+if [[ -n "$opt_install_prefix" ]]
+then
+  make install
+fi
 
 echo 'Build successful.'

@@ -12,6 +12,8 @@ CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 CPPFLAGS="$CPPFLAGS -fpic "
 LDFLAGS="$LDFLAGS -shared-intel "
 
+CMK_WARNINGS_ARE_ERRORS="-Werror"
+
 CMK_CF77="ifort -auto -fPIC "
 CMK_CF90="ifort -auto -fPIC "
 #CMK_CF90_FIXED="$CMK_CF90 -132 -FI "

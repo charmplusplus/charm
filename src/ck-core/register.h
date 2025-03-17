@@ -100,6 +100,9 @@ class EntryInfo {
     /// Human-readable name of entry method, including parameters.
     const char *name;
 
+    /// Policy for demand-creation entry methods
+    CkArray_IfNotThere ifNotThere;
+
     EntryInfo(const char *n, CkCallFnPtr c, int m, int ci, bool ownsN=false) :
       call(c), msgIdx(m), chareIdx(ci),
       marshallUnpack(0)
@@ -107,7 +110,7 @@ class EntryInfo {
       ,messagePup(0)
 #endif
       ,traceEnabled(true), noKeep(false), isImmediate(false), isInline(false), inCharm(false), appWork(false),
-      ownsName(ownsN), name(n)
+      ownsName(ownsN), name(n), ifNotThere(CkArray_IfNotThere_buffer)
     {
       if (ownsName) initName(n);
 #if CMK_CHARMDEBUG
