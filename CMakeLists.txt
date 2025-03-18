@@ -1003,7 +1003,7 @@ endif()
 # Check that we are able to build and link an executable
 add_executable(ckhello ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.C)
 add_dependencies(ckhello ck ldb-rand memory-default threads-default conv-static
-  converse reconverse ckmain ckqt
+  converse ckmain ckqt
   moduleNDMeshStreamer modulecompletion)
 
 # Create conv-mach-opt.sh

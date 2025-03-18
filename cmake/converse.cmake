@@ -203,8 +203,8 @@ set(tmgr-h-sources src/util/topomanager/TopoManager.h ${CMAKE_BINARY_DIR}/includ
 file(WRITE ${CMAKE_BINARY_DIR}/include/topomanager_config.h "// empty\n" )
 
 # Converse
-add_library(converse
-    ${CMAKE_BINARY_DIR}/include/commitid.C
+# add_library(converse
+    # ${CMAKE_BINARY_DIR}/include/commitid.C
     # ${conv-core-cxx-sources}
     # ${conv-core-h-sources}
     # ${conv-ccs-h-sources}
@@ -223,11 +223,19 @@ add_library(converse
     # ${tmgr-h-sources}
     # ${hwloc-objects}
     # ${all-ci-outputs}
-)
-add_dependencies(converse hwloc)
+# )
+# add_dependencies(converse hwloc)
 
 add_subdirectory(reconverse)
-add_dependencies(converse reconverse)
+# add_dependencies(converse reconverse)
+
+
+add_library(converse INTERFACE)
+
+target_link_libraries(converse INTERFACE
+    reconverse
+    hwloc
+)
 
 foreach(filename
     ${conv-core-h-sources}
@@ -240,15 +248,15 @@ foreach(filename
     configure_file(${filename} ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 endforeach()
 
-target_include_directories(converse PRIVATE src/arch/util) # for machine*.*
-target_include_directories(converse PRIVATE src/util) # for sockRoutines.C
-target_include_directories(converse PRIVATE src/conv-core src/util/topomanager src/ck-ldb src/ck-perf src/ck-cp)
+# target_include_directories(converse PRIVATE src/arch/util) # for machine*.*
+# target_include_directories(converse PRIVATE src/util) # for sockRoutines.C
+# target_include_directories(converse PRIVATE src/conv-core src/util/topomanager src/ck-ldb src/ck-perf src/ck-cp)
 
 # conv-static
 add_library(conv-static OBJECT src/conv-core/conv-static.c)
-add_dependencies(converse conv-static)
-add_custom_command(TARGET converse
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/conv-static.dir/src/conv-core/conv-static.c.o ${CMAKE_BINARY_DIR}/lib/conv-static.o
-    VERBATIM
-)
+# add_dependencies(converse conv-static)
+# add_custom_command(TARGET converse
+#     POST_BUILD
+#     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/conv-static.dir/src/conv-core/conv-static.c.o ${CMAKE_BINARY_DIR}/lib/conv-static.o
+#     VERBATIM
+# )
