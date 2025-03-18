@@ -599,7 +599,7 @@ endif()
 #disable ROMIO due to GCC 14 cascade of failures
 if(NOT DEFINED CMK_AMPI_WITH_ROMIO)
   set(CMK_AMPI_WITH_ROMIO 0)
-endif()  
+endif()
 set(CMK_ENABLE_C11   ${CMAKE_C11_EXTENSION_COMPILE_OPTION})
 
 # Use -std=gnu++11 if available
@@ -687,7 +687,7 @@ configure_file(src/arch/${VDIR}/conv-mach.sh                 include/ COPYONLY)
 
 set(CUDA_DIR "")
 if(BUILD_CUDA)
-  
+
   file(GLOB_RECURSE hybridAPI-h-sources ${CMAKE_SOURCE_DIR}/src/arch/cuda/*.h)
   file(GLOB_RECURSE hybridAPI-cxx-sources ${CMAKE_SOURCE_DIR}/src/arch/cuda/*.cpp)
   foreach(file ${hybridAPI-h-sources})
@@ -1003,7 +1003,7 @@ endif()
 # Check that we are able to build and link an executable
 add_executable(ckhello ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.C)
 add_dependencies(ckhello ck ldb-rand memory-default threads-default conv-static
-  converse ckmain ckqt
+  converse reconverse ckmain ckqt
   moduleNDMeshStreamer modulecompletion)
 
 # Create conv-mach-opt.sh

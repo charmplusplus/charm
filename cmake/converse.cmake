@@ -205,26 +205,29 @@ file(WRITE ${CMAKE_BINARY_DIR}/include/topomanager_config.h "// empty\n" )
 # Converse
 add_library(converse
     ${CMAKE_BINARY_DIR}/include/commitid.C
-    ${conv-core-cxx-sources}
-    ${conv-core-h-sources}
-    ${conv-ccs-h-sources}
-    ${conv-ccs-cxx-sources}
-    ${conv-perf-cxx-sources}
-    ${conv-perf-h-sources}
-    ${conv-util-c-sources}
-    ${conv-util-cxx-sources}
-    ${conv-util-h-sources}
-    ${conv-partition-cxx-sources}
-    ${conv-ldb-cxx-sources}
-    ${conv-ldb-h-sources}
-    src/arch/${GDIR}/machine.C
-    ${tmgr-c-sources}
-    ${tmgr-cxx-sources}
-    ${tmgr-h-sources}
-    ${hwloc-objects}
-    ${all-ci-outputs}
+    # ${conv-core-cxx-sources}
+    # ${conv-core-h-sources}
+    # ${conv-ccs-h-sources}
+    # ${conv-ccs-cxx-sources}
+    # ${conv-perf-cxx-sources}
+    # ${conv-perf-h-sources}
+    # ${conv-util-c-sources}
+    # ${conv-util-cxx-sources}
+    # ${conv-util-h-sources}
+    # ${conv-partition-cxx-sources}
+    # ${conv-ldb-cxx-sources}
+    # ${conv-ldb-h-sources}
+    # src/arch/${GDIR}/machine.C
+    # ${tmgr-c-sources}
+    # ${tmgr-cxx-sources}
+    # ${tmgr-h-sources}
+    # ${hwloc-objects}
+    # ${all-ci-outputs}
 )
 add_dependencies(converse hwloc)
+
+add_subdirectory(reconverse)
+add_dependencies(converse reconverse)
 
 foreach(filename
     ${conv-core-h-sources}
