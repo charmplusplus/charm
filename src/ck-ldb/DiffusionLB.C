@@ -28,10 +28,13 @@
 #define DEBUGL(x) CmiPrintf x;
 #define ITERATIONS 40
 
+#include "DiffusionMetric.C"
 #include "DiffusionNeighbors.C"
 
 // Percentage of error acceptable.
 #define THRESHOLD 2
+
+#define COMM
 
 // CreateLBFunc_Def(DiffusionLB, "The distributed graph refinement load balancer")
 static void lbinit()
@@ -260,14 +263,14 @@ void DiffusionLB::AcrossNodeLB()
   // DiffusionMetric* metric =
   //     new MetricCommEI(nodeStats, myNodeId, nodeSize, neighborCount, toSendLoad);
 
-  // neighborCount,
-  //                                          toSendLoad, sendToNeighbors);
-
+#ifdef COMM
+  DiffusionMetric* metric = new MetricComm(nodeStats, myNodeId, nodeSize, neighborCount,
+                                           toSendLoad, sendToNeighbors);
+#else
   DiffusionMetric* metric =
       new MetricCentroid(nborCentroids, nborDistances, myCentroid, nodeStats, myNodeId,
                                            toSendLoad, sendToNeighbors);
-
-  buildObjComms(n_objs);
+#endif
 
   loadReceivers = std::count_if(toSendLoad.begin(), toSendLoad.end(),
                                 [](double load) { return load > 0; });
@@ -292,29 +295,21 @@ void DiffusionLB::AcrossNodeLB()
 
     while (my_loadAfterTransfer > 0)
     {
-      // int nborId = getBestNeighbor();
       int nborId = metric->getBestNeighbor();  // this is causing cascading???
 
-      // CkAssert(nborId == test_nborId);
-      //  CkAssert(nborId == testnbor);
-
-      if (nborId == -1)
+      if (nborId == -1 || toSendLoad[nborId] <= 0)
+      {
         break;  // no more neighbors to send to
+      }
 
       int v_id = metric->popBestObject(nborId);
 
+      if (v_id == -1)
+      {
+        break;  // no more objects to send
+      }
+
       assert(nodeStats->objData[v_id].migratable);
-
-      // int v_id = getBestObject(nborId);
-
-      // CkPrintf("Object ids: %d %d\n", v_id, test_v_id);
-      // CkPrintf("Gain values: %d %d\n", gain_val[v_id], gain_val[test_v_id]);
-      //  doesn't pick same object, becuase of
-      //   underlying heap imp (if objects have same gain)
-
-      // CkPrintf("Picking object %d with gain %d for neighbor %d\n", v_id,
-      // gain_val[v_id],
-      //          nborId);
 
       double currLoad = objs[v_id].getVertexLoad();
       objs[v_id].setCurrPe(-1);
@@ -352,8 +347,11 @@ void DiffusionLB::AcrossNodeLB()
   }
 
   std::vector<std::vector<LBRealType>> positions(n_objs);
+  std::vector<double> load(n_objs);
   for (int i = 0; i < n_objs; i++)
   {
+    load[i] = nodeStats->objData[i].wallTime;
+
     int size = nodeStats->objData[i].position.size();
     positions[i].resize(size);
     for (int j = 0; j < size; j++)
@@ -363,8 +361,7 @@ void DiffusionLB::AcrossNodeLB()
   }
 
   thisProxy[0].ReceiveFinalStats(isMigratable, nodeStats->from_proc, nodeStats->to_proc,
-                                 nodeStats->commData, nodeStats->n_migrateobjs,
-                                 positions);
+                                 nodeStats->n_migrateobjs, positions, load);
 }
 
 /* Load has been logically sent from overloaded to underloaded nodes in LoadBalance().

@@ -12,7 +12,6 @@
 #include "ckheap.h"
 #include "topology.h"
 
-#include "DiffusionMetric.h"
 #include "Heap_helper.C"
 
 #include <queue>
@@ -55,9 +54,9 @@ public:
   void MigrationDoneWrapper();  // Call when migration is complete
   void ReceiveStats(CkMarshalledCLBStatsMessage&& data);
   void ReceiveFinalStats(std::vector<bool> isMigratable, std::vector<int> from_proc,
-                         std::vector<int> to_proc, std::vector<LDCommData> commData,
-                         int n_migrateobjs,
-                         std::vector<std::vector<LBRealType>> positions);
+                         std::vector<int> to_proc, int n_migrateobjs,
+                         std::vector<std::vector<LBRealType>> positions,
+                         std::vector<double> load);
 
   void buildMSTinRounds(double best_weight, int best_from, int best_to);
   void next_MSTphase(double newcost, int newparent, int newto);
@@ -100,11 +99,16 @@ private:
   int myNodeId;
 
   // centroid setup --------------------------------
+  std::vector<std::vector<LBRealType>> allNodeCentroids;
+  std::vector<double> allNodeDistances;
   std::vector<std::vector<LBRealType>> nborCentroids;
   std::vector<double> nborDistances;
   std::vector<LBRealType> myCentroid;
   int position_dim;
   int centReceiveNode;
+
+  void addNeighbor(int nbor);
+  void pairedSort(int* A, std::vector<double> B);
 
   // phase 1: build neighbor list --------------------------------
   int rank0_barrier_counter;

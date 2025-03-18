@@ -1,6 +1,8 @@
 /* Pick NUM_NEIGHBORS in random */
 /*readonly*/ bool centroid;
 
+#define COMM
+
 #include <assert.h>
 
 /* Entry point for neighbor building. Only rank0PEs call findNBors*/
@@ -23,10 +25,14 @@ void DiffusionLB::findNBors(int do_again)
   if (round == 0)
   {
     cost_for_neighbor = {};  // dictionary of nbor keys to cost
+
+#ifdef COMM
     createCommList();
+#else
     thisProxy[thisIndex]
         .createCentroidList();  // this is SDAG!! only works here because the result isn't
-                                // used until LB across nodes
+// used until LB across nodes
+#endif
   }
 
   mstVisitedPes.clear();
@@ -42,8 +48,10 @@ void DiffusionLB::findNBors(int do_again)
 
   visited = false;
 
+#ifdef COMM
   buildMSTinRounds(best_weight, best_from, best_to);
-  // findRemainingNbors(0);
+#endif
+  //  findRemainingNbors(0);
 }
 
 void DiffusionLB::buildMSTinRounds(double best_weight, int best_from, int best_to)
@@ -74,14 +82,16 @@ void DiffusionLB::buildMSTinRounds(double best_weight, int best_from, int best_t
       // this check ensures that during the first round (when to = 0, from = -1), we don't
       // add -1 to the neighbors
       assert(from % nodeSize == 0);  // assert that from is a rank0PE
-      sendToNeighbors.push_back(from);
+      // sendToNeighbors.push_back(from);
+
+      addNeighbor(from);
     }
   }
 
   if (myNodeId == from)
   {
     visited = true;
-    sendToNeighbors.push_back(to);
+    addNeighbor(to);
   }
 
   mstVisitedPes.push_back(to);
@@ -312,7 +322,8 @@ void DiffusionLB::proposeNbor(int nborId)
           sendToNeighbors.end())
   {
     agree = 1;
-    sendToNeighbors.push_back(nborId);
+    // sendToNeighbors.push_back(nborId);
+    addNeighbor(nborId);
   }
   thisProxy[nborId * nodeSize].okayNbor(agree, myNodeId);
 }
@@ -323,7 +334,8 @@ void DiffusionLB::okayNbor(int agree, int nborId)
       std::find(sendToNeighbors.begin(), sendToNeighbors.end(), nborId) ==
           sendToNeighbors.end())
   {
-    sendToNeighbors.push_back(nborId);
+    // sendToNeighbors.push_back(nborId);
+    addNeighbor(nborId);
   }
 
   requests_sent--;
@@ -359,4 +371,18 @@ void DiffusionLB::sortArr(long arr[], int n, int* nbors)
     }
   if (found == 0 && numNodes > 1)
     CkAbort("Error: No neighbors found on %d\n", CmiMyPe());
+}
+
+// helper function to add neighbors to the list
+void DiffusionLB::addNeighbor(int nbor)
+{
+#ifndef COMM
+  std::vector<LBRealType> centroid = allNodeCentroids[nbor];
+  double distance = allNodeDistances[nbor];
+
+  nborDistances.push_back(distance);
+  nborCentroids.push_back(centroid);
+#endif
+
+  sendToNeighbors.push_back(nbor);
 }

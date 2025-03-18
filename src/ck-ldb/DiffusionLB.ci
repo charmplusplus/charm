@@ -44,6 +44,7 @@ module DiffusionLB
     // entry void ResumeClients(int balancing);
 
     entry void PseudoLoad(int itr, double load, int node);
+    entry[reductiontarget] void pseudoDone(bool done);
     // entry void CallResumeClients();
     // entry void PrintDebugMessage(int len, double result[len]);
 
@@ -51,9 +52,9 @@ module DiffusionLB
     {
       serial
       {
-        // nbors = new int[numNodes];
-        nborCentroids.resize(numNodes);
-        nborDistances.resize(numNodes);
+        nbors = new int[numNodes];
+        allNodeCentroids.resize(numNodes);
+        allNodeDistances.resize(numNodes);
 
         int position_dim = 0;
         if (nodeStats->objData.size() > 0)
@@ -65,8 +66,8 @@ module DiffusionLB
         myCentroid.resize(position_dim, 0);
         for (int nbor = 0; nbor < numNodes; nbor++)
         {
-          // nbors[nbor] = nbor;
-          nborCentroids[nbor].resize(position_dim, 0);
+          nbors[nbor] = nbor;
+          allNodeCentroids[nbor].resize(position_dim, 0);
         }
 
         // compute my own centroid
@@ -92,10 +93,15 @@ module DiffusionLB
         when ReceiveCentroid(int node, std::vector<LBRealType> centroid) serial
         {
           position_dim = 3;
+          // CkPrintf(
+          //     "Node %d received centroid from %d with length %d, dest has size %d, "
+          //     "mycentroid has size %d, allnode sitances has size %d\n",
+          //     myNodeId, node, centroid.size(), allNodeCentroids[node].size(),
+          //     myCentroid.size(), allNodeDistances.size());
           double dist = 0;
           for (int i = 0; i < position_dim; i++)
           {
-            nborCentroids[node][i] = centroid[i];
+            allNodeCentroids[node][i] = centroid[i];
           }
 
           for (int i = 0; i < position_dim; i++)
@@ -106,16 +112,20 @@ module DiffusionLB
 
           if (node != myNodeId)
           {
-            nborDistances[node] = dist;
+            allNodeDistances[node] = dist;
           }
           else
           {
-            nborDistances[node] = 10000;
+            allNodeDistances[node] = 10000;
           }
         }
       }
 
-      // serial { pairedSort(nbors, nborDistances); }
+      serial "Sorting nbors"
+      {
+        pairedSort(nbors, allNodeDistances);
+        buildMSTinRounds(best_weight, best_from, best_to);
+      }
     }
 
     entry void pseudolb_rounds()
@@ -167,7 +177,7 @@ module DiffusionLB
         // Calculate average and do pseudo load balancing
         serial "Pseudo LB"
         {
-          avgLoadNeighbor = avgNborLoad();
+          // avgLoadNeighbor = avgNborLoad();
           PseudoLoadBalancing();
         }
 
@@ -177,7 +187,16 @@ module DiffusionLB
           {
             my_pseudo_load += load;
             int pos = findNborIdx(node);
-            toReceiveLoad[pos] += load;
+            toSendLoad[pos] -= load;
+          }
+        }
+
+        when pseudoDone(bool done) serial
+        {
+          if (done)
+          {
+            CkPrintf("Pseudo LB done in %d rounds\n", pseudo_itr + 1);
+            pseudo_itr = ITERATIONS;
           }
         }
       }
@@ -185,7 +204,13 @@ module DiffusionLB
       // Calculate the aggregate load that has to be sent.
       serial "Aggregate load"
       {
-        for (int i = 0; i < neighborCount; i++) toSendLoad[i] -= toReceiveLoad[i];
+        CkPrintf("PSEUDO: Node %d (load %f) with pseudo_load after LB %f\n", myNodeId,
+                 my_load, my_pseudo_load);
+        // for (int i = 0; i < neighborCount; i++)
+        // {
+        //   CkPrintf("PSEUDO: Node %d sending %f to %d\n", myNodeId, toSendLoad[i],
+        //            sendToNeighbors[i]);
+        // }
         loadReceivers = 0;
       }
     }

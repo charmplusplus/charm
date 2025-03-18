@@ -348,3 +348,22 @@ void DiffusionLB::ReceiveFinalStats(std::vector<bool> isMigratable,
     LBwriteStatsMsgs(fullStats);
   }
 }
+
+void DiffusionLB::pairedSort(int* A, std::vector<double> B)
+{
+  // sort array A based on corresponding values in B (both of size n)
+  int n = B.size();
+  std::vector<std::pair<long, int>> vp;
+  for (int i = 0; i < n; ++i)
+  {
+    vp.push_back(std::make_pair(B[i], A[i]));
+  }
+
+  sort(vp.begin(), vp.end());
+
+  // convert A back to array
+  for (int i = 0; i < n; ++i)
+  {
+    A[i] = vp[i].second;
+  }
+}
