@@ -312,8 +312,9 @@ int DiffusionLB::getBestObject(int nbor)
 // TODO: this is broken rn, because of BaseLB::LDStats pup problems
 void DiffusionLB::ReceiveFinalStats(std::vector<bool> isMigratable,
                                     std::vector<int> from_proc, std::vector<int> to_proc,
-                                    std::vector<LDCommData> commData, int n_migrateobjs,
-                                    std::vector<std::vector<LBRealType>> positions)
+                                    int n_migrateobjs,
+                                    std::vector<std::vector<LBRealType>> positions,
+                                    std::vector<double> load)
 {
   CkAssert(thisIndex == 0);
 
@@ -323,12 +324,13 @@ void DiffusionLB::ReceiveFinalStats(std::vector<bool> isMigratable,
   int oldSize = fullStats->objData.size();
 
   fullStats->objData.resize(fullStats->objData.size() + isMigratable.size());
-  fullStats->commData.resize(fullStats->commData.size() + commData.size());
+
   fullStats->n_migrateobjs += n_migrateobjs;
 
   for (int i = 0; i < isMigratable.size(); i++)
   {
     fullStats->objData[i + oldSize].migratable = isMigratable[i];
+    fullStats->objData[i + oldSize].wallTime = load[i];
 
     int poslen = positions[i].size();
     for (int j = 0; j < poslen; j++)
