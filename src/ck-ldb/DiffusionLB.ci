@@ -127,8 +127,11 @@ module DiffusionLB
 
       serial "Sorting nbors"
       {
+        if (thisIndex == rank0PE)
+        {
         pairedSort(nbors, allNodeDistances);
         buildMSTinRounds(best_weight, best_from, best_to);
+        }
       }
     }
 

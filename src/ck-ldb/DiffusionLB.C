@@ -117,6 +117,14 @@ void DiffusionLB::Strategy(const DistBaseLB::LDStats* const stats)
 
   // start stats assembly on rank0PE
   marshmsg = new CkMarshalledCLBStatsMessage(statsmsg);
+
+  // reset variables (necessary for mutliple LB rounds)
+  acks = 0;
+  max = 0;
+  round = 0;
+  statsReceived = 0;
+  rank0_barrier_counter = 0;
+
   thisProxy[rank0PE].ReceiveStats(*marshmsg);
   if (CkMyPe() != rank0PE)
   {
@@ -608,8 +616,13 @@ void DiffusionLB::ProcessMigrations()
 
   CkPrintf("PE %d doing %d migrates\n", CkMyPe(), total_migrates);
 
+  // if we don't do the barrier here, must be done with LBSyncResume so that it is done in
+  // MigrationDone
+  if (!_lb_args.syncResume())
+  {
   // SAME AS IN PROCESSMIGRATIONDECISION
   const int me = CkMyPe();
+    CkPrintf("IN diffusion: %d calling ProcessMigrationDecision\n", CkMyPe());
   for (int i = 0; i < msg->n_moves; i++)
   {
     MigrateInfo& move = msg->moves[i];
@@ -617,8 +630,10 @@ void DiffusionLB::ProcessMigrations()
     {
       if (move.to_pe == me)
       {
-        CkAbort("[%i] Error, attempting to migrate object myself to myself\n", CkMyPe());
+          CkAbort("[%i] Error, attempting to migrate object myself to myself\n",
+                  CkMyPe());
       }
+
       lbmgr->Migrate(move.obj, move.to_pe);
     }
     else if (move.from_pe != me)
@@ -629,11 +644,11 @@ void DiffusionLB::ProcessMigrations()
     }
   }
 
-  if (CkMyPe() == 0)
-  {
     CkCallback cb(CkIndex_DiffusionLB::MigrationDoneWrapper(), thisProxy);
-    CkStartQD(cb);
+    contribute(cb);
   }
+  else
+    ProcessMigrationDecision(msg);
 }
 
 void DiffusionLB::CascadingMigration(LDObjHandle h, double load)

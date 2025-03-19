@@ -238,7 +238,7 @@ void DiffusionLB::buildObjComms(int n_objs)
         int fromObj = nodeStats->getHash(from);
         int toObj = nodeStats->getHash(to);
 
-        CkAssert(fromObj != -1 && fromObj < nobjs);
+        CkAssert(fromObj != -1 && fromObj < n_objs);
         objectComms[fromObj][nborIdx] += commData.bytes;
         // lastKnown PE value can be wrong.
         if (toObj != -1 && toObj < n_objs)
