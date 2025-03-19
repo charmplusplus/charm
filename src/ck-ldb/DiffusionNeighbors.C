@@ -379,9 +379,11 @@ void DiffusionLB::addNeighbor(int nbor)
 #ifndef COMM
   std::vector<LBRealType> centroid = allNodeCentroids[nbor];
   double distance = allNodeDistances[nbor];
+  int nborCount = allNodeObjCount[nbor];
 
   nborDistances.push_back(distance);
   nborCentroids.push_back(centroid);
+  nborObjCount.push_back(nborCount);
 #endif
 
   sendToNeighbors.push_back(nbor);

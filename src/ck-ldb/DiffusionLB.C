@@ -361,7 +361,7 @@ void DiffusionLB::AcrossNodeLB()
 #else
   DiffusionMetric* metric =
       new MetricCentroid(nborCentroids, nborDistances, myCentroid, nodeStats, myNodeId,
-                                           toSendLoad, sendToNeighbors);
+                         toSendLoad, sendToNeighbors, nborObjCount);
 #endif
 
   loadReceivers = std::count_if(toSendLoad.begin(), toSendLoad.end(),

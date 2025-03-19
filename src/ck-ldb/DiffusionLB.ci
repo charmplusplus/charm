@@ -21,7 +21,7 @@ module DiffusionLB
         std::vector<int> to_proc, int n_migrateobjs,
         std::vector<std::vector<LBRealType>> positions, std::vector<double> load);
 
-    entry void ReceiveCentroid(int node, std::vector<LBRealType> centroid);
+    entry void ReceiveCentroid(int node, std::vector<LBRealType> centroid, int count);
     entry void ReceiveLoadInfo(int itr, double load, int node);
     entry void ReceiveStats(CkMarshalledCLBStatsMessage data);
     // entry void LoadTransfer(double load, int initPE, int objId);
@@ -54,6 +54,7 @@ module DiffusionLB
       {
         nbors = new int[numNodes];
         allNodeCentroids.resize(numNodes);
+        allNodeObjCount.resize(numNodes);
         allNodeDistances.resize(numNodes);
 
         int position_dim = 0;
@@ -85,12 +86,13 @@ module DiffusionLB
 
         for (int i = 0; i < position_dim; i++) myCentroid[i] /= nodeStats->objData.size();
 
-        thisProxy.ReceiveCentroid(myNodeId, myCentroid);
+        thisProxy.ReceiveCentroid(myNodeId, myCentroid, nodeStats->objData.size());
       }
 
       for (centReceiveNode = 0; centReceiveNode < numNodes; centReceiveNode++)
       {
-        when ReceiveCentroid(int node, std::vector<LBRealType> centroid) serial
+        when ReceiveCentroid(int node, std::vector<LBRealType> centroid, int objCount)
+            serial
         {
           position_dim = 3;
           // CkPrintf(
@@ -118,6 +120,8 @@ module DiffusionLB
           {
             allNodeDistances[node] = 10000;
           }
+
+          allNodeObjCount[node] = objCount;
         }
       }
 

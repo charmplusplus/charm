@@ -100,9 +100,11 @@ private:
 
   // centroid setup --------------------------------
   std::vector<std::vector<LBRealType>> allNodeCentroids;
+  std::vector<int> allNodeObjCount;
   std::vector<double> allNodeDistances;
   std::vector<std::vector<LBRealType>> nborCentroids;
   std::vector<double> nborDistances;
+  std::vector<int> nborObjCount;
   std::vector<LBRealType> myCentroid;
   int position_dim;
   int centReceiveNode;

@@ -47,6 +47,9 @@ private:
   std::vector<int> sendToNeighbors;
   std::vector<bool> objAvailable;
 
+  std::vector<std::vector<std::pair<int, int>>>
+      objCommEdges;  // for each object, list of internal comm edges
+
   int n_objs;
   int neighborCount;
   int myNodeId;
@@ -74,6 +77,7 @@ private:
   std::vector<std::vector<LBRealType>> objPosition;
 
   std::vector<double> nborDistances;
+  std::vector<int> nborObjCount;
   std::vector<LBRealType> myCentroid;
   int position_dim;
 
@@ -104,7 +108,7 @@ public:
   MetricCentroid(std::vector<std::vector<double>> nborCentroids,
                  std::vector<double> nborDistances, std::vector<LBRealType> myCentroid,
                  BaseLB::LDStats* ns, int nodeId, std::vector<double> tSL,
-                 std::vector<int> sendToNbrs);
+                 std::vector<int> sendToNbrs, std::vector<int> nborObjCount);
   int popBestObject(int nbor) override;
   int getBestNeighbor() override;
   void updateState(int objId, int destNbor) override;
@@ -181,8 +185,6 @@ int MetricCommEI::popBestObject(int nbor)
     }
   }
 
-  CkPrintf("Best object for neighbor %d is %d with comm diff %d\n", nbor, bestObject,
-           maxInternalComm);
   return bestObject;
 }
 
@@ -225,6 +227,7 @@ MetricComm::MetricComm(BaseLB::LDStats* ns, int nodeId, int nodeSize, int nCount
   }
 
   objAvailable.resize(n_objs, true);
+  objCommEdges.resize(n_objs);
   for (int edge = 0; edge < nodeStats->commData.size(); edge++)
   {
     LDCommData& commData = nodeStats->commData[edge];
@@ -246,7 +249,11 @@ MetricComm::MetricComm(BaseLB::LDStats* ns, int nodeId, int nodeSize, int nCount
         internalComm[fromObj] += commData.bytes;
 
         if (toObj != -1 && toObj < n_objs)
+        {
           internalComm[toObj] += commData.bytes;
+          objCommEdges[toObj].push_back(std::make_pair(toObj, commData.bytes));
+          objCommEdges[fromObj].push_back(std::make_pair(toObj, commData.bytes));
+        }
       }
       else
       {
@@ -288,14 +295,13 @@ int MetricComm::popBestObject(int nbor)
   if (bestObject != -1)
   {
     assert(objAvailable[bestObject]);
-    CkPrintf("Best object for neighbor %d is %d with comm %d\n", nbor, bestObject,
-             maxExternalComm);
     objAvailable[bestObject] = false;
   }
-  else
-  {
-    CkPrintf("No object found for neighbor %d, with capacity %f\n", nbor, nborCapacity);
-  }
+  // else
+  // {
+  //   CkPrintf("No object found for neighbor %d, with capacity %f\n", nbor,
+  //   nborCapacity);
+  // }
   return bestObject;
 };
 
@@ -316,20 +322,33 @@ int MetricComm::getBestNeighbor()
 void MetricComm::updateState(int objId, int destNbor)
 {
   toSendLoad[destNbor] -= nodeStats->objData[objId].wallTime;
+
+  for (std::pair<int, int> edge : objCommEdges[objId])
+  {
+    int toObj = edge.first;
+    int comm = edge.second;
+
+    if (objAvailable[toObj])
+    {
+      externalComm[destNbor][toObj] += comm;
+      internalComm[toObj] -= comm;
+    }
+  }
 }
 
 MetricCentroid::MetricCentroid(std::vector<std::vector<double>> nborCentroids,
                                std::vector<double> nborDistances,
                                std::vector<LBRealType> myCentroid, BaseLB::LDStats* ns,
                                int nodeId, std::vector<double> tSL,
-                               std::vector<int> sendToNbrs)
+                               std::vector<int> sendToNbrs, std::vector<int> nborObjCount)
     : nodeStats(ns),
       myNodeId(nodeId),
       nborCentroids(nborCentroids),
       myCentroid(myCentroid),
       nborDistances(nborDistances),
       toSendLoad(tSL),
-      sendToNeighbors(sendToNbrs)
+      sendToNeighbors(sendToNbrs),
+      nborObjCount(nborObjCount)
 {
   position_dim = myCentroid.size();
   neighborCount = nborCentroids.size();
@@ -423,4 +442,20 @@ int MetricCentroid::getBestNeighbor()
 void MetricCentroid::updateState(int objId, int destNbor)
 {
   toSendLoad[destNbor] -= nodeStats->objData[objId].wallTime;
+
+  // TODO: update my centroid (not used anywhere rn)
+  // update neighbor centroid
+  std::vector<LBRealType> old = nborCentroids[destNbor];
+  int count = nborObjCount[destNbor];
+  for (int i = 0; i < position_dim; i++)
+  {
+    nborCentroids[destNbor][i] = (old[i] * count + objPosition[objId][i]) / (count + 1);
+  }
+
+  // update objNborDistances
+  for (int i = 0; i < n_objs; i++)
+  {
+    objNborDistances[i][destNbor] =
+        computeDistance(objPosition[i], nborCentroids[destNbor]);
+  }
 }
