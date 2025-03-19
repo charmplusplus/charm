@@ -101,7 +101,7 @@ void DiffusionLB::buildMSTinRounds(double best_weight, int best_from, int best_t
     // all nodes have been visited, MST is complete
     int do_again = 1;
     assert(visited);
-    assert(std::find(mstVisitedPes.begin(), mstVisitedPes.end(), nbor) !=
+    assert(std::find(mstVisitedPes.begin(), mstVisitedPes.end(), myNodeId) !=
            mstVisitedPes.end());
 
     assert(sendToNeighbors.size() >= 1);

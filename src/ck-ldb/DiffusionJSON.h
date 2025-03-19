@@ -58,7 +58,7 @@ int LBwriteStatsMsgs(BaseLB::LDStats* statsData)
   std::ofstream outputFile("lbdump.json");
   if (outputFile.is_open())
   {
-    outputFile << std::setw(4) << jsonData << std::endl;
+    outputFile << jsonData.dump(4) << std::endl;
     outputFile.close();
     std::cout << "JSON data successfully written to lbdump.json" << std::endl;
   }

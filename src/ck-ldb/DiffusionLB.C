@@ -104,7 +104,6 @@ void DiffusionLB::Strategy(const DistBaseLB::LDStats* const stats)
   if (CkMyPe() == 0 && _lb_args.debug() >= 1)
   {
     double start_time = CmiWallTimer();
-    CkPrintf("In DiffusionLB strategy at %lf\n", start_time);
   }
   if (CkMyPe() == 0)
   {
@@ -622,7 +621,7 @@ void DiffusionLB::ProcessMigrations()
   {
   // SAME AS IN PROCESSMIGRATIONDECISION
   const int me = CkMyPe();
-    CkPrintf("IN diffusion: %d calling ProcessMigrationDecision\n", CkMyPe());
+
   for (int i = 0; i < msg->n_moves; i++)
   {
     MigrateInfo& move = msg->moves[i];
