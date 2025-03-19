@@ -16,7 +16,6 @@ set(conv-core-h-sources
     src/conv-core/conv-rdmadevice.h
     src/conv-core/conv-taskQ.h
     src/conv-core/conv-trace.h
-    src/conv-core/converse.h
     src/conv-core/cpthreads.h
     src/conv-core/debug-conv++.h
     src/conv-core/debug-conv.h
@@ -58,6 +57,19 @@ set(conv-core-cxx-sources
     src/conv-core/queueing.C
     src/conv-core/hrctimer.C
 )
+
+set(reconverse-h-sources 
+    reconverse/barrier.h
+    reconverse/convcore.h
+    reconverse/converse.h
+    reconverse/CpvMacros.h
+    reconverse/queue.h
+    reconverse/scheduler.h
+    reconverse/build/converse_config.h)
+
+set(reconverse-comm-backend-sources
+    reconverse/comm_backend/comm_backend_internal.h 
+    reconverse/comm_backend/comm_backend.h)
 
 if(${CMK_USE_SHMEM})
     set(conv-core-cxx-sources
@@ -237,6 +249,15 @@ target_link_libraries(converse INTERFACE
     hwloc
 )
 
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/comm_backend)
+
+foreach (filename 
+        ${reconverse-comm-backend-sources}
+)
+    configure_file(${filename} ${CMAKE_BINARY_DIR}/include/comm_backend/ COPYONLY)
+
+endforeach()
+
 foreach(filename
     ${conv-core-h-sources}
     ${conv-ccs-h-sources}
@@ -244,9 +265,12 @@ foreach(filename
     ${conv-util-h-sources}
     ${conv-ldb-h-sources}
     ${tmgr-h-sources}
+    ${reconverse-h-sources}
 )
     configure_file(${filename} ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 endforeach()
+
+
 
 # target_include_directories(converse PRIVATE src/arch/util) # for machine*.*
 # target_include_directories(converse PRIVATE src/util) # for sockRoutines.C
