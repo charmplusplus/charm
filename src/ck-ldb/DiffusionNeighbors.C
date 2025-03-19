@@ -278,13 +278,12 @@ void DiffusionLB::createCommList()
       int fromobj = nodeStats->getHash(from);  // this replaces the simulator get_obj_idx
       int toobj = nodeStats->getHash(to);
 
-      if (fromobj == -1 || toobj == -1)
-        continue;
+      //if (fromobj == -1 || toobj == -1)
+      //  continue;
 
       int fromNode = myNodeId;
       int toPE = commData.receiver.lastKnown();
       int toNode = toPE / nodeSize;
-
       if (myNodeId != toNode && toNode != -1 && toNode < numNodes)
         ebytes[toNode] += commData.bytes;
     }
@@ -295,6 +294,7 @@ void DiffusionLB::createCommList()
   for (int i = 0; i < numNodes; i++)
   {
     cost_for_neighbor[i] = ebytes[i];
+    CkPrintf("\n[PE-%d] ebytes[%d] = %d", CkMyPe(), i, ebytes[i]);
   }
 
   sortArr(ebytes, numNodes, nbors);
