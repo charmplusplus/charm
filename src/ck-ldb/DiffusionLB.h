@@ -144,6 +144,7 @@ private:
 
   int pseudo_itr;  // iteration count
   int temp_itr;
+  bool pseudo_done;
 
   // phase 3: across node LB --------------------------------
   void buildObjComms(int nobjs);
