@@ -123,6 +123,7 @@ void DiffusionLB::Strategy(const DistBaseLB::LDStats* const stats)
   round = 0;
   statsReceived = 0;
   rank0_barrier_counter = 0;
+  pseudo_done = true;
 
   thisProxy[rank0PE].ReceiveStats(*marshmsg);
   if (CkMyPe() != rank0PE)
@@ -175,6 +176,24 @@ void DiffusionLB::startStrategy()
   rank0_barrier_counter = 0;
   CkPrintf("--------NEIGHBOR SELECTION COMPLETE--------\n");
   for (int i = 0; i < numNodes; i++) thisProxy[i * nodeSize].pseudolb_rounds();
+}
+
+void DiffusionLB::pseudolb_barrier(int allZero)
+{
+  if (!allZero)
+  {
+    pseudo_done = false;
+  }
+
+  if (++rank0_barrier_counter < numNodes)
+    return;
+
+  for (int node = 0; node < numNodes; node++)
+  {
+    thisProxy[node * nodeSize].pseudoDone(pseudo_done);
+  }
+  pseudo_done = true;  // set up for next round
+  rank0_barrier_counter = 0;
 }
 
 void DiffusionLB::InitializeObjHeap(int n)
@@ -267,7 +286,7 @@ void DiffusionLB::PseudoLoadBalancing()
     thisRoundToSend[id] = toSend;
   }
 
-  bool allZero = 1;
+  bool allZero = true;
 
   for (int i = 0; i < neighborCount; i++)
   {
@@ -275,7 +294,7 @@ void DiffusionLB::PseudoLoadBalancing()
 
     if (thisRoundToSend[i] > 0)
     {
-      allZero = 0;
+      allZero = false;
     }
 
     my_pseudo_load -= thisRoundToSend[i];
@@ -283,8 +302,7 @@ void DiffusionLB::PseudoLoadBalancing()
   }
 
   // contribute to reduction to check if round is over
-  CkCallback cb(CkReductionTarget(DiffusionLB, pseudoDone), thisProxy);
-  contribute(sizeof(bool), &allZero, CkReduction::logical_and, cb);
+  thisProxy[0].pseudolb_barrier(allZero);
 
   // double threshold = THRESHOLD * avgLoadNeighbor / 100.0;
 
@@ -407,8 +425,6 @@ void DiffusionLB::AcrossNodeLB()
       {
         break;  // no more objects to send
       }
-
-      assert(nodeStats->objData[v_id].migratable);
 
       double currLoad = objs[v_id].getVertexLoad();
       objs[v_id].setCurrPe(-1);

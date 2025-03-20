@@ -67,10 +67,10 @@ void DiffusionLB::buildMSTinRounds(double best_weight, int best_from, int best_t
   int to = best_to;
   int from = best_from;
 
-  assert(thisIndex != rank0PE);
+  CkAssert(thisIndex == rank0PE);
 
-  assert(to != from);
-  assert(to != -1);
+  CkAssert(to != from && to != -1);
+
 
   // initiator is new node added to graph
   // assert that to is not already in graph
@@ -81,7 +81,8 @@ void DiffusionLB::buildMSTinRounds(double best_weight, int best_from, int best_t
     {
       // this check ensures that during the first round (when to = 0, from = -1), we don't
       // add -1 to the neighbors
-      assert(from % nodeSize == 0);  // assert that from is a rank0PE
+
+      CkAssert(from < numNodes);
       // sendToNeighbors.push_back(from);
 
       addNeighbor(from);
@@ -100,11 +101,11 @@ void DiffusionLB::buildMSTinRounds(double best_weight, int best_from, int best_t
   {
     // all nodes have been visited, MST is complete
     int do_again = 1;
-    assert(visited);
-    assert(std::find(mstVisitedPes.begin(), mstVisitedPes.end(), myNodeId) !=
+    CkAssert(visited);
+    CkAssert(std::find(mstVisitedPes.begin(), mstVisitedPes.end(), myNodeId) !=
            mstVisitedPes.end());
 
-    assert(sendToNeighbors.size() >= 1);
+    CkAssert(sendToNeighbors.size() >= 1);
 
     mstVisitedPes.clear();
 

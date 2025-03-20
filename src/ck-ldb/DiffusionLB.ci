@@ -27,6 +27,9 @@ module DiffusionLB
     // entry void LoadTransfer(double load, int initPE, int objId);
     entry void LoadReceived(int objId, int fromPE);
     entry void AcrossNodeLB();
+
+    entry void pseudolb_barrier(int allZero);
+
     entry[reductiontarget] void startStrategy();
     // entry [reductiontarget] void DoneNodeLB();
     // entry void MigratedHelper(LDObjHandle h, int waitBarrier);
@@ -151,6 +154,9 @@ module DiffusionLB
 
         CkPrintf("Node %d has neighbors: %s\n", myNodeId, neighborsStr.c_str());
 
+        loadNeighbors.clear();
+        toSendLoad.clear();
+
         loadNeighbors.resize(neighborCount, 0);
         toSendLoad.resize(neighborCount, 0);
         toReceiveLoad.resize(neighborCount, 0);
@@ -198,11 +204,10 @@ module DiffusionLB
           }
         }
 
-        when pseudoDone(bool done) serial
+        when pseudoDone(bool doneInPseudo) serial
         {
-          if (done)
+          if (doneInPseudo)
           {
-            CkPrintf("Pseudo LB done in %d rounds\n", pseudo_itr + 1);
             pseudo_itr = ITERATIONS;
           }
         }

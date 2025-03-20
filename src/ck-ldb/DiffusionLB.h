@@ -51,6 +51,8 @@ public:
   void next_phase(int val);
   void sortArr(long arr[], int n, int* nbors);
 
+  void pseudolb_barrier(int allZero);
+
   void MigrationDoneWrapper();  // Call when migration is complete
   void ReceiveStats(CkMarshalledCLBStatsMessage&& data);
   void ReceiveFinalStats(std::vector<bool> isMigratable, std::vector<int> from_proc,
