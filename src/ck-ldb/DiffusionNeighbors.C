@@ -295,7 +295,7 @@ void DiffusionLB::createCommList()
   for (int i = 0; i < numNodes; i++)
   {
     cost_for_neighbor[i] = ebytes[i];
-    CkPrintf("\n[PE-%d] ebytes[%d] = %d", CkMyPe(), i, ebytes[i]);
+    //CkPrintf("\n[PE-%d] ebytes[%d] = %d", CkMyPe(), i, ebytes[i]);
   }
 
   sortArr(ebytes, numNodes, nbors);
