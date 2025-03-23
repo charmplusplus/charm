@@ -1062,17 +1062,17 @@ void CentralLB::ProcessReceiveMigration()
 void CentralLB::CheckForLB() {
   if (pending_realloc_state == EXPAND_MSG_RECEIVED)
     CheckForRealloc();
-  else if (pending_realloc_state == SHRINK_MSG_RECEIVED)
-    thisProxy.CallLB();
   else
-    thisProxy.ResumeClients(0);
+    thisProxy.CallLB();
+  //else
+  //  thisProxy.ResumeClients(0);
 }
 
 // We assume that bit vector would have been aptly set async by either scheduler or charmrun.
 void CentralLB::CheckForRealloc(){
 #if CMK_SHRINK_EXPAND
-  if(pending_realloc_state == EXPAND_MSG_RECEIVED || pending_realloc_state == SHRINK_MSG_RECEIVED) {
-    pending_realloc_state = (pending_realloc_state == EXPAND_MSG_RECEIVED) ? EXPAND_IN_PROGRESS : SHRINK_IN_PROGRESS; //in progress
+  if(pending_realloc_state != NO_REALLOC) {
+    pending_realloc_state = (pending_realloc_state == SHRINK_MSG_RECEIVED) ? SHRINK_IN_PROGRESS : EXPAND_IN_PROGRESS; //in progress
     CkPrintf("Load balancer invoking charmrun to handle reallocation on pe %d\n", CkMyPe());
     double end_lb_time = CkWallTimer();
     CkPrintf("CharmLB> %s: PE [%d] step %d finished at %f duration %f s\n\n",

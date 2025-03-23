@@ -26,7 +26,12 @@ bool load_balancer_created;
 
 void realloc(char* reallocMsg)
 {
-    numProcessAfterRestart = *((int *)(reallocMsg + CkNumPes()));
+    numProcessAfterRestart = *((int *)reallocMsg);
+    reallocMsg += sizeof(int);
+    int numBits = *((int *)reallocMsg);
+    reallocMsg += sizeof(int);
+
+    CkPrintf("Charm> numProcessAfterRestart = %d\n", numProcessAfterRestart);
 
     if (LBManagerObj()->lb_in_progress)
     {
@@ -35,18 +40,62 @@ void realloc(char* reallocMsg)
     }
     else
     {
-        if (numProcessAfterRestart > CkNumPes())
-            pending_realloc_state = EXPAND_MSG_RECEIVED;
-        else
-            pending_realloc_state = SHRINK_MSG_RECEIVED;
+        //if (numProcessAfterRestart > CkNumPes())
+        //    pending_realloc_state = EXPAND_MSG_RECEIVED;
+        //else
+        //    pending_realloc_state = SHRINK_MSG_RECEIVED;
+
+        char* old_bitmap = (char *)malloc(sizeof(char) * CkNumPes());
+        LBManagerObj()->get_avail_vector(old_bitmap);
+
+        char* new_bitmap = (char *)malloc(sizeof(char) * CkNumPes());
+        memcpy(new_bitmap, old_bitmap, sizeof(char) * CkNumPes());
+
+        int last_pe = -1;
+        int j = 0;
+        for (int i = 0; i < numBits; i++)
+        {
+            if (reallocMsg[i] == 0)
+            {
+                while (last_pe < i && j < CkNumPes())
+                    last_pe += old_bitmap[j++];
+                
+                if (last_pe == i)
+                    new_bitmap[j-1] = 0;
+            }
+        }
+
+        for (int i = 0; i < CkNumPes(); i++)
+        {
+            CkPrintf("Charm> before old_bitmap[%d] = %d\n", i, old_bitmap[i]);
+            CkPrintf("Charm> reallocMsg[%d] = %d\n", i, reallocMsg[i]);
+            //new_bitmap[i] = reallocMsg[i] & new_bitmap[i];
+            CkPrintf("Charm> after new_bitmap[%d] = %d\n", i, new_bitmap[i]);
+        }
 
         if((CkMyPe() == 0) && (load_balancer_created))
-        LBManagerObj()->set_avail_vector(reallocMsg, 0);
+        LBManagerObj()->set_avail_vector(new_bitmap, 0);
 
         se_avail_vector = (char *)malloc(sizeof(char) * CkNumPes());
         LBManagerObj()->get_avail_vector(se_avail_vector);
 
-        free(reallocMsg);
+        // now find whether this is shrink/expand
+        pending_realloc_state = NO_REALLOC;
+        for (int i = 0; i < CkNumPes(); i++)
+            if (se_avail_vector[i] == 0)
+            {
+                pending_realloc_state = SHRINK_MSG_RECEIVED;
+                break;
+            }
+
+        if (numProcessAfterRestart > CkNumPes() || (numProcessAfterRestart == CkNumPes() && 
+                pending_realloc_state == SHRINK_MSG_RECEIVED))
+            pending_realloc_state = static_cast<realloc_state>(static_cast<uint8_t>(pending_realloc_state) | 
+                static_cast<uint8_t>(EXPAND_MSG_RECEIVED));
+
+        //free(reallocMsg);
+        free(new_bitmap);
+        free(old_bitmap);
     }
 }
 
@@ -54,7 +103,7 @@ static void handler(char *bit_map)
 {
 #if CMK_SHRINK_EXPAND
     printf("Charm> Rescaling called!\n");
-    shrinkExpandreplyToken = CcsDelayReply();
+    //shrinkExpandreplyToken = CcsDelayReply();
     bit_map += CmiMsgHeaderSizeBytes;
     realloc(bit_map);
 #endif

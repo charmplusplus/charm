@@ -1908,10 +1908,10 @@ void ConverseCleanup(void)
 
   if (CmiMyPe() == 0) {
     if (willContinue) {
-      CcsSendDelayedReply(shrinkExpandreplyToken, 0, 0); //reply to CCS client
+      //CcsSendDelayedReply(shrinkExpandreplyToken, 0, 0); //reply to CCS client
       // wait for this message to receive, hack
       // TODO: figure out why this is important
-      usleep(500);
+      //usleep(500);
       // this causes charmrun to go away
       ChMessageInt_t numProcessAfterRestart_msg = ChMessageInt_new(numProcessAfterRestart);
       ctrl_sendone_locking("realloc",(char *)&numProcessAfterRestart_msg, sizeof(int),NULL,0);

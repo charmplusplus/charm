@@ -23,6 +23,7 @@ public:
     CProxy_Jacobi array;
     int num_chares;
     int iterations;
+    int iterations_after_restart;
     int total_iterations;
 	double stTime;
     double startTime;
@@ -35,6 +36,7 @@ public:
 
         // set iteration counter to zero
         iterations=0;
+        iterations_after_restart=0;
 
         // store the main proxy
         mainProxy = thisProxy;
@@ -81,6 +83,8 @@ public:
       // subtle: Chare proxy readonly needs to be updated manually because of
       // the object pointer inside it.
     mainProxy = thisProxy;
+    stTime = CkWallTimer();
+    iterations_after_restart = 0;
 
     CkPrintf("Resuming Jacobi on %d processors with (%d,%d) elements\n", CkNumPes(), num_chare_rows, num_chare_cols);
 
@@ -98,10 +102,11 @@ void report(int completed_iteration) {
             CkExit();
             //exit(0);
         } else {
-            if(iterations%100==0) CkPrintf("starting new iteration; iteration %d time: %.6lf time/itr::%.6f\n", iterations, CkWallTimer()-stTime,(CkWallTimer()-stTime)/iterations);
+            if(iterations%10==0) CkPrintf("starting new iteration; iteration %d time: %.6lf time/itr::%.6f\n", iterations, CkWallTimer()-stTime,(CkWallTimer()-stTime)/iterations_after_restart);
             //CkPrintf("Memory Usage: %ld bytes \n", CmiMemoryUsage());
             recieve_count=0;
             iterations++;
+            iterations_after_restart++;
             // Call begin_iteration on all worker chares in array
             startTime = CkWallTimer();
             array.begin_iteration();
@@ -172,13 +177,13 @@ public:
     void begin_iteration(void) {
         if (iteration %200 ==0 && useLB ) {
             useLB = 0;
-            if(thisIndex.x==0 && thisIndex.y==0) CkPrintf("PROC#%d Calling LBD --------------------- iteration=%d\n",CkMyPe(),iteration);
+            //if(thisIndex.x==0 && thisIndex.y==0) CkPrintf("PROC#%d Calling LBD --------------------- iteration=%d\n",CkMyPe(),iteration);
             AtSync();
         } else {
 
         useLB=1;
         //if(thisIndex.x==0 && thisIndex.y==0) CkPrintf("PROC#%d started --------------------- iteration=%d\n",CkMyPe(),iteration);
-				iteration++;
+		iteration++;
         // Copy left column and right column into temporary arrays
         array1d left_edge(block_height);
         array1d right_edge(block_height);

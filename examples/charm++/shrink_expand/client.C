@@ -14,11 +14,6 @@ int main (int argc, char **argv)
 {
     int OLDNPROCS, NEWNPROCS;
 
-    if (argc < 5) {
-        printf("Usage: %s <hostname> <port> <oldprocs> <newprocs> \n", argv[0]);
-        return 1;
-    }
-
     // Create a CcsServer and connect to the given hostname and port
     CcsServer server;
     char host[BUF], *msg;
@@ -27,17 +22,14 @@ int main (int argc, char **argv)
 
     sprintf(host, "%s", argv[1]);
     sscanf(argv[2], "%d", &port);
-    sscanf(argv[3], "%d", &OLDNPROCS);
-    sscanf(argv[4], "%d", &NEWNPROCS);
+    OLDNPROCS = 4;
+    NEWNPROCS = 4;
 
     if( NEWNPROCS > OLDNPROCS)
         isExpand = true;
     else if(OLDNPROCS > NEWNPROCS)
         isExpand = false;
-    else{
-        printf("1");
-        return 0;
-    }
+
     //printf("Connecting to server %s %d\n", host, port);
     if (CcsConnect(&server, host, port, NULL) == -1) {
         printf("0");
@@ -45,15 +37,27 @@ int main (int argc, char **argv)
     }
     //printf("Connected to server\n");
 
-    cmdLen = sizeof(int) + sizeof(bool);
+    cmdLen = 2 * sizeof(int) + OLDNPROCS * sizeof(char);
     msg = (char *) malloc(cmdLen);
-    memcpy(msg, &isExpand, sizeof(bool));
-    memcpy(&msg[sizeof(bool)], &NEWNPROCS, sizeof(int));
-    CcsSendRequest(&server, "realloc", 0, cmdLen, msg);
+    memcpy(msg, &NEWNPROCS, sizeof(int));
+    memcpy(&msg[sizeof(int)], &OLDNPROCS, sizeof(int));
+    
+    int offset = 2 * sizeof(int);
+    msg[offset] = 1;
+    msg[1 + offset] = 0;
+    msg[2 + offset] = 1;
+    msg[3 + offset] = 1;
 
-    printf("Waiting for reply...\n" );
-    CcsRecvResponse(&server, cmdLen, msg , 180);
-    printf("Reply received.\n");
+    for (i = 0; i < OLDNPROCS; i++) {
+        printf("PE %d: %d\n", i, msg[i]);
+    }
+
+    //memcpy(&msg[sizeof(bool)], &NEWNPROCS, sizeof(int));
+    CcsSendRequest(&server, "set_bitmap", 0, cmdLen, msg);
+
+    //printf("Waiting for reply...\n" );
+    //CcsRecvResponse(&server, cmdLen, msg , 180);
+    //printf("Reply received.\n");
 
     return 0;
 }

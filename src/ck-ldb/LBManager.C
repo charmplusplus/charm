@@ -809,7 +809,8 @@ void LBManager::pup(PUP::er& p)
       p | avail_vector;
       // If we're restarting with more PEs, make the new ones available
       //if (avail_vector.size() < CkNumPes())
-      avail_vector.resize(CkNumPes(), 1);
+      //avail_vector.resize(CkNumPes(), 1);
+      avail_vector = std::vector<char>(CkNumPes(), 1);
     }
     else
     {

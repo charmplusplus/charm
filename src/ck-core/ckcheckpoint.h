@@ -72,10 +72,10 @@ int  CkCountArrayElements();
 enum realloc_state : uint8_t 
 {
   NO_REALLOC=0, 
-  SHRINK_MSG_RECEIVED=1, 
-  EXPAND_MSG_RECEIVED=2,
-  SHRINK_IN_PROGRESS=3,
-  EXPAND_IN_PROGRESS=4
+  SHRINK_MSG_RECEIVED=1 << 0, 
+  EXPAND_MSG_RECEIVED=1 << 1,
+  SHRINK_IN_PROGRESS=1 << 2,
+  EXPAND_IN_PROGRESS=1 << 3
 };
 
 extern realloc_state pending_realloc_state;
