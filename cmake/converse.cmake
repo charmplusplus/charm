@@ -201,11 +201,11 @@ set(conv-ldb-h-sources
 )
 
 add_library(ldb-none src/conv-ldb/cldb.none.C ${conv-ldb-h-sources})
-add_library(ldb-test src/conv-ldb/cldb.test.C ${conv-ldb-h-sources})
-add_library(ldb-rand src/conv-ldb/cldb.rand.C ${conv-ldb-h-sources})
-add_library(ldb-neighbor src/conv-ldb/cldb.neighbor.C src/conv-ldb/cldb.neighbor.h ${conv-ldb-h-sources})
-add_library(ldb-workstealing src/conv-ldb/cldb.workstealing.C src/conv-ldb/cldb.workstealing.h ${conv-ldb-h-sources})
-add_library(ldb-spray src/conv-ldb/cldb.spray.C ${conv-ldb-h-sources})
+#add_library(ldb-test src/conv-ldb/cldb.test.C ${conv-ldb-h-sources})
+#add_library(ldb-rand src/conv-ldb/cldb.rand.C ${conv-ldb-h-sources})
+#add_library(ldb-neighbor src/conv-ldb/cldb.neighbor.C src/conv-ldb/cldb.neighbor.h ${conv-ldb-h-sources})
+#add_library(ldb-workstealing src/conv-ldb/cldb.workstealing.C src/conv-ldb/cldb.workstealing.h ${conv-ldb-h-sources})
+#add_library(ldb-spray src/conv-ldb/cldb.spray.C ${conv-ldb-h-sources})
 # add_library(ldb-prioritycentralized src/conv-ldb/cldb.prioritycentralized.C src/conv-ldb/cldb.prioritycentralized.h ${conv-ldb-h-sources})
 
 # TopoManager
