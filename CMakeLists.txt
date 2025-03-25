@@ -1002,7 +1002,8 @@ endif()
 
 # Check that we are able to build and link an executable
 add_executable(ckhello ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.C)
-add_dependencies(ckhello ck ldb-none memory-default threads-default conv-static
+# ldb-none
+add_dependencies(ckhello ck memory-default threads-default conv-static
   converse ckmain ckqt
   moduleNDMeshStreamer modulecompletion)
 

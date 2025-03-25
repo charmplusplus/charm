@@ -59,17 +59,11 @@ set(conv-core-cxx-sources
 )
 
 set(reconverse-h-sources 
-    reconverse/barrier.h
-    reconverse/convcore.h
-    reconverse/converse.h
-    reconverse/CpvMacros.h
-    reconverse/queue.h
-    reconverse/scheduler.h
-    reconverse/build/converse_config.h)
+    reconverse/include/converse.h)
 
-set(reconverse-comm-backend-sources
-    reconverse/comm_backend/comm_backend_internal.h 
-    reconverse/comm_backend/comm_backend.h)
+#set(reconverse-comm-backend-sources
+#    reconverse/comm_backend/comm_backend_internal.h 
+#    reconverse/comm_backend/comm_backend.h)
 
 if(${CMK_USE_SHMEM})
     set(conv-core-cxx-sources
@@ -195,12 +189,12 @@ set(conv-ldb-cxx-sources
 )
 
 set(conv-ldb-h-sources
-    src/conv-ldb/cldb.h
-    src/conv-ldb/graphdefs.h
-    src/conv-ldb/topology.h
+    #src/conv-ldb/cldb.h
+    #src/conv-ldb/graphdefs.h
+    #src/conv-ldb/topology.h
 )
 
-add_library(ldb-none src/conv-ldb/cldb.none.C ${conv-ldb-h-sources})
+# add_library(ldb-none src/conv-ldb/cldb.none.C ${conv-ldb-h-sources})
 #add_library(ldb-test src/conv-ldb/cldb.test.C ${conv-ldb-h-sources})
 #add_library(ldb-rand src/conv-ldb/cldb.rand.C ${conv-ldb-h-sources})
 #add_library(ldb-neighbor src/conv-ldb/cldb.neighbor.C src/conv-ldb/cldb.neighbor.h ${conv-ldb-h-sources})
@@ -249,14 +243,14 @@ target_link_libraries(converse INTERFACE
     hwloc
 )
 
-file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/comm_backend)
+#file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/comm_backend)
 
-foreach (filename 
-        ${reconverse-comm-backend-sources}
-)
-    configure_file(${filename} ${CMAKE_BINARY_DIR}/include/comm_backend/ COPYONLY)
+#foreach (filename 
+#        ${reconverse-comm-backend-sources}
+#)
+ #   configure_file(${filename} ${CMAKE_BINARY_DIR}/include/comm_backend/ COPYONLY)
 
-endforeach()
+#endforeach()
 
 foreach(filename
     ${conv-core-h-sources}
