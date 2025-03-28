@@ -193,7 +193,7 @@ jobs:
       if: ${{ env.namd_secret != '' }}
       run: |
         cd ..
-        git clone https://${{ secrets.NAMD_CI_USERNAME_TOKEN }}@gitlab.com/tcbgUIUC/namd.git
+        git clone https://${{ secrets.NAMD_CI_USERNAME_TOKEN }}:${{ secrets.NAMD_CI_DEPLOY_PASSWORD }}@gitlab.com/tcbgUIUC/namd.git
         cd namd
         ./config Linux-x86_64-g++ --charm-base ../charm --charm-arch netlrts-linux-x86_64 --without-tcl
         cd Linux-x86_64-g++
