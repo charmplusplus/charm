@@ -114,7 +114,7 @@ public:
   CProxy_ArrayBase(const ArrayElement* e);
   CProxy_ArrayBase(const CProxy_ArrayBase& cs) : CProxy(cs), _aid(cs.ckGetArrayID()) {}
 
-  bool operator==(const CProxy_ArrayBase& other)
+  bool operator==(const CProxy_ArrayBase& other) const
   {
     return ckGetArrayID() == other.ckGetArrayID();
   }
@@ -176,7 +176,7 @@ public:
     return *this;
   }
 
-  bool operator==(const CProxyElement_ArrayBase& other)
+  bool operator==(const CProxyElement_ArrayBase& other) const
   {
     return ckGetArrayID() == other.ckGetArrayID() && ckGetIndex() == other.ckGetIndex();
   }
