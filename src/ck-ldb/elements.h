@@ -22,6 +22,7 @@ public:
 //   LDOMid omID;
 //   LDObjid id; 
    int Id; // should replace other Ids.
+   int pe;
 };
 
 

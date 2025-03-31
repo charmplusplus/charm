@@ -69,7 +69,7 @@ public:
   void ProcessMigrations();
   void WithinNodeLB();
 
-  void LoadMetaInfo(LDObjHandle h, double load);
+  void LoadMetaInfo(LDObjHandle h, int objId, double load, int senderPE);
 
 protected:
   virtual bool QueryBalanceNow(int) { return true; };
@@ -188,6 +188,9 @@ private:
   // Cascading migrations / not used (because cascading migration doesn't make sense?)
   std::vector<LDObjHandle> objectHandles;
   std::vector<double> objectLoads;
+  std::vector<int> objectSrcIds;
+  std::vector<int> objSenderPEs;
+  std::unordered_map<int, MigrateInfo*> mig_id_map;
   int FindObjectHandle(LDObjHandle h);
   void CascadingMigration(LDObjHandle h, double load);
 };

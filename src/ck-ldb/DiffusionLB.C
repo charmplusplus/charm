@@ -124,6 +124,11 @@ void DiffusionLB::Strategy(const DistBaseLB::LDStats* const stats)
   statsReceived = 0;
   rank0_barrier_counter = 0;
   pseudo_done = true;
+  mig_id_map.clear();
+  objectHandles.clear();
+  objectSrcIds.clear();
+  objSenderPEs.clear();
+  objectLoads.clear();
 
   thisProxy[rank0PE].ReceiveStats(*marshmsg);
   if (CkMyPe() != rank0PE)
@@ -448,7 +453,7 @@ void DiffusionLB::AcrossNodeLB()
       metric->updateState(v_id, nborId);  // update state to keep track of migrations
 
       LDObjHandle objHandle = nodeStats->objData[v_id].handle;
-      thisProxy[destPE].LoadMetaInfo(objHandle, currLoad);
+      thisProxy[destPE].LoadMetaInfo(objHandle, objId, currLoad, donorPE);
       thisProxy[donorPE].LoadReceived(objId, destPE);
 
       nodeStats->to_proc[v_id] = destPE;
@@ -502,6 +507,7 @@ void DiffusionLB::WithinNodeLB()
     // Create a max heap and min heap for pe loads
     vector<double> objectSizes;
     vector<int> objectIds;
+    vector<int> objectPEs;
     minHeap minPes(nodeSize);
     double threshold = THRESHOLD * avgPE / 100.0;
 
@@ -519,10 +525,22 @@ void DiffusionLB::WithinNodeLB()
         }
         for (int j = start; j < prefixObjects[i]; j++)
         {
-          if (objs[j].getCurrPe() != -1 && objs[j].getVertexLoad() <= overLoad)
+          if (objs[j].isMigratable() && objs[j].getCurrPe() != -1 && objs[j].getVertexLoad() <= overLoad)
           {
             objectSizes.push_back(objs[j].getVertexLoad());
             objectIds.push_back(j);
+            objectPEs.push_back(GetPENumber(j)+rank0PE);
+            overLoad -= objs[j].getVertexLoad();
+          }
+        }
+        if(i==0) {
+          //Objects migrating in
+          for(int i=0;i<objectLoads.size();i++) {
+            if(objectLoads[i] <= overLoad) {
+              objectSizes.push_back(objectLoads[i]);
+              objectIds.push_back(objectSrcIds[i]/*objHandle*/);
+              objectPEs.push_back(objSenderPEs[i]);
+            }
           }
         }
       }
@@ -542,6 +560,7 @@ void DiffusionLB::WithinNodeLB()
       InfoRecord* item = new InfoRecord;
       item->load = objectSizes[i];  // sorting factor in maxheap
       item->Id = objectIds[i];
+      item->pe = objectPEs[i]; // sending pe
       objects.insert(item);
     }
 
@@ -563,7 +582,7 @@ void DiffusionLB::WithinNodeLB()
         continue;
       }
 
-      thisProxy[pe + rank0PE].LoadReceived(objId, rank0PE + minPE->Id);
+      thisProxy[maxObj->pe/*pe + rank0PE*/].LoadReceived(objId, rank0PE + minPE->Id);
 
       pe_load[minPE->Id] += maxObj->load;
       pe_load[pe] -= maxObj->load;
@@ -605,14 +624,21 @@ void DiffusionLB::WithinNodeLB()
 void DiffusionLB::LoadReceived(int objId, int from0PE)
 {
   // load is received, hence create a migrate message for the object with id objId.
-
-  MigrateInfo* migrateMe = new MigrateInfo;
-  migrateMe->obj = myStats->objData[objId].handle;
-  migrateMe->from_pe = CkMyPe();
-  migrateMe->to_pe = from0PE;
-  // migrateMe->async_arrival = myStats->objData[objId].asyncArrival;
-  migrateInfo.push_back(migrateMe);
-  total_migrates++;
+  auto it = mig_id_map.find(objId);
+  if(it!=mig_id_map.end()) {
+    MigrateInfo* migrateMe = it->second;
+    CkPrintf("\nUpdating to PE from %d to %d", migrateMe->to_pe, from0PE);
+    migrateMe->to_pe = from0PE;
+  } else{
+    MigrateInfo* migrateMe = new MigrateInfo;
+    migrateMe->obj = myStats->objData[objId].handle;
+    migrateMe->from_pe = CkMyPe();
+    migrateMe->to_pe = from0PE;
+    // migrateMe->async_arrival = myStats->objData[objId].asyncArrival;
+    migrateInfo.push_back(migrateMe);
+    mig_id_map.emplace(objId, migrateMe);
+    total_migrates++;
+  }
 }
 
 void DiffusionLB::ProcessMigrations()
@@ -696,7 +722,7 @@ void DiffusionLB::CascadingMigration(LDObjHandle h, double load)
       }
       thisProxy[sendToNeighbors[minNode] *
                 nodeSize /*CkNodeFirst(sendToNeighbors[minNode])*/]
-          .LoadMetaInfo(h, load);
+          .LoadMetaInfo(h, 0, load, CkMyPe());
       lbmgr->Migrate(h, sendToNeighbors[minNode] *
                             nodeSize /*CkNodeFirst(sendToNeighbors[minNode])*/);
     }
@@ -727,21 +753,28 @@ void DiffusionLB::CascadingMigration(LDObjHandle h, double load)
 /* LoadMetaInfo is called on the receiver with the object that will be migrated to it
  * (via a MigrateMe in  LoadReceived). It is only called when migrating at the node
  * level. Not sure why the receiver would already have this handle though...*/
-void DiffusionLB::LoadMetaInfo(LDObjHandle h, double load)
+void DiffusionLB::LoadMetaInfo(LDObjHandle h, int objId, double load, int senderPE)
 {
+  pe_load[0] += load;
   int idx = FindObjectHandle(h);  // if object is in my handles
   if (idx == -1)
   {
     objectHandles.push_back(h);
+    objectSrcIds.push_back(objId);
     objectLoads.push_back(load);
+    objSenderPEs.push_back(senderPE);
   }
   else
   {
     CascadingMigration(h, load);
     objectHandles[idx] = objectHandles[objectHandles.size() - 1];
     objectLoads[idx] = objectLoads[objectLoads.size() - 1];
+    objectSrcIds[idx] = objectSrcIds[objectSrcIds.size()-1];
+    objSenderPEs[idx] = objSenderPEs[objSenderPEs.size()-1];
     objectHandles.pop_back();
     objectLoads.pop_back();
+    objectSrcIds.pop_back();
+    objSenderPEs.pop_back();
   }
 }
 
