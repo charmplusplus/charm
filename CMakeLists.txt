@@ -10,7 +10,7 @@
 # - the buildcmake script
 # - files in cmake/
 
-cmake_minimum_required(VERSION 3.4...3.5)
+cmake_minimum_required(VERSION 3.10)
 
 # Print warning
 message("##################################################################")
