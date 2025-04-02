@@ -10,7 +10,7 @@
 # - the buildcmake script
 # - files in cmake/
 
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.12)
 
 # Print warning
 message("##################################################################")
@@ -21,12 +21,10 @@ message("# with the below configuration information.                      #")
 message("# You can run './buildold' to use the previous build system.     #")
 message("##################################################################")
 
-if(CMAKE_VERSION VERSION_GREATER 3.12 OR CMAKE_VERSION VERSION_EQUAL 3.12)
-  cmake_policy(SET CMP0075 NEW)
+cmake_policy(SET CMP0075 NEW)
 
-  if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.17)
-    cmake_policy(SET CMP0102 NEW)
-  endif()
+if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.17)
+  cmake_policy(SET CMP0102 NEW)
 endif()
 
 # Fortran is optional, so don't include it in LANGUAGES here
