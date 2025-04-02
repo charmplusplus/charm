@@ -17,18 +17,22 @@ int main (int argc, char **argv)
     // Create a CcsServer and connect to the given hostname and port
     CcsServer server;
     char host[BUF], *msg;
-    int i, port, cmdLen;
+    int i, port, cmdLen, numKilled, numAdded;
     bool isExpand;
 
     sprintf(host, "%s", argv[1]);
     sscanf(argv[2], "%d", &port);
-    OLDNPROCS = 4;
-    NEWNPROCS = 4;
+    sscanf(argv[3], "%d", &OLDNPROCS);
+    sscanf(argv[4], "%d", &numKilled);
+    int killedIndex[numKilled];
+    
+    for (i = 0; i < numKilled; i++) {
+        sscanf(argv[5 + i], "%d", &killedIndex[i]);
+    }
 
-    if( NEWNPROCS > OLDNPROCS)
-        isExpand = true;
-    else if(OLDNPROCS > NEWNPROCS)
-        isExpand = false;
+    sscanf(argv[5 + numKilled], "%d", &numAdded);
+
+    NEWNPROCS = OLDNPROCS - numKilled + numAdded;
 
     //printf("Connecting to server %s %d\n", host, port);
     if (CcsConnect(&server, host, port, NULL) == -1) {
@@ -43,13 +47,18 @@ int main (int argc, char **argv)
     memcpy(&msg[sizeof(int)], &OLDNPROCS, sizeof(int));
     
     int offset = 2 * sizeof(int);
-    msg[offset] = 1;
-    msg[1 + offset] = 0;
-    msg[2 + offset] = 1;
-    msg[3 + offset] = 1;
+    int count = 0;
+    for (i = 0; i < OLDNPROCS; i++) {
+        if (i == killedIndex[count]) {
+            msg[i + offset] = 0;
+            count++;
+        }
+        else
+            msg[i + offset] = 1;
+    }
 
     for (i = 0; i < OLDNPROCS; i++) {
-        printf("PE %d: %d\n", i, msg[i]);
+        printf("PE %d: %d\n", i, msg[i + offset]);
     }
 
     //memcpy(&msg[sizeof(bool)], &NEWNPROCS, sizeof(int));
