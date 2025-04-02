@@ -334,19 +334,10 @@ set(CMK_HAS_PYTHON 0)
 set(CMK_PYTHON_VERSION "")
 set(CMK_BUILD_PYTHON "")
 
-if(CMAKE_VERSION VERSION_GREATER 3.12 OR CMAKE_VERSION VERSION_EQUAL 3.12)
-  find_package(Python2 COMPONENTS Interpreter)
-  if(Python2_FOUND)
-    set(CMK_PYTHON_VERSION_MAJOR ${Python2_VERSION_MAJOR})
-    set(CMK_PYTHON_VERSION_MINOR ${Python2_VERSION_MINOR})
-  endif()
-else()
-  set(Python_ADDITIONAL_VERSIONS 2)
-  find_package(PythonInterp)
-  if(PYTHONINTERP_FOUND)
-    set(CMK_PYTHON_VERSION_MAJOR ${PYTHON_VERSION_MAJOR})
-    set(CMK_PYTHON_VERSION_MINOR ${PYTHON_VERSION_MINOR})
-  endif()
+find_package(Python2 COMPONENTS Interpreter)
+if(Python2_FOUND)
+  set(CMK_PYTHON_VERSION_MAJOR ${Python2_VERSION_MAJOR})
+  set(CMK_PYTHON_VERSION_MINOR ${Python2_VERSION_MINOR})
 endif()
 
 if(CMK_PYTHON_VERSION_MAJOR)
@@ -597,7 +588,7 @@ endif()
 #disable ROMIO due to GCC 14 cascade of failures
 if(NOT DEFINED CMK_AMPI_WITH_ROMIO)
   set(CMK_AMPI_WITH_ROMIO 0)
-endif()  
+endif()
 set(CMK_ENABLE_C11   ${CMAKE_C11_EXTENSION_COMPILE_OPTION})
 
 # Use -std=gnu++11 if available
@@ -685,7 +676,7 @@ configure_file(src/arch/${VDIR}/conv-mach.sh                 include/ COPYONLY)
 
 set(CUDA_DIR "")
 if(BUILD_CUDA)
-  
+
   file(GLOB_RECURSE hybridAPI-h-sources ${CMAKE_SOURCE_DIR}/src/arch/cuda/*.h)
   file(GLOB_RECURSE hybridAPI-cxx-sources ${CMAKE_SOURCE_DIR}/src/arch/cuda/*.cpp)
   foreach(file ${hybridAPI-h-sources})
@@ -1239,13 +1230,9 @@ configure_package_config_file(
   "${CMAKE_BINARY_DIR}/lib/cmake/Charm/CharmConfig.cmake"
   INSTALL_DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/cmake/Charm/CharmConfig.cmake
   )
-# We want the `SameMinorVersion` compatibility mode, but it isn't available
-# before CMake v3.11
-if(CMAKE_VERSION VERSION_GREATER 3.11 OR CMAKE_VERSION VERSION_EQUAL 3.11)
-  set(VERSION_COMPATIBILITY_MODE SameMinorVersion)
-else()
-  set(VERSION_COMPATIBILITY_MODE ExactVersion)
-endif()
+
+set(VERSION_COMPATIBILITY_MODE SameMinorVersion)
+
 write_basic_package_version_file(
   ${CMAKE_BINARY_DIR}/lib/cmake/Charm/CharmConfigVersion.cmake
   COMPATIBILITY ${VERSION_COMPATIBILITY_MODE})
