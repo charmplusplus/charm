@@ -36,7 +36,7 @@ void realloc(char* reallocMsg)
     if (LBManagerObj()->lb_in_progress)
     {
         CkPrintf("Charm> Rescaling called while load balancing is in progress!\n");
-        LBManagerObj()->bufferRealloc(reallocMsg);
+        LBManagerObj()->bufferRealloc(reallocMsg - 2 * sizeof(int));
     }
     else
     {

@@ -272,6 +272,7 @@ class LBManager : public CBase_LBManager
 
   void bufferRealloc(char* bitmap)
   {
+    CkPrintf("Buffered realloc called\n");
     int size = CkNumPes() + sizeof(int);
     reallocBuffer = (char*)malloc(size);
     memcpy(reallocBuffer, bitmap, size);
@@ -279,6 +280,7 @@ class LBManager : public CBase_LBManager
 
   void callRealloc()
   {
+    CkPrintf("Called buffered realloc\n");
     if (reallocBuffer != nullptr)
     {
       realloc(reallocBuffer);

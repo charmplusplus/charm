@@ -1112,6 +1112,7 @@ void CentralLB::WillIbekilled(std::vector<char> avail, int newnumProcessAfterRes
 #if CMK_SHRINK_EXPAND
  numProcessAfterRestart = newnumProcessAfterRestart;
  mynewpe =  GetNewPeNumber(avail);
+ CkPrintf("[%d] -> new pe %d\n", CkMyPe(), mynewpe);
  willContinue = avail[CkMyPe()];
  //CkPrintf("PE%i> Sending start cleanup reduction\n", CkMyPe());
  CkCallback cb(CkIndex_CentralLB::StartCleanup(), thisProxy[0]);
@@ -1181,7 +1182,7 @@ void CentralLB::ResumeClients()
 void CentralLB::ResumeClients(int balancing)
 {
 #if CMK_LBDB_ON
-  DEBUGF(("[%d] Resuming clients. balancing:%d.\n",CkMyPe(),balancing));
+  CkPrintf("[%d] Resuming clients. balancing:%d.\n",CkMyPe(),balancing);
 
   lbmgr->ResumeClients();
   if (balancing)  {
@@ -1191,11 +1192,11 @@ void CentralLB::ResumeClients(int balancing)
             future_migrates_expected == future_migrates_completed) {
       CheckMigrationComplete();
     }
-
-    if (CkMyPe() == 0)
-      lbmgr->callRealloc();
   }
   lbmgr->lb_in_progress = false;
+
+  if (CkMyPe() == 0)
+    lbmgr->callRealloc();
 #endif
 }
 

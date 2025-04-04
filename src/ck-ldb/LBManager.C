@@ -826,6 +826,7 @@ void LBManager::pup(PUP::er& p)
   p | mystep;
   if (p.isUnpacking())
   {
+    reallocBuffer = nullptr;
     if (_lb_args.metaLbOn())
     {
       // if unpacking set metabalancer using the id
