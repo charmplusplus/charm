@@ -1,9 +1,15 @@
 /* Pick NUM_NEIGHBORS in random */
 /*readonly*/ bool centroid;
 
+#define SELF_IDX NUM_NEIGHBORS
+#define EXT_IDX NUM_NEIGHBORS + 1
+#define NUM_NEIGHBORS 4
+
 #define COMM
 
 #include <assert.h>
+
+#define ROUNDS 100
 
 /* Entry point for neighbor building. Only rank0PEs call findNBors*/
 void DiffusionLB::findNBors(int do_again)
@@ -52,6 +58,7 @@ void DiffusionLB::findNBors(int do_again)
   buildMSTinRounds(best_weight, best_from, best_to);
 #endif
   //  findRemainingNbors(0);
+//  thisProxy[0].startFirstRound();
 }
 
 void DiffusionLB::buildMSTinRounds(double best_weight, int best_from, int best_to)
@@ -138,7 +145,7 @@ void DiffusionLB::buildMSTinRounds(double best_weight, int best_from, int best_t
     // pick best edge (it is best because nbors are sorted by preference)
     for (int id = 0; id < numNodes; id++)
     {
-      int nbor = nbors[id];
+      int nbor = node_idx[id];
 
       if (std::find(mstVisitedPes.begin(), mstVisitedPes.end(), nbor) ==
               mstVisitedPes.end() &&
@@ -207,65 +214,85 @@ void DiffusionLB::startFirstRound()
   {
     rank0_barrier_counter = 0;
     CkPrintf("MST is built. Begin finding remaining neighbors.\n");
-    for (int i = 0; i < numNodes; i++) thisProxy[i * nodeSize].findNBorsRound(1);
+    for (int i = 0; i < numNodes; i++) thisProxy[i * nodeSize].findNBorsRound();
   }
 }
 
-void DiffusionLB::findNBorsRound(int do_again)
+void DiffusionLB::findNBorsRound()
 {
-  assert(thisIndex % nodeSize == 0);  // only node managers should call this
-  requests_sent = 0;
-  if (!do_again || round == 100)
-  {
+  if(CkMyPe()%nodeSize!=0) return;
+//  assert(thisIndex % nodeSize == 0);  // only node managers should call this
+  round++;
+  DEBUGL(("\nPE-%d, with round = %d", CkMyPe(), round));
+  if (round == ROUNDS)
+  { 
     neighborCount = sendToNeighbors.size();
+   /* 
+    loadNeighbors = new double[neighborCount];
+    toSendLoad = new double[neighborCount];
+    toReceiveLoad = new double[neighborCount];
+  */
+//    if(thisIndex==0) {
+//      CkCallback cb(CkIndex_DiffusionLB::startStrategy()/*startDiffusion()*/, thisProxy);
+//      CkStartQD(cb);//contribute(cb);
+//    }
     thisProxy[0].startStrategy();
-
     return;
   }
-  int potentialNb = 0;
-  int nborsNeeded = (NUM_NEIGHBORS - sendToNeighbors.size()) / 2;
+
+  int nborsNeeded = NUM_NEIGHBORS - sendToNeighbors.size() - holds[round];
+  int local_tries = 0;
+
   if (nborsNeeded > 0)
   {
-    while (potentialNb < nborsNeeded)
+    while(local_tries < nborsNeeded/2)
     {
-      int potentialNbor = nbors[pick++];  // rand() % numNodes;
+      int max_neighbors = numNodes<NUM_NEIGHBORS?numNodes:NUM_NEIGHBORS;
+      pick = (pick + 1)%max_neighbors;
+      int potentialNbor = node_idx[pick]; //pick - better logic needed here
+
+      if(potentialNbor == -1) {
+        local_tries++;
+        continue;
+      }
       if (myNodeId != potentialNbor &&
-          std::find(sendToNeighbors.begin(), sendToNeighbors.end(), potentialNbor) ==
-              sendToNeighbors.end() &&
-          potentialNbor < numNodes && potentialNbor >= 0)
+          std::find(sendToNeighbors.begin(), sendToNeighbors.end(), potentialNbor) == sendToNeighbors.end() &&
+          potentialNbor < numNodes &&
+          potentialNbor >= 0)
       {
-        // CkPrintf("Node-%d sending request round =%d, potentialNbor = %d\n", thisIndex,
-        // round, potentialNbor);
-        requests_sent++;
-        thisProxy[potentialNbor].proposeNbor(myNodeId);
-        potentialNb++;
+        node_idx[pick] = -1;
+        CkPrintf("Node-%d sending request round =%d, potentialNbor = Node-%d\n", myNodeId, round, potentialNbor);
+        thisProxy[potentialNbor*nodeSize].askNbor(myNodeId, round);
       }
-      else
-      {
-        CkAbort("NOT ENOUGH POTENTIAL NEIGHBORS: try adjusting NUM_NEIGHBORS\n");
-      }
+      local_tries++;
     }
   }
+  if(round < ROUNDS && thisIndex==0) {
+
+    CkCallback cb(CkIndex_DiffusionLB::findNBorsRound(), thisProxy);
+    CkStartQD(cb);
+  }
+/*
   else
   {
     int do_again = 0;
     thisProxy[0].next_phase(do_again);
-    /*
-        CkCallback cb(CkReductionTarget(DiffusionLB, findNBors), thisProxy);
-        contribute(sizeof(int), &do_again, CkReduction::max_int, cb);
-    */
   }
+*/
 }
 
 void DiffusionLB::createCommList()
 {
+  holds = new int[ROUNDS+1];
+    for(int i=0;i<ROUNDS+1;i++)
+      holds[i] = 0;
   pick = 0;
 
   long ebytes[numNodes];
   std::fill_n(ebytes, numNodes, 0);
 
-  nbors = new int[numNodes];
-  for (int i = 0; i < numNodes; i++) nbors[i] = -1;
+  node_idx = new int[numNodes];
+  for (int i = 0; i < numNodes; i++) node_idx[i] = -1;
 
   sendToNeighbors.clear();
   for (int edge = 0; edge < nodeStats->commData.size(); edge++)
@@ -298,7 +325,7 @@ void DiffusionLB::createCommList()
     //CkPrintf("\n[PE-%d] ebytes[%d] = %d", CkMyPe(), i, ebytes[i]);
   }
 
-  sortArr(ebytes, numNodes, nbors);
+  sortArr(ebytes, numNodes, node_idx);
 }
 
 void DiffusionLB::next_phase(int val)
@@ -309,7 +336,7 @@ void DiffusionLB::next_phase(int val)
   if (acks == numNodes)
   {
     acks = 0;
-    for (int i = 0; i < numNodes; i++) thisProxy[i * nodeSize].findNBorsRound(max);
+    for (int i = 0; i < numNodes; i++) thisProxy[i * nodeSize].findNBorsRound();
     max = 0;
   }
 }
@@ -329,6 +356,7 @@ void DiffusionLB::proposeNbor(int nborId)
   thisProxy[nborId * nodeSize].okayNbor(agree, myNodeId);
 }
 
+#if 0
 void DiffusionLB::okayNbor(int agree, int nborId)
 {
   if (sendToNeighbors.size() < NUM_NEIGHBORS && agree &&
@@ -349,6 +377,49 @@ void DiffusionLB::okayNbor(int agree, int nborId)
   round++;
 
   thisProxy[0].next_phase(do_again);
+}
+#endif
+void DiffusionLB::askNbor(int nborId, int rnd)
+{
+  int agree = 0;
+  int nborsNeeded = NUM_NEIGHBORS - sendToNeighbors.size() - holds[rnd];
+  if (nborsNeeded>0 &&
+      std::find(sendToNeighbors.begin(), sendToNeighbors.end(), nborId) == sendToNeighbors.end())
+  {
+    //HOLD A SPOT THOUGH on THIS ROUND!!
+    agree = 1;
+    holds[rnd]++;
+
+//    sendToNeighbors.push_back(nborId);
+    DEBUGL(("\nNode-%d (holds[%d]=%d), (%d- %d- %d> 0?) round =%d Agreeing to hold for %d ", thisIndex, rnd, holds[rnd], NUM_NEIGHBORS, sendToNeighbors.size(), holds[rnd]-1,
+    round, nborId));
+  }
+  else
+  {
+    DEBUGL(("\nNode-%d, round =%d Rejecting %d ", thisIndex, round, nborId));
+  }
+  CkPrintf("\n[PE-%d(node-%d)]Sending okay to nbor PE-%d(%d*%d)", CkMyPe(), myNodeId, nborId*nodeSize, nborId, nodeSize);
+  thisProxy[nborId*nodeSize].okayNbor(agree, myNodeId/*thisIndex*/);
+}
+
+void DiffusionLB::okayNbor(int agree, int nborId)
+{
+  int nborsNeeded = NUM_NEIGHBORS - sendToNeighbors.size() - holds[round];
+  if (nborsNeeded > 0 && agree && std::find(sendToNeighbors.begin(), sendToNeighbors.end(), nborId) == sendToNeighbors.end())
+  {
+    DEBUGL(("\n[Node-%d, round-%d] Rcvd ack, adding %d as nbor (neighbors:%d/%d, holds[%d]=%d)", thisIndex, round, nborId,sendToNeighbors.size(), NUM_NEIGHBORS, round, holds[round]));
+    sendToNeighbors.push_back(nborId);
+    thisProxy[nborId*nodeSize].ackNbor(myNodeId/*thisIndex*/);
+  } else {
+    CkPrintf("\n[Node-%d] Decided not to pursue orig request to node %d", thisIndex, nborId);
+  }
+}
+
+void DiffusionLB::ackNbor(int nborId) {
+  if(std::find(sendToNeighbors.begin(), sendToNeighbors.end(), nborId) == sendToNeighbors.end()) {
+    CkPrintf("\n[Node-%d] Adding neighbor [%d] through final ack (neighbors:%d/%d)", thisIndex, nborId, sendToNeighbors.size(), NUM_NEIGHBORS);
+    sendToNeighbors.push_back(nborId);
+  }
 }
 void DiffusionLB::sortArr(long arr[], int n, int* nbors)
 {

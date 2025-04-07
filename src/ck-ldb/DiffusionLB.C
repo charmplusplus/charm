@@ -25,8 +25,12 @@
 
 #define DEBUGF(x) CmiPrintf x;
 #define DEBUGR(x)  // CmiPrintf x;
-#define DEBUGL(x) CmiPrintf x;
+#define DEBUGL(x) /*CmiPrintf x*/;
 #define ITERATIONS 40
+
+#define SELF_IDX NUM_NEIGHBORS
+#define EXT_IDX NUM_NEIGHBORS + 1
+#define NUM_NEIGHBORS 4
 
 #include "DiffusionMetric.C"
 #include "DiffusionNeighbors.C"
@@ -105,11 +109,6 @@ void DiffusionLB::Strategy(const DistBaseLB::LDStats* const stats)
   {
     double start_time = CmiWallTimer();
   }
-  if (CkMyPe() == 0)
-  {
-    CkCallback cb(CkIndex_DiffusionLB::AcrossNodeLB(), thisProxy);
-    CkStartQD(cb);
-  }
   statsmsg = AssembleStats();
   if (statsmsg == NULL)
     CkAbort("Error: statsmsg is NULL\n");
@@ -178,8 +177,14 @@ void DiffusionLB::startStrategy()
   if (++rank0_barrier_counter < numNodes)
     return;
 
+  if (CkMyPe() == 0)
+  {
+    CkCallback cb(CkIndex_DiffusionLB::AcrossNodeLB(), thisProxy);
+    CkStartQD(cb);
+  }
+
   rank0_barrier_counter = 0;
-  CkPrintf("--------NEIGHBOR SELECTION COMPLETE--------\n");
+  CkPrintf("--------NEIGHBOR SELECTION COMPLETE--------\n"); fflush(stdout);
   for (int i = 0; i < numNodes; i++) thisProxy[i * nodeSize].pseudolb_rounds();
 }
 
