@@ -1079,7 +1079,8 @@ void CentralLB::CheckForRealloc(){
         lbname, cur_ld_balancer, step()-1, end_lb_time,	end_lb_time-start_lb_time);
     // do checkpoint
     CkCallback cb(CkIndex_CentralLB::ResumeFromReallocCheckpoint(), thisProxy[0]);
-    CkStartCheckpoint(_shrinkexpand_basedir, cb);
+    CkStartRescaleCheckpoint(_shrinkexpand_basedir, cb, 
+      std::vector<char>(se_avail_vector, se_avail_vector + CkNumPes()));
   } else {
     thisProxy.MigrationDoneImpl(1);
   }
@@ -1090,23 +1091,10 @@ void CentralLB::ResumeFromReallocCheckpoint(){
 #if CMK_SHRINK_EXPAND
     CkPrintf("Resumed from realloc\n");
     std::vector<char> avail(se_avail_vector, se_avail_vector + CkNumPes());
-    free(se_avail_vector);
+    //free(se_avail_vector);
     thisProxy.WillIbekilled(avail, numProcessAfterRestart);
 #endif
 }
-
-
-
-#if CMK_SHRINK_EXPAND
-int GetNewPeNumber(std::vector<char> avail){
-  int mype = CkMyPe();
-  int count =0;
-  for (int i =0; i <mype; i++){
-    if(avail[i] ==0) count++;
-  }
-  return (mype - count);
-}
-#endif
 
 void CentralLB::WillIbekilled(std::vector<char> avail, int newnumProcessAfterRestart){
 #if CMK_SHRINK_EXPAND

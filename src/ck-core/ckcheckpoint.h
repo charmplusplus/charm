@@ -41,6 +41,9 @@ restarting of Charm++ programs. ...
     }	\
   }
 
+  #if CMK_SHRINK_EXPAND
+  extern char* se_avail_vector;
+  #endif
 
 //int   _shrinkExpandRestartHandlerIdx;
 
@@ -60,10 +63,15 @@ void CkRecvGroupROData(char* msg);
 // min(writersPerNode, CkMyNodeSize())
 void CkStartCheckpoint(const char* dirname, const CkCallback& cb,
                        bool requestStatus = false, int writersPerNode = 0);
+void CkStartRescaleCheckpoint(const char* dirname, const CkCallback& cb, 
+  std::vector<char> avail, bool requestStatus = false, int writersPerNode = 0);
 void CkRestartMain(const char* dirname, CkArgMsg* args);
+
 #if CMK_SHRINK_EXPAND
+int GetNewPeNumber(std::vector<char> avail);
 void CkResumeRestartMain(char *msg);
 #endif
+
 #if __FAULT__
 int  CkCountArrayElements();
 #endif

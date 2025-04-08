@@ -12,6 +12,7 @@
 #include <vector>
 #include "pup_stl.h"
 #include "manager.h"
+#include "ckcheckpoint.h"
 extern CkGroupID loadbalancer;
 
 void CreateCentralLB();
