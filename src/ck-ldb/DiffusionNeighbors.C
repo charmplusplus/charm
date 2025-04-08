@@ -224,6 +224,11 @@ void DiffusionLB::findNBorsRound()
 //  assert(thisIndex % nodeSize == 0);  // only node managers should call this
   round++;
   DEBUGL(("\nPE-%d, with round = %d", CkMyPe(), round));
+  if(round < ROUNDS && thisIndex==0) {
+
+    CkCallback cb(CkIndex_DiffusionLB::findNBorsRound(), thisProxy);
+    CkStartQD(cb);
+  }
   if (round == ROUNDS)
   { 
     neighborCount = sendToNeighbors.size();
@@ -266,11 +271,6 @@ void DiffusionLB::findNBorsRound()
       }
       local_tries++;
     }
-  }
-  if(round < ROUNDS && thisIndex==0) {
-
-    CkCallback cb(CkIndex_DiffusionLB::findNBorsRound(), thisProxy);
-    CkStartQD(cb);
   }
 /*
   else
