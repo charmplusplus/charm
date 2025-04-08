@@ -3582,7 +3582,7 @@ Reduction on Groups
 ^^^^^^^^^^^^^^^^^^^^
 Reduction can be performed on groups using the same syntax as chare arrays. 
 See section :numref:`reductions` for more information. The example, 
-``examples/charm++/histogram_group`` demonstrates the api. 
+``examples/charm++/histogram_group`` demonstrates the API. 
 
 NodeGroup Objects
 ~~~~~~~~~~~~~~~~~
