@@ -64,6 +64,14 @@ void CcsRegisterHandler(const char *name, CmiHandler fn) {
   cp.fnOld=fn;
   *(CcsHandlerRec *)CkHashtablePut(CpvAccess(ccsTab),(void *)&cp.name)=cp;
 }
+
+#ifdef CMK_CHARM4PY
+void CcsRegisterHandlerExt(const char *ccs_handlername, void *fn)
+{
+  CcsRegisterHandler(ccs_handlername, (CmiHandler)fn);
+}
+#endif
+
 void CcsRegisterHandlerFn(const char *name, CcsHandlerFn fn, void *ptr) {
   CcsHandlerRec cp;
   initHandlerRec(&cp,name);

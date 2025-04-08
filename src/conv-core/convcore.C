@@ -4382,4 +4382,9 @@ void CmiSetPeHelpsOtherThreads(int input) {
   CmiMemoryWriteFence();
 }
 
+int getCmiReservedHeaderSize()
+{
+  return CmiReservedHeaderSize;
+}
+
 /*@}*/

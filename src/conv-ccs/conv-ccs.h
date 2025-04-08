@@ -51,6 +51,10 @@ typedef struct CcsHandlerRec {
  */
 void CcsRegisterHandler(const char *ccs_handlername, CmiHandler fn);
 
+#ifdef CMK_CHARM4PY
+void CcsRegisterHandlerExt(const char *ccs_handlername, void *fn);
+#endif
+
 CcsHandlerRec *CcsGetHandler(const char *name);
 
 /**
