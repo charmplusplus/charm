@@ -1060,6 +1060,7 @@ void CentralLB::ProcessReceiveMigration()
 }
 
 void CentralLB::CheckForLB() {
+  //sleep(5);
   if (pending_realloc_state == EXPAND_MSG_RECEIVED)
     CheckForRealloc();
   else
