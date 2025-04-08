@@ -11,6 +11,7 @@ module DiffusionLB
 
     // DiffusionNeighbors
     entry[reductiontarget] void findNBors(int do_again);
+    entry void begin();
     entry void startFirstRound();
     entry[reductiontarget] void findNBorsRound();
     entry[expedited] void proposeNbor(int nborId);

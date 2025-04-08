@@ -38,6 +38,7 @@ public:
   // void Migrated(LDObjHandle h, int waitBarrier = 1);
   void createCommList();
   void findNBors(int do_again);
+  void begin();
   void findNBorsRound();
   void startFirstRound();
   void proposeNbor(int nborId);

@@ -9,11 +9,15 @@
 
 #include <assert.h>
 
-#define ROUNDS 100
+#define ROUNDS 50
 
 /* Entry point for neighbor building. Only rank0PEs call findNBors*/
 void DiffusionLB::findNBors(int do_again)
 {
+  if(thisIndex==0) {
+    CkCallback cb(CkIndex_DiffusionLB::begin(), thisProxy);
+    CkStartQD(cb);
+  }
   if (thisIndex != rank0PE)
   {
     return;
@@ -41,6 +45,10 @@ void DiffusionLB::findNBors(int do_again)
 #endif
   }
 
+}
+
+void DiffusionLB::begin() {
+  if (CkMyPe() != rank0PE) return;
   mstVisitedPes.clear();
   round = 0;
   rank0_barrier_counter = 0;
@@ -266,7 +274,7 @@ void DiffusionLB::findNBorsRound()
           potentialNbor >= 0)
       {
         node_idx[pick] = -1;
-        CkPrintf("Node-%d sending request round =%d, potentialNbor = Node-%d\n", myNodeId, round, potentialNbor);
+        DEBUGL(("Node-%d sending request round =%d, potentialNbor = Node-%d\n", myNodeId, round, potentialNbor));
         thisProxy[potentialNbor*nodeSize].askNbor(myNodeId, round);
       }
       local_tries++;
@@ -398,7 +406,7 @@ void DiffusionLB::askNbor(int nborId, int rnd)
   {
     DEBUGL(("\nNode-%d, round =%d Rejecting %d ", thisIndex, round, nborId));
   }
-  CkPrintf("\n[PE-%d(node-%d)]Sending okay to nbor PE-%d(%d*%d)", CkMyPe(), myNodeId, nborId*nodeSize, nborId, nodeSize);
+  DEBUGL(("\n[PE-%d(node-%d)]Sending okay to nbor PE-%d(%d*%d)", CkMyPe(), myNodeId, nborId*nodeSize, nborId, nodeSize));
   thisProxy[nborId*nodeSize].okayNbor(agree, myNodeId/*thisIndex*/);
 }
 
@@ -411,7 +419,7 @@ void DiffusionLB::okayNbor(int agree, int nborId)
     sendToNeighbors.push_back(nborId);
     thisProxy[nborId*nodeSize].ackNbor(myNodeId/*thisIndex*/);
   } else {
-    CkPrintf("\n[Node-%d] Decided not to pursue orig request to node %d", thisIndex, nborId);
+    DEBUGL(("\n[Node-%d] Decided not to pursue orig request to node %d", thisIndex, nborId));
   }
 }
 

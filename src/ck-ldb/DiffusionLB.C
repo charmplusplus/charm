@@ -103,6 +103,8 @@ DiffusionLB::~DiffusionLB()
 // Main entry point for the load balancer
 void DiffusionLB::Strategy(const DistBaseLB::LDStats* const stats)
 {
+//  CkPrintf("\n[PE-%d] In Strategy", CkMyPe());
+//  fflush(stdout);
   total_migrates = 0;
 
   if (CkMyPe() == 0 && _lb_args.debug() >= 1)
@@ -168,6 +170,8 @@ void DiffusionLB::statsAssembled()
 {
   if (CkMyPe() == rank0PE)
   {
+//    CkPrintf("\nPE-%d, calling findNBors", CkMyPe());
+//    fflush(stdout);
     findNBors(1);
   }
 }
