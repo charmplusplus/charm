@@ -6,6 +6,8 @@ module CkCheckpoint {
     entry CkCheckpointWriteMgr(void);
     entry [exclusive] void Checkpoint(char dirname[strlen(dirname) + 1], CkCallback cb,
                           bool requestStatus, int writersPerNode);
+    entry [exclusive] void RescaleCheckpoint(char dirname[strlen(dirname) + 1], CkCallback cb,
+                          std::vector<char> avail, bool requestStatus, int writersPerNode);
     entry [exclusive] void FinishedCheckpoint(void);
   };
   group [migratable] CkCheckpointMgr {
