@@ -3435,6 +3435,13 @@ static void req_set_client_connect(std::vector<nodetab_process> & process_table,
     //fflush(stdout);
 #endif
     /* check appropriate clients for messages */
+
+    for (int i = 0; i < process_table.size(); i++)
+    {
+      nodetab_process & p = process_table[i];
+      printf("Charmrun> process table nodeno %d\n", p.nodeno);
+    }
+
     while (!open_sockets.empty())
     {
       const SOCKET req_client = open_sockets.front();
