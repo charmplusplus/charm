@@ -1631,6 +1631,7 @@ static void nodetab_init_with_nodelist()
             host->name = strdup(hostname.c_str());
             host->ip = nodetab_host::resolve(hostname.c_str());
             host->hostno = hostno++;
+            printf("Adding host %s, %i\n", host->name, host->hostno);
             temp_hosts.insert({hostname, host});
             nodetab_args(b3, host);
           }
@@ -4288,7 +4289,7 @@ int main(int argc, const char **argv, char **envp)
     for (const nodetab_host * h : host_table)
     {
       skt_print_ip(ips, sizeof(ips), h->ip);
-      printf("Charmrun> added host \"%s\", IP:%s\n", h->name, ips);
+      printf("Charmrun> added host \"%s\", hostno %d, IP:%s\n", h->name, h->hostno, ips);
     }
   }
 
