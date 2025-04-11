@@ -68,7 +68,7 @@ public:
   void ProcessMigrations();
   void WithinNodeLB();
 
-  void LoadMetaInfo(LDObjHandle h, int objId, double load, int senderPE);
+  void LoadMetaInfo(LDObjHandle h, int objId, double load, int senderPE, int only_mcount);
 
 protected:
   virtual bool QueryBalanceNow(int) { return true; };

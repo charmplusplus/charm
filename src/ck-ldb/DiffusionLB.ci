@@ -38,7 +38,7 @@ module DiffusionLB
     // entry void MigratedHelper(LDObjHandle h, int waitBarrier);
     entry void ProcessMigrations();
     entry void next_phase(int val);
-    entry void LoadMetaInfo(LDObjHandle h, int objId, double load, int senderPE);
+    entry void LoadMetaInfo(LDObjHandle h, int objId, double load, int senderPE, int only_mcount);
     entry void MigrationDoneWrapper();  // Call when migration is complete
     entry void WithinNodeLB();
   

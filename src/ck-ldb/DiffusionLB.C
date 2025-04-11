@@ -471,9 +471,8 @@ void DiffusionLB::AcrossNodeLB()
       metric->updateState(v_id, nborId);  // update state to keep track of migrations
 
       LDObjHandle objHandle = nodeStats->objData[v_id].handle;
-      thisProxy[destPE].LoadMetaInfo(objHandle, objId, currLoad, donorPE);
+      thisProxy[destPE].LoadMetaInfo(objHandle, objId, currLoad, donorPE, 0);
       thisProxy[donorPE].LoadReceived(objId, destPE);
-
       nodeStats->to_proc[v_id] = destPE;
     }
   }
@@ -534,47 +533,56 @@ void DiffusionLB::WithinNodeLB()
     vector<double> objectSizes;
     vector<int> objectIds;
     vector<int> objectPEs;
+    vector<LDObjHandle> objectHdl;
+    vector<int> isToken;
     minHeap minPes(nodeSize);
     double threshold = THRESHOLD * avgPE / 100.0;
 
     // for each pe... find overload, something with prefix sum?
     // and store the underloaded pes
-    for (int i = 0; i < nodeSize; i++)
+    for (int rank = 0; rank < nodeSize; rank++)
     {
-      if (pe_load[i] > avgPE + threshold)
+      CkPrintf("\nOrig PE load with node LB [%d] = %lf", rank+rank0PE, pe_load[rank]);
+      if (pe_load[rank] > avgPE + threshold)
       {
-        double overLoad = pe_load[i] - avgPE;
+        double overLoad = pe_load[rank] - avgPE;
         int start = 0;
-        if (i != 0)
+        if (rank != 0)
         {
-          start = prefixObjects[i - 1];
+          start = prefixObjects[rank - 1];
         }
-        for (int j = start; j < prefixObjects[i]; j++)
+        for (int j = start; j < prefixObjects[rank]; j++)
         {
           if (objs[j].isMigratable() && objs[j].getCurrPe() != -1 && objs[j].getVertexLoad() <= overLoad)
           {
             objectSizes.push_back(objs[j].getVertexLoad());
             objectIds.push_back(j);
-            objectPEs.push_back(GetPENumber(j)+rank0PE);
+            objectPEs.push_back(/*GetPENumber(j)*/rank+rank0PE);
+            objectHdl.push_back(nodeStats->objData[j].handle);
+            isToken.push_back(0);
             overLoad -= objs[j].getVertexLoad();
           }
         }
-        if(i==0) {
+        if(rank==0) {
           //Objects migrating in
           for(int i=0;i<objectLoads.size();i++) {
             if(objectLoads[i] <= overLoad) {
               objectSizes.push_back(objectLoads[i]);
               objectIds.push_back(objectSrcIds[i]/*objHandle*/);
+              objectHdl.push_back(objectHandles[i]);
               objectPEs.push_back(objSenderPEs[i]);
+              isToken.push_back(1);
+              overLoad -= objectLoads[i];
             }
           }
         }
       }
-      else if (pe_load[i] < avgPE - threshold)
+      else if (pe_load[rank] < avgPE - threshold)
       {
+        CkPrintf("\nAdding PE-%d to minPEs on node %d", CkMyPe(), myNodeId);
         InfoRecord* itemMin = new InfoRecord;
-        itemMin->load = pe_load[i];
-        itemMin->Id = i;
+        itemMin->load = pe_load[rank];
+        itemMin->Id = rank;
         minPes.insert(itemMin);
       }
     }
@@ -587,6 +595,10 @@ void DiffusionLB::WithinNodeLB()
       item->load = objectSizes[i];  // sorting factor in maxheap
       item->Id = objectIds[i];
       item->pe = objectPEs[i]; // sending pe
+      item->handle = objectHdl[i];
+      item->token = false;
+      if(isToken[i])
+        item->token = true;
       objects.insert(item);
     }
 
@@ -600,6 +612,10 @@ void DiffusionLB::WithinNodeLB()
       if (minPE == NULL)
         minPE = minPes.deleteMin();
       double diff = avgPE - minPE->load;
+      if(diff < 0) {
+        minPE = minPes.deleteMin();
+        continue;
+      }
       int objId = maxObj->Id;
       int pe = GetPENumber(objId);
       if (maxObj->load > diff || pe_load[pe] < avgPE - threshold)
@@ -608,20 +624,34 @@ void DiffusionLB::WithinNodeLB()
         continue;
       }
 
-      thisProxy[maxObj->pe/*pe + rank0PE*/].LoadReceived(objId, rank0PE + minPE->Id);
+      int destPE = rank0PE + minPE->Id;
+      int donorPE = maxObj->pe;
+      LDObjHandle objHandle = maxObj->handle;
+      double currLoad = maxObj->load;
+
+//      if(maxObj->token) 
+
+      thisProxy[destPE].LoadMetaInfo(objHandle, objId, currLoad, donorPE, 1); // to the receiving PE (mig++)
+ 
+      if(maxObj->token) {
+        migrates_expected--;
+        //subtract from intermediate PE (rank0, i.e. me)
+      }
+      
+      thisProxy[donorPE].LoadReceived(objId, destPE);
 
       pe_load[minPE->Id] += maxObj->load;
       pe_load[pe] -= maxObj->load;
       if (pe_load[minPE->Id] < avgPE)
       {
-        minPE->load = pe_load[minPE->Id];
+        minPE->load += maxObj->load;//= pe_load[minPE->Id];
         minPes.insert(minPE);
       }
       else
         delete minPE;
       minPE = NULL;
     }
-
+    //may be clearing heaps for next LB step, after intra-node LB is done above
     // TODO: clear the heaps? why?
     while (minPes.numElements() > 0)
     {
@@ -660,6 +690,7 @@ void DiffusionLB::LoadReceived(int objId, int from0PE)
     migrateMe->obj = myStats->objData[objId].handle;
     migrateMe->from_pe = CkMyPe();
     migrateMe->to_pe = from0PE;
+    if(CkMyPe()==rank0PE) pe_load[CkMyRank()] -= myStats->objData[objId].wallTime;
     // migrateMe->async_arrival = myStats->objData[objId].asyncArrival;
     migrateInfo.push_back(migrateMe);
     mig_id_map.emplace(objId, migrateMe);
@@ -672,6 +703,7 @@ void DiffusionLB::ProcessMigrations()
   // SAME AS IN PACKANDSENDMIGRATEMSGS
   LBMigrateMsg* msg = new (total_migrates, CkNumPes(), CkNumPes(), 0) LBMigrateMsg;
   msg->n_moves = total_migrates;
+  CkPrintf("\nPE-%d with %d migrates", CkMyPe(), total_migrates);
   for (int i = 0; i < total_migrates; i++)
   {
     MigrateInfo* item = (MigrateInfo*)migrateInfo[i];
@@ -718,6 +750,7 @@ void DiffusionLB::ProcessMigrations()
 
 void DiffusionLB::CascadingMigration(LDObjHandle h, double load)
 {
+#if 0
   CkAbort("CASCADING: we don't understand this implementation yet\n");
   double threshold = THRESHOLD * avgLoadNeighbor / 100.0;
   int minNode = 0;
@@ -746,7 +779,7 @@ void DiffusionLB::CascadingMigration(LDObjHandle h, double load)
       }
       thisProxy[sendToNeighbors[minNode] *
                 nodeSize /*CkNodeFirst(sendToNeighbors[minNode])*/]
-          .LoadMetaInfo(h, 0, load, CkMyPe());
+          .LoadMetaInfo(h, 0, load, CkMyPe(), 0);
       lbmgr->Migrate(h, sendToNeighbors[minNode] *
                             nodeSize /*CkNodeFirst(sendToNeighbors[minNode])*/);
     }
@@ -770,6 +803,7 @@ void DiffusionLB::CascadingMigration(LDObjHandle h, double load)
       lbmgr->Migrate(h, rank0PE + minRank);
     }
   }
+#endif
 }
 
 // When load balancing, remove object handle from your list, since it is about to be
@@ -777,9 +811,11 @@ void DiffusionLB::CascadingMigration(LDObjHandle h, double load)
 /* LoadMetaInfo is called on the receiver with the object that will be migrated to it
  * (via a MigrateMe in  LoadReceived). It is only called when migrating at the node
  * level. Not sure why the receiver would already have this handle though...*/
-void DiffusionLB::LoadMetaInfo(LDObjHandle h, int objId, double load, int senderPE)
+void DiffusionLB::LoadMetaInfo(LDObjHandle h, int objId, double load, int senderPE, int only_mcount)
 {
   migrates_expected++;
+  if(only_mcount)
+    return;
   pe_load[0] += load;
   int idx = FindObjectHandle(h);  // if object is in my handles
   if (idx == -1)

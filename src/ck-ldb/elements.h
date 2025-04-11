@@ -23,6 +23,8 @@ public:
 //   LDObjid id; 
    int Id; // should replace other Ids.
    int pe;
+   bool token;
+   LDObjHandle handle;
 };
 
 
