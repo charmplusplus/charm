@@ -28,10 +28,6 @@
 #define DEBUGL(x) /*CmiPrintf x*/;
 #define ITERATIONS 40
 
-#define SELF_IDX NUM_NEIGHBORS
-#define EXT_IDX NUM_NEIGHBORS + 1
-#define NUM_NEIGHBORS 4
-
 #include "DiffusionMetric.C"
 #include "DiffusionNeighbors.C"
 
@@ -423,21 +419,32 @@ void DiffusionLB::AcrossNodeLB()
 
     // // T1: create a heap based on gain values, and its position also.
     // InitializeObjHeap(n_objs);
+    int tries[neighborCount];
+    for (int i = 0; i < neighborCount; i++)
+      tries[i] = 0;
 
+    int nid = 0; 
     while (my_loadAfterTransfer > 0)
     {
-      int nborId = metric->getBestNeighbor();  // this is causing cascading???
-
-      if (nborId == -1 || toSendLoad[nborId] <= 0)
+      nid = (nid + 1)%neighborCount; //change to round robin for now
+      int nborId = nid;//metric->getBestNeighbor();  // this is causing cascading???
+      if (tries[nborId]==0 && /*nborId == -1 || */toSendLoad[nborId] <= 0)
       {
-        break;  // no more neighbors to send to
+        tries[nborId] = 1;
+        continue;//break;  // no more neighbors to send to
       }
 
       int v_id = metric->popBestObject(nborId);
 
-      if (v_id == -1)
+      if (v_id == -1)// && nborId==-1)
       {
-        break;  // no more objects to send
+        tries[nborId] = 1;
+        bool not_done = false;
+        for(int i = 0; i < neighborCount; i++)
+          if(tries[i] == 0)
+            not_done = true;
+        if(!not_done)
+          break;  // no more objects to send
       }
 
       double currLoad = objs[v_id].getVertexLoad();
@@ -450,11 +457,13 @@ void DiffusionLB::AcrossNodeLB()
       int destPE = node * nodeSize;  // send to rank0PE of dest node
       CkAssert(destPE != donorPE);   // if this is hit, our neighbor choice is not working
 
-      if (nodeStats->from_proc[v_id] != donorPE)
+      if (nodeStats->from_proc[v_id] != donorPE) {
+        continue;
         CkPrintf(
             "ERROR: not sure if this is supposed to work, but from_proc[%d] = %d, "
             "donorPE = %d\n",
             v_id, nodeStats->from_proc[v_id], donorPE);
+      }
 
       toSendLoad[nborId] -= currLoad;
       my_loadAfterTransfer -= currLoad;
@@ -507,7 +516,15 @@ void DiffusionLB::WithinNodeLB()
 {
   if (thisIndex == 0)
     CkPrintf("--------STARTING WITHIN NODE LB--------\n");
-
+  
+  if(nodeSize==1) {
+    if (CkMyPe() == 0)
+    {
+      CkCallback cb(CkIndex_DiffusionLB::ProcessMigrations(), thisProxy);
+      CkStartQD(cb);
+    }
+    return;
+  }
   if (CkMyPe() == rank0PE)
   {
     // CkPrintf("[%d] GRD: DoneNodeLB \n", CkMyPe());
@@ -664,8 +681,6 @@ void DiffusionLB::ProcessMigrations()
   }
   migrateInfo.clear();
 
-  CkPrintf("PE %d doing %d migrates\n", CkMyPe(), total_migrates);
-
   // if we don't do the barrier here, must be done with LBSyncResume so that it is done in
   // MigrationDone
   if (!_lb_args.syncResume())
@@ -764,6 +779,7 @@ void DiffusionLB::CascadingMigration(LDObjHandle h, double load)
  * level. Not sure why the receiver would already have this handle though...*/
 void DiffusionLB::LoadMetaInfo(LDObjHandle h, int objId, double load, int senderPE)
 {
+  migrates_expected++;
   pe_load[0] += load;
   int idx = FindObjectHandle(h);  // if object is in my handles
   if (idx == -1)
@@ -775,6 +791,7 @@ void DiffusionLB::LoadMetaInfo(LDObjHandle h, int objId, double load, int sender
   }
   else
   {
+#if 0
     CascadingMigration(h, load);
     objectHandles[idx] = objectHandles[objectHandles.size() - 1];
     objectLoads[idx] = objectLoads[objectLoads.size() - 1];
@@ -784,6 +801,7 @@ void DiffusionLB::LoadMetaInfo(LDObjHandle h, int objId, double load, int sender
     objectLoads.pop_back();
     objectSrcIds.pop_back();
     objSenderPEs.pop_back();
+#endif
   }
 }
 

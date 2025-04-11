@@ -218,7 +218,6 @@ MetricComm::MetricComm(BaseLB::LDStats* ns, int nodeId, int nodeSize, int nCount
       sendToNeighbors(sendToNbrs)
 {
   internalComm.resize(n_objs, 0);
-
   for (int nbor = 0; nbor < neighborCount; nbor++)
   {
     std::vector<int> nborComm;
@@ -280,12 +279,13 @@ int MetricComm::popBestObject(int nbor)
 
   for (int i = 0; i < n_objs; i++)
   {
+    if(!objAvailable[i]) continue;
     double objLoad = nodeStats->objData[i].wallTime;
 
     int testComm = externalComm[nbor][i];
 
     if ((testComm > maxExternalComm) && objAvailable[i] &&
-        (nodeStats->objData[i].migratable) && (objLoad <= nborCapacity))
+        (nodeStats->objData[i].migratable) && (objLoad <= nborCapacity*1.1))
     {
       maxExternalComm = testComm;
       bestObject = i;
@@ -322,18 +322,21 @@ int MetricComm::getBestNeighbor()
 void MetricComm::updateState(int objId, int destNbor)
 {
   toSendLoad[destNbor] -= nodeStats->objData[objId].wallTime;
-
+  if(objId<0 || objId>=n_objs)
+    return;
   for (std::pair<int, int> edge : objCommEdges[objId])
   {
     int toObj = edge.first;
     int comm = edge.second;
-
+//    CkPrintf("\n[%d][%d]", toObj, comm);
+    if(toObj<0 || toObj>=n_objs) continue; //replace with assert
     if (objAvailable[toObj])
     {
       externalComm[destNbor][toObj] += comm;
       internalComm[toObj] -= comm;
     }
   }
+
 }
 
 MetricCentroid::MetricCentroid(std::vector<std::vector<double>> nborCentroids,

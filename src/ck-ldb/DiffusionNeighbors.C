@@ -1,20 +1,17 @@
 /* Pick NUM_NEIGHBORS in random */
 /*readonly*/ bool centroid;
 
-#define SELF_IDX NUM_NEIGHBORS
-#define EXT_IDX NUM_NEIGHBORS + 1
-#define NUM_NEIGHBORS 4
-
 #define COMM
 
 #include <assert.h>
 
-#define ROUNDS 50
+#define ROUNDS 100
 
 /* Entry point for neighbor building. Only rank0PEs call findNBors*/
 void DiffusionLB::findNBors(int do_again)
 {
-  if(thisIndex==0) {
+  if(thisIndex==0) 
+  {
     CkCallback cb(CkIndex_DiffusionLB::begin(), thisProxy);
     CkStartQD(cb);
   }
@@ -66,7 +63,7 @@ void DiffusionLB::begin() {
   buildMSTinRounds(best_weight, best_from, best_to);
 #endif
   //  findRemainingNbors(0);
-//  thisProxy[0].startFirstRound();
+  //thisProxy[0].startFirstRound();
 }
 
 void DiffusionLB::buildMSTinRounds(double best_weight, int best_from, int best_to)
@@ -233,7 +230,6 @@ void DiffusionLB::findNBorsRound()
   round++;
   DEBUGL(("\nPE-%d, with round = %d", CkMyPe(), round));
   if(round < ROUNDS && thisIndex==0) {
-
     CkCallback cb(CkIndex_DiffusionLB::findNBorsRound(), thisProxy);
     CkStartQD(cb);
   }
