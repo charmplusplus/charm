@@ -1,6 +1,6 @@
 #define SELF_IDX NUM_NEIGHBORS
 #define EXT_IDX NUM_NEIGHBORS + 1
-#define NUM_NEIGHBORS 2
+#define NUM_NEIGHBORS 4
 // Assembling the stats for the PE
 CLBStatsMsg* DiffusionLB::AssembleStats()
 {

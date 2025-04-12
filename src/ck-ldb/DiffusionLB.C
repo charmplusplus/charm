@@ -45,6 +45,7 @@ static void lbinit()
 
 using std::vector;
 
+
 DiffusionLB::DiffusionLB(const CkLBOptions& opt) : CBase_DiffusionLB(opt)
 {
   nodeSize = CkNodeSize(0);
@@ -692,12 +693,19 @@ void DiffusionLB::LoadReceived(int objId, int from0PE)
     migrateMe->obj = myStats->objData[objId].handle;
     migrateMe->from_pe = CkMyPe();
     migrateMe->to_pe = from0PE;
-    if(CkMyPe()==rank0PE) pe_load[CkMyRank()] -= myStats->objData[objId].wallTime;
+    if(CkMyPe()==rank0PE)
+      pe_load[CkMyRank()] -= myStats->objData[objId].wallTime;
+    else
+      thisProxy[rank0PE].update_peload(CkMyRank(), myStats->objData[objId].wallTime);
     // migrateMe->async_arrival = myStats->objData[objId].asyncArrival;
     migrateInfo.push_back(migrateMe);
     mig_id_map.emplace(objId, migrateMe);
     total_migrates++;
   }
+}
+
+void DiffusionLB::update_peload(int rank, double load) {
+  pe_load[rank] -= load;
 }
 
 void DiffusionLB::ProcessMigrations()

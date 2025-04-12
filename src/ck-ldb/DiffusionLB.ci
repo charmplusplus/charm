@@ -16,6 +16,7 @@ module DiffusionLB
     entry[reductiontarget] void findNBorsRound();
     entry[expedited] void proposeNbor(int nborId);
     entry[expedited] void askNbor(int nborId, int rnd);
+    entry void update_peload(int rank, double load);
     entry[expedited] void okayNbor(int agree, int nborId);
     entry void ackNbor(int nbor);
 

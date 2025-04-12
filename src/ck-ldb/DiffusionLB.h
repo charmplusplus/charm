@@ -63,6 +63,7 @@ public:
   void next_MSTphase(double newcost, int newparent, int newto);
 
   void LoadReceived(int objId, int fromPE);
+  void update_peload(int rank, double load);
   void AcrossNodeLB();
 
   void ProcessMigrations();
