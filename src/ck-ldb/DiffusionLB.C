@@ -445,6 +445,8 @@ void DiffusionLB::AcrossNodeLB()
             not_done = true;
         if(!not_done)
           break;  // no more objects to send
+        else
+          continue;
       }
 
       double currLoad = objs[v_id].getVertexLoad();
@@ -685,7 +687,7 @@ void DiffusionLB::LoadReceived(int objId, int from0PE)
     MigrateInfo* migrateMe = it->second;
     CkPrintf("\nUpdating to PE from %d to %d", migrateMe->to_pe, from0PE);
     migrateMe->to_pe = from0PE;
-  } else{
+  } else {
     MigrateInfo* migrateMe = new MigrateInfo;
     migrateMe->obj = myStats->objData[objId].handle;
     migrateMe->from_pe = CkMyPe();

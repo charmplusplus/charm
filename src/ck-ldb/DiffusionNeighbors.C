@@ -5,7 +5,7 @@
 
 #include <assert.h>
 
-#define ROUNDS 100
+#define ROUNDS 50
 
 /* Entry point for neighbor building. Only rank0PEs call findNBors*/
 void DiffusionLB::findNBors(int do_again)
