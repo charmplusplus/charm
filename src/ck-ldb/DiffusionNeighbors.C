@@ -5,7 +5,7 @@
 
 #include <assert.h>
 
-#define ROUNDS 50
+#define ROUNDS 20
 
 /* Entry point for neighbor building. Only rank0PEs call findNBors*/
 void DiffusionLB::findNBors(int do_again)
@@ -36,9 +36,26 @@ void DiffusionLB::findNBors(int do_again)
 #ifdef COMM
     createCommList();
 #else
+    sendToNeighbors.clear();
+    pick = 0;
+    holds = new int[ROUNDS+1];
+    for(int i=0;i<ROUNDS+1;i++)
+      holds[i] = 0;
     thisProxy[thisIndex]
         .createCentroidList();  // this is SDAG!! only works here because the result isn't
 // used until LB across nodes
+    mstVisitedPes.clear();
+    round = 0;
+    rank0_barrier_counter = 0;
+
+    // initialize vars for mst
+    best_weight = 0;
+    best_from = -1;
+    best_to = 0;
+
+    all_tos_negative = 1;
+
+    visited = false;
 #endif
   }
 
@@ -390,7 +407,7 @@ void DiffusionLB::askNbor(int nborId, int rnd)
   if (nborsNeeded>0 &&
       std::find(sendToNeighbors.begin(), sendToNeighbors.end(), nborId) == sendToNeighbors.end())
   {
-    //HOLD A SPOT THOUGH on THIS ROUND!!
+    //Hold a spot on this round
     agree = 1;
     holds[rnd]++;
 

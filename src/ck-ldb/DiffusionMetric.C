@@ -444,7 +444,10 @@ int MetricCentroid::getBestNeighbor()
 
 void MetricCentroid::updateState(int objId, int destNbor)
 {
+  if(objId<0 || objId>=n_objs)
+    return;
   toSendLoad[destNbor] -= nodeStats->objData[objId].wallTime;
+  if(nborCentroids.size()<=destNbor) return;
 
   // TODO: update my centroid (not used anywhere rn)
   // update neighbor centroid

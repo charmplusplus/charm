@@ -60,6 +60,7 @@ module DiffusionLB
       serial
       {
         node_idx = new int[numNodes];
+        sendToNeighbors.clear();
         allNodeCentroids.resize(numNodes);
         allNodeObjCount.resize(numNodes);
         allNodeDistances.resize(numNodes);
