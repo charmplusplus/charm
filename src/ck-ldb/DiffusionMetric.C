@@ -363,6 +363,15 @@ MetricCentroid::MetricCentroid(std::vector<std::vector<double>> nborCentroids,
 
   for (int i = 0; i < n_objs; i++)
   {
+    if (ns->objData[i].position.size() == 0)
+    {
+      break;
+    }
+    else if (ns->objData[i].position.size() != position_dim)
+    {
+      CkAbort("Error: object %d has position with %d dimensions, expected %d\n", i,
+              ns->objData[i].position.size(), position_dim);
+    }
     objPosition[i].resize(position_dim);
     for (int j = 0; j < position_dim; j++)
     {
@@ -408,6 +417,11 @@ int MetricCentroid::popBestObject(int nbor)
   for (int i = 0; i < n_objs; i++)
   {
     double objLoad = nodeStats->objData[i].wallTime;
+
+    if (objNborDistances[i].size() <= nbor)
+    {
+      continue;
+    }
     int testDistance = objNborDistances[i][nbor];
     bool migratable = nodeStats->objData[i].migratable;
     bool available = objAvailable[i];
@@ -461,6 +475,10 @@ void MetricCentroid::updateState(int objId, int destNbor)
   // update objNborDistances
   for (int i = 0; i < n_objs; i++)
   {
+    if (objNborDistances[i].size() <= destNbor)
+    {
+      continue;
+    }
     objNborDistances[i][destNbor] =
         computeDistance(objPosition[i], nborCentroids[destNbor]);
   }

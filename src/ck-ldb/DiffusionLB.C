@@ -34,8 +34,6 @@
 // Percentage of error acceptable.
 #define THRESHOLD 2
 
-#define COMM
-
 // CreateLBFunc_Def(DiffusionLB, "The distributed graph refinement load balancer")
 static void lbinit()
 {
