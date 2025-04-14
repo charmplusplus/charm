@@ -40,4 +40,11 @@ mainmodule stencil3d {
       }
     };
   };
+
+  group Grid2DMap : CkArrayMap
+  {
+    entry Grid2DMap(int xdim, int ydim);
+  };
 };
+
+
