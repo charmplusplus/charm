@@ -1,8 +1,6 @@
 /* Pick NUM_NEIGHBORS in random */
 /*readonly*/ bool centroid;
 
-#define COMM
-
 #include <assert.h>
 
 #define ROUNDS 20
@@ -33,17 +31,17 @@ void DiffusionLB::findNBors(int do_again)
   {
     cost_for_neighbor = {};  // dictionary of nbor keys to cost
 
-#ifdef COMM
+    if (_lb_args.diffusionCommOn())
     createCommList();
-#else
+    else
+    {
     sendToNeighbors.clear();
     pick = 0;
-    holds = new int[ROUNDS+1];
-    for(int i=0;i<ROUNDS+1;i++)
-      holds[i] = 0;
+      holds = new int[ROUNDS + 1];
+      for (int i = 0; i < ROUNDS + 1; i++) holds[i] = 0;
     thisProxy[thisIndex]
-        .createCentroidList();  // this is SDAG!! only works here because the result isn't
-// used until LB across nodes
+          .createCentroidList();  // this is SDAG!! only works here because the result
+                                  // isn't used until LB across nodes
     mstVisitedPes.clear();
     round = 0;
     rank0_barrier_counter = 0;
@@ -56,9 +54,8 @@ void DiffusionLB::findNBors(int do_again)
     all_tos_negative = 1;
 
     visited = false;
-#endif
+    }
   }
-
 }
 
 void DiffusionLB::begin() {
@@ -76,9 +73,9 @@ void DiffusionLB::begin() {
 
   visited = false;
 
-#ifdef COMM
+  if (_lb_args.diffusionCommOn())
   buildMSTinRounds(best_weight, best_from, best_to);
-#endif
+
   //  findRemainingNbors(0);
   //thisProxy[0].startFirstRound();
 }
@@ -469,7 +466,8 @@ void DiffusionLB::sortArr(long arr[], int n, int* nbors)
 // helper function to add neighbors to the list
 void DiffusionLB::addNeighbor(int nbor)
 {
-#ifndef COMM
+  if (!(_lb_args.diffusionCommOn()))
+  {
   std::vector<LBRealType> centroid = allNodeCentroids[nbor];
   double distance = allNodeDistances[nbor];
   int nborCount = allNodeObjCount[nbor];
@@ -477,7 +475,7 @@ void DiffusionLB::addNeighbor(int nbor)
   nborDistances.push_back(distance);
   nborCentroids.push_back(centroid);
   nborObjCount.push_back(nborCount);
-#endif
+  }
 
   sendToNeighbors.push_back(nbor);
 }

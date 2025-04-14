@@ -370,6 +370,13 @@ void _loadbalancerInit()
   _lb_args.syncResume() = CmiGetArgFlagDesc(
       argv, "+LBSyncResume", "LB performs a barrier after migration is finished");
 
+  _lb_args.diffusionCommOn() =
+      CmiGetArgFlagDesc(argv, "+LBDiffusionCommOn", "LB uses diffusion communication");
+    
+  CmiGetArgIntDesc(
+      argv, "+LBDiffusionNumNbors", &_lb_args.diffusionNumNbors(),
+      "LB uses diffusion communication with this number of neighbors");
+
   // both +LBDebug and +LBDebug level should work
   if (!CmiGetArgIntDesc(argv, "+LBDebug", &_lb_args.debug(),
                         "Turn on LB debugging printouts"))
@@ -484,6 +491,8 @@ void LBManager::initnodeFn()
   _registerCommandLineOpt("+LBSimProcs");
   _registerCommandLineOpt("+LBShowDecisions");
   _registerCommandLineOpt("+LBSyncResume");
+  _registerCommandLineOpt("+LBDiffusionCommOn");
+  _registerCommandLineOpt("+LBDiffusionNumNbors");
   _registerCommandLineOpt("+LBDebug");
   _registerCommandLineOpt("+LBPrintSummary");
   _registerCommandLineOpt("+LBNoBackground");

@@ -185,7 +185,9 @@ void DiffusionLB::startStrategy()
   }
 
   rank0_barrier_counter = 0;
-  CkPrintf("--------NEIGHBOR SELECTION COMPLETE--------\n"); fflush(stdout);
+  CkPrintf("--------NEIGHBOR SELECTION COMPLETE (Using Comm? %s)--------\n",
+           _lb_args.diffusionCommOn() ? "true" : "false");
+  fflush(stdout);
   for (int i = 0; i < numNodes; i++) thisProxy[i * nodeSize].pseudolb_rounds();
 }
 
@@ -391,14 +393,15 @@ void DiffusionLB::AcrossNodeLB()
   // DiffusionMetric* metric =
   //     new MetricCommEI(nodeStats, myNodeId, nodeSize, neighborCount, toSendLoad);
 
-#ifdef COMM
-  DiffusionMetric* metric = new MetricComm(nodeStats, myNodeId, nodeSize, neighborCount,
-                                           toSendLoad, sendToNeighbors);
-#else
-  DiffusionMetric* metric =
-      new MetricCentroid(nborCentroids, nborDistances, myCentroid, nodeStats, myNodeId,
-                         toSendLoad, sendToNeighbors, nborObjCount);
-#endif
+  DiffusionMetric* metric;
+  if (_lb_args.diffusionCommOn())
+  {
+    metric = new MetricComm(nodeStats, myNodeId, nodeSize, neighborCount, toSendLoad,
+                            sendToNeighbors);
+  }
+  else
+    metric = new MetricCentroid(nborCentroids, nborDistances, myCentroid, nodeStats,
+                                myNodeId, toSendLoad, sendToNeighbors, nborObjCount);
 
   loadReceivers = std::count_if(toSendLoad.begin(), toSendLoad.end(),
                                 [](double load) { return load > 0; });
