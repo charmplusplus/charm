@@ -11,10 +11,14 @@ module DiffusionLB
 
     // DiffusionNeighbors
     entry[reductiontarget] void findNBors(int do_again);
+    entry void begin();
     entry void startFirstRound();
-    entry[reductiontarget] void findNBorsRound(int do_again);
+    entry[reductiontarget] void findNBorsRound();
     entry[expedited] void proposeNbor(int nborId);
+    entry[expedited] void askNbor(int nborId, int rnd);
+    entry void update_peload(int rank, double load);
     entry[expedited] void okayNbor(int agree, int nborId);
+    entry void ackNbor(int nbor);
 
     entry void ReceiveFinalStats(
         std::vector<bool> isMigratable, std::vector<int> from_proc,
@@ -35,10 +39,10 @@ module DiffusionLB
     // entry void MigratedHelper(LDObjHandle h, int waitBarrier);
     entry void ProcessMigrations();
     entry void next_phase(int val);
-    entry void LoadMetaInfo(LDObjHandle h, int objId, double load, int senderPE);
+    entry void LoadMetaInfo(LDObjHandle h, int objId, double load, int senderPE, int only_mcount);
     entry void MigrationDoneWrapper();  // Call when migration is complete
     entry void WithinNodeLB();
-
+  
     entry void buildMSTinRounds(double best_weight, int best_parent, int best_to);
     entry void next_MSTphase(double newcost, int newparent, int newto);
 
@@ -55,7 +59,8 @@ module DiffusionLB
     {
       serial
       {
-        nbors = new int[numNodes];
+        node_idx = new int[numNodes];
+        sendToNeighbors.clear();
         allNodeCentroids.resize(numNodes);
         allNodeObjCount.resize(numNodes);
         allNodeDistances.resize(numNodes);
@@ -70,7 +75,7 @@ module DiffusionLB
         myCentroid.resize(position_dim, 0);
         for (int nbor = 0; nbor < numNodes; nbor++)
         {
-          nbors[nbor] = nbor;
+          node_idx[nbor] = nbor;
           allNodeCentroids[nbor].resize(position_dim, 0);
         }
 
@@ -132,7 +137,7 @@ module DiffusionLB
       {
         if (thisIndex == rank0PE)
         {
-        pairedSort(nbors, allNodeDistances);
+        pairedSort(node_idx, allNodeDistances);
         buildMSTinRounds(best_weight, best_from, best_to);
         }
       }

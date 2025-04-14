@@ -22,10 +22,6 @@
 
 #include "DiffusionJSON.h"
 
-#define SELF_IDX NUM_NEIGHBORS
-#define EXT_IDX NUM_NEIGHBORS + 1
-#define NUM_NEIGHBORS 2
-
 void CreateDiffusionLB();
 
 /// for backward compatibility
@@ -42,10 +38,13 @@ public:
   // void Migrated(LDObjHandle h, int waitBarrier = 1);
   void createCommList();
   void findNBors(int do_again);
-  void findNBorsRound(int do_again);
+  void begin();
+  void findNBorsRound();
   void startFirstRound();
   void proposeNbor(int nborId);
+  void askNbor(int nbor, int rnd);
   void okayNbor(int agree, int nborId);
+  void ackNbor(int nbor);
   void statsAssembled();
   void startStrategy();
   void next_phase(int val);
@@ -64,12 +63,13 @@ public:
   void next_MSTphase(double newcost, int newparent, int newto);
 
   void LoadReceived(int objId, int fromPE);
+  void update_peload(int rank, double load);
   void AcrossNodeLB();
 
   void ProcessMigrations();
   void WithinNodeLB();
 
-  void LoadMetaInfo(LDObjHandle h, int objId, double load, int senderPE);
+  void LoadMetaInfo(LDObjHandle h, int objId, double load, int senderPE, int only_mcount);
 
 protected:
   virtual bool QueryBalanceNow(int) { return true; };
@@ -118,7 +118,7 @@ private:
   int rank0_barrier_counter;
   int neighborCount;
   std::vector<int> sendToNeighbors;  // Neighbors to which curr node has to send load.
-  int* nbors;
+  int* node_idx;//nbors;
 
   std::vector<int> mstVisitedPes;
   std::unordered_map<int, double> cost_for_neighbor;
@@ -156,6 +156,7 @@ private:
 
   int* gain_val;
   int loadReceivers;
+  int *holds;
 
   std::vector<std::vector<int>> objectComms;
 
