@@ -250,7 +250,7 @@ MetricComm::MetricComm(BaseLB::LDStats* ns, int nodeId, int nodeSize, int nCount
         if (toObj != -1 && toObj < n_objs)
         {
           internalComm[toObj] += commData.bytes;
-          objCommEdges[toObj].push_back(std::make_pair(toObj, commData.bytes));
+          objCommEdges[toObj].push_back(std::make_pair(fromObj, commData.bytes));
           objCommEdges[fromObj].push_back(std::make_pair(toObj, commData.bytes));
         }
       }
@@ -285,7 +285,7 @@ int MetricComm::popBestObject(int nbor)
     int testComm = externalComm[nbor][i];
 
     if ((testComm > maxExternalComm) && objAvailable[i] &&
-        (nodeStats->objData[i].migratable) && (objLoad <= nborCapacity*1.1))
+        (nodeStats->objData[i].migratable) && (objLoad <= nborCapacity))
     {
       maxExternalComm = testComm;
       bestObject = i;
@@ -336,7 +336,6 @@ void MetricComm::updateState(int objId, int destNbor)
       internalComm[toObj] -= comm;
     }
   }
-
 }
 
 MetricCentroid::MetricCentroid(std::vector<std::vector<double>> nborCentroids,

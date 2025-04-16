@@ -469,7 +469,6 @@ void DiffusionLB::AcrossNodeLB()
             v_id, nodeStats->from_proc[v_id], donorPE);
       }
 
-      toSendLoad[nborId] -= currLoad;
       my_loadAfterTransfer -= currLoad;
 
       metric->updateState(v_id, nborId);  // update state to keep track of migrations
