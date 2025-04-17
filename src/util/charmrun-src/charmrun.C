@@ -3437,11 +3437,11 @@ static void req_set_client_connect(std::vector<nodetab_process> & process_table,
 #endif
     /* check appropriate clients for messages */
 
-    for (int i = 0; i < process_table.size(); i++)
-    {
-      nodetab_process & p = process_table[i];
-      printf("Charmrun> process table nodeno %d\n", p.nodeno);
-    }
+    //for (int i = 0; i < process_table.size(); i++)
+    //{
+    //  nodetab_process & p = process_table[i];
+    //  printf("Charmrun> process table nodeno %d\n", p.nodeno);
+    //}
 
     while (!open_sockets.empty())
     {
@@ -3454,6 +3454,8 @@ static void req_set_client_connect(std::vector<nodetab_process> & process_table,
         ChMessage_recv(req_client, &msg);
 
         int nodeNo = ChMessageInt(((ChSingleNodeinfo *)msg.data)->nodeNo);
+
+        printf("Charmrun> node %d is connecting\n", nodeNo);
 
         if (node_set.find(nodeNo) != node_set.end())
         {

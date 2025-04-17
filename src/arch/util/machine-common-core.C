@@ -1586,7 +1586,6 @@ static void ConverseRunPE(int everReturn) {
     CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdCondFn)CmiNotifyStillIdle, NULL);
 #endif
 
-
     LrtsPostCommonInit(everReturn);
 
 #if CMK_SMP && CMK_LEVERAGE_COMMTHREAD

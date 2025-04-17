@@ -653,11 +653,13 @@ static void parse_netstart(void)
   int nread;
   int port;
   ns = getenv("NETSTART");
+  int dummy;
+  int* ptr = Cmi_isOldProcess == 1 ? &dummy : &Lrts_myNode;
   if (ns!=0) 
   {/*Read values set by Charmrun*/
         char Cmi_charmrun_name[1024];
         nread = sscanf(ns, "%d%s%d%d%d",
-                 &Lrts_myNode,
+                 ptr,
                  Cmi_charmrun_name, &Cmi_charmrun_port,
                  &Cmi_charmrun_pid, &port);
 	Cmi_charmrun_IP=skt_lookup_ip(Cmi_charmrun_name);
@@ -666,9 +668,12 @@ static void parse_netstart(void)
                 fprintf(stderr,"Error parsing NETSTART '%s'\n",ns);
                 exit(1);
         }
+    
 #if CMK_SHRINK_EXPAND
     Cmi_charmrun_assigned_pe = Lrts_myNode;
     if (Cmi_isOldProcess) {
+      //if (Cmi_charmrun_assigned_pe == 3)
+      //  exit(1);
       Cmi_myoldpe = Lrts_myNode;
     }
 #endif
@@ -1436,7 +1441,9 @@ static void send_singlenodeinfo(void)
   memset(&me, 0, sizeof(me));
 
 #if CMK_SHRINK_EXPAND
-  me.nodeNo = ChMessageInt_new(Cmi_charmrun_assigned_pe);
+  me.nodeNo = ChMessageInt_new(Lrts_myNode);
+  //if (Cmi_isOldProcess && ChMessageInt(me.nodeNo) == 3)
+  //  exit(1);
 #else
   me.nodeNo = ChMessageInt_new(Lrts_myNode);
 #endif
@@ -1802,7 +1809,7 @@ void LrtsPostCommonInit(int everReturn)
         CmiAbort("Charm++ Fatal Error: interrupt mode does not work with default system memory allocator. Run with +netpoll to disable the interrupt.");
     }
 #endif
-  }       
+  }
 
 #if MEMORYUSAGE_OUTPUT
   memoryusage_counter = 0;
@@ -2150,6 +2157,9 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #if CMK_SHRINK_EXPAND
   if (Cmi_isOldProcess == 1) {
     Lrts_myNode = Cmi_mynewpe;
+    Cmi_charmrun_assigned_pe = Lrts_myNode;
+    //if (Cmi_isOldProcess && Lrts_myNode == 3)
+    //  exit(1);
     Cmi_myoldpe = Cmi_oldpe;
     Lrts_numNodes = Cmi_newnumnodes;
   }
