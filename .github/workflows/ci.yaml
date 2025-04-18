@@ -72,7 +72,7 @@ jobs:
   cuda_netlrts-linux-x86_64_buildonly:
     # Buildonly test, as CUDA needs an actual device to run.
     timeout-minutes: 45
-    runs-on: ubuntu-20.04  # FIXME: ubuntu-latest does not work
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
     - name: build
@@ -193,7 +193,7 @@ jobs:
       if: ${{ env.namd_secret != '' }}
       run: |
         cd ..
-        git clone https://${{ secrets.NAMD_CI_USERNAME_TOKEN }}@gitlab.com/tcbgUIUC/namd.git
+        git clone https://${{ secrets.NAMD_CI_USERNAME_TOKEN }}:${{ secrets.NAMD_CI_DEPLOY_PASSWORD }}@gitlab.com/tcbgUIUC/namd.git
         cd namd
         ./config Linux-x86_64-g++ --charm-base ../charm --charm-arch netlrts-linux-x86_64 --without-tcl
         cd Linux-x86_64-g++

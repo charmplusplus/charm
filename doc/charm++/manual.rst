@@ -3578,6 +3578,12 @@ histogramming operation in which chare array elements funnel their bin
 counts through a group, instead of contributing directly to a reduction
 across all chares.
 
+Reduction on Groups
+^^^^^^^^^^^^^^^^^^^^
+Reduction can be performed on groups using the same syntax as chare arrays. 
+See section :numref:`reductions` for more information. The example, 
+``examples/charm++/histogram_group`` demonstrates the API. 
+
 NodeGroup Objects
 ~~~~~~~~~~~~~~~~~
 
@@ -3681,6 +3687,11 @@ which are described in the Converse manual.
 
 NodeGroups can be used in a similar way to groups so as to implement
 lower-level optimizations such as data sharing and message reduction.
+
+Reduction on NodeGroups
+^^^^^^^^^^^^^^^^^^^^^^^
+Reduction can be performed on NodeGroups using the same syntax as chare arrays. 
+See section :numref:`reductions` for more information.
 
 Initializations at Program Startup
 ----------------------------------
