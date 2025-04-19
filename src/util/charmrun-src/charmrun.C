@@ -1419,6 +1419,7 @@ struct nodetab_host
 
   skt_ip_t ip = _skt_invalid_ip;      /*IP address of host*/
   int cpus = 1;     /* # of physical CPUs*/
+  int remaining_cpus = 1; /* # of physical CPUs remaining for this host */
   int nice = -100;     /* process priority */
 //  int forks = 0;    /* number of processes to fork on remote node */
 
@@ -1493,6 +1494,42 @@ static std::vector<nodetab_host *> my_host_table;
 static std::vector<nodetab_process> my_process_table;
 static std::vector<nodetab_process *> pe_to_process_map;
 
+#if CMK_SHRINK_EXPAND
+ /*This little snippet creates a OLDNODENAMES
+ environment variable entry*/
+ char *create_oldnodenames()
+ {
+   static char dest1[1024 * 1000];
+   int i;
+   for (i = 0; i < my_process_table.size(); i++)
+     sprintf(dest1, "%s %s", dest1, (my_process_table[i].host)->name);
+   printf("Charmrun> Created oldnames %s \n", dest1);
+   return dest1;
+ }
+
+ int isPresent(const char *names, char **listofnames)
+ {
+   int k;
+   for (k = 0; k < arg_old_pes; k++) {
+     if (strcmp(names, listofnames[k]) == 0)
+       return 1;
+   }
+   return 0;
+ }
+ void parse_oldnodenames(char **oldnodelist)
+ {
+   char *ns;
+   ns = getenv("OLDNODENAMES");
+   int i;
+   char buffer[1024 * 1000];
+   for (i = 0; i < arg_old_pes; i++) {
+     oldnodelist[i] = (char *) malloc(100 * sizeof(char));
+     int nread = sscanf(ns, "%s %[^\n]", oldnodelist[i], buffer);
+     ns = buffer;
+   }
+ }
+ #endif
+
 static const char *nodetab_args(const char *args, nodetab_host *h)
 {
   while (*args != 0)
@@ -1538,7 +1575,7 @@ static const char *nodetab_args(const char *args, nodetab_host *h)
 
     args = skipblanks(e2);
   }
-
+  h->remaining_cpus = h->cpus;
   return args;
 }
 
@@ -2532,6 +2569,8 @@ static int req_handle_realloc(ChMessage *msg, SOCKET fd)
     ret[saved_argc + index++] = NULL;
   }
 
+  setenv("OLDNODENAMES", create_oldnodenames(), 1);
+
   ChMessage ackmsg;
   ChMessage_new("realloc_ack", 0, &ackmsg);
   for (const nodetab_process & p : my_process_table)
@@ -3418,6 +3457,13 @@ static void req_set_client_connect(std::vector<nodetab_process> & process_table,
   curclientend = 0;
 #endif
 
+  printf("Charmrun> Waiting for %d clients to connect.\n", count);
+  for (int i = 0; i < process_table.size(); i++)
+  {
+   nodetab_process & p = process_table[i];
+   printf("Charmrun> process table nodeno %d, name %s\n", p.nodeno, p.host->name);
+  }
+
   int finished = 0;
   while (finished < count)
   {
@@ -3703,23 +3749,70 @@ static void req_construct_phase2_processes(std::vector<nodetab_process> & phase2
 
   for (nodetab_process & p : my_process_table)
   {
-    p.forkstart = active_host_count + p.nodeno * new_processes_per_host;
+    //p.forkstart = active_host_count + p.nodeno * new_processes_per_host;
     p.host->processes = 1;
+    p.host->remaining_cpus--;
   }
 
-  for (int i = 0; i < num_new_processes; ++i)
+  int i = 0;
+  //int curr_pe = active_host_count;
+  int num_forks = 0;
+
+  // FIXME this will hang if total PEs requested > total PEs available
+  while (num_forks < num_new_processes)
   {
-    nodetab_process & src = my_process_table[i % active_host_count];
-    phase2_processes.push_back(src);
+    nodetab_process & src = my_process_table[i++ % active_host_count];
 
-    nodetab_process & p = phase2_processes.back();
-    p.nodeno = src.forkstart + (src.host->processes++ - 1);
+    int prev_pe = src.nodeno;
+    while (src.host->remaining_cpus > 0)
+    {
+      if (num_forks >= num_new_processes)
+        break;
+      ++prev_pe;
+      if (src.forkstart == 0)
+        src.forkstart = prev_pe;
+      src.host->processes++;
+      src.host->remaining_cpus--;
+
+      phase2_processes.push_back(src);
+      nodetab_process & p = phase2_processes.back();
+      p.nodeno = prev_pe;
+      num_forks++;
+    }
   }
+
+  printf("PHASE2> %d processes will be forked\n", phase2_processes.size());
 }
 
 static void start_nodes_local(const std::vector<nodetab_process> &);
 static void start_nodes_ssh(std::vector<nodetab_process> &);
 static void finish_nodes(std::vector<nodetab_process> &);
+
+static void req_client_reconnect(std::vector<nodetab_process> & process_table)
+{
+  skt_set_abort(client_connect_problem_skt);
+
+  std::vector<nodetab_process> phase2_processes;
+
+  req_construct_phase2_processes(phase2_processes);
+  printf("Phase2 reconnect: %d processes will be forked\n", phase2_processes.size());
+  if (phase2_processes.size() > 0)
+  {
+      if (!arg_local)
+      {
+#if CMK_SHRINK_EXPAND
+        if (arg_requested_pes > arg_old_pes)
+#endif
+        {
+          assert(!arg_mpiexec);
+          start_nodes_ssh(phase2_processes);
+        }
+      }
+  }
+  req_add_phase2_processes(phase2_processes);
+  req_client_connect_table(process_table);
+  req_all_clients_connected();
+}
 
 static void req_client_connect(std::vector<nodetab_process> & process_table)
 {
@@ -3766,23 +3859,28 @@ static void req_client_connect(std::vector<nodetab_process> & process_table)
     }
     else
     {
-      // send nodefork packets
-      ChMessageHeader hdr;
-      ChMessageInt_t mydata[ChInitNodeforkFields];
-      ChMessageHeader_new("nodefork", sizeof(mydata), &hdr);
-      for (const nodetab_process & p : process_table)
+#if CMK_SHRINK_EXPAND
+      if (!arg_shrinkexpand)
+#endif
       {
-        int numforks = p.host->processes - 1;
-        if (numforks <= 0)
-          continue;
+        // send nodefork packets
+        ChMessageHeader hdr;
+        ChMessageInt_t mydata[ChInitNodeforkFields];
+        ChMessageHeader_new("nodefork", sizeof(mydata), &hdr);
+        for (const nodetab_process & p : process_table)
+        {
+          int numforks = p.host->processes - 1;
+          if (numforks <= 0)
+            continue;
 
-        if (arg_verbose)
-          printf("Charmrun> Instructing host \"%s\" to fork() x %d\n", p.host->name, numforks);
+          if (arg_verbose)
+            printf("Charmrun> Instructing host \"%s\" to fork() x %d\n", p.host->name, numforks);
 
-        mydata[0] = ChMessageInt_new(numforks);
-        mydata[1] = ChMessageInt_new(p.forkstart);
-        skt_sendN(p.req_client, (const char *) &hdr, sizeof(hdr));
-        skt_sendN(p.req_client, (const char *) mydata, sizeof(mydata));
+          mydata[0] = ChMessageInt_new(numforks);
+          mydata[1] = ChMessageInt_new(p.forkstart);
+          skt_sendN(p.req_client, (const char *) &hdr, sizeof(hdr));
+          skt_sendN(p.req_client, (const char *) mydata, sizeof(mydata));
+        }
       }
     }
 
@@ -4320,12 +4418,14 @@ int main(int argc, const char **argv, char **envp)
                                        ? (arg_requested_nodes > 0 ? std::min(my_host_count, arg_requested_nodes) : my_host_count)
                                        : std::min(my_host_count, get_old_style_process_count());
   my_process_table.resize(my_initial_process_count);
+  int curr_nodeno = 0;
   for (int i = 0; i < my_initial_process_count; ++i)
   {
     nodetab_host * h = my_host_table[i];
     nodetab_process & p = my_process_table[i];
     p.host = h;
-    p.nodeno = h->hostno;
+    p.nodeno = curr_nodeno;
+    curr_nodeno += h->cpus;
   }
 
   /* start the node processes */
@@ -4425,7 +4525,9 @@ int main(int argc, const char **argv, char **envp)
 #endif
       finish_nodes(my_process_table);
 #endif
-    if (!arg_batch_spawn)
+    if (!arg_batch_spawn && arg_shrinkexpand)
+      req_client_reconnect(my_process_table);
+    else if (!arg_batch_spawn)
       req_client_connect(my_process_table);
   }
 #if CMK_SSH_KILL
@@ -5384,8 +5486,18 @@ static void start_one_node_ssh(nodetab_process & p, const char ** argv)
 
 static void start_nodes_ssh(std::vector<nodetab_process> & process_table)
 {
+  char **oldnodenames;
+  if (arg_shrinkexpand)
+  {
+    oldnodenames = (char **) malloc(arg_old_pes * sizeof(char *));
+    parse_oldnodenames(oldnodenames);
+  }
+
   for (nodetab_process & p : process_table)
   {
+    if (arg_shrinkexpand && !isPresent(p.host->name, oldnodenames))
+      start_one_node_ssh(p);
+    else if (!arg_shrinkexpand)
       start_one_node_ssh(p);
   }
 }
