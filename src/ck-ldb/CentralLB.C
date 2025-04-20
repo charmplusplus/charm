@@ -1063,6 +1063,8 @@ void CentralLB::CheckForLB() {
   //sleep(5);
   if (pending_realloc_state == EXPAND_MSG_RECEIVED)
     CheckForRealloc();
+  else if (pending_realloc_state == NO_REALLOC)
+    thisProxy.ResumeClients(0);
   else
     thisProxy.CallLB();
   //else
