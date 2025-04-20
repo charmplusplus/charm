@@ -1,21 +1,15 @@
 CHARMC ?= charmc
-FLAGS = -g -Wall -O2
-TYPE ?= RING
-ALLGATHER_DIR=.
-EXAMPLE_DIR=./example
+FLAGS = -g -Wall -Wno-unused-variable -Wno-sign-compare -O2
 
 
 allGather:
-	$(CHARMC) $(ALLGATHER_DIR)/allGather.ci
-	$(CHARMC) -c $(ALLGATHER_DIR)/allGather.cc
+	$(CHARMC) $(FLAGS) ./allGather.ci
+	$(CHARMC) $(FLAGS) -c ./allGather.cc
 	@echo "Built allGather Library"
 
 
-collectiveSim: allGather
-
-
 clean:
-	rm -f *.decl.h *.def.h *.o charmrun sim
+	rm -f *.decl.h *.def.h *.o
 
 
-.phony : allGather build-simulation run-simulation clean
+.phony : allGather clean
