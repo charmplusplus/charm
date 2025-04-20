@@ -102,75 +102,20 @@ void GreedyCentralLB::work(LDStats* stats)
     objs.push_back(CkVertex(obj, load, stats->objData[obj].migratable, stats->from_proc[obj]));
   }
 
-  // max heap of objects
-  sort(objs.begin(), objs.end(), GreedyCentralLB::ObjLoadGreater());
-  // min heap of processors
-  make_heap(procs.begin(), procs.end(), GreedyCentralLB::ProcLoadGreater());
+  int num_remain_objs = objs.size();
+  int num_remain_pes = procs.size();
+  CkPrintf("[%d] num_remain_objs=%d, num_remain_pes=%d\n", CkMyPe(), num_remain_objs, num_remain_pes);
+  int last_obj = 0;
 
-  if (_lb_args.debug()>1) 
-    CkPrintf("[%d] In GreedyCentralLB strategy\n",CkMyPe());
-
-
-    // greedy algorithm
-  int nmoves = 0;
-  for (obj=0; obj < objs.size(); obj++) {
-    ProcInfo p = procs.front();
-    pop_heap(procs.begin(), procs.end(), GreedyCentralLB::ProcLoadGreater());
-    procs.pop_back();
-
-    // Increment the time of the least loaded processor by the cpuTime of
-    // the `heaviest' object
-    p.setTotalLoad(p.getTotalLoad() + objs[obj].getVertexLoad() / p.getPeSpeed());
-
-    //Insert object into migration queue if necessary
-    const int dest = p.getProcId();
-    const int pe   = objs[obj].getCurrentPe();
-    const int id   = objs[obj].getVertexId();
-    if (dest != pe) {
-      stats->to_proc[id] = dest;
-      nmoves ++;
-      if (_lb_args.debug()>2) 
-        CkPrintf("[%d] Obj %d migrating from %d to %d\n", CkMyPe(),objs[obj].getVertexId(),pe,dest);
+  for (int p=0; p < procs.size(); p++) {
+    int nobjs = num_remain_objs / num_remain_pes;
+    for (int i=last_obj; i<last_obj + nobjs; i++) {
+      stats->to_proc[objs[i].getVertexId()] = procs[p].getProcId();
     }
-
-    //Insert the least loaded processor with load updated back into the heap
-    procs.push_back(p);
-    push_heap(procs.begin(), procs.end(), GreedyCentralLB::ProcLoadGreater());
-  }
-
-  if (_lb_args.debug()>0) 
-    CkPrintf("[%d] %d objects migrating.\n", CkMyPe(), nmoves);
-
-  if (_lb_args.debug()>1)  {
-    CkPrintf("CharmLB> Min obj: %f  Max obj: %f\n", objs[objs.size()-1].getVertexLoad(), objs[0].getVertexLoad());
-    CkPrintf("CharmLB> PE speed:\n");
-    for (pe = 0; pe<procs.size(); pe++)
-      CkPrintf("%f ", procs[pe].getPeSpeed());
-    CkPrintf("\n");
-    CkPrintf("CharmLB> PE Load:\n");
-    for (pe = 0; pe<procs.size(); pe++)
-      CkPrintf("%f (%f)  ", procs[pe].getTotalLoad(), procs[pe].getOverhead());
-    CkPrintf("\n");
-  }
-
-  if (_lb_args.metaLbOn()) {
-    double max_load = 0;
-    double avg_load = 0;
-    for (pe = 0; pe<procs.size(); pe++) {
-      if (procs[pe].getTotalLoad() > max_load) {
-        max_load = procs[pe].getTotalLoad();
-      }
-      avg_load += procs[pe].getTotalLoad();
-    }
-
-    stats->after_lb_max = max_load;
-    stats->after_lb_avg = avg_load/procs.size();
-    stats->is_prev_lb_refine = 0;
-    if (_lb_args.debug() > 0)
-      CkPrintf("GreedyCentralLB> After lb max load: %lf avg load: %lf\n", max_load, avg_load/procs.size());
+    last_obj += nobjs;
+    num_remain_objs -= nobjs;
+    num_remain_pes--;
   }
 }
 
 #include "GreedyCentralLB.def.h"
-
-/*@}*/
