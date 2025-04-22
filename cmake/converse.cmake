@@ -188,13 +188,13 @@ set(conv-ldb-cxx-sources
     src/conv-ldb/generate.C
 )
 
-set(conv-ldb-h-sources
-    #src/conv-ldb/cldb.h
+#set(conv-ldb-h-sources
+    #reconverse/src/cldb.h
     #src/conv-ldb/graphdefs.h
     #src/conv-ldb/topology.h
-)
+#)
 
-# add_library(ldb-none src/conv-ldb/cldb.none.C ${conv-ldb-h-sources})
+#add_library(ldb-none reconverse/src/cldb.none.C ${conv-ldb-h-sources})
 #add_library(ldb-test src/conv-ldb/cldb.test.C ${conv-ldb-h-sources})
 #add_library(ldb-rand src/conv-ldb/cldb.rand.C ${conv-ldb-h-sources})
 #add_library(ldb-neighbor src/conv-ldb/cldb.neighbor.C src/conv-ldb/cldb.neighbor.h ${conv-ldb-h-sources})
