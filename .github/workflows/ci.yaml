@@ -72,7 +72,7 @@ jobs:
   cuda_netlrts-linux-x86_64_buildonly:
     # Buildonly test, as CUDA needs an actual device to run.
     timeout-minutes: 45
-    runs-on: ubuntu-20.04  # FIXME: ubuntu-latest does not work
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
     - name: build
