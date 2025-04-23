@@ -883,7 +883,7 @@ include(cmake/hwloc.cmake)
 # Converse
 include(cmake/converse.cmake)
 add_subdirectory(src/QuickThreads)
-add_subdirectory(src/util/boost-context)
+# add_subdirectory(src/util/boost-context)
 add_subdirectory(src/conv-core)
 
 # LIBS
