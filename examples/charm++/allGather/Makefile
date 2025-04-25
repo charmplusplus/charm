@@ -13,9 +13,6 @@ allGather:
 	@echo "Built allGather Library"
 
 
-collectiveSim: allGather
-
-
 build-simulation: allGather
 	$(CHARMC) $(EXAMPLE_DIR)/user.ci
 	$(CHARMC) -D$(TYPE) -I$(ALLGATHER_DIR) $(EXAMPLE_DIR)/user.cc
