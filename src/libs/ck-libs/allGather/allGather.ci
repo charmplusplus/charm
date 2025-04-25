@@ -1,45 +1,60 @@
-module allGather {
-	include "vector";
-	readonly double alpha;
-	readonly double beta;
+module allGather
+{
+  include "vector";
 
-	message allGatherMsg;
+  message allGatherMsg;
 
-	group AllGather {
-		entry AllGather(int size, int n, int type);
-		entry void initdone();
-		entry void startGather();
-		entry void recvRing(int sender, CkNcpyBuffer data);
-		entry void local_buff_done(CkDataMsg * m);
-		entry void Hypercube() {
-			for (iter = 0; iter < numHypercubeIter; iter++) {
-				serial {
-					if (HypercubeRecursiveDoubling)
-						HypercubeToSend = (n + CkMyPe() - (int)pow(2, iter)) % n;
-					else
-						HypercubeToSend = CkMyPe() ^ ((int)pow(2, iter));
-				}
-				serial {
-					if (HypercubeRecursiveDoubling && iter == numHypercubeIter - 1) {
-						std::vector<CkNcpyBuffer> hyperCubeStoreCopy(hyperCubeStore.begin(), hyperCubeStore.begin() + (n - (int)pow(2, iter)));
-						std::vector<int> hyperCubeIndxCopy(hyperCubeIndx.begin(), hyperCubeIndx.begin() + (n - (int)pow(2, iter)));
-						thisProxy[HypercubeToSend].recvHypercube(iter, hyperCubeStoreCopy, hyperCubeIndxCopy);
-					} else
-						thisProxy[HypercubeToSend].recvHypercube(iter, hyperCubeStore, hyperCubeIndx);
-				}
-				when recvHypercube[iter](int ref, std::vector<CkNcpyBuffer> data, std::vector<int> dataIndx) {
-					serial {
-						for (int m = 0; m < data.size(); m++) {
-							hyperCubeStore.emplace_back(data[m]);
-							hyperCubeIndx.emplace_back(dataIndx[m]);
-							CkNcpyBuffer dst(store + dataIndx[m] * k, k * sizeof(long int), zero_copy_callback, CK_BUFFER_UNREG);
-							dst.get(data[m]);
-						}
-					}
-				}
-			}
-		};
-		entry void recvHypercube(int ref, std::vector<CkNcpyBuffer> data, std::vector<int> dataIndx);
-		entry void Flood(int sender, CkNcpyBuffer data);
-	};
+  group AllGather
+  {
+    entry AllGather(int size, int type);
+    entry void initdone();
+    entry void startGather();
+    entry void recvRing(int sender, CkNcpyBuffer data);
+    entry void local_buff_done(CkDataMsg * m);
+    entry void Hypercube()
+    {
+      for (iter = 0; iter < numHypercubeIter; iter++)
+      {
+        serial
+        {
+          if (HypercubeRecursiveDoubling)
+            HypercubeToSend = (n + CkMyPe() - (int)pow(2, iter)) % n;
+          else
+            HypercubeToSend = CkMyPe() ^ ((int)pow(2, iter));
+        }
+        serial
+        {
+          if (HypercubeRecursiveDoubling && iter == numHypercubeIter - 1)
+          {
+            std::vector<CkNcpyBuffer> hyperCubeStoreCopy(
+                hyperCubeStore.begin(), hyperCubeStore.begin() + (n - (int)pow(2, iter)));
+            std::vector<int> hyperCubeIndxCopy(
+                hyperCubeIndx.begin(), hyperCubeIndx.begin() + (n - (int)pow(2, iter)));
+            thisProxy[HypercubeToSend].recvHypercube(iter, hyperCubeStoreCopy,
+                                                     hyperCubeIndxCopy);
+          }
+          else
+            thisProxy[HypercubeToSend].recvHypercube(iter, hyperCubeStore, hyperCubeIndx);
+        }
+        when recvHypercube[iter](int ref, std::vector<CkNcpyBuffer> data,
+                                 std::vector<int> dataIndx)
+        {
+          serial
+          {
+            for (int m = 0; m < data.size(); m++)
+            {
+              hyperCubeStore.emplace_back(data[m]);
+              hyperCubeIndx.emplace_back(dataIndx[m]);
+              CkNcpyBuffer dst(store + dataIndx[m] * k, k * sizeof(long int),
+                               zero_copy_callback, CK_BUFFER_UNREG);
+              dst.get(data[m]);
+            }
+          }
+        }
+      }
+    };
+    entry void recvHypercube(int ref, std::vector<CkNcpyBuffer> data,
+                             std::vector<int> dataIndx);
+    entry void Flood(int sender, CkNcpyBuffer data);
+  };
 };
