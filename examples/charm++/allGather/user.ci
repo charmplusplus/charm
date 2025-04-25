@@ -1,0 +1,17 @@
+mainmodule user
+{
+  extern module allGather;
+
+  mainchare start
+  {
+    entry start(CkArgMsg * m);
+    entry[reductiontarget] void fini(int numDone);
+  };
+
+  array[1D] simBox
+  {
+    entry simBox(CProxy_start startProxy, int k, int n, int x, int y);
+    entry void begin(CProxy_AllGather allGatherProxy);
+    entry void done(allGatherMsg * m);
+  }
+};
