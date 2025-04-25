@@ -2637,6 +2637,18 @@ void CkArrayExtSend_multi(int aid, int *idx, int ndims, int epIdx, int num_bufs,
   }
 }
 
+
+#if CMK_CUDA
+#include "hapi.h"
+void CkHapiAddCallback(long stream, void (*cb)(void*, void*), int fid) 
+{
+  cudaStream_t stream_ptr = (cudaStream_t)stream;
+  CkCallback callback(cb, (void *) fid);
+  
+  hapiAddCallback(stream_ptr, callback, NULL);
+}
+#endif // CMK_CUDA
+
 #endif
 
 //------------------- Message Watcher (record/replay) ----------------
