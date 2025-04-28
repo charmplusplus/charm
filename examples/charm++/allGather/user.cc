@@ -20,15 +20,15 @@ start::start(CkArgMsg* msg)
   sim = CProxy_simBox::ckNew(thisProxy, k, n, x, y, n);
 
 #ifdef FLOODING
-  AllGather = CProxy_AllGather::ckNew(k, (int)allGatherType::ALL_GATHER_FLOODING);
+  AllGather = CProxy_AllGather::ckNew(k, (int)allGatherType::ALL_GATHER_FLOODING, 0);
 #endif
 
 #ifdef HYPERCUBE
-  AllGather = CProxy_AllGather::ckNew(k, (int)allGatherType::ALL_GATHER_HYPERCUBE);
+  AllGather = CProxy_AllGather::ckNew(k, (int)allGatherType::ALL_GATHER_HYPERCUBE, 0);
 #endif
 
 #ifdef RING
-  AllGather = CProxy_AllGather::ckNew(k, (int)allGatherType::ALL_GATHER_RING);
+  AllGather = CProxy_AllGather::ckNew(k, (int)allGatherType::ALL_GATHER_RING, 0);
 #endif
 
   sim.begin(AllGather);

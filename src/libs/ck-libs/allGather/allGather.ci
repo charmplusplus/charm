@@ -6,7 +6,7 @@ module allGather
 
   group AllGather
   {
-    entry AllGather(int size, int type);
+    entry AllGather(int size, int type, int seed);
     entry[reductiontarget] void startGather();
     entry void recvRing(int sender, CkNcpyBuffer data);
     entry void local_buff_done(CkDataMsg * m);

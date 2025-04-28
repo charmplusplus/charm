@@ -7,10 +7,10 @@ int AllGather::gen_rand()
   return dis(gen);
 }
 
-AllGather::AllGather(int k, int type) : k(k)
+AllGather::AllGather(int k, int type, int seed) : k(k)
 {
   this->msg = new allGatherMsg;
-  randCounter = getpid();
+  randCounter = seed ? seed : getpid();
   n = CkNumPes();
   this->type = (allGatherType)type;
   switch (type)

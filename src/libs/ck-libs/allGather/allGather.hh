@@ -47,7 +47,7 @@ private:
 public:
   AllGather_SDAG_CODE
 
-  AllGather(int k, int type);
+  AllGather(int k, int type, int seed);
 
   void startGather();
 

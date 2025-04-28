@@ -16,10 +16,10 @@ make allGather
 After that you need to declare allGather as an extern module in your `.ci` file and include the `allGather.hh` header file in your `cc/hh` file. Then create an AllGather group object.
 
 ```C++
-AllGather = CProxy_AllGather::ckNew(k, (int)allGatherType::ALL_GATHER_RING);
+AllGather = CProxy_AllGather::ckNew(k, (int)allGatherType::ALL_GATHER_RING, seed);
 ```
 
-Here, k refers to the number of data elements present in each chare array element(assuming the gather is happening among chare array elements, it can also be done among group elements) and the third parameter lets you choose the algorithm you want to run. The algorithms are:
+Here, k refers to the number of data elements present in each chare array element(assuming the gather is happening among chare array elements, it can also be done among group elements) and the second parameter lets you choose the algorithm you want to run. The algorithms are:
 
 ```C++
 enum allGatherType {
@@ -28,6 +28,7 @@ enum allGatherType {
   ALL_GATHER_FLOODING
 };
 ```
+The third argument is a random seed which is set randomly if zero is passed otherwise all the random seeds in the library are set equal to the passed value.
 
 You must also declare a callback to a function which the library can return to after its done and it must only take a pointer to `allGatherMsg` as its argument. To start operations, each chare array element must make a local pointer to the library chare group element on the same PE as it.
 
