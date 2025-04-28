@@ -35,7 +35,7 @@ You must also declare a callback to a function which the library can return to a
 AllGather *libptr = AllGatherGroup.ckLocalBranch();
 libptr->init(result, data, thisIndex, cb);
 ```
-Here, result is a pointer to where the user wants the result of allGather operation to be stored(note that it must be of size n * k, where n is the number of `PEs` or the number of participants in allGather), data refers to per chare array element contributed data and cb refers to the callback. Also, we must pass `thisIndex` to `init` to place the gathered data in the order of chare array indexes. Note that you can modify this to change the order of the gather.
+Here, result is a pointer to where the user wants the result of allGather operation to be stored(note that it must be of size n * k, where n is the number of `PEs` or the number of participants in allGather), data refers to per chare array element contributed data and cb refers to the callback. Both of these are expected to be RdmaBuffers allocated using `CkRdmaAlloc`. Also, we must pass `thisIndex` to `init` to place the gathered data in the order of chare array indexes. Note that you can modify this to change the order of the gather.
 For example,`libptr->init(result, data,CkNumPes() - thisIndex, cb);`, will gather the data in the order opposite to the array indicex.
 
 Once the library is done, it will send an empty message (a kick if you will) telling the user that the result is now available in the destination that the user specified earlier.

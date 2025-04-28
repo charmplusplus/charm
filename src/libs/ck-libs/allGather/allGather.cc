@@ -10,6 +10,7 @@ int AllGather::gen_rand()
 AllGather::AllGather(int k, int type) : k(k)
 {
   this->msg = new allGatherMsg;
+  randCounter = getpid();
   n = CkNumPes();
   this->type = (allGatherType)type;
   switch (type)
@@ -79,7 +80,7 @@ void AllGather::local_buff_done(CkDataMsg* m)
 void AllGather::startGather()
 {
   for (int i = 0; i < k; i++) store[k * idx + i] = data[i];
-  CkNcpyBuffer src(data, k * sizeof(long int), dum_dum, CK_BUFFER_UNREG);
+  CkNcpyBuffer src(data, k * sizeof(long int), dum_dum, CK_BUFFER_PREREG);
 
   switch (type)
   {
@@ -103,7 +104,7 @@ void AllGather::startGather()
 void AllGather::recvRing(int sender, CkNcpyBuffer src)
 {
   CkNcpyBuffer dst(store + sender * k, k * sizeof(long int), zero_copy_callback,
-                   CK_BUFFER_UNREG);
+                   CK_BUFFER_PREREG);
   dst.get(src);
   if (((CkMyPe() + 1) % n) != sender)
     thisProxy[(CkMyPe() + 1) % n].recvRing(sender, src);
@@ -115,7 +116,7 @@ void AllGather::Flood(int sender, CkNcpyBuffer src)
     return;
   recvFloodMsg[sender] = true;
   CkNcpyBuffer dst(store + sender * k, k * sizeof(long int), zero_copy_callback,
-                   CK_BUFFER_UNREG);
+                   CK_BUFFER_PREREG);
   dst.get(src);
   for (int i = 0; i < n; i++)
     if (graph[CkMyPe()][i] == 1 and i != sender)

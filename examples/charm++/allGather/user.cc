@@ -46,8 +46,8 @@ void start::fini(int numDone)
 simBox::simBox(CProxy_start startProxy, int k, int n, int x, int y)
     : startProxy(startProxy), k(k), n(n), x(x), y(y)
 {
-  result = (long int*)malloc(k * n * sizeof(long int));
-  data = (long int*)malloc(k * sizeof(long int));
+  result = (long int*)CkRdmaAlloc(k * n * sizeof(long int));
+  data = (long int*)CkRdmaAlloc(k * sizeof(long int));
   long int max_serial = (1 << y) - 1;
   long int base = thisIndex;
   while (max_serial > 0)
