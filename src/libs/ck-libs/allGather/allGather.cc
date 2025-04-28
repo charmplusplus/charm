@@ -49,15 +49,6 @@ AllGather::AllGather(int k, int type) : k(k)
   }
 }
 
-// This function will only ever be called for index 0
-void AllGather::initdone()
-{
-  static int num_init_done = 0;
-  num_init_done++;
-  if (num_init_done == n)
-    thisProxy.startGather();
-}
-
 void AllGather::init(long int* result, long int* data, int idx, CkCallback cb)
 {
   this->lib_done_callback = cb;
@@ -67,7 +58,8 @@ void AllGather::init(long int* result, long int* data, int idx, CkCallback cb)
   dum_dum = CkCallback(CkCallback::ignore);
   this->store = result;
   this->data = data;
-  thisProxy[0].initdone();
+  CkCallback cbInitDone(CkReductionTarget(AllGather, startGather), thisProxy);
+  contribute(0,0, CkReduction::nop, cbInitDone);
 }
 
 void AllGather::local_buff_done(CkDataMsg* m)

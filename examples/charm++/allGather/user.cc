@@ -34,13 +34,10 @@ start::start(CkArgMsg* msg)
   sim.begin(AllGather);
 }
 
-void start::fini(int numDone)
+void start::fini()
 {
-  if (numDone == n)
-  {
-    ckout << "[STATUS] Completed the AllGather Simulation" << endl;
-    CkExit();
-  }
+  ckout << "[STATUS] Completed the AllGather Simulation" << endl;
+  CkExit();
 }
 
 simBox::simBox(CProxy_start startProxy, int k, int n, int x, int y)
@@ -103,9 +100,8 @@ void simBox::done(allGatherMsg* msg)
     }
     ckout << endl;
   }
-  int cnt = 1;
   CkCallback cbfini(CkReductionTarget(start, fini), startProxy);
-  contribute(sizeof(int), &cnt, CkReduction::sum_int, cbfini);
+  contribute(0, 0, CkReduction::nop, cbfini);
 }
 
 #include "user.def.h"

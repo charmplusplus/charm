@@ -60,6 +60,4 @@ public:
   void Flood(int sender, CkNcpyBuffer data);
 
   void init(long int* result, long int* data, int idx, CkCallback cb);
-
-  void initdone();
 };

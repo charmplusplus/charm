@@ -7,8 +7,7 @@ module allGather
   group AllGather
   {
     entry AllGather(int size, int type);
-    entry void initdone();
-    entry void startGather();
+    entry[reductiontarget] void startGather();
     entry void recvRing(int sender, CkNcpyBuffer data);
     entry void local_buff_done(CkDataMsg * m);
     entry void Hypercube()

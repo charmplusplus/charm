@@ -5,7 +5,7 @@ mainmodule user
   mainchare start
   {
     entry start(CkArgMsg * m);
-    entry[reductiontarget] void fini(int numDone);
+    entry[reductiontarget] void fini();
   };
 
   array[1D] simBox

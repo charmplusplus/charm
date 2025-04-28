@@ -15,7 +15,7 @@ private:
 public:
   start(CkArgMsg* msg);
 
-  void fini(int numDone);
+  void fini();
 };
 
 class simBox : public CBase_simBox
