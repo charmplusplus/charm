@@ -9,6 +9,7 @@ int AllGather::gen_rand()
 
 AllGather::AllGather(int k, int type) : k(k)
 {
+  this->msg = new allGatherMsg;
   n = CkNumPes();
   this->type = (allGatherType)type;
   switch (type)
