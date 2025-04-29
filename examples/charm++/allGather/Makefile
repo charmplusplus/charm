@@ -6,12 +6,12 @@ all: build
 
 build:
 	$(CHARMC) $(FLAGS) ./user.ci
-	$(CHARMC) $(FLAGS) -o sim -D$(TYPE) ./user.cc -lallGather
+	$(CHARMC) $(FLAGS) -o allGather -D$(TYPE) ./user.cc -lallGather
 
 test: build
-	./charmrun ++local +p19 ./sim 19 29 10 1
+	./charmrun ++local +p19 ./allGather 19 29 10 1
 
 clean:
-	rm -f *.decl.h *.def.h *.o charmrun sim
+	rm -f *.decl.h *.def.h *.o charmrun allGather
 
 .phony : all build test clean
