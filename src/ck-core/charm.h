@@ -511,7 +511,7 @@ extern void CkEnableTracing(int epIdx);
 extern void CkCallWhenIdle(int epIdx, void* obj);
 
 
-#if CMK_CHARM4PY
+#if CMK_CHARM4PY && CMK_CUDA
 extern void CkHapiAddCallback(long stream, void (*cb)(void*, void*), int fid);
 #endif
 

@@ -2638,25 +2638,18 @@ void CkArrayExtSend_multi(int aid, int *idx, int ndims, int epIdx, int num_bufs,
 }
 
 
-// HAPI support
 #if CMK_CUDA
 #include "hapi.h"
-#endif 
-
 void CkHapiAddCallback(long stream, void (*cb)(void*, void*), int fid) 
 {
-  #if CMK_CUDA
   cudaStream_t stream_ptr = (cudaStream_t)stream;
   CkCallback callback(cb, (void *) fid);
   
   hapiAddCallback(stream_ptr, callback, NULL);
-  #else
-  // function must be defined regardless for cython compilation
-  CkAbort("CkHapiAddCallback> Charm++ was not built with CUDA support");
-  #endif
 }
+#endif // CMK_CUDA
 
-#endif // CMK_CHARM4PY
+#endif
 
 //------------------- Message Watcher (record/replay) ----------------
 
