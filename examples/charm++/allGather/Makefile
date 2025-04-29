@@ -1,6 +1,8 @@
-CHARMC ?= charmc
+CHARMC = ../../../bin/charmc $(OPTS)
 FLAGS = -g -Wall -Wno-unused-variable -Wno-sign-compare -Wno-class-memaccess -O2
 TYPE ?= RING
+
+all: build
 
 build:
 	$(CHARMC) $(FLAGS) ./user.ci
@@ -12,4 +14,4 @@ test: build
 clean:
 	rm -f *.decl.h *.def.h *.o charmrun sim
 
-.phony : build test clean
+.phony : all build test clean
