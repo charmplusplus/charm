@@ -187,6 +187,7 @@ option(ZLIB                "Enable zlib support" ON)
 option(AMPI_MPICH_TESTS    "Enable mpich tests for AMPI" OFF)
 option(DRONE_MODE          "Enable drone mode" OFF)
 option(TASK_QUEUE          "Enable task queue" OFF)
+option(RECONVERSE          "Use the Reconverse communication layer" OFF)
 
 
 if(TRACING STREQUAL "")
@@ -266,6 +267,12 @@ if(${TASK_QUEUE} OR ${OMP})
   set(CMK_TASKQUEUE 1)
 else()
   set(CMK_TASKQUEUE 0)
+endif()
+
+if(${RECONVERSE})
+  set(CMK_RECONVERSE 1)
+else()
+  set(CMK_RECONVERSE 0)
 endif()
 
 

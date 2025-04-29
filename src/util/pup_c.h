@@ -1,6 +1,7 @@
 #ifndef _PUP_C_H
 #define _PUP_C_H
 
+
 /*
 Pack/UnPack Library for UIUC Parallel Programming Lab
 C Bindings version
@@ -57,7 +58,7 @@ void pup_bar(pup_er p,bar *b)
 
 */
 
-#include "conv-config.h"
+#include "converse.h"
 #include <stddef.h>
 
 #ifdef __cplusplus

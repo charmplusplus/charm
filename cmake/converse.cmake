@@ -142,17 +142,17 @@ set(conv-util-h-sources
 )
 
 set(conv-util-cxx-sources
-    src/arch/util/mempool.C
-    src/arch/util/persist-comm.C
-    src/util/cmirdmautils.C
-    src/util/crc32.C
-    src/util/sockRoutines.C
-    src/util/ckdll.C
-    src/util/ckhashtable.C
-    src/util/ckimage.C
-    src/util/conv-lists.C
-    src/util/hilbert.C
-    src/util/partitioning_strategies.C
+    #src/arch/util/mempool.C
+    #src/arch/util/persist-comm.C
+    #src/util/cmirdmautils.C
+    #src/util/crc32.C
+    #src/util/sockRoutines.C
+    #src/util/ckdll.C
+    #src/util/ckhashtable.C
+    #src/util/ckimage.C
+    #src/util/conv-lists.C
+    #src/util/hilbert.C
+    #src/util/partitioning_strategies.C
     src/util/pup_c.C
     src/util/pup_cmialloc.C
     src/util/pup_paged.C
@@ -160,7 +160,7 @@ set(conv-util-cxx-sources
     src/util/pup_toNetwork4.C
     src/util/pup_util.C
     src/util/pup_xlater.C
-    src/util/spanningTree.C
+    #src/util/spanningTree.C
 )
 
 if(CMK_CAN_LINK_FORTRAN)
@@ -235,11 +235,14 @@ file(WRITE ${CMAKE_BINARY_DIR}/include/topomanager_config.h "// empty\n" )
 add_subdirectory(reconverse)
 # add_dependencies(converse reconverse)
 
+add_library(charm_cxx_utils STATIC
+    ${conv-util-cxx-sources})
 
 add_library(converse INTERFACE)
 
 target_link_libraries(converse INTERFACE
     reconverse
+    charm_cxx_utils
     hwloc
 )
 

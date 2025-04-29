@@ -17,7 +17,7 @@ private:
   CmiUInt8 id;
   bool *deletedMarker; /// Set this if we're deleted during processing
   bool running; /// True when inside a startTiming/stopTiming pair
-#if CMK_LBDB_ON
+#if 1
   bool  asyncMigrate;  /// if readyMove is inited
   bool  readyMigrate;    /// status whether it is ready to migrate
   bool  enable_measure;

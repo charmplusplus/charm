@@ -1,7 +1,7 @@
 #ifndef _CONV_RDMADEVICE_H_
 #define _CONV_RDMADEVICE_H_
 
-#include "conv-header.h"
+#include "converse.h"
 #include "cmirdmautils.h"
 #include "pup.h"
 
