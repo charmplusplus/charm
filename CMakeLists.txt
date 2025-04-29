@@ -882,11 +882,6 @@ if(${TARGET} STREQUAL "LIBS")
   set(EVERYLB 1)
 endif()
 
-# allGather
-configure_file(src/libs/ck-libs/allGather/allGather.hh  ${CMAKE_BINARY_DIR}/include COPYONLY)
-add_library(allGather src/libs/ck-libs/allGather/allGather.cc src/libs/ck-libs/allGather/allGather.hh)
-add_dependencies(allGather ck)
-
 # Charm++
 add_subdirectory(src/ck-core)
 add_subdirectory(src/ck-perf)
@@ -921,6 +916,11 @@ add_dependencies(moduleCkLoop ck)
 foreach(file ${ckloop-h-files})
   configure_file(${file} ${CMAKE_BINARY_DIR}/include COPYONLY)
 endforeach(file)
+
+# allGather
+configure_file(src/libs/ck-libs/allGather/allGather.hh  ${CMAKE_BINARY_DIR}/include COPYONLY)
+add_library(allGather src/libs/ck-libs/allGather/allGather.cc src/libs/ck-libs/allGather/allGather.hh)
+add_dependencies(allGather ck)
 
 # NDMeshStreamer
 file(GLOB moduleNDMeshStreamer-h-sources src/libs/ck-libs/NDMeshStreamer/*.h)
