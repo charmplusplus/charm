@@ -17,7 +17,6 @@ private:
   CmiUInt8 id;
   bool *deletedMarker; /// Set this if we're deleted during processing
   bool running; /// True when inside a startTiming/stopTiming pair
-#if 1
   bool  asyncMigrate;  /// if readyMove is inited
   bool  readyMigrate;    /// status whether it is ready to migrate
   bool  enable_measure;
@@ -26,7 +25,6 @@ private:
   LBManager *lbmgr;
   MetaBalancer *the_metalb;
   LDObjHandle ldHandle;
-#endif
 
 public:
 
@@ -43,23 +41,17 @@ public:
    */
   bool invokeEntry(CkMigratable *obj,void *msg,int idx,bool doFree);
 
-#if CMK_LBDB_ON  //For load balancing:
   /// Control the load balancer:
   void startTiming(int ignore_running=0);
   void stopTiming(int ignore_running=0);
   void setObjTime(double cputime);
   double getObjTime();
   void *getObjUserData(int idx);
-#else
-  inline void startTiming(int ignore_running=0) {  }
-  inline void stopTiming(int ignore_running=0) { }
-#endif
   inline const CkArrayIndex &getIndex(void) const {return idx;}
   inline CmiUInt8 getID() const { return id; }
   inline CkLocMgr *getLocMgr() const {return myLocMgr; }
   inline CkSyncBarrier* getSyncBarrier() const { return syncBarrier; }
 
-#if CMK_LBDB_ON
 public:
   inline LBManager *getLBMgr(void) const {return lbmgr;}
   inline MetaBalancer *getMetaBalancer(void) const {return the_metalb;}
@@ -77,9 +69,6 @@ public:
   bool checkBufferedMigration();	// check and execute pending migration
   int   MigrateToPe();
   inline void setMeasure(bool status) { enable_measure = status; }
-#else
-  void AsyncMigrate(bool use){};
-#endif
 };
 
 #endif // CK_LOC_REC_H

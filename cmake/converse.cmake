@@ -188,11 +188,10 @@ set(conv-ldb-cxx-sources
     src/conv-ldb/generate.C
 )
 
-#set(conv-ldb-h-sources
-    #reconverse/src/cldb.h
-    #src/conv-ldb/graphdefs.h
-    #src/conv-ldb/topology.h
-#)
+set(conv-ldb-h-sources
+    src/conv-ldb/graphdefs.h
+    src/conv-ldb/topology.h
+)
 
 #add_library(ldb-none reconverse/src/cldb.none.C ${conv-ldb-h-sources})
 #add_library(ldb-test src/conv-ldb/cldb.test.C ${conv-ldb-h-sources})
@@ -248,12 +247,12 @@ target_link_libraries(converse INTERFACE
 
 #file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/comm_backend)
 
-#foreach (filename 
-#        ${reconverse-comm-backend-sources}
-#)
- #   configure_file(${filename} ${CMAKE_BINARY_DIR}/include/comm_backend/ COPYONLY)
+foreach (filename 
+        ${conv-ldb-h-sources}
+)
+    configure_file(${filename} ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 
-#endforeach()
+endforeach()
 
 foreach(filename
     ${conv-core-h-sources}

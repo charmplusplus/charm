@@ -38,6 +38,7 @@ Orion Sky Lawlor, olawlor@acm.org, 7/22/2002
 #include <utility> /*for std::pair*/
 #include <chrono>
 #include "pup.h"
+#include "pup_c.h"
 
 #include <cstddef>
 
