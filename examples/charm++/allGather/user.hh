@@ -1,7 +1,6 @@
-#include "user.decl.h"
-
 #include "allGather.hh"
 
+#include "user.decl.h"
 class start : public CBase_start
 {
 private:

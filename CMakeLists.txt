@@ -882,6 +882,11 @@ if(${TARGET} STREQUAL "LIBS")
   set(EVERYLB 1)
 endif()
 
+# allGather
+configure_file(src/libs/ck-libs/allGather/allGather.hh  ${CMAKE_BINARY_DIR}/include COPYONLY)
+add_library(allGather src/libs/ck-libs/allGather/allGather.cc src/libs/ck-libs/allGather/allGather.hh)
+add_dependencies(allGather ck)
+
 # Charm++
 add_subdirectory(src/ck-core)
 add_subdirectory(src/ck-perf)
