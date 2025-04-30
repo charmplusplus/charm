@@ -919,8 +919,8 @@ endforeach(file)
 
 # allGather
 configure_file(src/libs/ck-libs/allGather/allGather.hh  ${CMAKE_BINARY_DIR}/include COPYONLY)
-add_library(allGather src/libs/ck-libs/allGather/allGather.cc src/libs/ck-libs/allGather/allGather.hh)
-add_dependencies(allGather ck)
+add_library(moduleallGather src/libs/ck-libs/allGather/allGather.cc src/libs/ck-libs/allGather/allGather.hh)
+add_dependencies(moduleallGather ck)
 
 # NDMeshStreamer
 file(GLOB moduleNDMeshStreamer-h-sources src/libs/ck-libs/NDMeshStreamer/*.h)

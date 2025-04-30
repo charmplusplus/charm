@@ -6,7 +6,7 @@ all: build
 
 build:
 	$(CHARMC) $(FLAGS) ./user.ci
-	$(CHARMC) $(FLAGS) -o allGather -D$(TYPE) ./user.cc -lallGather
+	$(CHARMC) $(FLAGS) -o allGather -D$(TYPE) ./user.cc -lmoduleallGather
 
 test: build
 	$(call run, +p19 ./allGather 19 29 7 )
