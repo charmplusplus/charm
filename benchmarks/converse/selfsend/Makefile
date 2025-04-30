@@ -15,7 +15,6 @@ test: self_send
 
 testp: self_send
 	$(call run, ./self_send +p$(P))
-	# $(call run, ./self_send +p$(P) 100 1024) # Example with args if needed
 
 clean:
 	rm -f core *.cpm.h
