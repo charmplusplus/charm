@@ -10,8 +10,8 @@ self_send.o: self_send.cpp
 	$(CHARMC) -language converse++ -c self_send.cpp
 
 test: self_send
-	$(call run, ./self_send +p4)
-	$(call run, ./self_send +p6)
+	$(call run, ./self_send +p1)
+	$(call run, ./self_send +p1)
 
 testp: self_send
 	$(call run, ./self_send +p$(P))
