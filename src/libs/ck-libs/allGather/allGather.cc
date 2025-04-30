@@ -10,7 +10,6 @@ int AllGather::gen_rand()
 AllGather::AllGather(int k, int type, int seed) : k(k)
 {
   this->msg = new allGatherMsg;
-  randCounter = seed ? seed : getpid();
   n = CkNumPes();
   this->type = (allGatherType)type;
   switch (type)
@@ -21,6 +20,7 @@ AllGather::AllGather(int k, int type, int seed) : k(k)
       numHypercubeIter = std::ceil(std::log2(n));
       break;
     case allGatherType::ALL_GATHER_FLOODING:
+      randCounter = seed ? seed : getpid();
       graph.resize(n);
       for (int i = 0; i < n; i++) graph[i].resize(n);
       /**
