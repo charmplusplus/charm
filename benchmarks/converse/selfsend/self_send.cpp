@@ -95,16 +95,12 @@ void handleAck(char *msg) {
   initiate();
 }
 
-// Converse main. Initialize variables and register handlers
 CmiStartFn mymain(int argc, char *argv[]) {
 
-  // iterations value
   CpvInitialize(int, iter);
 
-  // msg size value
   CpvInitialize(int, msgSize);
 
-  // Register Handlers
   CpvInitialize(int, initiateHandler);
   CpvAccess(initiateHandler) = CmiRegisterHandler((CmiHandler)handleInitiate);
 
@@ -125,13 +121,8 @@ CmiStartFn mymain(int argc, char *argv[]) {
   CpvInitialize(double, startTime);
   CpvInitialize(double, endTime);
 
-  // Set runtime cpuaffinity
-//   CmiInitCPUAffinity(argv);
 
-  // Initialize CPU topology
-//   CmiInitCPUTopology(argv);
-
-  // Wait for all PEs of the node to complete topology init
+  // Wait for all PEs of the node to complete init
   CmiNodeAllBarrier();
 
   // Update the argc after runtime parameters are extracted out
