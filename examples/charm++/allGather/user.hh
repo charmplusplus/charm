@@ -4,10 +4,6 @@
 class start : public CBase_start
 {
 private:
-  int n;
-  int k;
-  int x;
-  int y;
   CProxy_simBox sim;
   CProxy_AllGather AllGather;
 
@@ -23,13 +19,12 @@ private:
   CProxy_start startProxy;
   int k;
   int n;
-  int x;
-  int y;
+  int d;
   long int* data;
   long int* result;
 
 public:
-  simBox(CProxy_start startProxy, int k, int n, int x, int y);
+  simBox(CProxy_start startProxy, int k, int n, int d);
 
   void begin(CProxy_AllGather AllGather);
 

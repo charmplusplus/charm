@@ -2,22 +2,21 @@
 
 start::start(CkArgMsg* msg)
 {
-  if (msg->argc != 5)
+  if (msg->argc != 4)
   {
     ckout << "Usage: " << msg->argv[0]
           << " <chare_array_size> <num_data_points_per_chare_array_element> "
-             "<num_bits_for_pe> <num_bits_for_data_points>"
+             "<num_bits_for_data_points>"
           << endl;
     CkExit();
   }
 
-  n = atoi(msg->argv[1]);
-  k = atoi(msg->argv[2]);
-  x = atoi(msg->argv[3]);
-  y = atoi(msg->argv[4]);
+  int n = atoi(msg->argv[1]);
+  int k = atoi(msg->argv[2]);
+  int d = atoi(msg->argv[3]);
   delete msg;
 
-  sim = CProxy_simBox::ckNew(thisProxy, k, n, x, y, n);
+  sim = CProxy_simBox::ckNew(thisProxy, k, n, d, n);
 
 #ifdef FLOODING
   AllGather = CProxy_AllGather::ckNew(k, (int)allGatherType::ALL_GATHER_FLOODING, 0);
@@ -40,12 +39,12 @@ void start::fini()
   CkExit();
 }
 
-simBox::simBox(CProxy_start startProxy, int k, int n, int x, int y)
-    : startProxy(startProxy), k(k), n(n), x(x), y(y)
+simBox::simBox(CProxy_start startProxy, int k, int n, int d)
+    : startProxy(startProxy), k(k), n(n), d(d)
 {
   result = (long int*)CkRdmaAlloc(k * n * sizeof(long int));
   data = (long int*)CkRdmaAlloc(k * sizeof(long int));
-  long int max_serial = (1 << y) - 1;
+  long int max_serial = (1 << d) - 1;
   long int base = thisIndex;
   while (max_serial > 0)
   {
@@ -70,7 +69,7 @@ void simBox::done(allGatherMsg* msg)
   bool success = true;
   for (int i = 0; i < n; i++)
   {
-    long int max_serial = (1 << y) - 1;
+    long int max_serial = (1 << d) - 1;
     long int base = i;
     while (max_serial > 0)
     {

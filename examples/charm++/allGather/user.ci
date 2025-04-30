@@ -10,8 +10,8 @@ mainmodule user
 
   array[1D] simBox
   {
-    entry simBox(CProxy_start startProxy, int k, int n, int x, int y);
+    entry simBox(CProxy_start startProxy, int k, int n, int d);
     entry void begin(CProxy_AllGather allGatherProxy);
-    entry [nokeep] void done(allGatherMsg * m);
+    entry[nokeep] void done(allGatherMsg * m);
   }
 };
