@@ -9,10 +9,10 @@ build:
 	$(CHARMC) $(FLAGS) -o allGather -D$(TYPE) ./user.cc -lallGather
 
 test: build
-	./charmrun ++local +p19 ./allGather 19 29 7
+	$(call run, +p19 ./allGather 19 29 7 )
 
 testp: build
-	./charmrun ++local +p$(P) ./allGather $(P) 29 7
+	$(call run, +p$(P) ./allGather $(P) 29 7 )
 
 clean:
 	rm -f *.decl.h *.def.h *.o charmrun allGather
