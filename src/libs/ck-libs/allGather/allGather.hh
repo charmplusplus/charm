@@ -23,20 +23,20 @@ enum allGatherType
 class AllGather : public CBase_AllGather
 {
 private:
-  int k{};
-  int n{};
-  int idx{};
+  int k;
+  int n;
+  int idx;
   long int* store;
   int numRecvMsg{};
   CkCallback lib_done_callback;
   allGatherType type;
-  int numHypercubeIter{};
+  int numHypercubeIter;
   bool HypercubeRecursiveDoubling{};
   int iter;
   int HypercubeToSend;
   std::vector<std::vector<int>> graph{};
   std::map<int, bool> recvFloodMsg{};
-  int randCounter{};
+  int randCounter;
   std::vector<int> hyperCubeIndx{};
   std::vector<CkNcpyBuffer> hyperCubeStore{};
   allGatherMsg* msg;
