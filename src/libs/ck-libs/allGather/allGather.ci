@@ -25,22 +25,19 @@ module allGather
         {
           if (HypercubeRecursiveDoubling && iter == numHypercubeIter - 1)
           {
-            std::vector<CkNcpyBuffer> hyperCubeStoreCopy(
-                hyperCubeStore.begin(), hyperCubeStore.begin() + (n - (int)pow(2, iter)));
-            std::vector<int> hyperCubeIndxCopy(
-                hyperCubeIndx.begin(), hyperCubeIndx.begin() + (n - (int)pow(2, iter)));
-            thisProxy[HypercubeToSend].recvHypercube(iter, hyperCubeStoreCopy,
-                                                     hyperCubeIndxCopy);
+            int size = n - (int)pow(2, iter);
+            std::vector<CkNcpyBuffer> hyperCubeStoreCopy(hyperCubeStore.begin(), hyperCubeStore.begin() + size);
+            std::vector<int> hyperCubeIndxCopy(hyperCubeIndx.begin(), hyperCubeIndx.begin() + size);
+            thisProxy[HypercubeToSend].recvHypercube(iter, hyperCubeStoreCopy.data(), hyperCubeIndxCopy.data(), size);
           }
           else
-            thisProxy[HypercubeToSend].recvHypercube(iter, hyperCubeStore, hyperCubeIndx);
+            thisProxy[HypercubeToSend].recvHypercube(iter, hyperCubeStore.data(), hyperCubeIndx.data(), hyperCubeStore.size());
         }
-        when recvHypercube[iter](int ref, std::vector<CkNcpyBuffer> data,
-                                 std::vector<int> dataIndx)
+        when recvHypercube[iter](int ref, CkNcpyBuffer data[size], int dataIndx[size], int size)
         {
           serial
           {
-            for (int m = 0; m < data.size(); m++)
+            for (int m = 0; m < size; m++)
             {
               hyperCubeStore.emplace_back(data[m]);
               hyperCubeIndx.emplace_back(dataIndx[m]);
@@ -52,8 +49,7 @@ module allGather
         }
       }
     };
-    entry void recvHypercube(int ref, std::vector<CkNcpyBuffer> data,
-                             std::vector<int> dataIndx);
+    entry void recvHypercube(int ref, CkNcpyBuffer data[size], int dataIndx[size], int size);
     entry void Flood(int sender, CkNcpyBuffer data);
   };
 };
