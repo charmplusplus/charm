@@ -8,6 +8,7 @@ build:
 	$(CHARMC) -o allGather -D$(TYPE) ./user.C -lmoduleallGather
 
 test:
+	@$(CHARMC) ./user.ci
 	@echo "\033[1;34mRunning allGather with RING algorithm\033[0m"
 	@$(CHARMC) -o allGather -DRING ./user.C -lmoduleallGather
 	$(call run, +p4 ./allGather 4 29 7 )
@@ -22,6 +23,7 @@ test:
 	@echo "\033[1;32mAll Tests completed!\033[0m"
 
 testp:
+	@$(CHARMC) ./user.ci
 	@echo "\033[1;34mRunning allGather with RING algorithm\033[0m"
 	@$(CHARMC) -o allGather -DRING ./user.C -lmoduleallGather
 	$(call run, +p$(P) ./allGather $(P) 29 7 )
