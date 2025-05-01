@@ -1,4 +1,4 @@
-#include "user.hh"
+#include "user.h"
 
 start::start(CkArgMsg* msg)
 {

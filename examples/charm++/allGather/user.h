@@ -1,4 +1,4 @@
-#include "allGather.hh"
+#include "allGather.h"
 
 #include "user.decl.h"
 class start : public CBase_start

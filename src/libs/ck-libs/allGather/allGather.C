@@ -1,4 +1,4 @@
-#include "allGather.hh"
+#include "allGather.h"
 
 int AllGather::gen_rand()
 {

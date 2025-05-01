@@ -2,13 +2,13 @@ CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 DEST=$(CDIR)/lib/libmoduleallGather.a
 
-all: $(DEST) $(CDIR)/include/allGather.hh $(CDIR)/include/allGather.decl.h $(CDIR)/include/allGather.def.h
+all: $(DEST) $(CDIR)/include/allGather.h $(CDIR)/include/allGather.decl.h $(CDIR)/include/allGather.def.h
 
 $(DEST): allGather.o
 	$(CHARMC) -o $(DEST) allGather.o
 
-allGather.o: allGather.cc allGather.hh allGather.decl.h allGather.def.h
-	$(CHARMC) -c allGather.cc
+allGather.o: allGather.C allGather.h allGather.decl.h allGather.def.h
+	$(CHARMC) -c allGather.C
 
 allGather.decl.h allGather.def.h: allGather.ci
 	$(CHARMC) allGather.ci
@@ -16,8 +16,8 @@ allGather.decl.h allGather.def.h: allGather.ci
 $(CDIR)/include/allGather.decl.h: allGather.decl.h
 	/bin/cp allGather.decl.h $(CDIR)/include
 
-$(CDIR)/include/allGather.hh: allGather.hh
-	/bin/cp allGather.hh $(CDIR)/include
+$(CDIR)/include/allGather.h: allGather.h
+	/bin/cp allGather.h $(CDIR)/include
 
 $(CDIR)/include/allGather.def.h: allGather.def.h
 	/bin/cp allGather.def.h $(CDIR)/include
