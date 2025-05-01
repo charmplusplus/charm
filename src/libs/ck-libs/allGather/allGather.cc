@@ -59,7 +59,7 @@ void AllGather::init(void* result, void* data, int idx, CkCallback cb)
   this->store = (char*)result;
   this->data = (char*)data;
   CkCallback cbInitDone(CkReductionTarget(AllGather, startGather), thisProxy);
-  contribute(0,0, CkReduction::nop, cbInitDone);
+  contribute(cbInitDone);
 }
 
 void AllGather::local_buff_done(CkDataMsg* m)
