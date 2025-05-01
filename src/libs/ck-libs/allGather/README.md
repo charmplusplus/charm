@@ -4,16 +4,13 @@ A library for implementing collectives commonly used in machine learning tasks i
 
 ## allGather
 
-allGather lets you gather data distributed accross different chare array elements. The library provides 3 algorithms for doing the allGather operations, namely ring, hypercube and flooding.
+allGather lets you gather data distributed accross different chare array/group elements. The library provides 3 algorithms for doing the allGather operations, namely ring, hypercube and flooding.
 
 ### How to use
 
-You can build the library using 
-```bash
-make allGather
-```
+The library is available in a default charm++ build and to use allGather, you simply have to include the header `allGather.hh` and link against the library using the flag `-lmoduleallGather`.
 
-After that you need to declare allGather as an extern module in your `.ci` file and include the `allGather.hh` header file in your `cc/hh` file. Then create an AllGather group object.
+After that you need to declare allGather as an extern module in your `.ci` file and create an AllGather group object.
 
 ```C++
 AllGather = CProxy_AllGather::ckNew(k, (int)allGatherType::ALL_GATHER_RING, seed);
@@ -28,7 +25,7 @@ enum allGatherType {
   ALL_GATHER_FLOODING
 };
 ```
-The third argument is a random seed which is set randomly if zero is passed otherwise all the random seeds in the library are set equal to the passed value.
+The third argument is a random seed which is set to pid if zero is passed otherwise the passed value is used. Note that this is used only when `flooding` algorithm is run. 
 
 You must also declare a callback to a function which the library can return to after its done and it must only take a pointer to `allGatherMsg` as its argument. To start operations, each chare array element must make a local pointer to the library chare group element on the same PE as it.
 
@@ -36,13 +33,23 @@ You must also declare a callback to a function which the library can return to a
 AllGather *libptr = AllGatherGroup.ckLocalBranch();
 libptr->init(result, data, thisIndex, cb);
 ```
-Here, result is a pointer to where the user wants the result of allGather operation to be stored(note that it must be of size n * k, where n is the number of `PEs` or the number of participants in allGather), data refers to per chare array element contributed data and cb refers to the callback. Both of these are expected to be RdmaBuffers allocated using `CkRdmaAlloc`. Also, we must pass `thisIndex` to `init` to place the gathered data in the order of chare array indexes. Note that you can modify this to change the order of the gather.
-For example,`libptr->init(result, data,CkNumPes() - thisIndex, cb);`, will gather the data in the order opposite to the array indicex.
+The parameters for the `init` function are:
+
+- `result`: A pointer (void *) to where the allGather operation results will be stored. This must be allocated with enough space to hold n * k elements, where n is the (number of participants in allGather).
+- `data`: The per-chare array element data pointer (void *) that will be contributed to the allGather operation.
+- `thisIndex`: The index value used to determine the order of the gathered data.
+- `cb`: The callback that will be invoked when the allGather operation completes.
+
+You can customize the gathering order by modifying the `thisIndex` parameter. For example:
+```C++
+libptr->init(result, data, n - thisIndex, cb);
+```
+This would gather the data in the reverse order of array indices.
 
 Once the library is done, it will send an empty message (a kick if you will) telling the user that the result is now available in the destination that the user specified earlier.
 
 #### Notes on Implementation
-Each group element is a representative of one of the participants of the allGather. We use zero copy api so we do not tranfer the data as is. We first send zero copy buffers and the one's getting them can decide whether to get some data or not. This is signifincant mostly in the `ALL_GATHER_FLOODING` algorithm
+Each group element is a representative of one of the participants of the allGather. We use zero copy api so we do not tranfer the data as it is. We first send zero copy buffers and the one's getting them can decide whether to get some data or not. This is signifincant in the `ALL_GATHER_FLOODING` algorithm.
 
 In `ALL_GATHER_RING` the data for all the groups, starting from the originating group elements, gets forwarded in a ring(each element getting the data from lower `PE` group element and passing it to higher `PE` group element).
 
@@ -52,5 +59,5 @@ In `ALL_GATHER_FLOODING`, we make a sparse graph over the group elements to spec
 
 ### Notes
 - Currently only gathering equal sized data is supported.
-- The number of PEs needs to be the same as `n`.
+- The number of PEs needs to be the same as `n`(the participants in all gather).
 - The program still has an unresolved bug, where very rarely(2 in a 100 runs), the program reports a segfault after all the data has been correctly gathered.
