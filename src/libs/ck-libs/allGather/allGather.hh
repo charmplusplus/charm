@@ -27,7 +27,7 @@ private:
   int n;
   int idx;
   char* store;
-  int numRecvMsg{};
+  int numRecvMsg;
   CkCallback lib_done_callback;
   allGatherType type;
   int numHypercubeIter;
@@ -60,5 +60,5 @@ public:
 
   void Flood(int sender, CkNcpyBuffer data);
 
-  void init( void* result, void* data, int idx, CkCallback cb);
+  void init(void* result, void* data, int idx, CkCallback cb);
 };

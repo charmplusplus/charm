@@ -53,9 +53,11 @@ void AllGather::init(void* result, void* data, int idx, CkCallback cb)
 {
   this->lib_done_callback = cb;
   this->idx = idx;
-  zero_copy_callback = CkCallback(CkIndex_AllGather::local_buff_done(NULL), thisProxy[CkMyPe()]);
+  zero_copy_callback =
+      CkCallback(CkIndex_AllGather::local_buff_done(NULL), thisProxy[CkMyPe()]);
   this->store = (char*)result;
   this->data = (char*)data;
+  this->numRecvMsg = 0;
   CkCallback cbInitDone(CkReductionTarget(AllGather, startGather), thisProxy);
   contribute(cbInitDone);
 }
@@ -64,7 +66,23 @@ void AllGather::local_buff_done(CkDataMsg* m)
 {
   numRecvMsg++;
   if (numRecvMsg == 2 * (n - 1))
+  {
+    switch (type)
+    {
+      case allGatherType::ALL_GATHER_HYPERCUBE:
+        HypercubeRecursiveDoubling = false;
+        hyperCubeIndx.clear();
+        hyperCubeStore.clear();
+        break;
+      case allGatherType::ALL_GATHER_FLOODING:
+        recvFloodMsg.clear();
+        graph.clear();
+        break;
+      case allGatherType::ALL_GATHER_RING:
+        break;
+    }
     lib_done_callback.send(msg);
+  }
 }
 
 void AllGather::startGather()
@@ -93,7 +111,10 @@ void AllGather::startGather()
 
 void AllGather::recvRing(int sender, CkNcpyBuffer src)
 {
-  CkNcpyBuffer dst(store + sender * k, k * sizeof(char), zero_copy_callback, CK_BUFFER_REG);
+  if (numRecvMsg == 2 * (n - 1))
+    return;
+  CkNcpyBuffer dst(store + sender * k, k * sizeof(char), zero_copy_callback,
+                   CK_BUFFER_REG);
   dst.get(src);
   if (((CkMyPe() + 1) % n) != sender)
     thisProxy[(CkMyPe() + 1) % n].recvRing(sender, src);
@@ -101,10 +122,13 @@ void AllGather::recvRing(int sender, CkNcpyBuffer src)
 
 void AllGather::Flood(int sender, CkNcpyBuffer src)
 {
+  if (numRecvMsg == 2 * (n - 1))
+    return;
   if (recvFloodMsg[sender])
     return;
   recvFloodMsg[sender] = true;
-  CkNcpyBuffer dst(store + sender * k, k * sizeof(char), zero_copy_callback, CK_BUFFER_REG);
+  CkNcpyBuffer dst(store + sender * k, k * sizeof(char), zero_copy_callback,
+                   CK_BUFFER_REG);
   dst.get(src);
   for (int i = 0; i < n; i++)
     if (graph[CkMyPe()][i] == 1 and i != sender)

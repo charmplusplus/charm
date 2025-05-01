@@ -19,15 +19,18 @@ start::start(CkArgMsg* msg)
   sim = CProxy_simBox::ckNew(thisProxy, k, n, d, n);
 
 #ifdef FLOODING
-  AllGather = CProxy_AllGather::ckNew(k*sizeof(long int), (int)allGatherType::ALL_GATHER_FLOODING, 0);
+  AllGather = CProxy_AllGather::ckNew(k * sizeof(long int),
+                                      (int)allGatherType::ALL_GATHER_FLOODING, 0);
 #endif
 
 #ifdef HYPERCUBE
-  AllGather = CProxy_AllGather::ckNew(k*sizeof(long int), (int)allGatherType::ALL_GATHER_HYPERCUBE, 0);
+  AllGather = CProxy_AllGather::ckNew(k * sizeof(long int),
+                                      (int)allGatherType::ALL_GATHER_HYPERCUBE, 0);
 #endif
 
 #ifdef RING
-  AllGather = CProxy_AllGather::ckNew(k*sizeof(long int), (int)allGatherType::ALL_GATHER_RING, 0);
+  AllGather = CProxy_AllGather::ckNew(k * sizeof(long int),
+                                      (int)allGatherType::ALL_GATHER_RING, 0);
 #endif
 
   sim.begin(AllGather);
@@ -61,7 +64,7 @@ void simBox::begin(CProxy_AllGather AllGatherGroup)
 {
   CkCallback cb(CkIndex_simBox::done(NULL), CkArrayIndex1D(thisIndex), thisProxy);
   AllGather* libptr = AllGatherGroup.ckLocalBranch();
-  libptr->init((void *)result, (void *)data, thisIndex, cb);
+  libptr->init((void*)result, (void*)data, thisIndex, cb);
 }
 
 void simBox::done(allGatherMsg* msg)
