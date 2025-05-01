@@ -1,15 +1,14 @@
 CHARMC = ../../../bin/charmc $(OPTS)
-FLAGS = -g -Wall -Wno-unused-variable -Wno-sign-compare -Wno-class-memaccess -O2
 TYPE ?= RING
 
 all: build
 
 build:
-	$(CHARMC) $(FLAGS) ./user.ci
-	$(CHARMC) $(FLAGS) -o allGather -D$(TYPE) ./user.cc -lmoduleallGather
+	$(CHARMC) ./user.ci
+	$(CHARMC) -o allGather -D$(TYPE) ./user.cc -lmoduleallGather
 
 test: build
-	$(call run, +p19 ./allGather 19 29 7 )
+	$(call run, +p4 ./allGather 4 29 7 )
 
 testp: build
 	$(call run, +p$(P) ./allGather $(P) 29 7 )
