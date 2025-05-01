@@ -102,7 +102,7 @@ void simBox::done(allGatherMsg* msg)
   CkRdmaFree(result);
   CkRdmaFree(data);
   CkCallback cbfini(CkReductionTarget(start, fini), startProxy);
-  contribute(0, 0, CkReduction::nop, cbfini);
+  contribute(cbfini);
 }
 
 #include "user.def.h"
