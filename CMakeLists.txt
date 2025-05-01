@@ -918,8 +918,8 @@ foreach(file ${ckloop-h-files})
 endforeach(file)
 
 # allGather
-configure_file(src/libs/ck-libs/allGather/allGather.hh  ${CMAKE_BINARY_DIR}/include COPYONLY)
-add_library(moduleallGather src/libs/ck-libs/allGather/allGather.cc src/libs/ck-libs/allGather/allGather.hh)
+configure_file(src/libs/ck-libs/allGather/allGather.h  ${CMAKE_BINARY_DIR}/include COPYONLY)
+add_library(moduleallGather src/libs/ck-libs/allGather/allGather.C src/libs/ck-libs/allGather/allGather.h)
 add_dependencies(moduleallGather ck)
 
 # NDMeshStreamer
