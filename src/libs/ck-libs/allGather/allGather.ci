@@ -26,8 +26,15 @@ module allGather
           if (HypercubeRecursiveDoubling && iter == numHypercubeIter - 1)
           {
             int size = n - (int)pow(2, iter);
-            std::vector<CkNcpyBuffer> hyperCubeStoreCopy(hyperCubeStore.begin(), hyperCubeStore.begin() + size);
-            std::vector<int> hyperCubeIndxCopy(hyperCubeIndx.begin(), hyperCubeIndx.begin() + size);
+            if(size > hyperCubeIndxCopy.size()){
+              hyperCubeStoreCopy.resize(size);
+              hyperCubeIndxCopy.resize(size);
+            }
+            for(int m = 0; m < size; m++)
+            {
+              hyperCubeStoreCopy[m] = hyperCubeStore[m];
+              hyperCubeIndxCopy[m] = hyperCubeIndx[m];
+            }
             thisProxy[HypercubeToSend].recvHypercube(iter, hyperCubeStoreCopy.data(), hyperCubeIndxCopy.data(), size);
           }
           else
