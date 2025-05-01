@@ -30,11 +30,8 @@ module allGather
               hyperCubeStoreCopy.resize(size);
               hyperCubeIndxCopy.resize(size);
             }
-            for(int m = 0; m < size; m++)
-            {
-              hyperCubeStoreCopy[m] = hyperCubeStore[m];
-              hyperCubeIndxCopy[m] = hyperCubeIndx[m];
-            }
+            std::copy(hyperCubeStore.begin(), hyperCubeStore.begin() + size, hyperCubeStoreCopy.begin());
+            std::copy(hyperCubeIndx.begin(), hyperCubeIndx.begin() + size, hyperCubeIndxCopy.begin());
             thisProxy[HypercubeToSend].recvHypercube(iter, hyperCubeStoreCopy.data(), hyperCubeIndxCopy.data(), size);
           }
           else
