@@ -26,7 +26,7 @@ private:
   int k;
   int n;
   int idx;
-  long int* store;
+  char* store;
   int numRecvMsg{};
   CkCallback lib_done_callback;
   allGatherType type;
@@ -40,7 +40,7 @@ private:
   std::vector<int> hyperCubeIndx{};
   std::vector<CkNcpyBuffer> hyperCubeStore{};
   allGatherMsg* msg;
-  long int* data;
+  char* data;
   CkCallback zero_copy_callback;
   CkCallback dum_dum;
 
@@ -59,5 +59,5 @@ public:
 
   void Flood(int sender, CkNcpyBuffer data);
 
-  void init(long int* result, long int* data, int idx, CkCallback cb);
+  void init( void* result, void* data, int idx, CkCallback cb);
 };
