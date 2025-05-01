@@ -42,7 +42,6 @@ private:
   allGatherMsg* msg;
   char* data;
   CkCallback zero_copy_callback;
-  CkCallback dum_dum;
 
 public:
   AllGather_SDAG_CODE

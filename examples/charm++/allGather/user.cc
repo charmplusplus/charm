@@ -100,6 +100,7 @@ void simBox::done(allGatherMsg* msg)
     ckout << endl;
   }
   CkRdmaFree(result);
+  CkRdmaFree(data);
   CkCallback cbfini(CkReductionTarget(start, fini), startProxy);
   contribute(cbfini);
 }

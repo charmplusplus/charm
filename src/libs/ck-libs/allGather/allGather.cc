@@ -53,9 +53,7 @@ void AllGather::init(void* result, void* data, int idx, CkCallback cb)
 {
   this->lib_done_callback = cb;
   this->idx = idx;
-  zero_copy_callback =
-      CkCallback(CkIndex_AllGather::local_buff_done(NULL), thisProxy[CkMyPe()]);
-  dum_dum = CkCallback(CkCallback::ignore);
+  zero_copy_callback = CkCallback(CkIndex_AllGather::local_buff_done(NULL), thisProxy[CkMyPe()]);
   this->store = (char*)result;
   this->data = (char*)data;
   CkCallback cbInitDone(CkReductionTarget(AllGather, startGather), thisProxy);
@@ -65,14 +63,14 @@ void AllGather::init(void* result, void* data, int idx, CkCallback cb)
 void AllGather::local_buff_done(CkDataMsg* m)
 {
   numRecvMsg++;
-  if (numRecvMsg == n - 1)
+  if (numRecvMsg == 2 * (n - 1))
     lib_done_callback.send(msg);
 }
 
 void AllGather::startGather()
 {
   for (int i = 0; i < k; i++) store[k * idx + i] = data[i];
-  CkNcpyBuffer src(data, k * sizeof(char), dum_dum, CK_BUFFER_REG);
+  CkNcpyBuffer src(data, k * sizeof(char), zero_copy_callback, CK_BUFFER_REG);
 
   switch (type)
   {
@@ -95,8 +93,7 @@ void AllGather::startGather()
 
 void AllGather::recvRing(int sender, CkNcpyBuffer src)
 {
-  CkNcpyBuffer dst(store + sender * k, k * sizeof(char), zero_copy_callback,
-                   CK_BUFFER_REG);
+  CkNcpyBuffer dst(store + sender * k, k * sizeof(char), zero_copy_callback, CK_BUFFER_REG);
   dst.get(src);
   if (((CkMyPe() + 1) % n) != sender)
     thisProxy[(CkMyPe() + 1) % n].recvRing(sender, src);
@@ -107,8 +104,7 @@ void AllGather::Flood(int sender, CkNcpyBuffer src)
   if (recvFloodMsg[sender])
     return;
   recvFloodMsg[sender] = true;
-  CkNcpyBuffer dst(store + sender * k, k * sizeof(char), zero_copy_callback,
-                   CK_BUFFER_REG);
+  CkNcpyBuffer dst(store + sender * k, k * sizeof(char), zero_copy_callback, CK_BUFFER_REG);
   dst.get(src);
   for (int i = 0; i < n; i++)
     if (graph[CkMyPe()][i] == 1 and i != sender)
