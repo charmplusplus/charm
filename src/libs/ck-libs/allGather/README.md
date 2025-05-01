@@ -60,4 +60,3 @@ In `ALL_GATHER_FLOODING`, we make a sparse graph over the group elements to spec
 ### Notes
 - Currently only gathering equal sized data is supported.
 - The number of PEs needs to be the same as `n`(the participants in all gather).
-- The program still has an unresolved bug, where very rarely(2 in a 100 runs), the program reports a segfault after all the data has been correctly gathered.
