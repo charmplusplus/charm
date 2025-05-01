@@ -7,11 +7,31 @@ build:
 	$(CHARMC) ./user.ci
 	$(CHARMC) -o allGather -D$(TYPE) ./user.cc -lmoduleallGather
 
-test: build
+test:
+	@echo "\033[1;34mRunning allGather with RING algorithm\033[0m"
+	@$(CHARMC) -o allGather -DRING ./user.cc -lmoduleallGather
 	$(call run, +p4 ./allGather 4 29 7 )
+	@echo "\033[1;34mRunning allGather with HYPERCUBE algorithm\033[0m"
+	@$(CHARMC) -o allGather -DHYPERCUBE ./user.cc -lmoduleallGather
+	$(call run, +p4 ./allGather 4 29 7 )
+	@echo "\033[1;34mRunning allGather with RECURSIVE-DOUBLING algorithm\033[0m"
+	$(call run, +p5 ./allGather 5 29 7 )
+	@echo "\033[1;34mRunning allGather with FLOODING algorithm\033[0m"
+	@$(CHARMC) -o allGather -DFLOODING ./user.cc -lmoduleallGather
+	$(call run, +p4 ./allGather 4 29 7 )
+	@echo "\033[1;32mAll Tests completed!\033[0m"
 
-testp: build
+testp:
+	@echo "\033[1;34mRunning allGather with RING algorithm\033[0m"
+	@$(CHARMC) -o allGather -DRING ./user.cc -lmoduleallGather
 	$(call run, +p$(P) ./allGather $(P) 29 7 )
+	@echo "\033[1;34mRunning allGather with HYPERCUBE algorithm\033[0m"
+	@$(CHARMC) -o allGather -DHYPERCUBE ./user.cc -lmoduleallGather
+	$(call run, +p$(P) ./allGather $(P) 29 7 )
+	@echo "\033[1;34mRunning allGather with FLOODING algorithm\033[0m"
+	@$(CHARMC) -o allGather -DFLOODING ./user.cc -lmoduleallGather
+	$(call run, +p$(P) ./allGather $(P) 29 7 )
+	@echo "\033[1;32mAll Tests completed!\033[0m"
 
 clean:
 	rm -f *.decl.h *.def.h *.o charmrun allGather
