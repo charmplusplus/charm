@@ -39,7 +39,7 @@ public:
   const CkArrayIndex &ckGetArrayIndex(void) const {return myRec->getIndex();}
   CmiUInt8 ckGetID(void) const { return myRec->getID(); }
 
-#if CMK_LBDB_ON  //For load balancing:
+#if 1 //For load balancing:
   inline LBManager *getLBMgr(void) const {return myRec->getLBMgr();}
   inline MetaBalancer *getMetaBalancer(void) const {return myRec->getMetaBalancer();}
 #endif
@@ -84,7 +84,7 @@ public:
   void *getObjUserData(int idx);
 #endif
 
-#if CMK_LBDB_ON  //For load balancing:
+#if 1 //For load balancing:
   void AtSync(int waitForMigration=1);
   int MigrateToPe()  { return myRec->MigrateToPe(); }
 
