@@ -1,6 +1,7 @@
 -include ../../include/conv-mach-opt.mak
 
 DIRS = \
+  allGather \
   allToAll \
   array_map \
   ckcallback \

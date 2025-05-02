@@ -917,6 +917,11 @@ foreach(file ${ckloop-h-files})
   configure_file(${file} ${CMAKE_BINARY_DIR}/include COPYONLY)
 endforeach(file)
 
+# allGather
+configure_file(src/libs/ck-libs/allGather/allGather.h  ${CMAKE_BINARY_DIR}/include COPYONLY)
+add_library(moduleallGather src/libs/ck-libs/allGather/allGather.C src/libs/ck-libs/allGather/allGather.h)
+add_dependencies(moduleallGather ck)
+
 # NDMeshStreamer
 file(GLOB moduleNDMeshStreamer-h-sources src/libs/ck-libs/NDMeshStreamer/*.h)
 set(moduleNDMeshStreamer-cxx-sources src/libs/ck-libs/NDMeshStreamer/NDMeshStreamer.C)
