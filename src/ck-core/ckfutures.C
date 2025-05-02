@@ -266,6 +266,13 @@ CkFuture CkCreateFuture(void)
   return fut;
 }
 
+CkLocalFuture CkCreateLocalFuture(void)
+{
+  CkLocalFuture fut;
+  fut.id = createFuture();
+  return fut;
+}
+
 void CkReleaseFutureID(CkFutureID handle)
 {
   FutureState *fs = &(CpvAccess(futurestate));
@@ -530,6 +537,16 @@ void CkSendToFutureID(CkFutureID futNum, void *m, int PE)
   UsrToEnv(m)->setRef(futNum);
   CProxy_FutureBOC fBOC(_fbocID);
   fBOC[PE].SetFuture((FutureInitMsg *)m);
+}
+
+void CkSendToLocalFutureID(CkFutureID futNum, void *m)
+{
+  setFuture(futNum, m);
+}
+
+void CkSendToLocalFuture(CkLocalFuture fut, void *msg)
+{
+  CkSendToLocalFutureID(fut.id, msg);
 }
 
 void  CkSendToFuture(CkFuture fut, void *msg)

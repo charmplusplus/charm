@@ -24,7 +24,9 @@ extern "C" {
 #endif
 
 CkFuture CkCreateFuture(void);
+CkLocalFuture CkCreateLocalFuture(void);
 void  CkSendToFuture(CkFuture fut, void *msg);
+void  CkSendToLocalFuture(CkLocalFuture fut, void *msg);
 void* CkWaitFuture(CkFuture futNum);
 void CkReleaseFuture(CkFuture futNum);
 int CkProbeFuture(CkFuture futNum);
@@ -41,6 +43,7 @@ void CkWaitVoidFuture(CkFutureID futNum);
 void CkReleaseFutureID(CkFutureID futNum);
 int CkProbeFutureID(CkFutureID futNum);
 void  CkSendToFutureID(CkFutureID futNum, void *msg, int pe);
+void  CkSendToLocalFutureID(CkFutureID futNum, void *msg);
 CkFutureID CkCreateAttachedFuture(void *msg);
 
 CkFutureID CkCreateAttachedFutureSend(void *msg, int ep, struct CkArrayID id, CkArrayIndex idx,

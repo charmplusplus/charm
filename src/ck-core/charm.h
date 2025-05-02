@@ -453,6 +453,17 @@ typedef struct _ckFuture {
 #endif
 } CkFuture;
 
+typedef struct _ckLocalFuture {
+  CkFutureID id;
+#ifdef __cplusplus
+  public:
+    void pup(PUP::er &p) { p(id); }
+
+    bool operator==(const _ckFuture& other) const {
+      return this->id == other.id;
+    }
+#endif
+} CkLocalFuture;
 /******************************************************************************
  *
  * Semaphore calls
