@@ -26,12 +26,15 @@ module allGather
           if (HypercubeRecursiveDoubling && iter == numHypercubeIter - 1)
           {
             int size = n - (int)pow(2, iter);
-            thisProxy[HypercubeToSend].recvHypercube(iter, hyperCubeStore.data(), hyperCubeIndx.data(), size);
+            thisProxy[HypercubeToSend].recvHypercube(iter, hyperCubeStore.data(),
+                                                     hyperCubeIndx.data(), size);
           }
           else
-            thisProxy[HypercubeToSend].recvHypercube(iter, hyperCubeStore.data(), hyperCubeIndx.data(), hyperCubeStore.size());
+            thisProxy[HypercubeToSend].recvHypercube(
+                iter, hyperCubeStore.data(), hyperCubeIndx.data(), hyperCubeStore.size());
         }
-        when recvHypercube[iter](int ref, CkNcpyBuffer data[size], int dataIndx[size], int size)
+        when recvHypercube[iter](int ref, CkNcpyBuffer data[size], int dataIndx[size],
+                                 int size)
         {
           serial
           {
@@ -47,7 +50,8 @@ module allGather
         }
       }
     };
-    entry void recvHypercube(int ref, CkNcpyBuffer data[size], int dataIndx[size], int size);
+    entry void recvHypercube(int ref, CkNcpyBuffer data[size], int dataIndx[size],
+                             int size);
     entry void Flood(int sender, CkNcpyBuffer data);
   };
 };

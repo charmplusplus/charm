@@ -38,20 +38,22 @@ start::start(CkArgMsg* msg)
 
 void start::fini()
 {
-  if(numIter == 1){
+  if (numIter == 1)
+  {
     ckout << "[STATUS] Completed the AllGather Simulation" << endl;
     CkExit();
-  } else{
+  }
+  else
+  {
     numIter++;
     ckout << "[STATUS] Completed the AllGather Simulation, starting again" << endl;
     sim.begin(AllGather);
   }
-  
 }
 
 simBox::simBox(CProxy_start startProxy, int k, int n, int d)
     : startProxy(startProxy), k(k), n(n), d(d)
-{ 
+{
 }
 
 void simBox::begin(CProxy_AllGather AllGatherGroup)

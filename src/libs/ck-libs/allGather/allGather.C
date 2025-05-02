@@ -70,8 +70,8 @@ void AllGather::local_buff_done(CkDataMsg* m)
     switch (type)
     {
       case allGatherType::ALL_GATHER_HYPERCUBE:
-      hyperCubeIndx.clear();
-      hyperCubeStore.clear();
+        hyperCubeIndx.clear();
+        hyperCubeStore.clear();
         break;
       case allGatherType::ALL_GATHER_FLOODING:
         recvFloodMsg.clear();
