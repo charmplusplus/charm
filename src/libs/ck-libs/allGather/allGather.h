@@ -39,8 +39,6 @@ private:
   int randCounter;
   std::vector<int> hyperCubeIndx{};
   std::vector<CkNcpyBuffer> hyperCubeStore{};
-  std::vector<int> hyperCubeIndxCopy{};
-  std::vector<CkNcpyBuffer> hyperCubeStoreCopy{};
   allGatherMsg* msg;
   char* data;
   CkCallback zero_copy_callback;

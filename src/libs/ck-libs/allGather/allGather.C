@@ -9,7 +9,6 @@ int AllGather::gen_rand()
 
 AllGather::AllGather(int k, int type, int seed) : k(k)
 {
-  this->msg = new allGatherMsg;
   n = CkNumPes();
   this->type = (allGatherType)type;
   switch (type)
@@ -51,6 +50,7 @@ AllGather::AllGather(int k, int type, int seed) : k(k)
 
 void AllGather::init(void* result, void* data, int idx, CkCallback cb)
 {
+  this->msg = new allGatherMsg;
   this->lib_done_callback = cb;
   this->idx = idx;
   zero_copy_callback =
@@ -70,13 +70,11 @@ void AllGather::local_buff_done(CkDataMsg* m)
     switch (type)
     {
       case allGatherType::ALL_GATHER_HYPERCUBE:
-        HypercubeRecursiveDoubling = false;
-        hyperCubeIndx.clear();
-        hyperCubeStore.clear();
+      hyperCubeIndx.clear();
+      hyperCubeStore.clear();
         break;
       case allGatherType::ALL_GATHER_FLOODING:
         recvFloodMsg.clear();
-        graph.clear();
         break;
       case allGatherType::ALL_GATHER_RING:
         break;

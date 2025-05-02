@@ -6,6 +6,7 @@ class start : public CBase_start
 private:
   CProxy_simBox sim;
   CProxy_AllGather AllGather;
+  int numIter = 0;
 
 public:
   start(CkArgMsg* msg);

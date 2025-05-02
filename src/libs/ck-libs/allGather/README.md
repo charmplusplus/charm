@@ -8,7 +8,7 @@ allGather lets you gather data distributed accross different chare array/group e
 
 ### How to use
 
-The library is available in a default charm++ build and to use allGather, you simply have to include the header `allGather.hh` and link against the library using the flag `-lmoduleallGather`.
+The library is available in a default charm++ build and to use allGather, you simply have to include the header `allGather.h` and link against the library using the flag `-lmoduleallGather`.
 
 After that you need to declare allGather as an extern module in your `.ci` file and create an AllGather group object.
 

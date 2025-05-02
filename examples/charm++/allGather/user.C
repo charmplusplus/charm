@@ -38,12 +38,23 @@ start::start(CkArgMsg* msg)
 
 void start::fini()
 {
-  ckout << "[STATUS] Completed the AllGather Simulation" << endl;
-  CkExit();
+  if(numIter == 1){
+    ckout << "[STATUS] Completed the AllGather Simulation" << endl;
+    CkExit();
+  } else{
+    numIter++;
+    ckout << "[STATUS] Completed the AllGather Simulation, starting again" << endl;
+    sim.begin(AllGather);
+  }
+  
 }
 
 simBox::simBox(CProxy_start startProxy, int k, int n, int d)
     : startProxy(startProxy), k(k), n(n), d(d)
+{ 
+}
+
+void simBox::begin(CProxy_AllGather AllGatherGroup)
 {
   result = (long int*)CkRdmaAlloc(k * n * sizeof(long int));
   data = (long int*)CkRdmaAlloc(k * sizeof(long int));
@@ -58,10 +69,6 @@ simBox::simBox(CProxy_start startProxy, int k, int n, int d)
   {
     data[i] = base + i;
   }
-}
-
-void simBox::begin(CProxy_AllGather AllGatherGroup)
-{
   CkCallback cb(CkIndex_simBox::done(NULL), CkArrayIndex1D(thisIndex), thisProxy);
   AllGather* libptr = AllGatherGroup.ckLocalBranch();
   libptr->init((void*)result, (void*)data, thisIndex, cb);
