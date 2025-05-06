@@ -890,7 +890,7 @@ include(cmake/hwloc.cmake)
 
 # Converse
 include(cmake/converse.cmake)
-add_subdirectory(src/QuickThreads)
+# add_subdirectory(src/QuickThreads)
 # add_subdirectory(src/util/boost-context)
 add_subdirectory(src/conv-core)
 
@@ -927,6 +927,7 @@ configure_file(src/scripts/testrun bin/ COPYONLY)
 # Charm++ libraries
 
 # CkLoop
+#[[
 set(ckloop-cxx-files src/libs/ck-libs/ckloop/CkLoop.C)
 set(ckloop-h-files src/libs/ck-libs/ckloop/CkLambda.h src/libs/ck-libs/ckloop/CkLoopAPI.h src/libs/ck-libs/ckloop/CkLoop.h)
 add_library(moduleCkLoop ${ckloop-cxx-files} ${ckloop-h-files} ${CMAKE_BINARY_DIR}/include/CkLoop.decl.h)
@@ -935,6 +936,7 @@ add_dependencies(moduleCkLoop ck)
 foreach(file ${ckloop-h-files})
   configure_file(${file} ${CMAKE_BINARY_DIR}/include COPYONLY)
 endforeach(file)
+]]
 
 # NDMeshStreamer
 file(GLOB moduleNDMeshStreamer-h-sources src/libs/ck-libs/NDMeshStreamer/*.h)
@@ -956,6 +958,7 @@ configure_file(src/libs/ck-libs/NDMeshStreamer/libmoduleNDMeshStreamer.dep ${CMA
 
 
 # TCharm
+#[[
 file(GLOB tcharm-c-sources src/libs/ck-libs/tcharm/*.c)
 set(tcharm-h-sources
     src/libs/ck-libs/tcharm/tcharm.h
@@ -987,6 +990,8 @@ if(${TARGET} STREQUAL "AMPI" OR (${TARGET} STREQUAL "LIBS" AND NOT BUILD_CHANGA)
   add_subdirectory(src/libs/ck-libs/ampi)
 endif()
 
+]]
+
 # Charm4py
 if(${TARGET} STREQUAL "charm4py")
   # Create libcharm.so for Charm4py
@@ -1011,7 +1016,7 @@ endif()
 # Check that we are able to build and link an executable
 add_executable(ckhello ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.C)
 add_dependencies(ckhello ck memory-default threads-default conv-static
-  converse ckmain ckqt
+  converse ckmain
   moduleNDMeshStreamer modulecompletion)
 
 # Create conv-mach-opt.sh
