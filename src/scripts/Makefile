@@ -86,9 +86,7 @@ libcharm: charm++
 
 charm4py: libcharm
 
-LIBCHARM_LIBS= libck.a libconverse.a \
-               libmemory-default.a libthreads-default.a \
-               libldb-rand.a
+LIBCHARM_LIBS= libck.a libconverse.a 
 
 DEFAULT_LIBS= completion NDMeshStreamer dummy pythonCCS io ckloop
 
