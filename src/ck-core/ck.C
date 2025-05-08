@@ -1490,9 +1490,13 @@ void _skipCldHandler(void *converseMsg)
 		       (unsigned int *) env->getPrioPtr ());
   }
 #else
-  CqsEnqueueGeneral((Queue)CpvAccess(CsdSchedQueue),
+  /*
+  CqsEnqueueGeneral((Queue)CmiGetQueue(CmiMyRank()),
   	env, env->getQueueing(),env->getPriobits(),
   	(unsigned int *)env->getPrioPtr());
+  */
+  CsdEnqueueGeneral(env, env->getQueueing(),env->getPriobits(),
+  (int *) env->getPrioPtr());
 #endif
 }
 
@@ -1521,9 +1525,13 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
     else
 #endif
     {
+      /*
       CqsEnqueueGeneral((Queue)CpvAccess(CsdSchedQueue),
           env, env->getQueueing(),env->getPriobits(),
           (unsigned int *)env->getPrioPtr());
+          */
+      CsdEnqueueGeneral(env, env->getQueueing(),env->getPriobits(),
+          (int*) env->getPrioPtr());
     }
 #if CMK_PERSISTENT_COMM
     CmiPersistentOneSend();

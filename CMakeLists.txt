@@ -185,6 +185,7 @@ option(ZLIB                "Enable zlib support" ON)
 option(AMPI_MPICH_TESTS    "Enable mpich tests for AMPI" OFF)
 option(DRONE_MODE          "Enable drone mode" OFF)
 option(TASK_QUEUE          "Enable task queue" OFF)
+option(RECONVERSE          "Use the Reconverse communication layer" OFF)
 
 
 if(TRACING STREQUAL "")
@@ -264,6 +265,12 @@ if(${TASK_QUEUE} OR ${OMP})
   set(CMK_TASKQUEUE 1)
 else()
   set(CMK_TASKQUEUE 0)
+endif()
+
+if(${RECONVERSE})
+  set(CMK_RECONVERSE 1)
+else()
+  set(CMK_RECONVERSE 0)
 endif()
 
 
@@ -354,6 +361,7 @@ set(CMK_REFNUM_TYPE ${REFNUM_TYPE})
 set(CMK_LBTIME_TYPE ${LBTIME_TYPE})
 
 set(CMK_LB_USER_DATA ${LBUSERDATA})
+
 
 set(CMK_RANDOMIZED_MSGQ ${RANDOMIZED_MSGQ})
 set(CMK_SHRINK_EXPAND ${SHRINKEXPAND})
@@ -871,9 +879,9 @@ include(cmake/hwloc.cmake)
 
 # Converse
 include(cmake/converse.cmake)
-add_subdirectory(src/QuickThreads)
-add_subdirectory(src/util/boost-context)
-add_subdirectory(src/conv-core)
+# add_subdirectory(src/QuickThreads)
+# add_subdirectory(src/util/boost-context)
+# add_subdirectory(src/conv-core)
 
 # LIBS
 if(${TARGET} STREQUAL "LIBS")
@@ -908,14 +916,16 @@ configure_file(src/scripts/testrun bin/ COPYONLY)
 # Charm++ libraries
 
 # CkLoop
+#[[
 set(ckloop-cxx-files src/libs/ck-libs/ckloop/CkLoop.C)
-set(ckloop-h-files src/libs/ck-libs/ckloop/CkLambda.h src/libs/ck-libs/ckloop/CkLoopAPI.h src/libs/ck-libs/ckloop/CkLoop.h)
-add_library(moduleCkLoop ${ckloop-cxx-files} ${ckloop-h-files} ${CMAKE_BINARY_DIR}/include/CkLoop.decl.h)
-add_dependencies(moduleCkLoop ck)
+#set(ckloop-h-files src/libs/ck-libs/ckloop/CkLambda.h src/libs/ck-libs/ckloop/CkLoopAPI.h src/libs/ck-libs/ckloop/CkLoop.h)
+#add_library(moduleCkLoop ${ckloop-cxx-files} ${ckloop-h-files} ${CMAKE_BINARY_DIR}/include/CkLoop.decl.h)
+#add_dependencies(moduleCkLoop ck)
 
-foreach(file ${ckloop-h-files})
-  configure_file(${file} ${CMAKE_BINARY_DIR}/include COPYONLY)
-endforeach(file)
+#foreach(file ${ckloop-h-files})
+  #configure_file(${file} ${CMAKE_BINARY_DIR}/include COPYONLY)
+#endforeach(file)
+]]
 
 # allGather
 configure_file(src/libs/ck-libs/allGather/allGather.h  ${CMAKE_BINARY_DIR}/include COPYONLY)
@@ -942,6 +952,7 @@ configure_file(src/libs/ck-libs/NDMeshStreamer/libmoduleNDMeshStreamer.dep ${CMA
 
 
 # TCharm
+#[[
 file(GLOB tcharm-c-sources src/libs/ck-libs/tcharm/*.c)
 set(tcharm-h-sources
     src/libs/ck-libs/tcharm/tcharm.h
@@ -965,9 +976,11 @@ foreach(f ${tcharm-h-sources})
     configure_file(${f} ${CMAKE_BINARY_DIR}/include COPYONLY)
 endforeach(f)
 
+
 add_dependencies(moduletcharmmain ck)
 add_dependencies(moduletcharm ck)
 add_dependencies(tcharm-compat ck)
+]]
 
 if(${TARGET} STREQUAL "AMPI" OR (${TARGET} STREQUAL "LIBS" AND NOT BUILD_CHANGA))
   add_subdirectory(src/libs/ck-libs/ampi)
@@ -996,8 +1009,8 @@ endif()
 
 # Check that we are able to build and link an executable
 add_executable(ckhello ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.C)
-add_dependencies(ckhello ck ldb-rand memory-default threads-default conv-static
-  converse ckmain ckqt
+add_dependencies(ckhello ck conv-static
+  converse ckmain
   moduleNDMeshStreamer modulecompletion)
 
 # Create conv-mach-opt.sh

@@ -11,7 +11,7 @@ endif()
 
 set(CMK_MACHINE_NAME \"${CHARM_PLATFORM}\")
 
-set(CMK_CCS_AVAILABLE 1)
+set(CMK_CCS_AVAILABLE 0)
 if(${NETWORK} STREQUAL "pami" OR ${NETWORK} STREQUAL "pamilrts")
   set(CMK_CCS_AVAILABLE 0)
 endif()

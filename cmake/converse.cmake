@@ -16,7 +16,6 @@ set(conv-core-h-sources
     src/conv-core/conv-rdmadevice.h
     src/conv-core/conv-taskQ.h
     src/conv-core/conv-trace.h
-    src/conv-core/converse.h
     src/conv-core/cpthreads.h
     src/conv-core/debug-conv++.h
     src/conv-core/debug-conv.h
@@ -58,6 +57,13 @@ set(conv-core-cxx-sources
     src/conv-core/queueing.C
     src/conv-core/hrctimer.C
 )
+
+set(reconverse-h-sources 
+    reconverse/include/converse.h)
+
+#set(reconverse-comm-backend-sources
+#    reconverse/comm_backend/comm_backend_internal.h 
+#    reconverse/comm_backend/comm_backend.h)
 
 if(${CMK_USE_SHMEM})
     set(conv-core-cxx-sources
@@ -136,17 +142,17 @@ set(conv-util-h-sources
 )
 
 set(conv-util-cxx-sources
-    src/arch/util/mempool.C
-    src/arch/util/persist-comm.C
-    src/util/cmirdmautils.C
-    src/util/crc32.C
-    src/util/sockRoutines.C
-    src/util/ckdll.C
-    src/util/ckhashtable.C
-    src/util/ckimage.C
-    src/util/conv-lists.C
-    src/util/hilbert.C
-    src/util/partitioning_strategies.C
+    #src/arch/util/mempool.C
+    #src/arch/util/persist-comm.C
+    #src/util/cmirdmautils.C
+    #src/util/crc32.C
+    #src/util/sockRoutines.C
+    #src/util/ckdll.C
+    #src/util/ckhashtable.C
+    #src/util/ckimage.C
+    #src/util/conv-lists.C
+    #src/util/hilbert.C
+    #src/util/partitioning_strategies.C
     src/util/pup_c.C
     src/util/pup_cmialloc.C
     src/util/pup_paged.C
@@ -154,7 +160,7 @@ set(conv-util-cxx-sources
     src/util/pup_toNetwork4.C
     src/util/pup_util.C
     src/util/pup_xlater.C
-    src/util/spanningTree.C
+    #src/util/spanningTree.C
 )
 
 if(CMK_CAN_LINK_FORTRAN)
@@ -183,17 +189,16 @@ set(conv-ldb-cxx-sources
 )
 
 set(conv-ldb-h-sources
-    src/conv-ldb/cldb.h
     src/conv-ldb/graphdefs.h
     src/conv-ldb/topology.h
 )
 
-add_library(ldb-none src/conv-ldb/cldb.none.C ${conv-ldb-h-sources})
-add_library(ldb-test src/conv-ldb/cldb.test.C ${conv-ldb-h-sources})
-add_library(ldb-rand src/conv-ldb/cldb.rand.C ${conv-ldb-h-sources})
-add_library(ldb-neighbor src/conv-ldb/cldb.neighbor.C src/conv-ldb/cldb.neighbor.h ${conv-ldb-h-sources})
-add_library(ldb-workstealing src/conv-ldb/cldb.workstealing.C src/conv-ldb/cldb.workstealing.h ${conv-ldb-h-sources})
-add_library(ldb-spray src/conv-ldb/cldb.spray.C ${conv-ldb-h-sources})
+#add_library(ldb-none reconverse/src/cldb.none.C ${conv-ldb-h-sources})
+#add_library(ldb-test src/conv-ldb/cldb.test.C ${conv-ldb-h-sources})
+#add_library(ldb-rand reconverse/src/cl ${conv-ldb-h-sources})
+#add_library(ldb-neighbor src/conv-ldb/cldb.neighbor.C src/conv-ldb/cldb.neighbor.h ${conv-ldb-h-sources})
+#add_library(ldb-workstealing src/conv-ldb/cldb.workstealing.C src/conv-ldb/cldb.workstealing.h ${conv-ldb-h-sources})
+#add_library(ldb-spray src/conv-ldb/cldb.spray.C ${conv-ldb-h-sources})
 # add_library(ldb-prioritycentralized src/conv-ldb/cldb.prioritycentralized.C src/conv-ldb/cldb.prioritycentralized.h ${conv-ldb-h-sources})
 
 # TopoManager
@@ -203,28 +208,51 @@ set(tmgr-h-sources src/util/topomanager/TopoManager.h ${CMAKE_BINARY_DIR}/includ
 file(WRITE ${CMAKE_BINARY_DIR}/include/topomanager_config.h "// empty\n" )
 
 # Converse
-add_library(converse
-    ${CMAKE_BINARY_DIR}/include/commitid.C
-    ${conv-core-cxx-sources}
-    ${conv-core-h-sources}
-    ${conv-ccs-h-sources}
-    ${conv-ccs-cxx-sources}
-    ${conv-perf-cxx-sources}
-    ${conv-perf-h-sources}
-    ${conv-util-c-sources}
-    ${conv-util-cxx-sources}
-    ${conv-util-h-sources}
-    ${conv-partition-cxx-sources}
-    ${conv-ldb-cxx-sources}
-    ${conv-ldb-h-sources}
-    src/arch/${GDIR}/machine.C
-    ${tmgr-c-sources}
-    ${tmgr-cxx-sources}
-    ${tmgr-h-sources}
-    ${hwloc-objects}
-    ${all-ci-outputs}
+# add_library(converse
+    # ${CMAKE_BINARY_DIR}/include/commitid.C
+    # ${conv-core-cxx-sources}
+    # ${conv-core-h-sources}
+    # ${conv-ccs-h-sources}
+    # ${conv-ccs-cxx-sources}
+    # ${conv-perf-cxx-sources}
+    # ${conv-perf-h-sources}
+    # ${conv-util-c-sources}
+    # ${conv-util-cxx-sources}
+    # ${conv-util-h-sources}
+    # ${conv-partition-cxx-sources}
+    # ${conv-ldb-cxx-sources}
+    # ${conv-ldb-h-sources}
+    # src/arch/${GDIR}/machine.C
+    # ${tmgr-c-sources}
+    # ${tmgr-cxx-sources}
+    # ${tmgr-h-sources}
+    # ${hwloc-objects}
+    # ${all-ci-outputs}
+# )
+# add_dependencies(converse hwloc)
+
+add_subdirectory(reconverse)
+# add_dependencies(converse reconverse)
+
+add_library(charm_cxx_utils STATIC
+    ${conv-util-cxx-sources})
+
+add_library(converse INTERFACE)
+
+target_link_libraries(converse INTERFACE
+    reconverse
+    charm_cxx_utils
+    hwloc
 )
-add_dependencies(converse hwloc)
+
+#file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/comm_backend)
+
+foreach (filename 
+        ${conv-ldb-h-sources}
+)
+    configure_file(${filename} ${CMAKE_BINARY_DIR}/include/ COPYONLY)
+
+endforeach()
 
 foreach(filename
     ${conv-core-h-sources}
@@ -233,19 +261,22 @@ foreach(filename
     ${conv-util-h-sources}
     ${conv-ldb-h-sources}
     ${tmgr-h-sources}
+    ${reconverse-h-sources}
 )
     configure_file(${filename} ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 endforeach()
 
-target_include_directories(converse PRIVATE src/arch/util) # for machine*.*
-target_include_directories(converse PRIVATE src/util) # for sockRoutines.C
-target_include_directories(converse PRIVATE src/conv-core src/util/topomanager src/ck-ldb src/ck-perf src/ck-cp)
+
+
+# target_include_directories(converse PRIVATE src/arch/util) # for machine*.*
+# target_include_directories(converse PRIVATE src/util) # for sockRoutines.C
+# target_include_directories(converse PRIVATE src/conv-core src/util/topomanager src/ck-ldb src/ck-perf src/ck-cp)
 
 # conv-static
 add_library(conv-static OBJECT src/conv-core/conv-static.c)
-add_dependencies(converse conv-static)
-add_custom_command(TARGET converse
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/conv-static.dir/src/conv-core/conv-static.c.o ${CMAKE_BINARY_DIR}/lib/conv-static.o
-    VERBATIM
-)
+# add_dependencies(converse conv-static)
+# add_custom_command(TARGET converse
+#     POST_BUILD
+#     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/conv-static.dir/src/conv-core/conv-static.c.o ${CMAKE_BINARY_DIR}/lib/conv-static.o
+#     VERBATIM
+# )

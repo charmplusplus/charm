@@ -6,6 +6,7 @@
 #define CHARM_H
 
 #include "converse.h"
+#include "conv-autoconfig.h"
 #include <sys/types.h> /* for size_t */
 
 #ifdef __cplusplus

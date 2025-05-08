@@ -11,7 +11,7 @@
     @{
  */
 
-#include "conv-config.h"
+#include "converse.h"
 
 #ifdef __cplusplus
 extern "C" {

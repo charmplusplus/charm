@@ -247,6 +247,22 @@ else
   AC_DEFINE_UNQUOTED(CMK_TASKQUEUE, 1, [enable task queue])
 fi
 
+#enable reconverse
+AC_ARG_ENABLE([reconverse],
+              [AS_HELP_STRING([--enable-reconverse],
+                [use the reconverse communication layer])],
+              [enable_reconverse=$enableval],
+              [enable_reconverse=no])
+
+if test "$enable_reconverse" = "no"
+then 
+  Echo "Reconverse is disabled"
+  AC_DEFINE_UNQUOTED(CMK_RECONVERSE, 0, [disable reconverse])
+else 
+  Echo "Reconverse is enabled"
+  AC_DEFINE_UNQUOTED(CMK_RECONVERSE, 1, [enable reconverse])
+fi
+
 # enable drone mode
 AC_ARG_ENABLE([drone_mode],
             [AS_HELP_STRING([--enable-drone-mode],
