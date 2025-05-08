@@ -892,7 +892,7 @@ include(cmake/hwloc.cmake)
 include(cmake/converse.cmake)
 # add_subdirectory(src/QuickThreads)
 # add_subdirectory(src/util/boost-context)
-add_subdirectory(src/conv-core)
+# add_subdirectory(src/conv-core)
 
 # LIBS
 if(${TARGET} STREQUAL "LIBS")
@@ -1015,7 +1015,7 @@ endif()
 
 # Check that we are able to build and link an executable
 add_executable(ckhello ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.C)
-add_dependencies(ckhello ck memory-default threads-default conv-static
+add_dependencies(ckhello ck conv-static
   converse ckmain
   moduleNDMeshStreamer modulecompletion)
 
