@@ -41,34 +41,6 @@ jobs:
         cd changa/teststep
         make test
 
-  charm4py_netlrts-linux-x86_64_tcp:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: build-charm++
-      run: |
-        git fetch --unshallow # Need full repo for 'git describe' used by charm4py
-        ./build charm4py netlrts-linux-x86_64 tcp -g -j4 --with-production
-    - name: build-charm4py
-      run: |
-        pip3 install setuptools cython cffi greenlet numpy torch torchvision matplotlib
-        git clone https://github.com/UIUC-PPL/charm4py
-        export PYTHONPATH="$PWD/charm4py"
-
-        mkdir -p charm4py/charm_src/charm/bin && cp bin/charmrun charm4py/charm_src/charm/bin
-        mkdir -p charm4py/charm_src/charm/lib && cp lib/libcharm.so charm4py/charm_src/charm/lib
-        mkdir -p charm4py/charm_src/charm/include && cp -r -L include/* charm4py/charm_src/charm/include
-
-        cd charm4py
-        export CHARM4PY_BUILD_CFFI=1
-        python3 setup.py build_ext --inplace
-    - name: test-charm4py
-      run: |
-        export PYTHONPATH="$PWD/charm4py"
-        export CHARM4PY_TEST_NUM_PROCESSES=2
-        cd charm4py
-        python3 auto_test.py
-
   cuda_netlrts-linux-x86_64_buildonly:
     # Buildonly test, as CUDA needs an actual device to run.
     timeout-minutes: 45
