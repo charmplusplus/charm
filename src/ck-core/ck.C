@@ -2641,7 +2641,7 @@ void CkArrayExtSend_multi(int aid, int *idx, int ndims, int epIdx, int num_bufs,
 // HAPI support
 #if CMK_CUDA
 #include "hapi.h"
-#endif 
+#endif
 
 void CkHapiAddCallback(long stream, void (*cb)(void*, void*), int fid) 
 {
@@ -2654,6 +2654,21 @@ void CkHapiAddCallback(long stream, void (*cb)(void*, void*), int fid)
   // function must be defined regardless for cython compilation
   CkAbort("CkHapiAddCallback> Charm++ was not built with CUDA support");
   #endif
+}
+
+int CkTraceRegisterUserEvent(char *EventDesc, int eventNum)
+{
+  return traceRegisterUserEvent(EventDesc, eventNum);
+}
+
+void CkTraceBeginUserBracketEvent(int eventID)
+{
+  traceBeginUserBracketEvent(eventID);
+}
+
+void CkTraceEndUserBracketEvent(int eventID)
+{
+  traceEndUserBracketEvent(eventID);
 }
 
 #endif // CMK_CHARM4PY
