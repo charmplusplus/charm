@@ -9,6 +9,7 @@
 #include "ckcallback.h"
 #include "conv-rdma.h"
 #include <vector>
+#include <atomic>
 
 /*********************************** Zerocopy Direct API **********************************/
 

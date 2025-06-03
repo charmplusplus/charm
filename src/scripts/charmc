@@ -371,6 +371,7 @@ if [[ -d "$CHARMDIR/lib_so" ]]
 then
   CHARMLIBSO="$CHARMDIR/lib_so"
 fi
+CHARMRECONV="$CHARMDIR/../reconverse/build"
 
 ##############################################################################
 #
@@ -1617,7 +1618,7 @@ CORE_LIBS=(-lreconverse "${TRACE_OBJ[@]}" -lm)
 
 if [[ "$BUILD_SHARE" = '0' && "$USER_INITIATED_SHARED" = '0' ]]
 then
-       MIDDLE_LIBS=("${MEM_OBJ[@]}" "${THREAD_OBJ[@]}" "${MIDDLE_LIBS[@]}")
+       MIDDLE_LIBS=("${MIDDLE_LIBS[@]}")
 fi
 
 CMK_SYSLIBS+=" -lm"
@@ -1658,11 +1659,6 @@ case "$PARADIGM" in
 	;;
 esac
 
-if [[ "$BUILD_SHARE" = '0' && "$USER_INITIATED_SHARED" = '0' ]]
-then
-	MIDDLE_LIBS+=("${MEM_OBJ[@]}" "${THREAD_OBJ[@]}")
-fi
-
 if [[ "$CHARM_SHARED" = '1' ]]
 then
   [[ -z "$CHARMLIBSO" ]] &&  Abort "Charm++ lib_so directory not found!"
@@ -1670,7 +1666,7 @@ then
   OPTS_LD+=("$CMK_LD_LIBRARY_PATH")
   LANG_LIBS=("-L$CHARMLIBSO")
 else
-  LANG_LIBS=("-L$CHARMLIB")
+  LANG_LIBS=("-L$CHARMLIB -L$CHARMRECONV")
 fi
 
 if [[ -z "$STANDALONE" ]]
@@ -2156,22 +2152,10 @@ else
   MEM_OBJ_FILE="${CHARMLIBSO}/libmemory-${MEMORY}.so"
 fi
 
-if [[ ! -r "$MEM_OBJ_FILE" || ! -s "$MEM_OBJ_FILE" ]]
-then
-  (cd "$CHARMLIB" ; list=($(ls libmemory-* 2>/dev/null)); [[ ${#list[@]} -ne 0 ]] && for i in "${list[@]}"; do [[ -s "$i" ]] && ls -l "$i"; done )
-  Abort "charmc : No such memory mode $MEMORY"
-fi
-
 if [[ -f "${CHARMLIB}/libthreads-${THREAD}.a" ]]; then
   THREAD_OBJ_FILE="${CHARMLIB}/libthreads-${THREAD}.a"
 else
   THREAD_OBJ_FILE="${CHARMLIBSO}/libthreads-${THREAD}.so"
-fi
-
-if [[ ! -r "$THREAD_OBJ_FILE" || ! -s "$THREAD_OBJ_FILE" ]]
-then
-  (cd "$CHARMLIB" ; list=($(ls libthreads-* 2>/dev/null)); [[ ${#list[@]} -ne 0 ]] && for i in "${list[@]}"; do [[ -s "$i" ]] && ls -l "$i"; done )
-  Abort "charmc : No such thread mode $THREAD"
 fi
 
 
