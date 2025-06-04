@@ -58,11 +58,11 @@ set(conv-core-cxx-sources
     src/conv-core/hrctimer.C
 )
 
-set(reconverse-h-sources 
+set(reconverse-h-sources
     reconverse/include/converse.h)
 
 #set(reconverse-comm-backend-sources
-#    reconverse/comm_backend/comm_backend_internal.h 
+#    reconverse/comm_backend/comm_backend_internal.h
 #    reconverse/comm_backend/comm_backend.h)
 
 if(${CMK_USE_SHMEM})
@@ -247,7 +247,7 @@ target_link_libraries(converse INTERFACE
 
 #file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/comm_backend)
 
-foreach (filename 
+foreach (filename
         ${conv-ldb-h-sources}
 )
     configure_file(${filename} ${CMAKE_BINARY_DIR}/include/ COPYONLY)
@@ -274,9 +274,9 @@ endforeach()
 
 # conv-static
 add_library(conv-static OBJECT src/conv-core/conv-static.c)
-# add_dependencies(converse conv-static)
-# add_custom_command(TARGET converse
-#     POST_BUILD
-#     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/conv-static.dir/src/conv-core/conv-static.c.o ${CMAKE_BINARY_DIR}/lib/conv-static.o
-#     VERBATIM
-# )
+add_dependencies(reconverse conv-static)
+add_custom_command(TARGET charm_cxx_utils
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/conv-static.dir/src/conv-core/conv-static.c.o ${CMAKE_BINARY_DIR}/lib/conv-static.o
+    VERBATIM
+)
