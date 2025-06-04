@@ -879,7 +879,7 @@ include(cmake/hwloc.cmake)
 
 # Converse
 include(cmake/converse.cmake)
-# add_subdirectory(src/QuickThreads)
+add_subdirectory(src/QuickThreads)
 # add_subdirectory(src/util/boost-context)
 # add_subdirectory(src/conv-core)
 
@@ -1009,7 +1009,7 @@ endif()
 
 # Check that we are able to build and link an executable
 add_executable(ckhello ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.C)
-add_dependencies(ckhello ck conv-static
+add_dependencies(ckhello ck ckqt conv-static
   converse ckmain
   moduleNDMeshStreamer modulecompletion)
 
