@@ -1367,8 +1367,9 @@ void hapiPollEvents(void* param) {
   std::queue<hapiEvent>& queue = CpvAccess(hapi_event_queue);
   while (!queue.empty()) {
     hapiEvent hev = queue.front();
-    queue.pop(); // TODO: investigate possible race condition with charm4py futures - temporarily resolved by popping here
     if (cudaEventQuery(hev.event) == cudaSuccess) {
+      queue.pop(); // TODO: investigate possible race condition with charm4py futures - temporarily resolved by popping here
+
       // invoke Charm++ callback if one was given
       hev.cb.send(hev.cb_msg);
 

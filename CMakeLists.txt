@@ -991,14 +991,23 @@ if(${TARGET} STREQUAL "charm4py")
     target_link_libraries(charm cudart cudahybridapi)
   endif()
 
-  add_dependencies(charm hwloc)
-endif()
+  if(${TRACING})
+    if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+      target_link_libraries(charm trace-summary trace-projections "-Llib/ -standalone -all_load -c++stl -shared")
+    else()
+      target_link_libraries(charm trace-summary trace-projections "-Llib/ -standalone -whole-archive -c++stl -shared")
+    endif()
+  endif()
 
-# Check that we are able to build and link an executable
-add_executable(ckhello ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.C)
-add_dependencies(ckhello ck ldb-rand memory-default threads-default conv-static
-  converse ckmain ckqt
-  moduleNDMeshStreamer modulecompletion)
+  add_dependencies(charm hwloc)
+
+else()
+  # Check that we are able to build and link an executable
+  add_executable(ckhello ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.C)
+  add_dependencies(ckhello ck ldb-none memory-default threads-default conv-static
+    converse ckmain ckqt
+    moduleNDMeshStreamer modulecompletion)
+endif()
 
 # Create conv-mach-opt.sh
 set(optfile_sh ${CMAKE_BINARY_DIR}/include/conv-mach-opt.sh)
