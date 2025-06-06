@@ -338,7 +338,6 @@ jobs:
       run: |
         cd ..
         git clone --depth 1 https://github.com/spack/spack
-        git clone --depth 1 https://github.com/spack/spack-packages
         source spack/share/spack/setup-env.sh
         cd spack-packages
         spack compiler find
