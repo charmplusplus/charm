@@ -312,7 +312,7 @@ jobs:
       run: |
         cd ..
         git clone --depth 1 https://github.com/spack/spack-packages
-        cd spack
+        cd spack-packages
         [[ $(uname) == "Linux" ]] && sudo apt-get install -y gfortran
 
         # Use this branch for testing, not main
