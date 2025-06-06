@@ -340,6 +340,7 @@ jobs:
         git clone --depth 1 https://github.com/spack/spack
         source spack/share/spack/setup-env.sh
         cd spack-packages
+        cat repos/spack_repo/builtin/packages/charmpp/package.py
         spack compiler find
         spack compiler list
         spack spec charmpp@main
