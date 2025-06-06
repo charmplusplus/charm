@@ -336,6 +336,7 @@ jobs:
 
     - name: Build Charm++
       run: |
+        git clone --depth 1 https://github.com/spack/spack
         cd ../spack
         source share/spack/setup-env.sh
         spack compiler find
