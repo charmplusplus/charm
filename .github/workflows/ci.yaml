@@ -339,9 +339,9 @@ jobs:
     - name: Build Charm++
       run: |
         pwd
+        spack cd --repo builtin
         cat packages/charmpp/package.py
         cd ../../../../../..
-        source spack/share/spack/setup-env.sh
         spack compiler find
         spack compiler list
         spack spec charmpp@main
