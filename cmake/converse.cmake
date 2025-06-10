@@ -162,6 +162,7 @@ set(conv-util-cxx-sources
     src/util/pup_util.C
     src/util/pup_xlater.C
     #src/util/spanningTree.C
+    ${conv-perf-cxx-sources}
 )
 
 if(CMK_CAN_LINK_FORTRAN)
