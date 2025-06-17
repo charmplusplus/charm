@@ -880,11 +880,13 @@ void create_topoaware_partitions(void) {
   _Cmi_numpes = _Cmi_numnodes * _Cmi_mynodesize;
   
   TopoManager_init();
-  if(_partitionInfo.scheme == 100) {
-    createCustomPartitions(numparts_bak, _partitionInfo.partitionSize, _partitionInfo.nodeMap);       
-  } else {
-    TopoManager_createPartitions(_partitionInfo.scheme, numparts_bak, _partitionInfo.nodeMap);
-  }
+  createCustomPartitions(numparts_bak, _partitionInfo.partitionSize, _partitionInfo.nodeMap);
+  //Reconverse
+  // if(_partitionInfo.scheme == 100) {
+  //   createCustomPartitions(numparts_bak, _partitionInfo.partitionSize, _partitionInfo.nodeMap);       
+  // } else {
+  //   TopoManager_createPartitions(_partitionInfo.scheme, numparts_bak, _partitionInfo.nodeMap);
+  // }
   TopoManager_free();
   
   _partitionInfo.type = type_bak;
