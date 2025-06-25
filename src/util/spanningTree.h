@@ -5,38 +5,40 @@
 #define __SPANNING_TREE_H_
 
 #if defined(__cplusplus)
-extern "C" {
+extern "C"
+{
 #endif
 
-/**
- * Calculate and return parent and children of 'node' in topo tree rooted at 'rootNode'.
- * The tree spans the specified 'nodes', or *all* nodes if nodes == NULL
- * If nodes are given, rootNode must appear first in the array
- * NOTE: caller is responsible for freeing array of children (if child_count > 0)
- */
-void getNodeTopoTreeEdges(int node, int rootNode, int *nodes, int numnodes, unsigned int bfactor,
-                          int *parent, int *child_count, int **children);
+  /**
+   * Calculate and return parent and children of 'node' in topo tree rooted at 'rootNode'.
+   * The tree spans the specified 'nodes', or *all* nodes if nodes == NULL
+   * If nodes are given, rootNode must appear first in the array
+   * NOTE: caller is responsible for freeing array of children (if child_count > 0)
+   */
+  void getNodeTopoTreeEdges(int node, int rootNode, int* nodes, int numnodes,
+                            unsigned int bfactor, int* parent, int* child_count,
+                            int** children);
 
-/**
- * Calculate and return parent and children of 'pe' in topo tree rooted at 'rootPE'.
- * The tree spans the specified 'pes', or *all* pes if pes == NULL
- * If pes are given, rootPE must appear first in the array
- * NOTE: caller is responsible for freeing array of children (if child_count > 0)
- */
-void getPETopoTreeEdges(int pe, int rootPE, int *pes, int numpes, unsigned int bfactor,
-                        int *parent, int *child_count, int **children);
+  /**
+   * Calculate and return parent and children of 'pe' in topo tree rooted at 'rootPE'.
+   * The tree spans the specified 'pes', or *all* pes if pes == NULL
+   * If pes are given, rootPE must appear first in the array
+   * NOTE: caller is responsible for freeing array of children (if child_count > 0)
+   */
+  void getPETopoTreeEdges(int pe, int rootPE, int* pes, int numpes, unsigned int bfactor,
+                          int* parent, int* child_count, int** children);
 
-/// C API to ST_RecursivePartition_getTreeInfo (see below)
-void get_topo_tree_nbs(int root, int *parent, int *child_count, int **children);
+  /// C API to ST_RecursivePartition_getTreeInfo (see below)
+  void get_topo_tree_nbs(int root, int* parent, int* child_count, int** children);
 
-/**
- * partition given PEs into numparts topology-aware partitions.
- * 'pes' array is modified in place, to contain pes grouped by partition (but
- * there is no guarantee on order of PEs within a partition). The part_offsets
- * array will contain the starting offset of each partition in 'pes' (space
- * has to be allocated by caller)
- */
-void partitionPEs(int *pes, int numpes, int numparts, int *part_offsets);
+  /**
+   * partition given PEs into numparts topology-aware partitions.
+   * 'pes' array is modified in place, to contain pes grouped by partition (but
+   * there is no guarantee on order of PEs within a partition). The part_offsets
+   * array will contain the starting offset of each partition in 'pes' (space
+   * has to be allocated by caller)
+   */
+  void partitionPEs(int* pes, int numpes, int numparts, int* part_offsets);
 
 #if defined(__cplusplus)
 }
@@ -45,8 +47,9 @@ void partitionPEs(int *pes, int numpes, int numparts, int *part_offsets);
 // Fragile: machine-broadcast.C depends on this header, but we don't want
 // Converse to see charm++.h. Symptoms will include bigsim breakage.
 #if defined __cplusplus && !defined CONVERSE_MACHINE_BROADCAST_C_
-#include "charm++.h"
-#include <vector>
+// #include "charm++.h"
+#  include <map>
+#  include <vector>
 
 /**
  * Abstract class (interface) to generate a spanning tree from a set of pes or logical
@@ -54,7 +57,8 @@ void partitionPEs(int *pes, int numpes, int numparts, int *part_offsets);
  * be referred to as phynodes.
  */
 template <typename Iterator>
-class SpanningTreeGenerator {
+class SpanningTreeGenerator
+{
 public:
   /**
    * Given a range of nodes (with root in first position), calculates the children
@@ -81,7 +85,6 @@ public:
 
   /// return Iterator to end of generated subtree
   virtual Iterator end(int subtree) = 0;
-
 };
 
 // ------------- ST_RecursivePartition -------------
@@ -94,7 +97,7 @@ class TopoManager;
  * This function allocates and caches the TreeInfo structure, so any subsequent
  * calls don't recalculate the tree.
  */
-CmiSpanningTreeInfo *ST_RecursivePartition_getTreeInfo(int root);
+CmiSpanningTreeInfo* ST_RecursivePartition_getTreeInfo(int root);
 
 /**
  * This strategy is phynode aware, and can form a tree of pes or logical nodes.
@@ -113,16 +116,16 @@ CmiSpanningTreeInfo *ST_RecursivePartition_getTreeInfo(int root);
  * result there will only be one edge between phynodes).
  */
 template <typename Iterator>
-class ST_RecursivePartition : public SpanningTreeGenerator<Iterator> {
+class ST_RecursivePartition : public SpanningTreeGenerator<Iterator>
+{
 public:
-
   /**
    * \param nodeTree true if forming tree of nodes, false if tree of pes.
    *
    * \param preSorted true if nodes will be provided grouped by phynode. Allows
    * using slightly more efficient implementation.
    */
-  ST_RecursivePartition(bool nodeTree=true, bool preSorted=false);
+  ST_RecursivePartition(bool nodeTree = true, bool preSorted = false);
 
   /**
    * Will reorder node range so that nodes are grouped by subtree, *and* by phynode.
@@ -131,28 +134,31 @@ public:
    */
   virtual int buildSpanningTree(Iterator start, Iterator end, unsigned int maxBranches);
 
-  inline virtual int subtreeSize(int subtree) {
-#if CMK_ERROR_CHECKING
-    return std::distance(children.at(subtree), children.at(subtree+1));
-#else
-    return std::distance(children[subtree], children[subtree+1]);
-#endif
+  inline virtual int subtreeSize(int subtree)
+  {
+#  if CMK_ERROR_CHECKING
+    return std::distance(children.at(subtree), children.at(subtree + 1));
+#  else
+    return std::distance(children[subtree], children[subtree + 1]);
+#  endif
   }
 
-  inline virtual Iterator begin(int subtree) {
-#if CMK_ERROR_CHECKING
+  inline virtual Iterator begin(int subtree)
+  {
+#  if CMK_ERROR_CHECKING
     return children.at(subtree);
-#else
+#  else
     return children[subtree];
-#endif
+#  endif
   }
 
-  inline virtual Iterator end(int subtree) {
-#if CMK_ERROR_CHECKING
-    return children.at(subtree+1);
-#else
-    return children[subtree+1];
-#endif
+  inline virtual Iterator end(int subtree)
+  {
+#  if CMK_ERROR_CHECKING
+    return children.at(subtree + 1);
+#  else
+    return children[subtree + 1];
+#  endif
   }
 
   /**
@@ -162,31 +168,29 @@ public:
   void setVirtualRoot(int root) { virtualRoot = root; }
 
 private:
-
   class PhyNode;
   class PhyNodeCompare;
 
-  void initPhyNodes(Iterator start, Iterator end,
-                    std::vector<PhyNode> &phynodes) const;
-  void build(std::vector<PhyNode*> &phyNodes, Iterator start, unsigned int maxBranches);
-  void partition(std::vector<PhyNode*> &nodes, int start, int end,
-                 int numPartitions, std::vector<int> &children) const;
-  void chooseSubtreeRoots(std::vector<PhyNode*> &phyNodes,
-                          std::vector<int> &children) const;
-  void bisect(std::vector<PhyNode*> &nodes, int start, int end,
-              int numPartitions, std::vector<int> &children) const;
-  void trisect(std::vector<PhyNode*> &nodes, int start, int end,
-              int numPartitions, std::vector<int> &children) const;
-  int maxSpreadDimension(std::vector<PhyNode*> &nodes, int start, int end) const;
-#if XE6_TOPOLOGY
-  void translateCoordinates(std::vector<PhyNode> &nodes) const;
-#endif
-  void withinPhyNodeTree(PhyNode &rootPhyNode, int bfactor, Iterator &pos);
+  void initPhyNodes(Iterator start, Iterator end, std::vector<PhyNode>& phynodes) const;
+  void build(std::vector<PhyNode*>& phyNodes, Iterator start, unsigned int maxBranches);
+  void partition(std::vector<PhyNode*>& nodes, int start, int end, int numPartitions,
+                 std::vector<int>& children) const;
+  void chooseSubtreeRoots(std::vector<PhyNode*>& phyNodes,
+                          std::vector<int>& children) const;
+  void bisect(std::vector<PhyNode*>& nodes, int start, int end, int numPartitions,
+              std::vector<int>& children) const;
+  void trisect(std::vector<PhyNode*>& nodes, int start, int end, int numPartitions,
+               std::vector<int>& children) const;
+  int maxSpreadDimension(std::vector<PhyNode*>& nodes, int start, int end) const;
+#  if XE6_TOPOLOGY
+  void translateCoordinates(std::vector<PhyNode>& nodes) const;
+#  endif
+  void withinPhyNodeTree(PhyNode& rootPhyNode, int bfactor, Iterator& pos);
 
   std::vector<Iterator> children;
   bool nodeTree;
   bool preSorted;
-  TopoManager *tmgr;
+  TopoManager* tmgr;
   int virtualRoot = -1;
 };
 

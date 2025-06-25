@@ -38,6 +38,7 @@ set(conv-core-cxx-sources
     src/conv-core/convcore.C
     src/conv-core/cpm.C
     src/conv-core/cpthreads.C
+    src/conv-core/cputopology.C
     src/conv-core/cpuaffinity.C
     src/conv-core/debug-conv.C
     src/conv-core/futures.C
@@ -161,9 +162,12 @@ set(conv-util-cxx-sources
     src/util/pup_toNetwork4.C
     src/util/pup_util.C
     src/util/pup_xlater.C
-    #src/util/spanningTree.C
+    src/util/topomanager/TopoManager.C
+    src/util/spanningTree.C
     ${conv-perf-cxx-sources}
 )
+
+#Uncommenting spanning tree to satisfy ckrdma dep errors
 
 if(CMK_CAN_LINK_FORTRAN)
     add_library(conv-utilf pup_f.f90)
@@ -241,8 +245,17 @@ add_library(charm_cxx_utils STATIC
 
 add_library(converse INTERFACE)
 
+add_library(topomanager STATIC
+    ${tmgr-cxx-sources}
+    ${tmgr-h-sources})
+
+target_include_directories(topomanager PUBLIC
+    src/util/topomanager
+    ${CMAKE_BINARY_DIR}/include)
+
 target_link_libraries(converse INTERFACE
     reconverse
+    topomanager
     charm_cxx_utils
     hwloc
 )
