@@ -76,6 +76,7 @@ my $x86;
 my $amd64;
 my $ppc;
 my $arm7;
+my $arm8;
 # Determine architecture (x86, ppc, ...)
 if($cpu =~ m/i[0-9]86/){
   $x86 = 1;
@@ -85,7 +86,9 @@ if($cpu =~ m/i[0-9]86/){
   $ppc = 1;
 } elsif($cpu =~ m/ppc*/){
   $ppc = 1;
-} elsif($cpu =~ m/arm7/){
+} elsif($cpu =~ m/aarch64*/ || $cpu =~ m/arm64*/){
+  $arm8 = 1;
+} elsif($cpu =~ m/arm7/ || $cpu =~ m/armv7*/ || $cpu =~ m/armv6*/){
   $arm7 = 1;
 }
 
@@ -109,28 +112,7 @@ if($arch_os eq "darwin") {
 }
 
 
-# check for BG/Q
-
-if($skip_choosing eq "false"){
-  my $BGQ_FLOOR = $ENV{'BGQ_FLOOR'};
-  if (not defined $BGQ_FLOOR) {
-    $BGQ_FLOOR = "/bgsys/drivers/ppcfloor";
-  }
-
-  my $bgq_found = system("which \"$BGQ_FLOOR/gnu-linux/bin/powerpc64-bgq-linux-cpp\" 2>/dev/null") / 256;
-
-  if ($bgq_found == 0) {
-    print "\nI found that you have a Blue Gene/Q toolchain available in your path.\nDo you want to build Charm++ targeting BG/Q? [Y/n]: ";
-    my $p = promptUserYN();
-    if($p eq "yes" || $p eq "default") {
-      $arch = "pamilrts-bluegeneq";
-      $skip_choosing = "true";
-    }
-  }
-}
-
-
-# check for GNI
+# check for Cray
 
 if($skip_choosing eq "false"){
   my $craycc_found = index(`which CC 2>/dev/null`, "/opt/cray/") != -1;
@@ -140,11 +122,23 @@ if($skip_choosing eq "false"){
     $PE_PRODUCT_LIST = "";
   }
 
+  my $CRAYPE_NETWORK_TARGET = $ENV{'CRAYPE_NETWORK_TARGET'};
+  if (not defined $CRAYPE_NETWORK_TARGET) {
+    $CRAYPE_NETWORK_TARGET = "";
+  }
+
   my $CRAY_UGNI_found = index(":$PE_PRODUCT_LIST:", ":CRAY_UGNI:") != -1;
 
   my $gni_found = $craycc_found || $CRAY_UGNI_found;
 
-  if ($gni_found) {
+  if ($CRAYPE_NETWORK_TARGET eq "ofi") {
+    print "\nI found that you have a Cray environment.\nDo you want to build Charm++ targeting Cray Shasta? [Y/n]: ";
+    my $p = promptUserYN();
+    if($p eq "yes" || $p eq "default") {
+                  $arch = "ofi-crayshasta";
+                  $skip_choosing = "true";
+    }
+  } elsif ($gni_found) {
     my $CRAYPE_INTERLAGOS_found = index(":$PE_PRODUCT_LIST:", ":CRAYPE_INTERLAGOS:") != -1;
     if ($CRAYPE_INTERLAGOS_found) {
       print "\nI found that you have a Cray environment with Interlagos processors.\nDo you want to build Charm++ targeting Cray XE? [Y/n]: ";
@@ -276,10 +270,9 @@ Choose an interconnect from below: [1-10]
 	 2) Infiniband (verbs)
 	 3) Cray XE, XK
 	 4) Cray XC
-	 5) Blue Gene/Q
-	 6) Intel Omni-Path (ofi)
-	 7) PAMI
-	 8) UCX
+	 5) Intel Omni-Path (ofi)
+	 6) PAMI
+	 7) UCX
 
 EOF
 
@@ -298,15 +291,12 @@ EOF
 	        $arch = "gni-crayxc";
 	        last;
 	  } elsif($line eq "5"){
-		$arch = "pamilrts-bluegeneq";
-		last;
-	  } elsif($line eq "6"){
 		$converse_network_type = "ofi";
 		last;
-	  } elsif($line eq "7"){
+	  } elsif($line eq "6"){
 		$converse_network_type = "pamilrts";
 		last;
-	  } elsif($line eq "8"){
+	  } elsif($line eq "7"){
 		$converse_network_type = "ucx";
 		last;
 	  } else {
@@ -341,22 +331,18 @@ if($arch eq ""){
 		$arch = $arch . "-x86_64";
 	  } elsif($ppc){
 		$arch = $arch . "-ppc64le";
+	  } elsif($arm8){
+	  	$arch = $arch . "-arm8";
 	  } elsif($arm7){
 	  	$arch = $arch . "-arm7";
 	  }
-}
-
-# Fixup $arch to match the inconsistent directories in src/archs
-
-if($arch eq "netlrts-darwin"){
-	$arch = "netlrts-darwin-x86_64";
 }
 
 
 #================ Choose SMP/PXSHM =================================
 
 # find what options are available
-my $opts = `$dirname/build charm++ $arch help 2>&1 | grep "Supported options"`;
+my $opts = `$dirname/buildold charm++ $arch help 2>&1 | grep "Supported options"`;
 $opts =~ m/Supported options: (.*)/;
 $opts = $1;
 
@@ -403,7 +389,7 @@ if ($counter != 1) {
 #================ Choose Compiler =================================
 
 # Lookup list of compilers
-my $cs = `$dirname/build charm++ $arch help 2>&1 | grep "Supported compilers"`;
+my $cs = `$dirname/buildold charm++ $arch help 2>&1 | grep "Supported compilers"`;
 # prune away beginning of the line
 $cs =~ m/Supported compilers: (.*)/;
 $cs = $1;
@@ -595,7 +581,7 @@ print << "EOF";
 What do you want to build?
 	1) Charm++ [default] (choose this if you are building NAMD)
 	2) Charm++ and AMPI
-	3) Charm++, AMPI, ParFUM, FEM and other libraries
+	3) Charm++, AMPI, ParFUM and other libraries
 
 EOF
 

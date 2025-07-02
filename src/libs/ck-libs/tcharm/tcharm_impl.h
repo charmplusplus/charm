@@ -208,10 +208,6 @@ class TCharm: public CBase_TCharm
 	//Block, migrate to destPE, and resume
 	CMI_WARN_UNUSED_RESULT TCharm * migrateTo(int destPE) noexcept;
 
-#if CMK_FAULT_EVAC
-	CMI_WARN_UNUSED_RESULT TCharm * evacuate() noexcept;
-#endif
-
 	//Thread finished running
 	void done(int exitcode) noexcept;
 
@@ -226,15 +222,11 @@ class TCharm: public CBase_TCharm
 #endif
 		return c;
 	}
-	inline static TCharm *getNULL() noexcept {return CtvAccess(_curTCharm);}
+	static CMI_NOINLINE TCharm *getNULL() noexcept {return CtvAccess(_curTCharm);}
 	inline CthThread getThread() noexcept {return tid;}
 	inline const CProxy_TCharm &getProxy() const noexcept {return threadInfo.tProxy;}
 	inline int getElement() const noexcept {return threadInfo.thisElement;}
 	inline int getNumElements() const noexcept {return threadInfo.numElements;}
-
-	//Start/stop load balancer measurements
-	inline void stopTiming() noexcept {ckStopTiming();}
-	inline void startTiming() noexcept {ckStartTiming();}
 
 	//Block our thread, run the scheduler, and come back
 	CMI_WARN_UNUSED_RESULT TCharm * schedule() noexcept {
@@ -252,7 +244,9 @@ class TCharm: public CBase_TCharm
 		if (tcharm_nothreads)
 			CkAbort("Cannot make blocking calls using +tcharm_nothreads!\n");
 		#endif
-		stopTiming();
+		// tcharm does not trigger thread listeners on suspend/resume
+		// so it needs to manually start/stop timing
+		this->getCkLocRec()->stopTiming();
 		isStopped=true;
 		DBG("thread suspended");
 
@@ -268,9 +262,11 @@ class TCharm: public CBase_TCharm
 		 * from this point onward, you'll cause heap corruption if
 		 * we're resuming from migration!  (OSL 2003/9/23) */
 		TCharm *dis=TCharm::get();
-		TCharm::activateThread();
+		TCharm::activateThread(dis);
 		dis->isStopped=false;
-		dis->startTiming();
+		// tcharm does not trigger thread listeners on suspend/resume
+		// so it needs to manually start/stop timing
+		dis->getCkLocRec()->startTiming();
 		return dis;
 	}
 
@@ -302,13 +298,16 @@ class TCharm: public CBase_TCharm
 
 	//Entering thread context: turn stuff on
 	static void activateThread() noexcept {
-		TCharm *tc = CtvAccess(_curTCharm);
+		TCharm *tc = getNULL();
+		activateThread(tc);
+	}
+	static void activateThread(TCharm *tc) noexcept {
 		if (tc != nullptr)
 			CthInterceptionsDeactivatePop(tc->getThread());
 	}
 	//Leaving this thread's context: turn stuff back off
 	static void deactivateThread() noexcept {
-		TCharm *tc = CtvAccess(_curTCharm);
+		TCharm *tc = getNULL();
 		if (tc != nullptr)
 			CthInterceptionsDeactivatePush(tc->getThread());
 	}
@@ -392,6 +391,9 @@ public:
 FLINKAGE void FTN_NAME(TCHARM_USER_NODE_SETUP,tcharm_user_node_setup)(void);
 FLINKAGE void FTN_NAME(TCHARM_USER_SETUP,tcharm_user_setup)(void);
 
+/* For internal use only: semantics subject to change. */
+CLINKAGE void TCHARM_Node_Setup(int numelements);
+CLINKAGE void TCHARM_Element_Setup(int myelement, int numelements, CmiIsomallocContext ctx);
 
 #endif
 

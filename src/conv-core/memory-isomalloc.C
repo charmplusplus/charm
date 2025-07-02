@@ -89,13 +89,23 @@ static void meta_free(void *mem)
   if (!CmiIsomallocInRange(mem))
   {
     mm_free(mem);
+    return;
   }
-  else if (mem != nullptr && CpvInitialized(isomalloc_state) && CpvAccess(isomalloc_state).context.opaque)
-  {
-    CmiMemoryIsomallocDisablePush();
-    CmiIsomallocContextFree(CpvAccess(isomalloc_state).context, mem);
-    CmiMemoryIsomallocDisablePop();
-  }
+
+  if (mem == nullptr || !CpvInitialized(isomalloc_state))
+    return;
+
+  auto ctx = CpvAccess(isomalloc_state).context;
+  if (ctx.opaque == nullptr)
+    return;
+
+  CmiMemoryIsomallocDisablePush();
+
+  auto region = CmiIsomallocContextGetUsedExtent(ctx);
+  if (region.start <= mem && mem < region.end)
+    CmiIsomallocContextFree(ctx, mem);
+
+  CmiMemoryIsomallocDisablePop();
 }
 
 static void *meta_calloc(size_t nelem, size_t size)
@@ -190,7 +200,7 @@ static void *meta_valloc(size_t size)
 static void *meta_pvalloc(size_t size)
 {
 	const size_t pagesize = CmiGetPageSize();
-	return meta_memalign(pagesize, (size + pagesize - 1) & ~(pagesize - 1));
+	return meta_memalign(pagesize, CMIALIGN(size, pagesize));
 }
 
 #define CMK_MEMORY_HAS_NOMIGRATE

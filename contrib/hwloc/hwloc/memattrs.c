@@ -1,11 +1,12 @@
 /*
- * Copyright © 2020 Inria.  All rights reserved.
+ * Copyright © 2020-2023 Inria.  All rights reserved.
  * See COPYING in top-level directory.
  */
 
 #include "private/autogen/config.h"
 #include "hwloc.h"
 #include "private/private.h"
+#include "private/debug.h"
 
 
 /*****************************
@@ -49,36 +50,51 @@ hwloc__setup_memattr(struct hwloc_internal_memattr_s *imattr,
 void
 hwloc_internal_memattrs_prepare(struct hwloc_topology *topology)
 {
-#define NR_DEFAULT_MEMATTRS 4
-  topology->memattrs = malloc(NR_DEFAULT_MEMATTRS * sizeof(*topology->memattrs));
+  topology->memattrs = malloc(HWLOC_MEMATTR_ID_MAX * sizeof(*topology->memattrs));
   if (!topology->memattrs)
     return;
 
-  assert(HWLOC_MEMATTR_ID_CAPACITY < NR_DEFAULT_MEMATTRS);
   hwloc__setup_memattr(&topology->memattrs[HWLOC_MEMATTR_ID_CAPACITY],
                        (char *) "Capacity",
                        HWLOC_MEMATTR_FLAG_HIGHER_FIRST,
                        HWLOC_IMATTR_FLAG_STATIC_NAME|HWLOC_IMATTR_FLAG_CONVENIENCE);
 
-  assert(HWLOC_MEMATTR_ID_LOCALITY < NR_DEFAULT_MEMATTRS);
   hwloc__setup_memattr(&topology->memattrs[HWLOC_MEMATTR_ID_LOCALITY],
                        (char *) "Locality",
                        HWLOC_MEMATTR_FLAG_LOWER_FIRST,
                        HWLOC_IMATTR_FLAG_STATIC_NAME|HWLOC_IMATTR_FLAG_CONVENIENCE);
 
-  assert(HWLOC_MEMATTR_ID_BANDWIDTH < NR_DEFAULT_MEMATTRS);
   hwloc__setup_memattr(&topology->memattrs[HWLOC_MEMATTR_ID_BANDWIDTH],
                        (char *) "Bandwidth",
                        HWLOC_MEMATTR_FLAG_HIGHER_FIRST|HWLOC_MEMATTR_FLAG_NEED_INITIATOR,
                        HWLOC_IMATTR_FLAG_STATIC_NAME);
 
-  assert(HWLOC_MEMATTR_ID_LATENCY < NR_DEFAULT_MEMATTRS);
+  hwloc__setup_memattr(&topology->memattrs[HWLOC_MEMATTR_ID_READ_BANDWIDTH],
+                       (char *) "ReadBandwidth",
+                       HWLOC_MEMATTR_FLAG_HIGHER_FIRST|HWLOC_MEMATTR_FLAG_NEED_INITIATOR,
+                       HWLOC_IMATTR_FLAG_STATIC_NAME);
+
+  hwloc__setup_memattr(&topology->memattrs[HWLOC_MEMATTR_ID_WRITE_BANDWIDTH],
+                       (char *) "WriteBandwidth",
+                       HWLOC_MEMATTR_FLAG_HIGHER_FIRST|HWLOC_MEMATTR_FLAG_NEED_INITIATOR,
+                       HWLOC_IMATTR_FLAG_STATIC_NAME);
+
   hwloc__setup_memattr(&topology->memattrs[HWLOC_MEMATTR_ID_LATENCY],
                        (char *) "Latency",
                        HWLOC_MEMATTR_FLAG_LOWER_FIRST|HWLOC_MEMATTR_FLAG_NEED_INITIATOR,
                        HWLOC_IMATTR_FLAG_STATIC_NAME);
 
-  topology->nr_memattrs = NR_DEFAULT_MEMATTRS;
+  hwloc__setup_memattr(&topology->memattrs[HWLOC_MEMATTR_ID_READ_LATENCY],
+                       (char *) "ReadLatency",
+                       HWLOC_MEMATTR_FLAG_LOWER_FIRST|HWLOC_MEMATTR_FLAG_NEED_INITIATOR,
+                       HWLOC_IMATTR_FLAG_STATIC_NAME);
+
+  hwloc__setup_memattr(&topology->memattrs[HWLOC_MEMATTR_ID_WRITE_LATENCY],
+                       (char *) "WriteLatency",
+                       HWLOC_MEMATTR_FLAG_LOWER_FIRST|HWLOC_MEMATTR_FLAG_NEED_INITIATOR,
+                       HWLOC_IMATTR_FLAG_STATIC_NAME);
+
+  topology->nr_memattrs = HWLOC_MEMATTR_ID_MAX;
 }
 
 static void
@@ -126,6 +142,8 @@ hwloc_internal_memattrs_dup(struct hwloc_topology *new, struct hwloc_topology *o
   struct hwloc_tma *tma = new->tma;
   struct hwloc_internal_memattr_s *imattrs;
   hwloc_memattr_id_t id;
+
+  /* old->nr_memattrs is always > 0 thanks to default memattrs */
 
   imattrs = hwloc_tma_malloc(tma, old->nr_memattrs * sizeof(*imattrs));
   if (!imattrs)
@@ -1193,5 +1211,654 @@ hwloc_get_local_numanode_objs(hwloc_topology_t topology,
   }
 
   *nrp = i;
+  return 0;
+}
+
+
+/**************************************
+ * Using memattrs to identify HBM/DRAM
+ */
+
+enum hwloc_memory_tier_type_e {
+  /* WARNING: keep higher BW types first for compare_tiers_by_bw_and_type() when BW info is missing */
+  HWLOC_MEMORY_TIER_HBM  = 1UL<<0,
+  HWLOC_MEMORY_TIER_DRAM = 1UL<<1,
+  HWLOC_MEMORY_TIER_GPU  = 1UL<<2,
+  HWLOC_MEMORY_TIER_SPM  = 1UL<<3, /* Specific-Purpose Memory is usually HBM, we'll use BW to confirm or force*/
+  HWLOC_MEMORY_TIER_NVM  = 1UL<<4,
+  HWLOC_MEMORY_TIER_CXL  = 1UL<<5
+};
+typedef unsigned long hwloc_memory_tier_type_t;
+#define HWLOC_MEMORY_TIER_UNKNOWN 0UL
+
+static const char * hwloc_memory_tier_type_snprintf(hwloc_memory_tier_type_t type)
+{
+  switch (type) {
+  case HWLOC_MEMORY_TIER_DRAM: return "DRAM";
+  case HWLOC_MEMORY_TIER_HBM: return "HBM";
+  case HWLOC_MEMORY_TIER_GPU: return "GPUMemory";
+  case HWLOC_MEMORY_TIER_SPM: return "SPM";
+  case HWLOC_MEMORY_TIER_NVM: return "NVM";
+  case HWLOC_MEMORY_TIER_CXL:
+  case HWLOC_MEMORY_TIER_CXL|HWLOC_MEMORY_TIER_DRAM: return "CXL-DRAM";
+  case HWLOC_MEMORY_TIER_CXL|HWLOC_MEMORY_TIER_HBM: return "CXL-HBM";
+  case HWLOC_MEMORY_TIER_CXL|HWLOC_MEMORY_TIER_GPU: return "CXL-GPUMemory";
+  case HWLOC_MEMORY_TIER_CXL|HWLOC_MEMORY_TIER_SPM: return "CXL-SPM";
+  case HWLOC_MEMORY_TIER_CXL|HWLOC_MEMORY_TIER_NVM: return "CXL-NVM";
+  default: return NULL;
+  }
+}
+
+static hwloc_memory_tier_type_t hwloc_memory_tier_type_sscanf(const char *name)
+{
+  if (!strcasecmp(name, "DRAM"))
+    return HWLOC_MEMORY_TIER_DRAM;
+  if (!strcasecmp(name, "HBM"))
+    return HWLOC_MEMORY_TIER_HBM;
+  if (!strcasecmp(name, "GPUMemory"))
+    return HWLOC_MEMORY_TIER_GPU;
+  if (!strcasecmp(name, "SPM"))
+    return HWLOC_MEMORY_TIER_SPM;
+  if (!strcasecmp(name, "NVM"))
+    return HWLOC_MEMORY_TIER_NVM;
+  if (!strcasecmp(name, "CXL-DRAM"))
+    return HWLOC_MEMORY_TIER_CXL|HWLOC_MEMORY_TIER_DRAM;
+  if (!strcasecmp(name, "CXL-HBM"))
+    return HWLOC_MEMORY_TIER_CXL|HWLOC_MEMORY_TIER_HBM;
+  if (!strcasecmp(name, "CXL-GPUMemory"))
+    return HWLOC_MEMORY_TIER_CXL|HWLOC_MEMORY_TIER_GPU;
+  if (!strcasecmp(name, "CXL-SPM"))
+    return HWLOC_MEMORY_TIER_CXL|HWLOC_MEMORY_TIER_SPM;
+  if (!strcasecmp(name, "CXL-NVM"))
+    return HWLOC_MEMORY_TIER_CXL|HWLOC_MEMORY_TIER_NVM;
+  return 0;
+}
+
+/* factorized tier, grouping multiple nodes */
+struct hwloc_memory_tier_s {
+  hwloc_nodeset_t nodeset;
+  uint64_t local_bw_min, local_bw_max;
+  uint64_t local_lat_min, local_lat_max;
+  hwloc_memory_tier_type_t type;
+};
+
+/* early tier discovery, one entry per node */
+struct hwloc_memory_node_info_s {
+  hwloc_obj_t node;
+  uint64_t local_bw;
+  uint64_t local_lat;
+  hwloc_memory_tier_type_t type;
+  unsigned rank;
+};
+
+static int compare_node_infos_by_type_and_bw(const void *_a, const void *_b)
+{
+  const struct hwloc_memory_node_info_s *a = _a, *b = _b;
+  /* sort by type of node first */
+  if (a->type != b->type)
+    return a->type - b->type;
+  /* then by bandwidth */
+  if (a->local_bw > b->local_bw)
+    return -1;
+  else if (a->local_bw < b->local_bw)
+    return 1;
+  return 0;
+}
+
+static int compare_tiers_by_bw_and_type(const void *_a, const void *_b)
+{
+  const struct hwloc_memory_tier_s *a = _a, *b = _b;
+  /* sort by (average) BW first */
+  if (a->local_bw_min && b->local_bw_min) {
+    if (a->local_bw_min + a->local_bw_max > b->local_bw_min + b->local_bw_max)
+      return -1;
+    else if (a->local_bw_min + a->local_bw_max < b->local_bw_min + b->local_bw_max)
+      return 1;
+  }
+  /* then by tier type */
+  if (a->type != b->type)
+    return a->type - b->type;
+  return 0;
+}
+
+static struct hwloc_memory_tier_s *
+hwloc__group_memory_tiers(hwloc_topology_t topology,
+                          unsigned *nr_tiers_p)
+{
+  struct hwloc_internal_memattr_s *imattr_bw, *imattr_lat;
+  struct hwloc_memory_node_info_s *nodeinfos;
+  struct hwloc_memory_tier_s *tiers;
+  unsigned nr_tiers;
+  float bw_threshold = 0.1;
+  float lat_threshold = 0.1;
+  const char *env;
+  unsigned i, j, n;
+
+  n = hwloc_get_nbobjs_by_depth(topology, HWLOC_TYPE_DEPTH_NUMANODE);
+  assert(n);
+
+  env = getenv("HWLOC_MEMTIERS_BANDWIDTH_THRESHOLD");
+  if (env)
+    bw_threshold = atof(env);
+
+  env = getenv("HWLOC_MEMTIERS_LATENCY_THRESHOLD");
+  if (env)
+    lat_threshold = atof(env);
+
+  imattr_bw = &topology->memattrs[HWLOC_MEMATTR_ID_BANDWIDTH];
+  imattr_lat = &topology->memattrs[HWLOC_MEMATTR_ID_LATENCY];
+
+  if (!(imattr_bw->iflags & HWLOC_IMATTR_FLAG_CACHE_VALID))
+    hwloc__imattr_refresh(topology, imattr_bw);
+  if (!(imattr_lat->iflags & HWLOC_IMATTR_FLAG_CACHE_VALID))
+    hwloc__imattr_refresh(topology, imattr_lat);
+
+  nodeinfos = malloc(n * sizeof(*nodeinfos));
+  if (!nodeinfos)
+    return NULL;
+
+  for(i=0; i<n; i++) {
+    hwloc_obj_t node;
+    const char *daxtype;
+    struct hwloc_internal_location_s iloc;
+    struct hwloc_internal_memattr_target_s *imtg;
+
+    node = hwloc_get_obj_by_depth(topology, HWLOC_TYPE_DEPTH_NUMANODE, i);
+    assert(node);
+    nodeinfos[i].node = node;
+
+    /* defaults to unknown */
+    nodeinfos[i].type = HWLOC_MEMORY_TIER_UNKNOWN;
+    nodeinfos[i].local_bw = 0;
+    nodeinfos[i].local_lat = 0;
+
+    daxtype = hwloc_obj_get_info_by_name(node, "DAXType");
+    /* mark NVM, SPM and GPU nodes */
+    if (node->subtype && !strcmp(node->subtype, "GPUMemory"))
+      nodeinfos[i].type = HWLOC_MEMORY_TIER_GPU;
+    else if (daxtype && !strcmp(daxtype, "NVM"))
+      nodeinfos[i].type = HWLOC_MEMORY_TIER_NVM;
+    else if (daxtype && !strcmp(daxtype, "SPM"))
+      nodeinfos[i].type = HWLOC_MEMORY_TIER_SPM;
+    /* add CXL flag */
+    if (hwloc_obj_get_info_by_name(node, "CXLDevice") != NULL) {
+      /* CXL is always SPM for now. HBM and DRAM not possible here yet.
+       * Hence remove all but NVM first.
+       */
+      nodeinfos[i].type &= HWLOC_MEMORY_TIER_NVM;
+      nodeinfos[i].type |= HWLOC_MEMORY_TIER_CXL;
+    }
+
+    /* get local bandwidth */
+    imtg = NULL;
+    for(j=0; j<imattr_bw->nr_targets; j++)
+      if (imattr_bw->targets[j].obj == node) {
+        imtg = &imattr_bw->targets[j];
+        break;
+      }
+    if (imtg && !hwloc_bitmap_iszero(node->cpuset)) {
+      struct hwloc_internal_memattr_initiator_s *imi;
+      iloc.type = HWLOC_LOCATION_TYPE_CPUSET;
+      iloc.location.cpuset = node->cpuset;
+      imi = hwloc__memattr_target_get_initiator(imtg, &iloc, 0);
+      if (imi)
+        nodeinfos[i].local_bw = imi->value;
+    }
+    /* get local latency */
+    imtg = NULL;
+    for(j=0; j<imattr_lat->nr_targets; j++)
+      if (imattr_lat->targets[j].obj == node) {
+        imtg = &imattr_lat->targets[j];
+        break;
+      }
+    if (imtg && !hwloc_bitmap_iszero(node->cpuset)) {
+      struct hwloc_internal_memattr_initiator_s *imi;
+      iloc.type = HWLOC_LOCATION_TYPE_CPUSET;
+      iloc.location.cpuset = node->cpuset;
+      imi = hwloc__memattr_target_get_initiator(imtg, &iloc, 0);
+      if (imi)
+        nodeinfos[i].local_lat = imi->value;
+    }
+  }
+
+  /* Sort nodes.
+   * We could also sort by the existing subtype.
+   * KNL is the only case where subtypes are set in backends, but we set memattrs as well there.
+   * Also HWLOC_MEMTIERS_REFRESH would be a special value to ignore existing subtypes.
+   */
+  hwloc_debug("Sorting memory node infos...\n");
+  qsort(nodeinfos, n, sizeof(*nodeinfos), compare_node_infos_by_type_and_bw);
+#ifdef HWLOC_DEBUG
+  for(i=0; i<n; i++)
+    hwloc_debug("  node info %u = node L#%u P#%u with info type %lx and local BW %llu lat %llu\n",
+                i,
+                nodeinfos[i].node->logical_index, nodeinfos[i].node->os_index,
+                nodeinfos[i].type,
+                (unsigned long long) nodeinfos[i].local_bw,
+                (unsigned long long) nodeinfos[i].local_lat);
+#endif
+  /* now we have UNKNOWN nodes (sorted by BW only), then known ones */
+
+  /* iterate among them and add a rank value.
+   * start from rank 0 and switch to next rank when the type changes or when the BW or latendy difference is > threshold */
+  hwloc_debug("Starting memory tier #0 and iterating over nodes...\n");
+  nodeinfos[0].rank = 0;
+  for(i=1; i<n; i++) {
+    /* reuse the same rank by default */
+    nodeinfos[i].rank = nodeinfos[i-1].rank;
+    /* comparing type */
+    if (nodeinfos[i].type != nodeinfos[i-1].type) {
+      hwloc_debug("  Switching to memory tier #%u starting with node L#%u P#%u because of type\n",
+                  nodeinfos[i].rank, nodeinfos[i].node->logical_index, nodeinfos[i].node->os_index);
+      nodeinfos[i].rank++;
+      continue;
+    }
+    /* comparing bandwidth */
+    if (nodeinfos[i].local_bw && nodeinfos[i-1].local_bw) {
+      float bw_ratio = (float)nodeinfos[i].local_bw/(float)nodeinfos[i-1].local_bw;
+      if (bw_ratio < 1.)
+        bw_ratio = 1./bw_ratio;
+      if (bw_ratio > 1.0 + bw_threshold) {
+        nodeinfos[i].rank++;
+        hwloc_debug("  Switching to memory tier #%u starting with node L#%u P#%u because of bandwidth\n",
+                    nodeinfos[i].rank, nodeinfos[i].node->logical_index, nodeinfos[i].node->os_index);
+        continue;
+      }
+    }
+    /* comparing latency */
+    if (nodeinfos[i].local_lat && nodeinfos[i-1].local_lat) {
+      float lat_ratio = (float)nodeinfos[i].local_lat/(float)nodeinfos[i-1].local_lat;
+      if (lat_ratio < 1.)
+        lat_ratio = 1./lat_ratio;
+      if (lat_ratio > 1.0 + lat_threshold) {
+        hwloc_debug("  Switching to memory tier #%u starting with node L#%u P#%u because of latency\n",
+                    nodeinfos[i].rank, nodeinfos[i].node->logical_index, nodeinfos[i].node->os_index);
+        nodeinfos[i].rank++;
+        continue;
+      }
+    }
+  }
+  /* FIXME: if there are cpuset-intersecting nodes in same tier, split again? */
+  hwloc_debug("  Found %u tiers total\n", nodeinfos[n-1].rank + 1);
+
+  /* now group nodeinfos into factorized tiers */
+  nr_tiers = nodeinfos[n-1].rank + 1;
+  tiers = calloc(nr_tiers, sizeof(*tiers));
+  if (!tiers)
+    goto out_with_nodeinfos;
+  for(i=0; i<nr_tiers; i++) {
+    tiers[i].nodeset = hwloc_bitmap_alloc();
+    if (!tiers[i].nodeset)
+      goto out_with_tiers;
+    tiers[i].local_bw_min = tiers[i].local_bw_max = 0;
+    tiers[i].local_lat_min = tiers[i].local_lat_max = 0;
+    tiers[i].type = HWLOC_MEMORY_TIER_UNKNOWN;
+  }
+  for(i=0; i<n; i++) {
+    unsigned rank = nodeinfos[i].rank;
+    assert(rank < nr_tiers);
+    hwloc_bitmap_set(tiers[rank].nodeset, nodeinfos[i].node->os_index);
+    assert(tiers[rank].type == HWLOC_MEMORY_TIER_UNKNOWN
+           || tiers[rank].type == nodeinfos[i].type);
+    tiers[rank].type = nodeinfos[i].type;
+    /* nodeinfos are sorted in BW order, no need to compare */
+    if (!tiers[rank].local_bw_min)
+      tiers[rank].local_bw_min = nodeinfos[i].local_bw;
+    tiers[rank].local_bw_max = nodeinfos[i].local_bw;
+    /* compare latencies to update min/max */
+    if (!tiers[rank].local_lat_min || nodeinfos[i].local_lat < tiers[rank].local_lat_min)
+      tiers[rank].local_lat_min = nodeinfos[i].local_lat;
+    if (!tiers[rank].local_lat_max || nodeinfos[i].local_lat > tiers[rank].local_lat_max)
+      tiers[rank].local_lat_max = nodeinfos[i].local_lat;
+  }
+
+  free(nodeinfos);
+  *nr_tiers_p = nr_tiers;
+  return tiers;
+
+ out_with_tiers:
+  for(i=0; i<nr_tiers; i++)
+    hwloc_bitmap_free(tiers[i].nodeset);
+  free(tiers);
+ out_with_nodeinfos:
+  free(nodeinfos);
+  return NULL;
+}
+
+enum hwloc_guess_memtiers_flag {
+  HWLOC_GUESS_MEMTIERS_FLAG_NODE0_IS_DRAM = 1<<0,
+  HWLOC_GUESS_MEMTIERS_FLAG_SPM_IS_HBM = 1<<1
+};
+
+static int
+hwloc__guess_dram_hbm_tiers(struct hwloc_memory_tier_s *tier1,
+                            struct hwloc_memory_tier_s *tier2,
+                            unsigned long flags)
+{
+  struct hwloc_memory_tier_s *tmp;
+
+  if (!tier1->local_bw_min || !tier2->local_bw_min) {
+    hwloc_debug("    Missing BW info\n");
+    return -1;
+  }
+
+  /* reorder tiers by BW */
+  if (tier1->local_bw_min > tier2->local_bw_min) {
+    tmp = tier1; tier1 = tier2; tier2 = tmp;
+  }
+  /* tier1 < tier2 */
+
+  hwloc_debug("    tier1 BW %llu-%llu vs tier2 BW %llu-%llu\n",
+              (unsigned long long) tier1->local_bw_min,
+              (unsigned long long) tier1->local_bw_max,
+              (unsigned long long) tier2->local_bw_min,
+              (unsigned long long) tier2->local_bw_max);
+  if (tier2->local_bw_min <= tier1->local_bw_max * 2) {
+    /* tier2 BW isn't 2x tier1, we cannot guess HBM */
+    hwloc_debug("    BW difference isn't >2x\n");
+    return -1;
+  }
+  /* tier2 BW is >2x tier1 */
+
+  if ((flags & HWLOC_GUESS_MEMTIERS_FLAG_NODE0_IS_DRAM)
+      && hwloc_bitmap_isset(tier2->nodeset, 0)) {
+    /* node0 is not DRAM, and we assume that's not possible */
+    hwloc_debug("    node0 shouldn't have HBM BW\n");
+    return -1;
+  }
+
+  /* assume tier1 == DRAM and tier2 == HBM */
+  tier1->type = HWLOC_MEMORY_TIER_DRAM;
+  tier2->type = HWLOC_MEMORY_TIER_HBM;
+  hwloc_debug("    Success\n");
+  return 0;
+}
+
+static int
+hwloc__guess_memory_tiers_types(hwloc_topology_t topology __hwloc_attribute_unused,
+                                unsigned nr_tiers,
+                                struct hwloc_memory_tier_s *tiers)
+{
+  unsigned long flags;
+  const char *env;
+  unsigned nr_unknown, nr_spm;
+  struct hwloc_memory_tier_s *unknown_tier[2], *spm_tier;
+  unsigned i;
+
+  flags = 0;
+  env = getenv("HWLOC_MEMTIERS_GUESS");
+  if (env) {
+    if (!strcmp(env, "none"))
+      return 0;
+    /* by default, we don't guess anything unsure */
+    if (!strcmp(env, "all"))
+      /* enable all typical cases */
+      flags = ~0UL;
+    if (strstr(env, "spm_is_hbm")) {
+      hwloc_debug("Assuming SPM-tier is HBM, ignore bandwidth\n");
+      flags |= HWLOC_GUESS_MEMTIERS_FLAG_SPM_IS_HBM;
+    }
+    if (strstr(env, "node0_is_dram")) {
+      hwloc_debug("Assuming node0 is DRAM\n");
+      flags |= HWLOC_GUESS_MEMTIERS_FLAG_NODE0_IS_DRAM;
+    }
+  }
+
+  if (nr_tiers == 1)
+    /* Likely DRAM only, but could also be HBM-only in non-SPM mode.
+     * We cannot be sure, but it doesn't matter since there's a single tier.
+     */
+    return 0;
+
+  nr_unknown = nr_spm = 0;
+  unknown_tier[0] = unknown_tier[1] = spm_tier = NULL;
+  for(i=0; i<nr_tiers; i++) {
+    switch (tiers[i].type) {
+    case HWLOC_MEMORY_TIER_UNKNOWN:
+      if (nr_unknown < 2)
+        unknown_tier[nr_unknown] = &tiers[i];
+      nr_unknown++;
+      break;
+    case HWLOC_MEMORY_TIER_SPM:
+      spm_tier = &tiers[i];
+      nr_spm++;
+      break;
+    case HWLOC_MEMORY_TIER_DRAM:
+    case HWLOC_MEMORY_TIER_HBM:
+      /* not possible */
+      abort();
+    default:
+      /* ignore HBM, NVM, ... */
+      break;
+    }
+  }
+  hwloc_debug("Found %u unknown memory tiers and %u SPM\n",
+              nr_unknown, nr_spm);
+
+  /* Try to guess DRAM + HBM common cases.
+   * Other things we'd like to detect:
+   * single unknown => DRAM or HBM? HBM won't be SPM on HBM-only CPUs
+   * unknown + CXL DRAM => DRAM or HBM?
+   */
+  if (nr_unknown == 2 && !nr_spm) {
+    /* 2 unknown, could be DRAM + non-SPM HBM */
+    hwloc_debug("  Trying to guess 2 unknown tiers using BW\n");
+    hwloc__guess_dram_hbm_tiers(unknown_tier[0], unknown_tier[1], flags);
+  } else if (nr_unknown == 1 && nr_spm == 1) {
+    /* 1 unknown + 1 SPM, could be DRAM + SPM HBM */
+    hwloc_debug("  Trying to guess 1 unknown + 1 SPM tiers using BW\n");
+    hwloc__guess_dram_hbm_tiers(unknown_tier[0], spm_tier, flags);
+  }
+
+  if (flags & HWLOC_GUESS_MEMTIERS_FLAG_SPM_IS_HBM) {
+    /* force mark SPM as HBM */
+    for(i=0; i<nr_tiers; i++)
+      if (tiers[i].type == HWLOC_MEMORY_TIER_SPM) {
+        hwloc_debug("Forcing SPM tier to HBM");
+        tiers[i].type = HWLOC_MEMORY_TIER_HBM;
+      }
+  }
+
+  if (flags & HWLOC_GUESS_MEMTIERS_FLAG_NODE0_IS_DRAM) {
+    /* force mark node0's tier as DRAM if we couldn't guess it */
+    for(i=0; i<nr_tiers; i++)
+      if (hwloc_bitmap_isset(tiers[i].nodeset, 0)
+          && tiers[i].type == HWLOC_MEMORY_TIER_UNKNOWN) {
+        hwloc_debug("Forcing node0 tier to DRAM");
+        tiers[i].type = HWLOC_MEMORY_TIER_DRAM;
+        break;
+      }
+  }
+
+  return 0;
+}
+
+/* parses something like 0xf=HBM;0x0f=DRAM;0x00f=CXL-DRAM */
+static struct hwloc_memory_tier_s *
+hwloc__force_memory_tiers(hwloc_topology_t topology __hwloc_attribute_unused,
+                          unsigned *nr_tiers_p,
+                          const char *_env)
+{
+  struct hwloc_memory_tier_s *tiers = NULL;
+  unsigned nr_tiers, i;
+  hwloc_bitmap_t nodeset = NULL;
+  char *env;
+  const char *tmp;
+
+  env = strdup(_env);
+  if (!env) {
+    fprintf(stderr, "[hwloc/memtiers] failed to duplicate HWLOC_MEMTIERS envvar\n");
+    goto out;
+  }
+
+  tmp = env;
+  nr_tiers = 1;
+  while (1) {
+    tmp = strchr(tmp, ';');
+    if (!tmp)
+      break;
+    tmp++;
+    nr_tiers++;
+  }
+
+  nodeset = hwloc_bitmap_alloc();
+  if (!nodeset) {
+    fprintf(stderr, "[hwloc/memtiers] failed to allocated forced tiers' nodeset\n");
+    goto out_with_envvar;
+  }
+
+  tiers = calloc(nr_tiers, sizeof(*tiers));
+  if (!tiers) {
+    fprintf(stderr, "[hwloc/memtiers] failed to allocated forced tiers\n");
+    goto out_with_nodeset;
+  }
+  nr_tiers = 0;
+
+  tmp = env;
+  while (1) {
+    char *end;
+    char *equal;
+    hwloc_memory_tier_type_t type;
+
+    end = strchr(tmp, ';');
+    if (end)
+      *end = '\0';
+
+    equal = strchr(tmp, '=');
+    if (!equal) {
+      fprintf(stderr, "[hwloc/memtiers] missing `=' before end of forced tier description at `%s'\n", tmp);
+      goto out_with_tiers;
+    }
+    *equal = '\0';
+
+    hwloc_bitmap_sscanf(nodeset, tmp);
+    if (hwloc_bitmap_iszero(nodeset)) {
+      fprintf(stderr, "[hwloc/memtiers] empty forced tier nodeset `%s', aborting\n", tmp);
+      goto out_with_tiers;
+    }
+    type = hwloc_memory_tier_type_sscanf(equal+1);
+    if (!type)
+      hwloc_debug("failed to recognize forced tier type `%s'\n", equal+1);
+    tiers[nr_tiers].nodeset = hwloc_bitmap_dup(nodeset);
+    tiers[nr_tiers].type = type;
+    tiers[nr_tiers].local_bw_min = tiers[nr_tiers].local_bw_max = 0;
+    tiers[nr_tiers].local_lat_min = tiers[nr_tiers].local_lat_max = 0;
+    nr_tiers++;
+    if (!end)
+      break;
+    tmp = end+1;
+  }
+
+  free(env);
+  hwloc_bitmap_free(nodeset);
+  hwloc_debug("Forcing %u memory tiers\n", nr_tiers);
+#ifdef HWLOC_DEBUG
+  for(i=0; i<nr_tiers; i++) {
+    char *s;
+    hwloc_bitmap_asprintf(&s, tiers[i].nodeset);
+    hwloc_debug("  tier #%u type %lx nodeset %s\n", i, tiers[i].type, s);
+    free(s);
+  }
+#endif
+  *nr_tiers_p = nr_tiers;
+  return tiers;
+
+ out_with_tiers:
+  for(i=0; i<nr_tiers; i++)
+    hwloc_bitmap_free(tiers[i].nodeset);
+  free(tiers);
+ out_with_nodeset:
+  hwloc_bitmap_free(nodeset);
+ out_with_envvar:
+  free(env);
+ out:
+  return NULL;
+}
+
+static void
+hwloc__apply_memory_tiers_subtypes(hwloc_topology_t topology,
+                                   unsigned nr_tiers,
+                                   struct hwloc_memory_tier_s *tiers,
+                                   int force)
+{
+  hwloc_obj_t node = NULL;
+  hwloc_debug("Marking node tiers\n");
+  while ((node = hwloc_get_next_obj_by_type(topology, HWLOC_OBJ_NUMANODE, node)) != NULL) {
+    unsigned j;
+    for(j=0; j<nr_tiers; j++) {
+      if (hwloc_bitmap_isset(tiers[j].nodeset, node->os_index)) {
+        const char *subtype = hwloc_memory_tier_type_snprintf(tiers[j].type);
+        if (!node->subtype || force) { /* don't overwrite the existing subtype unless forced */
+          if (subtype) { /* don't set a subtype for unknown tiers */
+            hwloc_debug("  marking node L#%u P#%u as %s (was %s)\n", node->logical_index, node->os_index, subtype, node->subtype);
+            free(node->subtype);
+            node->subtype = strdup(subtype);
+          }
+        } else
+          hwloc_debug("  node L#%u P#%u already marked as %s, not setting %s\n",
+                      node->logical_index, node->os_index, node->subtype, subtype);
+        if (nr_tiers > 1) {
+          char tmp[20];
+          snprintf(tmp, sizeof(tmp), "%u", j);
+          hwloc__add_info_nodup(&node->infos, &node->infos_count, "MemoryTier", tmp, 1);
+        }
+        break; /* each node is in a single tier */
+      }
+    }
+  }
+}
+
+int
+hwloc_internal_memattrs_guess_memory_tiers(hwloc_topology_t topology, int force_subtype)
+{
+  struct hwloc_memory_tier_s *tiers;
+  unsigned nr_tiers;
+  unsigned i;
+  const char *env;
+
+  env = getenv("HWLOC_MEMTIERS");
+  if (env) {
+    if (!strcmp(env, "none"))
+      goto out;
+    tiers = hwloc__force_memory_tiers(topology, &nr_tiers, env);
+    if (tiers) {
+      assert(nr_tiers > 0);
+      force_subtype = 1;
+      goto ready;
+    }
+  }
+
+  tiers = hwloc__group_memory_tiers(topology, &nr_tiers);
+  if (!tiers)
+    goto out;
+
+  hwloc__guess_memory_tiers_types(topology, nr_tiers, tiers);
+
+  /* sort tiers by BW first, then by type */
+  hwloc_debug("Sorting memory tiers...\n");
+  qsort(tiers, nr_tiers, sizeof(*tiers), compare_tiers_by_bw_and_type);
+
+ ready:
+#ifdef HWLOC_DEBUG
+  for(i=0; i<nr_tiers; i++) {
+    char *s;
+    hwloc_bitmap_asprintf(&s, tiers[i].nodeset);
+    hwloc_debug("  tier %u = nodes %s with type %lx and local BW %llu-%llu lat %llu-%llu\n",
+                i,
+                s, tiers[i].type,
+                (unsigned long long) tiers[i].local_bw_min,
+                (unsigned long long) tiers[i].local_bw_max,
+                (unsigned long long) tiers[i].local_lat_min,
+                (unsigned long long) tiers[i].local_lat_max);
+    free(s);
+  }
+#endif
+
+  hwloc__apply_memory_tiers_subtypes(topology, nr_tiers, tiers, force_subtype);
+
+  for(i=0; i<nr_tiers; i++)
+    hwloc_bitmap_free(tiers[i].nodeset);
+  free(tiers);
+ out:
   return 0;
 }

@@ -18,8 +18,6 @@ Orion Sky Lawlor, olawlor@acm.org, 4/10/2001
 #endif
 
 CpvCExtern(int, freezeModeFlag);
-CpvStaticDeclare(int, continueFlag);
-CpvStaticDeclare(int, stepFlag);
 CpvCExtern(void *, debugQueue);
 CpvDeclare(void*, conditionalQueue);
 int conditionalPipe[2] = {0, 0};
@@ -126,13 +124,12 @@ static void CpdDebugReturnAllocationTree(void *tree) {
   pup_er sizer = pup_new_sizer();
   char *buf;
   pup_er packer;
-  int i;
   CpdDebug_pupAllocationPoint(sizer, tree);
   buf = (char *)malloc(pup_size(sizer));
   packer = pup_new_toMem(buf);
   CpdDebug_pupAllocationPoint(packer, tree);
   /*CmiPrintf("size=%d tree:",pup_size(sizer));
-  for (i=0;i<100;++i) CmiPrintf(" %02x",((unsigned char*)buf)[i]);
+  for (int i=0;i<100;++i) CmiPrintf(" %02x",((unsigned char*)buf)[i]);
   CmiPrintf("\n");*/
   CcsSendDelayedReply(CpvAccess(allocationTreeDelayedReply), pup_size(sizer),buf);
   pup_destroy(sizer);
@@ -180,14 +177,13 @@ static void CpdDebugReturnMemStat(void *stat) {
   char *buf;
   pup_er packerNet;
   pup_er packer;
-  int i;
   CpdDebug_pupMemStat(sizer, stat);
   buf = (char *)malloc(pup_size(sizer));
   packerNet = pup_new_network_pack(buf);
   packer = pup_new_fmt(packerNet);
   CpdDebug_pupMemStat(packer, stat);
   /*CmiPrintf("size=%d tree:",pup_size(sizer));
-  for (i=0;i<100;++i) CmiPrintf(" %02x",((unsigned char*)buf)[i]);
+  for (int i=0;i<100;++i) CmiPrintf(" %02x",((unsigned char*)buf)[i]);
   CmiPrintf("\n");*/
   CcsSendDelayedReply(CpvAccess(memStatDelayedReply), pup_size(sizer),buf);
   pup_destroy(sizerNet);
@@ -329,6 +325,7 @@ void CpdInit(void)
   CpvAccess(conditionalQueue) = CdsFifo_Create();
   
   CcsRegisterHandler("debug/converse/freeze", (CmiHandler)CpdDebugHandlerFreeze);
+  CcsSetMergeFn("debug/converse/freeze",CmiReduceMergeFn_random);
   CcsRegisterHandler("debug/converse/status", (CmiHandler)CpdDebugHandlerStatus);
   CcsSetMergeFn("debug/converse/status", CcsMerge_concat);
 

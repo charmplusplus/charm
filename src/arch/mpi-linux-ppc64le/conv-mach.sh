@@ -1,15 +1,39 @@
-. $CHARMINC/cc-mpi.sh
+. $CHARMINC/cc-mpiopts.sh
 
 CMK_QT='generic64-light'
 
-CMK_NATIVE_LIBS=''
-CMK_NATIVE_CC='xlc_r '
-CMK_NATIVE_LD='xlc_r '
-CMK_NATIVE_CXX='xlC_r '
-CMK_NATIVE_LDXX='xlC_r '
 
-CMK_CF77='mpif77 '
-CMK_CF90='mpif90 '
-CMK_F90LIBS='-L/opt/absoft/lib -lf90math -lfio -lU77 -lf77math '
-CMK_MOD_NAME_ALLCAPS=1
-CMK_MOD_EXT='mod'
+CMK_CC="$MPICC"
+CMK_CXX="$MPICXX"
+
+CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
+
+CMK_NATIVE_CC='gcc'
+CMK_NATIVE_CXX='g++'
+CMK_NATIVE_LD='gcc'
+CMK_NATIVE_LDXX='g++'
+CMK_NATIVE_LIBS=''
+
+CMK_NATIVE_FLAGS='-fPIC'
+
+CMK_NATIVE_CC_FLAGS="$CMK_NATIVE_FLAGS"
+CMK_NATIVE_LD_FLAGS="$CMK_NATIVE_FLAGS"
+CMK_NATIVE_CXX_FLAGS="$CMK_NATIVE_FLAGS"
+CMK_NATIVE_LDXX_FLAGS="$CMK_NATIVE_FLAGS"
+
+# Fortran
+CMK_CXX_IS_GCC=`$MPICXX -V 2>&1 | grep 'g++' `
+CMK_CXX_IS_ICC=`$MPICXX -V 2>&1 | grep Intel `
+CMK_CXX_IS_NVHPC=`$MPICXX -V 2>&1 | grep 'nvc++' `
+if test -n "$CMK_CXX_IS_GCC"
+then
+    . $CHARMINC/conv-mach-gfortran.sh
+elif test -n "$CMK_CXX_IS_ICC"
+then
+    . $CHARMINC/conv-mach-ifort.sh
+elif test -n "$CMK_CXX_IS_NVHPC"
+then
+    . $CHARMINC/conv-mach-nvfortran.sh
+fi
+
+CMK_COMPILER='mpicc'

@@ -9,24 +9,23 @@ module collidecharm {
     entry void reductionDone(CkReductionMsg *m);
   };
 
-  group syncReductionMgr {
-    entry syncReductionMgr();
-    entry void childProd(int stepCount);
-    entry void childDone(int stepCount);
+  group distributedCollideClient : collideClient {
+    entry distributedCollideClient(CkCallback clientCb_);
   };
-  group collideMgr : syncReductionMgr {
+
+  group collideMgr {
     entry collideMgr(CollideGrid3d gridMap,
         CProxy_collideClient client,
         CkArrayID cells);
     entry void voxelMessageRecvd(void);
+    entry void determineNumVoxels();
+    entry [reductiontarget] void reductionFinished();
   };
 
   array [3D] collideVoxel {
     entry collideVoxel(void);
     entry [createhere] void add(objListMsg *);
     //    entry [createhome] void add(objListMsg *);
-    entry void startCollision(int step,
-        CollideGrid3d gridMap,
-        CProxy_collideClient client);
+    entry void initiateCollision(CProxy_collideMgr mg);
   };
 };

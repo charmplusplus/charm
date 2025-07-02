@@ -26,9 +26,11 @@ test: all
 	$(call run, +p4 ./kNeighbor 4 50 128 10 +balancer GreedyLB +LBDebug 1 )
 	$(call run, +p4 ./kNeighbor 4 50 128 10 +balancer GreedyRefineLB +LBDebug 1 )
 	$(call run, +p4 ./kNeighbor 4 50 128 10 +balancer DistributedLB +LBDebug 1 )
+	$(call run, +p4 ./kNeighbor 4 50 128 10 +balancer MetisLB +LBDebug 1 )
 
 testp: all
 	$(call run, +p$(P) ./kNeighbor $$(( $(P) * 8 )) 50 128 10 +balancer RefineLB +LBDebug 1 )
 	$(call run, +p$(P) ./kNeighbor $$(( $(P) * 8 )) 50 128 10 +balancer GreedyLB +LBDebug 1 )
 	$(call run, +p$(P) ./kNeighbor $$(( $(P) * 8 )) 50 128 10 +balancer GreedyRefineLB +LBDebug 1 )
 	$(call run, +p$(P) ./kNeighbor $$(( $(P) * 8 )) 50 128 10 +balancer DistributedLB +LBDebug 1 )
+	$(call run, +p$(P) ./kNeighbor $$(( $(P) * 8 )) 50 128 10 +balancer MetisLB +LBDebug 1 )

@@ -57,7 +57,6 @@
 #define CMK_TIMER_USE_GETRUSAGE                            1
 #define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                0
-#define CMK_TIMER_USE_BLUEGENEL                            0
 
 /* Specifies what the processor will do when it is idle, either sleep (1) or go
    into busy waiting mode (0). In convcore.c there are a few files included if
@@ -75,7 +74,7 @@
 #define CMK_LBDB_ON                    1
 
 #define CMK_64BIT                      1
-#define CMK_AMD64                      1
+#define CMK_PPC64                      1
 
 /* Other possible definitions:
 

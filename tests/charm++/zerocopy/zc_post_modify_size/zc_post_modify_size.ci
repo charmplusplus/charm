@@ -5,6 +5,7 @@ mainmodule zc_post_modify_size
   readonly CProxy_grp grpProxy;
   readonly CProxy_nodegrp ngProxy;
   readonly CProxy_tester chareProxy;
+  readonly int arrSize;
 
   mainchare main
   {

@@ -1422,7 +1422,7 @@ Input/Output
 
 .. code-block:: c++
 
-  void CmiPrintf(char *format, arg1, arg2, ...)
+  int CmiPrintf(const char *format, ...)
 
 This function does an atomic ``printf()`` on ``stdout``. On machine with
 host, this is implemented on top of the messaging layer using
@@ -1430,7 +1430,7 @@ asynchronous sends.
 
 .. code-block:: c++
 
-  int CmiScanf(char *format, void *arg1, void *arg2, ...)
+  int CmiScanf(const char *format, ...)
 
 This function performs an atomic ``scanf`` from ``stdin``. The
 processor, on which the caller resides, blocks for input. On machines
@@ -1439,7 +1439,7 @@ asynchronous send and blocking receive.
 
 .. code-block:: c++
 
-  void CmiError(char *format, arg1, arg2, ...)
+  int CmiError(const char *format, ...)
 
 This function does an atomic ``printf()`` on ``stderr``. On machines
 with host, this is implemented on top of the messaging layer using
@@ -2002,18 +2002,18 @@ CcdUSERMAX
 
 .. code-block:: c++
 
-   int CcdCallOnCondition(int condnum, CcdVoidFn fnp, void* arg)
+   int CcdCallOnCondition(int condnum, CcdCondFn fnp, void* arg)
 
 This call instructs the system to call the function indicated by the
 function pointer ``fnp``, with the specified argument ``arg``, when
 the condition indicated by ``condnum`` is raised next. Multiple
 functions may be registered for the same condition number.
-``CcdVoidFn`` is a function pointer with the signature ``void fnp(void
-*userParam, double curWallTime)``
+``CcdCondFn`` is a function pointer with the signature ``void fnp(void
+*userParam)``
 
 .. code-block:: c++
 
-  int CcdCallOnConditionKeep(int condnum, CcdVoidFn fnp, void* arg)
+  int CcdCallOnConditionKeep(int condnum, CcdCondFn fnp, void* arg)
 
 As above, but the association is permanent- the given function will
 be called again whenever this condition is raised.
@@ -2032,20 +2032,11 @@ callbacks from within ccd callbacks.
 
 .. code-block:: c++
 
-  double CcdRaiseCondition(int condNum)
-
+  void CcdRaiseCondition(int condNum)
 
 When this function is called, it invokes all the functions whose
 pointers were registered for the ``condNum`` via a *prior* call to
-``CcdCallOnCondition`` or ``CcdCallOnConditionKeep``. The function
-internally calls ``CmiWallTimer`` and returns this value. When using
-``CcdRaiseCondition``, the return value can be used to determine the
-current walltime avoiding an additional call to ``CmiWallTimer``.
-However, it is important to note that the walltime value returned
-by ``CcdRaiseCondition`` could be stale by the time it is returned
-since registered functions are executed between the timer call and
-the return. For this reason, this walltime value returned should be
-used in situations where an exact or current timer value is not desired.
+``CcdCallOnCondition`` or ``CcdCallOnConditionKeep``.
 
 .. code-block:: c++
 
@@ -2056,6 +2047,11 @@ be called at least ``msLater`` milliseconds later. The registered
 function ``fnp`` is actually called the first time the scheduler gets
 control after ``deltaT`` milliseconds have elapsed. The default
 polling resolution for timed callbacks is 5 ms.
+``CcdVoidFn`` is a function pointer with the signature ``void fnp(void
+*userParam, double currWallTime)``. Note the extra wall-time parameter,
+which differs from ``CcdCondFn``, because the runtime system internally
+calls a timer in order to invoke periodic callbacks. It passes that
+time into the user callback as well to avoid the need for extra timer calls.
 
 .. code-block:: c++
 
@@ -2139,7 +2135,7 @@ CCS: Client-Side
 A CCS client connects to a CCS server, asks a server PE to execute a
 pre-registered handler, and receives the response data. The CCS client
 may be written in any language (see CCS network protocol, below), but a
-C interface (files “ccs-client.c” and “ccs-client.h”) and Java interface
+C interface (files "ccs-client.C" and "ccs-client.h") and Java interface
 (file “CcsServer.java”) are available in the charm include directory.
 
 The C routines use the skt_abort error-reporting strategy; see

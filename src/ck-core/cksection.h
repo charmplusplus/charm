@@ -26,61 +26,33 @@
 class CkSectionInfo {
 public:
 
-  /**
-   * For now we still need to encapsulate CkSectionInfo's data
-   * in a separate CkSectionInfoStruct because it is used in ckcallback
-   * inside a union, and C++03 doesn't support placing objects with non-trivial
-   * constructors in unions.
-   * TODO When all our supported compilers have C++11 we might want to modify callbackData
-   * union to allow objects with non-trivial constructors.
-   */
-  class CkSectionInfoStruct {
-  public:
-    /// Pointer to mCastEntry (used by CkMulticast)
-    void *val;
-    /// Array/group ID of the array/group that has been sectioned
-    CkGroupID aid;
-    /// The pe on which this object has been created
-    int pe;
-    /// Counter tracking the last reduction that has traversed this section (used by CkMulticast)
-    int redNo;
+  /// Pointer to mCastEntry (used by CkMulticast)
+  void *val;
+  /// Array/group ID of the array/group that has been sectioned
+  CkGroupID aid;
+  /// The pe on which this object has been created
+  int pe;
+  /// Counter tracking the last reduction that has traversed this section (used by CkMulticast)
+  int redNo;
 
-    bool operator==(CkSectionInfoStruct &other) {
-      return (val == other.val && aid == other.aid && pe == other.pe && redNo == other.redNo);
-    }
-  };
+  CkSectionInfo() : val(NULL), pe(-1), redNo(0) { }
 
-  CkSectionInfoStruct info;
+  CkSectionInfo(CkArrayID _aid, void *p = NULL)
+    : val(p), aid(_aid), pe(CkMyPe()), redNo(0) { }
 
-  CkSectionInfo() {
-    info.pe = -1;
-    info.redNo = 0;
-    info.val = NULL;
+  CkSectionInfo(int e, void *p, int r, CkArrayID _aid)
+    : val(p), aid(_aid), pe(e), redNo(r) { }
+
+  bool operator==(CkSectionInfo &other) const {
+    return (val == other.val && aid == other.aid && pe == other.pe && redNo == other.redNo);
   }
 
-  CkSectionInfo(const CkSectionInfoStruct &i): info(i) {}
-
-  CkSectionInfo(CkArrayID _aid, void *p = NULL) {
-    info.pe = CkMyPe();
-    info.aid = _aid;
-    info.val = p;
-    info.redNo = 0;
-  }
-
-  CkSectionInfo(int e, void *p, int r, CkArrayID _aid) {
-    info.pe = e;
-    info.aid = _aid;
-    info.val = p;
-    info.redNo = r;
-  }
-
-  inline int   &get_pe() { return info.pe; }
-  inline int   &get_redNo() { return info.redNo; }
-  inline void  set_redNo(int redNo) { info.redNo = redNo; }
-  inline void* &get_val() { return info.val; }
-  inline CkGroupID &get_aid() { return info.aid; }
-  inline CkGroupID get_aid() const { return info.aid; }
-
+  inline int   &get_pe() { return pe; }
+  inline int   &get_redNo() { return redNo; }
+  inline void  set_redNo(int _redNo) { redNo = _redNo; }
+  inline void* &get_val() { return val; }
+  inline CkGroupID &get_aid() { return aid; }
+  inline CkGroupID get_aid() const { return aid; }
 };
 
 PUPbytes(CkSectionInfo)

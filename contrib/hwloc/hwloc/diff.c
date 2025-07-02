@@ -1,5 +1,5 @@
 /*
- * Copyright © 2013-2020 Inria.  All rights reserved.
+ * Copyright © 2013-2023 Inria.  All rights reserved.
  * See COPYING in top-level directory.
  */
 
@@ -218,7 +218,7 @@ hwloc_diff_trees(hwloc_topology_t topo1, hwloc_obj_t obj1,
 		struct hwloc_info_s *info1 = &obj1->infos[i], *info2 = &obj2->infos[i];
 		if (strcmp(info1->name, info2->name))
 			goto out_too_complex;
-		if (strcmp(obj1->infos[i].value, obj2->infos[i].value)) {
+		if (strcmp(info1->value, info2->value)) {
 			err = hwloc_append_diff_obj_attr_string(obj1,
 								HWLOC_TOPOLOGY_DIFF_OBJ_ATTR_INFO,
 								info1->name,
@@ -406,6 +406,30 @@ int hwloc_topology_diff_build(hwloc_topology_t topo1,
               } else {
                 if (imtg1->noinitiator_value != imtg2->noinitiator_value)
                   goto roottoocomplex;
+              }
+            }
+          }
+        }
+
+        if (!err) {
+          /* cpukinds */
+          if (topo1->nr_cpukinds != topo2->nr_cpukinds)
+            goto roottoocomplex;
+          for(i=0; i<topo1->nr_cpukinds; i++) {
+            struct hwloc_internal_cpukind_s *ic1 = &topo1->cpukinds[i];
+            struct hwloc_internal_cpukind_s *ic2 = &topo2->cpukinds[i];
+            unsigned j;
+            if (!hwloc_bitmap_isequal(ic1->cpuset, ic2->cpuset)
+                || ic1->efficiency != ic2->efficiency
+                || ic1->forced_efficiency != ic2->forced_efficiency
+                || ic1->ranking_value != ic2->ranking_value
+                || ic1->nr_infos != ic2->nr_infos)
+              goto roottoocomplex;
+            for(j=0; j<ic1->nr_infos; j++) {
+              struct hwloc_info_s *info1 = &ic1->infos[j], *info2 = &ic2->infos[j];
+              if (strcmp(info1->name, info2->name)
+                  || strcmp(info1->value, info2->value)) {
+                goto roottoocomplex;
               }
             }
           }

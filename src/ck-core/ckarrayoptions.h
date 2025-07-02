@@ -76,14 +76,21 @@ class CkArrayOptions {
   CkGroupID map;       ///< Array location map object
   CkGroupID locMgr;    ///< Location manager to bind to
   CkGroupID mCastMgr;  /// <ckmulticast mgr to bind to, for sections
+  CkGroupID locCache;
   CkPupAblePtrVec<CkArrayListener> arrayListeners;  // CkArrayListeners for this array
   CkCallback reductionClient;                       // Default target of reductions
   CkCallback initCallback; // Callback to be invoked after chare array creation is complete
   bool anytimeMigration;                            // Elements are allowed to move freely
   bool disableNotifyChildInRed;  // Child elements are not notified when reduction starts
-  bool staticInsertion;          // Elements are only inserted at construction
   bool broadcastViaScheduler;    // broadcast inline or through scheduler
   bool sectionAutoDelegate;      // Create a mCastMgr and auto-delegate all sections
+
+  enum class InsertionType : char {
+    UNSET,
+    DYNAMIC,
+    STATIC
+  };
+  InsertionType insertionType;
 
   /// Set various safe defaults for all the constructors
   void init();
@@ -221,6 +228,11 @@ class CkArrayOptions {
     return *this;
   }
 
+  CkArrayOptions& setLocationCache(const CkGroupID& l) {
+    locCache = l;
+    return *this;
+  }
+
   /// Add an array listener component to this array (keeps the new'd listener)
   CkArrayOptions& addListener(CkArrayListener* listener);
 
@@ -229,6 +241,25 @@ class CkArrayOptions {
     return *this;
   }
   CkArrayOptions& setStaticInsertion(bool b);
+  bool isStaticInsertion() {
+    if (insertionType == InsertionType::STATIC) return true;
+    if (insertionType == InsertionType::DYNAMIC || numInitial.dimension == 0) return false;
+
+    bool empty = false;
+    bool shorts = numInitial.dimension > 3;
+    for (int i = 0; i < numInitial.dimension; i++) {
+      if (shorts && ((short*)numInitial.data())[i] == 0) {
+        empty = true;
+        break;
+      } else if (!shorts && numInitial.data()[i] == 0) {
+        empty = true;
+        break;
+      }
+    }
+    if (empty) return false;
+    else return true;
+  }
+
   CkArrayOptions& setBroadcastViaScheduler(bool b) {
     broadcastViaScheduler = b;
     return *this;
@@ -255,6 +286,7 @@ class CkArrayOptions {
   const CkGroupID& getMap(void) const { return map; }
   const CkGroupID& getLocationManager(void) const { return locMgr; }
   const CkGroupID& getMcastManager(void) const { return mCastMgr; }
+  const CkGroupID& getLocationCache(void) const { return locCache; }
   bool isSectionAutoDelegated(void) const { return sectionAutoDelegate; }
   const CkCallback &getInitCallback(void) const {return initCallback;}
   int getListeners(void) const { return arrayListeners.size(); }

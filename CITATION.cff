@@ -8,7 +8,7 @@ authors:
     given-names: "Laxmikant V."
     affiliation: "University of Illinois at Urbana-Champaign"
 message: "If you use this software, please cite both the software and the given book chapter."
-repository-code: "https://github.com/UIUC-PPL/charm"
+repository-code: "https://github.com/charmplusplus/charm"
 doi: "10.5281/zenodo.3370873"
 notes: |
   @misc{charm-zenodo,

@@ -29,7 +29,7 @@
 #include <sys/timeb.h>
 static char* strsignal(int sig) {
   static char outbuf[32];
-  sprintf(outbuf, "%d", sig);
+  snprintf(outbuf, sizeof(outbuf), "%d", sig);
   return outbuf;
 }
 #include <process.h>
@@ -142,7 +142,9 @@ CpvStaticDeclare(double, projTraceStart);
  * is set then a default value for MPI_POST_RECV_SIZE is used
  * if not specified by the user.
  */
-#define MPI_POST_RECV 0
+#ifndef MPI_POST_RECV
+#  define MPI_POST_RECV 0
+#endif
 
 /* Making those parameters configurable for testing them easily */
 
@@ -219,6 +221,11 @@ static void reportMsgHistogramInfo(void);
 #endif
 
 #define USE_MPI_CTRLMSG_SCHEME 0
+
+/* to use MPI_Alloc_mem inside CmiAlloc */
+#ifndef CMK_USE_MPI_ALLOC_MEM
+#define CMK_USE_MPI_ALLOC_MEM USE_MPI_CTRLMSG_SCHEME
+#endif
 
 /* Defining this macro will use MPI_Irecv instead of MPI_Recv for
  * large messages. This could save synchronization overhead caused by
@@ -1034,7 +1041,7 @@ static void PumpMsgsBlocking(void) {
 
 #if CMK_SMP_TRACE_COMMTHREAD && CMI_MPI_TRACE_MOREDETAILED
     char tmp[32];
-    sprintf(tmp, "To proc %d", CmiNodeFirst(CmiMyNode())+CMI_DEST_RANK(msg));
+    snprintf(tmp, sizeof(tmp), "To proc %d", CmiNodeFirst(CmiMyNode())+CMI_DEST_RANK(msg));
     traceUserSuppliedBracketedNote(tmp, 30, CpvAccess(projTraceStart), CmiWallTimer());
 #endif
 
@@ -1352,7 +1359,6 @@ static void registerMPITraceEvents(void) {
 }
 
 static const char *thread_level_tostring(int thread_level) {
-#if CMK_MPI_INIT_THREAD
     switch (thread_level) {
     case MPI_THREAD_SINGLE:
         return "MPI_THREAD_SINGLE";
@@ -1362,18 +1368,9 @@ static const char *thread_level_tostring(int thread_level) {
         return "MPI_THREAD_SERIALIZED";
     case MPI_THREAD_MULTIPLE :
         return "MPI_THREAD_MULTIPLE";
-    default: {
-        char *str = (char *)malloc(5); // XXX: leaked
-        sprintf(str,"%d", thread_level);
-        return str;
+    default:
+        return "unknown";
     }
-    }
-    return  "unknown";
-#else
-    char *str = (char *)malloc(5); // XXX: leaked
-    sprintf(str,"%d", thread_level);
-    return str;
-#endif
 }
 
 extern int quietMode;
@@ -1384,7 +1381,6 @@ extern int quietMode;
  */
 void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     int n,i;
-    int ver, subver;
     int provided;
     int thread_level;
     int myNID;
@@ -1404,7 +1400,6 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     *argc = CmiGetArgc(largv);     /* update it in case it is out of sync */
 
     if(!CharmLibInterOperate || userDrivenMode) {
-#if CMK_MPI_INIT_THREAD
 #if CMK_SMP
     if (Cmi_smp_mode_setting == COMM_THREAD_SEND_RECV)
         thread_level = MPI_THREAD_FUNNELED;
@@ -1415,18 +1410,24 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
 #endif
       MPI_Init_thread(argc, argv, thread_level, &provided);
       _thread_provided = provided;
-#else
-      MPI_Init(argc, argv);
-      thread_level = 0;
-      _thread_provided = -1;
-#endif
     }
 
     largc = *argc;
     largv = *argv;
+
     if(!CharmLibInterOperate || userDrivenMode) {
+#if MPI_VERSION >= 3
+      /* Create our communicator, with info hints (such as us not requiring
+       * message ordering) to enable possible MPI runtime optimizations. */
+      MPI_Info hints;
+      MPI_Info_create(&hints);
+      MPI_Info_set(hints, "mpi_assert_allow_overtaking", "true");
+      MPI_Comm_dup_with_info(MPI_COMM_WORLD, hints, &charmComm);
+#else
       MPI_Comm_dup(MPI_COMM_WORLD, &charmComm);
+#endif
     }
+
     MPI_Comm_size(charmComm, numNodes);
     MPI_Comm_rank(charmComm, myNodeID);
 
@@ -1443,11 +1444,14 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
 
     myNID = *myNodeID;
 
-    MPI_Get_version(&ver, &subver);
     if(!CharmLibInterOperate) {
       if ((myNID == 0) && (!quietMode)) {
-        printf("Charm++> Running on MPI version: %d.%d\n", ver, subver);
-        printf("Charm++> level of thread support used: %s (desired: %s)\n", thread_level_tostring(_thread_provided), thread_level_tostring(thread_level));
+        int ver, subver, libver_len;
+        char libver[MPI_MAX_LIBRARY_VERSION_STRING];
+        MPI_Get_version(&ver, &subver);
+        MPI_Get_library_version(libver, &libver_len);
+        printf("Charm++> Running on MPI library: %s (MPI standard: %d.%d)\n", libver, ver, subver);
+        printf("Charm++> Level of thread support used: %s (desired: %s)\n", thread_level_tostring(_thread_provided), thread_level_tostring(thread_level));
       }
     }
 
@@ -1537,8 +1541,9 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
       }
       static char s_restartaftercrash[] = "+restartaftercrash";
       restart_argv[i] = s_restartaftercrash;
-      phase_str = (char*)malloc(10);
-      sprintf(phase_str,"%d", CpvAccess(_curRestartPhase));
+      const int phase_str_len = 10;
+      phase_str = (char*)malloc(phase_str_len);
+      snprintf(phase_str, phase_str_len, "%d", CpvAccess(_curRestartPhase));
       restart_argv[i+1]=phase_str;
       restart_argv[i+2]=NULL;
       *argv = restart_argv;
@@ -1892,7 +1897,7 @@ void CmiTimerInit(char **argv) {
         starttimer = MPI_Wtime();
     }
 
-#if 0 && CMK_SMP && CMK_MPI_INIT_THREAD
+#if 0 && CMK_SMP
     if (CmiMyRank()==0 && _thread_provided == MPI_THREAD_SINGLE)
         timerLock = CmiCreateLock();
 #endif

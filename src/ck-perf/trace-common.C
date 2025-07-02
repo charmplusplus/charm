@@ -19,6 +19,8 @@
 #include "allEvents.h"          //projector
 #include "register.h" // for _entryTable
 
+#include "envelope.h"
+
 // To get username
 #if defined(_WIN32) || defined(_WIN64)
 #define WIN32_LEAN_AND_MEAN
@@ -68,7 +70,6 @@ CkpvDeclare(int, traceOnPe);
 CkpvDeclare(char*, traceRoot);
 CkpvDeclare(char*, partitionRoot);
 CkpvDeclare(int, traceRootBaseLength);
-CkpvDeclare(char*, selective);
 CkpvDeclare(bool, verbose);
 bool outlierAutomatic;
 bool findOutliers;
@@ -134,7 +135,7 @@ static void traceCommonInit(char **argv)
 
   char subdir[20];
   if(CmiNumPartitions() > 1) {
-    sprintf(subdir, "prj.part%d%s", CmiMyPartition(), PATHSEPSTR);
+    snprintf(subdir, sizeof(subdir), "prj.part%d%s", CmiMyPartition(), PATHSEPSTR);
   } else {
     subdir[0]='\0';
   }
@@ -174,33 +175,6 @@ static void traceCommonInit(char **argv)
     strcat(CkpvAccess(traceRoot), argv[0]);
   }
   CkpvAccess(traceRootBaseLength)  +=  strlen(subdir);
-	/* added for TAU trace module. */
-  char *cwd;
-  CkpvInitialize(char*, selective);
-  if (CmiGetArgStringDesc(argv, "+selective", &temproot, "TAU's selective instrumentation file")) {
-    // Trying to decide if the traceroot path is absolute or not. If it is not
-    // then create an absolute pathname for it.
-    if (temproot[0] != PATHSEP) {
-      cwd = GETCWD(NULL,0);
-      root = (char *)malloc(strlen(cwd)+strlen(temproot)+2);
-      strcpy(root, cwd);
-      strcat(root, PATHSEPSTR);
-      strcat(root, temproot);
-    } else {
-      root = (char *)malloc(strlen(temproot)+1);
-      strcpy(root,temproot);
-    }
-    CkpvAccess(selective) = (char *) malloc(strlen(root)+1);
-    _MEMCHECK(CkpvAccess(selective));
-    strcpy(CkpvAccess(selective), root);
-    if (CkMyPe() == 0) 
-      CmiPrintf("Trace: selective: %s\n", CkpvAccess(selective));
-  }
-  else {
-    CkpvAccess(selective) = (char *) malloc(3);
-    _MEMCHECK(CkpvAccess(selective));
-    strcpy(CkpvAccess(selective), "");
-  }
 
   outlierAutomatic = true;
   findOutliers = false;
@@ -268,7 +242,7 @@ void traceWriteSTS(FILE *stsfp,int nUserEvents) {
 #else
   fprintf(stsfp, "PROCESSORS %d\n", CkNumPes());
 #endif
-#ifdef CMK_SMP
+#if CMK_SMP
   fprintf(stsfp, "SMPMODE %d %d\n", CkMyNodeSize(), CkNumNodes());
 #endif
 
@@ -322,27 +296,27 @@ void traceWriteSTS(FILE *stsfp,int nUserEvents) {
   for(i=0;i<_chareTable.size();i++)
     fprintf(stsfp, "CHARE %d \"%s\" %d\n", (int)i, _chareTable[i]->name, _chareTable[i]->ndims);
   for(i=0;i<_entryTable.size();i++)
-    fprintf(stsfp, "ENTRY CHARE %d \"%s\" %d %d\n", (int)i, _entryTable[i]->name,
-                 (int)_entryTable[i]->chareIdx, (int)_entryTable[i]->msgIdx);
+      fprintf(stsfp, "ENTRY CHARE %d \"%s\" %d %d\n", (int)i, _entryTable[i]->name,
+              (int)_entryTable[i]->chareIdx, (int)_entryTable[i]->msgIdx);
   for(i=0;i<_msgTable.size();i++)
     fprintf(stsfp, "MESSAGE %d %u\n", (int)i, (int)_msgTable[i]->size);
 }
 
-void traceCommonBeginIdle(void *proj,double curWallTime)
+void traceCommonBeginIdle(void *proj)
 {
-  ((TraceArray *)proj)->beginIdle(curWallTime);
+  ((TraceArray *)proj)->beginIdle(CkWallTimer());
 }
  
-void traceCommonEndIdle(void *proj,double curWallTime)
+void traceCommonEndIdle(void *proj)
 {
-  ((TraceArray *)proj)->endIdle(curWallTime);
+  ((TraceArray *)proj)->endIdle(CkWallTimer());
 }
 
 void TraceArray::traceBegin() {
   if (n==0) return; // No tracing modules registered.
 #if ! CMK_TRACE_IN_CHARM
-  cancel_beginIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)traceCommonBeginIdle,this);
-  cancel_endIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,(CcdVoidFn)traceCommonEndIdle,this);
+  cancel_beginIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdCondFn)traceCommonBeginIdle,this);
+  cancel_endIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,(CcdCondFn)traceCommonEndIdle,this);
 #endif
   ALLDO(traceBegin());
 }
@@ -351,8 +325,8 @@ void TraceArray::traceBeginOnCommThread() {
 #if CMK_SMP_TRACE_COMMTHREAD
   if (n==0) return; // No tracing modules registered.
 /*#if ! CMK_TRACE_IN_CHARM	
-  cancel_beginIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)traceCommonBeginIdle,this);
-  cancel_endIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,(CcdVoidFn)traceCommonEndIdle,this);
+  cancel_beginIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdCondFn)traceCommonBeginIdle,this);
+  cancel_endIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,(CcdCondFn)traceCommonEndIdle,this);
 #endif*/
   ALLDO(traceBeginOnCommThread());
 #endif
@@ -513,10 +487,8 @@ static inline void _traceInit(char **argv)
   // check if trace is turned on/off for this pe
   CkpvAccess(traceOnPe) = checkTraceOnPe(argv);
 
-#if !CMK_CHARM4PY
   // defined in moduleInit.C
   _createTraces(argv);
-#endif
 
   // Now setup the control point tracing module if desired. It is always compiled/linked in, but is not always enabled
   // FIXME: make sure it is safe to use argv in SMP version 
@@ -853,12 +825,60 @@ void traceEnableCCS(void)
   CkpvAccess(_traces)->traceEnableCCS();  
 }
 
-/* **CW** Support for thread listeners. This makes a call to each
-   trace module which must support the call.
-*/
-void traceAddThreadListeners(CthThread tid, envelope *e) {
-  _TRACE_ONLY(CkpvAccess(_traces)->traceAddThreadListeners(tid, e));
+struct TraceThreadListener {
+  struct CthThreadListener base;
+  int event;
+  int msgType;
+  int ep;
+  int srcPe;
+  int ml;
+  CmiObjId idx;
+};
+
+static void traceThreadListener_suspend(struct CthThreadListener *l)
+{
+  /* here, we activate the appropriate trace codes for the appropriate
+     registered modules */
+  traceSuspend();
 }
+
+static void traceThreadListener_resume(struct CthThreadListener *l)
+{
+  TraceThreadListener *a=(TraceThreadListener *)l;
+  /* here, we activate the appropriate trace codes for the appropriate
+     registered modules */
+  _TRACE_BEGIN_EXECUTE_DETAILED(a->event,a->msgType,a->ep,a->srcPe,a->ml,
+				CthGetThreadID(a->base.thread), NULL);
+  a->event=-1;
+  a->srcPe=CkMyPe(); /* potential lie to migrated threads */
+  a->ml=0;
+}
+
+static void traceThreadListener_free(struct CthThreadListener *l)
+{
+  TraceThreadListener *a=(TraceThreadListener *)l;
+  delete a;
+}
+
+void traceAddThreadListeners(CthThread tid, envelope *e)
+{
+#if CMK_TRACE_ENABLED
+  /* strip essential information from the envelope */
+  TraceThreadListener *a= new TraceThreadListener;
+
+  a->base.suspend=traceThreadListener_suspend;
+  a->base.resume=traceThreadListener_resume;
+  a->base.free=traceThreadListener_free;
+  a->event=e->getEvent();
+  a->msgType=e->getMsgtype();
+  a->ep=e->getEpIdx();
+  a->srcPe=e->getSrcPe();
+  a->ml=e->getTotalsize();
+
+  CthAddListener(tid, (CthThreadListener *)a);
+#endif
+}
+
 
 #if 1
 // helper functions

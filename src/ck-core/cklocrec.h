@@ -63,7 +63,7 @@ public:
 public:
   inline LBManager *getLBMgr(void) const {return lbmgr;}
   inline MetaBalancer *getMetaBalancer(void) const {return the_metalb;}
-  inline LDObjHandle getLdHandle() const{return ldHandle;}
+  inline const LDObjHandle& getLdHandle() const{ return ldHandle; }
   static void staticMigrate(LDObjHandle h, int dest);
   static void staticMetaLBResumeWaitingChares(LDObjHandle h, int lb_ideal_period);
   static void staticMetaLBCallLBOnChares(LDObjHandle h);
@@ -79,20 +79,6 @@ public:
   inline void setMeasure(bool status) { enable_measure = status; }
 #else
   void AsyncMigrate(bool use){};
-#endif
-
-#if CMK_FAULT_EVAC
-private:
-	bool asyncEvacuate; //can the element be evacuated anytime, false for tcharm
-	bool bounced; //did this element try to immigrate into a processor which was evacuating
-											// and was bounced away to some other processor. This is assumed to happen
-											//only if this object was migrated by a load balancer, but the processor
-											// started crashing soon after
-public:	
-	bool isAsyncEvacuate(){return asyncEvacuate;}
-	void AsyncEvacuate(bool set){asyncEvacuate = set;}
-	bool isBounced(){return bounced;}
-	void Bounced(bool set){bounced = set;}
 #endif
 };
 

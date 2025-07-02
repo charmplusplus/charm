@@ -36,6 +36,9 @@ CkpvDeclare(ArrayObjMap, array_objs);
 
 #define CK_MSG_SKIP_OR_IMM    (CK_MSG_EXPEDITED | CK_MSG_IMMEDIATE)
 
+using ObjectStack = std::vector<Chare *>;
+CkpvDeclare(ObjectStack, runningObjs);
+
 VidBlock::VidBlock() { state = UNFILLED; msgQ = new PtrQ(); _MEMCHECK(msgQ); }
 
 int CMessage_CkMessage::__idx=-1;
@@ -58,13 +61,15 @@ void _initChareTables()
   CkpvAccess(currentChareIdx) = -1;
 #endif
 
+  CkpvInitialize(ObjectStack, runningObjs);
   CkpvInitialize(ArrayObjMap, array_objs);
 }
 
 //Charm++ virtual functions: declaring these here results in a smaller executable
-Chare::Chare(void) {
+Chare::Chare(void) : myRec(nullptr) {
   thishandle.onPE=CkMyPe();
   thishandle.objPtr=this;
+  this->ckInitialized=true;
 #if CMK_ERROR_CHECKING
   magic = CHARE_MAGIC;
 #endif
@@ -80,9 +85,10 @@ Chare::Chare(void) {
 #endif
 }
 
-Chare::Chare(CkMigrateMessage* m) {
+Chare::Chare(CkMigrateMessage* m) : myRec(nullptr) {
   thishandle.onPE=CkMyPe();
   thishandle.objPtr=this;
+  this->ckInitialized=false;
 #if CMK_ERROR_CHECKING
   magic = 0;
 #endif
@@ -101,6 +107,8 @@ void Chare::CkEnableObjQ()
 }
 
 Chare::~Chare() {
+  CkCallstackUnwind(this);
+
 #ifndef CMK_CHARE_USE_PTR
 /*
   if (chareIdx >= 0 && chareIdx < CpvAccess(chare_objs).size() && CpvAccess(chare_objs)[chareIdx] == this) 
@@ -135,6 +143,7 @@ void Chare::pup(PUP::er &p)
   p(chareIdx);
   if (chareIdx != -1) thishandle.objPtr=(void*)(CmiIntPtr)chareIdx;
 #endif
+  p(ckInitialized);
 #if CMK_ERROR_CHECKING
   p(magic);
 #endif
@@ -145,7 +154,7 @@ int Chare::ckGetChareType() const {
 }
 char *Chare::ckDebugChareName(void) {
   char buf[100];
-  sprintf(buf,"Chare on pe %d at %p",CkMyPe(),(void*)this);
+  snprintf(buf,sizeof(buf),"Chare on pe %d at %p",CkMyPe(),(void*)this);
   return strdup(buf);
 }
 int Chare::ckDebugChareID(char *str, int limit) {
@@ -157,10 +166,35 @@ void Chare::ckDebugPup(PUP::er &p) {
   pup(p);
 }
 
+using CkThreadListener = struct CthThreadListener;
+
+struct CkChareThreadListener: public CkThreadListener {
+  Chare *obj;
+  CkChareThreadListener(Chare *ch): obj(ch) {}
+};
+
+static void CkChareThreadListener_suspend(CkThreadListener *l) {
+  CkCallstackPop(((CkChareThreadListener *)l)->obj);
+}
+
+static void CkChareThreadListener_resume(CkThreadListener *l) {
+  CkCallstackPush(((CkChareThreadListener *)l)->obj);
+}
+
+static void CkChareThreadListener_free(CkThreadListener *l) {
+  delete (CkChareThreadListener *)l;
+}
+
 /// This method is called before starting a [threaded] entry method.
 void Chare::CkAddThreadListeners(CthThread th, void *msg) {
   CthSetThreadID(th, thishandle.onPE, (int)(((char *)thishandle.objPtr)-(char *)0), 0);
   traceAddThreadListeners(th, UsrToEnv(msg));
+
+  auto *l = new CkChareThreadListener(this);
+  l->suspend = CkChareThreadListener_suspend;
+  l->resume = CkChareThreadListener_resume;
+  l->free = CkChareThreadListener_free;
+  CthAddListener(th, l);
 }
 
 void CkMessage::ckDebugPup(PUP::er &p,void *msg) {
@@ -363,9 +397,8 @@ void CProxy::pup(PUP::er &p) {
 
       // create a dummy object for calling DelegatePointerPup
       int objId = _entryTable[migCtor]->chareIdx; 
-      size_t objSize = _chareTable[objId]->size;
-      void *obj = malloc(objSize); 
-      _entryTable[migCtor]->call(NULL, obj); 
+      auto *obj = CkAllocateChare(objId); 
+      CkInvokeEP(obj, migCtor, NULL);
       delegatedPtr = static_cast<CkDelegateMgr *> (obj)
         ->DelegatePointerPup(p, delegatedPtr);           
       free(obj);
@@ -592,7 +625,8 @@ static inline void _processBocBcastMsg(CkCoreState* ck, envelope* env);
 static
 void *_ckLocalNodeBranch(CkGroupID groupID) {
   CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
-  void *retval = CksvAccess(_nodeGroupTable)->find(groupID).getObj();
+  auto &entry = CksvAccess(_nodeGroupTable)->find(groupID);
+  void *retval = entry.isReady() ? entry.getObj() : nullptr;
   CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
   return retval;
 }
@@ -644,6 +678,84 @@ int CkGetArgc(void) {
 	return CmiGetArgc(CkpvAccess(Ck_argv));
 }
 
+Chare *CkActiveObj(void) {
+  auto &objs = *(&CkpvAccess(runningObjs));
+  if (objs.empty()) {
+    return nullptr;
+  } else {
+    return objs.back();
+  }
+}
+
+inline void _pushObj(Chare *obj) {
+  CkpvAccess(runningObjs).emplace_back(obj);
+}
+
+inline Chare *_popObj(void) {
+  auto &objs = *(&CkpvAccess(runningObjs));
+  if (objs.empty()) {
+    return nullptr;
+  } else {
+    auto *obj = objs.back();
+    objs.pop_back();
+    return obj;
+  }
+}
+
+inline void _ckStartTiming(void) {
+#if CMK_LBDB_ON
+  auto *active = CkActiveLocRec();
+  if (active) active->startTiming();
+#endif
+}
+
+inline void _ckStopTiming(void) {
+#if CMK_LBDB_ON
+  auto *active = CkActiveLocRec();
+  if (active) active->stopTiming();
+#endif
+}
+
+// puts ( obj ) on the stack (and manages timing)
+void CkCallstackPush(Chare *obj) {
+  _ckStopTiming();    // suspend timing of the previous obj
+  _pushObj(obj);      // push the current object onto the stack
+  _ckStartTiming();   // start timing the current obj
+}
+
+// removes all instances of ( obj ) from the stack
+void CkCallstackUnwind(Chare *obj) {
+  CkAssertMsg(obj != nullptr, "expected a valid object!");
+  auto &objs = *(&CkpvAccess(runningObjs));
+  auto start = std::begin(objs);
+  auto end = std::end(objs);
+  // ensures that all copies of the object are null'd
+  while (end != (start = std::find(start, end, obj))) {
+    *start = nullptr;
+    start += 1;                 // avoids redundant checks!
+  }
+  obj->ckInitialized = false;   // proactively prevents failures
+}
+
+// pops ( obj ) from the stack (and manages timing)
+void CkCallstackPop(Chare *obj) {
+  _ckStopTiming();        // stop timing the current obj
+  auto *popd = _popObj(); // pop it from the stack
+  CkAssertMsg(!popd || popd == obj, "object tracking mismatch");
+  _ckStartTiming();       // resume timing of the previous obj
+}
+
+#if CMK_LBDB_ON
+CkLocRec *CkActiveLocRec(void) {
+  auto *obj = CkActiveObj();
+  if (obj && obj->ckInitialized) {
+    return obj->getCkLocRec();
+  } else {
+    return nullptr;
+  }
+}
+#endif
+
 /******************** Basic support *****************/
 void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
 {
@@ -651,7 +763,7 @@ void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
   CpdBeforeEp(epIdx, obj, msg);
 #endif    
   const auto msgtype = (msg == NULL) ? LAST_CK_ENVELOPE_TYPE : UsrToEnv(msg)->getMsgtype();
-  _entryTable[epIdx]->call(msg, obj);
+  CkInvokeEP((Chare*)obj, epIdx, msg);
 #if CMK_CHARMDEBUG
   CpdAfterEp(epIdx);
 #endif
@@ -685,7 +797,7 @@ void CkDeliverMessageReadonly(int epIdx,const void *msg,void *obj)
 #if CMK_CHARMDEBUG
   CpdBeforeEp(epIdx, obj, (void*)msg);
 #endif
-  _entryTable[epIdx]->call(deliverMsg, obj);
+  CkInvokeEP((Chare*)obj, epIdx, deliverMsg);
 #if CMK_CHARMDEBUG
   CpdAfterEp(epIdx);
 #endif
@@ -761,24 +873,37 @@ void CkCreateChare(int cIdx, int eIdx, void *msg, CkChareID *pCid, int destPE)
   _TRACE_CREATION_DONE(1);
 }
 
+inline void CkReadyEntry(TableEntry &entry, bool nodeLevel) {
+  // the ready flag is set first to expedite the unblocking of
+  // node-level peers (that depend on the current [node]group)
+  entry.setReady();
+
+  auto *ptrq = entry.getPending();
+  if (ptrq) {
+    void *pending = nullptr;
+    while (nullptr != (pending = ptrq->deq())) {
+      if (nodeLevel) {
+        _CldNodeEnqueue(CkMyNode(), pending, _infoIdx);
+      } else {
+        CsdEnqueueGeneral(pending, CQS_QUEUEING_FIFO, 0, 0);
+      }
+    }
+    entry.clearPending();
+  }
+}
+
 void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
 {
   int gIdx = _entryTable[epIdx]->chareIdx;
-  void *obj = malloc(_chareTable[gIdx]->size);
-  _MEMCHECK(obj);
-  setMemoryTypeChare(obj);
+  auto *obj = CkAllocateChare(gIdx);
+
+  // this enables groups to access themselves via
+  // ckLocalBranch during their construction (nodegroups
+  // use _currentNodeGroupObj to achieve this)
   CmiImmediateLock(CkpvAccess(_groupTableImmLock));
   CkpvAccess(_groupTable)->find(groupID).setObj(obj);
   CkpvAccess(_groupTable)->find(groupID).setcIdx(gIdx);
   CkpvAccess(_groupIDTable)->push_back(groupID);
-  PtrQ *ptrq = CkpvAccess(_groupTable)->find(groupID).getPending();
-  if(ptrq) {
-    void *pending;
-    while((pending=ptrq->deq())!=0) {
-      CsdEnqueueGeneral(pending, CQS_QUEUEING_FIFO, 0, 0);
-    }
-    CkpvAccess(_groupTable)->find(groupID).clearPending();
-  }
   CmiImmediateUnlock(CkpvAccess(_groupTableImmLock));
 
   CkpvAccess(_currentGroup) = groupID;
@@ -795,16 +920,19 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
   CkpvAccess(currentChareIdx) = callingChareIdx;
 #endif
 
+  // this enables other PEs to access this object via
+  // ckLocalBranchOther, and schedules pending dependencies
+  CmiImmediateLock(CkpvAccess(_groupTableImmLock));
+  CkReadyEntry(CkpvAccess(_groupTable)->find(groupID), false);
+  CmiImmediateUnlock(CkpvAccess(_groupTableImmLock));
+
   _STATS_RECORD_PROCESS_GROUP_1();
 }
 
 void CkCreateLocalNodeGroup(CkGroupID groupID, int epIdx, envelope *env)
 {
   int gIdx = _entryTable[epIdx]->chareIdx;
-  size_t objSize=_chareTable[gIdx]->size;
-  void *obj = malloc(objSize);
-  _MEMCHECK(obj);
-  setMemoryTypeChare(obj);
+  auto *obj = CkAllocateChare(gIdx);
   CkpvAccess(_currentGroup) = groupID;
 
 // Now that the NodeGroup is created, add it to the table.
@@ -827,22 +955,19 @@ void CkCreateLocalNodeGroup(CkGroupID groupID, int epIdx, envelope *env)
 #endif
 
   CkpvAccess(_currentNodeGroupObj) = NULL;
-  _STATS_RECORD_PROCESS_NODE_GROUP_1();
 
+  // nodegroups use `_currentNodeGroupObj` so they do not
+  // need a table entry for objects to access themselves
+  // during creation. therefore, everything can be
+  // consolidated into one critical section
   CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
   CksvAccess(_nodeGroupTable)->find(groupID).setObj(obj);
   CksvAccess(_nodeGroupTable)->find(groupID).setcIdx(gIdx);
   CksvAccess(_nodeGroupIDTable).push_back(groupID);
-
-  PtrQ *ptrq = CksvAccess(_nodeGroupTable)->find(groupID).getPending();
-  if(ptrq) {
-    void *pending;
-    while((pending=ptrq->deq())!=0) {
-      _CldNodeEnqueue(CkMyNode(), pending, _infoIdx);
-    }
-    CksvAccess(_nodeGroupTable)->find(groupID).clearPending();
-  }
+  CkReadyEntry(CksvAccess(_nodeGroupTable)->find(groupID), true);
   CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
+
+  _STATS_RECORD_PROCESS_NODE_GROUP_1();
 }
 
 void _createGroup(CkGroupID groupID, envelope *env)
@@ -850,7 +975,6 @@ void _createGroup(CkGroupID groupID, envelope *env)
   _CHECK_USED(env);
   _SET_USED(env, 1);
   int epIdx = env->getEpIdx();
-  int gIdx = _entryTable[epIdx]->chareIdx;
   env->setGroupNum(groupID);
   env->setSrcPe(CkMyPe());
   env->setGroupEpoch(CkpvAccess(_charmEpoch));
@@ -963,17 +1087,24 @@ CkGroupID CkCreateNodeGroup(int cIdx, int eIdx, void *msg)
   return gid;
 }
 
+Chare *CkAllocateChare(int objId) {
+  auto objSize = _chareTable[objId]->size;
+  auto *obj = (Chare*)malloc(objSize);
+  _MEMCHECK(obj);
+  setMemoryTypeChare(obj);
+  obj->ckInitialized = false;
+  return obj;
+}
+
 static inline void *_allocNewChare(envelope *env, int &idx)
 {
   int chareIdx = _entryTable[env->getEpIdx()]->chareIdx;
-  void *tmp=malloc(_chareTable[chareIdx]->size);
-  _MEMCHECK(tmp);
+  auto *tmp = CkAllocateChare(chareIdx);
 #ifndef CMK_CHARE_USE_PTR
   CkpvAccess(chare_objs).push_back(tmp);
   CkpvAccess(chare_types).push_back(chareIdx);
   idx = CkpvAccess(chare_objs).size()-1;
 #endif
-  setMemoryTypeChare(tmp);
   return tmp;
 }
 
@@ -999,7 +1130,7 @@ static void _processNewChareMsg(CkCoreState *ck,envelope *env)
   if(ck)
     ck->process(); // ck->process() updates mProcessed count used in QD
   int idx;
-  void *obj = _allocNewChare(env, idx);
+  auto *obj = _allocNewChare(env, idx);
 #ifndef CMK_CHARE_USE_PTR
   CkpvAccess(currentChareIdx) = idx;
 #endif
@@ -1020,7 +1151,7 @@ static void _processNewVChareMsg(CkCoreState *ck,envelope *env)
     return;
   ck->process(); // ck->process() updates mProcessed count used in QD
   int idx;
-  void *obj = _allocNewChare(env, idx);
+  auto *obj = _allocNewChare(env, idx);
   CkChareID *pCid = (CkChareID *)
       _allocMsg(FillVidMsg, sizeof(CkChareID));
   pCid->onPE = CkMyPe();
@@ -1148,32 +1279,8 @@ IrrGroup *lookupGroupAndBufferIfNotThere(CkCoreState *ck,envelope *env,const CkG
 
 static inline void _deliverForBocMsg(CkCoreState *ck,int epIdx,envelope *env,IrrGroup *obj)
 {
-#if CMK_LBDB_ON
-  // if there is a running obj being measured, stop it temporarily
-  LDObjHandle objHandle;
-  int objstopped = 0;
-  LBManager *the_lbmgr = (LBManager *)CkLocalBranch(_lbmgr);
-  if (the_lbmgr->RunningObject(&objHandle)) {
-    objstopped = 1;
-    the_lbmgr->ObjectStop(objHandle);
-  }
-#endif
-
-#if CMK_SMP
-  unsigned short int msgType = CMI_ZC_MSGTYPE(env); // store msgType as msg could be freed
-#endif
-
   _invokeEntry(epIdx,env,obj);
 
-#if CMK_SMP
-  if(msgType == CMK_ZC_BCAST_RECV_DONE_MSG) {
-    updatePeerCounterAndPush(env);
-  }
-#endif
-
-#if CMK_LBDB_ON
-  if (objstopped) the_lbmgr->ObjectStart(objHandle);
-#endif
   _STATS_RECORD_PROCESS_BRANCH_1();
 }
 
@@ -1181,7 +1288,6 @@ static inline void _processForBocMsg(CkCoreState *ck,envelope *env)
 {
   if(isGroupDepUnsatisfied(ck, env))
     return;
-  CkGroupID groupID =  env->getGroupNum();
   IrrGroup *obj = _lookupGroupAndBufferIfNotThere(ck,env,env->getGroupNum());
   if(obj) {
     ck->process(); // ck->process() updates mProcessed count used in QD
@@ -1272,7 +1378,6 @@ static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
     // First see if we already have a direct pointer to the object
     _SET_USED(env, 0);
     ck->process(); // ck->process() updates mProcessed count used in QD
-    int opts = 0;
     if (msg->array_hops()>1) {
       CProxy_ArrayBase(env->getArrayMgr()).ckLocMgr()->multiHop(msg);
     }
@@ -1496,7 +1601,6 @@ void _skipCldHandler(void *converseMsg)
 #endif
 }
 
-
 //static void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 // Made non-static to be used by ckmessagelogging
 void _skipCldEnqueue(int pe,envelope *env, int infoFn)
@@ -1513,14 +1617,6 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
     CkRdmaPrepareZCMsg(env, CkNodeOf(pe));
   }
 
-#if CMK_FAULT_EVAC
-  if (pe == CkMyPe()) {
-    if (!CmiNodeAlive(CkMyPe())) {
-      printf("[%d] Invalid processor sending itself a message \n",CkMyPe());
-      //return;
-    }
-  }
-#endif
   if (pe == CkMyPe() && !CmiImmIsRunning()) {
 #if CMK_OBJECT_QUEUE_AVAILABLE
     Chare *obj = CkFindObjectPtr(env);
@@ -1554,6 +1650,9 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
     } else if (pe==CLD_BROADCAST_ALL) {
       CmiSyncNodeBroadcastAllAndFree(len, (char *)env);
     } else {
+#if CMK_USE_SHMEM
+      if (!_tryIpcSend<false, false>(pe, env, infoFn))
+#endif
       CmiSyncSendAndFree(pe, len, (char *)env);
     }
   }
@@ -1596,7 +1695,11 @@ static void _noCldEnqueue(int pe, envelope *env)
   int len=env->getTotalsize();
   if (pe==CLD_BROADCAST) { CmiSyncNodeBroadcastAndFree(len, (char *)env); }
   else if (pe==CLD_BROADCAST_ALL) { CmiSyncNodeBroadcastAllAndFree(len, (char *)env); }
-  else CmiSyncSendAndFree(pe, len, (char *)env);
+  else 
+#if CMK_USE_SHMEM
+    if (!_tryIpcSend<false, false>(pe, env, 0x0))
+#endif
+  CmiSyncSendAndFree(pe, len, (char *)env);
 }
 
 //static void _noCldNodeEnqueue(int node, envelope *env)
@@ -1629,6 +1732,9 @@ void _noCldNodeEnqueue(int node, envelope *env)
 
 }
   else {
+#if CMK_USE_SHMEM
+    if (!_tryIpcSend<true, false>(node, env, 0x0))
+#endif
 	CmiSyncNodeSendAndFree(node, len, (char *)env);
   }
 }
@@ -1739,11 +1845,6 @@ void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid, int opts)
 {
   if (pCid->onPE==CkMyPe())
   {
-#if CMK_FAULT_EVAC
-    if(!CmiNodeAlive(CkMyPe())){
-	return;
-    }
-#endif
 #if CMK_CHARMDEBUG
     //Just in case we need to breakpoint or use the envelope in some way
     _prepareMsg(entryIndex,msg,pCid);
@@ -1810,7 +1911,7 @@ static inline envelope *_prepareImmediateMsgBranch(int eIdx,void *msg,CkGroupID 
 static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
                   int pe=CLD_BROADCAST_ALL, int opts = 0)
 {
-  int numPes;
+  int numPes = 1;
   envelope *env;
     if (opts & CK_MSG_IMMEDIATE) {
         env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForBocMsg);
@@ -1876,7 +1977,7 @@ void CkSendMsgBranchImmediate(int eIdx, void *msg, int destPE, CkGroupID gID)
   }
   //Can't inline-- send the usual way
   envelope *env = UsrToEnv(msg);
-  int numPes;
+  int numPes = 1;
   _TRACE_ONLY(numPes = (destPE==CLD_BROADCAST_ALL?CkNumPes():1));
   env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForBocMsg);
   _TRACE_CREATION_N(env, numPes);
@@ -1894,11 +1995,6 @@ void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID, int o
 {
   if (destPE==CkMyPe())
   {
-#if CMK_FAULT_EVAC
-    if(!CmiNodeAlive(CkMyPe())){
-	return;
-    }
-#endif
     IrrGroup *obj=(IrrGroup *)_localBranch(gID);
     if (obj!=NULL)
     { //Just directly call the group:
@@ -2036,7 +2132,7 @@ void CkSendMsgNodeBranchImmediate(int eIdx, void *msg, int node, CkGroupID gID)
   }
   //Can't inline-- send the usual way
   envelope *env = UsrToEnv(msg);
-  int numPes;
+  int numPes = 1;
   _TRACE_ONLY(numPes = (node==CLD_BROADCAST_ALL?CkNumNodes():1));
   env = _prepareImmediateMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
   _TRACE_CREATION_N(env, numPes);
@@ -2166,10 +2262,8 @@ void CkArrayManagerDeliver(int pe,void *msg, int opts) {
 }
 
 class ElementDestroyer : public CkLocIterator {
-private:
-        CkLocMgr *locMgr;
 public:
-        ElementDestroyer(CkLocMgr* mgr_):locMgr(mgr_){};
+        ElementDestroyer(CkLocMgr* mgr_){}
         void addLocation(CkLocation &loc) {
 	  loc.destroyAll();
         }
@@ -2799,6 +2893,36 @@ int CkDeviceBufferSizeInBytes()
 
 #endif // CMK_CHARM4PY
 
+void CkHapiAddCallback(long stream, void (*cb)(void*, void*), int fid) 
+{
+  #if CMK_CUDA
+  cudaStream_t stream_ptr = (cudaStream_t)stream;
+  CkCallback callback(cb, (void *) fid);
+  
+  hapiAddCallback(stream_ptr, callback, NULL);
+  #else
+  // function must be defined regardless for cython compilation
+  CkAbort("CkHapiAddCallback> Charm++ was not built with CUDA support");
+  #endif
+}
+
+int CkTraceRegisterUserEvent(char *EventDesc, int eventNum)
+{
+  return traceRegisterUserEvent(EventDesc, eventNum);
+}
+
+void CkTraceBeginUserBracketEvent(int eventID)
+{
+  traceBeginUserBracketEvent(eventID);
+}
+
+void CkTraceEndUserBracketEvent(int eventID)
+{
+  traceEndUserBracketEvent(eventID);
+}
+
+#endif // CMK_CHARM4PY
+
 //------------------- Message Watcher (record/replay) ----------------
 
 #include "crc32.h"
@@ -2871,14 +2995,14 @@ private:
         crc1 = checksum_initial(((unsigned char*)env)+CmiMsgHeaderSizeBytes, sizeof(*env)-CmiMsgHeaderSizeBytes);
         crc2 = checksum_initial(((unsigned char*)env)+sizeof(*env), env->getTotalsize()-sizeof(*env));
       }
-      curpos+=sprintf(&buffer[curpos],"%d %d %d %d %x %x %d\n",env->getSrcPe(),env->getTotalsize(),env->getEvent(), env->getMsgtype()==NodeBocInitMsg || env->getMsgtype()==ForNodeBocMsg, crc1, crc2, env->getEpIdx());
+      curpos+=snprintf(&buffer[curpos],buffer.size() - curpos,"%d %d %d %d %x %x %d\n",env->getSrcPe(),env->getTotalsize(),env->getEvent(), env->getMsgtype()==NodeBocInitMsg || env->getMsgtype()==ForNodeBocMsg, crc1, crc2, env->getEpIdx());
       if (curpos > _recplay_logsize-128) flushLog();
       if (!wasPacked) CkUnpackMessage(envptr);
     }
     return true;
   }
   virtual bool process(CthThreadToken *token,CkCoreState *ck) {
-    curpos+=sprintf(&buffer[curpos], "%d %d %d\n",CkMyPe(), -2, token->serialNo);
+    curpos+=snprintf(&buffer[curpos], buffer.size() - curpos, "%d %d %d\n",CkMyPe(), -2, token->serialNo);
     if (curpos > _recplay_logsize-128) flushLog();
     return true;
   }
@@ -2922,8 +3046,8 @@ private:
   }
 };
 
-void CkMessageReplayQuiescence(void *rep, double time);
-void CkMessageDetailReplayDone(void *rep, double time);
+void CkMessageReplayQuiescence(void *rep);
+void CkMessageDetailReplayDone(void *rep);
 
 class CkMessageReplay : public CkMessageWatcher {
   int counter;
@@ -3050,7 +3174,7 @@ public:
 	  getNext();
 	  REPLAYDEBUG("Constructing ckMessageReplay: "<< nextPE <<" "<< nextSize <<" "<<nextEvent);
 #if CMI_QD
-	  if (CkMyPe()==0) CmiStartQD(CkMessageReplayQuiescence, this);
+	  if (CkMyPe()==0) CmiStartQD((CcdCondFn)CkMessageReplayQuiescence, this);
 #endif
 	}
 	~CkMessageReplay() {fclose(f);}
@@ -3149,7 +3273,7 @@ public:
 
     CsdEnqueue(getNext());
 
-    CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE, (CcdVoidFn)CkMessageDetailReplayDone, (void*)this);
+    CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE, (CcdCondFn)CkMessageDetailReplayDone, (void*)this);
   }
   virtual bool process(envelope **env,CkCoreState *ck) {
     void *msg = getNext();
@@ -3158,13 +3282,13 @@ public:
   }
 };
 
-void CkMessageReplayQuiescence(void *rep, double time) {
+void CkMessageReplayQuiescence(void *rep) {
   CkPrintf("[%d] Quiescence detected\n",CkMyPe());
   CkMessageReplay *replay = (CkMessageReplay*)rep;
-  //CmiStartQD(CkMessageReplayQuiescence, replay);
+  //CmiStartQD((CcdCondFn)CkMessageReplayQuiescence, replay);
 }
 
-void CkMessageDetailReplayDone(void *rep, double time) {
+void CkMessageDetailReplayDone(void *rep) {
   CkMessageDetailReplay *replay = (CkMessageDetailReplay *)rep;
   CkPrintf("[%d] Detailed replay finished after %f seconds. Exiting.\n",CkMyPe(),CkWallTimer()-replay->starttime);
   ConverseExit();

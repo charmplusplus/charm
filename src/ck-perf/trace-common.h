@@ -23,6 +23,7 @@
 #endif
 
 
+#define  INVALID            0
 #define  CREATION           1
 #define  BEGIN_PROCESSING   2
 #define  END_PROCESSING     3
@@ -77,7 +78,6 @@ CkpvExtern(CmiInt8, CtrLogBufSize);
 CkpvExtern(char*, traceRoot);
 CkpvExtern(char*, partitionRoot);
 CkpvExtern(int, traceRootBaseLength);
-CkpvExtern(char*, selective);
 CkpvExtern(bool, verbose);
 CkpvExtern(double, traceInitTime);
 CkpvExtern(double, traceInitCpuTime);

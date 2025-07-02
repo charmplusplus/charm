@@ -294,7 +294,7 @@ void chunk::out_print()
   int i;
 
   memset(filename, 0, 30);
-  sprintf(filename, "mesh.out");
+  snprintf(filename, sizeof(filename), "mesh.out");
   fp = fopen(filename, "a");
 
   if (cid == 0)
@@ -434,7 +434,7 @@ void chunk::debug_print(int c)
   int i;
 
   memset(filename, 0, 30);
-  sprintf(filename, "dbg_msh%d.%d", cid, c);
+  snprintf(filename, sizeof(filename), "dbg_msh%d.%d", cid, c);
   fp = fopen(filename, "w");
 
 

@@ -44,7 +44,7 @@ void WhenConstruct::propagateState(list<EncapState*> encap, list<CStateVar*>& pl
         if (pl->getGivenName() ==
             NULL) {  // if the parameter doesn't have a name, generate a dummy name
           char s[128];
-          sprintf(s, "gen_name%d", cntr);
+          snprintf(s, sizeof(s), "gen_name%d", cntr);
           pl->setGivenName(s);
           cntr++;
           dummy_var = true;
@@ -151,7 +151,7 @@ void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
   // the when method with the reference numbers determined based on the
   // current state
   if (numRefs > 0) {
-    sprintf(nameStr, "%s%s", CParsedFile::className->charstar(), label->charstar());
+    snprintf(nameStr, sizeof(nameStr), "%s%s", CParsedFile::className->charstar(), label->charstar());
     generateClosureSignature(decls, defs, entry, false, "SDAG::Continuation*", label,
                              false, encapState);
 
@@ -200,7 +200,7 @@ void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry) {
     endMethod(defs);
   }
 
-  sprintf(nameStr, "%s%s", CParsedFile::className->charstar(), label->charstar());
+  snprintf(nameStr, sizeof(nameStr), "%s%s", CParsedFile::className->charstar(), label->charstar());
   generateClosureSignature(decls, defs, entry, false, "SDAG::Continuation*", label, false,
                            encapState, numRefs);
 

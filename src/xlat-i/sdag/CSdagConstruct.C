@@ -80,9 +80,9 @@ void SdagConstruct::numberNodes(void) {
 XStr* SdagConstruct::createLabel(const char* str, int nodeNum) {
   char text[128];
   if (nodeNum != -1)
-    sprintf(text, "_%s_%d", str, nodeNum);
+    snprintf(text, sizeof(text), "_%s_%d", str, nodeNum);
   else
-    sprintf(text, "%s", str);
+    snprintf(text, sizeof(text), "%s", str);
 
   return new XStr(text);
 }
@@ -579,11 +579,16 @@ void SdagConstruct::generateTrace() {
 void SdagConstruct::generateTraceBeginCall(XStr& op, int indent) {
   if (traceName) {
     indentBy(op, indent);
+    if (entry->getContainer()->isArray())
+    {
+      op << "CmiObjId projID = this->ckGetArrayIndex().getProjectionID();\n";
+      indentBy(op, indent);
+    }
     op << "_TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, ("
        << "_sdag_idx_" << traceName << "()), CkMyPe(), 0, ";
 
     if (entry->getContainer()->isArray())
-      op << "this->ckGetArrayIndex().getProjectionID()";
+      op << "&projID";
     else
       op << "NULL";
 
@@ -593,10 +598,15 @@ void SdagConstruct::generateTraceBeginCall(XStr& op, int indent) {
 
 void SdagConstruct::generateDummyBeginExecute(XStr& op, int indent, Entry* entry) {
   indentBy(op, indent);
+  if (entry->getContainer()->isArray())
+  {
+    op << "CmiObjId projID = this->ckGetArrayIndex().getProjectionID();\n";
+    indentBy(op, indent);
+  }
   op << "_TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, _sdagEP, CkMyPe(), 0, ";
 
   if (entry->getContainer()->isArray())
-    op << "this->ckGetArrayIndex().getProjectionID()";
+    op << "&projID";
   else
     op << "NULL";
 
@@ -631,7 +641,6 @@ void SdagConstruct::generateTlineEndCall(XStr& op) {
 void SdagConstruct::generateEndSeq(XStr& op) {
   op << "    void* _bgParentLog = NULL;\n";
   op << "    CkElapse(0.01e-6);\n";
-  // op<<  "    BgElapse(1e-6);\n";
   generateTlineEndCall(op);
   generateTraceEndCall(op, 1);
   generateEndExec(op);

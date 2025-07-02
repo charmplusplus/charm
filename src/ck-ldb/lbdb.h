@@ -18,6 +18,9 @@
 #endif
 #include <inttypes.h>
 #include <list>
+#include <vector>
+
+#include "pup_stl.h"
 
 class LBManager;//Forward declaration
 
@@ -62,6 +65,10 @@ struct LDOMHandle {
   LDOMid id;
   int handle;		// index to LBOM
   inline void pup(PUP::er &p);
+
+  bool operator==(const LDOMHandle &obj) const {
+    return (this->handle == obj.handle && this->id == obj.id);
+  }
 };
 
 /* LDObjKey uniquely identify one object */
@@ -95,6 +102,13 @@ struct LDObjHandle {
   inline const LDOMid &omID() const { return omhandle.id; }
   inline const CmiUInt8 &objID() const { return id; }
   inline void pup(PUP::er &p);
+  
+  inline bool operator==(const LDObjHandle &obj) const {
+    return (this == &obj) || ((this->id == obj.id) &&
+      (this->handle == obj.handle) &&
+      (this->omhandle == obj.omhandle)
+    );
+  }
 };
 
 /* defines user data layout  */
@@ -115,34 +129,29 @@ public:
 CkpvExtern(LBUserDataLayout, lbobjdatalayout);
 
 class LBObjUserData {
-  char *data;
+  std::vector<char> data;
 public:
-  LBObjUserData() : data(NULL) {}
-
+  LBObjUserData() {
+    data.resize(CkpvAccess(lbobjdatalayout).size());
+  }
   LBObjUserData(const LBObjUserData &d) {
-    if (d.data != NULL) {
-      init();
-      memcpy(data, d.data, CkpvAccess(lbobjdatalayout).size());
-    } else {
-      data = NULL;
-    }
+    this->data = d.data;
+  }
+  LBObjUserData(LBObjUserData &&d) {
+    this->data = std::move(d.data);
   }
 
-  ~LBObjUserData() { delete [] data; }
+  ~LBObjUserData() { }
   LBObjUserData &operator = (const LBObjUserData &d) {
-    if (d.data != NULL) {
-      if (data==NULL) init();
-      memcpy(data, d.data, CkpvAccess(lbobjdatalayout).size());
-    } else if (data != NULL) {
-      delete [] data;
-      data = NULL;
-    }
+    this->data = d.data;
+    return *this;
+  }
+  LBObjUserData &operator = (LBObjUserData &&d) {
+    this->data = std::move(d.data);
     return *this;
   }
   inline void pup(PUP::er &p);
-  void *getData(int idx) { if (data==NULL) init(); return (void*)(data+idx); }
-private:
-  inline void init() { data = new char[CkpvAccess(lbobjdatalayout).size()]; }
+  void *getData(int idx) { return data.data()+idx; }
 };
 
 struct LDObjData {
@@ -318,16 +327,7 @@ inline void LDObjHandle::pup(PUP::er &p) {
 }
 
 inline void LBObjUserData::pup(PUP::er &p) {
-  int hasData;
-  if (!p.isUnpacking()) hasData = data != NULL;
-  p|hasData;
-  if (p.isUnpacking()) {
-    if (hasData)
-      data = new char[CkpvAccess(lbobjdatalayout).size()];
-    else
-      data = NULL;
-  }
-  if (data) p(data, CkpvAccess(lbobjdatalayout).size());
+  p|data;
 }
 
 inline void LDObjData::pup(PUP::er &p) {

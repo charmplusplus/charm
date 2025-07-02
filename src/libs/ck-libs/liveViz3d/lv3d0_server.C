@@ -191,7 +191,7 @@ int LV3D0_toMaster_bytesPer=100*1024;
 /// Communication parameter: maximum number of bytes to store in bucket.
 int LV3D0_toMaster_bytesMax=2*LV3D0_toMaster_bytesPer;
 
-static void toMaster_fillBucket(void *ptr,double timer);
+static void toMaster_fillBucket(void *ptr);
 
 static stats::op_t op_master_count=stats::count_op("master.count","Number of final master impostors","count");
 static stats::op_t op_master_bytes=stats::count_op("master.bytes","Number of final master bytes","bytes");
@@ -246,7 +246,7 @@ public:
 	}
 };
 /// Called every 10ms via CcdPERIODIC_10ms.
-static void toMaster_fillBucket(void *ptr,double timer) {
+static void toMaster_fillBucket(void *ptr) {
 	LV3D0_ClientManager_toMaster *p=(LV3D0_ClientManager_toMaster *)ptr;
 	p->fillBucket();
 }
@@ -438,7 +438,7 @@ static void LV3D_save_init(void) {
 	}
 	
 	char fName[1024];
-	sprintf(fName,LV3D_copy_view_src,CkMyPe());
+	snprintf(fName,sizeof(fName),LV3D_copy_view_src,CkMyPe());
 	FILE *f=fopen(fName,"wb");
 	if (f==NULL) CmiAbort("Couldn't create save view file!\n");
 	CkpvAccess(LV3D_save_views)=f;
@@ -486,9 +486,9 @@ static void LV3D_save_finish(void) {
 	CkpvAccess(LV3D_save_views)=0;
 	if (LV3D_copy_view_dest) { /* Copy view file to dest directory */
 		char fSrc[1024], fDest[1024], cmd[2048];
-		sprintf(fSrc,LV3D_copy_view_src,CkMyPe());
-		sprintf(fDest,LV3D_copy_view_dest,CkMyPe());
-		sprintf(cmd,"cp '%s' '%s' && rm '%s'", fSrc,fDest, fSrc);
+		snprintf(fSrc,sizeof(fSrc),LV3D_copy_view_src,CkMyPe());
+		snprintf(fDest,sizeof(fDest),LV3D_copy_view_dest,CkMyPe());
+		snprintf(cmd,sizeof(cmd),"cp '%s' '%s' && rm '%s'", fSrc,fDest, fSrc);
 		CkPrintf("Copying views file from %s to %s\n",fSrc,fDest);
 		system(cmd);
 		CkPrintf("Views file copied.\n");
@@ -531,7 +531,7 @@ static void printStats(void *rednMsg) {
 	//  of this horrible "print to a file and read it back" business.
 	
 	char tmpFileName[100];
-	sprintf(tmpFileName,"/tmp/stats.%d.%d",CkMyPe(),(int)getpid());
+	snprintf(tmpFileName,sizeof(tmpFileName),"/tmp/stats.%d.%d",CkMyPe(),(int)getpid());
 	FILE *f=fopen(tmpFileName,"w");
 	int len=0; void *buf=0;
 	if (f!=NULL) {
@@ -577,7 +577,7 @@ public:
 		CcdCallOnConditionKeep(CcdPROCESSOR_END_IDLE,perfmanager_stats_idle,0);
 		
 		/* Don't let the load balancer move stuff onto node 0: */
-		char *bitmap=new char[CkNumPes()];
+		std::vector<char> bitmap(CkNumPes());
 		for (int i=0;i<CkNumPes();i++)
 			bitmap[i]=(i!=masterProcessor);
 		set_avail_vector(bitmap);

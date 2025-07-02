@@ -25,41 +25,14 @@
 extern "C" double CmiWallTimer();
 #endif
 
-#ifdef HAPI_TRACE
-#define QUEUE_SIZE_INIT 128
-extern "C" int traceRegisterUserEvent(const char* x, int e);
-extern "C" void traceUserBracketEvent(int e, double beginT, double endT);
-
-typedef struct gpuEventTimer {
-  int stage;
-  double cmi_start_time;
-  double cmi_end_time;
-  int event_type;
-  const char* trace_name;
-} gpuEventTimer;
-#endif
-
 static void createPool(int *nbuffers, int n_slots, std::vector<BufferPool> &pools);
 static void releasePool(std::vector<BufferPool> &pools);
-
-// Event stages used for profiling.
-enum WorkRequestStage{
-  DataSetup        = 1,
-  KernelExecution  = 2,
-  DataCleanup      = 3
-};
-
-enum ProfilingStage{
-  GpuMemSetup   = 8800,
-  GpuKernelExec = 8801,
-  GpuMemCleanup = 8802
-};
 
 #ifdef HAPI_CUDA_CALLBACK
 struct hapiCallbackMessage {
   char header[CmiMsgHeaderSizeBytes];
   int rank;
-  void* cb;
+  CkCallback cb;
   void* cb_msg;
 };
 #endif
@@ -67,11 +40,11 @@ struct hapiCallbackMessage {
 #ifndef HAPI_CUDA_CALLBACK
 typedef struct hapiEvent {
   cudaEvent_t event;
-  void* cb;
+  CkCallback cb;
   void* cb_msg;
   hapiWorkRequest* wr; // if this is not NULL, buffers and request itself are deallocated
 
-  hapiEvent(cudaEvent_t event_, void* cb_, void* cb_msg_, hapiWorkRequest* wr_ = NULL)
+  hapiEvent(cudaEvent_t event_, const CkCallback& cb_, void* cb_msg_, hapiWorkRequest* wr_ = NULL)
             : event(event_), cb(cb_), cb_msg(cb_msg_), wr(wr_) {}
 } hapiEvent;
 
@@ -125,6 +98,12 @@ static void shmCleanup();
 static void ipcHandleCreate();
 static void ipcHandleOpen();
 
+#ifndef HAPI_CUDA_CALLBACK
+#if CSD_NO_SCHEDLOOP
+#  error please disable CSD_NO_SCHEDLOOP to use HAPI
+#endif
+#endif
+
 // Called by all PEs in Charm++ layer init
 void hapiInit(char** argv) {
   if (!CmiInCommThread()) {
@@ -139,7 +118,7 @@ void hapiInit(char** argv) {
 
 #ifndef HAPI_CUDA_CALLBACK
     // Register polling function to be invoked at every scheduler loop
-    CcdCallOnConditionKeep(CcdSCHEDLOOP, hapiPollEvents, NULL);
+    CcdCallOnConditionKeep(CcdSCHEDLOOP, (CcdCondFn)hapiPollEvents, NULL);
 #endif
   }
 
@@ -306,6 +285,8 @@ static void hapiMapping(char** argv) {
   switch (map_type) {
     case Mapping::Block:
       cpv_my_device = my_rank / csv_gpu_manager.pes_per_device;
+      if(cpv_my_device >= csv_gpu_manager.device_count)
+          cpv_my_device = csv_gpu_manager.device_count - 1;
       if (my_rank % csv_gpu_manager.pes_per_device == 0) cpv_device_rep = true;
       break;
     case Mapping::RoundRobin:
@@ -433,7 +414,7 @@ static void hapiMapping(char** argv) {
 }
 
 #ifndef HAPI_CUDA_CALLBACK
-void recordEvent(cudaStream_t stream, void* cb, void* cb_msg, hapiWorkRequest* wr = NULL) {
+void recordEvent(cudaStream_t stream, const CkCallback& cb, void* cb_msg, hapiWorkRequest* wr = NULL) {
   // create CUDA event and insert into stream
   cudaEvent_t ev;
   cudaEventCreateWithFlags(&ev, cudaEventDisableTiming);
@@ -474,8 +455,7 @@ static void* hostToDeviceCallback(void* arg) {
   NVTXTracer nvtx_range("hostToDeviceCallback", NVTXColor::Asbestos);
 #endif
   hapiWorkRequest* wr = *((hapiWorkRequest**)((char*)arg + CmiMsgHeaderSizeBytes + sizeof(int)));
-  CmiAssert(hapiInvokeCallback);
-  hapiInvokeCallback(wr->host_to_device_cb, NULL);
+  wr->host_to_device_cb.send();
 
   // inform QD that the host-to-device transfer is complete
   CmiAssert(hapiQdProcess);
@@ -490,8 +470,7 @@ static void* kernelCallback(void* arg) {
   NVTXTracer nvtx_range("kernelCallback", NVTXColor::Asbestos);
 #endif
   hapiWorkRequest* wr = *((hapiWorkRequest**)((char*)arg + CmiMsgHeaderSizeBytes + sizeof(int)));
-  CmiAssert(hapiInvokeCallback);
-  hapiInvokeCallback(wr->kernel_cb, NULL);
+  wr->kernel_cb.send();
 
   // inform QD that the kernel is complete
   CmiAssert(hapiQdProcess);
@@ -507,12 +486,7 @@ static void* deviceToHostCallback(void* arg) {
   NVTXTracer nvtx_range("deviceToHostCallback", NVTXColor::Asbestos);
 #endif
   hapiWorkRequest* wr = *((hapiWorkRequest**)((char*)arg + CmiMsgHeaderSizeBytes + sizeof(int)));
-
-  // invoke user callback
-  if (wr->device_to_host_cb) {
-    CmiAssert(hapiInvokeCallback);
-    hapiInvokeCallback(wr->device_to_host_cb, NULL);
-  }
+  wr->device_to_host_cb.send();
 
   hapiWorkRequestCleanup(wr);
 
@@ -532,10 +506,7 @@ static void* lightCallback(void *arg) {
   hapiCallbackMessage* conv_msg = (hapiCallbackMessage*)arg;
 
   // invoke user callback
-  if (conv_msg->cb) {
-    CmiAssert(hapiInvokeCallback);
-    hapiInvokeCallback(conv_msg->cb, conv_msg->cb_msg);
-  }
+  conv_msg->cb.send(conv_msg->cb_msg);
 
   // notify process to QD
   CmiAssert(hapiQdProcess);
@@ -638,7 +609,7 @@ void hapiEnqueue(hapiWorkRequest* wr) {
   csv_gpu_manager.hostToDeviceTransfer(wr);
 
   // add host-to-device transfer callback
-  if (wr->host_to_device_cb) {
+  if (wr->host_to_device_cb_set) {
     // while there is an ongoing workrequest, quiescence should not be detected
     // even if all PEs seem idle
     CmiAssert(hapiQdCreate);
@@ -655,7 +626,7 @@ void hapiEnqueue(hapiWorkRequest* wr) {
   csv_gpu_manager.runKernel(wr);
 
   // add kernel callback
-  if (wr->kernel_cb) {
+  if (wr->kernel_cb_set) {
     CmiAssert(hapiQdCreate);
     hapiQdCreate(1);
 
@@ -676,11 +647,11 @@ void hapiEnqueue(hapiWorkRequest* wr) {
   // always invoked to free memory
   addCallback(wr, AfterDeviceToHost);
 #else
-  if (wr->device_to_host_cb) {
+  if (wr->device_to_host_cb_set) {
     recordEvent(wr->stream, wr->device_to_host_cb, NULL, wr);
   }
   else {
-    recordEvent(wr->stream, NULL, NULL, wr);
+    recordEvent(wr->stream, CkCallback::ignore, NULL, wr);
   }
 #endif
 
@@ -696,10 +667,8 @@ hapiWorkRequest* hapiCreateWorkRequest() {
 }
 
 hapiWorkRequest::hapiWorkRequest() :
-    grid_dim(0), block_dim(0), shared_mem(0), host_to_device_cb(NULL),
-    kernel_cb(NULL), device_to_host_cb(NULL), runKernel(NULL), state(0),
-    user_data(NULL), free_user_data(false), free_host_to_device_cb(false),
-    free_kernel_cb(false), free_device_to_host_cb(false)
+    grid_dim(0), block_dim(0), shared_mem(0), runKernel(NULL), state(0),
+    user_data(NULL), free_user_data(false)
 {
 #ifdef HAPI_TRACE
   trace_name = "";
@@ -710,6 +679,18 @@ hapiWorkRequest::hapiWorkRequest() :
 
   // Use CUDA per-thread default stream
   stream = cudaStreamPerThread;
+
+  // Charm++ callbacks are not set by default
+  host_to_device_cb = CkCallback(CkCallback::ignore);
+  host_to_device_cb_set = false;
+  kernel_cb = CkCallback(CkCallback::ignore);
+  kernel_cb_set = false;
+  device_to_host_cb = CkCallback(CkCallback::ignore);
+  device_to_host_cb_set = false;
+}
+
+void hapiWorkRequestSetCallback(hapiWorkRequest* wr, void* cb) {
+  wr->setCallback(*(CkCallback*)cb);
 }
 
 static void shmInit() {
@@ -1112,6 +1093,7 @@ static void createPool(int *n_buffers, int n_slots, std::vector<BufferPool> &poo
     }
 
     pools[i].head = previous;
+    pools[i].chunk = pinned_chunk;
 #ifdef HAPI_MEMPOOL_DEBUG
     pools[i].num = num_buffers;
 #endif
@@ -1119,10 +1101,12 @@ static void createPool(int *n_buffers, int n_slots, std::vector<BufferPool> &poo
 }
 
 static void releasePool(std::vector<BufferPool> &pools){
+  int device;
+  hapiCheck(cudaGetDevice(&device));
   for (int i = 0; i < pools.size(); i++) {
-    BufferPoolHeader* hdr = pools[i].head;
-    if (hdr != NULL) {
-      hapiCheck(cudaFreeHost((void*)hdr));
+    void* chunk = pools[i].chunk;
+    if (chunk != NULL) {
+      hapiCheck(cudaFreeHost(chunk));
     }
   }
   pools.clear();
@@ -1146,6 +1130,7 @@ static int findPool(size_t size){
       return -1;
     }
     newpool.size = size;
+    newpool.chunk = (void *)newpool.head;
 #ifdef HAPI_MEMPOOL_DEBUG
     newpool.num = 1;
 #endif
@@ -1375,7 +1360,7 @@ void hapiClearInstrument() {
 // all successive completed events in the queue starting from the front.
 // TODO Maybe we should make one pass of all events in the queue instead,
 // since there might be completed events later in the queue.
-void hapiPollEvents(void* param, double cur_time) {
+void hapiPollEvents(void* param) {
 #ifndef HAPI_CUDA_CALLBACK
   if (CpvAccess(n_hapi_events) <= 0) return;
 
@@ -1383,18 +1368,16 @@ void hapiPollEvents(void* param, double cur_time) {
   while (!queue.empty()) {
     hapiEvent hev = queue.front();
     if (cudaEventQuery(hev.event) == cudaSuccess) {
+      queue.pop(); // TODO: investigate possible race condition with charm4py futures - temporarily resolved by popping here
+
       // invoke Charm++ callback if one was given
-      if (hev.cb) {
-        CmiAssert(hapiInvokeCallback);
-        hapiInvokeCallback(hev.cb, hev.cb_msg);
-      }
+      hev.cb.send(hev.cb_msg);
 
       // clean up hapiWorkRequest
       if (hev.wr) {
         hapiWorkRequestCleanup(hev.wr);
       }
       cudaEventDestroy(hev.event);
-      queue.pop();
       CpvAccess(n_hapi_events)--;
 
       // inform QD that an event was processed
@@ -1442,7 +1425,7 @@ cudaStream_t hapiGetStream() {
 }
 
 // Lightweight HAPI, to be invoked after data transfer or kernel execution.
-void hapiAddCallback(cudaStream_t stream, void* cb, void* cb_msg) {
+void hapiAddCallback(cudaStream_t stream, const CkCallback& cb, void* cb_msg) {
 #ifndef HAPI_CUDA_CALLBACK
   // record CUDA event
   recordEvent(stream, cb, cb_msg);
@@ -1476,6 +1459,10 @@ void hapiAddCallback(cudaStream_t stream, void* cb, void* cb_msg) {
   // even if all PEs seem idle
   CmiAssert(hapiQdCreate);
   hapiQdCreate(1);
+}
+
+void hapiAddCallback(cudaStream_t stream, void* cb, void* cb_msg) {
+  hapiAddCallback(stream, *(CkCallback*)cb, cb_msg);
 }
 
 cudaError_t hapiMalloc(void** devPtr, size_t size) {

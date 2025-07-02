@@ -1,4 +1,4 @@
-set(ckperf-h-sources trace-Tau.h trace-TauBOC.h
+set(ckperf-h-sources
     trace-controlPoints.h trace-controlPointsBOC.h trace-counter.h trace-common.h
     trace-memory.h trace-projections.h trace-projectionsBOC.h trace-projector.h
     trace-simple.h trace-simpleBOC.h trace-summary.h trace-summaryBOC.h
@@ -42,5 +42,9 @@ add_dependencies(trace-converse ck)
 
 if(CMK_CAN_LINK_FORTRAN)
     add_library(tracef_f tracef_f.f90)
-    target_compile_options(tracef_f PRIVATE -cpmod)
+    add_custom_command(TARGET tracef_f
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/tracemod.mod ${CMAKE_BINARY_DIR}/include/
+        VERBATIM
+    )
 endif()

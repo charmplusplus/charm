@@ -7,11 +7,11 @@
 # Increment the second and third digits when making a minor feature release
 # Increment the first digit when making a major feature release
 
-AC_INIT([Charm++], [61002], [charm@cs.illinois.edu], [charm], [https://charm.cs.illinois.edu/])
+AC_INIT([Charm++],[80001],[charm@cs.illinois.edu],[charm],[https://charm.cs.illinois.edu/])
 
 AC_CONFIG_SRCDIR(./Makefile)
 
-AC_CONFIG_HEADER(conv-autoconfig.h)
+AC_CONFIG_HEADERS([conv-autoconfig.h])
 
 AC_CONFIG_COMMANDS([config-cleanup],
                    [sed -i -e 's:^#define\s\+PACKAGE://&:' conv-autoconfig.h])
@@ -127,7 +127,6 @@ add_flag "OPTS_CC='$OPTS_CC'"   'Pass through user-provided C compiler options'
 add_flag "OPTS_CXX='$OPTS_CXX'" 'Pass through user-provided C++ compiler options'
 add_flag "CMK_MACOSX='$CMK_MACOSX'" 'basic setup'
 add_flag "CMK_WINDOWS='$CMK_WINDOWS'" 'basic setup'
-add_flag "CMK_BLUEGENEQ='$CMK_BLUEGENEQ'" 'basic setup'
 add_flag "CMK_POST_EXE='$CMK_POST_EXE'" 'basic setup'
 add_flag "CMK_SHARED_SUF='$CMK_SHARED_SUF'" 'basic setup'
 add_flag "CMK_USER_SUFFIX='$CMK_USER_SUFFIX'" 'basic setup'
@@ -138,7 +137,6 @@ add_make_flag "CMK_USER_SUFFIX:=$CMK_USER_SUFFIX" 'basic setup'
 add_make_flag "CMK_NO_PARTITIONS:=$CMK_NO_PARTITIONS" 'basic setup'
 add_make_flag "CMK_MACOSX:=$CMK_MACOSX" 'basic setup'
 add_make_flag "CMK_WINDOWS:=$CMK_WINDOWS" 'basic setup'
-add_make_flag "CMK_BLUEGENEQ:=$CMK_BLUEGENEQ" 'basic setup'
 add_make_flag "CMK_MULTICORE:=$CMK_MULTICORE" 'basic setup'
 add_make_flag "CMK_USE_LRTS:=$CMK_USE_LRTS" 'basic setup'
 add_make_flag "BUILD_CUDA:=$BUILD_CUDA" 'basic setup'
@@ -212,6 +210,12 @@ else
   add_make_flag 'CMK_TRACE_ENABLED:=1' 'tracing'
 fi
 
+AC_ARG_ENABLE([tls],
+            [AS_HELP_STRING([--enable-tls],
+              [enable tls support])],
+            [enable_tls=$enableval],
+            [enable_tls=yes])
+
 AC_ARG_ENABLE([tracing-commthread],
             [AS_HELP_STRING([--enable-tracing-commthread],
               [enable tracing communication thread])], ,
@@ -259,6 +263,21 @@ else
   AC_DEFINE_UNQUOTED(CMK_DRONE_MODE, 1, [enable drone mode])
 fi
 
+AC_ARG_ENABLE([ccs],
+            [AS_HELP_STRING([--enable-ccs],
+              [enable CCS])], ,
+            [enable_ccs=yes])
+
+if test "$enable_ccs" = "no" -o "$CMK_CCS_AVAILABLE" = '0'
+then
+  Echo "CCS is disabled"
+  AC_DEFINE_UNQUOTED(CMK_CCS_AVAILABLE, 0, [disable ccs])
+  CMK_CCS_AVAILABLE='0'
+else
+  Echo "CCS is enabled"
+  AC_DEFINE_UNQUOTED(CMK_CCS_AVAILABLE, 1, [enable ccs])
+fi
+
 AC_ARG_ENABLE([charmdebug],
             [AS_HELP_STRING([--enable-charmdebug],
               [enable charmDebug])], ,
@@ -296,20 +315,6 @@ else
     Echo "Charm record/replay is enabled"
     AC_DEFINE_UNQUOTED(CMK_REPLAYSYSTEM, 1, [enable replay])
   fi
-fi
-
-AC_ARG_ENABLE([ccs],
-            [AS_HELP_STRING([--enable-ccs],
-              [enable CCS])], ,
-            [enable_ccs=yes])
-
-if test "$enable_ccs" = "no" -o "$CMK_CCS_AVAILABLE" = '0'
-then
-  Echo "CCS is disabled" 
-  AC_DEFINE_UNQUOTED(CMK_CCS_AVAILABLE, 0, [disable ccs])
-else
-  Echo "CCS is enabled" 
-  AC_DEFINE_UNQUOTED(CMK_CCS_AVAILABLE, 1, [enable ccs])
 fi
 
 AC_ARG_ENABLE([controlpoint],
@@ -642,12 +647,6 @@ test_finish() {
 	exit $1
 }
 
-# detect certain architectures
-if cat /proc/cpuinfo 2>/dev/null | grep 'POWER7'  > /dev/null
-then
-  AC_DEFINE_UNQUOTED(CMK_POWER7, 1, [whether is power7])
-fi
-
 # detect OS
 OSNAME=`uname -s`
 if test $OSNAME = "Linux"
@@ -725,7 +724,7 @@ AC_MSG_CHECKING("Sequential C++ compiler as")
 AC_MSG_RESULT("$CMK_SEQ_CXX")
 
 # Needed to avoid migratable threads failing the stack check
-# See https://github.com/UIUC-PPL/charm/pull/3174 for details.
+# See https://github.com/charmplusplus/charm/pull/3174 for details.
 test_link "whether compiler accepts -fno-stack-protector" "ok" "no" "-fno-stack-protector"
 if test $strictpass -eq 1
 then
@@ -776,8 +775,8 @@ for i in "-std=c++11" "--c++11" "-h std=c++11" "-hstd=c++11"; do
     test_cxx "whether C++ compiler supports C++11 with '$i'" "yes" "no" "$i"
     if test $strictpass -eq 1
     then
-      add_flag "$(echo OPTS_CXX=\"\$OPTS_CXX $i\")" "Enable C++11 support"
-      OPTS_CXX="$OPTS_CXX $i"
+      add_flag "$(echo CMK_CXX_FLAGS=\"\$CMK_CXX_FLAGS $i\")" "Enable C++11 support"
+      CMK_CXX_FLAGS="$CMK_CXX_FLAGS $i"
       got_cpp11="true"
       break
     fi
@@ -789,10 +788,8 @@ then
   echo "Charm++ requires C++11 support, but doesn't know the flag to enable it"
   echo
   echo "For Intel's compiler please see"
-  echo "https://github.com/UIUC-PPL/charm/issues/1560"
+  echo "https://github.com/charmplusplus/charm/issues/1560"
   echo "about making a suitable version of gcc/g++/libstdc++ available"
-  echo
-  echo "For Blue Gene/Q please use the Clang compiler"
   test_finish 1
 fi
 
@@ -820,20 +817,24 @@ fi
 
 # Test for a flag tlsglobals sometimes depends on
 test_cxx "whether C++ compiler accepts -mno-tls-direct-seg-refs" "yes" "no" "-mno-tls-direct-seg-refs"
+CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS="$strictpass"
 if test $strictpass -eq 1
 then
     add_flag 'CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS="1"' "tlsglobals"
 fi
 
 # Needed so that tlsglobals works correctly with --build-shared
-# See https://github.com/UIUC-PPL/charm/issues/3168 for details.
+# See https://github.com/charmplusplus/charm/issues/3168 for details.
 test_cxx "whether C++ compiler accepts -ftls-model=initial-exec" "yes" "no" "-ftls-model=initial-exec"
 if test $strictpass -eq 1
 then
-    add_flag 'CMK_COMPILER_KNOWS_FTLS_MODEL="1"' "tlsglobals"
-    OPTS_CC="$OPTS_CC -ftls-model=initial-exec"
-    OPTS_CXX="$OPTS_CXX -ftls-model=initial-exec"
-    OPTS_LD="$OPTS_LD -ftls-model=initial-exec"
+    if test "$enable_tls" = "yes"
+    then
+      add_flag 'CMK_COMPILER_KNOWS_FTLS_MODEL="1"' "tlsglobals"
+      OPTS_CC="$OPTS_CC -ftls-model=initial-exec"
+      OPTS_CXX="$OPTS_CXX -ftls-model=initial-exec"
+      OPTS_LD="$OPTS_LD -ftls-model=initial-exec"
+    fi
 fi
 
 # Test for a flag important for shared linking
@@ -972,7 +973,7 @@ fi
 AC_ARG_WITH([mempool-cutoff],
             [AS_HELP_STRING([--with-mempool-cutoff=N],
                             [exponent of the maximum power of two to use for bin sizes in the mempool])],
-            [], [with_mempool_cutoff=26])
+            [], [with_mempool_cutoff=28])
 
 if test "$((6 < $with_mempool_cutoff && $with_mempool_cutoff < 32))" = '1'
 then
@@ -1209,7 +1210,7 @@ test_cxx "whether C++ library has <cstdatomic> " "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_CXX0X_CSTDATOMIC, $pass, [whether C++ library has <cstdatomic>])
 fi
 
-if test $pass -ne 1 -a "$CMK_COMPILER" != "bgxlc"
+if test $pass -ne 1
 then
 	echo "Charm++ requires C++11 atomic support"
 	test_finish 1
@@ -1517,34 +1518,6 @@ EOT
 test_linkc "whether has __executable_start" "yes" "no" ""
 AC_DEFINE_UNQUOTED([CMK_HAS_EXECUTABLE_START], $pass, [whether has __executable_start])
 
-### test if switching TLS register ###
-if test $in64bit = 1
-then
-cat > $t <<EOT
-void switchTLS() {
-  void * m1, * m2;
-  asm volatile ("movq %%fs:0x0, %0\n\t"
-                "movq %1, %%fs:0x0\n\t"
-                : "=&r"(m1)
-                : "r"(m2));
-}
-EOT
-test_cxx "whether switching TLS register (64-bit) is supported" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_TLS_SWITCHING_X86_64, $strictpass, [Allows switching TLS on x86_64.])
-else
-cat > $t <<EOT
-void switchTLS() {
-  void * m1, * m2;
-  asm volatile ("movl %%gs:0x0, %0\n\t"
-                "movl %1, %%gs:0x0\n\t"
-                : "=&r"(m1)
-                : "r"(m2));
-}
-EOT
-test_cxx "whether switching TLS register (32-bit) is supported" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_TLS_SWITCHING_X86, $strictpass, [Allows switching TLS on x86.])
-fi
-
 ### test for dl_iterate_phdr ###
 
 cat > $tc <<EOT
@@ -1567,6 +1540,7 @@ int main()
 }
 EOT
 test_linkc "whether has dl_iterate_phdr" "yes" "no" ""
+CMK_HAS_DL_ITERATE_PHDR="$pass"
 AC_DEFINE_UNQUOTED([CMK_HAS_DL_ITERATE_PHDR], $pass, [whether has dl_iterate_phdr])
 
 
@@ -1587,6 +1561,18 @@ add_make_flag "CMK_HAS_MALLOC_HOOK:=$pass" 'whether has __malloc_hook'
 #### test if we can build OFI ####
 if test "$CMK_BUILD_OFI" = 1
 then
+    CMK_LIBFABRIC_INC=`pkg-config --cflags libfabric`
+    if test "$?" = 0
+    then
+        add_flag CMK_INCDIR='"$CMK_INCDIR $CMK_LIBFABRIC_INC"' "libfabric inc"
+	CMK_INCDIR="$CMK_INCDIR $CMK_LIBFABRIC_INC"
+    fi
+    CMK_LIBFABRIC_LIBS=`pkg-config --libs libfabric`
+    if test "$?" = 0
+    then
+	add_flag CMK_LIBCDIR='"$CMK_LIBDIR $CMK_LIBFABRIC_LIBONLY"' "libfabric lib"
+	CMK_LIBDIR="$CMK_LIBDIR $CMK_LIBFABRIC_LIB"
+    fi
 cat > $tc <<EOT
 #include <rdma/fabric.h>
 int main(int argc, char **argv)
@@ -1596,7 +1582,7 @@ int main(int argc, char **argv)
   return 0;
 }
 EOT
-test_cc "whether build on OFI" "yes" "no" "-lfabric"
+test_cc "whether build on OFI" "yes" "no"
 AC_DEFINE_UNQUOTED(CMK_BUILD_ON_OFI, $strictpass, [build OFI.])
 BUILD_OFI=$strictpass
 
@@ -1621,13 +1607,41 @@ else
         test_finish 1
       fi
     else
-      echo "Error: -lfabric not working, $PSM_COMPAT_DIR not found"
-      echo "Pass '--basedir=/path/to/dir/' if -lfabric is located in a different directory"
-      test_finish 1
+      CMK_LIBFABRIC_LIBONLY=`pkg-config --libs-only-l libfabric`
+       if test "$?" = 0
+       then
+	  test_linkc "whether pkg-config fabric" "ok" "no" "-lfabric"
+      else
+	  echo "Error: -lfabric not working, $PSM_COMPAT_DIR not found, pkg-config libfabric not working"
+	  echo "Pass '--basedir=/path/to/dir/' if -lfabric is located in a different directory"
+	  test_finish 1
+      fi
+
     fi
   fi
 fi
 
+fi
+
+#### If we can build OFI, test if we can also build CXI ####
+if test "$BUILD_OFI" = 1
+then
+# get path info
+    CMK_LIBFABRIC_LIBONLY=`pkg-config --libs-only-l libfabric`
+    CMK_LIBFABRIC_INC=`pkg-config --cflags libfabric`
+    cat > $t <<EOT
+#include <rdma/fabric.h>
+#include <rdma/fi_cxi_ext.h>
+int main(int argc, char **argv)
+{
+  struct fi_info *providers;
+  int ret = fi_getinfo(FI_VERSION(1,0), NULL, NULL, 0ULL, NULL, &providers);
+  return 0;
+}
+EOT
+	test_cxx "whether build on CXI" "yes" "no"
+	AC_DEFINE_UNQUOTED(CMK_CXI, $strictpass, [build CXI.])
+	BUILD_CXI=$strictpass
 fi
 
 #### test if we can build UCX ####
@@ -1706,22 +1720,7 @@ then
   fi
 fi
 
-if test "$BUILD_MPI" = "1"
-then
-cat > $t <<EOT
-#include "mpi.h"
-int main(int argc, char **argv)
-{
-  int thread_level, provided;
-  thread_level = MPI_THREAD_FUNNELED;
-  MPI_Init_thread(&argc, &argv, thread_level, &provided);
-}
-EOT
-test_cxx "whether MPI_Init_thread is supported" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_MPI_INIT_THREAD, $strictpass, [Allows MPI_Init_thread.])
-fi
 mv -f ../include/mpi.h.bak ../include/mpi.h 2>/dev/null
-
 fi
 
 if test "$BUILD_MPI" = "1"
@@ -1909,6 +1908,36 @@ int main() {
 EOT
 test_link "whether has mallinfo" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_MALLINFO, $pass, [whether has mallinfo])
+
+#### test for cfree ###
+cat > $t <<EOT
+#include <stdlib.h>
+int main() {
+  cfree(0);
+}
+EOT
+test_link "whether has cfree" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_CFREE, $pass, [whether has cfree])
+
+#### test for pvalloc ###
+cat > $t <<EOT
+#include <malloc.h>
+int main() {
+  return pvalloc(4096) == 0;
+}
+EOT
+test_link "whether has pvalloc" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_PVALLOC, $pass, [whether has pvalloc])
+
+#### test for valloc ###
+cat > $t <<EOT
+#include <malloc.h>
+int main() {
+  return valloc(4096) == 0;
+}
+EOT
+test_link "whether has valloc" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_VALLOC, $pass, [whether has valloc])
 
 #### test for __morecore ###
 cat > $t <<EOT
@@ -2164,6 +2193,23 @@ cat > $tc <<EOT
 #include <stddef.h>
 int main()
 {
+  return dlopen("", RTLD_DEEPBIND) == NULL;
+}
+EOT
+test_cc "whether has RTLD_DEEPBIND" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_RTLD_DEEPBIND, $pass, [whether has RTLD_DEEPBIND])
+
+cat > $tc <<EOT
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE
+#endif
+#ifndef __USE_GNU
+# define __USE_GNU
+#endif
+#include <dlfcn.h>
+#include <stddef.h>
+int main()
+{
   return dlsym(RTLD_DEFAULT, "main") != NULL;
 }
 EOT
@@ -2268,6 +2314,16 @@ fi
 AC_DEFINE_UNQUOTED(CMK_SUPPORTS_PIPGLOBALS, $CMK_SUPPORTS_PIPGLOBALS, [whether supports PiP globals])
 add_flag "CMK_SUPPORTS_PIPGLOBALS=$CMK_SUPPORTS_PIPGLOBALS" 'PiP globals'
 add_make_flag "CMK_SUPPORTS_PIPGLOBALS:=$CMK_SUPPORTS_PIPGLOBALS" 'PiP globals'
+
+if test "$CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY" = '1' -a "$CMK_CAN_GET_BINARY_PATH" = '1' -a "$CMK_HAS_DL_ITERATE_PHDR" = '1'
+then
+  CMK_SUPPORTS_PIEGLOBALS='1'
+else
+  CMK_SUPPORTS_PIEGLOBALS='0'
+fi
+AC_DEFINE_UNQUOTED(CMK_SUPPORTS_PIEGLOBALS, $CMK_SUPPORTS_PIEGLOBALS, [whether supports PIE globals])
+add_flag "CMK_SUPPORTS_PIEGLOBALS=$CMK_SUPPORTS_PIEGLOBALS" 'PIE globals'
+add_make_flag "CMK_SUPPORTS_PIEGLOBALS:=$CMK_SUPPORTS_PIEGLOBALS" 'PIE globals'
 
 #### check if getProcAddress works ####
 cat > $t <<EOT
@@ -2400,10 +2456,10 @@ test_link "whether has support for shm transport using Cross Memory Attach" "yes
 AC_DEFINE_UNQUOTED(CMK_HAS_CMA, $pass, [whether supports cma])
 CMK_HAS_CMA="$pass"
 
-test "$CMK_HAS_CMA" = '1' -a "$CMK_MULTICORE" != '1' -a "$CMK_BLUEGENEQ" != '1' && CMK_USE_CMA='1' || CMK_USE_CMA='0'
+test "$CMK_HAS_CMA" = '1' -a "$CMK_MULTICORE" != '1' && CMK_USE_CMA='1' || CMK_USE_CMA='0'
 add_make_flag "CMK_USE_CMA:=$CMK_USE_CMA" 'Cross Memory Attach'
 
-test "$CMK_WINDOWS" != '1' -a "$CMK_BLUEGENEQ" != '1' && CMK_SUPPORTS_MEMORY_ISOMALLOC='1' || CMK_SUPPORTS_MEMORY_ISOMALLOC='0'
+test "$CMK_WINDOWS" != '1' && CMK_SUPPORTS_MEMORY_ISOMALLOC='1' || CMK_SUPPORTS_MEMORY_ISOMALLOC='0'
 add_flag "CMK_SUPPORTS_MEMORY_ISOMALLOC='$CMK_SUPPORTS_MEMORY_ISOMALLOC'" '-memory isomalloc'
 add_make_flag "CMK_SUPPORTS_MEMORY_ISOMALLOC:=$CMK_SUPPORTS_MEMORY_ISOMALLOC" '-memory isomalloc'
 
@@ -2533,10 +2589,61 @@ int main() {
 EOT
 test_cxx "whether has elf.h " "yes" "no" ""
 AC_DEFINE_UNQUOTED([CMK_HAS_ELF_H], $pass, [whether has elf.h])
-if test $pass -eq 1
+add_flag "CMK_HAS_ELF_H='$pass'" "elf.h"
+
+CMK_SUPPORTS_SWAPGLOBALS='0'
+CMK_SUPPORTS_TLSGLOBALS='0'
+if [[ "$CMK_MACOSX" = '1' ]]
 then
-	add_flag "CMK_HAS_ELF_H='1'" "elf.h"
+  CMK_SUPPORTS_TLSGLOBALS='1'
+elif test $pass -eq 1
+then
+  # swapglobals
+  if [[ "$CMK_SMP" != '1' ]]
+  then
+    LD_VERSION_OUTPUT="$($CMK_LD -Wl,--version,-v 2>/dev/null)"
+    if ! $(printf "$LD_VERSION_OUTPUT" | grep -q 'GNU ld')
+    then
+      CMK_SUPPORTS_SWAPGLOBALS='2'
+    else
+      LD_VERSION="$(printf "$LD_VERSION_OUTPUT" | grep -Eo 'GNU ld (\([[^)]]*\) )?(version )?[[-0-9._a-zA-Z]]+' | awk '{print $NF}')"
+      LD_VERSION_MAJOR="$(printf $LD_VERSION | cut -d. -f1)"
+      LD_VERSION_MINOR="$(printf $LD_VERSION | cut -d. -f2 | cut -d- -f1)"
+      if [[ "$LD_VERSION_MAJOR" -gt 2 ]] || [[ "$LD_VERSION_MAJOR" -eq 2 -a "$LD_VERSION_MINOR" -gt 23 ]]
+      then
+        CMK_SUPPORTS_SWAPGLOBALS='3'
+      else
+        CMK_SUPPORTS_SWAPGLOBALS='1'
+      fi
+    fi
+  fi
+
+  # tlsglobals
+  if [[ "$CMK_VDIR" = "${CMK_VDIR%x86_64}x86_64" -o "$CMK_VDIR" = "${CMK_VDIR%i386}i386" ]]
+  then
+    if [[ "$CMK_COMPILER_KNOWS_TLSDIRECTSEGREFS" != '1' -a "$CMK_COMPILER" != 'clang' ]]
+    then
+      CMK_SUPPORTS_TLSGLOBALS='2'
+    else
+      CMK_SUPPORTS_TLSGLOBALS='1'
+    fi
+  fi
 fi
+
+if test "$enable_tls" = "yes"
+then
+    add_flag 'CMK_USER_DISABLED_TLS="0"' "tlsglobals"
+else
+    add_flag 'CMK_USER_DISABLED_TLS="1"' "tlsglobals"
+    CMK_SUPPORTS_TLSGLOBALS='0'
+fi
+
+AC_DEFINE_UNQUOTED(CMK_SUPPORTS_SWAPGLOBALS, $CMK_SUPPORTS_SWAPGLOBALS, [whether supports swapglobals])
+add_flag "CMK_SUPPORTS_SWAPGLOBALS=$CMK_SUPPORTS_SWAPGLOBALS" 'swapglobals'
+add_make_flag "CMK_SUPPORTS_SWAPGLOBALS:=$CMK_SUPPORTS_SWAPGLOBALS" 'swapglobals'
+AC_DEFINE_UNQUOTED(CMK_SUPPORTS_TLSGLOBALS, $CMK_SUPPORTS_TLSGLOBALS, [whether supports tlsglobals])
+add_flag "CMK_SUPPORTS_TLSGLOBALS=$CMK_SUPPORTS_TLSGLOBALS" 'tlsglobals'
+add_make_flag "CMK_SUPPORTS_TLSGLOBALS:=$CMK_SUPPORTS_TLSGLOBALS" 'tlsglobals'
 
 #### test if has Multiprocessing.h for apple ####
 cat > $t <<EOT
@@ -2617,7 +2724,7 @@ fi
 fi
 
 #### test if Python headers are installed ####
-PYTHON_VERSION=`python -V 2>&1 | awk {'print $2'} | awk -F. {'print $1"."$2'}`
+PYTHON_VERSION=`python2 -V 2>&1 | awk {'print $2'} | awk -F. {'print $1"."$2'}`
 cat > $t <<EOT
 #include "python${PYTHON_VERSION}/Python.h"
 #include "python${PYTHON_VERSION}/compile.h"
@@ -2970,10 +3077,8 @@ int main(void)
 }
 EOT
 test_linkc "whether OpenMP is supported" "yes" "no" "$CMK_C_OPENMP"
-if test $pass -eq 1
-then
-	add_flag "CMK_HAS_OPENMP='1'" "OpenMP"
-fi
+add_flag "CMK_HAS_OPENMP='$pass'" "OpenMP"
+add_make_flag "CMK_HAS_OPENMP:=$pass" "OpenMP"
 
 ### check for Lustre FS availability ###
 cat > $tc <<EOT
@@ -2998,6 +3103,8 @@ fi
 
 eval `"$CHARMBIN/charmc" $OPTS -print-building-blocks -standalone`
 add_make_flag "HWLOC_CC:=$(get_full_command_name "$CHARM_CC")" "hwloc"
+add_make_flag "HWLOC_CXX:=$(get_full_command_name "$CHARM_CXX")" "hwloc"
 add_make_flag "HWLOC_CC_FLAGS:=$CHARM_CC_FLAGS" "hwloc"
+add_make_flag "HWLOC_CXX_FLAGS:=$CHARM_CXX_FLAGS" "hwloc"
 
 AC_OUTPUT

@@ -28,14 +28,14 @@ typedef struct readytoexectoken_s{
 } readytoexectoken;
 /******************* Yanhua seed load balancer */
 
-typedef struct CldProcInfo_s {
+typedef struct CldDataInfo_s {
   double lastCheck;
   int    sent;			/* flag to disable idle work request */
   int    balanceEvt;		/* user event for balancing */
   int    idleEvt;		/* user event for idle balancing */
   int    idleprocEvt;		/* user event for processing idle req */
   int   load;
-} *CldProcInfo;
+} *CldDataInfo;
 
 /* this is used by master to store the highest priority for each processor */
 typedef struct CldProcPriorInfo_s {

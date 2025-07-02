@@ -1,15 +1,15 @@
 #!/bin/bash
 
 # Silly shorthand, used for source reorganization
-if [ $(dirname $0) = "." ]
+if [[ "$(dirname "$0")" = '.' ]]
 then
   srcbaseabs="./src"
   srcbase="../../src"
 else
-  srcbaseabs="$(cd $(dirname $0)/src/; pwd)"
-  srcbase=$srcbaseabs
+  srcbaseabs="$(cd "$(dirname "$0")/src" ; pwd)"
+  srcbase="$srcbaseabs"
 fi
-src="$srcbaseabs/arch/"
+src="$srcbaseabs/arch"
 
 more=0
 
@@ -18,7 +18,7 @@ syntax() {
   echo 'Usage: build <target> <version> <options> [charmc-options ...]'
   echo ''
   echo '<targets>: converse charm++ LIBS AMPI charm4py msa'
-  if test $more = 1
+  if [[ "$more" = '1' ]]
   then
   echo ''
   echo '  charm++         compile Charm++ core only'
@@ -27,19 +27,18 @@ syntax() {
   echo '  LIBS            compile additional parallel libraries with Charm++ core'
   echo '  charm4py        compile shared library version of Charm++ for charm4py'
   echo '  msa             build Multiphase Shared Arrays(MSA) library'
-  echo '  Tau             build the TAU tracing library for generating TAU performance data' 
   echo '  ChaNGa          compile Charm++ core and necessary libraries for ChaNGa'
   echo '  everylb         compile EveryLB suite of load balancing strategies'
   echo ''
   fi
   echo '<versions>: '
-  ( cd $src ; ls -1 | egrep -v '(^mpi$)|(^netlrts?$)|(^multicore$)|(^util$)|(^common$)|(^win$)|(^gni$)|(^pami(lrts)?$)|(^verbs$)|(^ofi$)|(^ucx$)|(^template$)|(^cuda$)' | pr -3 -t )
+  ( cd "$src" ; ls -1 | egrep -v '(^mpi$)|(^netlrts?$)|(^multicore$)|(^util$)|(^common$)|(^win$)|(^gni$)|(^pami(lrts)?$)|(^verbs$)|(^ofi$)|(^ucx$)|(^template$)|(^cuda$)' | pr -3 -t )
   echo ''
   echo '<options>: compiler and platform specific options'
-  echo 'icc iccstatic xlc xlc64 gcc clang pgcc cc mpicxx'
+  echo 'icc iccstatic xlc xlc64 gcc clang icx pgcc cc mpicxx nvhpc'
   echo 'help smp omp tcp ooc syncft papi pthreads'
   echo '--incdir --libdir --basedir --build-shared --destination --suffix -j'
-  if test $more = 1
+  if [[ "$more" = '1' ]]
   then
   echo ''
   echo 'For platform specific options, use help option:'
@@ -49,8 +48,10 @@ syntax() {
   echo '  icc, iccstatic  Intel compilers (default or static linking)'
   echo '  xlc, xlc64      IBM XL compilers (with 64-bit option on architectures with 32-bit modes)'
   echo '  gcc             GNU compiler collection (on platforms where the default differs)'
-  echo '  clang           Clang C/C++ compiler (including bgclang)'
+  echo '  clang           Clang C/C++ compiler'
+  echo '  icx             Intel oneAPI DPC++/C++ compiler'
   echo '  pgcc            Portland Group compilers'
+  echo '  nvhpc           NVIDIA HPC compiler'
   echo ''
   echo 'Choose an alternative fortran compiler (only one option is allowed from this section):'
   echo '  gfortran        GNU Fortran compiler'
@@ -58,6 +59,7 @@ syntax() {
   echo '  xlf             IBM XL Fortran compiler'
   echo '  ifort           Intel Fortran compiler'
   echo "  pgf90           Portland Group Fortran compiler"
+  echo "  nvfortran       NVIDIA HPC Fortran compiler"
   echo ''
   echo 'Platform specific options (choose multiple if apply):'
   echo '  smp             support for SMP, multithreaded charm on each node'
@@ -99,8 +101,8 @@ syntax() {
   # Test that the above regular expressions are sufficient to capture all help strings.
   num_help_strings="$(grep -c AS_HELP_STRING "$configure_ac")"
   num_help_items="$(echo "$help_items" | wc -l)"
-  if [ $num_help_strings != $num_help_items ]; then
-    echo '<Warning>: Not all parameters were able to be displayed. Please open an issue on our GitHub: https://github.com/UIUC-PPL/charm'
+  if [[ "$num_help_strings" != "$num_help_items" ]]; then
+    echo '<Warning>: Not all parameters were able to be displayed. Please open an issue on our GitHub: https://github.com/charmplusplus/charm'
   fi
 
 
@@ -113,11 +115,10 @@ syntax() {
   echo "  --with-lbtime-type  specify real type for the load balancing timers"
   echo "  --destination=DIR   build Charm++ inside DIR, by default the destination is <version>"
   echo "  --suffix=DIR        append DIR to the destination directory of the Charm++ build"
-  echo "  --tau-makefile=FILE Specify which TAU stub makefile to use"
   fi
   echo ''
   echo '<charmc-options>: normal compiler options e.g. -g -optimize -save -verbose'
-  if test $more = 1
+  if [[ "$more" = '1' ]]
   then
   echo ''
   echo 'Examples:'
@@ -133,7 +134,6 @@ syntax() {
   echo '  ./build charm++ mpi-linux-x86_64 --incdir /usr/local/mpich/include --libdir /usr/local/mpich/lib -optimize'
   echo '   or in short,'
   echo '  ./build charm++ mpi-linux-x86_64 --basedir /usr/local/mpich -optimize'
-  echo '  ./build Tau --tau-makefile=/usr/local/packages/TAU/x86_64/lib/Makefile.tau-mpi'
   echo ''
   echo 'Note: This script:'
   echo ' 1. Creates directories <destination> and <destination>/tmp'
@@ -143,7 +143,7 @@ syntax() {
   echo "That's all build does.  The rest is handled by the Makefile."
   echo ''
   echo 'Thank you for using Charm++, please open an issue or discussion on the Charm++'
-  echo 'GitHub at https://github.com/UIUC-PPL/charm if you have any questions.'
+  echo 'GitHub at https://github.com/charmplusplus/charm if you have any questions.'
 
   else
   echo ''
@@ -152,28 +152,28 @@ syntax() {
 }
 
 Echo() {
-    [ "x$QUIET" = "x--quiet" ] || echo $*
+    [[ "$QUIET" = '--quiet' ]] || echo "$@"
 }
 
 printOption() {
   for prefix in cc conv-mach
   do
     str="Supported compilers:"
-    [ "$prefix" = "conv-mach" ] && str="Supported options:"
+    [[ "$prefix" = 'conv-mach' ]] && str="Supported options:"
     opts=""
-    for dir in $OPT_DIRS
+    for dir in "${OPT_DIRS[@]}"
     do
 #         echo "Checking for $prefix in $dir"
-          files=`cd $dir; ls $prefix-*.h 2>/dev/null`
-          opts="$opts "`echo $files | sed 's/'$prefix'-\([^.]*\).h/\1/g'`
-    done 
+          files="$(cd "$dir"; ls $prefix-*.h 2>/dev/null)"
+          opts+=" $(echo "$files" | sed 's/'$prefix'-\([^.]*\).h/\1/g')"
+    done
     tmp=.tmp.$$
-    rm -f $tmp; touch $tmp
+    rm -f "$tmp"; touch "$tmp"
     for o in $opts
     do
-      echo $o >> $tmp
+      echo "$o" >> "$tmp"
     done
-    opts=`sort $tmp | uniq`
+    opts=$(sort $tmp | uniq)
     rm -f $tmp
     echo $str $opts
   done
@@ -181,32 +181,32 @@ printOption() {
 }
 
 CheckDir() {
-  for d in $*
+  for d in "$@"
   do
-    if test ! -d $d
+    if [[ ! -d "$d" ]]
     then
-      echo Error: cannot find $d!
+      echo "Error: cannot find $d!"
       exit 1
     fi
   done
 }
 
 TestIfCompiler() {
-  compilerName=`echo $1 | sed 's/-[0-9\.][0-9\.]*$//'`
-  for dir in $OPT_DIRS
+  compilerName="$(echo "$1" | sed 's/-[0-9\.][0-9\.]*$//')"
+  for dir in "${OPT_DIRS[@]}"
   do
-    [ -f $dir/cc-$compilerName.sh ] && return 1
-  done  
+    [[ -f "$dir/cc-$compilerName.sh" ]] && return 1
+  done
   return 0
 }
 
 TestIfOption() {
-  for dir in $OPT_DIRS
+  for dir in "${OPT_DIRS[@]}"
   do
-    [ -f $dir/conv-mach-$1.h ] && return 1 
+    [[ -f "$dir/conv-mach-$1.h" ]] && return 1
   done
-  
-  echo "Error> option: $1 is not supported in this version!"; 
+
+  echo "Error> option: $1 is not supported in this version!";
   printOption
 }
 
@@ -214,157 +214,149 @@ TestIfOption() {
 # start
 
 BUILD_CUDA=0
-MAKEOPTS=""
-OPTS=""
-BOPTS=""
+MAKEOPTS=()
+OPTS=()
+CONFIG_OPTS=()
+BOPTS=()
 MORE=""
 COMPILER=""
-BASEDIR=
-LIBDIR=
-INCDIR=
+LIBDIR=()
+INCDIR=()
 ARCH=
 BUILD_SHARED=""             # default no shared lib
 WITH_PRODUCTION=
 DESTINATION=""
 DESTINATION_SUFFIX=""
-TAU_MAKEFILE=""
 QUIET=""
 BUILD_OMP=0
 ONLY_CONFIGURE=
 FORCE=
 AMPI_ONLY=
 
-[ "$1" = '--help' -o "$1" = '-h' ] && more=1 && syntax | ( less || more ) && exit 1
-[ $# -lt 2 ] && $(dirname "$0")/smart-build.pl && exit 1
-PROGRAM=$1
+[[ "$1" = '--help' || "$1" = '-h' ]] && more=1 && syntax | ( less || more ) && exit 1
+[[ $# -lt 2 ]] && "$(dirname "$0")/smart-build.pl" && exit 1
+PROGRAM="$1"
 shift
 
 # find longest prefix of version argument that exists as a directory in $src
 VERSION="$1"
-VERSOPTS=""
+VERSOPTS=()
 testversion=""
 oldifs="$IFS"
 IFS="-"
 for w in $1; do
   IFS="$oldifs"
-  if [ -z "$testversion" ]; then
+  if [[ -z "$testversion" ]]; then
     testversion="$w"
   else
     testversion="$testversion-$w"
   fi
-  if [ -d $src/$testversion ]; then
+  if [[ -d "$src/$testversion" ]]; then
     VERSION="$testversion"
-    VERSOPTS=""
+    VERSOPTS=()
   else
-    VERSOPTS="$VERSOPTS $w"
+    VERSOPTS+=("$w")
   fi
 done
-if [ "$VERSION" = "$1" ]; then VERSOPTS=""; fi
+[[ "$VERSION" = "$1" ]] && VERSOPTS=()
 
 BASEVERSION="$VERSION"
-ARCH=`echo $BASEVERSION | sed -e 's@-.*@@'`
+ARCH="$(echo "$BASEVERSION" | sed -e 's@-.*@@')"
 shift
 
 #echo $src
 #echo $BASEVERSION
 #echo $ARCH
 
-OPT_DIRS="$src/$BASEVERSION $src/$ARCH $src/common"
+OPT_DIRS=("$src/$BASEVERSION" "$src/$ARCH" "$src/common")
 
-# default to building ROMIO on AMPI where supported
+# default to not building ROMIO due to GCC 14 cascade failures
 case "$BASEVERSION" in
   *-win-*)
     WITH_ROMIO=''
     ;;
   *)
-    WITH_ROMIO='true'
+    WITH_ROMIO=''
     ;;
 esac
 
 # process remainder of version argument as options, copied from below
-for w in $VERSOPTS; do
+for w in "${VERSOPTS[@]}"; do
   # This has to be a build-time option (like "smp")
-        TestIfCompiler $w
-        if [ $? -eq 1 ] 
+        TestIfCompiler "$w"
+        if [[ $? -eq 1 ]]
         then
   # It specifies a compiler:
-          if [ ! -z "$COMPILER" ] 
+          if [[ -n "$COMPILER" ]]
           then
               echo "Error> Tried to specify two compilers: $COMPILER and $w"
               printOption
           fi
-          COMPILER=$w
+          COMPILER="$w"
         else
   # It specifies some other option:
-          TestIfOption $w
-          BOPTS="$BOPTS $w"
-          [ $w =  "cuda"   ] && BUILD_CUDA=1
+          TestIfOption "$w"
+          BOPTS+=("$w")
+          [[ "$w" = "cuda" ]] && BUILD_CUDA=1
         fi
 done
 
-while [ ! $# -eq 0 ]
+while [[ $# -ne 0 ]]
 do
   case "$1" in
     "--basedir")
-            shift; 
-      for dir in $1
-      do
-      CheckDir $dir/include $dir/lib
-              LIBDIR="$LIBDIR -L$dir/lib";
-              INCDIR="$INCDIR -I$dir/include"
-    done
-            shift
+      shift
+      dir="$1"
+      CheckDir "$dir/include" "$dir/lib"
+      LIBDIR+=("-L$dir/lib")
+      INCDIR+=("-I$dir/include")
+      if [[ -d "$dir/lib64" ]]; then
+        LIBDIR+=("-L$dir/lib64")
+      fi
+      shift
       ;;
     --basedir=*)
-                basedir=`echo $1 | awk -F= '{print $2}'`
-      for dir in $basedir
-      do
-      CheckDir $dir/include $dir/lib
-              LIBDIR="$LIBDIR -L$dir/lib";
-              INCDIR="$INCDIR -I$dir/include"
-    done
-            shift
+      dir="${1#--basedir=}"
+      CheckDir "$dir/include" "$dir/lib"
+      LIBDIR+=("-L$dir/lib")
+      INCDIR+=("-I$dir/include")
+      if [[ -d "$dir/lib64" ]]; then
+        LIBDIR+=("-L$dir/lib64")
+      fi
+      shift
       ;;
     "--libdir")
-            shift; CheckDir $1
-      for dir in $1
-      do
-              LIBDIR="$LIBDIR -L$dir"; 
-    done
-                shift
+      shift
+      dir="$1"
+      CheckDir "$dir"
+      LIBDIR+=("-L$dir")
+      shift
       ;;
     --libdir=*)
-                libdir=`echo $1 | awk -F= '{print $2}'`
-    CheckDir $libdir
-      for dir in $libdir
-      do
-              LIBDIR="$LIBDIR -L$dir"; 
-    done
-            shift
+      dir="${1#--libdir=}"
+      CheckDir "$dir"
+      LIBDIR+=("-L$dir")
+      shift
       ;;
     "--incdir")
-            shift; CheckDir $1
-      for dir in $1
-      do
-              INCDIR="$INCDIR -I$dir"; 
-    done
-            shift
+      shift
+      dir="$1"
+      CheckDir "$dir"
+      INCDIR+=("-I$dir")
+      shift
       ;;
     --incdir=*)
-                incdir=`echo $1 | awk -F= '{print $2}'`
-    CheckDir $incdir
-      for dir in $incdir
-      do
-              INCDIR="$INCDIR -I$dir"; 
-    done
-            shift
+      dir="${1#--incdir=}"
+      CheckDir "$dir"
+      INCDIR+=("-I$dir")
+      shift
       ;;
     --no-build-shared|--no-shared)
     BUILD_SHARED='';
     shift
     ;;
     --build-shared)
-    BUILD_SHARED="-build-shared"; 
+    BUILD_SHARED="-build-shared";
     shift
     ;;
     --ampi-only)
@@ -377,15 +369,15 @@ do
     WITH_ROMIO=""; shift
     ;;
     --with-production)
-    WITH_PRODUCTION="true" 
+    WITH_PRODUCTION="true"
     shift
     ;;
     --with-*)
-    CONFIG_OPTS="$CONFIG_OPTS $1"
+    CONFIG_OPTS+=("$1")
     shift
     ;;
     --without-*)
-    CONFIG_OPTS="$CONFIG_OPTS $1"
+    CONFIG_OPTS+=("$1")
     shift
     ;;
     --destination)
@@ -394,7 +386,7 @@ do
     shift
     ;;
     --destination=*)
-    DESTINATION="`echo $1 | awk -F= '{print $2}'`"
+    DESTINATION="${1#--destination=}"
     shift
     ;;
     --suffix)
@@ -403,19 +395,11 @@ do
     shift
     ;;
     --suffix=*)
-    DESTINATION_SUFFIX="`echo $1 | awk -F= '{print $2}'`"
-    shift
-    ;;
-    --tau-makefile)
-    TAU_MAKEFILE=$1
-    shift
-    ;;
-    --tau-makefile=*)
-    TAU_MAKEFILE=`echo $1 | awk -F= '{print $2}'`
+    DESTINATION_SUFFIX="${1#--suffix=}"
     shift
     ;;
     --quiet)
-          MAKEOPTS="$MAKEOPTS --quiet"
+    MAKEOPTS+=(--quiet)
     QUIET="--quiet"
     shift;
     ;;
@@ -428,30 +412,30 @@ do
     shift
     ;;
     --enable-tracing|--enable-tracing=*)
-    CONFIG_OPTS="$CONFIG_OPTS $1"
+    CONFIG_OPTS+=("$1")
     ENABLE_TRACING=yes
     shift
     ;;
     --enable-*)
-    CONFIG_OPTS="$CONFIG_OPTS $1"
+    CONFIG_OPTS+=("$1")
     shift
     ;;
     --disable-*)
-    CONFIG_OPTS="$CONFIG_OPTS $1"
+    CONFIG_OPTS+=("$1")
     shift
     ;;
     -j*)
-                PMAKENUM=`echo $1 | awk -Fj '{print $2}'`
-    MAKEOPTS="$MAKEOPTS -j $PMAKENUM"
+    PMAKENUM="$(echo "$1" | awk -Fj '{print $2}')"
+    MAKEOPTS+=(-j "$PMAKENUM")
     shift;
     ;;
     -k|--keep-going)
-    MAKEOPTS="$MAKEOPTS $1"
+    MAKEOPTS+=("$1")
     shift;
     ;;
-    -*) 
+    -*)
         # Compiler option (like -g or -Dfoo), copy it over
-        OPTS="$OPTS $1"
+        OPTS+=("$1")
         shift
     ;;
     "help")
@@ -459,81 +443,80 @@ do
   ;;
     *)
 # This has to be a build-time option (like "smp")
-        TestIfCompiler $1
-        if [ $? -eq 1 ] 
+        TestIfCompiler "$1"
+        if [[ $? -eq 1 ]]
         then
 # It specifies a compiler:
-          if [ ! -z "$COMPILER" ] 
+          if [[ -n "$COMPILER" ]]
           then
               echo "Error> Tried to specify two compilers: $COMPILER and $1"
               printOption
           fi
-          COMPILER=$1
+          COMPILER="$1"
         else
 # It specifies some other option:
-          TestIfOption $1
-          BOPTS="$BOPTS $1"
-          [ $1 =  "cuda"   ] && BUILD_CUDA=1
+          TestIfOption "$1"
+          BOPTS+=("$1")
+          [[ "$1" = 'cuda' ]] && BUILD_CUDA=1
         fi
         shift
   ;;
   esac
 done
 
-if [ $BUILD_CUDA -eq 1 ]; then
+if [[ "$BUILD_CUDA" = '1' ]]; then
   echo "Checking if NVCC is in your path..."
-  which nvcc &> /dev/null
-  if [ $? -eq 0 ]; then
-    NVCC_PATH=$(which nvcc)
-    CUDA_DIR=${NVCC_PATH%"/bin/nvcc"}
+  if command -v nvcc >/dev/null 2>&1 ; then
+    NVCC_PATH="$(command -v nvcc)"
+    CUDA_DIR="${NVCC_PATH%/bin/nvcc}"
     echo "NVCC found, using CUDA in $CUDA_DIR"
   else
     echo "NVCC not found, checking candidate CUDA directories..."
     HAVE_CUDA="no"
-    CUDA_PRESET_DIRS="/usr/local/cuda /usr/lib/nvidia-cuda-toolkit"
-    CUDA_CANDIDATE_DIRS="$CUDATOOLKIT_HOME $CUDA_DIR $CUDA_HOME $CUDA_PRESET_DIRS"
-    for dir in $CUDA_CANDIDATE_DIRS; do
-      if test -d $dir && test -e "$dir/bin/nvcc"; then
+    CUDA_PRESET_DIRS=("/usr/local/cuda" "/usr/lib/nvidia-cuda-toolkit")
+    CUDA_CANDIDATE_DIRS=("$CUDATOOLKIT_HOME" "$CUDA_DIR" "$CUDA_HOME" "${CUDA_PRESET_DIRS[@]}")
+    for dir in "${CUDA_CANDIDATE_DIRS[@]}"; do
+      if [[ -n "$dir" && -d "$dir" && -e "$dir/bin/nvcc" ]]; then
         echo "CUDA found in $dir"
-        CUDA_DIR=$dir
+        CUDA_DIR="$dir"
         HAVE_CUDA="yes"
         break
       fi
     done
-    if [ $HAVE_CUDA = "no" ]; then
-      echo "Error> CUDA not found, searched $\CUDATOOLKIT_HOME \$CUDA_DIR \$CUDA_HOME $CUDA_PRESET_DIRS"
+    if [[ "$HAVE_CUDA" = 'no' ]]; then
+      echo "Error> CUDA not found, searched $\CUDATOOLKIT_HOME \$CUDA_DIR \$CUDA_HOME ${CUDA_PRESET_DIRS[*]}"
       exit 1
     fi
   fi
 fi
 
-[ "x$VERSION" = "x" ] && syntax && exit 1
+[[ -z "$VERSION" ]] && syntax && exit 1
 
-if [ "x_$ARCH" = "x_net" ]; then
+if [[ "$ARCH" = 'net' ]]; then
   echo "Error: net-* has been removed, please use netlrts or verbs.";
   exit 1;
 fi
 
-#Check if building verbs on Omni-Path 
-if [ "x_$ARCH" = "x_verbs" ] && type /usr/sbin/opafabricinfo >/dev/null 2>&1; then
+#Check if building verbs on Omni-Path
+if [[ "$ARCH" = 'verbs' ]] && type /usr/sbin/opafabricinfo >/dev/null 2>&1; then
   echo "WARNING: Detected Omni-Path diagnostic tools.";
   echo "Verbs on Omni-Path architectures is not well supported: please use an OFI build instead.";
-fi 
-
-if [ -z "$MAKE" ] 
-then
-  # prefer gmake
-  MAKE=`which gmake 2>/dev/null`
-  [ -z "$MAKE" -o ! -x "$MAKE" ] && MAKE='make'
 fi
 
-if [ ! -f $src/$BASEVERSION/conv-mach.h ] 
+if [[ -z "$MAKE" ]]
+then
+  # prefer gmake
+  MAKE="$(command -v gmake 2>/dev/null)"
+  [[ -z "$MAKE" || ! -x "$MAKE" ]] && MAKE='make'
+fi
+
+if [[ ! -f "$src/$BASEVERSION/conv-mach.h" ]]
 then
   echo "Error> build can not find arch: $BASEVERSION!"
   exit 1
 fi
 
-if [ ! -f "$srcbaseabs/scripts/configure" ]
+if [[ ! -f "$srcbaseabs/scripts/configure" ]]
 then
   if ! command -v autoreconf >/dev/null 2>&1 || ! command -v aclocal >/dev/null 2>&1
   then
@@ -543,11 +526,11 @@ then
 fi
 
 #generate VERSION name combining all the build-time options.
-if [ -n "$BOPTS" -o -n "$COMPILER" ]
+if [[ ${#BOPTS[@]} -ne 0 || -n "$COMPILER" ]]
 then
   echo "Selected Compiler: $COMPILER"
 
-  if test -n "$COMPILER" -a `echo "$BASEVERSION" | grep -c "cray\|gni"` -gt 0
+  if [[ -n "$COMPILER" && $(echo "$BASEVERSION" | grep -c "cray\|gni") -gt 0 ]]
   then
     echo "Inserted explicit compiler options on Cray systems. Use compiler wrappers by loading PrgEnv-*"
     echo "e.g.) module load PrgEnv-* (e.g. cray for cce, gnu for gcc, intel for icc, and pgi for pgcc)"
@@ -556,9 +539,9 @@ then
     exit 1
   fi
 
-  if test `echo "$BOPTS" | grep -c "omp"` -gt 0 -a `echo "$BASEVERSION" | grep -c "darwin"` -gt 0
+  if [[ $(echo "${BOPTS[@]}" | grep -c "omp") -gt 0 && $(echo "$BASEVERSION" | grep -c "darwin") -gt 0 ]]
   then
-    if test -z "$COMPILER" -o "$COMPILER" != "gcc"
+    if [[ -z "$COMPILER" || "$COMPILER" != 'gcc' ]]
     then
       echo "The integrated OpenMP runtime library is supported on Mac only with the normal gcc"
       echo "You need to install this normal (non-clang) gcc via MacPorts or Homebrew"
@@ -566,94 +549,94 @@ then
       exit 1
     fi
   fi
-  echo "Selected Options: $BOPTS"
-  SORTED=`echo $BOPTS | awk  '{ for (i = 1; i <= NF; ++i) print $i }' | sort`
-  BOPTS_WITHCOMPILER=`echo $SORTED $COMPILER`
-  for i in $BOPTS_WITHCOMPILER
+  echo "Selected Options: ${BOPTS[*]}"
+  IFS=$'\n' SORTED=($(sort <<<"${BOPTS[*]}"))
+  unset IFS
+  for i in "${SORTED[@]}" "$COMPILER"
   do
-    VERSION=$VERSION-$i
+    [[ -n "$i" ]] && VERSION+="-$i"
   done
 fi
 
 #echo "|$DESTINATION|$DESTINATION_SUFFIX|"
 
-if [ -z "$DESTINATION" ]
+if [[ -z "$DESTINATION" ]]
 then
   DESTINATION="$VERSION"
 fi
 
-if [ $(dirname $DESTINATION) != "." ]
+if [[ "$(dirname "$DESTINATION")" != "." ]]
 then
-  srcbaseabs="$(cd $srcbaseabs; pwd)"
-  srcbase=$srcbaseabs
-  src="$srcbaseabs/arch/"
+  srcbaseabs="$(cd "$srcbaseabs" ; pwd)"
+  srcbase="$srcbaseabs"
+  src="$srcbaseabs/arch"
 fi
 
-if [ -n "$DESTINATION_SUFFIX" ]
+if [[ -n "$DESTINATION_SUFFIX" ]]
 then
   DESTINATION="$DESTINATION-$DESTINATION_SUFFIX"
 fi
 
 # make sure $DESTINATION is more than '/' characters, because we `rm -rf` it
-if [ -z "${DESTINATION#"${DESTINATION%%[!/]*}"}" ]
+if [[ -z "${DESTINATION#"${DESTINATION%%[!/]*}"}" ]]
 then
   echo 'Error: $DESTINATION is the filesystem root.'
   exit 1
 fi
 
-if test -n "$BOPTS"
+if [[ ${#BOPTS[@]} -ne 0 ]]
 then
     # pxshm+smp note: When combining the 'smp' and 'pxshm' directives, it is
     #                 important that they be included in $ConvHeader in that
     #                 exact order. See bug #717.
-    MYTMP=""
+    MYTMP=()
     HAS_PXSHM=0
     HAS_SMP=0
-    for i in $BOPTS; do
-      if [ "$i" = "smp" ]; then
+    for i in "${BOPTS[@]}"; do
+      if [[ "$i" = 'smp' ]]; then
         HAS_SMP=1
-      elif [ "$i" = "pxshm" ]; then
+      elif [[ "$i" = 'pxshm' ]]; then
         HAS_PXSHM=1
-      elif [ "$i" = "omp" ]; then
+      elif [[ "$i" = 'omp' ]]; then
         BUILD_OMP=1
-        MYTMP="$MYTMP $i"
+        MYTMP+=("$i")
       else
-        MYTMP="$MYTMP $i"
+        MYTMP+=("$i")
       fi
     done
-    if [ $HAS_PXSHM -eq 1 ]; then
-      MYTMP="pxshm $MYTMP"
+    if [[ "$HAS_PXSHM" = '1' ]]; then
+      MYTMP=(pxshm "${MYTMP[@]}")
     fi
-    if [ $HAS_SMP -eq 1 ]; then
-      MYTMP="smp $MYTMP"
-      if [ $BUILD_OMP -eq 1 ]; then
-        CONFIG_OPTS="--enable-task-queue $CONFIG_OPTS"
+    if [[ "$HAS_SMP" = '1' ]]; then
+      MYTMP=(smp "${MYTMP[@]}")
+      if [[ "$BUILD_OMP" = '1' ]]; then
+        CONFIG_OPTS=(--enable-task-queue "${CONFIG_OPTS[@]}")
       fi
-    elif [ $BUILD_OMP -eq 1 ]; then
+    elif [[ "$BUILD_OMP" = '1' ]]; then
       BUILD_OMP=2 #this means omp keyword inserted without smp keyword (presumably when building multicore-*)
-      CONFIG_OPTS="--enable-task-queue $CONFIG_OPTS"
+      CONFIG_OPTS=(--enable-task-queue "${CONFIG_OPTS[@]}")
     fi
 fi
 
 # build for Charm4py
-if [ "$PROGRAM" = "charm4py" ]; then
+if [[ "$PROGRAM" = 'charm4py' ]]; then
 
-    if [ -n "$BOPTS" ] && [ "$HAS_SMP" -eq 1 ]; then
+    if [[ ${#BOPTS[@]} -ne 0 && "$HAS_SMP" = '1' ]]; then
         echo "Error: SMP mode is currently not supported with charm4py. Choose a non-smp version."
         exit 1
     fi
 
-    if [ `echo "$BASEVERSION" | grep -c "multicore"` -gt 0 ]; then
+    if [[ $(echo "$BASEVERSION" | grep -c "multicore") -gt 0 ]]; then
         echo "Error: multicore is currently not supported with charm4py. Choose a non-smp version."
         exit 1
     fi
 
-    if test `echo "$CONFIG_OPTS" | grep -c "\--enable-charm4py"` -eq 0
+    if [[ $(echo "${CONFIG_OPTS[@]}" | grep -c "\--enable-charm4py") -eq 0 ]]
     then
-        CONFIG_OPTS="$CONFIG_OPTS --enable-charm4py"
+        CONFIG_OPTS+=(--enable-charm4py)
     fi
 
-    if test `echo "$BASEVERSION" | grep -c "win"` -gt 0
+    if [[ $(echo "$BASEVERSION" | grep -c "win") -gt 0 ]]
     then
         BUILD_SHARED=""
     else
@@ -661,39 +644,22 @@ if [ "$PROGRAM" = "charm4py" ]; then
     fi
 fi
 
-if test -n "$WITH_PRODUCTION"
+if [[ -n "$WITH_PRODUCTION" ]]
 then
     # Prepend optimize so that an explicit -no-optimize still works
-    OPTS="-optimize -production $OPTS"
-    CONFIG_OPTS="--disable-controlpoint --disable-tracing --disable-tracing-commthread --disable-charmdebug --disable-replay --disable-error-checking --disable-stats $CONFIG_OPTS"
+    OPTS=(-optimize -production "${OPTS[@]}")
+    CONFIG_OPTS=(--disable-controlpoint --disable-tracing --disable-tracing-commthread --disable-charmdebug --disable-replay --disable-error-checking --disable-stats "${CONFIG_OPTS[@]}")
 fi
 
-# build with Tau
-WITH_TAU=0
-if [ "$PROGRAM" = "Tau" ]
-then
-  Echo "TAU>>>> makefile config option: $TAU_MAKEFILE"
-  if [ -n "$TAU_MAKEFILE" -a -f $TAU_MAKEFILE ]
-  then
-    #Setting up TAU trace library:
-    Echo "TAU>>>> configuring with this TAU makefile: $TAU_MAKEFILE"
-
-          WITH_TAU=1
-  else
-    Echo "TAU>>>> ERROR could not find Makefile: $TAU_MAKEFILE, ignored"
-          TAU_MAKEFILE=""
-  fi
-fi
-
-if [ "$PROGRAM" = "ChaNGa" ]
+if [[ "$PROGRAM" = 'ChaNGa' ]]
 then
   #Setting lbuserdata when the build is ChaNGa
-  CONFIG_OPTS="--enable-lbuserdata $CONFIG_OPTS"
+  CONFIG_OPTS=(--enable-lbuserdata "${CONFIG_OPTS[@]}")
 fi
 
-if [ $BUILD_OMP = 2 ]
+if [[ "$BUILD_OMP" = '2' ]]
 then
-  case $DESTINATION in
+  case "$DESTINATION" in
     "multicore"*)
       BUILD_OMP=1
       ;;
@@ -715,10 +681,10 @@ fi
 # ---------- begin file structure creation ----------
 # ===================================================
 
-if [ -f "$DESTINATION/tmp/basics" ]
+if [[ -f "$DESTINATION/tmp/basics" ]]
 then
   Echo "The configure step has already taken place for the specified build."
-  if [ -z "$FORCE" ]
+  if [[ -z "$FORCE" ]]
   then
     Echo "To attempt a partial rebuild, run 'make' in \"$DESTINATION/tmp\"."
     Echo "To remove the existing data and reconfigure, run this script again with --force."
@@ -726,10 +692,10 @@ then
   else
     Echo "Removing existing data and starting over. (--force)"
   fi
-elif [ -e "$DESTINATION" -a ! -e "$DESTINATION/.spack" ]
+elif [[ -e "$DESTINATION" && ! -e "$DESTINATION/.spack" ]]
 then
   Echo "\"$DESTINATION\" already exists but is in an inconsistent state."
-  if [ -z "$FORCE" ]
+  if [[ -z "$FORCE" ]]
   then
     Echo "To remove the existing data and reconfigure, run this script again with --force."
     exit 1
@@ -739,7 +705,7 @@ then
 fi
 
 for d in benchmarks bin examples include lib lib_so tests tmp; do
-  rm -rf "$DESTINATION/$d"
+  rm -rf "${DESTINATION:?}/$d"
 done
 
 Echo "Creating dir: $DESTINATION"
@@ -748,201 +714,175 @@ mkdir -p "$DESTINATION/tmp"
 
 # Create the bin, lib, include, etc. links:
 WINNAME=`echo $VERSION | awk -F- '{print $2}'`
-if [ "x_$WINNAME" = "x_win" ]
+if [[ "$WINNAME" = 'win' ]]
 then
 #Win64 version needs special compilers and *copied* (not linked)
 # source files.
-  cp $src/win/system_ln $DESTINATION/tmp
+  cp "$src/win/system_ln" "$DESTINATION/tmp/"
   echo "Compiling createlink.cpp ..."
   case "$COMPILER" in
     gcc*|clang*)
       createlinkcc="$COMPILER"
       ;;
     *)
-      cp $src/win/unistd.h $DESTINATION/tmp
+      cp "$src/win/unistd.h" "$DESTINATION/tmp/"
       createlinkcc="./unix2nt_cc"
       ;;
   esac
-  (cd $src/win; $createlinkcc -c createlink.cpp -o createlink.o -D_WIN32_WINNT=0x0500; $createlinkcc createlink.o -o createlink.exe)
+  (cd "$src/win"; "$createlinkcc" -c createlink.cpp -o createlink.o -D_WIN32_WINNT=0x0500; "$createlinkcc" createlink.o -o createlink.exe)
 
-  if test ! -x $src/win/createlink.exe
+  if [[ ! -x "$src/win/createlink.exe" ]]
   then
     echo "VC++ is not properly installed!"
     exit 1
   fi
-  chmod +x $DESTINATION/tmp/system_ln
-  cp $src/win/gathertree.local   $DESTINATION/tmp
-  cp $src/win/gatherflat.local   $DESTINATION/tmp
+  chmod +x "$DESTINATION/tmp/system_ln"
+  cp "$src/win/gathertree.local" "$DESTINATION/tmp/"
+  cp "$src/win/gatherflat.local" "$DESTINATION/tmp/"
 else
-  cat > $DESTINATION/tmp/system_ln <<EOF
+  cat > "$DESTINATION/tmp/system_ln" <<EOF
 #!/bin/sh
-ln -f -s \$@
+ln -f -s "\$@"
 EOF
-  chmod +x $DESTINATION/tmp/system_ln
-  newdirlist='bin lib'
-  [ -n "$BUILD_SHARED" ] && newdirlist="$newdirlist lib_so"
-  newdirlist="$newdirlist include tmp"
-  for newdir in $newdirlist
+  chmod +x "$DESTINATION/tmp/system_ln"
+  newdirlist=(bin lib)
+  [[ -n "$BUILD_SHARED" ]] && newdirlist+=(lib_so)
+  newdirlist+=(include tmp)
+  for newdir in "${newdirlist[@]}"
   do
     Echo "Soft-linking over $newdir"
-    if [ -r $newdir ]
+    if [[ -r "$newdir" ]]
     then
-      rm -fr $newdir || exit 1
+      rm -fr "$newdir" || exit 1
     fi
-    $DESTINATION/tmp/system_ln $DESTINATION/$newdir $newdir
+    "$DESTINATION/tmp/system_ln" "$DESTINATION/$newdir" "$newdir"
   done
-  rm -f charm-version.h
-  $DESTINATION/tmp/system_ln $DESTINATION/include/charm-version.h charm-version.h
+  rm -f "charm-version.h"
+  "$DESTINATION/tmp/system_ln" "$DESTINATION/include/charm-version.h" "charm-version.h"
 fi
 
 Echo "Copying src/scripts/Makefile to $DESTINATION/tmp"
-$DESTINATION/tmp/system_ln "$srcbase/scripts/Make.depends" $DESTINATION/tmp/Make.depends
-$DESTINATION/tmp/system_ln "$srcbase/scripts/Make.cidepends" $DESTINATION/tmp/Make.cidepends
-if test -f "$srcbaseabs/ck-ldb/Make.lb"
+"$DESTINATION/tmp/system_ln" "$srcbase/scripts/Make.depends" "$DESTINATION/tmp/Make.depends"
+"$DESTINATION/tmp/system_ln" "$srcbase/scripts/Make.cidepends" "$DESTINATION/tmp/Make.cidepends"
+if [[ -f "$srcbaseabs/ck-ldb/Make.lb" ]]
 then
-$DESTINATION/tmp/system_ln "$srcbase/ck-ldb/Make.lb" $DESTINATION/tmp/Make.lb
+"$DESTINATION/tmp/system_ln" "$srcbase/ck-ldb/Make.lb" "$DESTINATION/tmp/Make.lb"
 else
-touch $DESTINATION/tmp/Make.lb
+touch "$DESTINATION/tmp/Make.lb"
 fi
-$DESTINATION/tmp/system_ln "$srcbase/scripts/Makefile" $DESTINATION/tmp/Makefile
-$DESTINATION/tmp/system_ln "$srcbase/scripts/Make.tau" $DESTINATION/tmp/Make.tau
-$DESTINATION/tmp/system_ln "$srcbase/scripts/Make.gpu" $DESTINATION/tmp/Make.gpu
-touch $DESTINATION/tmp/Makefile.machine
-touch $DESTINATION/tmp/Make.extlib
+"$DESTINATION/tmp/system_ln" "$srcbase/scripts/Makefile" "$DESTINATION/tmp/Makefile"
+"$DESTINATION/tmp/system_ln" "$srcbase/scripts/Make.gpu" "$DESTINATION/tmp/Make.gpu"
+touch "$DESTINATION/tmp/Makefile.machine"
+touch "$DESTINATION/tmp/Make.extlib"
 
 ConvUsr="$DESTINATION/tmp/conv-mach-pre.sh"
 Echo "Generating $ConvUsr"
-echo > $ConvUsr
-if test -n "$LIBDIR" 
+echo > "$ConvUsr"
+if [[ ${#LIBDIR[@]} -ne 0 ]]
 then
-  echo 'USER_OPTS_LD="$USER_OPTS_LD '$LIBDIR'"' >> $ConvUsr
+  echo 'USER_OPTS_LD="$USER_OPTS_LD '"${LIBDIR[*]}"'"' >> "$ConvUsr"
 fi
-if test -n "$INCDIR" 
+if [[ ${#INCDIR[@]} -ne 0 ]]
 then
-  echo 'USER_OPTS_CC="$USER_OPTS_CC '$INCDIR'"' >> $ConvUsr
-  echo 'USER_OPTS_CXX="$USER_OPTS_CXX '$INCDIR'"' >> $ConvUsr
+  echo 'USER_OPTS_CC="$USER_OPTS_CC '"${INCDIR[*]}"'"' >> "$ConvUsr"
+  echo 'USER_OPTS_CXX="$USER_OPTS_CXX '"${INCDIR[*]}"'"' >> "$ConvUsr"
 fi
-chmod +x $ConvUsr
+chmod +x "$ConvUsr"
 
 # Create conv-mach-opt headers with special build-time options
 ConvHeader="$DESTINATION/tmp/conv-mach-opt.h"
 ConvSh="$DESTINATION/tmp/conv-mach-opt.sh"
 ConvMak="$DESTINATION/tmp/conv-mach-opt.mak"
-if [ ! -f "$ConvSh" -o ! -f "$ConvHeader" -o ! -f "$ConvMak" ]
+if [[ ! -f "$ConvSh" || ! -f "$ConvHeader" || ! -f "$ConvMak" ]]
 then
   Echo "Generating $ConvHeader, conv-mach-opt.sh, conv-mach-opt.mak"
-  echo '/* Build-time options header, automatically generated by charm/build */' > $ConvHeader
-  echo '# Build-time options header, automatically generated by charm/build' > $ConvSh
-  echo '# Build-time options header, automatically generated by charm/build' > $ConvMak
-  echo '[ -z "$CHARMINC" ] && CHARMINC="."' >> $ConvSh
+  echo '/* Build-time options header, automatically generated by charm/build */' > "$ConvHeader"
+  echo '# Build-time options header, automatically generated by charm/build' > "$ConvSh"
+  echo '# Build-time options header, automatically generated by charm/build' > "$ConvMak"
+  echo '[ -z "$CHARMINC" ] && CHARMINC="."' >> "$ConvSh"
 fi
-if test -n "$COMPILER"
+if [[ -n "$COMPILER" ]]
 then
-      i=`echo $COMPILER | sed 's/-[0-9\.][0-9\.]*$//'`
-      echo "CMK_COMPILER_SUFFIX=${COMPILER#$i}" >> $ConvSh
-      echo '#include "'cc-$i.h'"' >> $ConvHeader
-      echo '. $CHARMINC/'"cc-$i.sh" >> $ConvSh
-elif test `echo "$BASEVERSION" | grep -c "bluegeneq"` -gt 0
-then
-      i="clang"
-      bgclang++11 --version
-      if [ $? -ne 0 ]; then
-         echo "ERROR: bgclang C/C++ compiler missing. Please load bgclang compilers, i.e. 'soft add +mpiwrapper-bgclang'."
-         exit 1
-      fi
-      echo '#include "'cc-$i.h'"' >> $ConvHeader
-      echo '. $CHARMINC/'"cc-$i.sh" >> $ConvSh
+      i="$(echo "$COMPILER" | sed 's/-[0-9\.][0-9\.]*$//')"
+      echo "CMK_COMPILER_SUFFIX=\"${COMPILER#$i}\"" >> "$ConvSh"
+      echo '#include "'"cc-$i.h"'"' >> "$ConvHeader"
+      echo '. "$CHARMINC/'"cc-$i.sh"'"' >> "$ConvSh"
 fi
-if test -n "$MYTMP"
+if [[ ${#MYTMP[@]} -ne 0 ]]
 then
-    BOPTS=$MYTMP
-    for i in $BOPTS
+    BOPTS=("${MYTMP[@]}")
+    for i in "${BOPTS[@]}"
     do
-      echo '#include "'conv-mach-$i.h'"' >> $ConvHeader
-      echo '. $CHARMINC/'"conv-mach-$i.sh" >> $ConvSh
+      echo '#include "'conv-mach-$i.h'"' >> "$ConvHeader"
+      echo '. "$CHARMINC/'"conv-mach-$i.sh"'"' >> "$ConvSh"
     done
-    if [ $BUILD_CUDA -eq 1 ]; then
-      echo 'CUDA_DIR="'$CUDA_DIR'"' >> $ConvSh
-      echo "CUDA_DIR:=$CUDA_DIR" >> $ConvMak
-      echo "BUILD_CUDA:=$BUILD_CUDA" >> $ConvMak
+    if [[ "$BUILD_CUDA" = '1' ]]; then
+      echo 'CUDA_DIR="'"$CUDA_DIR"'"' >> "$ConvSh"
+      echo "CUDA_DIR:=$CUDA_DIR" >> "$ConvMak"
+      echo "BUILD_CUDA:=$BUILD_CUDA" >> "$ConvMak"
     fi
 fi
 
-if test  "$BUILD_SHARED"  = "-build-shared"
+if [[ "$BUILD_SHARED" = '-build-shared' ]]
 then
-    echo "CMK_NO_BUILD_SHARED=false" >> $ConvSh
-    echo "CMK_NO_BUILD_SHARED:=false" >> $ConvMak
+    echo "CMK_NO_BUILD_SHARED=false" >> "$ConvSh"
+    echo "CMK_NO_BUILD_SHARED:=false" >> "$ConvMak"
 
-    OPTS="$OPTS $BUILD_SHARED"
+    OPTS+=("$BUILD_SHARED")
 else
-    echo "CMK_NO_BUILD_SHARED=true" >> $ConvSh
-    echo "CMK_NO_BUILD_SHARED:=true" >> $ConvMak
+    echo "CMK_NO_BUILD_SHARED=true" >> "$ConvSh"
+    echo "CMK_NO_BUILD_SHARED:=true" >> "$ConvMak"
 fi
 
-if test  -n "$WITH_ROMIO" 
+if [[ -n "$WITH_ROMIO" ]]
 then
-    echo "CMK_AMPI_WITH_ROMIO=\"1\"" >> $ConvSh
-    echo "CMK_AMPI_WITH_ROMIO:=1" >> $ConvMak
-    echo '#define CMK_AMPI_WITH_ROMIO 1' >> $ConvHeader
+    echo "CMK_AMPI_WITH_ROMIO=\"1\"" >> "$ConvSh"
+    echo "CMK_AMPI_WITH_ROMIO:=1" >> "$ConvMak"
+    echo '#define CMK_AMPI_WITH_ROMIO 1' >> "$ConvHeader"
 else
-    echo "CMK_AMPI_WITH_ROMIO=\"0\"" >> $ConvSh
-    echo "CMK_AMPI_WITH_ROMIO:=0" >> $ConvMak
-    echo '#define CMK_AMPI_WITH_ROMIO 0' >> $ConvHeader
+    echo "CMK_AMPI_WITH_ROMIO=\"0\"" >> "$ConvSh"
+    echo "CMK_AMPI_WITH_ROMIO:=0" >> "$ConvMak"
+    echo '#define CMK_AMPI_WITH_ROMIO 0' >> "$ConvHeader"
 fi
 
 if [[ -n "$AMPI_ONLY" ]]
 then
-    echo "CMK_AMPI_ONLY=\"1\"" >> $ConvSh
-    echo "CMK_AMPI_ONLY:=1" >> $ConvMak
-    echo '#define CMK_AMPI_ONLY 1' >> $ConvHeader
+    echo "CMK_AMPI_ONLY=\"1\"" >> "$ConvSh"
+    echo "CMK_AMPI_ONLY:=1" >> "$ConvMak"
+    echo '#define CMK_AMPI_ONLY 1' >> "$ConvHeader"
 
-    # AMPI doesn't use Charm-MPI interop or msg priorities of any kind.
+    # AMPI doesn't use Charm-MPI interop, msg priorities, non-FIFO queues, or CcdSCHEDLOOP.
     # AMPI creates O(NumVirtualRanks) chare arrays by default (for MPI_COMM_SELF),
     # so we bump up the number of bits reserved for the collection in the objid.
-    OPTS="-DCMK_NO_INTEROP=1 -DCMK_NO_MSG_PRIOS=1 -DCMK_FIFO_QUEUE_ONLY=1 -DCMK_OBJID_COLLECTION_BITS=29 $OPTS "
-    CONFIG_OPTS="--with-prio-type=char $CONFIG_OPTS "
+    OPTS=('-DCMK_NO_INTEROP=1' '-DCMK_NO_MSG_PRIOS=1' '-DCMK_FIFO_QUEUE_ONLY=1' '-DCSD_NO_SCHEDLOOP=1' '-DCMK_OBJID_COLLECTION_BITS=29' "${OPTS[@]}")
+    CONFIG_OPTS=('--with-prio-type=char' "${CONFIG_OPTS[@]}")
 else
-    echo "CMK_AMPI_ONLY=\"0\"" >> $ConvSh
-    echo "CMK_AMPI_ONLY:=0" >> $ConvMak
-    echo '#define CMK_AMPI_ONLY 0' >> $ConvHeader
+    echo "CMK_AMPI_ONLY=\"0\"" >> "$ConvSh"
+    echo "CMK_AMPI_ONLY:=0" >> "$ConvMak"
+    echo '#define CMK_AMPI_ONLY 0' >> "$ConvHeader"
 fi
 
-if test -n "$WITH_PRODUCTION"
+if [[ -n "$WITH_PRODUCTION" ]]
 then
-    echo '#define CMK_OPTIMIZE 1' >> $ConvHeader
-fi
-
-if test $WITH_TAU -eq 1
-then
-    [ -z "$TAU_MAKEFILE" ] && TAU_MAKEFILE="Make.tau"
-    SED_CHARMC="s@TAU_MAKEFILE=\(.*\)@TAU_MAKEFILE=$TAU_MAKEFILE@"
-
-    sed -e $SED_CHARMC $srcbaseabs/scripts/Makefile > .Makefile.$$ && cp .Makefile.$$ $srcbaseabs/scripts/Makefile && rm -f  .Makefile.$$
-    sed -e $SED_CHARMC $srcbaseabs/scripts/charmc > .charmc.$$ && cp .charmc.$$ $srcbaseabs/scripts/charmc && rm -f .charmc.$$
-
-    echo "#define CMK_WITH_TAU               1" >> $ConvHeader
-    echo "#define pthread_create             tau_pthread_create" >> $ConvHeader
-    echo "#define pthread_exit               tau_pthread_exit" >> $ConvHeader
-
-    echo "CMK_WITH_TAU=\"true\"" >> $ConvSh
+    echo '#define CMK_OPTIMIZE 1' >> "$ConvHeader"
 fi
 
 CMK_VDIR="$BASEVERSION"
-echo "$CMK_VDIR" > $DESTINATION/tmp/.vdir
-echo 'CMK_VDIR="'$CMK_VDIR'"' >> $ConvSh
-echo "CMK_VDIR:=$CMK_VDIR" >> $ConvMak
+echo "$CMK_VDIR" > "$DESTINATION/tmp/.vdir"
+echo 'CMK_VDIR="'$CMK_VDIR'"' >> "$ConvSh"
+echo "CMK_VDIR:=$CMK_VDIR" >> "$ConvMak"
 CMK_GDIR="`echo $BASEVERSION | sed -e 's@-.*@@'`"
-echo "$CMK_GDIR" > $DESTINATION/tmp/.gdir
-echo 'CMK_GDIR="'$CMK_GDIR'"' >> $ConvSh
-echo "CMK_GDIR:=$CMK_GDIR" >> $ConvMak
+echo "$CMK_GDIR" > "$DESTINATION/tmp/.gdir"
+echo 'CMK_GDIR="'"$CMK_GDIR"'"' >> "$ConvSh"
+echo "CMK_GDIR:=$CMK_GDIR" >> "$ConvMak"
 
-echo 'BUILDOPTS="'$OPTS'"'  >> $ConvSh
-echo "SRCBASE=$srcbase" > $DESTINATION/tmp/charmpath.mk
+echo 'BUILDOPTS="'"${OPTS[*]}"'"'  >> "$ConvSh"
+echo "SRCBASE=$srcbase" > "$DESTINATION/tmp/charmpath.mk"
 
-echo "CONFIG_OPTS=\"$CONFIG_OPTS\"" > "$DESTINATION/tmp/config_opts.sh"
-echo "OPTS=\"$OPTS\"" >> "$DESTINATION/tmp/config_opts.sh"
+echo "CONFIG_OPTS=\"${CONFIG_OPTS[*]}\"" > "$DESTINATION/tmp/config_opts.sh"
+echo "OPTS=\"${OPTS[*]}\"" >> "$DESTINATION/tmp/config_opts.sh"
 chmod +x "$DESTINATION/tmp/config_opts.sh"
-echo "OPTSATBUILDTIME:=$OPTS" >> $ConvMak
+echo "OPTSATBUILDTIME:=${OPTS[*]}" >> "$ConvMak"
 
 # ===================================================
 # ----------- end file structure creation -----------
@@ -954,29 +894,34 @@ printError()
   Echo "Charm++ NOT BUILT. Either cd into $DESTINATION/tmp and try"
   Echo "to resolve the problems yourself, visit"
   Echo "    https://charm.cs.illinois.edu/"
-  Echo "for more information. Otherwise, please open an issue on our GitHub https://github.com/UIUC-PPL/charm"
+  Echo "for more information. Otherwise, please open an issue on our GitHub https://github.com/charmplusplus/charm"
   exit $MAKEEXIT
 }
 
-Echo "Performing '$MAKE $MAKEOPTS basics OPTS="$OPTS" QUIET="$QUIET" CONFIG_OPTS="$CONFIG_OPTS"' in $DESTINATION/tmp"
-cd $DESTINATION/tmp 
-$MAKE $MAKEOPTS basics OPTS="$OPTS" QUIET="$QUIET"
-MAKEEXIT=$?
-[ $MAKEEXIT -ne 0 ] && printError
+cd "$DESTINATION/tmp"
 
-if test -n "$ONLY_CONFIGURE"
+runCmd()
+{
+  Echo "Performing '$@' in '$DESTINATION/tmp'"
+  "$@"
+}
+
+runCmd "$MAKE" "${MAKEOPTS[@]}" basics OPTS="${OPTS[*]}" QUIET="$QUIET"
+MAKEEXIT=$?
+[[ $MAKEEXIT -ne 0 ]] && printError
+
+if [[ -n "$ONLY_CONFIGURE" ]]
 then
     exit 0
 fi
 
-Echo "Performing '$MAKE $MAKEOPTS $PROGRAM OPTS="$OPTS" QUIET="$QUIET"' in $DESTINATION/tmp"
-$MAKE $MAKEOPTS $PROGRAM OPTS="$OPTS" QUIET="$QUIET"
+runCmd "$MAKE" "${MAKEOPTS[@]}" "$PROGRAM" OPTS="${OPTS[*]}" QUIET="$QUIET"
 MAKEEXIT=$?
-if [ $MAKEEXIT -eq 0 ]
+if [[ $MAKEEXIT -eq 0 ]]
 then
-  if [ $BUILD_OMP = 1 ];
+  if [[ "$BUILD_OMP" = '1' ]];
   then
-    $MAKE MFLAGS="$MAKEOPTS" openmp_llvm OPTS="$OPTS" QUIET="$QUIET"
+    "$MAKE" MFLAGS="${MAKEOPTS[*]}" openmp_llvm OPTS="${OPTS[*]}" QUIET="$QUIET"
   fi
   Echo "-------------------------------------------------"
   Echo "$PROGRAM built successfully."

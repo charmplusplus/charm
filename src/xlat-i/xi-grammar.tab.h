@@ -1,8 +1,9 @@
-/* A Bison parser, made by GNU Bison 3.0.4.  */
+/* A Bison parser, made by GNU Bison 3.8.2.  */
 
 /* Bison interface for Yacc-like parsers in C
 
-   Copyright (C) 1984, 1989-1990, 2000-2015 Free Software Foundation, Inc.
+   Copyright (C) 1984, 1989-1990, 2000-2015, 2018-2021 Free Software Foundation,
+   Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -15,7 +16,7 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+   along with this program.  If not, see <https://www.gnu.org/licenses/>.  */
 
 /* As a special exception, you may create a larger work that contains
    part or all of the Bison parser skeleton and distribute that work
@@ -30,6 +31,10 @@
    This special exception was added by the Free Software Foundation in
    version 2.2 of Bison.  */
 
+/* DO NOT RELY ON FEATURES THAT ARE NOT DOCUMENTED in the manual,
+   especially those whose name start with YY_ or yy_.  They are
+   private implementation details that can be changed or removed.  */
+
 #ifndef YY_YY_Y_TAB_H_INCLUDED
 # define YY_YY_Y_TAB_H_INCLUDED
 /* Debug traces.  */
@@ -40,92 +45,99 @@
 extern int yydebug;
 #endif
 
-/* Token type.  */
+/* Token kinds.  */
 #ifndef YYTOKENTYPE
 # define YYTOKENTYPE
   enum yytokentype
   {
-    MODULE = 258,
-    MAINMODULE = 259,
-    EXTERN = 260,
-    READONLY = 261,
-    INITCALL = 262,
-    INITNODE = 263,
-    INITPROC = 264,
-    PUPABLE = 265,
-    CHARE = 266,
-    MAINCHARE = 267,
-    GROUP = 268,
-    NODEGROUP = 269,
-    ARRAY = 270,
-    MESSAGE = 271,
-    CONDITIONAL = 272,
-    CLASS = 273,
-    INCLUDE = 274,
-    STACKSIZE = 275,
-    THREADED = 276,
-    TEMPLATE = 277,
-    WHENIDLE = 278,
-    SYNC = 279,
-    IGET = 280,
-    EXCLUSIVE = 281,
-    IMMEDIATE = 282,
-    SKIPSCHED = 283,
-    INLINE = 284,
-    VIRTUAL = 285,
-    MIGRATABLE = 286,
-    AGGREGATE = 287,
-    CREATEHERE = 288,
-    CREATEHOME = 289,
-    NOKEEP = 290,
-    NOTRACE = 291,
-    APPWORK = 292,
-    VOID = 293,
-    CONST = 294,
-    NOCOPY = 295,
-    NOCOPYPOST = 296,
-    NOCOPYDEVICE = 297,
-    PACKED = 298,
-    VARSIZE = 299,
-    ENTRY = 300,
-    FOR = 301,
-    FORALL = 302,
-    WHILE = 303,
-    WHEN = 304,
-    OVERLAP = 305,
-    SERIAL = 306,
-    IF = 307,
-    ELSE = 308,
-    PYTHON = 309,
-    LOCAL = 310,
-    NAMESPACE = 311,
-    USING = 312,
-    IDENT = 313,
-    NUMBER = 314,
-    LITERAL = 315,
-    CPROGRAM = 316,
-    HASHIF = 317,
-    HASHIFDEF = 318,
-    INT = 319,
-    LONG = 320,
-    SHORT = 321,
-    CHAR = 322,
-    FLOAT = 323,
-    DOUBLE = 324,
-    UNSIGNED = 325,
-    SIZET = 326,
-    BOOL = 327,
-    ACCEL = 328,
-    READWRITE = 329,
-    WRITEONLY = 330,
-    ACCELBLOCK = 331,
-    MEMCRITICAL = 332,
-    REDUCTIONTARGET = 333,
-    CASE = 334,
-    TYPENAME = 335
+    YYEMPTY = -2,
+    YYEOF = 0,                     /* "end of file"  */
+    YYerror = 256,                 /* error  */
+    YYUNDEF = 257,                 /* "invalid token"  */
+    MODULE = 258,                  /* MODULE  */
+    MAINMODULE = 259,              /* MAINMODULE  */
+    EXTERN = 260,                  /* EXTERN  */
+    READONLY = 261,                /* READONLY  */
+    INITCALL = 262,                /* INITCALL  */
+    INITNODE = 263,                /* INITNODE  */
+    INITPROC = 264,                /* INITPROC  */
+    PUPABLE = 265,                 /* PUPABLE  */
+    CHARE = 266,                   /* CHARE  */
+    MAINCHARE = 267,               /* MAINCHARE  */
+    GROUP = 268,                   /* GROUP  */
+    NODEGROUP = 269,               /* NODEGROUP  */
+    ARRAY = 270,                   /* ARRAY  */
+    MESSAGE = 271,                 /* MESSAGE  */
+    CONDITIONAL = 272,             /* CONDITIONAL  */
+    CLASS = 273,                   /* CLASS  */
+    INCLUDE = 274,                 /* INCLUDE  */
+    STACKSIZE = 275,               /* STACKSIZE  */
+    THREADED = 276,                /* THREADED  */
+    TEMPLATE = 277,                /* TEMPLATE  */
+    WHENIDLE = 278,                /* WHENIDLE  */
+    SYNC = 279,                    /* SYNC  */
+    IGET = 280,                    /* IGET  */
+    EXCLUSIVE = 281,               /* EXCLUSIVE  */
+    IMMEDIATE = 282,               /* IMMEDIATE  */
+    SKIPSCHED = 283,               /* SKIPSCHED  */
+    INLINE = 284,                  /* INLINE  */
+    VIRTUAL = 285,                 /* VIRTUAL  */
+    MIGRATABLE = 286,              /* MIGRATABLE  */
+    AGGREGATE = 287,               /* AGGREGATE  */
+    CREATEHERE = 288,              /* CREATEHERE  */
+    CREATEHOME = 289,              /* CREATEHOME  */
+    NOKEEP = 290,                  /* NOKEEP  */
+    NOTRACE = 291,                 /* NOTRACE  */
+    APPWORK = 292,                 /* APPWORK  */
+    VOID = 293,                    /* VOID  */
+    CONST = 294,                   /* CONST  */
+    NOCOPY = 295,                  /* NOCOPY  */
+    NOCOPYPOST = 296,              /* NOCOPYPOST  */
+    NOCOPYDEVICE = 297,            /* NOCOPYDEVICE  */
+    PACKED = 298,                  /* PACKED  */
+    VARSIZE = 299,                 /* VARSIZE  */
+    ENTRY = 300,                   /* ENTRY  */
+    FOR = 301,                     /* FOR  */
+    FORALL = 302,                  /* FORALL  */
+    WHILE = 303,                   /* WHILE  */
+    WHEN = 304,                    /* WHEN  */
+    OVERLAP = 305,                 /* OVERLAP  */
+    SERIAL = 306,                  /* SERIAL  */
+    IF = 307,                      /* IF  */
+    ELSE = 308,                    /* ELSE  */
+    PYTHON = 309,                  /* PYTHON  */
+    LOCAL = 310,                   /* LOCAL  */
+    NAMESPACE = 311,               /* NAMESPACE  */
+    USING = 312,                   /* USING  */
+    IDENT = 313,                   /* IDENT  */
+    NUMBER = 314,                  /* NUMBER  */
+    LITERAL = 315,                 /* LITERAL  */
+    CPROGRAM = 316,                /* CPROGRAM  */
+    HASHIF = 317,                  /* HASHIF  */
+    HASHIFDEF = 318,               /* HASHIFDEF  */
+    INT = 319,                     /* INT  */
+    LONG = 320,                    /* LONG  */
+    SHORT = 321,                   /* SHORT  */
+    CHAR = 322,                    /* CHAR  */
+    FLOAT = 323,                   /* FLOAT  */
+    DOUBLE = 324,                  /* DOUBLE  */
+    UNSIGNED = 325,                /* UNSIGNED  */
+    ACCEL = 326,                   /* ACCEL  */
+    READWRITE = 327,               /* READWRITE  */
+    WRITEONLY = 328,               /* WRITEONLY  */
+    ACCELBLOCK = 329,              /* ACCELBLOCK  */
+    MEMCRITICAL = 330,             /* MEMCRITICAL  */
+    REDUCTIONTARGET = 331,         /* REDUCTIONTARGET  */
+    CASE = 332,                    /* CASE  */
+    TYPENAME = 333                 /* TYPENAME  */
   };
+  typedef enum yytokentype yytoken_kind_t;
 #endif
-/* Tokens.  */
+/* Token kinds.  */
+#define YYEMPTY -2
+#define YYEOF 0
+#define YYerror 256
+#define YYUNDEF 257
 #define MODULE 258
 #define MAINMODULE 259
 #define EXTERN 260
@@ -194,23 +206,20 @@ extern int yydebug;
 #define FLOAT 323
 #define DOUBLE 324
 #define UNSIGNED 325
-#define SIZET 326
-#define BOOL 327
-#define ACCEL 328
-#define READWRITE 329
-#define WRITEONLY 330
-#define ACCELBLOCK 331
-#define MEMCRITICAL 332
-#define REDUCTIONTARGET 333
-#define CASE 334
-#define TYPENAME 335
+#define ACCEL 326
+#define READWRITE 327
+#define WRITEONLY 328
+#define ACCELBLOCK 329
+#define MEMCRITICAL 330
+#define REDUCTIONTARGET 331
+#define CASE 332
+#define TYPENAME 333
 
 /* Value type.  */
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
-
 union YYSTYPE
 {
-#line 54 "xi-grammar.y" /* yacc.c:1909  */
+#line 54 "xi-grammar.y"
 
   Attribute *attr;
   Attribute::Argument *attrarg;
@@ -256,9 +265,9 @@ union YYSTYPE
   XStr* xstrptr;
   AccelBlock* accelBlock;
 
-#line 260 "y.tab.h" /* yacc.c:1909  */
-};
+#line 269 "y.tab.h"
 
+};
 typedef union YYSTYPE YYSTYPE;
 # define YYSTYPE_IS_TRIVIAL 1
 # define YYSTYPE_IS_DECLARED 1
@@ -281,6 +290,8 @@ struct YYLTYPE
 
 extern YYSTYPE yylval;
 extern YYLTYPE yylloc;
+
 int yyparse (void);
+
 
 #endif /* !YY_YY_Y_TAB_H_INCLUDED  */

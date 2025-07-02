@@ -1,9 +1,10 @@
 #include "ampi.h"
 
 #include <string.h>
+#include <stdio.h>
 #include <vector>
+#include <algorithm>
 
-FLINKAGE {
 #define mpi_send FTN_NAME( MPI_SEND , mpi_send )
 #define mpi_recv FTN_NAME( MPI_RECV , mpi_recv )
 #define mpi_mrecv FTN_NAME( MPI_MRECV , mpi_mrecv )
@@ -71,7 +72,7 @@ FLINKAGE {
 #define mpi_type_size_x FTN_NAME( MPI_TYPE_SIZE_X , mpi_type_size_x )
 #define mpi_type_lb FTN_NAME( MPI_TYPE_LB , mpi_type_lb )
 #define mpi_type_ub FTN_NAME( MPI_TYPE_UB , mpi_type_ub )
-/* mpi_type_set_name is defined in ampifimpl.f90, see ampif_type_set_name defined below */
+#define mpi_type_set_name FTN_NAME ( MPI_TYPE_SET_NAME , mpi_type_set_name )
 #define mpi_type_get_name FTN_NAME( MPI_TYPE_GET_NAME , mpi_type_get_name )
 #define mpi_type_create_resized FTN_NAME( MPI_TYPE_CREATE_RESIZED, mpi_type_create_resized )
 #define mpi_type_dup FTN_NAME( MPI_TYPE_DUP, mpi_type_dup )
@@ -172,7 +173,7 @@ FLINKAGE {
 #define mpi_comm_test_inter FTN_NAME( MPI_COMM_TEST_INTER , mpi_comm_test_inter )
 #define mpi_comm_remote_size FTN_NAME ( MPI_COMM_REMOTE_SIZE , mpi_comm_remote_size )
 #define mpi_comm_remote_group FTN_NAME ( MPI_COMM_REMOTE_GROUP , mpi_comm_remote_group )
-/* mpi_comm_set_name is defined in ampifimpl.f90, see ampif_comm_set_name defined below */
+#define mpi_comm_set_name FTN_NAME ( MPI_COMM_SET_NAME , mpi_comm_set_name )
 #define mpi_comm_get_name FTN_NAME ( MPI_COMM_GET_NAME , mpi_comm_get_name )
 #define mpi_comm_set_info FTN_NAME ( MPI_COMM_SET_INFO , mpi_comm_set_info )
 #define mpi_comm_get_info FTN_NAME ( MPI_COMM_GET_INFO , mpi_comm_get_info )
@@ -223,7 +224,7 @@ FLINKAGE {
 #define mpi_errhandler_free FTN_NAME( MPI_ERRHANDLER_FREE , mpi_errhandler_free )
 #define mpi_add_error_code FTN_NAME( MPI_ADD_ERROR_CODE , mpi_add_error_code )
 #define mpi_add_error_class FTN_NAME( MPI_ADD_ERROR_CLASS , mpi_add_error_class )
-/* mpi_add_error_string is defined in ampifimpl.f90, see ampif_add_error_string defined below */
+#define mpi_add_error_string FTN_NAME ( MPI_ADD_ERROR_STRING , mpi_add_error_string )
 #define mpi_error_class FTN_NAME( MPI_ERROR_CLASS , mpi_error_class )
 #define mpi_error_string FTN_NAME( MPI_ERROR_STRING , mpi_error_string )
 #define mpi_wtime FTN_NAME( MPI_WTIME , mpi_wtime )
@@ -238,8 +239,10 @@ FLINKAGE {
 #define mpi_abort FTN_NAME( MPI_ABORT , mpi_abort )
 #define mpi_file_call_errhandler FTN_NAME( MPI_FILE_CALL_ERRHANDLER , mpi_file_call_errhandler )
 #define mpi_file_create_errhandler FTN_NAME( MPI_FILE_CREATE_ERRHANDLER , mpi_file_create_errhandler )
+#if !CMK_AMPI_WITH_ROMIO
 #define mpi_file_set_errhandler FTN_NAME( MPI_FILE_SET_ERRHANDLER , mpi_file_set_errhandler )
 #define mpi_file_get_errhandler FTN_NAME( MPI_FILE_GET_ERRHANDLER , mpi_file_get_errhandler )
+#endif
 
 /* MPI-2 */
 #define mpi_type_get_envelope FTN_NAME ( MPI_TYPE_GET_ENVELOPE , mpi_type_get_envelope )
@@ -258,7 +261,7 @@ FLINKAGE {
 #define mpi_win_get_attr  FTN_NAME ( MPI_WIN_GET_ATTR  , mpi_win_get_attr )
 #define mpi_win_set_attr  FTN_NAME ( MPI_WIN_SET_ATTR  , mpi_win_set_attr )
 #define mpi_win_get_group  FTN_NAME ( MPI_WIN_GET_GROUP  , mpi_win_get_group )
-/* mpi_win_set_name is defined in ampifimpl.f90, see ampif_win_set_name defined below */
+#define mpi_win_set_name FTN_NAME ( MPI_WIN_SET_NAME , mpi_win_set_name )
 #define mpi_win_get_name  FTN_NAME ( MPI_WIN_GET_NAME  , mpi_win_get_name )
 #define mpi_win_set_info  FTN_NAME ( MPI_WIN_SET_INFO  , mpi_win_set_info )
 #define mpi_win_get_info  FTN_NAME ( MPI_WIN_GET_INFO  , mpi_win_get_info )
@@ -286,28 +289,16 @@ FLINKAGE {
 #define mpi_compare_and_swap  FTN_NAME ( MPI_COMPARE_AND_SWAP  , mpi_compare_and_swap )
 
 #define mpi_info_create FTN_NAME ( MPI_INFO_CREATE , mpi_info_create )
-/* mpi_info_set is defined in ampifimpl.f90, see ampif_info_set defined below */
-/* mpi_info_delete is defined in ampifimpl.f90, see ampif_info_delete defined below */
-/* mpi_info_get is defined in ampifimpl.f90, see ampif_info_get defined below */
-/* mpi_info_get_valuelen is defined in ampifimpl.f90, see ampif_info_get_valuelen defined below */
+#define mpi_info_set FTN_NAME ( MPI_INFO_SET , mpi_info_set )
+#define mpi_info_delete FTN_NAME ( MPI_INFO_DELETE , mpi_info_delete )
+#define mpi_info_get FTN_NAME ( MPI_INFO_GET , mpi_info_get )
+#define mpi_info_get_valuelen FTN_NAME ( MPI_INFO_GET_VALUELEN , mpi_info_get_valuelen )
 #define mpi_info_get_nkeys FTN_NAME ( MPI_INFO_GET_NKEYS , mpi_info_get_nkeys )
 #define mpi_info_get_nthkey FTN_NAME ( MPI_INFO_GET_NTHKEYS , mpi_info_get_nthkey )
 #define mpi_info_dup FTN_NAME ( MPI_INFO_DUP , mpi_info_dup )
 #define mpi_info_free FTN_NAME ( MPI_INFO_FREE , mpi_info_free )
 
 #define mpi_pcontrol FTN_NAME ( MPI_PCONTROL , mpi_pcontrol )
-
-/* Functions that take 'const char*' arguments are wrapped by Fortran subroutines
- * defined in ampifimpl.f90. These functions should be prefixed with 'ampif_' here: */
-#define ampif_comm_set_name FTN_NAME ( AMPIF_COMM_SET_NAME , ampif_comm_set_name )
-#define ampif_type_set_name FTN_NAME ( AMPIF_TYPE_SET_NAME , ampif_type_set_name )
-#define ampif_win_set_name FTN_NAME ( AMPIF_WIN_SET_NAME , ampif_win_set_name )
-#define ampif_info_set FTN_NAME ( AMPIF_INFO_SET , ampif_info_set )
-#define ampif_info_delete FTN_NAME ( AMPIF_INFO_DELETE , ampif_info_delete )
-#define ampif_info_get FTN_NAME ( AMPIF_INFO_GET , ampif_info_get )
-#define ampif_info_get_valuelen FTN_NAME ( AMPIF_INFO_GET_VALUELEN , ampif_info_get_valuelen )
-#define ampif_add_error_string FTN_NAME ( AMPIF_ADD_ERROR_STRING , ampif_add_error_string )
-#define ampif_print FTN_NAME( AMPIF_PRINT , ampif_print )
 
 /* Extensions needed by ROMIO */
 #define mpir_status_set_bytes FTN_NAME ( MPIR_STATUS_SET_BYTES, mpir_status_set_bytes )
@@ -318,7 +309,6 @@ FLINKAGE {
 #define ampi_load_stop_measure FTN_NAME( AMPI_LOAD_STOP_MEASURE, ampi_load_stop_measure )
 #define ampi_load_reset_measure FTN_NAME( AMPI_LOAD_RESET_MEASURE, ampi_load_reset_measure )
 #define ampi_load_set_value FTN_NAME( AMPI_SET_LOAD_VALUE, ampi_load_set_value )
-#define ampi_evacuate FTN_NAME ( AMPI_EVACUATE , ampi_evacuate )
 #define ampi_migrate_to_pe FTN_NAME( AMPI_MIGRATE_TO_PE , ampi_migrate_to_pe )
 #define ampi_set_migratable FTN_NAME ( AMPI_SET_MIGRATABLE , ampi_set_migratable )
 #define ampi_register_pup FTN_NAME( AMPI_REGISTER_PUP , ampi_register_pup )
@@ -335,7 +325,7 @@ FLINKAGE {
 #define ampi_yield FTN_NAME ( AMPI_YIELD , ampi_yield )
 #define ampi_suspend FTN_NAME ( AMPI_SUSPEND , ampi_suspend )
 #define ampi_resume FTN_NAME ( AMPI_RESUME, ampi_resume )
-/* ampi_print is defined in ampifimpl.f90, see ampif_print defined below */
+#define ampi_print FTN_NAME( AMPI_PRINT , ampi_print )
 #define ampi_install_idle_timer FTN_NAME( AMPI_INSTALL_IDLE_TIMER , ampi_install_idle_timer )
 #define ampi_uninstall_idle_timer FTN_NAME( AMPI_UNINSTALL_IDLE_TIMER , ampi_uninstall_idle_timer )
 #define ampi_trace_begin FTN_NAME( AMPI_TRACE_BEGIN , ampi_trace_begin )
@@ -345,11 +335,69 @@ FLINKAGE {
 #define ampi_command_argument_count FTN_NAME( AMPI_COMMAND_ARGUMENT_COUNT , ampi_command_argument_count )
 #define ampi_get_command_argument FTN_NAME( AMPI_GET_COMMAND_ARGUMENT , ampi_get_command_argument )
 
-
 #if CMK_CUDA
 #define ampi_gpu_invoke_wr FTN_NAME ( AMPI_GPU_INVOKE_WR  , ampi_gpu_invoke_wr )
 #define ampi_gpu_iinvoke_wr FTN_NAME ( AMPI_GPU_IINVOKE_WR  , ampi_gpu_iinvoke_wr )
 #endif
+
+#if CMK_AMPI_WITH_ROMIO
+#define mpi_file_close FTN_NAME( MPI_FILE_CLOSE , mpi_file_close )
+#define mpi_file_delete FTN_NAME( MPI_FILE_DELETE , mpi_file_delete )
+#define mpi_file_sync FTN_NAME( MPI_FILE_SYNC , mpi_file_sync )
+#define mpi_file_get_amode FTN_NAME( MPI_FILE_GET_AMODE , mpi_file_get_amode )
+#define mpi_file_get_atomicity FTN_NAME( MPI_FILE_GET_ATOMICITY , mpi_file_get_atomicity )
+#define mpi_file_get_byte_offset FTN_NAME( MPI_FILE_GET_BYTE_OFFSET , mpi_file_get_byte_offset )
+#define mpi_file_get_errhandler FTN_NAME( MPI_FILE_GET_ERRHANDLER , mpi_file_get_errhandler )
+#define mpi_file_get_type_extent FTN_NAME( MPI_FILE_GET_TYPE_EXTENT , mpi_file_get_type_extent )
+#define mpi_file_get_group FTN_NAME( MPI_FILE_GET_GROUP , mpi_file_get_group )
+#define mpi_file_get_info FTN_NAME( MPI_FILE_GET_INFO , mpi_file_get_info )
+#define mpi_file_get_position_shared FTN_NAME( MPI_FILE_GET_POSITION_SHARED , mpi_file_get_position_shared )
+#define mpi_file_get_position FTN_NAME( MPI_FILE_GET_POSITION , mpi_file_get_position )
+#define mpi_file_get_size FTN_NAME( MPI_FILE_GET_SIZE , mpi_file_get_size )
+#define mpi_file_get_view FTN_NAME( MPI_FILE_GET_VIEW , mpi_file_get_view )
+#define mpio_test FTN_NAME( MPIO_TEST , mpio_test )
+#define mpio_wait FTN_NAME( MPIO_WAIT , mpio_wait )
+#define mpi_file_iread_at FTN_NAME( MPI_FILE_IREAD_AT , mpi_file_iread_at )
+#define mpi_file_iread_shared FTN_NAME( MPI_FILE_IREAD_SHARED , mpi_file_iread_shared )
+#define mpi_file_iread FTN_NAME( MPI_FILE_IREAD , mpi_file_iread )
+#define mpi_file_iwrite_at FTN_NAME( MPI_FILE_IWRITE_AT , mpi_file_iwrite_at )
+#define mpi_file_iwrite_shared FTN_NAME( MPI_FILE_IWRITE_SHARED , mpi_file_iwrite_shared )
+#define mpi_file_iwrite FTN_NAME( MPI_FILE_IWRITE , mpi_file_iwrite )
+#define mpi_file_open FTN_NAME( MPI_FILE_OPEN , mpi_file_open )
+#define mpi_file_preallocate FTN_NAME( MPI_FILE_PREALLOCATE , mpi_file_preallocate )
+#define mpi_file_read_at_all_begin FTN_NAME( MPI_FILE_READ_AT_ALL_BEGIN , mpi_file_read_at_all_begin )
+#define mpi_file_read_at_all_end FTN_NAME( MPI_FILE_READ_AT_ALL_END , mpi_file_read_at_all_end )
+#define mpi_file_read_all_begin FTN_NAME( MPI_FILE_READ_ALL_BEGIN , mpi_file_read_all_begin )
+#define mpi_file_read_all_end FTN_NAME( MPI_FILE_READ_ALL_END , mpi_file_read_all_end )
+#define mpi_file_read_all FTN_NAME( MPI_FILE_READ_ALL , mpi_file_read_all )
+#define mpi_file_read_at_all FTN_NAME( MPI_FILE_READ_AT_ALL , mpi_file_read_at_all )
+#define mpi_file_read_at FTN_NAME( MPI_FILE_READ_AT , mpi_file_read_at )
+#define mpi_file_read_ordered_begin FTN_NAME( MPI_FILE_READ_ORDERED_BEGIN , mpi_file_read_ordered_begin )
+#define mpi_file_read_ordered_end FTN_NAME( MPI_FILE_READ_ORDERED_END , mpi_file_read_ordered_end )
+#define mpi_file_read_ordered FTN_NAME( MPI_FILE_READ_ORDERED , mpi_file_read_ordered )
+#define mpi_file_read_shared FTN_NAME( MPI_FILE_READ_SHARED , mpi_file_read_shared )
+#define mpi_file_read FTN_NAME( MPI_FILE_READ , mpi_file_read )
+#define mpi_file_seek_shared FTN_NAME( MPI_FILE_SEEK_SHARED , mpi_file_seek_shared )
+#define mpi_file_seek FTN_NAME( MPI_FILE_SEEK , mpi_file_seek )
+#define mpi_file_set_atomicity FTN_NAME( MPI_FILE_SET_ATOMICITY , mpi_file_set_atomicity )
+#define mpi_file_set_errhandler FTN_NAME( MPI_FILE_SET_ERRHANDLER , mpi_file_set_errhandler )
+#define mpi_file_set_info FTN_NAME( MPI_FILE_SET_INFO , mpi_file_set_info )
+#define mpi_file_set_size FTN_NAME( MPI_FILE_SET_SIZE , mpi_file_set_size )
+#define mpi_file_set_view FTN_NAME( MPI_FILE_SET_VIEW , mpi_file_set_view )
+#define mpi_file_write_at_all_begin FTN_NAME( MPI_FILE_WRITE_AT_ALL_BEGIN , mpi_file_write_at_all_begin )
+#define mpi_file_write_at_all_end FTN_NAME( MPI_FILE_WRITE_AT_ALL_END , mpi_file_write_at_all_end )
+#define mpi_file_write_all_begin FTN_NAME( MPI_FILE_WRITE_ALL_BEGIN , mpi_file_write_all_begin )
+#define mpi_file_write_all_end FTN_NAME( MPI_FILE_WRITE_ALL_END , mpi_file_write_all_end )
+#define mpi_file_write_all FTN_NAME( MPI_FILE_WRITE_ALL , mpi_file_write_all )
+#define mpi_file_write_at_all FTN_NAME( MPI_FILE_WRITE_AT_ALL , mpi_file_write_at_all )
+#define mpi_file_write_at FTN_NAME( MPI_FILE_WRITE_AT , mpi_file_write_at )
+#define mpi_file_write_ordered_begin FTN_NAME( MPI_FILE_WRITE_ORDERED_BEGIN , mpi_file_write_ordered_begin )
+#define mpi_file_write_ordered_end FTN_NAME( MPI_FILE_WRITE_ORDERED_END , mpi_file_write_ordered_end )
+#define mpi_file_write_ordered FTN_NAME( MPI_FILE_WRITE_ORDERED , mpi_file_write_ordered )
+#define mpi_file_write_shared FTN_NAME( MPI_FILE_WRITE_SHARED , mpi_file_write_shared )
+#define mpi_file_write FTN_NAME( MPI_FILE_WRITE , mpi_file_write )
+#endif
+
 
 #define REDUCERF(caps, nocaps) \
 void FTN_NAME(caps, nocaps)(void *iv, void *iov, int *len, MPI_Datatype *dt){ \
@@ -358,7 +406,9 @@ void FTN_NAME(caps, nocaps)(void *iv, void *iov, int *len, MPI_Datatype *dt){ \
 
 /* Strings passed from Fortran must be explicitly NULL terminated
  * before they are passed into AMPI. */
-static void ampif_str_f2c(char* dst, const char* src, int len) noexcept {
+template <size_t N>
+static inline void ampif_str_f2c(char (&dst)[N], const char* src, size_t src_len) noexcept {
+  size_t len = std::min(src_len, N-1);
   memcpy(dst, src, len);
   dst[len] = '\0';
 }
@@ -388,10 +438,12 @@ static MPI_Status* handle_MPI_STATUSES_IGNORE(int *sts) noexcept {
   }
 }
 
-static void handle_MPI_IN_PLACE_f(void* inbuf, void* outbuf) noexcept {
+static void handle_MPI_IN_PLACE_f(void *& inbuf, void *& outbuf) noexcept {
   if (inbuf == NULL) inbuf = MPI_IN_PLACE;
   if (outbuf == NULL) outbuf = MPI_IN_PLACE;
 }
+
+FLINKAGE {
 
 void mpi_is_thread_main(int *flag, int *ierr) noexcept
 {
@@ -863,10 +915,10 @@ void mpi_type_ub(int* datatype, MPI_Aint* displacement, int* ierr) noexcept
   *ierr = MPI_Type_ub(*datatype, displacement);
 }
 
-void ampif_type_set_name(int* datatype, const char* name, int *nlen, int* ierr) noexcept
+void mpi_type_set_name(int* datatype, const char* name, int* ierr, long int nlen) noexcept
 {
   char tmpName[MPI_MAX_OBJECT_NAME];
-  ampif_str_f2c(tmpName, name, *nlen);
+  ampif_str_f2c(tmpName, name, nlen);
 
   *ierr = MPI_Type_set_name(*datatype, tmpName);
 }
@@ -888,7 +940,7 @@ void mpi_type_set_attr(int *datatype, int *type_keyval, void *attribute_val, int
 
 void mpi_type_get_attr(int *datatype, int *type_keyval, void *attribute_val, int *flag, int *ierr) noexcept
 {
-  int tmp, *result = &tmp;
+  int * result;
   *ierr = MPI_Type_get_attr(*datatype, *type_keyval, &result, flag);
   *(intptr_t *)attribute_val = *result;
 }
@@ -1559,7 +1611,7 @@ void mpi_file_create_errhandler(void (*function)(MPI_File*,int*,...), int *errha
 }
 
 #if !CMK_AMPI_WITH_ROMIO
-// Disable ROMIO's get_errhf.c and set_errhf.c if enabling these.
+// Disable the versions from ROMIO's get_errhf.c and set_errhf.c if enabling these.
 void mpi_file_set_errhandler(MPI_File* file, int* errhandler, int *ierr) noexcept
 {
   *ierr = MPI_File_set_errhandler(*file, *errhandler);
@@ -1601,10 +1653,10 @@ void mpi_add_error_class(int *errorclass, int *ierr) noexcept
   *ierr = MPI_Add_error_class(errorclass);
 }
 
-void ampif_add_error_string(int *errorcode, const char *errorstring, int* elen, int *ierr) noexcept
+void mpi_add_error_string(int *errorcode, const char *errorstring, int *ierr, long int elen) noexcept
 {
   char tmpErrorstring[MPI_MAX_ERROR_STRING];
-  ampif_str_f2c(tmpErrorstring, errorstring, *elen);
+  ampif_str_f2c(tmpErrorstring, errorstring, elen);
 
   *ierr = MPI_Add_error_string(*errorcode, tmpErrorstring);
 }
@@ -1732,10 +1784,10 @@ void mpi_intercomm_merge(int *intercomm, int *high, int *newintracomm, int *ierr
   *ierr = MPI_Intercomm_merge(*intercomm, *high, newintracomm);
 }
 
-void ampif_comm_set_name(int *comm, const char *comm_name, int* nlen, int *ierr) noexcept
+void mpi_comm_set_name(int *comm, const char *comm_name, int *ierr, long int nlen) noexcept
 {
   char tmpName[MPI_MAX_OBJECT_NAME];
-  ampif_str_f2c(tmpName, comm_name, *nlen);
+  ampif_str_f2c(tmpName, comm_name, nlen);
 
   *ierr = MPI_Comm_set_name(*comm, tmpName);
 }
@@ -1779,7 +1831,7 @@ void mpi_comm_set_attr(int *comm, int *keyval, void* attribute_val, int *ierr) n
 
 void mpi_comm_get_attr(int *comm, int *keyval, void *attribute_val, int *flag, int *ierr) noexcept
 {
-  int tmp, *result = &tmp;
+  int * result;
   *ierr = MPI_Comm_get_attr(*comm, *keyval, &result, flag);
   *(intptr_t *)attribute_val = *result;
 }
@@ -1807,7 +1859,7 @@ void mpi_attr_put(int *comm, int *keyval, void* attribute_val, int *ierr) noexce
 
 void mpi_attr_get(int *comm, int *keyval, void *attribute_val, int *flag, int *ierr) noexcept
 {
-  int tmp, *result = &tmp;
+  int * result;
   *ierr = MPI_Attr_get(*comm, *keyval, &result, flag);
   *(intptr_t *)attribute_val = *result;
 }
@@ -1889,7 +1941,7 @@ void mpi_win_delete_attr(int *win, int *key, int *ierr) noexcept
 void mpi_win_get_attr(int *win, int *win_keyval, void *attribute_val, int *flag,
                       int *ierr) noexcept
 {
-  int tmp, *result = &tmp;
+  int * result;
   *ierr = MPI_Win_get_attr(*win, *win_keyval, &result, flag);
   *(intptr_t *)attribute_val = *result;
 }
@@ -1904,10 +1956,10 @@ void mpi_win_get_group(int *win, int *group, int *ierr) noexcept
   *ierr = MPI_Win_get_group(*win, group);
 }
 
-void ampif_win_set_name(int *win, const char *name, int* nlen, int *ierr) noexcept
+void mpi_win_set_name(int *win, const char *name, int *ierr, long int nlen) noexcept
 {
   char tmpName[MPI_MAX_OBJECT_NAME];
-  ampif_str_f2c(tmpName, name, *nlen);
+  ampif_str_f2c(tmpName, name, nlen);
 
   *ierr = MPI_Win_set_name(*win, tmpName);
 }
@@ -2071,45 +2123,45 @@ void mpi_info_create(int* info, int* ierr) noexcept
   *ierr = MPI_Info_create(info);
 }
 
-void ampif_info_set(int* info, const char *key, const char *value,
-                    int *klen, int *vlen, int *ierr) noexcept
+void mpi_info_set(int* info, const char *key, const char *value,
+                    int *ierr, long int klen, long int vlen) noexcept
 {
   char tmpKey[MPI_MAX_INFO_KEY];
-  ampif_str_f2c(tmpKey, key, *klen);
+  ampif_str_f2c(tmpKey, key, klen);
 
   char tmpValue[MPI_MAX_INFO_VAL];
-  ampif_str_f2c(tmpValue, value, *vlen);
+  ampif_str_f2c(tmpValue, value, vlen);
 
   *ierr = MPI_Info_set(*info, tmpKey, tmpValue);
 }
 
-void ampif_info_delete(int* info, const char* key, int* klen, int* ierr) noexcept
+void mpi_info_delete(int* info, const char* key, int* ierr, long int klen) noexcept
 {
   char tmpKey[MPI_MAX_INFO_KEY];
-  ampif_str_f2c(tmpKey, key, *klen);
+  ampif_str_f2c(tmpKey, key, klen);
 
   *ierr = MPI_Info_delete(*info, tmpKey);
 }
 
-void ampif_info_get(int* info, const char *key, int* valuelen, char *value, int *flag,
-                    int* klen, int* ierr) noexcept
+void mpi_info_get(int* info, const char *key, char *value, int *flag,
+                    int* ierr, long int klen, long int valuelen) noexcept
 {
   char tmpKey[MPI_MAX_INFO_KEY];
-  ampif_str_f2c(tmpKey, key, *klen);
+  ampif_str_f2c(tmpKey, key, klen);
 
-  std::vector<char> tmpValue(*valuelen);
+  std::vector<char> tmpValue(valuelen);
 
-  *ierr = MPI_Info_get(*info, tmpKey, *valuelen, tmpValue.data(), flag);
+  *ierr = MPI_Info_get(*info, tmpKey, valuelen, tmpValue.data(), flag);
 
   if (*ierr == MPI_SUCCESS)
-    ampif_str_c2f(value, tmpValue.data(), *valuelen);
+    ampif_str_c2f(value, tmpValue.data(), valuelen);
 }
 
-void ampif_info_get_valuelen(int* info, const char *key, int *valuelen, int *flag,
-                             int *klen, int* ierr) noexcept
+void mpi_info_get_valuelen(int* info, const char *key, int *valuelen, int *flag,
+                             int* ierr, long int klen) noexcept
 {
   char tmpKey[MPI_MAX_INFO_KEY];
-  ampif_str_f2c(tmpKey, key, *klen);
+  ampif_str_f2c(tmpKey, key, klen);
 
   *ierr = MPI_Info_get_valuelen(*info, tmpKey, valuelen, flag);
 }
@@ -2176,13 +2228,6 @@ void ampi_load_set_value(double *value, int *ierr) noexcept
 {
   *ierr = AMPI_Load_set_value(*value);
 }
-
-#if CMK_FAULT_EVAC
-void ampi_evacuate(int *ierr) noexcept
-{
-  *ierr = AMPI_Evacuate();
-}
-#endif
 
 void ampi_migrate_to_pe(int *dest, int *ierr) noexcept
 {
@@ -2273,10 +2318,10 @@ void ampi_resume(int *dest, int *comm, int *ierr) noexcept
   *ierr = AMPI_Resume(*dest, *comm);
 }
 
-void ampif_print(const char *str, int *len, int *ierr) noexcept
+void ampi_print(const char *str, int *ierr, long int len) noexcept
 {
   char tmpStr[MPI_MAX_ERROR_STRING];
-  ampif_str_f2c(tmpStr, str, *len);
+  ampif_str_f2c(tmpStr, str, len);
 
   *ierr = AMPI_Print(tmpStr);
 }
@@ -2334,5 +2379,627 @@ void ampi_get_command_argument(int *c, char *str, int *len, int *ierr) noexcept
   }
 }
 
-} // extern "C"
+} /* FLINKAGE */
 
+#if CMK_AMPI_WITH_ROMIO
+static inline void romio_fortran_error_print(const char * str) noexcept
+{
+  fputs(str, stderr);
+}
+
+#define MPIO_Request MPI_Request
+#define MPIO_Wait MPI_Wait
+#define MPIO_Test MPI_Test
+#define ADIOI_Malloc malloc
+#define ADIOI_Free free
+#define ADIOI_Strncpy strncpy
+
+FLINKAGE {
+
+void mpi_file_close(MPI_Fint *fh, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_close(&fh_c);
+  *fh = MPI_File_c2f(fh_c);
+}
+
+void mpi_file_delete(char *filename, MPI_Fint *info, MPI_Fint *ierr, long int str_len) noexcept
+{
+  char *newfname;
+  long int real_len, i;
+  MPI_Info info_c;
+
+  info_c = MPI_Info_f2c(*info);
+
+  /* strip trailing blanks */
+  if (filename == nullptr) {
+    romio_fortran_error_print("MPI_File_delete: filename is an invalid address\n");
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
+  for (i=str_len-1; i>=0; i--) if (filename[i] != ' ') break;
+  if (i < 0) {
+    romio_fortran_error_print("MPI_File_delete: filename is a blank string\n");
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
+  real_len = i + 1;
+
+  newfname = (char *) ADIOI_Malloc((real_len+1)*sizeof(char));
+  ADIOI_Strncpy(newfname, filename, real_len);
+  newfname[real_len] = '\0';
+
+  *ierr = MPI_File_delete(newfname, info_c);
+
+  ADIOI_Free(newfname);
+}
+
+void mpi_file_sync(MPI_Fint *fh, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_sync(fh_c);
+}
+
+void mpi_file_get_amode(MPI_Fint *fh, MPI_Fint *amode, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_get_amode(fh_c, amode);
+}
+
+void mpi_file_get_atomicity(MPI_Fint *fh, MPI_Fint *flag, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_get_atomicity(fh_c, flag);
+}
+
+void mpi_file_get_byte_offset(MPI_Fint *fh,MPI_Offset *offset, MPI_Offset *disp, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_get_byte_offset(fh_c,*offset,disp);
+}
+
+void mpi_file_get_errhandler(MPI_Fint *fh, MPI_Fint *err_handler, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+  MPI_Errhandler err_handler_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_get_errhandler(fh_c, &err_handler_c);
+  *err_handler = MPI_Errhandler_c2f(err_handler_c);
+}
+
+void mpi_file_get_type_extent(MPI_Fint *fh,MPI_Datatype *datatype,
+               MPI_Fint *extent, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+  MPI_Aint extent_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_get_type_extent(fh_c,*datatype, &extent_c);
+  *(MPI_Aint*)extent = extent_c; /* Have to assume it's really an MPI_Aint? */
+}
+
+void mpi_file_get_group(MPI_Fint *fh,MPI_Group *group, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_get_group(fh_c, group);
+}
+
+void mpi_file_get_info(MPI_Fint *fh, MPI_Fint *info_used, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+  MPI_Info info_used_c;
+
+  fh_c = MPI_File_f2c(*fh);
+
+  *ierr = MPI_File_get_info(fh_c, &info_used_c);
+  *info_used = MPI_Info_c2f(info_used_c);
+}
+
+void mpi_file_get_position_shared(MPI_Fint *fh, MPI_Offset *offset, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_get_position_shared(fh_c, offset);
+}
+
+void mpi_file_get_position(MPI_Fint *fh, MPI_Offset *offset, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_get_position(fh_c, offset);
+}
+
+void mpi_file_get_size(MPI_Fint *fh, MPI_Offset *size, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_get_size(fh_c, size);
+}
+
+void mpi_file_get_view(MPI_Fint *fh, MPI_Offset *disp, MPI_Fint *etype, MPI_Fint *filetype,
+                       char *datarep, MPI_Fint *ierr, long int str_len) noexcept
+{
+  MPI_File fh_c;
+  long int i, tmpreplen;
+  MPI_Datatype etype_c, filetype_c;
+
+  char *tmprep;
+
+  /* Initialize the string to all blanks */
+  if (datarep == nullptr) {
+    romio_fortran_error_print("MPI_File_get_view: datarep is an invalid address\n");
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
+
+  tmprep = (char *) ADIOI_Malloc((MPI_MAX_DATAREP_STRING+1) * sizeof(char));
+  fh_c = MPI_File_f2c(*fh);
+  etype_c = MPI_Type_f2c(*etype);
+  filetype_c = MPI_Type_f2c(*filetype);
+  *ierr = MPI_File_get_view(fh_c, disp, &etype_c, &filetype_c, tmprep);
+
+  tmpreplen = strlen(tmprep);
+  if (tmpreplen <= str_len) {
+    memcpy(datarep, tmprep, tmpreplen);
+
+    /* blank pad the remaining space */
+    for (i=tmpreplen; i<str_len; i++) datarep[i] = ' ';
+  }
+  else {
+    /* not enough space */
+    memcpy(datarep, tmprep, str_len);
+    /* this should be flagged as an error. */
+    *ierr = MPI_ERR_UNKNOWN;
+  }
+
+  *etype = MPI_Type_c2f(etype_c);
+  *filetype = MPI_Type_c2f(filetype_c);
+  ADIOI_Free(tmprep);
+}
+
+void mpio_test(MPI_Fint *request,MPI_Fint *flag,MPI_Status *status, MPI_Fint *ierr) noexcept
+{
+  MPIO_Request req_c;
+
+  req_c = MPIO_Request_f2c(*request);
+  *ierr = MPIO_Test(&req_c,flag,status);
+  *request = MPIO_Request_c2f(req_c);
+}
+
+void mpio_wait(MPI_Fint *request,MPI_Status *status, MPI_Fint *ierr) noexcept
+{
+  MPIO_Request req_c;
+
+  req_c = MPIO_Request_f2c(*request);
+  *ierr = MPIO_Wait(&req_c, status);
+  *request = MPIO_Request_c2f(req_c);
+}
+
+void mpi_file_iread_at(MPI_Fint *fh,MPI_Offset *offset,void *buf,
+                       MPI_Fint *count,MPI_Datatype *datatype,
+                       MPI_Fint *request, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+  MPIO_Request req_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_iread_at(fh_c,*offset,buf,*count,*datatype,&req_c);
+  *request = MPIO_Request_c2f(req_c);
+}
+
+void mpi_file_iread_shared(MPI_Fint *fh,void *buf,MPI_Fint *count,
+                           MPI_Datatype *datatype,MPI_Fint *request, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+  MPIO_Request req_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_iread_shared(fh_c,buf,*count,*datatype,&req_c);
+  *request = MPIO_Request_c2f(req_c);
+}
+
+void mpi_file_iread(MPI_Fint *fh,void *buf,MPI_Fint *count,
+                    MPI_Datatype *datatype,MPI_Fint *request, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+  MPIO_Request req_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_iread(fh_c,buf,*count,*datatype,&req_c);
+  *request = MPIO_Request_c2f(req_c);
+}
+
+void mpi_file_iwrite_at(MPI_Fint *fh,MPI_Offset *offset,void *buf,
+                        MPI_Fint *count,MPI_Datatype *datatype,
+                        MPI_Fint *request, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+  MPIO_Request req_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_iwrite_at(fh_c,*offset,buf,*count,*datatype,&req_c);
+  *request = MPIO_Request_c2f(req_c);
+}
+
+void mpi_file_iwrite_shared(MPI_Fint *fh,void *buf,MPI_Fint *count,
+                            MPI_Datatype *datatype,MPI_Fint *request, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+  MPIO_Request req_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_iwrite_shared(fh_c,buf,*count,*datatype,&req_c);
+  *request = MPIO_Request_c2f(req_c);
+}
+
+void mpi_file_iwrite(MPI_Fint *fh,void *buf,MPI_Fint *count,
+                     MPI_Datatype *datatype,MPI_Fint *request, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+  MPIO_Request req_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_iwrite(fh_c,buf,*count,*datatype,&req_c);
+  *request = MPIO_Request_c2f(req_c);
+}
+
+void mpi_file_open(MPI_Fint *comm,char *filename,MPI_Fint *amode,
+                   MPI_Fint *info, MPI_Fint *fh, MPI_Fint *ierr, long int str_len) noexcept
+{
+  char *newfname;
+  MPI_File fh_c;
+  long int real_len, i;
+  MPI_Info info_c;
+
+  info_c = MPI_Info_f2c(*info);
+
+  /* strip trailing blanks */
+  if (filename == nullptr) {
+    romio_fortran_error_print("MPI_File_open: filename is an invalid address\n");
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
+  for (i=str_len-1; i>=0; i--) if (filename[i] != ' ') break;
+  if (i < 0) {
+	romio_fortran_error_print("MPI_File_open: filename is a blank string\n");
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
+  real_len = i + 1;
+
+  newfname = (char *) ADIOI_Malloc((real_len+1)*sizeof(char));
+  ADIOI_Strncpy(newfname, filename, real_len);
+  newfname[real_len] = '\0';
+
+  *ierr = MPI_File_open((MPI_Comm)(*comm), newfname, *amode, info_c, &fh_c);
+
+  *fh = MPI_File_c2f(fh_c);
+  ADIOI_Free(newfname);
+}
+
+void mpi_file_preallocate(MPI_Fint *fh,MPI_Offset *size, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_preallocate(fh_c,*size);
+}
+
+void mpi_file_read_at_all_begin(MPI_Fint *fh,MPI_Offset *offset,void *buf,
+                                MPI_Fint *count,MPI_Fint *datatype, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_read_at_all_begin(fh_c,*offset,buf,*count,(MPI_Datatype) *datatype);
+}
+
+void mpi_file_read_at_all_end(MPI_Fint *fh,void *buf,MPI_Status *status, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_read_at_all_end(fh_c,buf,status);
+}
+
+void mpi_file_read_all_begin(MPI_Fint *fh,void *buf,MPI_Fint *count,
+                             MPI_Fint *datatype, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_read_all_begin(fh_c,buf,*count,(MPI_Datatype) *datatype);
+}
+
+void mpi_file_read_all_end(MPI_Fint *fh,void *buf,MPI_Status *status, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+
+  *ierr = MPI_File_read_all_end(fh_c,buf,status);
+}
+
+void mpi_file_read_all(MPI_Fint *fh,void *buf,MPI_Fint *count,
+                       MPI_Fint *datatype,MPI_Status *status, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_read_all(fh_c,buf,*count,(MPI_Datatype)*datatype,status);
+}
+
+void mpi_file_read_at_all(MPI_Fint *fh,MPI_Offset *offset,void *buf,
+                          MPI_Fint *count,MPI_Fint *datatype,
+                          MPI_Status *status, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_read_at_all(fh_c,*offset,buf,*count,(MPI_Datatype)*datatype,status);
+}
+
+void mpi_file_read_at(MPI_Fint *fh,MPI_Offset *offset,void *buf,
+                      MPI_Fint *count,MPI_Fint *datatype,MPI_Status *status, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_read_at(fh_c,*offset,buf,*count,(MPI_Datatype)*datatype,status);
+}
+
+void mpi_file_read_ordered_begin(MPI_Fint *fh,void *buf,MPI_Fint *count,
+                                 MPI_Fint *datatype,MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_read_ordered_begin(fh_c,buf,*count,(MPI_Datatype)*datatype);
+}
+
+void mpi_file_read_ordered_end(MPI_Fint *fh,void *buf,MPI_Status *status, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+
+  *ierr = MPI_File_read_ordered_end(fh_c,buf,status);
+}
+
+void mpi_file_read_ordered(MPI_Fint *fh,void *buf,MPI_Fint *count,
+                           MPI_Fint *datatype,MPI_Status *status, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_read_ordered(fh_c,buf,*count,(MPI_Datatype)*datatype,status);
+}
+
+void mpi_file_read_shared(MPI_Fint *fh,void *buf,MPI_Fint *count,
+                          MPI_Fint *datatype,MPI_Status *status, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_read_shared(fh_c,buf,*count,(MPI_Datatype)*datatype,status);
+}
+
+void mpi_file_read(MPI_Fint *fh,void *buf,MPI_Fint *count,
+                   MPI_Fint *datatype,MPI_Status *status, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_read(fh_c,buf,*count,(MPI_Datatype)*datatype,status);
+}
+
+void mpi_file_seek_shared(MPI_Fint *fh,MPI_Offset *offset,MPI_Fint *whence, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_seek_shared(fh_c,*offset,*whence);
+}
+
+void mpi_file_seek(MPI_Fint *fh,MPI_Offset *offset,MPI_Fint *whence, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_seek(fh_c,*offset,*whence);
+}
+
+void mpi_file_set_atomicity(MPI_Fint *fh,MPI_Fint *flag, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_set_atomicity(fh_c,*flag);
+}
+
+void mpi_file_set_errhandler(MPI_Fint *fh, MPI_Fint *err_handler, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+  MPI_Errhandler err_handler_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  err_handler_c = MPI_Errhandler_f2c(*err_handler);
+
+  *ierr = MPI_File_set_errhandler(fh_c,err_handler_c);
+}
+
+void mpi_file_set_info(MPI_Fint *fh, MPI_Fint *info, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+  MPI_Info info_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  info_c = MPI_Info_f2c(*info);
+
+  *ierr = MPI_File_set_info(fh_c, info_c);
+}
+
+void mpi_file_set_size(MPI_Fint *fh,MPI_Offset *size, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_set_size(fh_c,*size);
+}
+
+void mpi_file_set_view(MPI_Fint *fh, MPI_Offset *disp, MPI_Fint *etype, MPI_Fint *filetype,
+                       char *datarep, MPI_Fint *info, MPI_Fint *ierr, long int str_len) noexcept
+{
+  char *newstr;
+  MPI_File fh_c;
+  long int i, real_len;
+  MPI_Info info_c;
+
+  info_c = MPI_Info_f2c(*info);
+
+  /* strip trailing blanks in datarep */
+  if (datarep == nullptr) {
+    romio_fortran_error_print("MPI_File_set_view: datarep is an invalid address\n");
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
+  for (i=str_len-1; i>=0; i--) if (datarep[i] != ' ') break;
+  if (i < 0) {
+	romio_fortran_error_print("MPI_File_set_view: datarep is a blank string\n");
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
+  real_len = i + 1;
+
+  newstr = (char *) ADIOI_Malloc((real_len+1)*sizeof(char));
+  ADIOI_Strncpy(newstr, datarep, real_len);
+  newstr[real_len] = '\0';
+
+  fh_c = MPI_File_f2c(*fh);
+
+  *ierr = MPI_File_set_view(fh_c,*disp,*etype,*filetype,newstr,info_c);
+
+  ADIOI_Free(newstr);
+}
+
+void mpi_file_write_at_all_begin(MPI_Fint *fh,MPI_Offset *offset,void *buf,
+                                 MPI_Fint *count,MPI_Fint *datatype, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_write_at_all_begin(fh_c,*offset,buf,*count,(MPI_Datatype)*datatype);
+}
+
+void mpi_file_write_at_all_end(MPI_Fint *fh,void *buf,MPI_Status *status, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+
+  *ierr = MPI_File_write_at_all_end(fh_c,buf,status);
+}
+
+void mpi_file_write_all_begin(MPI_Fint *fh,void *buf,MPI_Fint *count,
+                              MPI_Fint *datatype, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_write_all_begin(fh_c,buf,*count,(MPI_Datatype)*datatype);
+}
+
+void mpi_file_write_all_end(MPI_Fint *fh,void *buf,MPI_Status *status, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+
+  *ierr = MPI_File_write_all_end(fh_c,buf,status);
+}
+
+void mpi_file_write_all(MPI_Fint *fh,void *buf,MPI_Fint *count,
+                        MPI_Fint *datatype,MPI_Status *status, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_write_all(fh_c,buf,*count,*datatype,status);
+}
+
+void mpi_file_write_at_all(MPI_Fint *fh,MPI_Offset *offset,void *buf,
+                           MPI_Fint *count,MPI_Fint *datatype,
+                           MPI_Status *status, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_write_at_all(fh_c,*offset,buf,*count,*datatype,status);
+}
+
+void mpi_file_write_at(MPI_Fint *fh,MPI_Offset *offset,void *buf,
+                       MPI_Fint *count,MPI_Fint *datatype,
+                       MPI_Status *status, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_write_at(fh_c,*offset,buf,*count,*datatype,status);
+}
+
+void mpi_file_write_ordered_begin(MPI_Fint *fh,void *buf,MPI_Fint *count,
+                                  MPI_Fint *datatype, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_write_ordered_begin(fh_c,buf,*count,*datatype);
+}
+
+void mpi_file_write_ordered_end(MPI_Fint *fh,void *buf,MPI_Status *status, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+
+  *ierr = MPI_File_write_ordered_end(fh_c,buf,status);
+}
+
+void mpi_file_write_ordered(MPI_Fint *fh,void *buf,MPI_Fint *count,
+                            MPI_Fint *datatype,MPI_Status *status, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_write_ordered(fh_c,buf,*count,*datatype,status);
+}
+
+void mpi_file_write_shared(MPI_Fint *fh,void *buf,MPI_Fint *count,
+                           MPI_Fint *datatype,MPI_Status *status, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_write_shared(fh_c, buf,*count,*datatype,status);
+}
+
+void mpi_file_write(MPI_Fint *fh,void *buf,MPI_Fint *count,
+                    MPI_Fint *datatype,MPI_Status *status, MPI_Fint *ierr) noexcept
+{
+  MPI_File fh_c;
+
+  fh_c = MPI_File_f2c(*fh);
+  *ierr = MPI_File_write(fh_c, buf,*count,*datatype,status);
+}
+
+} /* FLINKAGE */
+#endif

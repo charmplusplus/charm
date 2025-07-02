@@ -43,9 +43,6 @@ typedef  void* PPCAtomicQueueElement;
 typedef struct _ppcatomicstate {
   volatile ppc_atomic_t Producer;
   volatile ppc_atomic_t UpperBound;
-#if CMK_BLUEGENEQ
-  char pad[32 - 2*sizeof(ppc_atomic_t)];
-#endif
 } PPCAtomicState;
 
 typedef struct _ppcatomicq {
@@ -65,13 +62,6 @@ void PPCAtomicQueueInit      (void            * atomic_mem,
   int               nelem)
 {
   pami_result_t rc;
-
-  //Verify counter array is 64-byte aligned
-#if CMK_BLUEGENEQ
-  assert ( (((uintptr_t) atomic_mem) & (0x1F)) == 0 );
-  assert (sizeof(PPCAtomicState) == 32); //all counters need to be lined up
-  assert (sizeof(PPCAtomicState) <= atomic_memsize);
-#endif
 
   queue->_useOverflowQ = use_overflow;
 

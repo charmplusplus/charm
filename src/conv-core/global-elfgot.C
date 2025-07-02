@@ -80,7 +80,7 @@ A more readable summary is at:
 
 CpvDeclare(int, CmiPICMethod);
 
-#if CMK_AMD64
+#if CMK_64BIT
 typedef Elf64_Addr    ELFXX_TYPE_Addr;
 typedef Elf64_Dyn     ELFXX_TYPE_Dyn;
 typedef Elf64_Rela    ELFXX_TYPE_Rel;

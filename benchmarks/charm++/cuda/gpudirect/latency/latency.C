@@ -230,16 +230,11 @@ public:
     // Inform the runtime where the incoming data should be stored
     // and which CUDA stream should be used for the transfer
     data = d_remote_data;
-    //devicePost[0].cuda_stream = stream;
+    devicePost[0].cuda_stream = stream;
   }
 
-  // Second receive (regular entry method), invoked after the data transfer is initiated
-  // The user can either wait for it to complete or offload other operations
-  // into the stream (that may be dependent on the arriving data)
+  // Second receive (regular entry method), invoked once the data transfers complete
   void receiveZC(size_t size, char* data) {
-    // Wait for data transfer to complete (no need for UCX)
-    //cudaStreamSynchronize(stream);
-
     afterReceive(size, true);
   }
 

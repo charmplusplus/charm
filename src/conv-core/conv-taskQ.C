@@ -9,7 +9,7 @@ extern "C" void StealTask() {
     ++random_rank;
 #if CMK_TRACE_ENABLED
   char s[10];
-  sprintf( s, "%d", random_rank );
+  snprintf( s, sizeof(s), "%d", random_rank );
   traceUserSuppliedBracketedNote(s, TASKQ_QUEUE_STEAL_EVENTID, _start, CmiWallTimer());
 #endif
   void* msg = TaskQueueSteal((TaskQueue)CpvAccessOther(CsdTaskQueue, random_rank));
@@ -29,10 +29,10 @@ static void TaskStealBeginIdle(void *dummy) {
 extern "C" void CmiTaskQueueInit() {
   if(CmiMyNodeSize() > 1) {
     CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
-        (CcdVoidFn) TaskStealBeginIdle, NULL);
+        (CcdCondFn) TaskStealBeginIdle, NULL);
 
     CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,
-        (CcdVoidFn) TaskStealBeginIdle, NULL);
+        (CcdCondFn) TaskStealBeginIdle, NULL);
   }
 #if CMK_TRACE_ENABLED
   traceRegisterUserEvent("taskq create work", TASKQ_CREATE_EVENTID);

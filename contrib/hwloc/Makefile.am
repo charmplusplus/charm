@@ -1,4 +1,4 @@
-# Copyright © 2009-2020 Inria.  All rights reserved.
+# Copyright © 2009-2021 Inria.  All rights reserved.
 # Copyright © 2009      Université Bordeaux
 # Copyright © 2009-2014 Cisco Systems, Inc.  All rights reserved.
 # See COPYING in top-level directory.
@@ -14,14 +14,12 @@ ACLOCAL_AMFLAGS = -I ./config
 EXTRA_DIST = \
         README VERSION COPYING AUTHORS \
         config/hwloc_get_version.sh \
-        config/distscript.sh
+        config/distscript.sh \
+        config/libtool-big-sur-fixup.patch
 
 SUBDIRS = include hwloc
 
 if HWLOC_BUILD_STANDALONE
-if BUILD_NETLOC
-SUBDIRS += netloc
-endif
 SUBDIRS += utils tests contrib/systemd contrib/completion contrib/misc contrib/hwloc-ps.www
 # We need doc/ if HWLOC_BUILD_DOXYGEN, or during make install if HWLOC_INSTALL_DOXYGEN.
 # There's no INSTALL_SUBDIRS, so always enter doc/ and check HWLOC_BUILD/INSTALL_DOXYGEN there
@@ -33,24 +31,13 @@ endif
 DIST_SUBDIRS = $(SUBDIRS)
 if HWLOC_BUILD_STANDALONE
 DIST_SUBDIRS += contrib/windows
-if !BUILD_NETLOC
-DIST_SUBDIRS += netloc
-endif
+EXTRA_DIST += contrib/windows-cmake
 endif
 
 # Only install the pkg file if we're building in standalone mode (and not on Windows)
 if HWLOC_BUILD_STANDALONE
 hwlocpkgconfigdir = $(libdir)/pkgconfig
 hwlocpkgconfig_DATA = hwloc.pc
-if BUILD_NETLOC
-# JMS Need to compare hwloc.pc and netloc.pc -- I think netloc.pc is
-# missing some things.
-# pkgconfig_DATA += netloc.pc Disabled until the netloc API is public
-EXTRA_DIST += netloc.pc
-if BUILD_NETLOCSCOTCH
-hwlocpkgconfig_DATA += netlocscotch.pc
-endif BUILD_NETLOCSCOTCH
-endif BUILD_NETLOC
 endif HWLOC_BUILD_STANDALONE
 
 # Only install the valgrind suppressions file if we're building in
@@ -67,7 +54,6 @@ else !HWLOC_BUILD_STANDALONE
 dist-hook:
 	@MKDIR_P@	\
 		$(distdir)/doc \
-		$(distdir)/netloc \
 		$(distdir)/utils \
 		$(distdir)/tests \
 		$(distdir)/contrib/completion \

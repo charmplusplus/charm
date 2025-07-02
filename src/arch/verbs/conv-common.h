@@ -4,7 +4,7 @@
 
 #define CMK_NET_VERSION					   1
 
-#define CMK_CMIPRINTF_IS_A_BUILTIN                         1
+#define CMK_USE_LRTS_STDIO                                 1
 
 #define CMK_CMIDELIVERS_USE_COMMON_CODE                    1
 

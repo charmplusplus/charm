@@ -14,23 +14,20 @@ configure_file(sparseContiguousReducer/cksparsecontiguousreducer.h ${CMAKE_BINAR
 add_library(modulemsa multiphaseSharedArrays/msa.h multiphaseSharedArrays/msa-common.h multiphaseSharedArrays/msa-distArray.h multiphaseSharedArrays/msa-DistPageMgr.h multiphaseSharedArrays/msa-distArray.C)
 add_dependencies(modulemsa ck)
 
-# armci
-configure_file(armci/libmodulearmci.dep ${CMAKE_BINARY_DIR}/lib COPYONLY)
-configure_file(armci/armci.h ${CMAKE_BINARY_DIR}/include COPYONLY)
-add_library(modulearmci armci/armci_vp.C armci/armci_impl.h armci/armci_api.C armci/armci.h)
-add_dependencies(modulearmci ck)
-
 # collide
-set(collide-h-sources collide/collide_util.h collide/bbox.h
-    collide/collide_cfg.h collide/collidecharm.h collide/collidec.h
-    collide/collidef.h collide/collidecharm_impl.h collide/collide_serial.h
-    collide/collide_buffers.h)
+set(collide-h-sources-public
+    collide/collide_util.h collide/bbox.h collide/collide_cfg.h
+    collide/collide_buffers.h collide/collidecharm.h collide/collidec.h
+)
+if(CMK_CAN_LINK_FORTRAN)
+    set(collide-h-sources-public ${collide-h-sources-public} collide/collidef.h)
+endif()
+set(collide-h-sources ${collide-h-sources-public}
+    collide/collidef.h collide/collidecharm_impl.h collide/collide_serial.h)
 set(collide-cxx-sources collide/collide_util.C collide/collide_serial.C
 collide/collidecharm.C collide/collide_buffers.C)
 
-foreach(file collide/collide_util.h collide/bbox.h collide/collide_cfg.h
-    collide/collide_buffers.h collide/collidecharm.h collide/collidec.h
-    collide/collidef.h)
+foreach(file ${collide-h-sources-public})
     configure_file(${file} ${CMAKE_BINARY_DIR}/include COPYONLY)
 endforeach(file)
 configure_file(collide/libmodulecollide.dep ${CMAKE_BINARY_DIR}/lib COPYONLY)
@@ -40,13 +37,17 @@ add_dependencies(modulecollide ck)
 add_dependencies(modulecollidecharm ck)
 
 # mblock
+set(mblock-h-sources mblock/mblock.h
+    mblock/patch.h mblock/gridutil.h mblock/mblock_impl.h)
 configure_file(mblock/libmodulemblock.dep ${CMAKE_BINARY_DIR}/lib COPYONLY)
 configure_file(mblock/mblock.h  ${CMAKE_BINARY_DIR}/include COPYONLY)
-configure_file(mblock/mblockf.h  ${CMAKE_BINARY_DIR}/include COPYONLY)
+if(CMK_CAN_LINK_FORTRAN)
+    set(mblock-h-sources ${mblock-h-sources} mblock/mblockf.h)
+    configure_file(mblock/mblockf.h  ${CMAKE_BINARY_DIR}/include COPYONLY)
+endif()
 
 add_library(modulemblock mblock/mblock.C mblock/patch.C
-mblock/compat_driver.c mblock/compat_fdriver.c mblock/mblock.h
-mblock/mblockf.h mblock/patch.h mblock/gridutil.h mblock/mblock_impl.h)
+mblock/compat_driver.c mblock/compat_fdriver.c ${mblock-h-sources})
 add_dependencies(modulemblock ck)
 
 # barrier
@@ -56,7 +57,9 @@ add_dependencies(modulebarrier ck)
 
 # irecv
 configure_file(irecv/receiver.h  ${CMAKE_BINARY_DIR}/include COPYONLY)
-configure_file(irecv/receiverf.h  ${CMAKE_BINARY_DIR}/include COPYONLY)
+if(CMK_CAN_LINK_FORTRAN)
+    configure_file(irecv/receiverf.h  ${CMAKE_BINARY_DIR}/include COPYONLY)
+endif()
 add_library(irecv irecv/receiver.C irecv/receiver.h)
 add_dependencies(irecv ck)
 
@@ -123,16 +126,21 @@ configure_file(pose/libmodulepose.dep ${CMAKE_BINARY_DIR}/lib/libmoduleseqpose.d
 
 
 # idxl
-set(idxl-h-sources idxl/idxlc.h idxl/idxlf.h idxl/idxl.h idxl/idxl_layout.h idxl/idxl_comm.h)
-set(idxl-cxx-sources idxl/idxl.C idxl/idxl_layout.C idxl/idxl_comm.C idxl/idxl_api.C)
-add_library(idxl ${idxl-h-sources} ${idxl-cxx-sources})
-add_dependencies(idxl ck moduleampi)
+if(NOT BUILD_CHANGA)
+  set(idxl-h-sources idxl/idxlc.h idxl/idxl.h idxl/idxl_layout.h idxl/idxl_comm.h)
+  if(CMK_CAN_LINK_FORTRAN)
+    set(idxl-h-sources ${idxl-h-sources} idxl/idxlf.h)
+  endif()
+  set(idxl-cxx-sources idxl/idxl.C idxl/idxl_layout.C idxl/idxl_comm.C idxl/idxl_api.C)
+  add_library(idxl ${idxl-h-sources} ${idxl-cxx-sources})
+  add_dependencies(idxl ck moduleampi)
 
-set_target_properties(idxl PROPERTIES RULE_LAUNCH_COMPILE ${CMAKE_BINARY_DIR}/bin/ampicxx)
+  set_target_properties(idxl PROPERTIES RULE_LAUNCH_COMPILE ${CMAKE_BINARY_DIR}/bin/ampicxx)
 
-foreach(file ${idxl-h-sources})
-	configure_file(${file} ${CMAKE_BINARY_DIR}/include COPYONLY)
-endforeach()
+  foreach(file ${idxl-h-sources})
+    configure_file(${file} ${CMAKE_BINARY_DIR}/include COPYONLY)
+  endforeach()
+endif()
 
 
 # searchengine
@@ -160,7 +168,7 @@ add_custom_command(
 # pythonCCS
 
 if(CMK_BUILD_PYTHON)
-  if(PYTHON_VERSION_MAJOR EQUAL 2) # pythonCCS needs Python 2.x
+  if(CMK_PYTHON_VERSION_MAJOR EQUAL 2) # pythonCCS needs Python 2.x
     set(pythonCCS-h-sources pythonCCS/PythonCCS.h pythonCCS/PythonCCS-client.h)
 
     file(GENERATE OUTPUT ${CMAKE_BINARY_DIR}/include/pythonIncludes.h CONTENT

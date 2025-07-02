@@ -58,8 +58,6 @@ enum {
     UCX_DEVICE_SEND_OP, // Device send
     UCX_DEVICE_RECV_OP, // Device recv
 #endif
-    UCX_TAG_SEND_OP,    // Tagged API send
-    UCX_TAG_RECV_OP     // Tagged API recv
 };
 
 #define UCX_LOG(prio, fmt, ...) \
@@ -453,7 +451,7 @@ static void UcxRxReqCompleted(void *request, ucs_status_t status,
         // Register the source buffer and send back to destination to perform GET
 
         NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(req->msgBuf);
-        UCX_LOG(4, "Got ncpy size %d (meta size %d)", ncpyOpInfo->srcSize, ncpyOpInfo->ncpyOpInfoSize);
+        UCX_LOG(4, "Got ncpy size %zu (meta size %d)", ncpyOpInfo->srcSize, ncpyOpInfo->ncpyOpInfoSize);
         resetNcpyOpInfoPointers(ncpyOpInfo);
 
         UcxRdmaInfo *info = (UcxRdmaInfo *)(ncpyOpInfo->srcLayerInfo + CmiGetRdmaCommonInfoSize());
@@ -465,7 +463,7 @@ static void UcxRxReqCompleted(void *request, ucs_status_t status,
         ncpyOpInfo->isSrcRegistered = 1;
 
         ncpyOpInfo->freeMe = CMK_FREE_NCPYOPINFO; // It's a message, not a realy ncpy Obj
-        UCX_LOG(4, "Reset ncpy size %d (meta size %d)", ncpyOpInfo->destSize, ncpyOpInfo->ncpyOpInfoSize);
+        UCX_LOG(4, "Reset ncpy size %zu (meta size %d)", ncpyOpInfo->destSize, ncpyOpInfo->ncpyOpInfoSize);
 
         // send back to destination process to perform GET
         UcxSendMsg(CmiNodeOf(ncpyOpInfo->destPe), ncpyOpInfo->destPe,

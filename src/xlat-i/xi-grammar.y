@@ -135,7 +135,7 @@ void ReservedWord(int token, int fCol, int lCol);
 %token NAMESPACE
 %token USING
 %token <strval> IDENT NUMBER LITERAL CPROGRAM HASHIF HASHIFDEF
-%token <intval> INT LONG SHORT CHAR FLOAT DOUBLE UNSIGNED SIZET BOOL
+%token <intval> INT LONG SHORT CHAR FLOAT DOUBLE UNSIGNED
 %token ACCEL
 %token READWRITE
 %token WRITEONLY
@@ -301,14 +301,16 @@ QualName	: IDENT
 		{ $$ = $1; }
 		| QualName ':'':' IDENT
 		{
-		  char *tmp = new char[strlen($1)+strlen($4)+3];
-		  sprintf(tmp,"%s::%s", $1, $4);
+		  int len = strlen($1)+strlen($4)+3;
+		  char *tmp = new char[len];
+		  snprintf(tmp,len,"%s::%s", $1, $4);
 		  $$ = tmp;
 		}
 		| QualName ':'':' ARRAY
 		{
-		  char *tmp = new char[strlen($1)+5+3];
-		  sprintf(tmp,"%s::array", $1);
+		  int len = strlen($1)+5+3;
+		  char *tmp = new char[len];
+		  snprintf(tmp, len, "%s::array", $1);
 		  $$ = tmp;
 		}
 		;
@@ -425,8 +427,12 @@ BuiltinType	: INT
 		{ $$ = new BuiltinType("int"); }
 		| LONG
 		{ $$ = new BuiltinType("long"); }
+		| LONG INT
+		{ $$ = new BuiltinType("long int"); }
 		| SHORT
 		{ $$ = new BuiltinType("short"); }
+		| SHORT INT
+		{ $$ = new BuiltinType("short int"); }
 		| CHAR
 		{ $$ = new BuiltinType("char"); }
 		| UNSIGNED INT
@@ -434,15 +440,21 @@ BuiltinType	: INT
 		| UNSIGNED LONG
 		{ $$ = new BuiltinType("unsigned long"); }
 		| UNSIGNED LONG INT
-		{ $$ = new BuiltinType("unsigned long"); }
+		{ $$ = new BuiltinType("unsigned long int"); }
 		| UNSIGNED LONG LONG
 		{ $$ = new BuiltinType("unsigned long long"); }
+		| UNSIGNED LONG LONG INT
+		{ $$ = new BuiltinType("unsigned long long int"); }
 		| UNSIGNED SHORT
 		{ $$ = new BuiltinType("unsigned short"); }
+		| UNSIGNED SHORT INT
+		{ $$ = new BuiltinType("unsigned short int"); }
 		| UNSIGNED CHAR
 		{ $$ = new BuiltinType("unsigned char"); }
 		| LONG LONG
 		{ $$ = new BuiltinType("long long"); }
+		| LONG LONG INT
+		{ $$ = new BuiltinType("long long int"); }
 		| FLOAT
 		{ $$ = new BuiltinType("float"); }
 		| DOUBLE
@@ -451,10 +463,6 @@ BuiltinType	: INT
 		{ $$ = new BuiltinType("long double"); }
 		| VOID
 		{ $$ = new BuiltinType("void"); }
-		| SIZET
-		{ $$ = new BuiltinType("size_t"); }
-		| BOOL
-		{ $$ = new BuiltinType("bool"); }
 		;
 
 NamedType	: Name OptTParams { $$ = new NamedType($1,$2); };
@@ -694,7 +702,7 @@ NodeGroup	: NODEGROUP CAttribs NamedType OptBaseList MemberEList
 ArrayIndexType	: '[' NUMBER Name ']'
 		{/*Stupid special case for [1D] indices*/
 			char *buf=new char[40];
-			sprintf(buf,"%sD",$2);
+			snprintf(buf,40,"%sD",$2);
 			$$ = new NamedType(buf); 
 		}
 		| '[' QualNamedType ']'
@@ -1061,8 +1069,9 @@ CPROGRAM_List   :  /* Empty */
 		{ $$ = $1; }
 		| CPROGRAM ',' CPROGRAM_List
 		{  /*Returned only when in_bracket*/
-			char *tmp = new char[strlen($1)+strlen($3)+3];
-			sprintf(tmp,"%s, %s", $1, $3);
+			int len = strlen($1)+strlen($3)+3;
+			char *tmp = new char[len];
+			snprintf(tmp,len,"%s, %s", $1, $3);
 			$$ = tmp;
 		}
 		;
@@ -1073,26 +1082,30 @@ CCode		: /* Empty */
 		{ $$ = $1; }
 		| CPROGRAM '[' CCode ']' CCode
 		{  /*Returned only when in_bracket*/
-			char *tmp = new char[strlen($1)+strlen($3)+strlen($5)+3];
-			sprintf(tmp,"%s[%s]%s", $1, $3, $5);
+			int len = strlen($1)+strlen($3)+strlen($5)+3;
+			char *tmp = new char[len];
+			snprintf(tmp, len, "%s[%s]%s", $1, $3, $5);
 			$$ = tmp;
 		}
 		| CPROGRAM '{' CCode '}' CCode
 		{ /*Returned only when in_braces*/
-			char *tmp = new char[strlen($1)+strlen($3)+strlen($5)+3];
-			sprintf(tmp,"%s{%s}%s", $1, $3, $5);
+			int len = strlen($1)+strlen($3)+strlen($5)+3;
+			char *tmp = new char[len];
+			snprintf(tmp, len, "%s{%s}%s", $1, $3, $5);
 			$$ = tmp;
 		}
 		| CPROGRAM '(' CPROGRAM_List ')' CCode
 		{ /*Returned only when in_braces*/
-			char *tmp = new char[strlen($1)+strlen($3)+strlen($5)+3];
-			sprintf(tmp,"%s(%s)%s", $1, $3, $5);
+			int len = strlen($1)+strlen($3)+strlen($5)+3;
+			char *tmp = new char[len];
+			snprintf(tmp, len, "%s(%s)%s", $1, $3, $5);
 			$$ = tmp;
 		}
 		|'(' CCode ')' CCode
 		{ /*Returned only when in_braces*/
-			char *tmp = new char[strlen($2)+strlen($4)+3];
-			sprintf(tmp,"(%s)%s", $2, $4);
+			int len = strlen($2)+strlen($4)+3;
+			char *tmp = new char[len];
+			snprintf(tmp, len, "(%s)%s", $2, $4);
 			$$ = tmp;
 		}
 		;

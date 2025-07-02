@@ -96,7 +96,7 @@ public:
   std::uint16_t *offsets;
   CkArrayIndex *destObjects;
 
-  MeshStreamerMessageV(int t, bool isFixedSize): numDataItems(0), msgType(t), fixedSize(isFixedSize) {
+  MeshStreamerMessageV(int t, bool isFixedSize): msgType(t), numDataItems(0), fixedSize(isFixedSize) {
     finalMsgCount = -1;
     if (!isFixedSize) {
       offsets[0] = 0;
@@ -1295,7 +1295,8 @@ public:
 
   void resendMisdeliveredItems(CkArrayIndex arrayId, int destinationPe) {
 
-    clientLocMgr_->updateLocation(arrayId, clientLocMgr_->lookupID(arrayId),destinationPe);
+    // TODO: This is an optimization that no longer works with the new CkLocMgr API
+    //clientLocMgr_->updateLocation(arrayId, clientLocMgr_->lookupID(arrayId),destinationPe);
 
     std::vector<dtype > &bufferedItems
       = misdeliveredItems[arrayId];
@@ -1315,7 +1316,8 @@ public:
     int prevOwner = clientArrayMgr_->lastKnown((CkArrayIndex)arrayId);
 
     if (prevOwner != destinationPe) {
-      clientLocMgr_->updateLocation(arrayId,clientLocMgr_->lookupID(arrayId), destinationPe);
+      // TODO: This is an optimization that no longer works with the new CkLocMgr API
+      //clientLocMgr_->updateLocation(arrayId,clientLocMgr_->lookupID(arrayId), destinationPe);
 
       // it is possible to also fix destinations of items buffered for arrayId,
       // but the search could be expensive; instead, with the current code

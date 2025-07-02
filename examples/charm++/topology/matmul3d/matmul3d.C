@@ -7,9 +7,6 @@
 #include "matmul3d.decl.h"
 #include "matmul3d.h"
 #include "TopoManager.h"
-#if CMK_BLUEGENEP || CMK_VERSION_BLUEGENE
-#include "essl.h"
-#endif
 #include "rand48_replacement.h"
 
 Main::Main(CkArgMsg* m) {
@@ -294,18 +291,10 @@ void Compute::receiveC(float *data, int size, int who) {
 void Compute::doWork() {
   if(countA == num_chare_z-1 && countB == num_chare_x-1) {
 
-#if CMK_BLUEGENEP || CMK_VERSION_BLUEGENE
-    const char trans = 'N';
-    const double alpha = 1.0;
-    const double beta = 0.0;
-
-    sgemm(&trans, &trans, blockDimX, blockDimZ, blockDimY, alpha, A, blockDimX, B, blockDimY, beta, C, blockDimX);
-#else
     for(int i=0; i<blockDimX; i++)
       for(int j=0; j<blockDimY; j++)
 	for(int k=0; k<blockDimZ; k++)
 	  C[i*blockDimZ+k] += A[i*blockDimY+j] * B[j*blockDimZ+k];
-#endif
     
     receiveC(&C[(thisIndex.y)*subBlockDimXy*blockDimZ], subBlockDimXy*blockDimZ, 0);
     sendC();

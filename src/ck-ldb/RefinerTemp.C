@@ -11,7 +11,7 @@
 
 int* RefinerTemp::AllocProcs(int count, BaseLB::LDStats* stats)
 {
-  return new int[stats->n_objs];
+  return new int[stats->objData.size()];
 }
 
 void RefinerTemp::FreeProcs(int* bufs)
@@ -88,7 +88,6 @@ void  RefinerTemp::deAssign(computeInfo *c, processorInfo *p)
 {
    c->processor = -1;
    p->computeSet->remove(c);
-int oldPe=c->oldProcessor;
    p->computeLoad -= c->load*procFreq[p->Id];
    p->load = p->computeLoad + p->backgroundLoad*procFreq[p->Id];
 }
@@ -298,15 +297,11 @@ int RefinerTemp::refine()
 int RefinerTemp::multirefine()
 {
   computeAverage();
-  double avg = averageLoad;
   int maxPe=-1;
- // double max = computeMax();
   double max = computeMax(&maxPe);
 
-  //const double overloadStep = 0.01;
   const double overloadStep = 0.01;
   const double overloadStart = 1.001;
-//  double dCurOverload = max / avg;
   double dCurOverload = max /(totalInst*procFreqNew[maxPe]/sumFreqs); 
                                                                                
   int minOverload = 0;
@@ -315,7 +310,6 @@ int RefinerTemp::multirefine()
   double dMaxOverload = maxOverload * overloadStep + overloadStart;
   int curOverload;
   int refineDone = 0;
-//CmiPrintf("maxPe=%d max=%f myAvg=%f dMinOverload: %f dMaxOverload: %f\n",maxPe,max,(totalInst*procFreqNew[maxPe]/sumFreqs), dMinOverload, dMaxOverload);
 
   if (_lb_args.debug()>=1)
     CmiPrintf("dMinOverload: %f dMaxOverload: %f\n", dMinOverload, dMaxOverload);

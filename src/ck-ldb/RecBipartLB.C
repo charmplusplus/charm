@@ -82,9 +82,9 @@ public:
   inline int getSwapid() const { return swapid; }
   inline void setSwapid(int v) { swapid = v; }
   inline short getBoundary() const { return forboundary; }
-  void push(Vertex*);
-  bool removeComplete(Vertex*);
-  bool removeToSwap(Vertex*);
+  void push(CkVertex*);
+  bool removeComplete(CkVertex*);
+  bool removeToSwap(CkVertex*);
 
 private:
   int mingain{};
@@ -93,17 +93,17 @@ private:
   short forboundary;
 };
 
-void RecursiveBiPart(ObjGraph*, vector<Vertex*>&, int, int);
-void adjustqueues(ObjGraph*, BQueue*, BQueue*, vector<Vertex*>&, vector<Vertex*>&, int*,
+void RecursiveBiPart(ObjGraph*, vector<CkVertex*>&, int, int);
+void adjustqueues(ObjGraph*, BQueue*, BQueue*, vector<CkVertex*>&, vector<CkVertex*>&, int*,
                   int);
-void adjustgain(ObjGraph*, vector<Vertex*>&, BQueue*);
-void RefineBoundary(ObjGraph*, vector<Vertex*>&, vector<Vertex*>&, BQueue*, BQueue*, int,
+void adjustgain(ObjGraph*, vector<CkVertex*>&, BQueue*);
+void RefineBoundary(ObjGraph*, vector<CkVertex*>&, vector<CkVertex*>&, BQueue*, BQueue*, int,
                     int, int, double, double, double);
-int modifypartitions(ObjGraph*, vector<Vertex*>&, vector<Vertex*>&, BQueue*, BQueue*, int,
+int modifypartitions(ObjGraph*, vector<CkVertex*>&, vector<CkVertex*>&, BQueue*, BQueue*, int,
                      int);
 void swapQ1toQ2(ObjGraph*, BQueue*, BQueue*, int);
-Vertex* removeinSwap(ObjGraph*, BQueue*, BQueue*, int);
-Vertex* removePtr(vector<Vertex*>&, int);
+CkVertex* removeinSwap(ObjGraph*, BQueue*, BQueue*, int);
+CkVertex* removePtr(vector<CkVertex*>&, int);
 
 int level;
 double TOTALLOAD;
@@ -116,10 +116,11 @@ static void lbinit()
   LBRegisterBalancer<RecBipartLB>(
       "RecBipartLB",
       "Algorithm for load balacing based on recursive bipartitioning of object graph");
+  LBTurnCommOn();
 }
 
 // removes from BQueue but not from boundaryline
-bool BQueue::removeToSwap(Vertex* vert)
+bool BQueue::removeToSwap(CkVertex* vert)
 {
   const int id = vert->getVertexId();
   const auto v = std::find(q.begin(), q.end(), id);
@@ -136,7 +137,7 @@ bool BQueue::removeToSwap(Vertex* vert)
 }
 
 // completely removes from the BQueue as well as from both boundarylines
-bool BQueue::removeComplete(Vertex* vert)
+bool BQueue::removeComplete(CkVertex* vert)
 {
   if (removeToSwap(vert))
   {
@@ -150,7 +151,7 @@ bool BQueue::removeComplete(Vertex* vert)
   return false;
 }
 
-void BQueue::push(Vertex* vert)
+void BQueue::push(CkVertex* vert)
 {
   const int id = vert->getVertexId();
   q.push_back(id);
@@ -170,7 +171,7 @@ bool RecBipartLB::QueryBalanceNow(int _step) { return true; }
 
 void RecBipartLB::work(LDStats* stats)
 {
-  vector<Vertex*> ptrvector;
+  vector<CkVertex*> ptrvector;
   /** ========================== INITIALIZATION ============================= */
   ProcArray* parr = new ProcArray(stats);  // Processor Array
   ObjGraph* ogr = new ObjGraph(stats);     // Object Graph
@@ -184,7 +185,7 @@ void RecBipartLB::work(LDStats* stats)
 
   parr->resetTotalLoad();
 
-  for (Vertex& vertex : ogr->vertices)
+  for (CkVertex& vertex : ogr->vertices)
   {
     Vertex_helper* helper = new Vertex_helper();
     vhelpers.push_back(helper);
@@ -198,14 +199,14 @@ void RecBipartLB::work(LDStats* stats)
 }
 
 /* Function that performs Recursive bipartitioning of the object graph.*/
-void RecursiveBiPart(ObjGraph* ogr, vector<Vertex*>& pvertices, int parent, int nump)
+void RecursiveBiPart(ObjGraph* ogr, vector<CkVertex*>& pvertices, int parent, int nump)
 {
   // if the number of processors that this call has to deal with is 1, dont recurse any
   // further
   if (nump == 1)
   {
     double totalLoad = 0;
-    for (Vertex* vertex : pvertices)
+    for (CkVertex* vertex : pvertices)
     {
       vertex->setNewPe(peno);
       totalLoad += vertex->getVertexLoad();
@@ -232,8 +233,8 @@ void RecursiveBiPart(ObjGraph* ogr, vector<Vertex*>& pvertices, int parent, int 
   }
 
   // child partitions
-  vector<Vertex*> partition1;
-  vector<Vertex*> partition2;
+  vector<CkVertex*> partition1;
+  vector<CkVertex*> partition2;
   vector<bool> taken(vhelpers.size(), false);
 
   int start = pvertices[0]->getVertexId();
@@ -274,7 +275,7 @@ void RecursiveBiPart(ObjGraph* ogr, vector<Vertex*>& pvertices, int parent, int 
     que2.pop();
     count++;
 
-    Vertex* v = (Vertex*)&(ogr->vertices[n]);
+    CkVertex* v = (CkVertex*)&(ogr->vertices[n]);
     loadseen += v->getVertexLoad();
 
     vhelpers[v->getVertexId()]->setPartition(
@@ -343,7 +344,7 @@ void RecursiveBiPart(ObjGraph* ogr, vector<Vertex*>& pvertices, int parent, int 
       {
         for (int i = lastforced; i < pvertices.size(); i++)
         {
-          Vertex* w = pvertices[i];
+          CkVertex* w = pvertices[i];
           if (!taken[w->getVertexId()])
           {
             que2.push(w->getVertexId());
@@ -356,7 +357,7 @@ void RecursiveBiPart(ObjGraph* ogr, vector<Vertex*>& pvertices, int parent, int 
     }
   }  // end of while loop
 
-  for (Vertex* v : pvertices)
+  for (CkVertex* v : pvertices)
   {
     if (!taken[v->getVertexId()])
     {
@@ -374,7 +375,7 @@ void RecursiveBiPart(ObjGraph* ogr, vector<Vertex*>& pvertices, int parent, int 
 
   for (i = 0; i < tempsize; i++)
   {
-    q2->push((Vertex*)&(
+    q2->push((CkVertex*)&(
         ogr->vertices[que2.front()]));  // also sets boundaryline=true for each vertex
     que2.pop();
   }
@@ -398,13 +399,13 @@ void RecursiveBiPart(ObjGraph* ogr, vector<Vertex*>& pvertices, int parent, int 
 }
 
 // Fills in que1, que2 and adjusts their gains, calculates initial edgecut before KLFM
-void adjustqueues(ObjGraph* ogr, BQueue* que1, BQueue* que2, vector<Vertex*>& partition1,
-                  vector<Vertex*>& partition2, int* initialedgecut, int parent)
+void adjustqueues(ObjGraph* ogr, BQueue* que1, BQueue* que2, vector<CkVertex*>& partition1,
+                  vector<CkVertex*>& partition2, int* initialedgecut, int parent)
 {
   int i = 0, uid = 0, wid = 0;
   bool swap = true;
   int ei = -1;
-  Edge* edge = nullptr;
+  CkEdge* edge = nullptr;
   int edgecut = 0;
   que2->setMingain(std::numeric_limits<int>::max());
   que2->setVertextoswap(-1);
@@ -414,7 +415,7 @@ void adjustqueues(ObjGraph* ogr, BQueue* que1, BQueue* que2, vector<Vertex*>& pa
   for (i = 0; i < que2->q.size(); i++)  // for each vertex v in que2
   {
     int vid = que2->q[i];
-    Vertex* v = ((Vertex*)&(ogr->vertices[vid]));
+    CkVertex* v = ((CkVertex*)&(ogr->vertices[vid]));
 
     while (true)
     {
@@ -435,15 +436,15 @@ void adjustqueues(ObjGraph* ogr, BQueue* que1, BQueue* que2, vector<Vertex*>& pa
       if (swap)
       {
         uid = v->sendToList[ei].getNeighborId();
-        edge = (Edge*)&(v->sendToList[ei]);
+        edge = (CkEdge*)&(v->sendToList[ei]);
       }
       else
       {
         uid = v->recvFromList[ei].getNeighborId();
-        edge = (Edge*)&(v->recvFromList[ei]);
+        edge = (CkEdge*)&(v->recvFromList[ei]);
       }
 
-      Vertex* u = (Vertex*)&(ogr->vertices[uid]);
+      CkVertex* u = (CkVertex*)&(ogr->vertices[uid]);
 
       if ((vhelpers[uid]->getPartition()) == (2 * parent - 1) &&
           (vhelpers[uid]->getLevel()) == level)  // since v is on boundaryline2, its every
@@ -469,7 +470,7 @@ void adjustqueues(ObjGraph* ogr, BQueue* que1, BQueue* que2, vector<Vertex*>& pa
       }
     }  // end of while(1) loop
 
-    // Edge counts are initialized while performing BFS
+    // CkEdge counts are initialized while performing BFS
     vhelpers[vid]->setGain(vhelpers[vid]->getEdgestopart2() -
                            vhelpers[vid]->getEdgestopart1());
     if (vhelpers[vid]->getGain() < que2->getMingain())  // we want most negative gain
@@ -485,7 +486,7 @@ void adjustqueues(ObjGraph* ogr, BQueue* que1, BQueue* que2, vector<Vertex*>& pa
     int uid = que1->q[i];
     swap = true;
     ei = -1;
-    Vertex* u = (Vertex*)&(ogr->vertices[uid]);
+    CkVertex* u = (CkVertex*)&(ogr->vertices[uid]);
 
     while (true)
     {
@@ -504,12 +505,12 @@ void adjustqueues(ObjGraph* ogr, BQueue* que1, BQueue* que2, vector<Vertex*>& pa
       if (swap)
       {
         wid = u->sendToList[ei].getNeighborId();
-        edge = (Edge*)&(u->sendToList[ei]);
+        edge = (CkEdge*)&(u->sendToList[ei]);
       }
       else
       {
         wid = u->recvFromList[ei].getNeighborId();
-        edge = (Edge*)&(u->recvFromList[ei]);
+        edge = (CkEdge*)&(u->recvFromList[ei]);
       }
 
       if (vhelpers[wid]->getLevel() == level &&
@@ -526,7 +527,7 @@ void adjustqueues(ObjGraph* ogr, BQueue* que1, BQueue* que2, vector<Vertex*>& pa
 }
 
 // precondition - edgestopart1 and edgestopart2 must be known for every vertex in queue
-void adjustgain(ObjGraph* ogr, vector<Vertex*>& partition, BQueue* que)
+void adjustgain(ObjGraph* ogr, vector<CkVertex*>& partition, BQueue* que)
 {
   int i = 0;
   int bdry = que->getBoundary();
@@ -537,7 +538,7 @@ void adjustgain(ObjGraph* ogr, vector<Vertex*>& partition, BQueue* que)
   for (i = 0; i < que->q.size(); i++)  // for each vertex u in que
   {
     int uid = que->q[i];
-    Vertex* u = (Vertex*)&(ogr->vertices[uid]);
+    CkVertex* u = (CkVertex*)&(ogr->vertices[uid]);
 
     if (bdry == 1)
     {
@@ -559,8 +560,8 @@ void adjustgain(ObjGraph* ogr, vector<Vertex*>& partition, BQueue* que)
 }
 
 // Fiduccia Mattheyses boundary refinement algorithm
-void RefineBoundary(ObjGraph* ogr, vector<Vertex*>& partition1,
-                    vector<Vertex*>& partition2, BQueue* que1, BQueue* que2, int runs,
+void RefineBoundary(ObjGraph* ogr, vector<CkVertex*>& partition1,
+                    vector<CkVertex*>& partition2, BQueue* que1, BQueue* que2, int runs,
                     int initialedgecut, int parent, double part1load, double part2load,
                     double ratio)
 {
@@ -603,8 +604,8 @@ void RefineBoundary(ObjGraph* ogr, vector<Vertex*>& partition1,
   }
 }
 
-int modifypartitions(ObjGraph* ogr, vector<Vertex*>& partition1,
-                     vector<Vertex*>& partition2, BQueue* q1, BQueue* q2, int ec,
+int modifypartitions(ObjGraph* ogr, vector<CkVertex*>& partition1,
+                     vector<CkVertex*>& partition2, BQueue* q1, BQueue* q2, int ec,
                      int parent)
 {
   int newedgecut = 0;
@@ -614,7 +615,7 @@ int modifypartitions(ObjGraph* ogr, vector<Vertex*>& partition1,
     int e1 = vhelpers[q1->getVertextoswap()]->getEdgestopart1();
     newedgecut = ec - (e2) + (e1);
     vhelpers[q1->getVertextoswap()]->setPartition(2 * parent);
-    Vertex* ptr = removePtr(partition1, q1->getVertextoswap());
+    CkVertex* ptr = removePtr(partition1, q1->getVertextoswap());
     partition2.push_back(ptr);
   }
   else if (q1->getBoundary() == 2)  // we are swapping vertex out of boundaryline2
@@ -623,7 +624,7 @@ int modifypartitions(ObjGraph* ogr, vector<Vertex*>& partition1,
     int e2 = vhelpers[q1->getVertextoswap()]->getEdgestopart2();
     newedgecut = ec - (e1) + (e2);
     vhelpers[q1->getVertextoswap()]->setPartition(2 * parent - 1);
-    Vertex* ptr = removePtr(partition2, q1->getVertextoswap());
+    CkVertex* ptr = removePtr(partition2, q1->getVertextoswap());
     partition1.push_back(ptr);
   }
 
@@ -636,18 +637,18 @@ int modifypartitions(ObjGraph* ogr, vector<Vertex*>& partition1,
 
 void swapQ1toQ2(ObjGraph* ogr, BQueue* q1, BQueue* q2, int parent)
 {
-  Vertex* vert = removeinSwap(ogr, q1, q2, parent);  // remove vertex from q1
+  CkVertex* vert = removeinSwap(ogr, q1, q2, parent);  // remove vertex from q1
   // removevert also removes or brings in new vertices in the queues, so the edgestopart1
   // and edgestopart2 are calculated for new vertices inside removevert
   q2->push(vert);
 }
 
-Vertex* removeinSwap(ObjGraph* ogr, BQueue* q1, BQueue* q2, int parent)
+CkVertex* removeinSwap(ObjGraph* ogr, BQueue* q1, BQueue* q2, int parent)
 {
   int ei = -1, uid = 0, wid = 0, einested = -1;
-  Edge *edge = nullptr, *edgenested = nullptr;
+  CkEdge *edge = nullptr, *edgenested = nullptr;
   bool swap = true, swapnested = true;
-  Vertex* v = (Vertex*)&(ogr->vertices[q1->getVertextoswap()]);
+  CkVertex* v = (CkVertex*)&(ogr->vertices[q1->getVertextoswap()]);
   // edge counts of v do not change
   // Adjust edgecounts of neighbours, verify whether any additions or deletions happen to
   // the boundarylines
@@ -667,15 +668,15 @@ Vertex* removeinSwap(ObjGraph* ogr, BQueue* q1, BQueue* q2, int parent)
     if (swap)
     {
       uid = v->sendToList[ei].getNeighborId();
-      edge = (Edge*)&(v->sendToList[ei]);
+      edge = (CkEdge*)&(v->sendToList[ei]);
     }
     else
     {
       uid = v->recvFromList[ei].getNeighborId();
-      edge = (Edge*)&(v->recvFromList[ei]);
+      edge = (CkEdge*)&(v->recvFromList[ei]);
     }
 
-    Vertex* u = (Vertex*)&(ogr->vertices[uid]);
+    CkVertex* u = (CkVertex*)&(ogr->vertices[uid]);
 
     if (q1->getBoundary() == 1)  // vertex being removed out of boundaryline1
     {
@@ -711,12 +712,12 @@ Vertex* removeinSwap(ObjGraph* ogr, BQueue* q1, BQueue* q2, int parent)
           if (swapnested)
           {
             wid = u->sendToList[einested].getNeighborId();
-            edgenested = (Edge*)&(u->sendToList[einested]);
+            edgenested = (CkEdge*)&(u->sendToList[einested]);
           }
           else
           {
             wid = u->recvFromList[einested].getNeighborId();
-            edgenested = (Edge*)&(u->recvFromList[einested]);
+            edgenested = (CkEdge*)&(u->recvFromList[einested]);
           }
           if (vhelpers[wid]->getLevel() == level &&
               vhelpers[wid]->getPartition() == (2 * parent - 1))
@@ -768,12 +769,12 @@ Vertex* removeinSwap(ObjGraph* ogr, BQueue* q1, BQueue* q2, int parent)
           if (swapnested)
           {
             wid = u->sendToList[einested].getNeighborId();
-            edgenested = (Edge*)&(u->sendToList[einested]);
+            edgenested = (CkEdge*)&(u->sendToList[einested]);
           }
           else
           {
             wid = u->recvFromList[einested].getNeighborId();
-            edgenested = (Edge*)&(u->recvFromList[einested]);
+            edgenested = (CkEdge*)&(u->recvFromList[einested]);
           }
 
           if (vhelpers[wid]->getLevel() == level &&
@@ -801,13 +802,13 @@ Vertex* removeinSwap(ObjGraph* ogr, BQueue* q1, BQueue* q2, int parent)
   return v;
 }
 
-Vertex* removePtr(vector<Vertex*>& vec, const int id)
+CkVertex* removePtr(vector<CkVertex*>& vec, const int id)
 {
   for (auto& ptr : vec)
   {
     if (ptr->getVertexId() == id)
     {
-      Vertex* value = ptr;
+      CkVertex* value = ptr;
       ptr = vec.back();
       vec.pop_back();
       return value;

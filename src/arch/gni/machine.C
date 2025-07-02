@@ -822,7 +822,7 @@ static void init_comm_stats(void)
   if (print_stats){
       char ln[200];
       int code = mkdir(counters_dirname, 00777);
-      sprintf(ln,"%s/statistics.%d.%d", counters_dirname, mysize, myrank);
+      snprintf(ln,sizeof(ln),"%s/statistics.%d.%d", counters_dirname, mysize, myrank);
       counterLog=fopen(ln,"w");
       if (counterLog == NULL) CmiAbort("Counter files open failed");
   }
@@ -1900,7 +1900,7 @@ void LrtsPostCommonInit(int everReturn)
 
 #if !CMK_SMP
     if (useDynamicSMSG)
-    CcdCallOnConditionKeep(CcdPERIODIC_10ms, (CcdVoidFn) PumpDatagramConnection, NULL);
+    CcdCallOnConditionKeep(CcdPERIODIC_10ms, (CcdCondFn) PumpDatagramConnection, NULL);
 #endif
 
 #if ! LARGEPAGE
@@ -1908,11 +1908,11 @@ void LrtsPostCommonInit(int everReturn)
 #if CMK_SMP
     if (CmiMyRank() == 0)
 #endif
-    CcdCallOnConditionKeep(CcdPERIODIC_2minute, (CcdVoidFn) CheckProgress, NULL);
+    CcdCallOnConditionKeep(CcdPERIODIC_2minute, (CcdCondFn) CheckProgress, NULL);
 #endif
 
 #if !LARGEPAGE
-    CcdCallOnCondition(CcdTOPOLOGY_AVAIL, (CcdVoidFn)set_limit, NULL);
+    CcdCallOnCondition(CcdTOPOLOGY_AVAIL, (CcdCondFn)set_limit, NULL);
 #endif
 }
 

@@ -81,13 +81,11 @@ CmiIdleLock_checkMessage
 #include "machine-smp.h"
 #include "sockRoutines.h"
 
-#if defined(__has_include)
-#  if __has_include(<barrier>)
-#    include <barrier>
-#  endif
+#if CMK_AMD64
+#  include <immintrin.h>
 #endif
-#include <mutex>
-#include <condition_variable>
+#include <atomic>
+#include <thread>
 
 void CmiStateInit(int pe, int rank, CmiState state);
 void CommunicationServerInit(void);
@@ -166,19 +164,16 @@ static DWORD WINAPI call_startfn(LPVOID vindex)
   ConverseRunPE(0);
 
   if(CharmLibInterOperate) {
-    while(1) {
-      if(!_cleanUp.load()) {
-        StartInteropScheduler();
-        CmiNodeAllBarrier();
-      } else {
-        if (CmiMyRank() == CmiMyNodeSize()) {
-          while (ckExitComplete.load() == 0) { CommunicationServerThread(5); }
-        } else {
-          CsdScheduler(-1);
-          CmiNodeAllBarrier();
-        }
-        break;
-      }
+    while(!_cleanUp.load()) {
+      StartInteropScheduler();
+      CmiNodeAllBarrier();
+    }
+
+    if (CmiMyRank() == CmiMyNodeSize()) {
+      while (ckExitComplete.load() == 0) { CommunicationServerThread(5); }
+    } else {
+      CsdScheduler(-1);
+      CmiNodeAllBarrier();
     }
   }
 
@@ -375,19 +370,16 @@ static void *call_startfn(void *vindex)
   ConverseRunPE(0);
 
   if(CharmLibInterOperate) {
-    while(1) {
-      if(!_cleanUp.load()) {
-        StartInteropScheduler();
-        CmiNodeAllBarrier();
-      } else {
-        if (CmiMyRank() == CmiMyNodeSize()) {
-          while (ckExitComplete.load() == 0) { CommunicationServerThread(5); }
-        } else { 
-          CsdScheduler(-1);
-          CmiNodeAllBarrier();
-        }
-        break;
-      }
+    while(!_cleanUp.load()) {
+      StartInteropScheduler();
+      CmiNodeAllBarrier();
+    }
+
+    if (CmiMyRank() == CmiMyNodeSize()) {
+      while (ckExitComplete.load() == 0) { CommunicationServerThread(5); }
+    } else {
+      CsdScheduler(-1);
+      CmiNodeAllBarrier();
     }
   }
 
@@ -403,11 +395,6 @@ static void *call_startfn(void *vindex)
 #endif  
   return 0;
 }
-
-#if CMK_BLUEGENEQ && !CMK_USE_LRTS
-/* pami/machine.C defines its own version of this: */
-void PerrorExit(const char*);
-#endif
 
 #if CMK_CONVERSE_PAMI
 // Array used by the 'rank 0' thread to wait for other threads using pthread_join
@@ -514,48 +501,117 @@ static void CmiDestroyLocks(void)
 
 #if !CMK_SHARED_VARS_UNAVAILABLE
 
-#if __cpp_lib_barrier
-
-using Barrier = std::barrier;
-
-#else
-
-class Barrier {
+class Barrier
+{
 public:
   Barrier(const Barrier&) = delete;
   Barrier& operator=(const Barrier&) = delete;
 
-  explicit Barrier(unsigned int count) :
-    curCount(count), barrierCount(count), curSense(true) {
+  explicit Barrier(unsigned int count)
+      : curSense(true), curCount(count), barrierCount(count)
+  {
   }
 
-  void arrive_and_wait() {
-    std::unique_lock<std::mutex> lock(barrierMutex);
-    const bool sense = curSense;
+  void arrive_and_wait()
+  {
+    const bool sense = curSense.load(std::memory_order_relaxed);
 
-    curCount--;
-
-    if (curCount == 0) {
-      curSense = !curSense;
-      curCount = barrierCount;
-      barrierCond.notify_all();
+    // If we're last, reset the count and flip the sense.
+    // Using acq_rel here effectively makes this read-modify-write a fence.
+    // Note: we compare against 1 because fetch_sub returns the previous value.
+    if (curCount.fetch_sub(1, std::memory_order_acq_rel) == 1)
+    {
+      curCount.store(barrierCount, std::memory_order_relaxed);
+      curSense.store(!sense, std::memory_order_release);
+#  ifdef __cpp_lib_atomic_wait
+      curSense.notify_all();
+#  endif
       return;
     }
 
-    while (sense == curSense) {
-      barrierCond.wait(lock);
+    // Use C++20's atomic wait/notify if it's available
+#  ifdef __cpp_lib_atomic_wait
+    // Waits while sense == curSense, cannot return spuriously, so no need for extra check
+    curSense.wait(sense, std::memory_order_acquire);
+#  else
+    // Otherwise we're not the last, so start the progressive spin sequence:
+    // Define how many iterations to spend in each phase. These are arbitrary constants,
+    // they can be tuned for performance, but this should be generally alright.
+    constexpr auto spinIters = 5, pauseIters = 10, yieldIters = 1000;
+
+    // Straight up spin at first.
+    for (int i = 0; i < spinIters; i++)
+    {
+      if (sense != curSense.load(std::memory_order_acquire))
+        return;
     }
+
+    // If that's taking too long, then start pausing during each spin.
+    for (int i = 0; i < pauseIters; i++)
+    {
+      if (sense != curSense.load(std::memory_order_acquire))
+        return;
+      pause();
+    }
+
+    // If we're still in the barrier, then it's time to lay off a bit
+    // and start yielding this thread at the OS level. Without this,
+    // oversubscribed scenarios become extremely costly.
+    while (true)
+    {
+      for (int i = 0; i < yieldIters; i++)
+      {
+        if (sense != curSense.load(std::memory_order_acquire))
+          return;
+        repeat_pause<10>();
+      }
+      std::this_thread::yield();
+    }
+#  endif
   }
 
 private:
-  std::mutex barrierMutex;
-  std::condition_variable barrierCond;
-  bool curSense;
-  unsigned int curCount;
+  alignas(CMI_CACHE_LINE_SIZE) std::atomic<bool> curSense;
+  alignas(CMI_CACHE_LINE_SIZE) std::atomic<unsigned int> curCount;
   const unsigned int barrierCount;
+
+  CMI_FORCE_INLINE static void pause()
+  {
+#  if CMK_AMD64
+    // From the Intel intrinsics guide: "Provide a hint to the processor that the code
+    // sequence is a spin-wait loop. This can help improve the performance and power
+    // consumption of spin-wait loops."
+    // Accomplishes two things: 1.) Relinquishes resources, saving power and improving the
+    // performance of other threads 2.) Prevents a false memory order violation from being
+    // detected when the barrier is reached, causing a flush penalty.
+    // Note: While this usually takes from 0 to a low double digits number of cycles, it
+    // can take up to 140 cycles (on Skylake), so it can be costly.
+    _mm_pause();  // MSVC's support for assembly is iffy, so use intrinsic
+#  elif CMK_ARM
+    // Notifies the hardware that the current task can be swapped out, recommended for use
+    // when spinning by ARM.
+    // https://developer.arm.com/documentation/dui0489/i/arm-and-thumb-instructions/yield?lang=en
+    asm volatile("yield");
+#  else
+    // For other platforms, do nothing.
+#  endif
+  }
+
+  // This template rigmarole is to ensure that the compiler generates a sequences of
+  // pauses without anything else in between, using a regular loop doesn't do that on icc,
+  // for example
+  template <size_t N>
+  CMI_FORCE_INLINE static void repeat_pause()
+  {
+    pause();
+    repeat_pause<N - 1>();
+  }
 };
 
-#endif
+template <>
+CMI_FORCE_INLINE void Barrier::repeat_pause<0>()
+{
+}
 
 /* Wait for all worker threads */
 void CmiNodeBarrier(void) {

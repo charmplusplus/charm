@@ -12,7 +12,7 @@
 #  define CM_STATUS(x) ckout<<"["<<CkMyPe()<<"] C.Mgr> "<<x<<endl;
 #  define CC_STATUS(x) { \
   char buf[100]; \
-  voxName(thisIndex,buf); \
+  voxName(thisIndex,buf,sizeof(buf)); \
   ckout<<"["<<CkMyPe()<<"] "<<buf<<" Voxel> "<<x<<endl; \
 }
 
@@ -45,6 +45,12 @@ CkGroupID CollideSerialClient(CkCallback clientCb)
   return cl;
 }
 
+CkGroupID CollideDistributedClient(CkCallback clientCb)
+{
+  CProxy_distributedCollideClient cl = CProxy_distributedCollideClient::ckNew(clientCb);
+  return cl;
+}
+
 /// Create a collider group to contribute objects to.
 ///  Should be called on processor 0.
 CollideHandle CollideCreate(const CollideGrid3d &gridMap,
@@ -74,7 +80,7 @@ void CollideBoxesPrio(CollideHandle h,int chunkNo,
     int nBox,const bbox3d *boxes,const int *prio)
 {
   CProxy_collideMgr mgr(h);
-  mgr.ckLocalBranch()->contribute(chunkNo,nBox,boxes,prio);
+  mgr.ckLocalBranch()->addBoxes(chunkNo,nBox,boxes,prio);
 }
 
 /******************** objListMsg **********************/
@@ -299,85 +305,6 @@ void CollisionAggregator::compact(void)
   voxels.empty();
 }
 
-/********************* syncReductionMgr ******************/
-syncReductionMgr::syncReductionMgr()
-  :thisproxy(thisgroup)
-{
-  stepCount=-1;
-  stepFinished=true;
-  localFinished=false;
-
-  //Set up the reduction tree
-  onPE=CkMyPe();
-  if (onPE==0) treeParent=-1;
-  else treeParent=(onPE-1)/TREE_WID;
-  treeChildStart=(onPE*TREE_WID)+1;
-  treeChildEnd=treeChildStart+TREE_WID;
-  if (treeChildStart>CkNumPes()) treeChildStart=CkNumPes();
-  if (treeChildEnd>CkNumPes()) treeChildEnd=CkNumPes();
-  nChildren=treeChildEnd-treeChildStart;
-}
-void syncReductionMgr::startStep(int stepNo,bool withProd)
-{
-  SRM_STATUS("syncReductionMgr::startStep");
-  if (stepNo<1+stepCount) return;//Already started
-  if (stepNo>1+stepCount) CkAbort("Tried to start SRMgr step from future\n");
-  stepCount++;
-  stepFinished=false;
-  localFinished=false;
-  childrenCount=0;
-  if (nChildren>0)
-    for (int i=0;i<TREE_WID;i++)
-      if (treeChildStart+i<CkNumPes())
-        thisproxy[treeChildStart+i].childProd(stepCount);
-  if (withProd)
-    pleaseAdvance();//Advise subclass to advance
-}
-
-void syncReductionMgr::advance(void)
-{
-  SRM_STATUS("syncReductionMgr::advance");
-  if (stepFinished) startStep(stepCount+1,false);
-  localFinished=true;
-  tryFinish();
-}
-
-void syncReductionMgr::pleaseAdvance(void)
-{ /*Child advisory only*/ }
-
-//This is called on PE 0 once the reduction is finished
-void syncReductionMgr::reductionFinished(void)
-{ /*Child use only */ }
-
-void syncReductionMgr::tryFinish(void) //Try to finish reduction
-{
-  SRM_STATUS("syncReductionMgr::tryFinish");
-  if (localFinished && (!stepFinished) && childrenCount==nChildren)
-  {
-    stepFinished=true;
-    if (treeParent!=-1)
-      thisproxy[treeParent].childDone(stepCount);
-    else
-      reductionFinished();
-  }
-}
-//Called by parent-- will you contribute?
-void syncReductionMgr::childProd(int stepCount)
-{
-  SRM_STATUS("syncReductionMgr::childProd");
-  if (stepFinished) startStep(stepCount,true);
-  tryFinish();
-}
-//Called by tree children-- me and my children are finished
-void syncReductionMgr::childDone(int stepCount)
-{
-  SRM_STATUS("syncReductionMgr::childDone");
-  if (stepFinished) startStep(stepCount,true);
-  childrenCount++;
-  tryFinish();
-}
-
-
 /*********************** collideMgr ***********************/
 //Extract the (signed) low 23 bits of src--
 // this is the IEEE floating-point mantissa used as a grid index
@@ -387,15 +314,15 @@ static int low23(unsigned int src)
   unsigned int offset=0x00400000u;
   return (src&loMask)-offset;
 }
-static const char * voxName(int ix,int iy,int iz,char *buf) {
+static const char * voxName(int ix,int iy,int iz,char *buf,int n) {
   int x=low23(ix);
   int y=low23(iy);
   int z=low23(iz);
-  sprintf(buf,"(%d,%d,%d)",x,y,z);
+  snprintf(buf,n,"(%d,%d,%d)",x,y,z);
   return buf;
 }
-static const char * voxName(const CkIndex3D &idx,char *buf) {
-  return voxName(idx.x,idx.y,idx.z,buf);
+static const char * voxName(const CkIndex3D &idx,char *buf,int n) {
+  return voxName(idx.x,idx.y,idx.z,buf,n);
 }
 
 
@@ -409,6 +336,8 @@ collideMgr::collideMgr(const CollideGrid3d &gridMap_,
   nContrib=0;
   contribCount=0;
   msgsSent=msgsRecvd=0;
+  totalLocalVoxels = -1;
+  collisionStarted = false;
 }
 
 //Maintain contributor registration count
@@ -424,11 +353,10 @@ void collideMgr::unregisterContributor(int chunkNo)
 }
 
 //Clients call this to contribute their triangle lists
-void collideMgr::contribute(int chunkNo,
-    int n,const bbox3d *boxes,const int *prio)
+void collideMgr::addBoxes(int chunkNo, int n, const bbox3d* boxes, const int* prio)
 {
   //printf("[%d] Receiving contribution from %d\n",CkMyPe(), chunkNo);
-  CM_STATUS("collideMgr::contribute "<<n<<" boxes from "<<chunkNo);
+  CM_STATUS("collideMgr::addBoxes "<<n<<" boxes from "<<chunkNo);
   aggregator.aggregate(CkMyPe(),chunkNo,n,boxes,prio);
   aggregator.send(); //Deliver all outgoing messages
   if (++contribCount==nContrib) { //That's everybody
@@ -448,7 +376,7 @@ void collideMgr::sendVoxelMessage(const CollideLoc3d &dest,
     int n,CollideObjRec *obj)
 {
   char destName[200];
-  CM_STATUS("collideMgr::sendVoxelMessage to "<<voxName(dest.x,dest.y,dest.z,destName));
+  CM_STATUS("collideMgr::sendVoxelMessage to "<<voxName(dest.x,dest.y,dest.z,destName,sizeof(destName)));
   msgsSent++;
   objListMsg *msg=new objListMsg(n,obj,
       objListMsg::returnReceipt(thisgroup,CkMyPe()));
@@ -486,10 +414,10 @@ void collideMgr::tryAdvance(void)
   CM_STATUS("tryAdvance: "<<nContrib-contribCount<<" contrib, "<<msgsSent-msgsRecvd<<" msg")
     if ((contribCount==nContrib) && (msgsSent==msgsRecvd)) {
       CM_STATUS("advancing");
-      advance();
       steps++;
       contribCount=0;
       msgsSent=msgsRecvd=0;
+      contribute(CkCallback(CkReductionTarget(collideMgr,reductionFinished), thisProxy[0]));
     }
 }
 
@@ -498,7 +426,43 @@ void collideMgr::reductionFinished(void)
 {
   CM_STATUS("collideMgr::reductionFinished");
   //Broadcast Collision start:
-  voxelProxy.startCollision(steps,gridMap,client);
+  thisProxy.determineNumVoxels();
+  voxelProxy.initiateCollision(thisProxy);
+}
+
+void collideMgr::checkRegistrationComplete() {
+  if(myVoxels.size() == totalLocalVoxels && collisionStarted == false) {
+    collisionStarted = true;
+    //CmiPrintf("[%d][%d][%d][%d] all voxels registered totalvox=%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), thisIndex, totalLocalVoxels);
+    //fflush(stdout);
+    CollisionList colls;
+    for(int i =0 ; i<myVoxels.size(); i++) {
+      myVoxels[i]->startCollision(steps, gridMap, client, colls);
+    }
+    client.ckLocalBranch()->collisions(steps,colls);
+    collisionStarted = false;
+    myVoxels.clear();
+  }
+}
+
+void collideMgr::determineNumVoxels() {
+  if(totalLocalVoxels == -1 ) {
+    CkArray *array = voxelProxy.ckLocalBranch();
+    totalLocalVoxels = array->getNumLocalElems();
+  }
+  //CmiPrintf("[%d][%d][%d][%d] determineNumVoxels totalLocalVoxels=%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), thisIndex, totalLocalVoxels);
+  //fflush(stdout);
+  checkRegistrationComplete();
+}
+
+void collideMgr::registerVoxel(collideVoxel *vox) {
+  if(totalLocalVoxels == -1 ) {
+    CkArrayID arrID = vox->ckGetArrayID();
+    CkArray *array = (CkArray *)CkLocalBranch(arrID);
+    totalLocalVoxels = array->getNumLocalElems();
+  }
+  myVoxels.push_back(vox);
+  checkRegistrationComplete();
 }
 
 
@@ -601,9 +565,15 @@ void collideVoxel::collide(const bbox3d &territory,CollisionList &dest)
 }
 
 
+void collideVoxel::initiateCollision(const CProxy_collideMgr &mgr)
+{
+  mgr.ckLocalBranch()->registerVoxel(this);
+}
+
 void collideVoxel::startCollision(int step,
     const CollideGrid3d &gridMap,
-    const CProxy_collideClient &client)
+    const CProxy_collideClient &client,
+    CollisionList &colls)
 {
   CC_STATUS("startCollision "<<step<<" on "<<msgs.length()<<" messages {");
 
@@ -611,10 +581,7 @@ void collideVoxel::startCollision(int step,
       gridMap.grid2world(1,rSeg1d(thisIndex.y,thisIndex.y+1)),
       gridMap.grid2world(2,rSeg1d(thisIndex.z,thisIndex.z+1))
       );
-  CollisionList colls;
   collide(territory,colls);
-  client.ckLocalBranch()->collisions(this,step,colls);
-
   emptyMessages();
   CC_STATUS("} startCollision");
 }
@@ -642,15 +609,14 @@ void serialCollideClient::setClient(CollisionClientFn clientFn_,void *clientPara
   clientParam=clientParam_;
 }
 
-void serialCollideClient::collisions(ArrayElement *src,
-    int step,CollisionList &colls)
+void serialCollideClient::collisions(int step,CollisionList &colls)
 {
   if(useCb) { // Use user passed callback as reduction target
-    src->contribute(colls.length()*sizeof(Collision),colls.getData(),
+    contribute(colls.length()*sizeof(Collision),colls.getData(),
       CkReduction::concat, clientCb);
   } else { // Use client fn with reduction targetted at serialCollideClient::reductionDone
     CkCallback cb(CkIndex_serialCollideClient::reductionDone(0),0,thisgroup);
-    src->contribute(colls.length()*sizeof(Collision),colls.getData(),
+    contribute(colls.length()*sizeof(Collision),colls.getData(),
       CkReduction::concat,cb);
   }
 }
@@ -667,6 +633,16 @@ void serialCollideClient::reductionDone(CkReductionMsg *msg)
   delete msg;
 }
 
+/********************** distributedCollideClient *****************/
+distributedCollideClient::distributedCollideClient(CkCallback clientCb_) {
+  clientCb = clientCb_;
+  clientCb.transformBcastToLocalElem();
+}
 
+void distributedCollideClient::collisions(int step,CollisionList &colls)
+{
+  // Invoke clientCb
+  clientCb.send(CkDataMsg::buildNew(colls.length()*sizeof(Collision), colls.getData()));
+}
 
 #include "collidecharm.def.h"

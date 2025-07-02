@@ -2,6 +2,7 @@ DIRS = \
   latency \
   bandwidth \
   latency-tag \
+  latency-persistent \
 
 TESTDIRS = $(DIRS)
 

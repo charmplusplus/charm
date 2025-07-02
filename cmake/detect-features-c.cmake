@@ -74,6 +74,7 @@ check_function_exists(_strdup HAVE__STRDUP)
 check_function_exists(asctime CMK_HAS_ASCTIME)
 check_function_exists(backtrace CMK_USE_BACKTRACE)
 check_function_exists(bindprocessor CMK_HAS_BINDPROCESSOR)
+check_function_exists(cfree CMK_HAS_CFREE)
 check_function_exists(clz HAVE_CLZ)
 check_function_exists(clzl HAVE_CLZL)
 check_symbol_exists(dlopen dlfcn.h CMK_DLL_USE_DLOPEN)
@@ -107,10 +108,9 @@ check_function_exists(mmap CMK_HAS_MMAP)
 check_symbol_exists(MAP_ANON sys/mman.h CMK_HAS_MMAP_ANON)
 check_symbol_exists(MAP_NORESERVE sys/mman.h CMK_HAS_MMAP_NORESERVE)
 check_function_exists(mprotect CMK_HAS_MPROTECT)
-check_symbol_exists(MPI_Init_thread mpi.h CMK_MPI_INIT_THREAD)
 check_function_exists(mstats CMK_HAS_MSTATS)
 check_function_exists(ntohl CMK_HAS_NTOHL)
-check_function_exists(offsetof CMK_HAS_OFFSETOF)
+check_symbol_exists(offsetof stddef.h CMK_HAS_OFFSETOF)
 check_function_exists(openat HAVE_OPENAT)
 check_function_exists(poll CMK_USE_POLL)
 check_function_exists(popen CMK_HAS_POPEN)
@@ -119,6 +119,8 @@ check_symbol_exists(pthread_getaffinity_np pthread.h HAVE_DECL_PTHREAD_GETAFFINI
 check_symbol_exists(pthread_setaffinity_np pthread.h HAVE_DECL_PTHREAD_SETAFFINITY_NP)
 set(CMK_HAS_PTHREAD_SETAFFINITY ${HAVE_DECL_PTHREAD_SETAFFINITY_NP})
 check_symbol_exists(pthread_spin_lock pthread.h CMK_HAS_SPINLOCK)
+check_symbol_exists(pvalloc malloc.h CMK_HAS_PVALLOC)
+check_symbol_exists(RTLD_DEEPBIND dlfcn.h CMK_HAS_RTLD_DEEPBIND)
 check_symbol_exists(RTLD_DEFAULT dlfcn.h CMK_HAS_RTLD_DEFAULT)
 check_symbol_exists(RTLD_NEXT dlfcn.h CMK_HAS_RTLD_NEXT)
 check_function_exists(readlink CMK_HAS_READLINK)
@@ -142,17 +144,10 @@ check_function_exists(sysctl HAVE_SYSCTL)
 check_function_exists(sysctlbyname HAVE_SYSCTLBYNAME)
 check_function_exists(uname HAVE_UNAME)
 check_function_exists(usleep CMK_HAS_USLEEP)
+check_symbol_exists(valloc malloc.h CMK_HAS_VALLOC)
 
 
 # Complex tests
-
-if(CMK_WINDOWS OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-  set(CMK_CAN_GET_BINARY_PATH 1)
-elseif(${CMK_HAS_READLINK} OR ${CMK_HAS_REALPATH})
-  set(CMK_CAN_GET_BINARY_PATH 1)
-else()
-  set(CMK_CAN_GET_BINARY_PATH 0)
-endif()
 
 file(WRITE ${CMAKE_BINARY_DIR}/test_file "")
 execute_process(COMMAND cp -p test_file test_file2 ERROR_VARIABLE CP_P_OPTION_ERROR)
@@ -295,8 +290,10 @@ int main()
 }
 " CMK_HAS_NUMACTRL)
 
-set(tmp ${CMAKE_REQUIRED_LIBRARIES})
-set(CMAKE_REQUIRED_LIBRARIES $ENV{CRAY_PMI_POST_LINK_OPTS} $ENV{CRAY_UGNI_POST_LINK_OPTS} -lugni -lpmi)
+set(tmp0 ${CMAKE_REQUIRED_INCLUDES})
+set(tmp1 ${CMAKE_REQUIRED_LIBRARIES})
+set(CMAKE_REQUIRED_INCLUDES $ENV{CRAY_PMI_PREFIX}/include)
+set(CMAKE_REQUIRED_LIBRARIES $ENV{CRAY_PMI_POST_LINK_OPTS} -lpmi)
 check_c_source_compiles("
 #include <pmi.h>
 int main() {
@@ -306,7 +303,8 @@ int main() {
     return 0;
 }
 " CMK_HAS_PMI_GET_NID)
-set(CMAKE_REQUIRED_LIBRARIES ${tmp})
+set(CMAKE_REQUIRED_INCLUDES ${tmp0})
+set(CMAKE_REQUIRED_LIBRARIES ${tmp1})
 
 check_c_source_compiles("
 #include <rca_lib.h>
@@ -359,26 +357,6 @@ void test()
 }
 " CMK_IBV_PORT_ATTR_HAS_LINK_LAYER)
 
-check_c_source_compiles([=[
-void main() {
-  void * m1, * m2;
-  asm volatile ("movq %%fs:0x0, %0\\n\t"
-                "movq %1, %%fs:0x0\\n\t"
-                : "=&r"(m1)
-                : "r"(m2));
-}
-]=] CMK_TLS_SWITCHING_X86_64)
-
-check_c_source_compiles([=[
-void main() {
-  void * m1, * m2;
-  asm volatile ("movl %%gs:0x0, %0\\n\t"
-                "movl %1, %%gs:0x0\\n\t"
-                : "=&r"(m1)
-                : "r"(m2));
-}
-]=] CMK_TLS_SWITCHING_X86)
-
 check_c_source_compiles("
 #include <stdint.h>
 #include <gni_pub.h>
@@ -392,15 +370,43 @@ int main() {
 }
 " CMK_BALANCED_INJECTION_API)
 
-if(NOT CMK_BALANCED_INJECTION_API)
-  # Since it is often checked via #ifdef, CMK_BALANCED_INJECTION_API
-  # can't be set to zero, but must be unset.
-  unset(CMK_BALANCED_INJECTION_API CACHE)
-endif()
-
-if(${CMK_BUILD_OFI} EQUAL 1)
+if(${NETWORK} STREQUAL "ofi" OR ${NETWORK} STREQUAL "ofi-crayshasta" OR ${NETWORK} STREQUAL "ofi-linux")
+# assume HPC installation
+include(CMakePrintHelpers)
+  find_package(EnvModules REQUIRED)
+  find_package(PkgConfig REQUIRED)
+  if(EnvModules_FOUND)
+  #at least get libfabric loaded if it isn't already
+	env_module(load libfabric)
+  endif()
   set(tmp ${CMAKE_REQUIRED_LIBRARIES})
-  set(CMAKE_REQUIRED_LIBRARIES "${CMAKE_REQUIRED_LIBRARIES} -lfabric")
+  if(${PkgConfig_FOUND})
+# this is tortured because pkg-config and cmake are infuriating
+	set(myconfigCommand "pkg-config")
+	set(myargs1 "libfabric")
+	set(myargs2 "--libs")
+	execute_process(COMMAND ${myconfigCommand} ${myargs1} ${myargs2}
+	                OUTPUT_VARIABLE PKG_CONFIG_OFI_LIBS_OUTPUT
+			RESULT_VARIABLE PKG_CONFIG_OFI_LIBS_RESULT
+			WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+			ERROR_VARIABLE thiserror
+			)
+	string(STRIP ${PKG_CONFIG_OFI_LIBS_OUTPUT} CMAKE_PKG_CONFIG_OFI_LIBS)
+	set(myargs2 "--cflags")
+	execute_process(COMMAND ${myconfigCommand} ${myargs1} ${myargs2}
+			OUTPUT_VARIABLE PKG_CONFIG_OFI_CFLAGS_OUTPUT
+			RESULT_VARIABLE PKG_CONFIG_OFI_CFLAGS_RESULT
+			WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+			ERROR_VARIABLE $thaterror
+			)
+	string(STRIP ${PKG_CONFIG_OFI_CFLAGS_OUTPUT} CMAKE_PKG_CONFIG_OFI_CFLAGS)
+	set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} ${CMAKE_PKG_CONFIG_OFI_CFLAGS}")
+	set(CMAKE_REQUIRED_LIBRARIES "${CMAKE_REQUIRED_LIBRARIES} ${CMAKE_PKG_CONFIG_OFI_LIBS}")
+  else()
+	message(WARNING "cmake can't find pkg-config")
+	set(CMAKE_REQUIRED_LIBRARIES "${CMAKE_REQUIRED_LIBRARIES}")
+  endif()
+
   check_c_source_compiles("
     #include <rdma/fabric.h>
     int main(int argc, char **argv)
@@ -410,9 +416,13 @@ if(${CMK_BUILD_OFI} EQUAL 1)
       return 0;
     }
   " CMK_BUILD_ON_OFI)
-  set(CMAKE_REQUIRED_LIBRARIES ${tmp})
+
   if("${CMK_BUILD_ON_OFI}" STREQUAL "")
-    message(FATAL_ERROR "Unable to build ofi.")
+    message(FATAL_ERROR "Unable to build ofi with FLAGS ${CMAKE_REQUIRED_FLAGS} LIBS ${CMAKE_REQUIRED_LIBRARIES}  for network ${NETWORK}.")
+    set(CMAKE_REQUIRED_LIBRARIES ${tmp})
+  else()
+#    set(CMAKE_EXTRA_INCLUDE_FILES "{CMAKE_EXTRA_INCLUDE_FILES} CMAKE_PKG_CONFIG_OFI_CFLAGS")
+#    set(CMK_LIBDIR "{CMK_LIBS} CMAKE_PKG_CONFIG_OFI_LIBS")
   endif()
 endif()
 

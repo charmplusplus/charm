@@ -91,6 +91,10 @@ Closes it.
 */
 void CcsServer_noReply(CcsImplHeader *hdr);
 
+#if !CMK_USE_LRTS_STDIO
+void print_node0(const char *format, va_list args);
+#endif
+
 #else /*CCS not available*/
 
 #define CcsServer_new(i,p) /*empty*/

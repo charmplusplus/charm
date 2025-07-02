@@ -56,6 +56,9 @@ extern "C" {
 #define CkError                 CmiError
 #define CkAbort                 CmiAbort
 #define CkAssert                CmiAssert
+#define CkAssertMsg             CmiAssertMsg
+#define CkEnforce               CmiEnforce
+#define CkEnforceMsg            CmiEnforceMsg
 #define CkSetPeHelpsOtherThreads CmiSetPeHelpsOtherThreads
 
 void realCkExit(int exitcode);
@@ -154,6 +157,10 @@ extern void CkStartQDExt_ArrayCallback(int aid, int* idx, int ndims, int epIdx, 
 extern void CkStartQDExt_SectionCallback(int sid_pe, int sid_cnt, int rootPE, int ep);
 extern void registerCreateCallbackMsgExtCallback(void (*cb)(void*, int, int, int, int *, char**, int*));
 extern void registerPyReductionExtCallback(int (*cb)(char**, int*, int, char**));
+extern int CkTraceRegisterUserEvent(char *EventDesc, int eventID);
+extern void CkTraceBeginUserBracketEvent(int eventID);
+extern void CkTraceEndUserBracketEvent(int eventID);
+
 #endif
 /*********************************************************/
 /**
@@ -194,6 +201,14 @@ typedef enum{
 	TypeArray
 } ChareType;
 
+// What to do if an entry method is invoked on
+// an array element that does not (yet) exist:
+typedef enum{
+	CkArray_IfNotThere_buffer = 0,     // Wait for it to be created
+	CkArray_IfNotThere_createhere = 1, // Make it on sending Pe
+	CkArray_IfNotThere_createhome = 2  // Make it on (a) home Pe
+} CkArray_IfNotThere;
+
 /** A "call function" to invoke a method on an object. See EntryInfo */
 typedef void  (*CkCallFnPtr) (void *msg, void *obj);
 /** Register this entry point, with this call function and flags.
@@ -220,12 +235,15 @@ extern void CkRegisterMigCtor(int chareIndex, int ctorEpIndex);
 extern void CkRegisterGroupIrr(int chareIndex,int isIrr);
 /** Register the chare baseIdx as a base class of the chare derivedIdx. */
 extern void CkRegisterBase(int derivedIdx, int baseIdx);
+/** Sets the ifNotThere policy of an EP **/
+extern void CkRegisterIfNotThere(int epIdx, CkArray_IfNotThere policy);
 #if CMK_CHARM4PY
-extern void CkRegisterMainChareExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx);
-extern void CkRegisterGroupExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx);
-extern void CkRegisterSectionManagerExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx);
-extern void CkRegisterArrayMapExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx);
-extern void CkRegisterArrayExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx);
+void CkRegisterMainChareExt(const char *s, const char **emNames, int emNamesStart, int numEntryMethods, int *chareIdx, int *startEpIdx);
+extern void CkRegisterGroupExt(const char *s, const char **emNames, int emNamesStart, int numEntryMethods, int *chareIdx, int *startEpIdx);
+extern void CkRegisterGroupExt(const char *s, const char **emNames, int emNamesStart, int numEntryMethods, int *chareIdx, int *startEpIdx);
+extern void CkRegisterSectionManagerExt(const char *s, const char **emNames, int emNamesStart, int numEntryMethods, int *chareIdx, int *startEpIdx);
+extern void CkRegisterArrayMapExt(const char *s, const char **emNames, int emNamesStart, int numEntryMethods, int *chareIdx, int *startEpIdx);
+extern void CkRegisterArrayExt(const char *s, const char **emNames, int emNamesStart, int numEntryMethods, int *chareIdx, int *startEpIdx);
 extern void CkRegisterReadonlyExt(const char *name, const char *type, size_t msgSize, char *msg);
 #endif
 
@@ -434,7 +452,19 @@ extern void CkArrayExtSend_multi(int aid, int *idx, int ndims, int epIdx, int nu
 
 /*@}*/
 
+typedef CMK_REFNUM_TYPE CkFutureID;
+typedef struct _ckFuture {
+  CkFutureID id;
+  int        pe;
+#ifdef __cplusplus
+  public:
+    void pup(PUP::er &p) { p(id); p(pe); }
 
+    bool operator==(const _ckFuture& other) const {
+      return this->id == other.id && this->pe == other.pe;
+    }
+#endif
+} CkFuture;
 
 /******************************************************************************
  *
@@ -514,6 +544,7 @@ extern int CkDeviceBufferSizeInBytes();
 extern void CkCUDAHtoD(void *dest, void *src, int nbytes, cudaStream_t stream);
 extern void CkCUDADtoH(void *dest, void *src, int nbytes, cudaStream_t stream);
 extern void CkCUDAStreamSynchronize(cudaStream_t stream);
+extern void CkHapiAddCallback(long stream, void (*cb)(void*, void*), int fid);
 #endif
 
 #ifdef __cplusplus

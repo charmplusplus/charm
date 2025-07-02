@@ -3,14 +3,12 @@
    every machine. */
 #define CMK_CMIDELIVERS_USE_COMMON_CODE                    1
 
-/* specifies if the functions CmiPrintf, CmiError and CmiScanf are implemented
-   in machine.C (1), or if the standard definitions in convcore.C should be used
-   (0). */
-#define CMK_CMIPRINTF_IS_A_BUILTIN                         0
+/* specifies if the functions LrtsPrintf, LrtsError and LrtsScanf are present
+   in machine.C (1), or if not (0). */
+#define CMK_USE_LRTS_STDIO                                 0
 
 /* define the converse headers. For most of the purposes, only the UNIQUE header
-   needs to be modified, the others will follow. BLUEGENE may need to be
-   adapted.
+   needs to be modified, the others will follow.
 
    In particular, the fields "hdl", "xhdl" and "info" must be always present in
    the extended header, since they are directly accessed in converse.h */

@@ -45,4 +45,13 @@ void  LrtsBarrier(void);
 /* ### lock functions ### */
 #include "lrtslock.h"
 
+#if CMK_USE_LRTS_STDIO
+int LrtsPrintf(const char *, va_list);
+int LrtsError(const char *, va_list);
+int LrtsScanf(const char *, va_list);
+int LrtsUsePrintf(void);
+int LrtsUseError(void);
+int LrtsUseScanf(void);
+#endif
+
 #endif

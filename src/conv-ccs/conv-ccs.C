@@ -37,6 +37,29 @@ static void initHandlerRec(CcsHandlerRec *c,const char *name) {
   c->nCalls=0;
 }
 
+#if CMK_CHARM4PY
+static void callHandlerRec(CcsHandlerRec *c, int reqLen, const void *reqData)
+{
+  c->nCalls++;
+  //structure of message: reserved header + handler name length (up to 32) + data length (up to 1024)
+  //+handler name + data
+  //get handler name and length (up to 32)
+  const char *handlerStr = c->name;
+  const int handlerStrLen = strlen(handlerStr);
+  //reserved header name and data
+  char *cmsg = (char *) CmiAlloc(CmiReservedHeaderSize+2*sizeof(int)+CCS_MAXHANDLER+reqLen);
+  //handler length (up to 32)
+  memcpy(cmsg+CmiReservedHeaderSize, &handlerStrLen, sizeof(int));
+  //data length (up to 1024)
+  memcpy(cmsg+CmiReservedHeaderSize+sizeof(int), &reqLen, sizeof(int));
+  //handler name (up to 32)
+  memcpy(cmsg+CmiReservedHeaderSize+2*sizeof(int), handlerStr, handlerStrLen);
+  //data
+  memcpy(cmsg+CmiReservedHeaderSize+2*sizeof(int)+CCS_MAXHANDLER, reqData, reqLen);
+  (c->fnOld)(cmsg);
+}
+
+#else
 static void callHandlerRec(CcsHandlerRec *c,int reqLen,const void *reqData) {
 	c->nCalls++;
 	if (c->fnOld) 
@@ -53,6 +76,8 @@ static void callHandlerRec(CcsHandlerRec *c,int reqLen,const void *reqData) {
 	}
 }
 
+#endif
+
 /*Table maps handler name to CcsHandler object*/
 CpvDeclare(CcsHandlerTable, ccsTab);
 
@@ -64,6 +89,14 @@ void CcsRegisterHandler(const char *name, CmiHandler fn) {
   cp.fnOld=fn;
   *(CcsHandlerRec *)CkHashtablePut(CpvAccess(ccsTab),(void *)&cp.name)=cp;
 }
+
+#ifdef CMK_CHARM4PY
+void CcsRegisterHandlerExt(const char *ccs_handlername, void *fn)
+{
+  CcsRegisterHandler(ccs_handlername, (CmiHandler)fn);
+}
+#endif
+
 void CcsRegisterHandlerFn(const char *name, CcsHandlerFn fn, void *ptr) {
   CcsHandlerRec cp;
   initHandlerRec(&cp,name);
@@ -228,7 +261,6 @@ CCS handler.
 */
 void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData)
 {
-  char *cmsg;
   int reqLen=ChMessageInt(hdr->len);
 /*Look up handler's converse ID*/
   char *handlerStr=hdr->handler;
@@ -519,7 +551,7 @@ void CcsInit(char **argv)
 
   CmiAssignOnce(&rep_fw_handler_idx, CmiRegisterHandler((CmiHandler)rep_fw_handler));
 #if NODE_0_IS_CONVHOST
-#if ! CMK_CMIPRINTF_IS_A_BUILTIN
+#if !CMK_USE_LRTS_STDIO
   CmiAssignOnce(&print_fw_handler_idx, CmiRegisterHandler((CmiHandler)print_fw_handler));
 #endif
   {
@@ -532,7 +564,7 @@ void CcsInit(char **argv)
      if (CmiMyPe()==0)
     {/*Create and occasionally poll on a CCS server port*/
       CcsServer_new(NULL,&ccs_serverPort,ccs_serverAuth);
-      CcdCallOnConditionKeep(CcdPERIODIC,(CcdVoidFn)CcsServerCheck,NULL);
+      CcdCallOnConditionKeep(CcdPERIODIC,(CcdCondFn)CcsServerCheck,NULL);
     }
   }
 #endif

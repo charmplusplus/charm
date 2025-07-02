@@ -88,7 +88,7 @@ typedef struct DeviceRdmaOpMsg_ {
   char header[CmiMsgHeaderSizeBytes];
   DeviceRdmaOp op;
 } DeviceRdmaOpMsg;
-#endif
+#endif // CMK_CUDA
 
 #ifdef __cplusplus
 extern "C" {

@@ -23,11 +23,11 @@ static int isEmpty(Q*);
 static int dequeue(Q*);
 
 #define VMAX 2050
-int V; /* no. of vertices */
-int E; /* no. of edges */
-int C; /* no. of connections per vertex */
+int globalNumVertices; /* no. of vertices */
+int globalNumEdges; /* no. of edges */
+int globalNumConnections; /* no. of connections per vertex */
 
-VerticesListType * InitVertices(EdgeListType * EdgeList, int V, int E);
+VerticesListType * InitVertices(EdgeListType * EdgeList, int numVertices, int numEdges);
 
 
 extern "C" void gengraph(int, int, int, int *, int *, int);
@@ -43,28 +43,29 @@ static void printOut(VerticesListType *vertices);
 static void copyOut(VerticesListType *vertices, int *npe, int *pes);
 static void initGraph(VerticesListType *graph);
 static void diameter(VerticesListType *graph);
-static void AddEdges(VerticesListType *graph, EdgeListType *EdgeList, int V, int n);
+static void AddEdges(VerticesListType *graph, EdgeListType *EdgeList, int numVertices, int n);
 
-void gengraph(int pV, int pC, int pseed, int *pes, int *npe, int tofile)
+extern EdgeListType * InitEdgeList(int);
+
+void gengraph(int numVertices, int numConnections, int pseed, int *pes, int *npe, int tofile)
 { int i;
   VerticesListType graph;
   int seed;
   EdgeListType * EdgeList;
   /* VerticesListType * vertices; */
-  extern EdgeListType * InitEdgeList(int);
   char dircmd[20], dirname[10];
 
-  V = pV;
-  C = pC;
+  globalNumVertices = numVertices;
+  globalNumConnections = numConnections;
   seed = pseed;
   
   if (CmiMyPe() == 0)
-  CmiPrintf("for %d PEs, connectivity %d... \n", V, C);
+  CmiPrintf("for %d PEs, connectivity %d... \n", globalNumVertices, globalNumConnections);
 
   /* make a directory */
   if (tofile && CmiMyPe() == 0) {
-  sprintf(dirname, "graph%d", V);
-  sprintf(dircmd, "mkdir %s", dirname);
+  snprintf(dirname, sizeof(dirname), "graph%d", globalNumVertices);
+  snprintf(dircmd, sizeof(dircmd), "mkdir %s", dirname);
   if (system(dircmd) == -1) {
     CmiAbort("CLD> call to system() failed!");
   }
@@ -72,12 +73,13 @@ void gengraph(int pV, int pC, int pseed, int *pes, int *npe, int tofile)
   
   /* for (i=0; i<seed; i++) rand(); */
   for (i=0; i<seed; i++) CrnRand();
-  if ((V*C %2) != 0) printf("V*C must be even\n");
-  E = V*C/2;
+  if (globalNumVertices*globalNumConnections % 2 != 0)
+    printf("globalNumVertices*globalNumConnections must be even\n");
+  globalNumEdges = globalNumVertices*globalNumConnections / 2;
   initGraph(&graph);
-  EdgeList = InitEdgeList(E);
-  AddEdges(&graph, EdgeList, V, E); 
-  /*  vertices = (VerticesListType *) InitVertices(EdgeList, V,E); */
+  EdgeList = InitEdgeList(globalNumEdges);
+  AddEdges(&graph, EdgeList, globalNumVertices, globalNumEdges);
+  /* vertices = (VerticesListType *) InitVertices(EdgeList, globalNumVertices, globalNumEdges); */
 
   if (tofile) {
     if (CmiMyPe()==0) printOut(&graph);
@@ -88,60 +90,60 @@ void gengraph(int pV, int pC, int pseed, int *pes, int *npe, int tofile)
 }
 
 #if 0
-static void AddEdges(EdgeListType *EdgeList, int V, int n)
-   /* Add more edges to make up a total of E edges */
+static void AddEdges(EdgeListType *EdgeList, int numVertices, int n)
+   /* Add more edges to make up a total of globalNumEdges edges */
 {int i,j,w,x,y;
-/* first add edges for a C-way spanning tree.*/
+/* first add edges for a globalNumConnections-way spanning tree.*/
 int c1;
-if (C>1) c1 = C-1;
+if (globalNumConnections>1) c1 = globalNumConnections-1;
 
-for (i=0; i< V/c1; i++)
+for (i=0; i< numVertices/c1; i++)
   for (j=0; j<c1; j++) {
       w = c1*i + j +1; 
       /* printf("considering (%d, %d)\n", i, w);  */
-      if (w < V) {
+      if (w < numVertices) {
 	addEdge(EdgeList,i,w);
 	/* printf(" --- added.\n"); */
       }
       else /*printf(" not added.\n")*/; 
   }
-n -= (V-1);
+n -= (numVertices-1);
 
  for (i=0; i<n; i++) 
    {
      do {
        do {
-	 x = CrnRand() % V;
-       } while (connections(x) >= C);
+	 x = CrnRand() % numVertices;
+       } while (connections(x) >= globalNumConnections);
        do {
-	 y = CrnRand() % V;
-       } while ((y== x) || connections(y) >= C);
+	 y = CrnRand() % numVertices;
+       } while (y == x || connections(y) >= globalNumConnections);
      } while (edgeExists(x,y));
      addEdge(EdgeList, x, y);
    }
 }
 #endif
 
-static void AddEdges(VerticesListType *graph, EdgeListType *EdgeList, int V, int n)
-	/* Add more edges to make up a total of E edges */
+static void AddEdges(VerticesListType *graph, EdgeListType *EdgeList, int numVertices, int n)
+	/* Add more edges to make up a total of globalNumEdges edges */
   {	int i,j,w,x,y,k;
 	int c1,max,maxi;
 	int **varr;
 	int varrlen,count=0;
 	int flag=0;
 
-	/* first add edges for a C-way spanning tree.*/
-        varr=(int **)calloc(V, sizeof(int*));
-        for (i=0;i<V;i++)
+	/* first add edges for a globalNumConnections-way spanning tree.*/
+        varr=(int **)calloc(numVertices, sizeof(int*));
+        for (i=0;i<numVertices;i++)
             varr[i] = (int *)calloc(2, sizeof(int));
 	
   c1 = 1;
-	if (C>1) c1 = C-1;
+	if (globalNumConnections>1) c1 = globalNumConnections-1;
 
-	for (i=0; i<= V/c1; i++)
+	for (i=0; i<= numVertices/c1; i++)
 	  for (j=0; j<c1; j++) {
 	      w = c1*i + j +1; 
-	      if (w < V) {
+	      if (w < numVertices) {
 		addEdge(graph, EdgeList,i,w);
 		count++;
 			      }
@@ -149,11 +151,11 @@ static void AddEdges(VerticesListType *graph, EdgeListType *EdgeList, int V, int
 	
 	/*varr is array of vertices and free connection for each vertex*/
 	j=0;
-	for (i=0;i<V;i++)
-		if(connections(graph, i)<C)
+	for (i=0;i<numVertices;i++)
+		if(connections(graph, i)<globalNumConnections)
 		{
 		 varr[j][0]=i;
-		 varr[j][1]=C-connections(graph,i);
+		 varr[j][1]=globalNumConnections-connections(graph,i);
 		 j++;
 		}
 	varrlen=j;
@@ -279,21 +281,21 @@ static void AddEdges(VerticesListType *graph, EdgeListType *EdgeList, int V, int
 						 varrlen--;
 					}
 			}	      
-        for (i=0;i<V;i++) free(varr[i]);
+        for (i=0;i<numVertices;i++) free(varr[i]);
         free(varr);
 }
 
 
-void fillAdjArray(Edge *edges, VerticesListType *vlist, int V, int E);
+void fillAdjArray(ConvEdge *edges, VerticesListType *vlist, int numVertices, int numEdges);
 void sortAdjArrays(VerticesListType *vlist);
 static void sort(int *adj, int fromIndex, int toIndex);
-void countDegrees(Edge *edges, Vertex *vertRecs, int V, int E);
+void countDegrees(ConvEdge *edges, ConvVertex *vertRecs, int numVertices, int numEdges);
 
 VerticesListType * 
-InitVertices(EdgeListType * EdgeList, int V, int E)
+InitVertices(EdgeListType * EdgeList, int numVertices, int numEdges)
 { /* returns a structure of type VerticesListType, which contains an arry of 
      vertex records, and an array of adjacency information. See typedef. */
-  /* First allocate the adjacency subarray of size E, and vertex subarray size V.
+  /* First allocate the adjacency subarray of size numEdges, and vertex subarray size numVertices.
      Then count the occurences of each vertex in the Edgelist in vertex.degree.
      Then compute the real adjListInd = sum from 0 to i-1 of the previous degrees.
      Then, traverse edge list, and enter each edge in two adj lists.
@@ -302,50 +304,50 @@ InitVertices(EdgeListType * EdgeList, int V, int E)
 
   vlist = (VerticesListType *) malloc(sizeof(VerticesListType));
   _MEMCHECK(vlist);
-  vlist->numVertices = V;
-  vlist->vertexArray = (Vertex *) malloc(V*sizeof(Vertex));
+  vlist->numVertices = numVertices;
+  vlist->vertexArray = (ConvVertex *) malloc(numVertices*sizeof(ConvVertex));
   _MEMCHECK(vlist->vertexArray);
-  vlist->adjArray = (int *) malloc(2*E*sizeof(int)); 
+  vlist->adjArray = (int *) malloc(2*numEdges*sizeof(int)); 
                     /* as each edge is entered twice */
   _MEMCHECK(vlist->adjArray);
-  countDegrees(EdgeList->edges, vlist->vertexArray, V, E);
-  fillAdjArray(EdgeList->edges, vlist, V, E);
+  countDegrees(EdgeList->edges, vlist->vertexArray, numVertices, numEdges);
+  fillAdjArray(EdgeList->edges, vlist, numVertices, numEdges);
   sortAdjArrays(vlist);
   return(vlist);
 }
 
-void countDegrees(Edge *edges, Vertex *vertRecs, int V, int E)
+void countDegrees(ConvEdge *edges, ConvVertex *vertRecs, int numVertices, int numEdges)
 { /* initialize the degrees of all vertices to 0. 
      Traverse the edge list, incrementing the degree of the 2 nodes for each edge.
      */
  int i, count;
  
- for (i=0; i<V; i++)
+ for (i=0; i<numVertices; i++)
    { vertRecs[i].degree = 0;
      vertRecs[i].next = 0;}
- for (i=0; i<E; i++)
+ for (i=0; i<numEdges; i++)
    {vertRecs[ edges[i].node1 ].degree++;
     vertRecs[ edges[i].node2 ].degree++;}
 
 /* now fill adjListInd, by starting a counter at 0, and adding degrees of visited
    nodes. */
  count = 0;
- for (i=0; i<V; i++)
+ for (i=0; i<numVertices; i++)
    { vertRecs[i].adjListInd = count;
      count += vertRecs[i].degree;
    }
 }
 
-void fillAdjArray(Edge *edges, VerticesListType *vlist, int V, int E)
+void fillAdjArray(ConvEdge *edges, VerticesListType *vlist, int numVertices, int numEdges)
 { /* Insert each edge <x,y> as an entry y in x's adj list, and vice versa. */
   int i, x,y;
  int * adj;
- Vertex * vertexRecs;
+ ConvVertex * vertexRecs;
 
  adj = vlist->adjArray;
  vertexRecs = vlist->vertexArray;
 
-  for (i=0; i<E; i++)
+  for (i=0; i<numEdges; i++)
     { x = edges[i].node1; y = edges[i].node2;
       adj[ vertexRecs[x].adjListInd + vertexRecs[x].next ] = y;
       vertexRecs[x].next++;
@@ -356,18 +358,18 @@ void fillAdjArray(Edge *edges, VerticesListType *vlist, int V, int E)
 
 void sortAdjArrays(VerticesListType *vlist)
 { /* sort each section of the array corresponding to each vertex. */
-  int V, i;
+  int numVertices, i;
   int dupcount;
 
-  V = vlist->numVertices;
-  for (i=0; i<V; i++)
+  numVertices = vlist->numVertices;
+  for (i=0; i<numVertices; i++)
     { sort(vlist->adjArray, 
 	   vlist->vertexArray[i].adjListInd,
 	   vlist->vertexArray[i].adjListInd + vlist->vertexArray[i].degree -1);
     }
   /* eliminate duplicates. May be should be merged with above? */
   dupcount = 0;
-  for (i=0; i<V; i++)
+  for (i=0; i<numVertices; i++)
     { int m,n, limit;
       int * adj;
 
@@ -391,7 +393,7 @@ void sortAdjArrays(VerticesListType *vlist)
 /* printf("number of duplicate edges removed = %d\n", dupcount/2);*/
 /* Here is an assignment to a global variable.... */
 if ((dupcount % 2) != 0) {printf("error. duplicates not even.\n"); }
-E -= dupcount/2;
+globalNumEdges -= dupcount/2;
 }
 
 static void sort(int *adj, int fromIndex, int toIndex)
@@ -416,7 +418,7 @@ static void copyOut(VerticesListType *vertices, int *npe, int *pes)
 { 
  int i;
  int * adj;
- Vertex * vertexRecs;
+ ConvVertex * vertexRecs;
  
  adj = vertices->adjArray;
  vertexRecs = vertices->vertexArray;
@@ -435,7 +437,7 @@ static void copyOut(VerticesListType *vertices, int *npe, int *pes)
 static void printOut(VerticesListType *vertices)
 {int i,j;
  int * adj;
- Vertex * vertexRecs;
+ ConvVertex * vertexRecs;
  FILE *fp;
  char filename[40];
  
@@ -445,7 +447,7 @@ static void printOut(VerticesListType *vertices)
  for (i=0; i<vertices->numVertices; i++)
    {
      /* Open graphN/graphi */
-     sprintf(filename, "graph%d/graph%d", vertices->numVertices, i);
+     snprintf(filename, sizeof(filename), "graph%d/graph%d", vertices->numVertices, i);
      fp = fopen(filename, "w");
      fprintf(fp, "%d ", vertexRecs[i].degree);
      for (j=0; j<vertexRecs[i].degree; j++)
@@ -457,24 +459,25 @@ static void printOut(VerticesListType *vertices)
 
 static void initGraph(VerticesListType *graph)
 { int i;
-  graph->numVertices = V;
-  graph->vertexArray = (Vertex *) malloc(V*sizeof(Vertex));
+  graph->numVertices = globalNumVertices;
+  graph->vertexArray = (ConvVertex *) malloc(globalNumVertices*sizeof(ConvVertex));
   _MEMCHECK(graph->vertexArray);
-  graph->adjArray = (int *) malloc(2*E*sizeof(int));
+  graph->adjArray = (int *) malloc(2*globalNumEdges*sizeof(int));
   _MEMCHECK(graph->adjArray);
 
-  for (i=0; i< V; i++) {
+  for (i = 0; i < globalNumVertices; i++) {
     graph->vertexArray[i].degree = 0;
-    graph->vertexArray[i].next = i*C;
-    graph->vertexArray[i].adjListInd = i*C;
+    graph->vertexArray[i].next = i*globalNumConnections;
+    graph->vertexArray[i].adjListInd = i*globalNumConnections;
   }
 }
 
 static void enqueue(Q *q, int i);
 
+extern Q * makeQueue(void);
+
 static void diameter(VerticesListType *graph)
 {
-  extern Q * makeQueue(void);
   int i,j, k, v, w, start;
   int *distance;
   int *histogram;
@@ -482,19 +485,20 @@ static void diameter(VerticesListType *graph)
   int dia;
   float average;
 
-  distance = (int *)calloc(V, sizeof(int));
-  histogram = (int *)calloc(V, sizeof(int));
+  distance = (int *)calloc(globalNumVertices, sizeof(int));
+  histogram = (int *)calloc(globalNumVertices, sizeof(int));
 
-  for (i=0; i<V; i++) {
+  for (i=0; i<globalNumVertices; i++) {
     histogram[i] = 0; 
   }
   
   dia = 0;
   average = 0.0;
   q = makeQueue();
-  for (i=0; i<V; i++) {
+  for (i=0; i<globalNumVertices; i++) {
     /* run non-weighted shortes distance algorithm for each vertex i */
-    for (j=0; j<V; j++) distance[j] = -1;
+    for (j=0; j<globalNumVertices; j++)
+      distance[j] = -1;
     distance[i] = 0;
     enqueue(q, i);
     while (! (isEmpty(q))) {
@@ -509,13 +513,13 @@ static void diameter(VerticesListType *graph)
 	}
       }
     }
-    for (j=0; j<V; j++) {
+    for (j=0; j<globalNumVertices; j++) {
       if (distance[j] > dia) dia = distance[j];
       average += distance[j];
       histogram[ distance[j]]++;
     }
   }
-  average = average / (V*V);
+  average = average / (globalNumVertices*globalNumVertices);
   printf("the diameter is: %d, average internode distance = %f\n", 
 	 dia, average);
   /*for (i = 0; i< 6; i++) printf("histo[%d] = %d\n", i, histogram[i]);*/

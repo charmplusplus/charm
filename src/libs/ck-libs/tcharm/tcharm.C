@@ -5,7 +5,6 @@ Orion Sky Lawlor, olawlor@acm.org, 11/19/2001
  */
 #include "tcharm_impl.h"
 #include "tcharm.h"
-#include "ckevacuation.h"
 #include <ctype.h>
 #include "memory-isomalloc.h"
 
@@ -59,6 +58,9 @@ static char* mapping = NULL;
 CsvDeclare(funcmap*, tcharm_funcmap);
 #endif
 
+// circumstances that need special handling so that node setup runs on pthread 0:
+#define TCHARM_NODESETUP_COMMTHD (CMK_CONVERSE_MPI && CMK_SMP && !CMK_SMP_NO_COMMTHD)
+
 void TCharm::nodeInit()
 {
   static bool tcharm_nodeinit_has_been_called;
@@ -73,18 +75,25 @@ void TCharm::nodeInit()
   }
 #endif
 
-  // Assumes no anytime migration and only static insertion
-  _isAnytimeMigration = false;
-  _isStaticInsertion = true;
-
   char **argv = CkGetArgv();
   nChunks = CkNumPes();
   CmiGetArgIntDesc(argv, "-vp", &nChunks, "Set the total number of virtual processors");
   CmiGetArgIntDesc(argv, "+vp", &nChunks, nullptr);
+
+#if !TCHARM_NODESETUP_COMMTHD
+  TCHARM_Node_Setup(nChunks);
+#endif
 }
 
 void TCharm::procInit()
 {
+#if TCHARM_NODESETUP_COMMTHD
+  if (CmiInCommThread())
+    TCHARM_Node_Setup(nChunks);
+
+  CmiNodeAllBarrier();
+#endif
+
   CtvInitialize(TCharm *,_curTCharm);
   CtvAccess(_curTCharm)=NULL;
   tcharm_initted=true;
@@ -139,8 +148,8 @@ void TCHARM_Api_trace(const char *routineName,const char *libraryName) noexcept
 	if (!tcharm_tracelibs.isTracing(libraryName)) return;
 	TCharm *tc=CtvAccess(_curTCharm);
 	char where[100];
-	if (tc==NULL) sprintf(where,"[serial context on %d]",CkMyPe());
-	else sprintf(where,"[%p> vp %d, p %d]",(void *)tc,tc->getElement(),CkMyPe());
+	if (tc==NULL) snprintf(where,sizeof(where),"[serial context on %d]",CkMyPe());
+	else snprintf(where,sizeof(where),"[%p> vp %d, p %d]",(void *)tc,tc->getElement(),CkMyPe());
 	CmiPrintf("%s Called routine %s\n",where,routineName);
 	CmiPrintStackTrace(1);
 	CmiPrintf("\n");
@@ -172,7 +181,7 @@ static void startTCharmThread(TCharmInitMsg *msg)
        TCHARM_Thread_data_start_fn threadFn = getTCharmThreadFunction(msg->threadFn);
 	threadFn(msg->data);
 	TCharm::deactivateThread();
-	CtvAccess(_curTCharm)->done(0);
+	TCharm::getNULL()->done(0);
 }
 
 TCharm::TCharm(TCharmInitMsg *initMsg_)
@@ -188,17 +197,19 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
   {
     if (tcharm_nomig) { /*Nonmigratable version, for debugging*/
       tid=CthCreate((CthVoidFn)startTCharmThread,initMsg,initMsg->opts.stackSize);
+      TCHARM_Element_Setup(thisIndex, initMsg->numElements, CmiIsomallocContext{});
     } else {
-      CmiIsomallocContext heapContext = CmiIsomallocContextCreate(thisIndex, initMsg->numElements);
+      // add one to numElements so that pieglobals can have some scratch space
+      CmiIsomallocContext heapContext = CmiIsomallocContextCreate(thisIndex, initMsg->numElements+1);
       tid = CthCreateMigratable((CthVoidFn)startTCharmThread,initMsg,initMsg->opts.stackSize, heapContext);
+      TCHARM_Element_Setup(thisIndex, initMsg->numElements, heapContext);
+      if (heapContext.opaque != nullptr)
+        CmiIsomallocContextEnableRandomAccess(heapContext);
     }
   }
   CtvAccessOther(tid,_curTCharm)=this;
   asyncMigrate = false;
   isStopped=true;
-#if CMK_FAULT_EVAC
-	AsyncEvacuate(true);
-#endif
   exitWhenDone=initMsg->opts.exitWhenDone;
   isSelfDone = false;
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
@@ -215,10 +226,6 @@ TCharm::TCharm(CkMigrateMessage *msg)
   initMsg=NULL;
   tid=NULL;
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
-
-#if CMK_FAULT_EVAC
-	AsyncEvacuate(true);
-#endif
 }
 
 void checkPupMismatch(PUP::er &p,int expected,const char *where)
@@ -269,7 +276,7 @@ void TCharm::pup(PUP::er &p) {
   // Set up TCHARM context for use during user's pup routines:
   if(isStopped) {
     CtvAccess(_curTCharm)=this;
-    activateThread();
+    activateThread(this);
   }
 
   s.seek(0);
@@ -440,17 +447,6 @@ CMI_WARN_UNUSED_RESULT TCharm * TCharm::migrate() noexcept
 #endif
 }
 
-#if CMK_FAULT_EVAC
-CMI_WARN_UNUSED_RESULT TCharm * TCharm::evacuate() noexcept {
-	//CkClearAllArrayElementsCPP();
-	if(CkpvAccess(startedEvac)){
-		CcdCallFnAfter((CcdVoidFn)CkEmmigrateElement, (void *)myRec, 1);
-		return suspend();
-	}
-	return this;
-}
-#endif
-
 //calls atsync with async mode
 CMI_WARN_UNUSED_RESULT TCharm * TCharm::async_migrate() noexcept
 {
@@ -487,6 +483,11 @@ CMI_WARN_UNUSED_RESULT TCharm * TCharm::allow_migrate()
 void TCharm::ResumeFromSync()
 {
   DBG("thread resuming from sync");
+
+  CthThread th = getThread();
+  auto ctx = CmiIsomallocGetThreadContext(th);
+  CmiIsomallocContextJustMigrated(ctx);
+
   if (resumeAfterMigrationCallback.isInvalid())
     start();
   else
@@ -649,8 +650,6 @@ FLINKAGE void FTN_NAME(TCHARM_CREATE_DATA,tcharm_create_data)
 		  void *threadData,int *threadDataLen)
 { TCHARM_Create_data(*nThreads,threadFn,threadData,*threadDataLen); }
 
-CkGroupID CkCreatePropMap();
-
 static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
 {
   CkArrayOptions opts(msg->numElements);
@@ -672,14 +671,19 @@ static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
     opts.setMap(mapID);
   } else if(0 == strcmp(mapping,"MAPFILE")) {
     CkPrintf("TCharm> reading map from mapfile\n");
+    mapID = CProxy_Simple1DFileMap::ckNew();
+    opts.setMap(mapID);
+  } else if(0 == strcmp(mapping,"TOPO_MAPFILE")) {
+    CkPrintf("TCharm> reading topo map from mapfile\n");
     mapID = CProxy_ReadFileMap::ckNew();
     opts.setMap(mapID);
   } else if(0 == strcmp(mapping,"PROP_MAP")) {
     CkPrintf("TCharm> using PROP_MAP\n");
-    mapID = CkCreatePropMap();
+    mapID = CProxy_PropMap::ckNew();
     opts.setMap(mapID);
   }
   opts.setStaticInsertion(true);
+  opts.setAnytimeMigration(false);
   opts.setSectionAutoDelegate(false);
   return CProxy_TCharm::ckNew(msg,opts);
 }
@@ -814,14 +818,6 @@ CLINKAGE void TCHARM_Migrate_to(int destPE)
 	TCHARMAPI("TCHARM_Migrate_to");
 	TCharm * unused = TCharm::get()->migrateTo(destPE);
 }
-
-#if CMK_FAULT_EVAC
-CLINKAGE void TCHARM_Evacuate()
-{
-	TCHARMAPI("TCHARM_Migrate_to");
-	TCharm * unused = TCharm::get()->evacuate();
-}
-#endif
 
 FORTRAN_AS_C(TCHARM_MIGRATE_TO,TCHARM_Migrate_to,tcharm_migrate_to,
 	(int *destPE),(*destPE))

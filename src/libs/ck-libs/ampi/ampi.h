@@ -9,7 +9,8 @@
 #define AMPI_INTERNAL_SKIP_FUNCTIONS
 
 #if CMK_CUDA
-#include "hapi.h"
+#include <cuda_runtime.h>
+typedef struct hapiWorkRequest hapiWorkRequest;
 #endif
 
 /* NON-standard define: this lets people #ifdef on
@@ -75,18 +76,28 @@ Silently rename the user's main routine.
 This is needed so we can call the routine as a new thread,
 instead of as an actual "main".
 */
-#ifdef __cplusplus /* C++ version-- rename "main" as "AMPI_Main_cpp" */
-#  define main AMPI_Main_cpp
-CLINKAGE CMI_EXPORT int AMPI_Main_cpp(int argc,char **argv); /* prototype for C++ main routine */
-CMI_EXPORT int AMPI_Main_cpp(void); /* prototype for C++ main routines without args, as in autoconf tests */
-
+#ifdef __cplusplus
 extern "C" {
-#else /* C version-- rename "main" as "AMPI_Main" */
-#  define main AMPI_Main
 #endif
 
-CMI_EXPORT int AMPI_Main(); /* declaration for C main routine (not a strict prototype!) */
-CMI_EXPORT int AMPI_Main_c(int argc,char **argv); /* C wrapper for calling AMPI_Main() from C++ */
+CMI_EXPORT int AMPI_Main_noargs(void);
+CMI_EXPORT int AMPI_Main(int argc, char **argv);
+
+/* Optional parameters for main() - based on
+https://stackoverflow.com/a/28074198/1250282
+Simulates compiler magic for accepting both forms,
+without abusing now-deprecated K&R declarations. */
+
+#define AMPIMAIN_2(x, y) AMPI_Main(x, y)
+#define AMPIMAIN_1(x) AMPI_Main(x)
+#define AMPIMAIN_0() AMPI_Main_noargs()
+
+#define AMPIMAIN_FUNC_CHOOSER(_f1, _f2, _f3, ...) _f3
+#define AMPIMAIN_FUNC_RECOMPOSER(argsWithParentheses) AMPIMAIN_FUNC_CHOOSER argsWithParentheses
+#define AMPIMAIN_CHOOSE_FROM_ARG_COUNT(...) AMPIMAIN_FUNC_RECOMPOSER((__VA_ARGS__, AMPIMAIN_2, AMPIMAIN_1, ))
+#define AMPIMAIN_NO_ARG_EXPANDER() ,,AMPIMAIN_0
+#define AMPIMAIN_MACRO_CHOOSER(...) AMPIMAIN_CHOOSE_FROM_ARG_COUNT(AMPIMAIN_NO_ARG_EXPANDER __VA_ARGS__ ())
+#define main(...) AMPIMAIN_MACRO_CHOOSER(__VA_ARGS__)(__VA_ARGS__)
 
 typedef int MPI_Datatype;
 typedef intptr_t MPI_Aint;
@@ -237,6 +248,8 @@ typedef long long int MPI_Offset;
 #define MPI_REQUEST_NULL   (-1)
 #define MPI_GROUP_NULL     (-1)
 #define MPI_GROUP_EMPTY       0
+#define MPI_COMM_WORLD        AMPI_API_STATIC_CAST(MPI_Comm, 1000000)
+#define MPI_COMM_SELF         AMPI_API_STATIC_CAST(MPI_Comm, 1000001)
 #define MPI_COMM_NULL      (-1)
 #define MPI_PROC_NULL      (-2)
 #define MPI_ROOT           (-3)
@@ -313,6 +326,7 @@ typedef void (MPI_User_function)(void *invec, void *inoutvec,
 #define AMPI_NUM_WTHS         -14
 #define AMPI_MY_PROCESS       -15
 #define AMPI_NUM_PROCESSES    -16
+#define AMPI_MY_HOME_WTH      -17
 
 /** Communicators give a communication context to a set of processors.
     An intercommunicator can be used for point to point messaging between two groups.
@@ -323,17 +337,6 @@ typedef int MPI_Comm;
 typedef int MPI_Group;
 
 typedef int MPI_Info;
-
-#define MPI_COMM_SELF               AMPI_API_STATIC_CAST(MPI_Comm, 1000000) /*MPI_COMM_SELF is the first split comm */
-#define MPI_COMM_FIRST_SPLIT        AMPI_API_STATIC_CAST(MPI_Comm, 1000000) /*Communicator from MPI_Comm_split */
-#define MPI_COMM_FIRST_GROUP        AMPI_API_STATIC_CAST(MPI_Comm, 2000000) /*Communicator from MPI_Comm_group */
-#define MPI_COMM_FIRST_CART         AMPI_API_STATIC_CAST(MPI_Comm, 3000000) /*Communicator from MPI_Cart_create */
-#define MPI_COMM_FIRST_GRAPH        AMPI_API_STATIC_CAST(MPI_Comm, 4000000) /*Communicator from MPI_Graph_create */
-#define MPI_COMM_FIRST_DIST_GRAPH   AMPI_API_STATIC_CAST(MPI_Comm, 5000000) /*Communicator from MPI_Dist_Graph_create */
-#define MPI_COMM_FIRST_INTER        AMPI_API_STATIC_CAST(MPI_Comm, 6000000) /*Communicator from MPI_Intercomm_create*/
-#define MPI_COMM_FIRST_INTRA        AMPI_API_STATIC_CAST(MPI_Comm, 7000000) /*Communicator from MPI_Intercomm_merge*/
-#define MPI_COMM_FIRST_RESVD        AMPI_API_STATIC_CAST(MPI_Comm, 8000000) /*Communicator reserved for now*/
-#define MPI_COMM_WORLD              AMPI_API_STATIC_CAST(MPI_Comm, 9000000) /*Start of universe*/
 
 #define MPI_INFO_ENV                AMPI_API_STATIC_CAST(MPI_Info, 0)
 #define AMPI_INFO_LB_SYNC           AMPI_API_STATIC_CAST(MPI_Info, 1)
