@@ -163,6 +163,7 @@ set(conv-util-cxx-sources
     src/util/pup_util.C
     src/util/pup_xlater.C
     src/util/topomanager/TopoManager.C
+    src/util/topomanager/cputopology.C
     src/util/spanningTree.C
     ${conv-perf-cxx-sources}
 )
