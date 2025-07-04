@@ -607,9 +607,9 @@ static void CkPupPerPlaceData(PUP::er &p, GroupIDTable *idTable, GroupTable *obj
   }
 
   if (p.isUnpacking()) {
-    if(CkMyPe()==0)  
-      numObjects = maxGroup+1; 
-    else 
+    if(CkMyPe()==0)
+      numObjects = maxGroup+1;
+    else
       numObjects = 1;
   }
 }
