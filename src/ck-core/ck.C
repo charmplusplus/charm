@@ -640,7 +640,7 @@ void CkCallstackPop(Chare *obj) {
   _ckStartTiming();       // resume timing of the previous obj
 }
 
-#if CMK_LBDB_ON
+#if 1
 CkLocRec *CkActiveLocRec(void) {
   auto *obj = CkActiveObj();
   if (obj && obj->ckInitialized) {

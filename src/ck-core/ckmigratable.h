@@ -93,7 +93,8 @@ private:
 public:
 
   void ReadyMigrate(bool ready);
-  void ckFinishConstruction(int epoch = -1);
+  //void ckFinishConstruction(int epoch = -1);
+  void ckFinishConstruction(int epoch = -1) { } //reconverse
   void setMigratable(int migratable);
   void setPupSize(size_t obj_pup_size);
 #else
