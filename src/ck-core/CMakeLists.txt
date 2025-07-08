@@ -118,7 +118,7 @@ add_library(moduleCkMulticast ../libs/ck-libs/dummy/ckdummy.C)
 configure_file(../libs/ck-libs/dummy/ckdummy.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 
 # CkIO
-add_library(moduleCkIO ../libs/ck-libs/io/ckio.C ../libs/ck-libs/io/fs_parameters.c ../libs/ck-libs/io/ckio.h)
+add_library(moduleCkIO ../libs/ck-libs/io/ckio.C ../libs/ck-libs/io/fs_parameters.C ../libs/ck-libs/io/ckio.h)
 add_dependencies(moduleCkIO ck)
 configure_file(../libs/ck-libs/io/ckio.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 
@@ -136,19 +136,7 @@ target_include_directories(ck PRIVATE . ../ck-ldb ../ck-perf ../ck-cp ../util/to
 target_include_directories(ckmain PRIVATE . ../ck-ldb ../ck-perf ../ck-cp ../util/topomanager)
 
 # Fortran interface
-if(CMK_CAN_LINK_FORTRAN)
-    add_library(ckf charmf.C charmmod.f90 charmf.h)
-    add_dependencies(ckf ck)
-    add_custom_command(TARGET ckf
-        POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/charm.mod ${CMAKE_BINARY_DIR}/include/
-        VERBATIM
-    )
-    add_library(ckmainf mainf.f90)
 
-    add_library(f90charm ../langs/f90charm/f90main.C ${CMAKE_BINARY_DIR}/include/f90main.decl.h)
-    add_dependencies(f90charm ck)
-endif()
 
 add_library(mpi-mainmodule mpi-mainmodule.C)
 add_dependencies(mpi-mainmodule ck)
