@@ -35,6 +35,7 @@ public:
     virtual void comment(const char *message);
     virtual void synchronize(unsigned int m);
     virtual void bytes(void *p,size_t n,size_t itemSize,PUP::dataType t);
+    virtual void bytes(void *p,size_t n,size_t itemSize,PUP::dataType t,PUP::PUPMode mode) {}
     virtual void pup_buffer(void *&p,size_t n,size_t itemSize,PUP::dataType t);
     virtual void pup_buffer(void *&p,size_t n, size_t itemSize, PUP::dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
 };

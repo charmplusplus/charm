@@ -1,4 +1,4 @@
-OPTS = -O3
+OPTS = -O3 -DHAPI_CUDA_CALLBACK
 
 CHARM_DIR = ../../../../..
 CHARMC = $(CHARM_DIR)/bin/charmc $(OPTS)

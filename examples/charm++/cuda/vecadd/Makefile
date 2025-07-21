@@ -6,7 +6,7 @@ CHARMC = ../../../../bin/charmc $(DEFS) $(OPTS)
 DEFS = #-DUSE_WR -USE_NVTX
 
 # set CUDATOOLKIT_HOME to the CUDA toolkit directory
-CUDATOOLKIT_HOME ?= /usr/local/cuda
+CUDATOOLKIT_HOME ?= /usr/
 NVCC = $(CUDATOOLKIT_HOME)/bin/nvcc
 NVCC_FLAGS = -c -std=c++11 $(DEFS)
 NVCC_INC = -I$(CUDATOOLKIT_HOME)/include

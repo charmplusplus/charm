@@ -92,12 +92,13 @@ class CkArrayElementMigrateMessage : public CMessage_CkArrayElementMigrateMessag
 {
 public:
   CkArrayElementMigrateMessage(CkArrayIndex idx_, CmiUInt8 id_, bool ignoreArrival_,
-                               int length_, int nManagers_, int epoch_)
+                               int length_, int nManagers_, int epoch_, bool hasGPUMsg_ = false)
       : idx(idx_),
         id(id_),
         ignoreArrival(ignoreArrival_),
         length(length_),
         nManagers(nManagers_),
+        hasGPUMsg(hasGPUMsg_),
         epoch(epoch_)
   {
   }
@@ -105,6 +106,7 @@ public:
   CkArrayIndex idx;    // Array index that is migrating
   CmiUInt8 id;         // ID of the elements with this index in this collection
   bool ignoreArrival;  // if to inform LB of arrival
+  bool hasGPUMsg;
   int length;          // Size in bytes of the packed data
   int nManagers;       // Number of associated array managers
   int epoch;
@@ -418,6 +420,11 @@ private:
   // Immigration messages which are waiting for all array managers to be ready
   std::list<CkArrayElementMigrateMessage*> pendingImmigrate;
 
+  std::unordered_map<CmiUInt8, CkArrayElementMigrateMessage*> bufferedHostMigrateMsgs;
+  std::unordered_map<CmiUInt8, void*> bufferedDeviceMigrateMsgs;
+
+  std::unordered_map<CmiUInt8, void*> receivedDeviceMsgs;
+
   // The mapping of index to ID is either done via compression or an explicit map,
   // depending on if the bounds of this array are compressible into a 64bit ID.
   CkArrayIndex bounds;
@@ -691,6 +698,8 @@ public:
 
   // Communication:
   void immigrate(CkArrayElementMigrateMessage* msg);
+  void immigrateGPU(CmiUInt8& id, int& size, char* &data, CkDeviceBufferPost* post);
+  void immigrateGPU(CmiUInt8 id, int size, char* data);
   void requestLocation(CmiUInt8 id);
   void requestLocation(const CkArrayIndex& idx);
   bool requestLocation(const CkArrayIndex& idx, int peToTell);

@@ -1,5 +1,4 @@
 mainmodule vecadd {
-  readonly int vectorSize;
   readonly CProxy_Main mainProxy;
 
   mainchare Main {
@@ -8,7 +7,7 @@ mainmodule vecadd {
   };
 
   array [1D] Workers {
-    entry Workers();
+    entry Workers(int size);
     entry void begin();
     entry void complete();
   };

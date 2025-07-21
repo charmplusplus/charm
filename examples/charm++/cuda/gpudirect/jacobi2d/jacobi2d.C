@@ -50,10 +50,10 @@ public:
   Main(CkArgMsg* m) {
     // Set default values
     main_proxy = thisProxy;
-    grid_width = 16384;
-    grid_height = 16384;
-    block_width = 4096;
-    block_height = 4096;
+    grid_width = 8192;
+    grid_height = 8192;
+    block_width = 2048;
+    block_height = 2048;
     n_iters = 100;
     warmup_iters = 10;
     use_zerocopy = false;

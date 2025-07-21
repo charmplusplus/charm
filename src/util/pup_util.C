@@ -23,6 +23,9 @@ virtual functions are defined here.
 #include "pup.h"
 #include "ckhashtable.h"
 
+#include <cuda_runtime.h>
+#include <cuda.h>
+
 #include "conv-rdma.h"
 #if defined(_WIN32)
 #include <io.h>
@@ -145,9 +148,21 @@ void PUP::sizer::bytes(void * /*p*/,size_t n,size_t itemSize,dataType /*t*/)
 	nBytes+=n*itemSize;
 }
 
+void PUP::sizer::bytes(void * p,size_t n,size_t itemSize,dataType t, PUPMode mode)
+{
+#ifdef CK_CHECK_PUP
+	nBytes+=sizeof(pupCheckRec);
+#endif
+  if (mode == PUPMode::HOST)
+    nBytes+=n*itemSize;
+  else if (mode == PUPMode::DEVICE)
+    gpuBytes += n * itemSize;
+}
+
 /*Memory PUP::er's*/
 void PUP::toMem::bytes(void *p,size_t n,size_t itemSize,dataType t)
 {
+  //CmiPrintf("[%d] PUP::toMem::bytes called with p=%p, n=%zu, itemSize=%zu, t=%d\n", CmiMyPe(), p, n, itemSize, t);
 #ifdef CK_CHECK_PUP
 	((pupCheckRec *)buf)->write(t,n);
 	buf+=sizeof(pupCheckRec);
@@ -156,8 +171,10 @@ void PUP::toMem::bytes(void *p,size_t n,size_t itemSize,dataType t)
 	memcpy((void *)buf,p,n); 
 	buf+=n;
 }
+
 void PUP::fromMem::bytes(void *p,size_t n,size_t itemSize,dataType t)
 {
+  //CmiPrintf("[%d] PUP::fromMem::bytes called with p=%p, n=%zu, itemSize=%zu, t=%d\n", CmiMyPe(), p, n, itemSize, t);
 #ifdef CK_CHECK_PUP
 	((pupCheckRec *)buf)->check(t,n);
 	buf+=sizeof(pupCheckRec);
@@ -165,6 +182,49 @@ void PUP::fromMem::bytes(void *p,size_t n,size_t itemSize,dataType t)
 	n*=itemSize; 
 	memcpy(p,(const void *)buf,n); 
 	buf+=n;
+}
+
+void PUP::toMem::bytes(void *p,size_t n,size_t itemSize,dataType t, PUPMode mode)
+{
+  //CmiPrintf("[%d] PUP::toMem::bytes called with p=%p, n=%zu, itemSize=%zu, t=%d, mode=%d\n", CmiMyPe(), p, n, itemSize, t, mode);
+#ifdef CK_CHECK_PUP
+	((pupCheckRec *)buf)->write(t,n);
+	buf+=sizeof(pupCheckRec);
+#endif
+	n*=itemSize;
+  if (mode == PUPMode::HOST)
+  {
+    memcpy((void *)buf,p,n); 
+    buf+=n;
+  }
+  else
+  {
+    //CmiPrintf("[%d] Copying %zu bytes from p=%p to GPU buffer\n", CmiMyPe(), n, p);
+    // For GPU mode, we assume p is a device pointer and copy directly
+    cudaMemcpy((void *)gpuBuf, p, n, cudaMemcpyDeviceToDevice);
+    gpuBuf += n;
+  }
+}
+
+void PUP::fromMem::bytes(void *p,size_t n,size_t itemSize,dataType t, PUPMode mode)
+{
+  //CmiPrintf("[%d] PUP::fromMem::bytes called with p=%p, n=%zu, itemSize=%zu, t=%d, mode=%d\n", CmiMyPe(), p, n, itemSize, t, mode);
+#ifdef CK_CHECK_PUP
+	((pupCheckRec *)buf)->check(t,n);
+	buf+=sizeof(pupCheckRec);
+#endif
+	n*=itemSize; 
+  if (mode == PUPMode::HOST)
+  {
+    memcpy(p,(const void *)buf,n); 
+    buf+=n;
+  }
+  else
+  {
+    //CmiPrintf("[%d] Copying %zu bytes from GPU buffer to p=%p\n", CmiMyPe(), n, p);
+    cudaMemcpy(p, (const void *)gpuBuf, n, cudaMemcpyDeviceToDevice);
+    gpuBuf += n;
+  }
 }
 
 void PUP::sizer::pup_buffer(void *&p,size_t n, size_t itemSize, dataType t) {
