@@ -57,7 +57,7 @@ class Main : public CBase_Main {
     CkPrintf("Chares: %d\n", 1);
 
     // create 1D chare array
-    workers = CProxy_Workers::ckNew(1024, 1);
+    workers = CProxy_Workers::ckNew(1024, 4);
 
     // start measuring execution time
     startTime = CkWallTimer();
@@ -82,6 +82,7 @@ class Workers : public CBase_Workers {
   float* h_A;
 #ifndef USE_WR
   float* d_A;
+  float* d_B;
 #endif
   cudaStream_t stream;
 
@@ -95,7 +96,10 @@ class Workers : public CBase_Workers {
     hapiCheck(cudaMallocHost(&h_A, dataSize));
     hapiCheck(cudaStreamCreate(&stream));
 #ifndef USE_WR
-    hapiCheck(cudaMalloc(&d_A, dataSize));
+    hapiCheck(hapiMalloc((void**) &d_A, dataSize));
+    hapiCheck(hapiMalloc((void**) &d_B, dataSize));
+    CkPrintf("[%d] d_A pointer: %p\n", CkMyPe(), d_A);
+    CkPrintf("[%d] d_B pointer: %p\n", CkMyPe(), d_B);
 #endif
 
     srand(time(NULL));
@@ -124,7 +128,7 @@ class Workers : public CBase_Workers {
     if (p.isUnpacking())
     {
       cudaMallocHost(&h_A, vectorSize * sizeof(float));
-      cudaMalloc(&d_A, vectorSize * sizeof(float));
+      hapiMalloc((void**) &d_A, vectorSize * sizeof(float));
       CkPrintf("[%d] d_A pointer: %p\n", CkMyPe(), d_A);
     }
     //p(h_A, vectorSize);
@@ -139,16 +143,17 @@ class Workers : public CBase_Workers {
     CkArrayIndex1D myIndex = CkArrayIndex1D(thisIndex);
 
     cudaVecAdd(vectorSize, h_A, d_A);
-    //complete();
+    complete();
 
-    CkPrintf("[%d] h_A array (size=%d):\n", CkMyPe(), vectorSize);
-    for (int i = 0; i < vectorSize; ++i) {
-      CkPrintf("%.2f ", h_A[i]);
-    }
-    CkPrintf("\n");
+    // CkPrintf("[%d] h_A array (size=%d):\n", CkMyPe(), vectorSize);
+    // for (int i = 0; i < vectorSize; ++i) {
+    //   CkPrintf("%.2f ", h_A[i]);
+    // }
+    // CkPrintf("\n");
 
-    if (thisIndex == 0)
-      migrateMe(1);
+    //if (thisIndex == 0)
+    //  migrateMe(1);
+    //CkExit();
   }
 
   void ckJustMigrated()
@@ -161,13 +166,13 @@ class Workers : public CBase_Workers {
     cudaMemcpy(h_A, d_A, vectorSize * sizeof(float), cudaMemcpyDeviceToHost);
 
     CkPrintf("[%d] d_A pointer: %p\n", CkMyPe(), d_A);
-    CkPrintf("[%d] h_A array (size=%d):\n", CkMyPe(), vectorSize);
-    for (int i = 0; i < vectorSize; ++i) {
-      CkPrintf("%.2f ", h_A[i]);
-    }
-    CkPrintf("\n");
+    // CkPrintf("[%d] h_A array (size=%d):\n", CkMyPe(), vectorSize);
+    // for (int i = 0; i < vectorSize; ++i) {
+    //   CkPrintf("%.2f ", h_A[i]);
+    // }
+    // CkPrintf("\n");
 
-    CkExit();
+    //CkExit();
 
 #ifdef USE_NVTX
     NVTXTracer nvtx_range("Workers::complete", NVTXColor::Clouds);
@@ -200,7 +205,9 @@ class Workers : public CBase_Workers {
     CkPrintf("\n");
 #endif
 
-    //contribute(CkCallback(CkIndex_Main::done(), mainProxy));
+    hapiCheck(hapiFree(d_A));
+    hapiCheck(hapiFree(d_B));
+    contribute(CkCallback(CkIndex_Main::done(), mainProxy));
   }
 };
 
