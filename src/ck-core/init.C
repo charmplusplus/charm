@@ -108,7 +108,7 @@ void _createTraces(char **argv){};
 
 void CkRestartMain(const char* dirname, CkArgMsg* args);
 
-#define DEBUGF(x)  // CmiPrintf x;
+#define DEBUGF(x)  CmiPrintf x;
 
 #define CMK_WITH_WARNINGS 0
 
@@ -731,6 +731,7 @@ static void _exitHandler(envelope* env)
 #if !CMK_WITH_STATS && !CMK_WITH_WARNINGS
       DEBUGF(("[%d] Calling converse exit from ReqStatMsg \n", CkMyPe()));
       ConverseExit(_exitcode);
+      DEBUGF(("[%d] Gets past converse exit \n",CkMyPe()));
       if (CharmLibInterOperate)
         CpvAccess(interopExitFlag) = 1;
 #endif
@@ -949,7 +950,7 @@ void _initDone(void)
  */
 static void _triggerHandler(envelope* env)
 {
-  DEBUGF(("Calling Init Done from _triggerHandler\n"));
+  DEBUGF(("[%d] Calling Init Done from _triggerHandler\n", CkMyPe()));
   checkForInitDone(true);  // RO ZCPY Bcast operation is already complete
   if (env != NULL)
     CmiFree(env);
@@ -1115,11 +1116,13 @@ static void _initHandler(void* msg, CkCoreState* ck)
   CkAssert(CkMyPe() != 0);
   envelope* env = (envelope*)msg;
 
+  #if CMK_RECORD_REPLAY
   if (ck->watcher != NULL)
   {
     if (!ck->watcher->processMessage(&env, ck))
       return;
   }
+  #endif
 
   switch (env->getMsgtype())
   {
@@ -1213,11 +1216,13 @@ void CkExit(int exitcode)
   envelope* env = _allocEnv(StartExitMsg);
   env->setSrcPe(CkMyPe());
   CmiSetHandler(env, _exitHandlerIdx);
+  CkPrintf("[%d] CkExit exitHandlerIdx: %d\n", CkMyPe(), _exitHandlerIdx);
   CmiSyncSendAndFree(0, env->getTotalsize(), (char*)env);
 
   _TRACE_END_EXECUTE();
   // Wait for stats, which will call ConverseExit when finished:
   if (!CharmLibInterOperate)
+    CkPrintf("[%d] Calling CsdScheduler\n", CkMyPe());
     CsdScheduler(-1);
 }
 
@@ -1329,6 +1334,7 @@ extern void (*CkRegisterMainModuleCallback)();
 
 void _sendReadonlies()
 {
+  DEBUGF(("[%d,%.6lf] _sendReadonlies started\n", CmiMyPe(), CmiWallTimer()));
   for (int i = 0; i < _readonlyMsgs.size(); i++) /* Send out readonly messages */
   {
     void* roMsg = (void*)*((char**)(_readonlyMsgs[i]->pMsg));
@@ -1527,6 +1533,7 @@ void _initCharm(int unused_argc, char** argv)
   CkpvAccess(_ckerr) = new _CkErrStream();
 
   CmiAssignOnce(&_charmHandlerIdx, CkRegisterHandler(_bufferHandler));
+  CkPrintf("[%d] charmHandlerIdx = %d\n", CkMyPe(), _charmHandlerIdx);
   CmiAssignOnce(&_initHandlerIdx,
                 CkRegisterHandlerEx(_initHandler, CkpvAccess(_coreState)));
   CmiAssignOnce(&_roRestartHandlerIdx, CkRegisterHandler(_roRestartHandler));
@@ -1534,6 +1541,7 @@ void _initCharm(int unused_argc, char** argv)
   CmiAssignOnce(&_roRdmaDoneHandlerIdx, CkRegisterHandler(_roRdmaDoneHandler));
 
   CmiAssignOnce(&_exitHandlerIdx, CkRegisterHandler(_exitHandler));
+  CkPrintf("[%d] exitHandlerIdx = %d\n", CkMyPe(), _exitHandlerIdx);
   // added for interoperabilitY
   CmiAssignOnce(&_libExitHandlerIdx, CkRegisterHandler(_libExitHandler));
   CmiAssignOnce(&_bocHandlerIdx,
