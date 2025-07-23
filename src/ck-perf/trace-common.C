@@ -296,8 +296,8 @@ void traceWriteSTS(FILE *stsfp,int nUserEvents) {
   for(i=0;i<_chareTable.size();i++)
     fprintf(stsfp, "CHARE %d \"%s\" %d\n", (int)i, _chareTable[i]->name, _chareTable[i]->ndims);
   for(i=0;i<_entryTable.size();i++)
-    fprintf(stsfp, "ENTRY CHARE %d \"%s\" %d %d\n", (int)i, _entryTable[i]->name,
-                 (int)_entryTable[i]->chareIdx, (int)_entryTable[i]->msgIdx);
+      fprintf(stsfp, "ENTRY CHARE %d \"%s\" %d %d\n", (int)i, _entryTable[i]->name,
+              (int)_entryTable[i]->chareIdx, (int)_entryTable[i]->msgIdx);
   for(i=0;i<_msgTable.size();i++)
     fprintf(stsfp, "MESSAGE %d %u\n", (int)i, (int)_msgTable[i]->size);
 }
@@ -487,10 +487,8 @@ static inline void _traceInit(char **argv)
   // check if trace is turned on/off for this pe
   CkpvAccess(traceOnPe) = checkTraceOnPe(argv);
 
-#if !CMK_CHARM4PY
   // defined in moduleInit.C
   _createTraces(argv);
-#endif
 
   // Now setup the control point tracing module if desired. It is always compiled/linked in, but is not always enabled
   // FIXME: make sure it is safe to use argv in SMP version 

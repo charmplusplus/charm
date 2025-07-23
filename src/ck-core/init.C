@@ -91,6 +91,21 @@ extern void QdCreate(int);
 extern void QdProcess(int);
 #endif
 
+#if CMK_CHARM4PY && CMK_TRACE_ENABLED
+extern void _registerTraceProjections();
+extern void _registerTraceSummary();
+extern void _createTraceprojections(char **argv);
+extern void _createTracesummary(char **argv);
+
+void _createTraces(char **argv) { (void)argv;
+_createTraceprojections(argv);
+_createTracesummary(argv);
+}
+
+#elif CMK_CHARM4PY
+void _createTraces(char **argv){};
+#endif
+
 void CkRestartMain(const char* dirname, CkArgMsg* args);
 
 #define DEBUGF(x)  // CmiPrintf x;
@@ -1624,13 +1639,20 @@ void _initCharm(int unused_argc, char** argv)
 #endif
 #if CMK_CHARM4PY
     /**
-      Load balancers are currently registered in Charm++ through a C file that is
-      generated and and compiled by charmc when making an executable. That file contains
-      appropriate calls to register whatever load balancers are being linked in. Without
-      an executable (charm4py just uses libcharm.so), the load balancers in libcharm.so
-      have to somehow be registered during init.
+       Load balancers are currently registered in Charm++ through a C file that is generated and
+       and compiled by charmc when making an executable. That file contains appropriate calls to
+       register whatever load balancers are being linked in.
+       Without an executable (charm4py just uses libcharm.so), the load balancers in libcharm.so
+       have to somehow be registered during init.
     */
     _registerTreeLB();
+
+#if CMK_TRACE_ENABLED
+      _registerTraceProjections();
+      _registerTraceSummary();
+#endif
+
+
 #endif
 
     /**
