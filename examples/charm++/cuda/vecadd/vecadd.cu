@@ -27,42 +27,8 @@ void run_VECADD_KERNEL(hapiWorkRequest* wr, cudaStream_t kernel_stream,
 }
 #endif
 
-#ifdef USE_WR
-void cudaVecAdd(int vectorSize, float* h_A, float* h_B, float* h_C,
-                cudaStream_t stream, void* cb) {
-#else
-void cudaVecAdd(int vectorSize, float* h_A, float* h_B, float* h_C, float* d_A,
-                float* d_B, float* d_C, cudaStream_t stream, void* cb) {
-#endif
+
+void cudaVecAdd(int vectorSize, float* h_A, float* d_A) {
   int size = vectorSize * sizeof(float);
-  dim3 dimBlock(BLOCK_SIZE, 1);
-  dim3 dimGrid((vectorSize - 1) / dimBlock.x + 1, 1);
-
-#ifdef USE_WR
-  // DEPRECATED
-  hapiWorkRequest* wr = hapiCreateWorkRequest();
-  wr->setExecParams(dimGrid, dimBlock);
-  wr->setStream(stream);
-  wr->addBuffer(h_A, size, true, false, true);
-  wr->addBuffer(h_B, size, true, false, true);
-  wr->addBuffer(h_C, size, false, true, true);
-  wr->setCallback(cb);
-#ifdef HAPI_TRACE
-  wr->setTraceName("vecadd");
-#endif
-  wr->setRunKernel(run_VECADD_KERNEL);
-  wr->copyUserData(&vectorSize, sizeof(int));
-
-  hapiEnqueue(wr);
-#else
-  hapiCheck(cudaMemcpyAsync(d_A, h_A, size, cudaMemcpyHostToDevice, stream));
-  hapiCheck(cudaMemcpyAsync(d_B, h_B, size, cudaMemcpyHostToDevice, stream));
-
-  vecAdd<<<dimGrid, dimBlock, 0, stream>>>(d_C, d_A, d_B, vectorSize);
-  hapiCheck(cudaPeekAtLastError());
-
-  hapiCheck(cudaMemcpyAsync(h_C, d_C, size, cudaMemcpyDeviceToHost, stream));
-
-  hapiAddCallback(stream, cb);
-#endif
+  hapiCheck(cudaMemcpy(d_A, h_A, size, cudaMemcpyHostToDevice));
 }

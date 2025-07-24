@@ -12,6 +12,7 @@
 
 #define CUDA_API_PER_THREAD_DEFAULT_STREAM
 #include <cuda_runtime.h>
+#include <cuda.h>
 
 #include "converse.h"
 #include "hapi.h"
@@ -20,6 +21,11 @@
 #ifdef HAPI_NVTX_PROFILE
 #include "hapi_nvtx.h"
 #endif
+
+#define SERVER_FIFO_TEMPLATE "/tmp/server_pipe_%ld"
+#define CLIENT_FIFO_TEMPLATE "/tmp/client_pipe_%ld"
+#define BUFFER_SIZE 256
+#define STREAM_BUF_SIZE 1024
 
 #if defined HAPI_TRACE || defined HAPI_INSTRUMENT_WRS
 extern "C" double CmiWallTimer();
@@ -52,6 +58,20 @@ CpvDeclare(std::queue<hapiEvent>, hapi_event_queue);
 #endif // HAPI_CUDA_CALLBACK
 CpvDeclare(int, n_hapi_events);
 
+int firstRankForDevice = 0; // First rank for each device, used for mapping
+
+typedef struct hapiMemoryMapEntry {
+  long pid;
+  std::unordered_map<int, std::pair<void*, size_t>> memory_map; // mapping the allocation id to device pointer
+} hapiMemoryMapEntry;
+
+// Managing memory state in server
+std::unordered_map<int, hapiMemoryMapEntry*> hapiMemoryMap;
+int hapiAllocId = 0; // Global allocation ID for HAPI
+
+// Managing memory state in client
+std::unordered_map<void*, int> hapiAllocIdMap;
+
 // Used to invoke user's Charm++ callback function
 void (*hapiInvokeCallback)(void*, void*) = NULL;
 
@@ -67,6 +87,8 @@ CsvDeclare(GPUManager, gpu_manager);
 
 CpvDeclare(int, my_device); // GPU device that this thread is mapped to
 CpvDeclare(bool, device_rep); // Is this PE a device representative thread? (1 per device)
+
+void hapiSendMemoryRequest(char* msg);
 
 // Returns the local rank of the logical node (process) that the given PE belongs to
 static inline int CmiNodeRankLocal(int pe) {
@@ -116,6 +138,8 @@ void hapiInit(char** argv) {
 
     hapiMapping(argv); // Perform PE-device mapping
 
+    hapiStartMemoryDaemon();
+
 #ifndef HAPI_CUDA_CALLBACK
     // Register polling function to be invoked at every scheduler loop
     CcdCallOnConditionKeep(CcdSCHEDLOOP, (CcdCondFn)hapiPollEvents, NULL);
@@ -134,9 +158,171 @@ void hapiInit(char** argv) {
   hapiRegisterCallbacks(); // Register callback functions
 }
 
+void hapiProcessMemoryRequest(char* buf)
+{
+  long client_pid;
+  char command[BUFFER_SIZE];
+  sscanf(buf, "%[^:]:", command);
+
+  char* pid_str = strchr(buf, ':');
+  if (pid_str) client_pid = atol(pid_str + 1); else return;
+
+  CmiPrintf("HAPI> Processing memory request: %s from client %ld\n", command, client_pid);
+
+  char client_fifo_path[BUFFER_SIZE];
+  sprintf(client_fifo_path, CLIENT_FIFO_TEMPLATE, client_pid);
+  int client_fd = open(client_fifo_path, O_WRONLY);
+
+  if (strcmp(command, "MALLOC") == 0) 
+  {
+    std::pair<void*, size_t> allocation = std::make_pair((void*)nullptr, 0);
+
+    size_t size_to_alloc;
+    int client_pe;
+    sscanf(buf, "MALLOC:%ld:%d:%zu", &client_pid, &client_pe, &size_to_alloc);
+
+    CmiPrintf("Server: MALLOC from new client %ld, pe %d for %zu bytes\n", 
+      client_pid, client_pe, size_to_alloc);
+
+    allocation.second = size_to_alloc;
+    hapiCheck(cudaMalloc(&(allocation.first), size_to_alloc));
+
+    cudaIpcMemHandle_t ipc_handle;
+    hapiCheck(cudaIpcGetMemHandle(&ipc_handle, allocation.first));
+    write(client_fd, &ipc_handle, sizeof(cudaIpcMemHandle_t));
+
+    //hapiMemoryMap[CkMyRank()].pid = client_pid;
+    if (hapiMemoryMap.find(client_pe) == hapiMemoryMap.end())
+      hapiMemoryMap[client_pe] = new hapiMemoryMapEntry();
+    hapiMemoryMap[client_pe]->memory_map[hapiAllocId++] = allocation;
+  }
+  else if (strcmp(command, "FREE") == 0) 
+  {
+    int alloc_id;
+    int client_pe;
+    sscanf(buf, "FREE:%ld:%d:%d", &client_pid, &client_pe, &alloc_id);
+    if (hapiMemoryMap[client_pe]->memory_map.find(alloc_id) == hapiMemoryMap[client_pe]->memory_map.end()) 
+    {
+      hapiCheck(cudaFree(hapiMemoryMap[client_pe]->memory_map[alloc_id].first));
+      hapiMemoryMap[client_pe]->memory_map[alloc_id] = std::make_pair(nullptr, 0);
+    }
+    write(client_fd, "\0", 1);
+  }
+  else if (strcmp(command, "KILL") == 0)
+  {
+    CmiPrintf("Server: KILL command received from client %ld\n", client_pid);
+    write(client_fd, "\0", 1);
+    exit(0);
+  }
+
+  close(client_fd);
+}
+
+void hapiStartMemoryDaemon()
+{
+#ifdef CMK_SHRINK_EXPAND
+  // start client FIFO
+  long pid = getpid();
+  char client_fifo_path[BUFFER_SIZE];
+  sprintf(client_fifo_path, CLIENT_FIFO_TEMPLATE, pid);
+  mkfifo(client_fifo_path, 0666);
+
+  if (CmiPhysicalRank(CmiMyPe()) != firstRankForDevice)
+  {
+    int& cpv_my_device = CpvAccess(my_device);
+    hapiCheck(cudaSetDevice(cpv_my_device));
+    return;
+  }
+
+  pid = fork();
+  if (pid < 0) {
+    CmiAbort("Failed to fork HAPI daemon process");
+  } else if (pid > 0) {
+    int& cpv_my_device = CpvAccess(my_device);
+    hapiCheck(cudaSetDevice(cpv_my_device));
+    // Parent process, return immediately
+    return;
+  }
+
+  // Child process, execute the server daemon
+
+  auto gpu_manager = CsvAccess(gpu_manager);
+
+  int& cpv_my_device = CpvAccess(my_device);
+  printf("HAPI> Memory daemon running on PE %d, device %d\n", CmiMyPe(), cpv_my_device);
+  hapiCheck(cudaSetDevice(cpv_my_device));
+
+  //hapiMemoryMap.resize(gpu_manager.device_count_on_physical_node);
+  char server_fifo_path[BUFFER_SIZE];
+  sprintf(server_fifo_path, SERVER_FIFO_TEMPLATE, cpv_my_device);
+  mkfifo(server_fifo_path, 0666);
+
+  char stream_buf[STREAM_BUF_SIZE];
+  size_t data_in_stream = 0;
+  int bytes_read;
+
+  while (1)
+  {
+    int server_fd = open(server_fifo_path, O_RDONLY);
+    if (server_fd == -1) 
+    {
+      perror("open");
+      sleep(1e-6); // Wait a moment before retrying
+      continue;
+    }
+
+    while ((bytes_read = read(server_fd, stream_buf + data_in_stream, STREAM_BUF_SIZE - data_in_stream)) > 0)
+    {
+      printf("HAPI> Read %d bytes from server FIFO\n", bytes_read);
+      data_in_stream += bytes_read;
+      if (data_in_stream >= STREAM_BUF_SIZE) {
+        CmiAbort("Stream buffer overflow");
+      }
+
+      while (1)
+      {
+        char* msg_end = (char*)memchr(stream_buf, '\0', data_in_stream);
+
+        if (msg_end == NULL) {
+          // No complete message in the buffer, wait for more data
+          break;
+        }
+
+        size_t msg_len = (msg_end - stream_buf) + 1;
+        char current_request[BUFFER_SIZE];
+        memcpy(current_request, stream_buf, msg_len);
+        
+        // Process the self-contained request
+        hapiProcessMemoryRequest(current_request);
+
+        // "Consume" the processed message from the stream buffer by shifting the remaining data
+        data_in_stream -= msg_len;
+        memmove(stream_buf, stream_buf + msg_len, data_in_stream);
+      }
+    }
+  }
+
+#endif
+}
+
 void hapiExit() {
   // Ensure all PEs have finished GPU work
   CmiNodeBarrier();
+
+  if (CmiPhysicalRank(CmiMyPe()) == firstRankForDevice)
+  {
+    char client_fifo_path[BUFFER_SIZE];
+    sprintf(client_fifo_path, CLIENT_FIFO_TEMPLATE, getpid());
+
+    char msg_buf[BUFFER_SIZE];
+    sprintf(msg_buf, "KILL:%ld:0", getpid());
+    hapiSendMemoryRequest(msg_buf);
+
+    int client_fd = open(client_fifo_path, O_RDONLY);
+    char status;
+    read(client_fd, &status, sizeof(status));
+    close(client_fd);
+  }
 
   if (CmiMyRank() == 0) {
     shmCleanup();
@@ -230,8 +416,9 @@ static void hapiMapping(char** argv) {
 
   if (CmiMyRank() == 0) {
     // Count number of GPU devices used by each process
-    int visible_device_count;
-    hapiCheck(cudaGetDeviceCount(&visible_device_count));
+    int visible_device_count = 1;
+    //hapiCheck(cudaGetDeviceCount(&visible_device_count));
+    // FIXME this call has to be made but it causes issues with fork()
     if (visible_device_count <= 0) {
       CmiAbort("Unable to perform PE-GPU mapping, no GPUs found!");
     }
@@ -288,17 +475,19 @@ static void hapiMapping(char** argv) {
       if(cpv_my_device >= csv_gpu_manager.device_count)
           cpv_my_device = csv_gpu_manager.device_count - 1;
       if (my_rank % csv_gpu_manager.pes_per_device == 0) cpv_device_rep = true;
+      firstRankForDevice = cpv_my_device * csv_gpu_manager.pes_per_device;
       break;
     case Mapping::RoundRobin:
       cpv_my_device = my_rank % csv_gpu_manager.device_count;
       if (my_rank < csv_gpu_manager.device_count) cpv_device_rep = true;
+      firstRankForDevice = cpv_my_device;
       break;
     default:
       CmiAbort("Unsupported mapping type!");
   }
 
   // Set device and store PE-device mapping
-  hapiCheck(cudaSetDevice(cpv_my_device));
+  //hapiCheck(cudaSetDevice(cpv_my_device));
 #if CMK_SMP
   CmiLock(csv_gpu_manager.device_mapping_lock);
 #endif
@@ -1465,20 +1654,93 @@ void hapiAddCallback(cudaStream_t stream, void* cb, void* cb_msg) {
   hapiAddCallback(stream, *(CkCallback*)cb, cb_msg);
 }
 
+void hapiSendMemoryRequest(char* msg)
+{
+  int cpv_my_device = CpvAccess(my_device);
+
+  char server_fifo[BUFFER_SIZE];
+  sprintf(server_fifo, SERVER_FIFO_TEMPLATE, cpv_my_device);
+  int server_fd = open(server_fifo, O_WRONLY);
+
+  write(server_fd, msg, strlen(msg) + 1);
+  close(server_fd);
+}
+
 cudaError_t hapiMalloc(void** devPtr, size_t size) {
+#ifdef CMK_SHRINK_EXPAND
+  // send a request to the server to allocate memory
+  
+  pid_t pid = getpid();
+
+  char client_fifo_path[BUFFER_SIZE];
+  sprintf(client_fifo_path, CLIENT_FIFO_TEMPLATE, pid);
+
+  char msg_buf[BUFFER_SIZE];
+  sprintf(msg_buf, "MALLOC:%ld:%d:%zu", pid, CkMyPe(), size);
+
+  hapiSendMemoryRequest(msg_buf);
+
+  int client_fd = open(client_fifo_path, O_RDONLY);
+  cudaIpcMemHandle_t ipc_handle;
+  read(client_fd, &ipc_handle, sizeof(ipc_handle));
+  close(client_fd);
+
+  cudaError_t err = cudaIpcOpenMemHandle(devPtr, ipc_handle, cudaIpcMemLazyEnablePeerAccess);
+
+  // track pointer to allocation ID
+  hapiAllocIdMap[*devPtr] = hapiAllocId++;
+
+  return err;
+#else
   return cudaMalloc(devPtr, size);
+#endif
 }
 
 cudaError_t hapiFree(void* devPtr) {
+#ifdef CMK_SHRINK_EXPAND
+  // send a request to the server to free memory
+  pid_t pid = getpid();
+
+  char client_fifo_path[BUFFER_SIZE];
+  sprintf(client_fifo_path, CLIENT_FIFO_TEMPLATE, pid);
+
+  char msg_buf[BUFFER_SIZE];
+
+  // retrieve allocation ID from the map
+  auto it = hapiAllocIdMap.find(devPtr);
+  if (it == hapiAllocIdMap.end()) {
+    CmiPrintf("[HAPI] hapiFree: devPtr %p not found in allocation map\n", devPtr);
+    return cudaErrorInvalidValue;
+  }
+  int allocId = it->second;
+  hapiAllocIdMap.erase(it); // remove from the map
+
+  sprintf(msg_buf, "FREE:%ld:%ld:%d", pid, CkMyPe(), allocId);
+
+  cudaError_t err = cudaIpcCloseMemHandle(devPtr);
+
+  hapiSendMemoryRequest(msg_buf);
+
+  int client_fd = open(client_fifo_path, O_RDONLY);
+  char status;
+  read(client_fd, &status, sizeof(status));
+  close(client_fd);
+
+  return err;
+#else
   return cudaFree(devPtr);
+#endif
 }
 
 cudaError_t hapiMallocHost(void** ptr, size_t size) {
-  return cudaMallocHost(ptr, size);
+  //return cudaMallocHost(ptr, size);
+  *ptr = malloc(size);
+  return cudaSuccess;
 }
 
 cudaError_t hapiFreeHost(void* ptr) {
-  return cudaFreeHost(ptr);
+  free(ptr);
+  return cudaSuccess;
 }
 
 cudaError_t hapiMemcpyAsync(void* dst, const void* src, size_t count, cudaMemcpyKind kind, cudaStream_t stream = 0) {

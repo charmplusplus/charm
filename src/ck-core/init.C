@@ -1696,6 +1696,7 @@ void _initCharm(int unused_argc, char **argv)
 #if CMK_CUDA
   // Perform HAPI initialization for GPU support
   hapiInit(argv);
+  //hapiStartMemoryDaemon();
 
   // Initialize Charm++ layer functions
   hapiInvokeCallback = CUDACallbackManager;

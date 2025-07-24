@@ -2972,12 +2972,11 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   callMethod(rec, &CkMigratable::ckAboutToMigrate);
 
   // First pass: find size of migration message
-  size_t bufSize;
-  {
-    PUP::sizer p(PUP::er::IS_MIGRATION);
-    pupElementsFor(p, rec, CkElementCreation_migrate);
-    bufSize = p.size();
-  }
+  size_t bufSize, gpuBufSize;
+  PUP::sizer p(PUP::er::IS_MIGRATION);
+  pupElementsFor(p, rec, CkElementCreation_migrate);
+  bufSize = p.size();
+  gpuBufSize = p.gpu_size();
 #if CMK_ERROR_CHECKING
   if (bufSize > std::numeric_limits<int>::max())
   {
@@ -2986,6 +2985,8 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   }
 #endif
 
+
+  void* gpuMsg;
   // Allocate and pack into message
   CkArrayElementMigrateMessage* msg =
       new (bufSize, 0) CkArrayElementMigrateMessage(idx, id,
@@ -2995,10 +2996,12 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
                                                     false,
 #endif
                                                     bufSize, managers.size(),
-                                                    cache->getEpoch(id) + 1);
+                                                    cache->getEpoch(id) + 1,
+                                                    gpuBufSize > 0);
 
   {
-    PUP::toMem p(msg->packData, PUP::er::IS_MIGRATION);
+    cudaMalloc(&gpuMsg, gpuBufSize);
+    PUP::toMem p(msg->packData, gpuMsg, PUP::er::IS_MIGRATION);
     p.becomeDeleting();
     pupElementsFor(p, rec, CkElementCreation_migrate);
     if (p.size() != bufSize)
@@ -3013,6 +3016,8 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 
   DEBM((AA "Migrated index size %s to %d \n" AB, idx2str(idx), toPe));
 
+  if (gpuBufSize > 0)
+    thisProxy[toPe].immigrateGPU(msg->id, gpuBufSize, CkDeviceBuffer(gpuMsg, gpuBufSize));
   thisProxy[toPe].immigrate(msg);
 
   duringMigration = true;
@@ -3047,14 +3052,47 @@ void CkLocMgr::metaLBCallLB(CkLocRec* rec)
 }
 #endif
 
+void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char* &data, CkDeviceBufferPost* post)
+{
+  cudaMalloc(&data, size);
+  receivedDeviceMsgs[id] = data;
+  post[0].cuda_stream = (cudaStream_t) 0;
+}
+
+void CkLocMgr::immigrateGPU(CmiUInt8 id, int size, char* data)
+{
+  void* dataPtr = receivedDeviceMsgs[id];
+  receivedDeviceMsgs.erase(id);
+  bufferedDeviceMigrateMsgs[id] = dataPtr;
+  if (bufferedHostMigrateMsgs.find(id) != bufferedHostMigrateMsgs.end())
+  {
+    immigrate(bufferedHostMigrateMsgs[id]);
+    bufferedHostMigrateMsgs.erase(id);
+  }
+}
+
 /**
   Migrating array element is arriving on this processor.
 */
 void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
 {
+  void* gpuMsg = nullptr;
+  if (msg->hasGPUMsg)
+  {
+    auto it = bufferedDeviceMigrateMsgs.find(msg->id);
+
+    if (it == bufferedDeviceMigrateMsgs.end())
+    {
+      bufferedHostMigrateMsgs[msg->id] = msg;
+      return;
+    }
+    
+    gpuMsg = it->second;
+  }
+
   const CkArrayIndex& idx = msg->idx;
 
-  PUP::fromMem p(msg->packData, PUP::er::IS_MIGRATION);
+  PUP::fromMem p(msg->packData, gpuMsg, PUP::er::IS_MIGRATION);
 
   if (msg->nManagers < managers.size())
     CkAbort("Array element arrived from location with fewer managers!\n");
@@ -3067,11 +3105,15 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
     return;
   }
 
+  if (msg->hasGPUMsg)
+    bufferedDeviceMigrateMsgs.erase(msg->id);
+
   insertID(idx, msg->id);
 
   // Create a record for this element
-  CkLocRec* rec =
-      createLocal(idx, true, msg->ignoreArrival, false /* home told on departure */, msg->epoch);
+  CkLocRec* rec = elementNrec(msg->id);
+  if (rec == nullptr)
+      rec = createLocal(idx, true, msg->ignoreArrival, false /* home told on departure */, msg->epoch);
 
   CmiAssert(CpvAccess(newZCPupGets).empty());  // Ensure that vector is empty
   // Create the new elements as we unpack the message
@@ -3105,6 +3147,7 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
   }
 
   delete msg;
+  cudaFree(gpuMsg);
 }
 
 void CkLocMgr::restore(const CkArrayIndex& idx, CmiUInt8 id, PUP::er& p)

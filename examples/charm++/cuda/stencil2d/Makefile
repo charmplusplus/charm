@@ -1,11 +1,11 @@
 -include ../../../../common.mk
 CHARMC = ../../../../bin/charmc $(OPTS)
-OPTS = -O3 -fopt-info-vec-optimized #-DUSE_NVTX
+OPTS = -O3 -fopt-info-vec-optimized -g #-DHAPI_CUDA_CALLBACK #-DUSE_NVTX
 
 # set CUDATOOLKIT_HOME to the CUDA toolkit directory
-CUDATOOLKIT_HOME ?= /usr/local/cuda
+CUDATOOLKIT_HOME ?= /usr
 NVCC = $(CUDATOOLKIT_HOME)/bin/nvcc
-NVCC_FLAGS = -O3 -c -std=c++11 -DTILE_SIZE=16 -use_fast_math
+NVCC_FLAGS = -O3 -c -std=c++11 -DTILE_SIZE=16 -use_fast_math -g
 NVCC_INC = -I$(CUDATOOLKIT_HOME)/include
 CHARM_INC = -I../../../../include
 LD_LIBS = #-lnvToolsExt
@@ -16,7 +16,7 @@ all: $(TARGET)
 OBJS = $(TARGET).o $(TARGET)CUDA.o
 
 $(TARGET): $(OBJS)
-	$(CHARMC) -language charm++ -o $@ $(OBJS) $(LD_LIBS)
+	$(CHARMC) -language charm++ -module EveryLB -o $@ $(OBJS) $(LD_LIBS)
 
 $(TARGET).decl.h: $(TARGET).ci
 	$(CHARMC) $<

@@ -4,7 +4,7 @@
 #define DIVIDEBY5 0.2
 #endif
 
-__global__ void stencil2DKernel(double* temperature, double* new_temperature,
+__global__ void stencil2DKernel(float* temperature, float* new_temperature,
                                 int block_x, int block_y, int thread_size) {
   int i_start = (blockDim.x * blockIdx.x + threadIdx.x) * thread_size + 1;
   int i_finish =
@@ -32,8 +32,8 @@ __global__ void stencil2DKernel(double* temperature, double* new_temperature,
   int j = jstart + threadIdx.y + blockDim.y*blockIdx.y;
 
   if (i < ifinish && j < jfinish) {
-    __shared__ double shared_temperature[TILE_SIZE][TILE_SIZE];
-    double center = temperature[j*(block_x+2)+i];
+    __shared__ float shared_temperature[TILE_SIZE][TILE_SIZE];
+    float center = temperature[j*(block_x+2)+i];
 
     shared_temperature[threadIdx.x][threadIdx.y] = center;
     __syncthreads();
@@ -55,8 +55,8 @@ __global__ void stencil2DKernel(double* temperature, double* new_temperature,
   */
 }
 
-void invokeKernel(cudaStream_t stream, double* d_temperature,
-                  double* d_new_temperature, int block_x, int block_y,
+void invokeKernel(cudaStream_t stream, float* d_temperature,
+                  float* d_new_temperature, int block_x, int block_y,
                   int thread_size) {
   dim3 block_dim(TILE_SIZE, TILE_SIZE);
   dim3 grid_dim(

@@ -4,7 +4,7 @@
 #ifdef TEST_CORRECTNESS
 typedef int DataType;
 #else
-typedef double DataType;
+typedef float DataType;
 #endif
 
 #define IDX(x,y) ((block_width+2)*(y)+(x))
