@@ -1324,11 +1324,11 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
     }
   }
 
-#if CMK_RECORD_REPLAY
+// #if CMK_RECORD_REPLAY
   if (ck->watcher!=NULL) {
     if (!ck->watcher->processMessage(&env,ck)) return;
   }
-#endif
+// #endif
 #if USE_CRITICAL_PATH_HEADER_ARRAY
   CK_CRITICALPATH_START(env)
 #endif
