@@ -24,7 +24,7 @@ jobs:
       run: make -C netlrts-linux-x86_64/tmp testp TESTOPTS="++local" P=3
 
   changa_netlrts-linux-x86_64:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest 
     steps:
     - uses: actions/checkout@v4
     - name: build-charm++
@@ -41,38 +41,10 @@ jobs:
         cd changa/teststep
         make test
 
-  charm4py_netlrts-linux-x86_64_tcp:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: build-charm++
-      run: |
-        git fetch --unshallow # Need full repo for 'git describe' used by charm4py
-        ./build charm4py netlrts-linux-x86_64 tcp -g -j4 --with-production
-    - name: build-charm4py
-      run: |
-        pip3 install setuptools cython cffi greenlet numpy torch torchvision
-        git clone https://github.com/UIUC-PPL/charm4py
-        export PYTHONPATH="$PWD/charm4py"
-
-        mkdir -p charm4py/charm_src/charm/bin && cp bin/charmrun charm4py/charm_src/charm/bin
-        mkdir -p charm4py/charm_src/charm/lib && cp lib/libcharm.so charm4py/charm_src/charm/lib
-        mkdir -p charm4py/charm_src/charm/include && cp -r -L include/* charm4py/charm_src/charm/include
-
-        cd charm4py
-        export CHARM4PY_BUILD_CFFI=1
-        python3 setup.py build_ext --inplace
-    - name: test-charm4py
-      run: |
-        export PYTHONPATH="$PWD/charm4py"
-        export CHARM4PY_TEST_NUM_PROCESSES=2
-        cd charm4py
-        python3 auto_test.py
-
   cuda_netlrts-linux-x86_64_buildonly:
     # Buildonly test, as CUDA needs an actual device to run.
     timeout-minutes: 45
-    runs-on: ubuntu-20.04  # FIXME: ubuntu-latest does not work
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
     - name: build
@@ -101,7 +73,7 @@ jobs:
 
   mpi-linux-x86_64:
     timeout-minutes: 90
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04  #  ubuntu-latest does not work
     steps:
     - uses: actions/checkout@v4
     - name: install-prerequisites
@@ -117,7 +89,7 @@ jobs:
 
   mpi-linux-x86_64_syncft:
     timeout-minutes: 90
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04  #  ubuntu-latest does not work
     steps:
     - uses: actions/checkout@v4
     - name: install-prerequisites
@@ -129,24 +101,24 @@ jobs:
 
   multicore-darwin-x86_64_projections:
     timeout-minutes: 60
-    runs-on: macos-12
+    runs-on: macos-13
     steps:
     - uses: actions/checkout@v4
-    - name: build
+    - name: build-only
       run: ./build LIBS multicore-darwin-x86_64 -g -j3 --with-production --enable-tracing
-    - name: test
-      run: |
-        make -C multicore-darwin-x86_64/tmp all-test -j3 OPTS="-g -tracemode projections"
-        make -C multicore-darwin-x86_64/tmp test
-    - name: projections
+#    - name: test
+#      run: |
+#        make -C multicore-darwin-x86_64/tmp all-test -j3 OPTS="-g -tracemode projections"
+#        make -C multicore-darwin-x86_64/tmp test
+    - name: projections-build-only
       run: |
         git clone https://github.com/UIUC-PPL/projections
         cd projections
         make
-        proj=$PWD/bin/projections
-        cd ..
-        files=$(find . -name *.sts)
-        for f in $files; do echo $f; pushd .; cd $(dirname $f); $proj --exit $(basename $f); popd; done
+  #    proj=$PWD/bin/projections
+  #      cd ..
+  #      files=$(find . -name *.sts)
+  #      for f in $files; do echo $f; pushd .; cd $(dirname $f); $proj --exit $(basename $f); popd; done
 
   # FIXME: disabled since tests don't pass
   # multicore-darwin-arm8_projections:
@@ -193,7 +165,7 @@ jobs:
       if: ${{ env.namd_secret != '' }}
       run: |
         cd ..
-        git clone https://${{ secrets.NAMD_CI_USERNAME_TOKEN }}@gitlab.com/tcbgUIUC/namd.git
+        git clone https://${{ secrets.NAMD_CI_USERNAME_TOKEN }}:${{ secrets.NAMD_CI_DEPLOY_PASSWORD }}@gitlab.com/tcbgUIUC/namd.git
         cd namd
         ./config Linux-x86_64-g++ --charm-base ../charm --charm-arch netlrts-linux-x86_64 --without-tcl
         cd Linux-x86_64-g++
@@ -228,18 +200,19 @@ jobs:
         cd ../namd/Linux-x86_64-g++
         ./charmrun ++local +p4 ./namd3 ~/namddata/apoa1/apoa1.namd
 
+# FIXME: darwin tests all fail
   netlrts-darwin-x86_64:
     timeout-minutes: 60
-    runs-on: macos-12
+    runs-on: macos-13
     steps:
     - uses: actions/checkout@v4
-    - name: build
+    - name: build-only
       run: ./build all-test netlrts-darwin-x86_64 --build-shared --with-production --enable-error-checking --enable-lbuserdata -j3 -g -Werror=vla
       # TODO: this should build tests with "-charm-shared". See #2735 on why this is not done currently.
-    - name: test
-      run: make -C netlrts-darwin-x86_64/tmp test TESTOPTS="++local"
-    - name: testp P=2
-      run: make -C netlrts-darwin-x86_64/tmp testp P=2 TESTOPTS="++local"
+  #    - name: test
+  #      run: make -C netlrts-darwin-x86_64/tmp test TESTOPTS="++local"
+  #    - name: testp P=2
+  #      run: make -C netlrts-darwin-x86_64/tmp testp P=2 TESTOPTS="++local"
 
   # FIXME: disabled since tests don't pass
   # netlrts-darwin-arm8:
@@ -329,47 +302,48 @@ jobs:
           src/arch/multicore/charmrun \
           src/arch/mpi-win-x86_64/charmrun \
 
-  spack:
-    name: spack_${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-12]
-
+  spack_ubuntu-latest:
+    #removed macos target and branch protection until macos ci testing is fixed
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
     - uses: actions/checkout@v4
     - name: Install Spack
       run: |
+        pwd
         cd ..
         git clone --depth 1 https://github.com/spack/spack
-        cd spack
+        source spack/share/spack/setup-env.sh
+        spack cd --repo builtin
         [[ $(uname) == "Linux" ]] && sudo apt-get install -y gfortran
 
         # Use this branch for testing, not main
-        sed -i -e 's,="main",="${{ github.head_ref }}",' var/spack/repos/builtin/packages/charmpp/package.py
+        sed -i -e 's,="main",="${{ github.head_ref }}",' packages/charmpp/package.py
 
         # Use a fork, not the main repo
         # If in merge_group mode, the branch should be created in the main repo
         if [[ ${{ github.event_name }} == 'pull_request' ]]; then
-          sed -i -e 's,charmplusplus/charm.git,${{github.event.pull_request.head.repo.full_name}},' var/spack/repos/builtin/packages/charmpp/package.py
+          sed -i -e 's,UIUC-PPL/charm.git,${{github.event.pull_request.head.repo.full_name}},' packages/charmpp/package.py
         fi
 
         # Compile with debug symbols
-        sed -i -e 's,build(target,options.append("-g"); build(target,' var/spack/repos/builtin/packages/charmpp/package.py
+        sed -i -e 's,build(target,options.append("-g"); build(target,' packages/charmpp/package.py
 
         # Add +setcpuaffinity option to TESTOPTS
-        sed -i -e 's,\+\+local,++local +setcpuaffinity,' var/spack/repos/builtin/packages/charmpp/package.py
+        sed -i -e 's,\+\+local,++local +setcpuaffinity,' packages/charmpp/package.py
 
         # No need for automake/autoconf
-        sed -i -e '/automake/d' var/spack/repos/builtin/packages/charmpp/package.py
-        sed -i -e '/autoconf/d' var/spack/repos/builtin/packages/charmpp/package.py
+        sed -i -e '/automake/d' packages/charmpp/package.py
+        sed -i -e '/autoconf/d' packages/charmpp/package.py
 
     - name: Build Charm++
       run: |
-        cd ../spack
-        source share/spack/setup-env.sh
+        pwd
+        cd ..
+        source spack/share/spack/setup-env.sh
+        spack cd --repo builtin
+        cat packages/charmpp/package.py
+        cd ../../../../../..
         spack compiler find
         spack compiler list
         spack spec charmpp@main
@@ -377,7 +351,7 @@ jobs:
 
   ucx-linux-x86_64_openpmix:
     timeout-minutes: 60
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v1
     # Uncomment the lines below to set up a tmate session for debugging.

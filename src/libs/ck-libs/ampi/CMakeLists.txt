@@ -1,6 +1,11 @@
 set(ampi-cxx-sources ampi.C ampiMisc.C ampiOneSided.C ampif.C ddt.C mpich-alltoall.C ampi_mpix.C ampi_noimpl.C)
 
 set(ampi-f90-sources ampimod.f90)
+#disable ROMIO due to GCC 14 cascade of failures
+if(NOT DEFINED CMK_AMPI_WITH_ROMIO)
+       set(CMK_AMPI_WITH_ROMIO 0)
+endif()       
+
 
 set(ampi-h-sources ampi.h ampi-interoperate.h ampiimpl.h ddt.h ampi_functions.h ampi_funcptr.h ampi_funcptr_loader.h
                    romio-stub/mpio_globals.h)
@@ -180,6 +185,7 @@ endif()
 
 # ROMIO
 set(romio-objects)
+
 if(CMK_AMPI_WITH_ROMIO)
     set(romio_dir ${CMAKE_BINARY_DIR}/src/libs/ck-libs/ampi/romio-prefix/src/romio)
 

@@ -183,7 +183,7 @@ liveViz’.
 Before compiling a liveViz program, the liveViz library may need to be
 compiled. To compile the liveViz library:
 
--  go to .../charm/tmp/libs/ck-libs/liveViz
+-  go to .../charm/src/libs/ck-libs/liveViz
 
 -  make
 

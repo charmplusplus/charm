@@ -603,12 +603,6 @@ static void CkPupPerPlaceData(PUP::er &p, GroupIDTable *idTable, GroupTable *obj
     numGroups = idTable->size();
   }
   p|numGroups;
-  if (p.isUnpacking()) {
-    if(CkMyPe()==0)  
-      numObjects = numGroups+1; 
-    else 
-      numObjects = 1;
-  }
   DEBCHK("[%d] CkPupPerPlaceData %s: numGroups = %d\n", CkMyPe(),p.typeString(),numGroups);
 
   std::vector<GroupInfo> tmpInfo(numGroups);
@@ -628,6 +622,7 @@ static void CkPupPerPlaceData(PUP::er &p, GroupIDTable *idTable, GroupTable *obj
   }
   p|tmpInfo;
 
+  int maxGroup = 0;
   for (i = 0; i < numGroups; i++) 
   {
     if (!tmpInfo[i].present)
@@ -647,6 +642,8 @@ static void CkPupPerPlaceData(PUP::er &p, GroupIDTable *idTable, GroupTable *obj
       {
         creationFn(gID, eIdx, env);
       }
+      if(gID.idx > maxGroup)
+          maxGroup = gID.idx;
 
       CkFreeSysMsg(m);
     }   // end of unPacking
@@ -655,6 +652,13 @@ static void CkPupPerPlaceData(PUP::er &p, GroupIDTable *idTable, GroupTable *obj
 
     // if using migration constructor, you'd better have a pup
     gobj->virtual_pup(p);
+  }
+
+  if (p.isUnpacking()) {
+    if(CkMyPe()==0)
+      numObjects = maxGroup+1;
+    else
+      numObjects = 1;
   }
 }
 
