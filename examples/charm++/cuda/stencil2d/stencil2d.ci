@@ -17,23 +17,21 @@ mainmodule stencil2d {
     entry CustomMap();
   };
 
-  message CallbackMsg;
 
   mainchare Main {
     entry Main(CkArgMsg* m);
     entry [reductiontarget] void initDone();
-    entry [reductiontarget] void done(double time);
+    entry [reductiontarget] void done(float time);
   };
 
   array [2D] Stencil {
     entry Stencil(void);
     entry void init();
-    entry void receiveGhosts(int ref, int dir, int w, double gh[w]);
+    entry void receiveGhosts(int ref, int dir, int w, float gh[w]);
+    entry void iterate();
 
-    entry void iterate(CallbackMsg* m) {
+    entry [reductiontarget] void compute() {
       serial {
-        delete m;
-
         // Measure iteration time
         if (my_iter > 0) {
           agg_time += CkWallTimer() - iter_start_time;
@@ -45,7 +43,7 @@ mainmodule stencil2d {
           CkPrintf("[%*d] Average time per iteration: %lf\n", n_digits,
                    thisFlatIndex, agg_time / num_iters);
           CkCallback cb(CkReductionTarget(Main, done), mainProxy);
-          contribute(sizeof(double), &agg_time, CkReduction::sum_double, cb);
+          contribute(sizeof(float), &agg_time, CkReduction::sum_float, cb);
         }
 
         // Send ghost data to neighbors
@@ -54,7 +52,7 @@ mainmodule stencil2d {
 
       // Receive ghost data from neighbors
       for (remote_count = 0; remote_count < neighbors; remote_count++) {
-        when receiveGhosts[my_iter](int ref, int dir, int w, double buf[w]) serial {
+        when receiveGhosts[my_iter](int ref, int dir, int w, float buf[w]) serial {
           processGhosts(dir, w, buf);
         }
       }
