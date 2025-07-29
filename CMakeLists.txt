@@ -673,6 +673,7 @@ configure_file(src/arch/common/conv-mach-tsan.h              include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-tsan.sh             include/ COPYONLY)
 configure_file(src/scripts/conv-config.sh                    include/ COPYONLY)
 configure_file(src/arch/${VDIR}/conv-mach.sh                 include/ COPYONLY)
+configure_file(src/util/ckrescale.h                         include/ COPYONLY)
 
 set(CUDA_DIR "")
 if(BUILD_CUDA)
@@ -692,7 +693,8 @@ if(BUILD_CUDA)
     find_package(CUDA REQUIRED)
     set(CUDA_DIR "${CUDA_TOOLKIT_ROOT_DIR}")
   endif()
-  add_library(cudahybridapi ${hybridAPI-cxx-sources})
+  add_library(ckrescale src/util/ckrescale.C)
+  add_library(cudahybridapi ${hybridAPI-cxx-sources} $<TARGET_OBJECTS:ckrescale>)
   if(TRACING)
     target_compile_definitions(cudahybridapi PRIVATE HAPI_TRACE)
   endif()
@@ -1005,7 +1007,7 @@ else()
   # Check that we are able to build and link an executable
   add_executable(ckhello ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.C)
   add_dependencies(ckhello ck ldb-none memory-default threads-default conv-static
-    converse ckmain ckqt
+    converse ckmain ckqt ckrescale
     moduleNDMeshStreamer modulecompletion)
 endif()
 

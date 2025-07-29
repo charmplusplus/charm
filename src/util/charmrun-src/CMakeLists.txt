@@ -8,7 +8,7 @@ target_link_libraries(charmd_faceless PRIVATE -seq)
 
 add_executable(charmrun charmrun.C)
 target_compile_options(charmrun PRIVATE -seq -DCMK_NOT_USE_CONVERSE=1)
-target_link_libraries(charmrun PRIVATE -seq)
+target_link_libraries(charmrun PRIVATE -seq ckrescale)
 
 target_include_directories(charmrun PRIVATE ../../conv-ccs ..) # for ccs-auth.c sockRoutines.c
 

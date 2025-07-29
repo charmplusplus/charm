@@ -642,7 +642,7 @@ class Stencil : public CBase_Stencil {
         //if (gpu_prio)
         //  CkSetQueueing(m, CK_QUEUEING_LIFO);
         hapiAddCallback(stream, cb);
-        cudaStreamSynchronize(stream);
+        //cudaStreamSynchronize(stream);
       }
     } else {  // CPU_MODE
       for (int i = 1; i <= block_x; ++i) {

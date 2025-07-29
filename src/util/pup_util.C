@@ -25,6 +25,7 @@ virtual functions are defined here.
 
 #include <cuda_runtime.h>
 #include <cuda.h>
+#include "hapi_impl.h"
 
 #include "conv-rdma.h"
 #if defined(_WIN32)
@@ -435,6 +436,20 @@ void PUP::toDisk::bytes(void *p,size_t n,size_t itemSize,dataType /*t*/)
   }
 }
 
+void PUP::toDisk::bytes(void *p,size_t n,size_t itemSize,dataType t, PUPMode mode)
+{
+  if (mode == PUPMode::HOST) {
+    bytes(p, n, itemSize, t);
+  } else if (mode == PUPMode::DEVICE) {
+    // For GPU mode, we assume p is a device pointer and copy directly
+    int allocId = hapiGetAllocId(p);
+    if(CmiFwrite(&allocId,sizeof(int),1,F) != 1)
+    {
+      error = true;
+    }
+  }
+}
+
 void PUP::toDisk::pup_buffer(void *&p,size_t n,size_t itemSize,dataType t) {
   bytes(p, n, itemSize, t);
   if(isDeleting()) free(p);
@@ -447,6 +462,18 @@ void PUP::toDisk::pup_buffer(void *&p,size_t n, size_t itemSize, dataType t, std
 
 void PUP::fromDisk::bytes(void *p,size_t n,size_t itemSize,dataType /*t*/)
 {/* CkPrintf("reading %d bytes\n",itemSize*n); */ CmiFread(p,itemSize,n,F);}
+
+void PUP::fromDisk::bytes(void **p,size_t n,size_t itemSize,dataType t, PUPMode mode)
+{
+  if (mode == PUPMode::HOST) {
+    bytes(*p, n, itemSize, t);
+  } else if (mode == PUPMode::DEVICE) {
+    // For GPU mode, we assume p is a device pointer and copy directly
+    int allocId;
+    CmiFread(&allocId,sizeof(int),1,F);
+    hapiGetPtrFromAllocId(allocId, p);
+  }
+}
 
 void PUP::fromDisk::pup_buffer(void *&p,size_t n,size_t itemSize,dataType t) {
   if(isUnpacking()) p = malloc(n * itemSize);

@@ -684,13 +684,14 @@ static void _exitHandler(envelope *env)
       }
       else
         CmiFree(env);
-#if CMK_SHRINK_EXPAND
-      ConverseCleanup();
-#endif
 
 #if CMK_CUDA
       // Clean up HAPI
       hapiExit();
+#endif
+
+#if CMK_SHRINK_EXPAND
+      ConverseCleanup();
 #endif
 
       //everyone exits here - there may be issues with leftover messages in the queue

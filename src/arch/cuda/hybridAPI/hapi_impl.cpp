@@ -15,6 +15,7 @@
 #include <cuda.h>
 
 #include "converse.h"
+#include "ckrescale.h"
 #include "hapi.h"
 #include "hapi_impl.h"
 #include "gpumanager.h"
@@ -30,6 +31,9 @@
 #if defined HAPI_TRACE || defined HAPI_INSTRUMENT_WRS
 extern "C" double CmiWallTimer();
 #endif
+
+extern bool shrinkexpand_exit;
+extern bool _inrestart;
 
 static void createPool(int *nbuffers, int n_slots, std::vector<BufferPool> &pools);
 static void releasePool(std::vector<BufferPool> &pools);
@@ -138,7 +142,12 @@ void hapiInit(char** argv) {
 
     hapiMapping(argv); // Perform PE-device mapping
 
-    hapiStartMemoryDaemon();
+#if CMK_SHRINK_EXPAND
+    if(!get_arg_shrinkexpand())
+#endif
+      hapiStartMemoryDaemon();
+
+    CmiBarrier();
 
 #ifndef HAPI_CUDA_CALLBACK
     // Register polling function to be invoked at every scheduler loop
@@ -158,7 +167,7 @@ void hapiInit(char** argv) {
   hapiRegisterCallbacks(); // Register callback functions
 }
 
-void hapiProcessMemoryRequest(char* buf)
+void hapiProcessMemoryRequest(int server_fd, char* buf)
 {
   long client_pid;
   char command[BUFFER_SIZE];
@@ -208,10 +217,31 @@ void hapiProcessMemoryRequest(char* buf)
     }
     write(client_fd, "\0", 1);
   }
+  else if (strcmp(command, "GET") == 0)
+  {
+    int alloc_id;
+    int client_pe;
+    sscanf(buf, "GET:%ld:%d:%d", &client_pid, &client_pe, &alloc_id);
+
+    void* ptr = hapiMemoryMap[client_pe]->memory_map[alloc_id].first;
+    cudaIpcMemHandle_t ipc_handle;
+    hapiCheck(cudaIpcGetMemHandle(&ipc_handle, ptr));
+    write(client_fd, &ipc_handle, sizeof(cudaIpcMemHandle_t));
+  }
   else if (strcmp(command, "KILL") == 0)
   {
     CmiPrintf("Server: KILL command received from client %ld\n", client_pid);
     write(client_fd, "\0", 1);
+    close(server_fd);
+
+    int cpv_my_device = CpvAccess(my_device);
+    char server_fifo[BUFFER_SIZE];
+    sprintf(server_fifo, SERVER_FIFO_TEMPLATE, cpv_my_device);
+    if (std::remove(server_fifo) == 0) {
+        CmiPrintf("File '%s' deleted successfully.\n", server_fifo);
+    } else {
+        CmiPrintf("Error deleting file '%s': %s\n", server_fifo, strerror(errno));
+    }
     exit(0);
   }
 
@@ -231,89 +261,182 @@ void hapiStartMemoryDaemon()
   {
     int& cpv_my_device = CpvAccess(my_device);
     hapiCheck(cudaSetDevice(cpv_my_device));
+    CmiBarrier();
     return;
   }
-
-  pid = fork();
-  if (pid < 0) {
-    CmiAbort("Failed to fork HAPI daemon process");
-  } else if (pid > 0) {
-    int& cpv_my_device = CpvAccess(my_device);
-    hapiCheck(cudaSetDevice(cpv_my_device));
-    // Parent process, return immediately
-    return;
-  }
-
-  // Child process, execute the server daemon
-
-  auto gpu_manager = CsvAccess(gpu_manager);
 
   int& cpv_my_device = CpvAccess(my_device);
-  printf("HAPI> Memory daemon running on PE %d, device %d\n", CmiMyPe(), cpv_my_device);
-  hapiCheck(cudaSetDevice(cpv_my_device));
 
-  //hapiMemoryMap.resize(gpu_manager.device_count_on_physical_node);
   char server_fifo_path[BUFFER_SIZE];
   sprintf(server_fifo_path, SERVER_FIFO_TEMPLATE, cpv_my_device);
   mkfifo(server_fifo_path, 0666);
 
+  // Create a ready signal FIFO for synchronization
+  char ready_fifo_path[BUFFER_SIZE];
+  sprintf(ready_fifo_path, "/tmp/daemon_ready_%d_%d", getpid(), cpv_my_device);
+  mkfifo(ready_fifo_path, 0666);
+
+  pid_t child_pid = fork();
+  if (child_pid < 0) {
+    CmiAbort("Failed to fork HAPI daemon process");
+  } else if (child_pid > 0) {
+    // Parent process: Wait for daemon to be ready
+    CmiPrintf("Parent: Waiting for daemon to be ready...\n");
+    
+    int ready_fd = open(ready_fifo_path, O_RDONLY);
+    if (ready_fd == -1) {
+      perror("Parent: open ready FIFO");
+      CmiAbort("Failed to open ready FIFO");
+    }
+    
+    char ready_signal;
+    read(ready_fd, &ready_signal, 1);
+    close(ready_fd);
+    unlink(ready_fifo_path);  // Clean up
+    
+    CmiPrintf("Parent: Daemon is ready!\n");
+    
+    int& cpv_my_device = CpvAccess(my_device);
+    hapiCheck(cudaSetDevice(cpv_my_device));
+    CmiBarrier();
+    return;
+  }
+
+  // Child process (daemon)
+  CmiPrintf("DAEMON: Starting daemon process PID=%d\n", getpid());
+  
+  // Set up the daemon's CUDA context
+  hapiCheck(cudaSetDevice(cpv_my_device));
+  
+  // Open server FIFO for reading (this may block until a writer connects)
+  CmiPrintf("DAEMON: Opening server FIFO %s\n", server_fifo_path);
+  int server_fd = open(server_fifo_path, O_RDONLY | O_NONBLOCK);
+  if (server_fd == -1) {
+    perror("DAEMON: open server FIFO");
+    exit(1);
+  }
+  
+  // Make it blocking for actual reads
+  int flags = fcntl(server_fd, F_GETFL);
+  fcntl(server_fd, F_SETFL, flags & ~O_NONBLOCK);
+  
+  // Signal parent that daemon is ready
+  int ready_fd = open(ready_fifo_path, O_WRONLY);
+  if (ready_fd == -1) {
+    perror("DAEMON: open ready FIFO for writing");
+    exit(1);
+  }
+  write(ready_fd, "1", 1);
+  close(ready_fd);
+  
+  CmiPrintf("DAEMON: Ready signal sent to parent\n");
+  
+  // Main daemon loop
   char stream_buf[STREAM_BUF_SIZE];
   size_t data_in_stream = 0;
   int bytes_read;
 
   while (1)
   {
-    int server_fd = open(server_fifo_path, O_RDONLY);
-    if (server_fd == -1) 
-    {
-      perror("open");
-      sleep(1e-6); // Wait a moment before retrying
-      continue;
-    }
+    // read() will block here until data is available
+    bytes_read = read(server_fd, stream_buf + data_in_stream, 
+                              STREAM_BUF_SIZE - data_in_stream);
 
-    while ((bytes_read = read(server_fd, stream_buf + data_in_stream, STREAM_BUF_SIZE - data_in_stream)) > 0)
+    if (bytes_read > 0)
     {
-      printf("HAPI> Read %d bytes from server FIFO\n", bytes_read);
+      CmiPrintf("DAEMON: Read %d bytes from server FIFO\n", bytes_read);
       data_in_stream += bytes_read;
+      
       if (data_in_stream >= STREAM_BUF_SIZE) {
-        CmiAbort("Stream buffer overflow");
+        CmiAbort("DAEMON: Stream buffer overflow");
       }
 
+      // Process all complete messages in the buffer
       while (1)
       {
         char* msg_end = (char*)memchr(stream_buf, '\0', data_in_stream);
-
         if (msg_end == NULL) {
-          // No complete message in the buffer, wait for more data
-          break;
+          break; // Wait for more data
         }
 
         size_t msg_len = (msg_end - stream_buf) + 1;
         char current_request[BUFFER_SIZE];
         memcpy(current_request, stream_buf, msg_len);
         
-        // Process the self-contained request
-        hapiProcessMemoryRequest(current_request);
+        // Process the request. Note: This may exit on a KILL command.
+        hapiProcessMemoryRequest(server_fd, current_request);
 
-        // "Consume" the processed message from the stream buffer by shifting the remaining data
+        // Remove processed message from buffer
         data_in_stream -= msg_len;
         memmove(stream_buf, stream_buf + msg_len, data_in_stream);
       }
     }
+    else if (bytes_read == 0)
+    {
+      // A writer closed the connection. The FIFO is still open.
+      // The next read() will block until a new writer connects.
+      // A small sleep prevents a potential tight spin-loop on misconfiguration.
+      usleep(1000);
+    }
+    else // bytes_read < 0
+    {
+      // An error occurred.
+      if (errno == EINTR) {
+        continue; // Interrupted by a signal, just try again.
+      }
+      perror("DAEMON: read from server FIFO");
+      break; // Exit on fatal error.
+    }
   }
+  
+  close(server_fd);
+  exit(0);
 
 #endif
 }
 
+int hapiGetAllocId(void* ptr) {
+  // Check if the pointer is already mapped to an allocation ID
+  auto it = hapiAllocIdMap.find(ptr);
+  if (it != hapiAllocIdMap.end()) {
+    return it->second; // Return the existing allocation ID
+  }
+  return -1; // ERROR
+}
+
+void hapiGetPtrFromAllocId(int alloc_id, void** devPtr) {
+  pid_t pid = getpid();
+
+  char client_fifo_path[BUFFER_SIZE];
+  sprintf(client_fifo_path, CLIENT_FIFO_TEMPLATE, pid);
+
+  char msg_buf[BUFFER_SIZE];
+  sprintf(msg_buf, "GET:%ld:%d:%d", pid, CkMyPe(), alloc_id);
+
+  hapiSendMemoryRequest(msg_buf);
+
+  int client_fd = open(client_fifo_path, O_RDONLY);
+  cudaIpcMemHandle_t ipc_handle;
+  read(client_fd, &ipc_handle, sizeof(ipc_handle));
+  close(client_fd);
+
+  cudaError_t err = cudaIpcOpenMemHandle(devPtr, ipc_handle, cudaIpcMemLazyEnablePeerAccess);
+
+  // track pointer to allocation ID
+  hapiAllocIdMap[*devPtr] = alloc_id;
+  hapiAllocId = std::max(hapiAllocId, alloc_id + 1);
+}
+
 void hapiExit() {
   // Ensure all PEs have finished GPU work
+  CmiPrintf("Exit called on PE %d\n", CmiMyPe());
   CmiNodeBarrier();
 
-  if (CmiPhysicalRank(CmiMyPe()) == firstRankForDevice)
+  char client_fifo_path[BUFFER_SIZE];
+  sprintf(client_fifo_path, CLIENT_FIFO_TEMPLATE, getpid());
+  
+  if (!shrinkexpand_exit && CmiPhysicalRank(CmiMyPe()) == firstRankForDevice)
   {
-    char client_fifo_path[BUFFER_SIZE];
-    sprintf(client_fifo_path, CLIENT_FIFO_TEMPLATE, getpid());
-
     char msg_buf[BUFFER_SIZE];
     sprintf(msg_buf, "KILL:%ld:0", getpid());
     hapiSendMemoryRequest(msg_buf);
@@ -323,6 +446,14 @@ void hapiExit() {
     read(client_fd, &status, sizeof(status));
     close(client_fd);
   }
+
+  // Attempt to delete the file
+  if (std::remove(client_fifo_path) == 0) {
+      CmiPrintf("File '%s' deleted successfully.\n", client_fifo_path);
+  } else {
+      CmiPrintf("Error deleting file '%s': %s\n", client_fifo_path, strerror(errno));
+  }
+  //std::remove(client_fifo_path);
 
   if (CmiMyRank() == 0) {
     shmCleanup();
@@ -1656,20 +1787,37 @@ void hapiAddCallback(cudaStream_t stream, void* cb, void* cb_msg) {
 
 void hapiSendMemoryRequest(char* msg)
 {
-  int cpv_my_device = CpvAccess(my_device);
-
-  char server_fifo[BUFFER_SIZE];
-  sprintf(server_fifo, SERVER_FIFO_TEMPLATE, cpv_my_device);
-  int server_fd = open(server_fifo, O_WRONLY);
-
-  write(server_fd, msg, strlen(msg) + 1);
-  close(server_fd);
+    int cpv_my_device = CpvAccess(my_device);
+    
+    char server_fifo[BUFFER_SIZE];
+    sprintf(server_fifo, SERVER_FIFO_TEMPLATE, cpv_my_device);
+    CmiPrintf("Sending request to %s: %s\n", server_fifo, msg);
+    
+    int server_fd = open(server_fifo, O_WRONLY | O_NONBLOCK);
+    if (server_fd == -1) {
+        perror("open server FIFO for writing");
+        return;
+    }
+    
+    ssize_t written = write(server_fd, msg, strlen(msg) + 1);
+    if (written == -1) {
+        perror("write to server FIFO");
+    } else {
+        CmiPrintf("Successfully wrote %zd bytes to server FIFO\n", written);
+    }
+    
+    close(server_fd);
 }
 
 cudaError_t hapiMalloc(void** devPtr, size_t size) {
 #ifdef CMK_SHRINK_EXPAND
+  if (_inrestart) // When loading from checkpoint, don't allocate during the pup call
+    return cudaSuccess;
+
   // send a request to the server to allocate memory
-  
+
+  CmiPrintf("[%d] Malloc called\n", CmiMyPe());
+
   pid_t pid = getpid();
 
   char client_fifo_path[BUFFER_SIZE];
@@ -1679,6 +1827,7 @@ cudaError_t hapiMalloc(void** devPtr, size_t size) {
   sprintf(msg_buf, "MALLOC:%ld:%d:%zu", pid, CkMyPe(), size);
 
   hapiSendMemoryRequest(msg_buf);
+  CmiPrintf("Request sent\n");
 
   int client_fd = open(client_fifo_path, O_RDONLY);
   cudaIpcMemHandle_t ipc_handle;
@@ -1699,6 +1848,8 @@ cudaError_t hapiMalloc(void** devPtr, size_t size) {
 cudaError_t hapiFree(void* devPtr) {
 #ifdef CMK_SHRINK_EXPAND
   // send a request to the server to free memory
+  if (shrinkexpand_exit) return cudaSuccess;
+
   pid_t pid = getpid();
 
   char client_fifo_path[BUFFER_SIZE];

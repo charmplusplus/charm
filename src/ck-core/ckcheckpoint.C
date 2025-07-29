@@ -60,7 +60,9 @@ int originalnumGroups = -1;
 extern int Cmi_isOldProcess;
 extern int Cmi_myoldpe;
 extern char *_shrinkexpand_basedir;
+bool shrinkexpand_exit = false;
 #endif
+
 
 // Required for broadcasting RO Data after recovering from failure
 #if CMK_SMP
@@ -264,6 +266,8 @@ public:
     if (inProgress) return;
     inProgress = true;
     numComplete = 0;
+
+    shrinkexpand_exit = true; // Set this flag to indicate that we are in the process of shrinking/expanding
 
     if (writersPerNode > 0) numWriters = std::min(writersPerNode, nodeSize);
 

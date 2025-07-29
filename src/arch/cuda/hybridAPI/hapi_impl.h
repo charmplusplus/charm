@@ -13,9 +13,12 @@ extern "C" {
 // Scale the amount of memory each node pins.
 #define HAPI_MEMPOOL_SCALE 1.0
 
+
 // HAPI init & exit functions
 void hapiInit(char** argv);
 void hapiStartMemoryDaemon();
+int hapiGetAllocId(void* ptr);
+void hapiGetPtrFromAllocId(int alloc_id, void** devPtr);
 void hapiExit();
 
 // Polls for GPU work completion. Does not do anything if HAPI_CUDA_CALLBACK is defined.

@@ -1613,7 +1613,7 @@ modInitObj="$modInitName.o"
 MAKE_LDXX="0"
 MAKE_LD="0"
 
-CORE_LIBS=(-lconverse "${TRACE_OBJ[@]}" -lm)
+CORE_LIBS=(-lconverse "${TRACE_OBJ[@]}" -lm -lckrescale)
 
 if [[ "$BUILD_SHARE" = '0' && "$USER_INITIATED_SHARED" = '0' ]]
 then

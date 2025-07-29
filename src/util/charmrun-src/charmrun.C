@@ -1,4 +1,5 @@
 #include "converse.h"
+#include "ckrescale.h"
 
 #include "sockRoutines.h"
 #include "sockRoutines.C"
@@ -37,6 +38,7 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+
 
 #if defined(_WIN32)
 /*Win32 has screwy names for the standard UNIX calls:*/
@@ -753,7 +755,6 @@ static char **saved_argv;
 static int saved_argc;
 static int arg_realloc_pes;
 static int arg_old_pes;
-static int arg_shrinkexpand;
 static int arg_charmrun_port;
 static const char *arg_shrinkexpand_basedir;
 #endif
@@ -961,10 +962,12 @@ static void arg_init(int argc, const char **argv)
   pparam_flag(&arg_child_charmrun, 0, "child-charmrun", "child charmrun");
 #endif
 #if CMK_SHRINK_EXPAND
+  int is_shrinkexpand = 0;
   pparam_int(&arg_realloc_pes, 1, "newp", "New number of processes to create");
   pparam_int(&arg_old_pes, 1, "oldp", "Old number of processes to create");
-  pparam_flag(&arg_shrinkexpand, 0, "shrinkexpand", "Enable shrink/expand support");
+  pparam_flag(&is_shrinkexpand, 0, "shrinkexpand", "Enable shrink/expand support");
   pparam_int(&arg_charmrun_port, 0, "charmrun_port", "Make charmrun listen on this port");
+  set_arg_shrinkexpand(is_shrinkexpand);
 #endif
   pparam_flag(&arg_interactive, 0, "interactive", "Force tty allocation for process 0 when using ssh");
   pparam_flag(&arg_usehostname, 0, "usehostname",
@@ -1056,7 +1059,7 @@ static void arg_init(int argc, const char **argv)
   if ( arg_mpiexec_no_n ) arg_mpiexec = arg_mpiexec_no_n;
 
 #if CMK_SHRINK_EXPAND
-  if (arg_shrinkexpand) {
+  if (get_arg_shrinkexpand()) {
     arg_requested_pes = arg_realloc_pes;
     //arg_nodelist = "/etc/mpi/hostfileScaled";
     //write_hostfile(arg_requested_pes);
@@ -3839,7 +3842,7 @@ static void req_client_connect(std::vector<nodetab_process> & process_table)
       if (!arg_local)
       {
 #if CMK_SHRINK_EXPAND
-        if (!arg_shrinkexpand || (arg_requested_pes > arg_old_pes))
+        if (!get_arg_shrinkexpand() || (arg_requested_pes > arg_old_pes))
 #endif
         {
           assert(!arg_mpiexec);
@@ -3860,7 +3863,7 @@ static void req_client_connect(std::vector<nodetab_process> & process_table)
     else
     {
 #if CMK_SHRINK_EXPAND
-      if (!arg_shrinkexpand)
+      if (!get_arg_shrinkexpand())
 #endif
       {
         // send nodefork packets
@@ -4182,7 +4185,7 @@ static void req_start_server(void)
   skt_ip_t ip = skt_innode_my_ip();
   server_port = 0;
 #if CMK_SHRINK_EXPAND
-  if (arg_shrinkexpand) { // Need port information
+  if (get_arg_shrinkexpand()) { // Need port information
     char *ns = getenv("NETSTART");
     if (ns != 0) { /*Read values set by Charmrun*/
       int node_num, old_charmrun_pid, port;
@@ -4462,7 +4465,7 @@ int main(int argc, const char **argv, char **envp)
 #if CMK_SHRINK_EXPAND
         //  modified rsh in shrink expand, need to launch only new ones,
         //  preserve some info between new and old
-        if (!arg_shrinkexpand || (arg_requested_pes > arg_old_pes))
+        if (!get_arg_shrinkexpand() || (arg_requested_pes > arg_old_pes))
 #endif
         {
           if (arg_mpiexec)
@@ -4525,7 +4528,7 @@ int main(int argc, const char **argv, char **envp)
 #endif
       finish_nodes(my_process_table);
 #endif
-    if (!arg_batch_spawn && arg_shrinkexpand)
+    if (!arg_batch_spawn && get_arg_shrinkexpand())
       req_client_reconnect(my_process_table);
     else if (!arg_batch_spawn)
       req_client_connect(my_process_table);
@@ -5487,7 +5490,7 @@ static void start_one_node_ssh(nodetab_process & p, const char ** argv)
 static void start_nodes_ssh(std::vector<nodetab_process> & process_table)
 {
   char **oldnodenames;
-  if (arg_shrinkexpand)
+  if (get_arg_shrinkexpand())
   {
     oldnodenames = (char **) malloc(arg_old_pes * sizeof(char *));
     parse_oldnodenames(oldnodenames);
@@ -5495,9 +5498,9 @@ static void start_nodes_ssh(std::vector<nodetab_process> & process_table)
 
   for (nodetab_process & p : process_table)
   {
-    if (arg_shrinkexpand && !isPresent(p.host->name, oldnodenames))
+    if (get_arg_shrinkexpand() && !isPresent(p.host->name, oldnodenames))
       start_one_node_ssh(p);
-    else if (!arg_shrinkexpand)
+    else if (!get_arg_shrinkexpand())
       start_one_node_ssh(p);
   }
 }

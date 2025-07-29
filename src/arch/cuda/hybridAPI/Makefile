@@ -14,9 +14,9 @@ libs: libcudahybridapi.a
 install: libcudahybridapi.a
 	cp libcudahybridapi.a $(CHARMDIR)/lib
 
-libcudahybridapi.a: hybridapi.o buddy_allocator.o
+libcudahybridapi.a: hybridapi.o buddy_allocator.o ck.o
 	-rm -f $@
-	ar q $@ hybridapi.o buddy_allocator.o
+	ar q $@ hybridapi.o buddy_allocator.o ck.o
 
 hybridapi.o: hapi_impl.cpp hapi_impl.h gpumanager.h devicemanager.h buddy_allocator.h hapi.h hapi_nvtx.h
 	$(CHARMC) $(FLAGS) $(INC) -o $@ -c $<

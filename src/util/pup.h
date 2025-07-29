@@ -267,13 +267,24 @@ class er {
 
   //For arrays:
   template<class T>
-  void operator()(T *a,size_t nItems) {
-    bytes((void *)a,nItems, sizeof(T), getXlateDataType(a));
+  void operator()(T *a, size_t nItems) {
+    bytes((void *)a, nItems, sizeof(T), getXlateDataType(a));
+  }
+
+  // Overload for T** (array of pointers)
+  template<class T>
+  void operator()(T **a, size_t nItems) {
+    bytes((void *)(*a), nItems, sizeof(T), getXlateDataType(a));
   }
 
   template<class T>
   void operator()(T *a,size_t nItems, PUPMode mode) {
     bytes((void *)a,nItems, sizeof(T), getXlateDataType(a), mode);
+  }
+
+  template<class T>
+  void operator()(T **a,size_t nItems, PUPMode mode) {
+    bytes((void **)a,nItems, sizeof(T), getXlateDataType(a), mode);
   }
 
   // Standard pup_buffer API that calls malloc for allocation on isUnpacking and free for deallocation on isPacking
@@ -334,6 +345,7 @@ class er {
   // and data type t from p.  Desc describes the data item
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t) =0;
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t,PUPMode mode) =0;
+  virtual void bytes(void **p,size_t n,size_t itemSize,dataType t,PUPMode mode) =0;
   virtual void object(able** a);
 
   virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t) = 0;
@@ -405,6 +417,9 @@ class sizer : public er {
   //Generic bottleneck: n items of size itemSize
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t, PUPMode mode);
+  virtual void bytes(void **p,size_t n,size_t itemSize,dataType t, PUPMode mode) {
+    bytes((void *)*p, n, itemSize, t, mode);
+  };
 
   virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t);
   virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
@@ -482,6 +497,9 @@ class toMem : public mem {
   //Generic bottleneck: pack n items of size itemSize from p.
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t, PUPMode mode);
+  virtual void bytes(void **p,size_t n,size_t itemSize,dataType t, PUPMode mode) {
+    bytes((void *)*p, n, itemSize, t, mode);
+  };
 
   virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t);
   virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
@@ -524,6 +542,9 @@ class fromMem : public mem {
   //Generic bottleneck: unpack n items of size itemSize from p.
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t, PUPMode mode);
+  virtual void bytes(void **p,size_t n,size_t itemSize,dataType t, PUPMode mode) {
+    bytes((void *)*p, n, itemSize, t, mode);
+  };
 
   virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t);
   virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
@@ -585,7 +606,10 @@ class toDisk : public disk {
  protected:
   //Generic bottleneck: pack n items of size itemSize from p.
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
-  virtual void bytes(void *p,size_t n,size_t itemSize,dataType t,PUPMode mode) {}
+  virtual void bytes(void *p,size_t n,size_t itemSize,dataType t,PUPMode mode);
+  virtual void bytes(void **p,size_t n,size_t itemSize,dataType t, PUPMode mode) {
+    bytes((void *)*p, n, itemSize, t, mode);
+  };
 
   virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t);
   virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
@@ -608,6 +632,7 @@ class fromDisk : public disk {
   //Generic bottleneck: unpack n items of size itemSize from p.
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t,PUPMode mode) {}
+  virtual void bytes(void **p,size_t n,size_t itemSize,dataType t, PUPMode mode);
 
   virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t);
   virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
@@ -640,6 +665,9 @@ class toTextUtil : public er {
  protected:
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t,PUPMode mode) {}
+  virtual void bytes(void **p,size_t n,size_t itemSize,dataType t, PUPMode mode) {
+    bytes((void *)*p, n, itemSize, t, mode);
+  };
 
   virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t);
   virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
@@ -680,6 +708,9 @@ class toTextFile : public er {
   FILE *f;
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t,PUPMode mode) {}
+  virtual void bytes(void **p,size_t n,size_t itemSize,dataType t, PUPMode mode) {
+    bytes((void *)*p, n, itemSize, t, mode);
+  };
 
   virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t);
   virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
@@ -702,6 +733,9 @@ class fromTextFile : public er {
   
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t,PUPMode mode) {}
+  virtual void bytes(void **p,size_t n,size_t itemSize,dataType t, PUPMode mode) {
+    bytes((void *)*p, n, itemSize, t, mode);
+  };
 
   virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t);
   virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
@@ -791,6 +825,9 @@ class xlater : public wrap_er {
   //Generic bottleneck: unpack n items of size itemSize from p.
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t,PUPMode mode) {}
+  virtual void bytes(void **p,size_t n,size_t itemSize,dataType t, PUPMode mode) {
+    bytes((void *)*p, n, itemSize, t, mode);
+  };
 
   virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t);
   virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
