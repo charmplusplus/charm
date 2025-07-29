@@ -15,7 +15,7 @@
 #define BOTTOM 4
 #define DIVIDEBY5 0.2
 
-#define USE_CUSTOM_MAP 1 // Should be set to 1 to use GPU handler PEs
+#define USE_CUSTOM_MAP 0 // Should be set to 1 to use GPU handler PEs
 
 /* readonly */ CProxy_Main mainProxy;
 /* readonly */ int grid_x;

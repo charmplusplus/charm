@@ -32,9 +32,6 @@
 extern "C" double CmiWallTimer();
 #endif
 
-extern bool shrinkexpand_exit;
-extern bool _inrestart;
-
 static void createPool(int *nbuffers, int n_slots, std::vector<BufferPool> &pools);
 static void releasePool(std::vector<BufferPool> &pools);
 
@@ -434,8 +431,8 @@ void hapiExit() {
 
   char client_fifo_path[BUFFER_SIZE];
   sprintf(client_fifo_path, CLIENT_FIFO_TEMPLATE, getpid());
-  
-  if (!shrinkexpand_exit && CmiPhysicalRank(CmiMyPe()) == firstRankForDevice)
+
+  if (!get_shrinkexpand_exit() && CmiPhysicalRank(CmiMyPe()) == firstRankForDevice)
   {
     char msg_buf[BUFFER_SIZE];
     sprintf(msg_buf, "KILL:%ld:0", getpid());
@@ -447,13 +444,15 @@ void hapiExit() {
     close(client_fd);
   }
 
-  // Attempt to delete the file
-  if (std::remove(client_fifo_path) == 0) {
-      CmiPrintf("File '%s' deleted successfully.\n", client_fifo_path);
-  } else {
-      CmiPrintf("Error deleting file '%s': %s\n", client_fifo_path, strerror(errno));
+  if (!get_shrinkexpand_exit())
+  {
+    // Attempt to delete the file
+    if (std::remove(client_fifo_path) == 0) {
+        CmiPrintf("File '%s' deleted successfully.\n", client_fifo_path);
+    } else {
+        CmiPrintf("Error deleting file '%s': %s\n", client_fifo_path, strerror(errno));
+    }
   }
-  //std::remove(client_fifo_path);
 
   if (CmiMyRank() == 0) {
     shmCleanup();
@@ -1811,7 +1810,7 @@ void hapiSendMemoryRequest(char* msg)
 
 cudaError_t hapiMalloc(void** devPtr, size_t size) {
 #ifdef CMK_SHRINK_EXPAND
-  if (_inrestart) // When loading from checkpoint, don't allocate during the pup call
+  if (get_in_restart()) // When loading from checkpoint, don't allocate during the pup call
     return cudaSuccess;
 
   // send a request to the server to allocate memory
@@ -1848,7 +1847,7 @@ cudaError_t hapiMalloc(void** devPtr, size_t size) {
 cudaError_t hapiFree(void* devPtr) {
 #ifdef CMK_SHRINK_EXPAND
   // send a request to the server to free memory
-  if (shrinkexpand_exit) return cudaSuccess;
+  if (get_shrinkexpand_exit()) return cudaSuccess;
 
   pid_t pid = getpid();
 

@@ -65,6 +65,7 @@ never be excluded...
 
 #include "ckcheckpoint.h"
 #include "ck.h"
+#include "ckrescale.h"
 #include "trace.h"
 #include "ckrdma.h"
 #include "CkCheckpoint.decl.h"
@@ -775,7 +776,7 @@ static inline void _processBufferedBocInits(void)
     envelope *env = inits[i];
     if(env==0) {
 #if CMK_SHRINK_EXPAND
-      if(_inrestart){
+      if(get_in_restart()){
         CkPrintf("_processBufferedBocInits: empty message in restart, ignoring\n");
         break;
       }

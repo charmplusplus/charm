@@ -20,6 +20,7 @@ using std::ostringstream;
 #include <cstring>
 #include "charm++.h"
 #include "ck.h"
+#include "ckrescale.h"
 #include "ckcheckpoint.h"
 #include "CkCheckpoint.decl.h"
 
@@ -50,7 +51,6 @@ struct GroupInfo
   }
 };
 
-bool _inrestart = false;
 bool _restarted = false;
 int _oldNumPes = 0;
 bool _chareRestored = false;
@@ -60,7 +60,6 @@ int originalnumGroups = -1;
 extern int Cmi_isOldProcess;
 extern int Cmi_myoldpe;
 extern char *_shrinkexpand_basedir;
-bool shrinkexpand_exit = false;
 #endif
 
 
@@ -267,7 +266,7 @@ public:
     inProgress = true;
     numComplete = 0;
 
-    shrinkexpand_exit = true; // Set this flag to indicate that we are in the process of shrinking/expanding
+    set_shrinkexpand_exit(true); // Set this flag to indicate that we are in the process of shrinking/expanding
 
     if (writersPerNode > 0) numWriters = std::min(writersPerNode, nodeSize);
 
@@ -955,7 +954,7 @@ void CkRecvGroupROData(char* msg)
       //}
 	}
 
-  _inrestart = false;
+  set_in_restart(false);
 
   if (CmiMyRank()==0) _initDone();  // this rank will trigger other ranks
 
@@ -984,7 +983,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 	int i;
 	
   if (CmiMyRank() == 0) {
-    _inrestart = true;
+    set_in_restart(true);
     _restarted = true;
     CkMemCheckPT::inRestarting = true;
   }
@@ -1055,7 +1054,7 @@ void CkResumeRestartMain(char * msg) {
   int i;
   char filename[1024];
   const char * dirname = "";
-  _inrestart = true;
+  set_in_restart(true);
   _restarted = true;
   CkMemCheckPT::inRestarting = true;
   CmiPrintf("[%d]CkResumeRestartMain: Inside Resume Restart\n",CkMyPe());
@@ -1083,7 +1082,7 @@ void CkResumeRestartMain(char * msg) {
     CmiFclose(datFile);
   }
   _initDone();
-  _inrestart = false;
+  set_in_restart(false);
   CkMemCheckPT::inRestarting = false;
   if(CkMyPe()==0) {
     CmiPrintf("[%d]CkResumeRestartMain done. sending out callback.\n",CkMyPe());
