@@ -32,6 +32,8 @@
 extern "C" double CmiWallTimer();
 #endif
 
+extern int Cmi_isOldProcess;
+
 static void createPool(int *nbuffers, int n_slots, std::vector<BufferPool> &pools);
 static void releasePool(std::vector<BufferPool> &pools);
 
@@ -140,7 +142,7 @@ void hapiInit(char** argv) {
     hapiMapping(argv); // Perform PE-device mapping
 
 #if CMK_SHRINK_EXPAND
-    if(!get_arg_shrinkexpand())
+    if(!Cmi_isOldProcess)
 #endif
       hapiStartMemoryDaemon();
 
