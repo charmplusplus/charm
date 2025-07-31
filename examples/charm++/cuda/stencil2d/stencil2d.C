@@ -258,14 +258,14 @@ class Stencil : public CBase_Stencil {
   int neighbors;
   int remote_count;
 
-  float* __restrict__ temperature;
-  float* __restrict__ new_temperature;
-  float* __restrict__ d_temperature;
-  float* __restrict__ d_new_temperature;
-  float* __restrict__ left_ghost;
-  float* __restrict__ right_ghost;
-  float* __restrict__ bottom_ghost;
-  float* __restrict__ top_ghost;
+  float*  temperature;
+  float*  new_temperature;
+  float*  d_temperature;
+  float*  d_new_temperature;
+  float*  left_ghost;
+  float*  right_ghost;
+  float*  bottom_ghost;
+  float*  top_ghost;
 
   cudaStream_t stream;
 
@@ -341,8 +341,8 @@ class Stencil : public CBase_Stencil {
 
     //p(temperature, (block_x + 2) * (block_y + 2));
     //p(new_temperature, (block_x + 2) * (block_y + 2));
-    p(d_temperature, (block_x + 2) * (block_y + 2), PUP::PUPMode::DEVICE);
-    p(d_new_temperature, (block_x + 2) * (block_y + 2), PUP::PUPMode::DEVICE);
+    p(&d_temperature, (block_x + 2) * (block_y + 2), PUP::PUPMode::DEVICE);
+    p(&d_new_temperature, (block_x + 2) * (block_y + 2), PUP::PUPMode::DEVICE);
     p(left_ghost, block_y);
     p(right_ghost, block_y);
     p(bottom_ghost, block_x);
