@@ -274,7 +274,7 @@ class er {
   // Overload for T** (array of pointers)
   template<class T>
   void operator()(T **a, size_t nItems) {
-    bytes((void *)(*a), nItems, sizeof(T), getXlateDataType(a));
+    bytes((void *)(*a), nItems, sizeof(T), getXlateDataType(*a));
   }
 
   template<class T>
@@ -284,7 +284,7 @@ class er {
 
   template<class T>
   void operator()(T **a,size_t nItems, PUPMode mode) {
-    bytes((void **)a,nItems, sizeof(T), getXlateDataType(a), mode);
+    bytes((void **)a,nItems, sizeof(T), getXlateDataType(*a), mode);
   }
 
   // Standard pup_buffer API that calls malloc for allocation on isUnpacking and free for deallocation on isPacking
