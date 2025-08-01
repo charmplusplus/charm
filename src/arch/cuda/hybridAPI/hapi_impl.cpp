@@ -143,10 +143,12 @@ void hapiInit(char** argv) {
 
 #if CMK_SHRINK_EXPAND
     if(!Cmi_isOldProcess)
-#endif
       hapiStartMemoryDaemon();
-
     CmiBarrier();
+#else
+    int& cpv_my_device = CpvAccess(my_device);
+    hapiCheck(cudaSetDevice(cpv_my_device));
+#endif
 
 #ifndef HAPI_CUDA_CALLBACK
     // Register polling function to be invoked at every scheduler loop
@@ -249,11 +251,12 @@ void hapiProcessMemoryRequest(int server_fd, char* buf)
 
 void hapiStartMemoryDaemon()
 {
-#ifdef CMK_SHRINK_EXPAND
+#if CMK_SHRINK_EXPAND
   // start client FIFO
   long pid = getpid();
   char client_fifo_path[BUFFER_SIZE];
   sprintf(client_fifo_path, CLIENT_FIFO_TEMPLATE, pid);
+  std::remove(client_fifo_path);
   mkfifo(client_fifo_path, 0666);
 
   if (CmiPhysicalRank(CmiMyPe()) != firstRankForDevice)
@@ -268,11 +271,13 @@ void hapiStartMemoryDaemon()
 
   char server_fifo_path[BUFFER_SIZE];
   sprintf(server_fifo_path, SERVER_FIFO_TEMPLATE, cpv_my_device);
+  std::remove(server_fifo_path);
   mkfifo(server_fifo_path, 0666);
 
   // Create a ready signal FIFO for synchronization
   char ready_fifo_path[BUFFER_SIZE];
   sprintf(ready_fifo_path, "/tmp/daemon_ready_%d_%d", getpid(), cpv_my_device);
+  std::remove(ready_fifo_path);
   mkfifo(ready_fifo_path, 0666);
 
   pid_t child_pid = fork();
@@ -431,6 +436,7 @@ void hapiExit() {
   CmiPrintf("Exit called on PE %d\n", CmiMyPe());
   CmiNodeBarrier();
 
+#if CMK_SHRINK_EXPAND
   char client_fifo_path[BUFFER_SIZE];
   sprintf(client_fifo_path, CLIENT_FIFO_TEMPLATE, getpid());
 
@@ -455,6 +461,7 @@ void hapiExit() {
         CmiPrintf("Error deleting file '%s': %s\n", client_fifo_path, strerror(errno));
     }
   }
+#endif
 
   if (CmiMyRank() == 0) {
     shmCleanup();
@@ -1811,7 +1818,7 @@ void hapiSendMemoryRequest(char* msg)
 }
 
 cudaError_t hapiMalloc(void** devPtr, size_t size) {
-#ifdef CMK_SHRINK_EXPAND
+#if CMK_SHRINK_EXPAND
   if (get_in_restart()) // When loading from checkpoint, don't allocate during the pup call
     return cudaSuccess;
 
@@ -1847,7 +1854,7 @@ cudaError_t hapiMalloc(void** devPtr, size_t size) {
 }
 
 cudaError_t hapiFree(void* devPtr) {
-#ifdef CMK_SHRINK_EXPAND
+#if CMK_SHRINK_EXPAND
   // send a request to the server to free memory
   if (get_shrinkexpand_exit()) return cudaSuccess;
 

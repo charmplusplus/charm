@@ -1061,12 +1061,17 @@ void CentralLB::ProcessReceiveMigration()
 
 void CentralLB::CheckForLB() {
   //sleep(5);
+#if CMK_SHRINK_EXPAND
   if (pending_realloc_state == EXPAND_MSG_RECEIVED)
     CheckForRealloc();
   else if (pending_realloc_state == NO_REALLOC)
     thisProxy.ResumeClients(0);
   else
     thisProxy.CallLB();
+#else
+  // if we are not in shrink/expand mode, just call LB
+  thisProxy.CallLB();
+#endif
   //else
   //  thisProxy.ResumeClients(0);
 }
