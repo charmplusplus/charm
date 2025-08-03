@@ -4528,8 +4528,11 @@ int main(int argc, const char **argv, char **envp)
 #endif
       finish_nodes(my_process_table);
 #endif
-    if (!arg_batch_spawn && arg_shrinkexpand)
-      req_client_reconnect(my_process_table);
+    if (!arg_batch_spawn)
+#if CMK_SHRINK_EXPAND
+      if (arg_shrinkexpand)
+#endif
+        req_client_reconnect(my_process_table);
     else if (!arg_batch_spawn)
       req_client_connect(my_process_table);
   }
