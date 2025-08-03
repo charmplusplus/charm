@@ -276,11 +276,13 @@ public:
     this->cb = cb;
     this->requestStatus = requestStatus;
 
+#if CMK_SHRINK_EXPAND
     if (CkMyPe() != 0)
     {
       se_avail_vector = (char*) malloc(CkNumPes() * sizeof(char));
       memcpy(se_avail_vector, avail.data(), CkNumPes() * sizeof(char));
     }
+#endif
 
     for (index = firstPE; index < firstPE + numWriters; index++)
       CProxy_CkCheckpointMgr(_sysChkptMgr)[index].Checkpoint(dirname, cb, requestStatus);
@@ -323,10 +325,18 @@ public:
 
 // broadcast
 void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _requestStatus){
+#if CMK_SHRINK_EXPAND
   std::vector<char> avail(se_avail_vector, se_avail_vector + CkNumPes());
   int myNewPe = GetNewPeNumber(avail);
+#else
+  int myNewPe = CkMyPe();
+#endif
 	chkptStartTimer = CmiWallTimer();
-  if (avail[CkMyPe()]) {
+  
+#if CMK_SHRINK_EXPAND
+  if (avail[CkMyPe()])
+#endif
+  {
     requestStatus = _requestStatus;
     // make dir on all PEs in case it is a local directory
     CmiMkdir(dirname);
@@ -862,6 +872,7 @@ void CkStartCheckpoint(const char* dirname, const CkCallback& cb, bool requestSt
 void CkStartRescaleCheckpoint(const char* dirname, const CkCallback& cb, 
   std::vector<char> avail, bool requestStatus, int writersPerNode)
 {
+#if CMK_SHRINK_EXPAND
   if (CkMyPe() != 0)
   {
     CkPrintf("[%d] se_avail_vector copied\n", CkMyPe());
@@ -880,6 +891,7 @@ void CkStartRescaleCheckpoint(const char* dirname, const CkCallback& cb,
   // hand over to checkpoint managers for per-processor checkpointing
   CProxy_CkCheckpointWriteMgr(_sysChkptWriteMgr)
       .RescaleCheckpoint(dirname, cb, avail, requestStatus, writersPerNode);
+#endif
 }
 
 /**
@@ -979,6 +991,7 @@ void CkRecvGroupROData(char* msg)
 }
 
 void CkRestartMain(const char* dirname, CkArgMsg *args){
+#if CMK_SHRINK_EXPAND
   chkptStartTimer = CmiWallTimer();
 	int i;
 	
@@ -1046,6 +1059,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
   }
 
    	//_initDone();
+#endif
 }
 
 #if CMK_SHRINK_EXPAND
