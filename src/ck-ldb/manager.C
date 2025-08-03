@@ -26,6 +26,7 @@ bool load_balancer_created;
 
 void realloc(char* reallocMsg)
 {
+#if CMK_SHRINK_EXPAND
     numProcessAfterRestart = *((int *)reallocMsg);
     reallocMsg += sizeof(int);
     int numBits = *((int *)reallocMsg);
@@ -97,6 +98,7 @@ void realloc(char* reallocMsg)
         free(new_bitmap);
         free(old_bitmap);
     }
+#endif
 }
 
 static void handler(char *bit_map)

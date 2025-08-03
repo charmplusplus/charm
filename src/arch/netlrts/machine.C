@@ -654,7 +654,11 @@ static void parse_netstart(void)
   int port;
   ns = getenv("NETSTART");
   int dummy;
+#if CMK_SHRINK_EXPAND
   int* ptr = Cmi_isOldProcess == 1 ? &dummy : &Lrts_myNode;
+#else
+  int* ptr = &Lrts_myNode;
+#endif
   if (ns!=0) 
   {/*Read values set by Charmrun*/
         char Cmi_charmrun_name[1024];
