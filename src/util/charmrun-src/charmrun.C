@@ -5490,6 +5490,7 @@ static void start_one_node_ssh(nodetab_process & p, const char ** argv)
 static void start_nodes_ssh(std::vector<nodetab_process> & process_table)
 {
   char **oldnodenames;
+#if CMK_SHRINK_EXPAND
   if (arg_shrinkexpand)
   {
     oldnodenames = (char **) malloc(arg_old_pes * sizeof(char *));
@@ -5503,6 +5504,12 @@ static void start_nodes_ssh(std::vector<nodetab_process> & process_table)
     else if (!arg_shrinkexpand)
       start_one_node_ssh(p);
   }
+#else
+  for (nodetab_process & p : process_table)
+  {
+    start_one_node_ssh(p);
+  }
+#endif
 }
 
 /* for mpiexec, for once calling mpiexec to start on all nodes  */
