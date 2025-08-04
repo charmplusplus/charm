@@ -34,6 +34,8 @@ extern "C" double CmiWallTimer();
 
 extern int Cmi_isOldProcess;
 
+extern int CmiSetCPUAffinityLogical(int core);
+
 static void createPool(int *nbuffers, int n_slots, std::vector<BufferPool> &pools);
 static void releasePool(std::vector<BufferPool> &pools);
 
@@ -284,6 +286,7 @@ void hapiStartMemoryDaemon()
   if (child_pid < 0) {
     CmiAbort("Failed to fork HAPI daemon process");
   } else if (child_pid > 0) {
+    CmiSetCPUAffinityLogical(CmiNumPesOnPhysicalNode());
     // Parent process: Wait for daemon to be ready
     CmiPrintf("Parent: Waiting for daemon to be ready...\n");
     
