@@ -9,6 +9,7 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <sched.h>
 
 #define CUDA_API_PER_THREAD_DEFAULT_STREAM
 #include <cuda_runtime.h>
@@ -282,6 +283,9 @@ void hapiStartMemoryDaemon()
   std::remove(ready_fifo_path);
   mkfifo(ready_fifo_path, 0666);
 
+  int current_cpu = sched_getcpu();
+  CmiPrintf("PE %i: Current CPU is %d\n", CmiMyPe(), current_cpu);
+
   pid_t child_pid = fork();
   if (child_pid < 0) {
     CmiAbort("Failed to fork HAPI daemon process");
@@ -291,6 +295,10 @@ void hapiStartMemoryDaemon()
     } else {
       CmiPrintf("Parent: Failed to set CPU affinity.\n");
     }
+
+    int current_cpu = sched_getcpu();
+    CmiPrintf("Daemon: Current CPU is %d\n", current_cpu);
+
     // Parent process: Wait for daemon to be ready
     CmiPrintf("Parent: Waiting for daemon to be ready...\n");
     
