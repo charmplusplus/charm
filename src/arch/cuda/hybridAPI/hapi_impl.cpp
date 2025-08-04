@@ -286,7 +286,11 @@ void hapiStartMemoryDaemon()
   if (child_pid < 0) {
     CmiAbort("Failed to fork HAPI daemon process");
   } else if (child_pid > 0) {
-    CmiSetCPUAffinityLogical(CmiNumPesOnPhysicalNode(CmiPhysicalNodeID(CmiMyPe())));
+    if (CmiSetCPUAffinityLogical(CmiNumPesOnPhysicalNode(CmiPhysicalNodeID(CmiMyPe()))) != -1) {
+      CmiPrintf("Parent: CPU affinity set successfully.\n");
+    } else {
+      CmiPrintf("Parent: Failed to set CPU affinity.\n");
+    }
     // Parent process: Wait for daemon to be ready
     CmiPrintf("Parent: Waiting for daemon to be ready...\n");
     
