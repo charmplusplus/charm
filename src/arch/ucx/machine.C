@@ -30,6 +30,12 @@
 #include "runtime-pmix.C"
 #endif
 
+#if CMK_SHRINK_EXPAND
+extern int numProcessAfterRestart;
+CcsDelayedReply shrinkExpandreplyToken;
+extern char *_shrinkexpand_basedir;
+#endif
+
 #define CmiSetMsgSize(msg, sz)    ((((CmiMsgHeaderBasic *)msg)->size) = (sz))
 
 #define UCX_MSG_PROBE_THRESH            32768
@@ -853,7 +859,7 @@ void ConverseCleanup(void)
       snprintf(temp2, sizeof(temp2), "%d", numProcessAfterRestart);
       ret[process_idx + 1] = temp2;
     } else {
-      CkAbort("ConverseCleanup: cannot find +p argument");
+      CmiAbort("ConverseCleanup: cannot find +p argument");
     }
 
     free(Cmi_argvcopy);

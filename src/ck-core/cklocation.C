@@ -2976,7 +2976,13 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   PUP::sizer p(PUP::er::IS_MIGRATION);
   pupElementsFor(p, rec, CkElementCreation_migrate);
   bufSize = p.size();
+
+#if CMK_CUDA
   gpuBufSize = p.gpu_size();
+#else
+  gpuBufSize = 0;
+#endif
+
 #if CMK_ERROR_CHECKING
   if (bufSize > std::numeric_limits<int>::max())
   {
@@ -3016,8 +3022,10 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 
   DEBM((AA "Migrated index size %s to %d \n" AB, idx2str(idx), toPe));
 
+#if CMK_CUDA
   if (gpuBufSize > 0)
     thisProxy[toPe].immigrateGPU(msg->id, gpuBufSize, CkDeviceBuffer(gpuMsg, gpuBufSize));
+#endif
   thisProxy[toPe].immigrate(msg);
 
   duringMigration = true;
@@ -3052,6 +3060,7 @@ void CkLocMgr::metaLBCallLB(CkLocRec* rec)
 }
 #endif
 
+#if CMK_CUDA
 void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char* &data, CkDeviceBufferPost* post)
 {
   cudaMalloc(&data, size);
@@ -3070,6 +3079,7 @@ void CkLocMgr::immigrateGPU(CmiUInt8 id, int size, char* data)
     bufferedHostMigrateMsgs.erase(id);
   }
 }
+#endif
 
 /**
   Migrating array element is arriving on this processor.
@@ -3147,7 +3157,9 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
   }
 
   delete msg;
+#if CMK_CUDA
   cudaFree(gpuMsg);
+#endif
 }
 
 void CkLocMgr::restore(const CkArrayIndex& idx, CmiUInt8 id, PUP::er& p)

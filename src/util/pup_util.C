@@ -23,9 +23,11 @@ virtual functions are defined here.
 #include "pup.h"
 #include "ckhashtable.h"
 
+#if CMK_CUDA
 #include <cuda_runtime.h>
 #include <cuda.h>
 #include "hapi_impl.h"
+#endif
 
 #include "conv-rdma.h"
 #if defined(_WIN32)
@@ -202,8 +204,10 @@ void PUP::toMem::bytes(void *p,size_t n,size_t itemSize,dataType t, PUPMode mode
   {
     //CmiPrintf("[%d] Copying %zu bytes from p=%p to GPU buffer\n", CmiMyPe(), n, p);
     // For GPU mode, we assume p is a device pointer and copy directly
+#if CMK_CUDA
     cudaMemcpy((void *)gpuBuf, p, n, cudaMemcpyDeviceToDevice);
-    gpuBuf += n;
+     gpuBuf += n;
+#endif
   }
 }
 
@@ -223,8 +227,10 @@ void PUP::fromMem::bytes(void *p,size_t n,size_t itemSize,dataType t, PUPMode mo
   else
   {
     //CmiPrintf("[%d] Copying %zu bytes from GPU buffer to p=%p\n", CmiMyPe(), n, p);
+#if CMK_CUDA
     cudaMemcpy(p, (const void *)gpuBuf, n, cudaMemcpyDeviceToDevice);
     gpuBuf += n;
+#endif
   }
 }
 

@@ -698,8 +698,10 @@ public:
 
   // Communication:
   void immigrate(CkArrayElementMigrateMessage* msg);
+#if CMK_CUDA
   void immigrateGPU(CmiUInt8& id, int& size, char* &data, CkDeviceBufferPost* post);
   void immigrateGPU(CmiUInt8 id, int size, char* data);
+#endif
   void requestLocation(CmiUInt8 id);
   void requestLocation(const CkArrayIndex& idx);
   bool requestLocation(const CkArrayIndex& idx, int peToTell);
