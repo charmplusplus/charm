@@ -32,7 +32,6 @@
 
 #if CMK_SHRINK_EXPAND
 extern int numProcessAfterRestart;
-CcsDelayedReply shrinkExpandreplyToken;
 extern char *_shrinkexpand_basedir;
 #endif
 
@@ -798,7 +797,7 @@ void ConverseCleanup(void)
 #endif
   ConverseCommonExit();               /* should be called by every rank */
   CmiNodeBarrier();        /* single node SMP, make sure every rank is done */
-  if (CmiMyRank()==0) CmiStdoutFlush();
+  //if (CmiMyRank()==0) CmiStdoutFlush();
 
   if (CmiMyPe() == 0) {
     // launch charmrun here

@@ -2992,7 +2992,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 #endif
 
 
-  void* gpuMsg;
+  void* gpuMsg = nullptr;
   // Allocate and pack into message
   CkArrayElementMigrateMessage* msg =
       new (bufSize, 0) CkArrayElementMigrateMessage(idx, id,
@@ -3006,7 +3006,8 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
                                                     gpuBufSize > 0);
 
   {
-    cudaMalloc(&gpuMsg, gpuBufSize);
+    if (gpuBufSize > 0)
+      cudaMalloc(&gpuMsg, gpuBufSize);
     PUP::toMem p(msg->packData, gpuMsg, PUP::er::IS_MIGRATION);
     p.becomeDeleting();
     pupElementsFor(p, rec, CkElementCreation_migrate);

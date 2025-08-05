@@ -74,8 +74,6 @@ class bar {
 #endif
 #endif
 
-#define CMK_GPU_PUP 1
-
 //We need CkMigrateMessage only to distinguish the migration
 // constructor from all other constructors-- the type
 // itself has no meaningful fields.
@@ -447,19 +445,13 @@ class mem : public er { //Memory-buffer packers and unpackers
  protected:
   myByte *origBuf;//Start of memory buffer
   myByte *buf;//Memory buffer (stuff gets packed into/out of here)
-#ifdef CMK_GPU_PUP
   myByte *gpuBuf;
   myByte *gpuOrigBuf;
-#endif
   mem(const unsigned int type, myByte* Nbuf, 
-#ifdef CMK_GPU_PUP
     myByte* gpuNbuf,
-#endif
     const unsigned int purpose = 0)
       : er(type | purpose), origBuf(Nbuf), buf(Nbuf)
-#ifdef CMK_GPU_PUP
       , gpuOrigBuf(gpuNbuf), gpuBuf(gpuNbuf)
-#endif
   {
     CmiAssert((purpose & TYPE_MASK) == 0);
   }
@@ -507,23 +499,17 @@ class toMem : public mem {
  public:
   //Write data to the given buffer
   toMem(void* Nbuf, 
-#ifdef CMK_GPU_PUP
     void* gpuNbuf,
-#endif
     const unsigned int purpose = 0, int state = IS_PACKING)
       : mem(state, (myByte*)Nbuf,
-#ifdef CMK_GPU_PUP
       (myByte*)gpuNbuf,
-#endif 
       purpose)
   {
   }
 
   toMem(void* Nbuf, const unsigned int purpose = 0, int state = IS_PACKING)
       : mem(state, (myByte*)Nbuf, 
-#ifdef CMK_GPU_PUP
       nullptr,
-#endif
       purpose)
   {
   }
@@ -553,23 +539,17 @@ class fromMem : public mem {
 
  public:
   fromMem(const void* Nbuf, 
-#ifdef CMK_GPU_PUP
     const void* gpuNbuf,
-#endif
     const unsigned int purpose = 0, int state = IS_UNPACKING)
       : mem(state, (myByte*)Nbuf,
-#ifdef CMK_GPU_PUP
       (myByte*)gpuNbuf,
-#endif 
       purpose)
   {
   }
 
   fromMem(const void* Nbuf, const unsigned int purpose = 0, int state = IS_UNPACKING)
       : mem(state, (myByte*)Nbuf, 
-#ifdef CMK_GPU_PUP
       nullptr,
-#endif
       purpose)
   {
   }
