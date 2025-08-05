@@ -839,6 +839,7 @@ void ConverseCleanup(void)
 
   if (get_shrinkexpand_exit() && CmiMyPe() == 0) {
     // launch charmrun here
+    CmiBarrier();
     LrtsCleanup();
 
     // child process
@@ -892,6 +893,9 @@ void ConverseCleanup(void)
 
   } else {
     // kill all other processes
+    CmiBarrier();
+    printf("Exiting PE %d\n", CmiMyPe());
+    fflush(stdout);
     LrtsExit();
   }
 }
