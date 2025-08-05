@@ -58,7 +58,6 @@ double chkptStartTimer = 0;
 #if CMK_SHRINK_EXPAND
 int originalnumGroups = -1;
 extern int Cmi_isOldProcess;
-extern int Cmi_myoldpe;
 extern char *_shrinkexpand_basedir;
 #endif
 
@@ -1067,44 +1066,6 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 // NOTE - This function doesn't appear to be called anywhere
 // after resume and getting message
 void CkResumeRestartMain(char * msg) {
-  int i;
-  char filename[1024];
-  const char * dirname = "";
-  set_in_restart(true);
-  _restarted = true;
-  CkMemCheckPT::inRestarting = true;
-  CmiPrintf("[%d]CkResumeRestartMain: Inside Resume Restart\n",CkMyPe());
-  CmiPrintf("[%d]CkResumeRestartMain: Group restored %d\n",CkMyPe(), CkpvAccess(_numGroups)-1);
-
-  int _numPes = -1;
-  if(CkMyPe()!=0) {
-    PUP::fromMem pRO((char *)(msg+CmiMsgHeaderSizeBytes+2*sizeof(int)), PUP::er::IS_CHECKPOINT);
-
-    CkPupROData(pRO);
-    CmiPrintf("[%d]CkRestartMain: readonlys restored\n",CkMyPe());
-
-    CkPupGroupData(pRO);
-    CmiPrintf("[%d]CkResumeRestartMain: Group restored %d\n",CkMyPe(), CkpvAccess(_numGroups)-1);
-  }
-
-  CmiFree(msg);
-  CmiNodeBarrier();
-  if(Cmi_isOldProcess) {
-    /* CmiPrintf("[%d] For shrinkexpand newpe=%d, oldpe=%d \n",Cmi_myoldpe, CkMyPe(), Cmi_myoldpe); */
-    // non-shrink files would be empty since LB would take care
-    FILE *datFile = openCheckpointFile(dirname, "arr", "rb", Cmi_myoldpe);
-    PUP::fromDisk  p(datFile, PUP::er::IS_CHECKPOINT);
-    CkPupArrayElementsData(p);
-    CmiFclose(datFile);
-  }
-  _initDone();
-  set_in_restart(false);
-  CkMemCheckPT::inRestarting = false;
-  if(CkMyPe()==0) {
-    CmiPrintf("[%d]CkResumeRestartMain done. sending out callback.\n",CkMyPe());
-    CkPrintf("Restart from shared memory  finished in %fs, sending out the cb...\n", CmiWallTimer() - chkptStartTimer);
-    globalCb.send();
-  }
 }
 
 int GetNewPeNumber(std::vector<char> avail){

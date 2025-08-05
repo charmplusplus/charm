@@ -33,6 +33,7 @@
 #if CMK_SHRINK_EXPAND
 extern int numProcessAfterRestart;
 extern char *_shrinkexpand_basedir;
+int mynewpe=0;
 #endif
 
 #define CmiSetMsgSize(msg, sz)    ((((CmiMsgHeaderBasic *)msg)->size) = (sz))
