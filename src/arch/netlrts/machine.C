@@ -598,7 +598,6 @@ int    Cmi_isOldProcess = 0; // means this process was already there
 static int    Cmi_mynewpe = 0;
 static int    Cmi_oldpe = 0;
 static int    Cmi_newnumnodes = 0;
-int    Cmi_myoldpe = 0;
 static int Cmi_charmrun_assigned_pe;
 #endif
 
@@ -675,11 +674,6 @@ static void parse_netstart(void)
     
 #if CMK_SHRINK_EXPAND
     Cmi_charmrun_assigned_pe = Lrts_myNode;
-    if (Cmi_isOldProcess) {
-      //if (Cmi_charmrun_assigned_pe == 3)
-      //  exit(1);
-      Cmi_myoldpe = Lrts_myNode;
-    }
 #endif
     if (getenv("CmiLocal") != NULL) {      /* ++local */
           /* CmiMyLocalRank is used for setting default cpu affinity */
@@ -2164,7 +2158,6 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     Cmi_charmrun_assigned_pe = Lrts_myNode;
     //if (Cmi_isOldProcess && Lrts_myNode == 3)
     //  exit(1);
-    Cmi_myoldpe = Cmi_oldpe;
     Lrts_numNodes = Cmi_newnumnodes;
   }
 #endif

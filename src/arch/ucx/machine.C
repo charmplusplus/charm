@@ -10,6 +10,7 @@
 #include <string>
 
 #include "converse.h"
+#include "ckrescale.h"
 #include "cmirdmautils.h"
 #include "machine.h"
 #include "pcqueue.h"
@@ -800,7 +801,7 @@ void ConverseCleanup(void)
   CmiNodeBarrier();        /* single node SMP, make sure every rank is done */
   //if (CmiMyRank()==0) CmiStdoutFlush();
 
-  if (CmiMyPe() == 0) {
+  if (get_shrinkexpand_exit() && CmiMyPe() == 0) {
     // launch charmrun here
     pid_t pid = fork();
     if (pid < 0) {
@@ -817,49 +818,40 @@ void ConverseCleanup(void)
 
     int i;
     int restart_idx = -1;
-    int process_idx = -1;
     for (i = 0; i < argc; ++i) {
       if (strcmp(Cmi_argvcopy[i], "+restart") == 0) {
         restart_idx = i;
-        break;
-      }
-
-      if (strcmp(Cmi_argvcopy[i], "+p") == 0) {
-        process_idx = i;
         break;
       }
     }
 
     const char **ret;
     if (restart_idx == -1) {
-      ret=(const char **)malloc(sizeof(char *)*(argc+4));
+      ret=(const char **)malloc(sizeof(char *)*(argc+6));
     } else {
-      ret=(const char **)malloc(sizeof(char *)*(argc+2));
+      ret=(const char **)malloc(sizeof(char *)*(argc+4));
     }
 
-    for (i=0;i<argc;i++) {
+    for (i=2;i<argc+2;i++) {
       MACHSTATE1(2,"Parameters %s",Cmi_argvcopy[i]);
       ret[i]=Cmi_argvcopy[i];
     }
 
-    ret[argc+0]="+shrinkexpand";
+    char temp2[50];
+    snprintf(temp2, sizeof(temp2), "%d", numProcessAfterRestart);
+    ret[0] = "+p";
+    ret[1] = temp2;
+
+    ret[argc+2]="+shrinkexpand";
 
 
     if (restart_idx == -1) {
-      ret[argc+1]="+restart";
-      ret[argc+2]=_shrinkexpand_basedir;
-      ret[argc+3]=Cmi_argvcopy[argc];
+      ret[argc+3]="+restart";
+      ret[argc+4]=_shrinkexpand_basedir;
+      ret[argc+5]=Cmi_argvcopy[argc];
     } else {
       ret[restart_idx + 1] = _shrinkexpand_basedir;
-      ret[argc+1]=Cmi_argvcopy[argc];
-    }
-
-    if (process_idx != -1) {
-      char temp2[50];
-      snprintf(temp2, sizeof(temp2), "%d", numProcessAfterRestart);
-      ret[process_idx + 1] = temp2;
-    } else {
-      CmiAbort("ConverseCleanup: cannot find +p argument");
+      ret[argc+3]=Cmi_argvcopy[argc];
     }
 
     free(Cmi_argvcopy);

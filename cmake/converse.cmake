@@ -223,8 +223,10 @@ add_library(converse
     ${tmgr-h-sources}
     ${hwloc-objects}
     ${all-ci-outputs}
+    
+    $<TARGET_OBJECTS:ckrescale>
 )
-add_dependencies(converse hwloc)
+add_dependencies(converse hwloc ckrescale)
 
 foreach(filename
     ${conv-core-h-sources}
