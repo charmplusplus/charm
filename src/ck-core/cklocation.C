@@ -3006,8 +3006,10 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
                                                     gpuBufSize > 0);
 
   {
+#if CMK_CUDA
     if (gpuBufSize > 0)
       cudaMalloc(&gpuMsg, gpuBufSize);
+#endif
     PUP::toMem p(msg->packData, gpuMsg, PUP::er::IS_MIGRATION);
     p.becomeDeleting();
     pupElementsFor(p, rec, CkElementCreation_migrate);

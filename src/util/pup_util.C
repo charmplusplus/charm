@@ -447,12 +447,14 @@ void PUP::toDisk::bytes(void *p,size_t n,size_t itemSize,dataType t, PUPMode mod
   if (mode == PUPMode::HOST) {
     bytes(p, n, itemSize, t);
   } else if (mode == PUPMode::DEVICE) {
+#if CMK_CUDA
     // For GPU mode, we assume p is a device pointer and copy directly
     int allocId = hapiGetAllocId(p);
     if(CmiFwrite(&allocId,sizeof(int),1,F) != 1)
     {
       error = true;
     }
+#endif
   }
 }
 
@@ -474,10 +476,12 @@ void PUP::fromDisk::bytes(void **p,size_t n,size_t itemSize,dataType t, PUPMode 
   if (mode == PUPMode::HOST) {
     bytes(*p, n, itemSize, t);
   } else if (mode == PUPMode::DEVICE) {
+#if CMK_CUDA
     // For GPU mode, we assume p is a device pointer and copy directly
     int allocId;
     CmiFread(&allocId,sizeof(int),1,F);
     hapiGetPtrFromAllocId(allocId, p);
+#endif
   }
 }
 
