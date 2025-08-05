@@ -775,6 +775,42 @@ void LrtsExit(int exitcode)
     }
 }
 
+void LrtsCleanup()
+{
+  int ret;
+    int i;
+    UcxRequest *req;
+    ucs_status_t status;
+
+    UCX_LOG(4, "LrtsExit");
+
+    LrtsAdvanceCommunication(0);
+
+    for (i = 0; i < ucxCtx.numRxReqs; ++i) {
+        req = ucxCtx.rxReqs[i];
+        CmiFree(req->msgBuf);
+        ucp_request_cancel(ucxCtx.worker, req);
+        ucp_request_free(req);
+    }
+
+    ucp_worker_destroy(ucxCtx.worker);
+    ucp_cleanup(ucxCtx.context);
+
+    CmiFree(ucxCtx.eps);
+    CmiFree(ucxCtx.rxReqs);
+#if CMK_SMP
+    PCQueueDestroy(ucxCtx.txQueue);
+#endif
+
+    if(!CharmLibInterOperate || userDrivenMode) {
+        ret = runtime_barrier();
+        UCX_CHECK_PMI_RET(ret, "runtime_barrier");
+
+        ret = runtime_fini();
+        UCX_CHECK_PMI_RET(ret, "runtime_fini");
+    }
+}
+
 #if CMK_MACHINE_PROGRESS_DEFINED
 void CmiMachineProgressImpl()
 {
@@ -803,14 +839,7 @@ void ConverseCleanup(void)
 
   if (get_shrinkexpand_exit() && CmiMyPe() == 0) {
     // launch charmrun here
-    pid_t pid = fork();
-    if (pid < 0) {
-      CmiPrintf("ConverseCleanup: fork failed: %s\n", strerror(errno));
-      exit(1);
-    } else if (pid > 0) {
-      // parent process
-      LrtsExit();
-    }
+    LrtsCleanup();
 
     // child process
 
