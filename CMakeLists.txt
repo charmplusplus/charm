@@ -675,6 +675,8 @@ configure_file(src/scripts/conv-config.sh                    include/ COPYONLY)
 configure_file(src/arch/${VDIR}/conv-mach.sh                 include/ COPYONLY)
 configure_file(src/util/ckrescale.h                         include/ COPYONLY)
 
+add_library(ckrescale src/util/ckrescale.C)
+
 set(CUDA_DIR "")
 if(BUILD_CUDA)
 
@@ -693,7 +695,6 @@ if(BUILD_CUDA)
     find_package(CUDA REQUIRED)
     set(CUDA_DIR "${CUDA_TOOLKIT_ROOT_DIR}")
   endif()
-  add_library(ckrescale src/util/ckrescale.C)
   add_library(cudahybridapi ${hybridAPI-cxx-sources} $<TARGET_OBJECTS:ckrescale> $<TARGET_OBJECTS:converse>)
 
   if(TRACING)
