@@ -891,6 +891,9 @@ void ConverseCleanup(void)
 
     execv(ret[0], const_cast<char * const *>(ret));
 
+    CmiPrintf("[%d] should not be here\n", CmiMyPe());
+    exit(1);
+
   } else {
     // kill all other processes
     CmiBarrier();
