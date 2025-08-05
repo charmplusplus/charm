@@ -839,7 +839,7 @@ void ConverseCleanup(void)
 
     char temp2[50];
     snprintf(temp2, sizeof(temp2), "%d", numProcessAfterRestart);
-    ret[0] = "./charmrun"
+    ret[0] = "./charmrun";
     ret[1] = "+p";
     ret[2] = temp2;
 
