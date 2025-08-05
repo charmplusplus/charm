@@ -834,7 +834,7 @@ void ConverseCleanup(void)
 
     for (i=2;i<argc+2;i++) {
       MACHSTATE1(2,"Parameters %s",Cmi_argvcopy[i]);
-      ret[i]=Cmi_argvcopy[i];
+      ret[i]=Cmi_argvcopy[i - 2];
     }
 
     char temp2[50];
