@@ -327,9 +327,9 @@ public:
 void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _requestStatus){
 #if CMK_SHRINK_EXPAND
   std::vector<char> avail(se_avail_vector, se_avail_vector + CkNumPes());
-  int myNewPe = GetNewPeNumber(avail);
+  int chckPtId = CmiPhysicalRank(CmiMyPe());
 #else
-  int myNewPe = CkMyPe();
+  int chckPtId = CmiPhysicalRank(CmiMyPe());
 #endif
 	chkptStartTimer = CmiWallTimer();
   
@@ -359,7 +359,7 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _reque
     dirPathNode << dirPath.str();
 
     // Create subdirectories
-    int mySubDir = myNewPe / SUBDIR_SIZE;
+    int mySubDir = chckPtId / SUBDIR_SIZE;
     dirPath << "/sub" << mySubDir;
     CmiMkdir(dirPath.str().c_str());
 
@@ -401,7 +401,7 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _reque
     if (CkpvAccess(chare_objs).size() > 0 || CkpvAccess(vidblocks).size() > 0)
     {
       // save plain singleton chares into Chares.dat
-      FILE* fChares = openCheckpointFile(dirname, "Chares", "wb", myNewPe);
+      FILE* fChares = openCheckpointFile(dirname, "Chares", "wb", chckPtId);
       PUP::toDisk pChares(fChares, PUP::er::IS_CHECKPOINT);
       CkPupChareData(pChares);
       if (pChares.checkError()) success = false;
@@ -412,7 +412,7 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _reque
     // save groups into Groups.dat
     // content of the file: numGroups, GroupInfo[numGroups], _groupTable(PUP'ed),
     // groups(PUP'ed)
-    FILE* fGroups = openCheckpointFile(dirname, "Groups", "wb", myNewPe);
+    FILE* fGroups = openCheckpointFile(dirname, "Groups", "wb", chckPtId);
     PUP::toDisk pGroups(fGroups, PUP::er::IS_CHECKPOINT);
     CkPupGroupData(pGroups);
     if (pGroups.checkError()) success = false;
@@ -434,7 +434,8 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _reque
     //if (pending_realloc_state == REALLOC_IN_PROGRESS && static_cast<bool>(avail_vector[CkMyPe()]))
     //{
       //printf("[%d] Writing array checkpoint\n", CkMyPe());
-      FILE* datFile = openCheckpointFile(dirname, "arr", "wb", myNewPe);
+      
+      FILE* datFile = openCheckpointFile(dirname, "arr", "wb", chckPtId);
       PUP::toDisk p(datFile, PUP::er::IS_CHECKPOINT);
       CkPupArrayElementsData(p);
       if (p.checkError()) success = false;
@@ -954,7 +955,7 @@ void CkRecvGroupROData(char* msg)
 	if(CkMyPe() < _numPes) {	// in normal range: restore, otherwise, do nothing
     //for (int i=0; i<_numPes;i++) {
     //  if (i%CkNumPes() == CkMyPe()) {
-          int i = CkMyPe();
+          int i = CmiPhysicalRank(CmiMyPe());
           CkPrintf("[%d]CkRestartMain: restoring array elements from PE %d\n", CkMyPe(), i);
           	// restore array elements
           	//CkLocMgr *mgr = (CkLocMgr *)CkpvAccess(_groupTable)->find((*CkpvAccess(_groupIDTable))[i]).getObj();
@@ -1063,6 +1064,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 }
 
 #if CMK_SHRINK_EXPAND
+// NOTE - This function doesn't appear to be called anywhere
 // after resume and getting message
 void CkResumeRestartMain(char * msg) {
   int i;

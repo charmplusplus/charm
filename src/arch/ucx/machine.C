@@ -777,6 +777,98 @@ void CmiMachineProgressImpl()
 }
 #endif
 
+
+#if CMK_SHRINK_EXPAND
+void ConverseCleanup(void)
+{
+  MACHSTATE(2,"ConverseCleanup {");
+
+  CmiBarrier();
+
+#if CMK_USE_SYSVSHM
+	CmiExitSysvshm();
+#elif CMK_USE_PXSHM
+	CmiExitPxshm();
+#endif
+  ConverseCommonExit();               /* should be called by every rank */
+  CmiNodeBarrier();        /* single node SMP, make sure every rank is done */
+  if (CmiMyRank()==0) CmiStdoutFlush();
+
+  if (CmiMyPe() == 0) {
+    // launch charmrun here
+    pid_t pid = fork();
+    if (pid < 0) {
+      CmiPrintf("ConverseCleanup: fork failed: %s\n", strerror(errno));
+      exit(1);
+    } else if (pid > 0) {
+      // parent process
+      LrtsExit();
+    }
+
+    // child process
+
+    int argc=CmiGetArgc(Cmi_argvcopy);
+
+    int i;
+    int restart_idx = -1;
+    int process_idx = -1;
+    for (i = 0; i < argc; ++i) {
+      if (strcmp(Cmi_argvcopy[i], "+restart") == 0) {
+        restart_idx = i;
+        break;
+      }
+
+      if (strcmp(Cmi_argvcopy[i], "+p") == 0) {
+        process_idx = i;
+        break;
+      }
+    }
+
+    const char **ret;
+    if (restart_idx == -1) {
+      ret=(const char **)malloc(sizeof(char *)*(argc+4));
+    } else {
+      ret=(const char **)malloc(sizeof(char *)*(argc+2));
+    }
+
+    for (i=0;i<argc;i++) {
+      MACHSTATE1(2,"Parameters %s",Cmi_argvcopy[i]);
+      ret[i]=Cmi_argvcopy[i];
+    }
+
+    ret[argc+0]="+shrinkexpand";
+
+
+    if (restart_idx == -1) {
+      ret[argc+1]="+restart";
+      ret[argc+2]=_shrinkexpand_basedir;
+      ret[argc+3]=Cmi_argvcopy[argc];
+    } else {
+      ret[restart_idx + 1] = _shrinkexpand_basedir;
+      ret[argc+1]=Cmi_argvcopy[argc];
+    }
+
+    if (process_idx != -1) {
+      char temp2[50];
+      snprintf(temp2, sizeof(temp2), "%d", numProcessAfterRestart);
+      ret[process_idx + 1] = temp2;
+    } else {
+      CkAbort("ConverseCleanup: cannot find +p argument");
+    }
+
+    free(Cmi_argvcopy);
+    //MACHSTATE1(3,"ConverseCleanup mynewpe %s", temp2);
+    MACHSTATE(2,"} ConverseCleanup");
+
+    execv("./charmrun", const_cast<char * const *>(ret));
+
+  } else {
+    // kill all other processes
+    LrtsExit();
+  }
+}
+#endif
+
 // In CMK_SMP, this is called by worker thread
 void LrtsPostNonLocal()
 {

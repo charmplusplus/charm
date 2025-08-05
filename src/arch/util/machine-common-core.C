@@ -1212,6 +1212,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     MSG_STATISTIC = CmiGetArgFlag(argv, "+msgstatistic");
 #endif
 
+    Cmi_argvcopy = CmiCopyArgs(argv);
+
   if (CmiGetArgFlagDesc(argv,"++quiet","Omit non-error runtime messages")) {
     quietModeRequested = quietMode = 1;
   }
@@ -1407,7 +1409,6 @@ if (  MSG_STATISTIC)
 
     _Cmi_numpes = _Cmi_numnodes * _Cmi_mynodesize;
     Cmi_nodestart = _Cmi_mynode * _Cmi_mynodesize;
-    Cmi_argvcopy = CmiCopyArgs(argv);
     Cmi_argv = argv;
     Cmi_startfn = fn;
     Cmi_usrsched = usched;

@@ -145,8 +145,7 @@ void hapiInit(char** argv) {
     hapiMapping(argv); // Perform PE-device mapping
 
 #if CMK_SHRINK_EXPAND
-    if(!Cmi_isOldProcess)
-      hapiStartMemoryDaemon();
+    hapiStartMemoryDaemon();
     CmiBarrier();
 #else
     int& cpv_my_device = CpvAccess(my_device);
@@ -274,7 +273,16 @@ void hapiStartMemoryDaemon()
 
   char server_fifo_path[BUFFER_SIZE];
   sprintf(server_fifo_path, SERVER_FIFO_TEMPLATE, cpv_my_device);
-  std::remove(server_fifo_path);
+
+  struct stat buffer;
+  if (stat(server_fifo_path, &buffer) == 0) {
+    CmiPrintf("HAPI> Server FIFO %s already running\n", server_fifo_path);
+    hapiCheck(cudaSetDevice(cpv_my_device));
+    CmiBarrier();
+    return;
+  }
+
+  //std::remove(server_fifo_path);
   mkfifo(server_fifo_path, 0666);
 
   // Create a ready signal FIFO for synchronization
@@ -290,15 +298,6 @@ void hapiStartMemoryDaemon()
   if (child_pid < 0) {
     CmiAbort("Failed to fork HAPI daemon process");
   } else if (child_pid > 0) {
-    if (CmiSetCPUAffinityLogical(CmiNumPesOnPhysicalNode(CmiPhysicalNodeID(CmiMyPe()))) != -1) {
-      CmiPrintf("Parent: CPU affinity set successfully.\n");
-    } else {
-      CmiPrintf("Parent: Failed to set CPU affinity.\n");
-    }
-
-    int current_cpu = sched_getcpu();
-    CmiPrintf("Daemon: Current CPU is %d\n", current_cpu);
-
     // Parent process: Wait for daemon to be ready
     CmiPrintf("Parent: Waiting for daemon to be ready...\n");
     
@@ -320,6 +319,15 @@ void hapiStartMemoryDaemon()
     CmiBarrier();
     return;
   }
+
+  if (CmiSetCPUAffinityLogical(CmiNumPesOnPhysicalNode(CmiPhysicalNodeID(CmiMyPe()))) != -1) {
+    CmiPrintf("Parent: CPU affinity set successfully.\n");
+  } else {
+    CmiPrintf("Parent: Failed to set CPU affinity.\n");
+  }
+
+  int current_cpu = sched_getcpu();
+  CmiPrintf("Daemon: Current CPU is %d\n", current_cpu);
 
   // Child process (daemon)
   CmiPrintf("DAEMON: Starting daemon process PID=%d\n", getpid());
