@@ -827,38 +827,39 @@ void ConverseCleanup(void)
 
     const char **ret;
     if (restart_idx == -1) {
-      ret=(const char **)malloc(sizeof(char *)*(argc+6));
+      ret=(const char **)malloc(sizeof(char *)*(argc+7));
     } else {
-      ret=(const char **)malloc(sizeof(char *)*(argc+4));
+      ret=(const char **)malloc(sizeof(char *)*(argc+5));
     }
 
-    for (i=2;i<argc+2;i++) {
+    for (i=3;i<argc+3;i++) {
       MACHSTATE1(2,"Parameters %s",Cmi_argvcopy[i]);
-      ret[i]=Cmi_argvcopy[i - 2];
+      ret[i]=Cmi_argvcopy[i - 3];
     }
 
     char temp2[50];
     snprintf(temp2, sizeof(temp2), "%d", numProcessAfterRestart);
-    ret[0] = "+p";
-    ret[1] = temp2;
+    ret[0] = "./charmrun"
+    ret[1] = "+p";
+    ret[2] = temp2;
 
-    ret[argc+2]="+shrinkexpand";
+    ret[argc+3]="+shrinkexpand";
 
 
     if (restart_idx == -1) {
-      ret[argc+3]="+restart";
-      ret[argc+4]=_shrinkexpand_basedir;
-      ret[argc+5]=Cmi_argvcopy[argc];
+      ret[argc+4]="+restart";
+      ret[argc+5]=_shrinkexpand_basedir;
+      ret[argc+6]=Cmi_argvcopy[argc];
     } else {
       ret[restart_idx + 1] = _shrinkexpand_basedir;
-      ret[argc+3]=Cmi_argvcopy[argc];
+      ret[argc+4]=Cmi_argvcopy[argc];
     }
 
     free(Cmi_argvcopy);
     //MACHSTATE1(3,"ConverseCleanup mynewpe %s", temp2);
     MACHSTATE(2,"} ConverseCleanup");
 
-    execv("./charmrun", const_cast<char * const *>(ret));
+    execv(ret[0], const_cast<char * const *>(ret));
 
   } else {
     // kill all other processes
