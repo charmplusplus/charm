@@ -875,7 +875,6 @@ void ConverseCleanup(void)
 
     ret[argc+3]="+shrinkexpand";
 
-
     if (restart_idx == -1) {
       ret[argc+4]="+restart";
       ret[argc+5]=_shrinkexpand_basedir;

@@ -70,6 +70,11 @@ do
 		args+=("$1" "$2")
 		shift
 		;;
+	++nodelist)
+		machinefile="$2"
+		args+=("--nodelist" "$2")
+		shift
+		;;
 	++quiet)
 		QUIET=1
 		;;
@@ -113,6 +118,15 @@ done
 [[ $LOCAL -eq 1 ]] && charm_args+=(++local)
 
 args+=("${charm_args[@]}")
+
+num_nodes=0
+if [[ -n "$machinefile" ]]; then
+	if [[ ! -f "$machinefile" ]]; then
+		echo "Charmrun> Error: nodelist file not found: $machinefile" >&2
+		exit 1
+	fi
+	num_nodes=$(wc -l < "$machinefile")
+fi
 
 if [[ "$DEBUG" = '1' || "$DEBUG_NO_PAUSE" = '1' ]]
 then
@@ -167,7 +181,7 @@ then
     else
  	#someday this should be pmix, but our pmix launcher needs some work
 	# on machines like NCSA Delta this is the most robust solution known to me
-	runCmd srun --mpi=pmi2 -n "$nodes" "${args[@]}"
+	runCmd srun --mpi=pmi2 -n "$nodes" -N "$num_nodes" "${args[@]}"
     fi	
 elif [[ -n "$PBS_NODEFILE" ]]
 then
