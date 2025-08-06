@@ -326,7 +326,7 @@ void hapiStartMemoryDaemon()
     CmiPrintf("Parent: Failed to set CPU affinity.\n");
   }
 
-  int current_cpu = sched_getcpu();
+  current_cpu = sched_getcpu();
   CmiPrintf("Daemon: Current CPU is %d\n", current_cpu);
 
   // Child process (daemon)
