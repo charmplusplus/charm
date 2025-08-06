@@ -840,7 +840,8 @@ void ConverseCleanup(void)
   if (get_shrinkexpand_exit() && CmiMyPe() == 0) {
     // launch charmrun here
 
-    FILE *fp = fopen(_shrinkexpand_basedir + "/numRestartProcs.txt", "w");
+    std::string path = std::string(_shrinkexpand_basedir) + "/numRestartProcs.txt";
+    FILE *fp = fopen(path.c_str(), "w");
     if (fp != NULL) {
       fprintf(fp, "%d", numProcessAfterRestart);
       fclose(fp);
