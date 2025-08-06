@@ -1,0 +1,61 @@
+  #!/bin/bash
+   
+is_restart=false
+
+original_args=("$@")
+
+pes_file="/dev/shm/numRestartProcs.txt"
+
+while true; do
+    args=()
+    pes_args=""
+    restart_arg=""
+
+
+    temp_args=("${original_args[@]}")
+    i=0
+    while [ $i -lt ${#temp_args[@]} ]; do
+        arg="${temp_args[$i]}"
+        case "$arg" in
+        +p|++p)
+        i=$((i+1))
+        pes_arg="$arg ${temp_args[$i]}"
+        ;;
+        +p[0-9]*)
+        pes_arg="$arg"
+        ;;
+        ++p[0-9]*)
+        pes_arg="$arg"
+        ;;
+        *)
+        args+=("$arg")
+        ;;
+        esac
+        i=$((i+1))
+    done
+
+    # 2. Check the flag. If it's a restart, prepare the extra argument.
+    if [ "$is_restart" = true ]; then
+        restart_arg="+shrinkexpand +restart /dev/shm"
+        if [ -f "$pes_file" ]; then
+            num_pes=$(cat "$pes_file")
+            pes_arg="+p $num_pes"
+        fi
+    fi
+
+    # Pass all script arguments ("$@") to the executable
+    ./charmrun $pes_arg "${args[@]}" $restart_arg
+
+    EXIT_CODE=$?
+
+    if [ "$EXIT_CODE" -eq 100 ]; then
+        is_restart=true
+        echo "Restart signal (code 100) received. Looping again."
+        echo "----------------------------------------"
+    else
+        echo "Final exit signal (code $EXIT_CODE) received. Exiting loop."
+        break
+    fi
+done
+
+echo "Control loop finished."

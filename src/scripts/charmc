@@ -2336,14 +2336,23 @@ fi
 
 if [[ "$COPY_CHARMRUN" = 'true' ]]
 then
-  targ="charmrun$CMK_POST_EXE"
-  [[ ! -x "$CHARMBIN/$targ" && -n "$CMK_POST_EXE" ]] && targ=charmrun
+	targ="charmrun$CMK_POST_EXE"
+	[[ ! -x "$CHARMBIN/$targ" && -n "$CMK_POST_EXE" ]] && targ=charmrun
 
-  if [[ -x "$CHARMBIN/$targ" ]]
-  then
+	if [[ -x "$CHARMBIN/$targ" ]]
+	then
 	DoNoErrCheck $RM "$targ"
 	DoNoErrCheck $CP "$CHARMBIN/$targ" "$targ" 2> /dev/null
-  fi
+	fi
+
+	targ_elastic="charmrun_elastic$CMK_POST_EXE"
+	[[ ! -x "$CHARMBIN/$targ_elastic" && -n "$CMK_POST_EXE" ]] && targ_elastic=charmrun_elastic
+
+	if [[ -x "$CHARMBIN/$targ_elastic" ]]
+	then
+	DoNoErrCheck $RM "$targ_elastic"
+	DoNoErrCheck $CP "$CHARMBIN/$targ_elastic" "$targ_elastic" 2> /dev/null
+	fi
 fi
 
 [[ -z "$SKIP_MODULEINIT" && -z "$SAVE" ]] && DoNoErrCheck $RM "$modInitSrc" "$modInitObj" > /dev/null 2>&1
