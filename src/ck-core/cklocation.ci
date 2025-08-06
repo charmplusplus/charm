@@ -1,3 +1,5 @@
+#include "conv-mach-cuda.h"
+
 module CkLocation {
   extern module CkMarshall;
 
