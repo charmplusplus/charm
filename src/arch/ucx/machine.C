@@ -839,6 +839,13 @@ void ConverseCleanup(void)
 
   if (get_shrinkexpand_exit() && CmiMyPe() == 0) {
     // launch charmrun here
+
+    FILE *fp = fopen(_shrinkexpand_basedir + "/numRestartProcs.txt", "w");
+    if (fp != NULL) {
+      fprintf(fp, "%d", numProcessAfterRestart);
+      fclose(fp);
+    }
+
     CmiBarrier();
     LrtsExit(100);
 
