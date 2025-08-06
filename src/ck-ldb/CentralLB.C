@@ -1178,7 +1178,7 @@ void CentralLB::ResumeClients()
 void CentralLB::ResumeClients(int balancing)
 {
 #if CMK_LBDB_ON
-  CkPrintf("[%d] Resuming clients. balancing:%d.\n",CkMyPe(),balancing);
+  //CkPrintf("[%d] Resuming clients. balancing:%d.\n",CkMyPe(),balancing);
 
   lbmgr->ResumeClients();
   if (balancing)  {
