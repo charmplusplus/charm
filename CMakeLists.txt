@@ -696,7 +696,7 @@ if(BUILD_CUDA)
     set(CUDA_DIR "${CUDA_TOOLKIT_ROOT_DIR}")
   endif()
   add_library(cudahybridapi ${hybridAPI-cxx-sources} $<TARGET_OBJECTS:ckrescale> $<TARGET_OBJECTS:converse>)
-  add_executable(hapi_memory_daemon src/arch/cuda/hapi_memory_daemon.C)
+  add_executable(hapi_memory_daemon src/arch/cuda/hybridAPI/hapi_memory_daemon.C)
 
   if(TRACING)
     target_compile_definitions(cudahybridapi PRIVATE HAPI_TRACE)
