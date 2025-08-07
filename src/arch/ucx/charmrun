@@ -181,7 +181,7 @@ then
     else
  	#someday this should be pmix, but our pmix launcher needs some work
 	# on machines like NCSA Delta this is the most robust solution known to me
-	runCmd srun --mpi=pmi2 -n "$nodes" -N "$num_nodes" "${args[@]}"
+	runCmd srun --mpi=pmi2 -n "$nodes" -N "$num_nodes" --exact "${args[@]}"
     fi	
 elif [[ -n "$PBS_NODEFILE" ]]
 then
