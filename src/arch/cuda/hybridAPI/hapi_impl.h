@@ -16,7 +16,7 @@ extern "C" {
 
 // HAPI init & exit functions
 void hapiInit(char** argv);
-void hapiStartMemoryDaemon();
+void hapiStartMemoryDaemon(char** argv);
 int hapiGetAllocId(void* ptr);
 void hapiGetPtrFromAllocId(int alloc_id, void** devPtr);
 void hapiExit();

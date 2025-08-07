@@ -139,7 +139,7 @@ void hapiInit(char** argv) {
     hapiMapping(argv); // Perform PE-device mapping
 
 #if CMK_SHRINK_EXPAND
-    hapiStartMemoryDaemon();
+    hapiStartMemoryDaemon(argv);
 #else
     int& cpv_my_device = CpvAccess(my_device);
     hapiCheck(cudaSetDevice(cpv_my_device));
@@ -164,7 +164,7 @@ void hapiInit(char** argv) {
 }
 
 
-void hapiStartMemoryDaemon()
+void hapiStartMemoryDaemon(char** argv)
 {
 #if CMK_SHRINK_EXPAND
   // start client FIFO
