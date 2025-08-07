@@ -2353,6 +2353,15 @@ then
 	DoNoErrCheck $RM "$targ_elastic"
 	DoNoErrCheck $CP "$CHARMBIN/$targ_elastic" "$targ_elastic" 2> /dev/null
 	fi
+
+	targ_elastic="hapi_memory_daemon$CMK_POST_EXE"
+	[[ ! -x "$CHARMBIN/$targ_elastic" && -n "$CMK_POST_EXE" ]] && targ_elastic=hapi_memory_daemon
+
+	if [[ -x "$CHARMBIN/$targ_elastic" ]]
+	then
+	DoNoErrCheck $RM "$targ_elastic"
+	DoNoErrCheck $CP "$CHARMBIN/$targ_elastic" "$targ_elastic" 2> /dev/null
+	fi
 fi
 
 [[ -z "$SKIP_MODULEINIT" && -z "$SAVE" ]] && DoNoErrCheck $RM "$modInitSrc" "$modInitObj" > /dev/null 2>&1
