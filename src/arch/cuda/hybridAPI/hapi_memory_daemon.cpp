@@ -34,6 +34,85 @@ typedef struct hapiMemoryMapEntry {
 std::unordered_map<int, hapiMemoryMapEntry*> hapiMemoryMap;
 int hapiAllocId = 0; // Global allocation ID for HAPI
 
+void hapiProcessMemoryRequest(int server_fd, int my_device, char* buf)
+{
+  long client_pid;
+  char command[BUFFER_SIZE];
+  sscanf(buf, "%[^:]:", command);
+
+  char* pid_str = strchr(buf, ':');
+  if (pid_str) client_pid = atol(pid_str + 1); else return;
+
+  CmiPrintf("HAPI> Processing memory request: %s from client %ld\n", command, client_pid);
+
+  char client_fifo_path[BUFFER_SIZE];
+  sprintf(client_fifo_path, CLIENT_FIFO_TEMPLATE, client_pid);
+  int client_fd = open(client_fifo_path, O_WRONLY);
+
+  if (strcmp(command, "MALLOC") == 0) 
+  {
+    std::pair<void*, size_t> allocation = std::make_pair((void*)nullptr, 0);
+
+    size_t size_to_alloc;
+    int client_pe;
+    sscanf(buf, "MALLOC:%ld:%d:%zu", &client_pid, &client_pe, &size_to_alloc);
+
+    CmiPrintf("Server: MALLOC from new client %ld, pe %d for %zu bytes\n", 
+      client_pid, client_pe, size_to_alloc);
+
+    allocation.second = size_to_alloc;
+    hapiCheck(cudaMalloc(&(allocation.first), size_to_alloc));
+
+    cudaIpcMemHandle_t ipc_handle;
+    hapiCheck(cudaIpcGetMemHandle(&ipc_handle, allocation.first));
+    write(client_fd, &ipc_handle, sizeof(cudaIpcMemHandle_t));
+
+    //hapiMemoryMap[CkMyRank()].pid = client_pid;
+    if (hapiMemoryMap.find(client_pe) == hapiMemoryMap.end())
+      hapiMemoryMap[client_pe] = new hapiMemoryMapEntry();
+    hapiMemoryMap[client_pe]->memory_map[hapiAllocId++] = allocation;
+  }
+  else if (strcmp(command, "FREE") == 0) 
+  {
+    int alloc_id;
+    int client_pe;
+    sscanf(buf, "FREE:%ld:%d:%d", &client_pid, &client_pe, &alloc_id);
+    if (hapiMemoryMap[client_pe]->memory_map.find(alloc_id) == hapiMemoryMap[client_pe]->memory_map.end()) 
+    {
+      hapiCheck(cudaFree(hapiMemoryMap[client_pe]->memory_map[alloc_id].first));
+      hapiMemoryMap[client_pe]->memory_map[alloc_id] = std::make_pair(nullptr, 0);
+    }
+    write(client_fd, "\0", 1);
+  }
+  else if (strcmp(command, "GET") == 0)
+  {
+    int alloc_id;
+    int client_pe;
+    sscanf(buf, "GET:%ld:%d:%d", &client_pid, &client_pe, &alloc_id);
+
+    void* ptr = hapiMemoryMap[client_pe]->memory_map[alloc_id].first;
+    cudaIpcMemHandle_t ipc_handle;
+    hapiCheck(cudaIpcGetMemHandle(&ipc_handle, ptr));
+    write(client_fd, &ipc_handle, sizeof(cudaIpcMemHandle_t));
+  }
+  else if (strcmp(command, "KILL") == 0)
+  {
+    CmiPrintf("Server: KILL command received from client %ld\n", client_pid);
+    write(client_fd, "\0", 1);
+    close(server_fd);
+
+    char server_fifo[BUFFER_SIZE];
+    sprintf(server_fifo, SERVER_FIFO_TEMPLATE, my_device);
+    if (std::remove(server_fifo) == 0) {
+        CmiPrintf("File '%s' deleted successfully.\n", server_fifo);
+    } else {
+        CmiPrintf("Error deleting file '%s': %s\n", server_fifo, strerror(errno));
+    }
+    exit(0);
+  }
+
+  close(client_fd);
+}
 
 void hapiStartMemoryDaemon(int my_device) {
 
@@ -134,86 +213,6 @@ void hapiStartMemoryDaemon(int my_device) {
   
   close(server_fd);
   exit(0);
-}
-
-void hapiProcessMemoryRequest(int server_fd, int my_device, char* buf)
-{
-  long client_pid;
-  char command[BUFFER_SIZE];
-  sscanf(buf, "%[^:]:", command);
-
-  char* pid_str = strchr(buf, ':');
-  if (pid_str) client_pid = atol(pid_str + 1); else return;
-
-  CmiPrintf("HAPI> Processing memory request: %s from client %ld\n", command, client_pid);
-
-  char client_fifo_path[BUFFER_SIZE];
-  sprintf(client_fifo_path, CLIENT_FIFO_TEMPLATE, client_pid);
-  int client_fd = open(client_fifo_path, O_WRONLY);
-
-  if (strcmp(command, "MALLOC") == 0) 
-  {
-    std::pair<void*, size_t> allocation = std::make_pair((void*)nullptr, 0);
-
-    size_t size_to_alloc;
-    int client_pe;
-    sscanf(buf, "MALLOC:%ld:%d:%zu", &client_pid, &client_pe, &size_to_alloc);
-
-    CmiPrintf("Server: MALLOC from new client %ld, pe %d for %zu bytes\n", 
-      client_pid, client_pe, size_to_alloc);
-
-    allocation.second = size_to_alloc;
-    hapiCheck(cudaMalloc(&(allocation.first), size_to_alloc));
-
-    cudaIpcMemHandle_t ipc_handle;
-    hapiCheck(cudaIpcGetMemHandle(&ipc_handle, allocation.first));
-    write(client_fd, &ipc_handle, sizeof(cudaIpcMemHandle_t));
-
-    //hapiMemoryMap[CkMyRank()].pid = client_pid;
-    if (hapiMemoryMap.find(client_pe) == hapiMemoryMap.end())
-      hapiMemoryMap[client_pe] = new hapiMemoryMapEntry();
-    hapiMemoryMap[client_pe]->memory_map[hapiAllocId++] = allocation;
-  }
-  else if (strcmp(command, "FREE") == 0) 
-  {
-    int alloc_id;
-    int client_pe;
-    sscanf(buf, "FREE:%ld:%d:%d", &client_pid, &client_pe, &alloc_id);
-    if (hapiMemoryMap[client_pe]->memory_map.find(alloc_id) == hapiMemoryMap[client_pe]->memory_map.end()) 
-    {
-      hapiCheck(cudaFree(hapiMemoryMap[client_pe]->memory_map[alloc_id].first));
-      hapiMemoryMap[client_pe]->memory_map[alloc_id] = std::make_pair(nullptr, 0);
-    }
-    write(client_fd, "\0", 1);
-  }
-  else if (strcmp(command, "GET") == 0)
-  {
-    int alloc_id;
-    int client_pe;
-    sscanf(buf, "GET:%ld:%d:%d", &client_pid, &client_pe, &alloc_id);
-
-    void* ptr = hapiMemoryMap[client_pe]->memory_map[alloc_id].first;
-    cudaIpcMemHandle_t ipc_handle;
-    hapiCheck(cudaIpcGetMemHandle(&ipc_handle, ptr));
-    write(client_fd, &ipc_handle, sizeof(cudaIpcMemHandle_t));
-  }
-  else if (strcmp(command, "KILL") == 0)
-  {
-    CmiPrintf("Server: KILL command received from client %ld\n", client_pid);
-    write(client_fd, "\0", 1);
-    close(server_fd);
-
-    char server_fifo[BUFFER_SIZE];
-    sprintf(server_fifo, SERVER_FIFO_TEMPLATE, my_device);
-    if (std::remove(server_fifo) == 0) {
-        CmiPrintf("File '%s' deleted successfully.\n", server_fifo);
-    } else {
-        CmiPrintf("Error deleting file '%s': %s\n", server_fifo, strerror(errno));
-    }
-    exit(0);
-  }
-
-  close(client_fd);
 }
 
 int main(int argc, char** argv) {
