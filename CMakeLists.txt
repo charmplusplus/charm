@@ -695,22 +695,11 @@ if(BUILD_CUDA)
     find_package(CUDA REQUIRED)
     set(CUDA_DIR "${CUDA_TOOLKIT_ROOT_DIR}")
   endif()
-  add_library(cudahybridapi ${hybridAPI-cxx-sources})
-  target_link_libraries(cudahybridapi PRIVATE ckrescale converse)
+  add_library(cudahybridapi ${hybridAPI-cxx-sources} $<TARGET_OBJECTS:ckrescale> $<TARGET_OBJECTS:converse>)
+  
   add_executable(hapi_memory_daemon src/arch/cuda/hybridAPI/hapi_memory_daemon.cpp)
-  target_link_libraries(hapi_memory_daemon PRIVATE
-      cudahybridapi
-      ck
-      ckmain
-      ckqt
-      moduleNDMeshStreamer
-      modulecompletion
-      ldb-rand
-      conv-static
-      memory-default
-      threads-default
-    )
-    
+  #add_dependencies(hapi_memory_daemon cudahybridapi ck converse ckqt moduleNDMeshStreamer ckmain memory-default threads-default ldb-rand modulecompletion conv-static)
+
   if(TRACING)
     target_compile_definitions(cudahybridapi PRIVATE HAPI_TRACE)
   endif()
