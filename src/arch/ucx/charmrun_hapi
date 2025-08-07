@@ -1,0 +1,80 @@
+#!/bin/bash
+   
+is_restart=false
+
+original_args=("$@")
+
+pes_file="/dev/shm/numRestartProcs.txt"
+
+pes_args=""
+temp_args=("${original_args[@]}")
+i=0
+while [ $i -lt ${#temp_args[@]} ]; do
+    arg="${temp_args[$i]}"
+    case "$arg" in
+    +p|++p)
+    i=$((i+1))
+    pes_arg="$arg ${temp_args[$i]}"
+    ;;
+    +p[0-9]*)
+    pes_arg="$arg"
+    ;;
+    ++p[0-9]*)
+    pes_arg="$arg"
+    ;;
+    ++nodelist)
+    machinefile="$2"
+    args=("${args[@]}" ++nodelist "$2")
+    ;;
+    *)
+    args+=("$arg")
+    ;;
+    esac
+    i=$((i+1))
+done
+
+num_nodes=0
+if [[ -n "$machinefile" ]]; then
+	if [[ ! -f "$machinefile" ]]; then
+		echo "Charmrun> Error: nodelist file not found: $machinefile" >&2
+		exit 1
+	fi
+	num_nodes=$(wc -l < "$machinefile")
+fi
+
+srun --ntasks-per-node 1 "rm -f /dev/shm/numRestartProcs.txt && \
+    rm -f /tmp/server_fifo_* && \
+    rm -f /tmp/client_fifo_* && \
+    rm -f /tmp/daemon_ready_* && \
+    mkfifo -m 0666 /tmp/daemon_ready_fifo_0"
+srun -n "$num_nodes" -N "$num_nodes" ./hapi_memory_daemon &
+
+while true; do
+    args=()
+    restart_arg=""
+
+    # 2. Check the flag. If it's a restart, prepare the extra argument.
+    if [ "$is_restart" = true ]; then
+        restart_arg="+shrinkexpand +restart /dev/shm"
+        if [ -f "$pes_file" ]; then
+            num_pes=$(cat "$pes_file")
+            pes_arg="+p $num_pes"
+        fi
+    fi
+
+    # Pass all script arguments ("$@") to the executable
+    ./charmrun $pes_arg "${args[@]}" $restart_arg
+
+    EXIT_CODE=$?
+
+    if [ "$EXIT_CODE" -eq 100 ]; then
+        is_restart=true
+        echo "Restart signal (code 100) received. Looping again."
+        echo "----------------------------------------"
+    else
+        echo "Final exit signal (code $EXIT_CODE) received. Exiting loop."
+        break
+    fi
+done
+
+echo "Control loop finished."
