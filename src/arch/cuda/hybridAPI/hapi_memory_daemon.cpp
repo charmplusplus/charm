@@ -32,7 +32,6 @@ typedef struct hapiMemoryMapEntry {
 
 // Managing memory state in server
 std::unordered_map<int, hapiMemoryMapEntry*> hapiMemoryMap;
-int hapiAllocId = 0; // Global allocation ID for HAPI
 
 void hapiProcessMemoryRequest(int server_fd, int my_device, char* buf)
 {
@@ -54,8 +53,8 @@ void hapiProcessMemoryRequest(int server_fd, int my_device, char* buf)
     std::pair<void*, size_t> allocation = std::make_pair((void*)nullptr, 0);
 
     size_t size_to_alloc;
-    int client_pe;
-    sscanf(buf, "MALLOC:%ld:%d:%zu", &client_pid, &client_pe, &size_to_alloc);
+    int client_pe, alloc_id;
+    sscanf(buf, "MALLOC:%ld:%d:%d:%zu", &client_pid, &client_pe, &alloc_id, &size_to_alloc);
 
     CmiPrintf("Server: MALLOC from new client %ld, pe %d for %zu bytes\n", 
       client_pid, client_pe, size_to_alloc);
@@ -70,7 +69,7 @@ void hapiProcessMemoryRequest(int server_fd, int my_device, char* buf)
     //hapiMemoryMap[CkMyRank()].pid = client_pid;
     if (hapiMemoryMap.find(client_pe) == hapiMemoryMap.end())
       hapiMemoryMap[client_pe] = new hapiMemoryMapEntry();
-    hapiMemoryMap[client_pe]->memory_map[hapiAllocId++] = allocation;
+    hapiMemoryMap[client_pe]->memory_map[alloc_id] = allocation;
   }
   else if (strcmp(command, "FREE") == 0) 
   {

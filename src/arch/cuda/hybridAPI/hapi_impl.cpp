@@ -66,13 +66,7 @@ CpvDeclare(int, n_hapi_events);
 
 int firstRankForDevice = 0; // First rank for each device, used for mapping
 
-typedef struct hapiMemoryMapEntry {
-  long pid;
-  std::unordered_map<int, std::pair<void*, size_t>> memory_map; // mapping the allocation id to device pointer
-} hapiMemoryMapEntry;
-
 // Managing memory state in server
-std::unordered_map<int, hapiMemoryMapEntry*> hapiMemoryMap;
 int hapiAllocId = 0; // Global allocation ID for HAPI
 
 // Managing memory state in client
@@ -1649,7 +1643,7 @@ cudaError_t hapiMalloc(void** devPtr, size_t size) {
   sprintf(client_fifo_path, CLIENT_FIFO_TEMPLATE, pid);
 
   char msg_buf[BUFFER_SIZE];
-  sprintf(msg_buf, "MALLOC:%ld:%d:%zu", pid, CkMyPe(), size);
+  sprintf(msg_buf, "MALLOC:%ld:%d:%d:%zu", pid, CkMyPe(), hapiAllocId, size);
 
   hapiSendMemoryRequest(msg_buf);
   CmiPrintf("Request sent\n");
