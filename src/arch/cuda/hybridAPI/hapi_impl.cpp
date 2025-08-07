@@ -187,7 +187,7 @@ void hapiStartMemoryDaemon(char** argv)
   sprintf(server_fifo_path, SERVER_FIFO_TEMPLATE, cpv_my_device);
 
   // Create a ready signal FIFO for synchronization
-  if (!CmiGetArgFlagDesc(*argv,"+shrinkexpand","Restarting of already running prcoess")) {
+  if (!CmiGetArgFlagDesc(argv,"+shrinkexpand","Restarting of already running prcoess")) {
     char ready_fifo_path[BUFFER_SIZE];
     sprintf(ready_fifo_path, "/tmp/daemon_ready_%d", cpv_my_device);
 
@@ -198,14 +198,14 @@ void hapiStartMemoryDaemon(char** argv)
       perror("Parent: open ready FIFO");
       CmiAbort("Failed to open ready FIFO");
     }
+  
+    char ready_signal;
+    read(ready_fd, &ready_signal, 1);
+    close(ready_fd);
+    unlink(ready_fifo_path);  // Clean up
+    
+    CmiPrintf("Parent: Daemon is ready!\n");
   }
-  
-  char ready_signal;
-  read(ready_fd, &ready_signal, 1);
-  close(ready_fd);
-  unlink(ready_fifo_path);  // Clean up
-  
-  CmiPrintf("Parent: Daemon is ready!\n");
   
   CmiBarrier();
   return;
