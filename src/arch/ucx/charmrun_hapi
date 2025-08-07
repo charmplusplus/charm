@@ -1,59 +1,65 @@
 #!/bin/bash
-   
+
 is_restart=false
-
 original_args=("$@")
-
 pes_file="/dev/shm/numRestartProcs.txt"
 
-pes_args=""
-temp_args=("${original_args[@]}")
-i=0
-while [ $i -lt ${#temp_args[@]} ]; do
-    arg="${temp_args[$i]}"
-    case "$arg" in
-    +p|++p)
-    i=$((i+1))
-    pes_arg="$arg ${temp_args[$i]}"
-    ;;
-    +p[0-9]*)
-    pes_arg="$arg"
-    ;;
-    ++p[0-9]*)
-    pes_arg="$arg"
-    ;;
-    ++nodelist)
-    machinefile="$2"
-    args=("${args[@]}" ++nodelist "$2")
-    ;;
-    *)
-    args+=("$arg")
-    ;;
-    esac
-    i=$((i+1))
+# --- Pre-parse to find the nodelist for daemon startup ---
+machinefile=""
+for ((i=0; i<${#original_args[@]}; ++i)); do
+    if [[ "${original_args[i]}" == "++nodelist" ]]; then
+        machinefile="${original_args[i+1]}"
+        break
+    fi
 done
 
 num_nodes=0
 if [[ -n "$machinefile" ]]; then
-	if [[ ! -f "$machinefile" ]]; then
-		echo "Charmrun> Error: nodelist file not found: $machinefile" >&2
-		exit 1
-	fi
-	num_nodes=$(wc -l < "$machinefile")
+    if [[ ! -f "$machinefile" ]]; then
+        echo "Charmrun> Error: nodelist file not found: $machinefile" >&2
+        exit 1
+    fi
+    num_nodes=$(wc -l < "$machinefile")
+else
+    echo "Charmrun> Warning: ++nodelist not found. Assuming 1 node for HAPI daemon."
+    num_nodes=1
 fi
 
-srun --ntasks-per-node 1 "rm -f /dev/shm/numRestartProcs.txt && \
-    rm -f /tmp/server_fifo_* && \
-    rm -f /tmp/client_fifo_* && \
-    rm -f /tmp/daemon_ready_* && \
-    mkfifo -m 0666 /tmp/daemon_ready_fifo_0"
-srun -n "$num_nodes" -N "$num_nodes" ./hapi_memory_daemon &
+# --- Clean up and start the memory daemon in the background ---
+srun --ntasks-per-node=1 --exact "rm -f /dev/shm/numRestartProcs.txt /tmp/server_fifo_* /tmp/client_fifo_* /tmp/daemon_ready_* 2>/dev/null && mkfifo -m 0666 /tmp/daemon_ready_fifo_0"
+srun --ntasks="$num_nodes" --nodes="$num_nodes" ./hapi_memory_daemon &
+daemon_pid=$!
 
+# --- Main execution loop ---
 while true; do
+    # Reset and parse arguments for each run
     args=()
+    pes_arg=""
     restart_arg=""
 
-    # 2. Check the flag. If it's a restart, prepare the extra argument.
+    temp_args=("${original_args[@]}")
+    i=0
+    while [ $i -lt ${#temp_args[@]} ]; do
+        arg="${temp_args[$i]}"
+        case "$arg" in
+        +p|++p)
+            i=$((i+1))
+            pes_arg="$arg ${temp_args[$i]}"
+            ;;
+        +p[0-9]*)
+            pes_arg="$arg"
+            ;;
+        ++p[0-9]*)
+            pes_arg="$arg"
+            ;;
+        *)
+            args+=("$arg")
+            ;;
+        esac
+        i=$((i+1))
+    done
+
+    # Check the flag. If it's a restart, prepare the extra arguments.
     if [ "$is_restart" = true ]; then
         restart_arg="+shrinkexpand +restart /dev/shm"
         if [ -f "$pes_file" ]; then
@@ -62,7 +68,7 @@ while true; do
         fi
     fi
 
-    # Pass all script arguments ("$@") to the executable
+    # Pass all script arguments to the executable
     ./charmrun $pes_arg "${args[@]}" $restart_arg
 
     EXIT_CODE=$?
@@ -73,6 +79,8 @@ while true; do
         echo "----------------------------------------"
     else
         echo "Final exit signal (code $EXIT_CODE) received. Exiting loop."
+        # Clean up the background daemon process
+        kill "$daemon_pid" 2>/dev/null
         break
     fi
 done

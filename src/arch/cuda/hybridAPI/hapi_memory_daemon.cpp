@@ -122,6 +122,10 @@ void hapiStartMemoryDaemon(int my_device) {
   
   // Set up the daemon's CUDA context
   cudaSetDevice(my_device);
+
+  char server_fifo[BUFFER_SIZE];
+  sprintf(server_fifo, SERVER_FIFO_TEMPLATE, my_device);
+  mkfifo(server_fifo, 0666);
   
   // Open server FIFO for reading (this may block until a writer connects)
   char server_fifo_path[BUFFER_SIZE];
