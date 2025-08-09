@@ -85,7 +85,7 @@ CsvDeclare(GPUManager, gpu_manager);
 CpvDeclare(int, my_device); // GPU device that this thread is mapped to
 CpvDeclare(bool, device_rep); // Is this PE a device representative thread? (1 per device)
 
-void hapiSendMemoryRequest(char* msg);
+void hapiSendMemoryRequest(char* msg, int size);
 
 // Returns the local rank of the logical node (process) that the given PE belongs to
 static inline int CmiNodeRankLocal(int pe) {
@@ -221,8 +221,9 @@ int hapiCheckpoint(void* devPtr, int size) {
   char msg_buf[BUFFER_SIZE];
   int offset = sprintf(msg_buf, "CKPT:%ld:%d:%d:", pid, CkMyPe(), size);
   memcpy(msg_buf + offset, &ipc_handle, sizeof(cudaIpcMemHandle_t));
+  int total_size = offset + sizeof(cudaIpcMemHandle_t);
 
-  hapiSendMemoryRequest(msg_buf);
+  hapiSendMemoryRequest(msg_buf, total_size);
 
   int client_fd = open(client_fifo_path, O_RDONLY);
   int alloc_id;
@@ -241,7 +242,7 @@ void hapiRestore(void* devPtr, int size, int alloc_id) {
   char msg_buf[BUFFER_SIZE];
   sprintf(msg_buf, "GET:%ld:%d", pid, alloc_id);
 
-  hapiSendMemoryRequest(msg_buf);
+  hapiSendMemoryRequest(msg_buf, strlen(msg_buf) + 1);
 
   int client_fd = open(client_fifo_path, O_RDONLY);
   cudaIpcMemHandle_t ipc_handle;
@@ -255,7 +256,7 @@ void hapiRestore(void* devPtr, int size, int alloc_id) {
 
   char free_msg[BUFFER_SIZE];
   sprintf(free_msg, "FREE:%ld:%d", pid, alloc_id);
-  hapiSendMemoryRequest(free_msg);
+  hapiSendMemoryRequest(free_msg, strlen(free_msg) + 1);
 }
 
 void hapiExit() {
@@ -271,7 +272,7 @@ void hapiExit() {
   {
     char msg_buf[BUFFER_SIZE];
     sprintf(msg_buf, "KILL:%ld:0", getpid());
-    hapiSendMemoryRequest(msg_buf);
+    hapiSendMemoryRequest(msg_buf, strlen(msg_buf) + 1);
 
     int client_fd = open(client_fifo_path, O_RDONLY);
     char status;
@@ -1620,7 +1621,7 @@ void hapiAddCallback(cudaStream_t stream, void* cb, void* cb_msg) {
   hapiAddCallback(stream, *(CkCallback*)cb, cb_msg);
 }
 
-void hapiSendMemoryRequest(char* msg)
+void hapiSendMemoryRequest(char* msg, int size)
 {
     int cpv_my_device = CpvAccess(my_device);
     
@@ -1633,8 +1634,8 @@ void hapiSendMemoryRequest(char* msg)
         perror("open server FIFO for writing");
         return;
     }
-    
-    ssize_t written = write(server_fd, msg, strlen(msg) + 1);
+
+    ssize_t written = write(server_fd, msg, size);
     if (written == -1) {
         perror("write to server FIFO");
     } else {
