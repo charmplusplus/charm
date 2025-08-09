@@ -593,7 +593,7 @@ class fromDisk : public disk {
  protected:
   //Generic bottleneck: unpack n items of size itemSize from p.
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
-  virtual void bytes(void *p,size_t n,size_t itemSize,dataType t,PUPMode mode) {}
+  virtual void bytes(void *p,size_t n,size_t itemSize,dataType t,PUPMode mode);
 
   virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t);
   virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
