@@ -206,7 +206,7 @@ void PUP::toMem::bytes(void *p,size_t n,size_t itemSize,dataType t, PUPMode mode
     // For GPU mode, we assume p is a device pointer and copy directly
 #if CMK_CUDA
     cudaMemcpy((void *)gpuBuf, p, n, cudaMemcpyDeviceToDevice);
-     gpuBuf += n;
+    gpuBuf += n;
 #endif
   }
 }

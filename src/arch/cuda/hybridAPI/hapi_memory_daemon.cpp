@@ -58,6 +58,7 @@ void hapiProcessMemoryRequest(int server_fd, int my_device, char* buf)
     cudaIpcOpenMemHandle(&client_ptr, ipc_handle, cudaIpcMemLazyEnablePeerAccess);
 
     auto allocation = std::make_pair(nullptr, size);
+    cudaMalloc((void**) &allocation.first, size);
 
     cudaMemcpy((void*) allocation.first, client_ptr, size, cudaMemcpyDeviceToDevice);
     hapiMemoryMap[allocId] = allocation;

@@ -2977,10 +2977,9 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   pupElementsFor(p, rec, CkElementCreation_migrate);
   bufSize = p.size();
 
+  gpuBufSize = 0;
 #if CMK_CUDA
   gpuBufSize = p.gpu_size();
-#else
-  gpuBufSize = 0;
 #endif
 
 #if CMK_ERROR_CHECKING
