@@ -239,7 +239,7 @@ void hapiRestore(void* devPtr, int size, int alloc_id) {
   sprintf(client_fifo_path, CLIENT_FIFO_TEMPLATE, pid);
 
   char msg_buf[BUFFER_SIZE];
-  sprintf(msg_buf, "GET:%ld:%d:", pid, alloc_id);
+  sprintf(msg_buf, "GET:%ld:%d", pid, alloc_id);
 
   hapiSendMemoryRequest(msg_buf);
 
