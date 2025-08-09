@@ -468,6 +468,11 @@ void PUP::toDisk::pup_buffer(void *&p,size_t n, size_t itemSize, dataType t, std
   if(isDeleting()) deallocate(p);
 }
 
+void PUP::fromDisk::bytes(void *p,size_t n,size_t itemSize,dataType t)
+{
+  CmiFread(p,itemSize,n,F);
+}
+
 void PUP::fromDisk::bytes(void *p,size_t n,size_t itemSize,dataType t, PUPMode mode)
 {
   if (mode == PUPMode::HOST) {
