@@ -23,14 +23,9 @@
 #define BUFFER_SIZE 256
 #define STREAM_BUF_SIZE 1024
 
-
-typedef struct hapiMemoryMapEntry {
-  long pid;
-  std::unordered_map<int, std::pair<void*, size_t>> memory_map; // mapping the allocation id to device pointer
-} hapiMemoryMapEntry;
-
 // Managing memory state in server
-std::unordered_map<int, hapiMemoryMapEntry*> hapiMemoryMap;
+std::unordered_map<int, std::pair<void*, size_t>> hapiMemoryMap;
+int allocId = 0;
 
 void hapiProcessMemoryRequest(int server_fd, int my_device, char* buf)
 {
@@ -47,51 +42,50 @@ void hapiProcessMemoryRequest(int server_fd, int my_device, char* buf)
   sprintf(client_fifo_path, CLIENT_FIFO_TEMPLATE, client_pid);
   int client_fd = open(client_fifo_path, O_WRONLY);
 
-  if (strcmp(command, "MALLOC") == 0) 
+  if (strcmp(command, "CKPT") == 0) 
   {
-    std::pair<void*, size_t> allocation = std::make_pair((void*)nullptr, 0);
+    int client_pe, size;
+    sscanf(buf, "CKPT:%ld:%d:%d:", &client_pid, &client_pe, &size);
 
-    size_t size_to_alloc;
-    int client_pe, alloc_id;
-    sscanf(buf, "MALLOC:%ld:%d:%d:%zu", &client_pid, &client_pe, &alloc_id, &size_to_alloc);
-
-    printf("Server: MALLOC from new client %ld, pe %d for %zu bytes\n", 
-      client_pid, client_pe, size_to_alloc);
-
-    allocation.second = size_to_alloc;
-    cudaMalloc(&(allocation.first), size_to_alloc);
+    char* handle_start = strchr(buf, ':');
+    handle_start = strchr(handle_start + 1, ':');
+    handle_start = strchr(handle_start + 1, ':') + 1;
 
     cudaIpcMemHandle_t ipc_handle;
-    cudaIpcGetMemHandle(&ipc_handle, allocation.first);
-    write(client_fd, &ipc_handle, sizeof(cudaIpcMemHandle_t));
+    memcpy(&ipc_handle, handle_start, sizeof(cudaIpcMemHandle_t));
 
-    //hapiMemoryMap[CkMyRank()].pid = client_pid;
-    if (hapiMemoryMap.find(client_pe) == hapiMemoryMap.end())
-      hapiMemoryMap[client_pe] = new hapiMemoryMapEntry();
-    hapiMemoryMap[client_pe]->memory_map[alloc_id] = allocation;
-  }
-  else if (strcmp(command, "FREE") == 0) 
-  {
-    int alloc_id;
-    int client_pe;
-    sscanf(buf, "FREE:%ld:%d:%d", &client_pid, &client_pe, &alloc_id);
-    if (hapiMemoryMap[client_pe]->memory_map.find(alloc_id) == hapiMemoryMap[client_pe]->memory_map.end()) 
-    {
-      cudaFree(hapiMemoryMap[client_pe]->memory_map[alloc_id].first);
-      hapiMemoryMap[client_pe]->memory_map[alloc_id] = std::make_pair(nullptr, 0);
-    }
-    write(client_fd, "\0", 1);
+    void* client_ptr;
+    cudaIpcOpenMemHandle(&client_ptr, ipc_handle, cudaIpcMemLazyEnablePeerAccess);
+
+    auto allocation = std::make_pair(nullptr, size);
+
+    cudaMemcpy((void*) allocation.first, client_ptr, size, cudaMemcpyDeviceToDevice);
+    hapiMemoryMap[allocId] = allocation;
+
+    cudaIpcCloseMemHandle(client_ptr);
+    write(client_fd, &allocId, sizeof(allocId));
+    allocId++;
   }
   else if (strcmp(command, "GET") == 0)
   {
     int alloc_id;
-    int client_pe;
-    sscanf(buf, "GET:%ld:%d:%d", &client_pid, &client_pe, &alloc_id);
+    sscanf(buf, "GET:%ld:%d", &client_pid, &alloc_id);
 
-    void* ptr = hapiMemoryMap[client_pe]->memory_map[alloc_id].first;
+    void* ptr = hapiMemoryMap[alloc_id].first;
     cudaIpcMemHandle_t ipc_handle;
     cudaIpcGetMemHandle(&ipc_handle, ptr);
     write(client_fd, &ipc_handle, sizeof(cudaIpcMemHandle_t));
+  }
+  else if (strcmp(command, "FREE") == 0)
+  {
+    int alloc_id;
+    sscanf(buf, "FREE:%ld:%d", &client_pid, &alloc_id);
+
+    auto it = hapiMemoryMap.find(alloc_id);
+    if (it != hapiMemoryMap.end()) {
+      cudaFree(it->second.first);
+      hapiMemoryMap.erase(it);
+    }
   }
   else if (strcmp(command, "KILL") == 0)
   {

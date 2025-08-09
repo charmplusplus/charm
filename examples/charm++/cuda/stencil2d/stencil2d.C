@@ -341,8 +341,8 @@ class Stencil : public CBase_Stencil {
 
     //p(temperature, (block_x + 2) * (block_y + 2));
     //p(new_temperature, (block_x + 2) * (block_y + 2));
-    p(&d_temperature, (block_x + 2) * (block_y + 2), PUP::PUPMode::DEVICE);
-    p(&d_new_temperature, (block_x + 2) * (block_y + 2), PUP::PUPMode::DEVICE);
+    p(d_temperature, (block_x + 2) * (block_y + 2), PUP::PUPMode::DEVICE);
+    p(d_new_temperature, (block_x + 2) * (block_y + 2), PUP::PUPMode::DEVICE);
     p(left_ghost, block_y);
     p(right_ghost, block_y);
     p(bottom_ghost, block_x);

@@ -69,9 +69,6 @@ int firstRankForDevice = 0; // First rank for each device, used for mapping
 // Managing memory state in server
 int hapiAllocId = 0; // Global allocation ID for HAPI
 
-// Managing memory state in client
-std::unordered_map<void*, int> hapiAllocIdMap;
-
 // Used to invoke user's Charm++ callback function
 void (*hapiInvokeCallback)(void*, void*) = NULL;
 
@@ -212,23 +209,37 @@ void hapiStartMemoryDaemon(char** argv)
 #endif
 }
 
-int hapiGetAllocId(void* ptr) {
-  // Check if the pointer is already mapped to an allocation ID
-  auto it = hapiAllocIdMap.find(ptr);
-  if (it != hapiAllocIdMap.end()) {
-    return it->second; // Return the existing allocation ID
-  }
-  return -1; // ERROR
+int hapiCheckpoint(void* devPtr, int size) {
+  pid_t pid = getpid();
+
+  char client_fifo_path[BUFFER_SIZE];
+  sprintf(client_fifo_path, CLIENT_FIFO_TEMPLATE, pid);
+
+  cudaIpcMemHandle_t ipc_handle;
+  hapiCheck(cudaIpcGetMemHandle(&ipc_handle, devPtr));
+
+  char msg_buf[BUFFER_SIZE];
+  int offset = sprintf(msg_buf, "CKPT:%ld:%d:%d:", pid, CkMyPe(), size);
+  memcpy(msg_buf + offset, &ipc_handle, sizeof(cudaIpcMemHandle_t));
+
+  hapiSendMemoryRequest(msg_buf);
+
+  int client_fd = open(client_fifo_path, O_RDONLY);
+  int alloc_id;
+  read(client_fd, &alloc_id, sizeof(int));
+  close(client_fd);
+
+  return alloc_id;
 }
 
-void hapiGetPtrFromAllocId(int alloc_id, void** devPtr) {
+void hapiRestore(void* devPtr, int size, int alloc_id) {
   pid_t pid = getpid();
 
   char client_fifo_path[BUFFER_SIZE];
   sprintf(client_fifo_path, CLIENT_FIFO_TEMPLATE, pid);
 
   char msg_buf[BUFFER_SIZE];
-  sprintf(msg_buf, "GET:%ld:%d:%d", pid, CkMyPe(), alloc_id);
+  sprintf(msg_buf, "GET:%ld:%d:", pid, alloc_id);
 
   hapiSendMemoryRequest(msg_buf);
 
@@ -237,11 +248,14 @@ void hapiGetPtrFromAllocId(int alloc_id, void** devPtr) {
   read(client_fd, &ipc_handle, sizeof(ipc_handle));
   close(client_fd);
 
-  cudaError_t err = cudaIpcOpenMemHandle(devPtr, ipc_handle, cudaIpcMemLazyEnablePeerAccess);
+  void* srcPtr;
+  hapiCheck(cudaIpcOpenMemHandle(&srcPtr, ipc_handle, cudaIpcMemLazyEnablePeerAccess));
+  hapiCheck(cudaMemcpy(devPtr, srcPtr, size, cudaMemcpyDeviceToDevice));
+  hapiCheck(cudaIpcCloseMemHandle(srcPtr));
 
-  // track pointer to allocation ID
-  hapiAllocIdMap[*devPtr] = alloc_id;
-  hapiAllocId = std::max(hapiAllocId, alloc_id + 1);
+  char free_msg[BUFFER_SIZE];
+  sprintf(free_msg, "FREE:%ld:%d", pid, alloc_id);
+  hapiSendMemoryRequest(free_msg);
 }
 
 void hapiExit() {
@@ -1631,77 +1645,11 @@ void hapiSendMemoryRequest(char* msg)
 }
 
 cudaError_t hapiMalloc(void** devPtr, size_t size) {
-#if CMK_SHRINK_EXPAND
-  if (get_in_restart()) // When loading from checkpoint, don't allocate during the pup call
-    return cudaSuccess;
-
-  // send a request to the server to allocate memory
-
-  CmiPrintf("[%d] Malloc called\n", CmiMyPe());
-
-  pid_t pid = getpid();
-
-  char client_fifo_path[BUFFER_SIZE];
-  sprintf(client_fifo_path, CLIENT_FIFO_TEMPLATE, pid);
-
-  char msg_buf[BUFFER_SIZE];
-  sprintf(msg_buf, "MALLOC:%ld:%d:%d:%zu", pid, CkMyPe(), hapiAllocId, size);
-
-  hapiSendMemoryRequest(msg_buf);
-  CmiPrintf("Request sent\n");
-
-  int client_fd = open(client_fifo_path, O_RDONLY);
-  cudaIpcMemHandle_t ipc_handle;
-  read(client_fd, &ipc_handle, sizeof(ipc_handle));
-  close(client_fd);
-
-  cudaError_t err = cudaIpcOpenMemHandle(devPtr, ipc_handle, cudaIpcMemLazyEnablePeerAccess);
-
-  // track pointer to allocation ID
-  hapiAllocIdMap[*devPtr] = hapiAllocId++;
-
-  return err;
-#else
   return cudaMalloc(devPtr, size);
-#endif
 }
 
 cudaError_t hapiFree(void* devPtr) {
-#if CMK_SHRINK_EXPAND
-  // send a request to the server to free memory
-  if (get_shrinkexpand_exit()) return cudaSuccess;
-
-  pid_t pid = getpid();
-
-  char client_fifo_path[BUFFER_SIZE];
-  sprintf(client_fifo_path, CLIENT_FIFO_TEMPLATE, pid);
-
-  char msg_buf[BUFFER_SIZE];
-
-  // retrieve allocation ID from the map
-  auto it = hapiAllocIdMap.find(devPtr);
-  if (it == hapiAllocIdMap.end()) {
-    CmiPrintf("[HAPI] hapiFree: devPtr %p not found in allocation map\n", devPtr);
-    return cudaErrorInvalidValue;
-  }
-  int allocId = it->second;
-  hapiAllocIdMap.erase(it); // remove from the map
-
-  sprintf(msg_buf, "FREE:%ld:%ld:%d", pid, CkMyPe(), allocId);
-
-  cudaError_t err = cudaIpcCloseMemHandle(devPtr);
-
-  hapiSendMemoryRequest(msg_buf);
-
-  int client_fd = open(client_fifo_path, O_RDONLY);
-  char status;
-  read(client_fd, &status, sizeof(status));
-  close(client_fd);
-
-  return err;
-#else
   return cudaFree(devPtr);
-#endif
 }
 
 cudaError_t hapiMallocHost(void** ptr, size_t size) {

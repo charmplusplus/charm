@@ -449,7 +449,7 @@ void PUP::toDisk::bytes(void *p,size_t n,size_t itemSize,dataType t, PUPMode mod
   } else if (mode == PUPMode::DEVICE) {
 #if CMK_CUDA
     // For GPU mode, we assume p is a device pointer and copy directly
-    int allocId = hapiGetAllocId(p);
+    int allocId = hapiCheckpoint(p, itemSize * n);
     if(CmiFwrite(&allocId,sizeof(int),1,F) != 1)
     {
       error = true;
@@ -468,19 +468,16 @@ void PUP::toDisk::pup_buffer(void *&p,size_t n, size_t itemSize, dataType t, std
   if(isDeleting()) deallocate(p);
 }
 
-void PUP::fromDisk::bytes(void *p,size_t n,size_t itemSize,dataType /*t*/)
-{/* CkPrintf("reading %d bytes\n",itemSize*n); */ CmiFread(p,itemSize,n,F);}
-
-void PUP::fromDisk::bytes(void **p,size_t n,size_t itemSize,dataType t, PUPMode mode)
+void PUP::fromDisk::bytes(void *p,size_t n,size_t itemSize,dataType t, PUPMode mode)
 {
   if (mode == PUPMode::HOST) {
-    bytes(*p, n, itemSize, t);
+    bytes(p, n, itemSize, t);
   } else if (mode == PUPMode::DEVICE) {
 #if CMK_CUDA
     // For GPU mode, we assume p is a device pointer and copy directly
     int allocId;
     CmiFread(&allocId,sizeof(int),1,F);
-    hapiGetPtrFromAllocId(allocId, p);
+    hapiRestore(p, itemSize * n, allocId);
 #endif
   }
 }
