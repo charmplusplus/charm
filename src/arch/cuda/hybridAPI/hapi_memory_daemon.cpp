@@ -54,9 +54,6 @@ void hapiProcessMemoryRequest(int server_fd, int my_device, char* buf)
     // This sscanf is fine, it extracts the needed integer values
     sscanf(buf, "CKPT:%ld:%d:%d:", &client_pid, &client_pe, &size);
 
-    printf("HAPI> Checkpoint request from client %ld (PE %d): %d bytes\n", client_pid, client_pe, size);
-    fflush(stdout);
-
     // Correctly find the start of the handle by looking for the 4th colon.
     char* handle_start = buf;
     for (int i = 0; i < 4; ++i) {
