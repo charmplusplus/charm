@@ -51,14 +51,23 @@ void hapiProcessMemoryRequest(int server_fd, int my_device, char* buf)
   if (strcmp(command, "CKPT") == 0) 
   {
     int client_pe, size;
+    // This sscanf is fine, it extracts the needed integer values
     sscanf(buf, "CKPT:%ld:%d:%d:", &client_pid, &client_pe, &size);
 
     printf("HAPI> Checkpoint request from client %ld (PE %d): %d bytes\n", client_pid, client_pe, size);
     fflush(stdout);
 
-    char* handle_start = strchr(buf, ':');
-    handle_start = strchr(handle_start + 1, ':');
-    handle_start = strchr(handle_start + 1, ':') + 1;
+    // Correctly find the start of the handle by looking for the 4th colon.
+    char* handle_start = buf;
+    for (int i = 0; i < 4; ++i) {
+      handle_start = strchr(handle_start, ':');
+      if (!handle_start) {
+        printf("DAEMON: Error parsing CKPT message, could not find 4 colons.\n");
+        close(client_fd);
+        return;
+      }
+      handle_start++; // Move past the found colon
+    }
 
     cudaIpcMemHandle_t ipc_handle;
     memcpy(&ipc_handle, handle_start, sizeof(cudaIpcMemHandle_t));
@@ -189,14 +198,14 @@ void hapiStartMemoryDaemon(int my_device) {
 
         if (strncmp(stream_buf, "CKPT", 4) == 0) {
           // CKPT message format: "CKPT:<pid>:<pe>:<size>:<ipc_handle>"
-          // Find the end of the text part (after the 3rd colon)
+          // Find the end of the text part (after the 4th colon)
           const char *p = stream_buf;
           int colons = 0;
           size_t header_len = 0;
           for (size_t i = 0; i < data_in_stream; ++i) {
             if (p[i] == ':') {
               colons++;
-              if (colons == 3) {
+              if (colons == 4) { // This must be 4
                 header_len = i + 1;
                 break;
               }
