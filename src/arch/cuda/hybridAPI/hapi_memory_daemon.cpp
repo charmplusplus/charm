@@ -17,6 +17,13 @@
 #include <cuda_runtime.h>
 #include <cuda.h>
 
+#define CUDA_CHECK(call) do { \
+  cudaError_t err = call; \
+  if (err != cudaSuccess) { \
+    fprintf(stderr, "HAPI> CUDA call failed: %s\n", cudaGetErrorString(err)); \
+  } \
+} while(0)
+
 
 #define SERVER_FIFO_TEMPLATE "/tmp/server_pipe_%ld"
 #define CLIENT_FIFO_TEMPLATE "/tmp/client_pipe_%ld"
@@ -58,15 +65,15 @@ void hapiProcessMemoryRequest(int server_fd, int my_device, char* buf)
     memcpy(&ipc_handle, handle_start, sizeof(cudaIpcMemHandle_t));
 
     void* client_ptr;
-    cudaIpcOpenMemHandle(&client_ptr, ipc_handle, cudaIpcMemLazyEnablePeerAccess);
+    CUDA_CHECK(cudaIpcOpenMemHandle(&client_ptr, ipc_handle, cudaIpcMemLazyEnablePeerAccess));
 
     auto allocation = std::make_pair(nullptr, size);
-    cudaMalloc((void**) &allocation.first, size);
+    CUDA_CHECK(cudaMalloc((void**) &(allocation.first), size));
 
-    cudaMemcpy((void*) allocation.first, client_ptr, size, cudaMemcpyDeviceToDevice);
+    CUDA_CHECK(cudaMemcpy((void*) allocation.first, client_ptr, size, cudaMemcpyDeviceToDevice));
     hapiMemoryMap[allocId] = allocation;
 
-    cudaIpcCloseMemHandle(client_ptr);
+    CUDA_CHECK(cudaIpcCloseMemHandle(client_ptr));
     write(client_fd, &allocId, sizeof(int));
     allocId++;
   }
@@ -77,10 +84,7 @@ void hapiProcessMemoryRequest(int server_fd, int my_device, char* buf)
 
     void* ptr = hapiMemoryMap[alloc_id].first;
     cudaIpcMemHandle_t ipc_handle;
-    cudaError_t err = cudaIpcGetMemHandle(&ipc_handle, ptr);
-    if (err != cudaSuccess) {
-      fprintf(stderr, "HAPI> cudaIpcGetMemHandle failed: %s\n", cudaGetErrorString(err));
-    }
+    CUDA_CHECK(cudaIpcGetMemHandle(&ipc_handle, ptr));
     write(client_fd, &ipc_handle, sizeof(cudaIpcMemHandle_t));
   }
   else if (strcmp(command, "FREE") == 0)
@@ -90,7 +94,7 @@ void hapiProcessMemoryRequest(int server_fd, int my_device, char* buf)
 
     auto it = hapiMemoryMap.find(alloc_id);
     if (it != hapiMemoryMap.end()) {
-      cudaFree(it->second.first);
+      CUDA_CHECK(cudaFree(it->second.first));
       hapiMemoryMap.erase(it);
     }
   }
