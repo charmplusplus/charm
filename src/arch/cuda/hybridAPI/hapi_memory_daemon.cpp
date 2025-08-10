@@ -48,6 +48,7 @@ void hapiProcessMemoryRequest(int server_fd, int my_device, char* buf)
     sscanf(buf, "CKPT:%ld:%d:%d:", &client_pid, &client_pe, &size);
 
     printf("HAPI> Checkpoint request from client %ld (PE %d): %d bytes\n", client_pid, client_pe, size);
+    fflush(stdout);
 
     char* handle_start = strchr(buf, ':');
     handle_start = strchr(handle_start + 1, ':');
