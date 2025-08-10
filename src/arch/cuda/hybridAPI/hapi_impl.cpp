@@ -246,7 +246,7 @@ void hapiRestore(void* devPtr, int size, int alloc_id) {
 
   int client_fd = open(client_fifo_path, O_RDONLY);
   cudaIpcMemHandle_t ipc_handle;
-  read(client_fd, &ipc_handle, sizeof(ipc_handle));
+  read(client_fd, &ipc_handle, sizeof(cudaIpcMemHandle_t));
   close(client_fd);
 
   void* srcPtr;
