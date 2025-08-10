@@ -67,7 +67,7 @@ void hapiProcessMemoryRequest(int server_fd, int my_device, char* buf)
     hapiMemoryMap[allocId] = allocation;
 
     cudaIpcCloseMemHandle(client_ptr);
-    write(client_fd, &allocId, sizeof(allocId));
+    write(client_fd, &allocId, sizeof(int));
     allocId++;
   }
   else if (strcmp(command, "GET") == 0)
