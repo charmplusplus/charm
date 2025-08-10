@@ -77,7 +77,10 @@ void hapiProcessMemoryRequest(int server_fd, int my_device, char* buf)
 
     void* ptr = hapiMemoryMap[alloc_id].first;
     cudaIpcMemHandle_t ipc_handle;
-    cudaIpcGetMemHandle(&ipc_handle, ptr);
+    cudaError_t err = cudaIpcGetMemHandle(&ipc_handle, ptr);
+    if (err != cudaSuccess) {
+      fprintf(stderr, "HAPI> cudaIpcGetMemHandle failed: %s\n", cudaGetErrorString(err));
+    }
     write(client_fd, &ipc_handle, sizeof(cudaIpcMemHandle_t));
   }
   else if (strcmp(command, "FREE") == 0)
