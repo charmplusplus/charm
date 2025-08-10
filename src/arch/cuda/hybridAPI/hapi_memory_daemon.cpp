@@ -75,7 +75,7 @@ void hapiProcessMemoryRequest(int server_fd, int my_device, char* buf)
     void* client_ptr;
     CUDA_CHECK(cudaIpcOpenMemHandle(&client_ptr, ipc_handle, cudaIpcMemLazyEnablePeerAccess));
 
-    auto allocation = std::make_pair(nullptr, size);
+    std::pair<void*, size_t> allocation = std::make_pair((void*) NULL, size);
     CUDA_CHECK(cudaMalloc((void**) &(allocation.first), size));
 
     CUDA_CHECK(cudaMemcpy((void*) allocation.first, client_ptr, size, cudaMemcpyDeviceToDevice));
