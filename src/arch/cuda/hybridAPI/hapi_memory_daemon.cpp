@@ -105,6 +105,7 @@ void hapiProcessMemoryRequest(int server_fd, int my_device, char* buf)
       CUDA_CHECK(cudaFree(it->second.first));
       hapiMemoryMap.erase(it);
     }
+    write(client_fd, "\0", 1);
   }
   else if (strcmp(command, "KILL") == 0)
   {
