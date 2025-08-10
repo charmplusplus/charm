@@ -20,10 +20,9 @@
 #define CUDA_CHECK(call) do { \
   cudaError_t err = call; \
   if (err != cudaSuccess) { \
-    fprintf(stderr, "HAPI> CUDA call failed: %s\n", cudaGetErrorString(err)); \
+    fprintf(stderr, "HAPI> CUDA call failed at %s:%d: %s\n", __FILE__, __LINE__, cudaGetErrorString(err)); \
   } \
 } while(0)
-
 
 #define SERVER_FIFO_TEMPLATE "/tmp/server_pipe_%ld"
 #define CLIENT_FIFO_TEMPLATE "/tmp/client_pipe_%ld"
