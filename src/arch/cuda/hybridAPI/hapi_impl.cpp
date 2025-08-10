@@ -258,7 +258,7 @@ void hapiRestore(void* devPtr, int size, int alloc_id) {
   sprintf(free_msg, "FREE:%ld:%d", pid, alloc_id);
   hapiSendMemoryRequest(free_msg, strlen(free_msg) + 1);
 
-  int client_fd = open(client_fifo_path, O_RDONLY);
+  client_fd = open(client_fifo_path, O_RDONLY);
   char status;
   read(client_fd, &status, sizeof(char));
   close(client_fd);
