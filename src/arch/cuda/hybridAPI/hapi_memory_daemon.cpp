@@ -181,15 +181,55 @@ void hapiStartMemoryDaemon(int my_device) {
       }
 
       // Process all complete messages in the buffer
-      while (1)
+      while (data_in_stream > 0)
       {
-        char* msg_end = (char*)memchr(stream_buf, '\0', data_in_stream);
-        if (msg_end == NULL) {
-          break; // Wait for more data
+        size_t msg_len = 0;
+        // We need at least 4 bytes to identify a command
+        if (data_in_stream < 4) break;
+
+        if (strncmp(stream_buf, "CKPT", 4) == 0) {
+          // CKPT message format: "CKPT:<pid>:<pe>:<size>:<ipc_handle>"
+          // Find the end of the text part (after the 3rd colon)
+          const char *p = stream_buf;
+          int colons = 0;
+          size_t header_len = 0;
+          for (size_t i = 0; i < data_in_stream; ++i) {
+            if (p[i] == ':') {
+              colons++;
+              if (colons == 3) {
+                header_len = i + 1;
+                break;
+              }
+            }
+          }
+
+          if (header_len == 0) {
+            // Header is incomplete, need more data
+            break;
+          }
+
+          msg_len = header_len + sizeof(cudaIpcMemHandle_t);
+          if (data_in_stream < msg_len) {
+            // Full message not yet received
+            break;
+          }
+        } else {
+          // Other messages are simple null-terminated strings
+          char* msg_end = (char*)memchr(stream_buf, '\0', data_in_stream);
+          if (msg_end == NULL) {
+            // Incomplete message
+            break;
+          }
+          msg_len = (msg_end - stream_buf) + 1;
         }
 
-        size_t msg_len = (msg_end - stream_buf) + 1;
+        if (msg_len == 0) break; // Should not happen
+
         char current_request[BUFFER_SIZE];
+        if (msg_len > BUFFER_SIZE) {
+          printf("DAEMON: Error, received message too long (%zu bytes). Aborting.\n", msg_len);
+          exit(1);
+        }
         memcpy(current_request, stream_buf, msg_len);
         
         // Process the request. Note: This may exit on a KILL command.
