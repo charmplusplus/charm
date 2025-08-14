@@ -1,5 +1,5 @@
 -include ../../../common.mk
-CHARMC=../../../../netlrts-linux-x86_64/bin/charmc -O3 $(OPTS)
+CHARMC=../../../../bin/charmc -O3 $(OPTS)
 
 OBJS = jacobi2d.o
 

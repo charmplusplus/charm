@@ -18,7 +18,7 @@
 realloc_state pending_realloc_state;
 char * se_avail_vector;
 int numProcessAfterRestart;
-//extern "C" CcsDelayedReply shrinkExpandreplyToken;
+extern "C" CcsDelayedReply shrinkExpandreplyToken;
 extern "C" char willContinue;
 char willContinue;
 #endif
@@ -105,7 +105,7 @@ static void handler(char *bit_map)
 {
 #if CMK_SHRINK_EXPAND
     printf("Charm> Rescaling called!\n");
-    //shrinkExpandreplyToken = CcsDelayReply();
+    shrinkExpandreplyToken = CcsDelayReply();
     bit_map += CmiMsgHeaderSizeBytes;
     realloc(bit_map);
 #endif
