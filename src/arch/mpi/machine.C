@@ -1,4 +1,3 @@
-
 /** @file
  * MPI based machine layer
  * @ingroup Machine
@@ -1847,6 +1846,7 @@ void LrtsPostCommonInit(int everReturn) {
 
 /***********************************************************************
  *
+ *
  * Abort function:
  *
  ************************************************************************/
@@ -2039,21 +2039,26 @@ void ConverseCleanup(void)
     std::string path = std::string(_shrinkexpand_basedir) + "/numRestartProcs.txt";
     FILE *fp = fopen(path.c_str(), "w");
     if (fp != NULL) {
+      CmiPrintf("Charm> Writing numProcessAfterRestart %i to %s\n", numProcessAfterRestart, path.c_str());
       fprintf(fp, "%d", numProcessAfterRestart);
       fclose(fp);
+    } else {
+      perror("Error opening file");
     }
 
-    CcsSendDelayedReply(shrinkExpandreplyToken, 0, 0);
+    // Use the new synchronous reply function. This blocks until the reply is
+    // sent and acknowledged by charmrun, robustly fixing the race condition.
+    CcsSendDelayedReplyAndTerm(shrinkExpandreplyToken, 0, 0);
 
     CmiBarrier();
-    LrtsExit(100);
+    ConverseExit(100);
 
   } else {
     // kill all other processes
     CmiBarrier();
     //printf("Exiting PE %d\n", CmiMyPe());
     //fflush(stdout);
-    LrtsExit();
+    ConverseExit();
   }
 }
 #endif
@@ -2426,7 +2431,4 @@ void CmiSetupMachineRecvBuffersUser(void)
 #endif
 }
 /*=======End of Msg Histogram or Dynamic Post-Recv Related Funcs======*/
-
-
-/*@}*/
 

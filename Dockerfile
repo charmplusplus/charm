@@ -16,7 +16,10 @@ RUN cd charm && git checkout shrinkexpand-mpi && ./build charm++ mpi-linux-x86_6
 
 RUN cd charm/examples/charm++/shrink_expand && make clean && make
 RUN cd charm/examples/charm++/shrink_expand/jacobi2d-iter && make clean && make
+RUN cd charm/examples/charm++/shrink_expand/startup && make clean && make
 RUN mkdir /app
 RUN cp charm/examples/charm++/shrink_expand/jacobi2d-iter/charmrun /app/
+RUN cp charm/examples/charm++/shrink_expand/jacobi2d-iter/charmrun_elastic /app/
 RUN cp charm/examples/charm++/shrink_expand/jacobi2d-iter/jacobi2d /app/
+RUN cp charm/examples/charm++/shrink_expand/startup/startup /app/
 RUN chmod 777 /app

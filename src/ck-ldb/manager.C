@@ -32,7 +32,7 @@ void realloc(char* reallocMsg)
     int numBits = *((int *)reallocMsg);
     reallocMsg += sizeof(int);
 
-    CkPrintf("Charm> numProcessAfterRestart = %d\n", numProcessAfterRestart);
+    CkPrintf("Charm> numProcessAfterRestart = %d, numBits = %d\n", numProcessAfterRestart, numBits);
 
     if (LBManagerObj()->lb_in_progress)
     {
@@ -115,27 +115,34 @@ static void realloc_handler(char *msg)
 {
 #if CMK_SHRINK_EXPAND
     printf("Charm> Rescaling called!\n");
-    //shrinkExpandreplyToken = CcsDelayReply();
+    int myPes = CkNumPes();
+    shrinkExpandreplyToken = CcsDelayReply();
     msg += CmiMsgHeaderSizeBytes;
     bool isExpand = *((bool *)msg);
     int numPes = *((int *)(msg + sizeof(bool)));
-    char* bit_map = (char *)malloc(CkNumPes() + sizeof(int));
+    printf("Charm> realloc_handler: isExpand=%d numPes=%d CkNumPes()=%d\n", isExpand, numPes, CkNumPes());
+    
+    char* bit_map = (char *)malloc(CkNumPes() + 2 * sizeof(int));
+    memcpy(bit_map, &numPes, sizeof(int));
+    memcpy(&bit_map[sizeof(int)], &myPes, sizeof(int));
+    char* start_bitmap = bit_map + 2 * sizeof(int);
+    
     if (isExpand)
     {
         for (int i = 0; i < CkNumPes(); i++) {
-            bit_map[i] = 1;
+            start_bitmap[i] = 1;
         }
     }
     else
     {
         for (int i = 0; i < CkNumPes(); i++) {
             if (i < numPes)
-                bit_map[i] = 1;
+                start_bitmap[i] = 1;
             else
-                bit_map[i] = 0;
+                start_bitmap[i] = 0;
         }
     }
-    memcpy(&bit_map[CkNumPes()], &numPes, sizeof(int));
+    
     realloc(bit_map);
 #endif
 }

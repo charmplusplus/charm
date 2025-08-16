@@ -76,7 +76,7 @@ do
 		;;
 	++nodelist)
 		machinefile="$2"
-		args=("-machinefile" "$2" "${args[@]} ++nodelist "$2"")
+		args=("-machinefile" "$2" "${args[@]}" "++nodelist" "$2")
 		shift
 		;;
 	++quiet)
