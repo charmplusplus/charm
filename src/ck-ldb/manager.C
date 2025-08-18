@@ -142,7 +142,7 @@ static void realloc_handler(char *msg)
 
 void rescale(char* bit_map)
 {
-    handler(bit_map);
+    realloc(bit_map);
 }
 
 void manager_init(){
