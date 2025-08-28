@@ -59,9 +59,6 @@ set(conv-core-cxx-sources
     src/conv-core/hrctimer.C
 )
 
-set(reconverse-h-sources
-    reconverse/include/converse.h)
-
 #set(reconverse-comm-backend-sources
 #    reconverse/comm_backend/comm_backend_internal.h
 #    reconverse/comm_backend/comm_backend.h)
@@ -237,13 +234,9 @@ file(WRITE ${CMAKE_BINARY_DIR}/include/topomanager_config.h "// empty\n" )
 # )
 # add_dependencies(converse hwloc)
 
-add_subdirectory(reconverse)
-# add_dependencies(converse reconverse)
-
 add_library(charm_cxx_utils STATIC
     ${conv-util-cxx-sources})
 
-add_library(converse INTERFACE)
 
 add_library(topomanager STATIC
     ${tmgr-cxx-sources}
@@ -253,12 +246,14 @@ target_include_directories(topomanager PUBLIC
     src/util/topomanager
     ${CMAKE_BINARY_DIR}/include)
 
-target_link_libraries(converse INTERFACE
-    reconverse
-    topomanager
-    charm_cxx_utils
-    hwloc
-)
+# add_library(converse INTERFACE)
+# target_link_libraries(converse INTERFACE
+#     reconverse
+#     topomanager
+#     charm_cxx_utils
+# )
+add_custom_target(converse)
+add_dependencies(converse reconverse topomanager charm_cxx_utils)
 
 #file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/comm_backend)
 
@@ -276,12 +271,9 @@ foreach(filename
     ${conv-util-h-sources}
     ${conv-ldb-h-sources}
     ${tmgr-h-sources}
-    ${reconverse-h-sources}
 )
     configure_file(${filename} ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 endforeach()
-
-
 
 # target_include_directories(converse PRIVATE src/arch/util) # for machine*.*
 # target_include_directories(converse PRIVATE src/util) # for sockRoutines.C
