@@ -443,3 +443,32 @@ jobs:
       run: |
         make -C netlrts-win-x86_64/tests test TESTOPTS="++local"
 
+  multicore-linux-x86_64_reconverse:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake libfabric-bin libfabric-dev
+    - name: build
+      run: ./build charm++ multicore-linux-x86_64 -j3 --with-production 
+    - name: test
+      run: |
+        multicore-linux-x86_64/_deps/lci-src/lcrun -n 2 multicore-linux-x86_64/bin/ckhello +pe 4
+
+  multicore-darwin-x86_64_reconverse:
+    timeout-minutes: 60
+    runs-on: macos-13
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install Dependencies
+      run: |
+        brew update
+        brew install cmake libfabric
+    - name: build
+      run: ./build charm++ multicore-darwin-x86_64 -j3 --with-production 
+    - name: test
+      run: |
+        multicore-darwin-x86_64/_deps/lci-src/lcrun -n 2 multicore-darwin-x86_64/bin/ckhello +pe 4
