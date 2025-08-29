@@ -12,6 +12,7 @@ extern int quietModeRequested;
 
 static void lbinit()
 {
+  CkPrintf("LBINIT CALLED\n");
   const auto& names = TreeStrategy::LBNames;
   std::ostringstream o;
   for (const auto& name : names)
@@ -98,7 +99,7 @@ void TreeLB::loadConfigFile(const CkLBOptions& opts)
 
 void TreeLB::init(const CkLBOptions& opts)
 {
-#if CMK_LBDB_ON
+#if 1
 
   lbname = "TreeLB";
 
@@ -123,7 +124,7 @@ void TreeLB::init(const CkLBOptions& opts)
 
 TreeLB::~TreeLB()
 {
-#if CMK_LBDB_ON
+#if 1
   lbmgr = CProxy_LBManager(_lbmgr).ckLocalBranch();
   if (lbmgr)
   {
@@ -138,7 +139,7 @@ TreeLB::~TreeLB()
 
 void TreeLB::configure(LBTreeBuilder& builder, json& config)
 {
-#if CMK_LBDB_ON
+#if 1
 
   if (numLevels > 0 && CkMyPe() == 0 && !quietModeRequested)
   {
@@ -179,7 +180,7 @@ void TreeLB::configure(LBTreeBuilder& builder, json& config)
 
 void TreeLB::configure(json& config)
 {
-#if CMK_LBDB_ON
+#if 1
   const std::string& tree_type = config["tree"];
   if (tree_type == "PE_Root")
   {
@@ -221,7 +222,7 @@ void TreeLB::pup(PUP::er& p)
 
 void TreeLB::InvokeLB()
 {
-#if CMK_LBDB_ON
+#if 1
   // NOTE: I'm assuming new LBManager will know when (and when not to) call AtSync
   if (barrier_before_lb)
   {
@@ -236,7 +237,8 @@ void TreeLB::InvokeLB()
 
 void TreeLB::ProcessAtSync()
 {
-#if CMK_LBDB_ON
+  CkAbort("Test");
+#if 1
   startTime = CkWallTimer();
   if (CkMyPe() == 0 && _lb_args.debug() > 0)
   {

@@ -57,7 +57,7 @@ void LBInfo::clear()
 
 void LBInfo::getInfo(BaseLB::LDStats* stats, int count, int considerComm)
 {
-#if CMK_LBDB_ON
+#if 1
 	int i, pe;
 
 	CmiAssert(peLoads);

@@ -87,7 +87,7 @@ void LBDatabase::DoneRegisteringObjects(LDOMHandle omh)
 
 LDObjHandle LBDatabase::RegisterObj(LDOMHandle omh, CmiUInt8 id,
                                     void* userPtr, int migratable) {
-#if CMK_LBDB_ON
+#if 1
   LDObjHandle newhandle;
 
   newhandle.omhandle = omh;
@@ -129,7 +129,7 @@ void LBDatabase::UnregisterObj(LDObjHandle h)
 
 void LBDatabase::Send(const LDOMHandle &destOM, const CmiUInt8 &destID, unsigned int bytes, int destObjProc, int force)
 {
-#if CMK_LBDB_ON
+#if 1
   if (force || (StatsOn() && _lb_args.traceComm())) {
     LBCommData* item_ptr;
 
@@ -158,7 +158,7 @@ void LBDatabase::Send(const LDOMHandle &destOM, const CmiUInt8 &destID, unsigned
 
 void LBDatabase::MulticastSend(const LDOMHandle &destOM, CmiUInt8 *destIDs, int nDests, unsigned int bytes, int nMsgs)
 {
-#if CMK_LBDB_ON
+#if 1
   if (StatsOn() && _lb_args.traceComm()) {
     LBCommData* item_ptr;
 
@@ -286,7 +286,7 @@ int LBDatabase::Migrate(LDObjHandle h, int dest)
 }
 
 void LBDatabase::MetaLBResumeWaitingChares(int lb_ideal_period) {
-#if CMK_LBDB_ON
+#if 1
   for (int i = 0; i < objs.size(); i++) {
     LBObj* obj = objs[i].obj;
     if (obj) {
@@ -299,7 +299,7 @@ void LBDatabase::MetaLBResumeWaitingChares(int lb_ideal_period) {
 }
 
 void LBDatabase::MetaLBCallLBOnChares() {
-#if CMK_LBDB_ON
+#if 1
   for (int i = 0; i < objs.size(); i++) {
     LBObj* obj = objs[i].obj;
     if (obj) {
@@ -321,7 +321,7 @@ int LBDatabase::useMem() {
 
 void LBDatabase::EstObjLoad(const LDObjHandle &_h, double cputime)
 {
-#if CMK_LBDB_ON
+#if 1
   LBObj *const obj = LbObj(_h);
 
   CmiAssert(obj != NULL);

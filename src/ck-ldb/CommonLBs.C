@@ -15,7 +15,7 @@ static void CreateNoLB(void)
 }
 
 void initCommonLBs(void) {
-#if CMK_LBDB_ON
+#if 1
 //  LBSetDefaultCreate(CreateNoLB);
 #endif
 }

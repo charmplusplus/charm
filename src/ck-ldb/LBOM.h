@@ -35,7 +35,7 @@ private:
 
   void DepositHandle(LDOMHandle _h) { myhandle = _h; };
   void Migrate(LDObjHandle _h, int dest) { callbacks.migrate(_h,dest); };
-#if CMK_LBDB_ON
+#if 1
   void MetaLBResumeWaitingChares(LDObjHandle _h, int lb_ideal_period) {
     callbacks.metaLBResumeWaitingChares(_h, lb_ideal_period);
   }

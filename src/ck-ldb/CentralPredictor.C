@@ -11,7 +11,7 @@
 #define SMALL_NUMBER   0.00001    // to avoid singular matrix in gaussj
 
 void gaussj(double **a, double *b, int n) {
-#if CMK_LBDB_ON
+#if 1
   int i,j,k;
   int irow, icol;
   double big, dum, pivinv;
@@ -73,7 +73,7 @@ void gaussj(double **a, double *b, int n) {
 }
 
 void Marquardt_coefficients(double *x, double *y, double *param, double **alpha, double *beta, double &chisq, LBPredictorFunction *predict) {
-#if CMK_LBDB_ON
+#if 1
   int i,j,k,l,m;
   double ymod, dy;
   double *dyda = new double[predict->num_params];
@@ -107,7 +107,7 @@ void Marquardt_coefficients(double *x, double *y, double *param, double **alpha,
 }
 
 bool Marquardt_solver(CentralLB::FutureModel *mod, int object) {
-#if CMK_LBDB_ON
+#if 1
   double chisq, ochisq;
   double lambda = 0.001;
   int i,j;
@@ -196,7 +196,7 @@ bool Marquardt_solver(CentralLB::FutureModel *mod, int object) {
 
 // routine that update LDStats given a predictor model
 void CentralLB::FuturePredictor(BaseLB::LDStats* stats) {
-#if CMK_LBDB_ON
+#if 1
   bool model_done;
   int i;
 

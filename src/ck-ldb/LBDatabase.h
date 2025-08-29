@@ -151,7 +151,7 @@ public:
   void CollectStatsOn(void);
   inline void CollectStatsOff(void) { TurnStatsOff(); };
   inline int  CollectingStats(void) {
-  #if CMK_LBDB_ON
+  #if 1
     return StatsOn();
   #else
     return 0;

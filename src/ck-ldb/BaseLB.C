@@ -7,7 +7,7 @@
 #include "BaseLB.h"
 #include "LBSimulation.h"
 
-#if CMK_LBDB_ON
+#if 1
 
 void BaseLB::initLB(const CkLBOptions &opt) {
   seqno = opt.getSeqNo();
@@ -44,14 +44,14 @@ void BaseLB::flushStates() {}
 
 void BaseLB::turnOn()
 {
-#if CMK_LBDB_ON
+#if 1
   lbmgr->TurnOnStartLBFn(startLbFnHdl);
 #endif
 }
 
 void BaseLB::turnOff()
 {
-#if CMK_LBDB_ON
+#if 1
   lbmgr->TurnOffStartLBFn(startLbFnHdl);
 #endif
 }
@@ -168,7 +168,7 @@ void BaseLB::LDStats::deleteCommHash() {
 
 int BaseLB::LDStats::getHash(const CmiUInt8 &oid, const LDOMid &mid)
 {
-#if CMK_LBDB_ON
+#if 1
     CmiAssert(hashSize > 0);
     int hash = ObjKey(oid, hashSize);
 
@@ -215,7 +215,7 @@ void BaseLB::LDStats::clearCommHash() {
 
 void BaseLB::LDStats::computeNonlocalComm(int &nmsgs, int &nbytes)
 {
-#if CMK_LBDB_ON
+#if 1
     	nmsgs = 0;
 	nbytes = 0;
 
@@ -295,7 +295,7 @@ void BaseLB::LDStats::normalize_speed() {
 
 void BaseLB::LDStats::print()
 {
-#if CMK_LBDB_ON
+#if 1
   int i = 0;
   CkPrintf("------------- Processor Data: %zu -------------\n", procs.size());
   for (const auto& proc : procs)

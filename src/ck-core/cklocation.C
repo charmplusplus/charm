@@ -23,7 +23,7 @@
 #include <stdarg.h>
 #include <vector>
 
-#if CMK_LBDB_ON
+#if 1
 #  include "LBManager.h"
 #  include "MetaBalancer.h"
 #  if CMK_GLOBAL_LOCATION_UPDATE
@@ -31,7 +31,7 @@
 #    include "init.h"
 #  endif
 CkpvExtern(int, _lb_obj_index);  // for lbdb user data for obj index
-#endif                           // CMK_LBDB_ON
+#endif                           // 1
 
 CpvExtern(std::vector<NcpyOperationInfo*>, newZCPupGets);  // used for ZC Pup
 #ifndef CMK_CHARE_USE_PTR
@@ -78,7 +78,7 @@ bool useNodeBlkMapping;
 /// unlocated array elements
 int _messageBufferingThreshold;
 
-#if CMK_LBDB_ON
+#if 1
 
 #  if CMK_GLOBAL_LOCATION_UPDATE
 void UpdateLocation(MigrateInfo& migData)
@@ -1723,7 +1723,7 @@ void CkMigratable::commonInit(void)
   prev_load = 0.0;
   can_reset = false;
 
-#if CMK_LBDB_ON
+#if 1
   if (_lb_args.metaLbOn())
   {
     atsync_iteration = myRec->getMetaBalancer()->get_iteration();
@@ -1750,7 +1750,7 @@ void CkMigratable::pup(PUP::er& p)
   p | can_reset;
   p | usesAutoMeasure;
 
-#if CMK_LBDB_ON
+#if 1
   bool readyMigrate = false;
   if (p.isPacking())
     readyMigrate = myRec->isReadyMigrate();
@@ -1795,7 +1795,7 @@ CkMigratable::~CkMigratable()
     prefetchObjID = -1;
   }
 #endif
-#if CMK_LBDB_ON
+#if 1
   if (barrierRegistered)
   {
     DEBL((AA "Removing barrier for element %s\n" AB, idx2str(thisIndexMax)));
@@ -1832,7 +1832,7 @@ void CkMigratable::UserSetLBLoad()
   CkAbort("::UserSetLBLoad() not defined for this array element!\n");
 }
 
-#if CMK_LBDB_ON  // For load balancing:
+#if 1  // For load balancing:
 // user can call this helper function to set obj load (for model-based lb)
 void CkMigratable::setObjTime(double cputime) { myRec->setObjTime(cputime); }
 double CkMigratable::getObjTime() { return myRec->getObjTime(); }
@@ -2079,7 +2079,7 @@ CkLocRec::CkLocRec(CkLocMgr* mgr, bool fromMigration, bool ignoreArrival,
                    const CkArrayIndex& idx_, CmiUInt8 id_)
     : myLocMgr(mgr), idx(idx_), id(id_), deletedMarker(NULL), running(false)
 {
-#if CMK_LBDB_ON
+#if 1
   DEBL((AA "Registering element %s with load balancer\n" AB, idx2str(idx)));
   nextPe = -1;
   asyncMigrate = false;
@@ -2109,7 +2109,7 @@ CkLocRec::~CkLocRec()
 {
   if (deletedMarker != NULL)
     *deletedMarker = true;
-#if CMK_LBDB_ON
+#if 1
   stopTiming();
   DEBL((AA "Unregistering element %s from load balancer\n" AB, idx2str(idx)));
   lbmgr->UnregisterObj(ldHandle);
@@ -2122,7 +2122,7 @@ void CkLocRec::migrateMe(int toPe)  // Leaving this processor
   myLocMgr->emigrate(this, toPe);
 }
 
-#if CMK_LBDB_ON
+#if 1
 void CkLocRec::startTiming(int ignore_running)
 {
   if (!ignore_running)
@@ -2196,7 +2196,7 @@ bool CkLocRec::invokeEntry(CkMigratable* obj, void* msg, int epIdx, bool doFree)
     }
   }
 #endif
-#if CMK_LBDB_ON
+#if 1
   if (!isDeleted)
     checkBufferedMigration();  // check if should migrate
 #endif
@@ -2206,7 +2206,7 @@ bool CkLocRec::invokeEntry(CkMigratable* obj, void* msg, int epIdx, bool doFree)
   return true;
 }
 
-#if CMK_LBDB_ON
+#if 1
 
 void CkLocRec::staticMetaLBResumeWaitingChares(LDObjHandle h, int lb_ideal_period)
 {
@@ -2433,7 +2433,7 @@ CkLocMgr::CkLocMgr(CkArrayOptions opts)
   compressor = ck::FixedArrayIndexCompressor::make(bounds);
 
   // Find and register with the load balancer
-#if CMK_LBDB_ON
+#if 1
   lbmgrID = _lbmgr;
   metalbID = _metalb;
   initLB(lbmgrID, metalbID);
@@ -2448,7 +2448,7 @@ CkLocMgr::CkLocMgr(CkMigrateMessage* m)
 
 CkLocMgr::~CkLocMgr()
 {
-#if CMK_LBDB_ON
+#if 1
   syncBarrier->removeBeginReceiver(lbBarrierBeginReceiver);
   syncBarrier->removeEndReceiver(lbBarrierEndReceiver);
   lbmgr->UnregisterOM(myLBHandle);
@@ -2489,7 +2489,7 @@ void CkLocMgr::pup(PUP::er& p)
     compressor = ck::FixedArrayIndexCompressor::make(bounds);
   }
 
-#if CMK_LBDB_ON
+#if 1
   p | lbmgrID;
   p | metalbID;
   if (p.isUnpacking())
@@ -2997,7 +2997,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   // Allocate and pack into message
   CkArrayElementMigrateMessage* msg = new (bufSize, 0)
       CkArrayElementMigrateMessage(idx, id,
-#if CMK_LBDB_ON
+#if 1
                                    rec->isAsyncMigrate(),
 #else
                                    false,
@@ -3032,7 +3032,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   cache->recordEmigration(id, toPe);
   informHome(idx, toPe);
 
-#if !CMK_LBDB_ON && CMK_GLOBAL_LOCATION_UPDATE
+#if !1 && CMK_GLOBAL_LOCATION_UPDATE
   DEBM((AA "Global location update. idx %s "
            "assigned to %d \n" AB,
         idx2str(idx), toPe));
@@ -3042,7 +3042,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   CK_MAGICNUMBER_CHECK
 }
 
-#if CMK_LBDB_ON
+#if 1
 void CkLocMgr::informLBPeriod(CkLocRec* rec, int lb_ideal_period)
 {
   callMethod(rec, &CkMigratable::recvLBPeriod, (void*)&lb_ideal_period);
@@ -3216,13 +3216,13 @@ unsigned int CkLocMgr::numLocalElements()
 
 /********************* LocMgr: LOAD BALANCE ****************/
 
-#if !CMK_LBDB_ON
+#if !1
 // Empty versions of all load balancer calls
 void CkLocMgr::startInserting(void) {}
 void CkLocMgr::doneInserting(void) {}
 #endif
 
-#if CMK_LBDB_ON
+#if 1
 void CkLocMgr::initLB(CkGroupID lbmgrID_, CkGroupID metalbID_)
 {  // Find and register with the load balancer
   lbmgr = (LBManager*)CkLocalBranch(lbmgrID_);

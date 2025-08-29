@@ -272,7 +272,7 @@ public:
 //                       sequence ticket,
 // AllocateFooLB():      allocate the class instead of a BOC
 // static void lbinit(): an init call for charm module registration
-#if CMK_LBDB_ON
+#if 1
 
 #  define CreateLBFunc_Def(x, str)                                                       \
     CMK_DEPRECATED_MSG("Use LBRegisterBalancer() instead of CreateLBFunc_Def()")         \

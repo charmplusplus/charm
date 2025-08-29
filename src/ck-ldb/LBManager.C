@@ -120,6 +120,7 @@ void LBDefaultCreate(const char* lbname) { lbRegistry.addCompiletimeBalancer(lbn
 void LBRegisterBalancer(std::string name, LBCreateFn fn, LBAllocFn afn, std::string help,
                         bool shown)
 {
+  CkPrintf("Charm++> Registering load balancer '%s'\n", name.c_str());
   lbRegistry.addEntry(name, fn, afn, help, shown);
 }
 
@@ -140,14 +141,16 @@ static void createLoadBalancer(const std::string& lbname, const char* legacybala
   }
   // invoke function to create load balancer
   int seqno = LBManagerObj()->getLoadbalancerTicket();
+  //CkPrintf("Charm++> Creating load balancer '%s' with sequence number %d.\n", lbname.c_str(), seqno);
   fn(CkLBOptions(seqno, legacybalancer));
 }
 
 // mainchare
 LBMgrInit::LBMgrInit(CkArgMsg* m)
 {
-#if CMK_LBDB_ON
+#if 1
   _lbmgr = CProxy_LBManager::ckNew();
+  CkPrintf("Charm++> Load Balancer Manager initialized, lbregistry contains %zu runtime load balancers\n", lbRegistry.runtime_lbs.size());
 
   // runtime specified load balancer
   if (!lbRegistry.runtime_lbs.empty())
@@ -158,6 +161,7 @@ LBMgrInit::LBMgrInit(CkArgMsg* m)
       const char* legacybalancer = lbRegistry.legacy_runtime_treelbs.count(i) > 0
                                        ? lbRegistry.legacy_runtime_treelbs[i]
                                        : nullptr;
+      CkPrintf("Charm++> Creating load balancer %s\n", lbRegistry.runtime_lbs[i]);
       createLoadBalancer(lbRegistry.runtime_lbs[i], legacybalancer);
     }
   }
@@ -182,6 +186,7 @@ LBMgrInit::LBMgrInit(CkArgMsg* m)
 // called from init.C
 void _loadbalancerInit()
 {
+  printf("Initializing load balancer...\n");
   CkpvInitialize(bool, lbmanagerInited);
   CkpvAccess(lbmanagerInited) = false;
 
@@ -240,8 +245,10 @@ void _loadbalancerInit()
           "pass directory of model files using +MetaLBModelDir.\n");
     if (CkMyRank() == 0)
     {
+      printf("Reading load balancer configurations...\n");
       while (CmiGetArgStringDesc(argv, "+balancer", &balancer, "Use this load balancer"))
       {
+        printf("Configuring load balancer: %s\n", balancer);
         bool isLegacyTreeLB = true;
         const char* legacyBalancer;
         if (strcmp(balancer, "GreedyLB") == 0)
@@ -272,9 +279,12 @@ void _loadbalancerInit()
     {
       // For other ranks, consume the +balancer arguments to avoid spuriously
       // passing them to the application
+      printf("Rank %d: Consuming load balancer configurations...\n", CkMyRank());
       while (CmiGetArgStringDesc(argv, "+balancer", &balancer, "Use this load balancer"))
         ;
     }
+
+    CmiNodeBarrier();
   }
 
   CmiGetArgDoubleDesc(
@@ -544,7 +554,7 @@ void LBManager::init(void)
   startLBFn_count = 0;
 
   CkpvAccess(lbmanagerInited) = true;
-#if CMK_LBDB_ON
+#if 1
   if (manualOn) TurnManualLBOn();
 #endif
   if (CkMyPe()==0 && _lb_args.traceComm() == 0 && !quietModeRequested)
@@ -858,7 +868,7 @@ void LBManager::configureTreeLB(json& config)
 
 void LBManager::ResetAdaptive()
 {
-#if CMK_LBDB_ON
+#if 1
   if (_lb_args.metaLbOn())
   {
     if (metabalancer == NULL)
@@ -875,7 +885,7 @@ void LBManager::ResetAdaptive()
 
 void LBManager::ResumeClients()
 {
-#if CMK_LBDB_ON
+#if 1
   if (_lb_args.metaLbOn())
   {
     if (metabalancer == NULL)
@@ -902,7 +912,7 @@ void LBManager::ResumeClients()
 
 void LBManager::SetMigrationCost(double cost)
 {
-#if CMK_LBDB_ON
+#if 1
   if (_lb_args.metaLbOn())
   {
     if (metabalancer == NULL)
@@ -919,7 +929,7 @@ void LBManager::SetMigrationCost(double cost)
 
 void LBManager::SetStrategyCost(double cost)
 {
-#if CMK_LBDB_ON
+#if 1
   if (_lb_args.metaLbOn())
   {
     if (metabalancer == NULL)
@@ -936,7 +946,7 @@ void LBManager::SetStrategyCost(double cost)
 
 void LBManager::UpdateDataAfterLB(double mLoad, double mCpuLoad, double avgLoad)
 {
-#if CMK_LBDB_ON
+#if 1
   if (_lb_args.metaLbOn())
   {
     if (metabalancer == NULL)
@@ -989,7 +999,7 @@ void LBManager::TurnOffBarrierReceiver(LDBarrierReceiver h)
 void LBManager::LocalBarrierOn(void) { CkSyncBarrier::object()->turnOn(); }
 void LBManager::LocalBarrierOff(void) { CkSyncBarrier::object()->turnOff(); }
 
-#if CMK_LBDB_ON
+#if 1
 static void work(int iter_block, volatile int* result)
 {
   int i;
@@ -1039,7 +1049,7 @@ int LDProcessorSpeed()
 
 #else
 int LDProcessorSpeed() { return 1; }
-#endif  // CMK_LBDB_ON
+#endif  // 1
 
 int LBManager::ProcessorSpeed()
 {
@@ -1052,7 +1062,7 @@ int LBManager::ProcessorSpeed()
 */
 void TurnManualLBOn()
 {
-#if CMK_LBDB_ON
+#if 1
   LBManager* myLbdb = LBManager::Object();
   if (myLbdb)
   {
@@ -1067,7 +1077,7 @@ void TurnManualLBOn()
 
 void TurnManualLBOff()
 {
-#if CMK_LBDB_ON
+#if 1
   LBManager* myLbdb = LBManager::Object();
   if (myLbdb)
   {
@@ -1082,7 +1092,7 @@ void TurnManualLBOff()
 
 void LBTurnInstrumentOn()
 {
-#if CMK_LBDB_ON
+#if 1
   if (CkpvAccess(lbmanagerInited))
     LBManager::Object()->CollectStatsOn();
   else
@@ -1092,7 +1102,7 @@ void LBTurnInstrumentOn()
 
 void LBTurnInstrumentOff()
 {
-#if CMK_LBDB_ON
+#if 1
   if (CkpvAccess(lbmanagerInited))
     LBManager::Object()->CollectStatsOff();
   else
@@ -1102,56 +1112,56 @@ void LBTurnInstrumentOff()
 
 void LBTurnCommOn()
 {
-#if CMK_LBDB_ON
+#if 1
   _lb_args.traceComm() = 1;
 #endif
 }
 
 void LBTurnCommOff()
 {
-#if CMK_LBDB_ON
+#if 1
   _lb_args.traceComm() = 0;
 #endif
 }
 
 void LBClearLoads()
 {
-#if CMK_LBDB_ON
+#if 1
   LBManager::Object()->ClearLoads();
 #endif
 }
 
 void LBTurnPredictorOn(LBPredictorFunction* model)
 {
-#if CMK_LBDB_ON
+#if 1
   LBManager::Object()->PredictorOn(model);
 #endif
 }
 
 void LBTurnPredictorOn(LBPredictorFunction* model, int wind)
 {
-#if CMK_LBDB_ON
+#if 1
   LBManager::Object()->PredictorOn(model, wind);
 #endif
 }
 
 void LBTurnPredictorOff()
 {
-#if CMK_LBDB_ON
+#if 1
   LBManager::Object()->PredictorOff();
 #endif
 }
 
 void LBChangePredictor(LBPredictorFunction* model)
 {
-#if CMK_LBDB_ON
+#if 1
   LBManager::Object()->ChangePredictor(model);
 #endif
 }
 
 void LBSetPeriod(double period)
 {
-#if CMK_LBDB_ON
+#if 1
   LBManager::SetLBPeriod(period);
 #endif
 }

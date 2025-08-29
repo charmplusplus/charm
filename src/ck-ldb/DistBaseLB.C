@@ -10,7 +10,7 @@
 #define  DEBUGF(x)      // CmiPrintf x;
 
 void DistBaseLB::barrierDone() {
-#if CMK_LBDB_ON
+#if 1
   if (lb_started) {
     return;
   }
@@ -43,7 +43,7 @@ void DistBaseLB::InvokeLB() {
 }
 
 DistBaseLB::DistBaseLB(const CkLBOptions &opt): CBase_DistBaseLB(opt) {
-#if CMK_LBDB_ON
+#if 1
   lbname = (char *)"DistBaseLB";
   thisProxy = CProxy_DistBaseLB(thisgroup);
   startLbFnHdl = lbmgr->AddStartLBFn(this, &DistBaseLB::barrierDone);
@@ -66,7 +66,7 @@ DistBaseLB::DistBaseLB(const CkLBOptions &opt): CBase_DistBaseLB(opt) {
 }
 
 DistBaseLB::~DistBaseLB() {
-#if CMK_LBDB_ON
+#if 1
   lbmgr = CProxy_LBManager(_lbmgr).ckLocalBranch();
   if (lbmgr) {
     lbmgr->RemoveStartLBFn(startLbFnHdl);
@@ -80,7 +80,7 @@ DistBaseLB::~DistBaseLB() {
 // Assemble the stats for the local PE. The stats are collected by the
 // LBManager so assemble all the stats.
 void DistBaseLB::AssembleStats() {
-#if CMK_LBDB_ON
+#if 1
 #if CMK_LB_CPUTIMER
   lbmgr->TotalTime(&myStats.total_walltime,&myStats.total_cputime);
   lbmgr->BackgroundLoad(&myStats.bg_walltime,&myStats.bg_cputime);
@@ -115,7 +115,7 @@ void DistBaseLB::AssembleStats() {
 }
 
 void DistBaseLB::LoadBalance() {
-#if CMK_LBDB_ON
+#if 1
   strat_start_time = CkWallTimer();
 
   if (CkMyPe() == 0 &&  _lb_args.debug()) {
@@ -141,7 +141,7 @@ void DistBaseLB::Migrated(int waitBarrier) {
 * migrateMsg
 */
 void DistBaseLB::ProcessMigrationDecision(LBMigrateMsg *migrateMsg) {
-#if CMK_LBDB_ON
+#if 1
   strat_end_time = CkWallTimer() - strat_start_time;
   const int me = CkMyPe();
 
@@ -176,7 +176,7 @@ void DistBaseLB::ProcessMigrationDecision(LBMigrateMsg *migrateMsg) {
 }
 
 void DistBaseLB::MigrationDone(int balancing) {
-#if CMK_LBDB_ON
+#if 1
   // Reset the lb_started flag to indicate that the lb is done
   lb_started = false;
   // Increment to next step
@@ -198,7 +198,7 @@ void DistBaseLB::ResumeClients() {
 }
 
 void DistBaseLB::ResumeClients(int balancing) {
-#if CMK_LBDB_ON
+#if 1
   DEBUGF(("[%d] ResumeClients. \n", CkMyPe()));
 
   if (CkMyPe() == 0 && balancing) {

@@ -46,7 +46,7 @@ public:
 };
 
 /* Utility */
-//#if CMK_LBDB_ON
+//#if 1
 #include "LBManager.h"
 #include "MetaBalancer.h"
 //#endif
@@ -465,7 +465,7 @@ private:
   void callMethod(CkLocRec* rec, CkMigratable_voidfn_arg_t fn, void*);
   void callMethod(CkLocRec* rec, CkMigratable_voidfn_t fn);
 
-#if CMK_LBDB_ON
+#if 1
   CkGroupID lbmgrID;
   CkGroupID metalbID;
   CkSyncBarrier* syncBarrier;
@@ -680,7 +680,7 @@ public:
   void informLBPeriod(CkLocRec* rec, int lb_ideal_period);
   void metaLBCallLB(CkLocRec* rec);
 
-#if CMK_LBDB_ON
+#if 1
   LBManager* getLBMgr(void) const { return lbmgr; }
   MetaBalancer* getMetaBalancer(void) const { return the_metalb; }
   const LDOMHandle& getOMHandle(void) const { return myLBHandle; }

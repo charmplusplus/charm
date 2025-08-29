@@ -11489,7 +11489,7 @@ CLINKAGE
 int AMPI_Set_migratable(int mig)
 {
   AMPI_API("AMPI_Set_migratable", mig);
-#if CMK_LBDB_ON
+#if 1
   getAmpiParent()->setMigratable((mig!=0));
 #else
   CkPrintf("WARNING: MPI_Set_migratable is not supported in this build of Charm++/AMPI.\n");

@@ -437,7 +437,7 @@ void TCharm::run() noexcept
 //Go to sync, block, possibly migrate, and then resume
 CMI_WARN_UNUSED_RESULT TCharm * TCharm::migrate() noexcept
 {
-#if CMK_LBDB_ON
+#if 1
   DBG("going to sync");
   AtSync();
   return stop();
@@ -450,7 +450,7 @@ CMI_WARN_UNUSED_RESULT TCharm * TCharm::migrate() noexcept
 //calls atsync with async mode
 CMI_WARN_UNUSED_RESULT TCharm * TCharm::async_migrate() noexcept
 {
-#if CMK_LBDB_ON
+#if 1
   DBG("going to sync at async mode");
   ReadyMigrate(false);
   asyncMigrate = true;
@@ -468,7 +468,7 @@ Note:
 */
 CMI_WARN_UNUSED_RESULT TCharm * TCharm::allow_migrate()
 {
-#if CMK_LBDB_ON
+#if 1
   int nextPe = MigrateToPe();
   if (nextPe != -1) {
     return migrateTo(nextPe);
