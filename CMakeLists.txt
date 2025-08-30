@@ -187,7 +187,6 @@ option(DRONE_MODE          "Enable drone mode" OFF)
 option(TASK_QUEUE          "Enable task queue" OFF)
 option(RECONVERSE          "Use the Reconverse communication layer" OFF)
 
-
 if(TRACING STREQUAL "")
   if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(TRACING 1)
@@ -272,7 +271,6 @@ if(${RECONVERSE})
 else()
   set(CMK_RECONVERSE 0)
 endif()
-
 
 if(${AMPI_MPICH_TESTS})
   add_definitions(-DAMPI_ERRHANDLER_RETURN=1)
@@ -457,7 +455,11 @@ file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/bin/)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/cklibs)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib_so)
+if(BUILD_SHARED)
+  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib_so)
+else()
+  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+endif()
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
 if (NOT CMAKE_INSTALL_PREFIX)
@@ -467,6 +469,12 @@ endif()
 if (NOT CMAKE_BUILD_TYPE)
     message(STATUS "${PROJECT_NAME}: No build type selected, default to Release")
     set(CMAKE_BUILD_TYPE "Release")
+endif()
+
+if(RECONVERSE)
+  # This needs to be include before we set charmc as the linker
+  # but after CMAKE_LIBRARY_OUTPUT_DIRECTORY has been set
+  add_subdirectory(cmake/fetch_reconverse)
 endif()
 
 if (NOT CMK_MEMPOOL_CUTOFFNUM)
@@ -1017,6 +1025,9 @@ if(${TARGET} STREQUAL "charm4py")
 else()
   # Check that we are able to build and link an executable
   add_executable(ckhello ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.C)
+  if(RECONVERSE)
+    target_link_libraries(ckhello PRIVATE reconverse)
+  endif()
   add_dependencies(ckhello ck ckqt conv-static
     converse ckmain
     moduleNDMeshStreamer modulecompletion)
