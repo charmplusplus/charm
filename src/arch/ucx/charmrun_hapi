@@ -26,7 +26,7 @@ else
 fi
 
 # --- Clean up and start the memory daemon in the background ---
-srun --ntasks-per-node=1 --nodes="$num_nodes" --exact bash -c "rm -f /dev/shm/numRestartProcs.txt /tmp/server_fifo_* /tmp/client_fifo_* /tmp/daemon_ready_*; mkfifo -m 0666 /tmp/daemon_ready_0"
+srun --ntasks-per-node=1 --exact bash -c "rm -f /dev/shm/numRestartProcs.txt /tmp/server_fifo_* /tmp/client_fifo_* /tmp/daemon_ready_*; mkfifo -m 0666 /tmp/daemon_ready_0"
 srun --ntasks-per-node=1 --nodes="$num_nodes" --exact ./hapi_memory_daemon &
 daemon_pid=$!
 
