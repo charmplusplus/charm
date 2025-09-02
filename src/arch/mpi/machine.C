@@ -1,10 +1,10 @@
-
 /** @file
  * MPI based machine layer
  * @ingroup Machine
  */
 /*@{*/
 
+#include <string>
 #include <stdio.h>
 #include <errno.h>
 #include "converse.h"
@@ -41,6 +41,16 @@ static char* strsignal(int sig) {
 
 #include "machine.h"
 #include "pcqueue.h"
+#include "conv-ccs.h"
+#include "ccs-server.h"
+#include "ckrescale.h"
+
+#if CMK_SHRINK_EXPAND
+CcsDelayedReply shrinkExpandreplyToken;
+extern int numProcessAfterRestart;
+extern char *_shrinkexpand_basedir;
+int mynewpe=0;
+#endif
 
 /* Msg types to have different actions taken for different message types
  * REGULAR                     - Regular Charm++ message
@@ -430,6 +440,17 @@ void CmiNotifyIdleForMPI(void);
 #if USE_MPI_CTRLMSG_SCHEME
 #include "machine-ctrlmsg.C"
 #endif
+
+void print_nodelist(char* arg_nodelist){
+    FILE *f=fopen(arg_nodelist,"r");
+    char c;
+    c = fgetc(f); 
+    while (c != EOF) {
+      printf ("%c", c); 
+      c = fgetc(f); 
+    } 
+    fclose(f);
+}
 
 SMSG_LIST *allocateSmsgList(char *msg, int destNode, int size, int mode, int type, void *ref) {
   SMSG_LIST *msg_tmp = (SMSG_LIST *) malloc(sizeof(SMSG_LIST));
@@ -1388,6 +1409,12 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     char** largv=*argv;
     int tagUbGetResult;
     void *tagUbVal;
+    char* arg_nodelist;
+
+    /*if (CmiGetArgStringDesc(argv, "++nodelist", &arg_nodelist, "nodelist"))
+    {
+        print_nodelist(arg_nodelist);
+    }*/
 
     if (CmiGetArgFlag(largv, "+comm_thread_only_recv")) {
 #if CMK_SMP
@@ -1819,6 +1846,7 @@ void LrtsPostCommonInit(int everReturn) {
 
 /***********************************************************************
  *
+ *
  * Abort function:
  *
  ************************************************************************/
@@ -1987,6 +2015,53 @@ int CmiBarrierZero(void) {
     CmiNodeAllBarrier();
     return 0;
 }
+
+
+#if CMK_SHRINK_EXPAND
+void ConverseCleanup(void)
+{
+  MACHSTATE(2,"ConverseCleanup {");
+
+  CmiBarrier();
+
+#if CMK_USE_SYSVSHM
+	CmiExitSysvshm();
+#elif CMK_USE_PXSHM
+	CmiExitPxshm();
+#endif
+  ConverseCommonExit();               /* should be called by every rank */
+  CmiNodeBarrier();        /* single node SMP, make sure every rank is done */
+  //if (CmiMyRank()==0) CmiStdoutFlush();
+
+  if (get_shrinkexpand_exit() && CmiMyPe() == 0) {
+    // launch charmrun here
+
+    std::string path = std::string(_shrinkexpand_basedir) + "/numRestartProcs.txt";
+    FILE *fp = fopen(path.c_str(), "w");
+    if (fp != NULL) {
+      CmiPrintf("Charm> Writing numProcessAfterRestart %i to %s\n", numProcessAfterRestart, path.c_str());
+      fprintf(fp, "%d", numProcessAfterRestart);
+      fclose(fp);
+    } else {
+      perror("Error opening file");
+    }
+
+    // Use the new synchronous reply function. This blocks until the reply is
+    // sent and acknowledged by charmrun, robustly fixing the race condition.
+    CcsSendDelayedReplyAndTerm(shrinkExpandreplyToken, 0, 0);
+
+    CmiBarrier();
+    ConverseExit(100);
+
+  } else {
+    // kill all other processes
+    CmiBarrier();
+    //printf("Exiting PE %d\n", CmiMyPe());
+    //fflush(stdout);
+    ConverseExit();
+  }
+}
+#endif
 
 
 #if CMK_MEM_CHECKPOINT || CMK_MESSAGE_LOGGING
@@ -2356,7 +2431,4 @@ void CmiSetupMachineRecvBuffersUser(void)
 #endif
 }
 /*=======End of Msg Histogram or Dynamic Post-Recv Related Funcs======*/
-
-
-/*@}*/
 
