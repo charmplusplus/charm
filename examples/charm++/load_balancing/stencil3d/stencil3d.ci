@@ -25,6 +25,7 @@ mainmodule stencil3d {
 
     entry [reductiontarget] void doStep() {
       serial "begin_iteration" {
+       
         begin_iteration();
       }
       for(imsg = 0; imsg < 6; imsg++) {
@@ -32,6 +33,7 @@ mainmodule stencil3d {
         when receiveGhosts[iterations] (int iter, int dir, int height,
             int width, double ghosts[height*width])
           serial "process_ghosts" {
+            
             processGhosts(dir, height, width, ghosts);
           }
       }

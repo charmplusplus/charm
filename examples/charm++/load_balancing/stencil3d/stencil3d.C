@@ -131,7 +131,7 @@ public:
     // Create new array of worker chares
     CProxy_Grid2DMap myMap = CProxy_Grid2DMap::ckNew(num_chare_x, num_chare_y);
 
-    // Make a new array using that map
+    // // Make a new array using that map
     CkArrayOptions opts(num_chare_x, num_chare_y, num_chare_z);
     opts.setMap(myMap);
     array = CProxy_Stencil::ckNew(opts);
@@ -220,6 +220,7 @@ public:
   {
     iterations++;
 
+   
     for (int k = 0; k < blockDimZ; ++k)
       for (int j = 0; j < blockDimY; ++j)
       {
@@ -241,6 +242,7 @@ public:
         backGhost[j * blockDimX + i] = temperature[index(i + 1, j + 1, blockDimZ)];
       }
 
+    
     // Send my left face
     thisProxy(wrap_x(thisIndex.x - 1), thisIndex.y, thisIndex.z)
         .receiveGhosts(iterations, RIGHT, blockDimY, blockDimZ, leftGhost.data());
@@ -259,6 +261,8 @@ public:
     // Send my back face
     thisProxy(thisIndex.x, thisIndex.y, wrap_z(thisIndex.z + 1))
         .receiveGhosts(iterations, FRONT, blockDimX, blockDimY, backGhost.data());
+
+       
   }
 
   void processGhosts(int dir, int height, int width, const double* gh)
@@ -389,11 +393,23 @@ class Grid2DMap : public CkArrayMap
 {
 public:
   int M, N;  // size of x and y dims
+  int procsM, procsN;
 
   Grid2DMap(int xdim, int ydim)
   {
+
     M = xdim;
     N = ydim;
+
+    int nprocs = CkNumPes();
+    int procsM = std::ceil(std::sqrt(nprocs));
+    int procsN = nprocs / procsM;
+
+    if (procsM * procsN != nprocs) {
+      procsM = nprocs;
+      procsN = 1;
+    }
+   
   }
   Grid2DMap(CkMigrateMessage* m) {}
   int registerArray(CkArrayIndex& numElements, CkArrayID aid) { return 0; }
@@ -402,34 +418,16 @@ public:
   {
     if (idx.nInts != 2)
     {
-      // CkPrintf("WARNING: Using Grid2DMap with Chare array dim %d\n", idx.nInts);
+      //CkPrintf("WARNING: Using Grid2DMap with Chare array dim %d\n", idx.nInts);
     }
     int x = idx.data()[0];
     int y = idx.data()[1];
+    
+    int block_row = y / procsN;
+    int block_col = x / procsM;
 
-    int nprocs = CkNumPes();
-    int sqrt_nprocs = std::ceil(std::sqrt(nprocs));
-
-    if (sqrt_nprocs == 0)
-    {
-      CkAbort("In initial chare mapping: number of processors is 0 ?\n");
-    }
-
-    int block_rows = std::ceil(M / sqrt_nprocs);
-    int block_cols = std::ceil(N / sqrt_nprocs);
-
-    if (block_rows == 0 || block_cols == 0)
-    {
-      CkAbort(
-          "In initial chare mapping: block_rows or block_cols is 0 ? Array size "
-          "computed as %d x %d, with block dim %d\n",
-          M, N, sqrt_nprocs);
-    }
-
-    int block_row = x / block_rows;
-    int block_col = y / block_cols;
-
-    int proc = block_row * sqrt_nprocs + block_col;
+    int proc = block_row * procsM + block_col;
+   
     return proc;
   }
 };
