@@ -6,20 +6,11 @@ original_args=("$@")
 
 pes_file="/dev/shm/numRestartProcs.txt"
 
-machinefile=""
-for ((i=0; i<${#original_args[@]}; ++i)); do
-    if [[ "${original_args[i]}" == "++nodelist" ]]; then
-        machinefile="${original_args[i+1]}"
-        break
-    fi
-done
-
 time {
 while true; do
     args=()
     pes_args=""
     restart_arg=""
-
 
     temp_args=("${original_args[@]}")
     i=0
@@ -45,7 +36,7 @@ while true; do
 
     # 2. Check the flag. If it's a restart, prepare the extra argument.
     if [ "$is_restart" = true ]; then
-        restart_arg="+shrinkexpand +restart /dev/shm"
+        restart_arg="+restart /dev/shm"
         if [ -f "$pes_file" ]; then
             num_pes=$(cat "$pes_file")
             echo "Charm> Reading pes $num_pes from $pes_file"
@@ -53,25 +44,8 @@ while true; do
         fi
     fi
 
-    if [ -n "$machinefile" ]; then
-        # Extract the number of PEs from pes_arg
-        num_pes=$(echo "$pes_arg" | sed 's/+p//' | tr -d ' ')
-        if [[ "$num_pes" =~ ^[0-9]+$ ]] && [ "$num_pes" -gt 0 ]; then
-            head -n "$num_pes" "$machinefile" > /app/hostfile
-        fi
-    fi
-
-    if [ -n "$machinefile" ]; then
-        for ((i=0; i<${#args[@]}; ++i)); do
-            if [[ "${args[i]}" == "++nodelist" ]]; then
-                args[i+1]="/app/hostfile"
-                break
-            fi
-        done
-    fi
-
     # Pass all script arguments ("$@") to the executable
-    /app/charmrun $pes_arg "${args[@]}" $restart_arg
+    ./charmrun $pes_arg "${args[@]}" $restart_arg
 
     EXIT_CODE=$?
 
