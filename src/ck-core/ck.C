@@ -640,7 +640,7 @@ void CkCallstackPop(Chare *obj) {
   _ckStartTiming();       // resume timing of the previous obj
 }
 
-#if 1
+#if CMK_LBDB_ON
 CkLocRec *CkActiveLocRec(void) {
   auto *obj = CkActiveObj();
   if (obj && obj->ckInitialized) {
@@ -919,6 +919,8 @@ static CkGroupID _groupCreate(envelope *env)
      groupNum.idx = CkpvAccess(_numGroups)++;
   else
      groupNum.idx = _getGroupIdx(CkNumPes(),CkMyPe(),CkpvAccess(_numGroups)++);
+  printf("Created group %d\n", groupNum.idx);
+  fflush(stdout);
   _createGroup(groupNum, env);
   return groupNum;
 }

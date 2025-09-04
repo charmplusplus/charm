@@ -5,7 +5,7 @@
 
 #include <charm++.h>
 
-#if 1
+#if CMK_LBDB_ON
 
 #include "LBObj.h"
 #include "LBOM.h"
