@@ -3,6 +3,7 @@
 #define MEMPOOL_H
 
 //#include "conv-config.h"
+#include "charm-config.h"
 #include "converse.h"
 
 #if CMK_CONVERSE_UGNI

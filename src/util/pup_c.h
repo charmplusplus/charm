@@ -58,6 +58,7 @@ void pup_bar(pup_er p,bar *b)
 
 */
 
+#include "charm-config.h"
 #include "converse.h"
 #include <stddef.h>
 

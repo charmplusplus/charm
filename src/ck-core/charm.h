@@ -5,6 +5,7 @@
 #ifndef CHARM_H
 #define CHARM_H
 
+#include "charm-config.h"
 #include "converse.h"
 #include "conv-autoconfig.h"
 #include <sys/types.h> /* for size_t */

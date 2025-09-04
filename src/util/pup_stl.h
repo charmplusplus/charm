@@ -15,6 +15,7 @@ Orion Sky Lawlor, olawlor@acm.org, 7/22/2002
 #ifndef _UIUC_CHARM_PUP_STL_H
 #define _UIUC_CHARM_PUP_STL_H
 
+#include "charm-config.h"
 #include "converse.h"
 
 /*It's kind of annoying that we have to drag all these headers in

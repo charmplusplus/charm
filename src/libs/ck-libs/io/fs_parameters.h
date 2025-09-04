@@ -1,6 +1,7 @@
 #ifndef FS_PARAMETERS_H
 #define FS_PARAMETERS_H
 #include <stdlib.h>
+#include "charm-config.h"
 #include "converse.h"
 
 #ifdef __cplusplus
