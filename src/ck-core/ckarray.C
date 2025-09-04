@@ -1871,7 +1871,7 @@ void CkArray::recvMsg(CkArrayMessage* msg, CmiUInt8 id, CkDeliver_t type, int op
 
 void CkArray::recordSend(const CmiUInt8 id, const unsigned int bytes, int pe, const int opts)
 {
-#if 1
+#if CMK_LBDB_ON
   if (!(opts & CK_MSG_LB_NOTRACE) && locMgr->getLBMgr()->CollectingCommStats())
   {
     // LB deals in IDs with collection information only when CMK_GLOBAL_LOCATION_UPDATE
@@ -1901,7 +1901,7 @@ void CkArray::sendToPe(CkArrayMessage* msg, int pe, CkDeliver_t type, int opts)
   // queuing infrastructure
   if (pe != CkMyPe() || type == CkDeliver_queue)
   {
-#if 1
+#if CMK_LBDB_ON
     // Track message sends if the LB framework is collecting comm stats
     if (msg->array_hops() == 0 && !(opts & CK_MSG_LB_NOTRACE) &&
         locMgr->getLBMgr()->CollectingCommStats())
@@ -1943,7 +1943,7 @@ void CkArray::sendToPe(CkArrayMessage* msg, int pe, CkDeliver_t type, int opts)
         demandCreateElement(idx, ctor);
       }
     }
-#if 1
+#if CMK_LBDB_ON
     // This ensures that communication is tracked even for inline sends
     if (msg->array_hops() == 0 && !(opts & CK_MSG_LB_NOTRACE) &&
         locMgr->getLBMgr()->CollectingCommStats())

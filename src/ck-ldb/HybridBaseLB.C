@@ -20,7 +20,7 @@ class DummyMsg: public CMessage_DummyMsg
 
 HybridBaseLB::HybridBaseLB(const CkLBOptions &opt): CBase_HybridBaseLB(opt)
 {
-#if 1
+#if CMK_LBDB_ON
   lbname = (char *)"HybridBaseLB";
   thisProxy = CProxy_HybridBaseLB(thisgroup);
 
@@ -65,7 +65,7 @@ HybridBaseLB::HybridBaseLB(const CkLBOptions &opt): CBase_HybridBaseLB(opt)
 
 void HybridBaseLB::initTree()
 {
-#if 1
+#if CMK_LBDB_ON
     // create a multicast group to optimize level 1 multicast
   if (tree->isroot(CkMyPe(), 1)) {
     int npes = tree->numChildren(CkMyPe(), 1);
@@ -82,7 +82,7 @@ void HybridBaseLB::initTree()
 
 HybridBaseLB::~HybridBaseLB()
 {
-#if 1
+#if CMK_LBDB_ON
   delete tree;
 #endif
 }
@@ -126,7 +126,7 @@ void HybridBaseLB::InvokeLB()
   CkSetInLdb();
 #endif
 
-#if 1
+#if CMK_LBDB_ON
   //  CkPrintf("[%d] HybridBaseLB At Sync step %d!!!!\n",CkMyPe(),mystep);
 
   FindNeighbors();
@@ -143,7 +143,7 @@ void HybridBaseLB::InvokeLB()
 
 void HybridBaseLB::ProcessAtSync()
 {
-#if 1
+#if CMK_LBDB_ON
   start_lb_time = 0;
 
   if (CkMyPe() == 0) {
@@ -167,7 +167,7 @@ void HybridBaseLB::ProcessAtSync()
 // only called on leaves
 CLBStatsMsg* HybridBaseLB::AssembleStats()
 {
-#if 1
+#if CMK_LBDB_ON
   // build and send stats
   const int osz = lbmgr->GetObjDataSz();
   const int csz = lbmgr->GetCommDataSz();
@@ -202,7 +202,7 @@ CLBStatsMsg* HybridBaseLB::AssembleStats()
 
 void HybridBaseLB::ReceiveStats(CkMarshalledCLBStatsMessage &&data, int fromlevel)
 {
-#if 1
+#if CMK_LBDB_ON
   FindNeighbors();
 
   // store the message
@@ -290,7 +290,7 @@ void HybridBaseLB::depositLBStatsMessage(CLBStatsMsg *m, int atlevel)
 // assmebly all stats messages from children
 void HybridBaseLB::buildStats(int atlevel)
 {
-#if 1
+#if CMK_LBDB_ON
   // build LDStats
   LevelData *lData = levelData[atlevel];
   LDStats *statsData = lData->statsData;
@@ -332,7 +332,7 @@ void HybridBaseLB::buildStats(int atlevel)
 // shrink if neccessary
 CLBStatsMsg * HybridBaseLB::buildCombinedLBStatsMessage(int atlevel)
 {
-#if 1
+#if CMK_LBDB_ON
   int i;
   double obj_walltime, obj_nmwalltime;
 #if CMK_LB_CPUTIMER 
@@ -505,7 +505,7 @@ void HybridBaseLB::Loadbalancing(int atlevel)
 
 LBMigrateMsg* HybridBaseLB::Strategy(LDStats* stats)
 {
-#if 1
+#if CMK_LBDB_ON
   work(stats);
 
   if (_lb_args.debug()>2)  {
@@ -524,7 +524,7 @@ LBMigrateMsg* HybridBaseLB::Strategy(LDStats* stats)
 // leaf nodes actually migrate objects
 void HybridBaseLB::ReceiveMigration(LBMigrateMsg *msg)
 {
-#if 1
+#if CMK_LBDB_ON
 #if CMK_MEM_CHECKPOINT
   CkResetInLdb();
 #endif
@@ -597,7 +597,7 @@ extern LBVectorMigrateMsg * VectorStrategy(BaseLB::LDStats *stats);
 
 LBVectorMigrateMsg* HybridBaseLB::VectorStrategy(LDStats* stats)
 {
-#if 1
+#if CMK_LBDB_ON
   LBVectorMigrateMsg* msg;
   if (statsStrategy == SHRINK_NULL) {
     msg = new(0,0) LBVectorMigrateMsg;
@@ -624,7 +624,7 @@ LBVectorMigrateMsg* HybridBaseLB::VectorStrategy(LDStats* stats)
 
 void HybridBaseLB::ReceiveVectorMigration(LBVectorMigrateMsg *msg)
 {
-#if 1
+#if CMK_LBDB_ON
   FindNeighbors();
 
   int atlevel = msg->level - 1;
@@ -986,7 +986,7 @@ void HybridBaseLB::CollectInfo(Location *loc, int n, int fromlevel)
 
 void HybridBaseLB::PropagateInfo(Location *loc, int n, int fromlevel)
 {
-#if 1
+#if CMK_LBDB_ON
   int i, obj;
   int atlevel = fromlevel - 1;
   LevelData *lData = levelData[atlevel];
@@ -1081,7 +1081,7 @@ void HybridBaseLB::PropagateInfo(Location *loc, int n, int fromlevel)
 
 void HybridBaseLB::MigrationDone(int balancing)
 {
-#if 1
+#if CMK_LBDB_ON
   DEBUGF(("[%d] HybridBaseLB::MigrationDone!\n", CkMyPe()));
 
   lbmgr->incStep();
@@ -1117,7 +1117,7 @@ void HybridBaseLB::ResumeClients(double result)
 
 void HybridBaseLB::ResumeClients(int balancing)
 {
-#if 1
+#if CMK_LBDB_ON
   DEBUGF(("[%d] ResumeClients. \n", CkMyPe()));
 
   double end_lb_time = CkWallTimer();
@@ -1137,14 +1137,14 @@ void HybridBaseLB::ResumeClients(int balancing)
 
 void HybridBaseLB::work(LDStats* stats)
 {
-#if 1
+#if CMK_LBDB_ON
   CkPrintf("[%d] HybridBaseLB::work called!\n", CkMyPe());
 #endif
 }
   
 LBMigrateMsg * HybridBaseLB::createMigrateMsg(LDStats* stats)
 {
-#if 1
+#if CMK_LBDB_ON
   int i;
 
   LevelData *lData = levelData[currentLevel];

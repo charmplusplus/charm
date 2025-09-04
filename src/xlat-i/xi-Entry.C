@@ -566,7 +566,7 @@ void Entry::genArrayDefs(XStr& str) {
           << "),CkMyPe(), 0, &projID, obj);\n";
     }
     if (isAppWork()) inlineCall << "    _TRACE_BEGIN_APPWORK();\n";
-    inlineCall << "#if 1\n";
+    inlineCall << "#if CMK_LBDB_ON\n";
     if (isInline())
     {
       inlineCall << "    const auto id = obj->ckGetID().getElementID();\n";

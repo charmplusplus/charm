@@ -5,7 +5,7 @@
 
 #include <converse.h>
 
-#if 1
+#if CMK_LBDB_ON
 
 #include <math.h>
 #include "LBComm.h"
@@ -230,6 +230,6 @@ void LBCommTable::GetCommInfo(int& bytes, int& msgs, int& outsidepemsgs, int&
   num_nghbor = num_neighbors.size();
 }
 
-#endif // 1
+#endif // CMK_LBDB_ON
 
 /*@}*/

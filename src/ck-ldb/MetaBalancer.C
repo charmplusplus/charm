@@ -96,7 +96,7 @@ double _nobj_timer = 10.0;
 
 // mainchare
 MetaLBInit::MetaLBInit(CkArgMsg *m) {
-#if 1
+#if CMK_LBDB_ON
   if (_lb_args.metaLbOn()) {
     _metalbred = CProxy_MetaBalancerRedn::ckNew();
     _metalb = CProxy_MetaBalancer::ckNew();
@@ -242,7 +242,7 @@ int MetaBalancer::get_finished_iteration() {
 }
 
 void MetaBalancer::AdjustCountForNewContributor(int it_n) {
-#if 1
+#if CMK_LBDB_ON
   int index;
 
   // it_n is the first iteration this chare will contribute to.
@@ -257,7 +257,7 @@ void MetaBalancer::AdjustCountForNewContributor(int it_n) {
 }
 
 void MetaBalancer::AdjustCountForDeadContributor(int it_n) {
-#if 1
+#if CMK_LBDB_ON
   int index;
   // it_n is the last iteration this chare contributed to.
   // If the finished_iteration_no is < it_n, then we need to update the counts
@@ -286,7 +286,7 @@ void MetaBalancer::SetCharePupSize(size_t psize) {
 }
 
 bool MetaBalancer::AddLoad(int it_n, double load) {
-#if 1
+#if CMK_LBDB_ON
   // From here on out we can ignore the periodic call to check for NoObj PEs
   // since our PE has objects. The subsequent checks for NoObj PEs are
   // triggered by the regular control flow.
@@ -325,7 +325,7 @@ bool MetaBalancer::AddLoad(int it_n, double load) {
 }
 
 void MetaBalancer::ContributeStats(int it_n) {
-#if 1
+#if CMK_LBDB_ON
   int index = it_n % VEC_SIZE;
 
   double idle_time, bg_walltime, cpu_bgtime;
@@ -989,7 +989,7 @@ void MetaBalancer::checkForNoObj(void *ad) {
 
 // Called by LBManager to indicate that no objs are there in this processor
 void MetaBalancer::HandleAdaptiveNoObj() {
-#if 1
+#if CMK_LBDB_ON
   if (lbmanager->GetObjDataSz() == 0) {
     adaptive_struct.finished_iteration_no++;
     adaptive_struct.lb_iteration_no++;
@@ -1023,7 +1023,7 @@ void MetaBalancer::RegisterNoObjCallback(int index) {
 }
 
 void MetaBalancer::TriggerAdaptiveReduction() {
-#if 1
+#if CMK_LBDB_ON
   if (lbmanager->GetObjDataSz() == 0) {
     adaptive_struct.finished_iteration_no++;
     adaptive_struct.lb_iteration_no++;

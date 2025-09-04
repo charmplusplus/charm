@@ -282,7 +282,7 @@ mCastEntry::mCastEntry (mCastEntry *old):
   parentGrp = old->parentGrp;
   allElem = old->allElem;
   allGrpElem = old->allGrpElem;
-#if 1
+#if CMK_LBDB_ON
   allObjKeys = old->allObjKeys;
 #endif
   pe = old->pe;
@@ -311,7 +311,7 @@ void CkMulticastMgr::setSection(CkSectionInfo &_id, CkArrayID aid, CkArrayIndex 
     entry->allObjKeys.reserve(n);
     for (int i=0; i<n; i++) {
         entry->allElem[i] = al[i];
-#if 1
+#if CMK_LBDB_ON
         CmiUInt8 _key;
         if(CProxy_ArrayBase(aid).ckLocMgr()->lookupID(al[i], _key))
             entry->allObjKeys.push_back(_key);
@@ -350,7 +350,7 @@ void CkMulticastMgr::setSection(CProxySection_ArrayElement &proxy)
   entry->allObjKeys.reserve(proxy.ckGetNumElements());
   for (int i=0; i<proxy.ckGetNumElements(); i++) {
     entry->allElem[i] = al[i];
-#if 1
+#if CMK_LBDB_ON
     CmiUInt8 _key;
     if(CProxy_ArrayBase(aid).ckLocMgr()->lookupID(al[i], _key))
       entry->allObjKeys.push_back(_key);
@@ -407,7 +407,7 @@ void CkMulticastMgr::prepareCookie(mCastEntry *entry, CkSectionID &sid, const Ck
   entry->allObjKeys.reserve(count);
   for (int i=0; i<count; i++) {
     entry->allElem[i] = al[i];
-#if 1
+#if CMK_LBDB_ON
     CmiUInt8 _key;
     if(CProxy_ArrayBase(aid).ckLocMgr()->lookupID(al[i], _key))
       entry->allObjKeys.push_back(_key);
@@ -931,7 +931,7 @@ void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionI
       s.get_val() = entry;
     }
 
-#if 1
+#if CMK_LBDB_ON
     if(!entry->isGrpSec()){
       // fixme: running obj?
       envelope *env = UsrToEnv(msg);

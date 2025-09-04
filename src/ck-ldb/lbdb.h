@@ -38,7 +38,7 @@ extern int _lb_version;
   /*  User-defined object ID is 4 ints long (as defined in converse.h) */
   /*  as OBJ_ID_SZ */
 
-#if 1
+#if CMK_LBDB_ON
 struct LDHandle {
   void *handle;            // pointer to LBDB
 };
@@ -295,7 +295,7 @@ typedef std::list<LBReceiver *>::iterator LDBarrierReceiver;
  */
 
 
-#if 1
+#if CMK_LBDB_ON
 PUPbytes(LDHandle)
 #endif
 

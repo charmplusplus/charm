@@ -12,9 +12,9 @@ clients, including the rest of Charm++, are actually C++.
 
 #include "pathHistory.h"
 
-#if 1
+#if CMK_LBDB_ON
 #include "LBManager.h"
-#endif // 1
+#endif // CMK_LBDB_ON
 
 #ifndef CMK_CHARE_USE_PTR
 #include <map>
@@ -598,14 +598,14 @@ inline Chare *_popObj(void) {
 }
 
 inline void _ckStartTiming(void) {
-#if 1
+#if CMK_LBDB_ON
   auto *active = CkActiveLocRec();
   if (active) active->startTiming();
 #endif
 }
 
 inline void _ckStopTiming(void) {
-#if 1
+#if CMK_LBDB_ON
   auto *active = CkActiveLocRec();
   if (active) active->stopTiming();
 #endif
@@ -919,8 +919,6 @@ static CkGroupID _groupCreate(envelope *env)
      groupNum.idx = CkpvAccess(_numGroups)++;
   else
      groupNum.idx = _getGroupIdx(CkNumPes(),CkMyPe(),CkpvAccess(_numGroups)++);
-  printf("Created group %d\n", groupNum.idx);
-  fflush(stdout);
   _createGroup(groupNum, env);
   return groupNum;
 }

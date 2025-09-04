@@ -2371,7 +2371,7 @@ class ampiParent final : public CBase_ampiParent {
   }
   inline CkDDT* getDDT() noexcept { return &myDDT; }
 
-#if 1
+#if CMK_LBDB_ON
   void setMigratable(bool mig) noexcept {
     thread->setMigratable(mig);
   }

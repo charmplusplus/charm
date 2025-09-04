@@ -137,7 +137,6 @@ class TreeLB : public CBase_TreeLB
  public:
   TreeLB(const CkLBOptions& opts) : CBase_TreeLB(opts)
   {
-    CkAbort("Test constructor");
     loadConfigFile(opts);
     init(opts);
   }

@@ -864,7 +864,7 @@ public:
 // restore the bitmap vector for LB
 void CkMemCheckPT::resetLB(int diepe)
 {
-#if 1
+#if CMK_LBDB_ON
   int i;
   std::vector<char> bitmap;
   // set processor available bitmap
