@@ -72,7 +72,6 @@ do
 		;;
 	++nodelist)
 		machinefile="$2"
-		args=("--nodelist" "$2" "${args[@]} ++nodelist "$2"")
 		shift
 		;;
 	++quiet)
@@ -119,13 +118,13 @@ done
 
 args+=("${charm_args[@]}")
 
-num_nodes=0
+# Set machinefile options for mpirun and srun if ++nodelist was specified
 if [[ -n "$machinefile" ]]; then
-	if [[ ! -f "$machinefile" ]]; then
-		echo "Charmrun> Error: nodelist file not found: $machinefile" >&2
-		exit 1
-	fi
-	num_nodes=$(wc -l < "$machinefile")
+    mpirun_machinefile_opt=(-machinefile "$machinefile")
+    srun_nodelist_opt=(--nodelist="$machinefile")
+else
+    mpirun_machinefile_opt=()
+    srun_nodelist_opt=()
 fi
 
 if [[ "$DEBUG" = '1' || "$DEBUG_NO_PAUSE" = '1' ]]
@@ -181,7 +180,7 @@ then
     else
  	#someday this should be pmix, but our pmix launcher needs some work
 	# on machines like NCSA Delta this is the most robust solution known to me
-	runCmd srun --mpi=pmi2 -n "$nodes" -N "$num_nodes" --exact "${args[@]}"
+	runCmd srun --mpi=pmi2 -n "$nodes" --exact "${args[@]}"
     fi	
 elif [[ -n "$PBS_NODEFILE" ]]
 then
@@ -400,16 +399,13 @@ then
   mpirun_cmd="$(command -v mpirun 2>/dev/null)"
   if [[ -n "$mpirun_cmd" ]]
   then
-    [[ -n "$MPI_MACHINEFILE" ]] && args=(-machinefile "$MPI_MACHINEFILE" "${args[@]}")
     setarch_cmd="$(command -v setarch 2>/dev/null)"
     if [[ -n "$setarch_cmd" && -x "$setarch_cmd" ]]
     then
-      # Disables randomization of the virtual address  space  (turns  on
-      #          ADDR_NO_RANDOMIZE).
       cur_arch="$(uname -m)"
-      runCmd "$setarch_cmd" "$cur_arch" -R mpirun -np "$nodes" "${args[@]}"
+      runCmd "$setarch_cmd" "$cur_arch" -R mpirun "${mpirun_machinefile_opt[@]}" -np "$nodes" "${args[@]}"
     else
-      runCmd mpirun -np "$nodes" "${args[@]}"
+      runCmd mpirun "${mpirun_machinefile_opt[@]}" -np "$nodes" "${args[@]}"
     fi
   else
     mpiexec_cmd="$(command -v mpiexec 2>/dev/null)"
@@ -426,7 +422,7 @@ then
   #mpirun is checked before srun to support the Bridges supercomputer at PSC
   #as srun has a known issue and fails to successfully launch the parallel job.
   #This is required to run the nightly ofi autobuild.
-  runCmd srun -n "$nodes" -c $(( ppn + 1 )) "${args[@]}"
+  runCmd srun "${srun_nodelist_opt[@]}" -n "$nodes" -c $(( ppn + 1 )) "${args[@]}"
 else
   echo "No job launcher found! (tried aprun, mpirun and srun)"
   exit 1

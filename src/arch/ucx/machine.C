@@ -848,65 +848,13 @@ void ConverseCleanup(void)
     }
 
     CmiBarrier();
-    LrtsExit(100);
-
-    // child process
-
-    int argc=CmiGetArgc(Cmi_argvcopy);
-
-    int i;
-    int restart_idx = -1;
-    for (i = 0; i < argc; ++i) {
-      if (strcmp(Cmi_argvcopy[i], "+restart") == 0) {
-        restart_idx = i;
-        break;
-      }
-    }
-
-    const char **ret;
-    if (restart_idx == -1) {
-      ret=(const char **)malloc(sizeof(char *)*(argc+7));
-    } else {
-      ret=(const char **)malloc(sizeof(char *)*(argc+5));
-    }
-
-    for (i=3;i<argc+3;i++) {
-      MACHSTATE1(2,"Parameters %s",Cmi_argvcopy[i]);
-      ret[i]=Cmi_argvcopy[i - 3];
-    }
-
-    char temp2[50];
-    snprintf(temp2, sizeof(temp2), "%d", numProcessAfterRestart);
-    ret[0] = "./charmrun";
-    ret[1] = "+p";
-    ret[2] = temp2;
-
-    ret[argc+3]="+shrinkexpand";
-
-    if (restart_idx == -1) {
-      ret[argc+4]="+restart";
-      ret[argc+5]=_shrinkexpand_basedir;
-      ret[argc+6]=Cmi_argvcopy[argc];
-    } else {
-      ret[restart_idx + 1] = _shrinkexpand_basedir;
-      ret[argc+4]=Cmi_argvcopy[argc];
-    }
-
-    free(Cmi_argvcopy);
-    //MACHSTATE1(3,"ConverseCleanup mynewpe %s", temp2);
-    MACHSTATE(2,"} ConverseCleanup");
-
-    execv(ret[0], const_cast<char * const *>(ret));
-
-    CmiPrintf("[%d] should not be here\n", CmiMyPe());
-    exit(1);
-
+    ConverseExit(100);
   } else {
     // kill all other processes
     CmiBarrier();
     //printf("Exiting PE %d\n", CmiMyPe());
     //fflush(stdout);
-    LrtsExit();
+    ConverseExit();
   }
 }
 #endif

@@ -45,7 +45,7 @@ while true; do
     fi
 
     # Pass all script arguments ("$@") to the executable
-    ./charmrun $pes_arg "${args[@]}" $restart_arg
+    "$(dirname "$0")/charmrun" $pes_arg "${args[@]}"
 
     EXIT_CODE=$?
 
