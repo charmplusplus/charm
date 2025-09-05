@@ -6,11 +6,11 @@ original_args=("$@")
 
 pes_file="/dev/shm/numRestartProcs.txt"
 
+time {
 while true; do
     args=()
     pes_args=""
     restart_arg=""
-
 
     temp_args=("${original_args[@]}")
     i=0
@@ -36,15 +36,16 @@ while true; do
 
     # 2. Check the flag. If it's a restart, prepare the extra argument.
     if [ "$is_restart" = true ]; then
-        restart_arg="+shrinkexpand +restart /dev/shm"
+        restart_arg="+restart /dev/shm"
         if [ -f "$pes_file" ]; then
             num_pes=$(cat "$pes_file")
+            echo "Charm> Reading pes $num_pes from $pes_file"
             pes_arg="+p $num_pes"
         fi
     fi
 
     # Pass all script arguments ("$@") to the executable
-    ./charmrun $pes_arg "${args[@]}" $restart_arg
+    "$(dirname "$0")/charmrun" $pes_arg "${args[@]}" $restart_arg
 
     EXIT_CODE=$?
 
@@ -57,5 +58,6 @@ while true; do
         break
     fi
 done
+}
 
 echo "Control loop finished."
