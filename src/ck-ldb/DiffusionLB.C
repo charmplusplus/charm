@@ -117,7 +117,6 @@ void DiffusionLB::Strategy(const DistBaseLB::LDStats* const stats)
   acks = 0;
   max = 0;
   round = 0;
-  statsReceived = 0;
   rank0_barrier_counter = 0;
   pseudo_done = true;
   mig_id_map.clear();
