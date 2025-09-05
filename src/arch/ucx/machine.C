@@ -32,6 +32,7 @@
 #endif
 
 #if CMK_SHRINK_EXPAND
+CcsDelayedReply shrinkExpandreplyToken;
 extern int numProcessAfterRestart;
 extern char *_shrinkexpand_basedir;
 int mynewpe=0;
