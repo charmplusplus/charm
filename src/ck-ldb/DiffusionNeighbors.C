@@ -8,6 +8,15 @@
 /* Entry point for neighbor building. Only rank0PEs call findNBors*/
 void DiffusionLB::findNBors(int do_again)
 {
+
+  CkPrintf("Num nodes HERE: %d\n", numNodes);
+  if (numNodes == 1)
+  {
+    CkPrintf("One node only - no neighbors\n");
+    thisProxy[0].startStrategy();
+    return;
+  }
+
   if(thisIndex==0) 
   {
     CkCallback cb(CkIndex_DiffusionLB::begin(), thisProxy);
@@ -18,12 +27,7 @@ void DiffusionLB::findNBors(int do_again)
     return;
   }
 
-  if (numNodes == 1)
-  {
-    CkPrintf("One node only - no neighbors\n");
-    thisProxy[0].startStrategy();
-    return;
-  }
+  
 
   // DEBUGL(("\nNode-%d, round =%d, sendToNeighbors.size() = %d", thisIndex, round,
   //         sendToNeighbors.size()));
@@ -242,7 +246,6 @@ void DiffusionLB::findNBorsRound()
   if(CkMyPe()%nodeSize!=0) return;
 //  assert(thisIndex % nodeSize == 0);  // only node managers should call this
   round++;
-  DEBUGL(("\nPE-%d, with round = %d", CkMyPe(), round));
   if(round < ROUNDS && thisIndex==0) {
     CkCallback cb(CkIndex_DiffusionLB::findNBorsRound(), thisProxy);
     CkStartQD(cb);
@@ -270,7 +273,7 @@ void DiffusionLB::findNBorsRound()
   {
     while(local_tries < nborsNeeded/2)
     {
-      int max_neighbors = numNodes<NUM_NEIGHBORS?numNodes:NUM_NEIGHBORS;
+      int max_neighbors = (numNodes<NUM_NEIGHBORS)?numNodes:NUM_NEIGHBORS;
       pick = (pick + 1)%max_neighbors;
       int potentialNbor = node_idx[pick]; //pick - better logic needed here
 
