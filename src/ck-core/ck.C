@@ -640,16 +640,17 @@ void CkCallstackPop(Chare *obj) {
   _ckStartTiming();       // resume timing of the previous obj
 }
 
-#if CMK_LBDB_ON
+
 CkLocRec *CkActiveLocRec(void) {
+  #if CMK_LBDB_ON
   auto *obj = CkActiveObj();
   if (obj && obj->ckInitialized) {
     return obj->getCkLocRec();
   } else {
     return nullptr;
   }
+  #endif
 }
-#endif
 
 /******************** Basic support *****************/
 void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
