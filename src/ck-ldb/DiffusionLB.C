@@ -175,7 +175,11 @@ void DiffusionLB::startStrategy()
   if (++rank0_barrier_counter < numNodes)
     return;
 
-  if (CkMyPe() == 0)
+  if (CkMyPe() == 0 && numNodes == 1) {
+    CkCallback cb(CkIndex_DiffusionLB::WithinNodeLB(), thisProxy);
+    CkStartQD(cb);
+  }
+  else if (CkMyPe() == 0)
   {
     CkCallback cb(CkIndex_DiffusionLB::AcrossNodeLB(), thisProxy);
     CkStartQD(cb);
