@@ -43,9 +43,10 @@ int LBwriteStatsMsgs(BaseLB::LDStats* statsData)
                                   {"position", odata.position},
                                   {"wallTime", odata.wallTime},
                                   {"oldpe", from},
-                                  {"newpe", to}};
+                                  {"newpe", (to == -1) ? from : to}};
   }
 
+  jsonData["n_procs"] = statsData->procs.size();
   jsonData["objData"] = objpe;
   // objdata: objID, omID, migratable, position, cpuTime, wallTime
 
