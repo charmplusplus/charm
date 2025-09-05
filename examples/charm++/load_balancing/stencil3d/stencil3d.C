@@ -406,28 +406,41 @@ public:
     int procsN = nprocs / procsM;
 
     if (procsM * procsN != nprocs) {
-      procsM = nprocs;
-      procsN = 1;
+      CkAbort("Processor grid failed to generate with %d processors\n", nprocs);
     }
-   
+    CkPrintf("Using Grid2DMap with %d x %d processors\n", procsM, procsN);
+
   }
   Grid2DMap(CkMigrateMessage* m) {}
   int registerArray(CkArrayIndex& numElements, CkArrayID aid) { return 0; }
 
   int procNum(int arrayHdl, const CkArrayIndex& idx)
   {
-    if (idx.nInts != 2)
-    {
-      //CkPrintf("WARNING: Using Grid2DMap with Chare array dim %d\n", idx.nInts);
+    int nprocs = CkNumPes();
+    int procsM = std::ceil(std::sqrt(nprocs));
+    int procsN = nprocs / procsM;
+
+    if (procsM * procsN != nprocs) {
+      CkAbort("Processor grid failed to generate with %d processors\n", nprocs);
     }
+
+
     int x = idx.data()[0];
     int y = idx.data()[1];
-    
-    int block_row = y / procsN;
-    int block_col = x / procsM;
 
-    int proc = block_row * procsM + block_col;
+    int dataperblock_x = ceil(M / (double)procsM);
+    int dataperblock_y = ceil(N / (double)procsN);
+
+
+    int block_row = x / (double)dataperblock_x;
+    int block_col = y / (double)dataperblock_y;
+
+    //CkPrintf("Chare (%d, %d) is in block (%d / %d, %d / %d)\n", x, y, block_row, procsM, block_col, procsN);
+    int proc = block_row * procsN + block_col;
+    //CkPrintf("Chare (%d, %d) mapped to processor %d\n", x, y, proc);
    
+    if (proc >= nprocs)
+      CkAbort("Error: Chare (%d, %d) mapped to processor %d >= %d\n", x, y, proc, nprocs);
     return proc;
   }
 };
