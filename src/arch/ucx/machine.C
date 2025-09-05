@@ -10,6 +10,8 @@
 #include <string>
 
 #include "converse.h"
+#include "conv-ccs.h"
+#include "ccs-server.h"
 #include "ckrescale.h"
 #include "cmirdmautils.h"
 #include "machine.h"
