@@ -1837,6 +1837,10 @@ int charm_main(int argc, char **argv)
   int stack_top=0;
   memory_stack_top = &stack_top;
 
+#if CMK_TRACE_ENABLED
+  registerTraceInit(traceInit);
+#endif
+
   ConverseInit(argc, argv, (CmiStartFn) _initCharm, 0, 0);
 
   return 0;
