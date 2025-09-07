@@ -1,29 +1,29 @@
+#include "partitioning_strategies.h"
+#include "hilbert.h"
 #include "TopoManager.h"
 #include "converse.h"
-#include "hilbert.h"
-#include "partitioning_strategies.h"
 
 #ifdef __cplusplus
-#  include <algorithm>
-#  include <iostream>
-#  include <math.h>
-#  include <queue>
-#  include <sstream>
-#  include <vector>
+#include <queue>
+#include <vector>
+#include <iostream>
+#include <sstream>
+#include <algorithm>
+#include <math.h>
 
-#  ifndef __STDC_FORMAT_MACROS
-#    define __STDC_FORMAT_MACROS
-#  endif
-#  ifndef __STDC_LIMIT_MACROS
-#    define __STDC_LIMIT_MACROS
-#  endif
-#  include <inttypes.h>
+#ifndef __STDC_FORMAT_MACROS
+#define __STDC_FORMAT_MACROS
+#endif
+#ifndef __STDC_LIMIT_MACROS
+#define __STDC_LIMIT_MACROS
+#endif
+#include <inttypes.h>
 
 using namespace std;
 
-#  ifndef PARTITION_TOPOLOGY_VERBOSE
-#    define PARTITION_TOPOLOGY_VERBOSE 0
-#  endif
+#ifndef PARTITION_TOPOLOGY_VERBOSE
+#define PARTITION_TOPOLOGY_VERBOSE 0
+#endif
 
 /**
  *  Author: Harshitha Menon, Nikhil Jain

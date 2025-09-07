@@ -1,7 +1,6 @@
 #ifndef _PUP_C_H
 #define _PUP_C_H
 
-
 /*
 Pack/UnPack Library for UIUC Parallel Programming Lab
 C Bindings version

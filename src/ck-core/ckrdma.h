@@ -5,25 +5,25 @@
 #ifndef _CKRDMA_H_
 #define _CKRDMA_H_
 
+#include "envelope.h"
 #include "ckcallback.h"
 #include "conv-rdma.h"
-#include "envelope.h"
 #include <atomic>
 #include <vector>
 
 /*********************************** Zerocopy Direct API
  * **********************************/
 
-#define CK_BUFFER_REG CMK_BUFFER_REG
-#define CK_BUFFER_UNREG CMK_BUFFER_UNREG
-#define CK_BUFFER_PREREG CMK_BUFFER_PREREG
-#define CK_BUFFER_NOREG CMK_BUFFER_NOREG
+#define CK_BUFFER_REG     CMK_BUFFER_REG
+#define CK_BUFFER_UNREG   CMK_BUFFER_UNREG
+#define CK_BUFFER_PREREG  CMK_BUFFER_PREREG
+#define CK_BUFFER_NOREG   CMK_BUFFER_NOREG
 
-#define CK_BUFFER_DEREG CMK_BUFFER_DEREG
-#define CK_BUFFER_NODEREG CMK_BUFFER_NODEREG
+#define CK_BUFFER_DEREG     CMK_BUFFER_DEREG
+#define CK_BUFFER_NODEREG   CMK_BUFFER_NODEREG
 
 #define CkRdmaAlloc CmiRdmaAlloc
-#define CkRdmaFree CmiRdmaFree
+#define CkRdmaFree  CmiRdmaFree
 
 #define CkNcpyStatus CmiNcpyStatus
 #define CkNcpyMode CmiNcpyMode
@@ -35,13 +35,7 @@ struct NcpyBcastRecvPeerAckInfo;
 // BCAST_SEND mode is used for EM BCAST Send API
 // P2P_RECV mode is used for EM P2P Recv API
 // BCAST_RECV mode is used for EM BCAST Send API
-enum class ncpyEmApiMode : char
-{
-  P2P_SEND,
-  BCAST_SEND,
-  P2P_RECV,
-  BCAST_RECV
-};
+enum class ncpyEmApiMode : char { P2P_SEND, BCAST_SEND, P2P_RECV, BCAST_RECV };
 
 struct CkNcpyBufferPost;
 

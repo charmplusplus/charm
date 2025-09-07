@@ -10,22 +10,23 @@ More documentation goes here...
 #include <stdio.h>
 #include <stdlib.h>
 #ifndef _WIN32
-#  include <unistd.h>
+#include <unistd.h>
 #endif
-#include <sstream>
 #include <string.h>
+#include <sstream>
 using std::ostringstream;
-#include "CkCheckpoint.decl.h"
+#include <errno.h>
 #include "charm++.h"
 #include "ck.h"
 #include "ckcheckpoint.h"
-#include "converse.h"
-#include <errno.h>
+#include "CkCheckpoint.decl.h"
 #include <sys/stat.h>
+#include "converse.h"
 
-void noopit(const char*, ...) {}
+void noopit(const char*, ...)
+{}
 
-// #define DEBCHK   CkPrintf
+//#define DEBCHK   CkPrintf
 #define DEBCHK noopit
 
 #define SUBDIR_SIZE 256

@@ -63,17 +63,17 @@ never be excluded...
 */
 /*@{*/
 
-#include "CkCheckpoint.decl.h"
-#include "CkSyncBarrier.decl.h"
-#include "ck.h"
 #include "ckcheckpoint.h"
-#include "ckmulticast.h"
-#include "ckrdma.h"
-#include "converse.h"
-#include "spanningTree.h"
+#include "ck.h"
 #include "trace.h"
-#include <limits.h>
+#include "ckrdma.h"
+#include "CkCheckpoint.decl.h"
+#include "ckmulticast.h"
 #include <sstream>
+#include <limits.h>
+#include "spanningTree.h"
+#include "CkSyncBarrier.decl.h"
+#include "converse.h"
 #if CMK_CHARM4PY
 #include "TreeLB.h"
 #endif

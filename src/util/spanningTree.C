@@ -9,10 +9,10 @@
 #include <limits.h>
 
 #include <unordered_map>
-typedef std::unordered_map<int, int> intMap;
+typedef std::unordered_map<int,int> intMap;
 
 #include <bitset>
-#define DIM_SET_SIZE 32  // bitset size
+#define DIM_SET_SIZE 32     // bitset size
 
 #define _DEBUG_SPANNING_TREE_ 0
 #define CkAbort CmiAbort
@@ -34,7 +34,7 @@ inline void CkAssert(bool condition, const char* conditionStr, const char* file,
 #define CkAssert(condition) CkAssert((condition), #condition, __FILE__, __LINE__)
 
 #if _DEBUG_SPANNING_TREE_
-#  include <sstream>
+#include <sstream>
 #endif
 
 template <typename Iterator>
@@ -631,7 +631,7 @@ void getPETopoTreeEdges(int pe, int rootPE, int *pes, int numpes, unsigned int b
   *children    = t.children;
 }
 
-typedef std::unordered_map<int, CmiSpanningTreeInfo*> TreeInfoMap;
+typedef std::unordered_map<int,CmiSpanningTreeInfo*> TreeInfoMap;
 
 static TreeInfoMap trees;
 CmiNodeLock _treeLock;
