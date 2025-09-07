@@ -272,7 +272,7 @@ class CkWhenIdleRecord {
 
   static void onIdle(CkWhenIdleRecord *self) {
     CkCallstackPush(self->obj_);
-    ((CcdVoidFn)_entryTable[self->epIdx_]->call)(self->obj_, CmiWallTimer());
+    ((CcdVoidFn)_entryTable[self->epIdx_]->call)(self->obj_);
     CkCallstackPop(self->obj_);
     delete self;
   }
