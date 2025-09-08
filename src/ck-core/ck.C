@@ -918,9 +918,7 @@ static CkGroupID _groupCreate(envelope *env)
   if(CkMyPe() == 0)
      groupNum.idx = CkpvAccess(_numGroups)++;
   else
-     groupNum.idx = _getGroupIdx(CkNumPes(),CkMyPe(),CkpvAccess(_numGroups)++);
-  printf("Created group %d\n", groupNum.idx);
-  fflush(stdout);
+     groupNum.idx = _getGroupIdx(CkNumPes(),CkMyPe(),CkpvAccess(_numGroups)++);\
   _createGroup(groupNum, env);
   return groupNum;
 }
