@@ -9314,7 +9314,8 @@ This entry method should be invoked on the sender by wrapping the
 source buffer with ``CkDeviceBuffer``, whose constructor takes a pointer
 to the source buffer, a Charm++ callback to be invoked once the transfer
 completes (optional), and a CUDA stream associated with the transfer
-(which is only used internally in the CUDA memcpy and IPC based implementation and is also optional):
+(which is only used internally in the CUDA memcpy and IPC based implementation and is also optional).
+The user guarantees that the GPU buffer won't be modified until the callback is called:
 
 .. code-block:: c++
 
