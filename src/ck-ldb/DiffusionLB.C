@@ -98,7 +98,7 @@ DiffusionLB::~DiffusionLB()
 // Main entry point for the load balancer
 void DiffusionLB::Strategy(const DistBaseLB::LDStats* const stats)
 {
-//  CkPrintf("\n[PE-%d] In Strategy", CkMyPe());
+CkPrintf("\n[PE-%d] In Strategy", CkMyPe());
 //  fflush(stdout);
   total_migrates = 0;
 
@@ -128,6 +128,7 @@ void DiffusionLB::Strategy(const DistBaseLB::LDStats* const stats)
   thisProxy[rank0PE].ReceiveStats(*marshmsg);
   if (CkMyPe() != rank0PE)
   {
+    CkPrintf("Contributing to statsAssembled from PE-%d\n", CkMyPe());
     CkCallback cb(CkReductionTarget(DiffusionLB, statsAssembled), thisProxy);
     contribute(cb);
   }
@@ -137,6 +138,7 @@ void DiffusionLB::Strategy(const DistBaseLB::LDStats* const stats)
  * all PEs call statsAssembled().*/
 void DiffusionLB::ReceiveStats(CkMarshalledCLBStatsMessage&& data)
 {
+  CkPrintf("\n[PE-%d] In ReceiveStats", CkMyPe());
   // TODO: why is this in CMK_LBDB_ON? needs to be done always?
 #if CMK_LBDB_ON
   CLBStatsMsg* m = data.getMessage();
@@ -152,6 +154,7 @@ void DiffusionLB::ReceiveStats(CkMarshalledCLBStatsMessage&& data)
   {
     // build LDStats
     BuildStats();
+    CkPrintf("Contributing to Stats assembled on PE-%d\n", CkMyPe());
     CkCallback cb(CkReductionTarget(DiffusionLB, statsAssembled), thisProxy);
     contribute(cb);
     statsReceived = 0;
@@ -164,7 +167,7 @@ void DiffusionLB::statsAssembled()
 {
   if (CkMyPe() == rank0PE)
   {
-//    CkPrintf("\nPE-%d, calling findNBors", CkMyPe());
+CkPrintf("\nPE-%d, calling findNBors", CkMyPe());
 //    fflush(stdout);
     findNBors(1);
   }
@@ -483,28 +486,8 @@ void DiffusionLB::AcrossNodeLB()
     }
   }
 
-  std::vector<bool> isMigratable(n_objs);
-  for (int i = 0; i < n_objs; i++)
-  {
-    isMigratable[i] = nodeStats->objData[i].migratable;
-  }
 
-  std::vector<std::vector<LBRealType>> positions(n_objs);
-  std::vector<double> load(n_objs);
-  for (int i = 0; i < n_objs; i++)
-  {
-    load[i] = nodeStats->objData[i].wallTime;
-
-    int size = nodeStats->objData[i].position.size();
-    positions[i].resize(size);
-    for (int j = 0; j < size; j++)
-    {
-      positions[i][j] = nodeStats->objData[i].position[j];
-    }
-  }
-
-  thisProxy[0].ReceiveFinalStats(isMigratable, nodeStats->from_proc, nodeStats->to_proc,
-                                 nodeStats->n_migrateobjs, positions, load);
+  
 }
 
 /* Load has been logically sent from overloaded to underloaded nodes in LoadBalance().
@@ -519,10 +502,13 @@ void DiffusionLB::AcrossNodeLB()
  * */
 void DiffusionLB::WithinNodeLB()
 {
+
   if (thisIndex == 0)
     CkPrintf("--------STARTING WITHIN NODE LB--------\n");
   
   if(nodeSize==1) {
+      CkPrintf("--------Node size is 1--------\n");
+
     if (CkMyPe() == 0)
     {
       CkCallback cb(CkIndex_DiffusionLB::ProcessMigrations(), thisProxy);
@@ -532,6 +518,7 @@ void DiffusionLB::WithinNodeLB()
   }
   if (CkMyPe() == rank0PE)
   {
+   
     // CkPrintf("[%d] GRD: DoneNodeLB \n", CkMyPe());
     double avgPE = averagePE();
 
@@ -562,7 +549,8 @@ void DiffusionLB::WithinNodeLB()
           if (objs[j].isMigratable() && objs[j].getCurrPe() != -1 && objs[j].getVertexLoad() <= overLoad)
           {
             objectSizes.push_back(objs[j].getVertexLoad());
-            objectIds.push_back(j);
+
+            objectIds.push_back(j );
             objectPEs.push_back(/*GetPENumber(j)*/rank+rank0PE);
             objectHdl.push_back(nodeStats->objData[j].handle);
             isToken.push_back(0);
@@ -574,6 +562,7 @@ void DiffusionLB::WithinNodeLB()
           for(int i=0;i<objectLoads.size();i++) {
             if(objectLoads[i] <= overLoad) {
               objectSizes.push_back(objectLoads[i]);
+              //CkPrintf("Adding object with objectSrcId %d with load %lf\n", objectSrcIds[i], objectLoads[i]);
               objectIds.push_back(objectSrcIds[i]/*objHandle*/);
               objectHdl.push_back(objectHandles[i]);
               objectPEs.push_back(objSenderPEs[i]);
@@ -637,6 +626,8 @@ void DiffusionLB::WithinNodeLB()
 
 //      if(maxObj->token) 
 
+CkPrintf("\nMigrating token obj %d (id %d) with load %lf from PE-%d to PE-%d", objHandle.handle, objs[objId].getVertexId(), currLoad, donorPE, destPE);
+
       thisProxy[destPE].LoadMetaInfo(objHandle, objId, currLoad, donorPE, 1); // to the receiving PE (mig++)
  
       if(maxObj->token) {
@@ -675,7 +666,31 @@ void DiffusionLB::WithinNodeLB()
     // divided amongs intra node PE's.
 
     if (CkMyPe() == 0)
+    { {
+  int n_objs = nodeStats->objData.size();
+  std::vector<bool> isMigratable(n_objs);
+  for (int i = 0; i < n_objs; i++)
+  {
+    isMigratable[i] = nodeStats->objData[i].migratable;
+  }
+
+  std::vector<std::vector<LBRealType>> positions(n_objs);
+  std::vector<double> load(n_objs);
+  for (int i = 0; i < n_objs; i++)
+  {
+    load[i] = nodeStats->objData[i].wallTime;
+
+    int size = nodeStats->objData[i].position.size();
+    positions[i].resize(size);
+    for (int j = 0; j < size; j++)
     {
+      positions[i][j] = nodeStats->objData[i].position[j];
+    }
+  }
+  thisProxy[0].ReceiveFinalStats(isMigratable, nodeStats->from_proc, nodeStats->to_proc,
+                                 nodeStats->n_migrateobjs, positions, load);
+  }
+
       CkCallback cb(CkIndex_DiffusionLB::ProcessMigrations(), thisProxy);
       CkStartQD(cb);
     }
@@ -713,10 +728,11 @@ void DiffusionLB::update_peload(int rank, double load) {
 
 void DiffusionLB::ProcessMigrations()
 {
+  
   // SAME AS IN PACKANDSENDMIGRATEMSGS
   LBMigrateMsg* msg = new (total_migrates, CkNumPes(), CkNumPes(), 0) LBMigrateMsg;
   msg->n_moves = total_migrates;
-  CkPrintf("\nPE-%d with %d migrates", CkMyPe(), total_migrates);
+  CkPrintf("\nPE-%d with %d migrates\n", CkMyPe(), total_migrates);
   for (int i = 0; i < total_migrates; i++)
   {
     MigrateInfo* item = (MigrateInfo*)migrateInfo[i];
@@ -732,10 +748,13 @@ void DiffusionLB::ProcessMigrations()
   {
   // SAME AS IN PROCESSMIGRATIONDECISION
   const int me = CkMyPe();
+  CkPrintf("\nPE-%d with %d moves", CkMyPe(), msg->n_moves);
 
   for (int i = 0; i < msg->n_moves; i++)
   {
     MigrateInfo& move = msg->moves[i];
+     CkPrintf("\n[PE-%d] Migrating obj from %d to %d", CkMyPe(), move.from_pe,
+               move.to_pe);
     if (move.from_pe == me)
     {
       if (move.to_pe == me)
@@ -743,7 +762,7 @@ void DiffusionLB::ProcessMigrations()
           CkAbort("[%i] Error, attempting to migrate object myself to myself\n",
                   CkMyPe());
       }
-
+     
       lbmgr->Migrate(move.obj, move.to_pe);
     }
     else if (move.from_pe != me)
