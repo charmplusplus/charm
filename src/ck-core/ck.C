@@ -918,7 +918,7 @@ static CkGroupID _groupCreate(envelope *env)
   if(CkMyPe() == 0)
      groupNum.idx = CkpvAccess(_numGroups)++;
   else
-     groupNum.idx = _getGroupIdx(CkNumPes(),CkMyPe(),CkpvAccess(_numGroups)++);\
+     groupNum.idx = _getGroupIdx(CkNumPes(),CkMyPe(),CkpvAccess(_numGroups)++);
   _createGroup(groupNum, env);
   return groupNum;
 }
