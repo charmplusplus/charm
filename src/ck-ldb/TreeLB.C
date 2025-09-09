@@ -15,11 +15,9 @@ extern "C" void charmrun_realloc(char *s);
 extern char willContinue;
 extern realloc_state pending_realloc_state;
 extern char * se_avail_vector;
-extern "C" int mynewpe;
 extern char *_shrinkexpand_basedir;
 extern int numProcessAfterRestart;
 extern bool load_balancer_created;
-extern int mynewpe;
 #endif
 
 static void lbinit()
