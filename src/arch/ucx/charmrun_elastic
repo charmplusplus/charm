@@ -4,7 +4,11 @@ is_restart=false
 
 original_args=("$@")
 
-pes_file="/dev/shm/numRestartProcs.txt"
+if [[ "$(uname)" == "Darwin" ]]; then
+    pes_file="/tmp/numRestartProcs.txt"
+else
+    pes_file="/dev/shm/numRestartProcs.txt"
+fi
 
 time {
 while true; do
