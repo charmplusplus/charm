@@ -1,14 +1,16 @@
 #!/bin/bash
-   
+
 is_restart=false
 
 original_args=("$@")
 
 if [[ "$(uname)" == "Darwin" ]]; then
-    pes_file="/tmp/numRestartProcs.txt"
+    TMPDIR="/tmp"
 else
-    pes_file="/dev/shm/numRestartProcs.txt"
+    TMPDIR="/dev/shm"
 fi
+
+pes_file="$TMPDIR/numRestartProcs.txt"
 
 time {
 while true; do
@@ -40,7 +42,7 @@ while true; do
 
     # 2. Check the flag. If it's a restart, prepare the extra argument.
     if [ "$is_restart" = true ]; then
-        restart_arg="+restart /dev/shm"
+        restart_arg="+restart $TMPDIR"
         if [ -f "$pes_file" ]; then
             num_pes=$(cat "$pes_file")
             echo "Charm> Reading pes $num_pes from $pes_file"
