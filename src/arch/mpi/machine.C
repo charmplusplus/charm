@@ -2022,7 +2022,10 @@ void ConverseCleanup(void)
 {
   MACHSTATE(2,"ConverseCleanup {");
 
-  CmiBarrier();
+  #if (CMK_SMP && !CMK_SMP_NO_COMMTHD)
+    CmiAbort(" ConverseCleanup called in SMP. CmiBarrier needs to be called on comm thread as well! Right now, this hangs. Remove this abort when SMP support implemented.\n");
+  #endif
+  CmiBarrier(); // TODO: for smp, this must also be called on comm thread. otherwise, hangs
 
 #if CMK_USE_SYSVSHM
 	CmiExitSysvshm();
