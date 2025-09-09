@@ -82,6 +82,7 @@ class CkLBArgs
   inline double& targetRatio() { return _lb_targetRatio; }
   inline bool& metaLbOn() { return _lb_metaLbOn; }
   inline char*& metaLbModelDir() { return _lb_metaLbModelDir; }
+  inline int percentMovesAllowed() { return 100; }
 };
 
 extern CkLBArgs _lb_args;

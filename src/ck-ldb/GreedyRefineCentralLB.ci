@@ -1,0 +1,10 @@
+module GreedyRefineCentralLB {
+
+  extern module CentralLB;
+  initnode void lbinit(void);
+  group [migratable] GreedyRefineCentralLB : CentralLB {
+    entry void GreedyRefineCentralLB(const CkLBOptions &);
+    entry void receiveSolutions(CkReductionMsg *msg);
+    entry [reductiontarget] void receiveTotalTime(double time);
+  };
+};
