@@ -553,16 +553,28 @@ void TreeLB::migrateObjects(const IDM& mig_order)
 void TreeLB::checkForRealloc()
 {
 #if CMK_SHRINK_EXPAND
-  if(pending_realloc_state == EXPAND_MSG_RECEIVED) 
-  {
-    pending_realloc_state = EXPAND_IN_PROGRESS; //in progress
+if (_lb_args.debug() > 0) {
+      CkPrintf(
+        "Check for Realloc"
+      );
+}
+
+  if(pending_realloc_state != NO_REALLOC) {
+    pending_realloc_state = (pending_realloc_state == SHRINK_MSG_RECEIVED) ? SHRINK_IN_PROGRESS : EXPAND_IN_PROGRESS; //in progress
     CkPrintf("Load balancer invoking charmrun to handle reallocation on pe %d\n", CkMyPe());
     double end_lb_time = CkWallTimer();
-    //CkPrintf("CharmLB> %s: PE [%d] step %d finished at %f duration %f s\n\n",
-    //    lbname, cur_ld_balancer, step()-1, end_lb_time,	end_lb_time-start_lb_time);
+   
     // do checkpoint
     CkCallback cb(CkIndex_TreeLB::resumeFromReallocCheckpoint(), thisProxy[0]);
-    CkStartCheckpoint(_shrinkexpand_basedir, cb);
+
+    // print avail vector
+    if (_lb_args.debug() > 0) {
+      CkPrintf("Shrink/Expand avail vector on pe %d: ", CkMyPe());
+      for(int i=0;i<CkNumPes();i++) CkPrintf("%d ", se_avail_vector[i]);
+      CkPrintf("\n");
+    }
+    CkStartRescaleCheckpoint(_shrinkexpand_basedir, cb, 
+      std::vector<char>(se_avail_vector, se_avail_vector + CkNumPes()));
   }
   else
   {
