@@ -196,6 +196,8 @@ class TreeLB : public CBase_TreeLB
   void lb_done_impl();
 
   void startCleanup();
+  void CallLB();
+  void CheckForLB();
 
   void checkForRealloc();
 

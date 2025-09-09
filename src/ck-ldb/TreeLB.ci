@@ -21,6 +21,8 @@ module TreeLB {
     entry void resumeFromReallocCheckpoint();
     entry void lb_done_impl();
     entry void startCleanup();
+    entry [reductiontarget] void CheckForLB();
+    entry void CallLB();
     entry void checkForRealloc();
     entry void willIbekilled(std::vector<char> avail, int newnumProcessAfterRestart);
   };

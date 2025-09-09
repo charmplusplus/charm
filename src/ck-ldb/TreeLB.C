@@ -234,10 +234,21 @@ void TreeLB::pup(PUP::er& p)
   }
 }
 
-void TreeLB::InvokeLB()
+void TreeLB::CallLB()
 {
-#if CMK_LBDB_ON
-  // NOTE: I'm assuming new LBManager will know when (and when not to) call AtSync
+  #if CMK_LBDB_ON
+  #if CMK_SHRINK_EXPAND
+  
+  if (pending_realloc_state != NO_REALLOC) {
+    // if (_lb_args.debug() > 0)
+    //   CkPrintf("TreeLB::CallLB pending_realloc_state=%d (EXPAND_MSG_RECEIVED %d, NO_REALLOC %d)\n", pending_realloc_state, EXPAND_MSG_RECEIVED, NO_REALLOC);
+    configure(config); // reconfigure tree in case number of PEs changed
+    CkPrintf("Done reconfiguring tree\n");
+  }
+
+
+  #endif    
+
   if (barrier_before_lb)
   {
     contribute(CkCallback(CkReductionTarget(TreeLB, ProcessAtSync), thisProxy));
@@ -246,6 +257,19 @@ void TreeLB::InvokeLB()
   {
     thisProxy[CkMyPe()].ProcessAtSync();
   }
+  #endif
+}
+
+void TreeLB::InvokeLB()
+{
+#if CMK_LBDB_ON
+  // NOTE: I'm assuming new LBManager will know when (and when not to) call AtSync
+
+  #if CMK_SHRINK_EXPAND
+    contribute(CkCallback(CkReductionTarget(TreeLB, CheckForLB), thisProxy[0]));
+  #else
+    CallLB();
+  #endif
 #endif
 }
 
@@ -264,6 +288,22 @@ void TreeLB::ProcessAtSync()
   stats->level = level;
   awaitingLB[level] = true;
   sendStatsUp((CkMessage*)stats);
+#endif
+}
+
+void TreeLB::CheckForLB() {
+#if CMK_SHRINK_EXPAND
+  // if (_lb_args.debug() > 0)
+  //   CkPrintf("TreeLB::CheckForLB pending_realloc_state=%d (EXPAND_MSG_RECEIVED %d, NO_REALLOC %d)\n", pending_realloc_state, EXPAND_MSG_RECEIVED, NO_REALLOC);
+
+  if (pending_realloc_state == EXPAND_MSG_RECEIVED)
+    checkForRealloc();
+  else if (pending_realloc_state == NO_REALLOC)
+    thisProxy.resumeClients(0);
+  else
+    thisProxy.CallLB();
+#else
+  thisProxy.CallLB();
 #endif
 }
 
@@ -542,24 +582,9 @@ void TreeLB::resumeFromReallocCheckpoint()
 #endif
 }
 
-#if CMK_SHRINK_EXPAND
-int getNewPeNumber(std::vector<char> avail)
-{
-  int mype = CkMyPe();
-  int count =0;
-  for (int i =0; i <mype; i++)
-  {
-    if(avail[i] == 0) count++;
-  }
-  return (mype - count);
-}
-#endif
-
 void TreeLB::willIbekilled(std::vector<char> avail, int newnumProcessAfterRestart){
 #if CMK_SHRINK_EXPAND
   numProcessAfterRestart = newnumProcessAfterRestart;
-  mynewpe = getNewPeNumber(avail);
-  willContinue = avail[CkMyPe()];
   CkCallback cb(CkIndex_TreeLB::startCleanup(), thisProxy[0]);
   contribute(cb);
 #endif
