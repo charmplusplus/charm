@@ -6,6 +6,7 @@ module CommonLBs {
   extern module MetisLB;
   extern module RecBipartLB;
   extern module GreedyCentralLB;
+  extern module GreedyRefineCentralLB;
 
   initnode void initCommonLBs(void);
 };

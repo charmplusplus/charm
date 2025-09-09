@@ -6,6 +6,7 @@ module EveryLB {
   extern module MetisLB;
   extern module RecBipartLB;
   extern module GreedyCentralLB;
+  extern module GreedyRefineCentralLB;
 
   initnode void initEveryLB(void);
 };
