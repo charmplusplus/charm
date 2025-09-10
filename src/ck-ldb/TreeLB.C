@@ -296,8 +296,8 @@ void TreeLB::CheckForLB() {
 
   if (pending_realloc_state == EXPAND_MSG_RECEIVED)
     checkForRealloc();
-  else if (pending_realloc_state == NO_REALLOC)
-    thisProxy.resumeClients(0);
+  //else if (pending_realloc_state == NO_REALLOC)
+  //  thisProxy.resumeClients(0);
   else
     thisProxy.CallLB();
 #else

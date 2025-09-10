@@ -1043,6 +1043,9 @@ int LDProcessorSpeed()
     wps = (int)((double)wps * correction + 0.5);
   }
 
+  if (_lb_args.debug() > 1)
+    CmiPrintf("LB> PE %d speed is %d\n", CkMyPe(), wps);
+
   return wps;
 }
 
