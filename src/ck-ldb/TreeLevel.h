@@ -374,6 +374,18 @@ class StrategyWrapper : public IStrategyWrapper
     sol->setErrorChecking(objs, procs);
 #endif
 
+#if CMK_SHRINK_EXPAND
+    if (se_avail_vector != NULL) {
+      // if shrink/expand is enabled, remove processors that will be removed
+      std::vector<P> procs2;
+      for (const auto& p : procs) {
+        if (se_avail_vector[p.id] != 0) procs2.push_back(p);
+      }
+      procs = procs2; 
+    }
+#endif
+
+
     double t0 = CkWallTimer();
     strategy->solve(objs, procs, *sol, false);
 
