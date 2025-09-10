@@ -84,12 +84,6 @@ int runtime_kvs_put(const char *k, const void *v, int vlen)
         return -2;
     }
 
-    if (PMIX_SUCCESS != (ret = PMIx_Commit())) {
-        fprintf(stderr, "Client ns %s rank %d: PMIx_Commit failed: %d\n",
-                myproc.nspace, myproc.rank, ret);
-        return -3;
-    }
-
     return 0;
 }
 
@@ -123,7 +117,19 @@ int runtime_barrier()
 {
     int ret;
 
-    if (PMIX_SUCCESS != (ret = PMIx_Fence(NULL, 0, NULL, 0))) {
+    if (PMIX_SUCCESS != (ret = PMIx_Commit())) {
+        fprintf(stderr, "Client ns %s rank %d: PMIx_Commit failed: %d\n",
+                myproc.nspace, myproc.rank, ret);
+        return -3;
+    }
+    
+    pmix_info_t info;
+    memset(&info, 0, sizeof(info));
+    strncpy(info.key, PMIX_COLLECT_DATA, PMIX_MAX_KEYLEN);
+    info.value.type = PMIX_BOOL;
+    info.value.data.flag = 1;
+
+    if (PMIX_SUCCESS != (ret = PMIx_Fence(NULL, 0, &info, 1))) {
         fprintf(stderr, "Client ns %s rank %d: PMIx_Fence failed: %d\n",
                 myproc.nspace, myproc.rank, ret);
         return -1;
