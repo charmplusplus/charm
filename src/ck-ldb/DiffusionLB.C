@@ -624,9 +624,8 @@ void DiffusionLB::WithinNodeLB()
       LDObjHandle objHandle = maxObj->handle;
       double currLoad = maxObj->load;
 
-//      if(maxObj->token) 
-
-CkPrintf("\nMigrating token obj %d (id %d) with load %lf from PE-%d to PE-%d", objHandle.handle, objs[objId].getVertexId(), currLoad, donorPE, destPE);
+      // update nodestats for within node migration as well
+      nodeStats->to_proc[objId] = destPE;
 
       thisProxy[destPE].LoadMetaInfo(objHandle, objId, currLoad, donorPE, 1); // to the receiving PE (mig++)
  
@@ -666,30 +665,7 @@ CkPrintf("\nMigrating token obj %d (id %d) with load %lf from PE-%d to PE-%d", o
     // divided amongs intra node PE's.
 
     if (CkMyPe() == 0)
-    { {
-  int n_objs = nodeStats->objData.size();
-  std::vector<bool> isMigratable(n_objs);
-  for (int i = 0; i < n_objs; i++)
-  {
-    isMigratable[i] = nodeStats->objData[i].migratable;
-  }
-
-  std::vector<std::vector<LBRealType>> positions(n_objs);
-  std::vector<double> load(n_objs);
-  for (int i = 0; i < n_objs; i++)
-  {
-    load[i] = nodeStats->objData[i].wallTime;
-
-    int size = nodeStats->objData[i].position.size();
-    positions[i].resize(size);
-    for (int j = 0; j < size; j++)
     {
-      positions[i][j] = nodeStats->objData[i].position[j];
-    }
-  }
-  thisProxy[0].ReceiveFinalStats(isMigratable, nodeStats->from_proc, nodeStats->to_proc,
-                                 nodeStats->n_migrateobjs, positions, load);
-  }
 
       CkCallback cb(CkIndex_DiffusionLB::ProcessMigrations(), thisProxy);
       CkStartQD(cb);
@@ -728,7 +704,32 @@ void DiffusionLB::update_peload(int rank, double load) {
 
 void DiffusionLB::ProcessMigrations()
 {
-  
+  if (CkMyPe() == rank0PE) {
+    int n_objs = nodeStats->objData.size();
+    std::vector<bool> isMigratable(n_objs);
+    for (int i = 0; i < n_objs; i++)
+    {
+      isMigratable[i] = nodeStats->objData[i].migratable;
+    }
+
+    std::vector<std::vector<LBRealType>> positions(n_objs);
+    std::vector<double> load(n_objs);
+    for (int i = 0; i < n_objs; i++)
+    {
+      load[i] = nodeStats->objData[i].wallTime;
+
+      int size = nodeStats->objData[i].position.size();
+      positions[i].resize(size);
+      for (int j = 0; j < size; j++)
+      {
+        positions[i][j] = nodeStats->objData[i].position[j];
+      }
+    }
+  thisProxy[0].ReceiveFinalStats(isMigratable, nodeStats->from_proc, nodeStats->to_proc,
+                                    nodeStats->n_migrateobjs, positions, load);
+  }
+
+
   // SAME AS IN PACKANDSENDMIGRATEMSGS
   LBMigrateMsg* msg = new (total_migrates, CkNumPes(), CkNumPes(), 0) LBMigrateMsg;
   msg->n_moves = total_migrates;
