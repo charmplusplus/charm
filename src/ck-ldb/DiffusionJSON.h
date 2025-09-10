@@ -47,6 +47,8 @@ int LBwriteStatsMsgs(BaseLB::LDStats* statsData)
   }
 
   jsonData["n_procs"] = statsData->procs.size();
+  jsonData["n_nodes"] = CkNumNodes();
+
   jsonData["objData"] = objpe;
   // objdata: objID, omID, migratable, position, cpuTime, wallTime
 
