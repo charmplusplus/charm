@@ -14,6 +14,8 @@
  */
 
 #include "DiffusionLB.h"
+#include "LBSimulation.h"
+
 
 #include "ck.h"
 #include "ckgraph.h"
@@ -704,7 +706,8 @@ void DiffusionLB::update_peload(int rank, double load) {
 
 void DiffusionLB::ProcessMigrations()
 {
-  if (CkMyPe() == rank0PE) {
+  if (CkMyPe() == rank0PE && (step() == LBSimulation::dumpStep))
+  {
     int n_objs = nodeStats->objData.size();
     std::vector<bool> isMigratable(n_objs);
     for (int i = 0; i < n_objs; i++)
