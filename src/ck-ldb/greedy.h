@@ -83,7 +83,10 @@ class GreedyRefine : public Strategy<O, P, S>
       // TODO improve the case where the proc is not in my list of processors (because
       // it belongs to a foreing domain). procHeap API should return an error?
       P& oldPe = procHeap.getProc(ptr(o)->oldPe);
-      if ((oldPe.id >= 0) && (oldPe.getLoad() + ptr(o)->getLoad() <= M))
+      // Create a temporary copy to test assignment without modifying the original
+      P tempPe = oldPe;
+      ptr(&tempPe)->assign(ptr(o));
+      if ((oldPe.id >= 0) && (ptr(&tempPe)->getLoad() <= M))
         p = oldPe;
       else
         p = procHeap.top();
