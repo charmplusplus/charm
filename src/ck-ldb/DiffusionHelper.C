@@ -99,7 +99,6 @@ void DiffusionLB::BuildStats()
 
       nodeStats->objData[nobj] = msg->objData[i];
       LDObjData& oData = nodeStats->objData[nobj];
-      //            CkPrintf("\n[PE-%d]Adding vertex id %d", CkMyPe(), nobj);
       objs[nobj] = CkVertex(nobj, oData.wallTime, nodeStats->objData[nobj].migratable,
                             nodeStats->from_proc[nobj]);
       my_load += msg->objData[i].wallTime;

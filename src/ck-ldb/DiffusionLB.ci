@@ -90,7 +90,7 @@ module DiffusionLB
           }
         }
 
-        CkPrintf("Node %d has neighbors: %s\n", myNodeId, neighborsStr.c_str());
+        if (_lb_args.debug()) CkPrintf("Node %d has neighbors: %s\n", myNodeId, neighborsStr.c_str());
 
         loadNeighbors.clear();
         toSendLoad.clear();
@@ -154,13 +154,8 @@ module DiffusionLB
       // Calculate the aggregate load that has to be sent.
       serial "Aggregate load"
       {
-        CkPrintf("PSEUDO: Node %d (load %f) with pseudo_load after LB %f\n", myNodeId,
+        if (_lb_args.debug()) CkPrintf("PSEUDO: Node %d (load %f) with pseudo_load after LB %f\n", myNodeId,
                  my_load, my_pseudo_load);
-        // for (int i = 0; i < neighborCount; i++)
-        // {
-        //   CkPrintf("PSEUDO: Node %d sending %f to %d\n", myNodeId, toSendLoad[i],
-        //            sendToNeighbors[i]);
-        // }
         loadReceivers = 0;
       }
     }

@@ -58,8 +58,6 @@ DiffusionLB::DiffusionLB(const CkLBOptions& opt) : CBase_DiffusionLB(opt)
 
 #if CMK_LBDB_ON
   lbname = "DiffusionLB";
-  if (CkMyPe() == 0)
-    CkPrintf("[%d] Diffusion created\n", CkMyPe());
   if (_lb_args.statsOn())
     lbmgr->CollectStatsOn();
   thisProxy = CProxy_DiffusionLB(thisgroup);
@@ -100,8 +98,7 @@ DiffusionLB::~DiffusionLB()
 // Main entry point for the load balancer
 void DiffusionLB::Strategy(const DistBaseLB::LDStats* const stats)
 {
-CkPrintf("\n[PE-%d] In Strategy", CkMyPe());
-//  fflush(stdout);
+  if (_lb_args.debug())CkPrintf("\n[PE-%d] In Strategy", CkMyPe());
   total_migrates = 0;
 
   if (CkMyPe() == 0 && _lb_args.debug() >= 1)
@@ -130,7 +127,6 @@ CkPrintf("\n[PE-%d] In Strategy", CkMyPe());
   thisProxy[rank0PE].ReceiveStats(*marshmsg);
   if (CkMyPe() != rank0PE)
   {
-    CkPrintf("Contributing to statsAssembled from PE-%d\n", CkMyPe());
     CkCallback cb(CkReductionTarget(DiffusionLB, statsAssembled), thisProxy);
     contribute(cb);
   }
@@ -140,7 +136,6 @@ CkPrintf("\n[PE-%d] In Strategy", CkMyPe());
  * all PEs call statsAssembled().*/
 void DiffusionLB::ReceiveStats(CkMarshalledCLBStatsMessage&& data)
 {
-  CkPrintf("\n[PE-%d] In ReceiveStats", CkMyPe());
   // TODO: why is this in CMK_LBDB_ON? needs to be done always?
 #if CMK_LBDB_ON
   CLBStatsMsg* m = data.getMessage();
@@ -156,7 +151,6 @@ void DiffusionLB::ReceiveStats(CkMarshalledCLBStatsMessage&& data)
   {
     // build LDStats
     BuildStats();
-    CkPrintf("Contributing to Stats assembled on PE-%d\n", CkMyPe());
     CkCallback cb(CkReductionTarget(DiffusionLB, statsAssembled), thisProxy);
     contribute(cb);
     statsReceived = 0;
@@ -169,8 +163,7 @@ void DiffusionLB::statsAssembled()
 {
   if (CkMyPe() == rank0PE)
   {
-CkPrintf("\nPE-%d, calling findNBors", CkMyPe());
-//    fflush(stdout);
+    if (_lb_args.debug()) CkPrintf("\nPE-%d, calling findNNeighbors", CkMyPe());
     findNBors(1);
   }
 }
@@ -191,7 +184,7 @@ void DiffusionLB::startStrategy()
   }
 
   rank0_barrier_counter = 0;
-  CkPrintf("--------NEIGHBOR SELECTION COMPLETE (Using Comm? %s)--------\n",
+  if (_lb_args.debug()) CkPrintf("--------NEIGHBOR SELECTION COMPLETE (Using Comm? %s)--------\n",
            _lb_args.diffusionCommOn() ? "true" : "false");
   fflush(stdout);
   for (int i = 0; i < numNodes; i++) thisProxy[i * nodeSize].pseudolb_rounds();
@@ -385,7 +378,7 @@ void DiffusionLB::AcrossNodeLB()
 
   if (CkMyPe() == 0)
   {
-    CkPrintf("--------STARTING ACROSS NODE LB--------\n");
+    if (_lb_args.debug()) CkPrintf("--------STARTING ACROSS NODE LB--------\n");
     CkCallback cb(CkIndex_DiffusionLB::WithinNodeLB(), thisProxy);
     CkStartQD(cb);
   }
@@ -471,7 +464,7 @@ void DiffusionLB::AcrossNodeLB()
 
       if (nodeStats->from_proc[v_id] != donorPE) {
         continue;
-        CkPrintf(
+        CkAbort(
             "ERROR: not sure if this is supposed to work, but from_proc[%d] = %d, "
             "donorPE = %d\n",
             v_id, nodeStats->from_proc[v_id], donorPE);
@@ -506,10 +499,10 @@ void DiffusionLB::WithinNodeLB()
 {
 
   if (thisIndex == 0)
-    CkPrintf("--------STARTING WITHIN NODE LB--------\n");
-  
+    if (_lb_args.debug()) CkPrintf("--------STARTING WITHIN NODE LB--------\n");
+
   if(nodeSize==1) {
-      CkPrintf("--------Node size is 1--------\n");
+      if (_lb_args.debug()) CkPrintf("--------Node size is 1--------\n");
 
     if (CkMyPe() == 0)
     {
@@ -537,7 +530,7 @@ void DiffusionLB::WithinNodeLB()
     // and store the underloaded pes
     for (int rank = 0; rank < nodeSize; rank++)
     {
-      CkPrintf("\nOrig PE load with node LB [%d] = %lf", rank+rank0PE, pe_load[rank]);
+      if (_lb_args.debug()) CkPrintf("\nOrig PE load with node LB [%d] = %lf", rank+rank0PE, pe_load[rank]);
       if (pe_load[rank] > avgPE + threshold)
       {
         double overLoad = pe_load[rank] - avgPE;
@@ -576,7 +569,7 @@ void DiffusionLB::WithinNodeLB()
       }
       else if (pe_load[rank] < avgPE - threshold)
       {
-        CkPrintf("\nAdding PE-%d to minPEs on node %d", CkMyPe(), myNodeId);
+        if (_lb_args.debug())CkPrintf("\nAdding PE-%d to minPEs on node %d", CkMyPe(), myNodeId);
         InfoRecord* itemMin = new InfoRecord;
         itemMin->load = pe_load[rank];
         itemMin->Id = rank;
@@ -682,7 +675,7 @@ void DiffusionLB::LoadReceived(int objId, int from0PE)
   auto it = mig_id_map.find(objId);
   if(it!=mig_id_map.end()) {
     MigrateInfo* migrateMe = it->second;
-    CkPrintf("\nUpdating to PE from %d to %d", migrateMe->to_pe, from0PE);
+    if (_lb_args.debug())CkPrintf("\nUpdating to PE from %d to %d", migrateMe->to_pe, from0PE);
     migrateMe->to_pe = from0PE;
   } else {
     MigrateInfo* migrateMe = new MigrateInfo;
@@ -736,7 +729,7 @@ void DiffusionLB::ProcessMigrations()
   // SAME AS IN PACKANDSENDMIGRATEMSGS
   LBMigrateMsg* msg = new (total_migrates, CkNumPes(), CkNumPes(), 0) LBMigrateMsg;
   msg->n_moves = total_migrates;
-  CkPrintf("\nPE-%d with %d migrates\n", CkMyPe(), total_migrates);
+  if (_lb_args.debug()) CkPrintf("PE-%d with %d migrates\n", CkMyPe(), total_migrates);
   for (int i = 0; i < total_migrates; i++)
   {
     MigrateInfo* item = (MigrateInfo*)migrateInfo[i];
@@ -752,12 +745,10 @@ void DiffusionLB::ProcessMigrations()
   {
   // SAME AS IN PROCESSMIGRATIONDECISION
   const int me = CkMyPe();
-  CkPrintf("\nPE-%d with %d moves", CkMyPe(), msg->n_moves);
-
   for (int i = 0; i < msg->n_moves; i++)
   {
     MigrateInfo& move = msg->moves[i];
-     CkPrintf("\n[PE-%d] Migrating obj from %d to %d", CkMyPe(), move.from_pe,
+     if (_lb_args.debug()) CkPrintf("\n[PE-%d] Migrating obj from %d to %d", CkMyPe(), move.from_pe,
                move.to_pe);
     if (move.from_pe == me)
     {
@@ -771,8 +762,6 @@ void DiffusionLB::ProcessMigrations()
     }
     else if (move.from_pe != me)
     {
-      CkPrintf("[%d] Error, strategy wants to move from %d to  %d\n", me, move.from_pe,
-               move.to_pe);
       CkAbort("Trying to move objs not on my PE\n");
     }
   }

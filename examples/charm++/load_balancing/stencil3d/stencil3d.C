@@ -406,10 +406,8 @@ public:
     int procsN = nprocs / procsM;
 
     if (procsM * procsN != nprocs) {
-      CkAbort("Processor grid failed to generate with %d processors\n", nprocs);
+      CkAbort("Processor grid failed to generate with %d processors (attempting %d x %d != %d)\n", nprocs, procsM, procsN, nprocs);
     }
-    CkPrintf("Using Grid2DMap with %d x %d processors\n", procsM, procsN);
-
   }
   Grid2DMap(CkMigrateMessage* m) {}
   int registerArray(CkArrayIndex& numElements, CkArrayID aid) { return 0; }
