@@ -206,9 +206,7 @@ void DiffusionLB::startFirstRound()
 }
 void DiffusionLB::findNBorsRound()
 {
-    if(thisIndex != rank0PE) {
-      return;
-    }
+    if (thisIndex != rank0PE) return;
 
     round++;
     DEBUGL(("\nPE-%d, with round = %d", thisIndex, round));
