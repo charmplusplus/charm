@@ -38,7 +38,7 @@ public:
   // void Migrated(LDObjHandle h, int waitBarrier = 1);
   void createCommList();
   void findNBors(int do_again);
-  void begin();
+  void beginMST();
   void findNBorsRound();
   void startFirstRound();
   void proposeNbor(int nborId);
@@ -194,6 +194,12 @@ private:
   std::unordered_map<int, MigrateInfo*> mig_id_map;
   int FindObjectHandle(LDObjHandle h);
   void CascadingMigration(LDObjHandle h, double load);
+
+   void processReceiveCentroid(int node, std::vector<LBRealType> centroid, int objCount);
+   void resetVarsMST();
+   void initializeCentroid();
+   void finishCentroidList();
+
 };
 
 #endif /* _DistributedLB_H_ */

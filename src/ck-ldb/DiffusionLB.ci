@@ -11,7 +11,7 @@ module DiffusionLB
 
     // DiffusionNeighbors
     entry[reductiontarget] void findNBors(int do_again);
-    entry void begin();
+    entry void beginMST();
     entry void startFirstRound();
     entry[reductiontarget] void findNBorsRound();
     entry[expedited] void proposeNbor(int nborId);
@@ -25,7 +25,7 @@ module DiffusionLB
         std::vector<int> to_proc, int n_migrateobjs,
         std::vector<std::vector<LBRealType>> positions, std::vector<double> load);
 
-    entry void ReceiveCentroid(int node, std::vector<LBRealType> centroid, int count);
+    entry void receiveCentroid(int node, std::vector<LBRealType> centroid, int count);
     entry void ReceiveLoadInfo(int itr, double load, int node);
     entry void ReceiveStats(CkMarshalledCLBStatsMessage data);
     // entry void LoadTransfer(double load, int initPE, int objId);
@@ -54,102 +54,25 @@ module DiffusionLB
     entry[reductiontarget] void pseudoDone(bool done);
     // entry void CallResumeClients();
     // entry void PrintDebugMessage(int len, double result[len]);
-
     entry void createCentroidList()
     {
       serial
       {
-        node_idx = new int[numNodes];
-        sendToNeighbors.clear();
-        allNodeCentroids.resize(numNodes);
-        allNodeObjCount.resize(numNodes);
-        allNodeDistances.resize(numNodes);
-
-        int position_dim = 0;
-        if (nodeStats->objData.size() > 0)
-        {
-          position_dim = nodeStats->objData[0].position.size();
-        }
-
-        // initialize centroid structures
-        myCentroid.resize(position_dim, 0);
-        for (int nbor = 0; nbor < numNodes; nbor++)
-        {
-          node_idx[nbor] = nbor;
-          allNodeCentroids[nbor].resize(position_dim, 0);
-        }
-
-        int totalObjCount = 0;
-        // compute my own centroid
-        for (int objIdx = 0; objIdx < nodeStats->objData.size(); objIdx++)
-        {
-          LDObjData& objData = nodeStats->objData[objIdx];
-          std::vector<LBRealType> position = objData.position;
-
-          if (objData.position.size() != position_dim)
-          {
-            CkPrintf("Object %d has position of size %d, but expected %d\n", objIdx,
-                     objData.position.size(), position_dim);
-            continue;
-          }
-
-          totalObjCount++;
-          for (int i = 0; i < position_dim; i++)
-          {
-            myCentroid[i] += position[i];
-          }
-          // store centroid
-        }
-        if (totalObjCount != 0)
-        {
-          for (int i = 0; i < position_dim; i++) myCentroid[i] /= totalObjCount;
-        }
-        thisProxy.ReceiveCentroid(myNodeId, myCentroid, totalObjCount);
+        initializeCentroid();
       }
 
       for (centReceiveNode = 0; centReceiveNode < numNodes; centReceiveNode++)
       {
-        when ReceiveCentroid(int node, std::vector<LBRealType> centroid, int objCount)
+        when receiveCentroid(int node, std::vector<LBRealType> centroid, int objCount)
             serial
         {
-          position_dim = 3;
-          // CkPrintf(
-          //     "Node %d received centroid from %d with length %d, dest has size %d, "
-          //     "mycentroid has size %d, allnode sitances has size %d\n",
-          //     myNodeId, node, centroid.size(), allNodeCentroids[node].size(),
-          //     myCentroid.size(), allNodeDistances.size());
-          double dist = 0;
-          for (int i = 0; i < position_dim; i++)
-          {
-            allNodeCentroids[node][i] = centroid[i];
-          }
-
-          for (int i = 0; i < position_dim; i++)
-          {
-            dist += (myCentroid[i] - centroid[i]) * (myCentroid[i] - centroid[i]);
-          }
-          dist = sqrt(dist);
-
-          if (node != myNodeId)
-          {
-            allNodeDistances[node] = dist;
-          }
-          else
-          {
-            allNodeDistances[node] = 10000;
-          }
-
-          allNodeObjCount[node] = objCount;
+          processReceiveCentroid(node, centroid, objCount);
         }
       }
 
       serial "Sorting nbors"
       {
-        if (thisIndex == rank0PE)
-        {
-        pairedSort(node_idx, allNodeDistances);
-        buildMSTinRounds(best_weight, best_from, best_to);
-        }
+        finishCentroidList();
       }
     }
 
