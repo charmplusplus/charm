@@ -175,7 +175,7 @@ public:
     // Perform one iteration of work
     // The first step is to send the local state to the neighbors
     void begin_iteration(void) {
-        if (iteration %100 ==0 && useLB ) {
+        if (iteration > 0 && iteration %100 ==0 && useLB ) {
             useLB = 0;
             //if(thisIndex.x==0 && thisIndex.y==0) CkPrintf("PROC#%d Calling LBD --------------------- iteration=%d\n",CkMyPe(),iteration);
             AtSync();

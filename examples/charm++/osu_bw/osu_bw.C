@@ -80,7 +80,7 @@ class Main : public CBase_Main {
     double bytes = double(curSize) * double(iters) * double(win);
     double mbps  = bytes / seconds / 1.0e6;
     CkPrintf("%-10d %.2f\n", curSize, mbps);
-    curSize = (curSize < 1024 ? curSize*2 : curSize + 1024);
+    curSize = (curSize == 0) ? 1 : curSize * 2;
     nextSize();
   }
 
