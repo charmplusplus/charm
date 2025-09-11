@@ -77,14 +77,14 @@ void CmiInitHwlocTopology(void)
       depth != HWLOC_TYPE_DEPTH_UNKNOWN ? cmi_hwloc_get_nbobjs_by_depth(legacy_topology, depth) : 1;
 }
 
-#if CMK_HAS_SETAFFINITY || defined (_WIN32) || CMK_HAS_BINDPROCESSOR
+#if CMK_HAS_SETAFFINITY || defined (_WIN32) || defined(_WIN64) || CMK_HAS_BINDPROCESSOR
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <errno.h>
 
-#ifdef _WIN32
+#if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
 #include <winbase.h>
 #else
@@ -105,7 +105,7 @@ void CmiInitHwlocTopology(void)
 static int excludecore[MAX_EXCLUDE] = {-1};
 static int excludecount = 0;
 
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(_WIN64)
 static int affMsgsRecvd = 1;  // number of affinity messages received at PE0
 static cpu_set_t core_usage;  // used to record union of CPUs used by every PE in physical node
 static int aff_is_set = 0;
@@ -131,7 +131,7 @@ static void add_exclude(int core)
 
 static int set_process_affinity(hwloc_cpuset_t cpuset)
 {
-#ifdef _WIN32
+#if defined(_WIN32) || defined (_WIN64)
   HANDLE process = GetCurrentProcess();
 # define PRINTF_PROCESS "%p"
 #else
@@ -167,7 +167,7 @@ static int set_process_affinity(hwloc_cpuset_t cpuset)
 #if CMK_SMP
 static int set_thread_affinity(hwloc_cpuset_t cpuset)
 {
-#ifdef _WIN32
+#if defined(_WIN32) || defined(_WIN64)
   HANDLE thread = GetCurrentThread();
 #else
   pthread_t thread = pthread_self();
@@ -288,7 +288,7 @@ int print_cpu_affinity(void) {
 
 #if CMK_SMP
 int print_thread_affinity(void) {
-#ifdef _WIN32
+#if defined(_WIN32) || defined(_WIN64)
   HANDLE thread = GetCurrentThread();
 #else
   pthread_t thread = pthread_self();
@@ -323,7 +323,7 @@ int CmiPrintCPUAffinity(void)
 #endif
 }
 
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(_WIN64)
 int get_cpu_affinity(cpu_set_t *cpuset) {
   CPU_ZERO(cpuset);
   if (sched_getaffinity(0, sizeof(cpuset), cpuset) < 0) {
@@ -417,7 +417,7 @@ struct rankMsg {
 
 struct affMsg {
   char core[CmiMsgHeaderSizeBytes];
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(_WIN64)
   cpu_set_t affinity;
 #endif
 };
@@ -696,7 +696,7 @@ static void cpuPhyNodeAffinityRecvHandler(void *msg)
   static int count = 0;
 
   affMsg *m = (affMsg *)msg;
-#if !defined(_WIN32) && defined(CPU_OR)
+#if !defined(_WIN32) && !defined(_WIN64) && defined(CPU_OR)
   CPU_OR(&core_usage, &core_usage, &m->affinity);
   affMsgsRecvd++;
 #endif
@@ -706,7 +706,7 @@ static void cpuPhyNodeAffinityRecvHandler(void *msg)
     cpuPhyAffCheckDone = true;
 }
 
-#if defined(_WIN32)
+#if defined(_WIN32) || defined(_WIN64)
   /* strtok is thread safe in VC++ */
 #define strtok_r(x,y,z) strtok(x,y)
 #endif
@@ -812,7 +812,7 @@ CLINKAGE int getXTNodeID(int mpirank, int nummpiranks);
  */
 void CmiCheckAffinity(void)
 {
-#if !defined(_WIN32) && CMK_SMP && CMK_HAS_PTHREAD_SETAFFINITY && defined(CPU_OR)
+#if !defined(_WIN32) && !defined(_WIN64) && CMK_SMP && CMK_HAS_PTHREAD_SETAFFINITY && defined(CPU_OR)
 
   if (!CmiCpuTopologyEnabled()) return;  // only works if cpu topology enabled
 
@@ -1097,7 +1097,7 @@ void CmiInitCPUAffinity(char **argv)
   }
 
   if (CmiMyRank() ==0) {
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(_WIN64)
      aff_is_set = affinity_flag;
      CPU_ZERO(&core_usage);
 #endif

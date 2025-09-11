@@ -4,8 +4,10 @@
 /*@{*/
 
 #include <sys/stat.h>
-#include <sys/types.h>
 
+#if !defined(_WIN64)
+#include <sys/types.h>
+#endif
 #include <ctime>        // std::time_t, std::gmtime
 #include <chrono>       // std::chrono::system_clock
 
@@ -32,7 +34,7 @@
 
 // To get hostname
 #if defined(_WIN32) || defined(_WIN64)
-#  include <Winsock2.h>
+//#  include <Winsock2.h>
 #else
 #  include <unistd.h>
 #  include <limits.h> // For HOST_NAME_MAX
@@ -145,7 +147,7 @@ static void traceCommonInit(char **argv)
     // Trying to decide if the traceroot path is absolute or not. If it is not
     // then create an absolute pathname for it.
     if (temproot[0] != PATHSEP) {
-      temproot2 = GETCWD(NULL,0);
+ //     temproot2 = GETCWD(NULL,0);
       root = (char *)malloc(strlen(temproot2)+1+strlen(temproot)+1);
       strcpy(root, temproot2);
       strcat(root, PATHSEPSTR);
@@ -259,8 +261,9 @@ void traceWriteSTS(FILE *stsfp,int nUserEvents) {
 
   // Add 1 for null terminator
   char hostname[HOST_NAME_MAX + 1];
-  if(gethostname(hostname, HOST_NAME_MAX + 1) == 0)
-    fprintf(stsfp, "HOSTNAME \"%s\"\n", hostname);
+
+  //if(gethostname(hostname, HOST_NAME_MAX + 1) == 0)
+//    fprintf(stsfp, "HOSTNAME \"%s\"\n", hostname);
 
   fprintf(stsfp, "COMMANDLINE \"");
   int index = 0;
@@ -277,7 +280,7 @@ void traceWriteSTS(FILE *stsfp,int nUserEvents) {
   using std::chrono::system_clock;
   const time_t now = system_clock::to_time_t(system_clock::now());
   struct tm currentTime;
-#if defined(_WIN32) || defined(_WIN64)
+#if defined(_WIN32) || defined(_WIN64) && !defined(__CYGWIN__)
   gmtime_s(&currentTime, &now);
 #else
   gmtime_r(&now, &currentTime);

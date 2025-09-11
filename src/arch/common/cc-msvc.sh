@@ -1,5 +1,6 @@
 
 CMK_CC="$CHARMBIN/unix2nt_cc"
+CMK_SEQ_CC="$CMK_CC"
 CMK_CPP_C="$CMK_CC"
 CMK_CXX="$CHARMBIN/unix2nt_cc"
 CMK_LD="$CMK_CC"

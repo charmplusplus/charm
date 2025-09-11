@@ -15,30 +15,15 @@ set -o errexit
 # Configurable option: Location of MSDEV
 if [[ -z "$VCINSTALLDIR" ]]
 then
-  VCC_DIR='C:/Program Files (x86)/Microsoft Visual Studio 14.0/VC'
+  VCC_DIR='C:/Program Files/Microsoft Visual Studio/2022/Community/VC'
 else
   VCC_DIR="$VCINSTALLDIR"
 fi
-if [[ ! -d "$(cygpath -u "$VCC_DIR")" ]]
+if [[ ! -d "$(cygpath.exe -u "$VCC_DIR")" ]]
 then
   echo "\$VCINSTALLDIR is not set properly: $VCC_DIR"
   exit 1
 fi
-if [[ -n "$WINDOWSSDKDIR" ]]
-then
-  SDK_DIR="$WINDOWSSDKDIR"
-elif [[ -n "$WindowsSdkDir" ]]
-then
-  SDK_DIR="$WindowsSdkDir"
-else
-  SDK_DIR='C:/Program Files/Windows Kits/10'
-fi
-if [[ ! -d "$(cygpath -u "$SDK_DIR")" ]]
-then
-  echo "\$WindowsSdkDir is not set properly: $SDK_DIR"
-  exit 1
-fi
-
 #CL command-line options for -O and -g mode
 #only for the environment that has set corresponding environmental variables
 CL_CMD='CL.EXE'
@@ -71,8 +56,7 @@ else
 LINK_CMD="$VCC_DIR/BIN/LINK.EXE"
 fi
 LINK_COMMON=(-nologo -subsystem:console -DYNAMICBASE:NO)
-LINK_POST=(ws2_32.lib kernel32.lib user32.lib psapi.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib -MACHINE:X64 -ERRORREPORT:PROMPT)
-
+LINK_POST=(WS2_32.lib WSock32.lib kernel32.lib user32.lib psapi.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib -MACHINE:X64 -ERRORREPORT:PROMPT)
 if [[ -z "$LIB" ]]
 then
 	echo "Variables already set!"

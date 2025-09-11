@@ -334,6 +334,11 @@ endif
 	-./system_ln  ../tmp/conv-mach-opt.mak ../include
 	if [ -x ./special.sh ] ; then SRCBASE=$(SRCBASE) ./special.sh ; fi
 	if [ ! -f conv-common.h ] ; then ( touch conv-common.h ) ; fi
+#       in the special case of reusing netlrts for windows, nuke Makefile.machine to not build charmrun
+	if case $(CMK_VDIR) in *-win-*) true;; *) false;; esac; then \
+		rm ../tmp/Makefile.machine ;\
+		touch ../tmp/Makefile.machine ; \
+	fi
 	touch dirs+sources
 
 ###############################################################################

@@ -15,9 +15,11 @@
 #define PATHSEP '\\'
 #define PATHSEPSTR "\\"
 #else
+#if !defined(_WIN64)
 #include <unistd.h>
+#endif
 #define CHDIR chdir
-#define GETCWD getcwd
+//#define GETCWD getcwd
 #define PATHSEP '/'
 #define PATHSEPSTR "/"
 #endif
