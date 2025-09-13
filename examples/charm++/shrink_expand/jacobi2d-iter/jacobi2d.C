@@ -25,6 +25,7 @@ public:
     int iterations;
     int iterations_after_restart;
     int total_iterations;
+    int lbTime;
 	double stTime;
     double startTime;
 
@@ -57,8 +58,14 @@ public:
 	        total_iterations = atoi(m->argv[3]);
 	    }
 
+        if (m->argc > 4) {
+            lbTime = atoi(m->argv[4]);
+        } else {
+            lbTime = 100;
+        }
+
         // Create new array of worker chares
-        array = CProxy_Jacobi::ckNew(num_chare_cols, num_chare_rows);
+        array = CProxy_Jacobi::ckNew(lbTime, num_chare_cols, num_chare_rows);
 
         // save the total number of worker chares we have in this simulation
         num_chares = num_chare_rows*num_chare_cols;
@@ -119,6 +126,7 @@ void pup(PUP::er &p){
     p|num_chares;
     p|iterations;
     p|total_iterations;
+    p|lbTime;
     p|stTime;
     p|startTime;
     CkPrintf("Main's PUPer. \n");
@@ -136,13 +144,15 @@ public:
     int messages_due;
 	int iteration;
     int useLB;
+    int lbTime;
     array2d temperature;
 
     // Constructor, initialize values
-    Jacobi()
+    Jacobi(int lbTime_)
     : messages_due(4)
     , iteration(0)
     , useLB(1)
+    , lbTime(lbTime_)
     , temperature(block_height + 2, array1d(block_width + 2, 0.0))
     {
         usesAtSync = true;
@@ -153,6 +163,7 @@ public:
         p|messages_due;
         p|iteration;
         p|useLB;
+        p|lbTime;
         p|temperature;
         /* There may be some more variables used in doWork */
     }
@@ -175,7 +186,7 @@ public:
     // Perform one iteration of work
     // The first step is to send the local state to the neighbors
     void begin_iteration(void) {
-        if (iteration > 0 && iteration %100 ==0 && useLB ) {
+        if (((iteration > 0 && iteration % lbTime == 0) || iteration == 10) && useLB) {
             useLB = 0;
             //if(thisIndex.x==0 && thisIndex.y==0) CkPrintf("PROC#%d Calling LBD --------------------- iteration=%d\n",CkMyPe(),iteration);
             AtSync();
