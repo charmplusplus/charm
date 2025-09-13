@@ -534,6 +534,7 @@ void LBManager::init(void)
 {
   mystep = 0;
   new_ld_balancer = 0;
+  lb_in_progress = false;
   chare_count = 0;
   metabalancer = nullptr;
   lbdb_obj = new LBDatabase();

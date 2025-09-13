@@ -237,12 +237,12 @@ void TreeLB::CallLB()
   #if CMK_LBDB_ON
   #if CMK_SHRINK_EXPAND
   
-  if (pending_realloc_state != NO_REALLOC) {
-    // if (_lb_args.debug() > 0)
-    //   CkPrintf("TreeLB::CallLB pending_realloc_state=%d (EXPAND_MSG_RECEIVED %d, NO_REALLOC %d)\n", pending_realloc_state, EXPAND_MSG_RECEIVED, NO_REALLOC);
-    configure(config); // reconfigure tree in case number of PEs changed
-    CkPrintf("Done reconfiguring tree\n");
-  }
+  // if (pending_realloc_state != NO_REALLOC) {
+  //   // if (_lb_args.debug() > 0)
+  //   //   CkPrintf("TreeLB::CallLB pending_realloc_state=%d (EXPAND_MSG_RECEIVED %d, NO_REALLOC %d)\n", pending_realloc_state, EXPAND_MSG_RECEIVED, NO_REALLOC);
+  //   configure(config); // reconfigure tree in case number of PEs changed
+  //   CkPrintf("Done reconfiguring tree\n");
+  // }
 
 
   #endif    
@@ -262,7 +262,7 @@ void TreeLB::InvokeLB()
 {
 #if CMK_LBDB_ON
   // NOTE: I'm assuming new LBManager will know when (and when not to) call AtSync
-
+  lbmgr->lb_in_progress = true;
   #if CMK_SHRINK_EXPAND
     contribute(CkCallback(CkReductionTarget(TreeLB, CheckForLB), thisProxy[0]));
   #else
@@ -677,6 +677,11 @@ void TreeLB::resumeClients()
     }
   }
   lbmgr->ResumeClients();
+
+  lbmgr->lb_in_progress = false;
+
+  if (CkMyPe() == 0)
+    lbmgr->callRealloc();
 }
 
 void TreeLB::reportLbTime(double* times, int n)
