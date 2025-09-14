@@ -17,7 +17,7 @@ CpvDeclare(double, total_time);
 CpvDeclare(double, process_time);
 CpvDeclare(double, send_time);
 
-#define MSG_COUNT 100
+int msg_count;
 #define nMSG_SIZE 3                   // if the msg_sizes are hard_coded, this should be the same as the length of the hard coded array
 #define nTRIALS_PER_SIZE 10
 #define CALCULATION_PRECISION 0.0001  // the decimal place that the output data is rounded to
@@ -105,7 +105,7 @@ void send_msg() {
   CpvAccess(process_time) = 0.0;
   CpvAccess(send_time) = 0.0;
   CpvAccess(total_time) = CmiWallTimer();
-  for(int k = 0; k < MSG_COUNT; k++) {
+  for(int k = 0; k < msg_count; k++) {
     crt_time = CmiWallTimer();
     msg = (message)CmiAlloc(CpvAccess(msg_size));
 
@@ -187,7 +187,7 @@ void bigmsg_handler(void *vmsg)
     } 
     // else
     //   CmiPrintf("Calculation OK\n"); // DEBUG: Computation Check
-    if(CpvAccess(recv_count) == MSG_COUNT) {
+    if(CpvAccess(recv_count) == msg_count) {
       CpvAccess(recv_count) = 0;
       
       CmiFree(msg);
@@ -296,6 +296,9 @@ void bigmsg_moduleinit(int argc, char **argv)
   CpvAccess(trial) = 0;
   CpvAccess(round) = 0;
   CpvAccess(warmup_flag) = 1;
+  msg_count = 100; // default msg count
+  CmiGetArgInt(argv, "-msg_count", &msg_count);
+  
   // Set runtime cpuaffinity
   CmiInitCPUAffinity(argv);
   // Initialize CPU topology
