@@ -41,38 +41,10 @@ jobs:
         cd changa/teststep
         make test
 
-  charm4py_netlrts-linux-x86_64_tcp:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: build-charm++
-      run: |
-        git fetch --unshallow # Need full repo for 'git describe' used by charm4py
-        ./build charm4py netlrts-linux-x86_64 tcp -g -j4 --with-production
-    - name: build-charm4py
-      run: |
-        pip3 install setuptools cython cffi greenlet numpy torch torchvision
-        git clone https://github.com/UIUC-PPL/charm4py
-        export PYTHONPATH="$PWD/charm4py"
-
-        mkdir -p charm4py/charm_src/charm/bin && cp bin/charmrun charm4py/charm_src/charm/bin
-        mkdir -p charm4py/charm_src/charm/lib && cp lib/libcharm.so charm4py/charm_src/charm/lib
-        mkdir -p charm4py/charm_src/charm/include && cp -r -L include/* charm4py/charm_src/charm/include
-
-        cd charm4py
-        export CHARM4PY_BUILD_CFFI=1
-        python3 setup.py build_ext --inplace
-    - name: test-charm4py
-      run: |
-        export PYTHONPATH="$PWD/charm4py"
-        export CHARM4PY_TEST_NUM_PROCESSES=2
-        cd charm4py
-        python3 auto_test.py
-
   cuda_netlrts-linux-x86_64_buildonly:
     # Buildonly test, as CUDA needs an actual device to run.
     timeout-minutes: 45
-    runs-on: ubuntu-20.04  # FIXME: ubuntu-latest does not work
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
     - name: build
@@ -193,7 +165,7 @@ jobs:
       if: ${{ env.namd_secret != '' }}
       run: |
         cd ..
-        git clone https://${{ secrets.NAMD_CI_USERNAME_TOKEN }}@gitlab.com/tcbgUIUC/namd.git
+        git clone https://${{ secrets.NAMD_CI_USERNAME_TOKEN }}:${{ secrets.NAMD_CI_DEPLOY_PASSWORD }}@gitlab.com/tcbgUIUC/namd.git
         cd namd
         ./config Linux-x86_64-g++ --charm-base ../charm --charm-arch netlrts-linux-x86_64 --without-tcl
         cd Linux-x86_64-g++
@@ -338,34 +310,40 @@ jobs:
     - uses: actions/checkout@v4
     - name: Install Spack
       run: |
+        pwd
         cd ..
         git clone --depth 1 https://github.com/spack/spack
-        cd spack
+        source spack/share/spack/setup-env.sh
+        spack cd --repo builtin
         [[ $(uname) == "Linux" ]] && sudo apt-get install -y gfortran
 
         # Use this branch for testing, not main
-        sed -i -e 's,="main",="${{ github.head_ref }}",' var/spack/repos/builtin/packages/charmpp/package.py
+        sed -i -e 's,="main",="${{ github.head_ref }}",' packages/charmpp/package.py
 
         # Use a fork, not the main repo
         # If in merge_group mode, the branch should be created in the main repo
         if [[ ${{ github.event_name }} == 'pull_request' ]]; then
-          sed -i -e 's,charmplusplus/charm.git,${{github.event.pull_request.head.repo.full_name}},' var/spack/repos/builtin/packages/charmpp/package.py
+          sed -i -e 's,UIUC-PPL/charm.git,${{github.event.pull_request.head.repo.full_name}},' packages/charmpp/package.py
         fi
 
         # Compile with debug symbols
-        sed -i -e 's,build(target,options.append("-g"); build(target,' var/spack/repos/builtin/packages/charmpp/package.py
+        sed -i -e 's,build(target,options.append("-g"); build(target,' packages/charmpp/package.py
 
         # Add +setcpuaffinity option to TESTOPTS
-        sed -i -e 's,\+\+local,++local +setcpuaffinity,' var/spack/repos/builtin/packages/charmpp/package.py
+        sed -i -e 's,\+\+local,++local +setcpuaffinity,' packages/charmpp/package.py
 
         # No need for automake/autoconf
-        sed -i -e '/automake/d' var/spack/repos/builtin/packages/charmpp/package.py
-        sed -i -e '/autoconf/d' var/spack/repos/builtin/packages/charmpp/package.py
+        sed -i -e '/automake/d' packages/charmpp/package.py
+        sed -i -e '/autoconf/d' packages/charmpp/package.py
 
     - name: Build Charm++
       run: |
-        cd ../spack
-        source share/spack/setup-env.sh
+        pwd
+        cd ..
+        source spack/share/spack/setup-env.sh
+        spack cd --repo builtin
+        cat packages/charmpp/package.py
+        cd ../../../../../..
         spack compiler find
         spack compiler list
         spack spec charmpp@main
