@@ -270,7 +270,11 @@ void hapiStartMemoryDaemon(int my_device) {
 }
 
 int main(int argc, char** argv) {
-  const char* local_rank_str = getenv("SLURM_LOCALID");
+  if (argc < 2) {
+    fprintf(stderr, "Usage: %s <local_rank>\n", argv[0]);
+    return 1;
+  }
+  const char* local_rank_str = argv[1];
   int local_rank = atoi(local_rank_str);
   hapiStartMemoryDaemon(local_rank);
 }

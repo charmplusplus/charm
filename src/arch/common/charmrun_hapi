@@ -26,9 +26,51 @@ else
 fi
 
 # --- Clean up and start the memory daemon in the background ---
-srun --ntasks-per-node=1 --exact bash -c "rm -f /dev/shm/numRestartProcs.txt /tmp/server_fifo_* /tmp/client_fifo_* /tmp/daemon_ready_*; mkfifo -m 0666 /tmp/daemon_ready_0"
-srun --ntasks-per-node=1 --nodes="$num_nodes" --exact ./hapi_memory_daemon &
-daemon_pid=$!
+# Read IP addresses and slots from nodelist file (format: ipaddress slots=X)
+declare -A node_slots
+node_ips=()
+if [[ -n "$machinefile" ]]; then
+    while IFS= read -r line; do
+        # Extract IP address and slots count
+        ip=$(echo "$line" | awk '{print $1}')
+        slots=$(echo "$line" | grep -o 'slots=[0-9]*' | cut -d'=' -f2)
+        if [[ -n "$ip" ]]; then
+            node_ips+=("$ip")
+            # Default to 1 slot if not specified
+            node_slots["$ip"]=${slots:-1}
+        fi
+    done < "$machinefile"
+else
+    # Default to localhost if no nodelist
+    node_ips=("localhost")
+    node_slots["localhost"]=1
+fi
+
+# Clean up on all nodes via SSH (async)
+cleanup_pids=()
+for ip in "${node_ips[@]}"; do
+    ssh "$ip" "rm -f /dev/shm/numRestartProcs.txt /tmp/server_fifo_* /tmp/client_fifo_* /tmp/daemon_ready_*; mkfifo -m 0666 /tmp/daemon_ready_0" &
+    cleanup_pids+=($!)
+done
+
+# Wait for cleanup to complete on all nodes before starting daemons
+for pid in "${cleanup_pids[@]}"; do
+    wait "$pid"
+done
+
+# Start memory daemons on all nodes via SSH (async) - one daemon per slot
+daemon_pids=()
+for ip in "${node_ips[@]}"; do
+    slots=${node_slots["$ip"]}
+    echo "Starting $slots daemon(s) on node $ip"
+    for ((slot=0; slot<slots; slot++)); do
+        ssh "$ip" "cd $(pwd) && nohup ./hapi_memory_daemon $slot > /dev/null 2>&1 &" &
+        daemon_pids+=($!)
+    done
+done
+
+# Optional: Wait a brief moment for SSH connections to establish (non-blocking)
+# sleep 1
 
 # --- Main execution loop ---
 while true; do
@@ -61,7 +103,7 @@ while true; do
 
     # Check the flag. If it's a restart, prepare the extra arguments.
     if [ "$is_restart" = true ]; then
-        restart_arg="+shrinkexpand +restart /dev/shm"
+        restart_arg="+restart /dev/shm"
         if [ -f "$pes_file" ]; then
             num_pes=$(cat "$pes_file")
             pes_arg="+p $num_pes"
@@ -69,7 +111,7 @@ while true; do
     fi
 
     # Pass all script arguments to the executable
-    ./charmrun $pes_arg "${args[@]}" $restart_arg
+    "$(dirname "$0")/charmrun" $pes_arg "${args[@]}" $restart_arg
 
     EXIT_CODE=$?
 
@@ -79,8 +121,14 @@ while true; do
         echo "----------------------------------------"
     else
         echo "Final exit signal (code $EXIT_CODE) received. Exiting loop."
-        # Clean up the background daemon process
-        kill "$daemon_pid" 2>/dev/null
+        # Clean up the background daemon processes on all nodes
+        for ip in "${node_ips[@]}"; do
+            ssh "$ip" "pkill -f hapi_memory_daemon" &
+        done
+        # Also kill any remaining SSH connection PIDs
+        for pid in "${daemon_pids[@]}"; do
+            kill "$pid" 2>/dev/null
+        done
         break
     fi
 done

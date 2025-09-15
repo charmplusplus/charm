@@ -172,6 +172,7 @@ void hapiStartMemoryDaemon(char** argv)
   mkfifo(client_fifo_path, 0666);
 
   int& cpv_my_device = CpvAccess(my_device);
+  CkPrintf("Device = %i\n", cpv_my_device);
   hapiCheck(cudaSetDevice(cpv_my_device));
 
   if (CmiPhysicalRank(CmiMyPe()) != firstRankForDevice)
