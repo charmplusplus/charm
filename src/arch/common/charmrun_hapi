@@ -3,6 +3,7 @@
 is_restart=false
 original_args=("$@")
 pes_file="/dev/shm/numRestartProcs.txt"
+original_nodelist_file="/tmp/hapi_original_nodelist.txt"
 
 # --- Pre-parse to find the nodelist for daemon startup ---
 machinefile=""
@@ -46,8 +47,79 @@ else
     node_slots["localhost"]=1
 fi
 
+# Save the original nodelist for restart comparison (only on first run)
+if [[ ! -f "$original_nodelist_file" ]]; then
+    if [[ -n "$machinefile" ]]; then
+        cp "$machinefile" "$original_nodelist_file"
+        echo "Charmrun> Saved original nodelist to $original_nodelist_file"
+    else
+        echo "localhost slots=1" > "$original_nodelist_file"
+        echo "Charmrun> Created default nodelist file at $original_nodelist_file"
+    fi
+fi
+
+# Function to get nodes from a nodelist file
+get_nodes_from_file() {
+    local file="$1"
+    local -A nodes_map
+    local -a nodes_list
+    
+    if [[ -f "$file" && -s "$file" ]]; then
+        while IFS= read -r line; do
+            # Skip empty lines and comments
+            [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+            ip=$(echo "$line" | awk '{print $1}')
+            slots=$(echo "$line" | grep -o 'slots=[0-9]*' | cut -d'=' -f2)
+            if [[ -n "$ip" ]]; then
+                nodes_map["$ip"]=${slots:-1}
+                nodes_list+=("$ip")
+            fi
+        done < "$file"
+    fi
+    
+    # Return both the list and the associative array (global variables)
+    eval "original_nodes=(${nodes_list[*]})"
+    for ip in "${nodes_list[@]}"; do
+        eval "original_node_slots[\"$ip\"]=${nodes_map["$ip"]}"
+    done
+}
+
+# Function to find new nodes by comparing current nodelist with original (optimized with hashmap)
+find_new_nodes() {
+    declare -A original_node_slots
+    declare -a original_nodes
+    
+    # Get original nodes
+    get_nodes_from_file "$original_nodelist_file"
+    
+    declare -A original_nodes_map
+    for orig_ip in "${original_nodes[@]}"; do
+        original_nodes_map["$orig_ip"]=1
+    done
+    
+    local -a new_nodes
+    local -A new_node_slots
+    
+    # Compare current nodes with original nodes using hashmap lookup
+    for ip in "${node_ips[@]}"; do
+        # Check if node exists in original nodes hashmap (O(1) lookup)
+        if [[ -z "${original_nodes_map[$ip]}" ]]; then
+            echo "Charmrun> New node detected: $ip"
+            new_nodes+=("$ip")
+            new_node_slots["$ip"]=${node_slots["$ip"]}
+        fi
+    done
+    
+    # Return new nodes (use global variables)
+    eval "detected_new_nodes=(${new_nodes[*]})"
+    for ip in "${new_nodes[@]}"; do
+        eval "detected_new_node_slots[\"$ip\"]=${new_node_slots["$ip"]}"
+    done
+}
+
 # Clean up on all nodes via SSH (async)
 cleanup_pids=()
+echo "Charmrun> Initial cleanup on ${#node_ips[@]} node(s): ${node_ips[*]}"
 for ip in "${node_ips[@]}"; do
     ssh "$ip" "rm -f /dev/shm/numRestartProcs.txt /tmp/server_fifo_* /tmp/client_fifo_* /tmp/daemon_ready_*; mkfifo -m 0666 /tmp/daemon_ready_0" &
     cleanup_pids+=($!)
@@ -60,9 +132,10 @@ done
 
 # Start memory daemons on all nodes via SSH (async) - one daemon per slot
 daemon_pids=()
+echo "Charmrun> Starting memory daemons on all nodes..."
 for ip in "${node_ips[@]}"; do
     slots=${node_slots["$ip"]}
-    echo "Starting $slots daemon(s) on node $ip"
+    echo "Charmrun> Starting $slots daemon(s) on node $ip"
     for ((slot=0; slot<slots; slot++)); do
         ssh "$ip" "cd $(pwd) && nohup ./hapi_memory_daemon $slot > /dev/null 2>&1 &" &
         daemon_pids+=($!)
@@ -108,6 +181,76 @@ while true; do
             num_pes=$(cat "$pes_file")
             pes_arg="+p $num_pes"
         fi
+        
+        echo "Charmrun> Restart detected - checking for new nodes..."
+        
+        # Re-read current nodelist to check for new nodes
+        declare -A current_node_slots
+        current_node_ips=()
+        if [[ -n "$machinefile" ]]; then
+            while IFS= read -r line; do
+                ip=$(echo "$line" | awk '{print $1}')
+                slots=$(echo "$line" | grep -o 'slots=[0-9]*' | cut -d'=' -f2)
+                if [[ -n "$ip" ]]; then
+                    current_node_ips+=("$ip")
+                    current_node_slots["$ip"]=${slots:-1}
+                fi
+            done < "$machinefile"
+        else
+            current_node_ips=("localhost")
+            current_node_slots["localhost"]=1
+        fi
+        
+        # Update global variables with current state
+        node_ips=("${current_node_ips[@]}")
+        for ip in "${current_node_ips[@]}"; do
+            node_slots["$ip"]=${current_node_slots["$ip"]}
+        done
+        
+        # Find new nodes
+        declare -a detected_new_nodes
+        declare -A detected_new_node_slots
+        find_new_nodes
+        
+        if [[ ${#detected_new_nodes[@]} -gt 0 ]]; then
+            echo "Charmrun> Found ${#detected_new_nodes[@]} new node(s): ${detected_new_nodes[*]}"
+            
+            # Clean up new nodes
+            echo "Charmrun> Cleaning up new nodes..."
+            cleanup_pids=()
+            for ip in "${detected_new_nodes[@]}"; do
+                echo "Charmrun> Cleaning up node: $ip"
+                ssh "$ip" "rm -f /dev/shm/numRestartProcs.txt /tmp/server_fifo_* /tmp/client_fifo_* /tmp/daemon_ready_*; mkfifo -m 0666 /tmp/daemon_ready_0" &
+                cleanup_pids+=($!)
+            done
+            
+            # Wait for cleanup to complete on new nodes
+            for pid in "${cleanup_pids[@]}"; do
+                wait "$pid"
+            done
+            
+            # Start memory daemons on new nodes
+            echo "Charmrun> Starting memory daemons on new nodes..."
+            daemon_pids=()
+            for ip in "${detected_new_nodes[@]}"; do
+                slots=${detected_new_node_slots["$ip"]}
+                echo "Charmrun> Starting $slots daemon(s) on new node $ip"
+                for ((slot=0; slot<slots; slot++)); do
+                    ssh "$ip" "cd $(pwd) && nohup ./hapi_memory_daemon $slot > /dev/null 2>&1 &" &
+                    daemon_pids+=($!)
+                done
+            done
+            
+            # Update the original nodelist to include new nodes for future restarts
+            if [[ -n "$machinefile" ]]; then
+                cp "$machinefile" "$original_nodelist_file"
+                echo "Charmrun> Updated original nodelist with new nodes"
+            fi
+            
+            echo "Charmrun> New nodes setup completed"
+        else
+            echo "Charmrun> No new nodes detected"
+        fi
     fi
 
     # Pass all script arguments to the executable
@@ -129,6 +272,9 @@ while true; do
         for pid in "${daemon_pids[@]}"; do
             kill "$pid" 2>/dev/null
         done
+        # Clean up temporary files
+        rm -f "$original_nodelist_file"
+        echo "Charmrun> Cleaned up temporary nodelist file"
         break
     fi
 done
