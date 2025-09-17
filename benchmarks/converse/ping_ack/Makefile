@@ -3,11 +3,11 @@ CHARMC=../../../bin/charmc $(OPTS)
 
 all: ping_ack
 
-ping_ack: ping.o
-	$(CHARMC) -language converse++ -o ping_ack ping.o
+ping_ack: ping_ack.o
+	$(CHARMC) -language converse++ -o ping_ack ping_ack.o
 
-ping.o: ping.cpp
-	$(CHARMC) -language converse++ -c ping.cpp
+ping_ack.o: ping_ack.cpp
+	$(CHARMC) -language converse++ -c ping_ack.cpp
 
 test: ping_ack
 	$(call run, ./ping_ack +p2 )
