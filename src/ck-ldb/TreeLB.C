@@ -263,11 +263,7 @@ void TreeLB::InvokeLB()
 #if CMK_LBDB_ON
   // NOTE: I'm assuming new LBManager will know when (and when not to) call AtSync
   lbmgr->lb_in_progress = true;
-  #if CMK_SHRINK_EXPAND
-    contribute(CkCallback(CkReductionTarget(TreeLB, CheckForLB), thisProxy[0]));
-  #else
-    CallLB();
-  #endif
+  CallLB();
 #endif
 }
 
@@ -299,9 +295,11 @@ void TreeLB::CheckForLB() {
   //else if (pending_realloc_state == NO_REALLOC)
   //  thisProxy.resumeClients(0);
   else
-    thisProxy.CallLB();
+    loadBalanceSubtree(numLevels - 1);
+    //thisProxy.CallLB();
 #else
-  thisProxy.CallLB();
+  //thisProxy.CallLB();
+  loadBalanceSubtree(numLevels - 1);
 #endif
 }
 
@@ -351,7 +349,15 @@ void TreeLB::receiveStats(TreeLBMessage* stats, int level)
     {
       // cutoff can be adjusted dynamically, to prevent lb between upper-level domains.
       // can be used, for example, to only do within-node lb on some steps
-      loadBalanceSubtree(level);
+      
+      #if CMK_SHRINK_EXPAND
+        //contribute(CkCallback(CkReductionTarget(TreeLB, CheckForLB), thisProxy[0]));
+        CheckForLB();
+      #else
+        //CallLB();
+        loadBalanceSubtree(level);
+      #endif
+      //loadBalanceSubtree(level);
     }
     else
     {
@@ -364,6 +370,7 @@ void TreeLB::receiveStats(TreeLBMessage* stats, int level)
 
 void TreeLB::loadBalanceSubtree(int level)
 {
+  CkPrintf("[%d] TreeLB::loadBalanceSubtree - level=%d\n", CkMyPe(), level);
   if (!awaitingLB[level]) return;
   awaitingLB[level] = false;
   if (level == 0) return lb_done();

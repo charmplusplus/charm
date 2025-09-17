@@ -164,7 +164,7 @@ class TreeLB : public CBase_TreeLB
 
   // start load balancing (non-AtSync mode)  NOTE: This seems to do a broadcast
   // (is this the behavior we want?)
-  inline void StartLB() { thisProxy.ProcessAtSync(); }
+  inline void StartLB() { loadBalanceSubtree(numLevels - 1); }
 
   // TODO: I would rename this group of functions (to maybe something like startLBLocal)
   // since they are also used in non-AtSync mode
