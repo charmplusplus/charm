@@ -12,7 +12,7 @@ RUN apt update \
 #RUN git clone https://github.com/charmplusplus/charm.git
 RUN mkdir /home/mpiuser/charm
 COPY . /home/mpiuser/charm
-RUN cd charm && git checkout shrinkexpand-mpi && ./build charm++ mpi-linux-x86_64 --enable-shrinkexpand -j8 --force --with-production
+RUN cd charm && git checkout kubernetes && ./build charm++ mpi-linux-x86_64 --enable-shrinkexpand -j2 --force --with-production
 
 RUN cd charm/examples/charm++/shrink_expand && make clean && make
 RUN cd charm/examples/charm++/shrink_expand/jacobi2d-iter && make clean && make
