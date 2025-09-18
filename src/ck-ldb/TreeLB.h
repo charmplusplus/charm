@@ -26,6 +26,8 @@ class TreeLBMessage
  public:
   uint8_t level;
   // WARNING: don't add any virtual methods here
+
+  virtual void pup(PUP::er& p) { p|level; }
 };
 
 class LevelLogic
@@ -103,6 +105,31 @@ class LevelLogic
     CkAbort("LevelLogic::processDecision not implemented\n");
   }
 
+  virtual void pup(PUP::er& p) { 
+    // if (p.isPacking()) {
+    //   num_stats_msgs = stats_msgs.size();
+
+    //   CkPrintf("[PE %d] PUP packing in LEVELLOGIC: with %d stats_msgs\n", CkMyPe(), num_stats_msgs);
+
+    // }
+    // p|num_stats_msgs;
+
+    // if (p.isUnpacking()) {
+    //   CkPrintf("[PE %d] PUP unpacking in LEVELLOGIC: with %d stats_msgs\n", CkMyPe(), num_stats_msgs);
+    //   stats_msgs.resize(num_stats_msgs);
+    // }
+
+    // CkPrintf("PUPPING LEVELLOGIC with %d stats_msgs\n", num_stats_msgs);
+    // for (int i = 0; i < num_stats_msgs; i++) {
+    //   stats_msgs[i] = new TreeLBMessage(); // TODO: this needs to be the right subclass
+    //   p|*stats_msgs[i];
+    // }
+
+    // CkPrintf("Done with pupping LEVELLOGIC\n");
+    CkAbort("LevelLogic::pup not implemented\n");
+  }
+   
+
   virtual bool makesTokens() { return false; }
 
   /// return nominal load that is being transferred in the tokens
@@ -126,6 +153,8 @@ class LevelLogic
 
  protected:
   std::vector<TreeLBMessage*> stats_msgs;
+  int num_stats_msgs = 0;
+  int num_strategies = 0;
 };
 
 class LBTreeBuilder;

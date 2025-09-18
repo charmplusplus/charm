@@ -219,7 +219,9 @@ void TreeLB::configure(json& config)
 
 void TreeLB::pup(PUP::er& p)
 {
+  CkPrintf("PUPPING TREE LB\n");
   std::string configString;
+  
   if (p.isPacking())
   {
     configString = config.dump();
@@ -230,6 +232,23 @@ void TreeLB::pup(PUP::er& p)
     config = json::parse(configString);
     init(CkLBOptions(seqno));
   }
+
+  p|numLevels;
+  if (p.isUnpacking()){
+    logic.resize(numLevels);
+    awaitingLB.resize(numLevels);
+    logic[0] = new PELevel(lbmgr);
+    logic[1] = new RootLevel();
+  }
+
+  for (int i = 0; i < numLevels; i++) {
+      p|*logic[i];
+  }
+    
+
+  p|awaitingLB;
+
+  CkPrintf("Done pupping: numLevels=%d, size of logic=%d\n", numLevels, logic.size());
 }
 
 void TreeLB::CallLB()
@@ -278,17 +297,20 @@ void TreeLB::ProcessAtSync()
   // CmiAssert(CmiNodeAlive(CkMyPe()));   // TODO move this logic to LBManager
   int level = 0;  // load balancing starts at the lowest level
   CkAssert(numLevels > 0 && !awaitingLB[level]);
+  CkPrintf("Attempting to get stats from level %d\n", level);
   TreeLBMessage* stats = logic[level]->getStats();
+  CkPrintf("Got stats from level %d\n", level);
   stats->level = level;
   awaitingLB[level] = true;
+  CkPrintf("Sending stats up from level %d\n", level);
   sendStatsUp((CkMessage*)stats);
 #endif
 }
 
 void TreeLB::CheckForLB() {
 #if CMK_SHRINK_EXPAND
-  // if (_lb_args.debug() > 0)
-  //   CkPrintf("TreeLB::CheckForLB pending_realloc_state=%d (EXPAND_MSG_RECEIVED %d, NO_REALLOC %d)\n", pending_realloc_state, EXPAND_MSG_RECEIVED, NO_REALLOC);
+//   // if (_lb_args.debug() > 0)
+//   //   CkPrintf("TreeLB::CheckForLB pending_realloc_state=%d (EXPAND_MSG_RECEIVED %d, NO_REALLOC %d)\n", pending_realloc_state, EXPAND_MSG_RECEIVED, NO_REALLOC);
 
   if (pending_realloc_state == EXPAND_MSG_RECEIVED)
     checkForRealloc();
@@ -308,7 +330,16 @@ void TreeLB::sendStatsUp(CkMessage* msg)
 {
   TreeLBMessage* stats = (TreeLBMessage*)msg;
   int level = stats->level;
+  CkPrintf("Checking validity of comm_stuff for level %d\n", level);
+  if (comm_parent.size() <= level || comm_children.size() <= level ||
+      comm_logic.size() <= level)
+  {
+    CkAbort("TreeLB: sendStatsUp invalid level %d, or comm_parent not initialized\n", level);
+  }
+
   int comm_parent_pe = comm_parent[level];
+  CkPrintf("VALIDITY OKAY, comm_parent_pe = %d\n", comm_parent_pe);
+
   // fprintf(stderr, "[%d] TreeLB::sendStatsUp - received msg level=%d comm_parent=%d\n",
   // CkMyPe(), level, comm_parent_pe);
   if (comm_parent_pe == -1)
@@ -339,6 +370,7 @@ void TreeLB::receiveStats(TreeLBMessage* stats, int level)
   level += 1;
   awaitingLB[level] = true;
   LevelLogic* l = logic[level];
+  CkPrintf("Depositing stats at level %d\n", level);
   l->depositStats(stats);
   size_t expected_msgs = comm_children[level - 1].size();
   if (logic[level - 1] != nullptr) expected_msgs += 1;  // expect msg from myself too
@@ -370,8 +402,9 @@ void TreeLB::receiveStats(TreeLBMessage* stats, int level)
 
 void TreeLB::loadBalanceSubtree(int level)
 {
-  CkPrintf("[%d] TreeLB::loadBalanceSubtree - level=%d\n", CkMyPe(), level);
+  CkPrintf("[%d] TreeLB::loadBalanceSubtree - level=%d, is awaitingLB size=%d\n", CkMyPe(), level, awaitingLB.size());
   if (!awaitingLB[level]) return;
+  CkPrintf("Proceeding with loadBalanceSubtree at level %d\n", level);
   awaitingLB[level] = false;
   if (level == 0) return lb_done();
 
@@ -379,7 +412,9 @@ void TreeLB::loadBalanceSubtree(int level)
 
   /// CkMessage *inter_subtree_migrations = nullptr;
   IDM idm;
+  CkPrintf("Calling loadBalance at level %d\n", level);
   TreeLBMessage* decision = logic[level]->loadBalance(idm);
+  CkPrintf("Returned from loadBalance at level %d\n", level);
   if (idm.size() > 0)
   {
     // this can happen when final destinations of chares has been decided,
@@ -402,6 +437,9 @@ void TreeLB::loadBalanceSubtree(int level)
   // send decision to next level
   decision->level = level - 1;
   sendDecisionDown((CkMessage*)decision);
+
+    CkPrintf("Done with loadBalanceSubtree at level %d\n", level);
+
 }
 
 void TreeLB::multicastIDM(const IDM& mig_order, int num_pes, int* _pes)
@@ -417,6 +455,8 @@ void TreeLB::multicastIDM(const IDM& mig_order, int num_pes, int* _pes)
       thisProxy[*tb.begin(i)].multicastIDM(mig_order, tb.subtreeSize(i), tb.begin(i));
   }
   migrateObjects(mig_order);
+
+  
 }
 
 void TreeLB::sendDecisionDown(CkMessage* msg)
@@ -580,6 +620,8 @@ if (_lb_args.debug() > 0) {
       for(int i=0;i<CkNumPes();i++) CkPrintf("%d ", se_avail_vector[i]);
       CkPrintf("\n");
     }
+
+    //print a couple object loads to sample;
     CkStartRescaleCheckpoint(_shrinkexpand_basedir, cb, 
       std::vector<char>(se_avail_vector, se_avail_vector + CkNumPes()));
   }
@@ -628,14 +670,23 @@ void TreeLB::lb_done()
 
 void TreeLB::lb_done_impl()
 {
+  CkPrintf("TreeLB::lb_done_impl called on pe %d\n", CkMyPe());
   // fprintf(stderr, "[%d] lb_done step %d lb_time=%f\n", CkMyPe(), lbmgr->step(),
   // CkWallTimer() - startTime);
 
   // TODO LBManager should do all of this, including global syncResume ******
   // Currently, TreeLB does syncResume by setting barrier_after_lb=true
 
-  // clear load stats
+
+#if CMK_SHRINK_EXPAND
+  // Only clear loads if not in the middle of a reallocation (EXPAND/SHRINK)
+  if (pending_realloc_state == NO_REALLOC){
+    CkPrintf("!!!!!!! CLEARING LOADS !!!!!!!\n");
+    lbmgr->ClearLoads();
+  }
+#else
   lbmgr->ClearLoads();
+#endif
 
   if (CkMyPe() == 0 && _lb_args.debug() > 0)
   {

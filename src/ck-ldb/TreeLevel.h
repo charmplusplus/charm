@@ -175,6 +175,9 @@ class IStrategyWrapper
   virtual void removeObj(int& local_id, int& oldPe, float& load) = 0;
 
   virtual void addForeignObject(int local_id, int oldPe, float load) = 0;
+
+  virtual void pup(PUP::er& p) { //CkAbort("IStrategyWrapper::pup not implemented\n")
+    } // TODO: pup correctly
 };
 
 // This wrapper allocates mem for objects and processors. to the lb algorithm,
@@ -474,6 +477,54 @@ class RootLevel : public LevelLogic
     for (auto w : wrappers) delete w;
   }
 
+  void pup(PUP::er& p)
+  {
+    // TODO: something similar needs to be done for all the LevelLogic subclasses
+    p|num_groups;
+    p|repeat_strategies;
+    p|current_strategy;
+    p|group_strategy_dummy;
+    p|nObjs;
+    p|total_load;
+
+    if (p.isPacking()) {
+      num_stats_msgs = stats_msgs.size();
+      num_strategies = wrappers.size();
+    }
+
+    p|num_stats_msgs;
+    p|num_strategies;
+    p|rateAware;
+    p|strategies;
+    
+
+    if (p.isUnpacking()) {
+      nPes = CkNumPes();
+
+      CkPrintf("[PE %d] PUP unpacking in RootLevel: with %d stats_msgs\n", CkMyPe(), num_stats_msgs);
+      stats_msgs.resize(num_stats_msgs);
+      //wrappers.resize(num_strategies);
+      
+      for (int i = 0; i < num_stats_msgs; i++) {
+        stats_msgs[i] = new LBStatsMsg_1(); // TODO: this needs to be the right subclass;
+      }
+      for (int i = 0; i < num_strategies; i++) {
+        // wrappers[i] = new StrategyWrapper<Obj<1>, Proc<1, true>>(
+        //       strategy_name, true, config[strategy_name])
+      }
+    }
+
+    CkPrintf("PUPPING RootLevel with %d stats_msgs\n", num_stats_msgs);
+    for (int i = 0; i < num_stats_msgs; i++) {
+      p|*stats_msgs[i];
+    }
+    for (int i = 0; i < num_strategies; i++) {
+      //p|*wrappers[i]; // this will segfault without the constructor above
+    }
+
+    CkPrintf("Done with pupping RootLevel. Num groups = %d\n", num_groups);
+  }
+
   /**
    * mode 0: receive obj stats
    * mode 1: receive aggregated group load
@@ -482,7 +533,10 @@ class RootLevel : public LevelLogic
                          json& config, bool repeat_strategies = false,
                          bool token_passing = true)
   {
+
     using namespace TreeStrategy;
+    this->rateAware = rateAware;
+    this->strategies = strategies;
     for (auto w : wrappers) delete w;
     wrappers.clear();
     if (num_groups == -1)
@@ -539,7 +593,8 @@ class RootLevel : public LevelLogic
     if (num_groups == -1)
     {
       // msg has object loads
-      CkAssert(wrappers.size() > current_strategy);
+      if (wrappers.size() == 0)
+        CkAbort("No strategies configured for TreeLB with obj-based strategies\n");
       IStrategyWrapper* wrapper = wrappers[current_strategy];
       CkAssert(wrapper != nullptr);
       CkAssert(nPes == CkNumPes());
@@ -672,6 +727,8 @@ class RootLevel : public LevelLogic
   unsigned int nObjs = 0;  // total number of objects in msgs I am processing
   float total_load = 0;
   std::vector<IStrategyWrapper*> wrappers;
+  bool rateAware;
+  std::vector<std::string> strategies;
 };
 
 // ---------------- NodeSetLevel ----------------
@@ -1074,6 +1131,32 @@ class PELevel : public LevelLogic
   PELevel(LBManager* _lbmgr) : lbmgr(_lbmgr), rateAware(_lb_args.testPeSpeed()) {}
 
   virtual ~PELevel() {}
+
+  void pup(PUP::er& p)
+  {
+  if (p.isPacking()) {
+      num_stats_msgs = stats_msgs.size();
+
+      CkPrintf("[PE %d] PUP packing in RootLevel: with %d stats_msgs\n", CkMyPe(), num_stats_msgs);
+
+    }
+    p|num_stats_msgs;
+
+    if (p.isUnpacking()) {
+      CkPrintf("[PE %d] PUP unpacking in RootLevel: with %d stats_msgs\n", CkMyPe(), num_stats_msgs);
+      stats_msgs.resize(num_stats_msgs);
+      for (int i = 0; i < num_stats_msgs; i++) {
+        stats_msgs[i] = new LBStatsMsg_1(); // TODO: this needs to be the right subclass
+      }
+    }
+
+    CkPrintf("PUPPING RootLevel with %d stats_msgs\n", num_stats_msgs);
+    for (int i = 0; i < num_stats_msgs; i++) {
+      p|*stats_msgs[i];
+    }
+
+    CkPrintf("Done with pupping RootLevel\n");
+  }
 
   virtual TreeLBMessage* getStats()
   {
