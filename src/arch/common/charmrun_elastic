@@ -12,11 +12,30 @@ fi
 
 pes_file="$TMPDIR/numRestartProcs.txt"
 
+# Function to create truncated nodelist
+create_truncated_nodelist() {
+    local num_pes="$1"
+    local original_nodelist="$2"
+    
+    if [[ -n "$num_pes" && -n "$original_nodelist" && -f "$original_nodelist" ]]; then
+        truncated_nodelist="$TMPDIR/truncated_nodelist.txt"
+        head -n "$num_pes" "$original_nodelist" > "$truncated_nodelist"
+        nodelist_arg="++nodelist $truncated_nodelist"
+        echo "Charm> Created truncated nodelist with $num_pes lines: $truncated_nodelist"
+        return 0
+    fi
+    return 1
+}
+
 time {
 while true; do
     args=()
     pes_args=""
     restart_arg=""
+    nodelist_arg=""
+    original_nodelist=""
+    num_pes=""
+    truncated_nodelist=""
 
     temp_args=("${original_args[@]}")
     i=0
@@ -26,12 +45,20 @@ while true; do
         +p|++p)
         i=$((i+1))
         pes_arg="$arg ${temp_args[$i]}"
+        num_pes="${temp_args[$i]}"
         ;;
         +p[0-9]*)
         pes_arg="$arg"
+        num_pes="${arg#*p}"
         ;;
         ++p[0-9]*)
         pes_arg="$arg"
+        num_pes="${arg#*++p}"
+        ;;
+        ++nodelist)
+        i=$((i+1))
+        original_nodelist="${temp_args[$i]}"
+        # Skip adding original nodelist to args - we'll add truncated one later
         ;;
         *)
         args+=("$arg")
@@ -50,10 +77,23 @@ while true; do
         fi
     fi
 
+    # Create truncated nodelist after determining final num_pes
+    if ! create_truncated_nodelist "$num_pes" "$original_nodelist"; then
+        if [[ -n "$original_nodelist" ]]; then
+            # If we have nodelist but no pes count, use original
+            nodelist_arg="++nodelist $original_nodelist"
+        fi
+    fi
+
     # Pass all script arguments ("$@") to the executable
-    "$(dirname "$0")/charmrun" $pes_arg "${args[@]}" $restart_arg
+    "$(dirname "$0")/charmrun" $pes_arg $nodelist_arg "${args[@]}" $restart_arg
 
     EXIT_CODE=$?
+
+    # Clean up truncated nodelist if it was created
+    if [[ -n "$truncated_nodelist" && -f "$truncated_nodelist" ]]; then
+        rm -f "$truncated_nodelist"
+    fi
 
     if [ "$EXIT_CODE" -eq 100 ]; then
         is_restart=true
