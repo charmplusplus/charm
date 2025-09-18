@@ -27,7 +27,7 @@ class TreeLBMessage
   uint8_t level;
   // WARNING: don't add any virtual methods here
 
-  virtual void pup(PUP::er& p) { p|level; }
+  virtual void pup(PUP::er& p) { CkAbort("TreeLBMessage::pup not implemented\n"); }
 };
 
 class LevelLogic
@@ -281,6 +281,8 @@ class TreeLB : public CBase_TreeLB
 
   uint8_t numLevels = 0;  // total number of tree levels (this chare won't necessarily
                           // participate in all levels)
+  int rootPE = 0;  // PE that is root of the tree
+
   std::vector<LevelLogic*> logic;  // level -> my logic object at this level
   std::vector<int>
       comm_parent;  // level -> my parent PE in comm-tree connecting level to level+1

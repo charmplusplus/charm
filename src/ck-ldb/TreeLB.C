@@ -231,24 +231,30 @@ void TreeLB::pup(PUP::er& p)
   {
     config = json::parse(configString);
     init(CkLBOptions(seqno));
+
+    const auto& root_config = config.at("root"); 
+    rootPE = root_config.value("pe", 0); // TODO: not sure if this works exactly
   }
 
+   
   p|numLevels;
+  p|rootPE;
   if (p.isUnpacking()){
-    logic.resize(numLevels);
-    awaitingLB.resize(numLevels);
-    logic[0] = new PELevel(lbmgr);
-    logic[1] = new RootLevel();
+    CkPrintf("[PE %d] Unpacking TreeLB with numLevels=%d\n", CkMyPe(), numLevels);
+    CkPrintf("[PE %d] logic size=%d\n", CkMyPe(), logic.size());
   }
 
-  for (int i = 0; i < numLevels; i++) {
-      p|*logic[i];
-  }
-    
+  assert(numLevels == 2); // rn this only supports the two level tree
+  p|*logic[0];
+  if (CkMyPe() == rootPE)
+    p|*logic[1];
+  
+
+  CkPrintf("[PE %d] Trying to pup awaitingLB with size=%d\n", CkMyPe(), awaitingLB.size());
 
   p|awaitingLB;
 
-  CkPrintf("Done pupping: numLevels=%d, size of logic=%d\n", numLevels, logic.size());
+  CkPrintf("[PE %d] Done pupping: numLevels=%d, size of logic=%d\n", CkMyPe(), numLevels, logic.size());
 }
 
 void TreeLB::CallLB()

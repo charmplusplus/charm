@@ -1173,16 +1173,17 @@ class PELevel : public LevelLogic
 
     }
     p|num_stats_msgs;
+    p|nObjs;
 
     if (p.isUnpacking()) {
-      CkPrintf("[PE %d] PUP unpacking in RootLevel: with %d stats_msgs\n", CkMyPe(), num_stats_msgs);
+      CkPrintf("[PE %d] PUP unpacking in PELevel: with %d stats_msgs\n", CkMyPe(), num_stats_msgs);
       stats_msgs.resize(num_stats_msgs);
+   
       for (int i = 0; i < num_stats_msgs; i++) {
-        stats_msgs[i] = new LBStatsMsg_1(); // TODO: this needs to be the right subclass
+        stats_msgs[i] = new(1, 1, 1, 2, nObjs, nObjs, 0) LBStatsMsg_1; // TODO: this needs to be the right subclass;
       }
     }
 
-    CkPrintf("PUPPING RootLevel with %d stats_msgs\n", num_stats_msgs);
     for (int i = 0; i < num_stats_msgs; i++) {
       p|*stats_msgs[i];
     }
@@ -1194,6 +1195,7 @@ class PELevel : public LevelLogic
   {
     const int mype = CkMyPe();
     int nobjs = lbmgr->GetObjDataSz();
+    nObjs = nobjs;
     std::vector<LDObjData> allLocalObjs(nobjs);
     if (nobjs > 0) lbmgr->GetObjData(allLocalObjs.data());  // populate allLocalObjs
     myObjs.clear();
@@ -1337,6 +1339,7 @@ class PELevel : public LevelLogic
   LBManager* lbmgr;
   bool rateAware;
   std::vector<LDObjData> myObjs;
+  int nObjs = 0;
 };
 
 // ---------------- MsgAggregator ----------------
