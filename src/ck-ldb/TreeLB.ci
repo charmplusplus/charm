@@ -1,5 +1,7 @@
 module TreeLB {
-
+  PUPable LevelLogic;
+  PUPable RootLevel;
+  PUPable PELevel;
   include "idm.h";
 
   extern module BaseLB;
@@ -10,6 +12,7 @@ module TreeLB {
 
     entry void TreeLB(const CkLBOptions &);
     entry [reductiontarget] void ProcessAtSync(void);
+    entry void loadBalanceSubtreeEntry(int level);
 
     entry void sendStatsUp(CkMessage *stats);
     entry void sendDecisionDown(CkMessage *decision);

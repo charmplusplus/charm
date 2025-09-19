@@ -30,9 +30,15 @@ class TreeLBMessage
   virtual void pup(PUP::er& p) { CkAbort("TreeLBMessage::pup not implemented\n"); }
 };
 
-class LevelLogic
+class LevelLogic : public PUP::able
 {
  public:
+   std::vector<TreeLBMessage*> stats_msgs;
+
+  LevelLogic() : PUP::able() {
+    num_stats_msgs = 0;
+    num_strategies = 0;
+  }
   virtual ~LevelLogic() {}
 
   /// return msg with lb stats for this PE. only needed at leaves
@@ -105,28 +111,16 @@ class LevelLogic
     CkAbort("LevelLogic::processDecision not implemented\n");
   }
 
+  PUPable_decl(LevelLogic);
+  LevelLogic(CkMigrateMessage *m) : PUP::able(m) {}
   virtual void pup(PUP::er& p) { 
+
+    PUP::able::pup(p);
     // if (p.isPacking()) {
     //   num_stats_msgs = stats_msgs.size();
-
-    //   CkPrintf("[PE %d] PUP packing in LEVELLOGIC: with %d stats_msgs\n", CkMyPe(), num_stats_msgs);
-
+    //   CkPrintf("[PE %d] PUP packing in TreeLevel: with %d stats_msgs\n", CkMyPe(), num_stats_msgs);
     // }
-    // p|num_stats_msgs;
-
-    // if (p.isUnpacking()) {
-    //   CkPrintf("[PE %d] PUP unpacking in LEVELLOGIC: with %d stats_msgs\n", CkMyPe(), num_stats_msgs);
-    //   stats_msgs.resize(num_stats_msgs);
-    // }
-
-    // CkPrintf("PUPPING LEVELLOGIC with %d stats_msgs\n", num_stats_msgs);
-    // for (int i = 0; i < num_stats_msgs; i++) {
-    //   stats_msgs[i] = new TreeLBMessage(); // TODO: this needs to be the right subclass
-    //   p|*stats_msgs[i];
-    // }
-
-    // CkPrintf("Done with pupping LEVELLOGIC\n");
-    CkAbort("LevelLogic::pup not implemented\n");
+    // |num_stats_msgs;
   }
    
 
@@ -152,9 +146,8 @@ class LevelLogic
   }
 
  protected:
-  std::vector<TreeLBMessage*> stats_msgs;
-  int num_stats_msgs = 0;
-  int num_strategies = 0;
+  int num_stats_msgs;
+  int num_strategies;
 };
 
 class LBTreeBuilder;
@@ -193,7 +186,13 @@ class TreeLB : public CBase_TreeLB
 
   // start load balancing (non-AtSync mode)  NOTE: This seems to do a broadcast
   // (is this the behavior we want?)
-  inline void StartLB() { loadBalanceSubtree(numLevels - 1); }
+  inline void StartLB() { 
+    //CkPrintf("[PE %d] TreeLB::StartLB with %d PEs\n", CkMyPe(), CkNumPes());
+    //thisProxy.loadBalanceSubtreeEntry(numLevels - 1);
+
+    // thisProxy.ProcessAtSync();
+     }
+
 
   // TODO: I would rename this group of functions (to maybe something like startLBLocal)
   // since they are also used in non-AtSync mode
@@ -202,6 +201,9 @@ class TreeLB : public CBase_TreeLB
   void ProcessAtSync();  // Receive a message from AtSync to avoid making projections
                          // output look funny
                          // TODO: do we still need this?
+
+                             void loadBalanceSubtreeEntry(int level);
+
 
   // send stats up using the comm-tree for this level
   void sendStatsUp(CkMessage* stats);
@@ -239,6 +241,7 @@ class TreeLB : public CBase_TreeLB
   void receiveStats(TreeLBMessage* stats, int level);
 
   void loadBalanceSubtree(int level);
+  void setupForProcessing(int level);
 
   // receive lb decision from parent (decision could be empty -do nothing-)
   // a non-empty decision implies load is moved from one subtree to another subtree

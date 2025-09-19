@@ -215,7 +215,7 @@ class IStrategyWrapper
 
   virtual void addForeignObject(int local_id, int oldPe, float load) = 0;
 
-  virtual void pup(PUP::er& p) { //CkAbort("IStrategyWrapper::pup not implemented\n")
+  virtual void pup(PUP::er& p) { CkAbort("IStrategyWrapper::pup not implemented\n");
     } // TODO: pup correctly
 };
 
@@ -509,61 +509,67 @@ class StrategyWrapper : public IStrategyWrapper
 class RootLevel : public LevelLogic
 {
  public:
-  RootLevel(int _num_groups = -1) : num_groups(_num_groups) {}
-
+  RootLevel(int _num_groups = -1) : num_groups(_num_groups) {
+    num_stats_msgs = 0;
+    CkPrintf("[PE %d] Creating RootLevel with num_groups=%d\n", CkMyPe(), num_groups);
+  }
   virtual ~RootLevel()
   {
     for (auto w : wrappers) delete w;
   }
 
+  PUPable_decl(RootLevel);
+  RootLevel(CkMigrateMessage *m) : LevelLogic(m) {}
   void pup(PUP::er& p)
   {
-    // TODO: something similar needs to be done for all the LevelLogic subclasses
-    // p|num_groups;
-    // p|repeat_strategies;
-    // p|current_strategy;
-    // p|group_strategy_dummy;
-    // p|nObjs;
-    // p|total_load;
+    
+      LevelLogic::pup(p); // Call base class
+    
+  //   CkPrintf("[PE %d] PUPPING RootLevel\n", CkMyPe());
+  //   // TODO: something similar needs to be done for all the LevelLogic subclasses
+  //   // p|num_groups;
+  //   // p|repeat_strategies;
+  //   // p|current_strategy;
+  //   // p|group_strategy_dummy;
+  //   // p|nObjs;
+  //   // p|total_load;
 
-    if (p.isPacking()) {
-      num_stats_msgs = stats_msgs.size();    
-    }
+  //  int test = 0;
+  //   p|test;
+  //   //LevelLogic::pup(p);
 
-    p|num_stats_msgs;
-    p|nObjs;
-    p|nPes;
+    
+    // CkPrintf("[PE %d] PUPPING RootLevel with nstats = %d\n", CkMyPe(), num_stats_msgs);
+    //p|nPes;
     // p|num_strategies;
     // p|rateAware;
     // p|strategies;
     
+    //  if (p.isUnpacking()) {
+    //   CkPrintf("[PE %d] PUP unpacking in RootLevel: with %d stats_msgs\n", CkMyPe(), num_stats_msgs);
+    //   //stats_msgs.resize(num_stats_msgs);
+    //  }
 
-    if (p.isUnpacking()) {
+    // if (p.isUnpacking()) {
             
 
-      CkPrintf("[PE %d] PUP unpacking in RootLevel: with %d stats_msgs\n", CkMyPe(), num_stats_msgs);
-      stats_msgs.resize(num_stats_msgs);
+    // //   CkPrintf("[PE %d] PUP unpacking in RootLevel: with %d stats_msgs\n", CkMyPe(), num_stats_msgs);
+    // //   stats_msgs.resize(num_stats_msgs);
    
-      for (int i = 0; i < num_stats_msgs; i++) {
-        stats_msgs[i] = new(nPes, nPes, nPes, nPes + 1, nObjs, nObjs, 0) LBStatsMsg_1; // TODO: this needs to be the right subclass;
-      }
+    // //   for (int i = 0; i < num_stats_msgs; i++) {
+    // //     stats_msgs[i] = new(nPes, nPes, nPes, nPes + 1, nObjs, nObjs, 0) LBStatsMsg_1; // TODO: this needs to be the right subclass;
+    // //   }
 
-      nPes = CkNumPes();
+    //   nPes = CkNumPes();
 
-    }
-
-    CkPrintf("PUPPING RootLevel with num_stats_msgs = %d, stats_msgs.size = %d\n", num_stats_msgs, stats_msgs.size());
-    for (int i = 0; i < num_stats_msgs; i++) {
-      p|*stats_msgs[i];
-    }
-    // for (int i = 0; i < num_strategies; i++) {
-    //   //p|*wrappers[i]; // this will segfault without the constructor above
     // }
-    if (p.isUnpacking()) {
-         CkPrintf("Done with pupping RootLevel\n");
 
-    CkPrintf("Obj in stats_msg [0] walltime: %f\n", ((LBStatsMsg_1*)stats_msgs[0])->oloads[0]);
-    }
+    // CkPrintf("[PE %d] PUPPING RootLevel with num_stats_msgs = %d, stats_msgs.size = %d\n", CkMyPe(), num_stats_msgs, stats_msgs.size());
+    // for (int i = 0; i < num_stats_msgs; i++) {
+    //   p|*stats_msgs[i];
+    // }
+
+
   }
 
   /**
@@ -1173,13 +1179,15 @@ class PELevel : public LevelLogic
 
   virtual ~PELevel() {}
 
+  PUPable_decl(PELevel);
+  PELevel(CkMigrateMessage *m) : LevelLogic(m) {}
+
   void pup(PUP::er& p)
   {
-  if (p.isPacking()) {
+    LevelLogic::pup(p);
+    if (p.isPacking()) {
       num_stats_msgs = stats_msgs.size();
-
-      CkPrintf("[PE %d] PUP packing in RootLevel: with %d stats_msgs\n", CkMyPe(), num_stats_msgs);
-
+      CkPrintf("[PE %d] PUP packing in TreeLevel: with %d stats_msgs\n", CkMyPe(), num_stats_msgs);
     }
     p|num_stats_msgs;
     p|nObjs;
@@ -1204,7 +1212,7 @@ class PELevel : public LevelLogic
   {
     const int mype = CkMyPe();
     int nobjs = lbmgr->GetObjDataSz();
-    nObjs = nobjs;
+
     std::vector<LDObjData> allLocalObjs(nobjs);
     if (nobjs > 0) lbmgr->GetObjData(allLocalObjs.data());  // populate allLocalObjs
     myObjs.clear();
@@ -1221,7 +1229,7 @@ class PELevel : public LevelLogic
       }
     }
     nobjs = myObjs.size();
-
+    nObjs = nobjs;
     // TODO verify that non-migratable objects are not added to msg and are only counted
     // as background load
 
