@@ -2049,11 +2049,10 @@ void ConverseCleanup(void)
       perror("Error opening file");
     }
 
+    CmiBarrier();
     // Use the new synchronous reply function. This blocks until the reply is
     // sent and acknowledged by charmrun, robustly fixing the race condition.
     CcsSendDelayedReplyAndTerm(shrinkExpandreplyToken, 0, 0);
-
-    CmiBarrier();
     ConverseExit(100);
 
   } else {
