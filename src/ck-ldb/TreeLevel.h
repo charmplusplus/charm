@@ -1172,6 +1172,18 @@ class PELevel : public LevelLogic
     LevelLogic::pup(p); // this packs num_stats_msgs
    
     p|nObjs;
+    p|myObjs;
+
+    int nPes = 0;
+    if (p.isPacking()) {
+      nPes = CkNumPes();
+    }
+
+    p|nPes;
+
+  
+
+    CkPrintf("[PE %d] PUP PELevel with %d stats_msgs and %d myObjs and %d nObjs\n", CkMyPe(), num_stats_msgs, myObjs.size());
 
     if (p.isUnpacking()) {
       CkPrintf("[PE %d] PUP unpacking in PELevel: with %d stats_msgs\n", CkMyPe(), num_stats_msgs);
@@ -1186,7 +1198,14 @@ class PELevel : public LevelLogic
       p|*stats_msgs[i];
     }
 
-    CkPrintf("Done with pupping RootLevel\n");
+
+      if (p.isUnpacking()) {
+      if (CkMyPe() >= nPes) {
+        CkPrintf("[Pe %d] I am a new pe in PUP\n", CkMyPe());
+        myObjs.clear();
+        nObjs = 0;
+      }
+    }
   }
 
   virtual TreeLBMessage* getStats()
