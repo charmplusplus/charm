@@ -114,13 +114,11 @@ class LevelLogic : public PUP::able
   PUPable_decl(LevelLogic);
   LevelLogic(CkMigrateMessage *m) : PUP::able(m) {}
   virtual void pup(PUP::er& p) { 
-
     PUP::able::pup(p);
-    // if (p.isPacking()) {
-    //   num_stats_msgs = stats_msgs.size();
-    //   CkPrintf("[PE %d] PUP packing in TreeLevel: with %d stats_msgs\n", CkMyPe(), num_stats_msgs);
-    // }
-    // |num_stats_msgs;
+    if (p.isPacking()) {
+      num_stats_msgs = stats_msgs.size();
+    }
+    p|num_stats_msgs;
   }
    
 
@@ -187,10 +185,7 @@ class TreeLB : public CBase_TreeLB
   // start load balancing (non-AtSync mode)  NOTE: This seems to do a broadcast
   // (is this the behavior we want?)
   inline void StartLB() { 
-    //CkPrintf("[PE %d] TreeLB::StartLB with %d PEs\n", CkMyPe(), CkNumPes());
-    //thisProxy.loadBalanceSubtreeEntry(numLevels - 1);
-
-    // thisProxy.ProcessAtSync();
+    loadBalanceSubtree(numLevels - 1);
      }
 
 
@@ -202,7 +197,6 @@ class TreeLB : public CBase_TreeLB
                          // output look funny
                          // TODO: do we still need this?
 
-                             void loadBalanceSubtreeEntry(int level);
 
 
   // send stats up using the comm-tree for this level

@@ -242,12 +242,15 @@ void TreeLB::pup(PUP::er& p)
   if (p.isUnpacking()){
     CkPrintf("[PE %d] Unpacking TreeLB with numLevels=%d\n", CkMyPe(), numLevels);
     CkPrintf("[PE %d] logic size=%d\n", CkMyPe(), logic.size());
+
+    se_avail_vector = (char *)malloc(sizeof(char) * CkNumPes()); // this is probably not the right place for this... but it is needed for shrink/expand multiple times
+    LBManagerObj()->get_avail_vector(se_avail_vector);
   }
 
   assert(numLevels == 2); // rn this only supports the two level tree
   p|*logic[0];
-  if (CkMyPe() == rootPE)
-    p|*logic[1];
+  if (CkMyPe() != 0) logic[1] = new RootLevel(); // this is needed because logic[1] is null on PE1, but PE1 still needs to participate in this... confusing?
+  p|*logic[1];
   
 
   CkPrintf("[PE %d] Trying to pup awaitingLB with size=%d\n", CkMyPe(), awaitingLB.size());

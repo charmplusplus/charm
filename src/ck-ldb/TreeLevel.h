@@ -49,10 +49,11 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
     
     p|nObjs;
     p|nPes;
+
+    int nNewPes = CkNumPes();
     CkPrintf("[PE %d] PUPPING LBStatsMsg_1 with %d objs and %d pes\n", CkMyPe(), nObjs, nPes);
     if (p.isUnpacking())
     {
-      int nNewPes = CkNumPes();
       pe_ids = new int[nNewPes];
       bgloads = new float[nNewPes];
       speeds = new float[nNewPes];
@@ -74,9 +75,22 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
     for (int i = 0; i < nObjs; i++)
       p|order[i];
 
+
+
     if (p.isUnpacking())
     {
+      if (nNewPes > nPes)
+      {
+        // initialize the rest of the pes to 0 load
+        for (int i = nPes; i < nNewPes; i++)
+        {
+          pe_ids[i] = i;
+          bgloads[i] = 0;
+          speeds[i] = 1.0;
+        }
+      }
       nPes = CkNumPes();
+      
     }
     CkPrintf("[PE %d] Done PUPPING LBStatsMsg_1 with %d objs and %d pes\n", CkMyPe(), nObjs, nPes);
 
@@ -520,54 +534,24 @@ class RootLevel : public LevelLogic
 
   PUPable_decl(RootLevel);
   RootLevel(CkMigrateMessage *m) : LevelLogic(m) {}
-  void pup(PUP::er& p)
+  virtual void pup(PUP::er& p)
   {
-    
-      LevelLogic::pup(p); // Call base class
-    
-  //   CkPrintf("[PE %d] PUPPING RootLevel\n", CkMyPe());
-  //   // TODO: something similar needs to be done for all the LevelLogic subclasses
-  //   // p|num_groups;
-  //   // p|repeat_strategies;
-  //   // p|current_strategy;
-  //   // p|group_strategy_dummy;
-  //   // p|nObjs;
-  //   // p|total_load;
+    LevelLogic::pup(p); // this packs num_stats_msgs
+    p|nObjs;
+    p|nPes;
 
-  //  int test = 0;
-  //   p|test;
-  //   //LevelLogic::pup(p);
+    if (p.isUnpacking()) {
+      stats_msgs.resize(num_stats_msgs);
+      nPes = CkNumPes();
+      for (int i = 0; i < num_stats_msgs; i++) {
+        stats_msgs[i] = new(nPes, nPes, nPes, nPes + 1, nObjs, nObjs, 0) LBStatsMsg_1; // TODO: this needs to be the right subclass;
+      }
 
-    
-    // CkPrintf("[PE %d] PUPPING RootLevel with nstats = %d\n", CkMyPe(), num_stats_msgs);
-    //p|nPes;
-    // p|num_strategies;
-    // p|rateAware;
-    // p|strategies;
-    
-    //  if (p.isUnpacking()) {
-    //   CkPrintf("[PE %d] PUP unpacking in RootLevel: with %d stats_msgs\n", CkMyPe(), num_stats_msgs);
-    //   //stats_msgs.resize(num_stats_msgs);
-    //  }
+    }
 
-    // if (p.isUnpacking()) {
-            
-
-    // //   CkPrintf("[PE %d] PUP unpacking in RootLevel: with %d stats_msgs\n", CkMyPe(), num_stats_msgs);
-    // //   stats_msgs.resize(num_stats_msgs);
-   
-    // //   for (int i = 0; i < num_stats_msgs; i++) {
-    // //     stats_msgs[i] = new(nPes, nPes, nPes, nPes + 1, nObjs, nObjs, 0) LBStatsMsg_1; // TODO: this needs to be the right subclass;
-    // //   }
-
-    //   nPes = CkNumPes();
-
-    // }
-
-    // CkPrintf("[PE %d] PUPPING RootLevel with num_stats_msgs = %d, stats_msgs.size = %d\n", CkMyPe(), num_stats_msgs, stats_msgs.size());
-    // for (int i = 0; i < num_stats_msgs; i++) {
-    //   p|*stats_msgs[i];
-    // }
+    for (int i = 0; i < num_stats_msgs; i++) {
+      p|*stats_msgs[i];
+    }
 
 
   }
@@ -1182,14 +1166,11 @@ class PELevel : public LevelLogic
   PUPable_decl(PELevel);
   PELevel(CkMigrateMessage *m) : LevelLogic(m) {}
 
-  void pup(PUP::er& p)
+  virtual void pup(PUP::er& p)
   {
-    LevelLogic::pup(p);
-    if (p.isPacking()) {
-      num_stats_msgs = stats_msgs.size();
-      CkPrintf("[PE %d] PUP packing in TreeLevel: with %d stats_msgs\n", CkMyPe(), num_stats_msgs);
-    }
-    p|num_stats_msgs;
+    CkPrintf("[PE %d] PUPPING PELevel\n", CkMyPe());
+    LevelLogic::pup(p); // this packs num_stats_msgs
+   
     p|nObjs;
 
     if (p.isUnpacking()) {
