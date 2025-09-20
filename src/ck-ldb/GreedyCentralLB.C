@@ -102,6 +102,11 @@ void GreedyCentralLB::work(LDStats* stats)
     objs.push_back(CkVertex(obj, load, stats->objData[obj].migratable, stats->from_proc[obj]));
   }
 
+  // Sort objects by their object IDs
+  std::sort(objs.begin(), objs.end(), [&stats](const CkVertex &v1, const CkVertex &v2) {
+    return stats->objData[v1.getVertexId()].objID() < stats->objData[v2.getVertexId()].objID();
+  });
+
   int num_remain_objs = objs.size();
   int num_remain_pes = procs.size();
   CkPrintf("[%d] num_remain_objs=%d, num_remain_pes=%d\n", CkMyPe(), num_remain_objs, num_remain_pes);
