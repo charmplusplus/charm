@@ -109,7 +109,7 @@ void report(int completed_iteration) {
             CkExit();
             //exit(0);
         } else {
-            if(iterations%10==0) CkPrintf("starting new iteration; iteration %d time: %.6lf time/itr::%.6f\n", iterations, CkWallTimer()-stTime,(CkWallTimer()-stTime)/iterations_after_restart);
+            if(iterations%10==0) CkPrintf("starting new iteration; iteration %d time: %.6lf time/itr::%.6f\n", iterations, CkWallTimer()-stTime,(CkWallTimer()-startTime));            
             //CkPrintf("Memory Usage: %ld bytes \n", CmiMemoryUsage());
             recieve_count=0;
             iterations++;

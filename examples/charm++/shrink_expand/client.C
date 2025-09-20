@@ -49,7 +49,7 @@ int main (int argc, char **argv)
     int offset = 2 * sizeof(int);
     int count = 0;
     for (i = 0; i < OLDNPROCS; i++) {
-        if (i == killedIndex[count]) {
+        if (numKilled > 0 && i == killedIndex[count]) {
             msg[i + offset] = 0;
             count++;
         }
