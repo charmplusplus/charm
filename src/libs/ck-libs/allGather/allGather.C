@@ -1,4 +1,8 @@
 #include "allGather.h"
+#if defined(_WIN32)
+//for getpid()
+#include "process.h"
+#endif
 
 int AllGather::gen_rand()
 {
@@ -129,7 +133,7 @@ void AllGather::Flood(int sender, CkNcpyBuffer src)
                    CK_BUFFER_REG);
   dst.get(src);
   for (int i = 0; i < n; i++)
-    if (graph[CkMyPe()][i] == 1 and i != sender)
+    if (graph[CkMyPe()][i] == 1 && i != sender)
       thisProxy[i].Flood(sender, src);
 }
 
