@@ -542,17 +542,16 @@ class RootLevel : public LevelLogic
 
     if (p.isUnpacking()) {
       stats_msgs.resize(num_stats_msgs);
-      nPes = CkNumPes();
+     
       for (int i = 0; i < num_stats_msgs; i++) {
         stats_msgs[i] = new(nPes, nPes, nPes, nPes + 1, nObjs, nObjs, 0) LBStatsMsg_1; // TODO: this needs to be the right subclass;
       }
-
+       nPes = CkNumPes();
     }
-
-    for (int i = 0; i < num_stats_msgs; i++) {
-      p|*stats_msgs[i];
+    for (int i = 0; i < num_stats_msgs; i++) {      
+      if (i == 0) // TODO: is stats_msg[1] needed?
+        p|*stats_msgs[i];
     }
-
 
   }
 
@@ -1204,6 +1203,7 @@ class PELevel : public LevelLogic
         CkPrintf("[Pe %d] I am a new pe in PUP\n", CkMyPe());
         myObjs.clear();
         nObjs = 0;
+        stats_msgs.clear();
       }
     }
   }
@@ -1299,6 +1299,7 @@ class PELevel : public LevelLogic
     outgoing = 0;
     int obj_start = decision->obj_start[mype];
     int obj_end = obj_start + int(myObjs.size());
+    assert(myObjs.size == nObjs);
     int j = 0;
     for (int i = obj_start; i < obj_end; i++, j++)
     {

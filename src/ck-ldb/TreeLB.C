@@ -152,7 +152,8 @@ TreeLB::~TreeLB()
 void TreeLB::configure(LBTreeBuilder& builder, json& config)
 {
 #if CMK_LBDB_ON
-
+  if (_lb_args.debug() > 0)
+    CkPrintf("[PE %d] Configuring TreeLB with %d levels\n", CkMyPe(), numLevels);
   if (numLevels > 0 && CkMyPe() == 0 && !quietModeRequested)
   {
     CkPrintf("[%d] Reconfiguring TreeLB\n", CkMyPe());
@@ -249,13 +250,28 @@ void TreeLB::pup(PUP::er& p)
 
   assert(numLevels == 2); // rn this only supports the two level tree
   p|*logic[0];
-  if (CkMyPe() != 0) logic[1] = new RootLevel(); // this is needed because logic[1] is null on PE1, but PE1 still needs to participate in this... confusing?
+  if (CkMyPe() != rootPE) {
+    CkPrintf("[PE %d] logic[1] is null\n", CkMyPe());
+    logic[1] = new RootLevel(); // this is needed because logic[1] is null on PE1, but PE1 still needs to participate in this... confusing?
+  } 
   p|*logic[1];
   
 
-  CkPrintf("[PE %d] Trying to pup awaitingLB with size=%d\n", CkMyPe(), awaitingLB.size());
 
-  p|awaitingLB;
+
+  if (p.isUnpacking() && CkMyPe() != 0){
+    awaitingLB[0] = true;
+    awaitingLB[1] = false;
+  }
+  if (p.isUnpacking() && CkMyPe() == 0){
+    awaitingLB[0] = true;
+    awaitingLB[1] = true;
+  }
+    for (size_t i = 0; i < awaitingLB.size(); i++) {
+      if (awaitingLB[i]) CkPrintf("true ");
+      else CkPrintf("false ");
+    }
+    CkPrintf("\n");
 
   CkPrintf("[PE %d] Done pupping: numLevels=%d, size of logic=%d\n", CkMyPe(), numLevels, logic.size());
 }
