@@ -140,27 +140,42 @@ EOF])
     AC_CONFIG_HEADERS(hwloc_config_prefix[include/private/autogen/config.h])
     AC_CONFIG_HEADERS(hwloc_config_prefix[include/hwloc/autogen/config.h])
 
+
     # What prefix are we using?
-    AC_MSG_CHECKING([for hwloc symbol prefix])
+    AH_VERBATIM([prefix_details_ifndef],
+	[ /* hwloc details should only be set once */
+	#ifndef HWLOC_SYM_DETAILS
+	#define HWLOC_SYM_DETAILS
+	])
+    AC_MSG_CHECKING([for hwloc symbol prefix])	      
     AS_IF([test "$hwloc_symbol_prefix_value" = ""],
           [AS_IF([test "$with_hwloc_symbol_prefix" = ""],
                  [hwloc_symbol_prefix_value=hwloc_],
                  [hwloc_symbol_prefix_value=$with_hwloc_symbol_prefix])])
+
+	
     AC_DEFINE_UNQUOTED(HWLOC_SYM_PREFIX, [$hwloc_symbol_prefix_value],
                        [The hwloc symbol prefix])
     # Ensure to [] escape the whole next line so that we can get the
     # proper tr tokens
     [hwloc_symbol_prefix_value_caps="`echo $hwloc_symbol_prefix_value | tr '[:lower:]' '[:upper:]'`"]
-    AC_DEFINE_UNQUOTED(HWLOC_SYM_PREFIX_CAPS, [$hwloc_symbol_prefix_value_caps],
-                       [The hwloc symbol prefix in all caps])
+    AC_CHECK_DEFINE([HWLOC_SYM_PREFIX_CAPS],[0],AC_DEFINE_UNQUOTED(HWLOC_SYM_PREFIX_CAPS, [$hwloc_symbol_prefix_value_caps],
+                       [The hwloc symbol prefix in all caps]))
     AC_MSG_RESULT([$hwloc_symbol_prefix_value])
 
-    # Give an easy #define to know if we need to transform all the
+    
+        # Give an easy #define to know if we need to transform all the
     # hwloc names
     AH_TEMPLATE([HWLOC_SYM_TRANSFORM], [Whether we need to re-define all the hwloc public symbols or not])
     AS_IF([test "$hwloc_symbol_prefix_value" = "hwloc_"],
           [AC_DEFINE([HWLOC_SYM_TRANSFORM], [0])],
           [AC_DEFINE([HWLOC_SYM_TRANSFORM], [1])])
+
+    AH_VERBATIM([prefix_details_endif],
+	[ /* HWLOC_DETAILS_SET */
+	#endif 
+	])
+
 
     # Disabled for Charm++ due to https://github.com/charmplusplus/charm/issues/2606
     # hwloc 2.0+ requires a C99 compliant compiler
