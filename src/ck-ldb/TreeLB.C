@@ -325,14 +325,6 @@ void TreeLB::setupForProcessing(int level)
     awaitingLB[1] = true;
 }
 
-void TreeLB::loadBalanceSubtreeEntry(int level)
-{
-  setupForProcessing(level);
-  
-  if (CkMyPe() == 0)
-    loadBalanceSubtree(level);
-}
-
 void TreeLB::ProcessAtSync()
 {
 #if CMK_LBDB_ON
