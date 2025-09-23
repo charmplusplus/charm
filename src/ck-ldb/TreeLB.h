@@ -168,12 +168,18 @@ class TreeLB : public CBase_TreeLB
   TreeLB(CkMigrateMessage* m) : CBase_TreeLB(m) 
   {
 #if CMK_SHRINK_EXPAND
+    CkPrintf("TREELB MIGRATION constructor ON PE %d\n", CkMyPe());
+    loadConfigFile(CkLBOptions(seqno));
+    init(CkLBOptions(seqno));
 		manager_init();
+
+    expand_init();
 #endif
   }
 
   virtual ~TreeLB();
 
+  void expand_init();
   void pup(PUP::er& p);
 
   void loadConfigFile(const CkLBOptions& opts);
@@ -278,7 +284,6 @@ class TreeLB : public CBase_TreeLB
 
   uint8_t numLevels = 0;  // total number of tree levels (this chare won't necessarily
                           // participate in all levels)
-  int rootPE = 0;  // PE that is root of the tree
 
   std::vector<LevelLogic*> logic;  // level -> my logic object at this level
   std::vector<int>

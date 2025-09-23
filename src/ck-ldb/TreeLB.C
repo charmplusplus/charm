@@ -134,6 +134,17 @@ void TreeLB::init(const CkLBOptions& opts)
 #endif
 }
 
+void TreeLB::expand_init()
+{
+
+  awaitingLB[0] = true;
+  awaitingLB[1] = false;
+
+  numLevels = 2;
+
+
+}
+
 TreeLB::~TreeLB()
 {
 #if CMK_LBDB_ON
@@ -220,36 +231,15 @@ void TreeLB::configure(json& config)
 
 void TreeLB::pup(PUP::er& p)
 {
-  int rootPE;
-  std::string configString;
-  if (p.isPacking())
-  {
-    configString = config.dump();
-    rootPE = 0;
-  }
-  p | configString;
-  if (p.isUnpacking())
-  {
-    config = json::parse(configString);
-    init(CkLBOptions(seqno));
-
-    const auto& root_config = config.at("root"); 
-    rootPE = root_config.value("pe", 0); // TODO: not sure if this works exactly
-  }
+  
 
    
-  p|numLevels;
-  p|rootPE;
-  if (p.isUnpacking()){
-    CkPrintf("[PE %d] Unpacking TreeLB with numLevels=%d\n", CkMyPe(), numLevels);
-    CkPrintf("[PE %d] logic size=%d\n", CkMyPe(), logic.size());
 
-   
-  }
+
 
   assert(numLevels == 2); // rn this only supports the two level tree
   p|*logic[0];
-  if (CkMyPe() != rootPE) {
+  if (logic[1] == nullptr) {
     CkPrintf("[PE %d] logic[1] is null\n", CkMyPe());
     logic[1] = new RootLevel(); // this is needed because logic[1] is null on PE1, but PE1 still needs to participate in this... confusing?
   } 
@@ -411,9 +401,7 @@ void TreeLB::receiveStats(TreeLBMessage* stats, int level)
 
 void TreeLB::loadBalanceSubtree(int level)
 {
-  CkPrintf("[%d] TreeLB::loadBalanceSubtree - level=%d, is awaitingLB size=%d\n", CkMyPe(), level, awaitingLB.size());
   if (!awaitingLB[level]) return;
-  CkPrintf("Proceeding with loadBalanceSubtree at level %d\n", level);
   awaitingLB[level] = false;
   if (level == 0) return lb_done();
 
@@ -421,9 +409,8 @@ void TreeLB::loadBalanceSubtree(int level)
 
   /// CkMessage *inter_subtree_migrations = nullptr;
   IDM idm;
-  CkPrintf("Calling loadBalance at level %d\n", level);
-  TreeLBMessage* decision = logic[level]->loadBalance(idm);
-  CkPrintf("Returned from loadBalance at level %d\n", level);
+  if (_lb_args.debug()) CkPrintf("[PE %d] Calling loadBalance at level %d\n", CkMyPe(), level);
+  TreeLBMessage* decision = logic[level]->loadBalance(idm); // this result is the MigMsg
   if (idm.size() > 0)
   {
     // this can happen when final destinations of chares has been decided,
@@ -447,7 +434,6 @@ void TreeLB::loadBalanceSubtree(int level)
   decision->level = level - 1;
   sendDecisionDown((CkMessage*)decision);
 
-    CkPrintf("Done with loadBalanceSubtree at level %d\n", level);
 
 }
 
@@ -506,7 +492,6 @@ void TreeLB::sendDecisionDown(CkMessage* msg)
 void TreeLB::receiveDecision(TreeLBMessage* decision, int level)
 {
   // fprintf(stderr, "[%d] TreeLB::receiveDecision, level=%d\n", CkMyPe(), level);
-
   // incoming and outgoing are integers. logic objects determine and interpret these
   // values
   int& incoming = expected_incoming[level];
