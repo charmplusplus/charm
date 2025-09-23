@@ -311,20 +311,6 @@ void TreeLB::InvokeLB()
 #endif
 }
 
-void TreeLB::setupForProcessing(int level)
-{
-  // nothing to do here for now
-  startTime = CkWallTimer();
-
-  CkPrintf("--------- Started LB step %d on PE %d ---------\n", lbmgr->step(), CkMyPe());
-
-  // CmiAssert(CmiNodeAlive(CkMyPe()));   // TODO move this logic to LBManager
-  awaitingLB[0] = true;
-
-  if (CkMyPe() == 0) // TODO: this only works if the root is at zero
-    awaitingLB[1] = true;
-}
-
 void TreeLB::ProcessAtSync()
 {
 #if CMK_LBDB_ON
