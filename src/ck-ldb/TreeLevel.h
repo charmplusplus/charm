@@ -536,15 +536,17 @@ class RootLevel : public LevelLogic
   {
     LevelLogic::pup(p); // this packs num_stats_msgs
     p|nObjs;
-    p|nPes;
+    p|nPes; // don't want to update this unless expanding!
 
+
+    // stats_msgs stuff is only relevant for expand
     if (p.isUnpacking()) {
       stats_msgs.resize(num_stats_msgs);
      
       for (int i = 0; i < num_stats_msgs; i++) {
         stats_msgs[i] = new(nPes, nPes, nPes, nPes + 1, nObjs, nObjs, 0) LBStatsMsg_1; // TODO: this needs to be the right subclass;
       }
-       nPes = CkNumPes();
+
     }
     for (int i = 0; i < num_stats_msgs; i++) {      
       if (i == 0) // TODO: is stats_msg[1] needed?
@@ -719,6 +721,7 @@ class RootLevel : public LevelLogic
       }
 
       total_load = 0.0;
+      nPes = nObjs = 0; // cleanup for next round
 
       int nmoves = int(solution.size());
       SubtreeMigrateDecisionMsg* migMsg =

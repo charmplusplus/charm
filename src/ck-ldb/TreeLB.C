@@ -220,12 +220,12 @@ void TreeLB::configure(json& config)
 
 void TreeLB::pup(PUP::er& p)
 {
-  CkPrintf("PUPPING TREE LB\n");
+  int rootPE;
   std::string configString;
-  
   if (p.isPacking())
   {
     configString = config.dump();
+    rootPE = 0;
   }
   p | configString;
   if (p.isUnpacking())
@@ -244,8 +244,7 @@ void TreeLB::pup(PUP::er& p)
     CkPrintf("[PE %d] Unpacking TreeLB with numLevels=%d\n", CkMyPe(), numLevels);
     CkPrintf("[PE %d] logic size=%d\n", CkMyPe(), logic.size());
 
-    se_avail_vector = (char *)malloc(sizeof(char) * CkNumPes()); // this is probably not the right place for this... but it is needed for shrink/expand multiple times
-    LBManagerObj()->get_avail_vector(se_avail_vector);
+   
   }
 
   assert(numLevels == 2); // rn this only supports the two level tree
