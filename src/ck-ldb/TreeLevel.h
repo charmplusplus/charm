@@ -524,8 +524,6 @@ class RootLevel : public LevelLogic
 {
  public:
   RootLevel(int _num_groups = -1) : num_groups(_num_groups) {
-    num_stats_msgs = 0;
-    CkPrintf("[PE %d] Creating RootLevel with num_groups=%d\n", CkMyPe(), num_groups);
   }
   virtual ~RootLevel()
   {
@@ -1185,7 +1183,6 @@ class PELevel : public LevelLogic
     CkPrintf("[PE %d] PUP PELevel with %d stats_msgs and %d myObjs and %d nObjs\n", CkMyPe(), num_stats_msgs, myObjs.size());
 
     if (p.isUnpacking()) {
-      CkPrintf("[PE %d] PUP unpacking in PELevel: with %d stats_msgs\n", CkMyPe(), num_stats_msgs);
       stats_msgs.resize(num_stats_msgs);
    
       for (int i = 0; i < num_stats_msgs; i++) {
@@ -1197,15 +1194,6 @@ class PELevel : public LevelLogic
       p|*stats_msgs[i];
     }
 
-
-      if (p.isUnpacking()) {
-      if (CkMyPe() >= nPes) {
-        CkPrintf("[Pe %d] I am a new pe in PUP\n", CkMyPe());
-        myObjs.clear();
-        nObjs = 0;
-        stats_msgs.clear();
-      }
-    }
   }
 
   virtual TreeLBMessage* getStats()
