@@ -47,11 +47,30 @@ restarting of Charm++ programs. ...
 
 //int   _shrinkExpandRestartHandlerIdx;
 
+
+struct GroupInfo
+{
+  CkGroupID gID;
+  int MigCtor;
+  std::string name;
+  bool present;
+
+  void pup(PUP::er& p)
+  {
+    p | gID;
+    p | MigCtor;
+    p | name;
+    p | present;
+  }
+};
+
 // utility functions to pup system global tables
 void CkPupROData(PUP::er &p);
 void CkPupMainChareData(PUP::er &p, CkArgMsg *args);
 void CkPupChareData(PUP::er &p);
-void CkPupGroupData(PUP::er &p);
+std::vector<GroupInfo> CkCreateGroupMetadata();
+void CkPupGroupMetadata(PUP::er &p, std::vector<GroupInfo> &tmpInfo);
+void CkPupGroupData(PUP::er &p, int numGroups, std::vector<GroupInfo> &groupMetadata);
 void CkPupNodeGroupData(PUP::er &p);
 void CkPupArrayElementsData(PUP::er &p, int notifyListeners=1);
 void CkPupProcessorData(PUP::er &p);
