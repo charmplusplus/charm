@@ -254,24 +254,9 @@ void TreeLB::pup(PUP::er& p)
     CkPrintf("[PE %d] logic[1] is null\n", CkMyPe());
     logic[1] = new RootLevel(); // this is needed because logic[1] is null on PE1, but PE1 still needs to participate in this... confusing?
   } 
-  p|*logic[1];
-  
+  p|*logic[1];  
+  p|awaitingLB;
 
-
-
-  if (p.isUnpacking() && CkMyPe() != 0){
-    awaitingLB[0] = true;
-    awaitingLB[1] = false;
-  }
-  if (p.isUnpacking() && CkMyPe() == 0){
-    awaitingLB[0] = true;
-    awaitingLB[1] = true;
-  }
-    for (size_t i = 0; i < awaitingLB.size(); i++) {
-      if (awaitingLB[i]) CkPrintf("true ");
-      else CkPrintf("false ");
-    }
-    CkPrintf("\n");
 
   CkPrintf("[PE %d] Done pupping: numLevels=%d, size of logic=%d\n", CkMyPe(), numLevels, logic.size());
 }
