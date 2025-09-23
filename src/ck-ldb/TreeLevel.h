@@ -48,16 +48,16 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
   {
     
     p|nObjs;
-    p|nPes;
+    
 
     int nNewPes = CkNumPes();
     CkPrintf("[PE %d] PUPPING LBStatsMsg_1 with %d objs and %d pes\n", CkMyPe(), nObjs, nPes);
     if (p.isUnpacking())
     {
-      pe_ids = new int[nNewPes];
-      bgloads = new float[nNewPes];
-      speeds = new float[nNewPes];
-      obj_start = new unsigned int[nNewPes + 1];
+      pe_ids = new int[nPes];
+      bgloads = new float[nPes];
+      speeds = new float[nPes];
+      obj_start = new unsigned int[nPes + 1];
       oloads = new float[nObjs];
       order = new unsigned int[nObjs];
     }
@@ -89,7 +89,7 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
           speeds[i] = 1.0;
         }
       }
-      nPes = CkNumPes();
+      //nPes = CkNumPes();
       
     }
     CkPrintf("[PE %d] Done PUPPING LBStatsMsg_1 with %d objs and %d pes\n", CkMyPe(), nObjs, nPes);
@@ -543,8 +543,9 @@ class RootLevel : public LevelLogic
     if (p.isUnpacking()) {
       stats_msgs.resize(num_stats_msgs);
      
+      int nPesStats = CkNumPes();
       for (int i = 0; i < num_stats_msgs; i++) {
-        stats_msgs[i] = new(nPes, nPes, nPes, nPes + 1, nObjs, nObjs, 0) LBStatsMsg_1; // TODO: this needs to be the right subclass;
+        stats_msgs[i] = new(nPesStats, nPesStats, nPesStats, nPesStats + 1, nObjs, nObjs, 0) LBStatsMsg_1; // TODO: this needs to be the right subclass;
       }
 
     }
