@@ -422,7 +422,7 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _reque
     // _nodeGroupTable(PUP'ed), nodegroups(PUP'ed)
     if (CkMyRank() == 0)
     {
-      FILE* fNodeGroups = openCheckpointFile(dirname, "NodeGroups", "wb", CkMyNode());
+      FILE* fNodeGroups = openCheckpointFile(dirname, "NodeGroups", "wb", 0);
       PUP::toDisk pNodeGroups(fNodeGroups, PUP::er::IS_CHECKPOINT);
       CkPupNodeGroupData(pNodeGroups);
       if (pNodeGroups.checkError()) success = false;
@@ -911,22 +911,18 @@ void CkRecvGroupROData(char* msg)
 
   //CkPrintf("dirname = %s, groupsize = %i\n", dirname.c_str(), groupSize);
 
-  PUP::fromMem bROGroups(msg, PUP::er::IS_CHECKPOINT);
+  PUP::fromMem bRO(msg, PUP::er::IS_CHECKPOINT);
 
   int _numPes = -1;
-  bROGroups|_numPes;
+  bRO|_numPes;
 	int _numNodes = -1;
-	bROGroups|_numNodes;
-	bROGroups|globalCb;
-	if (CmiMyRank() == 0) CkPupROData(bROGroups);
+	bRO|_numNodes;
+	bRO|globalCb;
+	if (CmiMyRank() == 0) CkPupROData(bRO);
 	bool requestStatus = false;
-	bROGroups|requestStatus;
+	bRO|requestStatus;
 
   CmiNodeBarrier();
-
-  CkPupGroupData(bROGroups);
-
-  if (CkMyRank() == 0) CkPupNodeGroupData(bROGroups);
 
 #ifndef CMK_CHARE_USE_PTR
   // restore chares only when number of pes is the same
@@ -950,21 +946,28 @@ void CkRecvGroupROData(char* msg)
 
 	// for each location, restore arrays
 	//DEBCHK("[%d]Trying to find location manager\n",CkMyPe());
-	DEBCHK("[%d]Number of PE: %d -> %d\n",CkMyPe(),_numPes,CkNumPes());
+	CkPrintf("[%d]Number of PE: %d -> %d\n",CkMyPe(),_numPes,CkNumPes());
 	if(CkMyPe() < _numPes) {	// in normal range: restore, otherwise, do nothing
-    //for (int i=0; i<_numPes;i++) {
-    //  if (i%CkNumPes() == CkMyPe()) {
-          int i = CmiPhysicalRank(CmiMyPe());
-          CkPrintf("[%d]CkRestartMain: restoring array elements from PE %d\n", CkMyPe(), i);
-          	// restore array elements
-          	//CkLocMgr *mgr = (CkLocMgr *)CkpvAccess(_groupTable)->find((*CkpvAccess(_groupIDTable))[i]).getObj();
-          FILE *datFile = openCheckpointFile(dirname.c_str(), "arr", "rb", i);
-          PUP::fromDisk  p(datFile, PUP::er::IS_CHECKPOINT);
-          CkPupArrayElementsData(p);
-          CmiFclose(datFile);
-        //}
-      //}
-	}
+    int rank = CmiPhysicalRank(CmiMyPe());
+    CkPrintf("[%d]CkRestartMain: restoring array elements from physical rank %d\n", CkMyPe(), rank);
+
+    FILE* groupFile = openCheckpointFile(dirname.c_str(), "Groups", "rb", rank);
+    PUP::fromDisk bGroups(groupFile, PUP::er::IS_CHECKPOINT);
+    CkPupGroupData(bGroups);
+    CmiFclose(groupFile);
+
+    if(CmiMyRank()==0) {
+      FILE* nodeGroupFile = openCheckpointFile(dirname.c_str(), "NodeGroups", "rb", 0);
+      PUP::fromDisk bNodeGroups(nodeGroupFile, PUP::er::IS_CHECKPOINT);
+      CkPupNodeGroupData(bNodeGroups);
+      CmiFclose(nodeGroupFile);
+    }
+
+    FILE *datFile = openCheckpointFile(dirname.c_str(), "arr", "rb", rank);
+    PUP::fromDisk  p(datFile, PUP::er::IS_CHECKPOINT);
+    CkPupArrayElementsData(p);
+    CmiFclose(datFile);
+  }
 
   set_in_restart(false);
 
@@ -1024,17 +1027,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
     std::streamsize ROSize = ROFile.tellg();
     ROFile.seekg(0, std::ios::beg);
 
-    std::string groupFileName = getCheckpointFileName(dirname, "Groups", 0);
-    std::ifstream groupFile(groupFileName, std::ios::binary | std::ios::ate);
-    std::streamsize groupSize = groupFile.tellg();
-    groupFile.seekg(0, std::ios::beg);
-
-    std::string nodeGroupFileName = getCheckpointFileName(dirname, "NodeGroups", 0);
-    std::ifstream nodeGroupFile(nodeGroupFileName, std::ios::binary | std::ios::ate);
-    std::streamsize nodeGroupSize = nodeGroupFile.tellg();
-    nodeGroupFile.seekg(0, std::ios::beg);
-
-    char* msg = (char*) CmiAlloc(groupSize + ROSize + nodeGroupSize + sizeof(int) + strLen + CmiMsgHeaderSizeBytes);
+    char* msg = (char*) CmiAlloc(ROSize + sizeof(int) + strLen + CmiMsgHeaderSizeBytes);
     char* buffer = msg + CmiMsgHeaderSizeBytes;
     std::memcpy(buffer, &strLen, sizeof(int));
     buffer += sizeof(int);
@@ -1044,16 +1037,10 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
     ROFile.read(buffer, ROSize);
     buffer += ROSize;
 
-    groupFile.read(buffer, groupSize);
-    buffer += groupSize;
-
-    nodeGroupFile.read(buffer, nodeGroupSize);
-    buffer += nodeGroupSize;
-
     CmiSetHandler(msg, _shrinkExpandRestartHandlerIdx);
 
-    CmiSyncBroadcastAllAndFree(groupSize + ROSize + nodeGroupSize + sizeof(int) + strLen + CmiMsgHeaderSizeBytes, msg);
-  
+    CmiSyncBroadcastAllAndFree(ROSize + sizeof(int) + strLen + CmiMsgHeaderSizeBytes, msg);
+
     //CkPrintf("PE %i at barrier\n", CkMyPe());
     //CmiBarrier();
   }
