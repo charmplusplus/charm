@@ -1824,8 +1824,14 @@ void CkMigratable::UserSetLBLoad()
 
 #if CMK_LBDB_ON  // For load balancing:
 // user can call this helper function to set obj load (for model-based lb)
-void CkMigratable::setObjTime(double cputime) { myRec->setObjTime(cputime); }
+void CkMigratable::setObjTime(double cputime) { 
+  myRec->setObjTime(cputime); }
 double CkMigratable::getObjTime() { return myRec->getObjTime(); }
+
+void CkMigratable::setObjGPUTime(double gputime) {
+  myRec->setObjGPUTime(gputime);
+}
+double CkMigratable::getObjGPUTime() { return myRec->getObjGPUTime(); }
 
 #  if CMK_LB_USER_DATA
 /**
@@ -2049,6 +2055,8 @@ void CkMigratable::CkAddThreadListeners(CthThread tid, void* msg)
 #else
 void CkMigratable::setObjTime(double cputime) {}
 double CkMigratable::getObjTime() { return 0.0; }
+void CkMigratable::setObjGPUTime(double gputime) {}
+double CkMigratable::getObjGPUTime() { return 0.0; }
 
 #  if CMK_LB_USER_DATA
 void* CkMigratable::getObjUserData(int idx) { return NULL; }
@@ -2129,12 +2137,22 @@ void CkLocRec::stopTiming(int ignore_running)
   if (!ignore_running)
     running = false;
 }
-void CkLocRec::setObjTime(double cputime) { lbmgr->EstObjLoad(ldHandle, cputime); }
+void CkLocRec::setObjTime(double cputime) { 
+  lbmgr->EstObjLoad(ldHandle, cputime); }
 double CkLocRec::getObjTime()
 {
   LBRealType walltime, cputime;
   lbmgr->GetObjLoad(ldHandle, walltime, cputime);
   return walltime;
+}
+void CkLocRec::setObjGPUTime(double gputime) {
+  lbmgr->EstObjLoad(ldHandle, gputime);
+}
+double CkLocRec::getObjGPUTime()
+{
+  LBRealType walltime, gputime;
+  lbmgr->GetObjLoad(ldHandle, walltime, gputime);
+  return gputime;
 }
 #  if CMK_LB_USER_DATA
 void* CkLocRec::getObjUserData(int idx) { return lbmgr->GetDBObjUserData(ldHandle, idx); }

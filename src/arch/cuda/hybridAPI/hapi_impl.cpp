@@ -1690,13 +1690,3 @@ void hapiErrorDie(cudaError_t retCode, const char* code, const char* file, int l
   }
 }
 
-void hapiRecordGPUTime(void *msg) {
-  cudaEvent_t start = ((cudaEvent_t*)msg)[0];
-  cudaEvent_t stop = ((cudaEvent_t*)msg)[1];
-
-  float milliseconds = 0;
-  cudaEventElapsedTime(&milliseconds, start, stop);
-
-  CkPrintf("[PE %d] Recording GPU time at runtime:  %f ms\n", CkMyPe(), milliseconds);
-}
-

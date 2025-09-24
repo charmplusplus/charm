@@ -49,6 +49,10 @@ public:
   void stopTiming(int ignore_running=0);
   void setObjTime(double cputime);
   double getObjTime();
+
+  void setObjGPUTime(double gputime);
+  double getObjGPUTime();
+
   void *getObjUserData(int idx);
 #else
   inline void startTiming(int ignore_running=0) {  }
