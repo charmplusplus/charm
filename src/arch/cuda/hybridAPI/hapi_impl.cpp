@@ -1544,7 +1544,7 @@ void hapiPollEvents(void* param) {
       if (hev.obj) {
         float gpu_time;
         cudaEventElapsedTime(&gpu_time, hev.start_ev, hev.event);
-        hev.obj->setObjGPUTime(gpu_time);
+        hev.obj->setObjGPUTime(gpu_time + hev.obj->getObjGPUTime());
         cudaEventDestroy(hev.start_ev);
       } else 
 #endif        
