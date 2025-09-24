@@ -472,7 +472,7 @@ class Stencil : public CBase_Stencil {
     if ((local_exec_mode == CUDA_MODE || local_exec_mode == HAPI_MODE) &&
         my_iter == 0) {
       hapiCheck(
-          cudaMemcpyAsync(d_temperature, temperature,
+          hapiMemcpyAsync(d_temperature, temperature,
                           sizeof(float) * (block_x + 2) * (block_y + 2),
                           cudaMemcpyHostToDevice, stream));
     }
@@ -511,7 +511,7 @@ class Stencil : public CBase_Stencil {
       case LEFT:
         if (local_exec_mode == CUDA_MODE || local_exec_mode == HAPI_MODE) {
           memcpy(left_ghost, gh, width * sizeof(float));
-          hapiCheck(cudaMemcpy2DAsync(
+          hapiCheck(hapiMemcpy2DAsync(
               d_temperature + (block_x + 2), (block_x + 2) * sizeof(float),
               left_ghost, sizeof(float), sizeof(float), block_y,
               cudaMemcpyHostToDevice, stream));
@@ -524,7 +524,7 @@ class Stencil : public CBase_Stencil {
       case RIGHT:
         if (local_exec_mode == CUDA_MODE || local_exec_mode == HAPI_MODE) {
           memcpy(right_ghost, gh, width * sizeof(float));
-          hapiCheck(cudaMemcpy2DAsync(
+          hapiCheck(hapiMemcpy2DAsync(
               d_temperature + (block_x + 2) + (block_x + 1),
               (block_x + 2) * sizeof(float), right_ghost, sizeof(float),
               sizeof(float), block_y, cudaMemcpyHostToDevice, stream));
@@ -537,7 +537,7 @@ class Stencil : public CBase_Stencil {
       case BOTTOM:
         if (local_exec_mode == CUDA_MODE || local_exec_mode == HAPI_MODE) {
           memcpy(bottom_ghost, gh, width * sizeof(float));
-          hapiCheck(cudaMemcpyAsync(d_temperature + 1, bottom_ghost,
+          hapiCheck(hapiMemcpyAsync(d_temperature + 1, bottom_ghost,
                                     block_x * sizeof(float),
                                     cudaMemcpyHostToDevice, stream));
         } else {
@@ -549,7 +549,7 @@ class Stencil : public CBase_Stencil {
       case TOP:
         if (local_exec_mode == CUDA_MODE || local_exec_mode == HAPI_MODE) {
           memcpy(top_ghost, gh, width * sizeof(float));
-          hapiCheck(cudaMemcpyAsync(
+          hapiCheck(hapiMemcpyAsync(
               d_temperature + (block_x + 2) * (block_y + 1) + 1, top_ghost,
               block_x * sizeof(float), cudaMemcpyHostToDevice, stream));
         } else {
@@ -601,32 +601,32 @@ class Stencil : public CBase_Stencil {
                    thread_size);
 
       // Transfer left ghost
-      hapiCheck(cudaMemcpy2DAsync(left_ghost, sizeof(float),
+      hapiCheck(hapiMemcpy2DAsync(left_ghost, sizeof(float),
             d_new_temperature + (block_x + 2),
             (block_x + 2) * sizeof(float), sizeof(float),
             block_y, cudaMemcpyDeviceToHost, stream));
 
       // Transfer right ghost
       hapiCheck(
-          cudaMemcpy2DAsync(right_ghost, sizeof(float),
+          hapiMemcpy2DAsync(right_ghost, sizeof(float),
             d_new_temperature + (block_x + 2) + (block_x + 1),
             (block_x + 2) * sizeof(float), sizeof(float),
             block_y, cudaMemcpyDeviceToHost, stream));
 
       // Transfer bottom ghost
-      hapiCheck(cudaMemcpyAsync(bottom_ghost, d_new_temperature + 1,
+      hapiCheck(hapiMemcpyAsync(bottom_ghost, d_new_temperature + 1,
             block_x * sizeof(float), cudaMemcpyDeviceToHost,
             stream));
 
       // Transfer top ghost
-      hapiCheck(cudaMemcpyAsync(
+      hapiCheck(hapiMemcpyAsync(
             top_ghost, d_new_temperature + (block_x + 2) * (block_y + 1) + 1,
             block_x * sizeof(float), cudaMemcpyDeviceToHost, stream));
 
       // Copy final temperature data back to host (on last iteration)
       if (my_iter == num_iters - 1) {
         hapiCheck(
-            cudaMemcpyAsync(temperature, d_new_temperature,
+            hapiMemcpyAsync(temperature, d_new_temperature,
                             sizeof(float) * (block_x + 2) * (block_y + 2),
                             cudaMemcpyDeviceToHost, stream));
       }
@@ -642,7 +642,6 @@ class Stencil : public CBase_Stencil {
         //if (gpu_prio)
         //  CkSetQueueing(m, CK_QUEUEING_LIFO);
         hapiAddCallback(stream, cb);
-        //cudaStreamSynchronize(stream);
       }
     } else {  // CPU_MODE
       for (int i = 1; i <= block_x; ++i) {

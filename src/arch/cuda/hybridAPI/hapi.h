@@ -244,6 +244,18 @@ static inline cudaError_t hapiFreeHost(void* ptr, bool pool) {
   return pool ? hapiPoolFree(ptr) : hapiFreeHost(ptr);
 }
 
+// C++ template wrapper for easier kernel launching with timing
+template<typename... Args>
+static inline cudaError_t hapiLaunchKernelWrapper(void (*kernel)(Args...), dim3 gridDim, dim3 blockDim, size_t sharedMem, cudaStream_t stream, Args... args) {
+  void* kernel_args[] = {(void*)&args...};
+  return hapiLaunchKernel((const void*)kernel, gridDim, blockDim, kernel_args, sharedMem, stream);
+}
+
+// Overload for kernels with no arguments
+static inline cudaError_t hapiLaunchKernelWrapper(void (*kernel)(), dim3 gridDim, dim3 blockDim, size_t sharedMem, cudaStream_t stream) {
+  return hapiLaunchKernel((const void*)kernel, gridDim, blockDim, nullptr, sharedMem, stream);
+}
+
 #endif /* defined __cplusplus */
 
 #endif /* !defined AMPI_INTERNAL_SKIP_FUNCTIONS */
