@@ -237,12 +237,20 @@ class Main : public CBase_Main {
     stencils.iterate();
   }
 
-  void done(float time) {
+  void done(float *times, int size) {
 #ifdef USE_NVTX
     NVTXTracer nvtx_range("Main::done", NVTXColor::Emerald);
 #endif
-    CkPrintf("\nAverage time per iteration: %lf\n",
-             time / ((num_chares_x * num_chares_y) * num_iters));
+    if (size != 2) {
+      CkAbort("Received reduction of incorrect size!");
+    }
+    float agg_time = times[0];
+    float gpu_time = times[1];
+    CkPrintf("Total times are: %lf CPU time, %lf GPU time\n",
+             agg_time, gpu_time);
+    CkPrintf("\nAverage time per iteration: %lf CPU time, %lf GPU time\n",
+             agg_time / ((num_chares_x * num_chares_y) * num_iters),
+             gpu_time / ((num_chares_x * num_chares_y) * num_iters));
     CkPrintf("Finished due to max iterations %d, total time %lf seconds\n",
              num_iters, CkWallTimer() - start_time);
     CkExit();
@@ -394,7 +402,7 @@ class Stencil : public CBase_Stencil {
         mode_string = "HAPI";
         break;
     }
-    CkPrintf("[%*d] Mode: %s, PE: %d\n", n_digits, thisFlatIndex, mode_string.c_str(), CkMyPe());
+   // CkPrintf("[%*d] Mode: %s, PE: %d\n", n_digits, thisFlatIndex, mode_string.c_str(), CkMyPe());
 
     // Initialize values
     my_iter = 0;
@@ -577,8 +585,8 @@ class Stencil : public CBase_Stencil {
     if (my_iter > 0 && my_iter < num_iters && my_iter % 10 == 0)
     {
       cudaStreamSynchronize(stream);
-      CkPrintf("Load balancing: %d/%d, iteration %d\n",
-               thisFlatIndex, num_chares_x * num_chares_y, my_iter);
+      CkPrintf("Load balancing: %d/%d, iteration %d. GPU Load = %f\n",
+               thisFlatIndex, num_chares_x * num_chares_y, my_iter, getObjGPUTime());
       AtSync();
     }
     else
