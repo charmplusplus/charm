@@ -28,6 +28,14 @@ void LBObj::Clear(void)
   data.minWall = 1e6;
   data.maxWall = 0.;
 #endif
+
+  startWTime = -1.0;
+  lastWallTime = .0;
+  gpuTime = .0;
+#if CMK_LB_CPUTIMER
+  startCTime = -1.0;
+  lastCpuTime = .0;
+#endif
 }
 
 void LBObj::IncrementTime(LBRealType walltime, LBRealType cputime)
