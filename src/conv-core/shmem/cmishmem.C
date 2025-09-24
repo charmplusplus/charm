@@ -59,7 +59,7 @@ CmiIpcBlock* CmiMsgToIpcBlock(CmiIpcManager* manager, char* src, std::size_t len
     if (block == nullptr) {
       return nullptr;
     } else {
-      CmiAssertMsg((block->dst == manager->mine) && (manager->mine == CmiMyNode()));
+      CmiAssert((block->dst == manager->mine) && (manager->mine == CmiMyNode()));
       dst = (char*)CmiIpcBlockToMsg(block, true);
       memcpy(dst, src, len);
       CmiFree(src);
@@ -159,7 +159,7 @@ std::pair<CmiIpcBlock*, CmiIpcAllocStatus> CmiAllocIpcBlock(CmiIpcManager* meta,
 
 void CmiFreeIpcBlock(CmiIpcManager* meta, CmiIpcBlock* block) {
   auto bin = whichBin_(block->size);
-  CmiAssertMsg(bin < kNumCutOffPoints);
+  CmiAssert(bin < kNumCutOffPoints);
   auto& shared = meta->shared[block->src];
   auto& free = shared->free[bin];
   while (!pushBlock_(free, block->orig, shared))
