@@ -642,14 +642,12 @@ void CkCallstackPop(Chare *obj) {
 
 
 CkLocRec *CkActiveLocRec(void) {
-  #if CMK_LBDB_ON
   auto *obj = CkActiveObj();
   if (obj && obj->ckInitialized) {
     return obj->getCkLocRec();
   } else {
     return nullptr;
   }
-  #endif
 }
 
 /******************** Basic support *****************/
