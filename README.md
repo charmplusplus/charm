@@ -73,11 +73,11 @@ will build Charm++ in the directory `netlrts-linux-x86_64/`. The communication
 defaults to UDP packets and the compiler to `gcc`.
 
 For a more complex example, consider a shared-memory build with the
-Intel C++ compiler `icc`, where you want the communication to happen over TCP sockets:
+Intel C++ compiler `icx`, where you want the communication to happen over TCP sockets:
 
-     $ ./build charm++ netlrts-linux-x86_64 smp icc tcp
+     $ ./build charm++ netlrts-linux-x86_64 smp icx tcp
 
-will build Charm++ in the directory `netlrts-linux-x86_64-smp-tcp-icc/`.
+will build Charm++ in the directory `netlrts-linux-x86_64-smp-tcp-icx/`.
 
 You can specify multiple options, however you can use at most one compiler
 option. The sequencing of options given to the build script should follow the rules:
@@ -95,14 +95,10 @@ of the `<options>` below.
 | Charm++ Version           | OS      | Communication | Default Compiler                      |
 |---------------------------|---------|---------------|---------------------------------------|
 | `netlrts-linux-x86_64`    | Linux   | UDP           | GNU compiler                          |
-| `netlrts-darwin-x86_64`   | macOS   | UDP           | Clang C++ compiler                    |
 | `netlrts-win-x86_64`      | Windows | UDP           | MS Visual C++                         |
 | `mpi-linux-x86_64`        | Linux   | MPI           | GNU compiler                          |
-| `multicore-linux-x86_64`  | Linux   | Shared memory | GNU compiler                          |
-| `multicore-darwin-x86_64` | macOS   | Shared memory | Clang C++ compiler                    |
-| `gni-crayxc`              | Linux   | GNI           | CC (whatever PrgEnv module is loaded) |
-| `gni-crayxe`              | Linux   | GNI           | CC (whatever PrgEnv module is loaded) |
-| `verbs-linux-x86_64`      | Linux   | IB Verbs      | GNU compiler                          |
+| `multicore-darwin-arm8`   | macOS   | Shared memory | Clang C++ compiler                    |
+| `ofi-crayshasta`          | Linux   | OFI           | CC (whatever PrgEnv module is loaded) |
 | `ofi-linux-x86_64`        | Linux   | OFI           | GNU compiler                          |
 | `ucx-linux-x86_64`        | Linux   | UCX           | GNU compiler                          |
 
@@ -124,13 +120,13 @@ To choose `<version>`, your choice is determined by two options:
 2. Your operating system/architecture:
     * `linux-x86_64`: Linux with AMD64 64-bit x86 instructions
     * `win-x86_64`: MS Windows with MS Visual C++ compiler
-    * `darwin-x86_64`: Apple macOS
-    * `cray{xe/xc}`: Cray XE/XC Supercomputer
+    * `darwin-arm8`: Apple macOS
+    * `crayshasta`: Cray Shasta Supercomputer
     * `linux-ppc64le`: POWER/PowerPC
 
 Your Charm++ version is made by concatenating the options, e.g.:
 * `netlrts-linux-x86_64`: Charm++ for a network of 64-bit Linux workstations compiled using g++.
-* `gni-crayxc`: Charm++ for Cray XC systems using the system compiler.
+* `ofi-crayshasta`: Charm++ for Cray Shasta systems using the system compiler.
 
 
 ### How to choose `<options>`:
@@ -144,40 +140,24 @@ suffixed with a version number to use a specific version, e.g. `gcc-7`). Note th
 this list is merely a sampling of common options, please see the documentation
 for more information:
 
-* `icc` - Intel C/C++ compiler.
-* `ifort` - Intel Fortran compiler
+* `icx` - Intel C/C++ compiler.
+* `ifx` - Intel Fortran compiler
 * `xlc` - IBM XLC compiler.
 * `clang` - Clang compiler.
 * `mpicxx` - Use MPI-wrappers for MPI builds.
-* `pgcc` - Portland Group's C++ compiler.
 * `smp` - Enable direct SMP support.  An `smp` version communicates using
     shared memory within a process but normal message passing across
     processes and nodes. `smp` mode also introduces a dedicated 
     communication thread for every process. Because of locking, `smp` may
     slightly impact non-SMP performance. Try your application to decide if
     enabling `smp` mode improves performance.
-* `tcp` - The `netlrts-` version communicates via UDP by default. The `tcp` option
-    will use TCP instead. The TCP version of Charm++ is usually slower
-    than UDP, but it is more reliable.
-* `async` - On PAMI systems, this option enables use of hardware communication
-    threads. For applications with significant communication on large
-    scale, this option typically improves performance.
-* `regularpages` - On Cray systems, Charm++'s default is to use `hugepages`. This
-    option disables `hugepages`, and uses regular `malloc` for messages.
-* `persistent` - On Cray systems, this option enables use of persistent mode for
-* `cxi` - On HPE Slingshot-11 systems, this option enables use of Cassini extensions for communication.  Usually autodetected and enabled where available.
-* `pxshm` - Use POSIX Shared Memory for communication between Charm++ processes
-    within a shared-memory host.
 * `syncft` - Enable in-memory fault tolerance support in Charm++.
-* `tsan` - Compile Charm++ with support for Thread Sanitizer.
-* `papi` - Enable PAPI performance counters.
-* `ooc` - Build Charm++ with out-of-core execution features.
 * `help` - show supported options for a version. For example, for `netlrts-linux-x86_64`, running:
-         
+
          $ ./build charm++ netlrts-linux-x86_64 help
-         
+
      will give:
-    
+
       Supported compilers: clang craycc gcc icc iccstatic msvc pgcc xlc xlc64 icx
       Supported options: common cuda flang gfortran ifort local nolb omp ooc papi perftools persistent pgf90 pxshm smp syncft sysvshm tcp tsan
 
