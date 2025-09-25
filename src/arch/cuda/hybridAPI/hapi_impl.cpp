@@ -1671,7 +1671,16 @@ cudaError_t hapiFreeHost(void* ptr) {
 }
 
 cudaError_t hapiMemcpyAsync(void* dst, const void* src, size_t count, cudaMemcpyKind kind, cudaStream_t stream = 0) {
-  return cudaMemcpyAsync(dst, src, count, kind, stream);
+  cudaError_t err;
+  cudaEvent_t start;
+  cudaEvent_t stop;
+  cudaEventCreate(&start);
+  cudaEventCreate(&stop);
+  cudaEventRecord(start, stream);
+  err = cudaMemcpyAsync(dst, src, count, kind, stream);
+  cudaEventRecord(stop, stream);
+  hapiAddCallback(stream, CkCallback(hapiRecordGPUTime, (void*[2]){start, stop}), (void*[2]){start, stop});
+  return err;
 }
 
 void hapiErrorDie(cudaError_t retCode, const char* code, const char* file, int line) {
@@ -1680,3 +1689,14 @@ void hapiErrorDie(cudaError_t retCode, const char* code, const char* file, int l
     CmiAbort("Exit due to CUDA error");
   }
 }
+
+void hapiRecordGPUTime(void *msg) {
+  cudaEvent_t start = ((cudaEvent_t*)msg)[0];
+  cudaEvent_t stop = ((cudaEvent_t*)msg)[1];
+
+  float milliseconds = 0;
+  cudaEventElapsedTime(&milliseconds, start, stop);
+
+  CkPrintf("[PE %d] Recording GPU time at runtime:  %f ms\n", CkMyPe(), milliseconds);
+}
+

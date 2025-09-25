@@ -29,6 +29,7 @@ public:
 //    registered = true;
     startWTime = -1.0;
     lastWallTime = .0;
+    gpuTime = .0;
 #if CMK_LB_CPUTIMER
     startCTime = -1.0;
     lastCpuTime = .0;
@@ -40,26 +41,29 @@ public:
   void Clear(void);
 
   void IncrementTime(LBRealType walltime, LBRealType cputime);
+  void IncrementGPUTime(LBRealType walltime);
+
   inline void StartTimer(void) {
-	startWTime = CkWallTimer();
+    startWTime = CkWallTimer();
 #if CMK_LB_CPUTIMER
-	startCTime = CkCpuTimer();
+    startCTime = CkCpuTimer();
 #endif
   }
+
   inline void StopTimer(LBRealType* walltime, LBRealType* cputime) {
-	if (startWTime >= 0.0) {	// in case startOn in middle of entry
-          const double endWTime = CkWallTimer();
-	  *walltime = endWTime - startWTime;
+    if (startWTime >= 0.0) {	// in case startOn in middle of entry
+      const double endWTime = CkWallTimer();
+      *walltime = endWTime - startWTime;
 #if CMK_LB_CPUTIMER
-          const double endCTime = CkCpuTimer();
-	  *cputime = endCTime - startCTime;
+      const double endCTime = CkCpuTimer();
+      *cputime = endCTime - startCTime;
 #else
-	  *cputime = *walltime;
+      *cputime = *walltime;
 #endif
-	}
-        else {
-          *walltime = *cputime = 0.0;
-        }
+	  }
+    else {
+      *walltime = *cputime = 0.0;
+    }
   }
 
   inline void getTime(LBRealType *w, LBRealType *c) {
@@ -108,6 +112,7 @@ private:
 //  bool registered;
   double startWTime;             // needs double precision
   LBRealType lastWallTime;
+  double gpuTime;
 #if CMK_LB_CPUTIMER
   double startCTime;
   LBRealType lastCpuTime;

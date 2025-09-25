@@ -42,6 +42,11 @@ void LBObj::IncrementTime(LBRealType walltime, LBRealType cputime)
 #endif
 }
 
+void LBObj::IncrementGPUTime(LBRealType walltime)
+{
+  gpuTime += walltime;
+}
+
 #endif
 
 /*@}*/
