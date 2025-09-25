@@ -256,7 +256,9 @@ void LBDatabase::ClearLoads(void)
         obj->lastCpuTime = obj->data.cpuTime;
 #endif
       }
-      obj->gpuTime = 0.0;
+#if CMK_CUDA
+      obj->data.gpuTime = 0.0;
+#endif
       obj->data.wallTime = 0.0;
 #if CMK_LB_CPUTIMER
       obj->data.cpuTime = 0.0;
