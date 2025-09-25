@@ -1300,7 +1300,7 @@ class PELevel : public LevelLogic
       {
         if (dest >= 0)
         {
-          CkPrintf("[%d] (processDecision) My obj %d (abs=%d) moving to %d\n", CkMyPe(),
+          if (_lb_args.debug() > 1) CkPrintf("[%d] (processDecision) My obj %d (abs=%d) moving to %d\n", CkMyPe(),
                    j, i, dest);
           if (lbmgr->Migrate(myObjs[j].handle, dest) == 0)
           {

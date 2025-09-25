@@ -133,24 +133,6 @@ public:
       logic[1] = level;
     }
 
-    if (CkMyPe() == 0 && !quietModeRequested)
-    {
-      CkPrintf("[%d] TreeLB: Using PE_Root tree with: ", CkMyPe());
-      for (const auto& strategy : strategies)
-      {
-        CkPrintf("%s ", strategy.c_str());
-      }
-      CkPrintf("\n");
-
-      if (_lb_args.debug() > 0)
-      {
-        CkPrintf(
-            "\tUsing %d as root\n"
-            "\tTest PE Speed: %s\n",
-            rootPE, _lb_args.testPeSpeed() ? "true" : "false");
-      }
-    }
-
     return L;
   }
 };

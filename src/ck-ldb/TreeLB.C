@@ -111,7 +111,6 @@ void TreeLB::loadConfigFile(const CkLBOptions& opts)
 
 void TreeLB::init(const CkLBOptions& opts)
 {
-  if (_lb_args.debug() > 0) CkPrintf("[PE %d] Initializing TreeLB\n", CkMyPe());
 #if CMK_LBDB_ON
 
   lbname = "TreeLB";
@@ -119,7 +118,6 @@ void TreeLB::init(const CkLBOptions& opts)
   if (_lb_args.syncResume()) barrier_after_lb = true;
 
   // create and turn on by default
-  if (_lb_args.debug() > 0) CkPrintf("TreeLB::init called on PE %d\n", CkMyPe());
   startLbFnHdl = lbmgr->AddStartLBFn(this, &TreeLB::StartLB);
 
   configure(config);
@@ -169,7 +167,6 @@ void TreeLB::configure(LBTreeBuilder& builder, json& config)
 {
 #if CMK_LBDB_ON
   if (_lb_args.debug() > 0)
-    CkPrintf("[PE %d] Configuring TreeLB with %d levels\n", CkMyPe(), numLevels);
   if (numLevels > 0 && CkMyPe() == 0 && !quietModeRequested)
   {
     CkPrintf("[%d] Reconfiguring TreeLB\n", CkMyPe());
@@ -329,7 +326,6 @@ void TreeLB::sendStatsUp(CkMessage* msg)
 {
   TreeLBMessage* stats = (TreeLBMessage*)msg;
   int level = stats->level;
-  CkPrintf("Checking validity of comm_stuff for level %d\n", level);
   if (comm_parent.size() <= level || comm_children.size() <= level ||
       comm_logic.size() <= level)
   {
@@ -337,7 +333,6 @@ void TreeLB::sendStatsUp(CkMessage* msg)
   }
 
   int comm_parent_pe = comm_parent[level];
-  CkPrintf("VALIDITY OKAY, comm_parent_pe = %d\n", comm_parent_pe);
 
   // fprintf(stderr, "[%d] TreeLB::sendStatsUp - received msg level=%d comm_parent=%d\n",
   // CkMyPe(), level, comm_parent_pe);
@@ -369,7 +364,6 @@ void TreeLB::receiveStats(TreeLBMessage* stats, int level)
   level += 1;
   awaitingLB[level] = true;
   LevelLogic* l = logic[level];
-  CkPrintf("Depositing stats at level %d\n", level);
   l->depositStats(stats);
   size_t expected_msgs = comm_children[level - 1].size();
   if (logic[level - 1] != nullptr) expected_msgs += 1;  // expect msg from myself too
@@ -597,7 +591,7 @@ void TreeLB::checkForRealloc()
 #if CMK_SHRINK_EXPAND
 if (_lb_args.debug() > 0) {
       CkPrintf(
-        "Check for Realloc"
+        "Check for Realloc\n"
       );
 }
 
@@ -665,7 +659,6 @@ void TreeLB::lb_done()
 
 void TreeLB::lb_done_impl()
 {
-  CkPrintf("TreeLB::lb_done_impl called on pe %d\n", CkMyPe());
   // fprintf(stderr, "[%d] lb_done step %d lb_time=%f\n", CkMyPe(), lbmgr->step(),
   // CkWallTimer() - startTime);
 
@@ -676,7 +669,6 @@ void TreeLB::lb_done_impl()
 #if CMK_SHRINK_EXPAND
   // Only clear loads if not in the middle of a reallocation (EXPAND/SHRINK)
   if (pending_realloc_state == NO_REALLOC){
-    CkPrintf("!!!!!!! CLEARING LOADS !!!!!!!\n");
     lbmgr->ClearLoads();
   }
 #else
