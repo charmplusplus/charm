@@ -19,7 +19,7 @@ else
   unlet b:current_syntax
 endif
 
-" C++/Charm extentions
+" C++/Charm extensions
 syn keyword cppStatement	new delete this friend using
 syn keyword cppStatement	serial atomic overlap when publishes connect
 syn keyword cppAccess		public protected private readonly

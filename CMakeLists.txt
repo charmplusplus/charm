@@ -185,7 +185,7 @@ option(ZLIB                "Enable zlib support" ON)
 option(AMPI_MPICH_TESTS    "Enable mpich tests for AMPI" OFF)
 option(DRONE_MODE          "Enable drone mode" OFF)
 option(TASK_QUEUE          "Enable task queue" OFF)
-
+option(RECONVERSE          "Use the Reconverse communication layer" OFF)
 
 if(TRACING STREQUAL "")
   if(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -266,6 +266,11 @@ else()
   set(CMK_TASKQUEUE 0)
 endif()
 
+if(${RECONVERSE})
+  set(CMK_RECONVERSE 1)
+else()
+  set(CMK_RECONVERSE 0)
+endif()
 
 if(${AMPI_MPICH_TESTS})
   add_definitions(-DAMPI_ERRHANDLER_RETURN=1)
@@ -449,7 +454,11 @@ file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/bin/)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/cklibs)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib_so)
+if(BUILD_SHARED)
+  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib_so)
+else()
+  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+endif()
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
 if (NOT CMAKE_INSTALL_PREFIX)
@@ -459,6 +468,12 @@ endif()
 if (NOT CMAKE_BUILD_TYPE)
     message(STATUS "${PROJECT_NAME}: No build type selected, default to Release")
     set(CMAKE_BUILD_TYPE "Release")
+endif()
+
+if(RECONVERSE)
+  # This needs to be include before we set charmc as the linker
+  # but after CMAKE_LIBRARY_OUTPUT_DIRECTORY has been set
+  add_subdirectory(cmake/fetch_reconverse)
 endif()
 
 if (NOT CMK_MEMPOOL_CUTOFFNUM)
@@ -872,8 +887,8 @@ include(cmake/hwloc.cmake)
 # Converse
 include(cmake/converse.cmake)
 add_subdirectory(src/QuickThreads)
-add_subdirectory(src/util/boost-context)
-add_subdirectory(src/conv-core)
+# add_subdirectory(src/util/boost-context)
+# add_subdirectory(src/conv-core)
 
 # LIBS
 if(${TARGET} STREQUAL "LIBS")
@@ -942,6 +957,7 @@ configure_file(src/libs/ck-libs/NDMeshStreamer/libmoduleNDMeshStreamer.dep ${CMA
 
 
 # TCharm
+#[[
 file(GLOB tcharm-c-sources src/libs/ck-libs/tcharm/*.c)
 set(tcharm-h-sources
     src/libs/ck-libs/tcharm/tcharm.h
@@ -965,9 +981,11 @@ foreach(f ${tcharm-h-sources})
     configure_file(${f} ${CMAKE_BINARY_DIR}/include COPYONLY)
 endforeach(f)
 
+
 add_dependencies(moduletcharmmain ck)
 add_dependencies(moduletcharm ck)
 add_dependencies(tcharm-compat ck)
+]]
 
 if(${TARGET} STREQUAL "AMPI" OR (${TARGET} STREQUAL "LIBS" AND NOT BUILD_CHANGA))
   add_subdirectory(src/libs/ck-libs/ampi)
@@ -1004,8 +1022,11 @@ if(${TARGET} STREQUAL "charm4py")
 else()
   # Check that we are able to build and link an executable
   add_executable(ckhello ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.C)
-  add_dependencies(ckhello ck ldb-none memory-default threads-default conv-static
-    converse ckmain ckqt
+  if(RECONVERSE)
+    target_link_libraries(ckhello PRIVATE reconverse)
+  endif()
+  add_dependencies(ckhello ck ckqt conv-static
+    converse ckmain
     moduleNDMeshStreamer modulecompletion)
 endif()
 

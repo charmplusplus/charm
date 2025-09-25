@@ -3,8 +3,8 @@
  * Uses recursive bisect/trisect functionality similar to what was in
  * src/util/treeStrategy_3dTorus_minHops.h
  */
-#include "spanningTree.h"
 #include "TopoManager.h"
+#include "spanningTree.h"
 #include <algorithm>
 #include <limits.h>
 
@@ -15,6 +15,23 @@ typedef std::unordered_map<int,int> intMap;
 #define DIM_SET_SIZE 32     // bitset size
 
 #define _DEBUG_SPANNING_TREE_ 0
+#define CkAbort CmiAbort
+#define CkNodeOf CmiNodeOf
+#define CkNumNodes CmiNumNodes
+#define CkNumPes CmiNumPes
+#define CkMyNode CmiMyNode
+inline void CkAssert(bool condition, const char* conditionStr, const char* file, int line)
+{
+  if (!condition)
+  {
+    char error_message[1024];
+    snprintf(error_message, sizeof(error_message),
+             "Assertion failed: (%s), file %s, line %d\n", conditionStr, file, line);
+    CmiAbort(error_message);
+  }
+}
+
+#define CkAssert(condition) CkAssert((condition), #condition, __FILE__, __LINE__)
 
 #if _DEBUG_SPANNING_TREE_
 #include <sstream>

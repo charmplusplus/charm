@@ -15,7 +15,8 @@ Orion Sky Lawlor, olawlor@acm.org, 7/22/2002
 #ifndef _UIUC_CHARM_PUP_STL_H
 #define _UIUC_CHARM_PUP_STL_H
 
-#include <conv-config.h>
+#include "charm-config.h"
+#include "converse.h"
 
 /*It's kind of annoying that we have to drag all these headers in
   just so the std:: parameter declarations will compile.
@@ -38,6 +39,7 @@ Orion Sky Lawlor, olawlor@acm.org, 7/22/2002
 #include <utility> /*for std::pair*/
 #include <chrono>
 #include "pup.h"
+#include "pup_c.h"
 
 #include <cstddef>
 

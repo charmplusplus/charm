@@ -17,7 +17,11 @@ versions of charm.
 #endif
 
 #include "conv-config.h"
-#include "converse.h"
+
+// FIXME: necessary for reconverse:
+// #include "converse.h"
+#define CMK_THREADLOCAL __thread
+#define CMI_NOOPTIMIZE
 
 struct helpdesc { qt_helper_t *hfn; qt_t *jb; void *oldptr; void *newptr; };
 
