@@ -358,9 +358,9 @@ class LBManager : public CBase_LBManager
   {
     lbdb_obj->GetTime(total_walltime, total_cputime, idletime, bg_walltime, bg_cputime);
   }
-  void GetGPUTime(LBRealType* bg_gputime)
+  void GetGPUBGTime(LBRealType* bg_gputime)
   {
-    lbdb_obj->GetGPUTime(bg_gputime);
+    lbdb_obj->GetGPUBGTime(bg_gputime);
   }
   LDObjHandle RegisterObj(LDOMHandle omh, CmiUInt8 id, void* userPtr, int migratable)
   {

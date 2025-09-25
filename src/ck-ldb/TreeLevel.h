@@ -1221,7 +1221,11 @@ class PELevel : public LevelLogic
       }
       else
       {
+        #if CMK_CUDA
+        nonMigratableLoad += allLocalObjs[i].gpuTime;
+        #else
         nonMigratableLoad += allLocalObjs[i].wallTime;
+        #endif
       }
     }
     nobjs = myObjs.size();
@@ -1231,7 +1235,11 @@ class PELevel : public LevelLogic
 
 #if DEBUG__TREE_LB_L3
     float total_obj_load = 0;
+    #if CMK_CUDA
+    for (int i = 0; i < nobjs; i++) total_obj_load += myObjs[i].gpuTime;
+    #else
     for (int i = 0; i < nobjs; i++) total_obj_load += myObjs[i].wallTime;
+    #endif
     CkPrintf("[%d] PELevel::getStats, myObjs=%d, aggregate_obj_load=%f\n", mype,
              int(myObjs.size()), total_obj_load);
 #endif
@@ -1275,7 +1283,9 @@ class PELevel : public LevelLogic
     }
 
     LBRealType t1, t2, t3, bg_walltime;
-#if CMK_LB_CPUTIMER
+#if CMK_CUDA
+    lbmgr->GetGPUBGTime(&bg_walltime);
+#elif CMK_LB_CPUTIMER
     LBRealType t4;
     lbmgr->GetTime(&t1, &t2, &t3, &bg_walltime, &t4);
 #else

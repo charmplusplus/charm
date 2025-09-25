@@ -6,6 +6,7 @@
 LBDatabase::LBDatabase() {
   omCount = omsRegistering = 0;
   obj_walltime = 0;
+  obj_gputime = 0;
   statsAreOn = false;
   objsEmptyHead = -1;
   commTable = new LBCommTable;
@@ -243,6 +244,12 @@ void LBDatabase::GetTime(LBRealType *total_walltime, LBRealType *total_cputime,
   //CkPrintf("HERE [%d] total: %f %f obj: %f %f idle: %f bg: %f\n", CkMyPe(), *total_walltime, *total_cputime, obj_walltime, obj_cputime, *idletime, *bg_walltime);
 }
 
+void LBDatabase::GetGPUBGTime(LBRealType *bg_gputime)
+{
+  // TODO: implement this properly
+  *bg_gputime = 0;
+}
+
 void LBDatabase::ClearLoads(void)
 {
   int i;
@@ -269,6 +276,7 @@ void LBDatabase::ClearLoads(void)
   commTable = new LBCommTable;
   machineUtil.Clear();
   obj_walltime = 0;
+  obj_gputime = 0;
 #if CMK_LB_CPUTIMER
   obj_cputime = 0;
 #endif
