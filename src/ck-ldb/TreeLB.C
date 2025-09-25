@@ -111,6 +111,7 @@ void TreeLB::loadConfigFile(const CkLBOptions& opts)
 
 void TreeLB::init(const CkLBOptions& opts)
 {
+  if (_lb_args.debug() > 0) CkPrintf("[PE %d] Initializing TreeLB\n", CkMyPe());
 #if CMK_LBDB_ON
 
   lbname = "TreeLB";
@@ -118,7 +119,7 @@ void TreeLB::init(const CkLBOptions& opts)
   if (_lb_args.syncResume()) barrier_after_lb = true;
 
   // create and turn on by default
-  CkPrintf("TreeLB::init called on PE %d\n", CkMyPe());
+  if (_lb_args.debug() > 0) CkPrintf("TreeLB::init called on PE %d\n", CkMyPe());
   startLbFnHdl = lbmgr->AddStartLBFn(this, &TreeLB::StartLB);
 
   configure(config);
@@ -139,6 +140,12 @@ void TreeLB::expand_init()
 {
   awaitingLB[0] = true;
   awaitingLB[1] = false;
+
+  if (CkMyPe() == 0)
+    awaitingLB[1] = true; // root level also needs to do LB
+
+  if (CkNumPes() == 1)
+    awaitingLB[0] = awaitingLB[1] = false; // no need for PE level if only 1 PE
 
   numLevels = 2;
 }
@@ -230,7 +237,7 @@ void TreeLB::configure(json& config)
 void TreeLB::pup(PUP::er& p)
 {
   p|seqno;
-   
+  
   loadConfigFile(CkLBOptions(seqno));
   init(CkLBOptions(seqno));
   manager_init();
@@ -238,15 +245,13 @@ void TreeLB::pup(PUP::er& p)
   assert(numLevels == 2); // rn this only supports the two level tree
   p|*logic[0];
   if (logic[1] == nullptr) {
-    CkPrintf("[PE %d] logic[1] is null\n", CkMyPe());
     logic[1] = new RootLevel(); // this is needed because logic[1] is null on PE1, but PE1 still needs to participate in this... confusing?
   } 
   p|*logic[1];  
-  p|awaitingLB;
 
-  expand_init();
+  if (p.isUnpacking())
+    expand_init();
 
-  CkPrintf("[PE %d] Done pupping: numLevels=%d, size of logic=%d\n", CkMyPe(), numLevels, logic.size());
 }
 
 void TreeLB::CallLB()
@@ -292,15 +297,11 @@ void TreeLB::ProcessAtSync()
   {
     CkPrintf("--------- Started LB step %d ---------\n", lbmgr->step());
   }
-  // CmiAssert(CmiNodeAlive(CkMyPe()));   // TODO move this logic to LBManager
-  int level = 0;  // load balancing starts at the lowest level
-  CkAssert(numLevels > 0 && !awaitingLB[level]);
-  CkPrintf("Attempting to get stats from level %d\n", level);
-  TreeLBMessage* stats = logic[level]->getStats();
-  CkPrintf("Got stats from level %d\n", level);
-  stats->level = level;
-  awaitingLB[level] = true;
-  CkPrintf("Sending stats up from level %d\n", level);
+  CkAssert(numLevels > 0 && !awaitingLB[0]);
+  TreeLBMessage* stats = logic[0]->getStats();
+  stats->level = 0;
+  awaitingLB[0] = true;
+
   sendStatsUp((CkMessage*)stats);
 #endif
 }
@@ -400,7 +401,7 @@ void TreeLB::receiveStats(TreeLBMessage* stats, int level)
 
 void TreeLB::loadBalanceSubtree(int level)
 {
-  CkPrintf("TreeLB::loadBalanceSubtree called for level %d, awaiting %d\n", level, awaitingLB[level]);
+  if (_lb_args.debug()) CkPrintf("[PE %d] TreeLB::loadBalanceSubtree called for level %d, awaiting %s\n", CkMyPe(), level, awaitingLB[level] ? "true" : "false");
   if (!awaitingLB[level]) return;
   awaitingLB[level] = false;
   if (level == 0) return lb_done();
@@ -610,7 +611,7 @@ if (_lb_args.debug() > 0) {
 
     // print avail vector
     if (_lb_args.debug() > 0) {
-      CkPrintf("Shrink/Expand avail vector on pe %d: ", CkMyPe());
+      CkPrintf("Shrink/Expand se_avail_vector on pe %d: ", CkMyPe());
       for(int i=0;i<CkNumPes();i++) CkPrintf("%d ", se_avail_vector[i]);
       CkPrintf("\n");
     }

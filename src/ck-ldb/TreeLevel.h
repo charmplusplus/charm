@@ -432,14 +432,22 @@ class StrategyWrapper : public IStrategyWrapper
 
 #if CMK_SHRINK_EXPAND
     if (se_avail_vector != NULL) {
-      // if shrink/expand is enabled, remove processors that will be removed
+      if (_lb_args.debug() > 0) CkPrintf("se_avail_vector is not null on pe %d, removing procs that will be removed\n", CkMyPe());
+      // if shrink/expand is enabled, remove processors that will be removed (this happens at shrink, before the checkpoint)
       std::vector<P> procs2;
       for (const auto& p : procs) {
         if (se_avail_vector[p.id] != 0) procs2.push_back(p);
       }
       procs = procs2; 
-    }
+    } 
 #endif
+    if (_lb_args.debug() > 0){
+      CkPrintf("[PE %d] Procs are : ", CkMyPe());
+      for (const auto& p : procs) {
+        CkPrintf("%d ", p.id);
+      }
+      CkPrintf("\n");
+    }
 
 
     double t0 = CkWallTimer();
@@ -524,6 +532,7 @@ class RootLevel : public LevelLogic
 {
  public:
   RootLevel(int _num_groups = -1) : num_groups(_num_groups) {
+    nPes = CkNumPes();
   }
   virtual ~RootLevel()
   {
@@ -536,16 +545,14 @@ class RootLevel : public LevelLogic
   {
     LevelLogic::pup(p); // this packs num_stats_msgs
     p|nObjs;
-    p|nPes; // don't want to update this unless expanding!
-
+    nPes = CkNumPes();
 
     // stats_msgs stuff is only relevant for expand
     if (p.isUnpacking()) {
       stats_msgs.resize(num_stats_msgs);
      
-      int nPesStats = CkNumPes();
       for (int i = 0; i < num_stats_msgs; i++) {
-        stats_msgs[i] = new(nPesStats, nPesStats, nPesStats, nPesStats + 1, nObjs, nObjs, 0) LBStatsMsg_1; // TODO: this needs to be the right subclass;
+        stats_msgs[i] = new(nPes, nPes, nPes, nPes + 1, nObjs, nObjs, 0) LBStatsMsg_1; // TODO: this needs to be the right subclass;
       }
 
     }
@@ -603,7 +610,6 @@ class RootLevel : public LevelLogic
     }
     else
     {
-      nPes += ((LBStatsMsg_1*)stats)->nPes;
       nObjs += ((LBStatsMsg_1*)stats)->nObjs;
     }
   }
@@ -636,6 +642,9 @@ class RootLevel : public LevelLogic
 #if DEBUG__TREE_LB_L1
       double t0 = CkWallTimer();
 #endif
+      if (nPes != CkNumPes()) {
+        CkAbort("nPes (%d) != CkNumPes() (%d) in RootLevel::loadBalance\n", nPes, CkNumPes());
+      }
       wrapper->prepStrategy(nObjs, nPes, stats_msgs, migMsg);
       wrapper->runStrategy(migMsg);
       if (current_strategy == wrappers.size() - 1)
@@ -653,7 +662,7 @@ class RootLevel : public LevelLogic
       // need to cast pointer to ensure delete of CMessage_LBStatsMsg_1 is called
       for (auto msg : stats_msgs) delete (LBStatsMsg_1*)msg;
       stats_msgs.clear();
-      nPes = nObjs = 0;
+      nObjs = 0;
       return migMsg;
     }
     else
@@ -722,7 +731,7 @@ class RootLevel : public LevelLogic
       }
 
       total_load = 0.0;
-      nPes = nObjs = 0; // cleanup for next round
+      nObjs = 0; // cleanup for next round
 
       int nmoves = int(solution.size());
       SubtreeMigrateDecisionMsg* migMsg =
@@ -1175,17 +1184,6 @@ class PELevel : public LevelLogic
     p|nObjs;
     p|myObjs;
 
-    int nPes = 0;
-    if (p.isPacking()) {
-      nPes = CkNumPes();
-    }
-
-    p|nPes;
-
-  
-
-    CkPrintf("[PE %d] PUP PELevel with %d stats_msgs and %d myObjs and %d nObjs\n", CkMyPe(), num_stats_msgs, myObjs.size());
-
     if (p.isUnpacking()) {
       stats_msgs.resize(num_stats_msgs);
    
@@ -1296,14 +1294,14 @@ class PELevel : public LevelLogic
     for (int i = obj_start; i < obj_end; i++, j++)
     {
       int dest = decision->to_pes[i];
+      if (dest > CkNumPes() - 1)
+        CkAbort("PELevel: processDecision found dest PE >= CkNumPes()\n");
       if (dest != mype)
       {
         if (dest >= 0)
         {
-#if DEBUG__TREE_LB_L3
           CkPrintf("[%d] (processDecision) My obj %d (abs=%d) moving to %d\n", CkMyPe(),
                    j, i, dest);
-#endif
           if (lbmgr->Migrate(myObjs[j].handle, dest) == 0)
           {
             CkAbort("PELevel: Migrate call returned 0\n");
