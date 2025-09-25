@@ -235,9 +235,12 @@ void TreeLB::pup(PUP::er& p)
 {
   p|seqno;
   
-  loadConfigFile(CkLBOptions(seqno));
-  init(CkLBOptions(seqno));
-  manager_init();
+
+  if(p.isUnpacking()){
+    loadConfigFile(CkLBOptions(seqno));
+    init(CkLBOptions(seqno));
+    manager_init();
+  }
 
   assert(numLevels == 2); // rn this only supports the two level tree
   p|*logic[0];
@@ -491,6 +494,7 @@ void TreeLB::receiveDecision(TreeLBMessage* decision, int level)
   // values
   int& incoming = expected_incoming[level];
   int& outgoing = expected_outgoing[level];
+  CkPrintf("[PE %d] TreeLB::receiveDecision at level %d, incoming=%d outgoing=%d\n", CkMyPe(), level, incoming, outgoing);
   logic[level]->processDecision(decision, incoming, outgoing);
   // fprintf(stderr, "[%d] level=%d incoming=%d outgoing=%d\n", CkMyPe(), level, incoming,
   // outgoing);
@@ -560,10 +564,12 @@ void TreeLB::recvLoadTokens(CkMessage* tokens)
 #endif
   int load = logic[level]->tokensReceived(token_set);
   load_received[level] += load;
+  CkPrintf("[PE %d] TreeLB::recvLoadTokens, load_received = %d\n", CkMyPe(), load_received[level]);
+
   checkLoadExchanged(level);
 }
 
-void TreeLB::objMovedIn(bool waitBarrier)
+void TreeLB::objMovedIn(bool waitBarrier) // this should be called, but is not
 {
   if (!waitBarrier) CkAbort("TreeLB future migrates not supported\n");
 
@@ -572,6 +578,8 @@ void TreeLB::objMovedIn(bool waitBarrier)
   int level = 0;
   CkAssert(numLevels > 0 && awaitingLB[level]);
   load_received[level] += 1;
+  CkPrintf("[PE %d] TreeLB::objMovedIn at level %d, load_received=%d\n", CkMyPe(), level, load_received[level]);
+
   checkLoadExchanged(level);
 }
 
@@ -591,7 +599,8 @@ void TreeLB::checkForRealloc()
 #if CMK_SHRINK_EXPAND
 if (_lb_args.debug() > 0) {
       CkPrintf(
-        "Check for Realloc\n"
+        "Check for Realloc. Number of stats messages: %d\n",
+        logic[1]->stats_msgs.size()
       );
 }
 

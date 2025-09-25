@@ -116,6 +116,7 @@ class LevelLogic : public PUP::able
   virtual void pup(PUP::er& p) { 
     PUP::able::pup(p);
     if (p.isPacking()) {
+      CkPrintf("[PE %d] PUPPING LevelLogic with %d stats and %d strategies\n", CkMyPe(), stats_msgs.size());
       num_stats_msgs = stats_msgs.size();
     }
     p|num_stats_msgs;
@@ -144,7 +145,7 @@ class LevelLogic : public PUP::able
   }
 
  protected:
-  int num_stats_msgs;
+  unsigned int num_stats_msgs;
   int num_strategies;
 };
 
@@ -261,6 +262,7 @@ class TreeLB : public CBase_TreeLB
   // load can be actual objects or tokens
   inline bool checkLoadReceived(int level)
   {
+    CkPrintf("[PE %d] TreeLB::checkLoadReceived at level %d: received=%d expected=%d\n", CkMyPe(), level, load_received[level], expected_incoming[level]);
     if (load_received[level] == expected_incoming[level])
     {
       load_received[level] = expected_incoming[level] = 0;
