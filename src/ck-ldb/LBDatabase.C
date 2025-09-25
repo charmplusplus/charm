@@ -331,3 +331,17 @@ void LBDatabase::EstObjLoad(const LDObjHandle &_h, double cputime)
   obj->setTiming(cputime);
 #endif
 }
+
+void LBDatabase::EstObjGPULoad(const LDObjHandle &_h, double gputime)
+{
+#if CMK_CUDA
+#if CMK_LBDB_ON
+  LBObj *const obj = LbObj(_h);
+
+  CmiAssert(obj != NULL);
+  obj->data.gpuTime = gputime;
+#endif
+#else
+    CmiAbort("LBDatabase::EstObjGPULoad called but CMK_CUDA is not set");
+#endif
+}

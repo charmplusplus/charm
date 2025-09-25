@@ -2146,12 +2146,12 @@ double CkLocRec::getObjTime()
   return walltime;
 }
 void CkLocRec::setObjGPUTime(double gputime) {
-  lbmgr->EstObjLoad(ldHandle, gputime);
+  lbmgr->EstObjGPULoad(ldHandle, gputime);
 }
 double CkLocRec::getObjGPUTime()
 {
-  LBRealType walltime, gputime;
-  lbmgr->GetObjLoad(ldHandle, walltime, gputime);
+  LBRealType gputime;
+  lbmgr->GetObjGPULoad(ldHandle, gputime);
   return gputime;
 }
 #  if CMK_LB_USER_DATA

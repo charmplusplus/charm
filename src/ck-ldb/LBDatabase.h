@@ -67,6 +67,10 @@ public:
     LbObj(h)->getTime(&walltime, &cputime);
   };
 
+  inline void GetObjGPULoad(LDObjHandle &h, LBRealType &gputime) {
+    LbObj(h)->getGPUTime(&gputime);
+  };
+
   inline void* GetObjUserData(LDObjHandle &h) {
     return LbObj(h)->getLocalUserData();
   }
@@ -127,6 +131,7 @@ public:
   void GetTime(LBRealType *total_walltime, LBRealType *total_cputime,
                LBRealType *idletime, LBRealType *bg_walltime,
                LBRealType *bg_cputime);
+  void GetGPUTime(LBRealType *bg_gputime);
   const std::vector<LBObjEntry>& getObjs() {return objs;}
 
   inline void ObjectStart(const LDObjHandle &h) {
