@@ -169,11 +169,6 @@ class TreeLB : public CBase_TreeLB
   {
 #if CMK_SHRINK_EXPAND
     CkPrintf("TREELB MIGRATION constructor ON PE %d\n", CkMyPe());
-    loadConfigFile(CkLBOptions(seqno));
-    init(CkLBOptions(seqno));
-		manager_init();
-
-    expand_init();
 #endif
   }
 
@@ -191,9 +186,9 @@ class TreeLB : public CBase_TreeLB
   // start load balancing (non-AtSync mode)  NOTE: This seems to do a broadcast
   // (is this the behavior we want?)
   inline void StartLB() { 
+    CkPrintf("TreeLB::StartLB called on PE %d\n", CkMyPe());
     loadBalanceSubtree(numLevels - 1);
-     }
-
+  }
 
   // TODO: I would rename this group of functions (to maybe something like startLBLocal)
   // since they are also used in non-AtSync mode

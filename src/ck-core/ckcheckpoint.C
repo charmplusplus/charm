@@ -357,6 +357,7 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _reque
 
     bool success = true;
     if (CkMyPe() == 0) {
+      
   #if CMK_SHRINK_EXPAND
       if (pending_realloc_state == SHRINK_IN_PROGRESS) {
         CkPrintf("Shrink in progress on PE%i\n", CkMyPe());
@@ -392,23 +393,12 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _reque
     }
   #endif
 
-    std::vector<GroupInfo> tmpInfo = CkCreateGroupMetadata();
-
-    if (CkMyPe() == 0) {
-        CkPrintf("Writing group metadata on PE %d\n", CkMyPe());
-        FILE* fGroupMetadata = openCheckpointFile(dirname, "GroupsMetadata", "wb", -1);
-        PUP::toDisk pGroupMetadata(fGroupMetadata, PUP::er::IS_CHECKPOINT);
-        CkPupGroupMetadata(pGroupMetadata, tmpInfo);
-        if (pGroupMetadata.checkError()) success = false;
-        if (CmiFclose(fGroupMetadata) != 0) success = false;
-    }
-
     // save groups into Groups.dat
     // content of the file: numGroups, GroupInfo[numGroups], _groupTable(PUP'ed),
     // groups(PUP'ed)
     FILE* fGroups = openCheckpointFile(dirname, "Groups", "wb", chckPtId);
     PUP::toDisk pGroups(fGroups, PUP::er::IS_CHECKPOINT);
-    CkPupGroupData(pGroups, tmpInfo.size(), tmpInfo);
+    CkPupGroupData(pGroups);
     if (pGroups.checkError()) success = false;
     if (CmiFclose(fGroups) != 0) success = false;
 
@@ -604,19 +594,62 @@ typedef void GroupCreationFn(CkGroupID groupID, int constructorIdx, envelope *en
 
 static void CkPupPerPlaceData(PUP::er &p, GroupIDTable *idTable, GroupTable *objectTable,
                               unsigned int &numObjects, int constructionMsgType,
-                              GroupCreationFn creationFn, int numGroups, std::vector<GroupInfo> &tmpInfo
+                              GroupCreationFn creationFn
                              )
 {
+  int numGroups = 0, i;
+
+  if (!p.isUnpacking()) {
+    numGroups = idTable->size();
+  }
+  p|numGroups;
+  CkPrintf("[%d] CkPupPerPlaceData %s: numGroups = %d\n", CkMyPe(),p.typeString(),numGroups);
+
+  std::vector<GroupInfo> tmpInfo(numGroups);
+  if (!p.isUnpacking()) {
+    for (i = 0; i < numGroups; i++) {
+      tmpInfo[i].gID = (*idTable)[i];
+      TableEntry ent = objectTable->find(tmpInfo[i].gID);
+      tmpInfo[i].present = ent.getObj() != NULL;
+      tmpInfo[i].MigCtor = _chareTable[ent.getcIdx()]->migCtor;
+      tmpInfo[i].name = _chareTable[ent.getcIdx()]->name;
+      //CkPrintf("[%d] CkPupPerPlaceData: %s group %s \n", CkMyPe(), p.typeString(), tmpInfo[i].name);
+
+      if(tmpInfo[i].MigCtor==-1) {
+        CkAbort("(Node)Group %s needs a migration constructor and PUP'er routine for restart.\n", tmpInfo[i].name.c_str());
+      }
+    }
+  }
+  p|tmpInfo;
+
   int maxGroup = 0;
-  for (int i = 0; i < numGroups; i++) 
+  for (i = 0; i < numGroups; i++) 
   {
     if (!tmpInfo[i].present)
       continue;
 
     CkGroupID gID = tmpInfo[i].gID;
-    if(gID.idx > maxGroup)
-      maxGroup = gID.idx;
+    if (p.isUnpacking()) {
+      int eIdx = tmpInfo[i].MigCtor;
+      if (eIdx == -1) {
+        CkPrintf("[%d] ERROR> (Node)Group %s's migration constructor is not defined!\n", CkMyPe(), tmpInfo[i].name.c_str());
+        CkAbort("Abort");
+      }
+      void *m = CkAllocSysMsg();
+      envelope* env = UsrToEnv((CkMessage *)m);
+      env->setMsgtype(constructionMsgType);
+
+      {
+        creationFn(gID, eIdx, env);
+      }
+      if(gID.idx > maxGroup)
+          maxGroup = gID.idx;
+
+      CkFreeSysMsg(m);
+    }   // end of unPacking
     IrrGroup *gobj = objectTable->find(gID).getObj();
+
+
     // if using migration constructor, you'd better have a pup
     gobj->virtual_pup(p);
   }
@@ -629,79 +662,20 @@ static void CkPupPerPlaceData(PUP::er &p, GroupIDTable *idTable, GroupTable *obj
   }
 }
 
-std::vector<GroupInfo> CkCreateGroupMetadata()
-{
-  GroupIDTable *idTable = CkpvAccess(_groupIDTable);
-  GroupTable *objectTable = CkpvAccess(_groupTable);
-  size_t numGroups = idTable->size();
-
-  std::vector<GroupInfo> tmpInfo(numGroups);
-    
-  for (int i = 0; i < numGroups; i++) {
-    tmpInfo[i].gID = (*idTable)[i];
-    TableEntry ent = objectTable->find(tmpInfo[i].gID);
-    tmpInfo[i].present = ent.getObj() != NULL;
-    tmpInfo[i].MigCtor = _chareTable[ent.getcIdx()]->migCtor;
-    tmpInfo[i].name = _chareTable[ent.getcIdx()]->name;
-      
-    if(tmpInfo[i].MigCtor==-1) {
-      CkAbort("(Node)Group %s needs a migration constructor and PUP'er routine for restart.\n", tmpInfo[i].name.c_str());
-    }
-  }
-
-  return tmpInfo;
-}
-
-void CkPupGroupMetadata(PUP::er &p, std::vector<GroupInfo> &tmpInfo)
-{
-  size_t numGroups = 0;
-  if (!p.isUnpacking())
-    numGroups = tmpInfo.size();
-  p|numGroups;
-
-  if (p.isUnpacking()) 
-    tmpInfo.resize(numGroups);
-
-  p|tmpInfo;
-
-  if (p.isUnpacking()) {
-    for (int i = 0; i < numGroups; i++) 
-    {
-      if (!tmpInfo[i].present)
-        continue;
-
-      CkGroupID gID = tmpInfo[i].gID;
-      int eIdx = tmpInfo[i].MigCtor;
-      if (eIdx == -1) {
-        CkPrintf("[%d] ERROR> (Node)Group %s's migration constructor is not defined!\n", CkMyPe(), tmpInfo[i].name.c_str());
-        CkAbort("Abort");
-      }
-      void *m = CkAllocSysMsg();
-      envelope* env = UsrToEnv((CkMessage *)m);
-      env->setMsgtype(BocInitMsg);
-
-      CkCreateLocalGroup(gID, eIdx, env);
-
-      CkFreeSysMsg(m);
-    }
-  }
-}
-
-void CkPupGroupData(PUP::er &p, int numGroups, std::vector<GroupInfo> &tmpInfo)
+void CkPupGroupData(PUP::er &p)
 {
   CkPupPerPlaceData(p, CkpvAccess(_groupIDTable), CkpvAccess(_groupTable),
-    CkpvAccess(_numGroups), BocInitMsg, &CkCreateLocalGroup,
-    numGroups, tmpInfo
+    CkpvAccess(_numGroups), BocInitMsg, &CkCreateLocalGroup
   );
 }
 
 void CkPupNodeGroupData(PUP::er &p
   )
 {
-          //CkPupPerPlaceData(p, &CksvAccess(_nodeGroupIDTable),
-          //                  CksvAccess(_nodeGroupTable), CksvAccess(_numNodeGroups),
-          //                  NodeBocInitMsg, &CkCreateLocalNodeGroup
-          //                 );
+          CkPupPerPlaceData(p, &CksvAccess(_nodeGroupIDTable),
+                           CksvAccess(_nodeGroupTable), CksvAccess(_numNodeGroups),
+                           NodeBocInitMsg, &CkCreateLocalNodeGroup
+                          );
 }
 
 // handle chare array elements for this processor
@@ -915,12 +889,12 @@ void CkStartRescaleCheckpoint(const char* dirname, const CkCallback& cb,
 CkCallback globalCb;
 void CkRecvGroupROData(char* msg)
 {
+  char* origMsg = msg;
   msg = msg + CmiMsgHeaderSizeBytes;
   int dirSize = *reinterpret_cast<int*>(msg);
   msg += sizeof(int);
   std::string dirname(msg, dirSize);
   msg += dirSize;
-
   int ROsize = *reinterpret_cast<int*>(msg);
   msg += sizeof(int);
 
@@ -936,15 +910,14 @@ void CkRecvGroupROData(char* msg)
 	bool requestStatus = false;
 	bRO|requestStatus;
 
-  CmiNodeBarrier();
-
   CkPrintf("[%d]Number of PE: %d -> %d\n",CkMyPe(),_numPes,CkNumPes());
 
   msg += ROsize;
 
-  PUP::fromMem bGroupMetadata(msg, PUP::er::IS_CHECKPOINT);
-  std::vector<GroupInfo> groupMetadata;
-  CkPupGroupMetadata(bGroupMetadata, groupMetadata);
+  if (CkMyPe() >= _numPes) {
+    PUP::fromMem bGroups(msg, PUP::er::IS_CHECKPOINT);
+    CkPupGroupData(bGroups);
+  }
 
 #ifndef CMK_CHARE_USE_PTR
   // restore chares only when number of pes is the same
@@ -964,7 +937,7 @@ void CkRecvGroupROData(char* msg)
     }
   }
 #endif
-  CmiFree(msg);
+  CmiFree(origMsg);
 
 	// for each location, restore arrays
 	//DEBCHK("[%d]Trying to find location manager\n",CkMyPe());
@@ -975,7 +948,7 @@ void CkRecvGroupROData(char* msg)
 
     FILE* groupFile = openCheckpointFile(dirname.c_str(), "Groups", "rb", rank);
     PUP::fromDisk bGroups(groupFile, PUP::er::IS_CHECKPOINT);
-    CkPupGroupData(bGroups, groupMetadata.size(), groupMetadata);
+    CkPupGroupData(bGroups);
     CmiFclose(groupFile);
 
     if(CmiMyRank()==0) {
@@ -1050,34 +1023,35 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
     ROFile.seekg(0, std::ios::beg);
     
     // Check for and exclude EOF character if present
-    if (ROSize > 0) {
-      ROFile.seekg(-1, std::ios::end);
-      char lastChar;
-      ROFile.get(lastChar);
-      if (lastChar == EOF || lastChar == '\0') {
-        ROSize--;
-      }
-      ROFile.seekg(0, std::ios::beg);
-    }
+    // if (ROSize > 0) {
+    //   ROFile.seekg(-1, std::ios::end);
+    //   char lastChar;
+    //   ROFile.get(lastChar);
+    //   if (lastChar == EOF || lastChar == '\0') {
+    //     ROSize--;
+    //   }
+    //   ROFile.seekg(0, std::ios::beg);
+    // }
 
-    std::string GroupMetadataFilename = getCheckpointFileName(dirname, "GroupsMetadata", -1);
-    std::ifstream GroupMetadataFile(GroupMetadataFilename, std::ios::binary | std::ios::ate);
-    std::streamsize GroupMetadataSize = GroupMetadataFile.tellg();
-    GroupMetadataFile.seekg(0, std::ios::beg);
-    
-    // Check for and exclude EOF character if present
-    if (GroupMetadataSize > 0) {
-      GroupMetadataFile.seekg(-1, std::ios::end);
-      char lastChar;
-      GroupMetadataFile.get(lastChar);
-      if (lastChar == EOF || lastChar == '\0') {
-        GroupMetadataSize--;
-      }
-      GroupMetadataFile.seekg(0, std::ios::beg);
-    }
     //CkPrintf("GroupMetadataSize = %lld\n", (long long)GroupMetadataSize);
 
-    char* msg = (char*) CmiAlloc(ROSize + GroupMetadataSize + sizeof(int) + strLen + CmiMsgHeaderSizeBytes);
+    std::string GroupFilename = getCheckpointFileName(dirname, "Groups", 0);
+    std::ifstream GroupFile(GroupFilename, std::ios::binary | std::ios::ate);
+    std::streamsize GroupSize = GroupFile.tellg();
+    GroupFile.seekg(0, std::ios::beg);
+
+    // Check for and exclude EOF character if present
+    // if (GroupSize > 0) {
+    //   GroupFile.seekg(-1, std::ios::end);
+    //   char lastChar;
+    //   GroupFile.get(lastChar);
+    //   if (lastChar == EOF || lastChar == '\0') {
+    //     GroupSize--;
+    //   }
+    //   GroupFile.seekg(0, std::ios::beg);
+    // }
+
+    char* msg = (char*) CmiAlloc(ROSize + GroupSize + 2 * sizeof(int) + strLen + CmiMsgHeaderSizeBytes);
     char* buffer = msg + CmiMsgHeaderSizeBytes;
     std::memcpy(buffer, &strLen, sizeof(int));
     buffer += sizeof(int);
@@ -1089,12 +1063,12 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
     ROFile.read(buffer, ROSize);
     buffer += ROSize;
 
-    GroupMetadataFile.read(buffer, GroupMetadataSize);
-    buffer += GroupMetadataSize;
+    GroupFile.read(buffer, GroupSize);
+    buffer += GroupSize;
 
     CmiSetHandler(msg, _shrinkExpandRestartHandlerIdx);
 
-    CmiSyncBroadcastAllAndFree(ROSize + GroupMetadataSize + 2 * sizeof(int) + strLen + CmiMsgHeaderSizeBytes, msg);
+    CmiSyncBroadcastAllAndFree(ROSize + GroupSize + 2 * sizeof(int) + strLen + CmiMsgHeaderSizeBytes, msg);
 
     //CkPrintf("PE %i at barrier\n", CkMyPe());
     //CmiBarrier();

@@ -160,6 +160,7 @@ public:
     }
 
     void pup(PUP::er &p){
+        //CkPrintf("[%d] Jacobi's PUPer. \n",CkMyPe());
         p|messages_due;
         p|iteration;
         p|useLB;

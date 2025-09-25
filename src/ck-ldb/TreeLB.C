@@ -118,6 +118,7 @@ void TreeLB::init(const CkLBOptions& opts)
   if (_lb_args.syncResume()) barrier_after_lb = true;
 
   // create and turn on by default
+  CkPrintf("TreeLB::init called on PE %d\n", CkMyPe());
   startLbFnHdl = lbmgr->AddStartLBFn(this, &TreeLB::StartLB);
 
   configure(config);
@@ -136,13 +137,10 @@ void TreeLB::init(const CkLBOptions& opts)
 
 void TreeLB::expand_init()
 {
-
   awaitingLB[0] = true;
   awaitingLB[1] = false;
 
   numLevels = 2;
-
-
 }
 
 TreeLB::~TreeLB()
@@ -231,11 +229,11 @@ void TreeLB::configure(json& config)
 
 void TreeLB::pup(PUP::er& p)
 {
-  
-
+  p|seqno;
    
-
-
+  loadConfigFile(CkLBOptions(seqno));
+  init(CkLBOptions(seqno));
+  manager_init();
 
   assert(numLevels == 2); // rn this only supports the two level tree
   p|*logic[0];
@@ -246,6 +244,7 @@ void TreeLB::pup(PUP::er& p)
   p|*logic[1];  
   p|awaitingLB;
 
+  expand_init();
 
   CkPrintf("[PE %d] Done pupping: numLevels=%d, size of logic=%d\n", CkMyPe(), numLevels, logic.size());
 }
@@ -401,6 +400,7 @@ void TreeLB::receiveStats(TreeLBMessage* stats, int level)
 
 void TreeLB::loadBalanceSubtree(int level)
 {
+  CkPrintf("TreeLB::loadBalanceSubtree called for level %d, awaiting %d\n", level, awaitingLB[level]);
   if (!awaitingLB[level]) return;
   awaitingLB[level] = false;
   if (level == 0) return lb_done();

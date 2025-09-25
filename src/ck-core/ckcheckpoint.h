@@ -68,9 +68,7 @@ struct GroupInfo
 void CkPupROData(PUP::er &p);
 void CkPupMainChareData(PUP::er &p, CkArgMsg *args);
 void CkPupChareData(PUP::er &p);
-std::vector<GroupInfo> CkCreateGroupMetadata();
-void CkPupGroupMetadata(PUP::er &p, std::vector<GroupInfo> &tmpInfo);
-void CkPupGroupData(PUP::er &p, int numGroups, std::vector<GroupInfo> &groupMetadata);
+void CkPupGroupData(PUP::er &p);
 void CkPupNodeGroupData(PUP::er &p);
 void CkPupArrayElementsData(PUP::er &p, int notifyListeners=1);
 void CkPupProcessorData(PUP::er &p);

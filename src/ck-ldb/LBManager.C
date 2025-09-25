@@ -571,6 +571,7 @@ int LBManager::AddStartLBFn(std::function<void()> fn)
 
   callbk->fn = fn;
   callbk->on = true;
+  CkPrintf("Registering StartLB function %p\n", (void*)callbk);
   startLBFnList.push_back(callbk);
   startLBFn_count++;
   return startLBFnList.size() - 1;
@@ -589,7 +590,7 @@ void LBManager::RemoveStartLBFn(int handle)
 
 void LBManager::StartLB()
 {
-  CkPrintf("Start LB called\n");
+  CkPrintf("Start LB called, count %d\n", startLBFn_count);
   if (startLBFn_count == 0)
   {
     CmiAbort("StartLB is not supported in this LB");
@@ -597,7 +598,12 @@ void LBManager::StartLB()
   for (int i = 0; i < startLBFnList.size(); i++)
   {
     StartLBCB* startLBFn = startLBFnList[i];
-    if (startLBFn && startLBFn->on) startLBFn->fn();
+    CkPrintf("StartLB checking function %d: %p, %d\n", i, (void*)startLBFn, startLBFn->on);
+    if (startLBFn && startLBFn->on) 
+    {
+      CkPrintf("Invoking StartLB function %p\n", (void*)&startLBFn->fn);
+      startLBFn->fn();
+    }
   }
 }
 

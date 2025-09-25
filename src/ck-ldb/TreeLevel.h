@@ -48,7 +48,7 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
   {
     
     p|nObjs;
-    
+    p|nPes;
 
     int nNewPes = CkNumPes();
     CkPrintf("[PE %d] PUPPING LBStatsMsg_1 with %d objs and %d pes\n", CkMyPe(), nObjs, nPes);
