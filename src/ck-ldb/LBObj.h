@@ -62,6 +62,14 @@ public:
 #endif
   }
 
+  inline void getGPUTime(LBRealType *w) {
+  #if CMK_CUDA
+    *w = data.gpuTime;
+  #else
+    CmiAbort("LBObj::getGPUTime called but CMK_CUDA is not set");
+  #endif
+  }
+
   inline void setTiming(LBRealType cputime)
   {
     data.wallTime = cputime;
@@ -99,7 +107,6 @@ private:
 //  bool registered;
   double startWTime;             // needs double precision
   LBRealType lastWallTime;
-  double gpuTime;
 #if CMK_LB_CPUTIMER
   double startCTime;
   LBRealType lastCpuTime;

@@ -1156,7 +1156,11 @@ class PELevel : public LevelLogic
   {
     inline bool operator()(const LDObjData& o1, const LDObjData& o2) const
     {
+#if CMK_CUDA
+      return (o1.gpuTime > o2.gpuTime);
+#else
       return (o1.wallTime > o2.wallTime);
+#endif
     }
   };
 
@@ -1257,10 +1261,16 @@ class PELevel : public LevelLogic
     {
       // If rateAware, convert object loads by multiplying by processor speed
       // Note this conversion isn't done for bgloads because they never leave the PE
+      
+#if CMK_CUDA
+      float oload = float(myObjs[i].gpuTime);
+#else
+      float oload = float(myObjs[i].wallTime);
+#endif
       if (rateAware)
-        msg->oloads[i] = float(myObjs[i].wallTime) * msg->speeds[0];
+        msg->oloads[i] = oload * msg->speeds[0];
       else
-        msg->oloads[i] = float(myObjs[i].wallTime);
+        msg->oloads[i] = oload;
       msg->order[i] = i;
     }
 
