@@ -6,6 +6,7 @@
 LBDatabase::LBDatabase() {
   omCount = omsRegistering = 0;
   obj_walltime = 0;
+  obj_gputime = 0;
   statsAreOn = false;
   objsEmptyHead = -1;
   commTable = new LBCommTable;
@@ -243,6 +244,12 @@ void LBDatabase::GetTime(LBRealType *total_walltime, LBRealType *total_cputime,
   //CkPrintf("HERE [%d] total: %f %f obj: %f %f idle: %f bg: %f\n", CkMyPe(), *total_walltime, *total_cputime, obj_walltime, obj_cputime, *idletime, *bg_walltime);
 }
 
+void LBDatabase::GetGPUBGTime(LBRealType *bg_gputime)
+{
+  // TODO: implement this properly
+  *bg_gputime = 0;
+}
+
 void LBDatabase::ClearLoads(void)
 {
   int i;
@@ -256,7 +263,9 @@ void LBDatabase::ClearLoads(void)
         obj->lastCpuTime = obj->data.cpuTime;
 #endif
       }
-      obj->gpuTime = 0.0;
+#if CMK_CUDA
+      obj->data.gpuTime = 0.0;
+#endif
       obj->data.wallTime = 0.0;
 #if CMK_LB_CPUTIMER
       obj->data.cpuTime = 0.0;
@@ -267,6 +276,7 @@ void LBDatabase::ClearLoads(void)
   commTable = new LBCommTable;
   machineUtil.Clear();
   obj_walltime = 0;
+  obj_gputime = 0;
 #if CMK_LB_CPUTIMER
   obj_cputime = 0;
 #endif
@@ -327,5 +337,19 @@ void LBDatabase::EstObjLoad(const LDObjHandle &_h, double cputime)
 
   CmiAssert(obj != NULL);
   obj->setTiming(cputime);
+#endif
+}
+
+void LBDatabase::EstObjGPULoad(const LDObjHandle &_h, double gputime)
+{
+#if CMK_CUDA
+#if CMK_LBDB_ON
+  LBObj *const obj = LbObj(_h);
+
+  CmiAssert(obj != NULL);
+  obj->data.gpuTime = gputime;
+#endif
+#else
+    CmiAbort("LBDatabase::EstObjGPULoad called but CMK_CUDA is not set");
 #endif
 }

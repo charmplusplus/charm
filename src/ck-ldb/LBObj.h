@@ -20,20 +20,7 @@ public:
     data.migratable = _migratable;
     data.asyncArrival = _asyncArrival;
     Clear();
-//    data.cpuTime = 0.;
-//    data.wallTime = 0.;
-//    data.minWall = 1e6;
-//    data.maxWall = 0.;
     localUserData = usr_ptr;
-//    migratable = _migratable;
-//    registered = true;
-    startWTime = -1.0;
-    lastWallTime = .0;
-    gpuTime = .0;
-#if CMK_LB_CPUTIMER
-    startCTime = -1.0;
-    lastCpuTime = .0;
-#endif
   }
 
   ~LBObj() { };
@@ -75,6 +62,14 @@ public:
 #endif
   }
 
+  inline void getGPUTime(LBRealType *w) {
+  #if CMK_CUDA
+    *w = data.gpuTime;
+  #else
+    CmiAbort("LBObj::getGPUTime called but CMK_CUDA is not set");
+  #endif
+  }
+
   inline void setTiming(LBRealType cputime)
   {
     data.wallTime = cputime;
@@ -112,7 +107,6 @@ private:
 //  bool registered;
   double startWTime;             // needs double precision
   LBRealType lastWallTime;
-  double gpuTime;
 #if CMK_LB_CPUTIMER
   double startCTime;
   LBRealType lastCpuTime;

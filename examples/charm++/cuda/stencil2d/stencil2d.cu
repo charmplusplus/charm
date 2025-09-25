@@ -64,7 +64,10 @@ void invokeKernel(cudaStream_t stream, float* d_temperature,
       (block_y + (block_dim.y * thread_size - 1)) /
           (block_dim.y * thread_size));
 
-  stencil2DKernel<<<grid_dim, block_dim, 0, stream>>>(
-      d_temperature, d_new_temperature, block_x, block_y, thread_size);
-  hapiCheck(cudaPeekAtLastError());
+  // stencil2DKernel<<<grid_dim, block_dim, 0, stream>>>(
+  //     d_temperature, d_new_temperature, block_x, block_y, thread_size);
+  // hapiCheck(cudaPeekAtLastError());
+
+    hapiCheck(hapiLaunchKernelWrapper(stencil2DKernel, grid_dim, block_dim, 0, stream,
+      d_temperature, d_new_temperature, block_x, block_y, thread_size));
 }

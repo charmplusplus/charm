@@ -32,6 +32,7 @@ private:
   LBCommTable* commTable;
   bool statsAreOn;
   double obj_walltime;
+  double obj_gputime;
   LBMachineUtil machineUtil;
   CkSyncBarrier* syncBarrier;
 
@@ -48,6 +49,13 @@ public:
 #endif
     }
   }
+
+  inline void MeasuredObjGPUTime(double gputime) {
+    if (statsAreOn) {
+      obj_gputime += gputime;
+    }
+  }
+
   inline LBOM* LbOM(LDOMHandle h) {
     return oms[h.handle];
   }
@@ -65,6 +73,10 @@ public:
 
   inline void GetObjLoad(LDObjHandle &h, LBRealType &walltime, LBRealType &cputime) {
     LbObj(h)->getTime(&walltime, &cputime);
+  };
+
+  inline void GetObjGPULoad(LDObjHandle &h, LBRealType &gputime) {
+    LbObj(h)->getGPUTime(&gputime);
   };
 
   inline void* GetObjUserData(LDObjHandle &h) {
@@ -121,12 +133,14 @@ public:
                           int migratable);
   void UnregisterObj(LDObjHandle h);
   void EstObjLoad(const LDObjHandle &h, double cpuload);
+  void EstObjGPULoad(const LDObjHandle &h, double cpuload);
   void BackgroundLoad(LBRealType *walltime, LBRealType *cputime);
   void Send(const LDOMHandle &destOM, const CmiUInt8 &destID, unsigned int bytes, int destObjProc, int force = 0);
   void MulticastSend(const LDOMHandle &_om, CmiUInt8 *_ids, int _n, unsigned int _b, int _nMsgs=1);
   void GetTime(LBRealType *total_walltime, LBRealType *total_cputime,
                LBRealType *idletime, LBRealType *bg_walltime,
                LBRealType *bg_cputime);
+  void GetGPUBGTime(LBRealType *bg_gputime);
   const std::vector<LBObjEntry>& getObjs() {return objs;}
 
   inline void ObjectStart(const LDObjHandle &h) {
@@ -143,6 +157,10 @@ public:
       obj->StopTimer(&walltime, &cputime);
       obj->IncrementTime(walltime, cputime);
       MeasuredObjTime(walltime, cputime);
+
+      #if CMK_CUDA
+      MeasuredObjGPUTime(obj->data.gpuTime);
+      #endif
     }
   };
   inline const LDObjHandle &GetObjHandle(int idx) {

@@ -333,6 +333,10 @@ class LBManager : public CBase_LBManager
   {
     lbdb_obj->GetObjLoad(h, walltime, cputime);
   };
+   void GetObjGPULoad(LDObjHandle& h, LBRealType& gputime)
+  {
+    lbdb_obj->GetObjGPULoad(h, gputime);
+  };
   void* GetObjUserData(LDObjHandle& h) { return lbdb_obj->GetObjUserData(h); }
   void MetaLBCallLBOnChares() { lbdb_obj->MetaLBCallLBOnChares(); }
   void MetaLBResumeWaitingChares(int lb_period)
@@ -352,6 +356,10 @@ class LBManager : public CBase_LBManager
   {
     lbdb_obj->GetTime(total_walltime, total_cputime, idletime, bg_walltime, bg_cputime);
   }
+  void GetGPUBGTime(LBRealType* bg_gputime)
+  {
+    lbdb_obj->GetGPUBGTime(bg_gputime);
+  }
   LDObjHandle RegisterObj(LDOMHandle omh, CmiUInt8 id, void* userPtr, int migratable)
   {
     return lbdb_obj->RegisterObj(omh, id, userPtr, migratable);
@@ -360,6 +368,10 @@ class LBManager : public CBase_LBManager
   void EstObjLoad(const LDObjHandle& h, double cpuload)
   {
     lbdb_obj->EstObjLoad(h, cpuload);
+  }
+  void EstObjGPULoad(const LDObjHandle& h, double gputime)
+  {
+    lbdb_obj->EstObjGPULoad(h, gputime);
   }
   void BackgroundLoad(LBRealType* walltime, LBRealType* cputime)
   {

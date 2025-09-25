@@ -17,6 +17,8 @@
 
 #include "converse.h"
 #include "ckrescale.h"
+#include "charm++.h"
+
 #include "hapi.h"
 #include "hapi_impl.h"
 #include "gpumanager.h"
@@ -55,9 +57,11 @@ typedef struct hapiEvent {
   CkCallback cb;
   void* cb_msg;
   hapiWorkRequest* wr; // if this is not NULL, buffers and request itself are deallocated
+  CkMigratable* obj; // pointer to the object whose load we want to set
+  cudaEvent_t start_ev; // event to record the start time
 
-  hapiEvent(cudaEvent_t event_, const CkCallback& cb_, void* cb_msg_, hapiWorkRequest* wr_ = NULL)
-            : event(event_), cb(cb_), cb_msg(cb_msg_), wr(wr_) {}
+  hapiEvent(cudaEvent_t event_, const CkCallback& cb_, void* cb_msg_, hapiWorkRequest* wr_ = NULL, CkMigratable* obj_ = NULL, cudaEvent_t start_ev_ = NULL)
+            : event(event_), cb(cb_), cb_msg(cb_msg_), wr(wr_), obj(obj_), start_ev(start_ev_) {}
 } hapiEvent;
 
 CpvDeclare(std::queue<hapiEvent>, hapi_event_queue);
@@ -576,13 +580,17 @@ static void hapiMapping(char** argv) {
 }
 
 #ifndef HAPI_CUDA_CALLBACK
-void recordEvent(cudaStream_t stream, const CkCallback& cb, void* cb_msg, hapiWorkRequest* wr = NULL) {
+void recordEvent(cudaStream_t stream, const CkCallback& cb, void* cb_msg, hapiWorkRequest* wr = NULL, CkMigratable* obj = NULL, cudaEvent_t start_ev = NULL) {
   // create CUDA event and insert into stream
   cudaEvent_t ev;
-  cudaEventCreateWithFlags(&ev, cudaEventDisableTiming);
+#if CMK_LBDB_ON
+  cudaEventCreateWithFlags(&ev,  cudaEventDefault);
+#else
+  cudaEventCreateWithFlags(&ev,  cudaEventDisableTiming);
+#endif 
   cudaEventRecord(ev, stream);
 
-  hapiEvent hev(ev, cb, cb_msg, wr);
+  hapiEvent hev(ev, cb, cb_msg, wr, obj, start_ev);
 
   // push event information in queue
   CpvAccess(hapi_event_queue).push(hev);
@@ -1532,6 +1540,14 @@ void hapiPollEvents(void* param) {
     if (cudaEventQuery(hev.event) == cudaSuccess) {
       queue.pop(); // TODO: investigate possible race condition with charm4py futures - temporarily resolved by popping here
 
+#if CMK_LBDB_ON
+      if (hev.obj) {
+        float gpu_time;
+        cudaEventElapsedTime(&gpu_time, hev.start_ev, hev.event);
+        hev.obj->setObjGPUTime(gpu_time + hev.obj->getObjGPUTime());
+        cudaEventDestroy(hev.start_ev);
+      } else 
+#endif        
       // invoke Charm++ callback if one was given
       hev.cb.send(hev.cb_msg);
 
@@ -1585,7 +1601,26 @@ cudaStream_t hapiGetStream() {
 
   return ret;
 }
+#if CMK_LBDB_ON
+// Lightweight HAPI, to be invoked after data transfer or kernel execution.
+void hapiRecordTime(cudaStream_t stream, cudaEvent_t start) {
+  Chare* obj = CkActiveObj();
+  if (obj && dynamic_cast<CkMigratable*>(obj)) {
 
+  #ifndef HAPI_CUDA_CALLBACK
+  // record CUDA event
+    recordEvent(stream, NULL, NULL, NULL, dynamic_cast<CkMigratable*>(obj), start);
+#else
+  #error hapi record time with hapi_cuda_callback not supported
+#endif
+
+    // while there is an ongoing workrequest, quiescence should not be detected
+    // even if all PEs seem idle
+    CmiAssert(hapiQdCreate);
+    hapiQdCreate(1);
+  }
+}
+#endif
 // Lightweight HAPI, to be invoked after data transfer or kernel execution.
 void hapiAddCallback(cudaStream_t stream, const CkCallback& cb, void* cb_msg) {
 #ifndef HAPI_CUDA_CALLBACK
@@ -1672,14 +1707,47 @@ cudaError_t hapiFreeHost(void* ptr) {
 
 cudaError_t hapiMemcpyAsync(void* dst, const void* src, size_t count, cudaMemcpyKind kind, cudaStream_t stream = 0) {
   cudaError_t err;
+#if CMK_LBDB_ON
   cudaEvent_t start;
-  cudaEvent_t stop;
+
   cudaEventCreate(&start);
-  cudaEventCreate(&stop);
   cudaEventRecord(start, stream);
+#endif
+
   err = cudaMemcpyAsync(dst, src, count, kind, stream);
-  cudaEventRecord(stop, stream);
-  hapiAddCallback(stream, CkCallback(hapiRecordGPUTime, (void*[2]){start, stop}), (void*[2]){start, stop});
+#if CMK_LBDB_ON
+  hapiRecordTime(stream, start);  
+#endif
+  return err;
+}
+
+cudaError_t hapiMemcpy2DAsync(void* dst, size_t dpitch, const void* src, size_t spitch, size_t width, size_t height, cudaMemcpyKind kind, cudaStream_t stream = 0) {
+  cudaError_t err;
+#if CMK_LBDB_ON
+  cudaEvent_t start;
+
+  cudaEventCreate(&start);
+  cudaEventRecord(start, stream);
+#endif
+  err = cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream);
+#if CMK_LBDB_ON
+  hapiRecordTime(stream, start);
+#endif
+  return err;
+}
+
+cudaError_t hapiLaunchKernel(const void* func, dim3 gridDim, dim3 blockDim, void** args, size_t sharedMem, cudaStream_t stream = 0) {
+  cudaError_t err;
+#if CMK_LBDB_ON
+  cudaEvent_t start;
+
+  cudaEventCreate(&start);
+  cudaEventRecord(start, stream);
+#endif
+  err = cudaLaunchKernel(func, gridDim, blockDim, args, sharedMem, stream);
+#if CMK_LBDB_ON
+  hapiRecordTime(stream, start);
+#endif
   return err;
 }
 
@@ -1688,15 +1756,5 @@ void hapiErrorDie(cudaError_t retCode, const char* code, const char* file, int l
     fprintf(stderr, "Fatal CUDA Error [%d] %s at %s:%d\n", retCode, cudaGetErrorString(retCode), file, line);
     CmiAbort("Exit due to CUDA error");
   }
-}
-
-void hapiRecordGPUTime(void *msg) {
-  cudaEvent_t start = ((cudaEvent_t*)msg)[0];
-  cudaEvent_t stop = ((cudaEvent_t*)msg)[1];
-
-  float milliseconds = 0;
-  cudaEventElapsedTime(&milliseconds, start, stop);
-
-  CkPrintf("[PE %d] Recording GPU time at runtime:  %f ms\n", CkMyPe(), milliseconds);
 }
 
