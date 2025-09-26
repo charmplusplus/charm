@@ -233,6 +233,9 @@ void TreeLB::configure(json& config)
 
 void TreeLB::pup(PUP::er& p)
 {
+  if (_lb_args.debug() > 0)
+    CkPrintf("[%d] TreeLB::pup numLevels=%d\n", CkMyPe(), numLevels);
+
   p|seqno;
   
 
@@ -243,10 +246,16 @@ void TreeLB::pup(PUP::er& p)
   }
 
   assert(numLevels == 2); // rn this only supports the two level tree
-  p|*logic[0];
-  if (logic[1] == nullptr) {
+
+  if (logic[1] == nullptr) { // TODO: delete this memory
     logic[1] = new RootLevel(); // this is needed because logic[1] is null on PE1, but PE1 still needs to participate in this... confusing?
   } 
+
+  if (_lb_args.debug() > 0)
+    CkPrintf("[%d] TreeLB::pupping logic things\n", CkMyPe());
+
+
+  p|*logic[0];
   p|*logic[1];  
 
   if (p.isUnpacking())
@@ -377,6 +386,7 @@ void TreeLB::receiveStats(TreeLBMessage* stats, int level)
     {
       // cutoff can be adjusted dynamically, to prevent lb between upper-level domains.
       // can be used, for example, to only do within-node lb on some steps
+      TreeLBMessage* newMsg = l->mergeStats();  // this is IN PLACE 
       
       #if CMK_SHRINK_EXPAND
         //contribute(CkCallback(CkReductionTarget(TreeLB, CheckForLB), thisProxy[0]));
@@ -578,7 +588,6 @@ void TreeLB::objMovedIn(bool waitBarrier) // this should be called, but is not
   int level = 0;
   CkAssert(numLevels > 0 && awaitingLB[level]);
   load_received[level] += 1;
-  CkPrintf("[PE %d] TreeLB::objMovedIn at level %d, load_received=%d\n", CkMyPe(), level, load_received[level]);
 
   checkLoadExchanged(level);
 }

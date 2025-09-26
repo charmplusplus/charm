@@ -50,21 +50,7 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
     
     p|nObjs;
     p|nPes;
-   
-    CkPrintf("[PE %d] PUPPING LBStatsMsg_1 with %d objs and %d pes\n", CkMyPe(), nObjs, nPes);
-    if (p.isUnpacking())
-    {
-      pe_ids = new int[nPes];
-      bgloads = new float[nPes];
-      speeds = new float[nPes];
-      obj_start = new unsigned int[nPes + 1];
-      pe_ids = new int[nPes];
-      bgloads = new float[nPes];
-      speeds = new float[nPes];
-      obj_start = new unsigned int[nPes + 1];
-      oloads = new float[nObjs];
-      order = new unsigned int[nObjs];
-    }
+
 
     for (int i = 0; i < nPes; i++)
       p|pe_ids[i];
@@ -142,32 +128,33 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
     int pe_cnt = 0;
     int obj_cnt = 0;
     float total_load = 0;
-    CkPrintf("[PE %d] LBStatsMsg_1::fill with %d msgs\n", CkMyPe(), msgs.size());
-    for (int i = 0; i < msgs.size(); i++)
+    
+    if (msgs.size() != 1) {
+      CkAbort("[PE %d] LBStatsMsg_1::fill should only have one msg, has %d\n", CkMyPe(), msgs.size());
+    }
+    LBStatsMsg_1* msg = (LBStatsMsg_1*)msgs[0];
+    if (_lb_args.debug() > 1)CkPrintf("[PE %d]   msg %d with %d pes and %d objs\n", CkMyPe(), 0, msg->nPes, msg->nObjs);
+    for (int j = 0; j < msg->nPes; j++)
     {
-      LBStatsMsg_1* msg = (LBStatsMsg_1*)msgs[i];
-      CkPrintf("[PE %d]   msg %d with %d pes and %d objs\n", CkMyPe(), i, msg->nPes, msg->nObjs);
-      for (int j = 0; j < msg->nPes; j++)
+      int pe = msg->pe_ids[j];
+      CkAssert(pe >= 0 && pe < CkNumPes());
+      if (_lb_args.debug() > 2) CkPrintf("[PE %d]   filling pe %d with %d objs\n", CkMyPe(), pe,
+                msg->obj_start[j + 1] - msg->obj_start[j]);
+      procs[pe_cnt].populate(pe, msg->bgloads + j, msg->speeds + j);
+      procs[pe_cnt++].resetLoad();
+      migMsg->obj_start[pe] = obj_cnt;
+      int local_id = 0;
+      for (int k = msg->obj_start[j]; k < msg->obj_start[j + 1];
+            k++, obj_cnt++, local_id++)
       {
-        int pe = msg->pe_ids[j];
-        CkAssert(pe >= 0 && pe < CkNumPes());
-        CkPrintf("[PE %d]   filling pe %d with %d objs\n", CkMyPe(), pe,
-                 msg->obj_start[j + 1] - msg->obj_start[j]);
-        procs[pe_cnt].populate(pe, msg->bgloads + j, msg->speeds + j);
-        procs[pe_cnt++].resetLoad();
-        migMsg->obj_start[pe] = obj_cnt;
-        int local_id = 0;
-        for (int k = msg->obj_start[j]; k < msg->obj_start[j + 1];
-             k++, obj_cnt++, local_id++)
-        {
-          objs[obj_cnt].populate(obj_cnt, msg->oloads + k, pe);
-          total_load += objs[obj_cnt].getLoad();
-          migMsg->to_pes[obj_cnt] = pe;
-          // if obj_local_ids.size() > 0:
-          obj_local_ids[obj_cnt] = local_id;
-        }
+        objs[obj_cnt].populate(obj_cnt, msg->oloads + k, pe);
+        total_load += objs[obj_cnt].getLoad();
+        migMsg->to_pes[obj_cnt] = pe;
+        // if obj_local_ids.size() > 0:
+        obj_local_ids[obj_cnt] = local_id;
       }
     }
+    
     CkAssert(obj_cnt == objs.size());
     CkAssert(pe_cnt == procs.size());
     return total_load;
@@ -260,7 +247,6 @@ class StrategyWrapper : public IStrategyWrapper
                0);  // check that object hasn't been assigned already
 #endif
       p->assign(o);
-      CkPrintf("[%d] Assigned object %d to processor %d\n", CkMyPe(), o->id, p->id);
       if (o->oldPe != p->id)
       {
         n_moves += 1;
@@ -531,40 +517,95 @@ class RootLevel : public LevelLogic
   {
     for (auto w : wrappers) delete w;
   }
+  
+  virtual TreeLBMessage* mergeStats()
+  {
+    // send obj loads up
+    TreeLBMessage* newMsg = LBStatsMsg_1::merge(stats_msgs);
+    // need to cast pointer to ensure delete of CMessage_LBStatsMsg_1 is called
+    for (auto m : stats_msgs) delete (LBStatsMsg_1*)m;
+    stats_msgs.clear();
+    stats_msgs.push_back(newMsg);
+    return newMsg;
+  }
 
   PUPable_decl(RootLevel);
   RootLevel(CkMigrateMessage *m) : LevelLogic(m) {}
+
   virtual void pup(PUP::er& p)
   {
+    if (_lb_args.debug() > 2) CkPrintf("[PE %d] PUPPING RootLevel\n", CkMyPe());
     LevelLogic::pup(p); // this packs num_stats_msgs
+
+    if (num_stats_msgs > 1) CkAbort("RootLevel should have just one stats message! Has %d\n", num_stats_msgs);
     p|nObjs;
-    nPes = CkNumPes();
+    p|nPes;
+    int nNewPes = CkNumPes();
+
+    if (_lb_args.debug() > 2) CkPrintf("[PE %d] Done with basics\n", CkMyPe());
+
 
     // stats_msgs stuff is only relevant for expand
     if (p.isUnpacking()) {
-      stats_msgs.resize(nPes);
-     
-      for (int i = 0; i < nPes; i++) {
-        LBStatsMsg_1* msg = new(1, 1, 1, 1, 0, 0, 0) LBStatsMsg_1; // TODO: this needs to be the right subclass;
-        msg->pe_ids[0] = i;
-        msg->bgloads[0] = 0;
-        msg->speeds[0] = 1.0;
-        msg->obj_start[0] = 0;
-        msg->obj_start[1] = 0;
-        msg->nObjs = 0;
-        msg->nPes = 1;
-        stats_msgs[i] = msg;
+      stats_msgs.resize(1);
+      LBStatsMsg_1* msg;
+      if (rateAware)
+        msg= new (nNewPes, nNewPes, nNewPes, nNewPes + 1, nObjs, nObjs, 0) LBStatsMsg_1;
+      else
+        msg= new (nNewPes, nNewPes, 0, nNewPes + 1, nObjs, nObjs, 0) LBStatsMsg_1;
+      stats_msgs[0] = msg;
+    }
+
+    if (stats_msgs.size() == 0) stats_msgs.push_back(new (nNewPes, nNewPes, nNewPes, nNewPes + 1, nObjs, nObjs, 0) LBStatsMsg_1);
+    p|*stats_msgs[0]; // everyone needs to pup this cause pup is dumb
+
+    if (p.isUnpacking() && CkMyPe() == 0 && num_stats_msgs > 0) {
+      // if num_stats_msgs = 0, then we aren't expanding 
+      LBStatsMsg_1* msg = (LBStatsMsg_1*)stats_msgs[0];
+      if (nObjs != msg->nObjs) {
+        CkAbort("In RootLevel::pup, nObjs (%d) != msg->nObjs (%d)\n", nObjs, msg->nObjs);
+      }
+
+      msg->nPes = CkNumPes();
+
+      // TODO: this will not work if we do simultaneous shrink/expand
+      for (int i = nPes; i < CkNumPes(); i++)
+      {
+        CkPrintf("PE %d: initializing info for new PE %d\n", CkMyPe(), i);
+        // on expand: need to reset the new PEs info
+        if (msg->pe_ids[i] > CkNumPes() - 1 || msg->pe_ids[i] <= 0) {
+          // you are a new pe!
+          if (_lb_args.debug() > 0) CkPrintf("PE %d is new, resetting its info\n", i);
+          msg->pe_ids[i] = i;
+          msg->bgloads[i] = 0;
+          msg->speeds[i] = 1.0;
+          msg->obj_start[i+1] = msg->obj_start[i]; // no objects
+        }
+      }
+
+      if (_lb_args.debug() > 0){
+      if (CkMyPe() == 0) {
+        CkPrintf("My stats message on PE 0: %d\n", msg->nObjs);
+        for (int i = 0; i < msg->nPes; i++) {
+          CkPrintf("  pe %d: id=%d bgload=%f speed=%f obj_start=%d\n", i, msg->pe_ids[i], msg->bgloads[i], msg->speeds[i], msg->obj_start[i]);
+        }
+
       }
     }
-    for (int i = 0; i < std::min(num_stats_msgs, nPes); i++) {
-      p|*stats_msgs[i];
+   
+
     }
 
+    if (num_stats_msgs == 0) {
+      stats_msgs.clear();
+    }
 
+    nPes = nNewPes;
     num_stats_msgs = stats_msgs.size();
 
   }
 
+  
   /**
    * mode 0: receive obj stats
    * mode 1: receive aggregated group load
@@ -623,6 +664,9 @@ class RootLevel : public LevelLogic
 #endif
 
     const int num_children = stats_msgs.size();
+    if (num_children != 1) {
+      CkAbort("RootLevel::loadBalance: expected just one stats message (merged) but received from %d\n", nPes, num_children);
+    }
     CkAssert(num_children > 0);
 #if DEBUG__TREE_LB_L1
     CkPrintf("[%d] RootLevel::loadBalance, num_children=%d nPes=%d nObjs=%d\n", CkMyPe(),
@@ -1208,6 +1252,7 @@ class PELevel : public LevelLogic
 
     }
 
+
     for (int i = 0; i < num_stats_msgs; i++) {
       p|*stats_msgs[i];
     }
@@ -1219,7 +1264,7 @@ class PELevel : public LevelLogic
 
       nPes = CkNumPes();
     }
-    CkPrintf("[PE %d] PUPPING PELevel with nObjs = %d\n", CkMyPe(), nObjs);
+    if (_lb_args.debug() > 2) CkPrintf("[PE %d] PUP done for PELevel with nObjs = %d\n", CkMyPe(), nObjs);
 
   }
 
@@ -1326,18 +1371,16 @@ class PELevel : public LevelLogic
     const int mype = CkMyPe();
     LLBMigrateMsg* decision = (LLBMigrateMsg*)decision_msg;
     incoming = decision->num_incoming[mype];
-    CkPrintf("[%d] PELevel::processDecision, incoming=%d \n", CkMyPe(), incoming);
     CkAssert(incoming >= 0);
     outgoing = 0;
     int obj_start = decision->obj_start[mype];
     int obj_end = obj_start + int(myObjs.size());
     assert(myObjs.size == nObjs);
     int j = 0;
-    CkPrintf("[%d] PELevel::processDecision, obj_start=%d obj_end=%d nObjs=%d\n",
-             CkMyPe(), obj_start, obj_end, nObjs);
+   
     for (int i = obj_start; i < obj_end; i++, j++)
     {
-      CkPrintf("[%d] PELevel: obj %d (abs=%d) to dest %d\n", CkMyPe(), j, i,
+      if (_lb_args.debug() > 2) CkPrintf("[%d] PELevel: obj %d (abs=%d) to dest %d\n", CkMyPe(), j, i,
                decision->to_pes[i]);
       int dest = decision->to_pes[i];
       if (dest > CkNumPes() - 1)
