@@ -43,6 +43,8 @@ class LevelLogic : public PUP::able
 
   /// return msg with lb stats for this PE. only needed at leaves
   virtual TreeLBMessage* getStats() { CkAbort("LevelLogic::getStats not implemented\n"); }
+  virtual bool collectSpeeds(int pe_id, float speed) { CkAbort("LevelLogic::collectSpeeds not implemented\n"); return false; }
+  virtual int getNumNewPes() { CkAbort("LevelLogic::getNumNewPes not implemented\n"); return 0; }
   // Note: These are not "=0" methods, because then the subclass would have to
   // implement (and abort inside) empty methods if it doesn't need them
 
@@ -186,10 +188,7 @@ class TreeLB : public CBase_TreeLB
 
   // start load balancing (non-AtSync mode)  NOTE: This seems to do a broadcast
   // (is this the behavior we want?)
-  inline void StartLB() { 
-    CkPrintf("TreeLB::StartLB called on PE %d\n", CkMyPe());
-    loadBalanceSubtree(numLevels - 1);
-  }
+  void StartLB();
 
   // TODO: I would rename this group of functions (to maybe something like startLBLocal)
   // since they are also used in non-AtSync mode
@@ -229,6 +228,8 @@ class TreeLB : public CBase_TreeLB
   void checkForRealloc();
 
   void willIbekilled(std::vector<char> avail, int newnumProcessAfterRestart);
+  void restartFromSE();
+  void collectSpeeds(int pe_id, float speed);
 
  private:
   void init(const CkLBOptions& opts);
@@ -262,7 +263,7 @@ class TreeLB : public CBase_TreeLB
   // load can be actual objects or tokens
   inline bool checkLoadReceived(int level)
   {
-    CkPrintf("[PE %d] TreeLB::checkLoadReceived at level %d: received=%d expected=%d\n", CkMyPe(), level, load_received[level], expected_incoming[level]);
+    if (_lb_args.debug() > 2) CkPrintf("[PE %d] TreeLB::checkLoadReceived at level %d: received=%d expected=%d\n", CkMyPe(), level, load_received[level], expected_incoming[level]);
     if (load_received[level] == expected_incoming[level])
     {
       load_received[level] = expected_incoming[level] = 0;
@@ -282,6 +283,7 @@ class TreeLB : public CBase_TreeLB
   uint8_t numLevels = 0;  // total number of tree levels (this chare won't necessarily
                           // participate in all levels)
 
+  bool thisPeNew = false; // true if this PE is new after a shrink/expand operation
   std::vector<LevelLogic*> logic;  // level -> my logic object at this level
   std::vector<int>
       comm_parent;  // level -> my parent PE in comm-tree connecting level to level+1

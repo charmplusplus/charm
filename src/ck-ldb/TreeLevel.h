@@ -517,6 +517,37 @@ class RootLevel : public LevelLogic
   {
     for (auto w : wrappers) delete w;
   }
+  virtual int getNumNewPes() { return num_new_pes; }
+
+  virtual bool collectSpeeds(int proc_id, float speed) {
+    if (rateAware)
+    {
+      CkPrintf("[PE %d] RootLevel::collectSpeeds proc_id=%d speed=%f\n", CkMyPe(), proc_id, speed);
+      LBStatsMsg_1* msg = (LBStatsMsg_1*)stats_msgs[0];
+      for (int i = 0; i < msg->nPes; i++) {
+        if (msg->pe_ids[i] == proc_id) {
+
+          msg->speeds[i] = 1.0; // todo: fix this, somehow causes obj migration problems?
+        }
+      }
+
+      num_new_pes--;
+      if (num_new_pes == 0) {
+         if (_lb_args.debug() > 0){
+      if (CkMyPe() == 0) {
+        CkPrintf("After speeds collected: My stats message on PE 0: %d\n", ((LBStatsMsg_1*)stats_msgs[0])->nObjs);
+        for (int i = 0; i < ((LBStatsMsg_1*)stats_msgs[0])->nPes; i++) {
+          CkPrintf("  pe %d: id=%d bgload=%f speed=%f obj_start=%d\n", i, ((LBStatsMsg_1*)stats_msgs[0])->pe_ids[i], ((LBStatsMsg_1*)stats_msgs[0])->bgloads[i], ((LBStatsMsg_1*)stats_msgs[0])->speeds[i], ((LBStatsMsg_1*)stats_msgs[0])->obj_start[i]);
+        }
+
+      }
+    }
+        // all new pes have reported their speed, can run lb now
+       return true;
+      }
+    }
+    return false;
+  }
   
   virtual TreeLBMessage* mergeStats()
   {
@@ -569,16 +600,17 @@ class RootLevel : public LevelLogic
       msg->nPes = CkNumPes();
 
       // TODO: this will not work if we do simultaneous shrink/expand
+      num_new_pes = 0;
       for (int i = nPes; i < CkNumPes(); i++)
       {
-        CkPrintf("PE %d: initializing info for new PE %d\n", CkMyPe(), i);
         // on expand: need to reset the new PEs info
         if (msg->pe_ids[i] > CkNumPes() - 1 || msg->pe_ids[i] <= 0) {
           // you are a new pe!
-          if (_lb_args.debug() > 0) CkPrintf("PE %d is new, resetting its info\n", i);
+          if (_lb_args.debug() > 0) CkPrintf("[PE %d] RootLevel::pup PE %d is new, resetting its info\n", CkMyPe(), i);
+          num_new_pes++;
           msg->pe_ids[i] = i;
           msg->bgloads[i] = 0;
-          msg->speeds[i] = 1.0;
+         // msg->speeds[i] = 1.0; // speeds need to be recomputed for the new procs and sent back to the root
           msg->obj_start[i+1] = msg->obj_start[i]; // no objects
         }
       }
@@ -592,12 +624,9 @@ class RootLevel : public LevelLogic
 
       }
     }
-   
-
-    }
-
-    if (num_stats_msgs == 0) {
+    if (CkMyPe() != 0) {
       stats_msgs.clear();
+    }
     }
 
     nPes = nNewPes;
@@ -807,6 +836,7 @@ class RootLevel : public LevelLogic
     int load;
   };
 
+  int num_new_pes = 0; // number of new pes on expand
   int num_groups;
   bool repeat_strategies;
   size_t current_strategy = 0;

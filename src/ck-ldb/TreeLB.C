@@ -40,6 +40,26 @@ void TreeLB::Migrated(int waitBarrier)
   objMovedIn(waitBarrier);
 }
 
+void TreeLB::StartLB(){
+  CkPrintf("TreeLB::StartLB called on PE %d\n", CkMyPe());
+  if (logic[1]) {
+    CkPrintf("size of stats_msgs = %d\n", logic[1]->stats_msgs.size());
+  }
+
+  int rateAware = false;
+  LBStatsMsg_1* mm = (LBStatsMsg_1*)logic[1]->stats_msgs[0];
+  if ((void*)mm->speeds != (void*)mm->obj_start) rateAware = true;
+
+  if (logic[1]->getNumNewPes() == 0 || !rateAware) {
+    CkPrintf("TreeLB::StartLB: no new PEs detected, starting load balancing\n");
+    loadBalanceSubtree(numLevels - 1);
+  }
+  else {
+    thisProxy.restartFromSE();
+    CkPrintf("TreeLB::StartLB: new PEs detected, setting up speeds first\n");
+  }
+}
+
 void TreeLB::loadConfigFile(const CkLBOptions& opts)
 {
   config.clear();
@@ -132,6 +152,35 @@ void TreeLB::init(const CkLBOptions& opts)
   }
 
 #endif
+}
+
+void TreeLB::collectSpeeds(int pe_id, float speed) {
+  if (_lb_args.debug() > 2) CkPrintf("[PE %d] TreeLB::collectSpeeds from PE %d speed=%f\n", CkMyPe(), pe_id, speed);
+  if (logic[1]->collectSpeeds(pe_id, speed))
+    loadBalanceSubtree(numLevels - 1);
+  else
+    CkPrintf("[PE %d] TreeLB::collectSpeeds: still waiting for more speeds\n", CkMyPe());
+}
+
+void TreeLB::restartFromSE() {
+  // TODO: need to collect and recompute bg load as well for the new pes
+
+  if (CkMyPe() == 0) {
+    // if there was just 1 pe initially, the speed isn't set, so recompute it here
+    // TODO: ideally this should be rearranged so that the stats msgs are always set up correctly
+    LBStatsMsg_1* msg = (LBStatsMsg_1*)logic[1]->stats_msgs[0];
+    for (int i = 0; i < msg->nPes; i++) {
+        if (msg->pe_ids[i] == 0 && msg->speeds[i] == 1.0  ) {
+          msg->speeds[i] = lbmgr->ProcessorSpeed();
+        }
+      }
+  }
+  if (thisPeNew) {
+    if (CkMyPe() == 0) CkAbort("[PE %d] Should never be new\n", CkMyPe());
+    float speed = float(lbmgr->ProcessorSpeed());
+    thisProxy[0].collectSpeeds(CkMyPe(), speed);
+    thisPeNew = false;
+  }
 }
 
 void TreeLB::expand_init()
@@ -233,12 +282,11 @@ void TreeLB::configure(json& config)
 
 void TreeLB::pup(PUP::er& p)
 {
-  if (_lb_args.debug() > 0)
+  if (_lb_args.debug() > 2)
     CkPrintf("[%d] TreeLB::pup numLevels=%d\n", CkMyPe(), numLevels);
 
   p|seqno;
   
-
   if(p.isUnpacking()){
     loadConfigFile(CkLBOptions(seqno));
     init(CkLBOptions(seqno));
@@ -251,16 +299,23 @@ void TreeLB::pup(PUP::er& p)
     logic[1] = new RootLevel(); // this is needed because logic[1] is null on PE1, but PE1 still needs to participate in this... confusing?
   } 
 
-  if (_lb_args.debug() > 0)
+  if (_lb_args.debug() > 2)
     CkPrintf("[%d] TreeLB::pupping logic things\n", CkMyPe());
 
+  int oldPE;
+  if (p.isPacking()) oldPE = CkMyPe();
+  p|oldPE;
+  if (p.isUnpacking()) {
+    if (CkMyPe() != oldPE) {
+      thisPeNew = true;
+    }
+  }
 
   p|*logic[0];
   p|*logic[1];  
 
   if (p.isUnpacking())
     expand_init();
-
 }
 
 void TreeLB::CallLB()
