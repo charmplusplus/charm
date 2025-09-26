@@ -1274,28 +1274,7 @@ class PELevel : public LevelLogic
         myObjs.clear();
         nObjs = 0;
        }
-      stats_msgs.resize(num_stats_msgs);
-   
-      for (int i = 0; i < num_stats_msgs; i++) {
-        stats_msgs[i] = new(1, 1, 1, 2, nObjs, nObjs, 0) LBStatsMsg_1; // TODO: this needs to be the right subclass;
-      }
-
     }
-
-
-    for (int i = 0; i < num_stats_msgs; i++) {
-      p|*stats_msgs[i];
-    }
-
-    if (p.isUnpacking()) {
-      if (CkMyPe() >= nPes) {
-        stats_msgs.clear();
-      }
-
-      nPes = CkNumPes();
-    }
-    if (_lb_args.debug() > 2) CkPrintf("[PE %d] PUP done for PELevel with nObjs = %d\n", CkMyPe(), nObjs);
-
   }
 
   virtual TreeLBMessage* getStats()
