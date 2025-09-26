@@ -720,7 +720,7 @@ class RootLevel : public LevelLogic
       if (nPes != CkNumPes()) {
         CkAbort("nPes (%d) != CkNumPes() (%d) in RootLevel::loadBalance\n", nPes, CkNumPes());
       }
-      CkPrintf("[%d] prepstrategy with nObjs=%d nPes=%d nstats_msgs=%d\n", CkMyPe(), nObjs, nPes, stats_msgs.size());
+      //CkPrintf("[%d] prepstrategy with nObjs=%d nPes=%d nstats_msgs=%d\n", CkMyPe(), nObjs, nPes, stats_msgs.size());
       wrapper->prepStrategy(nObjs, nPes, stats_msgs, migMsg);
       wrapper->runStrategy(migMsg);
       if (current_strategy == wrappers.size() - 1)

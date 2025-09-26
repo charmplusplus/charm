@@ -559,7 +559,7 @@ void TreeLB::receiveDecision(TreeLBMessage* decision, int level)
   // values
   int& incoming = expected_incoming[level];
   int& outgoing = expected_outgoing[level];
-  CkPrintf("[PE %d] TreeLB::receiveDecision at level %d, incoming=%d outgoing=%d\n", CkMyPe(), level, incoming, outgoing);
+  //CkPrintf("[PE %d] TreeLB::receiveDecision at level %d, incoming=%d outgoing=%d\n", CkMyPe(), level, incoming, outgoing);
   logic[level]->processDecision(decision, incoming, outgoing);
   // fprintf(stderr, "[%d] level=%d incoming=%d outgoing=%d\n", CkMyPe(), level, incoming,
   // outgoing);
