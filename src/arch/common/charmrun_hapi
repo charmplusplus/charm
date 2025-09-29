@@ -142,7 +142,7 @@ for ip in "${node_ips[@]}"; do
     slots=${node_slots["$ip"]}
     echo "Charmrun> Starting $slots daemon(s) on node $ip"
     for ((slot=0; slot<slots; slot++)); do
-        ssh "$ip" "cd $(pwd) && nohup ./hapi_memory_daemon $slot > /dev/null 2>&1 &" &
+        ssh "$ip" "nohup $(dirname "$0")/hapi_memory_daemon $slot > /dev/null 2>&1 &" &
         daemon_pids+=($!)
     done
 done
@@ -246,7 +246,7 @@ while true; do
                 slots=${detected_new_node_slots["$ip"]}
                 echo "Charmrun> Starting $slots daemon(s) on new node $ip"
                 for ((slot=0; slot<slots; slot++)); do
-                    ssh "$ip" "cd $(pwd) && nohup ./hapi_memory_daemon $slot > /dev/null 2>&1 &" &
+                    ssh "$ip" "nohup $(dirname "$0")/hapi_memory_daemon $slot > /dev/null 2>&1 &" &
                     daemon_pids+=($!)
                 done
             done
