@@ -263,7 +263,7 @@ class TreeLB : public CBase_TreeLB
   // load can be actual objects or tokens
   inline bool checkLoadReceived(int level)
   {
-    if (_lb_args.debug() > 2) CkPrintf("[PE %d] TreeLB::checkLoadReceived at level %d: received=%d expected=%d\n", CkMyPe(), level, load_received[level], expected_incoming[level]);
+    //if (_lb_args.debug() > 2) CkPrintf("[PE %d] TreeLB::checkLoadReceived at level %d: received=%d expected=%d\n", CkMyPe(), level, load_received[level], expected_incoming[level]);
     if (load_received[level] == expected_incoming[level])
     {
       load_received[level] = expected_incoming[level] = 0;

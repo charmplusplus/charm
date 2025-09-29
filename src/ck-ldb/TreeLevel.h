@@ -1264,7 +1264,6 @@ class PELevel : public LevelLogic
     p|nObjs;
     p|myObjs;
 
-
     int nPes;
     if (p.isPacking()) nPes = CkNumPes();
     p|nPes;
@@ -1389,8 +1388,8 @@ class PELevel : public LevelLogic
    
     for (int i = obj_start; i < obj_end; i++, j++)
     {
-      if (_lb_args.debug() > 2) CkPrintf("[%d] PELevel: obj %d (abs=%d) to dest %d\n", CkMyPe(), j, i,
-               decision->to_pes[i]);
+      if (_lb_args.debug() > 2) CkPrintf("[%d] PELevel: obj %d (abs=%d, handle=%d) to dest %d\n", CkMyPe(), j, i,
+              myObjs[j].handle.handle, decision->to_pes[i]);
       int dest = decision->to_pes[i];
       if (dest > CkNumPes() - 1)
         CkAbort("PELevel: processDecision found dest PE >= CkNumPes(): %d >= %d\n", dest, CkNumPes());
@@ -1398,8 +1397,8 @@ class PELevel : public LevelLogic
       {
         if (dest >= 0)
         {
-          if (_lb_args.debug() > 1) CkPrintf("[%d] (processDecision) My obj %d (abs=%d) moving to %d\n", CkMyPe(),
-                   j, i, dest);
+          if (_lb_args.debug() > 1) CkPrintf("[%d] (processDecision) My obj %d (abs=%d, handle=%d) moving to %d\n", CkMyPe(),
+                   j, i, myObjs[j].handle.handle, dest);
           if (lbmgr->Migrate(myObjs[j].handle, dest) == 0)
           {
             CkAbort("PELevel: Migrate call returned 0\n");

@@ -121,7 +121,12 @@ find_new_nodes() {
 cleanup_pids=()
 echo "Charmrun> Initial cleanup on ${#node_ips[@]} node(s): ${node_ips[*]}"
 for ip in "${node_ips[@]}"; do
-    ssh "$ip" "rm -f /dev/shm/numRestartProcs.txt /tmp/server_fifo_* /tmp/client_fifo_* /tmp/daemon_ready_*; mkfifo -m 0666 /tmp/daemon_ready_0" &
+    slots=${node_slots["$ip"]}
+    fifo_cmd="rm -f /dev/shm/numRestartProcs.txt /tmp/server_pipe_* /tmp/client_pipe_* /tmp/daemon_ready_*"
+    for ((slot=0; slot<slots; slot++)); do
+        fifo_cmd="$fifo_cmd; mkfifo -m 0666 /tmp/daemon_ready_$slot"
+    done
+    ssh "$ip" "$fifo_cmd" &
     cleanup_pids+=($!)
 done
 
@@ -220,7 +225,12 @@ while true; do
             cleanup_pids=()
             for ip in "${detected_new_nodes[@]}"; do
                 echo "Charmrun> Cleaning up node: $ip"
-                ssh "$ip" "rm -f /dev/shm/numRestartProcs.txt /tmp/server_fifo_* /tmp/client_fifo_* /tmp/daemon_ready_*; mkfifo -m 0666 /tmp/daemon_ready_0" &
+                slots=${detected_new_node_slots["$ip"]}
+                fifo_cmd="rm -f /dev/shm/numRestartProcs.txt /tmp/server_fifo_* /tmp/client_fifo_* /tmp/daemon_ready_*"
+                for ((slot=0; slot<slots; slot++)); do
+                    fifo_cmd="$fifo_cmd; mkfifo -m 0666 /tmp/daemon_ready_$slot"
+                done
+                ssh "$ip" "$fifo_cmd" &
                 cleanup_pids+=($!)
             done
             

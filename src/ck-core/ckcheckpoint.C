@@ -1023,15 +1023,15 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
     ROFile.seekg(0, std::ios::beg);
     
     // Check for and exclude EOF character if present
-    // if (ROSize > 0) {
-    //   ROFile.seekg(-1, std::ios::end);
-    //   char lastChar;
-    //   ROFile.get(lastChar);
-    //   if (lastChar == EOF || lastChar == '\0') {
-    //     ROSize--;
-    //   }
-    //   ROFile.seekg(0, std::ios::beg);
-    // }
+    if (ROSize > 0) {
+      ROFile.seekg(-1, std::ios::end);
+      char lastChar;
+      ROFile.get(lastChar);
+      if (lastChar == EOF || lastChar == '\0') {
+        ROSize--;
+      }
+      ROFile.seekg(0, std::ios::beg);
+    }
 
     //CkPrintf("GroupMetadataSize = %lld\n", (long long)GroupMetadataSize);
 
@@ -1041,15 +1041,15 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
     GroupFile.seekg(0, std::ios::beg);
 
     // Check for and exclude EOF character if present
-    // if (GroupSize > 0) {
-    //   GroupFile.seekg(-1, std::ios::end);
-    //   char lastChar;
-    //   GroupFile.get(lastChar);
-    //   if (lastChar == EOF || lastChar == '\0') {
-    //     GroupSize--;
-    //   }
-    //   GroupFile.seekg(0, std::ios::beg);
-    // }
+    if (GroupSize > 0) {
+      GroupFile.seekg(-1, std::ios::end);
+      char lastChar;
+      GroupFile.get(lastChar);
+      if (lastChar == EOF || lastChar == '\0') {
+        GroupSize--;
+      }
+      GroupFile.seekg(0, std::ios::beg);
+    }
 
     char* msg = (char*) CmiAlloc(ROSize + GroupSize + 2 * sizeof(int) + strLen + CmiMsgHeaderSizeBytes);
     char* buffer = msg + CmiMsgHeaderSizeBytes;
