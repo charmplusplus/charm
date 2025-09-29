@@ -181,7 +181,7 @@ while true; do
 
     # Check the flag. If it's a restart, prepare the extra arguments.
     if [ "$is_restart" = true ]; then
-        restart_arg="+restart /dev/shm"
+        restart_arg="+shrinkexpand +restart /dev/shm"
         if [ -f "$pes_file" ]; then
             num_pes=$(cat "$pes_file")
             pes_arg="+p $num_pes"
