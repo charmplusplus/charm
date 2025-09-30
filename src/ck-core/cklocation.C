@@ -2965,14 +2965,6 @@ void CkLocMgr::migratableList(CkLocRec* rec, std::vector<CkMigratable*>& list)
   }
 }
 
-void CkLocMgr::freeGPUMsg(CmiUInt8 id)
-{
-#if CMK_CUDA
-  cudaFree(sentDeviceMsgs[id]);
-  sentDeviceMsgs.erase(id);
-#endif
-}
-
 /// Migrate this local element away to another processor.
 void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 {
@@ -3050,14 +3042,6 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 
   DEBM((AA "Migrated index size %s to %d \n" AB, idx2str(idx), toPe));
 
-#if CMK_CUDA
-  if (gpuBufSize > 0)
-  {
-    sentDeviceMsgs[msg->id] = gpuMsg;
-    thisProxy[toPe].immigrateGPU(msg->id, gpuBufSize, CkDeviceBuffer(gpuMsg, gpuBufSize,
-      CkCallback(CkIndex_CkLocMgr::freeGPUMsg(msg->id), thisProxy[CkMyPe()])));
-  }
-#endif
   thisProxy[toPe].immigrate(msg);
 
   duringMigration = true;
@@ -3069,6 +3053,14 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 
   cache->recordEmigration(id, toPe);
   informHome(idx, toPe);
+#if CMK_CUDA
+  if (gpuBufSize > 0)
+  {
+    thisProxy[toPe].immigrateGPU(msg->id, gpuBufSize, CkDeviceBuffer(gpuMsg, gpuBufSize,
+      CkCallbackResumeThread()));
+    cudaFree(gpuMsg);
+  }
+#endif
 
 #if !CMK_LBDB_ON && CMK_GLOBAL_LOCATION_UPDATE
   DEBM((AA "Global location update. idx %s "

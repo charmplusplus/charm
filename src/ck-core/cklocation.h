@@ -682,7 +682,6 @@ public:
   /// This message took several hops to reach us-- fix it
   void multiHop(CkArrayMessage* m);
 
-  void freeGPUMsg(CmiUInt8 id);
   // Interface used by CkLocRec
   // Migrate us to another processor
   void emigrate(CkLocRec* rec, int toPe);
