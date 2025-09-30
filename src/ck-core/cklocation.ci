@@ -18,6 +18,7 @@ module CkLocation {
     entry [expedited] void immigrate(CkArrayElementMigrateMessage *msg);
 #ifdef CMK_CUDA
 #if CMK_CUDA
+    entry [expedited, threaded] void sendGPUMsg(CmiUInt8 id);
     entry [expedited] void immigrateGPU(CmiUInt8 id, int size, nocopydevice char data[size]);
 #endif
 #endif

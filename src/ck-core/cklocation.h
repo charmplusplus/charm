@@ -222,6 +222,17 @@ CkpvExtern(int, CkSaveRestorePrefetch);
 
 #include "ckmigratable.h"
 
+class GPUMigrateData
+{
+public:
+  int toPe;
+  int size;
+  void* data;
+
+  GPUMigrateData() : toPe(-1), size(0), data(nullptr) {}
+  GPUMigrateData(int toPe_, int size_, void* data_) : toPe(toPe_), size(size_), data(data_) {}
+};
+
 /********************** CkLocMgr ********************/
 /// A tiny class for detecting heap corruption
 class CkMagicNumber_impl
@@ -420,6 +431,7 @@ private:
   // Immigration messages which are waiting for all array managers to be ready
   std::list<CkArrayElementMigrateMessage*> pendingImmigrate;
 
+  std::unordered_map<CmiUInt8, GPUMigrateData> sendGPUBuffers;
   std::unordered_map<CmiUInt8, CkArrayElementMigrateMessage*> bufferedHostMigrateMsgs;
   std::unordered_map<CmiUInt8, void*> bufferedDeviceMigrateMsgs;
   std::unordered_map<CmiUInt8, void*> sentDeviceMsgs;
@@ -700,6 +712,7 @@ public:
   // Communication:
   void immigrate(CkArrayElementMigrateMessage* msg);
 #if CMK_CUDA
+  void sendGPUMsg(CmiUInt8 id);
   void immigrateGPU(CmiUInt8& id, int& size, char* &data, CkDeviceBufferPost* post);
   void immigrateGPU(CmiUInt8 id, int size, char* data);
 #endif

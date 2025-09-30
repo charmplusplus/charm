@@ -2965,6 +2965,16 @@ void CkLocMgr::migratableList(CkLocRec* rec, std::vector<CkMigratable*>& list)
   }
 }
 
+void CkLocMgr::sendGPUMsg(CmiUInt8 id)
+{
+  auto gpuData = sendGPUBuffers[id];
+  sendGPUBuffers.erase(id);
+  thisProxy[gpuData.toPe].immigrateGPU(id, gpuData.size, CkDeviceBuffer(gpuData.data, gpuData.size,
+    CkCallbackResumeThread()));
+  CkPrintf("PE %d sent GPU msg of size %zu for id %llu\n", CkMyPe(), gpuData.size, id);
+  cudaFree(gpuData.data);
+}
+
 /// Migrate this local element away to another processor.
 void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 {
@@ -3056,10 +3066,8 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 #if CMK_CUDA
   if (gpuBufSize > 0)
   {
-    thisProxy[toPe].immigrateGPU(msg->id, gpuBufSize, CkDeviceBuffer(gpuMsg, gpuBufSize,
-      CkCallbackResumeThread()));
-    CkPrintf("PE %d sent GPU msg of size %zu for id %llu\n", CkMyPe(), gpuBufSize, msg->id);
-    cudaFree(gpuMsg);
+    sendGPUBuffers[msg->id] = GPUMigrateData(toPe, gpuBufSize, gpuMsg);
+    thisProxy[CkMyPe()].sendGPUMsg(msg->id);
   }
 #endif
 
