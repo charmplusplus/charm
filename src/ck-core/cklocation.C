@@ -3058,6 +3058,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   {
     thisProxy[toPe].immigrateGPU(msg->id, gpuBufSize, CkDeviceBuffer(gpuMsg, gpuBufSize,
       CkCallbackResumeThread()));
+    CkPrintf("PE %d sent GPU msg of size %zu for id %llu\n", CkMyPe(), gpuBufSize, msg->id);
     cudaFree(gpuMsg);
   }
 #endif
@@ -3087,6 +3088,7 @@ void CkLocMgr::metaLBCallLB(CkLocRec* rec)
 #if CMK_CUDA
 void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char* &data, CkDeviceBufferPost* post)
 {
+  CkPrintf("PE %d allocating GPU memory size %d for id %llu\n", CkMyPe(), size, id);
   cudaMalloc(&data, size);
   receivedDeviceMsgs[id] = data;
   post[0].cuda_stream = (cudaStream_t) 0;
@@ -3152,6 +3154,11 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
   CmiAssert(CpvAccess(newZCPupGets).empty());  // Ensure that vector is empty
   // Create the new elements as we unpack the message
   pupElementsFor(p, rec, CkElementCreation_migrate);
+
+#if CMK_CUDA
+  cudaFree(gpuMsg);
+#endif
+
   bool zcRgetsActive = !CpvAccess(newZCPupGets).empty();
   if (zcRgetsActive)
   {
@@ -3181,9 +3188,6 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
   }
 
   delete msg;
-#if CMK_CUDA
-  cudaFree(gpuMsg);
-#endif
 }
 
 void CkLocMgr::restore(const CkArrayIndex& idx, CmiUInt8 id, PUP::er& p)
