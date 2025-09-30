@@ -2971,7 +2971,7 @@ void CkLocMgr::sendGPUMsg(CmiUInt8 id)
   sendGPUBuffers.erase(id);
   thisProxy[gpuData.toPe].immigrateGPU(id, gpuData.size, CkDeviceBuffer(gpuData.data, gpuData.size,
     CkCallbackResumeThread()));
-  CkPrintf("PE %d sent GPU msg of size %zu for id %llu\n", CkMyPe(), gpuData.size, id);
+  //CkPrintf("PE %d sent GPU msg of size %zu for id %llu\n", CkMyPe(), gpuData.size, id);
   cudaFree(gpuData.data);
 }
 
@@ -3096,7 +3096,7 @@ void CkLocMgr::metaLBCallLB(CkLocRec* rec)
 #if CMK_CUDA
 void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char* &data, CkDeviceBufferPost* post)
 {
-  CkPrintf("PE %d allocating GPU memory size %d for id %llu\n", CkMyPe(), size, id);
+  //CkPrintf("PE %d allocating GPU memory size %d for id %llu\n", CkMyPe(), size, id);
   cudaMalloc(&data, size);
   receivedDeviceMsgs[id] = data;
   post[0].cuda_stream = (cudaStream_t) 0;
