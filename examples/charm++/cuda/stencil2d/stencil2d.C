@@ -573,16 +573,13 @@ class Stencil : public CBase_Stencil {
 
   void ResumeFromSync()
   {
-    //CkPrintf("[%*d] Resuming from sync, iteration %d\n",
-    //         n_digits, thisFlatIndex, my_iter);
-    //thisProxy(thisIndex.x, thisIndex.y).compute();
     CkCallback cb(CkReductionTarget(Stencil, compute), thisProxy);
     contribute(cb);
   }
 
   void iterate()
   {
-    if (my_iter > 0 && my_iter < num_iters && my_iter % 100 == 0)
+    if (my_iter > 0 && my_iter < num_iters && my_iter % 1000 == 0)
     {
       cudaStreamSynchronize(stream);
       CkPrintf("Load balancing: %d/%d, iteration %d. GPU Load = %f\n",
@@ -591,7 +588,7 @@ class Stencil : public CBase_Stencil {
     }
     else
     {
-      if (thisFlatIndex == 0)
+      if (thisFlatIndex == 0 && my_iter % 100 == 0)
         CkPrintf("[%*d] Iteration %d\n", n_digits, thisFlatIndex, my_iter);
       thisProxy(thisIndex.x, thisIndex.y).compute();
     }
