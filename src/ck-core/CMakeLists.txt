@@ -23,8 +23,8 @@ set(ck-cxx-sources
     ck.C ckarray.C ckarrayoptions.C ckcallback.C
     ckcheckpoint.C ckfutures.C ckIgetControl.C
     cklocation.C ckmemcheckpoint.C ckmulticast.C
-    ckobjQ.C ckrdma.C ckrdmadevice.C ckreduction.C cksyncbarrier.C debug-charm.C
-    debug-message.C init.C modifyScheduler.C mpi-interoperate.C msgalloc.C
+    ckrdma.C ckrdmadevice.C ckreduction.C cksyncbarrier.C debug-charm.C
+    debug-message.C init.C mpi-interoperate.C msgalloc.C
     qd.C register.C sdag.C waitqd.C
 )
 
