@@ -1668,7 +1668,7 @@ void hapiSendMemoryRequest(char* msg, int size)
     
     char server_fifo[BUFFER_SIZE];
     sprintf(server_fifo, SERVER_FIFO_TEMPLATE, cpv_my_device);
-    CmiPrintf("Sending request to %s: %s\n", server_fifo, msg);
+    CmiPrintf("Sending request to %s\n", server_fifo);
     
     int server_fd = open(server_fifo, O_WRONLY | O_NONBLOCK);
     if (server_fd == -1) {
@@ -1680,7 +1680,7 @@ void hapiSendMemoryRequest(char* msg, int size)
     if (written == -1) {
         perror("write to server FIFO");
     } else {
-        CmiPrintf("Successfully wrote %zd bytes to server FIFO\n", written);
+        //CmiPrintf("Successfully wrote %zd bytes to server FIFO\n", written);
     }
     
     close(server_fd);
