@@ -2965,6 +2965,7 @@ void CkLocMgr::migratableList(CkLocRec* rec, std::vector<CkMigratable*>& list)
   }
 }
 
+#if CMK_CUDA
 void CkLocMgr::sendGPUMsg(CmiUInt8 id)
 {
   auto gpuData = sendGPUBuffers[id];
@@ -2974,6 +2975,7 @@ void CkLocMgr::sendGPUMsg(CmiUInt8 id)
   //CkPrintf("PE %d sent GPU msg of size %zu for id %llu\n", CkMyPe(), gpuData.size, id);
   cudaFree(gpuData.data);
 }
+#endif
 
 /// Migrate this local element away to another processor.
 void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
