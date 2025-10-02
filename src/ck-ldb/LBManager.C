@@ -8,6 +8,10 @@
 #include <ck.h>
 #include "cksyncbarrier.h"
 
+#ifdef CMK_CUDA
+#include <cuda_runtime.h>
+#endif
+
 #include "DistributedLB.h"
 #include "LBManager.h"
 #include "LBSimulation.h"
@@ -1064,6 +1068,61 @@ int LBManager::ProcessorSpeed()
 {
   static int peSpeed = LDProcessorSpeed();
   return peSpeed;
+}
+
+int LBManager::ProcessorGPUSpeed()
+{
+#ifdef CMK_CUDA
+  static int gpuSpeed = -1; // Cache the result
+  
+  if (gpuSpeed != -1) {
+    return gpuSpeed;
+  }
+  
+  // Check if GPU is available
+  int deviceCount = 0;
+  if (cudaGetDeviceCount(&deviceCount) != cudaSuccess || deviceCount == 0) {
+    CmiAbort("LB> PE %d: No GPU available, GPU speed = 0\n", CkMyPe());
+  }
+  
+  // Get device for this PE (round-robin assignment)
+  int deviceId = CkMyPe() % deviceCount;
+  if (cudaSetDevice(deviceId) != cudaSuccess) {
+    CmiAbort("LB> PE %d: Failed to set GPU device %d, GPU speed = 0\n", CkMyPe(), deviceId);
+  }
+  
+  // Get device properties
+  cudaDeviceProp prop;
+  if (cudaGetDeviceProperties(&prop, deviceId) != cudaSuccess) {
+    CmiAbort("LB> PE %d: Failed to get GPU device properties, GPU speed = 0\n", CkMyPe());
+  }
+  
+  // Calculate theoretical peak single-precision FLOPS
+  // Formula: multiProcessorCount * maxThreadsPerMultiProcessor * clockRate(KHz) * 2(FMA)
+  // Convert to GFLOPS and then scale to integer for comparison with CPU speed
+  long long peakFLOPS = (long long)prop.multiProcessorCount * 
+                        prop.maxThreadsPerMultiProcessor * 
+                        prop.clockRate * 2LL; // 2 for FMA (multiply-add)
+  
+  // Convert from KHz*ops to GFLOPS, then scale to reasonable integer range
+  double gflops = peakFLOPS / 1e6; // KHz to GHz conversion for GFLOPS
+  
+  // Scale to integer range similar to CPU ProcessorSpeed (typically 1-10000)
+  // Use a scaling factor to make GPU speeds comparable to CPU speeds
+  gpuSpeed = (int)(gflops / 100.0); // Scale down GFLOPS to reasonable range
+  
+  if (gpuSpeed < 1) gpuSpeed = 1; // Minimum speed
+  
+  if (_lb_args.debug() > 1) {
+    CmiPrintf("LB> PE %d GPU %s: %d SMs, %d threads/SM, %d MHz, %.1f GFLOPS -> speed %d\n", 
+              CkMyPe(), prop.name, prop.multiProcessorCount, 
+              prop.maxThreadsPerMultiProcessor, prop.clockRate/1000, gflops, gpuSpeed);
+  }
+  
+  return gpuSpeed;
+#else
+  CmiAbort("LB> PE %d: ProcessorGPUSpeed() GPU support not enabled in this build\n", CkMyPe());
+#endif
 }
 
 /*

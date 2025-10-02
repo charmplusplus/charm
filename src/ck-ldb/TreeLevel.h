@@ -1328,7 +1328,14 @@ class PELevel : public LevelLogic
     if (rateAware)
     {
       msg = new (1, 1, 1, 2, nobjs, nobjs, 0) LBStatsMsg_1;
+#if CMK_CUDA
+      msg->speeds[0] = float(lbmgr->ProcessorGPUSpeed());
+#else
       msg->speeds[0] = float(lbmgr->ProcessorSpeed());
+#endif
+
+    if (_lb_args.debug() > 1)
+        CkPrintf("[%d] PELevel: processor speed is %f\n", mype, msg->speeds[0]);
     }
     else
       msg = new (1, 1, 0, 2, nobjs, nobjs, 0) LBStatsMsg_1;

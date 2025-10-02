@@ -511,6 +511,7 @@ class LBManager : public CBase_LBManager
   void LocalBarrierOff(void);
   void ResumeClients();
   static int ProcessorSpeed();
+  static int ProcessorGPUSpeed();
   static void SetLBPeriod(double period)
   {
     _lb_args.lbperiod() = period;
