@@ -2,17 +2,23 @@
 
 is_restart=false
 original_args=("$@")
-pes_file="/dev/shm/numRestartProcs.txt"
+shrinkexpand_basedir="/dev/shm"  # Default base directory
+pes_file="$shrinkexpand_basedir/numRestartProcs.txt"
 original_nodelist_file="/tmp/hapi_original_nodelist.txt"
 
-# --- Pre-parse to find the nodelist for daemon startup ---
+# --- Pre-parse to find the nodelist and shrinkexpand_basedir ---
 machinefile=""
 for ((i=0; i<${#original_args[@]}; ++i)); do
     if [[ "${original_args[i]}" == "++nodelist" ]]; then
         machinefile="${original_args[i+1]}"
-        break
+    elif [[ "${original_args[i]}" == "+shrinkexpand_basedir" ]]; then
+        shrinkexpand_basedir="${original_args[i+1]}"
+        echo "Charmrun> Using custom base directory: $shrinkexpand_basedir"
     fi
 done
+
+# Update pes_file path with the (possibly custom) base directory
+pes_file="$shrinkexpand_basedir/numRestartProcs.txt"
 
 num_nodes=0
 if [[ -n "$machinefile" ]]; then
@@ -122,7 +128,7 @@ cleanup_pids=()
 echo "Charmrun> Initial cleanup on ${#node_ips[@]} node(s): ${node_ips[*]}"
 for ip in "${node_ips[@]}"; do
     slots=${node_slots["$ip"]}
-    fifo_cmd="rm -f /dev/shm/numRestartProcs.txt /tmp/server_pipe_* /tmp/client_pipe_* /tmp/daemon_ready_*"
+    fifo_cmd="rm -f $shrinkexpand_basedir/numRestartProcs.txt /tmp/server_pipe_* /tmp/client_pipe_* /tmp/daemon_ready_*"
     for ((slot=0; slot<slots; slot++)); do
         fifo_cmd="$fifo_cmd; mkfifo -m 0666 /tmp/daemon_ready_$slot"
     done
@@ -172,6 +178,10 @@ while true; do
         ++p[0-9]*)
             pes_arg="$arg"
             ;;
+        +shrinkexpand_basedir)
+            # Skip this and its argument - already parsed at script start
+            i=$((i+1))
+            ;;
         *)
             args+=("$arg")
             ;;
@@ -181,7 +191,7 @@ while true; do
 
     # Check the flag. If it's a restart, prepare the extra arguments.
     if [ "$is_restart" = true ]; then
-        restart_arg="+shrinkexpand +restart /dev/shm"
+        restart_arg="+shrinkexpand +restart $shrinkexpand_basedir +shrinkexpand_basedir $shrinkexpand_basedir"
         if [ -f "$pes_file" ]; then
             num_pes=$(cat "$pes_file")
             pes_arg="+p $num_pes"
@@ -226,7 +236,7 @@ while true; do
             for ip in "${detected_new_nodes[@]}"; do
                 echo "Charmrun> Cleaning up node: $ip"
                 slots=${detected_new_node_slots["$ip"]}
-                fifo_cmd="rm -f /dev/shm/numRestartProcs.txt /tmp/server_fifo_* /tmp/client_fifo_* /tmp/daemon_ready_*"
+                fifo_cmd="rm -f $shrinkexpand_basedir/numRestartProcs.txt /tmp/server_fifo_* /tmp/client_fifo_* /tmp/daemon_ready_*"
                 for ((slot=0; slot<slots; slot++)); do
                     fifo_cmd="$fifo_cmd; mkfifo -m 0666 /tmp/daemon_ready_$slot"
                 done

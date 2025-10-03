@@ -4,11 +4,21 @@ is_restart=false
 
 original_args=("$@")
 
+# Default TMPDIR based on OS
 if [[ "$(uname)" == "Darwin" ]]; then
     TMPDIR="/tmp"
 else
     TMPDIR="/dev/shm"
 fi
+
+# Pre-parse to check for +shrinkexpand_basedir
+for ((i=0; i<${#original_args[@]}; ++i)); do
+    if [[ "${original_args[i]}" == "+shrinkexpand_basedir" ]]; then
+        TMPDIR="${original_args[i+1]}"
+        echo "Charmrun> Using custom base directory: $TMPDIR"
+        break
+    fi
+done
 
 pes_file="$TMPDIR/numRestartProcs.txt"
 
@@ -33,6 +43,10 @@ while true; do
         ++p[0-9]*)
         pes_arg="$arg"
         ;;
+        +shrinkexpand_basedir)
+        # Skip this and its argument - already parsed at script start
+        i=$((i+1))
+        ;;
         *)
         args+=("$arg")
         ;;
@@ -42,7 +56,7 @@ while true; do
 
     # 2. Check the flag. If it's a restart, prepare the extra argument.
     if [ "$is_restart" = true ]; then
-        restart_arg="+restart $TMPDIR"
+        restart_arg="+restart $TMPDIR +shrinkexpand_basedir $TMPDIR"
         if [ -f "$pes_file" ]; then
             num_pes=$(cat "$pes_file")
             echo "Charm> Reading pes $num_pes from $pes_file"

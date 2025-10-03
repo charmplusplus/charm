@@ -140,7 +140,8 @@ void hapiInit(char** argv) {
     hapiMapping(argv); // Perform PE-device mapping
 
 #if CMK_SHRINK_EXPAND
-    hapiStartMemoryDaemon(argv);
+    int& cpv_my_device = CpvAccess(my_device);
+    hapiCheck(cudaSetDevice(cpv_my_device));
 #else
     int& cpv_my_device = CpvAccess(my_device);
     hapiCheck(cudaSetDevice(cpv_my_device));
@@ -164,142 +165,10 @@ void hapiInit(char** argv) {
   hapiRegisterCallbacks(); // Register callback functions
 }
 
-
-void hapiStartMemoryDaemon(char** argv)
-{
-#if CMK_SHRINK_EXPAND
-  // start client FIFO
-  long pid = getpid();
-  char client_fifo_path[BUFFER_SIZE];
-  sprintf(client_fifo_path, CLIENT_FIFO_TEMPLATE, pid);
-  std::remove(client_fifo_path);
-  mkfifo(client_fifo_path, 0666);
-
-  int& cpv_my_device = CpvAccess(my_device);
-  CkPrintf("Device = %i\n", cpv_my_device);
-  hapiCheck(cudaSetDevice(cpv_my_device));
-
-  if (CmiPhysicalRank(CmiMyPe()) != firstRankForDevice)
-  {
-    CmiBarrier();
-    return;
-  }
-
-  char server_fifo_path[BUFFER_SIZE];
-  sprintf(server_fifo_path, SERVER_FIFO_TEMPLATE, cpv_my_device);
-
-  // Create a ready signal FIFO for synchronization
-  if (!CmiGetArgFlagDesc(argv,"+shrinkexpand","Restarting of already running prcoess")) {
-    char ready_fifo_path[BUFFER_SIZE];
-    sprintf(ready_fifo_path, "/tmp/daemon_ready_%d", cpv_my_device);
-
-    CmiPrintf("Parent: Waiting for daemon to be ready...\n");
-    
-    int ready_fd = open(ready_fifo_path, O_RDONLY);
-    if (ready_fd == -1) {
-      perror("Parent: open ready FIFO");
-      CmiAbort("Failed to open ready FIFO");
-    }
-  
-    char ready_signal;
-    read(ready_fd, &ready_signal, 1);
-    close(ready_fd);
-    unlink(ready_fifo_path);  // Clean up
-    
-    CmiPrintf("Parent: Daemon is ready!\n");
-  }
-  
-  CmiBarrier();
-  return;
-#endif
-}
-
-int hapiCheckpoint(void* devPtr, int size) {
-  pid_t pid = getpid();
-
-  char client_fifo_path[BUFFER_SIZE];
-  sprintf(client_fifo_path, CLIENT_FIFO_TEMPLATE, pid);
-
-  cudaIpcMemHandle_t ipc_handle;
-  hapiCheck(cudaIpcGetMemHandle(&ipc_handle, devPtr));
-
-  char msg_buf[BUFFER_SIZE];
-  int offset = sprintf(msg_buf, "CKPT:%ld:%d:%d:", pid, CkMyPe(), size);
-  memcpy(msg_buf + offset, &ipc_handle, sizeof(cudaIpcMemHandle_t));
-  int total_size = offset + sizeof(cudaIpcMemHandle_t);
-
-  hapiSendMemoryRequest(msg_buf, total_size);
-
-  int client_fd = open(client_fifo_path, O_RDONLY);
-  int alloc_id;
-  read(client_fd, &alloc_id, sizeof(int));
-  close(client_fd);
-
-  return alloc_id;
-}
-
-void hapiRestore(void* devPtr, int size, int alloc_id) {
-  pid_t pid = getpid();
-
-  char client_fifo_path[BUFFER_SIZE];
-  sprintf(client_fifo_path, CLIENT_FIFO_TEMPLATE, pid);
-
-  char msg_buf[BUFFER_SIZE];
-  sprintf(msg_buf, "GET:%ld:%d", pid, alloc_id);
-
-  hapiSendMemoryRequest(msg_buf, strlen(msg_buf) + 1);
-
-  int client_fd = open(client_fifo_path, O_RDONLY);
-  cudaIpcMemHandle_t ipc_handle;
-  read(client_fd, &ipc_handle, sizeof(cudaIpcMemHandle_t));
-  close(client_fd);
-
-  void* srcPtr;
-  hapiCheck(cudaIpcOpenMemHandle(&srcPtr, ipc_handle, cudaIpcMemLazyEnablePeerAccess));
-  hapiCheck(cudaMemcpy(devPtr, srcPtr, size, cudaMemcpyDeviceToDevice));
-  hapiCheck(cudaIpcCloseMemHandle(srcPtr));
-
-  char free_msg[BUFFER_SIZE];
-  sprintf(free_msg, "FREE:%ld:%d", pid, alloc_id);
-  hapiSendMemoryRequest(free_msg, strlen(free_msg) + 1);
-
-  client_fd = open(client_fifo_path, O_RDONLY);
-  char status;
-  read(client_fd, &status, sizeof(char));
-  close(client_fd);
-}
-
 void hapiExit() {
   // Ensure all PEs have finished GPU work
   CmiPrintf("Exit called on PE %d\n", CmiMyPe());
   CmiNodeBarrier();
-
-#if CMK_SHRINK_EXPAND
-  char client_fifo_path[BUFFER_SIZE];
-  sprintf(client_fifo_path, CLIENT_FIFO_TEMPLATE, getpid());
-
-  if (!get_shrinkexpand_exit() && CmiPhysicalRank(CmiMyPe()) == firstRankForDevice)
-  {
-    char msg_buf[BUFFER_SIZE];
-    sprintf(msg_buf, "KILL:%ld:0", getpid());
-    hapiSendMemoryRequest(msg_buf, strlen(msg_buf) + 1);
-
-    int client_fd = open(client_fifo_path, O_RDONLY);
-    char status;
-    read(client_fd, &status, sizeof(char));
-    close(client_fd);
-  }
-
-  if (!get_shrinkexpand_exit())
-  {
-    // Attempt to delete the file
-    if (std::remove(client_fifo_path) == 0) {
-        CmiPrintf("File '%s' deleted successfully.\n", client_fifo_path);
-    } else {
-        CmiPrintf("Error deleting file '%s': %s\n", client_fifo_path, strerror(errno));
-    }
-  }
-#endif
 
   if (CmiMyRank() == 0) {
     shmCleanup();
