@@ -1096,13 +1096,18 @@ int LBManager::ProcessorGPUSpeed()
   if (cudaGetDeviceProperties(&prop, deviceId) != cudaSuccess) {
     CmiAbort("LB> PE %d: Failed to get GPU device properties, GPU speed = 0\n", CkMyPe());
   }
+
+  int clockRate;
+  if(cudaDeviceGetAttribute(&clockRate, cudaDevAttrClockRate, deviceId) != cudaSuccess) {
+    CmiAbort("LB> PE %d: Failed to get GPU clock rate, GPU speed = 0\n", CkMyPe());
+  }
   
   // Calculate theoretical peak single-precision FLOPS
   // Formula: multiProcessorCount * maxThreadsPerMultiProcessor * clockRate(KHz) * 2(FMA)
   // Convert to GFLOPS and then scale to integer for comparison with CPU speed
   long long peakFLOPS = (long long)prop.multiProcessorCount * 
                         prop.maxThreadsPerMultiProcessor * 
-                        prop.clockRate * 2LL; // 2 for FMA (multiply-add)
+                        clockRate * 2LL; // 2 for FMA (multiply-add)
   
   // Convert from KHz*ops to GFLOPS, then scale to reasonable integer range
   double gflops = peakFLOPS / 1e6; // KHz to GHz conversion for GFLOPS
@@ -1116,7 +1121,7 @@ int LBManager::ProcessorGPUSpeed()
   if (_lb_args.debug() > 1) {
     CmiPrintf("LB> PE %d GPU %s: %d SMs, %d threads/SM, %d MHz, %.1f GFLOPS -> speed %d\n", 
               CkMyPe(), prop.name, prop.multiProcessorCount, 
-              prop.maxThreadsPerMultiProcessor, prop.clockRate/1000, gflops, gpuSpeed);
+              prop.maxThreadsPerMultiProcessor, clockRate/1000, gflops, gpuSpeed);
   }
   
   return gpuSpeed;
