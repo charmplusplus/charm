@@ -8,7 +8,7 @@
 #include <ck.h>
 #include "cksyncbarrier.h"
 
-#ifdef CMK_CUDA
+#if CMK_CUDA
 #include <cuda_runtime.h>
 #endif
 
@@ -1072,7 +1072,7 @@ int LBManager::ProcessorSpeed()
 
 int LBManager::ProcessorGPUSpeed()
 {
-#ifdef CMK_CUDA
+#if CMK_CUDA
   static int gpuSpeed = -1; // Cache the result
   
   if (gpuSpeed != -1) {
