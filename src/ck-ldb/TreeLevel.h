@@ -624,10 +624,11 @@ class RootLevel : public LevelLogic
 
       }
     }
-    if (CkMyPe() != 0) {
+  }
+    if (num_stats_msgs == 0) {
       stats_msgs.clear();
     }
-    }
+    
 
     nPes = nNewPes;
     num_stats_msgs = stats_msgs.size();
