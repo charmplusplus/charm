@@ -133,13 +133,13 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
       CkAbort("[PE %d] LBStatsMsg_1::fill should only have one msg, has %d\n", CkMyPe(), msgs.size());
     }
     LBStatsMsg_1* msg = (LBStatsMsg_1*)msgs[0];
-    if (_lb_args.debug() > 1)CkPrintf("[PE %d]   msg %d with %d pes and %d objs\n", CkMyPe(), 0, msg->nPes, msg->nObjs);
+    //if (_lb_args.debug() > 1)CkPrintf("[PE %d]   msg %d with %d pes and %d objs\n", CkMyPe(), 0, msg->nPes, msg->nObjs);
     for (int j = 0; j < msg->nPes; j++)
     {
       int pe = msg->pe_ids[j];
       CkAssert(pe >= 0 && pe < CkNumPes());
-      if (_lb_args.debug() > 2) CkPrintf("[PE %d]   filling pe %d with %d objs\n", CkMyPe(), pe,
-                msg->obj_start[j + 1] - msg->obj_start[j]);
+      //if (_lb_args.debug() > 2) CkPrintf("[PE %d]   filling pe %d with %d objs\n", CkMyPe(), pe,
+      //          msg->obj_start[j + 1] - msg->obj_start[j]);
       procs[pe_cnt].populate(pe, msg->bgloads + j, msg->speeds + j);
       procs[pe_cnt++].resetLoad();
       migMsg->obj_start[pe] = obj_cnt;
@@ -1418,8 +1418,8 @@ class PELevel : public LevelLogic
    
     for (int i = obj_start; i < obj_end; i++, j++)
     {
-      if (_lb_args.debug() > 2) CkPrintf("[%d] PELevel: obj %d (abs=%d, handle=%d) to dest %d\n", CkMyPe(), j, i,
-              myObjs[j].handle.handle, decision->to_pes[i]);
+      //if (_lb_args.debug() > 2) CkPrintf("[%d] PELevel: obj %d (abs=%d, handle=%d) to dest %d\n", CkMyPe(), j, i,
+      //        myObjs[j].handle.handle, decision->to_pes[i]);
       int dest = decision->to_pes[i];
       if (dest > CkNumPes() - 1)
         CkAbort("PELevel: processDecision found dest PE >= CkNumPes(): %d >= %d\n", dest, CkNumPes());
@@ -1427,8 +1427,8 @@ class PELevel : public LevelLogic
       {
         if (dest >= 0)
         {
-          if (_lb_args.debug() > 1) CkPrintf("[%d] (processDecision) My obj %d (abs=%d, handle=%d) moving to %d\n", CkMyPe(),
-                   j, i, myObjs[j].handle.handle, dest);
+          //if (_lb_args.debug() > 1) CkPrintf("[%d] (processDecision) My obj %d (abs=%d, handle=%d) moving to %d\n", CkMyPe(),
+          //         j, i, myObjs[j].handle.handle, dest);
           if (lbmgr->Migrate(myObjs[j].handle, dest) == 0)
           {
             CkAbort("PELevel: Migrate call returned 0\n");
