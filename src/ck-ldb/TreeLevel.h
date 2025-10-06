@@ -721,7 +721,6 @@ class RootLevel : public LevelLogic
       if (nPes != CkNumPes()) {
         CkAbort("nPes (%d) != CkNumPes() (%d) in RootLevel::loadBalance\n", nPes, CkNumPes());
       }
-      //CkPrintf("[%d] prepstrategy with nObjs=%d nPes=%d nstats_msgs=%d\n", CkMyPe(), nObjs, nPes, stats_msgs.size());
       wrapper->prepStrategy(nObjs, nPes, stats_msgs, migMsg);
       wrapper->runStrategy(migMsg);
       if (current_strategy == wrappers.size() - 1)
@@ -1263,7 +1262,7 @@ class PELevel : public LevelLogic
     LevelLogic::pup(p); // this packs num_stats_msgs
    
     p|nObjs;
-    p|myObjs;
+   // p|myObjs;
 
     int nPes;
     if (p.isPacking()) nPes = CkNumPes();
@@ -1274,6 +1273,29 @@ class PELevel : public LevelLogic
         myObjs.clear();
         nObjs = 0;
        }
+    }
+    num_stats_msgs = 0;
+
+  }
+
+  virtual void resetObjs() {
+      int nobjs = lbmgr->GetObjDataSz();
+
+    std::vector<LDObjData> allLocalObjs(nobjs);
+    if (nobjs > 0) lbmgr->GetObjData(allLocalObjs.data());  // populate allLocalObjs
+
+    myObjs.clear();
+    nObjs = 0;
+
+    for (int i = 0; i < nobjs; i++)
+    {
+      if (allLocalObjs[i].migratable)
+      {
+     
+        myObjs.emplace_back(allLocalObjs[i]);
+       nObjs++;
+     
+      }
     }
   }
 

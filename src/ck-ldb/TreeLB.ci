@@ -28,7 +28,7 @@ module TreeLB {
     entry void checkForRealloc();
     entry void willIbekilled(std::vector<char> avail, int newnumProcessAfterRestart);
 
-    entry void restartFromSE();
+    entry void restartFromSE(bool rateAware);
     entry void collectSpeeds(int pe_id, float speed);
   };
 

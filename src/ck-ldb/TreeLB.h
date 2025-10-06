@@ -48,6 +48,7 @@ class LevelLogic : public PUP::able
   // Note: These are not "=0" methods, because then the subclass would have to
   // implement (and abort inside) empty methods if it doesn't need them
 
+  virtual void resetObjs() { CkAbort("LevelLogic::resetObjs not implemented\n"); }
   /// deposit stats msg received from a child
   virtual void depositStats(TreeLBMessage* stats) { stats_msgs.push_back(stats); }
 
@@ -228,7 +229,7 @@ class TreeLB : public CBase_TreeLB
   void checkForRealloc();
 
   void willIbekilled(std::vector<char> avail, int newnumProcessAfterRestart);
-  void restartFromSE();
+  void restartFromSE(bool rateAware);
   void collectSpeeds(int pe_id, float speed);
 
  private:

@@ -46,18 +46,17 @@ void TreeLB::StartLB(){
     CkPrintf("size of stats_msgs = %d\n", logic[1]->stats_msgs.size());
   }
 
-  int rateAware = false;
+  bool rateAware = false;
   LBStatsMsg_1* mm = (LBStatsMsg_1*)logic[1]->stats_msgs[0];
   if ((void*)mm->speeds != (void*)mm->obj_start) rateAware = true;
 
-  if (logic[1]->getNumNewPes() == 0 || !rateAware) {
-    CkPrintf("TreeLB::StartLB: no new PEs detected, starting load balancing\n");
-    loadBalanceSubtree(numLevels - 1);
-  }
-  else {
-    thisProxy.restartFromSE();
-    CkPrintf("TreeLB::StartLB: new PEs detected, setting up speeds first\n");
-  }
+  // if (logic[1]->getNumNewPes() == 0 || !rateAware) {
+  //   CkPrintf("TreeLB::StartLB: no new PEs detected, starting load balancing\n");
+  //   loadBalanceSubtree(numLevels - 1);
+  // }
+  // else 
+      thisProxy.restartFromSE(rateAware);
+
 }
 
 void TreeLB::loadConfigFile(const CkLBOptions& opts)
@@ -162,10 +161,10 @@ void TreeLB::collectSpeeds(int pe_id, float speed) {
     CkPrintf("[PE %d] TreeLB::collectSpeeds: still waiting for more speeds\n", CkMyPe());
 }
 
-void TreeLB::restartFromSE() {
+void TreeLB::restartFromSE(bool rateAware) {
   // TODO: need to collect and recompute bg load as well for the new pes
 
-  if (CkMyPe() == 0) {
+  if (CkMyPe() == 0 && rateAware) {
     // if there was just 1 pe initially, the speed isn't set, so recompute it here
     // TODO: ideally this should be rearranged so that the stats msgs are always set up correctly
     LBStatsMsg_1* msg = (LBStatsMsg_1*)logic[1]->stats_msgs[0];
@@ -175,11 +174,17 @@ void TreeLB::restartFromSE() {
         }
       }
   }
-  if (thisPeNew) {
+  if (thisPeNew && rateAware) {
     if (CkMyPe() == 0) CkAbort("[PE %d] Should never be new\n", CkMyPe());
     float speed = float(lbmgr->ProcessorSpeed());
     thisProxy[0].collectSpeeds(CkMyPe(), speed);
     thisPeNew = false;
+  }
+
+  logic[0]->resetObjs();
+
+  if (CkMyPe() == 0 && !rateAware) {
+    loadBalanceSubtree(numLevels - 1);
   }
 }
 
