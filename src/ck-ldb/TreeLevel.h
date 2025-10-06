@@ -527,7 +527,7 @@ class RootLevel : public LevelLogic
       for (int i = 0; i < msg->nPes; i++) {
         if (msg->pe_ids[i] == proc_id) {
 
-          msg->speeds[i] = 1.0; // todo: fix this, somehow causes obj migration problems?
+          msg->speeds[i] = speed; 
         }
       }
 
