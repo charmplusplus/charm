@@ -21,6 +21,8 @@
 /* readonly */ bool sync_ver;
 /* readonly */ bool use_zerocopy;
 /* readonly */ bool print_elements;
+/* readonly */ int lb_freq;
+/* readonly */ int first_lb;
 
 extern void invokeInitKernel(DataType* d_temperature, int block_width,
     int block_height, cudaStream_t stream);
@@ -60,6 +62,8 @@ public:
     print_elements = false;
     sync_ver = false;
     my_iter = 0;
+    first_lb = 10;
+    lb_freq = 100;
 
     // Initialize aggregate timers
     update_agg_time = 0.0;
@@ -214,6 +218,14 @@ class Block : public CBase_Block {
 
   Block() {}
 
+  Block(CkMigrateMessage* m) {
+    hapiCheck(cudaStreamCreateWithPriority(&compute_stream, cudaStreamDefault, 0));
+    hapiCheck(cudaStreamCreateWithPriority(&comm_stream, cudaStreamDefault, -1));
+
+    hapiCheck(cudaEventCreateWithFlags(&compute_event, cudaEventDisableTiming));
+    hapiCheck(cudaEventCreateWithFlags(&comm_event, cudaEventDisableTiming));
+  }
+
   ~Block() {
     hapiCheck(cudaFreeHost(h_temperature));
     hapiCheck(cudaFree(d_temperature));
@@ -239,6 +251,45 @@ class Block : public CBase_Block {
 
     hapiCheck(cudaEventDestroy(compute_event));
     hapiCheck(cudaEventDestroy(comm_event));
+  }
+
+  void pup(PUP::er& p) {
+    p | my_iter;
+    p | neighbors;
+    p | remote_count;
+    p | x;
+    p | y;
+    p | left_bound;
+    p | right_bound;
+    p | top_bound;
+    p | bottom_bound;
+
+    if (p.isUnpacking()) {
+      hapiCheck(hapiMallocHost((void**)&h_temperature,
+            sizeof(DataType) * (block_width + 2) * (block_height + 2)));
+      hapiCheck(hapiMalloc((void**)&d_temperature,
+            sizeof(DataType) * (block_width + 2) * (block_height + 2)));
+      hapiCheck(hapiMalloc((void**)&d_new_temperature,
+            sizeof(DataType) * (block_width + 2) * (block_height + 2)));
+      hapiCheck(hapiMallocHost((void**)&h_left_ghost, sizeof(DataType) * block_height));
+      hapiCheck(hapiMallocHost((void**)&h_right_ghost, sizeof(DataType) * block_height));
+      hapiCheck(hapiMallocHost((void**)&h_top_ghost, sizeof(DataType) * block_width));
+      hapiCheck(hapiMallocHost((void**)&h_bottom_ghost, sizeof(DataType) * block_width));
+      if (!use_zerocopy) {
+        hapiCheck(hapiMalloc((void**)&d_left_ghost, sizeof(DataType) * block_height));
+        hapiCheck(hapiMalloc((void**)&d_right_ghost, sizeof(DataType) * block_height));
+      } else {
+        hapiCheck(hapiMalloc((void**)&d_send_left_ghost, sizeof(DataType) * block_height));
+        hapiCheck(hapiMalloc((void**)&d_send_right_ghost, sizeof(DataType) * block_height));
+        hapiCheck(hapiMalloc((void**)&d_send_top_ghost, sizeof(DataType) * block_width));
+        hapiCheck(hapiMalloc((void**)&d_send_bottom_ghost, sizeof(DataType) * block_width));
+        hapiCheck(hapiMalloc((void**)&d_recv_left_ghost, sizeof(DataType) * block_height));
+        hapiCheck(hapiMalloc((void**)&d_recv_right_ghost, sizeof(DataType) * block_height));
+      }
+    }
+      
+    p(d_temperature, (block_width + 2) * (block_height + 2), PUP::PUPMode::DEVICE);
+    p(d_new_temperature, (block_width + 2) * (block_height + 2), PUP::PUPMode::DEVICE);
   }
 
   void init() {
@@ -272,26 +323,26 @@ class Block : public CBase_Block {
       neighbors++;
 
     // Allocate memory and create CUDA entities
-    hapiCheck(cudaMallocHost((void**)&h_temperature,
+    hapiCheck(hapiMallocHost((void**)&h_temperature,
           sizeof(DataType) * (block_width + 2) * (block_height + 2)));
-    hapiCheck(cudaMalloc((void**)&d_temperature,
+    hapiCheck(hapiMalloc((void**)&d_temperature,
           sizeof(DataType) * (block_width + 2) * (block_height + 2)));
-    hapiCheck(cudaMalloc((void**)&d_new_temperature,
+    hapiCheck(hapiMalloc((void**)&d_new_temperature,
           sizeof(DataType) * (block_width + 2) * (block_height + 2)));
-    hapiCheck(cudaMallocHost((void**)&h_left_ghost, sizeof(DataType) * block_height));
-    hapiCheck(cudaMallocHost((void**)&h_right_ghost, sizeof(DataType) * block_height));
-    hapiCheck(cudaMallocHost((void**)&h_top_ghost, sizeof(DataType) * block_width));
-    hapiCheck(cudaMallocHost((void**)&h_bottom_ghost, sizeof(DataType) * block_width));
+    hapiCheck(hapiMallocHost((void**)&h_left_ghost, sizeof(DataType) * block_height));
+    hapiCheck(hapiMallocHost((void**)&h_right_ghost, sizeof(DataType) * block_height));
+    hapiCheck(hapiMallocHost((void**)&h_top_ghost, sizeof(DataType) * block_width));
+    hapiCheck(hapiMallocHost((void**)&h_bottom_ghost, sizeof(DataType) * block_width));
     if (!use_zerocopy) {
-      hapiCheck(cudaMalloc((void**)&d_left_ghost, sizeof(DataType) * block_height));
-      hapiCheck(cudaMalloc((void**)&d_right_ghost, sizeof(DataType) * block_height));
+      hapiCheck(hapiMalloc((void**)&d_left_ghost, sizeof(DataType) * block_height));
+      hapiCheck(hapiMalloc((void**)&d_right_ghost, sizeof(DataType) * block_height));
     } else {
-      hapiCheck(cudaMalloc((void**)&d_send_left_ghost, sizeof(DataType) * block_height));
-      hapiCheck(cudaMalloc((void**)&d_send_right_ghost, sizeof(DataType) * block_height));
-      hapiCheck(cudaMalloc((void**)&d_send_top_ghost, sizeof(DataType) * block_width));
-      hapiCheck(cudaMalloc((void**)&d_send_bottom_ghost, sizeof(DataType) * block_width));
-      hapiCheck(cudaMalloc((void**)&d_recv_left_ghost, sizeof(DataType) * block_height));
-      hapiCheck(cudaMalloc((void**)&d_recv_right_ghost, sizeof(DataType) * block_height));
+      hapiCheck(hapiMalloc((void**)&d_send_left_ghost, sizeof(DataType) * block_height));
+      hapiCheck(hapiMalloc((void**)&d_send_right_ghost, sizeof(DataType) * block_height));
+      hapiCheck(hapiMalloc((void**)&d_send_top_ghost, sizeof(DataType) * block_width));
+      hapiCheck(hapiMalloc((void**)&d_send_bottom_ghost, sizeof(DataType) * block_width));
+      hapiCheck(hapiMalloc((void**)&d_recv_left_ghost, sizeof(DataType) * block_height));
+      hapiCheck(hapiMalloc((void**)&d_recv_right_ghost, sizeof(DataType) * block_height));
     }
 
     hapiCheck(cudaStreamCreateWithPriority(&compute_stream, cudaStreamDefault, 0));
@@ -322,6 +373,16 @@ class Block : public CBase_Block {
 
   void initDone() {
     contribute(CkCallback(CkReductionTarget(Main, initDone), main_proxy));
+  }
+
+  void iterate() {
+    if (my_iter != 0 && my_iter % 100 == 0) {
+      cudaStreamSynchronize(comm_stream);
+      cudaStreamSynchronize(compute_stream);
+      AtSync();
+    } else {
+      thisProxy[thisIndex].exchangeGhosts();
+    }
   }
 
   void update() {

@@ -426,6 +426,7 @@ class StrategyWrapper : public IStrategyWrapper
         CkPrintf("%d ", p.id);
       }
       CkPrintf("\n");
+      CkPrintf("[PE %d] Number of objs : %zu\n", CkMyPe(), objs.size());
     }
 
 
