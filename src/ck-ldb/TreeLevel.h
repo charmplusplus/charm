@@ -426,7 +426,15 @@ class StrategyWrapper : public IStrategyWrapper
         CkPrintf("%d ", p.id);
       }
       CkPrintf("\n");
-      CkPrintf("[PE %d] Number of objs : %zu\n", CkMyPe(), objs.size());
+      CkPrintf("[PE %d] Objs per PE: ", CkMyPe());
+      std::map<int, int> counts;
+      for (const auto& o : objs) {
+        counts[o.oldPe]++;
+      }
+      for (const auto& p : procs) {
+        CkPrintf("%d:%d ", p.id, counts[p.id]);
+      }
+      CkPrintf("\n");
     }
 
 
