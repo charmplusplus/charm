@@ -1695,14 +1695,14 @@ cudaError_t hapiFree(void* devPtr) {
 }
 
 cudaError_t hapiMallocHost(void** ptr, size_t size) {
-  //return cudaMallocHost(ptr, size);
-  *ptr = malloc(size);
-  return cudaSuccess;
+  return cudaMallocHost(ptr, size);
+  //*ptr = malloc(size);
+  //return cudaSuccess;
 }
 
 cudaError_t hapiFreeHost(void* ptr) {
-  free(ptr);
-  return cudaSuccess;
+  //free(ptr);
+  return cudaFreeHost(ptr);
 }
 
 cudaError_t hapiMemcpyAsync(void* dst, const void* src, size_t count, cudaMemcpyKind kind, cudaStream_t stream = 0) {
