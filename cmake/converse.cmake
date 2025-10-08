@@ -148,7 +148,7 @@ set(conv-util-cxx-sources
     #src/util/sockRoutines.C
     src/util/ckdll.C
     src/util/ckhashtable.C
-    #src/util/ckimage.C
+    src/util/ckimage.C
     src/util/conv-lists.C
     src/util/hilbert.C
     src/util/partitioning_strategies.C
