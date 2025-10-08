@@ -217,9 +217,12 @@ class Block : public CBase_Block {
 
   bool left_bound, right_bound, top_bound, bottom_bound;
 
-  Block() {}
+  Block() {
+    usesAtSync = true;
+  }
 
   Block(CkMigrateMessage* m) {
+    usesAtSync = true;
     hapiCheck(cudaStreamCreateWithPriority(&compute_stream, cudaStreamDefault, 0));
     hapiCheck(cudaStreamCreateWithPriority(&comm_stream, cudaStreamDefault, -1));
 
@@ -388,6 +391,10 @@ class Block : public CBase_Block {
     } else {
       thisProxy[thisIndex].exchangeGhosts();
     }
+  }
+
+  void ResumeFromSync() {
+    thisProxy[thisIndex].exchangeGhosts();
   }
 
   void update() {
