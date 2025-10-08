@@ -30,7 +30,7 @@ extern void invokeBoundaryKernels(DataType* d_temperature, int block_width,
     int block_height, bool left_bound, bool right_bound, bool top_bound,
     bool bottom_bound, cudaStream_t stream);
 extern void invokeJacobiKernel(DataType* d_temperature, DataType* d_new_temperature,
-    int block_width, int block_height, cudaStream_t stream);
+    int block_width, int block_height, int iter, cudaStream_t stream);
 extern void invokePackingKernels(DataType* d_temperature, DataType* d_left_ghost,
     DataType* d_right_ghost, bool left_bound, bool right_bound, int block_width,
     int block_height, cudaStream_t stream);
@@ -191,6 +191,7 @@ class Block : public CBase_Block {
   int neighbors;
   int remote_count;
   int x, y;
+  int load_iters;
 
   DataType* __restrict__ h_temperature;
   DataType* __restrict__ d_temperature;
@@ -263,6 +264,7 @@ class Block : public CBase_Block {
     p | right_bound;
     p | top_bound;
     p | bottom_bound;
+    p | load_iters;
 
     if (p.isUnpacking()) {
       hapiCheck(hapiMallocHost((void**)&h_temperature,
@@ -298,6 +300,9 @@ class Block : public CBase_Block {
     neighbors = 0;
     x = thisIndex.x;
     y = thisIndex.y;
+
+    load_iters = ((x + y) / (n_chares_x + n_chares_y)) * 5;
+    //CkPrintf("Block (%d,%d) load iters: %d\n", x, y, load_iters);
 
     std::ostringstream os;
     os << "Init (" << std::to_string(x) << "," << std::to_string(y) << ")";
@@ -397,7 +402,7 @@ class Block : public CBase_Block {
 
 #if !COMM_ONLY
     // Invoke GPU kernel for Jacobi computation
-    invokeJacobiKernel(d_temperature, d_new_temperature, block_width, block_height,
+    invokeJacobiKernel(d_temperature, d_new_temperature, block_width, block_height, load_iters,
         compute_stream);
 #endif
 

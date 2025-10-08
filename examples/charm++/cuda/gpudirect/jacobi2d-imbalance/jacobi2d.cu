@@ -46,7 +46,7 @@ __global__ void bottomBoundaryKernel(DataType* temperature, int block_width,
 }
 
 __global__ void jacobiKernel(DataType* temperature, DataType* new_temperature,
-    int block_width, int block_height) {
+    int block_width, int block_height, int iter) {
   int i = (blockDim.x * blockIdx.x + threadIdx.x) + 1;
   int j = (blockDim.y * blockIdx.y + threadIdx.y) + 1;
 
@@ -56,9 +56,14 @@ __global__ void jacobiKernel(DataType* temperature, DataType* new_temperature,
       temperature[IDX(i,j-1)] + temperature[IDX(i,j+1)] + temperature[IDX(i,j)]) %
       1e5;
 #else
-    new_temperature[IDX(i,j)] = (temperature[IDX(i-1,j)] + temperature[IDX(i+1,j)] +
+    DataType temp = 0;
+
+    for (int it = 0; it < iter; it++)
+      temp += (temperature[IDX(i-1,j)] + temperature[IDX(i+1,j)] +
       temperature[IDX(i,j-1)] + temperature[IDX(i,j+1)] + temperature[IDX(i,j)]) *
       DIVIDEBY5;
+
+    new_temperature[IDX(i,j)] = temp / iter;
 #endif
   }
 }
@@ -144,14 +149,14 @@ void invokeBoundaryKernels(DataType* d_temperature, int block_width,
 }
 
 void invokeJacobiKernel(DataType* d_temperature, DataType* d_new_temperature,
-    int block_width, int block_height, cudaStream_t stream) {
+    int block_width, int block_height, int iter, cudaStream_t stream) {
   dim3 block_dim(TILE_SIZE, TILE_SIZE);
   dim3 grid_dim((block_width + (block_dim.x - 1)) / block_dim.x,
       (block_height + (block_dim.y - 1)) / block_dim.y);
 
   //jacobiKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature, d_new_temperature, block_width, block_height);
   hapiLaunchKernelWrapper(jacobiKernel, grid_dim, block_dim, 0, stream,
-      d_temperature, d_new_temperature, block_width, block_height);
+      d_temperature, d_new_temperature, block_width, block_height, iter);
   hapiCheck(cudaPeekAtLastError());
 }
 
