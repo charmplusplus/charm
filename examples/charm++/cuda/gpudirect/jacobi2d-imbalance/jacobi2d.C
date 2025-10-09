@@ -23,6 +23,7 @@
 /* readonly */ bool print_elements;
 /* readonly */ int lb_freq;
 /* readonly */ int first_lb;
+/* readonly */ int imbalance;
 
 extern void invokeInitKernel(DataType* d_temperature, int block_width,
     int block_height, cudaStream_t stream);
@@ -64,6 +65,7 @@ public:
     my_iter = 0;
     first_lb = 10;
     lb_freq = 100;
+    imbalance = 5;  // Max extra iterations for load imbalance
 
     // Initialize aggregate timers
     update_agg_time = 0.0;
@@ -71,7 +73,7 @@ public:
 
     // Process arguments
     int c;
-    while ((c = getopt(m->argc, m->argv, "W:H:w:h:i:u:yzp")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "W:H:w:h:i:b:f:m:u:yzp")) != -1) {
       switch (c) {
         case 'W':
           grid_width = atoi(optarg);
@@ -88,6 +90,15 @@ public:
         case 'i':
           n_iters = atoi(optarg);
           break;
+        case 'b':
+          lb_freq = atoi(optarg);
+          break;
+        case 'f':
+          first_lb = atoi(optarg);
+          break;
+        case 'm':
+          imbalance = atoi(optarg);
+          break;
         case 'u':
           warmup_iters = atoi(optarg);
           break;
@@ -103,6 +114,7 @@ public:
         default:
           CkPrintf(
               "Usage: %s -W [grid width] -H [grid height] -w [block width] -h [block height]"
+              "-b [lb frequency] -f [first lb] -m [max imbalance] "
               "-i [iterations] -u [warmup] -y (use sync version) -z (use GPU zerocopy) -p (print blocks)\n",
               m->argv[0]);
           CkExit();
@@ -304,7 +316,7 @@ class Block : public CBase_Block {
     x = thisIndex.x;
     y = thisIndex.y;
 
-    load_iters = (((float) (x + y)) / (n_chares_x + n_chares_y)) * 100;
+    load_iters = (((float) (x + y)) / (n_chares_x + n_chares_y)) * imbalance;
     //CkPrintf("Block (%d,%d) load iters: %d\n", x, y, load_iters);
 
     std::ostringstream os;
@@ -384,7 +396,7 @@ class Block : public CBase_Block {
   }
 
   void iterate() {
-    if (my_iter != 0 && my_iter % 100 == 0) {
+    if (my_iter == first_lb || (my_iter != 0 && my_iter % lb_freq == 0)) {
       cudaStreamSynchronize(comm_stream);
       cudaStreamSynchronize(compute_stream);
       AtSync();

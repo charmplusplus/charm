@@ -16,6 +16,7 @@ mainmodule jacobi2d {
   readonly bool print_elements;
   readonly int lb_freq;
   readonly int first_lb;
+  readonly int imbalance;
 
   mainchare Main {
     entry Main(CkArgMsg* m);
