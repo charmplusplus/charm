@@ -304,7 +304,7 @@ class Block : public CBase_Block {
     x = thisIndex.x;
     y = thisIndex.y;
 
-    load_iters = ((x + y) / (n_chares_x + n_chares_y)) * 5;
+    load_iters = (((float) (x + y)) / (n_chares_x + n_chares_y)) * 100;
     //CkPrintf("Block (%d,%d) load iters: %d\n", x, y, load_iters);
 
     std::ostringstream os;
