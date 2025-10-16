@@ -38,6 +38,7 @@ module DiffusionLB
     // entry [reductiontarget] void DoneNodeLB();
     // entry void MigratedHelper(LDObjHandle h, int waitBarrier);
     entry void ProcessMigrations();
+    entry void ProcessFinalStats();
     entry void next_phase(int val);
     entry void LoadMetaInfo(LDObjHandle h, int objId, double load, int senderPE, int only_mcount);
     entry void MigrationDoneWrapper();  // Call when migration is complete

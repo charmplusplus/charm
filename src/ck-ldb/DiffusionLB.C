@@ -506,8 +506,16 @@ void DiffusionLB::WithinNodeLB()
 
     if (CkMyPe() == 0)
     {
-      CkCallback cb(CkIndex_DiffusionLB::ProcessMigrations(), thisProxy);
-      CkStartQD(cb);
+      if (step() == LBSimulation::dumpStep)
+      {
+        CkCallback cb(CkIndex_DiffusionLB::ProcessFinalStats(), thisProxy);
+         CkStartQD(cb);
+      }
+      else
+      {
+        CkCallback cb(CkIndex_DiffusionLB::ProcessMigrations(), thisProxy);
+        CkStartQD(cb);
+      }
     }
     return;
   }
@@ -660,10 +668,16 @@ void DiffusionLB::WithinNodeLB()
     // divided amongs intra node PE's.
 
     if (CkMyPe() == 0)
-    {
+    { if (step() == LBSimulation::dumpStep)
+      {
+        CkCallback cb(CkIndex_DiffusionLB::ProcessFinalStats(), thisProxy);
+         CkStartQD(cb);
+      }
+      else {
 
       CkCallback cb(CkIndex_DiffusionLB::ProcessMigrations(), thisProxy);
       CkStartQD(cb);
+      }
     }
   }
 }
@@ -697,9 +711,8 @@ void DiffusionLB::update_peload(int rank, double load) {
   pe_load[rank] -= load;
 }
 
-void DiffusionLB::ProcessMigrations()
-{
-  if (CkMyPe() == rank0PE && (step() == LBSimulation::dumpStep))
+void DiffusionLB::ProcessFinalStats() {
+  if (CkMyPe() == rank0PE)
   {
     int n_objs = nodeStats->objData.size();
     std::vector<bool> isMigratable(n_objs);
@@ -723,8 +736,20 @@ void DiffusionLB::ProcessMigrations()
     }
   thisProxy[0].ReceiveFinalStats(isMigratable, nodeStats->from_proc, nodeStats->to_proc,
                                     nodeStats->n_migrateobjs, positions, load);
+
+                                  }
+
+  if (CkMyPe() == 0)
+  {
+    CkCallback cb(CkIndex_DiffusionLB::ProcessMigrations(), thisProxy);
+    CkStartQD(cb);
   }
 
+}
+
+void DiffusionLB::ProcessMigrations()
+{
+  
 
   // SAME AS IN PACKANDSENDMIGRATEMSGS
   LBMigrateMsg* msg = new (total_migrates, CkNumPes(), CkNumPes(), 0) LBMigrateMsg;

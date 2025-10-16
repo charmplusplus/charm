@@ -67,6 +67,7 @@ public:
   void AcrossNodeLB();
 
   void ProcessMigrations();
+  void ProcessFinalStats();
   void WithinNodeLB();
 
   void LoadMetaInfo(LDObjHandle h, int objId, double load, int senderPE, int only_mcount);
