@@ -1572,6 +1572,8 @@ void CentralLB::writeStatsMsgs(const char* filename)
 
   p|_lb_args.lbversion();		// write version number
   p|stats_msg_count;
+
+  statsData->n_nodes = CkNumNodes();
   statsData->pup(p);
 
   fclose(f);

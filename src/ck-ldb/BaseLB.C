@@ -401,7 +401,8 @@ void BaseLB::LDStats::removeObject(int obj)
 
 void BaseLB::LDStats::pup(PUP::er &p)
 {
-  p(n_migrateobjs);
+  p|n_migrateobjs;
+  p|n_nodes;
   p|procs;
   if (p.isUnpacking())
   {
@@ -422,7 +423,7 @@ void BaseLB::LDStats::pup(PUP::er &p)
   p|from_proc;
   // reset to_proc when unpacking
   if (p.isUnpacking())
-    to_proc = from_proc;
+    to_proc.assign(from_proc.begin(), from_proc.end());
   p|commData;
   if (p.isUnpacking()) {
     if (_lb_args.lbversion() <= 1)

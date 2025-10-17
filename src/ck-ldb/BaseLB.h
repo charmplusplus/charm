@@ -87,6 +87,7 @@ public:
     std::vector<ProcStats> procs;		// processor statistics
 
     int n_migrateobjs;		// total number of migratable objects
+    int n_nodes;			// total number of nodes (differ from procs in SMP)
     std::vector<LDObjData> objData;	// LDObjData and LDCommData defined in lbdb.h
     std::vector<int> from_proc;	// current pe an object is on
     std::vector<int> to_proc;		// new pe you want the object to be on
