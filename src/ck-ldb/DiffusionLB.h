@@ -57,7 +57,8 @@ public:
   void ReceiveFinalStats(std::vector<bool> isMigratable, std::vector<int> from_proc,
                          std::vector<int> to_proc, int n_migrateobjs,
                          std::vector<std::vector<LBRealType>> positions,
-                         std::vector<double> load);
+                         std::vector<double> load,
+                         std::vector<LDCommData> commData);
 
   void buildMSTinRounds(double best_weight, int best_from, int best_to);
   void next_MSTphase(double newcost, int newparent, int newto);

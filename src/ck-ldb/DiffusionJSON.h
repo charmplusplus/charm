@@ -44,19 +44,31 @@ int DiffusionLB::LBwriteStatsMsgs(BaseLB::LDStats* statsData)
                                   {"wallTime", odata.wallTime},
                                   {"oldpe", from},
                                   {"newpe", (to == -1) ? from : to}};
+
+    // from_proc: old pe for object
+    // to_proc: pe object is migrating to NOT USING
   }
 
   jsonData["n_procs"] = statsData->procs.size();
   jsonData["n_nodes"] = CkNumNodes();
+  jsonData["objData"] = objpe; // objdata: objID, omID, migratable, position, cpuTime, wallTime
 
-  jsonData["objData"] = objpe;
-  // objdata: objID, omID, migratable, position, cpuTime, wallTime
 
-  // from_proc: old pe for object
-  // to_proc: pe object is migrating to NOT USING
-
-  // commData: list of (src_proc, sender, receiver, recv_type, msg_size, msg_count)
-  // can get edges between objects
+  json commdata = json::object();
+  for (int comm = 0; comm < statsData->commData.size(); comm++)
+  {
+    LDCommData cdata = statsData->commData[comm];
+    commdata[std::to_string(comm)] = {
+        {"src_proc", cdata.from_proc()},
+        {"sender_obj", {{"omID", cdata.sender.omID().id.idx},
+                        {"objID", cdata.sender.objID()}}},
+        {"receiver_obj", {{"omID", cdata.receiver.get_destObj().omID().id.idx},
+                          {"objID", cdata.receiver.get_destObj().objID()}}},
+        {"recv_type", cdata.recv_type()},
+        {"msg_size", cdata.bytes},
+        {"msg_count", cdata.messages}};
+  }
+  jsonData["commData"] = commdata; // commData: list of (src_proc, sender, receiver, recv_type, msg_size, msg_count)
 
   std::ofstream outputFile("lbdump.json");
   if (outputFile.is_open())

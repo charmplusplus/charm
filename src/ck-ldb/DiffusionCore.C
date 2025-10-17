@@ -183,7 +183,8 @@ void DiffusionLB::ProcessFinalStats() {
       }
     }
   thisProxy[0].ReceiveFinalStats(isMigratable, nodeStats->from_proc, nodeStats->to_proc,
-                                    nodeStats->n_migrateobjs, positions, load);
+                                    nodeStats->n_migrateobjs, positions, load,
+                                    nodeStats->commData);
 
                                   }
 
@@ -221,7 +222,8 @@ void DiffusionLB::ReceiveFinalStats(std::vector<bool> isMigratable,
                                     std::vector<int> from_proc, std::vector<int> to_proc,
                                     int n_migrateobjs,
                                     std::vector<std::vector<LBRealType>> positions,
-                                    std::vector<double> load)
+                                    std::vector<double> load,
+                                    std::vector<LDCommData> commData)
 {
   CkAssert(thisIndex == 0);
 
@@ -249,6 +251,9 @@ void DiffusionLB::ReceiveFinalStats(std::vector<bool> isMigratable,
   fullStats->from_proc.insert(fullStats->from_proc.end(), from_proc.begin(),
                               from_proc.end());
   fullStats->to_proc.insert(fullStats->to_proc.end(), to_proc.begin(), to_proc.end());
+
+  fullStats->commData.insert(fullStats->commData.end(), commData.begin(),
+                              commData.end());
 
   if (statsReceived == numNodes)
   {
