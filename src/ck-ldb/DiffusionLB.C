@@ -41,6 +41,8 @@ static void lbinit()
 {
   LBRegisterBalancer<DiffusionLB>("DiffusionLB",
                                   "The distributed graph refine load balancer");
+
+  numPes = CkNumPes();
 }
 
 using std::vector;

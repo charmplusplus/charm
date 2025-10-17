@@ -20,7 +20,7 @@
 
 #include "DiffusionLB.decl.h"
 
-#include "DiffusionJSON.h"
+int numPes;
 
 void CreateDiffusionLB();
 

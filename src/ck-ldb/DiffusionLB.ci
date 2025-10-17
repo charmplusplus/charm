@@ -1,5 +1,7 @@
 module DiffusionLB
 {
+  readonly int numPes;
+
   include "CentralLBMsg.h";
   extern module DistBaseLB;
   initnode void lbinit(void);
