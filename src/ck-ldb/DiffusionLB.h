@@ -201,6 +201,8 @@ private:
    void initializeCentroid();
    void finishCentroidList();
 
+   int LBwriteStatsMsgs(BaseLB::LDStats* statsData);
+
 };
 
 #endif /* _DistributedLB_H_ */

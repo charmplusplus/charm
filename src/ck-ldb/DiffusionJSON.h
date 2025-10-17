@@ -7,7 +7,7 @@
 using json = nlohmann::json;
 
 // write lbstats to a json file
-int LBwriteStatsMsgs(BaseLB::LDStats* statsData)
+int DiffusionLB::LBwriteStatsMsgs(BaseLB::LDStats* statsData)
 {
   json jsonData;
 
@@ -23,19 +23,19 @@ int LBwriteStatsMsgs(BaseLB::LDStats* statsData)
     int from = statsData->from_proc[obj];
     int to = statsData->to_proc[obj];
 
-    if (from >= CkNumPes() || from < 0)
+    if (from >= numPes || from < 0)
     {
-      CkAbort("<LBwriteStatsMsgs> from_proc is out of bounds");
+      CkAbort("<LBwriteStatsMsgs> from_proc is out of bounds (%d not in [0,%d))", from, numPes);
     }
 
-    if (to >= CkNumPes() || to < -1)
+    if (to >= numPes || to < -1)
     {
-      CkAbort("<LBwriteStatsMsgs> to_proc is out of bounds");
+      CkAbort("<LBwriteStatsMsgs> to_proc is out of bounds (%d not in [0,%d))", to, numPes);
     }
 
     if (to != -1 && (statsData->objData[obj].migratable == false))
     {
-      CkAbort("<LBwriteStatsMsgs> object shoult not be migrating");
+      CkAbort("<LBwriteStatsMsgs> object should not be migrating");
     }
 
     LDObjData odata = statsData->objData[obj];
