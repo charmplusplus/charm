@@ -5,6 +5,16 @@
 /* Pick NUM_NEIGHBORS in random */
 /*readonly*/ bool centroid;
 
+
+
+int DiffusionLB::findNborIdx(int node)
+{
+  for (int i = 0; i < sendToNeighbors.size(); i++)
+    if (sendToNeighbors[i] == node)
+      return i;
+  return -1;
+}
+
 /* Entry point for neighbor building. Only rank0PEs call findNBors*/
 void DiffusionLB::findNBors(int do_again)
 {

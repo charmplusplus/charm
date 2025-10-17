@@ -32,6 +32,8 @@
 
 #include "DiffusionMetric.C"
 #include "DiffusionNeighbors.C"
+#include "DiffusionPseudo.C"
+#include "DiffusionCore.C"
 
 // Percentage of error acceptable.
 #define THRESHOLD 2
@@ -170,46 +172,6 @@ void DiffusionLB::statsAssembled()
   }
 }
 
-void DiffusionLB::startStrategy()
-{
-  if (++rank0_barrier_counter < numNodes)
-    return;
-
-  if (CkMyPe() == 0 && numNodes == 1) {
-    CkCallback cb(CkIndex_DiffusionLB::WithinNodeLB(), thisProxy);
-    CkStartQD(cb);
-  }
-  else if (CkMyPe() == 0)
-  {
-    CkCallback cb(CkIndex_DiffusionLB::AcrossNodeLB(), thisProxy);
-    CkStartQD(cb);
-  }
-
-  rank0_barrier_counter = 0;
-  if (_lb_args.debug()) CkPrintf("--------NEIGHBOR SELECTION COMPLETE (Using Comm? %s)--------\n",
-           _lb_args.diffusionCommOn() ? "true" : "false");
-  fflush(stdout);
-  for (int i = 0; i < numNodes; i++) thisProxy[i * nodeSize].pseudolb_rounds();
-}
-
-void DiffusionLB::pseudolb_barrier(int allZero)
-{
-  if (!allZero)
-  {
-    pseudo_done = false;
-  }
-
-  if (++rank0_barrier_counter < numNodes)
-    return;
-
-  for (int node = 0; node < numNodes; node++)
-  {
-    thisProxy[node * nodeSize].pseudoDone(pseudo_done);
-  }
-  pseudo_done = true;  // set up for next round
-  rank0_barrier_counter = 0;
-}
-
 void DiffusionLB::InitializeObjHeap(int n)
 {
   obj_heap.resize(n);
@@ -222,269 +184,33 @@ void DiffusionLB::InitializeObjHeap(int n)
   heapify(obj_heap, ObjCompareOperator(&objects, gain_val), heap_pos);
 }
 
-/* In combination with the pseudolb_rounds SDAG code, this builds the toReceiveLoad and
- * toSendLoad vectors for each node. It is onlyl called on rank0PEs*/
-void DiffusionLB::PseudoLoadBalancing()
+// Create a migrate message for this obj from resident PE to rank0PE
+void DiffusionLB::LoadReceived(int objId, int from0PE)
 {
-  std::vector<double> thisRoundToSend(sendToNeighbors.size(), 0.0);
-
-  // create pairs for sorting
-  std::vector<std::pair<int, double>> nborPairs;
-    for (int i = 0; i < neighborCount; i++)
-    {
-    nborPairs.push_back(std::make_pair(i, loadNeighbors[i]));
+  // load is received, hence create a migrate message for the object with id objId.
+  auto it = mig_id_map.find(objId);
+  if(it!=mig_id_map.end()) {
+    MigrateInfo* migrateMe = it->second;
+    if (_lb_args.debug())CkPrintf("\nUpdating to PE from %d to %d", migrateMe->to_pe, from0PE);
+    migrateMe->to_pe = from0PE;
+  } else {
+    MigrateInfo* migrateMe = new MigrateInfo;
+    migrateMe->obj = myStats->objData[objId].handle;
+    migrateMe->from_pe = CkMyPe();
+    migrateMe->to_pe = from0PE;
+    if(CkMyPe()==rank0PE)
+      pe_load[CkMyRank()] -= myStats->objData[objId].wallTime;
+    else
+      thisProxy[rank0PE].update_peload(CkMyRank(), myStats->objData[objId].wallTime);
+    // migrateMe->async_arrival = myStats->objData[objId].asyncArrival;
+    migrateInfo.push_back(migrateMe);
+    mig_id_map.emplace(objId, migrateMe);
+    total_migrates++;
   }
-
-  // sort by load
-  std::sort(nborPairs.begin(), nborPairs.end(),
-            [](const std::pair<int, double>& a, const std::pair<int, double>& b)
-            { return a.second < b.second; });
-
-  // find the neighbors that I should balance with (set such that I am the only one with
-  // more load than set average)
-  std::vector<std::pair<int, double>> nborsToBalance;
-
-  double currAverage = my_pseudo_load;
-  for (std::pair<int, double> p : nborPairs)
-  {
-    int id = p.first;
-    double load = p.second;
-
-    if (load >= currAverage)
-    {
-      break;
-    }
-
-    nborsToBalance.push_back(p);
-    currAverage =
-        (currAverage * nborsToBalance.size() + load) / (nborsToBalance.size() + 1);
-  }
-
-  // balance with neighborstobalance
-  double myOverload = my_pseudo_load - currAverage;
-
-  // adjust my overload for what I've already sent out
-  double alreadySent = std::accumulate(toSendLoad.begin(), toSendLoad.end(), 0.0,
-                                       [](double sum, double value)
-                                       { return value > 0 ? sum + value : sum; });
-
-  double leftToSend = my_load - alreadySent;  // my_load is original load
-  myOverload = std::min(myOverload, leftToSend);
-
-  for (std::pair<int, double> p : nborsToBalance)
-  {
-    int id = p.first;
-    double load = p.second;
-
-    double trySend = currAverage - load;
-    double toSend = 0;
-
-    // exhaust a negative edge first
-    if (toSendLoad[id] < 0)
-    {
-      toSend += std::min(-toSendLoad[id], trySend);
-      trySend -= toSend;
-    }
-
-    // either edge was enough (trySend == 0)
-    // or we need to send more
-
-    if (trySend > 0)
-    {
-      toSend += std::min(myOverload, trySend);
-      trySend -= toSend;
-      myOverload -= toSend;
-    }
-
-    toSendLoad[id] += toSend;
-    thisRoundToSend[id] = toSend;
-  }
-
-  bool allZero = true;
-
-  for (int i = 0; i < neighborCount; i++)
-  {
-    int nbor_node = sendToNeighbors[i];
-
-    if (thisRoundToSend[i] > 0)
-    {
-      allZero = false;
-    }
-
-    my_pseudo_load -= thisRoundToSend[i];
-    thisProxy[nbor_node * nodeSize].PseudoLoad(pseudo_itr, thisRoundToSend[i], myNodeId);
-  }
-
-  // contribute to reduction to check if round is over
-  thisProxy[0].pseudolb_barrier(allZero);
-
-  // double threshold = THRESHOLD * avgLoadNeighbor / 100.0;
-
-  // avgLoadNeighbor = (avgLoadNeighbor + my_pseudo_load) / 2;
-  // double totalOverload = my_pseudo_load - avgLoadNeighbor;
-  // double totalUnderLoad = 0.0;
-  // double thisIterToSend[neighborCount];
-  // for (int i = 0; i < neighborCount; i++) thisIterToSend[i] = 0.0;
-  // if (totalOverload > 0)
-  //   for (int i = 0; i < neighborCount; i++)
-  //   {
-  //     if (loadNeighbors[i] < (avgLoadNeighbor - threshold))
-  //     {
-  //       thisIterToSend[i] = avgLoadNeighbor - loadNeighbors[i];
-  //       totalUnderLoad += avgLoadNeighbor - loadNeighbors[i];
-  //       //        DEBUGL2(("[PE-%d] iteration %d thisIterToSend %f avgLoadNeighbor %f
-  //       //        loadNeighbors[%d] %f to node %d\n",
-  //       //                thisIndex, itr, thisIterToSend[i], avgLoadNeighbor, i,
-  //       //                loadNeighbors[i], sendToNeighbors[i]));
-  //     }
-  //   }
-  // if (totalUnderLoad > 0 && totalOverload > 0 && totalUnderLoad > totalOverload)
-  //   totalOverload += threshold;
-  // else
-  //   totalOverload = totalUnderLoad;
-
-  // for (int i = 0; i < neighborCount; i++)
-  // {
-  //   if (totalOverload > 0 && totalUnderLoad > 0 && thisIterToSend[i] > 0)
-  //   {
-  //     //      DEBUGL2(("[%d] GRD: Pseudo Load Balancing Sending, iteration %d node
-  //     //      %d(pe-%d) toSend %lf totalToSend %lf\n", CkMyPe(), itr,
-  //     //      sendToNeighbors[i], CkNodeFirst(sendToNeighbors[i]), thisIterToSend[i],
-  //     //      (thisIterToSend[i]*totalOverload)/totalUnderLoad));
-  //     thisIterToSend[i] *= totalOverload / totalUnderLoad;
-  //     toSendLoad[i] += thisIterToSend[i];
-  //     if (my_pseudo_load - thisIterToSend[i] < 0)
-  //       CkAbort("Error: my_pseudo_load (%f) - thisIterToSend[i] (%f) < 0\n",
-  //               my_pseudo_load, thisIterToSend[i]);
-  //     my_pseudo_load -= thisIterToSend[i];
-  //   }
-  //   if (thisIterToSend[i] < 0.0)
-  //     thisIterToSend[i] = 0.0;
-  //   int nbor_node = sendToNeighbors[i];
-  //   thisProxy[nbor_node * nodeSize].PseudoLoad(pseudo_itr, thisIterToSend[i],
-  //   myNodeId);
-  // }
 }
 
-/* At the highest level:
-  - for each object compute the gain value (for comm, based on communication OUTWARD
-    - this changes in new impl
-  - while I have neighbors to send to, pick best object
-
-  On completion, waits for QD then calls WITHINNODELB.
-*/
-void DiffusionLB::AcrossNodeLB()
-{
-  if (CkMyPe() != rank0PE)
-    return;
-
-  if (CkMyPe() == 0)
-  {
-    if (_lb_args.debug()) CkPrintf("--------STARTING ACROSS NODE LB--------\n");
-    CkCallback cb(CkIndex_DiffusionLB::WithinNodeLB(), thisProxy);
-    CkStartQD(cb);
-  }
-
-  int n_objs = nodeStats->objData.size();
-
-  gain_val = new int[n_objs];
-  memset(gain_val, 100, n_objs);
-
-  // build object comms
-  // DiffusionMetric* metric =
-  //     new MetricCommEI(nodeStats, myNodeId, nodeSize, neighborCount, toSendLoad);
-
-  DiffusionMetric* metric;
-  if (_lb_args.diffusionCommOn())
-  {
-    metric = new MetricComm(nodeStats, myNodeId, nodeSize, neighborCount, toSendLoad,
-                            sendToNeighbors);
-  }
-  else
-    metric = new MetricCentroid(nborCentroids, nborDistances, myCentroid, nodeStats,
-                                myNodeId, toSendLoad, sendToNeighbors, nborObjCount);
-
-  loadReceivers = std::count_if(toSendLoad.begin(), toSendLoad.end(),
-                                [](double load) { return load > 0; });
-
-  // iterate through objects and set from_pe and to_pe correctly
-  for (int i = 0; i < n_objs; i++)
-  {
-    int from = nodeStats->from_proc[i];
-    CkAssert(from < CkNumPes() && from >= 0);
-    // todo also assert from is on this node?
-    nodeStats->to_proc[i] = -1;  // negative one if not migrated
-  }
-
-  // build obj heap from gain values
-  if (loadReceivers > 0)
-  {
-    // compute gain vals
-    // buildGainValues(n_objs);
-
-    // // T1: create a heap based on gain values, and its position also.
-    // InitializeObjHeap(n_objs);
-    int tries[neighborCount];
-    for (int i = 0; i < neighborCount; i++)
-      tries[i] = 0;
-
-    int nid = 0; 
-    while (my_loadAfterTransfer > 0)
-    {
-      nid = (nid + 1)%neighborCount; //change to round robin for now
-      int nborId = nid;//metric->getBestNeighbor();  // this is causing cascading???
-      if (tries[nborId]==0 && /*nborId == -1 || */toSendLoad[nborId] <= 0)
-      {
-        tries[nborId] = 1;
-        continue;//break;  // no more neighbors to send to
-      }
-
-      int v_id = metric->popBestObject(nborId);
-
-      if (v_id == -1)// && nborId==-1)
-      {
-        tries[nborId] = 1;
-        bool not_done = false;
-        for(int i = 0; i < neighborCount; i++)
-          if(tries[i] == 0)
-            not_done = true;
-        if(!not_done)
-          break;  // no more objects to send
-        else
-          continue;
-      }
-
-      double currLoad = objs[v_id].getVertexLoad();
-      objs[v_id].setCurrPe(-1);
-      int objId = objs[v_id].getVertexId();
-
-      int rank = GetPENumber(objId);
-      int node = sendToNeighbors[nborId];
-      int donorPE = rank0PE + rank;
-      int destPE = node * nodeSize;  // send to rank0PE of dest node
-      CkAssert(destPE != donorPE);   // if this is hit, our neighbor choice is not working
-
-      if (nodeStats->from_proc[v_id] != donorPE) {
-        continue;
-        CkAbort(
-            "ERROR: not sure if this is supposed to work, but from_proc[%d] = %d, "
-            "donorPE = %d\n",
-            v_id, nodeStats->from_proc[v_id], donorPE);
-      }
-
-      my_loadAfterTransfer -= currLoad;
-
-      metric->updateState(v_id, nborId);  // update state to keep track of migrations
-
-      LDObjHandle objHandle = nodeStats->objData[v_id].handle;
-      thisProxy[destPE].LoadMetaInfo(objHandle, objId, currLoad, donorPE, 0);
-      thisProxy[donorPE].LoadReceived(objId, destPE);
-      nodeStats->to_proc[v_id] = destPE;
-    }
-  }
-
-
-  
+void DiffusionLB::update_peload(int rank, double load) {
+  pe_load[rank] -= load;
 }
 
 /* Load has been logically sent from overloaded to underloaded nodes in LoadBalance().
@@ -528,11 +254,11 @@ void DiffusionLB::WithinNodeLB()
     double avgPE = averagePE();
 
     // Create a max heap and min heap for pe loads
-    vector<double> objectSizes;
-    vector<int> objectIds;
-    vector<int> objectPEs;
-    vector<LDObjHandle> objectHdl;
-    vector<int> isToken;
+    std::vector<double> objectSizes;
+    std::vector<int> objectIds;
+    std::vector<int> objectPEs;
+    std::vector<LDObjHandle> objectHdl;
+    std::vector<int> isToken;
     minHeap minPes(nodeSize);
     double threshold = THRESHOLD * avgPE / 100.0;
 
@@ -684,71 +410,6 @@ void DiffusionLB::WithinNodeLB()
   }
 }
 
-// Create a migrate message for this obj from resident PE to rank0PE
-void DiffusionLB::LoadReceived(int objId, int from0PE)
-{
-  // load is received, hence create a migrate message for the object with id objId.
-  auto it = mig_id_map.find(objId);
-  if(it!=mig_id_map.end()) {
-    MigrateInfo* migrateMe = it->second;
-    if (_lb_args.debug())CkPrintf("\nUpdating to PE from %d to %d", migrateMe->to_pe, from0PE);
-    migrateMe->to_pe = from0PE;
-  } else {
-    MigrateInfo* migrateMe = new MigrateInfo;
-    migrateMe->obj = myStats->objData[objId].handle;
-    migrateMe->from_pe = CkMyPe();
-    migrateMe->to_pe = from0PE;
-    if(CkMyPe()==rank0PE)
-      pe_load[CkMyRank()] -= myStats->objData[objId].wallTime;
-    else
-      thisProxy[rank0PE].update_peload(CkMyRank(), myStats->objData[objId].wallTime);
-    // migrateMe->async_arrival = myStats->objData[objId].asyncArrival;
-    migrateInfo.push_back(migrateMe);
-    mig_id_map.emplace(objId, migrateMe);
-    total_migrates++;
-  }
-}
-
-void DiffusionLB::update_peload(int rank, double load) {
-  pe_load[rank] -= load;
-}
-
-void DiffusionLB::ProcessFinalStats() {
-  if (CkMyPe() == rank0PE)
-  {
-    int n_objs = nodeStats->objData.size();
-    std::vector<bool> isMigratable(n_objs);
-    for (int i = 0; i < n_objs; i++)
-    {
-      isMigratable[i] = nodeStats->objData[i].migratable;
-    }
-
-    std::vector<std::vector<LBRealType>> positions(n_objs);
-    std::vector<double> load(n_objs);
-    for (int i = 0; i < n_objs; i++)
-    {
-      load[i] = nodeStats->objData[i].wallTime;
-
-      int size = nodeStats->objData[i].position.size();
-      positions[i].resize(size);
-      for (int j = 0; j < size; j++)
-      {
-        positions[i][j] = nodeStats->objData[i].position[j];
-      }
-    }
-  thisProxy[0].ReceiveFinalStats(isMigratable, nodeStats->from_proc, nodeStats->to_proc,
-                                    nodeStats->n_migrateobjs, positions, load);
-
-                                  }
-
-  if (CkMyPe() == 0)
-  {
-    CkCallback cb(CkIndex_DiffusionLB::ProcessMigrations(), thisProxy);
-    CkStartQD(cb);
-  }
-
-}
-
 void DiffusionLB::ProcessMigrations()
 {
   
@@ -858,40 +519,6 @@ void DiffusionLB::CascadingMigration(LDObjHandle h, double load)
 #endif
 }
 
-// When load balancing, remove object handle from your list, since it is about to be
-// migrated
-/* LoadMetaInfo is called on the receiver with the object that will be migrated to it
- * (via a MigrateMe in  LoadReceived). It is only called when migrating at the node
- * level. Not sure why the receiver would already have this handle though...*/
-void DiffusionLB::LoadMetaInfo(LDObjHandle h, int objId, double load, int senderPE, int only_mcount)
-{
-  migrates_expected++;
-  if(only_mcount)
-    return;
-  pe_load[0] += load;
-  int idx = FindObjectHandle(h);  // if object is in my handles
-  if (idx == -1)
-  {
-    objectHandles.push_back(h);
-    objectSrcIds.push_back(objId);
-    objectLoads.push_back(load);
-    objSenderPEs.push_back(senderPE);
-  }
-  else
-  {
-#if 0
-    CascadingMigration(h, load);
-    objectHandles[idx] = objectHandles[objectHandles.size() - 1];
-    objectLoads[idx] = objectLoads[objectLoads.size() - 1];
-    objectSrcIds[idx] = objectSrcIds[objectSrcIds.size()-1];
-    objSenderPEs[idx] = objSenderPEs[objSenderPEs.size()-1];
-    objectHandles.pop_back();
-    objectLoads.pop_back();
-    objectSrcIds.pop_back();
-    objSenderPEs.pop_back();
-#endif
-  }
-}
 
 void DiffusionLB::MigrationDoneWrapper()
 {

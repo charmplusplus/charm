@@ -170,29 +170,7 @@ int DiffusionLB::GetPENumber(int& obj_id)
   return i;
 }
 
-int DiffusionLB::findNborIdx(int node)
-{
-  for (int i = 0; i < sendToNeighbors.size(); i++)
-    if (sendToNeighbors[i] == node)
-      return i;
-  return -1;
-}
 
-double DiffusionLB::averagePE()
-{
-  double avg = 0.0;
-  for (int i = 0; i < nodeSize; i++) avg += pe_load[i];
-  avg /= nodeSize;
-  return avg;
-}
-
-int DiffusionLB::FindObjectHandle(LDObjHandle h)
-{
-  for (int i = 0; i < objectHandles.size(); i++)
-    if (objectHandles[i].id == h.id)
-      return i;
-  return -1;
-}
 
 double DiffusionLB::avgNborLoad()
 {
@@ -308,47 +286,6 @@ int DiffusionLB::getBestObject(int nbor)
 {
   int v_id = heap_pop(obj_heap, ObjCompareOperator(&objs, gain_val), heap_pos);
   return v_id;
-}
-
-// all nodes call this to send final stats to 0. For printing to JSON
-// TODO: this is broken rn, because of BaseLB::LDStats pup problems
-void DiffusionLB::ReceiveFinalStats(std::vector<bool> isMigratable,
-                                    std::vector<int> from_proc, std::vector<int> to_proc,
-                                    int n_migrateobjs,
-                                    std::vector<std::vector<LBRealType>> positions,
-                                    std::vector<double> load)
-{
-  CkAssert(thisIndex == 0);
-
-  // store the message
-  statsReceived++;
-
-  int oldSize = fullStats->objData.size();
-
-  fullStats->objData.resize(fullStats->objData.size() + isMigratable.size());
-
-  fullStats->n_migrateobjs += n_migrateobjs;
-
-  for (int i = 0; i < isMigratable.size(); i++)
-  {
-    fullStats->objData[i + oldSize].migratable = isMigratable[i];
-    fullStats->objData[i + oldSize].wallTime = load[i];
-
-    int poslen = positions[i].size();
-    for (int j = 0; j < poslen; j++)
-    {
-      fullStats->objData[i + oldSize].position.push_back(positions[i][j]);
-    }
-  }
-
-  fullStats->from_proc.insert(fullStats->from_proc.end(), from_proc.begin(),
-                              from_proc.end());
-  fullStats->to_proc.insert(fullStats->to_proc.end(), to_proc.begin(), to_proc.end());
-
-  if (statsReceived == numNodes)
-  {
-    LBwriteStatsMsgs(fullStats);
-  }
 }
 
 void DiffusionLB::pairedSort(int* A, std::vector<double> B)
