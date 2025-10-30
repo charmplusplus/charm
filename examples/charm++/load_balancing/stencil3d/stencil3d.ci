@@ -15,7 +15,12 @@ mainmodule stencil3d {
   mainchare Main {
     entry Main(CkArgMsg *m);
     entry [reductiontarget] void report();
-  };
+    entry [reductiontarget] void startLBTimer();
+    entry [reductiontarget] void stopLBTimer();
+    entry [reductiontarget] void startIterTimer();
+    entry [reductiontarget] void stopIterTimer();
+        
+};
 
   array [3D] Stencil {
     entry Stencil(void);
@@ -23,9 +28,12 @@ mainmodule stencil3d {
     entry void receiveGhosts(int iter, int dir, int height, int width,
         double ghosts[height*width]);
 
+   entry void callAtSync(void);
+   entry void processNext(void);
+
     entry [reductiontarget] void doStep() {
       serial "begin_iteration" {
-       
+             
         begin_iteration();
       }
       for(imsg = 0; imsg < 6; imsg++) {
