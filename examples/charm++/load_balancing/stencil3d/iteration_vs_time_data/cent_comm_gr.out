@@ -1,0 +1,203 @@
+Charm++> Running on MPI library: MPI VERSION    : CRAY MPICH version 8.1.30.8 (ANL base 3.4a2)
+MPI BUILD INFO : Sat Jun 01  4:44 2024 (git hash 69863f7)
+ (MPI standard: 3.1)
+Charm++> Level of thread support used: MPI_THREAD_SINGLE (desired: MPI_THREAD_SINGLE)
+Charm++> Running in non-SMP mode: 64 processes (PEs)
+Converse/Charm++ Commit ID: v8.0.1-devel-78-g6c5586d36
+Charm++> MPI timer is synchronized
+Isomalloc> Synchronized global address space.
+CharmLB> Load balancer assumes all CPUs are same.
+Charm++> cpu affinity enabled. 
+Charm++> Running on 4 hosts (2 sockets x 64 cores x 2 PUs = 256-way SMP)
+Charm++> cpu topology info is gathered in 0.006 seconds.
+
+STENCIL COMPUTATION WITH BARRIERS
+Running Stencil on 64 processors with (64, 64, 64) chares
+Array Dimensions: 1024 1024 1024
+Block Dimensions: 16 16 16
+Iter time = 3.014916
+Iter time = 2.658565
+Iter time = 2.343767
+Iter time = 2.351319
+LBTime = 0.446478
+Iter time = 2.607098
+Iter time = 2.337376
+Iter time = 2.325307
+Iter time = 2.364937
+LBTime = 0.269477
+Iter time = 2.564861
+Iter time = 2.299153
+Iter time = 2.300110
+Iter time = 2.297342
+LBTime = 0.405994
+Iter time = 2.493161
+Iter time = 2.308954
+Iter time = 2.266394
+Iter time = 2.269617
+LBTime = 0.595833
+Iter time = 2.460432
+Iter time = 2.248999
+Iter time = 2.284358
+Iter time = 2.211593
+LBTime = 0.849147
+Iter time = 2.448231
+Iter time = 2.269845
+Iter time = 2.266684
+Iter time = 2.235572
+LBTime = 1.201699
+Iter time = 2.445260
+Iter time = 2.238618
+Iter time = 2.229860
+Iter time = 2.253133
+LBTime = 1.608910
+Iter time = 2.436847
+Iter time = 2.203804
+Iter time = 2.222258
+Iter time = 2.204596
+LBTime = 2.023105
+Iter time = 2.477493
+Iter time = 2.243172
+Iter time = 2.216253
+Iter time = 2.240154
+LBTime = 2.530038
+Iter time = 2.462871
+Iter time = 2.219660
+Iter time = 2.208115
+Iter time = 2.218392
+[Partition 0][Node 0] End of program
+Charm++> Running on MPI library: MPI VERSION    : CRAY MPICH version 8.1.30.8 (ANL base 3.4a2)
+MPI BUILD INFO : Sat Jun 01  4:44 2024 (git hash 69863f7)
+ (MPI standard: 3.1)
+Charm++> Level of thread support used: MPI_THREAD_SINGLE (desired: MPI_THREAD_SINGLE)
+Charm++> Running in non-SMP mode: 64 processes (PEs)
+Converse/Charm++ Commit ID: v8.0.1-devel-78-g6c5586d36
+Charm++> MPI timer is synchronized
+Isomalloc> Synchronized global address space.
+CharmLB> Load balancer assumes all CPUs are same.
+Charm++> cpu affinity enabled. 
+Charm++> Running on 4 hosts (2 sockets x 64 cores x 2 PUs = 256-way SMP)
+Charm++> cpu topology info is gathered in 0.007 seconds.
+
+STENCIL COMPUTATION WITH BARRIERS
+Running Stencil on 64 processors with (64, 64, 64) chares
+Array Dimensions: 1024 1024 1024
+Block Dimensions: 16 16 16
+Iter time = 3.004796
+Iter time = 2.676485
+Iter time = 2.341820
+Iter time = 2.325484
+LBTime = 0.285572
+Iter time = 2.620559
+Iter time = 2.357704
+Iter time = 2.346148
+Iter time = 2.283579
+LBTime = 0.302493
+Iter time = 2.473785
+Iter time = 2.297060
+Iter time = 2.281260
+Iter time = 2.251206
+LBTime = 0.374339
+Iter time = 2.468946
+Iter time = 2.264386
+Iter time = 2.199434
+Iter time = 2.249115
+LBTime = 0.579304
+Iter time = 2.421267
+Iter time = 2.233955
+Iter time = 2.264199
+Iter time = 2.218386
+LBTime = 0.839501
+Iter time = 2.445145
+Iter time = 2.324126
+Iter time = 2.188350
+Iter time = 2.204329
+LBTime = 1.187172
+Iter time = 2.406392
+Iter time = 2.204572
+Iter time = 2.181347
+Iter time = 2.240864
+LBTime = 1.581930
+Iter time = 2.412834
+Iter time = 2.231291
+Iter time = 2.215358
+Iter time = 2.189771
+LBTime = 2.070582
+Iter time = 2.432143
+Iter time = 2.188662
+Iter time = 2.239558
+Iter time = 2.212718
+LBTime = 2.596105
+Iter time = 2.444284
+Iter time = 2.380609
+Iter time = 2.184570
+Iter time = 2.204407
+[Partition 0][Node 0] End of program
+Charm++> Running on MPI library: MPI VERSION    : CRAY MPICH version 8.1.30.8 (ANL base 3.4a2)
+MPI BUILD INFO : Sat Jun 01  4:44 2024 (git hash 69863f7)
+ (MPI standard: 3.1)
+Charm++> Level of thread support used: MPI_THREAD_SINGLE (desired: MPI_THREAD_SINGLE)
+Charm++> Running in non-SMP mode: 64 processes (PEs)
+Converse/Charm++ Commit ID: v8.0.1-devel-78-g6c5586d36
+Charm++> MPI timer is synchronized
+Isomalloc> Synchronized global address space.
+CharmLB> Load balancer assumes all CPUs are same.
+Charm++> cpu affinity enabled. 
+Charm++> Running on 4 hosts (2 sockets x 64 cores x 2 PUs = 256-way SMP)
+Charm++> cpu topology info is gathered in 0.007 seconds.
+[0] TreeLB in LEGACY MODE support
+[0] TreeLB: Using PE_Root tree with: GreedyRefine 
+
+STENCIL COMPUTATION WITH BARRIERS
+Running Stencil on 64 processors with (64, 64, 64) chares
+Array Dimensions: 1024 1024 1024
+Block Dimensions: 16 16 16
+Iter time = 2.993644
+Iter time = 2.658712
+Iter time = 2.340775
+Iter time = 2.341477
+LBTime = 0.189573
+Iter time = 2.579766
+Iter time = 2.324675
+Iter time = 2.265091
+Iter time = 2.232318
+LBTime = 0.098659
+Iter time = 2.496699
+Iter time = 2.247205
+Iter time = 2.303143
+Iter time = 2.205946
+LBTime = 0.090341
+Iter time = 2.437345
+Iter time = 2.229690
+Iter time = 2.193847
+Iter time = 2.228537
+LBTime = 0.073034
+Iter time = 2.467235
+Iter time = 2.322570
+Iter time = 2.245513
+Iter time = 2.197157
+LBTime = 0.100852
+Iter time = 2.343857
+Iter time = 2.257933
+Iter time = 2.244310
+Iter time = 2.204463
+LBTime = 0.067632
+Iter time = 2.397134
+Iter time = 2.231158
+Iter time = 2.209204
+Iter time = 2.180386
+LBTime = 0.092309
+Iter time = 2.370747
+Iter time = 2.198005
+Iter time = 2.180544
+Iter time = 2.249632
+LBTime = 0.066183
+Iter time = 2.342147
+Iter time = 2.232536
+Iter time = 2.291980
+Iter time = 2.258779
+LBTime = 0.079129
+Iter time = 2.334230
+Iter time = 2.229730
+Iter time = 2.195327
+Iter time = 2.213129
+[Partition 0][Node 0] End of program
