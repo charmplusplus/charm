@@ -1,14 +1,21 @@
 mainmodule vecadd {
   readonly CProxy_Main mainProxy;
+  readonly CProxy_NCCLManager ncclManagerProxy;
 
   mainchare Main {
     entry Main(CkArgMsg* m);
+    entry [reductiontarget] void nccl_done();
     entry [reductiontarget] void done();
   };
+
+  group NCCLManager {
+    entry NCCLManager();
+    entry void recvNCCLId(int size, char id_buf[size]);
+  }
 
   array [1D] Workers {
     entry Workers(int size);
     entry void begin();
-    entry void complete();
+    entry [reductiontarget] void reduction();
   };
 };

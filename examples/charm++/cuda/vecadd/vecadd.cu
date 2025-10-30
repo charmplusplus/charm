@@ -7,13 +7,13 @@
 #define B_INDEX 1
 #define C_INDEX 2
 
-__global__ void vecAdd(float* C, float* A, float* B, int n) {
+__global__ void vecAdd(float* C, float* A, int n) {
   // Get our global thread ID
   int id = blockIdx.x * blockDim.x + threadIdx.x;
 
   // Make sure we do not go out of bounds
   if (id < n) {
-    C[id] = A[id] + B[id];
+    C[id] = C[id] + A[id];
   }
 }
 
@@ -27,6 +27,10 @@ void run_VECADD_KERNEL(hapiWorkRequest* wr, cudaStream_t kernel_stream,
 }
 #endif
 
+void localReduce(float* A, float* result, int n) {
+  vecAdd<<<(n + BLOCK_SIZE - 1) / BLOCK_SIZE, BLOCK_SIZE>>>(
+      result, A, n);
+}
 
 void cudaVecAdd(int vectorSize, float* h_A, float* d_A) {
   int size = vectorSize * sizeof(float);
