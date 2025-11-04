@@ -61,7 +61,7 @@ int myrand(int numpes)
 #define index(a, b, c) \
   ((a) + (b) * (blockDimX + 2) + (c) * (blockDimX + 2) * (blockDimY + 2))
 
-#define MAX_ITER 6
+#define MAX_ITER 40
 #define LBPERIOD_ITER 4  // LB is called every LBPERIOD_ITER number of program iterations
 #define CHANGELOAD 30
 #define LEFT 1
@@ -79,7 +79,8 @@ class Main : public CBase_Main
 {
 public:
   CProxy_Stencil array;
-
+  double startLBTime;
+  double startIterTime;
   Main(CkArgMsg* m)
   {
     if ((m->argc != 3) && (m->argc != 7))
@@ -129,19 +130,41 @@ public:
     CkPrintf("Block Dimensions: %d %d %d\n", blockDimX, blockDimY, blockDimZ);
 
     // Create new array of worker chares
-    CProxy_Grid2DMap myMap = CProxy_Grid2DMap::ckNew(num_chare_x, num_chare_y);
+    //    CProxy_Grid2DMap myMap = CProxy_Grid2DMap::ckNew(num_chare_x, num_chare_y);
 
     // // Make a new array using that map
     CkArrayOptions opts(num_chare_x, num_chare_y, num_chare_z);
-    opts.setMap(myMap);
+    // opts.setMap(myMap);
     array = CProxy_Stencil::ckNew(opts);
-
-    // Start the computation
-    array.doStep();
   }
 
   // Each worker reports back to here when it completes an iteration
   void report() { CkExit(); }
+
+  void startLBTimer() {
+    startLBTime = CkWallTimer();
+    array.callAtSync();
+  }
+
+  void stopLBTimer() {
+    double stopTime = CkWallTimer();
+    CkPrintf("LBTime = %f\n", stopTime - startLBTime);
+
+    startIterTime = CkWallTimer();
+    array.doStep();
+  }
+
+  void startIterTimer() {
+    startIterTime = CkWallTimer();
+    array.doStep();
+  }
+
+  void stopIterTimer() {
+    double stopTime = CkWallTimer();
+    CkPrintf("Iter time = %f\n", stopTime - startIterTime);
+
+    array.processNext();
+  }
 };
 
 /** \class Stencil
@@ -150,9 +173,9 @@ public:
 
 class Stencil : public CBase_Stencil
 {
-Stencil_SDAG_CODE private : double startTime;
-
-  using vector_t = std::vector<double>;
+Stencil_SDAG_CODE
+private :
+    using vector_t = std::vector<double>;
 
 public:
   int iterations;
@@ -172,9 +195,8 @@ public:
   // Constructor, initialize values
   Stencil()
       : iterations(0),
-        imsg(0)
+        imsg(0),
         // allocate a three dimensional array
-        ,
         temperature((blockDimX + 2) * (blockDimY + 2) * (blockDimZ + 2), 0.0),
         new_temperature((blockDimX + 2) * (blockDimY + 2) * (blockDimZ + 2), 0.0)
         // Allocate ghost arrays
@@ -193,14 +215,12 @@ public:
     setObjPosition(centroid);
 
     constrainBC();
-    // start measuring time
-    if (thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0)
-      startTime = CkWallTimer();
+
+    contribute(CkCallback(CkReductionTarget(Main, startIterTimer), mainProxy));
   }
 
   void pup(PUP::er& p)
   {
-    p | startTime;
     p | iterations;
     p | imsg;
     p | temperature;
@@ -220,7 +240,7 @@ public:
   {
     iterations++;
 
-   
+    
     for (int k = 0; k < blockDimZ; ++k)
       for (int j = 0; j < blockDimY; ++j)
       {
@@ -326,26 +346,25 @@ public:
 
     constrainBC();
 
-    if (thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0)
-    {
-      double endTime = CkWallTimer();
-      CkPrintf("[%d] Time per iteration: %f %f\n", iterations, (endTime - startTime),
-               endTime);
-    }
+    contribute(CkCallback(CkReductionTarget(Main, stopIterTimer), mainProxy));
+  }
 
-    if (iterations == MAX_ITER)
+  void processNext() {
+    if (iterations == MAX_ITER){ // check if done
       contribute(CkCallback(CkReductionTarget(Main, report), mainProxy));
-    else
-    {
-      if (thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0)
-        startTime = CkWallTimer();
-      if (iterations % LBPERIOD_ITER == 0)
-      {
-        AtSync();
-      }
-      else
-        contribute(CkCallback(CkReductionTarget(Stencil, doStep), thisProxy));
     }
+    else {
+      if (iterations % LBPERIOD_ITER == 0){ // check for lb
+	contribute(CkCallback(CkReductionTarget(Main, startLBTimer), mainProxy));
+      }
+      else { // start next step manually	
+	contribute(CkCallback(CkReductionTarget(Main, startIterTimer), mainProxy));
+      }
+    }
+  }
+
+  void callAtSync() {
+    AtSync();
   }
 
   // Check to see if we have received all neighbor values yet
@@ -386,7 +405,9 @@ public:
       for (int i = 1; i < blockDimX + 1; ++i) temperature[index(i, j, 1)] = 255.0;
   }
 
-  void ResumeFromSync() { thisProxy[thisIndex].doStep(); }
+  void ResumeFromSync() {
+    contribute(CkCallback(CkReductionTarget(Main, stopLBTimer), mainProxy));
+  }
 };
 
 class Grid2DMap : public CkArrayMap

@@ -102,7 +102,6 @@ DiffusionLB::~DiffusionLB()
 // Main entry point for the load balancer
 void DiffusionLB::Strategy(const DistBaseLB::LDStats* const stats)
 {
-  if (_lb_args.debug())CkPrintf("\n[PE-%d] In Strategy", CkMyPe());
   total_migrates = 0;
 
   if (CkMyPe() == 0 && _lb_args.debug() >= 1)
@@ -167,7 +166,6 @@ void DiffusionLB::statsAssembled()
 {
   if (CkMyPe() == rank0PE)
   {
-    if (_lb_args.debug()) CkPrintf("\nPE-%d, calling findNNeighbors", CkMyPe());
     findNBors(1);
   }
 }
@@ -191,7 +189,6 @@ void DiffusionLB::LoadReceived(int objId, int from0PE)
   auto it = mig_id_map.find(objId);
   if(it!=mig_id_map.end()) {
     MigrateInfo* migrateMe = it->second;
-    if (_lb_args.debug())CkPrintf("\nUpdating to PE from %d to %d", migrateMe->to_pe, from0PE);
     migrateMe->to_pe = from0PE;
   } else {
     MigrateInfo* migrateMe = new MigrateInfo;
@@ -227,10 +224,10 @@ void DiffusionLB::WithinNodeLB()
 {
 
   if (thisIndex == 0)
-    if (_lb_args.debug()) CkPrintf("--------STARTING WITHIN NODE LB--------\n");
+    if (_lb_args.debug() == 3) CkPrintf("--------STARTING WITHIN NODE LB--------\n");
 
   if(nodeSize==1) {
-      if (_lb_args.debug()) CkPrintf("--------Node size is 1--------\n");
+      if (_lb_args.debug() == 3) CkPrintf("--------Node size is 1--------\n");
 
     if (CkMyPe() == 0)
     {
@@ -266,7 +263,7 @@ void DiffusionLB::WithinNodeLB()
     // and store the underloaded pes
     for (int rank = 0; rank < nodeSize; rank++)
     {
-      if (_lb_args.debug()) CkPrintf("\nOrig PE load with node LB [%d] = %lf", rank+rank0PE, pe_load[rank]);
+      if (_lb_args.debug() == 3) CkPrintf("\nOrig PE load with node LB [%d] = %lf", rank+rank0PE, pe_load[rank]);
       if (pe_load[rank] > avgPE + threshold)
       {
         double overLoad = pe_load[rank] - avgPE;
@@ -305,7 +302,6 @@ void DiffusionLB::WithinNodeLB()
       }
       else if (pe_load[rank] < avgPE - threshold)
       {
-        if (_lb_args.debug())CkPrintf("\nAdding PE-%d to minPEs on node %d", CkMyPe(), myNodeId);
         InfoRecord* itemMin = new InfoRecord;
         itemMin->load = pe_load[rank];
         itemMin->Id = rank;
@@ -436,7 +432,7 @@ void DiffusionLB::ProcessMigrations()
   for (int i = 0; i < msg->n_moves; i++)
   {
     MigrateInfo& move = msg->moves[i];
-     if (_lb_args.debug()) CkPrintf("\n[PE-%d] Migrating obj from %d to %d", CkMyPe(), move.from_pe,
+     if (_lb_args.debug() == 3) CkPrintf("\n[PE-%d] Migrating obj from %d to %d", CkMyPe(), move.from_pe,
                move.to_pe);
     if (move.from_pe == me)
     {

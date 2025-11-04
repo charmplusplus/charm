@@ -1,0 +1,3011 @@
+Charm++> Running on MPI library: MPI VERSION    : CRAY MPICH version 8.1.30.8 (ANL base 3.4a2)
+MPI BUILD INFO : Sat Jun 01  4:44 2024 (git hash 69863f7)
+ (MPI standard: 3.1)
+Charm++> Level of thread support used: MPI_THREAD_SINGLE (desired: MPI_THREAD_SINGLE)
+Charm++> Running in non-SMP mode: 64 processes (PEs)
+Converse/Charm++ Commit ID: v8.0.1-devel-78-g6c5586d36
+Charm++> MPI timer is synchronized
+Isomalloc> Synchronized global address space.
+CharmLB> Verbose level 1, load balancing period: -1 seconds
+CharmLB> Load balancer assumes all CPUs are same.
+Charm++> cpu affinity enabled. 
+Charm++> Running on 4 hosts (2 sockets x 64 cores x 2 PUs = 256-way SMP)
+Charm++> cpu topology info is gathered in 0.009 seconds.
+
+STENCIL COMPUTATION WITH BARRIERS
+Running Stencil on 64 processors with (64, 64, 64) chares
+Array Dimensions: 1024 1024 1024
+Block Dimensions: 16 16 16
+Iter time = 2.989261
+Iter time = 2.655486
+Iter time = 2.305965
+Iter time = 2.335231
+[DiffusionLB] Load balancing step 0 starting at 15.716433
+DistLB> DiffusionLB: step 0 starting at 15.717769 Memory: 431.233307 MB
+After MST: Node 0: Neighbors: 63 
+After MST: Node 16: Neighbors: 17 15 
+After MST: Node 15: Neighbors: 16 14 
+After MST: Node 32: Neighbors: 33 31 
+After MST: Node 17: Neighbors: 18 16 
+After MST: Node 48: Neighbors: 49 47 
+After MST: Node 3: Neighbors: 4 2 
+After MST: Node 34: Neighbors: 35 33 
+After MST: Node 18: Neighbors: 19 17 
+After MST: Node 51: Neighbors: 52 50 
+After MST: Node 8: Neighbors: 9 7 
+After MST: Node 36: Neighbors: 37 35 
+After MST: Node 19: Neighbors: 20 18 
+After MST: Node 63: Neighbors: 0 62 
+After MST: Node 1: Neighbors: 2 
+After MST: Node 47: Neighbors: 48 46 
+After MST: Node 31: Neighbors: 32 30 
+After MST: Node 49: Neighbors: 50 48 
+After MST: Node 2: Neighbors: 3 1 
+After MST: Node 33: Neighbors: 34 32 
+After MST: Node 20: Neighbors: 21 19 
+After MST: Node 50: Neighbors: 51 49 
+After MST: Node 4: Neighbors: 5 3 
+After MST: Node 35: Neighbors: 36 34 
+After MST: Node 21: Neighbors: 22 20 
+After MST: Node 52: Neighbors: 53 51 
+After MST: Node 5: Neighbors: 6 4 
+After MST: Node 37: Neighbors: 38 36 
+After MST: Node 22: Neighbors: 23 21 
+After MST: Node 53: Neighbors: 54 52 
+After MST: Node 6: Neighbors: 7 5 
+After MST: Node 38: Neighbors: 39 37 
+After MST: Node 23: Neighbors: 24 22 
+After MST: Node 54: Neighbors: 55 53 
+After MST: Node 7: Neighbors: 8 6 
+After MST: Node 39: Neighbors: 40 38 
+After MST: Node 24: Neighbors: 25 23 
+After MST: Node 55: Neighbors: 56 54 
+After MST: Node 9: Neighbors: 10 8 
+After MST: Node 40: Neighbors: 41 39 
+After MST: Node 25: Neighbors: 26 24 
+After MST: Node 56: Neighbors: 57 55 
+After MST: Node 10: Neighbors: 11 9 
+After MST: Node 41: Neighbors: 42 40 
+After MST: Node 26: Neighbors: 27 25 
+After MST: Node 57: Neighbors: 58 56 
+After MST: Node 11: Neighbors: 12 10 
+After MST: Node 42: Neighbors: 43 41 
+After MST: Node 27: Neighbors: 28 26 
+After MST: Node 58: Neighbors: 59 57 
+After MST: Node 12: Neighbors: 13 11 
+After MST: Node 43: Neighbors: 44 42 
+After MST: Node 28: Neighbors: 29 27 
+After MST: Node 59: Neighbors: 60 58 
+After MST: Node 13: Neighbors: 14 12 
+After MST: Node 44: Neighbors: 45 43 
+After MST: Node 29: Neighbors: 30 28 
+After MST: Node 60: Neighbors: 61 59 
+After MST: Node 14: Neighbors: 15 13 
+After MST: Node 45: Neighbors: 46 44 
+After MST: Node 30: Neighbors: 31 29 
+After MST: Node 61: Neighbors: 62 60 
+MST is built. Begin finding remaining neighbors.
+After MST: Node 46: Neighbors: 47 45 
+After MST: Node 62: Neighbors: 63 61 
+After Nbor Finding: Node 32: Neighbors: 33 31 
+After Nbor Finding: Node 48: Neighbors: 49 47 
+After Nbor Finding: Node 0: Neighbors: 63 
+After Nbor Finding: Node 33: Neighbors: 34 32 
+After Nbor Finding: Node 16: Neighbors: 17 15 
+After Nbor Finding: Node 49: Neighbors: 50 48 
+After Nbor Finding: Node 1: Neighbors: 2 
+After Nbor Finding: Node 34: Neighbors: 35 33 
+After Nbor Finding: Node 17: Neighbors: 18 16 
+After Nbor Finding: Node 50: Neighbors: 51 49 
+After Nbor Finding: Node 2: Neighbors: 3 1 
+After Nbor Finding: Node 35: Neighbors: 36 34 
+After Nbor Finding: Node 18: Neighbors: 19 17 
+After Nbor Finding: Node 51: Neighbors: 52 50 
+After Nbor Finding: Node 3: Neighbors: 4 2 
+After Nbor Finding: Node 36: Neighbors: 37 35 
+After Nbor Finding: Node 19: Neighbors: 20 18 
+After Nbor Finding: Node 52: Neighbors: 53 51 
+After Nbor Finding: Node 4: Neighbors: 5 3 
+After Nbor Finding: Node 37: Neighbors: 38 36 
+After Nbor Finding: Node 20: Neighbors: 21 19 
+After Nbor Finding: Node 53: Neighbors: 54 52 
+After Nbor Finding: Node 5: Neighbors: 6 4 
+After Nbor Finding: Node 38: Neighbors: 39 37 
+After Nbor Finding: Node 21: Neighbors: 22 20 
+After Nbor Finding: Node 54: Neighbors: 55 53 
+After Nbor Finding: Node 6: Neighbors: 7 5 
+After Nbor Finding: Node 39: Neighbors: 40 38 
+After Nbor Finding: Node 22: Neighbors: 23 21 
+After Nbor Finding: Node 55: Neighbors: 56 54 
+After Nbor Finding: Node 7: Neighbors: 8 6 
+After Nbor Finding: Node 40: Neighbors: 41 39 
+After Nbor Finding: Node 23: Neighbors: 24 22 
+After Nbor Finding: Node 56: Neighbors: 57 55 
+After Nbor Finding: Node 8: Neighbors: 9 7 
+After Nbor Finding: Node 41: Neighbors: 42 40 
+After Nbor Finding: Node 24: Neighbors: 25 23 
+After Nbor Finding: Node 57: Neighbors: 58 56 
+After Nbor Finding: Node 9: Neighbors: 10 8 
+After Nbor Finding: Node 42: Neighbors: 43 41 
+After Nbor Finding: Node 25: Neighbors: 26 24 
+After Nbor Finding: Node 58: Neighbors: 59 57 
+After Nbor Finding: Node 10: Neighbors: 11 9 
+After Nbor Finding: Node 43: Neighbors: 44 42 
+After Nbor Finding: Node 26: Neighbors: 27 25 
+After Nbor Finding: Node 59: Neighbors: 60 58 
+After Nbor Finding: Node 11: Neighbors: 12 10 
+After Nbor Finding: Node 44: Neighbors: 45 43 
+After Nbor Finding: Node 27: Neighbors: 28 26 
+After Nbor Finding: Node 60: Neighbors: 61 59 
+After Nbor Finding: Node 12: Neighbors: 13 11 
+After Nbor Finding: Node 45: Neighbors: 46 44 
+After Nbor Finding: Node 28: Neighbors: 29 27 
+After Nbor Finding: Node 61: Neighbors: 62 60 
+After Nbor Finding: Node 13: Neighbors: 14 12 
+After Nbor Finding: Node 46: Neighbors: 47 45 
+After Nbor Finding: Node 29: Neighbors: 30 28 
+After Nbor Finding: Node 62: Neighbors: 63 61 
+After Nbor Finding: Node 14: Neighbors: 15 13 
+After Nbor Finding: Node 47: Neighbors: 48 46 
+After Nbor Finding: Node 30: Neighbors: 31 29 
+After Nbor Finding: Node 63: Neighbors: 0 62 
+After Nbor Finding: Node 15: Neighbors: 16 14 
+Node 32 has neighbors: 33, 31
+After Nbor Finding: Node 31: Neighbors: 32 30 
+Node 48 has neighbors: 49, 47
+--------NEIGHBOR SELECTION COMPLETE (Using Comm? true)--------
+Node 34 has neighbors: 35, 33
+Node 16 has neighbors: 17, 15
+Node 49 has neighbors: 50, 48
+Node 2 has neighbors: 3, 1
+Node 36 has neighbors: 37, 35
+Node 18 has neighbors: 19, 17
+Node 50 has neighbors: 51, 49
+Node 3 has neighbors: 4, 2
+Node 37 has neighbors: 38, 36
+Node 20 has neighbors: 21, 19
+Node 51 has neighbors: 52, 50
+Node 0 has neighbors: 63
+Node 38 has neighbors: 39, 37
+Node 22 has neighbors: 23, 21
+Node 52 has neighbors: 53, 51
+Node 1 has neighbors: 2
+Node 39 has neighbors: 40, 38
+Node 23 has neighbors: 24, 22
+Node 53 has neighbors: 54, 52
+Node 4 has neighbors: 5, 3
+Node 41 has neighbors: 42, 40
+Node 17 has neighbors: 18, 16
+Node 54 has neighbors: 55, 53
+Node 5 has neighbors: 6, 4
+Node 42 has neighbors: 43, 41
+Node 21 has neighbors: 22, 20
+Node 55 has neighbors: 56, 54
+Node 6 has neighbors: 7, 5
+Node 44 has neighbors: 45, 43
+Node 24 has neighbors: 25, 23
+Node 56 has neighbors: 57, 55
+Node 7 has neighbors: 8, 6
+Node 46 has neighbors: 47, 45
+Node 25 has neighbors: 26, 24
+Node 57 has neighbors: 58, 56
+Node 8 has neighbors: 9, 7
+Node 47 has neighbors: 48, 46
+Node 27 has neighbors: 28, 26
+Node 58 has neighbors: 59, 57
+Node 9 has neighbors: 10, 8
+Node 33 has neighbors: 34, 32
+Node 28 has neighbors: 29, 27
+Node 59 has neighbors: 60, 58
+Node 10 has neighbors: 11, 9
+Node 35 has neighbors: 36, 34
+Node 30 has neighbors: 31, 29
+Node 60 has neighbors: 61, 59
+Node 11 has neighbors: 12, 10
+Node 40 has neighbors: 41, 39
+Node 31 has neighbors: 32, 30
+Node 61 has neighbors: 62, 60
+Node 12 has neighbors: 13, 11
+Node 43 has neighbors: 44, 42
+Node 19 has neighbors: 20, 18
+Node 62 has neighbors: 63, 61
+Node 13 has neighbors: 14, 12
+Node 45 has neighbors: 46, 44
+Node 26 has neighbors: 27, 25
+Node 63 has neighbors: 0, 62
+Node 14 has neighbors: 15, 13
+Node 29 has neighbors: 30, 28
+Node 15 has neighbors: 16, 14
+PSEUDO: Node 0 (load 8.543968) with pseudo_load after LB 8.506944
+PSEUDO: Node 32 (load 8.538745) with pseudo_load after LB 8.480693
+PSEUDO: Node 16 (load 8.443427) with pseudo_load after LB 8.913135
+PSEUDO: Node 48 (load 8.582530) with pseudo_load after LB 8.491601
+PSEUDO: Node 1 (load 8.763660) with pseudo_load after LB 9.368875
+PSEUDO: Node 34 (load 8.471567) with pseudo_load after LB 8.477607
+PSEUDO: Node 17 (load 8.467311) with pseudo_load after LB 8.908096
+PSEUDO: Node 49 (load 8.448276) with pseudo_load after LB 8.491601
+PSEUDO: Node 2 (load 9.374088) with pseudo_load after LB 9.367708
+PSEUDO: Node 35 (load 8.434710) with pseudo_load after LB 8.476283
+PSEUDO: Node 18 (load 8.505241) with pseudo_load after LB 8.794647
+PSEUDO: Node 50 (load 8.576176) with pseudo_load after LB 8.495510
+PSEUDO: Node 3 (load 9.663165) with pseudo_load after LB 9.367585
+PSEUDO: Node 36 (load 8.483108) with pseudo_load after LB 8.475876
+PSEUDO: Node 19 (load 8.438896) with pseudo_load after LB 8.790306
+PSEUDO: Node 51 (load 8.428920) with pseudo_load after LB 8.495510
+PSEUDO: Node 4 (load 9.346800) with pseudo_load after LB 9.361473
+PSEUDO: Node 38 (load 8.570062) with pseudo_load after LB 8.475355
+PSEUDO: Node 20 (load 8.488270) with pseudo_load after LB 8.691545
+PSEUDO: Node 52 (load 8.572315) with pseudo_load after LB 8.498654
+PSEUDO: Node 5 (load 9.413302) with pseudo_load after LB 9.360981
+PSEUDO: Node 39 (load 8.410990) with pseudo_load after LB 8.475138
+PSEUDO: Node 21 (load 8.447803) with pseudo_load after LB 8.688178
+PSEUDO: Node 53 (load 8.428376) with pseudo_load after LB 8.498654
+PSEUDO: Node 6 (load 9.612049) with pseudo_load after LB 9.343228
+PSEUDO: Node 41 (load 8.404031) with pseudo_load after LB 8.476324
+PSEUDO: Node 31 (load 8.501743) with pseudo_load after LB 8.484931
+PSEUDO: Node 54 (load 8.572997) with pseudo_load after LB 8.501074
+PSEUDO: Node 7 (load 9.387133) with pseudo_load after LB 9.341955
+PSEUDO: Node 42 (load 8.527158) with pseudo_load after LB 8.478943
+PSEUDO: Node 22 (load 8.478860) with pseudo_load after LB 8.610833
+PSEUDO: Node 55 (load 8.429483) with pseudo_load after LB 8.501074
+PSEUDO: Node 8 (load 9.516557) with pseudo_load after LB 9.304659
+PSEUDO: Node 43 (load 8.422950) with pseudo_load after LB 8.478943
+PSEUDO: Node 23 (load 8.443467) with pseudo_load after LB 8.608427
+PSEUDO: Node 56 (load 8.566594) with pseudo_load after LB 8.502971
+PSEUDO: Node 9 (load 9.459701) with pseudo_load after LB 9.302230
+PSEUDO: Node 44 (load 8.477379) with pseudo_load after LB 8.482737
+PSEUDO: Node 24 (load 8.490353) with pseudo_load after LB 8.553978
+PSEUDO: Node 57 (load 8.413959) with pseudo_load after LB 8.502971
+PSEUDO: Node 10 (load 9.660197) with pseudo_load after LB 9.239787
+PSEUDO: Node 45 (load 8.431635) with pseudo_load after LB 8.482737
+PSEUDO: Node 25 (load 8.444654) with pseudo_load after LB 8.552292
+PSEUDO: Node 58 (load 8.569930) with pseudo_load after LB 8.504528
+PSEUDO: Node 11 (load 9.355939) with pseudo_load after LB 9.236087
+PSEUDO: Node 46 (load 8.507432) with pseudo_load after LB 8.487169
+PSEUDO: Node 26 (load 8.500392) with pseudo_load after LB 8.517930
+PSEUDO: Node 59 (load 8.406403) with pseudo_load after LB 8.504528
+PSEUDO: Node 12 (load 9.529286) with pseudo_load after LB 9.148033
+PSEUDO: Node 47 (load 8.502742) with pseudo_load after LB 8.487169
+PSEUDO: Node 27 (load 8.448214) with pseudo_load after LB 8.516617
+PSEUDO: Node 60 (load 8.570626) with pseudo_load after LB 8.505784
+PSEUDO: Node 13 (load 9.353394) with pseudo_load after LB 9.143309
+PSEUDO: Node 33 (load 8.455841) with pseudo_load after LB 8.479196
+PSEUDO: Node 28 (load 8.519222) with pseudo_load after LB 8.497265
+PSEUDO: Node 61 (load 8.416806) with pseudo_load after LB 8.505784
+PSEUDO: Node 14 (load 9.534620) with pseudo_load after LB 9.035386
+PSEUDO: Node 37 (load 8.416489) with pseudo_load after LB 8.475085
+PSEUDO: Node 29 (load 8.450845) with pseudo_load after LB 8.495998
+PSEUDO: Node 62 (load 8.594002) with pseudo_load after LB 8.506638
+PSEUDO: Node 15 (load 9.539333) with pseudo_load after LB 9.030182
+PSEUDO: Node 40 (load 8.484543) with pseudo_load after LB 8.476324
+PSEUDO: Node 30 (load 8.516589) with pseudo_load after LB 8.486334
+PSEUDO: Node 63 (load 8.492778) with pseudo_load after LB 8.506638
+--------STARTING ACROSS NODE LB--------
+PE-1 with 0 migrates
+PE-33 with 32 migrates
+PE-16 with 1002 migrates
+PE-49 with 1 migrates
+PE-2 with 221 migrates
+PE-37 with 0 migrates
+PE-17 with 795 migrates
+PE-51 with 0 migrates
+PE-3 with 224 migrates
+PE-39 with 0 migrates
+PE-18 with 648 migrates
+PE-53 with 0 migrates
+PE-4 with 130 migrates
+PE-40 with 3 migrates
+PE-19 with 484 migrates
+PE-55 with 0 migrates
+PE-5 with 103 migrates
+PE-41 with 0 migrates
+PE-20 with 383 migrates
+PE-57 with 0 migrates
+PE-9 with 146 migrates
+PE-43 with 8 migrates
+PE-21 with 272 migrates
+PE-59 with 0 migrates
+PE-10 with 290 migrates
+PE-44 with 35 migrates
+PE-22 with 206 migrates
+PE-61 with 10 migrates
+PE-11 with 347 migrates
+PE-45 with 38 migrates
+PE-23 with 128 migrates
+PE-48 with 40 migrates
+PE-12 with 434 migrates
+PE-46 with 63 migrates
+PE-24 with 96 migrates
+PE-50 with 37 migrates
+PE-13 with 562 migrates
+PE-47 with 53 migrates
+PE-25 with 46 migrates
+PE-52 with 34 migrates
+PE-14 with 749 migrates
+PE-32 with 45 migrates
+PE-26 with 36 migrates
+PE-54 with 34 migrates
+PE-15 with 1026 migrates
+PE-34 with 29 migrates
+PE-27 with 4 migrates
+PE-0 with 16 migrates
+PE-35 with 9 migrates
+PE-29 with 0 migrates
+PE-56 with 30 migrates
+PE-6 with 114 migrates
+PE-36 with 13 migrates
+PE-28 with 14 migrates
+PE-58 with 30 migrates
+PE-7 with 21 migrates
+PE-38 with 45 migrates
+PE-30 with 13 migrates
+PE-60 with 41 migrates
+PE-8 with 68 migrates
+PE-42 with 31 migrates
+PE-31 with 15 migrates
+PE-62 with 52 migrates
+PE-63 with 11 migrates
+DiffusionLB> Strategy took 0.113072s memory usage: 440.290802 MB.
+DiffusionLB> step 0 finished at 15.957072 duration 0.239302 memory usage: 438.585037
+LBTime = 0.249805
+Iter time = 2.542626
+Iter time = 2.297322
+Iter time = 2.274932
+Iter time = 2.287205
+[DiffusionLB] Load balancing step 1 starting at 25.381117
+DistLB> DiffusionLB: step 1 starting at 25.382050 Memory: 443.919601 MB
+After MST: Node 0: Neighbors: 63 1 
+After MST: Node 1: Neighbors: 0 2 
+After MST: Node 32: Neighbors: 33 31 
+After MST: Node 2: Neighbors: 1 3 
+After MST: Node 33: Neighbors: 34 32 
+After MST: Node 16: Neighbors: 17 
+After MST: Node 48: Neighbors: 49 47 
+After MST: Node 3: Neighbors: 2 4 
+After MST: Node 34: Neighbors: 35 33 
+After MST: Node 17: Neighbors: 18 16 
+After MST: Node 49: Neighbors: 50 48 
+After MST: Node 4: Neighbors: 3 5 
+After MST: Node 35: Neighbors: 36 34 
+After MST: Node 18: Neighbors: 19 17 
+After MST: Node 50: Neighbors: 51 49 
+After MST: Node 5: Neighbors: 4 6 
+After MST: Node 36: Neighbors: 37 35 
+After MST: Node 19: Neighbors: 20 18 
+After MST: Node 51: Neighbors: 52 50 
+After MST: Node 6: Neighbors: 5 7 
+After MST: Node 37: Neighbors: 38 36 
+After MST: Node 20: Neighbors: 21 19 
+After MST: Node 52: Neighbors: 53 51 
+After MST: Node 7: Neighbors: 6 8 
+After MST: Node 38: Neighbors: 39 37 
+After MST: Node 21: Neighbors: 22 20 
+After MST: Node 53: Neighbors: 54 52 
+After MST: Node 8: Neighbors: 7 9 
+After MST: Node 39: Neighbors: 40 38 
+After MST: Node 22: Neighbors: 23 21 
+After MST: Node 54: Neighbors: 55 53 
+After MST: Node 9: Neighbors: 8 10 
+After MST: Node 40: Neighbors: 41 39 
+After MST: Node 23: Neighbors: 24 22 
+After MST: Node 55: Neighbors: 56 54 
+After MST: Node 10: Neighbors: 9 11 
+After MST: Node 41: Neighbors: 42 40 
+After MST: Node 24: Neighbors: 25 23 
+After MST: Node 56: Neighbors: 57 55 
+After MST: Node 11: Neighbors: 10 12 
+After MST: Node 42: Neighbors: 43 41 
+After MST: Node 25: Neighbors: 26 24 
+After MST: Node 57: Neighbors: 58 56 
+After MST: Node 12: Neighbors: 11 13 
+After MST: Node 43: Neighbors: 44 42 
+After MST: Node 26: Neighbors: 27 25 
+After MST: Node 58: Neighbors: 59 57 
+After MST: Node 13: Neighbors: 12 14 
+After MST: Node 44: Neighbors: 45 43 
+After MST: Node 27: Neighbors: 28 26 
+After MST: Node 59: Neighbors: 60 58 
+After MST: Node 14: Neighbors: 13 15 
+After MST: Node 45: Neighbors: 46 44 
+After MST: Node 28: Neighbors: 29 27 
+After MST: Node 60: Neighbors: 61 59 
+After MST: Node 15: Neighbors: 14 
+After MST: Node 46: Neighbors: 47 45 
+After MST: Node 29: Neighbors: 30 28 
+After MST: Node 61: Neighbors: 62 60 
+MST is built. Begin finding remaining neighbors.
+After MST: Node 47: Neighbors: 48 46 
+After MST: Node 30: Neighbors: 31 29 
+After MST: Node 62: Neighbors: 63 61 
+After MST: Node 31: Neighbors: 32 30 
+After MST: Node 63: Neighbors: 0 62 
+After Nbor Finding: Node 0: Neighbors: 63 1 
+After Nbor Finding: Node 32: Neighbors: 33 31 
+After Nbor Finding: Node 16: Neighbors: 17 
+After Nbor Finding: Node 1: Neighbors: 0 2 
+After Nbor Finding: Node 33: Neighbors: 34 32 
+After Nbor Finding: Node 17: Neighbors: 18 16 
+After Nbor Finding: Node 2: Neighbors: 1 3 
+After Nbor Finding: Node 34: Neighbors: 35 33 
+After Nbor Finding: Node 18: Neighbors: 19 17 
+After Nbor Finding: Node 3: Neighbors: 2 4 
+After Nbor Finding: Node 35: Neighbors: 36 34 
+After Nbor Finding: Node 19: Neighbors: 20 18 
+After Nbor Finding: Node 48: Neighbors: 49 47 
+After Nbor Finding: Node 4: Neighbors: 3 5 
+After Nbor Finding: Node 36: Neighbors: 37 35 
+After Nbor Finding: Node 20: Neighbors: 21 19 
+After Nbor Finding: Node 49: Neighbors: 50 48 
+Node 49 has neighbors: 50, 48
+After Nbor Finding: Node 5: Neighbors: 4 6 
+After Nbor Finding: Node 37: Neighbors: 38 36 
+After Nbor Finding: Node 21: Neighbors: 22 20 
+After Nbor Finding: Node 50: Neighbors: 51 49 
+Node 50 has neighbors: 51, 49
+After Nbor Finding: Node 6: Neighbors: 5 7 
+After Nbor Finding: Node 38: Neighbors: 39 37 
+After Nbor Finding: Node 22: Neighbors: 23 21 
+After Nbor Finding: Node 51: Neighbors: 52 50 
+Node 51 has neighbors: 52, 50
+After Nbor Finding: Node 7: Neighbors: 6 8 
+After Nbor Finding: Node 39: Neighbors: 40 38 
+After Nbor Finding: Node 23: Neighbors: 24 22 
+After Nbor Finding: Node 52: Neighbors: 53 51 
+Node 52 has neighbors: 53, 51
+After Nbor Finding: Node 8: Neighbors: 7 9 
+After Nbor Finding: Node 40: Neighbors: 41 39 
+After Nbor Finding: Node 24: Neighbors: 25 23 
+After Nbor Finding: Node 53: Neighbors: 54 52 
+Node 53 has neighbors: 54, 52
+After Nbor Finding: Node 9: Neighbors: 8 10 
+After Nbor Finding: Node 41: Neighbors: 42 40 
+After Nbor Finding: Node 25: Neighbors: 26 24 
+After Nbor Finding: Node 54: Neighbors: 55 53 
+Node 54 has neighbors: 55, 53
+After Nbor Finding: Node 10: Neighbors: 9 11 
+After Nbor Finding: Node 42: Neighbors: 43 41 
+After Nbor Finding: Node 26: Neighbors: 27 25 
+After Nbor Finding: Node 55: Neighbors: 56 54 
+Node 55 has neighbors: 56, 54
+After Nbor Finding: Node 11: Neighbors: 10 12 
+After Nbor Finding: Node 43: Neighbors: 44 42 
+After Nbor Finding: Node 27: Neighbors: 28 26 
+After Nbor Finding: Node 56: Neighbors: 57 55 
+Node 56 has neighbors: 57, 55
+After Nbor Finding: Node 12: Neighbors: 11 13 
+After Nbor Finding: Node 44: Neighbors: 45 43 
+After Nbor Finding: Node 28: Neighbors: 29 27 
+After Nbor Finding: Node 57: Neighbors: 58 56 
+Node 57 has neighbors: 58, 56
+After Nbor Finding: Node 13: Neighbors: 12 14 
+After Nbor Finding: Node 45: Neighbors: 46 44 
+After Nbor Finding: Node 29: Neighbors: 30 28 
+After Nbor Finding: Node 58: Neighbors: 59 57 
+Node 58 has neighbors: 59, 57
+After Nbor Finding: Node 14: Neighbors: 13 15 
+After Nbor Finding: Node 46: Neighbors: 47 45 
+After Nbor Finding: Node 30: Neighbors: 31 29 
+After Nbor Finding: Node 59: Neighbors: 60 58 
+Node 59 has neighbors: 60, 58
+After Nbor Finding: Node 15: Neighbors: 14 
+After Nbor Finding: Node 47: Neighbors: 48 46 
+After Nbor Finding: Node 31: Neighbors: 32 30 
+After Nbor Finding: Node 60: Neighbors: 61 59 
+Node 60 has neighbors: 61, 59
+--------NEIGHBOR SELECTION COMPLETE (Using Comm? true)--------
+Node 32 has neighbors: 33, 31
+Node 16 has neighbors: 17
+After Nbor Finding: Node 61: Neighbors: 62 60 
+Node 61 has neighbors: 62, 60
+Node 1 has neighbors: 0, 2
+Node 33 has neighbors: 34, 32
+Node 17 has neighbors: 18, 16
+After Nbor Finding: Node 62: Neighbors: 63 61 
+Node 62 has neighbors: 63, 61
+Node 2 has neighbors: 1, 3
+Node 34 has neighbors: 35, 33
+Node 18 has neighbors: 19, 17
+After Nbor Finding: Node 63: Neighbors: 0 62 
+Node 63 has neighbors: 0, 62
+Node 3 has neighbors: 2, 4
+Node 35 has neighbors: 36, 34
+Node 19 has neighbors: 20, 18
+Node 48 has neighbors: 49, 47
+Node 4 has neighbors: 3, 5
+Node 36 has neighbors: 37, 35
+Node 20 has neighbors: 21, 19
+Node 5 has neighbors: 4, 6
+Node 37 has neighbors: 38, 36
+Node 21 has neighbors: 22, 20
+Node 6 has neighbors: 5, 7
+Node 38 has neighbors: 39, 37
+Node 22 has neighbors: 23, 21
+Node 7 has neighbors: 6, 8
+Node 39 has neighbors: 40, 38
+Node 23 has neighbors: 24, 22
+Node 8 has neighbors: 7, 9
+Node 40 has neighbors: 41, 39
+Node 24 has neighbors: 25, 23
+Node 9 has neighbors: 8, 10
+Node 41 has neighbors: 42, 40
+Node 25 has neighbors: 26, 24
+Node 10 has neighbors: 9, 11
+Node 42 has neighbors: 43, 41
+Node 26 has neighbors: 27, 25
+Node 11 has neighbors: 10, 12
+Node 43 has neighbors: 44, 42
+Node 27 has neighbors: 28, 26
+Node 12 has neighbors: 11, 13
+Node 44 has neighbors: 45, 43
+Node 28 has neighbors: 29, 27
+Node 13 has neighbors: 12, 14
+Node 45 has neighbors: 46, 44
+Node 29 has neighbors: 30, 28
+Node 14 has neighbors: 13, 15
+Node 46 has neighbors: 47, 45
+Node 30 has neighbors: 31, 29
+Node 15 has neighbors: 14
+Node 47 has neighbors: 48, 46
+Node 31 has neighbors: 32, 30
+Node 0 has neighbors: 63, 1
+PSEUDO: Node 32 (load 8.273352) with pseudo_load after LB 8.310271
+PSEUDO: Node 16 (load 8.442164) with pseudo_load after LB 8.487652
+PSEUDO: Node 0 (load 8.283569) with pseudo_load after LB 8.587298
+PSEUDO: Node 33 (load 8.294341) with pseudo_load after LB 8.301531
+PSEUDO: Node 17 (load 8.680139) with pseudo_load after LB 8.484769
+PSEUDO: Node 48 (load 8.317663) with pseudo_load after LB 8.296537
+PSEUDO: Node 1 (load 8.918075) with pseudo_load after LB 8.653179
+PSEUDO: Node 34 (load 8.297708) with pseudo_load after LB 8.296631
+PSEUDO: Node 18 (load 8.593079) with pseudo_load after LB 8.479489
+PSEUDO: Node 49 (load 8.238551) with pseudo_load after LB 8.300114
+PSEUDO: Node 2 (load 9.068985) with pseudo_load after LB 8.653880
+PSEUDO: Node 35 (load 8.248385) with pseudo_load after LB 8.290271
+PSEUDO: Node 19 (load 8.573802) with pseudo_load after LB 8.471273
+PSEUDO: Node 50 (load 8.311367) with pseudo_load after LB 8.306246
+PSEUDO: Node 3 (load 8.907296) with pseudo_load after LB 8.710091
+PSEUDO: Node 36 (load 8.263085) with pseudo_load after LB 8.287311
+PSEUDO: Node 20 (load 8.516428) with pseudo_load after LB 8.461560
+PSEUDO: Node 51 (load 8.310931) with pseudo_load after LB 8.313649
+PSEUDO: Node 4 (load 8.947448) with pseudo_load after LB 8.710504
+PSEUDO: Node 37 (load 8.257874) with pseudo_load after LB 8.283168
+PSEUDO: Node 21 (load 8.462066) with pseudo_load after LB 8.449197
+PSEUDO: Node 52 (load 8.319882) with pseudo_load after LB 8.319573
+PSEUDO: Node 5 (load 8.961993) with pseudo_load after LB 8.750518
+PSEUDO: Node 38 (load 8.270041) with pseudo_load after LB 8.281798
+PSEUDO: Node 22 (load 8.433333) with pseudo_load after LB 8.436526
+PSEUDO: Node 53 (load 8.325748) with pseudo_load after LB 8.333412
+PSEUDO: Node 6 (load 8.852351) with pseudo_load after LB 8.750725
+PSEUDO: Node 39 (load 8.275776) with pseudo_load after LB 8.279619
+PSEUDO: Node 23 (load 8.401984) with pseudo_load after LB 8.421648
+PSEUDO: Node 54 (load 8.324149) with pseudo_load after LB 8.338678
+PSEUDO: Node 7 (load 8.984275) with pseudo_load after LB 8.772131
+PSEUDO: Node 40 (load 8.267933) with pseudo_load after LB 8.279646
+PSEUDO: Node 24 (load 8.377354) with pseudo_load after LB 8.407755
+PSEUDO: Node 55 (load 8.315724) with pseudo_load after LB 8.362048
+PSEUDO: Node 8 (load 8.883189) with pseudo_load after LB 8.772192
+PSEUDO: Node 41 (load 8.271275) with pseudo_load after LB 8.279011
+PSEUDO: Node 25 (load 8.357469) with pseudo_load after LB 8.392068
+PSEUDO: Node 56 (load 8.321046) with pseudo_load after LB 8.366385
+PSEUDO: Node 9 (load 8.871106) with pseudo_load after LB 8.777394
+PSEUDO: Node 42 (load 8.266898) with pseudo_load after LB 8.280341
+PSEUDO: Node 26 (load 8.331591) with pseudo_load after LB 8.378570
+PSEUDO: Node 57 (load 8.326572) with pseudo_load after LB 8.402018
+PSEUDO: Node 10 (load 8.779767) with pseudo_load after LB 8.776844
+PSEUDO: Node 43 (load 8.266835) with pseudo_load after LB 8.280491
+PSEUDO: Node 27 (load 8.329992) with pseudo_load after LB 8.363526
+PSEUDO: Node 58 (load 8.321922) with pseudo_load after LB 8.405353
+PSEUDO: Node 11 (load 8.889134) with pseudo_load after LB 8.773027
+PSEUDO: Node 44 (load 8.277677) with pseudo_load after LB 8.283793
+PSEUDO: Node 28 (load 8.328050) with pseudo_load after LB 8.351625
+PSEUDO: Node 59 (load 8.330664) with pseudo_load after LB 8.454356
+PSEUDO: Node 12 (load 8.897794) with pseudo_load after LB 8.771461
+PSEUDO: Node 45 (load 8.263066) with pseudo_load after LB 8.284390
+PSEUDO: Node 29 (load 8.301881) with pseudo_load after LB 8.338243
+PSEUDO: Node 60 (load 8.326179) with pseudo_load after LB 8.456771
+PSEUDO: Node 13 (load 8.685820) with pseudo_load after LB 8.766261
+PSEUDO: Node 46 (load 8.292811) with pseudo_load after LB 8.289206
+PSEUDO: Node 30 (load 8.303224) with pseudo_load after LB 8.328612
+PSEUDO: Node 61 (load 8.344813) with pseudo_load after LB 8.517396
+PSEUDO: Node 14 (load 8.647199) with pseudo_load after LB 8.764779
+PSEUDO: Node 47 (load 8.275287) with pseudo_load after LB 8.290764
+PSEUDO: Node 31 (load 8.291324) with pseudo_load after LB 8.317452
+PSEUDO: Node 62 (load 8.350658) with pseudo_load after LB 8.519062
+PSEUDO: Node 15 (load 8.381031) with pseudo_load after LB 8.762506
+PSEUDO: Node 63 (load 8.367664) with pseudo_load after LB 8.586194
+--------STARTING ACROSS NODE LB--------
+PE-0 with 605 migrates
+PE-32 with 57 migrates
+PE-16 with 0 migrates
+PE-49 with 31 migrates
+PE-1 with 717 migrates
+PE-34 with 54 migrates
+PE-23 with 205 migrates
+PE-50 with 60 migrates
+PE-2 with 531 migrates
+PE-35 with 34 migrates
+PE-24 with 188 migrates
+PE-51 with 58 migrates
+PE-3 with 350 migrates
+PE-36 with 22 migrates
+PE-25 with 172 migrates
+PE-52 with 58 migrates
+PE-4 with 267 migrates
+PE-38 with 3 migrates
+PE-26 with 148 migrates
+PE-54 with 63 migrates
+PE-5 with 168 migrates
+PE-39 with 1 migrates
+PE-27 with 133 migrates
+PE-55 with 70 migrates
+PE-6 with 76 migrates
+PE-40 with 0 migrates
+PE-28 with 121 migrates
+PE-56 with 93 migrates
+PE-8 with 99 migrates
+PE-41 with 3 migrates
+PE-29 with 103 migrates
+PE-57 with 116 migrates
+PE-15 with 0 migrates
+PE-33 with 53 migrates
+PE-30 with 90 migrates
+PE-58 with 152 migrates
+PE-7 with 89 migrates
+PE-37 with 9 migrates
+PE-31 with 76 migrates
+PE-59 with 196 migrates
+PE-9 with 141 migrates
+PE-42 with 7 migrates
+PE-20 with 210 migrates
+PE-60 with 252 migrates
+PE-10 with 141 migrates
+PE-43 with 14 migrates
+PE-22 with 213 migrates
+PE-61 with 323 migrates
+PE-11 with 196 migrates
+PE-44 with 21 migrates
+PE-17 with 97 migrates
+PE-62 with 401 migrates
+PE-12 with 250 migrates
+PE-45 with 24 migrates
+PE-18 with 131 migrates
+PE-63 with 497 migrates
+PE-13 with 221 migrates
+PE-46 with 33 migrates
+PE-19 with 183 migrates
+PE-48 with 41 migrates
+PE-14 with 169 migrates
+PE-47 with 33 migrates
+PE-21 with 217 migrates
+PE-53 with 59 migrates
+DiffusionLB> Strategy took 0.269027s memory usage: 463.804245 MB.
+DiffusionLB> step 1 finished at 25.667025 duration 0.284975 memory usage: 457.213821
+LBTime = 0.288172
+Iter time = 2.524906
+Iter time = 2.231281
+Iter time = 2.233009
+Iter time = 2.222211
+[DiffusionLB] Load balancing step 2 starting at 34.903614
+DistLB> DiffusionLB: step 2 starting at 34.905128 Memory: 463.294983 MB
+After MST: Node 1: Neighbors: 0 2 
+After MST: Node 32: Neighbors: 33 31 
+After MST: Node 16: Neighbors: 17 15 
+After MST: Node 48: Neighbors: 49 47 
+After MST: Node 2: Neighbors: 1 
+After MST: Node 33: Neighbors: 34 32 
+After MST: Node 17: Neighbors: 18 16 
+After MST: Node 49: Neighbors: 50 48 
+After MST: Node 3: Neighbors: 4 
+After MST: Node 34: Neighbors: 35 33 
+After MST: Node 18: Neighbors: 19 17 
+After MST: Node 50: Neighbors: 51 49 
+After MST: Node 4: Neighbors: 5 3 
+After MST: Node 35: Neighbors: 36 34 
+After MST: Node 19: Neighbors: 20 18 
+After MST: Node 51: Neighbors: 52 50 
+After MST: Node 5: Neighbors: 6 4 
+After MST: Node 36: Neighbors: 37 35 
+After MST: Node 20: Neighbors: 21 19 
+After MST: Node 52: Neighbors: 53 51 
+After MST: Node 6: Neighbors: 7 5 
+After MST: Node 37: Neighbors: 38 36 
+After MST: Node 21: Neighbors: 22 20 
+After MST: Node 53: Neighbors: 54 52 
+After MST: Node 7: Neighbors: 8 6 
+After MST: Node 38: Neighbors: 39 37 
+After MST: Node 22: Neighbors: 23 21 
+After MST: Node 54: Neighbors: 55 53 
+After MST: Node 8: Neighbors: 9 7 
+After MST: Node 39: Neighbors: 40 38 
+After MST: Node 23: Neighbors: 24 22 
+After MST: Node 55: Neighbors: 56 54 
+After MST: Node 9: Neighbors: 10 8 
+After MST: Node 40: Neighbors: 41 39 
+After MST: Node 24: Neighbors: 25 23 
+After MST: Node 56: Neighbors: 57 55 
+After MST: Node 10: Neighbors: 11 9 
+After MST: Node 41: Neighbors: 42 40 
+After MST: Node 25: Neighbors: 26 24 
+After MST: Node 57: Neighbors: 58 56 
+After MST: Node 11: Neighbors: 12 10 
+After MST: Node 42: Neighbors: 43 41 
+After MST: Node 26: Neighbors: 27 25 
+After MST: Node 58: Neighbors: 59 57 
+After MST: Node 12: Neighbors: 13 11 
+After MST: Node 43: Neighbors: 44 42 
+After MST: Node 27: Neighbors: 28 26 
+After MST: Node 59: Neighbors: 60 58 
+After MST: Node 13: Neighbors: 14 12 
+After MST: Node 44: Neighbors: 45 43 
+After MST: Node 28: Neighbors: 29 27 
+After MST: Node 60: Neighbors: 61 59 
+After MST: Node 14: Neighbors: 15 13 
+After MST: Node 45: Neighbors: 46 44 
+After MST: Node 29: Neighbors: 30 28 
+After MST: Node 61: Neighbors: 62 60 
+After MST: Node 15: Neighbors: 16 14 
+After MST: Node 46: Neighbors: 47 45 
+After MST: Node 30: Neighbors: 31 29 
+After MST: Node 62: Neighbors: 63 61 
+After MST: Node 0: Neighbors: 63 1 
+After MST: Node 47: Neighbors: 48 46 
+After MST: Node 31: Neighbors: 32 30 
+After MST: Node 63: Neighbors: 0 62 
+MST is built. Begin finding remaining neighbors.
+After Nbor Finding: Node 0: Neighbors: 63 1 
+After Nbor Finding: Node 16: Neighbors: 17 15 
+After Nbor Finding: Node 1: Neighbors: 0 2 
+After Nbor Finding: Node 32: Neighbors: 33 31 
+After Nbor Finding: Node 17: Neighbors: 18 16 
+After Nbor Finding: Node 2: Neighbors: 1 
+After Nbor Finding: Node 33: Neighbors: 34 32 
+After Nbor Finding: Node 18: Neighbors: 19 17 
+After Nbor Finding: Node 48: Neighbors: 49 47 
+After Nbor Finding: Node 3: Neighbors: 4 
+After Nbor Finding: Node 34: Neighbors: 35 33 
+After Nbor Finding: Node 19: Neighbors: 20 18 
+After Nbor Finding: Node 49: Neighbors: 50 48 
+After Nbor Finding: Node 4: Neighbors: 5 3 
+After Nbor Finding: Node 35: Neighbors: 36 34 
+After Nbor Finding: Node 20: Neighbors: 21 19 
+After Nbor Finding: Node 50: Neighbors: 51 49 
+After Nbor Finding: Node 5: Neighbors: 6 4 
+After Nbor Finding: Node 36: Neighbors: 37 35 
+After Nbor Finding: Node 21: Neighbors: 22 20 
+After Nbor Finding: Node 51: Neighbors: 52 50 
+After Nbor Finding: Node 6: Neighbors: 7 5 
+After Nbor Finding: Node 37: Neighbors: 38 36 
+After Nbor Finding: Node 22: Neighbors: 23 21 
+After Nbor Finding: Node 52: Neighbors: 53 51 
+After Nbor Finding: Node 7: Neighbors: 8 6 
+After Nbor Finding: Node 38: Neighbors: 39 37 
+After Nbor Finding: Node 23: Neighbors: 24 22 
+After Nbor Finding: Node 53: Neighbors: 54 52 
+After Nbor Finding: Node 8: Neighbors: 9 7 
+After Nbor Finding: Node 39: Neighbors: 40 38 
+After Nbor Finding: Node 24: Neighbors: 25 23 
+After Nbor Finding: Node 54: Neighbors: 55 53 
+After Nbor Finding: Node 9: Neighbors: 10 8 
+After Nbor Finding: Node 40: Neighbors: 41 39 
+After Nbor Finding: Node 25: Neighbors: 26 24 
+After Nbor Finding: Node 55: Neighbors: 56 54 
+After Nbor Finding: Node 10: Neighbors: 11 9 
+After Nbor Finding: Node 41: Neighbors: 42 40 
+After Nbor Finding: Node 26: Neighbors: 27 25 
+After Nbor Finding: Node 56: Neighbors: 57 55 
+After Nbor Finding: Node 11: Neighbors: 12 10 
+After Nbor Finding: Node 42: Neighbors: 43 41 
+After Nbor Finding: Node 27: Neighbors: 28 26 
+After Nbor Finding: Node 57: Neighbors: 58 56 
+After Nbor Finding: Node 12: Neighbors: 13 11 
+After Nbor Finding: Node 43: Neighbors: 44 42 
+After Nbor Finding: Node 28: Neighbors: 29 27 
+After Nbor Finding: Node 58: Neighbors: 59 57 
+After Nbor Finding: Node 13: Neighbors: 14 12 
+After Nbor Finding: Node 44: Neighbors: 45 43 
+After Nbor Finding: Node 29: Neighbors: 30 28 
+After Nbor Finding: Node 59: Neighbors: 60 58 
+After Nbor Finding: Node 14: Neighbors: 15 13 
+After Nbor Finding: Node 45: Neighbors: 46 44 
+After Nbor Finding: Node 30: Neighbors: 31 29 
+After Nbor Finding: Node 60: Neighbors: 61 59 
+After Nbor Finding: Node 15: Neighbors: 16 14 
+After Nbor Finding: Node 46: Neighbors: 47 45 
+After Nbor Finding: Node 31: Neighbors: 32 30 
+After Nbor Finding: Node 61: Neighbors: 62 60 
+Node 61 has neighbors: 62, 60
+--------NEIGHBOR SELECTION COMPLETE (Using Comm? true)--------
+After Nbor Finding: Node 47: Neighbors: 48 46 
+Node 16 has neighbors: 17, 15
+After Nbor Finding: Node 62: Neighbors: 63 61 
+Node 62 has neighbors: 63, 61
+Node 1 has neighbors: 0, 2
+Node 32 has neighbors: 33, 31
+Node 17 has neighbors: 18, 16
+After Nbor Finding: Node 63: Neighbors: 0 62 
+Node 63 has neighbors: 0, 62
+Node 2 has neighbors: 1
+Node 33 has neighbors: 34, 32
+Node 18 has neighbors: 19, 17
+Node 48 has neighbors: 49, 47
+Node 3 has neighbors: 4
+Node 34 has neighbors: 35, 33
+Node 19 has neighbors: 20, 18
+Node 49 has neighbors: 50, 48
+Node 4 has neighbors: 5, 3
+Node 35 has neighbors: 36, 34
+Node 20 has neighbors: 21, 19
+Node 50 has neighbors: 51, 49
+Node 5 has neighbors: 6, 4
+Node 36 has neighbors: 37, 35
+Node 21 has neighbors: 22, 20
+Node 51 has neighbors: 52, 50
+Node 6 has neighbors: 7, 5
+Node 37 has neighbors: 38, 36
+Node 22 has neighbors: 23, 21
+Node 52 has neighbors: 53, 51
+Node 7 has neighbors: 8, 6
+Node 38 has neighbors: 39, 37
+Node 23 has neighbors: 24, 22
+Node 53 has neighbors: 54, 52
+Node 8 has neighbors: 9, 7
+Node 39 has neighbors: 40, 38
+Node 24 has neighbors: 25, 23
+Node 54 has neighbors: 55, 53
+Node 9 has neighbors: 10, 8
+Node 41 has neighbors: 42, 40
+Node 25 has neighbors: 26, 24
+Node 55 has neighbors: 56, 54
+Node 10 has neighbors: 11, 9
+Node 42 has neighbors: 43, 41
+Node 26 has neighbors: 27, 25
+Node 56 has neighbors: 57, 55
+Node 11 has neighbors: 12, 10
+Node 43 has neighbors: 44, 42
+Node 27 has neighbors: 28, 26
+Node 57 has neighbors: 58, 56
+Node 12 has neighbors: 13, 11
+Node 44 has neighbors: 45, 43
+Node 28 has neighbors: 29, 27
+Node 58 has neighbors: 59, 57
+Node 13 has neighbors: 14, 12
+Node 45 has neighbors: 46, 44
+Node 29 has neighbors: 30, 28
+Node 59 has neighbors: 60, 58
+Node 14 has neighbors: 15, 13
+Node 46 has neighbors: 47, 45
+Node 30 has neighbors: 31, 29
+Node 60 has neighbors: 61, 59
+Node 15 has neighbors: 16, 14
+Node 47 has neighbors: 48, 46
+Node 31 has neighbors: 32, 30
+Node 0 has neighbors: 63, 1
+Node 40 has neighbors: 41, 39
+PSEUDO: Node 32 (load 8.286785) with pseudo_load after LB 8.258233
+PSEUDO: Node 16 (load 8.467096) with pseudo_load after LB 8.540707
+PSEUDO: Node 48 (load 8.297478) with pseudo_load after LB 8.265524
+PSEUDO: Node 33 (load 8.237051) with pseudo_load after LB 8.251128
+PSEUDO: Node 17 (load 8.405060) with pseudo_load after LB 8.519641
+PSEUDO: Node 49 (load 8.325528) with pseudo_load after LB 8.276769
+PSEUDO: Node 0 (load 8.554880) with pseudo_load after LB 8.467225
+--------STARTING ACROSS NODE LB--------
+PSEUDO: Node 34 (load 8.255319) with pseudo_load after LB 8.246459
+PSEUDO: Node 18 (load 8.425011) with pseudo_load after LB 8.491418
+PSEUDO: Node 50 (load 8.278453) with pseudo_load after LB 8.281627
+PSEUDO: Node 1 (load 8.585444) with pseudo_load after LB 8.477034
+PSEUDO: Node 35 (load 8.227670) with pseudo_load after LB 8.241857
+PSEUDO: Node 19 (load 8.389078) with pseudo_load after LB 8.468336
+PSEUDO: Node 51 (load 8.254703) with pseudo_load after LB 8.296336
+PSEUDO: Node 2 (load 8.629772) with pseudo_load after LB 8.478299
+PSEUDO: Node 36 (load 8.225958) with pseudo_load after LB 8.238690
+PSEUDO: Node 20 (load 8.411087) with pseudo_load after LB 8.442565
+PSEUDO: Node 52 (load 8.263964) with pseudo_load after LB 8.301573
+PSEUDO: Node 3 (load 8.636122) with pseudo_load after LB 8.699736
+PSEUDO: Node 37 (load 8.224257) with pseudo_load after LB 8.236248
+PSEUDO: Node 21 (load 8.365611) with pseudo_load after LB 8.418995
+PSEUDO: Node 53 (load 8.277222) with pseudo_load after LB 8.320108
+PSEUDO: Node 4 (load 8.696223) with pseudo_load after LB 8.698200
+PSEUDO: Node 38 (load 8.209950) with pseudo_load after LB 8.234611
+PSEUDO: Node 22 (load 8.390859) with pseudo_load after LB 8.397160
+PSEUDO: Node 54 (load 8.266754) with pseudo_load after LB 8.325760
+PSEUDO: Node 5 (load 8.697042) with pseudo_load after LB 8.696725
+PSEUDO: Node 39 (load 8.208752) with pseudo_load after LB 8.234164
+PSEUDO: Node 23 (load 8.325417) with pseudo_load after LB 8.374647
+PSEUDO: Node 55 (load 8.314373) with pseudo_load after LB 8.347979
+PSEUDO: Node 6 (load 8.715971) with pseudo_load after LB 8.691675
+PSEUDO: Node 40 (load 8.206605) with pseudo_load after LB 8.234081
+PSEUDO: Node 24 (load 8.327929) with pseudo_load after LB 8.357158
+PSEUDO: Node 56 (load 8.306168) with pseudo_load after LB 8.354059
+PSEUDO: Node 7 (load 8.694627) with pseudo_load after LB 8.688226
+PSEUDO: Node 41 (load 8.217468) with pseudo_load after LB 8.235610
+PSEUDO: Node 25 (load 8.293501) with pseudo_load after LB 8.336998
+PSEUDO: Node 57 (load 8.345420) with pseudo_load after LB 8.378966
+PSEUDO: Node 8 (load 8.795538) with pseudo_load after LB 8.678601
+PSEUDO: Node 42 (load 8.217619) with pseudo_load after LB 8.237018
+PSEUDO: Node 26 (load 8.311154) with pseudo_load after LB 8.323438
+PSEUDO: Node 58 (load 8.353959) with pseudo_load after LB 8.385305
+PSEUDO: Node 9 (load 8.728027) with pseudo_load after LB 8.672373
+PSEUDO: Node 43 (load 8.214061) with pseudo_load after LB 8.240601
+PSEUDO: Node 27 (load 8.269716) with pseudo_load after LB 8.306476
+PSEUDO: Node 59 (load 8.392766) with pseudo_load after LB 8.410887
+PSEUDO: Node 10 (load 8.776151) with pseudo_load after LB 8.657173
+PSEUDO: Node 44 (load 8.219970) with pseudo_load after LB 8.243310
+PSEUDO: Node 28 (load 8.270189) with pseudo_load after LB 8.296049
+PSEUDO: Node 60 (load 8.410612) with pseudo_load after LB 8.417033
+PSEUDO: Node 11 (load 8.688403) with pseudo_load after LB 8.647364
+PSEUDO: Node 45 (load 8.211462) with pseudo_load after LB 8.249108
+PSEUDO: Node 29 (load 8.251562) with pseudo_load after LB 8.282604
+PSEUDO: Node 61 (load 8.447190) with pseudo_load after LB 8.440422
+PSEUDO: Node 12 (load 8.710740) with pseudo_load after LB 8.626392
+PSEUDO: Node 46 (load 8.217398) with pseudo_load after LB 8.252822
+PSEUDO: Node 30 (load 8.149959) with pseudo_load after LB 8.274538
+PSEUDO: Node 62 (load 8.462606) with pseudo_load after LB 8.445668
+PSEUDO: Node 13 (load 8.707174) with pseudo_load after LB 8.612533
+PSEUDO: Node 47 (load 8.256297) with pseudo_load after LB 8.261123
+PSEUDO: Node 31 (load 8.264394) with pseudo_load after LB 8.264470
+PSEUDO: Node 63 (load 8.552733) with pseudo_load after LB 8.463661
+PSEUDO: Node 14 (load 8.808732) with pseudo_load after LB 8.586824
+PSEUDO: Node 15 (load 8.720305) with pseudo_load after LB 8.569005
+PE-48 with 90 migrates
+PE-37 with 28 migrates
+PE-16 with 384 migrates
+PE-51 with 54 migrates
+PE-39 with 3 migrates
+PE-17 with 337 migrates
+PE-52 with 73 migrates
+PE-40 with 0 migrates
+PE-20 with 239 migrates
+PE-53 with 92 migrates
+PE-45 with 54 migrates
+PE-22 with 212 migrates
+PE-54 with 114 migrates
+PE-46 with 72 migrates
+PE-23 with 189 migrates
+PE-55 with 145 migrates
+PE-0 with 167 migrates
+PE-47 with 90 migrates
+PE-24 with 171 migrates
+PE-56 with 159 migrates
+PE-1 with 121 migrates
+PE-32 with 50 migrates
+PE-25 with 152 migrates
+PE-57 with 186 migrates
+PE-2 with 67 migrates
+PE-33 with 43 migrates
+PE-26 with 144 migrates
+PE-49 with 77 migrates
+PE-3 with 0 migrates
+PE-34 with 47 migrates
+PE-27 with 127 migrates
+PE-50 with 51 migrates
+PE-4 with 27 migrates
+PE-35 with 41 migrates
+PE-28 with 113 migrates
+PE-58 with 199 migrates
+PE-5 with 27 migrates
+PE-36 with 34 migrates
+PE-29 with 99 migrates
+PE-59 with 216 migrates
+PE-6 with 28 migrates
+PE-38 with 15 migrates
+PE-30 with 36 migrates
+PE-61 with 227 migrates
+PE-7 with 17 migrates
+PE-41 with 9 migrates
+PE-31 with 36 migrates
+PE-60 with 222 migrates
+PE-8 with 52 migrates
+PE-42 with 19 migrates
+PE-18 with 297 migrates
+PE-62 with 223 migrates
+PE-9 with 58 migrates
+PE-43 with 29 migrates
+PE-19 with 260 migrates
+PE-63 with 216 migrates
+PE-10 with 106 migrates
+PE-44 with 41 migrates
+PE-21 with 216 migrates
+PE-11 with 130 migrates
+PE-12 with 169 migrates
+PE-13 with 215 migrates
+PE-14 with 308 migrates
+PE-15 with 366 migrates
+DiffusionLB> Strategy took 0.355731s memory usage: 471.020081 MB.
+DiffusionLB> step 2 finished at 35.286234 duration 0.381106 memory usage: 462.039856
+LBTime = 0.390544
+Iter time = 2.493527
+Iter time = 2.208068
+Iter time = 2.212831
+Iter time = 2.210905
+[DiffusionLB] Load balancing step 3 starting at 44.425439
+DistLB> DiffusionLB: step 3 starting at 44.427147 Memory: 466.638000 MB
+After MST: Node 1: Neighbors: 0 2 
+After MST: Node 2: Neighbors: 1 3 
+After MST: Node 32: Neighbors: 33 31 
+After MST: Node 3: Neighbors: 2 4 
+After MST: Node 33: Neighbors: 34 32 
+After MST: Node 16: Neighbors: 17 15 
+After MST: Node 48: Neighbors: 49 47 
+After MST: Node 4: Neighbors: 3 5 
+After MST: Node 34: Neighbors: 35 33 
+After MST: Node 17: Neighbors: 18 16 
+After MST: Node 49: Neighbors: 50 48 
+After MST: Node 5: Neighbors: 4 6 
+After MST: Node 35: Neighbors: 36 34 
+After MST: Node 18: Neighbors: 19 17 
+After MST: Node 50: Neighbors: 51 49 
+After MST: Node 6: Neighbors: 5 7 
+After MST: Node 36: Neighbors: 37 35 
+After MST: Node 19: Neighbors: 20 18 
+After MST: Node 51: Neighbors: 52 50 
+After MST: Node 7: Neighbors: 6 8 
+After MST: Node 37: Neighbors: 38 36 
+After MST: Node 20: Neighbors: 21 19 
+After MST: Node 52: Neighbors: 53 51 
+After MST: Node 8: Neighbors: 7 9 
+After MST: Node 38: Neighbors: 39 37 
+After MST: Node 21: Neighbors: 22 20 
+After MST: Node 53: Neighbors: 54 52 
+After MST: Node 9: Neighbors: 8 10 
+After MST: Node 39: Neighbors: 40 38 
+After MST: Node 22: Neighbors: 23 21 
+After MST: Node 54: Neighbors: 55 53 
+After MST: Node 10: Neighbors: 9 11 
+After MST: Node 40: Neighbors: 41 39 
+After MST: Node 23: Neighbors: 24 22 
+After MST: Node 55: Neighbors: 56 54 
+After MST: Node 11: Neighbors: 10 12 
+After MST: Node 41: Neighbors: 42 40 
+After MST: Node 24: Neighbors: 25 23 
+After MST: Node 56: Neighbors: 57 55 
+After MST: Node 12: Neighbors: 11 13 
+After MST: Node 42: Neighbors: 43 41 
+After MST: Node 25: Neighbors: 26 24 
+After MST: Node 57: Neighbors: 58 56 
+After MST: Node 13: Neighbors: 12 14 
+After MST: Node 43: Neighbors: 44 42 
+After MST: Node 26: Neighbors: 27 25 
+After MST: Node 58: Neighbors: 59 57 
+After MST: Node 14: Neighbors: 13 
+After MST: Node 44: Neighbors: 45 43 
+After MST: Node 27: Neighbors: 28 26 
+After MST: Node 59: Neighbors: 60 58 
+After MST: Node 15: Neighbors: 16 
+After MST: Node 45: Neighbors: 46 44 
+After MST: Node 28: Neighbors: 29 27 
+After MST: Node 60: Neighbors: 61 59 
+After MST: Node 0: Neighbors: 63 1 
+After MST: Node 46: Neighbors: 47 45 
+After MST: Node 29: Neighbors: 30 28 
+After MST: Node 61: Neighbors: 62 60 
+MST is built. Begin finding remaining neighbors.
+After MST: Node 47: Neighbors: 48 46 
+After MST: Node 30: Neighbors: 31 29 
+After MST: Node 62: Neighbors: 63 61 
+After MST: Node 31: Neighbors: 32 30 
+After MST: Node 63: Neighbors: 0 62 
+After Nbor Finding: Node 0: Neighbors: 63 1 
+After Nbor Finding: Node 16: Neighbors: 17 15 
+After Nbor Finding: Node 1: Neighbors: 0 2 
+After Nbor Finding: Node 17: Neighbors: 18 16 
+After Nbor Finding: Node 2: Neighbors: 1 3 
+After Nbor Finding: Node 18: Neighbors: 19 17 
+After Nbor Finding: Node 3: Neighbors: 2 4 
+After Nbor Finding: Node 32: Neighbors: 33 31 
+After Nbor Finding: Node 19: Neighbors: 20 18 
+After Nbor Finding: Node 48: Neighbors: 49 47 
+After Nbor Finding: Node 4: Neighbors: 3 5 
+After Nbor Finding: Node 33: Neighbors: 34 32 
+After Nbor Finding: Node 20: Neighbors: 21 19 
+After Nbor Finding: Node 49: Neighbors: 50 48 
+After Nbor Finding: Node 5: Neighbors: 4 6 
+After Nbor Finding: Node 34: Neighbors: 35 33 
+After Nbor Finding: Node 21: Neighbors: 22 20 
+After Nbor Finding: Node 50: Neighbors: 51 49 
+After Nbor Finding: Node 6: Neighbors: 5 7 
+After Nbor Finding: Node 35: Neighbors: 36 34 
+After Nbor Finding: Node 22: Neighbors: 23 21 
+After Nbor Finding: Node 51: Neighbors: 52 50 
+After Nbor Finding: Node 7: Neighbors: 6 8 
+After Nbor Finding: Node 36: Neighbors: 37 35 
+After Nbor Finding: Node 23: Neighbors: 24 22 
+After Nbor Finding: Node 52: Neighbors: 53 51 
+After Nbor Finding: Node 8: Neighbors: 7 9 
+After Nbor Finding: Node 37: Neighbors: 38 36 
+After Nbor Finding: Node 24: Neighbors: 25 23 
+After Nbor Finding: Node 53: Neighbors: 54 52 
+After Nbor Finding: Node 9: Neighbors: 8 10 
+After Nbor Finding: Node 38: Neighbors: 39 37 
+Node 38 has neighbors: 39, 37
+After Nbor Finding: Node 25: Neighbors: 26 24 
+After Nbor Finding: Node 54: Neighbors: 55 53 
+Node 54 has neighbors: 55, 53
+After Nbor Finding: Node 10: Neighbors: 9 11 
+After Nbor Finding: Node 39: Neighbors: 40 38 
+Node 39 has neighbors: 40, 38
+After Nbor Finding: Node 26: Neighbors: 27 25 
+After Nbor Finding: Node 55: Neighbors: 56 54 
+Node 55 has neighbors: 56, 54
+After Nbor Finding: Node 11: Neighbors: 10 12 
+After Nbor Finding: Node 40: Neighbors: 41 39 
+Node 40 has neighbors: 41, 39
+After Nbor Finding: Node 27: Neighbors: 28 26 
+After Nbor Finding: Node 56: Neighbors: 57 55 
+Node 56 has neighbors: 57, 55
+After Nbor Finding: Node 12: Neighbors: 11 13 
+After Nbor Finding: Node 41: Neighbors: 42 40 
+Node 41 has neighbors: 42, 40
+After Nbor Finding: Node 28: Neighbors: 29 27 
+After Nbor Finding: Node 57: Neighbors: 58 56 
+Node 57 has neighbors: 58, 56
+After Nbor Finding: Node 13: Neighbors: 12 14 
+After Nbor Finding: Node 42: Neighbors: 43 41 
+Node 42 has neighbors: 43, 41
+After Nbor Finding: Node 29: Neighbors: 30 28 
+After Nbor Finding: Node 58: Neighbors: 59 57 
+Node 58 has neighbors: 59, 57
+After Nbor Finding: Node 14: Neighbors: 13 
+After Nbor Finding: Node 43: Neighbors: 44 42 
+Node 43 has neighbors: 44, 42
+After Nbor Finding: Node 30: Neighbors: 31 29 
+After Nbor Finding: Node 59: Neighbors: 60 58 
+Node 59 has neighbors: 60, 58
+After Nbor Finding: Node 15: Neighbors: 16 
+After Nbor Finding: Node 44: Neighbors: 45 43 
+Node 44 has neighbors: 45, 43
+After Nbor Finding: Node 31: Neighbors: 32 30 
+After Nbor Finding: Node 60: Neighbors: 61 59 
+Node 60 has neighbors: 61, 59
+--------NEIGHBOR SELECTION COMPLETE (Using Comm? true)--------
+After Nbor Finding: Node 45: Neighbors: 46 44 
+Node 45 has neighbors: 46, 44
+Node 16 has neighbors: 17, 15
+After Nbor Finding: Node 61: Neighbors: 62 60 
+Node 61 has neighbors: 62, 60
+Node 1 has neighbors: 0, 2
+After Nbor Finding: Node 46: Neighbors: 47 45 
+Node 46 has neighbors: 47, 45
+Node 17 has neighbors: 18, 16
+After Nbor Finding: Node 62: Neighbors: 63 61 
+Node 62 has neighbors: 63, 61
+Node 2 has neighbors: 1, 3
+After Nbor Finding: Node 47: Neighbors: 48 46 
+Node 47 has neighbors: 48, 46
+Node 18 has neighbors: 19, 17
+After Nbor Finding: Node 63: Neighbors: 0 62 
+Node 63 has neighbors: 0, 62
+Node 3 has neighbors: 2, 4
+Node 32 has neighbors: 33, 31
+Node 19 has neighbors: 20, 18
+Node 48 has neighbors: 49, 47
+Node 4 has neighbors: 3, 5
+Node 33 has neighbors: 34, 32
+Node 20 has neighbors: 21, 19
+Node 49 has neighbors: 50, 48
+Node 5 has neighbors: 4, 6
+Node 34 has neighbors: 35, 33
+Node 21 has neighbors: 22, 20
+Node 50 has neighbors: 51, 49
+Node 6 has neighbors: 5, 7
+Node 35 has neighbors: 36, 34
+Node 22 has neighbors: 23, 21
+Node 51 has neighbors: 52, 50
+Node 7 has neighbors: 6, 8
+Node 36 has neighbors: 37, 35
+Node 23 has neighbors: 24, 22
+Node 52 has neighbors: 53, 51
+Node 8 has neighbors: 7, 9
+Node 37 has neighbors: 38, 36
+Node 24 has neighbors: 25, 23
+Node 53 has neighbors: 54, 52
+Node 9 has neighbors: 8, 10
+Node 25 has neighbors: 26, 24
+Node 10 has neighbors: 9, 11
+Node 26 has neighbors: 27, 25
+Node 11 has neighbors: 10, 12
+Node 27 has neighbors: 28, 26
+Node 12 has neighbors: 11, 13
+Node 28 has neighbors: 29, 27
+Node 13 has neighbors: 12, 14
+Node 29 has neighbors: 30, 28
+Node 14 has neighbors: 13
+Node 30 has neighbors: 31, 29
+Node 15 has neighbors: 16
+Node 31 has neighbors: 32, 30
+Node 0 has neighbors: 63, 1
+PSEUDO: Node 16 (load 8.428265) with pseudo_load after LB 8.416032
+PSEUDO: Node 0 (load 8.357243) with pseudo_load after LB 8.455046
+PSEUDO: Node 32 (load 8.180837) with pseudo_load after LB 8.258575
+PSEUDO: Node 17 (load 8.525430) with pseudo_load after LB 8.413733
+PSEUDO: Node 48 (load 8.171522) with pseudo_load after LB 8.243820
+PSEUDO: Node 1 (load 8.489479) with pseudo_load after LB 8.485766
+PSEUDO: Node 33 (load 8.191342) with pseudo_load after LB 8.252671
+PSEUDO: Node 18 (load 8.439483) with pseudo_load after LB 8.404760
+PSEUDO: Node 49 (load 8.124044) with pseudo_load after LB 8.247636
+PSEUDO: Node 2 (load 8.429259) with pseudo_load after LB 8.490453
+PSEUDO: Node 34 (load 8.195222) with pseudo_load after LB 8.245965
+PSEUDO: Node 19 (load 8.424665) with pseudo_load after LB 8.400363
+PSEUDO: Node 50 (load 8.218996) with pseudo_load after LB 8.256624
+PSEUDO: Node 3 (load 8.774350) with pseudo_load after LB 8.518041
+PSEUDO: Node 35 (load 8.235173) with pseudo_load after LB 8.241570
+PSEUDO: Node 20 (load 8.395796) with pseudo_load after LB 8.386988
+PSEUDO: Node 51 (load 8.242856) with pseudo_load after LB 8.262802
+PSEUDO: Node 4 (load 8.641016) with pseudo_load after LB 8.521287
+PSEUDO: Node 36 (load 8.221070) with pseudo_load after LB 8.236991
+PSEUDO: Node 21 (load 8.371229) with pseudo_load after LB 8.380847
+PSEUDO: Node 52 (load 8.261686) with pseudo_load after LB 8.273700
+PSEUDO: Node 5 (load 8.688774) with pseudo_load after LB 8.542952
+PSEUDO: Node 37 (load 8.229244) with pseudo_load after LB 8.234037
+PSEUDO: Node 22 (load 8.337992) with pseudo_load after LB 8.364943
+PSEUDO: Node 53 (load 8.279638) with pseudo_load after LB 8.283010
+PSEUDO: Node 6 (load 8.639343) with pseudo_load after LB 8.544996
+PSEUDO: Node 38 (load 8.225272) with pseudo_load after LB 8.231272
+PSEUDO: Node 23 (load 8.347809) with pseudo_load after LB 8.357504
+PSEUDO: Node 54 (load 8.298216) with pseudo_load after LB 8.294978
+PSEUDO: Node 7 (load 8.690945) with pseudo_load after LB 8.559398
+PSEUDO: Node 39 (load 8.227669) with pseudo_load after LB 8.229527
+PSEUDO: Node 24 (load 8.303616) with pseudo_load after LB 8.340937
+PSEUDO: Node 55 (load 8.292381) with pseudo_load after LB 8.308258
+PSEUDO: Node 8 (load 8.570634) with pseudo_load after LB 8.560515
+PSEUDO: Node 40 (load 8.220017) with pseudo_load after LB 8.228331
+PSEUDO: Node 25 (load 8.342120) with pseudo_load after LB 8.332702
+PSEUDO: Node 56 (load 8.313045) with pseudo_load after LB 8.320302
+PSEUDO: Node 9 (load 8.631086) with pseudo_load after LB 8.568186
+PSEUDO: Node 41 (load 8.237484) with pseudo_load after LB 8.227541
+PSEUDO: Node 26 (load 8.310883) with pseudo_load after LB 8.316972
+PSEUDO: Node 57 (load 8.333070) with pseudo_load after LB 8.338307
+PSEUDO: Node 10 (load 8.581436) with pseudo_load after LB 8.568673
+PSEUDO: Node 42 (load 8.222249) with pseudo_load after LB 8.227873
+PSEUDO: Node 27 (load 8.318256) with pseudo_load after LB 8.308495
+PSEUDO: Node 58 (load 8.344837) with pseudo_load after LB 8.349534
+PSEUDO: Node 11 (load 8.576959) with pseudo_load after LB 8.571613
+PSEUDO: Node 43 (load 8.233510) with pseudo_load after LB 8.227900
+PSEUDO: Node 28 (load 8.289438) with pseudo_load after LB 8.294591
+PSEUDO: Node 59 (load 8.361751) with pseudo_load after LB 8.372611
+PSEUDO: Node 12 (load 8.547358) with pseudo_load after LB 8.571758
+PSEUDO: Node 44 (load 8.225579) with pseudo_load after LB 8.229980
+PSEUDO: Node 29 (load 8.252495) with pseudo_load after LB 8.286459
+PSEUDO: Node 60 (load 8.381053) with pseudo_load after LB 8.382411
+PSEUDO: Node 13 (load 8.546555) with pseudo_load after LB 8.572399
+PSEUDO: Node 45 (load 8.245872) with pseudo_load after LB 8.230896
+PSEUDO: Node 30 (load 8.335937) with pseudo_load after LB 8.274890
+PSEUDO: Node 61 (load 8.376422) with pseudo_load after LB 8.410067
+PSEUDO: Node 14 (load 8.468574) with pseudo_load after LB 8.572421
+PSEUDO: Node 46 (load 8.235097) with pseudo_load after LB 8.235097
+PSEUDO: Node 31 (load 8.222107) with pseudo_load after LB 8.267662
+PSEUDO: Node 62 (load 8.354922) with pseudo_load after LB 8.418148
+PSEUDO: Node 15 (load 8.548073) with pseudo_load after LB 8.419197
+PSEUDO: Node 47 (load 8.225285) with pseudo_load after LB 8.237209
+PSEUDO: Node 63 (load 8.324978) with pseudo_load after LB 8.448721
+--------STARTING ACROSS NODE LB--------
+PE-48 with 0 migrates
+PE-49 with 35 migrates
+PE-14 with 0 migrates
+PE-32 with 74 migrates
+PE-30 with 135 migrates
+PE-50 with 95 migrates
+PE-0 with 261 migrates
+PE-33 with 44 migrates
+PE-31 with 113 migrates
+PE-52 with 123 migrates
+PE-1 with 288 migrates
+PE-37 with 4 migrates
+PE-17 with 124 migrates
+PE-53 with 132 migrates
+PE-2 with 278 migrates
+PE-38 with 1 migrates
+PE-18 with 145 migrates
+PE-54 with 132 migrates
+PE-3 with 292 migrates
+PE-39 with 0 migrates
+PE-19 with 158 migrates
+PE-51 with 115 migrates
+PE-4 with 172 migrates
+PE-40 with 0 migrates
+PE-20 with 159 migrates
+PE-56 with 137 migrates
+PE-5 with 135 migrates
+PE-41 with 4 migrates
+PE-21 with 157 migrates
+PE-55 with 131 migrates
+PE-6 with 68 migrates
+PE-42 with 0 migrates
+PE-22 with 140 migrates
+PE-57 with 144 migrates
+PE-7 with 58 migrates
+PE-43 with 2 migrates
+PE-23 with 139 migrates
+PE-58 with 143 migrates
+PE-8 with 30 migrates
+PE-44 with 0 migrates
+PE-24 with 119 migrates
+PE-60 with 152 migrates
+PE-9 with 57 migrates
+PE-46 with 6 migrates
+PE-25 with 123 migrates
+PE-61 with 155 migrates
+PE-10 with 63 migrates
+PE-47 with 1 migrates
+PE-26 with 119 migrates
+PE-62 with 170 migrates
+PE-11 with 68 migrates
+PE-34 with 18 migrates
+PE-27 with 124 migrates
+PE-59 with 147 migrates
+PE-12 with 56 migrates
+PE-35 with 15 migrates
+PE-28 with 122 migrates
+PE-63 with 204 migrates
+PE-13 with 40 migrates
+PE-36 with 7 migrates
+PE-29 with 106 migrates
+PE-15 with 57 migrates
+PE-45 with 7 migrates
+PE-16 with 65 migrates
+DiffusionLB> Strategy took 0.601775s memory usage: 474.005707 MB.
+DiffusionLB> step 3 finished at 45.034878 duration 0.607731 memory usage: 469.293457
+LBTime = 0.611752
+Iter time = 2.451304
+Iter time = 2.215358
+Iter time = 2.244899
+Iter time = 2.179911
+[DiffusionLB] Load balancing step 4 starting at 54.140775
+DistLB> DiffusionLB: step 4 starting at 54.141904 Memory: 474.086273 MB
+After MST: Node 0: Neighbors: 63 1 
+After MST: Node 32: Neighbors: 33 31 
+After MST: Node 1: Neighbors: 0 2 
+After MST: Node 33: Neighbors: 34 32 
+After MST: Node 48: Neighbors: 49 47 
+After MST: Node 2: Neighbors: 1 
+After MST: Node 34: Neighbors: 35 33 
+After MST: Node 16: Neighbors: 17 15 
+After MST: Node 49: Neighbors: 50 48 
+After MST: Node 3: Neighbors: 4 
+After MST: Node 35: Neighbors: 36 34 
+After MST: Node 17: Neighbors: 18 16 
+After MST: Node 50: Neighbors: 51 49 
+After MST: Node 4: Neighbors: 5 3 
+After MST: Node 36: Neighbors: 37 35 
+After MST: Node 18: Neighbors: 19 17 
+After MST: Node 51: Neighbors: 52 50 
+After MST: Node 5: Neighbors: 6 4 
+After MST: Node 37: Neighbors: 38 36 
+After MST: Node 19: Neighbors: 20 18 
+After MST: Node 52: Neighbors: 53 51 
+After MST: Node 6: Neighbors: 7 5 
+After MST: Node 38: Neighbors: 39 37 
+After MST: Node 20: Neighbors: 21 19 
+After MST: Node 53: Neighbors: 54 52 
+After MST: Node 7: Neighbors: 8 6 
+After MST: Node 39: Neighbors: 40 38 
+After MST: Node 21: Neighbors: 22 20 
+After MST: Node 54: Neighbors: 55 53 
+After MST: Node 8: Neighbors: 9 7 
+After MST: Node 40: Neighbors: 41 39 
+After MST: Node 22: Neighbors: 23 21 
+After MST: Node 55: Neighbors: 56 54 
+After MST: Node 9: Neighbors: 10 8 
+After MST: Node 41: Neighbors: 42 40 
+After MST: Node 23: Neighbors: 24 22 
+After MST: Node 56: Neighbors: 57 55 
+After MST: Node 10: Neighbors: 11 9 
+After MST: Node 42: Neighbors: 43 41 
+After MST: Node 24: Neighbors: 25 23 
+After MST: Node 57: Neighbors: 58 56 
+After MST: Node 11: Neighbors: 12 10 
+After MST: Node 43: Neighbors: 44 42 
+After MST: Node 25: Neighbors: 26 24 
+After MST: Node 58: Neighbors: 59 57 
+After MST: Node 12: Neighbors: 13 11 
+After MST: Node 44: Neighbors: 45 43 
+After MST: Node 26: Neighbors: 27 25 
+After MST: Node 59: Neighbors: 60 58 
+After MST: Node 13: Neighbors: 14 12 
+After MST: Node 45: Neighbors: 46 44 
+After MST: Node 27: Neighbors: 28 26 
+After MST: Node 60: Neighbors: 61 59 
+After MST: Node 14: Neighbors: 15 13 
+After MST: Node 46: Neighbors: 47 45 
+After MST: Node 28: Neighbors: 29 27 
+After MST: Node 61: Neighbors: 62 60 
+After MST: Node 15: Neighbors: 16 14 
+After MST: Node 47: Neighbors: 48 46 
+After MST: Node 29: Neighbors: 30 28 
+After MST: Node 62: Neighbors: 63 61 
+MST is built. Begin finding remaining neighbors.
+After MST: Node 30: Neighbors: 31 29 
+After MST: Node 63: Neighbors: 0 62 
+After MST: Node 31: Neighbors: 32 30 
+After Nbor Finding: Node 0: Neighbors: 63 1 
+After Nbor Finding: Node 1: Neighbors: 0 2 
+After Nbor Finding: Node 32: Neighbors: 33 31 
+After Nbor Finding: Node 16: Neighbors: 17 15 
+After Nbor Finding: Node 2: Neighbors: 1 
+After Nbor Finding: Node 33: Neighbors: 34 32 
+After Nbor Finding: Node 17: Neighbors: 18 16 
+After Nbor Finding: Node 48: Neighbors: 49 47 
+After Nbor Finding: Node 3: Neighbors: 4 
+After Nbor Finding: Node 34: Neighbors: 35 33 
+After Nbor Finding: Node 18: Neighbors: 19 17 
+After Nbor Finding: Node 49: Neighbors: 50 48 
+After Nbor Finding: Node 4: Neighbors: 5 3 
+After Nbor Finding: Node 35: Neighbors: 36 34 
+After Nbor Finding: Node 19: Neighbors: 20 18 
+After Nbor Finding: Node 50: Neighbors: 51 49 
+After Nbor Finding: Node 5: Neighbors: 6 4 
+After Nbor Finding: Node 36: Neighbors: 37 35 
+After Nbor Finding: Node 20: Neighbors: 21 19 
+After Nbor Finding: Node 51: Neighbors: 52 50 
+After Nbor Finding: Node 6: Neighbors: 7 5 
+After Nbor Finding: Node 37: Neighbors: 38 36 
+After Nbor Finding: Node 21: Neighbors: 22 20 
+After Nbor Finding: Node 52: Neighbors: 53 51 
+After Nbor Finding: Node 7: Neighbors: 8 6 
+After Nbor Finding: Node 38: Neighbors: 39 37 
+After Nbor Finding: Node 22: Neighbors: 23 21 
+After Nbor Finding: Node 53: Neighbors: 54 52 
+After Nbor Finding: Node 8: Neighbors: 9 7 
+After Nbor Finding: Node 39: Neighbors: 40 38 
+After Nbor Finding: Node 23: Neighbors: 24 22 
+After Nbor Finding: Node 54: Neighbors: 55 53 
+After Nbor Finding: Node 9: Neighbors: 10 8 
+After Nbor Finding: Node 40: Neighbors: 41 39 
+After Nbor Finding: Node 24: Neighbors: 25 23 
+After Nbor Finding: Node 55: Neighbors: 56 54 
+After Nbor Finding: Node 10: Neighbors: 11 9 
+After Nbor Finding: Node 41: Neighbors: 42 40 
+After Nbor Finding: Node 25: Neighbors: 26 24 
+After Nbor Finding: Node 56: Neighbors: 57 55 
+After Nbor Finding: Node 11: Neighbors: 12 10 
+After Nbor Finding: Node 42: Neighbors: 43 41 
+After Nbor Finding: Node 26: Neighbors: 27 25 
+After Nbor Finding: Node 57: Neighbors: 58 56 
+After Nbor Finding: Node 12: Neighbors: 13 11 
+After Nbor Finding: Node 43: Neighbors: 44 42 
+After Nbor Finding: Node 27: Neighbors: 28 26 
+After Nbor Finding: Node 58: Neighbors: 59 57 
+After Nbor Finding: Node 13: Neighbors: 14 12 
+After Nbor Finding: Node 44: Neighbors: 45 43 
+After Nbor Finding: Node 28: Neighbors: 29 27 
+After Nbor Finding: Node 59: Neighbors: 60 58 
+After Nbor Finding: Node 14: Neighbors: 15 13 
+After Nbor Finding: Node 45: Neighbors: 46 44 
+After Nbor Finding: Node 29: Neighbors: 30 28 
+After Nbor Finding: Node 60: Neighbors: 61 59 
+After Nbor Finding: Node 15: Neighbors: 16 14 
+After Nbor Finding: Node 46: Neighbors: 47 45 
+After Nbor Finding: Node 30: Neighbors: 31 29 
+After Nbor Finding: Node 61: Neighbors: 62 60 
+--------NEIGHBOR SELECTION COMPLETE (Using Comm? true)--------
+After Nbor Finding: Node 47: Neighbors: 48 46 
+After Nbor Finding: Node 31: Neighbors: 32 30 
+After Nbor Finding: Node 62: Neighbors: 63 61 
+Node 1 has neighbors: 0, 2
+Node 32 has neighbors: 33, 31
+Node 16 has neighbors: 17, 15
+After Nbor Finding: Node 63: Neighbors: 0 62 
+Node 2 has neighbors: 1
+Node 33 has neighbors: 34, 32
+Node 17 has neighbors: 18, 16
+Node 48 has neighbors: 49, 47
+Node 3 has neighbors: 4
+Node 34 has neighbors: 35, 33
+Node 18 has neighbors: 19, 17
+Node 49 has neighbors: 50, 48
+Node 4 has neighbors: 5, 3
+Node 35 has neighbors: 36, 34
+Node 19 has neighbors: 20, 18
+Node 50 has neighbors: 51, 49
+Node 5 has neighbors: 6, 4
+Node 36 has neighbors: 37, 35
+Node 20 has neighbors: 21, 19
+Node 51 has neighbors: 52, 50
+Node 6 has neighbors: 7, 5
+Node 37 has neighbors: 38, 36
+Node 21 has neighbors: 22, 20
+Node 52 has neighbors: 53, 51
+Node 7 has neighbors: 8, 6
+Node 38 has neighbors: 39, 37
+Node 22 has neighbors: 23, 21
+Node 53 has neighbors: 54, 52
+Node 8 has neighbors: 9, 7
+Node 39 has neighbors: 40, 38
+Node 23 has neighbors: 24, 22
+Node 54 has neighbors: 55, 53
+Node 9 has neighbors: 10, 8
+Node 40 has neighbors: 41, 39
+Node 24 has neighbors: 25, 23
+Node 55 has neighbors: 56, 54
+Node 10 has neighbors: 11, 9
+Node 41 has neighbors: 42, 40
+Node 25 has neighbors: 26, 24
+Node 56 has neighbors: 57, 55
+Node 11 has neighbors: 12, 10
+Node 42 has neighbors: 43, 41
+Node 26 has neighbors: 27, 25
+Node 57 has neighbors: 58, 56
+Node 12 has neighbors: 13, 11
+Node 43 has neighbors: 44, 42
+Node 27 has neighbors: 28, 26
+Node 58 has neighbors: 59, 57
+Node 13 has neighbors: 14, 12
+Node 44 has neighbors: 45, 43
+Node 28 has neighbors: 29, 27
+Node 59 has neighbors: 60, 58
+Node 14 has neighbors: 15, 13
+Node 45 has neighbors: 46, 44
+Node 29 has neighbors: 30, 28
+Node 61 has neighbors: 62, 60
+Node 15 has neighbors: 16, 14
+Node 46 has neighbors: 47, 45
+Node 30 has neighbors: 31, 29
+Node 62 has neighbors: 63, 61
+Node 0 has neighbors: 63, 1
+Node 47 has neighbors: 48, 46
+Node 31 has neighbors: 32, 30
+Node 63 has neighbors: 0, 62
+Node 60 has neighbors: 61, 59
+PSEUDO: Node 1 (load 8.396431) with pseudo_load after LB 8.362872
+PSEUDO: Node 32 (load 8.235698) with pseudo_load after LB 8.207219
+PSEUDO: Node 16 (load 8.371406) with pseudo_load after LB 8.440821
+PSEUDO: Node 48 (load 8.274806) with pseudo_load after LB 8.193867
+PSEUDO: Node 2 (load 8.416222) with pseudo_load after LB 8.365535
+PSEUDO: Node 33 (load 8.236526) with pseudo_load after LB 8.200576
+PSEUDO: Node 17 (load 8.387068) with pseudo_load after LB 8.420986
+PSEUDO: Node 49 (load 8.309821) with pseudo_load after LB 8.200547
+PSEUDO: Node 3 (load 8.426492) with pseudo_load after LB 8.511828
+PSEUDO: Node 34 (load 8.163503) with pseudo_load after LB 8.188627
+PSEUDO: Node 18 (load 8.430849) with pseudo_load after LB 8.411186
+PSEUDO: Node 50 (load 8.178886) with pseudo_load after LB 8.211749
+PSEUDO: Node 4 (load 8.523121) with pseudo_load after LB 8.511740
+PSEUDO: Node 35 (load 8.134082) with pseudo_load after LB 8.183892
+PSEUDO: Node 19 (load 8.437622) with pseudo_load after LB 8.390696
+PSEUDO: Node 51 (load 8.159708) with pseudo_load after LB 8.218960
+PSEUDO: Node 5 (load 8.493226) with pseudo_load after LB 8.510691
+PSEUDO: Node 36 (load 8.127257) with pseudo_load after LB 8.174141
+PSEUDO: Node 20 (load 8.356573) with pseudo_load after LB 8.378822
+PSEUDO: Node 52 (load 8.190147) with pseudo_load after LB 8.232290
+PSEUDO: Node 6 (load 8.542141) with pseudo_load after LB 8.510324
+PSEUDO: Node 37 (load 8.136482) with pseudo_load after LB 8.171283
+PSEUDO: Node 21 (load 8.414048) with pseudo_load after LB 8.359066
+PSEUDO: Node 53 (load 8.171895) with pseudo_load after LB 8.240016
+PSEUDO: Node 7 (load 8.506147) with pseudo_load after LB 8.507427
+PSEUDO: Node 38 (load 8.121957) with pseudo_load after LB 8.164509
+PSEUDO: Node 22 (load 8.338329) with pseudo_load after LB 8.345595
+PSEUDO: Node 54 (load 8.222957) with pseudo_load after LB 8.255104
+PSEUDO: Node 8 (load 8.538636) with pseudo_load after LB 8.506489
+PSEUDO: Node 39 (load 8.134039) with pseudo_load after LB 8.163551
+PSEUDO: Node 23 (load 8.317637) with pseudo_load after LB 8.327562
+PSEUDO: Node 55 (load 8.242283) with pseudo_load after LB 8.263340
+PSEUDO: Node 9 (load 8.537904) with pseudo_load after LB 8.500565
+PSEUDO: Node 40 (load 8.116887) with pseudo_load after LB 8.160314
+PSEUDO: Node 24 (load 8.330362) with pseudo_load after LB 8.313109
+PSEUDO: Node 56 (load 8.273855) with pseudo_load after LB 8.279501
+PSEUDO: Node 10 (load 8.569804) with pseudo_load after LB 8.498636
+PSEUDO: Node 41 (load 8.124879) with pseudo_load after LB 8.161433
+PSEUDO: Node 25 (load 8.269264) with pseudo_load after LB 8.297349
+PSEUDO: Node 57 (load 8.266907) with pseudo_load after LB 8.288050
+PSEUDO: Node 11 (load 8.549782) with pseudo_load after LB 8.488738
+PSEUDO: Node 42 (load 8.115887) with pseudo_load after LB 8.161519
+PSEUDO: Node 26 (load 8.228071) with pseudo_load after LB 8.282512
+PSEUDO: Node 58 (load 8.294052) with pseudo_load after LB 8.304198
+PSEUDO: Node 12 (load 8.561311) with pseudo_load after LB 8.485346
+PSEUDO: Node 43 (load 8.130316) with pseudo_load after LB 8.164710
+PSEUDO: Node 27 (load 8.178237) with pseudo_load after LB 8.269212
+PSEUDO: Node 59 (load 8.310439) with pseudo_load after LB 8.312565
+PSEUDO: Node 13 (load 8.564513) with pseudo_load after LB 8.471254
+PSEUDO: Node 44 (load 8.119569) with pseudo_load after LB 8.168005
+PSEUDO: Node 28 (load 8.183413) with pseudo_load after LB 8.254466
+PSEUDO: Node 60 (load 8.327383) with pseudo_load after LB 8.327305
+PSEUDO: Node 14 (load 8.593535) with pseudo_load after LB 8.465957
+PSEUDO: Node 45 (load 8.129539) with pseudo_load after LB 8.172838
+PSEUDO: Node 29 (load 8.257407) with pseudo_load after LB 8.243568
+PSEUDO: Node 61 (load 8.376379) with pseudo_load after LB 8.334721
+PSEUDO: Node 15 (load 8.403224) with pseudo_load after LB 8.448333
+PSEUDO: Node 46 (load 8.139573) with pseudo_load after LB 8.179065
+PSEUDO: Node 30 (load 8.243792) with pseudo_load after LB 8.229292
+PSEUDO: Node 62 (load 8.456888) with pseudo_load after LB 8.346577
+PSEUDO: Node 0 (load 8.402305) with pseudo_load after LB 8.359858
+PSEUDO: Node 47 (load 8.190648) with pseudo_load after LB 8.185024
+PSEUDO: Node 31 (load 8.257558) with pseudo_load after LB 8.220617
+PSEUDO: Node 63 (load 8.418436) with pseudo_load after LB 8.352169
+--------STARTING ACROSS NODE LB--------
+PE-3 with 0 migrates
+PE-33 with 139 migrates
+PE-16 with 162 migrates
+PE-48 with 114 migrates
+PE-0 with 63 migrates
+PE-34 with 125 migrates
+PE-17 with 146 migrates
+PE-50 with 25 migrates
+PE-2 with 22 migrates
+PE-35 with 101 migrates
+PE-18 with 154 migrates
+PE-51 with 42 migrates
+PE-4 with 36 migrates
+PE-36 with 76 migrates
+PE-19 with 178 migrates
+PE-52 with 70 migrates
+PE-5 with 32 migrates
+PE-37 with 58 migrates
+PE-20 with 169 migrates
+PE-53 with 92 migrates
+PE-6 with 38 migrates
+PE-38 with 37 migrates
+PE-21 with 195 migrates
+PE-54 with 125 migrates
+PE-7 with 25 migrates
+PE-39 with 23 migrates
+PE-22 with 193 migrates
+PE-55 with 144 migrates
+PE-8 with 26 migrates
+PE-40 with 0 migrates
+PE-23 with 189 migrates
+PE-56 with 151 migrates
+PE-9 with 15 migrates
+PE-41 with 0 migrates
+PE-24 with 196 migrates
+PE-58 with 166 migrates
+PE-10 with 34 migrates
+PE-42 with 17 migrates
+PE-25 with 183 migrates
+PE-59 with 173 migrates
+PE-11 with 63 migrates
+PE-44 with 58 migrates
+PE-26 with 155 migrates
+PE-60 with 171 migrates
+PE-12 with 97 migrates
+PE-32 with 119 migrates
+PE-27 with 109 migrates
+PE-61 with 173 migrates
+PE-13 with 126 migrates
+PE-43 with 41 migrates
+PE-28 with 71 migrates
+PE-62 with 150 migrates
+PE-14 with 164 migrates
+PE-45 with 83 migrates
+PE-29 with 79 migrates
+PE-63 with 95 migrates
+PE-15 with 176 migrates
+PE-46 with 103 migrates
+PE-30 with 86 migrates
+PE-49 with 80 migrates
+PE-1 with 40 migrates
+PE-47 with 125 migrates
+PE-31 with 103 migrates
+PE-57 with 158 migrates
+DiffusionLB> Strategy took 0.806110s memory usage: 470.176819 MB.
+DiffusionLB> step 4 finished at 54.980748 duration 0.838844 memory usage: 463.456940
+LBTime = 0.843533
+Iter time = 2.407184
+Iter time = 2.221628
+Iter time = 2.250443
+Iter time = 2.173076
+[DiffusionLB] Load balancing step 5 starting at 64.048479
+DistLB> DiffusionLB: step 5 starting at 64.049574 Memory: 467.947769 MB
+After MST: Node 1: Neighbors: 0 2 
+After MST: Node 48: Neighbors: 49 47 
+After MST: Node 2: Neighbors: 1 3 
+After MST: Node 32: Neighbors: 33 31 
+After MST: Node 16: Neighbors: 17 15 
+After MST: Node 49: Neighbors: 50 48 
+After MST: Node 3: Neighbors: 2 4 
+After MST: Node 33: Neighbors: 34 32 
+After MST: Node 17: Neighbors: 18 16 
+After MST: Node 50: Neighbors: 51 49 
+After MST: Node 4: Neighbors: 3 5 
+After MST: Node 34: Neighbors: 35 33 
+After MST: Node 18: Neighbors: 19 17 
+After MST: Node 51: Neighbors: 52 50 
+After MST: Node 5: Neighbors: 4 6 
+After MST: Node 35: Neighbors: 36 34 
+After MST: Node 19: Neighbors: 20 18 
+After MST: Node 52: Neighbors: 53 51 
+After MST: Node 6: Neighbors: 5 7 
+After MST: Node 36: Neighbors: 37 35 
+After MST: Node 20: Neighbors: 21 19 
+After MST: Node 53: Neighbors: 54 52 
+After MST: Node 7: Neighbors: 6 8 
+After MST: Node 37: Neighbors: 38 36 
+After MST: Node 21: Neighbors: 22 20 
+After MST: Node 54: Neighbors: 55 53 
+After MST: Node 8: Neighbors: 7 9 
+After MST: Node 38: Neighbors: 39 37 
+After MST: Node 22: Neighbors: 23 21 
+After MST: Node 55: Neighbors: 56 54 
+After MST: Node 9: Neighbors: 8 10 
+After MST: Node 39: Neighbors: 40 38 
+After MST: Node 23: Neighbors: 24 22 
+After MST: Node 56: Neighbors: 57 55 
+After MST: Node 10: Neighbors: 9 11 
+After MST: Node 40: Neighbors: 41 39 
+After MST: Node 24: Neighbors: 25 23 
+After MST: Node 57: Neighbors: 58 56 
+After MST: Node 11: Neighbors: 10 12 
+After MST: Node 41: Neighbors: 42 40 
+After MST: Node 25: Neighbors: 26 24 
+After MST: Node 58: Neighbors: 59 57 
+After MST: Node 12: Neighbors: 11 13 
+After MST: Node 42: Neighbors: 43 41 
+After MST: Node 26: Neighbors: 27 25 
+After MST: Node 59: Neighbors: 60 58 
+After MST: Node 13: Neighbors: 12 14 
+After MST: Node 43: Neighbors: 44 42 
+After MST: Node 27: Neighbors: 28 26 
+After MST: Node 60: Neighbors: 61 59 
+After MST: Node 14: Neighbors: 13 
+After MST: Node 44: Neighbors: 45 43 
+After MST: Node 28: Neighbors: 29 27 
+After MST: Node 61: Neighbors: 62 60 
+After MST: Node 15: Neighbors: 16 
+After MST: Node 45: Neighbors: 46 44 
+After MST: Node 29: Neighbors: 30 28 
+After MST: Node 62: Neighbors: 63 61 
+After MST: Node 0: Neighbors: 63 1 
+After MST: Node 46: Neighbors: 47 45 
+After MST: Node 30: Neighbors: 31 29 
+After MST: Node 63: Neighbors: 0 62 
+MST is built. Begin finding remaining neighbors.
+After MST: Node 47: Neighbors: 48 46 
+After MST: Node 31: Neighbors: 32 30 
+After Nbor Finding: Node 32: Neighbors: 33 31 
+After Nbor Finding: Node 16: Neighbors: 17 15 
+After Nbor Finding: Node 48: Neighbors: 49 47 
+After Nbor Finding: Node 33: Neighbors: 34 32 
+After Nbor Finding: Node 17: Neighbors: 18 16 
+After Nbor Finding: Node 49: Neighbors: 50 48 
+After Nbor Finding: Node 34: Neighbors: 35 33 
+After Nbor Finding: Node 18: Neighbors: 19 17 
+After Nbor Finding: Node 50: Neighbors: 51 49 
+After Nbor Finding: Node 0: Neighbors: 63 1 
+--------NEIGHBOR SELECTION COMPLETE (Using Comm? true)--------
+After Nbor Finding: Node 35: Neighbors: 36 34 
+After Nbor Finding: Node 19: Neighbors: 20 18 
+After Nbor Finding: Node 51: Neighbors: 52 50 
+After Nbor Finding: Node 1: Neighbors: 0 2 
+Node 1 has neighbors: 0, 2
+After Nbor Finding: Node 36: Neighbors: 37 35 
+After Nbor Finding: Node 20: Neighbors: 21 19 
+After Nbor Finding: Node 52: Neighbors: 53 51 
+After Nbor Finding: Node 2: Neighbors: 1 3 
+Node 2 has neighbors: 1, 3
+After Nbor Finding: Node 37: Neighbors: 38 36 
+After Nbor Finding: Node 21: Neighbors: 22 20 
+After Nbor Finding: Node 53: Neighbors: 54 52 
+After Nbor Finding: Node 3: Neighbors: 2 4 
+Node 3 has neighbors: 2, 4
+After Nbor Finding: Node 38: Neighbors: 39 37 
+After Nbor Finding: Node 22: Neighbors: 23 21 
+After Nbor Finding: Node 54: Neighbors: 55 53 
+After Nbor Finding: Node 4: Neighbors: 3 5 
+Node 4 has neighbors: 3, 5
+After Nbor Finding: Node 39: Neighbors: 40 38 
+After Nbor Finding: Node 23: Neighbors: 24 22 
+After Nbor Finding: Node 55: Neighbors: 56 54 
+After Nbor Finding: Node 5: Neighbors: 4 6 
+Node 5 has neighbors: 4, 6
+After Nbor Finding: Node 40: Neighbors: 41 39 
+After Nbor Finding: Node 24: Neighbors: 25 23 
+After Nbor Finding: Node 56: Neighbors: 57 55 
+After Nbor Finding: Node 6: Neighbors: 5 7 
+Node 6 has neighbors: 5, 7
+After Nbor Finding: Node 41: Neighbors: 42 40 
+After Nbor Finding: Node 25: Neighbors: 26 24 
+After Nbor Finding: Node 57: Neighbors: 58 56 
+After Nbor Finding: Node 7: Neighbors: 6 8 
+Node 7 has neighbors: 6, 8
+After Nbor Finding: Node 42: Neighbors: 43 41 
+After Nbor Finding: Node 26: Neighbors: 27 25 
+After Nbor Finding: Node 58: Neighbors: 59 57 
+After Nbor Finding: Node 8: Neighbors: 7 9 
+Node 8 has neighbors: 7, 9
+After Nbor Finding: Node 43: Neighbors: 44 42 
+After Nbor Finding: Node 27: Neighbors: 28 26 
+After Nbor Finding: Node 59: Neighbors: 60 58 
+After Nbor Finding: Node 9: Neighbors: 8 10 
+Node 9 has neighbors: 8, 10
+After Nbor Finding: Node 44: Neighbors: 45 43 
+After Nbor Finding: Node 28: Neighbors: 29 27 
+After Nbor Finding: Node 60: Neighbors: 61 59 
+After Nbor Finding: Node 10: Neighbors: 9 11 
+Node 10 has neighbors: 9, 11
+After Nbor Finding: Node 45: Neighbors: 46 44 
+After Nbor Finding: Node 29: Neighbors: 30 28 
+After Nbor Finding: Node 61: Neighbors: 62 60 
+After Nbor Finding: Node 11: Neighbors: 10 12 
+Node 11 has neighbors: 10, 12
+After Nbor Finding: Node 46: Neighbors: 47 45 
+After Nbor Finding: Node 30: Neighbors: 31 29 
+After Nbor Finding: Node 62: Neighbors: 63 61 
+After Nbor Finding: Node 12: Neighbors: 11 13 
+Node 12 has neighbors: 11, 13
+After Nbor Finding: Node 47: Neighbors: 48 46 
+After Nbor Finding: Node 31: Neighbors: 32 30 
+After Nbor Finding: Node 63: Neighbors: 0 62 
+After Nbor Finding: Node 13: Neighbors: 12 14 
+Node 13 has neighbors: 12, 14
+Node 32 has neighbors: 33, 31
+Node 16 has neighbors: 17, 15
+Node 48 has neighbors: 49, 47
+After Nbor Finding: Node 14: Neighbors: 13 
+Node 14 has neighbors: 13
+Node 33 has neighbors: 34, 32
+Node 17 has neighbors: 18, 16
+Node 49 has neighbors: 50, 48
+After Nbor Finding: Node 15: Neighbors: 16 
+Node 15 has neighbors: 16
+Node 34 has neighbors: 35, 33
+Node 18 has neighbors: 19, 17
+Node 50 has neighbors: 51, 49
+Node 0 has neighbors: 63, 1
+Node 35 has neighbors: 36, 34
+Node 19 has neighbors: 20, 18
+Node 51 has neighbors: 52, 50
+Node 36 has neighbors: 37, 35
+Node 20 has neighbors: 21, 19
+Node 52 has neighbors: 53, 51
+Node 37 has neighbors: 38, 36
+Node 21 has neighbors: 22, 20
+Node 53 has neighbors: 54, 52
+Node 38 has neighbors: 39, 37
+Node 22 has neighbors: 23, 21
+Node 54 has neighbors: 55, 53
+Node 39 has neighbors: 40, 38
+Node 23 has neighbors: 24, 22
+Node 55 has neighbors: 56, 54
+Node 40 has neighbors: 41, 39
+Node 24 has neighbors: 25, 23
+Node 56 has neighbors: 57, 55
+Node 41 has neighbors: 42, 40
+Node 25 has neighbors: 26, 24
+Node 57 has neighbors: 58, 56
+Node 42 has neighbors: 43, 41
+Node 26 has neighbors: 27, 25
+Node 58 has neighbors: 59, 57
+Node 43 has neighbors: 44, 42
+Node 27 has neighbors: 28, 26
+Node 59 has neighbors: 60, 58
+Node 44 has neighbors: 45, 43
+Node 28 has neighbors: 29, 27
+Node 61 has neighbors: 62, 60
+Node 45 has neighbors: 46, 44
+Node 29 has neighbors: 30, 28
+Node 62 has neighbors: 63, 61
+Node 46 has neighbors: 47, 45
+Node 30 has neighbors: 31, 29
+Node 63 has neighbors: 0, 62
+Node 47 has neighbors: 48, 46
+Node 31 has neighbors: 32, 30
+Node 60 has neighbors: 61, 59
+PSEUDO: Node 32 (load 8.285858) with pseudo_load after LB 8.251264
+PSEUDO: Node 16 (load 8.501374) with pseudo_load after LB 8.375364
+PSEUDO: Node 48 (load 8.237403) with pseudo_load after LB 8.244281
+PSEUDO: Node 0 (load 8.310686) with pseudo_load after LB 8.389557
+PSEUDO: Node 33 (load 8.146382) with pseudo_load after LB 8.235210
+PSEUDO: Node 17 (load 8.367896) with pseudo_load after LB 8.370647
+PSEUDO: Node 49 (load 8.200054) with pseudo_load after LB 8.247193
+PSEUDO: Node 1 (load 8.362985) with pseudo_load after LB 8.407418
+PSEUDO: Node 34 (load 8.194886) with pseudo_load after LB 8.235210
+PSEUDO: Node 18 (load 8.406738) with pseudo_load after LB 8.370647
+PSEUDO: Node 50 (load 8.268240) with pseudo_load after LB 8.259770
+PSEUDO: Node 2 (load 8.382645) with pseudo_load after LB 8.409469
+PSEUDO: Node 35 (load 8.195329) with pseudo_load after LB 8.222875
+PSEUDO: Node 19 (load 8.337347) with pseudo_load after LB 8.361372
+PSEUDO: Node 51 (load 8.233563) with pseudo_load after LB 8.263870
+PSEUDO: Node 3 (load 8.508019) with pseudo_load after LB 8.426503
+PSEUDO: Node 36 (load 8.213810) with pseudo_load after LB 8.222875
+PSEUDO: Node 20 (load 8.444082) with pseudo_load after LB 8.361372
+PSEUDO: Node 52 (load 8.283910) with pseudo_load after LB 8.276604
+PSEUDO: Node 4 (load 8.505018) with pseudo_load after LB 8.427801
+PSEUDO: Node 37 (load 8.185854) with pseudo_load after LB 8.214777
+PSEUDO: Node 21 (load 8.312595) with pseudo_load after LB 8.347913
+PSEUDO: Node 53 (load 8.303133) with pseudo_load after LB 8.282218
+PSEUDO: Node 5 (load 8.524318) with pseudo_load after LB 8.442576
+PSEUDO: Node 38 (load 8.209672) with pseudo_load after LB 8.214777
+PSEUDO: Node 22 (load 8.409668) with pseudo_load after LB 8.347913
+PSEUDO: Node 54 (load 8.341341) with pseudo_load after LB 8.294136
+PSEUDO: Node 6 (load 8.484417) with pseudo_load after LB 8.443372
+PSEUDO: Node 39 (load 8.175387) with pseudo_load after LB 8.211129
+PSEUDO: Node 23 (load 8.342684) with pseudo_load after LB 8.330935
+PSEUDO: Node 55 (load 8.303262) with pseudo_load after LB 8.301691
+PSEUDO: Node 7 (load 8.507682) with pseudo_load after LB 8.454950
+PSEUDO: Node 40 (load 8.202101) with pseudo_load after LB 8.211883
+PSEUDO: Node 24 (load 8.374479) with pseudo_load after LB 8.330935
+PSEUDO: Node 56 (load 8.307198) with pseudo_load after LB 8.312057
+PSEUDO: Node 8 (load 8.485349) with pseudo_load after LB 8.455420
+PSEUDO: Node 41 (load 8.175171) with pseudo_load after LB 8.210972
+PSEUDO: Node 25 (load 8.310202) with pseudo_load after LB 8.311432
+PSEUDO: Node 57 (load 8.319212) with pseudo_load after LB 8.322004
+PSEUDO: Node 9 (load 8.448899) with pseudo_load after LB 8.463533
+PSEUDO: Node 42 (load 8.206921) with pseudo_load after LB 8.213922
+PSEUDO: Node 26 (load 8.315286) with pseudo_load after LB 8.311432
+PSEUDO: Node 58 (load 8.328942) with pseudo_load after LB 8.330417
+PSEUDO: Node 10 (load 8.443338) with pseudo_load after LB 8.463795
+PSEUDO: Node 43 (load 8.179251) with pseudo_load after LB 8.214285
+PSEUDO: Node 27 (load 8.292557) with pseudo_load after LB 8.290691
+PSEUDO: Node 59 (load 8.339238) with pseudo_load after LB 8.343049
+PSEUDO: Node 11 (load 8.457023) with pseudo_load after LB 8.468733
+PSEUDO: Node 44 (load 8.207114) with pseudo_load after LB 8.220620
+PSEUDO: Node 28 (load 8.329486) with pseudo_load after LB 8.290691
+PSEUDO: Node 60 (load 8.348655) with pseudo_load after LB 8.349451
+PSEUDO: Node 12 (load 8.445583) with pseudo_load after LB 8.468862
+PSEUDO: Node 45 (load 8.186357) with pseudo_load after LB 8.221735
+PSEUDO: Node 29 (load 8.194322) with pseudo_load after LB 8.270161
+PSEUDO: Node 61 (load 8.344319) with pseudo_load after LB 8.364675
+PSEUDO: Node 13 (load 8.490069) with pseudo_load after LB 8.471143
+PSEUDO: Node 46 (load 8.212886) with pseudo_load after LB 8.230960
+PSEUDO: Node 30 (load 8.290006) with pseudo_load after LB 8.270161
+PSEUDO: Node 62 (load 8.318637) with pseudo_load after LB 8.369269
+PSEUDO: Node 14 (load 8.511835) with pseudo_load after LB 8.471181
+PSEUDO: Node 47 (load 8.216858) with pseudo_load after LB 8.232905
+PSEUDO: Node 31 (load 8.217113) with pseudo_load after LB 8.251264
+PSEUDO: Node 63 (load 8.428336) with pseudo_load after LB 8.386423
+PSEUDO: Node 15 (load 8.332137) with pseudo_load after LB 8.375364
+--------STARTING ACROSS NODE LB--------
+PE-9 with 0 migrates
+PE-39 with 4 migrates
+PE-28 with 149 migrates
+PE-10 with 1 migrates
+PE-40 with 0 migrates
+PE-29 with 113 migrates
+PE-48 with 79 migrates
+PE-15 with 0 migrates
+PE-41 with 0 migrates
+PE-16 with 59 migrates
+PE-49 with 86 migrates
+PE-0 with 101 migrates
+PE-32 with 119 migrates
+PE-17 with 40 migrates
+PE-50 with 107 migrates
+PE-1 with 137 migrates
+PE-33 with 78 migrates
+PE-18 with 58 migrates
+PE-51 with 106 migrates
+PE-2 with 130 migrates
+PE-34 with 57 migrates
+PE-19 with 46 migrates
+PE-52 with 118 migrates
+PE-3 with 156 migrates
+PE-35 with 44 migrates
+PE-20 with 86 migrates
+PE-55 with 81 migrates
+PE-4 with 107 migrates
+PE-36 with 39 migrates
+PE-21 with 71 migrates
+PE-56 with 79 migrates
+PE-5 with 84 migrates
+PE-37 with 25 migrates
+PE-22 with 100 migrates
+PE-57 with 83 migrates
+PE-6 with 47 migrates
+PE-38 with 22 migrates
+PE-23 with 107 migrates
+PE-58 with 82 migrates
+PE-7 with 34 migrates
+PE-42 with 18 migrates
+PE-24 with 126 migrates
+PE-59 with 85 migrates
+PE-8 with 13 migrates
+PE-43 with 22 migrates
+PE-25 with 128 migrates
+PE-60 with 87 migrates
+PE-11 with 11 migrates
+PE-44 with 39 migrates
+PE-26 with 130 migrates
+PE-61 with 85 migrates
+PE-12 with 17 migrates
+PE-45 with 45 migrates
+PE-27 with 132 migrates
+PE-62 with 95 migrates
+PE-13 with 29 migrates
+PE-46 with 64 migrates
+PE-30 with 119 migrates
+PE-63 with 121 migrates
+PE-14 with 19 migrates
+PE-47 with 71 migrates
+PE-31 with 105 migrates
+PE-53 with 115 migrates
+PE-54 with 102 migrates
+DiffusionLB> Strategy took 1.166615s memory usage: 473.015945 MB.
+DiffusionLB> step 5 finished at 65.221303 duration 1.171729 memory usage: 472.333374
+LBTime = 1.175347
+Iter time = 2.382701
+Iter time = 2.224496
+Iter time = 2.238924
+Iter time = 2.196875
+[DiffusionLB] Load balancing step 6 starting at 74.277785
+DistLB> DiffusionLB: step 6 starting at 74.278809 Memory: 477.298782 MB
+After MST: Node 1: Neighbors: 0 2 
+After MST: Node 16: Neighbors: 17 15 
+After MST: Node 2: Neighbors: 1 3 
+After MST: Node 17: Neighbors: 18 16 
+After MST: Node 3: Neighbors: 2 4 
+After MST: Node 32: Neighbors: 33 31 
+After MST: Node 18: Neighbors: 19 17 
+After MST: Node 48: Neighbors: 49 47 
+After MST: Node 4: Neighbors: 3 5 
+After MST: Node 33: Neighbors: 34 32 
+After MST: Node 19: Neighbors: 20 18 
+After MST: Node 49: Neighbors: 50 48 
+After MST: Node 5: Neighbors: 4 6 
+After MST: Node 34: Neighbors: 35 33 
+After MST: Node 20: Neighbors: 21 19 
+After MST: Node 50: Neighbors: 51 49 
+After MST: Node 6: Neighbors: 5 7 
+After MST: Node 35: Neighbors: 36 34 
+After MST: Node 21: Neighbors: 22 20 
+After MST: Node 51: Neighbors: 52 50 
+After MST: Node 7: Neighbors: 6 8 
+After MST: Node 36: Neighbors: 37 35 
+After MST: Node 22: Neighbors: 23 21 
+After MST: Node 52: Neighbors: 53 51 
+After MST: Node 8: Neighbors: 7 9 
+After MST: Node 37: Neighbors: 38 36 
+After MST: Node 23: Neighbors: 24 22 
+After MST: Node 53: Neighbors: 54 52 
+After MST: Node 9: Neighbors: 8 10 
+After MST: Node 38: Neighbors: 39 37 
+After MST: Node 24: Neighbors: 25 23 
+After MST: Node 54: Neighbors: 55 53 
+After MST: Node 10: Neighbors: 9 11 
+After MST: Node 39: Neighbors: 40 38 
+After MST: Node 25: Neighbors: 26 24 
+After MST: Node 55: Neighbors: 56 54 
+After MST: Node 11: Neighbors: 10 12 
+After MST: Node 40: Neighbors: 41 39 
+After MST: Node 26: Neighbors: 27 25 
+After MST: Node 56: Neighbors: 57 55 
+After MST: Node 12: Neighbors: 11 13 
+After MST: Node 41: Neighbors: 42 40 
+After MST: Node 27: Neighbors: 28 26 
+After MST: Node 57: Neighbors: 58 56 
+After MST: Node 13: Neighbors: 12 14 
+After MST: Node 42: Neighbors: 43 41 
+After MST: Node 28: Neighbors: 29 27 
+After MST: Node 58: Neighbors: 59 57 
+After MST: Node 14: Neighbors: 13 
+After MST: Node 43: Neighbors: 44 42 
+After MST: Node 29: Neighbors: 30 28 
+After MST: Node 59: Neighbors: 60 58 
+After MST: Node 15: Neighbors: 16 
+After MST: Node 44: Neighbors: 45 43 
+After MST: Node 30: Neighbors: 31 29 
+After MST: Node 60: Neighbors: 61 59 
+After MST: Node 0: Neighbors: 63 1 
+After MST: Node 45: Neighbors: 46 44 
+After MST: Node 31: Neighbors: 32 30 
+After MST: Node 61: Neighbors: 62 60 
+MST is built. Begin finding remaining neighbors.
+After MST: Node 46: Neighbors: 47 45 
+After Nbor Finding: Node 16: Neighbors: 17 15 
+After MST: Node 62: Neighbors: 63 61 
+After Nbor Finding: Node 0: Neighbors: 63 1 
+After MST: Node 47: Neighbors: 48 46 
+After Nbor Finding: Node 17: Neighbors: 18 16 
+After MST: Node 63: Neighbors: 0 62 
+After Nbor Finding: Node 1: Neighbors: 0 2 
+After Nbor Finding: Node 32: Neighbors: 33 31 
+After Nbor Finding: Node 18: Neighbors: 19 17 
+After Nbor Finding: Node 48: Neighbors: 49 47 
+After Nbor Finding: Node 2: Neighbors: 1 3 
+After Nbor Finding: Node 33: Neighbors: 34 32 
+After Nbor Finding: Node 19: Neighbors: 20 18 
+After Nbor Finding: Node 49: Neighbors: 50 48 
+After Nbor Finding: Node 3: Neighbors: 2 4 
+After Nbor Finding: Node 34: Neighbors: 35 33 
+After Nbor Finding: Node 20: Neighbors: 21 19 
+After Nbor Finding: Node 50: Neighbors: 51 49 
+After Nbor Finding: Node 4: Neighbors: 3 5 
+After Nbor Finding: Node 35: Neighbors: 36 34 
+After Nbor Finding: Node 21: Neighbors: 22 20 
+After Nbor Finding: Node 51: Neighbors: 52 50 
+After Nbor Finding: Node 5: Neighbors: 4 6 
+After Nbor Finding: Node 36: Neighbors: 37 35 
+After Nbor Finding: Node 22: Neighbors: 23 21 
+After Nbor Finding: Node 52: Neighbors: 53 51 
+After Nbor Finding: Node 6: Neighbors: 5 7 
+After Nbor Finding: Node 37: Neighbors: 38 36 
+After Nbor Finding: Node 23: Neighbors: 24 22 
+After Nbor Finding: Node 53: Neighbors: 54 52 
+After Nbor Finding: Node 7: Neighbors: 6 8 
+After Nbor Finding: Node 38: Neighbors: 39 37 
+After Nbor Finding: Node 24: Neighbors: 25 23 
+After Nbor Finding: Node 54: Neighbors: 55 53 
+After Nbor Finding: Node 8: Neighbors: 7 9 
+After Nbor Finding: Node 39: Neighbors: 40 38 
+After Nbor Finding: Node 25: Neighbors: 26 24 
+After Nbor Finding: Node 55: Neighbors: 56 54 
+After Nbor Finding: Node 9: Neighbors: 8 10 
+After Nbor Finding: Node 40: Neighbors: 41 39 
+After Nbor Finding: Node 26: Neighbors: 27 25 
+After Nbor Finding: Node 56: Neighbors: 57 55 
+After Nbor Finding: Node 10: Neighbors: 9 11 
+After Nbor Finding: Node 41: Neighbors: 42 40 
+After Nbor Finding: Node 27: Neighbors: 28 26 
+After Nbor Finding: Node 57: Neighbors: 58 56 
+After Nbor Finding: Node 11: Neighbors: 10 12 
+After Nbor Finding: Node 42: Neighbors: 43 41 
+After Nbor Finding: Node 28: Neighbors: 29 27 
+After Nbor Finding: Node 58: Neighbors: 59 57 
+After Nbor Finding: Node 12: Neighbors: 11 13 
+After Nbor Finding: Node 43: Neighbors: 44 42 
+After Nbor Finding: Node 29: Neighbors: 30 28 
+After Nbor Finding: Node 59: Neighbors: 60 58 
+After Nbor Finding: Node 13: Neighbors: 12 14 
+After Nbor Finding: Node 44: Neighbors: 45 43 
+After Nbor Finding: Node 30: Neighbors: 31 29 
+After Nbor Finding: Node 60: Neighbors: 61 59 
+After Nbor Finding: Node 14: Neighbors: 13 
+After Nbor Finding: Node 45: Neighbors: 46 44 
+After Nbor Finding: Node 31: Neighbors: 32 30 
+After Nbor Finding: Node 61: Neighbors: 62 60 
+Node 61 has neighbors: 62, 60
+After Nbor Finding: Node 15: Neighbors: 16 
+After Nbor Finding: Node 46: Neighbors: 47 45 
+Node 16 has neighbors: 17, 15
+After Nbor Finding: Node 62: Neighbors: 63 61 
+Node 62 has neighbors: 63, 61
+--------NEIGHBOR SELECTION COMPLETE (Using Comm? true)--------
+After Nbor Finding: Node 47: Neighbors: 48 46 
+Node 17 has neighbors: 18, 16
+After Nbor Finding: Node 63: Neighbors: 0 62 
+Node 63 has neighbors: 0, 62
+Node 1 has neighbors: 0, 2
+Node 32 has neighbors: 33, 31
+Node 18 has neighbors: 19, 17
+Node 48 has neighbors: 49, 47
+Node 2 has neighbors: 1, 3
+Node 33 has neighbors: 34, 32
+Node 19 has neighbors: 20, 18
+Node 49 has neighbors: 50, 48
+Node 3 has neighbors: 2, 4
+Node 34 has neighbors: 35, 33
+Node 20 has neighbors: 21, 19
+Node 50 has neighbors: 51, 49
+Node 4 has neighbors: 3, 5
+Node 35 has neighbors: 36, 34
+Node 21 has neighbors: 22, 20
+Node 51 has neighbors: 52, 50
+Node 5 has neighbors: 4, 6
+Node 36 has neighbors: 37, 35
+Node 22 has neighbors: 23, 21
+Node 52 has neighbors: 53, 51
+Node 6 has neighbors: 5, 7
+Node 37 has neighbors: 38, 36
+Node 23 has neighbors: 24, 22
+Node 53 has neighbors: 54, 52
+Node 7 has neighbors: 6, 8
+Node 38 has neighbors: 39, 37
+Node 24 has neighbors: 25, 23
+Node 54 has neighbors: 55, 53
+Node 8 has neighbors: 7, 9
+Node 39 has neighbors: 40, 38
+Node 25 has neighbors: 26, 24
+Node 55 has neighbors: 56, 54
+Node 9 has neighbors: 8, 10
+Node 40 has neighbors: 41, 39
+Node 26 has neighbors: 27, 25
+Node 56 has neighbors: 57, 55
+Node 10 has neighbors: 9, 11
+Node 41 has neighbors: 42, 40
+Node 27 has neighbors: 28, 26
+Node 57 has neighbors: 58, 56
+Node 11 has neighbors: 10, 12
+Node 42 has neighbors: 43, 41
+Node 28 has neighbors: 29, 27
+Node 58 has neighbors: 59, 57
+Node 12 has neighbors: 11, 13
+Node 43 has neighbors: 44, 42
+Node 29 has neighbors: 30, 28
+Node 59 has neighbors: 60, 58
+Node 13 has neighbors: 12, 14
+Node 44 has neighbors: 45, 43
+Node 30 has neighbors: 31, 29
+Node 60 has neighbors: 61, 59
+Node 14 has neighbors: 13
+Node 45 has neighbors: 46, 44
+Node 31 has neighbors: 32, 30
+PSEUDO: Node 48 (load 8.230957) with pseudo_load after LB 8.277775
+Node 15 has neighbors: 16
+Node 46 has neighbors: 47, 45
+PSEUDO: Node 16 (load 8.325851) with pseudo_load after LB 8.341102
+PSEUDO: Node 49 (load 8.210276) with pseudo_load after LB 8.278322
+Node 0 has neighbors: 63, 1
+Node 47 has neighbors: 48, 46
+PSEUDO: Node 17 (load 8.369590) with pseudo_load after LB 8.341065
+PSEUDO: Node 50 (load 8.313021) with pseudo_load after LB 8.293722
+PSEUDO: Node 0 (load 8.413446) with pseudo_load after LB 8.404859
+--------STARTING ACROSS NODE LB--------
+PSEUDO: Node 32 (load 8.167902) with pseudo_load after LB 8.270318
+PSEUDO: Node 18 (load 8.319800) with pseudo_load after LB 8.337889
+PSEUDO: Node 51 (load 8.329217) with pseudo_load after LB 8.294381
+PSEUDO: Node 1 (load 8.290502) with pseudo_load after LB 8.406594
+PSEUDO: Node 33 (load 8.263274) with pseudo_load after LB 8.270001
+PSEUDO: Node 19 (load 8.338715) with pseudo_load after LB 8.337810
+PSEUDO: Node 52 (load 8.359629) with pseudo_load after LB 8.311544
+PSEUDO: Node 2 (load 8.417552) with pseudo_load after LB 8.417270
+PSEUDO: Node 34 (load 8.266072) with pseudo_load after LB 8.260996
+PSEUDO: Node 20 (load 8.325829) with pseudo_load after LB 8.332561
+PSEUDO: Node 53 (load 8.290472) with pseudo_load after LB 8.312263
+PSEUDO: Node 3 (load 8.342097) with pseudo_load after LB 8.419305
+PSEUDO: Node 35 (load 8.258759) with pseudo_load after LB 8.260686
+PSEUDO: Node 21 (load 8.331121) with pseudo_load after LB 8.332431
+PSEUDO: Node 54 (load 8.306918) with pseudo_load after LB 8.329902
+PSEUDO: Node 4 (load 8.449231) with pseudo_load after LB 8.429172
+PSEUDO: Node 36 (load 8.247778) with pseudo_load after LB 8.253963
+PSEUDO: Node 22 (load 8.318393) with pseudo_load after LB 8.325178
+PSEUDO: Node 55 (load 8.317978) with pseudo_load after LB 8.330645
+PSEUDO: Node 5 (load 8.473138) with pseudo_load after LB 8.431329
+PSEUDO: Node 37 (load 8.247207) with pseudo_load after LB 8.253684
+PSEUDO: Node 23 (load 8.345996) with pseudo_load after LB 8.324992
+PSEUDO: Node 56 (load 8.384661) with pseudo_load after LB 8.347592
+PSEUDO: Node 6 (load 8.455725) with pseudo_load after LB 8.440014
+PSEUDO: Node 38 (load 8.229351) with pseudo_load after LB 8.249592
+PSEUDO: Node 24 (load 8.320918) with pseudo_load after LB 8.315886
+PSEUDO: Node 57 (load 8.342066) with pseudo_load after LB 8.348366
+PSEUDO: Node 7 (load 8.475492) with pseudo_load after LB 8.442046
+PSEUDO: Node 39 (load 8.246826) with pseudo_load after LB 8.249389
+PSEUDO: Node 25 (load 8.333610) with pseudo_load after LB 8.315649
+PSEUDO: Node 58 (load 8.425077) with pseudo_load after LB 8.363866
+PSEUDO: Node 8 (load 8.475041) with pseudo_load after LB 8.449088
+PSEUDO: Node 40 (load 8.232805) with pseudo_load after LB 8.248170
+PSEUDO: Node 26 (load 8.359453) with pseudo_load after LB 8.305030
+PSEUDO: Node 59 (load 8.374558) with pseudo_load after LB 8.364732
+PSEUDO: Node 9 (load 8.521306) with pseudo_load after LB 8.450762
+PSEUDO: Node 41 (load 8.239783) with pseudo_load after LB 8.248094
+PSEUDO: Node 27 (load 8.356513) with pseudo_load after LB 8.304751
+PSEUDO: Node 60 (load 8.438564) with pseudo_load after LB 8.378576
+PSEUDO: Node 10 (load 8.485308) with pseudo_load after LB 8.455832
+PSEUDO: Node 42 (load 8.232413) with pseudo_load after LB 8.250024
+PSEUDO: Node 28 (load 8.279844) with pseudo_load after LB 8.293226
+PSEUDO: Node 61 (load 8.384193) with pseudo_load after LB 8.379642
+PSEUDO: Node 11 (load 8.505226) with pseudo_load after LB 8.456995
+PSEUDO: Node 43 (load 8.246972) with pseudo_load after LB 8.250095
+PSEUDO: Node 29 (load 8.353511) with pseudo_load after LB 8.292922
+PSEUDO: Node 62 (load 8.445700) with pseudo_load after LB 8.392067
+PSEUDO: Node 12 (load 8.494398) with pseudo_load after LB 8.459998
+PSEUDO: Node 44 (load 8.240505) with pseudo_load after LB 8.255515
+PSEUDO: Node 30 (load 8.246432) with pseudo_load after LB 8.281339
+PSEUDO: Node 63 (load 8.354075) with pseudo_load after LB 8.393442
+PSEUDO: Node 13 (load 8.474704) with pseudo_load after LB 8.460585
+PSEUDO: Node 45 (load 8.251345) with pseudo_load after LB 8.255741
+PSEUDO: Node 31 (load 8.235466) with pseudo_load after LB 8.281024
+PSEUDO: Node 14 (load 8.369912) with pseudo_load after LB 8.461571
+PSEUDO: Node 46 (load 8.241249) with pseudo_load after LB 8.264820
+PSEUDO: Node 15 (load 8.407944) with pseudo_load after LB 8.342166
+PSEUDO: Node 47 (load 8.161909) with pseudo_load after LB 8.265213
+PE-6 with 75 migrates
+PE-49 with 109 migrates
+PE-7 with 75 migrates
+PE-16 with 24 migrates
+PE-50 with 139 migrates
+PE-14 with 0 migrates
+PE-17 with 39 migrates
+PE-51 with 133 migrates
+PE-0 with 28 migrates
+PE-32 with 31 migrates
+PE-18 with 30 migrates
+PE-48 with 83 migrates
+PE-1 with 24 migrates
+PE-33 with 27 migrates
+PE-19 with 31 migrates
+PE-53 with 91 migrates
+PE-2 with 73 migrates
+PE-34 with 29 migrates
+PE-20 with 27 migrates
+PE-54 with 99 migrates
+PE-3 with 71 migrates
+PE-35 with 29 migrates
+PE-21 with 27 migrates
+PE-55 with 114 migrates
+PE-4 with 96 migrates
+PE-36 with 25 migrates
+PE-22 with 23 migrates
+PE-56 with 120 migrates
+PE-5 with 96 migrates
+PE-37 with 23 migrates
+PE-23 with 34 migrates
+PE-57 with 100 migrates
+PE-8 with 55 migrates
+PE-38 with 12 migrates
+PE-24 with 36 migrates
+PE-58 with 102 migrates
+PE-9 with 48 migrates
+PE-39 with 11 migrates
+PE-25 with 46 migrates
+PE-59 with 73 migrates
+PE-10 with 14 migrates
+PE-40 with 3 migrates
+PE-26 with 72 migrates
+PE-60 with 67 migrates
+PE-11 with 23 migrates
+PE-41 with 0 migrates
+PE-27 with 99 migrates
+PE-61 with 38 migrates
+PE-12 with 38 migrates
+PE-42 with 0 migrates
+PE-28 with 91 migrates
+PE-62 with 33 migrates
+PE-13 with 43 migrates
+PE-43 with 9 migrates
+PE-29 with 123 migrates
+PE-52 with 112 migrates
+PE-15 with 31 migrates
+PE-44 with 11 migrates
+PE-30 with 105 migrates
+PE-63 with 9 migrates
+PE-45 with 18 migrates
+PE-31 with 83 migrates
+PE-46 with 20 migrates
+PE-47 with 32 migrates
+DiffusionLB> Strategy took 1.561956s memory usage: 481.431976 MB.
+DiffusionLB> step 6 finished at 75.845300 duration 1.566492 memory usage: 476.624176
+LBTime = 1.569836
+Iter time = 2.399544
+Iter time = 2.226521
+Iter time = 2.286872
+Iter time = 2.258429
+[DiffusionLB] Load balancing step 7 starting at 85.027525
+DistLB> DiffusionLB: step 7 starting at 85.028477 Memory: 481.145599 MB
+After MST: Node 1: Neighbors: 0 2 
+After MST: Node 16: Neighbors: 17 15 
+After MST: Node 2: Neighbors: 1 
+After MST: Node 17: Neighbors: 18 16 
+After MST: Node 3: Neighbors: 4 
+After MST: Node 32: Neighbors: 33 31 
+After MST: Node 18: Neighbors: 19 17 
+After MST: Node 48: Neighbors: 49 47 
+After MST: Node 4: Neighbors: 5 3 
+After MST: Node 33: Neighbors: 34 32 
+After MST: Node 19: Neighbors: 20 18 
+After MST: Node 49: Neighbors: 50 48 
+After MST: Node 5: Neighbors: 6 4 
+After MST: Node 34: Neighbors: 35 33 
+After MST: Node 20: Neighbors: 21 19 
+After MST: Node 50: Neighbors: 51 49 
+After MST: Node 6: Neighbors: 7 5 
+After MST: Node 35: Neighbors: 36 34 
+After MST: Node 21: Neighbors: 22 20 
+After MST: Node 51: Neighbors: 52 50 
+After MST: Node 7: Neighbors: 8 6 
+After MST: Node 36: Neighbors: 37 35 
+After MST: Node 22: Neighbors: 23 21 
+After MST: Node 52: Neighbors: 53 51 
+After MST: Node 8: Neighbors: 9 7 
+After MST: Node 37: Neighbors: 38 36 
+After MST: Node 23: Neighbors: 24 22 
+After MST: Node 53: Neighbors: 54 52 
+After MST: Node 9: Neighbors: 10 8 
+After MST: Node 38: Neighbors: 39 37 
+After MST: Node 24: Neighbors: 25 23 
+After MST: Node 54: Neighbors: 55 53 
+After MST: Node 10: Neighbors: 11 9 
+After MST: Node 39: Neighbors: 40 38 
+After MST: Node 25: Neighbors: 26 24 
+After MST: Node 55: Neighbors: 56 54 
+After MST: Node 11: Neighbors: 12 10 
+After MST: Node 40: Neighbors: 41 39 
+After MST: Node 26: Neighbors: 27 25 
+After MST: Node 56: Neighbors: 57 55 
+After MST: Node 12: Neighbors: 13 11 
+After MST: Node 41: Neighbors: 42 40 
+After MST: Node 27: Neighbors: 28 26 
+After MST: Node 57: Neighbors: 58 56 
+After MST: Node 13: Neighbors: 14 12 
+After MST: Node 42: Neighbors: 43 41 
+After MST: Node 28: Neighbors: 29 27 
+After MST: Node 58: Neighbors: 59 57 
+After MST: Node 14: Neighbors: 15 13 
+After MST: Node 43: Neighbors: 44 42 
+After MST: Node 29: Neighbors: 30 28 
+After MST: Node 59: Neighbors: 60 58 
+After MST: Node 15: Neighbors: 16 14 
+After MST: Node 44: Neighbors: 45 43 
+After MST: Node 30: Neighbors: 31 29 
+After MST: Node 60: Neighbors: 61 59 
+After MST: Node 0: Neighbors: 63 1 
+After MST: Node 45: Neighbors: 46 44 
+After MST: Node 31: Neighbors: 32 30 
+After MST: Node 61: Neighbors: 62 60 
+MST is built. Begin finding remaining neighbors.
+After MST: Node 46: Neighbors: 47 45 
+After MST: Node 62: Neighbors: 63 61 
+After MST: Node 47: Neighbors: 48 46 
+After MST: Node 63: Neighbors: 0 62 
+After Nbor Finding: Node 0: Neighbors: 63 1 
+After Nbor Finding: Node 1: Neighbors: 0 2 
+After Nbor Finding: Node 32: Neighbors: 33 31 
+After Nbor Finding: Node 48: Neighbors: 49 47 
+After Nbor Finding: Node 2: Neighbors: 1 
+After Nbor Finding: Node 33: Neighbors: 34 32 
+After Nbor Finding: Node 49: Neighbors: 50 48 
+After Nbor Finding: Node 3: Neighbors: 4 
+After Nbor Finding: Node 34: Neighbors: 35 33 
+After Nbor Finding: Node 16: Neighbors: 17 15 
+After Nbor Finding: Node 50: Neighbors: 51 49 
+After Nbor Finding: Node 4: Neighbors: 5 3 
+After Nbor Finding: Node 35: Neighbors: 36 34 
+After Nbor Finding: Node 17: Neighbors: 18 16 
+Node 17 has neighbors: 18, 16
+After Nbor Finding: Node 51: Neighbors: 52 50 
+After Nbor Finding: Node 5: Neighbors: 6 4 
+After Nbor Finding: Node 36: Neighbors: 37 35 
+After Nbor Finding: Node 18: Neighbors: 19 17 
+Node 18 has neighbors: 19, 17
+After Nbor Finding: Node 52: Neighbors: 53 51 
+After Nbor Finding: Node 6: Neighbors: 7 5 
+After Nbor Finding: Node 37: Neighbors: 38 36 
+After Nbor Finding: Node 19: Neighbors: 20 18 
+Node 19 has neighbors: 20, 18
+After Nbor Finding: Node 53: Neighbors: 54 52 
+After Nbor Finding: Node 7: Neighbors: 8 6 
+After Nbor Finding: Node 38: Neighbors: 39 37 
+After Nbor Finding: Node 20: Neighbors: 21 19 
+Node 20 has neighbors: 21, 19
+After Nbor Finding: Node 54: Neighbors: 55 53 
+After Nbor Finding: Node 8: Neighbors: 9 7 
+After Nbor Finding: Node 39: Neighbors: 40 38 
+After Nbor Finding: Node 21: Neighbors: 22 20 
+Node 21 has neighbors: 22, 20
+After Nbor Finding: Node 55: Neighbors: 56 54 
+After Nbor Finding: Node 9: Neighbors: 10 8 
+After Nbor Finding: Node 40: Neighbors: 41 39 
+After Nbor Finding: Node 22: Neighbors: 23 21 
+Node 22 has neighbors: 23, 21
+After Nbor Finding: Node 56: Neighbors: 57 55 
+After Nbor Finding: Node 10: Neighbors: 11 9 
+After Nbor Finding: Node 41: Neighbors: 42 40 
+After Nbor Finding: Node 23: Neighbors: 24 22 
+Node 23 has neighbors: 24, 22
+After Nbor Finding: Node 57: Neighbors: 58 56 
+After Nbor Finding: Node 11: Neighbors: 12 10 
+After Nbor Finding: Node 42: Neighbors: 43 41 
+After Nbor Finding: Node 24: Neighbors: 25 23 
+Node 24 has neighbors: 25, 23
+After Nbor Finding: Node 58: Neighbors: 59 57 
+After Nbor Finding: Node 12: Neighbors: 13 11 
+After Nbor Finding: Node 43: Neighbors: 44 42 
+After Nbor Finding: Node 25: Neighbors: 26 24 
+Node 25 has neighbors: 26, 24
+After Nbor Finding: Node 59: Neighbors: 60 58 
+After Nbor Finding: Node 13: Neighbors: 14 12 
+After Nbor Finding: Node 44: Neighbors: 45 43 
+After Nbor Finding: Node 26: Neighbors: 27 25 
+Node 26 has neighbors: 27, 25
+After Nbor Finding: Node 60: Neighbors: 61 59 
+After Nbor Finding: Node 14: Neighbors: 15 13 
+After Nbor Finding: Node 45: Neighbors: 46 44 
+After Nbor Finding: Node 27: Neighbors: 28 26 
+Node 27 has neighbors: 28, 26
+After Nbor Finding: Node 61: Neighbors: 62 60 
+After Nbor Finding: Node 15: Neighbors: 16 14 
+After Nbor Finding: Node 46: Neighbors: 47 45 
+After Nbor Finding: Node 28: Neighbors: 29 27 
+Node 28 has neighbors: 29, 27
+After Nbor Finding: Node 62: Neighbors: 63 61 
+--------NEIGHBOR SELECTION COMPLETE (Using Comm? true)--------
+After Nbor Finding: Node 47: Neighbors: 48 46 
+After Nbor Finding: Node 29: Neighbors: 30 28 
+Node 29 has neighbors: 30, 28
+After Nbor Finding: Node 63: Neighbors: 0 62 
+Node 1 has neighbors: 0, 2
+Node 32 has neighbors: 33, 31
+After Nbor Finding: Node 30: Neighbors: 31 29 
+Node 30 has neighbors: 31, 29
+Node 48 has neighbors: 49, 47
+Node 2 has neighbors: 1
+Node 33 has neighbors: 34, 32
+After Nbor Finding: Node 31: Neighbors: 32 30 
+Node 31 has neighbors: 32, 30
+Node 49 has neighbors: 50, 48
+Node 3 has neighbors: 4
+Node 34 has neighbors: 35, 33
+Node 16 has neighbors: 17, 15
+Node 50 has neighbors: 51, 49
+Node 4 has neighbors: 5, 3
+Node 35 has neighbors: 36, 34
+Node 51 has neighbors: 52, 50
+Node 5 has neighbors: 6, 4
+Node 36 has neighbors: 37, 35
+Node 52 has neighbors: 53, 51
+Node 6 has neighbors: 7, 5
+Node 37 has neighbors: 38, 36
+Node 53 has neighbors: 54, 52
+Node 7 has neighbors: 8, 6
+Node 38 has neighbors: 39, 37
+Node 54 has neighbors: 55, 53
+Node 8 has neighbors: 9, 7
+Node 39 has neighbors: 40, 38
+Node 55 has neighbors: 56, 54
+Node 9 has neighbors: 10, 8
+Node 40 has neighbors: 41, 39
+Node 56 has neighbors: 57, 55
+Node 10 has neighbors: 11, 9
+Node 41 has neighbors: 42, 40
+Node 57 has neighbors: 58, 56
+Node 11 has neighbors: 12, 10
+Node 42 has neighbors: 43, 41
+Node 58 has neighbors: 59, 57
+Node 12 has neighbors: 13, 11
+Node 43 has neighbors: 44, 42
+Node 59 has neighbors: 60, 58
+Node 13 has neighbors: 14, 12
+Node 44 has neighbors: 45, 43
+Node 60 has neighbors: 61, 59
+Node 14 has neighbors: 15, 13
+Node 45 has neighbors: 46, 44
+Node 61 has neighbors: 62, 60
+Node 15 has neighbors: 16, 14
+Node 46 has neighbors: 47, 45
+Node 62 has neighbors: 63, 61
+Node 0 has neighbors: 63, 1
+Node 47 has neighbors: 48, 46
+Node 63 has neighbors: 0, 62
+PSEUDO: Node 32 (load 8.244634) with pseudo_load after LB 8.228643
+PSEUDO: Node 16 (load 8.284822) with pseudo_load after LB 8.346077
+PSEUDO: Node 48 (load 8.246199) with pseudo_load after LB 8.248936
+PSEUDO: Node 33 (load 8.215928) with pseudo_load after LB 8.227545
+PSEUDO: Node 17 (load 8.376739) with pseudo_load after LB 8.334570
+PSEUDO: Node 49 (load 8.304359) with pseudo_load after LB 8.250475
+PSEUDO: Node 34 (load 8.242095) with pseudo_load after LB 8.227361
+PSEUDO: Node 18 (load 8.374244) with pseudo_load after LB 8.325538
+PSEUDO: Node 50 (load 8.258109) with pseudo_load after LB 8.255739
+PSEUDO: Node 0 (load 8.366855) with pseudo_load after LB 8.330719
+--------STARTING ACROSS NODE LB--------
+PSEUDO: Node 35 (load 8.224473) with pseudo_load after LB 8.227045
+PSEUDO: Node 19 (load 8.342794) with pseudo_load after LB 8.313860
+PSEUDO: Node 51 (load 8.239658) with pseudo_load after LB 8.257968
+PSEUDO: Node 1 (load 8.415696) with pseudo_load after LB 8.333707
+PSEUDO: Node 36 (load 8.233086) with pseudo_load after LB 8.227630
+PSEUDO: Node 20 (load 8.255229) with pseudo_load after LB 8.303829
+PSEUDO: Node 52 (load 8.250325) with pseudo_load after LB 8.263847
+PSEUDO: Node 2 (load 8.432754) with pseudo_load after LB 8.334923
+PSEUDO: Node 37 (load 8.222789) with pseudo_load after LB 8.227712
+PSEUDO: Node 21 (load 8.319687) with pseudo_load after LB 8.292919
+PSEUDO: Node 53 (load 8.250433) with pseudo_load after LB 8.267064
+PSEUDO: Node 3 (load 8.383604) with pseudo_load after LB 8.397364
+PSEUDO: Node 38 (load 8.237963) with pseudo_load after LB 8.229105
+PSEUDO: Node 22 (load 8.243127) with pseudo_load after LB 8.282887
+PSEUDO: Node 54 (load 8.249513) with pseudo_load after LB 8.273509
+PSEUDO: Node 4 (load 8.411476) with pseudo_load after LB 8.397247
+PSEUDO: Node 39 (load 8.212853) with pseudo_load after LB 8.229346
+PSEUDO: Node 23 (load 8.217397) with pseudo_load after LB 8.273453
+PSEUDO: Node 55 (load 8.248568) with pseudo_load after LB 8.277949
+PSEUDO: Node 5 (load 8.361040) with pseudo_load after LB 8.396418
+PSEUDO: Node 40 (load 8.227696) with pseudo_load after LB 8.231393
+PSEUDO: Node 24 (load 8.224552) with pseudo_load after LB 8.264448
+PSEUDO: Node 56 (load 8.277779) with pseudo_load after LB 8.284792
+PSEUDO: Node 6 (load 8.418297) with pseudo_load after LB 8.395974
+PSEUDO: Node 41 (load 8.212775) with pseudo_load after LB 8.231795
+PSEUDO: Node 25 (load 8.214450) with pseudo_load after LB 8.256887
+PSEUDO: Node 57 (load 8.286062) with pseudo_load after LB 8.290456
+PSEUDO: Node 7 (load 8.366403) with pseudo_load after LB 8.393939
+PSEUDO: Node 42 (load 8.236955) with pseudo_load after LB 8.234482
+PSEUDO: Node 26 (load 8.241453) with pseudo_load after LB 8.249685
+PSEUDO: Node 58 (load 8.290583) with pseudo_load after LB 8.297348
+PSEUDO: Node 8 (load 8.434678) with pseudo_load after LB 8.392901
+PSEUDO: Node 43 (load 8.219287) with pseudo_load after LB 8.235063
+PSEUDO: Node 27 (load 8.220792) with pseudo_load after LB 8.244094
+PSEUDO: Node 59 (load 8.287588) with pseudo_load after LB 8.303836
+PSEUDO: Node 9 (load 8.395738) with pseudo_load after LB 8.389091
+PSEUDO: Node 44 (load 8.234840) with pseudo_load after LB 8.238408
+PSEUDO: Node 28 (load 8.221437) with pseudo_load after LB 8.239034
+PSEUDO: Node 60 (load 8.302402) with pseudo_load after LB 8.310240
+PSEUDO: Node 10 (load 8.428576) with pseudo_load after LB 8.387052
+PSEUDO: Node 45 (load 8.228102) with pseudo_load after LB 8.239204
+PSEUDO: Node 29 (load 8.156390) with pseudo_load after LB 8.235273
+PSEUDO: Node 61 (load 8.300386) with pseudo_load after LB 8.316702
+PSEUDO: Node 11 (load 8.410428) with pseudo_load after LB 8.381001
+PSEUDO: Node 46 (load 8.247656) with pseudo_load after LB 8.243205
+PSEUDO: Node 30 (load 8.198422) with pseudo_load after LB 8.232252
+PSEUDO: Node 62 (load 8.292900) with pseudo_load after LB 8.321962
+PSEUDO: Node 12 (load 8.389115) with pseudo_load after LB 8.377497
+PSEUDO: Node 47 (load 8.215112) with pseudo_load after LB 8.244297
+PSEUDO: Node 31 (load 8.250830) with pseudo_load after LB 8.230016
+PSEUDO: Node 63 (load 8.335351) with pseudo_load after LB 8.327246
+PSEUDO: Node 13 (load 8.432822) with pseudo_load after LB 8.369106
+PSEUDO: Node 14 (load 8.551599) with pseudo_load after LB 8.363753
+PSEUDO: Node 15 (load 8.271317) with pseudo_load after LB 8.353407
+PE-3 with 0 migrates
+PE-4 with 6 migrates
+PE-5 with 0 migrates
+PE-29 with 0 migrates
+PE-48 with 42 migrates
+PE-7 with 6 migrates
+PE-30 with 4 migrates
+PE-49 with 44 migrates
+PE-9 with 4 migrates
+PE-32 with 11 migrates
+PE-16 with 99 migrates
+PE-50 with 18 migrates
+PE-0 with 108 migrates
+PE-33 with 3 migrates
+PE-17 with 121 migrates
+PE-51 with 17 migrates
+PE-1 with 85 migrates
+PE-34 with 8 migrates
+PE-18 with 144 migrates
+PE-52 with 26 migrates
+PE-2 with 44 migrates
+PE-35 with 1 migrates
+PE-19 with 160 migrates
+PE-53 with 33 migrates
+PE-6 with 15 migrates
+PE-36 with 2 migrates
+PE-20 with 135 migrates
+PE-54 with 41 migrates
+PE-10 with 21 migrates
+PE-37 with 0 migrates
+PE-21 with 150 migrates
+PE-55 with 54 migrates
+PE-11 with 35 migrates
+PE-38 with 3 migrates
+PE-22 with 130 migrates
+PE-56 with 66 migrates
+PE-14 with 146 migrates
+PE-39 with 0 migrates
+PE-23 with 102 migrates
+PE-57 with 73 migrates
+PE-15 with 120 migrates
+PE-40 with 6 migrates
+PE-24 with 81 migrates
+PE-58 with 73 migrates
+PE-8 with 19 migrates
+PE-41 with 8 migrates
+PE-25 with 60 migrates
+PE-59 with 78 migrates
+PE-12 with 41 migrates
+PE-42 with 17 migrates
+PE-26 with 55 migrates
+PE-60 with 85 migrates
+PE-13 with 50 migrates
+PE-43 with 16 migrates
+PE-27 with 44 migrates
+PE-61 with 90 migrates
+PE-44 with 24 migrates
+PE-28 with 35 migrates
+PE-62 with 97 migrates
+PE-45 with 26 migrates
+PE-31 with 21 migrates
+PE-63 with 112 migrates
+PE-46 with 31 migrates
+PE-47 with 30 migrates
+DiffusionLB> Strategy took 2.069116s memory usage: 485.388657 MB.
+DiffusionLB> step 7 finished at 87.101152 duration 2.072674 memory usage: 478.702728
+LBTime = 2.077207
+Iter time = 2.451876
+Iter time = 2.231245
+Iter time = 2.238089
+Iter time = 2.265369
+[DiffusionLB] Load balancing step 8 starting at 96.303297
+DistLB> DiffusionLB: step 8 starting at 96.304344 Memory: 483.169647 MB
+After MST: Node 1: Neighbors: 0 2 
+After MST: Node 32: Neighbors: 33 31 
+After MST: Node 16: Neighbors: 17 15 
+After MST: Node 48: Neighbors: 49 47 
+After MST: Node 2: Neighbors: 1 3 
+After MST: Node 33: Neighbors: 34 32 
+After MST: Node 17: Neighbors: 18 16 
+After MST: Node 49: Neighbors: 50 48 
+After MST: Node 3: Neighbors: 2 4 
+After MST: Node 34: Neighbors: 35 33 
+After MST: Node 18: Neighbors: 19 17 
+After MST: Node 50: Neighbors: 51 49 
+After MST: Node 4: Neighbors: 3 5 
+After MST: Node 35: Neighbors: 36 34 
+After MST: Node 19: Neighbors: 20 18 
+After MST: Node 51: Neighbors: 52 50 
+After MST: Node 5: Neighbors: 4 6 
+After MST: Node 36: Neighbors: 37 35 
+After MST: Node 20: Neighbors: 21 19 
+After MST: Node 52: Neighbors: 53 51 
+After MST: Node 6: Neighbors: 5 7 
+After MST: Node 37: Neighbors: 38 36 
+After MST: Node 21: Neighbors: 22 20 
+After MST: Node 53: Neighbors: 54 52 
+After MST: Node 7: Neighbors: 6 8 
+After MST: Node 38: Neighbors: 39 37 
+After MST: Node 22: Neighbors: 23 21 
+After MST: Node 54: Neighbors: 55 53 
+After MST: Node 8: Neighbors: 7 9 
+After MST: Node 39: Neighbors: 40 38 
+After MST: Node 23: Neighbors: 24 22 
+After MST: Node 55: Neighbors: 56 54 
+After MST: Node 9: Neighbors: 8 10 
+After MST: Node 40: Neighbors: 41 39 
+After MST: Node 24: Neighbors: 25 23 
+After MST: Node 56: Neighbors: 57 55 
+After MST: Node 10: Neighbors: 9 11 
+After MST: Node 41: Neighbors: 42 40 
+After MST: Node 25: Neighbors: 26 24 
+After MST: Node 57: Neighbors: 58 56 
+After MST: Node 11: Neighbors: 10 12 
+After MST: Node 42: Neighbors: 43 41 
+After MST: Node 26: Neighbors: 27 25 
+After MST: Node 58: Neighbors: 59 57 
+After MST: Node 12: Neighbors: 11 13 
+After MST: Node 43: Neighbors: 44 42 
+After MST: Node 27: Neighbors: 28 26 
+After MST: Node 59: Neighbors: 60 58 
+After MST: Node 13: Neighbors: 12 14 
+After MST: Node 44: Neighbors: 45 43 
+After MST: Node 28: Neighbors: 29 27 
+After MST: Node 60: Neighbors: 61 59 
+After MST: Node 14: Neighbors: 13 
+After MST: Node 45: Neighbors: 46 44 
+After MST: Node 29: Neighbors: 30 28 
+After MST: Node 61: Neighbors: 62 60 
+After MST: Node 15: Neighbors: 16 
+After MST: Node 46: Neighbors: 47 45 
+After MST: Node 30: Neighbors: 31 29 
+After MST: Node 62: Neighbors: 63 61 
+After MST: Node 0: Neighbors: 63 1 
+After MST: Node 47: Neighbors: 48 46 
+After MST: Node 31: Neighbors: 32 30 
+After MST: Node 63: Neighbors: 0 62 
+MST is built. Begin finding remaining neighbors.
+After Nbor Finding: Node 0: Neighbors: 63 1 
+After Nbor Finding: Node 32: Neighbors: 33 31 
+After Nbor Finding: Node 16: Neighbors: 17 15 
+After Nbor Finding: Node 48: Neighbors: 49 47 
+After Nbor Finding: Node 1: Neighbors: 0 2 
+After Nbor Finding: Node 33: Neighbors: 34 32 
+After Nbor Finding: Node 17: Neighbors: 18 16 
+After Nbor Finding: Node 49: Neighbors: 50 48 
+After Nbor Finding: Node 2: Neighbors: 1 3 
+After Nbor Finding: Node 34: Neighbors: 35 33 
+After Nbor Finding: Node 18: Neighbors: 19 17 
+After Nbor Finding: Node 50: Neighbors: 51 49 
+After Nbor Finding: Node 3: Neighbors: 2 4 
+After Nbor Finding: Node 35: Neighbors: 36 34 
+After Nbor Finding: Node 19: Neighbors: 20 18 
+After Nbor Finding: Node 51: Neighbors: 52 50 
+After Nbor Finding: Node 4: Neighbors: 3 5 
+After Nbor Finding: Node 36: Neighbors: 37 35 
+After Nbor Finding: Node 20: Neighbors: 21 19 
+After Nbor Finding: Node 52: Neighbors: 53 51 
+After Nbor Finding: Node 5: Neighbors: 4 6 
+After Nbor Finding: Node 37: Neighbors: 38 36 
+After Nbor Finding: Node 21: Neighbors: 22 20 
+After Nbor Finding: Node 53: Neighbors: 54 52 
+After Nbor Finding: Node 6: Neighbors: 5 7 
+After Nbor Finding: Node 38: Neighbors: 39 37 
+After Nbor Finding: Node 22: Neighbors: 23 21 
+After Nbor Finding: Node 54: Neighbors: 55 53 
+After Nbor Finding: Node 7: Neighbors: 6 8 
+After Nbor Finding: Node 39: Neighbors: 40 38 
+After Nbor Finding: Node 23: Neighbors: 24 22 
+After Nbor Finding: Node 55: Neighbors: 56 54 
+After Nbor Finding: Node 8: Neighbors: 7 9 
+After Nbor Finding: Node 40: Neighbors: 41 39 
+After Nbor Finding: Node 24: Neighbors: 25 23 
+After Nbor Finding: Node 56: Neighbors: 57 55 
+After Nbor Finding: Node 9: Neighbors: 8 10 
+After Nbor Finding: Node 41: Neighbors: 42 40 
+After Nbor Finding: Node 25: Neighbors: 26 24 
+After Nbor Finding: Node 57: Neighbors: 58 56 
+After Nbor Finding: Node 10: Neighbors: 9 11 
+After Nbor Finding: Node 42: Neighbors: 43 41 
+After Nbor Finding: Node 26: Neighbors: 27 25 
+After Nbor Finding: Node 58: Neighbors: 59 57 
+After Nbor Finding: Node 11: Neighbors: 10 12 
+After Nbor Finding: Node 43: Neighbors: 44 42 
+After Nbor Finding: Node 27: Neighbors: 28 26 
+After Nbor Finding: Node 59: Neighbors: 60 58 
+After Nbor Finding: Node 12: Neighbors: 11 13 
+After Nbor Finding: Node 44: Neighbors: 45 43 
+After Nbor Finding: Node 28: Neighbors: 29 27 
+After Nbor Finding: Node 60: Neighbors: 61 59 
+After Nbor Finding: Node 13: Neighbors: 12 14 
+After Nbor Finding: Node 45: Neighbors: 46 44 
+After Nbor Finding: Node 29: Neighbors: 30 28 
+After Nbor Finding: Node 61: Neighbors: 62 60 
+After Nbor Finding: Node 14: Neighbors: 13 
+After Nbor Finding: Node 46: Neighbors: 47 45 
+After Nbor Finding: Node 30: Neighbors: 31 29 
+After Nbor Finding: Node 62: Neighbors: 63 61 
+After Nbor Finding: Node 15: Neighbors: 16 
+After Nbor Finding: Node 47: Neighbors: 48 46 
+After Nbor Finding: Node 31: Neighbors: 32 30 
+After Nbor Finding: Node 63: Neighbors: 0 62 
+--------NEIGHBOR SELECTION COMPLETE (Using Comm? true)--------
+Node 32 has neighbors: 33, 31
+Node 16 has neighbors: 17, 15
+Node 48 has neighbors: 49, 47
+Node 1 has neighbors: 0, 2
+Node 33 has neighbors: 34, 32
+Node 17 has neighbors: 18, 16
+Node 49 has neighbors: 50, 48
+Node 2 has neighbors: 1, 3
+Node 34 has neighbors: 35, 33
+Node 18 has neighbors: 19, 17
+Node 50 has neighbors: 51, 49
+Node 3 has neighbors: 2, 4
+Node 35 has neighbors: 36, 34
+Node 19 has neighbors: 20, 18
+Node 51 has neighbors: 52, 50
+Node 4 has neighbors: 3, 5
+Node 36 has neighbors: 37, 35
+Node 20 has neighbors: 21, 19
+Node 52 has neighbors: 53, 51
+Node 5 has neighbors: 4, 6
+Node 37 has neighbors: 38, 36
+Node 21 has neighbors: 22, 20
+Node 53 has neighbors: 54, 52
+Node 6 has neighbors: 5, 7
+Node 38 has neighbors: 39, 37
+Node 22 has neighbors: 23, 21
+Node 54 has neighbors: 55, 53
+Node 7 has neighbors: 6, 8
+Node 39 has neighbors: 40, 38
+Node 23 has neighbors: 24, 22
+Node 55 has neighbors: 56, 54
+Node 8 has neighbors: 7, 9
+Node 40 has neighbors: 41, 39
+Node 24 has neighbors: 25, 23
+Node 56 has neighbors: 57, 55
+Node 9 has neighbors: 8, 10
+Node 41 has neighbors: 42, 40
+Node 25 has neighbors: 26, 24
+Node 57 has neighbors: 58, 56
+Node 10 has neighbors: 9, 11
+Node 42 has neighbors: 43, 41
+Node 26 has neighbors: 27, 25
+Node 58 has neighbors: 59, 57
+Node 11 has neighbors: 10, 12
+Node 43 has neighbors: 44, 42
+Node 27 has neighbors: 28, 26
+Node 59 has neighbors: 60, 58
+Node 12 has neighbors: 11, 13
+Node 44 has neighbors: 45, 43
+Node 28 has neighbors: 29, 27
+Node 60 has neighbors: 61, 59
+Node 13 has neighbors: 12, 14
+Node 45 has neighbors: 46, 44
+Node 29 has neighbors: 30, 28
+Node 61 has neighbors: 62, 60
+Node 14 has neighbors: 13
+Node 46 has neighbors: 47, 45
+Node 30 has neighbors: 31, 29
+Node 62 has neighbors: 63, 61
+Node 15 has neighbors: 16
+Node 47 has neighbors: 48, 46
+Node 31 has neighbors: 32, 30
+Node 63 has neighbors: 0, 62
+Node 0 has neighbors: 63, 1
+PSEUDO: Node 48 (load 8.322626) with pseudo_load after LB 8.251024
+PSEUDO: Node 32 (load 8.312267) with pseudo_load after LB 8.252564
+PSEUDO: Node 16 (load 8.435601) with pseudo_load after LB 8.338763
+PSEUDO: Node 49 (load 8.203345) with pseudo_load after LB 8.256003
+PSEUDO: Node 33 (load 8.262954) with pseudo_load after LB 8.244672
+PSEUDO: Node 17 (load 8.338365) with pseudo_load after LB 8.334019
+PSEUDO: Node 50 (load 8.231045) with pseudo_load after LB 8.262057
+PSEUDO: Node 34 (load 8.223689) with pseudo_load after LB 8.242496
+PSEUDO: Node 18 (load 8.358713) with pseudo_load after LB 8.333936
+PSEUDO: Node 51 (load 8.226216) with pseudo_load after LB 8.267301
+PSEUDO: Node 0 (load 8.353795) with pseudo_load after LB 8.358307
+--------STARTING ACROSS NODE LB--------
+PSEUDO: Node 35 (load 8.187198) with pseudo_load after LB 8.235856
+PSEUDO: Node 19 (load 8.308035) with pseudo_load after LB 8.325332
+PSEUDO: Node 52 (load 8.250429) with pseudo_load after LB 8.273894
+PSEUDO: Node 1 (load 8.285243) with pseudo_load after LB 8.367874
+PSEUDO: Node 36 (load 8.212221) with pseudo_load after LB 8.234280
+PSEUDO: Node 20 (load 8.348343) with pseudo_load after LB 8.325131
+PSEUDO: Node 53 (load 8.317529) with pseudo_load after LB 8.279270
+PSEUDO: Node 2 (load 8.270196) with pseudo_load after LB 8.372832
+PSEUDO: Node 37 (load 8.191184) with pseudo_load after LB 8.229392
+PSEUDO: Node 21 (load 8.296151) with pseudo_load after LB 8.314115
+PSEUDO: Node 54 (load 8.365705) with pseudo_load after LB 8.286363
+PSEUDO: Node 3 (load 8.416622) with pseudo_load after LB 8.382063
+PSEUDO: Node 38 (load 8.204862) with pseudo_load after LB 8.228750
+PSEUDO: Node 22 (load 8.322446) with pseudo_load after LB 8.313702
+PSEUDO: Node 55 (load 8.271074) with pseudo_load after LB 8.291970
+PSEUDO: Node 4 (load 8.469402) with pseudo_load after LB 8.385737
+PSEUDO: Node 39 (load 8.190036) with pseudo_load after LB 8.226140
+PSEUDO: Node 23 (load 8.275425) with pseudo_load after LB 8.301793
+PSEUDO: Node 56 (load 8.284543) with pseudo_load after LB 8.299484
+PSEUDO: Node 5 (load 8.468095) with pseudo_load after LB 8.393709
+PSEUDO: Node 40 (load 8.204897) with pseudo_load after LB 8.226567
+PSEUDO: Node 24 (load 8.302218) with pseudo_load after LB 8.301045
+PSEUDO: Node 57 (load 8.273959) with pseudo_load after LB 8.305606
+PSEUDO: Node 6 (load 8.453744) with pseudo_load after LB 8.396184
+PSEUDO: Node 41 (load 8.200595) with pseudo_load after LB 8.226356
+PSEUDO: Node 25 (load 8.237113) with pseudo_load after LB 8.289402
+PSEUDO: Node 58 (load 8.285705) with pseudo_load after LB 8.313339
+PSEUDO: Node 7 (load 8.420373) with pseudo_load after LB 8.402221
+PSEUDO: Node 42 (load 8.203048) with pseudo_load after LB 8.228192
+PSEUDO: Node 26 (load 8.242882) with pseudo_load after LB 8.288199
+PSEUDO: Node 59 (load 8.289478) with pseudo_load after LB 8.320323
+PSEUDO: Node 8 (load 8.408564) with pseudo_load after LB 8.403711
+PSEUDO: Node 43 (load 8.198169) with pseudo_load after LB 8.229975
+PSEUDO: Node 27 (load 8.218443) with pseudo_load after LB 8.277422
+PSEUDO: Node 60 (load 8.298655) with pseudo_load after LB 8.327938
+PSEUDO: Node 9 (load 8.413868) with pseudo_load after LB 8.407629
+PSEUDO: Node 44 (load 8.215735) with pseudo_load after LB 8.233365
+PSEUDO: Node 28 (load 8.335795) with pseudo_load after LB 8.275708
+PSEUDO: Node 61 (load 8.324897) with pseudo_load after LB 8.336008
+PSEUDO: Node 10 (load 8.454981) with pseudo_load after LB 8.408409
+PSEUDO: Node 45 (load 8.196226) with pseudo_load after LB 8.236662
+PSEUDO: Node 29 (load 8.304660) with pseudo_load after LB 8.265925
+PSEUDO: Node 62 (load 8.413047) with pseudo_load after LB 8.343087
+PSEUDO: Node 11 (load 8.413085) with pseudo_load after LB 8.410518
+PSEUDO: Node 46 (load 8.229533) with pseudo_load after LB 8.241235
+PSEUDO: Node 30 (load 8.284515) with pseudo_load after LB 8.263772
+PSEUDO: Node 63 (load 8.406646) with pseudo_load after LB 8.352154
+PSEUDO: Node 12 (load 8.469468) with pseudo_load after LB 8.410855
+PSEUDO: Node 47 (load 8.321459) with pseudo_load after LB 8.245604
+PSEUDO: Node 31 (load 8.242740) with pseudo_load after LB 8.254918
+PSEUDO: Node 13 (load 8.431330) with pseudo_load after LB 8.411704
+PSEUDO: Node 14 (load 8.294630) with pseudo_load after LB 8.411792
+PSEUDO: Node 15 (load 8.399631) with pseudo_load after LB 8.338785
+PE-14 with 0 migrates
+PE-39 with 0 migrates
+PE-27 with 0 migrates
+PE-0 with 49 migrates
+PE-40 with 0 migrates
+PE-16 with 77 migrates
+PE-1 with 49 migrates
+PE-32 with 83 migrates
+PE-17 with 82 migrates
+PE-48 with 48 migrates
+PE-2 with 84 migrates
+PE-33 with 95 migrates
+PE-18 with 93 migrates
+PE-49 with 14 migrates
+PE-3 with 112 migrates
+PE-34 with 84 migrates
+PE-19 with 86 migrates
+PE-50 with 40 migrates
+PE-4 with 104 migrates
+PE-35 with 60 migrates
+PE-20 with 96 migrates
+PE-51 with 56 migrates
+PE-5 with 76 migrates
+PE-36 with 48 migrates
+PE-21 with 88 migrates
+PE-52 with 74 migrates
+PE-6 with 42 migrates
+PE-37 with 29 migrates
+PE-24 with 80 migrates
+PE-53 with 88 migrates
+PE-7 with 19 migrates
+PE-38 with 17 migrates
+PE-25 with 54 migrates
+PE-54 with 67 migrates
+PE-8 with 10 migrates
+PE-41 with 11 migrates
+PE-26 with 30 migrates
+PE-55 with 28 migrates
+PE-9 with 7 migrates
+PE-42 with 24 migrates
+PE-28 with 31 migrates
+PE-56 with 39 migrates
+PE-10 with 20 migrates
+PE-43 with 37 migrates
+PE-29 with 51 migrates
+PE-57 with 46 migrates
+PE-11 with 16 migrates
+PE-44 with 53 migrates
+PE-30 with 61 migrates
+PE-58 with 62 migrates
+PE-12 with 45 migrates
+PE-45 with 62 migrates
+PE-31 with 55 migrates
+PE-59 with 76 migrates
+PE-13 with 37 migrates
+PE-46 with 82 migrates
+PE-22 with 91 migrates
+PE-60 with 90 migrates
+PE-15 with 27 migrates
+PE-47 with 88 migrates
+PE-23 with 80 migrates
+PE-61 with 108 migrates
+PE-62 with 109 migrates
+PE-63 with 77 migrates
+DiffusionLB> Strategy took 2.610946s memory usage: 487.611115 MB.
+DiffusionLB> step 8 finished at 98.917739 duration 2.613396 memory usage: 483.223602
+LBTime = 2.617996
+Iter time = 2.433773
+Iter time = 2.247663
+Iter time = 2.236391
+Iter time = 2.267539
+[Partition 0][Node 0] End of program

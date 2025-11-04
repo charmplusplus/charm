@@ -427,7 +427,7 @@ void DiffusionLB::initializeCentroid()
 
         if (objData.position.size() != position_dim)
         {
-            if (_lb_args.debug()) CkPrintf("Object %d has position of size %d, but expected %d\n", objIdx,
+            if (_lb_args.debug() > 0) CkPrintf("Object %d has position of size %d, but expected %d\n", objIdx,
                      objData.position.size(), position_dim);
             continue;
         }
