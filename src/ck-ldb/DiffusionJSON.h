@@ -6,8 +6,33 @@
 
 using json = nlohmann::json;
 
+int DiffusionLB::writeStatsMsgs(BaseLB::LDStats* statsData) {
+#if CMK_LBDB_ON
+  const char* filename = "lbdump.dat";
+  FILE *f = fopen(filename, "w");
+  int stats_msg_count ;
+  if (f==NULL) {
+    CkAbort("Fatal Error> writeStatsMsgs failed to open the output file %s!\n", filename);
+  }
+
+  const PUP::machineInfo &machInfo = PUP::machineInfo::current();
+  PUP::toDisk p(f);
+  p((char *)&machInfo, sizeof(machInfo));	// machine info
+
+  p|_lb_args.lbversion();		// write version number
+  p|stats_msg_count;
+
+  statsData->n_nodes = numNodes;
+  statsData->pup(p);
+
+  fclose(f);
+
+  CmiPrintf("WriteStatsMsgs to %s succeed (with %d nodes)!\n", filename, statsData->n_nodes);
+#endif
+}
+
 // write lbstats to a json file
-int DiffusionLB::LBwriteStatsMsgs(BaseLB::LDStats* statsData)
+int DiffusionLB::writeStatsMsgsJSON(BaseLB::LDStats* statsData)
 {
   json jsonData;
 
@@ -25,17 +50,17 @@ int DiffusionLB::LBwriteStatsMsgs(BaseLB::LDStats* statsData)
 
     if (from >= numPes || from < 0)
     {
-      CkAbort("<LBwriteStatsMsgs> from_proc is out of bounds (%d not in [0,%d))", from, numPes);
+      CkAbort("<writeStatsMsgs> from_proc is out of bounds (%d not in [0,%d))", from, numPes);
     }
 
     if (to >= numPes || to < -1)
     {
-      CkAbort("<LBwriteStatsMsgs> to_proc is out of bounds (%d not in [0,%d))", to, numPes);
+      CkAbort("<writeStatsMsgs> to_proc is out of bounds (%d not in [0,%d))", to, numPes);
     }
 
     if (to != -1 && (statsData->objData[obj].migratable == false))
     {
-      CkAbort("<LBwriteStatsMsgs> object should not be migrating");
+      CkAbort("<writeStatsMsgs> object should not be migrating");
     }
 
     LDObjData odata = statsData->objData[obj];

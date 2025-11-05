@@ -60,6 +60,8 @@ DiffusionLB::DiffusionLB(const CkLBOptions& opt) : CBase_DiffusionLB(opt)
   statsReceived = 0;
   rank0_barrier_counter = 0;
 
+  num_migrations = 0;
+
 #if CMK_LBDB_ON
   lbname = "DiffusionLB";
   if (_lb_args.statsOn())
@@ -128,6 +130,7 @@ void DiffusionLB::Strategy(const DistBaseLB::LDStats* const stats)
   objectLoads.clear();
 
   thisProxy[rank0PE].ReceiveStats(*marshmsg);
+
   if (CkMyPe() != rank0PE)
   {
     CkCallback cb(CkReductionTarget(DiffusionLB, statsAssembled), thisProxy);
@@ -147,6 +150,16 @@ void DiffusionLB::ReceiveStats(CkMarshalledCLBStatsMessage&& data)
   // store the message
   int fromRank = m->from_pe - rank0PE;
   statsReceived++;
+
+  // Clear nodeStats at the start of each new round to prevent accumulation
+  if (statsReceived == 1) {
+    nodeStats->objData.clear();
+    nodeStats->from_proc.clear();
+    nodeStats->to_proc.clear();
+    nodeStats->commData.clear();
+    nodeStats->n_migrateobjs = 0;
+    nodeStats->deleteCommHash();
+  }
 
   AddToList(m, fromRank);
 

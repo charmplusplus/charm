@@ -108,6 +108,7 @@ void DiffusionLB::AcrossNodeLB()
       }
 
       my_loadAfterTransfer -= currLoad;
+      num_migrations++;
 
       metric->updateState(v_id, nborId);  // update state to keep track of migrations
 
@@ -186,7 +187,13 @@ void DiffusionLB::ProcessFinalStats() {
                                     nodeStats->n_migrateobjs, positions, load,
                                     nodeStats->commData);
 
-                                  }
+    // Clear nodeStats after sending to avoid accumulation in next round
+    nodeStats->objData.clear();
+    nodeStats->from_proc.clear();
+    nodeStats->to_proc.clear();
+    nodeStats->commData.clear();
+    nodeStats->n_migrateobjs = 0;
+    }
 
   if (thisIndex == 0)
   {
@@ -230,6 +237,15 @@ void DiffusionLB::ReceiveFinalStats(std::vector<bool> isMigratable,
   // store the message
   statsReceived++;
 
+  // Clear fullStats at the start of each new round
+  if (statsReceived == 1) {
+    fullStats->objData.clear();
+    fullStats->from_proc.clear();
+    fullStats->to_proc.clear();
+    fullStats->commData.clear();
+    fullStats->n_migrateobjs = 0;
+  }
+
   int oldSize = fullStats->objData.size();
 
   fullStats->objData.resize(fullStats->objData.size() + isMigratable.size());
@@ -258,7 +274,8 @@ void DiffusionLB::ReceiveFinalStats(std::vector<bool> isMigratable,
   if (statsReceived == numNodes)
   {
     statsReceived = 0;
-    LBwriteStatsMsgs(fullStats);
+    printf("Writing final stats with number of objects: %d\n", fullStats->objData.size());
+    writeStatsMsgsJSON(fullStats);
   }
 }
 

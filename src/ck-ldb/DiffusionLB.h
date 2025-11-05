@@ -102,6 +102,8 @@ private:
   int numNodes;
   int myNodeId;
 
+  double num_migrations;
+
   // centroid setup --------------------------------
   std::vector<std::vector<LBRealType>> allNodeCentroids;
   std::vector<int> allNodeObjCount;
@@ -202,8 +204,8 @@ private:
    void initializeCentroid();
    void finishCentroidList();
 
-   int LBwriteStatsMsgs(BaseLB::LDStats* statsData);
-
+   int writeStatsMsgs(BaseLB::LDStats* statsData);
+   int writeStatsMsgsJSON(BaseLB::LDStats* statsData);
 };
 
 #endif /* _DistributedLB_H_ */

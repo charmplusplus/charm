@@ -66,7 +66,8 @@ inline static int ObjKey(const CmiUInt8 &oid, const int hashSize) {
 
 BaseLB::LDStats::LDStats(int npes, int complete)
 	: n_migrateobjs(0),
-          complete_flag(complete)
+          complete_flag(complete),
+          hashSize(0)
 {
   procs.resize(npes);
 }
@@ -143,10 +144,11 @@ static unsigned int primeLargerThan(unsigned int x)
 }
 
 void BaseLB::LDStats::makeCommHash() {
-  // hash table is already build
+  // hash table is already built
   if (!objHash.empty()) return;
-   
+  
   hashSize = primeLargerThan(objData.size() * 2);
+
   objHash.assign(hashSize, -1);
   int i = 0;
   for(const auto& obj : objData) {
@@ -161,6 +163,7 @@ void BaseLB::LDStats::makeCommHash() {
 
 void BaseLB::LDStats::deleteCommHash() {
   objHash.clear();
+  hashSize = 0;
   for(auto& comm : commData) {
       comm.clearHash();
   }
