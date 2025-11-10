@@ -725,292 +725,292 @@ public:
  * Convert array indices into 1D fashion according to their Hilbert filling curve
  */
 
-// typedef struct
-// {
-//   int intIndex;
-//   std::vector<int> coords;
-// } hilbert_pair;
+typedef struct
+{
+  int intIndex;
+  std::vector<int> coords;
+} hilbert_pair;
 
-// bool operator==(hilbert_pair p1, hilbert_pair p2) { return p1.intIndex == p2.intIndex; }
+bool operator==(hilbert_pair p1, hilbert_pair p2) { return p1.intIndex == p2.intIndex; }
 
-// bool myCompare(hilbert_pair p1, hilbert_pair p2) { return p1.intIndex < p2.intIndex; }
+bool myCompare(hilbert_pair p1, hilbert_pair p2) { return p1.intIndex < p2.intIndex; }
 
-// class HilbertArrayMap : public DefaultArrayMap
-// {
-//   std::vector<int> allpairs;
-//   std::vector<int> procList;
+class HilbertArrayMap : public DefaultArrayMap
+{
+  std::vector<int> allpairs;
+  std::vector<int> procList;
 
-// public:
-//   HilbertArrayMap(void)
-//   {
-//     procList.resize(CkNumPes());
-//     getHilbertList(procList.data());
-//     DEBC((AA "Creating HilbertArrayMap\n" AB));
-//   }
+public:
+  HilbertArrayMap(void)
+  {
+    procList.resize(CkNumPes());
+    getHilbertList(procList.data());
+    DEBC((AA "Creating HilbertArrayMap\n" AB));
+  }
 
-//   HilbertArrayMap(CkMigrateMessage* m) : DefaultArrayMap(m) {}
+  HilbertArrayMap(CkMigrateMessage* m) : DefaultArrayMap(m) {}
 
-//   ~HilbertArrayMap() {}
+  ~HilbertArrayMap() {}
 
-//   int registerArray(const CkArrayIndex& i, CkArrayID aid)
-//   {
-//     int idx;
-//     idx = DefaultArrayMap::registerArray(i, aid);
+  int registerArray(const CkArrayIndex& i, CkArrayID aid)
+  {
+    int idx;
+    idx = DefaultArrayMap::registerArray(i, aid);
 
-//     if (i.dimension == 1)
-//     {
-//       // CkPrintf("1D %d\n", amaps[idx]->_nelems.data()[0]);
-//     }
-//     else if (i.dimension == 2)
-//     {
-//       // CkPrintf("2D %d:%d\n", amaps[idx]->_nelems.data()[0],
-//       // amaps[idx]->_nelems.data()[1]);
-//       const int dims = 2;
-//       int nDim0 = amaps[idx]->_nelems.data()[0];
-//       int nDim1 = amaps[idx]->_nelems.data()[1];
-//       int index;
-//       int counter = 0;
-//       std::vector<int> coords;
-//       allpairs.resize((size_t)nDim0 * nDim1);
-//       coords.resize(dims);
-//       for (int i = 0; i < nDim0; i++)
-//         for (int j = 0; j < nDim1; j++)
-//         {
-//           coords[0] = i;
-//           coords[1] = j;
-//           index = Hilbert_to_int(coords, dims);
-//           // CkPrintf("(%d:%d)----------> %d \n", i, j, index);
-//           allpairs[counter] = index;
-//           counter++;
-//         }
-//     }
-//     else if (i.dimension == 3)
-//     {
-//       // CkPrintf("3D %d:%d:%d\n", amaps[idx]->_nelems.data()[0],
-//       // amaps[idx]->_nelems.data()[1],
-//       //        amaps[idx]->_nelems.data()[2]);
-//       const int dims = 3;
-//       int nDim0 = amaps[idx]->_nelems.data()[0];
-//       int nDim1 = amaps[idx]->_nelems.data()[1];
-//       int nDim2 = amaps[idx]->_nelems.data()[2];
-//       int index;
-//       int counter = 0;
-//       std::vector<int> coords;
-//       allpairs.resize((size_t)nDim0 * nDim1 * nDim2);
-//       coords.resize(dims);
-//       for (int i = 0; i < nDim0; i++)
-//         for (int j = 0; j < nDim1; j++)
-//           for (int k = 0; k < nDim2; k++)
-//           {
-//             coords[0] = i;
-//             coords[1] = j;
-//             coords[2] = k;
-//             index = Hilbert_to_int(coords, dims);
-//             allpairs[counter] = index;
-//             counter++;
-//           }
-//     }
-//     else if (i.dimension == 4)
-//     {
-//       // CkPrintf("4D %hd:%hd:%hd:%hd\n", ((short int*)amaps[idx]->_nelems.data())[0],
-//       //        ((short int*)amaps[idx]->_nelems.data())[1], ((short
-//       //        int*)amaps[idx]->_nelems.data())[2],
-//       //        ((short int*)amaps[idx]->_nelems.data())[3]);
-//       const int dims = 4;
-//       int nDim[dims];
-//       for (int k = 0; k < dims; k++)
-//       {
-//         nDim[k] = (int)((short int*)amaps[idx]->_nelems.data())[k];
-//       }
-//       int index;
-//       int counter = 0;
-//       std::vector<int> coords;
-//       allpairs.resize((size_t)nDim[0] * nDim[1] * nDim[2] * nDim[3]);
-//       coords.resize(dims);
-//       for (int i = 0; i < nDim[0]; i++)
-//         for (int j = 0; j < nDim[1]; j++)
-//           for (int k = 0; k < nDim[2]; k++)
-//             for (int x = 0; x < nDim[3]; x++)
-//             {
-//               coords[0] = i;
-//               coords[1] = j;
-//               coords[2] = k;
-//               coords[3] = x;
-//               index = Hilbert_to_int(coords, dims);
-//               allpairs[counter] = index;
-//               counter++;
-//             }
-//     }
-//     else if (i.dimension == 5)
-//     {
-//       // CkPrintf("5D %hd:%hd:%hd:%hd:%hd\n", ((short int*)amaps[idx]->_nelems.data())[0],
-//       //        ((short int*)amaps[idx]->_nelems.data())[1], ((short
-//       //        int*)amaps[idx]->_nelems.data())[2],
-//       //        ((short int*)amaps[idx]->_nelems.data())[3], ((short
-//       //        int*)amaps[idx]->_nelems.data())[4]);
-//       const int dims = 5;
-//       int nDim[dims];
-//       for (int k = 0; k < dims; k++)
-//       {
-//         nDim[k] = (int)((short int*)amaps[idx]->_nelems.data())[k];
-//       }
-//       int index;
-//       int counter = 0;
-//       std::vector<int> coords;
-//       allpairs.resize((size_t)nDim[0] * nDim[1] * nDim[2] * nDim[3] * nDim[4]);
-//       coords.resize(dims);
-//       for (int i = 0; i < nDim[0]; i++)
-//         for (int j = 0; j < nDim[1]; j++)
-//           for (int k = 0; k < nDim[2]; k++)
-//             for (int x = 0; x < nDim[3]; x++)
-//               for (int y = 0; y < nDim[4]; y++)
-//               {
-//                 coords[0] = i;
-//                 coords[1] = j;
-//                 coords[2] = k;
-//                 coords[3] = x;
-//                 coords[4] = y;
-//                 index = Hilbert_to_int(coords, dims);
-//                 allpairs[counter] = index;
-//                 counter++;
-//               }
-//     }
-//     else if (i.dimension == 6)
-//     {
-//       // CkPrintf("6D %hd:%hd:%hd:%hd:%hd:%hd\n", ((short
-//       // int*)amaps[idx]->_nelems.data())[0],
-//       //        ((short int*)amaps[idx]->_nelems.data())[1], ((short
-//       //        int*)amaps[idx]->_nelems.data())[2],
-//       //        ((short int*)amaps[idx]->_nelems.data())[3], ((short
-//       //        int*)amaps[idx]->_nelems.data())[4],
-//       //        ((short int*)amaps[idx]->_nelems.data())[5]);
-//       const int dims = 6;
-//       int nDim[dims];
-//       for (int k = 0; k < dims; k++)
-//       {
-//         nDim[k] = (int)((short int*)amaps[idx]->_nelems.data())[k];
-//       }
-//       int index;
-//       int counter = 0;
-//       std::vector<int> coords;
-//       allpairs.resize((size_t)nDim[0] * nDim[1] * nDim[2] * nDim[3] * nDim[4] * nDim[5]);
-//       coords.resize(dims);
-//       for (int i = 0; i < nDim[0]; i++)
-//         for (int j = 0; j < nDim[1]; j++)
-//           for (int k = 0; k < nDim[2]; k++)
-//             for (int x = 0; x < nDim[3]; x++)
-//               for (int y = 0; y < nDim[4]; y++)
-//                 for (int z = 0; z < nDim[5]; z++)
-//                 {
-//                   coords[0] = i;
-//                   coords[1] = j;
-//                   coords[2] = k;
-//                   coords[3] = x;
-//                   coords[4] = y;
-//                   coords[5] = y;
-//                   index = Hilbert_to_int(coords, dims);
-//                   allpairs[counter] = index;
-//                   counter++;
-//                 }
-//     }
-//     return idx;
-//   }
+    if (i.dimension == 1)
+    {
+      // CkPrintf("1D %d\n", amaps[idx]->_nelems.data()[0]);
+    }
+    else if (i.dimension == 2)
+    {
+      // CkPrintf("2D %d:%d\n", amaps[idx]->_nelems.data()[0],
+      // amaps[idx]->_nelems.data()[1]);
+      const int dims = 2;
+      int nDim0 = amaps[idx]->_nelems.data()[0];
+      int nDim1 = amaps[idx]->_nelems.data()[1];
+      int index;
+      int counter = 0;
+      std::vector<int> coords;
+      allpairs.resize((size_t)nDim0 * nDim1);
+      coords.resize(dims);
+      for (int i = 0; i < nDim0; i++)
+        for (int j = 0; j < nDim1; j++)
+        {
+          coords[0] = i;
+          coords[1] = j;
+          index = Hilbert_to_int(coords, dims);
+          // CkPrintf("(%d:%d)----------> %d \n", i, j, index);
+          allpairs[counter] = index;
+          counter++;
+        }
+    }
+    else if (i.dimension == 3)
+    {
+      // CkPrintf("3D %d:%d:%d\n", amaps[idx]->_nelems.data()[0],
+      // amaps[idx]->_nelems.data()[1],
+      //        amaps[idx]->_nelems.data()[2]);
+      const int dims = 3;
+      int nDim0 = amaps[idx]->_nelems.data()[0];
+      int nDim1 = amaps[idx]->_nelems.data()[1];
+      int nDim2 = amaps[idx]->_nelems.data()[2];
+      int index;
+      int counter = 0;
+      std::vector<int> coords;
+      allpairs.resize((size_t)nDim0 * nDim1 * nDim2);
+      coords.resize(dims);
+      for (int i = 0; i < nDim0; i++)
+        for (int j = 0; j < nDim1; j++)
+          for (int k = 0; k < nDim2; k++)
+          {
+            coords[0] = i;
+            coords[1] = j;
+            coords[2] = k;
+            index = Hilbert_to_int(coords, dims);
+            allpairs[counter] = index;
+            counter++;
+          }
+    }
+    else if (i.dimension == 4)
+    {
+      // CkPrintf("4D %hd:%hd:%hd:%hd\n", ((short int*)amaps[idx]->_nelems.data())[0],
+      //        ((short int*)amaps[idx]->_nelems.data())[1], ((short
+      //        int*)amaps[idx]->_nelems.data())[2],
+      //        ((short int*)amaps[idx]->_nelems.data())[3]);
+      const int dims = 4;
+      int nDim[dims];
+      for (int k = 0; k < dims; k++)
+      {
+        nDim[k] = (int)((short int*)amaps[idx]->_nelems.data())[k];
+      }
+      int index;
+      int counter = 0;
+      std::vector<int> coords;
+      allpairs.resize((size_t)nDim[0] * nDim[1] * nDim[2] * nDim[3]);
+      coords.resize(dims);
+      for (int i = 0; i < nDim[0]; i++)
+        for (int j = 0; j < nDim[1]; j++)
+          for (int k = 0; k < nDim[2]; k++)
+            for (int x = 0; x < nDim[3]; x++)
+            {
+              coords[0] = i;
+              coords[1] = j;
+              coords[2] = k;
+              coords[3] = x;
+              index = Hilbert_to_int(coords, dims);
+              allpairs[counter] = index;
+              counter++;
+            }
+    }
+    else if (i.dimension == 5)
+    {
+      // CkPrintf("5D %hd:%hd:%hd:%hd:%hd\n", ((short int*)amaps[idx]->_nelems.data())[0],
+      //        ((short int*)amaps[idx]->_nelems.data())[1], ((short
+      //        int*)amaps[idx]->_nelems.data())[2],
+      //        ((short int*)amaps[idx]->_nelems.data())[3], ((short
+      //        int*)amaps[idx]->_nelems.data())[4]);
+      const int dims = 5;
+      int nDim[dims];
+      for (int k = 0; k < dims; k++)
+      {
+        nDim[k] = (int)((short int*)amaps[idx]->_nelems.data())[k];
+      }
+      int index;
+      int counter = 0;
+      std::vector<int> coords;
+      allpairs.resize((size_t)nDim[0] * nDim[1] * nDim[2] * nDim[3] * nDim[4]);
+      coords.resize(dims);
+      for (int i = 0; i < nDim[0]; i++)
+        for (int j = 0; j < nDim[1]; j++)
+          for (int k = 0; k < nDim[2]; k++)
+            for (int x = 0; x < nDim[3]; x++)
+              for (int y = 0; y < nDim[4]; y++)
+              {
+                coords[0] = i;
+                coords[1] = j;
+                coords[2] = k;
+                coords[3] = x;
+                coords[4] = y;
+                index = Hilbert_to_int(coords, dims);
+                allpairs[counter] = index;
+                counter++;
+              }
+    }
+    else if (i.dimension == 6)
+    {
+      // CkPrintf("6D %hd:%hd:%hd:%hd:%hd:%hd\n", ((short
+      // int*)amaps[idx]->_nelems.data())[0],
+      //        ((short int*)amaps[idx]->_nelems.data())[1], ((short
+      //        int*)amaps[idx]->_nelems.data())[2],
+      //        ((short int*)amaps[idx]->_nelems.data())[3], ((short
+      //        int*)amaps[idx]->_nelems.data())[4],
+      //        ((short int*)amaps[idx]->_nelems.data())[5]);
+      const int dims = 6;
+      int nDim[dims];
+      for (int k = 0; k < dims; k++)
+      {
+        nDim[k] = (int)((short int*)amaps[idx]->_nelems.data())[k];
+      }
+      int index;
+      int counter = 0;
+      std::vector<int> coords;
+      allpairs.resize((size_t)nDim[0] * nDim[1] * nDim[2] * nDim[3] * nDim[4] * nDim[5]);
+      coords.resize(dims);
+      for (int i = 0; i < nDim[0]; i++)
+        for (int j = 0; j < nDim[1]; j++)
+          for (int k = 0; k < nDim[2]; k++)
+            for (int x = 0; x < nDim[3]; x++)
+              for (int y = 0; y < nDim[4]; y++)
+                for (int z = 0; z < nDim[5]; z++)
+                {
+                  coords[0] = i;
+                  coords[1] = j;
+                  coords[2] = k;
+                  coords[3] = x;
+                  coords[4] = y;
+                  coords[5] = y;
+                  index = Hilbert_to_int(coords, dims);
+                  allpairs[counter] = index;
+                  counter++;
+                }
+    }
+    return idx;
+  }
 
-//   int procNum(int arrayHdl, const CkArrayIndex& i)
-//   {
-//     int flati = 0;
-//     int myInt;
-//     if (amaps[arrayHdl]->_nelems.dimension == 0)
-//     {
-//       return RRMap::procNum(arrayHdl, i);
-//     }
-//     if (i.dimension == 1)
-//     {
-//       flati = i.data()[0];
-//     }
-//     else if (i.dimension == 2)
-//     {
-//       int nDim1 = amaps[arrayHdl]->_nelems.data()[1];
-//       myInt = i.data()[0] * nDim1 + i.data()[1];
-//       flati = allpairs[myInt];
-//     }
-//     else if (i.dimension == 3)
-//     {
-//       hilbert_pair mypair;
-//       mypair.coords.resize(3);
-//       int nDim[2];
-//       for (int j = 0; j < 2; j++)
-//       {
-//         nDim[j] = amaps[arrayHdl]->_nelems.data()[j + 1];
-//       }
-//       myInt = i.data()[0] * nDim[0] * nDim[1] + i.data()[1] * nDim[1] + i.data()[2];
-//       flati = allpairs[myInt];
-//     }
-//     else if (i.dimension == 4)
-//     {
-//       hilbert_pair mypair;
-//       mypair.coords.resize(4);
-//       short int nDim[3];
-//       for (int j = 0; j < 3; j++)
-//       {
-//         nDim[j] = ((short int*)amaps[arrayHdl]->_nelems.data())[j + 1];
-//       }
-//       myInt = (int)(((short int*)i.data())[0] * nDim[0] * nDim[1] * nDim[2] +
-//                     ((short int*)i.data())[1] * nDim[1] * nDim[2] +
-//                     ((short int*)i.data())[2] * nDim[2] + ((short int*)i.data())[3]);
-//       flati = allpairs[myInt];
-//     }
-//     else if (i.dimension == 5)
-//     {
-//       hilbert_pair mypair;
-//       mypair.coords.resize(5);
-//       short int nDim[4];
-//       for (int j = 0; j < 4; j++)
-//       {
-//         nDim[j] = ((short int*)amaps[arrayHdl]->_nelems.data())[j + 1];
-//       }
-//       myInt = (int)(((short int*)i.data())[0] * nDim[0] * nDim[1] * nDim[2] * nDim[3] +
-//                     ((short int*)i.data())[1] * nDim[1] * nDim[2] * nDim[3] +
-//                     ((short int*)i.data())[2] * nDim[2] * nDim[3] +
-//                     ((short int*)i.data())[3] * nDim[3] + ((short int*)i.data())[4]);
-//       flati = allpairs[myInt];
-//     }
-//     else if (i.dimension == 6)
-//     {
-//       hilbert_pair mypair;
-//       mypair.coords.resize(6);
-//       short int nDim[5];
-//       for (int j = 0; j < 5; j++)
-//       {
-//         nDim[j] = ((short int*)amaps[arrayHdl]->_nelems.data())[j + 1];
-//       }
-//       myInt = (int)(((short int*)i.data())[0] * nDim[0] * nDim[1] * nDim[2] * nDim[3] *
-//                         nDim[4] +
-//                     ((short int*)i.data())[1] * nDim[1] * nDim[2] * nDim[3] * nDim[4] +
-//                     ((short int*)i.data())[2] * nDim[2] * nDim[3] * nDim[4] +
-//                     ((short int*)i.data())[3] * nDim[3] * nDim[4] +
-//                     ((short int*)i.data())[4] * nDim[4] + ((short int*)i.data())[5]);
-//       flati = allpairs[myInt];
-//     }
-// #if CMK_ERROR_CHECKING
-//     else
-//     {
-//       CkAbort("CkArrayIndex has more than 6 dimensions!");
-//     }
-// #endif
+  int procNum(int arrayHdl, const CkArrayIndex& i)
+  {
+    int flati = 0;
+    int myInt;
+    if (amaps[arrayHdl]->_nelems.dimension == 0)
+    {
+      return RRMap::procNum(arrayHdl, i);
+    }
+    if (i.dimension == 1)
+    {
+      flati = i.data()[0];
+    }
+    else if (i.dimension == 2)
+    {
+      int nDim1 = amaps[arrayHdl]->_nelems.data()[1];
+      myInt = i.data()[0] * nDim1 + i.data()[1];
+      flati = allpairs[myInt];
+    }
+    else if (i.dimension == 3)
+    {
+      hilbert_pair mypair;
+      mypair.coords.resize(3);
+      int nDim[2];
+      for (int j = 0; j < 2; j++)
+      {
+        nDim[j] = amaps[arrayHdl]->_nelems.data()[j + 1];
+      }
+      myInt = i.data()[0] * nDim[0] * nDim[1] + i.data()[1] * nDim[1] + i.data()[2];
+      flati = allpairs[myInt];
+    }
+    else if (i.dimension == 4)
+    {
+      hilbert_pair mypair;
+      mypair.coords.resize(4);
+      short int nDim[3];
+      for (int j = 0; j < 3; j++)
+      {
+        nDim[j] = ((short int*)amaps[arrayHdl]->_nelems.data())[j + 1];
+      }
+      myInt = (int)(((short int*)i.data())[0] * nDim[0] * nDim[1] * nDim[2] +
+                    ((short int*)i.data())[1] * nDim[1] * nDim[2] +
+                    ((short int*)i.data())[2] * nDim[2] + ((short int*)i.data())[3]);
+      flati = allpairs[myInt];
+    }
+    else if (i.dimension == 5)
+    {
+      hilbert_pair mypair;
+      mypair.coords.resize(5);
+      short int nDim[4];
+      for (int j = 0; j < 4; j++)
+      {
+        nDim[j] = ((short int*)amaps[arrayHdl]->_nelems.data())[j + 1];
+      }
+      myInt = (int)(((short int*)i.data())[0] * nDim[0] * nDim[1] * nDim[2] * nDim[3] +
+                    ((short int*)i.data())[1] * nDim[1] * nDim[2] * nDim[3] +
+                    ((short int*)i.data())[2] * nDim[2] * nDim[3] +
+                    ((short int*)i.data())[3] * nDim[3] + ((short int*)i.data())[4]);
+      flati = allpairs[myInt];
+    }
+    else if (i.dimension == 6)
+    {
+      hilbert_pair mypair;
+      mypair.coords.resize(6);
+      short int nDim[5];
+      for (int j = 0; j < 5; j++)
+      {
+        nDim[j] = ((short int*)amaps[arrayHdl]->_nelems.data())[j + 1];
+      }
+      myInt = (int)(((short int*)i.data())[0] * nDim[0] * nDim[1] * nDim[2] * nDim[3] *
+                        nDim[4] +
+                    ((short int*)i.data())[1] * nDim[1] * nDim[2] * nDim[3] * nDim[4] +
+                    ((short int*)i.data())[2] * nDim[2] * nDim[3] * nDim[4] +
+                    ((short int*)i.data())[3] * nDim[3] * nDim[4] +
+                    ((short int*)i.data())[4] * nDim[4] + ((short int*)i.data())[5]);
+      flati = allpairs[myInt];
+    }
+#if CMK_ERROR_CHECKING
+    else
+    {
+      CkAbort("CkArrayIndex has more than 6 dimensions!");
+    }
+#endif
 
-//     /** binSize used in DefaultArrayMap is the floor of numChares/numPes
-//      *  but for this FastArrayMap, we need the ceiling */
-//     int block = flati / amaps[arrayHdl]->_binSizeCeil;
-//     // for(int i=0; i<CkNumPes(); i++)
-//     //    CkPrintf("(%d:%d) ", i, procList[i]);
-//     // CkPrintf("\n");
-//     // CkPrintf("block [%d:%d]\n", block, procList[block]);
-//     return procList[block];
-//   }
+    /** binSize used in DefaultArrayMap is the floor of numChares/numPes
+     *  but for this FastArrayMap, we need the ceiling */
+    int block = flati / amaps[arrayHdl]->_binSizeCeil;
+    // for(int i=0; i<CkNumPes(); i++)
+    //    CkPrintf("(%d:%d) ", i, procList[i]);
+    // CkPrintf("\n");
+    // CkPrintf("block [%d:%d]\n", block, procList[block]);
+    return procList[block];
+  }
 
-//   void pup(PUP::er& p) { DefaultArrayMap::pup(p); }
-// };
+  void pup(PUP::er& p) { DefaultArrayMap::pup(p); }
+};
 
 /**
  * This map can be used for topology aware mapping when the mapping is provided
