@@ -27,4 +27,5 @@ FetchContent_MakeAvailable(reconverse)
 set(BUILD_SHARED_LIBS ${_save_BUILD_SHARED_LIBS} CACHE INTERNAL "")
 
 configure_file(${reconverse_SOURCE_DIR}/include/converse.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
+configure_file(${reconverse_SOURCE_DIR}/src/cldb.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 configure_file(${reconverse_SOURCE_DIR}/include/charm-config.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)

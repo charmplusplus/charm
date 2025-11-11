@@ -728,12 +728,6 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-pxshm.sh)
   configure_file(src/arch/${VDIR}/conv-mach-pxshm.h          include/ COPYONLY)
 endif()
 
-if(${CMK_USE_SHMEM})
-  if (EXISTS ${CMAKE_SOURCE_DIR}/src/conv-core/cmishmem.h)
-    configure_file(src/conv-core/cmishmem.h                  include/ COPYONLY)
-  endif()
-endif()
-
 if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-sysvshm.sh)
   configure_file(src/arch/${VDIR}/conv-mach-sysvshm.sh       include/ COPYONLY)
   configure_file(src/arch/${VDIR}/conv-mach-sysvshm.h        include/ COPYONLY)
