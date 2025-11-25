@@ -11,7 +11,7 @@ mainmodule vecadd {
   group NCCLManager {
     entry NCCLManager();
     entry void recvNCCLId(int size, char id_buf[size]);
-  }
+  };
 
   array [1D] Workers {
     entry Workers(int size);
