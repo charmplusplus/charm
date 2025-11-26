@@ -2646,7 +2646,7 @@ void CkArrayExtSend_multi(int aid, int *idx, int ndims, int epIdx, int num_bufs,
 void CkHapiAddCallback(long stream, void (*cb)(void*, void*), int fid) 
 {
   #if CMK_CUDA
-  cudaStream_t stream_ptr = (cudaStream_t)stream;
+  hapiStream_t stream_ptr = (hapiStream_t)stream;
   CkCallback callback(cb, (void *) fid);
   
   hapiAddCallback(stream_ptr, callback, NULL);

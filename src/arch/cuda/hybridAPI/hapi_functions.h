@@ -30,26 +30,26 @@ AMPI_CUSTOM_FUNC(int, hapiCreateStreams, void)
 
 // Get a CUDA stream that was created by the runtime. Current scheme is to
 // hand out streams in a round-robin fashion.
-AMPI_CUSTOM_FUNC(cudaStream_t, hapiGetStream, void)
+AMPI_CUSTOM_FUNC(hapiStream_t, hapiGetStream, void)
 
 // Add a Charm++ callback function to be invoked after the previous operation
 // in the stream completes. This call should be placed after data transfers or
 // a kernel invocation.
-AMPI_CUSTOM_FUNC(void, hapiAddCallback, cudaStream_t, void*, void*)
+AMPI_CUSTOM_FUNC(void, hapiAddCallback, hapiStream_t, void*, void*)
 
 // Thin wrappers for memory related CUDA API calls.
-AMPI_CUSTOM_FUNC(cudaError_t, hapiMalloc, void**, size_t)
-AMPI_CUSTOM_FUNC(cudaError_t, hapiFree, void*)
-AMPI_CUSTOM_FUNC(cudaError_t, hapiMallocHost, void**, size_t)
-AMPI_CUSTOM_FUNC(cudaError_t, hapiFreeHost, void*)
-AMPI_CUSTOM_FUNC(cudaError_t, hapiMemcpyAsync, void*, const void*, size_t, enum cudaMemcpyKind, cudaStream_t)
+AMPI_CUSTOM_FUNC(hapiError_t, hapiMalloc, void**, size_t)
+AMPI_CUSTOM_FUNC(hapiError_t, hapiFree, void*)
+AMPI_CUSTOM_FUNC(hapiError_t, hapiMallocHost, void**, size_t)
+AMPI_CUSTOM_FUNC(hapiError_t, hapiFreeHost, void*)
+AMPI_CUSTOM_FUNC(hapiError_t, hapiMemcpyAsync, void*, const void*, size_t, enum hapiMemcpyKind, hapiStream_t)
 
 // Explicit memory allocations using pinned memory pool.
-AMPI_CUSTOM_FUNC(cudaError_t, hapiPoolMalloc, void**, size_t)
-AMPI_CUSTOM_FUNC(cudaError_t, hapiPoolFree, void*)
+AMPI_CUSTOM_FUNC(hapiError_t, hapiPoolMalloc, void**, size_t)
+AMPI_CUSTOM_FUNC(hapiError_t, hapiPoolFree, void*)
 
 // Provides support for detecting errors with CUDA API calls.
-AMPI_CUSTOM_FUNC(void, hapiErrorDie, cudaError_t, const char*, const char*, int)
+AMPI_CUSTOM_FUNC(void, hapiErrorDie, hapiError_t, const char*, const char*, int)
 
 #ifdef HAPI_INSTRUMENT_WRS
 AMPI_CUSTOM_FUNC(void, hapiInitInstrument, int n_chares, char n_types)

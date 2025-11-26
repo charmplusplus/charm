@@ -1,0 +1,124 @@
+#ifdef CMK_CUDA
+
+#include <cuda_runtime.h>
+
+#define hapiStream_t cudaStream_t
+
+#define hapiEvent_t cudaEvent_t
+
+#define hapiSetDevice(dev) cudaSetDevice(dev)
+
+#define hapiGetDeviceCount(devCount) cudaGetDeviceCount(devCount)
+
+#define hapiDeviceCanAccessPeer(canAccess, dev1, dev2) \
+    cudaDeviceCanAccessPeer(canAccess, dev1, dev2)
+
+#define hapiDeviceEnablePeerAccess(dev, flags) \
+    cudaDeviceEnablePeerAccess(dev, flags)
+
+#define hapiEventCreateWithFlags(flags, event) cudaEventCreateWithFlags(flags, event)
+
+#define hapiEventRecord(event, stream) cudaEventRecord(event, stream)
+#define hapiEventQuery(event) cudaEventQuery(event)
+#define hapiEventDestroy(event) cudaEventDestroy(event)
+#define hapiStreamWaitEvent(stream, event, flags) \
+    cudaStreamWaitEvent(stream, event, flags)
+
+#define hapiStreamSynchronize(stream) cudaStreamSynchronize(stream)
+
+#define hapiLaunchHostFunc(stream, func, args) \
+    cudaLaunchHostFunc(stream, func, args)
+
+#define hapiStreamPerThread cudaStreamPerThread
+
+#define hapiIpcMemHandle_t cudaIpcMemHandle_t
+
+#define hapiIpcGetMemHandle(handle, ptr) cudaIpcGetMemHandle(handle, ptr)
+
+#define hapiIpcGetEventHandle(handle, event) cudaIpcGetEventHandle(handle, event)
+
+#define hapiIpcOpenMemHandle(ptr, handle, flags) \
+    cudaIpcOpenMemHandle(ptr, handle, flags)
+
+#define hapiIpcOpenEventHandle(event, handle) \
+    cudaIpcOpenEventHandle(event, handle)
+
+#define hapiDeviceProp cudaDeviceProp
+
+#define hapiGetDeviceProperties(prop, dev) cudaGetDeviceProperties(prop, dev)
+
+#define hapiMallocHost(ptr, size) cudaMallocHost(ptr, size)
+#define hapiFreeHost(ptr) cudaFreeHost(ptr)
+
+#define hapiErrorMemoryAllocation cudaErrorMemoryAllocation
+#define hapiErrorInitializationError cudaErrorInitializationError
+#define hapiSuccess cudaSuccess
+#define hapiError_t cudaError_t
+
+#define hapiMemcpyKind cudaMemcpyKind
+#define hapiMemcpyHostToHost cudaMemcpyHostToHost
+#define hapiMemcpyHostToDevice cudaMemcpyHostToDevice
+#define hapiMemcpyDeviceToHost cudaMemcpyDeviceToHost
+#define hapiMemcpyDeviceToDevice cudaMemcpyDeviceToDevice
+#define hapiMemcpy(dst, src, count, kind) cudaMemcpy(dst, src, count, kind)
+#define hapiMemcpyAsync(dst, src, count, kind, stream) \
+    cudaMemcpyAsync(dst, src, count, kind, stream)
+
+#define hapiGetErrorString(err) cudaGetErrorString(err)
+
+#define hapiEventDisableTiming cudaEventDisableTiming
+#define hapiEventInterprocess cudaEventInterprocess
+#define hapiIpcMemLazyEnablePeerAccess cudaIpcMemLazyEnablePeerAccess
+
+#endif // CMK_CUDA
+
+#ifdef CMK_HIP
+
+#define hapiStream_t hipStream_t
+
+#define hapiEvent_t hipEvent_t
+
+#define hapiSetDevice(dev) hipSetDevice(dev)
+
+#define hapiGetDeviceCount(devCount) hipGetDeviceCount(devCount)
+
+#define hapiDeviceCanAccessPeer(canAccess, dev1, dev2) \
+    hipDeviceCanAccessPeer(canAccess, dev1, dev2)
+
+#define hapiDeviceEnablePeerAccess(dev, flags) \
+    hipDeviceEnablePeerAccess(dev, flags)
+
+#define hapiEventCreateWithFlags(flags, event) hipEventCreateWithFlags(flags, event)
+
+#define hapiEventRecord(event, stream) hipEventRecord(event, stream)
+#define hapiEventQuery(event) hipEventQuery(event)
+#define hapiEventDestroy(event) hipEventDestroy(event)
+
+#define hapiLaunchHostFunc(stream, func, args) \
+    hipLaunchHostFunc(stream, func, args)
+
+#define hapiStreamPerThread hipStreamPerThread
+
+#define hapiIpcMemHandle_t hipIpcMemHandle_t
+
+#define hapiIpcGetMemHandle(handle, ptr) hipIpcGetMemHandle(handle, ptr)
+#define hapiIpcGetEventHandle(handle, event) hipIpcGetEventHandle(handle, event)
+#define hapiIpcOpenMemHandle(ptr, handle, flags) \
+    hipIpcOpenMemHandle(ptr, handle, flags)
+#define hapiIpcOpenEventHandle(event, handle) \
+    hipIpcOpenEventHandle(event, handle)
+#define hapiDeviceProp hipDeviceProp_t
+#define hapiGetDeviceProperties(prop, dev) hipGetDeviceProperties(prop, dev)
+#define hapiMallocHost(ptr, size) hipHostMalloc(ptr, size)
+#define hapiFreeHost(ptr) hipHostFree(ptr)
+#define hapiErrorMemoryAllocation hipErrorMemoryAllocation
+#define hapiErrorInitializationError hipErrorNotInitialized
+#define hapiSuccess hipSuccess
+#define hapiError_t hipError_t
+
+#define hapiMemcpyAsync(dst, src, count, kind, stream) \
+    hipMemcpyAsync(dst, src, count, kind, stream)
+
+#define hapiGetErrorString(err) hipGetErrorString(err)
+
+#endif // CMK_HIP

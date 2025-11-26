@@ -1690,16 +1690,6 @@ void _initCharm(int unused_argc, char **argv)
         }
     }
 
-#if CMK_CUDA
-  // Perform HAPI initialization for GPU support
-  hapiInit(argv);
-
-  // Initialize Charm++ layer functions
-  hapiInvokeCallback = CUDACallbackManager;
-  hapiQdCreate = QdCreate;
-  hapiQdProcess = QdProcess;
-#endif
-
 #if CMK_USE_SHMEM
 #if CMK_SMP
     CmiNodeAllBarrier();
@@ -1835,6 +1825,16 @@ int charm_main(int argc, char **argv)
 {
   int stack_top=0;
   memory_stack_top = &stack_top;
+
+#if CMK_CUDA
+  // Perform HAPI initialization for GPU support
+  hapiInit(argv);
+
+  // Initialize Charm++ layer functions
+  hapiInvokeCallback = CUDACallbackManager;
+  hapiQdCreate = QdCreate;
+  hapiQdProcess = QdProcess;
+#endif
 
   ConverseInit(argc, argv, (CmiStartFn) _initCharm, 0, 0);
 
