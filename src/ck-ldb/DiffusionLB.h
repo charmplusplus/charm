@@ -50,6 +50,8 @@ public:
   void next_phase(int val);
   void sortArr(long arr[], int n, int* nbors);
 
+  void startMSTBarrier();
+
   void pseudolb_barrier(int allZero);
 
   void MigrationDoneWrapper();  // Call when migration is complete

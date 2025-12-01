@@ -55,8 +55,16 @@ void DiffusionLB::findNBors(int do_again)
 }
 
 // ******** FUNCTIONS FOR MST BUILDING ********
+
+void DiffusionLB::startMSTBarrier() {
+    buildMSTinRounds(best_weight, best_from, best_to);
+}
 void DiffusionLB::beginMST()
 {
+    if (_lb_args.debug())
+    {
+        CkPrintf("Beginning MST building\n");
+    }
     assert(thisIndex == rank0PE);
 
     mstVisitedPes.clear();
@@ -73,11 +81,15 @@ void DiffusionLB::beginMST()
     if (thisIndex == 0)
         visited = true;
 
-    buildMSTinRounds(best_weight, best_from, best_to);
+    contribute(CkCallback(CkReductionTarget(DiffusionLB, startMSTBarrier), thisProxy));
+   
 
     //  findRemainingNbors(0);
     // thisProxy[0].startFirstRound();
 }
+
+
+
 void DiffusionLB::buildMSTinRounds(double best_weight, int best_from, int best_to)
 {
     // correctness checks for reduction input
@@ -92,6 +104,10 @@ void DiffusionLB::buildMSTinRounds(double best_weight, int best_from, int best_t
 
     int to = best_to;
     int from = best_from;
+
+    if (_lb_args.debug()) {
+        CkPrintf("Node %d: building in rounds, from %d, to %d, weight %f\n", myNodeId, from, to, best_weight);
+    }
 
     // current edge is valid
     if (to != -1)
@@ -178,6 +194,8 @@ void DiffusionLB::resetVarsMST()
 void DiffusionLB::next_MSTphase(double newweight, int newparent, int newto)
 {
     acks++;
+
+    
 
     if (newto >= 0)
         all_tos_negative = 0;
