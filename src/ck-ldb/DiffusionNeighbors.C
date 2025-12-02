@@ -475,6 +475,18 @@ void DiffusionLB::processReceiveCentroid(int node, std::vector<LBRealType> centr
     //     myNodeId, node, centroid.size(), allNodeCentroids[node].size(),
     //     myCentroid.size(), allNodeDistances.size());
     double dist = 0;
+    if (centroid.size() != position_dim)
+    {
+        CkAbort("Node %d received centroid of size %d from node %d, expected size %d\n",
+                myNodeId, centroid.size(), node, position_dim);
+    }
+
+     if (myCentroid.size() != position_dim)
+    {
+        CkAbort("Node %d has myCentroid of size %d from node %d, expected size %d\n",
+                myNodeId, myCentroid.size(), node, position_dim);
+    }
+
     for (int i = 0; i < position_dim; i++)
     {
         allNodeCentroids[node][i] = centroid[i];
