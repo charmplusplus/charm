@@ -33,6 +33,8 @@
 
 #define hapiIpcMemHandle_t cudaIpcMemHandle_t
 
+#define hapiIpcEventHandle_t cudaIpcEventHandle_t
+
 #define hapiIpcGetMemHandle(handle, ptr) cudaIpcGetMemHandle(handle, ptr)
 
 #define hapiIpcGetEventHandle(handle, event) cudaIpcGetEventHandle(handle, event)
@@ -74,25 +76,28 @@
 
 #ifdef CMK_HIP
 
+#include <hip/hip_runtime.h>
+
 #define hapiStream_t hipStream_t
 
 #define hapiEvent_t hipEvent_t
 
 #define hapiSetDevice(dev) hipSetDevice(dev)
-
 #define hapiGetDeviceCount(devCount) hipGetDeviceCount(devCount)
 
 #define hapiDeviceCanAccessPeer(canAccess, dev1, dev2) \
     hipDeviceCanAccessPeer(canAccess, dev1, dev2)
-
 #define hapiDeviceEnablePeerAccess(dev, flags) \
     hipDeviceEnablePeerAccess(dev, flags)
 
 #define hapiEventCreateWithFlags(flags, event) hipEventCreateWithFlags(flags, event)
-
 #define hapiEventRecord(event, stream) hipEventRecord(event, stream)
 #define hapiEventQuery(event) hipEventQuery(event)
 #define hapiEventDestroy(event) hipEventDestroy(event)
+#define hapiStreamWaitEvent(stream, event, flags) \
+    hipStreamWaitEvent(stream, event, flags)
+
+#define hapiStreamSynchronize(stream) hipStreamSynchronize(stream)
 
 #define hapiLaunchHostFunc(stream, func, args) \
     hipLaunchHostFunc(stream, func, args)
@@ -101,24 +106,42 @@
 
 #define hapiIpcMemHandle_t hipIpcMemHandle_t
 
+#define hapiIpcEventHandle_t hipIpcEventHandle_t
+
 #define hapiIpcGetMemHandle(handle, ptr) hipIpcGetMemHandle(handle, ptr)
+
 #define hapiIpcGetEventHandle(handle, event) hipIpcGetEventHandle(handle, event)
+
 #define hapiIpcOpenMemHandle(ptr, handle, flags) \
     hipIpcOpenMemHandle(ptr, handle, flags)
+
 #define hapiIpcOpenEventHandle(event, handle) \
     hipIpcOpenEventHandle(event, handle)
-#define hapiDeviceProp hipDeviceProp_t
+
+#define hapiDeviceProp hipDeviceProp
+
 #define hapiGetDeviceProperties(prop, dev) hipGetDeviceProperties(prop, dev)
-#define hapiMallocHost(ptr, size) hipHostMalloc(ptr, size)
-#define hapiFreeHost(ptr) hipHostFree(ptr)
+
+#define hapiMallocHost(ptr, size) hipMallocHost(ptr, size)
+#define hapiFreeHost(ptr) hipFreeHost(ptr)
+
 #define hapiErrorMemoryAllocation hipErrorMemoryAllocation
-#define hapiErrorInitializationError hipErrorNotInitialized
+#define hapiErrorInitializationError hipErrorInitializationError
 #define hapiSuccess hipSuccess
 #define hapiError_t hipError_t
 
+#define hapiMemcpyKind hipMemcpyKind
+#define hapiMemcpyHostToHost hipMemcpyHostToHost
+#define hapiMemcpyHostToDevice hipMemcpyHostToDevice
+#define hapiMemcpyDeviceToHost hipMemcpyDeviceToHost
+#define hapiMemcpyDeviceToDevice hipMemcpyDeviceToDevice
+#define hapiMemcpy(dst, src, count, kind) hipMemcpy(dst, src, count, kind)
 #define hapiMemcpyAsync(dst, src, count, kind, stream) \
     hipMemcpyAsync(dst, src, count, kind, stream)
-
 #define hapiGetErrorString(err) hipGetErrorString(err)
+
+#define hapiEventDisableTiming hipEventDisableTiming
+#define hapiEventInterprocess hipEventInterprocess
+#define hapiIpcMemLazyEnablePeerAccess hipIpcMemLazyEnablePeerAccess
 
 #endif // CMK_HIP
