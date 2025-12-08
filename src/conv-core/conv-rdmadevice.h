@@ -5,7 +5,7 @@
 #include "cmirdmautils.h"
 #include "pup.h"
 
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
 #include "hapi_portable.h"
 
 // Represents the mode of device-side zerocopy transfer

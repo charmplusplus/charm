@@ -4,7 +4,7 @@
 #include <cstdlib>
 #include <cmath>
 #include <algorithm>
-#include <cuda_runtime.h>
+#include <hapi_portable.h>
 
 namespace buddy {
   void allocator::print_status() {
@@ -60,8 +60,8 @@ namespace buddy {
     // Request GPU memory (closest power of 2)
     int total_size_log2 = std::ceil(std::log2((double)size));
     total_size = (size_t)std::pow(2, total_size_log2);
-    cudaError_t status = cudaMalloc(&base_ptr, total_size);
-    if (status != cudaSuccess) {
+    hapiError_t status = hapiMallocHost(&base_ptr, total_size);
+    if (status != hapiSuccess) {
       fprintf(stderr, "Failed to allocate GPU memory\n");
       abort();
     }
@@ -75,8 +75,8 @@ namespace buddy {
 
   allocator::~allocator() {
     // Free GPU memory
-    cudaError_t status = cudaFree(base_ptr);
-    if (status != cudaSuccess) {
+    hapiError_t status = hapiFreeHost(base_ptr);
+    if (status != hapiSuccess) {
       fprintf(stderr, "Failed to free GPU memory\n");
       abort();
     }

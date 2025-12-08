@@ -470,7 +470,7 @@ void CkSectionID::pup(PUP::er &p) {
 
 /**** Tiny random API routines */
 
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
 void CUDACallbackManager(void *fn, void *msg) {
   if (fn) {
     ((CkCallback*)fn)->send(msg);
@@ -2639,13 +2639,13 @@ void CkArrayExtSend_multi(int aid, int *idx, int ndims, int epIdx, int num_bufs,
 
 
 // HAPI support
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
 #include "hapi.h"
 #endif
 
 void CkHapiAddCallback(long stream, void (*cb)(void*, void*), int fid) 
 {
-  #if CMK_CUDA
+  #if CMK_CUDA || CMK_HIP
   hapiStream_t stream_ptr = (hapiStream_t)stream;
   CkCallback callback(cb, (void *) fid);
   

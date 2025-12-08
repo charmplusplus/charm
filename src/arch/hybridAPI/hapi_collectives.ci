@@ -1,7 +1,7 @@
-module hapi_collectives {
-    nodegroup NCCLManager {
-        entry NCCLManager();
-        entry void recvNCCLId(int size, char id_buf[size]);
-        entry void registerChareArray();
-    };
-};
+// module hapi_collectives {
+//     nodegroup NCCLManager {
+//         entry NCCLManager();
+//         entry void recvNCCLId(int size, char id_buf[size]);
+//         entry void registerChareArray();
+//     };
+// };

@@ -50,7 +50,7 @@
 #include "ck.h"
 #include "ckrdmadevice.h"
 
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
 
 #include "hapi.h"
 #include "gpumanager.h"

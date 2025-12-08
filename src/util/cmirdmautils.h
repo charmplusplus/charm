@@ -59,7 +59,7 @@ typedef struct ncpystruct{
 
 }NcpyOperationInfo;
 
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
 enum DeviceRecvType {
   DEVICE_RECV_TYPE_CHARM,
   DEVICE_RECV_TYPE_AMPI,

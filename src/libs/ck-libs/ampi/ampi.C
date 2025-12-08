@@ -1430,7 +1430,7 @@ void ampiParent::pup(PUP::er &p) noexcept {
         case AMPI_G_REQ:
           blockingReq = new GReq;
           break;
-#if CMK_CUDA
+#if CMK_CUDA 
         case AMPI_GPU_REQ:
           CkAbort("AMPI> error trying to PUP a non-migratable GPU request!");
           break;

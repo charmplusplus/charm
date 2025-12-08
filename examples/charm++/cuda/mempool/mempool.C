@@ -130,9 +130,9 @@ class Workers : public CBase_Workers {
       for (int i = 0; i < N_SIZES; i++) {
         // dynamically allocate host memory to observe performance implications
         // of mempool
-        hapiCheck(hapiMallocHost((void**)&h_A[i], sizes[i], use_mempool));
-        hapiCheck(hapiMallocHost((void**)&h_B[i], sizes[i], use_mempool));
-        hapiCheck(hapiMallocHost((void**)&h_C[i], sizes[i], use_mempool));
+        hapiCheck(hapiMalloc((void**)&h_A[i], sizes[i], use_mempool));
+        hapiCheck(hapiMalloc((void**)&h_B[i], sizes[i], use_mempool));
+        hapiCheck(hapiMalloc((void**)&h_C[i], sizes[i], use_mempool));
 
         cudaVecAdd(n_floats[i], sizes[i], h_A[i], h_B[i], h_C[i],
             d_A[i], d_B[i], d_C[i], stream);
@@ -150,9 +150,9 @@ class Workers : public CBase_Workers {
 #endif
 
     for (int i = 0; i < N_SIZES; i++) {
-      hapiCheck(hapiFreeHost(h_A[i], use_mempool));
-      hapiCheck(hapiFreeHost(h_B[i], use_mempool));
-      hapiCheck(hapiFreeHost(h_C[i], use_mempool));
+      hapiCheck(hapiFree(h_A[i], use_mempool));
+      hapiCheck(hapiFree(h_B[i], use_mempool));
+      hapiCheck(hapiFree(h_C[i], use_mempool));
     }
 
     if (++cur_iter < iterations) {

@@ -1,7 +1,7 @@
 #ifndef __DEVICEMANAGER_H_
 #define __DEVICEMANAGER_H_
 
-#include <cuda_runtime.h>
+#include <hapi_portable.h>
 #include "converse.h"
 #include "buddy_allocator.h"
 

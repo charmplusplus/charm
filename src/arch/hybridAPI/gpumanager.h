@@ -121,9 +121,6 @@ struct GPUManager {
   CmiNodeLock device_mapping_lock;
 #endif
 
-#ifdef HAPI_CUDA_CALLBACK
-#endif
-
   int device_count; // GPU devices usable by this process (could be less than the number of visible devices)
   int device_count_on_physical_node;
   int pes_per_device;
@@ -418,7 +415,7 @@ struct GPUManager {
 
       if (device_buffers_[index] == NULL) {
         // allocate device memory
-        hapiCheck(hapiMalloc((void **)&device_buffers_[index], size));
+        hapiCheck(hapiMallocHost((void **)&device_buffers_[index], size));
 
 #ifdef HAPI_DEBUG
         CmiPrintf("[HAPI] allocated buffer %d at %p, time: %.2f, size: %zu\n",
@@ -475,7 +472,7 @@ struct GPUManager {
       int index = bi.id;
 
       if (bi.need_free) {
-        hapiCheck(hapiFree(device_buffers_[index]));
+        hapiCheck(hapiFreeHost(device_buffers_[index]));
         device_buffers_[index] = NULL;
 
 #ifdef HAPI_DEBUG

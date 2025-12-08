@@ -1,3 +1,10 @@
+#pragma once
+
+#undef CMK_CUDA
+#undef CMK_HIP
+
+#include "conv-mach-opt.h"
+
 #ifdef CMK_CUDA
 
 #include <cuda_runtime.h>
@@ -25,6 +32,8 @@
     cudaStreamWaitEvent(stream, event, flags)
 
 #define hapiStreamSynchronize(stream) cudaStreamSynchronize(stream)
+#define hapiStreamCreate(stream) cudaStreamCreate(stream)
+#define hapiStreamDestroy cudaStreamDestroy
 
 #define hapiLaunchHostFunc(stream, func, args) \
     cudaLaunchHostFunc(stream, func, args)
@@ -36,6 +45,7 @@
 #define hapiIpcEventHandle_t cudaIpcEventHandle_t
 
 #define hapiIpcGetMemHandle(handle, ptr) cudaIpcGetMemHandle(handle, ptr)
+#define hapiIpcCloseMemHandle(handle) cudaIpcCloseMemHandle(handle)
 
 #define hapiIpcGetEventHandle(handle, event) cudaIpcGetEventHandle(handle, event)
 
@@ -48,6 +58,7 @@
 #define hapiDeviceProp cudaDeviceProp
 
 #define hapiGetDeviceProperties(prop, dev) cudaGetDeviceProperties(prop, dev)
+#define hapiGetDevice(dev) cudaGetDevice(dev)
 
 #define hapiMallocHost(ptr, size) cudaMallocHost(ptr, size)
 #define hapiFreeHost(ptr) cudaFreeHost(ptr)
@@ -109,6 +120,7 @@
 #define hapiIpcEventHandle_t hipIpcEventHandle_t
 
 #define hapiIpcGetMemHandle(handle, ptr) hipIpcGetMemHandle(handle, ptr)
+#define hapiIpcCloseMemHandle(handle) hipIpcCloseMemHandle(handle)
 
 #define hapiIpcGetEventHandle(handle, event) hipIpcGetEventHandle(handle, event)
 
@@ -118,17 +130,20 @@
 #define hapiIpcOpenEventHandle(event, handle) \
     hipIpcOpenEventHandle(event, handle)
 
-#define hapiDeviceProp hipDeviceProp
+#define hapiDeviceProp hipDeviceProp_t
 
 #define hapiGetDeviceProperties(prop, dev) hipGetDeviceProperties(prop, dev)
+#define hapiGetDevice(dev) hipGetDevice(dev)
+#define hapiStreamCreate(stream) hipStreamCreate(stream)
 
-#define hapiMallocHost(ptr, size) hipMallocHost(ptr, size)
+#define hapiMallocHost(ptr, size) hipHostMalloc(ptr, size)
 #define hapiFreeHost(ptr) hipFreeHost(ptr)
 
 #define hapiErrorMemoryAllocation hipErrorMemoryAllocation
 #define hapiErrorInitializationError hipErrorInitializationError
 #define hapiSuccess hipSuccess
 #define hapiError_t hipError_t
+#define hapiStreamDestroy hipStreamDestroy
 
 #define hapiMemcpyKind hipMemcpyKind
 #define hapiMemcpyHostToHost hipMemcpyHostToHost

@@ -2,7 +2,9 @@
 #include <stdlib.h>
 #include "hapi.h"
 
-__global__ void helloKernel() {}
+__global__ void helloKernel() {
+  printf("Hello, World from GPU!\n");
+}
 
 void runHello(struct hapiWorkRequest* wr, cudaStream_t kernel_stream,
               void** deviceBuffers) {
