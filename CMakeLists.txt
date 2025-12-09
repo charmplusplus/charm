@@ -683,6 +683,7 @@ if(BUILD_CUDA OR BUILD_HIP)
 
   file(GLOB_RECURSE hybridAPI-h-sources ${CMAKE_SOURCE_DIR}/src/arch/hybridAPI/*.h)
   file(GLOB_RECURSE hybridAPI-cxx-sources ${CMAKE_SOURCE_DIR}/src/arch/hybridAPI/*.cpp)
+  add_compile_definitions(HAPI_CUDA_CALLBACK)
   foreach(file ${hybridAPI-h-sources})
     configure_file(${file} include/ COPYONLY)
   endforeach()

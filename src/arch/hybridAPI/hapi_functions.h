@@ -37,10 +37,6 @@ AMPI_CUSTOM_FUNC(hapiStream_t, hapiGetStream, void)
 // a kernel invocation.
 AMPI_CUSTOM_FUNC(void, hapiAddCallback, hapiStream_t, void*, void*)
 
-// Thin wrappers for memory related CUDA API calls.
-AMPI_CUSTOM_FUNC(hapiError_t, hapiMalloc, void**, size_t)
-AMPI_CUSTOM_FUNC(hapiError_t, hapiFree, void*)
-
 // Explicit memory allocations using pinned memory pool.
 AMPI_CUSTOM_FUNC(hapiError_t, hapiPoolMalloc, void**, size_t)
 AMPI_CUSTOM_FUNC(hapiError_t, hapiPoolFree, void*)

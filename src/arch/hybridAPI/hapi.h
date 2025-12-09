@@ -237,10 +237,10 @@ static inline void hapiAddCallback(hapiStream_t stream, void* cb) {
 }
 
 // Overloaded C++ wrappers for selecting whether to pool or not using a bool.
-static inline hapiError_t hapiMalloc(void** ptr, size_t size, bool pool) {
+static inline hapiError_t hapiMallocHost_Pool(void** ptr, size_t size, bool pool) {
   return pool ? hapiPoolMalloc(ptr, size) : hapiMallocHost(ptr, size);
 }
-static inline hapiError_t hapiFree(void* ptr, bool pool) {
+static inline hapiError_t hapiFreeHost_Pool(void* ptr, bool pool) {
   return pool ? hapiPoolFree(ptr) : hapiFreeHost(ptr);
 }
 

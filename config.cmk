@@ -1,0 +1,12 @@
+
+set(CHARM_DIR "/u/ajain18/hapi_hip/shogo/charm/netlrts-linux-x86_64-cuda")
+set(BASE_DIR "/u/ajain18/hapi_hip/shogo/charm")
+set(KOKKOS_DIR "${BASE_DIR}/kokkos/install")
+set(KOKKOS_KERNELS_DIR "${BASE_DIR}/kokkos-kernels/install")
+set(CHARMC "${CHARM_DIR}/bin/charmc")
+
+set(CPU_OPTS "-c++-option -std=c++20 -O3 -march=native -DNDEBUG")
+set(GPU_OPTS "-std=c++20 -O3 -march=native -DNDEBUG")
+set(GPU_LINK_OPTS -O3 -language charm++ -L${KOKKOS_DIR}/lib64 -L${KOKKOS_KERNELS_DIR}/lib64 -lkokkoscore -lkokkoscontainers -lkokkoskernels -L${CUDA_DIR} -lcuda -lcudart -lcusparse -lcublas)
+set(LD_OPTS "")
+set(INCS "-I${BASE_DIR}")

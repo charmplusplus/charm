@@ -118,6 +118,7 @@ void hapiInit(char** argv) {
 
 #ifndef HAPI_CUDA_CALLBACK
     // Register polling function to be invoked at every scheduler loop
+    CmiPrintf("using events for callback\n");
     CcdCallOnConditionKeep(CcdSCHEDLOOP, (CcdCondFn)hapiPollEvents, NULL);
 #endif
   }

@@ -50,3 +50,9 @@ charmrun
 ampirun
 pgm
 *.swp
+
+
+# HAPI 
+
+kokkos
+kokkos-kernels

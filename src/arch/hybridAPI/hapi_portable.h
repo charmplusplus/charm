@@ -34,6 +34,8 @@
 #define hapiStreamSynchronize(stream) cudaStreamSynchronize(stream)
 #define hapiStreamCreate(stream) cudaStreamCreate(stream)
 #define hapiStreamDestroy cudaStreamDestroy
+#define hapiStreamDefault cudaStreamDefault
+#define hapiStreamCreateWithPriority cudaStreamCreateWithPriority
 
 #define hapiLaunchHostFunc(stream, func, args) \
     cudaLaunchHostFunc(stream, func, args)
@@ -60,6 +62,8 @@
 #define hapiGetDeviceProperties(prop, dev) cudaGetDeviceProperties(prop, dev)
 #define hapiGetDevice(dev) cudaGetDevice(dev)
 
+#define hapiMalloc(ptr, size) cudaMalloc(ptr, size)
+#define hapiFree(ptr) cudaFree(ptr)
 #define hapiMallocHost(ptr, size) cudaMallocHost(ptr, size)
 #define hapiFreeHost(ptr) cudaFreeHost(ptr)
 
@@ -136,6 +140,8 @@
 #define hapiGetDevice(dev) hipGetDevice(dev)
 #define hapiStreamCreate(stream) hipStreamCreate(stream)
 
+#define hapiMalloc(ptr, size) hipMalloc(ptr, size)
+#define hapiFree(ptr) hipFree(ptr)
 #define hapiMallocHost(ptr, size) hipHostMalloc(ptr, size)
 #define hapiFreeHost(ptr) hipFreeHost(ptr)
 
@@ -144,6 +150,8 @@
 #define hapiSuccess hipSuccess
 #define hapiError_t hipError_t
 #define hapiStreamDestroy hipStreamDestroy
+#define hapiStreamDefault hipStreamDefault
+#define hapiStreamCreateWithPriority hipStreamCreateWithPriority
 
 #define hapiMemcpyKind hipMemcpyKind
 #define hapiMemcpyHostToHost hipMemcpyHostToHost
