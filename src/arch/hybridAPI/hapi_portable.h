@@ -15,6 +15,8 @@
 
 #define hapiSetDevice(dev) cudaSetDevice(dev)
 
+#define hapiPeekAtLastError cudaPeekAtLastError
+
 #define hapiGetDeviceCount(devCount) cudaGetDeviceCount(devCount)
 
 #define hapiDeviceCanAccessPeer(canAccess, dev1, dev2) \
@@ -99,6 +101,8 @@
 
 #define hapiSetDevice(dev) hipSetDevice(dev)
 #define hapiGetDeviceCount(devCount) hipGetDeviceCount(devCount)
+
+#define hapiPeekAtLastError hipPeekAtLastError
 
 #define hapiDeviceCanAccessPeer(canAccess, dev1, dev2) \
     hipDeviceCanAccessPeer(canAccess, dev1, dev2)
