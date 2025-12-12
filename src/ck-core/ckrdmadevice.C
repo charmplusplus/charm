@@ -411,6 +411,7 @@ static int findFreeIpcEvent(DeviceManager* dm, const size_t comm_offset) {
 
 // Performs sender-side operations necessary for device zerocopy
 void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
+  CmiPrintf("entering CkRdmaDeviceOnSender\n");
   // TODO: Need to handle the case where the destination PE could be wrong
   //       (due to migration, etc.). Currently the code relies on a global
   //       location update after migration (with CMK_GLOBAL_LOCATION_UPDATE).
@@ -427,9 +428,11 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
   }
 
   if (transfer_mode == CkNcpyModeDevice::MEMCPY) {
+    CmiPrintf("Memcpy\n");
     // Don't need to do anything for intra-process
     return;
   } else if (transfer_mode == CkNcpyModeDevice::IPC && csv_gpu_manager.use_shm) {
+    CmiPrintf("IPC_SHM\n");
     // Use optimizations with POSIX shaerd memory
     // Allocate blocks on device comm buffer
     DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
@@ -466,6 +469,7 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
       hapiCheck(hapiEventRecord(my_device_info.src_event_pool[buffers[i]->event_idx], buffers[i]->hapi_stream));
     }
   } else {
+    CmiPrintf("entering the intended else block\n");
     // Use a naive host-staged mechanism
     // Allocate temporary host buffers and copy source buffers
     for (int i = 0; i < numops; i++) {
@@ -477,7 +481,9 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
 
     // Wait for the copies to finish
     for (int i = 0; i < numops; i++) {
+      CmiPrintf("starting sync\n");
       hapiCheck(hapiStreamSynchronize(buffers[i]->hapi_stream));
+      CmiPrintf("ending sync\n");
     }
   }
 #else
