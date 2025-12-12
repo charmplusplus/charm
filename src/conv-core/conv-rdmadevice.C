@@ -1,7 +1,7 @@
 #include "converse.h"
 #include "conv-rdmadevice.h"
 
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
 
 CmiNcpyModeDevice findTransferModeDevice(int srcPe, int dstPe) {
   CmiEnforce((srcPe >= 0) && (srcPe <= CmiNumPes()));

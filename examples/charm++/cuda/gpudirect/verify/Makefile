@@ -1,6 +1,6 @@
 OPTS = -O0 -g
 
-CHARM_DIR = ../../../../..
+CHARM_DIR = /u/ajain18/hapi_hip/shogo/charm/netlrts-linux-x86_64-cuda
 CHARMC = $(CHARM_DIR)/bin/charmc $(OPTS)
 CHARM_INC = -I$(CHARM_DIR)/include
 

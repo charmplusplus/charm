@@ -77,7 +77,7 @@ never be excluded...
 #include "TreeLB.h"
 #endif
 
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
 #include "hapi_impl.h"
 #include "ckrdmadevice.h"
 
@@ -686,7 +686,7 @@ static void _exitHandler(envelope *env)
       ConverseCleanup();
 #endif
 
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
       // Clean up HAPI
       hapiExit();
 #endif
@@ -1480,7 +1480,7 @@ void _initCharm(int unused_argc, char **argv)
 	// Set the ack handler function used for the direct nocopy api
 	CmiSetDirectNcpyAckHandler(CkRdmaDirectAckHandler);
 
-#if CMK_CUDA && CMK_GPU_COMM
+#if (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM
 	CmiRdmaDeviceRecvInit(CkRdmaDeviceRecvHandler);
 #endif
 
@@ -1690,7 +1690,7 @@ void _initCharm(int unused_argc, char **argv)
         }
     }
 
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
   // Perform HAPI initialization for GPU support
   hapiInit(argv);
 

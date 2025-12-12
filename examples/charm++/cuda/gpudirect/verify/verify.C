@@ -12,32 +12,32 @@
 /* readonly */ int n_iters;
 /* readonly */ bool lb_test;
 
-extern void invokeInitKernel(double*, int, double, cudaStream_t);
+extern void invokeInitKernel(double*, int, double, hapiStream_t);
 
 struct Container {
   double* h_local_data;
   double* h_remote_data;
   double* d_local_data;
   double* d_remote_data;
-  cudaStream_t stream;
+  hapiStream_t stream;
 
   Container() : h_local_data(nullptr), h_remote_data(nullptr),
     d_local_data(nullptr), d_remote_data(nullptr) {}
 
   ~Container() {
-    hapiCheck(cudaFreeHost(h_local_data));
-    hapiCheck(cudaFreeHost(h_remote_data));
-    hapiCheck(cudaFree(d_local_data));
-    hapiCheck(cudaFree(d_remote_data));
-    hapiCheck(cudaStreamDestroy(stream));
+    hapiCheck(hapiFreeHost(h_local_data));
+    hapiCheck(hapiFreeHost(h_remote_data));
+    hapiCheck(hapiFree(d_local_data));
+    hapiCheck(hapiFree(d_remote_data));
+    hapiCheck(hapiStreamDestroy(stream));
   }
 
   void init(double val) {
-    hapiCheck(cudaMallocHost(&h_local_data, sizeof(double) * block_size));
-    hapiCheck(cudaMallocHost(&h_remote_data, sizeof(double) * block_size));
-    hapiCheck(cudaMalloc(&d_local_data, sizeof(double) * block_size));
-    hapiCheck(cudaMalloc(&d_remote_data, sizeof(double) * block_size));
-    hapiCheck(cudaStreamCreate(&stream));
+    hapiCheck(hapiMallocHost(&h_local_data, sizeof(double) * block_size));
+    hapiCheck(hapiMallocHost(&h_remote_data, sizeof(double) * block_size));
+    hapiCheck(hapiMalloc(&d_local_data, sizeof(double) * block_size));
+    hapiCheck(hapiMalloc(&d_remote_data, sizeof(double) * block_size));
+    hapiCheck(hapiStreamCreate(&stream));
 
     for (int i = 0; i < block_size; i++) {
       h_local_data[i] = val;
@@ -45,13 +45,13 @@ struct Container {
     invokeInitKernel(d_local_data, block_size, val, stream);
     invokeInitKernel(d_remote_data, block_size, val, stream);
 
-    hapiCheck(cudaStreamSynchronize(stream));
+    hapiCheck(hapiStreamSynchronize(stream));
   }
 
   void verify(double val) {
-    hapiCheck(cudaMemcpyAsync(h_remote_data, d_remote_data,
-          sizeof(double) * block_size, cudaMemcpyDeviceToHost, stream));
-    hapiCheck(cudaStreamSynchronize(stream));
+    hapiCheck(hapiMemcpyAsync(h_remote_data, d_remote_data,
+          sizeof(double) * block_size, hapiMemcpyDeviceToHost, stream));
+    hapiCheck(hapiStreamSynchronize(stream));
 
     for (int i = 0; i < block_size; i++) {
       if (fabs(h_remote_data[i] - val) > ERROR_TOLERANCE) {
@@ -104,7 +104,7 @@ public:
     delete m;
 
     // Print info
-    CkPrintf("[CUDA Zerocopy Verification Test]\n"
+    CkPrintf("[hapi Zerocopy Verification Test]\n"
         "Block size: %d, Iters: %d, Nodegroup: %s, LB test: %s\n",
         block_size, n_iters, test_nodegroup ? "true" : "false",
         lb_test ? "true" : "false");
@@ -179,7 +179,7 @@ public:
 
   void recv(int& size, double*& data, CkDeviceBufferPost* post) {
     data = container.d_remote_data;
-    post[0].cuda_stream = container.stream;
+    post[0].hapi_stream = container.stream;
   }
 
   void recv(int size, double* data) {
@@ -209,7 +209,7 @@ public:
 
   void recv(int& size, double*& data, CkDeviceBufferPost* post) {
     data = container.d_remote_data;
-    post[0].cuda_stream = container.stream;
+    post[0].hapi_stream = container.stream;
   }
 
   void recv(int size, double* data) {
@@ -231,7 +231,7 @@ public:
 
   void recv(int& size, double*& data, CkDeviceBufferPost* post) {
     data = container.d_remote_data;
-    post[0].cuda_stream = container.stream;
+    post[0].hapi_stream = container.stream;
   }
 
   void recv(int size, double* data) {

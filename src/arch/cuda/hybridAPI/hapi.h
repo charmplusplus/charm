@@ -1,6 +1,6 @@
 #ifndef __HAPI_H_
 #define __HAPI_H_
-#include <cuda_runtime.h>
+#include "hapi_portable.h"
 
 /* See hapi_functions.h for the majority of function declarations provided
  * by the Hybrid API. */
@@ -77,7 +77,7 @@ typedef struct hapiWorkRequest {
   // The user implements this function, using the given CUDA stream and
   // device buffers (which are indexed by hapiBufferInfo->id).
   // Could be set to NULL if no kernel needs to be executed.
-  void (*runKernel)(struct hapiWorkRequest* wr, cudaStream_t kernel_stream,
+  void (*runKernel)(struct hapiWorkRequest* wr, hapiStream_t kernel_stream,
                     void** device_buffers);
 
   // flag used for control by the system
@@ -90,7 +90,7 @@ typedef struct hapiWorkRequest {
   bool free_user_data;
 
   // CUDA stream index provided by the user or assigned by GPUManager
-  cudaStream_t stream;
+  hapiStream_t stream;
 
 #ifdef HAPI_INSTRUMENT_WRS
   double phase_start_time;
@@ -151,15 +151,15 @@ typedef struct hapiWorkRequest {
   }
 #endif
 
-  void setRunKernel(void (*_runKernel)(struct hapiWorkRequest*, cudaStream_t, void**)) {
+  void setRunKernel(void (*_runKernel)(struct hapiWorkRequest*, hapiStream_t, void**)) {
     runKernel = _runKernel;
   }
 
-  void setStream(cudaStream_t _stream) {
+  void setStream(hapiStream_t _stream) {
     stream = _stream;
   }
 
-  cudaStream_t getStream() {
+  hapiStream_t getStream() {
     return stream;
   }
 
@@ -228,19 +228,19 @@ extern "C" {
 #ifdef __cplusplus
 
 // Provide a C++-only stub for this function's default parameter.
-void hapiAddCallback(cudaStream_t stream, const CkCallback& cb, void* cb_msg);
-static inline void hapiAddCallback(cudaStream_t stream, const CkCallback& cb) {
+void hapiAddCallback(hapiStream_t stream, const CkCallback& cb, void* cb_msg);
+static inline void hapiAddCallback(hapiStream_t stream, const CkCallback& cb) {
   hapiAddCallback(stream, cb, nullptr);
 }
-static inline void hapiAddCallback(cudaStream_t stream, void* cb) {
+static inline void hapiAddCallback(hapiStream_t stream, void* cb) {
   hapiAddCallback(stream, cb, nullptr);
 }
 
 // Overloaded C++ wrappers for selecting whether to pool or not using a bool.
-static inline cudaError_t hapiMallocHost(void** ptr, size_t size, bool pool) {
+static inline hapiError_t hapiMallocHost_Pool(void** ptr, size_t size, bool pool) {
   return pool ? hapiPoolMalloc(ptr, size) : hapiMallocHost(ptr, size);
 }
-static inline cudaError_t hapiFreeHost(void* ptr, bool pool) {
+static inline hapiError_t hapiFreeHost_Pool(void* ptr, bool pool) {
   return pool ? hapiPoolFree(ptr) : hapiFreeHost(ptr);
 }
 

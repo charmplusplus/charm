@@ -208,6 +208,7 @@ option(BUILD_SHARED        "Build Charm++ dynamic libraries" OFF)
 
 # Other options
 option(BUILD_CUDA          "Build with CUDA support" OFF)
+option(BUILD_HIP           "Build with HIP support" OFF)
 option(PXSHM               "Build with PXSHM" OFF)
 
 # LRTS PMI options
@@ -645,6 +646,8 @@ configure_file(src/arch/common/cc-msvc.sh                    include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-craype.sh           include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-cuda.sh             include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-cuda.h              include/ COPYONLY)
+configure_file(src/arch/common/conv-mach-hip.sh              include/ COPYONLY)
+configure_file(src/arch/common/conv-mach-hip.h               include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-darwin.sh           include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-flang.h             include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-flang.sh            include/ COPYONLY)
@@ -675,7 +678,8 @@ configure_file(src/scripts/conv-config.sh                    include/ COPYONLY)
 configure_file(src/arch/${VDIR}/conv-mach.sh                 include/ COPYONLY)
 
 set(CUDA_DIR "")
-if(BUILD_CUDA)
+set(HIP_DIR "")
+if(BUILD_CUDA OR BUILD_HIP)
 
   file(GLOB_RECURSE hybridAPI-h-sources ${CMAKE_SOURCE_DIR}/src/arch/cuda/*.h)
   file(GLOB_RECURSE hybridAPI-cxx-sources ${CMAKE_SOURCE_DIR}/src/arch/cuda/*.cpp)
@@ -683,18 +687,66 @@ if(BUILD_CUDA)
     configure_file(${file} include/ COPYONLY)
   endforeach()
 
-  if(CMAKE_VERSION VERSION_GREATER 3.17 OR CMAKE_VERSION VERSION_EQUAL 3.17)
-    find_package(CUDAToolkit REQUIRED)
-    set(CMAKE_CUDA_COMPILER "${CUDAToolkit_NVCC_EXECUTABLE}")
-    enable_language(CUDA)
-    set(CUDA_DIR "${CUDAToolkit_TARGET_DIR}")
-  else()
-    find_package(CUDA REQUIRED)
-    set(CUDA_DIR "${CUDA_TOOLKIT_ROOT_DIR}")
+  if (BUILD_CUDA)
+    if(CMAKE_VERSION VERSION_GREATER 3.17 OR CMAKE_VERSION VERSION_EQUAL 3.17)
+      find_package(CUDAToolkit REQUIRED)
+      set(CMAKE_CUDA_COMPILER "${CUDAToolkit_NVCC_EXECUTABLE}")
+      enable_language(CUDA)
+      set(CUDA_DIR "${CUDAToolkit_TARGET_DIR}")
+    else()
+      find_package(CUDA REQUIRED)
+      set(CUDA_DIR "${CUDA_TOOLKIT_ROOT_DIR}")
+    endif()
+    add_library(hybridapi ${hybridAPI-cxx-sources})
+    if(TRACING)
+      target_compile_definitions(hybridapi PRIVATE HAPI_TRACE)
+    endif()
   endif()
-  add_library(cudahybridapi ${hybridAPI-cxx-sources})
-  if(TRACING)
-    target_compile_definitions(cudahybridapi PRIVATE HAPI_TRACE)
+
+  if (BUILD_HIP)
+    add_compile_definitions(__HIP_PLATFORM_AMD__)
+    # Modern ROCm/HIP detection
+    if(NOT DEFINED ROCM_PATH)
+      if(NOT DEFINED ENV{ROCM_PATH})
+        set(ROCM_PATH "/opt/rocm" CACHE PATH "Path to ROCm installation")
+      else()
+        set(ROCM_PATH $ENV{ROCM_PATH} CACHE PATH "Path to ROCm installation")
+      endif()
+    endif()
+    
+    # Find hipcc wrapper for reference
+    find_program(HIP_HIPCC_EXECUTABLE
+      NAMES hipcc
+      PATHS "${ROCM_PATH}/bin" "${ROCM_PATH}/hip/bin"
+      NO_DEFAULT_PATH
+    )
+    
+    if(NOT HIP_HIPCC_EXECUTABLE)
+      message(FATAL_ERROR "Could not find hipcc. Please set ROCM_PATH to your ROCm installation directory.")
+    endif()
+    
+    # Find the actual clang compiler used by ROCm (required by CMake)
+    find_program(CMAKE_HIP_COMPILER
+      NAMES clang++
+      PATHS "${ROCM_PATH}/llvm/bin" "${ROCM_PATH}/bin"
+      NO_DEFAULT_PATH
+    )
+    
+    if(NOT CMAKE_HIP_COMPILER)
+      message(FATAL_ERROR "Could not find ROCm clang++ compiler in ${ROCM_PATH}")
+    endif()
+    
+    set(HIP_DIR "${ROCM_PATH}")
+    set(CMAKE_HIP_ARCHITECTURES "gfx803;gfx900;gfx906;gfx908;gfx90a;gfx1030;gfx1100" CACHE STRING "HIP architectures")
+    
+    # Enable HIP language support
+    enable_language(HIP)
+    
+    add_library(hybridapi ${hybridAPI-cxx-sources})
+    target_include_directories(hybridapi PRIVATE "${ROCM_PATH}/include")
+    if(TRACING)
+      target_compile_definitions(hybridapi PRIVATE HAPI_TRACE)
+    endif()
   endif()
 endif()
 
@@ -988,7 +1040,11 @@ if(${TARGET} STREQUAL "charm4py")
   endif()
 
   if (${BUILD_CUDA})
-    target_link_libraries(charm cudart cudahybridapi)
+    target_link_libraries(charm cudart hybridapi)
+  endif()
+
+  if (${BUILD_HIP})
+    target_link_libraries(charm hiprtc hybridapi)
   endif()
 
   if(${TRACING})
@@ -1052,7 +1108,7 @@ foreach(l BUILDOPTS CMK_AMPI_WITH_ROMIO CMK_BUILD_PYTHON CMK_CAN_LINK_FORTRAN
         CXX_NO_AS_NEEDED LDXX_WHOLE_ARCHIVE_PRE LDXX_WHOLE_ARCHIVE_POST
         CMK_MACOSX CMK_POST_EXE CMK_SHARED_SUF CMK_USER_SUFFIX OPTS_LD
         CMK_COMPILER_KNOWS_FVISIBILITY CMK_LINKER_KNOWS_UNDEFINED
-        CMK_SUPPORTS_MEMORY_ISOMALLOC CUDA_DIR CMK_USER_DISABLED_TLS CMK_CXI)
+        CMK_SUPPORTS_MEMORY_ISOMALLOC CUDA_DIR HIP_DIR CMK_USER_DISABLED_TLS CMK_CXI)
     file(APPEND ${optfile_sh} "${l}=\"${${l}}\"\n" )
 endforeach(l)
 
@@ -1089,7 +1145,7 @@ endif()
 set(optfile_mak ${CMAKE_BINARY_DIR}/include/conv-mach-opt.mak)
 
 file(WRITE  ${optfile_mak} "# Build-time options header for Makefiles, automatically generated by cmake.\n")
-foreach(l CUDA_DIR BUILD_CUDA CMK_AMPI_WITH_ROMIO CMK_MACOSX CMK_BUILD_PYTHON
+foreach(l CUDA_DIR HIP_DIR BUILD_CUDA BUILD_HIP CMK_AMPI_WITH_ROMIO CMK_MACOSX CMK_BUILD_PYTHON
         CMK_CHARMDEBUG CMK_COMPILER CMK_GDIR CMK_HAS_MALLOC_HOOK CMK_HAS_MMAP CMK_LIBJPEG
         CMK_LUSTREAPI CMK_MULTICORE CMK_NO_BUILD_SHARED CMK_NO_PARTITIONS CMK_SHARED_SUF
         CMK_SMP CMK_SUPPORTS_FSGLOBALS CMK_SUPPORTS_PIPGLOBALS CMK_SUPPORTS_PIEGLOBALS
@@ -1102,7 +1158,8 @@ endforeach(l)
 
 # Add options
 set(CUDA ${BUILD_CUDA}) # need CUDA to match conv-mach file name
-foreach(opt SMP OMP TCP PTHREADS SYNCFT PXSHM PERSISTENT OOC CUDA PAPI CXI)
+set(HIP ${BUILD_HIP})   # need HIP to match conv-mach file name
+foreach(opt SMP OMP TCP PTHREADS SYNCFT PXSHM PERSISTENT OOC CUDA HIP PAPI CXI)
     if(${opt})
         string(TOLOWER ${opt} optl)
         file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/conv-mach-${optl}.sh\n")

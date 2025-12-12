@@ -5,11 +5,11 @@
 #include "cmirdmautils.h"
 #include "pup.h"
 
-#if CMK_CUDA
-#include <cuda_runtime.h>
+#if CMK_CUDA || CMK_HIP
+#include "hapi_portable.h"
 
 // Represents the mode of device-side zerocopy transfer
-// MEMCPY indicates that the PEs are on the same logical node and cudaMemcpyDeviceToDevice can be used
+// MEMCPY indicates that the PEs are on the same logical node and hapiMemcpyDeviceToDevice can be used
 // IPC indicates that the PEs are on different logical nodes within the same physical node and CUDA IPC can be used
 // RDMA indicates that the PEs are on different physical nodes and requires GPUDirect RDMA
 enum class CmiNcpyModeDevice : char { MEMCPY, IPC, RDMA };
@@ -22,7 +22,7 @@ public:
   // Pointer to and size of the buffer
   const void* ptr;
   size_t cnt;
-  cudaStream_t cuda_stream;
+  hapiStream_t hapi_stream;
 
 #if !CMK_GPU_COMM
   // Source and destination PEs
@@ -47,7 +47,7 @@ public:
     device_idx = -1;
     comm_offset = 0;
     event_idx = -1;
-    cuda_stream = cudaStreamPerThread;
+    hapi_stream = hapiStreamPerThread;
 
     data_stored = false;
     data = NULL;
@@ -72,7 +72,7 @@ public:
     p|data_stored;
     if (data_stored) {
       if (p.isUnpacking()) {
-        cudaMallocHost(&data, cnt);
+        hapiMallocHost(&data, cnt);
       }
       PUParray(p, (char*)data, cnt);
     }
@@ -83,7 +83,7 @@ public:
 
   ~CmiDeviceBuffer() {
 #if !CMK_GPU_COMM
-    if (data) cudaFreeHost(data);
+    if (data) hapiFreeHost(data);
 #endif
   }
 };
