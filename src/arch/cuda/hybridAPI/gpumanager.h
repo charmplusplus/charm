@@ -133,6 +133,7 @@ struct GPUManager {
 
   // POSIX shared memory for sharing CUDA IPC handles between processes on the same host
   bool use_shm;
+  bool test_field;
   void* shm_ptr;
   std::string shm_name;
   int shm_file;

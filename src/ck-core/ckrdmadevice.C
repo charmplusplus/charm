@@ -262,7 +262,7 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
       // Source and destination PEs are in the same process (logical node)
       // Directly invoke memcpy from source buffer to destination buffer
       hapiCheck(hapiMemcpyAsync((void*)dest.ptr, source.ptr, dest.cnt,
-            hapiMemcpyDeviceToDevice, postStructs[i].hapi_stream));
+            hapiMemcpyDeviceToDevice, postStructs[i].hapi_stream));      
     } else if (mode == CkNcpyModeDevice::IPC && csv_gpu_manager.use_shm) {
       // Inter-process using shared memory optimizations
       // Use optimiziations with POSIX shared memory
@@ -430,7 +430,6 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
     // Don't need to do anything for intra-process
     return;
   } else if (transfer_mode == CkNcpyModeDevice::IPC && csv_gpu_manager.use_shm) {
-    CmiPrintf("IPC_SHM\n");
     // Use optimizations with POSIX shaerd memory
     // Allocate blocks on device comm buffer
     DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
@@ -467,7 +466,6 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
       hapiCheck(hapiEventRecord(my_device_info.src_event_pool[buffers[i]->event_idx], buffers[i]->hapi_stream));
     }
   } else {
-    CmiPrintf("entering the intended else block\n");
     // Use a naive host-staged mechanism
     // Allocate temporary host buffers and copy source buffers
     for (int i = 0; i < numops; i++) {
@@ -479,9 +477,7 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
 
     // Wait for the copies to finish
     for (int i = 0; i < numops; i++) {
-      CmiPrintf("starting sync\n");
       hapiCheck(hapiStreamSynchronize(buffers[i]->hapi_stream));
-      CmiPrintf("ending sync\n");
     }
   }
 #else

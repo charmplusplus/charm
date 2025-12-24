@@ -118,7 +118,6 @@ void hapiInit(char** argv) {
 
 #ifndef HAPI_CUDA_CALLBACK
     // Register polling function to be invoked at every scheduler loop
-    CmiPrintf("using events for callback\n");
     CcdCallOnConditionKeep(CcdSCHEDLOOP, (CcdCondFn)hapiPollEvents, NULL);
 #endif
   }
@@ -286,8 +285,8 @@ static void hapiMapping(char** argv) {
   switch (map_type) {
     case Mapping::Block:
       cpv_my_device = my_rank / csv_gpu_manager.pes_per_device;
-      if(cpv_my_device >= csv_gpu_manager.device_count)
-          cpv_my_device = csv_gpu_manager.device_count - 1;
+      // if(cpv_my_device >= csv_gpu_manager.device_count)
+      //     cpv_my_device = csv_gpu_manager.device_count - 1;
       if (my_rank % csv_gpu_manager.pes_per_device == 0) cpv_device_rep = true;
       break;
     case Mapping::RoundRobin:
@@ -299,12 +298,21 @@ static void hapiMapping(char** argv) {
   }
 
   // Set device and store PE-device mapping
+  // Calculate local device index (index into this process's device_managers vector)
+  // cpv_my_device is the CUDA device ordinal, but device_managers is indexed locally per-process
+  // Local index = cpv_my_device - first_device_for_this_process
+  // where first_device_for_this_process = device_count * CmiMyNodeRankLocal()
+  int local_device_idx = cpv_my_device - csv_gpu_manager.device_count * CmiMyNodeRankLocal();
+  if (local_device_idx < 0 || local_device_idx >= (int)csv_gpu_manager.device_managers.size()) {
+    CmiAbort("Invalid local device index during device mapping");
+  }
+  
   hapiCheck(hapiSetDevice(cpv_my_device));
 #if CMK_SMP
   CmiLock(csv_gpu_manager.device_mapping_lock);
 #endif
   csv_gpu_manager.device_map.emplace(CmiMyPe(),
-      &(csv_gpu_manager.device_managers[cpv_my_device]));
+      &(csv_gpu_manager.device_managers[local_device_idx]));
 #if CMK_SMP
   CmiUnlock(csv_gpu_manager.device_mapping_lock);
 #endif
@@ -324,7 +332,10 @@ static void hapiMapping(char** argv) {
   }
 
   if (CmiMyRank() == 0) {
-    if (use_shm) csv_gpu_manager.use_shm = true;
+    if (use_shm) {
+      csv_gpu_manager.use_shm = true;
+    }
+    // csv_gpu_manager.test_field = true;
   }
 
   CmiNodeBarrier();
@@ -863,14 +874,23 @@ static void ipcHandleCreate() {
   if (!CpvAccess(device_rep)) return;
 
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
-  int& cpv_my_device = CpvAccess(my_device);
 
   // Create CUDA IPC memory handle in shared memory
-  DeviceManager& my_dm = csv_gpu_manager.device_managers[cpv_my_device];
+  // Use device_map to get the correct DeviceManager (handles +allgpus case where
+  // cpv_my_device may be the CUDA device ID, not the local index into device_managers)
+  auto it = csv_gpu_manager.device_map.find(CmiMyPe());
+  if (it == csv_gpu_manager.device_map.end()) {
+    CmiAbort("PE not found in device_map during ipcHandleCreate");
+  }
+  DeviceManager& my_dm = *(it->second);
   auto comm_buffer = my_dm.get_comm_buffer();
   CmiAssert(comm_buffer);
+
+  // Use local device index (0 to device_count-1) for shm_mem_handle offset
+  int local_device_idx = my_dm.local_index;
   hapiIpcMemHandle_t* shm_mem_handle = (hapiIpcMemHandle_t*)((char*)csv_gpu_manager.shm_my_ptr +
-      csv_gpu_manager.shm_chunk_size * cpv_my_device);
+      csv_gpu_manager.shm_chunk_size * local_device_idx);
+
   void* device_ptr = comm_buffer->base_ptr;
   hapiCheck(hapiIpcGetMemHandle(shm_mem_handle, device_ptr));
 

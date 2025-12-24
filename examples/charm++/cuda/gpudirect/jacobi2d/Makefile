@@ -2,7 +2,7 @@ CHARMC = /u/ajain18/charm/netlrts-linux-x86_64-cuda/bin/charmc $(USE_WR) $(OPTS)
 CHARMC_FLAGS = -D__HIP_PLATFORM_AMD__=ON
 
 HAPITOOLKIT_HOME ?= /opt/rocm
-HAPICC = hipcc
+HAPICC = nvcc
 HAPICC_FLAGS = -c -std=c++11
 HAPICC_INC = -I$(HAPITOOLKIT_HOME)/include
 HAPICC_LIB = -L$(HAPITOOLKIT_HOME)/lib

@@ -1,7 +1,7 @@
 #include "hapi.h"
 #include "jacobi2d.h"
 
-#define TILE_SIZE 16
+#define TILE_SIZE 32
 #define DIVIDEBY5 0.2
 
 __global__ void initKernel(DataType* temperature, int block_width,
