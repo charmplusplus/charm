@@ -68,7 +68,9 @@ int DiffusionLB::writeStatsMsgsJSON(BaseLB::LDStats* statsData)
                                   {"position", odata.position},
                                   {"wallTime", odata.wallTime},
                                   {"oldpe", from},
-                                  {"newpe", (to == -1) ? from : to}};
+                                  {"newpe", (to == -1) ? from : to},
+                                  {"omHandle", odata.omID().id.idx},
+                                  {"id", odata.objID()}};
 
     // from_proc: old pe for object
     // to_proc: pe object is migrating to NOT USING
