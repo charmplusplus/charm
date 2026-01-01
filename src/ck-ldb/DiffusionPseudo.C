@@ -46,6 +46,12 @@ void DiffusionLB::PseudoLoadBalancing()
 {
   std::vector<double> thisRoundToSend(sendToNeighbors.size(), 0.0);
 
+  // Define threshold as a percentage of average neighbor load
+  // Prevents micro-migrations when loads are very similar
+  const double THRESHOLD_PERCENT = 1.0;  // 1% threshold
+  double avgLoadNeighbor = std::accumulate(loadNeighbors.begin(), loadNeighbors.begin() + neighborCount, 0.0) / neighborCount;
+  double threshold = THRESHOLD_PERCENT * avgLoadNeighbor / 100.0;
+
   // create pairs for sorting
   std::vector<std::pair<int, double>> nborPairs;
     for (int i = 0; i < neighborCount; i++)
@@ -68,7 +74,8 @@ void DiffusionLB::PseudoLoadBalancing()
     int id = p.first;
     double load = p.second;
 
-    if (load >= currAverage)
+    // Only consider neighbors that are significantly underloaded (below threshold)
+    if (load >= currAverage - threshold)
     {
       break;
     }
@@ -78,8 +85,27 @@ void DiffusionLB::PseudoLoadBalancing()
         (currAverage * nborsToBalance.size() + load) / (nborsToBalance.size() + 1);
   }
 
+  // If no neighbors need balancing, we're done
+  if (nborsToBalance.empty())
+  {
+    // Still need to send messages to neighbors
+    for (int i = 0; i < neighborCount; i++)
+    {
+      int nbor_node = sendToNeighbors[i];
+      thisProxy[nbor_node * nodeSize].PseudoLoad(pseudo_itr, 0.0, myNodeId);
+    }
+    thisProxy[0].pseudolb_barrier(true);  // all zero
+    return;
+  }
+
   // balance with neighborstobalance
   double myOverload = my_pseudo_load - currAverage;
+
+  // Don't bother balancing if my overload is insignificant
+  if (myOverload < threshold)
+  {
+    myOverload = 0;
+  }
 
   // adjust my overload for what I've already sent out
   double alreadySent = std::accumulate(toSendLoad.begin(), toSendLoad.end(), 0.0,
@@ -89,29 +115,53 @@ void DiffusionLB::PseudoLoadBalancing()
   double leftToSend = my_load - alreadySent;  // my_load is original load
   myOverload = std::min(myOverload, leftToSend);
 
+  // First pass: calculate ideal send amounts (ignoring overload limits)
+  // and handle negative edges
+  double totalUnderLoad = 0.0;
+  std::vector<double> idealSend(neighborCount, 0.0);
+  
   for (std::pair<int, double> p : nborsToBalance)
   {
     int id = p.first;
     double load = p.second;
 
     double trySend = currAverage - load;
-    double toSend = 0;
-
-    // exhaust a negative edge first
+    
+    // First, handle negative edges (past receives we need to offset)
     if (toSendLoad[id] < 0)
     {
-      toSend += std::min(-toSendLoad[id], trySend);
-      trySend -= toSend;
+      double offset = std::min(-toSendLoad[id], trySend);
+      idealSend[id] += offset;
+      trySend -= offset;
     }
 
-    // either edge was enough (trySend == 0)
-    // or we need to send more
-
+    // Add remaining ideal send amount
     if (trySend > 0)
     {
-      toSend += std::min(myOverload, trySend);
-      trySend -= toSend;
-      myOverload -= toSend;
+      idealSend[id] += trySend;
+      totalUnderLoad += trySend;
+    }
+  }
+
+  // Second pass: scale down proportionally if we don't have enough overload
+  // This ensures all neighbors get a fair share
+  double scaleFactor = 1.0;
+  if (totalUnderLoad > myOverload && totalUnderLoad > 0)
+  {
+    scaleFactor = myOverload / totalUnderLoad;
+  }
+
+  for (std::pair<int, double> p : nborsToBalance)
+  {
+    int id = p.first;
+    
+    double toSend = idealSend[id] * scaleFactor;
+
+    // Only actually send if the amount is significant (exceeds threshold)
+    // This prevents tiny transfers that have high overhead relative to benefit
+    if (toSend < threshold)
+    {
+      toSend = 0;
     }
 
     toSendLoad[id] += toSend;
