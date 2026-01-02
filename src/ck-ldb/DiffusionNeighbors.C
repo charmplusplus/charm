@@ -358,7 +358,7 @@ void DiffusionLB::okayNbor(int agree, int nborId)
     if (nborsNeeded > 0 && agree && std::find(sendToNeighbors.begin(), sendToNeighbors.end(), nborId) == sendToNeighbors.end())
     {
         if (_lb_args.debug()) CkPrintf("\n[Node-%d, round-%d] Rcvd ack, adding %d as nbor (neighbors:%d/%d, holds[%d]=%d)", thisIndex, round, nborId, sendToNeighbors.size(), NUM_NEIGHBORS, round, holds[round]);
-        sendToNeighbors.push_back(nborId);
+        addNeighbor(nborId);
         thisProxy[nborId * nodeSize].ackNbor(myNodeId /*thisIndex*/);
     }
     else
@@ -371,7 +371,7 @@ void DiffusionLB::ackNbor(int nborId)
     if (std::find(sendToNeighbors.begin(), sendToNeighbors.end(), nborId) == sendToNeighbors.end())
     {
         if (_lb_args.debug()) CkPrintf("\n[Node-%d] Adding neighbor [%d] through final ack (neighbors:%d/%d)", thisIndex, nborId, sendToNeighbors.size(), NUM_NEIGHBORS);
-        sendToNeighbors.push_back(nborId);
+        addNeighbor(nborId);
     }
 }
 void DiffusionLB::sortArr(long arr[], int n, int *nbors)
