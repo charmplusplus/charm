@@ -364,7 +364,7 @@ MetricCentroid::MetricCentroid(std::vector<std::vector<double>> nborCentroids,
   {
     if (ns->objData[i].position.size() == 0)
     {
-      break;
+      continue;  // Skip objects without position data, but process the rest
     }
     else if (ns->objData[i].position.size() != position_dim)
     {
