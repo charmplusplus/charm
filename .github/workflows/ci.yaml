@@ -99,23 +99,22 @@ jobs:
     - name: test
       run: make -C mpi-linux-x86_64-syncft/tmp mpisyncfttest
 
-# darwin-x86_64 no longer available at free level in github
-#  multicore-darwin-x86_64_projections:
-#    timeout-minutes: 60
-#    runs-on: macos-13
-#    steps:
-#    - uses: actions/checkout@v4
-#    - name: build-only
-#      run: ./build LIBS multicore-darwin-x86_64 -g -j3 --with-production --enable-tracing
+  multicore-darwin-x86_64_projections:
+    timeout-minutes: 60
+    runs-on: macos-15-intel
+    steps:
+    - uses: actions/checkout@v4
+    - name: build-only
+      run: ./build LIBS multicore-darwin-x86_64 -g -j3 --with-production --enable-tracing
 #    - name: test
 #      run: |
 #        make -C multicore-darwin-x86_64/tmp all-test -j3 OPTS="-g -tracemode projections"
 #        make -C multicore-darwin-x86_64/tmp test
-#    - name: projections-build-only
-#      run: |
-#        git clone https://github.com/UIUC-PPL/projections
-#        cd projections
-#        make
+    - name: projections-build-only
+      run: |
+        git clone https://github.com/UIUC-PPL/projections
+        cd projections
+        make
   #    proj=$PWD/bin/projections
   #      cd ..
   #      files=$(find . -name *.sts)
@@ -201,15 +200,14 @@ jobs:
         cd ../namd/Linux-x86_64-g++
         ./charmrun ++local +p4 ./namd3 ~/namddata/apoa1/apoa1.namd
 
-# darwin-x86_64 no longer available at free level in github
 # FIXME: darwin tests all fail
-#  netlrts-darwin-x86_64:
-#    timeout-minutes: 60
-#    runs-on: macos-13
-#    steps:
-#    - uses: actions/checkout@v4
-#    - name: build-only
-#      run: ./build all-test netlrts-darwin-x86_64 --build-shared --with-production --enable-error-checking --enable-lbuserdata -j3 -g -Werror=vla
+  netlrts-darwin-x86_64:
+    timeout-minutes: 60
+    runs-on: macos-15-intel
+    steps:
+    - uses: actions/checkout@v4
+    - name: build-only
+      run: ./build all-test netlrts-darwin-x86_64 --build-shared --with-production --enable-error-checking --enable-lbuserdata -j3 -g -Werror=vla
       # TODO: this should build tests with "-charm-shared". See #2735 on why this is not done currently.
   #    - name: test
   #      run: make -C netlrts-darwin-x86_64/tmp test TESTOPTS="++local"
