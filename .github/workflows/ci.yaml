@@ -101,7 +101,7 @@ jobs:
 
   multicore-darwin-x86_64_projections:
     timeout-minutes: 60
-    runs-on: macos-13
+    runs-on: macos-15-intel
     steps:
     - uses: actions/checkout@v4
     - name: build-only
@@ -203,7 +203,7 @@ jobs:
 # FIXME: darwin tests all fail
   netlrts-darwin-x86_64:
     timeout-minutes: 60
-    runs-on: macos-13
+    runs-on: macos-15-intel
     steps:
     - uses: actions/checkout@v4
     - name: build-only
