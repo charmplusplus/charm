@@ -121,11 +121,8 @@ public:
   friend void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs);
 };
 
-#if !CMK_GPU_COMM
-void CkRdmaDeviceRecvHandler(void* data, void* msg);
-#else
 void CkRdmaDeviceRecvHandler(void* data);
-#endif
+void CkRdmaDeviceRecvHandler(void* data, void* msg);
 void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs);
 void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers);
 

@@ -1,6 +1,6 @@
 OPTS = -O0 -g
 
-CHARM_DIR = /u/ajain18/charm/netlrts-linux-x86_64-cuda
+CHARM_DIR = /u/ajain18/charm/mpi-linux-x86_64-cuda
 CHARMC = $(CHARM_DIR)/bin/charmc $(OPTS)
 CHARM_INC = -I$(CHARM_DIR)/include
 
@@ -14,7 +14,7 @@ all: $(TARGET)
 OBJS = $(TARGET).o $(TARGET)CUDA.o
 
 $(TARGET): $(OBJS)
-	$(CHARMC) -language charm++ -module CommonLBs -o $@ $(OBJS) $(LD_LIBS)
+	$(CHARMC) -language charm++ -module CommonLBs -lmpi_gtl_cuda -o $@ $(OBJS) $(LD_LIBS)
 
 $(TARGET).decl.h: $(TARGET).ci
 	$(CHARMC) $<

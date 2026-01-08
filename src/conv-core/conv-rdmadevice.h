@@ -24,7 +24,6 @@ public:
   size_t cnt;
   hapiStream_t hapi_stream;
 
-#if !CMK_GPU_COMM
   // Source and destination PEs
   int src_pe;
   int dest_pe;
@@ -52,18 +51,12 @@ public:
     data_stored = false;
     data = NULL;
   }
-#else
+
   uint64_t tag;
-
-  CmiDeviceBuffer() : ptr(NULL), cnt(0) {}
-
-  explicit CmiDeviceBuffer(const void* ptr_, size_t cnt_) : ptr(ptr_), cnt(cnt_) {}
-#endif // CMK_GPU_COMM
 
   void pup(PUP::er &p) {
     p((char *)&ptr, sizeof(ptr));
     p|cnt;
-#if !CMK_GPU_COMM
     p|src_pe;
     p|dest_pe;
     p|device_idx;
@@ -76,9 +69,8 @@ public:
       }
       PUParray(p, (char*)data, cnt);
     }
-#else
     p|tag;
-#endif // CMK_GPU_COMM
+    p|src_pe;
   }
 
   ~CmiDeviceBuffer() {
@@ -93,7 +85,7 @@ CmiNcpyModeDevice findTransferModeDevice(int srcPe, int destPe);
 #if CMK_GPU_COMM
 typedef void (*RdmaAckCallerFn)(void *token);
 
-void CmiSendDevice(int dest_pe, const void*& ptr, size_t size, uint64_t& tag);
+void CmiSendDevice(int& src_pe, const void*& ptr, size_t size, uint64_t& tag);
 void CmiRecvDevice(DeviceRdmaOp* op, DeviceRecvType type);
 void CmiRdmaDeviceRecvInit(RdmaAckCallerFn fn);
 void CmiInvokeRecvHandler(void* data);

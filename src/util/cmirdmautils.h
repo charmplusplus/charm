@@ -80,6 +80,7 @@ typedef struct DeviceRdmaOp_ {
   void* src_cb;
   void* dst_cb;
   uint64_t tag;
+  int src_pe;
 } DeviceRdmaOp;
 
 typedef struct DeviceRdmaOpMsg_ {

@@ -84,6 +84,7 @@ namespace buddy {
   }
 
   void* allocator::malloc(size_t request) {
+    DEBUG_PRINT("REQUEST: %ld, TOTAL_SIZE: %ld", request, total_size);
     // Cannot satisfy request larger than total size
     if (request > total_size) return nullptr;
 

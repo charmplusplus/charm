@@ -10,12 +10,10 @@ CmiNcpyModeDevice findTransferModeDevice(int srcPe, int dstPe) {
   if (CmiNodeOf(srcPe) == CmiNodeOf(dstPe)) {
     // Same logical node
     return CmiNcpyModeDevice::MEMCPY;
-  }
-  else if (CmiPeOnSamePhysicalNode(srcPe, dstPe)) {
+  } else if (CmiPeOnSamePhysicalNode(srcPe, dstPe)) {
     // Different logical nodes, same physical node
     return CmiNcpyModeDevice::IPC;
-  }
-  else {
+  } else {
     // Different physical nodes, requires GPUDirect RDMA
     return CmiNcpyModeDevice::RDMA;
   }
@@ -24,8 +22,8 @@ CmiNcpyModeDevice findTransferModeDevice(int srcPe, int dstPe) {
 #if CMK_GPU_COMM
 #include "machine-rdma.h"
 
-void CmiSendDevice(int dest_pe, const void*& ptr, size_t size, uint64_t& tag) {
-  LrtsSendDevice(dest_pe, ptr, size, tag);
+void CmiSendDevice(int& src_pe, const void*& ptr, size_t size, uint64_t& tag) {
+  LrtsSendDevice(src_pe, ptr, size, tag);
 }
 
 void CmiRecvDevice(DeviceRdmaOp* op, DeviceRecvType type) {

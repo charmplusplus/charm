@@ -77,6 +77,22 @@ static int dynamicRecvCap = CMI_DYNAMIC_MAXCAPSIZE;
 MPI_Comm charmComm;
 int tagUb;
 
+MPI_Win globalDevWin = MPI_WIN_NULL;
+
+void LrtsInitRMA() {
+    int result = MPI_Win_create_dynamic(MPI_INFO_NULL, MPI_COMM_WORLD, &globalDevWin);
+    
+    if (result != MPI_SUCCESS) {
+        CmiAbort("RMA Window Creation Failed!");
+    }
+}
+
+void LrtsCleanupRMA() {
+    if (globalDevWin != MPI_WIN_NULL) {
+        MPI_Win_free(&globalDevWin); // This will fail if memory is still attached!
+    }
+}
+
 #if CMI_EXERT_SEND_CAP
 static int SEND_CAP=3;
 #endif
@@ -1323,6 +1339,7 @@ void LrtsExit(int exitcode) {
 #else
       signal(SIGINT, signal_int);
 #endif
+      LrtsCleanupRMA();
       MPI_Finalize();
 #endif
       // Still want to return control to the user in userDrivenMode
@@ -1518,6 +1535,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
       if (newpe == -1) {
           MPI_Barrier(charmComm);
           //MPI_Barrier(charmComm);
+          LrtsCleanupRMA();
           MPI_Finalize();
           exit(0);
       }
@@ -1680,6 +1698,10 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
 #if CMK_ONESIDED_IMPL && CMK_SMP
     rdmaTagLock = CmiCreateLock();
 #endif
+#endif
+
+#if CMK_CUDA
+    LrtsInitRMA();
 #endif
 }
 
@@ -2057,6 +2079,7 @@ void CkDieNow(void)
     }
     MPI_Barrier(charmComm);
  //   MPI_Barrier(charmComm);
+    LrtsCleanupRMA();
     MPI_Finalize();
     exit(0);
 #endif
@@ -2356,6 +2379,66 @@ void CmiSetupMachineRecvBuffersUser(void)
 #endif
 }
 /*=======End of Msg Histogram or Dynamic Post-Recv Related Funcs======*/
+
+#if CMK_CUDA
+
+// static uint64_t random_my_tag = 4242;
+
+// void LrtsSendDevice(int& dest_pe, const void*& ptr, size_t size, uint64_t& tag) {
+//     tag = random_my_tag++;
+//   MPI_Request req;
+//   MPI_Status sts;
+//   int result = MPI_Isend((void *)ptr,size,MPI_BYTE,dest_pe,tag,charmComm,&req);
+// //   int result = MPI_Send((void*)ptr, size, MPI_BYTE, dest_pe, tag, charmComm);
+//   if (result != MPI_SUCCESS) {
+//     CmiAbort("lrtssenddevice: MPI_Send failed!\n");
+//   }
+// }
+
+// void LrtsRecvDevice(DeviceRdmaOp* op, DeviceRecvType type)
+// {
+//     MPI_Status sts;
+//     int result = MPI_Recv((void*)op->dest_ptr, op->size,MPI_BYTE,MPI_ANY_SOURCE,op->tag, charmComm,&sts);
+//     if(result != MPI_SUCCESS) {
+//         CmiAbort("lrtsrecvdevice: MPI_Recv failed!\n");
+//     }
+//     CmiInvokeRecvHandler(op);
+// }
+
+#include <map>
+
+std::map<std::pair<void*, size_t>, uint64_t> cache_window;
+
+void LrtsSendDevice(int& src_pe, const void*& ptr, size_t size, uint64_t& tag) {
+    if(cache_window.find(std::make_pair((void*)ptr, size)) != cache_window.end()) {
+        tag = cache_window[std::make_pair((void*)ptr, size)];
+    } else {
+        MPI_Aint disp;
+        MPI_Win_attach(globalDevWin, (void*)ptr, size);
+        MPI_Get_address((void*)ptr, &disp);
+        // tag is the virtual address of the buffer
+        tag = (uint64_t)(disp);
+    }
+    src_pe = CmiMyPe();
+}
+
+void LrtsRecvDevice(DeviceRdmaOp* op, DeviceRecvType type)
+{
+    MPI_Win_lock(MPI_LOCK_SHARED, op->src_pe, 0, globalDevWin);
+    int result = MPI_Get((void*)op->dest_ptr, op->size, MPI_BYTE, 
+                         op->src_pe, (MPI_Aint)(op->tag), op->size, 
+                         MPI_BYTE, globalDevWin);
+
+    if (result != MPI_SUCCESS) {
+        CmiAbort("LrtsRecvDevice: MPI_Get failed!\n");
+    }
+    MPI_Win_flush(op->src_pe , globalDevWin);
+    MPI_Win_unlock(op->src_pe, globalDevWin);
+
+    CmiInvokeRecvHandler(op);
+}
+
+#endif // CMK_CUDA
 
 
 /*@}*/
