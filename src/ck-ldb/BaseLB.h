@@ -26,6 +26,22 @@ protected:
   const char *lbname;
   LBManager *lbmgr;
   int  startLbFnHdl;
+  
+  // LB timing instrumentation
+  static double totalLBTime;
+  static double lbStartTime;
+  static double totalLBStrategyTime;
+  static int totalPhases;
+  
+  static void startLBTiming() { 
+    lbStartTime = CmiWallTimer(); }
+  static void endLBStrategyTiming() { 
+    totalLBStrategyTime += CmiWallTimer() - lbStartTime; }
+  static void endLBTiming() { 
+    totalLBTime += CmiWallTimer() - lbStartTime;
+    totalPhases += 1;
+  }
+  
 private:
   void initLB(const CkLBOptions &);
 public:
@@ -155,6 +171,15 @@ public:
   virtual int  useMem()  { return 0; }
   virtual void pup(PUP::er &p);
   virtual void flushStates();
+  
+  // LB timing instrumentation
+  static double getTotalLBTime() { return totalLBTime; }
+  static void printLBTime() { 
+    if (CkMyPe() == 0) {
+      CkPrintf("\n[LB Stats] Total: %.6f seconds, %.6f seconds in strategy, in %d phases\n", totalLBTime, totalLBStrategyTime, totalPhases);
+    }
+  }
+  
 //  virtual void AtSync(void) {  CmiAbort("AtSync not implemented"); } // Everything is at the PE barrier
   virtual void InvokeLB(void) { CmiAbort("InvokeLB not implemented"); }
   virtual void Migrated(int waitBarrier=1) { CmiAbort("Migrated not implemented"); }

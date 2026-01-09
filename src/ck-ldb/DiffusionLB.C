@@ -123,6 +123,9 @@ void DiffusionLB::Strategy(const DistBaseLB::LDStats* const stats)
   round = 0;
   rank0_barrier_counter = 0;
   pseudo_done = true;
+
+  num_migrations = 0;
+
   mig_id_map.clear();
   objectHandles.clear();
   objectSrcIds.clear();
@@ -421,7 +424,7 @@ void DiffusionLB::WithinNodeLB()
 
 void DiffusionLB::ProcessMigrations()
 {
-  
+  BaseLB::endLBStrategyTiming();
 
   // SAME AS IN PACKANDSENDMIGRATEMSGS
   LBMigrateMsg* msg = new (total_migrates, CkNumPes(), CkNumPes(), 0) LBMigrateMsg;
@@ -468,6 +471,12 @@ void DiffusionLB::ProcessMigrations()
   }
   else
     ProcessMigrationDecision(msg);
+
+    nodeStats->objData.clear();
+    nodeStats->from_proc.clear();
+    nodeStats->to_proc.clear();
+    nodeStats->commData.clear();
+    nodeStats->n_migrateobjs = 0;
 }
 
 void DiffusionLB::CascadingMigration(LDObjHandle h, double load)
@@ -533,6 +542,8 @@ void DiffusionLB::MigrationDoneWrapper()
 {
   int balancing = 1;
   MigrationDone(balancing);  // call DistBaseLB version
+  
+  // End LB timing instrumentation
 }
 
 #include "DiffusionLB.def.h"

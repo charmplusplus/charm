@@ -237,6 +237,7 @@ void TreeLB::InvokeLB()
 void TreeLB::ProcessAtSync()
 {
 #if CMK_LBDB_ON
+  BaseLB::startLBTiming();
   startTime = CkWallTimer();
   if (CkMyPe() == 0 && _lb_args.debug() > 0)
   {
@@ -320,6 +321,7 @@ void TreeLB::loadBalanceSubtree(int level)
   /// CkMessage *inter_subtree_migrations = nullptr;
   IDM idm;
   TreeLBMessage* decision = logic[level]->loadBalance(idm);
+  BaseLB::endLBStrategyTiming();
   if (idm.size() > 0)
   {
     // this can happen when final destinations of chares has been decided,
@@ -540,6 +542,7 @@ void TreeLB::lb_done()
 void TreeLB::resumeClients()
 {
   double lb_time = CkWallTimer() - startTime;
+  BaseLB::endLBTiming();
   if (CkMyPe() == 0 && _lb_args.debug() > 0)
     CkPrintf("[%d] lb time = %f\n", CkMyPe(), lb_time);
   int step = lbmgr->step() - 1;

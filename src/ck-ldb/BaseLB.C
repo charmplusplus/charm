@@ -7,6 +7,19 @@
 #include "BaseLB.h"
 #include "LBSimulation.h"
 
+// Initialize static LB timing variables
+double BaseLB::totalLBTime = 0.0;
+double BaseLB::lbStartTime = 0.0;
+double BaseLB::totalLBStrategyTime = 0.0;
+int BaseLB::totalPhases = 0;
+
+static bool lbTimingExitRegistered = false;
+
+static void printLBTimingAtExit() {
+  BaseLB::printLBTime();
+  CkContinueExit();
+}
+
 #if CMK_LBDB_ON
 
 void BaseLB::initLB(const CkLBOptions &opt) {
@@ -15,6 +28,16 @@ void BaseLB::initLB(const CkLBOptions &opt) {
   lbname = "Unknown";
   // register this load balancer to LBManager at the sequence number
   lbmgr->addLoadbalancer(this, seqno);
+
+  totalLBTime = 0.0;
+  lbStartTime = 0.0;
+  totalLBStrategyTime = 0.0;
+  totalPhases = 0.0;
+  // Register exit function to print LB timing (only once)
+  if (!lbTimingExitRegistered && CkMyPe() == 0) {
+    registerExitFn(printLBTimingAtExit);
+    lbTimingExitRegistered = true;
+  }
 }
 
 void BaseLB::pup(PUP::er &p) { 
