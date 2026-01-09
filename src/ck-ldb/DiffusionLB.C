@@ -495,11 +495,6 @@ void DiffusionLB::ProcessMigrations()
   else
     ProcessMigrationDecision(msg);
 
-    nodeStats->objData.clear();
-    nodeStats->from_proc.clear();
-    nodeStats->to_proc.clear();
-    nodeStats->commData.clear();
-    nodeStats->n_migrateobjs = 0;
 }
 
 void DiffusionLB::CascadingMigration(LDObjHandle h, double load)
