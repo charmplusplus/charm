@@ -15,7 +15,7 @@ void DiffusionLB::AcrossNodeLB()
 
   if (thisIndex == 0)
   {
-    if (_lb_args.debug()) CkPrintf("--------STARTING ACROSS NODE LB--------\n");
+    if (_lb_args.debug() > 1) CkPrintf("--------STARTING ACROSS NODE LB--------\n");
     CkCallback cb(CkIndex_DiffusionLB::WithinNodeLB(), thisProxy);
     CkStartQD(cb);
   }
@@ -67,11 +67,11 @@ void DiffusionLB::AcrossNodeLB()
     while (my_loadAfterTransfer > 0)
     {
       nid = (nid + 1)%neighborCount; //change to round robin for now
-      int nborId = nid;//metric->getBestNeighbor();  // this is causing cascading???
-      if (tries[nborId]==0 && /*nborId == -1 || */toSendLoad[nborId] <= 0)
+      int nborId = nid;//metric->getBestNeighbor();  // this is buggy (hangs)
+      if (nborId == -1)
       {
-        tries[nborId] = 1;
-        continue;//break;  // no more neighbors to send to
+        CkAbort("Error: no neighbor found to send to, but my_loadAfterTransfer = %f\n",
+                my_loadAfterTransfer);
       }
 
       int v_id = metric->popBestObject(nborId);

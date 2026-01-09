@@ -14,7 +14,7 @@ void DiffusionLB::startStrategy()
   }
 
   rank0_barrier_counter = 0;
-  if (_lb_args.debug()) CkPrintf("--------NEIGHBOR SELECTION COMPLETE (Using Comm? %s)--------\n",
+  if (_lb_args.debug() > 1) CkPrintf("--------NEIGHBOR SELECTION COMPLETE (Using Comm? %s)--------\n",
            _lb_args.diffusionCommOn() ? "true" : "false");
   fflush(stdout);
   for (int i = 0; i < numNodes; i++) thisProxy[i * nodeSize].pseudolb_rounds();
@@ -68,11 +68,15 @@ void DiffusionLB::PseudoLoadBalancing()
   // more load than set average)
   std::vector<std::pair<int, double>> nborsToBalance;
 
-  double currAverage = my_pseudo_load;
+  double sumNeighborLoads = 0.0;
+  double currAverage = my_pseudo_load;  // start with just me
   for (std::pair<int, double> p : nborPairs)
   {
     int id = p.first;
     double load = p.second;
+
+    // Calculate current average including me and all selected neighbors so far
+    currAverage = (my_pseudo_load + sumNeighborLoads) / (nborsToBalance.size() + 1);
 
     // Only consider neighbors that are significantly underloaded (below threshold)
     if (load >= currAverage - threshold)
@@ -81,8 +85,7 @@ void DiffusionLB::PseudoLoadBalancing()
     }
 
     nborsToBalance.push_back(p);
-    currAverage =
-        (currAverage * nborsToBalance.size() + load) / (nborsToBalance.size() + 1);
+    sumNeighborLoads += load;
   }
 
   // If no neighbors need balancing, we're done

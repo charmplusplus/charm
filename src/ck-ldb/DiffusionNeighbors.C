@@ -23,7 +23,7 @@ void DiffusionLB::findNBors(int do_again)
 
     if (numNodes == 1)
     {
-        if (_lb_args.debug())
+        if (_lb_args.debug() > 1)
         {
             CkPrintf("One node only - no neighbors\n");
         }
@@ -61,7 +61,7 @@ void DiffusionLB::startMSTBarrier() {
 }
 void DiffusionLB::beginMST()
 {
-    if (_lb_args.debug())
+    if (_lb_args.debug() > 1)
     {
         CkPrintf("Beginning MST building\n");
     }
@@ -105,7 +105,7 @@ void DiffusionLB::buildMSTinRounds(double best_weight, int best_from, int best_t
     int to = best_to;
     int from = best_from;
 
-    if (_lb_args.debug()) {
+    if (_lb_args.debug() > 1) {
         CkPrintf("Node %d: building in rounds, from %d, to %d, weight %f\n", myNodeId, from, to, best_weight);
     }
 
@@ -140,7 +140,7 @@ void DiffusionLB::buildMSTinRounds(double best_weight, int best_from, int best_t
                mstVisitedPes.end());
         assert(sendToNeighbors.size() >= 1);
 
-        if (_lb_args.debug()) {
+        if (_lb_args.debug() > 1) {
           std::string myNbors = "After MST: Node " + std::to_string(myNodeId) + ": Neighbors: ";
           for (int i = 0; i < sendToNeighbors.size(); i++)
           {
@@ -230,7 +230,7 @@ void DiffusionLB::startFirstRound()
     if (rank0_barrier_counter == numNodes)
     {
         rank0_barrier_counter = 0;
-        if (_lb_args.debug())
+        if (_lb_args.debug() > 1)
         {
             CkPrintf("MST is built. Begin finding remaining neighbors.\n");
         }
@@ -253,7 +253,7 @@ void DiffusionLB::findNBorsRound()
     {
         neighborCount = sendToNeighbors.size();
 
-        if (_lb_args.debug())
+        if (_lb_args.debug() > 1)
         {
             std::string myNbors = "After Nbor Finding: Node " + std::to_string(myNodeId) + ": Neighbors: ";
             for (int i = 0; i < sendToNeighbors.size(); i++)
@@ -341,12 +341,12 @@ void DiffusionLB::askNbor(int nborId, int rnd)
     }
     else
     {
-        if (_lb_args.debug())
+        if (_lb_args.debug() == 3)
         {
             CkPrintf("\nNode-%d, round =%d Rejecting %d ", thisIndex, round, nborId);
         }
     }
-    if (_lb_args.debug())
+    if (_lb_args.debug() == 3)
     {
         CkPrintf("\n[PE-%d(node-%d)]Sending okay to nbor PE-%d(%d*%d)", thisIndex, myNodeId, nborId * nodeSize, nborId, nodeSize);
     }
@@ -357,20 +357,20 @@ void DiffusionLB::okayNbor(int agree, int nborId)
     int nborsNeeded = NUM_NEIGHBORS - sendToNeighbors.size() - holds[round];
     if (nborsNeeded > 0 && agree && std::find(sendToNeighbors.begin(), sendToNeighbors.end(), nborId) == sendToNeighbors.end())
     {
-        if (_lb_args.debug()) CkPrintf("\n[Node-%d, round-%d] Rcvd ack, adding %d as nbor (neighbors:%d/%d, holds[%d]=%d)", thisIndex, round, nborId, sendToNeighbors.size(), NUM_NEIGHBORS, round, holds[round]);
+        if (_lb_args.debug() == 3) CkPrintf("\n[Node-%d, round-%d] Rcvd ack, adding %d as nbor (neighbors:%d/%d, holds[%d]=%d)", thisIndex, round, nborId, sendToNeighbors.size(), NUM_NEIGHBORS, round, holds[round]);
         addNeighbor(nborId);
         thisProxy[nborId * nodeSize].ackNbor(myNodeId /*thisIndex*/);
     }
     else
     {
-        if (_lb_args.debug()) CkPrintf("\n[Node-%d] Decided not to pursue orig request to node %d", thisIndex, nborId);
+        if (_lb_args.debug() == 3) CkPrintf("\n[Node-%d] Decided not to pursue orig request to node %d", thisIndex, nborId);
     }
 }
 void DiffusionLB::ackNbor(int nborId)
 {
     if (std::find(sendToNeighbors.begin(), sendToNeighbors.end(), nborId) == sendToNeighbors.end())
     {
-        if (_lb_args.debug()) CkPrintf("\n[Node-%d] Adding neighbor [%d] through final ack (neighbors:%d/%d)", thisIndex, nborId, sendToNeighbors.size(), NUM_NEIGHBORS);
+        if (_lb_args.debug() == 3) CkPrintf("\n[Node-%d] Adding neighbor [%d] through final ack (neighbors:%d/%d)", thisIndex, nborId, sendToNeighbors.size(), NUM_NEIGHBORS);
         addNeighbor(nborId);
     }
 }

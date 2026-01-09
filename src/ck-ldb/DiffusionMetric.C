@@ -292,11 +292,11 @@ int MetricComm::popBestObject(int nbor)
     }
   }
 
-  if (bestObject != -1)
-  {
-    assert(objAvailable[bestObject]);
-    objAvailable[bestObject] = false;
-  }
+  // if (bestObject != -1)
+  // {
+  //   assert(objAvailable[bestObject]);
+  //   objAvailable[bestObject] = false;
+  // }
   // else
   // {
   //   CkPrintf("No object found for neighbor %d, with capacity %f\n", nbor,
@@ -321,7 +321,12 @@ int MetricComm::getBestNeighbor()
 
 void MetricComm::updateState(int objId, int destNbor)
 {
-  toSendLoad[destNbor] -= nodeStats->objData[objId].wallTime;
+  double objLoad = nodeStats->objData[objId].wallTime;
+  if(_lb_args.debug() > 2)
+    CkPrintf("Node %d: migrating obj %d (load %.6f) to neighbor %d (tosend before: %.6f, after: %.6f)\n", 
+            myNodeId, objId, objLoad, sendToNeighbors[destNbor], 
+            toSendLoad[destNbor], toSendLoad[destNbor] - objLoad);
+  toSendLoad[destNbor] -= objLoad;
   if(objId<0 || objId>=n_objs)
     return;
   for (std::pair<int, int> edge : objCommEdges[objId])
@@ -329,13 +334,14 @@ void MetricComm::updateState(int objId, int destNbor)
     int toObj = edge.first;
     int comm = edge.second;
 //    CkPrintf("\n[%d][%d]", toObj, comm);
-    if(toObj<0 || toObj>=n_objs) continue; //replace with assert
+    if(toObj<0 || toObj>=n_objs) CkAbort("Error: invalid toObj %d in MetricComm::updateState\n", toObj);
     if (objAvailable[toObj])
     {
       externalComm[destNbor][toObj] += comm;
       internalComm[toObj] -= comm;
     }
   }
+  objAvailable[objId] = false;
 }
 
 MetricCentroid::MetricCentroid(std::vector<std::vector<double>> nborCentroids,
@@ -355,6 +361,12 @@ MetricCentroid::MetricCentroid(std::vector<std::vector<double>> nborCentroids,
   position_dim = myCentroid.size();
   neighborCount = nborCentroids.size();
   n_objs = ns->objData.size();
+
+  if (sendToNeighbors.size() != neighborCount)
+  {
+    CkAbort("Error: on node %d, sendToNeighbors size %d does not match neighborCount %d\n",
+            myNodeId, sendToNeighbors.size(), neighborCount);
+  }
 
   objAvailable.resize(n_objs, true);
   objPosition.resize(n_objs);
@@ -409,9 +421,22 @@ MetricCentroid::MetricCentroid(std::vector<std::vector<double>> nborCentroids,
 
 int MetricCentroid::popBestObject(int nbor)
 {
-  // find index of object with max internal comm
+  // find index of object with min distance to neighbor centroid
   double minDistance = std::numeric_limits<double>::max();
   int bestObject = -1;
+  
+  // Validate neighbor index
+  if (nbor < 0 || nbor >= neighborCount)
+  {
+    CkAbort("Error: on node %d, invalid neighbor index %d (must be 0 to %d) in MetricCentroid::popBestObject\n", 
+            myNodeId, nbor, neighborCount - 1);
+  }
+  
+  // Snapshot the current capacity to avoid stale reads
+  double nborCapacity = toSendLoad[nbor];
+
+  if(_lb_args.debug() == 3)
+    CkPrintf("Node %d: popBestObject for neighbor %d with capacity %.6f\n", myNodeId, nbor, nborCapacity);
 
   for (int i = 0; i < n_objs; i++)
   {
@@ -419,24 +444,36 @@ int MetricCentroid::popBestObject(int nbor)
 
     if (objNborDistances[i].size() <= nbor)
     {
+      if (nodeStats->objData[i].position.size() != 0){
+        CkAbort("Error: on node %d invalid neighbor %d for object %d in MetricCentroid::popBestObject\n", myNodeId, nbor, i);
+      }
       continue;
     }
-    int testDistance = objNborDistances[i][nbor];
+    double testDistance = objNborDistances[i][nbor];
     bool migratable = nodeStats->objData[i].migratable;
     bool available = objAvailable[i];
 
     if (testDistance < minDistance && available && migratable &&
-        (objLoad <= toSendLoad[nbor]))
+        (objLoad <= nborCapacity))
     {
       minDistance = testDistance;
       bestObject = i;
+    } else if (_lb_args.debug() == 3) {
+      if (myNodeId == 5) {
+        CkPrintf("Node %d: Object %d rejected - ", myNodeId, i);
+        if (testDistance >= minDistance)
+          CkPrintf("distance %.6f >= current min %.6f ", testDistance, minDistance);
+        if (!available)
+          CkPrintf("not available ");
+        if (!migratable)
+          CkPrintf("not migratable ");
+        if (objLoad > nborCapacity)
+          CkPrintf("load %.6f > capacity %.6f", objLoad, nborCapacity);
+        CkPrintf("\n");
+      }
     }
   }
 
-  if (bestObject != -1)
-  {
-    objAvailable[bestObject] = false;
-  }
   return bestObject;
 }
 
@@ -458,7 +495,8 @@ int MetricCentroid::getBestNeighbor()
 void MetricCentroid::updateState(int objId, int destNbor)
 {
   if(objId<0 || objId>=n_objs)
-    return;
+    CkAbort("Error: invalid objId %d in MetricCentroid::updateState\n", objId);
+  objAvailable[objId] = false;
   toSendLoad[destNbor] -= nodeStats->objData[objId].wallTime;
   if(nborCentroids.size()<=destNbor) return;
 
