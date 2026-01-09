@@ -33,6 +33,7 @@ class CkLBArgs
   bool _lb_migObjOnly;  // only consider migratable objs
   bool _lb_syncResume;
   bool _lb_diffcomm; // use communciation graph
+  bool _lb_noMST; // no MST in diffusion
   int _lb_diffnumnbors; // number of neighbors
   bool _lb_samePeSpeed;     // ignore cpu speed
   bool _lb_testPeSpeed;     // test cpu speed
@@ -54,6 +55,7 @@ class CkLBArgs
     _lb_debug = 0;
     _lb_ignoreBgLoad = _lb_syncResume = _lb_useCpuTime = false;
     _lb_diffcomm = false;
+    _lb_noMST = false;
     _lb_diffnumnbors = 1;
     _lb_printsummary = _lb_migObjOnly = false;
     _lb_statson = true;
@@ -75,6 +77,7 @@ class CkLBArgs
   inline bool& migObjOnly() { return _lb_migObjOnly; }
   inline bool& syncResume() { return _lb_syncResume; }
   inline bool& diffusionCommOn() { return _lb_diffcomm; }
+  inline bool& noMST() { return _lb_noMST; }
   inline int& diffusionNumNbors() { return _lb_diffnumnbors; }
   inline bool& samePeSpeed() { return _lb_samePeSpeed; }
   inline bool& testPeSpeed() { return _lb_testPeSpeed; }

@@ -64,6 +64,13 @@ void DiffusionLB::startMSTBarrier() {
 }
 void DiffusionLB::beginMST()
 {
+
+    // TODO: add option to just start first round here (no mst):
+    if (_lb_args.noMST()){
+        thisProxy[0].startFirstRound(); 
+        return;
+    }
+
     if (_lb_args.debug() > 1)
     {
         CkPrintf("Beginning MST building\n");

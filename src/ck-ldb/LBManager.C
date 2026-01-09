@@ -372,6 +372,9 @@ void _loadbalancerInit()
 
   _lb_args.diffusionCommOn() =
       CmiGetArgFlagDesc(argv, "+LBDiffusionCommOn", "LB uses diffusion communication");
+
+    _lb_args.noMST() =
+      CmiGetArgFlagDesc(argv, "+LBnoMST", "diffusion uses no MST");
     
   CmiGetArgIntDesc(
       argv, "+LBDiffusionNumNbors", &_lb_args.diffusionNumNbors(),
@@ -492,6 +495,7 @@ void LBManager::initnodeFn()
   _registerCommandLineOpt("+LBShowDecisions");
   _registerCommandLineOpt("+LBSyncResume");
   _registerCommandLineOpt("+LBDiffusionCommOn");
+  _registerCommandLineOpt("+LBnoMST");
   _registerCommandLineOpt("+LBDiffusionNumNbors");
   _registerCommandLineOpt("+LBDebug");
   _registerCommandLineOpt("+LBPrintSummary");
