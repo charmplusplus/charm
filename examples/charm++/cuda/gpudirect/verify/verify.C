@@ -60,6 +60,8 @@ struct Container {
             i, val, h_remote_data[i]);
       }
     }
+
+    CmiPrintf("Data verified, looks OK!\n");
   }
 };
 
@@ -70,9 +72,9 @@ class Main : public CBase_Main {
 public:
   Main(CkArgMsg* m) {
     main_proxy = thisProxy;
-    block_size = 16;
-    n_iters = 3;
-    n_warpup_iters = 1;
+    block_size = 16 * 1028;
+    n_iters = 50;
+    n_warpup_iters = 3;
     test_nodegroup = true;
     lb_test = false;
 
@@ -122,35 +124,35 @@ public:
 
   void test() {
     // warm up
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < n_warpup_iters; i++) {
       array_proxy[0].send();
+      CkWaitQD();
+      ckout << "starting next batch of things" << endl;
     }
-    CkWaitQD();
     start_time = CkWallTimer();
     
-    ckout << "starting next batch of things" << endl;
-    // CkPrintf("Testing chare array... ");
+    CkPrintf("Testing chare array... ");
     for (int i = 0; i < n_iters; i++) {
       array_proxy[0].send();
     }
     CkWaitQD();
-    // CkPrintf("PASS\n");
+    CkPrintf("PASS\n");
 
-    // CkPrintf("Testing chare group... ");
-    // for (int i = 0; i < n_iters; i++) {
-    //   group_proxy[0].send();
-    //   CkWaitQD();
-    // }
-    // CkPrintf("PASS\n");
+    CkPrintf("Testing chare group... ");
+    for (int i = 0; i < n_iters; i++) {
+      group_proxy[0].send();
+    }
+    CkWaitQD();
+    CkPrintf("PASS\n");
 
-    // if (test_nodegroup) {
-    //   CkPrintf("Testing chare nodegroup... ");
-    //   for (int i = 0; i < n_iters; i++) {
-    //     nodegroup_proxy[0].send();
-    //     CkWaitQD();
-    //   }
-    //   CkPrintf("PASS\n");
-    // }
+    if (test_nodegroup) {
+      CkPrintf("Testing chare nodegroup... ");
+      for (int i = 0; i < n_iters; i++) {
+        nodegroup_proxy[0].send();
+      }
+      CkWaitQD();
+      CkPrintf("PASS\n");
+    }
 
     CkPrintf("Elapsed: %.6lf s\n", CkWallTimer() - start_time);
     CkExit();
@@ -188,7 +190,6 @@ public:
   void recv(int& size, double*& data, CkDeviceBufferPost* post) {
     data = container.d_remote_data;
     post[0].hapi_stream = container.stream;
-    ckout << "OKay recv 1 done" << endl;
   }
 
   void recv(int size, double* data) {
@@ -197,12 +198,9 @@ public:
       pe = CkMyPe();
       AtSync();
     }
-    ckout << "okay recv 2 also done" << endl;
   }
 
-  void reuse() {
-    ckout << "okay src callback called as well" << endl;
-  }
+  void reuse() {}
 
   void ResumeFromSync() {}
 };

@@ -59,11 +59,6 @@ CsvExtern(GPUManager, gpu_manager);
 
 void CkRdmaDeviceRecvHandler(void* data)
 {
-#if CMK_GPU_COMM
-  // Process QD to mark completion of buffer transfer
-  QdProcess(1);
-#endif
-
   DeviceRdmaOp* op = (DeviceRdmaOp*)data;
   DeviceRdmaInfo* info = op->info;
 
@@ -92,11 +87,6 @@ void CkRdmaDeviceRecvHandler(void* data)
 // Invoked when a GPU buffer arrives on the receiver
 void CkRdmaDeviceRecvHandler(void* data, void* msg)
 {
-#if CMK_GPU_COMM
-  // Process QD to mark completion of buffer transfer
-  QdProcess(1);
-#endif
-
   DeviceRdmaOp* op = (DeviceRdmaOp*)data;
   DeviceRdmaInfo* info = op->info;
 
