@@ -3,6 +3,9 @@ void DiffusionLB::startStrategy()
   if (++rank0_barrier_counter < numNodes)
     return;
 
+  // End neighbor selection timing
+  endNeighborTiming();
+
   if (CkMyPe() == 0 && numNodes == 1) {
     CkCallback cb(CkIndex_DiffusionLB::WithinNodeLB(), thisProxy);
     CkStartQD(cb);
@@ -17,6 +20,10 @@ void DiffusionLB::startStrategy()
   if (_lb_args.debug() > 1) CkPrintf("--------NEIGHBOR SELECTION COMPLETE (Using Comm? %s)--------\n",
            _lb_args.diffusionCommOn() ? "true" : "false");
   fflush(stdout);
+  
+  // Start pseudo LB timing
+  startPseudoLBTiming();
+  
   for (int i = 0; i < numNodes; i++) thisProxy[i * nodeSize].pseudolb_rounds();
 }
 

@@ -160,6 +160,8 @@ module DiffusionLB
       // Calculate the aggregate load that has to be sent.
       serial "Aggregate load"
       {
+        endPseudoLBTiming();
+        startOtherTiming();
         if (_lb_args.debug() > 1) CkPrintf("PSEUDO: Node %d (load %f) with pseudo_load after LB %f\n", myNodeId,
                  my_load, my_pseudo_load);
         loadReceivers = 0;

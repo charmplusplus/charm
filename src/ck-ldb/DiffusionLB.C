@@ -38,6 +38,21 @@
 // Percentage of error acceptable.
 #define THRESHOLD 2
 
+// Initialize static Diffusion timing variables
+double DiffusionLB::totalNeighborTime = 0.0;
+double DiffusionLB::totalLBTime = 0.0;
+double DiffusionLB::totalStartTime = 0.0;
+double DiffusionLB::totalPseudoLBTime = 0.0;
+double DiffusionLB::totalOtherTime = 0.0;
+double DiffusionLB::phaseStartTime = 0.0;
+
+static bool diffusionTimingExitRegistered = false;
+
+static void printDiffusionTimingAtExit() {
+  DiffusionLB::printDiffusionTiming();
+  CkContinueExit();
+}
+
 // CreateLBFunc_Def(DiffusionLB, "The distributed graph refinement load balancer")
 static void lbinit()
 {
@@ -45,6 +60,12 @@ static void lbinit()
                                   "The distributed graph refine load balancer");
 
   numPes = CkNumPes();
+  
+  // Register exit function to print Diffusion timing
+  if (!diffusionTimingExitRegistered) {
+    registerExitFn(printDiffusionTimingAtExit);
+    diffusionTimingExitRegistered = true;
+  }
 }
 
 using std::vector;
@@ -104,6 +125,7 @@ DiffusionLB::~DiffusionLB()
 // Main entry point for the load balancer
 void DiffusionLB::Strategy(const DistBaseLB::LDStats* const stats)
 {
+  startOverallTiming();
   total_migrates = 0;
 
   if (CkMyPe() == 0 && _lb_args.debug() >= 1)
@@ -424,6 +446,7 @@ void DiffusionLB::WithinNodeLB()
 
 void DiffusionLB::ProcessMigrations()
 {
+  endOtherTiming();
   BaseLB::endLBStrategyTiming();
 
   // SAME AS IN PACKANDSENDMIGRATEMSGS
@@ -544,6 +567,19 @@ void DiffusionLB::MigrationDoneWrapper()
   MigrationDone(balancing);  // call DistBaseLB version
   
   // End LB timing instrumentation
+}
+
+void DiffusionLB::printDiffusionTiming()
+{
+  if (CkMyPe() == 0 && (totalNeighborTime > 0 || totalPseudoLBTime > 0 || totalOtherTime > 0))
+  {
+    CkPrintf("\n[DiffusionLB Timing] Neighbor Selection: %.6f seconds\n", totalNeighborTime);
+    CkPrintf("[DiffusionLB Timing] Pseudo LB: %.6f seconds\n", totalPseudoLBTime);
+    CkPrintf("[DiffusionLB Timing] Other (AcrossNode + WithinNode): %.6f seconds\n", totalOtherTime);
+    CkPrintf("[DiffusionLB Timing] Total: %.6f seconds (sum of phases %.6f)\n", 
+             totalLBTime, 
+             totalNeighborTime + totalPseudoLBTime + totalOtherTime);
+  }
 }
 
 #include "DiffusionLB.def.h"

@@ -33,6 +33,8 @@ public:
   DiffusionLB_SDAG_CODE DiffusionLB(const CkLBOptions&);
   DiffusionLB(CkMigrateMessage* m);
   ~DiffusionLB();
+    static void printDiffusionTiming();
+
 
   // void MigratedHelper(LDObjHandle h, int waitBarrier);
   // void Migrated(LDObjHandle h, int waitBarrier = 1);
@@ -180,6 +182,23 @@ private:
   // phase 5: migration --------------------------------
   std::vector<MigrateInfo*> migrateInfo;
   int total_migrates;
+
+  // Diffusion-specific timing instrumentation
+  static double totalNeighborTime;
+  static double totalPseudoLBTime;
+  static double totalOtherTime;
+  static double phaseStartTime;
+  static double totalStartTime;
+  static double totalLBTime;
+  
+  static void startOverallTiming() { totalStartTime = CmiWallTimer(); }
+  static void startNeighborTiming() { phaseStartTime = CmiWallTimer(); }
+  static void endNeighborTiming() { totalNeighborTime += CmiWallTimer() - phaseStartTime; }
+  static void startPseudoLBTiming() { phaseStartTime = CmiWallTimer(); }
+  static void endPseudoLBTiming() { totalPseudoLBTime += CmiWallTimer() - phaseStartTime; }
+  static void startOtherTiming() { phaseStartTime = CmiWallTimer(); }
+  static void endOtherTiming() { totalOtherTime += CmiWallTimer() - phaseStartTime;
+  totalLBTime += CmiWallTimer() - totalStartTime; }
 
   // main entry point
   void Strategy(const DistBaseLB::LDStats* const stats);

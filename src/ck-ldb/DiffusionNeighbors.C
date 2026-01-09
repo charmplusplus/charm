@@ -21,6 +21,9 @@ void DiffusionLB::findNBors(int do_again)
     if (thisIndex != rank0PE)
         return;
 
+    // Start timing neighbor selection
+    startNeighborTiming();
+
     if (numNodes == 1)
     {
         if (_lb_args.debug() > 1)
