@@ -24,6 +24,7 @@ void DiffusionLB::startStrategy()
   // Start pseudo LB timing
   startPseudoLBTiming();
   
+  if (numNodes > 1)
   for (int i = 0; i < numNodes; i++) thisProxy[i * nodeSize].pseudolb_rounds();
 }
 
