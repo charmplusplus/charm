@@ -94,6 +94,7 @@ void DiffusionLB::PseudoLoadBalancing()
     nborsToBalance.push_back(p);
     sumNeighborLoads += load;
   }
+  currAverage = (my_pseudo_load + sumNeighborLoads) / (nborsToBalance.size() + 1);
 
   // If no neighbors need balancing, we're done
   if (nborsToBalance.empty())

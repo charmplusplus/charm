@@ -61,8 +61,8 @@ int myrand(int numpes)
 #define index(a, b, c) \
   ((a) + (b) * (blockDimX + 2) + (c) * (blockDimX + 2) * (blockDimY + 2))
 
-#define MAX_ITER 40
-#define LBPERIOD_ITER 4  // LB is called every LBPERIOD_ITER number of program iterations
+#define MAX_ITER 2
+#define LBPERIOD_ITER 1  // LB is called every LBPERIOD_ITER number of program iterations
 #define CHANGELOAD 30
 #define LEFT 1
 #define RIGHT 2
@@ -130,11 +130,11 @@ public:
     CkPrintf("Block Dimensions: %d %d %d\n", blockDimX, blockDimY, blockDimZ);
 
     // Create new array of worker chares
-    //    CProxy_Grid2DMap myMap = CProxy_Grid2DMap::ckNew(num_chare_x, num_chare_y);
+    CProxy_Grid2DMap myMap = CProxy_Grid2DMap::ckNew(num_chare_x, num_chare_y);
 
     // // Make a new array using that map
     CkArrayOptions opts(num_chare_x, num_chare_y, num_chare_z);
-    // opts.setMap(myMap);
+    opts.setMap(myMap);
     array = CProxy_Stencil::ckNew(opts);
   }
 
@@ -460,6 +460,60 @@ public:
    
     if (proc >= nprocs)
       CkAbort("Error: Chare (%d, %d) mapped to processor %d >= %d\n", x, y, proc, nprocs);
+    return proc;
+  }
+};
+
+class Grid3DMap : public CkArrayMap
+{
+public:
+  int M, N, P;  // size of x, y and z dims
+  int procsM, procsN, procsP;
+
+  Grid3DMap(int xdim, int ydim, int zdim)
+  {
+    M = xdim;
+    N = ydim;
+    P = zdim;
+
+    int nprocs = CkNumPes();
+    
+    // Try to create a cubic-ish processor grid
+    procsM = std::ceil(std::cbrt(nprocs));
+    
+    // Find factors for remaining dimensions
+    int remaining = nprocs / procsM;
+    procsN = std::ceil(std::sqrt(remaining));
+    procsP = nprocs / (procsM * procsN);
+
+    if (procsM * procsN * procsP != nprocs) {
+      CkAbort("Processor grid failed to generate with %d processors (attempting %d x %d x %d = %d)\n", 
+              nprocs, procsM, procsN, procsP, procsM * procsN * procsP);
+    }
+  }
+  
+  Grid3DMap(CkMigrateMessage* m) {}
+  int registerArray(CkArrayIndex& numElements, CkArrayID aid) { return 0; }
+
+  int procNum(int arrayHdl, const CkArrayIndex& idx)
+  {
+    int x = idx.data()[0];
+    int y = idx.data()[1];
+    int z = idx.data()[2];
+
+    int dataperblock_x = ceil(M / (double)procsM);
+    int dataperblock_y = ceil(N / (double)procsN);
+    int dataperblock_z = ceil(P / (double)procsP);
+
+    int block_x = x / (double)dataperblock_x;
+    int block_y = y / (double)dataperblock_y;
+    int block_z = z / (double)dataperblock_z;
+
+    int proc = block_x * procsN * procsP + block_y * procsP + block_z;
+    
+    if (proc >= CkNumPes())
+      CkAbort("Error: Chare (%d, %d, %d) mapped to processor %d >= %d\n", 
+              x, y, z, proc, CkNumPes());
     return proc;
   }
 };

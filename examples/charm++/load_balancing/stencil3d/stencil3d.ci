@@ -55,6 +55,11 @@ mainmodule stencil3d {
   {
     entry Grid2DMap(int xdim, int ydim);
   };
+
+   group Grid3DMap : CkArrayMap
+  {
+    entry Grid3DMap(int xdim, int ydim, int zdim);
+  };
 };
 
 
