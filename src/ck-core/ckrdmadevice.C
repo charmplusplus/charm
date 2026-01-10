@@ -303,7 +303,6 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     } else if (mode == CkNcpyModeDevice::IPC && csv_gpu_manager.use_shm) {
       int cuda_device = -1;
       cudaGetDevice(&cuda_device);
-      CmiPrintf("Inside za receiver, gpu id : %d\n", cuda_device);
       // Inter-process using shared memory optimizations
       // Use optimiziations with POSIX shared memory
       hapi_ipc_device_info& device_info =
@@ -333,7 +332,6 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
       pthread_mutex_lock(&shm_event_shared->lock);
       shm_event_shared->dst_flag = true;
       pthread_mutex_unlock(&shm_event_shared->lock);
-      CmiPrintf("Done with za reciever as well\n");
     } else {
       // Handle all other cases (basic inter-process and inter-node)
       // Transfer the received/unpacked data on host to the destination device buffer
@@ -443,13 +441,12 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
   //       location update after migration (with CMK_GLOBAL_LOCATION_UPDATE).
   CkNcpyModeDevice transfer_mode = findTransferModeDevice(CkMyPe(), dest_pe);
 
-  if(transfer_mode == CkNcpyModeDevice::MEMCPY) return;
-
   // Store destination PE in the metadata message
   // FIXME: Not necessary? save_op.dest_pe is set to CkMyPe() on the receiver
   for (int i = 0; i < numops; i++) {
     buffers[i]->dest_pe = dest_pe;
   }
+  if(transfer_mode == CkNcpyModeDevice::MEMCPY) return;
 
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
   int cpv_my_device_id = CmiMyRank() % csv_gpu_manager.device_count;
@@ -457,7 +454,6 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
   if(transfer_mode == CkNcpyModeDevice::IPC && csv_gpu_manager.use_shm) {
     int cuda_device = -1;
     cudaGetDevice(&cuda_device);
-    CmiPrintf("Inside za sender, gpu id : %d\n", cuda_device);
     // Use optimizations with POSIX shaerd memory
     // Allocate blocks on device comm buffer
     DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
@@ -492,7 +488,6 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
       // Record event
       hapi_ipc_device_info& my_device_info = csv_gpu_manager.hapi_ipc_device_infos[(csv_gpu_manager.device_count * CmiMyNodeRankLocal() + cpv_my_device_id)];
       hapiCheck(hapiEventRecord(my_device_info.src_event_pool[buffers[i]->event_idx], buffers[i]->hapi_stream));
-      CmiPrintf("Done with za sender\n");
     }
   } else if(transfer_mode == CkNcpyModeDevice::RDMA) {
 #if !CMK_GPU_COMM

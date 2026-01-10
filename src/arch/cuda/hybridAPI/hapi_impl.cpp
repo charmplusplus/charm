@@ -131,7 +131,6 @@ void hapiInit(char** argv) {
   }
 
   shmInit();
-  CmiPrintf("HAPI> HAPI callback left only now\n");
 
   hapiRegisterCallbacks(); // Register callback functions
 
@@ -413,7 +412,6 @@ static void hapiMapping(char** argv) {
       CmiPrintf("HAPI> P2P access between devices not enabled\n");
     }
   }
-  CmiPrintf("HAPI> HAPI mapping all done\n");
 }
 
 #ifndef HAPI_CUDA_CALLBACK
@@ -699,8 +697,6 @@ void hapiWorkRequestSetCallback(hapiWorkRequest* wr, void* cb) {
 static void shmInit() {
   if (!CsvAccess(gpu_manager).use_shm) return;
 
-  CmiPrintf("SHM> init start\n");
-
   if (CmiMyRank() == 0) {
     shmSetup();
     if (CmiMyNodeRankLocal() == 0) {
@@ -715,13 +711,9 @@ static void shmInit() {
     CmiBarrier();
   }
 
-  CmiPrintf("SHM> some done\n");
-
   CmiNodeBarrier(); // Ensure shared memory has been mapped into the logical node
 
   ipcHandleCreate(); // Create CUDA IPC handles
-
-  CmiPrintf("Ipc handle creation also done\n");
 
   // Ensure CUDA IPC handles are available for all processes
   // Note: Causes a hang when this barrier is placed after CPU topology initialization
@@ -729,10 +721,8 @@ static void shmInit() {
   CmiBarrier();
 
   if (CmiMyRank() == 0) {
-    CmiPrintf("Trying ipc handles now\n");
     ipcHandleOpen(); // Open CUDA IPC handles for accessing other processes' device memory
   }
-  CmiPrintf("ipc handle opne faulting\n");
 }
 
 static void shmSetup() {
