@@ -91,19 +91,16 @@ void DiffusionLB::AcrossNodeLB()
 
       double currLoad = objs[v_id].getVertexLoad();
       objs[v_id].setCurrPe(-1);
-      int objId = objs[v_id].getVertexId();
 
-      int rank = GetPENumber(objId);
+      int rank = GetRank(v_id);
       int node = sendToNeighbors[nborId];
       int donorPE = rank0PE + rank;
       int destPE = node * nodeSize;  // send to rank0PE of dest node
       CkAssert(destPE != donorPE);   // if this is hit, our neighbor choice is not working
 
       if (nodeStats->from_proc[v_id] != donorPE) {
-        continue;
         CkAbort(
-            "ERROR: not sure if this is supposed to work, but from_proc[%d] = %d, "
-            "donorPE = %d\n",
+            "ERROR: Across Node LB - from_proc[%d] = %d does not match donorPE = %d\n",
             v_id, nodeStats->from_proc[v_id], donorPE);
       }
 
@@ -113,14 +110,21 @@ void DiffusionLB::AcrossNodeLB()
       metric->updateState(v_id, nborId);  // update state to keep track of migrations
 
       LDObjHandle objHandle = nodeStats->objData[v_id].handle;
-      thisProxy[destPE].LoadMetaInfo(objHandle, objId, currLoad, donorPE, 0);
-      thisProxy[donorPE].LoadReceived(objId, destPE);
+
+      int pe_local_id = v_id;
+      if (donorPE != rank0PE) {
+        pe_local_id = v_id - prefixObjects[donorPE - rank0PE - 1];
+        if (_lb_args.debug() > 1) CkPrintf("[PE %d] Adjusted local obj id for LoadReceived: %d\n", CkMyPe(), pe_local_id);
+      }
+
+      thisProxy[destPE].LoadMetaInfo(objHandle, pe_local_id, currLoad, donorPE, 0);     
+      thisProxy[donorPE].LoadReceived(pe_local_id, destPE);
       nodeStats->to_proc[v_id] = destPE;
     }
   }
 
 
-  
+
 }
 
 // When load balancing, remove object handle from your list, since it is about to be
@@ -128,22 +132,28 @@ void DiffusionLB::AcrossNodeLB()
 /* LoadMetaInfo is called on the receiver with the object that will be migrated to it
  * (via a MigrateMe in  LoadReceived). It is only called when migrating at the node
  * level. Not sure why the receiver would already have this handle though...*/
-void DiffusionLB::LoadMetaInfo(LDObjHandle h, int objId, double load, int senderPE, int only_mcount)
+void DiffusionLB::LoadMetaInfo(LDObjHandle h, int local_id, double load, int senderPE, int only_mcount)
 {
+  // local_id should be PE local here
   migrates_expected++;
   if(only_mcount)
     return;
+  if (CkMyPe() != rank0PE) {
+    CkAbort("Error: LoadMetaInfo called during across node on non-rank0PE %d\n", CkMyPe());
+  }
   pe_load[0] += load;
   int idx = FindObjectHandle(h);  // if object is in my handles
   if (idx == -1)
   {
     objectHandles.push_back(h);
-    objectSrcIds.push_back(objId);
+    objectSrcIds.push_back(local_id);
     objectLoads.push_back(load);
     objSenderPEs.push_back(senderPE);
   }
   else
   {
+    CkAbort("Error: LoadMetaInfo called for object handle %d that already exists on PE %d\n",
+            h.handle, CkMyPe());
 #if 0
     CascadingMigration(h, load);
     objectHandles[idx] = objectHandles[objectHandles.size() - 1];

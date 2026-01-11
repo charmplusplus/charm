@@ -132,6 +132,8 @@ void DistBaseLB::LoadBalance() {
 
 void DistBaseLB::Migrated(int waitBarrier) {
   migrates_completed++;
+  if (_lb_args.debug() > 2) CkPrintf("[%d] Migrated called %d of %d\n", CkMyPe(),
+      migrates_completed, migrates_expected);
   if (migrates_completed == migrates_expected && lb_started) {
     MigrationDone(1);
   }

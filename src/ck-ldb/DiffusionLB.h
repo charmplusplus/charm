@@ -206,7 +206,7 @@ private:
   // helper functions
   int findNborIdx(int node);
   double avgNborLoad();  // used in pseudoLB only
-  int GetPENumber(int& obj_id);
+  int GetRank(int obj_id);
   void BuildStats();
   CLBStatsMsg* AssembleStats();
   void AddToList(CLBStatsMsg* m, int rank);

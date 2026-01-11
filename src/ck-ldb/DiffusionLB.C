@@ -221,20 +221,27 @@ void DiffusionLB::InitializeObjHeap(int n)
 }
 
 // Create a migrate message for this obj from resident PE to rank0PE
-void DiffusionLB::LoadReceived(int objId, int from0PE)
+// objId should be PE local id of the object
+void DiffusionLB::LoadReceived(int objId, int destPE)
 {
+  int sourcePE = CkMyPe();
+  
+  if (objId < 0 || objId >= myStats->objData.size()) {
+    CkAbort("Error: objId %d out of bounds for size %d on PE %d\n", objId, (int)myStats->objData.size(), CkMyPe());
+  }
   // load is received, hence create a migrate message for the object with id objId.
   auto it = mig_id_map.find(objId);
   if(it!=mig_id_map.end()) {
     MigrateInfo* migrateMe = it->second;
-    migrateMe->to_pe = from0PE;
+    migrateMe->to_pe = destPE;
   } else {
     MigrateInfo* migrateMe = new MigrateInfo;
     migrateMe->obj = myStats->objData[objId].handle;
     migrateMe->from_pe = CkMyPe();
-    migrateMe->to_pe = from0PE;
-    if(CkMyPe()==rank0PE)
+    migrateMe->to_pe = destPE;
+    if(CkMyPe()==rank0PE){
       pe_load[CkMyRank()] -= myStats->objData[objId].wallTime;
+    }
     else
       thisProxy[rank0PE].update_peload(CkMyRank(), myStats->objData[objId].wallTime);
     // migrateMe->async_arrival = myStats->objData[objId].asyncArrival;
@@ -242,6 +249,8 @@ void DiffusionLB::LoadReceived(int objId, int from0PE)
     mig_id_map.emplace(objId, migrateMe);
     total_migrates++;
   }
+
+  if (_lb_args.debug() > 2) CkPrintf("[%d] Completing LoadReceived for objId %d to %d\n", CkMyPe(), objId, destPE);
 }
 
 void DiffusionLB::update_peload(int rank, double load) {
@@ -264,7 +273,7 @@ void DiffusionLB::WithinNodeLB()
   if (thisIndex == 0)
     if (_lb_args.debug() == 3) CkPrintf("--------STARTING WITHIN NODE LB--------\n");
 
-  if(nodeSize==1) {
+  if( nodeSize == 1) {
       if (_lb_args.debug() == 3) CkPrintf("--------Node size is 1--------\n");
 
     if (CkMyPe() == 0)
@@ -316,8 +325,12 @@ void DiffusionLB::WithinNodeLB()
           {
             objectSizes.push_back(objs[j].getVertexLoad());
 
-            objectIds.push_back(j );
-            objectPEs.push_back(/*GetPENumber(j)*/rank+rank0PE);
+            int pe_local_id = j;
+            if (rank != 0) {
+              pe_local_id = j - prefixObjects[rank - 1];
+            }
+            objectIds.push_back(pe_local_id);
+            objectPEs.push_back(rank+rank0PE);
             objectHdl.push_back(nodeStats->objData[j].handle);
             isToken.push_back(0);
             overLoad -= objs[j].getVertexLoad();
@@ -328,8 +341,7 @@ void DiffusionLB::WithinNodeLB()
           for(int i=0;i<objectLoads.size();i++) {
             if(objectLoads[i] <= overLoad) {
               objectSizes.push_back(objectLoads[i]);
-              //CkPrintf("Adding object with objectSrcId %d with load %lf\n", objectSrcIds[i], objectLoads[i]);
-              objectIds.push_back(objectSrcIds[i]/*objHandle*/);
+              objectIds.push_back(objectSrcIds[i]); // this is pe local id
               objectHdl.push_back(objectHandles[i]);
               objectPEs.push_back(objSenderPEs[i]);
               isToken.push_back(1);
@@ -376,9 +388,19 @@ void DiffusionLB::WithinNodeLB()
         minPE = minPes.deleteMin();
         continue;
       }
-      int objId = maxObj->Id;
-      int pe = GetPENumber(objId);
-      if (maxObj->load > diff || pe_load[pe] < avgPE - threshold)
+      int objId = maxObj->Id; // this is the pe local id of the object
+      int nodeObjId = objId; // node local id (to be cmoputed below)
+
+      // TODO!!!! objID must be the pe_local one the whole time!! otherwise, might tyr to compute pe index here for non local object!!
+      int rank = maxObj->pe % nodeSize; // donor PE rank (original)
+      bool is_local = !maxObj->token;
+
+      if (!is_local) rank = 0; // coming from rank0PE (as a token)
+
+      if (rank > 0)
+        nodeObjId += prefixObjects[rank - 1];
+
+      if (maxObj->load > diff || pe_load[rank] < avgPE - threshold)
       {
         delete maxObj;
         continue;
@@ -386,23 +408,29 @@ void DiffusionLB::WithinNodeLB()
 
       int destPE = rank0PE + minPE->Id;
       int donorPE = maxObj->pe;
+
+      if (is_local && donorPE != rank + rank0PE) {
+        CkAbort("Error: donorPE %d does not match object PE %d = %d + %d\n", donorPE, rank+rank0PE, rank, rank0PE);
+      }
+
       LDObjHandle objHandle = maxObj->handle;
-      double currLoad = maxObj->load;
-
-      // update nodestats for within node migration as well
-      nodeStats->to_proc[objId] = destPE;
-
-      thisProxy[destPE].LoadMetaInfo(objHandle, objId, currLoad, donorPE, 1); // to the receiving PE (mig++)
+      double currLoad = maxObj->load;     
  
-      if(maxObj->token) {
+      if(!is_local) {
         migrates_expected--;
         //subtract from intermediate PE (rank0, i.e. me)
+      } else {
+        nodeStats->to_proc[nodeObjId] = destPE;
       }
-      
+    
+      if (objId < 0) {
+        CkAbort("Error: objId %d is negative for objId %d on donorPE %d (rank0PE %d)\n",
+                objId, objId, donorPE, rank0PE);
+      }
+      thisProxy[destPE].LoadMetaInfo(objHandle, objId, currLoad, donorPE, 1); // to the receiving PE (mig++)
       thisProxy[donorPE].LoadReceived(objId, destPE);
-
       pe_load[minPE->Id] += maxObj->load;
-      pe_load[pe] -= maxObj->load;
+      pe_load[rank] -= maxObj->load;
       if (pe_load[minPE->Id] < avgPE)
       {
         minPE->load += maxObj->load;//= pe_load[minPE->Id];

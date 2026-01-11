@@ -153,17 +153,14 @@ void DiffusionLB::AddToList(CLBStatsMsg* m, int rank)
   procStat.n_objs = m->objData.size();
 }
 
-int DiffusionLB::GetPENumber(int& obj_id)
+// takes in node local id and returns rank
+int DiffusionLB::GetRank(int obj_id)
 {
   int i = 0;
   for (i = 0; i < nodeSize; i++)
   {
     if (obj_id < prefixObjects[i])
     {
-      int prevAgg = 0;
-      if (i != 0)
-        prevAgg = prefixObjects[i - 1];
-      obj_id = obj_id - prevAgg;
       break;
     }
   }
