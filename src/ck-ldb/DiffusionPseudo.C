@@ -1,8 +1,14 @@
-void DiffusionLB::startStrategy()
+void DiffusionLB::startStrategyBarrier()
 {
   if (++rank0_barrier_counter < numNodes)
     return;
 
+    rank0_barrier_counter = 0;
+
+  startStrategy();
+}
+
+void DiffusionLB::startStrategy(){
   // End neighbor selection timing
   endNeighborTiming();
 
@@ -16,7 +22,6 @@ void DiffusionLB::startStrategy()
     CkStartQD(cb);
   }
 
-  rank0_barrier_counter = 0;
   if (_lb_args.debug() > 1) CkPrintf("--------NEIGHBOR SELECTION COMPLETE (Using Comm? %s)--------\n",
            _lb_args.diffusionCommOn() ? "true" : "false");
   fflush(stdout);

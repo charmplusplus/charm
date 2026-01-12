@@ -39,7 +39,8 @@ module DiffusionLB
 
     entry[reductiontarget] void startMSTBarrier();
 
-    entry[reductiontarget] void startStrategy();
+    entry void startStrategy();
+    entry void startStrategyBarrier();
     // entry [reductiontarget] void DoneNodeLB();
     // entry void MigratedHelper(LDObjHandle h, int waitBarrier);
     entry void ProcessMigrations();

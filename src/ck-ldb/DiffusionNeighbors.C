@@ -21,9 +21,11 @@ void DiffusionLB::findNBors(int do_again)
     if (thisIndex != rank0PE)
         return;
 
-    // Start timing neighbor selection
     startNeighborTiming();
 
+
+    // Start timing neighbor selection
+   
     if (numNodes == 1)
     {
         if (_lb_args.debug() > 1)
@@ -48,6 +50,7 @@ void DiffusionLB::findNBors(int do_again)
     if (_lb_args.diffusionCommOn())
     {
         createCommList();
+
         beginMST();
     }
     else
@@ -254,14 +257,11 @@ void DiffusionLB::findNBorsRound()
     if (thisIndex != rank0PE) return;
 
     round++;
-    if (round < ROUNDS && thisIndex == 0)
-    {
-        CkCallback cb(CkIndex_DiffusionLB::findNBorsRound(), thisProxy);
-        CkStartQD(cb);
-    }
+
+    neighborCount = sendToNeighbors.size();
     if (round == ROUNDS)
     {
-        neighborCount = sendToNeighbors.size();
+        
 
         if (_lb_args.debug() > 1)
         {
@@ -272,7 +272,7 @@ void DiffusionLB::findNBorsRound()
             }
             CkPrintf("%s\n", myNbors.c_str());
         }
-        thisProxy[0].startStrategy();
+        thisProxy[0].startStrategyBarrier();
         return;
     }
 
@@ -303,6 +303,9 @@ void DiffusionLB::findNBorsRound()
             local_tries++;
         }
     }
+
+
+    thisProxy[0].next_phase(nborsNeeded);
     /*
       else
       {
@@ -319,8 +322,13 @@ void DiffusionLB::next_phase(int val)
     if (acks == numNodes)
     {
         acks = 0;
-        for (int i = 0; i < numNodes; i++)
-            thisProxy[i * nodeSize].findNBorsRound();
+        
+        if (max > 0) {
+            for (int i = 0; i < numNodes; i++)
+                thisProxy[i * nodeSize].findNBorsRound();
+        } else {
+            thisProxy[0].startStrategy();
+        }
         max = 0;
     }
 }

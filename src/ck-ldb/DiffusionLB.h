@@ -49,6 +49,7 @@ public:
   void ackNbor(int nbor);
   void statsAssembled();
   void startStrategy();
+  void startStrategyBarrier();
   void next_phase(int val);
   void sortArr(long arr[], int n, int* nbors);
 
