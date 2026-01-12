@@ -187,7 +187,8 @@ private:
   // Diffusion-specific timing instrumentation
   static double totalNeighborTime;
   static double totalPseudoLBTime;
-  static double totalOtherTime;
+  static double totalAcrossTime;
+  static double totalWithinTime;
   static double phaseStartTime;
   static double totalStartTime;
   static double totalLBTime;
@@ -197,9 +198,13 @@ private:
   static void endNeighborTiming() { totalNeighborTime += CmiWallTimer() - phaseStartTime; }
   static void startPseudoLBTiming() { phaseStartTime = CmiWallTimer(); }
   static void endPseudoLBTiming() { totalPseudoLBTime += CmiWallTimer() - phaseStartTime; }
-  static void startOtherTiming() { phaseStartTime = CmiWallTimer(); }
-  static void endOtherTiming() { totalOtherTime += CmiWallTimer() - phaseStartTime;
-  totalLBTime += CmiWallTimer() - totalStartTime; }
+  static void startAcrossTiming() { phaseStartTime = CmiWallTimer(); }
+  static void endAcrossTiming() { totalAcrossTime += CmiWallTimer() - phaseStartTime;}
+  static void startWithinTiming() { phaseStartTime = CmiWallTimer(); }
+  static void endWithinTiming() { 
+    totalWithinTime += CmiWallTimer() - phaseStartTime;
+    totalLBTime += CmiWallTimer() - totalStartTime; 
+  }
 
   // main entry point
   void Strategy(const DistBaseLB::LDStats* const stats);

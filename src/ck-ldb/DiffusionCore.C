@@ -20,6 +20,9 @@ void DiffusionLB::AcrossNodeLB()
     CkStartQD(cb);
   }
 
+  if (numNodes == 1)
+    return;  // nothing to do
+
   int n_objs = nodeStats->objData.size();
 
   gain_val = new int[n_objs];

@@ -43,8 +43,9 @@ double DiffusionLB::totalNeighborTime = 0.0;
 double DiffusionLB::totalLBTime = 0.0;
 double DiffusionLB::totalStartTime = 0.0;
 double DiffusionLB::totalPseudoLBTime = 0.0;
-double DiffusionLB::totalOtherTime = 0.0;
-double DiffusionLB::phaseStartTime = 0.0;
+  double DiffusionLB::totalAcrossTime = 0.0;
+double DiffusionLB::totalWithinTime = 0.0;
+  double DiffusionLB::phaseStartTime = 0.0;
 
 static bool diffusionTimingExitRegistered = false;
 
@@ -270,6 +271,8 @@ void DiffusionLB::update_peload(int rank, double load) {
 void DiffusionLB::WithinNodeLB()
 {
 
+   endAcrossTiming();
+      startWithinTiming();
   if (thisIndex == 0)
     if (_lb_args.debug() == 3) CkPrintf("--------STARTING WITHIN NODE LB--------\n");
 
@@ -469,12 +472,14 @@ void DiffusionLB::WithinNodeLB()
       CkStartQD(cb);
       }
     }
+
+    endWithinTiming();
   }
 }
 
 void DiffusionLB::ProcessMigrations()
 {
-  endOtherTiming();
+  if (CkMyPe() == 0)
   BaseLB::endLBStrategyTiming();
 
   // SAME AS IN PACKANDSENDMIGRATEMSGS
@@ -594,14 +599,15 @@ void DiffusionLB::MigrationDoneWrapper()
 
 void DiffusionLB::printDiffusionTiming()
 {
-  if (CkMyPe() == 0 && (totalNeighborTime > 0 || totalPseudoLBTime > 0 || totalOtherTime > 0))
+  if (CkMyPe() == 0 && (totalNeighborTime > 0 || totalPseudoLBTime > 0 || totalAcrossTime > 0 || totalWithinTime > 0))
   {
     CkPrintf("\n[DiffusionLB Timing] Neighbor Selection: %.6f seconds\n", totalNeighborTime);
     CkPrintf("[DiffusionLB Timing] Pseudo LB: %.6f seconds\n", totalPseudoLBTime);
-    CkPrintf("[DiffusionLB Timing] Other (AcrossNode + WithinNode): %.6f seconds\n", totalOtherTime);
+    CkPrintf("[DiffusionLB Timing] Across Node: %.6f seconds\n", totalAcrossTime);
+    CkPrintf("[DiffusionLB Timing] Within Node: %.6f seconds\n", totalWithinTime);
     CkPrintf("[DiffusionLB Timing] Total: %.6f seconds (sum of phases %.6f)\n", 
              totalLBTime, 
-             totalNeighborTime + totalPseudoLBTime + totalOtherTime);
+             totalNeighborTime + totalPseudoLBTime + totalAcrossTime + totalWithinTime);
   }
 }
 

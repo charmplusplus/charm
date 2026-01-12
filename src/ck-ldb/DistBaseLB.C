@@ -117,7 +117,9 @@ void DistBaseLB::AssembleStats() {
 void DistBaseLB::LoadBalance() {
 #if CMK_LBDB_ON
   strat_start_time = CkWallTimer();
-  BaseLB::startLBTiming();
+
+  if (CkMyPe() == 0)
+    BaseLB::startLBTiming();
 
   if (CkMyPe() == 0 &&  _lb_args.debug()) {
     CkPrintf("DistLB> %s: step %d starting at %f Memory: %f MB\n",
@@ -212,7 +214,8 @@ void DistBaseLB::ResumeClients(int balancing) {
           CmiMemoryUsage() / (1024.0 * 1024.0));
   }
 
-  BaseLB::endLBTiming();
+  if (CkMyPe() == 0)
+    BaseLB::endLBTiming();
   lbmgr->ResumeClients();
 #endif
 }
