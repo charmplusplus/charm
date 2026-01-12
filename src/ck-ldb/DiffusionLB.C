@@ -480,7 +480,7 @@ void DiffusionLB::ProcessMigrations()
   // SAME AS IN PACKANDSENDMIGRATEMSGS
   LBMigrateMsg* msg = new (total_migrates, CkNumPes(), CkNumPes(), 0) LBMigrateMsg;
   msg->n_moves = total_migrates;
-  if (_lb_args.debug()) CkPrintf("PE-%d with %d migrates\n", CkMyPe(), total_migrates);
+  if (_lb_args.debug() > 1) CkPrintf("PE-%d with %d migrates\n", CkMyPe(), total_migrates);
   for (int i = 0; i < total_migrates; i++)
   {
     MigrateInfo* item = (MigrateInfo*)migrateInfo[i];
