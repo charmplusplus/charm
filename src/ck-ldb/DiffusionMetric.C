@@ -10,36 +10,13 @@ public:
   virtual void updateState(int objId, int destNbor) = 0;
 };
 
-class MetricCommEI : public DiffusionMetric
-{
-private:
-  std::vector<int> internalComm;    // internal comm for each obj
-  std::vector<int> externalComm;    // external comm for each obj
-  std::vector<int> commDifference;  // external - internal comm for each obj
-
-  std::vector<double> toSendLoad;  // comm outward to each neighbor
-  BaseLB::LDStats* nodeStats;
-
-  std::vector<bool> objAvailable;
-
-  int n_objs;
-  int neighborCount;
-  int myNodeId;
-
-public:
-  MetricCommEI(BaseLB::LDStats* ns, int nodeId, int nodeSize, int nCount,
-               std::vector<double> tSL);
-
-  int popBestObject(int nbor) override;
-  int getBestNeighbor() override;
-  void updateState(int objId, int destNbor) override;
-};
-
 class MetricComm : public DiffusionMetric
 {
 private:
   std::vector<int> internalComm;               // internal comm for each obj
-  std::vector<std::vector<int>> externalComm;  // external comm for each obj for each nbor
+  std::vector<std::vector<std::pair<int, int>>> externalComm;  
+  // external comm for each obj for each nbor
+  // pair is <bytes, objid>
 
   std::vector<double> toSendLoad;  // comm outward to each neighbor
   BaseLB::LDStats* nodeStats;
@@ -53,6 +30,7 @@ private:
   int n_objs;
   int neighborCount;
   int myNodeId;
+
 
   int getNborId(int nbor)
   {
@@ -114,99 +92,7 @@ public:
   void updateState(int objId, int destNbor) override;
 };
 
-MetricCommEI::MetricCommEI(BaseLB::LDStats* ns, int nodeId, int nodeSize, int nCount,
-                           std::vector<double> tSL)
-{
-  nodeStats = ns;
-  myNodeId = nodeId;
-  n_objs = nodeStats->objData.size();
-  neighborCount = nCount;
-  toSendLoad = tSL;
 
-  internalComm.resize(n_objs, 0);
-  externalComm.resize(n_objs, 0);
-  commDifference.resize(n_objs, 0);
-  objAvailable.resize(n_objs, true);
-
-  for (int edge = 0; edge < nodeStats->commData.size(); edge++)
-  {
-    LDCommData& commData = nodeStats->commData[edge];
-
-    if ((!commData.from_proc()) && (commData.recv_type() == LD_OBJ_MSG))
-    {
-      LDObjKey from = commData.sender;
-      LDObjKey to = commData.receiver.get_destObj();
-
-      int fromNode = myNodeId;
-      int toPE = commData.receiver.lastKnown();
-      int toNode = toPE / nodeSize;
-
-      if (fromNode == toNode)
-      {
-        // internal communication
-        int fromObj = nodeStats->getHash(from);
-        int toObj = nodeStats->getHash(to);
-        internalComm[fromObj] += commData.bytes;
-
-        if (toObj != -1 && toObj < n_objs)
-          internalComm[toObj] += commData.bytes;
-      }
-      else
-      {
-        // External communication
-        int fromObj = nodeStats->getHash(from);
-        if (fromObj != -1 && fromObj < n_objs)
-          externalComm[fromObj] += commData.bytes;
-
-        // CkPrintf("Updated external comm at %d to %d\n", fromObj,
-        // externalComm[fromObj]);
-      }
-    }
-  }
-
-  for (int i = 0; i < n_objs; i++)
-  {
-    commDifference[i] = externalComm[i] - internalComm[i];
-  }
-}
-
-int MetricCommEI::popBestObject(int nbor)
-{
-  // find index of object with max internal comm
-  int maxInternalComm = std::numeric_limits<int>::min();
-  int bestObject = -1;
-  for (int i = 0; i < n_objs; i++)
-  {
-    int testComm = commDifference[i];
-    if (testComm > maxInternalComm && objAvailable[i] && nodeStats->objData[i].migratable)
-    {
-      maxInternalComm = commDifference[i];
-      bestObject = i;
-    }
-  }
-
-  return bestObject;
-}
-
-int MetricCommEI::getBestNeighbor()
-{
-  int bestNeighbor = -1;
-  for (int i = 0; i < neighborCount; i++)
-  {
-    if (toSendLoad[i] > 0)
-    {
-      bestNeighbor = i;
-      break;
-    }
-  }
-  return bestNeighbor;
-}
-
-void MetricCommEI::updateState(int objId, int destNbor)
-{
-  objAvailable[objId] = false;
-  toSendLoad[destNbor] -= nodeStats->objData[objId].wallTime;
-};
 
 MetricComm::MetricComm(BaseLB::LDStats* ns, int nodeId, int nodeSize, int nCount,
                        std::vector<double> tSL, std::vector<int> sendToNbrs)
@@ -220,8 +106,8 @@ MetricComm::MetricComm(BaseLB::LDStats* ns, int nodeId, int nodeSize, int nCount
   internalComm.resize(n_objs, 0);
   for (int nbor = 0; nbor < neighborCount; nbor++)
   {
-    std::vector<int> nborComm;
-    nborComm.resize(n_objs, 0);
+    std::vector<std::pair<int, int>> nborComm;
+    nborComm.resize(n_objs, std::make_pair(0, 0));
     externalComm.push_back(nborComm);
   }
 
@@ -263,46 +149,59 @@ MetricComm::MetricComm(BaseLB::LDStats* ns, int nodeId, int nodeSize, int nCount
 
         int fromObj = nodeStats->getHash(from);
         if (fromObj != -1 && fromObj < n_objs)
-          externalComm[nborId][fromObj] += commData.bytes;
+          externalComm[nborId].push_back(std::make_pair(commData.bytes, fromObj));
       }
     }
+  }
+
+  for (int nbor = 0; nbor < neighborCount; nbor++)
+  {
+    make_heap(externalComm[nbor].begin(), externalComm[nbor].end(),
+              [](const std::pair<int, int>& a, const std::pair<int, int>& b) {
+                return a.first < b.first;  // max-heap based on bytes
+              });
   }
 };
 
 int MetricComm::popBestObject(int nbor)
 {
-  // find index of object with max internal comm
-  int maxExternalComm = -1;
-  int bestObject = -1;
-
+  // Pop from heap until we find an available object that fits capacity
   double nborCapacity = toSendLoad[nbor];
 
-  for (int i = 0; i < n_objs; i++)
+  for (int attempt = 0; attempt < externalComm[nbor].size(); attempt++)
   {
-    if(!objAvailable[i]) continue;
-    double objLoad = nodeStats->objData[i].wallTime;
-
-    int testComm = externalComm[nbor][i];
-
-    if ((testComm > maxExternalComm) && objAvailable[i] &&
-        (nodeStats->objData[i].migratable) && (objLoad <= nborCapacity))
+    // Pop the max element (max-heap based on bytes)
+    std::pop_heap(externalComm[nbor].begin(), externalComm[nbor].end(),
+                  [](const std::pair<int, int>& a, const std::pair<int, int>& b) {
+                    return a.first < b.first;  // max-heap based on bytes
+                  });
+    
+    std::pair<int, int> top = externalComm[nbor].back();
+   
+    int objId = top.second;  // Extract object ID from pair
+    int commBytes = top.first;
+    
+    // Check if object is still available and fits capacity
+    if (objAvailable[objId] && nodeStats->objData[objId].migratable)
     {
-      maxExternalComm = testComm;
-      bestObject = i;
+      double objLoad = nodeStats->objData[objId].wallTime;
+      if (objLoad <= nborCapacity)
+      {
+        // Mark as unavailable immediately
+        objAvailable[objId] = false;
+        externalComm[nbor].pop_back();
+        printf("Returning obj %d with comm %d to nbor %d\n", objId, commBytes, nbor);
+        return objId;
+      }
     }
+    // If not available or doesn't fit, continue to next object in heap
   }
 
-  // if (bestObject != -1)
-  // {
-  //   assert(objAvailable[bestObject]);
-  //   objAvailable[bestObject] = false;
-  // }
-  // else
-  // {
-  //   CkPrintf("No object found for neighbor %d, with capacity %f\n", nbor,
-  //   nborCapacity);
-  // }
-  return bestObject;
+  push_heap(externalComm[nbor].begin(), externalComm[nbor].end(),
+            [](const std::pair<int, int>& a, const std::pair<int, int>& b) {
+              return a.first < b.first;  // max-heap based on bytes
+            });
+  return -1;  // No suitable object found
 };
 
 int MetricComm::getBestNeighbor()
@@ -329,6 +228,10 @@ void MetricComm::updateState(int objId, int destNbor)
   toSendLoad[destNbor] -= objLoad;
   if(objId<0 || objId>=n_objs)
     return;
+  
+  // Track which neighbors need heap rebuild
+  std::vector<bool> heapNeedsRebuild(neighborCount, false);
+  
   for (std::pair<int, int> edge : objCommEdges[objId])
   {
     int toObj = edge.first;
@@ -337,11 +240,36 @@ void MetricComm::updateState(int objId, int destNbor)
     if(toObj<0 || toObj>=n_objs) CkAbort("Error: invalid toObj %d in MetricComm::updateState\n", toObj);
     if (objAvailable[toObj])
     {
-      externalComm[destNbor][toObj] += comm;
+  
+      // Update internal communication
       internalComm[toObj] -= comm;
+      
+      for (int obj = 0; obj < externalComm[destNbor].size(); obj++)
+      {
+        if (externalComm[destNbor][obj].second == toObj)
+        {
+          // Update external communication
+          externalComm[destNbor][obj].first += comm;
+          heapNeedsRebuild[destNbor] = true;
+          break;
+        }
+      }
     }
   }
   objAvailable[objId] = false;
+  
+  // Remove migrated object from all neighbor heaps and rebuild if needed
+  for (int nbor = 0; nbor < neighborCount; nbor++)
+  {
+    if (heapNeedsRebuild[nbor])
+    {
+      // Rebuild the heap for this neighbor
+      make_heap(externalComm[nbor].begin(), externalComm[nbor].end(),
+                [](const std::pair<int, int>& a, const std::pair<int, int>& b) {
+                  return a.first < b.first;  // max-heap based on bytes
+                });
+    }
+  }
 }
 
 MetricCentroid::MetricCentroid(std::vector<std::vector<double>> nborCentroids,
