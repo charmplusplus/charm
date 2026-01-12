@@ -190,7 +190,6 @@ int MetricComm::popBestObject(int nbor)
         // Mark as unavailable immediately
         objAvailable[objId] = false;
         externalComm[nbor].pop_back();
-        printf("Returning obj %d with comm %d to nbor %d\n", objId, commBytes, nbor);
         return objId;
       }
     }
