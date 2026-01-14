@@ -272,17 +272,6 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     save_op.src_cb = (source.cb.type != CkCallback::ignore) ? new CkCallback(source.cb) : nullptr;
     save_op.dst_cb = nullptr;
 
-    if(mode == CkNcpyModeDevice::RDMA) {
-#if CMK_GPU_COMM
-      // Machine layer supports GPU-aware communication
-      save_op.tag = source.tag;
-      save_op.src_pe = source.src_pe;
-      QdCreate(1);
-      CmiRecvDevice(&save_op, DEVICE_RECV_TYPE_CHARM);
-      continue;
-#endif
-    }
-
     // Machine layer does not support GPU-aware communication
     // Check if destination PE is correct
     // TODO: Handle this case instead of aborting
@@ -301,8 +290,6 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
       hapiCheck(hapiMemcpyAsync((void*)dest.ptr, source.ptr, dest.cnt,
             hapiMemcpyDeviceToDevice, postStructs[i].hapi_stream));      
     } else if (mode == CkNcpyModeDevice::IPC && csv_gpu_manager.use_shm) {
-      int cuda_device = -1;
-      cudaGetDevice(&cuda_device);
       // Inter-process using shared memory optimizations
       // Use optimiziations with POSIX shared memory
       hapi_ipc_device_info& device_info =
@@ -333,12 +320,21 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
       shm_event_shared->dst_flag = true;
       pthread_mutex_unlock(&shm_event_shared->lock);
     } else {
+#if CMK_GPU_COMM
+      // Machine layer supports GPU-aware communication
+      save_op.tag = source.tag;
+      save_op.src_pe = source.src_pe;
+      QdCreate(1);
+      CmiRecvDevice(&save_op, DEVICE_RECV_TYPE_CHARM);
+      continue;
+#else
       // Handle all other cases (basic inter-process and inter-node)
       // Transfer the received/unpacked data on host to the destination device buffer
       // FIXME: Print warning that this is slow?
       CkAssert(source.data_stored);
       hapiCheck(hapiMemcpyAsync((void*)dest.ptr, source.data, dest.cnt,
             hapiMemcpyHostToDevice, postStructs[i].hapi_stream));
+#endif
     }
 
     // Add source callback for polling, so that it can be invoked once the transfer is complete
@@ -446,14 +442,14 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
   for (int i = 0; i < numops; i++) {
     buffers[i]->dest_pe = dest_pe;
   }
-  if(transfer_mode == CkNcpyModeDevice::MEMCPY) return;
+  if(transfer_mode == CkNcpyModeDevice::MEMCPY) {
+    return;
+  };
 
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
   int cpv_my_device_id = CmiMyRank() % csv_gpu_manager.device_count;
 
   if(transfer_mode == CkNcpyModeDevice::IPC && csv_gpu_manager.use_shm) {
-    int cuda_device = -1;
-    cudaGetDevice(&cuda_device);
     // Use optimizations with POSIX shaerd memory
     // Allocate blocks on device comm buffer
     DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
@@ -489,7 +485,7 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
       hapi_ipc_device_info& my_device_info = csv_gpu_manager.hapi_ipc_device_infos[(csv_gpu_manager.device_count * CmiMyNodeRankLocal() + cpv_my_device_id)];
       hapiCheck(hapiEventRecord(my_device_info.src_event_pool[buffers[i]->event_idx], buffers[i]->hapi_stream));
     }
-  } else if(transfer_mode == CkNcpyModeDevice::RDMA) {
+  } else {
 #if !CMK_GPU_COMM
     // Use a naive host-staged mechanism
     // Allocate temporary host buffers and copy source buffers

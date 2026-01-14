@@ -1805,6 +1805,7 @@ void _initCharm(int unused_argc, char **argv)
 		// NOTE: this assumes commthreads will not block from this point on
 	}
 
+
 	DEBUGF(("[%d,%d%.6lf] inCommThread %d\n",CmiMyPe(),CmiMyRank(),CmiWallTimer(),inCommThread));
 	// when I am a communication thread, I don't participate initDone.
         if (inCommThread) {
@@ -1828,6 +1829,8 @@ void _initCharm(int unused_argc, char **argv)
                 readKillFile();                                        
         }
 #endif
+
+        CmiPrintf("Main done for %d\n", CmiMyPe());
 
 }
 

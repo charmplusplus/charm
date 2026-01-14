@@ -1,5 +1,6 @@
 #include "converse.h"
 #include "conv-rdmadevice.h"
+#include "ck.h"
 
 #if CMK_CUDA || CMK_HIP
 
@@ -38,6 +39,7 @@ void CmiRdmaDeviceRecvInit(RdmaAckHandlerFn fn) {
 }
 
 void CmiInvokeRecvHandler(void* data) {
+  QdProcess(1);
   rdmaDeviceRecvHandlerFn(data);
 }
 #endif // CMK_GPU_COMM

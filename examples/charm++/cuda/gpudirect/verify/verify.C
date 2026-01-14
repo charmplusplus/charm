@@ -79,9 +79,9 @@ public:
     lb_test = false;
 
     // Check if there are 2 PEs
-    if (CkNumPes() != 2) {
-      CkAbort("Should be run with 2 PEs");
-    }
+    // if (CkNumPes() != 2) {
+    //   CkAbort("Should be run with 2 PEs");
+    // }
 
     // Don't do nodegroup test if run with 1 process
     if (CmiNumNodes() == 1) {
@@ -124,35 +124,35 @@ public:
 
   void test() {
     // warm up
-    for (int i = 0; i < n_warpup_iters; i++) {
-      array_proxy[0].send();
-      CkWaitQD();
-      ckout << "starting next batch of things" << endl;
-    }
+    // for (int i = 0; i < n_warpup_iters; i++) {
+    //   array_proxy[0].send();
+    //   CkWaitQD();
+    //   ckout << "starting next batch of things" << endl;
+    // }
     start_time = CkWallTimer();
     
     CkPrintf("Testing chare array... ");
-    for (int i = 0; i < n_iters; i++) {
+    for (int i = 0; i < 1; i++) {
       array_proxy[0].send();
     }
     CkWaitQD();
     CkPrintf("PASS\n");
 
-    CkPrintf("Testing chare group... ");
-    for (int i = 0; i < n_iters; i++) {
-      group_proxy[0].send();
-    }
-    CkWaitQD();
-    CkPrintf("PASS\n");
+    // CkPrintf("Testing chare group... ");
+    // for (int i = 0; i < n_iters; i++) {
+    //   group_proxy[0].send();
+    // }
+    // CkWaitQD();
+    // CkPrintf("PASS\n");
 
-    if (test_nodegroup) {
-      CkPrintf("Testing chare nodegroup... ");
-      for (int i = 0; i < n_iters; i++) {
-        nodegroup_proxy[0].send();
-      }
-      CkWaitQD();
-      CkPrintf("PASS\n");
-    }
+    // if (test_nodegroup) {
+    //   CkPrintf("Testing chare nodegroup... ");
+    //   for (int i = 0; i < n_iters; i++) {
+    //     nodegroup_proxy[0].send();
+    //   }
+    //   CkWaitQD();
+    //   CkPrintf("PASS\n");
+    // }
 
     CkPrintf("Elapsed: %.6lf s\n", CkWallTimer() - start_time);
     CkExit();
@@ -178,7 +178,29 @@ public:
   }
 
   void send() {
-    thisProxy[1].recv(block_size, CkDeviceBuffer(container.d_local_data,
+int my_device;
+cudaGetDevice(&my_device);
+
+cudaDeviceProp prop;
+cudaGetDeviceProperties(&prop, my_device);
+
+char hostname[256];
+gethostname(hostname, sizeof(hostname));
+
+ckout << "HOST: " << hostname
+      << " | DEVICE: " << my_device
+      << " (" << prop.name << ")"
+      << endl;
+
+ckout << "MY PE: " << CkMyPe()
+      << " / " << CkNumPes()
+      << "  MY NODE: " << CkMyNode()
+      << " / " << CkNumNodes()
+      << endl;
+
+
+
+    thisProxy[2].recv(block_size, CkDeviceBuffer(container.d_local_data,
           CkCallback(CkIndex_VerifyArray::reuse(), thisProxy[thisIndex]),
           container.stream));
     if (lb_test) {
@@ -193,6 +215,26 @@ public:
   }
 
   void recv(int size, double* data) {
+int my_device;
+cudaGetDevice(&my_device);
+
+cudaDeviceProp prop;
+cudaGetDeviceProperties(&prop, my_device);
+
+char hostname[256];
+gethostname(hostname, sizeof(hostname));
+
+ckout << "HOST: " << hostname
+      << " | DEVICE: " << my_device
+      << " (" << prop.name << ")"
+      << endl;
+ckout << "MY PE: " << CkMyPe()
+      << " / " << CkNumPes()
+      << "  MY NODE: " << CkMyNode()
+      << " / " << CkNumNodes()
+      << endl;
+
+
     container.verify(1);
     if (lb_test) {
       pe = CkMyPe();

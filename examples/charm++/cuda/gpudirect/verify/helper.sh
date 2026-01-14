@@ -1,3 +1,4 @@
 make clean
 make verify
-./charmrun ++local ++p 2 ./verify +gpushm +gpuipceventpool 512 +allgpus +gpucommbuffer 128
+# ./charmrun ++local ++p 2 ./verify +gpushm +gpuipceventpool 512 +allgpus +gpucommbuffer 128
+srun -n 2 ./verify +ppn 2

@@ -127,13 +127,15 @@ void hapiInit(char** argv) {
 
   if (CmiInCommThread()) {
     // FIXME: Comm. thread sets its device to be the same as worker thread 0
+    CmiPrintf("Printing gpu num: \n");
+    CmiPrintf("Gpu device: %d\n", CsvAccess(gpu_manager).comm_thread_device);
     hapiSetDevice(CsvAccess(gpu_manager).comm_thread_device);
   }
 
   shmInit();
 
   hapiRegisterCallbacks(); // Register callback functions
-
+  CmiPrintf("Everything done by PE: %d and numpes: %d\n", CmiMyPe(), 2);
 }
 
 void hapiExit() {

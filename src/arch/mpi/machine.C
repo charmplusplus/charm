@@ -2410,6 +2410,14 @@ void CmiSetupMachineRecvBuffersUser(void)
 std::map<std::pair<void*, size_t>, uint64_t> cache_window;
 
 void LrtsSendDevice(int& src_pe, const void*& ptr, size_t size, uint64_t& tag) {
+int rank;
+int _size;
+MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+MPI_Comm_size(MPI_COMM_WORLD, &_size);
+
+CmiPrintf("LrtseSendDevice start on MPI rank: %d of %d\n", rank, _size);
+
+    CmiPrintf("LrtseSendDevice start on PE: %d\n", CmiMyPe());
     if(cache_window.find(std::make_pair((void*)ptr, size)) != cache_window.end()) {
         tag = cache_window[std::make_pair((void*)ptr, size)];
     } else {
@@ -2420,15 +2428,26 @@ void LrtsSendDevice(int& src_pe, const void*& ptr, size_t size, uint64_t& tag) {
         tag = (uint64_t)(disp);
     }
     src_pe = CmiMyPe();
+    CmiPrintf("LrtsSendDevice Done\n");
 }
 
 void LrtsRecvDevice(DeviceRdmaOp* op, DeviceRecvType type)
 {
-    MPI_Win_lock(MPI_LOCK_SHARED, op->src_pe, 0, globalDevWin);
+    int rank;
+    int size;
+
+MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+CmiPrintf("LrtseRecvDevice start on MPI rank: %d of %d\n", rank, size);
+
+CmiPrintf("LrtsRecvDevice start on PE: %d and trying to get this lock: %d\n", CmiMyPe(), op->src_pe);
+MPI_Win_lock(MPI_LOCK_SHARED, op->src_pe, 0, globalDevWin);
+    CmiPrintf("Got za lock\n");
     int result = MPI_Get((void*)op->dest_ptr, op->size, MPI_BYTE, 
                          op->src_pe, (MPI_Aint)(op->tag), op->size, 
                          MPI_BYTE, globalDevWin);
-
+    CmiPrintf("No get for me\n");
     if (result != MPI_SUCCESS) {
         CmiAbort("LrtsRecvDevice: MPI_Get failed!\n");
     }
