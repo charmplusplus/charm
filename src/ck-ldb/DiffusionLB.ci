@@ -13,6 +13,12 @@ module DiffusionLB
 
     // DiffusionNeighbors
     entry[reductiontarget] void findNBors(int do_again);
+
+    entry[reductiontarget] void print_max_load(double max);
+    entry[reductiontarget] void print_avg_load(double sum);
+    entry[reductiontarget] void print_external_comm(double sum);
+    entry[reductiontarget] void print_internal_comm(double sum);
+    
     entry void beginMST();
     entry void startFirstRound();
     entry[reductiontarget] void findNBorsRound();
@@ -45,6 +51,7 @@ module DiffusionLB
     // entry void MigratedHelper(LDObjHandle h, int waitBarrier);
     entry void ProcessMigrations();
     entry void ProcessFinalStats();
+    entry void CollectStats();
     entry void next_phase(int val);
     entry void LoadMetaInfo(LDObjHandle h, int objId, double load, int senderPE, int only_mcount);
     entry void MigrationDoneWrapper();  // Call when migration is complete

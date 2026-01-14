@@ -42,7 +42,7 @@ private:
 
 public:
   MetricComm(BaseLB::LDStats* ns, int nodeId, int nodeSize, int nCount,
-             std::vector<double> tSL, std::vector<int> sendToNbrs);
+             std::vector<double> tSL, std::vector<int> sendToNbrs, double &internal, double &external);
   int popBestObject(int nbor) override;
   int getBestNeighbor() override;
   void updateState(int objId, int destNbor) override;
@@ -95,7 +95,8 @@ public:
 
 
 MetricComm::MetricComm(BaseLB::LDStats* ns, int nodeId, int nodeSize, int nCount,
-                       std::vector<double> tSL, std::vector<int> sendToNbrs)
+                       std::vector<double> tSL, std::vector<int> sendToNbrs, 
+                       double &internalbytes, double &externalbytes)
     : nodeStats(ns),
       myNodeId(nodeId),
       n_objs(ns->objData.size()),
@@ -139,10 +140,14 @@ MetricComm::MetricComm(BaseLB::LDStats* ns, int nodeId, int nodeSize, int nCount
           objCommEdges[toObj].push_back(std::make_pair(fromObj, commData.bytes));
           objCommEdges[fromObj].push_back(std::make_pair(toObj, commData.bytes));
         }
+
+        internalbytes += commData.bytes;
       }
       else
       {
         int nborId = getNborId(toNode);
+        externalbytes += commData.bytes;
+
 
         if (nborId == -1)  // could comm with node that is not a "neighbor".. ignore
           continue;
@@ -150,6 +155,7 @@ MetricComm::MetricComm(BaseLB::LDStats* ns, int nodeId, int nodeSize, int nCount
         int fromObj = nodeStats->getHash(from);
         if (fromObj != -1 && fromObj < n_objs)
           externalComm[nborId].push_back(std::make_pair(commData.bytes, fromObj));
+
       }
     }
   }

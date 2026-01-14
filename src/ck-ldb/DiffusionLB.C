@@ -82,6 +82,9 @@ DiffusionLB::DiffusionLB(const CkLBOptions& opt) : CBase_DiffusionLB(opt)
   statsReceived = 0;
   rank0_barrier_counter = 0;
 
+  myNodeInternalBytes = 0.0;
+  myNodeExternalBytes = 0.0;
+
   num_migrations = 0;
 
 #if CMK_LBDB_ON
@@ -155,12 +158,20 @@ void DiffusionLB::Strategy(const DistBaseLB::LDStats* const stats)
   objSenderPEs.clear();
   objectLoads.clear();
 
+  
+
   thisProxy[rank0PE].ReceiveStats(*marshmsg);
 
   if (CkMyPe() != rank0PE)
   {
     CkCallback cb(CkReductionTarget(DiffusionLB, statsAssembled), thisProxy);
     contribute(cb);
+  }
+
+  if (CkMyPe() == rank0PE) {
+      for (int i = 0; i < nodeSize; i++) pe_load[i] = 0;
+      myNodeInternalBytes = 0.0;
+      myNodeExternalBytes = 0.0;
   }
 }
 
@@ -276,14 +287,15 @@ void DiffusionLB::WithinNodeLB()
   if (thisIndex == 0)
     if (_lb_args.debug() == 3) CkPrintf("--------STARTING WITHIN NODE LB--------\n");
 
-  if( nodeSize == 1) {
-      if (_lb_args.debug() == 3) CkPrintf("--------Node size is 1--------\n");
-
-    if (CkMyPe() == 0)
+  if (CkMyPe() == 0)
     {
       if (step() == LBSimulation::dumpStep)
       {
         CkCallback cb(CkIndex_DiffusionLB::ProcessFinalStats(), thisProxy);
+         CkStartQD(cb);
+      }
+      else if (_lb_args.debug() > 0) {
+        CkCallback cb(CkIndex_DiffusionLB::CollectStats(), thisProxy);
          CkStartQD(cb);
       }
       else
@@ -292,6 +304,9 @@ void DiffusionLB::WithinNodeLB()
         CkStartQD(cb);
       }
     }
+
+  if( nodeSize == 1) {
+      if (_lb_args.debug() == 3) CkPrintf("--------Node size is 1--------\n");
     return;
   }
   if (CkMyPe() == rank0PE)
@@ -460,18 +475,6 @@ void DiffusionLB::WithinNodeLB()
     // This QD is essential because, before the actual migration starts, load should be
     // divided amongs intra node PE's.
 
-    if (CkMyPe() == 0)
-    { if (step() == LBSimulation::dumpStep)
-      {
-        CkCallback cb(CkIndex_DiffusionLB::ProcessFinalStats(), thisProxy);
-         CkStartQD(cb);
-      }
-      else {
-
-      CkCallback cb(CkIndex_DiffusionLB::ProcessMigrations(), thisProxy);
-      CkStartQD(cb);
-      }
-    }
 
     endWithinTiming();
   }

@@ -36,7 +36,7 @@ void DiffusionLB::AcrossNodeLB()
   if (_lb_args.diffusionCommOn())
   {
     metric = new MetricComm(nodeStats, myNodeId, nodeSize, neighborCount, toSendLoad,
-                            sendToNeighbors);
+                            sendToNeighbors, myNodeInternalBytes, myNodeExternalBytes);
   }
   else
     metric = new MetricCentroid(nborCentroids, nborDistances, myCentroid, nodeStats,
@@ -117,7 +117,6 @@ void DiffusionLB::AcrossNodeLB()
       int pe_local_id = v_id;
       if (donorPE != rank0PE) {
         pe_local_id = v_id - prefixObjects[donorPE - rank0PE - 1];
-        if (_lb_args.debug() > 1) CkPrintf("[PE %d] Adjusted local obj id for LoadReceived: %d\n", CkMyPe(), pe_local_id);
       }
 
       thisProxy[destPE].LoadMetaInfo(objHandle, pe_local_id, currLoad, donorPE, 0);     
@@ -125,7 +124,6 @@ void DiffusionLB::AcrossNodeLB()
       nodeStats->to_proc[v_id] = destPE;
     }
   }
-
 
 
 }
@@ -137,6 +135,7 @@ void DiffusionLB::AcrossNodeLB()
  * level. Not sure why the receiver would already have this handle though...*/
 void DiffusionLB::LoadMetaInfo(LDObjHandle h, int local_id, double load, int senderPE, int only_mcount)
 {
+
   // local_id should be PE local here
   migrates_expected++;
   if(only_mcount)
@@ -216,6 +215,55 @@ void DiffusionLB::ProcessFinalStats() {
 
 }
 
+void DiffusionLB::CollectStats() {
+
+  double load_to_report = 0.0;
+  double external_to_report = 0.0;
+  double internal_to_report = 0.0;
+  double avg_load = 0.0;
+  double max_load = 0.0;
+
+  if (thisIndex == rank0PE) {
+    for (int i = 0; i < nodeSize; i++) load_to_report += pe_load[i];
+    avg_load = load_to_report / nodeSize;
+    max_load = std::max_element(pe_load.begin(), pe_load.end())[0];
+    external_to_report = myNodeExternalBytes;
+    internal_to_report = myNodeInternalBytes;
+  }
+
+  
+  CkCallback cb_max_load(CkReductionTarget(DiffusionLB, print_max_load), thisProxy[0]);
+  contribute(sizeof(double), &max_load, CkReduction::max_double, cb_max_load);
+
+  CkCallback cb_avg_load(CkReductionTarget(DiffusionLB, print_avg_load), thisProxy[0]);
+  contribute(sizeof(double), &avg_load, CkReduction::sum_double, cb_avg_load);
+
+  CkCallback cb_external_comm(CkReductionTarget(DiffusionLB, print_external_comm), thisProxy[0]);
+  contribute(sizeof(double), &external_to_report, CkReduction::sum_double, cb_external_comm);
+
+  CkCallback cb_internal_comm(CkReductionTarget(DiffusionLB, print_internal_comm), thisProxy[0]);
+  contribute(sizeof(double), &internal_to_report, CkReduction::sum_double, cb_internal_comm);
+
+  if (CkMyPe() == 0){
+    CkCallback cb(CkIndex_DiffusionLB::ProcessMigrations(), thisProxy);
+    CkStartQD(cb);
+  }
+}
+
+void DiffusionLB::print_max_load(double max){
+  CkPrintf("Max load AFTER LB: %f\n", max);
+}
+void DiffusionLB::print_avg_load(double sum){
+    CkPrintf("Avg load AFTER LB: %f\n", sum / numNodes);
+
+}
+void DiffusionLB::print_external_comm(double sum){
+    CkPrintf("External comm BEFORE LB: %f MB\n", sum / (1024 * 1024 * 2));
+
+}
+void DiffusionLB::print_internal_comm(double sum){
+      CkPrintf("Internal comm BEFORE LB: %f MB\n", sum / (1024 * 1024 * 2));
+}
 
 
 double DiffusionLB::averagePE()

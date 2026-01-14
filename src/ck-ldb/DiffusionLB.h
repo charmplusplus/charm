@@ -74,7 +74,13 @@ public:
 
   void ProcessMigrations();
   void ProcessFinalStats();
+  void CollectStats();
   void WithinNodeLB();
+
+  void print_max_load(double max);
+    void print_avg_load(double sum);
+    void print_external_comm(double sum);
+    void print_internal_comm(double sum);
 
   void LoadMetaInfo(LDObjHandle h, int objId, double load, int senderPE, int only_mcount);
 
@@ -106,6 +112,9 @@ private:
   int nodeSize;
   int numNodes;
   int myNodeId;
+
+  double myNodeInternalBytes;
+  double myNodeExternalBytes;
 
   double num_migrations;
 
