@@ -55,6 +55,14 @@ void DiffusionLB::findNBors(int do_again)
     }
     else
     {
+        nborCentroids.clear();
+        allNodeCentroids.clear();
+        allNodeObjCount.clear();
+        allNodeDistances.clear();
+        nborDistances.clear();
+        nborObjCount.clear();
+        myCentroid.clear();
+
         // sdag calls beginMST();
         thisProxy[thisIndex].createCentroidList();
     }
