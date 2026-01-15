@@ -1121,7 +1121,6 @@ static int SendMsgBuf(void) {
                 deviceRecvCallbackMsg* conv_msg = (deviceRecvCallbackMsg*)CmiAlloc(sizeof(deviceRecvCallbackMsg));
                 conv_msg->op = msg_tmp->op;
                 CmiSetHandler(conv_msg,deviceRecvCallbackHandler);
-                CmiPrintf("recieved the data okay okay\n");
                 CmiPushPE(msg_tmp->op->dest_pe, conv_msg);
             } else
 #endif

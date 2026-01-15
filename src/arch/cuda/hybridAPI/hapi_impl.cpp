@@ -697,22 +697,22 @@ static void shmInit() {
   if (!CsvAccess(gpu_manager).use_shm) return;
 
   if (CmiMyRank() == 0) {
-    shmSetup();
+    if (!CmiInCommThread()) shmSetup();
     if (CmiMyNodeRankLocal() == 0) {
-      shmCreate(); // Create a per-host shared memory region
+      if (!CmiInCommThread()) shmCreate(); // Create a per-host shared memory region
       CmiBarrier(); // FIXME: Only needs to be a host-wide barrier
     } else {
       CmiBarrier();
-      shmOpen(); // Open the shared memory region created by local logical node 0
+      if (!CmiInCommThread()) shmOpen(); // Open the shared memory region created by local logical node 0
     }
-    shmMap(); // Map the shared memory file into memory
+    if (!CmiInCommThread()) shmMap(); // Map the shared memory file into memory
   } else {
     CmiBarrier();
   }
 
-  CmiNodeBarrier(); // Ensure shared memory has been mapped into the logical node
+  if (!CmiInCommThread()) CmiNodeBarrier(); // Ensure shared memory has been mapped into the logical node
 
-  ipcHandleCreate(); // Create CUDA IPC handles
+  if (!CmiInCommThread()) ipcHandleCreate(); // Create CUDA IPC handles
 
   // Ensure CUDA IPC handles are available for all processes
   // Note: Causes a hang when this barrier is placed after CPU topology initialization
@@ -720,7 +720,7 @@ static void shmInit() {
   CmiBarrier();
 
   if (CmiMyRank() == 0) {
-    ipcHandleOpen(); // Open CUDA IPC handles for accessing other processes' device memory
+    if (!CmiInCommThread()) ipcHandleOpen(); // Open CUDA IPC handles for accessing other processes' device memory
   }
 }
 
