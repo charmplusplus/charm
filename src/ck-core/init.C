@@ -1829,9 +1829,6 @@ void _initCharm(int unused_argc, char **argv)
                 readKillFile();                                        
         }
 #endif
-
-        CmiPrintf("Main done for %d\n", CmiMyPe());
-
 }
 
 int charm_main(int argc, char **argv)

@@ -322,6 +322,7 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     } else {
 #if CMK_GPU_COMM
       // Machine layer supports GPU-aware communication
+      save_op.dest_pe = CmiMyRank();
       save_op.tag = source.tag;
       save_op.src_pe = source.src_pe;
       QdCreate(1);

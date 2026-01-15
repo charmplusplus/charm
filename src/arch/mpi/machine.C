@@ -53,7 +53,12 @@ static char* strsignal(int sig) {
  * */
 
 #define CMI_MSGTYPE(msg)            ((CmiMsgHeaderBasic *)msg)->mpiMsgType
-enum mpiMsgTypes { REGULAR, ONESIDED_BUFFER_SEND, ONESIDED_BUFFER_RECV, ONESIDED_BUFFER_DIRECT_RECV, ONESIDED_BUFFER_DIRECT_SEND, POST_DIRECT_RECV, POST_DIRECT_SEND};
+enum mpiMsgTypes { REGULAR, ONESIDED_BUFFER_SEND, ONESIDED_BUFFER_RECV, ONESIDED_BUFFER_DIRECT_RECV, ONESIDED_BUFFER_DIRECT_SEND, POST_DIRECT_RECV, POST_DIRECT_SEND,
+#if CMK_CUDA
+    DEVICE_SEND_OP,
+    DEVICE_RECV_OP
+#endif
+};
 
 /* =======Beginning of Definitions of Performance-Specific Macros =======*/
 /* Whether to use multiple send queue in SMP mode */
@@ -76,22 +81,6 @@ static int dynamicSendCap = CMI_DYNAMIC_MAXCAPSIZE;
 static int dynamicRecvCap = CMI_DYNAMIC_MAXCAPSIZE;
 MPI_Comm charmComm;
 int tagUb;
-
-MPI_Win globalDevWin = MPI_WIN_NULL;
-
-void LrtsInitRMA() {
-    int result = MPI_Win_create_dynamic(MPI_INFO_NULL, MPI_COMM_WORLD, &globalDevWin);
-    
-    if (result != MPI_SUCCESS) {
-        CmiAbort("RMA Window Creation Failed!");
-    }
-}
-
-void LrtsCleanupRMA() {
-    if (globalDevWin != MPI_WIN_NULL) {
-        MPI_Win_free(&globalDevWin); // This will fail if memory is still attached!
-    }
-}
 
 #if CMI_EXERT_SEND_CAP
 static int SEND_CAP=3;
@@ -365,6 +354,11 @@ typedef struct msg_list {
     struct msg_list *next;
     int size, destpe, mode, type;
     MPI_Request req;
+#if CMK_CUDA
+    void* ptr;
+    size_t device_size;
+    DeviceRdmaOp* op;
+#endif
 #if CMK_ONESIDED_IMPL
     void *ref;
     // This field can store the pointer to any structure that might have to be accessed.
@@ -425,6 +419,41 @@ static int SendMsgBuf(void);
 static  void EnqueueMsg(void *m, int size, int node, int mode, int type, void *ref);
 #endif
 
+#if CMK_CUDA
+
+MPI_Win globalDevWin = MPI_WIN_NULL;
+void LrtsInitRMA() {
+    int result = MPI_Win_create_dynamic(MPI_INFO_NULL, MPI_COMM_WORLD, &globalDevWin);
+    
+    if (result != MPI_SUCCESS) {
+        CmiAbort("RMA Window Creation Failed!");
+    }
+}
+
+void LrtsCleanupRMA() {
+    if (globalDevWin != MPI_WIN_NULL) {
+        MPI_Win_free(&globalDevWin); // This will fail if memory is still attached!
+    }
+}
+
+#if CMK_SMP
+
+struct deviceRecvCallbackMsg {
+  char header[CmiMsgHeaderSizeBytes];
+  DeviceRdmaOp* op;
+};
+
+void* deviceRecvCallback(void* arg) {
+  deviceRecvCallbackMsg* recv_msg = (deviceRecvCallbackMsg*)arg;
+  CmiInvokeRecvHandler(recv_msg->op);
+  return NULL;
+}
+int deviceRecvCallbackHandler;
+
+#endif
+
+#endif
+
 /* ### End of Machine-running Related Functions ### */
 
 /* ### Beginning of Idle-state Related Functions ### */
@@ -468,14 +497,6 @@ static void EnqueueMsg(void *m, int size, int node, int mode, int type, void *re
     /*SMSG_LIST *msg_tmp = (SMSG_LIST *) CmiAlloc(sizeof(SMSG_LIST));*/
     SMSG_LIST *msg_tmp = allocateSmsgList((char *)m, node, size, mode, type, ref);
     MACHSTATE1(3,"EnqueueMsg to node %d {{ ", node);
-    msg_tmp->msg = (char *)m;
-    msg_tmp->size = size;
-    msg_tmp->destpe = node;
-    msg_tmp->next = 0;
-    msg_tmp->mode = mode;
-#if CMK_ONESIDED_IMPL
-    msg_tmp->ref = NULL;
-#endif
 
 #if MULTI_SENDQUEUE
     PCQueuePush(procState[CmiMyRank()].postMsgBuf,(char *)msg_tmp);
@@ -1075,28 +1096,35 @@ static int SendMsgBuf(void) {
     int i;
     int sent = 0;
 
-#if CMI_EXERT_SEND_CAP || CMI_DYNAMIC_EXERT_CAP
-    int sentCnt = 0;
-#endif
-
-#if CMI_DYNAMIC_EXERT_CAP
-    dynamicSendCap = CMI_DYNAMIC_MAXCAPSIZE;
-#endif
-
     MACHSTATE(2,"SendMsgBuf begin {");
-#if MULTI_SENDQUEUE
-    for (i=0; i<_Cmi_mynodesize+1; i++) { /* subtle: including comm thread */
-        if (!PCQueueEmpty(procState[i].postMsgBuf)) {
-            msg_tmp = (SMSG_LIST *)PCQueuePop(procState[i].postMsgBuf);
-#else
     /* single message sending queue */
     /* CmiLock(postMsgBufLock); */
     msg_tmp = (SMSG_LIST *)PCQueuePop(postMsgBuf);
     /* CmiUnlock(postMsgBufLock); */
     while (NULL != msg_tmp) {
-#endif
-
 #if CMK_ONESIDED_IMPL
+#if CMK_CUDA
+            if(msg_tmp->type == DEVICE_SEND_OP) {
+                MPI_Win_attach(globalDevWin, msg_tmp->ptr, size);
+            } else if(msg_tmp->type == DEVICE_RECV_OP) {
+                MPI_Win_lock(MPI_LOCK_SHARED, msg_tmp->op->src_pe, 0, globalDevWin);
+
+                int result = MPI_Get((void*)msg_tmp->op->dest_ptr, msg_tmp->op->size, MPI_BYTE, 
+                                    msg_tmp->op->src_pe, (MPI_Aint)(msg_tmp->op->tag), msg_tmp->op->size, 
+                                    MPI_BYTE, globalDevWin);
+                if (result != MPI_SUCCESS) {
+                    CmiAbort("LrtsRecvDevice: MPI_Get failed!\n");
+                }
+                MPI_Win_flush(msg_tmp->op->src_pe , globalDevWin);
+                MPI_Win_unlock(msg_tmp->op->src_pe, globalDevWin);
+
+                deviceRecvCallbackMsg* conv_msg = (deviceRecvCallbackMsg*)CmiAlloc(sizeof(deviceRecvCallbackMsg));
+                conv_msg->op = msg_tmp->op;
+                CmiSetHandler(conv_msg,deviceRecvCallbackHandler);
+                CmiPrintf("recieved the data okay okay\n");
+                CmiPushPE(msg_tmp->op->dest_pe, conv_msg);
+            } else
+#endif
             if(msg_tmp->type == ONESIDED_BUFFER_DIRECT_RECV || msg_tmp->type == ONESIDED_BUFFER_DIRECT_SEND) {
                 NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(msg_tmp->ref);
                 MPISendOrRecvOneBuffer(msg_tmp, ncpyOpInfo->tag);
@@ -1107,24 +1135,8 @@ static int SendMsgBuf(void) {
                 MPISendOneMsg(msg_tmp);
             }
             sent=1;
-
-#if CMI_EXERT_SEND_CAP
-            if (++sentCnt == SEND_CAP) break;
-#elif CMI_DYNAMIC_EXERT_CAP
-            if (++sentCnt >= dynamicSendCap) break;
-            if (CpvAccess(MsgQueueLen) > CMI_DYNAMIC_OUTGOING_THRESHOLD)
-                dynamicSendCap = CMI_DYNAMIC_SEND_CAPSIZE;
-#endif
-
-#if ! MULTI_SENDQUEUE
-            /* CmiLock(postMsgBufLock); */
             msg_tmp = (SMSG_LIST *)PCQueuePop(postMsgBuf);
-            /* CmiUnlock(postMsgBufLock); */
-#endif
         }
-#if MULTI_SENDQUEUE
-    }
-#endif
     MACHSTATE(2,"}SendMsgBuf end ");
     return sent;
 }
@@ -2406,48 +2418,51 @@ void CmiSetupMachineRecvBuffersUser(void)
 // }
 
 #include <map>
-
 std::map<std::pair<void*, size_t>, uint64_t> cache_window;
 
 void LrtsSendDevice(int& src_pe, const void*& ptr, size_t size, uint64_t& tag) {
-int rank;
-int _size;
-MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-MPI_Comm_size(MPI_COMM_WORLD, &_size);
-
-CmiPrintf("LrtseSendDevice start on MPI rank: %d of %d\n", rank, _size);
-
-    CmiPrintf("LrtseSendDevice start on PE: %d\n", CmiMyPe());
     if(cache_window.find(std::make_pair((void*)ptr, size)) != cache_window.end()) {
         tag = cache_window[std::make_pair((void*)ptr, size)];
     } else {
-        MPI_Aint disp;
-        MPI_Win_attach(globalDevWin, (void*)ptr, size);
-        MPI_Get_address((void*)ptr, &disp);
+#if CMK_SMP
+        SMSG_LIST *msg_tmp = (SMSG_LIST *) malloc(sizeof(SMSG_LIST));
+        msg_tmp->ptr = (void*)(ptr);
+        msg_tmp->device_size = size;
+        msg_tmp->type = DEVICE_SEND_OP;
+        PCQueuePush(postMsgBuf,(char *)msg_tmp);
+    #else
+        if(cache_window.find(std::make_pair((void*)ptr, size)) != cache_window.end()) {
+            tag = cache_window[std::make_pair((void*)ptr, size)];
+        } else {
+            MPI_Aint disp;
+            MPI_Win_attach(globalDevWin, (void*)ptr, size);
+        }
+    #endif
         // tag is the virtual address of the buffer
-        tag = (uint64_t)(disp);
+        tag = (uint64_t)(void*)(ptr);
+        cache_window[{(void*)ptr, size}] = tag;
     }
-    src_pe = CmiMyPe();
-    CmiPrintf("LrtsSendDevice Done\n");
+    MPI_Comm_rank(MPI_COMM_WORLD, &src_pe);
 }
+
+std::map<int, bool> handler_registered;
 
 void LrtsRecvDevice(DeviceRdmaOp* op, DeviceRecvType type)
 {
-    int rank;
-    int size;
-
-MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-MPI_Comm_size(MPI_COMM_WORLD, &size);
-
-CmiPrintf("LrtseRecvDevice start on MPI rank: %d of %d\n", rank, size);
-
-CmiPrintf("LrtsRecvDevice start on PE: %d and trying to get this lock: %d\n", CmiMyPe(), op->src_pe);
-MPI_Win_lock(MPI_LOCK_SHARED, op->src_pe, 0, globalDevWin);
-    CmiPrintf("Got za lock\n");
+#if CMK_SMP
+    if(handler_registered[CmiMyPe()] == false) {
+        deviceRecvCallbackHandler = CmiRegisterHandler((CmiHandler) deviceRecvCallback);
+        handler_registered[CmiMyPe()] = true;
+    }
+    SMSG_LIST *msg_tmp = (SMSG_LIST *) malloc(sizeof(SMSG_LIST));
+    msg_tmp->op = op;
+    msg_tmp->type = DEVICE_RECV_OP;
+    PCQueuePush(postMsgBuf,(char *)msg_tmp);
+#else
+    MPI_Win_lock(MPI_LOCK_SHARED, op->src_pe, 0, globalDevWin);
     int result = MPI_Get((void*)op->dest_ptr, op->size, MPI_BYTE, 
                          op->src_pe, (MPI_Aint)(op->tag), op->size, 
                          MPI_BYTE, globalDevWin);
-    CmiPrintf("No get for me\n");
     if (result != MPI_SUCCESS) {
         CmiAbort("LrtsRecvDevice: MPI_Get failed!\n");
     }
@@ -2455,6 +2470,7 @@ MPI_Win_lock(MPI_LOCK_SHARED, op->src_pe, 0, globalDevWin);
     MPI_Win_unlock(op->src_pe, globalDevWin);
 
     CmiInvokeRecvHandler(op);
+#endif
 }
 
 #endif // CMK_CUDA
