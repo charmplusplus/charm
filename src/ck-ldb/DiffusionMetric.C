@@ -10,36 +10,11 @@ public:
   virtual void updateState(int objId, int destNbor) = 0;
 };
 
-class MetricCommEI : public DiffusionMetric
-{
-private:
-  std::vector<int> internalComm;    // internal comm for each obj
-  std::vector<int> externalComm;    // external comm for each obj
-  std::vector<int> commDifference;  // external - internal comm for each obj
-
-  std::vector<double> toSendLoad;  // comm outward to each neighbor
-  BaseLB::LDStats* nodeStats;
-
-  std::vector<bool> objAvailable;
-
-  int n_objs;
-  int neighborCount;
-  int myNodeId;
-
-public:
-  MetricCommEI(BaseLB::LDStats* ns, int nodeId, int nodeSize, int nCount,
-               std::vector<double> tSL);
-
-  int popBestObject(int nbor) override;
-  int getBestNeighbor() override;
-  void updateState(int objId, int destNbor) override;
-};
-
 class MetricComm : public DiffusionMetric
 {
 private:
-  std::vector<int> internalComm;               // internal comm for each obj
-  std::vector<std::vector<int>> externalComm;  // external comm for each obj for each nbor
+  std::vector<double> internalComm;               // internal comm for each obj
+  std::vector<std::vector<double>> externalComm;  // external comm for each obj for each nbor
 
   std::vector<double> toSendLoad;  // comm outward to each neighbor
   BaseLB::LDStats* nodeStats;
@@ -114,99 +89,8 @@ public:
   void updateState(int objId, int destNbor) override;
 };
 
-MetricCommEI::MetricCommEI(BaseLB::LDStats* ns, int nodeId, int nodeSize, int nCount,
-                           std::vector<double> tSL)
-{
-  nodeStats = ns;
-  myNodeId = nodeId;
-  n_objs = nodeStats->objData.size();
-  neighborCount = nCount;
-  toSendLoad = tSL;
 
-  internalComm.resize(n_objs, 0);
-  externalComm.resize(n_objs, 0);
-  commDifference.resize(n_objs, 0);
-  objAvailable.resize(n_objs, true);
 
-  for (int edge = 0; edge < nodeStats->commData.size(); edge++)
-  {
-    LDCommData& commData = nodeStats->commData[edge];
-
-    if ((!commData.from_proc()) && (commData.recv_type() == LD_OBJ_MSG))
-    {
-      LDObjKey from = commData.sender;
-      LDObjKey to = commData.receiver.get_destObj();
-
-      int fromNode = myNodeId;
-      int toPE = commData.receiver.lastKnown();
-      int toNode = toPE / nodeSize;
-
-      if (fromNode == toNode)
-      {
-        // internal communication
-        int fromObj = nodeStats->getHash(from);
-        int toObj = nodeStats->getHash(to);
-        internalComm[fromObj] += commData.bytes;
-
-        if (toObj != -1 && toObj < n_objs)
-          internalComm[toObj] += commData.bytes;
-      }
-      else
-      {
-        // External communication
-        int fromObj = nodeStats->getHash(from);
-        if (fromObj != -1 && fromObj < n_objs)
-          externalComm[fromObj] += commData.bytes;
-
-        // CkPrintf("Updated external comm at %d to %d\n", fromObj,
-        // externalComm[fromObj]);
-      }
-    }
-  }
-
-  for (int i = 0; i < n_objs; i++)
-  {
-    commDifference[i] = externalComm[i] - internalComm[i];
-  }
-}
-
-int MetricCommEI::popBestObject(int nbor)
-{
-  // find index of object with max internal comm
-  int maxInternalComm = std::numeric_limits<int>::min();
-  int bestObject = -1;
-  for (int i = 0; i < n_objs; i++)
-  {
-    int testComm = commDifference[i];
-    if (testComm > maxInternalComm && objAvailable[i] && nodeStats->objData[i].migratable)
-    {
-      maxInternalComm = commDifference[i];
-      bestObject = i;
-    }
-  }
-
-  return bestObject;
-}
-
-int MetricCommEI::getBestNeighbor()
-{
-  int bestNeighbor = -1;
-  for (int i = 0; i < neighborCount; i++)
-  {
-    if (toSendLoad[i] > 0)
-    {
-      bestNeighbor = i;
-      break;
-    }
-  }
-  return bestNeighbor;
-}
-
-void MetricCommEI::updateState(int objId, int destNbor)
-{
-  objAvailable[objId] = false;
-  toSendLoad[destNbor] -= nodeStats->objData[objId].wallTime;
-};
 
 MetricComm::MetricComm(BaseLB::LDStats* ns, int nodeId, int nodeSize, int nCount,
                        std::vector<double> tSL, std::vector<int> sendToNbrs, 
@@ -221,7 +105,7 @@ MetricComm::MetricComm(BaseLB::LDStats* ns, int nodeId, int nodeSize, int nCount
   internalComm.resize(n_objs, 0);
   for (int nbor = 0; nbor < neighborCount; nbor++)
   {
-    std::vector<int> nborComm;
+    std::vector<double> nborComm;
     nborComm.resize(n_objs, 0);
     externalComm.push_back(nborComm);
   }
