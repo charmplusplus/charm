@@ -140,8 +140,8 @@ void DiffusionLB::LoadMetaInfo(LDObjHandle h, int local_id, double load, int sen
   migrates_expected++;
   if(only_mcount)
     return;
-  if (CkMyPe() != rank0PE) {
-    CkAbort("Error: LoadMetaInfo called during across node on non-rank0PE %d\n", CkMyPe());
+  if (thisIndex != rank0PE) {
+    CkAbort("Error: LoadMetaInfo called during across node on non-rank0PE %d\n", thisIndex);
   }
   pe_load[0] += load;
   int idx = FindObjectHandle(h);  // if object is in my handles
@@ -155,7 +155,7 @@ void DiffusionLB::LoadMetaInfo(LDObjHandle h, int local_id, double load, int sen
   else
   {
     CkAbort("Error: LoadMetaInfo called for object handle %d that already exists on PE %d\n",
-            h.handle, CkMyPe());
+            h.handle, thisIndex);
 #if 0
     CascadingMigration(h, load);
     objectHandles[idx] = objectHandles[objectHandles.size() - 1];
@@ -244,7 +244,7 @@ void DiffusionLB::CollectStats() {
   CkCallback cb_internal_comm(CkReductionTarget(DiffusionLB, print_internal_comm), thisProxy[0]);
   contribute(sizeof(double), &internal_to_report, CkReduction::sum_double, cb_internal_comm);
 
-  if (CkMyPe() == 0){
+  if (thisIndex == 0){
     CkCallback cb(CkIndex_DiffusionLB::ProcessMigrations(), thisProxy);
     CkStartQD(cb);
   }
