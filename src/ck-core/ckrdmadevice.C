@@ -224,6 +224,7 @@ static inline int CmiMyNodeRankLocal() {
 
 // Invoked after post entry method
 void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs) {
+  CmiPrintf("CkRdmaDeviceIssueRgets called\n");
   // Change message header to invoke regular entry method
   CMI_ZC_MSGTYPE(env) = CMK_REG_NO_ZC_MSG;
 
@@ -444,6 +445,7 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
     buffers[i]->dest_pe = dest_pe;
   }
   if(transfer_mode == CkNcpyModeDevice::MEMCPY) {
+    CmiPrintf("[MPI] MEMCPY\n");
     return;
   };
 
@@ -503,10 +505,32 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
     }
 #else
   for (int i = 0; i < numops; i++) {
-    CmiSendDevice(buffers[i]->src_pe , buffers[i]->ptr, buffers[i]->cnt, buffers[i]->tag);
-    // CmiSendDevice(dest_pe , buffers[i]->ptr, buffers[i]->cnt, buffers[i]->tag);
+    // CmiSendDevice(buffers[i]->src_pe , buffers[i]->ptr, buffers[i]->cnt, buffers[i]->tag);
+    int dest_rank = CmiNodeOf(dest_pe);
+    CmiSendDevice(dest_rank, buffers[i]->src_pe, buffers[i]->ptr, buffers[i]->cnt, buffers[i]->tag);
   }
 #endif
   }
+  CmiPrintf("CkRdmaDeviceOnSender Completed\n");
 }
 #endif // CMK_CUDA
+
+/*******
+ * 
+ * 
+ *     for i in array:
+ *        if i < 128:
+ * cmovb
+ * tmp = cnt_less_than+128
+ * tmp = tmp + i
+ * cmovb (i < 128) tmp cnt_less_than_128
+ * 
+ * 
+ * jmp / jne / je 
+ *        cnt_less_than_128 += i
+ *        cnt_all += i
+ * 
+ * 
+ * 
+ * 
+ */

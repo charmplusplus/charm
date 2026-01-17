@@ -242,6 +242,16 @@ class Block : public CBase_Block {
   }
 
   void init() {
+    int rank, size;
+
+    char hostname[256];
+    gethostname(hostname, sizeof(hostname));
+
+    int device;
+    cudaGetDevice(&device);
+
+    printf("host %s using GPU device %d\n", hostname, device);
+
     // Initialize values
     my_iter = 0;
     neighbors = 0;

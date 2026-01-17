@@ -72,7 +72,7 @@ class Main : public CBase_Main {
 public:
   Main(CkArgMsg* m) {
     main_proxy = thisProxy;
-    block_size = 16 * 1028;
+    block_size = 1028 * 1028 * 128;
     n_iters = 50;
     n_warpup_iters = 3;
     test_nodegroup = true;
@@ -177,20 +177,6 @@ public:
   }
 
   void send() {
-int my_device;
-cudaGetDevice(&my_device);
-
-cudaDeviceProp prop;
-cudaGetDeviceProperties(&prop, my_device);
-
-char hostname[256];
-gethostname(hostname, sizeof(hostname));
-
-ckout << "HOST: " << hostname
-      << " | DEVICE: " << my_device
-      << " (" << prop.name << ")"
-      << endl;
-
     thisProxy[2].recv(block_size, CkDeviceBuffer(container.d_local_data,
           CkCallback(CkIndex_VerifyArray::reuse(), thisProxy[thisIndex]),
           container.stream));
@@ -201,27 +187,11 @@ ckout << "HOST: " << hostname
   }
 
   void recv(int& size, double*& data, CkDeviceBufferPost* post) {
-    ckout << "verify recv1" << endl;
     data = container.d_remote_data;
     post[0].hapi_stream = container.stream;
   }
 
   void recv(int size, double* data) {
-    ckout << "verify recv2" << endl;
-int my_device;
-cudaGetDevice(&my_device);
-
-cudaDeviceProp prop;
-cudaGetDeviceProperties(&prop, my_device);
-
-char hostname[256];
-gethostname(hostname, sizeof(hostname));
-
-ckout << "HOST: " << hostname
-      << " | DEVICE: " << my_device
-      << " (" << prop.name << ")"
-      << endl;
-
     container.verify(1);
     if (lb_test) {
       pe = CkMyPe();
@@ -229,9 +199,7 @@ ckout << "HOST: " << hostname
     }
   }
 
-  void reuse() {
-    ckout << "verify src callback" << endl;
-  }
+  void reuse() {}
 
   void ResumeFromSync() {}
 };
@@ -245,43 +213,15 @@ public:
   }
 
   void send() {
-int my_device;
-cudaGetDevice(&my_device);
-
-cudaDeviceProp prop;
-cudaGetDeviceProperties(&prop, my_device);
-
-char hostname[256];
-gethostname(hostname, sizeof(hostname));
-
-ckout << "HOST: " << hostname
-      << " | DEVICE: " << my_device
-      << " (" << prop.name << ")"
-      << endl;
     thisProxy[2].recv(block_size, CkDeviceBuffer(container.d_local_data, container.stream));
   }
 
   void recv(int& size, double*& data, CkDeviceBufferPost* post) {
-ckout << "verify recv1" << endl;
     data = container.d_remote_data;
     post[0].hapi_stream = container.stream;
   }
 
   void recv(int size, double* data) {
-    ckout << "verify recv2" << endl;
-int my_device;
-cudaGetDevice(&my_device);
-
-cudaDeviceProp prop;
-cudaGetDeviceProperties(&prop, my_device);
-
-char hostname[256];
-gethostname(hostname, sizeof(hostname));
-
-ckout << "HOST: " << hostname
-      << " | DEVICE: " << my_device
-      << " (" << prop.name << ")"
-      << endl;
     container.verify(1);
   }
 };
@@ -295,43 +235,15 @@ public:
   }
 
   void send() {
-int my_device;
-cudaGetDevice(&my_device);
-
-cudaDeviceProp prop;
-cudaGetDeviceProperties(&prop, my_device);
-
-char hostname[256];
-gethostname(hostname, sizeof(hostname));
-
-ckout << "HOST: " << hostname
-      << " | DEVICE: " << my_device
-      << " (" << prop.name << ")"
-      << endl;
     thisProxy[1].recv(block_size, CkDeviceBuffer(container.d_local_data, container.stream));
   }
 
   void recv(int& size, double*& data, CkDeviceBufferPost* post) {
-ckout << "verify recv1" << endl;
     data = container.d_remote_data;
     post[0].hapi_stream = container.stream;
   }
 
   void recv(int size, double* data) {
-    ckout << "verify recv2" << endl;
-int my_device;
-cudaGetDevice(&my_device);
-
-cudaDeviceProp prop;
-cudaGetDeviceProperties(&prop, my_device);
-
-char hostname[256];
-gethostname(hostname, sizeof(hostname));
-
-ckout << "HOST: " << hostname
-      << " | DEVICE: " << my_device
-      << " (" << prop.name << ")"
-      << endl;
     container.verify(1);
   }
 };

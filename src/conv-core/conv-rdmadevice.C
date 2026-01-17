@@ -23,8 +23,8 @@ CmiNcpyModeDevice findTransferModeDevice(int srcPe, int dstPe) {
 #if CMK_GPU_COMM
 #include "machine-rdma.h"
 
-void CmiSendDevice(int& src_pe, const void*& ptr, size_t size, uint64_t& tag) {
-  LrtsSendDevice(src_pe, ptr, size, tag);
+void CmiSendDevice(int& dest_rank, int& src_rank, const void*& ptr, size_t size, uint64_t& tag) {
+  LrtsSendDevice(dest_rank, src_rank,  ptr, size, tag);
 }
 
 void CmiRecvDevice(DeviceRdmaOp* op, DeviceRecvType type) {
