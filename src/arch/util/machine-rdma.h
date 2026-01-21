@@ -19,7 +19,7 @@ void CmiInvokeNcpyAck(void *ack);
 // Function pointer to acknowledgement handler
 typedef void (*RdmaAckHandlerFn)(void *token);
 
-void LrtsSendDevice(int& dest_rank, int& src_rank, const void*& ptr, size_t size, uint64_t& tag);
+void LrtsSendDevice(int dest_rank, int src_rank, const void*& ptr, size_t size, uint64_t& tag);
 void LrtsRecvDevice(DeviceRdmaOp* op, DeviceRecvType type);
 
 void CmiInvokeRecvHandler(void* data);

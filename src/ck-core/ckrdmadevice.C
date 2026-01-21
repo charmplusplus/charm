@@ -64,6 +64,8 @@ void CkRdmaDeviceRecvHandler(void* data)
 
   // Invoke source callbacks
   if (op->src_cb) {
+    int rank;
+    CmiPrintf("[MPI] source callback called for this virtual address: %ld\n", op->tag);
     CkCallback* cb = (CkCallback*)op->src_cb;
     cb->send();
     delete cb;
@@ -224,7 +226,6 @@ static inline int CmiMyNodeRankLocal() {
 
 // Invoked after post entry method
 void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs) {
-  CmiPrintf("CkRdmaDeviceIssueRgets called\n");
   // Change message header to invoke regular entry method
   CMI_ZC_MSGTYPE(env) = CMK_REG_NO_ZC_MSG;
 
@@ -266,7 +267,6 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     // Store information about this buffer
     DeviceRdmaOp& save_op = *(DeviceRdmaOp*)((char*)rdma_data
         + sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * i);
-    save_op.dest_pe = CkMyPe();
     save_op.dest_ptr = arrPtrs[i];
     save_op.size = (size_t)arrSizes[i];
     save_op.info = rdma_info;
@@ -323,9 +323,11 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     } else {
 #if CMK_GPU_COMM
       // Machine layer supports GPU-aware communication
-      save_op.dest_pe = CmiMyRank();
       save_op.tag = source.tag;
       save_op.src_pe = source.src_pe;
+      save_op.dest_pe = source.dest_pe;
+      save_op.dest_mpi_rank = source.dest_mpi_rank;
+      save_op.src_mpi_rank = source.src_mpi_rank;
       QdCreate(1);
       CmiRecvDevice(&save_op, DEVICE_RECV_TYPE_CHARM);
       continue;
@@ -385,10 +387,7 @@ static int findFreeIpcEvent(DeviceManager* dm, const size_t comm_offset, int cpv
             + sizeof(hapiIpcMemHandle_t)) + i;
       bool can_query = false;
       pthread_mutex_lock(&shm_event_shared->lock);
-      if (shm_event_shared->dst_flag == true) {
-        shm_event_shared->dst_flag = false;
-        can_query = true;
-      }
+      if (shm_event_shared->dst_flag == true) can_query = true;
       pthread_mutex_unlock(&shm_event_shared->lock);
 
       // If the receiver has invoked the memcpy,
@@ -405,6 +404,9 @@ static int findFreeIpcEvent(DeviceManager* dm, const size_t comm_offset, int cpv
 
           // Mark event as free
           event_flag = 0;
+          pthread_mutex_lock(&shm_event_shared->lock);
+          shm_event_shared->dst_flag = false;
+          pthread_mutex_unlock(&shm_event_shared->lock);
         }
       }
     }
@@ -443,9 +445,11 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
   // FIXME: Not necessary? save_op.dest_pe is set to CkMyPe() on the receiver
   for (int i = 0; i < numops; i++) {
     buffers[i]->dest_pe = dest_pe;
+    buffers[i]->dest_mpi_rank = CmiNodeOf(dest_pe);
+    buffers[i]->src_pe = CmiMyPe();
+    buffers[i]->src_mpi_rank = CmiNodeOf(CmiMyPe());
   }
   if(transfer_mode == CkNcpyModeDevice::MEMCPY) {
-    CmiPrintf("[MPI] MEMCPY\n");
     return;
   };
 
@@ -505,13 +509,10 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
     }
 #else
   for (int i = 0; i < numops; i++) {
-    // CmiSendDevice(buffers[i]->src_pe , buffers[i]->ptr, buffers[i]->cnt, buffers[i]->tag);
-    int dest_rank = CmiNodeOf(dest_pe);
-    CmiSendDevice(dest_rank, buffers[i]->src_pe, buffers[i]->ptr, buffers[i]->cnt, buffers[i]->tag);
+    CmiSendDevice(buffers[i]->dest_mpi_rank, buffers[i]->src_mpi_rank, buffers[i]->ptr, buffers[i]->cnt, buffers[i]->tag);
   }
 #endif
   }
-  CmiPrintf("CkRdmaDeviceOnSender Completed\n");
 }
 #endif // CMK_CUDA
 
