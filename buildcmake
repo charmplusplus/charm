@@ -104,6 +104,7 @@ opt_charmdebug=0
 opt_controlpoint=0
 opt_cuda=0
 opt_hip=0
+opt_sycl=0
 opt_destination=""
 opt_disabletls=0
 opt_install_prefix=""
@@ -179,6 +180,9 @@ function parse_platform_compilers() {
       ;;
     hip)
       opt_hip=1
+      ;;
+    sycl)
+      opt_sycl=1
       ;;
     cxi)
       opt_cxi=1
@@ -653,6 +657,7 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
   -DCONTROLPOINT="$opt_controlpoint" \
   -DBUILD_CUDA="$opt_cuda" \
   -DBUILD_HIP="$opt_hip" \
+  -DBUILD_SYCL="$opt_sycl" \
   -DDISABLE_TLS="$opt_disabletls" \
   -DDRONE_MODE="$opt_drone_mode" \
   -DENABLE_FORTRAN=$opt_enable_fortran \

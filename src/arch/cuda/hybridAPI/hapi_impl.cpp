@@ -52,6 +52,8 @@ CpvDeclare(std::queue<hapiEvent>, hapi_event_queue);
 #endif // HAPI_CUDA_CALLBACK
 CpvDeclare(int, n_hapi_events);
 
+CsvDeclare()
+
 // Used to invoke user's Charm++ callback function
 void (*hapiInvokeCallback)(void*, void*) = NULL;
 

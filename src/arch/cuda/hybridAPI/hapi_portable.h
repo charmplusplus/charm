@@ -2,6 +2,7 @@
 
 #undef CMK_CUDA
 #undef CMK_HIP
+#undef CMK_SYCL
 
 #include "conv-mach-opt.h"
 
@@ -172,3 +173,9 @@
 #define hapiIpcMemLazyEnablePeerAccess hipIpcMemLazyEnablePeerAccess
 
 #endif // CMK_HIP
+
+#ifdef CMK_SYCL
+
+#include "sycl_impl.h"
+
+#endif // CMK_SYCL

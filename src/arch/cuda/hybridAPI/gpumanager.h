@@ -91,6 +91,12 @@ struct GPUManager {
   int n_streams_;
   int last_stream_id_;
 
+#ifdef CMK_SYCL
+  sycl::context ctx;
+  sycl::device dev;
+  bool ctx_initialized_;
+#endif
+
 #ifdef HAPI_CUDA_CALLBACK
   int host_to_device_cb_idx_;
   int kernel_cb_idx_;
@@ -114,6 +120,9 @@ struct GPUManager {
 
 #if CMK_SMP
   CmiNodeLock queue_lock_;
+#ifdef CMK_SYCL
+  CmiNodeLock context_lock_;
+#endif
   CmiNodeLock progress_lock_;
   CmiNodeLock stream_lock_;
   CmiNodeLock mempool_lock_;

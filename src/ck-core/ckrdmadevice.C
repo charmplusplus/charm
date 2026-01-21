@@ -340,6 +340,8 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     }
 
     // Add source callback for polling, so that it can be invoked once the transfer is complete
+    // FIXME - inefficient for IPC. Call the callback on the sender side after data
+    // copied to comm buffer
     hapiAddCallback(postStructs[i].hapi_stream, CkCallback(CkRdmaDeviceRecvHandler, &save_op));
   }
 }
