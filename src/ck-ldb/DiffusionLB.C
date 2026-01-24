@@ -251,11 +251,6 @@ void DiffusionLB::LoadReceived(int objId, int destPE)
     migrateMe->obj = myStats->objData[objId].handle;
     migrateMe->from_pe = CkMyPe();
     migrateMe->to_pe = destPE;
-    if(CkMyPe()==rank0PE){
-      pe_load[CkMyRank()] -= myStats->objData[objId].wallTime;
-    }
-    else
-      thisProxy[rank0PE].update_peload(CkMyRank(), myStats->objData[objId].wallTime);
     // migrateMe->async_arrival = myStats->objData[objId].asyncArrival;
     migrateInfo.push_back(migrateMe);
     mig_id_map.emplace(objId, migrateMe);
