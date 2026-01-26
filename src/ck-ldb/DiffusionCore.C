@@ -225,7 +225,7 @@ void DiffusionLB::CollectStats() {
 
   if (thisIndex == rank0PE) {
     for (int i = 0; i < nodeSize; i++) load_to_report += pe_load[i];
-    avg_load = load_to_report / nodeSize;
+    avg_load = load_to_report;
     max_load = std::max_element(pe_load.begin(), pe_load.end())[0];
     external_to_report = myNodeExternalBytes;
     internal_to_report = myNodeInternalBytes;
@@ -251,10 +251,10 @@ void DiffusionLB::CollectStats() {
 }
 
 void DiffusionLB::print_max_load(double max){
-  CkPrintf("Max load AFTER LB: %f\n", max);
+  CkPrintf("Max load per PE AFTER LB: %f\n", max);
 }
 void DiffusionLB::print_avg_load(double sum){
-    CkPrintf("Avg load AFTER LB: %f\n", sum / numNodes);
+    CkPrintf("Avg load per PE AFTER LB: %f\n", sum / numPes);
 
 }
 void DiffusionLB::print_external_comm(double sum){
