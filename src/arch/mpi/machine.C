@@ -1120,26 +1120,35 @@ static int SendMsgBuf(void) {
     while (NULL != msg_tmp) {
         if(msg_tmp->type == DEVICE_SEND_OP) 
             CmiPrintf("[MPI] DEVICE_SEND_OP [rank]: %d [tag]: %ld\n", rank, msg_tmp->tag);
-        else if(msg_tmp->type == msg_tmp->type == DEVICE_RECV_OP)
+        else if(msg_tmp->type == DEVICE_RECV_OP)
             CmiPrintf("[MPI] DEVICE_RECV_OP [rank]: %d [tag]: %ld\n", rank, msg_tmp->op->tag);
 #if CMK_ONESIDED_IMPL
 #if CMK_CUDA
             if (msg_tmp->type == DEVICE_SEND_OP) {
-                MPI_Win_attach(globalDevWin, msg_tmp->ptr, msg_tmp->device_size);
-                CmiPrintf("[MPI] sent data present at this virtual address: %ld from this MPI rank: %d to this MPI rank: %d\n", msg_tmp->tag, rank, msg_tmp->dest_mpi_rank);
+                int rc = MPI_Win_attach(globalDevWin, msg_tmp->ptr, msg_tmp->device_size);
+                if(rc!=MPI_SUCCESS) {
+                    CmiAbort("MPI_Win_attach failed\n");
+                }
+                MPI_Aint address;
+                MPI_Get_address(msg_tmp->ptr, &address);
+                CmiPrintf("[MPI] sent data present at this virtual address: %ld from this MPI rank: %d to this MPI rank: %d\n", address, rank, msg_tmp->dest_mpi_rank);
             } else if(msg_tmp->type == DEVICE_RECV_OP) {
-                if (access_epochs[msg_tmp->op->src_mpi_rank] == 0) MPI_Win_lock(MPI_LOCK_SHARED, msg_tmp->op->src_mpi_rank, 0, globalDevWin);
+                if (access_epochs[msg_tmp->op->src_mpi_rank] == 0) {
+                    MPI_Win_lock(MPI_LOCK_SHARED, msg_tmp->op->src_mpi_rank, 0, globalDevWin);
+                    CmiPrintf("[MPI] MPI RANK: %d is opening the access window for MPI RANK: %d\n", msg_tmp->op->dest_mpi_rank, msg_tmp->op->src_mpi_rank);
+                }
                 access_epochs[msg_tmp->op->src_mpi_rank]++;
-                CmiPrintf("[MPI] trying to get data from this virtual address: %ld present at this MPI rank: %d to this MPI rank: %d\n", msg_tmp->op->tag, msg_tmp->op->src_mpi_rank, msg_tmp->op->dest_mpi_rank);
                 MPI_Request req;
                 int result = MPI_Rget((void*)msg_tmp->op->dest_ptr, msg_tmp->op->size, MPI_BYTE, 
-                                    msg_tmp->op->src_mpi_rank, (MPI_Aint)(msg_tmp->op->tag), msg_tmp->op->size, 
-                                    MPI_BYTE, globalDevWin, &req);
+                msg_tmp->op->src_mpi_rank, (MPI_Aint)(msg_tmp->op->tag), msg_tmp->op->size, 
+                MPI_BYTE, globalDevWin, &req);
                 if (result != MPI_SUCCESS) {
                     CmiAbort("LrtsRecvDevice: MPI_Get failed!\n");
                 }
                 rdma_key++;
                 rdma_requests[rdma_key] = {req, msg_tmp->op};
+                CmiPrintf("[MPI] trying to get data from this virtual address: %ld present at this MPI rank: %d to this MPI rank: %d, with key %d and handle %p\n", msg_tmp->op->tag, msg_tmp->op->src_mpi_rank, msg_tmp->op->dest_mpi_rank, rdma_key, rdma_requests[rdma_key].first);
+                
                 // Get-Put / Rget ==================================
             } else
 #endif
@@ -1166,14 +1175,17 @@ void processRdmaRequests() {
     for (auto it = rdma_requests.begin(); it != rdma_requests.end();) {
         some_rdma_pending++;
         int rank; MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-        if(some_rdma_pending % 1000000 == 0) CmiPrintf("[MPI] mpi rank: %d has some pending rdma messages that needs to complete their get\n", rank);
         int done;
         MPI_Test(&((it->second).first), &done, MPI_STATUS_IGNORE);
+        if(some_rdma_pending % 1000000 == 0) CmiPrintf("[MPI] mpi rank: %d has some pending rdma messages that needs to complete their get, with rdma_key %d and handle %p\n", rank, it->first, (it->second).first);
         if (done) {
             DeviceRdmaOpMsg_* conv_msg = (DeviceRdmaOpMsg_*)CmiAlloc(sizeof(DeviceRdmaOpMsg_));
             conv_msg->op = (it->second).second;
             access_epochs[conv_msg->op->src_mpi_rank]--;
-            if (access_epochs[conv_msg->op->src_mpi_rank] == 0) MPI_Win_unlock(conv_msg->op->src_mpi_rank, globalDevWin);
+            if (access_epochs[conv_msg->op->src_mpi_rank] == 0) {
+                MPI_Win_unlock(conv_msg->op->src_mpi_rank, globalDevWin);
+                CmiPrintf("[MPI] MPI RANK: %d is closing the access window for MPI RANK: %d\n", conv_msg->op->dest_mpi_rank, conv_msg->op->src_mpi_rank);
+            }
             CmiSetHandler(conv_msg,deviceRecvCallbackHandler);
             CmiPushPE(CmiRankOf(conv_msg->op->dest_pe), conv_msg);
             CmiPrintf("[MPI] received data with this virtual address: %ld from this MPI rank: %d to this MPI rank: %d\n", conv_msg->op->tag, conv_msg->op->src_mpi_rank, conv_msg->op->dest_mpi_rank);
