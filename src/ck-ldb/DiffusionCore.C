@@ -223,6 +223,8 @@ void DiffusionLB::CollectStats() {
   double avg_load = 0.0;
   double max_load = 0.0;
 
+  int num_migrations = total_migrates;
+
   if (thisIndex == rank0PE) {
     for (int i = 0; i < nodeSize; i++) load_to_report += pe_load[i];
     avg_load = load_to_report;
@@ -244,6 +246,9 @@ void DiffusionLB::CollectStats() {
   CkCallback cb_internal_comm(CkReductionTarget(DiffusionLB, print_internal_comm), thisProxy[0]);
   contribute(sizeof(double), &internal_to_report, CkReduction::sum_double, cb_internal_comm);
 
+  CkCallback cb_num_migrations(CkReductionTarget(DiffusionLB, print_num_migrations), thisProxy[0]);
+  contribute(sizeof(int), &num_migrations, CkReduction::sum_int, cb_num_migrations);
+
   if (thisIndex == 0){
     CkCallback cb(CkIndex_DiffusionLB::ProcessMigrations(), thisProxy);
     CkStartQD(cb);
@@ -255,6 +260,10 @@ void DiffusionLB::print_max_load(double max){
 }
 void DiffusionLB::print_avg_load(double sum){
     CkPrintf("Avg load per PE AFTER LB: %f\n", sum / numPes);
+
+}
+void DiffusionLB::print_num_migrations(int sum){
+    CkPrintf("Number of migrations AFTER LB: %d\n", sum);
 
 }
 void DiffusionLB::print_external_comm(double sum){

@@ -16,6 +16,7 @@ module DiffusionLB
 
     entry[reductiontarget] void print_max_load(double max);
     entry[reductiontarget] void print_avg_load(double sum);
+    entry[reductiontarget] void print_num_migrations(int sum);
     entry[reductiontarget] void print_external_comm(double sum);
     entry[reductiontarget] void print_internal_comm(double sum);
     

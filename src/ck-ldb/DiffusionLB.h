@@ -81,6 +81,7 @@ public:
     void print_avg_load(double sum);
     void print_external_comm(double sum);
     void print_internal_comm(double sum);
+    void print_num_migrations(int sum);
 
   void LoadMetaInfo(LDObjHandle h, int objId, double load, int senderPE, int only_mcount);
 
