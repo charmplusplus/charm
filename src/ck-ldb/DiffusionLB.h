@@ -193,6 +193,7 @@ private:
   // phase 5: migration --------------------------------
   std::vector<MigrateInfo*> migrateInfo;
   int total_migrates;
+  int total_crossnode_migrates;
 
   // Diffusion-specific timing instrumentation
   static double totalNeighborTime;

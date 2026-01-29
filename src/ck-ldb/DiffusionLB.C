@@ -131,6 +131,7 @@ void DiffusionLB::Strategy(const DistBaseLB::LDStats* const stats)
 {
   startOverallTiming();
   total_migrates = 0;
+  total_crossnode_migrates = 0;
 
   if (CkMyPe() == 0 && _lb_args.debug() >= 1)
   {
@@ -255,6 +256,9 @@ void DiffusionLB::LoadReceived(int objId, int destPE)
     migrateInfo.push_back(migrateMe);
     mig_id_map.emplace(objId, migrateMe);
     total_migrates++;
+
+    if (CkMyPe() / nodeSize != destPE / nodeSize)
+      total_crossnode_migrates++;
   }
 
   if (_lb_args.debug() > 2) CkPrintf("[%d] Completing LoadReceived for objId %d to %d\n", CkMyPe(), objId, destPE);
@@ -483,7 +487,7 @@ void DiffusionLB::ProcessMigrations()
   // SAME AS IN PACKANDSENDMIGRATEMSGS
   LBMigrateMsg* msg = new (total_migrates, CkNumPes(), CkNumPes(), 0) LBMigrateMsg;
   msg->n_moves = total_migrates;
-  if (_lb_args.debug() > 1) CkPrintf("PE-%d with %d migrates\n", CkMyPe(), total_migrates);
+  if (_lb_args.debug() > 1) CkPrintf("PE-%d with %d migrates and %d cross-node migrates\n", CkMyPe(), total_migrates, total_crossnode_migrates);
   for (int i = 0; i < total_migrates; i++)
   {
     MigrateInfo* item = (MigrateInfo*)migrateInfo[i];

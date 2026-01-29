@@ -247,7 +247,7 @@ void DiffusionLB::CollectStats() {
   contribute(sizeof(double), &internal_to_report, CkReduction::sum_double, cb_internal_comm);
 
   CkCallback cb_num_migrations(CkReductionTarget(DiffusionLB, print_num_migrations), thisProxy[0]);
-  contribute(sizeof(int), &num_migrations, CkReduction::sum_int, cb_num_migrations);
+  contribute(sizeof(int), &total_crossnode_migrates, CkReduction::sum_int, cb_num_migrations);
 
   if (thisIndex == 0){
     CkCallback cb(CkIndex_DiffusionLB::ProcessMigrations(), thisProxy);
@@ -263,7 +263,7 @@ void DiffusionLB::print_avg_load(double sum){
 
 }
 void DiffusionLB::print_num_migrations(int sum){
-    CkPrintf("Number of migrations AFTER LB: %d\n", sum);
+    CkPrintf("Number of cross node migrations AFTER LB: %d\n", sum);
 
 }
 void DiffusionLB::print_external_comm(double sum){
