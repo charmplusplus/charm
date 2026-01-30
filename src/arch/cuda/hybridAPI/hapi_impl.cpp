@@ -14,6 +14,7 @@
 #include <cuda_runtime.h>
 
 #include "converse.h"
+#include "conv-mach-opt.h" /* for CMK_CUDA */
 #include "hapi.h"
 #include "hapi_impl.h"
 #include "gpumanager.h"
