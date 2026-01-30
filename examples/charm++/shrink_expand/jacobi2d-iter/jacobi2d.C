@@ -263,11 +263,16 @@ void ResumeFromSync() {begin_iteration();}
             // and write them to temperature[][] after all of the new values are computed.
             array2d new_temperature(block_height + 2, array1d(block_width + 2));
 
-            for(int i=1;i<block_height+1;++i){
-                for(int j=1;j<block_width+1;++j){
-                    // update my value based on the surrounding values
-                    new_temperature[i][j] = (temperature[i-1][j]+temperature[i+1][j]+temperature[i][j-1]+temperature[i][j+1]+temperature[i][j]) / 5.0;
-
+            const int tile_size_i = 1024;
+            const int tile_size_j = 1024;
+            for(int ii=1; ii<block_height+1; ii+=tile_size_i){
+                for(int jj=1; jj<block_width+1; jj+=tile_size_j){
+                    for(int i=ii; i<std::min(ii+tile_size_i, block_height+1); ++i){
+                        for(int j=jj; j<std::min(jj+tile_size_j, block_width+1); ++j){
+                            // update my value based on the surrounding values
+                            new_temperature[i][j] = (temperature[i-1][j]+temperature[i+1][j]+temperature[i][j-1]+temperature[i][j+1]+temperature[i][j]) / 5.0;
+                        }
+                    }
                 }
             }
 
