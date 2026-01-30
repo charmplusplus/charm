@@ -276,9 +276,15 @@ void ResumeFromSync() {begin_iteration();}
                 }
             }
 
-            for(int i=0;i<block_height+2;++i)
-                for(int j=0;j<block_width+2;++j)
-                    temperature[i][j] = new_temperature[i][j];
+            for(int ii=0; ii<block_height+2; ii+=tile_size_i){
+                for(int jj=0; jj<block_width+2; jj+=tile_size_j){
+                    for(int i=ii; i<std::min(ii+tile_size_i, block_height+2); ++i){
+                        for(int j=jj; j<std::min(jj+tile_size_j, block_width+2); ++j){
+                            temperature[i][j] = new_temperature[i][j];
+                        }
+                    }
+                }
+            }
 
             // Enforce the boundary conditions again
             BC();
