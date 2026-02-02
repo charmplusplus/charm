@@ -49,6 +49,7 @@ typedef struct hapiEvent {
 } hapiEvent;
 
 CpvDeclare(std::queue<hapiEvent>, hapi_event_queue);
+CpvDeclare(std::queue<hapiEvent_t>, hapi_event_pool);
 #endif // HAPI_CUDA_CALLBACK
 CpvDeclare(int, n_hapi_events);
 
@@ -158,6 +159,12 @@ static void hapiInitCpv() {
   // HAPI event-related
 #ifndef HAPI_CUDA_CALLBACK
   CpvInitialize(std::queue<hapiEvent>, hapi_event_queue);
+  CpvInitialize(std::queue<hapiEvent_t>, hapi_event_pool);
+  // for(int i = 0; i < 8; i++) {
+  //   hapiEvent_t ev;
+  //   hapiEventCreateWithFlags(&ev, hapiEventDisableTiming);
+  //   CpvAccess(hapi_event_pool).push(ev);
+  // }
 #endif
   CpvInitialize(int, n_hapi_events);
   CpvAccess(n_hapi_events) = 0;
@@ -182,6 +189,13 @@ static void hapiExitCsv() {
   if (csv_gpu_manager.mempool_initialized_) {
     releasePool(csv_gpu_manager.mempool_free_bufs_);
   }
+#ifndef HAPI_CUDA_CALLBACK
+  auto& hapi_event_pool_ = CpvAccess(hapi_event_pool);
+  while(!hapi_event_pool_.empty()) {
+    hapiEventDestroy(hapi_event_pool_.front());
+    hapi_event_pool_.pop();
+  }
+#endif
 }
 
 // Set up PE to GPU mapping, invoked from all PEs
@@ -299,8 +313,7 @@ static void hapiMapping(char** argv) {
 #if CMK_SMP
   CmiLock(csv_gpu_manager.device_mapping_lock);
 #endif
-  csv_gpu_manager.device_map.emplace(CmiMyPe(),
-      &(csv_gpu_manager.device_managers[cpv_my_device_id]));
+  csv_gpu_manager.device_map.emplace(CmiMyPe(), &(csv_gpu_manager.device_managers[cpv_my_device_id]));
 #if CMK_SMP
   CmiUnlock(csv_gpu_manager.device_mapping_lock);
 #endif
@@ -415,9 +428,15 @@ static void hapiMapping(char** argv) {
 
 #ifndef HAPI_CUDA_CALLBACK
 void recordEvent(hapiStream_t stream, const CkCallback& cb, void* cb_msg, hapiWorkRequest* wr = NULL) {
-  // create CUDA event and insert into stream
+  // create CUDA event / get CUDA event from the pool and insert into stream
   hapiEvent_t ev;
-  hapiEventCreateWithFlags(&ev, hapiEventDisableTiming);
+  auto& hapi_event_pool_local = CpvAccess(hapi_event_pool);
+  if(hapi_event_pool_local.size() == 0) {
+    hapiEventCreateWithFlags(&ev, hapiEventDisableTiming);
+  } else {
+    ev = hapi_event_pool_local.front();
+    hapi_event_pool_local.pop();
+  }
   hapiEventRecord(ev, stream);
 
   hapiEvent hev(ev, cb, cb_msg, wr);
@@ -1385,7 +1404,7 @@ void hapiPollEvents(void* param) {
       if (hev.wr) {
         hapiWorkRequestCleanup(hev.wr);
       }
-      hapiEventDestroy(hev.event);
+      CpvAccess(hapi_event_pool).push(hev.event);
       CpvAccess(n_hapi_events)--;
 
       // inform QD that an event was processed

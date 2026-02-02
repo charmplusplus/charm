@@ -664,7 +664,6 @@ static void ReleasePostedMessages(void) {
     MACHSTATE1(2,"ReleasePostedMessages begin on %d {", CmiMyPe());
     while (msg_tmp!=0) {
         int rank; MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-        CmiPrintf("[MPI] MPI RANK: %d ReleasePostedMessages found a message in sent_msgs\n", rank);
         done =0;
 #if CMK_SMP_TRACE_COMMTHREAD || CMK_TRACE_COMMOVERHEAD
         double startT = CmiWallTimer();
@@ -856,7 +855,6 @@ static int PumpMsgs(void) {
 
         if (!flg) break;
         int rank; MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-        CmiPrintf("[MPI] MPI RANK: %d PumpMsgs found a message through MPI_Iprobe with tag: %ld\n", rank, TAG);
         CONDITIONAL_TRACE_USER_EVENT(70); /* MPI_Iprobe related user event */
         
         recd = 1;
@@ -1118,10 +1116,6 @@ static int SendMsgBuf(void) {
     msg_tmp = (SMSG_LIST *)PCQueuePop(postMsgBuf);
     /* CmiUnlock(postMsgBufLock); */
     while (NULL != msg_tmp) {
-        if(msg_tmp->type == DEVICE_SEND_OP) 
-            CmiPrintf("[MPI] DEVICE_SEND_OP [rank]: %d [tag]: %ld\n", rank, msg_tmp->tag);
-        else if(msg_tmp->type == DEVICE_RECV_OP)
-            CmiPrintf("[MPI] DEVICE_RECV_OP [rank]: %d [tag]: %ld\n", rank, msg_tmp->op->tag);
 #if CMK_ONESIDED_IMPL
 #if CMK_CUDA
             if (msg_tmp->type == DEVICE_SEND_OP) {
@@ -1129,13 +1123,9 @@ static int SendMsgBuf(void) {
                 if(rc!=MPI_SUCCESS) {
                     CmiAbort("MPI_Win_attach failed\n");
                 }
-                MPI_Aint address;
-                MPI_Get_address(msg_tmp->ptr, &address);
-                CmiPrintf("[MPI] sent data present at this virtual address: %ld from this MPI rank: %d to this MPI rank: %d\n", address, rank, msg_tmp->dest_mpi_rank);
             } else if(msg_tmp->type == DEVICE_RECV_OP) {
                 if (access_epochs[msg_tmp->op->src_mpi_rank] == 0) {
                     MPI_Win_lock(MPI_LOCK_SHARED, msg_tmp->op->src_mpi_rank, 0, globalDevWin);
-                    CmiPrintf("[MPI] MPI RANK: %d is opening the access window for MPI RANK: %d\n", msg_tmp->op->dest_mpi_rank, msg_tmp->op->src_mpi_rank);
                 }
                 access_epochs[msg_tmp->op->src_mpi_rank]++;
                 MPI_Request req;
@@ -1147,8 +1137,6 @@ static int SendMsgBuf(void) {
                 }
                 rdma_key++;
                 rdma_requests[rdma_key] = {req, msg_tmp->op};
-                CmiPrintf("[MPI] trying to get data from this virtual address: %ld present at this MPI rank: %d to this MPI rank: %d, with key %d and handle %p\n", msg_tmp->op->tag, msg_tmp->op->src_mpi_rank, msg_tmp->op->dest_mpi_rank, rdma_key, rdma_requests[rdma_key].first);
-                
                 // Get-Put / Rget ==================================
             } else
 #endif
@@ -1171,24 +1159,19 @@ static int SendMsgBuf(void) {
 #if CMK_CUDA
 
 void processRdmaRequests() {
-    static uint64_t some_rdma_pending = 0;
     for (auto it = rdma_requests.begin(); it != rdma_requests.end();) {
-        some_rdma_pending++;
         int rank; MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         int done;
         MPI_Test(&((it->second).first), &done, MPI_STATUS_IGNORE);
-        if(some_rdma_pending % 1000000 == 0) CmiPrintf("[MPI] mpi rank: %d has some pending rdma messages that needs to complete their get, with rdma_key %d and handle %p\n", rank, it->first, (it->second).first);
         if (done) {
             DeviceRdmaOpMsg_* conv_msg = (DeviceRdmaOpMsg_*)CmiAlloc(sizeof(DeviceRdmaOpMsg_));
             conv_msg->op = (it->second).second;
             access_epochs[conv_msg->op->src_mpi_rank]--;
             if (access_epochs[conv_msg->op->src_mpi_rank] == 0) {
                 MPI_Win_unlock(conv_msg->op->src_mpi_rank, globalDevWin);
-                CmiPrintf("[MPI] MPI RANK: %d is closing the access window for MPI RANK: %d\n", conv_msg->op->dest_mpi_rank, conv_msg->op->src_mpi_rank);
             }
             CmiSetHandler(conv_msg,deviceRecvCallbackHandler);
             CmiPushPE(CmiRankOf(conv_msg->op->dest_pe), conv_msg);
-            CmiPrintf("[MPI] received data with this virtual address: %ld from this MPI rank: %d to this MPI rank: %d\n", conv_msg->op->tag, conv_msg->op->src_mpi_rank, conv_msg->op->dest_mpi_rank);
             it = rdma_requests.erase(it);
         } else {
             it++;
@@ -1259,18 +1242,6 @@ void LrtsAdvanceCommunication(int whenidle) {
 #if CMK_CUDA
     processRdmaRequests();
 #endif
-
-    if (PCQueueLength(postMsgBuf) > 0) {
-        int rank; MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-        CmiPrintf("[MPI] mpi rank: %d has %d messages in its queue\n", rank, PCQueueLength(postMsgBuf));
-    } else {
-        static uint64_t zero_msg_count = 0;
-        zero_msg_count++;
-        int rank; MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-        if(zero_msg_count % 1000000 == 0) {
-            CmiPrintf("[MPI] mpi rank: %d has %d messages in its queue\n", rank, PCQueueLength(postMsgBuf));
-        }
-    }
 
 #else /* non-SMP case */
     ReleasePostedMessages();
@@ -2491,8 +2462,6 @@ void LrtsSendDevice(int dest_mpi_rank, int src_mpi_rank, const void*& ptr, size_
         tag = (uint64_t)(void*)(ptr);
         cache_window[{(void*)ptr, size}] = tag;
     }
-    int pcqueue_size = PCQueueLength(postMsgBuf);
-    CmiPrintf("[MPI] lrtsSendDevice for this virtual address: %ld present at this MPI rank: %d to this MPI rank: %d, pcqueue length: %d\n", tag, src_mpi_rank, dest_mpi_rank, pcqueue_size);
 }
 
 std::map<int, bool> handler_registered;
@@ -2516,13 +2485,11 @@ void LrtsRecvDevice(DeviceRdmaOp* op, DeviceRecvType type)
     if (result != MPI_SUCCESS) {
         CmiAbort("LrtsRecvDevice: MPI_Get failed!\n");
     }
-    MPI_Win_flush(op->src_pe , globalDevWin);
+    MPI_Win_flush_local(op->src_pe , globalDevWin);
     MPI_Win_unlock(op->src_pe, globalDevWin);
 
     CmiInvokeRecvHandler(op);
 #endif
-    int pcqueue_size = PCQueueLength(postMsgBuf);
-    CmiPrintf("[MPI] lrtsrecvdevice for this virtual address: %ld present at this MPI rank: %d to this MPI rank: %d, pcqueue length: %d\n", op->tag, op->src_mpi_rank, op->dest_mpi_rank, pcqueue_size);
 }
 
 #endif // CMK_CUDA

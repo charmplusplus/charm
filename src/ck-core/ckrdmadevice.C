@@ -65,7 +65,6 @@ void CkRdmaDeviceRecvHandler(void* data)
   // Invoke source callbacks
   if (op->src_cb) {
     int rank;
-    CmiPrintf("[MPI] source callback called for this virtual address: %ld\n", op->tag);
     CkCallback* cb = (CkCallback*)op->src_cb;
     cb->send();
     delete cb;
@@ -267,6 +266,7 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     // Store information about this buffer
     DeviceRdmaOp& save_op = *(DeviceRdmaOp*)((char*)rdma_data
         + sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * i);
+    save_op.dest_pe  = source.dest_pe;
     save_op.dest_ptr = arrPtrs[i];
     save_op.size = (size_t)arrSizes[i];
     save_op.info = rdma_info;
@@ -515,23 +515,3 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
   }
 }
 #endif // CMK_CUDA
-
-/*******
- * 
- * 
- *     for i in array:
- *        if i < 128:
- * cmovb
- * tmp = cnt_less_than+128
- * tmp = tmp + i
- * cmovb (i < 128) tmp cnt_less_than_128
- * 
- * 
- * jmp / jne / je 
- *        cnt_less_than_128 += i
- *        cnt_all += i
- * 
- * 
- * 
- * 
- */

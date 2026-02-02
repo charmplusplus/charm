@@ -5,6 +5,8 @@
 #include <cstdint>
 #include <list>
 #include <unordered_map>
+#include <string>
+#include <pthread.h>
 
 // A cached memory allocator with GPU memory as the backing store.
 // A fixed size allocation is initially made to the backing store,
