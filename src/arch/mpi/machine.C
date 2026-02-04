@@ -1091,8 +1091,7 @@ static void PumpMsgsBlocking(void) {
 #if CMK_CUDA
     #include <map>
 
-    std::map<int, std::pair<MPI_Request, DeviceRdmaOp*>> rdma_requests;
-    int rdma_key = 0;
+    std::vector<std::pair<MPI_Request, DeviceRdmaOp*>> rdma_requests;
     // a map to tell how many rdma requests are gone to some rank 
     std::map<int, int> access_epochs;
 #endif
@@ -1130,8 +1129,7 @@ static int SendMsgBuf(void) {
                 MPI_BYTE, globalDevWin, &req);
                 if (result != MPI_SUCCESS)
                     CmiAbort("LrtsRecvDevice: MPI_Get failed!\n");
-                rdma_key++;
-                rdma_requests[rdma_key] = {req, msg_tmp->op};
+                rdma_requests.push_back({req, msg_tmp->op});
             } else
 #endif
             if(msg_tmp->type == ONESIDED_BUFFER_DIRECT_RECV || msg_tmp->type == ONESIDED_BUFFER_DIRECT_SEND) {
@@ -1186,41 +1184,109 @@ static double sendtime = 0.0;
 #if CMK_SMP
 
 void processRdmaRequests() {
-    for (auto it = rdma_requests.begin(); it != rdma_requests.end();) {
-        int done;
-        MPI_Test(&((it->second).first), &done, MPI_STATUS_IGNORE);
-        if (done) {
-            DeviceRdmaOpMsg_* conv_msg = (DeviceRdmaOpMsg_*)CmiAlloc(sizeof(DeviceRdmaOpMsg_));
-            conv_msg->op = (it->second).second;
-            access_epochs[conv_msg->op->src_mpi_rank]--;
-            if (access_epochs[conv_msg->op->src_mpi_rank] == 0)
-                MPI_Win_unlock(conv_msg->op->src_mpi_rank, globalDevWin);
-            CmiSetHandler(conv_msg,deviceRecvCallbackHandler);
-            CmiPushPE(CmiRankOf(conv_msg->op->dest_pe), conv_msg);
-            it = rdma_requests.erase(it);
-        } else {
-            it++;
-        }
+    int n = rdma_requests.size();
+    if (n == 0) return;
+
+    static std::vector<MPI_Request> requests(10);
+    static std::vector<int> indices(10);
+    static std::vector<MPI_Status> statuses(10);
+
+    if(n > requests.size()) {
+        requests.resize(n); indices.resize(n); statuses.resize(n);
     }
+
+    for (int i = 0; i < n; i++)
+        requests[i] = rdma_requests[i].first;
+
+    int outcount;
+    MPI_Testsome(n,
+                 requests.data(),
+                 &outcount,
+                 indices.data(),
+                 statuses.data());
+
+    if (outcount == MPI_UNDEFINED || outcount == 0)
+        return;
+
+    for (int i = 0; i < outcount; i++) {
+        int idx = indices[i];
+
+        auto &entry = rdma_requests[idx];
+        DeviceRdmaOp *op = entry.second;
+
+        DeviceRdmaOpMsg_* conv_msg =
+            (DeviceRdmaOpMsg_*)CmiAlloc(sizeof(DeviceRdmaOpMsg_));
+
+        conv_msg->op = op;
+
+        access_epochs[op->src_mpi_rank]--;
+        if (access_epochs[op->src_mpi_rank] == 0)
+            MPI_Win_unlock(op->src_mpi_rank, globalDevWin);
+
+        CmiSetHandler(conv_msg, deviceRecvCallbackHandler);
+        CmiPushPE(CmiRankOf(op->dest_pe), conv_msg);
+
+        rdma_requests[idx].first = MPI_REQUEST_NULL;
+    }
+
+    rdma_requests.erase(
+        std::remove_if(rdma_requests.begin(),
+                       rdma_requests.end(),
+                       [](const std::pair<MPI_Request, DeviceRdmaOp*> &e) {
+                           return e.first == MPI_REQUEST_NULL;
+                       }),
+        rdma_requests.end());
 }
 
 #else
 
 void processRdmaRequests() {
-    for (auto it = rdma_requests.begin(); it != rdma_requests.end();) {
-        int done;
-        MPI_Test(&((it->second).first), &done, MPI_STATUS_IGNORE);
-        if (done) {
-            const auto& op = (it->second).second;
-            access_epochs[op->src_mpi_rank]--;
-            if (access_epochs[op->src_mpi_rank] == 0)
-                MPI_Win_unlock(op->src_mpi_rank, globalDevWin);
-            CmiInvokeRecvHandler(op);
-            it = rdma_requests.erase(it);
-        } else {
-            it++;
-        }
+    int n = rdma_requests.size();
+    if (n == 0) return;
+
+    static std::vector<MPI_Request> requests(10);
+    static std::vector<int> indices(10);
+    static std::vector<MPI_Status> statuses(10);
+
+    if(n > requests.size()) {
+        requests.resize(n); indices.resize(n); statuses.resize(n);
     }
+
+    for (int i = 0; i < n; i++)
+        requests[i] = rdma_requests[i].first;
+
+    int outcount;
+    MPI_Testsome(n,
+                 requests.data(),
+                 &outcount,
+                 indices.data(),
+                 statuses.data());
+
+    if (outcount == MPI_UNDEFINED || outcount == 0)
+        return;
+
+    for (int i = 0; i < outcount; i++) {
+        int idx = indices[i];
+
+        auto &entry = rdma_requests[idx];
+        DeviceRdmaOp *op = entry.second;
+
+        access_epochs[op->src_mpi_rank]--;
+        if (access_epochs[op->src_mpi_rank] == 0)
+            MPI_Win_unlock(op->src_mpi_rank, globalDevWin);
+        
+        CmiInvokeRecvHandler(op);
+
+        rdma_requests[idx].first = MPI_REQUEST_NULL;
+    }
+
+    rdma_requests.erase(
+        std::remove_if(rdma_requests.begin(),
+                       rdma_requests.end(),
+                       [](const std::pair<MPI_Request, DeviceRdmaOp*> &e) {
+                           return e.first == MPI_REQUEST_NULL;
+                       }),
+        rdma_requests.end());
 }
 
 #endif
@@ -2510,8 +2576,7 @@ void LrtsRecvDevice(DeviceRdmaOp* op, DeviceRecvType type)
     if (result != MPI_SUCCESS) {
         CmiAbort("LrtsRecvDevice: MPI_Get failed!\n");
     }
-    rdma_key++;
-    rdma_requests[rdma_key] = {req, op};
+    rdma_requests.push_back({req, op});
 #endif
 }
 
