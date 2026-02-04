@@ -1088,6 +1088,9 @@ static void PumpMsgsBlocking(void) {
     handleOneRecvedMsg(nbytes, msg);
 }
 
+
+#if CMK_SMP
+
 #if CMK_CUDA
     #include <map>
 
@@ -1096,8 +1099,6 @@ static void PumpMsgsBlocking(void) {
     // a map to tell how many rdma requests are gone to some rank 
     std::map<int, int> access_epochs;
 #endif
-
-#if CMK_SMP
 
 /* called by communication thread in SMP */
 static int SendMsgBuf(void) {
@@ -1118,20 +1119,25 @@ static int SendMsgBuf(void) {
 #if CMK_ONESIDED_IMPL
 #if CMK_CUDA
             if (msg_tmp->type == DEVICE_SEND_OP) {
-                if (MPI_Win_attach(globalDevWin, msg_tmp->ptr, msg_tmp->device_size) != MPI_SUCCESS) 
+                int rc = MPI_Win_attach(globalDevWin, msg_tmp->ptr, msg_tmp->device_size);
+                if(rc!=MPI_SUCCESS) {
                     CmiAbort("MPI_Win_attach failed\n");
+                }
             } else if(msg_tmp->type == DEVICE_RECV_OP) {
-                if (access_epochs[msg_tmp->op->src_mpi_rank] == 0) 
+                if (access_epochs[msg_tmp->op->src_mpi_rank] == 0) {
                     MPI_Win_lock(MPI_LOCK_SHARED, msg_tmp->op->src_mpi_rank, 0, globalDevWin);
+                }
                 access_epochs[msg_tmp->op->src_mpi_rank]++;
                 MPI_Request req;
                 int result = MPI_Rget((void*)msg_tmp->op->dest_ptr, msg_tmp->op->size, MPI_BYTE, 
                 msg_tmp->op->src_mpi_rank, (MPI_Aint)(msg_tmp->op->tag), msg_tmp->op->size, 
                 MPI_BYTE, globalDevWin, &req);
-                if (result != MPI_SUCCESS)
+                if (result != MPI_SUCCESS) {
                     CmiAbort("LrtsRecvDevice: MPI_Get failed!\n");
+                }
                 rdma_key++;
                 rdma_requests[rdma_key] = {req, msg_tmp->op};
+                // Get-Put / Rget ==================================
             } else
 #endif
             if(msg_tmp->type == ONESIDED_BUFFER_DIRECT_RECV || msg_tmp->type == ONESIDED_BUFFER_DIRECT_SEND) {
@@ -1149,6 +1155,31 @@ static int SendMsgBuf(void) {
     MACHSTATE(2,"}SendMsgBuf end ");
     return sent;
 }
+
+#if CMK_CUDA
+
+void processRdmaRequests() {
+    for (auto it = rdma_requests.begin(); it != rdma_requests.end();) {
+        int rank; MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        int done;
+        MPI_Test(&((it->second).first), &done, MPI_STATUS_IGNORE);
+        if (done) {
+            DeviceRdmaOpMsg_* conv_msg = (DeviceRdmaOpMsg_*)CmiAlloc(sizeof(DeviceRdmaOpMsg_));
+            conv_msg->op = (it->second).second;
+            access_epochs[conv_msg->op->src_mpi_rank]--;
+            if (access_epochs[conv_msg->op->src_mpi_rank] == 0) {
+                MPI_Win_unlock(conv_msg->op->src_mpi_rank, globalDevWin);
+            }
+            CmiSetHandler(conv_msg,deviceRecvCallbackHandler);
+            CmiPushPE(CmiRankOf(conv_msg->op->dest_pe), conv_msg);
+            it = rdma_requests.erase(it);
+        } else {
+            it++;
+        }
+    }
+}
+
+#endif
 
 static int MsgQueueEmpty() {
     int i;
@@ -1180,52 +1211,6 @@ static double sendtime = 0.0;
 #endif
 
 #endif //end of CMK_SMP
-
-#if CMK_CUDA
-
-#if CMK_SMP
-
-void processRdmaRequests() {
-    for (auto it = rdma_requests.begin(); it != rdma_requests.end();) {
-        int done;
-        MPI_Test(&((it->second).first), &done, MPI_STATUS_IGNORE);
-        if (done) {
-            DeviceRdmaOpMsg_* conv_msg = (DeviceRdmaOpMsg_*)CmiAlloc(sizeof(DeviceRdmaOpMsg_));
-            conv_msg->op = (it->second).second;
-            access_epochs[conv_msg->op->src_mpi_rank]--;
-            if (access_epochs[conv_msg->op->src_mpi_rank] == 0)
-                MPI_Win_unlock(conv_msg->op->src_mpi_rank, globalDevWin);
-            CmiSetHandler(conv_msg,deviceRecvCallbackHandler);
-            CmiPushPE(CmiRankOf(conv_msg->op->dest_pe), conv_msg);
-            it = rdma_requests.erase(it);
-        } else {
-            it++;
-        }
-    }
-}
-
-#else
-
-void processRdmaRequests() {
-    for (auto it = rdma_requests.begin(); it != rdma_requests.end();) {
-        int done;
-        MPI_Test(&((it->second).first), &done, MPI_STATUS_IGNORE);
-        if (done) {
-            const auto& op = (it->second).second;
-            access_epochs[op->src_mpi_rank]--;
-            if (access_epochs[op->src_mpi_rank] == 0)
-                MPI_Win_unlock(op->src_mpi_rank, globalDevWin);
-            CmiInvokeRecvHandler(op);
-            it = rdma_requests.erase(it);
-        } else {
-            it++;
-        }
-    }
-}
-
-#endif
-
-#endif
 
 void LrtsAdvanceCommunication(int whenidle) {
 #if REPORT_COMM_METRICS
@@ -1270,10 +1255,6 @@ void LrtsAdvanceCommunication(int whenidle) {
     t3 = CmiWallTimer();
     pumptime += (t3-t2);
     releasetime += (t2-t1);
-#endif
-
-#if CMK_CUDA
-    processRdmaRequests();
 #endif
 
 #endif /* end of #if CMK_SMP */
@@ -2474,9 +2455,9 @@ void LrtsSendDevice(int dest_mpi_rank, int src_mpi_rank, const void*& ptr, size_
         msg_tmp->dest_mpi_rank = dest_mpi_rank;
         msg_tmp->tag = (uint64_t)(void*)(ptr);
         PCQueuePush(postMsgBuf,(char *)msg_tmp);
-#else
-        if (MPI_Win_attach(globalDevWin, (void*)ptr, size) != MPI_SUCCESS) CmiAbort("MPI_Win_attach failed\n");
-#endif
+    #else
+        MPI_Win_attach(globalDevWin, (void*)ptr, size);
+    #endif
         // tag is the virtual address of the buffer
         tag = (uint64_t)(void*)(ptr);
         cache_window[{(void*)ptr, size}] = tag;
@@ -2488,7 +2469,6 @@ std::map<int, bool> handler_registered;
 void LrtsRecvDevice(DeviceRdmaOp* op, DeviceRecvType type)
 {
 #if CMK_SMP
-    CmiPrintf("[Debug] SMP case OK!\n");
     if(handler_registered[CmiMyPe()] == false) {
         deviceRecvCallbackHandler = CmiRegisterHandler((CmiHandler) deviceRecvCallback);
         handler_registered[CmiMyPe()] = true;
@@ -2498,20 +2478,17 @@ void LrtsRecvDevice(DeviceRdmaOp* op, DeviceRecvType type)
     msg_tmp->type = DEVICE_RECV_OP;
     PCQueuePush(postMsgBuf,(char *)msg_tmp);
 #else
-    CmiPrintf("[Debug] Non-SMP case OK!\n");
-    if (access_epochs[op->src_mpi_rank] == 0) {
-        MPI_Win_lock(MPI_LOCK_SHARED, op->src_mpi_rank, 0, globalDevWin);
-    }
-    access_epochs[op->src_mpi_rank]++;
-    MPI_Request req;
-    int result = MPI_Rget((void*)op->dest_ptr, op->size, MPI_BYTE, 
-    op->src_mpi_rank, (MPI_Aint)(op->tag), op->size, 
-    MPI_BYTE, globalDevWin, &req);
+    MPI_Win_lock(MPI_LOCK_SHARED, op->src_pe, 0, globalDevWin);
+    int result = MPI_Get((void*)op->dest_ptr, op->size, MPI_BYTE, 
+                         op->src_pe, (MPI_Aint)(op->tag), op->size, 
+                         MPI_BYTE, globalDevWin);
     if (result != MPI_SUCCESS) {
         CmiAbort("LrtsRecvDevice: MPI_Get failed!\n");
     }
-    rdma_key++;
-    rdma_requests[rdma_key] = {req, op};
+    MPI_Win_flush_local(op->src_pe , globalDevWin);
+    MPI_Win_unlock(op->src_pe, globalDevWin);
+
+    CmiInvokeRecvHandler(op);
 #endif
 }
 
