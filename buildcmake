@@ -504,7 +504,7 @@ fi
 
 # Append certain features and compilers to the end of $builddir
 builddir_extra=""
-for flag in opt_omp opt_smp opt_tcp opt_pthreads opt_pxshm opt_syncft opt_ooc opt_persistent opt_cuda opt_cxi; do
+for flag in opt_omp opt_smp opt_tcp opt_pthreads opt_pxshm opt_syncft opt_ooc opt_persistent opt_cuda opt_hip opt_sycl opt_cxi; do
   [[ $flag -eq 1 ]] && builddir_extra+="-${flag/opt_/}"
 done
 
