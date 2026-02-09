@@ -762,8 +762,34 @@ if(BUILD_CUDA OR BUILD_HIP OR BUILD_SYCL)
     set(LEVELZERO_DIR "${LEVELZERO_PREFIX}")
     add_library(hybridapi ${hybridAPI-cxx-sources})
     target_include_directories(hybridapi PRIVATE ${LEVELZERO_INCLUDE_DIRS})
-    target_include_directories(hybridapi PRIVATE ${IntelSYCL_INCLUDE_DIRS})
-    target_compile_options(hybridapi PRIVATE ${IntelSYCL_FLAGS})
+    
+    # Handle SYCL includes: use package var, or SYCL_PATH, or Find path
+    if(DEFINED IntelSYCL_INCLUDE_DIRS AND NOT "${IntelSYCL_INCLUDE_DIRS}" STREQUAL "")
+      target_include_directories(hybridapi PRIVATE ${IntelSYCL_INCLUDE_DIRS})
+    else()
+      if(NOT SYCL_PATH AND DEFINED ENV{SYCL_PATH})
+        set(SYCL_PATH $ENV{SYCL_PATH})
+      endif()
+      
+      if(SYCL_PATH)
+        target_include_directories(hybridapi PRIVATE "${SYCL_PATH}/include")
+      else()
+        find_path(SYCL_INCLUDE_DIR NAMES sycl/sycl.hpp 
+          HINTS /opt/intel/oneapi/compiler/latest/linux/include
+          PATHS /usr/include /usr/local/include)
+        if(SYCL_INCLUDE_DIR)
+           target_include_directories(hybridapi PRIVATE ${SYCL_INCLUDE_DIR})
+        endif()
+      endif()
+    endif()
+
+    # Ensure -fsycl flag is present
+    if(DEFINED IntelSYCL_FLAGS AND "${IntelSYCL_FLAGS}" MATCHES "-fsycl")
+      target_compile_options(hybridapi PRIVATE ${IntelSYCL_FLAGS})
+    else()
+      target_compile_options(hybridapi PRIVATE "-fsycl" ${IntelSYCL_FLAGS})
+    endif()
+
     if(TRACING)
       target_compile_definitions(hybridapi PRIVATE HAPI_TRACE)
     endif()
