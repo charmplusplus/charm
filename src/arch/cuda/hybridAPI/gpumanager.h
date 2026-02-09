@@ -288,32 +288,7 @@ struct GPUManager {
     hapiCheck(hapiGetDevice(&device));
     hapiCheck(hapiGetDeviceProperties(&device_prop, device));
 
-    int new_n_streams = 0;
-
-    if (device_prop.major == 3) {
-      if (device_prop.minor == 0)
-        new_n_streams = 16;
-      else if (device_prop.minor == 2)
-        new_n_streams = 4;
-      else // 3.5, 3.7 or unknown 3.x
-        new_n_streams = 32;
-    }
-    else if (device_prop.major == 5) {
-      if (device_prop.minor == 3)
-        new_n_streams = 16;
-      else // 5.0, 5.2 or unknown 5.x
-        new_n_streams = 32;
-    }
-    else if (device_prop.major == 6) {
-      if (device_prop.minor == 1)
-        new_n_streams = 32;
-      else if (device_prop.minor == 2)
-        new_n_streams = 16;
-      else // 6.0 or unknown 6.x
-        new_n_streams = 128;
-    }
-    else // unknown (future) compute capability
-      new_n_streams = 128;
+    int new_n_streams = getNumStreams(device_prop);
 #if !CMK_SMP
     // Allocate total physical streams between GPU managers sharing a device...
     // i.e. PEs / num devices

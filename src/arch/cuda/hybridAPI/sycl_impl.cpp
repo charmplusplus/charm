@@ -204,3 +204,10 @@ int hapiIpcOpenEventHandle(hapiEvent_t* event, hapiIpcEventHandle_t handle) {
     
     return hapiSuccess;
 }
+
+int getNumStreams(hapiDeviceProp& device_prop) {
+    // This is a heuristic based on the compute capability of the device.
+    // For simplicity, we return a fixed number here, but this can be
+    // enhanced to return different numbers based on the device properties.
+    return 4; // Default to 4 streams for concurrency
+}

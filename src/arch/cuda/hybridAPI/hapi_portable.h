@@ -90,6 +90,35 @@
 #define hapiEventInterprocess cudaEventInterprocess
 #define hapiIpcMemLazyEnablePeerAccess cudaIpcMemLazyEnablePeerAccess
 
+int getNumStreams(hapiDeviceProp& device_prop) {
+    int new_n_streams = 0;
+    if (device_prop.major == 3) {
+      if (device_prop.minor == 0)
+        new_n_streams = 16;
+      else if (device_prop.minor == 2)
+        new_n_streams = 4;
+      else // 3.5, 3.7 or unknown 3.x
+        new_n_streams = 32;
+    }
+    else if (device_prop.major == 5) {
+      if (device_prop.minor == 3)
+        new_n_streams = 16;
+      else // 5.0, 5.2 or unknown 5.x
+        new_n_streams = 32;
+    }
+    else if (device_prop.major == 6) {
+      if (device_prop.minor == 1)
+        new_n_streams = 32;
+      else if (device_prop.minor == 2)
+        new_n_streams = 16;
+      else // 6.0 or unknown 6.x
+        new_n_streams = 128;
+    }
+    else // unknown (future) compute capability
+      new_n_streams = 128;
+    return new_n_streams;
+}
+
 #endif // CMK_CUDA
 
 #ifdef CMK_HIP
@@ -171,6 +200,35 @@
 #define hapiEventDisableTiming hipEventDisableTiming
 #define hapiEventInterprocess hipEventInterprocess
 #define hapiIpcMemLazyEnablePeerAccess hipIpcMemLazyEnablePeerAccess
+
+int getNumStreams(hapiDeviceProp& device_prop) {
+    int new_n_streams = 0;
+    if (device_prop.major == 3) {
+      if (device_prop.minor == 0)
+        new_n_streams = 16;
+      else if (device_prop.minor == 2)
+        new_n_streams = 4;
+      else // 3.5, 3.7 or unknown 3.x
+        new_n_streams = 32;
+    }
+    else if (device_prop.major == 5) {
+      if (device_prop.minor == 3)
+        new_n_streams = 16;
+      else // 5.0, 5.2 or unknown 5.x
+        new_n_streams = 32;
+    }
+    else if (device_prop.major == 6) {
+      if (device_prop.minor == 1)
+        new_n_streams = 32;
+      else if (device_prop.minor == 2)
+        new_n_streams = 16;
+      else // 6.0 or unknown 6.x
+        new_n_streams = 128;
+    }
+    else // unknown (future) compute capability
+      new_n_streams = 128;
+    return new_n_streams;
+}
 
 #endif // CMK_HIP
 

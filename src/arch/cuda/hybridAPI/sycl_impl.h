@@ -88,4 +88,6 @@ int hapiLaunchHostFunc(hapiStream_t stream, void (*func)(void*), void* args);
 int hapiGetDeviceProperties(hapiDeviceProp* prop, int dev);
 int hapiIpcOpenEventHandle(hapiEvent_t* event, hapiIpcEventHandle_t handle);
 
+int getNumStreams(hapiDeviceProp& device_prop);
+
 #endif // SYCL_IMPL_H
