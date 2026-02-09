@@ -1,6 +1,4 @@
-
 #include <sycl/sycl.hpp>
-#include <sycl/ext/intel/info/device.hpp>
 #include <level_zero/ze_api.h>
 
 #include "gpumanager.h"
