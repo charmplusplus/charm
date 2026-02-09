@@ -775,6 +775,10 @@ if(BUILD_CUDA OR BUILD_HIP OR BUILD_SYCL)
     pkg_check_modules(LEVELZERO REQUIRED libze_loader)
     set(SYCL_DIR "${SYCL_PATH}")
     set(LEVELZERO_DIR "${LEVELZERO_PREFIX}")
+    
+    # Add sycl_impl.cpp to sources
+    list(APPEND hybridAPI-cxx-sources ${CMAKE_SOURCE_DIR}/src/arch/cuda/hybridAPI/sycl_impl.cpp)
+    
     add_library(hybridapi ${hybridAPI-cxx-sources})
     target_include_directories(hybridapi PRIVATE ${LEVELZERO_INCLUDE_DIRS})
     
