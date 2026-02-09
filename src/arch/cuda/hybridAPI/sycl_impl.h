@@ -1,9 +1,12 @@
 #include <sycl/sycl.hpp>
+// #include <sycl/ext/intel/info/device.hpp>
 #include <level_zero/ze_api.h>
 
-// Forward declarations to avoid circular dependency
+// Forward declaration to avoid circular dependency
 class GPUManager;
-extern GPUManager& CsvAccess(GPUManager& manager);
+
+// Declare gpu_manager using CsvExtern
+CsvExtern(GPUManager, gpu_manager);
 
 // SYCL uses queues instead of streams
 #define hapiStream_t sycl::queue*
