@@ -211,3 +211,9 @@ int getNumStreams(hapiDeviceProp& device_prop) {
     // enhanced to return different numbers based on the device properties.
     return 4; // Default to 4 streams for concurrency
 }
+
+int hapiGetDeviceCount(int* count) {
+    auto devices = sycl::device::get_devices(sycl::info::device_type::gpu);
+    *count = devices.size();
+    return hapiSuccess;
+}
