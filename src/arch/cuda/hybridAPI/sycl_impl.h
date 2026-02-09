@@ -53,9 +53,27 @@ int hapiIpcGetMemHandle(hapiIpcMemHandle_t* handle, void* ptr);
 int hapiIpcGetEventHandle(hapiIpcEventHandle_t* handle, hapiEvent_t event);
 int hapiIpcOpenMemHandle(void** ptr, hapiIpcMemHandle_t handle, int flags);
 int hapiGetDevice(int* dev);
-int hapiMalloc(void** ptr, size_t size);
+
+// Base hapiMalloc function
+int hapiMallocImpl(void** ptr, size_t size);
+
+// Template wrapper for type-safe hapiMalloc
+template<typename T>
+inline int hapiMalloc(T** ptr, size_t size) {
+    return hapiMallocImpl(reinterpret_cast<void**>(ptr), size);
+}
+
 int hapiFree(void* ptr);
-int hapiMallocHost(void** ptr, size_t size);
+
+// Base hapiMallocHost function
+int hapiMallocHostImpl(void** ptr, size_t size);
+
+// Template wrapper for type-safe hapiMallocHost
+template<typename T>
+inline int hapiMallocHost(T** ptr, size_t size) {
+    return hapiMallocHostImpl(reinterpret_cast<void**>(ptr), size);
+}
+
 int hapiFreeHost(void* ptr);
 int hapiMemcpy(void* dst, const void* src, size_t size, hapiMemcpyKind kind);
 int hapiMemcpyAsync(void* dst, const void* src, size_t size, hapiMemcpyKind kind, hapiStream_t stream);

@@ -62,7 +62,7 @@ int hapiGetDevice(int* dev) {
     return hapiErrorInitializationError;
 }
 
-int hapiMalloc(void** ptr, size_t size) {
+int hapiMallocImpl(void** ptr, size_t size) {
     *(ptr) = sycl::malloc_device(size, sycl::queue(CsvAccess(gpu_manager).ctx, CsvAccess(gpu_manager).dev));
     if (*(ptr) == nullptr) {
         return hapiErrorMemoryAllocation;
@@ -75,7 +75,7 @@ int hapiFree(void* ptr) {
     return hapiSuccess;
 }
 
-int hapiMallocHost(void** ptr, size_t size) {
+int hapiMallocHostImpl(void** ptr, size_t size) {
     *(ptr) = sycl::malloc_host(size, sycl::queue(CsvAccess(gpu_manager).ctx, CsvAccess(gpu_manager).dev));
     if (*(ptr) == nullptr) {
         return hapiErrorMemoryAllocation;
