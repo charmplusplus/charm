@@ -2,6 +2,9 @@
 // #include <sycl/ext/intel/info/device.hpp>
 #include <level_zero/ze_api.h>
 
+// Include converse.h for CsvExtern and other Charm++ macros
+#include "converse.h"
+
 // Forward declaration to avoid circular dependency
 class GPUManager;
 
