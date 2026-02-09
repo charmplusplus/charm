@@ -109,7 +109,7 @@ int hapiMemcpyAsync(void* dst, const void* src, size_t size, hapiMemcpyKind kind
     return hapiSuccess;
 }
 
-int hapiCreateEventWithFlags(hapiEvent_t* event, unsigned int flags) {
+int hapiEventCreateWithFlags(hapiEvent_t* event, unsigned int flags) {
     *event = new struct { sycl::event ev; int flag; }();
     (*event)->flag = flags;
     

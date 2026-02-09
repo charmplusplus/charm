@@ -77,7 +77,7 @@ inline int hapiMallocHost(T** ptr, size_t size) {
 int hapiFreeHost(void* ptr);
 int hapiMemcpy(void* dst, const void* src, size_t size, hapiMemcpyKind kind);
 int hapiMemcpyAsync(void* dst, const void* src, size_t size, hapiMemcpyKind kind, hapiStream_t stream);
-int hapiCreateEventWithFlags(hapiEvent_t* event, unsigned int flags);
+int hapiEventCreateWithFlags(hapiEvent_t* event, unsigned int flags);
 int hapiEventRecord(hapiEvent_t event, hapiStream_t stream);
 int hapiEventQuery(hapiEvent_t event);
 int hapiEventDestroy(hapiEvent_t event);
@@ -88,6 +88,7 @@ int hapiLaunchHostFunc(hapiStream_t stream, void (*func)(void*), void* args);
 int hapiGetDeviceProperties(hapiDeviceProp* prop, int dev);
 int hapiIpcOpenEventHandle(hapiEvent_t* event, hapiIpcEventHandle_t handle);
 int hapiGetDeviceCount(int* count);
+int hapiDeviceEnablePeerAccess(int dev, int flags);
 
 int getNumStreams(hapiDeviceProp& device_prop);
 
