@@ -40,8 +40,10 @@ int hapiIpcGetMemHandle(hapiIpcMemHandle_t* handle, void* ptr) {
 }
 
 int hapiIpcGetEventHandle(hapiIpcEventHandle_t* handle, hapiEvent_t event) {
-    return zeEventPoolGetIpcHandle(sycl::get_native<sycl::backend::ext_oneapi_level_zero>(event->ev),
-                            &((handle)->ze_handle));
+    ze_event_handle_t hEvent = sycl::get_native<sycl::backend::ext_oneapi_level_zero>(event->ev);
+    ze_event_pool_handle_t hPool;
+    zeEventGetEventPool(hEvent, &hPool);
+    return zeEventPoolGetIpcHandle(hPool, &((handle)->ze_handle));
 }
 
 int hapiIpcOpenMemHandle(void** ptr, hapiIpcMemHandle_t handle, int flags) {
