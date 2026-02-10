@@ -678,7 +678,10 @@ hapiWorkRequest* hapiCreateWorkRequest() {
 }
 
 hapiWorkRequest::hapiWorkRequest() :
-    grid_dim(0), block_dim(0), shared_mem(0), runKernel(NULL), state(0),
+#ifndef CMK_SYCL
+    grid_dim(0), block_dim(0), shared_mem(0), 
+#endif
+    runKernel(NULL), state(0),
     user_data(NULL), free_user_data(false)
 {
 #ifdef HAPI_TRACE
