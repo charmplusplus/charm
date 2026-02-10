@@ -197,8 +197,9 @@ int hapiIpcOpenEventHandle(hapiEvent_t* event, hapiIpcEventHandle_t handle) {
 
     *event = new hapiEventStruct();
     (*event)->ev = sycl::make_event<sycl::backend::ext_oneapi_level_zero>(
-        {hEvent, sycl::ext::oneapi::level_zero::ownership::keep}, 
-        csv_gpu_manager.ctx
+        hEvent,              // The Level Zero event handle
+        csv_gpu_manager.ctx, // The SYCL context
+        true                 // KeepOwnership = true
     );
     (*event)->flag = hapiEventInterprocess;
     
