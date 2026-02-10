@@ -125,6 +125,7 @@ public:
   int peer;
 
   double start_time;
+  double allocTime;
   double* times;
 
   char* h_local_data;
@@ -211,6 +212,13 @@ public:
       cudaStreamSynchronize(stream);
       thisProxy[peer].receiveReg(size, h_local_data);
     } else {
+      double allocStart = CkWallTimer();
+      char* d_local_data_new;
+      hapiCheck(cudaMalloc(&d_local_data_new, size));
+      hapiCheck(cudaFree(d_local_data));
+      d_local_data = d_local_data_new;
+      send_buffer = CkDeviceBuffer(d_local_data);
+      allocTime = CkWallTimer() - allocStart;
       thisProxy[peer].receiveZC(size, send_buffer);
     }
   }
@@ -247,7 +255,7 @@ public:
     } else {
       // PE 0: received pong
       if (iter > warmup_iters) {
-        times[iter-warmup_iters-1] = (CkWallTimer() - start_time) / 2.0;
+        times[iter-warmup_iters-1] = (CkWallTimer() - start_time) / 2.0 - allocTime;
       }
 
       // Start next iteration or end test for current size
