@@ -80,9 +80,15 @@ add_library(ck ${ck-cxx-sources} ${ck-h-sources} ${all-ci-outputs})
 add_library(ckmain main.C)
 add_dependencies(ckmain ck)
 
-# CommonLBs used to be a subset of EveryLB, but they were unified as
-# part of the LB refactor. However, maintain both targets for
-# backwards compatibility and for possible future divergence.
+if(BUILD_SYCL)
+  if(DEFINED IntelSYCL_FLAGS AND "${IntelSYCL_FLAGS}" MATCHES "-fsycl")
+    target_compile_options(ckmain PRIVATE ${IntelSYCL_FLAGS})
+  else()
+    target_compile_options(ckmain PRIVATE "-fsycl" ${IntelSYCL_FLAGS})
+  endif()
+endif()
+
+# Skip METIS libraries when building with SYCL
 add_library(moduleCommonLBs ${ldb-cxx-sources} ${ldb-h-sources} ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h)
 add_library(moduleEveryLB ${ldb-cxx-sources} ${ldb-h-sources} ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h)
 configure_file(../ck-ldb/libmoduleCommonLBs.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
