@@ -109,7 +109,7 @@ int hapiMemcpyAsync(void* dst, const void* src, size_t size, hapiMemcpyKind kind
 }
 
 int hapiEventCreateWithFlags(hapiEvent_t* event, unsigned int flags) {
-    *event = new struct { sycl::event ev; int flag; }();
+    *event = new hapiEventStruct();
     (*event)->flag = flags;
     
     if (flags & hapiEventInterprocess) {
@@ -196,7 +196,7 @@ int hapiIpcOpenEventHandle(hapiEvent_t* event, hapiIpcEventHandle_t handle) {
     ze_event_handle_t hEvent;
     zeEventCreate(hPool, &eventDesc, &hEvent);
 
-    *event = new struct { sycl::event ev; int flag; }();
+    *event = new hapiEventStruct();
     (*event)->ev = sycl::make_event<sycl::backend::ext_oneapi_level_zero>(
         hEvent, csv_gpu_manager.ctx, sycl::ext::oneapi::level_zero::ownership::keep);
     (*event)->flag = hapiEventInterprocess;
