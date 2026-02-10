@@ -1,8 +1,9 @@
 #ifndef SYCL_IMPL_H
 #define SYCL_IMPL_H
 
-#include <sycl/sycl.hpp>
 #include <level_zero/ze_api.h>
+#include <sycl/sycl.hpp>
+#include <sycl/ext/oneapi/backend/level_zero.hpp>
 #include "converse.h"
 
 // SYCL uses queues instead of streams
