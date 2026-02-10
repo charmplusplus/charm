@@ -1014,6 +1014,14 @@ add_library(modulecompletion ${modulecompletion-cxx-sources} ${modulecompletion-
 configure_file(src/libs/ck-libs/completion/completion.h include/ COPYONLY)
 add_dependencies(modulecompletion ck)
 
+if(BUILD_SYCL)
+  if(DEFINED IntelSYCL_FLAGS AND "${IntelSYCL_FLAGS}" MATCHES "-fsycl")
+    target_compile_options(modulecompletion PRIVATE ${IntelSYCL_FLAGS})
+  else()
+    target_compile_options(modulecompletion PRIVATE "-fsycl" ${IntelSYCL_FLAGS})
+  endif()
+endif()
+
 # Charmrun + testrun
 if(${CMK_BUILD_CHARMRUN})
   add_subdirectory(src/util/charmrun-src)
