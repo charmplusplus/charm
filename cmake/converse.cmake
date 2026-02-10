@@ -1,4 +1,3 @@
-
 # conv-core
 set(conv-core-h-sources
     src/util/cmitls.h
@@ -240,6 +239,32 @@ endforeach()
 target_include_directories(converse PRIVATE src/arch/util) # for machine*.*
 target_include_directories(converse PRIVATE src/util) # for sockRoutines.C
 target_include_directories(converse PRIVATE src/conv-core src/util/topomanager src/ck-ldb src/ck-perf src/ck-cp)
+
+# Add SYCL support if enabled
+if(BUILD_SYCL)
+    if(DEFINED IntelSYCL_FLAGS AND "${IntelSYCL_FLAGS}" MATCHES "-fsycl")
+        target_compile_options(converse PRIVATE ${IntelSYCL_FLAGS})
+    else()
+        target_compile_options(converse PRIVATE "-fsycl" ${IntelSYCL_FLAGS})
+    endif()
+    
+    if(DEFINED IntelSYCL_INCLUDE_DIRS AND NOT "${IntelSYCL_INCLUDE_DIRS}" STREQUAL "")
+        target_include_directories(converse PRIVATE ${IntelSYCL_INCLUDE_DIRS})
+    elseif(SYCL_PATH)
+        target_include_directories(converse PRIVATE "${SYCL_PATH}/include")
+    else()
+        find_path(SYCL_INCLUDE_DIR NAMES sycl/sycl.hpp 
+            HINTS /opt/intel/oneapi/compiler/latest/linux/include
+            PATHS /usr/include /usr/local/include)
+        if(SYCL_INCLUDE_DIR)
+            target_include_directories(converse PRIVATE ${SYCL_INCLUDE_DIR})
+        endif()
+    endif()
+    
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(LEVELZERO REQUIRED libze_loader)
+    target_include_directories(converse PRIVATE ${LEVELZERO_INCLUDE_DIRS})
+endif()
 
 # conv-static
 add_library(conv-static OBJECT src/conv-core/conv-static.c)
