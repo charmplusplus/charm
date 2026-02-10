@@ -217,7 +217,7 @@ public:
       hapiCheck(cudaMalloc(&d_local_data_new, size));
       hapiCheck(cudaFree(d_local_data));
       d_local_data = d_local_data_new;
-      send_buffer = CkDeviceBuffer(d_local_data);
+      send_buffer = CkDeviceBuffer(d_local_data_new);
       allocTime = CkWallTimer() - allocStart;
       thisProxy[peer].receiveZC(size, send_buffer);
     }
