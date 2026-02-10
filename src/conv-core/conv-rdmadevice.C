@@ -2,7 +2,7 @@
 #include "conv-rdmadevice.h"
 #include "ck.h"
 
-#if CMK_CUDA || CMK_HIP
+#if CMK_CUDA || CMK_HIP || CMK_SYCL
 
 CmiNcpyModeDevice findTransferModeDevice(int srcPe, int dstPe) {
   CmiEnforce((srcPe >= 0) && (srcPe <= CmiNumPes()));
