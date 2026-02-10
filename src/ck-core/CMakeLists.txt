@@ -135,6 +135,32 @@ endforeach()
 target_include_directories(ck PRIVATE . ../ck-ldb ../ck-perf ../ck-cp ../util/topomanager ../conv-perf)
 target_include_directories(ckmain PRIVATE . ../ck-ldb ../ck-perf ../ck-cp ../util/topomanager)
 
+# Add SYCL support to ck if enabled
+if(BUILD_SYCL)
+  if(DEFINED IntelSYCL_FLAGS AND "${IntelSYCL_FLAGS}" MATCHES "-fsycl")
+    target_compile_options(ck PRIVATE ${IntelSYCL_FLAGS})
+  else()
+    target_compile_options(ck PRIVATE "-fsycl" ${IntelSYCL_FLAGS})
+  endif()
+  
+  if(DEFINED IntelSYCL_INCLUDE_DIRS AND NOT "${IntelSYCL_INCLUDE_DIRS}" STREQUAL "")
+    target_include_directories(ck PRIVATE ${IntelSYCL_INCLUDE_DIRS})
+  elseif(SYCL_PATH)
+    target_include_directories(ck PRIVATE "${SYCL_PATH}/include")
+  else()
+    find_path(SYCL_INCLUDE_DIR NAMES sycl/sycl.hpp 
+      HINTS /opt/intel/oneapi/compiler/latest/linux/include
+      PATHS /usr/include /usr/local/include)
+    if(SYCL_INCLUDE_DIR)
+      target_include_directories(ck PRIVATE ${SYCL_INCLUDE_DIR})
+    endif()
+  endif()
+  
+  find_package(PkgConfig REQUIRED)
+  pkg_check_modules(LEVELZERO REQUIRED libze_loader)
+  target_include_directories(ck PRIVATE ${LEVELZERO_INCLUDE_DIRS})
+endif()
+
 # Fortran interface
 if(CMK_CAN_LINK_FORTRAN)
     add_library(ckf charmf.C charmmod.f90 charmf.h)
