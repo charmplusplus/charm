@@ -73,19 +73,21 @@ typedef struct DeviceRdmaInfo_ {
 } DeviceRdmaInfo;
 
 typedef struct DeviceRdmaOp_ {
-  int dest_pe;
   const void* dest_ptr;
   size_t size;
   DeviceRdmaInfo* info;
   void* src_cb;
   void* dst_cb;
   uint64_t tag;
+  int dest_pe;
   int src_pe;
+  int src_mpi_rank;
+  int dest_mpi_rank;
 } DeviceRdmaOp;
 
 typedef struct DeviceRdmaOpMsg_ {
   char header[CmiMsgHeaderSizeBytes];
-  DeviceRdmaOp op;
+  DeviceRdmaOp* op;
 } DeviceRdmaOpMsg;
 #endif // CMK_CUDA
 

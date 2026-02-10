@@ -5,31 +5,32 @@
 #include <cmath>
 #include <algorithm>
 #include <hapi_portable.h>
+#include "converse.h"
 
 namespace buddy {
   void allocator::print_status() {
-    printf("(buckets)\n");
+    CmiPrintf("(buckets)\n");
     size_t free = 0;
     for (int i = 0; i < bucket_count; i++) {
-      printf("bucket[%d]: ", i);
+      CmiPrintf("bucket[%d]: ", i);
       for (const auto& block : buckets[i]) {
         free += block.size;
-        printf("{%p, %zu} ", block.ptr, block.size);
+        CmiPrintf("{%p, %zu} ", block.ptr, block.size);
       }
-      printf("\n");
+      CmiPrintf("\n");
     }
 
-    printf("(alloc_map)\n");
+    CmiPrintf("(alloc_map)\n");
     size_t allocated = 0;
     size_t used = 0;
     for (const auto& elem : alloc_map) {
       const auto& block = elem.second;
       allocated += block.size;
       used += block.requested;
-      printf("ptr: %p, size: %zu, req: %zu\n", elem.first, block.size, block.requested);
+      CmiPrintf("ptr: %p, size: %zu, req: %zu\n", elem.first, block.size, block.requested);
     }
 
-    printf("(fragmentation) free: %zu, allocated: %zu, used: %zu\n", free, allocated, used);
+    CmiPrintf("(fragmentation) free: %zu, allocated: %zu, used: %zu\n", free, allocated, used);
   }
 
   size_t allocator::get_free_size() {
@@ -106,19 +107,14 @@ namespace buddy {
     }
 
     // Found bucket with free block, take it and start splitting if needed
-    FreeBlock& block = buckets[bucket].front();
+    FreeBlock block = buckets[bucket].front();
     uint8_t* ptr = block.ptr;
     size_t size = block.size;
     buckets[bucket].pop_front();
 
     while (bucket-- > original_bucket) {
-      buckets[bucket].emplace_back(ptr, size / 2);
-      buckets[bucket].emplace_back(ptr + size / 2, size / 2);
-
-      block = buckets[bucket].front();
-      ptr = block.ptr;
-      size = block.size;
-      buckets[bucket].pop_front();
+      size /= 2;
+      buckets[bucket].emplace_back(ptr + size, size);
     }
 
     // Store allocation info
@@ -127,12 +123,6 @@ namespace buddy {
         std::forward_as_tuple(ptr),
         std::forward_as_tuple(size, request));
 
-    DEBUG_PRINT("Allocated ptr %p (base_ptr + %zu) with %zu bytes, requested was %zu bytes\n",
-        (void*)ptr, (size_t)(ptr - base_ptr), size, request);
-
-#if BUDDY_DEBUG
-    print_status();
-#endif
 
     return ptr;
   }
@@ -187,10 +177,5 @@ namespace buddy {
     }
 
 merge_done:
-    DEBUG_PRINT("Freed ptr %p with %zu bytes, requested was %zu bytes\n", ptr, size, requested);
-
-#if BUDDY_DEBUG
-    print_status();
-#endif
   }
 }

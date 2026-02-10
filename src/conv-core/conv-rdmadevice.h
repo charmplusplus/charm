@@ -26,7 +26,9 @@ public:
 
   // Source and destination PEs
   int src_pe;
+  int src_mpi_rank;
   int dest_pe;
+  int dest_mpi_rank;
 
   // Used for CUDA IPC
   int device_idx;
@@ -40,7 +42,7 @@ public:
   CmiDeviceBuffer() : ptr(NULL), cnt(0), src_pe(-1), dest_pe(-1) { init(); }
 
   explicit CmiDeviceBuffer(const void* ptr_, size_t cnt_) : ptr(ptr_), cnt(cnt_),
-    src_pe(CmiMyPe()), dest_pe(-1) { init(); }
+    src_pe(CmiMyPe()), src_mpi_rank(CmiNodeOf(CmiMyPe())), dest_pe(-1), dest_mpi_rank(-1) { init(); }
 
   void init() {
     device_idx = -1;
@@ -71,6 +73,9 @@ public:
     }
     p|tag;
     p|src_pe;
+    p|src_mpi_rank;
+    p|dest_pe;
+    p|dest_mpi_rank;
   }
 
   ~CmiDeviceBuffer() {
@@ -85,7 +90,7 @@ CmiNcpyModeDevice findTransferModeDevice(int srcPe, int destPe);
 #if CMK_GPU_COMM
 typedef void (*RdmaAckCallerFn)(void *token);
 
-void CmiSendDevice(int& dest_rank, int& src_rank, const void*& ptr, size_t size, uint64_t& tag);
+void CmiSendDevice(int dest_rank, int src_rank, const void*& ptr, size_t size, uint64_t& tag);
 void CmiRecvDevice(DeviceRdmaOp* op, DeviceRecvType type);
 void CmiRdmaDeviceRecvInit(RdmaAckCallerFn fn);
 void CmiInvokeRecvHandler(void* data);
