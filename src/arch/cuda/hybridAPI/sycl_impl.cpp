@@ -125,7 +125,7 @@ int hapiEventCreateWithFlags(hapiEvent_t* event, unsigned int flags) {
         ze_event_desc_t eventDesc = {ZE_STRUCTURE_TYPE_EVENT_DESC, nullptr, 0, 0, 0};
         ze_event_handle_t hEvent;
         zeEventCreate(hPool, &eventDesc, &hEvent);
-        sycl::backend_input_t<sycl::backend::ext_oneapi_level_zero, event> eventInteropInput = {
+        sycl::backend_input_t<sycl::backend::ext_oneapi_level_zero, sycl::event> eventInteropInput = {
             hEvent,             // The native Level Zero event handle
             ext::oneapi::level_zero::ownership::keep // SYCL will not destroy the native handle
         };
@@ -199,7 +199,7 @@ int hapiIpcOpenEventHandle(hapiEvent_t* event, hapiIpcEventHandle_t handle) {
     zeEventCreate(hPool, &eventDesc, &hEvent);
 
     *event = new hapiEventStruct();
-    sycl::backend_input_t<sycl::backend::ext_oneapi_level_zero, event> eventInteropInput = {
+    sycl::backend_input_t<sycl::backend::ext_oneapi_level_zero, sycl::event> eventInteropInput = {
         hEvent,             // The native Level Zero event handle
         ext::oneapi::level_zero::ownership::keep // SYCL will not destroy the native handle
     };
