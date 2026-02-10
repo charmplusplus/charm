@@ -11,8 +11,10 @@
 #include "cmirdmautils.h"
 #include <mpi.h>
 #include <algorithm>
-#include <cuda_runtime.h>
 
+#ifdef CMK_CUDA
+#include <cuda_runtime.h>
+#endif
 
 #ifdef AMPI
 #  warning "We got the AMPI version of mpi.h, instead of the system version--"
