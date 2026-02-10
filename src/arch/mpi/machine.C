@@ -422,7 +422,7 @@ static int SendMsgBuf(void);
 static  void EnqueueMsg(void *m, int size, int node, int mode, int type, void *ref);
 #endif
 
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP || CMK_SYCL
 
 CpvDeclare(int, tag_counter);
 
