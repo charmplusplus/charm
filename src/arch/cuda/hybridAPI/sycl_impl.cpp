@@ -1,6 +1,5 @@
 #include "sycl_impl.h"
 #include "gpumanager.h"
-#include "converse.h"
 
 CsvExtern(GPUManager, gpu_manager);
 
