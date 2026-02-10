@@ -12,7 +12,6 @@
 #include <mpi.h>
 #include <algorithm>
 
-#include "hapi_portable.h"
 
 #ifdef AMPI
 #  warning "We got the AMPI version of mpi.h, instead of the system version--"
