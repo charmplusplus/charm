@@ -214,7 +214,7 @@ public:
     } else {
       double allocStart = CkWallTimer();
       char* d_local_data_new;
-      hapiCheck(cudaMalloc(&d_local_data_new, size));
+      hapiCheck(cudaMalloc(&d_local_data_new, max_size));
       hapiCheck(cudaFree(d_local_data));
       d_local_data = d_local_data_new;
       send_buffer = CkDeviceBuffer(d_local_data_new);
