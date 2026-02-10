@@ -71,6 +71,10 @@ CpvDeclare(int, my_device); // GPU device that this thread is mapped to
 CpvDeclare(int, my_device_id); // index to the deviceManager that stores info about the device
 CpvDeclare(bool, device_rep); // Is this PE a device representative thread? (1 per device)
 
+#ifdef CMK_SYCL
+CpvExtern(hapiStream_t, sycl_per_thread_stream);
+#endif
+
 // Returns the local rank of the logical node (process) that the given PE belongs to
 static inline int CmiNodeRankLocal(int pe) {
   // Logical node index % Number of logical nodes per physical node
@@ -113,9 +117,9 @@ void hapiInit(char** argv) {
     if (CmiMyRank() == 0) {
       hapiInitCsv(); // Initialize per-process variables (GPUManager)
     }
-    hapiInitCpv(); // Initialize per-PE variables
-
     CmiNodeBarrier(); // Ensure hapiInitCsv is done for all PEs within a logical node
+
+    hapiInitCpv(); // Initialize per-PE variables
 
     hapiMapping(argv); // Perform PE-device mapping
 
@@ -171,6 +175,11 @@ static void hapiInitCpv() {
   CpvAccess(my_device) = 0;
   CpvInitialize(bool, device_rep);
   CpvAccess(device_rep) = false;
+
+#ifdef CMK_SYCL
+  CpvInitialize(hapiStream_t, sycl_per_thread_stream);
+  hapiStreamCreate(&CpvAccess(sycl_per_thread_stream));
+#endif
 }
 
 // Clean up per-process data

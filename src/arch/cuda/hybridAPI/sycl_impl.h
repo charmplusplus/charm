@@ -30,6 +30,10 @@
 #define hapiGetErrorString(err) \
     ((err) == hapiSuccess ? "Success" : "Error")
 
+#define hapiStreamPerThread (CpvAccess(sycl_per_thread_stream))
+
+CpvDeclare(hapiStream_t, sycl_per_thread_stream);
+
 // Event structure
 typedef struct {
     sycl::event ev;
