@@ -125,8 +125,11 @@ int hapiEventCreateWithFlags(hapiEvent_t* event, unsigned int flags) {
         ze_event_desc_t eventDesc = {ZE_STRUCTURE_TYPE_EVENT_DESC, nullptr, 0, 0, 0};
         ze_event_handle_t hEvent;
         zeEventCreate(hPool, &eventDesc, &hEvent);
-        
-        (*event)->ev = sycl::ext::oneapi::level_zero::make_event(hEvent, csv_gpu_manager.ctx, true);
+        sycl::backend_input_t<sycl::backend::ext_oneapi_level_zero, event> eventInteropInput = {
+            hEvent,             // The native Level Zero event handle
+            ext::oneapi::level_zero::ownership::keep // SYCL will not destroy the native handle
+        };
+        (*event)->ev = sycl::make_event<sycl::backend::ext_oneapi_level_zero>(eventInteropInput, csv_gpu_manager.ctx);
     }
     
     return hapiSuccess;
@@ -196,7 +199,11 @@ int hapiIpcOpenEventHandle(hapiEvent_t* event, hapiIpcEventHandle_t handle) {
     zeEventCreate(hPool, &eventDesc, &hEvent);
 
     *event = new hapiEventStruct();
-    (*event)->ev = sycl::ext::oneapi::level_zero::make_event(hEvent, csv_gpu_manager.ctx, true);
+    sycl::backend_input_t<sycl::backend::ext_oneapi_level_zero, event> eventInteropInput = {
+        hEvent,             // The native Level Zero event handle
+        ext::oneapi::level_zero::ownership::keep // SYCL will not destroy the native handle
+    };
+    (*event)->ev = sycl::make_event<sycl::backend::ext_oneapi_level_zero>(eventInteropInput, csv_gpu_manager.ctx);
     (*event)->flag = hapiEventInterprocess;
     
     return hapiSuccess;
