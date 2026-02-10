@@ -51,9 +51,11 @@ typedef struct hapiBufferInfo {
 // by the runtime.
 typedef struct hapiWorkRequest {
   // parameters for kernel execution
+#ifndef CMK_SYCL
   dim3 grid_dim;
   dim3 block_dim;
   int shared_mem;
+#endif
 
   // contains information about buffers associated with the kernel
   std::vector<hapiBufferInfo> buffers;
@@ -106,11 +108,13 @@ typedef struct hapiWorkRequest {
       std::free(user_data);
   }
 
+#ifndef CMK_SYCL
   void setExecParams(dim3 _grid_dim, dim3 _block_dim, int _shared_mem = 0) {
     grid_dim = _grid_dim;
     block_dim = _block_dim;
     shared_mem = _shared_mem;
   }
+#endif
 
   void addBuffer(void *host_buffer, size_t size, bool transfer_to_device,
                  bool transfer_to_host, bool need_free, int id = -1) {
