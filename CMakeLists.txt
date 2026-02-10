@@ -1031,6 +1031,14 @@ set(ckloop-h-files src/libs/ck-libs/ckloop/CkLambda.h src/libs/ck-libs/ckloop/Ck
 add_library(moduleCkLoop ${ckloop-cxx-files} ${ckloop-h-files} ${CMAKE_BINARY_DIR}/include/CkLoop.decl.h)
 add_dependencies(moduleCkLoop ck)
 
+if(BUILD_SYCL)
+  if(DEFINED IntelSYCL_FLAGS AND "${IntelSYCL_FLAGS}" MATCHES "-fsycl")
+    target_compile_options(moduleCkLoop PRIVATE ${IntelSYCL_FLAGS})
+  else()
+    target_compile_options(moduleCkLoop PRIVATE "-fsycl" ${IntelSYCL_FLAGS})
+  endif()
+endif()
+
 foreach(file ${ckloop-h-files})
   configure_file(${file} ${CMAKE_BINARY_DIR}/include COPYONLY)
 endforeach(file)
@@ -1039,6 +1047,14 @@ endforeach(file)
 configure_file(src/libs/ck-libs/allGather/allGather.h  ${CMAKE_BINARY_DIR}/include COPYONLY)
 add_library(moduleallGather src/libs/ck-libs/allGather/allGather.C src/libs/ck-libs/allGather/allGather.h)
 add_dependencies(moduleallGather ck)
+
+if(BUILD_SYCL)
+  if(DEFINED IntelSYCL_FLAGS AND "${IntelSYCL_FLAGS}" MATCHES "-fsycl")
+    target_compile_options(moduleallGather PRIVATE ${IntelSYCL_FLAGS})
+  else()
+    target_compile_options(moduleallGather PRIVATE "-fsycl" ${IntelSYCL_FLAGS})
+  endif()
+endif()
 
 # NDMeshStreamer
 file(GLOB moduleNDMeshStreamer-h-sources src/libs/ck-libs/NDMeshStreamer/*.h)
@@ -1051,6 +1067,14 @@ target_include_directories(moduleNDMeshStreamer PUBLIC .
     ../completion)
 
 add_dependencies(moduleNDMeshStreamer ck)
+
+if(BUILD_SYCL)
+  if(DEFINED IntelSYCL_FLAGS AND "${IntelSYCL_FLAGS}" MATCHES "-fsycl")
+    target_compile_options(moduleNDMeshStreamer PRIVATE ${IntelSYCL_FLAGS})
+  else()
+    target_compile_options(moduleNDMeshStreamer PRIVATE "-fsycl" ${IntelSYCL_FLAGS})
+  endif()
+endif()
 
 foreach(filename ${moduleNDMeshStreamer-h-sources})
   configure_file(${filename} ${CMAKE_BINARY_DIR}/include/ COPYONLY)
