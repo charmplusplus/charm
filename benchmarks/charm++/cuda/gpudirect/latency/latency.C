@@ -238,7 +238,7 @@ public:
     // Inform the runtime where the incoming data should be stored
     // and which CUDA stream should be used for the transfer
     data = d_remote_data;
-    devicePost[0].cuda_stream = stream; // Not used with UCX
+    devicePost[0].hapi_stream = stream; // Not used with UCX
   }
 
   // Second receive (regular entry method), invoked once the data transfers complete
