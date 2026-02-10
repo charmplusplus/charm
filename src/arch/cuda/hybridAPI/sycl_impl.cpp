@@ -126,9 +126,7 @@ int hapiEventCreateWithFlags(hapiEvent_t* event, unsigned int flags) {
         ze_event_handle_t hEvent;
         zeEventCreate(hPool, &eventDesc, &hEvent);
         
-        sycl::ext::oneapi::level_zero::event_handle eventHandle(hEvent);
-        (*event)->ev = sycl::make_event<sycl::backend::ext_oneapi_level_zero>(
-            eventHandle, csv_gpu_manager.ctx);
+        (*event)->ev = sycl::make_event<sycl::backend::ext_oneapi_level_zero>(hEvent, csv_gpu_manager.ctx);
     }
     
     return hapiSuccess;
@@ -198,9 +196,7 @@ int hapiIpcOpenEventHandle(hapiEvent_t* event, hapiIpcEventHandle_t handle) {
     zeEventCreate(hPool, &eventDesc, &hEvent);
 
     *event = new hapiEventStruct();
-    sycl::ext::oneapi::level_zero::event_handle eventHandle(hEvent);
-    (*event)->ev = sycl::make_event<sycl::backend::ext_oneapi_level_zero>(
-        eventHandle, csv_gpu_manager.ctx);
+    (*event)->ev = sycl::make_event<sycl::backend::ext_oneapi_level_zero>(hEvent, csv_gpu_manager.ctx);
     (*event)->flag = hapiEventInterprocess;
     
     return hapiSuccess;
