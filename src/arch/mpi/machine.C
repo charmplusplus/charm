@@ -55,7 +55,7 @@ static char* strsignal(int sig) {
 
 #define CMI_MSGTYPE(msg)            ((CmiMsgHeaderBasic *)msg)->mpiMsgType
 enum mpiMsgTypes { REGULAR, ONESIDED_BUFFER_SEND, ONESIDED_BUFFER_RECV, ONESIDED_BUFFER_DIRECT_RECV, ONESIDED_BUFFER_DIRECT_SEND, POST_DIRECT_RECV, POST_DIRECT_SEND,
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP || CMK_SYCL
     DEVICE_SEND_OP,
     DEVICE_RECV_OP
 #endif
