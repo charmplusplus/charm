@@ -1054,6 +1054,7 @@ static inline void profileWorkRequestEvent(hapiWorkRequest* wr,
 // if single, large buffer is allocated for each subpool
 // if multiple, smaller buffers are allocated for each subpool
 static void createPool(int *n_buffers, int n_slots, std::vector<BufferPool> &pools){
+#ifndef CMK_SYCL
   std::vector<size_t>& mempool_boundaries = CsvAccess(gpu_manager).mempool_boundaries_;
 
   // initialize pools
@@ -1117,6 +1118,7 @@ static void createPool(int *n_buffers, int n_slots, std::vector<BufferPool> &poo
     pools[i].num = num_buffers;
 #endif
   }
+#endif
 }
 
 static void releasePool(std::vector<BufferPool> &pools){
