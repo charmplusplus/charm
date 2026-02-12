@@ -44,6 +44,7 @@ void Module::generate() {
           << name
           << "_H_\n"
              "#include \"charm++.h\"\n"
+             "#include \"conv-rdmadevice.h\"\n"
              "#include \"envelope.h\"\n"
              "#include <memory>\n"
              "#include \"sdag.h\"\n";
