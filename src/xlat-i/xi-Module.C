@@ -44,9 +44,6 @@ void Module::generate() {
           << name
           << "_H_\n"
              "#include \"charm++.h\"\n"
-             "#if CMK_CUDA || CMK_HIP || CMK_SYCL\n"
-             "#include \"conv-rdmadevice.h\"\n"
-             "#endif\n"
              "#include \"envelope.h\"\n"
              "#include <memory>\n"
              "#include \"sdag.h\"\n";
