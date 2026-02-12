@@ -4,7 +4,7 @@
 #include "ckcallback.h"
 #include "conv-rdmadevice.h"
 
-#if CMK_CUDA || CMK_HIP
+#if CMK_CUDA || CMK_HIP || CMK_SYCL
 #include "hapi_portable.h"
 
 #define CkNcpyModeDevice CmiNcpyModeDevice
