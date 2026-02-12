@@ -258,3 +258,9 @@ int hapiGetDeviceCount(int* count) {
     *count = all_devices.size();
     return hapiSuccess;
 }
+
+int hapiIpcCloseMemHandle(hapiIpcMemHandle_t handle) {
+    // No explicit close needed for SYCL IPC memory handles, 
+    // but we can implement any necessary cleanup here if required in the future
+    return hapiSuccess;
+}
