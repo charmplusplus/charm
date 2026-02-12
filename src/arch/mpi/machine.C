@@ -2522,7 +2522,7 @@ void CmiSetupMachineRecvBuffersUser(void)
 }
 /*=======End of Msg Histogram or Dynamic Post-Recv Related Funcs======*/
 
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP || CMK_SYCL
 
 #include <map>
 std::map<std::pair<void*, size_t>, uint64_t> cache_window;
@@ -2579,7 +2579,7 @@ void LrtsRecvDevice(DeviceRdmaOp* op, DeviceRecvType type)
 #endif
 }
 
-#endif // CMK_CUDA
+#endif // CMK_CUDA || CMK_HIP || CMK_SYCL
 
 
 /*@}*/
