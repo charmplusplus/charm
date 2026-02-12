@@ -259,7 +259,7 @@ int hapiGetDeviceCount(int* count) {
     return hapiSuccess;
 }
 
-int hapiIpcCloseMemHandle(hapiIpcMemHandle_t handle) {
+int hapiIpcCloseMemHandle(void* handle) {
     // No explicit close needed for SYCL IPC memory handles, 
     // but we can implement any necessary cleanup here if required in the future
     return hapiSuccess;

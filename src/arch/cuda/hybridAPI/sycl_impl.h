@@ -95,7 +95,7 @@ int hapiGetDeviceProperties(hapiDeviceProp* prop, int dev);
 int hapiIpcOpenEventHandle(hapiEvent_t* event, hapiIpcEventHandle_t handle);
 int hapiGetDeviceCount(int* count);
 int hapiDeviceEnablePeerAccess(int dev, int flags);
-int hapiIpcCloseMemHandle(hapiIpcMemHandle_t handle);
+int hapiIpcCloseMemHandle(void* handle);
 
 int getNumStreams(hapiDeviceProp& device_prop);
 
