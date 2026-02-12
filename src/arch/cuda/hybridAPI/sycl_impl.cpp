@@ -3,7 +3,43 @@
 
 CsvExtern(GPUManager, gpu_manager);
 
+// Global device list that includes sub-devices (tiles) for Intel GPUs
+static std::vector<sycl::device> all_devices;
+static bool devices_enumerated = false;
+
+// Helper function to enumerate devices including sub-devices (tiles)
+static void enumerate_devices_with_tiles() {
+  if (devices_enumerated) return;
+  
+  std::vector<sycl::device> root_devices = sycl::device::get_devices(sycl::info::device_type::gpu);
+  
+  for (auto& root_dev : root_devices) {
+    // Try to partition device into tiles (sub-devices by affinity domain)
+    try {
+      auto sub_devices = root_dev.create_sub_devices<sycl::info::partition_property::partition_by_affinity_domain>(
+        sycl::info::partition_affinity_domain::next_partitionable);
+      
+      if (!sub_devices.empty()) {
+        // Device has tiles, add each tile as a separate device
+        for (auto& sub_dev : sub_devices) {
+          all_devices.push_back(sub_dev);
+        }
+      } else {
+        // No sub-devices, use root device
+        all_devices.push_back(root_dev);
+      }
+    } catch (...) {
+      // Partitioning not supported or failed, use root device
+      all_devices.push_back(root_dev);
+    }
+  }
+  
+  devices_enumerated = true;
+}
+
 int hapiSetDevice(int dev) {
+  enumerate_devices_with_tiles();
+  
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
   CmiLock(csv_gpu_manager.context_lock_);
   if (csv_gpu_manager.ctx_initialized_) {
@@ -11,9 +47,8 @@ int hapiSetDevice(int dev) {
     return hapiSuccess;
   }
   csv_gpu_manager.ctx_initialized_ = true;
-  std::vector<sycl::device> devices = sycl::device::get_devices(sycl::info::device_type::gpu);
-  csv_gpu_manager.ctx = sycl::context(devices[dev]);
-  csv_gpu_manager.dev = devices[dev];
+  csv_gpu_manager.ctx = sycl::context(all_devices[dev]);
+  csv_gpu_manager.dev = all_devices[dev];
   CmiUnlock(csv_gpu_manager.context_lock_);
   return hapiSuccess;
 }
@@ -24,9 +59,9 @@ int hapiStreamCreate(sycl::queue** stream) {
 }
 
 int hapiDeviceCanAccessPeer(int* canAccess, int devIdx1, int devIdx2) {
-    auto devices = sycl::device::get_devices(sycl::info::device_type::gpu);
-    sycl::device dev0 = devices[devIdx1];
-    sycl::device dev1 = devices[devIdx2];
+    enumerate_devices_with_tiles();
+    sycl::device dev0 = all_devices[devIdx1];
+    sycl::device dev1 = all_devices[devIdx2];
 
     // Note: This requires Intel extensions for P2P capabilities
     // If not available, assume no P2P
@@ -53,9 +88,9 @@ int hapiIpcOpenMemHandle(void** ptr, hapiIpcMemHandle_t handle, int flags) {
 }
 
 int hapiGetDevice(int* dev) {
-    auto devices = sycl::device::get_devices(sycl::info::device_type::gpu);
-    for (size_t i = 0; i < devices.size(); i++) {
-        if (devices[i] == CsvAccess(gpu_manager).dev) {
+    enumerate_devices_with_tiles();
+    for (size_t i = 0; i < all_devices.size(); i++) {
+        if (all_devices[i] == CsvAccess(gpu_manager).dev) {
             *dev = i;
             return hapiSuccess;
         }
@@ -181,11 +216,11 @@ int hapiLaunchHostFunc(hapiStream_t stream, void (*func)(void*), void* args) {
 }
 
 int hapiGetDeviceProperties(hapiDeviceProp* prop, int dev) {
-    auto devices = sycl::device::get_devices(sycl::info::device_type::gpu);
-    if (dev < 0 || dev >= static_cast<int>(devices.size())) {
+    enumerate_devices_with_tiles();
+    if (dev < 0 || dev >= static_cast<int>(all_devices.size())) {
         return hapiErrorInitializationError;
     }
-    *prop = devices[dev];
+    *prop = all_devices[dev];
     return hapiSuccess;
 }
 
@@ -219,7 +254,7 @@ int getNumStreams(hapiDeviceProp& device_prop) {
 }
 
 int hapiGetDeviceCount(int* count) {
-    auto devices = sycl::device::get_devices(sycl::info::device_type::gpu);
-    *count = devices.size();
+    enumerate_devices_with_tiles();
+    *count = all_devices.size();
     return hapiSuccess;
 }
