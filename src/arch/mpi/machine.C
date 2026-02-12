@@ -355,7 +355,7 @@ typedef struct msg_list {
     struct msg_list *next;
     int size, destpe, mode, type;
     MPI_Request req;
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP || CMK_SYCL
     void* ptr;
     size_t device_size;
     DeviceRdmaOp* op;
