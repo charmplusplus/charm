@@ -58,6 +58,12 @@ int hapiStreamCreate(sycl::queue** stream) {
     return hapiSuccess;
 }
 
+int hapiStreamCreateWithPriority(sycl::queue** stream, unsigned int flags, int priority) {
+    // SYCL does not have a standard way to set stream priority, so we ignore the priority parameter
+    *(stream) = new sycl::queue(CsvAccess(gpu_manager).ctx, CsvAccess(gpu_manager).dev, sycl::property::queue::in_order());
+    return hapiSuccess;
+}
+
 int hapiDeviceCanAccessPeer(int* canAccess, int devIdx1, int devIdx2) {
     enumerate_devices_with_tiles();
     sycl::device dev0 = all_devices[devIdx1];
@@ -268,5 +274,10 @@ int hapiIpcCloseMemHandle(void* handle) {
 int hapiDeviceEnablePeerAccess(int dev, int flags) {
     // SYCL does not have a direct equivalent of CUDA's peer access, but we can check if devices are in the same context
     // For simplicity, we assume that if devices are in the same context, they can access each other
+    return hapiSuccess;
+}
+
+int hapiPeekAtLastError() {
+    // SYCL exceptions will be thrown directly, so we can return success here
     return hapiSuccess;
 }

@@ -29,6 +29,8 @@
 #define hapiEventInterprocess 0x02
 #define hapiIpcMemLazyEnablePeerAccess 0x01
 
+#define hapiStreamDefault 0x00
+
 #define hapiGetErrorString(err) \
     ((err) == hapiSuccess ? "Success" : "Error")
 
@@ -96,6 +98,8 @@ int hapiIpcOpenEventHandle(hapiEvent_t* event, hapiIpcEventHandle_t handle);
 int hapiGetDeviceCount(int* count);
 int hapiDeviceEnablePeerAccess(int dev, int flags);
 int hapiIpcCloseMemHandle(void* handle);
+
+int hapiPeekAtLastError();
 
 int getNumStreams(hapiDeviceProp& device_prop);
 
