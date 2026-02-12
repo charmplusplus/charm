@@ -56,6 +56,7 @@ typedef struct {
 // Function declarations
 int hapiSetDevice(int dev);
 int hapiStreamCreate(sycl::queue** stream);
+int hapiStreamCreateWithPriority(sycl::queue** stream, unsigned int flags, int priority);
 int hapiDeviceCanAccessPeer(int* canAccess, int devIdx1, int devIdx2);
 int hapiIpcGetMemHandle(hapiIpcMemHandle_t* handle, void* ptr);
 int hapiIpcGetEventHandle(hapiIpcEventHandle_t* handle, hapiEvent_t event);
