@@ -264,3 +264,9 @@ int hapiIpcCloseMemHandle(hapiIpcMemHandle_t handle) {
     // but we can implement any necessary cleanup here if required in the future
     return hapiSuccess;
 }
+
+int hapiDeviceEnablePeerAccess(int dev, int flags) {
+    // SYCL does not have a direct equivalent of CUDA's peer access, but we can check if devices are in the same context
+    // For simplicity, we assume that if devices are in the same context, they can access each other
+    return hapiSuccess;
+}
