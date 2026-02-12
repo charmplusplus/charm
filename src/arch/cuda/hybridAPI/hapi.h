@@ -248,6 +248,16 @@ static inline hapiError_t hapiFreeHost_Pool(void* ptr, bool pool) {
   return pool ? hapiPoolFree(ptr) : hapiFreeHost(ptr);
 }
 
+#if CMK_CUDA || CMK_HIP
+hapiStream_t hapiGetNativeStream(hapiStream_t& stream) {
+  return stream;
+}
+#elif CMK_SYCL
+sycl::queue& hapiGetNativeStream(hapiStream_t& stream) {
+  return *stream;
+}
+#endif
+
 #endif /* defined __cplusplus */
 
 #endif /* !defined AMPI_INTERNAL_SKIP_FUNCTIONS */
