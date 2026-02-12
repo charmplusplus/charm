@@ -107,6 +107,15 @@ target_include_directories(moduleEveryLB PRIVATE ${CMAKE_SOURCE_DIR}/src/libs/ck
 
 add_dependencies(moduleMetisLB ck ckmetis)
 
+# Add SYCL support to moduleCommonLBs if enabled
+if(BUILD_SYCL)
+  if(DEFINED IntelSYCL_FLAGS AND "${IntelSYCL_FLAGS}" MATCHES "-fsycl")
+    target_compile_options(moduleCommonLBs PRIVATE ${IntelSYCL_FLAGS})
+  else()
+    target_compile_options(moduleCommonLBs PRIVATE "-fsycl" ${IntelSYCL_FLAGS})
+  endif()
+endif()
+
 # Single LBs
 add_library(moduleDistributedLB ../ck-ldb/DistributedLB.C)
 add_dependencies(moduleDistributedLB ck)
