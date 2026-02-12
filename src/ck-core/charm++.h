@@ -187,7 +187,7 @@ public:
 
 #include "ckrdma.h"
 
-#include "ckrdmadevice.h"
+//#include "ckrdmadevice.h"
 
 /********************* Superclass of all Chares ******************/
 #if CMK_MULTIPLE_DELETE
