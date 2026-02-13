@@ -169,6 +169,9 @@ struct GPUManager {
 
 #if CMK_SMP
     // Create mutex locks
+#if CMK_SYCL
+    context_lock_ = CmiCreateLock();
+#endif
     queue_lock_ = CmiCreateLock();
     progress_lock_ = CmiCreateLock();
     stream_lock_ = CmiCreateLock();
