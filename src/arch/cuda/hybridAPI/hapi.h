@@ -249,13 +249,9 @@ static inline hapiError_t hapiFreeHost_Pool(void* ptr, bool pool) {
 }
 
 #if CMK_CUDA || CMK_HIP
-hapiStream_t hapiGetNativeStream(hapiStream_t& stream) {
-  return stream;
-}
+hapiStream_t hapiGetNativeStream(hapiStream_t& stream);
 #elif CMK_SYCL
-sycl::queue& hapiGetNativeStream(hapiStream_t& stream) {
-  return *stream;
-}
+sycl::queue& hapiGetNativeStream(hapiStream_t& stream);
 #endif
 
 #endif /* defined __cplusplus */

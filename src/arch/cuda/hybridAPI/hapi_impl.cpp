@@ -1514,3 +1514,13 @@ void hapiErrorDie(hapiError_t retCode, const char* code, const char* file, int l
     CmiAbort("Exit due to CUDA error");
   }
 }
+
+#if CMK_CUDA || CMK_HIP
+hapiStream_t hapiGetNativeStream(hapiStream_t& stream) {
+  return stream;
+}
+#elif CMK_SYCL
+sycl::queue& hapiGetNativeStream(hapiStream_t& stream) {
+  return *stream;
+}
+#endif
