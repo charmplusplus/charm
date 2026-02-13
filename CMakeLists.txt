@@ -810,7 +810,7 @@ if(BUILD_CUDA OR BUILD_HIP OR BUILD_SYCL)
     endif()
 
     # Link with Level Zero RTC library and librt for shm_open
-    target_link_libraries(hybridapi PRIVATE -lze_loader -lrt)
+    target_link_libraries(hybridapi PUBLIC -lze_loader -lrt)
 
     if(TRACING)
       target_compile_definitions(hybridapi PRIVATE HAPI_TRACE)
