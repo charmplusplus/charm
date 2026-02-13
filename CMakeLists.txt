@@ -809,8 +809,11 @@ if(BUILD_CUDA OR BUILD_HIP OR BUILD_SYCL)
       target_compile_options(hybridapi PRIVATE "-fsycl" ${IntelSYCL_FLAGS})
     endif()
 
-    # Link with Level Zero RTC library and librt for shm_open
+    # Link with Level Zero and librt for shm_open
     target_link_libraries(hybridapi PUBLIC -lze_loader -lrt)
+    
+    # Create dependency file for charmc wrapper to add -lrt when linking
+    file(WRITE ${CMAKE_BINARY_DIR}/lib/libhybridapi.dep "-lrt\n")
 
     if(TRACING)
       target_compile_definitions(hybridapi PRIVATE HAPI_TRACE)
