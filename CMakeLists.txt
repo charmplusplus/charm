@@ -809,8 +809,8 @@ if(BUILD_CUDA OR BUILD_HIP OR BUILD_SYCL)
       target_compile_options(hybridapi PRIVATE "-fsycl" ${IntelSYCL_FLAGS})
     endif()
 
-    # Link with Level Zero RTC library
-    target_link_libraries(hybridapi PRIVATE -lze_loader -lrtc)
+    # Link with Level Zero RTC library and librt for shm_open
+    target_link_libraries(hybridapi PRIVATE -lze_loader -lrt)
 
     if(TRACING)
       target_compile_definitions(hybridapi PRIVATE HAPI_TRACE)
