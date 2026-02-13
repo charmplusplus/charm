@@ -8,6 +8,10 @@
 #if CMK_CUDA || CMK_HIP || CMK_SYCL
 #include "hapi_portable.h"
 
+#if CMK_SYCL
+CpvExtern(hapiStream_t, sycl_per_thread_stream);
+#endif
+
 // Represents the mode of device-side zerocopy transfer
 // MEMCPY indicates that the PEs are on the same logical node and hapiMemcpyDeviceToDevice can be used
 // IPC indicates that the PEs are on different logical nodes within the same physical node and CUDA IPC can be used
