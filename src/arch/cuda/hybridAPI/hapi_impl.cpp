@@ -73,7 +73,7 @@ CpvDeclare(int, my_device_id); // index to the deviceManager that stores info ab
 CpvDeclare(bool, device_rep); // Is this PE a device representative thread? (1 per device)
 
 #ifdef CMK_SYCL
-CpvExtern(hapiStream_t, sycl_per_thread_stream);
+CpvDeclare(hapiStream_t, sycl_per_thread_stream);
 #endif
 
 // Returns the local rank of the logical node (process) that the given PE belongs to

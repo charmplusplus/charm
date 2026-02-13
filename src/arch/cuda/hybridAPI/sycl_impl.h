@@ -36,8 +36,6 @@
 
 #define hapiStreamPerThread (CpvAccess(sycl_per_thread_stream))
 
-CpvDeclare(hapiStream_t, sycl_per_thread_stream);
-
 // Event structure
 typedef struct hapiEventStruct {
     sycl::event ev;
