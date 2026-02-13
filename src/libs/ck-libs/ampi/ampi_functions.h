@@ -23,7 +23,7 @@
 # error You must define AMPI_CUSTOM_FUNC before including this file!
 #endif
 
-#if CMK_CUDA || CMK_HIP
+#if CMK_CUDA || CMK_HIP || CMK_SYCL
 #include "hapi_functions.h"
 #endif
 
@@ -607,7 +607,7 @@ AMPI_CUSTOM_FUNC(int, AMPI_Alltoall_long, void *sendbuf, int sendcount, MPI_Data
 
 
 #ifdef __cplusplus
-#if CMK_CUDA || CMK_HIP
+#if CMK_CUDA || CMK_HIP || CMK_SYCL
 AMPI_CUSTOM_FUNC(int, AMPI_GPU_Iinvoke_wr, hapiWorkRequest *to_call, MPI_Request *request)
 AMPI_CUSTOM_FUNC(int, AMPI_GPU_Iinvoke, hapiStream_t stream, MPI_Request *request)
 AMPI_CUSTOM_FUNC(int, AMPI_GPU_Invoke_wr, hapiWorkRequest *to_call)

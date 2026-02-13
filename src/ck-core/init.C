@@ -77,7 +77,7 @@ never be excluded...
 #include "TreeLB.h"
 #endif
 
-#if CMK_CUDA || CMK_HIP
+#if CMK_CUDA || CMK_HIP || CMK_SYCL
 #include "hapi_impl.h"
 #include "ckrdmadevice.h"
 
@@ -686,7 +686,7 @@ static void _exitHandler(envelope *env)
       ConverseCleanup();
 #endif
 
-#if CMK_CUDA || CMK_HIP
+#if CMK_CUDA || CMK_HIP || CMK_SYCL
       // Clean up HAPI
       hapiExit();
 #endif
@@ -1690,7 +1690,7 @@ void _initCharm(int unused_argc, char **argv)
         }
     }
 
-#if CMK_CUDA || CMK_HIP
+#if CMK_CUDA || CMK_HIP || CMK_SYCL
   // Perform HAPI initialization for GPU support
   hapiInit(argv);
 
