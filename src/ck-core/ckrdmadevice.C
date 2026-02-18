@@ -449,9 +449,8 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
     buffers[i]->src_pe = CmiMyPe();
     buffers[i]->src_mpi_rank = CmiNodeOf(CmiMyPe());
   }
-  if(transfer_mode == CkNcpyModeDevice::MEMCPY) {
+  if(transfer_mode == CkNcpyModeDevice::MEMCPY)
     return;
-  };
 
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
   int cpv_my_device_id = CmiMyRank() % csv_gpu_manager.device_count;

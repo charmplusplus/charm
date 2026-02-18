@@ -2554,7 +2554,6 @@ std::map<int, bool> handler_registered;
 void LrtsRecvDevice(DeviceRdmaOp* op, DeviceRecvType type)
 {
 #if CMK_SMP
-    CmiPrintf("[Debug] SMP case OK!\n");
     if(handler_registered[CmiMyPe()] == false) {
         deviceRecvCallbackHandler = CmiRegisterHandler((CmiHandler) deviceRecvCallback);
         handler_registered[CmiMyPe()] = true;
@@ -2564,7 +2563,6 @@ void LrtsRecvDevice(DeviceRdmaOp* op, DeviceRecvType type)
     msg_tmp->type = DEVICE_RECV_OP;
     PCQueuePush(postMsgBuf,(char *)msg_tmp);
 #else
-    CmiPrintf("[Debug] Non-SMP case OK!\n");
     if (access_epochs[op->src_mpi_rank] == 0) {
         MPI_Win_lock(MPI_LOCK_SHARED, op->src_mpi_rank, 0, globalDevWin);
     }
