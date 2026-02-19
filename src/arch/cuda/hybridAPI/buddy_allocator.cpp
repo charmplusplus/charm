@@ -4,32 +4,33 @@
 #include <cstdlib>
 #include <cmath>
 #include <algorithm>
-#include <cuda_runtime.h>
+#include <hapi_portable.h>
+#include "converse.h"
 
 namespace buddy {
   void allocator::print_status() {
-    printf("(buckets)\n");
+    CmiPrintf("(buckets)\n");
     size_t free = 0;
     for (int i = 0; i < bucket_count; i++) {
-      printf("bucket[%d]: ", i);
+      CmiPrintf("bucket[%d]: ", i);
       for (const auto& block : buckets[i]) {
         free += block.size;
-        printf("{%p, %zu} ", block.ptr, block.size);
+        CmiPrintf("{%p, %zu} ", block.ptr, block.size);
       }
-      printf("\n");
+      CmiPrintf("\n");
     }
 
-    printf("(alloc_map)\n");
+    CmiPrintf("(alloc_map)\n");
     size_t allocated = 0;
     size_t used = 0;
     for (const auto& elem : alloc_map) {
       const auto& block = elem.second;
       allocated += block.size;
       used += block.requested;
-      printf("ptr: %p, size: %zu, req: %zu\n", elem.first, block.size, block.requested);
+      CmiPrintf("ptr: %p, size: %zu, req: %zu\n", elem.first, block.size, block.requested);
     }
 
-    printf("(fragmentation) free: %zu, allocated: %zu, used: %zu\n", free, allocated, used);
+    CmiPrintf("(fragmentation) free: %zu, allocated: %zu, used: %zu\n", free, allocated, used);
   }
 
   size_t allocator::get_free_size() {
@@ -60,8 +61,8 @@ namespace buddy {
     // Request GPU memory (closest power of 2)
     int total_size_log2 = std::ceil(std::log2((double)size));
     total_size = (size_t)std::pow(2, total_size_log2);
-    cudaError_t status = cudaMalloc(&base_ptr, total_size);
-    if (status != cudaSuccess) {
+    hapiError_t status = hapiMalloc(&base_ptr, total_size);
+    if (status != hapiSuccess) {
       fprintf(stderr, "Failed to allocate GPU memory\n");
       abort();
     }
@@ -75,8 +76,8 @@ namespace buddy {
 
   allocator::~allocator() {
     // Free GPU memory
-    cudaError_t status = cudaFree(base_ptr);
-    if (status != cudaSuccess) {
+    hapiError_t status = hapiFree(base_ptr);
+    if (status != hapiSuccess) {
       fprintf(stderr, "Failed to free GPU memory\n");
       abort();
     }
@@ -84,6 +85,7 @@ namespace buddy {
   }
 
   void* allocator::malloc(size_t request) {
+    DEBUG_PRINT("REQUEST: %ld, TOTAL_SIZE: %ld", request, total_size);
     // Cannot satisfy request larger than total size
     if (request > total_size) return nullptr;
 
@@ -105,19 +107,14 @@ namespace buddy {
     }
 
     // Found bucket with free block, take it and start splitting if needed
-    FreeBlock& block = buckets[bucket].front();
+    FreeBlock block = buckets[bucket].front();
     uint8_t* ptr = block.ptr;
     size_t size = block.size;
     buckets[bucket].pop_front();
 
     while (bucket-- > original_bucket) {
-      buckets[bucket].emplace_back(ptr, size / 2);
-      buckets[bucket].emplace_back(ptr + size / 2, size / 2);
-
-      block = buckets[bucket].front();
-      ptr = block.ptr;
-      size = block.size;
-      buckets[bucket].pop_front();
+      size /= 2;
+      buckets[bucket].emplace_back(ptr + size, size);
     }
 
     // Store allocation info
@@ -126,12 +123,6 @@ namespace buddy {
         std::forward_as_tuple(ptr),
         std::forward_as_tuple(size, request));
 
-    DEBUG_PRINT("Allocated ptr %p (base_ptr + %zu) with %zu bytes, requested was %zu bytes\n",
-        (void*)ptr, (size_t)(ptr - base_ptr), size, request);
-
-#if BUDDY_DEBUG
-    print_status();
-#endif
 
     return ptr;
   }
@@ -186,10 +177,5 @@ namespace buddy {
     }
 
 merge_done:
-    DEBUG_PRINT("Freed ptr %p with %zu bytes, requested was %zu bytes\n", ptr, size, requested);
-
-#if BUDDY_DEBUG
-    print_status();
-#endif
   }
 }

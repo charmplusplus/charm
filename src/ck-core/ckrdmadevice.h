@@ -4,8 +4,8 @@
 #include "ckcallback.h"
 #include "conv-rdmadevice.h"
 
-#if CMK_CUDA
-#include <cuda_runtime.h>
+#if CMK_CUDA || CMK_HIP
+#include "hapi_portable.h"
 
 #define CkNcpyModeDevice CmiNcpyModeDevice
 #define CkDeviceStatus CmiDeviceStatus
@@ -15,9 +15,9 @@ struct CkDevicePersistent {
   size_t cnt;
   CkCallback cb;
   void* cb_msg;
-  cudaStream_t cuda_stream;
+  hapiStream_t hapi_stream;
   int pe;
-  cudaIpcMemHandle_t cuda_ipc_handle;
+  hapiIpcMemHandle_t hapi_ipc_handle;
   void* ipc_ptr;
   bool ipc_open; // Used only by the remote chare
 
@@ -34,15 +34,15 @@ struct CkDevicePersistent {
     init();
   }
 
-  explicit CkDevicePersistent(const void* ptr_, size_t cnt_, cudaStream_t cuda_stream_)
+  explicit CkDevicePersistent(const void* ptr_, size_t cnt_, hapiStream_t hapi_stream_)
     : ptr(ptr_), cnt(cnt_), cb(CkCallback(CkCallback::ignore)),
-      cuda_stream(cuda_stream_) {
+      hapi_stream(hapi_stream_) {
     init();
   }
 
   explicit CkDevicePersistent(const void* ptr_, size_t cnt_, const CkCallback& cb_,
-      cudaStream_t cuda_stream_)
-    : ptr(ptr_), cnt(cnt_), cb(cb_), cuda_stream(cuda_stream_) {
+      hapiStream_t hapi_stream_)
+    : ptr(ptr_), cnt(cnt_), cb(cb_), hapi_stream(hapi_stream_) {
     init();
   }
 
@@ -62,10 +62,10 @@ struct CkDevicePersistent {
 
 struct CkDeviceBufferPost {
   // CUDA stream for device transfers
-  cudaStream_t cuda_stream;
+  hapiStream_t hapi_stream;
 
   // Use per-thread stream by default
-  CkDeviceBufferPost() : cuda_stream(cudaStreamPerThread) {}
+  CkDeviceBufferPost() : hapi_stream(hapiStreamPerThread) {}
 };
 
 class CkDeviceBuffer : public CmiDeviceBuffer {
@@ -85,14 +85,14 @@ public:
     cb = cb_;
   }
 
-  explicit CkDeviceBuffer(const void* ptr_, cudaStream_t cuda_stream_) : CmiDeviceBuffer(ptr_, 0) {
+  explicit CkDeviceBuffer(const void* ptr_, hapiStream_t hapi_stream_) : CmiDeviceBuffer(ptr_, 0) {
     cb = CkCallback(CkCallback::ignore);
-    cuda_stream = cuda_stream_;
+    hapi_stream = hapi_stream_;
   }
 
-  explicit CkDeviceBuffer(const void* ptr_, const CkCallback& cb_, cudaStream_t cuda_stream_) : CmiDeviceBuffer(ptr_, 0) {
+  explicit CkDeviceBuffer(const void* ptr_, const CkCallback& cb_, hapiStream_t hapi_stream_) : CmiDeviceBuffer(ptr_, 0) {
     cb = cb_;
-    cuda_stream = cuda_stream_;
+    hapi_stream = hapi_stream_;
   }
 
   explicit CkDeviceBuffer(const void* ptr_, size_t cnt_) : CmiDeviceBuffer(ptr_, cnt_) {
@@ -103,14 +103,14 @@ public:
     cb = cb_;
   }
 
-  explicit CkDeviceBuffer(const void* ptr_, size_t cnt_, cudaStream_t cuda_stream_) : CmiDeviceBuffer(ptr_, cnt_) {
+  explicit CkDeviceBuffer(const void* ptr_, size_t cnt_, hapiStream_t hapi_stream_) : CmiDeviceBuffer(ptr_, cnt_) {
     cb = CkCallback(CkCallback::ignore);
-    cuda_stream = cuda_stream_;
+    hapi_stream = hapi_stream_;
   }
 
-  explicit CkDeviceBuffer(const void* ptr_, size_t cnt_, const CkCallback& cb_, cudaStream_t cuda_stream_) : CmiDeviceBuffer(ptr_, cnt_) {
+  explicit CkDeviceBuffer(const void* ptr_, size_t cnt_, const CkCallback& cb_, hapiStream_t hapi_stream_) : CmiDeviceBuffer(ptr_, cnt_) {
     cb = cb_;
-    cuda_stream = cuda_stream_;
+    hapi_stream = hapi_stream_;
   }
 
   void pup(PUP::er &p) {
@@ -121,11 +121,8 @@ public:
   friend void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs);
 };
 
-#if !CMK_GPU_COMM
-void CkRdmaDeviceRecvHandler(void* data, void* msg);
-#else
 void CkRdmaDeviceRecvHandler(void* data);
-#endif
+void CkRdmaDeviceRecvHandler(void* data, void* msg);
 void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs);
 void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers);
 

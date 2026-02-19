@@ -15,6 +15,7 @@
 #include <cuda_runtime.h>
 #include <cuda.h>
 
+#include "hapi_portable.h"
 #include "converse.h"
 #include "ckrescale.h"
 #include "charm++.h"
@@ -53,18 +54,19 @@ struct hapiCallbackMessage {
 
 #ifndef HAPI_CUDA_CALLBACK
 typedef struct hapiEvent {
-  cudaEvent_t event;
+  hapiEvent_t event;
   CkCallback cb;
   void* cb_msg;
   hapiWorkRequest* wr; // if this is not NULL, buffers and request itself are deallocated
   CkMigratable* obj; // pointer to the object whose load we want to set
   cudaEvent_t start_ev; // event to record the start time
 
-  hapiEvent(cudaEvent_t event_, const CkCallback& cb_, void* cb_msg_, hapiWorkRequest* wr_ = NULL, CkMigratable* obj_ = NULL, cudaEvent_t start_ev_ = NULL)
+  hapiEvent(hapiEvent_t event_, const CkCallback& cb_, void* cb_msg_, hapiWorkRequest* wr_ = NULL, CkMigratable* obj_ = NULL, hapiEvent_t start_ev_ = NULL)
             : event(event_), cb(cb_), cb_msg(cb_msg_), wr(wr_), obj(obj_), start_ev(start_ev_) {}
 } hapiEvent;
 
 CpvDeclare(std::queue<hapiEvent>, hapi_event_queue);
+CpvDeclare(std::queue<hapiEvent_t>, hapi_event_pool);
 #endif // HAPI_CUDA_CALLBACK
 CpvDeclare(int, n_hapi_events);
 
@@ -87,6 +89,7 @@ void (*hapiQdProcess)(int) = NULL;
 CsvDeclare(GPUManager, gpu_manager);
 
 CpvDeclare(int, my_device); // GPU device that this thread is mapped to
+CpvDeclare(int, my_device_id); // index to the deviceManager that stores info about the device
 CpvDeclare(bool, device_rep); // Is this PE a device representative thread? (1 per device)
 
 void hapiSendMemoryRequest(char* msg, int size);
@@ -156,7 +159,7 @@ void hapiInit(char** argv) {
 
   if (CmiInCommThread()) {
     // FIXME: Comm. thread sets its device to be the same as worker thread 0
-    cudaSetDevice(CsvAccess(gpu_manager).comm_thread_device);
+    hapiSetDevice(CsvAccess(gpu_manager).comm_thread_device);
   }
 
   shmInit();
@@ -320,12 +323,20 @@ static void hapiInitCpv() {
   // HAPI event-related
 #ifndef HAPI_CUDA_CALLBACK
   CpvInitialize(std::queue<hapiEvent>, hapi_event_queue);
+  CpvInitialize(std::queue<hapiEvent_t>, hapi_event_pool);
+  // for(int i = 0; i < 8; i++) {
+  //   hapiEvent_t ev;
+  //   hapiEventCreateWithFlags(&ev, hapiEventDisableTiming);
+  //   CpvAccess(hapi_event_pool).push(ev);
+  // }
 #endif
   CpvInitialize(int, n_hapi_events);
   CpvAccess(n_hapi_events) = 0;
 
   // Device mapping
   CpvInitialize(int, my_device);
+  CpvInitialize(int, my_device_id);
+  CpvAccess(my_device_id) = 0;
   CpvAccess(my_device) = 0;
   CpvInitialize(bool, device_rep);
   CpvAccess(device_rep) = false;
@@ -342,15 +353,20 @@ static void hapiExitCsv() {
   if (csv_gpu_manager.mempool_initialized_) {
     releasePool(csv_gpu_manager.mempool_free_bufs_);
   }
+#ifndef HAPI_CUDA_CALLBACK
+  auto& hapi_event_pool_ = CpvAccess(hapi_event_pool);
+  while(!hapi_event_pool_.empty()) {
+    hapiEventDestroy(hapi_event_pool_.front());
+    hapi_event_pool_.pop();
+  }
+#endif
 }
 
 // Set up PE to GPU mapping, invoked from all PEs
 // TODO: Support custom mappings
 static void hapiMapping(char** argv) {
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
-  Mapping map_type = Mapping::Block; // Default is block mapping
-  bool all_gpus = false; // If true, all GPUs are visible to all processes.
-                         // Otherwise, only a subset are visible (e.g. with jsrun)
+  Mapping map_type = Mapping::RoundRobin; // Default is round robin
   char* gpumap = NULL;
 
   // Process +gpumap
@@ -372,15 +388,6 @@ static void hapiMapping(char** argv) {
     }
   }
 
-  // Process +allgpus
-  if (CmiGetArgFlagDesc(argv, "+allgpus",
-        "all GPUs are visible to all processes")) {
-    all_gpus = true;
-    if (CmiMyPe() == 0) {
-      CmiPrintf("HAPI> All GPUs are visible to all processes\n");
-    }
-  }
-
   // No mapping specified, user assumes responsibility
   if (map_type == Mapping::None) {
     if (CmiMyPe() == 0) {
@@ -393,19 +400,14 @@ static void hapiMapping(char** argv) {
 
   if (CmiMyRank() == 0) {
     // Count number of GPU devices used by each process
-    int visible_device_count = 1;
-    //hapiCheck(cudaGetDeviceCount(&visible_device_count));
-    // FIXME this call has to be made but it causes issues with fork()
+    int visible_device_count;
+    hapiCheck(hapiGetDeviceCount(&visible_device_count));
     if (visible_device_count <= 0) {
       CmiAbort("Unable to perform PE-GPU mapping, no GPUs found!");
     }
 
     int& device_count = csv_gpu_manager.device_count;
-    if (all_gpus) {
-      device_count = visible_device_count / (CmiNumNodes() / CmiNumPhysicalNodes());
-    } else {
-      device_count = visible_device_count;
-    }
+    device_count = visible_device_count / (CmiNumNodes() / CmiNumPhysicalNodes());
 
     // Handle the case where the number of GPUs per process are larger than
     // the number of PEs per process. This is needed because we currently don't
@@ -419,18 +421,25 @@ static void hapiMapping(char** argv) {
       device_count = CmiNodeSize(CmiMyNode());
     }
 
+    // We also need to handle the case where the number of GPUs are less than the 
+    // number of processes launched on a physical node. Thus multiple processes can
+    // share a GPU. In this case device_count would be 0, but instead, we will assign
+    // at least one gpu to each process
+    if(device_count == 0) {
+      device_count = 1;
+    }
+
     // Create a DeviceManager per GPU device
     std::vector<DeviceManager>& device_managers = csv_gpu_manager.device_managers;
     for (int i = 0; i < device_count; i++) {
-      device_managers.emplace_back(i, device_count * CmiMyNodeRankLocal() + i);
+      device_managers.emplace_back(i, (device_count * CmiMyNodeRankLocal() + i) % visible_device_count);
     }
 
     // Count number of PEs per device
     csv_gpu_manager.pes_per_device = CmiNodeSize(CmiMyNode()) / device_count;
 
     // Count number of devices on a physical node
-    csv_gpu_manager.device_count_on_physical_node =
-      device_count * (CmiNumNodes() / CmiNumPhysicalNodes());
+    csv_gpu_manager.device_count_on_physical_node = visible_device_count;
   }
 
   if (CmiMyPe() == 0) {
@@ -442,34 +451,35 @@ static void hapiMapping(char** argv) {
   CmiNodeBarrier();
 
   // Perform mapping and set device representative PE
-  int my_rank = all_gpus ? CmiPhysicalRank(CmiMyPe()) : CmiMyRank();
+  int my_rank = CmiMyRank();
   int& cpv_my_device = CpvAccess(my_device);
+  int& cpv_my_device_id = CpvAccess(my_device_id);
   bool& cpv_device_rep = CpvAccess(device_rep);
 
   switch (map_type) {
     case Mapping::Block:
       cpv_my_device = my_rank / csv_gpu_manager.pes_per_device;
-      if(cpv_my_device >= csv_gpu_manager.device_count)
-          cpv_my_device = csv_gpu_manager.device_count - 1;
+      // if(cpv_my_device >= csv_gpu_manager.device_count)
+      //     cpv_my_device = csv_gpu_manager.device_count - 1;
       if (my_rank % csv_gpu_manager.pes_per_device == 0) cpv_device_rep = true;
       firstRankForDevice = cpv_my_device * csv_gpu_manager.pes_per_device;
       break;
-    case Mapping::RoundRobin:
-      cpv_my_device = my_rank % csv_gpu_manager.device_count;
+    case Mapping::RoundRobin: {
+      cpv_my_device_id   = my_rank % csv_gpu_manager.device_count;
+      cpv_my_device      = csv_gpu_manager.device_managers[cpv_my_device_id].global_index;
       if (my_rank < csv_gpu_manager.device_count) cpv_device_rep = true;
       firstRankForDevice = cpv_my_device;
+    }
       break;
-    default:
+    default:  
       CmiAbort("Unsupported mapping type!");
   }
-
-  // Set device and store PE-device mapping
-  //hapiCheck(cudaSetDevice(cpv_my_device));
+  
+  hapiCheck(hapiSetDevice(cpv_my_device));
 #if CMK_SMP
   CmiLock(csv_gpu_manager.device_mapping_lock);
 #endif
-  csv_gpu_manager.device_map.emplace(CmiMyPe(),
-      &(csv_gpu_manager.device_managers[cpv_my_device]));
+  csv_gpu_manager.device_map.emplace(CmiMyPe(), &(csv_gpu_manager.device_managers[cpv_my_device_id]));
 #if CMK_SMP
   CmiUnlock(csv_gpu_manager.device_mapping_lock);
 #endif
@@ -489,7 +499,10 @@ static void hapiMapping(char** argv) {
   }
 
   if (CmiMyRank() == 0) {
-    if (use_shm) csv_gpu_manager.use_shm = true;
+    if (use_shm) {
+      csv_gpu_manager.use_shm = true;
+    }
+    // csv_gpu_manager.test_field = true;
   }
 
   CmiNodeBarrier();
@@ -529,20 +542,20 @@ static void hapiMapping(char** argv) {
     }
 
     // Process custom size for CUDA IPC event pool
-    int input_cuda_ipc_event_pool_size;
-    if (!CmiGetArgIntDesc(argv, "+gpuipceventpool", &input_cuda_ipc_event_pool_size,
+    int input_hapi_ipc_event_pool_size;
+    if (!CmiGetArgIntDesc(argv, "+gpuipceventpool", &input_hapi_ipc_event_pool_size,
           "GPU IPC event pool size per PE")) {
-      input_cuda_ipc_event_pool_size = 16;
+      input_hapi_ipc_event_pool_size = 16;
     }
 
     if (CmiMyRank() == 0) {
-      csv_gpu_manager.cuda_ipc_event_pool_size_pe = input_cuda_ipc_event_pool_size;
-      csv_gpu_manager.cuda_ipc_event_pool_size_total = input_cuda_ipc_event_pool_size * csv_gpu_manager.pes_per_device;
+      csv_gpu_manager.hapi_ipc_event_pool_size_pe = input_hapi_ipc_event_pool_size;
+      csv_gpu_manager.hapi_ipc_event_pool_size_total = input_hapi_ipc_event_pool_size * csv_gpu_manager.pes_per_device;
     }
 
     if (CmiMyPe() == 0) {
       CmiPrintf("HAPI> CUDA IPC event pool size - %d per PE, %d per device\n",
-          csv_gpu_manager.cuda_ipc_event_pool_size_pe, csv_gpu_manager.cuda_ipc_event_pool_size_total);
+          csv_gpu_manager.hapi_ipc_event_pool_size_pe, csv_gpu_manager.hapi_ipc_event_pool_size_total);
     }
   }
 
@@ -565,9 +578,9 @@ static void hapiMapping(char** argv) {
         if (i != cpv_my_device) {
           int can_access_peer;
 
-          hapiCheck(cudaDeviceCanAccessPeer(&can_access_peer, cpv_my_device, i));
+          hapiCheck(hapiDeviceCanAccessPeer(&can_access_peer, cpv_my_device, i));
           if (can_access_peer) {
-            cudaDeviceEnablePeerAccess(i, 0);
+            hapiDeviceEnablePeerAccess(i, 0);
           }
         }
       }
@@ -580,15 +593,21 @@ static void hapiMapping(char** argv) {
 }
 
 #ifndef HAPI_CUDA_CALLBACK
-void recordEvent(cudaStream_t stream, const CkCallback& cb, void* cb_msg, hapiWorkRequest* wr = NULL, CkMigratable* obj = NULL, cudaEvent_t start_ev = NULL) {
-  // create CUDA event and insert into stream
-  cudaEvent_t ev;
-#if CMK_LBDB_ON
-  cudaEventCreateWithFlags(&ev,  cudaEventDefault);
-#else
-  cudaEventCreateWithFlags(&ev,  cudaEventDisableTiming);
-#endif 
-  cudaEventRecord(ev, stream);
+void recordEvent(hapiStream_t stream, const CkCallback& cb, void* cb_msg, hapiWorkRequest* wr = NULL) {
+  // create CUDA event / get CUDA event from the pool and insert into stream
+  hapiEvent_t ev;
+  auto& hapi_event_pool_local = CpvAccess(hapi_event_pool);
+  if(hapi_event_pool_local.size() == 0) {
+  #if CMK_LBDB_ON
+    hapiEventCreateWithFlags(&ev, hapiEventDefault);
+  #else
+    hapiEventCreateWithFlags(&ev, hapiEventDisableTiming);
+  #endif
+  } else {
+    ev = hapi_event_pool_local.front();
+    hapi_event_pool_local.pop();
+  }
+  hapiEventRecord(ev, stream);
 
   hapiEvent hev(ev, cb, cb_msg, wr, obj, start_ev);
 
@@ -755,7 +774,7 @@ static void addCallback(hapiWorkRequest *wr, CallbackStage stage) {
   CmiSetHandler(conv_msg, handlerIdx);
 
   // add callback into CUDA stream
-  hapiCheck(cudaLaunchHostFunc(wr->stream, CUDACallback, (void*)conv_msg));
+  hapiCheck(hapiLaunchHostFunc(wr->stream, CUDACallback, (void*)conv_msg));
 }
 #endif // HAPI_CUDA_CALLBACK
 
@@ -848,7 +867,7 @@ hapiWorkRequest::hapiWorkRequest() :
 #endif
 
   // Use CUDA per-thread default stream
-  stream = cudaStreamPerThread;
+  stream = hapiStreamPerThread;
 
   // Charm++ callbacks are not set by default
   host_to_device_cb = CkCallback(CkCallback::ignore);
@@ -867,22 +886,22 @@ static void shmInit() {
   if (!CsvAccess(gpu_manager).use_shm) return;
 
   if (CmiMyRank() == 0) {
-    shmSetup();
+    if (!CmiInCommThread()) shmSetup();
     if (CmiMyNodeRankLocal() == 0) {
-      shmCreate(); // Create a per-host shared memory region
+      if (!CmiInCommThread()) shmCreate(); // Create a per-host shared memory region
       CmiBarrier(); // FIXME: Only needs to be a host-wide barrier
     } else {
       CmiBarrier();
-      shmOpen(); // Open the shared memory region created by local logical node 0
+      if (!CmiInCommThread()) shmOpen(); // Open the shared memory region created by local logical node 0
     }
-    shmMap(); // Map the shared memory file into memory
+    if (!CmiInCommThread()) shmMap(); // Map the shared memory file into memory
   } else {
     CmiBarrier();
   }
 
-  CmiNodeBarrier(); // Ensure shared memory has been mapped into the logical node
+  if (!CmiInCommThread()) CmiNodeBarrier(); // Ensure shared memory has been mapped into the logical node
 
-  ipcHandleCreate(); // Create CUDA IPC handles
+  if (!CmiInCommThread()) ipcHandleCreate(); // Create CUDA IPC handles
 
   // Ensure CUDA IPC handles are available for all processes
   // Note: Causes a hang when this barrier is placed after CPU topology initialization
@@ -890,7 +909,7 @@ static void shmInit() {
   CmiBarrier();
 
   if (CmiMyRank() == 0) {
-    ipcHandleOpen(); // Open CUDA IPC handles for accessing other processes' device memory
+    if (!CmiInCommThread()) ipcHandleOpen(); // Open CUDA IPC handles for accessing other processes' device memory
   }
 }
 
@@ -898,16 +917,16 @@ static void shmSetup() {
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
 
   // Set up shared memory file name
-  csv_gpu_manager.shm_name.assign("charm-cuda-host");
+  csv_gpu_manager.shm_name.assign("charm-hapi-host");
   int host_id = CmiPhysicalNodeID(CmiMyPe());
   csv_gpu_manager.shm_name.append(std::to_string(host_id));
   const char* shm_name = csv_gpu_manager.shm_name.c_str();
 
   // Calculate shared memory region size
-  csv_gpu_manager.shm_chunk_size = sizeof(cudaIpcMemHandle_t) +
-      sizeof(cuda_ipc_event_shared) * csv_gpu_manager.cuda_ipc_event_pool_size_total;
+  csv_gpu_manager.shm_chunk_size = sizeof(hapiIpcMemHandle_t) +
+      sizeof(hapi_ipc_event_shared) * csv_gpu_manager.hapi_ipc_event_pool_size_total;
   csv_gpu_manager.shm_size = csv_gpu_manager.shm_chunk_size *
-    csv_gpu_manager.device_count_on_physical_node;
+    csv_gpu_manager.device_count * ((CmiNumNodes() / CmiNumPhysicalNodes()));
 }
 
 // Create POSIX shared memory region accessible to all processes on the same host
@@ -990,12 +1009,12 @@ static void shmMap() {
 
   // Store pointer to my process' portion of the shared memory region
   csv_gpu_manager.shm_my_ptr = (void*)((char*)csv_gpu_manager.shm_ptr +
-      csv_gpu_manager.shm_chunk_size * csv_gpu_manager.device_count *
-      CmiMyNodeRankLocal());
+      csv_gpu_manager.shm_chunk_size * (csv_gpu_manager.device_count *
+      CmiMyNodeRankLocal()));
 
   // Allocate memory for local storage
-  for (int i = 0; i < csv_gpu_manager.device_count_on_physical_node; i++) {
-    csv_gpu_manager.cuda_ipc_device_infos.emplace_back();
+  for (int i = 0; i < csv_gpu_manager.device_count * ((CmiNumNodes() / CmiNumPhysicalNodes())); i++) {
+    csv_gpu_manager.hapi_ipc_device_infos.emplace_back();
   }
 }
 
@@ -1032,36 +1051,44 @@ static void ipcHandleCreate() {
   if (!CpvAccess(device_rep)) return;
 
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
-  int& cpv_my_device = CpvAccess(my_device);
+  int& cpv_my_device_id = CpvAccess(my_device_id);
 
   // Create CUDA IPC memory handle in shared memory
-  DeviceManager& my_dm = csv_gpu_manager.device_managers[cpv_my_device];
+  auto it = csv_gpu_manager.device_map.find(CmiMyPe());
+  if (it == csv_gpu_manager.device_map.end()) {
+    CmiAbort("PE not found in device_map during ipcHandleCreate");
+  }
+  DeviceManager& my_dm = *(it->second);
   auto comm_buffer = my_dm.get_comm_buffer();
   CmiAssert(comm_buffer);
-  cudaIpcMemHandle_t* shm_mem_handle = (cudaIpcMemHandle_t*)((char*)csv_gpu_manager.shm_my_ptr +
-      csv_gpu_manager.shm_chunk_size * cpv_my_device);
+
+  // Use local device index (0 to device_count-1) for shm_mem_handle offset
+  // int local_device_idx = my_dm.local_index;
+  hapiIpcMemHandle_t* shm_mem_handle = (hapiIpcMemHandle_t*)((char*)csv_gpu_manager.shm_my_ptr +
+      csv_gpu_manager.shm_chunk_size * cpv_my_device_id);
+
   void* device_ptr = comm_buffer->base_ptr;
-  hapiCheck(cudaIpcGetMemHandle(shm_mem_handle, device_ptr));
+  hapiCheck(hapiIpcGetMemHandle(shm_mem_handle, device_ptr));
 
-  // Create CUDA IPC events and store them locally (in cuda_ipc_device_info),
+  // Create CUDA IPC events and store them locally (in hapi_ipc_device_info),
   // and create corresponding IPC handles in shared memory
-  cuda_ipc_device_info& my_device_info = csv_gpu_manager.cuda_ipc_device_infos[my_dm.global_index];
-  cuda_ipc_event_shared* shm_event_shared = (cuda_ipc_event_shared*)((char*)shm_mem_handle + sizeof(cudaIpcMemHandle_t));
+  hapi_ipc_device_info& my_device_info = csv_gpu_manager.hapi_ipc_device_infos[csv_gpu_manager.device_count * CmiMyNodeRankLocal() + cpv_my_device_id];
+  hapi_ipc_event_shared* shm_event_shared = (hapi_ipc_event_shared*)((char*)shm_mem_handle + sizeof(hapiIpcMemHandle_t));
 
-  for (int i = 0; i < csv_gpu_manager.cuda_ipc_event_pool_size_total; i++) {
-    cuda_ipc_event_shared* cur_shm_event_shared = shm_event_shared + i;
+  for (int i = 0; i < csv_gpu_manager.hapi_ipc_event_pool_size_total; i++) {
+    hapi_ipc_event_shared* cur_shm_event_shared = shm_event_shared + i;
 
     my_device_info.event_pool_flags.push_back(0);
     my_device_info.event_pool_buff_offsets.push_back(0);
     my_device_info.src_event_pool.emplace_back();
     my_device_info.dst_event_pool.emplace_back();
-    hapiCheck(cudaEventCreateWithFlags(&my_device_info.src_event_pool[i],
-          cudaEventDisableTiming | cudaEventInterprocess));
-    hapiCheck(cudaEventCreateWithFlags(&my_device_info.dst_event_pool[i],
-          cudaEventDisableTiming | cudaEventInterprocess));
-    hapiCheck(cudaIpcGetEventHandle(&cur_shm_event_shared->src_event_handle,
+    hapiCheck(hapiEventCreateWithFlags(&my_device_info.src_event_pool[i],
+          hapiEventDisableTiming | hapiEventInterprocess));
+    hapiCheck(hapiEventCreateWithFlags(&my_device_info.dst_event_pool[i],
+          hapiEventDisableTiming | hapiEventInterprocess));
+    hapiCheck(hapiIpcGetEventHandle(&cur_shm_event_shared->src_event_handle,
           my_device_info.src_event_pool[i]));
-    hapiCheck(cudaIpcGetEventHandle(&cur_shm_event_shared->dst_event_handle,
+    hapiCheck(hapiIpcGetEventHandle(&cur_shm_event_shared->dst_event_handle,
           my_device_info.dst_event_pool[i]));
   }
 
@@ -1081,30 +1108,30 @@ static void ipcHandleOpen() {
     // Loop through GPU devices per process
     for (int j = 0; j < csv_gpu_manager.device_count; j++) {
       int device_index = csv_gpu_manager.device_count * i + j;
-      cuda_ipc_device_info& cur_device_info = csv_gpu_manager.cuda_ipc_device_infos[device_index];
+      hapi_ipc_device_info& cur_device_info = csv_gpu_manager.hapi_ipc_device_infos[device_index];
 
       // Open memory handle
-      cudaIpcMemHandle_t* shm_mem_handle =
-        (cudaIpcMemHandle_t*)((char*)csv_gpu_manager.shm_ptr
+      hapiIpcMemHandle_t* shm_mem_handle =
+        (hapiIpcMemHandle_t*)((char*)csv_gpu_manager.shm_ptr
             + csv_gpu_manager.shm_chunk_size * device_index);
-      hapiCheck(cudaIpcOpenMemHandle(&cur_device_info.buffer, *shm_mem_handle,
-            cudaIpcMemLazyEnablePeerAccess));
+      hapiCheck(hapiIpcOpenMemHandle(&cur_device_info.buffer, *shm_mem_handle,
+            hapiIpcMemLazyEnablePeerAccess));
 
       // Open event handles
-      cuda_ipc_event_shared* shm_event_shared =
-        (cuda_ipc_event_shared*)((char*)shm_mem_handle + sizeof(cudaIpcMemHandle_t));
+      hapi_ipc_event_shared* shm_event_shared =
+        (hapi_ipc_event_shared*)((char*)shm_mem_handle + sizeof(hapiIpcMemHandle_t));
 
       cur_device_info.event_pool_flags.clear();
       cur_device_info.event_pool_buff_offsets.clear();
 
-      for (int k = 0; k < csv_gpu_manager.cuda_ipc_event_pool_size_total; k++) {
-        cuda_ipc_event_shared* cur_shm_event_shared = shm_event_shared + k;
+      for (int k = 0; k < csv_gpu_manager.hapi_ipc_event_pool_size_total; k++) {
+        hapi_ipc_event_shared* cur_shm_event_shared = shm_event_shared + k;
 
         cur_device_info.src_event_pool.emplace_back();
         cur_device_info.dst_event_pool.emplace_back();
-        hapiCheck(cudaIpcOpenEventHandle(&cur_device_info.src_event_pool[k],
+        hapiCheck(hapiIpcOpenEventHandle(&cur_device_info.src_event_pool[k],
               cur_shm_event_shared->src_event_handle));
-        hapiCheck(cudaIpcOpenEventHandle(&cur_device_info.dst_event_pool[k],
+        hapiCheck(hapiIpcOpenEventHandle(&cur_device_info.dst_event_pool[k],
               cur_shm_event_shared->dst_event_handle));
       }
     }
@@ -1215,9 +1242,9 @@ static void createPool(int *n_buffers, int n_slots, std::vector<BufferPool> &poo
   }
 
   int device;
-  cudaDeviceProp device_prop;
-  hapiCheck(cudaGetDevice(&device));
-  hapiCheck(cudaGetDeviceProperties(&device_prop, device));
+  hapiDeviceProp device_prop;
+  hapiCheck(hapiGetDevice(&device));
+  hapiCheck(hapiGetDeviceProperties(&device_prop, device));
 
   // divide by # of PEs on physical node and multiply by # of PEs in logical node
   size_t available_memory = device_prop.totalGlobalMem /
@@ -1251,7 +1278,7 @@ static void createPool(int *n_buffers, int n_slots, std::vector<BufferPool> &poo
 
     // pin host memory in a contiguous block for a slot
     void* pinned_chunk;
-    hapiCheck(cudaMallocHost(&pinned_chunk, buf_size * num_buffers));
+    hapiCheck(hapiMallocHost(&pinned_chunk, buf_size * num_buffers));
 
     // initialize header structs
     for (int j = num_buffers - 1; j >= 0; j--) {
@@ -1272,11 +1299,11 @@ static void createPool(int *n_buffers, int n_slots, std::vector<BufferPool> &poo
 
 static void releasePool(std::vector<BufferPool> &pools){
   int device;
-  hapiCheck(cudaGetDevice(&device));
+  hapiCheck(hapiGetDevice(&device));
   for (int i = 0; i < pools.size(); i++) {
     void* chunk = pools[i].chunk;
     if (chunk != NULL) {
-      hapiCheck(cudaFreeHost(chunk));
+      hapiCheck(hapiFreeHost(chunk));
     }
   }
   pools.clear();
@@ -1293,7 +1320,7 @@ static int findPool(size_t size){
     csv_gpu_manager.mempool_boundaries_.push_back(size);
 
     BufferPool newpool;
-    hapiCheck(cudaMallocHost((void**)&newpool.head, size + sizeof(BufferPoolHeader)));
+    hapiCheck(hapiMallocHost((void**)&newpool.head, size + sizeof(BufferPoolHeader)));
     if (newpool.head == NULL) {
       CmiPrintf("[HAPI (%d)] findPool: failed to allocate newpool %d head, size %zu\n",
              CmiMyPe(), boundary_array_len, size);
@@ -1336,7 +1363,7 @@ static void* getBufferFromPool(int pool, size_t size){
   }
   else if (csv_gpu_manager.mempool_free_bufs_[pool].head == NULL) {
     BufferPoolHeader* hd;
-    hapiCheck(cudaMallocHost((void**)&hd, sizeof(BufferPoolHeader) +
+    hapiCheck(hapiMallocHost((void**)&hd, sizeof(BufferPoolHeader) +
                              csv_gpu_manager.mempool_free_bufs_[pool].size));
 #ifdef HAPI_MEMPOOL_DEBUG
     CmiPrintf("[HAPI (%d)] getBufferFromPool, pool: %d, size: %zu expand by 1\n",
@@ -1369,7 +1396,7 @@ static void returnBufferToPool(int pool, BufferPoolHeader* hd) {
 #endif
 }
 
-cudaError_t hapiPoolMalloc(void** ptr, size_t size) {
+hapiError_t hapiPoolMalloc(void** ptr, size_t size) {
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
 
 #if CMK_SMP
@@ -1415,7 +1442,7 @@ cudaError_t hapiPoolMalloc(void** ptr, size_t size) {
     CmiUnlock(csv_gpu_manager.mempool_lock_);
 #endif
 
-    return cudaErrorMemoryAllocation;
+    return hapiErrorMemoryAllocation;
   }
   *ptr = getBufferFromPool(pool, size);
 
@@ -1428,15 +1455,15 @@ cudaError_t hapiPoolMalloc(void** ptr, size_t size) {
   CmiUnlock(csv_gpu_manager.mempool_lock_);
 #endif
 
-  return cudaSuccess;
+  return hapiSuccess;
 }
 
-cudaError_t hapiPoolFree(void* ptr) {
+hapiError_t hapiPoolFree(void* ptr) {
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
 
   // Check if mempool was initialized
   if (!csv_gpu_manager.mempool_initialized_)
-    return cudaErrorInitializationError;
+    return hapiErrorInitializationError;
 
   BufferPoolHeader* hd = ((BufferPoolHeader*)ptr) - 1;
   int pool = hd->slot;
@@ -1461,7 +1488,7 @@ cudaError_t hapiPoolFree(void* ptr) {
          csv_gpu_manager.mempool_free_bufs_[pool].num);
 #endif
 
-  return cudaSuccess;
+  return hapiSuccess;
 }
 
 #ifdef HAPI_INSTRUMENT_WRS
@@ -1537,7 +1564,7 @@ void hapiPollEvents(void* param) {
   std::queue<hapiEvent>& queue = CpvAccess(hapi_event_queue);
   while (!queue.empty()) {
     hapiEvent hev = queue.front();
-    if (cudaEventQuery(hev.event) == cudaSuccess) {
+    if (hapiEventQuery(hev.event) == hapiSuccess) {
       queue.pop(); // TODO: investigate possible race condition with charm4py futures - temporarily resolved by popping here
 
 #if CMK_LBDB_ON
@@ -1555,7 +1582,7 @@ void hapiPollEvents(void* param) {
       if (hev.wr) {
         hapiWorkRequestCleanup(hev.wr);
       }
-      cudaEventDestroy(hev.event);
+      CpvAccess(hapi_event_pool).push(hev.event);
       CpvAccess(n_hapi_events)--;
 
       // inform QD that an event was processed
@@ -1586,14 +1613,14 @@ int hapiCreateStreams() {
   return ret;
 }
 
-cudaStream_t hapiGetStream() {
+hapiStream_t hapiGetStream() {
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
 
 #if CMK_SMP
   CmiLock(csv_gpu_manager.stream_lock_);
 #endif
 
-  cudaStream_t ret = csv_gpu_manager.getNextStream();
+  hapiStream_t ret = csv_gpu_manager.getNextStream();
 
 #if CMK_SMP
   CmiUnlock(csv_gpu_manager.stream_lock_);
@@ -1622,7 +1649,7 @@ void hapiRecordTime(cudaStream_t stream, cudaEvent_t start) {
 }
 #endif
 // Lightweight HAPI, to be invoked after data transfer or kernel execution.
-void hapiAddCallback(cudaStream_t stream, const CkCallback& cb, void* cb_msg) {
+void hapiAddCallback(hapiStream_t stream, const CkCallback& cb, void* cb_msg) {
 #ifndef HAPI_CUDA_CALLBACK
   // record CUDA event
   recordEvent(stream, cb, cb_msg);
@@ -1643,7 +1670,7 @@ void hapiAddCallback(cudaStream_t stream, const CkCallback& cb, void* cb_msg) {
   CmiSetHandler(conv_msg, csv_gpu_manager.light_cb_idx_);
 
   // push into CUDA stream
-  hapiCheck(cudaLaunchHostFunc(stream, CUDACallback, (void*)conv_msg));
+  hapiCheck(hapiLaunchHostFunc(stream, CUDACallback, (void*)conv_msg));
 
   /*
 #if CMK_SMP
@@ -1658,7 +1685,7 @@ void hapiAddCallback(cudaStream_t stream, const CkCallback& cb, void* cb_msg) {
   hapiQdCreate(1);
 }
 
-void hapiAddCallback(cudaStream_t stream, void* cb, void* cb_msg) {
+void hapiAddCallback(hapiStream_t stream, void* cb, void* cb_msg) {
   hapiAddCallback(stream, *(CkCallback*)cb, cb_msg);
 }
 

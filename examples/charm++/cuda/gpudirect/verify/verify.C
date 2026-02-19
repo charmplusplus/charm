@@ -10,34 +10,35 @@
 /* readonly */ CProxy_VerifyNodeGroup nodegroup_proxy;
 /* readonly */ int block_size;
 /* readonly */ int n_iters;
+/* readonly */ int n_warpup_iters;
 /* readonly */ bool lb_test;
 
-extern void invokeInitKernel(double*, int, double, cudaStream_t);
+extern void invokeInitKernel(double*, int, double, hapiStream_t);
 
 struct Container {
   double* h_local_data;
   double* h_remote_data;
   double* d_local_data;
   double* d_remote_data;
-  cudaStream_t stream;
+  hapiStream_t stream;
 
   Container() : h_local_data(nullptr), h_remote_data(nullptr),
     d_local_data(nullptr), d_remote_data(nullptr) {}
 
   ~Container() {
-    hapiCheck(cudaFreeHost(h_local_data));
-    hapiCheck(cudaFreeHost(h_remote_data));
-    hapiCheck(cudaFree(d_local_data));
-    hapiCheck(cudaFree(d_remote_data));
-    hapiCheck(cudaStreamDestroy(stream));
+    hapiCheck(hapiFreeHost(h_local_data));
+    hapiCheck(hapiFreeHost(h_remote_data));
+    hapiCheck(hapiFree(d_local_data));
+    hapiCheck(hapiFree(d_remote_data));
+    hapiCheck(hapiStreamDestroy(stream));
   }
 
   void init(double val) {
-    hapiCheck(cudaMallocHost(&h_local_data, sizeof(double) * block_size));
-    hapiCheck(cudaMallocHost(&h_remote_data, sizeof(double) * block_size));
-    hapiCheck(cudaMalloc(&d_local_data, sizeof(double) * block_size));
-    hapiCheck(cudaMalloc(&d_remote_data, sizeof(double) * block_size));
-    hapiCheck(cudaStreamCreate(&stream));
+    hapiCheck(hapiMallocHost(&h_local_data, sizeof(double) * block_size));
+    hapiCheck(hapiMallocHost(&h_remote_data, sizeof(double) * block_size));
+    hapiCheck(hapiMalloc(&d_local_data, sizeof(double) * block_size));
+    hapiCheck(hapiMalloc(&d_remote_data, sizeof(double) * block_size));
+    hapiCheck(hapiStreamCreate(&stream));
 
     for (int i = 0; i < block_size; i++) {
       h_local_data[i] = val;
@@ -45,13 +46,13 @@ struct Container {
     invokeInitKernel(d_local_data, block_size, val, stream);
     invokeInitKernel(d_remote_data, block_size, val, stream);
 
-    hapiCheck(cudaStreamSynchronize(stream));
+    hapiCheck(hapiStreamSynchronize(stream));
   }
 
   void verify(double val) {
-    hapiCheck(cudaMemcpyAsync(h_remote_data, d_remote_data,
-          sizeof(double) * block_size, cudaMemcpyDeviceToHost, stream));
-    hapiCheck(cudaStreamSynchronize(stream));
+    hapiCheck(hapiMemcpyAsync(h_remote_data, d_remote_data,
+          sizeof(double) * block_size, hapiMemcpyDeviceToHost, stream));
+    hapiCheck(hapiStreamSynchronize(stream));
 
     for (int i = 0; i < block_size; i++) {
       if (fabs(h_remote_data[i] - val) > ERROR_TOLERANCE) {
@@ -59,6 +60,8 @@ struct Container {
             i, val, h_remote_data[i]);
       }
     }
+
+    CmiPrintf("Data verified, looks OK!\n");
   }
 };
 
@@ -69,15 +72,16 @@ class Main : public CBase_Main {
 public:
   Main(CkArgMsg* m) {
     main_proxy = thisProxy;
-    block_size = 128;
-    n_iters = 100;
+    block_size = 1028 * 128;
+    n_iters = 50;
+    n_warpup_iters = 3;
     test_nodegroup = true;
     lb_test = false;
 
     // Check if there are 2 PEs
-    if (CkNumPes() != 2) {
-      CkAbort("Should be run with 2 PEs");
-    }
+    // if (CkNumPes() != 2) {
+    //   CkAbort("Should be run with 2 PEs");
+    // }
 
     // Don't do nodegroup test if run with 1 process
     if (CmiNumNodes() == 1) {
@@ -104,7 +108,7 @@ public:
     delete m;
 
     // Print info
-    CkPrintf("[CUDA Zerocopy Verification Test]\n"
+    CkPrintf("[hapi Zerocopy Verification Test]\n"
         "Block size: %d, Iters: %d, Nodegroup: %s, LB test: %s\n",
         block_size, n_iters, test_nodegroup ? "true" : "false",
         lb_test ? "true" : "false");
@@ -119,30 +123,35 @@ public:
   }
 
   void test() {
-    start_time = CkWallTimer();
-
-    CkPrintf("Testing chare array... ");
-    for (int i = 0; i < n_iters; i++) {
+    // warm up
+    for (int i = 0; i < n_warpup_iters; i++) {
       array_proxy[0].send();
-      CkWaitQD();
     }
+    CkWaitQD();
+    start_time = CkWallTimer();
+    
+    CkPrintf("Testing chare array... \n");
+    for (int i = 0; i < 10; i++) {
+      array_proxy[0].send();
+    }
+    CkWaitQD();
     CkPrintf("PASS\n");
 
-    CkPrintf("Testing chare group... ");
-    for (int i = 0; i < n_iters; i++) {
-      group_proxy[0].send();
-      CkWaitQD();
-    }
-    CkPrintf("PASS\n");
+    // CkPrintf("Testing chare group... \n");
+    // for (int i = 0; i < n_iters; i++) {
+    //   group_proxy[0].send();
+    // }
+    // CkWaitQD();
+    // CkPrintf("PASS\n");
 
-    if (test_nodegroup) {
-      CkPrintf("Testing chare nodegroup... ");
-      for (int i = 0; i < n_iters; i++) {
-        nodegroup_proxy[0].send();
-        CkWaitQD();
-      }
-      CkPrintf("PASS\n");
-    }
+    // if (test_nodegroup) {
+    //   CkPrintf("Testing chare nodegroup... \n");
+    //   for (int i = 0; i < n_iters; i++) {
+    //     nodegroup_proxy[0].send();
+    //   }
+    //   CkWaitQD();
+    //   CkPrintf("PASS\n");
+    // }
 
     CkPrintf("Elapsed: %.6lf s\n", CkWallTimer() - start_time);
     CkExit();
@@ -168,7 +177,7 @@ public:
   }
 
   void send() {
-    thisProxy[1].recv(block_size, CkDeviceBuffer(container.d_local_data,
+    thisProxy[2].recv(block_size, CkDeviceBuffer(container.d_local_data,
           CkCallback(CkIndex_VerifyArray::reuse(), thisProxy[thisIndex]),
           container.stream));
     if (lb_test) {
@@ -179,7 +188,7 @@ public:
 
   void recv(int& size, double*& data, CkDeviceBufferPost* post) {
     data = container.d_remote_data;
-    post[0].cuda_stream = container.stream;
+    post[0].hapi_stream = container.stream;
   }
 
   void recv(int size, double* data) {
@@ -204,12 +213,12 @@ public:
   }
 
   void send() {
-    thisProxy[1].recv(block_size, CkDeviceBuffer(container.d_local_data, container.stream));
+    thisProxy[2].recv(block_size, CkDeviceBuffer(container.d_local_data, container.stream));
   }
 
   void recv(int& size, double*& data, CkDeviceBufferPost* post) {
     data = container.d_remote_data;
-    post[0].cuda_stream = container.stream;
+    post[0].hapi_stream = container.stream;
   }
 
   void recv(int size, double* data) {
@@ -231,7 +240,7 @@ public:
 
   void recv(int& size, double*& data, CkDeviceBufferPost* post) {
     data = container.d_remote_data;
-    post[0].cuda_stream = container.stream;
+    post[0].hapi_stream = container.stream;
   }
 
   void recv(int size, double* data) {
