@@ -38,10 +38,10 @@ AMPI_CUSTOM_FUNC(hapiStream_t, hapiGetStream, void)
 AMPI_CUSTOM_FUNC(void, hapiAddCallback, hapiStream_t, void*, void*)
 
 // Thin wrappers for memory related CUDA API calls.
-AMPI_CUSTOM_FUNC(cudaError_t, hapiMalloc, void**, size_t)
-AMPI_CUSTOM_FUNC(cudaError_t, hapiFree, void*)
-AMPI_CUSTOM_FUNC(cudaError_t, hapiMallocHost, void**, size_t)
-AMPI_CUSTOM_FUNC(cudaError_t, hapiFreeHost, void*)
+// AMPI_CUSTOM_FUNC(cudaError_t, hapiMalloc, void**, size_t)
+// AMPI_CUSTOM_FUNC(cudaError_t, hapiFree, void*)
+// AMPI_CUSTOM_FUNC(cudaError_t, hapiMallocHost, void**, size_t)
+// AMPI_CUSTOM_FUNC(cudaError_t, hapiFreeHost, void*)
 AMPI_CUSTOM_FUNC(cudaError_t, hapiMemcpyAsync, void*, const void*, size_t, enum cudaMemcpyKind, cudaStream_t)
 AMPI_CUSTOM_FUNC(cudaError_t, hapiMemcpy2DAsync, void*, size_t, const void*, size_t, size_t, size_t, enum cudaMemcpyKind, cudaStream_t)
 

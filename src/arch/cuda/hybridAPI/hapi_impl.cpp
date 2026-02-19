@@ -593,7 +593,7 @@ static void hapiMapping(char** argv) {
 }
 
 #ifndef HAPI_CUDA_CALLBACK
-void recordEvent(hapiStream_t stream, const CkCallback& cb, void* cb_msg, hapiWorkRequest* wr = NULL) {
+void recordEvent(cudaStream_t stream, const CkCallback& cb, void* cb_msg, hapiWorkRequest* wr = NULL, CkMigratable* obj = NULL, cudaEvent_t start_ev = NULL) {
   // create CUDA event / get CUDA event from the pool and insert into stream
   hapiEvent_t ev;
   auto& hapi_event_pool_local = CpvAccess(hapi_event_pool);
@@ -1713,29 +1713,11 @@ void hapiSendMemoryRequest(char* msg, int size)
     close(server_fd);
 }
 
-cudaError_t hapiMalloc(void** devPtr, size_t size) {
-  return cudaMalloc(devPtr, size);
-}
 
-cudaError_t hapiFree(void* devPtr) {
-  return cudaFree(devPtr);
-}
-
-cudaError_t hapiMallocHost(void** ptr, size_t size) {
-  return cudaMallocHost(ptr, size);
-  //*ptr = malloc(size);
-  //return cudaSuccess;
-}
-
-cudaError_t hapiFreeHost(void* ptr) {
-  //free(ptr);
-  return cudaFreeHost(ptr);
-}
-
-cudaError_t hapiMemcpyAsync(void* dst, const void* src, size_t count, cudaMemcpyKind kind, cudaStream_t stream = 0) {
-  cudaError_t err;
+hapiError_t hapiMemcpyAsync(void* dst, const void* src, size_t count, cudaMemcpyKind kind, cudaStream_t stream = 0) {
+  hapiError_t err;
 #if CMK_LBDB_ON
-  cudaEvent_t start;
+  hapiEvent_t start;
 
   cudaEventCreate(&start);
   cudaEventRecord(start, stream);

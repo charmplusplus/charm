@@ -704,9 +704,6 @@ if(BUILD_CUDA OR BUILD_HIP)
       set(CUDA_DIR "${CUDA_TOOLKIT_ROOT_DIR}")
     endif()
     add_library(hybridapi ${hybridAPI-cxx-sources} $<TARGET_OBJECTS:ckrescale> $<TARGET_OBJECTS:converse>)
-  
-  add_executable(hapi_memory_daemon src/arch/cuda/hybridAPI/hapi_memory_daemon.cpp)
-  add_dependencies(hapi_memory_daemon cudahybridapi ck converse ckqt moduleNDMeshStreamer ckmain memory-default threads-default ldb-rand modulecompletion conv-static)
 
     if(TRACING)
       target_compile_definitions(hybridapi PRIVATE HAPI_TRACE)
@@ -755,14 +752,17 @@ if(BUILD_CUDA OR BUILD_HIP)
     add_library(hybridapi ${hybridAPI-cxx-sources})
     target_include_directories(hybridapi PRIVATE "${ROCM_PATH}/include")
 
-    add_executable(hapi_memory_daemon src/arch/cuda/hybridAPI/hapi_memory_daemon.cpp)
-    add_dependencies(hapi_memory_daemon cudahybridapi ck converse ckqt moduleNDMeshStreamer ckmain memory-default threads-default ldb-rand modulecompletion conv-static)
-
-
     if(TRACING)
       target_compile_definitions(hybridapi PRIVATE HAPI_TRACE)
     endif()
   endif()
+
+  # hapi_memory_daemon - standalone executable for shrink/expand GPU memory management
+  if(BUILD_CUDA)
+    add_executable(hapi_memory_daemon src/arch/cuda/hybridAPI/hapi_memory_daemon.cpp)
+    add_dependencies(hapi_memory_daemon hybridapi ck converse ckqt moduleNDMeshStreamer ckmain memory-default threads-default ldb-rand modulecompletion conv-static)
+  endif()
+
 endif()
 
 if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-cxi.sh)

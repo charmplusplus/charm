@@ -10,7 +10,6 @@ HAPICC = nvcc
 HAPICC_FLAGS = -c -std=c++11
 HAPICC_INC = -I$(HAPITOOLKIT_HOME)/include
 HAPICC_LIB = -L$(HAPITOOLKIT_HOME)/lib
-CHARM_INC = -I/u/ajain18/charm/mpi-linux-x86_64-smp-cuda/include
 
 LD_LIBS = -module EveryLB
 

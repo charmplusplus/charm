@@ -3101,7 +3101,7 @@ void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char* &data, CkDeviceBuffer
   //CkPrintf("PE %d allocating GPU memory size %d for id %llu\n", CkMyPe(), size, id);
   cudaMalloc(&data, size);
   receivedDeviceMsgs[id] = data;
-  post[0].cuda_stream = (cudaStream_t) 0;
+  post[0].hapi_stream = (cudaStream_t) 0;
 }
 
 void CkLocMgr::immigrateGPU(CmiUInt8 id, int size, char* data)

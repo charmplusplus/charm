@@ -7,14 +7,14 @@ FLAGS     := $(OPTSATBUILDTIME)
 INC       := -I$(CUDA_PATH)/include -I..
 
 all: libs
-	cp libcudahybridapi.a $(CHARMDIR)/lib
+	cp libhybridapi.a $(CHARMDIR)/lib
 
-libs: libcudahybridapi.a
+libs: libhybridapi.a
 
-install: libcudahybridapi.a
-	cp libcudahybridapi.a $(CHARMDIR)/lib
+install: libhybridapi.a
+	cp libhybridapi.a $(CHARMDIR)/lib
 
-libcudahybridapi.a: hybridapi.o buddy_allocator.o ck.o
+libhybridapi.a: hybridapi.o buddy_allocator.o ck.o
 	-rm -f $@
 	ar q $@ hybridapi.o buddy_allocator.o ck.o
 

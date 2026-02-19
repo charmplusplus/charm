@@ -16,6 +16,8 @@
 #define hapiSetDevice(dev) cudaSetDevice(dev)
 
 #define hapiPeekAtLastError cudaPeekAtLastError
+#define hapiEventDefault cudaEventDefault
+#define hapiEventDisableTiming cudaEventDisableTiming
 
 #define hapiGetDeviceCount(devCount) cudaGetDeviceCount(devCount)
 
@@ -80,8 +82,6 @@
 #define hapiMemcpyDeviceToHost cudaMemcpyDeviceToHost
 #define hapiMemcpyDeviceToDevice cudaMemcpyDeviceToDevice
 #define hapiMemcpy(dst, src, count, kind) cudaMemcpy(dst, src, count, kind)
-#define hapiMemcpyAsync(dst, src, count, kind, stream) \
-    cudaMemcpyAsync(dst, src, count, kind, stream)
 
 #define hapiGetErrorString(err) cudaGetErrorString(err)
 
@@ -163,8 +163,6 @@
 #define hapiMemcpyDeviceToHost hipMemcpyDeviceToHost
 #define hapiMemcpyDeviceToDevice hipMemcpyDeviceToDevice
 #define hapiMemcpy(dst, src, count, kind) hipMemcpy(dst, src, count, kind)
-#define hapiMemcpyAsync(dst, src, count, kind, stream) \
-    hipMemcpyAsync(dst, src, count, kind, stream)
 #define hapiGetErrorString(err) hipGetErrorString(err)
 
 #define hapiEventDisableTiming hipEventDisableTiming
