@@ -370,7 +370,7 @@ int main() {
 }
 " CMK_BALANCED_INJECTION_API)
 
-if(${NETWORK} STREQUAL "ofi" OR ${NETWORK} STREQUAL "ofi-crayshasta" OR ${NETWORK} STREQUAL "ofi-linux")
+if(${NETWORK} MATCHES "^ofi" OR ${NETWORK} MATCHES "ofi-crayshasta" OR ${NETWORK} MATCHES "ofi-linux")
 # assume HPC installation
 include(CMakePrintHelpers)
   find_package(EnvModules REQUIRED)

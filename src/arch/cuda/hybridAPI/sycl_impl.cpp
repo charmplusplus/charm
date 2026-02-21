@@ -90,7 +90,8 @@ int hapiIpcGetEventHandle(hapiIpcEventHandle_t* handle, hapiEvent_t event) {
 int hapiIpcOpenMemHandle(void** ptr, hapiIpcMemHandle_t handle, int flags) {
     ze_context_handle_t hCtx = sycl::get_native<sycl::backend::ext_oneapi_level_zero>(CsvAccess(gpu_manager).ctx);
     ze_device_handle_t hDev = sycl::get_native<sycl::backend::ext_oneapi_level_zero>(CsvAccess(gpu_manager).dev);
-    return zeMemOpenIpcHandle(hCtx, hDev, (handle).ze_handle, flags, ptr);
+    // Level Zero uses ze_ipc_memory_flags_t (0 = default); CUDA-style flags are not applicable
+    return zeMemOpenIpcHandle(hCtx, hDev, (handle).ze_handle, 0, ptr);
 }
 
 int hapiGetDevice(int* dev) {
@@ -154,6 +155,8 @@ int hapiMemcpyAsync(void* dst, const void* src, size_t size, hapiMemcpyKind kind
 int hapiEventCreateWithFlags(hapiEvent_t* event, unsigned int flags) {
     *event = new hapiEventStruct();
     (*event)->flag = flags;
+    (*event)->native_event = nullptr;
+    (*event)->native_pool = nullptr;
     
     if (flags & hapiEventInterprocess) {
         GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
@@ -168,6 +171,11 @@ int hapiEventCreateWithFlags(hapiEvent_t* event, unsigned int flags) {
         ze_event_desc_t eventDesc = {ZE_STRUCTURE_TYPE_EVENT_DESC, nullptr, 0, 0, 0};
         ze_event_handle_t hEvent;
         zeEventCreate(hPool, &eventDesc, &hEvent);
+
+        // Store native handles for signaling/querying and cleanup
+        (*event)->native_event = hEvent;
+        (*event)->native_pool = hPool;
+
         sycl::backend_input_t<sycl::backend::ext_oneapi_level_zero, sycl::event> eventInteropInput = {
             hEvent,             // The native Level Zero event handle
             sycl::ext::oneapi::level_zero::ownership::keep // SYCL will not destroy the native handle
@@ -179,20 +187,44 @@ int hapiEventCreateWithFlags(hapiEvent_t* event, unsigned int flags) {
 }
 
 int hapiEventRecord(hapiEvent_t event, hapiStream_t stream) {
-    event->ev = stream->ext_oneapi_submit_barrier();
+    if (event->flag & hapiEventInterprocess) {
+        // For IPC events, we must signal the native Level Zero event to make it
+        // visible across processes. Submit a host task that signals the native
+        // event after all preceding work on this stream completes.
+        ze_event_handle_t hEvent = event->native_event;
+        stream->submit([=](sycl::handler& cgh) {
+            cgh.host_task([=]() {
+                zeEventHostSignal(hEvent);
+            });
+        });
+    } else {
+        event->ev = stream->ext_oneapi_submit_barrier();
+    }
     return hapiSuccess;
 }
 
 int hapiEventQuery(hapiEvent_t event) {
-    auto status = event->ev.get_info<sycl::info::event::command_execution_status>();
-    if (status == sycl::info::event_command_status::complete) {
-        return hapiSuccess;
+    if (event->flag & hapiEventInterprocess) {
+        // For IPC events, query the native Level Zero event directly
+        ze_result_t result = zeEventQueryStatus(event->native_event);
+        return (result == ZE_RESULT_SUCCESS) ? hapiSuccess : hapiErrorNotReady;
     } else {
-        return hapiErrorNotReady;
+        auto status = event->ev.get_info<sycl::info::event::command_execution_status>();
+        if (status == sycl::info::event_command_status::complete) {
+            return hapiSuccess;
+        } else {
+            return hapiErrorNotReady;
+        }
     }
 }
 
 int hapiEventDestroy(hapiEvent_t event) {
+    if (event->native_event != nullptr) {
+        zeEventDestroy(event->native_event);
+    }
+    if (event->native_pool != nullptr) {
+        zeEventPoolDestroy(event->native_pool);
+    }
     delete event;
     return hapiSuccess;
 }
@@ -242,6 +274,8 @@ int hapiIpcOpenEventHandle(hapiEvent_t* event, hapiIpcEventHandle_t handle) {
     zeEventCreate(hPool, &eventDesc, &hEvent);
 
     *event = new hapiEventStruct();
+    (*event)->native_event = hEvent;
+    (*event)->native_pool = hPool;
     sycl::backend_input_t<sycl::backend::ext_oneapi_level_zero, sycl::event> eventInteropInput = {
         hEvent,             // The native Level Zero event handle
         sycl::ext::oneapi::level_zero::ownership::keep // SYCL will not destroy the native handle
@@ -266,9 +300,8 @@ int hapiGetDeviceCount(int* count) {
 }
 
 int hapiIpcCloseMemHandle(void* handle) {
-    // No explicit close needed for SYCL IPC memory handles, 
-    // but we can implement any necessary cleanup here if required in the future
-    return hapiSuccess;
+    ze_context_handle_t hCtx = sycl::get_native<sycl::backend::ext_oneapi_level_zero>(CsvAccess(gpu_manager).ctx);
+    return zeMemCloseIpcHandle(hCtx, handle);
 }
 
 int hapiDeviceEnablePeerAccess(int dev, int flags) {

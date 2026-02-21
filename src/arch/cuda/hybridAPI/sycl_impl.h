@@ -40,6 +40,8 @@
 typedef struct hapiEventStruct {
     sycl::event ev;
     int flag;
+    ze_event_handle_t native_event;       // Level Zero event handle (for IPC events)
+    ze_event_pool_handle_t native_pool;   // Level Zero event pool handle (for IPC events)
 }* hapiEvent_t;
 
 // IPC Handles - Level Zero based
