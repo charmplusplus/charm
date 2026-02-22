@@ -11,10 +11,12 @@ CmiNcpyModeDevice findTransferModeDevice(int srcPe, int dstPe) {
   if (CmiNodeOf(srcPe) == CmiNodeOf(dstPe)) {
     // Same logical node
     return CmiNcpyModeDevice::MEMCPY;
-  } else if (CmiPeOnSamePhysicalNode(srcPe, dstPe)) {
-    // Different logical nodes, same physical node
-    return CmiNcpyModeDevice::IPC;
-  } else {
+  } 
+  // else if (CmiPeOnSamePhysicalNode(srcPe, dstPe)) {
+  //   // Different logical nodes, same physical node
+  //   return CmiNcpyModeDevice::IPC;
+  // } 
+  else {
     // Different physical nodes, requires GPUDirect RDMA
     return CmiNcpyModeDevice::RDMA;
   }
