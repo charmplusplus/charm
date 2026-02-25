@@ -198,7 +198,13 @@ int hapiEventRecord(hapiEvent_t event, hapiStream_t stream) {
             });
         });
     } else {
-        event->ev = stream->ext_oneapi_get_last_event();
+        auto last = stream->ext_oneapi_get_last_event();
+        if (last.has_value()) {
+            event->ev = last.value();
+        } else {
+            // No prior commands in queue; fall back to barrier
+            event->ev = stream->ext_oneapi_submit_barrier();
+        }
     }
     return hapiSuccess;
 }
