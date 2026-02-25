@@ -198,7 +198,7 @@ int hapiEventRecord(hapiEvent_t event, hapiStream_t stream) {
             });
         });
     } else {
-        event->ev = stream->ext_oneapi_submit_barrier();
+        event->ev = stream->ext_oneapi_get_last_event();
     }
     return hapiSuccess;
 }
