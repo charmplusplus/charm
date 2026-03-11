@@ -52,10 +52,10 @@ public:
   Main(CkArgMsg* m) {
     // Set default values
     main_proxy = thisProxy;
-    grid_width = 8192;
-    grid_height = 8192;
-    block_width = 2048;
-    block_height = 2048;
+    grid_width = 16384;
+    grid_height = 16384;
+    block_width = 4096;
+    block_height = 4096;
     n_iters = 100;
     warmup_iters = 10;
     use_zerocopy = false;
@@ -189,6 +189,7 @@ class Block : public CBase_Block {
  public:
   int my_iter;
   int neighbors;
+  int send_done_idx;
   int remote_count;
   int x, y;
 
@@ -207,6 +208,8 @@ class Block : public CBase_Block {
   DataType* __restrict__ d_send_bottom_ghost;
   DataType* __restrict__ d_recv_left_ghost;
   DataType* __restrict__ d_recv_right_ghost;
+  DataType* __restrict__ d_recv_top_ghost;
+  DataType* __restrict__ d_recv_bottom_ghost;
 
   cudaStream_t compute_stream;
   cudaStream_t comm_stream;
@@ -218,9 +221,11 @@ class Block : public CBase_Block {
 
   Block() {
     usesAtSync = true;
-  }
+	  ckout<<"["<<thisIndex.x<<","<<thisIndex.y<<"]"<<CkMyPe()<<endl;  
+}
 
   Block(CkMigrateMessage* m) {
+    ckout<<"["<<thisIndex.x<<","<<thisIndex.y<<"]"<<CkMyPe()<<endl;   
     usesAtSync = true;
     hapiCheck(cudaStreamCreateWithPriority(&compute_stream, cudaStreamDefault, 0));
     hapiCheck(cudaStreamCreateWithPriority(&comm_stream, cudaStreamDefault, -1));
@@ -249,6 +254,8 @@ class Block : public CBase_Block {
       hapiCheck(cudaFree(d_send_bottom_ghost));
       hapiCheck(cudaFree(d_recv_left_ghost));
       hapiCheck(cudaFree(d_recv_right_ghost));
+      hapiCheck(cudaFree(d_recv_top_ghost));
+      hapiCheck(cudaFree(d_recv_bottom_ghost));
     }
 
     hapiCheck(cudaStreamDestroy(compute_stream));
@@ -290,6 +297,8 @@ class Block : public CBase_Block {
         hapiCheck(hapiMalloc((void**)&d_send_bottom_ghost, sizeof(DataType) * block_width));
         hapiCheck(hapiMalloc((void**)&d_recv_left_ghost, sizeof(DataType) * block_height));
         hapiCheck(hapiMalloc((void**)&d_recv_right_ghost, sizeof(DataType) * block_height));
+        hapiCheck(hapiMalloc((void**)&d_recv_top_ghost, sizeof(DataType) * block_width));
+        hapiCheck(hapiMalloc((void**)&d_recv_bottom_ghost, sizeof(DataType) * block_width));
       }
     }
       
@@ -348,6 +357,8 @@ class Block : public CBase_Block {
       hapiCheck(hapiMalloc((void**)&d_send_bottom_ghost, sizeof(DataType) * block_width));
       hapiCheck(hapiMalloc((void**)&d_recv_left_ghost, sizeof(DataType) * block_height));
       hapiCheck(hapiMalloc((void**)&d_recv_right_ghost, sizeof(DataType) * block_height));
+      hapiCheck(hapiMalloc((void**)&d_recv_top_ghost, sizeof(DataType) * block_width));
+      hapiCheck(hapiMalloc((void**)&d_recv_bottom_ghost, sizeof(DataType) * block_width));
     }
 
     hapiCheck(cudaStreamCreateWithPriority(&compute_stream, cudaStreamDefault, 0));
@@ -381,10 +392,11 @@ class Block : public CBase_Block {
   }
 
   void iterate() {
-    if (my_iter != 0 && my_iter % 100 == 0) {
+    if (my_iter != 0 && my_iter % 10 == 0) {
       cudaStreamSynchronize(comm_stream);
       cudaStreamSynchronize(compute_stream);
       AtSync();
+      ckout<<"called at sync"<<endl;
     } else {
       thisProxy[thisIndex].exchangeGhosts();
     }
@@ -498,16 +510,16 @@ class Block : public CBase_Block {
     if (use_zerocopy) {
       if (!left_bound)
         thisProxy(x - 1, y).receiveGhostsZC(my_iter, RIGHT, block_height,
-            CkDeviceBuffer(d_send_left_ghost, comm_stream));
+            CkDeviceBuffer(d_send_left_ghost,CkCallback(CkIndex_Block::d_send_left_ghost_done(), thisProxy[thisIndex]), comm_stream));
       if (!right_bound)
         thisProxy(x + 1, y).receiveGhostsZC(my_iter, LEFT, block_height,
-            CkDeviceBuffer(d_send_right_ghost, comm_stream));
+            CkDeviceBuffer(d_send_right_ghost,  CkCallback(CkIndex_Block::d_send_right_ghost_done(), thisProxy[thisIndex]), comm_stream));
       if (!top_bound)
         thisProxy(x, y - 1).receiveGhostsZC(my_iter, BOTTOM, block_width,
-            CkDeviceBuffer(d_send_top_ghost, comm_stream));
+            CkDeviceBuffer(d_send_top_ghost, CkCallback(CkIndex_Block::d_send_top_ghost_done(), thisProxy[thisIndex]), comm_stream));
       if (!bottom_bound)
         thisProxy(x, y + 1).receiveGhostsZC(my_iter, TOP, block_width,
-            CkDeviceBuffer(d_send_bottom_ghost, comm_stream));
+            CkDeviceBuffer(d_send_bottom_ghost,CkCallback(CkIndex_Block::d_send_bottom_ghost_done(), thisProxy[thisIndex]), comm_stream));
     } else {
       if (!left_bound)
         thisProxy(x - 1, y).receiveGhostsReg(my_iter, RIGHT, block_height, h_left_ghost);
@@ -531,10 +543,10 @@ class Block : public CBase_Block {
         buf = d_recv_right_ghost;
         break;
       case TOP:
-        buf = d_temperature + 1;
+        buf = d_recv_top_ghost;
         break;
       case BOTTOM:
-        buf = d_temperature + (block_width + 2) * (block_height + 1) + 1;
+        buf = d_recv_bottom_ghost;
         break;
       default:
         CkAbort("Error: invalid direction");
@@ -557,7 +569,12 @@ class Block : public CBase_Block {
             block_height, comm_stream);
         break;
       case TOP:
+          hapiCheck(cudaMemcpyAsync(d_temperature + 1, d_recv_top_ghost,
+              block_width * sizeof(DataType), cudaMemcpyDeviceToDevice, comm_stream));
+          break;
       case BOTTOM:
+          hapiCheck(cudaMemcpyAsync(d_temperature + (block_width + 2) * (block_height + 1) + 1,
+              d_recv_bottom_ghost, block_width * sizeof(DataType), cudaMemcpyDeviceToDevice, comm_stream));
         break;
       default:
         CkAbort("Error: invalid direction");

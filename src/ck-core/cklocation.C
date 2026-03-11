@@ -91,7 +91,14 @@ void UpdateLocation(MigrateInfo& migData)
 
   CkLocMgr* localLocMgr = (CkLocMgr*)CkLocalBranch(locMgrGid);
   // CkLocMgr only uses element IDs, so extract just that part from the ObjID
-  localLocMgr->updateLocation(ck::ObjID(migData.obj.id).getElementID(), migData.to_pe);
+  CmiUInt8 id = migData.obj.id;  // full ObjID
+  CkArrayIndex idx = localLocMgr->lookupIdx(id);
+  CkLocEntry entry;
+  entry.id = id;
+  entry.pe = migData.to_pe;
+  CkPrintf("[%d] UpdateLocation: obj id=%llu from_pe=%d to_pe=%d\n",
+           CkMyPe(), entry.id, migData.from_pe, entry.pe);
+  localLocMgr->updateLocation(idx, entry);
 }
 #  endif
 
@@ -3074,7 +3081,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 #endif
 
 #if !CMK_LBDB_ON && CMK_GLOBAL_LOCATION_UPDATE
-  DEBM((AA "Global location update. idx %s "
+  CmiPrintf((AA "Global location update. idx %s "
            "assigned to %d \n" AB,
         idx2str(idx), toPe));
   thisProxy.updateLocation(id, toPe);

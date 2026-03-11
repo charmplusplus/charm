@@ -37,6 +37,11 @@ mainmodule jacobi2d {
     entry void packGhostsDone();
     entry void receiveGhostsZC(int ref, int dir, int w, nocopydevice DataType gh[w]);
     entry void receiveGhostsReg(int ref, int dir, int w, DataType gh[w]);
+    entry void d_send_left_ghost_done();
+    entry void d_send_right_ghost_done();
+    entry void d_send_top_ghost_done();
+    entry void d_send_bottom_ghost_done();
+
     entry void iterate();
 
     entry void exchangeGhosts() {
@@ -67,6 +72,23 @@ mainmodule jacobi2d {
             serial {
               processGhostsReg(dir, w, buf);
             }
+          }
+        }
+      }
+
+      for (send_done_idx = 0; send_done_idx < 1; send_done_idx++) {
+        if (!sync_ver) {
+          if(!left_bound) {
+            when d_send_left_ghost_done() {}
+          }
+          if(!right_bound) {
+            when d_send_right_ghost_done() {}
+          }
+          if(!top_bound) {
+            when d_send_top_ghost_done() {}
+          }
+          if(!bottom_bound) {
+            when d_send_bottom_ghost_done() {}
           }
         }
       }
