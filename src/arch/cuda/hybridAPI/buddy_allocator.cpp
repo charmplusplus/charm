@@ -177,5 +177,6 @@ namespace buddy {
     }
 
 merge_done:
+    ;
   }
 }

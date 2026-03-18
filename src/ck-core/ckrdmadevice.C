@@ -276,7 +276,10 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     // Machine layer does not support GPU-aware communication
     // Check if destination PE is correct
     // TODO: Handle this case instead of aborting
+    // Chare* obj = CkActiveObj();
+    // CmiUInt8 id = obj->id; 
     if (source.dest_pe != CkMyPe()) {
+      CmiPrintf("Current PE %d does not match the destination PE %d and sender determined to be %d\n", CkMyPe(), source.dest_pe, env->getSrcPe());
       CkAbort("Current PE does not match the destination PE determined by the sender. "
           "Please enable CMK_GLOBAL_LOCATION_UPDATE.");
     }

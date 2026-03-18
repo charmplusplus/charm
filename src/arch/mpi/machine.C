@@ -733,13 +733,18 @@ static void ReleasePostedMessages(void) {
 
                 CmiInvokeNcpyAck(ncpyOpInfo);
             }
-            else if(msg_tmp->type == POST_DIRECT_SEND || msg_tmp->type == POST_DIRECT_RECV || msg_tmp->type == DEVICE_SEND_OP || msg_tmp->type == DEVICE_RECV_OP) {
+            else if(msg_tmp->type == POST_DIRECT_SEND || msg_tmp->type == POST_DIRECT_RECV) {
                 // do nothing as the received message is a NcpyOperationInfo object
                 // which is freed in the above code (either ONESIDED_BUFFER_DIRECT_RECV or
                 // ONESIDED_BUFFER_DIRECT_SEND)
             }
-            else
+            #if CMK_CUDA
+            else if(msg_tmp->type == DEVICE_SEND_OP || msg_tmp->type == DEVICE_RECV_OP) {
+                // TODO: check if we can remove this
+            }
+            #endif
 #endif
+            else
             {
               CmiFree(msg_tmp->msg);
             }
@@ -1501,7 +1506,9 @@ void LrtsExit(int exitcode) {
 #else
       signal(SIGINT, signal_int);
 #endif
+#if CMK_CUDA
       LrtsCleanupRMA();
+#endif
       MPI_Finalize();
 #endif
       // Still want to return control to the user in userDrivenMode

@@ -59,7 +59,7 @@ typedef struct hapiEvent {
   void* cb_msg;
   hapiWorkRequest* wr; // if this is not NULL, buffers and request itself are deallocated
   CkMigratable* obj; // pointer to the object whose load we want to set
-  cudaEvent_t start_ev; // event to record the start time
+  hapiEvent_t start_ev; // event to record the start time
 
   hapiEvent(hapiEvent_t event_, const CkCallback& cb_, void* cb_msg_, hapiWorkRequest* wr_ = NULL, CkMigratable* obj_ = NULL, hapiEvent_t start_ev_ = NULL)
             : event(event_), cb(cb_), cb_msg(cb_msg_), wr(wr_), obj(obj_), start_ev(start_ev_) {}
@@ -1571,6 +1571,7 @@ void hapiPollEvents(void* param) {
       if (hev.obj) {
         float gpu_time;
         cudaEventElapsedTime(&gpu_time, hev.start_ev, hev.event);
+        // CmiPrintf("[%d] adjusting object[%p] GPU time to %lf\n",CkMyPe(), hev.obj, gpu_time + hev.obj->getObjGPUTime());
         hev.obj->setObjGPUTime(gpu_time + hev.obj->getObjGPUTime());
         cudaEventDestroy(hev.start_ev);
       } else 
@@ -1745,20 +1746,6 @@ cudaError_t hapiMemcpy2DAsync(void* dst, size_t dpitch, const void* src, size_t 
   return err;
 }
 
-cudaError_t hapiLaunchKernel(const void* func, dim3 gridDim, dim3 blockDim, void** args, size_t sharedMem, cudaStream_t stream = 0) {
-  cudaError_t err;
-#if CMK_LBDB_ON
-  cudaEvent_t start;
-
-  cudaEventCreate(&start);
-  cudaEventRecord(start, stream);
-#endif
-  err = cudaLaunchKernel(func, gridDim, blockDim, args, sharedMem, stream);
-#if CMK_LBDB_ON
-  hapiRecordTime(stream, start);
-#endif
-  return err;
-}
 
 void hapiErrorDie(cudaError_t retCode, const char* code, const char* file, int line) {
   if (retCode != cudaSuccess) {

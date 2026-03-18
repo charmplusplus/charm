@@ -84,20 +84,19 @@ int _messageBufferingThreshold;
 void UpdateLocation(MigrateInfo& migData)
 {
   CkGroupID locMgrGid = ck::ObjID(migData.obj.id).getCollectionID();
-  if (locMgrGid.idx == 0)
-  {
-    return;
-  }
-
   CkLocMgr* localLocMgr = (CkLocMgr*)CkLocalBranch(locMgrGid);
-  // CkLocMgr only uses element IDs, so extract just that part from the ObjID
-  CmiUInt8 id = migData.obj.id;  // full ObjID
-  CkArrayIndex idx = localLocMgr->lookupIdx(id);
+  CkLocCache *cache = (CkLocCache *)CkLocalBranch(localLocMgr->getLocationCache());
+
+  CmiUInt8 elementID = ck::ObjID(migData.obj.id).getElementID();
+  CkArrayIndex idx = localLocMgr->lookupIdx(elementID);
+
   CkLocEntry entry;
-  entry.id = id;
+  entry.id = elementID;
   entry.pe = migData.to_pe;
-  CkPrintf("[%d] UpdateLocation: obj id=%llu from_pe=%d to_pe=%d\n",
-           CkMyPe(), entry.id, migData.from_pe, entry.pe);
+  entry.epoch = cache->getEpoch(elementID) + 1;
+
+  // CkPrintf("[%d] UpdateLocation: obj id=%llu from_pe=%d to_pe=%d epoch=%d\n",
+  //          CkMyPe(), entry.id, migData.from_pe, entry.pe, entry.epoch);
   localLocMgr->updateLocation(idx, entry);
 }
 #  endif
@@ -2388,8 +2387,10 @@ void CkLocCache::requestLocation(CmiUInt8 id, const int peToTell)
 
 void CkLocCache::updateLocation(const CkLocEntry& newEntry)
 {
+  // CmiPrintf("[%d] updateLocation: id=%llu pe=%d epoch=%d\n", CmiMyPe(), newEntry.id, newEntry.pe, newEntry.epoch);
   CkAssert(newEntry.pe != -1);
   CkLocEntry& oldEntry = locMap[newEntry.id];
+  // CmiPrintf("[%d] updateLocation: oldEntry.epoch=%d\n", CmiMyPe(), oldEntry.epoch);
   if (newEntry.epoch > oldEntry.epoch)
   {
     oldEntry = newEntry;
