@@ -84,6 +84,10 @@ int _messageBufferingThreshold;
 void UpdateLocation(MigrateInfo& migData)
 {
   CkGroupID locMgrGid = ck::ObjID(migData.obj.id).getCollectionID();
+  if (locMgrGid.idx == 0)
+  {
+    return;
+  }
   CkLocMgr* localLocMgr = (CkLocMgr*)CkLocalBranch(locMgrGid);
   CkLocCache *cache = (CkLocCache *)CkLocalBranch(localLocMgr->getLocationCache());
 
