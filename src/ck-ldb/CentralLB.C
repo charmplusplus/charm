@@ -1009,6 +1009,9 @@ void CentralLB::ProcessReceiveMigration()
   future_migrates_expected = 0;
   for(i=0; i < m->n_moves; i++) {
     MigrateInfo& move = m->moves[i];
+    #if CMK_GLOBAL_LOCATION_UPDATE      
+      UpdateLocation(move);
+    #endif
     const int me = CkMyPe();
     if (move.from_pe == me && move.to_pe != me) {
 #if CMK_DRONE_MODE
@@ -1030,12 +1033,6 @@ void CentralLB::ProcessReceiveMigration()
       if (!move.async_arrival) migrates_expected++;
       else future_migrates_expected++;
     }
-    else {
-#if CMK_GLOBAL_LOCATION_UPDATE      
-      UpdateLocation(move); 
-#endif
-    }
-
   }
 
   DEBUGF(("[%d] in ReceiveMigration %d moves expected: %d future expected: %d\n",CkMyPe(),m->n_moves, migrates_expected, future_migrates_expected));
