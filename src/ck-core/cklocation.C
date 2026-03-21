@@ -2801,6 +2801,9 @@ void CkLocMgr::multiHop(CkArrayMessage* msg)
   {  // Send a routing message letting original sender know new element location
     DEBS((AA "Sending update back to %d for element %" PRIu64 "\n" AB, srcPe,
           msg->array_element_id()));
+    #if CMK_GLOBAL_LOCATION_UPDATE
+    CkAssert(false && "Hop-count based location update should not occur with CMK_GLOBAL_LOCATION_UPDATE; all migrations must happen at load balancing steps via AtSync()");
+    #endif
     cache->requestLocation(msg->array_element_id(), srcPe);
   }
 }
