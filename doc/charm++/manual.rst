@@ -3304,8 +3304,6 @@ charm/lib, named as *libcldb-foo.a*, where *foo* is the strategy name
 used above. Now one can use **-balance foo** as compile time option to
 **charmc** to link with the *foo* seed load balancer.
 
-.. _globalupdate
-
 Global Location Update
 ~~~~~~~~~~~~~~~~~~~~~~
 
