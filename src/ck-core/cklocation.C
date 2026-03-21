@@ -88,11 +88,18 @@ void UpdateLocation(MigrateInfo& migData)
   {
     return;
   }
-
   CkLocMgr* localLocMgr = (CkLocMgr*)CkLocalBranch(locMgrGid);
-  // CkLocMgr only uses element IDs, so extract just that part from the ObjID
-  localLocMgr->updateLocation(ck::ObjID(migData.obj.id).getElementID(), migData.to_pe);
-}
+  CkLocCache *cache = (CkLocCache *)CkLocalBranch(localLocMgr->getLocationCache());
+
+  CmiUInt8 elementID = ck::ObjID(migData.obj.id).getElementID();
+  CkArrayIndex idx = localLocMgr->lookupIdx(elementID);
+
+  CkLocEntry entry;
+  entry.id = elementID;
+  entry.pe = migData.to_pe;
+  entry.epoch = cache->getEpoch(elementID) + 1;
+
+  localLocMgr->updateLocation(idx, entry);}
 #  endif
 
 #endif
