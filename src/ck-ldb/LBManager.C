@@ -87,6 +87,7 @@ class LBDBRegistry
   {
     lbtables.emplace_back(name, fn, afn, help, shown);
   }
+  bool hasBalancers() const { return !runtime_lbs.empty() || !compile_lbs.empty(); }
   void addCompiletimeBalancer(const char* name) { compile_lbs.push_back(name); }
   void addRuntimeBalancer(const char* name, const char* legacyLBName = nullptr)
   {
@@ -128,6 +129,11 @@ void LBRegisterBalancer(std::string name, LBCreateFn fn, LBAllocFn afn, std::str
 }
 
 LBAllocFn getLBAllocFn(const char* lbname) { return lbRegistry.getLBAllocFn(lbname); }
+
+bool LBHasBalancersRegistered()
+{
+  return lbRegistry.hasBalancers();
+}
 
 // create a load balancer group using the strategy name
 static void createLoadBalancer(const std::string& lbname, const char* legacybalancer = nullptr)

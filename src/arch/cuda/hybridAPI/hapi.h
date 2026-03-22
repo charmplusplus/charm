@@ -245,6 +245,10 @@ static inline hapiError_t hapiFreeHost_Pool(void* ptr, bool pool) {
 }
 
 void hapiRecordTime(cudaStream_t stream, cudaEvent_t start);
+uint64_t hapiCuptiPushObjCorrelation();
+void hapiCuptiPopObjCorrelation();
+void hapiProcessCuptiBuffers();
+void hapiClearCuptiData();
 
 #ifdef CMK_LBDB_ON
 #define HAPI_LAUNCH_KERNEL_WRAPPER(call, stream)\
@@ -258,6 +262,10 @@ void hapiRecordTime(cudaStream_t stream, cudaEvent_t start);
     call;
 #endif
 
+#define CUPTI_LAUNCH_WRAPPER(call)\
+  hapiCuptiPushObjCorrelation();\
+  call;\
+  hapiCuptiPopObjCorrelation();
 
 #endif /* defined __cplusplus */
 

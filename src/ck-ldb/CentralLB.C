@@ -10,6 +10,13 @@
 #include "envelope.h"
 #include "CentralLB.h"
 #include "LBSimulation.h"
+#if CMK_CUDA
+#include <cupti.h>
+#include "gpumanager.h"
+extern void hapiProcessCuptiBuffers();
+extern void hapiClearCuptiData();
+CsvExtern(GPUManager, gpu_manager);
+#endif
 
 #define  DEBUGF(x)       // CmiPrintf x;
 #define  DEBUG(x)        // x;
@@ -168,6 +175,16 @@ void CentralLB::ProcessAtSync()
   }
 
 
+#if CMK_CUDA
+  if(CmiMyRank()==0)
+  {
+    cuptiActivityFlushAll(0);
+    hapiProcessCuptiBuffers();
+
+    //process and fill in the cupti times
+    lbmgr->SetObjGPULoad(CsvAccess(gpu_manager).cupti_obj_gpu_times_);
+  }
+#endif
   // build message
   BuildStatsMsg();
 
@@ -1141,6 +1158,9 @@ void CentralLB::MigrationDoneImpl (int balancing)
   migrates_expected = -1;
   // clear load stats
   if (balancing) lbmgr->ClearLoads();
+#if CMK_CUDA
+  hapiClearCuptiData();
+#endif
   // Increment to next step
   lbmgr->incStep();
 	DEBUGF(("[%d] Incrementing Step %d \n",CkMyPe(),step()));

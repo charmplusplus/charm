@@ -27,6 +27,21 @@
 #include "hapi_nvtx.h"
 #endif
 
+#if CMK_LBDB_ON
+#include <cupti.h>
+#include "LBManager.h"
+
+#define CUPTI_SAFE_CALL(call)                                              \
+  do {                                                                     \
+    CUptiResult _status = call;                                            \
+    if (_status != CUPTI_SUCCESS) {                                        \
+      const char *errstr;                                                  \
+      cuptiGetResultString(_status, &errstr);                              \
+      CmiPrintf("HAPI CUPTI error: %s at %s:%d\n", errstr, __FILE__, __LINE__); \
+    }                                                          \
+  } while (0)
+#endif
+
 #define SERVER_FIFO_TEMPLATE "/tmp/server_pipe_%ld"
 #define CLIENT_FIFO_TEMPLATE "/tmp/client_pipe_%ld"
 #define BUFFER_SIZE 256
@@ -106,7 +121,7 @@ static inline int CmiMyNodeRankLocal() {
 }
 
 // HAPI internal function declarations
-static void hapiInitCsv();
+static void hapiInitCsv(char** argv);
 static void hapiInitCpv();
 static void hapiExitCsv();
 
@@ -124,6 +139,35 @@ static void shmCleanup();
 static void ipcHandleCreate();
 static void ipcHandleOpen();
 
+#ifdef CMK_LBDB_ON
+static void CUPTIAPI cuptiBufferRequested(uint8_t **buffer, size_t *size, size_t *maxNumRecords) {
+  *size = 64 * 1024;  // 64KB per buffer
+  *buffer = (uint8_t *)malloc(*size);
+  *maxNumRecords = 0;
+}
+
+//TODO: handle SMP mode
+static void CUPTIAPI cuptiBufferCompleted(CUcontext ctx, uint32_t streamId,
+                                          uint8_t *buffer, size_t size, size_t validSize) {
+  GPUManager& gm = CsvAccess(gpu_manager);
+
+  gm.cupti_buffer_queue_.push({buffer, validSize});
+}
+
+// Initialize CUPTI activity tracing — called once per process
+static void hapiCuptiInit() {
+  GPUManager& gm = CsvAccess(gpu_manager);
+  if (gm.cupti_initialized_) return;
+
+  CUPTI_SAFE_CALL(cuptiActivityRegisterCallbacks(cuptiBufferRequested, cuptiBufferCompleted));
+  CUPTI_SAFE_CALL(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_CONCURRENT_KERNEL));
+  CUPTI_SAFE_CALL(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_RUNTIME));
+  CUPTI_SAFE_CALL(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_EXTERNAL_CORRELATION));
+
+  gm.cupti_initialized_ = true;
+}
+#endif
+
 #ifndef HAPI_CUDA_CALLBACK
 #if CSD_NO_SCHEDLOOP
 #  error please disable CSD_NO_SCHEDLOOP to use HAPI
@@ -134,7 +178,7 @@ static void ipcHandleOpen();
 void hapiInit(char** argv) {
   if (!CmiInCommThread()) {
     if (CmiMyRank() == 0) {
-      hapiInitCsv(); // Initialize per-process variables (GPUManager)
+      hapiInitCsv(argv); // Initialize per-process variables (GPUManager)
     }
     hapiInitCpv(); // Initialize per-PE variables
 
@@ -312,11 +356,84 @@ void hapiExit() {
 }
 
 // Initialize per-process variables
-static void hapiInitCsv() {
+static void hapiInitCsv(char** argv) {
   // Create and initialize GPU Manager object
   CsvInitialize(GPUManager, gpu_manager);
   CsvAccess(gpu_manager).init();
+  #if CMK_LBDB_ON
+    if (LBHasBalancersRegistered())
+      hapiCuptiInit();
+  #endif
 }
+
+#ifdef CMK_LBDB_ON
+void hapiProcessCuptiBuffers() {
+  GPUManager& gm = CsvAccess(gpu_manager);
+
+  while (true) {
+    CuptiBufferItem item;
+
+    // Pop one buffer from the queue
+    if (gm.cupti_buffer_queue_.empty()) {
+      break;
+    }
+    item = gm.cupti_buffer_queue_.front();
+    gm.cupti_buffer_queue_.pop();
+
+    // Parse records in this buffer
+    CUpti_Activity *record = NULL;
+    while (cuptiActivityGetNextRecord(item.buffer, item.validSize, &record) == CUPTI_SUCCESS) {
+      if (record->kind == CUPTI_ACTIVITY_KIND_EXTERNAL_CORRELATION) {
+        CUpti_ActivityExternalCorrelation *corr = (CUpti_ActivityExternalCorrelation *)record;
+        if(gm.cupti_correlation_db_.find(corr->correlationId)!=gm.cupti_correlation_db_.end())
+        {
+          //out of order block 
+          uint64_t curr_kernel_time = gm.cupti_correlation_db_[corr->correlationId];
+          gm.cupti_obj_gpu_times_[corr->externalId] += curr_kernel_time;
+        }
+        gm.cupti_correlation_db_[corr->correlationId] = corr->externalId;
+      }
+      else if (record->kind == CUPTI_ACTIVITY_KIND_CONCURRENT_KERNEL ||
+               record->kind == CUPTI_ACTIVITY_KIND_KERNEL) {
+        CUpti_ActivityKernel4 *kernel = (CUpti_ActivityKernel4 *)record;
+        uint64_t duration_ns = kernel->end - kernel->start;
+
+        auto it = gm.cupti_correlation_db_.find(kernel->correlationId);
+        if (it != gm.cupti_correlation_db_.end()) {
+          uint64_t obj_id = it->second;
+          gm.cupti_obj_gpu_times_[obj_id] += duration_ns;
+          // gm.cupti_obj_gpu_times_[obj_id].kernel_count++;
+        }
+        else 
+        {
+          gm.cupti_correlation_db_[kernel->correlationId] = duration_ns;
+        }
+      }
+    }
+
+    free(item.buffer);
+  }
+
+  // DEBUG: print CUPTI obj-gpu-time map summary
+  if (!gm.cupti_obj_gpu_times_.empty()) {
+    CkPrintf("[PE %d] CUPTI: %zu objects with GPU times:\n", CmiMyPe(), gm.cupti_obj_gpu_times_.size());
+    for (auto& kv : gm.cupti_obj_gpu_times_)
+      CkPrintf("[PE %d]   objID=%lu  gpu_ns=%lu (%.6f s)\n", CmiMyPe(), kv.first, kv.second, kv.second / 1.0e9);
+  } else {
+    CkPrintf("[PE %d] CUPTI: no obj GPU times recorded (map empty)\n", CmiMyPe());
+  }
+}
+
+//TODO: safely handle SMP mode
+void hapiClearCuptiData() {
+  GPUManager& gm = CsvAccess(gpu_manager);
+
+  gm.cupti_obj_gpu_times_.clear();
+  gm.cupti_correlation_db_.clear();
+}
+
+#endif
+
 
 // Initialize per-PE variables
 static void hapiInitCpv() {
@@ -1571,8 +1688,9 @@ void hapiPollEvents(void* param) {
       if (hev.obj) {
         float gpu_time;
         cudaEventElapsedTime(&gpu_time, hev.start_ev, hev.event);
-        // CmiPrintf("[%d] adjusting object[%p] GPU time to %lf\n",CkMyPe(), hev.obj, gpu_time + hev.obj->getObjGPUTime());
-        hev.obj->setObjGPUTime(gpu_time + hev.obj->getObjGPUTime());
+        // cudaEventElapsedTime returns ms, convert to seconds to match wallTime units
+        double gpu_time_s = gpu_time / 1000.0;
+        hev.obj->setObjGPUTime(gpu_time_s + hev.obj->getObjGPUTime());
         cudaEventDestroy(hev.start_ev);
       } else 
 #endif        
@@ -1649,6 +1767,35 @@ void hapiRecordTime(cudaStream_t stream, cudaEvent_t start) {
   }
 }
 #endif
+
+uint64_t hapiCuptiPushObjCorrelation() {
+  if (!CsvAccess(gpu_manager).cupti_initialized_) return 0;
+
+  // Get the active Charm++ object
+  Chare* chare = CkActiveObj();
+  if (!chare) return 0;
+
+  CkMigratable* mig = dynamic_cast<CkMigratable*>(chare);
+  if (!mig) return 0;
+
+  // Use the raw element ID as the external correlation ID
+  // CmiUInt8 is a 64-bit unique object identifier
+  uint64_t obj_id = (uint64_t)mig->ckGetID();
+
+  CUPTI_SAFE_CALL(cuptiActivityPushExternalCorrelationId(
+      CUPTI_EXTERNAL_CORRELATION_KIND_UNKNOWN, obj_id));
+
+  return obj_id;
+}
+
+void hapiCuptiPopObjCorrelation() {
+  if (!CsvAccess(gpu_manager).cupti_initialized_) return;
+
+  uint64_t tag;
+  CUPTI_SAFE_CALL(cuptiActivityPopExternalCorrelationId(
+      CUPTI_EXTERNAL_CORRELATION_KIND_UNKNOWN, &tag));
+}
+
 // Lightweight HAPI, to be invoked after data transfer or kernel execution.
 void hapiAddCallback(hapiStream_t stream, const CkCallback& cb, void* cb_msg) {
 #ifndef HAPI_CUDA_CALLBACK

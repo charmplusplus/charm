@@ -7,6 +7,7 @@
 #define LBMANAGER_H
 
 #include <cassert>
+#include <unordered_map>
 
 #include "LBDatabase.h"
 #include "json_fwd.hpp"
@@ -137,6 +138,7 @@ typedef BaseLB* (*LBAllocFn)();
 void LBDefaultCreate(LBCreateFn f);
 
 void LBRegisterBalancer(std::string, LBCreateFn, LBAllocFn, std::string, bool shown = true);
+bool LBHasBalancersRegistered();
 
 template <typename T>
 void LBRegisterBalancer(std::string name, std::string description, bool shown = true)
@@ -337,6 +339,10 @@ class LBManager : public CBase_LBManager
   {
     lbdb_obj->GetObjGPULoad(h, gputime);
   };
+  void SetObjGPULoad(std::unordered_map<uint64_t, uint64_t> &id_gputimeMap)
+  {
+    lbdb_obj->SetObjGPULoad(id_gputimeMap);
+  }
   void* GetObjUserData(LDObjHandle& h) { return lbdb_obj->GetObjUserData(h); }
   void MetaLBCallLBOnChares() { lbdb_obj->MetaLBCallLBOnChares(); }
   void MetaLBResumeWaitingChares(int lb_period)

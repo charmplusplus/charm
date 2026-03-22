@@ -3,12 +3,14 @@
 
 #include "lbdb.h"
 
+#include "objid.h"
 #include "LBObj.h"
 #include "LBOM.h"
 #include "LBComm.h"
 #include "LBMachineUtil.h"
 
 #include <vector>
+#include <unordered_map>
 
 class CkSyncBarrier;
 
@@ -79,6 +81,31 @@ public:
     LbObj(h)->getGPUTime(&gputime);
   };
 
+  inline void SetObjGPULoad(std::unordered_map<uint64_t, uint64_t> &id_gputimeMap)
+  {
+    int matched = 0;
+    for (int i = 0; i < objs.size(); i++) {
+      if(objs[i].obj == nullptr)
+        continue;
+      // The CUPTI map is keyed by raw element IDs (from CkMigratable::ckGetID()).
+      // The LB database stores IDs with collection bits prepended (when
+      // CMK_GLOBAL_LOCATION_UPDATE is set). Strip collection bits to match.
+      CmiUInt8 lb_id = objs[i].obj->ObjData().objID();
+      CmiUInt8 raw_id = ck::ObjID(lb_id).getElementID();
+      auto it = id_gputimeMap.find(raw_id);
+      if(it==id_gputimeMap.end()) {
+        CkPrintf("[PE %d] SetObjGPULoad: obj %d lb_id=%lu raw_id=%lu NO MATCH\n", CmiMyPe(), i, (unsigned long)lb_id, (unsigned long)raw_id);
+        continue;
+      }
+
+      matched++;
+      CkPrintf("[PE %d] SetObjGPULoad: obj %d id=%lu -> gpuTime=%.6f s\n",
+               CmiMyPe(), i, (unsigned long)it->first, it->second / 1.0e9);
+      objs[i].obj->setGPUTiming(it->second / 1.0e9);
+    }
+    CkPrintf("[PE %d] SetObjGPULoad: %d/%zu objects matched from %zu CUPTI entries\n",
+             CmiMyPe(), matched, objs.size(), id_gputimeMap.size());
+  }
   inline void* GetObjUserData(LDObjHandle &h) {
     return LbObj(h)->getLocalUserData();
   }

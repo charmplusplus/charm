@@ -78,6 +78,15 @@ public:
 #endif
   }
 
+  inline void setGPUTiming(LBRealType gputime)
+  {
+  #if CMK_CUDA
+    data.gpuTime = gputime;
+  #else
+    CmiAbort("LBObj::setGPUTiming called but CMK_CUDA is not set");
+  #endif
+  }
+
   inline LDOMHandle &parentOM() { return data.handle.omhandle; }
   inline const LDObjHandle &GetLDObjHandle() const { return data.handle; }
   inline void SetMigratable(bool mig) { data.migratable = mig; }
