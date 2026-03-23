@@ -88,11 +88,18 @@ void UpdateLocation(MigrateInfo& migData)
   {
     return;
   }
-
   CkLocMgr* localLocMgr = (CkLocMgr*)CkLocalBranch(locMgrGid);
-  // CkLocMgr only uses element IDs, so extract just that part from the ObjID
-  localLocMgr->updateLocation(ck::ObjID(migData.obj.id).getElementID(), migData.to_pe);
-}
+  CkLocCache *cache = (CkLocCache *)CkLocalBranch(localLocMgr->getLocationCache());
+
+  CmiUInt8 elementID = ck::ObjID(migData.obj.id).getElementID();
+  CkArrayIndex idx = localLocMgr->lookupIdx(elementID);
+
+  CkLocEntry entry;
+  entry.id = elementID;
+  entry.pe = migData.to_pe;
+  entry.epoch = cache->getEpoch(elementID) + 1;
+
+  localLocMgr->updateLocation(idx, entry);}
 #  endif
 
 #endif
@@ -2794,6 +2801,9 @@ void CkLocMgr::multiHop(CkArrayMessage* msg)
   {  // Send a routing message letting original sender know new element location
     DEBS((AA "Sending update back to %d for element %" PRIu64 "\n" AB, srcPe,
           msg->array_element_id()));
+    #if CMK_GLOBAL_LOCATION_UPDATE
+    CkAssert(false && "Hop-count based location update should not occur with CMK_GLOBAL_LOCATION_UPDATE; all migrations must happen at load balancing steps via AtSync()");
+    #endif
     cache->requestLocation(msg->array_element_id(), srcPe);
   }
 }

@@ -3304,6 +3304,22 @@ charm/lib, named as *libcldb-foo.a*, where *foo* is the strategy name
 used above. Now one can use **-balance foo** as compile time option to
 **charmc** to link with the *foo* seed load balancer.
 
+Global Location Update
+~~~~~~~~~~~~~~~~~~~~~~
+
+When Charm++ is built with the ``CMK_GLOBAL_LOCATION_UPDATE`` option(``-DCMK_GLOBAL_LOCATION_UPDATE=1``), the
+runtime broadcasts updated object locations to all processors during each load
+balancing step. This eliminates the need for hop-count-based location discovery
+after migrations.
+
+.. important::
+
+   With ``CMK_GLOBAL_LOCATION_UPDATE`` enabled, **object migrations must
+   occur during global load balancing steps**. Anytime migration (e.g., via
+   ``migrateMe()``) is not supported in this mode. Applications must use the
+   ``AtSync()`` method to trigger load balancing.
+
+
 .. _lbexample:
 
 Simple Load Balancer Usage Example - Automatic with Sync LB
