@@ -137,6 +137,10 @@ foreach(filename ${ck-h-sources} ${ldb-h-sources})
 endforeach()
 
 target_include_directories(ck PRIVATE . ../ck-ldb ../ck-perf ../ck-cp ../util/topomanager ../conv-perf)
+if(BUILD_CUDA AND CUPTI_LIBRARY)
+  target_include_directories(ck PRIVATE "${CUDA_DIR}/extras/CUPTI/include")
+  target_link_libraries(ck ${CUPTI_LIBRARY})
+endif()
 target_include_directories(ckmain PRIVATE . ../ck-ldb ../ck-perf ../ck-cp ../util/topomanager)
 
 # Fortran interface

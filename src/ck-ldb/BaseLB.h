@@ -53,9 +53,15 @@ public:
     // double utilization;
     int pe;			// processor id
     bool available;
+#if CMK_CUDA
+    int gpu_device_id;		// GPU device this PE is mapped to (-1 = no GPU)
+#endif
     ProcStats(): n_objs(0), pe_speed(1), total_walltime(0.0), idletime(0.0),
 #if CMK_LB_CPUTIMER
 		 total_cputime(0.0), bg_cputime(0.0),
+#endif
+#if CMK_CUDA
+	   	 gpu_device_id(-1),
 #endif
 	   	 bg_walltime(0.0), pe(-1), available(true) {}
     inline void clearBgLoad() {
@@ -78,7 +84,10 @@ public:
          double dummy;  p|dummy;    // for old format with utilization
       }
       p|available; p|n_objs;
-      if (_lb_args.lbversion()>=2) p|pe; 
+      if (_lb_args.lbversion()>=2) p|pe;
+#if CMK_CUDA
+      p|gpu_device_id;
+#endif
     }
   };
 

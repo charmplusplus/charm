@@ -299,15 +299,31 @@ double GreedyRefineCentralLB::fillData(LDStats *stats,
       GreedyRefineCentralLB::GProc &p = procs[pe];
       if (!p.available)
         CkAbort("GreedyRefineCentralLB: nonmigratable object on unavailable processor\n");
-      p.bgload += oData.wallTime; // take non-migratable object load as background load
+#if CMK_CUDA
+      double nmObjLoad = oData.gpuTime;
+#else
+      double nmObjLoad = oData.wallTime;
+#endif
+      p.bgload += nmObjLoad; // take non-migratable object load as background load
+      //is the non migratable obj load correct
+      CkPrintf("[%d] Obj %d on PE %d is non-migratable, load=%.6f\n", CkMyPe(), i, pe, nmObjLoad);
       if (p.bgload > maxBGLoad) maxBGLoad = p.bgload;
     } else {
+#if CMK_CUDA
+      obj.load = oData.gpuTime * stats->procs[pe].pe_speed;
+#else
       obj.load = oData.wallTime * stats->procs[pe].pe_speed;
+#endif
+      CkPrintf("[%d] Obj %d on PE %d is migratable, load=%.6f\n", CkMyPe(), i, pe, obj.load);
       pobjs.push_back(&obj);
       totalObjLoad += obj.load;
       if (_lb_args.debug() > 1) {
         if (obj.load < minOload) minOload = obj.load;
         if (obj.load > maxOload) maxOload = obj.load;
+#if CMK_CUDA
+        CkPrintf("[%d] Obj %d (PE %d): wallTime=%.6f gpuTime=%.6f effectiveLoad=%.6f\n",
+                 CkMyPe(), i, pe, oData.wallTime, oData.gpuTime, obj.load);
+#endif
       }
     }
   }
@@ -315,6 +331,7 @@ double GreedyRefineCentralLB::fillData(LDStats *stats,
   procHeap.addProcessors(procs, (maxBGLoad <= 0.001), true);
 
   // ---- print some stats ----
+  // CkPrintf("here\n")
   if ((_lb_args.debug() > 1) && (!concurrent || (CkMyPe() == cur_ld_balancer))) {
     for (int pe=0; pe < n_pes; pe++) {
       GreedyRefineCentralLB::GProc &p = procs[pe];
@@ -329,6 +346,7 @@ double GreedyRefineCentralLB::fillData(LDStats *stats,
     CkPrintf("[%d] min_speed=%f mean_speed=%f max_speed=%f\n", CkMyPe(), minSpeed, (avgSpeed / availablePes), maxSpeed);
 
     double maxLoad = 0;
+    double minLoad = FLT_MAX;
     std::vector<double> ploads(n_pes, -1);
     for (int i=0; i < n_objs; i++) {
       GreedyRefineCentralLB::GObj &o = objs[i];
@@ -338,8 +356,17 @@ double GreedyRefineCentralLB::fillData(LDStats *stats,
       if (stats->objData[i].migratable)  // load for this object is already counted if !migratable
         ploads[pe] += o.load;
       if (ploads[pe] > maxLoad) maxLoad = ploads[pe];
+      if (ploads[pe] < minLoad) minLoad = ploads[pe];
     }
     CkPrintf("[%d] maxload with current map=%f\n", CkMyPe(), maxLoad);
+    CkPrintf("[%d] minload with current map=%f\n", CkMyPe(), minLoad);
+
+    // CkPrintf("[%d] --- Per-PE loads before LB ---\n", CkMyPe());
+    // for (int pe=0; pe < n_pes; pe++) {
+    //   if (ploads[pe] >= 0)
+    //     CkPrintf("[%d]   PE %d: totalLoad=%.6f bgLoad=%.6f\n",
+    //              CkMyPe(), pe, ploads[pe], procs[pe].bgload);
+    // }
 
     //CkPrintf("[%d] %f : Filled proc and obj stats\n", CkMyPe(), CkWallTimer() - strategyStartTime);
   }
@@ -442,8 +469,13 @@ void GreedyRefineCentralLB::work(LDStats *stats)
 
     // choose processor
     GreedyRefineCentralLB::GProc *p = llp;
+    // ckout<<"prevPe->load"<<
+    CkPrintf("(prevPe->load <= (llp->load+0.01)*B), %d \n", (prevPe && (prevPe->load <= (llp->load+0.01)*B)));
     if (prevPe && (prevPe->load <= (llp->load+0.01)*B) && (prevPe->load + obj->load <= M) && (prevPe->available))
       p = prevPe;  // use same PE
+  
+  CkPrintf("[%d] Obj %d: load=%.6f, least loaded PE=%d (load=%.6f), prevPE=%d (load=%.6f), newPE=%d (load=%.6f), B=%.6f, M=%.6f\n",
+           CkMyPe(), obj->id, obj->load, llp->id, llp->load, (prevPe?prevPe->id:-1), (prevPe?prevPe->load:-1), p->id, p->load, B, M);
 
     // update processor load
     procHeap.remove(p);
@@ -453,6 +485,10 @@ void GreedyRefineCentralLB::work(LDStats *stats)
     if (p->id != obj->oldPE) {
       nmoves++;
       stats->to_proc[obj->id] = p->id;
+      if (_lb_args.debug() > 1) {
+        CkPrintf("[%d] Migrating obj %d: PE %d -> PE %d (objLoad=%.6f, destPELoad=%.6f)\n",
+                 CkMyPe(), obj->id, obj->oldPE, p->id, obj->load, p->load);
+      }
     }
     if (p->load > maxLoad) {
       maxLoad = p->load;
@@ -460,6 +496,19 @@ void GreedyRefineCentralLB::work(LDStats *stats)
     }
   }
   // ----------------------------------------------
+  // ckout<<" cur_ld_balancer "<<curr_ld_balancer<<endl;
+  if (_lb_args.debug() > 1 && (!concurrent || (CkMyPe() == cur_ld_balancer))) {
+    CkPrintf("[%d] --- Per-PE loads after LB ---\n", CkMyPe());
+    for (int pe=0; pe < n_pes; pe++) {
+      GreedyRefineCentralLB::GProc &p = procs[pe];
+      if (p.available)
+        CkPrintf("[%d]   PE %d: totalLoad=%.6f bgLoad=%.6f\n",
+                 CkMyPe(), pe, p.load, p.bgload);
+    }
+    CkPrintf("[%d] After LB: max_load=%.6f, migrations=%d/%d (%.2f%%)\n",
+             CkMyPe(), maxLoad, nmoves, (int)pobjs.size(),
+             100.0 * nmoves / double(pobjs.size()));
+  }
 
   if (concurrent) {
 

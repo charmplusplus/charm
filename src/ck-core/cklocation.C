@@ -3062,6 +3062,13 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 
   DEBM((AA "Migrated index size %s to %d \n" AB, idx2str(idx), toPe));
 
+#if CMK_CUDA
+  // Ensure all device-to-device copies from PUP packing are complete before
+  // destroying elements, since cudaMemcpy(D2D) can be async in CUDA 12.x.
+  if (gpuBufSize > 0)
+    cudaDeviceSynchronize();
+#endif
+
   thisProxy[toPe].immigrate(msg);
 
   duringMigration = true;

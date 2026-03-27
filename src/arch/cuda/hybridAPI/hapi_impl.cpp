@@ -141,7 +141,7 @@ static void ipcHandleOpen();
 
 #ifdef CMK_LBDB_ON
 static void CUPTIAPI cuptiBufferRequested(uint8_t **buffer, size_t *size, size_t *maxNumRecords) {
-  *size = 64 * 1024;  // 64KB per buffer
+  *size = 5*1024 * 1024;  // 5MB per buffer
   *buffer = (uint8_t *)malloc(*size);
   *maxNumRecords = 0;
 }
@@ -155,7 +155,9 @@ static void CUPTIAPI cuptiBufferCompleted(CUcontext ctx, uint32_t streamId,
 }
 
 // Initialize CUPTI activity tracing — called once per process
-static void hapiCuptiInit() {
+void hapiCuptiInit() {
+  CmiPrintf("HAPI: Initializing CUPTI...\n");
+  cudaDeviceSynchronize(); 
   GPUManager& gm = CsvAccess(gpu_manager);
   if (gm.cupti_initialized_) return;
 
@@ -165,6 +167,16 @@ static void hapiCuptiInit() {
   CUPTI_SAFE_CALL(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_EXTERNAL_CORRELATION));
 
   gm.cupti_initialized_ = true;
+}
+
+void hapiCuptiFinalize() {
+  CmiPrintf("HAPI: Finalizing CUPTI...\n");
+  cudaDeviceSynchronize(); // Ensure all activity records are flushed
+  GPUManager& gm = CsvAccess(gpu_manager);
+  if(gm.cupti_initialized_== false) return;
+  gm.cupti_initialized_ = false;
+
+  CUPTI_SAFE_CALL(cuptiFinalize());
 }
 #endif
 
@@ -361,16 +373,21 @@ static void hapiInitCsv(char** argv) {
   CsvInitialize(GPUManager, gpu_manager);
   CsvAccess(gpu_manager).init();
   #if CMK_LBDB_ON
-    if (LBHasBalancersRegistered())
+    CmiPrintf("HAPI: seeing _lb_args.statsOn() = %d\n", _lb_args.statsOn());
+    if (LBHasBalancersRegistered() && _lb_args.statsOn())
       hapiCuptiInit();
   #endif
 }
 
+
 #ifdef CMK_LBDB_ON
 void hapiProcessCuptiBuffers() {
   GPUManager& gm = CsvAccess(gpu_manager);
-
+  
+  uint32_t kernel_count = 0;
+  uint32_t corr_count = 0;
   while (true) {
+    uint32_t record_count = 0;
     CuptiBufferItem item;
 
     // Pop one buffer from the queue
@@ -382,37 +399,55 @@ void hapiProcessCuptiBuffers() {
 
     // Parse records in this buffer
     CUpti_Activity *record = NULL;
+    // ckout<<"valid size for the CUPTI buffer: "<<item.validSize<<" bytes"<<endl;
     while (cuptiActivityGetNextRecord(item.buffer, item.validSize, &record) == CUPTI_SUCCESS) {
+      ++record_count;
       if (record->kind == CUPTI_ACTIVITY_KIND_EXTERNAL_CORRELATION) {
         CUpti_ActivityExternalCorrelation *corr = (CUpti_ActivityExternalCorrelation *)record;
+        corr_count++;
         if(gm.cupti_correlation_db_.find(corr->correlationId)!=gm.cupti_correlation_db_.end())
         {
           //out of order block 
           uint64_t curr_kernel_time = gm.cupti_correlation_db_[corr->correlationId];
           gm.cupti_obj_gpu_times_[corr->externalId] += curr_kernel_time;
+          gm.cupti_correlation_db_.erase(corr->correlationId); // Remove correlation ID after processing
         }
-        gm.cupti_correlation_db_[corr->correlationId] = corr->externalId;
+        else 
+        {
+          gm.cupti_correlation_db_[corr->correlationId] = corr->externalId;
+        }
       }
       else if (record->kind == CUPTI_ACTIVITY_KIND_CONCURRENT_KERNEL ||
                record->kind == CUPTI_ACTIVITY_KIND_KERNEL) {
+        kernel_count++;
         CUpti_ActivityKernel4 *kernel = (CUpti_ActivityKernel4 *)record;
         uint64_t duration_ns = kernel->end - kernel->start;
+        // ckout<<"the current kernel's duration is "<<duration_ns<<" ns "<<endl;
 
         auto it = gm.cupti_correlation_db_.find(kernel->correlationId);
         if (it != gm.cupti_correlation_db_.end()) {
           uint64_t obj_id = it->second;
           gm.cupti_obj_gpu_times_[obj_id] += duration_ns;
-          // gm.cupti_obj_gpu_times_[obj_id].kernel_count++;
+          gm.cupti_correlation_db_.erase(it); // Remove correlation ID after processing
         }
         else 
         {
+          CmiPrintf("found an out of order entry\n");
           gm.cupti_correlation_db_[kernel->correlationId] = duration_ns;
         }
       }
     }
 
+    
+    // ckout<<"number of CUPTI records in this buffer: "<<record_count<<endl;
+    
     free(item.buffer);
   }
+  //final state of gm.cupti_correlation_db_ and gm.cupti_obj_gpu_times_ 
+  // CmiPrintf("size of correlation DB is: %zu\n", gm.cupti_correlation_db_.size());
+  // CmiPrintf("size of obj_gpu_times_ map is: %zu\n", gm.cupti_obj_gpu_times_.size());
+  // CmiPrintf("number of kernel records processed: %u\n", kernel_count);
+  // CmiPrintf("number of correlation records processed: %u\n", corr_count);
 
   // DEBUG: print CUPTI obj-gpu-time map summary
   if (!gm.cupti_obj_gpu_times_.empty()) {
@@ -1899,5 +1934,9 @@ void hapiErrorDie(cudaError_t retCode, const char* code, const char* file, int l
     fprintf(stderr, "Fatal CUDA Error [%d] %s at %s:%d\n", retCode, cudaGetErrorString(retCode), file, line);
     CmiAbort("Exit due to CUDA error");
   }
+}
+
+int hapiMyDevice() {
+  return CpvAccess(my_device);
 }
 

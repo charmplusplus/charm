@@ -84,9 +84,11 @@ public:
   inline void SetObjGPULoad(std::unordered_map<uint64_t, uint64_t> &id_gputimeMap)
   {
     int matched = 0;
+    int liveObjs = 0;
     for (int i = 0; i < objs.size(); i++) {
       if(objs[i].obj == nullptr)
         continue;
+      liveObjs++;
       // The CUPTI map is keyed by raw element IDs (from CkMigratable::ckGetID()).
       // The LB database stores IDs with collection bits prepended (when
       // CMK_GLOBAL_LOCATION_UPDATE is set). Strip collection bits to match.
@@ -103,8 +105,8 @@ public:
                CmiMyPe(), i, (unsigned long)it->first, it->second / 1.0e9);
       objs[i].obj->setGPUTiming(it->second / 1.0e9);
     }
-    CkPrintf("[PE %d] SetObjGPULoad: %d/%zu objects matched from %zu CUPTI entries\n",
-             CmiMyPe(), matched, objs.size(), id_gputimeMap.size());
+    CkPrintf("[PE %d] SetObjGPULoad: %d/%d live objects matched from %zu CUPTI entries (objs.size=%zu)\n",
+             CmiMyPe(), matched, liveObjs, id_gputimeMap.size(), objs.size());
   }
   inline void* GetObjUserData(LDObjHandle &h) {
     return LbObj(h)->getLocalUserData();

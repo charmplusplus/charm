@@ -55,6 +55,9 @@ AMPI_CUSTOM_FUNC(hapiError_t, hapiPoolFree, void*)
 // Provides support for detecting errors with CUDA API calls.
 AMPI_CUSTOM_FUNC(void, hapiErrorDie, hapiError_t, const char*, const char*, int)
 
+// Returns the GPU device index this PE is mapped to (set during hapiMapping).
+AMPI_CUSTOM_FUNC(int, hapiMyDevice, void)
+
 #ifdef HAPI_INSTRUMENT_WRS
 AMPI_CUSTOM_FUNC(void, hapiInitInstrument, int n_chares, char n_types)
 AMPI_CUSTOM_FUNC(hapiRequestTimeInfo*, hapiQueryInstrument, int chare, char type, char phase)

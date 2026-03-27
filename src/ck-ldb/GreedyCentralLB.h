@@ -6,6 +6,8 @@
 #ifndef _GreedyCentralLB_H_
 #define _GreedyCentralLB_H_
 
+#define __DEBUG_GREEDY_REFINE_ 1
+
 #include "CentralLB.h"
 #include "GreedyCentralLB.decl.h"
 

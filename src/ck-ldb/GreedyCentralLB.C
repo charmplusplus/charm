@@ -12,6 +12,7 @@
 */
 
 #include <algorithm>
+#include <unordered_map>
 
 #include "charm++.h"
 
@@ -52,6 +53,17 @@ class GreedyCentralLB::ObjLoadGreater {
       return (v1.getCompLoad() > v2.getCompLoad());
     }
 };
+
+#if CMK_CUDA
+// A group of PEs that share the same GPU device.
+// Load balancing reasons at this level: the GPU is the bottleneck,
+// so we distribute objects across GPUs, not across individual PEs.
+struct GPUGroup {
+  int gpu_id;                      // GPU device id
+  double totalLoad;                // aggregate GPU load across all PEs in this group
+  std::vector<int> pe_indices;     // indices into the procs vector
+};
+#endif
 
 void GreedyCentralLB::work(LDStats* stats)
 {
@@ -115,16 +127,137 @@ void GreedyCentralLB::work(LDStats* stats)
 
   // max heap of objects (heaviest first)
   sort(objs.begin(), objs.end(), GreedyCentralLB::ObjLoadGreater());
-  // min heap of processors (lightest first)
-  make_heap(procs.begin(), procs.end(), GreedyCentralLB::ProcLoadGreater());
 
   if (_lb_args.debug()>1)
     CkPrintf("[%d] In GreedyCentralLB strategy\n",CkMyPe());
 
+  int nmoves = 0;
+
+#if CMK_CUDA
+  // ---- GPU-aware greedy: balance across GPU groups, not individual PEs ----
+
+  // Build GPU groups: map gpu_device_id -> GPUGroup
+  // With typical counts (2-8 GPUs), linear scan beats a heap and avoids
+  // heap-invariant headaches when we update a non-front group in place.
+  std::vector<GPUGroup> gpuGroups;
+  std::unordered_map<int, int> gpuIdToIdx;  // gpu_device_id -> index in gpuGroups
+
+  for (int i = 0; i < (int)procs.size(); i++) {
+    int real_pe = procs[i].getProcId();
+    int gpu_id = stats->procs[real_pe].gpu_device_id;
+
+    auto it = gpuIdToIdx.find(gpu_id);
+    if (it == gpuIdToIdx.end()) {
+      gpuIdToIdx[gpu_id] = gpuGroups.size();
+      GPUGroup g;
+      g.gpu_id = gpu_id;
+      g.totalLoad = procs[i].getTotalLoad();
+      g.pe_indices.push_back(i);
+      gpuGroups.push_back(std::move(g));
+    } else {
+      gpuGroups[it->second].totalLoad += procs[i].getTotalLoad();
+      gpuGroups[it->second].pe_indices.push_back(i);
+    }
+  }
+
+  // Reverse map: real PE -> index in gpuGroups
+  std::unordered_map<int, int> peToGroupIdx;
+  for (int gi = 0; gi < (int)gpuGroups.size(); gi++) {
+    for (int pidx : gpuGroups[gi].pe_indices) {
+      peToGroupIdx[procs[pidx].getProcId()] = gi;
+    }
+  }
+
+  CkPrintf("[%d] GreedyCentralLB: %d GPU group(s), %d available PEs, %d migratable objs\n",
+           CkMyPe(), (int)gpuGroups.size(), (int)procs.size(), (int)objs.size());
+  for (auto &g : gpuGroups) {
+    CkPrintf("[%d]   GPU %d: %d PEs, aggregate load=%.6f\n",
+             CkMyPe(), g.gpu_id, (int)g.pe_indices.size(), g.totalLoad);
+  }
+
+  // Greedy with locality preference:
+  // For each object (heaviest first), find the lightest GPU group.
+  // If the object's current GPU group has comparable load, keep it there.
+  // Within the chosen group, prefer the object's current PE if it belongs
+  // to that group; otherwise pick the lightest PE.
+  for (obj = 0; obj < (int)objs.size(); obj++) {
+    const int from_pe = objs[obj].getCurrentPe();
+    const int id = objs[obj].getVertexId();
+    double obj_load = objs[obj].getCompLoad();
+    if (obj_load <= 0.0) obj_load = 1e-6;
+
+    // Find lightest GPU group (linear scan — few groups)
+    int lightest_gi = 0;
+    for (int gi = 1; gi < (int)gpuGroups.size(); gi++) {
+      if (gpuGroups[gi].totalLoad < gpuGroups[lightest_gi].totalLoad)
+        lightest_gi = gi;
+    }
+
+    // Check if object's current group is close enough to the lightest
+    int chosen_gi = lightest_gi;
+    auto curIt = peToGroupIdx.find(from_pe);
+    if (curIt != peToGroupIdx.end()) {
+      int cur_gi = curIt->second;
+      if (gpuGroups[cur_gi].totalLoad <= gpuGroups[lightest_gi].totalLoad + 0.01) {
+        chosen_gi = cur_gi;  // stay on current GPU
+      }
+    }
+    GPUGroup &g = gpuGroups[chosen_gi];
+
+    // Within the chosen group, prefer the current PE if it belongs here
+    int best_idx = -1;
+    if (chosen_gi == (curIt != peToGroupIdx.end() ? curIt->second : -1)) {
+      // Object's current PE is in this group — use it
+      for (int k = 0; k < (int)g.pe_indices.size(); k++) {
+        if (procs[g.pe_indices[k]].getProcId() == from_pe) {
+          best_idx = g.pe_indices[k];
+          break;
+        }
+      }
+    }
+    if (best_idx < 0) {
+      // Pick the lightest PE in the group
+      best_idx = g.pe_indices[0];
+      double best_load = procs[best_idx].getTotalLoad();
+      for (int k = 1; k < (int)g.pe_indices.size(); k++) {
+        double pl = procs[g.pe_indices[k]].getTotalLoad();
+        if (pl < best_load) {
+          best_load = pl;
+          best_idx = g.pe_indices[k];
+        }
+      }
+    }
+
+    ProcInfo &p = procs[best_idx];
+    double scaled_load = obj_load / p.getPeSpeed();
+    p.setTotalLoad(p.getTotalLoad() + scaled_load);
+    g.totalLoad += scaled_load;
+
+    // Record migration only if PE actually changed
+    const int dest = p.getProcId();
+    if (dest != from_pe) {
+      stats->to_proc[id] = dest;
+      nmoves++;
+      if (_lb_args.debug() > 2)
+        CkPrintf("[%d] Obj %d migrating from %d to %d\n", CkMyPe(), id, from_pe, dest);
+    }
+  }
+
+    for (int gi = 0; gi < (int)gpuGroups.size(); gi++) {
+      CkPrintf("gpu group %d load: %f\n", gi, gpuGroups[gi].totalLoad);
+      // if ( < gpuGroups[lightest_gi].totalLoad)
+      //   lightest_gi = gi;
+    }
+
+#else
+  // ---- Original PE-level greedy (non-GPU path) ----
+
+  // min heap of processors (lightest first)
+  make_heap(procs.begin(), procs.end(), GreedyCentralLB::ProcLoadGreater());
+
   // greedy algorithm: assign heaviest object to lightest processor
   // Use getCompLoad() to avoid the 0.1 floor in getVertexLoad() which
   // destroys load differentiation for fine-grained GPU workloads
-  int nmoves = 0;
   for (obj=0; obj < objs.size(); obj++) {
     ProcInfo p = procs.front();
     pop_heap(procs.begin(), procs.end(), GreedyCentralLB::ProcLoadGreater());
@@ -149,6 +282,7 @@ void GreedyCentralLB::work(LDStats* stats)
     procs.push_back(p);
     push_heap(procs.begin(), procs.end(), GreedyCentralLB::ProcLoadGreater());
   }
+#endif
 
   CkPrintf("[%d] GreedyCentralLB: %d objects migrating.\n", CkMyPe(), nmoves);
 
