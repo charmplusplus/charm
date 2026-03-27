@@ -703,7 +703,25 @@ if(BUILD_CUDA OR BUILD_HIP)
       find_package(CUDA REQUIRED)
       set(CUDA_DIR "${CUDA_TOOLKIT_ROOT_DIR}")
     endif()
+
+    # Find CUPTI library and include directory
+    find_library(CUPTI_LIBRARY cupti
+      HINTS "${CUDA_DIR}/extras/CUPTI/lib64"
+            "${CUDA_DIR}/lib64"
+    )
+    set(CUPTI_INCLUDE_DIR "${CUDA_DIR}/extras/CUPTI/include")
+    if(NOT CUPTI_LIBRARY)
+      message(WARNING "CUPTI library not found. GPU load balancing will not be available.")
+    else()
+      message(STATUS "Found CUPTI: ${CUPTI_LIBRARY}")
+    endif()
+
     add_library(hybridapi ${hybridAPI-cxx-sources} $<TARGET_OBJECTS:ckrescale> $<TARGET_OBJECTS:converse>)
+
+    if(CUPTI_LIBRARY)
+      target_include_directories(hybridapi PRIVATE "${CUPTI_INCLUDE_DIR}")
+      target_link_libraries(hybridapi ${CUPTI_LIBRARY})
+    endif()
 
     if(TRACING)
       target_compile_definitions(hybridapi PRIVATE HAPI_TRACE)
@@ -1084,6 +1102,9 @@ else()
   add_dependencies(ckhello ck ldb-none memory-default threads-default conv-static
     converse ckmain ckqt ckrescale
     moduleNDMeshStreamer modulecompletion)
+  if(BUILD_CUDA OR BUILD_HIP)
+    add_dependencies(ckhello hybridapi)
+  endif()
 endif()
 
 # Create conv-mach-opt.sh
