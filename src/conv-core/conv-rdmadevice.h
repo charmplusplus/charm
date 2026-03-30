@@ -4,6 +4,7 @@
 #include "conv-header.h"
 #include "cmirdmautils.h"
 #include "pup.h"
+#include "conv-rdma.h"
 
 #if CMK_CUDA || CMK_HIP
 #include "hapi_portable.h"
@@ -38,6 +39,8 @@ public:
   // Store the actual data for host-staged inter-node messaging (no GPUDirect RDMA)
   bool data_stored;
   void* data;
+
+  CmiNcpyBuffer lci_ncpy_buffer;
 
   CmiDeviceBuffer() : ptr(NULL), cnt(0), src_pe(-1), dest_pe(-1) { init(); }
 
@@ -76,6 +79,7 @@ public:
     p|src_mpi_rank;
     p|dest_pe;
     p|dest_mpi_rank;
+    p|lci_ncpy_buffer;
   }
 
   ~CmiDeviceBuffer() {

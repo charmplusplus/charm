@@ -57,9 +57,38 @@
 
 CsvExtern(GPUManager, gpu_manager);
 
+// void CkRdmaDeviceRecvHandler(void* data)
+// {
+//   DeviceRdmaOp* op = (DeviceRdmaOp*)data;
+//   DeviceRdmaInfo* info = op->info;
+
+//   // Invoke source callbacks
+//   if (op->src_cb) {
+//     int rank;
+//     CkCallback* cb = (CkCallback*)op->src_cb;
+//     cb->send();
+//     delete cb;
+//   }
+
+//   // Update counter (there may be multiple buffers in transit)
+//   info->counter++;
+
+//   // Check if all buffers have been received
+//   // If so, invoke regular entry method
+//   if (info->counter == info->n_ops) {
+//     QdCreate(1);
+
+//     enqueueNcpyMessage(op->dest_pe, info->msg);
+
+//     // Free RDMA metadata
+//     CmiFree(info);
+//   }
+// }
+
 void CkRdmaDeviceRecvHandler(void* data)
 {
-  DeviceRdmaOp* op = (DeviceRdmaOp*)data;
+  NcpyOperationInfo *ncpy_op_info = (NcpyOperationInfo *)data;
+  DeviceRdmaOp* op = (DeviceRdmaOp*)(ncpy_op_info->deviceRdmaOpInfo);
   DeviceRdmaInfo* info = op->info;
 
   // Invoke source callbacks
@@ -323,13 +352,10 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     } else {
 #if CMK_GPU_COMM
       // Machine layer supports GPU-aware communication
-      save_op.tag = source.tag;
-      save_op.src_pe = source.src_pe;
-      save_op.dest_pe = source.dest_pe;
-      save_op.dest_mpi_rank = source.dest_mpi_rank;
-      save_op.src_mpi_rank = source.src_mpi_rank;
       QdCreate(1);
-      CmiRecvDevice(&save_op, DEVICE_RECV_TYPE_CHARM);
+      CmiSetDirectNcpyAckHandler(CkRdmaDeviceRecvHandler);
+      CmiNcpyBuffer lci_dest_ncpy_buffer(arrPtrs[i], (size_t)arrSizes[i], (void*)(&save_op));
+      lci_dest_ncpy_buffer.rdmaGet(source.lci_ncpy_buffer, 0, nullptr, nullptr);
       continue;
 #else
       // Handle all other cases (basic inter-process and inter-node)
@@ -509,7 +535,7 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
     }
 #else
   for (int i = 0; i < numops; i++) {
-    CmiSendDevice(buffers[i]->dest_mpi_rank, buffers[i]->src_mpi_rank, buffers[i]->ptr, buffers[i]->cnt, buffers[i]->tag);
+    buffers[i]->lci_ncpy_buffer = CmiNcpyBuffer(buffers[i]->ptr, buffers[i]->cnt);
   }
 #endif
   }
