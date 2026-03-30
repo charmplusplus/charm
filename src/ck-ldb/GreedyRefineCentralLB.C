@@ -189,14 +189,14 @@ GreedyRefineCentralLB::GreedyRefineCentralLB(const CkLBOptions &opt): CBase_Gree
   if (_lb_args.percentMovesAllowed() < 100) {
     migrationTolerance = float(_lb_args.percentMovesAllowed())/100.0;
   }
-  concurrent = true;
+  concurrent = false;
 }
 
 GreedyRefineCentralLB::GreedyRefineCentralLB(CkMigrateMessage *m): CBase_GreedyRefineCentralLB(m), migrationTolerance(1.0) {
   lbname = "GreedyRefineCentralLB";
   if (_lb_args.percentMovesAllowed() < 100)
     migrationTolerance = float(_lb_args.percentMovesAllowed())/100.0;
-  concurrent = true;
+  concurrent = false;
 }
 
 // ------------------------------------------------
