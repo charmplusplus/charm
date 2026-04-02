@@ -45,6 +45,7 @@ class CkLBArgs
   bool _lb_metaLbOn;
   char* _lb_metaLbModelDir;
   char* _lb_treeLBFile = (char*)"treelb.json";
+  int _lb_percentMovesAllowed;  // for GreedyRefineCentralLB, as percentage of chares that can be moved
 
  public:
   CkLBArgs()
@@ -61,6 +62,7 @@ class CkLBArgs
     _lb_targetRatio = 1.05;
     _lb_metaLbOn = false;
     _lb_metaLbModelDir = nullptr;
+    _lb_percentMovesAllowed = 100;
   }
   inline char*& treeLBFile() { return _lb_treeLBFile; }
   inline double& lbperiod() { return _autoLbPeriod; }
@@ -83,7 +85,7 @@ class CkLBArgs
   inline double& targetRatio() { return _lb_targetRatio; }
   inline bool& metaLbOn() { return _lb_metaLbOn; }
   inline char*& metaLbModelDir() { return _lb_metaLbModelDir; }
-  inline int percentMovesAllowed() { return 100; }
+  inline int& percentMovesAllowed() { return _lb_percentMovesAllowed; }
 };
 
 extern CkLBArgs _lb_args;

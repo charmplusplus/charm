@@ -28,6 +28,9 @@
 #include <limits.h>
 #include <algorithm>
 #include <math.h>
+#if CMK_CUDA
+#include <unordered_map>
+#endif
 
 extern int quietModeRequested;
 
@@ -189,14 +192,14 @@ GreedyRefineCentralLB::GreedyRefineCentralLB(const CkLBOptions &opt): CBase_Gree
   if (_lb_args.percentMovesAllowed() < 100) {
     migrationTolerance = float(_lb_args.percentMovesAllowed())/100.0;
   }
-  concurrent = false;
+  concurrent = true;
 }
 
 GreedyRefineCentralLB::GreedyRefineCentralLB(CkMigrateMessage *m): CBase_GreedyRefineCentralLB(m), migrationTolerance(1.0) {
   lbname = "GreedyRefineCentralLB";
   if (_lb_args.percentMovesAllowed() < 100)
     migrationTolerance = float(_lb_args.percentMovesAllowed())/100.0;
-  concurrent = false;
+  concurrent = true;
 }
 
 // ------------------------------------------------
@@ -443,72 +446,229 @@ void GreedyRefineCentralLB::work(LDStats *stats)
 
   std::sort(pobjs.begin(), pobjs.end(), GreedyRefineCentralLB::ObjLoadGreater());
 
-  double M = 0, greedyMaxLoad = 0;
+  int nmoves = 0;
+  double greedyMaxLoad = 0;
+
+#if CMK_CUDA
+  // ---- GPU-aware path: balance at GPU-group level ----
+  //
+  // Group PEs by gpu_device_id.  M tracks the max *GPU-group* aggregate load.
+  // greedyLB preprocessing computes M at GPU-group level.
+  // Main loop: pop lightest GPU group, assign object to lightest PE in that group.
+
+  // --- Build GPU groups from the per-PE procs vector ---
+
+  struct GPUGrp {
+    uint64_t gpu_id;
+    double load;                        // aggregate load across PEs in this group
+    std::vector<int> peIds;             // indices into procs[]
+  };
+
+  std::vector<GPUGrp> gpuGroups;
+  std::unordered_map<uint64_t, int> gpuIdToIdx;
+
+  for (int pe = 0; pe < n_pes; pe++) {
+    GreedyRefineCentralLB::GProc &p = procs[pe];
+    if (!p.available) continue;
+    uint64_t devId = stats->procs[pe].gpu_device_id;
+
+    auto it = gpuIdToIdx.find(devId);
+    if (it == gpuIdToIdx.end()) {
+      gpuIdToIdx[devId] = gpuGroups.size();
+      GPUGrp g;
+      g.gpu_id = devId;
+      g.load = p.bgload;
+      g.peIds.push_back(pe);
+      gpuGroups.push_back(std::move(g));
+    } else {
+      gpuGroups[it->second].load += p.bgload;
+      gpuGroups[it->second].peIds.push_back(pe);
+    }
+  }
+  int nGroups = gpuGroups.size();
+
+  CkPrintf("[%d] GreedyRefineCentralLB: %d GPU group(s), %d available PEs, %d migratable objs\n",
+           CkMyPe(), nGroups, availablePes, (int)pobjs.size());
+  for (auto &g : gpuGroups)
+    CkPrintf("[%d]   GPU %llu: %d PEs, bgload=%.6f\n",
+             CkMyPe(), g.gpu_id, (int)g.peIds.size(), g.load);
+
+  // --- Greedy preprocessing at GPU-group level to establish target M ---
+  // Reset group loads to bg only, then greedily assign objects to get M.
+  double M = 0;
+  {
+    // Save a copy of group bg loads
+    std::vector<double> grpLoad(nGroups);
+    for (int gi = 0; gi < nGroups; gi++) grpLoad[gi] = gpuGroups[gi].load;
+
+    for (int i = 0; i < (int)pobjs.size(); i++) {
+      // Find lightest GPU group
+      int lightest = 0;
+      for (int gi = 1; gi < nGroups; gi++) {
+        if (grpLoad[gi] < grpLoad[lightest]) lightest = gi;
+      }
+      grpLoad[lightest] += pobjs[i]->load;
+      if (grpLoad[lightest] > M) M = grpLoad[lightest];
+    }
+    greedyMaxLoad = M;
+  }
+  M *= A;
+  // CkPrintf("M is %f\n", M);
+
+  // Reset GPU group loads back to bg-only for the real assignment pass
+  for (int gi = 0; gi < nGroups; gi++) {
+    gpuGroups[gi].load = 0;
+    for (int pe : gpuGroups[gi].peIds)
+      gpuGroups[gi].load += procs[pe].bgload;
+  }
+  // Also reset per-PE loads in procHeap to bgload
+  procHeap.addProcessors(procs, (maxLoad <= 0.001), false);
+
+  // if ((_lb_args.debug() > 0) && (CkMyPe() == cur_ld_balancer))
+  //   CkPrintf("[%d] GPU greedy-refine: M(target)=%.6f, A=%.3f, B=%.3f\n", CkMyPe(), M, A, B);
+
+  // Reverse map: PE index -> GPU group index
+  std::unordered_map<int, int> peToGrpIdx;
+  for (int gi = 0; gi < nGroups; gi++)
+    for (int pe : gpuGroups[gi].peIds)
+      peToGrpIdx[pe] = gi;
+
+  // --- Main assignment loop (greedy refine at GPU-group level) ---
+  for (int i = 0; i < (int)pobjs.size(); i++) {
+    const GreedyRefineCentralLB::GObj *obj = pobjs[i];
+    double obj_load = obj->load;
+
+    // Find lightest GPU group (linear scan — few groups)
+    int lightest_gi = 0;
+    for (int gi = 1; gi < nGroups; gi++) {
+      if (gpuGroups[gi].load < gpuGroups[lightest_gi].load)
+        lightest_gi = gi;
+    }
+
+    // Refinement: if object's current GPU group is close enough, keep it there
+    int chosen_gi = lightest_gi;
+    if (obj->oldPE >= 0) {
+      auto curIt = peToGrpIdx.find(obj->oldPE);
+      if (curIt != peToGrpIdx.end()) {
+        int cur_gi = curIt->second;
+        GPUGrp &curGrp = gpuGroups[cur_gi];
+        // Keep on current GPU group if:
+        //   1) its load is within B tolerance of the lightest group
+        //   2) adding this object keeps it under the target M
+        if ((curGrp.load <= (gpuGroups[lightest_gi].load + 0.01) * B) &&
+            (curGrp.load + obj_load <= M))
+            {
+              chosen_gi = cur_gi;
+              // CmiPrintf("choosing to stay on the current GPU > %d because of curGrp.load %f, obj_load %f less than M %f\n", chosen_gi, curGrp.load, obj_load, M);
+            }
+            else {
+              // CmiPrintf("choosing to stay on the ligtest GPU > %d because of curGrp.load %f, obj_load %f greater than M %f\n", chosen_gi, curGrp.load, obj_load, M);
+            }
+      }
+    }
+
+    GPUGrp &g = gpuGroups[chosen_gi];
+
+    int bestPe = g.peIds[0];
+
+    //find the PE with the least walltime
+    for(int pe : g.peIds) {
+      if(procs[pe].load < procs[bestPe].load) {
+        bestPe = pe;
+      }
+    }
+
+    if(obj->oldPE >= 0 && peToGrpIdx[obj->oldPE] == chosen_gi)
+      bestPe = obj->oldPE;
+      
+    GreedyRefineCentralLB::GProc *p = &procs[bestPe];
+    double scaled = obj->load / p->speed;
+
+    // Update PE load
+    procHeap.remove(p);
+    p->load += scaled;
+    procHeap.push(p);
+
+    // Update GPU group aggregate
+    g.load += scaled;
+
+    // Track max GPU-group load; expand M if exceeded
+    if (g.load > maxLoad) {
+      maxLoad = g.load;
+      if (maxLoad > M) M = maxLoad;
+    }
+
+    // Record migration if PE changed
+    if (bestPe != obj->oldPE) {
+      nmoves++;
+      stats->to_proc[obj->id] = bestPe;
+      // if (_lb_args.debug() > 2)
+        // CkPrintf("[%d] Migrating obj %d: PE %d -> PE %d (GPU %d, objLoad=%.6f, gpuGrpLoad=%.6f)\n",
+        //          CkMyPe(), obj->id, obj->oldPE, bestPe, g.gpu_id, obj_load, g.load);
+    }
+  }
+
+  // Print per-GPU-group loads after LB
+  // CkPrintf("[%d] --- Per-GPU-group loads after LB ---\n", CkMyPe());
+  // for (int gi = 0; gi < nGroups; gi++)
+  //   CkPrintf("[%d]   GPU %llu: aggregate load=%.6f\n",
+  //            CkMyPe(), gpuGroups[gi].gpu_id, gpuGroups[gi].load);
+
+#else
+  // ---- Original PE-level greedy refine (non-GPU path) ----
+
+  double M = 0;
   if (B > 0) {
-    // greedy preprocessing: tells me what max_load to aim for
     M = greedyLB(pobjs, procHeap, stats);
     greedyMaxLoad = M;
     procHeap.addProcessors(procs, (maxLoad <= 0.001), false);
   }
 
-  // maxLoad at this point is based only on bg load
-  int nmoves = 0;
-  /*
-  // this would be in case I decide to drop greedyLB preprocessing, but the preprocessing
-  // seems useful and doesn't add much time
-  //if (M <= 0) M = std::max(totalObjLoad/availablePes, maxLoad) * A;
-  else*/ M *= A;
-  if ((_lb_args.debug() > 1) && (CkMyPe() == cur_ld_balancer)) {
-    CkPrintf("maxLoad=%f totalObjLoad=%f M=%f A=%f B=%f\n", maxLoad, totalObjLoad, M, A, B);
-  }
+  M *= A;
+  // if ((_lb_args.debug() > 1) && (CkMyPe() == cur_ld_balancer)) {
+  //   CkPrintf("maxLoad=%f totalObjLoad=%f M=%f A=%f B=%f\n", maxLoad, totalObjLoad, M, A, B);
+  // }
   for (int i=0; i < pobjs.size(); i++) {
     const GreedyRefineCentralLB::GObj *obj = pobjs[i];
-    GreedyRefineCentralLB::GProc *llp = procHeap.top();          // least loaded processor
+    GreedyRefineCentralLB::GProc *llp = procHeap.top();
     GreedyRefineCentralLB::GProc *prevPe = NULL;
-    if (obj->oldPE >= 0) prevPe = &(procs[obj->oldPE]); // current processor
+    if (obj->oldPE >= 0) prevPe = &(procs[obj->oldPE]);
 
-    // choose processor
     GreedyRefineCentralLB::GProc *p = llp;
-    // ckout<<"prevPe->load"<<
-    CkPrintf("(prevPe->load <= (llp->load+0.01)*B), %d \n", (prevPe && (prevPe->load <= (llp->load+0.01)*B)));
     if (prevPe && (prevPe->load <= (llp->load+0.01)*B) && (prevPe->load + obj->load <= M) && (prevPe->available))
-      p = prevPe;  // use same PE
-  
-  CkPrintf("[%d] Obj %d: load=%.6f, least loaded PE=%d (load=%.6f), prevPE=%d (load=%.6f), newPE=%d (load=%.6f), B=%.6f, M=%.6f\n",
-           CkMyPe(), obj->id, obj->load, llp->id, llp->load, (prevPe?prevPe->id:-1), (prevPe?prevPe->load:-1), p->id, p->load, B, M);
+      p = prevPe;
 
-    // update processor load
     procHeap.remove(p);
     p->load += (obj->load / p->speed);
     procHeap.push(p);
 
-    if (p->id != obj->oldPE) {
-      nmoves++;
-      stats->to_proc[obj->id] = p->id;
-      if (_lb_args.debug() > 1) {
-        CkPrintf("[%d] Migrating obj %d: PE %d -> PE %d (objLoad=%.6f, destPELoad=%.6f)\n",
-                 CkMyPe(), obj->id, obj->oldPE, p->id, obj->load, p->load);
-      }
-    }
+    // if (p->id != obj->oldPE) {
+    //   nmoves++;
+    //   stats->to_proc[obj->id] = p->id;
+    //   if (_lb_args.debug() > 1) {
+    //     CkPrintf("[%d] Migrating obj %d: PE %d -> PE %d (objLoad=%.6f, destPELoad=%.6f)\n",
+    //              CkMyPe(), obj->id, obj->oldPE, p->id, obj->load, p->load);
+    //   }
+    // }
     if (p->load > maxLoad) {
       maxLoad = p->load;
       if (maxLoad > M) M = maxLoad;
     }
   }
+#endif
   // ----------------------------------------------
-  // ckout<<" cur_ld_balancer "<<curr_ld_balancer<<endl;
-  if (_lb_args.debug() > 1 && (!concurrent || (CkMyPe() == cur_ld_balancer))) {
-    CkPrintf("[%d] --- Per-PE loads after LB ---\n", CkMyPe());
-    for (int pe=0; pe < n_pes; pe++) {
-      GreedyRefineCentralLB::GProc &p = procs[pe];
-      if (p.available)
-        CkPrintf("[%d]   PE %d: totalLoad=%.6f bgLoad=%.6f\n",
-                 CkMyPe(), pe, p.load, p.bgload);
-    }
-    CkPrintf("[%d] After LB: max_load=%.6f, migrations=%d/%d (%.2f%%)\n",
-             CkMyPe(), maxLoad, nmoves, (int)pobjs.size(),
-             100.0 * nmoves / double(pobjs.size()));
-  }
+  // if (_lb_args.debug() > 1 && (!concurrent || (CkMyPe() == cur_ld_balancer))) {
+  //   CkPrintf("[%d] --- Per-PE loads after LB ---\n", CkMyPe());
+  //   for (int pe=0; pe < n_pes; pe++) {
+  //     GreedyRefineCentralLB::GProc &p = procs[pe];
+  //     if (p.available)
+  //       CkPrintf("[%d]   PE %d: totalLoad=%.6f bgLoad=%.6f\n",
+  //                CkMyPe(), pe, p.load, p.bgload);
+  //   }
+  //   CkPrintf("[%d] After LB: max_load=%.6f, migrations=%d/%d (%.2f%%)\n",
+  //            CkMyPe(), maxLoad, nmoves, (int)pobjs.size(),
+  //            100.0 * nmoves / double(pobjs.size()));
+  // }
 
   if (concurrent) {
 
@@ -520,15 +680,15 @@ void GreedyRefineCentralLB::work(LDStats *stats)
 #endif
   } else if (_lb_args.debug() > 0) {
     double greedyRatio = 1.0;
-    if (B > 0) greedyRatio = maxLoad / greedyMaxLoad;
+    if (greedyMaxLoad > 0) greedyRatio = maxLoad / greedyMaxLoad;
     double migrationRatio = nmoves/double(pobjs.size());
-    if ((greedyRatio > 1.03) && (migrationRatio < migrationTolerance)) {
-      CkPrintf("[%d] GreedyRefine: WARNING - migration ratio is %.3f (within user-specified tolerance).\n"
-               "but maxload after lb is %f higher than greedy. Consider testing with A=0, B=-1\n",
-               CkMyPe(), migrationRatio, greedyRatio);
-    }
-    CkPrintf("[%d] GreedyRefineCentralLB: after lb, max_load=%.3f, migrations=%d(%.2f%%), ratioToGreedy=%.3f\n",
-             CkMyPe(), maxLoad, nmoves, 100.0*migrationRatio, greedyRatio);
+    // if ((greedyRatio > 1.03) && (migrationRatio < migrationTolerance)) {
+    //   CkPrintf("[%d] GreedyRefine: WARNING - migration ratio is %.3f (within user-specified tolerance).\n"
+    //            "but maxload after lb is %f higher than greedy. Consider testing with A=0, B=-1\n",
+    //            CkMyPe(), migrationRatio, greedyRatio);
+    // }
+    // CkPrintf("[%d] GreedyRefineCentralLB: after lb, max_load=%.3f, migrations=%d(%.2f%%), ratioToGreedy=%.3f\n",
+    //          CkMyPe(), maxLoad, nmoves, 100.0*migrationRatio, greedyRatio);
   }
 }
 
@@ -543,6 +703,7 @@ void GreedyRefineCentralLB::receiveSolutions(CkReductionMsg *msg)
   std::vector<GreedyRefineCentralLB::Solution> results(NUM_SOLUTIONS);
 
   int migrationsAllowed = totalObjs * migrationTolerance;
+  ckout<<"migrations allowed "<<migrationsAllowed<<" out of "<<totalObjs<<" total objs"<<endl;
   // feasible solutions are those satistying user's migration constraint
   bool feasibleSolutions = false;
   float lowest_max_load = FLT_MAX;    // lowest max load of all solutions

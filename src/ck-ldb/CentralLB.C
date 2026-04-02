@@ -1028,6 +1028,7 @@ void CentralLB::ProcessMigrationDecision() {
 
 void CentralLB::ProcessReceiveMigration()
 {
+  // CmiPrintf("[%d] ProcessReceiveMigration\n", CkMyPe());
 #if CMK_LBDB_ON
 	int i;
         LBMigrateMsg *m = storedMigrateMsg;
@@ -1040,9 +1041,11 @@ void CentralLB::ProcessReceiveMigration()
   CmiAssert(migrates_expected <= 0 || migrates_completed == migrates_expected);
   migrates_expected = 0;
   future_migrates_expected = 0;
+  // CmiPrintf("[%d] ProcessReceiveMigration: n_moves=%d\n", CkMyPe(), m->n_moves);
   for(i=0; i < m->n_moves; i++) {
     MigrateInfo& move = m->moves[i];
-    #if CMK_GLOBAL_LOCATION_UPDATE      
+    #if CMK_GLOBAL_LOCATION_UPDATE
+      // CmiPrintf("[%d] Updating location for obj id=%llu from %d to %d\n", CkMyPe(), move.obj.id, move.from_pe, move.to_pe);
       UpdateLocation(move);
     #endif
     const int me = CkMyPe();

@@ -243,13 +243,13 @@ class Block : public CBase_Block {
   }
 
   ~Block() {
-    hapiCheck(cudaFreeHost(h_temperature));
+    // hapiCheck(cudaFreeHost(h_temperature));
     hapiCheck(cudaFree(d_temperature));
     hapiCheck(cudaFree(d_new_temperature));
-    hapiCheck(cudaFreeHost(h_left_ghost));
-    hapiCheck(cudaFreeHost(h_right_ghost));
-    hapiCheck(cudaFreeHost(h_top_ghost));
-    hapiCheck(cudaFreeHost(h_bottom_ghost));
+    // hapiCheck(cudaFreeHost(h_left_ghost));
+    // hapiCheck(cudaFreeHost(h_right_ghost));
+    // hapiCheck(cudaFreeHost(h_top_ghost));
+    // hapiCheck(cudaFreeHost(h_bottom_ghost));
     if (!use_zerocopy) {
       hapiCheck(cudaFree(d_left_ghost));
       hapiCheck(cudaFree(d_right_ghost));
@@ -282,16 +282,16 @@ class Block : public CBase_Block {
     p | load_iters;
 
     if (p.isUnpacking()) {
-      hapiCheck(hapiMallocHost((void**)&h_temperature,
-            sizeof(DataType) * (block_width + 2) * (block_height + 2)));
+      // hapiCheck(hapiMallocHost((void**)&h_temperature,
+      //       sizeof(DataType) * (block_width + 2) * (block_height + 2)));
       hapiCheck(hapiMalloc((void**)&d_temperature,
             sizeof(DataType) * (block_width + 2) * (block_height + 2)));
       hapiCheck(hapiMalloc((void**)&d_new_temperature,
             sizeof(DataType) * (block_width + 2) * (block_height + 2)));
-      hapiCheck(hapiMallocHost((void**)&h_left_ghost, sizeof(DataType) * block_height));
-      hapiCheck(hapiMallocHost((void**)&h_right_ghost, sizeof(DataType) * block_height));
-      hapiCheck(hapiMallocHost((void**)&h_top_ghost, sizeof(DataType) * block_width));
-      hapiCheck(hapiMallocHost((void**)&h_bottom_ghost, sizeof(DataType) * block_width));
+      // hapiCheck(hapiMallocHost((void**)&h_left_ghost, sizeof(DataType) * block_height));
+      // hapiCheck(hapiMallocHost((void**)&h_right_ghost, sizeof(DataType) * block_height));
+      // hapiCheck(hapiMallocHost((void**)&h_top_ghost, sizeof(DataType) * block_width));
+      // hapiCheck(hapiMallocHost((void**)&h_bottom_ghost, sizeof(DataType) * block_width));
       if (!use_zerocopy) {
         hapiCheck(hapiMalloc((void**)&d_left_ghost, sizeof(DataType) * block_height));
         hapiCheck(hapiMalloc((void**)&d_right_ghost, sizeof(DataType) * block_height));
@@ -554,7 +554,7 @@ class Block : public CBase_Block {
       default:
         CkAbort("Error: invalid direction");
     }
-    devicePost[0].cuda_stream = comm_stream;
+    devicePost[0].hapi_stream = comm_stream;
   }
 
   void processGhostsZC(int dir, int size, DataType* gh) {

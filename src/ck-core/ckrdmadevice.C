@@ -245,6 +245,7 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
 
   // Find which mode of transfer should be used
+  // CmiPrintf("[%d] CkRdmaDeviceOnSender: src_pe=%d, dst_pe=%d\n", CkMyPe(), env->getSrcPe(), CkMyPe());
   CkNcpyModeDevice mode = findTransferModeDevice(env->getSrcPe(), CkMyPe());
 
   // Allocate and fill in metadata for this zerocopy operation
@@ -324,6 +325,7 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
       shm_event_shared->dst_flag = true;
       pthread_mutex_unlock(&shm_event_shared->lock);
     } else {
+      // CmiPrintf("it should never be called during intra node\n");
 #if CMK_GPU_COMM
       // Machine layer supports GPU-aware communication
       save_op.tag = source.tag;
@@ -442,6 +444,7 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
   // TODO: Need to handle the case where the destination PE could be wrong
   //       (due to migration, etc.). Currently the code relies on a global
   //       location update after migration (with CMK_GLOBAL_LOCATION_UPDATE).
+  // CmiPrintf("[%d] CkRdmaDeviceOnSender: src_pe=%d, dst_pe=%d\n", CkMyPe(), CkMyPe(), dest_pe);
   CkNcpyModeDevice transfer_mode = findTransferModeDevice(CkMyPe(), dest_pe);
 
   // Store destination PE in the metadata message

@@ -83,6 +83,7 @@ int _messageBufferingThreshold;
 #  if CMK_GLOBAL_LOCATION_UPDATE
 void UpdateLocation(MigrateInfo& migData)
 {
+  // CmiPrintf("calls update location\n");
   CkGroupID locMgrGid = ck::ObjID(migData.obj.id).getCollectionID();
   CkLocMgr* localLocMgr = (CkLocMgr*)CkLocalBranch(locMgrGid);
   CkLocCache *cache = (CkLocCache *)CkLocalBranch(localLocMgr->getLocationCache());

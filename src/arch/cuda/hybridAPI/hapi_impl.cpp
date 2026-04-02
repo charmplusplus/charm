@@ -559,7 +559,8 @@ static void hapiMapping(char** argv) {
     }
 
     int& device_count = csv_gpu_manager.device_count;
-    device_count = visible_device_count / (CmiNumNodes() / CmiNumPhysicalNodes());
+    device_count = visible_device_count / (CmiNumNodes() / CmiNumPhysicalNodes());//?????
+    ckout<<"device count "<<device_count<<endl;
 
     // Handle the case where the number of GPUs per process are larger than
     // the number of PEs per process. This is needed because we currently don't
@@ -580,18 +581,29 @@ static void hapiMapping(char** argv) {
     if(device_count == 0) {
       device_count = 1;
     }
-
-    // Create a DeviceManager per GPU device
-    std::vector<DeviceManager>& device_managers = csv_gpu_manager.device_managers;
-    for (int i = 0; i < device_count; i++) {
-      device_managers.emplace_back(i, (device_count * CmiMyNodeRankLocal() + i) % visible_device_count);
-    }
-
     // Count number of PEs per device
     csv_gpu_manager.pes_per_device = CmiNodeSize(CmiMyNode()) / device_count;
 
     // Count number of devices on a physical node
     csv_gpu_manager.device_count_on_physical_node = visible_device_count;
+
+    // Create a DeviceManager per GPU device
+    std::vector<DeviceManager>& device_managers = csv_gpu_manager.device_managers;
+    if(map_type == Mapping::RoundRobin) {
+      for (int i = 0; i < device_count; i++) {
+        device_managers.emplace_back(i, (device_count * CmiMyNodeRankLocal() + i) % visible_device_count);
+      }
+    }
+    else if(map_type == Mapping::Block)
+    {
+      for (int i = 0; i < device_count; i++) {
+        device_managers.emplace_back(i, (CmiMyNodeRankLocal() * visible_device_count + i)/(CmiNumNodes() / CmiNumPhysicalNodes()));
+      }
+    }
+    else
+    {
+      CmiAbort("Unsupported mapping type!");
+    }
   }
 
   if (CmiMyPe() == 0) {
@@ -609,12 +621,12 @@ static void hapiMapping(char** argv) {
   bool& cpv_device_rep = CpvAccess(device_rep);
 
   switch (map_type) {
-    case Mapping::Block:
-      cpv_my_device = my_rank / csv_gpu_manager.pes_per_device;
-      // if(cpv_my_device >= csv_gpu_manager.device_count)
-      //     cpv_my_device = csv_gpu_manager.device_count - 1;
-      if (my_rank % csv_gpu_manager.pes_per_device == 0) cpv_device_rep = true;
-      firstRankForDevice = cpv_my_device * csv_gpu_manager.pes_per_device;
+    case Mapping::Block:{
+      cpv_my_device_id   = (my_rank*csv_gpu_manager.device_count) / CmiNodeSize(CmiMyNode());
+      cpv_my_device      = csv_gpu_manager.device_managers[cpv_my_device_id].global_index;
+      if (my_rank < csv_gpu_manager.device_count) cpv_device_rep = true;
+      firstRankForDevice = cpv_my_device;
+    }
       break;
     case Mapping::RoundRobin: {
       cpv_my_device_id   = my_rank % csv_gpu_manager.device_count;
@@ -1936,7 +1948,9 @@ void hapiErrorDie(cudaError_t retCode, const char* code, const char* file, int l
   }
 }
 
-int hapiMyDevice() {
-  return CpvAccess(my_device);
+uint64_t hapiMyDevice() {
+  int physical_node_id = CmiPhysicalNodeID(CmiMyPe());
+  int my_device = CpvAccess(my_device);
+  return (static_cast<uint64_t>(physical_node_id) << 32) | my_device;
 }
 

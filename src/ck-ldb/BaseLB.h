@@ -54,7 +54,7 @@ public:
     int pe;			// processor id
     bool available;
 #if CMK_CUDA
-    int gpu_device_id;		// GPU device this PE is mapped to (-1 = no GPU)
+    uint64_t gpu_device_id;		// GPU device this PE is mapped to (-1 = no GPU)
 #endif
     ProcStats(): n_objs(0), pe_speed(1), total_walltime(0.0), idletime(0.0),
 #if CMK_LB_CPUTIMER

@@ -106,9 +106,9 @@ void invokeInitKernel(DataType* d_temperature, int block_width, int block_height
   dim3 grid_dim(((block_width + 2) + (block_dim.x - 1)) / block_dim.x,
       ((block_height + 2) + (block_dim.y - 1)) / block_dim.y);
 
-  //initKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature, block_width, block_height);
-  hapiLaunchKernelWrapper(initKernel, grid_dim, block_dim, 0, stream,
-      d_temperature, block_width, block_height);
+  HAPI_LAUNCH_KERNEL_WRAPPER((initKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature, block_width, block_height)), stream)
+  // hapiLaunchKernelWrapper(initKernel, grid_dim, block_dim, 0, stream,
+  //     d_temperature, block_width, block_height);
   hapiCheck(cudaPeekAtLastError());
 }
 
@@ -119,31 +119,31 @@ void invokeBoundaryKernels(DataType* d_temperature, int block_width,
 
   if (left_bound) {
     dim3 grid_dim((block_height + (block_dim.x - 1)) / block_dim.x);
-    //leftBoundaryKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature,
-    //    block_width, block_height);
-    hapiLaunchKernelWrapper(leftBoundaryKernel, grid_dim, block_dim, 0, stream,
-        d_temperature, block_width, block_height);
+    leftBoundaryKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature,
+       block_width, block_height);
+    // hapiLaunchKernelWrapper(leftBoundaryKernel, grid_dim, block_dim, 0, stream,
+    //     d_temperature, block_width, block_height);
   }
   if (right_bound) {
     dim3 grid_dim((block_height + (block_dim.x - 1)) / block_dim.x);
-    //rightBoundaryKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature,
-    //    block_width, block_height);
-    hapiLaunchKernelWrapper(rightBoundaryKernel, grid_dim, block_dim, 0, stream,
-        d_temperature, block_width, block_height);
+    rightBoundaryKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature,
+       block_width, block_height);
+    // hapiLaunchKernelWrapper(rightBoundaryKernel, grid_dim, block_dim, 0, stream,
+    //     d_temperature, block_width, block_height);
   }
   if (top_bound) {
     dim3 grid_dim((block_width + (block_dim.x - 1)) / block_dim.x);
-    //topBoundaryKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature,
-    //    block_width, block_height);
-    hapiLaunchKernelWrapper(topBoundaryKernel, grid_dim, block_dim, 0, stream,
-        d_temperature, block_width, block_height);
+    topBoundaryKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature,
+       block_width, block_height);
+    // hapiLaunchKernelWrapper(topBoundaryKernel, grid_dim, block_dim, 0, stream,
+    //     d_temperature, block_width, block_height);
   }
   if (bottom_bound) {
     dim3 grid_dim((block_width + (block_dim.x - 1)) / block_dim.x);
-    //bottomBoundaryKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature,
-    //    block_width, block_height);
-    hapiLaunchKernelWrapper(bottomBoundaryKernel, grid_dim, block_dim, 0, stream,
-        d_temperature, block_width, block_height);
+    bottomBoundaryKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature,
+       block_width, block_height);
+    // hapiLaunchKernelWrapper(bottomBoundaryKernel, grid_dim, block_dim, 0, stream,
+    //     d_temperature, block_width, block_height);
   }
   hapiCheck(cudaPeekAtLastError());
 }
@@ -154,9 +154,9 @@ void invokeJacobiKernel(DataType* d_temperature, DataType* d_new_temperature,
   dim3 grid_dim((block_width + (block_dim.x - 1)) / block_dim.x,
       (block_height + (block_dim.y - 1)) / block_dim.y);
 
-  //jacobiKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature, d_new_temperature, block_width, block_height);
-  hapiLaunchKernelWrapper(jacobiKernel, grid_dim, block_dim, 0, stream,
-      d_temperature, d_new_temperature, block_width, block_height, iter);
+  HAPI_LAUNCH_KERNEL_WRAPPER((jacobiKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature, d_new_temperature, block_width, block_height, iter)), stream)
+  // hapiLaunchKernelWrapper(jacobiKernel, grid_dim, block_dim, 0, stream,
+  //     d_temperature, d_new_temperature, block_width, block_height, iter);
   hapiCheck(cudaPeekAtLastError());
 }
 
@@ -166,14 +166,14 @@ void invokePackingKernels(DataType* d_temperature, DataType* d_left_ghost,
   dim3 block_dim(TILE_SIZE * TILE_SIZE);
   dim3 grid_dim((block_height + (block_dim.x - 1)) / block_dim.x);
   if (!left_bound) {
-    //leftPackingKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature, d_left_ghost, block_width, block_height);
-    hapiLaunchKernelWrapper(leftPackingKernel, grid_dim, block_dim, 0, stream,
-        d_temperature, d_left_ghost, block_width, block_height);
+    leftPackingKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature, d_left_ghost, block_width, block_height);
+    // hapiLaunchKernelWrapper(leftPackingKernel, grid_dim, block_dim, 0, stream,
+    //     d_temperature, d_left_ghost, block_width, block_height);
   }
   if (!right_bound) {
-    //rightPackingKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature, d_right_ghost, block_width, block_height);
-    hapiLaunchKernelWrapper(rightPackingKernel, grid_dim, block_dim, 0, stream,
-        d_temperature, d_right_ghost, block_width, block_height);
+    rightPackingKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature, d_right_ghost, block_width, block_height);
+    // hapiLaunchKernelWrapper(rightPackingKernel, grid_dim, block_dim, 0, stream,
+    //     d_temperature, d_right_ghost, block_width, block_height);
   }
   hapiCheck(cudaPeekAtLastError());
 }
@@ -183,13 +183,13 @@ void invokeUnpackingKernel(DataType* d_temperature, DataType* d_ghost, bool is_l
   dim3 block_dim(TILE_SIZE * TILE_SIZE);
   dim3 grid_dim((block_height + (block_dim.x - 1)) / block_dim.x);
   if (is_left) {
-    //leftUnpackingKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature, d_ghost, block_width, block_height);
-    hapiLaunchKernelWrapper(leftUnpackingKernel, grid_dim, block_dim, 0, stream,
-        d_temperature, d_ghost, block_width, block_height);
+    leftUnpackingKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature, d_ghost, block_width, block_height);
+    // hapiLaunchKernelWrapper(leftUnpackingKernel, grid_dim, block_dim, 0, stream,
+        // d_temperature, d_ghost, block_width, block_height);
   } else {
-    //rightUnpackingKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature, d_ghost, block_width, block_height);
-    hapiLaunchKernelWrapper(rightUnpackingKernel, grid_dim, block_dim, 0, stream,
-        d_temperature, d_ghost, block_width, block_height);
+    rightUnpackingKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature, d_ghost, block_width, block_height);
+    // hapiLaunchKernelWrapper(rightUnpackingKernel, grid_dim, block_dim, 0, stream,
+        // d_temperature, d_ghost, block_width, block_height);
   }
   hapiCheck(cudaPeekAtLastError());
 }

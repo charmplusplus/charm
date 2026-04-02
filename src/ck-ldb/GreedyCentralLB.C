@@ -140,11 +140,11 @@ void GreedyCentralLB::work(LDStats* stats)
   // With typical counts (2-8 GPUs), linear scan beats a heap and avoids
   // heap-invariant headaches when we update a non-front group in place.
   std::vector<GPUGroup> gpuGroups;
-  std::unordered_map<int, int> gpuIdToIdx;  // gpu_device_id -> index in gpuGroups
+  std::unordered_map<uint64_t, int> gpuIdToIdx;  // gpu_device_id -> index in gpuGroups
 
   for (int i = 0; i < (int)procs.size(); i++) {
     int real_pe = procs[i].getProcId();
-    int gpu_id = stats->procs[real_pe].gpu_device_id;
+    uint64_t gpu_id = stats->procs[real_pe].gpu_device_id;
 
     auto it = gpuIdToIdx.find(gpu_id);
     if (it == gpuIdToIdx.end()) {

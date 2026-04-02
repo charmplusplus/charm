@@ -56,7 +56,7 @@ AMPI_CUSTOM_FUNC(hapiError_t, hapiPoolFree, void*)
 AMPI_CUSTOM_FUNC(void, hapiErrorDie, hapiError_t, const char*, const char*, int)
 
 // Returns the GPU device index this PE is mapped to (set during hapiMapping).
-AMPI_CUSTOM_FUNC(int, hapiMyDevice, void)
+AMPI_CUSTOM_FUNC(uint64_t, hapiMyDevice, void)
 
 #ifdef HAPI_INSTRUMENT_WRS
 AMPI_CUSTOM_FUNC(void, hapiInitInstrument, int n_chares, char n_types)
