@@ -3084,8 +3084,8 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 #if CMK_CUDA
   if (gpuBufSize > 0)
   {
-    sendGPUBuffers[msg->id] = GPUMigrateData(toPe, gpuBufSize, gpuMsg);
-    thisProxy[CkMyPe()].sendGPUMsg(msg->id);
+    sendGPUBuffers[id] = GPUMigrateData(toPe, gpuBufSize, gpuMsg);
+    thisProxy[CkMyPe()].sendGPUMsg(id);
   }
 #endif
 
@@ -3116,6 +3116,7 @@ void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char* &data, CkDeviceBuffer
 {
   //CkPrintf("PE %d allocating GPU memory size %d for id %llu\n", CkMyPe(), size, id);
   cudaMalloc(&data, size);
+  cudaDeviceSynchronize();
   receivedDeviceMsgs[id] = data;
   post[0].hapi_stream = (cudaStream_t) 0;
 }

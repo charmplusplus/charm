@@ -432,7 +432,7 @@ void hapiProcessCuptiBuffers() {
         }
         else 
         {
-          CmiPrintf("found an out of order entry\n");
+          // CmiPrintf("found an out of order entry\n");
           gm.cupti_correlation_db_[kernel->correlationId] = duration_ns;
         }
       }
@@ -444,10 +444,10 @@ void hapiProcessCuptiBuffers() {
     free(item.buffer);
   }
   //final state of gm.cupti_correlation_db_ and gm.cupti_obj_gpu_times_ 
-  // CmiPrintf("size of correlation DB is: %zu\n", gm.cupti_correlation_db_.size());
-  // CmiPrintf("size of obj_gpu_times_ map is: %zu\n", gm.cupti_obj_gpu_times_.size());
-  // CmiPrintf("number of kernel records processed: %u\n", kernel_count);
-  // CmiPrintf("number of correlation records processed: %u\n", corr_count);
+  CmiPrintf("size of correlation DB is: %zu\n", gm.cupti_correlation_db_.size());
+  CmiPrintf("size of obj_gpu_times_ map is: %zu\n", gm.cupti_obj_gpu_times_.size());
+  CmiPrintf("number of kernel records processed: %u\n", kernel_count);
+  CmiPrintf("number of correlation records processed: %u\n", corr_count);
 
   // DEBUG: print CUPTI obj-gpu-time map summary
   if (!gm.cupti_obj_gpu_times_.empty()) {

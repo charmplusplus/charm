@@ -157,12 +157,12 @@ if (CmiMyRank() == 0)
   double start = CkWallTimer();
   cuptiActivityFlushAll(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED);//sync flush cupti records which are finished, does not wait for partial records
   hapiProcessCuptiBuffers();
-  lbmgr->SetObjGPULoad(CsvAccess(gpu_manager).cupti_obj_gpu_times_);
-  // ckout<<"CENTRALLB: CUPTI flush and process time: "<<(CkWallTimer() - start)<<" seconds"<<endl;
 }
-// #if CMK_SMP
-//   CmiNodeBarrier();
-// #endif
+#if CMK_SMP
+  CmiNodeBarrier();  // ensure rank 0 finishes buffer processing before other ranks read the map
+#endif
+  // Every PE matches its own objects against the shared per-process CUPTI map
+  lbmgr->SetObjGPULoad(CsvAccess(gpu_manager).cupti_obj_gpu_times_);
 #endif
 
   {

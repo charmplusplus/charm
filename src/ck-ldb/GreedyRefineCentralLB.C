@@ -317,15 +317,15 @@ double GreedyRefineCentralLB::fillData(LDStats *stats,
 #else
       obj.load = oData.wallTime * stats->procs[pe].pe_speed;
 #endif
-      CkPrintf("[%d] Obj %d on PE %d is migratable, load=%.6f\n", CkMyPe(), i, pe, obj.load);
+      // CkPrintf("[%d] Obj %d on PE %d is migratable, load=%.6f\n", CkMyPe(), i, pe, obj.load);
       pobjs.push_back(&obj);
       totalObjLoad += obj.load;
       if (_lb_args.debug() > 1) {
         if (obj.load < minOload) minOload = obj.load;
         if (obj.load > maxOload) maxOload = obj.load;
 #if CMK_CUDA
-        CkPrintf("[%d] Obj %d (PE %d): wallTime=%.6f gpuTime=%.6f effectiveLoad=%.6f\n",
-                 CkMyPe(), i, pe, oData.wallTime, oData.gpuTime, obj.load);
+        // CkPrintf("[%d] Obj %d (PE %d): wallTime=%.6f gpuTime=%.6f effectiveLoad=%.6f\n",
+        //          CkMyPe(), i, pe, oData.wallTime, oData.gpuTime, obj.load);
 #endif
       }
     }
