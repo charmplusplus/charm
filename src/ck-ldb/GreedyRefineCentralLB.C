@@ -378,7 +378,7 @@ double GreedyRefineCentralLB::fillData(LDStats *stats,
 }
 
 static const float Avals[] = {1.0, 1.005, 1.01, 1.015, 1.02, 1.03, 1.04, 1.05, 1.06, 1.07, 1.08, 1.16, 1.20, 1.30};
-static const float Bvals[] = {1.0, 1.05, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3, FLT_MAX};
+static const float Bvals[] = {FLT_MAX, 1.0, 1.05, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3};
 #define Avals_len 14
 #define Bvals_len 16
 #define NUM_SOLUTIONS Avals_len*Bvals_len+1
@@ -609,10 +609,10 @@ void GreedyRefineCentralLB::work(LDStats *stats)
   }
 
   // Print per-GPU-group loads after LB
-  // CkPrintf("[%d] --- Per-GPU-group loads after LB ---\n", CkMyPe());
-  // for (int gi = 0; gi < nGroups; gi++)
-  //   CkPrintf("[%d]   GPU %llu: aggregate load=%.6f\n",
-  //            CkMyPe(), gpuGroups[gi].gpu_id, gpuGroups[gi].load);
+  CkPrintf("[%d] --- Per-GPU-group loads after LB ---\n", CkMyPe());
+  for (int gi = 0; gi < nGroups; gi++)
+    CkPrintf("[%d]   GPU %llu: aggregate load=%.6f\n",
+             CkMyPe(), gpuGroups[gi].gpu_id, gpuGroups[gi].load);
 
 #else
   // ---- Original PE-level greedy refine (non-GPU path) ----

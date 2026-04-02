@@ -89,6 +89,9 @@
 #define hapiEventInterprocess cudaEventInterprocess
 #define hapiIpcMemLazyEnablePeerAccess cudaIpcMemLazyEnablePeerAccess
 
+#define hapiMemcpyAsync cudaMemcpyAsync
+#define hapiMemcpy2DAsync cudaMemcpy2DAsync
+
 #endif // CMK_CUDA
 
 #ifdef CMK_HIP
@@ -168,5 +171,6 @@
 #define hapiEventDisableTiming hipEventDisableTiming
 #define hapiEventInterprocess hipEventInterprocess
 #define hapiIpcMemLazyEnablePeerAccess hipIpcMemLazyEnablePeerAccess
+
 
 #endif // CMK_HIP

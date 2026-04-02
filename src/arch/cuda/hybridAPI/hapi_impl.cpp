@@ -758,6 +758,8 @@ static void hapiMapping(char** argv) {
 
 #ifndef HAPI_CUDA_CALLBACK
 void recordEvent(cudaStream_t stream, const CkCallback& cb, void* cb_msg, hapiWorkRequest* wr = NULL, CkMigratable* obj = NULL, cudaEvent_t start_ev = NULL) {
+  if(obj!=NULL)
+    CmiAbort("non null without HAPI CUDA CALLBACK");
   // create CUDA event / get CUDA event from the pool and insert into stream
   hapiEvent_t ev;
   auto& hapi_event_pool_local = CpvAccess(hapi_event_pool);
@@ -1733,6 +1735,7 @@ void hapiPollEvents(void* param) {
 
 #if CMK_LBDB_ON
       if (hev.obj) {
+        // CmiPrintf("should not be printed w/o hapi cuda callback \n");
         float gpu_time;
         cudaEventElapsedTime(&gpu_time, hev.start_ev, hev.event);
         // cudaEventElapsedTime returns ms, convert to seconds to match wallTime units
@@ -1909,36 +1912,36 @@ void hapiSendMemoryRequest(char* msg, int size)
 }
 
 
-hapiError_t hapiMemcpyAsync(void* dst, const void* src, size_t count, cudaMemcpyKind kind, cudaStream_t stream = 0) {
-  hapiError_t err;
-#if CMK_LBDB_ON
-  hapiEvent_t start;
+// hapiError_t hapiMemcpyAsync(void* dst, const void* src, size_t count, cudaMemcpyKind kind, cudaStream_t stream = 0) {
+//   hapiError_t err;
+// #if CMK_LBDB_ON
+//   hapiEvent_t start;
 
-  cudaEventCreate(&start);
-  cudaEventRecord(start, stream);
-#endif
+//   cudaEventCreate(&start);
+//   cudaEventRecord(start, stream);
+// #endif
 
-  err = cudaMemcpyAsync(dst, src, count, kind, stream);
-#if CMK_LBDB_ON
-  hapiRecordTime(stream, start);  
-#endif
-  return err;
-}
+//   err = cudaMemcpyAsync(dst, src, count, kind, stream);
+// #if CMK_LBDB_ON
+//   hapiRecordTime(stream, start);  
+// #endif
+//   return err;
+// }
 
-cudaError_t hapiMemcpy2DAsync(void* dst, size_t dpitch, const void* src, size_t spitch, size_t width, size_t height, cudaMemcpyKind kind, cudaStream_t stream = 0) {
-  cudaError_t err;
-#if CMK_LBDB_ON
-  cudaEvent_t start;
+// cudaError_t hapiMemcpy2DAsync(void* dst, size_t dpitch, const void* src, size_t spitch, size_t width, size_t height, cudaMemcpyKind kind, cudaStream_t stream = 0) {
+//   cudaError_t err;
+// #if CMK_LBDB_ON
+//   cudaEvent_t start;
 
-  cudaEventCreate(&start);
-  cudaEventRecord(start, stream);
-#endif
-  err = cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream);
-#if CMK_LBDB_ON
-  hapiRecordTime(stream, start);
-#endif
-  return err;
-}
+//   cudaEventCreate(&start);
+//   cudaEventRecord(start, stream);
+// #endif
+//   err = cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream);
+// #if CMK_LBDB_ON
+//   hapiRecordTime(stream, start);
+// #endif
+//   return err;
+// }
 
 
 void hapiErrorDie(cudaError_t retCode, const char* code, const char* file, int line) {

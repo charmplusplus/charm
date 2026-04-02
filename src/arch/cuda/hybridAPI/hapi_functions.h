@@ -42,8 +42,8 @@ AMPI_CUSTOM_FUNC(void, hapiAddCallback, hapiStream_t, void*, void*)
 // AMPI_CUSTOM_FUNC(cudaError_t, hapiFree, void*)
 // AMPI_CUSTOM_FUNC(cudaError_t, hapiMallocHost, void**, size_t)
 // AMPI_CUSTOM_FUNC(cudaError_t, hapiFreeHost, void*)
-AMPI_CUSTOM_FUNC(cudaError_t, hapiMemcpyAsync, void*, const void*, size_t, enum cudaMemcpyKind, cudaStream_t)
-AMPI_CUSTOM_FUNC(cudaError_t, hapiMemcpy2DAsync, void*, size_t, const void*, size_t, size_t, size_t, enum cudaMemcpyKind, cudaStream_t)
+// AMPI_CUSTOM_FUNC(cudaError_t, hapiMemcpyAsync, void*, const void*, size_t, enum cudaMemcpyKind, cudaStream_t)
+// AMPI_CUSTOM_FUNC(cudaError_t, hapiMemcpy2DAsync, void*, size_t, const void*, size_t, size_t, size_t, enum cudaMemcpyKind, cudaStream_t)
 
 // Kernel launch wrapper
 AMPI_CUSTOM_FUNC(cudaError_t, hapiLaunchKernel, const void*, dim3, dim3, void**, size_t, cudaStream_t)
