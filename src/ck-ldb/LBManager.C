@@ -275,6 +275,7 @@ void _loadbalancerInit()
       while (CmiGetArgStringDesc(argv, "+balancer", &balancer, "Use this load balancer"))
         ;
     }
+    CmiNodeBarrier();
   }
 
   CmiGetArgDoubleDesc(

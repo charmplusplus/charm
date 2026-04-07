@@ -86,9 +86,7 @@ libcharm: charm++
 
 charm4py: libcharm
 
-LIBCHARM_LIBS= libck.a libconverse.a \
-               libmemory-default.a libthreads-default.a \
-               libldb-rand.a
+LIBCHARM_LIBS= libck.a libconverse.a 
 
 DEFAULT_LIBS= completion NDMeshStreamer dummy pythonCCS io ckloop
 
@@ -450,7 +448,7 @@ endif
 LIBCONV_CORE=convcore.o hrctimer.o conv-conds.o conv-taskQ.o queueing.o msgmgr.o \
 	cpm.o cpthreads.o futures.o cldb.o random.o \
 	debug-conv.o debug-conv++.o conv-ccs.o ccs-builtins.o middle-ccs.o \
-	traceCore.o traceCoreCommon.o \
+	traceCore.o cputopology.o traceCoreCommon.o \
 	converseProjections.o machineProjections.o \
 	quiescence.o isomalloc.o mem-arena.o memory-darwin-clang.o \
 	global-nop.o cmipool.o cpuaffinity.o cputopology.o  \

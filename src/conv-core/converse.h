@@ -1754,6 +1754,8 @@ int 	   CmmGetLastTag(CmmTable t, int ntags, int *tags);
 
 /******** ConverseInit and ConverseExit ********/
 
+void registerTraceInit(void (*fn)(char **argv));
+
 void ConverseInit(int, char**, CmiStartFn, int, int);
 
 /* Optional parameter for ConverseExit() - based on

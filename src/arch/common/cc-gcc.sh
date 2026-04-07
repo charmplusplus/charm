@@ -10,7 +10,7 @@ CMK_CPP_C_FLAGS="-E"
 CMK_LD_SHARED='-shared'
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 CMK_RANLIB='ranlib'
-CMK_LIBS="$CMK_LIBS -lckqt"
+CMK_LIBS="$CMK_LIBS"
 CMK_PIC='-fPIC'
 CMK_PIE='' # empty string: will be reset to default by conv-config.sh
 

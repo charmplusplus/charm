@@ -3973,10 +3973,15 @@ int quietModeRequested;  // user has requested quiet mode
 extern int quietMode;
 int quietMode; // quiet mode active (CmiPrintf's are disabled)
 CmiSpanningTreeInfo* _topoTree = NULL;
+void (*CmiTraceFn)(char **argv) = nullptr;
 
 #if CMK_HAS_IO_FILE_OVERFLOW
 extern "C" int _IO_file_overflow(FILE *, int);
 #endif
+
+void registerTraceInit(void (*fn)(char **argv)) {
+  CmiTraceFn = fn;
+}
 
 /**
   Main Converse initialization routine.  This routine is 
@@ -4081,8 +4086,8 @@ void ConverseCommonInit(char **argv)
 #endif
 
 #if CMK_TRACE_ENABLED
-  traceInit(argv);
-/*initTraceCore(argv);*/ /* projector */
+  if (CmiTraceFn != nullptr)
+    CmiTraceFn(argv);
 #endif
   CmiProcessPriority(argv);
 

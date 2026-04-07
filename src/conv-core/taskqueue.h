@@ -13,6 +13,7 @@ typedef LONG taskq_idx;
 #else
 typedef int taskq_idx;
 #endif
+#include "converse.h"
 typedef struct TaskQueueStruct {
   taskq_idx head; // This pointer indicates the first task in the queue
   taskq_idx tail; // The tail indicates the array element next to the last available task in the queue. So, if head == tail, the queue is empty
