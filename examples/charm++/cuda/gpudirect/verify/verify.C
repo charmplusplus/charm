@@ -72,8 +72,8 @@ class Main : public CBase_Main {
 public:
   Main(CkArgMsg* m) {
     main_proxy = thisProxy;
-    block_size = 1028 * 1028 * 128;
-    n_iters = 50;
+    block_size = 1028;
+    n_iters = 100;
     n_warpup_iters = 3;
     test_nodegroup = true;
     lb_test = false;
@@ -154,6 +154,7 @@ public:
     // }
 
     CkPrintf("Elapsed: %.6lf s\n", CkWallTimer() - start_time);
+    fflush(stdout);
     CkExit();
   }
 };
@@ -197,9 +198,14 @@ public:
       pe = CkMyPe();
       AtSync();
     }
+    printf("[VERIFY] data received on PE: %d, Process: %d\n", CmiMyPe(), CmiMyNode());
+    fflush(stdout);
   }
 
-  void reuse() {}
+  void reuse() {
+    printf("[VERIFY] source callback called on PE: %d, Process: %d\n", CmiMyPe(), CmiMyNode());
+    fflush(stdout);
+  }
 
   void ResumeFromSync() {}
 };

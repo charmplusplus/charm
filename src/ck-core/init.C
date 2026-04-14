@@ -78,6 +78,7 @@ never be excluded...
 #include "TreeLB.h"
 #endif
 
+#define CMK_GPU_COMM 1
 #if CMK_CUDA || CMK_HIP
 #include "hapi_impl.h"
 #include "ckrdmadevice.h"
@@ -1482,7 +1483,7 @@ void _initCharm(int unused_argc, char **argv)
 	CmiSetDirectNcpyAckHandler(CkRdmaDirectAckHandler);
 
 #if (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM
-	CmiRdmaDeviceRecvInit(CkRdmaDeviceRecvHandler);
+  loopback_handler = CmiRegisterHandler((CmiHandler) loopback_bridge);
 #endif
 
 #if CMK_USE_SHMEM

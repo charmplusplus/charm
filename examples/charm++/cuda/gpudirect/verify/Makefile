@@ -1,11 +1,11 @@
 OPTS = -O0 -g
 
-CHARM_DIR = /u/ajain18/charm/mpi-linux-x86_64-smp-cuda
+CHARM_DIR = /u/ajain18/reconverse_charm_integration/charm/multicore-linux-x86_64-cuda
 CHARMC = $(CHARM_DIR)/bin/charmc $(OPTS)
 CHARM_INC = -I$(CHARM_DIR)/include
 
 NVCC = nvcc
-NVCC_FLAGS = -O3 -c -std=c++11 -use_fast_math
+NVCC_FLAGS = -O0 -g -c -std=c++11 -use_fast_math
 LD_LIBS =
 
 TARGET = verify
@@ -14,7 +14,7 @@ all: $(TARGET)
 OBJS = $(TARGET).o $(TARGET)CUDA.o
 
 $(TARGET): $(OBJS)
-	$(CHARMC) -language charm++ -module CommonLBs -lmpi_gtl_cuda -o $@ $(OBJS) $(LD_LIBS)
+	$(CHARMC) -language charm++ -module CommonLBs -o $@ $(OBJS) $(LD_LIBS)
 
 $(TARGET).decl.h: $(TARGET).ci
 	$(CHARMC) $<

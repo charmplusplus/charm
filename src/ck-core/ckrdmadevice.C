@@ -50,6 +50,8 @@
 #include "ck.h"
 #include "ckrdmadevice.h"
 
+#define CMK_GPU_COMM 1
+
 #if CMK_CUDA || CMK_HIP
 
 CmiNcpyModeDevice findTransferModeDevice(int srcPe, int dstPe) {
@@ -101,18 +103,47 @@ CsvExtern(GPUManager, gpu_manager);
 //   }
 // }
 
+struct LoopBackMsg {
+  char header[CmiMsgHeaderSizeBytes];
+  void* msg;
+};
+
+extern "C" {
+  void* loopback_bridge(void* arg) {
+    QdProcess(1);
+    LoopBackMsg* recv_msg = (LoopBackMsg*)arg;
+    CkRdmaDeviceRecvHandler(recv_msg->msg);
+    CmiFree(recv_msg);
+    return NULL;
+  }
+  
+  int loopback_handler;
+}
+
 void CkRdmaDeviceRecvHandler(void* data)
 {
   NcpyOperationInfo *ncpy_op_info = (NcpyOperationInfo *)data;
   DeviceRdmaOp* op = (DeviceRdmaOp*)(ncpy_op_info->deviceRdmaOpInfo);
+
+  if(op->dest_pe != CmiMyPe()) {
+        LoopBackMsg* conv_msg = (LoopBackMsg*)CmiAlloc(sizeof(LoopBackMsg));
+        conv_msg->msg = data;
+
+        QdCreate(1);
+        CmiSetHandler(conv_msg, loopback_handler);
+        CmiPushPE(CmiRankOf(op->dest_pe), conv_msg);
+        return;
+  }
+
+  QdProcess(1);
   DeviceRdmaInfo* info = op->info;
 
   // Invoke source callbacks
   if (op->src_cb) {
-    int rank;
     CkCallback* cb = (CkCallback*)op->src_cb;
     cb->send();
-    delete cb;
+    // TODO: Is this necessary ? 
+    // delete cb;
   }
 
   // Update counter (there may be multiple buffers in transit)
