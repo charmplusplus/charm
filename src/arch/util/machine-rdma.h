@@ -1,6 +1,8 @@
 #ifndef _MACHINE_RDMA_H_
 #define _MACHINE_RDMA_H_
 
+#define CMK_GPU_COMM 1
+
 /* Support for Nocopy Direct API */
 void LrtsSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short int mode);
 void LrtsIssueRget(NcpyOperationInfo *ncpyOpInfo);
