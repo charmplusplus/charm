@@ -72,7 +72,7 @@ class Main : public CBase_Main {
 public:
   Main(CkArgMsg* m) {
     main_proxy = thisProxy;
-    block_size = 1028;
+    block_size = 1024*1024;
     n_iters = 100;
     n_warpup_iters = 3;
     test_nodegroup = true;
@@ -126,13 +126,17 @@ public:
     // warm up
     for (int i = 0; i < n_warpup_iters; i++) {
       array_proxy[0].send();
+      // CkWaitQD();
+      printf("[ITER] %d DONE!", i);
+      fflush(stdout);
     }
-    CkWaitQD();
     start_time = CkWallTimer();
     
     CkPrintf("Testing chare array... ");
     for (int i = 0; i < n_iters; i++) {
       array_proxy[0].send();
+      printf("[ITER] %d DONE!", i);
+      fflush(stdout);
     }
     CkWaitQD();
     CkPrintf("PASS\n");
@@ -152,6 +156,8 @@ public:
     //   CkWaitQD();
     //   CkPrintf("PASS\n");
     // }
+
+    // sleep(3);
 
     CkPrintf("Elapsed: %.6lf s\n", CkWallTimer() - start_time);
     fflush(stdout);

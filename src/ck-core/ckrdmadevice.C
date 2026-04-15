@@ -126,8 +126,12 @@ void CkRdmaDeviceRecvHandler(void* data)
   DeviceRdmaOp* op = (DeviceRdmaOp*)(ncpy_op_info->deviceRdmaOpInfo);
 
   if(op->dest_pe != CmiMyPe()) {
+        int infoSize = ncpy_op_info->ncpyOpInfoSize;
+        NcpyOperationInfo* copy = (NcpyOperationInfo*)CmiAlloc(infoSize);
+        memcpy(copy, ncpy_op_info, infoSize);
+
         LoopBackMsg* conv_msg = (LoopBackMsg*)CmiAlloc(sizeof(LoopBackMsg));
-        conv_msg->msg = data;
+        conv_msg->msg = copy;
 
         QdCreate(1);
         CmiSetHandler(conv_msg, loopback_handler);
@@ -142,7 +146,6 @@ void CkRdmaDeviceRecvHandler(void* data)
   if (op->src_cb) {
     CkCallback* cb = (CkCallback*)op->src_cb;
     cb->send();
-    // TODO: Is this necessary ? 
     // delete cb;
   }
 
@@ -157,7 +160,7 @@ void CkRdmaDeviceRecvHandler(void* data)
     enqueueNcpyMessage(op->dest_pe, info->msg);
 
     // Free RDMA metadata
-    CmiFree(info);
+    // CmiFree(info);
   }
 }
 
@@ -523,6 +526,9 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
     buffers[i]->src_mpi_rank = CmiNodeOf(CmiMyPe());
   }
   if(transfer_mode == CkNcpyModeDevice::MEMCPY) {
+  for (int i = 0; i < numops; i++) {
+      cudaStreamSynchronize(buffers[i]->hapi_stream);
+    }
     return;
   };
 
@@ -582,6 +588,7 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
     }
 #else
   for (int i = 0; i < numops; i++) {
+    cudaStreamSynchronize(buffers[i]->hapi_stream);
     buffers[i]->lci_ncpy_buffer = CmiNcpyBuffer(buffers[i]->ptr, buffers[i]->cnt);
   }
 #endif
