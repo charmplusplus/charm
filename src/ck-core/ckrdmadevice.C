@@ -74,6 +74,7 @@ CmiNcpyModeDevice findTransferModeDevice(int srcPe, int dstPe) {
 #include "gpumanager.h"
 
 CsvExtern(GPUManager, gpu_manager);
+CpvExtern(int, my_device_id);
 
 // void CkRdmaDeviceRecvHandler(void* data)
 // {
@@ -103,20 +104,12 @@ CsvExtern(GPUManager, gpu_manager);
 //   }
 // }
 
-struct LoopBackMsg {
-  char header[CmiMsgHeaderSizeBytes];
-  void* msg;
-};
-
 extern "C" {
   void* loopback_bridge(void* arg) {
-    QdProcess(1);
-    LoopBackMsg* recv_msg = (LoopBackMsg*)arg;
-    CkRdmaDeviceRecvHandler(recv_msg->msg);
-    CmiFree(recv_msg);
+    (void)arg;
     return NULL;
   }
-  
+
   int loopback_handler;
 }
 
@@ -125,19 +118,7 @@ void CkRdmaDeviceRecvHandler(void* data)
   NcpyOperationInfo *ncpy_op_info = (NcpyOperationInfo *)data;
   DeviceRdmaOp* op = (DeviceRdmaOp*)(ncpy_op_info->deviceRdmaOpInfo);
 
-  if(op->dest_pe != CmiMyPe()) {
-        int infoSize = ncpy_op_info->ncpyOpInfoSize;
-        NcpyOperationInfo* copy = (NcpyOperationInfo*)CmiAlloc(infoSize);
-        memcpy(copy, ncpy_op_info, infoSize);
-
-        LoopBackMsg* conv_msg = (LoopBackMsg*)CmiAlloc(sizeof(LoopBackMsg));
-        conv_msg->msg = copy;
-
-        QdCreate(1);
-        CmiSetHandler(conv_msg, loopback_handler);
-        CmiPushPE(CmiRankOf(op->dest_pe), conv_msg);
-        return;
-  }
+  CmiEnforce(op->dest_pe == CmiMyPe());
 
   QdProcess(1);
   DeviceRdmaInfo* info = op->info;
@@ -188,7 +169,7 @@ void CkRdmaDeviceRecvHandler(void* data, void* msg)
     enqueueNcpyMessage(op->dest_pe, info->msg);
 
     // Free RDMA metadata
-    CmiFree(info);
+    //CmiFree(info);
   }
 }
 
@@ -539,7 +520,8 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
   }
 
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
-  int cpv_my_device_id = CmiMyRank() % csv_gpu_manager.device_count;
+  //int cpv_my_device_id = CmiMyRank() % csv_gpu_manager.device_count;
+  int cpv_my_device_id = CpvAccess(my_device_id);
 
   if(transfer_mode == CkNcpyModeDevice::IPC && csv_gpu_manager.use_shm) {
     // Use optimizations with POSIX shaerd memory
