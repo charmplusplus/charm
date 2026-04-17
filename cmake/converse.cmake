@@ -240,7 +240,8 @@ add_library(charm_cxx_utils STATIC
 
 add_library(topomanager STATIC
     ${tmgr-cxx-sources}
-    ${tmgr-h-sources})
+    ${tmgr-h-sources}
+    $<TARGET_OBJECTS:ckrescale>)
 
 target_include_directories(topomanager PUBLIC
     src/util/topomanager
@@ -253,7 +254,7 @@ target_include_directories(topomanager PUBLIC
 #     charm_cxx_utils
 # )
 add_custom_target(converse)
-add_dependencies(converse reconverse topomanager charm_cxx_utils)
+add_dependencies(converse reconverse topomanager charm_cxx_utils ckrescale)
 
 #file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/comm_backend)
 

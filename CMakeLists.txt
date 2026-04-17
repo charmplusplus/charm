@@ -534,6 +534,9 @@ else()
   set(CMK_BUILD_CHARMRUN 1)
 endif()
 
+set(CHARMRUN_ELASTIC_DIR src/arch/common)
+set(CHARMRUN_HAPI_DIR src/arch/common)
+
 include(cmake/detect-features.cmake)
 include(cmake/ci-files.cmake)
 
@@ -691,6 +694,9 @@ configure_file(src/arch/common/conv-mach-tsan.h              include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-tsan.sh             include/ COPYONLY)
 configure_file(src/scripts/conv-config.sh                    include/ COPYONLY)
 configure_file(src/arch/${VDIR}/conv-mach.sh                 include/ COPYONLY)
+configure_file(src/util/ckrescale.h                         include/ COPYONLY)
+
+add_library(ckrescale src/util/ckrescale.C)
 
 set(CUDA_DIR "")
 set(HIP_DIR "")
@@ -712,7 +718,26 @@ if(BUILD_CUDA OR BUILD_HIP)
       find_package(CUDA REQUIRED)
       set(CUDA_DIR "${CUDA_TOOLKIT_ROOT_DIR}")
     endif()
-    add_library(hybridapi ${hybridAPI-cxx-sources})
+
+    # Find CUPTI library and include directory
+    find_library(CUPTI_LIBRARY cupti
+      HINTS "${CUDA_DIR}/extras/CUPTI/lib64"
+            "${CUDA_DIR}/lib64"
+    )
+    set(CUPTI_INCLUDE_DIR "${CUDA_DIR}/extras/CUPTI/include")
+    if(NOT CUPTI_LIBRARY)
+      message(WARNING "CUPTI library not found. GPU load balancing will not be available.")
+    else()
+      message(STATUS "Found CUPTI: ${CUPTI_LIBRARY}")
+    endif()
+
+    add_library(hybridapi ${hybridAPI-cxx-sources} $<TARGET_OBJECTS:ckrescale> $<TARGET_OBJECTS:converse>)
+
+    if(CUPTI_LIBRARY)
+      target_include_directories(hybridapi PRIVATE "${CUPTI_INCLUDE_DIR}")
+      target_link_libraries(hybridapi ${CUPTI_LIBRARY})
+    endif()
+
     if(TRACING)
       target_compile_definitions(hybridapi PRIVATE HAPI_TRACE)
     endif()
@@ -759,10 +784,18 @@ if(BUILD_CUDA OR BUILD_HIP)
     
     add_library(hybridapi ${hybridAPI-cxx-sources})
     target_include_directories(hybridapi PRIVATE "${ROCM_PATH}/include")
+
     if(TRACING)
       target_compile_definitions(hybridapi PRIVATE HAPI_TRACE)
     endif()
   endif()
+
+  # hapi_memory_daemon - standalone executable for shrink/expand GPU memory management
+  if(BUILD_CUDA)
+    add_executable(hapi_memory_daemon src/arch/cuda/hybridAPI/hapi_memory_daemon.cpp)
+    add_dependencies(hapi_memory_daemon hybridapi ck converse ckqt moduleNDMeshStreamer ckmain memory-default threads-default ldb-rand modulecompletion conv-static)
+  endif()
+
 endif()
 
 if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-cxi.sh)
@@ -963,6 +996,12 @@ if(${CMK_BUILD_CHARMRUN})
   add_dependencies(charmrun create_symlinks)
 else()
   configure_file(${CHARMRUN_DIR}/charmrun ${CMAKE_BINARY_DIR}/bin COPYONLY)
+  if(EXISTS ${CMAKE_SOURCE_DIR}/${CHARMRUN_ELASTIC_DIR}/charmrun_elastic)
+    configure_file(${CHARMRUN_ELASTIC_DIR}/charmrun_elastic ${CMAKE_BINARY_DIR}/bin COPYONLY)
+  endif()
+  if(EXISTS ${CMAKE_SOURCE_DIR}/${CHARMRUN_HAPI_DIR}/charmrun_hapi)
+    configure_file(${CHARMRUN_HAPI_DIR}/charmrun_hapi ${CMAKE_BINARY_DIR}/bin COPYONLY)
+  endif()
 endif()
 configure_file(src/scripts/testrun bin/ COPYONLY)
 
@@ -1075,9 +1114,12 @@ else()
   if(RECONVERSE)
     target_link_libraries(ckhello PRIVATE reconverse)
   endif()
-  add_dependencies(ckhello ck ckqt conv-static
+  add_dependencies(ckhello ck ckqt ckrescale conv-static
     converse ckmain
     moduleNDMeshStreamer modulecompletion)
+  if(BUILD_CUDA OR BUILD_HIP)
+    add_dependencies(ckhello hybridapi)
+  endif()
 endif()
 
 # Create conv-mach-opt.sh

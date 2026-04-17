@@ -92,12 +92,14 @@ int CheckSocketsReady(int withDelayMs)
   }
   
   CmiStdoutCheck(CMK_PIPE_SUB);
-  if (Cmi_charmrun_fd!=-1) 
+  if (Cmi_charmrun_fd!=-1) {
 	  ctrlskt_ready_read = CMK_PIPE_CHECKREAD(Cmi_charmrun_fd);
+  }
   if (dataskt!=-1) {
-	dataskt_ready_read = CMK_PIPE_CHECKREAD(dataskt);
-	if (dataWrite)
-		dataskt_ready_write = CMK_PIPE_CHECKWRITE(dataskt);
+	  dataskt_ready_read = CMK_PIPE_CHECKREAD(dataskt);
+    if (dataWrite) {
+      dataskt_ready_write = CMK_PIPE_CHECKWRITE(dataskt);
+    }
   }
   return nreadable;
 }

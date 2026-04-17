@@ -12,6 +12,7 @@
 #include <vector>
 #include "pup_stl.h"
 #include "manager.h"
+#include "ckcheckpoint.h"
 extern CkGroupID loadbalancer;
 
 void CreateCentralLB();
@@ -96,6 +97,7 @@ public:
   int GetPESpeed();
   inline void setConcurrent(bool c) { concurrent = c; }
 
+  void CallLB();
   void InvokeLB(); // Everything is at the PE barrier
   void ProcessAtSync(void); // Receive a message from AtSync to avoid
                             // making projections output look funny
@@ -121,6 +123,7 @@ public:
   void MissMigrate(int waitForBarrier);
 
   //Shrink-Expand related functions
+  void CheckForLB();
   void CheckForRealloc ();
   void ResumeFromReallocCheckpoint();
   void MigrationDoneImpl (int );
@@ -283,6 +286,9 @@ public:
 
   int from_pe;
   int pe_speed;
+#if CMK_CUDA
+  int gpu_device_id;
+#endif
   LBRealType total_walltime;
   LBRealType idletime;
   LBRealType bg_walltime;
@@ -298,7 +304,11 @@ public:
 
 public:
   CLBStatsMsg(int osz, int csz);
-  CLBStatsMsg(): from_pe(0), pe_speed(0), total_walltime(0.0), idletime(0.0),
+  CLBStatsMsg(): from_pe(0), pe_speed(0),
+#if CMK_CUDA
+		 gpu_device_id(-1),
+#endif
+		 total_walltime(0.0), idletime(0.0),
 		 bg_walltime(0.0),
 #if defined(TEMP_LDB)
 		pe_temp(1.0),

@@ -10,6 +10,14 @@
 #include "envelope.h"
 #include "CentralLB.h"
 #include "LBSimulation.h"
+#if CMK_CUDA
+#include <cupti.h>
+#include "gpumanager.h"
+// extern void hapiProcessCuptiBuffers();
+// extern void hapiClearCuptiData();
+CsvExtern(GPUManager, gpu_manager);
+#include "hapi.h"
+#endif
 
 #define  DEBUGF(x)       // CmiPrintf x;
 #define  DEBUG(x)        // x;
@@ -37,14 +45,13 @@ extern "C" void charmrun_realloc(char *s);
 extern char willContinue;
 extern realloc_state pending_realloc_state;
 extern char * se_avail_vector;
-extern "C" int mynewpe;
+extern int mynewpe;
 extern char *_shrinkexpand_basedir;
-int numProcessAfterRestart;
-int mynewpe=0;
+extern int numProcessAfterRestart;
 #endif
 CkGroupID loadbalancer;
 int * lb_ptr;
-bool load_balancer_created;
+extern bool load_balancer_created;
 
 static void lbinit()
 {
@@ -130,11 +137,11 @@ int CentralLB::GetPESpeed()
   return myspeed;
 }
 
-void CentralLB::InvokeLB()
+void CentralLB::CallLB()
 {
-#if CMK_LBDB_ON
+  #if CMK_LBDB_ON
   DEBUGF(("[%d] CentralLB AtSync step %d!!!!!\n",CkMyPe(),step()));
-#if CMK_MEM_CHECKPOINT	
+#if CMK_MEM_CHECKPOINT
   CkSetInLdb();
 #endif
 
@@ -143,9 +150,34 @@ void CentralLB::InvokeLB()
     MigrationDone(0);
     return;
   }
+
+#if CMK_CUDA
+if (CmiMyRank() == 0)
+{
+  double start = CkWallTimer();
+  cuptiActivityFlushAll(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED);//sync flush cupti records which are finished, does not wait for partial records
+  hapiProcessCuptiBuffers();
+}
+#if CMK_SMP
+  CmiNodeBarrier();  // ensure rank 0 finishes buffer processing before other ranks read the map
+#endif
+  // Every PE matches its own objects against the shared per-process CUPTI map
+  lbmgr->SetObjGPULoad(CsvAccess(gpu_manager).cupti_obj_gpu_times_);
+#endif
+
   {
     thisProxy [CkMyPe()].ProcessAtSync();
   }
+#endif
+}
+
+void CentralLB::InvokeLB()
+{
+  lbmgr->lb_in_progress = true;
+#if CMK_SHRINK_EXPAND
+  contribute(CkCallback(CkReductionTarget(CentralLB, CheckForLB), thisProxy[0]));
+#else
+  CallLB();
 #endif
 }
 
@@ -306,16 +338,21 @@ void CentralLB::BuildStatsMsg()
   msg->pe_speed = myspeed;
 #endif
 
-  DEBUGF(("Processor %d Total time (wall,cpu) = %f %f Idle = %f Bg = %f %f\n", CkMyPe(),msg->total_walltime,msg->total_cputime,msg->idletime,msg->bg_walltime,msg->bg_cputime));
+#if CMK_CUDA
+  msg->gpu_device_id = hapiMyDevice();
+#endif
+
+  DEBUGF(("Processor %d Total time (wall,cpu) = %f Idle = %f Bg = %f\n", CkMyPe(),msg->total_walltime,msg->idletime,msg->bg_walltime));
 
   msg->objData.resize(osz);
   lbmgr->GetObjData(msg->objData.data());
   msg->commData.resize(csz);
   lbmgr->GetCommData(msg->commData.data());
 //  lbmgr->ClearLoads();
-  DEBUGF(("PE %d BuildStatsMsg %d objs, %d comm\n",CkMyPe(),msg->n_objs,msg->n_comm));
+  DEBUGF(("PE %d BuildStatsMsg %d objs, %d comm\n",CkMyPe(),msg->objData.size(),msg->commData.size()));
 
   if(CkMyPe() == cur_ld_balancer) {
+    int count_avail = 0;
     lbmgr->get_avail_vector(msg->avail_vector);
     msg->next_lb = LBManagerObj()->new_lbbalancer();
   }
@@ -435,6 +472,9 @@ void CentralLB::depositData(CLBStatsMsg *m)
   procStat.bg_cputime = m->bg_cputime;
 #endif
   procStat.pe_speed = m->pe_speed;
+#if CMK_CUDA
+  procStat.gpu_device_id = m->gpu_device_id;
+#endif
 
   //procStat.utilization = 1.0;
   procStat.available = true;
@@ -510,6 +550,9 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &&msg)
       procStat.bg_cputime = m->bg_cputime;
 #endif
       procStat.pe_speed = m->pe_speed;
+#if CMK_CUDA
+      procStat.gpu_device_id = m->gpu_device_id;
+#endif
       //procStat.utilization = 1.0;
       procStat.available = true;
       procStat.n_objs = msg_n_objs;
@@ -985,6 +1028,7 @@ void CentralLB::ProcessMigrationDecision() {
 
 void CentralLB::ProcessReceiveMigration()
 {
+  // CmiPrintf("[%d] ProcessReceiveMigration\n", CkMyPe());
 #if CMK_LBDB_ON
 	int i;
         LBMigrateMsg *m = storedMigrateMsg;
@@ -997,8 +1041,13 @@ void CentralLB::ProcessReceiveMigration()
   CmiAssert(migrates_expected <= 0 || migrates_completed == migrates_expected);
   migrates_expected = 0;
   future_migrates_expected = 0;
+  // CmiPrintf("[%d] ProcessReceiveMigration: n_moves=%d\n", CkMyPe(), m->n_moves);
   for(i=0; i < m->n_moves; i++) {
     MigrateInfo& move = m->moves[i];
+    #if CMK_GLOBAL_LOCATION_UPDATE
+      // CmiPrintf("[%d] Updating location for obj id=%llu from %d to %d\n", CkMyPe(), move.obj.id, move.from_pe, move.to_pe);
+      UpdateLocation(move);
+    #endif
     const int me = CkMyPe();
     if (move.from_pe == me && move.to_pe != me) {
 #if CMK_DRONE_MODE
@@ -1020,12 +1069,6 @@ void CentralLB::ProcessReceiveMigration()
       if (!move.async_arrival) migrates_expected++;
       else future_migrates_expected++;
     }
-    else {
-#if CMK_GLOBAL_LOCATION_UPDATE      
-      UpdateLocation(move); 
-#endif
-    }
-
   }
 
   DEBUGF(("[%d] in ReceiveMigration %d moves expected: %d future expected: %d\n",CkMyPe(),m->n_moves, migrates_expected, future_migrates_expected));
@@ -1049,52 +1092,58 @@ void CentralLB::ProcessReceiveMigration()
 #endif
 }
 
+void CentralLB::CheckForLB() {
+  //sleep(5);
+#if CMK_SHRINK_EXPAND
+  if (pending_realloc_state == EXPAND_MSG_RECEIVED)
+    CheckForRealloc();
+  //else if (pending_realloc_state == NO_REALLOC)
+  //  thisProxy.ResumeClients(0);
+  else
+    thisProxy.CallLB();
+#else
+  // if we are not in shrink/expand mode, just call LB
+  thisProxy.CallLB();
+#endif
+  //else
+  //  thisProxy.ResumeClients(0);
+}
+
 // We assume that bit vector would have been aptly set async by either scheduler or charmrun.
 void CentralLB::CheckForRealloc(){
 #if CMK_SHRINK_EXPAND
-   if(pending_realloc_state == REALLOC_MSG_RECEIVED) {
-        pending_realloc_state = REALLOC_IN_PROGRESS; //in progress
-        CkPrintf("Load balancer invoking charmrun to handle reallocation on pe %d\n", CkMyPe());
-        double end_lb_time = CkWallTimer();
-        CkPrintf("CharmLB> %s: PE [%d] step %d finished at %f duration %f s\n\n",
-            lbname, cur_ld_balancer, step()-1, end_lb_time,	end_lb_time-start_lb_time);
-        // do checkpoint
-        CkCallback cb(CkIndex_CentralLB::ResumeFromReallocCheckpoint(), thisProxy[0]);
-        CkStartCheckpoint(_shrinkexpand_basedir, cb);
-    }
-    else{
-        thisProxy.MigrationDoneImpl(1);
-    }
+  if(pending_realloc_state != NO_REALLOC) {
+    pending_realloc_state = (pending_realloc_state == SHRINK_MSG_RECEIVED) ? SHRINK_IN_PROGRESS : EXPAND_IN_PROGRESS; //in progress
+    CkPrintf("Load balancer invoking charmrun to handle reallocation on pe %d\n", CkMyPe());
+    double end_lb_time = CkWallTimer();
+    CkPrintf("CharmLB> %s: PE [%d] step %d finished at %f duration %f s\n\n",
+        lbname, cur_ld_balancer, step()-1, end_lb_time,	end_lb_time-start_lb_time);
+    // do checkpoint
+    CkCallback cb(CkIndex_CentralLB::ResumeFromReallocCheckpoint(), thisProxy[0]);
+    CkStartRescaleCheckpoint(_shrinkexpand_basedir, cb, 
+      std::vector<char>(se_avail_vector, se_avail_vector + CkNumPes()));
+  } else {
+    thisProxy.MigrationDoneImpl(1);
+  }
 #endif
 }
 
 void CentralLB::ResumeFromReallocCheckpoint(){
 #if CMK_SHRINK_EXPAND
-    const int count = CkNumPes();
-    std::vector<char> avail(se_avail_vector, se_avail_vector + count);
-    memset(se_avail_vector, 0, sizeof(char) * count);
+    CkPrintf("Resumed from realloc\n");
+    std::vector<char> avail(se_avail_vector, se_avail_vector + CkNumPes());
+    //free(se_avail_vector);
     thisProxy.WillIbekilled(avail, numProcessAfterRestart);
 #endif
 }
-
-
-
-#if CMK_SHRINK_EXPAND
-int GetNewPeNumber(std::vector<char> avail){
-  int mype = CkMyPe();
-  int count =0;
-  for (int i =0; i <mype; i++){
-    if(avail[i] ==0) count++;
-  }
-  return (mype - count);
-}
-#endif
 
 void CentralLB::WillIbekilled(std::vector<char> avail, int newnumProcessAfterRestart){
 #if CMK_SHRINK_EXPAND
  numProcessAfterRestart = newnumProcessAfterRestart;
  mynewpe =  GetNewPeNumber(avail);
+ //CkPrintf("[%d] -> new pe %d\n", CkMyPe(), mynewpe);
  willContinue = avail[CkMyPe()];
+ //CkPrintf("PE%i> Sending start cleanup reduction\n", CkMyPe());
  CkCallback cb(CkIndex_CentralLB::StartCleanup(), thisProxy[0]);
  contribute(cb);
 #endif
@@ -1102,9 +1151,12 @@ void CentralLB::WillIbekilled(std::vector<char> avail, int newnumProcessAfterRes
 
 void CentralLB::StartCleanup(){
 #if CMK_SHRINK_EXPAND
-		CkCleanup();
+  //CkAbort("FLAG\n");
+  //CkPrintf("Starting cleanup\n");
+	CkCleanup();
 #endif
 }
+
 void CentralLB::MigrationDone(int balancing)
 {
 #if CMK_SHRINK_EXPAND
@@ -1116,6 +1168,7 @@ void CentralLB::MigrationDone(int balancing)
     MigrationDoneImpl(balancing);
 #endif
 }
+
 void CentralLB::MigrationDoneImpl (int balancing)
 {
 
@@ -1124,6 +1177,10 @@ void CentralLB::MigrationDoneImpl (int balancing)
   migrates_expected = -1;
   // clear load stats
   if (balancing) lbmgr->ClearLoads();
+#if CMK_CUDA
+  if (CmiMyRank() == 0)
+    hapiClearCuptiData();
+#endif
   // Increment to next step
   lbmgr->incStep();
 	DEBUGF(("[%d] Incrementing Step %d \n",CkMyPe(),step()));
@@ -1158,7 +1215,7 @@ void CentralLB::ResumeClients()
 void CentralLB::ResumeClients(int balancing)
 {
 #if CMK_LBDB_ON
-  DEBUGF(("[%d] Resuming clients. balancing:%d.\n",CkMyPe(),balancing));
+  //CkPrintf("[%d] Resuming clients. balancing:%d.\n",CkMyPe(),balancing);
 
   lbmgr->ResumeClients();
   if (balancing)  {
@@ -1169,6 +1226,10 @@ void CentralLB::ResumeClients(int balancing)
       CheckMigrationComplete();
     }
   }
+  lbmgr->lb_in_progress = false;
+
+  if (CkMyPe() == 0)
+    lbmgr->callRealloc();
 #endif
 }
 
@@ -1652,6 +1713,9 @@ CLBStatsMsg::~CLBStatsMsg() {
 void CLBStatsMsg::pup(PUP::er &p) {
   p|from_pe;
   p|pe_speed;
+#if CMK_CUDA
+  p|gpu_device_id;
+#endif
   p|total_walltime;
   p|idletime;
 #if defined(TEMP_LDB)

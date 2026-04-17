@@ -51,6 +51,7 @@ waits for the migrant contributions to straggle in.
 
 #include "charm++.h"
 #include "ck.h"
+#include "ckrescale.h"
 
 #include "pathHistory.h"
 
@@ -83,7 +84,6 @@ waits for the migrant contributions to straggle in.
 #define INT_MAX 2147483647
 #endif
 
-extern bool _inrestart;
 #if CMK_CHARM4PY
 //define a global instance of CkReductionTypesExt for external access
 CkReductionTypesExt charm_reducers;
@@ -92,7 +92,7 @@ extern int (*PyReductionExt)(char**, int*, int, char**);
 
 Group::Group():thisIndex(CkMyPe())
 {
-	if (_inrestart) CmiAbort("A Group object did not call the migratable constructor of its base class!");
+	if (get_in_restart()) CmiAbort("A Group object did not call the migratable constructor of its base class!");
 
 	creatingContributors();
 	contributorStamped(&reductionInfo);

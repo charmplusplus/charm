@@ -4,10 +4,10 @@ CHARMC=../../../bin/ampicxx $(OPTS)
 all: migration
 
 migration: test.o
-	$(CHARMC) -o migration test.o
+	$(CHARMC) -pieglobals -o migration test.o
 
 test.o: test.C
-	$(CHARMC) -c test.C
+	$(CHARMC) -pieglobals -c test.C
 
 #
 #

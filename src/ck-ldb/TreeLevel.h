@@ -9,6 +9,7 @@
 #include "TreeStrategyFactory.h"
 #include <cmath>
 #include <limits>  // std::numeric_limits
+#include <algorithm>
 
 #define FLOAT_TO_INT_MULT 10000
 
@@ -43,6 +44,32 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
                   // considered to have ID i
   unsigned int*
       order;  // list of obj ids sorted by load (ids are determined by position in oloads)
+      
+  void pup(PUP::er& p)
+  {
+    
+    p|nObjs;
+    p|nPes;
+
+
+    for (int i = 0; i < nPes; i++)
+      p|pe_ids[i];
+    for (int i = 0; i < nPes; i++)
+      p|bgloads[i];
+    for (int i = 0; i < nPes; i++)
+      p|speeds[i];
+    for (int i = 0; i < nPes + 1; i++)
+      p|obj_start[i];
+    for (int i = 0; i < nObjs; i++)
+      p|oloads[i];
+    for (int i = 0; i < nObjs; i++)
+      p|order[i];
+
+
+    CkPrintf("[PE %d] Done PUPPING LBStatsMsg_1 with %d objs and %d pes\n", CkMyPe(), nObjs, nPes);
+
+  }
+
 
   static TreeLBMessage* merge(std::vector<TreeLBMessage*>& msgs)
   {
@@ -101,28 +128,33 @@ class LBStatsMsg_1 : public TreeLBMessage, public CMessage_LBStatsMsg_1
     int pe_cnt = 0;
     int obj_cnt = 0;
     float total_load = 0;
-    for (int i = 0; i < msgs.size(); i++)
+    
+    if (msgs.size() != 1) {
+      CkAbort("[PE %d] LBStatsMsg_1::fill should only have one msg, has %d\n", CkMyPe(), msgs.size());
+    }
+    LBStatsMsg_1* msg = (LBStatsMsg_1*)msgs[0];
+    //if (_lb_args.debug() > 1)CkPrintf("[PE %d]   msg %d with %d pes and %d objs\n", CkMyPe(), 0, msg->nPes, msg->nObjs);
+    for (int j = 0; j < msg->nPes; j++)
     {
-      LBStatsMsg_1* msg = (LBStatsMsg_1*)msgs[i];
-      for (int j = 0; j < msg->nPes; j++)
+      int pe = msg->pe_ids[j];
+      CkAssert(pe >= 0 && pe < CkNumPes());
+      //if (_lb_args.debug() > 2) CkPrintf("[PE %d]   filling pe %d with %d objs\n", CkMyPe(), pe,
+      //          msg->obj_start[j + 1] - msg->obj_start[j]);
+      procs[pe_cnt].populate(pe, msg->bgloads + j, msg->speeds + j);
+      procs[pe_cnt++].resetLoad();
+      migMsg->obj_start[pe] = obj_cnt;
+      int local_id = 0;
+      for (int k = msg->obj_start[j]; k < msg->obj_start[j + 1];
+            k++, obj_cnt++, local_id++)
       {
-        int pe = msg->pe_ids[j];
-        CkAssert(pe >= 0 && pe < CkNumPes());
-        procs[pe_cnt].populate(pe, msg->bgloads + j, msg->speeds + j);
-        procs[pe_cnt++].resetLoad();
-        migMsg->obj_start[pe] = obj_cnt;
-        int local_id = 0;
-        for (int k = msg->obj_start[j]; k < msg->obj_start[j + 1];
-             k++, obj_cnt++, local_id++)
-        {
-          objs[obj_cnt].populate(obj_cnt, msg->oloads + k, pe);
-          total_load += objs[obj_cnt].getLoad();
-          migMsg->to_pes[obj_cnt] = pe;
-          // if obj_local_ids.size() > 0:
-          obj_local_ids[obj_cnt] = local_id;
-        }
+        objs[obj_cnt].populate(obj_cnt, msg->oloads + k, pe);
+        total_load += objs[obj_cnt].getLoad();
+        migMsg->to_pes[obj_cnt] = pe;
+        // if obj_local_ids.size() > 0:
+        obj_local_ids[obj_cnt] = local_id;
       }
     }
+    
     CkAssert(obj_cnt == objs.size());
     CkAssert(pe_cnt == procs.size());
     return total_load;
@@ -175,6 +207,9 @@ class IStrategyWrapper
   virtual void removeObj(int& local_id, int& oldPe, float& load) = 0;
 
   virtual void addForeignObject(int local_id, int oldPe, float load) = 0;
+
+  virtual void pup(PUP::er& p) { CkAbort("IStrategyWrapper::pup not implemented\n");
+    } // TODO: pup correctly
 };
 
 // This wrapper allocates mem for objects and processors. to the lb algorithm,
@@ -374,6 +409,35 @@ class StrategyWrapper : public IStrategyWrapper
     sol->setErrorChecking(objs, procs);
 #endif
 
+#if CMK_SHRINK_EXPAND
+    if (se_avail_vector != NULL) {
+      if (_lb_args.debug() > 0) CkPrintf("se_avail_vector is not null on pe %d, removing procs that will be removed\n", CkMyPe());
+      // if shrink/expand is enabled, remove processors that will be removed (this happens at shrink, before the checkpoint)
+      std::vector<P> procs2;
+      for (const auto& p : procs) {
+        if (se_avail_vector[p.id] != 0) procs2.push_back(p);
+      }
+      procs = procs2; 
+    } 
+#endif
+    if (_lb_args.debug() > 0){
+      CkPrintf("[PE %d] Procs are : ", CkMyPe());
+      for (const auto& p : procs) {
+        CkPrintf("%d ", p.id);
+      }
+      CkPrintf("\n");
+      CkPrintf("[PE %d] Objs per PE: ", CkMyPe());
+      std::map<int, int> counts;
+      for (const auto& o : objs) {
+        counts[o.oldPe]++;
+      }
+      for (const auto& p : procs) {
+        CkPrintf("%d:%d ", p.id, counts[p.id]);
+      }
+      CkPrintf("\n");
+    }
+
+
     double t0 = CkWallTimer();
     strategy->solve(objs, procs, *sol, false);
 
@@ -455,13 +519,132 @@ class StrategyWrapper : public IStrategyWrapper
 class RootLevel : public LevelLogic
 {
  public:
-  RootLevel(int _num_groups = -1) : num_groups(_num_groups) {}
-
+  RootLevel(int _num_groups = -1) : num_groups(_num_groups) {
+    nPes = CkNumPes();
+  }
   virtual ~RootLevel()
   {
     for (auto w : wrappers) delete w;
   }
+  virtual int getNumNewPes() { return num_new_pes; }
 
+  virtual bool collectSpeeds(int proc_id, float speed) {
+    if (rateAware)
+    {
+      CkPrintf("[PE %d] RootLevel::collectSpeeds proc_id=%d speed=%f\n", CkMyPe(), proc_id, speed);
+      LBStatsMsg_1* msg = (LBStatsMsg_1*)stats_msgs[0];
+      for (int i = 0; i < msg->nPes; i++) {
+        if (msg->pe_ids[i] == proc_id) {
+
+          msg->speeds[i] = speed; 
+        }
+      }
+
+      num_new_pes--;
+      if (num_new_pes == 0) {
+         if (_lb_args.debug() > 0){
+      if (CkMyPe() == 0) {
+        CkPrintf("After speeds collected: My stats message on PE 0: %d\n", ((LBStatsMsg_1*)stats_msgs[0])->nObjs);
+        for (int i = 0; i < ((LBStatsMsg_1*)stats_msgs[0])->nPes; i++) {
+          CkPrintf("  pe %d: id=%d bgload=%f speed=%f obj_start=%d\n", i, ((LBStatsMsg_1*)stats_msgs[0])->pe_ids[i], ((LBStatsMsg_1*)stats_msgs[0])->bgloads[i], ((LBStatsMsg_1*)stats_msgs[0])->speeds[i], ((LBStatsMsg_1*)stats_msgs[0])->obj_start[i]);
+        }
+
+      }
+    }
+        // all new pes have reported their speed, can run lb now
+       return true;
+      }
+    }
+    return false;
+  }
+  
+  virtual TreeLBMessage* mergeStats()
+  {
+    // send obj loads up
+    TreeLBMessage* newMsg = LBStatsMsg_1::merge(stats_msgs);
+    // need to cast pointer to ensure delete of CMessage_LBStatsMsg_1 is called
+    for (auto m : stats_msgs) delete (LBStatsMsg_1*)m;
+    stats_msgs.clear();
+    stats_msgs.push_back(newMsg);
+    return newMsg;
+  }
+
+  PUPable_decl(RootLevel);
+  RootLevel(CkMigrateMessage *m) : LevelLogic(m) {}
+
+  virtual void pup(PUP::er& p)
+  {
+    if (_lb_args.debug() > 2) CkPrintf("[PE %d] PUPPING RootLevel\n", CkMyPe());
+    LevelLogic::pup(p); // this packs num_stats_msgs
+
+    if (num_stats_msgs > 1) CkAbort("RootLevel should have just one stats message! Has %d\n", num_stats_msgs);
+    p|nObjs;
+    p|nPes;
+    int nNewPes = CkNumPes();
+
+    if (_lb_args.debug() > 2) CkPrintf("[PE %d] Done with basics\n", CkMyPe());
+
+
+    // stats_msgs stuff is only relevant for expand
+    if (p.isUnpacking()) {
+      stats_msgs.resize(1);
+      LBStatsMsg_1* msg;
+      if (rateAware)
+        msg= new (nNewPes, nNewPes, nNewPes, nNewPes + 1, nObjs, nObjs, 0) LBStatsMsg_1;
+      else
+        msg= new (nNewPes, nNewPes, 0, nNewPes + 1, nObjs, nObjs, 0) LBStatsMsg_1;
+      stats_msgs[0] = msg;
+    }
+
+    if (stats_msgs.size() == 0) stats_msgs.push_back(new (nNewPes, nNewPes, nNewPes, nNewPes + 1, nObjs, nObjs, 0) LBStatsMsg_1);
+    p|*stats_msgs[0]; // everyone needs to pup this cause pup is dumb
+
+    if (p.isUnpacking() && CkMyPe() == 0 && num_stats_msgs > 0) {
+      // if num_stats_msgs = 0, then we aren't expanding 
+      LBStatsMsg_1* msg = (LBStatsMsg_1*)stats_msgs[0];
+      if (nObjs != msg->nObjs) {
+        CkAbort("In RootLevel::pup, nObjs (%d) != msg->nObjs (%d)\n", nObjs, msg->nObjs);
+      }
+
+      msg->nPes = CkNumPes();
+
+      // TODO: this will not work if we do simultaneous shrink/expand
+      num_new_pes = 0;
+      for (int i = nPes; i < CkNumPes(); i++)
+      {
+        // on expand: need to reset the new PEs info
+        if (msg->pe_ids[i] > CkNumPes() - 1 || msg->pe_ids[i] <= 0) {
+          // you are a new pe!
+          if (_lb_args.debug() > 0) CkPrintf("[PE %d] RootLevel::pup PE %d is new, resetting its info\n", CkMyPe(), i);
+          num_new_pes++;
+          msg->pe_ids[i] = i;
+          msg->bgloads[i] = 0;
+         // msg->speeds[i] = 1.0; // speeds need to be recomputed for the new procs and sent back to the root
+          msg->obj_start[i+1] = msg->obj_start[i]; // no objects
+        }
+      }
+
+      if (_lb_args.debug() > 0){
+      if (CkMyPe() == 0) {
+        CkPrintf("My stats message on PE 0: %d\n", msg->nObjs);
+        for (int i = 0; i < msg->nPes; i++) {
+          CkPrintf("  pe %d: id=%d bgload=%f speed=%f obj_start=%d\n", i, msg->pe_ids[i], msg->bgloads[i], msg->speeds[i], msg->obj_start[i]);
+        }
+
+      }
+    }
+  }
+    if (num_stats_msgs == 0) {
+      stats_msgs.clear();
+    }
+    
+
+    nPes = nNewPes;
+    num_stats_msgs = stats_msgs.size();
+
+  }
+
+  
   /**
    * mode 0: receive obj stats
    * mode 1: receive aggregated group load
@@ -470,7 +653,10 @@ class RootLevel : public LevelLogic
                          json& config, bool repeat_strategies = false,
                          bool token_passing = true)
   {
+
     using namespace TreeStrategy;
+    this->rateAware = rateAware;
+    this->strategies = strategies;
     for (auto w : wrappers) delete w;
     wrappers.clear();
     if (num_groups == -1)
@@ -506,7 +692,6 @@ class RootLevel : public LevelLogic
     }
     else
     {
-      nPes += ((LBStatsMsg_1*)stats)->nPes;
       nObjs += ((LBStatsMsg_1*)stats)->nObjs;
     }
   }
@@ -518,6 +703,9 @@ class RootLevel : public LevelLogic
 #endif
 
     const int num_children = stats_msgs.size();
+    if (num_children != 1) {
+      CkAbort("RootLevel::loadBalance: expected just one stats message (merged) but received from %d\n", nPes, num_children);
+    }
     CkAssert(num_children > 0);
 #if DEBUG__TREE_LB_L1
     CkPrintf("[%d] RootLevel::loadBalance, num_children=%d nPes=%d nObjs=%d\n", CkMyPe(),
@@ -527,7 +715,8 @@ class RootLevel : public LevelLogic
     if (num_groups == -1)
     {
       // msg has object loads
-      CkAssert(wrappers.size() > current_strategy);
+      if (wrappers.size() == 0)
+        CkAbort("No strategies configured for TreeLB with obj-based strategies\n");
       IStrategyWrapper* wrapper = wrappers[current_strategy];
       CkAssert(wrapper != nullptr);
       CkAssert(nPes == CkNumPes());
@@ -538,6 +727,9 @@ class RootLevel : public LevelLogic
 #if DEBUG__TREE_LB_L1
       double t0 = CkWallTimer();
 #endif
+      if (nPes != CkNumPes()) {
+        CkAbort("nPes (%d) != CkNumPes() (%d) in RootLevel::loadBalance\n", nPes, CkNumPes());
+      }
       wrapper->prepStrategy(nObjs, nPes, stats_msgs, migMsg);
       wrapper->runStrategy(migMsg);
       if (current_strategy == wrappers.size() - 1)
@@ -555,7 +747,7 @@ class RootLevel : public LevelLogic
       // need to cast pointer to ensure delete of CMessage_LBStatsMsg_1 is called
       for (auto msg : stats_msgs) delete (LBStatsMsg_1*)msg;
       stats_msgs.clear();
-      nPes = nObjs = 0;
+      nObjs = 0;
       return migMsg;
     }
     else
@@ -624,6 +816,7 @@ class RootLevel : public LevelLogic
       }
 
       total_load = 0.0;
+      nObjs = 0; // cleanup for next round
 
       int nmoves = int(solution.size());
       SubtreeMigrateDecisionMsg* migMsg =
@@ -652,6 +845,7 @@ class RootLevel : public LevelLogic
     int load;
   };
 
+  int num_new_pes = 0; // number of new pes on expand
   int num_groups;
   bool repeat_strategies;
   size_t current_strategy = 0;
@@ -660,6 +854,8 @@ class RootLevel : public LevelLogic
   unsigned int nObjs = 0;  // total number of objects in msgs I am processing
   float total_load = 0;
   std::vector<IStrategyWrapper*> wrappers;
+  bool rateAware;
+  std::vector<std::string> strategies;
 };
 
 // ---------------- NodeSetLevel ----------------
@@ -1055,7 +1251,11 @@ class PELevel : public LevelLogic
   {
     inline bool operator()(const LDObjData& o1, const LDObjData& o2) const
     {
+#if CMK_CUDA
+      return (o1.gpuTime > o2.gpuTime);
+#else
       return (o1.wallTime > o2.wallTime);
+#endif
     }
   };
 
@@ -1063,10 +1263,56 @@ class PELevel : public LevelLogic
 
   virtual ~PELevel() {}
 
+  PUPable_decl(PELevel);
+  PELevel(CkMigrateMessage *m) : LevelLogic(m) {}
+
+  virtual void pup(PUP::er& p)
+  {
+    LevelLogic::pup(p); // this packs num_stats_msgs
+   
+    p|nObjs;
+   // p|myObjs;
+
+    int nPes;
+    if (p.isPacking()) nPes = CkNumPes();
+    p|nPes;
+
+    if (p.isUnpacking()) {
+       if (CkMyPe() >= nPes) {
+        myObjs.clear();
+        nObjs = 0;
+       }
+    }
+    num_stats_msgs = 0;
+
+  }
+
+  virtual void resetObjs() {
+      int nobjs = lbmgr->GetObjDataSz();
+
+    std::vector<LDObjData> allLocalObjs(nobjs);
+    if (nobjs > 0) lbmgr->GetObjData(allLocalObjs.data());  // populate allLocalObjs
+
+    myObjs.clear();
+    nObjs = 0;
+
+    for (int i = 0; i < nobjs; i++)
+    {
+      if (allLocalObjs[i].migratable)
+      {
+     
+        myObjs.emplace_back(allLocalObjs[i]);
+       nObjs++;
+     
+      }
+    }
+  }
+
   virtual TreeLBMessage* getStats()
   {
     const int mype = CkMyPe();
     int nobjs = lbmgr->GetObjDataSz();
+
     std::vector<LDObjData> allLocalObjs(nobjs);
     if (nobjs > 0) lbmgr->GetObjData(allLocalObjs.data());  // populate allLocalObjs
     myObjs.clear();
@@ -1079,17 +1325,25 @@ class PELevel : public LevelLogic
       }
       else
       {
+        #if CMK_CUDA
+        nonMigratableLoad += allLocalObjs[i].gpuTime;
+        #else
         nonMigratableLoad += allLocalObjs[i].wallTime;
+        #endif
       }
     }
     nobjs = myObjs.size();
-
+    nObjs = nobjs;
     // TODO verify that non-migratable objects are not added to msg and are only counted
     // as background load
 
 #if DEBUG__TREE_LB_L3
     float total_obj_load = 0;
+    #if CMK_CUDA
+    for (int i = 0; i < nobjs; i++) total_obj_load += myObjs[i].gpuTime;
+    #else
     for (int i = 0; i < nobjs; i++) total_obj_load += myObjs[i].wallTime;
+    #endif
     CkPrintf("[%d] PELevel::getStats, myObjs=%d, aggregate_obj_load=%f\n", mype,
              int(myObjs.size()), total_obj_load);
 #endif
@@ -1106,7 +1360,14 @@ class PELevel : public LevelLogic
     if (rateAware)
     {
       msg = new (1, 1, 1, 2, nobjs, nobjs, 0) LBStatsMsg_1;
+#if CMK_CUDA
+      msg->speeds[0] = float(lbmgr->ProcessorGPUSpeed());
+#else
       msg->speeds[0] = float(lbmgr->ProcessorSpeed());
+#endif
+
+    if (_lb_args.debug() > 1)
+        CkPrintf("[%d] PELevel: processor speed is %f\n", mype, msg->speeds[0]);
     }
     else
       msg = new (1, 1, 0, 2, nobjs, nobjs, 0) LBStatsMsg_1;
@@ -1119,15 +1380,23 @@ class PELevel : public LevelLogic
     {
       // If rateAware, convert object loads by multiplying by processor speed
       // Note this conversion isn't done for bgloads because they never leave the PE
+      
+#if CMK_CUDA
+      float oload = float(myObjs[i].gpuTime);
+#else
+      float oload = float(myObjs[i].wallTime);
+#endif
       if (rateAware)
-        msg->oloads[i] = float(myObjs[i].wallTime) * msg->speeds[0];
+        msg->oloads[i] = oload * msg->speeds[0];
       else
-        msg->oloads[i] = float(myObjs[i].wallTime);
+        msg->oloads[i] = oload;
       msg->order[i] = i;
     }
 
     LBRealType t1, t2, t3, bg_walltime;
-#if CMK_LB_CPUTIMER
+#if CMK_CUDA
+    lbmgr->GetGPUBGTime(&bg_walltime);
+#elif CMK_LB_CPUTIMER
     LBRealType t4;
     lbmgr->GetTime(&t1, &t2, &t3, &bg_walltime, &t4);
 #else
@@ -1153,18 +1422,22 @@ class PELevel : public LevelLogic
     outgoing = 0;
     int obj_start = decision->obj_start[mype];
     int obj_end = obj_start + int(myObjs.size());
+    assert(myObjs.size == nObjs);
     int j = 0;
+   
     for (int i = obj_start; i < obj_end; i++, j++)
     {
+      //if (_lb_args.debug() > 2) CkPrintf("[%d] PELevel: obj %d (abs=%d, handle=%d) to dest %d\n", CkMyPe(), j, i,
+      //        myObjs[j].handle.handle, decision->to_pes[i]);
       int dest = decision->to_pes[i];
+      if (dest > CkNumPes() - 1)
+        CkAbort("PELevel: processDecision found dest PE >= CkNumPes(): %d >= %d\n", dest, CkNumPes());
       if (dest != mype)
       {
         if (dest >= 0)
         {
-#if DEBUG__TREE_LB_L3
-          CkPrintf("[%d] (processDecision) My obj %d (abs=%d) moving to %d\n", CkMyPe(),
-                   j, i, dest);
-#endif
+          //if (_lb_args.debug() > 1) CkPrintf("[%d] (processDecision) My obj %d (abs=%d, handle=%d) moving to %d\n", CkMyPe(),
+          //         j, i, myObjs[j].handle.handle, dest);
           if (lbmgr->Migrate(myObjs[j].handle, dest) == 0)
           {
             CkAbort("PELevel: Migrate call returned 0\n");
@@ -1210,6 +1483,7 @@ class PELevel : public LevelLogic
   LBManager* lbmgr;
   bool rateAware;
   std::vector<LDObjData> myObjs;
+  int nObjs = 0;
 };
 
 // ---------------- MsgAggregator ----------------

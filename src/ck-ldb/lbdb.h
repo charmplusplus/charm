@@ -157,6 +157,9 @@ public:
 struct LDObjData {
   LDObjHandle handle;
   LBRealType wallTime;
+#if CMK_CUDA
+  LBRealType gpuTime;
+#endif
 #if CMK_LB_CPUTIMER
   LBRealType cpuTime;
 #endif
@@ -333,6 +336,9 @@ inline void LBObjUserData::pup(PUP::er &p) {
 inline void LDObjData::pup(PUP::er &p) {
   p|handle;
   p|wallTime;
+#if CMK_CUDA
+  p|gpuTime;
+#endif
 #if CMK_LB_CPUTIMER
   p|cpuTime;
 #endif

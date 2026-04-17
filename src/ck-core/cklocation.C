@@ -83,15 +83,22 @@ int _messageBufferingThreshold;
 #  if CMK_GLOBAL_LOCATION_UPDATE
 void UpdateLocation(MigrateInfo& migData)
 {
+  // CmiPrintf("calls update location\n");
   CkGroupID locMgrGid = ck::ObjID(migData.obj.id).getCollectionID();
-  if (locMgrGid.idx == 0)
-  {
-    return;
-  }
-
   CkLocMgr* localLocMgr = (CkLocMgr*)CkLocalBranch(locMgrGid);
-  // CkLocMgr only uses element IDs, so extract just that part from the ObjID
-  localLocMgr->updateLocation(ck::ObjID(migData.obj.id).getElementID(), migData.to_pe);
+  CkLocCache *cache = (CkLocCache *)CkLocalBranch(localLocMgr->getLocationCache());
+
+  CmiUInt8 elementID = ck::ObjID(migData.obj.id).getElementID();
+  CkArrayIndex idx = localLocMgr->lookupIdx(elementID);
+
+  CkLocEntry entry;
+  entry.id = elementID;
+  entry.pe = migData.to_pe;
+  entry.epoch = cache->getEpoch(elementID) + 1;
+
+  // CkPrintf("[%d] UpdateLocation: obj id=%llu from_pe=%d to_pe=%d epoch=%d\n",
+  //          CkMyPe(), entry.id, migData.from_pe, entry.pe, entry.epoch);
+  localLocMgr->updateLocation(idx, entry);
 }
 #  endif
 
@@ -1824,8 +1831,14 @@ void CkMigratable::UserSetLBLoad()
 
 #if CMK_LBDB_ON  // For load balancing:
 // user can call this helper function to set obj load (for model-based lb)
-void CkMigratable::setObjTime(double cputime) { myRec->setObjTime(cputime); }
+void CkMigratable::setObjTime(double cputime) { 
+  myRec->setObjTime(cputime); }
 double CkMigratable::getObjTime() { return myRec->getObjTime(); }
+
+void CkMigratable::setObjGPUTime(double gputime) {
+  myRec->setObjGPUTime(gputime);
+}
+double CkMigratable::getObjGPUTime() { return myRec->getObjGPUTime(); }
 
 #  if CMK_LB_USER_DATA
 /**
@@ -2049,6 +2062,8 @@ void CkMigratable::CkAddThreadListeners(CthThread tid, void* msg)
 #else
 void CkMigratable::setObjTime(double cputime) {}
 double CkMigratable::getObjTime() { return 0.0; }
+void CkMigratable::setObjGPUTime(double gputime) {}
+double CkMigratable::getObjGPUTime() { return 0.0; }
 
 #  if CMK_LB_USER_DATA
 void* CkMigratable::getObjUserData(int idx) { return NULL; }
@@ -2129,12 +2144,22 @@ void CkLocRec::stopTiming(int ignore_running)
   if (!ignore_running)
     running = false;
 }
-void CkLocRec::setObjTime(double cputime) { lbmgr->EstObjLoad(ldHandle, cputime); }
+void CkLocRec::setObjTime(double cputime) { 
+  lbmgr->EstObjLoad(ldHandle, cputime); }
 double CkLocRec::getObjTime()
 {
   LBRealType walltime, cputime;
   lbmgr->GetObjLoad(ldHandle, walltime, cputime);
   return walltime;
+}
+void CkLocRec::setObjGPUTime(double gputime) {
+  lbmgr->EstObjGPULoad(ldHandle, gputime);
+}
+double CkLocRec::getObjGPUTime()
+{
+  LBRealType gputime;
+  lbmgr->GetObjGPULoad(ldHandle, gputime);
+  return gputime;
 }
 #  if CMK_LB_USER_DATA
 void* CkLocRec::getObjUserData(int idx) { return lbmgr->GetDBObjUserData(ldHandle, idx); }
@@ -2363,8 +2388,10 @@ void CkLocCache::requestLocation(CmiUInt8 id, const int peToTell)
 
 void CkLocCache::updateLocation(const CkLocEntry& newEntry)
 {
+  // CmiPrintf("[%d] updateLocation: id=%llu pe=%d epoch=%d\n", CmiMyPe(), newEntry.id, newEntry.pe, newEntry.epoch);
   CkAssert(newEntry.pe != -1);
   CkLocEntry& oldEntry = locMap[newEntry.id];
+  // CmiPrintf("[%d] updateLocation: oldEntry.epoch=%d\n", CmiMyPe(), oldEntry.epoch);
   if (newEntry.epoch > oldEntry.epoch)
   {
     oldEntry = newEntry;
@@ -2947,6 +2974,18 @@ void CkLocMgr::migratableList(CkLocRec* rec, std::vector<CkMigratable*>& list)
   }
 }
 
+#if CMK_CUDA
+void CkLocMgr::sendGPUMsg(CmiUInt8 id)
+{
+  auto gpuData = sendGPUBuffers[id];
+  sendGPUBuffers.erase(id);
+  thisProxy[gpuData.toPe].immigrateGPU(id, gpuData.size, CkDeviceBuffer(gpuData.data, gpuData.size,
+    CkCallbackResumeThread()));
+  //CkPrintf("PE %d sent GPU msg of size %zu for id %llu\n", CkMyPe(), gpuData.size, id);
+  cudaFree(gpuData.data);
+}
+#endif
+
 /// Migrate this local element away to another processor.
 void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 {
@@ -2972,12 +3011,16 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   callMethod(rec, &CkMigratable::ckAboutToMigrate);
 
   // First pass: find size of migration message
-  size_t bufSize;
-  {
-    PUP::sizer p(PUP::er::IS_MIGRATION);
-    pupElementsFor(p, rec, CkElementCreation_migrate);
-    bufSize = p.size();
-  }
+  size_t bufSize, gpuBufSize;
+  PUP::sizer p(PUP::er::IS_MIGRATION);
+  pupElementsFor(p, rec, CkElementCreation_migrate);
+  bufSize = p.size();
+
+  gpuBufSize = 0;
+#if CMK_CUDA
+  gpuBufSize = p.gpu_size();
+#endif
+
 #if CMK_ERROR_CHECKING
   if (bufSize > std::numeric_limits<int>::max())
   {
@@ -2986,6 +3029,8 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   }
 #endif
 
+
+  void* gpuMsg = nullptr;
   // Allocate and pack into message
   CkArrayElementMigrateMessage* msg =
       new (bufSize, 0) CkArrayElementMigrateMessage(idx, id,
@@ -2995,10 +3040,15 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
                                                     false,
 #endif
                                                     bufSize, managers.size(),
-                                                    cache->getEpoch(id) + 1);
+                                                    cache->getEpoch(id) + 1,
+                                                    gpuBufSize > 0);
 
   {
-    PUP::toMem p(msg->packData, PUP::er::IS_MIGRATION);
+#if CMK_CUDA
+    if (gpuBufSize > 0)
+      cudaMalloc(&gpuMsg, gpuBufSize);
+#endif
+    PUP::toMem p(msg->packData, gpuMsg, PUP::er::IS_MIGRATION);
     p.becomeDeleting();
     pupElementsFor(p, rec, CkElementCreation_migrate);
     if (p.size() != bufSize)
@@ -3013,6 +3063,13 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 
   DEBM((AA "Migrated index size %s to %d \n" AB, idx2str(idx), toPe));
 
+#if CMK_CUDA
+  // Ensure all device-to-device copies from PUP packing are complete before
+  // destroying elements, since cudaMemcpy(D2D) can be async in CUDA 12.x.
+  if (gpuBufSize > 0)
+    cudaDeviceSynchronize();
+#endif
+
   thisProxy[toPe].immigrate(msg);
 
   duringMigration = true;
@@ -3024,9 +3081,16 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 
   cache->recordEmigration(id, toPe);
   informHome(idx, toPe);
+#if CMK_CUDA
+  if (gpuBufSize > 0)
+  {
+    sendGPUBuffers[id] = GPUMigrateData(toPe, gpuBufSize, gpuMsg);
+    thisProxy[CkMyPe()].sendGPUMsg(id);
+  }
+#endif
 
 #if !CMK_LBDB_ON && CMK_GLOBAL_LOCATION_UPDATE
-  DEBM((AA "Global location update. idx %s "
+  CmiPrintf((AA "Global location update. idx %s "
            "assigned to %d \n" AB,
         idx2str(idx), toPe));
   thisProxy.updateLocation(id, toPe);
@@ -3047,14 +3111,51 @@ void CkLocMgr::metaLBCallLB(CkLocRec* rec)
 }
 #endif
 
+#if CMK_CUDA
+void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char* &data, CkDeviceBufferPost* post)
+{
+  //CkPrintf("PE %d allocating GPU memory size %d for id %llu\n", CkMyPe(), size, id);
+  cudaMalloc(&data, size);
+  cudaDeviceSynchronize();
+  receivedDeviceMsgs[id] = data;
+  post[0].hapi_stream = (cudaStream_t) 0;
+}
+
+void CkLocMgr::immigrateGPU(CmiUInt8 id, int size, char* data)
+{
+  void* dataPtr = receivedDeviceMsgs[id];
+  receivedDeviceMsgs.erase(id);
+  bufferedDeviceMigrateMsgs[id] = dataPtr;
+  if (bufferedHostMigrateMsgs.find(id) != bufferedHostMigrateMsgs.end())
+  {
+    immigrate(bufferedHostMigrateMsgs[id]);
+    bufferedHostMigrateMsgs.erase(id);
+  }
+}
+#endif
+
 /**
   Migrating array element is arriving on this processor.
 */
 void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
 {
+  void* gpuMsg = nullptr;
+  if (msg->hasGPUMsg)
+  {
+    auto it = bufferedDeviceMigrateMsgs.find(msg->id);
+
+    if (it == bufferedDeviceMigrateMsgs.end())
+    {
+      bufferedHostMigrateMsgs[msg->id] = msg;
+      return;
+    }
+    
+    gpuMsg = it->second;
+  }
+
   const CkArrayIndex& idx = msg->idx;
 
-  PUP::fromMem p(msg->packData, PUP::er::IS_MIGRATION);
+  PUP::fromMem p(msg->packData, gpuMsg, PUP::er::IS_MIGRATION);
 
   if (msg->nManagers < managers.size())
     CkAbort("Array element arrived from location with fewer managers!\n");
@@ -3067,15 +3168,24 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
     return;
   }
 
+  if (msg->hasGPUMsg)
+    bufferedDeviceMigrateMsgs.erase(msg->id);
+
   insertID(idx, msg->id);
 
   // Create a record for this element
-  CkLocRec* rec =
-      createLocal(idx, true, msg->ignoreArrival, false /* home told on departure */, msg->epoch);
+  CkLocRec* rec = elementNrec(msg->id);
+  if (rec == nullptr)
+      rec = createLocal(idx, true, msg->ignoreArrival, false /* home told on departure */, msg->epoch);
 
   CmiAssert(CpvAccess(newZCPupGets).empty());  // Ensure that vector is empty
   // Create the new elements as we unpack the message
   pupElementsFor(p, rec, CkElementCreation_migrate);
+
+#if CMK_CUDA
+  cudaFree(gpuMsg);
+#endif
+
   bool zcRgetsActive = !CpvAccess(newZCPupGets).empty();
   if (zcRgetsActive)
   {

@@ -1,6 +1,6 @@
 OPTS = -O0 -g
 
-CHARM_DIR = /u/ajain18/reconverse_charm_integration/charm/multicore-linux-x86_64-cuda
+CHARM_DIR = ../../../../..
 CHARMC = $(CHARM_DIR)/bin/charmc $(OPTS)
 CHARM_INC = -I$(CHARM_DIR)/include
 

@@ -11,6 +11,10 @@
 #include "hapi_impl.h"
 #include "devicemanager.h"
 
+#include <cupti.h>
+#include <unordered_map>
+#include <queue>
+
 // Initial size of the user-addressed portion of host/device buffer arrays;
 // the system-addressed portion of host/device buffer arrays (used when there
 // is no need to share buffers between work requests) will be equivalant in size.
@@ -31,6 +35,13 @@ struct hapi_ipc_event_shared {
   bool dst_flag;
   pthread_mutex_t lock;
 };
+
+#if CMK_LBDB_ON
+struct CuptiBufferItem {
+  uint8_t* buffer;
+  size_t validSize;
+};
+#endif
 
 // Per-device struct containing data for CUDA IPC.
 // Use SMP lock in DeviceManager if needed.
@@ -148,6 +159,17 @@ struct GPUManager {
   // CUDA IPC handles opened for processes on the same node
   // Vector size is equal to the number of devices on the physical node
   std::vector<hapi_ipc_device_info> hapi_ipc_device_infos;
+
+  //CUPTI load balancing
+#ifdef CMK_LBDB_ON
+  std::unordered_map<uint32_t, uint64_t> cupti_correlation_db_;//correlationID -> ObjectID
+
+  std::unordered_map<uint64_t, uint64_t> cupti_obj_gpu_times_;//objectID -> accumulated GPU time in ns
+  
+  std::queue<CuptiBufferItem> cupti_buffer_queue_;
+
+  bool cupti_initialized_;
+#endif
 
   void init() {
     next_buffer_ = NUM_BUFFERS;

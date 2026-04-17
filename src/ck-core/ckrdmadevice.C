@@ -324,6 +324,7 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
 
   // Find which mode of transfer should be used
+  // CmiPrintf("[%d] CkRdmaDeviceOnSender: src_pe=%d, dst_pe=%d\n", CkMyPe(), env->getSrcPe(), CkMyPe());
   CkNcpyModeDevice mode = findTransferModeDevice(env->getSrcPe(), CkMyPe());
 
   // Allocate and fill in metadata for this zerocopy operation
@@ -355,7 +356,10 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     // Machine layer does not support GPU-aware communication
     // Check if destination PE is correct
     // TODO: Handle this case instead of aborting
+    // Chare* obj = CkActiveObj();
+    // CmiUInt8 id = obj->id; 
     if (source.dest_pe != CkMyPe()) {
+      CmiPrintf("Current PE %d does not match the destination PE %d and sender determined to be %d\n", CkMyPe(), source.dest_pe, env->getSrcPe());
       CkAbort("Current PE does not match the destination PE determined by the sender. "
           "Please enable CMK_GLOBAL_LOCATION_UPDATE.");
     }
@@ -400,6 +404,7 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
       shm_event_shared->dst_flag = true;
       pthread_mutex_unlock(&shm_event_shared->lock);
     } else {
+      // CmiPrintf("it should never be called during intra node\n");
 #if CMK_GPU_COMM
       // Machine layer supports GPU-aware communication
       QdCreate(1);
@@ -515,6 +520,7 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
   // TODO: Need to handle the case where the destination PE could be wrong
   //       (due to migration, etc.). Currently the code relies on a global
   //       location update after migration (with CMK_GLOBAL_LOCATION_UPDATE).
+  // CmiPrintf("[%d] CkRdmaDeviceOnSender: src_pe=%d, dst_pe=%d\n", CkMyPe(), CkMyPe(), dest_pe);
   CkNcpyModeDevice transfer_mode = findTransferModeDevice(CkMyPe(), dest_pe);
 
   // Store destination PE in the metadata message
@@ -525,12 +531,12 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
     buffers[i]->src_pe = CmiMyPe();
     buffers[i]->src_mpi_rank = CmiNodeOf(CmiMyPe());
   }
-  if(transfer_mode == CkNcpyModeDevice::MEMCPY) {
-  for (int i = 0; i < numops; i++) {
-      cudaStreamSynchronize(buffers[i]->hapi_stream);
-    }
+  if(transfer_mode == CkNcpyModeDevice::MEMCPY)
+  {
+    for (int i = 0; i < numops; i++)
+      hapiStreamSynchronize(buffers[i]->hapi_stream);
     return;
-  };
+  }
 
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
   int cpv_my_device_id = CmiMyRank() % csv_gpu_manager.device_count;

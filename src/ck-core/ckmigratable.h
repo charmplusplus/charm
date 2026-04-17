@@ -80,6 +80,8 @@ public:
   virtual void UserSetLBLoad(void);  /// user define this when setLBLoad is true
   void setObjTime(double cputime);
   double getObjTime();
+  void setObjGPUTime(double cputime);
+  double getObjGPUTime();
 #if CMK_LB_USER_DATA
   void *getObjUserData(int idx);
 #endif

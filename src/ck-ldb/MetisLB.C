@@ -85,12 +85,19 @@ void MetisLB::work(LDStats* stats)
   std::vector<idx_t> adjwgt(numEdges);
 
   int edgeNum = 0;
-  const double ratio = 256.0 / maxLoad;
+  double ratio;
+  if (maxLoad == 0)
+    ratio = 0;
+  else
+    ratio = 256.0 / maxLoad;
 
   for (int i = 0; i < numVertices; i++)
   {
     xadj[i] = edgeNum;
-    vwgt[i] = (int)ceil(ogr->vertices[i].getVertexLoad() * ratio);
+    if (ogr->vertices[i].getVertexLoad() == 0 && ratio == 0)
+      vwgt[i] = 1;
+    else
+      vwgt[i] = (int)ceil(ogr->vertices[i].getVertexLoad() * ratio);
     for (const auto& outEdge : ogr->vertices[i].sendToList)
     {
       adjncy[edgeNum] = outEdge.getNeighborId();
@@ -151,9 +158,16 @@ void MetisLB::work(LDStats* stats)
   // tpwghts: target partition weight, can pass NULL to equally divide
   // ubvec: of size ncon to indicate allowed load imbalance tolerance (> 1.0)
   // options: array of options; edgecut: stores the edgecut; pemap: mapping
-  METIS_PartGraphRecursive(&numVertices, &ncon, xadj.data(), adjncy.data(), vwgt.data(),
-                           vsize, adjwgt.data(), &numPes, tpwgts, ubvec.data(),
-                           options.data(), &edgecut, pemap.data());
+  CkPrintf("Metis partitioning in %i partitions\n", parr->availProcSize);
+  
+  if (parr->availProcSize > 1)
+    METIS_PartGraphRecursive(&numVertices, &ncon, xadj.data(), adjncy.data(), vwgt.data(),
+                            vsize, adjwgt.data(), &parr->availProcSize, tpwgts, ubvec.data(),
+                            options.data(), &edgecut, pemap.data());
+  else
+    pemap.resize(numVertices, 0);
+  
+  parr->reassignPeMapToAvailable(pemap);
 
   if (_lb_args.debug() >= 1)
   {

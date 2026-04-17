@@ -1,10 +1,10 @@
-
 /** @file
  * MPI based machine layer
  * @ingroup Machine
  */
 /*@{*/
 
+#include <string>
 #include <stdio.h>
 #include <errno.h>
 #include "converse.h"
@@ -43,6 +43,16 @@ static char* strsignal(int sig) {
 
 #include "machine.h"
 #include "pcqueue.h"
+#include "conv-ccs.h"
+#include "ccs-server.h"
+#include "ckrescale.h"
+
+#if CMK_SHRINK_EXPAND
+CcsDelayedReply shrinkExpandreplyToken;
+extern int numProcessAfterRestart;
+extern char *_shrinkexpand_basedir;
+int mynewpe=0;
+#endif
 
 /* Msg types to have different actions taken for different message types
  * REGULAR                     - Regular Charm++ message
@@ -477,6 +487,17 @@ void CmiNotifyIdleForMPI(void);
 #include "machine-ctrlmsg.C"
 #endif
 
+void print_nodelist(char* arg_nodelist){
+    FILE *f=fopen(arg_nodelist,"r");
+    char c;
+    c = fgetc(f); 
+    while (c != EOF) {
+      printf ("%c", c); 
+      c = fgetc(f); 
+    } 
+    fclose(f);
+}
+
 SMSG_LIST *allocateSmsgList(char *msg, int destNode, int size, int mode, int type, void *ref) {
   SMSG_LIST *msg_tmp = (SMSG_LIST *) malloc(sizeof(SMSG_LIST));
   msg_tmp->msg = msg;
@@ -712,13 +733,18 @@ static void ReleasePostedMessages(void) {
 
                 CmiInvokeNcpyAck(ncpyOpInfo);
             }
-            else if(msg_tmp->type == POST_DIRECT_SEND || msg_tmp->type == POST_DIRECT_RECV || msg_tmp->type == DEVICE_SEND_OP || msg_tmp->type == DEVICE_RECV_OP) {
+            else if(msg_tmp->type == POST_DIRECT_SEND || msg_tmp->type == POST_DIRECT_RECV) {
                 // do nothing as the received message is a NcpyOperationInfo object
                 // which is freed in the above code (either ONESIDED_BUFFER_DIRECT_RECV or
                 // ONESIDED_BUFFER_DIRECT_SEND)
             }
-            else
+            #if CMK_CUDA
+            else if(msg_tmp->type == DEVICE_SEND_OP || msg_tmp->type == DEVICE_RECV_OP) {
+                // TODO: check if we can remove this
+            }
+            #endif
 #endif
+            else
             {
               CmiFree(msg_tmp->msg);
             }
@@ -1480,7 +1506,9 @@ void LrtsExit(int exitcode) {
 #else
       signal(SIGINT, signal_int);
 #endif
+#if CMK_CUDA
       LrtsCleanupRMA();
+#endif
       MPI_Finalize();
 #endif
       // Still want to return control to the user in userDrivenMode
@@ -1546,6 +1574,12 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     char** largv=*argv;
     int tagUbGetResult;
     void *tagUbVal;
+    char* arg_nodelist;
+
+    /*if (CmiGetArgStringDesc(argv, "++nodelist", &arg_nodelist, "nodelist"))
+    {
+        print_nodelist(arg_nodelist);
+    }*/
 
     if (CmiGetArgFlag(largv, "+comm_thread_only_recv")) {
 #if CMK_SMP
@@ -1984,6 +2018,7 @@ void LrtsPostCommonInit(int everReturn) {
 
 /***********************************************************************
  *
+ *
  * Abort function:
  *
  ************************************************************************/
@@ -2152,6 +2187,56 @@ int CmiBarrierZero(void) {
     CmiNodeAllBarrier();
     return 0;
 }
+
+
+#if CMK_SHRINK_EXPAND
+void ConverseCleanup(void)
+{
+  MACHSTATE(2,"ConverseCleanup {");
+
+  #if (CMK_SMP && !CMK_SMP_NO_COMMTHD)
+    CmiAbort(" ConverseCleanup called in SMP. CmiBarrier needs to be called on comm thread as well! Right now, this hangs. Remove this abort when SMP support implemented.\n");
+  #endif
+  CmiBarrier(); // TODO: for smp, this must also be called on comm thread. otherwise, hangs
+
+#if CMK_USE_SYSVSHM
+	CmiExitSysvshm();
+#elif CMK_USE_PXSHM
+	CmiExitPxshm();
+#endif
+  ConverseCommonExit();               /* should be called by every rank */
+  CmiNodeBarrier();        /* single node SMP, make sure every rank is done */
+  //if (CmiMyRank()==0) CmiStdoutFlush();
+
+  if (get_shrinkexpand_exit() && CmiMyPe() == 0) {
+    // launch charmrun here
+
+    std::string path = std::string(_shrinkexpand_basedir) + "/numRestartProcs.txt";
+    FILE *fp = fopen(path.c_str(), "w");
+    if (fp != NULL) {
+      CmiPrintf("Charm> Writing numProcessAfterRestart %i to %s\n", numProcessAfterRestart, path.c_str());
+      fprintf(fp, "%d", numProcessAfterRestart);
+      fclose(fp);
+    } else {
+      perror("Error opening file");
+    }
+
+    // Use the new synchronous reply function. This blocks until the reply is
+    // sent and acknowledged by charmrun, robustly fixing the race condition.
+    CcsSendDelayedReplyAndTerm(shrinkExpandreplyToken, 0, 0);
+
+    CmiBarrier();
+    ConverseExit(100);
+
+  } else {
+    // kill all other processes
+    CmiBarrier();
+    //printf("Exiting PE %d\n", CmiMyPe());
+    //fflush(stdout);
+    ConverseExit();
+  }
+}
+#endif
 
 
 #if CMK_MEM_CHECKPOINT || CMK_MESSAGE_LOGGING
@@ -2554,7 +2639,6 @@ std::map<int, bool> handler_registered;
 void LrtsRecvDevice(DeviceRdmaOp* op, DeviceRecvType type)
 {
 #if CMK_SMP
-    CmiPrintf("[Debug] SMP case OK!\n");
     if(handler_registered[CmiMyPe()] == false) {
         deviceRecvCallbackHandler = CmiRegisterHandler((CmiHandler) deviceRecvCallback);
         handler_registered[CmiMyPe()] = true;
@@ -2564,7 +2648,6 @@ void LrtsRecvDevice(DeviceRdmaOp* op, DeviceRecvType type)
     msg_tmp->type = DEVICE_RECV_OP;
     PCQueuePush(postMsgBuf,(char *)msg_tmp);
 #else
-    CmiPrintf("[Debug] Non-SMP case OK!\n");
     if (access_epochs[op->src_mpi_rank] == 0) {
         MPI_Win_lock(MPI_LOCK_SHARED, op->src_mpi_rank, 0, globalDevWin);
     }

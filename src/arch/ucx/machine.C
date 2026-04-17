@@ -10,6 +10,9 @@
 #include <string>
 
 #include "converse.h"
+#include "conv-ccs.h"
+#include "ccs-server.h"
+#include "ckrescale.h"
 #include "cmirdmautils.h"
 #include "machine.h"
 #include "pcqueue.h"
@@ -28,6 +31,13 @@
 #include "runtime-pmi2.C"
 #elif CMK_USE_PMIX
 #include "runtime-pmix.C"
+#endif
+
+#if CMK_SHRINK_EXPAND
+CcsDelayedReply shrinkExpandreplyToken;
+extern int numProcessAfterRestart;
+extern char *_shrinkexpand_basedir;
+int mynewpe=0;
 #endif
 
 #define CmiSetMsgSize(msg, sz)    ((((CmiMsgHeaderBasic *)msg)->size) = (sz))
@@ -279,7 +289,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     ucp_worker_params_t wParams;
     ucs_status_t status;
     int ret;
-
+    
     ret = runtime_init(myNodeID, numNodes);
     UCX_CHECK_PMI_RET(ret, "runtime_init");
 
@@ -768,12 +778,87 @@ void LrtsExit(int exitcode)
     }
 }
 
+void LrtsCleanup()
+{
+  int ret;
+    int i;
+    UcxRequest *req;
+    ucs_status_t status;
+
+    UCX_LOG(4, "LrtsExit");
+
+    LrtsAdvanceCommunication(0);
+
+    for (i = 0; i < ucxCtx.numRxReqs; ++i) {
+        req = ucxCtx.rxReqs[i];
+        CmiFree(req->msgBuf);
+        ucp_request_cancel(ucxCtx.worker, req);
+        ucp_request_free(req);
+    }
+
+    ucp_worker_destroy(ucxCtx.worker);
+    ucp_cleanup(ucxCtx.context);
+
+    CmiFree(ucxCtx.eps);
+    CmiFree(ucxCtx.rxReqs);
+#if CMK_SMP
+    PCQueueDestroy(ucxCtx.txQueue);
+#endif
+
+    if(!CharmLibInterOperate || userDrivenMode) {
+        ret = runtime_barrier();
+        UCX_CHECK_PMI_RET(ret, "runtime_barrier");
+
+        ret = runtime_fini();
+        UCX_CHECK_PMI_RET(ret, "runtime_fini");
+    }
+}
+
 #if CMK_MACHINE_PROGRESS_DEFINED
 void CmiMachineProgressImpl()
 {
     if (CmiMyRank() == CmiMyNodeSize()) {
         CommunicationServerThread(0);
     }
+}
+#endif
+
+
+#if CMK_SHRINK_EXPAND
+void ConverseCleanup(void)
+{
+  MACHSTATE(2,"ConverseCleanup {");
+
+  CmiBarrier();
+
+#if CMK_USE_SYSVSHM
+	CmiExitSysvshm();
+#elif CMK_USE_PXSHM
+	CmiExitPxshm();
+#endif
+  ConverseCommonExit();               /* should be called by every rank */
+  CmiNodeBarrier();        /* single node SMP, make sure every rank is done */
+  //if (CmiMyRank()==0) CmiStdoutFlush();
+
+  if (get_shrinkexpand_exit() && CmiMyPe() == 0) {
+    // launch charmrun here
+
+    std::string path = std::string(_shrinkexpand_basedir) + "/numRestartProcs.txt";
+    FILE *fp = fopen(path.c_str(), "w");
+    if (fp != NULL) {
+      fprintf(fp, "%d", numProcessAfterRestart);
+      fclose(fp);
+    }
+
+    CmiBarrier();
+    ConverseExit(100);
+  } else {
+    // kill all other processes
+    CmiBarrier();
+    //printf("Exiting PE %d\n", CmiMyPe());
+    //fflush(stdout);
+    ConverseExit();
+  }
 }
 #endif
 

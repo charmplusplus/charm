@@ -65,6 +65,7 @@ never be excluded...
 
 #include "ckcheckpoint.h"
 #include "ck.h"
+#include "ckrescale.h"
 #include "trace.h"
 #include "ckrdma.h"
 #include "CkCheckpoint.decl.h"
@@ -156,10 +157,12 @@ int   _infoIdx;
 int   _charmHandlerIdx;
 int   _initHandlerIdx;
 int   _roRestartHandlerIdx;
+int   _shrinkExpandRestartHandlerIdx;
 int   _bocHandlerIdx;
 int   _qdHandlerIdx;
 int   _qdCommHandlerIdx;
 int   _triggerHandlerIdx;
+
 bool  _mainDone = false;
 CksvDeclare(bool, _triggersSent);
 
@@ -684,13 +687,14 @@ static void _exitHandler(envelope *env)
       }
       else
         CmiFree(env);
-#if CMK_SHRINK_EXPAND
-      ConverseCleanup();
-#endif
 
 #if CMK_CUDA || CMK_HIP
       // Clean up HAPI
       hapiExit();
+#endif
+
+#if CMK_SHRINK_EXPAND
+      ConverseCleanup();
 #endif
 
       //everyone exits here - there may be issues with leftover messages in the queue
@@ -774,7 +778,7 @@ static inline void _processBufferedBocInits(void)
     envelope *env = inits[i];
     if(env==0) {
 #if CMK_SHRINK_EXPAND
-      if(_inrestart){
+      if(get_in_restart()){
         CkPrintf("_processBufferedBocInits: empty message in restart, ignoring\n");
         break;
       }
@@ -1446,6 +1450,7 @@ void _initCharm(int unused_argc, char **argv)
 #if CMK_SHRINK_EXPAND
 	// for shrink expand cleanup
 	CmiAssignOnce(&_ROGroupRestartHandlerIdx, CkRegisterHandler(_ROGroupRestartHandler));
+	CmiAssignOnce(&_shrinkExpandRestartHandlerIdx, CkRegisterHandler(CkRecvGroupROData));
 #endif
 
 	_infoIdx = CldRegisterInfoFn((CldInfoFn)_infoFn);
@@ -1695,6 +1700,7 @@ void _initCharm(int unused_argc, char **argv)
 #if CMK_CUDA || CMK_HIP
   // Perform HAPI initialization for GPU support
   hapiInit(argv);
+  //hapiStartMemoryDaemon();
 
   // Initialize Charm++ layer functions
   hapiInvokeCallback = CUDACallbackManager;
