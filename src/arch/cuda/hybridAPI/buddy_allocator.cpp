@@ -158,25 +158,21 @@ namespace buddy {
       uint8_t* buddy_ptr = block_index_even ? (merge_ptr + merge_size) : (merge_ptr - merge_size);
 
       // If buddy is also free, merge
+      bool merged = false;
       for (std::list<FreeBlock>::iterator it = buckets[i].begin(); it != buckets[i].end(); it++) {
-        const auto& block = *it;
-        if (block.ptr == buddy_ptr) {
+        if (it->ptr == buddy_ptr) {
           buckets[i+1].emplace_back(block_index_even ? merge_ptr : buddy_ptr, 2 * merge_size);
-          buckets[i].erase(it); // Iterator is invalid after this erase
+          buckets[i].erase(it);
           buckets[i].pop_back();
+          merged = true;
           break;
         }
-        else {
-          // Did not find free buddy block, stop merging
-          goto merge_done;
-        }
       }
+
+      if (!merged) break;
 
       if (!block_index_even) merge_ptr = buddy_ptr;
       merge_size *= 2;
     }
-
-merge_done:
-    ;
   }
 }

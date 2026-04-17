@@ -51,6 +51,9 @@ private:
     int pos;    // position in min heap
     double load;
     double bgload; // background load
+    #ifdef CMK_CUDA
+    double bg_walltime;
+    #endif
     float speed;
   };
 

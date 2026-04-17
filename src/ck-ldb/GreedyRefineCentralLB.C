@@ -276,8 +276,17 @@ double GreedyRefineCentralLB::fillData(LDStats *stats,
     p.speed = stats->procs[pe].pe_speed;
     if (p.available) {
       availablePes++;
-      p.bgload = stats->procs[pe].bg_walltime;
-      if (p.bgload > maxBGLoad) maxBGLoad = p.bgload;
+      #ifndef CMK_CUDA
+        p.bgload = stats->procs[pe].bg_walltime;
+        if (p.bgload > maxBGLoad) maxBGLoad = p.bgload;
+      #else
+        p.bgload = 0.0;
+      #endif
+
+      #ifdef CMK_CUDA
+        p.bg_walltime = stats->procs[pe].bg_walltime;
+        // CmiPrintf("[%d] settign bg_walltime to %f\n", pe, p.bg_walltime);
+      #endif
       if (_lb_args.debug() > 1) {
         double &speed = stats->procs[pe].pe_speed;
         if (speed < minSpeed) minSpeed = speed;

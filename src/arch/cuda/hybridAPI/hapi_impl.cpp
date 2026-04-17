@@ -551,6 +551,9 @@ static void hapiMapping(char** argv) {
   CmiAssert(map_type != Mapping::None);
 
   if (CmiMyRank() == 0) {
+    printf("number of physical nodes is %d\n", CmiNumPhysicalNodes());
+    printf("number of nodes is %d\n", CmiNumNodes());
+    printf("my rank is %d\n", CmiMyRank());
     // Count number of GPU devices used by each process
     int visible_device_count;
     hapiCheck(hapiGetDeviceCount(&visible_device_count));
@@ -758,8 +761,8 @@ static void hapiMapping(char** argv) {
 
 #ifndef HAPI_CUDA_CALLBACK
 void recordEvent(cudaStream_t stream, const CkCallback& cb, void* cb_msg, hapiWorkRequest* wr = NULL, CkMigratable* obj = NULL, cudaEvent_t start_ev = NULL) {
-  if(obj!=NULL)
-    CmiAbort("non null without HAPI CUDA CALLBACK");
+  // if(obj!=NULL)
+  //   CmiAbort("non null without HAPI CUDA CALLBACK");
   // create CUDA event / get CUDA event from the pool and insert into stream
   hapiEvent_t ev;
   auto& hapi_event_pool_local = CpvAccess(hapi_event_pool);
