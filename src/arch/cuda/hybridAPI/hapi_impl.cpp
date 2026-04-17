@@ -1809,7 +1809,7 @@ void hapiRecordTime(cudaStream_t stream, cudaEvent_t start) {
 
   #ifndef HAPI_CUDA_CALLBACK
   // record CUDA event
-    recordEvent(stream, NULL, NULL, NULL, dynamic_cast<CkMigratable*>(obj), start);
+    recordEvent(stream, CkCallback(), NULL, NULL, dynamic_cast<CkMigratable*>(obj), start);
 #else
   #error hapi record time with hapi_cuda_callback not supported
 #endif

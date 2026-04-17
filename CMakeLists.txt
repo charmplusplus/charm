@@ -539,6 +539,7 @@ set(CHARMRUN_HAPI_DIR src/arch/common)
 
 include(cmake/detect-features.cmake)
 include(cmake/ci-files.cmake)
+add_custom_target(ci-generated DEPENDS ${all-ci-outputs})
 
 
 if(${TARGET} STREQUAL "all-test")
@@ -731,7 +732,8 @@ if(BUILD_CUDA OR BUILD_HIP)
       message(STATUS "Found CUPTI: ${CUPTI_LIBRARY}")
     endif()
 
-    add_library(hybridapi ${hybridAPI-cxx-sources} $<TARGET_OBJECTS:ckrescale> $<TARGET_OBJECTS:converse>)
+    add_library(hybridapi ${hybridAPI-cxx-sources} $<TARGET_OBJECTS:ckrescale>)
+    add_dependencies(hybridapi ci-generated)
 
     if(CUPTI_LIBRARY)
       target_include_directories(hybridapi PRIVATE "${CUPTI_INCLUDE_DIR}")
@@ -783,6 +785,7 @@ if(BUILD_CUDA OR BUILD_HIP)
     enable_language(HIP)
     
     add_library(hybridapi ${hybridAPI-cxx-sources})
+    add_dependencies(hybridapi ci-generated)
     target_include_directories(hybridapi PRIVATE "${ROCM_PATH}/include")
 
     if(TRACING)
@@ -793,7 +796,7 @@ if(BUILD_CUDA OR BUILD_HIP)
   # hapi_memory_daemon - standalone executable for shrink/expand GPU memory management
   if(BUILD_CUDA)
     add_executable(hapi_memory_daemon src/arch/cuda/hybridAPI/hapi_memory_daemon.cpp)
-    add_dependencies(hapi_memory_daemon hybridapi ck converse ckqt moduleNDMeshStreamer ckmain memory-default threads-default ldb-rand modulecompletion conv-static)
+    add_dependencies(hapi_memory_daemon hybridapi ck converse ckqt moduleNDMeshStreamer ckmain modulecompletion conv-static)
   endif()
 
 endif()
