@@ -5,32 +5,31 @@
 #include <cmath>
 #include <algorithm>
 #include <hapi_portable.h>
-#include "converse.h"
 
 namespace buddy {
   void allocator::print_status() {
-    CmiPrintf("(buckets)\n");
+    printf("(buckets)\n");
     size_t free = 0;
     for (int i = 0; i < bucket_count; i++) {
-      CmiPrintf("bucket[%d]: ", i);
+      printf("bucket[%d]: ", i);
       for (const auto& block : buckets[i]) {
         free += block.size;
-        CmiPrintf("{%p, %zu} ", block.ptr, block.size);
+        printf("{%p, %zu} ", block.ptr, block.size);
       }
-      CmiPrintf("\n");
+      printf("\n");
     }
 
-    CmiPrintf("(alloc_map)\n");
+    printf("(alloc_map)\n");
     size_t allocated = 0;
     size_t used = 0;
     for (const auto& elem : alloc_map) {
       const auto& block = elem.second;
       allocated += block.size;
       used += block.requested;
-      CmiPrintf("ptr: %p, size: %zu, req: %zu\n", elem.first, block.size, block.requested);
+      printf("ptr: %p, size: %zu, req: %zu\n", elem.first, block.size, block.requested);
     }
 
-    CmiPrintf("(fragmentation) free: %zu, allocated: %zu, used: %zu\n", free, allocated, used);
+    printf("(fragmentation) free: %zu, allocated: %zu, used: %zu\n", free, allocated, used);
   }
 
   size_t allocator::get_free_size() {
@@ -158,24 +157,21 @@ namespace buddy {
       uint8_t* buddy_ptr = block_index_even ? (merge_ptr + merge_size) : (merge_ptr - merge_size);
 
       // If buddy is also free, merge
+      bool merged = false;
       for (std::list<FreeBlock>::iterator it = buckets[i].begin(); it != buckets[i].end(); it++) {
-        const auto& block = *it;
-        if (block.ptr == buddy_ptr) {
+        if (it->ptr == buddy_ptr) {
           buckets[i+1].emplace_back(block_index_even ? merge_ptr : buddy_ptr, 2 * merge_size);
-          buckets[i].erase(it); // Iterator is invalid after this erase
+          buckets[i].erase(it);
           buckets[i].pop_back();
+          merged = true;
           break;
         }
-        else {
-          // Did not find free buddy block, stop merging
-          goto merge_done;
-        }
       }
+
+      if (!merged) break;
 
       if (!block_index_even) merge_ptr = buddy_ptr;
       merge_size *= 2;
     }
-
-merge_done:
   }
 }

@@ -120,7 +120,7 @@ public:
         "Warm-up: %d, Bulk-synchronous: %d, Zerocopy: %d, Print: %d\n\n",
         grid_width, grid_height, block_width, block_height, n_chares_x, n_chares_y,
         n_iters, warmup_iters, sync_ver, use_zerocopy, print_elements);
-
+fflush(stdout);
     // Create blocks and start iteration
     block_proxy = CProxy_Block::ckNew(n_chares_x, n_chares_y);
     init_start_time = CkWallTimer();
@@ -129,7 +129,7 @@ public:
 
   void initDone() {
     CkPrintf("Init time: %.3lf s\n", CkWallTimer() - init_start_time);
-
+fflush(stdout);
     startIter();
   }
 
@@ -161,9 +161,11 @@ public:
     double total_time = CkWallTimer() - start_time;
     CkPrintf("Total time: %.3lf s\nAverage iteration time: %.3lf us\n",
         total_time, (total_time / n_iters) * 1e6);
+  fflush(stdout);
     if (sync_ver) {
       CkPrintf("Comm time per iteration: %.3lf us\nUpdate time per iteration: %.3lf us\n",
           (comm_agg_time / n_iters) * 1e6, (update_agg_time / n_iters) * 1e6);
+fflush(stdout);
     }
 
     if (print_elements) {
@@ -335,6 +337,8 @@ class Block : public CBase_Block {
   }
 
   void update() {
+    printf("[ITER] %d updating on Process: %d\n", my_iter, CmiMyNode());
+    fflush(stdout);
     std::ostringstream os;
     os << "update (" << std::to_string(x) << "," << std::to_string(y) << ")";
     NVTXTracer(os.str(), NVTXColor::WetAsphalt);
@@ -565,6 +569,7 @@ class Block : public CBase_Block {
     } else {
       main_proxy.printDone();
     }
+    fflush(stdout);
   }
 };
 

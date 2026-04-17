@@ -1,12 +1,14 @@
-CHARMC = /u/ajain18/charm/mpi-linux-x86_64-smp-cuda/bin/charmc $(USE_WR) $(OPTS)
-CHARMC_FLAGS = -D__HIP_PLATFORM_AMD__=ON
+CHARM_DIR=/u/ajain18/reconverse_charm_integration/charm/multicore-linux-x86_64-cuda
 
-HAPITOOLKIT_HOME ?= /opt/rocm
+CHARMC = $(CHARM_DIR)/bin/charmc $(USE_WR) $(OPTS)
+CHARMC_FLAGS = 
+
+# HAPITOOLKIT_HOME ?= /opt/rocm
 HAPICC = nvcc
-HAPICC_FLAGS = -c -std=c++11
-HAPICC_INC = -I$(HAPITOOLKIT_HOME)/include
-HAPICC_LIB = -L$(HAPITOOLKIT_HOME)/lib
-CHARM_INC = -I/u/ajain18/charm/mpi-linux-x86_64-smp-cuda/include
+HAPICC_FLAGS = -O3 -g -c -std=c++11 -use_fast_math
+# HAPICC_INC = -I$(HAPITOOLKIT_HOME)/include
+# HAPICC_LIB = -L$(HAPITOOLKIT_HOME)/lib
+CHARM_INC = -I$(CHARM_DIR)/include
 LD_LIBS =
 
 TARGET = jacobi2d
@@ -15,7 +17,7 @@ all: $(TARGET)
 OBJS = $(TARGET).o $(TARGET)HAPI.o
 
 $(TARGET): $(OBJS)
-	$(CHARMC) $(CHARMC_FLAGS) -lmpi_gtl_cuda -language charm++ -o $@ $(OBJS) $(LD_LIBS)
+	$(CHARMC) $(CHARMC_FLAGS) -language charm++ -o $@ $(OBJS) $(LD_LIBS)
 
 $(TARGET).decl.h: $(TARGET).ci
 	$(CHARMC) $(CHARMC_FLAGS) $<
