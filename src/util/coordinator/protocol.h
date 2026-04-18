@@ -1,0 +1,67 @@
+// Coordinator wire protocol.
+//
+// Frame: [u32 totalLen][u32 type][payload of (totalLen - 4) bytes].
+// All integers are network byte order (big-endian).
+//
+// Member record (used inside several payloads):
+//   [u32 nodeId][u32 ucxAddrLen][ucxAddrLen bytes ucxAddr]
+//
+// Rank-side flow:
+//   Initial rank:
+//     -> REGISTER_INITIAL { nodeId, ucxAddr }                  (nodeId is the rank's
+//                                                              PMI rank — coordinator
+//                                                              uses it directly so both
+//                                                              sides agree on numbering)
+//     <- REGISTER_INITIAL_REPLY { nodeId, epoch, members[] }   (sent after coordinator
+//                                                              has collected expected count)
+//   Newcomer rank:
+//     -> REGISTER_NEWCOMER { ucxAddr }
+//     <- REGISTER_NEWCOMER_REPLY { epoch, members[] }          (immediate snapshot of
+//                                                              current members so the
+//                                                              newcomer can build
+//                                                              speculative eps while
+//                                                              waiting for COMMIT)
+//     <- INTEGRATE { nodeId, epoch, members[] }                (pushed when committed;
+//                                                              members[] are the FINAL
+//                                                              compactly-renumbered set)
+//   PE 0 driving a reconfig:
+//     -> QUERY_PENDING
+//     <- QUERY_PENDING_REPLY { count }
+//     -> COMMIT { epoch, kills[], take }
+//     <- COMMIT_REPLY { newNodeId, epoch, members[] }           (PE 0 specifically; gives its
+//                                                              own renumbered nodeId)
+//   Surviving (non-initiator) members during reconfig:
+//     <- RECONFIG { newNodeId, epoch, members[] }               (pushed at COMMIT; same shape
+//                                                              as INTEGRATE)
+//   Killed members during reconfig:
+//     <- DIE { }                                                (pushed at COMMIT; receiver
+//                                                              should exit)
+//   Any rank during wireup:
+//     -> BARRIER { epoch, nodeId }
+//     <- BARRIER_REPLY                                          (after all alive ranks check in)
+
+#pragma once
+
+#include <cstdint>
+
+namespace coord {
+
+enum MsgType : uint32_t {
+  REGISTER_INITIAL       = 1,
+  REGISTER_INITIAL_REPLY = 2,
+  REGISTER_NEWCOMER      = 3,
+  INTEGRATE              = 4,
+  QUERY_PENDING          = 5,
+  QUERY_PENDING_REPLY    = 6,
+  COMMIT                 = 7,
+  COMMIT_REPLY           = 8,
+  BARRIER                = 9,
+  BARRIER_REPLY          = 10,
+  RECONFIG               = 11,
+  DIE                    = 12,
+  REGISTER_NEWCOMER_REPLY = 13,
+};
+
+constexpr uint32_t HEADER_BYTES = 8;  // totalLen + type
+
+}  // namespace coord

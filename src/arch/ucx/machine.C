@@ -34,10 +34,32 @@
 #endif
 
 #if CMK_SHRINK_EXPAND
+#include <limits.h>
+#include <setjmp.h>
+#include <unordered_map>
+#include "../../util/coordinator/coord_client.h"
+
+static void UcxCloseEp(ucp_ep_h ep);
 CcsDelayedReply shrinkExpandreplyToken;
 extern int numProcessAfterRestart;
 extern char *_shrinkexpand_basedir;
 int mynewpe=0;
+
+// Set by ConverseCleanup, read by charm_main after longjmp
+extern jmp_buf _shrinkexpand_jmpbuf;
+static bool _shrinkexpand_restarting = false;
+static int  _shrinkexpand_new_numnodes = 0;
+static int  _shrinkexpand_my_node = 0;
+
+// Coordinator state (per-node).
+static int   _coord_fd       = -1;
+static char *_coord_host     = nullptr;  // owned by argv, do not free
+static int   _coord_port     = 0;
+static uint32_t _coord_epoch = 0;        // tracked locally; updated on each commit
+// Mirror of the coordinator's current member list (in current nodeId order).
+// Used by UcxReInitEpsFromView to diff old vs new and avoid tearing down eps
+// to peers that survived. Updated in LrtsInit and at every successful commit.
+static std::vector<coord::Member> _coord_members;
 #endif
 
 #define CmiSetMsgSize(msg, sz)    ((((CmiMsgHeaderBasic *)msg)->size) = (sz))
@@ -284,12 +306,189 @@ static void UcxInitEps(int numNodes, int myId)
 // Only invoked by comm threads
 void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 {
+#if CMK_SHRINK_EXPAND
+    if (_shrinkexpand_restarting) {
+        // UCX was already re-initialized by UcxReInitEpsFromView in ConverseCleanup.
+        // Just report the new topology to the caller.
+        *numNodes = _shrinkexpand_new_numnodes;
+        *myNodeID = _shrinkexpand_my_node;
+        return;
+    }
+
+    // Newcomer process: standalone (no PMI), joins a running cluster via the
+    // coordinator. Launched by external manager with:
+    //   ./binary +newcomer +coordinator host:port +restart <basedir> ...
+    // We init UCX locally, register with the coordinator and block in INTEGRATE
+    // until PE 0 commits the rescale, then build endpoints from the returned
+    // member list. The +restart flag (injected in charm_main if missing) is what
+    // gets us into CkRestartMain's broadcast handler so we receive readonlies.
+    if (CmiGetArgFlagDesc(*argv, "+newcomer",
+            "Join a running cluster as a newcomer (used by external manager)")) {
+        ucp_params_t cParams;
+        ucp_config_t *config;
+        ucp_worker_params_t wParams;
+        ucs_status_t status;
+
+        status = ucp_config_read("Charm++", NULL, &config);
+        UCX_CHECK_STATUS(status, "ucp_config_read (newcomer)");
+
+        cParams.field_mask        = UCP_PARAM_FIELD_FEATURES          |
+                                    UCP_PARAM_FIELD_REQUEST_SIZE      |
+                                    UCP_PARAM_FIELD_TAG_SENDER_MASK   |
+                                    UCP_PARAM_FIELD_REQUEST_INIT      |
+                                    UCP_PARAM_FIELD_MT_WORKERS_SHARED |
+                                    UCP_PARAM_FIELD_ESTIMATED_NUM_EPS;
+        cParams.features          = UCP_FEATURE_TAG | UCP_FEATURE_RMA;
+        cParams.request_size      = sizeof(UcxRequest);
+        cParams.tag_sender_mask   = 0ul;
+        cParams.request_init      = UcxRequestInit;
+        cParams.mt_workers_shared = 0;
+        // Conservative; reset after INTEGRATE tells us actual count.
+        cParams.estimated_num_eps = 1;
+
+        status = ucp_init(&cParams, config, &ucxCtx.context);
+        ucp_config_release(config);
+        UCX_CHECK_STATUS(status, "ucp_init (newcomer)");
+
+        wParams.field_mask  = UCP_WORKER_PARAM_FIELD_THREAD_MODE;
+        wParams.thread_mode = UCS_THREAD_MODE_SINGLE;
+        status = ucp_worker_create(ucxCtx.context, &wParams, &ucxCtx.worker);
+        UCX_CHECK_STATUS(status, "ucp_worker_create (newcomer)");
+
+        ucxCtx.numRxReqs = UCX_MSG_NUM_RX_REQS;
+        if (CmiGetArgInt(*argv, "+ucx_num_rx_reqs", &ucxCtx.numRxReqs)) {
+            if ((ucxCtx.numRxReqs <= 0) || (ucxCtx.numRxReqs > UCX_MSG_NUM_RX_REQS_MAX)) {
+                CmiPrintf("UCX: Invalid number of RX reqs: %d\n", ucxCtx.numRxReqs);
+                CmiAbort(__func__);
+            }
+        }
+
+        int thresh = UCX_MSG_PROBE_THRESH;
+        CmiGetArgInt(*argv, "+ucx_rndv_thresh", &thresh);
+        ucxCtx.eagerSize = std::max(LrtsGetMaxNcpyOperationInfoSize(), thresh);
+
+        char *coordSpec = nullptr;
+        CmiGetArgStringDesc(*argv, "+coordinator", &coordSpec,
+                            "host:port of the rescale coordinator");
+        if (coordSpec == nullptr) {
+            CmiAbort("UCX: +newcomer requires +coordinator host:port");
+        }
+        char *colon = strchr(coordSpec, ':');
+        if (colon == nullptr) CmiAbort("UCX: +coordinator must be host:port");
+        *colon = '\0';
+        _coord_host = coordSpec;
+        _coord_port = atoi(colon + 1);
+        if (_coord_port <= 0) CmiAbort("UCX: +coordinator port invalid");
+
+        ucp_address_t *myAddr = nullptr;
+        size_t myAddrLen = 0;
+        status = ucp_worker_get_address(ucxCtx.worker, &myAddr, &myAddrLen);
+        UCX_CHECK_STATUS(status, "ucp_worker_get_address (newcomer)");
+
+        _coord_fd = coord::connect_blocking(_coord_host, _coord_port);
+        if (_coord_fd < 0) {
+            CmiAbort("UCX: failed to connect to coordinator (newcomer)");
+        }
+
+        // Phase 1: snapshot. Coordinator returns the current member list
+        // immediately so we can build speculative eps + handshake while
+        // waiting for COMMIT. Final nodeIds and the post-kill member set
+        // arrive later via INTEGRATE.
+        coord::ClusterView snapshot;
+        if (!coord::register_newcomer(_coord_fd, myAddr, (uint32_t)myAddrLen,
+                                      &snapshot)) {
+            CmiAbort("UCX: coordinator REGISTER_NEWCOMER failed");
+        }
+        ucp_worker_release_address(ucxCtx.worker, myAddr);
+
+        // Speculative eps keyed by ucxAddr (the snapshot's nodeIds may not
+        // survive compact renumbering, so we can't index by them yet).
+        std::unordered_map<std::string, ucp_ep_h> specEps;
+        specEps.reserve(snapshot.members.size());
+        for (const auto &m : snapshot.members) {
+            ucp_ep_params_t eParams;
+            eParams.field_mask = UCP_EP_PARAM_FIELD_REMOTE_ADDRESS;
+            eParams.address    = (const ucp_address_t *)m.ucxAddr.data();
+            ucp_ep_h ep = nullptr;
+            status = ucp_ep_create(ucxCtx.worker, &eParams, &ep);
+            UCX_CHECK_STATUS(status, "ucp_ep_create (newcomer speculative)");
+            specEps[m.ucxAddr] = ep;
+        }
+
+        UcxPrepostRxBuffers();
+        // Force handshakes to complete now so they overlap with the manager's
+        // RTT to PE 0 + PE 0's wait for the LB step to drain.
+        status = ucp_worker_flush(ucxCtx.worker);
+        UCX_CHECK_STATUS(status, "ucp_worker_flush (newcomer speculative)");
+
+        // Phase 2: block until COMMIT pushes the final view.
+        coord::ClusterView view;
+        if (!coord::await_integrate(_coord_fd, &view)) {
+            CmiAbort("UCX: coordinator INTEGRATE (await) failed");
+        }
+        _coord_epoch = view.epoch;
+
+        const int newNumNodes = (int)view.members.size();
+        *numNodes = newNumNodes;
+        *myNodeID = (int)view.nodeId;
+        _shrinkexpand_my_node      = (int)view.nodeId;
+        _shrinkexpand_new_numnodes = newNumNodes;
+
+        // Diff: assign speculative eps to their final nodeId slot, create
+        // fresh eps for members not in the snapshot (other newcomers), close
+        // any speculative eps to peers that turned out to be killed.
+        ucxCtx.eps = (ucp_ep_h *)CmiAlloc(sizeof(ucp_ep_h) * newNumNodes);
+        for (int i = 0; i < newNumNodes; i++) ucxCtx.eps[i] = nullptr;
+
+        for (const auto &m : view.members) {
+            if ((int)m.nodeId == *myNodeID) continue;
+            auto it = specEps.find(m.ucxAddr);
+            if (it != specEps.end()) {
+                ucxCtx.eps[m.nodeId] = it->second;
+                specEps.erase(it);
+            } else {
+                ucp_ep_params_t eParams;
+                eParams.field_mask = UCP_EP_PARAM_FIELD_REMOTE_ADDRESS;
+                eParams.address    = (const ucp_address_t *)m.ucxAddr.data();
+                status = ucp_ep_create(ucxCtx.worker, &eParams,
+                                       &ucxCtx.eps[m.nodeId]);
+                UCX_CHECK_STATUS(status, "ucp_ep_create (newcomer post-INTEGRATE)");
+            }
+        }
+        // Anything left in specEps is to a peer that got killed during the
+        // wait window — close it.
+        for (auto &kv : specEps) UcxCloseEp(kv.second);
+
+        _coord_members = view.members;
+
+#if CMK_SMP
+        ucxCtx.txQueue = PCQueueCreate();
+#endif
+
+#if CMK_CUDA
+        CpvInitialize(int, tag_counter);
+        CpvAccess(tag_counter) = 0;
+#endif
+
+        // Coordinator-side barrier waits for members_.size() (= survivors +
+        // newcomers) post-COMMIT, so survivors won't proceed past their
+        // ConverseCleanup barrier until we hit this too.
+        if (!coord::barrier(_coord_fd, _coord_epoch, view.nodeId)) {
+            CmiAbort("UCX: coordinator BARRIER failed (newcomer)");
+        }
+
+        CmiPrintf("Charm> newcomer integrated: nodeId=%u epoch=%u members=%d\n",
+                  view.nodeId, _coord_epoch, newNumNodes);
+        return;
+    }
+#endif
+
     ucp_params_t cParams;
     ucp_config_t *config;
     ucp_worker_params_t wParams;
     ucs_status_t status;
     int ret;
-    
+
     ret = runtime_init(myNodeID, numNodes);
     UCX_CHECK_PMI_RET(ret, "runtime_init");
 
@@ -341,6 +540,53 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     // Ensure connects completion
     status = ucp_worker_flush(ucxCtx.worker);
     UCX_CHECK_STATUS(status, "ucp_worker_flush");
+
+#if CMK_SHRINK_EXPAND
+    // Parse +coordinator host:port. Required when shrink/expand is enabled —
+    // even runs that never rescale must register so the coordinator has a
+    // consistent membership view.
+    {
+      char *coordSpec = nullptr;
+      CmiGetArgStringDesc(*argv, "+coordinator", &coordSpec,
+                          "host:port of the rescale coordinator");
+      if (coordSpec == nullptr) {
+        CmiAbort("UCX: +coordinator host:port is required (shrink/expand build).");
+      }
+      char *colon = strchr(coordSpec, ':');
+      if (colon == nullptr) CmiAbort("UCX: +coordinator must be host:port");
+      *colon = '\0';
+      _coord_host = coordSpec;
+      _coord_port = atoi(colon + 1);
+      if (_coord_port <= 0) CmiAbort("UCX: +coordinator port invalid");
+
+      // Get our local UCX worker address to publish.
+      ucp_address_t *myAddr = nullptr;
+      size_t myAddrLen = 0;
+      status = ucp_worker_get_address(ucxCtx.worker, &myAddr, &myAddrLen);
+      UCX_CHECK_STATUS(status, "ucp_worker_get_address (coordinator REGISTER)");
+
+      _coord_fd = coord::connect_blocking(_coord_host, _coord_port);
+      if (_coord_fd < 0) {
+        CmiAbort("UCX: failed to connect to coordinator");
+      }
+      coord::ClusterView view;
+      if (!coord::register_initial(_coord_fd, (uint32_t)*myNodeID,
+                                   myAddr, (uint32_t)myAddrLen, &view)) {
+        CmiAbort("UCX: coordinator REGISTER_INITIAL failed");
+      }
+      _coord_epoch = view.epoch;
+      _coord_members = view.members;
+      ucp_worker_release_address(ucxCtx.worker, myAddr);
+
+      if ((int)view.nodeId != *myNodeID) {
+        CmiAbort("UCX: coordinator returned nodeId mismatching PMI rank");
+      }
+      if (*myNodeID == 0) {
+        CmiPrintf("Charm> coordinator registered: nodeId=%u epoch=%u members=%zu\n",
+                  view.nodeId, view.epoch, view.members.size());
+      }
+    }
+#endif
 
 #if CMK_SMP
     ucxCtx.txQueue = PCQueueCreate();
@@ -825,9 +1071,107 @@ void CmiMachineProgressImpl()
 
 
 #if CMK_SHRINK_EXPAND
+extern char *se_avail_vector;  // populated on PE 0 by ck-ldb/manager.C realloc()
+
+// Close one endpoint cleanly (flush mode) and wait for completion. UCX returns
+// a request handle that needs to be progressed to OK before we drop the worker.
+static void UcxCloseEp(ucp_ep_h ep)
+{
+    ucs_status_ptr_t req = ucp_ep_close_nb(ep, UCP_EP_CLOSE_MODE_FLUSH);
+    if (req == NULL) return;
+    if (UCS_PTR_IS_ERR(req)) {
+        UCX_LOG(50, "ucp_ep_close_nb failed: %s",
+                ucs_status_string(UCS_PTR_STATUS(req)));
+        return;
+    }
+    ucs_status_t st;
+    do {
+        ucp_worker_progress(ucxCtx.worker);
+        st = ucp_request_check_status(req);
+    } while (st == UCS_INPROGRESS);
+    ucp_request_free(req);
+}
+
+// Coordinator-driven endpoint reconfig. PE 0 already drove COMMIT and pushed
+// RECONFIG to other survivors; this just consumes the new view (passed in)
+// and updates the eps array.
+//
+// Diff-based: surviving peers are identified by ucxAddr. Their existing eps
+// are reused (and just remapped to the new compactly-renumbered nodeId), so
+// no UCX handshake is repeated. Killed peers' eps are closed; newcomers get
+// fresh eps. _coord_members is the OLD view we're diffing against.
+//
+// oldNodeId is this rank's nodeId in the old numbering — needed to skip the
+// self slot in ucxCtx.eps (which UcxInitEps left uninitialized).
+static void UcxReInitEpsFromView(const coord::ClusterView &view,
+                                 int oldNumNodes, int oldNodeId)
+{
+    ucs_status_t status;
+
+    std::unordered_map<std::string, int> oldByAddr;
+    oldByAddr.reserve(_coord_members.size());
+    for (const auto &m : _coord_members) {
+        if (static_cast<int>(m.nodeId) == oldNodeId) continue;
+        oldByAddr.emplace(m.ucxAddr, static_cast<int>(m.nodeId));
+    }
+
+    int newNumNodes = static_cast<int>(view.members.size());
+    ucp_ep_h *newEps = (ucp_ep_h*)CmiAlloc(sizeof(ucp_ep_h) * newNumNodes);
+    CmiEnforce(newEps);
+    for (int i = 0; i < newNumNodes; ++i) newEps[i] = nullptr;
+
+    std::vector<bool> oldUsed(oldNumNodes, false);
+
+    for (const auto &m : view.members) {
+        if (static_cast<int>(m.nodeId) == static_cast<int>(view.nodeId)) continue;
+        auto it = oldByAddr.find(m.ucxAddr);
+        if (it != oldByAddr.end()) {
+            int oldId = it->second;
+            newEps[m.nodeId] = ucxCtx.eps[oldId];
+            oldUsed[oldId] = true;
+            UCX_LOG(4, "Reusing ep: oldId=%d -> newId=%u (ep %p)",
+                    oldId, m.nodeId, newEps[m.nodeId]);
+        } else {
+            ucp_ep_params_t eParams;
+            eParams.field_mask = UCP_EP_PARAM_FIELD_REMOTE_ADDRESS;
+            eParams.address    = reinterpret_cast<const ucp_address_t*>(m.ucxAddr.data());
+            status = ucp_ep_create(ucxCtx.worker, &eParams, &newEps[m.nodeId]);
+            UCX_CHECK_STATUS(status, "ucp_ep_create (reconfig newcomer)");
+            UCX_LOG(4, "New ep to nodeId=%u (ep %p)", m.nodeId, newEps[m.nodeId]);
+        }
+    }
+
+    // Close eps to killed peers (anything in old eps that didn't get reused,
+    // skipping the self slot which was never initialized).
+    for (int i = 0; i < oldNumNodes; ++i) {
+        if (i == oldNodeId) continue;
+        if (oldUsed[i]) continue;
+        UcxCloseEp(ucxCtx.eps[i]);
+    }
+
+    CmiFree(ucxCtx.eps);
+    ucxCtx.eps = newEps;
+
+    // Receives are tag-matched and not bound to specific eps; leave the
+    // preposted recv pool alone. Just flush so handshakes for newly-added
+    // eps complete before the LB step starts driving traffic.
+    status = ucp_worker_flush(ucxCtx.worker);
+    UCX_CHECK_STATUS(status, "ucp_worker_flush (reconfig)");
+
+    _coord_members = view.members;
+}
+
 void ConverseCleanup(void)
 {
   MACHSTATE(2,"ConverseCleanup {");
+
+#if CMK_SHRINK_EXPAND
+  {
+    extern double rescale_t_cleanup_enter;
+    extern double rescale_wall_now();
+    if (CmiMyPe() == 0) rescale_t_cleanup_enter = rescale_wall_now();
+  }
+#endif
 
   CmiBarrier();
 
@@ -836,27 +1180,115 @@ void ConverseCleanup(void)
 #elif CMK_USE_PXSHM
 	CmiExitPxshm();
 #endif
-  ConverseCommonExit();               /* should be called by every rank */
-  CmiNodeBarrier();        /* single node SMP, make sure every rank is done */
-  //if (CmiMyRank()==0) CmiStdoutFlush();
+  ConverseCommonExit();
+  CmiNodeBarrier();
 
-  if (get_shrinkexpand_exit() && CmiMyPe() == 0) {
-    // launch charmrun here
+  if (get_shrinkexpand_exit()) {
+    int oldNumNodes = _Cmi_numnodes;
+    int myNode = CmiMyNode();
 
-    std::string path = std::string(_shrinkexpand_basedir) + "/numRestartProcs.txt";
-    FILE *fp = fopen(path.c_str(), "w");
-    if (fp != NULL) {
-      fprintf(fp, "%d", numProcessAfterRestart);
-      fclose(fp);
+    // Drain any in-flight messages before we touch the coordinator/eps.
+    LrtsAdvanceCommunication(0);
+
+    // PE 0 writes new PE count for charmrun_elastic compatibility (legacy).
+    // Coordinator is the source of truth for the new shape; this is a hint.
+    if (CmiMyPe() == 0) {
+      std::string path = std::string(_shrinkexpand_basedir) + "/numRestartProcs.txt";
+      FILE *fp = fopen(path.c_str(), "w");
+      if (fp != NULL) {
+        fprintf(fp, "%d", numProcessAfterRestart);
+        fclose(fp);
+      }
     }
 
-    CmiBarrier();
-    ConverseExit(100);
+    coord::ClusterView view;
+    bool gotDie = false;
+
+    if (CmiMyPe() == 0) {
+      // PE 0 drives the COMMIT. Build kill set from se_avail_vector
+      // (in OLD nodeId space — entries with value 0 are being killed).
+      if (se_avail_vector == nullptr) {
+        CmiAbort("UCX: shrink/expand exit on PE 0 with null se_avail_vector");
+      }
+      std::vector<uint32_t> kills;
+      int survivors = 0;
+      for (int i = 0; i < oldNumNodes; ++i) {
+        if (se_avail_vector[i]) survivors++;
+        else kills.push_back(static_cast<uint32_t>(i));
+      }
+      uint32_t take = (numProcessAfterRestart > survivors)
+                          ? static_cast<uint32_t>(numProcessAfterRestart - survivors)
+                          : 0;
+      // For Stage 3 we only support shrink end-to-end; expand requires
+      // newcomers being ready (Stage 4). Clamp take by what coordinator has.
+      uint32_t pending = 0;
+      if (!coord::query_pending(_coord_fd, &pending)) {
+        CmiAbort("UCX: coord::query_pending failed");
+      }
+      if (take > pending) {
+        CmiPrintf("Charm> coordinator: requested %u newcomers, only %u available\n",
+                  take, pending);
+        take = pending;
+      }
+      if (!coord::commit(_coord_fd, _coord_epoch, kills, take, &view)) {
+        CmiAbort("UCX: coord::commit failed");
+      }
+      CmiPrintf("Charm> coordinator COMMIT: epoch %u->%u, %u kills, %u taken, %zu members\n",
+                _coord_epoch, view.epoch, (uint32_t)kills.size(), take, view.members.size());
+      {
+        extern double rescale_t_commit_done;
+        extern double rescale_wall_now();
+        rescale_t_commit_done = rescale_wall_now();
+      }
+    } else {
+      // Other ranks: block on coord_fd for either RECONFIG or DIE.
+      if (!coord::await_reconfig_or_die(_coord_fd, &view, &gotDie) && !gotDie) {
+        CmiAbort("UCX: coordinator push read failed (expected RECONFIG or DIE)");
+      }
+    }
+
+    if (gotDie) {
+      // Killed: tear down everything and exit.
+      ucp_worker_destroy(ucxCtx.worker);
+      ucp_cleanup(ucxCtx.context);
+      CmiFree(ucxCtx.eps);
+      CmiFree(ucxCtx.rxReqs);
+#if CMK_SMP
+      PCQueueDestroy(ucxCtx.txQueue);
+#endif
+      ::close(_coord_fd);
+      _exit(0);
+    }
+
+    // Survivor: rebuild endpoints against the new view; worker stays alive.
+    UcxReInitEpsFromView(view, oldNumNodes, myNode);
+    _coord_epoch = view.epoch;
+    {
+      extern double rescale_t_ep_reinit_done;
+      extern double rescale_wall_now();
+      if (CmiMyPe() == 0) rescale_t_ep_reinit_done = rescale_wall_now();
+    }
+
+    // Coordinator-mediated barrier so every rank finishes wireup before any
+    // of them start sending in the new epoch.
+    if (!coord::barrier(_coord_fd, _coord_epoch, view.nodeId)) {
+      CmiAbort("UCX: coord::barrier failed");
+    }
+    {
+      extern double rescale_t_barrier_done, rescale_t_longjmp;
+      extern double rescale_wall_now();
+      if (CmiMyPe() == 0) {
+        rescale_t_barrier_done = rescale_wall_now();
+        rescale_t_longjmp      = rescale_t_barrier_done; // no work between
+      }
+    }
+
+    _shrinkexpand_restarting = true;
+    _shrinkexpand_new_numnodes = static_cast<int>(view.members.size());
+    _shrinkexpand_my_node = static_cast<int>(view.nodeId);
+    longjmp(_shrinkexpand_jmpbuf, 1);
   } else {
-    // kill all other processes
     CmiBarrier();
-    //printf("Exiting PE %d\n", CmiMyPe());
-    //fflush(stdout);
     ConverseExit();
   }
 }
@@ -892,6 +1324,19 @@ void  LrtsStillIdle()
 
 void  LrtsBarrier()
 {
+#if CMK_SHRINK_EXPAND
+    // Newcomers never call PMI runtime_init, and survivors' PMI world is the
+    // pre-shrink set — neither can use the PMI fence to sync with the current
+    // (post-rescale) membership. Route through the coordinator instead so all
+    // current members participate.
+    if (_coord_fd >= 0) {
+        if (!coord::barrier(_coord_fd, _coord_epoch,
+                            (uint32_t)CmiMyNode())) {
+            CmiAbort("UCX: coord::barrier (LrtsBarrier) failed");
+        }
+        return;
+    }
+#endif
     int ret;
     ret = runtime_barrier();
     UCX_CHECK_PMI_RET(ret, "runtime_barrier");

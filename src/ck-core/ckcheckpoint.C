@@ -11,6 +11,7 @@ More documentation goes here...
 #include <stdlib.h>
 #ifndef _WIN32
 #include <unistd.h>
+#include <sys/time.h>
 #endif
 #include <string.h>
 #include <sstream>
@@ -39,9 +40,91 @@ bool _restarted = false;
 int _oldNumPes = 0;
 bool _chareRestored = false;
 double chkptStartTimer = 0;
+// PE-0 wall-clock (gettimeofday seconds) timestamps spanning a rescale, used
+// to break down where the post-checkpoint restart-overhead time goes. All
+// fields are 0 outside an active rescale.
+//
+// Must be a wall clock (not CmiWallTimer), since the rescale crosses a
+// ConverseInit re-init that resets CmiWallTimer's epoch.
+double rescale_overhead_start_timer = 0; // entry to ResumeFromReallocCheckpoint
+double rescale_t_cleanup_enter      = 0; // ConverseCleanup entry
+double rescale_t_commit_done        = 0; // after coordinator COMMIT
+double rescale_t_ep_reinit_done     = 0; // after UcxReInitEpsFromView (or MPI equiv)
+double rescale_t_barrier_done       = 0; // after coord::barrier post-reinit
+double rescale_t_longjmp            = 0; // just before longjmp
+double rescale_t_after_longjmp      = 0; // just after setjmp != 0 returns
+double rescale_t_converseinit_call  = 0; // just before re-entering ConverseInit
+double rescale_t_lrtsinit_done      = 0; // after LrtsInit (UCX/PMIx init)
+double rescale_t_converserunpe_enter= 0; // ConverseRunPE entry
+double rescale_t_commoninit_done    = 0; // after ConverseCommonInit
+// ConverseCommonInit sub-phase stamps (PE 0):
+double rescale_t_cci_basics         = 0; // after CmiIOInit
+double rescale_t_cci_tmp            = 0; // after CmiTmpInit
+double rescale_t_cci_timer_only     = 0; // after CmiTimerInit
+double rescale_t_cci_stats          = 0; // after CstatsInit
+double rescale_t_cci_timers         = 0; // after CmiInitCPUAffinityUtil
+double rescale_t_cci_handlers       = 0; // after CIdleTimeoutInit
+double rescale_t_cci_iso_predeps    = 0; // after CldModuleInit (before CmiIsomallocInit)
+double rescale_t_cci_trace          = 0; // after traceInit
+double rescale_t_cci_persistent     = 0; // after CmiOnesidedDirectInit
+double rescale_t_cci_ccs            = 0; // after CcsInit
+double rescale_t_cci_threads        = 0; // after CmiInitMultipleSend
+double rescale_t_initcharm_enter    = 0; // _initCharm entry
+double rescale_t_register_done      = 0; // after _register pass (or skip)
+// Post-register sub-phase stamps (PE 0):
+double rescale_t_pr_initcalls_done  = 0; // after _initCallTable.enumerateInitCalls
+double rescale_t_pr_aff_done        = 0; // after CmiInitCPUAffinity + CmiInitMemAffinity
+double rescale_t_pr_cputopo_done    = 0; // after CmiInitCPUTopology
+double rescale_t_pr_topo_done       = 0; // after TopoManager_reset + tree
+double rescale_t_pr_to_faultfunc    = 0; // just before faultFunc(CkRestartMain) call
+double rescale_t_restart_main_enter = 0; // CkRestartMain entry
+double rescale_wall_now()
+{
+#ifdef _WIN32
+  return 0;
+#else
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  return tv.tv_sec + tv.tv_usec * 1e-6;
+#endif
+}
+static void rescale_clear_timers()
+{
+  rescale_overhead_start_timer  = 0;
+  rescale_t_cleanup_enter       = 0;
+  rescale_t_commit_done         = 0;
+  rescale_t_ep_reinit_done      = 0;
+  rescale_t_barrier_done        = 0;
+  rescale_t_longjmp             = 0;
+  rescale_t_after_longjmp       = 0;
+  rescale_t_converseinit_call   = 0;
+  rescale_t_lrtsinit_done       = 0;
+  rescale_t_converserunpe_enter = 0;
+  rescale_t_commoninit_done     = 0;
+  rescale_t_cci_basics          = 0;
+  rescale_t_cci_tmp             = 0;
+  rescale_t_cci_timer_only      = 0;
+  rescale_t_cci_stats           = 0;
+  rescale_t_cci_timers          = 0;
+  rescale_t_cci_handlers        = 0;
+  rescale_t_cci_iso_predeps     = 0;
+  rescale_t_cci_trace           = 0;
+  rescale_t_cci_persistent      = 0;
+  rescale_t_cci_ccs             = 0;
+  rescale_t_cci_threads         = 0;
+  rescale_t_initcharm_enter     = 0;
+  rescale_t_register_done       = 0;
+  rescale_t_pr_initcalls_done   = 0;
+  rescale_t_pr_aff_done         = 0;
+  rescale_t_pr_cputopo_done     = 0;
+  rescale_t_pr_topo_done        = 0;
+  rescale_t_pr_to_faultfunc     = 0;
+  rescale_t_restart_main_enter  = 0;
+}
 #if CMK_SHRINK_EXPAND
 int originalnumGroups = -1;
 extern int Cmi_isOldProcess;
+extern bool _shrinkexpand_isNewcomer;
 extern char *_shrinkexpand_basedir;
 #endif
 
@@ -914,7 +997,7 @@ void CkRecvGroupROData(char* msg)
 
   msg += ROsize;
 
-  if (CkMyPe() >= _numPes) {
+  if (_shrinkexpand_isNewcomer) {
     PUP::fromMem bGroups(msg, PUP::er::IS_CHECKPOINT);
     CkPupGroupData(bGroups);
   }
@@ -942,7 +1025,7 @@ void CkRecvGroupROData(char* msg)
 	// for each location, restore arrays
 	//DEBCHK("[%d]Trying to find location manager\n",CkMyPe());
 	
-	if(CkMyPe() < _numPes) {	// in normal range: restore, otherwise, do nothing
+	if(!_shrinkexpand_isNewcomer) {	// survivor: restore from on-disk checkpoint; newcomers received state via the in-memory broadcast above
     int rank = CmiPhysicalRank(CmiMyPe());
     CkPrintf("[%d]CkRestartMain: restoring array elements from physical rank %d\n", CkMyPe(), rank);
 
@@ -966,6 +1049,11 @@ void CkRecvGroupROData(char* msg)
 
   set_in_restart(false);
 
+  // Once the integrating restart completes, this rank is a survivor for any
+  // future rescale events. Clear the flag so subsequent CkRecvGroupROData
+  // calls take the survivor branches.
+  _shrinkexpand_isNewcomer = false;
+
   if (CmiMyRank()==0) _initDone();  // this rank will trigger other ranks
 
 	if(CkMyPe()==0) {
@@ -984,13 +1072,110 @@ void CkRecvGroupROData(char* msg)
   if (CmiMyRank() == 0) CkMemCheckPT::inRestarting = false;
 
   if (CmiMyPe() == 0) {
-    CkPrintf("Restore from disk finished in %fs, sending out the cb...\n", CmiWallTimer() - chkptStartTimer);
+    double restore_s = CmiWallTimer() - chkptStartTimer;
+    CkPrintf("Restore from disk finished in %fs, sending out the cb...\n", restore_s);
+    if (rescale_overhead_start_timer > 0) {
+      double now = rescale_wall_now();
+      double total_s    = now - rescale_overhead_start_timer;
+      double overhead_s = total_s - restore_s;
+      // Break the overhead into the segments that span the longjmp. Any
+      // segment whose endpoint wasn't stamped (e.g. on machines other than
+      // UCX) shows up as 0.
+      auto seg = [](double a, double b) { return (a > 0 && b > 0) ? (b - a) : 0.0; };
+      double s_orch        = seg(rescale_overhead_start_timer, rescale_t_cleanup_enter);
+      double s_commit      = seg(rescale_t_cleanup_enter,      rescale_t_commit_done);
+      double s_ep_reinit   = seg(rescale_t_commit_done,        rescale_t_ep_reinit_done);
+      double s_post_barrier= seg(rescale_t_ep_reinit_done,     rescale_t_barrier_done);
+      double s_to_longjmp  = seg(rescale_t_barrier_done,       rescale_t_longjmp);
+      double s_jmp_to_init = seg(rescale_t_longjmp,            rescale_t_converseinit_call);
+      double s_lrts_init    = seg(rescale_t_converseinit_call,  rescale_t_lrtsinit_done);
+      double s_lrts_to_runpe= seg(rescale_t_lrtsinit_done,      rescale_t_converserunpe_enter);
+      double s_common_init  = seg(rescale_t_converserunpe_enter,rescale_t_commoninit_done);
+      double s_cci_basics   = seg(rescale_t_converserunpe_enter,rescale_t_cci_basics);
+      double s_cci_timers   = seg(rescale_t_cci_basics,         rescale_t_cci_timers);
+      double s_cci_tmp      = seg(rescale_t_cci_basics,         rescale_t_cci_tmp);
+      double s_cci_timer    = seg(rescale_t_cci_tmp,            rescale_t_cci_timer_only);
+      double s_cci_stats    = seg(rescale_t_cci_timer_only,     rescale_t_cci_stats);
+      double s_cci_aff_util = seg(rescale_t_cci_stats,          rescale_t_cci_timers);
+      double s_cci_handlers = seg(rescale_t_cci_timers,         rescale_t_cci_handlers);
+      double s_cci_trace    = seg(rescale_t_cci_handlers,       rescale_t_cci_trace);
+      double s_cci_persist  = seg(rescale_t_cci_trace,          rescale_t_cci_persistent);
+      double s_cci_ccs      = seg(rescale_t_cci_persistent,     rescale_t_cci_ccs);
+      double s_cci_threads  = seg(rescale_t_cci_ccs,            rescale_t_cci_threads);
+      double s_cci_isopre   = seg(rescale_t_cci_threads,        rescale_t_cci_iso_predeps);
+      double s_cci_isoonly  = seg(rescale_t_cci_iso_predeps,    rescale_t_commoninit_done);
+      double s_cci_isomalloc= seg(rescale_t_cci_threads,        rescale_t_commoninit_done);
+      double s_to_initcharm = seg(rescale_t_commoninit_done,    rescale_t_initcharm_enter);
+      double s_register     = seg(rescale_t_initcharm_enter,    rescale_t_register_done);
+      double s_post_register= seg(rescale_t_register_done,      rescale_t_restart_main_enter);
+      double s_pr_initcalls = seg(rescale_t_register_done,      rescale_t_pr_initcalls_done);
+      double s_pr_topo      = seg(rescale_t_pr_initcalls_done,  rescale_t_pr_topo_done);
+      double s_pr_aff       = seg(rescale_t_pr_initcalls_done,  rescale_t_pr_aff_done);
+      double s_pr_cputopo   = seg(rescale_t_pr_aff_done,        rescale_t_pr_cputopo_done);
+      double s_pr_topomgr   = seg(rescale_t_pr_cputopo_done,    rescale_t_pr_topo_done);
+      double s_pr_to_fault  = seg(rescale_t_pr_topo_done,       rescale_t_pr_to_faultfunc);
+      double s_pr_dispatch  = seg(rescale_t_pr_to_faultfunc,    rescale_t_restart_main_enter);
+      double s_post_restore = seg(rescale_t_restart_main_enter, now) - restore_s;
+      CkPrintf("Charm> Rescale timing (PE 0): total=%.6fs restore=%.6fs overhead=%.6fs\n"
+               "  orchestration  (cb -> ConverseCleanup)             : %.6fs\n"
+               "  coord COMMIT   (cleanup -> commit returned)        : %.6fs\n"
+               "  ep reinit      (commit -> UcxReInitEpsFromView)    : %.6fs\n"
+               "  post barrier   (ep reinit -> coord::barrier)       : %.6fs\n"
+               "  to longjmp     (barrier -> longjmp)                : %.6fs\n"
+               "  longjmp->init  (after setjmp -> ConverseInit call) : %.6fs\n"
+               "  ConverseInit:\n"
+               "    LrtsInit       (Converse entry -> LrtsInit done) : %.6fs\n"
+               "    -> ConverseRunPE (LrtsInit -> RunPE entry)       : %.6fs\n"
+               "    ConverseCommonInit (RunPE -> CommonInit done)    : %.6fs\n"
+               "      cci basics    (RunPE -> CmiIOInit)             : %.6fs\n"
+               "      cci timers    (-> CmiInitCPUAffinityUtil)      : %.6fs\n"
+               "        cci tmp     (-> CmiTmpInit)                  : %.6fs\n"
+               "        cci timer   (-> CmiTimerInit)                : %.6fs\n"
+               "        cci stats   (-> CstatsInit)                  : %.6fs\n"
+               "        cci affutil (-> CmiInitCPUAffinityUtil)      : %.6fs\n"
+               "      cci handlers  (-> CIdleTimeoutInit)            : %.6fs\n"
+               "      cci trace     (-> traceInit)                   : %.6fs\n"
+               "      cci persist   (-> CmiOnesidedDirectInit)       : %.6fs\n"
+               "      cci ccs       (-> CcsInit)                     : %.6fs\n"
+               "      cci threads   (-> CmiInitMultipleSend)         : %.6fs\n"
+               "      cci isomalloc (-> CmiIsomallocInit/end)        : %.6fs\n"
+               "        cci isopre  (CrnInit + CldModuleInit)        : %.6fs\n"
+               "        cci isoonly (CmiIsomallocInit only)          : %.6fs\n"
+               "    -> _initCharm (CommonInit -> _initCharm entry)   : %.6fs\n"
+               "    _register pass  (_initCharm -> register done)    : %.6fs\n"
+               "    post-register   (register -> CkRestartMain)      : %.6fs\n"
+               "      pr initcalls  (-> _initCallTable.enumerate)    : %.6fs\n"
+               "      pr topo       (-> CmiInitCPUTopology+tree)     : %.6fs\n"
+               "        pr aff      (-> CmiInit{CPU,Mem}Affinity)    : %.6fs\n"
+               "        pr cputopo  (-> CmiInitCPUTopology)          : %.6fs\n"
+               "        pr topomgr  (-> TopoManager+tree)            : %.6fs\n"
+               "      pr to fault   (-> just before faultFunc call)  : %.6fs\n"
+               "      pr dispatch   (faultFunc -> CkRestartMain ent) : %.6fs\n"
+               "  post-restore   (after restore I/O -> now)          : %.6fs\n",
+               total_s, restore_s, overhead_s,
+               s_orch, s_commit, s_ep_reinit, s_post_barrier, s_to_longjmp,
+               s_jmp_to_init,
+               s_lrts_init, s_lrts_to_runpe, s_common_init,
+               s_cci_basics, s_cci_timers,
+               s_cci_tmp, s_cci_timer, s_cci_stats, s_cci_aff_util,
+               s_cci_handlers, s_cci_trace,
+               s_cci_persist, s_cci_ccs, s_cci_threads, s_cci_isomalloc,
+               s_cci_isopre, s_cci_isoonly,
+               s_to_initcharm,
+               s_register, s_post_register,
+               s_pr_initcalls, s_pr_topo,
+               s_pr_aff, s_pr_cputopo, s_pr_topomgr,
+               s_pr_to_fault, s_pr_dispatch,
+               s_post_restore);
+      rescale_clear_timers();
+    }
   }
 }
 
 void CkRestartMain(const char* dirname, CkArgMsg *args){
 #if CMK_SHRINK_EXPAND
   chkptStartTimer = CmiWallTimer();
+  if (CmiMyPe() == 0) rescale_t_restart_main_enter = rescale_wall_now();
 	int i;
 	
   if (CmiMyRank() == 0) {
@@ -1021,54 +1206,32 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
     std::ifstream ROFile(ROFileName, std::ios::binary | std::ios::ate);
     std::streamsize ROSize = ROFile.tellg();
     ROFile.seekg(0, std::ios::beg);
-    
-    // Check for and exclude EOF character if present
-    if (ROSize > 0) {
-      ROFile.seekg(-1, std::ios::end);
-      char lastChar;
-      ROFile.get(lastChar);
-      if (lastChar == EOF || lastChar == '\0') {
-        ROSize--;
-      }
-      ROFile.seekg(0, std::ios::beg);
-    }
-
-    //CkPrintf("GroupMetadataSize = %lld\n", (long long)GroupMetadataSize);
 
     std::string GroupFilename = getCheckpointFileName(dirname, "Groups", 0);
     std::ifstream GroupFile(GroupFilename, std::ios::binary | std::ios::ate);
     std::streamsize GroupSize = GroupFile.tellg();
     GroupFile.seekg(0, std::ios::beg);
 
-    // Check for and exclude EOF character if present
-    if (GroupSize > 0) {
-      GroupFile.seekg(-1, std::ios::end);
-      char lastChar;
-      GroupFile.get(lastChar);
-      if (lastChar == EOF || lastChar == '\0') {
-        GroupSize--;
-      }
-      GroupFile.seekg(0, std::ios::beg);
-    }
-
-    char* msg = (char*) CmiAlloc(ROSize + GroupSize + 2 * sizeof(int) + strLen + CmiMsgHeaderSizeBytes);
+    int ROSizeInt = (int)ROSize;
+    int GroupSizeInt = (int)GroupSize;
+    char* msg = (char*) CmiAlloc(ROSizeInt + GroupSizeInt + 2 * sizeof(int) + strLen + CmiMsgHeaderSizeBytes);
     char* buffer = msg + CmiMsgHeaderSizeBytes;
     std::memcpy(buffer, &strLen, sizeof(int));
     buffer += sizeof(int);
     std::memcpy(buffer, dirname, strLen);
     buffer += strLen;
-    std::memcpy(buffer, &ROSize, sizeof(int));
+    std::memcpy(buffer, &ROSizeInt, sizeof(int));
     buffer += sizeof(int);
 
-    ROFile.read(buffer, ROSize);
-    buffer += ROSize;
+    ROFile.read(buffer, ROSizeInt);
+    buffer += ROSizeInt;
 
-    GroupFile.read(buffer, GroupSize);
-    buffer += GroupSize;
+    GroupFile.read(buffer, GroupSizeInt);
+    buffer += GroupSizeInt;
 
     CmiSetHandler(msg, _shrinkExpandRestartHandlerIdx);
 
-    CmiSyncBroadcastAllAndFree(ROSize + GroupSize + 2 * sizeof(int) + strLen + CmiMsgHeaderSizeBytes, msg);
+    CmiSyncBroadcastAllAndFree(ROSizeInt + GroupSizeInt + 2 * sizeof(int) + strLen + CmiMsgHeaderSizeBytes, msg);
 
     //CkPrintf("PE %i at barrier\n", CkMyPe());
     //CmiBarrier();

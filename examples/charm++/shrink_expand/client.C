@@ -34,12 +34,12 @@ int main (int argc, char **argv)
 
     NEWNPROCS = OLDNPROCS - numKilled + numAdded;
 
-    //printf("Connecting to server %s %d\n", host, port);
+    printf("Connecting to server %s %d\n", host, port);
     if (CcsConnect(&server, host, port, NULL) == -1) {
         printf("0");
         return 0;
     }
-    //printf("Connected to server\n");
+    printf("Connected to server\n");
 
     cmdLen = 2 * sizeof(int) + OLDNPROCS * sizeof(char);
     msg = (char *) malloc(cmdLen);

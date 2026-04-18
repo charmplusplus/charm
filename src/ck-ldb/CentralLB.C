@@ -1097,7 +1097,13 @@ void CentralLB::CheckForRealloc(){
 
 void CentralLB::ResumeFromReallocCheckpoint(){
 #if CMK_SHRINK_EXPAND
-    CkPrintf("Resumed from realloc\n");
+    // Stamp the start of the post-checkpoint rescale orchestration so the
+    // PE-0 print at the end of CkRestartMain can report total / restore /
+    // overhead. Uses gettimeofday wall-clock (defined in ckcheckpoint.C)
+    // because CmiWallTimer's epoch resets across the rescale longjmp.
+    extern double rescale_overhead_start_timer;
+    extern double rescale_wall_now();
+    if (CkMyPe() == 0) rescale_overhead_start_timer = rescale_wall_now();
     std::vector<char> avail(se_avail_vector, se_avail_vector + CkNumPes());
     //free(se_avail_vector);
     thisProxy.WillIbekilled(avail, numProcessAfterRestart);
@@ -1108,9 +1114,7 @@ void CentralLB::WillIbekilled(std::vector<char> avail, int newnumProcessAfterRes
 #if CMK_SHRINK_EXPAND
  numProcessAfterRestart = newnumProcessAfterRestart;
  mynewpe =  GetNewPeNumber(avail);
- //CkPrintf("[%d] -> new pe %d\n", CkMyPe(), mynewpe);
  willContinue = avail[CkMyPe()];
- //CkPrintf("PE%i> Sending start cleanup reduction\n", CkMyPe());
  CkCallback cb(CkIndex_CentralLB::StartCleanup(), thisProxy[0]);
  contribute(cb);
 #endif
@@ -1118,8 +1122,6 @@ void CentralLB::WillIbekilled(std::vector<char> avail, int newnumProcessAfterRes
 
 void CentralLB::StartCleanup(){
 #if CMK_SHRINK_EXPAND
-  //CkAbort("FLAG\n");
-  //CkPrintf("Starting cleanup\n");
 	CkCleanup();
 #endif
 }

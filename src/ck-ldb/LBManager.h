@@ -7,6 +7,8 @@
 #define LBMANAGER_H
 
 #include <cassert>
+#include <deque>
+#include <vector>
 
 #include "LBDatabase.h"
 #include "json_fwd.hpp"
@@ -242,7 +244,11 @@ class LBManager : public CBase_LBManager
 
   int startLBFn_count;
 
-  char* reallocBuffer;
+  // Queue of buffered realloc requests that arrived while LB was in progress.
+  // Each entry holds a self-contained bitmap message; multiple rescales can
+  // pile up across successive rounds, so single-slot storage would silently
+  // drop all but the last. Drained at end of each LB step in callRealloc().
+  std::deque<std::vector<char>> reallocQueue;
 
  public:
   int chare_count;
@@ -274,16 +280,20 @@ class LBManager : public CBase_LBManager
   void bufferRealloc(char* bitmap)
   {
     int size = CkNumPes() + 2 * sizeof(int);
-    reallocBuffer = (char*)malloc(size);
-    memcpy(reallocBuffer, bitmap, size);
+    reallocQueue.emplace_back(bitmap, bitmap + size);
   }
 
   void callRealloc()
   {
-    if (reallocBuffer != nullptr)
+    // Drain the queue. Each replayed realloc() runs in the LB-not-in-progress
+    // branch (we just cleared lb_in_progress before this call) and updates
+    // avail_vector + pending_realloc_state; the next AtSync triggers the
+    // actual rescale.
+    while (!reallocQueue.empty())
     {
-      realloc(reallocBuffer);
-      reallocBuffer = nullptr;
+      std::vector<char> msg = std::move(reallocQueue.front());
+      reallocQueue.pop_front();
+      realloc(msg.data());
     }
   }
 

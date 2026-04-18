@@ -154,12 +154,16 @@ void rescale(char* bit_map)
 
 void manager_init(){
 #if CMK_SHRINK_EXPAND
-    static int inited = 0;
+    // CCS handler registration is idempotent (CkHashtablePut overwrites) and the
+    // ccsTab is reset on every Converse re-init from a longjmp restart, so we
+    // must re-register every time. Otherwise the second-and-later rescales fail
+    // with "CCS Client Not Alive" because the set_bitmap handler is missing.
+    static int stateInited = 0;
     willContinue = 0;
-    if (inited) return;
     CcsRegisterHandler("set_bitmap", (CmiHandler) handler);
     CcsRegisterHandler("realloc", (CmiHandler) realloc_handler);
-    inited = 1;
+    if (stateInited) return;
+    stateInited = 1;
     pending_realloc_state = NO_REALLOC;
 #endif
 }

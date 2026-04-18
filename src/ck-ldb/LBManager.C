@@ -543,7 +543,6 @@ void LBManager::init(void)
   metabalancer = nullptr;
   lbdb_obj = new LBDatabase();
   currentLBIndex = 0;
-  reallocBuffer = nullptr;
 #if CMK_LB_CPUTIMER
   obj_cputime = 0;
 #endif
@@ -841,7 +840,7 @@ void LBManager::pup(PUP::er& p)
   p | mystep;
   if (p.isUnpacking())
   {
-    reallocBuffer = nullptr;
+    reallocQueue.clear();
     if (_lb_args.metaLbOn())
     {
       // if unpacking set metabalancer using the id

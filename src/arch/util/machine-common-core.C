@@ -1361,6 +1361,13 @@ if (  MSG_STATISTIC)
 #endif
 
     LrtsInit(&argc, &argv, &_Cmi_numnodes, &_Cmi_mynode);
+#if CMK_SHRINK_EXPAND
+    {
+      extern double rescale_t_lrtsinit_done;
+      extern double rescale_wall_now();
+      if (CmiMyNode() == 0) rescale_t_lrtsinit_done = rescale_wall_now();
+    }
+#endif
 
 #if MACHINE_DEBUG_LOG
     char ln[200];
@@ -1530,6 +1537,14 @@ static void ConverseRunPE(int everReturn) {
     CmiState cs;
     char** CmiMyArgv;
 
+#if CMK_SHRINK_EXPAND
+    {
+      extern double rescale_t_converserunpe_enter;
+      extern double rescale_wall_now();
+      if (CmiMyNode() == 0 && CmiMyRank() == 0) rescale_t_converserunpe_enter = rescale_wall_now();
+    }
+#endif
+
     LrtsPreCommonInit(everReturn);
 
 #if CMK_OFFLOAD_BCAST_PROCESS
@@ -1573,7 +1588,14 @@ static void ConverseRunPE(int everReturn) {
     CpvAccess(networkProgressCount) = 0;
 
     ConverseCommonInit(CmiMyArgv);
-   
+#if CMK_SHRINK_EXPAND
+    {
+      extern double rescale_t_commoninit_done;
+      extern double rescale_wall_now();
+      if (CmiMyNode() == 0 && CmiMyRank() == 0) rescale_t_commoninit_done = rescale_wall_now();
+    }
+#endif
+
     // register idle events
 
 #if CMK_SMP

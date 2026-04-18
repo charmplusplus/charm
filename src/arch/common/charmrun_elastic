@@ -1,7 +1,15 @@
 #!/bin/bash
 
+# Open MPI's ORTE aborts the entire job when a rank exits without calling
+# MPI_Finalize. The shrink path needs killed PEs to _exit(0) (calling
+# MPI_Finalize would deadlock on its internal barrier across MPI_COMM_WORLD,
+# since surviving ranks never finalize). Tell ORTE to tolerate this. Harmless
+# on non-OpenMPI builds.
+export OMPI_MCA_orte_allowed_exit_without_sync=1
+
 is_restart=false
 
+script_dir="$(dirname "$0")"
 original_args=("$@")
 
 if [[ "$(uname)" == "Darwin" ]]; then
@@ -12,10 +20,61 @@ fi
 
 pes_file="$TMPDIR/numRestartProcs.txt"
 
+# Parse +p / ++p once up front so we know the initial cluster size for the
+# coordinator. Walk the args verbatim so unknown flags pass through to charmrun
+# unchanged.
+initial_pes=1
+user_supplied_coordinator=false
+i=0
+while [ $i -lt ${#original_args[@]} ]; do
+    a="${original_args[$i]}"
+    case "$a" in
+    +p|++p)
+        i=$((i+1))
+        initial_pes="${original_args[$i]}"
+        ;;
+    +p[0-9]*)
+        initial_pes="${a#+p}"
+        ;;
+    ++p[0-9]*)
+        initial_pes="${a#++p}"
+        ;;
+    +coordinator)
+        user_supplied_coordinator=true
+        ;;
+    esac
+    i=$((i+1))
+done
+
+# Start the coordinator unless the caller already wired one up. It outlives the
+# inner charmrun loop (which restarts across rescales) and is killed on script
+# exit.
+coord_pid=""
+coord_args=()
+if [ "$user_supplied_coordinator" = false ]; then
+    coord_bin="${CHARM_COORDINATOR:-$script_dir/charm_coordinator}"
+    if [ ! -x "$coord_bin" ]; then
+        echo "charmrun_elastic: cannot find charm_coordinator (looked at $coord_bin)" >&2
+        echo "  set CHARM_COORDINATOR to its path, or pass +coordinator HOST:PORT yourself" >&2
+        exit 1
+    fi
+    coord_port="${CHARM_COORDINATOR_PORT:-41234}"
+    coord_log="${CHARM_COORDINATOR_LOG:-$TMPDIR/charm_coordinator.log}"
+    "$coord_bin" --port "$coord_port" --initial-size "$initial_pes" --verbose \
+        >"$coord_log" 2>&1 &
+    coord_pid=$!
+    trap '[ -n "$coord_pid" ] && kill "$coord_pid" 2>/dev/null; wait "$coord_pid" 2>/dev/null; exit' EXIT INT TERM
+    # Give the coordinator a beat to bind its listening socket before charmrun
+    # processes try to connect.
+    sleep 0.5
+    coord_args=("+coordinator" "127.0.0.1:$coord_port")
+    echo "Charm> Started coordinator (pid=$coord_pid) on port $coord_port, log: $coord_log"
+fi
+
 time {
 while true; do
     args=()
-    pes_args=""
+    pes_arg=""
     restart_arg=""
 
     temp_args=("${original_args[@]}")
@@ -51,7 +110,7 @@ while true; do
     fi
 
     # Pass all script arguments ("$@") to the executable
-    "$(dirname "$0")/charmrun" $pes_arg "${args[@]}" $restart_arg
+    "$script_dir/charmrun" $pes_arg "${args[@]}" "${coord_args[@]}" $restart_arg
 
     EXIT_CODE=$?
 

@@ -921,6 +921,14 @@ else()
 endif()
 configure_file(src/scripts/testrun bin/ COPYONLY)
 
+# Standalone coordinator binary used by charmrun_elastic for shrink/expand.
+# Built unconditionally so charmrun_elastic can find it next to itself in bin/.
+add_executable(charm_coordinator src/util/coordinator/coordinator.cpp)
+set_target_properties(charm_coordinator PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+  CXX_STANDARD 17
+  CXX_STANDARD_REQUIRED ON)
+
 # Charm++ libraries
 
 # CkLoop

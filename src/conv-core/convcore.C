@@ -1054,15 +1054,34 @@ void CmiTimerInit(char **argv)
 
   int tmptime = CmiGetArgFlagDesc(argv,"+useAbsoluteTime", "Use system's absolute time as wallclock time.");
   if(CmiMyRank() == 0) _absoluteTime = tmptime;   /* initialize only  once */
+#if CMK_SHRINK_EXPAND
+  // Originally 4 barriers (3 before + 1 after). The "before" trio is
+  // variance-dampening + first-call warmup, the "after" guarantees rank 0
+  // has written inittime_wallclock before peers read it (only matters in
+  // absolute mode). On a shrink/expand event the world is already warmed up
+  // and inittime_wallclock is per-process — collapse to a single barrier
+  // (kept for ms-level alignment of wall-clock epochs in default mode).
+  // Survivors and newcomers must take the same branch to avoid deadlock.
+  extern bool _reuseRegistrationStateOnRestart;
+  extern bool _shrinkexpand_isNewcomer;
+  const bool _se_collapse_timer_barriers =
+      _reuseRegistrationStateOnRestart || _shrinkexpand_isNewcomer;
+#else
+  const bool _se_collapse_timer_barriers = false;
+#endif
 #if !(__FAULT__)
   /* try to synchronize calling barrier */
 #if CMK_CCS_AVAILABLE
   if(cmiArgDebugFlag == 0)
 #endif
     {
-      CmiBarrier();
-      CmiBarrier();
-      CmiBarrier();
+      if (_se_collapse_timer_barriers) {
+        CmiBarrier();
+      } else {
+        CmiBarrier();
+        CmiBarrier();
+        CmiBarrier();
+      }
     }
 #endif
 if(CmiMyRank() == 0) /* initialize only  once */
@@ -1072,7 +1091,7 @@ if(CmiMyRank() == 0) /* initialize only  once */
     CpvAccess(inittime_virtual) = inittime_wallclock;
 #else
     struct rusage ru;
-    getrusage(RUSAGE_WHO, &ru); 
+    getrusage(RUSAGE_WHO, &ru);
     CpvAccess(inittime_virtual) =
       (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
       (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
@@ -1083,7 +1102,9 @@ if(CmiMyRank() == 0) /* initialize only  once */
 #if CMK_CCS_AVAILABLE
   if(cmiArgDebugFlag == 0)
 #endif
-    CmiBarrier();
+  // Collapsed into the single pre-init barrier on the rescale path; see
+  // the comment above the barrier block.
+  if (!_se_collapse_timer_barriers) CmiBarrier();
 /*  CmiBarrierZero(); */
 #endif
 }
@@ -4030,6 +4051,13 @@ void ConverseCommonInit(char **argv)
   CmiArgInit(argv);
   CmiMemoryInit(argv);
   CmiIOInit(argv);
+#if CMK_SHRINK_EXPAND
+  {
+    extern double rescale_t_cci_basics;
+    extern double rescale_wall_now();
+    if (CmiMyPe() == 0) rescale_t_cci_basics = rescale_wall_now();
+  }
+#endif
   if (CmiMyPe() == 0)
   {
     CmiPrintf("Converse/Charm++ Commit ID: %s\n", CmiCommitID);
@@ -4054,13 +4082,50 @@ void ConverseCommonInit(char **argv)
   CmiPoolAllocInit(30);  
 #endif
   CmiTmpInit(argv);
+#if CMK_SHRINK_EXPAND
+  {
+    extern double rescale_t_cci_tmp;
+    extern double rescale_wall_now();
+    if (CmiMyPe() == 0) rescale_t_cci_tmp = rescale_wall_now();
+  }
   CmiTimerInit(argv);
+#else
+  CmiTimerInit(argv);
+#endif
+#if CMK_SHRINK_EXPAND
+  {
+    extern double rescale_t_cci_timer_only;
+    extern double rescale_wall_now();
+    if (CmiMyPe() == 0) rescale_t_cci_timer_only = rescale_wall_now();
+  }
+#endif
   CstatsInit(argv);
+#if CMK_SHRINK_EXPAND
+  {
+    extern double rescale_t_cci_stats;
+    extern double rescale_wall_now();
+    if (CmiMyPe() == 0) rescale_t_cci_stats = rescale_wall_now();
+  }
+#endif
   CmiInitCPUAffinityUtil();
+#if CMK_SHRINK_EXPAND
+  {
+    extern double rescale_t_cci_timers;
+    extern double rescale_wall_now();
+    if (CmiMyPe() == 0) rescale_t_cci_timers = rescale_wall_now();
+  }
+#endif
   CcdModuleInit(argv);
   CmiHandlerInit();
   CmiReductionsInit();
   CIdleTimeoutInit(argv);
+#if CMK_SHRINK_EXPAND
+  {
+    extern double rescale_t_cci_handlers;
+    extern double rescale_wall_now();
+    if (CmiMyPe() == 0) rescale_t_cci_handlers = rescale_wall_now();
+  }
+#endif
   
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP /*Used by the netlrts-*-smp and multicore versions*/
   if(CmiGetArgFlagDesc(argv, "+CmiSpinOnIdle", "Force the runtime system to spin on message reception when idle, rather than sleeping")) {
@@ -4084,6 +4149,13 @@ void ConverseCommonInit(char **argv)
   traceInit(argv);
 /*initTraceCore(argv);*/ /* projector */
 #endif
+#if CMK_SHRINK_EXPAND
+  {
+    extern double rescale_t_cci_trace;
+    extern double rescale_wall_now();
+    if (CmiMyPe() == 0) rescale_t_cci_trace = rescale_wall_now();
+  }
+#endif
   CmiProcessPriority(argv);
 
 #if CMK_USE_TSAN
@@ -4094,6 +4166,13 @@ void ConverseCommonInit(char **argv)
 
   // Initialize converse handlers for supporting generic Direct Nocopy API
   CmiOnesidedDirectInit();
+#if CMK_SHRINK_EXPAND
+  {
+    extern double rescale_t_cci_persistent;
+    extern double rescale_wall_now();
+    if (CmiMyPe() == 0) rescale_t_cci_persistent = rescale_wall_now();
+  }
+#endif
 
   useCMAForZC = true;
   if (CmiGetArgFlagDesc(argv, "+noCMAForZC", "When Cross Memory Attach (CMA) is supported, the program does not use CMA when using the Zerocopy API")) {
@@ -4113,12 +4192,26 @@ void ConverseCommonInit(char **argv)
   ccsRunning = 0;
   CcsInit(argv);
 #endif
+#if CMK_SHRINK_EXPAND
+  {
+    extern double rescale_t_cci_ccs;
+    extern double rescale_wall_now();
+    if (CmiMyPe() == 0) rescale_t_cci_ccs = rescale_wall_now();
+  }
+#endif
 
   CpdInit();
   CthSchedInit();
   CmiGroupInit();
   CmiMulticastInit();
   CmiInitMultipleSend();
+#if CMK_SHRINK_EXPAND
+  {
+    extern double rescale_t_cci_threads;
+    extern double rescale_wall_now();
+    if (CmiMyPe() == 0) rescale_t_cci_threads = rescale_wall_now();
+  }
+#endif
 #if CMI_QD
   CQdInit();
 #endif
@@ -4126,8 +4219,16 @@ void ConverseCommonInit(char **argv)
   CrnInit();
   CmiInitImmediateMsg();
   CldModuleInit(argv);
-
+#if CMK_SHRINK_EXPAND
+  {
+    extern double rescale_t_cci_iso_predeps;
+    extern double rescale_wall_now();
+    if (CmiMyPe() == 0) rescale_t_cci_iso_predeps = rescale_wall_now();
+  }
   CmiIsomallocInit(argv);
+#else
+  CmiIsomallocInit(argv);
+#endif
 
   /* main thread is suspendable */
 /*

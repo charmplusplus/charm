@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# Open MPI's ORTE aborts the entire job when a rank exits without calling
+# MPI_Finalize. The shrink path needs killed PEs to _exit(0) (calling
+# MPI_Finalize would deadlock on its internal barrier across MPI_COMM_WORLD,
+# since surviving ranks never finalize). Tell ORTE to tolerate this.
+export OMPI_MCA_orte_allowed_exit_without_sync=1
+
 is_restart=false
 
 original_args=("$@")

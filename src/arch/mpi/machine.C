@@ -46,10 +46,22 @@ static char* strsignal(int sig) {
 #include "ckrescale.h"
 
 #if CMK_SHRINK_EXPAND
+#include <setjmp.h>
+#include <limits.h>
 CcsDelayedReply shrinkExpandreplyToken;
 extern int numProcessAfterRestart;
 extern char *_shrinkexpand_basedir;
 int mynewpe=0;
+
+// Set by ConverseCleanup, read by charm_main after longjmp
+extern jmp_buf _shrinkexpand_jmpbuf;
+static bool _shrinkexpand_restarting = false;
+static int  _shrinkexpand_new_numnodes = 0;
+static int  _shrinkexpand_my_node = 0;
+// The new communicator created via MPI_Comm_split/MPI_Intercomm_merge
+static MPI_Comm _shrinkexpand_newComm = MPI_COMM_NULL;
+// Path to the nodelist/machinefile (from ++nodelist argument)
+static char *_shrinkexpand_nodelist = NULL;
 #endif
 
 /* Msg types to have different actions taken for different message types
@@ -503,6 +515,18 @@ static CmiCommHandle MPISendOneMsg(SMSG_LIST *smsg) {
     int dstrank;
 
     MACHSTATE2(3,"MPI_send to node %d rank: %d{", node, CMI_DEST_RANK(msg));
+#if CMK_SHRINK_EXPAND
+    {
+      int commSize;
+      MPI_Comm_size(charmComm, &commSize);
+      if (node < 0 || node >= commSize) {
+        CmiPrintf("[%d] MPISendOneMsg: INVALID dest node %d (commSize=%d, handler=%d)\n",
+                  CmiMyNode(), node, commSize, CmiGetHandler(msg));
+        CmiPrintStackTrace(0);
+        CmiAbort("MPISendOneMsg: destination rank out of range for charmComm");
+      }
+    }
+#endif
 #if CMK_ERROR_CHECKING
     CMI_MAGIC(msg) = CHARM_MAGIC_NUMBER;
     CMI_SET_CHECKSUM(msg, size);
@@ -1355,13 +1379,41 @@ void LrtsExit(int exitcode) {
 
 static int Cmi_truecrash;
 
+// File-scope so it can be reset across longjmp-based shrink/expand restart.
+static int already_in_signal_handler = 0;
+
 static void KillOnAllSigs(int sigNo) {
-    static int already_in_signal_handler = 0;
     char *m;
     if (already_in_signal_handler) return;   /* MPI_Abort(charmComm,1); */
     already_in_signal_handler = 1;
 
     CmiAbortHelper("Caught Signal", strsignal(sigNo), NULL, 1, 1);
+}
+
+static void installSignalHandlers(void) {
+    if (Cmi_truecrash) return;
+#if !defined(_WIN32)
+    struct sigaction sa;
+    sa.sa_handler = KillOnAllSigs;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART;
+
+    sigaction(SIGSEGV, &sa, NULL);
+    sigaction(SIGFPE, &sa, NULL);
+    sigaction(SIGILL, &sa, NULL);
+    sigaction(SIGINT, &sa, &signal_int);
+    sigaction(SIGTERM, &sa, NULL);
+    sigaction(SIGABRT, &sa, NULL);
+    sigaction(SIGQUIT, &sa, NULL);
+    sigaction(SIGBUS, &sa, NULL);
+#else
+    signal(SIGSEGV, KillOnAllSigs);
+    signal(SIGFPE, KillOnAllSigs);
+    signal(SIGILL, KillOnAllSigs);
+    signal_int = signal(SIGINT, KillOnAllSigs);
+    signal(SIGTERM, KillOnAllSigs);
+    signal(SIGABRT, KillOnAllSigs);
+#endif
 }
 /* ######End of functions related with exiting programs###### */
 
@@ -1411,10 +1463,27 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     void *tagUbVal;
     char* arg_nodelist;
 
-    /*if (CmiGetArgStringDesc(argv, "++nodelist", &arg_nodelist, "nodelist"))
-    {
-        print_nodelist(arg_nodelist);
-    }*/
+    fprintf(stderr, "[SE LrtsInit-enter pid=%d argc=%d]\n", (int)getpid(), *argc); fflush(stderr);
+
+#if CMK_SHRINK_EXPAND
+    // On re-entry after longjmp: MPI is already initialized and we have
+    // a new communicator from MPI_Comm_split. Just set it and return.
+    if (_shrinkexpand_restarting) {
+        charmComm = _shrinkexpand_newComm;
+        _shrinkexpand_newComm = MPI_COMM_NULL;
+        *numNodes = _shrinkexpand_new_numnodes;
+        *myNodeID = _shrinkexpand_my_node;
+        // SIGTERM was ignored across the comm split; re-install our handler
+        // and clear the recursion guard (stale across longjmp).
+        already_in_signal_handler = 0;
+        installSignalHandlers();
+        return;
+    }
+#endif
+
+#if CMK_SHRINK_EXPAND
+    CmiGetArgStringDesc(largv, "++nodelist", &_shrinkexpand_nodelist, "nodelist file for expand");
+#endif
 
     if (CmiGetArgFlag(largv, "+comm_thread_only_recv")) {
 #if CMK_SMP
@@ -1454,6 +1523,26 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
       MPI_Comm_dup(MPI_COMM_WORLD, &charmComm);
 #endif
     }
+
+#if CMK_SHRINK_EXPAND
+    // If this process was spawned by MPI_Comm_spawn (expand), merge with
+    // the parent communicator to form a unified communicator across all ranks.
+    {
+      MPI_Comm parent;
+      MPI_Comm_get_parent(&parent);
+      fprintf(stderr, "[SE LrtsInit pid=%d] Comm_get_parent returned %s\n",
+              (int)getpid(), parent == MPI_COMM_NULL ? "NULL (not spawned)" : "non-NULL (spawned child)"); fflush(stderr);
+      if (parent != MPI_COMM_NULL) {
+        MPI_Comm mergedComm;
+        fprintf(stderr, "[SE LrtsInit pid=%d] before Intercomm_merge (high=1)\n", (int)getpid()); fflush(stderr);
+        MPI_Intercomm_merge(parent, 1, &mergedComm); // new ranks get high numbers
+        fprintf(stderr, "[SE LrtsInit pid=%d] after Intercomm_merge\n", (int)getpid()); fflush(stderr);
+        MPI_Comm_free(&parent);
+        MPI_Comm_free(&charmComm);
+        charmComm = mergedComm;
+      }
+    }
+#endif
 
     MPI_Comm_size(charmComm, numNodes);
     MPI_Comm_rank(charmComm, myNodeID);
@@ -1586,32 +1675,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     }
 
     /* setup signal handlers */
-  if(!Cmi_truecrash) {
-#if !defined(_WIN32)
-    struct sigaction sa;
-    sa.sa_handler = KillOnAllSigs;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_RESTART;
-
-    sigaction(SIGSEGV, &sa, NULL);
-    sigaction(SIGFPE, &sa, NULL);
-    sigaction(SIGILL, &sa, NULL);
-    sigaction(SIGINT, &sa, &signal_int);
-    sigaction(SIGTERM, &sa, NULL);
-    sigaction(SIGABRT, &sa, NULL);
-#else
-    signal(SIGSEGV, KillOnAllSigs);
-    signal(SIGFPE, KillOnAllSigs);
-    signal(SIGILL, KillOnAllSigs);
-    signal_int = signal(SIGINT, KillOnAllSigs);
-    signal(SIGTERM, KillOnAllSigs);
-    signal(SIGABRT, KillOnAllSigs);
-#endif
-#if !defined(_WIN32) /*UNIX-only signals*/
-    sigaction(SIGQUIT, &sa, NULL);
-    sigaction(SIGBUS, &sa, NULL);
-#endif /*UNIX*/
-  }
+    installSignalHandlers();
 
 #if CMK_NO_OUTSTANDING_SENDS
     no_outstanding_sends=1;
@@ -1829,6 +1893,19 @@ void LrtsPreCommonInit(int everReturn) {
     CpvAccess(sent_msgs) = NULL;
     CpvAccess(end_sent) = NULL;
     CpvAccess(MsgQueueLen) = 0;
+
+#if CMK_SHRINK_EXPAND
+    /* Reset the cached topology tree before ConverseCommonInit runs.
+     * After shrink/expand, _topoTree still holds the old spanning tree
+     * (built for the pre-shrink node count), which would cause broadcasts
+     * in CmiIsomallocInit to send to nodes that no longer exist.
+     * Setting it to NULL forces the broadcast code to use the dynamic
+     * spanning tree formulas based on CmiNumNodes(). _topoTree will be
+     * correctly recomputed later in _initCharm. */
+    if (_shrinkexpand_restarting) {
+      _topoTree = NULL;
+    }
+#endif
 }
 
 void LrtsPostCommonInit(int everReturn) {
@@ -2025,20 +2102,19 @@ void ConverseCleanup(void)
   #if (CMK_SMP && !CMK_SMP_NO_COMMTHD)
     CmiAbort(" ConverseCleanup called in SMP. CmiBarrier needs to be called on comm thread as well! Right now, this hangs. Remove this abort when SMP support implemented.\n");
   #endif
-  CmiBarrier(); // TODO: for smp, this must also be called on comm thread. otherwise, hangs
 
-#if CMK_USE_SYSVSHM
-	CmiExitSysvshm();
-#elif CMK_USE_PXSHM
-	CmiExitPxshm();
-#endif
-  ConverseCommonExit();               /* should be called by every rank */
-  CmiNodeBarrier();        /* single node SMP, make sure every rank is done */
-  //if (CmiMyRank()==0) CmiStdoutFlush();
+  int myNode = CmiMyNode();
+  int oldNumNodes = CmiNumNodes();
+  int newNumNodes = numProcessAfterRestart;
 
-  if (get_shrinkexpand_exit() && CmiMyPe() == 0) {
-    // launch charmrun here
+  fprintf(stderr, "[SE %d] enter ConverseCleanup old=%d new=%d\n", myNode, oldNumNodes, newNumNodes); fflush(stderr);
 
+  // ---- Phase 1: Drain all pending MPI communication ----
+  LrtsDrainResources();
+  fprintf(stderr, "[SE %d] after LrtsDrainResources\n", myNode); fflush(stderr);
+
+  // PE 0 writes the restart metadata
+  if (CmiMyPe() == 0) {
     std::string path = std::string(_shrinkexpand_basedir) + "/numRestartProcs.txt";
     FILE *fp = fopen(path.c_str(), "w");
     if (fp != NULL) {
@@ -2048,21 +2124,150 @@ void ConverseCleanup(void)
     } else {
       perror("Error opening file");
     }
+  }
 
-    // Use the new synchronous reply function. This blocks until the reply is
-    // sent and acknowledged by charmrun, robustly fixing the race condition.
-    CcsSendDelayedReplyAndTerm(shrinkExpandreplyToken, 0, 0);
+  // ---- Phase 2: Cancel any posted receives ----
+#if MPI_POST_RECV
+  {
+    MPIPostRecvList *ptr = CpvAccess(postRecvListHdr);
+    if (ptr) {
+      do {
+        for (int i = 0; i < ptr->bufCnt; i++)
+          MPI_Cancel(ptr->postedRecvReqs + i);
+        ptr = ptr->next;
+      } while (ptr != CpvAccess(postRecvListHdr));
+    }
+  }
+#endif
 
-    CmiBarrier();
-    ConverseExit(100);
+#if CMK_USE_SYSVSHM
+  CmiExitSysvshm();
+#elif CMK_USE_PXSHM
+  CmiExitPxshm();
+#endif
+  fprintf(stderr, "[SE %d] before ConverseCommonExit\n", myNode); fflush(stderr);
+  ConverseCommonExit();
+  fprintf(stderr, "[SE %d] after ConverseCommonExit, before CmiNodeBarrier\n", myNode); fflush(stderr);
+  CmiNodeBarrier();
+  fprintf(stderr, "[SE %d] after CmiNodeBarrier\n", myNode); fflush(stderr);
+
+  // ---- Phase 3: Reshape the communicator ----
+  MPI_Comm newComm;
+
+  if (newNumNodes < oldNumNodes) {
+    // ---- SHRINK: MPI_Comm_split ----
+    bool willSurvive = (myNode < newNumNodes);
+    if (willSurvive) {
+      // Killed PEs call _exit(0) below, which Open MPI's ORTE detects as
+      // abnormal termination and reacts to by SIGTERM-ing the surviving
+      // ranks. Ignore SIGTERM across the split window; LrtsInit's restart
+      // path re-installs our handler after longjmp returns.
+      signal(SIGTERM, SIG_IGN);
+    }
+    int color = willSurvive ? 0 : MPI_UNDEFINED;
+    MPI_Comm_split(charmComm, color, myNode, &newComm);
+    MPI_Comm_free(&charmComm);
+
+    if (!willSurvive) {
+      // Do NOT call MPI_Finalize here — it contains an internal barrier
+      // that would deadlock since surviving ranks never finalize.
+      // Just exit the process immediately.
+      _exit(0);
+    }
+
+  } else if (newNumNodes > oldNumNodes) {
+    // ---- EXPAND: MPI_Comm_spawn + MPI_Intercomm_merge ----
+    int nSpawn = newNumNodes - oldNumNodes;
+
+    // Get this executable's path for spawning
+    char exePath[PATH_MAX];
+    ssize_t len = readlink("/proc/self/exe", exePath, sizeof(exePath) - 1);
+    if (len == -1) CmiAbort("ConverseCleanup expand: failed to read /proc/self/exe");
+    exePath[len] = '\0';
+
+    // Build argv for spawned processes from the saved original args.
+    // MPI_Comm_spawn argv does not include argv[0] (the binary is separate).
+    int orig_argc = 0;
+    while (Cmi_argvcopy[orig_argc]) orig_argc++;
+
+    char **spawn_argv = (char **)malloc(sizeof(char *) * (orig_argc + 3));
+    int sa = 0;
+    for (int i = 1; i < orig_argc; i++) {
+      // Strip any existing +restart and its value
+      if (strcmp(Cmi_argvcopy[i], "+restart") == 0) { i++; continue; }
+      spawn_argv[sa++] = Cmi_argvcopy[i];
+    }
+    spawn_argv[sa++] = const_cast<char*>("+restart");
+    spawn_argv[sa++] = _shrinkexpand_basedir;
+    spawn_argv[sa] = NULL;
+
+    // Set up MPI_Info with the hostfile for process placement.
+    // The nodelist contains all hosts; new processes should be placed on
+    // hosts beyond the first oldNumNodes entries.
+    MPI_Info spawnInfo = MPI_INFO_NULL;
+    char tmpHostfile[PATH_MAX];
+    tmpHostfile[0] = '\0';
+
+    if (_shrinkexpand_nodelist) {
+      // Extract new hosts: skip first oldNumNodes lines, write the rest
+      snprintf(tmpHostfile, sizeof(tmpHostfile),
+               "/tmp/charm_expand_hosts_%d.txt", getpid());
+      FILE *in = fopen(_shrinkexpand_nodelist, "r");
+      FILE *out = fopen(tmpHostfile, "w");
+      if (in && out) {
+        char line[1024];
+        int lineNum = 0;
+        while (fgets(line, sizeof(line), in)) {
+          if (lineNum >= oldNumNodes)
+            fputs(line, out);
+          lineNum++;
+        }
+        fclose(in);
+        fclose(out);
+        MPI_Info_create(&spawnInfo);
+        MPI_Info_set(spawnInfo, "hostfile", tmpHostfile);
+      } else {
+        if (in) fclose(in);
+        if (out) fclose(out);
+        CmiPrintf("Warning: could not create expand hostfile, spawning without placement hints\n");
+      }
+    }
+
+    // All old ranks participate in the collective spawn
+    MPI_Comm intercomm;
+    int *errcodes = (int *)malloc(sizeof(int) * nSpawn);
+    fprintf(stderr, "[SE %d] before MPI_Comm_spawn nSpawn=%d exe=%s hostfile=%s\n",
+            myNode, nSpawn, exePath, tmpHostfile[0] ? tmpHostfile : "(none)"); fflush(stderr);
+    int spawn_rc = MPI_Comm_spawn(exePath, spawn_argv, nSpawn,
+                                  spawnInfo, 0, charmComm, &intercomm, errcodes);
+    fprintf(stderr, "[SE %d] after MPI_Comm_spawn rc=%d\n", myNode, spawn_rc); fflush(stderr);
+    free(errcodes);
+    free(spawn_argv);
+    if (spawnInfo != MPI_INFO_NULL) MPI_Info_free(&spawnInfo);
+
+    // Clean up temp hostfile
+    if (tmpHostfile[0] != '\0') unlink(tmpHostfile);
+
+    // Merge old and new ranks into a single communicator.
+    // Old ranks pass high=0 so they keep rank numbers 0..M-1.
+    fprintf(stderr, "[SE %d] before MPI_Intercomm_merge\n", myNode); fflush(stderr);
+    MPI_Intercomm_merge(intercomm, 0, &newComm);
+    fprintf(stderr, "[SE %d] after MPI_Intercomm_merge\n", myNode); fflush(stderr);
+    MPI_Comm_free(&intercomm);
+    MPI_Comm_free(&charmComm);
 
   } else {
-    // kill all other processes
-    CmiBarrier();
-    //printf("Exiting PE %d\n", CmiMyPe());
-    //fflush(stdout);
-    ConverseExit();
+    // Same count — just restart in place
+    newComm = charmComm;
   }
+
+  // ---- Phase 4: Surviving/old ranks longjmp back ----
+  _shrinkexpand_newComm = newComm;
+  _shrinkexpand_restarting = true;
+  _shrinkexpand_new_numnodes = newNumNodes;
+  _shrinkexpand_my_node = myNode;
+  fprintf(stderr, "[SE %d] reshape done, longjmp back to LrtsInit\n", myNode); fflush(stderr);
+  longjmp(_shrinkexpand_jmpbuf, 1);
 }
 #endif
 
