@@ -339,7 +339,9 @@ void CentralLB::BuildStatsMsg()
 #endif
 
 #if CMK_CUDA
+  // printf("CMK_CUDA setting device is %ld\n", hapiMyDevice());
   msg->gpu_device_id = hapiMyDevice();
+  // printf("msg->gpu_device_id is %ld\n", msg->gpu_device_id);
 #endif
 
   DEBUGF(("Processor %d Total time (wall,cpu) = %f Idle = %f Bg = %f\n", CkMyPe(),msg->total_walltime,msg->idletime,msg->bg_walltime));
@@ -1044,10 +1046,6 @@ void CentralLB::ProcessReceiveMigration()
   // CmiPrintf("[%d] ProcessReceiveMigration: n_moves=%d\n", CkMyPe(), m->n_moves);
   for(i=0; i < m->n_moves; i++) {
     MigrateInfo& move = m->moves[i];
-    #if CMK_GLOBAL_LOCATION_UPDATE
-      // CmiPrintf("[%d] Updating location for obj id=%llu from %d to %d\n", CkMyPe(), move.obj.id, move.from_pe, move.to_pe);
-      UpdateLocation(move);
-    #endif
     const int me = CkMyPe();
     if (move.from_pe == me && move.to_pe != me) {
 #if CMK_DRONE_MODE
@@ -1068,6 +1066,12 @@ void CentralLB::ProcessReceiveMigration()
        DEBUGF(("[%d] expecting object from %d\n",move.to_pe,move.from_pe));
       if (!move.async_arrival) migrates_expected++;
       else future_migrates_expected++;
+    }
+    else {
+      #if CMK_GLOBAL_LOCATION_UPDATE
+      // CmiPrintf("[%d] Updating location for obj id=%llu from %d to %d\n", CkMyPe(), move.obj.id, move.from_pe, move.to_pe);
+        UpdateLocation(move);
+      #endif
     }
   }
 

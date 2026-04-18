@@ -20,6 +20,11 @@
 #include "ckgraph.h"
 #include "cklists.h"
 #include "GreedyCentralLB.h"
+#include "conv-mach-cuda.h"
+
+#ifndef CMK_CUDA
+#warning "CMK_CUDA is not defined"
+#endif
 
 using namespace std;
 
@@ -141,10 +146,12 @@ void GreedyCentralLB::work(LDStats* stats)
   // heap-invariant headaches when we update a non-front group in place.
   std::vector<GPUGroup> gpuGroups;
   std::unordered_map<uint64_t, int> gpuIdToIdx;  // gpu_device_id -> index in gpuGroups
-
+  CkPrintf("starting stratergy for GPU\n");
   for (int i = 0; i < (int)procs.size(); i++) {
     int real_pe = procs[i].getProcId();
     uint64_t gpu_id = stats->procs[real_pe].gpu_device_id;
+    printf("gpu_id %ld\n", gpu_id);
+    fflush(stdout);
 
     auto it = gpuIdToIdx.find(gpu_id);
     if (it == gpuIdToIdx.end()) {
@@ -168,10 +175,10 @@ void GreedyCentralLB::work(LDStats* stats)
     }
   }
 
-  CkPrintf("[%d] GreedyCentralLB: %d GPU group(s), %d available PEs, %d migratable objs\n",
+  CkPrintf("[%d] GreedyCentralLB: %ld GPU group(s), %ld available PEs, %ld migratable objs\n",
            CkMyPe(), (int)gpuGroups.size(), (int)procs.size(), (int)objs.size());
   for (auto &g : gpuGroups) {
-    CkPrintf("[%d]   GPU %d: %d PEs, aggregate load=%.6f\n",
+    CkPrintf("[%d]   GPU %ld: %ld PEs, aggregate load=%.6f\n",
              CkMyPe(), g.gpu_id, (int)g.pe_indices.size(), g.totalLoad);
   }
 

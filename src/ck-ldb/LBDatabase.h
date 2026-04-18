@@ -96,17 +96,17 @@ public:
       CmiUInt8 raw_id = ck::ObjID(lb_id).getElementID();
       auto it = id_gputimeMap.find(raw_id);
       if(it==id_gputimeMap.end()) {
-        CkPrintf("[PE %d] SetObjGPULoad: obj %d lb_id=%lu raw_id=%lu NO MATCH\n", CmiMyPe(), i, (unsigned long)lb_id, (unsigned long)raw_id);
+        // CkPrintf("[PE %d] SetObjGPULoad: obj %d lb_id=%lu raw_id=%lu NO MATCH\n", CmiMyPe(), i, (unsigned long)lb_id, (unsigned long)raw_id);
         continue;
       }
 
       matched++;
-      CkPrintf("[PE %d] SetObjGPULoad: obj %d id=%lu -> gpuTime=%.6f s\n",
-               CmiMyPe(), i, (unsigned long)it->first, it->second / 1.0e9);
+      // CkPrintf("[PE %d] SetObjGPULoad: obj %d id=%lu -> gpuTime=%.6f s\n",
+      //          CmiMyPe(), i, (unsigned long)it->first, it->second / 1.0e9);
       objs[i].obj->setGPUTiming(it->second / 1.0e9);
     }
-    CkPrintf("[PE %d] SetObjGPULoad: %d/%d live objects matched from %zu CUPTI entries (objs.size=%zu)\n",
-             CmiMyPe(), matched, liveObjs, id_gputimeMap.size(), objs.size());
+    // CkPrintf("[PE %d] SetObjGPULoad: %d/%d live objects matched from %zu CUPTI entries (objs.size=%zu)\n",
+    //          CmiMyPe(), matched, liveObjs, id_gputimeMap.size(), objs.size());
   }
   inline void* GetObjUserData(LDObjHandle &h) {
     return LbObj(h)->getLocalUserData();

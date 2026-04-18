@@ -287,7 +287,7 @@ public:
   int from_pe;
   int pe_speed;
 #if CMK_CUDA
-  int gpu_device_id;
+  uint64_t gpu_device_id;
 #endif
   LBRealType total_walltime;
   LBRealType idletime;

@@ -104,12 +104,20 @@ CpvExtern(int, my_device_id);
 //   }
 // }
 
+struct LoopBackMsg {
+  char header[CmiMsgHeaderSizeBytes];
+  void* msg;
+};
+
 extern "C" {
   void* loopback_bridge(void* arg) {
-    (void)arg;
+    QdProcess(1);
+    LoopBackMsg* recv_msg = (LoopBackMsg*)arg;
+    CkRdmaDeviceRecvHandler(recv_msg->msg);
+    CmiFree(recv_msg);
     return NULL;
   }
-
+  
   int loopback_handler;
 }
 
@@ -118,7 +126,19 @@ void CkRdmaDeviceRecvHandler(void* data)
   NcpyOperationInfo *ncpy_op_info = (NcpyOperationInfo *)data;
   DeviceRdmaOp* op = (DeviceRdmaOp*)(ncpy_op_info->deviceRdmaOpInfo);
 
-  CmiEnforce(op->dest_pe == CmiMyPe());
+  if(op->dest_pe != CmiMyPe()) {
+        int infoSize = ncpy_op_info->ncpyOpInfoSize;
+        NcpyOperationInfo* copy = (NcpyOperationInfo*)CmiAlloc(infoSize);
+        memcpy(copy, ncpy_op_info, infoSize);
+
+        LoopBackMsg* conv_msg = (LoopBackMsg*)CmiAlloc(sizeof(LoopBackMsg));
+        conv_msg->msg = copy;
+
+        QdCreate(1);
+        CmiSetHandler(conv_msg, loopback_handler);
+        CmiPushPE(CmiRankOf(op->dest_pe), conv_msg);
+        return;
+  }
 
   QdProcess(1);
   DeviceRdmaInfo* info = op->info;
@@ -127,7 +147,7 @@ void CkRdmaDeviceRecvHandler(void* data)
   if (op->src_cb) {
     CkCallback* cb = (CkCallback*)op->src_cb;
     cb->send();
-    // delete cb;
+    delete cb;
   }
 
   // Update counter (there may be multiple buffers in transit)
@@ -144,7 +164,6 @@ void CkRdmaDeviceRecvHandler(void* data)
     // CmiFree(info);
   }
 }
-
 // Invoked when a GPU buffer arrives on the receiver
 void CkRdmaDeviceRecvHandler(void* data, void* msg)
 {
@@ -169,7 +188,7 @@ void CkRdmaDeviceRecvHandler(void* data, void* msg)
     enqueueNcpyMessage(op->dest_pe, info->msg);
 
     // Free RDMA metadata
-    //CmiFree(info);
+    CmiFree(info);
   }
 }
 

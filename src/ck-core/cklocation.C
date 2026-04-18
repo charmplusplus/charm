@@ -2388,10 +2388,10 @@ void CkLocCache::requestLocation(CmiUInt8 id, const int peToTell)
 
 void CkLocCache::updateLocation(const CkLocEntry& newEntry)
 {
-  // CmiPrintf("[%d] updateLocation: id=%llu pe=%d epoch=%d\n", CmiMyPe(), newEntry.id, newEntry.pe, newEntry.epoch);
+  // printf("[%d] updateLocation: id=%llu pe=%d epoch=%d\n", CmiMyPe(), newEntry.id, newEntry.pe, newEntry.epoch);
   CkAssert(newEntry.pe != -1);
   CkLocEntry& oldEntry = locMap[newEntry.id];
-  // CmiPrintf("[%d] updateLocation: oldEntry.epoch=%d\n", CmiMyPe(), oldEntry.epoch);
+  // printf("[%d] updateLocation: oldEntry.epoch=%d\n", CmiMyPe(), oldEntry.epoch);
   if (newEntry.epoch > oldEntry.epoch)
   {
     oldEntry = newEntry;
@@ -2402,6 +2402,8 @@ void CkLocCache::updateLocation(const CkLocEntry& newEntry)
 void CkLocCache::recordEmigration(CmiUInt8 id, int pe)
 {
   LocationMap::iterator itr = locMap.find(id);
+
+  // printf("[%d] recordEmigration: id=%llu itr->second.pe=%d pe=%d\n", CmiMyPe(), id, itr->second.pe, pe);
 
   CkAssert(itr != locMap.end());
   CkAssert(itr->second.pe == CkMyPe());
@@ -3019,6 +3021,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   gpuBufSize = 0;
 #if CMK_CUDA
   gpuBufSize = p.gpu_size();
+  printf("sending GPU buf of size %d", gpuBufSize);
 #endif
 
 #if CMK_ERROR_CHECKING

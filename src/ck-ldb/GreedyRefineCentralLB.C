@@ -480,6 +480,7 @@ void GreedyRefineCentralLB::work(LDStats *stats)
     GreedyRefineCentralLB::GProc &p = procs[pe];
     if (!p.available) continue;
     uint64_t devId = stats->procs[pe].gpu_device_id;
+    // printf("pe gpu_id %ld\n", devId);
 
     auto it = gpuIdToIdx.find(devId);
     if (it == gpuIdToIdx.end()) {
@@ -496,11 +497,11 @@ void GreedyRefineCentralLB::work(LDStats *stats)
   }
   int nGroups = gpuGroups.size();
 
-  CkPrintf("[%d] GreedyRefineCentralLB: %d GPU group(s), %d available PEs, %d migratable objs\n",
-           CkMyPe(), nGroups, availablePes, (int)pobjs.size());
-  for (auto &g : gpuGroups)
-    CkPrintf("[%d]   GPU %llu: %d PEs, bgload=%.6f\n",
-             CkMyPe(), g.gpu_id, (int)g.peIds.size(), g.load);
+  // CkPrintf("[%d] GreedyRefineCentralLB: %d GPU group(s), %d available PEs, %d migratable objs\n",
+  //          CkMyPe(), nGroups, availablePes, (int)pobjs.size());
+  // for (auto &g : gpuGroups)
+  //   CkPrintf("[%d]   GPU %llu: %d PEs, bgload=%.6f\n",
+  //            CkMyPe(), g.gpu_id, (int)g.peIds.size(), g.load);
 
   // --- Greedy preprocessing at GPU-group level to establish target M ---
   // Reset group loads to bg only, then greedily assign objects to get M.
@@ -618,10 +619,10 @@ void GreedyRefineCentralLB::work(LDStats *stats)
   }
 
   // Print per-GPU-group loads after LB
-  CkPrintf("[%d] --- Per-GPU-group loads after LB ---\n", CkMyPe());
-  for (int gi = 0; gi < nGroups; gi++)
-    CkPrintf("[%d]   GPU %llu: aggregate load=%.6f\n",
-             CkMyPe(), gpuGroups[gi].gpu_id, gpuGroups[gi].load);
+  // CkPrintf("[%d] --- Per-GPU-group loads after LB ---\n", CkMyPe());
+  // for (int gi = 0; gi < nGroups; gi++)
+  //   CkPrintf("[%d]   GPU %llu: aggregate load=%.6f\n",
+  //            CkMyPe(), gpuGroups[gi].gpu_id, gpuGroups[gi].load);
 
 #else
   // ---- Original PE-level greedy refine (non-GPU path) ----

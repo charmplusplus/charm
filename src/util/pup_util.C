@@ -22,6 +22,7 @@ virtual functions are defined here.
 #include "converse.h"
 #include "pup.h"
 #include "ckhashtable.h"
+#include "conv-mach-cuda.h"
 
 #if CMK_CUDA
 #include <cuda_runtime.h>

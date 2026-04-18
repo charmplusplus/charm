@@ -574,6 +574,7 @@ int CkGetArgc(void) {
 }
 
 Chare *CkActiveObj(void) {
+  printf("[PE %d] getting active: stack size now %zu\n", CkMyPe(), CkpvAccess(runningObjs).size());
   auto &objs = *(&CkpvAccess(runningObjs));
   if (objs.empty()) {
     return nullptr;
@@ -584,10 +585,12 @@ Chare *CkActiveObj(void) {
 
 inline void _pushObj(Chare *obj) {
   CkpvAccess(runningObjs).emplace_back(obj);
+  printf("[PE %d] pushObj: stack size now %zu\n", CkMyPe(), CkpvAccess(runningObjs).size());
 }
 
 inline Chare *_popObj(void) {
   auto &objs = *(&CkpvAccess(runningObjs));
+  printf("[PE %d] popobj: stack size now %zu\n", CkMyPe(), CkpvAccess(runningObjs).size());
   if (objs.empty()) {
     return nullptr;
   } else {

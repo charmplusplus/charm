@@ -445,19 +445,19 @@ void hapiProcessCuptiBuffers() {
     free(item.buffer);
   }
   //final state of gm.cupti_correlation_db_ and gm.cupti_obj_gpu_times_ 
-  CmiPrintf("size of correlation DB is: %zu\n", gm.cupti_correlation_db_.size());
-  CmiPrintf("size of obj_gpu_times_ map is: %zu\n", gm.cupti_obj_gpu_times_.size());
-  CmiPrintf("number of kernel records processed: %u\n", kernel_count);
-  CmiPrintf("number of correlation records processed: %u\n", corr_count);
+  // CmiPrintf("size of correlation DB is: %zu\n", gm.cupti_correlation_db_.size());
+  // CmiPrintf("size of obj_gpu_times_ map is: %zu\n", gm.cupti_obj_gpu_times_.size());
+  // CmiPrintf("number of kernel records processed: %u\n", kernel_count);
+  // CmiPrintf("number of correlation records processed: %u\n", corr_count);
 
   // DEBUG: print CUPTI obj-gpu-time map summary
-  if (!gm.cupti_obj_gpu_times_.empty()) {
-    CkPrintf("[PE %d] CUPTI: %zu objects with GPU times:\n", CmiMyPe(), gm.cupti_obj_gpu_times_.size());
-    for (auto& kv : gm.cupti_obj_gpu_times_)
-      CkPrintf("[PE %d]   objID=%lu  gpu_ns=%lu (%.6f s)\n", CmiMyPe(), kv.first, kv.second, kv.second / 1.0e9);
-  } else {
-    CkPrintf("[PE %d] CUPTI: no obj GPU times recorded (map empty)\n", CmiMyPe());
-  }
+  // if (!gm.cupti_obj_gpu_times_.empty()) {
+  //   CkPrintf("[PE %d] CUPTI: %zu objects with GPU times:\n", CmiMyPe(), gm.cupti_obj_gpu_times_.size());
+  //   for (auto& kv : gm.cupti_obj_gpu_times_)
+  //     CkPrintf("[PE %d]   objID=%lu  gpu_ns=%lu (%.6f s)\n", CmiMyPe(), kv.first, kv.second, kv.second / 1.0e9);
+  // } else {
+  //   CkPrintf("[PE %d] CUPTI: no obj GPU times recorded (map empty)\n", CmiMyPe());
+  // }
 }
 
 //TODO: safely handle SMP mode
@@ -1823,6 +1823,7 @@ void hapiRecordTime(cudaStream_t stream, cudaEvent_t start) {
 #endif
 
 uint64_t hapiCuptiPushObjCorrelation() {
+  printf("seeing CsvAccess(gpu_manager).cupti_initialized_ as %d\n", CsvAccess(gpu_manager).cupti_initialized_);
   if (!CsvAccess(gpu_manager).cupti_initialized_) return 0;
 
   // Get the active Charm++ object
@@ -1830,6 +1831,7 @@ uint64_t hapiCuptiPushObjCorrelation() {
   if (!chare) return 0;
 
   CkMigratable* mig = dynamic_cast<CkMigratable*>(chare);
+  printf("mig %p\n", mig);
   if (!mig) return 0;
 
   // Use the raw element ID as the external correlation ID
@@ -1838,6 +1840,7 @@ uint64_t hapiCuptiPushObjCorrelation() {
 
   CUPTI_SAFE_CALL(cuptiActivityPushExternalCorrelationId(
       CUPTI_EXTERNAL_CORRELATION_KIND_UNKNOWN, obj_id));
+  printf("pushed corr id\n");
 
   return obj_id;
 }
@@ -1845,6 +1848,7 @@ uint64_t hapiCuptiPushObjCorrelation() {
 void hapiCuptiPopObjCorrelation() {
   if (!CsvAccess(gpu_manager).cupti_initialized_) return;
 
+  printf("popped corr id\n");
   uint64_t tag;
   CUPTI_SAFE_CALL(cuptiActivityPopExternalCorrelationId(
       CUPTI_EXTERNAL_CORRELATION_KIND_UNKNOWN, &tag));
