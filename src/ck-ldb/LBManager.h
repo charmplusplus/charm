@@ -315,6 +315,7 @@ class LBManager : public CBase_LBManager
   void NonMigratable(LDObjHandle h) { lbdb_obj->NonMigratable(h); }
   void Migratable(LDObjHandle h) { lbdb_obj->Migratable(h); }
   void setPupSize(LDObjHandle h, size_t pup_size) { lbdb_obj->setPupSize(h, pup_size); }
+  void setGPUPupSize(LDObjHandle h, size_t gpu_pup_size) { lbdb_obj->setGPUPupSize(h, gpu_pup_size); }
   void UseAsyncMigrate(LDObjHandle h, bool flag) { lbdb_obj->UseAsyncMigrate(h, flag); };
   int GetObjDataSz(void) { return lbdb_obj->GetObjDataSz(); }
   int GetCommDataSz(void) { return lbdb_obj->GetCommDataSz(); }

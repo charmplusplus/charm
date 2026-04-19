@@ -74,6 +74,7 @@ public:
   void recvMigrate(int dest);
   void setMigratable(int migratable);	/// set migratable
   void setPupSize(size_t obj_pup_size);
+  void setGPUPupSize(size_t obj_gpu_pup_size);
   void AsyncMigrate(bool use);
   bool isAsyncMigrate()   { return asyncMigrate; }
   void ReadyMigrate(bool ready) { readyMigrate = ready; } ///called from user

@@ -287,6 +287,8 @@ public:
   int from_pe;
   int pe_speed;
 #if CMK_CUDA
+  size_t gpu_mem_remaining;
+  size_t pool_buff_mem_remaing;
   uint64_t gpu_device_id;
 #endif
   LBRealType total_walltime;
@@ -306,7 +308,7 @@ public:
   CLBStatsMsg(int osz, int csz);
   CLBStatsMsg(): from_pe(0), pe_speed(0),
 #if CMK_CUDA
-		 gpu_device_id(-1),
+		 gpu_device_id(-1), gpu_mem_remaining(0), pool_buff_mem_remaing(0),
 #endif
 		 total_walltime(0.0), idletime(0.0),
 		 bg_walltime(0.0),

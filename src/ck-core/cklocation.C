@@ -1949,12 +1949,21 @@ void CkMigratable::AtSync(int waitForMigration)
   if (usesAutoMeasure == false)
     UserSetLBLoad();
 
+  #ifdef CMK_CUDA
+  PUP::sizer ps(PUP::er::IS_MIGRATION);
+  this->virtual_pup(ps);
+  // printf("[%d] gpu pup size %ld\n",CkMyPe(), ps.gpu_size() );
+  setGPUPupSize(ps.gpu_size());
+  #endif
   if (_lb_psizer_on || _lb_args.metaLbOn())
   {
     PUP::sizer ps(PUP::er::IS_MIGRATION);
     this->virtual_pup(ps);
     if (_lb_psizer_on)
+    {
       setPupSize(ps.size());
+    }
+    //TODO: check if this is correct after gpuPUP size
     if (_lb_args.metaLbOn())
       myRec->getMetaBalancer()->SetCharePupSize(ps.size());
   }
@@ -2052,6 +2061,9 @@ void CkMigratable::ResumeFromSyncHelper()
 void CkMigratable::setMigratable(int migratable) { myRec->setMigratable(migratable); }
 
 void CkMigratable::setPupSize(size_t obj_pup_size) { myRec->setPupSize(obj_pup_size); }
+
+void CkMigratable::setGPUPupSize(size_t obj_gpu_pup_size) { myRec->setGPUPupSize(obj_gpu_pup_size); }
+
 
 void CkMigratable::CkAddThreadListeners(CthThread tid, void* msg)
 {
@@ -2296,6 +2308,11 @@ void CkLocRec::setMigratable(int migratable)
 void CkLocRec::setPupSize(size_t obj_pup_size)
 {
   lbmgr->setPupSize(ldHandle, obj_pup_size);
+}
+
+void CkLocRec::setGPUPupSize(size_t obj_gpu_pup_size)
+{
+  lbmgr->setGPUPupSize(ldHandle, obj_gpu_pup_size);
 }
 
 #endif

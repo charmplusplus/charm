@@ -98,6 +98,7 @@ public:
   void ckFinishConstruction(int epoch = -1);
   void setMigratable(int migratable);
   void setPupSize(size_t obj_pup_size);
+  void setGPUPupSize(size_t obj_gpu_pup_size);
 #else
   void AtSync(int waitForMigration=1) { ResumeFromSync();}
   void setMigratable(int migratable)  { }

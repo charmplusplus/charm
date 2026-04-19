@@ -130,6 +130,7 @@ public:
   inline void NonMigratable(LDObjHandle h) { LbObj(h)->SetMigratable(false); };
   inline void Migratable(LDObjHandle h) { LbObj(h)->SetMigratable(true); };
   inline void setPupSize(LDObjHandle h, size_t pup_size) { LbObj(h)->setPupSize(pup_size);};
+  inline void setGPUPupSize(LDObjHandle h, size_t gpu_pup_size) { LbObj(h)->setGPUPupSize(gpu_pup_size);};
   inline void UseAsyncMigrate(LDObjHandle h, bool flag) { LbObj(h)->UseAsyncMigrate(flag); };
   inline int GetCommDataSz(void) {
     if (commTable)

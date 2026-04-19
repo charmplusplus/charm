@@ -29,6 +29,7 @@
 #include <algorithm>
 #include <math.h>
 #if CMK_CUDA
+CkpvExtern(int, _lb_obj_index);
 #include <unordered_map>
 #endif
 
@@ -303,6 +304,8 @@ double GreedyRefineCentralLB::fillData(LDStats *stats,
     int pe = stats->from_proc[i];
     obj.id = i;
     obj.oldPE = pe;
+    obj.gpuPupSize = oData.gpuPupSize;
+    obj.gpuAllocSize = *(size_t *)oData.getUserData(CkpvAccess(_lb_obj_index));
     CkAssert(pe >= 0 && pe <= n_pes);
     if (pe == n_pes) obj.oldPE = -1; // this can happen in HybridLB if object comes from outside group. mark oldPE as -1 in this situation
     if (!oData.migratable) {
@@ -326,7 +329,7 @@ double GreedyRefineCentralLB::fillData(LDStats *stats,
 #else
       obj.load = oData.wallTime * stats->procs[pe].pe_speed;
 #endif
-      // CkPrintf("[%d] Obj %d on PE %d is migratable, load=%.6f\n", CkMyPe(), i, pe, obj.load);
+        // CkPrintf("[%d] Obj %d on PE %d is migratable, load=%.6f, GPU pup size=%ld, GPU alloc size=%ld\n", CkMyPe(), i, pe, obj.load, oData.gpuPupSize, obj.gpuAllocSize);
       pobjs.push_back(&obj);
       totalObjLoad += obj.load;
       if (_lb_args.debug() > 1) {
@@ -471,6 +474,8 @@ void GreedyRefineCentralLB::work(LDStats *stats)
     uint64_t gpu_id;
     double load;                        // aggregate load across PEs in this group
     std::vector<int> peIds;             // indices into procs[]
+    size_t gpu_mem_remaining;
+    size_t pool_buff_mem_remaing;
   };
 
   std::vector<GPUGrp> gpuGroups;
@@ -480,6 +485,8 @@ void GreedyRefineCentralLB::work(LDStats *stats)
     GreedyRefineCentralLB::GProc &p = procs[pe];
     if (!p.available) continue;
     uint64_t devId = stats->procs[pe].gpu_device_id;
+    size_t gpu_mem_remaining = stats->procs[pe].gpu_mem_remaining;
+    size_t pool_buff_mem_remaing = stats->procs[pe].pool_buff_mem_remaing;
     // printf("pe gpu_id %ld\n", devId);
 
     auto it = gpuIdToIdx.find(devId);
@@ -489,6 +496,8 @@ void GreedyRefineCentralLB::work(LDStats *stats)
       g.gpu_id = devId;
       g.load = p.bgload;
       g.peIds.push_back(pe);
+      g.gpu_mem_remaining = gpu_mem_remaining;
+      g.pool_buff_mem_remaing = pool_buff_mem_remaing;
       gpuGroups.push_back(std::move(g));
     } else {
       gpuGroups[it->second].load += p.bgload;
@@ -500,8 +509,8 @@ void GreedyRefineCentralLB::work(LDStats *stats)
   // CkPrintf("[%d] GreedyRefineCentralLB: %d GPU group(s), %d available PEs, %d migratable objs\n",
   //          CkMyPe(), nGroups, availablePes, (int)pobjs.size());
   // for (auto &g : gpuGroups)
-  //   CkPrintf("[%d]   GPU %llu: %d PEs, bgload=%.6f\n",
-  //            CkMyPe(), g.gpu_id, (int)g.peIds.size(), g.load);
+  //   CkPrintf("[%d]   GPU %llu: %d PEs, bgload=%.6f, gpu_mem_remaining=%ld, pool_buff_mem_remaing=%ld\n",
+  //            CkMyPe(), g.gpu_id, (int)g.peIds.size(), g.load, g.gpu_mem_remaining, g.pool_buff_mem_remaing);
 
   // --- Greedy preprocessing at GPU-group level to establish target M ---
   // Reset group loads to bg only, then greedily assign objects to get M.
@@ -543,37 +552,34 @@ void GreedyRefineCentralLB::work(LDStats *stats)
     for (int pe : gpuGroups[gi].peIds)
       peToGrpIdx[pe] = gi;
 
-  // --- Main assignment loop (greedy refine at GPU-group level) ---
   for (int i = 0; i < (int)pobjs.size(); i++) {
     const GreedyRefineCentralLB::GObj *obj = pobjs[i];
     double obj_load = obj->load;
 
-    // Find lightest GPU group (linear scan — few groups)
     int lightest_gi = 0;
     for (int gi = 1; gi < nGroups; gi++) {
       if (gpuGroups[gi].load < gpuGroups[lightest_gi].load)
         lightest_gi = gi;
     }
 
+    int src_gi = -1;
+    if (obj->oldPE >= 0) {
+      auto srcIt = peToGrpIdx.find(obj->oldPE);
+      if (srcIt != peToGrpIdx.end()) src_gi = srcIt->second;
+    }
+
     // Refinement: if object's current GPU group is close enough, keep it there
     int chosen_gi = lightest_gi;
-    if (obj->oldPE >= 0) {
-      auto curIt = peToGrpIdx.find(obj->oldPE);
-      if (curIt != peToGrpIdx.end()) {
-        int cur_gi = curIt->second;
-        GPUGrp &curGrp = gpuGroups[cur_gi];
-        // Keep on current GPU group if:
-        //   1) its load is within B tolerance of the lightest group
-        //   2) adding this object keeps it under the target M
-        if ((curGrp.load <= (gpuGroups[lightest_gi].load + 0.01) * B) &&
-            (curGrp.load + obj_load <= M))
-            {
-              chosen_gi = cur_gi;
-              // CmiPrintf("choosing to stay on the current GPU > %d because of curGrp.load %f, obj_load %f less than M %f\n", chosen_gi, curGrp.load, obj_load, M);
-            }
-            else {
-              // CmiPrintf("choosing to stay on the ligtest GPU > %d because of curGrp.load %f, obj_load %f greater than M %f\n", chosen_gi, curGrp.load, obj_load, M);
-            }
+    if (src_gi >= 0) {
+      GPUGrp &curGrp = gpuGroups[src_gi];
+      if ((curGrp.load <= (gpuGroups[lightest_gi].load + 0.01) * B) && (curGrp.load + obj_load <= M))
+            chosen_gi = src_gi;
+    }
+
+    // Pool buffer constraint
+    if (chosen_gi != src_gi && src_gi >= 0 && obj->gpuPupSize > 0) {
+      if (gpuGroups[src_gi].pool_buff_mem_remaing < obj->gpuPupSize || gpuGroups[chosen_gi].pool_buff_mem_remaing < obj->gpuPupSize) {
+        chosen_gi = src_gi;
       }
     }
 
@@ -601,6 +607,12 @@ void GreedyRefineCentralLB::work(LDStats *stats)
 
     // Update GPU group aggregate
     g.load += scaled;
+
+    if (chosen_gi != src_gi && src_gi >= 0 && obj->gpuPupSize > 0)
+    {
+      gpuGroups[src_gi].pool_buff_mem_remaing -= obj->gpuPupSize;
+      gpuGroups[chosen_gi].pool_buff_mem_remaing -= obj->gpuPupSize;
+    }
 
     // Track max GPU-group load; expand M if exceeded
     if (g.load > maxLoad) {

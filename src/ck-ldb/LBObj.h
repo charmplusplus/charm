@@ -93,6 +93,10 @@ public:
   inline void setPupSize(size_t obj_pup_size) {
     data.pupSize = pup_encodeSize(obj_pup_size);
   }
+  inline void setGPUPupSize(size_t obj_gpu_pup_size){
+    data.gpuPupSize = obj_gpu_pup_size;
+  }
+  
   inline void UseAsyncMigrate(bool async) { data.asyncArrival = async; }
   inline LDObjData &ObjData() { return data; };
   inline void lastKnownLoad(LBRealType *w, LBRealType *c) {

@@ -62,6 +62,8 @@ private:
     int id;
     double load;
     int oldPE;
+    size_t gpuPupSize;
+    size_t gpuAllocSize;
   };
 
   class ObjLoadGreater {

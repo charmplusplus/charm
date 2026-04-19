@@ -174,6 +174,9 @@ struct LDObjData {
   // An encoded approximation of the amount of data the object would pack;
   // call pup_decodeSize(pupSize) to get the actual approximate value
   CmiUInt2 pupSize;
+#if CMK_CUDA
+  size_t gpuPupSize;
+#endif
   inline const LDOMHandle &omHandle() const { return handle.omhandle; }
   inline const LDOMid &omID() const { return handle.omhandle.id; }
   inline const CmiUInt8 &objID() const { return handle.id; }
@@ -354,6 +357,9 @@ inline void LDObjData::pup(PUP::er &p) {
   }
 #endif
   p|pupSize;
+#if CMK_CUDA
+  p|gpuPupSize;
+#endif
 }
 
 inline bool LDCommDesc::operator==(const LDCommDesc &obj) const {

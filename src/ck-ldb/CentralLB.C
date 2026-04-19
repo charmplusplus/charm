@@ -16,6 +16,7 @@
 // extern void hapiProcessCuptiBuffers();
 // extern void hapiClearCuptiData();
 CsvExtern(GPUManager, gpu_manager);
+CkpvExtern(int, _lb_obj_index);
 #include "hapi.h"
 #endif
 
@@ -77,6 +78,10 @@ void CentralLB::initLB(const CkLBOptions &opt)
   // CkPrintf("[%d] CentralLB initLB \n",CkMyPe());
   if (opt.getSeqNo() > 0 || (_lb_args.metaLbOn() && _lb_args.metaLbModelDir() != nullptr))
     turnOff();
+
+  #if CMK_CUDA
+  CkpvAccess(_lb_obj_index) = LBRegisterObjUserData(sizeof(size_t));//gpu allocation size
+  #endif
 
   stats_msg_count = 0;
   statsMsgsList = NULL;
@@ -341,6 +346,9 @@ void CentralLB::BuildStatsMsg()
 #if CMK_CUDA
   // printf("CMK_CUDA setting device is %ld\n", hapiMyDevice());
   msg->gpu_device_id = hapiMyDevice();
+  size_t freeMem, totalMem;
+  cudaMemGetInfo(&freeMem, &totalMem);
+  msg->gpu_mem_remaining = freeMem;
   // printf("msg->gpu_device_id is %ld\n", msg->gpu_device_id);
 #endif
 
@@ -476,6 +484,8 @@ void CentralLB::depositData(CLBStatsMsg *m)
   procStat.pe_speed = m->pe_speed;
 #if CMK_CUDA
   procStat.gpu_device_id = m->gpu_device_id;
+  procStat.gpu_mem_remaining = m->gpu_mem_remaining;
+  procStat.pool_buff_mem_remaing = m->pool_buff_mem_remaing;
 #endif
 
   //procStat.utilization = 1.0;
@@ -554,6 +564,8 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &&msg)
       procStat.pe_speed = m->pe_speed;
 #if CMK_CUDA
       procStat.gpu_device_id = m->gpu_device_id;
+      procStat.gpu_mem_remaining = m->gpu_mem_remaining;
+      procStat.pool_buff_mem_remaing = m->pool_buff_mem_remaing;
 #endif
       //procStat.utilization = 1.0;
       procStat.available = true;
@@ -1719,6 +1731,8 @@ void CLBStatsMsg::pup(PUP::er &p) {
   p|pe_speed;
 #if CMK_CUDA
   p|gpu_device_id;
+  p|gpu_mem_remaining;
+  p|pool_buff_mem_remaing;
 #endif
   p|total_walltime;
   p|idletime;
