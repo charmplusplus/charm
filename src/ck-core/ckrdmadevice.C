@@ -548,13 +548,21 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
     DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
 
     for (int i = 0; i < numops; i++) {
+      bool is_lb_buffer = ( (size_t)((char*)(buffers[i]->ptr) - (char*)(dm->comm_buffer->base_ptr)) < dm->comm_buffer->total_size );
 #if CMK_SMP
       CmiLock(dm->lock);
 #endif
-      void* alloc_comm_buffer = dm->alloc_comm_buffer(buffers[i]->cnt);
-      if (alloc_comm_buffer == nullptr) {
-        CkAbort("PE %d, device %d: Not enough memory on device communication buffer (%zu free)",
-            CkMyPe(), dm->global_index, dm->get_comm_buffer_free_size());
+      void* alloc_comm_buffer;
+      if(is_lb_buffer) {
+        printf("[GPUDIRECT RDMA] Lol Imma use the already LDB buffer=================================\n");
+        fflush(stdout);
+        alloc_comm_buffer = const_cast<void*>(buffers[i]->ptr);
+      } else {
+        alloc_comm_buffer = dm->alloc_comm_buffer(buffers[i]->cnt);
+        if (alloc_comm_buffer == nullptr) {
+          CkAbort("PE %d, device %d: Not enough memory on device communication buffer (%zu free)",
+              CkMyPe(), dm->global_index, dm->get_comm_buffer_free_size());
+        }
       }
       buffers[i]->comm_offset = (char*)alloc_comm_buffer - (char*)dm->comm_buffer->base_ptr;
       buffers[i]->device_idx = (csv_gpu_manager.device_count * CmiMyNodeRankLocal() + cpv_my_device_id);
@@ -571,8 +579,10 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
 #endif
 
       // Initiate transfer from source buffer to device comm buffer
-      hapiCheck(hapiMemcpyAsync(alloc_comm_buffer, buffers[i]->ptr, buffers[i]->cnt,
-            hapiMemcpyDeviceToDevice, buffers[i]->hapi_stream));
+      if(!is_lb_buffer) {
+        hapiCheck(hapiMemcpyAsync(alloc_comm_buffer, buffers[i]->ptr, buffers[i]->cnt,
+              hapiMemcpyDeviceToDevice, buffers[i]->hapi_stream));
+      }
 
       // Record event
       hapi_ipc_device_info& my_device_info = csv_gpu_manager.hapi_ipc_device_infos[(csv_gpu_manager.device_count * CmiMyNodeRankLocal() + cpv_my_device_id)];
