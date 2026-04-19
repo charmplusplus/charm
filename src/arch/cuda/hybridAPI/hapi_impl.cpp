@@ -1823,15 +1823,16 @@ void hapiRecordTime(cudaStream_t stream, cudaEvent_t start) {
 #endif
 
 uint64_t hapiCuptiPushObjCorrelation() {
-  printf("seeing CsvAccess(gpu_manager).cupti_initialized_ as %d\n", CsvAccess(gpu_manager).cupti_initialized_);
+  // printf("seeing CsvAccess(gpu_manager).cupti_initialized_ as %d\n", CsvAccess(gpu_manager).cupti_initialized_);
   if (!CsvAccess(gpu_manager).cupti_initialized_) return 0;
 
   // Get the active Charm++ object
   Chare* chare = CkActiveObj();
-  if (!chare) return 0;
+  if (!chare)
+    CmiAbort("hapiCuptiPushObjCorrelation call without active object is not possible");
 
   CkMigratable* mig = dynamic_cast<CkMigratable*>(chare);
-  printf("mig %p\n", mig);
+  // printf("mig %p\n", mig);
   if (!mig) return 0;
 
   // Use the raw element ID as the external correlation ID
@@ -1840,7 +1841,7 @@ uint64_t hapiCuptiPushObjCorrelation() {
 
   CUPTI_SAFE_CALL(cuptiActivityPushExternalCorrelationId(
       CUPTI_EXTERNAL_CORRELATION_KIND_UNKNOWN, obj_id));
-  printf("pushed corr id\n");
+  // printf("pushed corr id\n");
 
   return obj_id;
 }
@@ -1848,7 +1849,7 @@ uint64_t hapiCuptiPushObjCorrelation() {
 void hapiCuptiPopObjCorrelation() {
   if (!CsvAccess(gpu_manager).cupti_initialized_) return;
 
-  printf("popped corr id\n");
+  // printf("popped corr id\n");
   uint64_t tag;
   CUPTI_SAFE_CALL(cuptiActivityPopExternalCorrelationId(
       CUPTI_EXTERNAL_CORRELATION_KIND_UNKNOWN, &tag));
