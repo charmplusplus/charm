@@ -37,13 +37,13 @@ struct DeviceManager {
     return comm_buffer;
   }
 
-  void create_comm_buffer(size_t size) {
+  void create_comm_buffer(size_t total_size, size_t comm_size) {
     if (comm_buffer == nullptr)
-      comm_buffer = new buddy::allocator(size);
+      comm_buffer = new buddy::allocator(total_size, comm_size);
   }
 
-  void* alloc_comm_buffer(size_t size) {
-    return comm_buffer->malloc(size);
+  void* alloc_comm_buffer(size_t size, bool is_comm = true) {
+    return comm_buffer->malloc(size, is_comm);
   }
 
   void free_comm_buffer(size_t offset) {

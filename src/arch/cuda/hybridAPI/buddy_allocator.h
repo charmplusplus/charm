@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <list>
 #include <unordered_map>
+#include <vector>
 #include <string>
 #include <pthread.h>
 
@@ -49,13 +50,30 @@ namespace buddy {
       AllocBlock(size_t size_, size_t requested_) : size(size_), requested(requested_) {}
     };
 
+    struct lb_free_list {
+      lb_free_list* next;
+      lb_free_list* prev;
+      void* ptr;
+      size_t size;
+      size_t indx;
+    };
+    lb_free_list* head;
+    lb_free_list* tail;
+    std::vector<lb_free_list> lb_free_pool;
+    std::unordered_map<size_t, bool> lb_free_pool_taken;
+    std::unordered_map<void*, size_t> lb_ptr_size;
+    uint8_t* lb_ptr;
+
     // Allocation size limits
+    size_t comm_size;
+    size_t lb_size;
     size_t total_size;
     const size_t min_size;
 
     // Base pointer of the initial allocation
     uint8_t* base_ptr;
-
+    uint8_t* lb_base_ptr;
+  
     // Buckets each with a free list
     std::list<FreeBlock>* buckets;
     int bucket_count;
@@ -70,9 +88,9 @@ namespace buddy {
     int get_block_index(uint8_t* ptr, size_t size);
 
     // Allocation functions
-    allocator(size_t size);
+    allocator(size_t size, size_t);
     ~allocator();
-    void* malloc(size_t request);
+    void* malloc(size_t request, bool is_comm);
     void free(void* ptr);
   };
 }

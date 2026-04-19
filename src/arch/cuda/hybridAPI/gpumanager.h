@@ -142,6 +142,9 @@ struct GPUManager {
   // Device communication buffer
   size_t comm_buffer_size;
 
+  // Device load-balancing buffer
+  size_t lb_buffer_size;
+
   // POSIX shared memory for sharing CUDA IPC handles between processes on the same host
   bool use_shm;
   bool test_field;

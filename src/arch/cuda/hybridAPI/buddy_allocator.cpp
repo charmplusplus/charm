@@ -51,16 +51,15 @@ namespace buddy {
     return (size_t)(ptr - base_ptr) / size;
   }
 
-  allocator::allocator(size_t size) : min_size(4), base_ptr(NULL) {
-    if (size == 0) {
+  allocator::allocator(size_t _comm_lb_size, size_t _comm_size) : min_size(4), base_ptr(NULL) {
+    if (_comm_size == 0) {
       fprintf(stderr, "Allocator size has to be larger than 0 bytes\n");
       abort();
     }
 
     // Request GPU memory (closest power of 2)
-    int total_size_log2 = std::ceil(std::log2((double)size));
-    total_size = (size_t)std::pow(2, total_size_log2);
-    hapiError_t status = hapiMalloc(&base_ptr, total_size);
+    hapiError_t status = hapiMalloc(&base_ptr, _comm_lb_size);
+    this->comm_size = _comm_size;
     if (status != hapiSuccess) {
       fprintf(stderr, "Failed to allocate GPU memory\n");
       abort();
@@ -68,9 +67,32 @@ namespace buddy {
     DEBUG_PRINT("Initialized base_ptr %p with %zu bytes\n", (void*)base_ptr, total_size);
 
     // Initialize buckets and set up last bucket (for size min_size)
+    int total_size_log2 = std::ceil(std::log2((double)_comm_size));
     bucket_count = total_size_log2 - 1;
     buckets = new std::list<FreeBlock>[bucket_count];
-    buckets[bucket_count-1].emplace_back(base_ptr, total_size);
+    buckets[bucket_count-1].emplace_back(base_ptr, _comm_size);
+
+    // Initialize vars for load balancing
+    if(_comm_lb_size != _comm_size) {
+      lb_free_pool.resize(128);
+
+      head = &(lb_free_pool[0]);
+      lb_free_pool_taken[0] = true;
+
+      tail = &(lb_free_pool[1]);
+      lb_free_pool_taken[1] = true;
+
+      head->next = tail;
+      head->prev = nullptr;
+      tail->next = nullptr;
+      tail->prev = head;
+
+      this->lb_size = _comm_lb_size - _comm_size;
+      this->lb_base_ptr = base_ptr + _comm_size;
+      this->lb_ptr = lb_base_ptr;
+    }
+
+    this->total_size = _comm_lb_size;
   }
 
   allocator::~allocator() {
@@ -83,10 +105,51 @@ namespace buddy {
     delete[] buckets;
   }
 
-  void* allocator::malloc(size_t request) {
+  void* allocator::malloc(size_t request, bool is_comm) {
+    if(!is_comm) {
+      // buffers for load balancing
+      if(request > lb_size) return nullptr;
+      lb_free_list* tmp = head->next;
+
+      // see if existing free block can service request
+      while (tmp != tail) {
+        if(tmp->size == request) {
+          tmp->prev->next = tmp->next;
+          tmp->next->prev = tmp->prev;
+          void* ptr = tmp->ptr;
+          lb_ptr_size[ptr] = request;
+
+          tmp->next = nullptr;
+          tmp->prev = nullptr;
+          tmp->size = 0;
+          lb_free_pool_taken[tmp->indx] = false;
+          tmp->ptr = nullptr;
+
+          return ptr;
+        } else if(tmp->size > request) {
+          void* ptr = tmp->ptr;
+          lb_ptr_size[ptr] = request;
+
+          tmp->size = tmp->size - request;
+          tmp->ptr = tmp->ptr + request;
+
+          return ptr;
+        }
+
+        tmp = tmp->next;
+      }
+
+      // service the request from the tip of lb_ptr
+      if(lb_ptr + request > lb_base_ptr + lb_size) return nullptr;
+      void* ptr = lb_ptr;
+      lb_ptr_size[ptr] = request;
+      lb_ptr = lb_ptr + request;
+      return ptr;
+    }
+
     DEBUG_PRINT("REQUEST: %ld, TOTAL_SIZE: %ld", request, total_size);
     // Cannot satisfy request larger than total size
-    if (request > total_size) return nullptr;
+    if (request > comm_size) return nullptr;
 
     // Has to be larger than minimum allocation size (4 bytes)
     // Size is rounded up to the nearest power of 2
@@ -127,6 +190,105 @@ namespace buddy {
   }
 
   void allocator::free(void* ptr) {
+    if((uint8_t*)ptr >= lb_base_ptr) {
+      size_t alloc_size = lb_ptr_size[ptr];
+      if(alloc_size == 0) {
+        printf("Load balancing allocator got a request to free buffer of size 0\n");
+        fflush(stdout);
+        std::abort();
+      }
+
+      // see if the ptr is just before lb_ptr
+      if((uint8_t*)ptr + alloc_size == lb_ptr) {
+        lb_ptr -= alloc_size;
+        lb_ptr_size[ptr] = 0;
+        return;
+      }
+
+      // see if mergeable with any existing free block
+      lb_free_list* tmp = head->next;
+      bool merged = false;
+      while(tmp != tail) {
+        if (((uint8_t*)tmp->ptr + tmp->size) == (uint8_t*)ptr) {
+          tmp->size = tmp->size + alloc_size;
+          lb_free_list* tmp_next = tmp->next;
+
+          if (tmp_next != tail && (((uint8_t*)tmp->ptr + tmp->size) == (uint8_t*)tmp_next->ptr)) {
+            tmp->size = tmp->size + tmp_next->size;
+
+            tmp_next->prev->next = tmp_next->next;
+            tmp_next->next->prev = tmp_next->prev;
+            
+            tmp_next->next = nullptr;
+            tmp_next->prev = nullptr;
+            tmp_next->size = 0;
+            lb_free_pool_taken[tmp_next->indx] = false;
+            tmp_next->ptr = nullptr;
+          }
+          
+          merged = true;
+          break;
+        } else if(((uint8_t*)ptr + alloc_size) == (uint8_t*)tmp->ptr) {
+          tmp->size = tmp->size + alloc_size;
+          tmp->ptr = ptr;
+
+          merged = true;
+          break;
+        } else if (tmp->ptr > ptr) {
+          break;
+        }
+
+        tmp = tmp->next;
+      }
+
+      // see if merging reached the lb_ptr
+      if(merged) {
+        if((uint8_t*)tmp->ptr + tmp->size == lb_ptr) {
+            lb_ptr -= tmp->size;
+
+            tmp->prev->next = tmp->next;
+            tmp->next->prev = tmp->prev;
+            
+            tmp->next = nullptr;
+            tmp->prev = nullptr;
+            tmp->size = 0;
+            lb_free_pool_taken[tmp->indx] = false;
+            tmp->ptr = nullptr;
+
+          }
+
+          lb_ptr_size[ptr] = 0;
+          return;
+      }
+
+      // add a free node just before tmp
+      size_t free_space_indx = 2;
+      while(lb_free_pool_taken[free_space_indx] && free_space_indx < lb_free_pool.size())
+        free_space_indx++;
+      lb_free_list* free_node;
+      if(free_space_indx == lb_free_pool.size()) {
+        // TODO : Implement this logic or just increase the default size of 
+        // lb_free_pool
+        printf("Load balancing allocator does not have any more free nodes\n");
+        fflush(stdout);
+        std::abort();
+      } else {
+        free_node = &(lb_free_pool[free_space_indx]);
+        lb_free_pool_taken[free_space_indx] = true;
+      }
+
+      free_node->indx = free_space_indx;
+      free_node->ptr = ptr;
+      free_node->size = lb_ptr_size[ptr];
+      free_node->prev = tmp->prev;
+      free_node->next = tmp;
+
+      tmp->prev->next = free_node;
+      tmp->prev = free_node;
+
+      lb_ptr_size[ptr] = 0;
+      return;
+    }
     // Find pointer in allocation map
     auto alloc_it = alloc_map.find((uint8_t*)ptr);
     if (alloc_it == alloc_map.end()) {

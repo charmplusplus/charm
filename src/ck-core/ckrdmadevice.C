@@ -554,8 +554,6 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
 #endif
       void* alloc_comm_buffer;
       if(is_lb_buffer) {
-        printf("[GPUDIRECT RDMA] Lol Imma use the already LDB buffer=================================\n");
-        fflush(stdout);
         alloc_comm_buffer = const_cast<void*>(buffers[i]->ptr);
       } else {
         alloc_comm_buffer = dm->alloc_comm_buffer(buffers[i]->cnt);
