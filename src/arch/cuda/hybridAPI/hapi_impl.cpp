@@ -129,15 +129,32 @@ static void ipcHandleOpen();
 
 // Called by all PEs in Charm++ layer init
 void hapiInit(char** argv) {
+#if CMK_SHRINK_EXPAND
+  extern bool _reuseRegistrationStateOnRestart;
+  // On a survivor restart the GPU context, PE-device mapping, IPC handles,
+  // and registered callbacks/pollers are all preserved in this process.
+  // Skip the work but still participate in any cross-process barriers so we
+  // stay in lockstep with newcomer processes (which run a full hapiInit).
+  // Rescale fires at LB sync time, so the event queue is drained and there
+  // is no in-flight GPU work to worry about.
+  const bool survivor_restart = _reuseRegistrationStateOnRestart;
+#else
+  const bool survivor_restart = false;
+#endif
+
   if (!CmiInCommThread()) {
-    if (CmiMyRank() == 0) {
-      hapiInitCsv(); // Initialize per-process variables (GPUManager)
+    if (!survivor_restart) {
+      if (CmiMyRank() == 0) {
+        hapiInitCsv(); // Initialize per-process variables (GPUManager)
+      }
+      hapiInitCpv(); // Initialize per-PE variables
     }
-    hapiInitCpv(); // Initialize per-PE variables
 
     CmiNodeBarrier(); // Ensure hapiInitCsv is done for all PEs within a logical node
 
-    hapiMapping(argv); // Perform PE-device mapping
+    if (!survivor_restart) {
+      hapiMapping(argv); // Perform PE-device mapping
+    }
 
 #if CMK_SHRINK_EXPAND
     hapiStartMemoryDaemon(argv);
@@ -147,8 +164,10 @@ void hapiInit(char** argv) {
 #endif
 
 #ifndef HAPI_CUDA_CALLBACK
-    // Register polling function to be invoked at every scheduler loop
-    CcdCallOnConditionKeep(CcdSCHEDLOOP, (CcdCondFn)hapiPollEvents, NULL);
+    if (!survivor_restart) {
+      // Register polling function to be invoked at every scheduler loop
+      CcdCallOnConditionKeep(CcdSCHEDLOOP, (CcdCondFn)hapiPollEvents, NULL);
+    }
 #endif
   }
 
@@ -161,54 +180,61 @@ void hapiInit(char** argv) {
 
   shmInit();
 
-  hapiRegisterCallbacks(); // Register callback functions
+  if (!survivor_restart) {
+    hapiRegisterCallbacks(); // Register callback functions
+  }
 }
 
 
 void hapiStartMemoryDaemon(char** argv)
 {
 #if CMK_SHRINK_EXPAND
-  // start client FIFO
-  long pid = getpid();
-  char client_fifo_path[BUFFER_SIZE];
-  sprintf(client_fifo_path, CLIENT_FIFO_TEMPLATE, pid);
-  std::remove(client_fifo_path);
-  mkfifo(client_fifo_path, 0666);
+  extern bool _reuseRegistrationStateOnRestart;
+  const bool survivor_restart = _reuseRegistrationStateOnRestart;
 
-  int& cpv_my_device = CpvAccess(my_device);
-  CkPrintf("Device = %i\n", cpv_my_device);
-  hapiCheck(cudaSetDevice(cpv_my_device));
+  if (!survivor_restart) {
+    // start client FIFO
+    long pid = getpid();
+    char client_fifo_path[BUFFER_SIZE];
+    sprintf(client_fifo_path, CLIENT_FIFO_TEMPLATE, pid);
+    std::remove(client_fifo_path);
+    mkfifo(client_fifo_path, 0666);
 
-  if (CmiPhysicalRank(CmiMyPe()) != firstRankForDevice)
-  {
-    CmiBarrier();
-    return;
-  }
+    int& cpv_my_device = CpvAccess(my_device);
+    CkPrintf("Device = %i\n", cpv_my_device);
+    hapiCheck(cudaSetDevice(cpv_my_device));
 
-  char server_fifo_path[BUFFER_SIZE];
-  sprintf(server_fifo_path, SERVER_FIFO_TEMPLATE, cpv_my_device);
+    if (CmiPhysicalRank(CmiMyPe()) == firstRankForDevice)
+    {
+      char server_fifo_path[BUFFER_SIZE];
+      sprintf(server_fifo_path, SERVER_FIFO_TEMPLATE, cpv_my_device);
 
-  // Create a ready signal FIFO for synchronization
-  if (!CmiGetArgFlagDesc(argv,"+shrinkexpand","Restarting of already running prcoess")) {
-    char ready_fifo_path[BUFFER_SIZE];
-    sprintf(ready_fifo_path, "/tmp/daemon_ready_%d", cpv_my_device);
+      // Create a ready signal FIFO for synchronization
+      if (!CmiGetArgFlagDesc(argv,"+shrinkexpand","Restarting of already running prcoess")) {
+        char ready_fifo_path[BUFFER_SIZE];
+        sprintf(ready_fifo_path, "/tmp/daemon_ready_%d", cpv_my_device);
 
-    CmiPrintf("Parent: Waiting for daemon to be ready...\n");
-    
-    int ready_fd = open(ready_fifo_path, O_RDONLY);
-    if (ready_fd == -1) {
-      perror("Parent: open ready FIFO");
-      CmiAbort("Failed to open ready FIFO");
+        CmiPrintf("Parent: Waiting for daemon to be ready...\n");
+
+        int ready_fd = open(ready_fifo_path, O_RDONLY);
+        if (ready_fd == -1) {
+          perror("Parent: open ready FIFO");
+          CmiAbort("Failed to open ready FIFO");
+        }
+
+        char ready_signal;
+        read(ready_fd, &ready_signal, 1);
+        close(ready_fd);
+        unlink(ready_fifo_path);  // Clean up
+
+        CmiPrintf("Parent: Daemon is ready!\n");
+      }
     }
-  
-    char ready_signal;
-    read(ready_fd, &ready_signal, 1);
-    close(ready_fd);
-    unlink(ready_fifo_path);  // Clean up
-    
-    CmiPrintf("Parent: Daemon is ready!\n");
   }
-  
+  // Survivor restart: client FIFO already exists, daemon already running and
+  // signaled ready, device already bound. Skip all of the above but still
+  // hit the trailing barrier so newcomer processes (which run the full path)
+  // don't deadlock here.
   CmiBarrier();
   return;
 #endif
@@ -865,6 +891,18 @@ void hapiWorkRequestSetCallback(hapiWorkRequest* wr, void* cb) {
 
 static void shmInit() {
   if (!CsvAccess(gpu_manager).use_shm) return;
+
+#if CMK_SHRINK_EXPAND
+  {
+    extern bool _reuseRegistrationStateOnRestart;
+    if (_reuseRegistrationStateOnRestart) {
+      // Re-establishing CUDA IPC handles between survivors and a joining
+      // newcomer process is not implemented for the no-restart shrink/expand
+      // path. Bail loudly rather than hang in shmCreate / ipcHandleOpen.
+      CmiAbort("[HAPI] +gpushm is not supported with no-restart shrink/expand");
+    }
+  }
+#endif
 
   if (CmiMyRank() == 0) {
     shmSetup();

@@ -1727,12 +1727,9 @@ void _initCharm(int unused_argc, char **argv)
           extern double rescale_wall_now();
           if (CmiMyPe() == 0) rescale_t_pr_topo_done = rescale_wall_now();
         }
-        // All survivor-restart short-circuits (CmiTimerInit, CmiIsomallocInit,
-        // CmiInitCPUAffinity, CmiInitMemAffinity, CmiInitCPUTopology, register
-        // pass) consult _reuseRegistrationStateOnRestart. Now that they're
-        // past, clear it so a future *non-rescale* exit/restart path doesn't
-        // see a stale flag.
-        _reuseRegistrationStateOnRestart = false;
+        // hapiInit (called below) is also a consumer of
+        // _reuseRegistrationStateOnRestart, so we defer the reset until after
+        // it has run.
 #endif
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
         if (CmiCpuTopologyEnabled()) {
@@ -1784,6 +1781,15 @@ void _initCharm(int unused_argc, char **argv)
   hapiInvokeCallback = CUDACallbackManager;
   hapiQdCreate = QdCreate;
   hapiQdProcess = QdProcess;
+#endif
+
+#if CMK_SHRINK_EXPAND
+  // All survivor-restart short-circuits (CmiTimerInit, CmiIsomallocInit,
+  // CmiInitCPUAffinity, CmiInitMemAffinity, CmiInitCPUTopology, register
+  // pass, hapiInit) have consulted _reuseRegistrationStateOnRestart by now;
+  // clear it so a future *non-rescale* exit/restart path doesn't see a stale
+  // flag.
+  _reuseRegistrationStateOnRestart = false;
 #endif
 
 #if CMK_USE_SHMEM
