@@ -677,7 +677,7 @@ static void hapiMapping(char** argv) {
 
   if (csv_gpu_manager.use_shm) {
     // Process device communication buffer parameters (in MB)
-    int input_comm_buffer_size;
+    int input_comm_buffer_size = 0;
     if (CmiGetArgIntDesc(argv, "+gpucommbuffer", &input_comm_buffer_size,
           "GPU communication buffer size (in MB)")) {
       if (CmiMyRank() == 0) {
@@ -688,10 +688,26 @@ static void hapiMapping(char** argv) {
       }
     }
 
+    // Process device communication buffer parameters (in MB)
+    int input_lb_buffer_size = 0;
+    if (CmiGetArgIntDesc(argv, "+gpulbbuffer", &input_lb_buffer_size,
+          "GPU load balancing buffer size (in MB)")) {
+      if (CmiMyRank() == 0) {
+        // Round up size to the closest power of 2
+        size_t lb_buffer_size = (size_t)input_lb_buffer_size * 1024 * 1024;
+        int size_log2 = std::ceil(std::log2((double)lb_buffer_size));
+        csv_gpu_manager.lb_buffer_size = (size_t)std::pow(2, size_log2);
+      }
+    }
+
     if (CmiMyPe() == 0) {
       CmiPrintf("HAPI> GPU communication buffer size: %zu MB "
           "(rounded up to the nearest power of two)\n",
           csv_gpu_manager.comm_buffer_size / (1024 * 1024));
+
+      CmiPrintf("HAPI> GPU load balancing buffer size: %zu MB "
+          "(rounded up to the nearest power of two)\n",
+          csv_gpu_manager.lb_buffer_size / (1024 * 1024));
     }
 
     CmiNodeBarrier(); // Ensure device communication buffer size is set
@@ -703,7 +719,7 @@ static void hapiMapping(char** argv) {
 #if CMK_SMP
       CmiLock(dm->lock);
 #endif
-      dm->create_comm_buffer(csv_gpu_manager.comm_buffer_size);
+      dm->create_comm_buffer(csv_gpu_manager.comm_buffer_size + csv_gpu_manager.lb_buffer_size, csv_gpu_manager.comm_buffer_size);
 #if CMK_SMP
       CmiUnlock(dm->lock);
 #endif
