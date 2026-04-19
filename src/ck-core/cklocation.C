@@ -3066,7 +3066,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
         gpuMsg = dm->alloc_comm_buffer(gpuBufSize, false);
         if (gpuMsg == nullptr) {
           CkAbort("PE %d, device %d: Not enough memory on device Load balance buffer (%zu free)",
-              CkMyPe(), dm->global_index, dm->get_comm_buffer_free_size());
+              CkMyPe(), dm->global_index, dm->get_lb_buffer_free_size());
         }
 #if CMK_SMP
         CmiUnlock(dm->lock);
@@ -3150,7 +3150,7 @@ void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char* &data, CkDeviceBuffer
     data = (char*)(dm->alloc_comm_buffer(size, false));
     if (data == nullptr) {
       CkAbort("PE %d, device %d: Not enough memory on device Load balance buffer (%zu free)",
-          CkMyPe(), dm->global_index, dm->get_comm_buffer_free_size());
+          CkMyPe(), dm->global_index, dm->get_lb_buffer_free_size());
     }
 #if CMK_SMP
     CmiUnlock(dm->lock);

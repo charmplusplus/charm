@@ -84,6 +84,7 @@ namespace buddy {
     // Utility functions
     void print_status();
     size_t get_free_size();
+    size_t get_lb_free_size();
     int get_bucket(size_t size);
     int get_block_index(uint8_t* ptr, size_t size);
 
