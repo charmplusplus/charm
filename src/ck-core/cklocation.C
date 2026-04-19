@@ -23,6 +23,15 @@
 #include <stdarg.h>
 #include <vector>
 
+#if CMK_CUDA || CMK_HIP
+
+#include "hapi.h"
+#include "gpumanager.h"
+
+CsvExtern(GPUManager, gpu_manager);
+
+#endif // CMK_CUDA || CMK_HIP
+
 #if CMK_LBDB_ON
 #  include "LBManager.h"
 #  include "MetaBalancer.h"
@@ -3001,7 +3010,6 @@ void CkLocMgr::sendGPUMsg(CmiUInt8 id)
   thisProxy[gpuData.toPe].immigrateGPU(id, gpuData.size, CkDeviceBuffer(gpuData.data, gpuData.size,
     CkCallbackResumeThread()));
   //CkPrintf("PE %d sent GPU msg of size %zu for id %llu\n", CkMyPe(), gpuData.size, id);
-  cudaFree(gpuData.data);
 }
 #endif
 
@@ -3065,8 +3073,23 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 
   {
 #if CMK_CUDA
-    if (gpuBufSize > 0)
-      cudaMalloc(&gpuMsg, gpuBufSize);
+    if (gpuBufSize > 0) {
+      GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
+      if(csv_gpu_manager.use_shm) {
+        DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
+#if CMK_SMP
+        CmiLock(dm->lock);
+#endif
+        gpuMsg = dm->alloc_comm_buffer(gpuBufSize);
+        if (gpuMsg == nullptr) {
+          CkAbort("PE %d, device %d: Not enough memory on device Load balance buffer (%zu free)",
+              CkMyPe(), dm->global_index, dm->get_comm_buffer_free_size());
+        }
+#if CMK_SMP
+        CmiUnlock(dm->lock);
+#endif
+      }
+    }
 #endif
     PUP::toMem p(msg->packData, gpuMsg, PUP::er::IS_MIGRATION);
     p.becomeDeleting();
@@ -3135,7 +3158,21 @@ void CkLocMgr::metaLBCallLB(CkLocRec* rec)
 void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char* &data, CkDeviceBufferPost* post)
 {
   //CkPrintf("PE %d allocating GPU memory size %d for id %llu\n", CkMyPe(), size, id);
-  cudaMalloc(&data, size);
+  GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
+  if(csv_gpu_manager.use_shm) {
+    DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
+#if CMK_SMP
+    CmiLock(dm->lock);
+#endif
+    data = (char*)(dm->alloc_comm_buffer(size));
+    if (data == nullptr) {
+      CkAbort("PE %d, device %d: Not enough memory on device Load balance buffer (%zu free)",
+          CkMyPe(), dm->global_index, dm->get_comm_buffer_free_size());
+    }
+#if CMK_SMP
+    CmiUnlock(dm->lock);
+#endif
+  }
   cudaDeviceSynchronize();
   receivedDeviceMsgs[id] = data;
   post[0].hapi_stream = (cudaStream_t) 0;
@@ -3201,9 +3238,20 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
   CmiAssert(CpvAccess(newZCPupGets).empty());  // Ensure that vector is empty
   // Create the new elements as we unpack the message
   pupElementsFor(p, rec, CkElementCreation_migrate);
+  cudaDeviceSynchronize();
 
 #if CMK_CUDA
-  cudaFree(gpuMsg);
+  GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
+  if(csv_gpu_manager.use_shm) {
+    DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
+#if CMK_SMP
+    CmiLock(dm->lock);
+#endif
+  dm->free_comm_buffer((size_t)((char*)gpuMsg - (char*)dm->comm_buffer->base_ptr));
+#if CMK_SMP
+    CmiUnlock(dm->lock);
+#endif
+  }
 #endif
 
   bool zcRgetsActive = !CpvAccess(newZCPupGets).empty();
