@@ -54,6 +54,10 @@ struct DeviceManager {
     return comm_buffer->get_free_size();
   }
 
+  size_t get_lb_buffer_free_size() {
+    return comm_buffer->get_lb_free_size();
+  }
+
   void destroy_comm_buffer() {
     if (comm_buffer) {
       delete comm_buffer;

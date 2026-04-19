@@ -43,6 +43,18 @@ namespace buddy {
     return free;
   }
 
+  size_t allocator::get_lb_free_size() {
+    size_t free = 0;
+    lb_free_list* tmp = head->next;
+    while(tmp != tail) {
+      free += tmp->size;
+      tmp = tmp->next;
+    }
+
+    free += lb_size - (size_t)(lb_ptr - lb_base_ptr);
+    return free;
+  }
+
   int allocator::get_bucket(size_t size) {
     return (int)std::ceil(std::log2((double)size)) - 2;
   }
