@@ -475,7 +475,7 @@ void GreedyRefineCentralLB::work(LDStats *stats)
     double load;                        // aggregate load across PEs in this group
     std::vector<int> peIds;             // indices into procs[]
     size_t gpu_mem_remaining;
-    size_t pool_buff_mem_remaing;
+    size_t pool_buff_mem_remaining;
   };
 
   std::vector<GPUGrp> gpuGroups;
@@ -486,7 +486,7 @@ void GreedyRefineCentralLB::work(LDStats *stats)
     if (!p.available) continue;
     uint64_t devId = stats->procs[pe].gpu_device_id;
     size_t gpu_mem_remaining = stats->procs[pe].gpu_mem_remaining;
-    size_t pool_buff_mem_remaing = stats->procs[pe].pool_buff_mem_remaing;
+    size_t pool_buff_mem_remaining = stats->procs[pe].pool_buff_mem_remaining;
     // printf("pe gpu_id %ld\n", devId);
 
     auto it = gpuIdToIdx.find(devId);
@@ -497,7 +497,7 @@ void GreedyRefineCentralLB::work(LDStats *stats)
       g.load = p.bgload;
       g.peIds.push_back(pe);
       g.gpu_mem_remaining = gpu_mem_remaining;
-      g.pool_buff_mem_remaing = pool_buff_mem_remaing;
+      g.pool_buff_mem_remaining = pool_buff_mem_remaining;
       gpuGroups.push_back(std::move(g));
     } else {
       gpuGroups[it->second].load += p.bgload;
@@ -509,8 +509,8 @@ void GreedyRefineCentralLB::work(LDStats *stats)
   // CkPrintf("[%d] GreedyRefineCentralLB: %d GPU group(s), %d available PEs, %d migratable objs\n",
   //          CkMyPe(), nGroups, availablePes, (int)pobjs.size());
   // for (auto &g : gpuGroups)
-  //   CkPrintf("[%d]   GPU %llu: %d PEs, bgload=%.6f, gpu_mem_remaining=%ld, pool_buff_mem_remaing=%ld\n",
-  //            CkMyPe(), g.gpu_id, (int)g.peIds.size(), g.load, g.gpu_mem_remaining, g.pool_buff_mem_remaing);
+  //   CkPrintf("[%d]   GPU %llu: %d PEs, bgload=%.6f, gpu_mem_remaining=%ld, pool_buff_mem_remaining=%ld\n",
+  //            CkMyPe(), g.gpu_id, (int)g.peIds.size(), g.load, g.gpu_mem_remaining, g.pool_buff_mem_remaining);
 
   // --- Greedy preprocessing at GPU-group level to establish target M ---
   // Reset group loads to bg only, then greedily assign objects to get M.
@@ -578,9 +578,11 @@ void GreedyRefineCentralLB::work(LDStats *stats)
 
     // Pool buffer constraint
     if (chosen_gi != src_gi && src_gi >= 0 && obj->gpuPupSize > 0) {
-      if (gpuGroups[src_gi].pool_buff_mem_remaing < obj->gpuPupSize || gpuGroups[chosen_gi].pool_buff_mem_remaing < obj->gpuPupSize) {
+      if (gpuGroups[src_gi].pool_buff_mem_remaining < obj->gpuPupSize || gpuGroups[chosen_gi].pool_buff_mem_remaining < obj->gpuPupSize)
         chosen_gi = src_gi;
-      }
+
+      if((size_t)(0.95 * gpuGroups[chosen_gi].gpu_mem_remaining) <  obj->gpuAllocSize )//95% of the rest of the memory can be filled
+        chosen_gi = src_gi;
     }
 
     GPUGrp &g = gpuGroups[chosen_gi];
@@ -610,8 +612,9 @@ void GreedyRefineCentralLB::work(LDStats *stats)
 
     if (chosen_gi != src_gi && src_gi >= 0 && obj->gpuPupSize > 0)
     {
-      gpuGroups[src_gi].pool_buff_mem_remaing -= obj->gpuPupSize;
-      gpuGroups[chosen_gi].pool_buff_mem_remaing -= obj->gpuPupSize;
+      gpuGroups[src_gi].pool_buff_mem_remaining -= obj->gpuPupSize;
+      gpuGroups[chosen_gi].pool_buff_mem_remaining -= obj->gpuPupSize;
+      gpuGroups[chosen_gi].gpu_mem_remaining-= obj->gpuAllocSize;
     }
 
     // Track max GPU-group load; expand M if exceeded
@@ -631,10 +634,10 @@ void GreedyRefineCentralLB::work(LDStats *stats)
   }
 
   // Print per-GPU-group loads after LB
-  // CkPrintf("[%d] --- Per-GPU-group loads after LB ---\n", CkMyPe());
-  // for (int gi = 0; gi < nGroups; gi++)
-  //   CkPrintf("[%d]   GPU %llu: aggregate load=%.6f\n",
-  //            CkMyPe(), gpuGroups[gi].gpu_id, gpuGroups[gi].load);
+  CkPrintf("[%d] --- Per-GPU-group loads after LB ---\n", CkMyPe());
+  for (int gi = 0; gi < nGroups; gi++)
+    CkPrintf("[%d]   GPU %llu: aggregate load=%.6f\n",
+             CkMyPe(), gpuGroups[gi].gpu_id, gpuGroups[gi].load);
 
 #else
   // ---- Original PE-level greedy refine (non-GPU path) ----

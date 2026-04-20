@@ -155,8 +155,11 @@ void CentralLB::CallLB()
     MigrationDone(0);
     return;
   }
-
+  
 #if CMK_CUDA
+#if CMK_SMP
+  CmiNodeBarrier();  // ensure rank 0 finishes buffer processing before other ranks read the map
+#endif
 if (CmiMyRank() == 0)
 {
   double start = CkWallTimer();
@@ -349,6 +352,15 @@ void CentralLB::BuildStatsMsg()
   size_t freeMem, totalMem;
   cudaMemGetInfo(&freeMem, &totalMem);
   msg->gpu_mem_remaining = freeMem;
+  GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
+  if(csv_gpu_manager.use_shm) {
+    DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
+    msg->pool_buff_mem_remaining = dm->get_lb_buffer_free_size();
+    // printf("PE %d: GPU %ld free mem: %ld, pool buffer free mem: %ld\n", CkMyPe(), msg->gpu_device_id, msg->gpu_mem_remaining, msg->pool_buff_mem_remaining);
+  } else 
+  {
+    msg->pool_buff_mem_remaining = 0;//// should not run
+  }
   // printf("msg->gpu_device_id is %ld\n", msg->gpu_device_id);
 #endif
 
@@ -485,7 +497,7 @@ void CentralLB::depositData(CLBStatsMsg *m)
 #if CMK_CUDA
   procStat.gpu_device_id = m->gpu_device_id;
   procStat.gpu_mem_remaining = m->gpu_mem_remaining;
-  procStat.pool_buff_mem_remaing = m->pool_buff_mem_remaing;
+  procStat.pool_buff_mem_remaining = m->pool_buff_mem_remaining;
 #endif
 
   //procStat.utilization = 1.0;
@@ -565,7 +577,7 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &&msg)
 #if CMK_CUDA
       procStat.gpu_device_id = m->gpu_device_id;
       procStat.gpu_mem_remaining = m->gpu_mem_remaining;
-      procStat.pool_buff_mem_remaing = m->pool_buff_mem_remaing;
+      procStat.pool_buff_mem_remaining = m->pool_buff_mem_remaining;
 #endif
       //procStat.utilization = 1.0;
       procStat.available = true;
@@ -1732,7 +1744,7 @@ void CLBStatsMsg::pup(PUP::er &p) {
 #if CMK_CUDA
   p|gpu_device_id;
   p|gpu_mem_remaining;
-  p|pool_buff_mem_remaing;
+  p|pool_buff_mem_remaining;
 #endif
   p|total_walltime;
   p|idletime;

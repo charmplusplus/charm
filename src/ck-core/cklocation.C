@@ -3002,6 +3002,19 @@ void CkLocMgr::migratableList(CkLocRec* rec, std::vector<CkMigratable*>& list)
   }
 }
 
+bool did_inter_node_gpudirect_rdma(int srcPe, int dstPe) {
+  CmiEnforce((srcPe >= 0) && (srcPe <= CmiNumPes()));
+  CmiEnforce((dstPe >= 0) && (dstPe <= CmiNumPes()));
+
+  if (CmiNodeOf(srcPe) == CmiNodeOf(dstPe)) {
+    return false;
+  } else if (CmiPeOnSamePhysicalNode(srcPe, dstPe)) {
+    return false;
+  } else {
+    return true;
+  }
+}
+
 #if CMK_CUDA
 void CkLocMgr::sendGPUMsg(CmiUInt8 id)
 {
@@ -3009,6 +3022,20 @@ void CkLocMgr::sendGPUMsg(CmiUInt8 id)
   sendGPUBuffers.erase(id);
   thisProxy[gpuData.toPe].immigrateGPU(id, gpuData.size, CkDeviceBuffer(gpuData.data, gpuData.size,
     CkCallbackResumeThread()));
+
+  if(did_inter_node_gpudirect_rdma(CkMyPe(), gpuData.toPe)) {
+    GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
+    if(csv_gpu_manager.use_shm) {
+      DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
+  #if CMK_SMP
+      CmiLock(dm->lock);
+  #endif
+    dm->free_comm_buffer((size_t)((char*)gpuData.data - (char*)dm->comm_buffer->base_ptr));
+  #if CMK_SMP
+      CmiUnlock(dm->lock);
+  #endif
+    }
+  }
   //CkPrintf("PE %d sent GPU msg of size %zu for id %llu\n", CkMyPe(), gpuData.size, id);
 }
 #endif
@@ -3046,7 +3073,6 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   gpuBufSize = 0;
 #if CMK_CUDA
   gpuBufSize = p.gpu_size();
-  printf("sending GPU buf of size %d", gpuBufSize);
 #endif
 
 #if CMK_ERROR_CHECKING

@@ -693,10 +693,7 @@ static void hapiMapping(char** argv) {
     if (CmiGetArgIntDesc(argv, "+gpulbbuffer", &input_lb_buffer_size,
           "GPU load balancing buffer size (in MB)")) {
       if (CmiMyRank() == 0) {
-        // Round up size to the closest power of 2
-        size_t lb_buffer_size = (size_t)input_lb_buffer_size * 1024 * 1024;
-        int size_log2 = std::ceil(std::log2((double)lb_buffer_size));
-        csv_gpu_manager.lb_buffer_size = (size_t)std::pow(2, size_log2);
+        csv_gpu_manager.lb_buffer_size =  (size_t)input_lb_buffer_size * 1024 * 1024;
       }
     }
 
@@ -706,7 +703,7 @@ static void hapiMapping(char** argv) {
           csv_gpu_manager.comm_buffer_size / (1024 * 1024));
 
       CmiPrintf("HAPI> GPU load balancing buffer size: %zu MB "
-          "(rounded up to the nearest power of two)\n",
+          "\n",
           csv_gpu_manager.lb_buffer_size / (1024 * 1024));
     }
 
