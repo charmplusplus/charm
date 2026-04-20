@@ -314,7 +314,6 @@ void CollisionAggregator::compact(void)
 
 /********************* syncReductionMgr ******************/
 syncReductionMgr::syncReductionMgr()
-  :thisproxy(thisgroup)
 {
   stepCount=-1;
   stepFinished=true;
@@ -339,10 +338,12 @@ void syncReductionMgr::startStep(int stepNo,bool withProd)
   stepFinished=false;
   localFinished=false;
   childrenCount=0;
-  if (nChildren>0)
+  if (nChildren>0) {
+    CProxy_syncReductionMgr proxy(ckGetGroupID());
     for (int i=0;i<TREE_WID;i++)
       if (treeChildStart+i<CkNumPes())
-        thisproxy[treeChildStart+i].childProd(stepCount);
+        proxy[treeChildStart+i].childProd(stepCount);
+  }
   if (withProd)
     pleaseAdvance();//Advise subclass to advance
 }
@@ -373,7 +374,7 @@ void syncReductionMgr::tryFinish(void) //Try to finish reduction
   {
     stepFinished=true;
     if (treeParent!=-1)
-      thisproxy[treeParent].childDone(stepCount);
+      CProxy_syncReductionMgr(ckGetGroupID())[treeParent].childDone(stepCount);
     else
       reductionFinished();
   }
@@ -437,7 +438,7 @@ static const char * voxName(const CkIndex3D &idx,char *buf) {
 collideMgr::collideMgr(const CollideGrid3d &gridMap_,
     const CProxy_collideClient &client_,
     const CProxy_collideVoxel &voxels)
-  :thisproxy(thisgroup), voxelProxy(voxels),
+  :voxelProxy(voxels),
   gridMap(gridMap_), client(client_), aggregator(gridMap,this)
 {
   steps=0;

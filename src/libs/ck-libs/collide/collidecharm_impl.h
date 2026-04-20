@@ -96,7 +96,6 @@ class CollisionAggregator {
   */
 class syncReductionMgr : public CBase_syncReductionMgr
 {
-  CProxy_syncReductionMgr thisproxy;
   void status(const char *msg) {
     CkPrintf("SRMgr pe %d> %s\n",CkMyPe(),msg);
   }
@@ -176,6 +175,11 @@ class collideMgr : public CBase_collideMgr
   collideMgr(CkMigrateMessage* m);
 
   void pup(PUP::er &p) {
+    // thisgroup is a protected member of IrrGroup.  It is not saved/restored
+    // by the migrate constructor, so we do it here.  syncReductionMgr uses
+    // CProxy_syncReductionMgr(ckGetGroupID()) at call time, which requires
+    // thisgroup to be valid when startStep()/tryFinish() are invoked.
+    p | thisgroup;
     p | thisproxy;
     //p | steps;
     p | voxelProxy;
@@ -246,6 +250,10 @@ class serialCollideClient : public collideClient {
   serialCollideClient(CkCallback clientCb_);
   serialCollideClient(CkMigrateMessage *m);
   void pup(PUP::er &p) {
+    // thisgroup must be saved: collisions() uses it to construct the
+    // reduction callback CkCallback(..., thisgroup).  Without this, thisgroup
+    // is 0 after restart and the callback targets a non-existent group.
+    p | thisgroup;
     p | useCb;
   }
 
