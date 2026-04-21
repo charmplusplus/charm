@@ -39,6 +39,7 @@
 #define hapiStreamSynchronize(stream) cudaStreamSynchronize(stream)
 #define hapiDeviceSynchronize cudaDeviceSynchronize
 #define hapiEventElapsedTime(a, b, c) cudaEventElapsedTime(a, b, c)
+#define hapiMemGetInfo(a, b) cudaMemGetInfo(a, b)
 #define hapiStreamCreate(stream) cudaStreamCreate(stream)
 #define hapiStreamDestroy cudaStreamDestroy
 #define hapiStreamDefault cudaStreamDefault
@@ -126,6 +127,7 @@
 #define hapiStreamSynchronize(stream) hipStreamSynchronize(stream)
 #define hapiDeviceSynchronize hipDeviceSynchronize
 #define hapiEventElapsedTime(a, b, c) hipEventElapsedTime(a, b, c)
+#define hapiMemGetInfo(a, b) hipMemGetInfo(a, b)
 #define hapiLaunchHostFunc(stream, func, args) \
     hipLaunchHostFunc(stream, func, args)
 
