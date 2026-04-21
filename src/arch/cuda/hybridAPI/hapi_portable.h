@@ -37,6 +37,7 @@
     cudaStreamWaitEvent(stream, event, flags)
 
 #define hapiStreamSynchronize(stream) cudaStreamSynchronize(stream)
+#define hapiDeviceSynchronize cudaDeviceSynchronize
 #define hapiStreamCreate(stream) cudaStreamCreate(stream)
 #define hapiStreamDestroy cudaStreamDestroy
 #define hapiStreamDefault cudaStreamDefault
@@ -122,7 +123,7 @@
     hipStreamWaitEvent(stream, event, flags)
 
 #define hapiStreamSynchronize(stream) hipStreamSynchronize(stream)
-
+#define hapiDeviceSynchronize hipDeviceSynchronize
 #define hapiLaunchHostFunc(stream, func, args) \
     hipLaunchHostFunc(stream, func, args)
 
