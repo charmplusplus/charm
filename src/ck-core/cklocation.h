@@ -711,7 +711,7 @@ public:
 
   // Communication:
   void immigrate(CkArrayElementMigrateMessage* msg);
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
   void sendGPUMsg(CmiUInt8 id);
   void immigrateGPU(CmiUInt8& id, int& size, char* &data, CkDeviceBufferPost* post);
   void immigrateGPU(CmiUInt8 id, int size, char* data);

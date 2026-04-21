@@ -8,6 +8,7 @@
 #ifdef CMK_CUDA
 
 #include <cuda_runtime.h>
+#include <cuda.h>
 
 #define hapiStream_t cudaStream_t
 
@@ -97,6 +98,7 @@
 #ifdef CMK_HIP
 
 #include <hip/hip_runtime.h>
+#include <hip/hip.h>
 
 #define hapiStream_t hipStream_t
 

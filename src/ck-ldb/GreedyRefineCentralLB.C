@@ -28,7 +28,7 @@
 #include <limits.h>
 #include <algorithm>
 #include <math.h>
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
 CkpvExtern(int, _lb_obj_index);
 #include <unordered_map>
 #endif
@@ -277,14 +277,14 @@ double GreedyRefineCentralLB::fillData(LDStats *stats,
     p.speed = stats->procs[pe].pe_speed;
     if (p.available) {
       availablePes++;
-      #ifndef CMK_CUDA
+      #if !(CMK_CUDA || CMK_HIP)
         p.bgload = stats->procs[pe].bg_walltime;
         if (p.bgload > maxBGLoad) maxBGLoad = p.bgload;
       #else
         p.bgload = 0.0;
       #endif
 
-      #ifdef CMK_CUDA
+      #if (CMK_CUDA || CMK_HIP)
         p.bg_walltime = stats->procs[pe].bg_walltime;
         // CmiPrintf("[%d] settign bg_walltime to %f\n", pe, p.bg_walltime);
       #endif
@@ -314,7 +314,7 @@ double GreedyRefineCentralLB::fillData(LDStats *stats,
       GreedyRefineCentralLB::GProc &p = procs[pe];
       if (!p.available)
         CkAbort("GreedyRefineCentralLB: nonmigratable object on unavailable processor\n");
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
       double nmObjLoad = oData.gpuTime;
 #else
       double nmObjLoad = oData.wallTime;
@@ -324,7 +324,7 @@ double GreedyRefineCentralLB::fillData(LDStats *stats,
       CkPrintf("[%d] Obj %d on PE %d is non-migratable, load=%.6f\n", CkMyPe(), i, pe, nmObjLoad);
       if (p.bgload > maxBGLoad) maxBGLoad = p.bgload;
     } else {
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
       obj.load = oData.gpuTime * stats->procs[pe].pe_speed;
 #else
       obj.load = oData.wallTime * stats->procs[pe].pe_speed;
@@ -335,7 +335,7 @@ double GreedyRefineCentralLB::fillData(LDStats *stats,
       if (_lb_args.debug() > 1) {
         if (obj.load < minOload) minOload = obj.load;
         if (obj.load > maxOload) maxOload = obj.load;
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
         // CkPrintf("[%d] Obj %d (PE %d): wallTime=%.6f gpuTime=%.6f effectiveLoad=%.6f\n",
         //          CkMyPe(), i, pe, oData.wallTime, oData.gpuTime, obj.load);
 #endif
@@ -461,7 +461,7 @@ void GreedyRefineCentralLB::work(LDStats *stats)
   int nmoves = 0;
   double greedyMaxLoad = 0;
 
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
   // ---- GPU-aware path: balance at GPU-group level ----
   //
   // Group PEs by gpu_device_id.  M tracks the max *GPU-group* aggregate load.

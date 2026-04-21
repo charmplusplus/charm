@@ -63,7 +63,7 @@ public:
   }
 
   inline void getGPUTime(LBRealType *w) {
-  #if CMK_CUDA
+  #if CMK_CUDA || CMK_HIP
     *w = data.gpuTime;
   #else
     CmiAbort("LBObj::getGPUTime called but CMK_CUDA is not set");
@@ -80,7 +80,7 @@ public:
 
   inline void setGPUTiming(LBRealType gputime)
   {
-  #if CMK_CUDA
+  #if CMK_CUDA || CMK_HIP
     data.gpuTime = gputime;
   #else
     CmiAbort("LBObj::setGPUTiming called but CMK_CUDA is not set");

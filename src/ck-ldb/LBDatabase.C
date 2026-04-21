@@ -263,7 +263,7 @@ void LBDatabase::ClearLoads(void)
         obj->lastCpuTime = obj->data.cpuTime;
 #endif
       }
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
       obj->data.gpuTime = 0.0;
 #endif
       obj->data.wallTime = 0.0;
@@ -342,7 +342,7 @@ void LBDatabase::EstObjLoad(const LDObjHandle &_h, double cputime)
 
 void LBDatabase::EstObjGPULoad(const LDObjHandle &_h, double gputime)
 {
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
 #if CMK_LBDB_ON
   LBObj *const obj = LbObj(_h);
 

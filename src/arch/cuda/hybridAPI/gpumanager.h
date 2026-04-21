@@ -11,7 +11,6 @@
 #include "hapi_impl.h"
 #include "devicemanager.h"
 
-#include <cupti.h>
 #include <unordered_map>
 #include <queue>
 

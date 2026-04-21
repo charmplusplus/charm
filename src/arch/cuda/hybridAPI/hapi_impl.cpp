@@ -11,13 +11,11 @@
 #include <fcntl.h>
 #include <sched.h>
 
-#define CUDA_API_PER_THREAD_DEFAULT_STREAM
-#include <cuda_runtime.h>
-#include <cuda.h>
+#define hapi_API_PER_THREAD_DEFAULT_STREAM
 
 #include "hapi_portable.h"
 #include "converse.h"
-#include "conv-mach-opt.h" /* for CMK_CUDA */
+#include "conv-mach-opt.h" /* for CMK_hapi */
 #include "ckrescale.h"
 #include "charm++.h"
 
@@ -29,9 +27,12 @@
 #endif
 
 #if CMK_LBDB_ON
+#if CMK_CUDA
 #include <cupti.h>
+#endif
 #include "LBManager.h"
 
+#if CMK_CUDA
 #define CUPTI_SAFE_CALL(call)                                              \
   do {                                                                     \
     CUptiResult _status = call;                                            \
@@ -41,6 +42,7 @@
       CmiPrintf("HAPI CUPTI error: %s at %s:%d\n", errstr, __FILE__, __LINE__); \
     }                                                          \
   } while (0)
+#endif
 #endif
 
 #define SERVER_FIFO_TEMPLATE "/tmp/server_pipe_%ld"
@@ -129,7 +131,7 @@ static void hapiExitCsv();
 static void hapiMapping(char** argv);
 static void hapiRegisterCallbacks();
 
-// CUDA IPC related functions
+// hapi IPC related functions
 static void shmInit();
 static void shmSetup();
 static void shmCreate();
@@ -157,8 +159,9 @@ static void CUPTIAPI cuptiBufferCompleted(CUcontext ctx, uint32_t streamId,
 
 // Initialize CUPTI activity tracing — called once per process
 void hapiCuptiInit() {
+#if CMK_CUDA
   CmiPrintf("HAPI: Initializing CUPTI...\n");
-  cudaDeviceSynchronize(); 
+  hapiDeviceSynchronize(); 
   GPUManager& gm = CsvAccess(gpu_manager);
   if (gm.cupti_initialized_) return;
 
@@ -168,16 +171,18 @@ void hapiCuptiInit() {
   CUPTI_SAFE_CALL(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_EXTERNAL_CORRELATION));
 
   gm.cupti_initialized_ = true;
+#endif
 }
 
 void hapiCuptiFinalize() {
   CmiPrintf("HAPI: Finalizing CUPTI...\n");
-  cudaDeviceSynchronize(); // Ensure all activity records are flushed
+  hapiDeviceSynchronize(); // Ensure all activity records are flushed
   GPUManager& gm = CsvAccess(gpu_manager);
   if(gm.cupti_initialized_== false) return;
   gm.cupti_initialized_ = false;
-
+#if CMK_CUDA
   CUPTI_SAFE_CALL(cuptiFinalize());
+#endif
 }
 #endif
 
@@ -203,7 +208,7 @@ void hapiInit(char** argv) {
     hapiStartMemoryDaemon(argv);
 #else
     int& cpv_my_device = CpvAccess(my_device);
-    hapiCheck(cudaSetDevice(cpv_my_device));
+    hapiCheck(hapiSetDevice(cpv_my_device));
 #endif
 
 #ifndef HAPI_CUDA_CALLBACK
@@ -237,7 +242,7 @@ void hapiStartMemoryDaemon(char** argv)
 
   int& cpv_my_device = CpvAccess(my_device);
   CkPrintf("Device = %i\n", cpv_my_device);
-  hapiCheck(cudaSetDevice(cpv_my_device));
+  hapiCheck(hapiSetDevice(cpv_my_device));
 
   if (CmiPhysicalRank(CmiMyPe()) != firstRankForDevice)
   {
@@ -280,13 +285,13 @@ int hapiCheckpoint(void* devPtr, int size) {
   char client_fifo_path[BUFFER_SIZE];
   sprintf(client_fifo_path, CLIENT_FIFO_TEMPLATE, pid);
 
-  cudaIpcMemHandle_t ipc_handle;
-  hapiCheck(cudaIpcGetMemHandle(&ipc_handle, devPtr));
+  hapiIpcMemHandle_t ipc_handle;
+  hapiCheck(hapiIpcGetMemHandle(&ipc_handle, devPtr));
 
   char msg_buf[BUFFER_SIZE];
   int offset = sprintf(msg_buf, "CKPT:%ld:%d:%d:", pid, CkMyPe(), size);
-  memcpy(msg_buf + offset, &ipc_handle, sizeof(cudaIpcMemHandle_t));
-  int total_size = offset + sizeof(cudaIpcMemHandle_t);
+  memcpy(msg_buf + offset, &ipc_handle, sizeof(hapiIpcMemHandle_t));
+  int total_size = offset + sizeof(hapiIpcMemHandle_t);
 
   hapiSendMemoryRequest(msg_buf, total_size);
 
@@ -310,14 +315,14 @@ void hapiRestore(void* devPtr, int size, int alloc_id) {
   hapiSendMemoryRequest(msg_buf, strlen(msg_buf) + 1);
 
   int client_fd = open(client_fifo_path, O_RDONLY);
-  cudaIpcMemHandle_t ipc_handle;
-  read(client_fd, &ipc_handle, sizeof(cudaIpcMemHandle_t));
+  hapiIpcMemHandle_t ipc_handle;
+  read(client_fd, &ipc_handle, sizeof(hapiIpcMemHandle_t));
   close(client_fd);
 
   void* srcPtr;
-  hapiCheck(cudaIpcOpenMemHandle(&srcPtr, ipc_handle, cudaIpcMemLazyEnablePeerAccess));
-  hapiCheck(cudaMemcpy(devPtr, srcPtr, size, cudaMemcpyDeviceToDevice));
-  hapiCheck(cudaIpcCloseMemHandle(srcPtr));
+  hapiCheck(hapiIpcOpenMemHandle(&srcPtr, ipc_handle, hapiIpcMemLazyEnablePeerAccess));
+  hapiCheck(hapiMemcpy(devPtr, srcPtr, size, hapiMemcpyDeviceToDevice));
+  hapiCheck(hapiIpcCloseMemHandle(srcPtr));
 
   char free_msg[BUFFER_SIZE];
   sprintf(free_msg, "FREE:%ld:%d", pid, alloc_id);
@@ -401,6 +406,7 @@ void hapiProcessCuptiBuffers() {
     // Parse records in this buffer
     CUpti_Activity *record = NULL;
     // ckout<<"valid size for the CUPTI buffer: "<<item.validSize<<" bytes"<<endl;
+#if CMK_CUDA
     while (cuptiActivityGetNextRecord(item.buffer, item.validSize, &record) == CUPTI_SUCCESS) {
       ++record_count;
       if (record->kind == CUPTI_ACTIVITY_KIND_EXTERNAL_CORRELATION) {
@@ -438,7 +444,7 @@ void hapiProcessCuptiBuffers() {
         }
       }
     }
-
+#endif
     
     // ckout<<"number of CUPTI records in this buffer: "<<record_count<<endl;
     
@@ -722,7 +728,7 @@ static void hapiMapping(char** argv) {
 #endif
     }
 
-    // Process custom size for CUDA IPC event pool
+    // Process custom size for hapi IPC event pool
     int input_hapi_ipc_event_pool_size;
     if (!CmiGetArgIntDesc(argv, "+gpuipceventpool", &input_hapi_ipc_event_pool_size,
           "GPU IPC event pool size per PE")) {
@@ -735,7 +741,7 @@ static void hapiMapping(char** argv) {
     }
 
     if (CmiMyPe() == 0) {
-      CmiPrintf("HAPI> CUDA IPC event pool size - %d per PE, %d per device\n",
+      CmiPrintf("HAPI> hapi IPC event pool size - %d per PE, %d per device\n",
           csv_gpu_manager.hapi_ipc_event_pool_size_pe, csv_gpu_manager.hapi_ipc_event_pool_size_total);
     }
   }
@@ -774,10 +780,10 @@ static void hapiMapping(char** argv) {
 }
 
 #ifndef HAPI_CUDA_CALLBACK
-void recordEvent(cudaStream_t stream, const CkCallback& cb, void* cb_msg, hapiWorkRequest* wr = NULL, CkMigratable* obj = NULL, cudaEvent_t start_ev = NULL) {
+void recordEvent(hapiStream_t stream, const CkCallback& cb, void* cb_msg, hapiWorkRequest* wr = NULL, CkMigratable* obj = NULL, hapiEvent_t start_ev = NULL) {
   // if(obj!=NULL)
-  //   CmiAbort("non null without HAPI CUDA CALLBACK");
-  // create CUDA event / get CUDA event from the pool and insert into stream
+  //   CmiAbort("non null without HAPI hapi CALLBACK");
+  // create hapi event / get hapi event from the pool and insert into stream
   hapiEvent_t ev;
   auto& hapi_event_pool_local = CpvAccess(hapi_event_pool);
   if(hapi_event_pool_local.size() == 0) {
@@ -907,15 +913,15 @@ static void hapiRegisterCallbacks() {
 }
 
 #ifdef HAPI_CUDA_CALLBACK
-// Callback function invoked by the CUDA runtime certain parts of GPU work are
+// Callback function invoked by the hapi runtime certain parts of GPU work are
 // complete. It sends a converse message to the original PE to free the relevant
 // device memory and invoke the user's callback. The reason for this method is
-// that a thread created by the CUDA runtime does not have access to any of the
+// that a thread created by the hapi runtime does not have access to any of the
 // CpvDeclare'd variables as it is not one of the threads created by the Charm++
 // runtime.
-static void CUDACallback(void *data) {
+static void hapiCallback(void *data) {
 #ifdef HAPI_NVTX_PROFILE
-  NVTXTracer nvtx_range("CUDACallback", NVTXColor::Silver);
+  NVTXTracer nvtx_range("hapiCallback", NVTXColor::Silver);
 #endif
 
   // send message to the original PE
@@ -933,7 +939,7 @@ enum CallbackStage {
 static void addCallback(hapiWorkRequest *wr, CallbackStage stage) {
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
 
-  // create converse message to be delivered to this PE after CUDA callback
+  // create converse message to be delivered to this PE after hapi callback
   char *conv_msg = (char *)CmiAlloc(CmiMsgHeaderSizeBytes + sizeof(int) +
                                   sizeof(hapiWorkRequest *)); // FIXME memory leak?
   *((int *)(conv_msg + CmiMsgHeaderSizeBytes)) = CmiMyRank();
@@ -956,8 +962,8 @@ static void addCallback(hapiWorkRequest *wr, CallbackStage stage) {
   }
   CmiSetHandler(conv_msg, handlerIdx);
 
-  // add callback into CUDA stream
-  hapiCheck(hapiLaunchHostFunc(wr->stream, CUDACallback, (void*)conv_msg));
+  // add callback into hapi stream
+  hapiCheck(hapiLaunchHostFunc(wr->stream, hapiCallback, (void*)conv_msg));
 }
 #endif // HAPI_CUDA_CALLBACK
 
@@ -1049,7 +1055,7 @@ hapiWorkRequest::hapiWorkRequest() :
   chare_index = -1;
 #endif
 
-  // Use CUDA per-thread default stream
+  // Use hapi per-thread default stream
   stream = hapiStreamPerThread;
 
   // Charm++ callbacks are not set by default
@@ -1084,15 +1090,15 @@ static void shmInit() {
 
   if (!CmiInCommThread()) CmiNodeBarrier(); // Ensure shared memory has been mapped into the logical node
 
-  if (!CmiInCommThread()) ipcHandleCreate(); // Create CUDA IPC handles
+  if (!CmiInCommThread()) ipcHandleCreate(); // Create hapi IPC handles
 
-  // Ensure CUDA IPC handles are available for all processes
+  // Ensure hapi IPC handles are available for all processes
   // Note: Causes a hang when this barrier is placed after CPU topology initialization
   // FIXME: This only needs to be a host-wide synchronization
   CmiBarrier();
 
   if (CmiMyRank() == 0) {
-    if (!CmiInCommThread()) ipcHandleOpen(); // Open CUDA IPC handles for accessing other processes' device memory
+    if (!CmiInCommThread()) ipcHandleOpen(); // Open hapi IPC handles for accessing other processes' device memory
   }
 }
 
@@ -1226,7 +1232,7 @@ static void shmCleanup() {
   }
 }
 
-// Create CUDA IPC handles and populate shared memory region
+// Create hapi IPC handles and populate shared memory region
 // Invoked by all PEs
 static void ipcHandleCreate() {
   // Only device reps should continue to perform the following operations
@@ -1236,7 +1242,7 @@ static void ipcHandleCreate() {
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
   int& cpv_my_device_id = CpvAccess(my_device_id);
 
-  // Create CUDA IPC memory handle in shared memory
+  // Create hapi IPC memory handle in shared memory
   auto it = csv_gpu_manager.device_map.find(CmiMyPe());
   if (it == csv_gpu_manager.device_map.end()) {
     CmiAbort("PE not found in device_map during ipcHandleCreate");
@@ -1253,7 +1259,7 @@ static void ipcHandleCreate() {
   void* device_ptr = comm_buffer->base_ptr;
   hapiCheck(hapiIpcGetMemHandle(shm_mem_handle, device_ptr));
 
-  // Create CUDA IPC events and store them locally (in hapi_ipc_device_info),
+  // Create hapi IPC events and store them locally (in hapi_ipc_device_info),
   // and create corresponding IPC handles in shared memory
   hapi_ipc_device_info& my_device_info = csv_gpu_manager.hapi_ipc_device_infos[csv_gpu_manager.device_count * CmiMyNodeRankLocal() + cpv_my_device_id];
   hapi_ipc_event_shared* shm_event_shared = (hapi_ipc_event_shared*)((char*)shm_mem_handle + sizeof(hapiIpcMemHandle_t));
@@ -1279,7 +1285,7 @@ static void ipcHandleCreate() {
   my_device_info.buffer = device_ptr;
 }
 
-// Open CUDA IPC handles created by other processes
+// Open hapi IPC handles created by other processes
 // Invoked by PE rank 0 of each process
 static void ipcHandleOpen() {
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
@@ -1752,13 +1758,13 @@ void hapiPollEvents(void* param) {
 
 #if CMK_LBDB_ON
       if (hev.obj) {
-        // CmiPrintf("should not be printed w/o hapi cuda callback \n");
+        // CmiPrintf("should not be printed w/o hapi hapi callback \n");
         float gpu_time;
-        cudaEventElapsedTime(&gpu_time, hev.start_ev, hev.event);
-        // cudaEventElapsedTime returns ms, convert to seconds to match wallTime units
+        hapiEventElapsedTime(&gpu_time, hev.start_ev, hev.event);
+        // hapiEventElapsedTime returns ms, convert to seconds to match wallTime units
         double gpu_time_s = gpu_time / 1000.0;
         hev.obj->setObjGPUTime(gpu_time_s + hev.obj->getObjGPUTime());
-        cudaEventDestroy(hev.start_ev);
+        hapiEventDestroy(hev.start_ev);
       } else 
 #endif        
       // invoke Charm++ callback if one was given
@@ -1816,15 +1822,15 @@ hapiStream_t hapiGetStream() {
 }
 #if CMK_LBDB_ON
 // Lightweight HAPI, to be invoked after data transfer or kernel execution.
-void hapiRecordTime(cudaStream_t stream, cudaEvent_t start) {
+void hapiRecordTime(hapiStream_t stream, hapiEvent_t start) {
   Chare* obj = CkActiveObj();
   if (obj && dynamic_cast<CkMigratable*>(obj)) {
 
   #ifndef HAPI_CUDA_CALLBACK
-  // record CUDA event
+  // record hapi event
     recordEvent(stream, CkCallback(), NULL, NULL, dynamic_cast<CkMigratable*>(obj), start);
 #else
-  #error hapi record time with hapi_cuda_callback not supported
+  #error hapi record time with HAPI_CUDA_CALLBACK not supported
 #endif
 
     // while there is an ongoing workrequest, quiescence should not be detected
@@ -1851,9 +1857,10 @@ uint64_t hapiCuptiPushObjCorrelation() {
   // Use the raw element ID as the external correlation ID
   // CmiUInt8 is a 64-bit unique object identifier
   uint64_t obj_id = (uint64_t)mig->ckGetID();
-
+#if CMK_CUDA
   CUPTI_SAFE_CALL(cuptiActivityPushExternalCorrelationId(
       CUPTI_EXTERNAL_CORRELATION_KIND_UNKNOWN, obj_id));
+#endif
   // printf("pushed corr id\n");
 
   return obj_id;
@@ -1864,14 +1871,16 @@ void hapiCuptiPopObjCorrelation() {
 
   // printf("popped corr id\n");
   uint64_t tag;
+#if CMK_CUDA
   CUPTI_SAFE_CALL(cuptiActivityPopExternalCorrelationId(
       CUPTI_EXTERNAL_CORRELATION_KIND_UNKNOWN, &tag));
+#endif
 }
 
 // Lightweight HAPI, to be invoked after data transfer or kernel execution.
 void hapiAddCallback(hapiStream_t stream, const CkCallback& cb, void* cb_msg) {
 #ifndef HAPI_CUDA_CALLBACK
-  // record CUDA event
+  // record hapi event
   recordEvent(stream, cb, cb_msg);
 #else
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
@@ -1882,15 +1891,15 @@ void hapiAddCallback(hapiStream_t stream, const CkCallback& cb, void* cb_msg) {
 #endif
 */
 
-  // create converse message to be delivered to this PE after CUDA callback
+  // create converse message to be delivered to this PE after hapi callback
   hapiCallbackMessage* conv_msg = (hapiCallbackMessage*)CmiAlloc(sizeof(hapiCallbackMessage)); // FIXME memory leak?
   conv_msg->rank = CmiMyRank();
   conv_msg->cb = cb;
   conv_msg->cb_msg = cb_msg;
   CmiSetHandler(conv_msg, csv_gpu_manager.light_cb_idx_);
 
-  // push into CUDA stream
-  hapiCheck(hapiLaunchHostFunc(stream, CUDACallback, (void*)conv_msg));
+  // push into hapi stream
+  hapiCheck(hapiLaunchHostFunc(stream, hapiCallback, (void*)conv_msg));
 
   /*
 #if CMK_SMP
@@ -1934,31 +1943,31 @@ void hapiSendMemoryRequest(char* msg, int size)
 }
 
 
-// hapiError_t hapiMemcpyAsync(void* dst, const void* src, size_t count, cudaMemcpyKind kind, cudaStream_t stream = 0) {
+// hapiError_t hapiMemcpyAsync(void* dst, const void* src, size_t count, hapiMemcpyKind kind, hapiStream_t stream = 0) {
 //   hapiError_t err;
 // #if CMK_LBDB_ON
 //   hapiEvent_t start;
 
-//   cudaEventCreate(&start);
-//   cudaEventRecord(start, stream);
+//   hapiEventCreate(&start);
+//   hapiEventRecord(start, stream);
 // #endif
 
-//   err = cudaMemcpyAsync(dst, src, count, kind, stream);
+//   err = hapiMemcpyAsync(dst, src, count, kind, stream);
 // #if CMK_LBDB_ON
 //   hapiRecordTime(stream, start);  
 // #endif
 //   return err;
 // }
 
-// cudaError_t hapiMemcpy2DAsync(void* dst, size_t dpitch, const void* src, size_t spitch, size_t width, size_t height, cudaMemcpyKind kind, cudaStream_t stream = 0) {
-//   cudaError_t err;
+// hapiError_t hapiMemcpy2DAsync(void* dst, size_t dpitch, const void* src, size_t spitch, size_t width, size_t height, hapiMemcpyKind kind, hapiStream_t stream = 0) {
+//   hapiError_t err;
 // #if CMK_LBDB_ON
-//   cudaEvent_t start;
+//   hapiEvent_t start;
 
-//   cudaEventCreate(&start);
-//   cudaEventRecord(start, stream);
+//   hapiEventCreate(&start);
+//   hapiEventRecord(start, stream);
 // #endif
-//   err = cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream);
+//   err = hapiMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream);
 // #if CMK_LBDB_ON
 //   hapiRecordTime(stream, start);
 // #endif
@@ -1966,10 +1975,10 @@ void hapiSendMemoryRequest(char* msg, int size)
 // }
 
 
-void hapiErrorDie(cudaError_t retCode, const char* code, const char* file, int line) {
-  if (retCode != cudaSuccess) {
-    fprintf(stderr, "Fatal CUDA Error [%d] %s at %s:%d\n", retCode, cudaGetErrorString(retCode), file, line);
-    CmiAbort("Exit due to CUDA error");
+void hapiErrorDie(hapiError_t retCode, const char* code, const char* file, int line) {
+  if (retCode != hapiSuccess) {
+    fprintf(stderr, "Fatal hapi Error [%d] %s at %s:%d\n", retCode, hapiGetErrorString(retCode), file, line);
+    CmiAbort("Exit due to hapi error");
   }
 }
 

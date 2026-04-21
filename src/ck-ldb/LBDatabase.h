@@ -188,7 +188,7 @@ public:
       obj->IncrementTime(walltime, cputime);
       MeasuredObjTime(walltime, cputime);
 
-      #if CMK_CUDA
+      #if CMK_CUDA || CMK_HIP
       MeasuredObjGPUTime(obj->data.gpuTime);
       #endif
     }

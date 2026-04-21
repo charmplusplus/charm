@@ -8,9 +8,7 @@
 #include <ck.h>
 #include "cksyncbarrier.h"
 
-#if CMK_CUDA
-#include <cuda_runtime.h>
-#endif
+#include "hapi_portable.h"
 
 #include "DistributedLB.h"
 #include "LBManager.h"
@@ -1081,7 +1079,7 @@ int LBManager::ProcessorSpeed()
 
 int LBManager::ProcessorGPUSpeed()
 {
-#if CMK_CUDA
+#if CMK_hapi || CMK_HIP
   static int gpuSpeed = -1; // Cache the result
   
   if (gpuSpeed != -1) {
@@ -1090,24 +1088,24 @@ int LBManager::ProcessorGPUSpeed()
   
   // Check if GPU is available
   int deviceCount = 0;
-  if (cudaGetDeviceCount(&deviceCount) != cudaSuccess || deviceCount == 0) {
+  if (hapiGetDeviceCount(&deviceCount) != hapiSuccess || deviceCount == 0) {
     CmiAbort("LB> PE %d: No GPU available, GPU speed = 0\n", CkMyPe());
   }
   
   // Get device for this PE (round-robin assignment)
   int deviceId = CkMyPe() % deviceCount;
-  if (cudaSetDevice(deviceId) != cudaSuccess) {
+  if (hapiSetDevice(deviceId) != hapiSuccess) {
     CmiAbort("LB> PE %d: Failed to set GPU device %d, GPU speed = 0\n", CkMyPe(), deviceId);
   }
   
   // Get device properties
-  cudaDeviceProp prop;
-  if (cudaGetDeviceProperties(&prop, deviceId) != cudaSuccess) {
+  hapiDeviceProp prop;
+  if (hapiGetDeviceProperties(&prop, deviceId) != hapiSuccess) {
     CmiAbort("LB> PE %d: Failed to get GPU device properties, GPU speed = 0\n", CkMyPe());
   }
 
   int clockRate = 0;
-  if (cudaDeviceGetAttribute(&clockRate, cudaDevAttrClockRate, deviceId) != cudaSuccess) {
+  if (hapiDeviceGetAttribute(&clockRate, hapiDevAttrClockRate, deviceId) != hapiSuccess) {
     CmiAbort("LB> PE %d: Failed to get GPU clock rate, GPU speed = 0\n", CkMyPe());
   }
   

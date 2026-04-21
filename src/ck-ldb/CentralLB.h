@@ -286,7 +286,7 @@ public:
 
   int from_pe;
   int pe_speed;
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
   size_t gpu_mem_remaining;
   size_t pool_buff_mem_remaining;
   uint64_t gpu_device_id;
@@ -307,7 +307,7 @@ public:
 public:
   CLBStatsMsg(int osz, int csz);
   CLBStatsMsg(): from_pe(0), pe_speed(0),
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
 		 gpu_device_id(-1), gpu_mem_remaining(0), pool_buff_mem_remaining(0),
 #endif
 		 total_walltime(0.0), idletime(0.0),

@@ -21,10 +21,7 @@
 #include "cklists.h"
 #include "GreedyCentralLB.h"
 #include "conv-mach-cuda.h"
-
-#ifndef CMK_CUDA
-#warning "CMK_CUDA is not defined"
-#endif
+#include "conv-mach-hip.h"
 
 using namespace std;
 
@@ -59,7 +56,7 @@ class GreedyCentralLB::ObjLoadGreater {
     }
 };
 
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
 // A group of PEs that share the same GPU device.
 // Load balancing reasons at this level: the GPU is the bottleneck,
 // so we distribute objects across GPUs, not across individual PEs.
@@ -94,7 +91,7 @@ void GreedyCentralLB::work(LDStats* stats)
         pe = map[pe];
         if (pe==-1)
           CmiAbort("GreedyCentralLB: nonmigratable object on an unavail processor!\n");
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
         procs[pe].setOverhead(procs[pe].getOverhead() + std::max(oData.wallTime, oData.gpuTime));
 #else
         procs[pe].setOverhead(procs[pe].getOverhead() + oData.wallTime);
@@ -119,7 +116,7 @@ void GreedyCentralLB::work(LDStats* stats)
         CmiAbort("GreedyCentralLB cannot handle nonmigratable object on an unavial processor!\n");
       continue;
     }
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
     // Use whichever is the bottleneck: CPU wall time or GPU kernel time
     double load = std::max(oData.wallTime, oData.gpuTime) * stats->procs[pe].pe_speed;
     CkPrintf("[%d] GreedyCentralLB obj %d (PE %d): gpuTime=%.6f wallTime=%.6f load=%.6f\n",
@@ -138,7 +135,7 @@ void GreedyCentralLB::work(LDStats* stats)
 
   int nmoves = 0;
 
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
   // ---- GPU-aware greedy: balance across GPU groups, not individual PEs ----
 
   // Build GPU groups: map gpu_device_id -> GPUGroup

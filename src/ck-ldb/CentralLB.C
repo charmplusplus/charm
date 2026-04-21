@@ -10,8 +10,10 @@
 #include "envelope.h"
 #include "CentralLB.h"
 #include "LBSimulation.h"
+#if CMK_CUDA || CMK_HIP
 #if CMK_CUDA
 #include <cupti.h>
+#endif
 #include "gpumanager.h"
 // extern void hapiProcessCuptiBuffers();
 // extern void hapiClearCuptiData();
@@ -79,7 +81,7 @@ void CentralLB::initLB(const CkLBOptions &opt)
   if (opt.getSeqNo() > 0 || (_lb_args.metaLbOn() && _lb_args.metaLbModelDir() != nullptr))
     turnOff();
 
-  #if CMK_CUDA
+  #if CMK_CUDA || CMK_HIP
   CkpvAccess(_lb_obj_index) = LBRegisterObjUserData(sizeof(size_t));//gpu allocation size
   #endif
 
@@ -156,15 +158,17 @@ void CentralLB::CallLB()
     return;
   }
   
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
 #if CMK_SMP
   CmiNodeBarrier();  // ensure rank 0 finishes buffer processing before other ranks read the map
 #endif
 if (CmiMyRank() == 0)
 {
+#if CMK_CUDA
   double start = CkWallTimer();
   cuptiActivityFlushAll(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED);//sync flush cupti records which are finished, does not wait for partial records
   hapiProcessCuptiBuffers();
+#endif
 }
 #if CMK_SMP
   CmiNodeBarrier();  // ensure rank 0 finishes buffer processing before other ranks read the map
@@ -346,11 +350,11 @@ void CentralLB::BuildStatsMsg()
   msg->pe_speed = myspeed;
 #endif
 
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
   // printf("CMK_CUDA setting device is %ld\n", hapiMyDevice());
   msg->gpu_device_id = hapiMyDevice();
   size_t freeMem, totalMem;
-  cudaMemGetInfo(&freeMem, &totalMem);
+  hapiMemGetInfo(&freeMem, &totalMem);
   msg->gpu_mem_remaining = freeMem;
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
   if(csv_gpu_manager.use_shm) {
@@ -494,7 +498,7 @@ void CentralLB::depositData(CLBStatsMsg *m)
   procStat.bg_cputime = m->bg_cputime;
 #endif
   procStat.pe_speed = m->pe_speed;
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
   procStat.gpu_device_id = m->gpu_device_id;
   procStat.gpu_mem_remaining = m->gpu_mem_remaining;
   procStat.pool_buff_mem_remaining = m->pool_buff_mem_remaining;
@@ -574,7 +578,7 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &&msg)
       procStat.bg_cputime = m->bg_cputime;
 #endif
       procStat.pe_speed = m->pe_speed;
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
       procStat.gpu_device_id = m->gpu_device_id;
       procStat.gpu_mem_remaining = m->gpu_mem_remaining;
       procStat.pool_buff_mem_remaining = m->pool_buff_mem_remaining;
@@ -1205,7 +1209,7 @@ void CentralLB::MigrationDoneImpl (int balancing)
   migrates_expected = -1;
   // clear load stats
   if (balancing) lbmgr->ClearLoads();
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
   if (CmiMyRank() == 0)
     hapiClearCuptiData();
 #endif
@@ -1741,7 +1745,7 @@ CLBStatsMsg::~CLBStatsMsg() {
 void CLBStatsMsg::pup(PUP::er &p) {
   p|from_pe;
   p|pe_speed;
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
   p|gpu_device_id;
   p|gpu_mem_remaining;
   p|pool_buff_mem_remaining;

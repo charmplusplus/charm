@@ -23,10 +23,10 @@ virtual functions are defined here.
 #include "pup.h"
 #include "ckhashtable.h"
 #include "conv-mach-cuda.h"
+#include "conv-mach-hip.h"
 
-#if CMK_CUDA
-#include <cuda_runtime.h>
-#include <cuda.h>
+#if CMK_CUDA || CMK_HIP
+#include "hapi_portable.h"
 #include "hapi_impl.h"
 #endif
 
@@ -205,8 +205,8 @@ void PUP::toMem::bytes(void *p,size_t n,size_t itemSize,dataType t, PUPMode mode
   {
     //CmiPrintf("[%d] Copying %zu bytes from p=%p to GPU buffer\n", CmiMyPe(), n, p);
     // For GPU mode, we assume p is a device pointer and copy directly
-#if CMK_CUDA
-    cudaMemcpy((void *)gpuBuf, p, n, cudaMemcpyDeviceToDevice);
+#if CMK_CUDA || CMK_HIP
+    hapiMemcpy((void *)gpuBuf, p, n, hapiMemcpyDeviceToDevice);
     gpuBuf += n;
 #endif
   }
@@ -228,8 +228,8 @@ void PUP::fromMem::bytes(void *p,size_t n,size_t itemSize,dataType t, PUPMode mo
   else
   {
     //CmiPrintf("[%d] Copying %zu bytes from GPU buffer to p=%p\n", CmiMyPe(), n, p);
-#if CMK_CUDA
-    cudaMemcpy(p, (const void *)gpuBuf, n, cudaMemcpyDeviceToDevice);
+#if CMK_CUDA || CMK_HIP
+    hapiMemcpy(p, (const void *)gpuBuf, n, hapiMemcpyDeviceToDevice);
     gpuBuf += n;
 #endif
   }
@@ -448,7 +448,7 @@ void PUP::toDisk::bytes(void *p,size_t n,size_t itemSize,dataType t, PUPMode mod
   if (mode == PUPMode::HOST) {
     bytes(p, n, itemSize, t);
   } else if (mode == PUPMode::DEVICE) {
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
     // For GPU mode, we assume p is a device pointer and copy directly
     int allocId = hapiCheckpoint(p, itemSize * n);
     //CmiPrintf("Alloc ID = %d\n", allocId);
@@ -480,7 +480,7 @@ void PUP::fromDisk::bytes(void *p,size_t n,size_t itemSize,dataType t, PUPMode m
   if (mode == PUPMode::HOST) {
     bytes(p, n, itemSize, t);
   } else if (mode == PUPMode::DEVICE) {
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
     // For GPU mode, we assume p is a device pointer and copy directly
     int allocId;
     CmiFread(&allocId,sizeof(int),1,F);

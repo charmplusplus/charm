@@ -1958,7 +1958,7 @@ void CkMigratable::AtSync(int waitForMigration)
   if (usesAutoMeasure == false)
     UserSetLBLoad();
 
-  #ifdef CMK_CUDA
+  #ifdef CMK_CUDA || CMK_HIP
   PUP::sizer ps(PUP::er::IS_MIGRATION);
   this->virtual_pup(ps);
   // printf("[%d] gpu pup size %ld\n",CkMyPe(), ps.gpu_size() );
@@ -3015,7 +3015,7 @@ bool did_inter_node_gpudirect_rdma(int srcPe, int dstPe) {
   }
 }
 
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
 void CkLocMgr::sendGPUMsg(CmiUInt8 id)
 {
   auto gpuData = sendGPUBuffers[id];
@@ -3071,7 +3071,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   bufSize = p.size();
 
   gpuBufSize = 0;
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
   gpuBufSize = p.gpu_size();
 #endif
 
@@ -3098,7 +3098,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
                                                     gpuBufSize > 0);
 
   {
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
     if (gpuBufSize > 0) {
       GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
       if(csv_gpu_manager.use_shm) {
@@ -3132,11 +3132,11 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 
   DEBM((AA "Migrated index size %s to %d \n" AB, idx2str(idx), toPe));
 
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
   // Ensure all device-to-device copies from PUP packing are complete before
   // destroying elements, since cudaMemcpy(D2D) can be async in CUDA 12.x.
   if (gpuBufSize > 0)
-    cudaDeviceSynchronize();
+    hapiDeviceSynchronize();
 #endif
 
   thisProxy[toPe].immigrate(msg);
@@ -3150,7 +3150,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 
   cache->recordEmigration(id, toPe);
   informHome(idx, toPe);
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
   if (gpuBufSize > 0)
   {
     sendGPUBuffers[id] = GPUMigrateData(toPe, gpuBufSize, gpuMsg);
@@ -3180,7 +3180,7 @@ void CkLocMgr::metaLBCallLB(CkLocRec* rec)
 }
 #endif
 
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
 void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char* &data, CkDeviceBufferPost* post)
 {
   //CkPrintf("PE %d allocating GPU memory size %d for id %llu\n", CkMyPe(), size, id);
@@ -3199,9 +3199,9 @@ void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char* &data, CkDeviceBuffer
     CmiUnlock(dm->lock);
 #endif
   }
-  cudaDeviceSynchronize();
+  hapiDeviceSynchronize();
   receivedDeviceMsgs[id] = data;
-  post[0].hapi_stream = (cudaStream_t) 0;
+  post[0].hapi_stream = (hapiStream_t) 0;
 }
 
 void CkLocMgr::immigrateGPU(CmiUInt8 id, int size, char* data)
@@ -3264,9 +3264,9 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
   CmiAssert(CpvAccess(newZCPupGets).empty());  // Ensure that vector is empty
   // Create the new elements as we unpack the message
   pupElementsFor(p, rec, CkElementCreation_migrate);
-  cudaDeviceSynchronize();
+  hapiDeviceSynchronize();
 
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
   if(csv_gpu_manager.use_shm) {
     DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];

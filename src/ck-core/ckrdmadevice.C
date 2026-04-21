@@ -603,7 +603,7 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
     }
 #else
   for (int i = 0; i < numops; i++) {
-    cudaStreamSynchronize(buffers[i]->hapi_stream);
+    hapiStreamSynchronize(buffers[i]->hapi_stream);
     buffers[i]->lci_ncpy_buffer = CmiNcpyBuffer(buffers[i]->ptr, buffers[i]->cnt);
   }
 #endif

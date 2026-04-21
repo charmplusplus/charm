@@ -157,7 +157,7 @@ public:
 struct LDObjData {
   LDObjHandle handle;
   LBRealType wallTime;
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
   LBRealType gpuTime;
 #endif
 #if CMK_LB_CPUTIMER
@@ -174,7 +174,7 @@ struct LDObjData {
   // An encoded approximation of the amount of data the object would pack;
   // call pup_decodeSize(pupSize) to get the actual approximate value
   CmiUInt2 pupSize;
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
   size_t gpuPupSize;
 #endif
   inline const LDOMHandle &omHandle() const { return handle.omhandle; }
@@ -339,7 +339,7 @@ inline void LBObjUserData::pup(PUP::er &p) {
 inline void LDObjData::pup(PUP::er &p) {
   p|handle;
   p|wallTime;
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
   p|gpuTime;
 #endif
 #if CMK_LB_CPUTIMER
@@ -357,7 +357,7 @@ inline void LDObjData::pup(PUP::er &p) {
   }
 #endif
   p|pupSize;
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
   p|gpuPupSize;
 #endif
 }

@@ -1251,7 +1251,7 @@ class PELevel : public LevelLogic
   {
     inline bool operator()(const LDObjData& o1, const LDObjData& o2) const
     {
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
       return (o1.gpuTime > o2.gpuTime);
 #else
       return (o1.wallTime > o2.wallTime);
@@ -1325,7 +1325,7 @@ class PELevel : public LevelLogic
       }
       else
       {
-        #if CMK_CUDA
+        #if CMK_CUDA || CMK_HIP
         nonMigratableLoad += allLocalObjs[i].gpuTime;
         #else
         nonMigratableLoad += allLocalObjs[i].wallTime;
@@ -1339,7 +1339,7 @@ class PELevel : public LevelLogic
 
 #if DEBUG__TREE_LB_L3
     float total_obj_load = 0;
-    #if CMK_CUDA
+    #if CMK_CUDA || CMK_HIP
     for (int i = 0; i < nobjs; i++) total_obj_load += myObjs[i].gpuTime;
     #else
     for (int i = 0; i < nobjs; i++) total_obj_load += myObjs[i].wallTime;
@@ -1360,7 +1360,7 @@ class PELevel : public LevelLogic
     if (rateAware)
     {
       msg = new (1, 1, 1, 2, nobjs, nobjs, 0) LBStatsMsg_1;
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
       msg->speeds[0] = float(lbmgr->ProcessorGPUSpeed());
 #else
       msg->speeds[0] = float(lbmgr->ProcessorSpeed());
@@ -1381,7 +1381,7 @@ class PELevel : public LevelLogic
       // If rateAware, convert object loads by multiplying by processor speed
       // Note this conversion isn't done for bgloads because they never leave the PE
       
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
       float oload = float(myObjs[i].gpuTime);
 #else
       float oload = float(myObjs[i].wallTime);
@@ -1394,7 +1394,7 @@ class PELevel : public LevelLogic
     }
 
     LBRealType t1, t2, t3, bg_walltime;
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
     lbmgr->GetGPUBGTime(&bg_walltime);
 #elif CMK_LB_CPUTIMER
     LBRealType t4;

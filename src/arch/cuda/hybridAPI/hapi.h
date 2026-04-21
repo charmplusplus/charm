@@ -74,7 +74,7 @@ typedef struct hapiWorkRequest {
 #endif
 
   // Pointer to host-side function that actually invokes the kernel.
-  // The user implements this function, using the given CUDA stream and
+  // The user implements this function, using the given hapi stream and
   // device buffers (which are indexed by hapiBufferInfo->id).
   // Could be set to NULL if no kernel needs to be executed.
   void (*runKernel)(struct hapiWorkRequest* wr, hapiStream_t kernel_stream,
@@ -89,7 +89,7 @@ typedef struct hapiWorkRequest {
   // flags determining whether memory should be freed on destruction
   bool free_user_data;
 
-  // CUDA stream index provided by the user or assigned by GPUManager
+  // hapi stream index provided by the user or assigned by GPUManager
   hapiStream_t stream;
 
 #ifdef HAPI_INSTRUMENT_WRS
@@ -189,7 +189,7 @@ typedef struct hapiWorkRequest hapiWorkRequest;
 
 #endif /* defined __cplusplus */
 
-// Provides support for detecting errors with CUDA API calls.
+// Provides support for detecting errors with hapi API calls.
 #ifndef HAPI_CHECK_OFF
 #define hapiCheck(code) hapiErrorDie(code, #code, __FILE__, __LINE__)
 #else
@@ -244,7 +244,7 @@ static inline hapiError_t hapiFreeHost_Pool(void* ptr, bool pool) {
   return pool ? hapiPoolFree(ptr) : hapiFreeHost(ptr);
 }
 
-void hapiRecordTime(cudaStream_t stream, cudaEvent_t start);
+void hapiRecordTime(hapiStream_t stream, hapiEvent_t start);
 #ifdef CMK_LBDB_ON
 void hapiCuptiInit();
 void hapiCuptiFinalize();
@@ -256,9 +256,9 @@ void hapiClearCuptiData();
 
 #ifdef CMK_LBDB_ON
 #define HAPI_LAUNCH_KERNEL_WRAPPER(call, stream)\
-    cudaEvent_t start;\
-    cudaEventCreate(&start);\
-    cudaEventRecord(start, stream);\
+    hapiEvent_t start;\
+    hapiEventCreate(&start);\
+    hapiEventRecord(start, stream);\
     call;\
     hapiRecordTime(stream, start);
 #else
