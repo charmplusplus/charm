@@ -72,8 +72,8 @@ class Main : public CBase_Main {
 public:
   Main(CkArgMsg* m) {
     main_proxy = thisProxy;
-    block_size = 1028 * 128;
-    n_iters = 50;
+    block_size = 1024 * 128;
+    n_iters = 150;
     n_warpup_iters = 3;
     test_nodegroup = true;
     lb_test = false;
@@ -133,7 +133,7 @@ public:
     start_time = CkWallTimer();
     
     CkPrintf("Testing chare array... \n");
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < n_iters; i++) {
       array_proxy[0].send();
       printf("[ITER] %d DONE!", i);
       fflush(stdout);
