@@ -925,7 +925,7 @@ void UcxRecvDeviceCompleted(void* request, ucs_status_t status,
   }
 }
 
-void LrtsSendDevice(int dest_pe, const void*& ptr, size_t size, uint64_t& tag) {
+void LrtsSendDevice(int dest_pe, int src_pe, const void*& ptr, size_t size, uint64_t& tag) {
   // FIXME: Is this tag generation OK?
   tag = ((uint64_t)CpvAccess(tag_counter)++ << (UCX_TAG_PE_BITS + UCX_TAG_MSG_BITS)) | (CmiMyPe() << UCX_TAG_MSG_BITS) | UCX_MSG_TAG_DEVICE;
 #if CMK_SMP
