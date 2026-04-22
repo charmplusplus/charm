@@ -235,8 +235,8 @@ class Block : public CBase_Block {
 
   Block(CkMigrateMessage* m) {
     usesAtSync = true;
-    hapiCheck(cudaStreamCreateWithPriority(&compute_stream, cudaStreamDefault, 0));
-    hapiCheck(cudaStreamCreateWithPriority(&comm_stream, cudaStreamDefault, -1));
+    hapiCheck(cudaStreamCreateWithPriority(&compute_stream, cudaStreamNonBlocking, 0));
+    hapiCheck(cudaStreamCreateWithPriority(&comm_stream, cudaStreamNonBlocking, -1));
 
     hapiCheck(cudaEventCreateWithFlags(&compute_event, cudaEventDisableTiming));
     hapiCheck(cudaEventCreateWithFlags(&comm_event, cudaEventDisableTiming));
@@ -365,8 +365,8 @@ class Block : public CBase_Block {
       hapiCheck(hapiMalloc((void**)&d_recv_right_ghost, sizeof(DataType) * block_height));
     }
 
-    hapiCheck(cudaStreamCreateWithPriority(&compute_stream, cudaStreamDefault, 0));
-    hapiCheck(cudaStreamCreateWithPriority(&comm_stream, cudaStreamDefault, -1));
+    hapiCheck(cudaStreamCreateWithPriority(&compute_stream, cudaStreamNonBlocking, 0));
+    hapiCheck(cudaStreamCreateWithPriority(&comm_stream, cudaStreamNonBlocking, -1));
 
     hapiCheck(cudaEventCreateWithFlags(&compute_event, cudaEventDisableTiming));
     hapiCheck(cudaEventCreateWithFlags(&comm_event, cudaEventDisableTiming));
