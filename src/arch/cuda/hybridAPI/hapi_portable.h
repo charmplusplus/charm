@@ -16,6 +16,9 @@
 
 #define hapiSetDevice(dev) cudaSetDevice(dev)
 
+#define hapiDevAttrClockRate cudaDevAttrClockRate
+#define hapiDeviceGetAttribute(a,b,c) cudaDeviceGetAttribute(a,b,c)
+
 #define hapiPeekAtLastError cudaPeekAtLastError
 #define hapiEventDefault cudaEventDefault
 #define hapiEventDisableTiming cudaEventDisableTiming
@@ -89,7 +92,6 @@
 
 #define hapiGetErrorString(err) cudaGetErrorString(err)
 
-#define hapiEventDisableTiming cudaEventDisableTiming
 #define hapiEventInterprocess cudaEventInterprocess
 #define hapiIpcMemLazyEnablePeerAccess cudaIpcMemLazyEnablePeerAccess
 
@@ -101,7 +103,6 @@
 #ifdef CMK_HIP
 
 #include <hip/hip_runtime.h>
-#include <hip/hip.h>
 
 #define hapiStream_t hipStream_t
 
@@ -109,6 +110,8 @@
 
 #define hapiSetDevice(dev) hipSetDevice(dev)
 #define hapiGetDeviceCount(devCount) hipGetDeviceCount(devCount)
+#define hapiDevAttrClockRate hipDeviceAttributeClockRate
+#define hapiDeviceGetAttribute(a,b,c) hipDeviceGetAttribute(a,b,c)
 
 #define hapiPeekAtLastError hipPeekAtLastError
 
@@ -176,8 +179,11 @@
 #define hapiGetErrorString(err) hipGetErrorString(err)
 
 #define hapiEventDisableTiming hipEventDisableTiming
+#define hapiEventDefault hipEventDefault
 #define hapiEventInterprocess hipEventInterprocess
 #define hapiIpcMemLazyEnablePeerAccess hipIpcMemLazyEnablePeerAccess
 
+#define hapiMemcpyAsync hipMemcpyAsync
+#define hapiMemcpy2DAsync hipMemcpy2DAsync
 
 #endif // CMK_HIP

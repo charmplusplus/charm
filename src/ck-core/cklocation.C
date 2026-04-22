@@ -1958,7 +1958,7 @@ void CkMigratable::AtSync(int waitForMigration)
   if (usesAutoMeasure == false)
     UserSetLBLoad();
 
-  #ifdef CMK_CUDA || CMK_HIP
+  #if CMK_CUDA || CMK_HIP
   PUP::sizer ps(PUP::er::IS_MIGRATION);
   this->virtual_pup(ps);
   // printf("[%d] gpu pup size %ld\n",CkMyPe(), ps.gpu_size() );

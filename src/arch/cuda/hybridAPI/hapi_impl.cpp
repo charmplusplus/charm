@@ -143,6 +143,8 @@ static void ipcHandleCreate();
 static void ipcHandleOpen();
 
 #ifdef CMK_LBDB_ON
+
+#if CMK_CUDA
 static void CUPTIAPI cuptiBufferRequested(uint8_t **buffer, size_t *size, size_t *maxNumRecords) {
   *size = 5*1024 * 1024;  // 5MB per buffer
   *buffer = (uint8_t *)malloc(*size);
@@ -156,6 +158,7 @@ static void CUPTIAPI cuptiBufferCompleted(CUcontext ctx, uint32_t streamId,
 
   gm.cupti_buffer_queue_.push({buffer, validSize});
 }
+#endif
 
 // Initialize CUPTI activity tracing — called once per process
 void hapiCuptiInit() {
@@ -387,7 +390,9 @@ static void hapiInitCsv(char** argv) {
 
 
 #ifdef CMK_LBDB_ON
+
 void hapiProcessCuptiBuffers() {
+  #if CMK_CUDA
   GPUManager& gm = CsvAccess(gpu_manager);
   
   uint32_t kernel_count = 0;
@@ -406,7 +411,6 @@ void hapiProcessCuptiBuffers() {
     // Parse records in this buffer
     CUpti_Activity *record = NULL;
     // ckout<<"valid size for the CUPTI buffer: "<<item.validSize<<" bytes"<<endl;
-#if CMK_CUDA
     while (cuptiActivityGetNextRecord(item.buffer, item.validSize, &record) == CUPTI_SUCCESS) {
       ++record_count;
       if (record->kind == CUPTI_ACTIVITY_KIND_EXTERNAL_CORRELATION) {
@@ -444,7 +448,6 @@ void hapiProcessCuptiBuffers() {
         }
       }
     }
-#endif
     
     // ckout<<"number of CUPTI records in this buffer: "<<record_count<<endl;
     
@@ -455,17 +458,19 @@ void hapiProcessCuptiBuffers() {
   // CmiPrintf("size of obj_gpu_times_ map is: %zu\n", gm.cupti_obj_gpu_times_.size());
   // CmiPrintf("number of kernel records processed: %u\n", kernel_count);
   // CmiPrintf("number of correlation records processed: %u\n", corr_count);
-
+  
   // DEBUG: print CUPTI obj-gpu-time map summary
   // if (!gm.cupti_obj_gpu_times_.empty()) {
-  //   CkPrintf("[PE %d] CUPTI: %zu objects with GPU times:\n", CmiMyPe(), gm.cupti_obj_gpu_times_.size());
-  //   for (auto& kv : gm.cupti_obj_gpu_times_)
-  //     CkPrintf("[PE %d]   objID=%lu  gpu_ns=%lu (%.6f s)\n", CmiMyPe(), kv.first, kv.second, kv.second / 1.0e9);
-  // } else {
-  //   CkPrintf("[PE %d] CUPTI: no obj GPU times recorded (map empty)\n", CmiMyPe());
-  // }
-}
-
+    //   CkPrintf("[PE %d] CUPTI: %zu objects with GPU times:\n", CmiMyPe(), gm.cupti_obj_gpu_times_.size());
+    //   for (auto& kv : gm.cupti_obj_gpu_times_)
+    //     CkPrintf("[PE %d]   objID=%lu  gpu_ns=%lu (%.6f s)\n", CmiMyPe(), kv.first, kv.second, kv.second / 1.0e9);
+    // } else {
+      //   CkPrintf("[PE %d] CUPTI: no obj GPU times recorded (map empty)\n", CmiMyPe());
+      // }
+      #endif
+    }
+    
+    
 //TODO: safely handle SMP mode
 void hapiClearCuptiData() {
   GPUManager& gm = CsvAccess(gpu_manager);
