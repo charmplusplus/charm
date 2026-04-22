@@ -2061,6 +2061,10 @@ uint64_t hapiMyDevice() {
   return (static_cast<uint64_t>(physical_node_id) << 32) | my_device;
 }
 
+int hapiDeviceForPe(int pe) {
+  return CpvAccessOther(my_device, CmiRankOf(pe));
+}
+
 int hapiMyDeviceTotalSMs() {
 #ifdef CMK_LBDB_ON
   GPUManager& gm = CsvAccess(gpu_manager);

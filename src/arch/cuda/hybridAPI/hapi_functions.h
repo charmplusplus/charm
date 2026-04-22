@@ -61,6 +61,10 @@ AMPI_CUSTOM_FUNC(uint64_t, hapiMyDevice, void)
 // Returns the number of SMs on the GPU this PE is mapped to (0 if unknown).
 AMPI_CUSTOM_FUNC(int, hapiMyDeviceTotalSMs, void)
 
+// Returns the CUDA device index that the given PE is mapped to. The PE must
+// be in the same CmiNode as the caller (this uses CpvAccessOther).
+AMPI_CUSTOM_FUNC(int, hapiDeviceForPe, int)
+
 #ifdef HAPI_INSTRUMENT_WRS
 AMPI_CUSTOM_FUNC(void, hapiInitInstrument, int n_chares, char n_types)
 AMPI_CUSTOM_FUNC(hapiRequestTimeInfo*, hapiQueryInstrument, int chare, char type, char phase)

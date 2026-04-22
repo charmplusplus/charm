@@ -23,6 +23,10 @@
 #include <stdarg.h>
 #include <vector>
 
+#if CMK_CUDA
+#  include "hapi.h"
+#endif
+
 #if CMK_LBDB_ON
 #  include "LBManager.h"
 #  include "MetaBalancer.h"
@@ -3040,13 +3044,19 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   gpuBufSize = p.gpu_size();
 #endif
 
-  // Fast path: for intra-process (same CmiNode) migration of host-only
-  // chares, transfer ownership of the live chare objects to the destination
-  // PE without packing/copying. GPU-resident data is not yet supported on
-  // this path and falls through to the packed path below.
-  if (gpuBufSize == 0 && CmiNodeOf(CkMyPe()) == CmiNodeOf(toPe))
+  // Fast path: for intra-process (same CmiNode) migration, transfer
+  // ownership of the live chare objects to the destination PE without
+  // packing/copying. GPU-resident data is only carried along when the
+  // destination PE is mapped to the same physical GPU as the source,
+  // because raw device pointers are only directly usable in that case.
+  if (CmiNodeOf(CkMyPe()) == CmiNodeOf(toPe))
   {
-    if (emigrateIntraProcess(rec, toPe))
+    bool sameGpuRequirementMet = (gpuBufSize == 0);
+#if CMK_CUDA
+    if (gpuBufSize > 0)
+      sameGpuRequirementMet = (CpvAccess(my_device) == hapiDeviceForPe(toPe));
+#endif
+    if (sameGpuRequirementMet && emigrateIntraProcess(rec, toPe))
       return;
   }
 
