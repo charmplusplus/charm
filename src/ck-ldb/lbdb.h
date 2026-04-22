@@ -154,11 +154,23 @@ public:
   void *getData(int idx) { return data.data()+idx; }
 };
 
+#if CMK_CUDA
+// Per-kernel record captured via CUPTI and shipped to Central LB
+// for SM-utilization-normalized GPU load attribution.
+struct LBKernelRecord {
+  uint64_t start_ns;   // CUPTI device-clock timestamp (ns)
+  uint64_t end_ns;     // CUPTI device-clock timestamp (ns)
+  int      sms_used;   // Number of SMs occupied while this kernel was running
+  inline void pup(PUP::er &p) { p|start_ns; p|end_ns; p|sms_used; }
+};
+#endif
+
 struct LDObjData {
   LDObjHandle handle;
   LBRealType wallTime;
 #if CMK_CUDA
   LBRealType gpuTime;
+  std::vector<LBKernelRecord> gpuKernels;
 #endif
 #if CMK_LB_CPUTIMER
   LBRealType cpuTime;
@@ -338,6 +350,7 @@ inline void LDObjData::pup(PUP::er &p) {
   p|wallTime;
 #if CMK_CUDA
   p|gpuTime;
+  p|gpuKernels;
 #endif
 #if CMK_LB_CPUTIMER
   p|cpuTime;

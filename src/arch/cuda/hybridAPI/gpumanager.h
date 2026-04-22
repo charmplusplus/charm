@@ -15,6 +15,10 @@
 #include <unordered_map>
 #include <queue>
 
+#if CMK_LBDB_ON
+#include "lbdb.h"  // for LBKernelRecord
+#endif
+
 // Initial size of the user-addressed portion of host/device buffer arrays;
 // the system-addressed portion of host/device buffer arrays (used when there
 // is no need to share buffers between work requests) will be equivalant in size.
@@ -164,8 +168,11 @@ struct GPUManager {
 #ifdef CMK_LBDB_ON
   std::unordered_map<uint32_t, uint64_t> cupti_correlation_db_;//correlationID -> ObjectID
 
-  std::unordered_map<uint64_t, uint64_t> cupti_obj_gpu_times_;//objectID -> accumulated GPU time in ns
-  
+  // Per-kernel records: objectID -> list of (start_ns, end_ns, sms_used)
+  // Replaces the old scalar-accumulator so the Central LB can reason about
+  // kernel overlap and SM usage across PEs sharing a GPU.
+  std::unordered_map<uint64_t, std::vector<LBKernelRecord>> cupti_obj_kernel_records_;
+
   std::queue<CuptiBufferItem> cupti_buffer_queue_;
 
   bool cupti_initialized_;

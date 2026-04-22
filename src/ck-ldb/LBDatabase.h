@@ -81,7 +81,7 @@ public:
     LbObj(h)->getGPUTime(&gputime);
   };
 
-  inline void SetObjGPULoad(std::unordered_map<uint64_t, uint64_t> &id_gputimeMap)
+  inline void SetObjGPULoad(std::unordered_map<uint64_t, std::vector<LBKernelRecord>> &id_recordsMap)
   {
     int matched = 0;
     int liveObjs = 0;
@@ -94,19 +94,22 @@ public:
       // CMK_GLOBAL_LOCATION_UPDATE is set). Strip collection bits to match.
       CmiUInt8 lb_id = objs[i].obj->ObjData().objID();
       CmiUInt8 raw_id = ck::ObjID(lb_id).getElementID();
-      auto it = id_gputimeMap.find(raw_id);
-      if(it==id_gputimeMap.end()) {
+      auto it = id_recordsMap.find(raw_id);
+      if(it==id_recordsMap.end()) {
         CkPrintf("[PE %d] SetObjGPULoad: obj %d lb_id=%lu raw_id=%lu NO MATCH\n", CmiMyPe(), i, (unsigned long)lb_id, (unsigned long)raw_id);
         continue;
       }
 
       matched++;
-      CkPrintf("[PE %d] SetObjGPULoad: obj %d id=%lu -> gpuTime=%.6f s\n",
-               CmiMyPe(), i, (unsigned long)it->first, it->second / 1.0e9);
-      objs[i].obj->setGPUTiming(it->second / 1.0e9);
+      uint64_t total_ns = 0;
+      for (const auto& r : it->second) total_ns += (r.end_ns - r.start_ns);
+      CkPrintf("[PE %d] SetObjGPULoad: obj %d id=%lu -> %zu kernels, total=%.6f s\n",
+               CmiMyPe(), i, (unsigned long)it->first, it->second.size(),
+               total_ns / 1.0e9);
+      objs[i].obj->setGPUKernelRecords(std::move(it->second));
     }
     CkPrintf("[PE %d] SetObjGPULoad: %d/%d live objects matched from %zu CUPTI entries (objs.size=%zu)\n",
-             CmiMyPe(), matched, liveObjs, id_gputimeMap.size(), objs.size());
+             CmiMyPe(), matched, liveObjs, id_recordsMap.size(), objs.size());
   }
   inline void* GetObjUserData(LDObjHandle &h) {
     return LbObj(h)->getLocalUserData();

@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <climits>
 #include <cmath>
 #include <algorithm>
 #include <queue>
@@ -154,10 +155,40 @@ static void CUPTIAPI cuptiBufferCompleted(CUcontext ctx, uint32_t streamId,
   gm.cupti_buffer_queue_.push({buffer, validSize});
 }
 
+// Populate DeviceManager with device attributes needed to compute per-kernel
+// SM usage from CUPTI records. Queried once per local device.
+static void hapiPopulateDeviceProps(GPUManager& gm) {
+  for (DeviceManager& dm : gm.device_managers) {
+    if (dm.props_initialized) continue;
+    int dev = dm.global_index;
+    cudaDeviceGetAttribute(&dm.multi_processor_count,
+                           cudaDevAttrMultiProcessorCount, dev);
+    cudaDeviceGetAttribute(&dm.max_threads_per_sm,
+                           cudaDevAttrMaxThreadsPerMultiProcessor, dev);
+#ifdef cudaDevAttrMaxBlocksPerMultiprocessor
+    cudaDeviceGetAttribute(&dm.max_blocks_per_sm,
+                           cudaDevAttrMaxBlocksPerMultiprocessor, dev);
+#else
+    dm.max_blocks_per_sm = 0;
+#endif
+    cudaDeviceGetAttribute(&dm.max_registers_per_sm,
+                           cudaDevAttrMaxRegistersPerMultiprocessor, dev);
+    cudaDeviceGetAttribute(&dm.max_shared_mem_per_sm,
+                           cudaDevAttrMaxSharedMemoryPerMultiprocessor, dev);
+    cudaDeviceGetAttribute(&dm.warp_size, cudaDevAttrWarpSize, dev);
+    dm.props_initialized = true;
+    CmiPrintf("HAPI: device %d props: %d SMs, %d warp_size, %d max_threads/SM, "
+              "%d max_blocks/SM, %d max_regs/SM, %d max_smem/SM\n",
+              dev, dm.multi_processor_count, dm.warp_size,
+              dm.max_threads_per_sm, dm.max_blocks_per_sm,
+              dm.max_registers_per_sm, dm.max_shared_mem_per_sm);
+  }
+}
+
 // Initialize CUPTI activity tracing — called once per process
 void hapiCuptiInit() {
   CmiPrintf("HAPI: Initializing CUPTI...\n");
-  cudaDeviceSynchronize(); 
+  cudaDeviceSynchronize();
   GPUManager& gm = CsvAccess(gpu_manager);
   if (gm.cupti_initialized_) return;
 
@@ -165,6 +196,9 @@ void hapiCuptiInit() {
   CUPTI_SAFE_CALL(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_CONCURRENT_KERNEL));
   CUPTI_SAFE_CALL(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_RUNTIME));
   CUPTI_SAFE_CALL(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_EXTERNAL_CORRELATION));
+
+  // Note: device_managers is populated later in hapiMapping, so device
+  // properties are queried lazily on first use in hapiProcessCuptiBuffers.
 
   gm.cupti_initialized_ = true;
 }
@@ -381,9 +415,78 @@ static void hapiInitCsv(char** argv) {
 
 
 #ifdef CMK_LBDB_ON
+// Find the DeviceManager that matches this kernel's device id.
+static DeviceManager* findDeviceManager(GPUManager& gm, uint32_t device_id) {
+  for (DeviceManager& dm : gm.device_managers) {
+    if ((uint32_t)dm.global_index == device_id) return &dm;
+  }
+  return nullptr;
+}
+
+// Compute the number of SMs this kernel occupies while running.
+// Uses the CUDA occupancy model: theoretical max_active_blocks_per_sm is
+// limited by (a) max blocks per SM, (b) warp count, (c) register pressure,
+// (d) shared memory. Then:
+//   sms_used = min(num_sms, ceil(total_blocks / max_active_blocks_per_sm))
+static int computeKernelSMs(const DeviceManager& dm,
+                            const CUpti_ActivityKernel4* k) {
+  if (!dm.props_initialized || dm.multi_processor_count <= 0) return 1;
+
+  uint64_t threads_per_block =
+      (uint64_t)k->blockX * (uint64_t)k->blockY * (uint64_t)k->blockZ;
+  uint64_t total_blocks =
+      (uint64_t)k->gridX * (uint64_t)k->gridY * (uint64_t)k->gridZ;
+  if (threads_per_block == 0 || total_blocks == 0) return 1;
+
+  int warp_size = dm.warp_size > 0 ? dm.warp_size : 32;
+  int warps_per_block = (int)((threads_per_block + warp_size - 1) / warp_size);
+
+  // Warp-count limit: maxThreadsPerSM / threadsPerBlock (rounded down).
+  int limit_warps =
+      dm.max_threads_per_sm > 0 && threads_per_block > 0
+          ? (int)(dm.max_threads_per_sm / threads_per_block)
+          : INT_MAX;
+  if (limit_warps <= 0) limit_warps = 1;
+
+  // Block-count limit (CUDA 11+; 0 means not available → use a large value).
+  int limit_blocks = dm.max_blocks_per_sm > 0 ? dm.max_blocks_per_sm : INT_MAX;
+
+  // Register-pressure limit.
+  uint64_t regs_per_block = (uint64_t)k->registersPerThread * threads_per_block;
+  int limit_regs = INT_MAX;
+  if (regs_per_block > 0 && dm.max_registers_per_sm > 0) {
+    uint64_t r = (uint64_t)dm.max_registers_per_sm / regs_per_block;
+    limit_regs = r > INT_MAX ? INT_MAX : (int)r;
+    if (limit_regs <= 0) limit_regs = 1;
+  }
+
+  // Shared-memory limit.
+  uint64_t smem_per_block =
+      (uint64_t)k->staticSharedMemory + (uint64_t)k->dynamicSharedMemory;
+  int limit_smem = INT_MAX;
+  if (smem_per_block > 0 && dm.max_shared_mem_per_sm > 0) {
+    uint64_t s = (uint64_t)dm.max_shared_mem_per_sm / smem_per_block;
+    limit_smem = s > INT_MAX ? INT_MAX : (int)s;
+    if (limit_smem <= 0) limit_smem = 1;
+  }
+
+  int max_active_blocks_per_sm =
+      std::min(std::min(limit_blocks, limit_warps),
+               std::min(limit_regs, limit_smem));
+  if (max_active_blocks_per_sm < 1) max_active_blocks_per_sm = 1;
+
+  uint64_t sms_needed =
+      (total_blocks + max_active_blocks_per_sm - 1) / max_active_blocks_per_sm;
+  int sms_used = (int)std::min<uint64_t>(sms_needed,
+                                         (uint64_t)dm.multi_processor_count);
+  if (sms_used < 1) sms_used = 1;
+  return sms_used;
+}
+
 void hapiProcessCuptiBuffers() {
   GPUManager& gm = CsvAccess(gpu_manager);
-  
+  hapiPopulateDeviceProps(gm);  // lazy: device_managers is ready by now
+
   uint32_t kernel_count = 0;
   uint32_t corr_count = 0;
   while (true) {
@@ -399,63 +502,61 @@ void hapiProcessCuptiBuffers() {
 
     // Parse records in this buffer
     CUpti_Activity *record = NULL;
-    // ckout<<"valid size for the CUPTI buffer: "<<item.validSize<<" bytes"<<endl;
     while (cuptiActivityGetNextRecord(item.buffer, item.validSize, &record) == CUPTI_SUCCESS) {
       ++record_count;
       if (record->kind == CUPTI_ACTIVITY_KIND_EXTERNAL_CORRELATION) {
         CUpti_ActivityExternalCorrelation *corr = (CUpti_ActivityExternalCorrelation *)record;
         corr_count++;
-        if(gm.cupti_correlation_db_.find(corr->correlationId)!=gm.cupti_correlation_db_.end())
-        {
-          //out of order block 
-          uint64_t curr_kernel_time = gm.cupti_correlation_db_[corr->correlationId];
-          gm.cupti_obj_gpu_times_[corr->externalId] += curr_kernel_time;
-          gm.cupti_correlation_db_.erase(corr->correlationId); // Remove correlation ID after processing
-        }
-        else 
-        {
-          gm.cupti_correlation_db_[corr->correlationId] = corr->externalId;
-        }
+        // Record the object ID that maps to this kernel's correlationId.
+        // If the kernel record already arrived out-of-order, it parked a
+        // pending-kernel sentinel under this ID; clear it (we cannot
+        // retroactively attribute that kernel — drop it to keep the flow
+        // simple).
+        gm.cupti_correlation_db_[corr->correlationId] = corr->externalId;
       }
       else if (record->kind == CUPTI_ACTIVITY_KIND_CONCURRENT_KERNEL ||
                record->kind == CUPTI_ACTIVITY_KIND_KERNEL) {
         kernel_count++;
         CUpti_ActivityKernel4 *kernel = (CUpti_ActivityKernel4 *)record;
-        uint64_t duration_ns = kernel->end - kernel->start;
-        // ckout<<"the current kernel's duration is "<<duration_ns<<" ns "<<endl;
 
         auto it = gm.cupti_correlation_db_.find(kernel->correlationId);
-        if (it != gm.cupti_correlation_db_.end()) {
-          uint64_t obj_id = it->second;
-          gm.cupti_obj_gpu_times_[obj_id] += duration_ns;
-          gm.cupti_correlation_db_.erase(it); // Remove correlation ID after processing
+        if (it == gm.cupti_correlation_db_.end()) {
+          // External correlation record hasn't arrived yet — skip.
+          // (In practice external correlation records precede kernels.)
+          continue;
         }
-        else 
-        {
-          // CmiPrintf("found an out of order entry\n");
-          gm.cupti_correlation_db_[kernel->correlationId] = duration_ns;
-        }
+        uint64_t obj_id = it->second;
+        gm.cupti_correlation_db_.erase(it);
+
+        DeviceManager* dm = findDeviceManager(gm, kernel->deviceId);
+        int sms_used = dm ? computeKernelSMs(*dm, kernel) : 1;
+
+        LBKernelRecord rec;
+        rec.start_ns = kernel->start;
+        rec.end_ns   = kernel->end;
+        rec.sms_used = sms_used;
+        gm.cupti_obj_kernel_records_[obj_id].push_back(rec);
       }
     }
 
-    
-    // ckout<<"number of CUPTI records in this buffer: "<<record_count<<endl;
-    
     free(item.buffer);
   }
-  //final state of gm.cupti_correlation_db_ and gm.cupti_obj_gpu_times_ 
   CmiPrintf("size of correlation DB is: %zu\n", gm.cupti_correlation_db_.size());
-  CmiPrintf("size of obj_gpu_times_ map is: %zu\n", gm.cupti_obj_gpu_times_.size());
+  CmiPrintf("size of obj_kernel_records_ map is: %zu\n", gm.cupti_obj_kernel_records_.size());
   CmiPrintf("number of kernel records processed: %u\n", kernel_count);
   CmiPrintf("number of correlation records processed: %u\n", corr_count);
 
-  // DEBUG: print CUPTI obj-gpu-time map summary
-  if (!gm.cupti_obj_gpu_times_.empty()) {
-    CkPrintf("[PE %d] CUPTI: %zu objects with GPU times:\n", CmiMyPe(), gm.cupti_obj_gpu_times_.size());
-    for (auto& kv : gm.cupti_obj_gpu_times_)
-      CkPrintf("[PE %d]   objID=%lu  gpu_ns=%lu (%.6f s)\n", CmiMyPe(), kv.first, kv.second, kv.second / 1.0e9);
+  if (!gm.cupti_obj_kernel_records_.empty()) {
+    CkPrintf("[PE %d] CUPTI: %zu objects with kernel records:\n",
+             CmiMyPe(), gm.cupti_obj_kernel_records_.size());
+    for (auto& kv : gm.cupti_obj_kernel_records_) {
+      uint64_t total_ns = 0;
+      for (auto& r : kv.second) total_ns += (r.end_ns - r.start_ns);
+      CkPrintf("[PE %d]   objID=%lu  kernels=%zu  total_ns=%lu (%.6f s)\n",
+               CmiMyPe(), kv.first, kv.second.size(), total_ns, total_ns / 1.0e9);
+    }
   } else {
-    CkPrintf("[PE %d] CUPTI: no obj GPU times recorded (map empty)\n", CmiMyPe());
+    CkPrintf("[PE %d] CUPTI: no obj kernel records recorded (map empty)\n", CmiMyPe());
   }
 }
 
@@ -463,7 +564,7 @@ void hapiProcessCuptiBuffers() {
 void hapiClearCuptiData() {
   GPUManager& gm = CsvAccess(gpu_manager);
 
-  gm.cupti_obj_gpu_times_.clear();
+  gm.cupti_obj_kernel_records_.clear();
   gm.cupti_correlation_db_.clear();
 }
 
@@ -1958,5 +2059,25 @@ uint64_t hapiMyDevice() {
   int physical_node_id = CmiPhysicalNodeID(CmiMyPe());
   int my_device = CpvAccess(my_device);
   return (static_cast<uint64_t>(physical_node_id) << 32) | my_device;
+}
+
+int hapiMyDeviceTotalSMs() {
+#ifdef CMK_LBDB_ON
+  GPUManager& gm = CsvAccess(gpu_manager);
+  int local_id = CpvAccess(my_device_id);
+  if (local_id < 0 || local_id >= (int)gm.device_managers.size()) return 0;
+  DeviceManager& dm = gm.device_managers[local_id];
+  if (!dm.props_initialized) {
+    // Fallback: query directly for just this device if CUPTI init hasn't
+    // populated props yet.
+    int count = 0;
+    cudaDeviceGetAttribute(&count, cudaDevAttrMultiProcessorCount,
+                           dm.global_index);
+    return count;
+  }
+  return dm.multi_processor_count;
+#else
+  return 0;
+#endif
 }
 

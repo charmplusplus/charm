@@ -55,13 +55,14 @@ public:
     bool available;
 #if CMK_CUDA
     uint64_t gpu_device_id;		// GPU device this PE is mapped to (-1 = no GPU)
+    int gpu_total_sms;			// Number of SMs on that GPU (0 if unknown)
 #endif
     ProcStats(): n_objs(0), pe_speed(1), total_walltime(0.0), idletime(0.0),
 #if CMK_LB_CPUTIMER
 		 total_cputime(0.0), bg_cputime(0.0),
 #endif
 #if CMK_CUDA
-	   	 gpu_device_id(-1),
+	   	 gpu_device_id(-1), gpu_total_sms(0),
 #endif
 	   	 bg_walltime(0.0), pe(-1), available(true) {}
     inline void clearBgLoad() {
@@ -87,6 +88,7 @@ public:
       if (_lb_args.lbversion()>=2) p|pe;
 #if CMK_CUDA
       p|gpu_device_id;
+      p|gpu_total_sms;
 #endif
     }
   };

@@ -268,6 +268,9 @@ private:
 
   void BuildStatsMsg();
   void buildStats();
+#if CMK_CUDA
+  void normalizeGPULoad(LDStats* stats);
+#endif
   void printStrategyStats(LBMigrateMsg *msg);
 
 public:
@@ -288,6 +291,7 @@ public:
   int pe_speed;
 #if CMK_CUDA
   int gpu_device_id;
+  int gpu_total_sms;
 #endif
   LBRealType total_walltime;
   LBRealType idletime;
@@ -306,7 +310,7 @@ public:
   CLBStatsMsg(int osz, int csz);
   CLBStatsMsg(): from_pe(0), pe_speed(0),
 #if CMK_CUDA
-		 gpu_device_id(-1),
+		 gpu_device_id(-1), gpu_total_sms(0),
 #endif
 		 total_walltime(0.0), idletime(0.0),
 		 bg_walltime(0.0),

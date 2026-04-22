@@ -87,6 +87,22 @@ public:
   #endif
   }
 
+#if CMK_CUDA
+  inline void setGPUKernelRecords(std::vector<LBKernelRecord>&& recs)
+  {
+    data.gpuKernels = std::move(recs);
+    // Keep scalar gpuTime in sync as the sum of per-kernel durations
+    // so existing LB strategies keep working as a fallback before the
+    // SM-normalization pass runs.
+    uint64_t total_ns = 0;
+    for (const auto& r : data.gpuKernels) total_ns += (r.end_ns - r.start_ns);
+    data.gpuTime = total_ns / 1.0e9;
+  }
+  inline const std::vector<LBKernelRecord>& getGPUKernelRecords() const {
+    return data.gpuKernels;
+  }
+#endif
+
   inline LDOMHandle &parentOM() { return data.handle.omhandle; }
   inline const LDObjHandle &GetLDObjHandle() const { return data.handle; }
   inline void SetMigratable(bool mig) { data.migratable = mig; }

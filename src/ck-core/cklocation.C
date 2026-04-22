@@ -1927,6 +1927,25 @@ void CkMigratable::ckFinishConstruction(int epoch)
   barrierRegistered = true;
 }
 
+int CkMigratable::ckPrepareIntraProcessMigrate()
+{
+  int epoch = -1;
+  if (usesAtSync && barrierRegistered)
+  {
+    epoch = (*ldBarrierHandle)->epoch;
+    myRec->getSyncBarrier()->removeClient(ldBarrierHandle);
+    barrierRegistered = false;
+  }
+  myRec = nullptr;
+  return epoch;
+}
+
+void CkMigratable::ckFinalizeIntraProcessMigrate(CkLocRec* newRec, int epoch)
+{
+  myRec = newRec;
+  ckFinishConstruction(epoch);
+}
+
 void CkMigratable::AtSync(int waitForMigration)
 {
   if (!usesAtSync)
@@ -3021,6 +3040,16 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   gpuBufSize = p.gpu_size();
 #endif
 
+  // Fast path: for intra-process (same CmiNode) migration of host-only
+  // chares, transfer ownership of the live chare objects to the destination
+  // PE without packing/copying. GPU-resident data is not yet supported on
+  // this path and falls through to the packed path below.
+  if (gpuBufSize == 0 && CmiNodeOf(CkMyPe()) == CmiNodeOf(toPe))
+  {
+    if (emigrateIntraProcess(rec, toPe))
+      return;
+  }
+
 #if CMK_ERROR_CHECKING
   if (bufSize > std::numeric_limits<int>::max())
   {
@@ -3097,6 +3126,115 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 #endif
 
   CK_MAGICNUMBER_CHECK
+}
+
+// Fast path for intra-process (same CmiNode) migration in SMP mode.
+// Transfers ownership of the live CkMigratable objects to the destination PE
+// without pup-based serialization. Must be called after ckAboutToMigrate and
+// only when there is no GPU-resident data.
+bool CkLocMgr::emigrateIntraProcess(CkLocRec* rec, int toPe)
+{
+  CkArrayIndex idx = rec->getIndex();
+  CmiUInt8 id = rec->getID();
+
+  // Gather (aid, elt) pairs from each manager and detach each chare from
+  // this PE's sync barrier, capturing the barrier epoch.
+  std::vector<CkGroupID> aids;
+  std::vector<uintptr_t> eltPtrs;
+  aids.reserve(managers.size());
+  eltPtrs.reserve(managers.size());
+  int barrierEpoch = -1;
+
+  for (auto itr = managers.begin(); itr != managers.end(); ++itr)
+  {
+    CkMigratable* elt = itr->second->getEltFromArrMgr(id);
+    if (!elt) continue;
+    int ep = elt->ckPrepareIntraProcessMigrate();
+    if (ep != -1) barrierEpoch = ep;
+    aids.push_back(itr->first);
+    eltPtrs.push_back(reinterpret_cast<uintptr_t>(elt));
+  }
+
+  int nElts = (int)aids.size();
+  int locEpoch = cache->getEpoch(id) + 1;
+
+  CkArrayElementIntraProcessMigrateMessage* msg =
+      new (nElts, nElts) CkArrayElementIntraProcessMigrateMessage(
+          idx, id,
+#if CMK_LBDB_ON
+          rec->isAsyncMigrate(),
+#else
+          false,
+#endif
+          nElts, locEpoch, barrierEpoch);
+  for (int i = 0; i < nElts; i++)
+  {
+    msg->aids[i] = aids[i];
+    msg->eltPtrs[i] = eltPtrs[i];
+  }
+
+  DEBM((AA "Intra-process migrating index %s to %d\n" AB, idx2str(idx), toPe));
+
+  thisProxy[toPe].immigrateIntraProcess(msg);
+
+  // Detach from this PE's array managers and location tables. Do NOT delete
+  // the CkMigratable objects -- they now live on the destination PE.
+  duringMigration = true;
+  for (auto itr = managers.begin(); itr != managers.end(); ++itr)
+  {
+    itr->second->eraseEltFromArrMgr(id);
+  }
+  removeFromTable(id);
+  delete rec;
+  duringMigration = false;
+
+  cache->recordEmigration(id, toPe);
+  informHome(idx, toPe);
+
+#if !CMK_LBDB_ON && CMK_GLOBAL_LOCATION_UPDATE
+  CmiPrintf((AA "Global location update. idx %s "
+           "assigned to %d \n" AB,
+        idx2str(idx), toPe));
+  thisProxy.updateLocation(id, toPe);
+#endif
+
+  CK_MAGICNUMBER_CHECK
+  return true;
+}
+
+// Receive side of the intra-process migration fast path.
+void CkLocMgr::immigrateIntraProcess(CkArrayElementIntraProcessMigrateMessage* msg)
+{
+  const CkArrayIndex& idx = msg->idx;
+
+  if (msg->nManagers > (int)managers.size())
+  {
+    // Some array managers haven't registered yet. This should be rare during
+    // an AtSync-driven migration; fall back to the existing pendingImmigrate
+    // list is not yet implemented, so abort loudly to catch it in testing.
+    CkAbort("Intra-process immigrate: managers not yet registered on destination PE\n");
+  }
+
+  insertID(idx, msg->id);
+
+  CkLocRec* rec = elementNrec(msg->id);
+  if (rec == nullptr)
+    rec = createLocal(idx, true /* fromMigration */, msg->ignoreArrival,
+                      false /* home told on departure */, msg->locEpoch);
+
+  for (int i = 0; i < msg->nManagers; i++)
+  {
+    auto mit = managers.find(msg->aids[i]);
+    if (mit == managers.end())
+      CkAbort("Intra-process immigrate: unknown array manager\n");
+    CkMigratable* elt = reinterpret_cast<CkMigratable*>(msg->eltPtrs[i]);
+    mit->second->putEltInArrMgr(msg->id, elt);
+    elt->ckFinalizeIntraProcessMigrate(rec, msg->barrierEpoch);
+  }
+
+  callMethod(rec, &CkMigratable::ckJustMigrated);
+
+  delete msg;
 }
 
 #if CMK_LBDB_ON

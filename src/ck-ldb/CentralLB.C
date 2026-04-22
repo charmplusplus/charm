@@ -162,7 +162,7 @@ if (CmiMyRank() == 0)
   CmiNodeBarrier();  // ensure rank 0 finishes buffer processing before other ranks read the map
 #endif
   // Every PE matches its own objects against the shared per-process CUPTI map
-  lbmgr->SetObjGPULoad(CsvAccess(gpu_manager).cupti_obj_gpu_times_);
+  lbmgr->SetObjGPULoad(CsvAccess(gpu_manager).cupti_obj_kernel_records_);
 #endif
 
   {
@@ -340,6 +340,7 @@ void CentralLB::BuildStatsMsg()
 
 #if CMK_CUDA
   msg->gpu_device_id = hapiMyDevice();
+  msg->gpu_total_sms = hapiMyDeviceTotalSMs();
 #endif
 
   DEBUGF(("Processor %d Total time (wall,cpu) = %f Idle = %f Bg = %f\n", CkMyPe(),msg->total_walltime,msg->idletime,msg->bg_walltime));
@@ -446,6 +447,61 @@ void CentralLB::buildStats()
                       [](const LDObjData& data) { return data.migratable; });
 }
 
+#if CMK_CUDA
+// Overwrite each migratable object's scalar gpuTime with an SM-utilization-
+// normalized load, computed from the per-kernel records collected via CUPTI.
+//
+// For each kernel record (start_ns, end_ns, sms_used) attributed to an object,
+// its contribution to the object's GPU load is:
+//     duration_s * (sms_used / total_sms_on_that_gpu)
+//
+// First-pass model: single sms_used per kernel, uniform across duration,
+// no FIFO throttling or wave-level breakdown. Cross-PE overlap on a shared
+// GPU is handled by the fact that CUPTI timestamps across PEs sharing a
+// device come from the same GPU clock — so future passes that sweep-line
+// over all records of a gpu_device_id already have compatible timebases.
+void CentralLB::normalizeGPULoad(LDStats* stats)
+{
+    if (stats == NULL) return;
+
+    // Per-GPU SM count, keyed by gpu_device_id. A PE without records still
+    // contributes its total_sms here so we know the device size.
+    std::unordered_map<uint64_t, int> gpuSMs;
+    for (size_t p = 0; p < stats->procs.size(); ++p) {
+        const auto& ps = stats->procs[p];
+        if (ps.gpu_total_sms > 0) gpuSMs[ps.gpu_device_id] = ps.gpu_total_sms;
+    }
+
+    size_t objects_rewritten = 0;
+    for (size_t i = 0; i < stats->objData.size(); ++i) {
+        LDObjData& od = stats->objData[i];
+        if (od.gpuKernels.empty()) continue;
+
+        int from_pe = stats->from_proc[i];
+        if (from_pe < 0 || from_pe >= (int)stats->procs.size()) continue;
+        uint64_t gpu_id = stats->procs[from_pe].gpu_device_id;
+
+        auto it = gpuSMs.find(gpu_id);
+        int total_sms = (it == gpuSMs.end()) ? 0 : it->second;
+        if (total_sms <= 0) continue;  // leave scalar gpuTime as-is
+
+        double normalized = 0.0;
+        for (const auto& k : od.gpuKernels) {
+            if (k.end_ns <= k.start_ns) continue;
+            double duration_s = (k.end_ns - k.start_ns) / 1.0e9;
+            double frac = (double)k.sms_used / (double)total_sms;
+            if (frac > 1.0) frac = 1.0;
+            normalized += duration_s * frac;
+        }
+        od.gpuTime = normalized;
+        ++objects_rewritten;
+    }
+
+    CmiPrintf("[%d] CentralLB::normalizeGPULoad: rewrote gpuTime for %zu/%zu objects across %zu GPU(s)\n",
+              CkMyPe(), objects_rewritten, stats->objData.size(), gpuSMs.size());
+}
+#endif
+
 // deposit one processor data at a time, note database is pre-allocated
 // to have enough space
 // used when USE_REDUCTION = 1
@@ -474,6 +530,7 @@ void CentralLB::depositData(CLBStatsMsg *m)
   procStat.pe_speed = m->pe_speed;
 #if CMK_CUDA
   procStat.gpu_device_id = m->gpu_device_id;
+  procStat.gpu_total_sms = m->gpu_total_sms;
 #endif
 
   //procStat.utilization = 1.0;
@@ -552,6 +609,7 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &&msg)
       procStat.pe_speed = m->pe_speed;
 #if CMK_CUDA
       procStat.gpu_device_id = m->gpu_device_id;
+      procStat.gpu_total_sms = m->gpu_total_sms;
 #endif
       //procStat.utilization = 1.0;
       procStat.available = true;
@@ -648,6 +706,10 @@ void CentralLB::LoadBalance()
 
   removeCommDataOfDeletedObjs(statsData);
   preprocess(statsData);
+
+#if CMK_CUDA
+  normalizeGPULoad(statsData);
+#endif
 
 //    CkPrintf("Before Calling Strategy\n");
 
@@ -1715,6 +1777,7 @@ void CLBStatsMsg::pup(PUP::er &p) {
   p|pe_speed;
 #if CMK_CUDA
   p|gpu_device_id;
+  p|gpu_total_sms;
 #endif
   p|total_walltime;
   p|idletime;

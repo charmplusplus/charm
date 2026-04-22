@@ -113,6 +113,37 @@ public:
   char* packData;
 };
 
+/**
+ *  Intra-process (same CmiNode / SMP mode) migration message. Instead of
+ *  packing the chare, the source PE transfers ownership of the live
+ *  CkMigratable objects to the destination PE via raw pointers.
+ */
+class CkArrayElementIntraProcessMigrateMessage
+  : public CMessage_CkArrayElementIntraProcessMigrateMessage
+{
+public:
+  CkArrayElementIntraProcessMigrateMessage(CkArrayIndex idx_, CmiUInt8 id_,
+                                           bool ignoreArrival_, int nManagers_,
+                                           int locEpoch_, int barrierEpoch_)
+      : idx(idx_),
+        id(id_),
+        ignoreArrival(ignoreArrival_),
+        nManagers(nManagers_),
+        locEpoch(locEpoch_),
+        barrierEpoch(barrierEpoch_)
+  {
+  }
+
+  CkArrayIndex idx;
+  CmiUInt8 id;
+  bool ignoreArrival;
+  int nManagers;
+  int locEpoch;      // location cache epoch (for createLocal)
+  int barrierEpoch;  // AtSync sync-barrier epoch (for ckFinishConstruction)
+  CkGroupID* aids;
+  uintptr_t* eltPtrs;
+};
+
 /******************* Map object ******************/
 
 extern CkGroupID _defaultArrayMapID;
@@ -697,6 +728,11 @@ public:
   // Interface used by CkLocRec
   // Migrate us to another processor
   void emigrate(CkLocRec* rec, int toPe);
+  // Fast path for intra-process (same CmiNode) migration: transfer live
+  // chare objects to the destination PE without packing. Returns false if
+  // the fast path is not applicable and the caller should fall through to
+  // the packed emigrate path.
+  bool emigrateIntraProcess(CkLocRec* rec, int toPe);
   void informLBPeriod(CkLocRec* rec, int lb_ideal_period);
   void metaLBCallLB(CkLocRec* rec);
 
@@ -711,6 +747,7 @@ public:
 
   // Communication:
   void immigrate(CkArrayElementMigrateMessage* msg);
+  void immigrateIntraProcess(CkArrayElementIntraProcessMigrateMessage* msg);
 #if CMK_CUDA
   void sendGPUMsg(CmiUInt8 id);
   void immigrateGPU(CmiUInt8& id, int& size, char* &data, CkDeviceBufferPost* post);

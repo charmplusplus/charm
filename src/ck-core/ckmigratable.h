@@ -106,6 +106,17 @@ public:
   void ckFinishConstruction(int epoch) { }
 #endif
 
+public:
+  // Intra-process (same CmiNode / SMP mode) migration fast path.
+  // Called on the source PE just before ownership is transferred: returns
+  // the current AtSync barrier epoch and detaches from the source PE's
+  // sync barrier. Returns -1 if no epoch tracking is needed.
+  int ckPrepareIntraProcessMigrate();
+  // Called on the destination PE after ownership is transferred: rebinds
+  // the chare to its new CkLocRec and re-registers with the destination
+  // PE's sync barrier at the given epoch.
+  void ckFinalizeIntraProcessMigrate(CkLocRec* newRec, int epoch);
+
 #if CMK_OUT_OF_CORE
 private:
   friend class CkLocMgr;

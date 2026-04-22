@@ -31,6 +31,7 @@ void LBObj::Clear(void)
 
 #if CMK_CUDA
   data.gpuTime = 0.;
+  data.gpuKernels.clear();
 #endif
 
   startWTime = -1.0;

@@ -7,6 +7,11 @@ module CkLocation {
     char packData[];
   };
 
+  message CkArrayElementIntraProcessMigrateMessage {
+    CkGroupID aids[];
+    uintptr_t eltPtrs[];
+  };
+
   group [migratable] CkLocCache {
     entry CkLocCache();
     entry [expedited] void requestLocation(CmiUInt8 id, int peToTell);
@@ -16,6 +21,7 @@ module CkLocation {
   group [migratable] CkLocMgr {
     entry CkLocMgr(CkArrayOptions opts);
     entry [expedited] void immigrate(CkArrayElementMigrateMessage *msg);
+    entry [expedited] void immigrateIntraProcess(CkArrayElementIntraProcessMigrateMessage *msg);
 #ifdef CMK_CUDA
 #if CMK_CUDA
     entry [expedited, threaded] void sendGPUMsg(CmiUInt8 id);
