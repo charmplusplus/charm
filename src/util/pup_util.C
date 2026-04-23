@@ -197,17 +197,27 @@ void PUP::toMem::bytes(void *p,size_t n,size_t itemSize,dataType t, PUPMode mode
 	n*=itemSize;
   if (mode == PUPMode::HOST)
   {
-    memcpy((void *)buf,p,n); 
+    memcpy((void *)buf,p,n);
     buf+=n;
   }
   else
   {
-    //CmiPrintf("[%d] Copying %zu bytes from p=%p to GPU buffer\n", CmiMyPe(), n, p);
-    // For GPU mode, we assume p is a device pointer and copy directly
+    // In pointer-and-get migration mode, the collector records source device
+    // pointers instead of packing data into gpuBuf. The destination will
+    // later pull the data via IPC.
+    if (deviceCollector != nullptr)
+    {
+      deviceCollector->emplace_back(p, n);
+    }
+    else
+    {
+      //CmiPrintf("[%d] Copying %zu bytes from p=%p to GPU buffer\n", CmiMyPe(), n, p);
+      // For GPU mode, we assume p is a device pointer and copy directly
 #if CMK_CUDA
-    cudaMemcpy((void *)gpuBuf, p, n, cudaMemcpyDeviceToDevice);
-    gpuBuf += n;
+      cudaMemcpy((void *)gpuBuf, p, n, cudaMemcpyDeviceToDevice);
+      gpuBuf += n;
 #endif
+    }
   }
 }
 

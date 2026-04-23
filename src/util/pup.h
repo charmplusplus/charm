@@ -61,6 +61,7 @@ class bar {
 #include <type_traits>
 #include <utility>
 #include <functional>
+#include <vector>
 
 #ifndef __cplusplus
 #error "Use pup_c.h for C programs-- pup.h is for C++ programs"
@@ -485,8 +486,14 @@ class toMem : public mem {
   virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
 
  public:
+  // If non-null, DEVICE-mode bytes() calls append (src_ptr, size) to this
+  // collector instead of copying into gpuBuf. Used by intra-node
+  // pointer-and-get style migration where the destination pulls the device
+  // payload via IPC rather than the source packing it into a buffer.
+  std::vector<std::pair<void*, size_t>>* deviceCollector = nullptr;
+
   //Write data to the given buffer
-  toMem(void* Nbuf, 
+  toMem(void* Nbuf,
     void* gpuNbuf,
     const unsigned int purpose = 0, int state = IS_PACKING)
       : mem(state, (myByte*)Nbuf,
@@ -496,7 +503,7 @@ class toMem : public mem {
   }
 
   toMem(void* Nbuf, const unsigned int purpose = 0, int state = IS_PACKING)
-      : mem(state, (myByte*)Nbuf, 
+      : mem(state, (myByte*)Nbuf,
       nullptr,
       purpose)
   {

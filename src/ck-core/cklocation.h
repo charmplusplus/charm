@@ -81,6 +81,10 @@ struct CkLocEntry {
 };
 PUPbytes(CkLocEntry);
 
+#if CMK_CUDA
+#include "ckrdmadevice.h"
+#endif
+
 #include "CkLocation.decl.h"
 
 /************************** Array Messages ****************************/
@@ -112,6 +116,37 @@ public:
   int epoch;
   char* packData;
 };
+
+#if CMK_CUDA
+/**
+ *  Device-migration handle message for the pointer-and-get path.
+ *  Source ships only per-buffer transport info (src_ptr + one of
+ *  {ipc_handle, rdma_tag}); the destination pulls the bytes via the
+ *  DeviceMigrationStrategy selected for the (src, dst) pair.
+ */
+class CkArrayElementMigrateHandleMessage
+  : public CMessage_CkArrayElementMigrateHandleMessage
+{
+public:
+  CkArrayElementMigrateHandleMessage(CmiUInt8 id_, int src_pe_, int nHandles_)
+      : id(id_), src_pe(src_pe_), nHandles(nHandles_) {}
+
+  CmiUInt8 id;
+  int src_pe;
+  int nHandles;
+  CkDeviceMigrateHandle* handles;
+};
+
+/**
+ *  Completion hook message delivered to CkLocMgr::finalizeGPUMigrate() when
+ *  all device-buffer pulls for a given migration have completed.
+ */
+class CkLocMgrFinalizeMsg : public CMessage_CkLocMgrFinalizeMsg
+{
+public:
+  CmiUInt8 id;
+};
+#endif
 
 /**
  *  Intra-process (same CmiNode / SMP mode) migration message. Instead of
@@ -469,6 +504,27 @@ private:
 
   std::unordered_map<CmiUInt8, void*> receivedDeviceMsgs;
 
+  // Source-side state for the pointer-and-get migration path. The chare
+  // objects and location record are detached from this PE's tables but not
+  // destroyed until the destination acks that it has pulled the device
+  // bytes. Only populated when CMK_CUDA is enabled and the handle path is
+  // actually used.
+  struct HeldMigratingChares {
+    CkLocRec* rec;
+    std::vector<CkMigratable*> chares;
+  };
+  std::unordered_map<CmiUInt8, HeldMigratingChares> heldChares;
+
+  // Destination-side state while a handle-path migration is in flight. The
+  // gpuMsg has been allocated and device pulls have been issued; when all
+  // pulls complete, finalizeGPUMigrate(id) runs and drains this map.
+  struct PendingPull {
+    void* gpuMsg;
+    int src_pe;
+    std::vector<void*> openedIpcPtrs;
+  };
+  std::unordered_map<CmiUInt8, PendingPull> pendingPulls;
+
   // The mapping of index to ID is either done via compression or an explicit map,
   // depending on if the bounds of this array are compressible into a 64bit ID.
   CkArrayIndex bounds;
@@ -731,8 +787,14 @@ public:
   // Fast path for intra-process (same CmiNode) migration: transfer live
   // chare objects to the destination PE without packing. Returns false if
   // the fast path is not applicable and the caller should fall through to
-  // the packed emigrate path.
+  // emigrateByValue.
   bool emigrateIntraProcess(CkLocRec* rec, int toPe);
+  // Universal by-value migration path. Packs host state and, if the chare
+  // has GPU-resident data, dispatches the device-buffer transport via a
+  // DeviceMigrationStrategy selected by the src->dst topology. Supports
+  // same-GPU cross-process (MEMCPY), same-host cross-process (IPC), and
+  // cross-host (RDMA via CmiSendDevice/CmiRecvDevice).
+  void emigrateByValue(CkLocRec* rec, int toPe, size_t bufSize, size_t gpuBufSize);
   void informLBPeriod(CkLocRec* rec, int lb_ideal_period);
   void metaLBCallLB(CkLocRec* rec);
 
@@ -752,6 +814,12 @@ public:
   void sendGPUMsg(CmiUInt8 id);
   void immigrateGPU(CmiUInt8& id, int& size, char* &data, CkDeviceBufferPost* post);
   void immigrateGPU(CmiUInt8 id, int size, char* data);
+  void immigrateGPUHandle(CkArrayElementMigrateHandleMessage* msg);
+  // Completion hook fired by DeviceMigrationStrategy when all device pulls
+  // for `msg->id` have completed. Stashes the gpuMsg, runs immigrate() if
+  // the host message has arrived, and acks the source PE.
+  void finalizeGPUMigrate(CkLocMgrFinalizeMsg* msg);
+  void ackGPUMigrate(CmiUInt8 id);
 #endif
   void requestLocation(CmiUInt8 id);
   void requestLocation(const CkArrayIndex& idx);
