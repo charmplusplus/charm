@@ -924,7 +924,7 @@ void UcxRecvDeviceCompleted(void* request, ucs_status_t status,
   }
 }
 
-void LrtsSendDevice(int dest_pe, int src_pe, const void*& ptr, size_t size, uint64_t& tag) {
+void LrtsSendDevice(int dest_rank, int src_rank, const void*& ptr, size_t size, uint64_t& tag) {
   // FIXME: Is this tag generation OK?
   tag = ((uint64_t)CpvAccess(tag_counter)++ << (UCX_TAG_PE_BITS + UCX_TAG_MSG_BITS)) | (CmiMyPe() << UCX_TAG_MSG_BITS) | UCX_MSG_TAG_DEVICE;
 #if CMK_SMP
@@ -932,14 +932,14 @@ void LrtsSendDevice(int dest_pe, int src_pe, const void*& ptr, size_t size, uint
   req->msgBuf = (void*)ptr;
   req->size   = size;
   req->tag    = tag;
-  req->dNode  = CmiNodeOf(dest_pe);
+  req->dNode  = dest_rank;
   req->cb     = UcxSendDeviceCompleted;
   req->op     = UCX_DEVICE_SEND_OP;
 
   PCQueuePush(ucxCtx.txQueue, (char *)req);
 #else
   ucs_status_ptr_t status_ptr;
-  status_ptr = ucp_tag_send_nb(ucxCtx.eps[CmiNodeOf(dest_pe)], (void*)ptr, size,
+  status_ptr = ucp_tag_send_nb(ucxCtx.eps[dest_rank], (void*)ptr, size,
                                ucp_dt_make_contig(1), tag,
                                UcxSendDeviceCompleted);
 
