@@ -3054,7 +3054,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
     bool sameGpuRequirementMet = (gpuBufSize == 0);
 #if CMK_CUDA
     if (gpuBufSize > 0)
-      sameGpuRequirementMet = (CpvAccess(my_device) == hapiDeviceForPe(toPe));
+      sameGpuRequirementMet = (hapiDeviceForPe(CkMyPe()) == hapiDeviceForPe(toPe));
 #endif
     if (sameGpuRequirementMet && emigrateIntraProcess(rec, toPe))
       return;
@@ -3288,14 +3288,13 @@ class IpcStrategy : public DeviceMigrationStrategy {
   void issuePulls(CkLocMgr* mgr, CmiUInt8 id, int /*srcPe*/,
                   const CkDeviceMigrateHandle* handles, int n,
                   void* dstGpuMsg) override {
-    auto& pending = mgr->pendingPulls[id];
     size_t offset = 0;
     cudaStream_t stream = (cudaStream_t)0;
     for (int i = 0; i < n; ++i) {
       void* src = nullptr;
       hapiCheck(hapiIpcOpenMemHandle(&src, handles[i].ipc_handle,
                                      hapiIpcMemLazyEnablePeerAccess));
-      pending.openedIpcPtrs.push_back(src);
+      mgr->registerOpenedIpcPtr(id, src);
       hapiCheck(hapiMemcpyAsync((char*)dstGpuMsg + offset, src, handles[i].size,
                                 hapiMemcpyDeviceToDevice, stream));
       offset += handles[i].size;

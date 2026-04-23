@@ -820,6 +820,13 @@ public:
   // the host message has arrived, and acks the source PE.
   void finalizeGPUMigrate(CkLocMgrFinalizeMsg* msg);
   void ackGPUMigrate(CmiUInt8 id);
+  // Record an IPC-opened device pointer that must be closed when the
+  // pending pull for `id` finalizes. Called by DeviceMigrationStrategy
+  // implementations from issuePulls().
+  void registerOpenedIpcPtr(CmiUInt8 id, void* ptr)
+  {
+    pendingPulls[id].openedIpcPtrs.push_back(ptr);
+  }
 #endif
   void requestLocation(CmiUInt8 id);
   void requestLocation(const CkArrayIndex& idx);
