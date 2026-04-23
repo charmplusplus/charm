@@ -348,11 +348,6 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 
     UCX_LOG(5, "Initialized: preposted reqs %d, rndv thresh %d\n",
             ucxCtx.numRxReqs, ucxCtx.eagerSize);
-
-#if CMK_CUDA
-    CpvInitialize(int, tag_counter);
-    CpvAccess(tag_counter) = 0;
-#endif
 }
 
 static inline UcxRequest* UcxPostRxReqInternal(ucp_tag_t tag, size_t size,
@@ -618,6 +613,10 @@ CmiCommHandle LrtsSendFunc(int destNode, int destPE, int size, char *msg, int mo
 void LrtsPreCommonInit(int everReturn)
 {
     UCX_LOG(2, "LrtsPreCommonInit");
+#if CMK_CUDA
+    CpvInitialize(int, tag_counter);
+    CpvAccess(tag_counter) = 0;
+#endif
 }
 
 void LrtsPostCommonInit(int everReturn)
