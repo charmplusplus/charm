@@ -1925,16 +1925,16 @@ void hapiRecordTime(cudaStream_t stream, cudaEvent_t start) {
 uint64_t hapiCuptiPushObjCorrelation() {
   if (!CsvAccess(gpu_manager).cupti_initialized_) return 0;
 
-  // Get the active Charm++ object
+  // Always push (possibly with id=0 when there's no active migratable chare)
+  // so the paired pop in _ckStopTiming always has a match. The chare may not
+  // be ckInitialized yet at push time but become initialized before the
+  // matching pop, which would otherwise underflow CUPTI's stack.
+  uint64_t obj_id = 0;
   Chare* chare = CkActiveObj();
-  if (!chare) return 0;
-
-  CkMigratable* mig = dynamic_cast<CkMigratable*>(chare);
-  if (!mig) return 0;
-
-  // Use the raw element ID as the external correlation ID
-  // CmiUInt8 is a 64-bit unique object identifier
-  uint64_t obj_id = (uint64_t)mig->ckGetID();
+  if (chare) {
+    if (CkMigratable* mig = dynamic_cast<CkMigratable*>(chare))
+      obj_id = (uint64_t)mig->ckGetID();
+  }
 
   CUPTI_SAFE_CALL(cuptiActivityPushExternalCorrelationId(
       CUPTI_EXTERNAL_CORRELATION_KIND_UNKNOWN, obj_id));

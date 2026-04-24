@@ -486,15 +486,22 @@ void CentralLB::normalizeGPULoad(LDStats* stats)
         if (total_sms <= 0) continue;  // leave scalar gpuTime as-is
 
         double normalized = 0.0;
+        double raw_sum_s = 0.0;
         for (const auto& k : od.gpuKernels) {
             if (k.end_ns <= k.start_ns) continue;
             double duration_s = (k.end_ns - k.start_ns) / 1.0e9;
             double frac = (double)k.sms_used / (double)total_sms;
             if (frac > 1.0) frac = 1.0;
             normalized += duration_s * frac;
+            raw_sum_s  += duration_s;
         }
         od.gpuTime = normalized;
         ++objects_rewritten;
+
+        CmiPrintf("[%d]   obj %zu pe=%d gpu=%lu kernels=%zu raw=%.6fs norm=%.6fs SM-util=%.3f\n",
+                  CkMyPe(), i, from_pe, (unsigned long)gpu_id,
+                  od.gpuKernels.size(), raw_sum_s, normalized,
+                  raw_sum_s > 0.0 ? normalized / raw_sum_s : 0.0);
     }
 
     CmiPrintf("[%d] CentralLB::normalizeGPULoad: rewrote gpuTime for %zu/%zu objects across %zu GPU(s)\n",

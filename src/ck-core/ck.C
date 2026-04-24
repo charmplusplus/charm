@@ -610,7 +610,11 @@ inline void _ckStartTiming(void) {
   auto *active = CkActiveLocRec();
   if (active) active->startTiming();
 #if CMK_CUDA || CMK_HIP
-  if (active) hapiCuptiPushObjCorrelation();
+  // Push unconditionally -- pairs with the unconditional pop in
+  // _ckStopTiming so CUPTI's external-correlation stack stays balanced
+  // even if the active chare transitions ckInitialized state between the
+  // two calls (e.g. during construction).
+  hapiCuptiPushObjCorrelation();
 #endif
 #endif
 }
@@ -619,7 +623,7 @@ inline void _ckStopTiming(void) {
 #if CMK_LBDB_ON
   auto *active = CkActiveLocRec();
 #if CMK_CUDA || CMK_HIP
-  if (active) hapiCuptiPopObjCorrelation();
+  hapiCuptiPopObjCorrelation();
 #endif
   if (active) active->stopTiming();
 #endif
