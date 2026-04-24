@@ -3561,11 +3561,7 @@ void CkLocMgr::finalizeGPUMigrate(CkLocMgrFinalizeMsg* msg)
   delete msg;
 
   auto it = pendingPulls.find(id);
-  if (it == pendingPulls.end()) {
-    CmiPrintf("[PE %d] finalizeGPUMigrate id=%lu: no pending pull (already finalized?)\n",
-              CkMyPe(), (unsigned long)id);
-    return;
-  }
+  if (it == pendingPulls.end()) return;
   PendingPull pending = std::move(it->second);
   pendingPulls.erase(it);
 
@@ -3576,11 +3572,7 @@ void CkLocMgr::finalizeGPUMigrate(CkLocMgrFinalizeMsg* msg)
   bufferedDeviceMigrateMsgs[id] = pending.gpuMsg;
 
   auto hit = bufferedHostMigrateMsgs.find(id);
-  bool hostReady = (hit != bufferedHostMigrateMsgs.end());
-  CmiPrintf("[PE %d] finalizeGPUMigrate id=%lu: GPU data ready, hostMsg_ready=%d src_pe=%d\n",
-            CkMyPe(), (unsigned long)id, (int)hostReady, pending.src_pe);
-
-  if (hostReady) {
+  if (hit != bufferedHostMigrateMsgs.end()) {
     CkArrayElementMigrateMessage* hostMsg = hit->second;
     bufferedHostMigrateMsgs.erase(hit);
     immigrate(hostMsg);
@@ -3657,18 +3649,11 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
 
     if (it == bufferedDeviceMigrateMsgs.end())
     {
-      CmiPrintf("[PE %d] immigrate id=%lu: hostMsg arrived, GPU not ready -> buffer\n",
-                CkMyPe(), (unsigned long)msg->id);
       bufferedHostMigrateMsgs[msg->id] = msg;
       return;
     }
 
-    CmiPrintf("[PE %d] immigrate id=%lu: hostMsg arrived, GPU already ready -> proceed\n",
-              CkMyPe(), (unsigned long)msg->id);
     gpuMsg = it->second;
-  } else {
-    CmiPrintf("[PE %d] immigrate id=%lu: hostMsg (no GPU data)\n",
-              CkMyPe(), (unsigned long)msg->id);
   }
 
   const CkArrayIndex& idx = msg->idx;

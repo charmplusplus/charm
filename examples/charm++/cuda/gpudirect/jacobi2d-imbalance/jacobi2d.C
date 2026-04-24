@@ -511,8 +511,10 @@ class Block : public CBase_Block {
     os << "sendGhosts (" << std::to_string(x) << "," << std::to_string(y) << ")";
     NVTXTracer(os.str(), NVTXColor::PeterRiver);
 
-    CkPrintf("[PE %d] sendGhosts chare(%d,%d) iter=%d\n",
-             CkMyPe(), x, y, my_iter);
+    // Print once every 20 iters so we can see where each chare is without flooding.
+    if (my_iter % 20 == 0) {
+      CkPrintf("[PE %d] chare(%d,%d) iter=%d\n", CkMyPe(), x, y, my_iter);
+    }
 
     // Send ghosts to neighboring chares
     if (use_zerocopy) {
