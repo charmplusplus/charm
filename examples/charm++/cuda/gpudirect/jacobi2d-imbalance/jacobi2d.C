@@ -406,6 +406,8 @@ class Block : public CBase_Block {
   }
 
   void ResumeFromSync() {
+    CkPrintf("[PE %d] ResumeFromSync chare(%d,%d) my_iter=%d\n",
+             CkMyPe(), x, y, my_iter);
     thisProxy[thisIndex].exchangeGhosts();
   }
 
@@ -508,6 +510,9 @@ class Block : public CBase_Block {
     std::ostringstream os;
     os << "sendGhosts (" << std::to_string(x) << "," << std::to_string(y) << ")";
     NVTXTracer(os.str(), NVTXColor::PeterRiver);
+
+    CkPrintf("[PE %d] sendGhosts chare(%d,%d) iter=%d\n",
+             CkMyPe(), x, y, my_iter);
 
     // Send ghosts to neighboring chares
     if (use_zerocopy) {
