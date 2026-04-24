@@ -3589,9 +3589,13 @@ void CkLocMgr::ackGPUMigrate(CmiUInt8 id)
   auto it = heldChares.find(id);
   if (it == heldChares.end()) return;
 
+  // `delete elt` runs ~CkMigratable, which calls myRec->destroy() ->
+  // CkLocMgr::reclaim(rec) -> `delete rec`. The rec is already gone after
+  // the first chare is destroyed, so do NOT delete it->second.rec here --
+  // that would be a double-free (and any subsequent chares sharing the
+  // same rec would also dereference freed memory).
   duringMigration = true;
   for (CkMigratable* elt : it->second.chares) delete elt;
-  delete it->second.rec;
   duringMigration = false;
 
   heldChares.erase(it);
