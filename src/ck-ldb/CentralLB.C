@@ -405,17 +405,14 @@ void CentralLB::Migrated(int waitBarrier)
 #if CMK_LBDB_ON
   if (waitBarrier) {
 	    migrates_completed++;
-      CmiPrintf("[%d] Migrated: completed=%d expected=%d\n",
-                CkMyPe(), migrates_completed, migrates_expected);
+      DEBUGF(("[%d] An object migrated! %d %d\n",CkMyPe(),migrates_completed,migrates_expected));
     if (migrates_completed == migrates_expected) {
-      CmiPrintf("[%d] Migrated: ALL DONE, calling MigrationDone\n", CkMyPe());
       MigrationDone(1);
     }
   }
   else {
     future_migrates_completed ++;
-    CmiPrintf("[%d] Migrated (no barrier): completed=%d expected=%d\n",
-              CkMyPe(), future_migrates_completed, future_migrates_expected);
+    DEBUGF(("[%d] An object migrated with no barrier! %d expected: %d\n",CkMyPe(),future_migrates_completed,future_migrates_expected));
     if (future_migrates_completed == future_migrates_expected)  {
 	CheckMigrationComplete();
     }
@@ -475,7 +472,6 @@ void CentralLB::normalizeGPULoad(LDStats* stats)
         if (ps.gpu_total_sms > 0) gpuSMs[ps.gpu_device_id] = ps.gpu_total_sms;
     }
 
-    size_t objects_rewritten = 0;
     for (size_t i = 0; i < stats->objData.size(); ++i) {
         LDObjData& od = stats->objData[i];
         if (od.gpuKernels.empty()) continue;
@@ -489,29 +485,14 @@ void CentralLB::normalizeGPULoad(LDStats* stats)
         if (total_sms <= 0) continue;  // leave scalar gpuTime as-is
 
         double normalized = 0.0;
-        double raw_sum_s = 0.0;
         for (const auto& k : od.gpuKernels) {
             if (k.end_ns <= k.start_ns) continue;
             double duration_s = (k.end_ns - k.start_ns) / 1.0e9;
             double frac = (double)k.sms_used / (double)total_sms;
             if (frac > 1.0) frac = 1.0;
             normalized += duration_s * frac;
-            raw_sum_s  += duration_s;
         }
         od.gpuTime = normalized;
-        ++objects_rewritten;
-
-        if (CkMyPe() == 0) {
-            CmiPrintf("  obj %zu pe=%d gpu=%lu kernels=%zu raw=%.6fs norm=%.6fs SM-util=%.3f\n",
-                      i, from_pe, (unsigned long)gpu_id,
-                      od.gpuKernels.size(), raw_sum_s, normalized,
-                      raw_sum_s > 0.0 ? normalized / raw_sum_s : 0.0);
-        }
-    }
-
-    if (CkMyPe() == 0) {
-        CmiPrintf("CentralLB::normalizeGPULoad: rewrote gpuTime for %zu/%zu objects across %zu GPU(s)\n",
-                  objects_rewritten, stats->objData.size(), gpuSMs.size());
     }
 }
 #endif
@@ -1117,15 +1098,12 @@ void CentralLB::ProcessReceiveMigration()
   CmiAssert(migrates_expected <= 0 || migrates_completed == migrates_expected);
   migrates_expected = 0;
   future_migrates_expected = 0;
-  int local_out = 0, local_in = 0, same_pe = 0, cross_node = 0;
   for(i=0; i < m->n_moves; i++) {
     MigrateInfo& move = m->moves[i];
     #if CMK_GLOBAL_LOCATION_UPDATE
       UpdateLocation(move);
     #endif
     const int me = CkMyPe();
-    if (move.from_pe == move.to_pe) same_pe++;
-    if (CmiNodeOf(move.from_pe) != CmiNodeOf(move.to_pe)) cross_node++;
     if (move.from_pe == me && move.to_pe != me) {
 #if CMK_DRONE_MODE
       int to_pe_rank0 = CMK_RANK_0(move.to_pe);
@@ -1134,7 +1112,6 @@ void CentralLB::ProcessReceiveMigration()
 #endif
 
       DEBUGF(("[%d] migrating object to %d\n",move.from_pe,move.to_pe));
-      ++local_out;
       // migrate object, in case it is already gone, inform toPe
       if (lbmgr->Migrate(move.obj,move.to_pe) == 0)
          thisProxy[move.to_pe].MissMigrate(!move.async_arrival);
@@ -1144,15 +1121,10 @@ void CentralLB::ProcessReceiveMigration()
       if(me != to_pe_rank0) continue;
 #endif
        DEBUGF(("[%d] expecting object from %d\n",move.to_pe,move.from_pe));
-      ++local_in;
       if (!move.async_arrival) migrates_expected++;
       else future_migrates_expected++;
     }
   }
-  CmiPrintf("[%d] ProcessReceiveMigration: n_moves=%d same_pe=%d cross_node=%d "
-            "local_out=%d local_in=%d migrates_expected=%d\n",
-            CkMyPe(), m->n_moves, same_pe, cross_node,
-            local_out, local_in, migrates_expected);
 
   DEBUGF(("[%d] in ReceiveMigration %d moves expected: %d future expected: %d\n",CkMyPe(),m->n_moves, migrates_expected, future_migrates_expected));
   // if (_lb_debug) CkPrintf("[%d] expecting %d objects migrating.\n", CkMyPe(), migrates_expected);
@@ -1169,14 +1141,8 @@ void CentralLB::ProcessReceiveMigration()
       LBManagerObj()->set_avail_vector(m->avail_vector, -2);
   }
 
-  if (migrates_expected == 0 || migrates_completed == migrates_expected) {
-    CmiPrintf("[%d] ProcessReceiveMigration END: expected=%d completed=%d -> MigrationDone(1)\n",
-              CkMyPe(), migrates_expected, migrates_completed);
+  if (migrates_expected == 0 || migrates_completed == migrates_expected)
     MigrationDone(1);
-  } else {
-    CmiPrintf("[%d] ProcessReceiveMigration END: expected=%d completed=%d -> wait for Migrated\n",
-              CkMyPe(), migrates_expected, migrates_completed);
-  }
   delete m;
 #endif
 }
@@ -1260,7 +1226,6 @@ void CentralLB::MigrationDone(int balancing)
 
 void CentralLB::MigrationDoneImpl (int balancing)
 {
-  CmiPrintf("[%d] MigrationDoneImpl ENTER balancing=%d\n", CkMyPe(), balancing);
 
 #if CMK_LBDB_ON
   migrates_completed = 0;
@@ -1282,14 +1247,12 @@ void CentralLB::MigrationDoneImpl (int balancing)
   LoadbalanceDone(balancing);        // callback
   // if sync resume invoke a barrier
   if (balancing && _lb_args.syncResume()) {
-    CmiPrintf("[%d] MigrationDoneImpl: contributing to ResumeClients reduction\n", CkMyPe());
     contribute(CkCallback(CkReductionTarget(CentralLB, ResumeClients),
                 thisProxy));
   }
   else{
     {
-      CmiPrintf("[%d] MigrationDoneImpl: calling ResumeClients(%d) locally\n", CkMyPe(), balancing);
-      thisProxy [CkMyPe()].ResumeClients(balancing);
+	thisProxy [CkMyPe()].ResumeClients(balancing);
     }
   }
 #if CMK_GRID_QUEUE_AVAILABLE
@@ -1301,13 +1264,11 @@ void CentralLB::MigrationDoneImpl (int balancing)
 
 void CentralLB::ResumeClients()
 {
-  CmiPrintf("[%d] ResumeClients() (reduction target) fired\n", CkMyPe());
   ResumeClients(1);
 }
 
 void CentralLB::ResumeClients(int balancing)
 {
-  CmiPrintf("[%d] ResumeClients(%d) ENTER\n", CkMyPe(), balancing);
 #if CMK_LBDB_ON
   //CkPrintf("[%d] Resuming clients. balancing:%d.\n",CkMyPe(),balancing);
 

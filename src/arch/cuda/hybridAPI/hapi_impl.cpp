@@ -542,23 +542,8 @@ void hapiProcessCuptiBuffers() {
 
     free(item.buffer);
   }
-  CmiPrintf("size of correlation DB is: %zu\n", gm.cupti_correlation_db_.size());
-  CmiPrintf("size of obj_kernel_records_ map is: %zu\n", gm.cupti_obj_kernel_records_.size());
-  CmiPrintf("number of kernel records processed: %u\n", kernel_count);
-  CmiPrintf("number of correlation records processed: %u\n", corr_count);
-
-  if (!gm.cupti_obj_kernel_records_.empty()) {
-    CkPrintf("[PE %d] CUPTI: %zu objects with kernel records:\n",
-             CmiMyPe(), gm.cupti_obj_kernel_records_.size());
-    for (auto& kv : gm.cupti_obj_kernel_records_) {
-      uint64_t total_ns = 0;
-      for (auto& r : kv.second) total_ns += (r.end_ns - r.start_ns);
-      CkPrintf("[PE %d]   objID=%lu  kernels=%zu  total_ns=%lu (%.6f s)\n",
-               CmiMyPe(), kv.first, kv.second.size(), total_ns, total_ns / 1.0e9);
-    }
-  } else {
-    CkPrintf("[PE %d] CUPTI: no obj kernel records recorded (map empty)\n", CmiMyPe());
-  }
+  (void)kernel_count;
+  (void)corr_count;
 }
 
 //TODO: safely handle SMP mode
