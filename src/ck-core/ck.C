@@ -597,16 +597,30 @@ inline Chare *_popObj(void) {
   }
 }
 
+#if CMK_LBDB_ON && (CMK_CUDA || CMK_HIP)
+// Declared in hapi.h; forward-declared here to avoid pulling in the full HAPI
+// header this early in ck.C. These bracket the entry-method body so CUPTI
+// kernel records can be correlated back to the active migratable object.
+extern uint64_t hapiCuptiPushObjCorrelation();
+extern void     hapiCuptiPopObjCorrelation();
+#endif
+
 inline void _ckStartTiming(void) {
 #if CMK_LBDB_ON
   auto *active = CkActiveLocRec();
   if (active) active->startTiming();
+#if CMK_CUDA || CMK_HIP
+  if (active) hapiCuptiPushObjCorrelation();
+#endif
 #endif
 }
 
 inline void _ckStopTiming(void) {
 #if CMK_LBDB_ON
   auto *active = CkActiveLocRec();
+#if CMK_CUDA || CMK_HIP
+  if (active) hapiCuptiPopObjCorrelation();
+#endif
   if (active) active->stopTiming();
 #endif
 }
