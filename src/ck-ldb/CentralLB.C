@@ -1169,8 +1169,14 @@ void CentralLB::ProcessReceiveMigration()
       LBManagerObj()->set_avail_vector(m->avail_vector, -2);
   }
 
-  if (migrates_expected == 0 || migrates_completed == migrates_expected)
+  if (migrates_expected == 0 || migrates_completed == migrates_expected) {
+    CmiPrintf("[%d] ProcessReceiveMigration END: expected=%d completed=%d -> MigrationDone(1)\n",
+              CkMyPe(), migrates_expected, migrates_completed);
     MigrationDone(1);
+  } else {
+    CmiPrintf("[%d] ProcessReceiveMigration END: expected=%d completed=%d -> wait for Migrated\n",
+              CkMyPe(), migrates_expected, migrates_completed);
+  }
   delete m;
 #endif
 }
@@ -1254,6 +1260,7 @@ void CentralLB::MigrationDone(int balancing)
 
 void CentralLB::MigrationDoneImpl (int balancing)
 {
+  CmiPrintf("[%d] MigrationDoneImpl ENTER balancing=%d\n", CkMyPe(), balancing);
 
 #if CMK_LBDB_ON
   migrates_completed = 0;
