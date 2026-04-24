@@ -609,22 +609,12 @@ inline void _ckStartTiming(void) {
 #if CMK_LBDB_ON
   auto *active = CkActiveLocRec();
   if (active) active->startTiming();
-#if CMK_CUDA || CMK_HIP
-  // Push unconditionally -- pairs with the unconditional pop in
-  // _ckStopTiming so CUPTI's external-correlation stack stays balanced
-  // even if the active chare transitions ckInitialized state between the
-  // two calls (e.g. during construction).
-  hapiCuptiPushObjCorrelation();
-#endif
 #endif
 }
 
 inline void _ckStopTiming(void) {
 #if CMK_LBDB_ON
   auto *active = CkActiveLocRec();
-#if CMK_CUDA || CMK_HIP
-  hapiCuptiPopObjCorrelation();
-#endif
   if (active) active->stopTiming();
 #endif
 }
@@ -634,6 +624,13 @@ void CkCallstackPush(Chare *obj) {
   _ckStopTiming();    // suspend timing of the previous obj
   _pushObj(obj);      // push the current object onto the stack
   _ckStartTiming();   // start timing the current obj
+#if CMK_LBDB_ON && (CMK_CUDA || CMK_HIP)
+  // After _pushObj, `obj` is the active chare. Push a CUPTI external
+  // correlation ID (obj's lb id, or 0 when not migratable / CUPTI not
+  // yet initialised) so kernels launched until the matching Pop attribute
+  // to this chare. Structurally paired 1:1 with CkCallstackPop.
+  hapiCuptiPushObjCorrelation();
+#endif
 }
 
 // removes all instances of ( obj ) from the stack
@@ -652,6 +649,10 @@ void CkCallstackUnwind(Chare *obj) {
 
 // pops ( obj ) from the stack (and manages timing)
 void CkCallstackPop(Chare *obj) {
+#if CMK_LBDB_ON && (CMK_CUDA || CMK_HIP)
+  // Paired 1:1 with the push in CkCallstackPush.
+  hapiCuptiPopObjCorrelation();
+#endif
   _ckStopTiming();        // stop timing the current obj
   auto *popd = _popObj(); // pop it from the stack
   CkAssertMsg(!popd || popd == obj, "object tracking mismatch");
