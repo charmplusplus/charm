@@ -1282,14 +1282,16 @@ void CentralLB::MigrationDoneImpl (int balancing)
   LoadbalanceDone(balancing);        // callback
   // if sync resume invoke a barrier
   if (balancing && _lb_args.syncResume()) {
+    CmiPrintf("[%d] MigrationDoneImpl: contributing to ResumeClients reduction\n", CkMyPe());
     contribute(CkCallback(CkReductionTarget(CentralLB, ResumeClients),
                 thisProxy));
   }
   else{
     {
-	thisProxy [CkMyPe()].ResumeClients(balancing);
-    }	
-  }	
+      CmiPrintf("[%d] MigrationDoneImpl: calling ResumeClients(%d) locally\n", CkMyPe(), balancing);
+      thisProxy [CkMyPe()].ResumeClients(balancing);
+    }
+  }
 #if CMK_GRID_QUEUE_AVAILABLE
   CmiGridQueueDeregisterAll ();
   CpvAccess(CkGridObject) = NULL;
@@ -1299,11 +1301,13 @@ void CentralLB::MigrationDoneImpl (int balancing)
 
 void CentralLB::ResumeClients()
 {
+  CmiPrintf("[%d] ResumeClients() (reduction target) fired\n", CkMyPe());
   ResumeClients(1);
 }
 
 void CentralLB::ResumeClients(int balancing)
 {
+  CmiPrintf("[%d] ResumeClients(%d) ENTER\n", CkMyPe(), balancing);
 #if CMK_LBDB_ON
   //CkPrintf("[%d] Resuming clients. balancing:%d.\n",CkMyPe(),balancing);
 
