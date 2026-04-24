@@ -46,10 +46,21 @@ public:
 
   //Initiate a migration to the given processor
   inline void ckMigrate(int toPe) {myRec->migrateMe(toPe);}
-  
-  /// Called by the system just before and after migration to another processor:  
+
+  /// Called by the system just before and after migration to another processor:
   virtual void ckAboutToMigrate(void); /*default is empty*/
   virtual void ckJustMigrated(void); /*default is empty*/
+
+#if CMK_LBDB_ON
+  /// Remove this chare from the AtSync barrier so that the LB will not
+  /// invoke ResumeFromSync on it. Used by the GPU-aware migration path
+  /// when the source-side chare must stay alive (held in CkLocMgr) until
+  /// the destination acks that the GPU pulls have completed -- without
+  /// this, the held chare would continue iterating in parallel with the
+  /// migrated copy. The chare's ~CkMigratable will see barrierRegistered
+  /// is already false and skip the duplicate removeClient call.
+  void ckSuspendBarrierForDeferredDestroy();
+#endif
 
   void recvLBPeriod(void *data);
   void metaLBCallLB();

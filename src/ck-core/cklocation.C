@@ -1944,6 +1944,20 @@ int CkMigratable::ckPrepareIntraProcessMigrate()
   return epoch;
 }
 
+#if CMK_LBDB_ON
+void CkMigratable::ckSuspendBarrierForDeferredDestroy()
+{
+  // Remove this chare from the AtSync barrier (so it won't be woken by
+  // the next ResumeClients). Keep myRec alive; the chare is still held
+  // by CkLocMgr and will be deleted when the migration ack arrives.
+  if (usesAtSync && barrierRegistered)
+  {
+    myRec->getSyncBarrier()->removeClient(ldBarrierHandle);
+    barrierRegistered = false;
+  }
+}
+#endif
+
 void CkMigratable::ckFinalizeIntraProcessMigrate(CkLocRec* newRec, int epoch)
 {
   myRec = newRec;
@@ -3495,11 +3509,18 @@ void CkLocMgr::emigrateByValue(CkLocRec* rec, int toPe, size_t bufSize,
 
     // Detach chares from tables without destroying. The destructor only
     // runs when ackGPUMigrate arrives, guaranteeing the dst pulls are done.
+    // Also remove each chare's AtSync barrier client so the LB does NOT
+    // invoke ResumeFromSync on the held chare -- otherwise the held chare
+    // continues iterating on the source in parallel with the migrated copy
+    // on the destination, producing duplicate state.
     HeldMigratingChares held;
     held.rec = rec;
     for (auto itr = managers.begin(); itr != managers.end(); ++itr) {
       CkMigratable* elt = itr->second->getEltFromArrMgr(id);
       if (elt) {
+#if CMK_LBDB_ON
+        elt->ckSuspendBarrierForDeferredDestroy();
+#endif
         held.chares.push_back(elt);
         itr->second->eraseEltFromArrMgr(id);
       }
