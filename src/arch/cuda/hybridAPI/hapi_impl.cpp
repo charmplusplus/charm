@@ -20,6 +20,7 @@
 #include "converse.h"
 #include "ckrescale.h"
 #include "charm++.h"
+#include "cklocrec.h"
 
 #include "hapi.h"
 #include "hapi_impl.h"
@@ -1925,15 +1926,16 @@ void hapiRecordTime(cudaStream_t stream, cudaEvent_t start) {
 uint64_t hapiCuptiPushObjCorrelation() {
   if (!CsvAccess(gpu_manager).cupti_initialized_) return 0;
 
-  // Always push (possibly with id=0 when there's no active migratable chare)
-  // so the paired pop in _ckStopTiming always has a match. The chare may not
-  // be ckInitialized yet at push time but become initialized before the
-  // matching pop, which would otherwise underflow CUPTI's stack.
+  // Always push (possibly with id=0 when no fully-constructed migratable is
+  // active) so the paired pop in CkCallstackPop always finds a match. Mirror
+  // CkActiveLocRec's guard: only dereference the object if ckInitialized is
+  // true -- otherwise the vtable / myRec field may be garbage (Chare* was
+  // pushed before the Chare base constructor finished).
   uint64_t obj_id = 0;
   Chare* chare = CkActiveObj();
-  if (chare) {
-    if (CkMigratable* mig = dynamic_cast<CkMigratable*>(chare))
-      obj_id = (uint64_t)mig->ckGetID();
+  if (chare && chare->ckInitialized) {
+    if (CkLocRec* rec = chare->getCkLocRec())
+      obj_id = (uint64_t)rec->getID();
   }
 
   CUPTI_SAFE_CALL(cuptiActivityPushExternalCorrelationId(
