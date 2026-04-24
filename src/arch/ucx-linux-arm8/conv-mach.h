@@ -77,7 +77,7 @@
  * has the destination PE for a migrated ID. Required for GPU-aware LB
  * paths that consult dest_pe on the sender (see ckrdmadevice.C).
  * Currently disabled while debugging a hang it introduces on imbalanced jacobi. */
-#define CMK_GLOBAL_LOCATION_UPDATE     0
+#define CMK_GLOBAL_LOCATION_UPDATE     1
 
 #define CMK_64BIT                      1
 #define CMK_AMD64                      0

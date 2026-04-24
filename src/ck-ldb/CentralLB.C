@@ -405,14 +405,17 @@ void CentralLB::Migrated(int waitBarrier)
 #if CMK_LBDB_ON
   if (waitBarrier) {
 	    migrates_completed++;
-      DEBUGF(("[%d] An object migrated! %d %d\n",CkMyPe(),migrates_completed,migrates_expected));
+      CmiPrintf("[%d] Migrated: completed=%d expected=%d\n",
+                CkMyPe(), migrates_completed, migrates_expected);
     if (migrates_completed == migrates_expected) {
+      CmiPrintf("[%d] Migrated: ALL DONE, calling MigrationDone\n", CkMyPe());
       MigrationDone(1);
     }
   }
   else {
     future_migrates_completed ++;
-    DEBUGF(("[%d] An object migrated with no barrier! %d expected: %d\n",CkMyPe(),future_migrates_completed,future_migrates_expected));
+    CmiPrintf("[%d] Migrated (no barrier): completed=%d expected=%d\n",
+              CkMyPe(), future_migrates_completed, future_migrates_expected);
     if (future_migrates_completed == future_migrates_expected)  {
 	CheckMigrationComplete();
     }
@@ -1114,14 +1117,15 @@ void CentralLB::ProcessReceiveMigration()
   CmiAssert(migrates_expected <= 0 || migrates_completed == migrates_expected);
   migrates_expected = 0;
   future_migrates_expected = 0;
-  // CmiPrintf("[%d] ProcessReceiveMigration: n_moves=%d\n", CkMyPe(), m->n_moves);
+  int local_out = 0, local_in = 0, same_pe = 0, cross_node = 0;
   for(i=0; i < m->n_moves; i++) {
     MigrateInfo& move = m->moves[i];
     #if CMK_GLOBAL_LOCATION_UPDATE
-      // CmiPrintf("[%d] Updating location for obj id=%llu from %d to %d\n", CkMyPe(), move.obj.id, move.from_pe, move.to_pe);
       UpdateLocation(move);
     #endif
     const int me = CkMyPe();
+    if (move.from_pe == move.to_pe) same_pe++;
+    if (CmiNodeOf(move.from_pe) != CmiNodeOf(move.to_pe)) cross_node++;
     if (move.from_pe == me && move.to_pe != me) {
 #if CMK_DRONE_MODE
       int to_pe_rank0 = CMK_RANK_0(move.to_pe);
@@ -1130,6 +1134,7 @@ void CentralLB::ProcessReceiveMigration()
 #endif
 
       DEBUGF(("[%d] migrating object to %d\n",move.from_pe,move.to_pe));
+      ++local_out;
       // migrate object, in case it is already gone, inform toPe
       if (lbmgr->Migrate(move.obj,move.to_pe) == 0)
          thisProxy[move.to_pe].MissMigrate(!move.async_arrival);
@@ -1139,10 +1144,15 @@ void CentralLB::ProcessReceiveMigration()
       if(me != to_pe_rank0) continue;
 #endif
        DEBUGF(("[%d] expecting object from %d\n",move.to_pe,move.from_pe));
+      ++local_in;
       if (!move.async_arrival) migrates_expected++;
       else future_migrates_expected++;
     }
   }
+  CmiPrintf("[%d] ProcessReceiveMigration: n_moves=%d same_pe=%d cross_node=%d "
+            "local_out=%d local_in=%d migrates_expected=%d\n",
+            CkMyPe(), m->n_moves, same_pe, cross_node,
+            local_out, local_in, migrates_expected);
 
   DEBUGF(("[%d] in ReceiveMigration %d moves expected: %d future expected: %d\n",CkMyPe(),m->n_moves, migrates_expected, future_migrates_expected));
   // if (_lb_debug) CkPrintf("[%d] expecting %d objects migrating.\n", CkMyPe(), migrates_expected);
