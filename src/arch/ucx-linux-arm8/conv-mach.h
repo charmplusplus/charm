@@ -73,6 +73,11 @@
 /* enables the load balancer framework. set to 1 for almost all the machines */
 #define CMK_LBDB_ON                    1
 
+/* Broadcast post-migration location updates so every PE's location cache
+ * has the destination PE for a migrated ID. Required for GPU-aware LB
+ * paths that consult dest_pe on the sender (see ckrdmadevice.C). */
+#define CMK_GLOBAL_LOCATION_UPDATE     1
+
 #define CMK_64BIT                      1
 #define CMK_AMD64                      0
 
