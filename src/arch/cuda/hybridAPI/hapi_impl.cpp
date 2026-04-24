@@ -2060,7 +2060,10 @@ void hapiErrorDie(cudaError_t retCode, const char* code, const char* file, int l
 uint64_t hapiMyDevice() {
   int physical_node_id = CmiPhysicalNodeID(CmiMyPe());
   int my_device = CpvAccess(my_device);
-  return (static_cast<uint64_t>(physical_node_id) << 32) | my_device;
+  uint64_t id = (static_cast<uint64_t>(physical_node_id) << 32) | (uint64_t)my_device;
+  CmiPrintf("[PE %d] hapiMyDevice: physnode=%d my_device=%d -> id=0x%lx\n",
+            CkMyPe(), physical_node_id, my_device, (unsigned long)id);
+  return id;
 }
 
 int hapiDeviceForPe(int pe) {
