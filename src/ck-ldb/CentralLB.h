@@ -290,7 +290,7 @@ public:
   int from_pe;
   int pe_speed;
 #if CMK_CUDA
-  int gpu_device_id;
+  uint64_t gpu_device_id;  // matches ProcStats::gpu_device_id (BaseLB.h)
   int gpu_total_sms;
 #endif
   LBRealType total_walltime;

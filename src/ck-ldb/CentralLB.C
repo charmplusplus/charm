@@ -341,9 +341,6 @@ void CentralLB::BuildStatsMsg()
 #if CMK_CUDA
   msg->gpu_device_id = hapiMyDevice();
   msg->gpu_total_sms = hapiMyDeviceTotalSMs();
-  CmiPrintf("[PE %d] CLBStatsMsg: gpu_device_id=0x%lx gpu_total_sms=%d physnode=%d\n",
-            CkMyPe(), (unsigned long)msg->gpu_device_id, msg->gpu_total_sms,
-            CmiPhysicalNodeID(CmiMyPe()));
 #endif
 
   DEBUGF(("Processor %d Total time (wall,cpu) = %f Idle = %f Bg = %f\n", CkMyPe(),msg->total_walltime,msg->idletime,msg->bg_walltime));
