@@ -157,11 +157,17 @@ void CentralLB::CallLB()
 if (CmiMyRank() == 0)
 {
   double start = CkWallTimer();
+  // CUPTI only dispatches completed-kernel buffers. Kernels still executing
+  // on any stream — including HAPI-internal stream-pool streams the app
+  // doesn't touch — keep their buffer un-dispatched. Sync the device first
+  // so flushAll can actually return everything.
+  cudaError_t sync_rc = cudaDeviceSynchronize();
   CUptiResult flush_rc = cuptiActivityFlushAll(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED);
   const char* flush_str = nullptr;
   cuptiGetResultString(flush_rc, &flush_str);
-  CmiPrintf("HAPI[diag pid=%d pe=%d]: cuptiActivityFlushAll rc=%d (%s)\n",
-            (int)getpid(), CmiMyPe(), (int)flush_rc,
+  CmiPrintf("HAPI[diag pid=%d pe=%d]: cudaDeviceSynchronize rc=%d  "
+            "cuptiActivityFlushAll rc=%d (%s)\n",
+            (int)getpid(), CmiMyPe(), (int)sync_rc, (int)flush_rc,
             flush_str ? flush_str : "(null)");
   hapiProcessCuptiBuffers();
 }
