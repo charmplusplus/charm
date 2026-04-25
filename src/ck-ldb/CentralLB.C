@@ -5,6 +5,7 @@
 /*@{*/
 
 #include <algorithm>
+#include <set>
 #include <charm++.h>
 #include "ck.h"
 #include "envelope.h"
@@ -449,51 +450,148 @@ void CentralLB::buildStats()
 
 #if CMK_CUDA
 // Overwrite each migratable object's scalar gpuTime with an SM-utilization-
-// normalized load, computed from the per-kernel records collected via CUPTI.
+// normalized load that accounts for cross-kernel contention on shared GPUs.
 //
-// For each kernel record (start_ns, end_ns, sms_used) attributed to an object,
-// its contribution to the object's GPU load is:
-//     duration_s * (sms_used / total_sms_on_that_gpu)
+// Per-GPU FIFO sweep-line over all kernel intervals from all PEs sharing the
+// device. At each event (kernel start or end), the current set of active
+// kernels is iterated in submission order (earliest start_ns first); each
+// kernel is granted min(its sms_used, remaining capacity). The kernel's
+// effective SM share over the segment, divided by N_SM, is integrated into
+// the owning object's load.
 //
-// First-pass model: single sms_used per kernel, uniform across duration,
-// no FIFO throttling or wave-level breakdown. Cross-PE overlap on a shared
-// GPU is handled by the fact that CUPTI timestamps across PEs sharing a
-// device come from the same GPU clock — so future passes that sweep-line
-// over all records of a gpu_device_id already have compatible timebases.
+// This matches the GPU's block-level FIFO scheduler: an already-running
+// kernel keeps its full SM allocation, and a later-arriving kernel gets only
+// the leftover capacity until earlier kernels release SMs. CUPTI device-clock
+// timestamps from PEs sharing a physical GPU are directly comparable, so no
+// cross-PE clock synchronization is needed.
 void CentralLB::normalizeGPULoad(LDStats* stats)
 {
     if (stats == NULL) return;
 
-    // Per-GPU SM count, keyed by gpu_device_id. A PE without records still
-    // contributes its total_sms here so we know the device size.
+    // Map gpu_device_id -> total SMs (advertised by any PE on that GPU).
     std::unordered_map<uint64_t, int> gpuSMs;
     for (size_t p = 0; p < stats->procs.size(); ++p) {
         const auto& ps = stats->procs[p];
         if (ps.gpu_total_sms > 0) gpuSMs[ps.gpu_device_id] = ps.gpu_total_sms;
     }
 
+    // Group kernels by GPU; each entry remembers its owning object index so
+    // we can attribute load back after the sweep.
+    struct GPUKernel {
+        int      obj_idx;
+        uint64_t start_ns;
+        uint64_t end_ns;
+        int      sms_used;
+    };
+    std::unordered_map<uint64_t, std::vector<GPUKernel>> kernelsByGPU;
     for (size_t i = 0; i < stats->objData.size(); ++i) {
-        LDObjData& od = stats->objData[i];
+        const LDObjData& od = stats->objData[i];
         if (od.gpuKernels.empty()) continue;
-
         int from_pe = stats->from_proc[i];
         if (from_pe < 0 || from_pe >= (int)stats->procs.size()) continue;
         uint64_t gpu_id = stats->procs[from_pe].gpu_device_id;
-
-        auto it = gpuSMs.find(gpu_id);
-        int total_sms = (it == gpuSMs.end()) ? 0 : it->second;
-        if (total_sms <= 0) continue;  // leave scalar gpuTime as-is
-
-        double normalized = 0.0;
+        auto& vec = kernelsByGPU[gpu_id];
         for (const auto& k : od.gpuKernels) {
             if (k.end_ns <= k.start_ns) continue;
-            double duration_s = (k.end_ns - k.start_ns) / 1.0e9;
-            double frac = (double)k.sms_used / (double)total_sms;
-            if (frac > 1.0) frac = 1.0;
-            normalized += duration_s * frac;
+            vec.push_back({(int)i, k.start_ns, k.end_ns, k.sms_used});
         }
-        od.gpuTime = normalized;
     }
+
+    // Accumulator: object index -> normalized load in seconds.
+    std::unordered_map<int, double> objLoad;
+
+    size_t total_kernels = 0;
+    for (auto& kv : kernelsByGPU) {
+        const uint64_t gpu_id = kv.first;
+        std::vector<GPUKernel>& kernels = kv.second;
+        if (kernels.empty()) continue;
+
+        auto smsIt = gpuSMs.find(gpu_id);
+        int total_sms = (smsIt == gpuSMs.end()) ? 0 : smsIt->second;
+        if (total_sms <= 0) continue;  // unknown device size — skip
+        total_kernels += kernels.size();
+
+        // Build event list: 2 events per kernel.
+        // kind: 0 = END, 1 = START. END sorts before START on time ties so a
+        // kernel ending at instant t doesn't briefly count alongside one
+        // starting at the same instant.
+        struct Event { uint64_t time; int kind; int kidx; };
+        std::vector<Event> events;
+        events.reserve(2 * kernels.size());
+        for (int ki = 0; ki < (int)kernels.size(); ++ki) {
+            events.push_back({kernels[ki].start_ns, 1, ki});
+            events.push_back({kernels[ki].end_ns,   0, ki});
+        }
+        std::sort(events.begin(), events.end(),
+                  [](const Event& a, const Event& b) {
+                      if (a.time != b.time) return a.time < b.time;
+                      return a.kind < b.kind;
+                  });
+
+        // Active set ordered by start_ns (then kernel index for stability)
+        // so iteration order is FIFO by submission.
+        auto cmpActive = [&kernels](int a, int b) {
+            if (kernels[a].start_ns != kernels[b].start_ns)
+                return kernels[a].start_ns < kernels[b].start_ns;
+            return a < b;
+        };
+        std::set<int, decltype(cmpActive)> active(cmpActive);
+
+        uint64_t t_prev = events.front().time;
+        for (const auto& ev : events) {
+            if (ev.time > t_prev && !active.empty()) {
+                double dt_s = (double)(ev.time - t_prev) / 1.0e9;
+                int remaining = total_sms;
+                for (int ki : active) {       // FIFO iteration
+                    if (remaining <= 0) break;
+                    int eff = std::min(kernels[ki].sms_used, remaining);
+                    if (eff <= 0) continue;
+                    remaining -= eff;
+                    objLoad[kernels[ki].obj_idx] +=
+                        dt_s * ((double)eff / (double)total_sms);
+                }
+            }
+            if (ev.kind == 1) active.insert(ev.kidx);
+            else              active.erase(ev.kidx);
+            t_prev = ev.time;
+        }
+    }
+
+    // Write back. Only overwrite gpuTime for objects we actually saw kernels
+    // for; leave others untouched. Print before/after per object.
+    //
+    // Pre-overwrite gpuTime (set by setGPUKernelRecords) is the sum of raw
+    // kernel durations — i.e. the unnormalized load that the old pipeline
+    // would have used.
+    size_t objects_rewritten = 0;
+    std::vector<int> rewritten_idxs;
+    rewritten_idxs.reserve(objLoad.size());
+    for (auto& kv : objLoad) rewritten_idxs.push_back(kv.first);
+    std::sort(rewritten_idxs.begin(), rewritten_idxs.end());
+
+    for (int idx : rewritten_idxs) {
+        if (idx < 0 || idx >= (int)stats->objData.size()) continue;
+        LDObjData& od = stats->objData[idx];
+        double unnorm = od.gpuTime;          // raw sum of durations
+        double norm   = objLoad[idx];        // contention-adjusted
+        int    pe     = stats->from_proc[idx];
+        uint64_t gpu_id = (pe >= 0 && pe < (int)stats->procs.size())
+                             ? stats->procs[pe].gpu_device_id : 0;
+        CkPrintf("[%d] normLoad: obj=%d id=%lu pe=%d gpu=0x%lx "
+                 "kernels=%zu  unnormalized=%.6f s  normalized=%.6f s  "
+                 "(ratio=%.3f)\n",
+                 CkMyPe(), idx, (unsigned long)od.objID(), pe,
+                 (unsigned long)gpu_id, od.gpuKernels.size(),
+                 unnorm, norm,
+                 unnorm > 0.0 ? norm / unnorm : 0.0);
+        od.gpuTime = norm;
+        ++objects_rewritten;
+    }
+
+    CmiPrintf("[%d] CentralLB::normalizeGPULoad: %zu kernels across %zu GPU(s); "
+              "rewrote gpuTime for %zu/%zu objects (FIFO sweep-line)\n",
+              CkMyPe(), total_kernels, kernelsByGPU.size(),
+              objects_rewritten, stats->objData.size());
 }
 #endif
 
