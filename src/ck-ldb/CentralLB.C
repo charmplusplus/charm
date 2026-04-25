@@ -156,25 +156,32 @@ void CentralLB::CallLB()
 #if CMK_CUDA
 if (CmiMyRank() == 0)
 {
-  double start = CkWallTimer();
-  // Drain CUPTI before reading per-object kernel records.
-  //   1. cudaDeviceSynchronize: ensures all kernels — including those on
-  //      HAPI-internal stream-pool streams the app doesn't touch — have
-  //      finished, so CUPTI can finalize their activity records.
-  //   2. cuptiActivityFlushAll(FLUSH_FORCED): the more-aggressive variant.
-  //      Empirically still does NOT deliver the currently-open in-progress
-  //      buffer in our SMP+CUPTI setup — that's why we keep the buffer size
-  //      small (see cuptiBufferRequested) so the residual in-flight records
-  //      at LB time are minimal.
-  cudaError_t sync_rc = cudaDeviceSynchronize();
-  CUptiResult flush_rc = cuptiActivityFlushAll(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED);
-  const char* flush_str = nullptr;
-  cuptiGetResultString(flush_rc, &flush_str);
-  CmiPrintf("HAPI[diag pid=%d pe=%d]: cudaDeviceSynchronize rc=%d  "
-            "cuptiActivityFlushAll(FORCED) rc=%d (%s)\n",
-            (int)getpid(), CmiMyPe(), (int)sync_rc, (int)flush_rc,
-            flush_str ? flush_str : "(null)");
-  hapiProcessCuptiBuffers();
+  // Zero-loss CUPTI drain at LB time: cuptiFinalize is the only API that's
+  // guaranteed by the docs to dispatch every in-progress buffer (else CUPTI
+  // would leak records on teardown). Pay the cost of re-init per LB step in
+  // exchange for full record fidelity.
+  //
+  // Timing breakdown is printed below so we can revisit if the overhead
+  // turns out to be too high.
+  double t0 = CkWallTimer();
+  cudaDeviceSynchronize();                    // wait for all GPU work
+  double t_sync = CkWallTimer();
+  hapiCuptiFinalize();                        // drains all in-progress buffers
+  double t_fin = CkWallTimer();
+  hapiProcessCuptiBuffers();                  // consume queue into per-obj records
+  double t_proc = CkWallTimer();
+  // Correlation IDs are per-CUPTI-session and would mis-match across the
+  // boundary; clear residual entries before the new session starts.
+  CsvAccess(gpu_manager).cupti_correlation_db_.clear();
+  hapiCuptiInit();                            // re-arm CUPTI for the next interval
+  double t_init = CkWallTimer();
+  CmiPrintf("HAPI[diag pid=%d pe=%d]: LB CUPTI cycle "
+            "sync=%.3f ms  finalize=%.3f ms  process=%.3f ms  reinit=%.3f ms  "
+            "total=%.3f ms\n",
+            (int)getpid(), CmiMyPe(),
+            (t_sync - t0) * 1e3, (t_fin - t_sync) * 1e3,
+            (t_proc - t_fin) * 1e3, (t_init - t_proc) * 1e3,
+            (t_init - t0) * 1e3);
 }
 #if CMK_SMP
   CmiNodeBarrier();  // ensure rank 0 finishes buffer processing before other ranks read the map

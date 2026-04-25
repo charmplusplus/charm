@@ -249,13 +249,20 @@ void hapiCuptiInit() {
 }
 
 void hapiCuptiFinalize() {
-  CmiPrintf("HAPI: Finalizing CUPTI...\n");
-  cudaDeviceSynchronize(); // Ensure all activity records are flushed
   GPUManager& gm = CsvAccess(gpu_manager);
-  if(gm.cupti_initialized_== false) return;
+  if (gm.cupti_initialized_ == false) return;
   gm.cupti_initialized_ = false;
 
+  // cuptiFinalize is the only CUPTI API documented to drain all internal
+  // state — it must dispatch every in-progress buffer via the
+  // buffer-completed callback before tearing down. This is what gives the
+  // finalize+reinit pattern its zero-loss guarantee.
   CUPTI_SAFE_CALL(cuptiFinalize());
+
+  // Reset per-process counters so the next session's diagnostics start clean.
+  cupti_buf_req_count_.store(0, std::memory_order_relaxed);
+  cupti_buf_done_count_.store(0, std::memory_order_relaxed);
+  cupti_buf_done_bytes_.store(0, std::memory_order_relaxed);
 }
 #endif
 
