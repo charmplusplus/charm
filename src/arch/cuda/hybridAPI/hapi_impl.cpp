@@ -142,10 +142,16 @@ static void ipcHandleCreate();
 static void ipcHandleOpen();
 
 #ifdef CMK_LBDB_ON
+// Diagnostic counters — incremented by CUPTI callbacks. Per process (CSV).
+static std::atomic<uint64_t> cupti_buf_req_count_{0};
+static std::atomic<uint64_t> cupti_buf_done_count_{0};
+static std::atomic<uint64_t> cupti_buf_done_bytes_{0};
+
 static void CUPTIAPI cuptiBufferRequested(uint8_t **buffer, size_t *size, size_t *maxNumRecords) {
   *size = 5*1024 * 1024;  // 5MB per buffer
   *buffer = (uint8_t *)malloc(*size);
   *maxNumRecords = 0;
+  cupti_buf_req_count_.fetch_add(1, std::memory_order_relaxed);
 }
 
 //TODO: handle SMP mode
@@ -154,6 +160,8 @@ static void CUPTIAPI cuptiBufferCompleted(CUcontext ctx, uint32_t streamId,
   GPUManager& gm = CsvAccess(gpu_manager);
 
   gm.cupti_buffer_queue_.push({buffer, validSize});
+  cupti_buf_done_count_.fetch_add(1, std::memory_order_relaxed);
+  cupti_buf_done_bytes_.fetch_add(validSize, std::memory_order_relaxed);
 }
 
 // Populate DeviceManager with device attributes needed to compute per-kernel
@@ -188,15 +196,47 @@ static void hapiPopulateDeviceProps(GPUManager& gm) {
 
 // Initialize CUPTI activity tracing — called once per process
 void hapiCuptiInit() {
-  CmiPrintf("HAPI: Initializing CUPTI...\n");
+  CmiPrintf("HAPI[diag pid=%d pe=%d]: Initializing CUPTI...\n",
+            (int)getpid(), CmiMyPe());
   cudaDeviceSynchronize();
   GPUManager& gm = CsvAccess(gpu_manager);
-  if (gm.cupti_initialized_) return;
+  if (gm.cupti_initialized_) {
+    CmiPrintf("HAPI[diag pid=%d pe=%d]: CUPTI already initialized — skip\n",
+              (int)getpid(), CmiMyPe());
+    return;
+  }
 
-  CUPTI_SAFE_CALL(cuptiActivityRegisterCallbacks(cuptiBufferRequested, cuptiBufferCompleted));
-  CUPTI_SAFE_CALL(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_CONCURRENT_KERNEL));
-  CUPTI_SAFE_CALL(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_RUNTIME));
-  CUPTI_SAFE_CALL(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_EXTERNAL_CORRELATION));
+  // Capture each CUPTI return code explicitly so a silent disable on one
+  // process is visible. CUPTI failures here mean per-PE GPU load attribution
+  // will silently report zero work for this process's chares — abort instead
+  // of producing misleading load-balancing decisions.
+  CUptiResult r_cb = cuptiActivityRegisterCallbacks(cuptiBufferRequested,
+                                                    cuptiBufferCompleted);
+  CUptiResult r_ck = cuptiActivityEnable(CUPTI_ACTIVITY_KIND_CONCURRENT_KERNEL);
+  CUptiResult r_rt = cuptiActivityEnable(CUPTI_ACTIVITY_KIND_RUNTIME);
+  CUptiResult r_ex = cuptiActivityEnable(CUPTI_ACTIVITY_KIND_EXTERNAL_CORRELATION);
+
+  auto rstr = [](CUptiResult r) {
+    const char* s = nullptr;
+    cuptiGetResultString(r, &s);
+    return s ? s : "(null)";
+  };
+  CmiPrintf("HAPI[diag pid=%d pe=%d]: CUPTI register_callbacks=%d(%s)  "
+            "enable CONCURRENT_KERNEL=%d(%s)  RUNTIME=%d(%s)  "
+            "EXTERNAL_CORRELATION=%d(%s)\n",
+            (int)getpid(), CmiMyPe(),
+            (int)r_cb, rstr(r_cb), (int)r_ck, rstr(r_ck),
+            (int)r_rt, rstr(r_rt), (int)r_ex, rstr(r_ex));
+
+  if (r_cb != CUPTI_SUCCESS || r_ck != CUPTI_SUCCESS ||
+      r_rt != CUPTI_SUCCESS || r_ex != CUPTI_SUCCESS) {
+    CmiAbort("HAPI: CUPTI initialization failed on pid=%d pe=%d "
+             "(register_callbacks=%s, CONCURRENT_KERNEL=%s, RUNTIME=%s, "
+             "EXTERNAL_CORRELATION=%s) — refusing to continue with broken "
+             "GPU load measurement",
+             (int)getpid(), CmiMyPe(),
+             rstr(r_cb), rstr(r_ck), rstr(r_rt), rstr(r_ex));
+  }
 
   // Note: device_managers is populated later in hapiMapping, so device
   // properties are queried lazily on first use in hapiProcessCuptiBuffers.
@@ -488,6 +528,26 @@ void hapiProcessCuptiBuffers() {
   GPUManager& gm = CsvAccess(gpu_manager);
   hapiPopulateDeviceProps(gm);  // lazy: device_managers is ready by now
 
+  // Per-process diagnostic snapshot before draining the queue. Surfaces silent
+  // CUPTI failures: if a process never received any buffer-completed callback
+  // its req/done counts will be zero or stuck.
+  CmiPrintf("HAPI[diag pid=%d pe=%d]: hapiProcessCuptiBuffers entry  "
+            "buf_requested=%lu  buf_completed=%lu  bytes_completed=%lu  "
+            "queue_size=%zu  cupti_initialized=%d\n",
+            (int)getpid(), CmiMyPe(),
+            (unsigned long)cupti_buf_req_count_.load(),
+            (unsigned long)cupti_buf_done_count_.load(),
+            (unsigned long)cupti_buf_done_bytes_.load(),
+            gm.cupti_buffer_queue_.size(),
+            (int)gm.cupti_initialized_);
+
+  // Probe what CUPTI thinks: how many records remain unflushed for this ctx.
+  size_t dropped = 0;
+  CUptiResult r_drop = cuptiActivityGetNumDroppedRecords(NULL, 0, &dropped);
+  CmiPrintf("HAPI[diag pid=%d pe=%d]: cuptiActivityGetNumDroppedRecords -> "
+            "rc=%d dropped=%zu\n",
+            (int)getpid(), CmiMyPe(), (int)r_drop, dropped);
+
   uint32_t kernel_count = 0;
   uint32_t corr_count = 0;
   while (true) {
@@ -542,8 +602,13 @@ void hapiProcessCuptiBuffers() {
 
     free(item.buffer);
   }
-  (void)kernel_count;
-  (void)corr_count;
+
+  CmiPrintf("HAPI[diag pid=%d pe=%d]: hapiProcessCuptiBuffers exit  "
+            "kernels_processed=%u  correlations_processed=%u  "
+            "kernel_records_objs=%zu  correlation_db_residual=%zu\n",
+            (int)getpid(), CmiMyPe(), kernel_count, corr_count,
+            gm.cupti_obj_kernel_records_.size(),
+            gm.cupti_correlation_db_.size());
 }
 
 //TODO: safely handle SMP mode
