@@ -154,47 +154,62 @@ void CentralLB::CallLB()
   }
 
 #if CMK_CUDA
-if (CmiMyRank() == 0)
-{
-  // Zero-loss CUPTI drain at LB time: cuptiFinalize is the only API that's
-  // guaranteed by the docs to dispatch every in-progress buffer (else CUPTI
-  // would leak records on teardown). Pay the cost of re-init per LB step in
-  // exchange for full record fidelity.
-  //
-  // Timing breakdown is printed below so we can revisit if the overhead
-  // turns out to be too high.
-  double t0 = CkWallTimer();
-  cudaDeviceSynchronize();                    // wait for all GPU work
-  double t_sync = CkWallTimer();
-  hapiCuptiFinalize();                        // drains all in-progress buffers
-  double t_fin = CkWallTimer();
-  hapiProcessCuptiBuffers();                  // consume queue into per-obj records
-  double t_proc = CkWallTimer();
-  // Correlation IDs are per-CUPTI-session and would mis-match across the
-  // boundary; clear residual entries before the new session starts.
-  CsvAccess(gpu_manager).cupti_correlation_db_.clear();
-  hapiCuptiInit();                            // re-arm CUPTI for the next interval
-  double t_init = CkWallTimer();
-  CmiPrintf("HAPI[diag pid=%d pe=%d]: LB CUPTI cycle "
-            "sync=%.3f ms  finalize=%.3f ms  process=%.3f ms  reinit=%.3f ms  "
-            "total=%.3f ms\n",
-            (int)getpid(), CmiMyPe(),
-            (t_sync - t0) * 1e3, (t_fin - t_sync) * 1e3,
-            (t_proc - t_fin) * 1e3, (t_init - t_proc) * 1e3,
-            (t_init - t0) * 1e3);
+  // Cross-PE barrier so every chare has reached AtSync (and therefore
+  // launched & synchronized all its iter-N kernels) before any process
+  // snapshots CUPTI. Without this, processes that arrived first would
+  // capture fewer iterations of records than processes that arrived later.
+  contribute(CkCallback(CkReductionTarget(CentralLB, DrainCUPTIAfterBarrier),
+                        thisProxy));
+#else
+  thisProxy[CkMyPe()].ProcessAtSync();
+#endif
+#endif
 }
+
+#if CMK_CUDA
+// Runs on every PE once the CallLB-time all-reduce has completed. By the
+// time this fires, every chare across every process has called AtSync, so
+// the CUPTI snapshot we take here covers identical work intervals on all
+// PEs sharing a process/GPU.
+void CentralLB::DrainCUPTIAfterBarrier()
+{
+#if CMK_LBDB_ON
+  if (CmiMyRank() == 0)
+  {
+    // Zero-loss CUPTI drain at LB time: cuptiFinalize is the only API that's
+    // guaranteed by the docs to dispatch every in-progress buffer (else CUPTI
+    // would leak records on teardown). Pay the cost of re-init per LB step in
+    // exchange for full record fidelity.
+    double t0 = CkWallTimer();
+    cudaDeviceSynchronize();                    // wait for all GPU work
+    double t_sync = CkWallTimer();
+    hapiCuptiFinalize();                        // drains all in-progress buffers
+    double t_fin = CkWallTimer();
+    hapiProcessCuptiBuffers();                  // consume queue into per-obj records
+    double t_proc = CkWallTimer();
+    // Correlation IDs are per-CUPTI-session and would mis-match across the
+    // boundary; clear residual entries before the new session starts.
+    CsvAccess(gpu_manager).cupti_correlation_db_.clear();
+    hapiCuptiInit();                            // re-arm CUPTI for the next interval
+    double t_init = CkWallTimer();
+    CmiPrintf("HAPI[diag pid=%d pe=%d]: LB CUPTI cycle "
+              "sync=%.3f ms  finalize=%.3f ms  process=%.3f ms  reinit=%.3f ms  "
+              "total=%.3f ms\n",
+              (int)getpid(), CmiMyPe(),
+              (t_sync - t0) * 1e3, (t_fin - t_sync) * 1e3,
+              (t_proc - t_fin) * 1e3, (t_init - t_proc) * 1e3,
+              (t_init - t0) * 1e3);
+  }
 #if CMK_SMP
   CmiNodeBarrier();  // ensure rank 0 finishes buffer processing before other ranks read the map
 #endif
   // Every PE matches its own objects against the shared per-process CUPTI map
   lbmgr->SetObjGPULoad(CsvAccess(gpu_manager).cupti_obj_kernel_records_);
-#endif
 
-  {
-    thisProxy [CkMyPe()].ProcessAtSync();
-  }
-#endif
+  thisProxy[CkMyPe()].ProcessAtSync();
+#endif // CMK_LBDB_ON
 }
+#endif // CMK_CUDA
 
 void CentralLB::InvokeLB()
 {

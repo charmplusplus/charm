@@ -32,6 +32,7 @@ group [migratable] CentralLB : BaseLB {
   entry [reductiontarget] void ProcessMigrationDecision();
   entry void MissMigrate(int);
   entry void CallLB();
+  entry [reductiontarget] void DrainCUPTIAfterBarrier();
   entry void CheckForRealloc();
   entry void ResumeFromReallocCheckpoint();
   entry void MigrationDoneImpl(int);

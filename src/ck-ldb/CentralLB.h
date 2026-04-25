@@ -98,6 +98,12 @@ public:
   inline void setConcurrent(bool c) { concurrent = c; }
 
   void CallLB();
+#if CMK_CUDA
+  // Reduction target invoked once every PE has reached AtSync. The CUPTI
+  // snapshot work is deferred to here so all chares' kernels are guaranteed
+  // to have been launched and synchronized before we drain.
+  void DrainCUPTIAfterBarrier();
+#endif
   void InvokeLB(); // Everything is at the PE barrier
   void ProcessAtSync(void); // Receive a message from AtSync to avoid
                             // making projections output look funny
