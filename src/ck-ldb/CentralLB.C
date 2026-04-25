@@ -161,18 +161,17 @@ if (CmiMyRank() == 0)
   //   1. cudaDeviceSynchronize: ensures all kernels — including those on
   //      HAPI-internal stream-pool streams the app doesn't touch — have
   //      finished, so CUPTI can finalize their activity records.
-  //   2. cuptiActivityFlushAll(0): documented synchronous flush. Unlike the
-  //      CUPTI_ACTIVITY_FLAG_FLUSH_FORCED variant (which only dispatches
-  //      buffers already containing records and returns asynchronously),
-  //      flag=0 returns only after every buffer-completed callback fires.
-  //      Empirically the FORCED flag failed to deliver in-progress buffers
-  //      and left ~64 chares with zero records per LB step.
+  //   2. cuptiActivityFlushAll(FLUSH_FORCED): the more-aggressive variant.
+  //      Empirically still does NOT deliver the currently-open in-progress
+  //      buffer in our SMP+CUPTI setup — that's why we keep the buffer size
+  //      small (see cuptiBufferRequested) so the residual in-flight records
+  //      at LB time are minimal.
   cudaError_t sync_rc = cudaDeviceSynchronize();
-  CUptiResult flush_rc = cuptiActivityFlushAll(0);
+  CUptiResult flush_rc = cuptiActivityFlushAll(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED);
   const char* flush_str = nullptr;
   cuptiGetResultString(flush_rc, &flush_str);
   CmiPrintf("HAPI[diag pid=%d pe=%d]: cudaDeviceSynchronize rc=%d  "
-            "cuptiActivityFlushAll(0) rc=%d (%s)\n",
+            "cuptiActivityFlushAll(FORCED) rc=%d (%s)\n",
             (int)getpid(), CmiMyPe(), (int)sync_rc, (int)flush_rc,
             flush_str ? flush_str : "(null)");
   hapiProcessCuptiBuffers();

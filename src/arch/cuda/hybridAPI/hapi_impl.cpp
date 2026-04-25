@@ -148,7 +148,11 @@ static std::atomic<uint64_t> cupti_buf_done_count_{0};
 static std::atomic<uint64_t> cupti_buf_done_bytes_{0};
 
 static void CUPTIAPI cuptiBufferRequested(uint8_t **buffer, size_t *size, size_t *maxNumRecords) {
-  *size = 5*1024 * 1024;  // 5MB per buffer
+  // Small buffer so cuptiBufferCompleted fires frequently during normal
+  // execution. The forced flush at LB time does NOT dispatch the currently-
+  // open in-progress buffer in our setup, so we want the residual at LB time
+  // to be tiny. With ~70-100 B per kernel record, 64 KB ≈ 600 records.
+  *size = 64 * 1024;
   *buffer = (uint8_t *)malloc(*size);
   *maxNumRecords = 0;
   cupti_buf_req_count_.fetch_add(1, std::memory_order_relaxed);
