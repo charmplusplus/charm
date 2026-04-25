@@ -5,8 +5,6 @@
 #include <algorithm>
 #include <queue>
 #include <atomic>
-#include <chrono>
-#include <thread>
 #include <vector>
 #include <unistd.h>
 #include <sys/mman.h>
@@ -550,37 +548,12 @@ void hapiProcessCuptiBuffers() {
             "rc=%d dropped=%zu\n",
             (int)getpid(), CmiMyPe(), (int)r_drop, dropped);
 
-  // Wait for any in-flight cuptiBufferCompleted callbacks to drain.
-  //
-  // cuptiActivityFlushAll(FLUSH_FORCED) returns CUPTI_SUCCESS once it has
-  // dispatched buffers to its worker thread, but the worker may not have
-  // invoked our completed-callback yet. Without this poll, ~64 chares per
-  // process were silently dropped on some runs (the second buffer's
-  // callback fired *after* we checked the queue). Charm's AtSync semantics
-  // guarantee worker quiescence by the time we get here, so we don't need
-  // an extra cudaDeviceSynchronize — just wait out the callback.
-  //
-  // Worst-case spin is bounded by callback dispatch latency (sub-ms in
-  // practice). Aborts on long timeout to surface a real CUPTI hang rather
-  // than silently producing wrong load data.
-  {
-    const auto deadline =
-        std::chrono::steady_clock::now() + std::chrono::seconds(2);
-    uint64_t req, done;
-    while (true) {
-      req = cupti_buf_req_count_.load(std::memory_order_acquire);
-      done = cupti_buf_done_count_.load(std::memory_order_acquire);
-      if (done >= req) break;
-      if (std::chrono::steady_clock::now() > deadline) {
-        CmiAbort("HAPI: CUPTI buffer-completed callback never fired on pid=%d "
-                 "pe=%d (buf_requested=%lu  buf_completed=%lu) — refusing to "
-                 "continue with broken GPU load measurement",
-                 (int)getpid(), CmiMyPe(),
-                 (unsigned long)req, (unsigned long)done);
-      }
-      std::this_thread::sleep_for(std::chrono::microseconds(100));
-    }
-  }
+  // No buffer-completion poll here: cuptiActivityFlushAll(0) called by the
+  // central LB before invoking us is documented to be synchronous, so by the
+  // time we arrive every relevant buffer has already been pushed onto
+  // cupti_buffer_queue_ via cuptiBufferCompleted. (CUPTI keeps an in-progress
+  // buffer always open — buf_requested permanently exceeds buf_completed by
+  // ~1 — so polling on those counters can never converge.)
 
   uint32_t kernel_count = 0;
   uint32_t corr_count = 0;

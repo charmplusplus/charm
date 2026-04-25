@@ -157,16 +157,22 @@ void CentralLB::CallLB()
 if (CmiMyRank() == 0)
 {
   double start = CkWallTimer();
-  // CUPTI only dispatches completed-kernel buffers. Kernels still executing
-  // on any stream — including HAPI-internal stream-pool streams the app
-  // doesn't touch — keep their buffer un-dispatched. Sync the device first
-  // so flushAll can actually return everything.
+  // Drain CUPTI before reading per-object kernel records.
+  //   1. cudaDeviceSynchronize: ensures all kernels — including those on
+  //      HAPI-internal stream-pool streams the app doesn't touch — have
+  //      finished, so CUPTI can finalize their activity records.
+  //   2. cuptiActivityFlushAll(0): documented synchronous flush. Unlike the
+  //      CUPTI_ACTIVITY_FLAG_FLUSH_FORCED variant (which only dispatches
+  //      buffers already containing records and returns asynchronously),
+  //      flag=0 returns only after every buffer-completed callback fires.
+  //      Empirically the FORCED flag failed to deliver in-progress buffers
+  //      and left ~64 chares with zero records per LB step.
   cudaError_t sync_rc = cudaDeviceSynchronize();
-  CUptiResult flush_rc = cuptiActivityFlushAll(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED);
+  CUptiResult flush_rc = cuptiActivityFlushAll(0);
   const char* flush_str = nullptr;
   cuptiGetResultString(flush_rc, &flush_str);
   CmiPrintf("HAPI[diag pid=%d pe=%d]: cudaDeviceSynchronize rc=%d  "
-            "cuptiActivityFlushAll rc=%d (%s)\n",
+            "cuptiActivityFlushAll(0) rc=%d (%s)\n",
             (int)getpid(), CmiMyPe(), (int)sync_rc, (int)flush_rc,
             flush_str ? flush_str : "(null)");
   hapiProcessCuptiBuffers();
