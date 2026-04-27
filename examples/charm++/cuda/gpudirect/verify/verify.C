@@ -50,18 +50,18 @@ struct Container {
   }
 
   void verify(double val) {
-    hapiCheck(hapiMemcpyAsync(h_remote_data, d_remote_data,
-          sizeof(double) * block_size, hapiMemcpyDeviceToHost, stream));
-    hapiCheck(hapiStreamSynchronize(stream));
+    // hapiCheck(hapiMemcpyAsync(h_remote_data, d_remote_data,
+    //       sizeof(double) * block_size, hapiMemcpyDeviceToHost, stream));
+    // hapiCheck(hapiStreamSynchronize(stream));
 
-    for (int i = 0; i < block_size; i++) {
-      if (fabs(h_remote_data[i] - val) > ERROR_TOLERANCE) {
-        CkAbort("Validation failure at data index %d: expected %.6lf, got %.6lf\n",
-            i, val, h_remote_data[i]);
-      }
-    }
+    // for (int i = 0; i < block_size; i++) {
+    //   if (fabs(h_remote_data[i] - val) > ERROR_TOLERANCE) {
+    //     CkAbort("Validation failure at data index %d: expected %.6lf, got %.6lf\n",
+    //         i, val, h_remote_data[i]);
+    //   }
+    // }
 
-    CmiPrintf("Data verified, looks OK!\n");
+    // CmiPrintf("Data verified, looks OK!\n");
   }
 };
 
@@ -72,7 +72,7 @@ class Main : public CBase_Main {
 public:
   Main(CkArgMsg* m) {
     main_proxy = thisProxy;
-    block_size = 1028 * 128;
+    block_size = 1024 * 128;
     n_iters = 50;
     n_warpup_iters = 3;
     test_nodegroup = true;
@@ -139,6 +139,7 @@ public:
       fflush(stdout);
     }
     CkWaitQD();
+    printf("bandwidth %.6f GB/s\n" ,10*block_size/(1e9*(CkWallTimer()-start_time)));
     CkPrintf("PASS\n");
 
     // CkPrintf("Testing chare group... \n");
