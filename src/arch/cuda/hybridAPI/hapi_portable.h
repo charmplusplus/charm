@@ -46,6 +46,7 @@
 #define hapiStreamCreate(stream) cudaStreamCreate(stream)
 #define hapiStreamDestroy cudaStreamDestroy
 #define hapiStreamDefault cudaStreamDefault
+#define hapiStreamNonBlocking cudaStreamNonBlocking
 #define hapiStreamCreateWithPriority cudaStreamCreateWithPriority
 
 #define hapiLaunchHostFunc(stream, func, args) \
@@ -160,6 +161,7 @@
 #define hapiStreamCreate(stream) hipStreamCreate(stream)
 #define hapiStreamDestroy hipStreamDestroy
 #define hapiStreamDefault hipStreamDefault
+#define hapiStreamNonBlocking hipStreamNonBlocking
 #define hapiStreamCreateWithPriority hipStreamCreateWithPriority
 
 #define hapiMalloc(ptr, size) hipMalloc(ptr, size)
