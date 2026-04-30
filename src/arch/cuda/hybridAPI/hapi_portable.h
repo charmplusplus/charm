@@ -89,6 +89,8 @@
 #define hapiMemcpyDeviceToHost cudaMemcpyDeviceToHost
 #define hapiMemcpyDeviceToDevice cudaMemcpyDeviceToDevice
 #define hapiMemcpy(dst, src, count, kind) cudaMemcpy(dst, src, count, kind)
+#define hapiMemcpy2D(dst, dpitch, src, spitch, width, height, kind) \
+    cudaMemcpy2D(dst, dpitch, src, spitch, width, height, kind)
 
 #define hapiGetErrorString(err) cudaGetErrorString(err)
 
@@ -176,6 +178,8 @@
 #define hapiMemcpyDeviceToHost hipMemcpyDeviceToHost
 #define hapiMemcpyDeviceToDevice hipMemcpyDeviceToDevice
 #define hapiMemcpy(dst, src, count, kind) hipMemcpy(dst, src, count, kind)
+#define hapiMemcpy2D(dst, dpitch, src, spitch, width, height, kind) \
+    hipMemcpy2D(dst, dpitch, src, spitch, width, height, kind)
 #define hapiGetErrorString(err) hipGetErrorString(err)
 
 #define hapiEventDisableTiming hipEventDisableTiming
