@@ -158,6 +158,9 @@
 #define hapiGetDeviceProperties(prop, dev) hipGetDeviceProperties(prop, dev)
 #define hapiGetDevice(dev) hipGetDevice(dev)
 #define hapiStreamCreate(stream) hipStreamCreate(stream)
+#define hapiStreamDestroy hipStreamDestroy
+#define hapiStreamDefault hipStreamDefault
+#define hapiStreamCreateWithPriority hipStreamCreateWithPriority
 
 #define hapiMalloc(ptr, size) hipMalloc(ptr, size)
 #define hapiFree(ptr) hipFree(ptr)
