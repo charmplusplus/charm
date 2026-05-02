@@ -77,6 +77,9 @@ class threadCollideMgr : public CBase_threadCollideMgr
     contrib[chunkNo]=NULL;
   }
 
+  /// Placeholder for collideClient's restart reinitialization interface.
+  void setClient(CollisionClientFn, void *) {}
+
   /// collideClient interface (called by voxels)
   /// Splits up collisions by destination PE
   void collisions(int step,CollisionList &colls);
