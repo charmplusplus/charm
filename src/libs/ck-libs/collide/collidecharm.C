@@ -92,7 +92,6 @@ void CollideBoxesPrio(CollideHandle h,int chunkNo,
     int nBox,const bbox3d *boxes,const int *prio)
 {
   CProxy_collideMgr mgr(h);
-  std::cout << "CollideBoxesPrio init'ed collideMgr from nBoxes " << nBox << std::endl;
   mgr.ckLocalBranch()->addBoxes(chunkNo,nBox,boxes,prio);
 }
 
@@ -371,7 +370,6 @@ void collideMgr::reinitClient(
   CollisionClientFn clientFn,
   void *clientParam )
 {
-  std::cout << "collideMgr::reinitClient from " << thisIndex << std::endl;
   client.ckLocalBranch()->setClient(clientFn, clientParam);
 }
 
@@ -391,7 +389,6 @@ void collideMgr::unregisterContributor(int chunkNo)
 void collideMgr::addBoxes(int chunkNo, int n, const bbox3d* boxes, const int* prio)
 {
   //printf("[%d] Receiving contribution from %d\n",CkMyPe(), chunkNo);
-  std::cout << "began contribute() of nBoxes " << n << std::endl;
   CM_STATUS("collideMgr::addBoxes "<<n<<" boxes from "<<chunkNo);
   aggregator.aggregate(CkMyPe(),chunkNo,n,boxes,prio);
   aggregator.send(); //Deliver all outgoing messages
@@ -401,7 +398,6 @@ void collideMgr::addBoxes(int chunkNo, int n, const bbox3d* boxes, const int* pr
     aggregator.compact();//Blow away all the old voxels (saves memory)
     tryAdvance();
   }
-  std::cout << "completed contribute() of nBoxes " << n << std::endl;
   //printf("[%d] DONE receiving contribution from %d\n",CkMyPe(), chunkNo);
 }
 
@@ -448,7 +444,6 @@ void collideMgr::pleaseAdvance(void)
 //Attempt to finish the voxel send/recv step
 void collideMgr::tryAdvance(void)
 {
-  std::cout << "in collideMgr::tryAdvance()" << std::endl;
   CM_STATUS("tryAdvance: "<<nContrib-contribCount<<" contrib, "<<msgsSent-msgsRecvd<<" msg")
     if ((contribCount==nContrib) && (msgsSent==msgsRecvd)) {
       CM_STATUS("advancing");
@@ -463,7 +458,6 @@ void collideMgr::tryAdvance(void)
 //This is called on PE 0 once the voxel send/recv reduction is finished
 void collideMgr::reductionFinished(void)
 {
-  std::cout << "in collideMgr::reductionFinished()" << std::endl;
   CM_STATUS("collideMgr::reductionFinished");
   //Broadcast Collision start:
   CProxy_collideMgr proxy(ckGetGroupID());
@@ -623,7 +617,6 @@ void collideVoxel::startCollision(int step,
       gridMap.grid2world(2,rSeg1d(thisIndex.z,thisIndex.z+1))
       );
   collide(territory,colls);
-  std::cout << "in collideVoxel::startCollision(), completed local collide" << std::endl;
   emptyMessages();
   CC_STATUS("} startCollision");
 }
@@ -658,7 +651,6 @@ serialCollideClient::serialCollideClient(CkCallback clientCb_) {
 
 /// Call this client function on processor 0:
 void serialCollideClient::setClient(CollisionClientFn clientFn_,void *clientParam_) {
-  std::cout << "serialCollideClient::setClient from " << thisIndex << std::endl;
   clientFn=clientFn_;
   clientParam=clientParam_;
 }
@@ -666,26 +658,21 @@ void serialCollideClient::setClient(CollisionClientFn clientFn_,void *clientPara
 void serialCollideClient::collisions(int step,CollisionList &colls)
 {
   if(useCb) { // Use user passed callback as reduction target
-    std::cout << "in serialCollideClient::collisions(), useCB" << std::endl;
     contribute(colls.length()*sizeof(Collision),colls.getData(),
       CkReduction::concat, clientCb);
   } else { // Use client fn with reduction targetted at serialCollideClient::reductionDone
     CkCallback cb(CkIndex_serialCollideClient::reductionDone(0),0,thisgroup);
-    std::cout << "in serialCollideClient::collisions(), NOT useCB " << thisIndex << std::endl;
     contribute(colls.length()*sizeof(Collision),colls.getData(),
       CkReduction::concat,cb);
-    std::cout << "in serialCollideClient::collisions(), after contribute " << thisIndex << std::endl;
   }
 }
 
 //This is called after the collideVoxel Collision reduction completes
 void serialCollideClient::reductionDone(CkReductionMsg *msg)
 {
-  std::cout << "in serialCollideClient::reductionDone()" << std::endl;
   int nColl=msg->getSize()/sizeof(Collision);
   CM_STATUS("serialCollideClient with "<<nColl<<" collisions");
   if (clientFn!=NULL) {//User wants Collisions on node 0
-    std::cout << "in serialCollideClient::reductionDone() in clientFn" << std::endl;
     (clientFn)(clientParam,nColl,(Collision *)msg->getData());
   }
   else //FIXME: never registered a client
