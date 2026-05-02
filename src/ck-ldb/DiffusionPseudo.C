@@ -129,12 +129,12 @@ void DiffusionLB::PseudoLoadBalancing()
                                        [](double sum, double value)
                                        { return value > 0 ? sum + value : sum; });
 
-  double leftToSend = my_load - alreadySent;  // my_load is original load
+  double leftToSend = std::max(0.0, my_load - alreadySent);  // my_load is original load
   myOverload = std::min(myOverload, leftToSend);
 
   // First pass: calculate ideal send amounts (ignoring overload limits)
   // and handle negative edges
-  double totalUnderLoad = 0.0;
+  double totalIdealSend = 0.0;
   std::vector<double> idealSend(neighborCount, 0.0);
   
   for (std::pair<int, double> p : nborsToBalance)
@@ -149,6 +149,7 @@ void DiffusionLB::PseudoLoadBalancing()
     {
       double offset = std::min(-toSendLoad[id], trySend);
       idealSend[id] += offset;
+      totalIdealSend += offset;
       trySend -= offset;
     }
 
@@ -156,16 +157,16 @@ void DiffusionLB::PseudoLoadBalancing()
     if (trySend > 0)
     {
       idealSend[id] += trySend;
-      totalUnderLoad += trySend;
+      totalIdealSend += trySend;
     }
   }
 
-  // Second pass: scale down proportionally if we don't have enough overload
-  // This ensures all neighbors get a fair share
+  // Second pass: scale down proportionally if we don't have enough original load
+  // to cover the total amount we would like to send.
   double scaleFactor = 1.0;
-  if (totalUnderLoad > myOverload && totalUnderLoad > 0)
+  if (totalIdealSend > myOverload && totalIdealSend > 0)
   {
-    scaleFactor = myOverload / totalUnderLoad;
+    scaleFactor = myOverload / totalIdealSend;
   }
 
   for (std::pair<int, double> p : nborsToBalance)

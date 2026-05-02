@@ -57,6 +57,12 @@ void DiffusionLB::AcrossNodeLB()
   // build obj heap from gain values
   if (loadReceivers > 0)
   {
+    double plannedOutgoingLoad = std::accumulate(toSendLoad.begin(), toSendLoad.end(), 0.0,
+                                                 [](double sum, double value)
+                                                 { return value > 0 ? sum + value : sum; });
+    plannedOutgoingLoad = std::min(plannedOutgoingLoad, my_load);
+    double migratedOutgoingLoad = 0.0;
+
     // compute gain vals
     // buildGainValues(n_objs);
 
@@ -67,7 +73,7 @@ void DiffusionLB::AcrossNodeLB()
       tries[i] = 0;
 
     int nid = 0; 
-    while (my_loadAfterTransfer > 0)
+    while (my_loadAfterTransfer > 0 && migratedOutgoingLoad < plannedOutgoingLoad)
     {
       nid = (nid + 1)%neighborCount; //change to round robin for now
       int nborId = nid;//metric->getBestNeighbor();  // this is buggy (hangs)
@@ -93,6 +99,9 @@ void DiffusionLB::AcrossNodeLB()
       }
 
       double currLoad = objs[v_id].getVertexLoad();
+      if (migratedOutgoingLoad + currLoad > plannedOutgoingLoad)
+        break;
+
       objs[v_id].setCurrPe(-1);
 
       int rank = GetRank(v_id);
@@ -108,6 +117,7 @@ void DiffusionLB::AcrossNodeLB()
       }
 
       my_loadAfterTransfer -= currLoad;
+      migratedOutgoingLoad += currLoad;
       num_migrations++;
 
       metric->updateState(v_id, nborId);  // update state to keep track of migrations
@@ -348,4 +358,3 @@ void DiffusionLB::ReceiveFinalStats(std::vector<bool> isMigratable,
     writeStatsMsgsJSON(fullStats);
   }
 }
-

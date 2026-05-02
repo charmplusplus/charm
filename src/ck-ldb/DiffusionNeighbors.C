@@ -42,6 +42,7 @@ void DiffusionLB::findNBors(int do_again)
         holds[i] = 0;
 
     cost_for_neighbor.clear(); // dictionary of nbor keys to cost
+    minCommNeighborBytes = 0.0;
     sendToNeighbors.clear();
 
     pick = 0;
@@ -189,6 +190,7 @@ void DiffusionLB::buildMSTinRounds(double best_weight, int best_from, int best_t
             if (std::find(mstVisitedPes.begin(), mstVisitedPes.end(), nbor) ==
                     mstVisitedPes.end() &&
                 nbor != myNodeId && nbor < numNodes && nbor >= 0 &&
+                isEligibleNeighbor(nbor) &&
                 sendToNeighbors.size() < NUM_NEIGHBORS // dont build too many nieghbors
             )
             {
@@ -301,9 +303,10 @@ void DiffusionLB::findNBorsRound()
                 continue;
             }
             if (myNodeId != potentialNbor &&
-                std::find(sendToNeighbors.begin(), sendToNeighbors.end(), potentialNbor) == sendToNeighbors.end() &&
                 potentialNbor < numNodes &&
-                potentialNbor >= 0)
+                potentialNbor >= 0 &&
+                std::find(sendToNeighbors.begin(), sendToNeighbors.end(), potentialNbor) == sendToNeighbors.end() &&
+                isEligibleNeighbor(potentialNbor))
             {
                 node_idx[pick] = -1;
                 thisProxy[potentialNbor * nodeSize].askNbor(myNodeId, round);
@@ -345,6 +348,7 @@ void DiffusionLB::proposeNbor(int nborId)
     int agree = 0;
     if ((NUM_NEIGHBORS - sendToNeighbors.size()) - requests_sent > 0 &&
         sendToNeighbors.size() < NUM_NEIGHBORS &&
+        isEligibleNeighbor(nborId) &&
         std::find(sendToNeighbors.begin(), sendToNeighbors.end(), nborId) ==
             sendToNeighbors.end())
     {
@@ -359,6 +363,7 @@ void DiffusionLB::askNbor(int nborId, int rnd)
     int agree = 0;
     int nborsNeeded = NUM_NEIGHBORS - sendToNeighbors.size() - holds[rnd];
     if (nborsNeeded > 0 &&
+        isEligibleNeighbor(nborId) &&
         std::find(sendToNeighbors.begin(), sendToNeighbors.end(), nborId) == sendToNeighbors.end())
     {
         // Hold a spot on this round
@@ -381,7 +386,7 @@ void DiffusionLB::askNbor(int nborId, int rnd)
 void DiffusionLB::okayNbor(int agree, int nborId)
 {
     int nborsNeeded = NUM_NEIGHBORS - sendToNeighbors.size() - holds[round];
-    if (nborsNeeded > 0 && agree && std::find(sendToNeighbors.begin(), sendToNeighbors.end(), nborId) == sendToNeighbors.end())
+    if (nborsNeeded > 0 && agree && isEligibleNeighbor(nborId) && std::find(sendToNeighbors.begin(), sendToNeighbors.end(), nborId) == sendToNeighbors.end())
     {
         if (_lb_args.debug() == 3) CkPrintf("\n[Node-%d, round-%d] Rcvd ack, adding %d as nbor (neighbors:%d/%d, holds[%d]=%d)", thisIndex, round, nborId, sendToNeighbors.size(), NUM_NEIGHBORS, round, holds[round]);
         addNeighbor(nborId);
@@ -394,7 +399,7 @@ void DiffusionLB::okayNbor(int agree, int nborId)
 }
 void DiffusionLB::ackNbor(int nborId)
 {
-    if (std::find(sendToNeighbors.begin(), sendToNeighbors.end(), nborId) == sendToNeighbors.end())
+    if (isEligibleNeighbor(nborId) && std::find(sendToNeighbors.begin(), sendToNeighbors.end(), nborId) == sendToNeighbors.end())
     {
         if (_lb_args.debug() == 3) CkPrintf("\n[Node-%d] Adding neighbor [%d] through final ack (neighbors:%d/%d)", thisIndex, nborId, sendToNeighbors.size(), NUM_NEIGHBORS);
         addNeighbor(nborId);
@@ -437,6 +442,15 @@ void DiffusionLB::addNeighbor(int nbor)
     }
 
     sendToNeighbors.push_back(nbor);
+}
+
+bool DiffusionLB::isEligibleNeighbor(int nbor)
+{
+    if (!(_lb_args.diffusionCommOn()))
+        return true;
+
+    std::unordered_map<int, double>::iterator iter = cost_for_neighbor.find(nbor);
+    return iter != cost_for_neighbor.end() && iter->second >= minCommNeighborBytes;
 }
 
 // ******** CENTROID METHOD FUNCTIONS ********
@@ -563,18 +577,33 @@ void DiffusionLB::createCommList()
             LDObjKey to = commData.receiver.get_destObj();
 
             int fromobj = nodeStats->getHash(from); // this replaces the simulator get_obj_idx
-            int toobj = nodeStats->getHash(to);
+            BaseLB::LDStats *globalStats = myNodeCache->globalStatsData;
+            int toobj = globalStats->getHash(to);
 
-            // if (fromobj == -1 || toobj == -1)
-            //   continue;
+            if (fromobj == -1 || toobj == -1)
+              continue;
 
             int fromNode = myNodeId;
-            int toPE = commData.receiver.lastKnown();
+            // int toPE = commData.receiver.lastKnown();
+            int toPE = globalStats->to_proc[toobj];
+            if (toPE == -1)
+                toPE = globalStats->from_proc[toobj];
             int toNode = toPE / nodeSize;
             if (myNodeId != toNode && toNode != -1 && toNode < numNodes)
                 ebytes[toNode] += commData.bytes;
         }
     }
+
+    double totalExternalBytes = 0.0;
+    for (int i = 0; i < numNodes; i++)
+    {
+        if (i != myNodeId)
+            totalExternalBytes += ebytes[i];
+    }
+
+    double avgExternalBytes = (numNodes > 1) ? totalExternalBytes / (numNodes - 1) : 0.0;
+    minCommNeighborBytes = avgExternalBytes * 0.01;
+    // TODO: This does not deal with the situation if a PE is not communicating with its neighbors.
 
     // initialize cost per neighbor (cost is a misnomer: higher cost is better neighbor)
     // TODO: note that this cost can be zero... is this okay?
@@ -585,4 +614,10 @@ void DiffusionLB::createCommList()
     }
 
     sortArr(ebytes, numNodes, node_idx);
+
+    for (int i = 0; i < numNodes; i++)
+    {
+        if (node_idx[i] != -1 && !isEligibleNeighbor(node_idx[i]))
+            node_idx[i] = -1;
+    }
 }
