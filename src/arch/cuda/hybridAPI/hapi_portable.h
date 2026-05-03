@@ -167,7 +167,7 @@
 #define hapiMalloc(ptr, size) hipMalloc(ptr, size)
 #define hapiFree(ptr) hipFree(ptr)
 #define hapiMallocHost(ptr, size) hipHostMalloc(ptr, size)
-#define hapiFreeHost(ptr) hipFreeHost(ptr)
+#define hapiFreeHost(ptr) hipHostFree(ptr)
 
 #define hapiErrorMemoryAllocation hipErrorMemoryAllocation
 #define hapiErrorInitializationError hipErrorInitializationError
