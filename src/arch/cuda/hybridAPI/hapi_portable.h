@@ -20,6 +20,7 @@
 #define hapiDeviceGetAttribute(a,b,c) cudaDeviceGetAttribute(a,b,c)
 
 #define hapiPeekAtLastError cudaPeekAtLastError
+#define hapiGetLastError cudaGetLastError
 #define hapiEventDefault cudaEventDefault
 #define hapiEventDisableTiming cudaEventDisableTiming
 
@@ -117,6 +118,7 @@
 #define hapiDeviceGetAttribute(a,b,c) hipDeviceGetAttribute(a,b,c)
 
 #define hapiPeekAtLastError hipPeekAtLastError
+#define hapiGetLastError hipGetLastError
 
 #define hapiDeviceCanAccessPeer(canAccess, dev1, dev2) \
     hipDeviceCanAccessPeer(canAccess, dev1, dev2)
