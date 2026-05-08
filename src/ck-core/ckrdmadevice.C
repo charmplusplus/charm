@@ -296,33 +296,24 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
       hapi_ipc_device_info& device_info =
         csv_gpu_manager.hapi_ipc_device_infos[source.device_idx];
 
-      // 1. Make user-provided stream wait for IPC event using hapiStreamWaitEvent
-      //    (source buffer to device comm buffer on source)
-      // stream synchronized at soiurce
-      // hapiCheck(hapiStreamWaitEvent(postStructs[i].hapi_stream,
-      //       device_info.src_event_pool[source.event_idx], 0));
-
       // 2. Invoke hapiMemcpyAsync (from source device comm buffer to destination buffer)
       hapiCheck(hapiMemcpyAsync((void*)dest.ptr,
             (void*)((char*)device_info.buffer + source.comm_offset),
             dest.cnt, hapiMemcpyDeviceToDevice, postStructs[i].hapi_stream));
-      
+
+      // 3. Synchronize stream to ensure memcpy is complete before signaling.
+      //    This replaces IPC event recording which is not supported on AMD HIP.
       hapiStreamSynchronize(postStructs[i].hapi_stream);
 
-      // 3. Record IPC event so that the sender can query it for freeing
-      //    device comm buffer and corresponding pair of CUDA IPC events
-      hapiCheck(hapiEventRecord(device_info.dst_event_pool[source.event_idx],
-            postStructs[i].hapi_stream));
-
-      // 4. Set flag in shared memory so that the sender can start querying
-      //    completion of the IPC event
+      // 4. Set flag in shared memory to signal the sender that the transfer
+      //    from comm buffer to destination is complete and the comm buffer
+      //    block can be freed. The stream synchronization above guarantees
+      //    the memcpy has finished.
       hapi_ipc_event_shared* shm_event_shared =
         (hapi_ipc_event_shared*)((char*)csv_gpu_manager.shm_ptr
             + csv_gpu_manager.shm_chunk_size * source.device_idx
             + sizeof(hapiIpcMemHandle_t)) + source.event_idx;
-      pthread_mutex_lock(&shm_event_shared->lock);
-      shm_event_shared->dst_flag = true;
-      pthread_mutex_unlock(&shm_event_shared->lock);
+      __atomic_store_n(&shm_event_shared->dst_flag, 1, __ATOMIC_RELEASE);
     } else {
 #if CMK_GPU_COMM
       // Machine layer supports GPU-aware communication
@@ -388,29 +379,18 @@ static int findFreeIpcEvent(DeviceManager* dm, const size_t comm_offset, int cpv
         (hapi_ipc_event_shared*)((char*)csv_gpu_manager.shm_ptr
             + csv_gpu_manager.shm_chunk_size * (csv_gpu_manager.device_count * CmiMyNodeRankLocal() + cpv_my_device_id)
             + sizeof(hapiIpcMemHandle_t)) + i;
-      bool can_query = false;
-      pthread_mutex_lock(&shm_event_shared->lock);
-      if (shm_event_shared->dst_flag == true) can_query = true;
-      pthread_mutex_unlock(&shm_event_shared->lock);
+      bool can_query = __atomic_load_n(&shm_event_shared->dst_flag, __ATOMIC_ACQUIRE);
 
-      // If the receiver has invoked the memcpy,
-      // the sender can query the event for completion
+      // If the receiver has set dst_flag, it means the memcpy from comm
+      // buffer to destination is complete (receiver called
+      // hapiStreamSynchronize before setting the flag). Free the block.
       if (can_query) {
-        if (hapiEventQuery(ev) == hapiSuccess) {
-          // Event completion means that the transfer from source device comm buffer
-          // to dest buffer is complete, so free the allocated block
-          if (event_flag == 1) {
-            dm->free_comm_buffer(buff_offset);
-          } else {
-            CkAbort("Retrieved hapiSuccess for a free IPC event");
-          }
-
-          // Mark event as free
-          event_flag = 0;
-          pthread_mutex_lock(&shm_event_shared->lock);
-          shm_event_shared->dst_flag = false;
-          pthread_mutex_unlock(&shm_event_shared->lock);
+        if (event_flag == 1) {
+          dm->free_comm_buffer(buff_offset);
         }
+
+        event_flag = 0;
+        __atomic_store_n(&shm_event_shared->dst_flag, 0, __ATOMIC_RELEASE);
       }
     }
   }
@@ -497,10 +477,6 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
       hapiCheck(hapiMemcpyAsync(alloc_comm_buffer, buffers[i]->ptr, buffers[i]->cnt,
             hapiMemcpyDeviceToDevice, buffers[i]->hapi_stream));
       hapiStreamSynchronize(buffers[i]->hapi_stream);
-
-      // Record event
-      hapi_ipc_device_info& my_device_info = csv_gpu_manager.hapi_ipc_device_infos[(csv_gpu_manager.device_count * CmiMyNodeRankLocal() + cpv_my_device_id)];
-      hapiCheck(hapiEventRecord(my_device_info.src_event_pool[buffers[i]->event_idx], buffers[i]->hapi_stream));
     }
   } else {
 #if !CMK_GPU_COMM

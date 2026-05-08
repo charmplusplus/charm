@@ -908,6 +908,9 @@ static void ipcHandleCreate() {
   for (int i = 0; i < csv_gpu_manager.hapi_ipc_event_pool_size_total; i++) {
     hapi_ipc_event_shared* cur_shm_event_shared = shm_event_shared + i;
 
+    // Initialize the completion flag (accessed atomically across processes)
+    cur_shm_event_shared->dst_flag = 0;
+
     my_device_info.event_pool_flags.push_back(0);
     my_device_info.event_pool_buff_offsets.push_back(0);
     my_device_info.src_event_pool.emplace_back();
