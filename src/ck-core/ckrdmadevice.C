@@ -298,13 +298,16 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
 
       // 1. Make user-provided stream wait for IPC event using hapiStreamWaitEvent
       //    (source buffer to device comm buffer on source)
-      hapiCheck(hapiStreamWaitEvent(postStructs[i].hapi_stream,
-            device_info.src_event_pool[source.event_idx], 0));
+      // stream synchronized at soiurce
+      // hapiCheck(hapiStreamWaitEvent(postStructs[i].hapi_stream,
+      //       device_info.src_event_pool[source.event_idx], 0));
 
       // 2. Invoke hapiMemcpyAsync (from source device comm buffer to destination buffer)
       hapiCheck(hapiMemcpyAsync((void*)dest.ptr,
             (void*)((char*)device_info.buffer + source.comm_offset),
             dest.cnt, hapiMemcpyDeviceToDevice, postStructs[i].hapi_stream));
+      
+      hapiStreamSynchronize(postStructs[i].hapi_stream);
 
       // 3. Record IPC event so that the sender can query it for freeing
       //    device comm buffer and corresponding pair of CUDA IPC events
@@ -450,6 +453,8 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
     buffers[i]->src_mpi_rank = CmiNodeOf(CmiMyPe());
   }
   if(transfer_mode == CkNcpyModeDevice::MEMCPY) {
+    for(int i=0;i<numops;i++)
+      hapiStreamSynchronize(buffers[i]->hapi_stream);
     return;
   };
 
@@ -459,6 +464,10 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
   if(transfer_mode == CkNcpyModeDevice::IPC && csv_gpu_manager.use_shm) {
     // Use optimizations with POSIX shaerd memory
     // Allocate blocks on device comm buffer
+
+    for(int i=0;i<numops;i++)
+      hapiStreamSynchronize(buffers[i]->hapi_stream);
+
     DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
 
     for (int i = 0; i < numops; i++) {
@@ -487,6 +496,7 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
       // Initiate transfer from source buffer to device comm buffer
       hapiCheck(hapiMemcpyAsync(alloc_comm_buffer, buffers[i]->ptr, buffers[i]->cnt,
             hapiMemcpyDeviceToDevice, buffers[i]->hapi_stream));
+      hapiStreamSynchronize(buffers[i]->hapi_stream);
 
       // Record event
       hapi_ipc_device_info& my_device_info = csv_gpu_manager.hapi_ipc_device_infos[(csv_gpu_manager.device_count * CmiMyNodeRankLocal() + cpv_my_device_id)];
