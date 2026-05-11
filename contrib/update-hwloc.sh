@@ -8,7 +8,6 @@ DIST_SUBDIRS=(
   utils
   tests
   doc
-  contrib/completion
   contrib/hwloc-ps.www
   contrib/misc
   contrib/systemd
