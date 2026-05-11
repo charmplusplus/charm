@@ -1,11 +1,12 @@
 /*
- * Copyright © 2010-2023 Inria.  All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * Copyright © 2010-2026 Inria.  All rights reserved.
  * Copyright © 2010-2013 Université Bordeaux
  * Copyright © 2010-2011 Cisco Systems, Inc.  All rights reserved.
  * See COPYING in top-level directory.
  *
  *
- * This backend is only used when the operating system does not export
+ * This backend is mostly used when the operating system does not export
  * the necessary hardware topology information to user-space applications.
  * Currently, FreeBSD and NetBSD only add PUs and then fallback to this
  * backend for CPU/Cache discovery.
@@ -15,6 +16,7 @@
  * on various architectures, without having to use this x86-specific code.
  * But this backend is still used after them to annotate some objects with
  * additional details (CPU info in Package, Inclusiveness in Caches).
+ * It may also be enabled manually to work-around bugs in native OS discovery.
  */
 
 #include "private/autogen/config.h"
@@ -487,7 +489,7 @@ static void read_amd_cores_legacy(struct procinfo *infos, struct cpuiddump *src_
 }
 
 /* AMD unit/node from CPUID 0x8000001e leaf (topoext) */
-static void read_amd_cores_topoext(struct hwloc_x86_backend_data_s *data, struct procinfo *infos, unsigned long flags, struct cpuiddump *src_cpuiddump)
+static void read_amd_cores_topoext(struct hwloc_x86_backend_data_s *data, struct procinfo *infos, unsigned long flags __hwloc_attribute_unused, struct cpuiddump *src_cpuiddump)
 {
   unsigned apic_id, nodes_per_proc = 0;
   unsigned eax, ebx, ecx, edx;
@@ -496,7 +498,6 @@ static void read_amd_cores_topoext(struct hwloc_x86_backend_data_s *data, struct
   cpuid_or_from_dump(&eax, &ebx, &ecx, &edx, src_cpuiddump);
   infos->apicid = apic_id = eax;
 
-  if (flags & HWLOC_X86_DISC_FLAG_TOPOEXT_NUMANODES) {
     if (infos->cpufamilynumber == 0x16) {
       /* ecx is reserved */
       infos->ids[NODE] = 0;
@@ -511,7 +512,6 @@ static void read_amd_cores_topoext(struct hwloc_x86_backend_data_s *data, struct
         || (infos->cpufamilynumber == 0x19 && nodes_per_proc > 1)) {
       hwloc_debug("warning: undefined nodes_per_proc value %u, assuming it means %u\n", nodes_per_proc, nodes_per_proc);
     }
-  }
 
   if (infos->cpufamilynumber <= 0x16) { /* topoext appeared in 0x15 and compute-units were only used in 0x15 and 0x16 */
     unsigned cores_per_unit;
@@ -533,9 +533,9 @@ static void read_amd_cores_topoext(struct hwloc_x86_backend_data_s *data, struct
 }
 
 /* Intel core/thread or even die/module/tile from CPUID 0x0b or 0x1f leaves (v1 and v2 extended topology enumeration)
- * or AMD complex/ccd from CPUID 0x80000026 (extended CPU topology)
+ * or AMD core/thread or even complex/ccd from CPUID 0x0b or 0x80000026 (extended CPU topology)
  */
-static void read_extended_topo(struct hwloc_x86_backend_data_s *data, struct procinfo *infos, unsigned leaf, enum cpuid_type cpuid_type, struct cpuiddump *src_cpuiddump)
+static void read_extended_topo(struct hwloc_x86_backend_data_s *data, struct procinfo *infos, unsigned leaf, enum cpuid_type cpuid_type __hwloc_attribute_unused, struct cpuiddump *src_cpuiddump)
 {
   unsigned level, apic_nextshift, apic_type, apic_id = 0, apic_shift = 0, id;
   unsigned threadid __hwloc_attribute_unused = 0; /* shut-up compiler */
@@ -547,20 +547,15 @@ static void read_extended_topo(struct hwloc_x86_backend_data_s *data, struct pro
     eax = leaf;
     cpuid_or_from_dump(&eax, &ebx, &ecx, &edx, src_cpuiddump);
     /* Intel specifies that the 0x0b/0x1f loop should stop when we get "invalid domain" (0 in ecx[8:15])
-     * (if so, we also get 0 in eax/ebx for invalid subleaves).
+     * (if so, we also get 0 in eax/ebx for invalid subleaves). Zhaoxin implements this too.
      * However AMD rather says that the 0x80000026/0x0b loop should stop when we get "no thread at this level" (0 in ebx[0:15]).
-     * Zhaoxin follows the Intel specs but also returns "no thread at this level" for the last *valid* level (at least on KH-4000).
-     * From the Linux kernel code, it's very likely that AMD also returns "invalid domain"
-     * (because detect_extended_topology() uses that for all x86 CPUs)
-     * but keep with the official doc until AMD can clarify that (see #593).
+     *
+     * Linux kernel <= 6.8 used "invalid domain" for both Intel and AMD (in detect_extended_topology())
+     * but x86 discovery revamp in 6.9 now properly checks both Intel and AMD conditions (in topo_subleaf()).
+     * So let's assume we are allowed to break-out once one of the Intel+AMD conditions is met.
      */
-    if (cpuid_type == amd) {
-      if (!(ebx & 0xffff))
-        break;
-    } else {
-      if (!(ecx & 0xff00))
-        break;
-    }
+    if (!(ebx & 0xffff) || !(ecx & 0xff00))
+      break;
     apic_packageshift = eax & 0x1f;
   }
 
@@ -572,13 +567,8 @@ static void read_extended_topo(struct hwloc_x86_backend_data_s *data, struct pro
 	ecx = level;
 	eax = leaf;
 	cpuid_or_from_dump(&eax, &ebx, &ecx, &edx, src_cpuiddump);
-        if (cpuid_type == amd) {
-          if (!(ebx & 0xffff))
-            break;
-        } else {
-          if (!(ecx & 0xff00))
-            break;
-        }
+        if (!(ebx & 0xffff) || !(ecx & 0xff00))
+          break;
 	apic_nextshift = eax & 0x1f;
 	apic_type = (ecx & 0xff00) >> 8;
 	apic_id = edx;
@@ -664,7 +654,13 @@ static void look_proc(struct hwloc_backend *backend, struct procinfo *infos, uns
   cpuid_or_from_dump(&eax, &ebx, &ecx, &edx, src_cpuiddump);
   infos->apicid = ebx >> 24;
   if (edx & (1 << 28)) {
-    legacy_max_log_proc = 1 << hwloc_flsl(((ebx >> 16) & 0xff) - 1);
+    unsigned ebx_16_23 = (ebx >> 16) & 0xff;
+    if (ebx_16_23) {
+      legacy_max_log_proc = 1 << hwloc_flsl(ebx_16_23 - 1);
+    } else {
+      hwloc_debug("HTT bit set in CPUID 0x01.edx, but legacy_max_proc = 0 in ebx, assuming legacy_max_log_proc = 1\n");
+      legacy_max_log_proc = 1;
+    }
   } else {
     hwloc_debug("HTT bit not set in CPUID 0x01.edx, assuming legacy_max_log_proc = 1\n");
     legacy_max_log_proc = 1;
@@ -1426,20 +1422,46 @@ look_procs(struct hwloc_backend *backend, struct procinfo *infos, unsigned long 
       /* use hybrid info for cpukinds */
       if (cpuid_type == intel) {
         /* Hybrid Intel */
+        hwloc_bitmap_t lpset = hwloc_bitmap_alloc();
         hwloc_bitmap_t atomset = hwloc_bitmap_alloc();
         hwloc_bitmap_t coreset = hwloc_bitmap_alloc();
+        unsigned max_cache_levels = 0;
+        int efficiency;
         for(i=0; i<nbprocs; i++) {
-          if (infos[i].hybridcoretype == 0x20)
-            hwloc_bitmap_set(atomset, i);
-          else if (infos[i].hybridcoretype == 0x40)
+          if (infos[i].numcaches > max_cache_levels)
+            max_cache_levels = infos[i].numcaches;
+        }
+        for(i=0; i<nbprocs; i++) {
+          if (infos[i].hybridcoretype == 0x20) {
+            /* On Family 6 hybrids, Atom cores without an L3 cache are low-power cores */
+            if (infos[i].cpufamilynumber == 6 && infos[i].numcaches < max_cache_levels)
+              hwloc_bitmap_set(lpset, i);
+            else
+              hwloc_bitmap_set(atomset, i);
+          } else if (infos[i].hybridcoretype == 0x40) {
             hwloc_bitmap_set(coreset, i);
+          }
+        }
+        /* Lower values indicate less efficient cores. This counter is incremented each time a new
+         * CPU kind is registered, so registration must be done in least-to-most efficient order.
+         */
+        efficiency = 0;
+        /* register IntelLowPower set if any */
+        if (!hwloc_bitmap_iszero(lpset)) {
+          struct hwloc_info_s infoattr;
+          infoattr.name = (char *) "CoreType";
+          infoattr.value = (char *) "IntelLowPower";
+          hwloc_internal_cpukinds_register(topology, lpset, efficiency++, &infoattr, 1, HWLOC_CPUKINDS_REGISTER_FLAG_OVERWRITE_FORCED_EFFICIENCY);
+          /* the cpuset is given to the callee */
+        } else {
+          hwloc_bitmap_free(lpset);
         }
         /* register IntelAtom set if any */
         if (!hwloc_bitmap_iszero(atomset)) {
           struct hwloc_info_s infoattr;
           infoattr.name = (char *) "CoreType";
           infoattr.value = (char *) "IntelAtom";
-          hwloc_internal_cpukinds_register(topology, atomset, HWLOC_CPUKIND_EFFICIENCY_UNKNOWN, &infoattr, 1, 0);
+          hwloc_internal_cpukinds_register(topology, atomset, efficiency++, &infoattr, 1, HWLOC_CPUKINDS_REGISTER_FLAG_OVERWRITE_FORCED_EFFICIENCY);
           /* the cpuset is given to the callee */
         } else {
           hwloc_bitmap_free(atomset);
@@ -1449,7 +1471,7 @@ look_procs(struct hwloc_backend *backend, struct procinfo *infos, unsigned long 
           struct hwloc_info_s infoattr;
           infoattr.name = (char *) "CoreType";
           infoattr.value = (char *) "IntelCore";
-          hwloc_internal_cpukinds_register(topology, coreset, HWLOC_CPUKIND_EFFICIENCY_UNKNOWN, &infoattr, 1, 0);
+          hwloc_internal_cpukinds_register(topology, coreset, efficiency++, &infoattr, 1, HWLOC_CPUKINDS_REGISTER_FLAG_OVERWRITE_FORCED_EFFICIENCY);
           /* the cpuset is given to the callee */
         } else {
           hwloc_bitmap_free(coreset);
@@ -1753,7 +1775,7 @@ hwloc_x86_discover(struct hwloc_backend *backend, struct hwloc_disc_status *dsta
 
   if (topology->levels[0][0]->cpuset) {
     /* somebody else discovered things, reconnect levels so that we can look at them */
-    hwloc_topology_reconnect(topology, 0);
+    hwloc__reconnect(topology, 0);
     if (topology->nb_levels == 2 && topology->level_nbobjects[1] == data->nbprocs) {
       /* only PUs were discovered, as much as we would, complete the topology with everything else */
       alreadypus = 1;
@@ -1825,7 +1847,7 @@ hwloc_x86_check_cpuiddump_input(const char *src_cpuiddump_path, hwloc_bitmap_t s
     goto out_with_path;
   }
   fclose(file);
-  if (strcmp(line, "Architecture: x86\n")) {
+  if (strncmp(line, "Architecture: x86", 17)) {
     fprintf(stderr, "hwloc/x86: Found non-x86 dumped cpuid summary in %s: %s\n", path, line);
     goto out_with_path;
   }

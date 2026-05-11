@@ -1,4 +1,5 @@
 /*
+ * SPDX-License-Identifier: BSD-3-Clause
  * Copyright © 2009 CNRS
  * Copyright © 2009-2023 Inria.  All rights reserved.
  * Copyright © 2009-2013 Université Bordeaux
@@ -845,6 +846,10 @@ hwloc_look_darwin(struct hwloc_backend *backend, struct hwloc_disc_status *dstat
         if (n > 3)
           cachesize[3] = l3cachesize;
       }
+      else
+        /* Even on 64b systems, cachesize[0] is bogus when memsize is more than 4G. */
+        if (n > 0 && cachesize[0] < (uint64_t) memsize)
+          cachesize[0] = memsize;
 
       hwloc_debug("%s", "non-hybrid caches");
       for (i = 0; i < n && cacheconfig[i]; i++)
@@ -890,7 +895,7 @@ hwloc_look_darwin(struct hwloc_backend *backend, struct hwloc_disc_status *dstat
   if (gotnuma)
     topology->support.discovery->numa = 1;
   if (gotnumamemory)
-    topology->support.discovery->numa = 1;
+    topology->support.discovery->numa_memory = 1;
 
   /* add PU objects */
   hwloc_setup_pu_level(topology, nprocs);

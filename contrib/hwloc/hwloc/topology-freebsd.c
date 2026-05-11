@@ -1,4 +1,5 @@
 /*
+ * SPDX-License-Identifier: BSD-3-Clause
  * Copyright © 2009 CNRS
  * Copyright © 2009-2022 Inria.  All rights reserved.
  * Copyright © 2009-2010, 2012, 2020 Université Bordeaux
@@ -505,6 +506,8 @@ hwloc_look_freebsd_domains(struct hwloc_topology *topology){
     }
     if(nodes != NULL && !(topology->flags & HWLOC_TOPOLOGY_FLAG_NO_DISTANCES))
       set_locality_info(topology, ndomains, nodes);
+    else
+      free(nodes);
 
   /* nodes is either freed or given to the core in set_locality_info() */
   free(domains_memory);
