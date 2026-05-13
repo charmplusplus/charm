@@ -28,8 +28,7 @@ struct hapi_ipc_event_shared {
   hapiIpcEventHandle_t src_event_handle;
   hapiIpcEventHandle_t dst_event_handle;
   bool src_flag; // Unused for now
-  bool dst_flag;
-  pthread_mutex_t lock;
+  int dst_flag;  // Accessed atomically across processes, no mutex needed
 };
 
 // Per-device struct containing data for CUDA IPC.
