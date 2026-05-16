@@ -1408,17 +1408,23 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvInitialize(_CkErrStream*, _ckerr);
 	CkpvInitialize(Stats*, _myStats);
 
-	CkpvAccess(_groupIDTable) = new GroupIDTable(0);
-	CkpvAccess(_groupTable) = new GroupTable;
-	CkpvAccess(_groupTable)->init();
-	CkpvAccess(_groupTableImmLock) = CmiCreateImmediateLock();
-	CkpvAccess(_numGroups) = 1; // make 0 an invalid group number
-	CkpvAccess(_buffQ) = new PtrQ();
+	if (!reusingRegistrationState) {
+		CkpvAccess(_groupIDTable) = new GroupIDTable(0);
+		CkpvAccess(_groupTable) = new GroupTable;
+		CkpvAccess(_groupTable)->init();
+		CkpvAccess(_groupTableImmLock) = CmiCreateImmediateLock();
+		CkpvAccess(_numGroups) = 1; // make 0 an invalid group number
+		CkpvAccess(_buffQ) = new PtrQ();
+	}
+	// _bocInitVec and _nodeBocInitVec are transient init queues that
+	// _initDone deletes (`delete &inits;`); on a survivor restart we must
+	// allocate fresh ones, otherwise CksvAccess returns a dangling pointer
+	// and _processBufferedNodeBocInits aborts on stale entries.
 	CkpvAccess(_bocInitVec) = new PtrVec();
 
 	CkpvAccess(_currentNodeGroupObj) = NULL;
 
-	if(CkMyRank()==0)
+	if(CkMyRank()==0 && !reusingRegistrationState)
 	{
 	  	CksvAccess(_numNodeGroups) = 1; //make 0 an invalid group number
           	CksvAccess(_numInitNodeMsgs) = 0;
@@ -1429,13 +1435,13 @@ void _initCharm(int unused_argc, char **argv)
 		CksvAccess(_nodeGroupTable) = new GroupTable();
 		CksvAccess(_nodeGroupTable)->init();
 		CksvAccess(_nodeGroupTableImmLock) = CmiCreateImmediateLock();
-		CksvAccess(_nodeBocInitVec) = new PtrVec();
 		CksvAccess(_nodeZCPendingLock) = CmiCreateLock();
 		CksvAccess(_nodeZCPostReqLock) = CmiCreateLock();
 		CksvAccess( _nodeZCBufferReqLock) = CmiCreateLock();
 
 		CmiSetNcpyAckSize(sizeof(CkCallback));
 	}
+	if (CkMyRank() == 0) CksvAccess(_nodeBocInitVec) = new PtrVec();
 
 
 	CkCallbackInit();
@@ -1623,7 +1629,15 @@ void _initCharm(int unused_argc, char **argv)
 
 	CmiNodeAllBarrier();
 
-	// Execute the initcalls registered in modules
+	// Execute the initcalls registered in modules.
+	// Must run on survivor restart too: ConverseCommonInit resets the handler table
+	// (CmiHandlerInit zeroes CmiHandlerCount), so any handlers registered by initprocs
+	// (e.g. _ckArrayInit's ckinsertIdxFunc / CkCreateArrayAsync) must be re-registered
+	// in the same order on every PE — otherwise survivor and newcomer end up with
+	// misaligned handler indices and broadcasts (e.g. cputopology) dispatch to the
+	// wrong handler. The init bodies are idempotent: CkpvInitialize is per-PE state
+	// reset on every restart anyway, CkDisableTracing just toggles a flag, and
+	// CmiAssignOnce overwrites the handler-index globals to their new (matching) value.
 	_initCallTable.enumerateInitCalls();
 #if CMK_SHRINK_EXPAND
 	{
@@ -1639,8 +1653,10 @@ void _initCharm(int unused_argc, char **argv)
 	if (!reusingRegistrationState) _registerDone();
 	CmiNodeAllBarrier();
 
-	CkpvAccess(_myStats) = new Stats();
-	CkpvAccess(_msgPool) = new MsgPool();
+	if (!reusingRegistrationState) {
+		CkpvAccess(_myStats) = new Stats();
+		CkpvAccess(_msgPool) = new MsgPool();
+	}
 
 	CmiNodeAllBarrier();
 

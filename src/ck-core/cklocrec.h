@@ -60,6 +60,11 @@ public:
 #endif
   inline const CkArrayIndex &getIndex(void) const {return idx;}
   inline CmiUInt8 getID() const { return id; }
+#if CMK_SHRINK_EXPAND
+  // Used by CkLocMgr::resetForRescale to re-key local records when the new
+  // CkNumPes() shifts the home-PE encoded in the upper bits of the ID.
+  inline void setID(CmiUInt8 newId) { id = newId; }
+#endif
   inline CkLocMgr *getLocMgr() const {return myLocMgr; }
   inline CkSyncBarrier* getSyncBarrier() const { return syncBarrier; }
 

@@ -9,6 +9,15 @@ CkpvDeclare(bool, CkSyncBarrierInited);
 void _CkSyncBarrierInit()
 {
   CkpvInitialize(bool, CkSyncBarrierInited);
+#if CMK_SHRINK_EXPAND
+  // On survivor restart the CkSyncBarrier group object is preserved in memory
+  // (init.C gates the group-table overwrites on _reuseRegistrationStateOnRestart),
+  // so its constructor — and therefore init() which sets this flag to true — does
+  // not re-run. Resetting the flag here would leave object() returning nullptr,
+  // and the next CentralLB::ResumeClients() would segfault dereferencing it.
+  extern bool _reuseRegistrationStateOnRestart;
+  if (_reuseRegistrationStateOnRestart) return;
+#endif
   CkpvAccess(CkSyncBarrierInited) = false;
 }
 

@@ -626,6 +626,15 @@ public:
           amaps[i]->compute_binsize();
     }
   }
+
+#if CMK_SHRINK_EXPAND
+  void resetForRescale() override
+  {
+    for (int i = 0; i < amaps.size(); i++)
+      if (amaps[i])
+        amaps[i]->compute_binsize();
+  }
+#endif
 };
 
 /**
@@ -2306,6 +2315,69 @@ void CkLocMgr::flushLocalRecs(void)
 
 // All records are local records after the 64bit ID update
 void CkLocMgr::flushAllRecs(void) { flushLocalRecs(); }
+
+#if CMK_SHRINK_EXPAND
+// Survivor-side recovery after a shrink/expand commit.
+//
+// The pre-rescale state we have to fix up:
+//   - DefaultArrayMap::amaps[i]->_binSizeFloor / _numFirstSet were computed
+//     against the OLD CkNumPes(), so map->homePe(idx) returns the wrong PE.
+//   - cache->locMap may map IDs to PEs that were just killed, OR to PEs whose
+//     home-encoded ID is about to shift.
+//   - hash[id] -> rec is keyed by the OLD home-encoded ID. With the new map,
+//     lookupID(idx) returns a different ID, so remote sends would miss this
+//     record entirely.
+void CkLocMgr::resetForRescale()
+{
+  // 1. Refresh per-array bin sizes against the new CkNumPes().
+  if (map)
+    map->resetForRescale();
+
+  // 2. Wipe the cache. Stale (id -> PE) entries either point at killed peers
+  //    or are about to be invalidated by step 3's id rekey.
+  if (cache)
+    cache->resetForRescale();
+
+  // 3. Re-key local records under the new home-encoded ID. Snapshot first so
+  //    we can mutate the hash safely.
+  std::vector<CkLocRec*> recs;
+  recs.reserve(hash.size());
+  for (LocRecHash::iterator it = hash.begin(); it != hash.end(); ++it)
+    recs.push_back(it->second);
+
+  hash.clear();
+  if (!compressor)
+    idx2id.clear();
+
+  for (CkLocRec* rec : recs)
+  {
+    const CkArrayIndex& idx = rec->getIndex();
+    CmiUInt8 newId;
+    if (compressor)
+    {
+      const CmiUInt8 home = homePe(idx);
+      newId = (home << CMK_OBJID_ELEMENT_BITS) + compressor->compress(idx);
+    }
+    else
+    {
+      // Non-compressor: keep the old ID (the home is not encoded in it).
+      newId = rec->getID();
+      idx2id[idx] = newId;
+    }
+    rec->setID(newId);
+    hash[newId] = rec;
+  }
+
+  // 4. Re-publish: insert into local cache, then notify the new home PE so
+  //    remote PEs can resolve idx -> ID -> PE through the home.
+  for (CkLocRec* rec : recs)
+  {
+    CmiUInt8 id = rec->getID();
+    cache->insert(id, 0);
+    informHome(rec->getIndex(), CkMyPe());
+  }
+}
+#endif
 
 /*************************** LocCache **************************/
 const CkLocEntry CkLocEntry::nullEntry = CkLocEntry();

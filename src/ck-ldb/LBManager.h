@@ -297,6 +297,22 @@ class LBManager : public CBase_LBManager
     }
   }
 
+  // Survivor restart hook. The pre-rescale LB step set lb_in_progress=true in
+  // CentralLB::InvokeLB but never reached CentralLB::ResumeClients (the rescale
+  // path branches off at CheckForRealloc/StartCleanup), so the flag is stuck
+  // true on every survivor PE — and on PE 0 the realloc CCS handler then
+  // rejects every subsequent rescale request with "Rescaling called while load
+  // balancing is in progress". Clear the flag on every PE; on PE 0 also drain
+  // any rescale requests that arrived during the LB step and were stashed by
+  // bufferRealloc, replaying them so their pending_realloc_state lands before
+  // the next AtSync.
+  void resetForRescale()
+  {
+    lb_in_progress = false;
+    if (CkMyPe() == 0)
+      callRealloc();
+  }
+
   /*
    * Calls from object managers to load database
    */

@@ -1749,7 +1749,7 @@ void CkArray::forwardZCMsgToSpecificElem(envelope *env, CkMigratable *elem) {
 void CkArray::flushStates()
 {
   CkReductionMgr::flushStates();
-  // For chare arrays, and for chare arrays alone, the global and local
+  // For chare arrays, and for chare alone, the global and local
   // element counters in the reduction manager need to be reset to 0.
   // This is because all array elements are recreated during recovery
   // and will reregister, pushing the counts back to the correct levels.
@@ -1761,6 +1761,18 @@ void CkArray::flushStates()
   resetCountersWhenFlushingStates();
   CK_ARRAYLISTENER_LOOP(listeners, l->flushState());
 }
+
+#if CMK_SHRINK_EXPAND
+// Survivor restart: rebuild only the spanning tree against the new CkNumPes().
+// Do NOT flush redNo/futureMsgs — surviving array elements preserve their
+// contributorInfo::redNo across the longjmp, and flushing manager state would
+// desync against them, causing every post-rescale contribute() to land in
+// futureMsgs and stall the application's reduction chain forever.
+void CkArray::resetForRescale()
+{
+  rebuildTreeForRescale();
+}
+#endif
 
 void CkArray::ckDestroy()
 {

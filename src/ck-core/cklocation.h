@@ -147,6 +147,13 @@ public:
     return procNum(arrayHdl, element);
   }
 
+#if CMK_SHRINK_EXPAND
+  // Survivors keep their map state across a longjmp; the per-array bin sizes
+  // were computed against the OLD CkNumPes() and need recomputation against
+  // the new one before any homePe(idx) lookup is correct. No-op in the base.
+  virtual void resetForRescale() {}
+#endif
+
   virtual void pup(PUP::er& p);
 
   CkArrayOptions storeOpts;
@@ -378,6 +385,14 @@ public:
       l(id, pe);
     }
   }
+
+#if CMK_SHRINK_EXPAND
+  // Wipe every cached (id -> pe) entry. After a survivor restart the home PE
+  // baked into existing IDs (upper bits) may point at a killed peer, and the
+  // (id -> pe) mapping for surviving chares is stale relative to the new map.
+  // CkLocMgr::resetForRescale re-publishes its local elements after this.
+  void resetForRescale() { locMap.clear(); }
+#endif
 };
 
 /**
@@ -729,6 +744,17 @@ public:
   void flushAllRecs(void);
   void flushLocalRecs(void);
   void pup(PUP::er& p);
+
+#if CMK_SHRINK_EXPAND
+  // Survivor-side recovery after a shrink/expand commit. Called from
+  // CkRecvGroupROData on every group that isLocMgr(). Steps:
+  //   1. Refresh the array map's per-array bin sizes (homePe(idx) was stale).
+  //   2. Wipe the location cache (entries point at killed peers OR at peers
+  //      whose new homePe encoding has shifted).
+  //   3. Re-key every local CkLocRec under its new home-encoded ID.
+  //   4. Inform the new home for each local element so remote PEs can resolve.
+  void resetForRescale();
+#endif
 };
 
 /// check the command line arguments to determine if we can use ConfigurableRRMap

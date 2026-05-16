@@ -252,6 +252,51 @@ void CkReductionMgr::flushStates()
 
 }
 
+#if CMK_SHRINK_EXPAND
+// On a shrink/expand survivor restart the existing CkReductionMgr-derived
+// group instance is preserved across the longjmp, so its constructor (which
+// builds the spanning tree from CkNumPes() and zeroes redNo) does not run
+// again. Newcomer groups, in contrast, are freshly constructed against the
+// post-rescale CkNumPes() with redNo=0. Without resetting, the survivor's
+// stale parent/numKids/kids point at pre-rescale PE numbers, and the next
+// reduction sees newcomer contributions arrive with a redNo smaller than the
+// survivor's completedRedNo — RecvMsg aborts on
+// "Recv'd late remote contribution!". Drop pending state and rebuild the
+// tree against the current topology so survivor and newcomer are aligned.
+void CkReductionMgr::resetForRescale()
+{
+  flushStates();
+  rebuildTreeForRescale();
+}
+
+// Rebuild only the parent/kids spanning tree against the new CkNumPes()
+// without touching redNo/futureMsgs/contributor state. Used by chare-array
+// reduction managers (CkArray) where contributorInfo::redNo is preserved
+// across the longjmp on each surviving array element — flushing manager
+// state would desync against those contributors and silently park
+// post-rescale contributions in futureMsgs forever.
+void CkReductionMgr::rebuildTreeForRescale()
+{
+  kids.clear();
+  // inactiveList keys are PE numbers from the OLD tree. After rescale a stale
+  // entry may name a killed peer, and the next sendReductionStartingToKids
+  // would push a message at that dead PE (UCX endpoint == nullptr -> abort).
+  inactiveList.clear();
+  is_inactive = false;
+#ifdef BINOMIAL_TREE
+  init_BinomialTree();
+#else
+  init_TopoTree();
+#endif
+  // After tree rebuild, leaf PEs that have no local contributors (e.g. a
+  // newcomer that just joined via expand and has lcount=0, or a survivor whose
+  // chares all migrated away) must immediately inform their NEW parent that
+  // they are inactive. Otherwise the parent waits forever for their
+  // contribution and the in-flight reduction stalls.
+  checkIsActive();
+}
+#endif
+
 //////////// Reduction Manager Client API /////////////
 
 //Add the given client function.  Overwrites any previous client.
@@ -745,8 +790,10 @@ void CkReductionMgr::finishReduction(void)
   else if (isFuture(m->redNo)) {
     DEBR((AA "Recv'd early remote contribution %d for #%d\n" AB,nRemote,m->redNo));
     futureRemoteMsgs.enq(m);
-  } 
-  else CkAbort("Recv'd late remote contribution!\n");
+  }
+  else {
+    CkAbort("Recv'd late remote contribution!\n");
+  }
 }
 
 void CkReductionMgr::AddToInactiveList(CkReductionInactiveMsg *m) {
@@ -2046,6 +2093,21 @@ void CkNodeReductionMgr::flushStates()
   while (!futureLateMigrantMsgs.isEmpty()) delete futureLateMigrantMsgs.deq();
   }
 }
+
+#if CMK_SHRINK_EXPAND
+void CkNodeReductionMgr::resetForRescale()
+{
+  flushStates();
+  if (CkMyRank() == 0) {
+    kids.clear();
+#ifdef BINOMIAL_TREE
+    init_BinomialTree();
+#else
+    init_TopoTree();
+#endif
+  }
+}
+#endif
 
 //////////// Reduction Manager Client API /////////////
 

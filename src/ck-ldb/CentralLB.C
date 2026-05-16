@@ -119,6 +119,28 @@ CentralLB::~CentralLB()
 #endif
 }
 
+#if CMK_LBDB_ON && CMK_SHRINK_EXPAND
+// On survivor restart, statsMsgsList was allocated against the pre-rescale
+// CkNumPes() and won't be re-sized: ReceiveStats only allocates when the
+// pointer is NULL, so an expanded cluster's stats from the new PE land at an
+// out-of-bounds index, and a shrunk cluster keeps a stale slot. statsData's
+// procs vector has the same staleness. Drop both so the next LB step rebuilds
+// them with the post-rescale CkNumPes().
+void CentralLB::flushStates()
+{
+  BaseLB::flushStates();
+  if (statsMsgsList) {
+    for (int i = 0; i < stats_msg_count; i++) delete statsMsgsList[i];
+    delete[] statsMsgsList;
+    statsMsgsList = NULL;
+  }
+  delete statsData;
+  statsData = NULL;
+  stats_msg_count = 0;
+  reduction_started = false;
+}
+#endif
+
 void CentralLB::SetPESpeed(int speed) 
 {
   myspeed = speed;
@@ -1140,7 +1162,6 @@ void CentralLB::MigrationDone(int balancing)
 
 void CentralLB::MigrationDoneImpl (int balancing)
 {
-
 #if CMK_LBDB_ON
   migrates_completed = 0;
   migrates_expected = -1;

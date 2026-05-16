@@ -187,11 +187,24 @@ LBMgrInit::LBMgrInit(CkArgMsg* m)
 void _loadbalancerInit()
 {
   CkpvInitialize(bool, lbmanagerInited);
-  CkpvAccess(lbmanagerInited) = false;
-
   CkpvInitialize(LBUserDataLayout, lbobjdatalayout);
   CkpvInitialize(int, _lb_obj_index);
+#if CMK_SHRINK_EXPAND
+  // On a shrink/expand survivor restart the LBManager group instance is
+  // preserved across the longjmp, so its constructor (which sets
+  // lbmanagerInited=true) does not run again. Resetting these here would
+  // leave LBManager::Object() permanently NULL and BuildStatsMsg would trap
+  // on the next AtSync. Only initialize on a fresh start; survivors keep
+  // their pre-rescale state.
+  extern bool _reuseRegistrationStateOnRestart;
+  if (!_reuseRegistrationStateOnRestart) {
+    CkpvAccess(lbmanagerInited) = false;
+    CkpvAccess(_lb_obj_index) = -1;
+  }
+#else
+  CkpvAccess(lbmanagerInited) = false;
   CkpvAccess(_lb_obj_index) = -1;
+#endif
 
   char** argv = CkGetArgv();
   char* balancer = NULL;

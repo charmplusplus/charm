@@ -133,6 +133,10 @@ public:
   // manual start load balancing
   inline void StartLB() { thisProxy.ProcessAtSync(); }
 
+#if CMK_SHRINK_EXPAND
+  void flushStates() override;
+#endif
+
   // Migrated-element callback
   void Migrated(int waitBarrier=1);
 

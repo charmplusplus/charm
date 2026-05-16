@@ -491,6 +491,10 @@ public:
 
 	virtual void flushStates();	// flush state varaibles
 
+#if CMK_SHRINK_EXPAND
+	void resetForRescale(); // flush state + rebuild spanning tree (survivor restart)
+#endif
+
 	virtual int getTotalGCount(){return 0;};
 
 private:
@@ -648,7 +652,11 @@ public:
 
 	virtual bool isReductionMgr(void){ return true; }
 	virtual void flushStates();
-	/*FAULT_EVAC: used to get the gcount on a processor when 
+#if CMK_SHRINK_EXPAND
+	virtual void resetForRescale(); // flush state + rebuild spanning tree (survivor restart)
+	void rebuildTreeForRescale();   // rebuild spanning tree only (preserve redNo/contributors)
+#endif
+	/*FAULT_EVAC: used to get the gcount on a processor when
 		it is evacuated.
 		TODO: It needs to be fixed as it should return the gcount
 		and the adjustment information for objects that might have

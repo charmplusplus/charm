@@ -568,7 +568,14 @@ CpvDeclare(int, cpdSuspendStartup);
 void CcsInit(char **argv)
 {
   CpvInitialize(CkHashtable_c, ccsTab);
-  CpvAccess(ccsTab) = CkCreateHashtable_string(sizeof(CcsHandlerRec),5);
+#if CMK_SHRINK_EXPAND
+  // Survivors longjmp back through CcsInit but their CentralLB constructor
+  // (which calls manager_init() to register set_bitmap/realloc) does NOT
+  // re-run — preserve the existing handler table across the restart.
+  extern bool _reuseRegistrationStateOnRestart;
+  if (!_reuseRegistrationStateOnRestart)
+#endif
+    CpvAccess(ccsTab) = CkCreateHashtable_string(sizeof(CcsHandlerRec),5);
   CpvInitialize(CcsImplHeader *, ccsReq);
   CpvAccess(ccsReq) = NULL;
   CmiAssignOnce(&_ccsHandlerIdx,CmiRegisterHandler((CmiHandler)req_fw_handler));

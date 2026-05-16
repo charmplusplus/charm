@@ -892,6 +892,9 @@ private:
 public:
   CkArrayBroadcaster* getBroadcaster() { return broadcaster; }
   void flushStates();
+#if CMK_SHRINK_EXPAND
+  void resetForRescale() override;
+#endif
   void forwardZCMsgToOtherElems(envelope *env);
   void forwardZCMsgToSpecificElem(envelope *env, CkMigratable *elem);
 
