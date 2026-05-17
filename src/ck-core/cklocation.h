@@ -391,7 +391,15 @@ public:
   // baked into existing IDs (upper bits) may point at a killed peer, and the
   // (id -> pe) mapping for surviving chares is stale relative to the new map.
   // CkLocMgr::resetForRescale re-publishes its local elements after this.
-  void resetForRescale() { locMap.clear(); }
+  // Bump rescaleEpoch so freshly-published cache entries carry an epoch > 0;
+  // otherwise updateLocation's strict-> filter discards the informHome
+  // notifications (oldEntry default-constructs with epoch=0) and listeners
+  // never fire to drain bufferedIDMsgs at the home.
+  void resetForRescale() { locMap.clear(); ++rescaleEpoch; }
+  int getRescaleEpoch() const { return rescaleEpoch; }
+
+private:
+  int rescaleEpoch = 0;
 #endif
 };
 

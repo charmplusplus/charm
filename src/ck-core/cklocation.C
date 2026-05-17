@@ -2369,11 +2369,16 @@ void CkLocMgr::resetForRescale()
   }
 
   // 4. Re-publish: insert into local cache, then notify the new home PE so
-  //    remote PEs can resolve idx -> ID -> PE through the home.
+  //    remote PEs can resolve idx -> ID -> PE through the home. Use the cache's
+  //    bumped rescale epoch so the receiver's CkLocCache::updateLocation passes
+  //    its strict newEntry.epoch > oldEntry.epoch check — with epoch=0 on a
+  //    wiped cache, listeners would never fire and bufferedIDMsgs would never
+  //    drain.
+  const int epoch = cache->getRescaleEpoch();
   for (CkLocRec* rec : recs)
   {
     CmiUInt8 id = rec->getID();
-    cache->insert(id, 0);
+    cache->insert(id, epoch);
     informHome(rec->getIndex(), CkMyPe());
   }
 }
