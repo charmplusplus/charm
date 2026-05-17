@@ -52,7 +52,7 @@ void run_initial(const char *host, int port, int idx) {
 
   ClusterView post;
   bool gotDie = false;
-  bool ok = await_reconfig_or_die(fd, &post, &gotDie);
+  bool ok = await_reconfig_or_die(fd, view.members, &post, &gotDie);
   if (gotDie) {
     fprintf(stderr, "[initial idx=%d] DIE received — exiting\n", idx);
   } else if (ok) {
@@ -172,7 +172,8 @@ int main(int argc, char **argv) {
 
   std::vector<uint32_t> kills(killSet.begin(), killSet.end());
   ClusterView committed;
-  if (!commit(fd, view.epoch, kills, static_cast<uint32_t>(newCount), &committed)) {
+  if (!commit(fd, view.epoch, kills, static_cast<uint32_t>(newCount),
+              view.members, &committed)) {
     fprintf(stderr, "COMMIT failed\n");
     exit(1);
   }

@@ -28,11 +28,22 @@
 //     -> QUERY_PENDING
 //     <- QUERY_PENDING_REPLY { count }
 //     -> COMMIT { epoch, kills[], take }
-//     <- COMMIT_REPLY { newNodeId, epoch, members[] }           (PE 0 specifically; gives its
-//                                                              own renumbered nodeId)
+//     <- COMMIT_REPLY { newNodeId, epoch, killedOldIds[], added[] }
+//                                                              (delta against the
+//                                                              caller's cached view;
+//                                                              killedOldIds are in OLD
+//                                                              numbering; added carry
+//                                                              their final new nodeIds)
 //   Surviving (non-initiator) members during reconfig:
-//     <- RECONFIG { newNodeId, epoch, members[] }               (pushed at COMMIT; same shape
-//                                                              as INTEGRATE)
+//     <- RECONFIG { newNodeId, epoch, killedOldIds[], added[] } (same delta shape as
+//                                                              COMMIT_REPLY)
+//
+//   Delta reconstruction (client-side, deterministic; matches server in
+//   coordinator.cpp handleCommit):
+//     1. From cached old members in OLD nodeId order, drop any whose nodeId is
+//        in killedOldIds.
+//     2. Renumber the survivors compactly to 0..S-1 (preserving relative order).
+//     3. Append `added` members verbatim — their nodeIds are S..S+|added|-1.
 //   Killed members during reconfig:
 //     <- DIE { }                                                (pushed at COMMIT; receiver
 //                                                              should exit)
