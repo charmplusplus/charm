@@ -1230,8 +1230,7 @@ void ConverseCleanup(void)
                   take, pending);
         take = pending;
       }
-      if (!coord::commit(_coord_fd, _coord_epoch, kills, take,
-                         _coord_members, &view)) {
+      if (!coord::commit(_coord_fd, _coord_epoch, kills, take, &view)) {
         CmiAbort("UCX: coord::commit failed");
       }
       CmiPrintf("Charm> coordinator COMMIT: epoch %u->%u, %u kills, %u taken, %zu members\n",
@@ -1243,8 +1242,7 @@ void ConverseCleanup(void)
       }
     } else {
       // Other ranks: block on coord_fd for either RECONFIG or DIE.
-      if (!coord::await_reconfig_or_die(_coord_fd, _coord_members, &view,
-                                        &gotDie) && !gotDie) {
+      if (!coord::await_reconfig_or_die(_coord_fd, &view, &gotDie) && !gotDie) {
         CmiAbort("UCX: coordinator push read failed (expected RECONFIG or DIE)");
       }
     }

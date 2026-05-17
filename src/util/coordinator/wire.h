@@ -72,42 +72,6 @@ inline std::vector<Member> get_members(const uint8_t *&p, const uint8_t *end) {
   return out;
 }
 
-inline void put_u32_vec(std::vector<uint8_t> &buf, const std::vector<uint32_t> &v) {
-  put_u32(buf, static_cast<uint32_t>(v.size()));
-  for (uint32_t x : v) put_u32(buf, x);
-}
-
-inline std::vector<uint32_t> get_u32_vec(const uint8_t *&p, const uint8_t *end) {
-  uint32_t n = get_u32(p, end);
-  std::vector<uint32_t> out;
-  out.reserve(n);
-  for (uint32_t i = 0; i < n; ++i) out.push_back(get_u32(p, end));
-  return out;
-}
-
-// Apply a (killedOldIds, added) delta to an old member list (in OLD nodeId
-// order) to produce the new member list with compact renumbering. Matches the
-// server-side algorithm in coordinator.cpp handleCommit.
-inline std::vector<Member> apply_member_delta(
-    const std::vector<Member> &oldMembers,
-    const std::vector<uint32_t> &killedOldIds,
-    const std::vector<Member> &added) {
-  std::vector<uint8_t> killed;  // bitmap by old nodeId
-  for (uint32_t k : killedOldIds) {
-    if (k >= killed.size()) killed.resize(k + 1, 0);
-    killed[k] = 1;
-  }
-  std::vector<Member> out;
-  out.reserve(oldMembers.size() - killedOldIds.size() + added.size());
-  uint32_t nextId = 0;
-  for (const auto &m : oldMembers) {
-    if (m.nodeId < killed.size() && killed[m.nodeId]) continue;
-    out.push_back({nextId++, m.ucxAddr});
-  }
-  for (const auto &m : added) out.push_back(m);
-  return out;
-}
-
 // Read exactly n bytes, returning false on EOF/error.
 inline bool read_exact(int fd, void *buf, size_t n) {
   uint8_t *p = static_cast<uint8_t *>(buf);

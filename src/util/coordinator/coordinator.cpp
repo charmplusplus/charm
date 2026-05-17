@@ -348,20 +348,7 @@ class Coordinator {
       memberFd_[cs.nodeId] = newFd;
     }
 
-    // Build the kill list (in OLD numbering) and the added list (newcomers
-    // with their final NEW nodeIds) once — both are reused for every survivor
-    // and for the initiator. Survivors apply the delta against their cached
-    // view to reconstruct the full new membership.
-    std::vector<uint32_t> killedOldIds(killSet.begin(), killSet.end());
-    std::vector<Member> added;
-    added.reserve(takenFds.size());
-    for (size_t i = 0; i < takenFds.size(); ++i) {
-      added.push_back(newMembers[survivors.size() + i]);
-    }
-
-    // Push INTEGRATE to each newly-integrated newcomer. Newcomers don't have
-    // a stable cached view (their snapshot may be from an older epoch if a
-    // prior commit didn't take them), so they still get the full member list.
+    // Push INTEGRATE to each newly-integrated newcomer.
     for (size_t i = 0; i < takenFds.size(); ++i) {
       int newFd = takenFds[i];
       uint32_t nodeId = clients_[newFd].nodeId;
@@ -373,17 +360,16 @@ class Coordinator {
       else clients_[newFd].replyDeferred = false;
     }
 
-    // Push RECONFIG (delta) to each surviving non-initiator member. They're
-    // blocked in ConverseCleanup waiting for it and have the previous-epoch
-    // members_ cached, so we only send what changed.
+    // Push RECONFIG to each surviving non-initiator member (they're blocked
+    // in ConverseCleanup waiting for it). The initiator gets COMMIT_REPLY
+    // with the same payload shape so the rank-side code path stays uniform.
     for (size_t i = 0; i < survivors.size(); ++i) {
       if (survivors[i].fd == fd) continue;
       uint32_t nodeId = newMembers[i].nodeId;
       std::vector<uint8_t> rpl;
       put_u32(rpl, nodeId);
       put_u32(rpl, epoch_);
-      put_u32_vec(rpl, killedOldIds);
-      put_members(rpl, added);
+      put_members(rpl, members_);
       if (!send_frame(survivors[i].fd, RECONFIG, rpl)) closeClient(survivors[i].fd);
     }
 
@@ -393,14 +379,13 @@ class Coordinator {
       // Don't close — the killed rank will close from its side after _exit.
     }
 
-    // Reply to PE 0 with the same delta shape.
+    // Reply to PE 0 with its new nodeId + the new membership.
     {
       uint32_t initiatorNewId = clients_[fd].nodeId;
       std::vector<uint8_t> rpl;
       put_u32(rpl, initiatorNewId);
       put_u32(rpl, epoch_);
-      put_u32_vec(rpl, killedOldIds);
-      put_members(rpl, added);
+      put_members(rpl, members_);
       if (!send_frame(fd, COMMIT_REPLY, rpl)) closeClient(fd);
     }
   }

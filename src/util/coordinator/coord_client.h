@@ -113,12 +113,8 @@ inline bool query_pending(int fd, uint32_t *outCount) {
   return true;
 }
 
-// COMMIT_REPLY carries a delta against the caller's cached `oldMembers`
-// (which must be the membership at `epoch` in OLD nodeId order). On success
-// `out->members` is the fully reconstructed new view in NEW nodeId order.
 inline bool commit(int fd, uint32_t epoch, const std::vector<uint32_t> &kills,
-                   uint32_t take, const std::vector<Member> &oldMembers,
-                   ClusterView *out) {
+                   uint32_t take, ClusterView *out) {
   std::vector<uint8_t> p;
   put_u32(p, epoch);
   put_u32(p, static_cast<uint32_t>(kills.size()));
@@ -131,19 +127,15 @@ inline bool commit(int fd, uint32_t epoch, const std::vector<uint32_t> &kills,
   const uint8_t *end = q + f.payload.size();
   out->nodeId = get_u32(q, end);
   out->epoch = get_u32(q, end);
-  std::vector<uint32_t> killedOldIds = get_u32_vec(q, end);
-  std::vector<Member> added = get_members(q, end);
-  out->members = apply_member_delta(oldMembers, killedOldIds, added);
+  out->members = get_members(q, end);
   return true;
 }
 
 // Surviving non-initiator members block on this in ConverseCleanup. Returns
-// true on RECONFIG (out is populated from a delta applied to oldMembers),
-// false on DIE (caller should exit). On socket error returns false with
-// out->epoch == 0 — caller should treat as fatal (use the read_frame
-// f.type==0 convention).
-inline bool await_reconfig_or_die(int fd, const std::vector<Member> &oldMembers,
-                                  ClusterView *out, bool *gotDie) {
+// true on RECONFIG (out is populated), false on DIE (caller should exit).
+// On socket error returns false with out->epoch == 0 — caller should treat as
+// fatal (use the read_frame f.type==0 convention).
+inline bool await_reconfig_or_die(int fd, ClusterView *out, bool *gotDie) {
   Frame f = read_frame(fd);
   if (f.type == DIE) { *gotDie = true; return false; }
   if (f.type != RECONFIG) { *gotDie = false; return false; }
@@ -152,9 +144,7 @@ inline bool await_reconfig_or_die(int fd, const std::vector<Member> &oldMembers,
   const uint8_t *end = q + f.payload.size();
   out->nodeId = get_u32(q, end);
   out->epoch = get_u32(q, end);
-  std::vector<uint32_t> killedOldIds = get_u32_vec(q, end);
-  std::vector<Member> added = get_members(q, end);
-  out->members = apply_member_delta(oldMembers, killedOldIds, added);
+  out->members = get_members(q, end);
   return true;
 }
 
