@@ -894,6 +894,19 @@ public:
   void flushStates();
 #if CMK_SHRINK_EXPAND
   void resetForRescale() override;
+  // Re-key one chare's entry in localElems after CkLocMgr re-encodes its ID
+  // (homePe shifted on rescale). The underlying CkMigratable* and its offset
+  // in localElemVec stay the same — only the id-keyed lookup table moves.
+  void reKeyLocalElem(CmiUInt8 oldId, CmiUInt8 newId)
+  {
+    auto itr = localElems.find(oldId);
+    if (itr != localElems.end())
+    {
+      unsigned int offset = itr->second;
+      localElems.erase(itr);
+      localElems[newId] = offset;
+    }
+  }
 #endif
   void forwardZCMsgToOtherElems(envelope *env);
   void forwardZCMsgToSpecificElem(envelope *env, CkMigratable *elem);

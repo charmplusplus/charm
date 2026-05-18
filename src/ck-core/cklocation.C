@@ -2352,6 +2352,7 @@ void CkLocMgr::resetForRescale()
   for (CkLocRec* rec : recs)
   {
     const CkArrayIndex& idx = rec->getIndex();
+    const CmiUInt8 oldId = rec->getID();
     CmiUInt8 newId;
     if (compressor)
     {
@@ -2366,6 +2367,15 @@ void CkLocMgr::resetForRescale()
     }
     rec->setID(newId);
     hash[newId] = rec;
+    // Re-key each managed CkArray's localElems table so lookup(newId) at the
+    // actual PE finds the chare. Without this, ghost messages arriving with
+    // newId silently buffer in bufferedIDMsgs forever — listeners have already
+    // fired from cache->insert above, so the buffer never drains.
+    if (newId != oldId)
+    {
+      for (auto& kv : managers)
+        kv.second->reKeyLocalElem(oldId, newId);
+    }
   }
 
   // 4. Re-publish: insert into local cache, then notify the new home PE so
