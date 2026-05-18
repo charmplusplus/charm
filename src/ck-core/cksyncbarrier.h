@@ -151,6 +151,21 @@ public:
   };
   void turnOff() { on = false; };
 
+#if CMK_SHRINK_EXPAND
+  // Survivor restart: the iter-N LB step that triggered the rescale fired the
+  // begin-receivers (RegisteringObjects → turnOff) and set startedAtSync=true
+  // inside checkBarrier, but the matching ResumeClients → reset() never ran
+  // (the rescale path forks off at CheckForRealloc → StartCleanup → longjmp).
+  // Force the barrier back into a triggerable state: clear startedAtSync,
+  // clear the propagation-kick bookkeeping, and turn it on. The next AtSync
+  // round can then fire checkBarrier without bailing on !on or startedAtSync.
+  void resetForRescale()
+  {
+    reset();
+    on = true;
+  }
+#endif
+
   void resumeClients();
 
   bool hasReceivers() { return !receivers.empty(); };

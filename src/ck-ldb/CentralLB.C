@@ -126,6 +126,17 @@ CentralLB::~CentralLB()
 // out-of-bounds index, and a shrunk cluster keeps a stale slot. statsData's
 // procs vector has the same staleness. Drop both so the next LB step rebuilds
 // them with the post-rescale CkNumPes().
+//
+// Also reset the migration counters. MigrationDoneImpl normally zeros these,
+// but the rescale path forks off at CheckForRealloc before MigrationDoneImpl
+// runs. On the next LB step, ProcessReceiveMigration sets
+// migrates_expected=N for the incoming migrations, but the stale
+// migrates_completed (carried over from the rescale-triggering LB) is already
+// > N, so the equality check that triggers MigrationDone never matches and
+// the LB step hangs after migration. Same for lbdone, which CheckMigrationComplete
+// only resets after lbdone reaches 2; if the rescale interrupts at lbdone==1,
+// the next LB step starts at lbdone=1 and only needs ONE
+// CheckMigrationComplete to flip — which then prematurely calls MigrationDoneImpl.
 void CentralLB::flushStates()
 {
   BaseLB::flushStates();
@@ -138,6 +149,11 @@ void CentralLB::flushStates()
   statsData = NULL;
   stats_msg_count = 0;
   reduction_started = false;
+  migrates_completed = 0;
+  migrates_expected = -1;
+  future_migrates_completed = 0;
+  future_migrates_expected = -1;
+  lbdone = 0;
 }
 #endif
 
@@ -155,7 +171,7 @@ void CentralLB::CallLB()
 {
   #if CMK_LBDB_ON
   DEBUGF(("[%d] CentralLB AtSync step %d!!!!!\n",CkMyPe(),step()));
-#if CMK_MEM_CHECKPOINT	
+#if CMK_MEM_CHECKPOINT
   CkSetInLdb();
 #endif
 
@@ -568,7 +584,7 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &&msg)
   const int clients = CkNumPes();
 
   DEBUGF(("THIS POINT count = %d, clients = %d\n",stats_msg_count,clients));
- 
+
   if (stats_msg_count == clients) {
 	DEBUGF(("[%d] All stats messages received \n",CmiMyPe()));
     statsData->procs.resize(stats_msg_count);
