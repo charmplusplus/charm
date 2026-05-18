@@ -260,6 +260,22 @@ void CkSyncBarrier::resumeClients()
   for (const auto& c : clients) c->fn();
 }
 
-void CkSyncBarrier::pup(PUP::er& p) { IrrGroup::pup(p); }
+void CkSyncBarrier::pup(PUP::er& p)
+{
+  IrrGroup::pup(p);
+#if CMK_SHRINK_EXPAND
+  // On expand, a newcomer constructs its CkSyncBarrier fresh with curEpoch=0,
+  // but the survivors have already advanced curEpoch through every pre- and
+  // post-rescale AtSync round. When the newcomer's chares hit their first
+  // AtSync post-integration and the newcomer's barrier triggers, the kick
+  // it propagates carries kickEpoch=1 (newcomer's freshly-incremented epoch).
+  // The survivors see kickEpoch <= their own curEpoch and silently discard the
+  // kick (per the "I've moved past this epoch" guard in kick()), so the
+  // survivors' empty-clients barrier never fires and the cluster wedges at
+  // the next regular LB step. Pup curEpoch so the newcomer adopts the
+  // cluster's epoch from the rescale-time broadcast.
+  p | curEpoch;
+#endif
+}
 
 #include "CkSyncBarrier.def.h"
