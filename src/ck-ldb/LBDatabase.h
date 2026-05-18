@@ -59,6 +59,19 @@ public:
   inline LBOM* LbOM(LDOMHandle h) {
     return oms[h.handle];
   }
+
+#if CMK_SHRINK_EXPAND
+  // Survivor restart: the iter-N LB step that triggered the rescale called the
+  // CkSyncBarrier begin-receiver (RegisteringObjects) on every CkLocMgr OM,
+  // bumping omsRegistering and flipping syncBarrier->on = false. The matching
+  // end-receiver (DoneRegisteringObjects) would normally fire from
+  // CentralLB::ResumeClients, but the rescale path forks off at
+  // CheckForRealloc -> StartCleanup -> longjmp before that. Without resetting,
+  // the next AtSync fills atCount up to clients but checkBarrier() bails on
+  // !on, so the barrier never fires and the post-rescale LB step hangs
+  // forever. Clear OM registering flags and force barrier on.
+  void resetRegisteringForRescale();
+#endif
   inline LBObj *LbObj(const LDObjHandle &h) const {
     return objs[h.handle].obj;
   }

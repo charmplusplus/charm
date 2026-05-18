@@ -309,6 +309,9 @@ class LBManager : public CBase_LBManager
   void resetForRescale()
   {
     lb_in_progress = false;
+    // Clear LBDatabase OM registering state and force-on the CkSyncBarrier.
+    // See LBDatabase::resetRegisteringForRescale for full reasoning.
+    if (lbdb_obj) lbdb_obj->resetRegisteringForRescale();
     if (CkMyPe() == 0)
       callRealloc();
   }

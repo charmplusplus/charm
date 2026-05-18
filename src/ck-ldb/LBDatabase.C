@@ -86,6 +86,14 @@ void LBDatabase::DoneRegisteringObjects(LDOMHandle omh)
 }
 
 
+#if CMK_SHRINK_EXPAND
+void LBDatabase::resetRegisteringForRescale() {
+  for (LBOM* om : oms) if (om) om->SetRegisteringObjs(false);
+  omsRegistering = 0;
+  if (syncBarrier) syncBarrier->turnOn();
+}
+#endif
+
 LDObjHandle LBDatabase::RegisterObj(LDOMHandle omh, CmiUInt8 id,
                                     void* userPtr, int migratable) {
 #if CMK_LBDB_ON
