@@ -905,6 +905,19 @@ static void CmiHandlerInit(void)
   CpvInitialize(int         , CmiHandlerLocal);
   CpvInitialize(int         , CmiHandlerGlobal);
   CpvInitialize(int         , CmiHandlerMax);
+#if CMK_SHRINK_EXPAND
+  // On a shrink/expand survivor restart, ConverseCommonInit runs again post-
+  // longjmp. Wiping CmiHandlerTable + resetting CmiHandlerCount would
+  // invalidate every CmiAssignOnce'd handler index from the first init (their
+  // recorded slot numbers still point into a now-empty table); subsequent
+  // CmiRegisterHandler calls would re-fill slots in a different order
+  // depending on which init paths got gated, scrambling routing for
+  // CldHandler, _skipCldHandler, _bocHandlerIdx, etc. Skip the reset on
+  // survivor restart so the entire dispatch table — and every
+  // CmiAssignOnce'd index that references it — stays valid.
+  extern bool _reuseRegistrationStateOnRestart;
+  if (_reuseRegistrationStateOnRestart) return;
+#endif
   CpvAccess(CmiHandlerCount)  = 0;
   CpvAccess(CmiHandlerLocal)  = 1;
   CpvAccess(CmiHandlerGlobal) = 2;
