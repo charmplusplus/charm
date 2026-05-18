@@ -1773,6 +1773,30 @@ void CkArray::resetForRescale()
   rebaseCountersForRescale();
   rebuildTreeForRescale();
 }
+
+void CkArray::reKeyLocalElem(CmiUInt8 oldId, CmiUInt8 newId)
+{
+  auto itr = localElems.find(oldId);
+  if (itr != localElems.end())
+  {
+    unsigned int offset = itr->second;
+    localElems.erase(itr);
+    localElems[newId] = offset;
+  }
+  const CmiUInt8 oldObjID = ck::ObjID(thisgroup, oldId).getID();
+  const CmiUInt8 newObjID = ck::ObjID(thisgroup, newId).getID();
+  if (oldObjID != newObjID)
+  {
+    auto& objMap = CkpvAccess(array_objs);
+    auto oit = objMap.find(oldObjID);
+    if (oit != objMap.end())
+    {
+      ArrayElement* aelem = (ArrayElement*)oit->second;
+      objMap.erase(oit);
+      objMap[newObjID] = aelem;
+    }
+  }
+}
 #endif
 
 void CkArray::ckDestroy()

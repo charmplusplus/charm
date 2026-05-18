@@ -2367,10 +2367,13 @@ void CkLocMgr::resetForRescale()
     }
     rec->setID(newId);
     hash[newId] = rec;
-    // Re-key each managed CkArray's localElems table so lookup(newId) at the
-    // actual PE finds the chare. Without this, ghost messages arriving with
-    // newId silently buffer in bufferedIDMsgs forever — listeners have already
-    // fired from cache->insert above, so the buffer never drains.
+    // Re-key each managed CkArray's localElems table AND the PE-level
+    // array_objs fast-path hash so lookup(newId) at the actual PE finds the
+    // chare. Without this, ghost messages arriving with newId silently buffer
+    // in bufferedIDMsgs forever — listeners have already fired from
+    // cache->insert above, so the buffer never drains. Without the array_objs
+    // re-key, _processArrayEltMsg's fast path can also resolve stale recipient
+    // IDs to a freed element pointer once the chare is migrated away.
     if (newId != oldId)
     {
       for (auto& kv : managers)
