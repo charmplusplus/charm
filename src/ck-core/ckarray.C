@@ -1770,6 +1770,7 @@ void CkArray::flushStates()
 // futureMsgs and stall the application's reduction chain forever.
 void CkArray::resetForRescale()
 {
+  rebaseCountersForRescale();
   rebuildTreeForRescale();
 }
 #endif
