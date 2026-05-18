@@ -818,7 +818,23 @@ static void CmiExtendHandlerTable(int atLeastLen) {
 }
 
 void CmiAssignOnce(int* variable, int value) {
+#if CMK_SHRINK_EXPAND
+  // Truly assign-once on the rescale path: a survivor's _initCharm re-runs
+  // after the longjmp and would otherwise overwrite the slot recorded during
+  // the first init. Chares and any messages in flight reference that original
+  // slot, and a newcomer joining the cluster also registers in the same
+  // deterministic order and lands on the same slot — so preserving the
+  // original survivor slot is what lets all peers resolve handler indices
+  // consistently. Without this gate the survivor's static for e.g.
+  // CmiIsomallocSyncBroadcastHandlerIdx drifts to the latest (post-rescale
+  // re-registration) slot, and the newcomer — whose only-init slot matches
+  // the survivor's ORIGINAL slot — looks up an out-of-bounds entry and
+  // segfaults in CmiHandleMessage. Slot 0 is the reserved zero handler so a
+  // real CmiAssignOnce target is non-zero only after a successful prior call.
+  if (CmiMyRank() == 0 && *variable == 0) { *variable = value; }
+#else
   if (CmiMyRank() == 0) { *variable = value; }
+#endif
   CmiNodeAllBarrier();
 }
 
