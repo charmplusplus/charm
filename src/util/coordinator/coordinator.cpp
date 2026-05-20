@@ -373,19 +373,9 @@ class Coordinator {
       else clients_[newFd].replyDeferred = false;
     }
 
-    // Push RECONFIG (delta) to each surviving non-initiator member. They're
-    // blocked in ConverseCleanup waiting for it and have the previous-epoch
-    // members_ cached, so we only send what changed.
-    for (size_t i = 0; i < survivors.size(); ++i) {
-      if (survivors[i].fd == fd) continue;
-      uint32_t nodeId = newMembers[i].nodeId;
-      std::vector<uint8_t> rpl;
-      put_u32(rpl, nodeId);
-      put_u32(rpl, epoch_);
-      put_u32_vec(rpl, killedOldIds);
-      put_members(rpl, added);
-      if (!send_frame(survivors[i].fd, RECONFIG, rpl)) closeClient(survivors[i].fd);
-    }
+    // Surviving non-initiator members no longer receive RECONFIG over TCP.
+    // PE 0 broadcasts the delta to them via the existing UCX endpoints (chain
+    // fanout in machine.C). The coordinator still pushes DIE/INTEGRATE.
 
     // Push DIE to killed members so they exit cleanly.
     for (int kfd : killedFds) {

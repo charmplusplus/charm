@@ -35,8 +35,13 @@
 //                                                              numbering; added carry
 //                                                              their final new nodeIds)
 //   Surviving (non-initiator) members during reconfig:
-//     <- RECONFIG { newNodeId, epoch, killedOldIds[], added[] } (same delta shape as
-//                                                              COMMIT_REPLY)
+//     RECONFIG is no longer pushed by the coordinator. Survivors receive the
+//     delta from PE 0 via UCX chain-broadcast (see machine.C
+//     UcxReconfigChainForward / UcxRecvReconfigBytes). UCX payload shape:
+//     { u32 epoch, u32 killedCount, u32 killedOldIds[killedCount],
+//       u32 addedCount, Member added[addedCount] }
+//     Each receiver computes its own new nodeId locally from killedOldIds
+//     (new = old - count_of_killed_ids_strictly_less_than_self).
 //
 //   Delta reconstruction (client-side, deterministic; matches server in
 //   coordinator.cpp handleCommit):

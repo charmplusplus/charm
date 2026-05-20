@@ -73,6 +73,12 @@ static std::vector<coord::Member> _coord_members;
 #define UCX_MSG_TAG_EAGER               UCS_BIT(0)
 #define UCX_MSG_TAG_PROBE               UCS_BIT(1)
 #define UCX_MSG_TAG_DEVICE              UCS_BIT(2)
+#if CMK_SHRINK_EXPAND
+// Control-plane tag used only during ConverseCleanup to chain-broadcast the
+// new cluster view over surviving UCX endpoints. The low UCX_TAG_MSG_BITS
+// must NOT overlap with EAGER/PROBE/DEVICE; bit 3 is free in that range.
+#define UCX_MSG_TAG_RECONFIG            UCS_BIT(3)
+#endif
 #define UCX_RMA_TAG_GET                 UCS_BIT(UCX_TAG_MSG_BITS + 1)
 #define UCX_RMA_TAG_REG_AND_SEND_BACK   UCS_BIT(UCX_TAG_MSG_BITS + 2)
 #define UCX_RMA_TAG_DEREG_AND_ACK       UCS_BIT(UCX_TAG_MSG_BITS + 3)
@@ -1092,6 +1098,115 @@ static void UcxCloseEp(ucp_ep_h ep)
     ucp_request_free(req);
 }
 
+// Empty no-op callbacks for the control-plane reconfig send/recv. We poll
+// for completion via ucp_request_check_status; the callback only fires if
+// the request didn't complete inline.
+static void UcxReconfigSendCb(void *req, ucs_status_t status) { (void)req; (void)status; }
+static void UcxReconfigRecvCb(void *req, ucs_status_t status,
+                              ucp_tag_recv_info_t *info)
+{
+    (void)req; (void)status; (void)info;
+}
+
+// Synchronous reconfig send over an existing OLD-numbering UCX endpoint.
+// Used by PE 0 (and by each chain forwarder) during ConverseCleanup, when
+// regular Charm traffic is already drained. Blocks until UCX reports
+// completion.
+static void UcxSendReconfigBytes(int destNodeOldId, const uint8_t *data, size_t size)
+{
+    ucs_status_ptr_t req = ucp_tag_send_nb(ucxCtx.eps[destNodeOldId], data, size,
+                                           ucp_dt_make_contig(1),
+                                           UCX_MSG_TAG_RECONFIG,
+                                           UcxReconfigSendCb);
+    if (UCS_PTR_IS_ERR(req)) {
+        CmiAbort("UCX: ucp_tag_send_nb(RECONFIG) to nodeId=%d failed: %s",
+                 destNodeOldId, ucs_status_string(UCS_PTR_STATUS(req)));
+    }
+    if (req == NULL) return;  // completed inline
+    ucs_status_t st;
+    do {
+        ucp_worker_progress(ucxCtx.worker);
+        st = ucp_request_check_status(req);
+    } while (st == UCS_INPROGRESS);
+    if (st != UCS_OK) {
+        CmiAbort("UCX: RECONFIG send to nodeId=%d errored: %s",
+                 destNodeOldId, ucs_status_string(st));
+    }
+    ucp_request_free(req);
+}
+
+// Probe + receive the reconfig broadcast on a survivor. Returns the raw
+// payload bytes (delta-shape; see ConverseCleanup for the layout). Tag
+// matches strictly on UCX_MSG_TAG_RECONFIG within the MSG tag range so it
+// can't collide with eager/probe traffic.
+static std::vector<uint8_t> UcxRecvReconfigBytes(ucp_tag_message_h msgHandle,
+                                                  size_t length)
+{
+    std::vector<uint8_t> buf(length);
+    ucs_status_ptr_t req = ucp_tag_msg_recv_nb(ucxCtx.worker, buf.data(), length,
+                                               ucp_dt_make_contig(1), msgHandle,
+                                               UcxReconfigRecvCb);
+    if (UCS_PTR_IS_ERR(req)) {
+        CmiAbort("UCX: ucp_tag_msg_recv_nb(RECONFIG) failed: %s",
+                 ucs_status_string(UCS_PTR_STATUS(req)));
+    }
+    if (req == NULL) return buf;  // completed inline
+    ucs_status_t st;
+    do {
+        ucp_worker_progress(ucxCtx.worker);
+        st = ucp_request_check_status(req);
+    } while (st == UCS_INPROGRESS);
+    if (st != UCS_OK) {
+        CmiAbort("UCX: RECONFIG recv errored: %s", ucs_status_string(st));
+    }
+    ucp_request_free(req);
+    return buf;
+}
+
+// Compute this rank's chain successor in OLD numbering: the lowest OLD nodeId
+// > myOldId that isn't being killed. Returns -1 if we're the chain terminus.
+// killSet is a sorted vector of OLD nodeIds being removed.
+static int UcxReconfigChainSuccessor(int oldNumNodes, int myOldId,
+                                      const std::vector<uint32_t> &killSet)
+{
+    for (int i = myOldId + 1; i < oldNumNodes; ++i) {
+        bool killed = false;
+        for (uint32_t k : killSet) {
+            if ((int)k == i) { killed = true; break; }
+        }
+        if (!killed) return i;
+    }
+    return -1;
+}
+
+// Serialize the reconfig delta payload. NodeId is intentionally omitted —
+// every receiver computes its own new nodeId from killSet (new = old - count
+// of killed ids < self).
+static std::vector<uint8_t> UcxBuildReconfigPayload(
+    uint32_t epoch,
+    const std::vector<uint32_t> &killSet,
+    const std::vector<coord::Member> &added)
+{
+    std::vector<uint8_t> buf;
+    coord::put_u32(buf, epoch);
+    coord::put_u32_vec(buf, killSet);
+    coord::put_members(buf, added);
+    return buf;
+}
+
+// Drive the chain-fanout origin: PE 0 (or any forwarder) sends the same
+// payload to its chain successor. No-op if we're the chain terminus.
+static void UcxReconfigChainForward(int oldNumNodes, int myOldId,
+                                     const std::vector<uint32_t> &killSet,
+                                     const std::vector<uint8_t> &payload)
+{
+    int next = UcxReconfigChainSuccessor(oldNumNodes, myOldId, killSet);
+    if (next < 0) return;
+    UCX_LOG(3, "RECONFIG chain forward: oldId=%d -> oldId=%d (size=%zu)",
+            myOldId, next, payload.size());
+    UcxSendReconfigBytes(next, payload.data(), payload.size());
+}
+
 // Coordinator-driven endpoint reconfig. PE 0 already drove COMMIT and pushed
 // RECONFIG to other survivors; this just consumes the new view (passed in)
 // and updates the eps array.
@@ -1241,11 +1356,69 @@ void ConverseCleanup(void)
         extern double rescale_wall_now();
         rescale_t_commit_done = rescale_wall_now();
       }
+
+      // Chain-broadcast the delta to surviving non-initiator ranks via the
+      // existing UCX endpoints (still in OLD numbering at this point). The
+      // last `take` entries of view.members are the newly-added newcomers.
+      std::vector<coord::Member> added(view.members.end() - take, view.members.end());
+      std::vector<uint8_t> reconfigPayload =
+          UcxBuildReconfigPayload(view.epoch, kills, added);
+      UcxReconfigChainForward(oldNumNodes, myNode, kills, reconfigPayload);
     } else {
-      // Other ranks: block on coord_fd for either RECONFIG or DIE.
-      if (!coord::await_reconfig_or_die(_coord_fd, _coord_members, &view,
-                                        &gotDie) && !gotDie) {
-        CmiAbort("UCX: coordinator push read failed (expected RECONFIG or DIE)");
+      // Non-initiator: wait for either DIE on TCP (killed ranks) or the UCX
+      // chain-broadcast (survivors). Poll both so we don't deadlock either
+      // way; the coordinator only pushes DIE on TCP — RECONFIG arrives via
+      // UCX from this rank's chain predecessor.
+      std::vector<uint8_t> reconfigPayload;
+      bool gotReconfig = false;
+      while (!gotDie && !gotReconfig) {
+        // Non-blocking TCP probe for DIE.
+        coord::Frame f;
+        bool eof = false;
+        if (coord::try_read_frame(_coord_fd, &f, &eof)) {
+          if (f.type == coord::DIE) {
+            gotDie = true;
+            break;
+          }
+          CmiAbort("UCX: unexpected coord frame type %u during rescale", f.type);
+        }
+        if (eof) {
+          CmiAbort("UCX: coordinator closed connection during rescale");
+        }
+        // UCX probe for RECONFIG broadcast.
+        ucp_tag_recv_info_t info;
+        ucp_tag_message_h msgh = ucp_tag_probe_nb(ucxCtx.worker,
+                                                   UCX_MSG_TAG_RECONFIG,
+                                                   UCX_MSG_TAG_MASK, 1, &info);
+        if (msgh != NULL) {
+          reconfigPayload = UcxRecvReconfigBytes(msgh, info.length);
+          gotReconfig = true;
+          break;
+        }
+        ucp_worker_progress(ucxCtx.worker);
+      }
+
+      if (gotReconfig) {
+        // Parse the delta payload (no nodeId — we compute our own from the
+        // kill set). Then forward to our chain successor BEFORE rebuilding
+        // eps so the chain operates on the still-valid OLD ep array.
+        const uint8_t *p = reconfigPayload.data();
+        const uint8_t *end = p + reconfigPayload.size();
+        uint32_t newEpoch = coord::get_u32(p, end);
+        std::vector<uint32_t> killSet = coord::get_u32_vec(p, end);
+        std::vector<coord::Member> added = coord::get_members(p, end);
+
+        UcxReconfigChainForward(oldNumNodes, myNode, killSet, reconfigPayload);
+
+        // Build view from delta. Our new nodeId = oldId minus the count of
+        // killed old ids strictly less than oldId (compact renumber).
+        uint32_t myNewId = static_cast<uint32_t>(myNode);
+        for (uint32_t k : killSet) {
+          if ((int)k < myNode) myNewId--;
+        }
+        view.nodeId = myNewId;
+        view.epoch = newEpoch;
+        view.members = coord::apply_member_delta(_coord_members, killSet, added);
       }
     }
 

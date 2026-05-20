@@ -162,6 +162,25 @@ inline Frame read_frame(int fd) {
   return f;
 }
 
+// Non-blocking probe + blocking read. Returns true if a complete frame is read
+// into *out. Returns false if no full frame header is available yet (caller
+// should retry later). On EOF or fatal error sets *gotEof=true and returns
+// false. Uses MSG_PEEK to avoid consuming a partial header.
+inline bool try_read_frame(int fd, Frame *out, bool *gotEof) {
+  *gotEof = false;
+  uint8_t hdr[8];
+  ssize_t r = ::recv(fd, hdr, sizeof(hdr), MSG_PEEK | MSG_DONTWAIT);
+  if (r == 0) { *gotEof = true; return false; }
+  if (r < 0) {
+    if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) return false;
+    *gotEof = true;
+    return false;
+  }
+  if (r < (ssize_t)sizeof(hdr)) return false;  // partial header — wait
+  *out = read_frame(fd);
+  return out->type != 0;
+}
+
 inline bool send_frame(int fd, uint32_t type, const std::vector<uint8_t> &payload) {
   uint32_t totalLen = htonl(static_cast<uint32_t>(4 + payload.size()));
   uint32_t typeBe = htonl(type);
