@@ -2024,6 +2024,13 @@ int charm_main(int argc, char **argv)
     _exitStarted = false;
     _mainDone = false;
 
+    // RescaleCheckpoint set this flag to route ConverseCleanup down the
+    // rescale path (instead of clean exit). It's never reset elsewhere, so
+    // without this clear the next CkExit() after the application finishes
+    // would also be misrouted into the rescale path, sending an empty
+    // COMMIT and aborting in CkRestartMain (no stashed _rescaleResumeCb).
+    set_shrinkexpand_exit(false);
+
     // The cached broadcast spanning tree references the pre-shrink node count.
     // Drop it so the first broadcast in the second ConverseInit (e.g. from
     // CmiIsomallocInit) falls back to the NULL-tree path that uses the
