@@ -11,6 +11,7 @@
 #include <arpa/inet.h>
 #include <getopt.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <poll.h>
 #include <signal.h>
 #include <stdio.h>
@@ -129,6 +130,15 @@ class Coordinator {
     if (fd < 0) {
       perror("accept");
       return;
+    }
+    // Disable Nagle. The coord protocol is small request -> small reply per
+    // round-trip (BARRIER, COMMIT, etc.); Nagle + delayed-ACK turn each
+    // round-trip into ~80ms (the steady-state cost we were paying for every
+    // post-rescale CmiBarrier through coord::barrier). With TCP_NODELAY each
+    // round-trip drops to ~microseconds.
+    {
+      int one = 1;
+      setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
     }
     clients_[fd] = ClientState{};
     LOG("accept fd=%d", fd);

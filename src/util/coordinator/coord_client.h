@@ -8,6 +8,7 @@
 
 #include <netdb.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -42,6 +43,14 @@ inline int connect_blocking(const char *host, int port, int retries = 50,
     usleep(retryUsec);
   }
   freeaddrinfo(res);
+  // Disable Nagle on the rank-side socket. Pairs with the same setsockopt on
+  // the coordinator's accept() side — without both, BARRIER round-trips
+  // (small request, small reply) get stuck waiting for delayed-ACK / Nagle,
+  // adding ~80ms per coord::barrier call.
+  if (fd >= 0) {
+    int one = 1;
+    setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
+  }
   return fd;
 }
 
