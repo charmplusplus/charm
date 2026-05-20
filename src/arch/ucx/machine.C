@@ -67,17 +67,32 @@ static std::vector<coord::Member> _coord_members;
 #define UCX_MSG_PROBE_THRESH            32768
 #define UCX_MSG_NUM_RX_REQS             64
 #define UCX_MSG_NUM_RX_REQS_MAX         1024
-#define UCX_TAG_MSG_BITS                4
+// UCX_TAG_MSG_BITS bumped from 4 to 6 to make room for the rescale-time
+// control-plane tags below (RECONFIG, BARRIER_ARRIVE, BARRIER_RELEASE).
+// RMA tags shift up by 2 bits accordingly; nothing in the codebase places
+// data in the formerly-RMA-mask bits 4..5 standalone.
+#define UCX_TAG_MSG_BITS                6
 #define UCX_TAG_RMA_BITS                4
 #define UCX_TAG_PE_BITS                 32
 #define UCX_MSG_TAG_EAGER               UCS_BIT(0)
 #define UCX_MSG_TAG_PROBE               UCS_BIT(1)
 #define UCX_MSG_TAG_DEVICE              UCS_BIT(2)
 #if CMK_SHRINK_EXPAND
-// Control-plane tag used only during ConverseCleanup to chain-broadcast the
-// new cluster view over surviving UCX endpoints. The low UCX_TAG_MSG_BITS
-// must NOT overlap with EAGER/PROBE/DEVICE; bit 3 is free in that range.
+// Control-plane tags used only at rescale time.
+// RECONFIG: chain-broadcast of the new cluster view from PE 0 down the
+//   binary tree over OLD-numbering UCX endpoints (pre-ep-rebuild).
+// BARRIER_ARRIVE / BARRIER_RELEASE: tree-collective barrier replacing the
+//   coordinator BARRIER round-trip; up-reduce then down-broadcast over
+//   NEW-numbering UCX endpoints (post-ep-rebuild).
+// All three must NOT overlap with EAGER/PROBE/DEVICE in the low
+// UCX_TAG_MSG_BITS; bits 3,4,5 are free in that range.
 #define UCX_MSG_TAG_RECONFIG            UCS_BIT(3)
+#define UCX_MSG_TAG_BARRIER_ARRIVE      UCS_BIT(4)
+#define UCX_MSG_TAG_BARRIER_RELEASE     UCS_BIT(5)
+// Forward declaration so the newcomer-side LrtsInit (defined earlier in this
+// file) can invoke the tree barrier (defined alongside the other rescale
+// helpers, much further down).
+static void UcxTreeBarrier(int newNodeId, int numNodes);
 #endif
 #define UCX_RMA_TAG_GET                 UCS_BIT(UCX_TAG_MSG_BITS + 1)
 #define UCX_RMA_TAG_REG_AND_SEND_BACK   UCS_BIT(UCX_TAG_MSG_BITS + 2)
@@ -476,12 +491,11 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
         CpvAccess(tag_counter) = 0;
 #endif
 
-        // Coordinator-side barrier waits for members_.size() (= survivors +
-        // newcomers) post-COMMIT, so survivors won't proceed past their
-        // ConverseCleanup barrier until we hit this too.
-        if (!coord::barrier(_coord_fd, _coord_epoch, view.nodeId)) {
-            CmiAbort("UCX: coordinator BARRIER failed (newcomer)");
-        }
+        // Tree-collective barrier over the post-INTEGRATE topology. Newcomer
+        // joins as a (typically leaf) node at its assigned new nodeId; sends
+        // ARRIVE up to its parent and waits for RELEASE. Pairs with the
+        // survivor-side UcxTreeBarrier in ConverseCleanup.
+        UcxTreeBarrier(static_cast<int>(view.nodeId), newNumNodes);
 
         CmiPrintf("Charm> newcomer integrated: nodeId=%u epoch=%u members=%d\n",
                   view.nodeId, _coord_epoch, newNumNodes);
@@ -1234,6 +1248,96 @@ static void UcxReconfigTreeForward(int oldNumNodes, int myOldId,
     }
 }
 
+// Empty-payload, synchronous tag send over a NEW-numbering UCX endpoint.
+// Used by the tree-collective barrier; the payload is implicit in the tag.
+static void UcxSendEmptyTagSync(int destNewNodeId, ucp_tag_t tag)
+{
+    ucs_status_ptr_t req = ucp_tag_send_nb(ucxCtx.eps[destNewNodeId], NULL, 0,
+                                           ucp_dt_make_contig(1), tag,
+                                           UcxReconfigSendCb);
+    if (UCS_PTR_IS_ERR(req)) {
+        CmiAbort("UCX: ucp_tag_send_nb(tag=%" PRIx64 ") to nodeId=%d failed: %s",
+                 (uint64_t)tag, destNewNodeId,
+                 ucs_status_string(UCS_PTR_STATUS(req)));
+    }
+    if (req == NULL) return;  // completed inline
+    ucs_status_t st;
+    do {
+        ucp_worker_progress(ucxCtx.worker);
+        st = ucp_request_check_status(req);
+    } while (st == UCS_INPROGRESS);
+    if (st != UCS_OK) {
+        CmiAbort("UCX: tag-send (tag=%" PRIx64 ") to nodeId=%d errored: %s",
+                 (uint64_t)tag, destNewNodeId, ucs_status_string(st));
+    }
+    ucp_request_free(req);
+}
+
+// Probe + drain an empty-payload tag message. Spins on worker_progress until
+// matched; the message is consumed (payload discarded since it's empty).
+static void UcxRecvEmptyTagSync(ucp_tag_t tag)
+{
+    ucp_tag_message_h msgh = NULL;
+    ucp_tag_recv_info_t info;
+    while (msgh == NULL) {
+        msgh = ucp_tag_probe_nb(ucxCtx.worker, tag, UCX_MSG_TAG_MASK, 1, &info);
+        if (msgh == NULL) ucp_worker_progress(ucxCtx.worker);
+    }
+    // info.length is 0; pass a small stack buffer just in case.
+    char dummy;
+    ucs_status_ptr_t req = ucp_tag_msg_recv_nb(ucxCtx.worker, &dummy, 0,
+                                               ucp_dt_make_contig(1), msgh,
+                                               UcxReconfigRecvCb);
+    if (UCS_PTR_IS_ERR(req)) {
+        CmiAbort("UCX: ucp_tag_msg_recv_nb(tag=%" PRIx64 ") failed: %s",
+                 (uint64_t)tag, ucs_status_string(UCS_PTR_STATUS(req)));
+    }
+    if (req == NULL) return;  // completed inline
+    ucs_status_t st;
+    do {
+        ucp_worker_progress(ucxCtx.worker);
+        st = ucp_request_check_status(req);
+    } while (st == UCS_INPROGRESS);
+    if (st != UCS_OK) {
+        CmiAbort("UCX: tag-recv (tag=%" PRIx64 ") errored: %s",
+                 (uint64_t)tag, ucs_status_string(st));
+    }
+    ucp_request_free(req);
+}
+
+// Tree-collective barrier over NEW-numbering UCX endpoints. Replaces the
+// coordinator's O(N) TCP star with two O(log N) tree passes over the same
+// binary tree shape used by the RECONFIG broadcast (rooted at NEW nodeId 0,
+// children of n are 2n+1 and 2n+2, parent is (n-1)/2).
+//
+// Phase 1 (up-reduce, ARRIVE): each rank waits for ARRIVE from each child,
+// then sends ARRIVE to its parent. When PE 0 has received ARRIVE from both
+// of its children, every rank has finished UcxReInitEpsFromView.
+//
+// Phase 2 (down-broadcast, RELEASE): root sends RELEASE to its children;
+// each rank forwards RELEASE to its children before returning. When a rank
+// returns, it's guaranteed every rank has hit the barrier — same guarantee
+// as the old coord-mediated barrier.
+//
+// Coordinator does zero work for this barrier. Critical path is
+// 2 * ceil(log2(N)) UCX hops instead of 2N TCP frames serialized on coord.
+static void UcxTreeBarrier(int newNodeId, int numNodes)
+{
+    int parent = (newNodeId == 0) ? -1 : (newNodeId - 1) / 2;
+    int leftChild  = (2 * newNodeId + 1 < numNodes) ? (2 * newNodeId + 1) : -1;
+    int rightChild = (2 * newNodeId + 2 < numNodes) ? (2 * newNodeId + 2) : -1;
+
+    // Up-reduce
+    if (leftChild  >= 0) UcxRecvEmptyTagSync(UCX_MSG_TAG_BARRIER_ARRIVE);
+    if (rightChild >= 0) UcxRecvEmptyTagSync(UCX_MSG_TAG_BARRIER_ARRIVE);
+    if (parent >= 0)     UcxSendEmptyTagSync(parent, UCX_MSG_TAG_BARRIER_ARRIVE);
+
+    // Down-broadcast
+    if (parent >= 0)     UcxRecvEmptyTagSync(UCX_MSG_TAG_BARRIER_RELEASE);
+    if (leftChild  >= 0) UcxSendEmptyTagSync(leftChild,  UCX_MSG_TAG_BARRIER_RELEASE);
+    if (rightChild >= 0) UcxSendEmptyTagSync(rightChild, UCX_MSG_TAG_BARRIER_RELEASE);
+}
+
 // Coordinator-driven endpoint reconfig. PE 0 already drove COMMIT and pushed
 // RECONFIG to other survivors; this just consumes the new view (passed in)
 // and updates the eps array.
@@ -1471,11 +1575,11 @@ void ConverseCleanup(void)
       if (CmiMyPe() == 0) rescale_t_ep_reinit_done = rescale_wall_now();
     }
 
-    // Coordinator-mediated barrier so every rank finishes wireup before any
-    // of them start sending in the new epoch.
-    if (!coord::barrier(_coord_fd, _coord_epoch, view.nodeId)) {
-      CmiAbort("UCX: coord::barrier failed");
-    }
+    // Tree-collective barrier over the new-numbering UCX topology, replacing
+    // the O(N) coordinator TCP star. Survivors and newcomers both call this;
+    // up-reduce + down-broadcast over the binary tree (root at new nodeId 0).
+    UcxTreeBarrier(static_cast<int>(view.nodeId),
+                   static_cast<int>(view.members.size()));
     {
       extern double rescale_t_barrier_done, rescale_t_longjmp;
       extern double rescale_wall_now();
