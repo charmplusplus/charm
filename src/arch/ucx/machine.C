@@ -1163,20 +1163,39 @@ static std::vector<uint8_t> UcxRecvReconfigBytes(ucp_tag_message_h msgHandle,
     return buf;
 }
 
-// Compute this rank's chain successor in OLD numbering: the lowest OLD nodeId
-// > myOldId that isn't being killed. Returns -1 if we're the chain terminus.
-// killSet is a sorted vector of OLD nodeIds being removed.
-static int UcxReconfigChainSuccessor(int oldNumNodes, int myOldId,
-                                      const std::vector<uint32_t> &killSet)
+// Compute this rank's children in the binary-tree broadcast over surviving
+// OLD nodeIds. Survivors are conceptually re-indexed 0..S-1 (skipping the
+// kill set, preserving relative order), and each survivor index s sends to
+// children at 2s+1 and 2s+2. Returns each child's OLD nodeId (or -1 if not
+// present). myOldId is assumed to be a survivor — leaves get two -1s.
+//
+// O(N) per call where N is the cluster size (10s..1000s); runs once per
+// participating rank per rescale, well below the cost of even one UCX
+// endpoint create. Critical path is log2(S) hops instead of S-1.
+static void UcxReconfigTreeChildren(int oldNumNodes, int myOldId,
+                                     const std::vector<uint32_t> &killSet,
+                                     int *leftChildOldId, int *rightChildOldId)
 {
-    for (int i = myOldId + 1; i < oldNumNodes; ++i) {
+    *leftChildOldId = -1;
+    *rightChildOldId = -1;
+    std::vector<int> survivors;
+    survivors.reserve(oldNumNodes);
+    for (int i = 0; i < oldNumNodes; ++i) {
         bool killed = false;
         for (uint32_t k : killSet) {
             if ((int)k == i) { killed = true; break; }
         }
-        if (!killed) return i;
+        if (!killed) survivors.push_back(i);
     }
-    return -1;
+    int myIdx = -1;
+    for (int i = 0; i < (int)survivors.size(); ++i) {
+        if (survivors[i] == myOldId) { myIdx = i; break; }
+    }
+    if (myIdx < 0) return;  // caller is not a survivor (shouldn't happen here)
+    int li = 2 * myIdx + 1;
+    int ri = 2 * myIdx + 2;
+    if (li < (int)survivors.size()) *leftChildOldId = survivors[li];
+    if (ri < (int)survivors.size()) *rightChildOldId = survivors[ri];
 }
 
 // Serialize the reconfig delta payload. NodeId is intentionally omitted —
@@ -1194,17 +1213,25 @@ static std::vector<uint8_t> UcxBuildReconfigPayload(
     return buf;
 }
 
-// Drive the chain-fanout origin: PE 0 (or any forwarder) sends the same
-// payload to its chain successor. No-op if we're the chain terminus.
-static void UcxReconfigChainForward(int oldNumNodes, int myOldId,
-                                     const std::vector<uint32_t> &killSet,
-                                     const std::vector<uint8_t> &payload)
+// Forward the reconfig payload to this rank's binary-tree children over
+// existing OLD-numbering UCX endpoints. PE 0 calls this after coord::commit;
+// each survivor calls it before rebuilding its eps. No-op for leaves.
+static void UcxReconfigTreeForward(int oldNumNodes, int myOldId,
+                                    const std::vector<uint32_t> &killSet,
+                                    const std::vector<uint8_t> &payload)
 {
-    int next = UcxReconfigChainSuccessor(oldNumNodes, myOldId, killSet);
-    if (next < 0) return;
-    UCX_LOG(3, "RECONFIG chain forward: oldId=%d -> oldId=%d (size=%zu)",
-            myOldId, next, payload.size());
-    UcxSendReconfigBytes(next, payload.data(), payload.size());
+    int leftChild, rightChild;
+    UcxReconfigTreeChildren(oldNumNodes, myOldId, killSet, &leftChild, &rightChild);
+    if (leftChild >= 0) {
+        UCX_LOG(3, "RECONFIG tree forward: oldId=%d -> oldId=%d (L, size=%zu)",
+                myOldId, leftChild, payload.size());
+        UcxSendReconfigBytes(leftChild, payload.data(), payload.size());
+    }
+    if (rightChild >= 0) {
+        UCX_LOG(3, "RECONFIG tree forward: oldId=%d -> oldId=%d (R, size=%zu)",
+                myOldId, rightChild, payload.size());
+        UcxSendReconfigBytes(rightChild, payload.data(), payload.size());
+    }
 }
 
 // Coordinator-driven endpoint reconfig. PE 0 already drove COMMIT and pushed
@@ -1357,16 +1384,16 @@ void ConverseCleanup(void)
         rescale_t_commit_done = rescale_wall_now();
       }
 
-      // Chain-broadcast the delta to surviving non-initiator ranks via the
+      // Tree-broadcast the delta to surviving non-initiator ranks via the
       // existing UCX endpoints (still in OLD numbering at this point). The
       // last `take` entries of view.members are the newly-added newcomers.
       std::vector<coord::Member> added(view.members.end() - take, view.members.end());
       std::vector<uint8_t> reconfigPayload =
           UcxBuildReconfigPayload(view.epoch, kills, added);
-      UcxReconfigChainForward(oldNumNodes, myNode, kills, reconfigPayload);
+      UcxReconfigTreeForward(oldNumNodes, myNode, kills, reconfigPayload);
     } else {
       // Non-initiator: wait for either DIE on TCP (killed ranks) or the UCX
-      // chain-broadcast (survivors). Poll both so we don't deadlock either
+      // tree-broadcast (survivors). Poll both so we don't deadlock either
       // way; the coordinator only pushes DIE on TCP — RECONFIG arrives via
       // UCX from this rank's chain predecessor.
       std::vector<uint8_t> reconfigPayload;
@@ -1408,7 +1435,7 @@ void ConverseCleanup(void)
         std::vector<uint32_t> killSet = coord::get_u32_vec(p, end);
         std::vector<coord::Member> added = coord::get_members(p, end);
 
-        UcxReconfigChainForward(oldNumNodes, myNode, killSet, reconfigPayload);
+        UcxReconfigTreeForward(oldNumNodes, myNode, killSet, reconfigPayload);
 
         // Build view from delta. Our new nodeId = oldId minus the count of
         // killed old ids strictly less than oldId (compact renumber).
