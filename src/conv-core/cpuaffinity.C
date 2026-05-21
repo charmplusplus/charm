@@ -50,6 +50,17 @@ void CmiInitHwlocTopology(void)
 {
     int depth;
 
+#if CMK_SHRINK_EXPAND
+    // On a survivor restart, the hardware topology hasn't changed: the
+    // `topology` and `legacy_topology` handles from the first init are still
+    // valid, and CmiHwlocTopologyLocal (num_sockets/cores/pus/total_num_pus)
+    // is a static the longjmp preserves. cmi_hwloc_topology_load() does a
+    // full /sys/devices/system/cpu/ walk that runs in milliseconds, so we
+    // skip the whole probe and reuse the cached values.
+    extern bool _reuseRegistrationStateOnRestart;
+    if (_reuseRegistrationStateOnRestart) return;
+#endif
+
     cmi_hwloc_topology_init(&topology);
     cmi_hwloc_topology_load(topology);
 
