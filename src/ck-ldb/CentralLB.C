@@ -81,7 +81,7 @@ void CentralLB::initLB(const CkLBOptions &opt)
   if (opt.getSeqNo() > 0 || (_lb_args.metaLbOn() && _lb_args.metaLbModelDir() != nullptr))
     turnOff();
 
-  #if CMK_CUDA || CMK_HIP
+  #if CMK_CUDA || CMK_HIP && CMK_LB_USER_DATA
   CkpvAccess(_lb_obj_index) = LBRegisterObjUserData(sizeof(size_t));//gpu allocation size
   #endif
 

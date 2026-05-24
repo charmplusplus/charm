@@ -51,7 +51,7 @@
 #define STREAM_BUF_SIZE 1024
 
 #if defined HAPI_TRACE || defined HAPI_INSTRUMENT_WRS
-extern "C" double CmiWallTimer();
+// extern "C" double CmiWallTimer();
 #endif
 
 extern int Cmi_isOldProcess;
@@ -1340,7 +1340,7 @@ static inline void gpuEventStart(hapiWorkRequest* wr, int* index,
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
   gpuEventTimer* shared_gpu_events_ = csv_gpu_manager.gpu_events_;
   int shared_time_idx_ = csv_gpu_manager.time_idx_++;
-  shared_gpu_events_[shared_time_idx_].cmi_start_time = CmiWallTimer();
+  // shared_gpu_events_[shared_time_idx_].cmi_start_time = CmiWallTimer();
   shared_gpu_events_[shared_time_idx_].event_type = event;
   shared_gpu_events_[shared_time_idx_].trace_name = wr->trace_name;
   *index = shared_time_idx_;
@@ -1357,7 +1357,7 @@ static inline void gpuEventStart(hapiWorkRequest* wr, int* index,
 static inline void gpuEventEnd(int index) {
 #ifdef HAPI_TRACE
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
-  csv_gpu_manager.gpu_events_[index].cmi_end_time = CmiWallTimer();
+  // csv_gpu_manager.gpu_events_[index].cmi_end_time = CmiWallTimer();
   traceUserBracketEvent(csv_gpu_manager.gpu_events_[index].stage,
                         csv_gpu_manager.gpu_events_[index].cmi_start_time,
                         csv_gpu_manager.gpu_events_[index].cmi_end_time);
@@ -1372,7 +1372,7 @@ static inline void gpuEventEnd(int index) {
 
 static inline void hapiWorkRequestStartTime(hapiWorkRequest* wr) {
 #ifdef HAPI_INSTRUMENT_WRS
-  wr->phase_start_time = CmiWallTimer();
+  // wr->phase_start_time = CmiWallTimer();
 #endif
 }
 
@@ -1386,7 +1386,7 @@ static inline void profileWorkRequestEvent(hapiWorkRequest* wr,
 #endif
 
   if (csv_gpu_manager.init_instr_) {
-    double tt = CmiWallTimer() - (wr->phase_start_time);
+    // double tt = CmiWallTimer() - (wr->phase_start_time);
     int index = wr->chare_index;
     char type = wr->comp_type;
     char phase = wr->comp_phase;

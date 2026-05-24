@@ -400,9 +400,7 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
         (hapi_ipc_event_shared*)((char*)csv_gpu_manager.shm_ptr
             + csv_gpu_manager.shm_chunk_size * source.device_idx
             + sizeof(hapiIpcMemHandle_t)) + source.event_idx;
-      pthread_mutex_lock(&shm_event_shared->lock);
-      shm_event_shared->dst_flag = true;
-      pthread_mutex_unlock(&shm_event_shared->lock);
+      __atomic_store_n(&shm_event_shared->dst_flag, 1, __ATOMIC_RELEASE);
     } else {
       // CmiPrintf("it should never be called during intra node\n");
 #if CMK_GPU_COMM
@@ -466,10 +464,7 @@ static int findFreeIpcEvent(DeviceManager* dm, const size_t comm_offset, int cpv
         (hapi_ipc_event_shared*)((char*)csv_gpu_manager.shm_ptr
             + csv_gpu_manager.shm_chunk_size * (csv_gpu_manager.device_count * CmiMyNodeRankLocal() + cpv_my_device_id)
             + sizeof(hapiIpcMemHandle_t)) + i;
-      bool can_query = false;
-      pthread_mutex_lock(&shm_event_shared->lock);
-      if (shm_event_shared->dst_flag == true) can_query = true;
-      pthread_mutex_unlock(&shm_event_shared->lock);
+      bool can_query = __atomic_load_n(&shm_event_shared->dst_flag, __ATOMIC_ACQUIRE);
 
       // If the receiver has invoked the memcpy,
       // the sender can query the event for completion
@@ -485,9 +480,7 @@ static int findFreeIpcEvent(DeviceManager* dm, const size_t comm_offset, int cpv
 
           // Mark event as free
           event_flag = 0;
-          pthread_mutex_lock(&shm_event_shared->lock);
-          shm_event_shared->dst_flag = false;
-          pthread_mutex_unlock(&shm_event_shared->lock);
+          __atomic_store_n(&shm_event_shared->dst_flag, 0, __ATOMIC_RELEASE);
         }
       }
     }
