@@ -918,11 +918,24 @@ configure_file(src/scripts/testrun bin/ COPYONLY)
 
 # Standalone coordinator binary used by charmrun_elastic for shrink/expand.
 # Built unconditionally so charmrun_elastic can find it next to itself in bin/.
-add_executable(charm_coordinator src/util/coordinator/coordinator.cpp)
-set_target_properties(charm_coordinator PROPERTIES
-  RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-  CXX_STANDARD 17
-  CXX_STANDARD_REQUIRED ON)
+#
+# Compile + link with the raw host C++ compiler (CMK_CXX), bypassing charmc.
+# The coordinator is a plain TCP utility with NO Charm++ dependencies; routing
+# through charmc would try to link the full Charm runtime (libmemory-default,
+# threads, ldb, ...) and fails in a fresh parallel build when those libs are
+# not built yet ("charmc : No such memory mode default" abort at link time).
+set(_coord_src ${CMAKE_SOURCE_DIR}/src/util/coordinator/coordinator.cpp)
+set(_coord_bin ${CMAKE_BINARY_DIR}/bin/charm_coordinator)
+add_custom_command(
+  OUTPUT ${_coord_bin}
+  COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/bin
+  COMMAND ${CMK_CXX} -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter
+          ${_coord_src} -o ${_coord_bin}
+  DEPENDS ${_coord_src}
+          ${CMAKE_SOURCE_DIR}/src/util/coordinator/wire.h
+          ${CMAKE_SOURCE_DIR}/src/util/coordinator/protocol.h
+  COMMENT "Building standalone coordinator with ${CMK_CXX}")
+add_custom_target(charm_coordinator ALL DEPENDS ${_coord_bin})
 
 # Charm++ libraries
 
