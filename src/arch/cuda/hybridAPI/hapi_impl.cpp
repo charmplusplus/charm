@@ -26,9 +26,6 @@
 #include "hapi_nvtx.h"
 #endif
 
-#define SERVER_FIFO_TEMPLATE "/tmp/server_pipe_%ld"
-#define CLIENT_FIFO_TEMPLATE "/tmp/client_pipe_%ld"
-#define BUFFER_SIZE 256
 #define STREAM_BUF_SIZE 1024
 
 #if defined HAPI_TRACE || defined HAPI_INSTRUMENT_WRS
@@ -88,8 +85,6 @@ CsvDeclare(GPUManager, gpu_manager);
 
 CpvDeclare(int, my_device); // GPU device that this thread is mapped to
 CpvDeclare(bool, device_rep); // Is this PE a device representative thread? (1 per device)
-
-void hapiSendMemoryRequest(char* msg, int size);
 
 // Returns the local rank of the logical node (process) that the given PE belongs to
 static inline int CmiNodeRankLocal(int pe) {
@@ -157,7 +152,17 @@ void hapiInit(char** argv) {
     }
 
 #if CMK_SHRINK_EXPAND
-    hapiStartMemoryDaemon(argv);
+    // Bind the device on first init / newcomer integration. On a survivor
+    // restart the device is already bound and its CUDA context persists across
+    // the longjmp, so skip the (re)bind. The trailing barrier keeps survivors
+    // and newcomers aligned at this point. (Previously hapiStartMemoryDaemon
+    // did this plus GPU memory daemon FIFO setup; the daemon was removed since
+    // no-restart rescale keeps device memory alive in-process.)
+    if (!survivor_restart) {
+      int& cpv_my_device = CpvAccess(my_device);
+      hapiCheck(cudaSetDevice(cpv_my_device));
+    }
+    CmiBarrier();
 #else
     int& cpv_my_device = CpvAccess(my_device);
     hapiCheck(cudaSetDevice(cpv_my_device));
@@ -185,147 +190,9 @@ void hapiInit(char** argv) {
   }
 }
 
-
-void hapiStartMemoryDaemon(char** argv)
-{
-#if CMK_SHRINK_EXPAND
-  extern bool _reuseRegistrationStateOnRestart;
-  const bool survivor_restart = _reuseRegistrationStateOnRestart;
-
-  if (!survivor_restart) {
-    // start client FIFO
-    long pid = getpid();
-    char client_fifo_path[BUFFER_SIZE];
-    sprintf(client_fifo_path, CLIENT_FIFO_TEMPLATE, pid);
-    std::remove(client_fifo_path);
-    mkfifo(client_fifo_path, 0666);
-
-    int& cpv_my_device = CpvAccess(my_device);
-    CkPrintf("Device = %i\n", cpv_my_device);
-    hapiCheck(cudaSetDevice(cpv_my_device));
-
-    if (CmiPhysicalRank(CmiMyPe()) == firstRankForDevice)
-    {
-      char server_fifo_path[BUFFER_SIZE];
-      sprintf(server_fifo_path, SERVER_FIFO_TEMPLATE, cpv_my_device);
-
-      // Create a ready signal FIFO for synchronization
-      if (!CmiGetArgFlagDesc(argv,"+shrinkexpand","Restarting of already running prcoess")) {
-        char ready_fifo_path[BUFFER_SIZE];
-        sprintf(ready_fifo_path, "/tmp/daemon_ready_%d", cpv_my_device);
-
-        CmiPrintf("Parent: Waiting for daemon to be ready...\n");
-
-        int ready_fd = open(ready_fifo_path, O_RDONLY);
-        if (ready_fd == -1) {
-          perror("Parent: open ready FIFO");
-          CmiAbort("Failed to open ready FIFO");
-        }
-
-        char ready_signal;
-        read(ready_fd, &ready_signal, 1);
-        close(ready_fd);
-        unlink(ready_fifo_path);  // Clean up
-
-        CmiPrintf("Parent: Daemon is ready!\n");
-      }
-    }
-  }
-  // Survivor restart: client FIFO already exists, daemon already running and
-  // signaled ready, device already bound. Skip all of the above but still
-  // hit the trailing barrier so newcomer processes (which run the full path)
-  // don't deadlock here.
-  CmiBarrier();
-  return;
-#endif
-}
-
-int hapiCheckpoint(void* devPtr, int size) {
-  pid_t pid = getpid();
-
-  char client_fifo_path[BUFFER_SIZE];
-  sprintf(client_fifo_path, CLIENT_FIFO_TEMPLATE, pid);
-
-  cudaIpcMemHandle_t ipc_handle;
-  hapiCheck(cudaIpcGetMemHandle(&ipc_handle, devPtr));
-
-  char msg_buf[BUFFER_SIZE];
-  int offset = sprintf(msg_buf, "CKPT:%ld:%d:%d:", pid, CkMyPe(), size);
-  memcpy(msg_buf + offset, &ipc_handle, sizeof(cudaIpcMemHandle_t));
-  int total_size = offset + sizeof(cudaIpcMemHandle_t);
-
-  hapiSendMemoryRequest(msg_buf, total_size);
-
-  int client_fd = open(client_fifo_path, O_RDONLY);
-  int alloc_id;
-  read(client_fd, &alloc_id, sizeof(int));
-  close(client_fd);
-
-  return alloc_id;
-}
-
-void hapiRestore(void* devPtr, int size, int alloc_id) {
-  pid_t pid = getpid();
-
-  char client_fifo_path[BUFFER_SIZE];
-  sprintf(client_fifo_path, CLIENT_FIFO_TEMPLATE, pid);
-
-  char msg_buf[BUFFER_SIZE];
-  sprintf(msg_buf, "GET:%ld:%d", pid, alloc_id);
-
-  hapiSendMemoryRequest(msg_buf, strlen(msg_buf) + 1);
-
-  int client_fd = open(client_fifo_path, O_RDONLY);
-  cudaIpcMemHandle_t ipc_handle;
-  read(client_fd, &ipc_handle, sizeof(cudaIpcMemHandle_t));
-  close(client_fd);
-
-  void* srcPtr;
-  hapiCheck(cudaIpcOpenMemHandle(&srcPtr, ipc_handle, cudaIpcMemLazyEnablePeerAccess));
-  hapiCheck(cudaMemcpy(devPtr, srcPtr, size, cudaMemcpyDeviceToDevice));
-  hapiCheck(cudaIpcCloseMemHandle(srcPtr));
-
-  char free_msg[BUFFER_SIZE];
-  sprintf(free_msg, "FREE:%ld:%d", pid, alloc_id);
-  hapiSendMemoryRequest(free_msg, strlen(free_msg) + 1);
-
-  client_fd = open(client_fifo_path, O_RDONLY);
-  char status;
-  read(client_fd, &status, sizeof(char));
-  close(client_fd);
-}
-
 void hapiExit() {
   // Ensure all PEs have finished GPU work
-  CmiPrintf("Exit called on PE %d\n", CmiMyPe());
   CmiNodeBarrier();
-
-#if CMK_SHRINK_EXPAND
-  char client_fifo_path[BUFFER_SIZE];
-  sprintf(client_fifo_path, CLIENT_FIFO_TEMPLATE, getpid());
-
-  if (!get_shrinkexpand_exit() && CmiPhysicalRank(CmiMyPe()) == firstRankForDevice)
-  {
-    char msg_buf[BUFFER_SIZE];
-    sprintf(msg_buf, "KILL:%ld:0", getpid());
-    hapiSendMemoryRequest(msg_buf, strlen(msg_buf) + 1);
-
-    int client_fd = open(client_fifo_path, O_RDONLY);
-    char status;
-    read(client_fd, &status, sizeof(char));
-    close(client_fd);
-  }
-
-  if (!get_shrinkexpand_exit())
-  {
-    // Attempt to delete the file
-    if (std::remove(client_fifo_path) == 0) {
-        CmiPrintf("File '%s' deleted successfully.\n", client_fifo_path);
-    } else {
-        CmiPrintf("Error deleting file '%s': %s\n", client_fifo_path, strerror(errno));
-    }
-  }
-#endif
 
   if (CmiMyRank() == 0) {
     shmCleanup();
@@ -1698,30 +1565,6 @@ void hapiAddCallback(cudaStream_t stream, const CkCallback& cb, void* cb_msg) {
 
 void hapiAddCallback(cudaStream_t stream, void* cb, void* cb_msg) {
   hapiAddCallback(stream, *(CkCallback*)cb, cb_msg);
-}
-
-void hapiSendMemoryRequest(char* msg, int size)
-{
-    int cpv_my_device = CpvAccess(my_device);
-    
-    char server_fifo[BUFFER_SIZE];
-    sprintf(server_fifo, SERVER_FIFO_TEMPLATE, cpv_my_device);
-    CmiPrintf("Sending request to %s\n", server_fifo);
-    
-    int server_fd = open(server_fifo, O_WRONLY | O_NONBLOCK);
-    if (server_fd == -1) {
-        perror("open server FIFO for writing");
-        return;
-    }
-
-    ssize_t written = write(server_fd, msg, size);
-    if (written == -1) {
-        perror("write to server FIFO");
-    } else {
-        //CmiPrintf("Successfully wrote %zd bytes to server FIFO\n", written);
-    }
-    
-    close(server_fd);
 }
 
 cudaError_t hapiMalloc(void** devPtr, size_t size) {

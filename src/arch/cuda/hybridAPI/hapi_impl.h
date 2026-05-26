@@ -16,9 +16,6 @@ extern "C" {
 
 // HAPI init & exit functions
 void hapiInit(char** argv);
-void hapiStartMemoryDaemon(char** argv);
-int hapiCheckpoint(void* devPtr, int size);
-void hapiRestore(void* devPtr, int size, int alloc_id);
 void hapiExit();
 
 // Polls for GPU work completion. Does not do anything if HAPI_CUDA_CALLBACK is defined.
