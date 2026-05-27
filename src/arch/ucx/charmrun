@@ -118,9 +118,19 @@ done
 
 args+=("${charm_args[@]}")
 
-# Set machinefile options for mpirun and srun if ++nodelist was specified
+# Set machinefile options for mpirun/prterun and srun if ++nodelist was
+# specified. prterun (PRRTE) doesn't accept the -machinefile alias that
+# mpirun does — it only knows --hostfile. Pick the right form based on
+# the active launcher.
 if [[ -n "$machinefile" ]]; then
-    mpirun_machinefile_opt=(-machinefile "$machinefile")
+    case "${CHARM_LAUNCHER:-mpirun}" in
+        prterun|prun)
+            mpirun_machinefile_opt=(--hostfile "$machinefile")
+            ;;
+        *)
+            mpirun_machinefile_opt=(-machinefile "$machinefile")
+            ;;
+    esac
     srun_nodelist_opt=(--nodelist="$machinefile")
 else
     mpirun_machinefile_opt=()
