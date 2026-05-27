@@ -1115,16 +1115,28 @@ void CmiTimerInit(char **argv)
 #endif
 if(CmiMyRank() == 0) /* initialize only  once */
   {
-    inittime_wallclock = inithrc();
-#ifndef RUSAGE_WHO
-    CpvAccess(inittime_virtual) = inittime_wallclock;
-#else
-    struct rusage ru;
-    getrusage(RUSAGE_WHO, &ru);
-    CpvAccess(inittime_virtual) =
-      (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
-      (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
+#if CMK_SHRINK_EXPAND
+    // On a survivor restart the HRC epoch must not advance. Application
+    // code (and Charm internals like LB) hold pre-rescale CmiWallTimer()
+    // values and compare them against post-rescale reads; resetting
+    // `epoch` here makes CmiWallTimer() jump backwards by tens of
+    // seconds, manifesting as nonsensical iter prints right after the
+    // rescale ("time: 2.9s" two minutes into a run) and bogus LB stats.
+    // Newcomers still need a fresh init — they have no prior epoch.
+    if (!_reuseRegistrationStateOnRestart)
 #endif
+    {
+      inittime_wallclock = inithrc();
+#ifndef RUSAGE_WHO
+      CpvAccess(inittime_virtual) = inittime_wallclock;
+#else
+      struct rusage ru;
+      getrusage(RUSAGE_WHO, &ru);
+      CpvAccess(inittime_virtual) =
+        (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
+        (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
+#endif
+    }
   }
 
 #if !(__FAULT__)

@@ -394,18 +394,23 @@ End() {
                 	sleep 20
 		fi
         done
-elif [[ -n "$(command -v mpirun 2>/dev/null)" ]]
+# Launcher is selectable via $CHARM_LAUNCHER (default: mpirun). prterun
+# from PRRTE is a drop-in replacement with softer daemon-loss semantics —
+# useful for shrink/expand on spot instances, where ORTE's "lost daemon =>
+# kill job" policy fires when a vacated host disappears. Override per-run:
+#   CHARM_LAUNCHER=prterun ./charmrun_elastic ...
+elif [[ -n "$(command -v "${CHARM_LAUNCHER:-mpirun}" 2>/dev/null)" ]]
 then
-  mpirun_cmd="$(command -v mpirun 2>/dev/null)"
-  if [[ -n "$mpirun_cmd" ]]
+  launcher_cmd="$(command -v "${CHARM_LAUNCHER:-mpirun}" 2>/dev/null)"
+  if [[ -n "$launcher_cmd" ]]
   then
     setarch_cmd="$(command -v setarch 2>/dev/null)"
     if [[ -n "$setarch_cmd" && -x "$setarch_cmd" ]]
     then
       cur_arch="$(uname -m)"
-      runCmd "$setarch_cmd" "$cur_arch" -R mpirun "${mpirun_machinefile_opt[@]}" -np "$nodes" "${args[@]}"
+      runCmd "$setarch_cmd" "$cur_arch" -R "$launcher_cmd" "${mpirun_machinefile_opt[@]}" -np "$nodes" "${args[@]}"
     else
-      runCmd mpirun "${mpirun_machinefile_opt[@]}" -np "$nodes" "${args[@]}"
+      runCmd "$launcher_cmd" "${mpirun_machinefile_opt[@]}" -np "$nodes" "${args[@]}"
     fi
   else
     mpiexec_cmd="$(command -v mpiexec 2>/dev/null)"
