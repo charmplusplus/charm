@@ -118,13 +118,12 @@ done
 
 args+=("${charm_args[@]}")
 
-# Set machinefile options for mpirun/prterun and srun if ++nodelist was
-# specified. prterun (PRRTE) doesn't accept the -machinefile alias that
-# mpirun does — it only knows --hostfile. Pick the right form based on
-# the active launcher.
+# Set machinefile options for mpirun/prterun/charmrun_ssh and srun if
+# ++nodelist was specified. prterun (PRRTE) and charmrun_ssh both want
+# --hostfile; mpirun also accepts that but historically takes -machinefile.
 if [[ -n "$machinefile" ]]; then
     case "${CHARM_LAUNCHER:-mpirun}" in
-        prterun|prun)
+        prterun|prun|ssh|charmrun_ssh)
             mpirun_machinefile_opt=(--hostfile "$machinefile")
             ;;
         *)
@@ -405,17 +404,32 @@ End() {
 		fi
         done
 # Launcher is selectable via $CHARM_LAUNCHER (default: mpirun). prterun
-# from PRRTE is a drop-in replacement with softer daemon-loss semantics —
-# useful for shrink/expand on spot instances, where ORTE's "lost daemon =>
-# kill job" policy fires when a vacated host disappears. Override per-run:
-#   CHARM_LAUNCHER=prterun ./charmrun_elastic ...
-elif [[ -n "$(command -v "${CHARM_LAUNCHER:-mpirun}" 2>/dev/null)" ]]
+# from PRRTE is a drop-in replacement with softer daemon-loss semantics.
+# CHARM_LAUNCHER=ssh routes through charmrun_ssh (shipped next to charmrun
+# in bin/), which does direct ssh fan-out and uses coord-bootstrap mode in
+# the rank binary — no supervised daemon mesh at all. The right choice for
+# shrink/expand on spot instances, where ORTE/PRRTE's "lost daemon => kill
+# job" policy fires when a vacated host disappears. Override per-run:
+#   CHARM_LAUNCHER=ssh ./charmrun_elastic ...
+elif [[ -n "$(command -v "${CHARM_LAUNCHER:-mpirun}" 2>/dev/null)" \
+     || ( "${CHARM_LAUNCHER:-}" == "ssh" \
+          && -x "$(dirname "$0")/charmrun_ssh" ) ]]
 then
-  launcher_cmd="$(command -v "${CHARM_LAUNCHER:-mpirun}" 2>/dev/null)"
+  # Resolve the launcher binary. CHARM_LAUNCHER=ssh is a short name for
+  # charmrun_ssh (located next to this charmrun script in bin/) and never
+  # the system `ssh` binary, which doesn't speak our argument convention.
+  if [[ "${CHARM_LAUNCHER:-}" == "ssh" ]]; then
+    launcher_cmd="$(dirname "$0")/charmrun_ssh"
+  else
+    launcher_cmd="$(command -v "${CHARM_LAUNCHER:-mpirun}" 2>/dev/null)"
+  fi
   if [[ -n "$launcher_cmd" ]]
   then
+    # setarch is only meaningful for mpirun/prterun; skip it for our
+    # ssh launcher to keep its argv clean.
     setarch_cmd="$(command -v setarch 2>/dev/null)"
-    if [[ -n "$setarch_cmd" && -x "$setarch_cmd" ]]
+    if [[ -n "$setarch_cmd" && -x "$setarch_cmd" \
+          && "${CHARM_LAUNCHER:-mpirun}" != "ssh" ]]
     then
       cur_arch="$(uname -m)"
       runCmd "$setarch_cmd" "$cur_arch" -R "$launcher_cmd" "${mpirun_machinefile_opt[@]}" -np "$nodes" "${args[@]}"

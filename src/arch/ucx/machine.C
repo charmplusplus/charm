@@ -6,7 +6,6 @@
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
-#include <signal.h>
 #include <stdlib.h>
 #include <string>
 
@@ -57,6 +56,12 @@ static int   _coord_fd       = -1;
 static char *_coord_host     = nullptr;  // owned by argv, do not free
 static int   _coord_port     = 0;
 static uint32_t _coord_epoch = 0;        // tracked locally; updated on each commit
+// Set in LrtsInit when launcher passed +nodeId/+numNodes/+coordinator and PMI
+// was skipped. Read in LrtsDrainResources/LrtsExit to route shutdown barriers
+// through the coordinator instead of runtime_barrier (which would no-op or
+// crash since PMI was never initialized).
+static bool  _coord_bootstrap_active = false;
+static int   _coord_bootstrap_my_node = -1;
 // Mirror of the coordinator's current member list (in current nodeId order).
 // Used by UcxReInitEpsFromView to diff old vs new and avoid tearing down eps
 // to peers that survived. Updated in LrtsInit and at every successful commit.
@@ -510,8 +515,41 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     ucs_status_t status;
     int ret;
 
-    ret = runtime_init(myNodeID, numNodes);
-    UCX_CHECK_PMI_RET(ret, "runtime_init");
+#if CMK_SHRINK_EXPAND
+    // Coord-bootstrap mode: when the launcher passes +nodeId, +numNodes, and
+    // +coordinator, the coordinator is the only source of truth for cluster
+    // wireup — skip PMI entirely. This lets us launch via a thin ssh fan-out
+    // (charmrun_ssh) instead of mpirun/prterun, which have the supervised-
+    // daemon model that triggers job teardown when any host disappears (spot
+    // termination, etc.). The PMI fallback is preserved for backward
+    // compatibility with mpirun-launched runs.
+    int _arg_nodeId   = -1;
+    int _arg_numNodes = -1;
+    char *_arg_coord  = nullptr;
+    bool _coord_bootstrap_mode = false;
+    CmiGetArgIntDesc(*argv, "+nodeId", &_arg_nodeId,
+                     "(coord-bootstrap) this rank's node ID, set by launcher");
+    CmiGetArgIntDesc(*argv, "+numNodes", &_arg_numNodes,
+                     "(coord-bootstrap) total node count, set by launcher");
+    // Don't consume +coordinator here — peek so the existing coord-registration
+    // block can read it normally. CmiGetArgString without -consume isn't
+    // available, so use the standard form; the second read below will then
+    // re-extract it from the saved coordSpec_saved buffer.
+    char *_coord_peek = nullptr;
+    CmiGetArgStringDesc(*argv, "+coordinator", &_coord_peek,
+                        "host:port of the rescale coordinator");
+    if (_arg_nodeId >= 0 && _arg_numNodes > 0 && _coord_peek != nullptr) {
+        _coord_bootstrap_mode = true;
+        _arg_coord = _coord_peek;
+        *myNodeID  = _arg_nodeId;
+        *numNodes  = _arg_numNodes;
+    }
+    if (!_coord_bootstrap_mode)
+#endif
+    {
+        ret = runtime_init(myNodeID, numNodes);
+        UCX_CHECK_PMI_RET(ret, "runtime_init");
+    }
 
     status = ucp_config_read("Charm++", NULL, &config);
     UCX_CHECK_STATUS(status, "ucp_config_read");
@@ -554,7 +592,73 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     CmiGetArgInt(*argv, "+ucx_rndv_thresh", &thresh);
     ucxCtx.eagerSize = std::max(LrtsGetMaxNcpyOperationInfoSize(), thresh);
 
-    UcxInitEps(*numNodes, *myNodeID);
+#if CMK_SHRINK_EXPAND
+    if (_coord_bootstrap_mode) {
+      // Coord-bootstrap path: the launcher gave us +nodeId/+numNodes and the
+      // coordinator already has every rank's UCX address. Register, collect
+      // the full member list, build endpoints directly. No PMI KVS exchange,
+      // no UcxInitEps.
+      _coord_bootstrap_active  = true;
+      _coord_bootstrap_my_node = *myNodeID;
+
+      char *colon = strchr(_arg_coord, ':');
+      if (colon == nullptr) CmiAbort("UCX: +coordinator must be host:port");
+      *colon = '\0';
+      _coord_host = _arg_coord;
+      _coord_port = atoi(colon + 1);
+      if (_coord_port <= 0) CmiAbort("UCX: +coordinator port invalid");
+
+      ucp_address_t *myAddr = nullptr;
+      size_t myAddrLen = 0;
+      status = ucp_worker_get_address(ucxCtx.worker, &myAddr, &myAddrLen);
+      UCX_CHECK_STATUS(status,
+                       "ucp_worker_get_address (coord-bootstrap REGISTER)");
+
+      _coord_fd = coord::connect_blocking(_coord_host, _coord_port);
+      if (_coord_fd < 0) {
+        CmiAbort("UCX: failed to connect to coordinator (coord-bootstrap)");
+      }
+      coord::ClusterView view;
+      if (!coord::register_initial(_coord_fd, (uint32_t)*myNodeID,
+                                   myAddr, (uint32_t)myAddrLen, &view)) {
+        CmiAbort("UCX: coordinator REGISTER_INITIAL failed (coord-bootstrap)");
+      }
+      _coord_epoch   = view.epoch;
+      _coord_members = view.members;
+      ucp_worker_release_address(ucxCtx.worker, myAddr);
+
+      if ((int)view.nodeId != *myNodeID) {
+        CmiAbort("UCX: coordinator returned nodeId mismatching launcher rank "
+                 "(coord-bootstrap)");
+      }
+      if ((int)view.members.size() != *numNodes) {
+        CmiAbort("UCX: coordinator returned %d members, launcher said %d "
+                 "(coord-bootstrap)",
+                 (int)view.members.size(), *numNodes);
+      }
+
+      ucxCtx.eps = (ucp_ep_h *)CmiAlloc(sizeof(ucp_ep_h) * (*numNodes));
+      CmiEnforce(ucxCtx.eps);
+      for (int i = 0; i < *numNodes; i++) ucxCtx.eps[i] = nullptr;
+      for (const auto &m : view.members) {
+        if ((int)m.nodeId == *myNodeID) continue;
+        ucp_ep_params_t eParams;
+        eParams.field_mask = UCP_EP_PARAM_FIELD_REMOTE_ADDRESS;
+        eParams.address    = (const ucp_address_t *)m.ucxAddr.data();
+        status = ucp_ep_create(ucxCtx.worker, &eParams, &ucxCtx.eps[m.nodeId]);
+        UCX_CHECK_STATUS(status, "ucp_ep_create (coord-bootstrap)");
+      }
+
+      if (*myNodeID == 0) {
+        CmiPrintf("Charm> coordinator registered (coord-bootstrap): "
+                  "nodeId=%u epoch=%u members=%zu\n",
+                  view.nodeId, view.epoch, view.members.size());
+      }
+    } else
+#endif
+    {
+      UcxInitEps(*numNodes, *myNodeID);
+    }
 
     UcxPrepostRxBuffers();
 
@@ -563,10 +667,10 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     UCX_CHECK_STATUS(status, "ucp_worker_flush");
 
 #if CMK_SHRINK_EXPAND
-    // Parse +coordinator host:port. Required when shrink/expand is enabled —
-    // even runs that never rescale must register so the coordinator has a
-    // consistent membership view.
-    {
+    // PMI bootstrap path still needs to register with the coordinator (so the
+    // coord has a complete membership view even on runs that never rescale).
+    // The coord-bootstrap branch above already did this.
+    if (!_coord_bootstrap_mode) {
       char *coordSpec = nullptr;
       CmiGetArgStringDesc(*argv, "+coordinator", &coordSpec,
                           "host:port of the rescale coordinator");
@@ -1002,6 +1106,16 @@ void LrtsDrainResources()
 {
     int ret;
     LrtsAdvanceCommunication(0);
+#if CMK_SHRINK_EXPAND
+    if (_coord_bootstrap_active) {
+      // No PMI session — use the coordinator's all-ranks barrier instead.
+      if (!coord::barrier(_coord_fd, _coord_epoch,
+                          (uint32_t)_coord_bootstrap_my_node)) {
+        CmiAbort("coord::barrier failed in LrtsDrainResources");
+      }
+      return;
+    }
+#endif
     ret = runtime_barrier();
     UCX_CHECK_PMI_RET(ret, "runtime_barrier");
 }
@@ -1034,13 +1148,31 @@ void LrtsExit(int exitcode)
 #endif
 
     if(!CharmLibInterOperate || userDrivenMode) {
-        ret = runtime_barrier();
-        UCX_CHECK_PMI_RET(ret, "runtime_barrier");
+#if CMK_SHRINK_EXPAND
+        if (_coord_bootstrap_active) {
+          // No PMI — coord barrier + clean socket close. The coord itself
+          // tolerates clients dropping (it's not part of the supervised
+          // launch tree), so nothing else needed.
+          if (!coord::barrier(_coord_fd, _coord_epoch,
+                              (uint32_t)_coord_bootstrap_my_node)) {
+            // Best-effort: don't abort at shutdown if peers already left.
+            CmiPrintf("Charm> coord::barrier failed at LrtsExit (ignored)\n");
+          }
+          if (_coord_fd >= 0) ::close(_coord_fd);
+          if (!userDrivenMode) {
+            exit(exitcode);
+          }
+        } else
+#endif
+        {
+          ret = runtime_barrier();
+          UCX_CHECK_PMI_RET(ret, "runtime_barrier");
 
-        ret = runtime_fini();
-        UCX_CHECK_PMI_RET(ret, "runtime_fini");
-        if (!userDrivenMode) {
-          exit(exitcode);
+          ret = runtime_fini();
+          UCX_CHECK_PMI_RET(ret, "runtime_fini");
+          if (!userDrivenMode) {
+            exit(exitcode);
+          }
         }
     }
 }
@@ -1073,11 +1205,22 @@ void LrtsCleanup()
 #endif
 
     if(!CharmLibInterOperate || userDrivenMode) {
-        ret = runtime_barrier();
-        UCX_CHECK_PMI_RET(ret, "runtime_barrier");
+#if CMK_SHRINK_EXPAND
+        if (_coord_bootstrap_active) {
+          if (!coord::barrier(_coord_fd, _coord_epoch,
+                              (uint32_t)_coord_bootstrap_my_node)) {
+            CmiPrintf("Charm> coord::barrier failed at LrtsCleanup (ignored)\n");
+          }
+          if (_coord_fd >= 0) ::close(_coord_fd);
+        } else
+#endif
+        {
+          ret = runtime_barrier();
+          UCX_CHECK_PMI_RET(ret, "runtime_barrier");
 
-        ret = runtime_fini();
-        UCX_CHECK_PMI_RET(ret, "runtime_fini");
+          ret = runtime_fini();
+          UCX_CHECK_PMI_RET(ret, "runtime_fini");
+        }
     }
 }
 
@@ -1556,6 +1699,21 @@ void ConverseCleanup(void)
 
     if (gotDie) {
       // Killed: tear down everything and exit.
+      //
+      // NOTE: We previously tried `kill(getppid(), SIGTERM)` here to make
+      // the local orted/prted exit cleanly so the HNP would stop watching
+      // this node (so a later spot-instance termination wouldn't trigger
+      // "lost communication" job teardown). It failed: the HNP treats any
+      // unexpected daemon exit — including a clean SIGTERM-induced one —
+      // as "lost communication" and tears down the entire job
+      // *immediately*. So the kill broke normal shrink without buying
+      // anything for the spot-loss case. Both ORTE and PRRTE behave this
+      // way; the TCP-loss path is not gated by any MCA flag.
+      //
+      // The correct fix lives outside Charm — either switch to a launcher
+      // that doesn't supervise daemons (Slurm srun, or a thin ssh-based
+      // launcher with PMIx-direct bootstrap), or accept that a spot loss
+      // ends the run and let charmrun_elastic restart the survivors.
       ucp_worker_destroy(ucxCtx.worker);
       ucp_cleanup(ucxCtx.context);
       CmiFree(ucxCtx.eps);
@@ -1564,27 +1722,6 @@ void ConverseCleanup(void)
       PCQueueDestroy(ucxCtx.txQueue);
 #endif
       ::close(_coord_fd);
-
-      // Tell the launcher (mpirun/prterun) daemon this node is leaving
-      // cleanly so the HNP stops supervising it. Otherwise the daemon entry
-      // persists in the HNP's tables, and when the instance later dies
-      // (spot reclaim, etc.) the HNP detects an unexpected TCP close on
-      // the orted/prted socket and tears down the entire job with
-      // "ORTE/PRTE has lost communication with a remote daemon" — even
-      // with all heartbeat MCA flags disabled (the TCP-loss path is not
-      // gated by them).
-      //
-      // ASSUMPTION: shrink granularity is whole-instance — every PE on
-      // this physical node is being killed in the same rescale. If a
-      // future workload shrinks at finer granularity, this kill takes
-      // out surviving siblings too. In that case, gate this on an
-      // is_last_on_node flag pushed from the coordinator (computed
-      // coord-side via getpeername grouping by IP).
-      pid_t launcher_pid = getppid();
-      if (launcher_pid > 1) {
-        kill(launcher_pid, SIGTERM);
-      }
-
       _exit(0);
     }
 
