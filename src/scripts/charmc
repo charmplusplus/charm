@@ -2354,6 +2354,18 @@ then
 	DoNoErrCheck $CP "$CHARMBIN/$targ_elastic" "$targ_elastic" 2> /dev/null
 	fi
 
+	# charmrun_ssh is the ssh-fanout launcher used when CHARM_LAUNCHER=ssh.
+	# charmrun looks for it via dirname "$0", so it must sit next to the
+	# per-example charmrun copy, not only in $CHARMBIN.
+	targ_ssh="charmrun_ssh$CMK_POST_EXE"
+	[[ ! -x "$CHARMBIN/$targ_ssh" && -n "$CMK_POST_EXE" ]] && targ_ssh=charmrun_ssh
+
+	if [[ -x "$CHARMBIN/$targ_ssh" ]]
+	then
+	DoNoErrCheck $RM "$targ_ssh"
+	DoNoErrCheck $CP "$CHARMBIN/$targ_ssh" "$targ_ssh" 2> /dev/null
+	fi
+
 fi
 
 [[ -z "$SKIP_MODULEINIT" && -z "$SAVE" ]] && DoNoErrCheck $RM "$modInitSrc" "$modInitObj" > /dev/null 2>&1
