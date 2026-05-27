@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <string>
 
@@ -1563,6 +1564,27 @@ void ConverseCleanup(void)
       PCQueueDestroy(ucxCtx.txQueue);
 #endif
       ::close(_coord_fd);
+
+      // Tell the launcher (mpirun/prterun) daemon this node is leaving
+      // cleanly so the HNP stops supervising it. Otherwise the daemon entry
+      // persists in the HNP's tables, and when the instance later dies
+      // (spot reclaim, etc.) the HNP detects an unexpected TCP close on
+      // the orted/prted socket and tears down the entire job with
+      // "ORTE/PRTE has lost communication with a remote daemon" — even
+      // with all heartbeat MCA flags disabled (the TCP-loss path is not
+      // gated by them).
+      //
+      // ASSUMPTION: shrink granularity is whole-instance — every PE on
+      // this physical node is being killed in the same rescale. If a
+      // future workload shrinks at finer granularity, this kill takes
+      // out surviving siblings too. In that case, gate this on an
+      // is_last_on_node flag pushed from the coordinator (computed
+      // coord-side via getpeername grouping by IP).
+      pid_t launcher_pid = getppid();
+      if (launcher_pid > 1) {
+        kill(launcher_pid, SIGTERM);
+      }
+
       _exit(0);
     }
 
