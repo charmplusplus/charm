@@ -41,6 +41,9 @@ class CkLBArgs
   bool _lb_traceComm;       // stats collection for comm
   int _lb_central_pe;      // processor number for centralized strategy
   int _lb_maxDistPhases;   // Specifies the max number of LB phases in DistributedLB
+  // Migration ceiling for strategies that honor it (GreedyRefineCentralLB).
+  // CLI: +LBPercentMoves N (0..100). Default 100 = unlimited.
+  int _lb_percentMovesAllowed;
   double _lb_targetRatio;  // Specifies the target load ratio for LBs that aim for a
                            // particular load ratio
   bool _lb_metaLbOn;
@@ -59,6 +62,7 @@ class CkLBArgs
     _lb_loop = false;
     _lb_central_pe = 0;
     _lb_maxDistPhases = 10;
+    _lb_percentMovesAllowed = 100;
     _lb_targetRatio = 1.05;
     _lb_metaLbOn = false;
     _lb_metaLbModelDir = nullptr;
@@ -84,7 +88,7 @@ class CkLBArgs
   inline double& targetRatio() { return _lb_targetRatio; }
   inline bool& metaLbOn() { return _lb_metaLbOn; }
   inline char*& metaLbModelDir() { return _lb_metaLbModelDir; }
-  inline int percentMovesAllowed() { return 100; }
+  inline int& percentMovesAllowed() { return _lb_percentMovesAllowed; }
 };
 
 extern CkLBArgs _lb_args;

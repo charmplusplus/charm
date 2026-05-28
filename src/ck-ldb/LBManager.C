@@ -302,6 +302,14 @@ void _loadbalancerInit()
   CmiGetArgIntDesc(argv, "+DistLBMaxPhases", &_lb_args.maxDistPhases(),
                    "The maximum number of phases that DistributedLB will attempt");
 
+  // Migration ceiling honored by GreedyRefineCentralLB (and any future LB
+  // that consults _lb_args.percentMovesAllowed()). 0..100; default 100.
+  // Treated as a soft target: if no parameter-sweep solution fits the cap,
+  // GreedyRefine falls back to the lowest-migration solution instead.
+  CmiGetArgIntDesc(argv, "+LBPercentMoves", &_lb_args.percentMovesAllowed(),
+                   "Soft cap (0..100) on percent of chares that may migrate "
+                   "per LB step; honored by GreedyRefineCentralLB.");
+
   // set up init value for LBPeriod time in seconds
   // it can also be set by calling LBSetPeriod/LBManager::SetLBPeriod
   CmiGetArgDoubleDesc(argv, "+LBPeriod", &_lb_args.lbperiod(),
