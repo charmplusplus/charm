@@ -285,6 +285,33 @@ double GreedyRefineCentralLB::fillData(LDStats *stats,
   }
   if (!availablePes) CkAbort("GreedyRefineCentralLB: No available processors\n");
 
+  // Equal-weight fallback. When the load profiler hasn't accumulated any
+  // measurable per-object data (typical for the first LB step after a
+  // shrink/expand: lbmgr->ClearLoads() ran post-migration and the next LB
+  // step fires before meaningful work was sampled), every migratable
+  // object's wallTime is 0. Without a floor, Greedy distinguishes objects
+  // only by their (near-zero) load and dumps them all onto the lowest-
+  // bgload PE — a degenerate "all 64 objects to the newcomer" decision
+  // that costs multiple seconds to execute and immediately needs to be
+  // re-balanced. Treat that case as "all objects equal weight" so Greedy
+  // distributes by count instead. Only kicks in when there's no signal;
+  // a single non-zero object load takes the normal path.
+  double migratableLoadSum = 0.0;
+  int    migratableCount   = 0;
+  for (int i = 0; i < n_objs; i++) {
+    if (stats->objData[i].migratable) {
+      migratableLoadSum += stats->objData[i].wallTime;
+      migratableCount++;
+    }
+  }
+  const bool useUnitWeights = (migratableCount > 0
+                               && migratableLoadSum < 1e-9);
+  if (useUnitWeights && _lb_args.debug() > 0 && CkMyPe() == cur_ld_balancer) {
+    CkPrintf("[%d] GreedyRefineCentralLB: object loads are all 0 "
+             "(post-rescale or pre-warmup); using unit weights so objects "
+             "balance by count\n", CkMyPe());
+  }
+
   for (int i=0; i < n_objs; i++) {
     LDObjData &oData = stats->objData[i];
     GreedyRefineCentralLB::GObj &obj = objs[i];
@@ -302,7 +329,8 @@ double GreedyRefineCentralLB::fillData(LDStats *stats,
       p.bgload += oData.wallTime; // take non-migratable object load as background load
       if (p.bgload > maxBGLoad) maxBGLoad = p.bgload;
     } else {
-      obj.load = oData.wallTime * stats->procs[pe].pe_speed;
+      const double effLoad = useUnitWeights ? 1.0 : oData.wallTime;
+      obj.load = effLoad * stats->procs[pe].pe_speed;
       pobjs.push_back(&obj);
       totalObjLoad += obj.load;
       if (_lb_args.debug() > 1) {
