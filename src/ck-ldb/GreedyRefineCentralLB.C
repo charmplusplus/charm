@@ -383,12 +383,23 @@ static const float Bvals[] = {1.0, 1.05, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8,
 static void getGreedyRefineParams(int rank, float &A, float &B) {
   if (rank == 0) { A = 0; B = -1; return; } // causes PE0 to run regular greedy
   rank--;
-  int x = rank / Bvals_len;
-  if (x >= Avals_len) {
+  // When CkNumPes()-1 < NUM_SOLUTIONS (the common case at small PE counts:
+  // 4 PEs samples only the first 3 of 224 (A,B) combinations — all near
+  // B=1.0..1.1, missing every "stay-in-place" leaning variant). Stride the
+  // sample so the few PEs cover the full grid instead of clustering at
+  // the front; the lattice traversal is sub-grid-walk so we still hit
+  // Avals[0..N] for each Bvals[k%N].
+  const int totalCombos = Avals_len * Bvals_len;
+  const int sweepPEs    = std::max(1, CkNumPes() - 1);
+  const int stride      = (sweepPEs >= totalCombos) ? 1
+                                                    : std::max(1,
+                                                               totalCombos / sweepPEs);
+  const int idx = rank * stride;
+  if (idx >= totalCombos) {
     A = B = -1;
   } else {
-    A = Avals[x];
-    B = Bvals[rank % Bvals_len];
+    A = Avals[idx / Bvals_len];
+    B = Bvals[idx % Bvals_len];
   }
 }
 
