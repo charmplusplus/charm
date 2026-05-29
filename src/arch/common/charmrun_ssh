@@ -149,8 +149,15 @@ for ((r=0; r<np; r++)); do
 
     # -n closes stdin; -o BatchMode requires keys (no password prompts).
     # Tag each line of output with the rank for legibility.
+    # ServerAlive: tolerate ~15 min of unresponsive control channel during
+    # rescale events (PE 0's broadcast + survivors' UCX wireup can stall
+    # ssh keepalives on multi-host EC2 setups; the default 2-min ceiling
+    # caused ranks to drop in bursts mid-expand). Override per-run with
+    # CHARM_SSH_KEEPALIVE_COUNT.
     ssh -n -o StrictHostKeyChecking=no -o BatchMode=yes \
-        -o ServerAliveInterval=30 -o ServerAliveCountMax=4 \
+        -o "ServerAliveInterval=30" \
+        -o "ServerAliveCountMax=${CHARM_SSH_KEEPALIVE_COUNT:-30}" \
+        -o "TCPKeepAlive=yes" \
         "$host" "bash -c $(printf '%q' "$remote_cmd")" 2>&1 \
         | sed -u "s/^/[$r] /" &
     pids+=($!)
