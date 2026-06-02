@@ -608,6 +608,14 @@ fi
 
 my_os=$(echo "$actual_triplet" | cut -d '-' -f2)
 
+# reconverse network type implies reconverse communication layer and inherent SMP.
+# CMK_SMP is forced to 1 by CMakeLists.txt for reconverse; we do not pass -DSMP=1
+# here because that would trigger the opt-file loop to source conv-mach-smp.sh,
+# which does not exist for reconverse (SMP flags are baked into conv-mach.h directly).
+if [[ $opt_network == "reconverse" ]]; then
+  opt_reconverse=1
+fi
+
 if [[ $opt_network == "mpi" && $my_os == "win" ]]; then
   echo "Warning: CMake build is not supported with MPI on Windows, running ./buildold instead."
   sleep 2

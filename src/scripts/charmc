@@ -1688,7 +1688,7 @@ fi
 
 ALL_LIBS+=($CMK_SYSLIBS)
 
-if [[ "$BUILD_SHARE" = '0' && "$USER_INITIATED_SHARED" = '0' ]]
+if [[ "$BUILD_SHARE" = '0' && "$USER_INITIATED_SHARED" = '0' && -f "$CHARMLIB/conv-static.o" ]]
 then
   ALL_LIBS+=("$CHARMLIB/conv-static.o")
 fi
