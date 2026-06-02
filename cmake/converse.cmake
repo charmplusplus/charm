@@ -297,12 +297,14 @@ endforeach()
 # target_include_directories(converse PRIVATE src/util) # for sockRoutines.C
 # target_include_directories(converse PRIVATE src/conv-core src/util/topomanager src/ck-ldb src/ck-perf src/ck-cp)
 
-# conv-static
-add_library(conv-static OBJECT src/conv-core/conv-static.c)
-add_dependencies(reconverse conv-static)
-add_dependencies(charm_cxx_utils conv-static)
-add_custom_command(TARGET charm_cxx_utils
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/conv-static.dir/src/conv-core/conv-static.c.o ${CMAKE_BINARY_DIR}/lib/conv-static.o
-    VERBATIM
-)
+# conv-static: not needed for reconverse builds (reconverse provides its own converse layer)
+if(NOT RECONVERSE)
+  add_library(conv-static OBJECT src/conv-core/conv-static.c)
+  add_dependencies(reconverse conv-static)
+  add_dependencies(charm_cxx_utils conv-static)
+  add_custom_command(TARGET charm_cxx_utils
+      POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/conv-static.dir/src/conv-core/conv-static.c.o ${CMAKE_BINARY_DIR}/lib/conv-static.o
+      VERBATIM
+  )
+endif()

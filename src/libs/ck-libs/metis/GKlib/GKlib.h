@@ -11,7 +11,9 @@
 #ifndef _GKLIB_H_
 #define _GKLIB_H_ 1
 
-#include "conv-config.h"
+//#include "conv-config.h"
+#include "charm-config.h"
+#include "converse.h"
 
 #define GKMSPACE
 

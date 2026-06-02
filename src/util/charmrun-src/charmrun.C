@@ -1,3 +1,5 @@
+#include "conv-autoconfig.h"
+#include "conv-mach.h"
 #include "converse.h"
 #include "ckrescale.h"
 

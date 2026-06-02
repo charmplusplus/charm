@@ -107,7 +107,7 @@ else()
 endif()
 
 # Build options
-set(NETWORK "netlrts" CACHE STRING "Target network layer, can be one of mpi,multicore,netlrts,gni,ofi,pami,pamilrts,ucx,verbs")
+set(NETWORK "netlrts" CACHE STRING "Target network layer, can be one of mpi,multicore,netlrts,reconverse,gni,ofi,pami,pamilrts,ucx,verbs")
 set(TARGET "charm++" CACHE STRING "Target build type, can be one of charm++,AMPI,LIBS,charm4py,ChaNGa,everylb,all-test")
 set(ARCH "" CACHE STRING "Target architecture, can be one of i386,x86_64,arm7,arm8,ppc64le") # By default, detect arch we are running on.
 
@@ -267,6 +267,10 @@ else()
   set(CMK_TASKQUEUE 0)
 endif()
 
+if(${NETWORK} STREQUAL "reconverse")
+  set(RECONVERSE ON)
+endif()
+
 if(${RECONVERSE})
   set(CMK_RECONVERSE 1)
 else()
@@ -291,8 +295,10 @@ else()
   set(CMK_SMP 0)
 endif()
 
-if(${NETWORK} STREQUAL "multicore")
+if(${NETWORK} STREQUAL "multicore" OR ${NETWORK} STREQUAL "reconverse")
   set(CMK_SMP 1)
+endif()
+if(${NETWORK} STREQUAL "multicore")
   set(CMK_MULTICORE 1)
 else()
   set(CMK_MULTICORE 0)
@@ -328,7 +334,7 @@ IF(JPEG_FOUND)
   set(CMK_USE_LIBJPEG 1)
 ENDIF()
 
-if(NETWORK STREQUAL "pami")
+if(NETWORK STREQUAL "pami" OR NETWORK STREQUAL "reconverse")
   set(CMK_USE_LRTS 0)
 else()
   set(CMK_USE_LRTS 1)
@@ -876,7 +882,9 @@ if(CMK_COMPILER STREQUAL "msvc")
 endif()
 
 # Header files
-configure_file(src/arch/${GDIR}/conv-common.h                include/ COPYONLY)
+if(EXISTS src/arch/${GDIR}/conv-common.h)
+  configure_file(src/arch/${GDIR}/conv-common.h                include/ COPYONLY)
+endif()
 if(EXISTS src/arch/${GDIR}/conv-common.sh)
   configure_file(src/arch/${GDIR}/conv-common.sh               include/ COPYONLY)
 endif()
@@ -970,7 +978,9 @@ include(cmake/hwloc.cmake)
 
 # Converse
 include(cmake/converse.cmake)
-add_subdirectory(src/QuickThreads)
+if(NOT RECONVERSE)
+  add_subdirectory(src/QuickThreads)
+endif()
 # add_subdirectory(src/util/boost-context)
 # add_subdirectory(src/conv-core)
 
@@ -1145,9 +1155,12 @@ else()
   if(RECONVERSE)
     target_link_libraries(ckhello PRIVATE reconverse)
   endif()
-  add_dependencies(ckhello ck ckqt ckrescale conv-static
-    converse ckmain
-    moduleNDMeshStreamer modulecompletion)
+  set(ckhello_deps ck ckrescale converse ckmain
+      moduleNDMeshStreamer modulecompletion)
+  if(NOT RECONVERSE)
+    list(APPEND ckhello_deps ckqt conv-static)
+  endif()
+  add_dependencies(ckhello ${ckhello_deps})
   if(BUILD_CUDA OR BUILD_HIP)
     add_dependencies(ckhello hybridapi)
   endif()
