@@ -4,6 +4,7 @@
  */
 #include "charm++.h"
 #include "collidecharm_impl.h"
+#include <iostream>
 
 #define COLLIDE_TRACE 0
 #if COLLIDE_TRACE
@@ -45,6 +46,17 @@ CkGroupID CollideSerialClient(CkCallback clientCb)
   return cl;
 }
 
+/// Call this on all procesors at restart, to reinitialize the Collision client
+/// with correct clientFn and clientParam
+void CollideSerialClientRestart(
+  CollideHandle h,
+  CollisionClientFn clientFn,
+  void *clientParam )
+{
+  CProxy_collideMgr mgr(h);
+  mgr.ckLocalBranch()->reinitClient(clientFn, clientParam);
+}
+
 /// Create a collider group to contribute objects to.
 ///  Should be called on processor 0.
 CollideHandle CollideCreate(const CollideGrid3d &gridMap,
@@ -74,6 +86,7 @@ void CollideBoxesPrio(CollideHandle h,int chunkNo,
     int nBox,const bbox3d *boxes,const int *prio)
 {
   CProxy_collideMgr mgr(h);
+  std::cout << "CollideBoxesPrio init'ed collideMgr from nBoxes " << nBox << std::endl;
   mgr.ckLocalBranch()->contribute(chunkNo,nBox,boxes,prio);
 }
 
@@ -301,7 +314,6 @@ void CollisionAggregator::compact(void)
 
 /********************* syncReductionMgr ******************/
 syncReductionMgr::syncReductionMgr()
-  :thisproxy(thisgroup)
 {
   stepCount=-1;
   stepFinished=true;
@@ -326,16 +338,19 @@ void syncReductionMgr::startStep(int stepNo,bool withProd)
   stepFinished=false;
   localFinished=false;
   childrenCount=0;
-  if (nChildren>0)
+  if (nChildren>0) {
+    CProxy_syncReductionMgr proxy(ckGetGroupID());
     for (int i=0;i<TREE_WID;i++)
       if (treeChildStart+i<CkNumPes())
-        thisproxy[treeChildStart+i].childProd(stepCount);
+        proxy[treeChildStart+i].childProd(stepCount);
+  }
   if (withProd)
     pleaseAdvance();//Advise subclass to advance
 }
 
 void syncReductionMgr::advance(void)
 {
+  std::cout << "in syncReductionMgr::advance()" << std::endl;
   SRM_STATUS("syncReductionMgr::advance");
   if (stepFinished) startStep(stepCount+1,false);
   localFinished=true;
@@ -347,16 +362,19 @@ void syncReductionMgr::pleaseAdvance(void)
 
 //This is called on PE 0 once the reduction is finished
 void syncReductionMgr::reductionFinished(void)
-{ /*Child use only */ }
+{ /*Child use only */
+  std::cout << "in syncReductionMgr::reductionFinished()" << std::endl;
+}
 
 void syncReductionMgr::tryFinish(void) //Try to finish reduction
 {
+  std::cout << "in syncReductionMgr::tryFinished()" << std::endl;
   SRM_STATUS("syncReductionMgr::tryFinish");
   if (localFinished && (!stepFinished) && childrenCount==nChildren)
   {
     stepFinished=true;
     if (treeParent!=-1)
-      thisproxy[treeParent].childDone(stepCount);
+      CProxy_syncReductionMgr(ckGetGroupID())[treeParent].childDone(stepCount);
     else
       reductionFinished();
   }
@@ -371,12 +389,30 @@ void syncReductionMgr::childProd(int stepCount)
 //Called by tree children-- me and my children are finished
 void syncReductionMgr::childDone(int stepCount)
 {
+  std::cout << "in syncReductionMgr::childDone()" << std::endl;
   SRM_STATUS("syncReductionMgr::childDone");
   if (stepFinished) startStep(stepCount,true);
   childrenCount++;
   tryFinish();
 }
 
+syncReductionMgr::syncReductionMgr(CkMigrateMessage* m) :
+  CBase_syncReductionMgr(m)
+{
+  stepCount=-1;
+  stepFinished=true;
+  localFinished=false;
+
+  //Set up the reduction tree
+  onPE=CkMyPe();
+  if (onPE==0) treeParent=-1;
+  else treeParent=(onPE-1)/TREE_WID;
+  treeChildStart=(onPE*TREE_WID)+1;
+  treeChildEnd=treeChildStart+TREE_WID;
+  if (treeChildStart>CkNumPes()) treeChildStart=CkNumPes();
+  if (treeChildEnd>CkNumPes()) treeChildEnd=CkNumPes();
+  nChildren=treeChildEnd-treeChildStart;
+}
 
 /*********************** collideMgr ***********************/
 //Extract the (signed) low 23 bits of src--
@@ -402,13 +438,33 @@ static const char * voxName(const CkIndex3D &idx,char *buf) {
 collideMgr::collideMgr(const CollideGrid3d &gridMap_,
     const CProxy_collideClient &client_,
     const CProxy_collideVoxel &voxels)
-  :thisproxy(thisgroup), voxelProxy(voxels),
+  :voxelProxy(voxels),
   gridMap(gridMap_), client(client_), aggregator(gridMap,this)
 {
   steps=0;
   nContrib=0;
   contribCount=0;
   msgsSent=msgsRecvd=0;
+}
+
+collideMgr::collideMgr(CkMigrateMessage* m) :
+  CBase_collideMgr(m),
+  gridMap(CollideGrid3d(CkVector3d(0, 0, 0),CkVector3d(2, 100, 2))),
+  aggregator(gridMap,this)
+{
+  steps=0;
+  nContrib=0;
+  contribCount=0;
+  msgsSent=msgsRecvd=0;
+}
+
+// Reinitialize collideClient's state on restart
+void collideMgr::reinitClient(
+  CollisionClientFn clientFn,
+  void *clientParam )
+{
+  std::cout << "collideMgr::reinitClient from " << thisIndex << std::endl;
+  client.ckLocalBranch()->setClient(clientFn, clientParam);
 }
 
 //Maintain contributor registration count
@@ -428,6 +484,7 @@ void collideMgr::contribute(int chunkNo,
     int n,const bbox3d *boxes,const int *prio)
 {
   //printf("[%d] Receiving contribution from %d\n",CkMyPe(), chunkNo);
+  std::cout << "began contribute() of nBoxes " << n << std::endl;
   CM_STATUS("collideMgr::contribute "<<n<<" boxes from "<<chunkNo);
   aggregator.aggregate(CkMyPe(),chunkNo,n,boxes,prio);
   aggregator.send(); //Deliver all outgoing messages
@@ -437,6 +494,7 @@ void collideMgr::contribute(int chunkNo,
     aggregator.compact();//Blow away all the old voxels (saves memory)
     tryAdvance();
   }
+  std::cout << "completed contribute() of nBoxes " << n << std::endl;
   //printf("[%d] DONE receiving contribution from %d\n",CkMyPe(), chunkNo);
 }
 
@@ -483,6 +541,7 @@ void collideMgr::pleaseAdvance(void)
 //Attempt to finish the voxel send/recv step
 void collideMgr::tryAdvance(void)
 {
+  std::cout << "in collideMgr::tryAdvance()" << std::endl;
   CM_STATUS("tryAdvance: "<<nContrib-contribCount<<" contrib, "<<msgsSent-msgsRecvd<<" msg")
     if ((contribCount==nContrib) && (msgsSent==msgsRecvd)) {
       CM_STATUS("advancing");
@@ -496,6 +555,7 @@ void collideMgr::tryAdvance(void)
 //This is called on PE 0 once the voxel send/recv reduction is finished
 void collideMgr::reductionFinished(void)
 {
+  std::cout << "in collideMgr::reductionFinished()" << std::endl;
   CM_STATUS("collideMgr::reductionFinished");
   //Broadcast Collision start:
   voxelProxy.startCollision(steps,gridMap,client);
@@ -613,11 +673,17 @@ void collideVoxel::startCollision(int step,
       );
   CollisionList colls;
   collide(territory,colls);
+
+  std::cout << "in collideVoxel::startCollision(), completed local collide" << std::endl;
   client.ckLocalBranch()->collisions(this,step,colls);
 
   emptyMessages();
   CC_STATUS("} startCollision");
 }
+
+collideClient::collideClient() {}
+
+collideClient::collideClient(CkMigrateMessage* m) : Group(m) {}
 
 collideClient::~collideClient() {}
 
@@ -629,6 +695,13 @@ serialCollideClient::serialCollideClient(void) {
   useCb = false;
 }
 
+serialCollideClient::serialCollideClient(CkMigrateMessage* m) : collideClient(m)
+{
+  clientFn = NULL;
+  clientParam = NULL;
+  clientCb = CkCallback(CkCallback::ignore);
+}
+
 serialCollideClient::serialCollideClient(CkCallback clientCb_) {
   clientFn=NULL;
   clientParam=NULL;
@@ -638,6 +711,7 @@ serialCollideClient::serialCollideClient(CkCallback clientCb_) {
 
 /// Call this client function on processor 0:
 void serialCollideClient::setClient(CollisionClientFn clientFn_,void *clientParam_) {
+  std::cout << "serialCollideClient::setClient from " << thisIndex << std::endl;
   clientFn=clientFn_;
   clientParam=clientParam_;
 }
@@ -646,22 +720,28 @@ void serialCollideClient::collisions(ArrayElement *src,
     int step,CollisionList &colls)
 {
   if(useCb) { // Use user passed callback as reduction target
+    std::cout << "in serialCollideClient::collisions(), useCB" << std::endl;
     src->contribute(colls.length()*sizeof(Collision),colls.getData(),
       CkReduction::concat, clientCb);
   } else { // Use client fn with reduction targetted at serialCollideClient::reductionDone
     CkCallback cb(CkIndex_serialCollideClient::reductionDone(0),0,thisgroup);
+    std::cout << "in serialCollideClient::collisions(), NOT useCB " << thisIndex << std::endl;
     src->contribute(colls.length()*sizeof(Collision),colls.getData(),
       CkReduction::concat,cb);
+    std::cout << "in serialCollideClient::collisions(), after contribute " << thisIndex << std::endl;
   }
 }
 
 //This is called after the collideVoxel Collision reduction completes
 void serialCollideClient::reductionDone(CkReductionMsg *msg)
 {
+  std::cout << "in serialCollideClient::reductionDone()" << std::endl;
   int nColl=msg->getSize()/sizeof(Collision);
   CM_STATUS("serialCollideClient with "<<nColl<<" collisions");
-  if (clientFn!=NULL) //User wants Collisions on node 0
+  if (clientFn!=NULL) {//User wants Collisions on node 0
+    std::cout << "in serialCollideClient::reductionDone() in clientFn" << std::endl;
     (clientFn)(clientParam,nColl,(Collision *)msg->getData());
+  }
   else //FIXME: never registered a client
     CkAbort("Forgot to call serialCollideClient::setClient!\n");
   delete msg;

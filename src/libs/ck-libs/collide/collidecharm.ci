@@ -3,18 +3,18 @@ module collidecharm {
 
   group collideClient {
   };
-  group serialCollideClient : collideClient {
+  group [migratable] serialCollideClient : collideClient {
     entry serialCollideClient();
     entry serialCollideClient(CkCallback clientCb_);
     entry void reductionDone(CkReductionMsg *m);
   };
 
-  group syncReductionMgr {
+  group [migratable] syncReductionMgr {
     entry syncReductionMgr();
     entry void childProd(int stepCount);
     entry void childDone(int stepCount);
   };
-  group collideMgr : syncReductionMgr {
+  group [migratable] collideMgr : syncReductionMgr {
     entry collideMgr(CollideGrid3d gridMap,
         CProxy_collideClient client,
         CkArrayID cells);
