@@ -215,6 +215,19 @@ void hapiInit(char** argv) {
 #endif
 
 #ifndef HAPI_CUDA_CALLBACK
+    // Pre-warm the per-PE event pool so steady-state recordEvent never hits
+    // cudaEventCreate on the critical path. Must run after hapiSetDevice so
+    // events bind to the right CUDA context. 64 covers the deepest expected
+    // in-flight depth for a single PE under task-bench-style workloads.
+    {
+      auto& pool = CpvAccess(hapi_event_pool);
+      for (int i = 0; i < 64; i++) {
+        hapiEvent_t ev;
+        hapiCheck(hapiEventCreateWithFlags(&ev, hapiEventDisableTiming));
+        pool.push(ev);
+      }
+    }
+
     // Register polling function to be invoked at every scheduler loop
     CcdCallOnConditionKeep(CcdSCHEDLOOP, (CcdCondFn)hapiPollEvents, NULL);
 #endif
@@ -488,11 +501,8 @@ static void hapiInitCpv() {
 #ifndef HAPI_CUDA_CALLBACK
   CpvInitialize(std::queue<hapiEvent>, hapi_event_queue);
   CpvInitialize(std::queue<hapiEvent_t>, hapi_event_pool);
-  // for(int i = 0; i < 8; i++) {
-  //   hapiEvent_t ev;
-  //   hapiEventCreateWithFlags(&ev, hapiEventDisableTiming);
-  //   CpvAccess(hapi_event_pool).push(ev);
-  // }
+  // The event pool is pre-warmed in hapiInit() after hapiSetDevice, since
+  // cudaEventCreate binds the event to the calling thread's current device.
 #endif
   CpvInitialize(int, n_hapi_events);
   CpvAccess(n_hapi_events) = 0;
@@ -792,11 +802,10 @@ void recordEvent(hapiStream_t stream, const CkCallback& cb, void* cb_msg, hapiWo
   hapiEvent_t ev;
   auto& hapi_event_pool_local = CpvAccess(hapi_event_pool);
   if(hapi_event_pool_local.size() == 0) {
-  #if CMK_LBDB_ON
-    hapiEventCreateWithFlags(&ev, hapiEventDefault);
-  #else
+    // Always disable timing. The elapsed-time path in hapiPollEvents only
+    // fires when hev.obj != NULL (LB instrumentation), and recording a
+    // timing-enabled event is measurably heavier on the driver.
     hapiEventCreateWithFlags(&ev, hapiEventDisableTiming);
-  #endif
   } else {
     ev = hapi_event_pool_local.front();
     hapi_event_pool_local.pop();
@@ -1762,16 +1771,18 @@ void hapiPollEvents(void* param) {
       queue.pop(); // TODO: investigate possible race condition with charm4py futures - temporarily resolved by popping here
 
 #if CMK_LBDB_ON
-      if (hev.obj) {
-        // CmiPrintf("should not be printed w/o hapi hapi callback \n");
+      // hev.obj is only set when the caller passes a CkMigratable* (LB
+      // instrumentation overload). Tell the compiler the common case is
+      // null so the elapsed-time + destroy path stays off the hot trace.
+      if (__builtin_expect(hev.obj != nullptr, 0)) {
         float gpu_time;
         hapiEventElapsedTime(&gpu_time, hev.start_ev, hev.event);
         // hapiEventElapsedTime returns ms, convert to seconds to match wallTime units
         double gpu_time_s = gpu_time / 1000.0;
         hev.obj->setObjGPUTime(gpu_time_s + hev.obj->getObjGPUTime());
         hapiEventDestroy(hev.start_ev);
-      } else 
-#endif        
+      } else
+#endif
       // invoke Charm++ callback if one was given
       hev.cb.send(hev.cb_msg);
 
