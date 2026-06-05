@@ -1422,7 +1422,7 @@ class PELevel : public LevelLogic
     outgoing = 0;
     int obj_start = decision->obj_start[mype];
     int obj_end = obj_start + int(myObjs.size());
-    assert(myObjs.size == nObjs);
+    assert(myObjs.size() == nObjs);
     int j = 0;
    
     for (int i = obj_start; i < obj_end; i++, j++)

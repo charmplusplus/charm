@@ -123,46 +123,15 @@ extern "C" {
 
 void CkRdmaDeviceRecvHandler(void* data)
 {
-  NcpyOperationInfo *ncpy_op_info = (NcpyOperationInfo *)data;
-  DeviceRdmaOp* op = (DeviceRdmaOp*)(ncpy_op_info->deviceRdmaOpInfo);
-
-  if(op->dest_pe != CmiMyPe()) {
-        int infoSize = ncpy_op_info->ncpyOpInfoSize;
-        NcpyOperationInfo* copy = (NcpyOperationInfo*)CmiAlloc(infoSize);
-        memcpy(copy, ncpy_op_info, infoSize);
-
-        LoopBackMsg* conv_msg = (LoopBackMsg*)CmiAlloc(sizeof(LoopBackMsg));
-        conv_msg->msg = copy;
-
-        QdCreate(1);
-        CmiSetHandler(conv_msg, loopback_handler);
-        CmiPushPE(CmiRankOf(op->dest_pe), conv_msg);
-        return;
-  }
-
-  QdProcess(1);
-  DeviceRdmaInfo* info = op->info;
-
-  // Invoke source callbacks
-  if (op->src_cb) {
-    CkCallback* cb = (CkCallback*)op->src_cb;
-    cb->send();
-    delete cb;
-  }
-
-  // Update counter (there may be multiple buffers in transit)
-  info->counter++;
-
-  // Check if all buffers have been received
-  // If so, invoke regular entry method
-  if (info->counter == info->n_ops) {
-    QdCreate(1);
-
-    enqueueNcpyMessage(op->dest_pe, info->msg);
-
-    // Free RDMA metadata
-    // CmiFree(info);
-  }
+  // FIXME: this overload expects to extract a DeviceRdmaOp* from the
+  // NcpyOperationInfo, but the field that was supposed to carry it
+  // (deviceRdmaOpInfo) was never added to struct ncpystruct. Aborting
+  // here keeps the build green for callers that don't exercise device
+  // RDMA (task-bench charm++ uses HAPI callbacks, not GPUDirect/IPC
+  // ack handling, so this path is dead in that workload).
+  CmiAbort("CkRdmaDeviceRecvHandler(void*): NcpyOperationInfo->deviceRdmaOpInfo "
+           "is unimplemented in this tree. Use the (data, msg) overload, or "
+           "wire up the missing field in struct ncpystruct before calling.");
 }
 // Invoked when a GPU buffer arrives on the receiver
 void CkRdmaDeviceRecvHandler(void* data, void* msg)
