@@ -11,7 +11,15 @@
 #include <fcntl.h>
 #include <sched.h>
 
-#define hapi_API_PER_THREAD_DEFAULT_STREAM
+// Must be CUDA_API_PER_THREAD_DEFAULT_STREAM (the standard CUDA macro) for
+// cuda_runtime.h to redirect cudaXxx() -> cudaXxx_ptsz(). Without per-thread
+// default streams, every PE in an SMP process shares the per-context driver
+// launch lock; with 8 PEs/process that serializes every CUDA call. A rename
+// to hapi_API_PER_THREAD_DEFAULT_STREAM in the reconverse port left this
+// silently broken — nsys profile showed cudaEventQuery at 2.5 us median in
+// reconverse vs 0.91 us in classic, and the symbol was plain cudaEventRecord
+// instead of cudaEventRecord_ptsz.
+#define CUDA_API_PER_THREAD_DEFAULT_STREAM
 
 #include "hapi_portable.h"
 #include "converse.h"
