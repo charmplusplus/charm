@@ -101,6 +101,7 @@ of the `<options>` below.
 | `multicore-linux-x86_64`      | Linux   | Shared memory  | GNU compiler                          |
 | `multicore-darwin-x86_64`     | macOS   | Shared memory  | Clang C++ compiler                    |
 | `reconverse-linux-x86_64`     | Linux   | LCI/LCW        | GNU compiler                          |
+| `reconverse-linux-arm8`       | Linux   | LCI/LCW        | GNU compiler                          |
 | `reconverse-darwin-arm8`      | macOS   | LCI/LCW        | Clang C++ compiler                    |
 | `gni-crayxc`                  | Linux   | GNI            | CC (whatever PrgEnv module is loaded) |
 | `gni-crayxe`                  | Linux   | GNI            | CC (whatever PrgEnv module is loaded) |
@@ -201,6 +202,10 @@ enable the Reconverse communication layer. They are built with the standard
 On Linux x86\_64:
 
     $ ./build charm++ reconverse-linux-x86_64
+
+On Linux ARM64:
+
+    $ ./build charm++ reconverse-linux-arm8
 
 On macOS ARM64:
 
