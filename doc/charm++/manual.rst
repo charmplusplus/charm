@@ -6359,7 +6359,7 @@ CkArrayMap and defines these virtual methods:
 
 .. code-block:: c++
 
-    class CkArrayMap : public Group {
+    class CkArrayMap : public IrrGroup {
     public:
       // ...
 
@@ -6368,6 +6368,12 @@ CkArrayMap and defines these virtual methods:
       // Return the home processor number for this element of this array
       virtual int procNum(int arrayHdl,const CkArrayIndex &element);
     };
+
+Note that CkArrayMap derives from IrrGroup, not from Group. Map groups
+therefore do not carry reduction support: a map class cannot call
+contribute, and a barrier over map branches cannot be expressed as a
+reduction. The creation-dependence mechanism described below covers the
+ordering needs that such a barrier would otherwise serve.
 
 For example, a simple 1D blockmapping scheme. Actual mapping is handled
 in the procNum function.
@@ -6412,6 +6418,46 @@ map object named BlockMap:
     CkArrayOptions opts(nElements);
     opts.setMap(myMap);
     a1=CProxy_A1::ckNew(parameters,opts);
+
+The example above creates the map group and immediately creates the
+array that uses it. That ordering is safe when it runs in a mainchare
+constructor, because everything created during program initialization is
+installed on every PE, in creation order, before the scheduler executes
+any other message. When a map group and its array are instead created
+later in the run — from any entry method after initialization — that
+guarantee no longer applies: the array creation can execute on a remote
+PE before the map group's branch has been created there, and the runtime
+aborts in the array constructor with "ERROR! Local branch of array map
+is NULL!". Whether a given run fails is a race; the probability of
+failure grows with the number of PEs.
+
+To make post-initialization creation safe, declare the map group as a
+creation dependence of the array, using the same CkEntryOptions
+mechanism described for group-on-group dependence in
+Section :numref:`sec:groups/creation`. The ckNew of a chare array
+accepts a trailing CkEntryOptions pointer:
+
+.. code-block:: c++
+
+    // Create the map group, at any point in the run
+    CProxy_BlockMap myMap = CProxy_BlockMap::ckNew();
+
+    CkArrayOptions opts(nElements);
+    opts.setMap(myMap);
+
+    // Declare the dependence: each PE buffers the array creation
+    // until its branch of the map group exists.
+    CkEntryOptions e_opts;
+    e_opts.setGroupDepID(opts.getMap());
+    a1 = CProxy_A1::ckNew(parameters, opts, &e_opts);
+
+The runtime declares equivalent dependences internally for the location
+manager and location cache it creates alongside a new array, so the
+plain setMap case is ordered even without the explicit option. One
+combination is not covered internally: an array created with both
+bindTo (which reuses the bound-to array's existing location manager,
+skipping the internal dependence chain) and a newly created map. For
+that combination the explicit dependence shown above is required.
 
 A very basic example which also demonstrates how initial elements are created
 may be found in ``examples/charm++/array_map``
