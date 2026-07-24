@@ -9,7 +9,37 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Detect whether the pull request changes anything outside doc/.
+  # Documentation-only PRs skip the build/test matrix below: each gated job
+  # reports "skipped", which satisfies required status checks, and only the
+  # doc job does real work. merge_group events (the merge queue) always run
+  # the full matrix, so the final gate before landing is unchanged.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      non_doc: ${{ steps.filter.outputs.non_doc }}
+    steps:
+    - uses: actions/checkout@v4
+      if: ${{ github.event_name == 'pull_request' }}
+      with:
+        fetch-depth: 0
+    - name: Check for changes outside doc/
+      id: filter
+      run: |
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          base=$(git merge-base "origin/${{ github.base_ref }}" HEAD)
+          if git diff --name-only "$base" HEAD | grep -v '^doc/' | grep -q .; then
+            echo "non_doc=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "non_doc=false" >> "$GITHUB_OUTPUT"
+          fi
+        else
+          echo "non_doc=true" >> "$GITHUB_OUTPUT"
+        fi
+
   buildold_netlrts-linux-x86_64:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     timeout-minutes: 90
     runs-on: ubuntu-latest
     steps:
@@ -24,6 +54,8 @@ jobs:
       run: make -C netlrts-linux-x86_64/tmp testp TESTOPTS="++local" P=3
 
   changa_netlrts-linux-x86_64:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     runs-on: ubuntu-latest 
     steps:
     - uses: actions/checkout@v4
@@ -42,6 +74,8 @@ jobs:
         make test
 
   cuda_netlrts-linux-x86_64_buildonly:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     # Buildonly test, as CUDA needs an actual device to run.
     timeout-minutes: 45
     runs-on: ubuntu-latest
@@ -72,6 +106,8 @@ jobs:
         make html
 
   mpi-linux-x86_64:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     timeout-minutes: 90
     runs-on: ubuntu-22.04  #  ubuntu-latest does not work
     steps:
@@ -88,6 +124,8 @@ jobs:
     #  run: make -C mpi-linux-x86_64-smp/tmp testp P=4 TESTOPTS="+setcpuaffinity ++ppn 2"
 
   mpi-linux-x86_64_syncft:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     timeout-minutes: 90
     runs-on: ubuntu-22.04  #  ubuntu-latest does not work
     steps:
@@ -100,6 +138,8 @@ jobs:
       run: make -C mpi-linux-x86_64-syncft/tmp mpisyncfttest
 
   multicore-darwin-x86_64_projections:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     timeout-minutes: 60
     runs-on: macos-15-intel
     steps:
@@ -143,6 +183,8 @@ jobs:
   #       for f in $files; do echo $f; pushd .; cd $(dirname $f); $proj --exit $(basename $f); popd; done
 
   namd_netlrts-linux-x86_64:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     # Since NAMD requires a secret to download its source from Gitlab, CI builds from outside PPL
     # always fail in this test since the secret is not available.
     env:
@@ -202,6 +244,8 @@ jobs:
 
 # FIXME: darwin tests all fail
   netlrts-darwin-x86_64:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     timeout-minutes: 60
     runs-on: macos-15-intel
     steps:
@@ -229,6 +273,8 @@ jobs:
   #     run: make -C netlrts-darwin-arm8/tmp testp P=2 TESTOPTS="++local"
 
   netlrts-linux-i386:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
@@ -247,6 +293,8 @@ jobs:
       run: make -C netlrts-linux-i386/tmp testp P=2 TESTOPTS="++local"
 
   netlrts-linux-x86_64:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
@@ -260,6 +308,8 @@ jobs:
       run: make -C netlrts-linux-x86_64/tmp testp P=2 TESTOPTS="++local"
 
   netlrts-linux-x86_64_smp:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
@@ -273,6 +323,8 @@ jobs:
       run: make -C netlrts-linux-x86_64-smp/tmp testp P=4 TESTOPTS="++local +setcpuaffinity +CmiSleepOnIdle ++ppn 2"
 
   netlrts-linux-x86_64_syncft:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     timeout-minutes: 90
     runs-on: ubuntu-latest
     steps:
@@ -283,6 +335,8 @@ jobs:
       run: make -C netlrts-linux-x86_64-syncft/tmp syncfttest TESTOPTS="++local"
 
   shellcheck:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     # See https://github.com/koalaman/shellcheck/wiki
     # for explanations of ShellCheck error codes
     timeout-minutes: 10
@@ -303,6 +357,8 @@ jobs:
           src/arch/mpi-win-x86_64/charmrun \
 
   spack_ubuntu-latest:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     #removed macos target and branch protection until macos ci testing is fixed
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -350,6 +406,8 @@ jobs:
         spack install --test root charmpp@main
 
   ucx-linux-x86_64_openpmix:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     timeout-minutes: 60
     runs-on: ubuntu-22.04
     steps:
@@ -392,6 +450,8 @@ jobs:
         make -C ucx-linux-x86_64-openpmix/examples test
 
   verbs-linux-x86_64_smp:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     # Buildonly test, as the machine layer needs an actual device to run.
     # Also test packaging a tarball and building from it.
     # Since it is buildonly, test both build and buildold with the tarball.
@@ -420,6 +480,8 @@ jobs:
         ./buildold all-test verbs-linux-x86_64 -j4 -g --build-shared
 
   netlrts-win-x86_64_mingw64:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     timeout-minutes: 90
 
     runs-on: windows-latest
