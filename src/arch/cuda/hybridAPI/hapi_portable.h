@@ -79,6 +79,8 @@
 #define hapiFree(ptr) cudaFree(ptr)
 #define hapiMallocHost(ptr, size) cudaMallocHost(ptr, size)
 #define hapiFreeHost(ptr) cudaFreeHost(ptr)
+#define hapiHostGetDevicePointer(devPtr, hostPtr, flags) \
+    cudaHostGetDevicePointer(devPtr, hostPtr, flags)
 
 #define hapiErrorMemoryAllocation cudaErrorMemoryAllocation
 #define hapiErrorInitializationError cudaErrorInitializationError
@@ -170,6 +172,8 @@
 #define hapiFree(ptr) hipFree(ptr)
 #define hapiMallocHost(ptr, size) hipHostMalloc(ptr, size)
 #define hapiFreeHost(ptr) hipHostFree(ptr)
+#define hapiHostGetDevicePointer(devPtr, hostPtr, flags) \
+    hipHostGetDevicePointer(devPtr, hostPtr, flags)
 
 #define hapiErrorMemoryAllocation hipErrorMemoryAllocation
 #define hapiErrorInitializationError hipErrorInitializationError

@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <cstring>
+#include <cstdint>
 #include <cmath>
 #include <algorithm>
 #include <queue>
@@ -80,19 +82,40 @@ struct hapiCallbackMessage {
 
 #ifndef HAPI_CUDA_CALLBACK
 typedef struct hapiEvent {
-  hapiEvent_t event;
+  hapiEvent_t event; // NULL marks a pinned-flag entry (see flag_seq)
   CkCallback cb;
   void* cb_msg;
   hapiWorkRequest* wr; // if this is not NULL, buffers and request itself are deallocated
   CkMigratable* obj; // pointer to the object whose load we want to set
   hapiEvent_t start_ev; // event to record the start time
+  uint32_t flag_seq; // pinned-flag entries: sequence number the slot must reach
 
   hapiEvent(hapiEvent_t event_, const CkCallback& cb_, void* cb_msg_, hapiWorkRequest* wr_ = NULL, CkMigratable* obj_ = NULL, hapiEvent_t start_ev_ = NULL)
-            : event(event_), cb(cb_), cb_msg(cb_msg_), wr(wr_), obj(obj_), start_ev(start_ev_) {}
+            : event(event_), cb(cb_), cb_msg(cb_msg_), wr(wr_), obj(obj_), start_ev(start_ev_), flag_seq(0) {}
 } hapiEvent;
 
 CpvDeclare(std::queue<hapiEvent>, hapi_event_queue);
 CpvDeclare(std::queue<hapiEvent_t>, hapi_event_pool);
+
+// Pinned-flag completion detection (+gpuflagpoll). Motivation: on AMD an
+// event query against a not-yet-complete event costs ~10 us and is
+// serialized process-wide inside the runtime, so a scheduler that polls
+// events steals ~10 us from launches/messaging per in-flight chare per
+// sweep. Instead, completion is detected by enqueueing a stream-ordered
+// 32-bit write of a per-PE sequence number into a pinned slot
+// (hip/cuStreamWriteValue32); the scheduler then checks completion with a
+// plain load, which takes no lock and costs nanoseconds. Slots live in a
+// per-PE ring; a slot is reassigned only after HAPI_FLAG_SLOTS newer
+// callbacks, and recordEvent falls back to the event path when that many
+// are already in flight, so a pending entry's slot is never overwritten.
+// The LB instrumentation path keeps events (it needs event timestamps).
+#define HAPI_FLAG_SLOTS 256  // power of two; max in-flight flag entries per PE
+#define HAPI_FLAG_STRIDE 16  // uint32s per slot: one cache line, no false sharing
+static bool hapi_use_flag_poll = false;
+CpvDeclare(uint32_t*, hapi_flag_slots);   // pinned host ring
+CpvDeclare(void*, hapi_flag_slots_dev);   // device alias of the ring
+CpvDeclare(uint32_t, hapi_flag_seq);      // last assigned sequence number
+CpvDeclare(int, hapi_flag_inflight);      // flag entries currently queued
 #endif // HAPI_CUDA_CALLBACK
 CpvDeclare(int, n_hapi_events);
 
@@ -234,6 +257,17 @@ void hapiInit(char** argv) {
         hapiCheck(hapiEventCreateWithFlags(&ev, hapiEventDisableTiming));
         pool.push(ev);
       }
+    }
+
+    // Allocate the per-PE pinned-flag ring (must run after hapiSetDevice so
+    // the pinned allocation and its device alias belong to this device).
+    if (hapi_use_flag_poll) {
+      uint32_t*& slots = CpvAccess(hapi_flag_slots);
+      size_t bytes = (size_t)HAPI_FLAG_SLOTS * HAPI_FLAG_STRIDE * sizeof(uint32_t);
+      hapiCheck(hapiMallocHost((void**)&slots, bytes));
+      memset((void*)slots, 0, bytes);
+      hapiCheck(hapiHostGetDevicePointer(&CpvAccess(hapi_flag_slots_dev),
+                                         (void*)slots, 0));
     }
 
     // Register polling function to be invoked at every scheduler loop
@@ -511,6 +545,15 @@ static void hapiInitCpv() {
   CpvInitialize(std::queue<hapiEvent_t>, hapi_event_pool);
   // The event pool is pre-warmed in hapiInit() after hapiSetDevice, since
   // cudaEventCreate binds the event to the calling thread's current device.
+  CpvInitialize(uint32_t*, hapi_flag_slots);
+  CpvInitialize(void*, hapi_flag_slots_dev);
+  CpvInitialize(uint32_t, hapi_flag_seq);
+  CpvInitialize(int, hapi_flag_inflight);
+  CpvAccess(hapi_flag_slots) = NULL;
+  CpvAccess(hapi_flag_slots_dev) = NULL;
+  CpvAccess(hapi_flag_seq) = 0;
+  CpvAccess(hapi_flag_inflight) = 0;
+  // The flag ring itself is allocated in hapiInit() after hapiSetDevice.
 #endif
   CpvInitialize(int, n_hapi_events);
   CpvAccess(n_hapi_events) = 0;
@@ -540,6 +583,10 @@ static void hapiExitCsv() {
   while(!hapi_event_pool_.empty()) {
     hapiEventDestroy(hapi_event_pool_.front());
     hapi_event_pool_.pop();
+  }
+  if (CpvAccess(hapi_flag_slots)) {
+    hapiFreeHost((void*)CpvAccess(hapi_flag_slots));
+    CpvAccess(hapi_flag_slots) = NULL;
   }
 #endif
 }
@@ -769,6 +816,18 @@ static void hapiMapping(char** argv) {
     }
   }
 
+#ifndef HAPI_CUDA_CALLBACK
+  // Check if user opted in to pinned-flag completion detection
+  if (CmiGetArgFlagDesc(argv, "+gpuflagpoll",
+        "detect kernel completion via pinned-flag writes instead of event polling")) {
+    hapi_use_flag_poll = true;
+    if (CmiMyPe() == 0) {
+      CmiPrintf("HAPI> Pinned-flag completion detection enabled "
+                "(%d slots per PE)\n", HAPI_FLAG_SLOTS);
+    }
+  }
+#endif
+
   // Check if P2P access should be enabled
   bool enable_peer = true; // Enabled by default
   if (CmiGetArgFlagDesc(argv, "+gpunopeer",
@@ -803,7 +862,47 @@ static void hapiMapping(char** argv) {
 }
 
 #ifndef HAPI_CUDA_CALLBACK
+// Enqueue a stream-ordered write of seq into flag slot idx: executes only
+// after all prior work on the stream, so the slot reaching seq means that
+// work is complete.
+static inline void hapiEnqueueFlagWrite(hapiStream_t stream, uint32_t idx,
+                                        uint32_t seq) {
+  uint32_t* slot_dev =
+      (uint32_t*)CpvAccess(hapi_flag_slots_dev) + (size_t)idx * HAPI_FLAG_STRIDE;
+#ifdef CMK_HIP
+  hapiCheck(hipStreamWriteValue32(stream, (void*)slot_dev, seq, 0));
+#else
+  // Runtime API has no stream write; use the driver API (cuda.h is included
+  // by hapi_portable.h and the runtime's primary context is current).
+  CUresult res =
+      cuStreamWriteValue32((CUstream)stream, (CUdeviceptr)slot_dev, seq, 0);
+  if (res != CUDA_SUCCESS)
+    CmiAbort("HAPI> cuStreamWriteValue32 failed; "
+             "+gpuflagpoll is not supported on this system");
+#endif
+}
+
 void recordEvent(hapiStream_t stream, const CkCallback& cb, void* cb_msg, hapiWorkRequest* wr = NULL, CkMigratable* obj = NULL, hapiEvent_t start_ev = NULL) {
+  // Pinned-flag path: no event object, no event query later. Excluded for
+  // LB instrumentation entries (they need event timestamps) and when the
+  // ring is full (falling back to events preserves correctness; a slot may
+  // otherwise be reassigned while still pending).
+  if (hapi_use_flag_poll && obj == NULL && start_ev == NULL &&
+      CpvAccess(hapi_flag_inflight) < HAPI_FLAG_SLOTS) {
+    uint32_t& seq_counter = CpvAccess(hapi_flag_seq);
+    if (++seq_counter == 0) ++seq_counter; // 0 means "slot never written"
+    uint32_t seq = seq_counter;
+    uint32_t idx = seq & (HAPI_FLAG_SLOTS - 1);
+    hapiEnqueueFlagWrite(stream, idx, seq);
+
+    hapiEvent hev(NULL, cb, cb_msg, wr);
+    hev.flag_seq = seq;
+    CpvAccess(hapi_flag_inflight)++;
+    CpvAccess(hapi_event_queue).push(hev);
+    CpvAccess(n_hapi_events)++;
+    return;
+  }
+
   // if(obj!=NULL)
   //   CmiAbort("non null without HAPI hapi CALLBACK");
   // create hapi event / get hapi event from the pool and insert into stream
@@ -1775,7 +1874,16 @@ void hapiPollEvents(void* param) {
   std::queue<hapiEvent>& queue = CpvAccess(hapi_event_queue);
   while (!queue.empty()) {
     hapiEvent hev = queue.front();
-    if (hapiEventQuery(hev.event) == hapiSuccess) {
+    bool complete;
+    if (hev.event == NULL) {
+      // Pinned-flag entry: a plain load, no runtime call, no lock.
+      volatile uint32_t* slot = CpvAccess(hapi_flag_slots) +
+          (size_t)(hev.flag_seq & (HAPI_FLAG_SLOTS - 1)) * HAPI_FLAG_STRIDE;
+      complete = (*slot == hev.flag_seq);
+    } else {
+      complete = (hapiEventQuery(hev.event) == hapiSuccess);
+    }
+    if (complete) {
       queue.pop(); // TODO: investigate possible race condition with charm4py futures - temporarily resolved by popping here
 
 #if CMK_LBDB_ON
@@ -1798,7 +1906,11 @@ void hapiPollEvents(void* param) {
       if (hev.wr) {
         hapiWorkRequestCleanup(hev.wr);
       }
-      CpvAccess(hapi_event_pool).push(hev.event);
+      if (hev.event == NULL) {
+        CpvAccess(hapi_flag_inflight)--; // slot may now be reassigned
+      } else {
+        CpvAccess(hapi_event_pool).push(hev.event);
+      }
       CpvAccess(n_hapi_events)--;
 
       // inform QD that an event was processed

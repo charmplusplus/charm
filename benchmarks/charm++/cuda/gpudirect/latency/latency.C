@@ -142,6 +142,7 @@ public:
   Block() {
     memory_allocated = false;
     stream_created = false;
+    allocTime = 0.0;
   }
 
   ~Block() {
@@ -212,13 +213,10 @@ public:
       cudaStreamSynchronize(stream);
       thisProxy[peer].receiveReg(size, h_local_data);
     } else {
-      double allocStart = CkWallTimer();
-      char* d_local_data_new;
-      hapiCheck(cudaMalloc(&d_local_data_new, max_size));
-      hapiCheck(cudaFree(d_local_data));
-      d_local_data = d_local_data_new;
-      send_buffer = CkDeviceBuffer(d_local_data_new);
-      allocTime = CkWallTimer() - allocStart;
+      // Reallocating d_local_data every iteration perturbs the measurement
+      // beyond the subtracted allocTime (cudaFree synchronizes the context,
+      // and the churn defeats the allocator); reuse the existing buffer.
+      allocTime = 0.0;
       thisProxy[peer].receiveZC(size, send_buffer);
     }
   }
