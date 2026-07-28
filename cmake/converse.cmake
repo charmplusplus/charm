@@ -164,6 +164,14 @@ set(conv-util-cxx-sources
     ${conv-perf-cxx-sources}
 )
 
+if(RECONVERSE)
+    # Reconverse implements persistent communication itself, on top of its own
+    # comm backend, so the legacy machine-layer implementation has nothing to
+    # sit on: it needs machine-persistent.h from src/arch/<layer>, and its
+    # entry points would collide with the ones in libreconverse.
+    list(REMOVE_ITEM conv-util-cxx-sources src/arch/util/persist-comm.C)
+endif()
+
 #Uncommenting spanning tree to satisfy ckrdma dep errors
 
 if(CMK_CAN_LINK_FORTRAN)
@@ -289,6 +297,14 @@ if(RECONVERSE)
     # agree with what libreconverse was compiled against. Do not shadow it with
     # the legacy Converse copy; cmake/fetch_reconverse installs the real one.
     list(REMOVE_ITEM conv-core-h-to-install src/conv-core/conv-rdma.h)
+    # Same for persistent.h: reconverse's converse.h includes it, so the copy
+    # on the include path has to be reconverse's. The legacy one pulls in
+    # conv-config.h, which does not exist in a reconverse build.
+    list(REMOVE_ITEM conv-core-h-to-install src/conv-core/persistent.h)
+    # And for taskqueue.h, which reconverse's converse.h also includes: the
+    # TaskQueue layout Charm++ compiles against has to be the one libreconverse
+    # was built with.
+    list(REMOVE_ITEM conv-core-h-to-install src/conv-core/taskqueue.h)
 endif()
 
 foreach(filename
