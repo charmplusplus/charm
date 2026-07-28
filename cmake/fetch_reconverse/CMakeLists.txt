@@ -34,3 +34,13 @@ configure_file(${reconverse_SOURCE_DIR}/include/charm-config.h ${CMAKE_BINARY_DI
 # src/conv-core/conv-rdma.h is excluded from the Converse header copy in
 # cmake/converse.cmake so that this is the only conv-rdma.h on the include path.
 configure_file(${reconverse_SOURCE_DIR}/include/conv-rdma.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
+# reconverse's converse.h includes persistent.h, so this must be the copy on
+# the include path. The legacy src/conv-core/persistent.h is excluded from the
+# Converse header copy in cmake/converse.cmake, and its machine-layer
+# implementation (src/arch/util/persist-comm.C) is dropped from the build
+# there as well.
+configure_file(${reconverse_SOURCE_DIR}/include/persistent.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
+# Likewise taskqueue.h, the other header reconverse's converse.h includes. Note
+# that this copy does not include converse.h itself, so anything including it
+# directly has to include converse.h first.
+configure_file(${reconverse_SOURCE_DIR}/include/taskqueue.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
