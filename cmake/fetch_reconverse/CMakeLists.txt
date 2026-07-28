@@ -29,3 +29,8 @@ set(BUILD_SHARED_LIBS ${_save_BUILD_SHARED_LIBS} CACHE INTERNAL "")
 configure_file(${reconverse_SOURCE_DIR}/include/converse.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 configure_file(${reconverse_SOURCE_DIR}/src/cldb.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 configure_file(${reconverse_SOURCE_DIR}/include/charm-config.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
+# Charm++ must build against the same RDMA configuration that libreconverse was
+# compiled with (CMK_REG_REQUIRED, CMK_NOCOPY_DIRECT_BYTES). The legacy
+# src/conv-core/conv-rdma.h is excluded from the Converse header copy in
+# cmake/converse.cmake so that this is the only conv-rdma.h on the include path.
+configure_file(${reconverse_SOURCE_DIR}/include/conv-rdma.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)

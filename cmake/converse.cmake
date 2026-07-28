@@ -264,8 +264,17 @@ foreach (filename
 
 endforeach()
 
+set(conv-core-h-to-install ${conv-core-h-sources})
+if(RECONVERSE)
+    # Reconverse provides its own conv-rdma.h, which is the authority on the
+    # RDMA configuration (CMK_REG_REQUIRED, CMK_NOCOPY_DIRECT_BYTES) and must
+    # agree with what libreconverse was compiled against. Do not shadow it with
+    # the legacy Converse copy; cmake/fetch_reconverse installs the real one.
+    list(REMOVE_ITEM conv-core-h-to-install src/conv-core/conv-rdma.h)
+endif()
+
 foreach(filename
-    ${conv-core-h-sources}
+    ${conv-core-h-to-install}
     ${conv-ccs-h-sources}
     ${conv-perf-h-sources}
     ${conv-util-h-sources}
