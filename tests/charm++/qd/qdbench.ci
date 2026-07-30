@@ -1,0 +1,15 @@
+mainmodule qdbench {
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_Ring ringProxy;
+
+  mainchare Main {
+    entry Main(CkArgMsg*);
+    entry void phaseDone();
+    entry void qdReached();
+  };
+
+  group Ring {
+    entry Ring();
+    entry void token(int hops);
+  };
+};
