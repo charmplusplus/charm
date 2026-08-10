@@ -12,11 +12,17 @@
 #include "CentralLB.h"
 #include "converse.h"
 #include "conv-ccs.h"
+#include <vector>
 
 
 #if CMK_SHRINK_EXPAND
 realloc_state pending_realloc_state;
 char * se_avail_vector;
+// Durable copy of the availability vector, taken at set_bitmap time. The
+// raw se_avail_vector malloc on PE 0 has been observed clobbered (heap
+// reuse) between the CCS handler and the rescale exit path, producing
+// garbage kill sets; downstream PE-0 consumers read this snapshot instead.
+std::vector<char> se_avail_snapshot;
 int numProcessAfterRestart;
 extern "C" CcsDelayedReply shrinkExpandreplyToken;
 extern "C" char willContinue;
@@ -79,6 +85,7 @@ void realloc(char* reallocMsg)
 
         se_avail_vector = (char *)malloc(sizeof(char) * CkNumPes());
         LBManagerObj()->get_avail_vector(se_avail_vector);
+        se_avail_snapshot.assign(se_avail_vector, se_avail_vector + CkNumPes());
 
         // now find whether this is shrink/expand
         pending_realloc_state = NO_REALLOC;

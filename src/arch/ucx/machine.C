@@ -40,6 +40,7 @@
 #include "../../util/coordinator/coord_client.h"
 
 static void UcxCloseEp(ucp_ep_h ep);
+static void UcxForceCloseEps(ucp_ep_h *eps, int n);
 CcsDelayedReply shrinkExpandreplyToken;
 extern int numProcessAfterRestart;
 extern char *_shrinkexpand_basedir;
@@ -483,8 +484,13 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
             }
         }
         // Anything left in specEps is to a peer that got killed during the
-        // wait window — close it.
-        for (auto &kv : specEps) UcxCloseEp(kv.second);
+        // wait window — batched force close (the peer is exiting).
+        {
+            std::vector<ucp_ep_h> toClose;
+            toClose.reserve(specEps.size());
+            for (auto &kv : specEps) toClose.push_back(kv.second);
+            UcxForceCloseEps(toClose.data(), (int)toClose.size());
+        }
 
         _coord_members = view.members;
 
@@ -671,9 +677,9 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     // coord has a complete membership view even on runs that never rescale).
     // The coord-bootstrap branch above already did this.
     if (!_coord_bootstrap_mode) {
-      char *coordSpec = nullptr;
-      CmiGetArgStringDesc(*argv, "+coordinator", &coordSpec,
-                          "host:port of the rescale coordinator");
+      // +coordinator was already consumed from argv by the bootstrap-mode
+      // peek above; reuse that value rather than re-parsing.
+      char *coordSpec = _coord_peek;
       if (coordSpec == nullptr) {
         CmiAbort("UCX: +coordinator host:port is required (shrink/expand build).");
       }
@@ -1236,6 +1242,7 @@ void CmiMachineProgressImpl()
 
 #if CMK_SHRINK_EXPAND
 extern char *se_avail_vector;  // populated on PE 0 by ck-ldb/manager.C realloc()
+extern std::vector<char> se_avail_snapshot;  // durable copy, same origin
 
 // Close one endpoint cleanly (flush mode) and wait for completion. UCX returns
 // a request handle that needs to be progressed to OK before we drop the worker.
@@ -1254,6 +1261,51 @@ static void UcxCloseEp(ucp_ep_h ep)
         st = ucp_request_check_status(req);
     } while (st == UCS_INPROGRESS);
     ucp_request_free(req);
+}
+
+// Batch-close endpoints to removed members. The peers received DIE and are
+// exiting, and all traffic to them was drained before the commit, so FORCE
+// mode applies: no flush or disconnect handshake with a peer that may
+// already be gone. All closes are initiated first, then progressed
+// together, so n closes cost roughly the slowest one rather than the sum.
+static void UcxForceCloseEps(ucp_ep_h *eps, int n)
+{
+    std::vector<ucs_status_ptr_t> reqs;
+    reqs.reserve(n);
+    for (int i = 0; i < n; ++i) {
+        if (eps[i] == nullptr) continue;
+        ucs_status_ptr_t req = ucp_ep_close_nb(eps[i], UCP_EP_CLOSE_MODE_FORCE);
+        if (UCS_PTR_IS_ERR(req)) {
+            // FORCE requires endpoints created with PEER error-handling
+            // mode; on transports without it UCX rejects the request
+            // inline and the ep is untouched. Fall back to a flush-mode
+            // close, still initiated without waiting so all closes
+            // progress together below.
+            req = ucp_ep_close_nb(eps[i], UCP_EP_CLOSE_MODE_FLUSH);
+            if (UCS_PTR_IS_ERR(req)) {
+                UCX_LOG(50, "ucp_ep_close_nb failed: %s",
+                        ucs_status_string(UCS_PTR_STATUS(req)));
+                continue;
+            }
+        }
+        if (req == NULL) continue;
+        reqs.push_back(req);
+    }
+    bool pending = !reqs.empty();
+    while (pending) {
+        ucp_worker_progress(ucxCtx.worker);
+        pending = false;
+        for (auto &req : reqs) {
+            if (req == nullptr) continue;
+            ucs_status_t st = ucp_request_check_status(req);
+            if (st == UCS_INPROGRESS) {
+                pending = true;
+            } else {
+                ucp_request_free(req);
+                req = nullptr;
+            }
+        }
+    }
 }
 
 // Empty no-op callbacks for the control-plane reconfig send/recv. We poll
@@ -1532,11 +1584,17 @@ static void UcxReInitEpsFromView(const coord::ClusterView &view,
     }
 
     // Close eps to killed peers (anything in old eps that didn't get reused,
-    // skipping the self slot which was never initialized).
-    for (int i = 0; i < oldNumNodes; ++i) {
-        if (i == oldNodeId) continue;
-        if (oldUsed[i]) continue;
-        UcxCloseEp(ucxCtx.eps[i]);
+    // skipping the self slot which was never initialized). Batched force
+    // close: the peers are exiting and traffic to them was drained before
+    // the commit.
+    {
+        std::vector<ucp_ep_h> toClose;
+        for (int i = 0; i < oldNumNodes; ++i) {
+            if (i == oldNodeId) continue;
+            if (oldUsed[i]) continue;
+            toClose.push_back(ucxCtx.eps[i]);
+        }
+        UcxForceCloseEps(toClose.data(), (int)toClose.size());
     }
 
     CmiFree(ucxCtx.eps);
@@ -1597,13 +1655,13 @@ void ConverseCleanup(void)
     if (CmiMyPe() == 0) {
       // PE 0 drives the COMMIT. Build kill set from se_avail_vector
       // (in OLD nodeId space — entries with value 0 are being killed).
-      if (se_avail_vector == nullptr) {
-        CmiAbort("UCX: shrink/expand exit on PE 0 with null se_avail_vector");
+      if (se_avail_snapshot.size() < (size_t)oldNumNodes) {
+        CmiAbort("UCX: shrink/expand exit on PE 0 with missing avail snapshot");
       }
       std::vector<uint32_t> kills;
       int survivors = 0;
       for (int i = 0; i < oldNumNodes; ++i) {
-        if (se_avail_vector[i]) survivors++;
+        if (se_avail_snapshot[i]) survivors++;
         else kills.push_back(static_cast<uint32_t>(i));
       }
       uint32_t take = (numProcessAfterRestart > survivors)

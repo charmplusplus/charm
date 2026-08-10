@@ -348,11 +348,11 @@ public:
     this->requestStatus = requestStatus;
 
 #if CMK_SHRINK_EXPAND
-    if (CkMyPe() != 0)
-    {
-      se_avail_vector = (char*) malloc(CkNumPes() * sizeof(char));
-      memcpy(se_avail_vector, avail.data(), CkNumPes() * sizeof(char));
-    }
+    // All PEs, including PE 0, refresh se_avail_vector from the carried
+    // copy here: PE 0's original handler-time malloc has been observed
+    // clobbered by the time the exit path reads it.
+    se_avail_vector = (char*) malloc(CkNumPes() * sizeof(char));
+    memcpy(se_avail_vector, avail.data(), CkNumPes() * sizeof(char));
 #endif
 
     for (index = firstPE; index < firstPE + numWriters; index++)
@@ -967,11 +967,9 @@ void CkStartRescaleCheckpoint(const char* dirname, const CkCallback& cb,
   std::vector<char> avail, bool requestStatus, int writersPerNode)
 {
 #if CMK_SHRINK_EXPAND
-  if (CkMyPe() != 0)
-  {
-    se_avail_vector = (char*) malloc(CkNumPes() * sizeof(char));
-    memcpy(se_avail_vector, avail.data(), CkNumPes() * sizeof(char));
-  }
+  // Refresh PE 0's se_avail_vector as well (see RescaleCheckpoint).
+  se_avail_vector = (char*) malloc(CkNumPes() * sizeof(char));
+  memcpy(se_avail_vector, avail.data(), CkNumPes() * sizeof(char));
 
   if (cb.isInvalid())
   CkAbort("callback after checkpoint is not set properly");

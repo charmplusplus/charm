@@ -37,6 +37,7 @@ extern "C" void charmrun_realloc(char *s);
 extern char willContinue;
 extern realloc_state pending_realloc_state;
 extern char * se_avail_vector;
+extern std::vector<char> se_avail_snapshot;
 extern int mynewpe;
 extern char *_shrinkexpand_basedir;
 extern int numProcessAfterRestart;
@@ -1125,8 +1126,7 @@ void CentralLB::CheckForRealloc(){
         lbname, cur_ld_balancer, step()-1, end_lb_time,	end_lb_time-start_lb_time);
     // do checkpoint
     CkCallback cb(CkIndex_CentralLB::ResumeFromReallocCheckpoint(), thisProxy[0]);
-    CkStartRescaleCheckpoint(_shrinkexpand_basedir, cb, 
-      std::vector<char>(se_avail_vector, se_avail_vector + CkNumPes()));
+    CkStartRescaleCheckpoint(_shrinkexpand_basedir, cb, se_avail_snapshot);
   } else {
     thisProxy.MigrationDoneImpl(1);
   }
@@ -1142,7 +1142,7 @@ void CentralLB::ResumeFromReallocCheckpoint(){
     extern double rescale_overhead_start_timer;
     extern double rescale_wall_now();
     if (CkMyPe() == 0) rescale_overhead_start_timer = rescale_wall_now();
-    std::vector<char> avail(se_avail_vector, se_avail_vector + CkNumPes());
+    std::vector<char> avail = se_avail_snapshot;
     //free(se_avail_vector);
     thisProxy.WillIbekilled(avail, numProcessAfterRestart);
 #endif
