@@ -1,13 +1,15 @@
 OPTS = -O0 -g
 
-CHARM_DIR = /u/ajain18/oldCharm/multicore-linux-x86_64
+# Override on the command line to build against a different Charm++ build,
+# e.g. make CHARM_DIR=../../../../../reconverse-linux-x86_64-cuda
+CHARM_DIR ?= ../../../../../reconverse-linux-x86_64-amd
 CHARMC = $(CHARM_DIR)/bin/charmc $(OPTS)
 CHARM_INC = -I$(CHARM_DIR)/include
 
 AMD_FLAGS = -D__HIP_PLATFORM_AMD__=ON
 
 HAPICC = hipcc
-HAPITOOLKIT_HOME = /opt/rocm
+HAPITOOLKIT_HOME ?= $(if $(ROCM_PATH),$(ROCM_PATH),/opt/rocm)
 HAPICC_INC = -I$(HAPITOOLKIT_HOME)/include
 HAPICC_LIB = -L$(HAPITOOLKIT_HOME)/lib
 HAPI_FLAGS = -O3 -g -c -std=c++11 -use_fast_math
