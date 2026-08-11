@@ -16,8 +16,11 @@ More documentation goes here...
 #include <sstream>
 using std::ostringstream;
 #include <errno.h>
+#include <fstream>
+#include <cstring>
 #include "charm++.h"
 #include "ck.h"
+#include "ckrescale.h"
 #include "ckcheckpoint.h"
 #include "CkCheckpoint.decl.h"
 #include <sys/stat.h>
@@ -36,23 +39,6 @@ void noopit(const char*, ...)
 CkGroupID _sysChkptWriteMgr;
 CkGroupID _sysChkptMgr;
 
-struct GroupInfo
-{
-  CkGroupID gID;
-  int MigCtor;
-  std::string name;
-  bool present;
-
-  void pup(PUP::er& p)
-  {
-    p | gID;
-    p | MigCtor;
-    p | name;
-    p | present;
-  }
-};
-
-bool _inrestart = false;
 bool _restarted = false;
 int _oldNumPes = 0;
 bool _chareRestored = false;
@@ -60,9 +46,9 @@ double chkptStartTimer = 0;
 #if CMK_SHRINK_EXPAND
 int originalnumGroups = -1;
 extern int Cmi_isOldProcess;
-extern int Cmi_myoldpe;
 extern char *_shrinkexpand_basedir;
 #endif
+
 
 // Required for broadcasting RO Data after recovering from failure
 #if CMK_SMP
@@ -99,14 +85,15 @@ private:
 public:
         ElementCheckpointer(CkLocMgr* mgr_, PUP::er &p_):locMgr(mgr_),p(p_){};
         void addLocation(CkLocation &loc) {
-                CkArrayIndex idx=loc.getIndex();
-		CkGroupID gID = locMgr->ckGetGroupID();
-                CmiUInt8 id = loc.getID();
-		p|gID;	    // store loc mgr's GID as well for easier restore
-                p|idx;
-                p|id;
-	        p|loc;
-		//CkPrintf("[%d] addLocation: ", CkMyPe()), idx.print();
+          CkArrayIndex idx=loc.getIndex();
+          //CkPrintf("[%d] Packing index dim = %i, %s\n", CkMyPe(), idx.dimension, idx2str(idx));
+          CkGroupID gID = locMgr->ckGetGroupID();
+          CmiUInt8 id = loc.getID();
+          p|gID;	    // store loc mgr's GID as well for easier restore
+          p|idx;
+          p|id;
+          p|loc;
+		      //CkPrintf("[%d] addLocation: ", CkMyPe()), idx.print();
         }
 };
 
@@ -148,7 +135,7 @@ static void bdcastROGroupData(void){
 	CkPupROData(ps);
 	int ROSize = ps.size();
 
-	CkPupGroupData(ps1);
+	//CkPupGroupData(ps1);
 	int GroupSize = ps1.size();
 
 	char *msg = (char *)CmiAlloc(CmiMsgHeaderSizeBytes + 2*sizeof(int) + ps.size() + ps1.size());
@@ -164,7 +151,7 @@ static void bdcastROGroupData(void){
 	PUP::toMem pp((char *)payloadOffset, PUP::er::IS_CHECKPOINT);
 	CkPupROData(pp);
 
-	CkPupGroupData(pp);
+	//CkPupGroupData(pp);
 
 	CmiSetHandler(msg, _ROGroupRestartHandlerIdx);
 	CmiSyncBroadcastAllAndFree(CmiMsgHeaderSizeBytes + 2*sizeof(int) + pp.size(), msg);
@@ -258,6 +245,36 @@ public:
       CProxy_CkCheckpointMgr(_sysChkptMgr)[index].Checkpoint(dirname, cb, requestStatus);
   }
 
+  void RescaleCheckpoint(const char* dirname, CkCallback cb, std::vector<char> avail,
+    bool requestStatus = false, int writersPerNode = 0)
+  {
+    // If currently checkpointing, drop new requests
+    if (inProgress) return;
+    inProgress = true;
+    numComplete = 0;
+
+    set_shrinkexpand_exit(true); // Set this flag to indicate that we are in the process of shrinking/expanding
+
+    if (writersPerNode > 0) numWriters = std::min(writersPerNode, nodeSize);
+
+    // Save params for future invocations and kick off the first numWriters PEs to start
+    // checkpointing
+    this->dirname = dirname;
+    this->cb = cb;
+    this->requestStatus = requestStatus;
+
+#if CMK_SHRINK_EXPAND
+    if (CkMyPe() != 0)
+    {
+      se_avail_vector = (char*) malloc(CkNumPes() * sizeof(char));
+      memcpy(se_avail_vector, avail.data(), CkNumPes() * sizeof(char));
+    }
+#endif
+
+    for (index = firstPE; index < firstPE + numWriters; index++)
+      CProxy_CkCheckpointMgr(_sysChkptMgr)[index].Checkpoint(dirname, cb, requestStatus);
+  }
+
   void FinishedCheckpoint()
   {
     numComplete++;
@@ -295,109 +312,135 @@ public:
 
 // broadcast
 void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _requestStatus){
-	chkptStartTimer = CmiWallTimer();
-	requestStatus = _requestStatus;
-	// make dir on all PEs in case it is a local directory
-	CmiMkdir(dirname);
-
-	// Create partition directories (if applicable)
-	ostringstream dirPath;
-	dirPath << dirname;
-	if (CmiNumPartitions() > 1) {
-		addPartitionDirectory(dirPath);
-		CmiMkdir(dirPath.str().c_str());
-	}
-
-	// Due to file system issues we have observed, divide checkpoints
-	// into subdirectories to avoid having too many files in a single directory.
-	// Nodegroups should be checked separately since they could go into
-	// different subdirectory.
-
-	// Save current path for later use with nodegroups
-	ostringstream dirPathNode;
-	dirPathNode << dirPath.str();
-
-	// Create subdirectories
-	int mySubDir = CkMyPe() / SUBDIR_SIZE;
-	dirPath << "/sub" << mySubDir;
-	CmiMkdir(dirPath.str().c_str());
-
-	// Create Nodegroup subdirectory if needed
-	if (CkMyRank() == 0) {
-		int mySubDirNode = CkMyNode() / SUBDIR_SIZE;
-		if (mySubDirNode != mySubDir) {
-			dirPathNode << "/sub" << mySubDirNode;
-			CmiMkdir(dirPathNode.str().c_str());
-		}
-	}
-
-	bool success = true;
-	if (CkMyPe() == 0) {
 #if CMK_SHRINK_EXPAND
-    if (pending_realloc_state == REALLOC_IN_PROGRESS) {
-      // After restarting from this AtSync checkpoint, resume execution along the
-      // normal path (i.e. whatever the user defined as ResumeFromSync.)
-      CkCallback resumeFromSyncCB(CkIndex_LBManager::ResumeClients(), _lbmgr);
-      success &= checkpointOne(dirname, resumeFromSyncCB, requestStatus);
-    } else
+  std::vector<char> avail(se_avail_vector, se_avail_vector + CkNumPes());
+  int chckPtId = CmiPhysicalRank(CmiMyPe());
+#else
+  int chckPtId = CmiPhysicalRank(CmiMyPe());
 #endif
-    {
-      success &= checkpointOne(dirname, cb, requestStatus);
+	chkptStartTimer = CmiWallTimer();
+  
+#if CMK_SHRINK_EXPAND
+  if (avail[CkMyPe()])
+#endif
+  {
+    requestStatus = _requestStatus;
+    // make dir on all PEs in case it is a local directory
+    CmiMkdir(dirname);
+
+    // Create partition directories (if applicable)
+    ostringstream dirPath;
+    dirPath << dirname;
+    if (CmiNumPartitions() > 1) {
+      addPartitionDirectory(dirPath);
+      CmiMkdir(dirPath.str().c_str());
     }
+
+    // Due to file system issues we have observed, divide checkpoints
+    // into subdirectories to avoid having too many files in a single directory.
+    // Nodegroups should be checked separately since they could go into
+    // different subdirectory.
+
+    // Save current path for later use with nodegroups
+    ostringstream dirPathNode;
+    dirPathNode << dirPath.str();
+
+    // Create subdirectories
+    int mySubDir = chckPtId / SUBDIR_SIZE;
+    dirPath << "/sub" << mySubDir;
+    CmiMkdir(dirPath.str().c_str());
+
+    // Create Nodegroup subdirectory if needed
+    if (CkMyRank() == 0) {
+      int mySubDirNode = CkMyNode() / SUBDIR_SIZE;
+      if (mySubDirNode != mySubDir) {
+        dirPathNode << "/sub" << mySubDirNode;
+        CmiMkdir(dirPathNode.str().c_str());
+      }
+    }
+
+    bool success = true;
+    if (CkMyPe() == 0) {
+      
+  #if CMK_SHRINK_EXPAND
+      if (pending_realloc_state == SHRINK_IN_PROGRESS) {
+        CkPrintf("Shrink in progress on PE%i\n", CkMyPe());
+        // After restarting from this AtSync checkpoint, resume execution along the
+        // normal path (i.e. whatever the user defined as ResumeFromSync.)
+        CkCallback resumeFromSyncCB(CkIndex_LBManager::ResumeClients(), _lbmgr);
+        success &= checkpointOne(dirname, resumeFromSyncCB, requestStatus);
+      } else if (pending_realloc_state == EXPAND_IN_PROGRESS) {
+        CkPrintf("Expand in progress on PE%i\n", CkMyPe());
+        CkCallback resumeFromSyncCB(CkIndex_LBManager::StartLB(), CProxy_LBManager(_lbmgr)[0]);
+        success &= checkpointOne(dirname, resumeFromSyncCB, requestStatus);
+      } else
+  #endif
+      {
+        success &= checkpointOne(dirname, cb, requestStatus);
+      }
+    }
+    
+  #if CMK_SHRINK_EXPAND
+    pending_realloc_state = NO_REALLOC;
+  #endif
+
+  #ifndef CMK_CHARE_USE_PTR
+    // only create chare checkpoint file if this PE actually has data
+    if (CkpvAccess(chare_objs).size() > 0 || CkpvAccess(vidblocks).size() > 0)
+    {
+      // save plain singleton chares into Chares.dat
+      FILE* fChares = openCheckpointFile(dirname, "Chares", "wb", chckPtId);
+      PUP::toDisk pChares(fChares, PUP::er::IS_CHECKPOINT);
+      CkPupChareData(pChares);
+      if (pChares.checkError()) success = false;
+      if (CmiFclose(fChares) != 0) success = false;
+    }
+  #endif
+
+    // save groups into Groups.dat
+    // content of the file: numGroups, GroupInfo[numGroups], _groupTable(PUP'ed),
+    // groups(PUP'ed)
+    FILE* fGroups = openCheckpointFile(dirname, "Groups", "wb", chckPtId);
+    PUP::toDisk pGroups(fGroups, PUP::er::IS_CHECKPOINT);
+    CkPupGroupData(pGroups);
+    if (pGroups.checkError()) success = false;
+    if (CmiFclose(fGroups) != 0) success = false;
+
+    // save nodegroups into NodeGroups.dat
+    // content of the file: numNodeGroups, GroupInfo[numNodeGroups],
+    // _nodeGroupTable(PUP'ed), nodegroups(PUP'ed)
+    if (CkMyRank() == 0)
+    {
+      FILE* fNodeGroups = openCheckpointFile(dirname, "NodeGroups", "wb", 0);
+      PUP::toDisk pNodeGroups(fNodeGroups, PUP::er::IS_CHECKPOINT);
+      CkPupNodeGroupData(pNodeGroups);
+      if (pNodeGroups.checkError()) success = false;
+      if (CmiFclose(fNodeGroups) != 0) success = false;
+    }
+    //std::vector<char> avail_vector;
+    //get_avail_vector(avail_vector);
+    //if (pending_realloc_state == REALLOC_IN_PROGRESS && static_cast<bool>(avail_vector[CkMyPe()]))
+    //{
+      //printf("[%d] Writing array checkpoint\n", CkMyPe());
+      
+      FILE* datFile = openCheckpointFile(dirname, "arr", "wb", chckPtId);
+      PUP::toDisk p(datFile, PUP::er::IS_CHECKPOINT);
+      CkPupArrayElementsData(p);
+      if (p.checkError()) success = false;
+      if (CmiFclose(datFile) != 0) success = false;
+    //}
+
+  #if ! CMK_DISABLE_SYNC
+  #if CMK_HAS_SYNC_FUNC
+          sync();
+  #elif CMK_HAS_SYNC
+    system("sync");
+  #endif
+  #endif
+    chkpStatus = success?CK_CHECKPOINT_SUCCESS:CK_CHECKPOINT_FAILURE;
+    restartCB = cb;
+    DEBCHK("[%d]restartCB installed\n",CkMyPe());
   }
-
-#ifndef CMK_CHARE_USE_PTR
-  // only create chare checkpoint file if this PE actually has data
-  if (CkpvAccess(chare_objs).size() > 0 || CkpvAccess(vidblocks).size() > 0)
-  {
-    // save plain singleton chares into Chares.dat
-    FILE* fChares = openCheckpointFile(dirname, "Chares", "wb", CkMyPe());
-    PUP::toDisk pChares(fChares, PUP::er::IS_CHECKPOINT);
-    CkPupChareData(pChares);
-    if (pChares.checkError()) success = false;
-    if (CmiFclose(fChares) != 0) success = false;
-  }
-#endif
-
-  // save groups into Groups.dat
-  // content of the file: numGroups, GroupInfo[numGroups], _groupTable(PUP'ed),
-  // groups(PUP'ed)
-  FILE* fGroups = openCheckpointFile(dirname, "Groups", "wb", CkMyPe());
-  PUP::toDisk pGroups(fGroups, PUP::er::IS_CHECKPOINT);
-  CkPupGroupData(pGroups);
-  if (pGroups.checkError()) success = false;
-  if (CmiFclose(fGroups) != 0) success = false;
-
-  // save nodegroups into NodeGroups.dat
-  // content of the file: numNodeGroups, GroupInfo[numNodeGroups],
-  // _nodeGroupTable(PUP'ed), nodegroups(PUP'ed)
-  if (CkMyRank() == 0)
-  {
-    FILE* fNodeGroups = openCheckpointFile(dirname, "NodeGroups", "wb", CkMyNode());
-    PUP::toDisk pNodeGroups(fNodeGroups, PUP::er::IS_CHECKPOINT);
-    CkPupNodeGroupData(pNodeGroups);
-    if (pNodeGroups.checkError()) success = false;
-    if (CmiFclose(fNodeGroups) != 0) success = false;
-  }
-
-  // DEBCHK("[%d]CkCheckpointMgr::Checkpoint called dirname={%s}\n",CkMyPe(),dirname);
-  FILE* datFile = openCheckpointFile(dirname, "arr", "wb", CkMyPe());
-  PUP::toDisk p(datFile, PUP::er::IS_CHECKPOINT);
-  CkPupArrayElementsData(p);
-  if (p.checkError()) success = false;
-  if (CmiFclose(datFile) != 0) success = false;
-
-#if ! CMK_DISABLE_SYNC
-#if CMK_HAS_SYNC_FUNC
-        sync();
-#elif CMK_HAS_SYNC
-	system("sync");
-#endif
-#endif
-	chkpStatus = success?CK_CHECKPOINT_SUCCESS:CK_CHECKPOINT_FAILURE;
-	restartCB = cb;
-	DEBCHK("[%d]restartCB installed\n",CkMyPe());
-
 	// Use barrier instead of contribute here:
 	// barrier is stateless and multiple calls to it do not overlap.
 	barrier(CkCallback(CkReductionTarget(CkCheckpointMgr, SendRestartCB), 0, thisgroup));
@@ -441,7 +484,7 @@ void CkPupROData(PUP::er &p)
 void CkPupMainChareData(PUP::er &p, CkArgMsg *args)
 {
 	int nMains=_mainTable.size();
-	DEBCHK("[%d] CkPupMainChareData %s: nMains = %d\n", CkMyPe(),p.typeString(),nMains);
+	//CkPrintf("[%d] CkPupMainChareData %s: nMains = %d\n", CkMyPe(),p.typeString(),nMains);
 	for(int i=0;i<nMains;i++){  /* Create all mainchares */
 		const auto& chareIdx = _mainTable[i]->chareIdx;
 		ChareInfo *entry = _chareTable[chareIdx];
@@ -449,11 +492,14 @@ void CkPupMainChareData(PUP::er &p, CkArgMsg *args)
 		if(entryMigCtor!=-1) {
 			Chare* obj;
 			if (p.isUnpacking()) {
-				DEBCHK("MainChare PUP'ed: name = %s, idx = %d, size = %d\n", entry->name, i, entry->size);
+				//CkPrintf("MainChare PUP'ed: name = %s, idx = %d, size = %d\n", entry->name, i, entry->size);
 				obj = CkAllocateChare(chareIdx);
+        //CkPrintf("Allocated mainchare %s\n", entry->name);
 				_mainTable[i]->setObj(obj);
+        //CkPrintf("Set mainchare %s\n", entry->name);
 				//void *m = CkAllocSysMsg();
 				CkInvokeEP(obj, entryMigCtor, args);
+        //CkPrintf("Invoked migration constructor for mainchare %s\n", entry->name);
 			}
 			else 
 			 	obj = (Chare *)_mainTable[i]->getObj();
@@ -548,6 +594,8 @@ void CkPupChareData(PUP::er &p)
 
 typedef void GroupCreationFn(CkGroupID groupID, int constructorIdx, envelope *env);
 
+
+
 static void CkPupPerPlaceData(PUP::er &p, GroupIDTable *idTable, GroupTable *objectTable,
                               unsigned int &numObjects, int constructionMsgType,
                               GroupCreationFn creationFn
@@ -559,7 +607,7 @@ static void CkPupPerPlaceData(PUP::er &p, GroupIDTable *idTable, GroupTable *obj
     numGroups = idTable->size();
   }
   p|numGroups;
-  DEBCHK("[%d] CkPupPerPlaceData %s: numGroups = %d\n", CkMyPe(),p.typeString(),numGroups);
+  CkPrintf("[%d] CkPupPerPlaceData %s: numGroups = %d\n", CkMyPe(),p.typeString(),numGroups);
 
   std::vector<GroupInfo> tmpInfo(numGroups);
   if (!p.isUnpacking()) {
@@ -618,21 +666,20 @@ static void CkPupPerPlaceData(PUP::er &p, GroupIDTable *idTable, GroupTable *obj
   }
 }
 
-void CkPupGroupData(PUP::er &p
-  )
+void CkPupGroupData(PUP::er &p)
 {
-        CkPupPerPlaceData(p, CkpvAccess(_groupIDTable), CkpvAccess(_groupTable),
-                          CkpvAccess(_numGroups), BocInitMsg, &CkCreateLocalGroup
-                         );
+  CkPupPerPlaceData(p, CkpvAccess(_groupIDTable), CkpvAccess(_groupTable),
+    CkpvAccess(_numGroups), BocInitMsg, &CkCreateLocalGroup
+  );
 }
 
 void CkPupNodeGroupData(PUP::er &p
   )
 {
           CkPupPerPlaceData(p, &CksvAccess(_nodeGroupIDTable),
-                            CksvAccess(_nodeGroupTable), CksvAccess(_numNodeGroups),
-                            NodeBocInitMsg, &CkCreateLocalNodeGroup
-                           );
+                           CksvAccess(_nodeGroupTable), CksvAccess(_numNodeGroups),
+                           NodeBocInitMsg, &CkCreateLocalNodeGroup
+                          );
 }
 
 // handle chare array elements for this processor
@@ -640,7 +687,7 @@ void CkPupArrayElementsData(PUP::er &p, int notifyListeners)
 {
  	int i;
 	// safe in both packing/unpacking at this stage
-        int numGroups = CkpvAccess(_groupIDTable)->size();
+  int numGroups = CkpvAccess(_groupIDTable)->size();
 
 	// number of array elements on this processor
 	int numElements = 0;
@@ -656,25 +703,25 @@ void CkPupArrayElementsData(PUP::er &p, int notifyListeners)
 	if (!p.isUnpacking())
 	{
 	  // let CkLocMgr iterate over and store every array element
-          CKLOCMGR_LOOP(ElementCheckpointer chk(mgr, p); mgr->iterate(chk););
-        }
+    CKLOCMGR_LOOP(ElementCheckpointer chk(mgr, p); mgr->iterate(chk););
+  }
 	else {
 	  // loop and create all array elements ourselves
 	  //CkPrintf("total chare array cnts: %d\n", numElements);
 	  for (int i=0; i<numElements; i++) {
-		CkGroupID gID;
-		CkArrayIndex idx;
-                CmiUInt8 id;
-		p|gID;
-                p|idx;
-                p|id;
-		CkLocMgr *mgr = (CkLocMgr*)CkpvAccess(_groupTable)->find(gID).getObj();
-		if (notifyListeners){
-		  mgr->resume(idx, id, p, true);
-		}
-                else{
-		  mgr->restore(idx, id, p);
-		}
+      CkGroupID gID;
+      CkArrayIndex idx;
+      CmiUInt8 id;
+      p|gID;
+      p|idx;
+      p|id;
+      //CkPrintf("[%d] Unpacked dim = %i: %s\n", CkMyPe(), idx.dimension, idx2str(idx));
+      CkLocMgr *mgr = (CkLocMgr*)CkpvAccess(_groupTable)->find(gID).getObj();
+      if (notifyListeners){
+        mgr->resume(idx, id, p, true);
+      } else{
+        mgr->restore(idx, id, p);
+      }
 	  }
 	}
 	// finish up
@@ -713,7 +760,7 @@ void CkPupProcessorData(PUP::er &p)
     CkPupChareData(p);
 
     // save groups 
-    CkPupGroupData(p);
+    //CkPupGroupData(p);
 
     // save nodegroups
     if(CkMyRank()==0) {
@@ -812,109 +859,119 @@ void CkStartCheckpoint(const char* dirname, const CkCallback& cb, bool requestSt
       .Checkpoint(dirname, cb, requestStatus, writersPerNode);
 }
 
+void CkStartRescaleCheckpoint(const char* dirname, const CkCallback& cb, 
+  std::vector<char> avail, bool requestStatus, int writersPerNode)
+{
+#if CMK_SHRINK_EXPAND
+  if (CkMyPe() != 0)
+  {
+    CkPrintf("[%d] se_avail_vector copied\n", CkMyPe());
+    se_avail_vector = (char*) malloc(CkNumPes() * sizeof(char));
+    memcpy(se_avail_vector, avail.data(), CkNumPes() * sizeof(char));
+  }
+
+  if (cb.isInvalid())
+  CkAbort("callback after checkpoint is not set properly");
+
+  if (cb.containsPointer())
+  CkAbort("Cannot restart from a callback based on a pointer");
+
+  CkPrintf("[%d] Checkpoint starting in %s\n", CkMyPe(), dirname);
+
+  // hand over to checkpoint managers for per-processor checkpointing
+  CProxy_CkCheckpointWriteMgr(_sysChkptWriteMgr)
+      .RescaleCheckpoint(dirname, cb, avail, requestStatus, writersPerNode);
+#endif
+}
+
 /**
   * Restart: There's no such object as restart manager is created
   *          because a group cannot restore itself anyway.
   *          The mechanism exists as converse code and get invoked by
   *          broadcast message.
   **/
-
 CkCallback globalCb;
-void CkRestartMain(const char* dirname, CkArgMsg *args){
-	int i;
-	
-        if (CmiMyRank() == 0) {
-          _inrestart = true;
-          _restarted = true;
-          CkMemCheckPT::inRestarting = true;
-        }
+void CkRecvGroupROData(char* msg)
+{
+  char* origMsg = msg;
+  msg = msg + CmiMsgHeaderSizeBytes;
+  int dirSize = *reinterpret_cast<int*>(msg);
+  msg += sizeof(int);
+  std::string dirname(msg, dirSize);
+  msg += dirSize;
+  int ROsize = *reinterpret_cast<int*>(msg);
+  msg += sizeof(int);
 
-	// restore readonlys
-	FILE* fRO = openCheckpointFile(dirname, "RO", "rb", -1);
-	int _numPes = -1;
-	PUP::fromDisk pRO(fRO, PUP::er::IS_CHECKPOINT);
-	pRO|_numPes;
+  //CkPrintf("dirname = %s, groupsize = %i\n", dirname.c_str(), groupSize);
+  PUP::fromMem bRO(msg, PUP::er::IS_CHECKPOINT);
+
+  int _numPes = -1;
+  bRO|_numPes;
 	int _numNodes = -1;
-	pRO|_numNodes;
-	pRO|globalCb;
-	if (CmiMyRank() == 0) CkPupROData(pRO);
+	bRO|_numNodes;
+	bRO|globalCb;
+	/*if (CmiMyRank() == 0)*/ CkPupROData(bRO);
 	bool requestStatus = false;
-	pRO|requestStatus;
-	CmiFclose(fRO);
-	DEBCHK("[%d]CkRestartMain: readonlys restored\n",CkMyPe());
-        _oldNumPes = _numPes;
+	bRO|requestStatus;
 
-	CmiNodeBarrier();
+  CkPrintf("[%d]Number of PE: %d -> %d\n",CkMyPe(),_numPes,CkNumPes());
 
-        // Restore mainchares on PE 0
-        if (CkMyPe() == 0)
-        {
-          FILE* fMain = openCheckpointFile(dirname, "MainChares", "rb");
-          if (fMain)
-          {
-            PUP::fromDisk pMain(fMain, PUP::er::IS_CHECKPOINT);
-            CkPupMainChareData(pMain, args);
-            CmiFclose(fMain);
-            DEBCHK("[%d]CkRestartMain: mainchares restored\n", CkMyPe());
-          }
-        }
+  msg += ROsize;
+
+  if (CkMyPe() >= _numPes) {
+    PUP::fromMem bGroups(msg, PUP::er::IS_CHECKPOINT);
+    CkPupGroupData(bGroups);
+  }
 
 #ifndef CMK_CHARE_USE_PTR
-        // restore chares only when number of pes is the same
-        if (CkNumPes() == _numPes)
-        {
-          // A chare checkpoint file only exists when the PE actually contained singleton
-          // chares at checkpoint time, so check to see if the file exists before trying
-          // to restore
-          std::string filename = getCheckpointFileName(dirname, "Chares", CkMyPe());
-          FILE* fChares = CmiFopen(filename.c_str(), "rb");
-          if (fChares)
-          {
-            PUP::fromDisk pChares(fChares, PUP::er::IS_CHECKPOINT);
-            CkPupChareData(pChares);
-            CmiFclose(fChares);
-            _chareRestored = true;
-          }
-        }
+  // restore chares only when number of pes is the same
+  if (CkNumPes() == _numPes)
+  {
+    // A chare checkpoint file only exists when the PE actually contained singleton
+    // chares at checkpoint time, so check to see if the file exists before trying
+    // to restore
+    std::string filename = getCheckpointFileName(dirname.c_str(), "Chares", CkMyPe());
+    FILE* fChares = CmiFopen(filename.c_str(), "rb");
+    if (fChares)
+    {
+      PUP::fromDisk pChares(fChares, PUP::er::IS_CHECKPOINT);
+      CkPupChareData(pChares);
+      CmiFclose(fChares);
+      _chareRestored = true;
+    }
+  }
 #endif
-
-	// restore groups
-	// content of the file: numGroups, GroupInfo[numGroups], _groupTable(PUP'ed), groups(PUP'ed)
-	// restore from PE0's copy if shrink/expand
-	FILE* fGroups = openCheckpointFile(dirname, "Groups", "rb",
-                                     (CkNumPes() == _numPes) ? CkMyPe() : 0);
-	PUP::fromDisk pGroups(fGroups, PUP::er::IS_CHECKPOINT);
-    CkPupGroupData(pGroups);
-	CmiFclose(fGroups);
-
-	// restore nodegroups
-	// content of the file: numNodeGroups, GroupInfo[numNodeGroups], _nodeGroupTable(PUP'ed), nodegroups(PUP'ed)
-	if(CkMyRank()==0){
-                FILE* fNodeGroups = openCheckpointFile(dirname, "NodeGroups", "rb",
-                                                       (CkNumNodes() == _numNodes) ? CkMyNode() : 0);
-                PUP::fromDisk pNodeGroups(fNodeGroups, PUP::er::IS_CHECKPOINT);
-        CkPupNodeGroupData(pNodeGroups);
-		CmiFclose(fNodeGroups);
-	}
+  CmiFree(origMsg);
 
 	// for each location, restore arrays
 	//DEBCHK("[%d]Trying to find location manager\n",CkMyPe());
-	DEBCHK("[%d]Number of PE: %d -> %d\n",CkMyPe(),_numPes,CkNumPes());
-	if(CkMyPe() < _numPes) 	// in normal range: restore, otherwise, do nothing
-          for (i=0; i<_numPes;i++) {
-            if (i%CkNumPes() == CkMyPe()) {
-              FILE *datFile = openCheckpointFile(dirname, "arr", "rb", i);
-	      PUP::fromDisk  p(datFile, PUP::er::IS_CHECKPOINT);
-	      CkPupArrayElementsData(p);
-	      CmiFclose(datFile);
-            }
-	  }
+	
+	if(CkMyPe() < _numPes) {	// in normal range: restore, otherwise, do nothing
+    int rank = CmiPhysicalRank(CmiMyPe());
+    CkPrintf("[%d]CkRestartMain: restoring array elements from physical rank %d\n", CkMyPe(), rank);
 
-        _inrestart = false;
+    FILE* groupFile = openCheckpointFile(dirname.c_str(), "Groups", "rb", rank);
+    PUP::fromDisk bGroups(groupFile, PUP::er::IS_CHECKPOINT);
+    CkPupGroupData(bGroups);
+    CmiFclose(groupFile);
 
-   	if (CmiMyRank()==0) _initDone();  // this rank will trigger other ranks
-   	//_initDone();
-	CkMemCheckPT::inRestarting = false;
+    if(CmiMyRank()==0) {
+      FILE* nodeGroupFile = openCheckpointFile(dirname.c_str(), "NodeGroups", "rb", 0);
+      PUP::fromDisk bNodeGroups(nodeGroupFile, PUP::er::IS_CHECKPOINT);
+      CkPupNodeGroupData(bNodeGroups);
+      CmiFclose(nodeGroupFile);
+    }
+
+    FILE *datFile = openCheckpointFile(dirname.c_str(), "arr", "rb", rank);
+    PUP::fromDisk  p(datFile, PUP::er::IS_CHECKPOINT);
+    CkPupArrayElementsData(p);
+    CmiFclose(datFile);
+  }
+
+  set_in_restart(false);
+
+  if (CmiMyRank()==0) _initDone();  // this rank will trigger other ranks
+
 	if(CkMyPe()==0) {
 		CmiPrintf("[%d]CkRestartMain done. sending out callback.\n",CkMyPe());
 		if(requestStatus)
@@ -927,49 +984,117 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 		  globalCb.send();
 		}
 	}
+  
+  if (CmiMyRank() == 0) CkMemCheckPT::inRestarting = false;
+
+  if (CmiMyPe() == 0) {
+    CkPrintf("Restore from disk finished in %fs, sending out the cb...\n", CmiWallTimer() - chkptStartTimer);
+  }
+}
+
+void CkRestartMain(const char* dirname, CkArgMsg *args){
+#if CMK_SHRINK_EXPAND
+  chkptStartTimer = CmiWallTimer();
+	int i;
+	
+  if (CmiMyRank() == 0) {
+    set_in_restart(true);
+    _restarted = true;
+    CkMemCheckPT::inRestarting = true;
+  }
+
+  // Restore mainchares on PE 0
+  if (CkMyPe() == 0)
+  {
+    FILE* fMain = openCheckpointFile(dirname, "MainChares", "rb");
+    if (fMain)
+    {
+      PUP::fromDisk pMain(fMain, PUP::er::IS_CHECKPOINT);
+      CkPupMainChareData(pMain, args);
+      CmiFclose(fMain);
+      DEBCHK("[%d]CkRestartMain: mainchares restored\n", CkMyPe());
+    }
+  }
+
+  if (CkMyPe() == 0)
+  {
+    std::string dirnameStr(dirname);
+    int strLen = dirnameStr.size();
+
+    std::string ROFileName = getCheckpointFileName(dirname, "RO", -1);
+    std::ifstream ROFile(ROFileName, std::ios::binary | std::ios::ate);
+    std::streamsize ROSize = ROFile.tellg();
+    ROFile.seekg(0, std::ios::beg);
+    
+    // Check for and exclude EOF character if present
+    if (ROSize > 0) {
+      ROFile.seekg(-1, std::ios::end);
+      char lastChar;
+      ROFile.get(lastChar);
+      if (lastChar == EOF || lastChar == '\0') {
+        ROSize--;
+      }
+      ROFile.seekg(0, std::ios::beg);
+    }
+
+    //CkPrintf("GroupMetadataSize = %lld\n", (long long)GroupMetadataSize);
+
+    std::string GroupFilename = getCheckpointFileName(dirname, "Groups", 0);
+    std::ifstream GroupFile(GroupFilename, std::ios::binary | std::ios::ate);
+    std::streamsize GroupSize = GroupFile.tellg();
+    GroupFile.seekg(0, std::ios::beg);
+
+    // Check for and exclude EOF character if present
+    if (GroupSize > 0) {
+      GroupFile.seekg(-1, std::ios::end);
+      char lastChar;
+      GroupFile.get(lastChar);
+      if (lastChar == EOF || lastChar == '\0') {
+        GroupSize--;
+      }
+      GroupFile.seekg(0, std::ios::beg);
+    }
+
+    char* msg = (char*) CmiAlloc(ROSize + GroupSize + 2 * sizeof(int) + strLen + CmiMsgHeaderSizeBytes);
+    char* buffer = msg + CmiMsgHeaderSizeBytes;
+    std::memcpy(buffer, &strLen, sizeof(int));
+    buffer += sizeof(int);
+    std::memcpy(buffer, dirname, strLen);
+    buffer += strLen;
+    std::memcpy(buffer, &ROSize, sizeof(int));
+    buffer += sizeof(int);
+
+    ROFile.read(buffer, ROSize);
+    buffer += ROSize;
+
+    GroupFile.read(buffer, GroupSize);
+    buffer += GroupSize;
+
+    CmiSetHandler(msg, _shrinkExpandRestartHandlerIdx);
+
+    CmiSyncBroadcastAllAndFree(ROSize + GroupSize + 2 * sizeof(int) + strLen + CmiMsgHeaderSizeBytes, msg);
+
+    //CkPrintf("PE %i at barrier\n", CkMyPe());
+    //CmiBarrier();
+  }
+
+   	//_initDone();
+#endif
 }
 
 #if CMK_SHRINK_EXPAND
+// NOTE - This function doesn't appear to be called anywhere
 // after resume and getting message
 void CkResumeRestartMain(char * msg) {
-  int i;
-  char filename[1024];
-  const char * dirname = "";
-  _inrestart = true;
-  _restarted = true;
-  CkMemCheckPT::inRestarting = true;
-  CmiPrintf("[%d]CkResumeRestartMain: Inside Resume Restart\n",CkMyPe());
-  CmiPrintf("[%d]CkResumeRestartMain: Group restored %d\n",CkMyPe(), CkpvAccess(_numGroups)-1);
+}
 
-  int _numPes = -1;
-  if(CkMyPe()!=0) {
-    PUP::fromMem pRO((char *)(msg+CmiMsgHeaderSizeBytes+2*sizeof(int)), PUP::er::IS_CHECKPOINT);
-
-    CkPupROData(pRO);
-    CmiPrintf("[%d]CkRestartMain: readonlys restored\n",CkMyPe());
-
-    CkPupGroupData(pRO);
-    CmiPrintf("[%d]CkResumeRestartMain: Group restored %d\n",CkMyPe(), CkpvAccess(_numGroups)-1);
+int GetNewPeNumber(std::vector<char> avail){
+  int mype = CkMyPe();
+  int count =0;
+  for (int i =0; i <mype; i++){
+    if(avail[i] ==0) count++;
   }
-
-  CmiFree(msg);
-  CmiNodeBarrier();
-  if(Cmi_isOldProcess) {
-    /* CmiPrintf("[%d] For shrinkexpand newpe=%d, oldpe=%d \n",Cmi_myoldpe, CkMyPe(), Cmi_myoldpe); */
-    // non-shrink files would be empty since LB would take care
-    FILE *datFile = openCheckpointFile(dirname, "arr", "rb", Cmi_myoldpe);
-    PUP::fromDisk  p(datFile, PUP::er::IS_CHECKPOINT);
-    CkPupArrayElementsData(p);
-    CmiFclose(datFile);
-  }
-  _initDone();
-  _inrestart = false;
-  CkMemCheckPT::inRestarting = false;
-  if(CkMyPe()==0) {
-    CmiPrintf("[%d]CkResumeRestartMain done. sending out callback.\n",CkMyPe());
-    CkPrintf("Restart from shared memory  finished in %fs, sending out the cb...\n", CmiWallTimer() - chkptStartTimer);
-    globalCb.send();
-  }
+  return (mype - count);
 }
 #endif
 

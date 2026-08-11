@@ -103,6 +103,7 @@ opt_ccs=0
 opt_charmdebug=0
 opt_controlpoint=0
 opt_cuda=0
+opt_amd=0
 opt_destination=""
 opt_disabletls=0
 opt_install_prefix=""
@@ -180,6 +181,11 @@ function parse_platform_compilers() {
       ;;
     cuda)
       opt_cuda=1
+      ;;
+    amd|hip)
+      # AMD GPU support via HIP/ROCm. Both spellings are accepted; the build
+      # directory is always suffixed "-amd" (e.g. reconverse-linux-x86_64-amd).
+      opt_amd=1
       ;;
     cxi)
       opt_cxi=1
@@ -518,7 +524,7 @@ fi
 
 # Append certain features and compilers to the end of $builddir
 builddir_extra=""
-for flag in opt_omp opt_smp opt_tcp opt_pthreads opt_pxshm opt_syncft opt_ooc opt_persistent opt_cuda opt_cxi; do
+for flag in opt_omp opt_smp opt_tcp opt_pthreads opt_pxshm opt_syncft opt_ooc opt_persistent opt_cuda opt_amd opt_cxi; do
   [[ $flag -eq 1 ]] && builddir_extra+="-${flag/opt_/}"
 done
 
@@ -689,6 +695,7 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
   -DCHARMDEBUG="$opt_charmdebug" \
   -DCONTROLPOINT="$opt_controlpoint" \
   -DBUILD_CUDA="$opt_cuda" \
+  -DBUILD_HIP="$opt_amd" \
   -DDISABLE_TLS="$opt_disabletls" \
   -DDRONE_MODE="$opt_drone_mode" \
   -DENABLE_FORTRAN=$opt_enable_fortran \

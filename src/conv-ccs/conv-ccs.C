@@ -8,6 +8,7 @@
 #include "ccs-server.h"
 #include "sockRoutines.h"
 #include "queueing.h"
+#include <sys/socket.h>
 
 #ifdef _WIN32
 # include <io.h>
@@ -230,6 +231,35 @@ void CcsSendDelayedReply(CcsDelayedReply d,int replyLen, const void *replyData)
   h->len=ChMessageInt_new(1);
   CcsReply(h,replyLen,replyData);
   free(h);
+}
+
+void CcsSendDelayedReplyAndTerm(CcsDelayedReply d, int replyLen, const void *replyData)
+{
+    CcsImplHeader *h = d.hdr;
+    int fd = ChMessageInt(h->replyFd);
+
+    // 1. Send the reply data, same as CcsReply.
+    h->len = ChMessageInt_new(replyLen);
+    skt_sendN(fd, &replyLen, sizeof(int));
+    if (replyLen > 0) {
+        skt_sendN(fd, replyData, replyLen);
+    }
+
+    // 2. Perform a synchronous close to ensure data is sent before returning.
+    //    shutdown() tells the kernel to send all buffered data, then a FIN packet.
+    shutdown(fd, SHUT_WR);
+
+    // 3. Wait for the peer (charmrun) to close its side. The recv() will block
+    //    until charmrun reads the data and closes its socket, which gives us an
+    //    EOF (recv returns 0). This is our acknowledgment.
+    char dummy_buffer[32];
+    recv(fd, dummy_buffer, sizeof(dummy_buffer), 0);
+
+    // 4. Now that the handshake is complete, we can safely close our end.
+    skt_close(fd);
+
+    // 5. Free the handle resource.
+    free(h);
 }
 
 void CcsNoReply(void)

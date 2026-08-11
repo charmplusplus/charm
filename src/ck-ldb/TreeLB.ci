@@ -1,5 +1,7 @@
 module TreeLB {
-
+  PUPable LevelLogic;
+  PUPable RootLevel;
+  PUPable PELevel;
   include "idm.h";
 
   extern module BaseLB;
@@ -17,6 +19,17 @@ module TreeLB {
     entry void multicastIDM(IDM &mig_order, int num_pes, int _pes[num_pes]);
     entry [reductiontarget] void resumeClients(void);
     entry [reductiontarget] void reportLbTime(double times[n], int n);
+  
+    entry void resumeFromReallocCheckpoint();
+    entry void lb_done_impl();
+    entry void startCleanup();
+    entry [reductiontarget] void CheckForLB();
+    entry void CallLB();
+    entry void checkForRealloc();
+    entry void willIbekilled(std::vector<char> avail, int newnumProcessAfterRestart);
+
+    entry void restartFromSE(bool rateAware);
+    entry void collectSpeeds(int pe_id, float speed);
   };
 
 };

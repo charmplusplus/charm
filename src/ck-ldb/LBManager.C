@@ -8,6 +8,8 @@
 #include <ck.h>
 #include "cksyncbarrier.h"
 
+#include "hapi_portable.h"
+
 #include "DistributedLB.h"
 #include "LBManager.h"
 #include "LBSimulation.h"
@@ -83,6 +85,7 @@ class LBDBRegistry
   {
     lbtables.emplace_back(name, fn, afn, help, shown);
   }
+  bool hasBalancers() const { return !runtime_lbs.empty() || !compile_lbs.empty(); }
   void addCompiletimeBalancer(const char* name) { compile_lbs.push_back(name); }
   void addRuntimeBalancer(const char* name, const char* legacyLBName = nullptr)
   {
@@ -124,6 +127,11 @@ void LBRegisterBalancer(std::string name, LBCreateFn fn, LBAllocFn afn, std::str
 }
 
 LBAllocFn getLBAllocFn(const char* lbname) { return lbRegistry.getLBAllocFn(lbname); }
+
+bool LBHasBalancersRegistered()
+{
+  return lbRegistry.hasBalancers();
+}
 
 // create a load balancer group using the strategy name
 static void createLoadBalancer(const std::string& lbname, const char* legacybalancer = nullptr)
@@ -212,6 +220,8 @@ void _loadbalancerInit()
       lbNames.push_back("Refine");
       lbNames.push_back("Hybrid");
       lbNames.push_back("MetisLB");
+      lbNames.push_back("GreedyCentralLB");
+      lbNames.push_back("GreedyRefineCentralLB");
       if (CkMyPe() == 0)
       {
         if (CmiGetArgStringDesc(argv, "+balancer", &balancer, "Use this load balancer"))
@@ -316,6 +326,8 @@ void _loadbalancerInit()
   CmiGetArgIntDesc(argv, "+LBVersion", &_lb_args.lbversion(),
                    "LB database file version number");
   CmiGetArgIntDesc(argv, "+LBCentPE", &_lb_args.central_pe(), "CentralLB processor");
+  CmiGetArgIntDesc(argv, "+LBPercentMovesAllowed", &_lb_args.percentMovesAllowed(),
+                   "For GreedyRefineCentralLB, the percentage of chares that can be moved");
   bool _lb_dump_activated = false;
   if (CmiGetArgIntDesc(argv, "+LBDump", &LBSimulation::dumpStep,
                        "Dump the LB state from this step"))
@@ -533,10 +545,12 @@ void LBManager::init(void)
 {
   mystep = 0;
   new_ld_balancer = 0;
+  lb_in_progress = false;
   chare_count = 0;
   metabalancer = nullptr;
   lbdb_obj = new LBDatabase();
   currentLBIndex = 0;
+  reallocBuffer = nullptr;
 #if CMK_LB_CPUTIMER
   obj_cputime = 0;
 #endif
@@ -568,6 +582,7 @@ int LBManager::AddStartLBFn(std::function<void()> fn)
 
   callbk->fn = fn;
   callbk->on = true;
+  CkPrintf("Registering StartLB function %p\n", (void*)callbk);
   startLBFnList.push_back(callbk);
   startLBFn_count++;
   return startLBFnList.size() - 1;
@@ -586,6 +601,7 @@ void LBManager::RemoveStartLBFn(int handle)
 
 void LBManager::StartLB()
 {
+  CkPrintf("Start LB called, count %d\n", startLBFn_count);
   if (startLBFn_count == 0)
   {
     CmiAbort("StartLB is not supported in this LB");
@@ -593,7 +609,12 @@ void LBManager::StartLB()
   for (int i = 0; i < startLBFnList.size(); i++)
   {
     StartLBCB* startLBFn = startLBFnList[i];
-    if (startLBFn && startLBFn->on) startLBFn->fn();
+    CkPrintf("StartLB checking function %d: %p, %d\n", i, (void*)startLBFn, startLBFn->on);
+    if (startLBFn && startLBFn->on) 
+    {
+      CkPrintf("Invoking StartLB function %p\n", (void*)&startLBFn->fn);
+      startLBFn->fn();
+    }
   }
 }
 
@@ -751,7 +772,10 @@ void LBManager::nextLoadbalancer(int seq)
 // switch strategy
 void LBManager::switchLoadbalancer(int switchFrom, int switchTo)
 {
-  if (lbNames[switchTo] != "DistributedLB" && lbNames[switchTo] != "MetisLB")
+  if (lbNames[switchTo] != "DistributedLB" &&
+    lbNames[switchTo] != "MetisLB" && 
+    lbNames[switchTo] != "GreedyCentralLB" && 
+    lbNames[switchTo] != "GreedyRefineCentralLB")
   {
     json config;
     if (lbNames[switchTo] == "Hybrid")
@@ -806,8 +830,9 @@ void LBManager::pup(PUP::er& p)
       avail_vector_set = true;
       p | avail_vector;
       // If we're restarting with more PEs, make the new ones available
-      if (avail_vector.size() < CkNumPes())
-        avail_vector.resize(CkNumPes(), 1);
+      //if (avail_vector.size() < CkNumPes())
+      //avail_vector.resize(CkNumPes(), 1);
+      avail_vector = std::vector<char>(CkNumPes(), 1);
     }
     else
     {
@@ -823,6 +848,7 @@ void LBManager::pup(PUP::er& p)
   p | mystep;
   if (p.isUnpacking())
   {
+    reallocBuffer = nullptr;
     if (_lb_args.metaLbOn())
     {
       // if unpacking set metabalancer using the id
@@ -1035,6 +1061,9 @@ int LDProcessorSpeed()
     wps = (int)((double)wps * correction + 0.5);
   }
 
+  if (_lb_args.debug() > 1)
+    CmiPrintf("LB> PE %d speed is %d\n", CkMyPe(), wps);
+
   return wps;
 }
 
@@ -1046,6 +1075,66 @@ int LBManager::ProcessorSpeed()
 {
   static int peSpeed = LDProcessorSpeed();
   return peSpeed;
+}
+
+int LBManager::ProcessorGPUSpeed()
+{
+#if CMK_hapi || CMK_HIP
+  static int gpuSpeed = -1; // Cache the result
+  
+  if (gpuSpeed != -1) {
+    return gpuSpeed;
+  }
+  
+  // Check if GPU is available
+  int deviceCount = 0;
+  if (hapiGetDeviceCount(&deviceCount) != hapiSuccess || deviceCount == 0) {
+    CmiAbort("LB> PE %d: No GPU available, GPU speed = 0\n", CkMyPe());
+  }
+  
+  // Get device for this PE (round-robin assignment)
+  int deviceId = CkMyPe() % deviceCount;
+  if (hapiSetDevice(deviceId) != hapiSuccess) {
+    CmiAbort("LB> PE %d: Failed to set GPU device %d, GPU speed = 0\n", CkMyPe(), deviceId);
+  }
+  
+  // Get device properties
+  hapiDeviceProp prop;
+  if (hapiGetDeviceProperties(&prop, deviceId) != hapiSuccess) {
+    CmiAbort("LB> PE %d: Failed to get GPU device properties, GPU speed = 0\n", CkMyPe());
+  }
+
+  int clockRate = 0;
+  if (hapiDeviceGetAttribute(&clockRate, hapiDevAttrClockRate, deviceId) != hapiSuccess) {
+    CmiAbort("LB> PE %d: Failed to get GPU clock rate, GPU speed = 0\n", CkMyPe());
+  }
+  
+  // Calculate theoretical peak single-precision FLOPS
+  // Formula: multiProcessorCount * maxThreadsPerMultiProcessor * clockRate(KHz) * 2(FMA)
+  // Convert to GFLOPS and then scale to integer for comparison with CPU speed
+  long long peakFLOPS = (long long)prop.multiProcessorCount * 
+                        prop.maxThreadsPerMultiProcessor * 
+                        clockRate * 2LL; // 2 for FMA (multiply-add)
+  
+  // Convert from KHz*ops to GFLOPS, then scale to reasonable integer range
+  double gflops = peakFLOPS / 1e6; // KHz to GHz conversion for GFLOPS
+  
+  // Scale to integer range similar to CPU ProcessorSpeed (typically 1-10000)
+  // Use a scaling factor to make GPU speeds comparable to CPU speeds
+  gpuSpeed = (int)(gflops / 100.0); // Scale down GFLOPS to reasonable range
+  
+  if (gpuSpeed < 1) gpuSpeed = 1; // Minimum speed
+  
+  if (_lb_args.debug() > 1) {
+    CmiPrintf("LB> PE %d GPU %s: %d SMs, %d threads/SM, %d MHz, %.1f GFLOPS -> speed %d\n", 
+              CkMyPe(), prop.name, prop.multiProcessorCount, 
+              prop.maxThreadsPerMultiProcessor, clockRate/1000, gflops, gpuSpeed);
+  }
+  
+  return gpuSpeed;
+#else
+  CmiAbort("LB> PE %d: ProcessorGPUSpeed() GPU support not enabled in this build\n", CkMyPe());
+#endif
 }
 
 /*

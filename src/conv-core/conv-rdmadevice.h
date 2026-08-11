@@ -5,12 +5,15 @@
 #include "converse.h"
 #include "cmirdmautils.h"
 #include "pup.h"
+#include "conv-rdma.h"
 
-#if CMK_CUDA
-#include <cuda_runtime.h>
+#define CMK_GPU_COMM 1
+
+#if CMK_CUDA || CMK_HIP
+#include "hapi_portable.h"
 
 // Represents the mode of device-side zerocopy transfer
-// MEMCPY indicates that the PEs are on the same logical node and cudaMemcpyDeviceToDevice can be used
+// MEMCPY indicates that the PEs are on the same logical node and hapiMemcpyDeviceToDevice can be used
 // IPC indicates that the PEs are on different logical nodes within the same physical node and CUDA IPC can be used
 // RDMA indicates that the PEs are on different physical nodes and requires GPUDirect RDMA
 enum class CmiNcpyModeDevice : char { MEMCPY, IPC, RDMA };
@@ -23,12 +26,13 @@ public:
   // Pointer to and size of the buffer
   const void* ptr;
   size_t cnt;
-  cudaStream_t cuda_stream;
+  hapiStream_t hapi_stream;
 
-#if !CMK_GPU_COMM
   // Source and destination PEs
   int src_pe;
+  int src_mpi_rank;
   int dest_pe;
+  int dest_mpi_rank;
 
   // Used for CUDA IPC
   int device_idx;
@@ -39,32 +43,28 @@ public:
   bool data_stored;
   void* data;
 
+  CmiNcpyBuffer lci_ncpy_buffer;
+
   CmiDeviceBuffer() : ptr(NULL), cnt(0), src_pe(-1), dest_pe(-1) { init(); }
 
   explicit CmiDeviceBuffer(const void* ptr_, size_t cnt_) : ptr(ptr_), cnt(cnt_),
-    src_pe(CmiMyPe()), dest_pe(-1) { init(); }
+    src_pe(CmiMyPe()), src_mpi_rank(CmiNodeOf(CmiMyPe())), dest_pe(-1), dest_mpi_rank(-1) { init(); }
 
   void init() {
     device_idx = -1;
     comm_offset = 0;
     event_idx = -1;
-    cuda_stream = cudaStreamPerThread;
+    hapi_stream = hapiStreamPerThread;
 
     data_stored = false;
     data = NULL;
   }
-#else
+
   uint64_t tag;
-
-  CmiDeviceBuffer() : ptr(NULL), cnt(0) {}
-
-  explicit CmiDeviceBuffer(const void* ptr_, size_t cnt_) : ptr(ptr_), cnt(cnt_) {}
-#endif // CMK_GPU_COMM
 
   void pup(PUP::er &p) {
     p((char *)&ptr, sizeof(ptr));
     p|cnt;
-#if !CMK_GPU_COMM
     p|src_pe;
     p|dest_pe;
     p|device_idx;
@@ -73,18 +73,21 @@ public:
     p|data_stored;
     if (data_stored) {
       if (p.isUnpacking()) {
-        cudaMallocHost(&data, cnt);
+        hapiMallocHost(&data, cnt);
       }
       PUParray(p, (char*)data, cnt);
     }
-#else
     p|tag;
-#endif // CMK_GPU_COMM
+    p|src_pe;
+    p|src_mpi_rank;
+    p|dest_pe;
+    p|dest_mpi_rank;
+    p|lci_ncpy_buffer;
   }
 
   ~CmiDeviceBuffer() {
 #if !CMK_GPU_COMM
-    if (data) cudaFreeHost(data);
+    if (data) hapiFreeHost(data);
 #endif
   }
 };
@@ -94,7 +97,7 @@ CmiNcpyModeDevice findTransferModeDevice(int srcPe, int destPe);
 #if CMK_GPU_COMM
 typedef void (*RdmaAckCallerFn)(void *token);
 
-void CmiSendDevice(int dest_pe, const void*& ptr, size_t size, uint64_t& tag);
+void CmiSendDevice(int dest_rank, int src_rank, const void*& ptr, size_t size, uint64_t& tag);
 void CmiRecvDevice(DeviceRdmaOp* op, DeviceRecvType type);
 void CmiRdmaDeviceRecvInit(RdmaAckCallerFn fn);
 void CmiInvokeRecvHandler(void* data);

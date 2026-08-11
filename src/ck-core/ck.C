@@ -175,6 +175,7 @@ static void CkChareThreadListener_suspend(CkThreadListener *l) {
 }
 
 static void CkChareThreadListener_resume(CkThreadListener *l) {
+  // printf("[PE %d] CkChareThreadListener_resume: obj=%p\n", CkMyPe(), ((CkChareThreadListener*)l)->obj);
   CkCallstackPush(((CkChareThreadListener *)l)->obj);
 }
 
@@ -470,7 +471,7 @@ void CkSectionID::pup(PUP::er &p) {
 
 /**** Tiny random API routines */
 
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
 void CUDACallbackManager(void *fn, void *msg) {
   if (fn) {
     ((CkCallback*)fn)->send(msg);
@@ -574,6 +575,7 @@ int CkGetArgc(void) {
 }
 
 Chare *CkActiveObj(void) {
+  // printf("[PE %d] getting active: stack size now %zu\n", CkMyPe(), CkpvAccess(runningObjs).size());
   auto &objs = *(&CkpvAccess(runningObjs));
   if (objs.empty()) {
     return nullptr;
@@ -584,10 +586,12 @@ Chare *CkActiveObj(void) {
 
 inline void _pushObj(Chare *obj) {
   CkpvAccess(runningObjs).emplace_back(obj);
+  // printf("[PE %d] pushObj: stack size now %zu\n", CkMyPe(), CkpvAccess(runningObjs).size());
 }
 
 inline Chare *_popObj(void) {
   auto &objs = *(&CkpvAccess(runningObjs));
+  // printf("[PE %d] popobj: stack size now %zu\n", CkMyPe(), CkpvAccess(runningObjs).size());
   if (objs.empty()) {
     return nullptr;
   } else {
@@ -620,10 +624,16 @@ void CkCallstackPush(Chare *obj) {
 
 // removes all instances of ( obj ) from the stack
 void CkCallstackUnwind(Chare *obj) {
+  // printf("[%d] removing all instances of obj %p\n",CkMyPe(), obj);
+
   CkAssertMsg(obj != nullptr, "expected a valid object!");
   auto &objs = *(&CkpvAccess(runningObjs));
   auto start = std::begin(objs);
   auto end = std::end(objs);
+  //   for(auto it=start;it!=end;it++)
+  // {
+  //   printf("objects still in the stack are %p\n", *it);
+  // }
   // ensures that all copies of the object are null'd
   while (end != (start = std::find(start, end, obj))) {
     *start = nullptr;
@@ -2639,14 +2649,14 @@ void CkArrayExtSend_multi(int aid, int *idx, int ndims, int epIdx, int num_bufs,
 
 
 // HAPI support
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
 #include "hapi.h"
 #endif
 
 void CkHapiAddCallback(long stream, void (*cb)(void*, void*), int fid) 
 {
-  #if CMK_CUDA
-  cudaStream_t stream_ptr = (cudaStream_t)stream;
+  #if CMK_CUDA || CMK_HIP
+  hapiStream_t stream_ptr = (hapiStream_t)stream;
   CkCallback callback(cb, (void *) fid);
   
   hapiAddCallback(stream_ptr, callback, NULL);
