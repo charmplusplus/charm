@@ -20,8 +20,8 @@
 #include "ckgraph.h"
 #include "cklists.h"
 #include "GreedyCentralLB.h"
-#include "conv-mach-cuda.h"
-#include "conv-mach-hip.h"
+// CMK_CUDA / CMK_HIP come from conv-mach-opt.h (via converse.h); including
+// conv-mach-{cuda,hip}.h here would force them on in CPU-only builds too.
 
 using namespace std;
 

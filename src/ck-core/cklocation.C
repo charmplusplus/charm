@@ -3264,9 +3264,12 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
   CmiAssert(CpvAccess(newZCPupGets).empty());  // Ensure that vector is empty
   // Create the new elements as we unpack the message
   pupElementsFor(p, rec, CkElementCreation_migrate);
-  hapiDeviceSynchronize();
 
 #if CMK_CUDA || CMK_HIP
+  // Device-side unpacking issued by pupElementsFor must complete before the
+  // migration message's device buffer is handed back to the allocator below.
+  hapiDeviceSynchronize();
+
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
   if(csv_gpu_manager.use_shm) {
     DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];

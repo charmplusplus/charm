@@ -94,7 +94,11 @@ public:
     data.pupSize = pup_encodeSize(obj_pup_size);
   }
   inline void setGPUPupSize(size_t obj_gpu_pup_size){
+  #if CMK_CUDA || CMK_HIP
     data.gpuPupSize = obj_gpu_pup_size;
+  #else
+    CmiAbort("LBObj::setGPUPupSize called but neither CMK_CUDA nor CMK_HIP is set");
+  #endif
   }
   
   inline void UseAsyncMigrate(bool async) { data.asyncArrival = async; }

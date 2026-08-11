@@ -246,6 +246,12 @@ else()
   set(BUILD_CHANGA 0)
 endif()
 
+# The GPU-aware load balancers store each object's device allocation size in LB
+# user data (registered by CentralLB::initLB), so GPU builds imply LBUSERDATA.
+if(BUILD_CUDA OR BUILD_HIP)
+  set(LBUSERDATA 1)
+endif()
+
 if(${TARGET} STREQUAL "everylb")
   set(TARGET "LIBS")
 endif()

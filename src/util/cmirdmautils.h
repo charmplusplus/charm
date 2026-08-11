@@ -2,6 +2,13 @@
 #define _CKRDMAUTILS_H
 
 #include "charm-config.h"
+/* CMK_CUDA / CMK_HIP gate the device RDMA declarations below. Under reconverse
+ * the converse.h on the include path is reconverse's and does not pull in
+ * conv-mach-opt.h, and several translation units (e.g. ckrdma.C) include this
+ * header before charm.h. Without this include those builds would silently
+ * compile the non-GPU version of this header and then fail later in
+ * conv-rdmadevice.h, where CMK_HIP is set. */
+#include "conv-mach-opt.h"
 #include "converse.h"
 #include <stdio.h>
 #include <stddef.h>

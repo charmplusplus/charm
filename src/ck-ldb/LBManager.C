@@ -8,7 +8,9 @@
 #include <ck.h>
 #include "cksyncbarrier.h"
 
+#if CMK_CUDA || CMK_HIP
 #include "hapi_portable.h"
+#endif
 
 #include "DistributedLB.h"
 #include "LBManager.h"
@@ -1079,7 +1081,7 @@ int LBManager::ProcessorSpeed()
 
 int LBManager::ProcessorGPUSpeed()
 {
-#if CMK_hapi || CMK_HIP
+#if CMK_CUDA || CMK_HIP
   static int gpuSpeed = -1; // Cache the result
   
   if (gpuSpeed != -1) {

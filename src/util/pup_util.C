@@ -22,8 +22,14 @@ virtual functions are defined here.
 #include "converse.h"
 #include "pup.h"
 #include "ckhashtable.h"
-#include "conv-mach-cuda.h"
-#include "conv-mach-hip.h"
+
+// conv-mach-opt.h pulls in conv-mach-cuda.h / conv-mach-hip.h for GPU builds
+// only, so it is what defines CMK_CUDA / CMK_HIP. It has to be included
+// explicitly here: under reconverse the converse.h above is reconverse's and
+// does not include it. Including conv-mach-{cuda,hip}.h directly instead would
+// define both to 1 in every build, including CPU-only ones where
+// hapi_portable.h is not installed into include/.
+#include "conv-mach-opt.h"
 
 #if CMK_CUDA || CMK_HIP
 #include "hapi_portable.h"

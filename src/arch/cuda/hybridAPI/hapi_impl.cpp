@@ -15,7 +15,7 @@
 
 #include "hapi_portable.h"
 #include "converse.h"
-#include "conv-mach-opt.h" /* for CMK_hapi */
+#include "conv-mach-opt.h" /* for CMK_CUDA / CMK_HIP */
 #include "ckrescale.h"
 #include "charm++.h"
 
