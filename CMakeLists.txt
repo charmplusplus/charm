@@ -817,7 +817,13 @@ if(BUILD_CUDA OR BUILD_HIP)
   # hapi_memory_daemon - standalone executable for shrink/expand GPU memory management
   if(BUILD_CUDA)
     add_executable(hapi_memory_daemon src/arch/cuda/hybridAPI/hapi_memory_daemon.cpp)
-    add_dependencies(hapi_memory_daemon hybridapi ck converse ckqt moduleNDMeshStreamer ckmain modulecompletion conv-static)
+    set(hapi_memory_daemon_deps hybridapi ck converse moduleNDMeshStreamer ckmain modulecompletion)
+    # ckqt and conv-static are only built for non-reconverse builds; reconverse
+    # provides its own converse layer and threading.
+    if(NOT RECONVERSE)
+      list(APPEND hapi_memory_daemon_deps ckqt conv-static)
+    endif()
+    add_dependencies(hapi_memory_daemon ${hapi_memory_daemon_deps})
   endif()
 
 endif()
