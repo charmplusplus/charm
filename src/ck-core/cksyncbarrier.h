@@ -43,6 +43,10 @@ class CkSyncBarrier : public CBase_CkSyncBarrier
 {
 private:
   std::list<LBClient*> clients;
+  // Clients that arrived (via migration) with an epoch this PE has already
+  // resumed past; they missed their round's resumeClients() and are resumed
+  // asynchronously on arrival. See addClient().
+  std::vector<LBClient*> lateClients;
   std::list<LBReceiver*> receivers;
   std::list<LBReceiver*> beginReceivers;
   std::list<LBReceiver*> endReceivers;
@@ -167,6 +171,7 @@ public:
 #endif
 
   void resumeClients();
+  void resumeLateClients();
 
   bool hasReceivers() { return !receivers.empty(); };
 };

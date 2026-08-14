@@ -839,6 +839,18 @@ static int _charmLoadEstimator(void)
   return CkpvAccess(_buffQ)->length();
 }
 
+#if CMK_SHRINK_EXPAND
+// Survivor-restart counterpart of the _initDone drain: restore normal message
+// processing and deliver everything _bufferHandler queued during the rescale
+// window (see the longjmp landing in charm_main). Called at the end of the
+// survivor restore path, after groups are restored.
+void _resumeBufferedCharmMessages(void)
+{
+  CkNumberHandlerEx(_bocHandlerIdx, _processHandler, CkpvAccess(_coreState));
+  _processBufferedMsgs();
+}
+#endif
+
 /**
  * This function is used to send other processors on the same node a signal so
  * they can check if their _initDone can be called: the reason for this is that
@@ -2022,6 +2034,20 @@ int charm_main(int argc, char **argv)
     // during the next checkpoint resume aborts.
     _exitStarted = false;
     _mainDone = false;
+
+    // The exit flow also pointed _charmHandlerIdx and _bocHandlerIdx at
+    // _discardHandler (correct for the kill-and-restart model, where stale
+    // old-world messages must die). On the no-restart path the survivors keep
+    // their registration tables, so those slots stay on _discardHandler deep
+    // into the restart, silently eating messages from faster-restoring peers
+    // (location informs/requests, leading to permanently buffered ghost
+    // messages and a wedged first post-rescale iteration). Re-point them at
+    // _bufferHandler: arrivals queue in _buffQ and are drained by
+    // _processBufferedMsgs once this PE finishes its restore. No survivor can
+    // send before every survivor passes this point, because the transport
+    // re-init (worker address exchange) barriers first.
+    CkNumberHandler(_charmHandlerIdx, _bufferHandler);
+    CkNumberHandler(_bocHandlerIdx, _bufferHandler);
 
     // RescaleCheckpoint set this flag to route ConverseCleanup down the
     // rescale path (instead of clean exit). It's never reset elsewhere, so

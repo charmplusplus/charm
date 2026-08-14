@@ -1095,6 +1095,20 @@ void CkRecvGroupROData(char* msg)
   // already populated their groups from the in-memory broadcast above; their
   // array elements arrive later via LB-driven migration.
 
+  {
+    // Deliver any messages stashed on group table entries while this PE's
+    // groups were not yet re-linked (see CkDrainStashedGroupMsgs in ck.C).
+    extern void CkDrainStashedGroupMsgs(void);
+    CkDrainStashedGroupMsgs();
+  }
+  {
+    // Restore _charmHandlerIdx/_bocHandlerIdx to _processHandler and deliver
+    // everything _bufferHandler collected since the longjmp landing (messages
+    // from faster-restoring peers; see init.C). Must run before resuming
+    // clients so buffered location informs/requests repair the caches first.
+    extern void _resumeBufferedCharmMessages(void);
+    _resumeBufferedCharmMessages();
+  }
   set_in_restart(false);
 
   // Once the integrating restart completes, this rank is a survivor for any

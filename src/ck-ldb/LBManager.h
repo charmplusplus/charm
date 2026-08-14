@@ -313,6 +313,13 @@ class LBManager : public CBase_LBManager
   void resetForRescale()
   {
     lb_in_progress = false;
+    // After a committed rescale the member set IS the live set: every current
+    // rank is usable. The old avail_vector carries stale zeros (doomed PEs of
+    // the previous world; a newly integrated PE reuses such a rank and would
+    // inherit its zero). Stale zeros corrupt the next realloc request's
+    // live-PE bit mapping and its shrink/expand classification, and hide the
+    // PE from the balancer. Reset to all-available for the new world.
+    avail_vector.assign(std::max<size_t>(avail_vector.size(), CkNumPes()), 1);
     // Clear LBDatabase OM registering state and force-on the CkSyncBarrier.
     // See LBDatabase::resetRegisteringForRescale for full reasoning.
     if (lbdb_obj) lbdb_obj->resetRegisteringForRescale();

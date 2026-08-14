@@ -1868,6 +1868,18 @@ void CkArray::recvMsg(CkArrayMessage* msg, CmiUInt8 id, CkDeliver_t type, int op
 {
   msg->array_hops()++;
 
+  // Fail fast on a location-forwarding cycle: with the hop-limit fallback
+  // below disabled, two PEs holding mutually stale location entries (e.g.
+  // an epoch-tied update rejection after a rescale) bounce the message
+  // forever, which presents as a silent full-cluster spin.
+  if (msg->array_hops() > 100)
+  {
+    CkAbort("[%d] CkArray::recvMsg: message for element id %" PRIu64
+            " bounced %d times (whichPe=%d, ep=%d) — forwarding cycle",
+            CkMyPe(), (CmiUInt8)id, (int)msg->array_hops(),
+            locMgr->whichPe(id), msg->array_ep());
+  }
+
   // First, if this is the actual location of the element, just deliver the message
   // right away and completely avoid location management.
   ArrayElement* elem = lookup(id);
@@ -2018,14 +2030,11 @@ void CkArray::handleUnknown(CkArrayMessage* msg, const CkArrayIndex& idx,
   int home = locMgr->homePe(idx);
   if (msg->array_ifNotThere() == CkArray_IfNotThere_buffer)
   {
-    if (isSmall && hasID && CkMyPe() != home)
-    {
-      sendToPe(msg, home, type, opts);
-    }
-    else
-    {
-      bufferForLocation(msg, idx);
-    }
+    // Always buffer-and-request rather than forwarding via the home: the
+    // request-reply also repairs this PE's location cache, so subsequent
+    // sends go direct instead of repeatedly detouring through the home
+    // (and post-rescale, a forward can chase a stale entry in a cycle).
+    bufferForLocation(msg, idx);
   }
   else
   {

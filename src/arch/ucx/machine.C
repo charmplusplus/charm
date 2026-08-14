@@ -41,6 +41,20 @@
 
 static void UcxCloseEp(ucp_ep_h ep);
 static void UcxForceCloseEps(ucp_ep_h *eps, int n);
+
+// FORCE-closing endpoints to departing peers (no disconnect handshake)
+// requires PEER error-handling mode, but PEER mode excludes transports
+// without fault-detection support -- notably shared memory -- which slows
+// intra-node traffic badly (~5x on loopback). Opt in with +ucx_peer_err
+// when rescale latency matters more than intra-node throughput.
+static bool _ucx_peer_err_mode = false;
+static void UcxSetEpErrMode(ucp_ep_params_t &p)
+{
+    if (_ucx_peer_err_mode) {
+        p.field_mask |= UCP_EP_PARAM_FIELD_ERR_HANDLING_MODE;
+        p.err_mode    = UCP_ERR_HANDLING_MODE_PEER;
+    }
+}
 CcsDelayedReply shrinkExpandreplyToken;
 extern int numProcessAfterRestart;
 extern char *_shrinkexpand_basedir;
@@ -57,6 +71,7 @@ static int   _coord_fd       = -1;
 static char *_coord_host     = nullptr;  // owned by argv, do not free
 static int   _coord_port     = 0;
 static uint32_t _coord_epoch = 0;        // tracked locally; updated on each commit
+extern int _rescaleGeneration;           // cluster-global generation (convcore.C)
 // Set in LrtsInit when launcher passed +nodeId/+numNodes/+coordinator and PMI
 // was skipped. Read in LrtsDrainResources/LrtsExit to route shutdown barriers
 // through the coordinator instead of runtime_barrier (which would no-op or
@@ -319,6 +334,7 @@ static void UcxInitEps(int numNodes, int myId)
         }
 
         eParams.field_mask = UCP_EP_PARAM_FIELD_REMOTE_ADDRESS;
+        UcxSetEpErrMode(eParams);
         eParams.address    = (const ucp_address_t*)remoteAddr;
 
         status = ucp_ep_create(ucxCtx.worker, &eParams, &ucxCtx.eps[peer]);
@@ -334,6 +350,10 @@ static void UcxInitEps(int numNodes, int myId)
 // Only invoked by comm threads
 void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 {
+    _ucx_peer_err_mode = CmiGetArgFlagDesc(*argv, "+ucx_peer_err",
+        "create UCX endpoints with PEER error-handling mode (enables "
+        "force-close of endpoints to departing peers on rescale; may "
+        "exclude shared-memory transports)");
 #if CMK_SHRINK_EXPAND
     if (_shrinkexpand_restarting) {
         // UCX was already re-initialized by UcxReInitEpsFromView in ConverseCleanup.
@@ -436,6 +456,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
         for (const auto &m : snapshot.members) {
             ucp_ep_params_t eParams;
             eParams.field_mask = UCP_EP_PARAM_FIELD_REMOTE_ADDRESS;
+            UcxSetEpErrMode(eParams);
             eParams.address    = (const ucp_address_t *)m.ucxAddr.data();
             ucp_ep_h ep = nullptr;
             status = ucp_ep_create(ucxCtx.worker, &eParams, &ep);
@@ -455,6 +476,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
             CmiAbort("UCX: coordinator INTEGRATE (await) failed");
         }
         _coord_epoch = view.epoch;
+        _rescaleGeneration = (int)view.epoch;
 
         const int newNumNodes = (int)view.members.size();
         *numNodes = newNumNodes;
@@ -477,6 +499,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
             } else {
                 ucp_ep_params_t eParams;
                 eParams.field_mask = UCP_EP_PARAM_FIELD_REMOTE_ADDRESS;
+                UcxSetEpErrMode(eParams);
                 eParams.address    = (const ucp_address_t *)m.ucxAddr.data();
                 status = ucp_ep_create(ucxCtx.worker, &eParams,
                                        &ucxCtx.eps[m.nodeId]);
@@ -650,6 +673,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
         if ((int)m.nodeId == *myNodeID) continue;
         ucp_ep_params_t eParams;
         eParams.field_mask = UCP_EP_PARAM_FIELD_REMOTE_ADDRESS;
+        UcxSetEpErrMode(eParams);
         eParams.address    = (const ucp_address_t *)m.ucxAddr.data();
         status = ucp_ep_create(ucxCtx.worker, &eParams, &ucxCtx.eps[m.nodeId]);
         UCX_CHECK_STATUS(status, "ucp_ep_create (coord-bootstrap)");
@@ -706,6 +730,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
         CmiAbort("UCX: coordinator REGISTER_INITIAL failed");
       }
       _coord_epoch = view.epoch;
+      _rescaleGeneration = (int)view.epoch;
       _coord_members = view.members;
       ucp_worker_release_address(ucxCtx.worker, myAddr);
 
@@ -931,6 +956,18 @@ inline void* UcxSendMsg(int destNode, int destPE, int size, char *msg,
                         ucp_tag_t tag, ucp_send_callback_t cb)
 {
     ucp_tag_t sTag;
+
+#if CMK_SHRINK_EXPAND
+    // Fail fast on sends to a node that does not exist in the current view
+    // (e.g. a stale location entry naming a departed PE after a shrink).
+    // Such sends would otherwise index past the endpoint table or target a
+    // closed endpoint and vanish silently, starving the cluster.
+    if (destNode < 0 || destNode >= _Cmi_numnodes ||
+        ucxCtx.eps[destNode] == NULL) {
+        CmiAbort("UCX: send to invalid node %d (numnodes=%d, pe=%d, size=%d)",
+                 destNode, _Cmi_numnodes, destPE, size);
+    }
+#endif
 
     // Combine tag and sTag: sTag defines msg protocol, tag may indicate RMA requests
     sTag  = (size > ucxCtx.eagerSize) ? UCX_MSG_TAG_PROBE : UCX_MSG_TAG_EAGER;
@@ -1576,6 +1613,7 @@ static void UcxReInitEpsFromView(const coord::ClusterView &view,
         } else {
             ucp_ep_params_t eParams;
             eParams.field_mask = UCP_EP_PARAM_FIELD_REMOTE_ADDRESS;
+            UcxSetEpErrMode(eParams);
             eParams.address    = reinterpret_cast<const ucp_address_t*>(m.ucxAddr.data());
             status = ucp_ep_create(ucxCtx.worker, &eParams, &newEps[m.nodeId]);
             UCX_CHECK_STATUS(status, "ucp_ep_create (reconfig newcomer)");
@@ -1786,6 +1824,7 @@ void ConverseCleanup(void)
     // Survivor: rebuild endpoints against the new view; worker stays alive.
     UcxReInitEpsFromView(view, oldNumNodes, myNode);
     _coord_epoch = view.epoch;
+    _rescaleGeneration = (int)view.epoch;
     {
       extern double rescale_t_ep_reinit_done;
       extern double rescale_wall_now();

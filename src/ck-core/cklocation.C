@@ -2394,6 +2394,30 @@ void CkLocMgr::resetForRescale()
     cache->insert(id, epoch);
     informHome(rec->getIndex(), CkMyPe());
   }
+
+  // Second inform sweep, shortly after the restore settles: the first
+  // sweep's informs travel during the cluster-wide restore burst, where
+  // rare per-message losses have been observed to wedge the first ghost
+  // exchange (requests for the affected ids buffer forever at their
+  // homes). Re-informing is idempotent (same-epoch updates are no-ops and
+  // replyBufferedIdRequests drains on every apply), so a retry outside
+  // the burst window makes the location protocol tolerant of any single
+  // lost inform.
+  CcdCallFnAfter(
+      [](void* arg, double) { ((CkLocMgr*)arg)->reInformHomes(); },
+      (void*)this, 200.0 /*ms*/);
+}
+
+// Re-send informHome for every element currently local to this PE.
+// Idempotent; used as a delayed retry after a rescale (see above).
+void CkLocMgr::reInformHomes()
+{
+  int resent = 0;
+  for (LocRecHash::iterator it = hash.begin(); it != hash.end(); ++it)
+  {
+    informHome(it->second->getIndex(), CkMyPe());
+    resent++;
+  }
 }
 #endif
 
@@ -2460,24 +2484,63 @@ void CkLocCache::requestLocation(CmiUInt8 id, const int peToTell)
   if (peToTell == CkMyPe()) return;
 
   LocationMap::const_iterator itr = locMap.find(id);
-  // TODO: If the location is not found, we probably need to buffer this request. Should
-  // only effect very weird corner cases at the moment, and is a problem that already
-  // existed, but should be addressed in the upcoming delivery/buffering cleanup.
   if (itr != locMap.end())
   {
     thisProxy[peToTell].updateLocation(itr->second);
   }
+  else
+  {
+    // We (the home) do not know this ID's location yet — the request raced
+    // ahead of the element's informHome (common immediately after a rescale,
+    // when survivors' wiped caches emit a burst of by-ID requests while the
+    // informs are still in flight). Dropping the request would leave the
+    // requester's messages buffered forever; hold it and reply from
+    // insert()/updateLocation() once the location is known.
+    bufferedIdRequests[id].push_back(peToTell);
+  }
 }
 
-void CkLocCache::updateLocation(const CkLocEntry& newEntry)
+// Reply to any by-ID location requests that were buffered because this PE
+// did not yet know the ID's location.
+void CkLocCache::replyBufferedIdRequests(CmiUInt8 id)
+{
+  auto itr = bufferedIdRequests.find(id);
+  if (itr == bufferedIdRequests.end()) return;
+  const CkLocEntry& e = getLocationEntry(id);
+  CkAssert(e.pe != -1);
+  for (int pe : itr->second)
+  {
+    if (pe != CkMyPe()) thisProxy[pe].updateLocation(e);
+  }
+  bufferedIdRequests.erase(itr);
+}
+
+bool CkLocCache::applyLocationUpdate(const CkLocEntry& newEntry)
 {
   CkAssert(newEntry.pe != -1);
+#if CMK_SHRINK_EXPAND
+  if (newEntry.epoch < rescaleEpoch)
+  {
+    // Dead-generation entry: a location update that was in flight or sat in
+    // the (preserved) scheduler queue across a rescale. Its id and pe are
+    // meaningless under the new numbering; accepting it would poison the
+    // cache and, at the CkLocMgr layer, the idx-to-id map.
+    return false;
+  }
+#endif
   CkLocEntry& oldEntry = locMap[newEntry.id];
   if (newEntry.epoch > oldEntry.epoch)
   {
     oldEntry = newEntry;
     notifyListeners(newEntry.id, newEntry.pe);
   }
+  replyBufferedIdRequests(newEntry.id);
+  return true;
+}
+
+void CkLocCache::updateLocation(const CkLocEntry& newEntry)
+{
+  bool accepted = applyLocationUpdate(newEntry);
 }
 
 void CkLocCache::recordEmigration(CmiUInt8 id, int pe)
@@ -2494,6 +2557,12 @@ void CkLocCache::recordEmigration(CmiUInt8 id, int pe)
 
 void CkLocCache::insert(CmiUInt8 id, int epoch)
 {
+#if CMK_SHRINK_EXPAND
+  // Local insertions (element creation, migration arrival) must never sit
+  // below the current rescale floor, or peers would reject the resulting
+  // location updates as dead-generation entries.
+  if (epoch < rescaleEpoch) epoch = rescaleEpoch;
+#endif
   CkLocEntry& e = locMap[id];
   // TODO: This should be > probably, but demand creation needs some fixing up
   CkAssert(epoch >= e.epoch);
@@ -2501,6 +2570,7 @@ void CkLocCache::insert(CmiUInt8 id, int epoch)
   e.pe = CkMyPe();
   e.epoch = epoch;
   notifyListeners(e.id, e.pe);
+  replyBufferedIdRequests(id);
 }
 
 /*************************** LocMgr: CREATION *****************************/
@@ -2804,11 +2874,15 @@ bool CkLocMgr::requestLocation(const CkArrayIndex& idx, const int peToTell)
 void CkLocMgr::updateLocation(const CkArrayIndex& idx, const CkLocEntry& e)
 {
   CkAssert(e.pe != -1);
+  // Apply to the cache FIRST: if the entry is from a dead generation (its
+  // epoch is below the rescale floor), it must not touch the idx-to-id map
+  // either — the historical unconditional insertID here re-pointed idx to a
+  // dead id when a stale update crossed a rescale, wedging every later send
+  // for that index (buffered under an id no home would ever learn).
+  if (!cache->applyLocationUpdate(e)) return;
+
   // Set the mapping from idx to id
   insertID(idx, e.id);
-
-  // Update the location information
-  cache->updateLocation(e);
 
   // Any location requests that we had to buffer because we didn't know how the index
   // mapped to the id can now be replied to.

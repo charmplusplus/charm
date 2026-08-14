@@ -225,6 +225,14 @@ void  *CmiGetNonLocalNodeQ();
 
 CpvDeclare(Queue, CsdSchedQueue);
 
+/* Cluster-global rescale generation: the coordinator's membership epoch,
+   set by the machine layer on every committed reconfiguration (survivors
+   at reconfig, newcomers at INTEGRATE). All PEs agree on it by protocol,
+   unlike any per-PE reset counter, which diverges between original
+   survivors and newcomer-lineage PEs. Consumers: CkLocCache's location
+   epoch floor. */
+int _rescaleGeneration = 0;
+
 #if CMK_OUT_OF_CORE
 /* The Queue where the Prefetch Thread puts the messages from CsdSchedQueue  */
 CpvDeclare(Queue, CsdPrefetchQueue);
@@ -1782,24 +1790,30 @@ void CsdSchedulerState_new(CsdSchedulerState_t *s)
  */
 void *CsdNextMessage(CsdSchedulerState_t *s) {
 	void *msg;
+	/* Poll the LIVE local queue (CpvAccess), not the pointer cached in the
+	   scheduler state at loop entry: on a no-restart rescale the running
+	   scheduler frame can predate queue re-pointing done during
+	   reinitialization, and a stale cache leaves messages enqueued by
+	   CmiSendSelf invisible to the scheduler forever (observed as a PE
+	   spinning idle with a deliverable message in its local queue). */
 	if((*(s->localCounter))-- >0)
 	  {
               /* This avoids a race condition with migration detected by megatest*/
-              msg=CdsFifo_Dequeue(s->localQ);
+              msg=CdsFifo_Dequeue(CpvAccess(CmiLocalQueue));
               if (msg!=NULL)
 		{
 #if CMI_QD
 		  CpvAccess(cQdState)->mProcessed++;
 #endif
-		  return msg;	    
+		  return msg;
 		}
-              CqsDequeue(s->schedQ,(void **)&msg);
+              CqsDequeue((Queue)CpvAccess(CsdSchedQueue),(void **)&msg);
               if (msg!=NULL) return msg;
 	  }
-	
+
 	*(s->localCounter)=CsdLocalMax;
-	if ( NULL!=(msg=CmiGetNonLocal()) || 
-	     NULL!=(msg=CdsFifo_Dequeue(s->localQ)) ) {
+	if ( NULL!=(msg=CmiGetNonLocal()) ||
+	     NULL!=(msg=CdsFifo_Dequeue(CpvAccess(CmiLocalQueue))) ) {
 #if CMI_QD
             CpvAccess(cQdState)->mProcessed++;
 #endif
@@ -2266,7 +2280,20 @@ void CsdInit(char **argv)
   int argmaxset = CmiGetArgIntDesc(argv,"+csdLocalMax",&argCsdLocalMax,"Set the max number of local messages to process before forcing a check for remote messages.");
   if (CmiMyRank() == 0 ) CsdLocalMax = argCsdLocalMax;
   CpvAccess(CsdLocalCounter) = argCsdLocalMax;
-  CpvAccess(CsdSchedQueue) = CqsCreate();
+  {
+    /* The scheduler queue is boot-once state: never replace a live queue.
+       On a no-restart rescale, messages from faster PEs (readonly/group
+       data, the resume callback, informHome location updates) can arrive
+       and be enqueued while this PE is still (re)initializing — on
+       survivors re-running ConverseInit after the longjmp, AND on
+       integrating expand newcomers whose init-time collectives pump the
+       network before this point. Recreating the queue silently drops
+       those messages, leaving the PE deaf (observed as rare post-rescale
+       hangs: a lost resume callback on survivors, lost informHome on
+       newcomers wedging the first ghost exchange). */
+    if (CpvAccess(CsdSchedQueue) == NULL)
+      CpvAccess(CsdSchedQueue) = CqsCreate();
+  }
 #if CMK_SMP && CMK_TASKQUEUE
   CsvInitialize(CmiMemoryAtomicUInt, idleThreadsCnt);
   CsvAccess(idleThreadsCnt) = 0;

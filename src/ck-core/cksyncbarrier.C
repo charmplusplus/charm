@@ -48,6 +48,7 @@ void CkSyncBarrier::reset()
 LDBarrierClient CkSyncBarrier::addClient(Chare* chare, std::function<void()> fn,
                                          int epoch)
 {
+  bool late = false;
   if (epoch == -1)
     epoch = curEpoch;
   else if (epoch > curEpoch)
@@ -55,9 +56,29 @@ LDBarrierClient CkSyncBarrier::addClient(Chare* chare, std::function<void()> fn,
     // If the incoming client is ahead of us, then record those syncs
     atCount += epoch - curEpoch;
   }
+  else if (epoch < curEpoch)
+  {
+    // Late arrival: this client already completed AtSync for a round that
+    // this PE has resumed past. This happens when an element migrates onto
+    // a PE whose empty barrier was kick-triggered beyond the element's
+    // round before the (slower) migration message arrived — e.g. an expand
+    // newcomer receiving its first elements while faster survivors already
+    // started the next round. The resumeClients() for its round is never
+    // coming on this PE, so resume it on arrival and align it with the
+    // current round; its next AtSync then counts toward this round.
+    epoch = curEpoch;
+    late = true;
+  }
 
   const auto client = LDBarrierClient(
       clients.insert(clients.end(), new LBClient(chare, std::move(fn), epoch)));
+  if (late)
+  {
+    // Resume asynchronously so the caller's construction path (migration
+    // unpacking) finishes first.
+    lateClients.push_back(*client);
+    thisProxy[thisIndex].resumeLateClients();
+  }
   // Check the barrier if it can trigger. Do this asynchronously so that the caller
   // functions for object construction finish first.
   if (on && !startedAtSync && atCount >= clients.size())
@@ -246,6 +267,16 @@ void CkSyncBarrier::callReceiverList(const std::list<LBReceiver*>& receiverList)
     {
       r->fn();
     }
+  }
+}
+
+void CkSyncBarrier::resumeLateClients()
+{
+  while (!lateClients.empty())
+  {
+    LBClient* c = lateClients.back();
+    lateClients.pop_back();
+    c->fn();
   }
 }
 
