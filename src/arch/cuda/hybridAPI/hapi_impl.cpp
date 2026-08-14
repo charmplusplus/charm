@@ -244,7 +244,6 @@ void hapiStartMemoryDaemon(char** argv)
   mkfifo(client_fifo_path, 0666);
 
   int& cpv_my_device = CpvAccess(my_device);
-  CkPrintf("Device = %i\n", cpv_my_device);
   hapiCheck(hapiSetDevice(cpv_my_device));
 
   if (CmiPhysicalRank(CmiMyPe()) != firstRankForDevice)
@@ -339,7 +338,6 @@ void hapiRestore(void* devPtr, int size, int alloc_id) {
 
 void hapiExit() {
   // Ensure all PEs have finished GPU work
-  CmiPrintf("Exit called on PE %d\n", CmiMyPe());
   CmiNodeBarrier();
 
 #if CMK_SHRINK_EXPAND
@@ -382,7 +380,6 @@ static void hapiInitCsv(char** argv) {
   CsvInitialize(GPUManager, gpu_manager);
   CsvAccess(gpu_manager).init();
   #if CMK_LBDB_ON
-    CmiPrintf("HAPI: seeing _lb_args.statsOn() = %d\n", _lb_args.statsOn());
     if (LBHasBalancersRegistered() && _lb_args.statsOn())
       hapiCuptiInit();
   #endif
@@ -563,9 +560,6 @@ static void hapiMapping(char** argv) {
   CmiAssert(map_type != Mapping::None);
 
   if (CmiMyRank() == 0) {
-    printf("number of physical nodes is %d\n", CmiNumPhysicalNodes());
-    printf("number of nodes is %d\n", CmiNumNodes());
-    printf("my rank is %d\n", CmiMyRank());
     // Count number of GPU devices used by each process
     int visible_device_count;
     hapiCheck(hapiGetDeviceCount(&visible_device_count));
@@ -575,7 +569,6 @@ static void hapiMapping(char** argv) {
 
     int& device_count = csv_gpu_manager.device_count;
     device_count = visible_device_count / (CmiNumNodes() / CmiNumPhysicalNodes());//?????
-    ckout<<"device count "<<device_count<<endl;
 
     // Handle the case where the number of GPUs per process are larger than
     // the number of PEs per process. This is needed because we currently don't
