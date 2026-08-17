@@ -597,6 +597,33 @@ static int findFreeIpcEvent(DeviceManager* dm, const size_t comm_offset, int cpv
   return -1;
 }
 
+// Device payload of the zerocopy send currently being marshalled, in bytes.
+//
+// The load balancer's communication graph weights each edge by
+// UsrToEnv(msg)->getTotalsize(), but a device zerocopy message carries only the
+// CkDeviceBuffer descriptors in its envelope -- a few hundred bytes standing in
+// for a transfer that is routinely megabytes. Weighted that way, GPU-to-GPU
+// edges are effectively invisible to any communication-aware strategy.
+//
+// The real sizes are known here and nowhere later on the send path, so they are
+// parked per PE and picked up by CkArray::sendToPe. The generated code between
+// this call and that one is straight-line marshalling with no intervening entry
+// method, so the value cannot be interleaved with another send on this PE.
+// CkArray::sendToPe takes and clears it unconditionally, so a stale value
+// cannot outlive one array send.
+//
+// Limitation: group and nodegroup device sends never reach CkArray::sendToPe,
+// so their value is left for the next array send on that PE to discard. The LB
+// only builds object-to-object edges from array elements, so this costs
+// nothing today, but it is why the take-and-clear must stay unconditional.
+static thread_local size_t _ck_pending_device_send_bytes = 0;
+
+size_t CkRdmaDeviceTakePendingSendBytes() {
+  const size_t bytes = _ck_pending_device_send_bytes;
+  _ck_pending_device_send_bytes = 0;
+  return bytes;
+}
+
 // Performs sender-side operations necessary for device zerocopy
 void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
   // TODO: Need to handle the case where the destination PE could be wrong
@@ -607,12 +634,15 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
 
   // Store destination PE in the metadata message
   // FIXME: Not necessary? save_op.dest_pe is set to CkMyPe() on the receiver
+  size_t device_bytes = 0;
   for (int i = 0; i < numops; i++) {
     buffers[i]->dest_pe = dest_pe;
     buffers[i]->dest_mpi_rank = CmiNodeOf(dest_pe);
     buffers[i]->src_pe = CmiMyPe();
     buffers[i]->src_mpi_rank = CmiNodeOf(CmiMyPe());
+    device_bytes += buffers[i]->cnt;
   }
+  _ck_pending_device_send_bytes = device_bytes;
   if(transfer_mode == CkNcpyModeDevice::MEMCPY)
   {
     for (int i = 0; i < numops; i++)

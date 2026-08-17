@@ -145,4 +145,15 @@ extern "C" {
 
 #endif // CMK_CUDA
 
+// Returns and clears the device payload size recorded by the most recent
+// CkRdmaDeviceOnSender on this PE, so the LB communication graph can weight a
+// device zerocopy edge by what actually crosses the wire rather than by the
+// descriptor envelope. Returns 0 for a non-device send. Declared outside the
+// CUDA guard so the send path can call it without an #ifdef.
+#if CMK_CUDA || CMK_HIP
+size_t CkRdmaDeviceTakePendingSendBytes();
+#else
+inline size_t CkRdmaDeviceTakePendingSendBytes() { return 0; }
+#endif
+
 #endif // _CKRDMADEVICE_H_

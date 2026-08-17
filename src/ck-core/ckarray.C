@@ -1922,6 +1922,13 @@ void CkArray::sendToPe(CkArrayMessage* msg, int pe, CkDeliver_t type, int opts)
   CkAssert(thisgroup == UsrToEnv(msg)->getArrayMgr());
   CkAssert(UsrToEnv(msg)->getRecipientID() != 0);
 
+#if CMK_LBDB_ON
+  // Take this unconditionally, before any branch: a device zerocopy send parks
+  // its payload size on the PE during marshalling, and leaving it behind would
+  // let it be charged to whichever send comes next. Zero for a normal message.
+  const size_t deviceBytes = CkRdmaDeviceTakePendingSendBytes();
+#endif
+
   // If the message is not for me, or is supposed to be queued, send it via the normal
   // queuing infrastructure
   if (pe != CkMyPe() || type == CkDeliver_queue)
@@ -1931,7 +1938,8 @@ void CkArray::sendToPe(CkArrayMessage* msg, int pe, CkDeliver_t type, int opts)
     if (msg->array_hops() == 0 && !(opts & CK_MSG_LB_NOTRACE) &&
         locMgr->getLBMgr()->CollectingCommStats())
     {
-      recordSend(msg->array_element_id(), UsrToEnv(msg)->getTotalsize(), pe, opts);
+      recordSend(msg->array_element_id(),
+                 UsrToEnv(msg)->getTotalsize() + deviceBytes, pe, opts);
     }
 #endif
     CkArrayManagerDeliver(pe, msg, opts);
@@ -1973,7 +1981,8 @@ void CkArray::sendToPe(CkArrayMessage* msg, int pe, CkDeliver_t type, int opts)
     if (msg->array_hops() == 0 && !(opts & CK_MSG_LB_NOTRACE) &&
         locMgr->getLBMgr()->CollectingCommStats())
     {
-      recordSend(msg->array_element_id(), UsrToEnv(msg)->getTotalsize(), pe, opts);
+      recordSend(msg->array_element_id(),
+                 UsrToEnv(msg)->getTotalsize() + deviceBytes, pe, opts);
     }
 #endif
     deliverToElement(msg, elem);
