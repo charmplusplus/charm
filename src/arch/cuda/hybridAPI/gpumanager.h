@@ -194,6 +194,10 @@ struct GPUManager {
   std::queue<CuptiBufferItem> cupti_buffer_queue_;
   std::mutex cupti_queue_lock_;
 
+  // PE-to-device mapping scheme, kept so later code (IPC handle exchange) can
+  // recompute which global device another process's slot lives on.
+  Mapping map_type = Mapping::RoundRobin;
+
   bool cupti_initialized_;
   // Whether activity tracing is currently running. Separate from
   // cupti_initialized_: the buffer callbacks are registered once, but tracing

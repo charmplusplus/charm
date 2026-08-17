@@ -815,6 +815,8 @@ static void hapiMapping(char** argv) {
   }
 
   // No mapping specified, user assumes responsibility
+  csv_gpu_manager.map_type = map_type;
+
   if (map_type == Mapping::None) {
     if (CmiMyPe() == 0) {
       CmiPrintf("HAPI> User should explicitly select devices for PEs/chares\n");
@@ -1595,6 +1597,30 @@ static void ipcHandleOpen() {
       cur_device_info.event_pool_flags.clear();
       cur_device_info.event_pool_buff_offsets.clear();
 
+      // Open the event handles with the EXPORTER's device current, then switch
+      // back. An IPC event's semaphore lives in device memory of the device it
+      // was created on; opening the handle under a different current device
+      // leaves that storage unmapped here, and the first cudaStreamWaitEvent
+      // on the imported event faults with an illegal memory access when the SM
+      // polls it. Opening under the exporter's device makes the wait an
+      // ordinary cross-device event wait, which CUDA synchronizes without any
+      // peer read. The memory handle above deliberately stays under OUR device:
+      // that mapping must be accessible from the device that issues the copies.
+      int exporter_device;
+      switch (csv_gpu_manager.map_type) {
+        case Mapping::Block:
+          exporter_device = (i * csv_gpu_manager.device_count_on_physical_node + j) /
+                            (CmiNumNodes() / CmiNumPhysicalNodes());
+          break;
+        case Mapping::RoundRobin:
+        default:
+          exporter_device = (csv_gpu_manager.device_count * i + j) %
+                            csv_gpu_manager.device_count_on_physical_node;
+          break;
+      }
+      const int my_device = CpvAccess(my_device);
+      if (exporter_device != my_device) hapiCheck(hapiSetDevice(exporter_device));
+
       for (int k = 0; k < csv_gpu_manager.hapi_ipc_event_pool_size_total; k++) {
         hapi_ipc_event_shared* cur_shm_event_shared = shm_event_shared + k;
 
@@ -1605,6 +1631,8 @@ static void ipcHandleOpen() {
         hapiCheck(hapiIpcOpenEventHandle(&cur_device_info.dst_event_pool[k],
               cur_shm_event_shared->dst_event_handle));
       }
+
+      if (exporter_device != my_device) hapiCheck(hapiSetDevice(my_device));
     }
   }
 }
