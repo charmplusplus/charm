@@ -1628,35 +1628,11 @@ static void ipcHandleOpen() {
       cur_device_info.event_pool_flags.clear();
       cur_device_info.event_pool_buff_offsets.clear();
 
-      // Open the event handles with the EXPORTER's device current, then switch
-      // back. An IPC event's semaphore lives in device memory of the device it
-      // was created on; opening the handle under a different current device
-      // leaves that storage unmapped here, and the first cudaStreamWaitEvent
-      // on the imported event faults with an illegal memory access when the SM
-      // polls it. Opening under the exporter's device makes the wait an
-      // ordinary cross-device event wait, which CUDA synchronizes without any
-      // peer read. The memory handle above deliberately stays under OUR device:
-      // that mapping must be accessible from the device that issues the copies.
-      int exporter_device;
-      switch (csv_gpu_manager.map_type) {
-        case Mapping::Block:
-          exporter_device = (i * csv_gpu_manager.device_count_on_physical_node + j) /
-                            (CmiNumNodes() / CmiNumPhysicalNodes());
-          break;
-        case Mapping::RoundRobin:
-        default:
-          exporter_device = (csv_gpu_manager.device_count * i + j) %
-                            csv_gpu_manager.device_count_on_physical_node;
-          break;
-      }
-      const int my_device = CpvAccess(my_device);
-      // CHARM_NO_IPC_EVENT_DEVSWITCH restores the original behaviour (open the
-      // peer's event handles under OUR device) for bisecting.
-      static const bool devswitch_off =
-          (getenv("CHARM_NO_IPC_EVENT_DEVSWITCH") != nullptr);
-      if (!devswitch_off && exporter_device != my_device)
-        hapiCheck(hapiSetDevice(exporter_device));
-
+      // Open the peer's event handles under OUR current device. Do NOT switch to
+      // the exporter's device around this: that was tried and it breaks all
+      // cross-process transfers (git bisect, commit bec910fef). cudaIpcOpen*
+      // is defined in terms of the caller's context, and the imported event is
+      // usable from here without any device change.
       for (int k = 0; k < csv_gpu_manager.hapi_ipc_event_pool_size_total; k++) {
         hapi_ipc_event_shared* cur_shm_event_shared = shm_event_shared + k;
 
@@ -1668,8 +1644,6 @@ static void ipcHandleOpen() {
               cur_shm_event_shared->dst_event_handle));
       }
 
-      if (!devswitch_off && exporter_device != my_device)
-        hapiCheck(hapiSetDevice(my_device));
     }
   }
 }
