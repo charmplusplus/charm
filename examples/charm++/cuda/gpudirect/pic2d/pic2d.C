@@ -528,6 +528,9 @@ class Patch : public CBase_Patch {
   void ResumeFromSync() {
     // iterate() switches instrumentation back off once the next AtSync is far
     // enough away; leaving it to that keeps the decision in one place.
+    if (getenv("CHARM_DEBUG_MIGRATE"))
+      CkPrintf("[RESUME %d] (%d,%d) iter=%d\n", CkMyPe(), thisIndex.x,
+               thisIndex.y, my_iter);
     thisProxy[thisIndex].runStep();
   }
 

@@ -3429,20 +3429,21 @@ class MemcpyStrategy : public DeviceMigrationStrategy {
   void issuePulls(CkLocMgr* mgr, CmiUInt8 id, int /*srcPe*/,
                   const CkDeviceMigrateHandle* handles, int n,
                   void* dstGpuMsg) override {
+    // Completes synchronously. An async pull leaves the chare "in flight" --
+    // released by its source but not yet constructed here, because immigrate()
+    // is deferred until the pull finishes. Other PEs resume from the load
+    // balancer independently and immediately start the next ghost exchange, so
+    // device messages can arrive for a chare that exists nowhere. The packed
+    // path completes inline and has no such window; this matches it.
     size_t offset = 0;
-    cudaStream_t stream = (cudaStream_t)0;
     for (int i = 0; i < n; ++i) {
-      hapiCheck(hapiMemcpyAsync((char*)dstGpuMsg + offset,
-                                reinterpret_cast<void*>(handles[i].src_ptr),
-                                handles[i].size,
-                                hapiMemcpyDeviceToDevice, stream));
+      hapiCheck(hapiMemcpy((char*)dstGpuMsg + offset,
+                           reinterpret_cast<void*>(handles[i].src_ptr),
+                           handles[i].size,
+                           hapiMemcpyDeviceToDevice));
       offset += handles[i].size;
     }
-    hapiAddCallback(
-        stream,
-        CkCallback(CkIndex_CkLocMgr::finalizeGPUMigrate((CkLocMgrFinalizeMsg*)nullptr),
-                   CProxy_CkLocMgr(mgr->ckGetGroupID())[CkMyPe()]),
-        makeFinalizeMsg(id));
+    mgr->finalizeGPUMigrate(makeFinalizeMsg(id));
   }
 };
 
@@ -3463,22 +3464,21 @@ class IpcStrategy : public DeviceMigrationStrategy {
   void issuePulls(CkLocMgr* mgr, CmiUInt8 id, int /*srcPe*/,
                   const CkDeviceMigrateHandle* handles, int n,
                   void* dstGpuMsg) override {
+    // Synchronous for the same reason as MemcpyStrategy: see the note there.
+    // The window is far wider here -- a cross-process pull takes long enough
+    // that peers finish load balancing and resume while the chare is still in
+    // flight.
     size_t offset = 0;
-    cudaStream_t stream = (cudaStream_t)0;
     for (int i = 0; i < n; ++i) {
       void* src = nullptr;
       hapiCheck(hapiIpcOpenMemHandle(&src, handles[i].ipc_handle,
                                      hapiIpcMemLazyEnablePeerAccess));
       mgr->registerOpenedIpcPtr(id, src);
-      hapiCheck(hapiMemcpyAsync((char*)dstGpuMsg + offset, src, handles[i].size,
-                                hapiMemcpyDeviceToDevice, stream));
+      hapiCheck(hapiMemcpy((char*)dstGpuMsg + offset, src, handles[i].size,
+                           hapiMemcpyDeviceToDevice));
       offset += handles[i].size;
     }
-    hapiAddCallback(
-        stream,
-        CkCallback(CkIndex_CkLocMgr::finalizeGPUMigrate((CkLocMgrFinalizeMsg*)nullptr),
-                   CProxy_CkLocMgr(mgr->ckGetGroupID())[CkMyPe()]),
-        makeFinalizeMsg(id));
+    mgr->finalizeGPUMigrate(makeFinalizeMsg(id));
   }
 };
 
