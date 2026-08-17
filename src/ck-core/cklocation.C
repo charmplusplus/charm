@@ -3593,6 +3593,14 @@ void CkLocMgr::registerOpenedIpcPtr(CmiUInt8 id, void* ptr)
 // chare's device buffers as (ptr,size) instead of copying them, ships those as
 // transport handles, and holds the chare alive until the destination signals
 // (ackGPUMigrate) that its pulls have completed.
+// TEMPORARY (CHARM_DEBUG_MIGRATE): trace the four steps of the export-and-pull
+// device migration handshake, so a stall can be located to a specific step
+// rather than inferred.
+static inline bool migDbg() {
+  static const bool on = (getenv("CHARM_DEBUG_MIGRATE") != nullptr);
+  return on;
+}
+
 bool CkLocMgr::emigrateDeviceByHandle(CkLocRec* rec, int toPe, size_t bufSize)
 {
   CkArrayIndex idx = rec->getIndex();
@@ -3631,6 +3639,11 @@ bool CkLocMgr::emigrateDeviceByHandle(CkLocRec* rec, int toPe, size_t bufSize)
       new (nHandles) CkArrayElementMigrateHandleMessage(id, CkMyPe(), nHandles);
   strat.fillSourceHandles(toPe, collector, handleMsg->handles);
 
+  if (migDbg()) {
+    CkPrintf("[MIG %d] 1 emigrateByHandle id=%llu -> pe=%d nHandles=%d\n",
+             CkMyPe(), (unsigned long long)id, toPe, nHandles);
+    fflush(stdout);
+  }
   thisProxy[toPe].immigrate(hostMsg);
   thisProxy[toPe].immigrateGPUHandle(handleMsg);
 
@@ -3727,9 +3740,20 @@ void CkLocMgr::immigrateGPUHandle(CkArrayElementMigrateHandleMessage* msg)
 
   pendingPulls[msg->id] = PendingPull{gpuMsg, total, msg->src_pe, {}};
 
+  if (migDbg()) {
+    CkPrintf("[MIG %d] 2 immigrateGPUHandle id=%llu src=%d n=%d total=%zu\n",
+             CkMyPe(), (unsigned long long)msg->id, msg->src_pe,
+             msg->nHandles, total);
+    fflush(stdout);
+  }
   auto& strat = DeviceMigrationStrategy::forPes(msg->src_pe, CkMyPe());
   strat.issuePulls(this, msg->id, msg->src_pe, msg->handles, msg->nHandles,
                    gpuMsg);
+  if (migDbg()) {
+    CkPrintf("[MIG %d] 2b issuePulls returned id=%llu\n", CkMyPe(),
+             (unsigned long long)msg->id);
+    fflush(stdout);
+  }
 
   delete msg;
   // Completion arrives asynchronously via finalizeGPUMigrate(id).
@@ -3741,6 +3765,11 @@ void CkLocMgr::finalizeGPUMigrate(CkLocMgrFinalizeMsg* msg)
 {
   CmiUInt8 id = msg->id;
   delete msg;
+  if (migDbg()) {
+    CkPrintf("[MIG %d] 3 finalizeGPUMigrate id=%llu\n", CkMyPe(),
+             (unsigned long long)id);
+    fflush(stdout);
+  }
   auto it = pendingPulls.find(id);
   if (it == pendingPulls.end()) return;
   PendingPull pending = std::move(it->second);
@@ -3770,6 +3799,11 @@ void CkLocMgr::finalizeGPUMigrate(CkLocMgrFinalizeMsg* msg)
 
 void CkLocMgr::ackGPUMigrate(CmiUInt8 id)
 {
+  if (migDbg()) {
+    CkPrintf("[MIG %d] 4 ackGPUMigrate id=%llu\n", CkMyPe(),
+             (unsigned long long)id);
+    fflush(stdout);
+  }
   auto it = heldChares.find(id);
   if (it == heldChares.end()) return;
 
