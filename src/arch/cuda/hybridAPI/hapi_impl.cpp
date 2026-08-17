@@ -1020,21 +1020,36 @@ static void hapiMapping(char** argv) {
     enable_peer = false;
   }
 
-  // Enable P2P access to other visible devices
-  // (only useful for multiple devices per process)
+  // Enable P2P access to every other device on this host, not just the ones
+  // this process owns. Inter-process GPU messaging opens an IPC handle to a
+  // buffer on a peer process's device, and the resulting pointer is only usable
+  // once peer access to that device has been enabled here. Ranging over
+  // device_count (a per-process count) instead left peer access off entirely in
+  // the common one-GPU-per-process layout, so the first copy touching a peer
+  // buffer faulted with an illegal access -- reported at whichever CUDA call
+  // checked next, since error 700 is sticky and asynchronous.
+  //
+  // Note cpv_my_device and the loop index are both global device indices;
+  // device_count_on_physical_node counts devices on the host.
+  //
   // Should only be done by device representative threads
   if (enable_peer) {
     if (CmiMyPe() == 0) {
       CmiPrintf("HAPI> Enabling P2P access between devices\n");
     }
     if (cpv_device_rep) {
-      for (int i = 0; i < csv_gpu_manager.device_count; i++) {
+      for (int i = 0; i < csv_gpu_manager.device_count_on_physical_node; i++) {
         if (i != cpv_my_device) {
           int can_access_peer;
 
           hapiCheck(hapiDeviceCanAccessPeer(&can_access_peer, cpv_my_device, i));
           if (can_access_peer) {
+            // Returns hapiErrorPeerAccessAlreadyEnabled when already on, which
+            // is benign -- deliberately not wrapped in hapiCheck.
             hapiDeviceEnablePeerAccess(i, 0);
+          } else if (_lb_args.debug() > 0 && CmiMyPe() == 0) {
+            CmiPrintf("HAPI> No P2P access from device %d to device %d\n",
+                      cpv_my_device, i);
           }
         }
       }
