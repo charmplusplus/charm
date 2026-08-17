@@ -154,10 +154,29 @@ public:
   void *getData(int idx) { return data.data()+idx; }
 };
 
+#if CMK_CUDA
+// Per-kernel record captured via CUPTI, used for SM-utilization-normalized
+// GPU load attribution.
+//
+// These are consumed entirely within the process that produced them (see
+// hapiNormalizeCuptiLoads) and are never shipped to the central LB: every PE
+// sharing a GPU is in the same process, so the whole kernel timeline for a
+// device is already local. Only the resulting scalar load per object crosses
+// the wire, in LDObjData::gpuTime.
+struct LBKernelRecord {
+  uint64_t start_ns;   // CUPTI device-clock timestamp (ns)
+  uint64_t end_ns;     // CUPTI device-clock timestamp (ns)
+  uint32_t device_id;  // CUPTI device id this kernel ran on
+  int      sms_used;   // Number of SMs occupied while this kernel was running
+};
+#endif
+
 struct LDObjData {
   LDObjHandle handle;
   LBRealType wallTime;
 #if CMK_CUDA
+  // SM-utilization-normalized GPU load, in seconds of whole-device occupancy.
+  // Computed in-process by hapiNormalizeCuptiLoads before the stats are sent.
   LBRealType gpuTime;
 #endif
 #if CMK_LB_CPUTIMER

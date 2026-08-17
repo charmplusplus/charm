@@ -88,6 +88,37 @@ PUPbytes(CkLocEntry);
  *  This is the message type used to actually send a migrating array element.
  */
 
+/**
+ *  Intra-process (same CmiNode / SMP mode) migration message. Instead of
+ *  packing the chare, the source PE transfers ownership of the live
+ *  CkMigratable objects to the destination PE via raw pointers.
+ */
+class CkArrayElementIntraProcessMigrateMessage
+  : public CMessage_CkArrayElementIntraProcessMigrateMessage
+{
+public:
+  CkArrayElementIntraProcessMigrateMessage(CkArrayIndex idx_, CmiUInt8 id_,
+                                           bool ignoreArrival_, int nManagers_,
+                                           int locEpoch_, int barrierEpoch_)
+      : idx(idx_),
+        id(id_),
+        ignoreArrival(ignoreArrival_),
+        nManagers(nManagers_),
+        locEpoch(locEpoch_),
+        barrierEpoch(barrierEpoch_)
+  {
+  }
+
+  CkArrayIndex idx;
+  CmiUInt8 id;
+  bool ignoreArrival;
+  int nManagers;
+  int locEpoch;      // location cache epoch (for createLocal)
+  int barrierEpoch;  // AtSync sync-barrier epoch (for ckFinishConstruction)
+  CkGroupID* aids;
+  uintptr_t* eltPtrs;
+};
+
 class CkArrayElementMigrateMessage : public CMessage_CkArrayElementMigrateMessage
 {
 public:
@@ -112,6 +143,37 @@ public:
   int epoch;
   char* packData;
 };
+
+#if CMK_CUDA
+/**
+ *  Device-migration handle message for the pointer-and-get path.
+ *  Source ships only per-buffer transport info (src_ptr + one of
+ *  {ipc_handle, rdma_tag}); the destination pulls the bytes via the
+ *  DeviceMigrationStrategy selected for the (src, dst) pair.
+ */
+class CkArrayElementMigrateHandleMessage
+  : public CMessage_CkArrayElementMigrateHandleMessage
+{
+public:
+  CkArrayElementMigrateHandleMessage(CmiUInt8 id_, int src_pe_, int nHandles_)
+      : id(id_), src_pe(src_pe_), nHandles(nHandles_) {}
+
+  CmiUInt8 id;
+  int src_pe;
+  int nHandles;
+  CkDeviceMigrateHandle* handles;
+};
+
+/**
+ *  Completion hook message delivered to CkLocMgr::finalizeGPUMigrate() when
+ *  all device-buffer pulls for a given migration have completed.
+ */
+class CkLocMgrFinalizeMsg : public CMessage_CkLocMgrFinalizeMsg
+{
+public:
+  CmiUInt8 id;
+};
+#endif
 
 /******************* Map object ******************/
 
@@ -711,10 +773,49 @@ public:
 
   // Communication:
   void immigrate(CkArrayElementMigrateMessage* msg);
+  // Fast path for intra-process (same CmiNode) migration: transfer live
+  // chare objects to the destination PE without packing. Returns false if
+  // the fast path is not applicable and the caller should fall through to
+  // the packed emigrate path.
+  bool emigrateIntraProcess(CkLocRec* rec, int toPe);
+#if CMK_CUDA
+  // Pointer-and-get device migration: pack host state only, export the chare's
+  // device buffers as handles, and let the destination pull them. Returns
+  // false if the caller should fall through to the staged path.
+  bool emigrateDeviceByHandle(CkLocRec* rec, int toPe, size_t bufSize);
+#endif
+  void immigrateIntraProcess(CkArrayElementIntraProcessMigrateMessage* msg);
 #if CMK_CUDA
   void sendGPUMsg(CmiUInt8 id);
   void immigrateGPU(CmiUInt8& id, int& size, char* &data, CkDeviceBufferPost* post);
   void immigrateGPU(CmiUInt8 id, int size, char* data);
+  // Pointer-and-get device migration path (see DeviceMigrationStrategy).
+  void immigrateGPUHandle(CkArrayElementMigrateHandleMessage* msg);
+  void finalizeGPUMigrate(CkLocMgrFinalizeMsg* msg);
+  void ackGPUMigrate(CmiUInt8 id);
+  // Record an IPC pointer opened by IpcStrategy so finalizeGPUMigrate can
+  // close it once the pull for this migration completes.
+  void registerOpenedIpcPtr(CmiUInt8 id, void* ptr);
+
+  // Destination-side state while a handle-path migration is in flight. The
+  // gpuMsg has been allocated and device pulls have been issued; when all
+  // pulls complete, finalizeGPUMigrate(id) runs and drains this map.
+  struct PendingPull {
+    void* gpuMsg;
+    size_t size;
+    int src_pe;
+    std::vector<void*> openedIpcPtrs;
+  };
+  std::unordered_map<CmiUInt8, PendingPull> pendingPulls;
+
+  // Source-side state: chares whose device buffers the destination is still
+  // pulling from. They must stay alive (and their device pointers valid)
+  // until ackGPUMigrate arrives, so destruction is deferred.
+  struct HeldMigratingChares {
+    CkLocRec* rec;
+    std::vector<CkMigratable*> chares;
+  };
+  std::unordered_map<CmiUInt8, HeldMigratingChares> heldChares;
 #endif
   void requestLocation(CmiUInt8 id);
   void requestLocation(const CkArrayIndex& idx);

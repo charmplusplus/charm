@@ -47,6 +47,15 @@ src/arch/win/createlink.exe
 # Ignore cruft that would result from compiling charm example/test code
 # Note this is negated inside src/arch to permit addition of new charmrun files in there
 charmrun
+charmrun_elastic
+charmrun_hapi
+hapi_memory_daemon
 ampirun
 pgm
 *.swp
+
+# Ignore projections trace output from example runs
+*.btr
+*.sts
+*.log.gz
+*.projrc

@@ -1,0 +1,109 @@
+mainmodule pic2d {
+  include "pic2d.h";
+
+  readonly CProxy_Main main_proxy;
+  readonly CProxy_Patch patch_proxy;
+  readonly int grid_width;
+  readonly int grid_height;
+  readonly int block_width;
+  readonly int block_height;
+  readonly int n_chares_x;
+  readonly int n_chares_y;
+  readonly int n_iters;
+  readonly int warmup_iters;
+  readonly int jacobi_iters;
+  readonly int ppc;
+  readonly int first_lb;
+  readonly int lb_freq;
+  readonly int dist_type;
+  readonly long n_total_particles;
+  readonly double bunch_frac;
+  readonly double bunch_sigma;
+  readonly double drift_vx;
+  readonly double vth;
+  readonly double sim_dt;
+  readonly double coupling;
+  readonly int part_capacity;
+  readonly int exch_capacity;
+  readonly int stats_freq;
+  readonly bool print_parts;
+
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry [reductiontarget] void initDone(long total_np);
+    entry void stepStats(CkReductionMsg* msg);
+    entry [reductiontarget] void allDone();
+    entry void printDone();
+  };
+
+  array [2D] Patch {
+    entry Patch(void);
+    entry void init();
+    entry void initDone();
+    entry void iterate();
+
+    // Targets of hapiAddCallback, invoked when GPU stream work completes
+    entry void chargeGhostsPacked();
+    entry void phiGhostsPacked();
+    entry void eGhostsPacked();
+    entry void pushDone();
+
+    // Zerocopy device receives; the corresponding post entry methods that
+    // supply the device buffers are defined in pic2d.C
+    entry void receiveChargeGhosts(int ref, int dir, int n, nocopydevice RealType buf[n]);
+    entry void receivePhiGhosts(int ref, int dir, int n, nocopydevice RealType buf[n]);
+    entry void receiveEGhosts(int ref, int dir, int n, nocopydevice RealType buf[n]);
+    // m = max(n,1) so that zero-particle messages still carry a valid buffer
+    entry void receiveParticles(int ref, int dir, int n, int m, nocopydevice Particle parts[m]);
+
+    entry void runStep() {
+      // Phase 1: charge deposition; edge deposits land in the ghost ring and
+      // are shipped to all 8 neighbors, which accumulate them into their
+      // interior boundary cells
+      serial {
+        my_iter++;
+        startDeposit();
+      }
+      when chargeGhostsPacked() serial { sendChargeGhosts(); }
+      for (recv_count = 0; recv_count < NUM_DIRS; recv_count++) {
+        when receiveChargeGhosts[my_iter](int ref, int dir, int n, nocopydevice RealType buf[n])
+          serial { accumChargeGhost(dir, n, buf); }
+      }
+
+      // Phase 2: Jacobi iterations for the Poisson solve, one 4-way ghost
+      // exchange per iteration; the final round is exchange-only so the
+      // E field sees up-to-date boundary potentials
+      for (jacobi_k = 0; jacobi_k <= jacobi_iters; jacobi_k++) {
+        serial { phi_iter++; packPhiGhosts(); }
+        when phiGhostsPacked() serial { sendPhiGhosts(); }
+        for (recv_count = 0; recv_count < 4; recv_count++) {
+          when receivePhiGhosts[phi_iter](int ref, int dir, int n, nocopydevice RealType buf[n])
+            serial { unpackPhiGhost(dir, n, buf); }
+        }
+        serial { if (jacobi_k < jacobi_iters) jacobiUpdate(); }
+      }
+
+      // Phase 3: E = -grad(phi) on interior cells, then an 8-way exchange to
+      // fill the E ghost ring (gather needs E in ghost cells, incl. corners)
+      serial { computeEField(); }
+      when eGhostsPacked() serial { sendEGhosts(); }
+      for (recv_count = 0; recv_count < NUM_DIRS; recv_count++) {
+        when receiveEGhosts[my_iter](int ref, int dir, int n, nocopydevice RealType buf[n])
+          serial { unpackEGhost(dir, n, buf); }
+      }
+
+      // Phase 4: gather + leapfrog push; leavers are compacted into
+      // per-direction send buffers on the device and exchanged
+      serial { pushParticles(); }
+      when pushDone() serial { finishPush(); }
+      for (recv_count = 0; recv_count < NUM_DIRS; recv_count++) {
+        when receiveParticles[my_iter](int ref, int dir, int n, int m, nocopydevice Particle parts[m])
+          serial { appendParticles(dir, n); }
+      }
+
+      serial { endOfStep(); }
+    };
+
+    entry void print();
+  };
+};

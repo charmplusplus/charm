@@ -601,6 +601,15 @@ inline Chare *_popObj(void) {
   }
 }
 
+#if CMK_LBDB_ON && (CMK_CUDA || CMK_HIP)
+// Declared in hapi.h; forward-declared here to avoid pulling in the full HAPI
+// header this early in ck.C. These bracket the entry-method body so CUPTI
+// kernel records can be correlated back to the active migratable object,
+// regardless of how the application launches its kernels.
+extern uint64_t hapiCuptiPushObjCorrelation();
+extern void     hapiCuptiPopObjCorrelation();
+#endif
+
 inline void _ckStartTiming(void) {
 #if CMK_LBDB_ON
   auto *active = CkActiveLocRec();
@@ -620,6 +629,13 @@ void CkCallstackPush(Chare *obj) {
   _ckStopTiming();    // suspend timing of the previous obj
   _pushObj(obj);      // push the current object onto the stack
   _ckStartTiming();   // start timing the current obj
+#if CMK_LBDB_ON && (CMK_CUDA || CMK_HIP)
+  // After _pushObj, `obj` is the active chare. Push a CUPTI external
+  // correlation ID (its LB id, or 0 when not migratable) so every kernel
+  // launched until the matching Pop is attributed to this chare.
+  // Structurally paired 1:1 with CkCallstackPop.
+  hapiCuptiPushObjCorrelation();
+#endif
 }
 
 // removes all instances of ( obj ) from the stack
@@ -644,6 +660,10 @@ void CkCallstackUnwind(Chare *obj) {
 
 // pops ( obj ) from the stack (and manages timing)
 void CkCallstackPop(Chare *obj) {
+#if CMK_LBDB_ON && (CMK_CUDA || CMK_HIP)
+  // Paired 1:1 with the push in CkCallstackPush.
+  hapiCuptiPopObjCorrelation();
+#endif
   _ckStopTiming();        // stop timing the current obj
   auto *popd = _popObj(); // pop it from the stack
   CkAssertMsg(!popd || popd == obj, "object tracking mismatch");

@@ -19,8 +19,26 @@ struct DeviceManager {
   // Buddy allocator for communication buffer
   buddy::allocator* comm_buffer;
 
+#ifdef CMK_LBDB_ON
+  // Device properties needed to estimate how many SMs a kernel occupies.
+  // Filled lazily by hapiPopulateDeviceProps once device_managers is ready.
+  int multi_processor_count;
+  int max_threads_per_sm;
+  int max_blocks_per_sm;
+  int max_registers_per_sm;
+  int max_shared_mem_per_sm;
+  int warp_size;
+  bool props_initialized;
+#endif
+
   DeviceManager(int local_index_, int global_index_) :
-    local_index(local_index_), global_index(global_index_), comm_buffer(nullptr) {
+    local_index(local_index_), global_index(global_index_), comm_buffer(nullptr)
+#ifdef CMK_LBDB_ON
+    , multi_processor_count(0), max_threads_per_sm(0), max_blocks_per_sm(0),
+      max_registers_per_sm(0), max_shared_mem_per_sm(0), warp_size(0),
+      props_initialized(false)
+#endif
+  {
 #if CMK_SMP
     lock = CmiCreateLock();
 #endif

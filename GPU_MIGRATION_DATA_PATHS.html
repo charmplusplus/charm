@@ -1,0 +1,766 @@
+<title>GPU Migration Data Paths</title>
+<style>
+  /* ---- tokens: complete light palette on bare :root ---- */
+  :root {
+    --bg:        #F6F8FA;
+    --surface:   #FFFFFF;
+    --surface-2: #EDF1F5;
+    --ink:       #15191F;
+    --ink-2:     #4E5866;
+    --ink-3:     #7C8899;
+    --rule:      #DDE3EA;
+    --rule-2:    #C7D0DA;
+    --accent:    #0E6D7A;
+    --accent-2:  #0A555F;
+    --accent-wash: #E2F0F2;
+
+    --good:      #26694C;
+    --good-wash: #E1EFE8;
+    --warn:      #7E600F;
+    --warn-wash: #F4EDDA;
+    --crit:      #9A3535;
+    --crit-wash: #F5E3E3;
+
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --body: Charter, "Bitstream Charter", "Source Serif 4", "Iowan Old Style", Georgia, serif;
+
+    --measure: 68ch;
+    --step-0: 1rem;
+    --step-1: 1.15rem;
+    --step-2: 1.42rem;
+    --step-3: 1.95rem;
+    --step-4: 2.6rem;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:        #0E1116;
+      --surface:   #161B22;
+      --surface-2: #1D242D;
+      --ink:       #E3E8EE;
+      --ink-2:     #A8B3C0;
+      --ink-3:     #7A8797;
+      --rule:      #262E38;
+      --rule-2:    #36404C;
+      --accent:    #55C4D2;
+      --accent-2:  #86DAE4;
+      --accent-wash: #12313640;
+
+      --good:      #6FCB9F;
+      --good-wash: #17342740;
+      --warn:      #D6B45C;
+      --warn-wash: #332C1240;
+      --crit:      #E0807F;
+      --crit-wash: #3A1F1F40;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg:        #0E1116;
+    --surface:   #161B22;
+    --surface-2: #1D242D;
+    --ink:       #E3E8EE;
+    --ink-2:     #A8B3C0;
+    --ink-3:     #7A8797;
+    --rule:      #262E38;
+    --rule-2:    #36404C;
+    --accent:    #55C4D2;
+    --accent-2:  #86DAE4;
+    --accent-wash: #12313640;
+
+    --good:      #6FCB9F;
+    --good-wash: #17342740;
+    --warn:      #D6B45C;
+    --warn-wash: #332C1240;
+    --crit:      #E0807F;
+    --crit-wash: #3A1F1F40;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: var(--step-0);
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 60rem;
+    margin: 0 auto;
+    padding: 4rem 1.5rem 6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 3.25rem;
+  }
+
+  /* ---- masthead ---- */
+  .masthead { display: flex; flex-direction: column; gap: 1rem; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0;
+  }
+  h1 {
+    font-family: var(--mono);
+    font-size: var(--step-4);
+    line-height: 1.08;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+    margin: 0;
+    text-wrap: balance;
+  }
+  .standfirst {
+    max-width: var(--measure);
+    font-size: var(--step-1);
+    color: var(--ink-2);
+    margin: 0;
+  }
+  .masthead-rule { height: 2px; background: var(--ink); opacity: 0.85; }
+
+  /* ---- sections ---- */
+  section { display: flex; flex-direction: column; gap: 1.1rem; }
+  h2 {
+    font-family: var(--mono);
+    font-size: var(--step-2);
+    letter-spacing: -0.01em;
+    font-weight: 600;
+    margin: 0;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--rule);
+    text-wrap: balance;
+  }
+  h3 {
+    font-family: var(--mono);
+    font-size: var(--step-1);
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: -0.005em;
+  }
+  p { margin: 0; max-width: var(--measure); }
+  strong { font-weight: 700; color: var(--ink); }
+  code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    background: var(--surface-2);
+    padding: 0.1em 0.36em;
+    border-radius: 3px;
+    color: var(--ink);
+  }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+
+  ul.notes { margin: 0; padding-left: 1.1rem; max-width: var(--measure); display: flex; flex-direction: column; gap: 0.5rem; }
+
+  /* ---- hop chain ---- */
+  .chainbox { overflow-x: auto; padding-bottom: 0.25rem; }
+  .chain {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    min-width: max-content;
+    font-family: var(--mono);
+    font-size: 0.76rem;
+  }
+  .chain li {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 0.8rem;
+    border: 1px solid var(--rule-2);
+    background: var(--surface);
+    color: var(--ink-2);
+    white-space: nowrap;
+  }
+  .chain li.buf {
+    border-color: var(--accent);
+    background: var(--accent-wash);
+    color: var(--accent-2);
+    font-weight: 600;
+  }
+  .chain li.stage {
+    border-color: var(--warn);
+    background: var(--warn-wash);
+    color: var(--warn);
+  }
+  .chain li.wire {
+    border-style: dashed;
+    background: transparent;
+    color: var(--ink-3);
+  }
+  .chain .arrow {
+    border: none;
+    background: none;
+    padding: 0 0.4rem;
+    color: var(--ink-3);
+    font-size: 0.9rem;
+  }
+  .chain .arrow.counted { color: var(--accent); font-weight: 700; }
+
+  .chain-legend {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--ink-3);
+    letter-spacing: 0.03em;
+    margin: 0;
+  }
+
+  /* ---- option cards ---- */
+  .option {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--rule-2);
+    padding: 1.4rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+  }
+  .option.is-current  { border-left-color: var(--ink-3); }
+  .option.is-shipped  { border-left-color: var(--good); }
+  .option.is-proposed { border-left-color: var(--accent); }
+  .option.is-blocked  { border-left-color: var(--crit); }
+
+  .option-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.6rem 0.9rem; }
+  .option-head h3 { flex: 1 1 auto; }
+
+  .chip {
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.2rem 0.5rem;
+    border-radius: 2px;
+    border: 1px solid currentColor;
+    white-space: nowrap;
+  }
+  .chip.good { color: var(--good); background: var(--good-wash); }
+  .chip.warn { color: var(--warn); background: var(--warn-wash); }
+  .chip.crit { color: var(--crit); background: var(--crit-wash); }
+  .chip.neut { color: var(--ink-3); background: var(--surface-2); }
+
+  .facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: 0.9rem 1.4rem;
+    margin: 0;
+    padding: 0.9rem 0 0;
+    border-top: 1px solid var(--rule);
+  }
+  .facts div { display: flex; flex-direction: column; gap: 0.15rem; }
+  .facts dt {
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .facts dd {
+    margin: 0;
+    font-family: var(--mono);
+    font-size: 0.95rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+
+  .verdict { display: flex; flex-direction: column; gap: 0.35rem; }
+  .verdict p { max-width: none; }
+  .verdict .label {
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+
+  /* ---- tables ---- */
+  .tablebox { overflow-x: auto; border: 1px solid var(--rule); background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; min-width: 44rem; font-size: 0.88rem; }
+  th, td {
+    text-align: left;
+    padding: 0.6rem 0.85rem;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  thead th {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    background: var(--surface-2);
+    white-space: nowrap;
+  }
+  tbody th {
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+  td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tbody tr:last-child th, tbody tr:last-child td { border-bottom: none; }
+
+  /* ---- callout ---- */
+  .callout {
+    background: var(--surface-2);
+    border-left: 3px solid var(--accent);
+    padding: 1.1rem 1.3rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+  .callout .label {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .callout p { max-width: none; }
+
+  footer {
+    border-top: 1px solid var(--rule);
+    padding-top: 1.2rem;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--ink-3);
+    line-height: 1.7;
+  }
+
+  @media (max-width: 40rem) {
+    .wrap { padding: 2.5rem 1.1rem 4rem; gap: 2.5rem; }
+    :root { --step-4: 2rem; --step-3: 1.6rem; --step-2: 1.25rem; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">Charm++ · reconverse · device state</p>
+    <h1>GPU Migration Data Paths</h1>
+    <div class="masthead-rule"></div>
+    <p class="standfirst">
+      When a chare migrates, its host state is packed and sent — but its device buffers have to
+      physically move between GPUs. There are five ways to do that. They differ by a factor of
+      three in copies and a factor of four in peak device memory, and each one optimizes a
+      different scarce resource.
+    </p>
+  </header>
+
+  <section>
+    <h2>What a migration actually moves</h2>
+    <p>
+      A migrating chare has two kinds of state. The host side is serialized by its PUP routine into
+      a normal Charm message. The device side — call it <code>S</code> bytes across <code>k</code>
+      buffers — has to get from the source GPU into freshly allocated buffers on the destination GPU.
+    </p>
+    <p>
+      Every design below is a different answer to one question: <strong>how many times do those
+      <code>S</code> bytes get copied, and how much memory is live at once while it happens.</strong>
+      The transport used for each hop (direct memcpy, CUDA IPC, RDMA) is a separate axis, decided by
+      where source and destination sit relative to each other.
+    </p>
+    <div class="callout">
+      <span class="label">Why memory leads</span>
+      <p>
+        Staging buffers come from a device region reserved at startup via <code>+gpulbbuffer</code>.
+        That reservation is unavailable to the application <em>for the whole run</em>, whether or not
+        anything migrates — and when a load-balance step migrates many chares at once, demand is
+        <code>N·S</code> per side. Exceeding it is not graceful: it aborts with
+        <code>"Not enough memory on device Load balance buffer"</code>. On a 4&nbsp;GB card running
+        pic2d, chare state alone is ~800&nbsp;MB. Copies cost microseconds; memory costs the run.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>The five approaches</h2>
+    <p class="chain-legend">
+      chain legend — <span style="color:var(--accent)">▮</span> live chare buffers ·
+      <span style="color:var(--warn)">▮</span> staging buffer · ⇢ transport hop ·
+      <strong>→</strong> counted data copy
+    </p>
+
+    <article class="option is-current">
+      <div class="option-head">
+        <h3>A · Stage and push</h3>
+        <span class="chip neut">In use today</span>
+        <span class="chip good">Proven cross-node</span>
+      </div>
+      <p>
+        The source PUPs its device buffers into an LB staging buffer, pushes that buffer to the
+        destination as a <code>CkDeviceBuffer</code>, and destroys the chare immediately. The
+        destination receives into its own staging buffer and PUPs out into the new chare's buffers.
+      </p>
+      <div class="chainbox">
+        <ol class="chain">
+          <li class="buf">src chare buffers</li><li class="arrow counted">→</li>
+          <li class="stage">src LB staging</li><li class="arrow">⇢</li>
+          <li class="wire">transport</li><li class="arrow counted">→</li>
+          <li class="stage">dst LB staging</li><li class="arrow counted">→</li>
+          <li class="buf">dst chare buffers</li>
+        </ol>
+      </div>
+      <dl class="facts">
+        <div><dt>Copies</dt><dd>3</dd></div>
+        <div><dt>Peak memory</dt><dd>2S src · 2S dst</dd></div>
+        <div><dt>LB buffer</dt><dd>both sides</dd></div>
+        <div><dt>Device-wide sync</dt><dd>yes, per migration</dd></div>
+        <div><dt>Handle setup</dt><dd>none</dd></div>
+      </dl>
+      <div class="verdict">
+        <span class="label">Optimizes</span>
+        <p>
+          <strong>Simplicity and lifetime safety.</strong> The source owns nothing after packing, so
+          there is no deferred destruction, no acknowledgement protocol, and no window where a
+          destination reads memory the source might free. That is a real asset — it is why this is
+          the version that works.
+        </p>
+        <span class="label">Costs</span>
+        <p>
+          The most copies and the most memory of any option, plus a full
+          <code>cudaDeviceSynchronize()</code> on the migration path that stalls the whole device,
+          not just the stream. When many chares migrate together those syncs serialize.
+        </p>
+      </div>
+    </article>
+
+    <article class="option is-blocked">
+      <div class="option-head">
+        <h3>B · Export handles, destination pulls</h3>
+        <span class="chip warn">Ported, unreachable</span>
+        <span class="chip crit">No cross-node path</span>
+      </div>
+      <p>
+        The source exports one CUDA IPC handle per device buffer and holds the chare alive; the
+        destination opens each handle and copies straight out of the source's live buffers into its
+        staging buffer, then acknowledges so the source can finally destroy.
+      </p>
+      <div class="chainbox">
+        <ol class="chain">
+          <li class="buf">src chare buffers</li><li class="arrow counted">→</li>
+          <li class="stage">dst LB staging</li><li class="arrow counted">→</li>
+          <li class="buf">dst chare buffers</li>
+        </ol>
+      </div>
+      <dl class="facts">
+        <div><dt>Copies</dt><dd>2</dd></div>
+        <div><dt>Peak memory</dt><dd>S src · 2S dst</dd></div>
+        <div><dt>LB buffer</dt><dd>destination only</dd></div>
+        <div><dt>Device-wide sync</dt><dd>none</dd></div>
+        <div><dt>Handle setup</dt><dd>2k open + k close</dd></div>
+      </dl>
+      <div class="verdict">
+        <span class="label">Optimizes</span>
+        <p>
+          <strong>Source-side memory.</strong> Removing source staging halves that side's LB-buffer
+          requirement, which is the reservation you can then give back to the application.
+        </p>
+        <span class="label">Costs</span>
+        <p>
+          <code>cudaIpcOpenMemHandle</code> runs roughly 100&nbsp;µs–1&nbsp;ms and is paid
+          <em>per buffer, per migration</em>. Against ~1&nbsp;TB/s device bandwidth, the one copy it
+          saves only pays for itself somewhere around 100&nbsp;MB per buffer — so a chare with several
+          small buffers pays <code>k</code> times over and saves proportionally less. It also
+          introduces deferred destruction and an ack protocol, and IPC handles must name allocation
+          bases: pointers suballocated from the buddy allocator would silently resolve to the wrong
+          offset. Cross-node needs <code>CmiSendDevice</code>, which does not exist under reconverse.
+        </p>
+      </div>
+    </article>
+
+    <article class="option is-proposed">
+      <div class="option-head">
+        <h3>C · Host first, pull into place</h3>
+        <span class="chip neut">Proposed</span>
+        <span class="chip good">Memory floor</span>
+      </div>
+      <p>
+        Process the host message <em>before</em> the device transfer, so PUP allocates the destination
+        chare's real buffers first. Then pull each source buffer directly into its final destination
+        buffer. No staging exists on either side.
+      </p>
+      <div class="chainbox">
+        <ol class="chain">
+          <li class="buf">src chare buffers</li><li class="arrow counted">→</li>
+          <li class="buf">dst chare buffers</li>
+        </ol>
+      </div>
+      <dl class="facts">
+        <div><dt>Copies</dt><dd>1</dd></div>
+        <div><dt>Peak memory</dt><dd>S src · S dst</dd></div>
+        <div><dt>LB buffer</dt><dd>none</dd></div>
+        <div><dt>Device-wide sync</dt><dd>none</dd></div>
+        <div><dt>Handle setup</dt><dd>transport-dependent</dd></div>
+      </dl>
+      <div class="verdict">
+        <span class="label">Optimizes</span>
+        <p>
+          <strong>Memory, to the theoretical minimum</strong> — the bytes exist once on each side and
+          nowhere else. <code>+gpulbbuffer</code> could shrink toward zero for the migration path,
+          returning that reservation to the application permanently. It also happens to be the fewest
+          copies, and it sidesteps the IPC base-pointer hazard because the destination pulls into
+          freshly allocated chare buffers rather than a suballocated region.
+        </p>
+        <span class="label">Costs</span>
+        <p>
+          Ordering becomes mandatory. Today whichever of the host message or the device transfer
+          arrives second drives the unpack; this design requires host-then-device, and PUP has to
+          split into allocate-then-fill rather than copying out of a contiguous blob. That is the
+          real work — a rendezvous change plus a PUP restructuring, not a port.
+        </p>
+      </div>
+    </article>
+
+    <article class="option is-shipped">
+      <div class="option-head">
+        <h3>D · Pointer handoff, same process and GPU</h3>
+        <span class="chip good">Implemented</span>
+        <span class="chip warn">Unverified</span>
+      </div>
+      <p>
+        When source and destination PEs are threads of one process bound to the same GPU, nothing
+        needs to move at all. Ownership of the live <code>CkMigratable</code> objects transfers by
+        raw pointer; device pointers stay valid because the address space and context are shared.
+      </p>
+      <div class="chainbox">
+        <ol class="chain">
+          <li class="buf">chare buffers stay put — ownership transfers</li>
+        </ol>
+      </div>
+      <dl class="facts">
+        <div><dt>Copies</dt><dd>0</dd></div>
+        <div><dt>Peak memory</dt><dd>S total</dd></div>
+        <div><dt>LB buffer</dt><dd>none</dd></div>
+        <div><dt>Device-wide sync</dt><dd>none</dd></div>
+        <div><dt>Applies to</dt><dd>same proc + same GPU</dd></div>
+      </dl>
+      <div class="verdict">
+        <span class="label">Optimizes</span>
+        <p>
+          <strong>Everything, within a narrow scope.</strong> This is strictly the best option wherever
+          it applies, and it is the case that matters most for the intra-group CPU rebalancing a
+          two-level GPU load balancer leans on.
+        </p>
+        <span class="label">Costs</span>
+        <p>
+          Applicability only. It bypasses PUP entirely, so any semantics a chare's PUP routine
+          performs beyond copying bytes are skipped — worth auditing per application.
+        </p>
+      </div>
+    </article>
+
+    <article class="option is-proposed">
+      <div class="option-head">
+        <h3>E · Peer copy, same process across GPUs</h3>
+        <span class="chip neut">Gap — not implemented</span>
+      </div>
+      <p>
+        Two PEs in one process bound to <em>different</em> GPUs. Both pointers are valid in the same
+        address space, so a peer-to-peer device copy moves the bytes directly with no handles and no
+        staging. Today this case falls back to the full packed path.
+      </p>
+      <div class="chainbox">
+        <ol class="chain">
+          <li class="buf">src chare buffers</li><li class="arrow counted">→</li>
+          <li class="wire">peer copy</li><li class="arrow">⇢</li>
+          <li class="buf">dst chare buffers</li>
+        </ol>
+      </div>
+      <dl class="facts">
+        <div><dt>Copies</dt><dd>1</dd></div>
+        <div><dt>Peak memory</dt><dd>S src · S dst</dd></div>
+        <div><dt>LB buffer</dt><dd>none</dd></div>
+        <div><dt>Device-wide sync</dt><dd>none</dd></div>
+        <div><dt>Handle setup</dt><dd>none</dd></div>
+      </dl>
+      <div class="verdict">
+        <span class="label">Optimizes</span>
+        <p>
+          <strong>The multi-GPU-per-process configuration</strong>, which reconverse supports via
+          <code>device_count</code> but which currently pays the full three-copy price for no reason.
+          Cheapest option after D and needs no IPC machinery.
+        </p>
+      </div>
+    </article>
+  </section>
+
+  <section>
+    <h2>Side by side</h2>
+    <div class="tablebox">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Approach</th>
+            <th scope="col">Copies</th>
+            <th scope="col">Peak src</th>
+            <th scope="col">Peak dst</th>
+            <th scope="col">LB buffer</th>
+            <th scope="col">Dev sync</th>
+            <th scope="col">Primary win</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">A · Stage and push</th>
+            <td class="num">3</td><td class="num">2S</td><td class="num">2S</td>
+            <td>both sides</td><td>yes</td><td>simplicity, safety</td>
+          </tr>
+          <tr>
+            <th scope="row">B · Export and pull</th>
+            <td class="num">2</td><td class="num">S</td><td class="num">2S</td>
+            <td>dst only</td><td>no</td><td>source memory</td>
+          </tr>
+          <tr>
+            <th scope="row">C · Pull into place</th>
+            <td class="num">1</td><td class="num">S</td><td class="num">S</td>
+            <td>none</td><td>no</td><td>memory floor</td>
+          </tr>
+          <tr>
+            <th scope="row">D · Pointer handoff</th>
+            <td class="num">0</td><td class="num">S</td><td class="num">—</td>
+            <td>none</td><td>no</td><td>everything, narrow</td>
+          </tr>
+          <tr>
+            <th scope="row">E · Peer copy</th>
+            <td class="num">1</td><td class="num">S</td><td class="num">S</td>
+            <td>none</td><td>no</td><td>multi-GPU per process</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="chain-legend">
+      S = device bytes held by one chare. During a load-balance step, LB-buffer demand scales as N·S
+      per side for the N chares leaving a PE simultaneously.
+    </p>
+  </section>
+
+  <section>
+    <h2>Transport availability under reconverse</h2>
+    <p>
+      Staging strategy and transport are independent choices, but not every transport exists here.
+      Regular entry methods with device parameters already exercise all three working transports —
+      the migration path can use exactly the same ones.
+    </p>
+    <div class="tablebox">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Source → destination</th>
+            <th scope="col">Transport</th>
+            <th scope="col">Used by entry methods</th>
+            <th scope="col">Available to migration</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">Same logical node</th>
+            <td>direct device-to-device copy</td>
+            <td>yes</td><td>yes</td>
+          </tr>
+          <tr>
+            <th scope="row">Same physical node</th>
+            <td>pre-shared comm buffer + IPC events</td>
+            <td>yes</td><td>yes</td>
+          </tr>
+          <tr>
+            <th scope="row">Across physical nodes</th>
+            <td><code>CmiNcpyBuffer::rdmaGet</code> (LCI)</td>
+            <td>yes</td><td>yes</td>
+          </tr>
+          <tr>
+            <th scope="row">Across physical nodes</th>
+            <td><code>CmiSendDevice</code> / LRTS</td>
+            <td>no</td><td><strong>no — absent under reconverse</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      The last row is the one that constrains the port. <code>CmiSendDevice</code> is charm-layer code,
+      but <code>RECONVERSE=1</code> replaces the entire converse target, and its implementation bottoms
+      out in <code>LrtsSendDevice</code> from charm's ucx/mpi machine layers — also replaced. Any
+      cross-node strategy has to be written against <code>rdmaGet</code> instead, which is a better fit
+      regardless: it is already a destination-pull primitive, which is the semantics approaches B and C
+      want.
+    </p>
+  </section>
+
+  <section>
+    <h2>What to pick, by topology</h2>
+    <div class="tablebox">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Case</th>
+            <th scope="col">Recommendation</th>
+            <th scope="col">Rationale</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">Same process, same GPU</th>
+            <td>D · pointer handoff</td>
+            <td>Zero cost. Already implemented; needs verification.</td>
+          </tr>
+          <tr>
+            <th scope="row">Same process, other GPU</th>
+            <td>E · peer copy</td>
+            <td>One copy, no handles. Currently an unnecessary gap.</td>
+          </tr>
+          <tr>
+            <th scope="row">Same node, other process</th>
+            <td>A today → C when ready</td>
+            <td>B's per-buffer handle cost likely exceeds the copy it saves.</td>
+          </tr>
+          <tr>
+            <th scope="row">Across nodes</th>
+            <td>A today → C via <code>rdmaGet</code></td>
+            <td>Biggest memory win; transport already exists and pulls.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Before committing</h2>
+    <ul class="notes">
+      <li>
+        <strong>Migration of GPU-resident chares currently fails on this branch</strong> under a
+        forced-migration LB — the existing path crashes inside <code>immigrateGPU</code>, and the
+        pointer-handoff path loses data. There is no known-good baseline to measure against yet, and
+        that should be fixed before layering more on top.
+      </li>
+      <li>
+        <strong>Measure <code>cudaIpcOpenMemHandle</code> on the target hardware.</strong> That single
+        number decides whether approach B belongs in the tree at all, and it is a ten-line benchmark.
+      </li>
+      <li>
+        <strong>Characterize <code>k</code> and <code>S</code> for real chares.</strong> Per-buffer
+        handle costs scale with <code>k</code>; copy savings scale with <code>S</code>. pic2d sits near
+        50&nbsp;MB per patch across two dominant buffers.
+      </li>
+      <li>
+        <strong>Compare reserved <code>+gpulbbuffer</code> against peak concurrent demand.</strong> If
+        the reservation is sized for N·S and approach C drops it to zero, that memory returns to the
+        application for the entire run — likely the largest single win available here.
+      </li>
+    </ul>
+  </section>
+
+  <footer>
+    Figures are per migrating chare: S = its device bytes, k = its device buffer count.
+    Copy counts include the transport hop. Peak memory counts live chare buffers plus staging on
+    each side, and doubles when source and destination share one GPU.
+  </footer>
+
+</div>

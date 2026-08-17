@@ -358,6 +358,10 @@ public:
   /// Called by the system just before and after migration to another processor:
   virtual void ckAboutToMigrate(void);
   virtual void ckJustMigrated(void);
+  // Intra-process migration fast path: maintain the per-PE state that the
+  // packed path maintains implicitly via destruction and reconstruction.
+  int ckPrepareIntraProcessMigrate() override;
+  void ckFinalizeIntraProcessMigrate(CkLocRec* newRec, int epoch) override;
 
   virtual void ckJustRestored(void);
 

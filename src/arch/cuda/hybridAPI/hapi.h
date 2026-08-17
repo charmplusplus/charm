@@ -244,26 +244,14 @@ static inline hapiError_t hapiFreeHost_Pool(void* ptr, bool pool) {
   return pool ? hapiPoolFree(ptr) : hapiFreeHost(ptr);
 }
 
-void hapiRecordTime(cudaStream_t stream, cudaEvent_t start);
 #ifdef CMK_LBDB_ON
 void hapiCuptiInit();
 void hapiCuptiFinalize();
 uint64_t hapiCuptiPushObjCorrelation();
 void hapiCuptiPopObjCorrelation();
 void hapiProcessCuptiBuffers();
+void hapiNormalizeCuptiLoads();
 void hapiClearCuptiData();
-#endif
-
-#ifdef CMK_LBDB_ON
-#define HAPI_LAUNCH_KERNEL_WRAPPER(call, stream)\
-    cudaEvent_t start;\
-    cudaEventCreate(&start);\
-    cudaEventRecord(start, stream);\
-    call;\
-    hapiRecordTime(stream, start);
-#else
-#define HAPI_LAUNCH_KERNEL_WRAPPER(call, stream)\
-    call;
 #endif
 
 #ifdef CMK_LBDB_ON
@@ -275,6 +263,24 @@ void hapiClearCuptiData();
 #define CUPTI_LAUNCH_WRAPPER(call)\
   call;
 #endif
+
+// Convenience form of kernel<<<grid, block, shmem, stream>>>(args...).
+//
+// This carries no instrumentation. CUPTI external-correlation IDs are pushed
+// once per entry method in CkCallstackPush/Pop, which covers every kernel
+// launched from application code regardless of how it is launched, so there is
+// nothing for a per-launch wrapper to add.
+//
+// Only visible to the CUDA compiler: the <<<>>> launch syntax is not valid C++
+// for a host-only compiler, and hapi.h is included by both.
+#if defined(__CUDACC__)
+template <typename Kernel, typename... Args>
+inline void hapiLaunchKernelWrapper(Kernel kernel, dim3 grid_dim, dim3 block_dim,
+                                    size_t shared_mem, cudaStream_t stream,
+                                    Args... args) {
+  kernel<<<grid_dim, block_dim, shared_mem, stream>>>(args...);
+}
+#endif // __CUDACC__
 
 #endif /* defined __cplusplus */
 

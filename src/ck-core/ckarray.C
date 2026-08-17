@@ -387,6 +387,31 @@ void ArrayElement::ckDestroy(void)
   thisArray->deleteElt(CkMigratable::ckGetID());
 }
 
+// ---- Intra-process migration fast path -------------------------------
+// The packed migration path maintains two pieces of per-PE state implicitly:
+// ~ArrayElement() removes the element from the source PE's array_objs table,
+// and ArrayElement::pup() re-resolves thisArray to the destination PE's local
+// branch on unpack. The pointer-handoff path neither destroys nor re-pups, so
+// it must do both explicitly -- otherwise the element stays registered for
+// fast delivery on the PE it left, and keeps calling into that PE's CkArray
+// branch.
+
+int ArrayElement::ckPrepareIntraProcessMigrate()
+{
+  // Stop fast message delivery finding this element on the source PE.
+  CkpvAccess(array_objs).erase(ckGetID().getID());
+  return CkMigratable::ckPrepareIntraProcessMigrate();
+}
+
+void ArrayElement::ckFinalizeIntraProcessMigrate(CkLocRec* newRec, int epoch)
+{
+  CkMigratable::ckFinalizeIntraProcessMigrate(newRec, epoch);
+  // Rebind to the destination PE's array branch, as pup() does on unpack.
+  thisArray = thisArrayID.ckLocalBranch();
+  // Register for fast message delivery on the destination PE.
+  CkpvAccess(array_objs)[ckGetID().getID()] = this;
+}
+
 // Destructor (virtual)
 ArrayElement::~ArrayElement()
 {

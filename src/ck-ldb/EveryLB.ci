@@ -7,6 +7,7 @@ module EveryLB {
   extern module RecBipartLB;
   extern module GreedyCentralLB;
   extern module GreedyRefineCentralLB;
+  extern module GreedyRefineCentralGPULB;
 
   initnode void initEveryLB(void);
 };

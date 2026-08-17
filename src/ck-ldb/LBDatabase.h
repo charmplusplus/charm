@@ -81,32 +81,24 @@ public:
     LbObj(h)->getGPUTime(&gputime);
   };
 
-  inline void SetObjGPULoad(std::unordered_map<uint64_t, uint64_t> &id_gputimeMap)
+  // Copy the per-object normalized GPU loads computed by
+  // hapiNormalizeCuptiLoads into this PE's LB objects. The map is shared
+  // per-process and every PE reads it concurrently, so this must not mutate it.
+  inline void SetObjGPULoad(const std::unordered_map<uint64_t, double> &id_loadMap)
   {
-    int matched = 0;
-    int liveObjs = 0;
     for (int i = 0; i < objs.size(); i++) {
       if(objs[i].obj == nullptr)
         continue;
-      liveObjs++;
       // The CUPTI map is keyed by raw element IDs (from CkMigratable::ckGetID()).
       // The LB database stores IDs with collection bits prepended (when
       // CMK_GLOBAL_LOCATION_UPDATE is set). Strip collection bits to match.
       CmiUInt8 lb_id = objs[i].obj->ObjData().objID();
       CmiUInt8 raw_id = ck::ObjID(lb_id).getElementID();
-      auto it = id_gputimeMap.find(raw_id);
-      if(it==id_gputimeMap.end()) {
-        // CkPrintf("[PE %d] SetObjGPULoad: obj %d lb_id=%lu raw_id=%lu NO MATCH\n", CmiMyPe(), i, (unsigned long)lb_id, (unsigned long)raw_id);
+      auto it = id_loadMap.find(raw_id);
+      if(it==id_loadMap.end())
         continue;
-      }
-
-      matched++;
-      // CkPrintf("[PE %d] SetObjGPULoad: obj %d id=%lu -> gpuTime=%.6f s\n",
-      //          CmiMyPe(), i, (unsigned long)it->first, it->second / 1.0e9);
-      objs[i].obj->setGPUTiming(it->second / 1.0e9);
+      objs[i].obj->setGPUTiming(it->second);
     }
-    // CkPrintf("[PE %d] SetObjGPULoad: %d/%d live objects matched from %zu CUPTI entries (objs.size=%zu)\n",
-    //          CmiMyPe(), matched, liveObjs, id_gputimeMap.size(), objs.size());
   }
   inline void* GetObjUserData(LDObjHandle &h) {
     return LbObj(h)->getLocalUserData();

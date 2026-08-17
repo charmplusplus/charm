@@ -106,7 +106,7 @@ void invokeInitKernel(DataType* d_temperature, int block_width, int block_height
   dim3 grid_dim(((block_width + 2) + (block_dim.x - 1)) / block_dim.x,
       ((block_height + 2) + (block_dim.y - 1)) / block_dim.y);
 
-  HAPI_LAUNCH_KERNEL_WRAPPER((initKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature, block_width, block_height)), stream)
+  initKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature, block_width, block_height);
   // hapiLaunchKernelWrapper(initKernel, grid_dim, block_dim, 0, stream,
   //     d_temperature, block_width, block_height);
   hapiCheck(cudaPeekAtLastError());
@@ -154,7 +154,7 @@ void invokeJacobiKernel(DataType* d_temperature, DataType* d_new_temperature,
   dim3 grid_dim((block_width + (block_dim.x - 1)) / block_dim.x,
       (block_height + (block_dim.y - 1)) / block_dim.y);
 
-  HAPI_LAUNCH_KERNEL_WRAPPER((jacobiKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature, d_new_temperature, block_width, block_height, iter)), stream)
+  jacobiKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature, d_new_temperature, block_width, block_height, iter);
   // hapiLaunchKernelWrapper(jacobiKernel, grid_dim, block_dim, 0, stream,
   //     d_temperature, d_new_temperature, block_width, block_height, iter);
   hapiCheck(cudaPeekAtLastError());

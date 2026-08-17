@@ -4,6 +4,16 @@
  * converse.h.
  */
 
+// When building against Reconverse, these enums are provided by Reconverse's
+// own converse.h (they moved there in reconverse commit 95ce7e1), and defining
+// them here too is a hard redefinition error.
+//
+// Testing CMK_RECONVERSE alone is not enough: charmxi includes conv-config.h
+// without ever including converse.h, so it still needs these definitions. Skip
+// them only when Reconverse's converse.h has actually been seen in this
+// translation unit -- it defines CONVERSE_H before including conv-config.h.
+#if !CMK_RECONVERSE || !defined(CONVERSE_H)
+
 // Enum for registration modes used in the Zerocopy API
 // TODO:Convert to typed enum post C++ conversion
 enum ncpyRegModes {
@@ -54,9 +64,13 @@ enum ncpyDeregModes {
   CMK_BUFFER_NODEREG  = 5
 };
 
+#endif // !CMK_RECONVERSE || !defined(CONVERSE_H)
+
 // default of CMK_COMMON_NOCOPY_DIRECT_BYTES assumes no CMA support
 // Refined for lrts layers with CMA support inside lrts-common.h
 #define CMK_COMMON_NOCOPY_DIRECT_BYTES 0
+
+#if !CMK_RECONVERSE || !defined(CONVERSE_H)
 
 // Enum for the type of zerocopy operation
 // TODO: Convert to typed enum post C++ conversion
@@ -100,6 +114,8 @@ enum cmiZCMsgType {
   CMK_ZC_BCAST_RECV_ALL_DONE_MSG = 7,
   CMK_ZC_DEVICE_MSG = 8
 };
+
+#endif // !CMK_RECONVERSE || !defined(CONVERSE_H)
 
 #ifndef CMK_NOCOPY_DIRECT_BYTES
 

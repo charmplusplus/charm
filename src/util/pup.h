@@ -487,6 +487,12 @@ class toMem : public mem {
   virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
 
  public:
+  // If non-null, DEVICE-mode bytes() calls append (src_ptr, size) to this
+  // collector instead of copying into gpuBuf. Used by pointer-and-get style
+  // migration, where the destination pulls the device payload directly from
+  // the source's live buffers rather than the source packing a staging copy.
+  std::vector<std::pair<void*, size_t>>* deviceCollector = nullptr;
+
   //Write data to the given buffer
   toMem(void* Nbuf, 
     void* gpuNbuf,

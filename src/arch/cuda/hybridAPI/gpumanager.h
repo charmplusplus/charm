@@ -14,6 +14,11 @@
 #include <cupti.h>
 #include <unordered_map>
 #include <queue>
+#include <mutex>
+
+#if CMK_LBDB_ON
+#include "lbdb.h"  // for LBKernelRecord
+#endif
 
 // Initial size of the user-addressed portion of host/device buffer arrays;
 // the system-addressed portion of host/device buffer arrays (used when there
@@ -167,9 +172,27 @@ struct GPUManager {
 #ifdef CMK_LBDB_ON
   std::unordered_map<uint32_t, uint64_t> cupti_correlation_db_;//correlationID -> ObjectID
 
-  std::unordered_map<uint64_t, uint64_t> cupti_obj_gpu_times_;//objectID -> accumulated GPU time in ns
-  
+  // Per-kernel records: objectID -> list of (start_ns, end_ns, device, sms_used).
+  std::unordered_map<uint64_t, std::vector<LBKernelRecord>> cupti_obj_kernel_records_;
+
+  // Kernels that could not be attributed to any object (launched outside a
+  // migratable entry method, or with no correlation record). They occupy SMs
+  // and so take part in the sweep-line as contention, but receive no load.
+  // Kept separate rather than under a sentinel object ID, because 0 is a
+  // perfectly valid chare element ID.
+  std::vector<LBKernelRecord> cupti_unattributed_kernels_;
+
+  // objectID -> SM-utilization-normalized GPU load in seconds, produced by
+  // hapiNormalizeCuptiLoads. This is what the LB actually consumes; every PE
+  // in the process reads it concurrently, so it is const after that call.
+  std::unordered_map<uint64_t, double> cupti_obj_norm_load_;
+
+  // Written by CUPTI's buffer-completed callback, which may run on a
+  // CUPTI-owned thread. That thread exists in non-SMP builds too, where the
+  // Converse locks compile out, so this needs a real mutex rather than a
+  // CmiNodeLock.
   std::queue<CuptiBufferItem> cupti_buffer_queue_;
+  std::mutex cupti_queue_lock_;
 
   bool cupti_initialized_;
 #endif

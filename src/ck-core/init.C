@@ -1656,7 +1656,10 @@ void _initCharm(int unused_argc, char **argv)
           _topoTree = ST_RecursivePartition_getTreeInfo(0);
         }
         CmiNodeAllBarrier(); // threads wait until _topoTree has been generated
-#if CMK_SHARED_VARS_POSIX_THREADS_SMP
+// Reconverse owns idle policy and does not export _Cmi_sleepOnIdle /
+// _Cmi_forceSpinOnIdle (they live in Charm's own machine layer, which
+// Reconverse replaces), so skip this oversubscription warning there.
+#if CMK_SHARED_VARS_POSIX_THREADS_SMP && !CMK_RECONVERSE
         if (CmiCpuTopologyEnabled()) {
             int *pelist;
             int num;

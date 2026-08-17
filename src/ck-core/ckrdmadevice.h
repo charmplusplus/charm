@@ -60,6 +60,18 @@ struct CkDevicePersistent {
   CkDeviceStatus put(CkDevicePersistent& dst);
 };
 
+// Descriptor for a single device buffer being transferred via the
+// pointer-and-get migration path. Which fields are populated depends on
+// the transport chosen for the source->destination pair (see
+// DeviceMigrationStrategy). The destination derives the source's CmiNode
+// from CkArrayElementMigrateHandleMessage::src_pe.
+struct CkDeviceMigrateHandle {
+  uintptr_t src_ptr;              // MEMCPY: raw src pointer (same process)
+  size_t size;                    // bytes
+  hapiIpcMemHandle_t ipc_handle;  // IPC: handle openable in dst process
+  uint64_t rdma_tag;              // RDMA: tag assigned by CmiSendDevice
+};
+
 struct CkDeviceBufferPost {
   // CUDA stream for device transfers
   hapiStream_t hapi_stream;

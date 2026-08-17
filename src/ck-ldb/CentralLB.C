@@ -165,12 +165,15 @@ if (CmiMyRank() == 0)
   double start = CkWallTimer();
   cuptiActivityFlushAll(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED);//sync flush cupti records which are finished, does not wait for partial records
   hapiProcessCuptiBuffers();
+  // Reduce the kernel timeline to one scalar load per object here, while the
+  // records are still local. Only those scalars are sent to the central LB.
+  hapiNormalizeCuptiLoads();
 }
 #if CMK_SMP
   CmiNodeBarrier();  // ensure rank 0 finishes buffer processing before other ranks read the map
 #endif
-  // Every PE matches its own objects against the shared per-process CUPTI map
-  lbmgr->SetObjGPULoad(CsvAccess(gpu_manager).cupti_obj_gpu_times_);
+  // Every PE picks up the normalized loads for its own objects
+  lbmgr->SetObjGPULoad(CsvAccess(gpu_manager).cupti_obj_norm_load_);
 #endif
 
   {
@@ -349,6 +352,7 @@ void CentralLB::BuildStatsMsg()
 #if CMK_CUDA
   // printf("CMK_CUDA setting device is %ld\n", hapiMyDevice());
   msg->gpu_device_id = hapiMyDevice();
+  msg->gpu_total_sms = hapiMyDeviceTotalSMs();
   size_t freeMem, totalMem;
   cudaMemGetInfo(&freeMem, &totalMem);
   msg->gpu_mem_remaining = freeMem;
@@ -496,6 +500,7 @@ void CentralLB::depositData(CLBStatsMsg *m)
   procStat.pe_speed = m->pe_speed;
 #if CMK_CUDA
   procStat.gpu_device_id = m->gpu_device_id;
+  procStat.gpu_total_sms = m->gpu_total_sms;
   procStat.gpu_mem_remaining = m->gpu_mem_remaining;
   procStat.pool_buff_mem_remaining = m->pool_buff_mem_remaining;
 #endif
@@ -576,6 +581,7 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &&msg)
       procStat.pe_speed = m->pe_speed;
 #if CMK_CUDA
       procStat.gpu_device_id = m->gpu_device_id;
+      procStat.gpu_total_sms = m->gpu_total_sms;
       procStat.gpu_mem_remaining = m->gpu_mem_remaining;
       procStat.pool_buff_mem_remaining = m->pool_buff_mem_remaining;
 #endif
@@ -1743,6 +1749,7 @@ void CLBStatsMsg::pup(PUP::er &p) {
   p|pe_speed;
 #if CMK_CUDA
   p|gpu_device_id;
+  p|gpu_total_sms;
   p|gpu_mem_remaining;
   p|pool_buff_mem_remaining;
 #endif

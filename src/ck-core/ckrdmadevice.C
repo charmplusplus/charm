@@ -346,22 +346,29 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     // Store information about this buffer
     DeviceRdmaOp& save_op = *(DeviceRdmaOp*)((char*)rdma_data
         + sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * i);
-    save_op.dest_pe  = source.dest_pe;
+    // Use the PE we are actually running on, not the one the sender recorded.
+    // If the target chare migrated after the sender posted this transfer, the
+    // sender's dest_pe is stale; the message itself has already been routed
+    // here by the location manager, so this PE is the one that hosts the chare
+    // and that posted arrPtrs below.
+    save_op.dest_pe  = CkMyPe();
     save_op.dest_ptr = arrPtrs[i];
     save_op.size = (size_t)arrSizes[i];
     save_op.info = rdma_info;
     save_op.src_cb = (source.cb.type != CkCallback::ignore) ? new CkCallback(source.cb) : nullptr;
     save_op.dst_cb = nullptr;
 
-    // Machine layer does not support GPU-aware communication
-    // Check if destination PE is correct
-    // TODO: Handle this case instead of aborting
-    // Chare* obj = CkActiveObj();
-    // CmiUInt8 id = obj->id; 
-    if (source.dest_pe != CkMyPe()) {
-      CmiPrintf("Current PE %d does not match the destination PE %d and sender determined to be %d\n", CkMyPe(), source.dest_pe, env->getSrcPe());
-      CkAbort("Current PE does not match the destination PE determined by the sender. "
-          "Please enable CMK_GLOBAL_LOCATION_UPDATE.");
+    // A mismatch here means the target chare migrated between the sender
+    // posting this transfer and its arrival. That is expected and safe: the
+    // transfer mode above is derived from CkMyPe(), the destination buffers
+    // are the ones this PE posted, and the message reached this PE precisely
+    // because the location manager knows the chare lives here now. Previously
+    // this aborted, which made any migration concurrent with a GPU-direct send
+    // fatal.
+    if (source.dest_pe != CkMyPe() && _lb_args.debug() > 1) {
+      CmiPrintf("[%d] CkRdmaDeviceIssueRgets: sender addressed PE %d (src PE %d); "
+                "chare has since migrated here, retargeting.\n",
+                CkMyPe(), source.dest_pe, env->getSrcPe());
     }
 
     // Destination buffer (on this receiver)

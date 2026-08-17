@@ -342,9 +342,9 @@ class LBManager : public CBase_LBManager
   {
     lbdb_obj->GetObjGPULoad(h, gputime);
   };
-  void SetObjGPULoad(std::unordered_map<uint64_t, uint64_t> &id_gputimeMap)
+  void SetObjGPULoad(const std::unordered_map<uint64_t, double> &id_loadMap)
   {
-    lbdb_obj->SetObjGPULoad(id_gputimeMap);
+    lbdb_obj->SetObjGPULoad(id_loadMap);
   }
   void* GetObjUserData(LDObjHandle& h) { return lbdb_obj->GetObjUserData(h); }
   void MetaLBCallLBOnChares() { lbdb_obj->MetaLBCallLBOnChares(); }
