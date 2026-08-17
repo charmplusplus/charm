@@ -1557,8 +1557,24 @@ static void ipcHandleCreate() {
   hapi_ipc_device_info& my_device_info = csv_gpu_manager.hapi_ipc_device_infos[csv_gpu_manager.device_count * CmiMyNodeRankLocal() + cpv_my_device_id];
   hapi_ipc_event_shared* shm_event_shared = (hapi_ipc_event_shared*)((char*)shm_mem_handle + sizeof(hapiIpcMemHandle_t));
 
+  // Each slot carries a pthread mutex that lives in the shared-memory region
+  // and is locked by BOTH the owning process and whichever peer receives from
+  // it. A pthread mutex is process-private unless it is explicitly created
+  // with PTHREAD_PROCESS_SHARED, and mmap'd memory merely starts zeroed --
+  // which is not a valid initialized mutex. Locking it from the peer process
+  // was undefined behavior and segfaulted on the first cross-process transfer.
+  // Only the slot's owner initializes it, before any peer can reach it: the
+  // CmiBarrier between ipcHandleCreate and ipcHandleOpen orders that.
+  pthread_mutexattr_t shared_attr;
+  pthread_mutexattr_init(&shared_attr);
+  pthread_mutexattr_setpshared(&shared_attr, PTHREAD_PROCESS_SHARED);
+
   for (int i = 0; i < csv_gpu_manager.hapi_ipc_event_pool_size_total; i++) {
     hapi_ipc_event_shared* cur_shm_event_shared = shm_event_shared + i;
+
+    pthread_mutex_init(&cur_shm_event_shared->lock, &shared_attr);
+    cur_shm_event_shared->src_flag = false;
+    cur_shm_event_shared->dst_flag = false;
 
     my_device_info.event_pool_flags.push_back(0);
     my_device_info.event_pool_buff_offsets.push_back(0);
@@ -1573,6 +1589,8 @@ static void ipcHandleCreate() {
     hapiCheck(hapiIpcGetEventHandle(&cur_shm_event_shared->dst_event_handle,
           my_device_info.dst_event_pool[i]));
   }
+
+  pthread_mutexattr_destroy(&shared_attr);
 
   // Store device comm buffer ptr in local info (just in case)
   my_device_info.buffer = device_ptr;
