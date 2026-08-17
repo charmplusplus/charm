@@ -106,6 +106,15 @@
 
 #ifdef CMK_HIP
 
+// This header is pulled in by charm++.h, so any user code compiled against a
+// HIP-enabled build ends up including hip_runtime.h through a plain host
+// compiler (g++), which does not set a HIP platform macro on its own. The
+// Charm++ build itself gets this from cmake; supply it here so user code
+// compiled with charmc sees the same platform.
+#if !defined(__HIP_PLATFORM_AMD__) && !defined(__HIP_PLATFORM_NVIDIA__)
+#define __HIP_PLATFORM_AMD__
+#endif
+
 #include <hip/hip_runtime.h>
 
 #define hapiStream_t hipStream_t
