@@ -1,0 +1,452 @@
+<title>GPU Load Balancer Plan</title>
+<style>
+  @font-face {
+    font-family: 'Plan';
+    src: local('SF Mono'), local('Menlo'), local('Consolas'), local('monospace');
+  }
+  :root {
+    --bg: #fafaf8;
+    --fg: #1a1a1a;
+    --fg-dim: #5c5c5c;
+    --accent: #2563eb;
+    --accent-dim: #93b4f5;
+    --surface: #f0f0ec;
+    --border: #d4d4cf;
+    --phase-bg: #e8eef8;
+    --phase-border: #b8ccee;
+    --warn-bg: #fef3e0;
+    --warn-border: #e8c87a;
+    --code-bg: #eaeae6;
+    --table-header: #e4e4df;
+    --table-stripe: #f5f5f2;
+    --tag-cpu: #dbeafe;
+    --tag-gpu: #d1fae5;
+    --tag-mem: #fce7f3;
+    --tag-topo: #ede9fe;
+    --tag-done: #cdebd4;
+    --tag-done-fg: #1d5c30;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #161618;
+      --fg: #e4e4e0;
+      --fg-dim: #8a8a84;
+      --accent: #6d9eff;
+      --accent-dim: #3a5a99;
+      --surface: #1e1e22;
+      --border: #333338;
+      --phase-bg: #1a2236;
+      --phase-border: #2a3a5a;
+      --warn-bg: #2a2218;
+      --warn-border: #5a4a28;
+      --code-bg: #222226;
+      --table-header: #242428;
+      --table-stripe: #1c1c20;
+      --tag-cpu: #1e3a5e;
+      --tag-gpu: #1a3a2e;
+      --tag-mem: #3a1e2e;
+      --tag-topo: #2a2240;
+      --tag-done: #1c4a2a;
+      --tag-done-fg: #86d99b;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #161618;
+    --fg: #e4e4e0;
+    --fg-dim: #8a8a84;
+    --accent: #6d9eff;
+    --accent-dim: #3a5a99;
+    --surface: #1e1e22;
+    --border: #333338;
+    --phase-bg: #1a2236;
+    --phase-border: #2a3a5a;
+    --warn-bg: #2a2218;
+    --warn-border: #5a4a28;
+    --code-bg: #222226;
+    --table-header: #242428;
+    --table-stripe: #1c1c20;
+    --tag-cpu: #1e3a5e;
+    --tag-gpu: #1a3a2e;
+    --tag-mem: #3a1e2e;
+    --tag-topo: #2a2240;
+    --tag-done: #1c4a2a;
+    --tag-done-fg: #86d99b;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    line-height: 1.6;
+    max-width: 52rem;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+  }
+
+  h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin: 0 0 0.25rem;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+  .subtitle {
+    color: var(--fg-dim);
+    font-size: 0.95rem;
+    margin: 0 0 2.5rem;
+  }
+  h2 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin: 2.5rem 0 0.75rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 2px solid var(--accent);
+    letter-spacing: -0.01em;
+  }
+  h3 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin: 1.5rem 0 0.5rem;
+    color: var(--accent);
+  }
+  p, li { font-size: 0.92rem; }
+  ul, ol { padding-left: 1.25rem; }
+  li { margin-bottom: 0.3rem; }
+
+  .phase {
+    background: var(--phase-bg);
+    border: 1px solid var(--phase-border);
+    border-radius: 6px;
+    padding: 1rem 1.25rem;
+    margin: 1rem 0;
+  }
+  .phase-title {
+    font-weight: 700;
+    font-size: 0.95rem;
+    margin-bottom: 0.5rem;
+  }
+  .warn {
+    background: var(--warn-bg);
+    border: 1px solid var(--warn-border);
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    margin: 1rem 0;
+    font-size: 0.88rem;
+  }
+  code {
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.82rem;
+    background: var(--code-bg);
+    padding: 0.15em 0.35em;
+    border-radius: 3px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 0.8rem;
+    line-height: 1.5;
+  }
+  pre code {
+    background: none;
+    padding: 0;
+  }
+
+  .tag {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.1em 0.5em;
+    border-radius: 3px;
+    vertical-align: middle;
+    margin-right: 0.25rem;
+  }
+  .tag-cpu { background: var(--tag-cpu); }
+  .tag-gpu { background: var(--tag-gpu); }
+  .tag-mem { background: var(--tag-mem); }
+  .tag-topo { background: var(--tag-topo); }
+  .tag-done { background: var(--tag-done); color: var(--tag-done-fg); font-weight: 700; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    margin: 1rem 0;
+  }
+  th {
+    background: var(--table-header);
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    font-weight: 600;
+    border-bottom: 2px solid var(--border);
+  }
+  td {
+    padding: 0.4rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+  }
+  tr:nth-child(even) td { background: var(--table-stripe); }
+
+  .overflow-x { overflow-x: auto; }
+  .dim { color: var(--fg-dim); }
+  .section-intro {
+    color: var(--fg-dim);
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+  }
+  hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 2rem 0;
+  }
+</style>
+
+<h1>GreedyRefineCentralGPULB — Implementation Plan</h1>
+<p class="subtitle">Cost-aware, overlap-aware, topology-aware GPU load balancing for Charm++</p>
+
+<h2>Context</h2>
+<p>The current <code>GreedyRefineCentralGPULB</code> balances at two levels: GPU load across GPU groups (processes), CPU load across PEs within a group. It inherits the concurrent multi-parameter search from <code>GreedyRefineCentralLB</code>.</p>
+
+<p><strong>Known bugs and gaps:</strong></p>
+<ul>
+  <li><s>Single GPU → 0 migrations: the objective reports only GPU-group load (constant with one group), so all solutions look identical and the lowest-migration solution (0) wins.</s> <strong>Fixed in Phase 1.</strong></li>
+  <li>No overlap model: <code>max(gpu, cpu)</code> assumes perfect overlap; <code>gpu + cpu</code> assumes none. Reality is somewhere between.</li>
+  <li>Flat migration cost: pointer handoff (free) and cross-node staging (expensive) are treated identically.</li>
+  <li>No GPU memory constraint: the LB can assign more objects to a GPU than its memory can hold.</li>
+  <li>No notion of communication locality: neighbor placement is invisible to the objective, so a move that halves an object's compute but scatters its ghost exchanges across processes scores as a pure win.</li>
+</ul>
+
+<div class="warn">
+  <strong>Where this stands as of 2026-08-17.</strong> The full pipeline runs end to
+  end on NCSA Delta — 4 processes × 8 PEs on 4 A40s, 4 GPU groups, cross-process IPC
+  chare migration, all 64 chares resuming, run completing. Phase 1 landed and the
+  balancer now migrates. But it migrates <em>badly</em>: pic2d runs at roughly
+  20 ms/iteration with the balancer against 13.4 ms with migration disabled, and stays
+  slower well after migration finishes. Two causes, both in this document:
+  <code>objGPU</code> is about 0.1% of step time, so the balancer optimizes a
+  negligible dimension; and neither migration cost nor communication locality appears
+  in the objective, so it moved 32 of 64 chares for a marginal gain. Phase 3 is the
+  direct answer, which is why the implementation order below changed.
+</div>
+
+<h2>Available Data at LB Decision Time</h2>
+<div class="overflow-x">
+<table>
+  <tr><th>Source</th><th>Field</th><th>Meaning</th></tr>
+  <tr><td>ProcStats</td><td><code>total_walltime</code></td><td>Wall clock for the LB step (idle + bg + obj)</td></tr>
+  <tr><td>ProcStats</td><td><code>idletime</code></td><td>Time PE spent idle</td></tr>
+  <tr><td>ProcStats</td><td><code>bg_walltime</code></td><td>Background overhead (non-object CPU work)</td></tr>
+  <tr><td>ProcStats</td><td><code>pe_speed</code></td><td>Relative PE speed (usually 1.0)</td></tr>
+  <tr><td>ProcStats</td><td><code>gpu_device_id</code></td><td>Which GPU this PE is bound to</td></tr>
+  <tr><td>ProcStats</td><td><code>gpu_total_sms</code></td><td>SM count on that GPU</td></tr>
+  <tr><td>ProcStats</td><td><code>gpu_mem_remaining</code></td><td>Free GPU memory</td></tr>
+  <tr><td>ProcStats</td><td><code>pool_buff_mem_remaining</code></td><td>Free LB staging buffer</td></tr>
+  <tr><td>LDObjData</td><td><code>wallTime</code></td><td>Per-object CPU time (host-side entry methods)</td></tr>
+  <tr><td>LDObjData</td><td><code>gpuTime</code></td><td>Per-object GPU time (SM-normalized via CUPTI)</td></tr>
+  <tr><td>LDObjData</td><td><code>gpuPupSize</code></td><td>Per-object GPU migration payload (bytes moved on migrate)</td></tr>
+  <tr><td>LDObjData userData</td><td><code>_lb_obj_index</code> slot</td><td>Per-object GPU allocation size (HAPI hapiMalloc/Free attribution — device footprint)</td></tr>
+  <tr><td>Topology</td><td><code>CmiNodeOf(pe)</code></td><td>Process (logical node) of a PE</td></tr>
+  <tr><td>Topology</td><td><code>CmiPeOnSamePhysicalNode</code></td><td>Same physical host?</td></tr>
+  <tr><td>Topology</td><td><code>findTransferModeDevice</code></td><td>MEMCPY / IPC / RDMA for a (src, dst) pair</td></tr>
+</table>
+</div>
+
+<h2>Phased Implementation</h2>
+<p class="section-intro">Each phase is independently valuable and testable. Later phases build on earlier ones but don't require them.</p>
+
+<!-- Phase 1 -->
+<div class="phase">
+  <div class="phase-title">Phase 1 — Fix the 0-Migrations Bug <span class="tag tag-done">done</span><span class="tag tag-cpu">cpu</span><span class="tag tag-gpu">gpu</span></div>
+  <p><strong>Problem:</strong> <code>maxLoad</code> (the Solution objective) tracks only <code>max(GPU group loads)</code>. With one GPU group this is constant across all solutions.</p>
+  <p><strong>Fix:</strong> Track max PE CPU load alongside max GPU-group load during the assignment loop. Report <code>max(maxGpuGroupLoad, maxPeCpuLoad)</code> as the Solution's <code>max_load</code>. The greedy-refine target M stays GPU-only (it governs outer group-level decisions).</p>
+  <pre><code>// After assigning each object:
+g.load += obj_gpu;
+p->cpuLoad += obj_cpu / p->speed;
+if (g.load > maxGpuLoad) maxGpuLoad = g.load;
+if (p->cpuLoad > maxCpuLoad) maxCpuLoad = p->cpuLoad;
+
+// Reported objective:
+maxLoad = std::max(maxGpuLoad, maxCpuLoad);</code></pre>
+  <p><strong>Effect:</strong> With one GPU, GPU-group load is constant but CPU balance varies across solutions → the best CPU balance wins → non-zero migrations. Multi-GPU also improves: a solution with good GPU balance but terrible CPU imbalance now scores worse.</p>
+  <p><strong>Test:</strong> Single GPU + RandCentLB → verify non-zero migrations. Check that per-PE CPU imbalance improves.</p>
+  <div class="warn">
+    <strong>Done — commit <code>8166caea0</code>, plus one thing the plan missed.</strong>
+    The objective fix alone still produced zero migrations. Greedy packing only
+    works if objects are visited in descending order of the quantity being
+    balanced, and <code>ObjLoadGreater</code> still sorted by GPU load alone — so
+    with a negligible <code>objGPU</code> the order was effectively arbitrary and
+    the CPU-aware objective had nothing to work with. The sort key in
+    <code>GreedyRefineCentralGPULB.h</code> now uses
+    <code>std::max(load, cpuLoad)</code> under <code>CMK_CUDA</code>, matching the
+    objective. Lesson worth keeping: when changing what a greedy balancer
+    optimizes, change its sort key in the same edit.
+  </div>
+</div>
+
+<!-- Phase 2 -->
+<div class="phase">
+  <div class="phase-title">Phase 2 — Overlap-Aware Objective <span class="tag tag-cpu">cpu</span><span class="tag tag-gpu">gpu</span></div>
+  <p><strong>Problem:</strong> <code>max(gpu, cpu)</code> assumes the CPU and GPU timelines overlap perfectly. If the application serializes (launch → sync → compute), the actual step time is closer to <code>gpu + cpu</code>.</p>
+  <p><strong>Approach:</strong> Measure the overlap coefficient α from the existing per-PE statistics, once per LB step:</p>
+  <pre><code>// Per GPU group g:
+double gpu_time = g.load;                   // aggregate GPU load
+double max_cpu  = max(p.cpuLoad) for p in g // max PE CPU load in group
+double measured = max(p.total_walltime) for p in g  // actual step time
+
+// Solve for α:  measured = α·(gpu + cpu) + (1−α)·max(gpu, cpu)
+// α = 0 → perfect overlap, α = 1 → fully serial
+double overlap = max(gpu_time, max_cpu);
+double serial  = gpu_time + max_cpu;
+if (serial > overlap)
+    α = (measured - overlap) / (serial - overlap);
+else
+    α = 0;
+
+// Predicted step time for a candidate assignment:
+predicted = α * (gpu + cpu) + (1 - α) * max(gpu, cpu);</code></pre>
+  <p><strong>Key insight:</strong> <code>total_walltime</code> in ProcStats already measures the actual step duration — LBMachineUtil accumulates <code>CkWallTimer()</code> between <code>StatsOn()</code>/<code>StatsOff()</code>, which bracket the LB step. No new instrumentation needed — just compare predicted vs measured to calibrate α.</p>
+  <div class="warn">
+    <strong>Caveat:</strong> α is group-level, not per-object. An object that does <code>cudaDeviceSynchronize()</code> contributes serial coupling, but we can't attribute that to individual objects from the aggregate. α is a best-effort approximation.
+  </div>
+  <p><strong>Fallback:</strong> If <code>total_walltime</code> isn't reliable (first LB step, or tracing disabled), default to α = 0 (Phase 1 behavior).</p>
+</div>
+
+<!-- Phase 3 -->
+<div class="phase">
+  <div class="phase-title">Phase 3 — Migration-Cost-Aware Decisions <span class="tag tag-topo">topo</span></div>
+  <p><strong>Problem:</strong> The B tolerance parameter (migration reluctance) is topology-blind. A pointer handoff within the same GPU group is free; a cross-node staged migration is expensive. The LB treats them identically.</p>
+  <p><strong>Transport modes and costs:</strong></p>
+  <div class="overflow-x">
+  <table>
+    <tr><th>Mode</th><th>Condition</th><th>Data cost</th><th>Fixed overhead</th></tr>
+    <tr><td>Pointer handoff</td><td>Same process, same GPU</td><td>0</td><td>~0</td></tr>
+    <tr><td>MemcpyStrategy</td><td>Same process, cross GPU</td><td>∝ gpu_size (peer D2D)</td><td>~0</td></tr>
+    <tr><td>IpcStrategy</td><td>Cross process, same node</td><td>∝ gpu_size (IPC D2D)</td><td><strong>synchronous pull wait, 25–240&nbsp;μs measured</strong></td></tr>
+    <tr><td>Staged path</td><td>Cross node</td><td>2× gpu_size (stage + ship)</td><td>cudaDeviceSync + alloc</td></tr>
+  </table>
+  </div>
+  <p><strong>Design:</strong> Replace the flat B tolerance with a per-move cost model. For each candidate (object, destination PE) pair:</p>
+  <pre><code>// Migration cost in seconds (estimated)
+double migCost(int objIdx, int srcPe, int dstPe, size_t gpuBytes) {
+    if (CmiNodeOf(srcPe) == CmiNodeOf(dstPe)) {
+        if (sameGpuGroup(srcPe, dstPe))
+            return 0;                         // pointer handoff
+        return gpuBytes / PEER_BW;            // ~600 GB/s PCIe / NVLink
+    }
+    if (CmiPeOnSamePhysicalNode(srcPe, dstPe))
+        return IPC_OPEN_COST + gpuBytes / IPC_BW;
+    return STAGE_COST + 2 * gpuBytes / HOST_BW;
+}
+
+// Only migrate if benefit exceeds cost:
+double benefit = loadReduction(obj, srcPe, dstPe);
+if (benefit > migCost(...) * costWeight)
+    migrate;</code></pre>
+  <p><strong>Bandwidth constants</strong> can be measured once at startup (a small D2D benchmark) or hard-coded per architecture.</p>
+
+  <div class="warn">
+    <strong>Measured on Delta (4× A40, 2026-08-17), superseding the estimates above.</strong>
+    The dominant fixed cost for a cross-process move is not the IPC handle open —
+    it is the <em>synchronous pull wait</em>, because migration completion now blocks
+    rather than finishing from a CUDA callback. Peer copies run over PCIe at roughly
+    25&nbsp;GB/s, and observed chare payloads were 590&nbsp;KB–5.9&nbsp;MB, giving
+    <strong>25–240&nbsp;μs per migrated chare</strong>. Use that as
+    <code>IPC_FIXED_COST</code> until the async path lands (see
+    <code>ASYNC_MIGRATION_PLAN.md</code>), at which point this term shrinks toward the
+    pure bandwidth cost.
+  </div>
+
+  <div class="warn">
+    <strong>Why this phase is now the priority.</strong> On Delta, with the balancer
+    migrating, pic2d ran at <strong>~20&nbsp;ms/iter against 13.4&nbsp;ms with migration
+    disabled — about 52% slower</strong>, and it stayed slower long after the migration
+    finished, so this is the chosen assignment being worse rather than migration
+    overhead. The balancer moved 32 of 64 chares for a marginal compute gain because
+    every move looks free to it. A migration cost model is what lets it decline.
+    Pair this with a communication-minimizing initial mapping: a good starting
+    assignment plus a reason to stay put is the combination that fixes the regression.
+  </div>
+  <div class="warn">
+    <strong>Prerequisite already met:</strong> per-object sizes are already in the stats. <code>LDObjData::gpuPupSize</code> gives the migration payload for the data-cost term, and the <code>_lb_obj_index</code> user-data slot gives the device allocation footprint. No new plumbing — read them the way <code>GreedyRefineCentralLB::fillData</code> already does (lines 307-308).
+  </div>
+</div>
+
+<!-- Phase 4 -->
+<div class="phase">
+  <div class="phase-title">Phase 4 — GPU Memory Constraint (port, not new work) <span class="tag tag-mem">mem</span><span class="tag tag-gpu">gpu</span></div>
+  <p><strong>Status:</strong> this branch's <code>GreedyRefineCentralLB.C</code> already implements exactly this, at group level (lines 477-617): per-group <code>gpu_mem_remaining</code> and <code>pool_buff_mem_remaining</code> budgets seeded from ProcStats, a veto when either end's staging buffer can't hold <code>gpuPupSize</code> or when the destination GPU's free memory (with a 5% headroom margin) can't hold <code>gpuAllocSize</code>, and budget decrements on each accepted move.</p>
+  <pre><code>// Existing veto logic to port into GreedyRefineCentralGPULB:
+if (chosen_gi != src_gi && obj->gpuPupSize > 0) {
+    if (grp[src_gi].pool_buff_mem_remaining  < obj->gpuPupSize ||
+        grp[chosen_gi].pool_buff_mem_remaining < obj->gpuPupSize)  → keep on src
+    if ((size_t)(0.95 * grp[chosen_gi].gpu_mem_remaining) < obj->gpuAllocSize) → keep on src
+}
+// On accept: decrement both groups' pool budgets and dest group's gpu_mem.</code></pre>
+  <p><strong>Work:</strong> port this into <code>GreedyRefineCentralGPULB</code>'s assignment loop, with two refinements: credit <code>gpu_mem_remaining</code> back to the source group when an object leaves it, and skip the <code>pool_buff</code> veto for moves the new migration paths make staging-free (pointer handoff and export-and-pull don't consume the source LB buffer — only the destination's).</p>
+</div>
+
+<!-- Phase 5 -->
+<div class="phase">
+  <div class="phase-title">Phase 5 — Topology-Aware Group Preferences <span class="tag tag-topo">topo</span></div>
+  <p><strong>Problem:</strong> The outer greedy loop picks the lightest GPU group globally. On a multi-node system, migrating to a remote node's GPU group is much more expensive than a nearby one.</p>
+  <p><strong>Design:</strong> Weight group selection by transport cost. Instead of pure lightest-first, prefer groups reachable by cheaper transport:</p>
+  <pre><code>// Candidate scoring:
+for (int gi = 0; gi < nGroups; gi++) {
+    double effectiveLoad = gpuGroups[gi].load;
+    double topoPenalty = migCost(obj, srcPe, gpuGroups[gi].peIds[0], obj_gpu_size);
+    score[gi] = effectiveLoad + topoPenalty * topoWeight;
+}
+int chosen_gi = argmin(score);</code></pre>
+  <p>This naturally prefers local GPU groups when loads are similar, falling back to remote groups only when the load imbalance justifies the migration cost.</p>
+</div>
+
+<hr>
+
+<h2>Additional Considerations</h2>
+
+<h3>SM Utilization Normalization</h3>
+<p>The CUPTI pipeline already normalizes GPU load by SM utilization (sweep-line over kernel intervals). This means <code>gpuTime</code> reflects <em>effective</em> GPU occupancy, not just wall-clock kernel duration. Two objects that each use 50% of SMs simultaneously have <code>gpuTime</code> that correctly sums to 1× step time, not 2×. This is important for the outer GPU-group objective: the aggregate <code>gpuTime</code> across objects in a group approximates the group's actual GPU wall time.</p>
+
+<h3>Non-Migratable Object Accounting</h3>
+<p>Non-migratable objects contribute to both <code>bgload</code> (GPU) and <code>cpuLoad</code> (CPU) as background load on their PE. The current code handles this correctly (lines 306-311 in fillData). The overlap model should include this background in its α calculation.</p>
+
+<h3>Historical Load Smoothing</h3>
+<p>A single LB step's load might be noisy (e.g., particle imbalance varies per iteration). The LB could smooth loads over K recent steps using an exponential moving average. This is especially relevant for the overlap coefficient α, which should be stable across steps rather than swinging between 0 and 1.</p>
+
+<h3>Concurrent Parameter Search</h3>
+<p>The current design runs up to NUM_SOLUTIONS = 225 parameter combinations across PEs concurrently (14 A-values × 16 B-values, plus pure greedy on PE 0). Each PE computes a solution with different (A, B) refine parameters and reports its objective; <code>receiveSolutions</code> picks the fewest-migrations solution within 1.003× of the best feasible load. All phases above are compatible with this: each PE evaluates the same cost model with different refine tolerances, and the reported objective captures both dimensions. Note the selection rule's bias toward fewer migrations is exactly what turns an undiscriminating objective into 0 moves — Phase 1's fix works <em>because</em> it makes the objective discriminate.</p>
+
+<h3>Two GPU Sizes, Two Meanings</h3>
+<p>Phases 3 and 4 need per-object GPU sizes, and both already exist with distinct roles: <code>LDObjData::gpuPupSize</code> is the <em>wire</em> size — bytes that move during a migration — and drives the migration-cost model and staging-buffer budget; the <code>_lb_obj_index</code> user-data slot carries the HAPI-attributed <em>allocation</em> size — the object's resident device footprint — and drives the GPU-memory constraint. Don't conflate them: an object can pup a small subset of a large resident allocation, or vice versa.</p>
+
+<h3>Relationship to GreedyRefineCentralLB on This Branch</h3>
+<p>This branch's <code>GreedyRefineCentralLB.C</code> was already made GPU-group-aware (group aggregation by <code>gpu_device_id</code>, memory budgets, size-based vetoes). <code>GreedyRefineCentralGPULB</code> adds the two-level CPU dimension but currently lacks the memory logic. The end state should be one LB, not two near-copies — after Phase 4 ports the memory logic across, evaluate folding the remaining differences and retiring one of the two.</p>
+
+<h3>Bandwidth Calibration</h3>
+<p>Phase 3's cost model uses bandwidth constants. These could be:</p>
+<ul>
+  <li><strong>Hard-coded per architecture:</strong> PCIe 4.0 ≈ 25 GB/s, NVLink 3.0 ≈ 600 GB/s. Simple but fragile.</li>
+  <li><strong>Measured at startup:</strong> Small D2D benchmark on first LB step. The IPC handle-open cost can be measured alongside, feeding the A-vs-C switching decision.</li>
+  <li><strong>Measured from migration history:</strong> After each migration, record (bytes, time, mode). Refine the cost model from actual measurements.</li>
+</ul>
+
+<h3>Interaction with Existing LB Ecosystem</h3>
+<p>This LB can be composed via MetaBalancer or chained with other LBs. The two-level structure means it's a natural fit for HybridLB (GPU-aware at the node level, another strategy at the inter-node level). The cost model should be usable by other GPU-aware LBs, not locked into GreedyRefineCentralGPULB — consider factoring it into a shared utility.</p>
+
+<hr>
+
+<h2>Implementation Order</h2>
+<div class="overflow-x">
+<table>
+  <tr><th>Phase</th><th>Effort</th><th>Prerequisite</th><th>Testable on 1 GPU?</th><th>Status</th></tr>
+  <tr><td>1. Fix 0-migrations</td><td>Small — ~20 lines</td><td>None</td><td>Yes</td><td><strong>Done</strong> (<code>8166caea0</code>)</td></tr>
+  <tr><td>3. Migration cost</td><td>Medium — cost model + gpu_size in LDObjData</td><td>Phase 1</td><td>Partially (only pointer-handoff vs memcpy)</td><td><strong>Next</strong></td></tr>
+  <tr><td>5. Topology preferences</td><td>Small — weighted group selection</td><td>Phase 3</td><td>No (single node)</td><td>Folds into 3</td></tr>
+  <tr><td>4. Memory constraint</td><td>Small — port from GreedyRefineCentralLB</td><td>None (sizes already plumbed)</td><td>Yes (can verify no OOM)</td><td>Queued</td></tr>
+  <tr><td>2. Overlap model</td><td>Medium — α calibration + prediction</td><td>Phase 1</td><td>Yes (α observable)</td><td>Deferred</td></tr>
+</table>
+</div>
+<p><strong>Why this order changed.</strong> The original order ran the phases as numbered. After Phase 1 landed and the balancer was measured on Delta, the binding problem turned out to be that <em>every migration looks free</em>, not that the compute model is imprecise — so Phase 3 moves ahead of Phase 2, and Phase 5 is small enough to fold into it as the group-selection term of the same cost function. Phase 2's overlap model only matters once the balancer stops making moves that lose more to migration and lost locality than they gain in compute.</p>
+<p>Phase 3 also pairs with work outside this document: a communication-minimizing <em>initial</em> mapping for pic2d, which currently uses <code>DefaultArrayMap</code> via a bare <code>CProxy_Patch::ckNew(nx, ny)</code>. A good starting assignment plus a cost model that gives the balancer a reason to stay put is the combination that addresses the regression; either alone is unlikely to.</p>
