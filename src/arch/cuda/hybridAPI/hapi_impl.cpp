@@ -1572,9 +1572,13 @@ static void ipcHandleCreate() {
   for (int i = 0; i < csv_gpu_manager.hapi_ipc_event_pool_size_total; i++) {
     hapi_ipc_event_shared* cur_shm_event_shared = shm_event_shared + i;
 
-    pthread_mutex_init(&cur_shm_event_shared->lock, &shared_attr);
-    cur_shm_event_shared->src_flag = false;
-    cur_shm_event_shared->dst_flag = false;
+    // CHARM_NO_IPC_MUTEX_INIT restores the original (uninitialized) state for
+    // bisecting.
+    if (getenv("CHARM_NO_IPC_MUTEX_INIT") == nullptr) {
+      pthread_mutex_init(&cur_shm_event_shared->lock, &shared_attr);
+      cur_shm_event_shared->src_flag = false;
+      cur_shm_event_shared->dst_flag = false;
+    }
 
     my_device_info.event_pool_flags.push_back(0);
     my_device_info.event_pool_buff_offsets.push_back(0);
@@ -1646,7 +1650,12 @@ static void ipcHandleOpen() {
           break;
       }
       const int my_device = CpvAccess(my_device);
-      if (exporter_device != my_device) hapiCheck(hapiSetDevice(exporter_device));
+      // CHARM_NO_IPC_EVENT_DEVSWITCH restores the original behaviour (open the
+      // peer's event handles under OUR device) for bisecting.
+      static const bool devswitch_off =
+          (getenv("CHARM_NO_IPC_EVENT_DEVSWITCH") != nullptr);
+      if (!devswitch_off && exporter_device != my_device)
+        hapiCheck(hapiSetDevice(exporter_device));
 
       for (int k = 0; k < csv_gpu_manager.hapi_ipc_event_pool_size_total; k++) {
         hapi_ipc_event_shared* cur_shm_event_shared = shm_event_shared + k;
@@ -1659,7 +1668,8 @@ static void ipcHandleOpen() {
               cur_shm_event_shared->dst_event_handle));
       }
 
-      if (exporter_device != my_device) hapiCheck(hapiSetDevice(my_device));
+      if (!devswitch_off && exporter_device != my_device)
+        hapiCheck(hapiSetDevice(my_device));
     }
   }
 }
