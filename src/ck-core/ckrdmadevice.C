@@ -302,6 +302,23 @@ static inline int CmiMyNodeRankLocal() {
   return CmiNodeRankLocal(CmiMyPe());
 }
 
+// TEMPORARY (CHARM_DEBUG_IPC_RECV): synchronize after each individual CUDA
+// operation on the shm/IPC path and abort naming the exact step that failed.
+// Illegal-access errors are sticky and asynchronous, so without this they
+// surface at whatever call happens to be checked next -- which is how the same
+// fault has been reported from three unrelated lines. With it, the first
+// failing operation identifies itself.
+static inline void ipcDebugSync(const char* step, hapiStream_t stream) {
+  if (!getenv("CHARM_DEBUG_IPC_RECV")) return;
+  hapiError_t err = hapiStreamSynchronize(stream);
+  if (err != hapiSuccess) {
+    CmiPrintf("[%d] IPC step '%s' FAILED: %s\n", CmiMyPe(), step,
+              cudaGetErrorString(err));
+    fflush(stdout);
+    CmiAbort("IPC debug: step '%s' failed", step);
+  }
+}
+
 // Invoked after post entry method
 void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs) {
   // Change message header to invoke regular entry method
@@ -410,16 +427,19 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
       //    (source buffer to device comm buffer on source)
       hapiCheck(hapiStreamWaitEvent(postStructs[i].hapi_stream,
             device_info.src_event_pool[source.event_idx], 0));
+      ipcDebugSync("recv 1: wait imported src_event", postStructs[i].hapi_stream);
 
       // 2. Invoke hapiMemcpyAsync (from source device comm buffer to destination buffer)
       hapiCheck(hapiMemcpyAsync((void*)dest.ptr,
             (void*)((char*)device_info.buffer + source.comm_offset),
             dest.cnt, hapiMemcpyDeviceToDevice, postStructs[i].hapi_stream));
+      ipcDebugSync("recv 2: peer copy comm_buffer -> dest", postStructs[i].hapi_stream);
 
       // 3. Record IPC event so that the sender can query it for freeing
       //    device comm buffer and corresponding pair of CUDA IPC events
       hapiCheck(hapiEventRecord(device_info.dst_event_pool[source.event_idx],
             postStructs[i].hapi_stream));
+      ipcDebugSync("recv 3: record imported dst_event", postStructs[i].hapi_stream);
 
       // 4. Set flag in shared memory so that the sender can start querying
       //    completion of the IPC event
@@ -620,11 +640,13 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
       if(!is_lb_buffer) {
         hapiCheck(hapiMemcpyAsync(alloc_comm_buffer, buffers[i]->ptr, buffers[i]->cnt,
               hapiMemcpyDeviceToDevice, buffers[i]->hapi_stream));
+        ipcDebugSync("send 1: stage src -> comm_buffer", buffers[i]->hapi_stream);
       }
 
       // Record event
       hapi_ipc_device_info& my_device_info = csv_gpu_manager.hapi_ipc_device_infos[(csv_gpu_manager.device_count * CmiMyNodeRankLocal() + cpv_my_device_id)];
       hapiCheck(hapiEventRecord(my_device_info.src_event_pool[buffers[i]->event_idx], buffers[i]->hapi_stream));
+      ipcDebugSync("send 2: record own src_event", buffers[i]->hapi_stream);
     }
   } else {
 #if !CMK_GPU_COMM
