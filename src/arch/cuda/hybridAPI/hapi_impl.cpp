@@ -197,7 +197,11 @@ void hapiCuptiInit() { hapiCuptiStartTracing(); }
 // run. Enabling an activity kind is separately what makes records flow.
 void hapiCuptiStartTracing() {
   GPUManager& gm = CsvAccess(gpu_manager);
-  if (gm.cupti_tracing_active_) return;
+  // Every PE thread reaches this through its own LBDatabase::TurnStatsOn, so
+  // the check and the enable must be one atomic step -- otherwise several
+  // threads each enable the same activity kinds.
+  std::lock_guard<std::mutex> lk(gm.cupti_tracing_lock_);
+  if (gm.cupti_tracing_active_.load(std::memory_order_relaxed)) return;
 
   if (!gm.cupti_initialized_) {
     cudaDeviceSynchronize();
@@ -214,12 +218,15 @@ void hapiCuptiStartTracing() {
   CUPTI_SAFE_CALL(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_RUNTIME));
   CUPTI_SAFE_CALL(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_EXTERNAL_CORRELATION));
 
-  gm.cupti_tracing_active_ = true;
+  gm.cupti_tracing_active_.store(true, std::memory_order_relaxed);
 }
 
 void hapiCuptiStopTracing() {
   GPUManager& gm = CsvAccess(gpu_manager);
-  if (!gm.cupti_initialized_ || !gm.cupti_tracing_active_) return;
+  std::lock_guard<std::mutex> lk(gm.cupti_tracing_lock_);
+  if (!gm.cupti_initialized_ ||
+      !gm.cupti_tracing_active_.load(std::memory_order_relaxed))
+    return;
 
   CUPTI_SAFE_CALL(cuptiActivityDisable(CUPTI_ACTIVITY_KIND_CONCURRENT_KERNEL));
   CUPTI_SAFE_CALL(cuptiActivityDisable(CUPTI_ACTIVITY_KIND_RUNTIME));
@@ -228,24 +235,26 @@ void hapiCuptiStopTracing() {
   // Clear the flag before flushing so the buffers handed back by the flush are
   // the last ones, and no further correlation pushes race with them. Flush on
   // the way out so records buffered before the stop are not lost when the
-  // application switches instrumentation off around its own AtSync.
-  gm.cupti_tracing_active_ = false;
+  // application switches instrumentation off around its own AtSync. The flush
+  // drives the buffer-completed callback, which takes cupti_queue_lock_ -- a
+  // different mutex from the one held here, so this cannot deadlock.
+  gm.cupti_tracing_active_.store(false, std::memory_order_relaxed);
   CUPTI_SAFE_CALL(cuptiActivityFlushAll(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED));
 
-  // Detach. An attached CUPTI costs ~1.3 ms per step even with every activity
-  // kind disabled, which dominates what is left once tracing is windowed.
-  // Measured: a detach costs ~2.3 ms and the re-attach after it ~0.01 ms, so
-  // this pays for itself once load-balancing steps are more than about two
-  // iterations apart. Bumping the generation is what makes it safe -- see
-  // GPUManager::cupti_generation_.
-  cudaDeviceSynchronize();
-  CUPTI_SAFE_CALL(cuptiFinalize());
-  gm.cupti_initialized_ = false;
-  ++gm.cupti_generation_;
+  // Deliberately NOT detaching with cuptiFinalize(). Staying attached costs
+  // ~1.3 ms per step even with every kind disabled, and detaching measured
+  // cheaper (~2.3 ms per window against 1.3 ms per step) -- but it cannot be
+  // done safely from here. The entry-method hooks check cupti_tracing_active_
+  // and then call into CUPTI without holding this lock, so a thread that has
+  // already passed that check can be inside cuptiActivityPushExternalCorrelationId
+  // while this one finalizes underneath it, which corrupts CUPTI's allocator
+  // and surfaces later as heap corruption in unrelated allocations. Reclaiming
+  // that 1.3 ms needs the hooks made safe against detach first.
 }
 
 bool hapiCuptiTracingActive() {
-  return CsvAccess(gpu_manager).cupti_tracing_active_;
+  return CsvAccess(gpu_manager).cupti_tracing_active_.load(
+      std::memory_order_relaxed);
 }
 
 void hapiCuptiFinalize() {
@@ -2149,7 +2158,7 @@ uint64_t hapiCuptiPushObjCorrelation() {
   // Gated on tracing rather than initialization: this runs on every entry
   // method, so when tracing is off the whole body -- the active-object lookup
   // and two CUPTI calls -- must be skipped, not just wasted.
-  if (!gm.cupti_tracing_active_) return 0;
+  if (!gm.cupti_tracing_active_.load(std::memory_order_relaxed)) return 0;
   hapiCuptiSyncGeneration(gm);
 
   // Identify the active Charm++ object, if there is a usable one. This is

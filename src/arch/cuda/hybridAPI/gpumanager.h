@@ -15,6 +15,7 @@
 #include <unordered_map>
 #include <queue>
 #include <mutex>
+#include <atomic>
 
 #if CMK_LBDB_ON
 #include "lbdb.h"  // for LBKernelRecord
@@ -202,7 +203,19 @@ struct GPUManager {
   // Whether activity tracing is currently running. Separate from
   // cupti_initialized_: the buffer callbacks are registered once, but tracing
   // itself is switched on and off as the application asks for it.
-  bool cupti_tracing_active_ = false;
+  //
+  // Atomic because the entry-method hooks read it on every invocation from
+  // every PE thread while another thread may be switching tracing on or off.
+  std::atomic<bool> cupti_tracing_active_{false};
+  // Serializes hapiCuptiStartTracing/hapiCuptiStopTracing. This state lives in
+  // the node-wide GPUManager, but the switch is reached per-PE through
+  // LBDatabase::TurnStatsOn/Off, so every PE thread calls in. Without this,
+  // several threads enable or disable the same CUPTI activity kinds and flush
+  // concurrently, which corrupts CUPTI's internal buffer bookkeeping and shows
+  // up later as heap corruption in an unrelated allocation. Must NOT be the
+  // same mutex as cupti_queue_lock_: the flush in the stop path invokes the
+  // buffer-completed callback, which takes that one.
+  std::mutex cupti_tracing_lock_;
   // Bumped every time CUPTI is detached. Detaching clears CUPTI's
   // external-correlation stack for every PE, but the counters that keep the
   // entry-method push/pop hooks paired are per-PE, and only the PE that ran the
