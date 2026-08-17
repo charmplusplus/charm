@@ -329,6 +329,29 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
   void* old_msg = EnvToUsr(env);
   envelope* new_env = UsrToEnv(CkCopyMsg(&old_msg));
 
+  // Retarget the copied message's device buffers to the buffers this receiver
+  // posted. The transfers below land in arrPtrs[], but the copy still carries
+  // the SENDER's CkDeviceBuffer::ptr, and the entry method delivered from it
+  // reads that pointer as its data. Within one process the sender's pointer is
+  // a valid local address holding the same bytes, so this went unnoticed;
+  // across processes it names memory in another address space and the first
+  // kernel touching it faults. Rewriting in place is safe because pupping a
+  // CkDeviceBuffer is fixed-width -- only ptr changes value.
+  {
+    char* new_buf = ((CkMarshallMsg*)EnvToUsr(new_env))->msgBuf;
+    PUP::fromMem walk(new_buf);
+    int copy_numops;
+    walk | copy_numops;
+    for (int i = 0; i < numops && i < copy_numops; i++) {
+      const size_t field_off = walk.size();
+      CkDeviceBuffer db;
+      walk | db;
+      db.ptr = arrPtrs[i];
+      PUP::toMem patch(new_buf + field_off);
+      patch | db;
+    }
+  }
+
   // Start unpacking marshalled message
   PUP::fromMem up((void *)((CkMarshallMsg *)EnvToUsr(env))->msgBuf);
   int received_numops;
