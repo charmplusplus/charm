@@ -3867,7 +3867,11 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
   CmiAssert(CpvAccess(newZCPupGets).empty());  // Ensure that vector is empty
   // Create the new elements as we unpack the message
   pupElementsFor(p, rec, CkElementCreation_migrate);
+#if CMK_CUDA
+  // Device-to-device copies issued while unpacking may still be in flight;
+  // the element must not run until its device state is complete.
   cudaDeviceSynchronize();
+#endif
 
 #if CMK_CUDA
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
