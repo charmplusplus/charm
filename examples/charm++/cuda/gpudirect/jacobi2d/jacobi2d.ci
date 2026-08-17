@@ -77,7 +77,11 @@ mainmodule jacobi2d {
       }
 
       for (send_done_idx = 0; send_done_idx < 1; send_done_idx++) {
-        if (!sync_ver) {
+        // The d_send_*_ghost_done events are fired by the zerocopy sends'
+        // CkDeviceBuffer source callbacks; the host-staged path marshals the
+        // ghost into the message at send time and fires none of them. Waiting
+        // for them without zerocopy therefore deadlocks on the first exchange.
+        if (!sync_ver && use_zerocopy) {
           if(!left_bound) {
             when d_send_left_ghost_done() {}
           }
