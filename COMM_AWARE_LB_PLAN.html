@@ -1,0 +1,427 @@
+<title>Communication-Aware GPU Placement</title>
+<style>
+  :root {
+    --bg: #fafaf8;
+    --fg: #1a1a1a;
+    --fg-dim: #5c5c5c;
+    --accent: #2563eb;
+    --accent-dim: #93b4f5;
+    --surface: #f0f0ec;
+    --border: #d4d4cf;
+    --phase-bg: #e8eef8;
+    --phase-border: #b8ccee;
+    --warn-bg: #fef3e0;
+    --warn-border: #e8c87a;
+    --code-bg: #eaeae6;
+    --table-header: #e4e4df;
+    --table-stripe: #f5f5f2;
+    --tag-cpu: #dbeafe;
+    --tag-gpu: #d1fae5;
+    --tag-mem: #fce7f3;
+    --tag-topo: #ede9fe;
+    --tag-done: #cdebd4;
+    --tag-done-fg: #1d5c30;
+    --verdict-bg: #e6f4ea;
+    --verdict-border: #8fc9a3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #161618;
+      --fg: #e4e4e0;
+      --fg-dim: #8a8a84;
+      --accent: #6d9eff;
+      --accent-dim: #3a5a99;
+      --surface: #1e1e22;
+      --border: #333338;
+      --phase-bg: #1a2236;
+      --phase-border: #2a3a5a;
+      --warn-bg: #2a2218;
+      --warn-border: #5a4a28;
+      --code-bg: #222226;
+      --table-header: #242428;
+      --table-stripe: #1c1c20;
+      --tag-cpu: #1e3a5e;
+      --tag-gpu: #1a3a2e;
+      --tag-mem: #3a1e2e;
+      --tag-topo: #2a2240;
+      --tag-done: #1c4a2a;
+      --tag-done-fg: #86d99b;
+      --verdict-bg: #16301f;
+      --verdict-border: #2f6641;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #161618;
+    --fg: #e4e4e0;
+    --fg-dim: #8a8a84;
+    --accent: #6d9eff;
+    --accent-dim: #3a5a99;
+    --surface: #1e1e22;
+    --border: #333338;
+    --phase-bg: #1a2236;
+    --phase-border: #2a3a5a;
+    --warn-bg: #2a2218;
+    --warn-border: #5a4a28;
+    --code-bg: #222226;
+    --table-header: #242428;
+    --table-stripe: #1c1c20;
+    --tag-cpu: #1e3a5e;
+    --tag-gpu: #1a3a2e;
+    --tag-mem: #3a1e2e;
+    --tag-topo: #2a2240;
+    --tag-done: #1c4a2a;
+    --tag-done-fg: #86d99b;
+    --verdict-bg: #16301f;
+    --verdict-border: #2f6641;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    line-height: 1.6;
+    max-width: 52rem;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+  }
+
+  h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin: 0 0 0.25rem;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+  .subtitle {
+    color: var(--fg-dim);
+    font-size: 0.95rem;
+    margin: 0 0 2.5rem;
+  }
+  h2 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin: 2.5rem 0 0.75rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 2px solid var(--accent);
+    letter-spacing: -0.01em;
+  }
+  h3 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin: 1.5rem 0 0.5rem;
+    color: var(--accent);
+  }
+  p, li { font-size: 0.92rem; }
+  ul, ol { padding-left: 1.25rem; }
+  li { margin-bottom: 0.3rem; }
+
+  .phase {
+    background: var(--phase-bg);
+    border: 1px solid var(--phase-border);
+    border-radius: 6px;
+    padding: 1rem 1.25rem;
+    margin: 1rem 0;
+  }
+  .phase-title {
+    font-weight: 700;
+    font-size: 0.95rem;
+    margin-bottom: 0.5rem;
+  }
+  .warn {
+    background: var(--warn-bg);
+    border: 1px solid var(--warn-border);
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    margin: 1rem 0;
+    font-size: 0.88rem;
+  }
+  .verdict {
+    background: var(--verdict-bg);
+    border: 1px solid var(--verdict-border);
+    border-left-width: 4px;
+    border-radius: 6px;
+    padding: 0.9rem 1.1rem;
+    margin: 1.25rem 0;
+    font-size: 0.92rem;
+  }
+  code {
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.82rem;
+    background: var(--code-bg);
+    padding: 0.15em 0.35em;
+    border-radius: 3px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 0.8rem;
+    line-height: 1.5;
+  }
+  pre code {
+    background: none;
+    padding: 0;
+  }
+
+  .tag {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.1em 0.5em;
+    border-radius: 3px;
+    vertical-align: middle;
+    margin-right: 0.25rem;
+  }
+  .tag-cpu { background: var(--tag-cpu); }
+  .tag-gpu { background: var(--tag-gpu); }
+  .tag-mem { background: var(--tag-mem); }
+  .tag-topo { background: var(--tag-topo); }
+  .tag-done { background: var(--tag-done); color: var(--tag-done-fg); font-weight: 700; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    margin: 1rem 0;
+  }
+  th {
+    background: var(--table-header);
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    font-weight: 600;
+    border-bottom: 2px solid var(--border);
+  }
+  td {
+    padding: 0.4rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: var(--table-stripe); }
+
+  .overflow-x { overflow-x: auto; }
+  .dim { color: var(--fg-dim); }
+  .no { color: #b3261e; font-weight: 600; }
+  .yes { color: #1d5c30; font-weight: 600; }
+  :root:not([data-theme="light"]) .no { color: #f2938c; }
+  :root:not([data-theme="light"]) .yes { color: #86d99b; }
+  :root[data-theme="dark"] .no { color: #f2938c; }
+  :root[data-theme="dark"] .yes { color: #86d99b; }
+  .section-intro {
+    color: var(--fg-dim);
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+  }
+  hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 2rem 0;
+  }
+</style>
+
+<h1>Communication-Aware GPU Placement</h1>
+<p class="subtitle">Should we build a new comm-aware load balancer or reuse one — and what should it actually do? Companion to <code>GPU_LB_PLAN.html</code>, Phase 6.</p>
+
+<h2>The problem this has to solve</h2>
+<p>On Delta, <code>GreedyRefineCentralGPULB</code> moved 32 of 64 pic2d chares and made the application ~52% slower — ~20&nbsp;ms/iteration against 13.4&nbsp;ms with migration disabled — and it stayed slower long after migration had finished. The lasting cost is therefore the <em>assignment</em>, not the move. The balancer traded a marginal compute gain (<code>objGPU</code> is about 0.1% of step time) for a ghost-exchange pattern that now crosses process and device boundaries, and nothing in its objective could see that it had done so.</p>
+
+<div class="warn">
+  <strong>Migration cost is not communication cost.</strong> The two are easy to
+  conflate and often discussed together, but they behave completely differently.
+  Migration cost is paid <em>once</em>, at the load-balancing step. Communication
+  cost is paid <em>every iteration</em>, forever after. A migration-cost term can
+  only make the balancer reluctant, and reluctance is indiscriminate: it
+  penalises a move that improves locality exactly as much as one that destroys
+  it. At best it preserves whatever locality the initial mapping happened to
+  have — it can never create any. Because the pic2d regression persists in steady
+  state, reluctance alone cannot fix it.
+</div>
+
+<h2>What is actually available in this tree</h2>
+<p class="section-intro">Not what upstream Charm++ has — what this branch builds. From <code>src/ck-ldb/Make.lb</code>, <code>CommonLBs.ci</code>, and <code>EveryLB.ci</code>.</p>
+
+<div class="overflow-x">
+<table>
+  <tr><th>Balancer</th><th>Built here?</th><th>Comm-aware?</th><th>Approach</th></tr>
+  <tr><td><code>MetisLB</code></td><td>Yes, but needs external METIS (<code>#include &lt;metis.h&gt;</code>)</td><td class="yes">Yes</td><td>k-way graph partitioning; minimises edge cut subject to a vertex-weight balance constraint</td></tr>
+  <tr><td><code>RecBipartLB</code></td><td>Yes, no external dependency</td><td class="yes">Yes</td><td>Recursive bipartitioning over <code>ObjGraph</code> with KL/FM-style boundary refinement</td></tr>
+  <tr><td><code>GreedyRefineCentralLB</code></td><td>Yes</td><td class="no">No</td><td>Greedy packing plus migration-reluctance tolerance; GPU-group and memory aware on this branch</td></tr>
+  <tr><td><code>GreedyRefineCentralGPULB</code></td><td>Yes</td><td class="no">No</td><td>Two-level: GPU load across groups, CPU load across PEs in a group</td></tr>
+  <tr><td><code>GreedyCentralLB</code>, <code>DistributedLB</code>, <code>TreeLB</code></td><td>Yes</td><td class="no">No</td><td>Load only</td></tr>
+  <tr><td><code>ScotchLB</code>, <code>ScotchRefineLB</code>, <code>ScotchTopoLB</code>, <code>ZoltanLB</code></td><td class="no">Source present, not in the build</td><td class="yes">Yes</td><td>Scotch / Zoltan partitioners. <code>ScotchTopoLB</code> is architecture-aware mapping — closest in spirit to transport tiers</td></tr>
+  <tr><td><code>RefineCommLB</code>, <code>GreedyCommLB</code></td><td class="no">Not in this tree at all</td><td>—</td><td>—</td></tr>
+</table>
+</div>
+
+<h2>Why none of them can be adopted as-is</h2>
+
+<div class="phase">
+  <div class="phase-title">1. A partitioner's output is an arbitrary relabelling</div>
+  <p>METIS, Scotch and recursive bipartitioning all solve "cut this graph into <em>k</em> balanced parts." Nothing in that formulation says part 3 should be the part that already lives on PE 3. Run at every LB step, a partitioner therefore remaps nearly everything — which is precisely the failure mode we are trying to fix. Mitigations exist (seeding from the current assignment, matching parts to PEs by maximum overlap) but they are bolt-ons to a formulation that has no notion of an incumbent placement.</p>
+</div>
+
+<div class="phase">
+  <div class="phase-title">2. They are flat over PEs; our problem is two-level</div>
+  <p>The GPU decision (which device, therefore which process) and the CPU decision (which PE inside that process) have different cost structures and different balance targets. A flat partitioner sees <em>N</em> interchangeable parts. On a 4-GPU node with 8 PEs per GPU, "PE 7 and PE 8" is a device boundary while "PE 6 and PE 7" is not, and a flat model cannot express that.</p>
+</div>
+
+<div class="phase">
+  <div class="phase-title">3. Edge weights are transport-blind</div>
+  <p>In every one of these, a cut edge costs the same wherever it lands. On a multi-GPU node the same logical edge spans four cost tiers that differ by orders of magnitude — a same-device exchange versus a cross-node RDMA staged transfer. <code>findTransferModeDevice</code> already classifies exactly this for any <code>(src, dst)</code> pair, and none of the existing balancers consult it. <code>ScotchTopoLB</code> is the only one whose model could express it, and it is not in the build.</p>
+</div>
+
+<div class="phase">
+  <div class="phase-title">4. Single load dimension, and it is the wrong one</div>
+  <p><code>ObjGraph</code> sets <code>CkVertex::compLoad = objData[v].wallTime</code> — host CPU time only. The SM-normalised <code>gpuTime</code> that this whole branch exists to collect never reaches the graph. METIS multi-constraint partitioning (<code>ncon = 2</code>) could carry CPU and GPU as separate balance constraints, which is a genuinely good fit, but objections 1–3 still stand.</p>
+</div>
+
+<div class="verdict">
+  <strong>Verdict: extend <code>GreedyRefineCentralGPULB</code>; reuse <code>ObjGraph</code>, not a balancer.</strong>
+  The refinement structure — an incumbent assignment, a per-object decision to
+  stay or move, a tolerance governing how much improvement justifies a move — is
+  the right shape for this problem and is exactly what the partitioners lack.
+  What we are missing is a term in the objective, not a different algorithm.
+  <code>ObjGraph</code> (<code>src/ck-ldb/ckgraph.h</code>) already does the tedious
+  half: it converts <code>LDStats::commData</code> into per-vertex
+  <code>sendToList</code>/<code>recvFromList</code> with message and byte counts,
+  resolves object keys through the comm hash, handles multicast, and writes
+  decisions back via <code>convertDecisions</code>. Reuse it for plumbing and keep
+  our own placement logic.
+</div>
+
+<h3>Worth borrowing rather than adopting</h3>
+<ul>
+  <li><strong><code>RecBipartLB</code>'s <code>RefineBoundary</code></strong> — a KL/FM gain-based boundary swap. Once a comm term exists, this is the natural inner refinement pass: it only considers objects on a partition boundary, which is where locality is actually won or lost, and it is cheap.</li>
+  <li><strong>METIS as a startup mapper, not a balancer</strong> — see below.</li>
+</ul>
+
+<h2>The one place a partitioner genuinely fits</h2>
+<p>Objection 1 — that a partitioner remaps everything — costs nothing when nothing has been placed yet. At <em>t</em>&nbsp;=&nbsp;0 an arbitrary relabelling is free.</p>
+<p>pic2d currently builds its array with a bare <code>CProxy_Patch::ckNew(n_chares_x, n_chares_y)</code>, so it gets <code>DefaultArrayMap</code>: a linearisation of the 2D index space blocked over PEs. For a 5-point stencil that is a reasonable but not good mapping — it gives long thin strips with a large surface-to-volume ratio rather than compact blocks.</p>
+<p>So the division of labour is:</p>
+<ul>
+  <li><strong>Startup:</strong> a partitioner (or, for a structured stencil, simply a 2D blocked <code>CkArrayMap</code> — cheaper and near-optimal) produces a communication-minimising initial mapping.</li>
+  <li><strong>Every LB step after that:</strong> <code>GreedyRefineCentralGPULB</code> with a comm term maintains it, moving objects only when the load imbalance is worth the locality it breaks.</li>
+</ul>
+<p>Neither half works alone. A good initial map with a locality-blind balancer is destroyed at the first AtSync — which is the regression we measured. A locality-aware balancer starting from a bad map spends every step climbing out of a hole it should never have been in.</p>
+
+<h2>What the balancer should do</h2>
+
+<h3>The cost table</h3>
+<p>One table, shared with Phase 3's migration cost. Tiers, not hard-coded numbers — the numbers are calibrated (see below).</p>
+<div class="overflow-x">
+<table>
+  <tr><th>Tier</th><th>Condition</th><th>Mechanism</th><th>Relative cost</th></tr>
+  <tr><td>T0</td><td>Same PE</td><td>None — no message at all</td><td>0</td></tr>
+  <tr><td>T1</td><td>Same process, same GPU</td><td>Device pointer handoff</td><td>Near 0</td></tr>
+  <tr><td>T2</td><td>Same process, different GPU</td><td>Peer D2D copy</td><td>bytes / peer BW</td></tr>
+  <tr><td>T3</td><td>Same node, different process</td><td>CUDA IPC</td><td>bytes / IPC BW + handle overhead</td></tr>
+  <tr><td>T4</td><td>Different node</td><td>Host-staged RDMA</td><td>2 × bytes / host BW + staging</td></tr>
+</table>
+</div>
+<p>The tier for any <code>(srcPe, dstPe)</code> pair is what <code>findTransferModeDevice</code> already returns, refined by <code>gpu_device_id</code> equality to split T1 from T2.</p>
+
+<h3>The objective</h3>
+<p>Per-iteration cost of a candidate assignment, as seen by the busiest resource:</p>
+<pre><code>cost(assignment) = max( maxGpuGroupLoad,        // existing, Phase 1
+                        maxPeCpuLoad )           // existing, Phase 1
+                 + commWeight * maxPeCommTime    // new
+
+// Communication charged to the PE that pays it, not summed globally --
+// a hot spot on one PE stalls the step even if total traffic is low.
+maxPeCommTime = max over pe of ( sum over edges (o, nbr) with place(o) == pe
+                                   of tierCost(pe, place(nbr)) * bytes(o, nbr) )</code></pre>
+<p>Charging communication to the busiest PE rather than summing it globally matters: total edge cut is what a partitioner minimises, but what lengthens a step is one PE's inbox, and those are different quantities whenever the cut is unevenly distributed.</p>
+
+<h3>Scoring a candidate placement</h3>
+<pre><code>double commCost(int objIdx, int candidatePe) {
+  double c = 0;
+  for (const CkEdge &e : vertices[objIdx].sendToList) {
+    int nbrPe = (newPe[e.getNeighborId()] >= 0)   // placed already this pass?
+                  ? newPe[e.getNeighborId()]      //   use the new decision
+                  : oldPe[e.getNeighborId()];     //   else assume it stays put
+    c += tierCost(candidatePe, nbrPe) * e.getNumBytes();
+  }
+  // recvFromList likewise; an edge is charged once to each endpoint's PE
+  return c;
+}</code></pre>
+
+<div class="warn">
+  <strong>Ordering hazard.</strong> A comm term inside a greedy loop is
+  order-dependent: when object <em>i</em> is placed, some of its neighbours are
+  not placed yet. Scoring against the peer's old PE when it has not yet been
+  placed is the standard treatment in a refinement balancer, and it is a good
+  prior here precisely because most objects will not move. Two refinements if it
+  proves insufficient: run a second scoring pass once all placements are known
+  (cheap — the assignment loop is not the bottleneck), or process objects in
+  graph order (BFS from a seed) rather than load order, so neighbours are
+  usually already placed. The second interacts badly with the descending-load
+  ordering that greedy packing needs, so prefer the second pass.
+</div>
+
+<h3>Calibrating the constants</h3>
+<p>Three options, in increasing order of fidelity and effort:</p>
+<ol>
+  <li><strong>Hard-code per architecture.</strong> Fragile, but a starting point. PCIe 4.0 measured at roughly 25&nbsp;GB/s on Delta's A40s.</li>
+  <li><strong>Micro-benchmark at startup.</strong> One D2D copy per tier on the first LB step. The IPC handle-open cost measured here also feeds the deferred A-vs-C staged-versus-IPC switching decision.</li>
+  <li><strong>Learn from history.</strong> Record <code>(bytes, tier, elapsed)</code> for each actual transfer and fit. Most accurate, most machinery; defer.</li>
+</ol>
+<p>Start with (2) — it is a few dozen lines and removes the per-machine fragility of (1).</p>
+
+<h3><code>commWeight</code></h3>
+<p>The objective adds seconds of compute to seconds of communication, so in principle <code>commWeight</code> is 1 and the terms are directly comparable. In practice it should be exposed as a tunable, because the two are measured very differently: compute load comes from CUPTI and the LB timers, communication is <em>estimated</em> from a byte count and a bandwidth constant, with no account of overlap between communication and computation. Making it a parameter also lets it join the existing concurrent (A, B) search as a third dimension, so the best value is picked by measurement rather than argued about.</p>
+
+<h2>Implementation steps</h2>
+<div class="overflow-x">
+<table>
+  <tr><th>#</th><th>Step</th><th>Notes</th><th>Status</th></tr>
+  <tr><td>1</td><td>Device byte accounting on the send path</td><td>Without it every GPU edge weighs a few hundred bytes instead of megabytes</td><td><strong>Done</strong></td></tr>
+  <tr><td>2</td><td>Verify the graph is populated and weighted correctly</td><td>Run with <code>+LBCommOn</code>, dump edges under <code>_lb_args.debug() &gt; 1</code>, confirm 4 neighbours per interior chare at the expected byte counts</td><td>Next</td></tr>
+  <tr><td>3</td><td>Build <code>ObjGraph</code> in <code>work()</code>, add the tier table</td><td>Tier from <code>findTransferModeDevice</code> + <code>gpu_device_id</code></td><td></td></tr>
+  <tr><td>4</td><td>Add <code>commCost</code> to the inner PE choice and the outer group choice</td><td>Old-PE fallback for unplaced neighbours</td><td></td></tr>
+  <tr><td>5</td><td>Add <code>maxPeCommTime</code> to the reported objective</td><td>Must also appear in the objective, not only in the per-move decision, or the concurrent search cannot distinguish solutions</td><td></td></tr>
+  <tr><td>6</td><td>Sweep <code>commWeight</code> as a third search dimension</td><td>Reuses the existing <code>NUM_SOLUTIONS</code> machinery</td><td></td></tr>
+  <tr><td>7</td><td>Communication-minimising initial map for pic2d</td><td>2D blocked <code>CkArrayMap</code>; independent of steps 2–6 and testable on its own</td><td></td></tr>
+</table>
+</div>
+
+<div class="warn">
+  <strong>Step 5 is the one that is easy to get wrong.</strong> Phase 1 already
+  taught this lesson once: a term that influences per-move decisions but is
+  absent from the reported <code>max_load</code> is invisible to
+  <code>receiveSolutions</code>, which then falls through to its
+  fewest-migrations tie-break. The same trap applies to the sort key — if
+  placement is scored on communication, the ordering should reflect it too
+  (heaviest-communicating objects placed first, when they still have a free
+  choice of PE).
+</div>
+
+<h2>Validation</h2>
+<p class="section-intro">Each step is measurable on its own; do not stack them before measuring.</p>
+<ul>
+  <li><strong>Step 2, single GPU:</strong> edge dump matches the known 5-point stencil. This catches a broken graph before any placement logic depends on it.</li>
+  <li><strong>Step 7 alone, no LB:</strong> blocked map versus <code>DefaultArrayMap</code>, migration disabled. Isolates the initial-mapping gain from everything else.</li>
+  <li><strong>Steps 3–5, 4 processes × 8 PEs on Delta:</strong> the headline number is iteration time with the balancer against the 13.4&nbsp;ms no-migration baseline. Migration count should fall well below 32/64, but count is a diagnostic — time is the result.</li>
+  <li><strong>Regression:</strong> a genuinely imbalanced run must still migrate. A comm term that simply freezes everything in place is not a fix, and would look identical to success on pic2d, which is already balanced.</li>
+</ul>
+
+<div class="warn">
+  <strong>The honest risk.</strong> pic2d may be the wrong benchmark to prove
+  this on. It is already load-balanced, so the best available assignment is close
+  to the initial one and a balancer that does nothing scores nearly perfectly.
+  That makes it a good <em>regression</em> test — it must not get slower — but a
+  poor demonstration that comm-aware placement helps. A workload with genuine
+  imbalance <em>and</em> real neighbour communication is needed to show the term
+  earning its keep, otherwise "did not make things worse" is all that can be
+  claimed.
+</div>
+
+<h2>Open questions</h2>
+<ul>
+  <li><strong>Does the comm graph capture the GPU-direct path at all?</strong> Step 2 exists to answer this. The send goes through <code>CkArray::sendToPe</code> like any other array message, so it should — but that is read from code, not yet observed on a run.</li>
+  <li><strong><code>LDCommData::bytes</code> is an <code>int</code>.</strong> At 5.9&nbsp;MB per message that is roughly 360 messages per edge before it wraps. The narrow <code>LBTurnInstrumentOn/Off</code> window keeps this safe today; widening the field is an ABI change across every LB and every stats message.</li>
+  <li><strong>Group and nodegroup device sends</strong> bypass <code>CkArray::sendToPe</code>, so their payload size is discarded rather than recorded. Harmless while only array elements form object-to-object edges, but it is why the take-and-clear on the array path must stay unconditional.</li>
+  <li><strong>Overlap between communication and computation</strong> is not modelled — the objective adds them. This is the same question Phase 2 asks about CPU/GPU overlap, and probably wants the same answer.</li>
+</ul>

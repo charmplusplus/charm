@@ -402,6 +402,56 @@ int chosen_gi = argmin(score);</code></pre>
   <p>This naturally prefers local GPU groups when loads are similar, falling back to remote groups only when the load imbalance justifies the migration cost.</p>
 </div>
 
+<!-- Phase 6 -->
+<div class="phase">
+  <div class="phase-title">Phase 6 — Communication-Aware Placement <span class="tag tag-topo">topo</span><span class="tag tag-gpu">gpu</span></div>
+  <p><strong>Problem:</strong> Nothing in the objective knows where an object's neighbours are. A move that halves an object's compute but scatters its ghost exchanges across processes scores as a pure win. This is the term that persists: pic2d stayed at ~20&nbsp;ms/iter long after migration finished, so the cost is the <em>assignment</em>, not the move.</p>
+  <div class="warn">
+    <strong>Phase 3 does not cover this, and cannot.</strong> Migration cost is
+    paid once, at the LB step; communication cost is paid every iteration
+    afterwards. A migration-cost term makes the balancer <em>reluctant</em>, and
+    reluctance is indiscriminate — it penalises a move that improves locality
+    exactly as much as one that destroys it. At best it preserves whatever
+    locality the initial mapping happened to have. It can never create any.
+  </div>
+  <p><strong>Where the two phases really connect:</strong> they share one transport-tier cost table — same GPU group, cross-GPU within a process, IPC within a node, RDMA across nodes, already classified by <code>findTransferModeDevice</code>. Migration applies that table once per moved object; communication applies it per iteration weighted by edge bytes. One table, two independent terms.</p>
+
+  <p><strong>Prerequisite — device byte accounting.</strong> <span class="tag tag-done">done</span> The LB communication graph weights each edge by <code>UsrToEnv(msg)-&gt;getTotalsize()</code>, but a <code>nocopydevice</code> message carries only the <code>CkDeviceBuffer</code> descriptors in its envelope. pic2d's ghost exchanges were therefore logged at a few hundred bytes each instead of 590&nbsp;KB–5.9&nbsp;MB: edge topology correct, weights wrong by roughly three orders of magnitude. Any comm-aware strategy run before this fix was balancing GPU traffic that it could not see.</p>
+  <pre><code>// ckrdmadevice.C — the real sizes exist here and nowhere later on the send path
+size_t device_bytes = 0;
+for (int i = 0; i &lt; numops; i++) { ...; device_bytes += buffers[i]-&gt;cnt; }
+_ck_pending_device_send_bytes = device_bytes;
+
+// ckarray.C — taken unconditionally at the top of sendToPe, before any branch
+const size_t deviceBytes = CkRdmaDeviceTakePendingSendBytes();
+recordSend(msg-&gt;array_element_id(),
+           UsrToEnv(msg)-&gt;getTotalsize() + deviceBytes, pe, opts);</code></pre>
+
+  <p><strong>Remaining work:</strong></p>
+  <ul>
+    <li><strong>Turn comm instrumentation on.</strong> <code>_lb_args.traceComm()</code> defaults to false (<code>LBManager.C:418</code>); it needs <code>+LBCommOn</code>. It is already gated by <code>StatsOn()</code>, so it respects the <code>LBTurnInstrumentOn/Off</code> window and costs nothing outside it.</li>
+    <li><strong>Build the graph.</strong> <code>ObjGraph</code> (<code>ckgraph.h</code>) already converts <code>LDStats::commData</code> into per-vertex <code>sendToList</code>/<code>recvFromList</code> with message and byte counts, handles multicast, and writes decisions back through <code>convertDecisions</code>. Reuse it rather than walking <code>commData</code> by hand.</li>
+    <li><strong>Add the term to the objective</strong>, scoring each candidate placement by the transport tier of every incident edge.</li>
+  </ul>
+
+  <div class="warn">
+    <strong>Ordering hazard.</strong> A comm term inside a greedy loop is
+    order-dependent: when object <em>i</em> is placed, some of its neighbours are
+    not placed yet. The standard treatment in a refinement balancer is to score
+    against the peer's <em>new</em> PE if it has already been placed and its
+    <em>old</em> PE otherwise — the old assignment is a good prior precisely
+    because most objects will not move.
+  </div>
+  <div class="warn">
+    <strong>Watch for overflow.</strong> <code>LDCommData::bytes</code> is an
+    <code>int</code>. At 5.9&nbsp;MB per message that is ~360 messages per edge
+    before it wraps. The narrow <code>LBTurnInstrumentOn/Off</code> window keeps
+    this safe today, but a wide window or a bigger payload will silently wrap,
+    and widening the field is an ABI change across every LB.
+  </div>
+  <p>Design detail — whether to extend this balancer or adopt an existing comm-aware LB — is in <code>COMM_AWARE_LB_PLAN.html</code>.</p>
+</div>
+
 <hr>
 
 <h2>Additional Considerations</h2>
@@ -442,11 +492,13 @@ int chosen_gi = argmin(score);</code></pre>
 <table>
   <tr><th>Phase</th><th>Effort</th><th>Prerequisite</th><th>Testable on 1 GPU?</th><th>Status</th></tr>
   <tr><td>1. Fix 0-migrations</td><td>Small — ~20 lines</td><td>None</td><td>Yes</td><td><strong>Done</strong> (<code>8166caea0</code>)</td></tr>
-  <tr><td>3. Migration cost</td><td>Medium — cost model + gpu_size in LDObjData</td><td>Phase 1</td><td>Partially (only pointer-handoff vs memcpy)</td><td><strong>Next</strong></td></tr>
+  <tr><td>6a. Device byte accounting</td><td>Small — 3 files</td><td>None</td><td>Yes</td><td><strong>Done</strong></td></tr>
+  <tr><td>6b. Communication term</td><td>Medium — ObjGraph + transport-tier scoring</td><td>6a</td><td>Partially (PE-level edges only)</td><td><strong>Next</strong></td></tr>
+  <tr><td>3. Migration cost</td><td>Medium — cost model + gpu_size in LDObjData</td><td>Phase 1</td><td>Partially (only pointer-handoff vs memcpy)</td><td>After 6b (shares its cost table)</td></tr>
   <tr><td>5. Topology preferences</td><td>Small — weighted group selection</td><td>Phase 3</td><td>No (single node)</td><td>Folds into 3</td></tr>
   <tr><td>4. Memory constraint</td><td>Small — port from GreedyRefineCentralLB</td><td>None (sizes already plumbed)</td><td>Yes (can verify no OOM)</td><td>Queued</td></tr>
   <tr><td>2. Overlap model</td><td>Medium — α calibration + prediction</td><td>Phase 1</td><td>Yes (α observable)</td><td>Deferred</td></tr>
 </table>
 </div>
-<p><strong>Why this order changed.</strong> The original order ran the phases as numbered. After Phase 1 landed and the balancer was measured on Delta, the binding problem turned out to be that <em>every migration looks free</em>, not that the compute model is imprecise — so Phase 3 moves ahead of Phase 2, and Phase 5 is small enough to fold into it as the group-selection term of the same cost function. Phase 2's overlap model only matters once the balancer stops making moves that lose more to migration and lost locality than they gain in compute.</p>
-<p>Phase 3 also pairs with work outside this document: a communication-minimizing <em>initial</em> mapping for pic2d, which currently uses <code>DefaultArrayMap</code> via a bare <code>CProxy_Patch::ckNew(nx, ny)</code>. A good starting assignment plus a cost model that gives the balancer a reason to stay put is the combination that addresses the regression; either alone is unlikely to.</p>
+<p><strong>Why this order changed.</strong> The original order ran the phases as numbered. After Phase 1 landed and the balancer was measured on Delta, the binding problem turned out not to be that the compute model is imprecise, but that the balancer cannot see either of the two costs it is actually paying — the one-time cost of moving an object and the per-iteration cost of separating it from its neighbours. Of those, the communication term is the one that persists in steady state, and it is what the measurement points at, so Phase 6 leads. Phase 3 follows immediately because it reuses the same transport-tier cost table, and Phase 5 is small enough to fold into it as the group-selection term. Phase 2's overlap model only matters once the balancer stops making moves that lose more to migration and lost locality than they gain in compute.</p>
+<p>Phase 6 also pairs with work outside this document: a communication-minimizing <em>initial</em> mapping for pic2d, which currently uses <code>DefaultArrayMap</code> via a bare <code>CProxy_Patch::ckNew(nx, ny)</code>. A good starting assignment plus a balancer that can see what it would cost to break it is the combination that addresses the regression; either alone is unlikely to.</p>
