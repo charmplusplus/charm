@@ -568,9 +568,28 @@ class Patch : public CBase_Patch {
       CkDeviceBufferPost* devicePost) {
     buf = d_recv_rho + stripOff(dir);
     devicePost[0].hapi_stream = comm_stream;
+    if (getenv("CHARM_DEBUG_IPC_RECV")) {
+      const int slab8 = 2 * (block_width + block_height) + 4;
+      CkPrintf("[%d] post (%d,%d): ref=%d dir=%d n=%d off=%d slab8=%d "
+               "recv_base=%p buf=%p%s\n",
+               CkMyPe(), thisIndex.x, thisIndex.y, ref, dir, n, stripOff(dir),
+               slab8, (void*)d_recv_rho, (void*)buf,
+               (dir < 0 || dir >= NUM_DIRS || stripOff(dir) + n > slab8)
+                 ? "  <-- OUT OF RANGE" : "");
+    }
   }
 
   void accumChargeGhost(int dir, int n, RealType* buf) {
+    if (getenv("CHARM_DEBUG_IPC_RECV")) {
+      const int slab8 = 2 * (block_width + block_height) + 4;
+      CkPrintf("[%d] accum (%d,%d): dir=%d n=%d buf=%p recv_base=%p "
+               "delta=%ld rho=%p%s\n",
+               CkMyPe(), thisIndex.x, thisIndex.y, dir, n, (void*)buf,
+               (void*)d_recv_rho, (long)(buf - d_recv_rho), (void*)d_rho,
+               (dir < 0 || dir >= NUM_DIRS ||
+                buf < d_recv_rho || buf - d_recv_rho >= slab8)
+                 ? "  <-- BAD" : "");
+    }
     invokeAccumChargeGhostKernel(d_rho, buf, dir, block_width, block_height,
         comm_stream);
   }
