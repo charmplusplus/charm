@@ -429,6 +429,11 @@ void CentralLB::SendStats()
 }
 
 
+static inline bool lbMigDbg() {
+  static const bool on = (getenv("CHARM_DEBUG_MIGRATE") != nullptr);
+  return on;
+}
+
 void CentralLB::Migrated(int waitBarrier)
 {
 
@@ -436,6 +441,11 @@ void CentralLB::Migrated(int waitBarrier)
   if (waitBarrier) {
 	    migrates_completed++;
       DEBUGF(("[%d] An object migrated! %d %d\n",CkMyPe(),migrates_completed,migrates_expected));
+    if (lbMigDbg()) {
+      CkPrintf("[LBMIG %d] arrived %d/%d\n", CkMyPe(), migrates_completed,
+               migrates_expected);
+      fflush(stdout);
+    }
     if (migrates_completed == migrates_expected) {
       MigrationDone(1);
     }
@@ -1212,6 +1222,10 @@ void CentralLB::MigrationDoneImpl (int balancing)
 {
 
 #if CMK_LBDB_ON
+  if (lbMigDbg()) {
+    CkPrintf("[LBMIG %d] MigrationDone balancing=%d\n", CkMyPe(), balancing);
+    fflush(stdout);
+  }
   migrates_completed = 0;
   migrates_expected = -1;
   // clear load stats
@@ -1254,6 +1268,10 @@ void CentralLB::ResumeClients()
 void CentralLB::ResumeClients(int balancing)
 {
 #if CMK_LBDB_ON
+  if (lbMigDbg()) {
+    CkPrintf("[LBMIG %d] ResumeClients balancing=%d\n", CkMyPe(), balancing);
+    fflush(stdout);
+  }
   //CkPrintf("[%d] Resuming clients. balancing:%d.\n",CkMyPe(),balancing);
 
   lbmgr->ResumeClients();
