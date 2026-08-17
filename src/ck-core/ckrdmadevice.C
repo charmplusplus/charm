@@ -386,6 +386,26 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
       hapi_ipc_device_info& device_info =
         csv_gpu_manager.hapi_ipc_device_infos[source.device_idx];
 
+      // TEMPORARY: locate the invalid pointer behind the illegal access seen in
+      // the first cross-process ghost exchange. Prints the peer mapping and the
+      // pool sizes actually backing the indices used just below, so a null peer
+      // buffer, an out-of-range index, or a desynchronised event pool is
+      // visible directly rather than inferred.
+      if (getenv("CHARM_DEBUG_IPC_RECV")) {
+        CmiPrintf("[%d] IPC recv: dev_idx=%d (infos=%zu) ev_idx=%d "
+                  "(src_pool=%zu dst_pool=%zu flags=%zu) peer_buf=%p "
+                  "off=%zu dest=%p cnt=%zu src_pe=%d\n",
+                  CkMyPe(), source.device_idx,
+                  csv_gpu_manager.hapi_ipc_device_infos.size(),
+                  source.event_idx,
+                  device_info.src_event_pool.size(),
+                  device_info.dst_event_pool.size(),
+                  device_info.event_pool_flags.size(),
+                  device_info.buffer, (size_t)source.comm_offset,
+                  (void*)dest.ptr, (size_t)dest.cnt, source.src_pe);
+        fflush(stdout);
+      }
+
       // 1. Make user-provided stream wait for IPC event using hapiStreamWaitEvent
       //    (source buffer to device comm buffer on source)
       hapiCheck(hapiStreamWaitEvent(postStructs[i].hapi_stream,
@@ -582,6 +602,19 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
 #if CMK_SMP
       CmiUnlock(dm->lock);
 #endif
+
+      // TEMPORARY: paired with the receive-side print, so the indices and
+      // offsets the sender publishes can be compared against what the receiver
+      // resolves them to.
+      if (getenv("CHARM_DEBUG_IPC_RECV")) {
+        CmiPrintf("[%d] IPC send: dev_idx=%d ev_idx=%d off=%zu cnt=%zu "
+                  "src_ptr=%p comm_base=%p alloc=%p is_lb=%d dest_pe=%d\n",
+                  CkMyPe(), buffers[i]->device_idx, buffers[i]->event_idx,
+                  (size_t)buffers[i]->comm_offset, (size_t)buffers[i]->cnt,
+                  buffers[i]->ptr, dm->comm_buffer->base_ptr,
+                  alloc_comm_buffer, (int)is_lb_buffer, dest_pe);
+        fflush(stdout);
+      }
 
       // Initiate transfer from source buffer to device comm buffer
       if(!is_lb_buffer) {
