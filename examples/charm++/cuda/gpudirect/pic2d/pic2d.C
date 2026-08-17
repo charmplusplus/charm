@@ -633,9 +633,17 @@ class Patch : public CBase_Patch {
     buf = d_recv_phi + (size_t)(ref & 1) * 2 * (block_width + block_height) +
         phiOff(dir);
     devicePost[0].hapi_stream = comm_stream;
+    if (getenv("CHARM_DEBUG_IPC_RECV"))
+      CkPrintf("[%d] postPHI (%d,%d): ref=%d dir=%d n=%d base=%p buf=%p\n",
+               CkMyPe(), thisIndex.x, thisIndex.y, ref, dir, n,
+               (void*)d_recv_phi, (void*)buf);
   }
 
   void unpackPhiGhost(int dir, int n, RealType* buf) {
+    if (getenv("CHARM_DEBUG_IPC_RECV"))
+      CkPrintf("[%d] usePHI  (%d,%d): dir=%d n=%d buf=%p base=%p delta=%ld\n",
+               CkMyPe(), thisIndex.x, thisIndex.y, dir, n, (void*)buf,
+               (void*)d_recv_phi, (long)(buf - d_recv_phi));
     if (dir == LEFT || dir == RIGHT) {
       invokeUnpackPhiLRKernel(d_phi, buf, dir, block_width, block_height,
           comm_stream);
@@ -693,9 +701,17 @@ class Patch : public CBase_Patch {
       CkDeviceBufferPost* devicePost) {
     buf = (RealType*)(d_recv_e + stripOff(dir));
     devicePost[0].hapi_stream = comm_stream;
+    if (getenv("CHARM_DEBUG_IPC_RECV"))
+      CkPrintf("[%d] postE   (%d,%d): ref=%d dir=%d n=%d base=%p buf=%p\n",
+               CkMyPe(), thisIndex.x, thisIndex.y, ref, dir, n,
+               (void*)d_recv_e, (void*)buf);
   }
 
   void unpackEGhost(int dir, int n, RealType* buf) {
+    if (getenv("CHARM_DEBUG_IPC_RECV"))
+      CkPrintf("[%d] useE    (%d,%d): dir=%d n=%d buf=%p base=%p delta=%ld\n",
+               CkMyPe(), thisIndex.x, thisIndex.y, dir, n, (void*)buf,
+               (void*)d_recv_e, (long)((float2*)buf - d_recv_e));
     invokeUnpackEGhostKernel(d_efield, (const float2*)buf, dir, block_width,
         block_height, comm_stream);
   }
@@ -751,9 +767,18 @@ class Patch : public CBase_Patch {
       CkDeviceBufferPost* devicePost) {
     parts = d_recv_parts + (size_t)dir * exch_capacity;
     devicePost[0].hapi_stream = comm_stream;
+    if (getenv("CHARM_DEBUG_IPC_RECV"))
+      CkPrintf("[%d] postPART(%d,%d): ref=%d dir=%d n=%d m=%d cap=%d base=%p parts=%p\n",
+               CkMyPe(), thisIndex.x, thisIndex.y, ref, dir, n, m,
+               exch_capacity, (void*)d_recv_parts, (void*)parts);
   }
 
   void appendParticles(int dir, int n) {
+    if (getenv("CHARM_DEBUG_IPC_RECV"))
+      CkPrintf("[%d] usePART (%d,%d): dir=%d n=%d np=%d cap=%d%s\n",
+               CkMyPe(), thisIndex.x, thisIndex.y, dir, n, np, part_capacity,
+               (dir < 0 || dir >= NUM_DIRS || n < 0 || n > exch_capacity)
+                 ? "  <-- BAD" : "");
     if (n == 0) return;
     if (np + n > part_capacity) {
       CkAbort("Patch (%d,%d): %d particles exceed capacity %d at iteration "
