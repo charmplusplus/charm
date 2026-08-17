@@ -30,6 +30,8 @@
 #include "CentralLB.h"
 #include "GreedyRefineCentralGPULB.decl.h"
 
+#include <algorithm>
+
 void CreateGreedyRefineCentralGPULB();
 BaseLB *AllocateGreedyRefineCentralGPULB();
 
@@ -71,7 +73,16 @@ private:
   class ObjLoadGreater {
   public:
     inline bool operator() (const GObj *o1, const GObj *o2) const {
+#if CMK_CUDA
+      // Greedy packing is only as good as its ordering: placing the largest
+      // items first is what keeps the bins even. Placement here is scored on
+      // both dimensions, so order by whichever one binds for each object.
+      // Ordering on GPU time alone leaves the CPU dimension in essentially
+      // arbitrary order, which packs it worse than not moving anything at all.
+      return std::max(o1->load, o1->cpuLoad) > std::max(o2->load, o2->cpuLoad);
+#else
       return (o1->load > o2->load);
+#endif
     }
   };
 

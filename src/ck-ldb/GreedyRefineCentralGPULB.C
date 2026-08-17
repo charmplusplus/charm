@@ -501,9 +501,18 @@ void GreedyRefineCentralGPULB::work(LDStats *stats)
     for (int pe : gpuGroups[gi].peIds)
       peToGrpIdx[pe] = gi;
 
-  maxLoad = 0;  // track max GPU-group aggregate load (the reported objective)
+  // Two dimensions are tracked separately. maxLoad follows the GPU-group
+  // aggregate and keeps driving the refine target M below; maxCpuLoad follows
+  // the busiest PE's CPU load. Only their combination is reported as the
+  // solution objective -- see the note after the assignment loop.
+  maxLoad = 0;
   for (int gi = 0; gi < nGroups; gi++)
     if (gpuGroups[gi].load > maxLoad) maxLoad = gpuGroups[gi].load;
+
+  double maxCpuLoad = 0;
+  for (int pe = 0; pe < n_pes; pe++)
+    if (procs[pe].available && procs[pe].cpuLoad > maxCpuLoad)
+      maxCpuLoad = procs[pe].cpuLoad;
 
   // --- Main assignment loop ---
   for (int i = 0; i < (int)pobjs.size(); i++) {
@@ -554,12 +563,22 @@ void GreedyRefineCentralGPULB::work(LDStats *stats)
       maxLoad = g.load;
       if (maxLoad > M) M = maxLoad;
     }
+    if (p->cpuLoad > maxCpuLoad) maxCpuLoad = p->cpuLoad;
 
     if (bestPe != obj->oldPE) {
       nmoves++;
       stats->to_proc[obj->id] = bestPe;
     }
   }
+
+  // A step is not over until both resources are done with it, and because
+  // kernels are launched asynchronously the two overlap, so a group's step time
+  // is set by whichever dimension is busier: its GPU or its busiest PE.
+  // Reporting only the GPU term hides every intra-group difference -- with a
+  // single GPU group that term is the same for every (A,B) candidate, so
+  // receiveSolutions falls through to its fewest-migrations tie-break and picks
+  // the do-nothing solution. That is why a one-GPU run never migrated anything.
+  maxLoad = std::max(maxLoad, maxCpuLoad);
 
   if ((_lb_args.debug() > 1) && (CkMyPe() == cur_ld_balancer)) {
     CkPrintf("[%d] --- Per-GPU-group GPU load after LB ---\n", CkMyPe());
