@@ -195,6 +195,16 @@ struct GPUManager {
   std::mutex cupti_queue_lock_;
 
   bool cupti_initialized_;
+  // Whether activity tracing is currently running. Separate from
+  // cupti_initialized_: the buffer callbacks are registered once, but tracing
+  // itself is switched on and off as the application asks for it.
+  bool cupti_tracing_active_ = false;
+  // Bumped every time CUPTI is detached. Detaching clears CUPTI's
+  // external-correlation stack for every PE, but the counters that keep the
+  // entry-method push/pop hooks paired are per-PE, and only the PE that ran the
+  // detach could reset its own. Each PE compares this against the generation it
+  // last saw and zeroes its counter when they differ.
+  uint64_t cupti_generation_ = 0;
 #endif
 
   void init() {

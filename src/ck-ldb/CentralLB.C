@@ -163,7 +163,12 @@ void CentralLB::CallLB()
 if (CmiMyRank() == 0)
 {
   double start = CkWallTimer();
-  cuptiActivityFlushAll(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED);//sync flush cupti records which are finished, does not wait for partial records
+  // Only flush while CUPTI is attached. An application that drives its own
+  // instrumentation window may already have switched tracing off, which
+  // detaches CUPTI -- its stop path flushed on the way out, so the records are
+  // already here and there is nothing left to pull.
+  if (hapiCuptiTracingActive())
+    cuptiActivityFlushAll(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED);//sync flush cupti records which are finished, does not wait for partial records
   hapiProcessCuptiBuffers();
   // Reduce the kernel timeline to one scalar load per object here, while the
   // records are still local. Only those scalars are sent to the central LB.

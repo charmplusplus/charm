@@ -9,6 +9,12 @@
 #include "LBComm.h"
 #include "LBMachineUtil.h"
 
+#if (CMK_CUDA || CMK_HIP) && CMK_LBDB_ON
+// For hapiCuptiStartTracing/hapiCuptiStopTracing, called from TurnStatsOn/Off.
+void hapiCuptiStartTracing();
+void hapiCuptiStopTracing();
+#endif
+
 #include <vector>
 #include <unordered_map>
 
@@ -103,10 +109,23 @@ public:
   inline void* GetObjUserData(LDObjHandle &h) {
     return LbObj(h)->getLocalUserData();
   }
+  // GPU activity tracing follows the same switch as CPU instrumentation, so an
+  // application that calls LBTurnInstrumentOn()/LBTurnInstrumentOff() around
+  // its own AtSync schedule controls both with one call. Tracing is by far the
+  // more expensive of the two, so leaving it off between load-balancing steps
+  // is what makes instrumented runs affordable.
   inline void TurnStatsOn(void)
-       {statsAreOn = true; machineUtil.StatsOn();}
+       {statsAreOn = true; machineUtil.StatsOn();
+#if (CMK_CUDA || CMK_HIP) && CMK_LBDB_ON
+        hapiCuptiStartTracing();
+#endif
+       }
   inline void TurnStatsOff(void)
-       {statsAreOn = false; machineUtil.StatsOff();}
+       {statsAreOn = false; machineUtil.StatsOff();
+#if (CMK_CUDA || CMK_HIP) && CMK_LBDB_ON
+        hapiCuptiStopTracing();
+#endif
+       }
   inline bool StatsOn(void) const
        { return statsAreOn; };
   inline void IdleTime(LBRealType *walltime) {

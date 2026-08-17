@@ -252,6 +252,17 @@ void hapiCuptiPopObjCorrelation();
 void hapiProcessCuptiBuffers();
 void hapiNormalizeCuptiLoads();
 void hapiClearCuptiData();
+
+// Start/stop CUPTI activity tracing. Tracing is the dominant cost of GPU load
+// instrumentation, and the loads it produces are only read at a load-balancing
+// step, so an application that balances on an explicit schedule can leave it
+// off and switch it on for a few steps ahead of AtSync. These follow the
+// existing LBTurnInstrumentOn()/LBTurnInstrumentOff() switch, so applications
+// control GPU tracing with the same call that controls CPU instrumentation.
+// Both are idempotent.
+void hapiCuptiStartTracing();
+void hapiCuptiStopTracing();
+bool hapiCuptiTracingActive();
 #endif
 
 #ifdef CMK_LBDB_ON
