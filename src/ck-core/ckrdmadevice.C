@@ -346,9 +346,18 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
       const size_t field_off = walk.size();
       CkDeviceBuffer db;
       walk | db;
+      const size_t field_len = walk.size() - field_off;
       db.ptr = arrPtrs[i];
       PUP::toMem patch(new_buf + field_off);
       patch | db;
+      // Rewriting in place is only sound if packing a CkDeviceBuffer produces
+      // exactly as many bytes as unpacking consumed. If that ever stops being
+      // true, this would silently overwrite the marshalled parameters that
+      // follow (ref/dir/n) instead of just the pointer.
+      if (patch.size() != field_len)
+        CkAbort("CkRdmaDeviceIssueRgets: device buffer pup asymmetry "
+                "(read %zu bytes, wrote %zu) -- in-place retarget is unsafe",
+                field_len, patch.size());
     }
   }
 
