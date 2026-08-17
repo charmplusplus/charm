@@ -330,14 +330,17 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
   envelope* new_env = UsrToEnv(CkCopyMsg(&old_msg));
 
   // Retarget the copied message's device buffers to the buffers this receiver
-  // posted. The transfers below land in arrPtrs[], but the copy still carries
+  // posted. Set CHARM_NO_ZC_RETARGET to skip this and restore the previous
+  // behaviour (entry method sees the SENDER's pointer) for A/B testing.
+  // The transfers below land in arrPtrs[], but the copy still carries
   // the SENDER's CkDeviceBuffer::ptr, and the entry method delivered from it
   // reads that pointer as its data. Within one process the sender's pointer is
   // a valid local address holding the same bytes, so this went unnoticed;
   // across processes it names memory in another address space and the first
   // kernel touching it faults. Rewriting in place is safe because pupping a
   // CkDeviceBuffer is fixed-width -- only ptr changes value.
-  {
+  static const bool zc_retarget_off = (getenv("CHARM_NO_ZC_RETARGET") != nullptr);
+  if (!zc_retarget_off) {
     char* new_buf = ((CkMarshallMsg*)EnvToUsr(new_env))->msgBuf;
     PUP::fromMem walk(new_buf);
     int copy_numops;
