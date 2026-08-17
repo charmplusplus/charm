@@ -3429,20 +3429,27 @@ class MemcpyStrategy : public DeviceMigrationStrategy {
   void issuePulls(CkLocMgr* mgr, CmiUInt8 id, int /*srcPe*/,
                   const CkDeviceMigrateHandle* handles, int n,
                   void* dstGpuMsg) override {
-    // Completes synchronously. An async pull leaves the chare "in flight" --
-    // released by its source but not yet constructed here, because immigrate()
-    // is deferred until the pull finishes. Other PEs resume from the load
-    // balancer independently and immediately start the next ghost exchange, so
-    // device messages can arrive for a chare that exists nowhere. The packed
-    // path completes inline and has no such window; this matches it.
+    // The copies are issued asynchronously so they overlap on the stream, but
+    // this waits for them before completing rather than finishing from a CUDA
+    // callback. Completing asynchronously leaves the chare "in flight" --
+    // released by its source and not yet constructed here, because immigrate()
+    // is deferred until the pull lands. Peers resume from the load balancer
+    // independently and immediately start the next ghost exchange, so device
+    // messages arrive for a chare that exists on no PE and nothing delivers
+    // them. The packed path completes inline and has no such window.
+    //
+    // Removing the wait entirely requires the runtime to buffer device
+    // messages addressed to in-flight chares and replay them on construction.
     size_t offset = 0;
+    cudaStream_t stream = (cudaStream_t)0;
     for (int i = 0; i < n; ++i) {
-      hapiCheck(hapiMemcpy((char*)dstGpuMsg + offset,
-                           reinterpret_cast<void*>(handles[i].src_ptr),
-                           handles[i].size,
-                           hapiMemcpyDeviceToDevice));
+      hapiCheck(hapiMemcpyAsync((char*)dstGpuMsg + offset,
+                                reinterpret_cast<void*>(handles[i].src_ptr),
+                                handles[i].size,
+                                hapiMemcpyDeviceToDevice, stream));
       offset += handles[i].size;
     }
+    hapiCheck(hapiStreamSynchronize(stream));
     mgr->finalizeGPUMigrate(makeFinalizeMsg(id));
   }
 };
@@ -3464,20 +3471,22 @@ class IpcStrategy : public DeviceMigrationStrategy {
   void issuePulls(CkLocMgr* mgr, CmiUInt8 id, int /*srcPe*/,
                   const CkDeviceMigrateHandle* handles, int n,
                   void* dstGpuMsg) override {
-    // Synchronous for the same reason as MemcpyStrategy: see the note there.
-    // The window is far wider here -- a cross-process pull takes long enough
-    // that peers finish load balancing and resume while the chare is still in
-    // flight.
+    // Same shape as MemcpyStrategy: overlap the copies, wait once, complete
+    // inline. See the note there for why completion cannot be deferred to a
+    // callback. The wait matters more here -- these are peer copies over PCIe,
+    // so a multi-megabyte chare costs a few hundred microseconds.
     size_t offset = 0;
+    cudaStream_t stream = (cudaStream_t)0;
     for (int i = 0; i < n; ++i) {
       void* src = nullptr;
       hapiCheck(hapiIpcOpenMemHandle(&src, handles[i].ipc_handle,
                                      hapiIpcMemLazyEnablePeerAccess));
       mgr->registerOpenedIpcPtr(id, src);
-      hapiCheck(hapiMemcpy((char*)dstGpuMsg + offset, src, handles[i].size,
-                           hapiMemcpyDeviceToDevice));
+      hapiCheck(hapiMemcpyAsync((char*)dstGpuMsg + offset, src, handles[i].size,
+                                hapiMemcpyDeviceToDevice, stream));
       offset += handles[i].size;
     }
+    hapiCheck(hapiStreamSynchronize(stream));
     mgr->finalizeGPUMigrate(makeFinalizeMsg(id));
   }
 };
