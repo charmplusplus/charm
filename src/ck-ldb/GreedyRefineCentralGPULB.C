@@ -471,6 +471,32 @@ void GreedyRefineCentralGPULB::work(LDStats *stats)
                CkMyPe(), (unsigned long long)g.gpu_id, (int)g.peIds.size(), g.load);
   }
 
+  // What a step is actually made of, per PE, so the objective can be checked
+  // against reality: if the measured step time is not tracked by whichever of
+  // the CPU and GPU terms the balancer minimises, then balancing that term
+  // cannot make the step shorter no matter how well it succeeds.
+  if ((_lb_args.debug() > 1) && (CkMyPe() == cur_ld_balancer)) {
+    std::vector<double> peCpu(n_pes, 0.0), peGpu(n_pes, 0.0);
+    std::vector<int> peObjs(n_pes, 0);
+    for (size_t i = 0; i < stats->objData.size(); i++) {
+      const int pe = stats->from_proc[i];
+      if (pe < 0 || pe >= n_pes) continue;
+      peCpu[pe] += stats->objData[i].wallTime;
+      peGpu[pe] += stats->objData[i].gpuTime;
+      peObjs[pe]++;
+    }
+    CkPrintf("[%d] --- step composition (s) ---\n", CkMyPe());
+    for (int pe = 0; pe < n_pes; pe++) {
+      const double tot = stats->procs[pe].total_walltime;
+      const double idle = stats->procs[pe].idletime;
+      CkPrintf("[%d]  PE %d objs=%d total=%.6f idle=%.6f (%.0f%%) bg=%.6f "
+               "objCPU=%.6f objGPU=%.6f busy=%.6f\n",
+               CkMyPe(), pe, peObjs[pe], tot, idle,
+               tot > 0 ? 100.0 * idle / tot : 0.0,
+               stats->procs[pe].bg_walltime, peCpu[pe], peGpu[pe], tot - idle);
+    }
+  }
+
   // --- Greedy preprocessing at GPU-group level to establish target M ---
   double M = 0;
   {
