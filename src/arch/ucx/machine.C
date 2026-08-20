@@ -59,7 +59,7 @@ static void UcxSetEpErrMode(ucp_ep_params_t &p)
 // links, so it exists for machine layers and for Reconverse alike.
 extern int numProcessAfterRestart;
 extern char *_shrinkexpand_basedir;
-int mynewpe=0;
+// mynewpe now lives in src/util/ckrescale.C, which every build links.
 
 // Set by ConverseCleanup, read by charm_main after longjmp
 extern jmp_buf _shrinkexpand_jmpbuf;

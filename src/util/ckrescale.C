@@ -7,6 +7,11 @@
 // links ckrescale.
 CcsDelayedReply shrinkExpandreplyToken;
 
+// This rank's id in the membership being committed, computed during the load
+// balancing step that precedes a rescale. Kept alongside the reply token for
+// the same reason: the Reconverse build has no machine layer to hold it.
+int mynewpe = 0;
+
 bool shrinkexpand_exit = false; // Flag to indicate if we are in the process of shrinking/expanding
 bool in_restart = false; // Flag to indicate if we are in a restart process
 

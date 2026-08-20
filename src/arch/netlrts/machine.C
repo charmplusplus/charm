@@ -251,7 +251,7 @@ int _kq = -1;
 #if CMK_SHRINK_EXPAND
 extern void resumeAfterRealloc(void);
 extern char willContinue;
-int mynewpe=0;
+// mynewpe now lives in src/util/ckrescale.C, which every build links.
 extern int numProcessAfterRestart;
 // shrinkExpandreplyToken now lives in src/util/ckrescale.C, which every build
 // links, so it exists for machine layers and for Reconverse alike.

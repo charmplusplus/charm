@@ -755,18 +755,22 @@ void CentralLB::ApplyDecision() {
   }
 
 #if CMK_SHRINK_EXPAND
-  // Rescale backstop: this LB step is about to trigger a rescale
-  // (CheckForRealloc runs at MigrationDone), and survivors keep their
-  // elements in memory across the longjmp while doomed PEs simply exit —
-  // there is no restore path for anything left on a doomed PE. If the
-  // strategy placed objects on a PE the pending bitmap dooms (possible when
-  // the request raced the step, or via stale avail state), those elements
-  // would be silently lost. Redirect every doomed placement to a survivor
-  // and rebuild the migrate message.
-  if (pending_realloc_state != NO_REALLOC && !se_avail_snapshot.empty()) {
+  // Nothing may be left on a processor the balancer was told is unavailable.
+  // On a rescale that PE is about to exit, and survivors keep their elements
+  // in memory across the longjmp while a departing PE simply goes away: there
+  // is no restore path for anything still on it, so it is lost silently. A
+  // strategy is supposed to place nothing there, but one can leave an object
+  // where it already was, and a request that races the step can arrive with
+  // the placement already made. Redirect anything landing on an unavailable
+  // PE and rebuild the migrate message.
+  {
+    // Availability comes from the stats every PE holds, not from the
+    // PE-0-only bitmap state: ApplyDecision runs on whichever PE produced the
+    // winning solution, which is usually not PE 0, and there the bitmap state
+    // reads as "no rescale pending" and the backstop would quietly do nothing.
     auto doomed = [&](int pe) {
-      return pe >= 0 && pe < CkNumPes() && pe < (int)se_avail_snapshot.size() &&
-             se_avail_snapshot[pe] == 0;
+      return pe >= 0 && pe < (int)statsData->procs.size() &&
+             !statsData->procs[pe].available;
     };
     std::vector<int> survivors;
     for (int p = 0; p < CkNumPes(); p++)
@@ -786,8 +790,8 @@ void CentralLB::ApplyDecision() {
       }
     }
     if (redirected || unmovable) {
-      CkPrintf("[%d] CharmLB> rescale backstop: redirected %d object(s) off "
-               "doomed PEs (%d unmigratable left behind)\n",
+      CkPrintf("[%d] CharmLB> redirected %d object(s) off unavailable PEs "
+               "(%d unmigratable left behind)\n",
                CkMyPe(), redirected, unmovable);
       delete migrateMsg;
       migrateMsg = createMigrateMsg(statsData);
