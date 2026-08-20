@@ -2010,6 +2010,7 @@ int charm_main(int argc, char **argv)
   // the GPU up in that window: otherwise the processes already running stall
   // at their next barrier while this one creates its context, which measured
   // as most of the cost of an expansion.
+  hapiNewcomerWarmupArgv = argv;
   registerNewcomerWarmup(hapiNewcomerWarmup);
 #endif
 #if CMK_RECONVERSE && CMK_CCS_AVAILABLE

@@ -251,12 +251,29 @@ void hapiWarmupDeviceContext() {
 // Only the context is forced. Everything else hapiInit does depends on
 // Converse state that does not exist yet, and the context is what costs.
 // hapiInit runs normally afterwards and finds the context already present.
+char** hapiNewcomerWarmupArgv = nullptr;
+
 void hapiNewcomerWarmup(void) {
-  // Any runtime call that touches the device creates the primary context for
-  // it. Device selection proper happens in hapiInit's mapping; with the one
-  // device per process this path is used for, that is this same device.
+  // Force the device context. Usually already created by this point, since
+  // anything that touches CUDA earlier in startup creates it, in which case
+  // this costs microseconds and the real work below is what matters.
   hapiCheck(hapiFree(0));
   hapiCheck(hapiDeviceSynchronize());
+
+  // CUPTI is the expensive part of bringing up a GPU process: measured at
+  // roughly 18 ms, and it was being paid after the newcomer was admitted,
+  // where every process already in the job waits for it at the next barrier.
+  // Only do it when it will actually be used. hapiInitCsv starts CUPTI when
+  // load balancing statistics are on, which requires a balancer, and the
+  // load balancer's own state does not exist this early, so the request is
+  // read from the command line instead. hapiCuptiInit is idempotent, so the
+  // later call finds the work already done.
+  char** argv = hapiNewcomerWarmupArgv;
+  bool wants_stats = false;
+  for (int i = 0; argv && argv[i]; i++) {
+    if (strcmp(argv[i], "+balancer") == 0) { wants_stats = true; break; }
+  }
+  if (wants_stats) hapiCuptiInit();
 }
 
 void hapiInit(char** argv) {
