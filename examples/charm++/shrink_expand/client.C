@@ -49,7 +49,10 @@ int main (int argc, char **argv)
     int offset = 2 * sizeof(int);
     int count = 0;
     for (i = 0; i < OLDNPROCS; i++) {
-        if (i == killedIndex[count]) {
+        // count < numKilled first: with nothing being removed, which is the
+        // case for a pure expansion, killedIndex is empty and indexing it
+        // reads past the end.
+        if (count < numKilled && i == killedIndex[count]) {
             msg[i + offset] = 0;
             count++;
         }
