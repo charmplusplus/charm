@@ -398,7 +398,11 @@ class Block : public CBase_Block {
       hapiStreamSynchronize(comm_stream);
       hapiStreamSynchronize(compute_stream);
       AtSync();
-      ckout<<"called at sync"<<endl;
+      // One chare reports, as a heartbeat. Every chare reporting turns a
+      // long run's output into tens of thousands of lines that say the same
+      // thing.
+      if (thisIndex.x == 0 && thisIndex.y == 0)
+        ckout << "called at sync, iteration " << my_iter << endl;
     } else {
       thisProxy[thisIndex].exchangeGhosts();
     }
@@ -409,8 +413,14 @@ class Block : public CBase_Block {
   }
 
   void update() {
-    printf("[ITER] %d updating on Process: %d\n", my_iter, CmiMyNode());
-    fflush(stdout);
+    // Debug tracing, off unless -p is given. Unconditionally printing and
+    // flushing once per chare per iteration dominates the run at any useful
+    // chare count, and lands on the critical path of the very iteration
+    // timings this benchmark reports.
+    if (print_elements) {
+      printf("[ITER] %d updating on Process: %d\n", my_iter, CmiMyNode());
+      fflush(stdout);
+    }
     std::ostringstream os;
     os << "update (" << std::to_string(x) << "," << std::to_string(y) << ")";
     NVTXTracer(os.str(), NVTXColor::WetAsphalt);
