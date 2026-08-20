@@ -308,45 +308,6 @@ class Block : public CBase_Block {
     p(d_new_temperature, (block_width + 2) * (block_height + 2), PUP::PUPMode::DEVICE);
   }
 
-  void pup(PUP::er& p) {
-    p | my_iter;
-    p | neighbors;
-    p | remote_count;
-    p | x;
-    p | y;
-    p | left_bound;
-    p | right_bound;
-    p | top_bound;
-    p | bottom_bound;
-
-    if (p.isUnpacking()) {
-      hapiCheck(hapiMallocHost((void**)&h_temperature,
-            sizeof(DataType) * (block_width + 2) * (block_height + 2)));
-      hapiCheck(hapiMalloc((void**)&d_temperature,
-            sizeof(DataType) * (block_width + 2) * (block_height + 2)));
-      hapiCheck(hapiMalloc((void**)&d_new_temperature,
-            sizeof(DataType) * (block_width + 2) * (block_height + 2)));
-      hapiCheck(hapiMallocHost((void**)&h_left_ghost, sizeof(DataType) * block_height));
-      hapiCheck(hapiMallocHost((void**)&h_right_ghost, sizeof(DataType) * block_height));
-      hapiCheck(hapiMallocHost((void**)&h_top_ghost, sizeof(DataType) * block_width));
-      hapiCheck(hapiMallocHost((void**)&h_bottom_ghost, sizeof(DataType) * block_width));
-      if (!use_zerocopy) {
-        hapiCheck(hapiMalloc((void**)&d_left_ghost, sizeof(DataType) * block_height));
-        hapiCheck(hapiMalloc((void**)&d_right_ghost, sizeof(DataType) * block_height));
-      } else {
-        hapiCheck(hapiMalloc((void**)&d_send_left_ghost, sizeof(DataType) * block_height));
-        hapiCheck(hapiMalloc((void**)&d_send_right_ghost, sizeof(DataType) * block_height));
-        hapiCheck(hapiMalloc((void**)&d_send_top_ghost, sizeof(DataType) * block_width));
-        hapiCheck(hapiMalloc((void**)&d_send_bottom_ghost, sizeof(DataType) * block_width));
-        hapiCheck(hapiMalloc((void**)&d_recv_left_ghost, sizeof(DataType) * block_height));
-        hapiCheck(hapiMalloc((void**)&d_recv_right_ghost, sizeof(DataType) * block_height));
-      }
-    }
-      
-    p(d_temperature, (block_width + 2) * (block_height + 2), PUP::PUPMode::DEVICE);
-    p(d_new_temperature, (block_width + 2) * (block_height + 2), PUP::PUPMode::DEVICE);
-  }
-
   void init() {
     // Initialize values
     my_iter = 0;
