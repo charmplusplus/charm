@@ -337,7 +337,15 @@ double GreedyRefineCentralLB::fillData(LDStats *stats,
     obj.oldPE = pe;
 #if CMK_CUDA || CMK_HIP
     obj.gpuPupSize = oData.gpuPupSize;
+    // The allocation size rides in the load balancer's per-object user data,
+    // which only exists when CMK_LB_USER_DATA is on. CentralLB registers the
+    // slot under the same condition, so _lb_obj_index is meaningless without
+    // it.
+#if CMK_LB_USER_DATA
     obj.gpuAllocSize = *(size_t *)oData.getUserData(CkpvAccess(_lb_obj_index));
+#else
+    obj.gpuAllocSize = 0;
+#endif
 #endif
     CkAssert(pe >= 0 && pe <= n_pes);
     if (pe == n_pes) obj.oldPE = -1; // this can happen in HybridLB if object comes from outside group. mark oldPE as -1 in this situation

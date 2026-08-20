@@ -2047,21 +2047,6 @@ void hapiCuptiPopObjCorrelation() {
       CUPTI_EXTERNAL_CORRELATION_KIND_UNKNOWN, &tag));
 #endif
 }
-
-  #ifndef HAPI_CUDA_CALLBACK
-  // record CUDA event
-    recordEvent(stream, NULL, NULL, NULL, dynamic_cast<CkMigratable*>(obj), start);
-#else
-  #error hapi record time with hapi_cuda_callback not supported
-#endif
-
-    // while there is an ongoing workrequest, quiescence should not be detected
-    // even if all PEs seem idle
-    CmiAssert(hapiQdCreate);
-    hapiQdCreate(1);
-  }
-}
-#endif
 // Lightweight HAPI, to be invoked after data transfer or kernel execution.
 void hapiAddCallback(hapiStream_t stream, const CkCallback& cb, void* cb_msg) {
 #ifndef HAPI_CUDA_CALLBACK

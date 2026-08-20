@@ -7,7 +7,13 @@
 #include "pup.h"
 #include "conv-rdma.h"
 
+/* A default, not an override: the machine layer, or the arch header for a
+   build that has no machine layer, gets to say whether GPU-aware transport
+   hooks exist. Defining it unconditionally here contradicted those settings
+   for every translation unit that included this header. */
+#ifndef CMK_GPU_COMM
 #define CMK_GPU_COMM 1
+#endif
 
 #if CMK_CUDA || CMK_HIP
 #include "hapi_portable.h"

@@ -70,5 +70,13 @@
    supervising launcher, which the shrink/expand control path depends on. */
 #define NODE_0_IS_CONVHOST                                 1
 
+/* Reconverse has no machine layer, so the LrtsSendDevice/LrtsRecvDevice hooks
+   that CMK_GPU_COMM selects do not exist here, and neither do the DeviceRdmaOp
+   and DeviceRecvType types they are declared with. Device buffers still travel
+   between nodes: ckrdmadevice.C enables its own path for that translation unit
+   and moves them with CmiNcpyBuffer::rdmaGet, which Reconverse implements over
+   comm_backend's RMA. */
+#define CMK_GPU_COMM                                       0
+
 
 #endif
