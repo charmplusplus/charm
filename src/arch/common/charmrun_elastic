@@ -51,6 +51,17 @@ while [ $i -lt ${#original_args[@]} ]; do
     i=$((i+1))
 done
 
+# Resolve the launcher. The UCX build ships charmrun as a shell script that
+# dispatches on $CHARM_LAUNCHER itself. Other builds, Reconverse among them,
+# ship the compiled netlrts charmrun, which cannot honour the variable, does
+# not understand this nodelist format, and cannot bootstrap LCI's PMI. Route
+# those to charmrun_ssh, which sets up each rank's PMI environment directly.
+use_ssh_launcher=false
+if [ "${CHARM_LAUNCHER:-}" = "ssh" ] && [ -x "$script_dir/charmrun_ssh" ] \
+   && [ "$(head -c2 "$script_dir/charmrun" 2>/dev/null)" != '#!' ]; then
+    use_ssh_launcher=true
+fi
+
 # Start the coordinator unless the caller already wired one up. It outlives the
 # inner charmrun loop (which restarts across rescales) and is killed on script
 # exit.
@@ -131,6 +142,7 @@ while true; do
     args=()
     pes_arg=""
     restart_arg=""
+    num_pes=""
 
     temp_args=("${original_args[@]}")
     i=0
@@ -165,7 +177,27 @@ while true; do
     fi
 
     # Pass all script arguments ("$@") to the executable
-    "$script_dir/charmrun" $pes_arg "${args[@]}" "${coord_args[@]}" $restart_arg
+    if [ "$use_ssh_launcher" = true ]; then
+        # charmrun_ssh speaks mpirun-style options and takes the binary
+        # directly, so translate: the PE count becomes -np and ++nodelist
+        # becomes --hostfile. Both must also be removed from the pass-through
+        # arguments, or charmrun_ssh would mistake the nodelist path for the
+        # application binary.
+        ssh_args=()
+        j=0
+        while [ $j -lt ${#args[@]} ]; do
+            case "${args[$j]}" in
+            ++nodelist) j=$((j+1)) ;;   # drop the flag and the file after it
+            *)          ssh_args+=("${args[$j]}") ;;
+            esac
+            j=$((j+1))
+        done
+        np_val="${num_pes:-$initial_pes}"
+        "$script_dir/charmrun_ssh" -np "$np_val" --hostfile "$nodelist_arg" \
+            "${ssh_args[@]}" "${coord_args[@]}" $restart_arg
+    else
+        "$script_dir/charmrun" $pes_arg "${args[@]}" "${coord_args[@]}" $restart_arg
+    fi
 
     EXIT_CODE=$?
 
