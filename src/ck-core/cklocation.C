@@ -3198,6 +3198,9 @@ void CkLocMgr::sendGPUMsg(CmiUInt8 id)
   #if CMK_SMP
       CmiUnlock(dm->lock);
   #endif
+    } else if (gpuData.data != nullptr) {
+      // Matches the direct allocation in emigrate.
+      hapiFree(gpuData.data);
     }
   }
   //CkPrintf("PE %d sent GPU msg of size %zu for id %llu\n", CkMyPe(), gpuData.size, id);
@@ -3278,6 +3281,17 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 #if CMK_SMP
         CmiUnlock(dm->lock);
 #endif
+      } else {
+        // Same omission as on the receiving side: without the shared-memory
+        // pool nothing allocated the staging buffer, so the packing PUP below
+        // wrote the element's device state into a null pointer and the
+        // migration then advertised a null source address to the receiver.
+        // The transfer was issued against it and simply never completed,
+        // which is why a GPU shrink hung with no error at all.
+        if (hapiMalloc(&gpuMsg, gpuBufSize) != hapiSuccess || gpuMsg == nullptr) {
+          CkAbort("PE %d: failed to allocate %zu bytes of device memory to pack "
+                  "a migrating object", CkMyPe(), (size_t)gpuBufSize);
+        }
       }
     }
 #endif
@@ -3362,6 +3376,19 @@ void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char* &data, CkDeviceBuffer
 #if CMK_SMP
     CmiUnlock(dm->lock);
 #endif
+  } else {
+    // Without the shared-memory pool there is nowhere to take the buffer
+    // from, so allocate one. This branch was missing entirely, which left
+    // `data` (a reference the post entry method is required to point at the
+    // destination) untouched, and the post machinery then aborted with
+    // "Post Entry Method doesn't post the buffer by initializing the
+    // reference to the pointer for data". Since use_shm is off unless
+    // +gpushm is given, that made migration of a GPU-resident object fail on
+    // any default run. Freed symmetrically in immigrate().
+    if (hapiMalloc((void**)&data, size) != hapiSuccess || data == nullptr) {
+      CkAbort("PE %d: failed to allocate %d bytes of device memory for an "
+              "incoming migrating object", CkMyPe(), size);
+    }
   }
   hapiDeviceSynchronize();
   receivedDeviceMsgs[id] = data;
@@ -3442,6 +3469,12 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
 #if CMK_SMP
     CmiUnlock(dm->lock);
 #endif
+  } else if (gpuMsg != nullptr) {
+    // Matches the direct allocation in immigrateGPU: the element has been
+    // unpacked from this buffer and the device is synchronized, so it can go
+    // back now. Without this every migrated GPU object would leak its
+    // payload.
+    hapiFree(gpuMsg);
   }
 #endif
 

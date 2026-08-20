@@ -123,15 +123,28 @@ extern "C" {
 
 void CkRdmaDeviceRecvHandler(void* data)
 {
-  // FIXME: this overload expects to extract a DeviceRdmaOp* from the
-  // NcpyOperationInfo, but the field that was supposed to carry it
-  // (deviceRdmaOpInfo) was never added to struct ncpystruct. Aborting
-  // here keeps the build green for callers that don't exercise device
-  // RDMA (task-bench charm++ uses HAPI callbacks, not GPUDirect/IPC
-  // ack handling, so this path is dead in that workload).
-  CmiAbort("CkRdmaDeviceRecvHandler(void*): NcpyOperationInfo->deviceRdmaOpInfo "
-           "is unimplemented in this tree. Use the (data, msg) overload, or "
-           "wire up the missing field in struct ncpystruct before calling.");
+#if CMK_RECONVERSE
+  // Called through CmiSetDirectNcpyAckHandler once a device transfer issued by
+  // rdmaGet completes, so `data` is the NcpyOperationInfo for that operation.
+  // The DeviceRdmaOp the transfer belongs to travels on it: the receiver put it
+  // there by constructing its CmiNcpyBuffer with the op as deviceRdmaOpInfo,
+  // and createNcpyOpInfo carries it across. Recovering it here is all that was
+  // missing; the (data, msg) overload does the actual completion work and
+  // ignores its msg argument.
+  NcpyOperationInfo* ncpyOpInfo = (NcpyOperationInfo*)data;
+  if (ncpyOpInfo == nullptr || ncpyOpInfo->deviceRdmaOpInfo == nullptr) {
+    CmiAbort("CkRdmaDeviceRecvHandler: device transfer completed without a "
+             "DeviceRdmaOp attached to its NcpyOperationInfo");
+  }
+  CkRdmaDeviceRecvHandler(ncpyOpInfo->deviceRdmaOpInfo, nullptr);
+#else
+  // Converse's NcpyOperationInfo has no field to carry the DeviceRdmaOp, so
+  // there is nothing to recover it from. Builds with a machine layer reach the
+  // (data, msg) overload directly and never come through here.
+  CmiAbort("CkRdmaDeviceRecvHandler(void*): NcpyOperationInfo has no "
+           "deviceRdmaOpInfo field in this build. Use the (data, msg) "
+           "overload.");
+#endif
 }
 // Invoked when a GPU buffer arrives on the receiver
 void CkRdmaDeviceRecvHandler(void* data, void* msg)
