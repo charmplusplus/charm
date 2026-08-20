@@ -123,7 +123,7 @@ for v in "${extra_env_vars[@]}" PATH LD_LIBRARY_PATH HOME USER; do
 done
 while IFS='=' read -r name _; do
     case "$name" in
-        UCX_*|CHARM_*|PRTE_MCA_*|OMPI_MCA_*|PMIX_*) add_env "$name" ;;
+        UCX_*|CHARM_*|PRTE_MCA_*|OMPI_MCA_*|PMIX_*|LCI_*|LCT_*|FI_*) add_env "$name" ;;
     esac
 done < <(env)
 
@@ -135,6 +135,15 @@ if [[ "${CHARM_SSH_VERBOSE:-0}" == "1" ]]; then
     echo "charmrun_ssh> binary=$binary args=${bin_args[*]}" >&2
 fi
 
+# LCI builds bootstrap through LCI's own TCP rendezvous rather than a process
+# manager, which is what keeps this launcher out of the supervision business.
+# Rank 0 hosts the rendezvous; every rank needs its own RANK plus the shared
+# WORLD_SIZE and endpoint. Set CHARM_LCI_BOOTSTRAP=0 to leave the environment
+# alone when the ranks get their bootstrap some other way.
+lci_bootstrap="${CHARM_LCI_BOOTSTRAP:-1}"
+lci_master_addr="${LCI_MASTER_ADDR:-${hosts[0]}}"
+lci_master_port="${LCI_MASTER_PORT:-$(( ${coord##*:} + 1 ))}"
+
 # Fan out one ssh per rank in parallel.
 pids=()
 hosts_used=()
@@ -142,10 +151,16 @@ for ((r=0; r<np; r++)); do
     host="${hosts[$r]}"
     hosts_used+=("$host")
 
+    lci_env_prefix=""
+    if [[ "$lci_bootstrap" == "1" ]]; then
+        lci_env_prefix=$(printf 'export LCT_PMI_BACKEND=%q RANK=%q WORLD_SIZE=%q LCI_MASTER_ADDR=%q LCI_MASTER_PORT=%q; ' \
+            "${LCT_PMI_BACKEND:-tcp}" "$r" "$np" "$lci_master_addr" "$lci_master_port")
+    fi
+
     # Build the remote command. Quote every binary arg + the appended
     # +nodeId/+numNodes so paths with spaces survive.
     remote_args="$(printf '%q ' "${bin_args[@]}")+nodeId $r +numNodes $np"
-    remote_cmd="cd $(printf '%q' "$cwd"); ${env_prefix} exec $(printf '%q' "$binary") $remote_args"
+    remote_cmd="cd $(printf '%q' "$cwd"); ${env_prefix}${lci_env_prefix} exec $(printf '%q' "$binary") $remote_args"
 
     # -n closes stdin; -o BatchMode requires keys (no password prompts).
     # Tag each line of output with the rank for legibility.

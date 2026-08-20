@@ -106,7 +106,16 @@ if [ "$user_supplied_coordinator" = false ]; then
         [ -z "$coord_host" ] && coord_host="127.0.0.1"
     fi
 
+    # Reconverse over LCI cannot fan a committed change out to survivors
+    # itself, so the coordinator delivers it. The UCX machine layer does its
+    # own fan-out and must not receive these.
+    coord_push=()
+    if [ "${CHARM_COORDINATOR_PUSH_RECONFIG:-0}" = "1" ]; then
+        coord_push=(--push-reconfig)
+    fi
+
     "$coord_bin" --port "$coord_port" --initial-size "$initial_pes" --verbose \
+        "${coord_push[@]}" \
         >"$coord_log" 2>&1 &
     coord_pid=$!
     trap '[ -n "$coord_pid" ] && kill "$coord_pid" 2>/dev/null; wait "$coord_pid" 2>/dev/null; exit' EXIT INT TERM
