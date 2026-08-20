@@ -21,6 +21,12 @@ int hapiCheckpoint(void* devPtr, int size);
 void hapiRestore(void* devPtr, int size, int alloc_id);
 void hapiExit();
 
+// Force CUDA driver initialization and primary-context creation ahead of
+// hapiInit. Called by the machine layer on the no-restart newcomer path
+// between coordinator registration and the INTEGRATE wait, so the context
+// creation cost overlaps the wait instead of serializing after integration.
+void hapiWarmupDeviceContext();
+
 // Polls for GPU work completion. Does not do anything if HAPI_CUDA_CALLBACK is defined.
 void hapiPollEvents(void* param);
 

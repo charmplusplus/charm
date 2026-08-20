@@ -1,0 +1,185 @@
+#!/bin/bash
+#
+# Drop-in replacement for mpirun/prterun when launching Charm++ UCX builds
+# with the coord-bootstrap mode (machine.C: +nodeId/+numNodes args).
+#
+# Why: mpirun and prterun both implement a supervised-daemon model where the
+# HNP keeps a TCP connection to every orted/prted it spawned and tears the
+# whole job down if any of those connections drops (heartbeat-detected OR
+# TCP-close-detected — no MCA flag gates the latter). That is incompatible
+# with shrink/expand on spot instances, where a vacated host disappearing
+# kills the surviving cluster.
+#
+# This script does ssh fan-out and exits the supervision business entirely:
+#   - parse mpirun-compatible flags (--hostfile/-machinefile, -np)
+#   - read the hostfile, expand to a per-rank host assignment (respects
+#     slots=N annotations and per-line repeats)
+#   - parse +coordinator from the binary args (the rescale coordinator the
+#     user/charmrun_elastic already started)
+#   - ssh to each host in parallel, exec the binary with +nodeId N
+#     +numNodes M appended to the user's args
+#   - propagate stdin-less ssh + signal handling so Ctrl-C cleans up
+#
+# Each rank registers with the coordinator on its own — there is no parent
+# process for the ranks to lose contact with. When a host dies, ssh's local
+# child returns non-zero and we report it; nothing tears the rest down.
+
+set -o pipefail
+
+hostfile=""
+np=0
+extra_env_vars=()
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --hostfile|-hostfile|-machinefile)
+            hostfile="$2"; shift 2 ;;
+        -np|-n)
+            np="$2"; shift 2 ;;
+        -x)
+            # mpirun-style env var forwarding: -x VAR
+            extra_env_vars+=("$2"); shift 2 ;;
+        --)
+            shift; break ;;
+        -*)
+            # Unknown flag — skip both flag and its value if it looks like
+            # a flag-with-arg. Safer to swallow than to misroute.
+            shift ;;
+        *)
+            break ;;
+    esac
+done
+
+binary="$1"
+[[ -z "$binary" ]] && { echo "charmrun_ssh: missing binary" >&2; exit 1; }
+shift
+bin_args=("$@")
+
+[[ -z "$hostfile" ]]   && { echo "charmrun_ssh: missing --hostfile" >&2; exit 1; }
+[[ ! -f "$hostfile" ]] && { echo "charmrun_ssh: hostfile '$hostfile' not readable" >&2; exit 1; }
+[[ $np -le 0 ]]        && { echo "charmrun_ssh: -np must be > 0" >&2; exit 1; }
+
+# Find +coordinator HOST:PORT in the binary args (must be present — the
+# ranks need it to register and exchange UCX addresses).
+coord=""
+for ((i=0; i<${#bin_args[@]}; i++)); do
+    if [[ "${bin_args[$i]}" == "+coordinator" ]]; then
+        coord="${bin_args[$((i+1))]}"
+        break
+    fi
+done
+[[ -z "$coord" ]] && {
+    echo "charmrun_ssh: +coordinator HOST:PORT not found in binary args" >&2
+    exit 1
+}
+
+# Expand hostfile -> per-rank host array. Supports:
+#   host
+#   host slots=N
+#   host cpu=N
+#   host    # comment
+# and blank/comment-only lines.
+hosts=()
+while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%%#*}"
+    [[ -z "${line// }" ]] && continue
+    host=""
+    slots=1
+    for tok in $line; do
+        case "$tok" in
+            slots=*)            slots="${tok#slots=}" ;;
+            cpu=*|cpus=*)       slots="${tok#*=}" ;;
+            max_slots=*)        : ;;  # ignore
+            *)                  [[ -z "$host" ]] && host="$tok" ;;
+        esac
+    done
+    [[ -z "$host" ]] && continue
+    for ((s=0; s<slots; s++)); do
+        hosts+=("$host")
+    done
+done < "$hostfile"
+
+if (( ${#hosts[@]} < np )); then
+    echo "charmrun_ssh: hostfile expanded to ${#hosts[@]} slots, but -np $np requested" >&2
+    exit 1
+fi
+
+# Build the env-propagation prefix for the remote shell. We forward:
+#   - explicit -x VARS from the launcher invocation
+#   - PATH, LD_LIBRARY_PATH (so the rank can find libucp etc.)
+#   - anything UCX_*, CHARM_*, PRTE_MCA_*, OMPI_MCA_* (consistent with how
+#     mpirun auto-forwards these for openpmix-built apps).
+declare -A env_seen
+env_prefix=""
+add_env() {
+    local v="$1"
+    [[ -n "${env_seen[$v]:-}" ]] && return
+    [[ -z "${!v+x}" ]] && return     # unset → skip
+    env_prefix+=$(printf 'export %s=%q; ' "$v" "${!v}")
+    env_seen[$v]=1
+}
+for v in "${extra_env_vars[@]}" PATH LD_LIBRARY_PATH HOME USER; do
+    add_env "$v"
+done
+while IFS='=' read -r name _; do
+    case "$name" in
+        UCX_*|CHARM_*|PRTE_MCA_*|OMPI_MCA_*|PMIX_*) add_env "$name" ;;
+    esac
+done < <(env)
+
+cwd="$(pwd)"
+
+# Verbose mode (for charmrun's "$@" printing)
+if [[ "${CHARM_SSH_VERBOSE:-0}" == "1" ]]; then
+    echo "charmrun_ssh> hostfile=$hostfile np=$np coordinator=$coord" >&2
+    echo "charmrun_ssh> binary=$binary args=${bin_args[*]}" >&2
+fi
+
+# Fan out one ssh per rank in parallel.
+pids=()
+hosts_used=()
+for ((r=0; r<np; r++)); do
+    host="${hosts[$r]}"
+    hosts_used+=("$host")
+
+    # Build the remote command. Quote every binary arg + the appended
+    # +nodeId/+numNodes so paths with spaces survive.
+    remote_args="$(printf '%q ' "${bin_args[@]}")+nodeId $r +numNodes $np"
+    remote_cmd="cd $(printf '%q' "$cwd"); ${env_prefix} exec $(printf '%q' "$binary") $remote_args"
+
+    # -n closes stdin; -o BatchMode requires keys (no password prompts).
+    # Tag each line of output with the rank for legibility.
+    # ServerAlive: tolerate ~15 min of unresponsive control channel during
+    # rescale events (PE 0's broadcast + survivors' UCX wireup can stall
+    # ssh keepalives on multi-host EC2 setups; the default 2-min ceiling
+    # caused ranks to drop in bursts mid-expand). Override per-run with
+    # CHARM_SSH_KEEPALIVE_COUNT.
+    ssh -n -o StrictHostKeyChecking=no -o BatchMode=yes \
+        -o "ServerAliveInterval=30" \
+        -o "ServerAliveCountMax=${CHARM_SSH_KEEPALIVE_COUNT:-30}" \
+        -o "TCPKeepAlive=yes" \
+        "$host" "bash -c $(printf '%q' "$remote_cmd")" 2>&1 \
+        | sed -u "s/^/[$r] /" &
+    pids+=($!)
+done
+
+cleanup() {
+    local sig="$1"
+    echo "charmrun_ssh> caught SIG$sig, forwarding to ${#pids[@]} ranks" >&2
+    for p in "${pids[@]}"; do
+        kill -"$sig" "$p" 2>/dev/null
+    done
+}
+trap 'cleanup TERM' TERM
+trap 'cleanup INT'  INT
+trap 'cleanup HUP'  HUP
+
+# Reap. Exit non-zero iff any rank exited non-zero; report the highest code.
+status=0
+for p in "${pids[@]}"; do
+    if ! wait "$p"; then
+        rc=$?
+        (( rc > status )) && status=$rc
+    fi
+done
+exit $status

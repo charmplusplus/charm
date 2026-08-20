@@ -86,6 +86,19 @@ void LBDatabase::DoneRegisteringObjects(LDOMHandle omh)
 }
 
 
+#if CMK_SHRINK_EXPAND
+void LBDatabase::resetRegisteringForRescale() {
+  for (LBOM* om : oms) if (om) om->SetRegisteringObjs(false);
+  omsRegistering = 0;
+  // resetForRescale: clear startedAtSync + kick state AND set on=true. The
+  // mere turnOn was not enough — the iter-N LB step that triggered the
+  // rescale also left startedAtSync=true (set in checkBarrier when the LB
+  // barrier fired), and checkBarrier() bails on startedAtSync at the top, so
+  // the next AtSync would never trigger.
+  if (syncBarrier) syncBarrier->resetForRescale();
+}
+#endif
+
 LDObjHandle LBDatabase::RegisterObj(LDOMHandle omh, CmiUInt8 id,
                                     void* userPtr, int migratable) {
 #if CMK_LBDB_ON

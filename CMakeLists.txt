@@ -674,6 +674,8 @@ configure_file(src/arch/common/conv-mach-gfortran.sh         include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-gfortran.h          include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-ifort.sh            include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-ifort.h             include/ COPYONLY)
+configure_file(src/arch/common/conv-mach-ifx.sh              include/ COPYONLY)
+configure_file(src/arch/common/conv-mach-ifx.h               include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-nolb.h              include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-nolb.sh             include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-nvfortran.sh        include/ COPYONLY)
@@ -1005,8 +1007,34 @@ else()
   if(EXISTS ${CMAKE_SOURCE_DIR}/${CHARMRUN_HAPI_DIR}/charmrun_hapi)
     configure_file(${CHARMRUN_HAPI_DIR}/charmrun_hapi ${CMAKE_BINARY_DIR}/bin COPYONLY)
   endif()
+  # Direct-ssh launcher used when CHARM_LAUNCHER=ssh — avoids mpirun/prterun's
+  # supervised-daemon teardown when a host disappears (spot termination).
+  if(EXISTS ${CMAKE_SOURCE_DIR}/${CHARMRUN_ELASTIC_DIR}/charmrun_ssh)
+    configure_file(${CHARMRUN_ELASTIC_DIR}/charmrun_ssh ${CMAKE_BINARY_DIR}/bin COPYONLY)
+  endif()
 endif()
 configure_file(src/scripts/testrun bin/ COPYONLY)
+
+# Standalone coordinator binary used by charmrun_elastic for shrink/expand.
+# Built unconditionally so charmrun_elastic can find it next to itself in bin/.
+#
+# Compile + link with the raw host C++ compiler (CMK_CXX), bypassing charmc.
+# The coordinator is a plain TCP utility with NO Charm++ dependencies; routing
+# through charmc would try to link the full Charm runtime (libmemory-default,
+# threads, ldb, ...) and fails in a fresh parallel build when those libs are
+# not built yet ("charmc : No such memory mode default" abort at link time).
+set(_coord_src ${CMAKE_SOURCE_DIR}/src/util/coordinator/coordinator.cpp)
+set(_coord_bin ${CMAKE_BINARY_DIR}/bin/charm_coordinator)
+add_custom_command(
+  OUTPUT ${_coord_bin}
+  COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/bin
+  COMMAND ${CMK_CXX} -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter
+          ${_coord_src} -o ${_coord_bin}
+  DEPENDS ${_coord_src}
+          ${CMAKE_SOURCE_DIR}/src/util/coordinator/wire.h
+          ${CMAKE_SOURCE_DIR}/src/util/coordinator/protocol.h
+  COMMENT "Building standalone coordinator with ${CMK_CXX}")
+add_custom_target(charm_coordinator ALL DEPENDS ${_coord_bin})
 
 # Charm++ libraries
 

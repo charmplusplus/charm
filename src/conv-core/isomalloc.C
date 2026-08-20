@@ -852,6 +852,15 @@ static void CmiIsomallocInitExtent(char ** argv)
   }
   else if (CmiNumNodes() > 1)
   {
+    if (CmiMyRank() == 0)
+    {
+      CmiIsomallocSyncHandlerDone.store(false);
+#if CMK_SMP && !CMK_SMP_NO_COMMTHD
+      CmiIsomallocSyncCommThreadDone.store(false);
+#endif
+    }
+    CmiNodeAllBarrier();
+
 #if CMK_SMP && !CMK_SMP_NO_COMMTHD
     if (CmiInCommThread())
     {

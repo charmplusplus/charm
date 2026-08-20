@@ -224,6 +224,11 @@ void StopInteropScheduler();
 //for shrink expand cleanup
 int _ROGroupRestartHandlerIdx;
 const char* _shrinkexpand_basedir;
+// Non-static so machine layers and ConverseCommonInit can short-circuit
+// expensive one-time init (timer calibration, isomalloc address scan) on a
+// shrink/expand survivor restart, where the process is the same and those
+// answers haven't changed.
+bool _reuseRegistrationStateOnRestart = false;
 #endif
 
 int    _exitHandlerIdx;
@@ -689,8 +694,26 @@ static void _exitHandler(envelope *env)
         CmiFree(env);
 
 #if CMK_CUDA || CMK_HIP
-      // Clean up HAPI
+      // Clean up HAPI. Never on the no-restart rescale path: survivors keep
+      // their device context and HAPI state alive across the longjmp (the GPU
+      // elasticity design depends on exactly that), so tearing down the GPU
+      // manager here would leave them running on freed state, and the second
+      // rescale of a run then dies in glibc ("free(): invalid pointer" on
+      // every survivor) when the teardown runs again on already-freed pools.
+      // Doomed PEs skip the teardown too, which is harmless: they _exit
+      // immediately after and the driver reclaims everything.
+#if CMK_SHRINK_EXPAND
+      {
+        extern bool get_shrinkexpand_exit();
+        if (!get_shrinkexpand_exit()) hapiExit();
+      }
+#else
       hapiExit();
+#endif
+#endif
+
+#if CMK_SHRINK_EXPAND
+      ConverseCleanup();
 #endif
 
 #if CMK_SHRINK_EXPAND
@@ -835,6 +858,18 @@ static int _charmLoadEstimator(void)
 {
   return CkpvAccess(_buffQ)->length();
 }
+
+#if CMK_SHRINK_EXPAND
+// Survivor-restart counterpart of the _initDone drain: restore normal message
+// processing and deliver everything _bufferHandler queued during the rescale
+// window (see the longjmp landing in charm_main). Called at the end of the
+// survivor restore path, after groups are restored.
+void _resumeBufferedCharmMessages(void)
+{
+  CkNumberHandlerEx(_bocHandlerIdx, _processHandler, CkpvAccess(_coreState));
+  _processBufferedMsgs();
+}
+#endif
 
 /**
  * This function is used to send other processors on the same node a signal so
@@ -1320,8 +1355,20 @@ void _sendReadonlies() {
   at the top of the file for overall flow.
 */
 void _initCharm(int unused_argc, char **argv)
-{ 
+{
+#if CMK_SHRINK_EXPAND
+  {
+    extern double rescale_t_initcharm_enter;
+    extern double rescale_wall_now();
+    if (CmiMyPe() == 0) rescale_t_initcharm_enter = rescale_wall_now();
+  }
+#endif
   int inCommThread = (CmiMyRank() == CmiMyNodeSize());
+#if CMK_SHRINK_EXPAND
+  const bool reusingRegistrationState = _reuseRegistrationStateOnRestart;
+#else
+  const bool reusingRegistrationState = false;
+#endif
 
   DEBUGF(("[%d,%.6lf ] _initCharm started\n",CmiMyPe(),CmiWallTimer()));
   std::set_terminate([](){
@@ -1393,17 +1440,23 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvInitialize(_CkErrStream*, _ckerr);
 	CkpvInitialize(Stats*, _myStats);
 
-	CkpvAccess(_groupIDTable) = new GroupIDTable(0);
-	CkpvAccess(_groupTable) = new GroupTable;
-	CkpvAccess(_groupTable)->init();
-	CkpvAccess(_groupTableImmLock) = CmiCreateImmediateLock();
-	CkpvAccess(_numGroups) = 1; // make 0 an invalid group number
-	CkpvAccess(_buffQ) = new PtrQ();
+	if (!reusingRegistrationState) {
+		CkpvAccess(_groupIDTable) = new GroupIDTable(0);
+		CkpvAccess(_groupTable) = new GroupTable;
+		CkpvAccess(_groupTable)->init();
+		CkpvAccess(_groupTableImmLock) = CmiCreateImmediateLock();
+		CkpvAccess(_numGroups) = 1; // make 0 an invalid group number
+		CkpvAccess(_buffQ) = new PtrQ();
+	}
+	// _bocInitVec and _nodeBocInitVec are transient init queues that
+	// _initDone deletes (`delete &inits;`); on a survivor restart we must
+	// allocate fresh ones, otherwise CksvAccess returns a dangling pointer
+	// and _processBufferedNodeBocInits aborts on stale entries.
 	CkpvAccess(_bocInitVec) = new PtrVec();
 
 	CkpvAccess(_currentNodeGroupObj) = NULL;
 
-	if(CkMyRank()==0)
+	if(CkMyRank()==0 && !reusingRegistrationState)
 	{
 	  	CksvAccess(_numNodeGroups) = 1; //make 0 an invalid group number
           	CksvAccess(_numInitNodeMsgs) = 0;
@@ -1414,13 +1467,13 @@ void _initCharm(int unused_argc, char **argv)
 		CksvAccess(_nodeGroupTable) = new GroupTable();
 		CksvAccess(_nodeGroupTable)->init();
 		CksvAccess(_nodeGroupTableImmLock) = CmiCreateImmediateLock();
-		CksvAccess(_nodeBocInitVec) = new PtrVec();
 		CksvAccess(_nodeZCPendingLock) = CmiCreateLock();
 		CksvAccess(_nodeZCPostReqLock) = CmiCreateLock();
 		CksvAccess( _nodeZCBufferReqLock) = CmiCreateLock();
 
 		CmiSetNcpyAckSize(sizeof(CkCallback));
 	}
+	if (CkMyRank() == 0) CksvAccess(_nodeBocInitVec) = new PtrVec();
 
 
 	CkCallbackInit();
@@ -1513,37 +1566,38 @@ void _initCharm(int unused_argc, char **argv)
 	*/
 	if(CkMyRank()==0)
 	{
-		SDAG::registerPUPables();
 		CmiArgGroup("Charm++",NULL);
 		_parseCommandLineOpts(argv);
-		_registerInit();
-		CkRegisterMsg("System", 0, 0, CkFreeMsg, sizeof(int));
-		CkRegisterChareInCharm(CkRegisterChare("null", 0, TypeChare));
-		CkIndex_Chare::__idx=CkRegisterChare("Chare", sizeof(Chare), TypeChare);
-		CkRegisterChareInCharm(CkIndex_Chare::__idx);
-		CkIndex_Group::__idx=CkRegisterChare("Group", sizeof(Group), TypeGroup);
-                CkRegisterChareInCharm(CkIndex_Group::__idx);
-		CkRegisterEp("null", (CkCallFnPtr)_nullFn, 0, 0, 0+CK_EP_INTRINSIC);
-		
-		/**
-		  These _register calls are for the built-in
-		  Charm .ci files, like arrays and load balancing.
-		  If you add a .ci file to charm, you'll have to 
-		  add a call to the _register routine here, or make
-		  your library into a "-module".
-		*/
-		_registerCkFutures();
-		_registerCkArray();
-		_registerCkSyncBarrier();
-		_registerLBManager();
-		_registerTreeLevel();
-    _registerMetaBalancer();
-		_registerCkCallback();
-		_registerwaitqd();
-		_registerCkCheckpoint();
-                _registerCkMulticast();
+		if (!reusingRegistrationState) {
+			SDAG::registerPUPables();
+			_registerInit();
+			CkRegisterMsg("System", 0, 0, CkFreeMsg, sizeof(int));
+			CkRegisterChareInCharm(CkRegisterChare("null", 0, TypeChare));
+			CkIndex_Chare::__idx=CkRegisterChare("Chare", sizeof(Chare), TypeChare);
+			CkRegisterChareInCharm(CkIndex_Chare::__idx);
+			CkIndex_Group::__idx=CkRegisterChare("Group", sizeof(Group), TypeGroup);
+	                CkRegisterChareInCharm(CkIndex_Group::__idx);
+			CkRegisterEp("null", (CkCallFnPtr)_nullFn, 0, 0, 0+CK_EP_INTRINSIC);
+			
+			/**
+			  These _register calls are for the built-in
+			  Charm .ci files, like arrays and load balancing.
+			  If you add a .ci file to charm, you'll have to 
+			  add a call to the _register routine here, or make
+			  your library into a "-module".
+			*/
+			_registerCkFutures();
+			_registerCkArray();
+			_registerCkSyncBarrier();
+			_registerLBManager();
+			_registerTreeLevel();
+			_registerMetaBalancer();
+			_registerCkCallback();
+			_registerwaitqd();
+			_registerCkCheckpoint();
+			_registerCkMulticast();
 #if CMK_MEM_CHECKPOINT
-		_registerCkMemCheckpoint();
+			_registerCkMemCheckpoint();
 #endif
 #if CMK_CHARM4PY
     /**
@@ -1563,60 +1617,102 @@ void _initCharm(int unused_argc, char **argv)
 
 #endif
 
-		/**
-		  CkRegisterMainModule is generated by the (unique)
-		  "mainmodule" .ci file.  It will include calls to 
-		  register all the .ci files.
-		*/
+			/**
+			  CkRegisterMainModule is generated by the (unique)
+			  "mainmodule" .ci file.  It will include calls to 
+			  register all the .ci files.
+			*/
 #if !CMK_CHARM4PY
-		CkRegisterMainModule();
+			CkRegisterMainModule();
 #else
                 // CkRegisterMainModule doesn't exist in charm4py because there is no executable.
                 // Instead, we go to Python to register user chares from there
-		if (CkRegisterMainModuleCallback)
-			CkRegisterMainModuleCallback();
-		else
-			CkAbort("No callback for CkRegisterMainModule");
+			if (CkRegisterMainModuleCallback)
+				CkRegisterMainModuleCallback();
+			else
+				CkAbort("No callback for CkRegisterMainModule");
 #endif
 
-		/**
-		  _registerExternalModules is actually generated by 
-		  charmc at link time (as "moduleinit<pid>.C").  
-		  
-		  This generated routine calls the _register functions
-		  for the .ci files of libraries linked using "-module".
-		  This funny initialization is most useful for AMPI/FEM
-		  programs, which don't have a .ci file and hence have
-		  no other way to control the _register process.
-		*/
+			/**
+			  _registerExternalModules is actually generated by 
+			  charmc at link time (as "moduleinit<pid>.C").  
+			  
+			  This generated routine calls the _register functions
+			  for the .ci files of libraries linked using "-module".
+			  This funny initialization is most useful for AMPI/FEM
+			  programs, which don't have a .ci file and hence have
+			  no other way to control the _register process.
+			*/
 #if !CMK_CHARM4PY
-		_registerExternalModules(argv);
+			_registerExternalModules(argv);
 #endif
+		}
 	}
+#if CMK_SHRINK_EXPAND
+	{
+	  extern double rescale_t_register_done;
+	  extern double rescale_wall_now();
+	  if (CmiMyPe() == 0) rescale_t_register_done = rescale_wall_now();
+	}
+#endif
 
 	/* The following will happen on every virtual processor in BigEmulator, not just on once per real processor */
 	CpdBreakPointInit();
-	
+
 	CmiNodeAllBarrier();
 
-	// Execute the initcalls registered in modules
+	// Execute the initcalls registered in modules.
+	// Must run on survivor restart too: ConverseCommonInit resets the handler table
+	// (CmiHandlerInit zeroes CmiHandlerCount), so any handlers registered by initprocs
+	// (e.g. _ckArrayInit's ckinsertIdxFunc / CkCreateArrayAsync) must be re-registered
+	// in the same order on every PE — otherwise survivor and newcomer end up with
+	// misaligned handler indices and broadcasts (e.g. cputopology) dispatch to the
+	// wrong handler. The init bodies are idempotent: CkpvInitialize is per-PE state
+	// reset on every restart anyway, CkDisableTracing just toggles a flag, and
+	// CmiAssignOnce overwrites the handler-index globals to their new (matching) value.
 	_initCallTable.enumerateInitCalls();
+#if CMK_SHRINK_EXPAND
+	{
+	  extern double rescale_t_pr_initcalls_done;
+	  extern double rescale_wall_now();
+	  if (CmiMyPe() == 0) rescale_t_pr_initcalls_done = rescale_wall_now();
+	}
+#endif
 
 #if CMK_CHARMDEBUG
 	CpdFinishInitialization();
 #endif
-	_registerDone();
+	if (!reusingRegistrationState) _registerDone();
 	CmiNodeAllBarrier();
 
-	CkpvAccess(_myStats) = new Stats();
-	CkpvAccess(_msgPool) = new MsgPool();
+	if (!reusingRegistrationState) {
+		CkpvAccess(_myStats) = new Stats();
+		CkpvAccess(_msgPool) = new MsgPool();
+	}
 
 	CmiNodeAllBarrier();
 
 #if !(__FAULT__)
+	// Originally 3 barriers (align all PEs before _TRACE_BEGIN_COMPUTATION).
+	// On a shrink/expand event the world is already warmed up and ms-level
+	// alignment is sufficient — collapse to one barrier to save ~2× ~80ms.
+#if CMK_SHRINK_EXPAND
+	{
+	  extern bool _shrinkexpand_isNewcomer;
+	  const bool collapse = reusingRegistrationState || _shrinkexpand_isNewcomer;
+	  if (collapse) {
+	    CmiBarrier();
+	  } else {
+	    CmiBarrier();
+	    CmiBarrier();
+	    CmiBarrier();
+	  }
+	}
+#else
 	CmiBarrier();
 	CmiBarrier();
 	CmiBarrier();
+#endif
 #endif
 #if CMK_SMP_TRACE_COMMTHREAD
 	_TRACE_BEGIN_COMPUTATION();	
@@ -1650,12 +1746,39 @@ void _initCharm(int unused_argc, char **argv)
 	  CmiInitCPUAffinity(argv);
           CmiInitMemAffinity(argv);
         }
+#if CMK_SHRINK_EXPAND
+        {
+          extern double rescale_t_pr_aff_done;
+          extern double rescale_wall_now();
+          if (CmiMyPe() == 0) rescale_t_pr_aff_done = rescale_wall_now();
+        }
+#endif
         CmiInitCPUTopology(argv);
+#if CMK_SHRINK_EXPAND
+        {
+          extern double rescale_t_pr_cputopo_done;
+          extern double rescale_wall_now();
+          if (CmiMyPe() == 0) rescale_t_pr_cputopo_done = rescale_wall_now();
+        }
+#endif
         if (CkMyRank() == 0) {
           TopoManager_reset(); // initialize TopoManager singleton
+#if CMK_SHRINK_EXPAND
+          ST_RecursivePartition_clearCache();
+#endif
           _topoTree = ST_RecursivePartition_getTreeInfo(0);
         }
         CmiNodeAllBarrier(); // threads wait until _topoTree has been generated
+#if CMK_SHRINK_EXPAND
+        {
+          extern double rescale_t_pr_topo_done;
+          extern double rescale_wall_now();
+          if (CmiMyPe() == 0) rescale_t_pr_topo_done = rescale_wall_now();
+        }
+        // hapiInit (called below) is also a consumer of
+        // _reuseRegistrationStateOnRestart, so we defer the reset until after
+        // it has run.
+#endif
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
         if (CmiCpuTopologyEnabled()) {
             int *pelist;
@@ -1708,6 +1831,15 @@ void _initCharm(int unused_argc, char **argv)
   hapiQdProcess = QdProcess;
 #endif
 
+#if CMK_SHRINK_EXPAND
+  // All survivor-restart short-circuits (CmiTimerInit, CmiIsomallocInit,
+  // CmiInitCPUAffinity, CmiInitMemAffinity, CmiInitCPUTopology, register
+  // pass, hapiInit) have consulted _reuseRegistrationStateOnRestart by now;
+  // clear it so a future *non-rescale* exit/restart path doesn't see a stale
+  // flag.
+  _reuseRegistrationStateOnRestart = false;
+#endif
+
 #if CMK_USE_SHMEM
 #if CMK_SMP
     CmiNodeAllBarrier();
@@ -1746,6 +1878,13 @@ void _initCharm(int unused_argc, char **argv)
                   CkArgMsg *msg = (CkArgMsg *)CkAllocMsg(0, sizeof(CkArgMsg), 0, GroupDepNum{});
                   msg->argc = CmiGetArgc(argv);
                   msg->argv = argv;
+#if CMK_SHRINK_EXPAND
+                  {
+                    extern double rescale_t_pr_to_faultfunc;
+                    extern double rescale_wall_now();
+                    if (CmiMyPe() == 0) rescale_t_pr_to_faultfunc = rescale_wall_now();
+                  }
+#endif
                   faultFunc(_restartDir, msg);
                   CkFreeMsg(msg);
                 }
@@ -1839,6 +1978,24 @@ void _initCharm(int unused_argc, char **argv)
 #endif
 }
 
+#if CMK_SHRINK_EXPAND
+#include <setjmp.h>
+jmp_buf _shrinkexpand_jmpbuf;
+
+// True only for ranks whose first init in this process is via the +newcomer
+// path joining a running cluster. Cleared once the integrating restart
+// completes so subsequent rescales (where this rank is now a survivor) take
+// the survivor branches in CkRecvGroupROData.
+bool _shrinkexpand_isNewcomer = false;
+
+// Defined in machine.C (UCX or MPI layer, via machine-common-core.C linkage)
+extern bool _shrinkexpand_restarting;
+extern int  _shrinkexpand_new_numnodes;
+extern int  _shrinkexpand_my_node;
+extern const char *_shrinkexpand_basedir;
+extern char **Cmi_argvcopy;  // Full copy of original argv, set in ConverseInit
+#endif
+
 int charm_main(int argc, char **argv)
 {
   int stack_top=0;
@@ -1846,6 +2003,121 @@ int charm_main(int argc, char **argv)
 
 #if CMK_TRACE_ENABLED
   registerTraceInit(traceInit);
+#endif
+
+#if CMK_SHRINK_EXPAND
+  // Newcomer launched by external manager: ensure +restart <basedir> is in argv
+  // so faultFunc=CkRestartMain wires up. PE 0 (a survivor) reads checkpoint
+  // files and broadcasts RO+groups; the newcomer just needs to be in restart
+  // mode so it processes the broadcast in CkRecvGroupROData (rank>=_numPes
+  // branch) instead of running main().
+  bool _is_newcomer = false;
+  for (int i = 1; i < argc; i++) {
+    if (strcmp(argv[i], "+newcomer") == 0) { _is_newcomer = true; break; }
+  }
+  _shrinkexpand_isNewcomer = _is_newcomer;
+  if (_is_newcomer) {
+    bool hasRestart = false;
+    for (int i = 1; i < argc; i++) {
+      if (strcmp(argv[i], "+restart") == 0) { hasRestart = true; break; }
+    }
+    if (!hasRestart) {
+# if defined(__APPLE__)
+      const char *defaultBasedir = "/tmp";
+# else
+      const char *defaultBasedir = "/dev/shm";
+# endif
+      char **newArgv = new char*[argc + 3];
+      for (int i = 0; i < argc; i++) newArgv[i] = argv[i];
+      newArgv[argc]     = const_cast<char*>("+restart");
+      newArgv[argc + 1] = const_cast<char*>(defaultBasedir);
+      newArgv[argc + 2] = nullptr;
+      argv = newArgv;
+      argc += 2;
+    }
+  }
+
+  if (setjmp(_shrinkexpand_jmpbuf) != 0) {
+    {
+      extern double rescale_t_after_longjmp;
+      extern double rescale_wall_now();
+      if (CmiMyPe() == 0) rescale_t_after_longjmp = rescale_wall_now();
+    }
+    // Returned via longjmp from ConverseCleanup.
+    // Transport layer is already re-initialized among surviving ranks
+    // (UCX: new endpoints via PMI, MPI: new communicator via MPI_Comm_split).
+    // Preserve the existing registration tables: translator-generated module
+    // registration functions are one-shot and keep internal _done flags, so a
+    // second registration pass after _registerReset() drops user/runtime
+    // readonlies and breaks checkpoint restore.
+    _reuseRegistrationStateOnRestart = true;
+
+    // The exit-via-rescale path on PE 0 set _exitStarted (gate in StartExitMsg)
+    // and every PE set _mainDone (gate against post-main readonly writes).
+    // Without resetting, the next rescale's CkCleanup -> StartExitMsg is
+    // silently dropped at the _exitStarted check, and readonly restoration
+    // during the next checkpoint resume aborts.
+    _exitStarted = false;
+    _mainDone = false;
+
+    // The exit flow also pointed _charmHandlerIdx and _bocHandlerIdx at
+    // _discardHandler (correct for the kill-and-restart model, where stale
+    // old-world messages must die). On the no-restart path the survivors keep
+    // their registration tables, so those slots stay on _discardHandler deep
+    // into the restart, silently eating messages from faster-restoring peers
+    // (location informs/requests, leading to permanently buffered ghost
+    // messages and a wedged first post-rescale iteration). Re-point them at
+    // _bufferHandler: arrivals queue in _buffQ and are drained by
+    // _processBufferedMsgs once this PE finishes its restore. No survivor can
+    // send before every survivor passes this point, because the transport
+    // re-init (worker address exchange) barriers first.
+    CkNumberHandler(_charmHandlerIdx, _bufferHandler);
+    CkNumberHandler(_bocHandlerIdx, _bufferHandler);
+
+    // RescaleCheckpoint set this flag to route ConverseCleanup down the
+    // rescale path (instead of clean exit). It's never reset elsewhere, so
+    // without this clear the next CkExit() after the application finishes
+    // would also be misrouted into the rescale path, sending an empty
+    // COMMIT and aborting in CkRestartMain (no stashed _rescaleResumeCb).
+    set_shrinkexpand_exit(false);
+
+    // The cached broadcast spanning tree references the pre-shrink node count.
+    // Drop it so the first broadcast in the second ConverseInit (e.g. from
+    // CmiIsomallocInit) falls back to the NULL-tree path that uses the
+    // current CmiNumNodes(). _initCharm rebuilds it later via
+    // ST_RecursivePartition_getTreeInfo after CmiInitCPUTopology.
+    ST_RecursivePartition_clearCache();
+    _topoTree = NULL;
+
+    // Build new argv from the saved original, adding +restart <basedir>
+    int orig_argc = 0;
+    while (Cmi_argvcopy[orig_argc]) orig_argc++;
+
+    // Allocate space: original args + "+restart" + basedir + NULL
+    char **restart_argv = new char*[orig_argc + 3];
+    int new_argc = 0;
+    for (int i = 0; i < orig_argc; i++) {
+      // Strip any existing +restart and its value
+      if (strcmp(Cmi_argvcopy[i], "+restart") == 0) {
+        i++;  // skip the value too
+        continue;
+      }
+      restart_argv[new_argc++] = Cmi_argvcopy[i];
+    }
+    restart_argv[new_argc++] = const_cast<char*>("+restart");
+    restart_argv[new_argc++] = const_cast<char*>(_shrinkexpand_basedir);
+    restart_argv[new_argc] = NULL;
+
+    {
+      extern double rescale_t_converseinit_call;
+      extern double rescale_wall_now();
+      if (CmiMyPe() == 0) rescale_t_converseinit_call = rescale_wall_now();
+    }
+    ConverseInit(new_argc, restart_argv, (CmiStartFn) _initCharm, 0, 0);
+
+    delete[] restart_argv;
+    return 0;
+  }
 #endif
 
   ConverseInit(argc, argv, (CmiStartFn) _initCharm, 0, 0);

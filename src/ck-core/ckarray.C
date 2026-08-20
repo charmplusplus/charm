@@ -1749,7 +1749,7 @@ void CkArray::forwardZCMsgToSpecificElem(envelope *env, CkMigratable *elem) {
 void CkArray::flushStates()
 {
   CkReductionMgr::flushStates();
-  // For chare arrays, and for chare arrays alone, the global and local
+  // For chare arrays, and for chare alone, the global and local
   // element counters in the reduction manager need to be reset to 0.
   // This is because all array elements are recreated during recovery
   // and will reregister, pushing the counts back to the correct levels.
@@ -1761,6 +1761,43 @@ void CkArray::flushStates()
   resetCountersWhenFlushingStates();
   CK_ARRAYLISTENER_LOOP(listeners, l->flushState());
 }
+
+#if CMK_SHRINK_EXPAND
+// Survivor restart: rebuild only the spanning tree against the new CkNumPes().
+// Do NOT flush redNo/futureMsgs — surviving array elements preserve their
+// contributorInfo::redNo across the longjmp, and flushing manager state would
+// desync against them, causing every post-rescale contribute() to land in
+// futureMsgs and stall the application's reduction chain forever.
+void CkArray::resetForRescale()
+{
+  rebaseCountersForRescale();
+  rebuildTreeForRescale();
+}
+
+void CkArray::reKeyLocalElem(CmiUInt8 oldId, CmiUInt8 newId)
+{
+  auto itr = localElems.find(oldId);
+  if (itr != localElems.end())
+  {
+    unsigned int offset = itr->second;
+    localElems.erase(itr);
+    localElems[newId] = offset;
+  }
+  const CmiUInt8 oldObjID = ck::ObjID(thisgroup, oldId).getID();
+  const CmiUInt8 newObjID = ck::ObjID(thisgroup, newId).getID();
+  if (oldObjID != newObjID)
+  {
+    auto& objMap = CkpvAccess(array_objs);
+    auto oit = objMap.find(oldObjID);
+    if (oit != objMap.end())
+    {
+      ArrayElement* aelem = (ArrayElement*)oit->second;
+      objMap.erase(oit);
+      objMap[newObjID] = aelem;
+    }
+  }
+}
+#endif
 
 void CkArray::ckDestroy()
 {
@@ -1830,6 +1867,18 @@ void CkArray::sendMsg(CkArrayMessage* msg, const CkArrayIndex& idx, CkDeliver_t 
 void CkArray::recvMsg(CkArrayMessage* msg, CmiUInt8 id, CkDeliver_t type, int opts)
 {
   msg->array_hops()++;
+
+  // Fail fast on a location-forwarding cycle: with the hop-limit fallback
+  // below disabled, two PEs holding mutually stale location entries (e.g.
+  // an epoch-tied update rejection after a rescale) bounce the message
+  // forever, which presents as a silent full-cluster spin.
+  if (msg->array_hops() > 100)
+  {
+    CkAbort("[%d] CkArray::recvMsg: message for element id %" PRIu64
+            " bounced %d times (whichPe=%d, ep=%d) — forwarding cycle",
+            CkMyPe(), (CmiUInt8)id, (int)msg->array_hops(),
+            locMgr->whichPe(id), msg->array_ep());
+  }
 
   // First, if this is the actual location of the element, just deliver the message
   // right away and completely avoid location management.
@@ -1981,14 +2030,11 @@ void CkArray::handleUnknown(CkArrayMessage* msg, const CkArrayIndex& idx,
   int home = locMgr->homePe(idx);
   if (msg->array_ifNotThere() == CkArray_IfNotThere_buffer)
   {
-    if (isSmall && hasID && CkMyPe() != home)
-    {
-      sendToPe(msg, home, type, opts);
-    }
-    else
-    {
-      bufferForLocation(msg, idx);
-    }
+    // Always buffer-and-request rather than forwarding via the home: the
+    // request-reply also repairs this PE's location cache, so subsequent
+    // sends go direct instead of repeatedly detouring through the home
+    // (and post-rescale, a forward can chase a stale entry in a cycle).
+    bufferForLocation(msg, idx);
   }
   else
   {

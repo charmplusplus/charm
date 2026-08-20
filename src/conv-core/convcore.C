@@ -225,6 +225,14 @@ void  *CmiGetNonLocalNodeQ();
 
 CpvDeclare(Queue, CsdSchedQueue);
 
+/* Cluster-global rescale generation: the coordinator's membership epoch,
+   set by the machine layer on every committed reconfiguration (survivors
+   at reconfig, newcomers at INTEGRATE). All PEs agree on it by protocol,
+   unlike any per-PE reset counter, which diverges between original
+   survivors and newcomer-lineage PEs. Consumers: CkLocCache's location
+   epoch floor. */
+int _rescaleGeneration = 0;
+
 #if CMK_OUT_OF_CORE
 /* The Queue where the Prefetch Thread puts the messages from CsdSchedQueue  */
 CpvDeclare(Queue, CsdPrefetchQueue);
@@ -818,7 +826,23 @@ static void CmiExtendHandlerTable(int atLeastLen) {
 }
 
 void CmiAssignOnce(int* variable, int value) {
+#if CMK_SHRINK_EXPAND
+  // Truly assign-once on the rescale path: a survivor's _initCharm re-runs
+  // after the longjmp and would otherwise overwrite the slot recorded during
+  // the first init. Chares and any messages in flight reference that original
+  // slot, and a newcomer joining the cluster also registers in the same
+  // deterministic order and lands on the same slot — so preserving the
+  // original survivor slot is what lets all peers resolve handler indices
+  // consistently. Without this gate the survivor's static for e.g.
+  // CmiIsomallocSyncBroadcastHandlerIdx drifts to the latest (post-rescale
+  // re-registration) slot, and the newcomer — whose only-init slot matches
+  // the survivor's ORIGINAL slot — looks up an out-of-bounds entry and
+  // segfaults in CmiHandleMessage. Slot 0 is the reserved zero handler so a
+  // real CmiAssignOnce target is non-zero only after a successful prior call.
+  if (CmiMyRank() == 0 && *variable == 0) { *variable = value; }
+#else
   if (CmiMyRank() == 0) { *variable = value; }
+#endif
   CmiNodeAllBarrier();
 }
 
@@ -905,6 +929,19 @@ static void CmiHandlerInit(void)
   CpvInitialize(int         , CmiHandlerLocal);
   CpvInitialize(int         , CmiHandlerGlobal);
   CpvInitialize(int         , CmiHandlerMax);
+#if CMK_SHRINK_EXPAND
+  // On a shrink/expand survivor restart, ConverseCommonInit runs again post-
+  // longjmp. Wiping CmiHandlerTable + resetting CmiHandlerCount would
+  // invalidate every CmiAssignOnce'd handler index from the first init (their
+  // recorded slot numbers still point into a now-empty table); subsequent
+  // CmiRegisterHandler calls would re-fill slots in a different order
+  // depending on which init paths got gated, scrambling routing for
+  // CldHandler, _skipCldHandler, _bocHandlerIdx, etc. Skip the reset on
+  // survivor restart so the entire dispatch table — and every
+  // CmiAssignOnce'd index that references it — stays valid.
+  extern bool _reuseRegistrationStateOnRestart;
+  if (_reuseRegistrationStateOnRestart) return;
+#endif
   CpvAccess(CmiHandlerCount)  = 0;
   CpvAccess(CmiHandlerLocal)  = 1;
   CpvAccess(CmiHandlerGlobal) = 2;
@@ -1054,36 +1091,69 @@ void CmiTimerInit(char **argv)
 
   int tmptime = CmiGetArgFlagDesc(argv,"+useAbsoluteTime", "Use system's absolute time as wallclock time.");
   if(CmiMyRank() == 0) _absoluteTime = tmptime;   /* initialize only  once */
+#if CMK_SHRINK_EXPAND
+  // Originally 4 barriers (3 before + 1 after). The "before" trio is
+  // variance-dampening + first-call warmup, the "after" guarantees rank 0
+  // has written inittime_wallclock before peers read it (only matters in
+  // absolute mode). On a shrink/expand event the world is already warmed up
+  // and inittime_wallclock is per-process — collapse to a single barrier
+  // (kept for ms-level alignment of wall-clock epochs in default mode).
+  // Survivors and newcomers must take the same branch to avoid deadlock.
+  extern bool _reuseRegistrationStateOnRestart;
+  extern bool _shrinkexpand_isNewcomer;
+  const bool _se_collapse_timer_barriers =
+      _reuseRegistrationStateOnRestart || _shrinkexpand_isNewcomer;
+#else
+  const bool _se_collapse_timer_barriers = false;
+#endif
 #if !(__FAULT__)
   /* try to synchronize calling barrier */
 #if CMK_CCS_AVAILABLE
   if(cmiArgDebugFlag == 0)
 #endif
     {
-      CmiBarrier();
-      CmiBarrier();
-      CmiBarrier();
+      if (_se_collapse_timer_barriers) {
+        CmiBarrier();
+      } else {
+        CmiBarrier();
+        CmiBarrier();
+        CmiBarrier();
+      }
     }
 #endif
 if(CmiMyRank() == 0) /* initialize only  once */
   {
-    inittime_wallclock = inithrc();
-#ifndef RUSAGE_WHO
-    CpvAccess(inittime_virtual) = inittime_wallclock;
-#else
-    struct rusage ru;
-    getrusage(RUSAGE_WHO, &ru); 
-    CpvAccess(inittime_virtual) =
-      (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
-      (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
+#if CMK_SHRINK_EXPAND
+    // On a survivor restart the HRC epoch must not advance. Application
+    // code (and Charm internals like LB) hold pre-rescale CmiWallTimer()
+    // values and compare them against post-rescale reads; resetting
+    // `epoch` here makes CmiWallTimer() jump backwards by tens of
+    // seconds, manifesting as nonsensical iter prints right after the
+    // rescale ("time: 2.9s" two minutes into a run) and bogus LB stats.
+    // Newcomers still need a fresh init — they have no prior epoch.
+    if (!_reuseRegistrationStateOnRestart)
 #endif
+    {
+      inittime_wallclock = inithrc();
+#ifndef RUSAGE_WHO
+      CpvAccess(inittime_virtual) = inittime_wallclock;
+#else
+      struct rusage ru;
+      getrusage(RUSAGE_WHO, &ru);
+      CpvAccess(inittime_virtual) =
+        (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
+        (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
+#endif
+    }
   }
 
 #if !(__FAULT__)
 #if CMK_CCS_AVAILABLE
   if(cmiArgDebugFlag == 0)
 #endif
-    CmiBarrier();
+  // Collapsed into the single pre-init barrier on the rescale path; see
+  // the comment above the barrier block.
+  if (!_se_collapse_timer_barriers) CmiBarrier();
 /*  CmiBarrierZero(); */
 #endif
 }
@@ -1720,24 +1790,30 @@ void CsdSchedulerState_new(CsdSchedulerState_t *s)
  */
 void *CsdNextMessage(CsdSchedulerState_t *s) {
 	void *msg;
+	/* Poll the LIVE local queue (CpvAccess), not the pointer cached in the
+	   scheduler state at loop entry: on a no-restart rescale the running
+	   scheduler frame can predate queue re-pointing done during
+	   reinitialization, and a stale cache leaves messages enqueued by
+	   CmiSendSelf invisible to the scheduler forever (observed as a PE
+	   spinning idle with a deliverable message in its local queue). */
 	if((*(s->localCounter))-- >0)
 	  {
               /* This avoids a race condition with migration detected by megatest*/
-              msg=CdsFifo_Dequeue(s->localQ);
+              msg=CdsFifo_Dequeue(CpvAccess(CmiLocalQueue));
               if (msg!=NULL)
 		{
 #if CMI_QD
 		  CpvAccess(cQdState)->mProcessed++;
 #endif
-		  return msg;	    
+		  return msg;
 		}
-              CqsDequeue(s->schedQ,(void **)&msg);
+              CqsDequeue((Queue)CpvAccess(CsdSchedQueue),(void **)&msg);
               if (msg!=NULL) return msg;
 	  }
-	
+
 	*(s->localCounter)=CsdLocalMax;
-	if ( NULL!=(msg=CmiGetNonLocal()) || 
-	     NULL!=(msg=CdsFifo_Dequeue(s->localQ)) ) {
+	if ( NULL!=(msg=CmiGetNonLocal()) ||
+	     NULL!=(msg=CdsFifo_Dequeue(CpvAccess(CmiLocalQueue))) ) {
 #if CMI_QD
             CpvAccess(cQdState)->mProcessed++;
 #endif
@@ -2204,7 +2280,20 @@ void CsdInit(char **argv)
   int argmaxset = CmiGetArgIntDesc(argv,"+csdLocalMax",&argCsdLocalMax,"Set the max number of local messages to process before forcing a check for remote messages.");
   if (CmiMyRank() == 0 ) CsdLocalMax = argCsdLocalMax;
   CpvAccess(CsdLocalCounter) = argCsdLocalMax;
-  CpvAccess(CsdSchedQueue) = CqsCreate();
+  {
+    /* The scheduler queue is boot-once state: never replace a live queue.
+       On a no-restart rescale, messages from faster PEs (readonly/group
+       data, the resume callback, informHome location updates) can arrive
+       and be enqueued while this PE is still (re)initializing — on
+       survivors re-running ConverseInit after the longjmp, AND on
+       integrating expand newcomers whose init-time collectives pump the
+       network before this point. Recreating the queue silently drops
+       those messages, leaving the PE deaf (observed as rare post-rescale
+       hangs: a lost resume callback on survivors, lost informHome on
+       newcomers wedging the first ghost exchange). */
+    if (CpvAccess(CsdSchedQueue) == NULL)
+      CpvAccess(CsdSchedQueue) = CqsCreate();
+  }
 #if CMK_SMP && CMK_TASKQUEUE
   CsvInitialize(CmiMemoryAtomicUInt, idleThreadsCnt);
   CsvAccess(idleThreadsCnt) = 0;
@@ -4035,6 +4124,13 @@ void ConverseCommonInit(char **argv)
   CmiArgInit(argv);
   CmiMemoryInit(argv);
   CmiIOInit(argv);
+#if CMK_SHRINK_EXPAND
+  {
+    extern double rescale_t_cci_basics;
+    extern double rescale_wall_now();
+    if (CmiMyPe() == 0) rescale_t_cci_basics = rescale_wall_now();
+  }
+#endif
   if (CmiMyPe() == 0)
   {
     CmiPrintf("Converse/Charm++ Commit ID: %s\n", CmiCommitID);
@@ -4059,13 +4155,50 @@ void ConverseCommonInit(char **argv)
   CmiPoolAllocInit(30);  
 #endif
   CmiTmpInit(argv);
+#if CMK_SHRINK_EXPAND
+  {
+    extern double rescale_t_cci_tmp;
+    extern double rescale_wall_now();
+    if (CmiMyPe() == 0) rescale_t_cci_tmp = rescale_wall_now();
+  }
   CmiTimerInit(argv);
+#else
+  CmiTimerInit(argv);
+#endif
+#if CMK_SHRINK_EXPAND
+  {
+    extern double rescale_t_cci_timer_only;
+    extern double rescale_wall_now();
+    if (CmiMyPe() == 0) rescale_t_cci_timer_only = rescale_wall_now();
+  }
+#endif
   CstatsInit(argv);
+#if CMK_SHRINK_EXPAND
+  {
+    extern double rescale_t_cci_stats;
+    extern double rescale_wall_now();
+    if (CmiMyPe() == 0) rescale_t_cci_stats = rescale_wall_now();
+  }
+#endif
   CmiInitCPUAffinityUtil();
+#if CMK_SHRINK_EXPAND
+  {
+    extern double rescale_t_cci_timers;
+    extern double rescale_wall_now();
+    if (CmiMyPe() == 0) rescale_t_cci_timers = rescale_wall_now();
+  }
+#endif
   CcdModuleInit(argv);
   CmiHandlerInit();
   CmiReductionsInit();
   CIdleTimeoutInit(argv);
+#if CMK_SHRINK_EXPAND
+  {
+    extern double rescale_t_cci_handlers;
+    extern double rescale_wall_now();
+    if (CmiMyPe() == 0) rescale_t_cci_handlers = rescale_wall_now();
+  }
+#endif
   
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP /*Used by the netlrts-*-smp and multicore versions*/
   if(CmiGetArgFlagDesc(argv, "+CmiSpinOnIdle", "Force the runtime system to spin on message reception when idle, rather than sleeping")) {
@@ -4089,6 +4222,13 @@ void ConverseCommonInit(char **argv)
   if (CmiTraceFn != nullptr)
     CmiTraceFn(argv);
 #endif
+#if CMK_SHRINK_EXPAND
+  {
+    extern double rescale_t_cci_trace;
+    extern double rescale_wall_now();
+    if (CmiMyPe() == 0) rescale_t_cci_trace = rescale_wall_now();
+  }
+#endif
   CmiProcessPriority(argv);
 
 #if CMK_USE_TSAN
@@ -4099,6 +4239,13 @@ void ConverseCommonInit(char **argv)
 
   // Initialize converse handlers for supporting generic Direct Nocopy API
   CmiOnesidedDirectInit();
+#if CMK_SHRINK_EXPAND
+  {
+    extern double rescale_t_cci_persistent;
+    extern double rescale_wall_now();
+    if (CmiMyPe() == 0) rescale_t_cci_persistent = rescale_wall_now();
+  }
+#endif
 
   useCMAForZC = true;
   if (CmiGetArgFlagDesc(argv, "+noCMAForZC", "When Cross Memory Attach (CMA) is supported, the program does not use CMA when using the Zerocopy API")) {
@@ -4118,12 +4265,26 @@ void ConverseCommonInit(char **argv)
   ccsRunning = 0;
   CcsInit(argv);
 #endif
+#if CMK_SHRINK_EXPAND
+  {
+    extern double rescale_t_cci_ccs;
+    extern double rescale_wall_now();
+    if (CmiMyPe() == 0) rescale_t_cci_ccs = rescale_wall_now();
+  }
+#endif
 
   CpdInit();
   CthSchedInit();
   CmiGroupInit();
   CmiMulticastInit();
   CmiInitMultipleSend();
+#if CMK_SHRINK_EXPAND
+  {
+    extern double rescale_t_cci_threads;
+    extern double rescale_wall_now();
+    if (CmiMyPe() == 0) rescale_t_cci_threads = rescale_wall_now();
+  }
+#endif
 #if CMI_QD
   CQdInit();
 #endif
@@ -4131,8 +4292,16 @@ void ConverseCommonInit(char **argv)
   CrnInit();
   CmiInitImmediateMsg();
   CldModuleInit(argv);
-
+#if CMK_SHRINK_EXPAND
+  {
+    extern double rescale_t_cci_iso_predeps;
+    extern double rescale_wall_now();
+    if (CmiMyPe() == 0) rescale_t_cci_iso_predeps = rescale_wall_now();
+  }
   CmiIsomallocInit(argv);
+#else
+  CmiIsomallocInit(argv);
+#endif
 
   /* main thread is suspendable */
 /*

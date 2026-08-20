@@ -298,6 +298,37 @@ double GreedyRefineCentralLB::fillData(LDStats *stats,
   }
   if (!availablePes) CkAbort("GreedyRefineCentralLB: No available processors\n");
 
+  // Equal-weight fallback. When the load profiler hasn't accumulated any
+  // measurable per-object data (typical for the first LB step after a
+  // shrink/expand: lbmgr->ClearLoads() ran post-migration and the next LB
+  // step fires before meaningful work was sampled), every migratable
+  // object's effective load is 0. Without a floor, Greedy distinguishes
+  // objects only by their (near-zero) load and dumps them all onto the
+  // lowest-bgload PE — a degenerate "all objects to the newcomer" decision
+  // that costs multiple seconds to execute and immediately needs to be
+  // re-balanced. Treat that case as "all objects equal weight" so Greedy
+  // distributes by count instead. Only kicks in when there's no signal;
+  // a single non-zero object load takes the normal path.
+  double migratableLoadSum = 0.0;
+  int    migratableCount   = 0;
+  for (int i = 0; i < n_objs; i++) {
+    if (stats->objData[i].migratable) {
+#if CMK_CUDA || CMK_HIP
+      migratableLoadSum += stats->objData[i].gpuTime;
+#else
+      migratableLoadSum += stats->objData[i].wallTime;
+#endif
+      migratableCount++;
+    }
+  }
+  const bool useUnitWeights = (migratableCount > 0
+                               && migratableLoadSum < 1e-9);
+  if (useUnitWeights && _lb_args.debug() > 0 && CkMyPe() == cur_ld_balancer) {
+    CkPrintf("[%d] GreedyRefineCentralLB: object loads are all 0 "
+             "(post-rescale or pre-warmup); using unit weights so objects "
+             "balance by count\n", CkMyPe());
+  }
+
   for (int i=0; i < n_objs; i++) {
     LDObjData &oData = stats->objData[i];
     GreedyRefineCentralLB::GObj &obj = objs[i];
@@ -325,10 +356,11 @@ double GreedyRefineCentralLB::fillData(LDStats *stats,
       if (p.bgload > maxBGLoad) maxBGLoad = p.bgload;
     } else {
 #if CMK_CUDA || CMK_HIP
-      obj.load = oData.gpuTime * stats->procs[pe].pe_speed;
+      const double effLoad = useUnitWeights ? 1.0 : oData.gpuTime;
 #else
-      obj.load = oData.wallTime * stats->procs[pe].pe_speed;
+      const double effLoad = useUnitWeights ? 1.0 : oData.wallTime;
 #endif
+      obj.load = effLoad * stats->procs[pe].pe_speed;
         // CkPrintf("[%d] Obj %d on PE %d is migratable, load=%.6f, GPU pup size=%ld, GPU alloc size=%ld\n", CkMyPe(), i, pe, obj.load, oData.gpuPupSize, obj.gpuAllocSize);
       pobjs.push_back(&obj);
       totalObjLoad += obj.load;
@@ -390,19 +422,44 @@ double GreedyRefineCentralLB::fillData(LDStats *stats,
 }
 
 static const float Avals[] = {1.0, 1.005, 1.01, 1.015, 1.02, 1.03, 1.04, 1.05, 1.06, 1.07, 1.08, 1.16, 1.20, 1.30};
-static const float Bvals[] = {FLT_MAX, 1.0, 1.05, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3};
+static const float Bvals[] = {1.0, 1.05, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3, FLT_MAX};
 #define Avals_len 14
 #define Bvals_len 16
 #define NUM_SOLUTIONS Avals_len*Bvals_len+1
 static void getGreedyRefineParams(int rank, float &A, float &B) {
-  if (rank == 0) { A = 0; B = -1; return; } // causes PE0 to run regular greedy
+  // PE 0 runs the migration-minimizing extreme: largest A (loosest M
+  // ceiling at 1.3 * greedyMaxLoad) + B=FLT_MAX (stay-in-place check
+  // engages whenever the M constraint allows). This guarantees the
+  // parameter sweep always contains at least one solution near the
+  // physical minimum-migration count, so when the user sets a tight
+  // +LBPercentMoves cap, receiveSolutions has an actual conservative
+  // candidate to pick from rather than 3-4 aggressive-greedy variants.
+  // (Previously PE 0 ran A=0/B=-1, which was the *maximum*-migration
+  // reference point — useful for LOAD_MIG_BAL scoring but the opposite
+  // of what we want when the migration budget is tight.)
+  if (rank == 0) {
+    A = Avals[Avals_len - 1];   // 1.30
+    B = Bvals[Bvals_len - 1];   // FLT_MAX
+    return;
+  }
   rank--;
-  int x = rank / Bvals_len;
-  if (x >= Avals_len) {
+  // When CkNumPes()-1 < NUM_SOLUTIONS (the common case at small PE counts:
+  // 4 PEs samples only the first 3 of 224 (A,B) combinations — all near
+  // B=1.0..1.1, missing every "stay-in-place" leaning variant). Stride the
+  // sample so the few PEs cover the full grid instead of clustering at
+  // the front; the lattice traversal is sub-grid-walk so we still hit
+  // Avals[0..N] for each Bvals[k%N].
+  const int totalCombos = Avals_len * Bvals_len;
+  const int sweepPEs    = std::max(1, CkNumPes() - 1);
+  const int stride      = (sweepPEs >= totalCombos) ? 1
+                                                    : std::max(1,
+                                                               totalCombos / sweepPEs);
+  const int idx = rank * stride;
+  if (idx >= totalCombos) {
     A = B = -1;
   } else {
-    A = Avals[x];
-    B = Bvals[rank % Bvals_len];
+    A = Avals[idx / Bvals_len];
+    B = Bvals[idx % Bvals_len];
   }
 }
 

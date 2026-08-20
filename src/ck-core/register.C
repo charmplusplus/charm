@@ -30,6 +30,19 @@ void _registerInit(void)
     return;
 }
 
+#if CMK_SHRINK_EXPAND
+void _registerReset(void)
+{
+  _entryTable.reset();
+  _msgTable.reset();
+  _chareTable.reset();
+  _mainTable.reset();
+  _readonlyTable.reset();
+  _readonlyMsgs.reset();
+  __registerDone = 0;
+}
+#endif
+
 int CkRegisterMsg(const char *name, CkPackFnPtr pack, CkUnpackFnPtr unpack,
                   CkDeallocFnPtr dealloc, size_t size)
 {

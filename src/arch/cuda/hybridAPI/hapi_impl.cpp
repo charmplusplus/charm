@@ -68,6 +68,10 @@ extern int Cmi_isOldProcess;
 
 extern int CmiSetCPUAffinityLogical(int core);
 
+extern int Cmi_isOldProcess;
+
+extern int CmiSetCPUAffinityLogical(int core);
+
 static void createPool(int *nbuffers, int n_slots, std::vector<BufferPool> &pools);
 static void releasePool(std::vector<BufferPool> &pools);
 
@@ -227,51 +231,90 @@ void hapiCuptiFinalize() {
 #endif
 
 // Called by all PEs in Charm++ layer init
+void hapiWarmupDeviceContext() {
+  // A no-op free forces driver init and creation of the primary context on
+  // the current device, which is the expensive part of first device use
+  // (~150-200 ms observed on a T4). On multi-device nodes hapiInit may later
+  // select a different device for this PE; the driver initialization, which
+  // dominates the cost, is process-wide and is still saved. Deliberately no
+  // error check: if the device is genuinely unusable, hapiInit reports it in
+  // its usual way.
+  hapiFree(0);
+}
+
 void hapiInit(char** argv) {
+#if CMK_SHRINK_EXPAND
+  extern bool _reuseRegistrationStateOnRestart;
+  // On a survivor restart the GPU context, PE-device mapping, IPC handles,
+  // and registered callbacks/pollers are all preserved in this process.
+  // Skip the work but still participate in any cross-process barriers so we
+  // stay in lockstep with newcomer processes (which run a full hapiInit).
+  // Rescale fires at LB sync time, so the event queue is drained and there
+  // is no in-flight GPU work to worry about.
+  const bool survivor_restart = _reuseRegistrationStateOnRestart;
+#else
+  const bool survivor_restart = false;
+#endif
+
   if (!CmiInCommThread()) {
-    if (CmiMyRank() == 0) {
-      hapiInitCsv(argv); // Initialize per-process variables (GPUManager)
+    if (!survivor_restart) {
+      if (CmiMyRank() == 0) {
+        hapiInitCsv(argv); // Initialize per-process variables (GPUManager)
+      }
+      hapiInitCpv(); // Initialize per-PE variables
     }
-    hapiInitCpv(); // Initialize per-PE variables
 
     CmiNodeBarrier(); // Ensure hapiInitCsv is done for all PEs within a logical node
 
-    hapiMapping(argv); // Perform PE-device mapping
+    if (!survivor_restart) {
+      hapiMapping(argv); // Perform PE-device mapping
+    }
 
+    // Bind the device on first init / newcomer integration. On a survivor
+    // restart the device is already bound and its context persists across the
+    // longjmp, so skip the (re)bind. (This used to route through
+    // hapiStartMemoryDaemon, which additionally set up the GPU memory daemon
+    // FIFOs; the daemon existed only to carry device data across the
+    // kill-and-restart teardown, and no-restart rescale keeps device memory
+    // alive in-process, so it is gone.)
+    if (!survivor_restart) {
+      int& cpv_my_device = CpvAccess(my_device);
+      hapiCheck(hapiSetDevice(cpv_my_device));
+    }
 #if CMK_SHRINK_EXPAND
-    hapiStartMemoryDaemon(argv);
-#else
-    int& cpv_my_device = CpvAccess(my_device);
-    hapiCheck(hapiSetDevice(cpv_my_device));
+    // Keeps survivors and newcomers aligned at this point.
+    CmiBarrier();
 #endif
 
 #ifndef HAPI_CUDA_CALLBACK
-    // Pre-warm the per-PE event pool so steady-state recordEvent never hits
-    // cudaEventCreate on the critical path. Must run after hapiSetDevice so
-    // events bind to the right CUDA context. 64 covers the deepest expected
-    // in-flight depth for a single PE under task-bench-style workloads.
-    {
-      auto& pool = CpvAccess(hapi_event_pool);
-      for (int i = 0; i < 64; i++) {
-        hapiEvent_t ev;
-        hapiCheck(hapiEventCreateWithFlags(&ev, hapiEventDisableTiming));
-        pool.push(ev);
+    if (!survivor_restart) {
+      // Pre-warm the per-PE event pool so steady-state recordEvent never hits
+      // hapiEventCreate on the critical path. Must run after hapiSetDevice so
+      // events bind to the right device context. 64 covers the deepest expected
+      // in-flight depth for a single PE under task-bench-style workloads.
+      {
+        auto& pool = CpvAccess(hapi_event_pool);
+        for (int i = 0; i < 64; i++) {
+          hapiEvent_t ev;
+          hapiCheck(hapiEventCreateWithFlags(&ev, hapiEventDisableTiming));
+          pool.push(ev);
+        }
       }
-    }
 
-    // Allocate the per-PE pinned-flag ring (must run after hapiSetDevice so
-    // the pinned allocation and its device alias belong to this device).
-    if (hapi_use_flag_poll) {
-      uint32_t*& slots = CpvAccess(hapi_flag_slots);
-      size_t bytes = (size_t)HAPI_FLAG_SLOTS * HAPI_FLAG_STRIDE * sizeof(uint32_t);
-      hapiCheck(hapiMallocHost((void**)&slots, bytes));
-      memset((void*)slots, 0, bytes);
-      hapiCheck(hapiHostGetDevicePointer(&CpvAccess(hapi_flag_slots_dev),
-                                         (void*)slots, 0));
-    }
+      // Allocate the per-PE pinned-flag ring (must run after hapiSetDevice so
+      // the pinned allocation and its device alias belong to this device).
+      if (hapi_use_flag_poll) {
+        uint32_t*& slots = CpvAccess(hapi_flag_slots);
+        size_t bytes = (size_t)HAPI_FLAG_SLOTS * HAPI_FLAG_STRIDE * sizeof(uint32_t);
+        hapiCheck(hapiMallocHost((void**)&slots, bytes));
+        memset((void*)slots, 0, bytes);
+        hapiCheck(hapiHostGetDevicePointer(&CpvAccess(hapi_flag_slots_dev),
+                                           (void*)slots, 0));
+      }
 
-    // Register polling function to be invoked at every scheduler loop
-    CcdCallOnConditionKeep(CcdSCHEDLOOP, (CcdCondFn)hapiPollEvents, NULL);
+      // Register polling function to be invoked at every scheduler loop
+      CcdCallOnConditionKeep(CcdSCHEDLOOP, (CcdCondFn)hapiPollEvents, NULL);
+    }
 #endif
   }
 
@@ -284,7 +327,9 @@ void hapiInit(char** argv) {
 
   shmInit();
 
-  hapiRegisterCallbacks(); // Register callback functions
+  if (!survivor_restart) {
+    hapiRegisterCallbacks(); // Register callback functions
+  }
 }
 
 
@@ -394,35 +439,13 @@ void hapiRestore(void* devPtr, int size, int alloc_id) {
 
 void hapiExit() {
   // Ensure all PEs have finished GPU work
-  CmiPrintf("Exit called on PE %d\n", CmiMyPe());
   CmiNodeBarrier();
 
-#if CMK_SHRINK_EXPAND
-  char client_fifo_path[BUFFER_SIZE];
-  sprintf(client_fifo_path, CLIENT_FIFO_TEMPLATE, getpid());
-
-  if (!get_shrinkexpand_exit() && CmiPhysicalRank(CmiMyPe()) == firstRankForDevice)
-  {
-    char msg_buf[BUFFER_SIZE];
-    sprintf(msg_buf, "KILL:%ld:0", getpid());
-    hapiSendMemoryRequest(msg_buf, strlen(msg_buf) + 1);
-
-    int client_fd = open(client_fifo_path, O_RDONLY);
-    char status;
-    read(client_fd, &status, sizeof(char));
-    close(client_fd);
-  }
-
-  if (!get_shrinkexpand_exit())
-  {
-    // Attempt to delete the file
-    if (std::remove(client_fifo_path) == 0) {
-        CmiPrintf("File '%s' deleted successfully.\n", client_fifo_path);
-    } else {
-        CmiPrintf("Error deleting file '%s': %s\n", client_fifo_path, strerror(errno));
-    }
-  }
-#endif
+  // The GPU memory daemon teardown handshake used to live here (KILL request
+  // over the client FIFO, then unlink). No-restart rescale keeps the process
+  // and its device memory alive, so no daemon is started and there is nothing
+  // to tear down. hapiExit is also never reached on the rescale path at all;
+  // _exitHandler gates it on !get_shrinkexpand_exit().
 
   if (CmiMyRank() == 0) {
     shmCleanup();
@@ -1194,6 +1217,18 @@ void hapiWorkRequestSetCallback(hapiWorkRequest* wr, void* cb) {
 
 static void shmInit() {
   if (!CsvAccess(gpu_manager).use_shm) return;
+
+#if CMK_SHRINK_EXPAND
+  {
+    extern bool _reuseRegistrationStateOnRestart;
+    if (_reuseRegistrationStateOnRestart) {
+      // Re-establishing CUDA IPC handles between survivors and a joining
+      // newcomer process is not implemented for the no-restart shrink/expand
+      // path. Bail loudly rather than hang in shmCreate / ipcHandleOpen.
+      CmiAbort("[HAPI] +gpushm is not supported with no-restart shrink/expand");
+    }
+  }
+#endif
 
   if (CmiMyRank() == 0) {
     if (!CmiInCommThread()) shmSetup();
@@ -2013,6 +2048,20 @@ void hapiCuptiPopObjCorrelation() {
 #endif
 }
 
+  #ifndef HAPI_CUDA_CALLBACK
+  // record CUDA event
+    recordEvent(stream, NULL, NULL, NULL, dynamic_cast<CkMigratable*>(obj), start);
+#else
+  #error hapi record time with hapi_cuda_callback not supported
+#endif
+
+    // while there is an ongoing workrequest, quiescence should not be detected
+    // even if all PEs seem idle
+    CmiAssert(hapiQdCreate);
+    hapiQdCreate(1);
+  }
+}
+#endif
 // Lightweight HAPI, to be invoked after data transfer or kernel execution.
 void hapiAddCallback(hapiStream_t stream, const CkCallback& cb, void* cb_msg) {
 #ifndef HAPI_CUDA_CALLBACK

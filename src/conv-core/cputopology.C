@@ -366,7 +366,7 @@ extern "C" void LrtsInitCpuTopo(char **argv)
 {
   static skt_ip_t myip;
   double startT;
- 
+
   int obtain_flag = 1;              // default on
   int show_flag = 0;                // default not show topology
 
@@ -385,6 +385,17 @@ extern "C" void LrtsInitCpuTopo(char **argv)
 
   CmiAssignOnce(&cpuTopoHandlerIdx, CmiRegisterHandler((CmiHandler)cpuTopoHandler));
   CmiAssignOnce(&cpuTopoRecvHandlerIdx, CmiRegisterHandler((CmiHandler)cpuTopoRecvHandler));
+
+  // Reset stale state that persists across longjmp (shrink/expand restart).
+  // topomsg was freed by CmiSyncNodeBroadcastAllAndFree but never NULLed;
+  // cpuTopoSyncHandlerDone stays true; cpuTopo keeps old topology data.
+  topomsg = NULL;
+  cpuTopoSyncHandlerDone = false;
+  cpuTopo.nodeIDs = NULL;
+  cpuTopo.numPes = 0;
+  cpuTopo.numNodes = 0;
+  cpuTopo.bynodes = NULL;
+  cpuTopo.supported = 0;
 
   if (!obtain_flag) {
     if (CmiMyRank() == 0) cpuTopo.sort();
@@ -481,6 +492,7 @@ extern "C" void LrtsInitCpuTopo(char **argv)
       if (CmiMyPe() == 0)
       {
         CmiSyncNodeBroadcastAllAndFree(sizeof(nodeTopoMsg)+CmiNumPes()*sizeof(int), (char *)topomsg);
+        topomsg = NULL;  // freed by BroadcastAllAndFree
 
         CsdSchedulePoll();
       }

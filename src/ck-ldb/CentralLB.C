@@ -48,6 +48,7 @@ extern "C" void charmrun_realloc(char *s);
 extern char willContinue;
 extern realloc_state pending_realloc_state;
 extern char * se_avail_vector;
+extern std::vector<char> se_avail_snapshot;
 extern int mynewpe;
 extern char *_shrinkexpand_basedir;
 extern int numProcessAfterRestart;
@@ -133,6 +134,44 @@ CentralLB::~CentralLB()
   }
 #endif
 }
+
+#if CMK_LBDB_ON && CMK_SHRINK_EXPAND
+// On survivor restart, statsMsgsList was allocated against the pre-rescale
+// CkNumPes() and won't be re-sized: ReceiveStats only allocates when the
+// pointer is NULL, so an expanded cluster's stats from the new PE land at an
+// out-of-bounds index, and a shrunk cluster keeps a stale slot. statsData's
+// procs vector has the same staleness. Drop both so the next LB step rebuilds
+// them with the post-rescale CkNumPes().
+//
+// Also reset the migration counters. MigrationDoneImpl normally zeros these,
+// but the rescale path forks off at CheckForRealloc before MigrationDoneImpl
+// runs. On the next LB step, ProcessReceiveMigration sets
+// migrates_expected=N for the incoming migrations, but the stale
+// migrates_completed (carried over from the rescale-triggering LB) is already
+// > N, so the equality check that triggers MigrationDone never matches and
+// the LB step hangs after migration. Same for lbdone, which CheckMigrationComplete
+// only resets after lbdone reaches 2; if the rescale interrupts at lbdone==1,
+// the next LB step starts at lbdone=1 and only needs ONE
+// CheckMigrationComplete to flip — which then prematurely calls MigrationDoneImpl.
+void CentralLB::flushStates()
+{
+  BaseLB::flushStates();
+  if (statsMsgsList) {
+    for (int i = 0; i < stats_msg_count; i++) delete statsMsgsList[i];
+    delete[] statsMsgsList;
+    statsMsgsList = NULL;
+  }
+  delete statsData;
+  statsData = NULL;
+  stats_msg_count = 0;
+  reduction_started = false;
+  migrates_completed = 0;
+  migrates_expected = -1;
+  future_migrates_completed = 0;
+  future_migrates_expected = -1;
+  lbdone = 0;
+}
+#endif
 
 void CentralLB::SetPESpeed(int speed) 
 {
@@ -609,7 +648,7 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &&msg)
   const int clients = CkNumPes();
 
   DEBUGF(("THIS POINT count = %d, clients = %d\n",stats_msg_count,clients));
- 
+
   if (stats_msg_count == clients) {
 	DEBUGF(("[%d] All stats messages received \n",CmiMyPe()));
     statsData->procs.resize(stats_msg_count);
@@ -715,6 +754,46 @@ void CentralLB::ApplyDecision() {
     storedMigrateMsg = NULL;
   }
 
+#if CMK_SHRINK_EXPAND
+  // Rescale backstop: this LB step is about to trigger a rescale
+  // (CheckForRealloc runs at MigrationDone), and survivors keep their
+  // elements in memory across the longjmp while doomed PEs simply exit —
+  // there is no restore path for anything left on a doomed PE. If the
+  // strategy placed objects on a PE the pending bitmap dooms (possible when
+  // the request raced the step, or via stale avail state), those elements
+  // would be silently lost. Redirect every doomed placement to a survivor
+  // and rebuild the migrate message.
+  if (pending_realloc_state != NO_REALLOC && !se_avail_snapshot.empty()) {
+    auto doomed = [&](int pe) {
+      return pe >= 0 && pe < CkNumPes() && pe < (int)se_avail_snapshot.size() &&
+             se_avail_snapshot[pe] == 0;
+    };
+    std::vector<int> survivors;
+    for (int p = 0; p < CkNumPes(); p++)
+      if (!doomed(p)) survivors.push_back(p);
+    int redirected = 0, unmovable = 0;
+    if (!survivors.empty()) {
+      size_t rr = 0;
+      for (size_t i = 0; i < statsData->objData.size(); i++) {
+        if (doomed(statsData->to_proc[i])) {
+          if (statsData->objData[i].migratable) {
+            statsData->to_proc[i] = survivors[rr++ % survivors.size()];
+            redirected++;
+          } else {
+            unmovable++;
+          }
+        }
+      }
+    }
+    if (redirected || unmovable) {
+      CkPrintf("[%d] CharmLB> rescale backstop: redirected %d object(s) off "
+               "doomed PEs (%d unmigratable left behind)\n",
+               CkMyPe(), redirected, unmovable);
+      delete migrateMsg;
+      migrateMsg = createMigrateMsg(statsData);
+    }
+  }
+#endif
 
 #if CMK_REPLAYSYSTEM
   CpdHandleLBMessage(&migrateMsg);
@@ -1152,8 +1231,7 @@ void CentralLB::CheckForRealloc(){
         lbname, cur_ld_balancer, step()-1, end_lb_time,	end_lb_time-start_lb_time);
     // do checkpoint
     CkCallback cb(CkIndex_CentralLB::ResumeFromReallocCheckpoint(), thisProxy[0]);
-    CkStartRescaleCheckpoint(_shrinkexpand_basedir, cb, 
-      std::vector<char>(se_avail_vector, se_avail_vector + CkNumPes()));
+    CkStartRescaleCheckpoint(_shrinkexpand_basedir, cb, se_avail_snapshot);
   } else {
     thisProxy.MigrationDoneImpl(1);
   }
@@ -1162,8 +1240,14 @@ void CentralLB::CheckForRealloc(){
 
 void CentralLB::ResumeFromReallocCheckpoint(){
 #if CMK_SHRINK_EXPAND
-    CkPrintf("Resumed from realloc\n");
-    std::vector<char> avail(se_avail_vector, se_avail_vector + CkNumPes());
+    // Stamp the start of the post-checkpoint rescale orchestration so the
+    // PE-0 print at the end of CkRestartMain can report total / restore /
+    // overhead. Uses gettimeofday wall-clock (defined in ckcheckpoint.C)
+    // because CmiWallTimer's epoch resets across the rescale longjmp.
+    extern double rescale_overhead_start_timer;
+    extern double rescale_wall_now();
+    if (CkMyPe() == 0) rescale_overhead_start_timer = rescale_wall_now();
+    std::vector<char> avail = se_avail_snapshot;
     //free(se_avail_vector);
     thisProxy.WillIbekilled(avail, numProcessAfterRestart);
 #endif
@@ -1183,8 +1267,6 @@ void CentralLB::WillIbekilled(std::vector<char> avail, int newnumProcessAfterRes
 
 void CentralLB::StartCleanup(){
 #if CMK_SHRINK_EXPAND
-  //CkAbort("FLAG\n");
-  //CkPrintf("Starting cleanup\n");
 	CkCleanup();
 #endif
 }
@@ -1203,7 +1285,6 @@ void CentralLB::MigrationDone(int balancing)
 
 void CentralLB::MigrationDoneImpl (int balancing)
 {
-
 #if CMK_LBDB_ON
   migrates_completed = 0;
   migrates_expected = -1;
@@ -1248,7 +1329,6 @@ void CentralLB::ResumeClients(int balancing)
 {
 #if CMK_LBDB_ON
   //CkPrintf("[%d] Resuming clients. balancing:%d.\n",CkMyPe(),balancing);
-
   lbmgr->ResumeClients();
   if (balancing)  {
 

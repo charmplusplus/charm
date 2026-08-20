@@ -8,6 +8,7 @@ network are actually received.
 */
 #include <stdio.h>
 #include <ctype.h>
+#include <unistd.h>
 #include "conv-ccs.h"
 #include "ccs-server.h"
 #include "ccs-auth.h"
@@ -351,9 +352,18 @@ void CcsServer_new(skt_ip_t *ret_ip,int *use_port,const char *authFile)
   globalSecurityMgr=CcsSecMan_default(authFile);
   skt_init();
   ip=skt_my_ip();
+  // On re-init (e.g., after a shrink/expand longjmp restart), the old listening
+  // socket is still bound to `port`. Close it before re-binding, otherwise the
+  // new bind() fails with EADDRINUSE, ccs_server_fd is set to -1, and CCS
+  // requests pile up in the (orphaned) old socket's accept queue.
+  if (ccs_server_fd != SOCKET_ERROR) {
+    skt_close(ccs_server_fd);
+    ccs_server_fd = SOCKET_ERROR;
+  }
   ccs_server_fd=skt_server(&port);
-  printf("ccs: %s\nccs: Server IP = %s, Server port = %u $\n", 
-           CMK_CCS_VERSION, skt_print_ip(ip_str,sizeof(ip_str),ip), port);
+  printf("ccs: %s\nccs: Server IP = %s, Server port = %u $ pid=%d fd=%d\n",
+           CMK_CCS_VERSION, skt_print_ip(ip_str,sizeof(ip_str),ip), port,
+           (int)getpid(), (int)ccs_server_fd);
   fflush(stdout);
   if (ret_ip!=NULL) *ret_ip=ip;
   if (use_port!=NULL) *use_port=port;

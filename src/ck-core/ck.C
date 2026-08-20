@@ -797,6 +797,29 @@ inline void CkReadyEntry(TableEntry &entry, bool nodeLevel) {
   }
 }
 
+#if CMK_SHRINK_EXPAND
+/* No-restart rescale: messages that arrive at a surviving PE between its
+   post-longjmp reinitialization and the completion of its restore find a
+   fresh group table whose local branches are not yet re-linked, so
+   _lookupGroupAndBufferIfNotThere stashes them on the table entries.
+   Newcomers drain those stashes because their restore path goes through
+   CkCreateLocalGroup -> CkReadyEntry, but the survivor branch installs
+   nothing (groups are live across the longjmp) and the stashes would sit
+   forever — observed as another survivor's re-key informHome messages
+   vanishing, leaving elements unresolvable and wedging the first ghost
+   exchange. Called at the end of the restore on every PE. */
+void CkDrainStashedGroupMsgs(void)
+{
+  GroupIDTable *idTable = CkpvAccess(_groupIDTable);
+  GroupTable *objTable = CkpvAccess(_coreState)->getGroupTable();
+  for (unsigned int i = 0; i < idTable->size(); i++)
+  {
+    TableEntry &entry = objTable->find((*idTable)[i]);
+    if (entry.getObj() != NULL) CkReadyEntry(entry, false);
+  }
+}
+#endif
+
 void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
 {
   int gIdx = _entryTable[epIdx]->chareIdx;

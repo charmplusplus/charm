@@ -8,6 +8,8 @@
 
 #include <cassert>
 #include <unordered_map>
+#include <deque>
+#include <vector>
 
 #include "LBDatabase.h"
 #include "json_fwd.hpp"
@@ -40,6 +42,9 @@ class CkLBArgs
   bool _lb_traceComm;       // stats collection for comm
   int _lb_central_pe;      // processor number for centralized strategy
   int _lb_maxDistPhases;   // Specifies the max number of LB phases in DistributedLB
+  // Migration ceiling for strategies that honor it (GreedyRefineCentralLB).
+  // CLI: +LBPercentMoves N (0..100). Default 100 = unlimited.
+  int _lb_percentMovesAllowed;
   double _lb_targetRatio;  // Specifies the target load ratio for LBs that aim for a
                            // particular load ratio
   bool _lb_metaLbOn;
@@ -59,6 +64,7 @@ class CkLBArgs
     _lb_loop = false;
     _lb_central_pe = 0;
     _lb_maxDistPhases = 10;
+    _lb_percentMovesAllowed = 100;
     _lb_targetRatio = 1.05;
     _lb_metaLbOn = false;
     _lb_metaLbModelDir = nullptr;
@@ -246,7 +252,11 @@ class LBManager : public CBase_LBManager
 
   int startLBFn_count;
 
-  char* reallocBuffer;
+  // Queue of buffered realloc requests that arrived while LB was in progress.
+  // Each entry holds a self-contained bitmap message; multiple rescales can
+  // pile up across successive rounds, so single-slot storage would silently
+  // drop all but the last. Drained at end of each LB step in callRealloc().
+  std::deque<std::vector<char>> reallocQueue;
 
  public:
   int chare_count;
@@ -278,17 +288,47 @@ class LBManager : public CBase_LBManager
   void bufferRealloc(char* bitmap)
   {
     int size = CkNumPes() + 2 * sizeof(int);
-    reallocBuffer = (char*)malloc(size);
-    memcpy(reallocBuffer, bitmap, size);
+    reallocQueue.emplace_back(bitmap, bitmap + size);
   }
 
   void callRealloc()
   {
-    if (reallocBuffer != nullptr)
+    // Drain the queue. Each replayed realloc() runs in the LB-not-in-progress
+    // branch (we just cleared lb_in_progress before this call) and updates
+    // avail_vector + pending_realloc_state; the next AtSync triggers the
+    // actual rescale.
+    while (!reallocQueue.empty())
     {
-      realloc(reallocBuffer);
-      reallocBuffer = nullptr;
+      std::vector<char> msg = std::move(reallocQueue.front());
+      reallocQueue.pop_front();
+      realloc(msg.data());
     }
+  }
+
+  // Survivor restart hook. The pre-rescale LB step set lb_in_progress=true in
+  // CentralLB::InvokeLB but never reached CentralLB::ResumeClients (the rescale
+  // path branches off at CheckForRealloc/StartCleanup), so the flag is stuck
+  // true on every survivor PE — and on PE 0 the realloc CCS handler then
+  // rejects every subsequent rescale request with "Rescaling called while load
+  // balancing is in progress". Clear the flag on every PE; on PE 0 also drain
+  // any rescale requests that arrived during the LB step and were stashed by
+  // bufferRealloc, replaying them so their pending_realloc_state lands before
+  // the next AtSync.
+  void resetForRescale()
+  {
+    lb_in_progress = false;
+    // After a committed rescale the member set IS the live set: every current
+    // rank is usable. The old avail_vector carries stale zeros (doomed PEs of
+    // the previous world; a newly integrated PE reuses such a rank and would
+    // inherit its zero). Stale zeros corrupt the next realloc request's
+    // live-PE bit mapping and its shrink/expand classification, and hide the
+    // PE from the balancer. Reset to all-available for the new world.
+    avail_vector.assign(std::max<size_t>(avail_vector.size(), CkNumPes()), 1);
+    // Clear LBDatabase OM registering state and force-on the CkSyncBarrier.
+    // See LBDatabase::resetRegisteringForRescale for full reasoning.
+    if (lbdb_obj) lbdb_obj->resetRegisteringForRescale();
+    if (CkMyPe() == 0)
+      callRealloc();
   }
 
   /*

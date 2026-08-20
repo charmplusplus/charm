@@ -335,7 +335,14 @@ public:
 	}
 	
 	size_t size(void) {return vec.size();}
-	
+
+	/// Clear all entries, freeing heap-allocated records.
+	/// Used by shrink-expand to allow clean re-registration.
+	void reset(void) {
+		for (size_t i=0; i<vec.size(); i++) if (vec[i]) delete vec[i];
+		vec.removeAll();
+	}
+
 	/// Return the registered data at this index.
 	T *operator[](size_t idx) {
 #if CMK_ERROR_CHECKING
@@ -356,6 +363,9 @@ extern CkRegisteredInfo<ReadonlyMsgInfo> _readonlyMsgs;
 
 extern void _registerInit(void);
 extern void _registerDone(void);
+#if CMK_SHRINK_EXPAND
+extern void _registerReset(void);
+#endif
 
 extern int CkGetChareIdx(const char *name);
 

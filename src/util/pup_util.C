@@ -449,13 +449,18 @@ void PUP::toDisk::bytes(void *p,size_t n,size_t itemSize,dataType t, PUPMode mod
     bytes(p, n, itemSize, t);
   } else if (mode == PUPMode::DEVICE) {
 #if CMK_CUDA || CMK_HIP
-    // For GPU mode, we assume p is a device pointer and copy directly
-    int allocId = hapiCheckpoint(p, itemSize * n);
-    //CmiPrintf("Alloc ID = %d\n", allocId);
-    if(CmiFwrite(&allocId,sizeof(int),1,F) != 1)
+    // p is a device pointer. Stage it through a host buffer and write the raw
+    // bytes to disk. (This previously routed through the GPU memory daemon via
+    // a CUDA IPC handle, writing only an alloc id; the no-restart shrink/expand
+    // model keeps the process and its device memory alive across a rescale, so
+    // the daemon was removed. A genuine disk checkpoint copies the bytes out.)
+    void *hostBuf = malloc(itemSize * n);
+    hapiMemcpy(hostBuf, p, itemSize * n, hapiMemcpyDeviceToHost);
+    if (CmiFwrite(hostBuf, itemSize, n, F) != n)
     {
       error = true;
     }
+    free(hostBuf);
 #endif
   }
 }
@@ -481,10 +486,13 @@ void PUP::fromDisk::bytes(void *p,size_t n,size_t itemSize,dataType t, PUPMode m
     bytes(p, n, itemSize, t);
   } else if (mode == PUPMode::DEVICE) {
 #if CMK_CUDA || CMK_HIP
-    // For GPU mode, we assume p is a device pointer and copy directly
-    int allocId;
-    CmiFread(&allocId,sizeof(int),1,F);
-    hapiRestore(p, itemSize * n, allocId);
+    // p is a device pointer. Read raw bytes from disk into a host staging
+    // buffer and copy them to the device. Mirror of toDisk::bytes above; the
+    // GPU memory daemon (CUDA IPC) path was removed with no-restart rescale.
+    void *hostBuf = malloc(itemSize * n);
+    CmiFread(hostBuf, itemSize, n, F);
+    hapiMemcpy(p, hostBuf, itemSize * n, hapiMemcpyHostToDevice);
+    free(hostBuf);
 #endif
   }
 }

@@ -9,6 +9,15 @@ CkpvDeclare(bool, CkSyncBarrierInited);
 void _CkSyncBarrierInit()
 {
   CkpvInitialize(bool, CkSyncBarrierInited);
+#if CMK_SHRINK_EXPAND
+  // On survivor restart the CkSyncBarrier group object is preserved in memory
+  // (init.C gates the group-table overwrites on _reuseRegistrationStateOnRestart),
+  // so its constructor — and therefore init() which sets this flag to true — does
+  // not re-run. Resetting the flag here would leave object() returning nullptr,
+  // and the next CentralLB::ResumeClients() would segfault dereferencing it.
+  extern bool _reuseRegistrationStateOnRestart;
+  if (_reuseRegistrationStateOnRestart) return;
+#endif
   CkpvAccess(CkSyncBarrierInited) = false;
 }
 
@@ -39,6 +48,7 @@ void CkSyncBarrier::reset()
 LDBarrierClient CkSyncBarrier::addClient(Chare* chare, std::function<void()> fn,
                                          int epoch)
 {
+  bool late = false;
   if (epoch == -1)
     epoch = curEpoch;
   else if (epoch > curEpoch)
@@ -46,9 +56,29 @@ LDBarrierClient CkSyncBarrier::addClient(Chare* chare, std::function<void()> fn,
     // If the incoming client is ahead of us, then record those syncs
     atCount += epoch - curEpoch;
   }
+  else if (epoch < curEpoch)
+  {
+    // Late arrival: this client already completed AtSync for a round that
+    // this PE has resumed past. This happens when an element migrates onto
+    // a PE whose empty barrier was kick-triggered beyond the element's
+    // round before the (slower) migration message arrived — e.g. an expand
+    // newcomer receiving its first elements while faster survivors already
+    // started the next round. The resumeClients() for its round is never
+    // coming on this PE, so resume it on arrival and align it with the
+    // current round; its next AtSync then counts toward this round.
+    epoch = curEpoch;
+    late = true;
+  }
 
   const auto client = LDBarrierClient(
       clients.insert(clients.end(), new LBClient(chare, std::move(fn), epoch)));
+  if (late)
+  {
+    // Resume asynchronously so the caller's construction path (migration
+    // unpacking) finishes first.
+    lateClients.push_back(*client);
+    thisProxy[thisIndex].resumeLateClients();
+  }
   // Check the barrier if it can trigger. Do this asynchronously so that the caller
   // functions for object construction finish first.
   if (on && !startedAtSync && atCount >= clients.size())
@@ -240,6 +270,16 @@ void CkSyncBarrier::callReceiverList(const std::list<LBReceiver*>& receiverList)
   }
 }
 
+void CkSyncBarrier::resumeLateClients()
+{
+  while (!lateClients.empty())
+  {
+    LBClient* c = lateClients.back();
+    lateClients.pop_back();
+    c->fn();
+  }
+}
+
 void CkSyncBarrier::resumeClients()
 {
   // The end receiver or client functions may trigger the barrier again, so make sure
@@ -251,6 +291,22 @@ void CkSyncBarrier::resumeClients()
   for (const auto& c : clients) c->fn();
 }
 
-void CkSyncBarrier::pup(PUP::er& p) { IrrGroup::pup(p); }
+void CkSyncBarrier::pup(PUP::er& p)
+{
+  IrrGroup::pup(p);
+#if CMK_SHRINK_EXPAND
+  // On expand, a newcomer constructs its CkSyncBarrier fresh with curEpoch=0,
+  // but the survivors have already advanced curEpoch through every pre- and
+  // post-rescale AtSync round. When the newcomer's chares hit their first
+  // AtSync post-integration and the newcomer's barrier triggers, the kick
+  // it propagates carries kickEpoch=1 (newcomer's freshly-incremented epoch).
+  // The survivors see kickEpoch <= their own curEpoch and silently discard the
+  // kick (per the "I've moved past this epoch" guard in kick()), so the
+  // survivors' empty-clients barrier never fires and the cluster wedges at
+  // the next regular LB step. Pup curEpoch so the newcomer adopts the
+  // cluster's epoch from the rescale-time broadcast.
+  p | curEpoch;
+#endif
+}
 
 #include "CkSyncBarrier.def.h"

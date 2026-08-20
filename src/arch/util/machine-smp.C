@@ -761,14 +761,23 @@ void CmiStateInit(int pe, int rank, CmiState state)
   state->pe = pe;
   state->rank = rank;
   if (rank==CmiMyNodeSize()) return; /* Communications thread */
+  /* The receive and local queues are boot-once state: on a no-restart
+     rescale, this runs again on every surviving process, and messages
+     delivered during the exit/reinitialization window (e.g. another
+     survivor's post-restore location informs pumped in during this PE's
+     tree barrier) are already sitting in these queues. Recreating them
+     orphans those messages, leaving elements homed on this PE
+     unresolvable and wedging the first post-rescale ghost exchange.
+     Create only when absent. */
 #if !CMK_SMP_MULTIQ
-  state->recv = CMIQueueCreate();
+  if (state->recv == NULL) state->recv = CMIQueueCreate();
 #else
-  for(i=0; i<MULTIQ_GRPSIZE; i++) state->recv[i]=CMIQueueCreate();
+  for(i=0; i<MULTIQ_GRPSIZE; i++)
+    if (state->recv[i] == NULL) state->recv[i]=CMIQueueCreate();
   state->myGrpIdx = rank % MULTIQ_GRPSIZE;
   state->curPolledIdx = 0;
 #endif
-  state->localqueue = CdsFifo_Create();
+  if (state->localqueue == NULL) state->localqueue = CdsFifo_Create();
   CmiIdleLock_init(&state->idle);
 }
 

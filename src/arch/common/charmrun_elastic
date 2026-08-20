@@ -1,7 +1,15 @@
 #!/bin/bash
 
+# Open MPI's ORTE aborts the entire job when a rank exits without calling
+# MPI_Finalize. The shrink path needs killed PEs to _exit(0) (calling
+# MPI_Finalize would deadlock on its internal barrier across MPI_COMM_WORLD,
+# since surviving ranks never finalize). Tell ORTE to tolerate this. Harmless
+# on non-OpenMPI builds.
+export OMPI_MCA_orte_allowed_exit_without_sync=1
+
 is_restart=false
 
+script_dir="$(dirname "$0")"
 original_args=("$@")
 
 if [[ "$(uname)" == "Darwin" ]]; then
@@ -12,10 +20,107 @@ fi
 
 pes_file="$TMPDIR/numRestartProcs.txt"
 
+# Parse +p / ++p / ++nodelist once up front so we know the initial cluster
+# size for the coordinator and which host PE 0 will land on. Walk the args
+# verbatim so unknown flags pass through to charmrun unchanged.
+initial_pes=1
+user_supplied_coordinator=false
+nodelist_arg=""
+i=0
+while [ $i -lt ${#original_args[@]} ]; do
+    a="${original_args[$i]}"
+    case "$a" in
+    +p|++p)
+        i=$((i+1))
+        initial_pes="${original_args[$i]}"
+        ;;
+    +p[0-9]*)
+        initial_pes="${a#+p}"
+        ;;
+    ++p[0-9]*)
+        initial_pes="${a#++p}"
+        ;;
+    +coordinator)
+        user_supplied_coordinator=true
+        ;;
+    ++nodelist)
+        i=$((i+1))
+        nodelist_arg="${original_args[$i]}"
+        ;;
+    esac
+    i=$((i+1))
+done
+
+# Start the coordinator unless the caller already wired one up. It outlives the
+# inner charmrun loop (which restarts across rescales) and is killed on script
+# exit.
+coord_pid=""
+coord_args=()
+if [ "$user_supplied_coordinator" = false ]; then
+    coord_bin="${CHARM_COORDINATOR:-$script_dir/charm_coordinator}"
+    if [ ! -x "$coord_bin" ]; then
+        echo "charmrun_elastic: cannot find charm_coordinator (looked at $coord_bin)" >&2
+        echo "  set CHARM_COORDINATOR to its path, or pass +coordinator HOST:PORT yourself" >&2
+        exit 1
+    fi
+    coord_port="${CHARM_COORDINATOR_PORT:-41234}"
+    coord_log="${CHARM_COORDINATOR_LOG:-$TMPDIR/charm_coordinator.log}"
+
+    # The coordinator must run on PE 0's host — PE 0 drives every COMMIT, and
+    # the rescale path assumes 127.0.0.1-style local reachability between
+    # them. PE 0 lands on the first `host` entry of the nodelist, so the
+    # launcher process running this script needs to be on that host too.
+    # Resolve the nodelist the same way charmrun does (++nodelist, $NODELIST,
+    # ./nodelist, ~/.nodelist) and verify before spawning.
+    nodelist_file="$nodelist_arg"
+    [ -z "$nodelist_file" ] && nodelist_file="${NODELIST:-}"
+    [ -z "$nodelist_file" ] && [ -f ./nodelist ]  && nodelist_file="./nodelist"
+    [ -z "$nodelist_file" ] && [ -f "$HOME/.nodelist" ] && nodelist_file="$HOME/.nodelist"
+    if [ -n "$nodelist_file" ] && [ -f "$nodelist_file" ]; then
+        pe0_host="$(awk '/^[[:space:]]*host[[:space:]]/ {print $2; exit}' "$nodelist_file")"
+        if [ -n "$pe0_host" ] && [ "$pe0_host" != "localhost" ]; then
+            my_names=" $(hostname) $(hostname -s 2>/dev/null) $(hostname -f 2>/dev/null) $(hostname -I 2>/dev/null) "
+            if ! echo "$my_names" | grep -qw -- "$pe0_host"; then
+                echo "charmrun_elastic: PE 0 will land on '$pe0_host' (first host in $nodelist_file)" >&2
+                echo "  but this script is running on '$(hostname)'. The coordinator must" >&2
+                echo "  co-locate with PE 0. Either run charmrun_elastic from '$pe0_host'," >&2
+                echo "  or start the coord there yourself and pass +coordinator $pe0_host:PORT." >&2
+                exit 1
+            fi
+        fi
+    fi
+
+    # Coord listens on INADDR_ANY (see coordinator.cpp). For +coordinator the
+    # ranks need a routable IP — loopback only works when every rank is on
+    # the launcher host. Default to the first non-loopback IP; override with
+    # CHARM_COORDINATOR_HOST when the autodetected iface is wrong (multi-NIC
+    # boxes, VPNs, etc.).
+    if [ -n "$CHARM_COORDINATOR_HOST" ]; then
+        coord_host="$CHARM_COORDINATOR_HOST"
+    elif [[ "$(uname)" == "Darwin" ]]; then
+        coord_host="$(ipconfig getifaddr en0 2>/dev/null \
+                   || ipconfig getifaddr en1 2>/dev/null \
+                   || echo 127.0.0.1)"
+    else
+        coord_host="$(hostname -I 2>/dev/null | awk '{print $1}')"
+        [ -z "$coord_host" ] && coord_host="127.0.0.1"
+    fi
+
+    "$coord_bin" --port "$coord_port" --initial-size "$initial_pes" --verbose \
+        >"$coord_log" 2>&1 &
+    coord_pid=$!
+    trap '[ -n "$coord_pid" ] && kill "$coord_pid" 2>/dev/null; wait "$coord_pid" 2>/dev/null; exit' EXIT INT TERM
+    # Give the coordinator a beat to bind its listening socket before charmrun
+    # processes try to connect.
+    sleep 0.5
+    coord_args=("+coordinator" "$coord_host:$coord_port")
+    echo "Charm> Started coordinator (pid=$coord_pid) on $coord_host:$coord_port, log: $coord_log"
+fi
+
 time {
 while true; do
     args=()
-    pes_args=""
+    pes_arg=""
     restart_arg=""
 
     temp_args=("${original_args[@]}")
@@ -51,7 +156,7 @@ while true; do
     fi
 
     # Pass all script arguments ("$@") to the executable
-    "$(dirname "$0")/charmrun" $pes_arg "${args[@]}" $restart_arg
+    "$script_dir/charmrun" $pes_arg "${args[@]}" "${coord_args[@]}" $restart_arg
 
     EXIT_CODE=$?
 

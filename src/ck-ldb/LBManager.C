@@ -191,11 +191,24 @@ LBMgrInit::LBMgrInit(CkArgMsg* m)
 void _loadbalancerInit()
 {
   CkpvInitialize(bool, lbmanagerInited);
-  CkpvAccess(lbmanagerInited) = false;
-
   CkpvInitialize(LBUserDataLayout, lbobjdatalayout);
   CkpvInitialize(int, _lb_obj_index);
+#if CMK_SHRINK_EXPAND
+  // On a shrink/expand survivor restart the LBManager group instance is
+  // preserved across the longjmp, so its constructor (which sets
+  // lbmanagerInited=true) does not run again. Resetting these here would
+  // leave LBManager::Object() permanently NULL and BuildStatsMsg would trap
+  // on the next AtSync. Only initialize on a fresh start; survivors keep
+  // their pre-rescale state.
+  extern bool _reuseRegistrationStateOnRestart;
+  if (!_reuseRegistrationStateOnRestart) {
+    CkpvAccess(lbmanagerInited) = false;
+    CkpvAccess(_lb_obj_index) = -1;
+  }
+#else
+  CkpvAccess(lbmanagerInited) = false;
   CkpvAccess(_lb_obj_index) = -1;
+#endif
 
   char** argv = CkGetArgv();
   char* balancer = NULL;
@@ -293,6 +306,14 @@ void _loadbalancerInit()
       "The max/avg load ratio that DistributedLB will attempt to achieve");
   CmiGetArgIntDesc(argv, "+DistLBMaxPhases", &_lb_args.maxDistPhases(),
                    "The maximum number of phases that DistributedLB will attempt");
+
+  // Migration ceiling honored by GreedyRefineCentralLB (and any future LB
+  // that consults _lb_args.percentMovesAllowed()). 0..100; default 100.
+  // Treated as a soft target: if no parameter-sweep solution fits the cap,
+  // GreedyRefine falls back to the lowest-migration solution instead.
+  CmiGetArgIntDesc(argv, "+LBPercentMoves", &_lb_args.percentMovesAllowed(),
+                   "Soft cap (0..100) on percent of chares that may migrate "
+                   "per LB step; honored by GreedyRefineCentralLB.");
 
   // set up init value for LBPeriod time in seconds
   // it can also be set by calling LBSetPeriod/LBManager::SetLBPeriod
@@ -848,7 +869,7 @@ void LBManager::pup(PUP::er& p)
   p | mystep;
   if (p.isUnpacking())
   {
-    reallocBuffer = nullptr;
+    reallocQueue.clear();
     if (_lb_args.metaLbOn())
     {
       // if unpacking set metabalancer using the id

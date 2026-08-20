@@ -29,6 +29,9 @@ void getPETopoTreeEdges(int pe, int rootPE, int *pes, int numpes, unsigned int b
 /// C API to ST_RecursivePartition_getTreeInfo (see below)
 void get_topo_tree_nbs(int root, int *parent, int *child_count, int **children);
 
+/// Clear the cached spanning tree info (needed for shrink/expand restart)
+void ST_RecursivePartition_clearCache(void);
+
 /**
  * partition given PEs into numparts topology-aware partitions.
  * 'pes' array is modified in place, to contain pes grouped by partition (but

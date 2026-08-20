@@ -520,7 +520,14 @@ static void CWeb_Collect(void)
 
 void CWebPerformanceRegisterFunction(CWebFunction fn)
 {
+  int i;
   if (CmiMyRank()!=0) return; /* Should only register from rank 0 */
+  /* Idempotent across rescale reinitializations: survivors re-run
+     CWebInit in every incarnation, and re-registering the same
+     function would leak a table slot per incarnation and abort the
+     job at its MAXFNS/2-th rescale. */
+  for (i = 0; i < CWebNoOfFns; i++)
+    if (CWebPerformanceFunctionArray[i] == fn) return;
   if (CWebNoOfFns>=MAXFNS) CmiAbort("Registered too many CWebPerformance functions!");
   CWebPerformanceFunctionArray[CWebNoOfFns] = fn;
   CWebNoOfFns++;

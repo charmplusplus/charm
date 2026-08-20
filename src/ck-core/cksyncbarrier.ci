@@ -12,6 +12,7 @@ module CkSyncBarrier {
     // Only for internal use
     entry void kick(int kickStep, int sourceNode, int sourcePe);
     entry void checkBarrier();
+    entry void resumeLateClients();
   };
 
 };

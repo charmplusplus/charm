@@ -892,6 +892,17 @@ private:
 public:
   CkArrayBroadcaster* getBroadcaster() { return broadcaster; }
   void flushStates();
+#if CMK_SHRINK_EXPAND
+  void resetForRescale() override;
+  // Re-key one chare's entry in localElems and the PE-level array_objs fast-path
+  // hash after CkLocMgr re-encodes its ID (homePe shifted on rescale). The
+  // underlying CkMigratable* and its offset in localElemVec stay the same — only
+  // the id-keyed lookup tables move. array_objs is keyed by the full ObjID
+  // (group id + element id); without re-keying it, _processArrayEltMsg's fast
+  // path can still resolve old recipient IDs to a now-stale or freed element
+  // pointer once the chare is migrated away or destroyed.
+  void reKeyLocalElem(CmiUInt8 oldId, CmiUInt8 newId);
+#endif
   void forwardZCMsgToOtherElems(envelope *env);
   void forwardZCMsgToSpecificElem(envelope *env, CkMigratable *elem);
 

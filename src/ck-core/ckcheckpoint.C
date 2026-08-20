@@ -11,6 +11,7 @@ More documentation goes here...
 #include <stdlib.h>
 #ifndef _WIN32
 #include <unistd.h>
+#include <sys/time.h>
 #endif
 #include <string.h>
 #include <sstream>
@@ -43,10 +44,97 @@ bool _restarted = false;
 int _oldNumPes = 0;
 bool _chareRestored = false;
 double chkptStartTimer = 0;
+// PE-0 wall-clock (gettimeofday seconds) timestamps spanning a rescale, used
+// to break down where the post-checkpoint restart-overhead time goes. All
+// fields are 0 outside an active rescale.
+//
+// Must be a wall clock (not CmiWallTimer), since the rescale crosses a
+// ConverseInit re-init that resets CmiWallTimer's epoch.
+double rescale_overhead_start_timer = 0; // entry to ResumeFromReallocCheckpoint
+double rescale_t_cleanup_enter      = 0; // ConverseCleanup entry
+double rescale_t_commit_done        = 0; // after coordinator COMMIT
+double rescale_t_ep_reinit_done     = 0; // after UcxReInitEpsFromView (or MPI equiv)
+double rescale_t_barrier_done       = 0; // after coord::barrier post-reinit
+double rescale_t_longjmp            = 0; // just before longjmp
+double rescale_t_after_longjmp      = 0; // just after setjmp != 0 returns
+double rescale_t_converseinit_call  = 0; // just before re-entering ConverseInit
+double rescale_t_lrtsinit_done      = 0; // after LrtsInit (UCX/PMIx init)
+double rescale_t_converserunpe_enter= 0; // ConverseRunPE entry
+double rescale_t_commoninit_done    = 0; // after ConverseCommonInit
+// ConverseCommonInit sub-phase stamps (PE 0):
+double rescale_t_cci_basics         = 0; // after CmiIOInit
+double rescale_t_cci_tmp            = 0; // after CmiTmpInit
+double rescale_t_cci_timer_only     = 0; // after CmiTimerInit
+double rescale_t_cci_stats          = 0; // after CstatsInit
+double rescale_t_cci_timers         = 0; // after CmiInitCPUAffinityUtil
+double rescale_t_cci_handlers       = 0; // after CIdleTimeoutInit
+double rescale_t_cci_iso_predeps    = 0; // after CldModuleInit (before CmiIsomallocInit)
+double rescale_t_cci_trace          = 0; // after traceInit
+double rescale_t_cci_persistent     = 0; // after CmiOnesidedDirectInit
+double rescale_t_cci_ccs            = 0; // after CcsInit
+double rescale_t_cci_threads        = 0; // after CmiInitMultipleSend
+double rescale_t_initcharm_enter    = 0; // _initCharm entry
+double rescale_t_register_done      = 0; // after _register pass (or skip)
+// Post-register sub-phase stamps (PE 0):
+double rescale_t_pr_initcalls_done  = 0; // after _initCallTable.enumerateInitCalls
+double rescale_t_pr_aff_done        = 0; // after CmiInitCPUAffinity + CmiInitMemAffinity
+double rescale_t_pr_cputopo_done    = 0; // after CmiInitCPUTopology
+double rescale_t_pr_topo_done       = 0; // after TopoManager_reset + tree
+double rescale_t_pr_to_faultfunc    = 0; // just before faultFunc(CkRestartMain) call
+double rescale_t_restart_main_enter = 0; // CkRestartMain entry
+double rescale_wall_now()
+{
+#ifdef _WIN32
+  return 0;
+#else
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  return tv.tv_sec + tv.tv_usec * 1e-6;
+#endif
+}
+static void rescale_clear_timers()
+{
+  rescale_overhead_start_timer  = 0;
+  rescale_t_cleanup_enter       = 0;
+  rescale_t_commit_done         = 0;
+  rescale_t_ep_reinit_done      = 0;
+  rescale_t_barrier_done        = 0;
+  rescale_t_longjmp             = 0;
+  rescale_t_after_longjmp       = 0;
+  rescale_t_converseinit_call   = 0;
+  rescale_t_lrtsinit_done       = 0;
+  rescale_t_converserunpe_enter = 0;
+  rescale_t_commoninit_done     = 0;
+  rescale_t_cci_basics          = 0;
+  rescale_t_cci_tmp             = 0;
+  rescale_t_cci_timer_only      = 0;
+  rescale_t_cci_stats           = 0;
+  rescale_t_cci_timers          = 0;
+  rescale_t_cci_handlers        = 0;
+  rescale_t_cci_iso_predeps     = 0;
+  rescale_t_cci_trace           = 0;
+  rescale_t_cci_persistent      = 0;
+  rescale_t_cci_ccs             = 0;
+  rescale_t_cci_threads         = 0;
+  rescale_t_initcharm_enter     = 0;
+  rescale_t_register_done       = 0;
+  rescale_t_pr_initcalls_done   = 0;
+  rescale_t_pr_aff_done         = 0;
+  rescale_t_pr_cputopo_done     = 0;
+  rescale_t_pr_topo_done        = 0;
+  rescale_t_pr_to_faultfunc     = 0;
+  rescale_t_restart_main_enter  = 0;
+}
 #if CMK_SHRINK_EXPAND
 int originalnumGroups = -1;
 extern int Cmi_isOldProcess;
+extern bool _shrinkexpand_isNewcomer;
 extern char *_shrinkexpand_basedir;
+// PE-0-only: callback that resumes the LB after the rescale restart.
+// On the no-disk path this is stashed here at checkpoint time and consumed by
+// CkRestartMain when it builds the in-memory broadcast for newcomers.
+static CkCallback _rescaleResumeCb;
+static bool _rescaleResumeCbValid = false;
 #endif
 
 
@@ -264,11 +352,11 @@ public:
     this->requestStatus = requestStatus;
 
 #if CMK_SHRINK_EXPAND
-    if (CkMyPe() != 0)
-    {
-      se_avail_vector = (char*) malloc(CkNumPes() * sizeof(char));
-      memcpy(se_avail_vector, avail.data(), CkNumPes() * sizeof(char));
-    }
+    // All PEs, including PE 0, refresh se_avail_vector from the carried
+    // copy here: PE 0's original handler-time malloc has been observed
+    // clobbered by the time the exit path reads it.
+    se_avail_vector = (char*) malloc(CkNumPes() * sizeof(char));
+    memcpy(se_avail_vector, avail.data(), CkNumPes() * sizeof(char));
 #endif
 
     for (index = firstPE; index < firstPE + numWriters; index++)
@@ -321,122 +409,135 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _reque
 	chkptStartTimer = CmiWallTimer();
   
 #if CMK_SHRINK_EXPAND
+  // pending_realloc_state only carries the SHRINK_IN_PROGRESS / EXPAND_IN_PROGRESS
+  // distinction on PE 0 (set in CentralLB::CheckForRealloc); other PEs reach
+  // here via the RescaleCheckpoint broadcast which sets shrinkexpand_exit on
+  // every PE. Trust shrinkexpand_exit as the rescale indicator; fall back to
+  // pending_realloc_state on PE 0 for the SHRINK vs EXPAND callback selection
+  // below.
+  const bool isRescale = get_shrinkexpand_exit()
+                         || pending_realloc_state == SHRINK_IN_PROGRESS
+                         || pending_realloc_state == EXPAND_IN_PROGRESS;
+#else
+  const bool isRescale = false;
+#endif
+
+#if CMK_SHRINK_EXPAND
   if (avail[CkMyPe()])
 #endif
   {
     requestStatus = _requestStatus;
-    // make dir on all PEs in case it is a local directory
-    CmiMkdir(dirname);
-
-    // Create partition directories (if applicable)
-    ostringstream dirPath;
-    dirPath << dirname;
-    if (CmiNumPartitions() > 1) {
-      addPartitionDirectory(dirPath);
-      CmiMkdir(dirPath.str().c_str());
-    }
-
-    // Due to file system issues we have observed, divide checkpoints
-    // into subdirectories to avoid having too many files in a single directory.
-    // Nodegroups should be checked separately since they could go into
-    // different subdirectory.
-
-    // Save current path for later use with nodegroups
-    ostringstream dirPathNode;
-    dirPathNode << dirPath.str();
-
-    // Create subdirectories
-    int mySubDir = chckPtId / SUBDIR_SIZE;
-    dirPath << "/sub" << mySubDir;
-    CmiMkdir(dirPath.str().c_str());
-
-    // Create Nodegroup subdirectory if needed
-    if (CkMyRank() == 0) {
-      int mySubDirNode = CkMyNode() / SUBDIR_SIZE;
-      if (mySubDirNode != mySubDir) {
-        dirPathNode << "/sub" << mySubDirNode;
-        CmiMkdir(dirPathNode.str().c_str());
-      }
-    }
-
     bool success = true;
-    if (CkMyPe() == 0) {
-      
+
   #if CMK_SHRINK_EXPAND
-      if (pending_realloc_state == SHRINK_IN_PROGRESS) {
-        CkPrintf("Shrink in progress on PE%i\n", CkMyPe());
-        // After restarting from this AtSync checkpoint, resume execution along the
-        // normal path (i.e. whatever the user defined as ResumeFromSync.)
-        CkCallback resumeFromSyncCB(CkIndex_LBManager::ResumeClients(), _lbmgr);
-        success &= checkpointOne(dirname, resumeFromSyncCB, requestStatus);
-      } else if (pending_realloc_state == EXPAND_IN_PROGRESS) {
-        CkPrintf("Expand in progress on PE%i\n", CkMyPe());
-        CkCallback resumeFromSyncCB(CkIndex_LBManager::StartLB(), CProxy_LBManager(_lbmgr)[0]);
-        success &= checkpointOne(dirname, resumeFromSyncCB, requestStatus);
-      } else
+    if (isRescale) {
+      // No-disk rescale path. The survivor's groups/nodegroups/arrays/chares/RO
+      // are still live in memory across the longjmp (init.C gates the table
+      // overwrites on _reuseRegistrationStateOnRestart), and newcomers will
+      // receive groups + RO via an in-memory broadcast that PE 0 builds in
+      // CkRestartMain. So we skip every disk write here.
+      if (CkMyPe() == 0) {
+        if (pending_realloc_state == SHRINK_IN_PROGRESS) {
+          CkPrintf("Shrink in progress on PE%i\n", CkMyPe());
+          _rescaleResumeCb = CkCallback(CkIndex_LBManager::ResumeClients(), _lbmgr);
+        } else {
+          CkPrintf("Expand in progress on PE%i\n", CkMyPe());
+          _rescaleResumeCb = CkCallback(CkIndex_LBManager::StartLB(),
+                                        CProxy_LBManager(_lbmgr)[0]);
+        }
+        _rescaleResumeCbValid = true;
+      }
+      pending_realloc_state = NO_REALLOC;
+    } else
   #endif
-      {
+    {
+      // make dir on all PEs in case it is a local directory
+      CmiMkdir(dirname);
+
+      // Create partition directories (if applicable)
+      ostringstream dirPath;
+      dirPath << dirname;
+      if (CmiNumPartitions() > 1) {
+        addPartitionDirectory(dirPath);
+        CmiMkdir(dirPath.str().c_str());
+      }
+
+      // Due to file system issues we have observed, divide checkpoints
+      // into subdirectories to avoid having too many files in a single directory.
+      // Nodegroups should be checked separately since they could go into
+      // different subdirectory.
+
+      // Save current path for later use with nodegroups
+      ostringstream dirPathNode;
+      dirPathNode << dirPath.str();
+
+      // Create subdirectories
+      int mySubDir = chckPtId / SUBDIR_SIZE;
+      dirPath << "/sub" << mySubDir;
+      CmiMkdir(dirPath.str().c_str());
+
+      // Create Nodegroup subdirectory if needed
+      if (CkMyRank() == 0) {
+        int mySubDirNode = CkMyNode() / SUBDIR_SIZE;
+        if (mySubDirNode != mySubDir) {
+          dirPathNode << "/sub" << mySubDirNode;
+          CmiMkdir(dirPathNode.str().c_str());
+        }
+      }
+
+      if (CkMyPe() == 0) {
         success &= checkpointOne(dirname, cb, requestStatus);
       }
-    }
-    
-  #if CMK_SHRINK_EXPAND
-    pending_realloc_state = NO_REALLOC;
-  #endif
 
   #ifndef CMK_CHARE_USE_PTR
-    // only create chare checkpoint file if this PE actually has data
-    if (CkpvAccess(chare_objs).size() > 0 || CkpvAccess(vidblocks).size() > 0)
-    {
-      // save plain singleton chares into Chares.dat
-      FILE* fChares = openCheckpointFile(dirname, "Chares", "wb", chckPtId);
-      PUP::toDisk pChares(fChares, PUP::er::IS_CHECKPOINT);
-      CkPupChareData(pChares);
-      if (pChares.checkError()) success = false;
-      if (CmiFclose(fChares) != 0) success = false;
-    }
+      // only create chare checkpoint file if this PE actually has data
+      if (CkpvAccess(chare_objs).size() > 0 || CkpvAccess(vidblocks).size() > 0)
+      {
+        // save plain singleton chares into Chares.dat
+        FILE* fChares = openCheckpointFile(dirname, "Chares", "wb", chckPtId);
+        PUP::toDisk pChares(fChares, PUP::er::IS_CHECKPOINT);
+        CkPupChareData(pChares);
+        if (pChares.checkError()) success = false;
+        if (CmiFclose(fChares) != 0) success = false;
+      }
   #endif
 
-    // save groups into Groups.dat
-    // content of the file: numGroups, GroupInfo[numGroups], _groupTable(PUP'ed),
-    // groups(PUP'ed)
-    FILE* fGroups = openCheckpointFile(dirname, "Groups", "wb", chckPtId);
-    PUP::toDisk pGroups(fGroups, PUP::er::IS_CHECKPOINT);
-    CkPupGroupData(pGroups);
-    if (pGroups.checkError()) success = false;
-    if (CmiFclose(fGroups) != 0) success = false;
+      // save groups into Groups.dat
+      // content of the file: numGroups, GroupInfo[numGroups], _groupTable(PUP'ed),
+      // groups(PUP'ed)
+      FILE* fGroups = openCheckpointFile(dirname, "Groups", "wb", chckPtId);
+      PUP::toDisk pGroups(fGroups, PUP::er::IS_CHECKPOINT);
+      CkPupGroupData(pGroups);
+      if (pGroups.checkError()) success = false;
+      if (CmiFclose(fGroups) != 0) success = false;
 
-    // save nodegroups into NodeGroups.dat
-    // content of the file: numNodeGroups, GroupInfo[numNodeGroups],
-    // _nodeGroupTable(PUP'ed), nodegroups(PUP'ed)
-    if (CkMyRank() == 0)
-    {
-      FILE* fNodeGroups = openCheckpointFile(dirname, "NodeGroups", "wb", 0);
-      PUP::toDisk pNodeGroups(fNodeGroups, PUP::er::IS_CHECKPOINT);
-      CkPupNodeGroupData(pNodeGroups);
-      if (pNodeGroups.checkError()) success = false;
-      if (CmiFclose(fNodeGroups) != 0) success = false;
-    }
-    //std::vector<char> avail_vector;
-    //get_avail_vector(avail_vector);
-    //if (pending_realloc_state == REALLOC_IN_PROGRESS && static_cast<bool>(avail_vector[CkMyPe()]))
-    //{
-      //printf("[%d] Writing array checkpoint\n", CkMyPe());
-      
+      // save nodegroups into NodeGroups.dat
+      // content of the file: numNodeGroups, GroupInfo[numNodeGroups],
+      // _nodeGroupTable(PUP'ed), nodegroups(PUP'ed)
+      if (CkMyRank() == 0)
+      {
+        FILE* fNodeGroups = openCheckpointFile(dirname, "NodeGroups", "wb", 0);
+        PUP::toDisk pNodeGroups(fNodeGroups, PUP::er::IS_CHECKPOINT);
+        CkPupNodeGroupData(pNodeGroups);
+        if (pNodeGroups.checkError()) success = false;
+        if (CmiFclose(fNodeGroups) != 0) success = false;
+      }
+
       FILE* datFile = openCheckpointFile(dirname, "arr", "wb", chckPtId);
       PUP::toDisk p(datFile, PUP::er::IS_CHECKPOINT);
       CkPupArrayElementsData(p);
       if (p.checkError()) success = false;
       if (CmiFclose(datFile) != 0) success = false;
-    //}
 
   #if ! CMK_DISABLE_SYNC
   #if CMK_HAS_SYNC_FUNC
-          sync();
+            sync();
   #elif CMK_HAS_SYNC
-    system("sync");
+      system("sync");
   #endif
   #endif
+    }
+
     chkpStatus = success?CK_CHECKPOINT_SUCCESS:CK_CHECKPOINT_FAILURE;
     restartCB = cb;
     DEBCHK("[%d]restartCB installed\n",CkMyPe());
@@ -449,7 +550,14 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _reque
 
 void CkCheckpointMgr::SendRestartCB(void){
 	DEBCHK("[%d]Sending out the cb\n",CkMyPe());
-	CkPrintf("Checkpoint to disk finished in %fs, sending out the cb...\n", CmiWallTimer() - chkptStartTimer);
+#if CMK_SHRINK_EXPAND
+	const bool isRescale = get_shrinkexpand_exit();
+#else
+	const bool isRescale = false;
+#endif
+	CkPrintf("%s finished in %fs, sending out the cb...\n",
+		isRescale ? "Rescale snapshot (no-op)" : "Checkpoint to disk",
+		CmiWallTimer() - chkptStartTimer);
 	if(requestStatus)
 	{
 	  CkCheckpointStatusMsg * m = new CkCheckpointStatusMsg(chkpStatus);
@@ -863,20 +971,15 @@ void CkStartRescaleCheckpoint(const char* dirname, const CkCallback& cb,
   std::vector<char> avail, bool requestStatus, int writersPerNode)
 {
 #if CMK_SHRINK_EXPAND
-  if (CkMyPe() != 0)
-  {
-    CkPrintf("[%d] se_avail_vector copied\n", CkMyPe());
-    se_avail_vector = (char*) malloc(CkNumPes() * sizeof(char));
-    memcpy(se_avail_vector, avail.data(), CkNumPes() * sizeof(char));
-  }
+  // Refresh PE 0's se_avail_vector as well (see RescaleCheckpoint).
+  se_avail_vector = (char*) malloc(CkNumPes() * sizeof(char));
+  memcpy(se_avail_vector, avail.data(), CkNumPes() * sizeof(char));
 
   if (cb.isInvalid())
   CkAbort("callback after checkpoint is not set properly");
 
   if (cb.containsPointer())
   CkAbort("Cannot restart from a callback based on a pointer");
-
-  CkPrintf("[%d] Checkpoint starting in %s\n", CkMyPe(), dirname);
 
   // hand over to checkpoint managers for per-processor checkpointing
   CProxy_CkCheckpointWriteMgr(_sysChkptWriteMgr)
@@ -918,9 +1021,53 @@ void CkRecvGroupROData(char* msg)
 
   msg += ROsize;
 
-  if (CkMyPe() >= _numPes) {
+  if (_shrinkexpand_isNewcomer) {
     PUP::fromMem bGroups(msg, PUP::er::IS_CHECKPOINT);
     CkPupGroupData(bGroups);
+  }
+  // Reset reduction state on EVERY rank (survivor and newcomer). The broadcast
+  // payload was packed on PE 0 *before* the survivor's resetForRescale ran, so
+  // newcomers unpack stale reductionInfo.redNo values and emit reduction
+  // messages stamped with the pre-rescale redNo, which then sit in the
+  // survivor parent's futureRemoteMsgs queue forever (msg.redNo > myRedNo=0).
+  // Drop pending state on every group so survivor and newcomer are aligned.
+  {
+    int numGroups = CkpvAccess(_groupIDTable)->size();
+    for (int i = 0; i < numGroups; i++) {
+      CkGroupID gID = (*CkpvAccess(_groupIDTable))[i];
+      IrrGroup *obj = CkpvAccess(_groupTable)->find(gID).getObj();
+      if (obj && obj->isReductionMgr()) {
+        ((CkReductionMgr *)obj)->resetForRescale();
+      }
+      // Survivor sends were crashing UCX with destPE = killed-PE. Cause: the
+      // location cache and home-PE encoded in chare IDs were both stale after
+      // the longjmp. Recompute home for every local element, rekey hash entries
+      // under the new ID, clear the ID->PE cache, and re-publish to the new
+      // home so remote PEs can resolve.
+      if (obj && obj->isLocMgr()) {
+        ((CkLocMgr *)obj)->resetForRescale();
+      }
+    }
+    if (CkMyRank() == 0) {
+      int numNodeGroups = CksvAccess(_nodeGroupIDTable).size();
+      for (int i = 0; i < numNodeGroups; i++) {
+        CkGroupID gID = CksvAccess(_nodeGroupIDTable)[i];
+        IrrGroup *obj = CksvAccess(_nodeGroupTable)->find(gID).getObj();
+        if (obj && obj->isNodeGroup()) {
+          ((CkNodeReductionMgr *)obj)->resetForRescale();
+        }
+      }
+    }
+    // The pre-rescale LB step set lb_in_progress=true in CentralLB::InvokeLB
+    // but never reached ResumeClients (the rescale path forks at
+    // CheckForRealloc → StartCleanup → longjmp). On the survivor the flag is
+    // stuck true, so the realloc CCS handler on PE 0 rejects every subsequent
+    // rescale request with "Rescaling called while load balancing is in
+    // progress". Clear the flag on every survivor PE; on PE 0 also replay any
+    // rescale requests that arrived during the LB step (bufferRealloc) so
+    // their pending_realloc_state takes effect on the next AtSync.
+    LBManager *_lbm = LBManager::Object();
+    if (_lbm) _lbm->resetForRescale();
   }
 
 #ifndef CMK_CHARE_USE_PTR
@@ -946,29 +1093,32 @@ void CkRecvGroupROData(char* msg)
 	// for each location, restore arrays
 	//DEBCHK("[%d]Trying to find location manager\n",CkMyPe());
 	
-	if(CkMyPe() < _numPes) {	// in normal range: restore, otherwise, do nothing
-    int rank = CmiPhysicalRank(CmiMyPe());
-    CkPrintf("[%d]CkRestartMain: restoring array elements from physical rank %d\n", CkMyPe(), rank);
+  // Survivor branch: groups, nodegroups, and array elements are all live in
+  // memory across the longjmp (preserved by the gated allocations in
+  // _initCharm). Nothing to restore — no disk reads, no PUP cycle. Newcomers
+  // already populated their groups from the in-memory broadcast above; their
+  // array elements arrive later via LB-driven migration.
 
-    FILE* groupFile = openCheckpointFile(dirname.c_str(), "Groups", "rb", rank);
-    PUP::fromDisk bGroups(groupFile, PUP::er::IS_CHECKPOINT);
-    CkPupGroupData(bGroups);
-    CmiFclose(groupFile);
-
-    if(CmiMyRank()==0) {
-      FILE* nodeGroupFile = openCheckpointFile(dirname.c_str(), "NodeGroups", "rb", 0);
-      PUP::fromDisk bNodeGroups(nodeGroupFile, PUP::er::IS_CHECKPOINT);
-      CkPupNodeGroupData(bNodeGroups);
-      CmiFclose(nodeGroupFile);
-    }
-
-    FILE *datFile = openCheckpointFile(dirname.c_str(), "arr", "rb", rank);
-    PUP::fromDisk  p(datFile, PUP::er::IS_CHECKPOINT);
-    CkPupArrayElementsData(p);
-    CmiFclose(datFile);
+  {
+    // Deliver any messages stashed on group table entries while this PE's
+    // groups were not yet re-linked (see CkDrainStashedGroupMsgs in ck.C).
+    extern void CkDrainStashedGroupMsgs(void);
+    CkDrainStashedGroupMsgs();
   }
-
+  {
+    // Restore _charmHandlerIdx/_bocHandlerIdx to _processHandler and deliver
+    // everything _bufferHandler collected since the longjmp landing (messages
+    // from faster-restoring peers; see init.C). Must run before resuming
+    // clients so buffered location informs/requests repair the caches first.
+    extern void _resumeBufferedCharmMessages(void);
+    _resumeBufferedCharmMessages();
+  }
   set_in_restart(false);
+
+  // Once the integrating restart completes, this rank is a survivor for any
+  // future rescale events. Clear the flag so subsequent CkRecvGroupROData
+  // calls take the survivor branches.
+  _shrinkexpand_isNewcomer = false;
 
   if (CmiMyRank()==0) _initDone();  // this rank will trigger other ranks
 
@@ -988,13 +1138,110 @@ void CkRecvGroupROData(char* msg)
   if (CmiMyRank() == 0) CkMemCheckPT::inRestarting = false;
 
   if (CmiMyPe() == 0) {
-    CkPrintf("Restore from disk finished in %fs, sending out the cb...\n", CmiWallTimer() - chkptStartTimer);
+    double restore_s = CmiWallTimer() - chkptStartTimer;
+    CkPrintf("Rescale restore (in-memory) finished in %fs, sending out the cb...\n", restore_s);
+    if (rescale_overhead_start_timer > 0) {
+      double now = rescale_wall_now();
+      double total_s    = now - rescale_overhead_start_timer;
+      double overhead_s = total_s - restore_s;
+      // Break the overhead into the segments that span the longjmp. Any
+      // segment whose endpoint wasn't stamped (e.g. on machines other than
+      // UCX) shows up as 0.
+      auto seg = [](double a, double b) { return (a > 0 && b > 0) ? (b - a) : 0.0; };
+      double s_orch        = seg(rescale_overhead_start_timer, rescale_t_cleanup_enter);
+      double s_commit      = seg(rescale_t_cleanup_enter,      rescale_t_commit_done);
+      double s_ep_reinit   = seg(rescale_t_commit_done,        rescale_t_ep_reinit_done);
+      double s_post_barrier= seg(rescale_t_ep_reinit_done,     rescale_t_barrier_done);
+      double s_to_longjmp  = seg(rescale_t_barrier_done,       rescale_t_longjmp);
+      double s_jmp_to_init = seg(rescale_t_longjmp,            rescale_t_converseinit_call);
+      double s_lrts_init    = seg(rescale_t_converseinit_call,  rescale_t_lrtsinit_done);
+      double s_lrts_to_runpe= seg(rescale_t_lrtsinit_done,      rescale_t_converserunpe_enter);
+      double s_common_init  = seg(rescale_t_converserunpe_enter,rescale_t_commoninit_done);
+      double s_cci_basics   = seg(rescale_t_converserunpe_enter,rescale_t_cci_basics);
+      double s_cci_timers   = seg(rescale_t_cci_basics,         rescale_t_cci_timers);
+      double s_cci_tmp      = seg(rescale_t_cci_basics,         rescale_t_cci_tmp);
+      double s_cci_timer    = seg(rescale_t_cci_tmp,            rescale_t_cci_timer_only);
+      double s_cci_stats    = seg(rescale_t_cci_timer_only,     rescale_t_cci_stats);
+      double s_cci_aff_util = seg(rescale_t_cci_stats,          rescale_t_cci_timers);
+      double s_cci_handlers = seg(rescale_t_cci_timers,         rescale_t_cci_handlers);
+      double s_cci_trace    = seg(rescale_t_cci_handlers,       rescale_t_cci_trace);
+      double s_cci_persist  = seg(rescale_t_cci_trace,          rescale_t_cci_persistent);
+      double s_cci_ccs      = seg(rescale_t_cci_persistent,     rescale_t_cci_ccs);
+      double s_cci_threads  = seg(rescale_t_cci_ccs,            rescale_t_cci_threads);
+      double s_cci_isopre   = seg(rescale_t_cci_threads,        rescale_t_cci_iso_predeps);
+      double s_cci_isoonly  = seg(rescale_t_cci_iso_predeps,    rescale_t_commoninit_done);
+      double s_cci_isomalloc= seg(rescale_t_cci_threads,        rescale_t_commoninit_done);
+      double s_to_initcharm = seg(rescale_t_commoninit_done,    rescale_t_initcharm_enter);
+      double s_register     = seg(rescale_t_initcharm_enter,    rescale_t_register_done);
+      double s_post_register= seg(rescale_t_register_done,      rescale_t_restart_main_enter);
+      double s_pr_initcalls = seg(rescale_t_register_done,      rescale_t_pr_initcalls_done);
+      double s_pr_topo      = seg(rescale_t_pr_initcalls_done,  rescale_t_pr_topo_done);
+      double s_pr_aff       = seg(rescale_t_pr_initcalls_done,  rescale_t_pr_aff_done);
+      double s_pr_cputopo   = seg(rescale_t_pr_aff_done,        rescale_t_pr_cputopo_done);
+      double s_pr_topomgr   = seg(rescale_t_pr_cputopo_done,    rescale_t_pr_topo_done);
+      double s_pr_to_fault  = seg(rescale_t_pr_topo_done,       rescale_t_pr_to_faultfunc);
+      double s_pr_dispatch  = seg(rescale_t_pr_to_faultfunc,    rescale_t_restart_main_enter);
+      double s_post_restore = seg(rescale_t_restart_main_enter, now) - restore_s;
+      CkPrintf("Charm> Rescale timing (PE 0): total=%.6fs restore=%.6fs overhead=%.6fs\n"
+               "  orchestration  (cb -> ConverseCleanup)             : %.6fs\n"
+               "  coord COMMIT   (cleanup -> commit returned)        : %.6fs\n"
+               "  ep reinit      (commit -> UcxReInitEpsFromView)    : %.6fs\n"
+               "  post barrier   (ep reinit -> coord::barrier)       : %.6fs\n"
+               "  to longjmp     (barrier -> longjmp)                : %.6fs\n"
+               "  longjmp->init  (after setjmp -> ConverseInit call) : %.6fs\n"
+               "  ConverseInit:\n"
+               "    LrtsInit       (Converse entry -> LrtsInit done) : %.6fs\n"
+               "    -> ConverseRunPE (LrtsInit -> RunPE entry)       : %.6fs\n"
+               "    ConverseCommonInit (RunPE -> CommonInit done)    : %.6fs\n"
+               "      cci basics    (RunPE -> CmiIOInit)             : %.6fs\n"
+               "      cci timers    (-> CmiInitCPUAffinityUtil)      : %.6fs\n"
+               "        cci tmp     (-> CmiTmpInit)                  : %.6fs\n"
+               "        cci timer   (-> CmiTimerInit)                : %.6fs\n"
+               "        cci stats   (-> CstatsInit)                  : %.6fs\n"
+               "        cci affutil (-> CmiInitCPUAffinityUtil)      : %.6fs\n"
+               "      cci handlers  (-> CIdleTimeoutInit)            : %.6fs\n"
+               "      cci trace     (-> traceInit)                   : %.6fs\n"
+               "      cci persist   (-> CmiOnesidedDirectInit)       : %.6fs\n"
+               "      cci ccs       (-> CcsInit)                     : %.6fs\n"
+               "      cci threads   (-> CmiInitMultipleSend)         : %.6fs\n"
+               "      cci isomalloc (-> CmiIsomallocInit/end)        : %.6fs\n"
+               "        cci isopre  (CrnInit + CldModuleInit)        : %.6fs\n"
+               "        cci isoonly (CmiIsomallocInit only)          : %.6fs\n"
+               "    -> _initCharm (CommonInit -> _initCharm entry)   : %.6fs\n"
+               "    _register pass  (_initCharm -> register done)    : %.6fs\n"
+               "    post-register   (register -> CkRestartMain)      : %.6fs\n"
+               "      pr initcalls  (-> _initCallTable.enumerate)    : %.6fs\n"
+               "      pr topo       (-> CmiInitCPUTopology+tree)     : %.6fs\n"
+               "        pr aff      (-> CmiInit{CPU,Mem}Affinity)    : %.6fs\n"
+               "        pr cputopo  (-> CmiInitCPUTopology)          : %.6fs\n"
+               "        pr topomgr  (-> TopoManager+tree)            : %.6fs\n"
+               "      pr to fault   (-> just before faultFunc call)  : %.6fs\n"
+               "      pr dispatch   (faultFunc -> CkRestartMain ent) : %.6fs\n"
+               "  post-restore   (after restore I/O -> now)          : %.6fs\n",
+               total_s, restore_s, overhead_s,
+               s_orch, s_commit, s_ep_reinit, s_post_barrier, s_to_longjmp,
+               s_jmp_to_init,
+               s_lrts_init, s_lrts_to_runpe, s_common_init,
+               s_cci_basics, s_cci_timers,
+               s_cci_tmp, s_cci_timer, s_cci_stats, s_cci_aff_util,
+               s_cci_handlers, s_cci_trace,
+               s_cci_persist, s_cci_ccs, s_cci_threads, s_cci_isomalloc,
+               s_cci_isopre, s_cci_isoonly,
+               s_to_initcharm,
+               s_register, s_post_register,
+               s_pr_initcalls, s_pr_topo,
+               s_pr_aff, s_pr_cputopo, s_pr_topomgr,
+               s_pr_to_fault, s_pr_dispatch,
+               s_post_restore);
+      rescale_clear_timers();
+    }
   }
 }
 
 void CkRestartMain(const char* dirname, CkArgMsg *args){
 #if CMK_SHRINK_EXPAND
   chkptStartTimer = CmiWallTimer();
+  if (CmiMyPe() == 0) rescale_t_restart_main_enter = rescale_wall_now();
 	int i;
 	
   if (CmiMyRank() == 0) {
@@ -1003,79 +1250,69 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
     CkMemCheckPT::inRestarting = true;
   }
 
-  // Restore mainchares on PE 0
-  if (CkMyPe() == 0)
-  {
-    FILE* fMain = openCheckpointFile(dirname, "MainChares", "rb");
-    if (fMain)
-    {
-      PUP::fromDisk pMain(fMain, PUP::er::IS_CHECKPOINT);
-      CkPupMainChareData(pMain, args);
-      CmiFclose(fMain);
-      DEBCHK("[%d]CkRestartMain: mainchares restored\n", CkMyPe());
-    }
-  }
+  // Mainchares are live in memory across the longjmp (they were preserved by
+  // gating the table allocations in _initCharm), so no restore is needed.
 
   if (CkMyPe() == 0)
   {
-    std::string dirnameStr(dirname);
-    int strLen = dirnameStr.size();
+    // Build the rescale broadcast in-memory: PE 0's live readonly data + group
+    // table become the source of truth that newcomers will deserialize. The
+    // dirname slot in the message format is preserved for receiver-side parser
+    // compatibility but is left empty — no file paths are involved any more.
+    const int strLen = 0;
 
-    std::string ROFileName = getCheckpointFileName(dirname, "RO", -1);
-    std::ifstream ROFile(ROFileName, std::ios::binary | std::ios::ate);
-    std::streamsize ROSize = ROFile.tellg();
-    ROFile.seekg(0, std::ios::beg);
-    
-    // Check for and exclude EOF character if present
-    if (ROSize > 0) {
-      ROFile.seekg(-1, std::ios::end);
-      char lastChar;
-      ROFile.get(lastChar);
-      if (lastChar == EOF || lastChar == '\0') {
-        ROSize--;
-      }
-      ROFile.seekg(0, std::ios::beg);
+    if (!_rescaleResumeCbValid) {
+      CmiAbort("[CkRestartMain] _rescaleResumeCb was not stashed before the "
+               "rescale longjmp — checkpoint path bypassed?");
     }
 
-    //CkPrintf("GroupMetadataSize = %lld\n", (long long)GroupMetadataSize);
+    int _numPes = CkNumPes();
+    int _numNodes = CkNumNodes();
 
-    std::string GroupFilename = getCheckpointFileName(dirname, "Groups", 0);
-    std::ifstream GroupFile(GroupFilename, std::ios::binary | std::ios::ate);
-    std::streamsize GroupSize = GroupFile.tellg();
-    GroupFile.seekg(0, std::ios::beg);
+    PUP::sizer pROsz(PUP::er::IS_CHECKPOINT);
+    pROsz | _numPes;
+    pROsz | _numNodes;
+    pROsz | _rescaleResumeCb;
+    CkPupROData(pROsz);
+    bool requestStatusLocal = false;
+    pROsz | requestStatusLocal;
+    const int ROSizeInt = (int)pROsz.size();
 
-    // Check for and exclude EOF character if present
-    if (GroupSize > 0) {
-      GroupFile.seekg(-1, std::ios::end);
-      char lastChar;
-      GroupFile.get(lastChar);
-      if (lastChar == EOF || lastChar == '\0') {
-        GroupSize--;
-      }
-      GroupFile.seekg(0, std::ios::beg);
-    }
+    PUP::sizer pGrpsz(PUP::er::IS_CHECKPOINT);
+    CkPupGroupData(pGrpsz);
+    const int GroupSizeInt = (int)pGrpsz.size();
 
-    char* msg = (char*) CmiAlloc(ROSize + GroupSize + 2 * sizeof(int) + strLen + CmiMsgHeaderSizeBytes);
+    const size_t totalSize = CmiMsgHeaderSizeBytes
+                           + 2 * sizeof(int) + strLen
+                           + ROSizeInt + GroupSizeInt;
+    char* msg = (char*) CmiAlloc(totalSize);
     char* buffer = msg + CmiMsgHeaderSizeBytes;
     std::memcpy(buffer, &strLen, sizeof(int));
     buffer += sizeof(int);
-    std::memcpy(buffer, dirname, strLen);
-    buffer += strLen;
-    std::memcpy(buffer, &ROSize, sizeof(int));
+    // (no dirname bytes — strLen == 0)
+    std::memcpy(buffer, &ROSizeInt, sizeof(int));
     buffer += sizeof(int);
 
-    ROFile.read(buffer, ROSize);
-    buffer += ROSize;
+    {
+      PUP::toMem pRO(buffer, PUP::er::IS_CHECKPOINT);
+      pRO | _numPes;
+      pRO | _numNodes;
+      pRO | _rescaleResumeCb;
+      CkPupROData(pRO);
+      pRO | requestStatusLocal;
+    }
+    buffer += ROSizeInt;
 
-    GroupFile.read(buffer, GroupSize);
-    buffer += GroupSize;
+    {
+      PUP::toMem pGrp(buffer, PUP::er::IS_CHECKPOINT);
+      CkPupGroupData(pGrp);
+    }
+    buffer += GroupSizeInt;
+
+    _rescaleResumeCbValid = false;
 
     CmiSetHandler(msg, _shrinkExpandRestartHandlerIdx);
-
-    CmiSyncBroadcastAllAndFree(ROSize + GroupSize + 2 * sizeof(int) + strLen + CmiMsgHeaderSizeBytes, msg);
-
-    //CkPrintf("PE %i at barrier\n", CkMyPe());
-    //CmiBarrier();
+    CmiSyncBroadcastAllAndFree(totalSize, msg);
   }
 
    	//_initDone();

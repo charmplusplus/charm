@@ -491,6 +491,10 @@ public:
 
 	virtual void flushStates();	// flush state varaibles
 
+#if CMK_SHRINK_EXPAND
+	virtual void resetForRescale(); // flush state + rebuild spanning tree (survivor restart)
+#endif
+
 	virtual int getTotalGCount(){return 0;};
 
 private:
@@ -648,7 +652,11 @@ public:
 
 	virtual bool isReductionMgr(void){ return true; }
 	virtual void flushStates();
-	/*FAULT_EVAC: used to get the gcount on a processor when 
+#if CMK_SHRINK_EXPAND
+	virtual void resetForRescale(); // flush state + rebuild spanning tree (survivor restart)
+	void rebuildTreeForRescale();   // rebuild spanning tree only (preserve redNo/contributors)
+#endif
+	/*FAULT_EVAC: used to get the gcount on a processor when
 		it is evacuated.
 		TODO: It needs to be fixed as it should return the gcount
 		and the adjustment information for objects that might have
@@ -744,6 +752,19 @@ protected:
 	//whether to notify children that reduction starts
 	bool disableNotifyChildrenStart;
 	void resetCountersWhenFlushingStates() { gcount = lcount = 0; }
+#if CMK_SHRINK_EXPAND
+	// After a shrink survivor restart, the doomed PEs' gcount contributions are
+	// lost (gcount tracks net births per-PE; migrations don't move it). The
+	// cluster sum of gcount no longer matches the actual contributor count and
+	// the next reduction overshoots ("Too many contributions at root!").
+	// Rebase gcount to lcount on each survivor so the sum equals the actual
+	// total local-contributor count. Also drop adjVec — entries were stamped
+	// against the pre-rescale topology and double-count post-rescale.
+	void rebaseCountersForRescale() {
+	  gcount = lcount;
+	  adjVec.clear();
+	}
+#endif
         bool isDestroying;
 
 //Checkpointing utilities

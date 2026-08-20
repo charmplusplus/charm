@@ -633,10 +633,24 @@ void getPETopoTreeEdges(int pe, int rootPE, int *pes, int numpes, unsigned int b
 
 typedef std::unordered_map<int,CmiSpanningTreeInfo*> TreeInfoMap;
 
-static TreeInfoMap trees;
+static TreeInfoMap *treesPtr = nullptr;
 CmiNodeLock _treeLock;
 
+static TreeInfoMap &getTreeMap() {
+  if (treesPtr == nullptr)
+    treesPtr = new TreeInfoMap();
+  return *treesPtr;
+}
+
+void ST_RecursivePartition_clearCache(void) {
+  // After longjmp, freeing pre-longjmp heap allocations can crash (the
+  // memory subsystem has been reinitialized).  Abandon the old map and
+  // its entries — the small leak is acceptable for a one-time restart.
+  treesPtr = nullptr;
+}
+
 CmiSpanningTreeInfo *ST_RecursivePartition_getTreeInfo(int root) {
+  TreeInfoMap &trees = getTreeMap();
   if (trees.size() == 0) {
     _treeLock = CmiCreateLock();
 #if CMK_ERROR_CHECKING
