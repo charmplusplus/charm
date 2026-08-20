@@ -55,7 +55,8 @@ static void UcxSetEpErrMode(ucp_ep_params_t &p)
         p.err_mode    = UCP_ERR_HANDLING_MODE_PEER;
     }
 }
-CcsDelayedReply shrinkExpandreplyToken;
+// shrinkExpandreplyToken now lives in src/util/ckrescale.C, which every build
+// links, so it exists for machine layers and for Reconverse alike.
 extern int numProcessAfterRestart;
 extern char *_shrinkexpand_basedir;
 int mynewpe=0;

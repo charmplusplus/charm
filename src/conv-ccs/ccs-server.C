@@ -542,7 +542,10 @@ int check_stdio_header(CcsImplHeader *hdr) {
   return 1;
 }
 
-#if !CMK_USE_LRTS_STDIO
+/* Forwarding prints to PE 0 goes through Converse messaging, so it only exists
+   in the runtime. charmrun includes this file too, built with
+   CMK_NOT_USE_CONVERSE, and has no Converse to send through. */
+#if !CMK_USE_LRTS_STDIO && !CMK_NOT_USE_CONVERSE
 #define MAX_PRINT_BUF_SIZE 8192
 int print_fw_handler_idx;
 

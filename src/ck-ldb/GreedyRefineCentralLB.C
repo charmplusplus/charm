@@ -335,8 +335,10 @@ double GreedyRefineCentralLB::fillData(LDStats *stats,
     int pe = stats->from_proc[i];
     obj.id = i;
     obj.oldPE = pe;
+#if CMK_CUDA || CMK_HIP
     obj.gpuPupSize = oData.gpuPupSize;
     obj.gpuAllocSize = *(size_t *)oData.getUserData(CkpvAccess(_lb_obj_index));
+#endif
     CkAssert(pe >= 0 && pe <= n_pes);
     if (pe == n_pes) obj.oldPE = -1; // this can happen in HybridLB if object comes from outside group. mark oldPE as -1 in this situation
     if (!oData.migratable) {

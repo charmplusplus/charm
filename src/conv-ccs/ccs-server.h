@@ -20,6 +20,13 @@ the reply socket is for the original machine).
 #ifndef CCS_SERVER_H
 #define CCS_SERVER_H
 
+/* CMK_CCS_AVAILABLE and NODE_0_IS_CONVHOST, which everything below is
+   conditional on. Included directly rather than through conv-config.h because
+   the Reconverse build has no conv-common.h, and its converse.h does not carry
+   the build configuration the way Converse's does. */
+#include "conv-autoconfig.h"
+#include "conv-mach.h"
+
 #include "sockRoutines.h"
 
 #ifdef __cplusplus

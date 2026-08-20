@@ -50,7 +50,8 @@ static char* strsignal(int sig) {
 #if CMK_SHRINK_EXPAND
 #include <setjmp.h>
 #include <limits.h>
-CcsDelayedReply shrinkExpandreplyToken;
+// shrinkExpandreplyToken now lives in src/util/ckrescale.C, which every build
+// links, so it exists for machine layers and for Reconverse alike.
 extern int numProcessAfterRestart;
 extern char *_shrinkexpand_basedir;
 int mynewpe=0;

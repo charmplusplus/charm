@@ -50,7 +50,6 @@ class CkLBArgs
   bool _lb_metaLbOn;
   char* _lb_metaLbModelDir;
   char* _lb_treeLBFile = (char*)"treelb.json";
-  int _lb_percentMovesAllowed;  // for GreedyRefineCentralLB, as percentage of chares that can be moved
 
  public:
   CkLBArgs()

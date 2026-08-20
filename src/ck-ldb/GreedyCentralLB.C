@@ -20,8 +20,10 @@
 #include "ckgraph.h"
 #include "cklists.h"
 #include "GreedyCentralLB.h"
-#include "conv-mach-cuda.h"
-#include "conv-mach-hip.h"
+// CMK_CUDA and CMK_HIP come from the build configuration, which
+// converse.h already pulls in. Including the conv-mach fragments
+// directly would define them unconditionally and force the GPU paths
+// on in builds that have no GPU support configured.
 
 using namespace std;
 

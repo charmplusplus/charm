@@ -7,7 +7,11 @@
 #include "conv-ccs.h"
 #include "ccs-server.h"
 #include "sockRoutines.h"
+/* Converse's scheduler queue. Reconverse has its own Queue type of the same
+   name, and nothing here uses either, so leave it out there. */
+#if !CMK_RECONVERSE
 #include "queueing.h"
+#endif
 #include <sys/socket.h>
 
 #ifdef _WIN32
@@ -114,7 +118,14 @@ void CcsSetMergeFn(const char *name, CmiReduceMergeFn newMerge) {
     CmiAbort("[%d] CCS: Unknown CCS handler name %s.\n",CmiMyPe(),name);
   }
   rec->mergeFn=newMerge;
+#if CMK_RECONVERSE
+  /* Reduction ids belong to CmiListReduce, which Reconverse does not have.
+     Only multicast CCS requests use them; a request addressed to one PE,
+     which is how the shrink/expand control path talks to PE 0, never does. */
+  rec->redID=0;
+#else
   rec->redID=CmiGetGlobalReduction();
+#endif
 }
 
 void * CcsMerge_concat(int *size,void *local,void **remote,int n) {

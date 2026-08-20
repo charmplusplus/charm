@@ -1,3 +1,12 @@
+#include "ckrescale.h"
+#include "conv-ccs.h"
+
+// The CCS request that asked for the rescale, held open until the rescale
+// completes so the caller can be told it finished. It lives here rather than
+// in a machine layer because the Reconverse build has none, and every build
+// links ckrescale.
+CcsDelayedReply shrinkExpandreplyToken;
+
 bool shrinkexpand_exit = false; // Flag to indicate if we are in the process of shrinking/expanding
 bool in_restart = false; // Flag to indicate if we are in a restart process
 

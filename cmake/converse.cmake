@@ -252,8 +252,14 @@ add_library(charm_cxx_utils STATIC
 # here: sockRoutines above, ckhashtable in charm_cxx_utils, CcdCallOnCondition
 # and CmiRegisterHandler from Reconverse. CcsInit is hooked into startup via
 # registerCcsInit, since Reconverse has no ConverseCommonInit to call it from.
+# ccs-builtins.C and middle-ccs.C are written against Converse debugger
+# internals that Reconverse has no equivalent of. Neither is needed to use CCS
+# as a control channel, which is what the shrink/expand path does, so both are
+# replaced by cut-down versions. See ccs-builtins-none.C and middle-ccs-none.C.
 add_library(conv-ccs STATIC
-    ${conv-ccs-cxx-sources}
+    src/conv-ccs/conv-ccs.C
+    src/conv-ccs/middle-ccs-none.C
+    src/conv-ccs/ccs-builtins-none.C
     ${conv-ccs-h-sources})
 
 target_include_directories(conv-ccs PRIVATE

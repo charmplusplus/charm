@@ -65,4 +65,10 @@
 
 #define CMK_CONVERSE_MPI                                   0
 
+/* PE 0 hosts the CCS server socket itself, rather than a separate conv-host
+   process forwarding requests to it. This is what makes CCS usable without a
+   supervising launcher, which the shrink/expand control path depends on. */
+#define NODE_0_IS_CONVHOST                                 1
+
+
 #endif

@@ -253,7 +253,8 @@ extern void resumeAfterRealloc(void);
 extern char willContinue;
 int mynewpe=0;
 extern int numProcessAfterRestart;
-CcsDelayedReply shrinkExpandreplyToken;
+// shrinkExpandreplyToken now lives in src/util/ckrescale.C, which every build
+// links, so it exists for machine layers and for Reconverse alike.
 extern char *_shrinkexpand_basedir;
 #endif
 

@@ -8,7 +8,9 @@
 #include <ck.h>
 #include "cksyncbarrier.h"
 
+#if CMK_CUDA || CMK_HIP
 #include "hapi_portable.h"
+#endif
 
 #include "DistributedLB.h"
 #include "LBManager.h"
@@ -571,7 +573,7 @@ void LBManager::init(void)
   metabalancer = nullptr;
   lbdb_obj = new LBDatabase();
   currentLBIndex = 0;
-  reallocBuffer = nullptr;
+  reallocQueue.clear();
 #if CMK_LB_CPUTIMER
   obj_cputime = 0;
 #endif

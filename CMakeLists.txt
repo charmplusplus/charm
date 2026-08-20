@@ -1011,17 +1011,20 @@ if(${CMK_BUILD_CHARMRUN})
   add_dependencies(charmrun create_symlinks)
 else()
   configure_file(${CHARMRUN_DIR}/charmrun ${CMAKE_BINARY_DIR}/bin COPYONLY)
-  if(EXISTS ${CMAKE_SOURCE_DIR}/${CHARMRUN_ELASTIC_DIR}/charmrun_elastic)
-    configure_file(${CHARMRUN_ELASTIC_DIR}/charmrun_elastic ${CMAKE_BINARY_DIR}/bin COPYONLY)
-  endif()
-  if(EXISTS ${CMAKE_SOURCE_DIR}/${CHARMRUN_HAPI_DIR}/charmrun_hapi)
-    configure_file(${CHARMRUN_HAPI_DIR}/charmrun_hapi ${CMAKE_BINARY_DIR}/bin COPYONLY)
-  endif()
-  # Direct-ssh launcher used when CHARM_LAUNCHER=ssh — avoids mpirun/prterun's
-  # supervised-daemon teardown when a host disappears (spot termination).
-  if(EXISTS ${CMAKE_SOURCE_DIR}/${CHARMRUN_ELASTIC_DIR}/charmrun_ssh)
-    configure_file(${CHARMRUN_ELASTIC_DIR}/charmrun_ssh ${CMAKE_BINARY_DIR}/bin COPYONLY)
-  endif()
+endif()
+
+# The elastic launchers are independent of whether charmrun itself is built
+# from source, so they are copied either way.
+if(EXISTS ${CMAKE_SOURCE_DIR}/${CHARMRUN_ELASTIC_DIR}/charmrun_elastic)
+  configure_file(${CHARMRUN_ELASTIC_DIR}/charmrun_elastic ${CMAKE_BINARY_DIR}/bin COPYONLY)
+endif()
+if(EXISTS ${CMAKE_SOURCE_DIR}/${CHARMRUN_HAPI_DIR}/charmrun_hapi)
+  configure_file(${CHARMRUN_HAPI_DIR}/charmrun_hapi ${CMAKE_BINARY_DIR}/bin COPYONLY)
+endif()
+# Direct-ssh launcher used when CHARM_LAUNCHER=ssh — avoids mpirun/prterun's
+# supervised-daemon teardown when a host disappears (spot termination).
+if(EXISTS ${CMAKE_SOURCE_DIR}/${CHARMRUN_ELASTIC_DIR}/charmrun_ssh)
+  configure_file(${CHARMRUN_ELASTIC_DIR}/charmrun_ssh ${CMAKE_BINARY_DIR}/bin COPYONLY)
 endif()
 configure_file(src/scripts/testrun bin/ COPYONLY)
 

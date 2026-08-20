@@ -1776,7 +1776,10 @@ void _initCharm(int unused_argc, char **argv)
         // _reuseRegistrationStateOnRestart, so we defer the reset until after
         // it has run.
 #endif
-#if CMK_SHARED_VARS_POSIX_THREADS_SMP
+        // Warn about running more SMP threads than physical cores, and switch
+        // idle PEs to sleeping if so. Reconverse owns its own idle policy and
+        // has neither knob, so the warning does not apply there.
+#if CMK_SHARED_VARS_POSIX_THREADS_SMP && !CMK_RECONVERSE
         if (CmiCpuTopologyEnabled()) {
             int *pelist;
             int num;
