@@ -35,6 +35,16 @@ namespace {
 
 bool g_verbose = false;
 
+// Whether to push the committed delta to surviving members over their
+// coordinator sockets.
+//
+// The UCX machine layer does not want this: PE 0 fans the delta out over the
+// endpoints that already exist, which keeps the commit a single round trip
+// whose cost does not grow with the number of survivors. Reconverse over LCI
+// has no equivalent fan-out available while the scheduler is stopped, so there
+// the coordinator delivers it, at one extra round trip per survivor.
+bool g_pushReconfig = false;
+
 #define LOG(...)                            \
   do {                                      \
     if (g_verbose) {                        \
@@ -383,9 +393,22 @@ class Coordinator {
       else clients_[newFd].replyDeferred = false;
     }
 
-    // Surviving non-initiator members no longer receive RECONFIG over TCP.
-    // PE 0 broadcasts the delta to them via the existing UCX endpoints (chain
-    // fanout in machine.C). The coordinator still pushes DIE/INTEGRATE.
+    // Surviving non-initiator members get the delta from PE 0 over the
+    // existing endpoints (chain fanout in machine.C) unless the job asked the
+    // coordinator to deliver it. Either way the coordinator pushes
+    // DIE/INTEGRATE.
+    if (g_pushReconfig) {
+      for (size_t i = 0; i < survivors.size(); ++i) {
+        if (survivors[i].fd == fd) continue;  // the initiator gets COMMIT_REPLY
+        std::vector<uint8_t> rpl;
+        put_u32(rpl, newMembers[i].nodeId);
+        put_u32(rpl, epoch_);
+        put_u32_vec(rpl, killedOldIds);
+        put_members(rpl, added);
+        if (!send_frame(survivors[i].fd, RECONFIG, rpl))
+          closeClient(survivors[i].fd);
+      }
+    }
 
     // Push DIE to killed members so they exit cleanly.
     for (int kfd : killedFds) {
@@ -429,7 +452,12 @@ class Coordinator {
 
 void usage() {
   fprintf(stderr,
-          "Usage: charm_coordinator --port P --initial-size N [--verbose]\n");
+          "Usage: charm_coordinator --port P --initial-size N [--verbose] "
+          "[--push-reconfig]\n"
+          "  --push-reconfig  deliver each committed change to surviving "
+          "members over their\n"
+          "                   coordinator sockets, for runtimes that cannot "
+          "fan it out themselves\n");
   exit(1);
 }
 
@@ -444,14 +472,16 @@ int main(int argc, char **argv) {
       {"port", required_argument, nullptr, 'p'},
       {"initial-size", required_argument, nullptr, 'n'},
       {"verbose", no_argument, nullptr, 'v'},
+      {"push-reconfig", no_argument, nullptr, 'r'},
       {nullptr, 0, nullptr, 0},
   };
   int c;
-  while ((c = getopt_long(argc, argv, "p:n:v", opts, nullptr)) != -1) {
+  while ((c = getopt_long(argc, argv, "p:n:vr", opts, nullptr)) != -1) {
     switch (c) {
       case 'p': port = atoi(optarg); break;
       case 'n': initialSize = atoi(optarg); break;
       case 'v': g_verbose = true; break;
+      case 'r': g_pushReconfig = true; break;
       default: usage();
     }
   }
