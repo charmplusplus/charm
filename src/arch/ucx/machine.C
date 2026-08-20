@@ -135,6 +135,12 @@ enum {
 #endif
 };
 
+#if CMK_CUDA
+// hybridAPI; used on the newcomer path to overlap CUDA context creation
+// with the coordinator INTEGRATE wait.
+extern "C" void hapiWarmupDeviceContext(void);
+#endif
+
 #define UCX_LOG(prio, fmt, ...) \
     do { \
         if (prio >= UCX_LOG_PRIO) { \
@@ -469,6 +475,17 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
         // RTT to PE 0 + PE 0's wait for the LB step to drain.
         status = ucp_worker_flush(ucxCtx.worker);
         UCX_CHECK_STATUS(status, "ucp_worker_flush (newcomer speculative)");
+
+#if CMK_CUDA
+        // Warm up the CUDA driver and primary context while blocked below:
+        // the INTEGRATE wait typically lasts seconds (until the running job
+        // reaches its next load balancing step), whereas hapiInit's context
+        // creation costs ~170 ms and would otherwise run after integration,
+        // where the init-time lockstep barriers put it on the critical path
+        // of every survivor's restore (observed as the dominant term of the
+        // GPU expand: 172 ms at 4 nodes growing to 233 ms at 8).
+        hapiWarmupDeviceContext();
+#endif
 
         // Phase 2: block until COMMIT pushes the final view.
         coord::ClusterView view;

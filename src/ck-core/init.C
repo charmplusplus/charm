@@ -692,8 +692,22 @@ static void _exitHandler(envelope *env)
         CmiFree(env);
 
 #if CMK_CUDA
-      // Clean up HAPI
+      // Clean up HAPI. Never on the no-restart rescale path: survivors keep
+      // their CUDA context and HAPI state alive across the longjmp (the GPU
+      // elasticity design depends on exactly that), so tearing down the GPU
+      // manager here would leave them running on freed state, and the second
+      // rescale of a run then dies in glibc ("free(): invalid pointer" on
+      // every survivor) when the teardown runs again on already-freed pools.
+      // Doomed PEs skip the teardown too, which is harmless: they _exit
+      // immediately after and the driver reclaims everything.
+#if CMK_SHRINK_EXPAND
+      {
+        extern bool get_shrinkexpand_exit();
+        if (!get_shrinkexpand_exit()) hapiExit();
+      }
+#else
       hapiExit();
+#endif
 #endif
 
 #if CMK_SHRINK_EXPAND

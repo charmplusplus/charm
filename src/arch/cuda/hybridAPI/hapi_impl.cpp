@@ -123,6 +123,17 @@ static void ipcHandleOpen();
 #endif
 
 // Called by all PEs in Charm++ layer init
+void hapiWarmupDeviceContext() {
+  // A no-op allocation call forces cuInit and creation of the primary
+  // context on the current device, which is the expensive part of first
+  // CUDA use (~150-200 ms observed on T4). On multi-device nodes hapiInit
+  // may later select a different device for this PE; the driver
+  // initialization, which dominates the cost, is process-wide and is still
+  // saved. Deliberately no error check: if CUDA is genuinely unusable,
+  // hapiInit reports it in its usual way.
+  cudaFree(0);
+}
+
 void hapiInit(char** argv) {
 #if CMK_SHRINK_EXPAND
   extern bool _reuseRegistrationStateOnRestart;
