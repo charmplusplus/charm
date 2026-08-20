@@ -22,9 +22,24 @@ someone wants the debugger there.
 #include <limits.h>
 #include "converse.h"
 #include "pup.h"
+#include "conv-ccs.h"
 #include "ccs-builtins.h"
 
-void CcsBuiltinsInit(char **argv) { (void)argv; }
+#if CMK_CCS_AVAILABLE
+void ccs_getinfo(char *msg);
+#endif
+
+void CcsBuiltinsInit(char **argv)
+{
+  (void)argv;
+#if CMK_CCS_AVAILABLE
+  /* Every CCS client asks for this first: CcsConnect uses it to learn the node
+     and PE layout, and gets no reply at all if it is missing. The rest of the
+     builtins (kill-port, kill-PE, CWeb, the debugger's object lists) are not
+     registered here; see the note above. */
+  CcsRegisterHandler("ccs_getinfo", (CmiHandler)ccs_getinfo);
+#endif
+}
 
 void PUP_fmt::fieldHeader(typeCode_t typeCode,int nItems) {
     // Compute and write intro byte:
