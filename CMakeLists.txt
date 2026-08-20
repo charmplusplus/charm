@@ -801,8 +801,13 @@ if(BUILD_CUDA OR BUILD_HIP)
     endif()
   endif()
 
-  # hapi_memory_daemon - standalone executable for shrink/expand GPU memory management
-  if(BUILD_CUDA)
+  # hapi_memory_daemon - standalone executable for shrink/expand GPU memory
+  # management. It belongs to the kill-and-restart model, where every process
+  # is replaced and its CUDA context must be rebuilt; under the no-restart
+  # rescale the surviving processes keep their contexts, so nothing uses it.
+  # It also links Converse targets (ckqt, conv-static) that a Reconverse build
+  # does not have, so configuring one with CUDA fails outright without this.
+  if(BUILD_CUDA AND NOT RECONVERSE)
     add_executable(hapi_memory_daemon src/arch/cuda/hybridAPI/hapi_memory_daemon.cpp)
     add_dependencies(hapi_memory_daemon hybridapi ck converse ckqt moduleNDMeshStreamer ckmain modulecompletion conv-static)
   endif()
