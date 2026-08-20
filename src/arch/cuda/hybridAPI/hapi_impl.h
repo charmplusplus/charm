@@ -16,6 +16,9 @@ extern "C" {
 
 // HAPI init & exit functions
 void hapiInit(char** argv);
+// Creates the device context on a joining process while it waits to be
+// admitted, so the job it joins does not wait for it afterwards.
+void hapiNewcomerWarmup(void);
 void hapiStartMemoryDaemon(char** argv);
 int hapiCheckpoint(void* devPtr, int size);
 void hapiRestore(void* devPtr, int size, int alloc_id);

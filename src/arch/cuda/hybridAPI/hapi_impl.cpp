@@ -242,6 +242,23 @@ void hapiWarmupDeviceContext() {
   hapiFree(0);
 }
 
+// Run on a joining process while it waits to be admitted to a running job,
+// before hapiInit. Creating the CUDA context is the expensive part of bringing
+// up a GPU process, and doing it here rather than after the membership commit
+// keeps it off the critical path: the processes already in the job would
+// otherwise sit at their next barrier waiting for this work to finish.
+//
+// Only the context is forced. Everything else hapiInit does depends on
+// Converse state that does not exist yet, and the context is what costs.
+// hapiInit runs normally afterwards and finds the context already present.
+void hapiNewcomerWarmup(void) {
+  // Any runtime call that touches the device creates the primary context for
+  // it. Device selection proper happens in hapiInit's mapping; with the one
+  // device per process this path is used for, that is this same device.
+  hapiCheck(hapiFree(0));
+  hapiCheck(hapiDeviceSynchronize());
+}
+
 void hapiInit(char** argv) {
 #if CMK_SHRINK_EXPAND
   extern bool _reuseRegistrationStateOnRestart;

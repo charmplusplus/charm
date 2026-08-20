@@ -2005,6 +2005,13 @@ int charm_main(int argc, char **argv)
   registerTraceInit(traceInit);
 #endif
 
+#if CMK_RECONVERSE && CMK_SHRINK_EXPAND && (CMK_CUDA || CMK_HIP)
+  // A joining process has seconds of idle time before it is admitted. Bring
+  // the GPU up in that window: otherwise the processes already running stall
+  // at their next barrier while this one creates its context, which measured
+  // as most of the cost of an expansion.
+  registerNewcomerWarmup(hapiNewcomerWarmup);
+#endif
 #if CMK_RECONVERSE && CMK_CCS_AVAILABLE
   // Reconverse has no ConverseCommonInit, which is where classic Converse
   // calls CcsInit. Hook it in so it still runs on every PE before the start
