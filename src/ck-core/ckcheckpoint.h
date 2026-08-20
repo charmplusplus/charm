@@ -44,6 +44,9 @@ restarting of Charm++ programs. ...
 
   #if CMK_SHRINK_EXPAND
   extern char* se_avail_vector;
+  // Node count the job should have after the pending rescale; set on PE 0 by
+  // the realloc CCS handler in ck-ldb/manager.C.
+  extern int numProcessAfterRestart;
   #endif
 
 //int   _shrinkExpandRestartHandlerIdx;

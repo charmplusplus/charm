@@ -357,6 +357,15 @@ public:
     // clobbered by the time the exit path reads it.
     se_avail_vector = (char*) malloc(CkNumPes() * sizeof(char));
     memcpy(se_avail_vector, avail.data(), CkNumPes() * sizeof(char));
+
+# if CMK_RECONVERSE
+    // Reconverse owns the membership change rather than a machine layer, so
+    // hand it the same decision here: which of the current nodes stay, and how
+    // many nodes the job should end up with. One PE per process on this path,
+    // so the avail vector indexes nodes directly.
+    CmiSetRescalePending(1);
+    CmiRescaleRequest(se_avail_vector, CkNumPes(), numProcessAfterRestart);
+# endif
 #endif
 
     for (index = firstPE; index < firstPE + numWriters; index++)

@@ -75,6 +75,7 @@ never be excluded...
 #include "spanningTree.h"
 #include "CkSyncBarrier.decl.h"
 #include "converse.h"
+#include "conv-ccs.h"
 #if CMK_CHARM4PY
 #include "TreeLB.h"
 #endif
@@ -710,10 +711,6 @@ static void _exitHandler(envelope *env)
 #else
       hapiExit();
 #endif
-#endif
-
-#if CMK_SHRINK_EXPAND
-      ConverseCleanup();
 #endif
 
 #if CMK_SHRINK_EXPAND
@@ -2003,6 +2000,13 @@ int charm_main(int argc, char **argv)
 
 #if CMK_TRACE_ENABLED
   registerTraceInit(traceInit);
+#endif
+
+#if CMK_RECONVERSE && CMK_CCS_AVAILABLE
+  // Reconverse has no ConverseCommonInit, which is where classic Converse
+  // calls CcsInit. Hook it in so it still runs on every PE before the start
+  // function, keeping the handler-registration order the same on every rank.
+  registerCcsInit(CcsInit);
 #endif
 
 #if CMK_SHRINK_EXPAND

@@ -145,7 +145,7 @@ set(conv-util-cxx-sources
     src/arch/util/persist-comm.C
     src/util/cmirdmautils.C
     src/util/crc32.C
-    #src/util/sockRoutines.C
+    src/util/sockRoutines.C
     src/util/ckdll.C
     src/util/ckhashtable.C
     src/util/ckimage.C
@@ -237,6 +237,23 @@ file(WRITE ${CMAKE_BINARY_DIR}/include/topomanager_config.h "// empty\n" )
 add_library(charm_cxx_utils STATIC
     ${conv-util-cxx-sources})
 
+# CCS. Reconverse has no equivalent, and Charm++ needs it: the shrink/expand
+# control path (the set_bitmap and realloc handlers that the fleet manager
+# talks to) is a CCS service, as is the CCS server socket that PE 0 polls.
+# Everything CCS depends on is either in the standard library or already built
+# here: sockRoutines above, ckhashtable in charm_cxx_utils, CcdCallOnCondition
+# and CmiRegisterHandler from Reconverse. CcsInit is hooked into startup via
+# registerCcsInit, since Reconverse has no ConverseCommonInit to call it from.
+add_library(conv-ccs STATIC
+    ${conv-ccs-cxx-sources}
+    ${conv-ccs-h-sources})
+
+target_include_directories(conv-ccs PRIVATE
+    src/conv-ccs
+    src/util
+    ${CMAKE_BINARY_DIR}/include)
+
+add_dependencies(conv-ccs reconverse charm_cxx_utils)
 
 add_library(topomanager STATIC
     ${tmgr-cxx-sources}
@@ -254,7 +271,7 @@ target_include_directories(topomanager PUBLIC
 #     charm_cxx_utils
 # )
 add_custom_target(converse)
-add_dependencies(converse reconverse topomanager charm_cxx_utils ckrescale)
+add_dependencies(converse reconverse topomanager charm_cxx_utils ckrescale conv-ccs)
 
 #file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/comm_backend)
 

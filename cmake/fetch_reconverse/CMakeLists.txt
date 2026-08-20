@@ -22,6 +22,11 @@ FetchContent_Declare(
 set(_save_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
 set(BUILD_SHARED_LIBS ON CACHE INTERNAL "")
 
+# Reconverse needs the same shrink/expand setting Charm++ was configured with:
+# it owns the reinitialization lifecycle (boot-once per-PE state, handler index
+# replay, the preserved wall-clock epoch) and ConverseCleanup.
+set(CMK_SHRINK_EXPAND ${SHRINKEXPAND} CACHE INTERNAL "")
+
 FetchContent_MakeAvailable(reconverse)
 
 set(BUILD_SHARED_LIBS ${_save_BUILD_SHARED_LIBS} CACHE INTERNAL "")

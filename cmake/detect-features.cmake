@@ -11,7 +11,10 @@ endif()
 
 set(CMK_MACHINE_NAME \"${CHARM_PLATFORM}\")
 
-set(CMK_CCS_AVAILABLE 0)
+# CCS carries the external control path for shrink/expand: the fleet manager
+# delivers keep/remove bitmaps to PE 0 over it. Turning it off leaves the
+# runtime with no way to be told to rescale.
+set(CMK_CCS_AVAILABLE 1)
 if(${NETWORK} STREQUAL "pami" OR ${NETWORK} STREQUAL "pamilrts")
   set(CMK_CCS_AVAILABLE 0)
 endif()
