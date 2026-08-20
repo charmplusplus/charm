@@ -260,20 +260,18 @@ void hapiNewcomerWarmup(void) {
   hapiCheck(hapiFree(0));
   hapiCheck(hapiDeviceSynchronize());
 
-  // CUPTI is the expensive part of bringing up a GPU process: measured at
-  // roughly 18 ms, and it was being paid after the newcomer was admitted,
-  // where every process already in the job waits for it at the next barrier.
-  // Only do it when it will actually be used. hapiInitCsv starts CUPTI when
-  // load balancing statistics are on, which requires a balancer, and the
-  // load balancer's own state does not exist this early, so the request is
-  // read from the command line instead. hapiCuptiInit is idempotent, so the
-  // later call finds the work already done.
-  char** argv = hapiNewcomerWarmupArgv;
-  bool wants_stats = false;
-  for (int i = 0; argv && argv[i]; i++) {
-    if (strcmp(argv[i], "+balancer") == 0) { wants_stats = true; break; }
-  }
-  if (wants_stats) hapiCuptiInit();
+  // Bringing CUPTI up is the expensive part of starting a GPU process, and it
+  // was being paid after the newcomer was admitted, where every process
+  // already in the job waits for it at the next barrier.
+  //
+  // Only the library load is forced here, not hapiCuptiInit. Enabling activity
+  // collection this early lets records arrive before GPUManager::init() has
+  // run, and the load balancer then reads per-object data that was never
+  // initialized, which segfaults in GreedyRefineCentralLB::work. Loading the
+  // library is the part that costs; enabling the activity kinds afterwards in
+  // hapiInitCsv, once the manager exists, is comparatively cheap.
+  uint32_t cupti_version = 0;
+  cuptiGetVersion(&cupti_version);
 }
 
 void hapiInit(char** argv) {
