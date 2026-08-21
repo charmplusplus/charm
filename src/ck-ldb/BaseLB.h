@@ -26,6 +26,20 @@ protected:
   const char *lbname;
   LBManager *lbmgr;
   int  startLbFnHdl;
+
+  // LB timing instrumentation, used by DiffusionLB to separate strategy time from
+  // total LB time (migration included).
+  static double totalLBTime;
+  static double lbStartTime;
+  static double totalLBStrategyTime;
+  static int totalPhases;
+
+  static void startLBTiming() { lbStartTime = CmiWallTimer(); }
+  static void endLBStrategyTiming() { totalLBStrategyTime += CmiWallTimer() - lbStartTime; }
+  static void endLBTiming() {
+    totalLBTime += CmiWallTimer() - lbStartTime;
+    totalPhases += 1;
+  }
 private:
   void initLB(const CkLBOptions &);
 public:
@@ -103,6 +117,7 @@ public:
     std::vector<ProcStats> procs;		// processor statistics
 
     int n_migrateobjs;		// total number of migratable objects
+    int n_nodes;			// total number of nodes (differs from procs in SMP)
     std::vector<LDObjData> objData;	// LDObjData and LDCommData defined in lbdb.h
     std::vector<int> from_proc;	// current pe an object is on
     std::vector<int> to_proc;		// new pe you want the object to be on

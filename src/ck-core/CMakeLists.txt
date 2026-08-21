@@ -108,6 +108,17 @@ add_library(moduleTreeLB ../ck-ldb/TreeLB.C)
 add_dependencies(moduleTreeLB ck)
 add_library(moduleRecBipartLB ../ck-ldb/RecBipartLB.C ../ck-ldb/RecBipartLB.h)
 add_dependencies(moduleRecBipartLB ck)
+# DiffusionLB is a single translation unit: DiffusionLB.C #includes DiffusionHelper.C,
+# DiffusionMetric.C, DiffusionNeighbors.C, DiffusionPseudo.C and DiffusionCore.C, so
+# only DiffusionLB.C is compiled. The rest are listed for dependency tracking.
+add_library(moduleDiffusionLB ../ck-ldb/DiffusionLB.C ../ck-ldb/DiffusionLB.h
+  ../ck-ldb/DiffusionCore.C ../ck-ldb/DiffusionHelper.C ../ck-ldb/DiffusionMetric.C
+  ../ck-ldb/DiffusionNeighbors.C ../ck-ldb/DiffusionPseudo.C ../ck-ldb/DiffusionJSON.h)
+set_source_files_properties(
+  ../ck-ldb/DiffusionCore.C ../ck-ldb/DiffusionHelper.C ../ck-ldb/DiffusionMetric.C
+  ../ck-ldb/DiffusionNeighbors.C ../ck-ldb/DiffusionPseudo.C
+  PROPERTIES HEADER_FILE_ONLY TRUE)
+add_dependencies(moduleDiffusionLB ck)
 add_library(moduleGreedyCentralLB ../ck-ldb/GreedyCentralLB.C ../ck-ldb/GreedyCentralLB.h)
 add_dependencies(moduleGreedyCentralLB ck)
 add_library(moduleGreedyRefineCentralLB ../ck-ldb/GreedyRefineCentralLB.C ../ck-ldb/GreedyRefineCentralLB.h)

@@ -22,6 +22,11 @@ CLBStatsMsg* DiffusionLB::AssembleStats()
   const int osz = lbmgr->GetObjDataSz();
   const int csz = lbmgr->GetCommDataSz();
 
+  // TEMPORARY diagnostic: is the comm graph populated at all?
+  if (_lb_args.debug() > 1)
+    CkPrintf("[%d] DiffusionLB AssembleStats: objs=%d commRecords=%d traceComm=%d statsOn=%d\n",
+             CkMyPe(), osz, csz, (int)_lb_args.traceComm(), (int)lbmgr->CollectingCommStats());
+
   // TODO: not deleted
   CLBStatsMsg* statsMsg = new CLBStatsMsg(osz, csz);
   statsMsg->from_pe = CkMyPe();
@@ -99,10 +104,16 @@ void DiffusionLB::BuildStats()
 
       nodeStats->objData[nobj] = msg->objData[i];
       LDObjData& oData = nodeStats->objData[nobj];
-      objs[nobj] = CkVertex(nobj, oData.wallTime, nodeStats->objData[nobj].migratable,
+      // The origin of every load figure in this balancer: the CkVertex compLoad that
+      // getCompLoad() returns downstream, the node total the pseudo-LB rounds
+      // diffuse, and the per-PE totals the within-node heap balances. Routing all
+      // three through diffusionObjLoad() is what makes the load model GPU-aware in
+      // one edit instead of five.
+      const double objLoad = diffusionObjLoad(oData);
+      objs[nobj] = CkVertex(nobj, objLoad, nodeStats->objData[nobj].migratable,
                             nodeStats->from_proc[nobj]);
-      my_load += msg->objData[i].wallTime;
-      pe_load[pe] += msg->objData[i].wallTime;
+      my_load += objLoad;
+      pe_load[pe] += objLoad;
 
       /*TODO Keys LDObjKey key;
       key.omID() = msg->objData[i].handle.omID;

@@ -45,6 +45,16 @@ void DiffusionLB::AcrossNodeLB()
   loadReceivers = std::count_if(toSendLoad.begin(), toSendLoad.end(),
                                 [](double load) { return load > 0; });
 
+  // TEMPORARY diagnostic: why does across-node diffusion move nothing?
+  if (_lb_args.debug() > 1)
+  {
+    CkPrintf("[node %d] AcrossNodeLB: my_load=%f nbrs=%d loadReceivers=%d n_objs=%d\n",
+             myNodeId, my_load, neighborCount, loadReceivers, n_objs);
+    for (int i = 0; i < neighborCount; i++)
+      CkPrintf("[node %d]   toSendLoad[%d] (-> node %d) = %f\n",
+               myNodeId, i, sendToNeighbors[i], toSendLoad[i]);
+  }
+
   // iterate through objects and set from_pe and to_pe correctly
   for (int i = 0; i < n_objs; i++)
   {
@@ -92,7 +102,12 @@ void DiffusionLB::AcrossNodeLB()
           continue;
       }
 
-      double currLoad = objs[v_id].getVertexLoad();
+      // getCompLoad(), not getVertexLoad(): currLoad is decremented from
+      // my_loadAfterTransfer, which is in real measured seconds, and it is what the
+      // loop's termination test reads. getVertexLoad()'s 0.1s floor would make the
+      // loop retire its budget in one unit while testing against another, ending
+      // transfers after far fewer objects than intended.
+      double currLoad = objs[v_id].getCompLoad();
       objs[v_id].setCurrPe(-1);
 
       int rank = GetRank(v_id);
@@ -186,7 +201,11 @@ void DiffusionLB::ProcessFinalStats() {
     std::vector<double> load(n_objs);
     for (int i = 0; i < n_objs; i++)
     {
-      load[i] = nodeStats->objData[i].wallTime;
+      // Simulator/dump path (LBSimulation::dumpStep only). Uses the same combined
+      // figure as the balancer itself, so a dumped trace reflects the load the
+      // decisions were actually made on -- note the receiving side stores it back
+      // into wallTime, which is lossy on a CUDA run.
+      load[i] = diffusionObjLoad(nodeStats->objData[i]);
 
       int size = nodeStats->objData[i].position.size();
       positions[i].resize(size);

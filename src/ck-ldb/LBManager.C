@@ -424,6 +424,18 @@ void _loadbalancerInit()
   if(CkMyPe()==0 && lbcommOff)
     CmiPrintf("Warning: Ignoring the deprecated +LBCommOff option as communication is off by default.\n");
 
+  // DiffusionLB tuning. +LBDiffusionCommOn selects the communication-aware object
+  // metric (MetricComm) over the geometric one (MetricCentroid); without it the
+  // strategy silently degrades to centroid-based selection.
+  _lb_args.diffusionCommOn() = CmiGetArgFlagDesc(
+      argv, "+LBDiffusionCommOn", "DiffusionLB uses the communication graph to pick objects");
+  _lb_args.noMST() =
+      CmiGetArgFlagDesc(argv, "+LBnoMST", "DiffusionLB skips MST neighbor construction");
+  CmiGetArgIntDesc(argv, "+LBDiffusionNumNbors", &_lb_args.diffusionNumNbors(),
+                   "DiffusionLB number of diffusion neighbors");
+  CmiGetArgDoubleDesc(argv, "+LBDiffusionBeta", &_lb_args.diffusionBeta(),
+                      "DiffusionLB second-order momentum, in [1,2). 1.0 disables it");
+
   // set alpha and beta
   _lb_args.alpha() = PER_MESSAGE_SEND_OVERHEAD_DEFAULT;
   _lb_args.beta() = PER_BYTE_SEND_OVERHEAD_DEFAULT;
@@ -507,6 +519,10 @@ void LBManager::initnodeFn()
   _registerCommandLineOpt("+LBOff");
   _registerCommandLineOpt("+LBCommOn");
   _registerCommandLineOpt("+LBCommOff");
+  _registerCommandLineOpt("+LBDiffusionCommOn");
+  _registerCommandLineOpt("+LBnoMST");
+  _registerCommandLineOpt("+LBDiffusionNumNbors");
+  _registerCommandLineOpt("+LBDiffusionBeta");
   _registerCommandLineOpt("+MetaLB");
   _registerCommandLineOpt("+LBAlpha");
   _registerCommandLineOpt("+LBBeta");

@@ -160,6 +160,10 @@ public:
   std::vector<CkEdge> recvFromList;
   std::vector<McastSrc> mcastToList;
   std::vector<McastDest> mcastFromList;
+  // Measured load, no floor applied. Prefer this over getVertexLoad() wherever the
+  // load is weighed against a budget in seconds: getVertexLoad()'s MAX(compLoad, 0.1)
+  // reports every object as 0.1s when real per-object load is smaller -- the common
+  // case -- so such comparisons fail for every object at once.
   double getCompLoad() const { return compLoad; }
   void setCompLoad(double s) { compLoad = s; }
   int getCurrPe() const { return currPe; }

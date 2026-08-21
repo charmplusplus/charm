@@ -187,6 +187,12 @@ struct LDObjData {
 #endif
   bool migratable;
   bool asyncArrival;
+  // Object position, for geometric load balancers (DiffusionLB's MetricCentroid).
+  // Ported as a field only: the CkMigratable::setObjPosition plumbing that would
+  // populate it was deliberately not brought across, because the comm-aware metric
+  // (MetricComm, +LBDiffusionCommOn) does not use it. It therefore stays empty --
+  // anything reading it must guard for that.
+  std::vector<LBRealType> position;
 #if CMK_LB_USER_DATA
   LBObjUserData   userData;
 #endif
@@ -370,6 +376,7 @@ inline void LDObjData::pup(PUP::er &p) {
 #endif
   p|migratable;
   if (_lb_version > -1) p|asyncArrival;
+  p|position;
 #if CMK_LB_USER_DATA
   if (_lb_version > 2) {
     p|userData;

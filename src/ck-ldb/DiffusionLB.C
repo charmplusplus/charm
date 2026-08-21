@@ -91,6 +91,12 @@ DiffusionLB::DiffusionLB(const CkLBOptions& opt) : CBase_DiffusionLB(opt)
   lbname = "DiffusionLB";
   if (_lb_args.statsOn())
     lbmgr->CollectStatsOn();
+  // Every comm-aware balancer in this tree enables communication instrumentation
+  // from its own constructor rather than requiring the user to pass +LBCommOn --
+  // MetisLB.C:23, ScotchLB.C:23, ScotchTopoLB.C:25, ScotchRefineLB.C:20,
+  // RecBipartLB.C:119, ZoltanLB.C:62. Without this the comm graph is empty and
+  // MetricComm scores every object identically.
+  LBTurnCommOn();
   thisProxy = CProxy_DiffusionLB(thisgroup);
   numNodes = CkNumPes() / nodeSize;  // CkNumNodes();
   myStats = new DistBaseLB::LDStats;
@@ -338,9 +344,15 @@ void DiffusionLB::WithinNodeLB()
         }
         for (int j = start; j < prefixObjects[rank]; j++)
         {
-          if (objs[j].isMigratable() && objs[j].getCurrPe() != -1 && objs[j].getVertexLoad() <= overLoad)
+          // getCompLoad(), not getVertexLoad(): this weighs an object's load against
+          // a budget in seconds (overLoad), and getVertexLoad()'s MAX(compLoad, 0.1)
+          // floor reports every object as 0.1s whenever real per-object load is
+          // smaller -- the common case. With a typical overLoad well under 0.1s the
+          // test then fails for every object on every step, and within-node balancing
+          // silently does nothing while reporting that it ran.
+          if (objs[j].isMigratable() && objs[j].getCurrPe() != -1 && objs[j].getCompLoad() <= overLoad)
           {
-            objectSizes.push_back(objs[j].getVertexLoad());
+            objectSizes.push_back(objs[j].getCompLoad());
 
             int pe_local_id = j;
             if (rank != 0) {
@@ -350,7 +362,7 @@ void DiffusionLB::WithinNodeLB()
             objectPEs.push_back(rank+rank0PE);
             objectHdl.push_back(nodeStats->objData[j].handle);
             isToken.push_back(0);
-            overLoad -= objs[j].getVertexLoad();
+            overLoad -= objs[j].getCompLoad();
           }
         }
         if(rank==0) {

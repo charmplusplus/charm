@@ -73,20 +73,68 @@ void DiffusionLB::findNBors(int do_again)
 void DiffusionLB::startMSTBarrier() {
     buildMSTinRounds(best_weight, best_from, best_to);
 }
+// Build the connectivity backbone for the diffusion graph.
+//
+// Phase 2 (pseudo-LB) only converges if the neighbour graph is CONNECTED. A split
+// graph converges to two different averages and stays permanently imbalanced, with
+// no error reported anywhere. Neighbours derived from the communication graph do not
+// guarantee connectivity on their own -- "top-k heaviest partners" can easily yield
+// isolated clusters -- so something has to supply that guarantee.
+//
+// A ring supplies it in O(1) per node with no protocol at all: every node links to
+// its successor and predecessor, so the graph is connected by construction. The MST
+// this replaces needed O(numNodes) rounds, rebuilt from scratch on every LB step,
+// and closed each round with a *group* reduction that only rank-0 PEs ever
+// contributed to -- so it could never complete and simply hung.
+//
+// Ring edges may carry little traffic, which is fine: they exist so that load can
+// FLOW anywhere, while popBestObject still routes individual objects along the
+// high-affinity edges added by the neighbour rounds that follow this.
+void DiffusionLB::buildRingBackbone()
+{
+    assert(thisIndex == rank0PE);
+    if (numNodes < 2)
+        return;
+
+    addNeighbor((myNodeId + 1) % numNodes);
+
+    // With exactly two nodes the successor and the predecessor are the same node;
+    // adding it twice would double-count it in every subsequent load exchange.
+    if (numNodes > 2)
+        addNeighbor((myNodeId - 1 + numNodes) % numNodes);
+
+    if (_lb_args.debug() > 1)
+    {
+        std::string s = "Ring backbone: Node " + std::to_string(myNodeId) + ": ";
+        for (size_t i = 0; i < sendToNeighbors.size(); i++)
+            s += std::to_string(sendToNeighbors[i]) + " ";
+        CkPrintf("%s\n", s.c_str());
+    }
+}
+
 void DiffusionLB::beginMST()
 {
+    assert(thisIndex == rank0PE);
 
-    // TODO: add option to just start first round here (no mst):
-    if (_lb_args.noMST()){
-        thisProxy[0].startFirstRound(); 
-        return;
-    }
+    // The MST that used to run here is replaced by the ring backbone above: same
+    // connectivity guarantee, no rounds, no reduction, nothing to hang. +LBnoMST
+    // retains the historical behaviour of building no backbone at all, which leaves
+    // connectivity to chance -- kept only for A/B comparison.
+    if (!_lb_args.noMST())
+        buildRingBackbone();
 
+    thisProxy[0].startFirstRound();
+    return;
+
+    // ---- unreachable: former MST construction, retained for reference ----
+    // Known broken: the contribute() below is a group reduction, but only rank-0
+    // PEs reach this function (findNBors returns early otherwise), so the reduction
+    // can never complete. Every other barrier in this file is hand-rolled with a
+    // counter for exactly that reason.
     if (_lb_args.debug() > 1)
     {
         CkPrintf("Beginning MST building\n");
     }
-    assert(thisIndex == rank0PE);
 
     mstVisitedPes.clear();
     mstVisitedPes.push_back(0);

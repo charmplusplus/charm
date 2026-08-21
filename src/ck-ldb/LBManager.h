@@ -38,6 +38,10 @@ class CkLBArgs
   bool _lb_useCpuTime;      // use cpu instead of wallclock time
   bool _lb_statson;         // stats collection
   bool _lb_traceComm;       // stats collection for comm
+  bool _lb_diffcomm;        // DiffusionLB: use the communication graph
+  bool _lb_noMST;           // DiffusionLB: skip MST neighbor construction
+  int _lb_diffnumnbors;     // DiffusionLB: number of diffusion neighbors
+  double _lb_diffbeta;      // DiffusionLB: second-order diffusion momentum (1.0 = off)
   int _lb_central_pe;      // processor number for centralized strategy
   int _lb_maxDistPhases;   // Specifies the max number of LB phases in DistributedLB
   double _lb_targetRatio;  // Specifies the target load ratio for LBs that aim for a
@@ -56,6 +60,10 @@ class CkLBArgs
     _lb_printsummary = _lb_migObjOnly = false;
     _lb_statson = true;
     _lb_traceComm = false;
+    _lb_diffcomm = false;
+    _lb_noMST = false;
+    _lb_diffnumnbors = 1;
+    _lb_diffbeta = 1.0;
     _lb_loop = false;
     _lb_central_pe = 0;
     _lb_maxDistPhases = 10;
@@ -78,6 +86,10 @@ class CkLBArgs
   inline bool& useCpuTime() { return _lb_useCpuTime; }
   inline bool& statsOn() { return _lb_statson; }
   inline bool& traceComm() { return _lb_traceComm; }
+  inline bool& diffusionCommOn() { return _lb_diffcomm; }
+  inline bool& noMST() { return _lb_noMST; }
+  inline int& diffusionNumNbors() { return _lb_diffnumnbors; }
+  inline double& diffusionBeta() { return _lb_diffbeta; }
   inline int& central_pe() { return _lb_central_pe; }
   inline double& alpha() { return _lb_alpha; }
   inline double& beta() { return _lb_beta; }

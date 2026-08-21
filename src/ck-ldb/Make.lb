@@ -2,6 +2,7 @@
 COMMON_LDBS=\
    TreeLB \
    DistributedLB \
+   DiffusionLB \
    MetisLB \
    RecBipartLB \
    GreedyCentralLB \
@@ -12,6 +13,7 @@ COMMON_LDBS=\
 ALL_LDBS=\
    TreeLB \
    DistributedLB \
+   DiffusionLB \
    MetisLB \
    RecBipartLB \
    GreedyCentralLB \
@@ -40,6 +42,9 @@ LBHEADERS += MetisLB.h MetisLB.decl.h
 $(L)/libmoduleRecBipartLB.a:
 LBHEADERS += RecBipartLB.h RecBipartLB.decl.h
 
+$(L)/libmoduleDiffusionLB.a:
+LBHEADERS += DiffusionLB.h DiffusionLB.decl.h
+
 $(L)/libmoduleScotchLB.a:
 LBHEADERS += ScotchLB.h ScotchLB.decl.h
 
@@ -51,6 +56,7 @@ ALL_LB_OBJS=EveryLB.o \
     CommonLBs.o \
     TreeLB.o \
     DistributedLB.o \
+    DiffusionLB.o \
     MetisLB.o \
     GreedyCentralLB.o \
     GreedyRefineCentralLB.o \

@@ -169,7 +169,7 @@ int MetricComm::popBestObject(int nbor)
   for (int i = 0; i < n_objs; i++)
   {
     if(!objAvailable[i]) continue;
-    double objLoad = nodeStats->objData[i].wallTime;
+    double objLoad = diffusionObjLoad(nodeStats->objData[i]);
 
     int testComm = externalComm[nbor][i];
 
@@ -210,7 +210,9 @@ int MetricComm::getBestNeighbor()
 
 void MetricComm::updateState(int objId, int destNbor)
 {
-  double objLoad = nodeStats->objData[objId].wallTime;
+  // Must match what popBestObject weighed against the quota, or the quota is
+  // retired in different units from the ones it was tested in.
+  double objLoad = diffusionObjLoad(nodeStats->objData[objId]);
   if(_lb_args.debug() > 2)
     CkPrintf("Node %d: migrating obj %d (load %.6f) to neighbor %d (tosend before: %.6f, after: %.6f)\n", 
             myNodeId, objId, objLoad, sendToNeighbors[destNbor], 
@@ -329,7 +331,7 @@ int MetricCentroid::popBestObject(int nbor)
 
   for (int i = 0; i < n_objs; i++)
   {
-    double objLoad = nodeStats->objData[i].wallTime;
+    double objLoad = diffusionObjLoad(nodeStats->objData[i]);
 
     if (objNborDistances[i].size() <= nbor)
     {
@@ -386,7 +388,7 @@ void MetricCentroid::updateState(int objId, int destNbor)
   if(objId<0 || objId>=n_objs)
     CkAbort("Error: invalid objId %d in MetricCentroid::updateState\n", objId);
   objAvailable[objId] = false;
-  toSendLoad[destNbor] -= nodeStats->objData[objId].wallTime;
+  toSendLoad[destNbor] -= diffusionObjLoad(nodeStats->objData[objId]);
   if(nborCentroids.size()<=destNbor) return;
 
   // TODO: update my centroid (not used anywhere rn)

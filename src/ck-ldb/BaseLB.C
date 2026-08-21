@@ -9,6 +9,12 @@
 
 #if CMK_LBDB_ON
 
+// LB timing instrumentation (declared in BaseLB.h, used by DiffusionLB).
+double BaseLB::totalLBTime = 0.0;
+double BaseLB::lbStartTime = 0.0;
+double BaseLB::totalLBStrategyTime = 0.0;
+int BaseLB::totalPhases = 0;
+
 void BaseLB::initLB(const CkLBOptions &opt) {
   seqno = opt.getSeqNo();
   lbmgr = CProxy_LBManager(_lbmgr).ckLocalBranch();

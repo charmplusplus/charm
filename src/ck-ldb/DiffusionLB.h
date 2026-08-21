@@ -24,6 +24,31 @@ int numPes;
 
 void CreateDiffusionLB();
 
+// Single point of truth for "how much load does this object represent" in
+// DiffusionLB. Every load decision in this balancer -- the per-node totals that the
+// pseudo-LB rounds diffuse, the per-PE totals the within-node heap balances, the
+// capacity test in popBestObject, and the quota accounting in updateState -- must
+// read through this, so that the load model can be changed in one place rather than
+// hunted across five files.
+//
+// An object occupies its PE for as long as the busier of its two resources is busy,
+// so the CPU and GPU terms combine with max() rather than a sum. That assumes the
+// two timelines overlap, which is the same assumption GreedyRefineCentralGPULB's
+// Phase 1 sort key makes; the overlap coefficient that would refine it into
+// alpha*(cpu+gpu) + (1-alpha)*max(cpu,gpu) is GPU_LB_PLAN.html Phase 2, and when it
+// lands it lands here.
+//
+// Reduces exactly to wallTime in a non-CUDA build, so this is behaviour-preserving
+// on CPU-only runs.
+static inline double diffusionObjLoad(const LDObjData& o)
+{
+#if CMK_CUDA
+  return (o.gpuTime > o.wallTime) ? o.gpuTime : o.wallTime;
+#else
+  return o.wallTime;
+#endif
+}
+
 /// for backward compatibility
 typedef LBMigrateMsg NLBMigrateMsg;
 
@@ -55,7 +80,7 @@ public:
 
   void startMSTBarrier();
 
-  void pseudolb_barrier(int allZero);
+  // pseudolb_barrier removed with the global convergence check (DiffusionPseudo.C)
 
   void MigrationDoneWrapper();  // Call when migration is complete
   void ReceiveStats(CkMarshalledCLBStatsMessage&& data);
@@ -131,6 +156,9 @@ private:
   int centReceiveNode;
 
   void addNeighbor(int nbor);
+  // Connectivity backbone for the diffusion graph; replaces the MST. See the
+  // definition in DiffusionNeighbors.C for why.
+  void buildRingBackbone();
   void pairedSort(int* A, std::vector<double> B);
 
   // phase 1: build neighbor list --------------------------------
@@ -157,6 +185,10 @@ private:
   void PseudoLoadBalancing();
   std::vector<double> toSendLoad;
   std::vector<double> toReceiveLoad;
+  // Flow sent to each neighbour in the previous pseudo-LB round. Second-order
+  // diffusion carries a fraction of it into this round as momentum; see
+  // PseudoLoadBalancing.
+  std::vector<double> prevRoundToSend;
   std::vector<double> loadNeighbors;
   double avgLoadNeighbor;  // Average load of the neighbor group
   double my_pseudo_load;

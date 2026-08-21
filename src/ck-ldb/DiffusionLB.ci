@@ -42,7 +42,7 @@ module DiffusionLB
     entry void LoadReceived(int objId, int fromPE);
     entry void AcrossNodeLB();
 
-    entry void pseudolb_barrier(int allZero);
+    // (pseudolb_barrier removed -- global convergence check deleted)
 
     entry[reductiontarget] void startMSTBarrier();
 
@@ -66,7 +66,8 @@ module DiffusionLB
     // entry void ResumeClients(int balancing);
 
     entry void PseudoLoad(int itr, double load, int node);
-    entry[reductiontarget] void pseudoDone(bool done);
+    // pseudoDone / pseudolb_barrier removed with the global convergence check;
+    // see the note in the pseudolb_rounds loop below.
     // entry void CallResumeClients();
     // entry void PrintDebugMessage(int len, double result[len]);
     entry void createCentroidList()
@@ -113,6 +114,8 @@ module DiffusionLB
         loadNeighbors.resize(neighborCount, 0);
         toSendLoad.resize(neighborCount, 0);
         toReceiveLoad.resize(neighborCount, 0);
+        // Momentum starts at zero each LB step: the first round is pure first-order.
+        prevRoundToSend.assign(neighborCount, 0.0);
 
         my_pseudo_load = my_load;
       }
@@ -157,13 +160,13 @@ module DiffusionLB
           }
         }
 
-        when pseudoDone(bool doneInPseudo) serial
-        {
-          if (doneInPseudo)
-          {
-            pseudo_itr = ITERATIONS;
-          }
-        }
+        // The global convergence check that used to sit here -- every node
+        // reporting "nothing to send" to PE 0, which ANDed the votes and
+        // broadcast the verdict -- has been removed. It was the only global
+        // synchronisation in this phase, cost an O(N) fan-in plus a broadcast
+        // per round, and its sole purpose was breaking out of a loop that is
+        // already bounded at ITERATIONS. Rounds now run to the fixed count and
+        // Phase 2 is entirely neighbour-local.
       }
 
       // Calculate the aggregate load that has to be sent.
