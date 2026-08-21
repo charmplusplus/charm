@@ -290,7 +290,57 @@ int nborId = nid;                     // metric-&gt;getBestNeighbor() is buggy (
   before <code>getBestNeighbor</code> is fixed is measuring a half-enabled strategy.
 </div>
 
-<h2>The GPU-awareness gap: four sites, one scalar</h2>
+<div class="verdict">
+  <strong>Implemented, 2026-08-21 — and not as a single scalar.</strong> The section
+  below proposed one <code>objLoad()</code> returning something like
+  <code>max(wallTime, gpuTime)</code>. That turned out to be wrong twice over, and
+  what shipped is a genuine two-level split. Kept for the reasoning; read the
+  correction first.
+  <p><strong>max() over-counts.</strong> Summing per-object maxima inflates every
+  object whose two timelines overlap. A node's step time is
+  <code>max(Σ gpuTime, max over PEs of Σ wallTime)</code> — aggregate first, then take
+  the max. Summing <code>max(cpu, gpu)</code> per object is the same "max of maxima"
+  error this plan flags elsewhere in the objective, in a new place.</p>
+  <p><strong>One scalar cannot serve both levels.</strong> PEs inside a process
+  <em>share a device</em>, so relocating a chare between them relieves the GPU by
+  nothing at all — only host work moves. Charging the within-node heap any GPU time
+  has it believe it is rebalancing something it structurally cannot.</p>
+  <p>So there are two accessors in <code>DiffusionLB.h</code>:
+  <code>diffusionObjLoad()</code>, the dimension diffused <em>across</em> nodes
+  (device occupancy under <code>+LBDiffusionGpuDim</code>, host time otherwise), and
+  <code>diffusionObjCpuLoad()</code>, always host time, for everything
+  <em>within</em> a node.</p>
+  <div class="overflow-x">
+  <table>
+    <tr><th>Level</th><th>Equalises</th><th>Rationale</th></tr>
+    <tr><td>Across nodes — pseudo-LB rounds and <code>AcrossNodeLB</code></td><td><code>Σ gpuTime</code> with <code>+LBDiffusionGpuDim</code>, else <code>Σ wallTime</code></td><td>under one process per device a node <em>is</em> a GPU, so device occupancy is the scarce resource</td></tr>
+    <tr><td>Within a node — <code>WithinNodeLB</code>, <code>pe_load[]</code>, <code>CkVertex</code> compLoad</td><td>per-PE <code>Σ wallTime</code>, always</td><td>PEs share the device; only host work can relocate between them</td></tr>
+  </table>
+  </div>
+  <p><strong>The subtle part needed no protocol change.</strong>
+  <code>AcrossNodeLB</code> now computes two figures per migration:
+  <code>shedLoad</code> retires the node's obligation and the per-neighbour quota in
+  the diffused dimension, while <code>cpuLoad</code> is what travels in the
+  <code>LoadMetaInfo</code> message — because the receiver adds it to
+  <code>pe_load</code> and hands it to the CPU heap. Shipping GPU time there would
+  have silently corrupted the within-node level.</p>
+  <p><strong>The dimension is an explicit flag, not auto-detected.</strong> Nodes must
+  agree: if some equalise GPU while others equalise CPU, they diffuse incoherently
+  against each other. A local heuristic cannot guarantee that agreement without the
+  global step this design just removed.</p>
+  <p><strong>Verified both ways.</strong> Default (CPU) on <code>lb_test</code>: mean
+  final max/avg 1.094 over five runs at 4 nodes, migrations every LB step.
+  <code>+LBDiffusionGpuDim</code> on the same CPU-only app: runs clean with
+  <strong>zero</strong> cross-node migrations, which is correct —
+  <code>gpuTime = 0</code> everywhere means there is no device occupancy to
+  equalise, so it degrades to a no-op rather than doing something wrong.</p>
+  <p><strong>Still open from this section:</strong> the <code>deviceFreeMem</code>
+  field of the widened <code>PseudoLoad</code> message (Phase G's capacity
+  advertising) is not implemented — there is no GPU workload here to justify its
+  shape yet.</p>
+</div>
+
+<h2>The GPU-awareness gap: four sites, one scalar <span class="dim">(superseded — see above)</span></h2>
 <p>Every load decision in DiffusionLB reads host CPU time. The GPU dimension that this branch exists to collect never enters.</p>
 <div class="overflow-x">
 <table>

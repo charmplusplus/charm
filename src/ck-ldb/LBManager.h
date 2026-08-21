@@ -42,6 +42,7 @@ class CkLBArgs
   bool _lb_noMST;           // DiffusionLB: skip MST neighbor construction
   int _lb_diffnumnbors;     // DiffusionLB: number of diffusion neighbors
   double _lb_diffbeta;      // DiffusionLB: second-order diffusion momentum (1.0 = off)
+  bool _lb_diffgpudim;      // DiffusionLB: diffuse GPU load across nodes (else CPU)
   int _lb_central_pe;      // processor number for centralized strategy
   int _lb_maxDistPhases;   // Specifies the max number of LB phases in DistributedLB
   double _lb_targetRatio;  // Specifies the target load ratio for LBs that aim for a
@@ -64,6 +65,7 @@ class CkLBArgs
     _lb_noMST = false;
     _lb_diffnumnbors = 1;
     _lb_diffbeta = 1.0;
+    _lb_diffgpudim = false;
     _lb_loop = false;
     _lb_central_pe = 0;
     _lb_maxDistPhases = 10;
@@ -90,6 +92,7 @@ class CkLBArgs
   inline bool& noMST() { return _lb_noMST; }
   inline int& diffusionNumNbors() { return _lb_diffnumnbors; }
   inline double& diffusionBeta() { return _lb_diffbeta; }
+  inline bool& diffusionGpuDim() { return _lb_diffgpudim; }
   inline int& central_pe() { return _lb_central_pe; }
   inline double& alpha() { return _lb_alpha; }
   inline double& beta() { return _lb_beta; }

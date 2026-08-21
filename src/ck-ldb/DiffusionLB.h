@@ -24,30 +24,44 @@ int numPes;
 
 void CreateDiffusionLB();
 
-// Single point of truth for "how much load does this object represent" in
-// DiffusionLB. Every load decision in this balancer -- the per-node totals that the
-// pseudo-LB rounds diffuse, the per-PE totals the within-node heap balances, the
-// capacity test in popBestObject, and the quota accounting in updateState -- must
-// read through this, so that the load model can be changed in one place rather than
-// hunted across five files.
+// DiffusionLB balances two different resources at its two levels, and they are not
+// interchangeable:
 //
-// An object occupies its PE for as long as the busier of its two resources is busy,
-// so the CPU and GPU terms combine with max() rather than a sum. That assumes the
-// two timelines overlap, which is the same assumption GreedyRefineCentralGPULB's
-// Phase 1 sort key makes; the overlap coefficient that would refine it into
-// alpha*(cpu+gpu) + (1-alpha)*max(cpu,gpu) is GPU_LB_PLAN.html Phase 2, and when it
-// lands it lands here.
+//   Across nodes. Under one process per device a node IS a GPU, so the scarce
+//   resource is device occupancy and the quantity to equalise is the sum of GPU
+//   time over the node's objects. Selected with +LBDiffusionGpuDim.
 //
-// Reduces exactly to wallTime in a non-CUDA build, so this is behaviour-preserving
-// on CPU-only runs.
+//   Within a node. The PEs of a process SHARE that device, so moving a chare from
+//   one PE to another does not relieve the GPU by a microsecond -- the kernel still
+//   runs on the same card. Only host-side work relocates. The intra-node heap must
+//   therefore balance CPU time alone; charging it GPU time would have it believe it
+//   is rebalancing something it structurally cannot.
+//
+// Hence two accessors. diffusionObjLoad() is the diffused dimension (what crosses
+// node boundaries); diffusionObjCpuLoad() is always host time (what moves between
+// PEs inside a node).
+//
+// Note deliberately NOT max(cpu, gpu): summing per-object maxima over-counts every
+// object whose two timelines overlap. A node's step time is
+// max(sum of gpuTime, max over PEs of sum of wallTime) -- aggregate first, then take
+// the max, never the other way round.
+
+// The dimension diffused across nodes. Defaults to host time so that CPU-only
+// workloads keep working; +LBDiffusionGpuDim switches it to device occupancy for
+// GPU-bound runs. An automatic choice would have to be identical on every node --
+// nodes disagreeing about which resource they are equalising would diffuse
+// incoherently -- so it is an explicit flag rather than a local heuristic.
 static inline double diffusionObjLoad(const LDObjData& o)
 {
 #if CMK_CUDA
-  return (o.gpuTime > o.wallTime) ? o.gpuTime : o.wallTime;
-#else
-  return o.wallTime;
+  if (_lb_args.diffusionGpuDim()) return o.gpuTime;
 #endif
+  return o.wallTime;
 }
+
+// Host time, always. Used for per-PE totals and the within-node heap, which can only
+// ever move host work between PEs that share a device.
+static inline double diffusionObjCpuLoad(const LDObjData& o) { return o.wallTime; }
 
 /// for backward compatibility
 typedef LBMigrateMsg NLBMigrateMsg;

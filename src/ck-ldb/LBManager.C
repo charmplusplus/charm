@@ -435,6 +435,9 @@ void _loadbalancerInit()
                    "DiffusionLB number of diffusion neighbors");
   CmiGetArgDoubleDesc(argv, "+LBDiffusionBeta", &_lb_args.diffusionBeta(),
                       "DiffusionLB second-order momentum, in [1,2). 1.0 disables it");
+  _lb_args.diffusionGpuDim() = CmiGetArgFlagDesc(
+      argv, "+LBDiffusionGpuDim",
+      "DiffusionLB diffuses GPU load across nodes (default: CPU load)");
 
   // set alpha and beta
   _lb_args.alpha() = PER_MESSAGE_SEND_OVERHEAD_DEFAULT;
@@ -523,6 +526,7 @@ void LBManager::initnodeFn()
   _registerCommandLineOpt("+LBnoMST");
   _registerCommandLineOpt("+LBDiffusionNumNbors");
   _registerCommandLineOpt("+LBDiffusionBeta");
+  _registerCommandLineOpt("+LBDiffusionGpuDim");
   _registerCommandLineOpt("+MetaLB");
   _registerCommandLineOpt("+LBAlpha");
   _registerCommandLineOpt("+LBBeta");

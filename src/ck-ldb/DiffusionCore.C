@@ -102,12 +102,21 @@ void DiffusionLB::AcrossNodeLB()
           continue;
       }
 
-      // getCompLoad(), not getVertexLoad(): currLoad is decremented from
-      // my_loadAfterTransfer, which is in real measured seconds, and it is what the
-      // loop's termination test reads. getVertexLoad()'s 0.1s floor would make the
-      // loop retire its budget in one unit while testing against another, ending
-      // transfers after far fewer objects than intended.
-      double currLoad = objs[v_id].getCompLoad();
+      // Two different figures, because two different consumers.
+      //
+      // shedLoad is in the diffused dimension: it retires this node's obligation
+      // (my_loadAfterTransfer) and the per-neighbour quota, both of which the
+      // pseudo-LB rounds expressed in that dimension. Using anything else would
+      // retire the budget in different units from the ones it was computed in.
+      //
+      // cpuLoad is host time, and is what travels in the message: the receiver adds
+      // it to pe_load and hands it to the within-node heap, which balances host work
+      // between PEs that share a device. Shipping GPU time would corrupt that.
+      //
+      // Both read getCompLoad()/objData rather than getVertexLoad(), whose
+      // MAX(compLoad, 0.1) floor would retire the budget in yet another unit.
+      const double shedLoad = diffusionObjLoad(nodeStats->objData[v_id]);
+      const double cpuLoad  = objs[v_id].getCompLoad();
       objs[v_id].setCurrPe(-1);
 
       int rank = GetRank(v_id);
@@ -122,7 +131,7 @@ void DiffusionLB::AcrossNodeLB()
             v_id, nodeStats->from_proc[v_id], donorPE);
       }
 
-      my_loadAfterTransfer -= currLoad;
+      my_loadAfterTransfer -= shedLoad;
       num_migrations++;
 
       metric->updateState(v_id, nborId);  // update state to keep track of migrations
@@ -134,7 +143,7 @@ void DiffusionLB::AcrossNodeLB()
         pe_local_id = v_id - prefixObjects[donorPE - rank0PE - 1];
       }
 
-      thisProxy[destPE].LoadMetaInfo(objHandle, pe_local_id, currLoad, donorPE, 0);     
+      thisProxy[destPE].LoadMetaInfo(objHandle, pe_local_id, cpuLoad, donorPE, 0);
       thisProxy[donorPE].LoadReceived(pe_local_id, destPE);
       nodeStats->to_proc[v_id] = destPE;
     }

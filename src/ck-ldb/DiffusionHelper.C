@@ -104,16 +104,21 @@ void DiffusionLB::BuildStats()
 
       nodeStats->objData[nobj] = msg->objData[i];
       LDObjData& oData = nodeStats->objData[nobj];
-      // The origin of every load figure in this balancer: the CkVertex compLoad that
-      // getCompLoad() returns downstream, the node total the pseudo-LB rounds
-      // diffuse, and the per-PE totals the within-node heap balances. Routing all
-      // three through diffusionObjLoad() is what makes the load model GPU-aware in
-      // one edit instead of five.
-      const double objLoad = diffusionObjLoad(oData);
-      objs[nobj] = CkVertex(nobj, objLoad, nodeStats->objData[nobj].migratable,
+      // The origin of every load figure in this balancer, and the two levels take
+      // different dimensions from it.
+      //
+      // my_load is what the pseudo-LB rounds diffuse across nodes: the resource that
+      // is scarce at node granularity, GPU occupancy or host time per
+      // +LBDiffusionGpuDim.
+      //
+      // pe_load and the CkVertex compLoad are always host time, because they feed the
+      // within-node heap, and PEs inside a process share a device -- relocating a
+      // chare between them moves host work only.
+      objs[nobj] = CkVertex(nobj, diffusionObjCpuLoad(oData),
+                            nodeStats->objData[nobj].migratable,
                             nodeStats->from_proc[nobj]);
-      my_load += objLoad;
-      pe_load[pe] += objLoad;
+      my_load += diffusionObjLoad(oData);
+      pe_load[pe] += diffusionObjCpuLoad(oData);
 
       /*TODO Keys LDObjKey key;
       key.omID() = msg->objData[i].handle.omID;
