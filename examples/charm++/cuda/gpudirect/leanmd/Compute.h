@@ -37,7 +37,7 @@ class Compute : public CBase_Compute {
     int cellIdx[2][3];
 
     void deriveCells();
-    void ensureStream();
+    void ensureDevice();
     void ensureSlot(int s, int n);
     void freeDevice();
     int slotFor(int cx, int cy, int cz) const;

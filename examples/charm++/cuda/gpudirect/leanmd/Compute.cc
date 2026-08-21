@@ -17,8 +17,6 @@ Compute::Compute() : stepCount(1), d_energyPartial(NULL), d_energyScalar(NULL),
   nPart[0] = nPart[1] = 0;
   stream = NULL;
   deriveCells();
-  hapiCheck(hapiMalloc((void**)&d_energyScalar, sizeof(double)));
-  hapiCheck(hapiMallocHost((void**)&h_energy, sizeof(double)));
 }
 
 Compute::Compute(CkMigrateMessage *msg): CBase_Compute(msg) {
@@ -31,17 +29,24 @@ Compute::Compute(CkMigrateMessage *msg): CBase_Compute(msg) {
   h_energy = NULL;
   stream = NULL;
   deriveCells();
-  hapiCheck(hapiMalloc((void**)&d_energyScalar, sizeof(double)));
-  hapiCheck(hapiMallocHost((void**)&h_energy, sizeof(double)));
   delete msg;
 }
 
-// Computes are created from inside Cell::createComputes, which runs from the main
-// chare constructor, so the stream pool group may not have a branch on this PE
-// yet. Taking the stream on first use rather than at construction sidesteps the
-// ordering question entirely.
-void Compute::ensureStream() {
-  if (stream == NULL) stream = streamPool.ckLocalBranch()->acquire();
+// NOTHING device-side may be touched from the constructors.
+//
+// Computes are inserted by Cell::createComputes, which runs from the main chare
+// constructor -- during startup, before HAPI has necessarily selected this PE's
+// device and before the stream pool group is guaranteed to have a branch here.
+// A cudaMalloc from there fails, hapiCheck aborts, and because it happens ahead
+// of any entry method the process dies without printing a single line.
+//
+// So every device resource is taken on first use instead, from the post entry
+// method, which is the earliest point at which this chare does real work.
+void Compute::ensureDevice() {
+  if (stream != NULL) return;
+  stream = streamPool.ckLocalBranch()->acquire();
+  hapiCheck(hapiMalloc((void**)&d_energyScalar, sizeof(double)));
+  hapiCheck(hapiMallocHost((void**)&h_energy, sizeof(double)));
 }
 
 Compute::~Compute() { freeDevice(); }
@@ -98,7 +103,7 @@ void Compute::freeDevice() {
 
 void Compute::calculateForces(int ref, int ord, int cx, int cy, int cz, int& n,
                               vec3*& pos, CkDeviceBufferPost* devicePost) {
-  ensureStream();
+  ensureDevice();
   const int s = slotFor(cx, cy, cz);
   ensureSlot(s, n);
   pos = d_pos[s];
