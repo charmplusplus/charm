@@ -1,0 +1,338 @@
+<title>LeanMD GPU Port</title>
+<style>
+  :root {
+    --bg: #fafaf8;
+    --fg: #1a1a1a;
+    --fg-dim: #5c5c5c;
+    --accent: #2563eb;
+    --accent-dim: #93b4f5;
+    --surface: #f0f0ec;
+    --border: #d4d4cf;
+    --phase-bg: #e8eef8;
+    --phase-border: #b8ccee;
+    --warn-bg: #fef3e0;
+    --warn-border: #e8c87a;
+    --code-bg: #eaeae6;
+    --table-header: #e4e4df;
+    --table-stripe: #f5f5f2;
+    --tag-cpu: #dbeafe;
+    --tag-gpu: #d1fae5;
+    --tag-mem: #fce7f3;
+    --tag-topo: #ede9fe;
+    --tag-done: #cdebd4;
+    --tag-done-fg: #1d5c30;
+    --verdict-bg: #e6f4ea;
+    --verdict-border: #8fc9a3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #161618;
+      --fg: #e4e4e0;
+      --fg-dim: #8a8a84;
+      --accent: #6d9eff;
+      --accent-dim: #3a5a99;
+      --surface: #1e1e22;
+      --border: #333338;
+      --phase-bg: #1a2236;
+      --phase-border: #2a3a5a;
+      --warn-bg: #2a2218;
+      --warn-border: #5a4a28;
+      --code-bg: #222226;
+      --table-header: #242428;
+      --table-stripe: #1c1c20;
+      --tag-cpu: #1e3a5e;
+      --tag-gpu: #1a3a2e;
+      --tag-mem: #3a1e2e;
+      --tag-topo: #2a2240;
+      --tag-done: #1c4a2a;
+      --tag-done-fg: #86d99b;
+      --verdict-bg: #16301f;
+      --verdict-border: #2f6641;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #161618;
+    --fg: #e4e4e0;
+    --fg-dim: #8a8a84;
+    --accent: #6d9eff;
+    --accent-dim: #3a5a99;
+    --surface: #1e1e22;
+    --border: #333338;
+    --phase-bg: #1a2236;
+    --phase-border: #2a3a5a;
+    --warn-bg: #2a2218;
+    --warn-border: #5a4a28;
+    --code-bg: #222226;
+    --table-header: #242428;
+    --table-stripe: #1c1c20;
+    --tag-cpu: #1e3a5e;
+    --tag-gpu: #1a3a2e;
+    --tag-mem: #3a1e2e;
+    --tag-topo: #2a2240;
+    --tag-done: #1c4a2a;
+    --tag-done-fg: #86d99b;
+    --verdict-bg: #16301f;
+    --verdict-border: #2f6641;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    line-height: 1.6;
+    max-width: 52rem;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+  }
+
+  h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin: 0 0 0.25rem;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+  .subtitle {
+    color: var(--fg-dim);
+    font-size: 0.95rem;
+    margin: 0 0 2.5rem;
+  }
+  h2 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin: 2.5rem 0 0.75rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 2px solid var(--accent);
+    letter-spacing: -0.01em;
+  }
+  h3 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin: 1.5rem 0 0.5rem;
+    color: var(--accent);
+  }
+  p, li { font-size: 0.92rem; }
+  ul, ol { padding-left: 1.25rem; }
+  li { margin-bottom: 0.3rem; }
+
+  .phase {
+    background: var(--phase-bg);
+    border: 1px solid var(--phase-border);
+    border-radius: 6px;
+    padding: 1rem 1.25rem;
+    margin: 1rem 0;
+  }
+  .phase-title {
+    font-weight: 700;
+    font-size: 0.95rem;
+    margin-bottom: 0.5rem;
+  }
+  .warn {
+    background: var(--warn-bg);
+    border: 1px solid var(--warn-border);
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    margin: 1rem 0;
+    font-size: 0.88rem;
+  }
+  .verdict {
+    background: var(--verdict-bg);
+    border: 1px solid var(--verdict-border);
+    border-left-width: 4px;
+    border-radius: 6px;
+    padding: 0.9rem 1.1rem;
+    margin: 1.25rem 0;
+    font-size: 0.92rem;
+  }
+  code {
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.82rem;
+    background: var(--code-bg);
+    padding: 0.15em 0.35em;
+    border-radius: 3px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 0.8rem;
+    line-height: 1.5;
+  }
+  pre code {
+    background: none;
+    padding: 0;
+  }
+
+  .tag {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.1em 0.5em;
+    border-radius: 3px;
+    vertical-align: middle;
+    margin-right: 0.25rem;
+  }
+  .tag-cpu { background: var(--tag-cpu); }
+  .tag-gpu { background: var(--tag-gpu); }
+  .tag-mem { background: var(--tag-mem); }
+  .tag-topo { background: var(--tag-topo); }
+  .tag-done { background: var(--tag-done); color: var(--tag-done-fg); font-weight: 700; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    margin: 1rem 0;
+  }
+  th {
+    background: var(--table-header);
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    font-weight: 600;
+    border-bottom: 2px solid var(--border);
+  }
+  td {
+    padding: 0.4rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: var(--table-stripe); }
+
+  .overflow-x { overflow-x: auto; }
+  .dim { color: var(--fg-dim); }
+  .no { color: #b3261e; font-weight: 600; }
+  .yes { color: #1d5c30; font-weight: 600; }
+  :root:not([data-theme="light"]) .no { color: #f2938c; }
+  :root:not([data-theme="light"]) .yes { color: #86d99b; }
+  :root[data-theme="dark"] .no { color: #f2938c; }
+  :root[data-theme="dark"] .yes { color: #86d99b; }
+  .section-intro {
+    color: var(--fg-dim);
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+  }
+  hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 2rem 0;
+  }
+</style>
+
+<h1>LeanMD GPU Port</h1>
+<p class="subtitle">Porting LeanMD to GPUs as a benchmark for METIS-then-diffusion load balancing. Parked — <code>DiffusionLB</code> porting comes first. Companion to <code>DIFFUSION_GPU_LB_PLAN.html</code>.</p>
+
+<div class="warn">
+  <strong>Status, 2026-08-20.</strong> Not started, and deliberately not next. The
+  agreed order is: port <code>DiffusionLB</code> from <code>origin/diffusionlb</code>
+  onto <code>cupti_lb_reconverse</code> first (Phase A of
+  <code>DIFFUSION_GPU_LB_PLAN.html</code>), because that work is independent of which
+  benchmark it eventually runs on. This document exists so the LeanMD investigation
+  is not repeated from scratch later. Everything below was read out of the source at
+  <code>/home/aditya/LeanMD</code> (cloned from
+  <code>github.com/UIUC-PPL/LeanMD</code>) and is cited by file and line.
+  <p><strong>One thing already landed from this investigation:</strong> the
+  <code>n_migrateobjs</code> loop-bound bug in
+  <code>GreedyRefineCentralGPULB::fillData</code>, described under "Already fixed"
+  below. LeanMD is what exposed it; the fix is in and compiles.</p>
+</div>
+
+<h2>Why LeanMD is a candidate at all</h2>
+<p>pic2d failed as a benchmark for GPU-aware load balancing for reasons now measured rather than assumed: 24 host round trips per iteration (21 of them a Jacobi halo-exchange loop moving 43&nbsp;KB), kernels too narrow to occupy the SMs, and an elasticity of GPU work to step time of about 0.3. LeanMD offers four things pic2d does not.</p>
+<ul>
+  <li><strong>A correctness oracle.</strong> <code>Main::run</code> compares initial against final total energy against <code>ENERGY_VAR = 1e-5</code> and prints pass/fail. That catches migration corrupting state — the failure mode we currently have no automatic detector for. pic2d has nothing equivalent.</li>
+  <li><strong>A locality-blind starting point.</strong> See "What METIS actually fixes" below. The default Compute placement is round-robin, so a startup partitioner has a large, structural gain available rather than the single-digit percent projected for pic2d.</li>
+  <li><strong>Mixed migratability</strong>, which exercises code paths no current benchmark reaches.</li>
+  <li><strong>Real physics with real lineage</strong> — Lennard-Jones MD, the mini-app for NAMD, which is the application the Charm++ load-balancing literature is built on.</li>
+</ul>
+
+<h2>The object model</h2>
+<p class="section-intro">Two arrays with completely different economics. This asymmetry is the whole reason LeanMD is interesting, and the reason it is awkward.</p>
+<div class="overflow-x">
+<table>
+  <tr><th></th><th>Count (3×3×3)</th><th>Migratable</th><th>State carried</th><th>Load</th><th>Comm degree</th></tr>
+  <tr><td><code>Cell</code> (3D array)</td><td>27</td><td class="no">No — <code>setMigratable(false)</code>, <code>Cell.cc:31</code> and in the migration constructor</td><td>atom arrays, MB-scale</td><td>integration only</td><td>38 Computes</td></tr>
+  <tr><td><code>Compute</code> (6D array)</td><td>1026</td><td class="yes">Yes</td><td>~100 bytes: SDAG state, <code>stepCount</code>, two <code>CkSectionInfo</code>, <code>energy[2]</code> (<code>Compute.cc:63-74</code>)</td><td><strong>all the force work</strong></td><td>2 Cells</td></tr>
+</table>
+</div>
+<p>Computes per cell is <code>NUM_NEIGHBORS/2 + 1 = 38</code> with the default <code>KAWAY 2,2,1</code> (<code>NBRS 5×5×3 = 75</code>). The comm graph is bipartite and <strong>every Compute has degree 2</strong>. That single fact drives the rest of this document: a Compute's ideal home is wherever its two Cells live, and it costs nearly nothing to put it there.</p>
+
+<h3>How LB works when the load-bearing objects hold no data</h3>
+<p>Migrating a Compute moves ~100 bytes. What it actually relocates is (a) where the O(N<sub>A</sub>·N<sub>B</sub>) force computation runs, and (b) where the position multicasts and force reductions flow. This is the NAMD model — patches pinned, stateless computes free to move — and it means placement is the entire decision. A Compute for pair (A,B) sitting on A's PE needs one remote position stream and one remote reduction; on a third PE it needs four. Same load, double the traffic.</p>
+
+<h2>What METIS actually fixes</h2>
+<p>The strongest argument for this benchmark. <code>Cell.cc:69</code>:</p>
+<pre><code>int currPe = CkMyPe();
+...
+computeArray[index].insert((++currPe) % CkNumPes());</code></pre>
+<p><strong>Round-robin.</strong> All 1026 force computations are placed with no reference to where their Cells live, so both position multicasts and both force reductions are remote essentially always. Unlike pic2d — where <code>DefaultArrayMap</code> already yields a reasonable blocked layout and the projected startup-mapping gain was single digits — here the baseline is effectively random, and a communication-minimising partition at the first LB step has a large structural inefficiency to remove.</p>
+
+<h2>Why diffusion then works without modification</h2>
+<p><code>MetricComm::popBestObject(nbor)</code> (<code>DiffusionMetric.C:161-195</code>) selects, among objects fitting the neighbour's capacity, the one maximising <code>externalComm[nbor][i]</code> — whichever object already communicates most with the destination node.</p>
+<p>A Compute's entire communication is with its two Cells. So "the object that talks most to node N" is exactly "a Compute whose cells are on node N." <strong>The diffusion metric reproduces the NAMD placement heuristic with no LeanMD-specific code.</strong> Combined with ~100-byte transfers, diffusion can shed load aggressively with no migration-cost term fighting it.</p>
+
+<h2>The risk that decides whether this is worth doing</h2>
+<div class="warn">
+  <strong>Kernel granularity — resolve this before writing any code.</strong>
+  A Compute evaluates one cell-pair interaction. At the stock 100–250 atoms per cell
+  (<code>PARTICLES_PER_CELL_START/END</code>, <code>defs.h</code>) that is
+  10<sup>4</sup>–6×10<sup>4</sup> pair evaluations — a <em>tiny, narrow</em> kernel.
+  Launching 1026 of them per step reproduces pic2d's exact pathology in new
+  clothing: not kernels that are too short, but kernels too narrow to occupy the
+  SMs, which is what drove SM-normalised GPU load toward zero and elasticity to 0.3.
+  <p>Two ways out, and one must be chosen up front:</p>
+  <ul>
+    <li><strong>Much larger cells</strong> — raise <code>PARTICLES_PER_CELL_*</code> into
+    the thousands and widen <code>PTP_CUT_OFF</code>/<code>CELL_SIZE</code> to match.
+    Fewer, fatter Computes. Costs LB granularity (fewer objects to balance).</li>
+    <li><strong>Batch many Computes into one launch</strong> — keeps LB granularity
+    fine, but means a PE's resident Computes are co-scheduled, which complicates
+    attributing <code>gpuTime</code> back to individual objects. CUPTI attribution is
+    per-kernel, so batched objects would need their share estimated by pair count
+    rather than measured.</li>
+  </ul>
+  <p>The second preserves what makes LeanMD a good LB benchmark but weakens the
+  per-object GPU load measurement this whole branch exists to collect. The first is
+  simpler and is the recommended starting point.</p>
+</div>
+
+<h2>Decisions to make before porting</h2>
+<h3>1. Do Cells become migratable?</h3>
+<p>Stock LeanMD pins them, which makes this a <em>pure communication-objective</em> benchmark: migration cost is ~0 everywhere, so nothing exercises <code>gpuPupSize</code>, the export-and-pull path, the T1–T4 migration tiers, or the GPU memory constraint. Those are Phases 3, 4, G and H of the other two plans.</p>
+<p><strong>Recommendation: make Cells migratable.</strong> One line plus a PUP routine for the atom vector. It turns LeanMD into a full-stack test — Cells carry MB-scale device-resident atom arrays whose size correlates with load, which is the honest dilemma (the most valuable objects to move are the most expensive to move) and the only way the memory-capacity machinery gets tested.</p>
+
+<h3>2. METIS cannot express pinned vertices</h3>
+<p>If Cells stay pinned, plain <code>MetisLB</code> is wrong for the startup step: METIS 5.x <code>PartGraphKway</code> has no fixed-vertex support, so it would assign new PEs to all 27 Cells and <code>convertDecisions</code> would write migration targets for non-migratable objects. Either make Cells migratable (decision 1, which dissolves the problem) or use Scotch, which does support fixed vertices, as the startup partitioner.</p>
+
+<h3>3. Where GPU load lives</h3>
+<p>GPU-ifying <code>calcPairForces</code>/<code>calcInternalForces</code> (<code>physics.h</code>) puts <code>gpuTime</code> on <strong>Computes</strong> — the cheap-to-migrate array. That is the favourable arrangement: the balanced dimension sits on the objects that move nearly free. Under one process per device, diffusion's node-level equalisation is GPU-group equalisation directly.</p>
+
+<h2>Gotchas checklist</h2>
+<ol>
+  <li><strong>The <code>getVertexLoad()</code> 0.1&nbsp;s floor</strong> (<code>ckgraph.h:152</code>) flattens every vertex weight at this granularity — a Compute handling 100–250 atoms per side is orders of magnitude below it. METIS would partition with <em>uniform</em> weights: pure edge cut, no balance constraint. Survivable for a startup mapper, but not what the code appears to do. Same issue applies to <code>DiffusionCore.C:101</code>.</li>
+  <li><strong>Section proxies must survive migration.</strong> Cells reach Computes through multicast sections built in <code>Cell::createSection()</code>; <code>Compute::pup</code> carries <code>mcast1</code>/<code>mcast2</code> and resets <code>set_redNo(0)</code> on restart. Diffusion migrating Computes every LB step will exercise section rebuild far harder than LeanMD's stock <code>RefineLB</code> runs ever did.</li>
+  <li><strong>Load evolution is weak as shipped.</strong> Initial imbalance is a static linear ramp — <code>myNumParts = START + (myid*(END-START))/nCells</code>, <code>Cell.cc:10</code> — and atoms start on a lattice with ±0.1·<code>MAX_VELOCITY</code> jitter, a cold near-uniform system. Atoms redistribute only every <code>MIGRATE_STEPCOUNT = 20</code> steps. Genuine evolving load needs a driver: shock propagation through the LJ solid is the recommended mechanism (front velocity is set by the Hugoniot relations, giving an analytic check, and it proxies materials-science MD directly). Free expansion is easier but decays monotonically to uniform.</li>
+  <li><strong>Compute load is <code>N_A × N_B</code></strong>, so it evolves as cell populations change — and message sizes evolve with it, since positions and forces are both proportional to atom count. Load and communication move together here, unlike a fixed-size stencil.</li>
+  <li><strong>Energy conservation doubles as a migration oracle.</strong> Wire the pass/fail check into the test loop: any migration that corrupts device-resident state should break conservation. This is the single most valuable thing LeanMD brings.</li>
+</ol>
+
+<h2>Already fixed</h2>
+<p><code>GreedyRefineCentralGPULB::fillData</code> bounded its object loop by <code>stats->n_migrateobjs</code> while indexing <code>stats->objData[i]</code>. <code>n_migrateobjs</code> is a <em>count</em> of migratable objects (<code>CentralLB.C:485</code> computes it with <code>count_if</code> over the whole array), not an upper bound on their indices — <code>objData</code> is filled in per-PE registration order and never partitioned. The tail of <code>objData</code> was therefore neither balanced nor charged as background load; its load vanished from the objective entirely.</p>
+<p>Latent whenever every chare is migratable, which is why pic2d and jacobi2d never exposed it. LeanMD would trigger it immediately: 27 pinned Cells + 1026 migratable Computes gives <code>objData.size() = 1053</code> against <code>n_migrateobjs = 1026</code>, dropping 27 objects. Fixed by bounding the loop with <code>objData.size()</code> and sizing the <code>GObj</code> vector to match; <code>totalObjs</code> stays the migratable count because it bounds <code>migrationsAllowed</code>. This also corrects the <code>mean_oload</code> denominator, previously wrong whenever a non-migratable object sat in the prefix. Compiles clean.</p>
+<p>The same pattern exists in <code>GreedyRefineCentralLB.C</code> (lines 265 and 443) and was left alone — same two-line fix if that balancer is ever used on a mixed-migratability workload.</p>
+
+<h2>Suggested phase order, when this is picked up</h2>
+<div class="overflow-x">
+<table>
+  <tr><th>Phase</th><th>Work</th><th>Gate</th></tr>
+  <tr><td>L0. Decide granularity</td><td>Large cells vs batched launches (see the risk box). Estimate pair counts per kernel and confirm they can occupy the target device.</td><td>Do this on paper before any code</td></tr>
+  <tr><td>L1. Build and run stock</td><td>CPU LeanMD on <code>cupti_lb_reconverse</code>, energy check passing, with <code>GreedyRefineCentralLB</code>.</td><td>Energy conservation passes</td></tr>
+  <tr><td>L2. GPU force kernel</td><td>Port <code>calcPairForces</code>/<code>calcInternalForces</code>; atoms resident on device; positions/forces via device zerocopy.</td><td><strong>Elasticity E ≥ 0.8</strong> — scale GPU work 4×, require log-slope of step time. Fails ⇒ return to L0.</td></tr>
+  <tr><td>L3. Migratable Cells</td><td><code>setMigratable(true)</code> + atom-array PUP + device migration path.</td><td>Energy check still passes after migrations</td></tr>
+  <tr><td>L4. Evolving load</td><td>Shock driver. Report per-cell atom counts over time to confirm the front moves at the expected velocity.</td><td>Imbalance grows and <em>moves</em></td></tr>
+  <tr><td>L5. METIS + diffusion</td><td><code>+balancer MetisLB +balancer DiffusionLB</code>, no <code>+LBLoop</code>.</td><td>Beats round-robin baseline; migration count and external/internal comm ratio reported</td></tr>
+</table>
+</div>
+<p>L2's gate is the one that matters. The elasticity test — E = Δlog(step time)/Δlog(GPU work), measured by scaling the problem and requiring E ≥ 0.8 — is what pic2d fails at 0.3. A benchmark that fails it is measuring its latency chain, and any load-balancing result taken on it is noise. If LeanMD cannot pass L2 under either granularity option, it is not worth carrying further and the effort should go to a purpose-built proxy instead.</p>

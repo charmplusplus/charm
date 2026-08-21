@@ -1,0 +1,640 @@
+<title>Metis + Diffusion GPU Balancing</title>
+<style>
+  :root {
+    --bg: #fafaf8;
+    --fg: #1a1a1a;
+    --fg-dim: #5c5c5c;
+    --accent: #2563eb;
+    --accent-dim: #93b4f5;
+    --surface: #f0f0ec;
+    --border: #d4d4cf;
+    --phase-bg: #e8eef8;
+    --phase-border: #b8ccee;
+    --warn-bg: #fef3e0;
+    --warn-border: #e8c87a;
+    --code-bg: #eaeae6;
+    --table-header: #e4e4df;
+    --table-stripe: #f5f5f2;
+    --tag-cpu: #dbeafe;
+    --tag-gpu: #d1fae5;
+    --tag-mem: #fce7f3;
+    --tag-topo: #ede9fe;
+    --tag-done: #cdebd4;
+    --tag-done-fg: #1d5c30;
+    --verdict-bg: #e6f4ea;
+    --verdict-border: #8fc9a3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #161618;
+      --fg: #e4e4e0;
+      --fg-dim: #8a8a84;
+      --accent: #6d9eff;
+      --accent-dim: #3a5a99;
+      --surface: #1e1e22;
+      --border: #333338;
+      --phase-bg: #1a2236;
+      --phase-border: #2a3a5a;
+      --warn-bg: #2a2218;
+      --warn-border: #5a4a28;
+      --code-bg: #222226;
+      --table-header: #242428;
+      --table-stripe: #1c1c20;
+      --tag-cpu: #1e3a5e;
+      --tag-gpu: #1a3a2e;
+      --tag-mem: #3a1e2e;
+      --tag-topo: #2a2240;
+      --tag-done: #1c4a2a;
+      --tag-done-fg: #86d99b;
+      --verdict-bg: #16301f;
+      --verdict-border: #2f6641;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #161618;
+    --fg: #e4e4e0;
+    --fg-dim: #8a8a84;
+    --accent: #6d9eff;
+    --accent-dim: #3a5a99;
+    --surface: #1e1e22;
+    --border: #333338;
+    --phase-bg: #1a2236;
+    --phase-border: #2a3a5a;
+    --warn-bg: #2a2218;
+    --warn-border: #5a4a28;
+    --code-bg: #222226;
+    --table-header: #242428;
+    --table-stripe: #1c1c20;
+    --tag-cpu: #1e3a5e;
+    --tag-gpu: #1a3a2e;
+    --tag-mem: #3a1e2e;
+    --tag-topo: #2a2240;
+    --tag-done: #1c4a2a;
+    --tag-done-fg: #86d99b;
+    --verdict-bg: #16301f;
+    --verdict-border: #2f6641;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    line-height: 1.6;
+    max-width: 52rem;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+  }
+
+  h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin: 0 0 0.25rem;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+  .subtitle {
+    color: var(--fg-dim);
+    font-size: 0.95rem;
+    margin: 0 0 2.5rem;
+  }
+  h2 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin: 2.5rem 0 0.75rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 2px solid var(--accent);
+    letter-spacing: -0.01em;
+  }
+  h3 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin: 1.5rem 0 0.5rem;
+    color: var(--accent);
+  }
+  p, li { font-size: 0.92rem; }
+  ul, ol { padding-left: 1.25rem; }
+  li { margin-bottom: 0.3rem; }
+
+  .phase {
+    background: var(--phase-bg);
+    border: 1px solid var(--phase-border);
+    border-radius: 6px;
+    padding: 1rem 1.25rem;
+    margin: 1rem 0;
+  }
+  .phase-title {
+    font-weight: 700;
+    font-size: 0.95rem;
+    margin-bottom: 0.5rem;
+  }
+  .warn {
+    background: var(--warn-bg);
+    border: 1px solid var(--warn-border);
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    margin: 1rem 0;
+    font-size: 0.88rem;
+  }
+  .verdict {
+    background: var(--verdict-bg);
+    border: 1px solid var(--verdict-border);
+    border-left-width: 4px;
+    border-radius: 6px;
+    padding: 0.9rem 1.1rem;
+    margin: 1.25rem 0;
+    font-size: 0.92rem;
+  }
+  code {
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.82rem;
+    background: var(--code-bg);
+    padding: 0.15em 0.35em;
+    border-radius: 3px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 0.8rem;
+    line-height: 1.5;
+  }
+  pre code {
+    background: none;
+    padding: 0;
+  }
+
+  .tag {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.1em 0.5em;
+    border-radius: 3px;
+    vertical-align: middle;
+    margin-right: 0.25rem;
+  }
+  .tag-cpu { background: var(--tag-cpu); }
+  .tag-gpu { background: var(--tag-gpu); }
+  .tag-mem { background: var(--tag-mem); }
+  .tag-topo { background: var(--tag-topo); }
+  .tag-done { background: var(--tag-done); color: var(--tag-done-fg); font-weight: 700; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    margin: 1rem 0;
+  }
+  th {
+    background: var(--table-header);
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    font-weight: 600;
+    border-bottom: 2px solid var(--border);
+  }
+  td {
+    padding: 0.4rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: var(--table-stripe); }
+
+  .overflow-x { overflow-x: auto; }
+  .dim { color: var(--fg-dim); }
+  .no { color: #b3261e; font-weight: 600; }
+  .yes { color: #1d5c30; font-weight: 600; }
+  :root:not([data-theme="light"]) .no { color: #f2938c; }
+  :root:not([data-theme="light"]) .yes { color: #86d99b; }
+  :root[data-theme="dark"] .no { color: #f2938c; }
+  :root[data-theme="dark"] .yes { color: #86d99b; }
+  .section-intro {
+    color: var(--fg-dim);
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+  }
+  hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 2rem 0;
+  }
+</style>
+
+<h1>Metis + Diffusion GPU Balancing</h1>
+<p class="subtitle">One METIS partition to establish locality, then GPU-aware diffusion to maintain it. Supersedes the comm-term work in <code>COMM_AWARE_LB_PLAN.html</code>.</p>
+
+<h2>What changes, and why</h2>
+<p><code>COMM_AWARE_LB_PLAN.html</code> concluded: extend <code>GreedyRefineCentralGPULB</code>, reuse <code>ObjGraph</code>, don't adopt a balancer. That verdict rested on a survey of what this tree contains — and the survey missed a branch. <code>origin/diffusionlb</code> exists, it is communication-aware, and its comm bookkeeping is most of what the comm term was going to be built from scratch.</p>
+
+<p>It also appears to be the implementation behind the 2026 PDSEC result that reports <code>GreedyRefine</code> producing the best load balance and the worst communication locality of every strategy tested, with diffusion achieving a 2× improvement in maximum per-PE communication time on a PIC benchmark. Its <code>print_external_comm</code> / <code>print_internal_comm</code> entry points emit exactly the external/internal ratio that comparison used. If that is the same code, then the pic2d regression is a published property of the strategy family we inherited, and the fix is to change strategy rather than to patch a term onto the one that loses.</p>
+
+<div class="verdict">
+  <strong>New architecture: partition once, diffuse thereafter.</strong>
+  <strong>Step 0</strong> — <code>MetisLB</code> produces a communication-minimising
+  global assignment from a cold start.
+  <strong>Every step after</strong> — <code>DiffusionLB</code>, made GPU-load-aware,
+  maintains it with local, incremental, comm-aware transfers that never remap globally.
+  <p>The pairing is what makes each half work. The standing objection to partitioners
+  — that they remap everything at every LB step — costs nothing when run once, at the
+  first step, where there is no incumbent to preserve. The standing objection to
+  diffusion — that it is local, and slow to repair a globally bad assignment — is
+  answered by handing it a good one to start from. Neither objection survives the
+  combination.</p>
+</div>
+
+<h2>The sequencing is already built</h2>
+<p>No new mechanism is needed to run one balancer once and another forever after. <code>LBManager::nextLoadbalancer</code> (<code>LBManager.C:754-772</code>) advances through the balancer list and then <em>stays on the last entry</em>:</p>
+<pre><code>currentLBIndex = seq + 1;
+if (_lb_args.loop()) {
+  if (currentLBIndex == loadbalancers.size()) currentLBIndex = 0;
+} else {
+  if (currentLBIndex == loadbalancers.size()) currentLBIndex--;  // keep using the last one
+}</code></pre>
+<p>So the whole architecture is a command line:</p>
+<pre><code>./charmrun +p32 ./pic2d ... +balancer MetisLB +balancer DiffusionLB +LBCommOn</code></pre>
+<div class="warn">
+  <strong>Do not pass <code>+LBLoop</code>.</strong> It flips the branch above to
+  wrap-around, which would re-run METIS at every other LB step — the global remap
+  this architecture exists to avoid. The absence of that flag is load-bearing;
+  say so wherever the run command is documented.
+</div>
+<p>One consequence worth stating: METIS runs at the <em>first LB step</em>, not at construction, so it partitions using measured load and a measured communication graph gathered while the application ran under <code>DefaultArrayMap</code>. That is what we want — it needs the graph, and the graph requires having run — but it means the first LB interval is spent on a bad mapping, and the reported "before" numbers belong to that mapping rather than to METIS.</p>
+
+<h2>What is on <code>origin/diffusionlb</code></h2>
+<p class="section-intro">Last commit <code>30f6ef5d4</code>, 2026-05-01. Forked from main at 2024-08-15. Nine files, integrated in <code>Make.lb</code> as its own <code>libmoduleDiffusionLB</code>. No other branch contains it — not <code>main</code>, not any <code>cupti_lb*</code> branch.</p>
+<div class="overflow-x">
+<table>
+  <tr><th>File</th><th>Bytes</th><th>Role</th></tr>
+  <tr><td><code>DiffusionLB.C/.h/.ci</code></td><td>17.7K</td><td>Chare, SDAG protocol, neighbour negotiation (<code>findNBors</code>, <code>proposeNbor</code>, <code>askNbor</code>, MST barrier)</td></tr>
+  <tr><td><code>DiffusionCore.C</code></td><td>11.6K</td><td>The transfer loop — picks neighbour, picks object, migrates until the planned outgoing load is met</td></tr>
+  <tr><td><code>DiffusionMetric.C</code></td><td>12.1K</td><td><code>MetricComm</code> (comm-aware) and <code>MetricCentroid</code> (geometric) object selectors</td></tr>
+  <tr><td><code>DiffusionNeighbors.C</code></td><td>17.8K</td><td>Builds the diffusion neighbour topology from <code>commData</code></td></tr>
+  <tr><td><code>DiffusionHelper.C</code>, <code>DiffusionPseudo.C</code>, <code>DiffusionJSON.h</code></td><td>17.2K</td><td>Support, simulation mode, config</td></tr>
+</table>
+</div>
+
+<h3>What is genuinely comm-aware — and what isn't</h3>
+<p><code>MetricComm</code> walks <code>nodeStats-&gt;commData</code> directly with the same filter <code>ObjGraph</code> uses — <code>(!from_proc() &amp;&amp; recv_type() == LD_OBJ_MSG)</code> — and maintains per-object, per-neighbour structures:</p>
+<pre><code>std::vector&lt;double&gt; internalComm;               // internal comm for each obj
+std::vector&lt;std::vector&lt;double&gt;&gt; externalComm;  // external comm for each obj for each nbor</code></pre>
+<p>The selection rule (<code>DiffusionMetric.C:161-195</code>) is: among available, migratable objects whose load fits the destination's remaining capacity, take the one with <strong>maximum <code>externalComm[nbor][i]</code></strong> — send the object that already communicates most with the place it is going. That is the right rule, and it is the half of the design worth adopting.</p>
+
+<div class="warn">
+  <strong>The other half is disabled.</strong> <code>DiffusionCore.C:78-80</code>:
+  <pre><code>nid = (nid + 1) % neighborCount;      // change to round robin for now
+int nborId = nid;                     // metric-&gt;getBestNeighbor() is buggy (hangs)</code></pre>
+  Neighbour selection is round-robin. So load is offered to neighbours in arbitrary
+  order and only the <em>object</em> choice is communication-aware. Any claim that
+  "DiffusionLB is comm-aware" needs that qualification, and any measurement taken
+  before <code>getBestNeighbor</code> is fixed is measuring a half-enabled strategy.
+</div>
+
+<h2>The GPU-awareness gap: four sites, one scalar</h2>
+<p>Every load decision in DiffusionLB reads host CPU time. The GPU dimension that this branch exists to collect never enters.</p>
+<div class="overflow-x">
+<table>
+  <tr><th>Site</th><th>Code today</th><th>What it feeds</th></tr>
+  <tr><td><code>DiffusionCore.C:199</code></td><td><code>load[i] = nodeStats-&gt;objData[i].wallTime</code></td><td>the per-object load vector shipped between nodes</td></tr>
+  <tr><td><code>DiffusionCore.C:101</code></td><td><code>objs[v_id].getVertexLoad()</code></td><td>transfer accounting — decrements <code>my_loadAfterTransfer</code></td></tr>
+  <tr><td><code>DiffusionMetric.C:172</code></td><td><code>objLoad = nodeStats-&gt;objData[i].wallTime</code></td><td>the capacity filter inside <code>popBestObject</code></td></tr>
+  <tr><td><code>pe_load[]</code> / <code>my_load</code></td><td>summed <code>wallTime</code></td><td>the diffusion equalisation target itself</td></tr>
+  <tr><td><code>WithinNodeLB</code> (<code>DiffusionLB.C:281</code>)</td><td><code>getVertexLoad()</code> for residents, shipped raw <code>load</code> for arrivals</td><td>the intra-node heap — <em>two units compared against one threshold</em></td></tr>
+</table>
+</div>
+<p><strong>The work is one function, not five edits.</strong> Introduce a single <code>objLoad(const LDObjData&amp;)</code> and route all five sites through it. What it returns is the open modelling question — <code>max(wallTime, gpuTime)</code>, <code>wallTime + gpuTime</code>, or the α-blend that <code>GPU_LB_PLAN.html</code> Phase 2 describes — and routing everything through one function is what lets that question be answered later by changing one line rather than hunting call sites.</p>
+<p>The fifth site is the worst of them: <code>WithinNodeLB</code> weighs resident objects by the floored <code>getVertexLoad()</code> (0.1&nbsp;s each at pic2d granularity) and newly arrived objects by their shipped raw load (~10⁻⁴&nbsp;s), then compares both against the same <code>overLoad</code> threshold. The heap will systematically shuffle residents while placing arrivals arbitrarily. Phase A's "reproduces original behaviour" test passes with this bug intact — it is original behaviour — so it is a Phase B item, and it is why Phase B cannot be skipped for CPU-only runs either.</p>
+
+<h3>Don't pick the scalar — ship both dimensions</h3>
+<p>Deferring <code>objLoad()</code>'s definition is right; deferring the <em>protocol</em> is not. The <code>PseudoLoad</code> exchange carries a single <code>double</code> today, so every future change to the load model is a protocol revision. Widen it once, now, before any consumers exist:</p>
+<pre><code>// PseudoLoad message payload, per node:
+struct { double cpuLoad; double gpuLoad; double deviceFreeMem; };</code></pre>
+<p>Then the cross-node decision can be two-dimensional from day one, and the equalised dimension is chosen by measurement rather than baked in: under one process per device, cross-node <em>is</em> cross-device, so equalise summed <code>gpuTime</code> when the application is device-bound and per-PE CPU load when it is not — the Phase-2 α measurement in <code>GPU_LB_PLAN.html</code> already distinguishes the regimes. On pic2d, where <code>objGPU</code> is ~0.1% of step time, a gpuTime-equalising diffusion would chase noise; that is a property of the benchmark, not the design, and is why the validation matrix below leads with a device-bound workload.</p>
+<p><code>deviceFreeMem</code> rides along for the memory-capacity mechanism described under "GPU memory is a crash, not a constraint" below.</p>
+
+<div class="warn">
+  <strong>Two different load models are already running in the same loop.</strong>
+  <code>getVertexLoad()</code> is <code>MAX(compLoad, 0.1)</code>
+  (<code>ckgraph.h:152</code>). At pic2d's granularity every object sits below that
+  floor, so the transfer accounting at <code>DiffusionCore.C:101</code> sees every
+  object as weighing exactly 0.1&nbsp;s while the capacity filter at
+  <code>DiffusionMetric.C:172</code> reads real <code>wallTime</code> values three
+  orders of magnitude smaller. The loop therefore decrements its budget in units it
+  never checks against. Reconcile these before attributing any behaviour to the
+  algorithm — this alone could explain erratic migration counts.
+</div>
+
+<h2>Node versus GPU group — do not restructure</h2>
+<p>Diffusion is node-level throughout: <code>myNodeId</code>, <code>nodeSize</code>, and transfers addressed as <code>destPE = node * nodeSize</code>. The GPU decision is per-device. The tempting move is to rewrite diffusion in terms of GPU groups. Don't.</p>
+<p>Under <strong>one process per device</strong> — the precondition <code>GPU_LB_PLAN.html</code> already carries, and which holds on Delta at 4 processes × 8 PEs × 4 A40s — a Charm++ logical node <em>is</em> a GPU group, <code>myNodeId</code> <em>is</em> the device index, and the entire node-level algorithm becomes GPU-group-level with no structural change. Assert the precondition instead of engineering around it:</p>
+<pre><code>// In DiffusionLB setup: the two-level decomposition assumes one process per device.
+// If a logical node's PEs span more than one device, the node-level diffusion
+// is balancing across a boundary it cannot see. Detect and refuse.
+for (pe in myNode) CkAssert(hapiDeviceForPe(pe) == hapiDeviceForPe(rank0PE));</code></pre>
+<p>CPU balance <em>within</em> a device across its 8 PEs is handled, but not where the code suggests. <code>CascadingMigration</code> is dead — its body is <code>#if 0</code> (<code>DiffusionLB.C:537</code>) and its only call site sits inside a <code>CkAbort</code> branch. The live second level is <code>WithinNodeLB</code> (<code>DiffusionLB.C:281</code>): after cross-node migrations complete under quiescence detection, rank 0 heap-balances its residents <em>plus the newly arrived objects</em> across the node's PEs. Phase C's audit target is that function.</p>
+<div class="verdict">
+  <strong>The two-hop delivery is free on the device — claim it, don't fear it.</strong>
+  An object arriving cross-node lands on rank 0, then <code>WithinNodeLB</code> may
+  migrate it again to its final PE. That second hop is same
+  <code>CmiNode</code> and — under one process per device — same
+  <code>hapiDeviceForPe</code>, so it takes <code>emigrateIntraProcess</code>
+  (<code>cklocation.C:3229-3237</code>): raw pointer transfer, no PUP, no device copy.
+  The expensive cross-node pull happens exactly once; the fix-up hop costs nothing
+  on the device. The earlier open question about double device moves is resolved,
+  in this architecture's favour — <em>conditional on the one-process-per-device
+  assertion above actually holding</em>, which is one more reason to assert it
+  rather than assume it.
+</div>
+
+<h2>GPU memory is a crash, not a constraint</h2>
+<p>For a central balancer, ignoring GPU memory produces a bad placement. For this pipeline it produces an abort: the destination's pull path allocates the incoming chare's device payload from the device LB buffer pool <em>before</em> issuing pulls, and hard-fails when the pool cannot hold it — <code>immigrateGPUHandle</code>'s "Not enough memory on device Load balance buffer" <code>CkAbort</code>. <code>popBestObject</code>'s capacity filter checks load only; no <code>gpuAllocSize</code>, no pool budget.</p>
+<p>Diffusion makes this strictly worse than the central case, because the decisions are distributed: several overloaded nodes can independently select the same underloaded node in one LB step. Each transfer fits the destination's memory on its own; the sum aborts the run. A central LB can check a budget at assignment time — diffusion cannot, unless capacity is part of the protocol. That is what the <code>deviceFreeMem</code> field in the widened <code>PseudoLoad</code> message is for: each node advertises device headroom during the pseudo-LB rounds, senders decrement their local copy of it as they commit objects, and the round-trip nature of the pseudo rounds bounds the staleness. Conservative — headroom can be over-reserved, never over-committed.</p>
+<p>Consequence for ordering: the memory phase moves <strong>before the first multi-node GPU measurement</strong>, not after the tuning phases. An LB experiment that can abort mid-run on a full buffer pool is not producing measurements, it is producing reruns.</p>
+
+<h2>Tier-aware neighbour selection</h2>
+<p>Diffusion's whole cost profile rides on which nodes are neighbours: load only flows along diffusion edges, and every edge is also a migration route. <code>findNBors</code> negotiates neighbours from the communication graph and object counts; nothing in it knows that two devices on the same physical node exchange load over an IPC pull (25–240&nbsp;μs measured) while cross-node edges pay RDMA plus the staging synchronisation.</p>
+<p>The fix reuses the transport tier table from <code>COMM_AWARE_LB_PLAN.html</code> a third time:</p>
+<ul>
+  <li><strong>Seed, don't negotiate, the cheap edges.</strong> Every same-physical-node device pair becomes a diffusion edge unconditionally — on a 4-GPU node that is 3 free neighbours per node before the comm-graph negotiation runs, and it guarantees the cheapest transfer routes always exist regardless of what the MST finds.</li>
+  <li><strong>Give the fixed <code>getBestNeighbor()</code> its tie-break.</strong> When Phase F revives comm-aware neighbour choice, equal-deficit neighbours should be ordered by tier — prefer shedding load across PCIe before shedding it across the network.</li>
+</ul>
+
+<h2>Making METIS the right step 0</h2>
+<p>METIS ships inside this tree at <code>src/libs/ck-libs/metis/</code>, so <code>MetisLB</code> builds with no external dependency. Two changes make it the right partitioner for this job.</p>
+
+<h3>1. Vertex weights are currently uniform</h3>
+<p><code>MetisLB</code> weights vertices through <code>ObjGraph</code>, which means through <code>getVertexLoad()</code> and its 0.1&nbsp;s floor. On this workload <strong>every vertex weight is identical</strong>, so METIS is doing pure edge-cut partitioning with no balance constraint whatsoever. For a step-0 mapping on an already-balanced application that is nearly harmless — and it is also not what anyone reading the code would assume. Give it the GPU-aware <code>objLoad()</code> scalar, bypassing the floor. Keep <code>ncon = 1</code>: multi-constraint partitioning across a CPU and a GPU dimension that differ by three orders of magnitude spends METIS's freedom satisfying a dimension that cannot affect runtime.</p>
+
+<h3>2. Flat partitioning cannot see the tier hierarchy</h3>
+<p>METIS k-way has no notion of heterogeneous link cost, so a flat partition into 32 parts prices a cross-device cut exactly like a cross-PE-within-device cut, when the two differ by roughly 28×. The fix does not require METIS to support anything it doesn't — partition twice:</p>
+<pre><code>// Level 1: nGpuGroups parts. Minimises the expensive cut -- across devices.
+metisPartition(fullGraph, nGpuGroups);        // 4 parts on Delta
+
+// Level 2: within each part independently, nPEsPerGroup parts.
+// Minimises the cheap cut -- across PEs sharing a device.
+for (g in groups) metisPartition(subgraphOf(g), nPEsPerGroup);   // 8 parts each</code></pre>
+<p>This encodes the transport hierarchy structurally rather than numerically, and it produces exactly the two-level assignment the rest of this effort is organised around. It is also strictly cheaper than one 32-way partition.</p>
+<p>Part-to-PE remapping — the maximum-weight matching that keeps a partitioner from gratuitously relabelling — is <em>unnecessary here</em>. At the first LB step there is no incumbent worth preserving. This is the one place the standard objection genuinely does not apply.</p>
+
+<h2>Porting: cherry-pick the module, do not merge the branch</h2>
+<p><code>origin/diffusionlb</code> forked from main in August 2024 and was last touched in May 2026; <code>cupti_lb_reconverse</code> carries CUPTI instrumentation, device migration paths, GPU groups, and reconverse. Merging the branch would drag 21 months of unrelated divergence. The nine <code>Diffusion*</code> files are a self-contained LB module and the <code>Make.lb</code> integration is purely additive, so cherry-pick the files.</p>
+<p>Three things travel with them that are not files:</p>
+<ul>
+  <li><strong><code>_lb_args.diffusionCommOn()</code> does not exist on the target branch.</strong> It gates the entire comm-aware path (<code>DiffusionCore.C:36</code>); without it the build fails, and with it stubbed to false the strategy silently degrades to <code>MetricCentroid</code>. Port the argument alongside the code.</li>
+  <li><strong>DiffusionLB never calls <code>LBTurnCommOn()</code>.</strong> Unlike every other comm-aware balancer in this tree, it relies on the user passing <code>+LBCommOn</code>. Call it from the constructor, as <code>MetisLB.C:23</code> and the rest do — and note <code>MetisLB</code> already does, so the METIS step would work while the diffusion step silently saw an empty graph.</li>
+  <li><strong><code>LDStats</code> has changed since the fork</strong> — <code>gpuPupSize</code>, the user-data slot, and the CUDA-guarded fields. Expect the stats-shipping code in <code>DiffusionCore.C:312-340</code> to need attention.</li>
+</ul>
+
+<h2>Phases</h2>
+<div class="overflow-x">
+<table>
+  <tr><th>Phase</th><th>Work</th><th>Testable without GPUs?</th></tr>
+  <tr><td>A. Build it here</td><td>Cherry-pick nine files onto <code>cupti_lb_reconverse</code>, port <code>diffusionCommOn</code>, fix SDAG/charmxi drift, <code>LBTurnCommOn()</code> in the constructor. Behaviour unchanged, CPU-only.</td><td>Yes — this is the whole point of doing it first</td></tr>
+  <tr><td>B. GPU-aware load</td><td>One <code>objLoad()</code>, five call sites (including <code>WithinNodeLB</code>'s mixed-units heap), widen <code>PseudoLoad</code> to <code>(cpu, gpu, freeMem)</code>.</td><td>Partly</td></tr>
+  <tr><td>C. Assert node == GPU group</td><td>One-process-per-device assertion. Audit <code>WithinNodeLB</code> (not the dead <code>CascadingMigration</code>): arrival integration, CPU-awareness of the heap.</td><td>No</td></tr>
+  <tr><td>G. GPU memory capacity</td><td><code>gpuAllocSize</code> in the capacity filter <em>and</em> advertised <code>deviceFreeMem</code> in the pseudo rounds — prevents the distributed-senders abort. <strong>Before any multi-node GPU measurement.</strong></td><td>No</td></tr>
+  <tr><td>D. METIS as step 0</td><td><code>+balancer MetisLB +balancer DiffusionLB</code>. GPU-aware vertex weights. Verify the handoff actually happens at the right step.</td><td>Partly</td></tr>
+  <tr><td>E. Hierarchical METIS</td><td>Two-level partition, groups then PEs.</td><td>Partly</td></tr>
+  <tr><td>F. Re-enable the disabled half</td><td>Fix <code>getBestNeighbor()</code>'s hang with tier tie-break; seed same-physical-node neighbours; restore <code>objAvailable</code>; fix the <code>int</code> truncation.</td><td>Yes</td></tr>
+  <tr><td>H. Migration benefit/cost</td><td>Selection rule becomes <code>externalComm[nbor][i] / migCost(gpuPupSize_i, tier(nbor))</code>, amortised over the LB period — two objects with equal comm affinity can differ 10× in move cost.</td><td>No</td></tr>
+</table>
+</div>
+<p>Phase A before everything, and measured on its own. A cherry-picked research-quality LB module that builds and reproduces its original behaviour is a known-good starting point; one that is ported and GPU-ified in the same step is two unrelated failure modes in one changeset. G sits out of alphabetical order deliberately: it is the crash-prevention phase, and it gates every measurement that involves real device payloads on more than one node.</p>
+
+<h2>Phase A: done, and what it found</h2>
+<p class="section-intro">Ported onto <code>cupti_lb_reconverse</code> 2026-08-20. Builds, links, runs multi-process under <code>lcrun</code>, collects load <em>and</em> communication stats, and migrates objects both within and across nodes. What follows is the record of what was actually wrong, because four of the five defects share a signature: <strong>the code runs, prints, reports timings, and does nothing.</strong> None announced itself.</p>
+
+<div class="warn">
+  <strong>The working configuration today is</strong>
+  <code>+balancer DiffusionLB +LBDiffusionCommOn +LBnoMST +LBDiffusionNumNbors 2</code>.
+  Every one of those flags is load-bearing: without <code>+LBDiffusionCommOn</code> it
+  falls back to the geometric metric reading an unpopulated <code>position</code>
+  vector; without <code>+LBnoMST</code> it hangs; and at the default
+  <code>diffusionNumNbors = 1</code> it discovers zero neighbours and migrates nothing.
+</div>
+
+<div class="overflow-x">
+<table>
+  <tr><th>#</th><th>Defect</th><th>Symptom</th><th>Status</th></tr>
+  <tr><td>1</td><td><strong>Donor tip does not compile.</strong> <code>30f6ef5d4</code> "Diffusion changes" adds 8 uses of <code>isEligibleNeighbor</code> plus <code>minCommNeighborBytes</code> and <code>myNodeCache</code> to <code>DiffusionNeighbors.C</code>, touching only three <code>.C</code> files and never the header. Those symbols are declared nowhere in the repository.</td><td>Build failure</td><td>Using <code>784101be9</code>, the last self-consistent commit</td></tr>
+  <tr><td>2</td><td><strong><code>getVertexLoad()</code>'s 0.1&nbsp;s floor disabled within-node balancing entirely.</strong> The selection test is <code>getVertexLoad() &lt;= overLoad</code>; the floor reports every object as 0.1&nbsp;s while a typical <code>overLoad</code> is ~0.05&nbsp;s, so it is false for every object on every step.</td><td>Ran, printed, migrated nothing; max-after was bit-identical to max-before</td><td><strong>Fixed</strong> — use <code>getCompLoad()</code> (already existed, unfloored) in <code>DiffusionLB.C:347-359</code> and <code>DiffusionCore.C:95</code></td></tr>
+  <tr><td>3</td><td><strong>MST neighbour construction hangs.</strong> <code>beginMST</code> issues a <em>group</em> reduction but only rank-0 PEs reach it (<code>findNBors</code> returns early otherwise). A group reduction needs every branch to contribute, so it can never complete.</td><td>Prints "Beginning MST building", then silence</td><td>Worked around with <code>+LBnoMST</code>; see improvement 1</td></tr>
+  <tr><td>4</td><td><strong><code>diffusionNumNbors = 1</code> is a non-functional default</strong>, by two independent mechanisms. Non-MST path: <code>while (local_tries &lt; nborsNeeded / 2)</code> is <code>1/2 == 0</code>, so no neighbour is ever proposed. MST path: the candidate filter <code>sendToNeighbors.size() &lt; NUM_NEIGHBORS</code> blocks a node from proposing once it has one neighbour, but a spanning tree needs interior degree 2 — the code even has the guard <code>"MST can't add enough edges... Try adjusting NUM_NEIGHBORS"</code>.</td><td>Zero neighbours ⇒ empty <code>toSendLoad</code> ⇒ <code>loadReceivers = 0</code> ⇒ zero cross-node migrations</td><td>Workaround <code>+LBDiffusionNumNbors 2</code>; raise the default</td></tr>
+  <tr><td>5</td><td><strong>Adding <code>LDObjData::position</code> is an ABI change.</strong> Rebuilding only <code>moduleDiffusionLB</code> left <code>moduleCommonLBs</code> compiled against the old layout.</td><td>Segfault in <code>GreedyRefineCentralLB::fillData</code></td><td>Rebuild all LB targets after any <code>LDStats</code>/<code>LDObjData</code> change</td></tr>
+</table>
+</div>
+<p>Also ported, beyond the plan's original three items: <code>Heap_helper.C</code> (a tenth file the inventory missed), <code>LDStats::n_nodes</code>, three <code>InfoRecord</code> fields, and four <code>BaseLB</code> timing statics. And confirmed working: <code>LBTurnCommOn()</code> in the constructor — <code>traceComm=1</code> with no command-line flag, and 68–100 comm records per PE reaching <code>AssembleStats</code>.</p>
+
+<h2>Algorithm improvements</h2>
+<p class="section-intro">Suggested after reading the implementation end to end. Ordered by value; the first two are correctness-at-scale rather than tuning.</p>
+
+<div class="phase">
+  <div class="phase-title">1. Replace the MST with a ring backbone</div>
+  <p>The MST exists for exactly one reason: Phase 2 only converges if the neighbour graph is <strong>connected</strong>. A split graph converges to two different averages — permanently imbalanced, silently. Communication-derived neighbours do not guarantee connectivity on their own.</p>
+  <p>But a ring guarantees it far more cheaply: every node unconditionally adds <code>(myNodeId ± 1) % numNodes</code>, then fills its remaining <em>k−2</em> slots with top-communication partners. Connectivity by construction, no rounds, no reduction, nothing to hang.</p>
+  <p>This <strong>deletes defect 3 rather than debugging it</strong>, deletes the degree-starvation half of defect 4, and removes an O(numNodes)-round protocol that currently re-runs on every LB step. The cost is two possibly-low-traffic edges per node — acceptable, because those are a fallback path for load <em>flow</em>; <code>popBestObject</code> still routes objects preferentially along high-affinity edges.</p>
+</div>
+
+<div class="phase">
+  <div class="phase-title">2. The "distributed" balancer is centralised through PE 0</div>
+  <p>Every phase transition is a hand-rolled barrier that fans in to PE 0: <code>next_phase</code>, <code>next_MSTphase</code> and <code>pseudolb_barrier</code> all count <code>acks++</code> until <code>acks == numNodes</code>, via point-to-point messages — <em>every pseudo-LB round</em>. With <code>ITERATIONS 40</code> that is 40 sequential O(N) fan-ins per LB step.</p>
+  <p>Invisible at 2 nodes; at 1000 nodes the decentralised balancer has a central coordinator with an O(N) inbox per round — 40,000 messages serialised through one scheduler per LB step — which is the bottleneck diffusion exists to avoid.</p>
+
+  <p><strong>Anatomy of a round.</strong> Only two of the five steps are global:</p>
+  <pre><code>1. send my_pseudo_load to each neighbour     -- neighbour-local, fine
+2. when ReceiveLoadInfo x neighbourCount     -- neighbour-local, fine
+3. PseudoLoadBalancing():
+     send PseudoLoad to each neighbour       -- neighbour-local, fine
+     thisProxy[0].pseudolb_barrier(allZero)  -- GLOBAL: O(N) fan-in to PE 0
+4. when PseudoLoad x neighbourCount          -- neighbour-local, fine
+5. when pseudoDone(bool)                     -- GLOBAL: broadcast back from PE 0</code></pre>
+  <p>Those two exist for exactly one purpose: <strong>early termination</strong>.
+  <code>pseudolb_barrier</code> ANDs every node's <code>allZero</code> flag and, if all
+  nodes had nothing to send, <code>pseudoDone(true)</code> sets
+  <code>pseudo_itr = ITERATIONS</code> to break the loop.</p>
+
+  <div class="warn">
+    <strong>The obvious fix hangs.</strong> Replacing
+    <code>thisProxy[0]</code> with <code>contribute()</code> reproduces defect 3
+    exactly: <code>DiffusionLB</code> is a <code>group</code>, so a group reduction
+    needs every PE branch to contribute, and only rank-0 PEs execute
+    <code>PseudoLoadBalancing</code>. Same participation mismatch that killed
+    <code>beginMST</code>.
+  </div>
+
+  <p>Three viable routes, in increasing order of how much they change:</p>
+  <ul>
+    <li><strong>Tree reduction, participation fixed.</strong> Either have non-rank-0 PEs contribute the AND-identity (<code>allZero = 1</code>) — which means driving them through a round loop they currently skip, more invasive than it looks — or build a <code>CkSectionProxy</code> over exactly the rank-0 branches once at neighbour-construction time and reduce over that. The section is the cleaner fit: participation matches by construction and non-rank-0 PEs are untouched. O(N) inbox becomes O(log N) depth, semantics identical.</li>
+    <li><strong>Amortise the check.</strong> Diffusion converges monotonically, so checking 40 times to save a few rounds is a poor trade. Reduce only every <em>K</em> rounds (K ≈ 4–5): barriers drop 40 → 8 at a cost of at most K−1 wasted rounds. One guard on the contribute, composes with the above.</li>
+    <li><strong>Delete the barrier.</strong> The loop is already <code>for (pseudo_itr = 0; pseudo_itr &lt; ITERATIONS; pseudo_itr++)</code> — <em>fixed at 40</em>. The barrier's only job is early exit. Accept a fixed round count and Phase 2 becomes purely neighbour-local with zero global synchronisation. The cost is always paying the full count, but rounds move only doubles between neighbours, and with improvement 3 the count drops to ~7 — at which point deleting a distributed barrier to always run 7 cheap local rounds beats keeping one to sometimes run 5.</li>
+  </ul>
+
+  <p><strong>Recommended order:</strong> try deletion first behind a flag, since it removes the centralisation outright rather than making it cheaper. Only if measurement shows the early exit saves meaningful rounds on real workloads, fall back to section-reduction plus K-amortisation. Leave <code>next_phase</code> alone — it runs <code>ROUNDS=20</code> times but only during neighbour discovery, and improvement 7 makes that rare.</p>
+
+  <p><strong>Not testable here.</strong> At 2–4 nodes an O(N) fan-in and an O(log N) reduction are indistinguishable. This is a scaling fix and needs Delta, or at minimum a node count where the two separate, to demonstrate rather than assert. Deferred for that reason.</p>
+</div>
+
+<div class="phase">
+  <div class="phase-title">3. Second-order diffusion — the largest convergence win available</div>
+  <p><code>PseudoLoadBalancing</code> is first-order: move load proportional to the deficit against the neighbourhood average. That is Jacobi iteration, and load crosses one hop per round.</p>
+  <p>The published fix is second-order over-relaxation (Diekmann, Frommer &amp; Monien) — momentum on the flow:</p>
+  <pre><code>flow[nbor] = beta * firstOrderFlow(nbor) + (beta - 1) * prevFlow[nbor];</code></pre>
+  <p>Same relationship as SOR to Jacobi. On mesh-like graphs it cuts round counts by roughly a square root — 40 first-order rounds ≈ 6–7 second-order. A few lines, plus one previous-flow vector per neighbour. It compounds with improvement 2, because the rounds are precisely what carries the PE-0 barrier. β wants tuning against graph eigenvalues, but a fixed β ≈ 1.4–1.6 beats first-order on anything non-pathological.</p>
+</div>
+
+<div class="phase">
+  <div class="phase-title">4. Pay quotas best-fit, not first-fit</div>
+  <p>Phase 2 produces continuous quotas; Phase 3 pays them with discrete objects under <code>objLoad &lt;= nborCapacity</code>, taking the highest-affinity object that fits. Two consequences: a <strong>quantisation residue</strong> — owing 0.04&nbsp;s while holding only 0.05&nbsp;s objects pays nothing, and the imbalance survives the step — and comm affinity strictly dominating load fit.</p>
+  <p>Better: among high-affinity candidates pick the one minimising <code>|remainingQuota - objLoad|</code>, and permit bounded overshoot (~25% of quota). Overshooting slightly and letting the next round pull it back is how continuous diffusion is meant to behave. This directly caps how balanced the result can be, so it is cheap value.</p>
+</div>
+
+<div class="phase">
+  <div class="phase-title">5. Amortise migration cost — diffusion needs this more than a central LB does</div>
+  <p>Diffusion migrates small amounts frequently, which is its nature; so "does this move repay itself before the next LB step?" bites harder here than for a balancer that moves rarely. There is currently <em>no</em> cost test — any positive quota triggers migration.</p>
+  <p>Apply the epoch rule from <code>GPU_LB_PLAN.html</code>: move only when
+  <code>epochIterations * perIterationGain &gt; migCost(gpuPupSize, tier)</code>.
+  Negligible for CPU-only <code>lb_test</code>; decisive for GPU chares with MB payloads, where an object near a quota boundary can otherwise be diffused back and forth on alternating steps. The cheap version is hysteresis: do not migrate an object that arrived within the last LB step unless the gain doubles.</p>
+</div>
+
+<div class="phase">
+  <div class="phase-title">6. Migrate once, not twice</div>
+  <p>Cross-node objects migrate to the destination's rank 0, then <code>WithinNodeLB</code> migrates them again to a final PE. Under one process per device the second hop is the free intra-process pointer handoff, but the first hop's destination choice is wasted and each migration is a real PUP plus a location-manager epoch. Restructure so <code>LoadMetaInfo</code> records the incoming object, <code>WithinNodeLB</code> chooses its final PE first, and a single <code>Migrate(handle, finalPE)</code> is issued from the donor. One migration per cross-node move, and no transient where rank 0 hosts everything.</p>
+</div>
+
+<div class="phase">
+  <div class="phase-title">7. Persist the neighbour graph across LB steps</div>
+  <p><code>Strategy()</code> rebuilds neighbours from scratch on every invocation, running the full discovery protocol each time — but a stencil or mesh application's communication pattern barely changes between steps. Cache <code>sendToNeighbors</code> and rebuild only when the observed communication distribution shifts materially (say, the external/internal ratio moves more than a set percentage). Converts the per-step cost from "full protocol" to "nothing".</p>
+</div>
+
+<p><strong>If two are implemented first:</strong> the ring backbone (1), because it removes the MST hang rather than debugging it, and best-fit quotas (4), because it is small and its absence bounds achievable balance. The GPU-specific items — two-scalar pseudo-load, <code>deviceFreeMem</code> advertising, tier-aware neighbour seeding — are already covered in their own sections above and are not repeated here.</p>
+
+<h2>Measured outcomes and the percolation decision</h2>
+<p class="section-intro">What happened when the improvements met measurement, and the design decision that resolved the open questions. 2026-08-21.</p>
+
+<h3>Improvement 1: implemented, kept</h3>
+<p>The ring backbone is in (<code>buildRingBackbone</code>, <code>DiffusionNeighbors.C</code>). Binary result, immune to noise: the default flags used to hang in MST construction and now complete with migrations at 2 and 4 nodes — including at the previously-fatal default <code>diffusionNumNbors = 1</code>, because the ring ignores the neighbour cap. Connectivity is not negotiable, so it shouldn't be capped.</p>
+
+<h3>Improvement 4: implemented, measured, <strong>rejected</strong></h3>
+<p>Best-fit quota payment made things worse, twice over. With 25% overshoot the balancer churned ~6 objects per step and never settled — diffusion re-corrects every round by construction and does not need permission to overshoot; giving it that permission creates oscillation. With overshoot removed, five-run means at 4 nodes: first-fit <strong>1.058</strong> max/avg (spread 0.043), best-fit <strong>1.079</strong> (spread 0.109). Slightly worse and 2.5× more variable. Reverted.</p>
+<div class="warn">
+  <strong>The measurement lesson outlived the change.</strong> The first single-run A/B
+  pointed the opposite direction from the five-run means. <code>lb_test</code> derives
+  load from busy-wait calibration on a laptop, and its run-to-run variance is
+  comparable to the effect sizes under test. Every balance-ratio claim needs n≈5 runs
+  and a mean; integer results (round counts, migration counts, hang-vs-complete) are
+  the only single-run-trustworthy measurements here.
+</div>
+
+<h3>Rejected designs for the >1000-node target</h3>
+<ul>
+  <li><strong>Dimension exchange</strong> (hypercube pairwise averaging, log₂N rounds, provably balanced): optimises rounds-to-equalise, but the partner schedule is index-based — quotas point at nodes the objects have no affinity for, and object-level comm-awareness cannot rescue a topology-level mistake. Wrong objective.</li>
+  <li><strong>Long-range chords</strong> (ring + power-of-two offsets, log-diameter): every chord migration exiles a chare to a node it shares no communication with — a <em>per-iteration</em> cost paid forever to buy a <em>per-LB-step</em> convergence saving. This is the pic2d regression's shape. Mitigations exist (compute-dominant passengers only, ship connected clusters, affinity-based homing), but the decision was to not need them.</li>
+</ul>
+
+<h3>The decision: no-jumps diffusion</h3>
+<div class="verdict">
+  <strong>No jump edges — but convergence is still wanted.</strong> The topology is
+  comm edges plus ring, full stop; a quota can therefore only ever point at a node
+  the objects have a reason to be near, and every migration is one hop.
+  Convergence of the <em>pseudo</em> phase is a separate matter and is kept:
+  quotas are numbers, and numbers flowing A→B→C through the graph exile nobody.
+  When the pseudo phase converges, the multi-hop transport is realised as a
+  <em>chain of simultaneous one-hop migrations</em> — A pays B with A's objects
+  while B pays C with B's — so most of a hot region drains in a single LB step,
+  every move local and affinity-scored. What rolls over to later steps is only the
+  residue: a lightly-loaded conduit node that cannot forward as much as flows
+  through it, and quantisation. The thing being refused is exactly one thing:
+  <strong>moving a chare to a non-communicating node to buy convergence speed</strong>.
+  Convergence may cost extra rounds of cheap number-passing; it may never cost
+  locality.
+</div>
+<p>What the decision resolves:</p>
+<div class="overflow-x">
+<table>
+  <tr><th>Open question</th><th>Resolution under no-jumps</th></tr>
+  <tr><td>Chords, diameter probes, hysteresis</td><td><strong>Deleted.</strong> Convergence on a slow-mixing graph costs more pseudo rounds — doubles between neighbours — never chare exile. Slow is acceptable; wrong-place is not.</td></tr>
+  <tr><td>Improvement 3: second-order diffusion</td><td><strong>Implemented, default off.</strong> It accelerates precisely the phase that is allowed to be slow — the number-passing — at zero locality cost, taking equilibration from ~D² rounds toward ~D. But it only pays when the round budget is the binding constraint, and measurement says it is not at small node counts. See the measured results below.</td></tr>
+  <tr><td><code>ITERATIONS = 40</code> (a flagged placeholder: "TODO: Currently fixed iterations")</td><td>Remains a cap, not a target: run until the early exit fires or the cap binds. With second-order diffusion the exit should fire well under any reasonable cap; the cap wants to scale like the graph's mixing time, and measuring rounds-to-exit versus N is the integer-valued experiment that pins it.</td></tr>
+  <tr><td>Improvement 2: the PE-0 barrier</td><td><strong>Removed, and measured free.</strong> Phase 2 is now entirely neighbour-local: no global synchronisation, no O(N) fan-in. The round loop runs to the fixed <code>ITERATIONS</code> cap. See below.</td></tr>
+  <tr><td>Zero-affinity destinations in <code>popBestObject</code></td><td>Largely moot — quotas only ever point at comm neighbours and ring neighbours. For ring edges (the one remaining low-affinity case), prefer objects maximising <code>load / internalComm</code>: compute-heavy, weakly-entangled chares are the cheapest to move without an affinity signal.</td></tr>
+</table>
+</div>
+<p><strong>Implementation delta from current state:</strong> nothing removed. Add second-order flow to <code>PseudoLoadBalancing</code> (improvement 3, now unblocked), add the <code>load / internalComm</code> preference for ring-edge quotas, and add the one-hop assertion (migration destination ∈ neighbour set) in <code>updateState</code> as a permanent invariant of the design. Ring backbone, comm-neighbour rounds, <code>popBestObject</code> first-fit, the early exit, and the within-node heap all stay.</p>
+<p><strong>Validation:</strong> two integer-valued, noise-immune measurements. Locally: impose a skewed initial mapping at 4 nodes, count LB steps until max/avg stabilises, and confirm every migration one-hop via the assertion. For the >1000-node question — rounds-to-convergence versus N and blob radius, first- versus second-order — the pseudo phase is arithmetic on numbers, so it can be validated in a standalone simulation harness before touching the runtime: synthetic comm graphs (stencil, hub, random), synthetic load fields (gradient, hot blob), exact round counts.</p>
+
+<h3>Phase 2 rework: implemented and measured</h3>
+<p class="section-intro">Barrier removal and second-order diffusion, 2026-08-21. Five runs each at 4 nodes / 8 PEs / 64 objects, mesh2d; the figure is the final LB step's max/avg per-PE load.</p>
+<div class="overflow-x">
+<table>
+  <tr><th>Configuration</th><th>Mean final max/avg</th><th>Verdict</th></tr>
+  <tr><td>First-order + barrier (original)</td><td>1.058</td><td>baseline</td></tr>
+  <tr><td>First-order, <strong>barrier removed</strong></td><td><strong>1.060</strong></td><td><strong>Kept.</strong> Free — the difference is well inside run-to-run noise, and Phase 2 loses its only global synchronisation.</td></tr>
+  <tr><td>Second-order β=1.5, barrier removed</td><td>1.115</td><td><strong>Default off.</strong> Measurably worse at this scale.</td></tr>
+</table>
+</div>
+
+<div class="warn">
+  <strong>Why β=1.5 lost, and why that was predictable.</strong> The optimal
+  over-relaxation factor is
+  <code>β_opt = 2 / (1 + √(1 − μ²))</code>, where μ is the subdominant eigenvalue of
+  the first-order iteration — the per-round survival factor of the smoothest
+  imbalance the graph can hold. That formula is exactly where the SOR discriminant
+  vanishes, so <strong>β_opt is the critical-damping point</strong>: below it, slower
+  monotone approach; above it, oscillation with modulus β−1.
+  <p>μ depends on the graph, so β_opt does too. On an N-ring with step size α the
+  Laplacian eigenvalues are <code>2 − 2cos(2πk/N)</code>, giving
+  <code>μ = 1 − α·(2 − 2cos(2π/N))</code>:</p>
+  <ul>
+    <li><strong>N = 4</strong> (α ≈ 1/3): μ = 1/3, so <strong>β_opt ≈ 1.03</strong>. The graph mixes so fast that the right amount of momentum is essentially none — first-order already converges long before the round cap. β = 1.5 is far past optimum, which is precisely the regression measured.</li>
+    <li><strong>N = 1000</strong>: μ ≈ 0.99999, so <strong>β_opt ≈ 1.99</strong>. Here momentum is the difference between converging and not.</li>
+  </ul>
+  <p>So the default of 1.0 is not a fallback — at this node count it is within 3% of
+  theoretically optimal. A hardcoded 1.5 would have been wrong at both ends, which is
+  why β is a runtime knob (<code>+LBDiffusionBeta</code>) rather than a constant.</p>
+</div>
+
+<h3>The ~1.06 plateau is quantisation, not convergence</h3>
+<p>Every configuration lands near 1.06, including ones the linear theory says should reach 10⁻¹². That floor is <strong>object granularity</strong>: 64 objects over 8 PEs is 8 per PE, so one object is ~12.5% of a PE's load and a half-object misfit is ~6%. 1.058 and 1.060 are sitting on it. No value of β fixes discreteness, and the residue that survives even at β=1.5 comes from the implementation's nonlinearities — the 1% threshold zeroing small flows, the <code>leftToSend</code> clamp truncating boosted sends, the negative-edge offsetting — not from oscillation. <strong>Further pseudo-phase tuning buys nothing at this problem size</strong>; the binding constraint moved downstream.</p>
+
+<h3>Dynamic β: specified, deferred to ≥32 nodes</h3>
+<p>β_opt must scale with the graph, and μ is measurable from the iteration's own behaviour — the diffusion process <em>is</em> a power iteration, so the global load variance decays as μ<sup>2k</sup>:</p>
+<pre><code>mu   = (Var_R / Var_S) ^ (1 / (2*(R - S)))       // sample at rounds S~5 and R~30
+beta = clamp(2 / (1 + sqrt(1 - mu*mu)), 1.0, 1.95);</code></pre>
+<p><code>Var</code> needs Σ L and Σ L² — <strong>one reduction, two doubles</strong>, sampled twice per LB step. That is 2 global operations against the 80 (2 × 40 rounds) just deleted, and unlike the barrier its value <em>grows</em> with N. Reuse β across LB steps; topology is stable between them.</p>
+<p>Three practical rules: sample from round ~5, not 0, since the error only decays as a clean power law once it aligns with the dominant eigenvector; <strong>bias μ low</strong>, because underestimating gives β below optimum (slower but monotone) while overestimating gives genuine oscillation; and skip the update when <code>Var_R</code> is at the threshold floor, where the ratio is noise.</p>
+<p><strong>Not buildable here.</strong> Below ~32 nodes the correct answer is β = 1.0, which is already the default — an estimator whose right answer is the value you already have cannot be validated. Build it where the slow-mixing regime exists.</p>
+
+<h2>Defects to expect in the diffusion code</h2>
+<p class="section-intro">Beyond the five found in Phase A. Research code with visible rough edges; none disqualifying, all worth knowing before debugging behaviour that looks algorithmic.</p>
+<ul>
+  <li><strong><code>getBestNeighbor()</code> hangs</strong> and is bypassed by round-robin — the neighbour half of the comm-awareness is off. Note this is a <em>second</em> broken neighbour routine, independent of defect 3.</li>
+  <li><strong><code>objAvailable[bestObject] = false</code> is commented out</strong> in <code>popBestObject</code> (<code>DiffusionMetric.C:184-188</code>), so the same object can be selected repeatedly unless <code>updateState</code> covers it. Verify that it does.</li>
+  <li><strong><code>int testComm = externalComm[nbor][i]</code></strong> truncates a double byte-count to <code>int</code> — both a precision loss and a re-entry of the overflow hazard already documented for <code>LDCommData::bytes</code>.</li>
+  <li><strong><code>memset(gain_val, 100, n_objs)</code></strong> sets <code>n_objs</code> bytes of an <code>int</code> array to <code>0x64</code>. The gain-value machinery appears unused (<code>buildGainValues</code> and <code>InitializeObjHeap</code> are commented out), so this is likely dead — confirm before relying on it.</li>
+</ul>
+
+<h2>Validation</h2>
+<div class="warn">
+  <strong>The benchmark matrix was inverted — lead with the device-bound workload.</strong>
+  pic2d is already balanced and its GPU fraction is ~0.1% of step time: it can only
+  ever prove "did not get worse." The demonstration workload needs genuine imbalance
+  with a dominant GPU dimension, and one is already built in this tree:
+  <code>examples/charm++/cuda/gpudirect/jacobi2d-imbalance</code>. Primary benchmark
+  for Phases B and D; pic2d becomes the regression benchmark it was always suited
+  to be.
+</div>
+<ul>
+  <li><strong>Phase A:</strong> DiffusionLB on <code>cupti_lb_reconverse</code> reproduces its behaviour on <code>origin/diffusionlb</code> for a CPU benchmark. Migration counts and load summaries should match.</li>
+  <li><strong>Phase B:</strong> confirm <code>gpuTime</code> actually differentiates objects on <code>jacobi2d-imbalance</code> — and confirm it does <em>not</em> on pic2d, which is the measured justification for equalising the CPU dimension there instead. Phase 1's lesson was that a load dimension worth 0.1% of step time cannot drive a balancer.</li>
+  <li><strong>Phase D, the headline:</strong> pic2d iteration time against the two established numbers — 13.4&nbsp;ms with migration disabled, ~20&nbsp;ms with <code>GreedyRefineCentralGPULB</code>. The target is to beat the first, not merely the second.</li>
+  <li><strong>Locality, using their metric:</strong> <code>print_internal_comm</code> / <code>print_external_comm</code> are already in the code, and the external/internal ratio is the quantity the published GreedyRefine-versus-diffusion comparison reports. Using the same metric makes our numbers directly comparable to theirs rather than merely internally consistent.</li>
+  <li><strong>Regression:</strong> a genuinely imbalanced run must still migrate. Diffusion that converges to doing nothing is indistinguishable from success on pic2d, which is already balanced.</li>
+</ul>
+
+<h2>Open questions</h2>
+<ul>
+  <li><code>destPE = node * nodeSize</code> assumes uniform node size. Is that safe under the launch configurations we use?</li>
+  <li>Heterogeneous devices: when nodes carry different GPUs, the pseudo rounds should equalise <code>gpuLoad / capacity</code> rather than raw load. <code>ProcStats::gpu_total_sms</code> is already collected and is the natural capacity denominator — one more field the widened <code>PseudoLoad</code> message can carry, but only worth it on machines we actually target.</li>
+  <li>Is the PDSEC paper's implementation this branch, or a descendant of it? Worth resolving, because if it is, its reported numbers are a baseline we can reproduce rather than a claim we have to trust.</li>
+  <li>Does METIS's step-0 partition survive the first diffusion step, or does diffusion immediately undo it? The two optimise related but not identical objectives, and nothing currently prevents the second from discarding the first.</li>
+</ul>

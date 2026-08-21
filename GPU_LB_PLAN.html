@@ -324,27 +324,38 @@ predicted = α * (gpu + cpu) + (1 - α) * max(gpu, cpu);</code></pre>
     <tr><td>Pointer handoff</td><td>Same process, same GPU</td><td>0</td><td>~0</td></tr>
     <tr><td>MemcpyStrategy</td><td>Same process, cross GPU</td><td>∝ gpu_size (peer D2D)</td><td>~0</td></tr>
     <tr><td>IpcStrategy</td><td>Cross process, same node</td><td>∝ gpu_size (IPC D2D)</td><td><strong>synchronous pull wait, 25–240&nbsp;μs measured</strong></td></tr>
-    <tr><td>Staged path</td><td>Cross node</td><td>2× gpu_size (stage + ship)</td><td>cudaDeviceSync + alloc</td></tr>
+    <tr><td>Device-staged + GPUDirect</td><td>Cross node</td><td>gpu_size / HBM (pack) + gpu_size / net (ship) — <strong>never touches host memory</strong></td><td><code>cudaDeviceSynchronize</code> + comm-buffer alloc</td></tr>
   </table>
   </div>
   <p><strong>Design:</strong> Replace the flat B tolerance with a per-move cost model. For each candidate (object, destination PE) pair:</p>
-  <pre><code>// Migration cost in seconds (estimated)
-double migCost(int objIdx, int srcPe, int dstPe, size_t gpuBytes) {
-    if (CmiNodeOf(srcPe) == CmiNodeOf(dstPe)) {
-        if (sameGpuGroup(srcPe, dstPe))
-            return 0;                         // pointer handoff
-        return gpuBytes / PEER_BW;            // ~600 GB/s PCIe / NVLink
-    }
-    if (CmiPeOnSamePhysicalNode(srcPe, dstPe))
-        return IPC_OPEN_COST + gpuBytes / IPC_BW;
-    return STAGE_COST + 2 * gpuBytes / HOST_BW;
-}
+  <pre><code>// Migration cost in seconds:  migCost = alpha[tier] + beta[tier] * gpuPupSize
+// Tier comes from the ordered predicate in COMM_AWARE_LB_PLAN.html.
+//
+// T1 really is free here. emigrateIntraProcess (cklocation.C:3081) transfers
+// ownership of the live chare -- it ships raw element pointers, no PUP and no
+// device copy -- and cklocation.C:3229-3237 gates it on same CmiNode AND
+// hapiDeviceForPe(src) == hapiDeviceForPe(dst), returning before the
+// export-and-pull path is ever reached. Migration is the one place ownership
+// can transfer; communication is not (see the tier table's T1 note).
 
-// Only migrate if benefit exceeds cost:
-double benefit = loadReduction(obj, srcPe, dstPe);
-if (benefit > migCost(...) * costWeight)
+// Only migrate if benefit exceeds cost -- and the two must be in the same units:
+double benefit = epochIterations * perIterationGain(obj, srcPe, dstPe);
+if (benefit > migCost(...))
     migrate;</code></pre>
-  <p><strong>Bandwidth constants</strong> can be measured once at startup (a small D2D benchmark) or hard-coded per architecture.</p>
+  <p><strong>Bandwidth constants</strong> can be measured once at startup (a small D2D benchmark) or hard-coded per architecture. Calibrate at the application's actual message sizes, not at one large buffer: 590&nbsp;KB–5.9&nbsp;MB sits in the interconnect's un-saturated regime, where <code>bytes / PEAK_BW</code> systematically under-costs the transfer. Fit α and β together, and run the benchmark concurrently rather than pairwise — see the calibration section of <code>COMM_AWARE_LB_PLAN.html</code>.</p>
+
+  <div class="warn">
+    <strong>Sum-of-moves is the wrong shape for migration cost.</strong> A per-move
+    sum implicitly assumes migrations serialise. They do not — they proceed
+    concurrently, and what determines how long the migration phase takes is the
+    busiest endpoint, not the total. Track per-GPU-group <code>sentBytes[g]</code> and
+    <code>recvBytes[g]</code> during the assignment loop and define
+    <pre><code>migrationCost = beta * ( max_g sentBytes[g] + max_g recvBytes[g] ) + fixedOverhead;</code></pre>
+    Keep the per-move <code>migCost()</code> as the incremental decision rule, but do
+    not report the sum of it as the solution's migration cost — the aggregate is a
+    bottleneck quantity and has to be scored as one, the same way the communication
+    term is.
+  </div>
 
   <div class="warn">
     <strong>Measured on Delta (4× A40, 2026-08-17), superseding the estimates above.</strong>
@@ -369,7 +380,15 @@ if (benefit > migCost(...) * costWeight)
     assignment plus a reason to stay put is the combination that fixes the regression.
   </div>
   <div class="warn">
-    <strong>Prerequisite already met:</strong> per-object sizes are already in the stats. <code>LDObjData::gpuPupSize</code> gives the migration payload for the data-cost term, and the <code>_lb_obj_index</code> user-data slot gives the device allocation footprint. No new plumbing — read them the way <code>GreedyRefineCentralLB::fillData</code> already does (lines 307-308).
+    <strong>Prerequisite <s>already met</s> — half met.</strong> The data exists in
+    <code>LDStats</code>: <code>LDObjData::gpuPupSize</code> gives the migration payload
+    for the data-cost term, and the <code>_lb_obj_index</code> user-data slot gives the
+    device allocation footprint. But <code>GreedyRefineCentralGPULB</code> reads
+    <em>neither</em> — a grep for both in <code>GreedyRefineCentralGPULB.C/.h</code>
+    returns nothing. Add both to <code>GObj</code> and populate them in
+    <code>fillData</code>, mirroring <code>GreedyRefineCentralLB.C:307-308</code>.
+    Guard the reads with <code>#if CMK_CUDA &amp;&amp; CMK_LB_USER_DATA</code> plus a
+    runtime <code>CkpvAccess(_lb_obj_index) &gt;= 0</code> check.
   </div>
 </div>
 
@@ -384,7 +403,23 @@ if (chosen_gi != src_gi && obj->gpuPupSize > 0) {
     if ((size_t)(0.95 * grp[chosen_gi].gpu_mem_remaining) < obj->gpuAllocSize) → keep on src
 }
 // On accept: decrement both groups' pool budgets and dest group's gpu_mem.</code></pre>
-  <p><strong>Work:</strong> port this into <code>GreedyRefineCentralGPULB</code>'s assignment loop, with two refinements: credit <code>gpu_mem_remaining</code> back to the source group when an object leaves it, and skip the <code>pool_buff</code> veto for moves the new migration paths make staging-free (pointer handoff and export-and-pull don't consume the source LB buffer — only the destination's).</p>
+  <p><strong>Work:</strong> port this into <code>GreedyRefineCentralGPULB</code>'s assignment loop, with two refinements: credit <code>gpu_mem_remaining</code> back to the source group when an object leaves it, and skip the <code>pool_buff</code> veto for moves the new migration paths make staging-free (export-and-pull doesn't consume the source LB buffer — only the destination's).</p>
+  <div class="warn">
+    <strong>The veto is narrower than described, and the port should fix it rather than copy it.</strong>
+    The <code>gpuAllocSize</code> test sits inside the <code>gpuPupSize &gt; 0</code> gate,
+    so an object with a large resident device footprint and a small wire size skips
+    the GPU-memory check entirely — which contradicts this document's own
+    "Two GPU Sizes, Two Meanings" section. Hoist it out of that gate. Also raise the
+    effort estimate: this is not a pure port, because
+    <code>GreedyRefineCentralGPULB</code> does not yet read either size (see Phase 3).
+    <p><strong>And the veto needs a voice in the objective.</strong> A veto outside the
+    scalar objective is invisible to <code>receiveSolutions</code>: a solution that had
+    to decline moves for memory reasons reports the same <code>max_load</code> as one
+    that did not, and the fewest-migrations tie-break then quietly prefers the
+    constrained one. Have a solution that invoked the veto report a penalty — infinite
+    if any object could not be placed at all, or proportional to the overflow if
+    graceful degradation is wanted. This is the same lesson as Phase 1, in a new place.</p>
+  </div>
 </div>
 
 <!-- Phase 5 -->
@@ -429,9 +464,9 @@ recordSend(msg-&gt;array_element_id(),
 
   <p><strong>Remaining work:</strong></p>
   <ul>
-    <li><strong>Turn comm instrumentation on.</strong> <code>_lb_args.traceComm()</code> defaults to false (<code>LBManager.C:418</code>); it needs <code>+LBCommOn</code>. It is already gated by <code>StatsOn()</code>, so it respects the <code>LBTurnInstrumentOn/Off</code> window and costs nothing outside it.</li>
-    <li><strong>Build the graph.</strong> <code>ObjGraph</code> (<code>ckgraph.h</code>) already converts <code>LDStats::commData</code> into per-vertex <code>sendToList</code>/<code>recvFromList</code> with message and byte counts, handles multicast, and writes decisions back through <code>convertDecisions</code>. Reuse it rather than walking <code>commData</code> by hand.</li>
-    <li><strong>Add the term to the objective</strong>, scoring each candidate placement by the transport tier of every incident edge.</li>
+    <li><strong>Turn comm instrumentation on — from the constructor, not the command line.</strong> <code>_lb_args.traceComm()</code> does default to false (<code>LBManager.C:418</code>), but requiring the user to pass <code>+LBCommOn</code> is not how this tree does it: every comm-aware balancer here calls <code>LBTurnCommOn()</code> in its own constructor (<code>MetisLB.C:23</code>, <code>ScotchLB.C:23</code>, <code>ScotchTopoLB.C:25</code>, <code>ScotchRefineLB.C:20</code>, <code>RecBipartLB.C:119</code>, <code>ZoltanLB.C:62</code>). Do the same. It is already gated by <code>StatsOn()</code>, so it respects the <code>LBTurnInstrumentOn/Off</code> window and costs nothing outside it.</li>
+    <li><strong>Build the graph — and fix it first.</strong> <code>ObjGraph</code> (<code>ckgraph.h</code>) converts <code>LDStats::commData</code> into per-vertex <code>sendToList</code>/<code>recvFromList</code> with message and byte counts and writes decisions back through <code>convertDecisions</code>. Reuse it rather than walking <code>commData</code> by hand — but note three defects documented in <code>COMM_AWARE_LB_PLAN.html</code>: multicast lands in <em>separate</em> lists (<code>mcastToList</code>/<code>mcastFromList</code>) so a scorer walking only the edge lists prices it at zero; <code>ckgraph.C:79-83</code> indexes <code>vertices[]</code> with an unguarded hash result and can write <code>vertices[-1]</code>; and <code>getVertexLoad()</code>'s <code>MAX(compLoad, 0.1)</code> floor makes every vertex weight identical at this workload's granularity.</li>
+    <li><strong>Add the term to the objective</strong>, scoring each candidate placement by the transport tier of every incident edge — as a per-tier <code>alpha*msgs + beta*bytes</code>, and summed per PE <em>before</em> the max is taken, not as a separate max added to the load max.</li>
   </ul>
 
   <div class="warn">
@@ -440,7 +475,13 @@ recordSend(msg-&gt;array_element_id(),
     not placed yet. The standard treatment in a refinement balancer is to score
     against the peer's <em>new</em> PE if it has already been placed and its
     <em>old</em> PE otherwise — the old assignment is a good prior precisely
-    because most objects will not move.
+    because most objects will not move. <code>stats-&gt;to_proc</code> already holds
+    exactly this, so no new array is needed.
+    <p>Do <em>not</em> respond to it by sorting objects by communication. Communication
+    cost is non-monotone in the assignment, so no ordering of objects by it can be
+    consumed the way a greedy pass consumes descending load. Keep Phase 1's
+    <code>max(load, cpuLoad)</code> sort key and put the locality optimisation in a
+    bounded KL/FM boundary pass afterwards.</p>
   </div>
   <div class="warn">
     <strong>Watch for overflow.</strong> <code>LDCommData::bytes</code> is an
@@ -483,7 +524,8 @@ recordSend(msg-&gt;array_element_id(),
 </ul>
 
 <h3>Interaction with Existing LB Ecosystem</h3>
-<p>This LB can be composed via MetaBalancer or chained with other LBs. The two-level structure means it's a natural fit for HybridLB (GPU-aware at the node level, another strategy at the inter-node level). The cost model should be usable by other GPU-aware LBs, not locked into GreedyRefineCentralGPULB — consider factoring it into a shared utility.</p>
+<p>This LB can be composed via MetaBalancer or chained with other LBs. The cost model should be usable by other GPU-aware LBs, not locked into GreedyRefineCentralGPULB — consider factoring it into a shared utility.</p>
+<p><strong>Correction on hierarchical composition.</strong> An earlier draft called the two-level structure a natural fit for HybridLB. There is no HybridLB in this tree, and nothing here derives from <code>HybridBaseLB</code>. <code>TreeLB</code> is the hierarchical framework that <em>is</em> built, and its level protocol carries no communication data at any level — so slotting a comm-aware strategy into a TreeLB level is a stats-protocol change, not a configuration change. Out of scope for this plan; worth knowing before it is promised.</p>
 
 <hr>
 
@@ -493,12 +535,19 @@ recordSend(msg-&gt;array_element_id(),
   <tr><th>Phase</th><th>Effort</th><th>Prerequisite</th><th>Testable on 1 GPU?</th><th>Status</th></tr>
   <tr><td>1. Fix 0-migrations</td><td>Small — ~20 lines</td><td>None</td><td>Yes</td><td><strong>Done</strong> (<code>8166caea0</code>)</td></tr>
   <tr><td>6a. Device byte accounting</td><td>Small — 3 files</td><td>None</td><td>Yes</td><td><strong>Done</strong></td></tr>
-  <tr><td>6b. Communication term</td><td>Medium — ObjGraph + transport-tier scoring</td><td>6a</td><td>Partially (PE-level edges only)</td><td><strong>Next</strong></td></tr>
-  <tr><td>3. Migration cost</td><td>Medium — cost model + gpu_size in LDObjData</td><td>Phase 1</td><td>Partially (only pointer-handoff vs memcpy)</td><td>After 6b (shares its cost table)</td></tr>
+  <tr><td>0. Rule out the LB-frequency confound</td><td>Trivial — one re-run</td><td>None</td><td>Yes</td><td><strong>Do first</strong></td></tr>
+  <tr><td>6a′. <code>ObjGraph</code> defect fixes</td><td>Small — multicast lists, <code>vertices[-1]</code> guard, GObj index alignment</td><td>None</td><td>Yes</td><td>Blocks 6b</td></tr>
+  <tr><td>6b. Communication term</td><td>Medium — ObjGraph + transport-tier scoring</td><td>6a, 6a′</td><td>Partially (PE-level edges only)</td><td><strong>Next</strong></td></tr>
+  <tr><td>6c. KL/FM boundary refinement</td><td>Small — borrow <code>RecBipartLB::RefineBoundary</code></td><td>6b</td><td>Partially</td><td>Where the locality gain actually lands</td></tr>
+  <tr><td>3. Migration cost</td><td>Medium — cost model + <code>gpuPupSize</code> into GObj</td><td>Phase 1</td><td>Partially (only pointer-handoff vs memcpy)</td><td>After 6b (shares its cost table)</td></tr>
   <tr><td>5. Topology preferences</td><td>Small — weighted group selection</td><td>Phase 3</td><td>No (single node)</td><td>Folds into 3</td></tr>
-  <tr><td>4. Memory constraint</td><td>Small — port from GreedyRefineCentralLB</td><td>None (sizes already plumbed)</td><td>Yes (can verify no OOM)</td><td>Queued</td></tr>
+  <tr><td>4. Memory constraint</td><td><s>Small — port</s> Medium — port <em>plus</em> the size plumbing it assumed was done</td><td>Phase 3's <code>fillData</code> change</td><td>Yes (can verify no OOM)</td><td>Queued</td></tr>
   <tr><td>2. Overlap model</td><td>Medium — α calibration + prediction</td><td>Phase 1</td><td>Yes (α observable)</td><td>Deferred</td></tr>
 </table>
 </div>
 <p><strong>Why this order changed.</strong> The original order ran the phases as numbered. After Phase 1 landed and the balancer was measured on Delta, the binding problem turned out not to be that the compute model is imprecise, but that the balancer cannot see either of the two costs it is actually paying — the one-time cost of moving an object and the per-iteration cost of separating it from its neighbours. Of those, the communication term is the one that persists in steady state, and it is what the measurement points at, so Phase 6 leads. Phase 3 follows immediately because it reuses the same transport-tier cost table, and Phase 5 is small enough to fold into it as the group-selection term. Phase 2's overlap model only matters once the balancer stops making moves that lose more to migration and lost locality than they gain in compute.</p>
-<p>Phase 6 also pairs with work outside this document: a communication-minimizing <em>initial</em> mapping for pic2d, which currently uses <code>DefaultArrayMap</code> via a bare <code>CProxy_Patch::ckNew(nx, ny)</code>. A good starting assignment plus a balancer that can see what it would cost to break it is the combination that addresses the regression; either alone is unlikely to.</p>
+<p>Phase 6 also pairs with work outside this document: a communication-minimizing <em>initial</em> mapping for pic2d, which currently uses <code>DefaultArrayMap</code> via a bare <code>CProxy_Patch::ckNew(nx, ny)</code>. A good starting assignment plus a balancer that can see what it would cost to break it is the combination that addresses the regression; either alone is unlikely to. Expect single-digit percent from the map alone at 64 chares over 4 processes — it is worth doing because it is what the balancer's reluctance then preserves, not for its own headline number.</p>
+
+<p><strong>Phase 0 is new and comes first because it is nearly free.</strong> LB period is a variable neither document named. Re-run the Delta case with exactly one LB invocation before attributing the 52% regression to the assignment at all: if a single invocation already produces most of it, the assignment is the problem and this ordering is right; if it takes repeated invocations, the cheaper fix is to call the balancer less often, and everything below is a smaller win than it looks.</p>
+
+<p>The revisions marked throughout these two documents were made against the published literature on communication-aware load balancing and against the sources in this tree. <strong>The in-tree claims are cited by file and line and are checkable; the literature-derived ones are stated on their technical merits because citation verification was left incomplete.</strong> The split, and what still needs checking, is recorded under "Where the design claims come from" in <code>COMM_AWARE_LB_PLAN.html</code>.</p>

@@ -250,16 +250,33 @@
   <tr><td><code>GreedyRefineCentralLB</code></td><td>Yes</td><td class="no">No</td><td>Greedy packing plus migration-reluctance tolerance; GPU-group and memory aware on this branch</td></tr>
   <tr><td><code>GreedyRefineCentralGPULB</code></td><td>Yes</td><td class="no">No</td><td>Two-level: GPU load across groups, CPU load across PEs in a group</td></tr>
   <tr><td><code>GreedyCentralLB</code>, <code>DistributedLB</code>, <code>TreeLB</code></td><td>Yes</td><td class="no">No</td><td>Load only</td></tr>
-  <tr><td><code>ScotchLB</code>, <code>ScotchRefineLB</code>, <code>ScotchTopoLB</code>, <code>ZoltanLB</code></td><td class="no">Source present, not in the build</td><td class="yes">Yes</td><td>Scotch / Zoltan partitioners. <code>ScotchTopoLB</code> is architecture-aware mapping — closest in spirit to transport tiers</td></tr>
+  <tr><td><code>ScotchLB</code>, <code>ScotchRefineLB</code>, <code>ScotchTopoLB</code>, <code>ZoltanLB</code></td><td class="no">Source present, not in the build</td><td class="yes">Yes</td><td>Scotch / Zoltan partitioners. <code>ScotchTopoLB</code> maps onto a <em>hardcoded 3D torus</em> (<code>SCOTCH_archTorus3</code>, <code>ScotchTopoLB.C:144</code>) — expressing transport tiers would need <code>SCOTCH_archTleaf</code> with per-level link costs, a different architecture, not just a rebuild</td></tr>
   <tr><td><code>RefineCommLB</code>, <code>GreedyCommLB</code></td><td class="no">Not in this tree at all</td><td>—</td><td>—</td></tr>
 </table>
+</div>
+
+<div class="warn">
+  <strong>Two corrections to this table, from reading the sources.</strong>
+  <code>TreeLB</code> is listed as "load only" and that undersells the problem: its
+  level protocol carries no communication data <em>at all</em>, and nothing in this
+  tree derives from <code>HybridBaseLB</code>. So hierarchical composition of a
+  comm-aware strategy — floated at the end of <code>GPU_LB_PLAN.html</code> — is a
+  stats-protocol change, not a configuration change, and is out of scope here.
+  Second: every comm-aware balancer in this tree calls <code>LBTurnCommOn()</code>
+  from its own constructor (<code>MetisLB.C:23</code>, <code>ScotchLB.C:23</code>,
+  <code>ScotchTopoLB.C:25</code>, <code>ScotchRefineLB.C:20</code>,
+  <code>RecBipartLB.C:119</code>, <code>ZoltanLB.C:62</code>).
+  <code>GreedyRefineCentralGPULB</code> does not, which is what step 1 below has to fix
+  — asking the user for <code>+LBCommOn</code> is not how the rest of this tree does it.
 </div>
 
 <h2>Why none of them can be adopted as-is</h2>
 
 <div class="phase">
   <div class="phase-title">1. A partitioner's output is an arbitrary relabelling</div>
-  <p>METIS, Scotch and recursive bipartitioning all solve "cut this graph into <em>k</em> balanced parts." Nothing in that formulation says part 3 should be the part that already lives on PE 3. Run at every LB step, a partitioner therefore remaps nearly everything — which is precisely the failure mode we are trying to fix. Mitigations exist (seeding from the current assignment, matching parts to PEs by maximum overlap) but they are bolt-ons to a formulation that has no notion of an incumbent placement.</p>
+  <p>METIS, Scotch and recursive bipartitioning all solve "cut this graph into <em>k</em> balanced parts." Nothing in that formulation says part 3 should be the part that already lives on PE 3. Run at every LB step, a partitioner therefore remaps nearly everything — which is precisely the failure mode we are trying to fix.</p>
+  <p><strong>Scope this objection correctly.</strong> It holds for <code>MetisLB</code> (<code>METIS_PartGraphRecursive</code>, <code>MetisLB.C:164</code>), <code>ScotchLB</code> (<code>SCOTCH_graphPart</code>, <code>ScotchLB.C:140</code>), <code>ScotchTopoLB</code> (<code>SCOTCH_graphMap</code>, <code>ScotchTopoLB.C:146</code>) and <code>ZoltanLB</code> (<code>LB_APPROACH="PARTITION"</code>, <code>ZoltanLB.C:201</code>). It does <em>not</em> hold for <code>ScotchRefineLB</code>, which seeds from the incumbent assignment as a first-class part of its formulation — and none of the four above call the part-remapping step that would fix them.</p>
+  <p>Nor are the mitigations "bolt-ons." Matching parts to PEs by maximum overlap is a maximum-weight bipartite matching on the overlap matrix, with a greedy 2-approximation that runs in <em>O(E)</em>; the published penalty for skipping it is on the order of 5%. That is small next to pic2d's 52%, which means <strong>partitioner relabelling is probably not the dominant term in the regression we measured</strong> — the honest reason to extend the refinement balancer instead is objections 2–4, not this one. Keep the verdict; drop this objection's claim to being decisive.</p>
 </div>
 
 <div class="phase">
@@ -269,12 +286,25 @@
 
 <div class="phase">
   <div class="phase-title">3. Edge weights are transport-blind</div>
-  <p>In every one of these, a cut edge costs the same wherever it lands. On a multi-GPU node the same logical edge spans four cost tiers that differ by orders of magnitude — a same-device exchange versus a cross-node RDMA staged transfer. <code>findTransferModeDevice</code> already classifies exactly this for any <code>(src, dst)</code> pair, and none of the existing balancers consult it. <code>ScotchTopoLB</code> is the only one whose model could express it, and it is not in the build.</p>
+  <p>In every one of these, a cut edge costs the same wherever it lands. On a multi-GPU node the same logical edge spans four cost tiers that differ by orders of magnitude — a same-device exchange versus a cross-node RDMA staged transfer. None of the existing balancers consult the transport at all, and <code>ScotchTopoLB</code>, the only one whose model could express a hierarchy, hardcodes a 3D torus instead.</p>
+  <p><strong><code>findTransferModeDevice</code> does less than this document assumed.</strong> It is process-granular and returns three values, not four (<code>conv-core/conv-rdmadevice.C:7-19</code>): <code>MEMCPY</code> for same logical node, <code>IPC</code> for different logical node but same physical node, <code>RDMA</code> otherwise. Every intra-process pair — same device and cross device alike — collapses to <code>MEMCPY</code>. The T0/T1/T2 split has to come from elsewhere, as an explicit ordered predicate:</p>
+  <pre><code>Tier tierOf(int src, int dst) {
+    if (src == dst) return T0;                       // same PE — no message at all
+    switch (findTransferModeDevice(src, dst)) {
+      case MEMCPY: return gpu_device_id[src] == gpu_device_id[dst] ? T1 : T2;
+      case IPC:    return T3;
+      case RDMA:   return T4;
+    }
+}
+// The ordering is load-bearing: the src == dst test must precede the call,
+// and the gpu_device_id test only means anything inside the MEMCPY case.</code></pre>
 </div>
 
 <div class="phase">
   <div class="phase-title">4. Single load dimension, and it is the wrong one</div>
-  <p><code>ObjGraph</code> sets <code>CkVertex::compLoad = objData[v].wallTime</code> — host CPU time only. The SM-normalised <code>gpuTime</code> that this whole branch exists to collect never reaches the graph. METIS multi-constraint partitioning (<code>ncon = 2</code>) could carry CPU and GPU as separate balance constraints, which is a genuinely good fit, but objections 1–3 still stand.</p>
+  <p><code>ObjGraph</code> sets <code>CkVertex::compLoad = objData[v].wallTime</code> — host CPU time only. The SM-normalised <code>gpuTime</code> that this whole branch exists to collect never reaches the graph.</p>
+  <p><strong>Worse than the wrong dimension — a constant one.</strong> <code>CkVertex::getVertexLoad()</code> is <code>MAX(compLoad, 0.1)</code> (<code>ckgraph.h:152</code>). At pic2d's granularity every per-object load is far below 0.1 s, so every vertex weight the partitioners see is <em>identical</em>. Any A/B against <code>MetisLB</code> or <code>RecBipartLB</code> on this workload is measuring pure edge cut with uniform vertex weights, and reports a balance quality it did not actually compute. Fix or bypass the floor before drawing any conclusion from such a comparison.</p>
+  <p><strong>Do not reach for <code>ncon = 2</code>.</strong> An earlier draft called METIS multi-constraint partitioning a good fit for carrying CPU and GPU as separate balance constraints. With our skew it is actively harmful: the GPU term is ~0.1% of step time, and multi-constraint partitioning enforces every constraint to the same tolerance, so METIS spends its freedom satisfying a dimension that cannot affect runtime and gives up cut quality to do it. For the startup mapper below, use <code>ncon = 1</code> with a single scalar weight equal to the predicted per-object step-time contribution.</p>
 </div>
 
 <div class="verdict">
@@ -286,10 +316,19 @@
   <code>ObjGraph</code> (<code>src/ck-ldb/ckgraph.h</code>) already does the tedious
   half: it converts <code>LDStats::commData</code> into per-vertex
   <code>sendToList</code>/<code>recvFromList</code> with message and byte counts,
-  resolves object keys through the comm hash, handles multicast, and writes
+  resolves object keys through the comm hash, and writes
   decisions back via <code>convertDecisions</code>. Reuse it for plumbing and keep
   our own placement logic.
 </div>
+
+<h3>Three defects in <code>ObjGraph</code> to fix before building on it</h3>
+<p class="section-intro">All three are in shared code that every graph LB in this tree inherits. Own them as step-3 prerequisites rather than discovering them as symptoms.</p>
+<ul>
+  <li><strong>Multicast is not in the edge lists.</strong> An earlier draft said <code>ObjGraph</code> "handles multicast." It does, but in <em>separate</em> lists: only <code>LD_OBJ_MSG</code> reaches <code>sendToList</code>/<code>recvFromList</code> (<code>ckgraph.C:78-83</code>), while <code>LD_OBJLIST_MSG</code> goes to <code>mcastToList</code>/<code>mcastFromList</code> (<code>ckgraph.h:161-162</code>). A <code>commCost()</code> that walks only the first pair silently prices every multicast at zero.</li>
+  <li><strong><code>vertices[-1]</code> on a hash miss.</strong> <code>ckgraph.C:79-83</code> takes <code>from</code> and <code>to</code> straight from <code>stats-&gt;getHash()</code> and indexes with them unguarded; the equivalent loop in <code>BaseLB</code> checks first. A chare that communicated and then died inside the instrumentation window corrupts the vector. Two lines: <code>if (from &lt; 0 || to &lt; 0) continue;</code></li>
+  <li><strong>The 0.1-second vertex-load floor</strong> described under objection 4 — decide deliberately whether the comm term's companion load term should inherit it. It should not.</li>
+</ul>
+<p>A fourth, in our own code rather than <code>ObjGraph</code>: <code>GObj</code> indices and <code>ObjGraph</code> vertex indices coincide only over <code>[0, n_migrateobjs)</code>, because the balancer's fill loop stops there. Size the <code>GObj</code> vector to <code>stats-&gt;objData.size()</code> and <code>continue</code> past non-migratable objects after charging them as background, so the two index spaces agree unconditionally.</p>
 
 <h3>Worth borrowing rather than adopting</h3>
 <ul>
@@ -310,30 +349,101 @@
 <h2>What the balancer should do</h2>
 
 <h3>The cost table</h3>
-<p>One table, shared with Phase 3's migration cost. Tiers, not hard-coded numbers — the numbers are calibrated (see below).</p>
+<p>The same <em>tiers</em> as Phase 3's migration cost — but not the same numbers, and the place they diverge is T1. Tiers, not hard-coded values: the numbers are calibrated (see below). Each tier is a <em>pair</em> of constants, not one: a per-message fixed cost α and a per-byte cost β, applied as</p>
+<pre><code>tierCost(t, e) = alpha[t] * e.getNumMsgs() + beta[t] * e.getNumBytes();</code></pre>
 <div class="overflow-x">
 <table>
-  <tr><th>Tier</th><th>Condition</th><th>Mechanism</th><th>Relative cost</th></tr>
-  <tr><td>T0</td><td>Same PE</td><td>None — no message at all</td><td>0</td></tr>
-  <tr><td>T1</td><td>Same process, same GPU</td><td>Device pointer handoff</td><td>Near 0</td></tr>
-  <tr><td>T2</td><td>Same process, different GPU</td><td>Peer D2D copy</td><td>bytes / peer BW</td></tr>
-  <tr><td>T3</td><td>Same node, different process</td><td>CUDA IPC</td><td>bytes / IPC BW + handle overhead</td></tr>
-  <tr><td>T4</td><td>Different node</td><td>Host-staged RDMA</td><td>2 × bytes / host BW + staging</td></tr>
+  <tr><th>Tier</th><th>Condition</th><th>Mechanism</th><th>α (per message)</th><th>β (per byte)</th></tr>
+  <tr><td>T0</td><td>Same PE</td><td>None — no message at all</td><td>0</td><td>0</td></tr>
+  <tr><td>T1</td><td>Same process, same GPU</td><td>Same-device D2D copy <span class="dim">(migration: free handoff — see note)</span></td><td>copy launch</td><td>1 / HBM BW (~700 GB/s, A40)</td></tr>
+  <tr><td>T2</td><td>Same process, different GPU</td><td>Peer D2D copy</td><td>near 0</td><td>1 / peer BW (~25 GB/s, PCIe)</td></tr>
+  <tr><td>T3</td><td>Same node, different process</td><td>CUDA IPC</td><td>handle open + pull sync</td><td><em>same as T2</em></td></tr>
+  <tr><td>T4</td><td>Different node</td><td>GPUDirect RDMA, device→device</td><td>LRTS send + <code>cudaDeviceSync</code> <span class="dim">(migration only)</span></td><td>1 / network BW</td></tr>
 </table>
 </div>
-<p>The tier for any <code>(srcPe, dstPe)</code> pair is what <code>findTransferModeDevice</code> already returns, refined by <code>gpu_device_id</code> equality to split T1 from T2.</p>
+
+<div class="warn">
+  <strong>Three notes on the tier model.</strong>
+  <p><strong>Migration and communication diverge at T1 — do not share one number.</strong>
+  For <em>migration</em>, T1 genuinely is a pointer handoff and genuinely is free:
+  <code>emigrateIntraProcess</code> (<code>cklocation.C:3081</code>) ships raw element
+  pointers with no PUP and no device copy, and it is gated on same
+  <code>CmiNode</code> <em>and</em>
+  <code>hapiDeviceForPe(src) == hapiDeviceForPe(dst)</code>
+  (<code>cklocation.C:3229-3237</code>), returning before the export-and-pull path is
+  reached. Ownership transfers, so nothing moves.</p>
+  <p>For <em>communication</em> it cannot work that way: a ghost exchange writes into
+  a buffer the receiver already owns, so there is nothing to alias.
+  <code>CkDevicePersistent::get</code> takes the <code>MEMCPY</code> branch
+  (<code>ckrdmadevice.C:234</code>) and issues a full
+  <code>hapiMemcpyDeviceToDevice</code> — on the same device, but a real copy of
+  every byte. So T1's communication β is nonzero: on an A40 roughly
+  β<sub>T2</sub>/28, HBM rather than PCIe. Reserve 0 for T0, the only tier that
+  sends no message at all.</p>
+  <p>This is the one asymmetry between the two uses of the table, and it is
+  structural rather than a calibration detail: migration can transfer ownership,
+  communication cannot.</p>
+  <p><strong>T2 and T3 share a β.</strong> Both are peer device-to-device copies over
+  the same physical link; CUDA IPC does not make the wire slower. They differ in
+  α — the handle open plus the synchronous pull wait — and nothing else. Modelling
+  them as two bandwidth tiers double-counts a difference that lives entirely in the
+  fixed term.</p>
+  <p><strong>T4 is not host-staged, and the "2×" factor is not a host round trip.</strong>
+  Nothing on this path copies to host memory. Cross-node <em>communication</em> is
+  GPUDirect RDMA straight from the source device buffer. Cross-node
+  <em>migration</em> does stage, but into a <em>device</em> buffer:
+  <code>dm-&gt;alloc_comm_buffer</code> takes it from the device LB pool, the PUP packs
+  the chare's scattered device allocations into it with D2D copies, and
+  <code>sendGPUMsg</code> ships that contiguous region over GPUDirect
+  (<code>cklocation.C:3052-3072</code>, <code>3272-3310</code>). So the two-term shape
+  is right for migration — pack, then ship — but the pack term runs at HBM speed and
+  the ship term at network speed; neither is host bandwidth.</p>
+  <p>A genuinely host-staged path does exist in the source — <code>ckrdmadevice.C:501</code>,
+  commented "use a naive host-staged mechanism" — but it is behind
+  <code>#if !CMK_GPU_COMM</code>, and <code>CMK_GPU_COMM</code> is defined to 1
+  unconditionally at <code>ckrdmadevice.C:53</code>. It is dead code here. If it is
+  ever revived for a non-GPUDirect machine layer, T4's constants have to become
+  build-dependent — that fallback is roughly an order of magnitude worse and would
+  change which moves are worth making.</p>
+  <p><strong>T2 or T3 can silently collapse toward T4.</strong> When peer access is
+  unavailable between two devices, the runtime falls back to a slower path and
+  the cost jumps a tier with no change in the topology predicate. Probe
+  <code>cudaDeviceCanAccessPeer</code> at calibration time and demote the tier
+  explicitly rather than discovering it as an unexplained slowdown.</p>
+</div>
+
+<p>The tier for any <code>(srcPe, dstPe)</code> pair comes from the ordered predicate in objection 3 — <code>findTransferModeDevice</code> alone is process-granular and cannot split T1 from T2.</p>
 
 <h3>The objective</h3>
-<p>Per-iteration cost of a candidate assignment, as seen by the busiest resource:</p>
-<pre><code>cost(assignment) = max( maxGpuGroupLoad,        // existing, Phase 1
-                        maxPeCpuLoad )           // existing, Phase 1
-                 + commWeight * maxPeCommTime    // new
+<p>Charging communication to the PE that pays it, rather than summing it globally, is the right instinct: total edge cut is what a partitioner minimises, but what lengthens a step is one PE's inbox, and those differ whenever the cut is unevenly distributed. The first draft of the formula got the algebra wrong, though, in a way that matters.</p>
 
-// Communication charged to the PE that pays it, not summed globally --
-// a hot spot on one PE stalls the step even if total traffic is low.
-maxPeCommTime = max over pe of ( sum over edges (o, nbr) with place(o) == pe
-                                   of tierCost(pe, place(nbr)) * bytes(o, nbr) )</code></pre>
-<p>Charging communication to the busiest PE rather than summing it globally matters: total edge cut is what a partitioner minimises, but what lengthens a step is one PE's inbox, and those are different quantities whenever the cut is unevenly distributed.</p>
+<div class="warn">
+  <strong>Do not add maxima taken over different PEs.</strong> The drafted form was
+  <code>max<sub>p</sub>(comp<sub>p</sub>) + w · max<sub>p</sub>(comm<sub>p</sub>)</code>,
+  which charges the compute peak of one PE and the communication peak of a
+  <em>different</em> PE to the same imaginary processor. It over-counts whenever the
+  two peaks are on different PEs — the common case — and it is not the makespan of
+  any real assignment. Sum per PE first, then take the max.
+</div>
+
+<pre><code>// Per-PE time, then the bottleneck over PEs:
+peTime(p)  = cpuLoad(p)                       // Phase 1, overlap-adjusted by Phase 2
+           + commWeight * commTime(p);        // new
+
+cost(assignment) = max( max over groups g of gpuGroupLoad(g),   // separate resource
+                        max over pe p     of peTime(p) );
+
+// Send and receive run concurrently on a duplex link -- take the max, not the sum.
+commTime(p) = max( sum over outgoing cross-PE edges of tierCost(tier(p, nbrPe), e),
+                   sum over incoming cross-PE edges of tierCost(tier(nbrPe, p), e) );</code></pre>
+
+<p>The GPU-group term stays a separate max because it is a genuinely different resource; the CPU and communication terms do not, because they are both paid by the PE. Two further points on the inner sum:</p>
+<ul>
+  <li><strong>Charge an edge once per endpoint, as <code>max(sent, received)</code>.</strong> The earlier "an edge is charged once to each endpoint's PE" double-charges a duplex link the hardware runs concurrently. Accumulate <code>sendCost(p)</code> and <code>recvCost(p)</code> separately and combine with <code>max</code>. Keep the sum form behind a flag for the staged T4 path, where send and receive really do serialise through the host.</li>
+  <li><strong>Put each tier's α on the end that pays it.</strong> For T3 the fixed cost is the receiver's pull wait, not the sender's — so α<sub>T3</sub> belongs in <code>recvCost</code>. This is asymmetric and the code should say so.</li>
+</ul>
+
+<p>Keep <code>totalTierBytes = Σ<sub>edges</sub> tierCost(e)</code> as a <em>diagnostic</em> rather than an objective. It is the hop-bytes analogue, and it is the quantity that should fall when locality improves — which makes it the right sanity check for step 2's edge dump, and the wrong thing to optimise.</p>
 
 <h3>Scoring a candidate placement</h3>
 <pre><code>double commCost(int objIdx, int candidatePe) {
@@ -342,24 +452,45 @@ maxPeCommTime = max over pe of ( sum over edges (o, nbr) with place(o) == pe
     int nbrPe = (newPe[e.getNeighborId()] >= 0)   // placed already this pass?
                   ? newPe[e.getNeighborId()]      //   use the new decision
                   : oldPe[e.getNeighborId()];     //   else assume it stays put
-    c += tierCost(candidatePe, nbrPe) * e.getNumBytes();
+    c += tierCost(tierOf(candidatePe, nbrPe), e);   // alpha*msgs + beta*bytes
   }
-  // recvFromList likewise; an edge is charged once to each endpoint's PE
+  // recvFromList likewise, accumulated separately -- combine with max(), not +
+  // AND a third loop over mcastToList/mcastFromList; see below
   return c;
 }</code></pre>
 
+<p><strong><code>stats-&gt;to_proc</code> already implements the placed/unplaced rule.</strong> The <code>newPe</code>/<code>oldPe</code> ternary above is exactly what <code>to_proc</code> holds during a central LB's assignment pass — it is seeded from the incumbent and overwritten as decisions are made. No new bookkeeping array.</p>
+
+<h3>Three things the drafted <code>commCost</code> gets wrong</h3>
+<ul>
+  <li><strong>It drops every multicast edge.</strong> <code>sendToList</code>/<code>recvFromList</code> carry only point-to-point <code>LD_OBJ_MSG</code> traffic. Add a third loop over <code>mcastToList</code>/<code>mcastFromList</code>, and charge a multicast sender <em>once per distinct destination PE</em> — dedupe over the destination list — rather than once per destination object. This is also the one place where per-edge byte weighting genuinely over-counts: a multicast to eight objects that happen to share a PE is one message on the wire, not eight.</li>
+  <li><strong>It uses bytes only.</strong> With α and β per tier, use <code>e.getNumMsgs()</code> alongside <code>e.getNumBytes()</code>. At pic2d's 590&nbsp;KB–5.9&nbsp;MB payloads the α/β crossover falls <em>inside</em> the observed range at device bandwidths, so message count is not a rounding error. Charm++ already exposes <code>_lb_args.alpha()</code> and <code>_lb_args.beta()</code> — seed the cross-node tier T4 from them so existing tuning still applies.</li>
+  <li><strong>It considers every PE as a destination.</strong> Restrict the candidate set: an object's legal destinations are the groups/PEs already hosting at least one of its <code>ObjGraph</code> neighbours, <em>plus</em> the globally lightest group as an escape hatch. This is the published fix for exactly this regression shape, it makes the comm term cheap to evaluate, and the escape hatch is what keeps a genuinely imbalanced run from freezing.</li>
+</ul>
+
 <div class="warn">
-  <strong>Ordering hazard.</strong> A comm term inside a greedy loop is
-  order-dependent: when object <em>i</em> is placed, some of its neighbours are
-  not placed yet. Scoring against the peer's old PE when it has not yet been
-  placed is the standard treatment in a refinement balancer, and it is a good
-  prior here precisely because most objects will not move. Two refinements if it
-  proves insufficient: run a second scoring pass once all placements are known
-  (cheap — the assignment loop is not the bottleneck), or process objects in
-  graph order (BFS from a seed) rather than load order, so neighbours are
-  usually already placed. The second interacts badly with the descending-load
-  ordering that greedy packing needs, so prefer the second pass.
+  <strong>Ordering hazard — and the reason not to fix it with a comm-based sort key.</strong>
+  A comm term inside a greedy loop is order-dependent: when object <em>i</em> is
+  placed, some of its neighbours are not. Scoring against the peer's old PE is the
+  standard treatment and a good prior, since most objects will not move.
+  <p>An earlier draft proposed also reordering the sort key so that
+  heaviest-communicating objects are placed first. <strong>Don't.</strong>
+  Communication cost is non-monotone in the assignment — moving an object can
+  reduce one PE's comm time and raise another's — so there is no ordering of
+  objects by communication that a greedy pass can consume the way it consumes
+  descending load. Keep Phase 1's <code>max(load, cpuLoad)</code> ordering, which is
+  well-founded, and put the communication optimisation in a bounded
+  boundary-refinement pass afterwards.</p>
+  <p>What the ordering change would have cost is also quantifiable, and it is small:
+  longest-processing-time-first ordering guarantees a makespan within
+  4/3&nbsp;−&nbsp;1/(3<em>m</em>) of optimal, arbitrary order within
+  2&nbsp;−&nbsp;1/<em>m</em>. So abandoning load order risks at most about 1.5× in
+  balance on 32 PEs — recoverable by a refinement pass, but there is no reason to
+  pay it when the second pass is the better instrument anyway.</p>
 </div>
+
+<h3>The refinement pass, promoted</h3>
+<p><code>RecBipartLB</code>'s <code>RefineBoundary</code> was filed above under "worth borrowing." Promote it to a scheduled step. A single-level refinement balancer — which is what this is — is specifically weak on long, thin partitions, and a KL/FM gain-based boundary pass is the cheapest available mitigation: it only touches objects on a partition boundary, which is exactly where locality is won or lost. Run it after the greedy assignment, in BFS order over the <code>ObjGraph</code> seeded from the heaviest object, and bound it so it cannot worsen the balance the packing pass achieved.</p>
 
 <h3>Calibrating the constants</h3>
 <p>Three options, in increasing order of fidelity and effort:</p>
@@ -368,22 +499,58 @@ maxPeCommTime = max over pe of ( sum over edges (o, nbr) with place(o) == pe
   <li><strong>Micro-benchmark at startup.</strong> One D2D copy per tier on the first LB step. The IPC handle-open cost measured here also feeds the deferred A-vs-C staged-versus-IPC switching decision.</li>
   <li><strong>Learn from history.</strong> Record <code>(bytes, tier, elapsed)</code> for each actual transfer and fit. Most accurate, most machinery; defer.</li>
 </ol>
-<p>Start with (2) — it is a few dozen lines and removes the per-machine fragility of (1).</p>
+<p>Start with (2) — it is a few dozen lines and removes the per-machine fragility of (1). Two requirements on how (2) is run:</p>
+<ul>
+  <li><strong>Fit two numbers per tier, not one.</strong> A zero-byte round trip gives α; a large payload gives β. Print α/β alongside the tier table under <code>_lb_args.debug()</code> so the crossover is visible against the observed edge byte counts.</li>
+  <li><strong>Make it concurrent, not pairwise.</strong> A single idle-machine ping-pong systematically under-calibrates exactly the tiers the balancer exists to avoid, because the contention that makes T3 and T4 expensive only appears when many PEs transfer at once. For T2, have every GPU-bound PE issue its peer copy simultaneously and divide achieved aggregate bandwidth by the number of concurrent streams; for T3, have all PEs in a process pull at the same time. Calibrating on an idle machine tells you the tier ratios are mild, and then the balancer believes it.</li>
+</ul>
+<p>Express the results as dimensionless ratios against T1 rather than absolute bandwidths — it makes the table portable and makes a miscalibration obvious by inspection.</p>
 
-<h3><code>commWeight</code></h3>
-<p>The objective adds seconds of compute to seconds of communication, so in principle <code>commWeight</code> is 1 and the terms are directly comparable. In practice it should be exposed as a tunable, because the two are measured very differently: compute load comes from CUPTI and the LB timers, communication is <em>estimated</em> from a byte count and a bandwidth constant, with no account of overlap between communication and computation. Making it a parameter also lets it join the existing concurrent (A, B) search as a third dimension, so the best value is picked by measurement rather than argued about.</p>
+<h3><code>commWeight</code>, and why it should not be swept</h3>
+<p>The objective adds seconds of compute to seconds of communication, so <code>commWeight</code> is 1 by construction and the terms are directly comparable. Treat any need to deviate from 1 as evidence the tier calibration is wrong, not as a tuning opportunity.</p>
+
+<div class="warn">
+  <strong>The missing multiplier is not a weight — it is the epoch length.</strong>
+  The drafted objective adds a per-iteration cost to a one-time cost with no
+  conversion between them. Communication is paid every iteration until the next LB
+  step; migration is paid once, at the step. The factor relating them is the number
+  of application iterations the assignment will be in force — which Charm++ knows,
+  because it is the AtSync interval.
+  <pre><code>cost = max( maxGpuGroupLoad, max_p peTime(p) )   // per iteration
+     + migrationCost / epochIterations;           // amortised over the epoch
+
+// equivalently, and more readable in the assignment loop:
+//   epochIterations * (per-iteration cost) + migrationCost</code></pre>
+  With the measured 25–240&nbsp;μs migration cost and a typical LB period of 100
+  iterations, a per-iteration communication saving of a few microseconds already
+  repays the move — which is the calculation the balancer currently cannot do at all.
+</div>
+
+<p>So spend the third search dimension on something unknown, not on a quantity that has a derivation. The candidate worth sweeping is the <em>communication-to-migration</em> ratio, and even that has a published recipe: set it each step from measurement, as (inter-process communication time since the last LB step) / (measured migration time of the last LB step), clamped to a sane range with a fixed value on the first step. Keep a scalar override flag for experiments; make the default derived.</p>
+
+<h3>An alternative structure: balance as a constraint, communication as the objective</h3>
+<p>Worth stating because it addresses the root failure directly. The additive form is what let a 0.1% GPU term drive 32 migrations: any term in a weighted sum can dominate if the others are small enough. The constrained form cannot do that.</p>
+<pre><code>feasible(s)  :=  maxGpuGroupLoad(s) &lt;= (1+eps) * avgGpuGroupLoad
+             &amp;&amp;  maxPeCpuLoad(s)   &lt;= (1+eps) * avgPeCpuLoad;
+
+// among feasible solutions, minimise communication + amortised migration.
+// if none is feasible, fall back to today's pure load objective.</code></pre>
+<p>Neither of the two closest published systems uses an additive weighted objective; both make load a hard tolerance and communication the thing minimised inside it. The existing <code>A</code> refine tolerance is already the right knob to reuse for ε. This is a larger change than adding a term, so it is not the first move — but if the additive form proves hard to tune, this is where to go, not to more weights.</p>
 
 <h2>Implementation steps</h2>
 <div class="overflow-x">
 <table>
   <tr><th>#</th><th>Step</th><th>Notes</th><th>Status</th></tr>
   <tr><td>1</td><td>Device byte accounting on the send path</td><td>Without it every GPU edge weighs a few hundred bytes instead of megabytes</td><td><strong>Done</strong></td></tr>
-  <tr><td>2</td><td>Verify the graph is populated and weighted correctly</td><td>Run with <code>+LBCommOn</code>, dump edges under <code>_lb_args.debug() &gt; 1</code>, confirm 4 neighbours per interior chare at the expected byte counts</td><td>Next</td></tr>
-  <tr><td>3</td><td>Build <code>ObjGraph</code> in <code>work()</code>, add the tier table</td><td>Tier from <code>findTransferModeDevice</code> + <code>gpu_device_id</code></td><td></td></tr>
-  <tr><td>4</td><td>Add <code>commCost</code> to the inner PE choice and the outer group choice</td><td>Old-PE fallback for unplaced neighbours</td><td></td></tr>
-  <tr><td>5</td><td>Add <code>maxPeCommTime</code> to the reported objective</td><td>Must also appear in the objective, not only in the per-move decision, or the concurrent search cannot distinguish solutions</td><td></td></tr>
-  <tr><td>6</td><td>Sweep <code>commWeight</code> as a third search dimension</td><td>Reuses the existing <code>NUM_SOLUTIONS</code> machinery</td><td></td></tr>
-  <tr><td>7</td><td>Communication-minimising initial map for pic2d</td><td>2D blocked <code>CkArrayMap</code>; independent of steps 2–6 and testable on its own</td><td></td></tr>
+  <tr><td>1b</td><td>Call <code>LBTurnCommOn()</code> from the constructor</td><td>What every other comm-aware LB in this tree does. Not a user-facing <code>+LBCommOn</code> flag</td><td>Next</td></tr>
+  <tr><td>2</td><td>Verify the graph is populated and weighted correctly</td><td>Dump edges under <code>_lb_args.debug() &gt; 1</code>. Expect <strong>8 neighbours for every chare</strong> — the grid is periodic (<code>pic2d.C:390-391</code>), so there are no boundary chares — with the phi exchange touching only 4 of the 8 directions (<code>pic2d.C:627</code>)</td><td></td></tr>
+  <tr><td>2b</td><td>Fix the three <code>ObjGraph</code> defects</td><td>Multicast lists, the <code>vertices[-1]</code> guard, the <code>GObj</code> index alignment. Shared code; do it before anything depends on it</td><td></td></tr>
+  <tr><td>3</td><td>Build <code>ObjGraph</code> in <code>work()</code>, add the tier table</td><td>Ordered predicate, not <code>findTransferModeDevice</code> alone. Two constants (α, β) per tier</td><td></td></tr>
+  <tr><td>4</td><td>Add <code>commCost</code> to the inner PE choice and the outer group choice</td><td><code>stats-&gt;to_proc</code> supplies the placed/unplaced fallback. Restrict candidates to the neighbourhood plus the lightest group</td><td></td></tr>
+  <tr><td>5</td><td>Add the comm term to the reported objective</td><td>As <code>max<sub>p</sub>(cpuLoad + w·commTime)</code> — per PE first, then max. Must appear in the reported <code>max_load</code>, not only in the per-move decision</td><td></td></tr>
+  <tr><td>6</td><td><s>Sweep <code>commWeight</code></s> → derive the epoch multiplier</td><td><code>commWeight</code> is 1; the multiplier is the LB period in iterations. Spend the search dimension on the comm/migration ratio instead</td><td></td></tr>
+  <tr><td>6b</td><td>KL/FM boundary refinement pass</td><td>Borrowed from <code>RecBipartLB::RefineBoundary</code>. This is where the comm optimisation goes, since the sort key cannot carry it</td><td></td></tr>
+  <tr><td>7</td><td>Communication-minimising initial map for pic2d</td><td>2D blocked <code>CkArrayMap</code>; independent of steps 2–6 and testable on its own. See the scoping note below</td><td></td></tr>
 </table>
 </div>
 
@@ -401,11 +568,22 @@ maxPeCommTime = max over pe of ( sum over edges (o, nbr) with place(o) == pe
 <h2>Validation</h2>
 <p class="section-intro">Each step is measurable on its own; do not stack them before measuring.</p>
 <ul>
-  <li><strong>Step 2, single GPU:</strong> edge dump matches the known 5-point stencil. This catches a broken graph before any placement logic depends on it.</li>
+  <li><strong>Step 2, single GPU:</strong> edge dump shows 8 neighbours for <em>every</em> chare, not 4 for interior ones — pic2d's grid is periodic. An acceptance criterion of "4 per interior chare" would flag a correct graph as broken. Check the phi edges separately: those are 4-way.</li>
   <li><strong>Step 7 alone, no LB:</strong> blocked map versus <code>DefaultArrayMap</code>, migration disabled. Isolates the initial-mapping gain from everything else.</li>
-  <li><strong>Steps 3–5, 4 processes × 8 PEs on Delta:</strong> the headline number is iteration time with the balancer against the 13.4&nbsp;ms no-migration baseline. Migration count should fall well below 32/64, but count is a diagnostic — time is the result.</li>
+  <li><strong>Steps 3–5, 4 processes × 8 PEs on Delta:</strong> the headline number is iteration time with the balancer against the 13.4&nbsp;ms no-migration baseline. Migration count should fall well below 32/64, but count is a diagnostic — time is the result. Report <code>totalTierBytes</code> and max-per-PE comm time alongside it: if wall time improves and neither of those moved, the improvement came from somewhere else.</li>
   <li><strong>Regression:</strong> a genuinely imbalanced run must still migrate. A comm term that simply freezes everything in place is not a fix, and would look identical to success on pic2d, which is already balanced.</li>
+  <li><strong>Rule out the frequency confound first.</strong> LB period is a variable this plan never named, and for a regular stencil the published answer is "balance once, early." Before attributing the 52% regression to the assignment at all, re-run the Delta case with exactly <em>one</em> LB invocation and compare. If a single invocation is most of the regression, the assignment is the problem and this plan is aimed correctly; if repeated invocations are, the cheaper fix is to stop calling the balancer.</li>
 </ul>
+
+<div class="warn">
+  <strong>Scope step 7 honestly.</strong> The surface-to-volume argument for a 2D
+  blocked map over <code>DefaultArrayMap</code>'s strips is real, but at pic2d's
+  actual configuration — 64 chares over 4 processes — the arithmetic gives a
+  single-digit percentage improvement in cut, not a qualitative win. It is worth
+  doing because it is cheap and because a good starting assignment is what the
+  balancer's reluctance then preserves, not because it will move the headline
+  number on its own. Say so, so that a measured ~8% is not read as a failure.
+</div>
 
 <div class="warn">
   <strong>The honest risk.</strong> pic2d may be the wrong benchmark to prove
@@ -424,4 +602,31 @@ maxPeCommTime = max over pe of ( sum over edges (o, nbr) with place(o) == pe
   <li><strong><code>LDCommData::bytes</code> is an <code>int</code>.</strong> At 5.9&nbsp;MB per message that is roughly 360 messages per edge before it wraps. The narrow <code>LBTurnInstrumentOn/Off</code> window keeps this safe today; widening the field is an ABI change across every LB and every stats message.</li>
   <li><strong>Group and nodegroup device sends</strong> bypass <code>CkArray::sendToPe</code>, so their payload size is discarded rather than recorded. Harmless while only array elements form object-to-object edges, but it is why the take-and-clear on the array path must stay unconditional.</li>
   <li><strong>Overlap between communication and computation</strong> is not modelled — the objective adds them. This is the same question Phase 2 asks about CPU/GPU overlap, and probably wants the same answer.</li>
+  <li><strong>A GPU group is a (physical node, device) pair, not a process.</strong> The two-level decomposition silently assumes exactly one process per device; the identity breaks otherwise. Add an assertion in the group-building loop — if any group's <code>peIds</code> span more than one <code>CmiNodeOf</code> value, log it and fall back — rather than leaving the precondition implicit.</li>
+  <li><strong><code>CMK_CUDA</code> is defined to 0 in non-CUDA builds</strong> (<code>conv-config.h:123</code>), not left undefined, so both balancers' <code>#ifndef CMK_CUDA</code> branches are dead in <em>every</em> build. Normalise every guard to <code>#if CMK_CUDA</code> before adding more of them.</li>
 </ul>
+
+<h2>Where the design claims come from</h2>
+<p class="section-intro">This plan was revised against the published literature on communication-aware load balancing and against the sources in this tree. Two different standards of evidence apply, and they are kept separate deliberately.</p>
+
+<p><strong>In-tree claims</strong> — the <code>ObjGraph</code> defects, the tier predicate, <code>ScotchTopoLB</code>'s torus, the <code>LBTurnCommOn</code> convention, the vertex-load floor, pic2d's periodic 8-neighbour stencil, the <code>CMK_CUDA</code> guard — were each read out of the sources and are cited inline by file and line. They are checkable and should be checked when touched.</p>
+
+<p><strong>Literature-derived claims</strong> drove the following revisions: the bottleneck objective form (sum per PE, then max), send/receive as a max rather than a sum, the two-constant α/β tier model, the epoch multiplier relating per-iteration communication to one-time migration, deriving rather than sweeping the weight, restricting candidate destinations to the communication neighbourhood, the non-monotonicity argument against a comm-based sort key, the Graham bounds on ordering, the balance-as-constraint alternative, concurrent rather than pairwise calibration, and the migration-cost-as-bottleneck-metric change in <code>GPU_LB_PLAN.html</code> Phase 3.</p>
+
+<div class="warn">
+  <strong>Citation status.</strong> The underlying sources were collected and
+  partially fact-checked; verification completed for the objective-theory and
+  greedy-algorithm strands and did not complete for the transport-mapping,
+  repartitioning, GPU-heterogeneous, and evidence strands. No claim above is
+  reproduced here as a quotation or attributed to a named work, precisely because
+  that verification is incomplete — each is stated on its own technical merits and
+  can be evaluated as such. Before any of this is cited in a paper or a commit
+  message, re-derive the attribution.
+  <p>One claim is worth completing the check on specifically: a 2026 PDSEC paper is
+  reported to evaluate the <code>GreedyRefine</code> family against communication-aware
+  diffusion and to find the same signature we measured — best max/avg load ratio of
+  every strategy tested, worst communication locality, with a 2× gap in maximum
+  per-PE communication time on a PIC benchmark. If that holds up, the pic2d
+  regression is not a bug in our port but a published property of the strategy we
+  inherited, and it belongs at the top of this document rather than in a footnote.</p>
+</div>
