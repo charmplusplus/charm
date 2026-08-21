@@ -663,7 +663,16 @@ void GreedyRefineCentralLB::work(LDStats *stats)
       }
     }
 
-    if(obj->oldPE >= 0 && peToGrpIdx[obj->oldPE] == chosen_gi)
+    // Look the old PE up rather than indexing: peToGrpIdx holds only available
+    // PEs, and operator[] would insert a 0 for a missing one. An object being
+    // moved off an unavailable PE would then match whenever the chosen group
+    // is group 0, and be sent straight back to the PE that is going away. That
+    // PE is not in procHeap, so the removal below corrupts the heap and the
+    // strategy dies somewhere unrelated. The same lookup is done correctly a
+    // few lines above when computing src_gi.
+    auto oldIt = (obj->oldPE >= 0) ? peToGrpIdx.find(obj->oldPE)
+                                   : peToGrpIdx.end();
+    if (oldIt != peToGrpIdx.end() && oldIt->second == chosen_gi)
       bestPe = obj->oldPE;
       
     GreedyRefineCentralLB::GProc *p = &procs[bestPe];
