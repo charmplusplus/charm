@@ -336,3 +336,33 @@ computeArray[index].insert((++currPe) % CkNumPes());</code></pre>
 </table>
 </div>
 <p>L2's gate is the one that matters. The elasticity test — E = Δlog(step time)/Δlog(GPU work), measured by scaling the problem and requiring E ≥ 0.8 — is what pic2d fails at 0.3. A benchmark that fails it is measuring its latency chain, and any load-balancing result taken on it is noise. If LeanMD cannot pass L2 under either granularity option, it is not worth carrying further and the effort should go to a purpose-built proxy instead.</p>
+
+<h2>Status: L0–L2 complete</h2>
+
+<p>The port lives in <code>examples/charm++/cuda/gpudirect/leanmd/</code> (commit <code>404ee32d3</code>).</p>
+
+<p><strong>L2 passes its gate.</strong> Scaling particles per cell from 500 to 1000 raises pair work 4× (the kernel evaluates N<sub>A</sub>×N<sub>B</sub> pairs regardless of the cutoff test) and raises mean step time from 94.20&nbsp;ms to 332.56&nbsp;ms — a 3.53× ratio, so <strong>E = 0.91</strong>. Measured on an RTX&nbsp;3050 laptop at 3×3×3 cells, +p4. pic2d sits at 0.3 on the same test. LeanMD is device bound and is worth carrying to L3.</p>
+
+<p><strong>Correctness.</strong> Validated against the unmodified CPU benchmark rebuilt at matching granularity: initial and final energies agree to all ten printed digits, at +p1, +p2 and +p4, over 60 steps — which spans two migration rounds, so the device binning and exchange are covered too, not just the force kernel.</p>
+
+<h3>What device residency cost, structurally</h3>
+
+<p>Two pieces of the original could not survive the constraint, and both were load-bearing.</p>
+
+<p><em>The CkMulticast section is gone in both directions.</em> It carried positions down as a multicast and forces back up as a <code>CkReduction::sum_double</code>. Charm++ reductions combine host buffers, so keeping the upward half would have meant a D2H on every Compute and an H2D on every Cell, every step — the exact traffic the port exists to remove. Positions now go out as point-to-point <code>nocopydevice</code> sends and forces return the same way, folded in by a kernel. Each message carries the ordinal its Cell handed out, so a returning array lands in its own slot; that is what the <code>CkSectionInfo</code> cookie used to do, and a Compute now recovers its two cells from its own 6D index instead. Two consequences: the spanning tree is lost (27 unicasts per Cell per step, since no device-buffer multicast exists), and forces sum in arrival order rather than tree order, so totals are no longer bit-identical run to run.</p>
+
+<p><em>Particle migration moved to the device.</em> The host-side sort in <code>migrateParticles</code> would have pulled the entire particle array back every 20 steps. A single kernel now classifies, wraps and compacts; stayers are adopted by a pointer swap and outgoing buckets ship as device buffers. Only the per-bucket counts reach the host.</p>
+
+<h3>Bugs found on the way</h3>
+
+<ul>
+<li><strong>Non-reproducible initial conditions, pre-existing.</strong> Initial velocities came from <code>srand48</code>/<code>drand48</code>, which share one global state. Every PE of an SMP build is a thread of one process, so Cell constructors on different PEs corrupted each other's sequence: initial energy differed on every run at +p4 and varied with PE count. Confirmed by reproducing it in the untouched CPU benchmark. This would have made every A/B comparison between balancers meaningless — the two runs would not have been simulating the same system. Fixed with <code>erand48</code>, seeded to reproduce what a single-PE stock run produced.</li>
+<li><strong>Two timesteps, not one.</strong> <code>updateProperties</code> advances velocity by <code>DEFAULT_DELTA × 10<sup>-20</sup></code> and position by plain <code>DEFAULT_DELTA</code>, because acceleration is in m/s² and velocity in Å/fs. A single <code>dt</code> in the integration kernel rescales the dynamics by 10<sup>20</sup>.</li>
+<li><strong>Kinetic and potential energy were in different units.</strong> <code>updateProperties</code> scales kinetic energy by 10<sup>10</sup> to reach the milliJoules the pair potential is already in. Omitting it makes the conservation test compare unlike quantities.</li>
+<li><strong>Positions, not Particles, on the wire.</strong> The kernels read only <code>pos</code>; sending full <code>Particle</code> structs would have put 80 bytes per atom on the wire where the original put 24, tripling communication volume in a benchmark built to exercise a communication-<em>aware</em> balancer.</li>
+<li><strong>An unreachable indexing bug in the original.</strong> <code>migrateToCell</code> can return offsets of ±2, which would index past the end of its 27-entry vector. It cannot fire at these parameters (an atom drifts at most 2&nbsp;Å between migrations, against a 30&nbsp;Å cell), but the device version clamps rather than inheriting a latent memory stomp.</li>
+</ul>
+
+<h3>Still open before L3</h3>
+
+<p>Cells remain <code>setMigratable(false)</code> — which is exactly L3. Their <code>pup</code> currently packs a host particle vector that is empty after initialisation, so making Cells migratable means pulling the array down from the device on pack and pushing it back on unpack, or routing it through the device-migration path the branch already has. Computes migrate today and are exercised by the <code>+balancer</code> run; their device scratch holds nothing that outlives a step, so it is released by the destructor and reallocated lazily on the new PE.</p>
