@@ -198,6 +198,16 @@ static void CUPTIAPI cuptiBufferCompleted(CUcontext ctx, uint32_t streamId,
 // Initialize CUPTI activity tracing — called once per process
 void hapiCuptiInit() {
 #if CMK_CUDA
+  // The UCX tree the published GPU numbers were taken on had no CUPTI support
+  // at all, so comparing against them means being able to turn it off here
+  // while leaving CPU-side LB instrumentation alone.
+  {
+    const char* off = getenv("CHARM_DISABLE_CUPTI");
+    if (off && strcmp(off, "0") != 0) {
+      CmiPrintf("HAPI: CUPTI disabled by CHARM_DISABLE_CUPTI\n");
+      return;
+    }
+  }
   CmiPrintf("HAPI: Initializing CUPTI...\n");
   hapiDeviceSynchronize(); 
   GPUManager& gm = CsvAccess(gpu_manager);
@@ -253,6 +263,8 @@ void hapiWarmupDeviceContext() {
 // hapiInit runs normally afterwards and finds the context already present.
 char** hapiNewcomerWarmupArgv = nullptr;
 
+static bool hapi_newcomer_preinit_done = false;
+
 void hapiNewcomerWarmup(void) {
   // Force the device context. Usually already created by this point, since
   // anything that touches CUDA earlier in startup creates it, in which case
@@ -260,18 +272,30 @@ void hapiNewcomerWarmup(void) {
   hapiCheck(hapiFree(0));
   hapiCheck(hapiDeviceSynchronize());
 
-  // Bringing CUPTI up is the expensive part of starting a GPU process, and it
-  // was being paid after the newcomer was admitted, where every process
-  // already in the job waits for it at the next barrier.
-  //
-  // Only the library load is forced here, not hapiCuptiInit. Enabling activity
-  // collection this early lets records arrive before GPUManager::init() has
-  // run, and the load balancer then reads per-object data that was never
-  // initialized, which segfaults in GreedyRefineCentralLB::work. Loading the
-  // library is the part that costs; enabling the activity kinds afterwards in
-  // hapiInitCsv, once the manager exists, is comparatively cheap.
-  uint32_t cupti_version = 0;
-  cuptiGetVersion(&cupti_version);
+  // Everything hapiInit does before its CmiBarrier that can run this early,
+  // done here instead: the process is parked waiting for admission and
+  // nothing is waiting on it, so the cost is free. Left where it was it
+  // landed after the commit, where every process already in the job sits at
+  // that barrier until this one has finished starting CUDA. Measured as
+  // ~17.5 ms of a ~21 ms expansion at 4 nodes.
+  extern char** hapiNewcomerWarmupArgv;
+  if (hapiNewcomerWarmupArgv == nullptr || CmiInCommThread()) return;
+
+  if (CmiMyRank() == 0) hapiInitCsv(hapiNewcomerWarmupArgv);
+
+  // hapiInitCsv only brings CUPTI up when a balancer is already registered,
+  // and none is this early: the warmup runs from ConverseInit, before
+  // _initCharm. Ask for it directly. The first cuptiActivityEnable is the
+  // expensive part of starting a GPU process, and paying it here is the whole
+  // point. It is self-guarded, so hapiInitCsv's own later call is a no-op.
+#if CMK_CUDA && CMK_LBDB_ON
+  hapiCuptiInit();
+#endif
+
+  // hapiInitCpv, hapiMapping and hapiSetDevice stay in hapiInit: they are
+  // CPV-backed, and per-PE storage is not created until CmiInitState, which
+  // converseRunPe calls after this point, so running them here segfaults.
+  hapi_newcomer_preinit_done = true;
 }
 
 void hapiInit(char** argv) {
@@ -290,7 +314,7 @@ void hapiInit(char** argv) {
 
   if (!CmiInCommThread()) {
     if (!survivor_restart) {
-      if (CmiMyRank() == 0) {
+      if (CmiMyRank() == 0 && !hapi_newcomer_preinit_done) {
         hapiInitCsv(argv); // Initialize per-process variables (GPUManager)
       }
       hapiInitCpv(); // Initialize per-PE variables
@@ -649,6 +673,7 @@ static void hapiExitCsv() {
 // Set up PE to GPU mapping, invoked from all PEs
 // TODO: Support custom mappings
 static void hapiMapping(char** argv) {
+  double t_map_enter = CmiWallTimer();
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
   Mapping map_type = Mapping::RoundRobin; // Default is round robin
   char* gpumap = NULL;
@@ -747,7 +772,11 @@ static void hapiMapping(char** argv) {
         csv_gpu_manager.device_count_on_physical_node);
   }
 
+  double t_map_csv = CmiWallTimer() - t_map_enter;
+  double t_map_bar0 = CmiWallTimer();
   CmiNodeBarrier();
+  double t_map_bar = CmiWallTimer() - t_map_bar0;
+  double t_map_cpv0 = CmiWallTimer();
 
   // Perform mapping and set device representative PE
   int my_rank = CmiMyRank();
@@ -775,6 +804,9 @@ static void hapiMapping(char** argv) {
   }
   
   hapiCheck(hapiSetDevice(cpv_my_device));
+  CmiPrintf("Charm> hapiMapping csv=%.6f nodebar=%.6f cpv=%.6f total=%.6f\n",
+            t_map_csv, t_map_bar, CmiWallTimer() - t_map_cpv0,
+            CmiWallTimer() - t_map_enter);
 #if CMK_SMP
   CmiLock(csv_gpu_manager.device_mapping_lock);
 #endif
