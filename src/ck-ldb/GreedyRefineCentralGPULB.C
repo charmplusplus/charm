@@ -253,7 +253,19 @@ double GreedyRefineCentralGPULB::fillData(LDStats *stats,
                             PHeap &procHeap)
 {
   const int n_pes = stats->nprocs();
-  const int n_objs = stats->n_migrateobjs;
+  // Walk every object, not just the migratable ones: the loop below indexes
+  // stats->objData[i] directly, and non-migratable objects must still be charged
+  // as background load on their PE.
+  //
+  // n_migrateobjs is a *count* of migratable objects (CentralLB.C:485 computes it
+  // with count_if over the whole array), not an upper bound on their indices --
+  // objData is filled in per-PE registration order and is never partitioned, so
+  // migratable and non-migratable objects interleave. Using the count as a loop
+  // bound silently truncates objData: the tail is neither balanced nor charged as
+  // background, so its load vanishes from the objective entirely. Latent whenever
+  // every chare is migratable (n_migrateobjs == objData.size()), which is why
+  // pic2d and jacobi2d never exposed it.
+  const int n_objs = stats->objData.size();
   // most of these variables are just for printing stats when _lb_args.debug()
   int unmigratableObjs = 0;
   availablePes = 0; totalObjLoad = 0;
@@ -342,7 +354,8 @@ double GreedyRefineCentralGPULB::fillData(LDStats *stats,
       if (p.bgload < minBGLoad) minBGLoad = p.bgload;
       avgBGLoad += p.bgload;
     }
-    CkPrintf("[%d] GreedyRefineCentralGPULB: num pes=%d, num objs=%d\n", CkMyPe(), n_pes, n_objs);
+    CkPrintf("[%d] GreedyRefineCentralGPULB: num pes=%d, num objs=%d (%d migratable, %d background)\n",
+             CkMyPe(), n_pes, n_objs, n_objs - unmigratableObjs, unmigratableObjs);
     CkPrintf("[%d] Unavailable processors=%d, Unmigratable objs=%d\n", CkMyPe(), n_pes - availablePes, unmigratableObjs);
     CkPrintf("[%d] min_bgload=%f mean_bgload=%f max_bgload=%f\n", CkMyPe(), minBGLoad, (avgBGLoad / availablePes), maxBGLoad);
     CkPrintf("[%d] min_oload=%f mean_oload=%f max_oload=%f\n", CkMyPe(), minOload, (totalObjLoad / (n_objs - unmigratableObjs)), maxOload);
@@ -405,7 +418,10 @@ void GreedyRefineCentralGPULB::work(LDStats *stats)
   const int n_pes = stats->nprocs();
   totalObjs = stats->n_migrateobjs;
 
-  std::vector<GreedyRefineCentralGPULB::GObj> objs(totalObjs);
+  // Sized to every object, because fillData indexes this by LDStats object index.
+  // totalObjs stays the migratable count -- it bounds how many objects may move
+  // (migrationsAllowed below), which is a different quantity from how many exist.
+  std::vector<GreedyRefineCentralGPULB::GObj> objs(stats->objData.size());
   // will sort pobjs instead of objs (faster swapping). will only contain pointers
   // to migratable objects
   std::vector<GreedyRefineCentralGPULB::GObj*> pobjs;
