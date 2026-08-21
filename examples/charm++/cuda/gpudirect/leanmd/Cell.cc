@@ -11,7 +11,10 @@ Cell::Cell() : inbrs(NUM_NEIGHBORS), stepCount(1), updateCount(0), forceCount(0)
                d_particles(NULL), d_stay(NULL), d_send_parts(NULL),
                d_recv_parts(NULL), d_pos(NULL), d_force(NULL), d_recv_force(NULL),
                d_kePartial(NULL), d_energy(NULL), d_counts(NULL), h_counts(NULL),
-               h_energy(NULL) {
+               h_energy(NULL), stream(NULL) {
+  // stream is read by the post entry methods, which run at message arrival and
+  // are not ordered against run(). A garbage handle there surfaces far away, as
+  // CUDA error 400 inside the runtime's IPC path, so it starts null.
   //load balancing to be called when AtSync is called
   usesAtSync = true;
 
