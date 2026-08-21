@@ -1,0 +1,93 @@
+Developers and contact:
+This benchmark was developed by Nikhil Jain as part of PPL's effort
+to develop miniapplications that demonstrate utility of Charm++. It
+mimics the short-ranged force computation (due to Lennard Jones potential)
+in NAMD. It is roughly based on mol3d, developed by Edgar Solomonik and
+Abhinav Bhatele, which is a benchmark based on NAMD. Phil Miller's guidance
+was crucial in writing the SDAG routines. Later on Esteban Meneses and Xiang Ni
+added fault tolerance to it. It has been used in many publications related
+to Charm++. Contact nikhil.jain@acm.org for any bug report or comments.
+
+GPU PORT
+--------
+This copy is a GPUDirect port of that benchmark, for work on communication-aware
+GPU load balancing. Particle and force arrays are device resident for the whole
+run: they are allocated once on the GPU, read and written only by kernels, and
+exchanged between chares by device-to-device zerocopy. The only things that cross
+to the host are per-bucket particle counts at migration steps and two energy
+scalars at the first and last step.
+
+What changed from the original, and why:
+
+ * The CkMulticast section is gone, in both directions. A Cell used one section
+   both to multicast positions to its computes and to collect their forces with
+   CkReduction::sum_double. Charm++ reductions combine host buffers, so keeping
+   that would have meant a D2H on every compute and an H2D on every cell, every
+   step. Positions now go out as point-to-point nocopydevice sends and forces come
+   back the same way, folded into the accumulator by a kernel. Each message
+   carries the ordinal the cell handed out, so a returning force array lands in
+   its own slot -- which is what the CkSectionInfo cookie used to do.
+
+   Two consequences. The spanning tree is lost, so a cell now issues 27 unicasts
+   instead of one tree'd multicast; there is no device-buffer multicast in the
+   runtime, and the point-to-point edges are what the balancer's communication
+   graph needs to see anyway. And forces sum in arrival order rather than tree
+   order, so totals are no longer bit-identical run to run.
+
+ * Particle migration runs on the device. The host-side sort in migrateParticles
+   would have pulled the entire particle array back every MIGRATE_STEPCOUNT steps.
+   binParticlesKernel classifies, wraps and compacts in one pass; the stayers are
+   adopted by a pointer swap and the outgoing buckets are shipped as device
+   buffers.
+
+ * Granularity is coarser: KAWAY 1,1,1 and 800-1000 particles per cell, against
+   2,2,1 and 100-250. See the occupancy table in defs.h -- at stock values a
+   compute's pair kernel launches 40 blocks and cannot fill a GPU.
+
+ * The pair kernel uses one block per atom with a shared-memory reduction, and
+   does not exploit Newton's third law. Both choices are explained at the top of
+   leanmd.cu.
+
+ * The initial-velocity RNG was switched from srand48/drand48 to erand48. The
+   originals share one global state, and every PE of an SMP build is a thread of
+   one process, so Cell constructors on different PEs corrupted each other's
+   sequence: initial energy differed on every run at +p4 and varied with PE count.
+   The seeding reproduces what a single-PE stock run produced.
+
+Validated against the unmodified CPU benchmark at matching granularity: initial
+and final energies agree to all ten printed digits at +p1, +p2 and +p4, including
+across migration steps.
+
+TO COMPILE-
+Do a make in this folder
+
+TO RUN-
+Either provide no arguments or provide all
+./leanmd +p<Procs> <dimX,dimY,dimZ,steps,firstLBstep,LBPeriod>
+Example - ./leanmd +p4 3 3 3 1001 20 20
+Example - ./leanmd +p4 3 3 3 1001 20 20 +balancer GreedyRefineLB
+
+READ ORDER
+leanmd.ci - contains the most important aspects of the program, look for run()
+function for each chare which is called right after constructor call for each
+chare. It contains most of the parallel flow and control flow information.
+
+leanmd.cu - the force, integration, energy and migration kernels.
+
+leanmd_cuda.h - host-visible interface to those kernels, and the place where the
+device-residency contract is written down.
+
+Cell.* - contains the implementation of important functions attached with
+Cell; focus on sendPositions(), accumulateForce() and binParticles()
+
+Compute.* - contains the implementation for Compute; launchForces() does the
+force computation and periodicShift() handles the wraparound.
+
+Main.* - contains the constructor for Main chare; also the starting point
+of the application; main chare passes control to run() of Main chare and
+constructors of Cell.
+
+physics.h - the original CPU force computation. No longer compiled; kept as the
+reference the kernels in leanmd.cu were ported from.
+
+defs.h - #define for constant values and some class declaration
