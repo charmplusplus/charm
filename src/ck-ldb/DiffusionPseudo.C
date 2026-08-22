@@ -16,38 +16,86 @@ void DiffusionLB::startStrategy(){
     CkCallback cb(CkIndex_DiffusionLB::WithinNodeLB(), thisProxy);
     CkStartQD(cb);
   }
-  else if (CkMyPe() == 0)
-  {
-    CkCallback cb(CkIndex_DiffusionLB::AcrossNodeLB(), thisProxy);
-    CkStartQD(cb);
-  }
 
   if (_lb_args.debug() > 1) CkPrintf("--------NEIGHBOR SELECTION COMPLETE (Using Comm? %s)--------\n",
            _lb_args.diffusionCommOn() ? "true" : "false");
   fflush(stdout);
-  
+
   // Start pseudo LB timing
   startPseudoLBTiming();
-  
+
   if (numNodes > 1)
-  for (int i = 0; i < numNodes; i++) thisProxy[i * nodeSize].pseudolb_rounds();
+  {
+    // Drain the neighbour handshake before starting the rounds.
+    //
+    // Neighbour selection ends on a counting barrier (startStrategyBarrier /
+    // next_phase) that each node reports to as soon as it has *issued* its asks
+    // for the round -- not once the ask/okay/ack exchange has finished. The
+    // final ack is what makes an edge symmetric: okayNbor adds the peer and
+    // sends ackNbor, and the peer adds this node only when that ack lands. An
+    // ack still in flight when the barrier completes therefore leaves one node
+    // holding an edge its peer does not.
+    //
+    // The rounds below wait for exactly sendToNeighbors.size() messages each,
+    // so a one-sided edge deadlocks them: the node missing it never sends, and
+    // its peer waits forever.
+    //
+    // This is latent rather than observed at small node counts. Whenever
+    // numNodes <= NUM_NEIGHBORS + 1 every node ends up adjacent to every other,
+    // so the graph is complete and symmetric no matter how the acks race --
+    // measured at 4 nodes, zero asymmetric edges over ten runs with and without
+    // this drain. It becomes reachable once the graph is a genuine subgraph.
+    //
+    // Quiescence closes it cheaply: it guarantees every handshake message has
+    // been delivered and processed, so the graph is final before any round
+    // starts. One extra QD per LB step is noise against the round loop.
+    CkCallback cb(CkIndex_DiffusionLB::beginPseudoRounds(), thisProxy[0]);
+    CkStartQD(cb);
+  }
+}
+
+// PE 0, at quiescence: the neighbour graph is now final and symmetric, so arm
+// the post-rounds quiescence detector and kick the rounds off.
+void DiffusionLB::beginPseudoRounds()
+{
+  CkCallback cb(CkIndex_DiffusionLB::AcrossNodeLB(), thisProxy);
+  CkStartQD(cb);
+
+  // Build the section of diffusing PEs once (one per node) and delegate it to
+  // a multicast manager, so the per-round convergence reduction runs over
+  // exactly those members. The seeding multicast below is what gives each
+  // member its section cookie; after that the rounds only reduce.
+  if (!pseudoSectionBuilt)
+  {
+    pseudoMcastGid = CProxy_CkMulticastMgr::ckNew();
+    std::vector<int> pelist(numNodes);
+    for (int i = 0; i < numNodes; i++) pelist[i] = i * nodeSize;
+    // Group sections are built by constructor, not ckNew.
+    pseudoSection =
+        CProxySection_DiffusionLB(thisgroup, pelist.data(), numNodes);
+    CkMulticastMgr* mg = CProxy_CkMulticastMgr(pseudoMcastGid).ckLocalBranch();
+    pseudoSection.ckSectionDelegate(mg);
+    pseudoSectionBuilt = true;
+  }
+  PseudoRoundMsg* m = new PseudoRoundMsg;
+  m->mcastGid = pseudoMcastGid;
+  m->maxRatio = 0.0;
+  pseudoSection.pseudoRoundStart(m);
 }
 
 
-// pseudolb_barrier removed. It was the global convergence check for the pseudo-LB
-// rounds: every node reported "nothing left to send" to PE 0, which ANDed the votes
-// and broadcast the verdict so all nodes could break out of the round loop early.
+// The global convergence check used to be pseudolb_barrier: every node reported
+// "nothing left to send" to PE 0 by point-to-point message, PE 0 ANDed the votes
+// and broadcast the verdict. It was dropped because it put an O(N) fan-in plus a
+// broadcast on PE 0 every round -- a central coordinator inside a balancer whose
+// premise is not having one -- and the round loop is bounded by ITERATIONS anyway.
 //
-// Two reasons it went. It was the only global synchronisation in an otherwise
-// neighbour-local phase, costing an O(N) fan-in plus a broadcast every round -- a
-// central coordinator inside a balancer whose whole premise is not having one. And
-// its benefit shrinks as the machine grows: the exit condition is unanimous, so at
-// large node counts some node almost always still has a slightly underloaded
-// neighbour and the check never fires while still being paid for every round.
-//
-// The round loop is bounded by ITERATIONS regardless, so removing the check cannot
-// run forever; it only means always running the full count. Second-order diffusion
-// in PseudoLoadBalancing is what makes that fixed count sufficient.
+// It is back, in the form above: a reduction over a CkMulticast section holding
+// exactly the diffusing PEs (one per node), with the verdict multicast back over
+// the same section. The fan-in is now a spanning tree over the section rather than
+// N messages into PE 0, and PEs that do not diffuse are not dragged into the round
+// lockstep at all. Paying for that buys back most of the round budget: the rounds
+// converge in 1-3 at 4 nodes against a fixed count of 40.
 
 
 /* In combination with the pseudolb_rounds SDAG code, this builds the toReceiveLoad and
@@ -293,4 +341,42 @@ void DiffusionLB::PseudoLoadBalancing()
   //   thisProxy[nbor_node * nodeSize].PseudoLoad(pseudo_itr, thisIterToSend[i],
   //   myNodeId);
   // }
+}
+
+
+// Section members land here first: take the cookie out of the multicast, note
+// the multicast manager it belongs to, then run the round loop.
+void DiffusionLB::pseudoRoundStart(PseudoRoundMsg* m)
+{
+  CkGetSectionInfo(pseudoCookie, m);
+  pseudoMcastGid = m->mcastGid;
+  delete m;
+  thisProxy[CkMyPe()].pseudolb_rounds();
+}
+
+// The section reduction delivers its result here on PE 0, which hands the same
+// verdict to every member so they all leave the loop on the same round.
+//
+// The verdict travels in a PseudoRoundMsg rather than as a marshalled double:
+// CkMulticastMgr::sendToSection writes the section cookie and entry point over
+// the head of whatever message it is handed, which for a marshalled send lands
+// squarely on CkMarshallMsg::msgBuf and the payload behind it. The receiver then
+// unpacks its argument through a corrupted pointer. It has to be a message that
+// starts with CkMcastBaseMsg.
+void DiffusionLB::pseudoVerdictRoot(double maxRatio)
+{
+  PseudoRoundMsg* m = new PseudoRoundMsg;
+  m->mcastGid = pseudoMcastGid;
+  m->maxRatio = maxRatio;
+  pseudoSection.pseudoConvergeResult(m);
+}
+
+// Every section member, once per round: refresh the cookie from the multicast
+// (the documented CkMulticast contract) and hand the verdict to the SDAG loop.
+void DiffusionLB::pseudoConvergeResult(PseudoRoundMsg* m)
+{
+  CkGetSectionInfo(pseudoCookie, m);
+  const double maxRatio = m->maxRatio;
+  delete m;
+  thisProxy[CkMyPe()].pseudoVerdict(maxRatio);
 }

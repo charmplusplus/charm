@@ -28,7 +28,21 @@
 #define DEBUGF(x) CmiPrintf x;
 #define DEBUGR(x)  // CmiPrintf x;
 #define DEBUGL(x) /*CmiPrintf x*/;
-#define ITERATIONS 40
+// Rounds of the pseudo-load diffusion loop. Fixed, with no convergence check:
+// every round costs two neighbour exchanges and the SDAG waits between them, so
+// the strategy pays all 40 even when the load is already even. On a GPU-bound
+// run where diffusion wants to move ~1% of the load, that is the single largest
+// cost of load balancing -- larger than the migration it decides on.
+// CHARM_LB_DIFFUSION_ITERS overrides it so the trade can be measured.
+static int diffusionIterations() {
+  static const int n = []() {
+    const char* s = getenv("CHARM_LB_DIFFUSION_ITERS");
+    const int v = s ? atoi(s) : 40;
+    return v > 0 ? v : 40;
+  }();
+  return n;
+}
+#define ITERATIONS (diffusionIterations())
 
 #include "DiffusionMetric.C"
 #include "DiffusionNeighbors.C"
@@ -37,6 +51,20 @@
 
 // Percentage of error acceptable.
 #define THRESHOLD 2
+
+// Diffusion rounds stop once no node wants to shift more than this fraction of
+// its own load. Measured on a GPU-bound run, diffusion asks to move ~1.6% on the
+// first round and converges immediately after, so the fixed 40 rounds were
+// almost entirely wasted.
+static double pseudoConvergeRatio() {
+  static const double r = []() {
+    const char* s = getenv("CHARM_LB_DIFFUSION_CONVERGE");
+    const double v = s ? atof(s) : (THRESHOLD / 100.0);
+    return v > 0.0 ? v : (THRESHOLD / 100.0);
+  }();
+  return r;
+}
+#define PSEUDO_CONVERGE_RATIO (pseudoConvergeRatio())
 
 // Initialize static Diffusion timing variables
 double DiffusionLB::totalNeighborTime = 0.0;
@@ -86,6 +114,7 @@ DiffusionLB::DiffusionLB(const CkLBOptions& opt) : CBase_DiffusionLB(opt)
   myNodeExternalBytes = 0.0;
 
   num_migrations = 0;
+  pseudoSectionBuilt = false;
 
 #if CMK_LBDB_ON
   lbname = "DiffusionLB";
@@ -536,6 +565,11 @@ void DiffusionLB::ProcessMigrations()
     }
   }
 
+#if CMK_GLOBAL_LOCATION_UPDATE
+  // SAME AS IN PROCESSMIGRATIONDECISION
+  BroadcastLocationUpdate(msg);
+#endif
+
     CkCallback cb(CkIndex_DiffusionLB::MigrationDoneWrapper(), thisProxy);
     contribute(cb);
   }
@@ -576,8 +610,18 @@ void DiffusionLB::CascadingMigration(LDObjHandle h, double load)
       thisProxy[sendToNeighbors[minNode] *
                 nodeSize /*CkNodeFirst(sendToNeighbors[minNode])*/]
           .LoadMetaInfo(h, 0, load, CkMyPe(), 0);
-      lbmgr->Migrate(h, sendToNeighbors[minNode] *
-                            nodeSize /*CkNodeFirst(sendToNeighbors[minNode])*/);
+      const int acrossNodeToPe = sendToNeighbors[minNode] *
+                            nodeSize /*CkNodeFirst(sendToNeighbors[minNode])*/;
+      lbmgr->Migrate(h, acrossNodeToPe);
+#if CMK_GLOBAL_LOCATION_UPDATE
+      // This is the across-node move, so the object lands in a different
+      // process. Bystanders have to learn the new location, or a GPU-direct
+      // sender keeps picking its transfer mode for the process the object just
+      // left -- and a MEMCPY chosen that way hands the receiver a pointer into
+      // an address space it cannot read. Migrating one object at a time means
+      // the move-list broadcast never sees these.
+      BroadcastSingleLocationUpdate(h, acrossNodeToPe);
+#endif
     }
   }
   if (loadReceivers <= 0 || minNode == myPos || minNode == -1)
@@ -597,6 +641,11 @@ void DiffusionLB::CascadingMigration(LDObjHandle h, double load)
     if (minRank > 0)
     {
       lbmgr->Migrate(h, rank0PE + minRank);
+#if CMK_GLOBAL_LOCATION_UPDATE
+      // Within-node move: same process, so no transfer mode changes meaning,
+      // but other PEs still cache a location that is now wrong.
+      BroadcastSingleLocationUpdate(h, rank0PE + minRank);
+#endif
     }
   }
 #endif

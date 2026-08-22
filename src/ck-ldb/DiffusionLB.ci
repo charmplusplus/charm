@@ -4,7 +4,10 @@ module DiffusionLB
 
   include "CentralLBMsg.h";
   extern module DistBaseLB;
+  extern module CkMulticast;
   initnode void lbinit(void);
+
+  message PseudoRoundMsg;
 
   group[migratable] DiffusionLB : DistBaseLB
   {
@@ -66,6 +69,20 @@ module DiffusionLB
     // entry void ResumeClients(int balancing);
 
     entry void PseudoLoad(int itr, double load, int node);
+    // Fires on PE 0 once the neighbour handshake has drained (quiescence), which
+    // is what guarantees the neighbour graph is symmetric before the rounds start.
+    entry void beginPseudoRounds();
+    // Seeds the section cookie on each member, then starts its round loop.
+    entry void pseudoRoundStart(PseudoRoundMsg* m);
+    // Reduction result lands here on PE 0, which multicasts the verdict to the
+    // section; members wait for it inside the round loop.
+    entry [reductiontarget] void pseudoVerdictRoot(double maxRatio);
+    // Verdict multicast. This MUST take a CkMcastBaseMsg-derived message: a
+    // CkMulticast-delegated section send stamps the section cookie over the head
+    // of the outgoing message, which silently shreds a marshalled one.
+    entry void pseudoConvergeResult(PseudoRoundMsg* m);
+    // Local hand-off from pseudoConvergeResult into the SDAG round loop.
+    entry void pseudoVerdict(double maxRatio);
     // pseudoDone / pseudolb_barrier removed with the global convergence check;
     // see the note in the pseudolb_rounds loop below.
     // entry void CallResumeClients();
@@ -108,6 +125,11 @@ module DiffusionLB
 
         if (_lb_args.debug() > 1) CkPrintf("Node %d has neighbors: %s\n", myNodeId, neighborsStr.c_str());
 
+        // Size the per-neighbour vectors off the list the loops below actually
+        // walk. findNBorsRound latches neighborCount before the last round's
+        // handshake has landed, so the two can disagree by an entry or two.
+        neighborCount = sendToNeighbors.size();
+
         loadNeighbors.clear();
         toSendLoad.clear();
 
@@ -118,11 +140,22 @@ module DiffusionLB
         prevRoundToSend.assign(neighborCount, 0.0);
 
         my_pseudo_load = my_load;
+        pseudo_itr = 0;
+        pseudo_converged = false;
+        prev_pseudo_load = my_load;
+        isPseudoRoot = (CkMyPe() == rank0PE);
       }
 
-      // TODO: Currently fixed iterations
-      for (pseudo_itr = 0; pseudo_itr < ITERATIONS; pseudo_itr++)
+      // Rounds stop when diffusion has nothing left worth moving, rather than
+      // always running the fixed bound. The check is a reduction over the
+      // section of diffusing PEs -- one per node -- whose verdict is multicast
+      // back, replacing the O(N) fan-in to PE 0 that the old check used. Only
+      // section members reach this code, so no idle PE is dragged into the
+      // round lockstep.
+      while (pseudo_itr < ITERATIONS && !pseudo_converged)
       {
+        if (isPseudoRoot)
+        {
         // Send its load
         serial "Communicate load info"
         {
@@ -139,7 +172,11 @@ module DiffusionLB
           when ReceiveLoadInfo[pseudo_itr](int itr, double load, int node) serial
           {
             int pos = findNborIdx(node);
-            loadNeighbors[pos] = load;
+            if (pos < 0)
+              CkPrintf("[DiffusionLB] ERROR: node %d got round-%d load from non-neighbour "
+                       "node %d -- neighbour graph is asymmetric\n", myNodeId, itr, node);
+            else
+              loadNeighbors[pos] = load;
           }
         }
 
@@ -156,22 +193,62 @@ module DiffusionLB
           {
             my_pseudo_load += load;
             int pos = findNborIdx(node);
-            toSendLoad[pos] -= load;
+            if (pos < 0)
+              CkPrintf("[DiffusionLB] ERROR: node %d got round-%d transfer from non-neighbour "
+                       "node %d -- neighbour graph is asymmetric\n", myNodeId, itr, node);
+            else
+              toSendLoad[pos] -= load;
           }
         }
 
-        // The global convergence check that used to sit here -- every node
-        // reporting "nothing to send" to PE 0, which ANDed the votes and
-        // broadcast the verdict -- has been removed. It was the only global
-        // synchronisation in this phase, cost an O(N) fan-in plus a broadcast
-        // per round, and its sole purpose was breaking out of a loop that is
-        // already bounded at ITERATIONS. Rounds now run to the fixed count and
-        // Phase 2 is entirely neighbour-local.
+        }  // end if (isPseudoRoot)
+
+        // Global convergence check, restored as a reduction. Each node reports
+        // the largest share of its own load it still wants to shift; the max
+        // across the group decides, and the verdict is broadcast to everyone.
+        // Nodes converge on the first round or two here -- diffusion typically
+        // wants to move ~1% -- so this replaces most of the fixed round count
+        // with two collectives.
+        serial "Convergence contribute"
+        {
+          pseudo_metric = 0.0;
+          if (isPseudoRoot)
+          {
+            // Converged means the diffused loads have stopped moving, not that
+            // this round proposed no transfers: PseudoLoadBalancing recomputes
+            // the transfers from the current load differences every round, so
+            // the residual never decays to zero even at equilibrium. What does
+            // settle is my_pseudo_load itself.
+            const double denom = (my_load > 1e-12) ? my_load : 1e-12;
+            pseudo_metric = fabs(my_pseudo_load - prev_pseudo_load) / denom;
+            prev_pseudo_load = my_pseudo_load;
+          }
+          // Reduce across the section's members only. The result goes to PE 0,
+          // which multicasts the verdict back so every member leaves the loop
+          // on the same round.
+          CkMulticastMgr* mg =
+              CProxy_CkMulticastMgr(pseudoMcastGid).ckLocalBranch();
+          mg->contribute(sizeof(double), &pseudo_metric, CkReduction::max_double,
+                         pseudoCookie,
+                         CkCallback(CkReductionTarget(DiffusionLB, pseudoVerdictRoot),
+                                    thisProxy[0]));
+        }
+
+        when pseudoVerdict(double maxRatio) serial "Convergence verdict"
+        {
+          pseudo_converged = (maxRatio <= PSEUDO_CONVERGE_RATIO);
+          pseudo_itr++;
+          if (isPseudoRoot && myNodeId == 0 && (pseudo_converged || pseudo_itr == ITERATIONS)
+              && _lb_args.debug() >= 1)
+            CkPrintf("[DiffusionLB] pseudo rounds run: %d (converged=%d, max ratio %g)\n",
+                     pseudo_itr, (int)pseudo_converged, maxRatio);
+        }
       }
 
       // Calculate the aggregate load that has to be sent.
       serial "Aggregate load"
       {
+        if (!isPseudoRoot) return;
         endPseudoLBTiming();
         startAcrossTiming();
         if (_lb_args.debug() > 1) CkPrintf("PSEUDO: Node %d (load %f) with pseudo_load after LB %f\n", myNodeId,

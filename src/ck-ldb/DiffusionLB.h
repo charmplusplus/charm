@@ -18,6 +18,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "ckmulticast.h"
+
 #include "DiffusionLB.decl.h"
 
 int numPes;
@@ -66,9 +68,27 @@ static inline double diffusionObjCpuLoad(const LDObjData& o) { return o.wallTime
 /// for backward compatibility
 typedef LBMigrateMsg NLBMigrateMsg;
 
+// Multicast that seeds the pseudo-LB section: its CkMcastBaseMsg base carries
+// the cookie each member contributes against, and it hands over the multicast
+// manager's id so members can reach their local branch.
+class PseudoRoundMsg : public CkMcastBaseMsg, public CMessage_PseudoRoundMsg
+{
+public:
+  CkGroupID mcastGid;
+  // Verdict payload, used when this message carries the convergence result back
+  // to the section. Unused (and ignored) by the round-start multicast.
+  double maxRatio;
+};
+
 class DiffusionLB : public CBase_DiffusionLB
 {
 public:
+  // Entry methods for the pseudo-LB section reduction; public so the
+  // generated dispatch code can reach them.
+  void beginPseudoRounds();
+  void pseudoRoundStart(PseudoRoundMsg* m);
+  void pseudoVerdictRoot(double maxRatio);
+  void pseudoConvergeResult(PseudoRoundMsg* m);
   DiffusionLB_SDAG_CODE DiffusionLB(const CkLBOptions&);
   DiffusionLB(CkMigrateMessage* m);
   ~DiffusionLB();
@@ -197,6 +217,7 @@ private:
 
   // phase 2: pseudo load balancing --------------------------------
   void PseudoLoadBalancing();
+
   std::vector<double> toSendLoad;
   std::vector<double> toReceiveLoad;
   // Flow sent to each neighbour in the previous pseudo-LB round. Second-order
@@ -210,6 +231,25 @@ private:
   int pseudo_itr;  // iteration count
   int temp_itr;
   bool pseudo_done;
+  // Global convergence state for the pseudo-LB rounds. pseudo_metric is this
+  // node's "how much load do I still want to shift", expressed as a fraction of
+  // its own load so nodes of different sizes are comparable; the reduction takes
+  // the max across nodes and every PE gets the same verdict back.
+  double pseudo_metric;
+  // Section over the one PE per node that actually diffuses, plus the multicast
+  // cookie its reductions run on. Reducing over these numNodes members rather
+  // than the whole group keeps the collective the width of the algorithm, and
+  // keeps PEs with no part in diffusion out of its lockstep entirely.
+  CProxySection_DiffusionLB pseudoSection;
+  CkSectionInfo pseudoCookie;
+  CkGroupID pseudoMcastGid;
+  bool pseudoSectionBuilt;
+
+  double prev_pseudo_load;  // my_pseudo_load at the end of the previous round
+  bool pseudo_converged;
+  // Only one PE per node drives diffusion; the rest join the convergence
+  // reduction with a neutral value so the collective is over the whole group.
+  bool isPseudoRoot;
 
   // phase 3: across node LB --------------------------------
   void buildObjComms(int nobjs);
