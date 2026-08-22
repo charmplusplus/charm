@@ -277,7 +277,13 @@ void ParamList::size(XStr& str)
       }
       else if (container->isArray())
       {
-        str << "  dest_pe = ckLocalBranch()->lastKnown(ckGetIndex());\n";
+        // Not lastKnown(): that silently substitutes homePe() when the
+        // location is unconfirmed, and homePe() has no relationship to
+        // where the element actually lives for arrays populated by explicit
+        // insert() (e.g. round-robin). CkRdmaDeviceOnSender needs to know
+        // when it genuinely doesn't know -- whichPe() reports -1 rather
+        // than guessing.
+        str << "  dest_pe = ckLocalBranch()->getLocMgr()->whichPe(ckGetIndex());\n";
       }
       else if (container->isGroup() || container->isNodeGroup())
       {

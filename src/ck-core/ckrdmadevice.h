@@ -152,8 +152,11 @@ extern "C" {
 // CUDA guard so the send path can call it without an #ifdef.
 #if CMK_CUDA || CMK_HIP
 size_t CkRdmaDeviceTakePendingSendBytes();
+// Claimed IPC event slots for this PE, or -1 when shm IPC is not in use.
+int CkRdmaDeviceBusyIpcSlots();
 #else
 inline size_t CkRdmaDeviceTakePendingSendBytes() { return 0; }
+inline int CkRdmaDeviceBusyIpcSlots() { return -1; }
 #endif
 
 #endif // _CKRDMADEVICE_H_

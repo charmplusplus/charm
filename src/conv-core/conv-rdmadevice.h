@@ -39,6 +39,14 @@ public:
   size_t comm_offset;
   int event_idx;
 
+  // Same-process (MEMCPY) ordering. The receiver reads ptr directly on its own
+  // stream, which has no ordering against the stream still producing the data,
+  // so the two have to be tied together somehow. This carries an event recorded
+  // on the sender's stream for the receiver to wait on -- a raw handle, which is
+  // meaningful precisely because MEMCPY means one process. Null when the sender
+  // did not record one, in which case the receiver must not assume ordering.
+  void* memcpy_event;
+
   // Store the actual data for host-staged inter-node messaging (no GPUDirect RDMA)
   bool data_stored;
   void* data;
@@ -54,6 +62,7 @@ public:
     device_idx = -1;
     comm_offset = 0;
     event_idx = -1;
+    memcpy_event = NULL;
     hapi_stream = hapiStreamPerThread;
 
     data_stored = false;
@@ -70,6 +79,7 @@ public:
     p|device_idx;
     p|comm_offset;
     p|event_idx;
+    p((char *)&memcpy_event, sizeof(memcpy_event));
     p|data_stored;
     if (data_stored) {
       if (p.isUnpacking()) {
