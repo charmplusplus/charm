@@ -157,26 +157,13 @@ void CentralLB::CallLB()
   }
   
 #if CMK_CUDA
-#if CMK_SMP
-  CmiNodeBarrier();  // ensure rank 0 finishes buffer processing before other ranks read the map
-#endif
-if (CmiMyRank() == 0)
-{
-  double start = CkWallTimer();
-  // Only flush while CUPTI is attached. An application that drives its own
-  // instrumentation window may already have switched tracing off, which
-  // detaches CUPTI -- its stop path flushed on the way out, so the records are
-  // already here and there is nothing left to pull.
-  if (hapiCuptiTracingActive())
-    cuptiActivityFlushAll(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED);//sync flush cupti records which are finished, does not wait for partial records
-  hapiProcessCuptiBuffers();
-  // Reduce the kernel timeline to one scalar load per object here, while the
-  // records are still local. Only those scalars are sent to the central LB.
-  hapiNormalizeCuptiLoads();
-}
-#if CMK_SMP
-  CmiNodeBarrier();  // ensure rank 0 finishes buffer processing before other ranks read the map
-#endif
+  // Reduce the kernel timeline to one scalar load per object, while the records
+  // are still local -- only those scalars are sent to the central LB. Done once
+  // per round under a lock rather than by rank 0 between two CmiNodeBarriers:
+  // those barriers were behind #if CMK_SMP, which is 0 in the multicore build
+  // even though a process really does run many PE threads, so they compiled away
+  // and left the other ranks reading the map while it was being rebuilt.
+  hapiPrepareCuptiLoads();
   // Every PE picks up the normalized loads for its own objects
   lbmgr->SetObjGPULoad(CsvAccess(gpu_manager).cupti_obj_norm_load_);
 #endif

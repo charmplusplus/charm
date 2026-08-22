@@ -148,9 +148,23 @@ static void ipcHandleOpen();
 static const uint64_t HAPI_CUPTI_NO_OBJECT = UINT64_MAX;
 
 static void CUPTIAPI cuptiBufferRequested(uint8_t **buffer, size_t *size, size_t *maxNumRecords) {
-  *size = 5*1024 * 1024;  // 5MB per buffer
-  *buffer = (uint8_t *)malloc(*size);
-  *maxNumRecords = 0;
+  // CUPTI writes activity records straight into this buffer and has no way to
+  // tell us the allocation failed: hand it NULL and it writes through a null
+  // pointer, and the NULL comes back through cuptiBufferCompleted to be parsed
+  // later, so the fault surfaces inside cuptiActivityGetNextRecord with nothing
+  // left to say where it came from. Step down to a smaller buffer before giving
+  // up, and if even that fails, say so here.
+  static const size_t sizes[] = {5*1024*1024, 1024*1024, 256*1024};
+  for (size_t s : sizes) {
+    *buffer = (uint8_t *)malloc(s);
+    if (*buffer != NULL) {
+      *size = s;
+      *maxNumRecords = 0;
+      return;
+    }
+  }
+  CmiAbort("HAPI: could not allocate a CUPTI activity buffer (tried down to "
+           "%zu bytes). GPU load instrumentation cannot continue.", sizes[2]);
 }
 
 static void CUPTIAPI cuptiBufferCompleted(CUcontext ctx, uint32_t streamId,
@@ -561,6 +575,13 @@ void hapiProcessCuptiBuffers() {
       gm.cupti_buffer_queue_.pop();
     }
 
+    // A buffer CUPTI never wrote to (or one it handed back empty) has nothing
+    // to parse, and passing it on would dereference whatever came back.
+    if (item.buffer == NULL || item.validSize == 0) {
+      free(item.buffer);
+      continue;
+    }
+
     // Parse records in this buffer
     CUpti_Activity *record = NULL;
     while (cuptiActivityGetNextRecord(item.buffer, item.validSize, &record) == CUPTI_SUCCESS) {
@@ -738,8 +759,43 @@ void hapiNormalizeCuptiLoads() {
   }
 }
 
+// Build this round's per-object GPU loads, exactly once per round however many
+// PE threads call in. Every PE needs cupti_obj_norm_load_ populated before it
+// reads its own objects out of it, and the work itself must be done by one
+// thread; holding the lock across both gives the readers their ordering without
+// a barrier that every PE has to reach.
+void hapiPrepareCuptiLoads() {
+  GPUManager& gm = CsvAccess(gpu_manager);
+  std::lock_guard<std::mutex> lk(gm.cupti_prepare_lock_);
+  if (gm.cupti_loads_ready_) return;
+
+  const bool timeIt = (getenv("CHARM_LB_CUPTI_TIME") != nullptr);
+  const double t0 = timeIt ? CmiWallTimer() : 0.0;
+  // Only flush while CUPTI is attached: an application driving its own
+  // instrumentation window may already have switched tracing off, and its stop
+  // path flushed on the way out, so there is nothing left to pull.
+  if (hapiCuptiTracingActive())
+    CUPTI_SAFE_CALL(cuptiActivityFlushAll(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED));
+  const double t1 = timeIt ? CmiWallTimer() : 0.0;
+  hapiProcessCuptiBuffers();
+  const double t2 = timeIt ? CmiWallTimer() : 0.0;
+  hapiNormalizeCuptiLoads();
+  if (timeIt) {
+    const double t3 = CmiWallTimer();
+    CmiPrintf("[LBCUPTI pe=%d] flush=%.3fs process=%.3fs normalize=%.3fs total=%.3fs\n",
+              CmiMyPe(), t1 - t0, t2 - t1, t3 - t2, t3 - t0);
+    fflush(stdout);
+  }
+
+  gm.cupti_loads_ready_ = true;
+}
+
 void hapiClearCuptiData() {
   GPUManager& gm = CsvAccess(gpu_manager);
+  // Same lock as hapiPrepareCuptiLoads: this drops the maps that function
+  // builds and that every PE reads, so it must not run underneath either.
+  std::lock_guard<std::mutex> lk(gm.cupti_prepare_lock_);
+  gm.cupti_loads_ready_ = false;
 
   gm.cupti_obj_kernel_records_.clear();
   gm.cupti_unattributed_kernels_.clear();

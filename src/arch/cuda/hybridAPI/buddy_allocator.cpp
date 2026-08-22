@@ -44,6 +44,10 @@ namespace buddy {
   }
 
   size_t allocator::get_lb_free_size() {
+    // No load-balancing region configured -- nothing is free because nothing
+    // exists. Callers (e.g. CentralLB::BuildStatsMsg) ask unconditionally.
+    if (head == nullptr) return 0;
+
     size_t free = 0;
     lb_free_list* tmp = head->next;
     while(tmp != tail) {
@@ -102,6 +106,19 @@ namespace buddy {
       this->lb_size = _comm_lb_size - _comm_size;
       this->lb_base_ptr = base_ptr + _comm_size;
       this->lb_ptr = lb_base_ptr;
+    }
+    else {
+      // No load-balancing region (+gpulbbuffer defaults to 0). These members
+      // were previously left uninitialized, so get_lb_free_size() walked a
+      // garbage free list and free() compared against a garbage base -- which
+      // is how any CentralLB-derived balancer (BuildStatsMsg calls
+      // get_lb_free_size unconditionally) died on its first stats round
+      // unless +gpulbbuffer happened to be set.
+      head = nullptr;
+      tail = nullptr;
+      this->lb_size = 0;
+      this->lb_base_ptr = nullptr;
+      this->lb_ptr = nullptr;
     }
 
     this->total_size = _comm_lb_size;
@@ -202,7 +219,10 @@ namespace buddy {
   }
 
   void allocator::free(void* ptr) {
-    if((uint8_t*)ptr >= lb_base_ptr) {
+    // lb_base_ptr is null when no load-balancing region exists; without the
+    // guard every ordinary comm-buffer free would compare >= nullptr, test
+    // true, and be misrouted into the load-balancing path.
+    if(lb_base_ptr != nullptr && (uint8_t*)ptr >= lb_base_ptr) {
       size_t alloc_size = lb_ptr_size[ptr];
       if(alloc_size == 0) {
         printf("Load balancing allocator got a request to free buffer of size 0\n");

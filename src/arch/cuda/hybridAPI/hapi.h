@@ -250,6 +250,10 @@ void hapiCuptiFinalize();
 uint64_t hapiCuptiPushObjCorrelation();
 void hapiCuptiPopObjCorrelation();
 void hapiProcessCuptiBuffers();
+// Flush, parse and normalize this round's CUPTI records, once per round however
+// many PE threads call it. Load balancers should call this rather than the three
+// steps individually -- see the comment on GPUManager::cupti_prepare_lock_.
+void hapiPrepareCuptiLoads();
 void hapiNormalizeCuptiLoads();
 void hapiClearCuptiData();
 

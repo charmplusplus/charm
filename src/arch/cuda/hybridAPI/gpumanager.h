@@ -222,6 +222,18 @@ struct GPUManager {
   // detach could reset its own. Each PE compares this against the generation it
   // last saw and zeroes its counter when they differ.
   uint64_t cupti_generation_ = 0;
+  // Serializes turning this round's raw CUPTI records into cupti_obj_norm_load_,
+  // and makes that work happen exactly once per LB round no matter how many PE
+  // threads ask for it. The load balancers used to do this with "rank 0 does the
+  // work between two CmiNodeBarrier calls", but both barriers sat behind
+  // #if CMK_SMP, which is 0 in the multicore build even though a process really
+  // does run many PE threads -- so the barriers vanished and the other ranks read
+  // cupti_obj_norm_load_ while rank 0 was rebuilding it. A lock also cannot
+  // deadlock the way a spin barrier can: a PE waiting here waits on a PE that is
+  // running, not on one that has yet to arrive.
+  std::mutex cupti_prepare_lock_;
+  // Set once this round's loads are built; cleared by hapiClearCuptiData.
+  bool cupti_loads_ready_ = false;
 #endif
 
   void init() {
