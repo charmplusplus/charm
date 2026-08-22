@@ -176,6 +176,15 @@ void MetisLB::work(LDStats* stats)
 
   for (int i = 0; i < numVertices; i++)
   {
+    // Objects that declared themselves non-migratable (setMigratable(false))
+    // stay put. Metis partitions the whole graph without any notion of pinned
+    // vertices, so without this the partition is applied to them as well and
+    // the runtime migrates chares whose own code has assumed it never would --
+    // e.g. one that leaves device-resident state out of its pup because it is
+    // documented as non-migratable. The partition was computed as if these
+    // were free to move, so balance is a little worse than Metis intended;
+    // that is the cost of honouring the constraint at all.
+    if (!ogr->vertices[i].isMigratable()) continue;
     if (pemap[i] != ogr->vertices[i].getCurrentPe())
       ogr->vertices[i].setNewPe(pemap[i]);
   }
