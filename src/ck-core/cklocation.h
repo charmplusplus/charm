@@ -393,6 +393,11 @@ public:
 };
 CkpvExtern(CkMigratable_initInfo, mig_initInfo);
 
+// CHARM_ZC_STATS: split whichPe() misses into "no id for this index" versus
+// "id known, location unknown". They need completely different fixes, and the
+// send path cannot tell them apart from a -1.
+void ckLocNoteWhichPeMiss(bool noId);
+
 class CkLocCache : public CBase_CkLocCache
 {
 private:
@@ -403,6 +408,11 @@ private:
   using Listener = std::function<void(CmiUInt8, int)>;
   std::list<Listener> listeners;
 
+  // Elements this PE has already asked the home PE about, so a stream of sends
+  // to an element whose location is unknown costs one request rather than one
+  // per message.
+  std::unordered_set<CmiUInt8> pendingLocReqs;
+
 public:
   CkLocCache() = default;
   CkLocCache(CkMigrateMessage* m) : CBase_CkLocCache(m) {}
@@ -410,6 +420,22 @@ public:
   void pup(PUP::er& p);
 
   void requestLocation(CmiUInt8 id);
+  // Ask the home PE where an element lives, at most once until the answer
+  // arrives. Delivery forwards an unresolvable message via the home PE without
+  // ever learning the location, so without this a sender keeps paying the
+  // detour -- and, for a device-zerocopy send, keeps choosing its transfer mode
+  // for an unknown destination.
+  void requestLocationOnce(CmiUInt8 id)
+  {
+    // CHARM_NO_LOCREQ restores the old behaviour (forward via home forever,
+    // never learn) so the trade can be measured: learning costs a request per
+    // sender/element pair, and migration invalidates what was learned.
+    static const bool disabled = (getenv("CHARM_NO_LOCREQ") != nullptr);
+    if (disabled) return;
+    if (locMap.find(id) != locMap.end()) return;
+    if (!pendingLocReqs.insert(id).second) return;
+    requestLocation(id);
+  }
 
   // Entry methods for updating location tables across PEs
   void requestLocation(CmiUInt8 id, int peToTell);
@@ -600,8 +626,13 @@ public:
   {
     CmiUInt8 id;
     if (!lookupID(idx, id))
+    {
+      ckLocNoteWhichPeMiss(true);   // never learned this index's element id
       return -1;
-    return cache->getPe(id);
+    }
+    const int pe = cache->getPe(id);
+    if (pe == -1) ckLocNoteWhichPeMiss(false);  // knew the id, not the location
+    return pe;
   }
 
   CmiUInt8 lookupID(const CkArrayIndex& idx) const
@@ -660,6 +691,39 @@ public:
         return true;
       }
     }
+  }
+
+  /// id -> index, but report failure instead of asserting when this PE has
+  /// never heard of the element.
+  ///
+  /// lookupIdx below can only resolve an id that this PE already knows: with
+  /// no index compressor it needs either a local record or an idx2id entry.
+  /// A PE that is neither the source nor the destination of a migration, and
+  /// has never talked to the element, has neither -- so a broadcast location
+  /// update (CMK_GLOBAL_LOCATION_UPDATE) reaches PEs that legitimately cannot
+  /// name the index. Those PEs have nothing to refresh and should skip it.
+  bool tryLookupIdx(const CmiUInt8& id, CkArrayIndex& out) const
+  {
+    CkLocRec* rec = nullptr;
+    if (compressor)
+    {
+      out = compressor->decompress(id);
+      return true;
+    }
+    else if ((rec = elementNrec(id)))
+    {
+      out = rec->getIndex();
+      return true;
+    }
+    for (IdxIdMap::const_iterator itr = idx2id.begin(); itr != idx2id.end(); itr++)
+    {
+      if (itr->second == id)
+      {
+        out = itr->first;
+        return true;
+      }
+    }
+    return false;
   }
 
   CkArrayIndex lookupIdx(const CmiUInt8& id) const
@@ -818,6 +882,8 @@ public:
   std::unordered_map<CmiUInt8, HeldMigratingChares> heldChares;
 #endif
   void requestLocation(CmiUInt8 id);
+  // See CkLocCache::requestLocationOnce.
+  void requestLocationOnce(CmiUInt8 id) { cache->requestLocationOnce(id); }
   void requestLocation(const CkArrayIndex& idx);
   bool requestLocation(const CkArrayIndex& idx, int peToTell);
   void updateLocation(const CkArrayIndex& idx, const CkLocEntry& e);

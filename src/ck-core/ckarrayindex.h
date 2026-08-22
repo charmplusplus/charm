@@ -397,6 +397,17 @@ namespace ck {
       for (unsigned int i = 0; i < idx.dimension; ++i) {
         unsigned int numBits = bitsPerDim[i];
         unsigned int thisDim = shorts ? idx.indexShorts[i] : idx.index[i];
+        if (thisDim >= (1UL << numBits)) {
+          // Report before dying: the bare assertion names neither the array nor
+          // the offending value, and this can be reached either with a genuinely
+          // out-of-bounds index or with a stale one arriving through a location
+          // management path, which need very different fixes.
+          CmiPrintf("[%d] index compress overflow: component %u of %u, "
+                    "value=%u, bits=%u, compressorDims=%u, nInts=%u\n",
+                    CkMyPe(), i, (unsigned)idx.dimension, thisDim, numBits,
+                    (unsigned)dims, (unsigned)idx.nInts);
+          fflush(stdout);
+        }
         CkAssert(thisDim < (1UL << numBits));
         eid = (eid << numBits) | thisDim;
       }

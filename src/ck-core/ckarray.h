@@ -716,6 +716,9 @@ private:
   void deliverToElement(CkArrayMessage* msg, ArrayElement* elem);
   void handleUnknown(CkArrayMessage* msg, const CkArrayIndex& idx, CkDeliver_t type,
                      int opts = 0);
+  // Variant for an element whose index cannot be recovered from its id (a
+  // multidimensional array the element is unknown on); routes purely by id.
+  void handleUnknownByID(CkArrayMessage* msg, CmiUInt8 id, CkDeliver_t type, int opts = 0);
 
   // If we don't want to send the message, we will buffer the messages and send either a
   // location request or a demand creation request.

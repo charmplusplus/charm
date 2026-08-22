@@ -11,6 +11,8 @@
 #include "TopoManager.h"
 #include "charm++.h"
 #include "ck.h"
+#include <atomic>
+#include <unistd.h>
 #include "cksyncbarrier.h"
 #include "hilbert.h"
 #include "partitioning_strategies.h"
@@ -98,7 +100,13 @@ void UpdateLocation(MigrateInfo& migData)
   CkLocCache *cache = (CkLocCache *)CkLocalBranch(localLocMgr->getLocationCache());
 
   CmiUInt8 elementID = ck::ObjID(migData.obj.id).getElementID();
-  CkArrayIndex idx = localLocMgr->lookupIdx(elementID);
+  // A PE that has never dealt with this element cannot name its index (see
+  // CkLocMgr::tryLookupIdx) and has no cache entry worth refreshing, so there
+  // is nothing to do here. That is the common case for the bystander PEs a
+  // broadcast location update reaches, and asserting on them made migration
+  // of any non-compressible (e.g. multidimensional) index fatal.
+  CkArrayIndex idx;
+  const bool haveIdx = localLocMgr->tryLookupIdx(elementID, idx);
 
   CkLocEntry entry;
   entry.id = elementID;
@@ -107,7 +115,20 @@ void UpdateLocation(MigrateInfo& migData)
 
   // CkPrintf("[%d] UpdateLocation: obj id=%llu from_pe=%d to_pe=%d epoch=%d\n",
   //          CkMyPe(), entry.id, migData.from_pe, entry.pe, entry.epoch);
-  localLocMgr->updateLocation(idx, entry);
+  if (haveIdx)
+  {
+    localLocMgr->updateLocation(idx, entry);
+  }
+  else
+  {
+    // The index is unrecoverable here, but the location cache is keyed by id,
+    // so the new PE can still be recorded. This is the case that matters most:
+    // a PE which cannot name the index is exactly one that has only ever sent
+    // to the element, and without this its next send resolves the destination
+    // to -1 and has to fall back to the topology-agnostic staging path. That
+    // is what made every post-migration step slower than no balancing at all.
+    cache->updateLocation(entry);
+  }
 }
 #  endif
 
@@ -2422,6 +2443,57 @@ void CkLocCache::pup(PUP::er& p)
 #endif
 }
 
+// CHARM_LB_MIGSTATS: how much wall time each migration path actually consumes,
+// and how many objects take it. Separates the live-pointer handoff used inside a
+// process from the pack/unpack path used across processes.
+namespace {
+struct MigStats {
+  std::atomic<double> intraSecs{0.0}, packedSecs{0.0};
+  std::atomic<long> intraN{0}, packedN{0};
+  ~MigStats() {
+    if (intraN.load() + packedN.load() == 0) return;
+    fprintf(stderr, "[mig-stats] pid=%d intraproc n=%ld time=%.3fs | packed n=%ld time=%.3fs\n",
+            (int)getpid(), intraN.load(), intraSecs.load(),
+            packedN.load(), packedSecs.load());
+    fflush(stderr);
+  }
+};
+MigStats g_mig;
+inline bool migStatsOn() {
+  static const bool on = (getenv("CHARM_LB_MIGSTATS") != nullptr);
+  return on;
+}
+struct MigTimer {
+  double t0; bool on; std::atomic<double>* acc; std::atomic<long>* cnt;
+  MigTimer(std::atomic<double>* a, std::atomic<long>* c)
+      : t0(0), on(migStatsOn()), acc(a), cnt(c) { if (on) t0 = CkWallTimer(); }
+  ~MigTimer() {
+    if (!on) return;
+    double d = CkWallTimer() - t0, cur = acc->load();
+    while (!acc->compare_exchange_weak(cur, cur + d)) {}
+    cnt->fetch_add(1, std::memory_order_relaxed);
+  }
+};
+}  // namespace
+
+void ckLocNoteWhichPeMiss(bool noId)
+{
+  static const bool on = (getenv("CHARM_ZC_STATS") != nullptr);
+  if (!on) return;
+  static std::atomic<long> noIdCount{0}, noLocCount{0};
+  static struct Reporter {
+    ~Reporter() {
+      const long a = noIdCount.load(), b = noLocCount.load();
+      if (a + b == 0) return;
+      fprintf(stderr, "[whichPe-miss] pid=%d no_id=%ld no_location=%ld\n",
+              (int)getpid(), a, b);
+      fflush(stderr);
+    }
+  } reporter;
+  if (noId) noIdCount.fetch_add(1, std::memory_order_relaxed);
+  else noLocCount.fetch_add(1, std::memory_order_relaxed);
+}
+
 void CkLocCache::requestLocation(CmiUInt8 id)
 {
   int home = homePe(id);
@@ -2449,6 +2521,8 @@ void CkLocCache::updateLocation(const CkLocEntry& newEntry)
 {
   // printf("[%d] updateLocation: id=%llu pe=%d epoch=%d\n", CmiMyPe(), newEntry.id, newEntry.pe, newEntry.epoch);
   CkAssert(newEntry.pe != -1);
+  // The answer is in; a later miss on this element may ask again.
+  pendingLocReqs.erase(newEntry.id);
   CkLocEntry& oldEntry = locMap[newEntry.id];
   // printf("[%d] updateLocation: oldEntry.epoch=%d\n", CmiMyPe(), oldEntry.epoch);
   if (newEntry.epoch > oldEntry.epoch)
@@ -3151,6 +3225,7 @@ bool CkLocMgr::emigrateIntraProcess(CkLocRec* rec, int toPe)
 // Receive side of the intra-process migration fast path.
 void CkLocMgr::immigrateIntraProcess(CkArrayElementIntraProcessMigrateMessage* msg)
 {
+  MigTimer _t(&g_mig.intraSecs, &g_mig.intraN);
   const CkArrayIndex& idx = msg->idx;
 
   if (msg->nManagers > (int)managers.size())
@@ -3869,6 +3944,7 @@ void CkLocMgr::immigrateGPU(CmiUInt8 id, int size, char* data)
 */
 void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
 {
+  MigTimer _t(&g_mig.packedSecs, &g_mig.packedN);
   void* gpuMsg = nullptr;
   if (msg->hasGPUMsg)
   {
@@ -3912,13 +3988,23 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
   pupElementsFor(p, rec, CkElementCreation_migrate);
 #if CMK_CUDA
   // Device-to-device copies issued while unpacking may still be in flight;
-  // the element must not run until its device state is complete.
-  cudaDeviceSynchronize();
+  // the element must not run until its device state is complete. Only elements
+  // that actually carried device state issue those copies, though (gpuMsg is
+  // null otherwise), and this is a whole-device barrier: doing it for every
+  // arrival made a migration round wait on all outstanding work of every PE
+  // sharing the GPU, once per object, for objects with no device state at all.
+  // That was the bulk of the cost of the first step after load balancing.
+  if (gpuMsg != nullptr)
+    cudaDeviceSynchronize();
 #endif
 
 #if CMK_CUDA
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
-  if(csv_gpu_manager.use_shm) {
+  // Only elements that actually carried device state allocated a comm-buffer
+  // block above (gpuMsg stays null when msg->hasGPUMsg is false). Freeing
+  // unconditionally handed the allocator base_ptr + (0 - base_ptr) == nullptr
+  // and aborted, so migrating any element without GPU state was fatal.
+  if(csv_gpu_manager.use_shm && gpuMsg != nullptr) {
     DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
 #if CMK_SMP
     CmiLock(dm->lock);

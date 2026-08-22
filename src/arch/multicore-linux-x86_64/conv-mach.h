@@ -59,6 +59,11 @@
 
 #define CMK_LBDB_ON					   1
 
+/* Broadcast post-migration location updates so every PE's location cache
+ * has the destination PE for a migrated ID. Required for GPU-aware LB
+ * paths that consult dest_pe on the sender (see ckrdmadevice.C). */
+#define CMK_GLOBAL_LOCATION_UPDATE     1
+
 /*#define CMK_PCQUEUE_LOCK                                   1 */
 /*Replaced by CMK_NOT_USE_TLS_THREAD for the default case*/
 /*#define CMK_USE_TLS_THREAD                                 1*/
