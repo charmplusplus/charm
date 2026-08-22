@@ -1,6 +1,18 @@
 # List all *.ci files in src/
 file(GLOB_RECURSE ci-files ${CMAKE_SOURCE_DIR}/src/*.ci)
 
+# charmxi (invoked via charmc below) only sees macros passed explicitly on its
+# own command line -- it does not read conv-mach.h the way a normal .C compile
+# does. So a #if CMK_GLOBAL_LOCATION_UPDATE guard inside a .ci file (e.g.
+# DistBaseLB.ci) needs this threaded through by hand, mirroring CUDA_OPT below,
+# or charmxi silently strips the guarded entry and the later C++ compile (which
+# does see the arch's conv-mach.h #define) fails to find it on the proxy.
+file(STRINGS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach.h GLU_MATCH
+     REGEX "^#define[ \t]+CMK_GLOBAL_LOCATION_UPDATE[ \t]+1")
+if(GLU_MATCH)
+    set(GLU_OPT "-DCMK_GLOBAL_LOCATION_UPDATE=1")
+endif()
+
 list(APPEND ci-files ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.ci)
 
 foreach(in_f ${ci-files})
@@ -110,14 +122,14 @@ foreach(in_f ${ci-files})
         set(all-ci-outputs ${all-ci-outputs} ${CMAKE_BINARY_DIR}/include/cklibs/${ci-output} ${CMAKE_BINARY_DIR}/include/${ci-output-defh})
         add_custom_command(
           OUTPUT ${CMAKE_BINARY_DIR}/include/cklibs/${ci-output} ${CMAKE_BINARY_DIR}/include/cklibs/${ci-output-defh}
-          COMMAND ${CMAKE_BINARY_DIR}/bin/charmc -I. ${OPTS} ${CUDA_OPT} ${in_f}
+          COMMAND ${CMAKE_BINARY_DIR}/bin/charmc -I. ${OPTS} ${CUDA_OPT} ${GLU_OPT} ${in_f}
           WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/include/cklibs
           DEPENDS ${in_f} charmxi
           )
     endif()
     add_custom_command(
       OUTPUT ${CMAKE_BINARY_DIR}/include/${ci-output} ${CMAKE_BINARY_DIR}/include/${ci-output-defh}
-      COMMAND ${CMAKE_BINARY_DIR}/bin/charmc -I. ${OPTS} ${CUDA_OPT} ${in_f}
+      COMMAND ${CMAKE_BINARY_DIR}/bin/charmc -I. ${OPTS} ${CUDA_OPT} ${GLU_OPT} ${in_f}
       WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/include/
       DEPENDS ${in_f} charmxi
       )
