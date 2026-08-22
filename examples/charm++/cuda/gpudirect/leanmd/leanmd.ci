@@ -15,11 +15,18 @@ mainmodule leanmd {
   readonly int checkptFreq;     // do FT every period
   readonly int checkptStrategy; // choose the checkpoint strategy
   readonly std::string logs;   // log file for checkpointing
+  readonly int densityMode;    // -density: atom count profile across cells
+  readonly int computeMapMode; // -computemap: where Computes are first placed
+  readonly int maxCellParts;   // atoms in the fullest cell, sizes device buffers
+  readonly int densityReportFreq; // -densityreport: steps between density reports
 
   //central controller chare
   mainchare [migratable] Main {
     entry Main(CkArgMsg* msg);
     entry [reductiontarget] void energySum(double iE, double fE);  //reduction of potential energy
+    // Atoms per x-slab, summed over all cells. x is the axis the density
+    // profiles vary along, so this is what says whether a profile survives.
+    entry [reductiontarget] void densityReport(int n, int counts[n]);
 
     // called when computes have been created
     entry [reductiontarget] void run() {
@@ -114,6 +121,11 @@ mainmodule leanmd {
           }
         }
 
+        // After the exchange, so the counts are this step's.
+        if (densityReportFreq > 0 && (stepCount % densityReportFreq) == 0) {
+          serial { reportDensity(); }
+        }
+
         if (thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0) serial {
           CkPrintf("Step %d Benchmark Time %lf ms/step\n",
           stepCount, ((CkWallTimer() - stepTime))*1000);
@@ -166,6 +178,10 @@ mainmodule leanmd {
     entry Compute();
     entry void ResumeFromSync();
     entry void forcesReady();
+    // One per force send, from the runtime, once the receiving cell has pulled
+    // d_force. run() drains these before AtSync: the buffer is owned by this
+    // chare and migrating (and so freeing it) mid-pull faults on the device.
+    entry void forceSendDone();
 
     // Positions from one of my two cells, landing straight in device memory. The
     // post entry method routes it to a slot by the sender's coordinates, which is
@@ -188,6 +204,13 @@ mainmodule leanmd {
 
         //periodically call load balancer
         if (stepCount >= firstLdbStep && (stepCount - firstLdbStep) % ldbPeriod== 0) {
+          // Only on a balancing step: wait until the cells have finished pulling
+          // the force arrays before allowing migration to free them. Off the
+          // balancing steps nothing frees the buffers, so the sends are left to
+          // complete in the background as before.
+          for (ackCount = 0; ackCount < pendingForceSends; ackCount++) {
+            when forceSendDone() { }
+          }
           serial { AtSync();}
           when ResumeFromSync() { }
         }

@@ -67,6 +67,71 @@ Either provide no arguments or provide all
 Example - ./leanmd +p4 3 3 3 1001 20 20
 Example - ./leanmd +p4 3 3 3 1001 20 20 +balancer GreedyRefineLB
 
+LOAD IMBALANCE
+The stock configuration cannot show a load balancer doing anything useful: it is
+uniform by construction. Measured GPU work per device comes out even to 1.5%, and
+DiffusionLB correctly migrates 96 objects, then 19, then 8, then none, with no
+change in step time. Two things make it uniform:
+
+  - the atom count per cell is a mild 800 -> 1000 ramp, a 1.56x spread in pair
+    work (a Compute evaluates N_A x N_B pairs);
+  - Cell::createComputes inserts every Compute round-robin over all PEs, which
+    averages *any* density profile away -- each PE gets a sample of the whole box.
+
+Two options switch that off. Both default to the stock behaviour, so a run with
+neither is bit-identical to before.
+
+  -computemap rr|local     (default rr)
+      local places a Compute on the PE of the cell that owns it, keeping the
+      box's spatial structure. This is what makes a density profile reach the PEs.
+
+  -density uniform|gradient|clump    (default uniform)
+      gradient  atoms ramp 200 -> 1000 linearly in x
+      clump     the low half of x is full (1000), the rest sparse (200)
+      x is the axis CellMap blocks along, so either profile lands as an imbalance
+      across whole processes (and therefore devices) rather than within them.
+
+Measured on 4 A40s, 32 PEs, 6x6x6 cells, 100 steps, with -computemap local:
+
+  -density gradient   device GPU work max/avg 1.49 before the first LB, 1.03 after
+                      total   noLB 12.8s   MetisLB 11.3s   DiffusionLB 11.1s
+                      step    noLB 121ms   MetisLB  97ms   DiffusionLB  92ms
+
+  -density clump      device GPU work max/avg 2.10 before the first LB, 1.04 after
+                      total   noLB 17.2s   MetisLB 13.3s   DiffusionLB 14.0-15.0s
+                      step    noLB 172ms   MetisLB 118ms   DiffusionLB 117-139ms
+
+Energy drift is identical across balancers for a given profile, so the three runs
+are simulating the same system.
+
+The imbalance these profiles create is STATIC, not dynamic. -densityreport <N>
+prints atoms per x-slab every N steps; over 600 steps of -density clump with no
+balancer the slab counts go
+
+  36000 36000 36000  7200  7200  7200     (step 0,   max/avg 1.667)
+  33552 36004 33604  9607  7231  9602     (step 600, max/avg 1.667)
+
+Only the two interfaces of the dense block erode -- the box is periodic in x, so
+x=1 and x=4 are interior and do not change at all. The edge slabs lose about 7% of
+their atoms per 600 steps, so full equilibration is an O(10^4)-step process and the
+slab-level imbalance is unchanged over any practical run. The balancer's view says
+the same thing: device GPU work goes 2.16 -> 1.06 at the first LB and then sits at
+1.01-1.03 for every round after, with migrations collapsing from 1573 to a trickle.
+
+So this is a test of recovering from a bad initial placement, not of tracking a
+moving one. Testing the latter needs work that varies with time as well as space --
+a per-Compute cost multiplier following a wave in x would do it -- which is not
+something the physics here produces on its own.
+
+CPU BINDING
+This benchmark is sensitive to it. A process runs its PE threads plus several LCI
+progress threads and the CUDA driver's own threads, and Charm++ PE threads spin
+when idle, so giving a rank exactly as many cores as it has PEs oversubscribes it:
+step times spread from 102ms to 778ms and the DiffusionLB strategy itself took 2.5s
+per round instead of 0.05s. Give each rank a whole NUMA node and pin the PEs to
+part of it -- run_numa.sh does this, and also documents that Delta's GPU<->NUMA
+mapping is the reverse of the rank order Slurm assigns.
+
 READ ORDER
 leanmd.ci - contains the most important aspects of the program, look for run()
 function for each chare which is called right after constructor call for each

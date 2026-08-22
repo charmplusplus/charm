@@ -19,7 +19,7 @@ Cell::Cell() : inbrs(NUM_NEIGHBORS), stepCount(1), updateCount(0), forceCount(0)
   usesAtSync = true;
 
   int myid = thisIndex.z+cellArrayDimZ*(thisIndex.y+thisIndex.x*cellArrayDimY);
-  myNumParts = PARTICLES_PER_CELL_START + (myid*(PARTICLES_PER_CELL_END-PARTICLES_PER_CELL_START))/(cellArrayDimX*cellArrayDimY*cellArrayDimZ);
+  myNumParts = cellParticleCount(thisIndex.x, thisIndex.y, thisIndex.z);
 
   // Per-cell RNG state.
   //
@@ -46,10 +46,21 @@ Cell::Cell() : inbrs(NUM_NEIGHBORS), stepCount(1), updateCount(0), forceCount(0)
     particles.push_back(Particle());
     particles[i].mass = HYDROGEN_MASS;
 
+    // Lattice site for this atom. The stock fill takes sites 0..N-1 in order,
+    // which is fine at 800-1000 of the 1000 available sites but would bunch a
+    // sparse cell's atoms against one face -- an artificial density spike inside
+    // the cell, on top of the one between cells that the profile is meant to
+    // create. Stride the sites for the imbalanced profiles so a sparse cell still
+    // fills its own volume evenly. DENSITY_UNIFORM keeps the stock fill exactly,
+    // so the stock benchmark's initial energy is unchanged.
+    const int site = (densityMode == DENSITY_UNIFORM)
+                       ? i
+                       : (int)(((long)i * PERDIM * PERDIM * PERDIM) / myNumParts);
+
     //uniformly place particles, avoid close distance among them
-    particles[i].pos.x = (GAP/(float)2) + thisIndex.x * CELL_SIZE_X + ((i*KAWAY_Y*KAWAY_Z)/(PERDIM*PERDIM))*GAP;
-    particles[i].pos.y = (GAP/(float)2) + thisIndex.y * CELL_SIZE_Y + (((i*KAWAY_Z)/PERDIM)%(PERDIM/KAWAY_Y))*GAP;
-    particles[i].pos.z = (GAP/(float)2) + thisIndex.z * CELL_SIZE_Z + (i%(PERDIM/KAWAY_Z))*GAP;
+    particles[i].pos.x = (GAP/(float)2) + thisIndex.x * CELL_SIZE_X + ((site*KAWAY_Y*KAWAY_Z)/(PERDIM*PERDIM))*GAP;
+    particles[i].pos.y = (GAP/(float)2) + thisIndex.y * CELL_SIZE_Y + (((site*KAWAY_Z)/PERDIM)%(PERDIM/KAWAY_Y))*GAP;
+    particles[i].pos.z = (GAP/(float)2) + thisIndex.z * CELL_SIZE_Z + (site%(PERDIM/KAWAY_Z))*GAP;
     //give random values for velocity
     particles[i].vel.x = (erand48(xsub) - 0.5) * .2 * MAX_VELOCITY;
     particles[i].vel.y = (erand48(xsub) - 0.5) * .2 * MAX_VELOCITY;
@@ -62,7 +73,19 @@ Cell::Cell() : inbrs(NUM_NEIGHBORS), stepCount(1), updateCount(0), forceCount(0)
 }
 
 //constructor for chare object migration
-Cell::Cell(CkMigrateMessage *msg): CBase_Cell(msg) {
+Cell::Cell(CkMigrateMessage *msg): CBase_Cell(msg),
+               part_capacity(0), exch_capacity(0),
+               d_particles(NULL), d_stay(NULL), d_send_parts(NULL),
+               d_recv_parts(NULL), d_pos(NULL), d_force(NULL), d_recv_force(NULL),
+               d_kePartial(NULL), d_energy(NULL), d_counts(NULL), h_counts(NULL),
+               h_energy(NULL), stream(NULL) {
+  // Mirror the default constructor: everything device-side starts null so it is
+  // reallocated on first use. Leaving these uninitialized meant a reconstructed
+  // Cell held garbage -- a garbage stream surfaces far away as CUDA error 400
+  // (invalid resource handle) inside the runtime's send path, and a garbage
+  // d_force faults in cuLaunchKernel. Note this only makes the state *defined*:
+  // pup() still does not carry the device-resident particles, so Cells remain
+  // setMigratable(false) and a migrated Cell would resume with empty arrays.
   usesAtSync = true;
   setMigratable(false);
   delete msg;
@@ -76,7 +99,7 @@ Cell::~Cell() { freeDevice(); }
 void Cell::allocateDevice() {
   stream = streamPool.ckLocalBranch()->acquire();
 
-  part_capacity = 2 * myNumParts + 64;
+  part_capacity = 2 * maxCellParts + 64;
   // A particle drifts at most MAX_VELOCITY * DEFAULT_DELTA * MIGRATE_STEPCOUNT
   // = 2 Angstroms between migrations, against a 30 Angstrom cell, so only atoms
   // within a thin shell of a face can leave. An eighth of the cell is generous.
@@ -151,7 +174,14 @@ void Cell::createComputes() {
       py2 = py1+dy;
       pz2 = pz1+dz;
       CkArrayIndex6D index(px1, py1, pz1, px2, py2, pz2);
-      computeArray[index].insert((++currPe) % CkNumPes());
+      // Round-robin spreads each cell's Computes over every PE, which balances
+      // by construction and averages any density profile away. COMPUTEMAP_LOCAL
+      // keeps a Compute on the PE of the cell that owns it -- cell one of the
+      // pair is this cell -- so the box's spatial structure reaches the PEs and
+      // a density profile becomes a real imbalance for the balancer to work on.
+      computeArray[index].insert(computeMapMode == COMPUTEMAP_LOCAL
+                                     ? CkMyPe()
+                                     : ((++currPe) % CkNumPes()));
       computesList[num] = index;
     } else {
       // these computes will be created by pairing cells
@@ -166,6 +196,16 @@ void Cell::createComputes() {
     }
   } // end of for loop
   contribute(CkCallback(CkReductionTarget(Main,run),mainProxy));
+}
+
+// Atoms currently in this cell, binned by x -- the axis the density profiles vary
+// along. Summed across all cells this says whether a profile is still there, which
+// is the question of whether the imbalance it creates is static or decaying.
+void Cell::reportDensity() {
+  std::vector<int> slab(cellArrayDimX, 0);
+  slab[thisIndex.x] = myNumParts;
+  contribute(sizeof(int) * cellArrayDimX, slab.data(), CkReduction::sum_int,
+             CkCallback(CkReductionTarget(Main, densityReport), mainProxy));
 }
 
 // Zero the accumulator and pull this step's positions out of the particle array.

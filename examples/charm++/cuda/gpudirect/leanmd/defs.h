@@ -40,6 +40,33 @@
 #define PARTICLES_PER_CELL_START        800
 #define PARTICLES_PER_CELL_END          1000
 
+// Atom count for the sparse cells of the imbalanced profiles below. A Compute
+// evaluates N_A x N_B pairs, so 200 against 1000 is a 25x spread in work between
+// the lightest and heaviest pair -- far more than any measurement noise.
+#define PARTICLES_PER_CELL_LIGHT        200
+
+// Where the load imbalance comes from.
+//
+// The stock benchmark is uniform by construction and cannot show a load balancer
+// doing anything useful: measured GPU work per device came out even to 1.5%, and
+// DiffusionLB correctly moved 96 objects, then 19, then 8, then none. Two things
+// make it uniform, and both have to be switched for an imbalance to survive:
+//
+//   -density     the atom count per cell. The stock ramp is 800 -> 1000 across the
+//                linearised cell index, a 1.56x spread in pair work, which is real
+//                but small.
+//   -computemap  where Computes are placed. Cell::createComputes inserts each one
+//                round-robin over every PE, which averages *any* density profile
+//                away -- each PE ends up with a sample of the whole box. Placing a
+//                Compute on the PE of one of its cells keeps the spatial structure,
+//                so a density profile becomes a PE (and device) imbalance.
+//
+// CellMap blocks cells along the linearised index z + y*Z + x*Y*Z, so x is the axis
+// that maps onto whole processes: a gradient or a dense half-box in x lands as a
+// gradient across the four devices rather than being smeared within each.
+enum DensityMode { DENSITY_UNIFORM = 0, DENSITY_GRADIENT, DENSITY_CLUMP };
+enum ComputeMapMode { COMPUTEMAP_RR = 0, COMPUTEMAP_LOCAL };
+
 #define DEFAULT_DELTA           1	// in femtoseconds
 
 #define DEFAULT_FIRST_LDB       20
@@ -138,6 +165,38 @@ extern /* readonly */ int cellArrayDimX;
 extern /* readonly */ int cellArrayDimY;
 extern /* readonly */ int cellArrayDimZ;
 extern /* readonly */ int finalStepCount;
+// Needed outside the SDAG so Compute::sendForces can tell whether this step
+// ends in AtSync, and therefore whether its force buffers must be held until
+// the receiving cells have pulled them.
+extern /* readonly */ int firstLdbStep;
+extern /* readonly */ int ldbPeriod;
 extern /* readonly */ int checkptStrategy;
 extern /* readonly */ std::string logs;
+extern /* readonly */ int densityMode;      // DensityMode
+extern /* readonly */ int computeMapMode;   // ComputeMapMode
+extern /* readonly */ int maxCellParts;     // atoms in the fullest cell
+extern /* readonly */ int densityReportFreq; // -densityreport: steps between reports, 0 = off
+
+// Atoms in cell (x,y,z) under the selected density profile.
+inline int cellParticleCount(int x, int y, int z) {
+  const int nCells = cellArrayDimX * cellArrayDimY * cellArrayDimZ;
+  switch (densityMode) {
+    case DENSITY_GRADIENT: {
+      // Linear in x, the axis CellMap blocks along.
+      const int span = PARTICLES_PER_CELL_END - PARTICLES_PER_CELL_LIGHT;
+      const int denom = (cellArrayDimX > 1) ? (cellArrayDimX - 1) : 1;
+      return PARTICLES_PER_CELL_LIGHT + (x * span) / denom;
+    }
+    case DENSITY_CLUMP:
+      // Dense half-box: the low half of x is full, the rest is sparse.
+      return (x < (cellArrayDimX + 1) / 2) ? PARTICLES_PER_CELL_END
+                                           : PARTICLES_PER_CELL_LIGHT;
+    default: {
+      // Stock: a mild ramp across the linearised cell index.
+      const int myid = z + cellArrayDimZ * (y + x * cellArrayDimY);
+      return PARTICLES_PER_CELL_START +
+             (myid * (PARTICLES_PER_CELL_END - PARTICLES_PER_CELL_START)) / nCells;
+    }
+  }
+}
 #endif

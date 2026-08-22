@@ -102,7 +102,8 @@ public:
   Cell();
   Cell(CkMigrateMessage *msg);
   ~Cell();
-  void createComputes();  //add my computes
+  void createComputes();
+  void reportDensity();  //bin my atoms by x for the density report
   void beginStep();
   void sendPositions();
   void accumulateForce(int ordinal, int n, vec3* f);

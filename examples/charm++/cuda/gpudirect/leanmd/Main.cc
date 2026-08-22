@@ -1,4 +1,6 @@
 #include <string>
+#include <cstring>
+#include <algorithm>
 #include "time.h"
 #include "Main.h"
 #include "Cell.h"
@@ -18,6 +20,10 @@
 /* readonly */ int checkptFreq; 
 /* readonly */ int checkptStrategy;
 /* readonly */ std::string logs;
+/* readonly */ int densityMode;
+/* readonly */ int computeMapMode;
+/* readonly */ int maxCellParts;
+/* readonly */ int densityReportFreq;
 
 // Entry point of Charm++ application
 Main::Main(CkArgMsg* m) {
@@ -39,6 +45,32 @@ Main::Main(CkArgMsg* m) {
 
   int numPes = CkNumPes();
   int currPe = -1, pe;
+
+  // Named options first: CmiGetArg* strips what it matches out of argv, so the
+  // positional parsing below still sees a clean argument list.
+  densityMode = DENSITY_UNIFORM;
+  computeMapMode = COMPUTEMAP_RR;
+  {
+    char* opt = NULL;
+    if (CmiGetArgStringDesc(m->argv, "-density", &opt,
+                            "atom density profile: uniform|gradient|clump")) {
+      if (!strcmp(opt, "gradient")) densityMode = DENSITY_GRADIENT;
+      else if (!strcmp(opt, "clump")) densityMode = DENSITY_CLUMP;
+      else if (strcmp(opt, "uniform"))
+        CkAbort("unknown -density '%s' (expected uniform, gradient or clump)", opt);
+    }
+    if (CmiGetArgStringDesc(m->argv, "-computemap", &opt,
+                            "Compute placement: rr|local")) {
+      if (!strcmp(opt, "local")) computeMapMode = COMPUTEMAP_LOCAL;
+      else if (strcmp(opt, "rr"))
+        CkAbort("unknown -computemap '%s' (expected rr or local)", opt);
+    }
+    densityReportFreq = 0;
+    CmiGetArgIntDesc(m->argv, "-densityreport", &densityReportFreq,
+                     "report atoms per x-slab every N steps (0 = off)");
+    m->argc = CmiGetArgc(m->argv);
+  }
+
   int cur_arg = 1;
 
   CkPrintf("\nInput Parameters...\n");
@@ -83,6 +115,23 @@ Main::Main(CkArgMsg* m) {
     logs = m->argv[cur_arg];
   }
 
+  // Both knobs have to be reported: a run's numbers mean nothing without them,
+  // and the defaults reproduce the stock benchmark exactly.
+  static const char* const kDensityName[] = {"uniform", "gradient", "clump"};
+  static const char* const kMapName[] = {"round-robin", "local"};
+  CkPrintf("Atom density profile:%s\n", kDensityName[densityMode]);
+  CkPrintf("Compute placement:%s\n", kMapName[computeMapMode]);
+
+  // Device buffers are sized off the fullest cell rather than each cell's own
+  // count: migration moves atoms between cells, and under an imbalanced profile a
+  // sparse cell sitting next to dense ones takes in far more than it started with.
+  maxCellParts = 0;
+  for (int x = 0; x < cellArrayDimX; x++)
+    for (int y = 0; y < cellArrayDimY; y++)
+      for (int z = 0; z < cellArrayDimZ; z++)
+        maxCellParts = std::max(maxCellParts, cellParticleCount(x, y, z));
+  CkPrintf("Atoms in the fullest cell:%d\n", maxCellParts);
+
   CProxy_CellMap cellMap = CProxy_CellMap::ckNew(cellArrayDimX, 
     cellArrayDimY, cellArrayDimZ);
   CkArrayOptions opts(cellArrayDimX, cellArrayDimY, cellArrayDimZ);
@@ -98,6 +147,25 @@ Main::Main(CkArgMsg* m) {
     cellArrayDimY, cellArrayDimZ);
 
   delete m;
+}
+
+// Atoms per x-slab. The density profiles vary along x, so a decaying spread here
+// is the physical statement that the imbalance they create is transient: atoms
+// diffuse from the dense slabs into the sparse ones until the box is uniform
+// again, and from then on there is nothing for a balancer to do.
+void Main::densityReport(int n, int* counts) {
+  int lo = counts[0], hi = counts[0];
+  long total = 0;
+  std::string line;
+  for (int x = 0; x < n; x++) {
+    lo = std::min(lo, counts[x]);
+    hi = std::max(hi, counts[x]);
+    total += counts[x];
+    line += " " + std::to_string(counts[x]);
+  }
+  const double avg = (double)total / n;
+  CkPrintf("[density] slabs:%s  min=%d max=%d max/min=%.2f max/avg=%.3f\n",
+           line.c_str(), lo, hi, lo ? (double)hi / lo : 0.0, avg ? hi / avg : 0.0);
 }
 
 //constructor for chare object migration
