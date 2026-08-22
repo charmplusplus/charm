@@ -10,6 +10,13 @@ group [migratable] DistBaseLB: BaseLB {
   entry [reductiontarget] void barrierDone();
   entry [reductiontarget] void ResumeClients();
   entry void ResumeClients(int balancing);
+#if CMK_GLOBAL_LOCATION_UPDATE
+  // DistBaseLB has no global move list the way CentralLB does -- each PE
+  // only knows the objects it is migrating away. This lets a migrating PE
+  // broadcast those moves so every other PE's location cache stays current
+  // for them too (see DistBaseLB::BroadcastLocationUpdate).
+  entry void ReceiveLocationUpdate(LBMigrateMsg*);
+#endif
 };
 
 };

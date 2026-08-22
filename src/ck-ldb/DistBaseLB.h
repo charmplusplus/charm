@@ -25,6 +25,9 @@ public:
   void ResumeClients(int balancing);
   // Migrated-element callback
   void Migrated(int waitBarrier);
+#if CMK_GLOBAL_LOCATION_UPDATE
+  void ReceiveLocationUpdate(LBMigrateMsg* msg);
+#endif
 
   struct LDStats {  // Passed to Strategy
     int from_pe;
@@ -56,6 +59,16 @@ protected:
   virtual void Strategy(const LDStats* const myStats);
   void ProcessMigrationDecision(LBMigrateMsg* migrateMsg);
   void MigrationDone(int balancing);  // Call when migration is complete
+#if CMK_GLOBAL_LOCATION_UPDATE
+  // Broadcasts this PE's own moves (the only ones it knows about) so every
+  // other PE's location cache stays current for them too. Safe to call with
+  // zero moves; a no-op in that case.
+  void BroadcastLocationUpdate(LBMigrateMsg* migrateMsg);
+  // Same, for a strategy that migrates objects one at a time with
+  // lbmgr->Migrate() instead of handing down a move list; those migrations are
+  // invisible to the call above.
+  void BroadcastSingleLocationUpdate(const LDObjHandle& h, int to_pe);
+#endif
 
   LDStats myStats;
   int migrates_expected;

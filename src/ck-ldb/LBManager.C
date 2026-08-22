@@ -382,6 +382,28 @@ void _loadbalancerInit()
   // force a global barrier after migration done
   _lb_args.syncResume() = CmiGetArgFlagDesc(
       argv, "+LBSyncResume", "LB performs a barrier after migration is finished");
+  {
+    const bool noSync = CmiGetArgFlagDesc(
+        argv, "+LBNoSyncResume",
+        "Let each PE resume its own objects as soon as its own migrations finish "
+        "(unsafe with device zerocopy; see LBManager.C)");
+#if CMK_CUDA
+    // On a CUDA build this defaults ON, because without it a PE resumes its
+    // objects while other PEs' location updates are still in flight, and those
+    // objects then pick a device zerocopy transfer mode from a stale location.
+    // Picking MEMCPY means staging nothing -- the receiver is expected to read
+    // the sender's pointer directly -- so when the message is forwarded into a
+    // different process there is no staged copy to read and the pointer belongs
+    // to an address space the receiver cannot touch. That surfaced as an
+    // unregistered rdmaGet ("Message too long") or an illegal access on an
+    // unrelated stream; CkRdmaDeviceIssueRgets now names it outright.
+    //
+    // +LBNoSyncResume restores the old per-PE resume for anyone who needs it.
+    if (!noSync) _lb_args.syncResume() = true;
+#else
+    (void)noSync;
+#endif
+  }
 
   // both +LBDebug and +LBDebug level should work
   if (!CmiGetArgIntDesc(argv, "+LBDebug", &_lb_args.debug(),
@@ -512,6 +534,7 @@ void LBManager::initnodeFn()
   _registerCommandLineOpt("+LBSimProcs");
   _registerCommandLineOpt("+LBShowDecisions");
   _registerCommandLineOpt("+LBSyncResume");
+  _registerCommandLineOpt("+LBNoSyncResume");
   _registerCommandLineOpt("+LBDebug");
   _registerCommandLineOpt("+LBPrintSummary");
   _registerCommandLineOpt("+LBNoBackground");
