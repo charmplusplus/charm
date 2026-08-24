@@ -4,12 +4,14 @@ mainmodule qdbench {
 
   mainchare Main {
     entry Main(CkArgMsg*);
-    entry void phaseDone();
+    entry void tokenDone();
     entry void qdReached();
+    entry void lapsPrinted();
   };
 
   group Ring {
     entry Ring();
-    entry void token(int hops);
+    entry void token(int hops, int tokenId, int n, char payload[n]);
+    entry void reportLaps();
   };
 };
