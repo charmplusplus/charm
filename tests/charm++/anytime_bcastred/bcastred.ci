@@ -1,0 +1,25 @@
+mainmodule bcastred {
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_Elem elemProxy;
+  readonly int nElems;
+  readonly int nSteps;
+  readonly int migPeriod;
+  readonly int migPerEvent;
+  readonly int gSeed;
+  readonly int verbose;
+
+  mainchare Main {
+    entry Main(CkArgMsg*);
+    entry [reductiontarget] void stepDone(long long sum);
+    entry [reductiontarget] void finalStats(long long totalMigrations);
+    entry void checkProgress();
+  };
+
+  array [1D] Elem {
+    entry Elem();
+    entry void nextStep(int step);
+    entry void neighborVal(int fromIdx, int step, long long val);
+    entry void finish();
+    entry void dumpState();
+  };
+}
