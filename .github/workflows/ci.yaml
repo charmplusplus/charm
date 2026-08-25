@@ -1,6 +1,11 @@
 name: CI
 
-on: [pull_request, merge_group]
+# Classic (frozen-line) CI: runs only for PRs targeting main. The
+# reviewed reconverse line is gated by reconverse-ci.yaml instead.
+on:
+  pull_request:
+    branches: [main]
+  merge_group:
 
 # Cancel in progress CI runs when a new run targeting the same PR or branch/tag is triggered.
 # https://stackoverflow.com/questions/66335225/how-to-cancel-previous-runs-in-the-pr-when-you-push-new-commitsupdate-the-curre
