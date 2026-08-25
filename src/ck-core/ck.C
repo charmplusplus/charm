@@ -2953,8 +2953,13 @@ public:
 
 private:
 	virtual bool process(envelope **envptr,CkCoreState *ck) {
+          // Same rule as CkMessageRecorder::process (#3940): pack only when a
+          // CRC/checksum over packed bytes will be computed. The swap
+          // corrupts envelopes that other code retains a pointer to
+          // (CkArrayBroadcaster), and matching needs no packing.
+          const bool needPacked = _recplay_crc || _recplay_checksum;
           bool wasPacked = (*envptr)->isPacked();
-          if (!wasPacked) CkPackMessage(envptr);
+          if (needPacked && !wasPacked) CkPackMessage(envptr);
           envelope *env = *envptr;
 	  //CkAssert(*(int*)env == 0x34567890);
 	  REPLAYDEBUG("ProcessMessage message: "<<env->getSrcPe()<<" "<<env->getTotalsize()<<" "<<env->getEvent() <<" " <<env->getMsgtype() <<" " <<env->getMsgIdx() << " ep:" << env->getEpIdx());
@@ -2963,13 +2968,22 @@ private:
 			REPLAYDEBUG("Executing message: "<<env->getSrcPe()<<" "<<env->getTotalsize()<<" "<<env->getEvent())
 			getNext(); /* Advance over this message */
 			flush(); /* try to process queued-up stuff */
-    			if (!wasPacked) CkUnpackMessage(envptr);
+    			if (needPacked && !wasPacked) CkUnpackMessage(envptr);
 			return true;
 		}
 #if CMK_SMP
-                else if (env->getMsgtype()==NodeBocInitMsg || env->getMsgtype()==ForNodeBocMsg) {
+                else if (env->getMsgtype()==NodeBocInitMsg || env->getMsgtype()==ForNodeBocMsg
+                         || env->getMsgtype()==BocBcastMsg || env->getMsgtype()==ArrayBcastMsg) {
                          // try next rank, we can't just buffer the msg and left
-                         // we need to keep unprocessed msg on the fly
+                         // we need to keep unprocessed msg on the fly.
+                         // BocBcastMsg/ArrayBcastMsg belong here too (#3940): they ride
+                         // the node queue and are claimed by an arbitrary rank, which
+                         // then performs the within-node fan-out with its own
+                         // srcPe/event stamps (_processBocBcastMsg ->
+                         // _sendMsgBranchWithinNode). Buffering one at the wrong rank
+                         // both strands the original and suppresses the fan-out the
+                         // other ranks' logs expect -- the replay stalls with no
+                         // diagnostic. Bouncing lets the recorded winner claim it.
                         int nextpe = CkMyPe()+1;
                         if (nextpe == CkNodeFirst(CkMyNode())+CkMyNodeSize())
                         nextpe = CkNodeFirst(CkMyNode());
