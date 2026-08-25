@@ -7,6 +7,7 @@ mainmodule bcastred {
   readonly int migPerEvent;
   readonly int gSeed;
   readonly int verbose;
+  readonly int useP2P;
 
   mainchare Main {
     entry Main(CkArgMsg*);
