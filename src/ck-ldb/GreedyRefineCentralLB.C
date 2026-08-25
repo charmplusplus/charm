@@ -42,6 +42,24 @@ extern int quietModeRequested;
 
 using namespace std;
 
+#if CMK_SHRINK_EXPAND
+#include "ckcheckpoint.h"
+// PE-0 state of the in-flight barrier-less rescale round (LBManager.C /
+// manager.C). Only PE 0 sees these set; that is deliberate -- the evacuation
+// decision is made once, on the PE whose doom bitmap is authoritative, and
+// receiveSolutions (also on PE 0) forces that solution to win.
+extern bool _rescaleBarrierlessRound;
+extern realloc_state pending_realloc_state;
+extern std::vector<char> se_avail_snapshot;
+
+static bool rescaleEvacRoundOnThisPe()
+{
+  return _rescaleBarrierlessRound &&
+         (pending_realloc_state & SHRINK_MSG_RECEIVED) &&
+         !se_avail_snapshot.empty();
+}
+#endif
+
 class GreedyRefineCentralLB::Solution {
 public:
   Solution() {}
@@ -494,9 +512,78 @@ void GreedyRefineCentralLB::sendSolution(double maxLoad, int migrations)
   free(buffer);
 }
 
+#if CMK_SHRINK_EXPAND
+bool GreedyRefineCentralLB::rescaleEvacuateOnly(LDStats* stats)
+{
+  const int n_pes = stats->nprocs();
+  auto doomed = [&](int pe) {
+    return pe >= 0 && pe < (int)se_avail_snapshot.size() &&
+           se_avail_snapshot[pe] == 0;
+  };
+
+  // Current per-PE load: background plus resident objects, with wallTimes
+  // already snapshot-substituted by applyLoadSnapshot when this round's
+  // window is short (always, for a rescale round).
+  std::vector<double> load(n_pes, 0.0);
+  for (int p = 0; p < n_pes; p++) load[p] = stats->procs[p].bg_walltime;
+  std::vector<int> evacuees;
+  int unmovable = 0;
+  for (int i = 0; i < (int)stats->objData.size(); i++) {
+    const int from = stats->from_proc[i];
+    if (!doomed(from)) {
+      load[from] += stats->objData[i].wallTime;
+    } else if (stats->objData[i].migratable) {
+      evacuees.push_back(i);
+    } else {
+      unmovable++;
+    }
+  }
+
+  std::vector<int> survivors;
+  for (int p = 0; p < n_pes; p++)
+    if (!doomed(p)) survivors.push_back(p);
+  if (survivors.empty()) return false;  // nonsense bitmap; let the strategy run
+
+  // Largest first onto the least-loaded survivor.
+  std::sort(evacuees.begin(), evacuees.end(), [&](int a, int b) {
+    return stats->objData[a].wallTime > stats->objData[b].wallTime;
+  });
+  for (int i : evacuees) {
+    int best = survivors[0];
+    for (int p : survivors)
+      if (load[p] < load[best]) best = p;
+    stats->to_proc[i] = best;
+    load[best] += stats->objData[i].wallTime;
+  }
+
+  double maxLoad = 0.0;
+  for (int p : survivors) maxLoad = std::max(maxLoad, load[p]);
+
+  CkPrintf("CharmLB> %s: PE [%d] rescale evacuation: placed %d object(s) off "
+           "%d doomed PE(s) onto %d survivor(s)%s; survivors keep their "
+           "objects\n",
+           lbname, CkMyPe(), (int)evacuees.size(),
+           n_pes - (int)survivors.size(), (int)survivors.size(),
+           unmovable ? " (some unmigratable left behind!)" : "");
+
+  if (concurrent)
+    sendSolution(maxLoad, (int)evacuees.size());
+  return true;
+}
+#endif
+
 void GreedyRefineCentralLB::work(LDStats *stats)
 {
   strategyStartTime = CkWallTimer();
+#if CMK_SHRINK_EXPAND
+  // A barrier-less rescale round is evacuate-only: survivors keep their
+  // objects (they are running the application right now; a survivor-to-
+  // survivor move here buys nothing the next regular LB step cannot, and
+  // extends the window the doomed PEs must stay alive). Only PE 0 holds the
+  // round state, so only PE 0 takes this path; the other solver PEs run the
+  // normal strategy and their solutions are ignored in receiveSolutions.
+  if (rescaleEvacRoundOnThisPe() && rescaleEvacuateOnly(stats)) return;
+#endif
   float A = 1.001, B = FLT_MAX; // Use A=0, B=-1 to imitate regular Greedy (ignore migrations)
   if (concurrent) {
     getGreedyRefineParams(CkMyPe(), A, B);
@@ -743,14 +830,19 @@ void GreedyRefineCentralLB::work(LDStats *stats)
     p->load += (obj->load / p->speed);
     procHeap.push(p);
 
-    // if (p->id != obj->oldPE) {
-    //   nmoves++;
-    //   stats->to_proc[obj->id] = p->id;
-    //   if (_lb_args.debug() > 1) {
-    //     CkPrintf("[%d] Migrating obj %d: PE %d -> PE %d (objLoad=%.6f, destPELoad=%.6f)\n",
-    //              CkMyPe(), obj->id, obj->oldPE, p->id, obj->load, p->load);
-    //   }
-    // }
+    // Record the decision. Without this the solver still computes loads and
+    // reports an honest max_load, but to_proc is never written and nmoves
+    // stays 0 -- every solution claims zero migrations, the winner applies
+    // an empty migrate message, and the strategy is a silent no-op (observed:
+    // a post-expand rebalance that never populated the empty newcomer).
+    if (p->id != obj->oldPE) {
+      nmoves++;
+      stats->to_proc[obj->id] = p->id;
+      if (_lb_args.debug() > 2) {
+        CkPrintf("[%d] Migrating obj %d: PE %d -> PE %d (objLoad=%.6f, destPELoad=%.6f)\n",
+                 CkMyPe(), obj->id, obj->oldPE, p->id, obj->load, p->load);
+      }
+    }
     if (p->load > maxLoad) {
       maxLoad = p->load;
       if (maxLoad > M) M = maxLoad;
@@ -813,6 +905,31 @@ void GreedyRefineCentralLB::receiveSolutions(CkReductionMsg *msg)
   int lowestMigrations = INT_MAX;     // lowest num migrations of all solutions
   const GreedyRefineCentralLB::Solution *bestSol = NULL; // best solution
 
+#if CMK_SHRINK_EXPAND
+  // On a barrier-less rescale round, only PE 0 computed the evacuation
+  // placement (the doom bitmap lives there); every other PE ran the normal
+  // strategy on stats that may not mark the doomed PEs unavailable. Their
+  // solutions are not merely worse, they are wrong for this round -- force
+  // the evacuation solution regardless of score. Scan the full set (not the
+  // NUM_SOLUTIONS-capped copy) for PE 0's entry.
+  if (rescaleEvacRoundOnThisPe()) {
+    for (CkReduction::setElement* cur = (CkReduction::setElement*)msg->getData();
+         cur; cur = cur->next()) {
+      GreedyRefineCentralLB::Solution sol;
+      PUP::fromMem pd(&cur->data);
+      pd|sol;
+      if (sol.pe == CkMyPe() && sol.migrations >= 0) {
+        if (_lb_args.debug())
+          CkPrintf("GreedyRefineCentralLB: rescale round, applying the "
+                   "evacuation solution (%d moves)\n", sol.migrations);
+        thisProxy[sol.pe].ApplyDecision();
+        return;
+      }
+    }
+    CkPrintf("GreedyRefineCentralLB: Warning: rescale round but no evacuation "
+             "solution from PE %d; falling back to best-score pick\n", CkMyPe());
+  }
+#endif
   // first pass. Will record solution with lowest migrations as the best, in case
   // there is no feasible solution
   CkReduction::setElement *current = (CkReduction::setElement*)msg->getData();  // Get the first element in the set

@@ -257,6 +257,13 @@ class LBManager : public CBase_LBManager
   // drop all but the last. Drained at end of each LB step in callRealloc().
   std::deque<std::vector<char>> reallocQueue;
 
+  // Set when a rescale request was accepted while this PE was still restoring
+  // from the previous one, so the arming handshake could not run: PE 0's peers
+  // are mid-restore, a broadcast issued then is only buffered, and starting a
+  // reduction races the reduction manager's own rescale reset. Consumed by
+  // ArmRescalePointIfDeferred() at the end of the restore.
+  bool rescaleArmDeferred = false;
+
  public:
   int chare_count;
   bool lb_in_progress;
@@ -330,6 +337,49 @@ class LBManager : public CBase_LBManager
       callRealloc();
   }
 
+  /* Application-declared rescale points. See ../ck-ldb/rescalepoint.h.
+   *
+   * An application that declares its iteration boundaries lets a rescale land
+   * at the next one rather than at the next load balancing step. Agreeing on
+   * which iteration is a three-phase consensus, run once a request has been
+   * accepted:
+   *
+   *   PE 0   RescaleTentative(t) broadcast,  t = its own iterSeen + lead
+   *   all    local = max(t, iterSeen + 1); arm at local; report local
+   *   PE 0   RescaleFinal: the maximum arrives by reduction
+   *   all    RescaleCommit(final) broadcast; anyone held is released
+   *
+   * Installing the ceiling before reporting is what makes this sound. Both
+   * happen inside one entry method, so no element can advance between the read
+   * of iterSeen and the arm, and the reduced maximum is therefore a bound no
+   * element has passed -- by construction, not because a margin happened to be
+   * generous enough. A target below some PE's current iteration would not be a
+   * benign late entry: in a coupled code that PE cannot reach another boundary
+   * once its neighbours have stopped producing, so it would never enter and
+   * the barrier would never fire.
+   *
+   * Every element then enters the barrier having completed the same number of
+   * iterations, which is the state every rescale so far has been exercised
+   * from. The lead is no longer a correctness margin, only a stall knob -- see
+   * +RescaleLead. */
+  void ArmRescalePoint();
+  void ArmRescalePointIfDeferred();
+  void RescaleTentative(int tentative, int gen);
+  void RescaleTentativeNow(int tentative, int gen);
+  void RescaleFinal(int n, int* v);
+  void RescaleCommit(int final, int gen);
+  // Broadcast from PE 0 at set_bitmap time: install the doom bitmap in every
+  // PE's avail vector while the application is still running. Solver PEs then
+  // see correct availability in their stats, and the quiet-probe protocol has
+  // a consistent doomed list everywhere. Idempotent; PE 0 also applies it
+  // locally (synchronously) in realloc() before this lands.
+  void RescaleAnnounceDoom(std::vector<char> bitmap);
+  // Post-rescale resume: like ResumeClients, but only releases clients that
+  // are actually held at the sync barrier. Safe whether the restore finds
+  // clients running (early release, barrier-less), all held (hold-boundary),
+  // or held by a racing LB round the cut beheaded.
+  void ResumeClientsIfHeld();
+
   /*
    * Calls from object managers to load database
    */
@@ -351,6 +401,10 @@ class LBManager : public CBase_LBManager
   }
   void ObjectStart(const LDObjHandle& h) { lbdb_obj->ObjectStart(h); }
   void ObjectStop(const LDObjHandle& h) { lbdb_obj->ObjectStop(h); }
+  void ObjectMessageArrived(const LDObjHandle& h, double sendTime)
+  {
+    lbdb_obj->ObjectMessageArrived(h, sendTime);
+  }
   void NonMigratable(LDObjHandle h) { lbdb_obj->NonMigratable(h); }
   void Migratable(LDObjHandle h) { lbdb_obj->Migratable(h); }
   void setPupSize(LDObjHandle h, size_t pup_size) { lbdb_obj->setPupSize(h, pup_size); }

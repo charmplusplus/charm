@@ -145,8 +145,9 @@ void CkSyncBarrier::turnOnReceiver(LDBarrierReceiver r) { (*r)->on = true; }
 
 void CkSyncBarrier::turnOffReceiver(LDBarrierReceiver r) { (*r)->on = false; }
 
-void CkSyncBarrier::atBarrier(LDBarrierClient c)
+void CkSyncBarrier::atBarrier(LDBarrierClient c, int iter)
 {
+  (*c)->arrivedAtIter = iter;
   (*c)->epoch++;
   atCount++;
 
@@ -248,6 +249,9 @@ void CkSyncBarrier::checkBarrier()
     {
       _TRACE_END_PHASE();
       startedAtSync = true;
+#if CMK_SHRINK_EXPAND
+      clientsAwaitingResume = true;
+#endif
       curEpoch++;
       // Propagate kick message to trigger barrier on PEs that don't have any AtSync
       // elements on them
@@ -280,8 +284,47 @@ void CkSyncBarrier::resumeLateClients()
   }
 }
 
+bool CkSyncBarrier::resumeClientsIfHeld()
+{
+  if (startedAtSync)
+  {
+    resumeClients();
+    return true;
+  }
+
+#if CMK_SHRINK_EXPAND
+  // The rescale reset cleared startedAtSync so that the next AtSync round can
+  // fire, but a round that fired before the cut and never resumed its clients
+  // still has them parked inside AtSync, and nothing else is coming to let
+  // them go. That is exactly hold-boundary mode. Without this an AMPI job run
+  // with +rescaleholdboundary completes its rescale and then never takes
+  // another step, every rank still waiting in AMPI_Migrate.
+  if (clientsAwaitingResume)
+  {
+    resumeClients();
+    return true;
+  }
+
+  // A client that arrived but whose round never fired -- the barrier was shut
+  // for the rescale before it could trigger.
+  for (const auto& c : clients)
+  {
+    if (c->epoch > curEpoch)
+    {
+      resumeClients();
+      return true;
+    }
+  }
+#endif
+
+  return false;
+}
+
 void CkSyncBarrier::resumeClients()
 {
+#if CMK_SHRINK_EXPAND
+  clientsAwaitingResume = false;
+#endif
   // The end receiver or client functions may trigger the barrier again, so make sure
   // reset() is called before them to put the barrier in a valid state to be triggered
   reset();

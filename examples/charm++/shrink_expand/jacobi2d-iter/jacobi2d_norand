@@ -1,0 +1,13 @@
+#!/bin/bash
+# Launch jacobi2d with address-space randomization off.
+#
+# Isomalloc negotiates one global address range for the whole job. With
+# randomization on, each process probes a slightly different free region, so a
+# process that joins later can find that the range the job agreed on is not
+# entirely free in its own address space -- and it is refused. Migrating a
+# thread has the same requirement for the program's code.
+#
+# The launcher cannot do this for us: ranks are started through ssh, so they do
+# not inherit the launcher's personality.
+d="$(cd "$(dirname "$0")" && pwd)"
+exec setarch "$(uname -m)" -R "$d/jacobi2d" "$@"

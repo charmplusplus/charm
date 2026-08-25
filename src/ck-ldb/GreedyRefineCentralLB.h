@@ -83,6 +83,12 @@ private:
                   PHeap &procHeap);
 
   double greedyLB(const std::vector<GObj*> &pobjs, PHeap &procHeap, const BaseLB::LDStats *stats) const;
+#if CMK_SHRINK_EXPAND
+  // Barrier-less rescale rounds move ONLY the objects on doomed PEs (greedy
+  // placement onto least-loaded survivors); survivors keep running and keep
+  // their objects. Returns true if this round was handled. See work().
+  bool rescaleEvacuateOnly(LDStats* stats);
+#endif
   void sendSolution(double maxLoad, int migrations);
 
   double strategyStartTime;

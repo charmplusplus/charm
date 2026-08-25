@@ -437,6 +437,11 @@ static inline void _parseCommandLineOpts(char **argv)
        
 }
 
+int CkRescaleBuffQLen(void)
+{
+  return CkpvAccess(_buffQ) ? CkpvAccess(_buffQ)->length() : -1;
+}
+
 static void _bufferHandler(void *msg)
 {
   DEBUGF(("[%d] _bufferHandler called.\n", CkMyPe()));
@@ -454,6 +459,62 @@ static void _discardHandler(envelope *env)
 #endif
   CmiFree(env);
 }
+
+#if CMK_SHRINK_EXPAND
+/** What the exit flow does to the charm handler slots, from the moment a PE
+ *  joins the exit sequence until the scheduler stops.
+ *
+ * On a plain exit the answer is discard: the job is over and stale messages
+ * must die. A no-restart rescale is not over -- and the scheduler keeps
+ * popping for the whole stats round-trip after this point, so whatever these
+ * slots do is applied to every application message still queued or arriving.
+ * Discarding here silently ate the last in-flight messages of a barrier-less
+ * rescale (observed: ghosts lost with balanced transport counters and empty
+ * queues -- they had "arrived", into the discard).
+ *
+ * So on the rescale path: a survivor buffers -- _buffQ lives across the
+ * longjmp and _resumeBufferedCharmMessages delivers after the restore. A
+ * departing PE keeps processing: its elements are already evacuated, so an
+ * arriving message is a stray whose delivery forwards it to the element's
+ * new host -- which is exactly what the pre-teardown flush pump needs; a
+ * buffered message would exit with the process. */
+extern "C" char willContinue;
+
+#if CMK_SHRINK_EXPAND
+#include <signal.h>
+/** SIGUSR2: dump every charm-level structure a message could be parked in.
+ *  Diagnostic for wedged rescale runs; converse's SIGUSR1 dump covers the
+ *  queues below this layer. */
+static void _seCharmDump(int)
+{
+  extern int CkRescaleBuffQLen(void);
+  fprintf(stderr, "SEDUMP[%d] _buffQ=%d\n", CkMyPe(), CkRescaleBuffQLen());
+  int numGroups = CkpvAccess(_groupIDTable)->size();
+  for (int i = 0; i < numGroups; i++)
+  {
+    CkGroupID gID = (*CkpvAccess(_groupIDTable))[i];
+    IrrGroup* obj = CkpvAccess(_groupTable)->find(gID).getObj();
+    if (obj && obj->isLocMgr()) ((CkLocMgr*)obj)->debugDumpRescale();
+    if (obj && obj->isReductionMgr()) ((CkReductionMgr*)obj)->debugDumpRescale();
+  }
+  fflush(stderr);
+}
+#endif
+
+static void _rescaleExitRepointHandlers(void)
+{
+  if (get_shrinkexpand_exit()) {
+    if (willContinue) {
+      CkNumberHandler(_charmHandlerIdx, _bufferHandler);
+      CkNumberHandler(_bocHandlerIdx, _bufferHandler);
+    }
+    // departing: leave the handlers live.
+  } else {
+    CkNumberHandler(_charmHandlerIdx, (CmiHandler)_discardHandler);
+    CkNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
+  }
+}
+#endif
 
 #if CMK_WITH_STATS
 static inline void _printStats(void)
@@ -644,8 +705,12 @@ static void _exitHandler(envelope *env)
         break;
       }
 
+#if CMK_SHRINK_EXPAND
+      _rescaleExitRepointHandlers();
+#else
       CkNumberHandler(_charmHandlerIdx,_discardHandler);
       CkNumberHandler(_bocHandlerIdx, _discardHandler);
+#endif
       env->setMsgtype(ReqStatMsg);
       env->setSrcPe(CkMyPe());
       // if exit in ring, instead of broadcasting, send in ring
@@ -664,8 +729,12 @@ static void _exitHandler(envelope *env)
       break;
     case ReqStatMsg: // Request stats and warnings message
       DEBUGF(("ReqStatMsg on %d\n", CkMyPe()));
+#if CMK_SHRINK_EXPAND
+      _rescaleExitRepointHandlers();
+#else
       CkNumberHandler(_charmHandlerIdx,_discardHandler);
       CkNumberHandler(_bocHandlerIdx, _discardHandler);
+#endif
       {
 #if CMK_WITH_STATS
          _sendStats();
@@ -840,6 +909,30 @@ static inline void _processBufferedMsgs(void)
   CkNumberHandlerEx(_charmHandlerIdx, _processHandler, CkpvAccess(_coreState));
   envelope *env;
   while(NULL!=(env=(envelope*)CkpvAccess(_buffQ)->deq())) {
+#if CMK_SHRINK_EXPAND
+    // Everything in _buffQ at restore time was buffered during the previous
+    // world's exit window (post-restore arrivals dispatch directly), so a
+    // message here addressed to the load balancer groups is an old-world
+    // protocol fragment -- a stats contribution or migration broadcast of
+    // the round that carried the rescale. Replaying it into the new world's
+    // balancer starts a ghost round that runs concurrently with a real one:
+    // stats built while the real round's migrations are in flight (observed:
+    // "14 out of 14 total objs" on a 16-object array, then SEGV applying the
+    // decisions). Application messages must survive the cut; these must not.
+    if (env->getMsgtype() == ForBocMsg || env->getMsgtype() == ForNodeBocMsg)
+    {
+      extern CkGroupID _lbmgr;
+      extern CkGroupID loadbalancer;
+      const CkGroupID g = env->getGroupNum();
+      if (g.idx == _lbmgr.idx || g.idx == loadbalancer.idx)
+      {
+        CmiPrintf("[%d] rescale drain: dropped stale balancer msg (gid %d ep %d)\n",
+                  CkMyPe(), g.idx, env->getEpIdx());
+        CmiFree(env);
+        continue;
+      }
+    }
+#endif
     if(env->getMsgtype()==NewChareMsg || env->getMsgtype()==NewVChareMsg) {
       if(env->isForAnyPE())
         _CldEnqueue(CLD_ANYWHERE, env, _infoIdx);
@@ -928,6 +1021,14 @@ void _initDone(void)
   DEBUGF(("Crossed CmiNodeBarrier(), pe = %d, rank = %d\n", CkMyPe(), CkMyRank()));
   _processBufferedMsgs();
   CkpvAccess(_charmEpoch)=1;
+#if CMK_RECONVERSE
+  // The runtime is up, so a randomized message queue may start perturbing
+  // delivery order. Not before: bringing it up is a fixed sequence whose steps
+  // read each other back synchronously. A library layered on top may still
+  // have its own startup left (AMPI does) and will have suspended the window
+  // again on its own account.
+  CmiRandomizedQueueResume();
+#endif
   if (userDrivenMode) {
     StopInteropScheduler();
   }
@@ -1445,6 +1546,9 @@ void _initCharm(int unused_argc, char **argv)
 		CkpvAccess(_numGroups) = 1; // make 0 an invalid group number
 		CkpvAccess(_buffQ) = new PtrQ();
 	}
+#if CMK_SHRINK_EXPAND
+	signal(SIGUSR2, _seCharmDump);
+#endif
 	// _bocInitVec and _nodeBocInitVec are transient init queues that
 	// _initDone deletes (`delete &inits;`); on a survivor restart we must
 	// allocate fresh ones, otherwise CksvAccess returns a dangling pointer
@@ -2020,6 +2124,16 @@ int charm_main(int argc, char **argv)
   registerCcsInit(CcsInit);
 #endif
 
+#if CMK_RECONVERSE
+  // Same reason, for Isomalloc: it is initialized from ConverseCommonInit in
+  // classic Converse, and it has to be up before CthInit, which is the first
+  // thing that could ask for a migratable thread stack.
+  {
+    extern void CmiIsomallocHookIntoReconverse(void);
+    CmiIsomallocHookIntoReconverse();
+  }
+#endif
+
 #if CMK_SHRINK_EXPAND
   // Newcomer launched by external manager: ensure +restart <basedir> is in argv
   // so faultFunc=CkRestartMain wires up. PE 0 (a survivor) reads checkpoint
@@ -2089,7 +2203,7 @@ int charm_main(int argc, char **argv)
     CkNumberHandler(_charmHandlerIdx, _bufferHandler);
     CkNumberHandler(_bocHandlerIdx, _bufferHandler);
 
-    // RescaleCheckpoint set this flag to route ConverseCleanup down the
+    // ArmRescaleCut set this flag to route ConverseCleanup down the
     // rescale path (instead of clean exit). It's never reset elsewhere, so
     // without this clear the next CkExit() after the application finishes
     // would also be misrouted into the rescale path, sending an empty

@@ -33,7 +33,11 @@ group [migratable] CentralLB : BaseLB {
   entry void MissMigrate(int);
   entry void CallLB();
   entry void CheckForRealloc();
-  entry void ResumeFromReallocCheckpoint();
+  entry void RescaleEarlyResume();
+  entry [reductiontarget] void RescaleEarlyResumeDone();
+  entry void RescaleQuietProbe(std::vector<int> doomed);
+  entry void RescaleQuietReport(long data[n], int n);
+  entry void RescaleCutArmed();
   entry void MigrationDoneImpl(int);
   entry void WillIbekilled(std::vector <char> avail, int);
   entry [reductiontarget] void StartCleanup();

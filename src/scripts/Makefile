@@ -196,7 +196,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  waitqd.h LBDatabase.h LBManager.h MetaBalancer.h RandomForestModel.h lbdb.h $(LBHEADERS) \
           LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
 	  RefinerTemp.h Refiner.h ckgraph.h ckheap.h \
-          elements.h topology.h manager.h \
+          elements.h topology.h manager.h telemetry.h \
 	  BaseLB.h CentralLB.h CentralLBMsg.h TreeLB.h \
 	  DistBaseLB.h HybridBaseLB.h HybridLBMsg.h \
 	  middle.h middle-conv.h \
@@ -690,7 +690,7 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
            LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
 	   BaseLB.o CentralLB.o TreeLB.o HybridBaseLB.o DistBaseLB.o \
            ckgraph.o LButil.o RefinerTemp.o Refiner.o \
-           manager.o ckset.o ckheap.o \
+           manager.o telemetry.o ckset.o ckheap.o \
 	   LBSimulation.o modifyScheduler.o \
 	   charmProjections.o ckbitvector.o \
            pathHistory.o controlPoints.o arrayRedistributor.o cp_effects.o \

@@ -177,6 +177,24 @@ namespace ck {
   }
 }
 
+/** Per-message send timestamp, for load-balancer wait accounting.
+ *
+ * Off by default: it widens every envelope by 8 bytes and stamps a timer on
+ * every send. Enable with -DCMK_LB_WAIT_TIME=1 when the scheduler needs to
+ * know how much communication a job is hiding behind its own computation --
+ * see LBManager::ObjectMessageArrived.
+ */
+#ifndef CMK_LB_WAIT_TIME
+#define CMK_LB_WAIT_TIME 0
+#endif
+
+#if CMK_LB_WAIT_TIME
+#define CMK_ENVELOPE_WAIT_FIELDS                                               \
+  double sendTime;   /* CkWallTimer() when this message was allocated */
+#else
+#define CMK_ENVELOPE_WAIT_FIELDS
+#endif
+
 #define CMK_ENVELOPE_FT_FIELDS
 
 #if CMK_REPLAYSYSTEM || CMK_TRACE_ENABLED
@@ -193,6 +211,7 @@ namespace ck {
   ck::impl::u_type type; /* Depends on message type (attribs.mtype) */         \
   UInt   totalsize;    /* Byte count from envelope start to end of group dependencies */ \
   CMK_ENVELOPE_OPTIONAL_FIELDS                                                 \
+  CMK_ENVELOPE_WAIT_FIELDS                                                     \
   CMK_REFNUM_TYPE ref; /* Used by futures and SDAG */                          \
   UShort priobits;     /* Number of bits of priority data after user data */   \
   UShort groupDepNum;  /* Number of group dependencies */                      \
@@ -222,6 +241,10 @@ public:
 #if CMK_REPLAYSYSTEM || CMK_TRACE_ENABLED
     UInt   getEvent(void) const { return event; }
     void   setEvent(const UInt e) { event = e; }
+#endif
+#if CMK_LB_WAIT_TIME
+    double getSendTime(void) const { return sendTime; }
+    void   setSendTime(const double t) { sendTime = t; }
 #endif
     CMK_REFNUM_TYPE   getRef(void) const { return ref; }
     void   setRef(const CMK_REFNUM_TYPE r) { ref = r; }
@@ -291,6 +314,11 @@ public:
       //CkPrintf("[%d] inside envelope alloc groupDepNum:%d\n", CkMyPe(), (int)groupDepNumRequest);
 
       envelope *env = (envelope *)CmiAlloc(tsize);
+#if CMK_LB_WAIT_TIME
+      // Stamped at allocation rather than at the send call: the two are
+      // adjacent, and this catches every path that builds a message.
+      env->sendTime = CkWallTimer();
+#endif
 #if CMK_REPLAYSYSTEM
       //for record-replay
       memset(env, 0, sizeof(envelope));

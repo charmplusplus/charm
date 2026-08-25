@@ -893,7 +893,8 @@ public:
   CkArrayBroadcaster* getBroadcaster() { return broadcaster; }
   void flushStates();
 #if CMK_SHRINK_EXPAND
-  void resetForRescale() override;
+  void resetReductionForRescale() override;
+  void debugDumpRescale();
   // Re-key one chare's entry in localElems and the PE-level array_objs fast-path
   // hash after CkLocMgr re-encodes its ID (homePe shifted on rescale). The
   // underlying CkMigratable* and its offset in localElemVec stay the same — only

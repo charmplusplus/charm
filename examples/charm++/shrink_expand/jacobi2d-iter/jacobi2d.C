@@ -187,7 +187,10 @@ public:
     // Perform one iteration of work
     // The first step is to send the local state to the neighbors
     void begin_iteration(void) {
-        if (((iteration > 0 && iteration % lbTime == 0) || iteration == 10) && useLB) {
+        // checkRescale offers this boundary as a place the job could change
+        // width; false at every boundary but one, at the cost of a compare.
+        if (useLB && (checkRescale(iteration) ||
+                      (iteration > 0 && iteration % lbTime == 0) || iteration == 10)) {
             useLB = 0;
             //if(thisIndex.x==0 && thisIndex.y==0) CkPrintf("PROC#%d Calling LBD --------------------- iteration=%d\n",CkMyPe(),iteration);
             AtSync();

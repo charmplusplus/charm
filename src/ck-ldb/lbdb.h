@@ -154,9 +154,24 @@ public:
   void *getData(int idx) { return data.data()+idx; }
 };
 
+#ifndef CMK_LB_WAIT_TIME
+#define CMK_LB_WAIT_TIME 0
+#endif
+
 struct LDObjData {
   LDObjHandle handle;
   LBRealType wallTime;
+#if CMK_LB_WAIT_TIME
+  /** How long this object spent waiting for the data it needed, whether or
+   *  not the PE had other work to hide the wait behind.
+   *
+   * Measured as the gap between the object finishing and its next input being
+   * produced, so it is the *potential* wait -- the part that would become real
+   * idle time if the object had no siblings on its PE to overlap with. That is
+   * what a scheduler needs in order to predict a wider width, where there are
+   * fewer siblings to hide behind. */
+  LBRealType waitTime;
+#endif
 #if CMK_CUDA || CMK_HIP
   LBRealType gpuTime;
 #endif
@@ -339,6 +354,9 @@ inline void LBObjUserData::pup(PUP::er &p) {
 inline void LDObjData::pup(PUP::er &p) {
   p|handle;
   p|wallTime;
+#if CMK_LB_WAIT_TIME
+  p|waitTime;
+#endif
 #if CMK_CUDA || CMK_HIP
   p|gpuTime;
 #endif

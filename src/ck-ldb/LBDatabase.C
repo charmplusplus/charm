@@ -280,6 +280,9 @@ void LBDatabase::ClearLoads(void)
       obj->data.gpuTime = 0.0;
 #endif
       obj->data.wallTime = 0.0;
+#if CMK_LB_WAIT_TIME
+      obj->data.waitTime = 0.0;
+#endif
 #if CMK_LB_CPUTIMER
       obj->data.cpuTime = 0.0;
 #endif

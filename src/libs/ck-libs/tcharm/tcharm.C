@@ -99,6 +99,22 @@ void TCharm::procInit()
   tcharm_initted=true;
   CtgInit();
 
+#if CMK_SHRINK_EXPAND
+  // A TCharm thread can only be moved where it is quiescent -- inside
+  // TCHARM_Migrate, which for AMPI is AMPI_Migrate. That makes the rescale
+  // early release's premise ("nothing the application does from here on
+  // changes the rescale") false here: a released rank resumes into MPI calls
+  // and can put a message on the wire toward a PE that is leaving, which is
+  // then lost at the cut and stops an MPI_Waitall that will never complete.
+  // Ask to be held through the cut instead. The command line still wins,
+  // either way, via +rescaleholdboundary / +rescaleearlyrelease.
+  {
+    extern bool _rescaleHoldBoundary;
+    extern bool _rescaleHoldBoundaryExplicit;
+    if (!_rescaleHoldBoundaryExplicit) _rescaleHoldBoundary = true;
+  }
+#endif
+
   CkpvInitialize(bool, mapCreated);
   CkpvAccess(mapCreated) = false;
 
@@ -378,6 +394,15 @@ CMI_WARN_UNUSED_RESULT TCharm * TCharm::migrateTo(int destPE) noexcept {
 }
 void TCharm::ckJustMigrated() {
 	ArrayElement::ckJustMigrated();
+	// Arrival is the point at which the thread's Isomalloc context needs its
+	// page protections put back: unpacking maps the region read-write, so a
+	// context holding executable pages -- which is every rank under
+	// pieglobals, whose code segment lives in the context -- comes back
+	// non-executable, and the first instruction the resumed thread runs
+	// faults. Doing it here rather than in ResumeFromSync covers the
+	// asynchronous path too (TCHARM_Migrate_to / AMPI_Migrate_to_pe resume
+	// from right below, never passing through the sync barrier).
+	CmiIsomallocContextJustMigrated(CmiIsomallocGetThreadContext(getThread()));
     if (asyncMigrate) {
         asyncMigrate = false;
         resume();
@@ -484,9 +509,10 @@ void TCharm::ResumeFromSync()
 {
   DBG("thread resuming from sync");
 
-  CthThread th = getThread();
-  auto ctx = CmiIsomallocGetThreadContext(th);
-  CmiIsomallocContextJustMigrated(ctx);
+  // Page protections are restored in ckJustMigrated, which runs on arrival and
+  // therefore covers both the synchronous and asynchronous migration paths.
+  // Most calls here follow a barrier at which nothing moved, so there would be
+  // nothing to restore anyway.
 
   if (resumeAfterMigrationCallback.isInvalid())
     start();

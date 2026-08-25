@@ -34,6 +34,12 @@ void LBObj::Clear(void)
 #endif
 
   startWTime = -1.0;
+#if CMK_LB_WAIT_TIME
+  // Construction only. The per-window reset is in LBDatabase::ClearLoads,
+  // alongside wallTime -- without it this accumulates over the whole run and
+  // reads as a wait many times longer than the window it is reported against.
+  data.waitTime = 0.;
+#endif
   lastWallTime = .0;
 #if CMK_LB_CPUTIMER
   startCTime = -1.0;

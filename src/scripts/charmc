@@ -1616,7 +1616,9 @@ MAKE_LD="0"
 
 # conv-ccs comes before charm_cxx_utils: it pulls ckhashtable and sockRoutines
 # out of it.
-CORE_LIBS=(-lreconverse -lconv-ccs -lcharm_cxx_utils "${TRACE_OBJ[@]}" -lm -lckrescale)
+# isomalloc before reconverse: it registers itself with Reconverse's thread
+# layer, so the reference runs this way round.
+CORE_LIBS=(-lisomalloc -lreconverse -lconv-ccs -lcharm_cxx_utils "${TRACE_OBJ[@]}" -lm -lckrescale)
 
 if [[ "$BUILD_SHARE" = '0' && "$USER_INITIATED_SHARED" = '0' ]]
 then
@@ -1673,7 +1675,16 @@ fi
 
 if [[ -z "$STANDALONE" ]]
 then
-  ALL_LIBS=("${LANG_LIBS[@]}" "${PRE_LIBRARIES[@]}" "${MIDDLE_LIBS[@]}" "${BAL_OBJ[@]}" $CMK_LIBS "${POST_LIBRARIES[@]}")
+  # A memory module is only linked when one was asked for. Reconverse supplies
+  # the allocator otherwise, and libmemory-default would just be an extra copy
+  # of the pass-through wrappers. The module has to come before the runtime
+  # libraries so that its malloc/free definitions win over libc's.
+  MEM_LIBS=()
+  if [[ "$MEMORY" != 'default' ]]
+  then
+    MEM_LIBS=("${MEM_OBJ[@]}")
+  fi
+  ALL_LIBS=("${LANG_LIBS[@]}" "${PRE_LIBRARIES[@]}" "${MEM_LIBS[@]}" "${MIDDLE_LIBS[@]}" "${BAL_OBJ[@]}" $CMK_LIBS "${POST_LIBRARIES[@]}")
   case "$PARADIGM" in
   "charm"|"charm++"|"f90charm")
     ALL_LIBS+=(-lmoduleNDMeshStreamer -lmodulecompletion)

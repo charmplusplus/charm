@@ -91,6 +91,7 @@ extern int _messageBufferingThreshold;
 /// This arrayListener is in charge of performing reductions on the array.
 class CkArrayReducer : public CkArrayListener
 {
+  friend class CkArray;  // SIGUSR2 diagnostic reads contributor state
   CkGroupID mgrID;
   CkReductionMgr* mgr;
   typedef contributorInfo* I;
@@ -1768,10 +1769,54 @@ void CkArray::flushStates()
 // contributorInfo::redNo across the longjmp, and flushing manager state would
 // desync against them, causing every post-rescale contribute() to land in
 // futureMsgs and stall the application's reduction chain forever.
-void CkArray::resetForRescale()
+/** SIGUSR2 diagnostic: everything a message could be parked in here. */
+void CkArray::debugDumpRescale()
+{
+  fprintf(stderr, "SEDUMP[%d] CkArray g%d: local=%zu bufID=%zu bufIdx=%zu bufCre=%zu\n",
+          CkMyPe(), thisgroup.idx, localElems.size(), bufferedIDMsgs.size(),
+          bufferedIndexMsgs.size(), bufferedCreationMsgs.size());
+  for (auto& kv : bufferedIDMsgs)
+    fprintf(stderr, "SEDUMP[%d]   bufID id=%lu n=%zu\n", CkMyPe(),
+            (unsigned long)kv.first, kv.second.size());
+  for (auto& kv : bufferedIndexMsgs)
+    fprintf(stderr, "SEDUMP[%d]   bufIdx idx=(%d,%d) n=%zu\n", CkMyPe(),
+            kv.first.data()[0], kv.first.data()[1], kv.second.size());
+  for (auto& kv : localElems)
+  {
+    CkMigratable* e = localElemVec[kv.second];
+    fprintf(stderr, "SEDUMP[%d]   localElem id=%lu redNo=%d\n", CkMyPe(),
+            (unsigned long)kv.first,
+            (e && reducer) ? reducer->getData((ArrayElement*)e)->redNo : -1);
+  }
+}
+
+void CkArray::resetReductionForRescale()
 {
   rebaseCountersForRescale();
   rebuildTreeForRescale();
+
+  // Re-dispatch every message parked here awaiting a location. The keys these
+  // buffers use and the location requests they issued belong to the old
+  // world: an entry under an old-world ID will never drain, because the
+  // repairs that fire the drains arrive under new-world IDs -- and the reply
+  // the entry is waiting for may have been owed by a PE that no longer
+  // exists. Observed as ghosts parked forever after a barrier-less rescale
+  // (a message that arrived while its element's migration was still in
+  // flight sat in bufferedIDMsgs across the cut). Running each message back
+  // through recvMsg resolves it against the new world: delivered on the spot
+  // when the element is local, re-buffered with a fresh request otherwise.
+  {
+    auto idMsgs = std::move(bufferedIDMsgs);
+    bufferedIDMsgs.clear();
+    auto idxMsgs = std::move(bufferedIndexMsgs);
+    bufferedIndexMsgs.clear();
+    for (auto& kv : idMsgs)
+      for (CkArrayMessage* msg : kv.second)
+        recvMsg(msg, msg->array_element_id(), CkDeliver_queue, 0);
+    for (auto& kv : idxMsgs)
+      for (CkArrayMessage* msg : kv.second)
+        recvMsg(msg, msg->array_element_id(), CkDeliver_queue, 0);
+  }
 }
 
 void CkArray::reKeyLocalElem(CmiUInt8 oldId, CmiUInt8 newId)
@@ -1866,6 +1911,7 @@ void CkArray::sendMsg(CkArrayMessage* msg, const CkArrayIndex& idx, CkDeliver_t 
 // similar logic as sendMsg to forward the message, buffer it, or trigger demand creation.
 void CkArray::recvMsg(CkArrayMessage* msg, CmiUInt8 id, CkDeliver_t type, int opts)
 {
+
   msg->array_hops()++;
 
   // Fail fast on a location-forwarding cycle: with the hop-limit fallback
@@ -1941,6 +1987,7 @@ void CkArray::recordSend(const CmiUInt8 id, const unsigned int bytes, int pe, co
 // possible that it has either been deleted or not been created yet.
 void CkArray::sendToPe(CkArrayMessage* msg, int pe, CkDeliver_t type, int opts)
 {
+
   // This method should only be called for a valid PE, and with a properly filled in msg.
   CkAssert(pe >= 0 && pe < CkNumPes());
   CkAssert(thisgroup == UsrToEnv(msg)->getArrayMgr());
@@ -2026,6 +2073,56 @@ void CkArray::handleUnknown(CkArrayMessage* msg, const CkArrayIndex& idx,
   envelope* env = UsrToEnv(msg);
   // TODO: Make sure this is actually a sentinel ID
   bool hasID = env->getRecipientID() != 0;
+#if CMK_SHRINK_EXPAND
+  // A message that crossed a rescale can carry an ID minted under another
+  // world's map. That is not only the migrated elements: a shrink reshapes
+  // every bin, so an element that never moved can still change home, and its
+  // old ID is then dead -- in range, but a key no inform will ever repair
+  // (observed: ghosts parked in bufferedIDMsgs behind a held request for a
+  // dead ID). A range test cannot see those. The message's index can: the
+  // current map's ID for this index is a pure function, and disagreement with
+  // the carried ID is exactly "this ID is from another era". When the map has
+  // not changed, fresh == carried and none of this runs.
+  //
+  // Resolution order: deliver here under the fresh ID if the element is
+  // local; honor an old-ID location entry if this PE holds one (the old
+  // world's forwarding, e.g. a doomed PE's emigration record); otherwise
+  // restamp and fall through to buffer-and-request by the fresh ID, whose
+  // home is the authority of the current world and IS repaired by informs.
+  if (hasID)
+  {
+    const CmiUInt8 carried = msg->array_element_id();
+    CmiUInt8 fresh;
+    if (locMgr->lookupID(idx, fresh) && fresh != carried)
+    {
+      if (lookup(fresh) != NULL)
+      {
+        env->setRecipientID(ck::ObjID(thisgroup, fresh));
+        recvMsg(msg, fresh, type, opts);
+        return;
+      }
+      const int knownPe = locMgr->whichPe(carried);
+      if (knownPe != -1 && knownPe != CkMyPe())
+      {
+        sendToPe(msg, knownPe, type, opts);
+        return;
+      }
+      env->setRecipientID(ck::ObjID(thisgroup, fresh));
+    }
+    // A carried ID whose embedded home PE does not exist in this world is a
+    // dead-world key: requesting a location by it would SEND to the dead PE
+    // (observed: "Destnode 7 out of range 7" aborts on the first interior-
+    // hole shrink, where survivor renumbering leaves old ids embedding the
+    // removed PE). No live PE can be asked by that key -- strip it and fall
+    // through to the by-index path, whose home is computed against the
+    // current world and is answerable by informs.
+    else if ((int)ck::ObjID(msg->array_element_id()).getHomeID() >= CkNumPes())
+    {
+      env->setRecipientID(0);
+      hasID = false;
+    }
+  }
+#endif
   bool isSmall = env->getTotalsize() < _messageBufferingThreshold;
   int home = locMgr->homePe(idx);
   if (msg->array_ifNotThere() == CkArray_IfNotThere_buffer)

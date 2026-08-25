@@ -84,7 +84,7 @@ void CkRecvGroupROData(char* msg);
 // min(writersPerNode, CkMyNodeSize())
 void CkStartCheckpoint(const char* dirname, const CkCallback& cb,
                        bool requestStatus = false, int writersPerNode = 0);
-void CkStartRescaleCheckpoint(const char* dirname, const CkCallback& cb, 
+void CkArmRescaleCut(const char* dirname, const CkCallback& cb, 
   std::vector<char> avail, bool requestStatus = false, int writersPerNode = 0);
 void CkRestartMain(const char* dirname, CkArgMsg* args);
 

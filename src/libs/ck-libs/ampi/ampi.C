@@ -11,6 +11,7 @@
 
 #if CMK_TRACE_ENABLED
 #include "register.h" // for _chareTable, _entryTable
+#include "rescalepoint.h" // for CkRescaleArmed
 #endif
 
 // Default is to abort on error, but users can build
@@ -973,6 +974,18 @@ static void getAmpiBinaryPath() noexcept
 
 static void ampiNodeInit() noexcept
 {
+  /* Initnode calls run again on every survivor of a shrink/expand event --
+     Charm++ resets the handler table across the cut, so anything that
+     registers a handler has to register it again, in the same order, or
+     survivors and newcomers end up with different indices. That makes this
+     function's one-shot work actively harmful the second time through: the
+     assertion below fires, and the reducer registration would append a second
+     AmpiReducer, leaving survivors and newcomers disagreeing about which index
+     means what. Nothing here registers a handler, so sitting the repeat out is
+     the whole fix. */
+  if (ampi_nodeinit_has_been_called)
+    return;
+
   getAmpiBinaryPath();
 
 #if CMK_TRACE_ENABLED
@@ -1075,6 +1088,15 @@ static void EndIdle(void *dummy) noexcept
 #endif
 
 static void ampiProcInit() noexcept {
+#if CMK_RECONVERSE
+  /* AMPI's own startup runs after Charm++'s: the TCharm, ampiParent and ampi
+     arrays are created from the application's main, and each of the three
+     reaches the one before it synchronously (ckLocalBranch on ampiPeMgr,
+     ckLocal on the parent element). A randomized message queue must not
+     perturb that, so hold it shut past the point where Charm++ would open it
+     and let ampiInit open it once MPI_COMM_WORLD exists. */
+  CmiRandomizedQueueSuspend();
+#endif
   CtvInitialize(ampiParent*, ampiPtr);
   CtvInitialize(bool,ampiInitDone);
   CtvInitialize(bool,ampiFinalized);
@@ -1188,7 +1210,15 @@ static void removeUnimportantArrayObjsfromPeCache() noexcept {
   ArrayObjMap& arrayObjs = CkpvAccess(array_objs);
   arrayObjs.erase(pptr->getThread()->ckGetID().getID());
   arrayObjs.erase(pptr->ckGetID().getID());
-  arrayObjs.erase(getAmpiInstance(MPI_COMM_SELF)->ckGetID().getID());
+  /* MPI_COMM_SELF resolves through ckLocal(), which answers null when that
+     element is not on this PE. AMPI_Migrate calls this the moment the rank
+     resumes on a new PE, and the element bound to it need not have arrived
+     yet -- observed as a segmentation fault here after a rescale moved a rank
+     (RESCALE_KNOWN_ISSUES.md R12). Nothing is lost by skipping it: this whole
+     function is cache pruning, and an element that is not here has nothing in
+     this PE's cache to prune. */
+  ampi* self = getAmpiInstance(MPI_COMM_SELF);
+  if (self != NULL) arrayObjs.erase(self->ckGetID().getID());
 }
 
 /*
@@ -1248,6 +1278,20 @@ static ampi *ampiInit(char **argv) noexcept
 
   // Find our ampi object:
   ampi *ptr=(ampi *)TCharm::get()->semaGet(AMPI_TCHARM_SEMAID);
+#if CMK_RECONVERSE
+  /* Every array this PE needed is built and found; the suspension taken in
+     ampiProcInit can go. Once per PE -- later ranks on it run through here
+     too, and the count must not go negative. */
+  {
+    /* thread_local, so per PE: user-level threads share their PE's storage,
+       which is the granularity ampiProcInit took the suspension at. */
+    static thread_local bool resumedOnThisPe = false;
+    if (!resumedOnThisPe) {
+      resumedOnThisPe = true;
+      CmiRandomizedQueueResume();
+    }
+  }
+#endif
   CtvAccess(ampiInitDone)=true;
   CtvAccess(ampiFinalized)=false;
   STARTUP_DEBUG("ampiInit> complete")
@@ -11386,6 +11430,38 @@ CLINKAGE char ** AMPI_Get_argv()
 CLINKAGE int AMPI_Get_argc()
 {
   return CkGetArgc();
+}
+
+/* Application-declared rescale points. See src/ck-ldb/rescalepoint.h for the
+   protocol; these are the MPI-facing spelling of it.
+
+   An elastic scheduler can ask a job to change width at any moment, but an
+   AMPI rank can only change host where it is quiescent, which means inside
+   AMPI_Migrate. Without help the scheduler therefore waits for the job's load
+   balancing period. These let the application offer every iteration boundary
+   instead, at the cost of one comparison at each. */
+CLINKAGE int AMPI_Rescale_check(int iteration, int *flag)
+{
+  AMPI_API("AMPI_Rescale_check", iteration, flag);
+  if (flag == nullptr)
+    return ampiErrhandler("AMPI_Rescale_check", MPI_ERR_ARG);
+
+  TCharm *tc = TCharm::get();
+  *flag = (tc != nullptr && tc->checkRescale(iteration)) ? 1 : 0;
+  return MPI_SUCCESS;
+}
+
+/* The weaker form, for a job with no globally meaningful iteration counter:
+   ranks stop at whatever boundary follows the request rather than at one they
+   agreed on. Prefer the iteration form wherever there is a counter to give. */
+CLINKAGE int AMPI_Rescale_armed(int *flag)
+{
+  AMPI_API("AMPI_Rescale_armed", flag);
+  if (flag == nullptr)
+    return ampiErrhandler("AMPI_Rescale_armed", MPI_ERR_ARG);
+
+  *flag = CkRescaleArmed() ? 1 : 0;
+  return MPI_SUCCESS;
 }
 
 CLINKAGE int AMPI_Migrate(MPI_Info hints)

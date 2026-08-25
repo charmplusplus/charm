@@ -26,6 +26,7 @@ using std::ostringstream;
 #include "CkCheckpoint.decl.h"
 #include <sys/stat.h>
 #include "converse.h"
+#include "memory-isomalloc.h"   /* CmiIsomalloc{Get,Adopt}Region */
 
 void noopit(const char*, ...)
 {}
@@ -50,7 +51,7 @@ double chkptStartTimer = 0;
 //
 // Must be a wall clock (not CmiWallTimer), since the rescale crosses a
 // ConverseInit re-init that resets CmiWallTimer's epoch.
-double rescale_overhead_start_timer = 0; // entry to ResumeFromReallocCheckpoint
+double rescale_overhead_start_timer = 0; // entry to CentralLB::RescaleCutArmed
 double rescale_t_cleanup_enter      = 0; // ConverseCleanup entry
 double rescale_t_commit_done        = 0; // after coordinator COMMIT
 double rescale_t_ep_reinit_done     = 0; // after UcxReInitEpsFromView (or MPI equiv)
@@ -333,7 +334,7 @@ public:
       CProxy_CkCheckpointMgr(_sysChkptMgr)[index].Checkpoint(dirname, cb, requestStatus);
   }
 
-  void RescaleCheckpoint(const char* dirname, CkCallback cb, std::vector<char> avail,
+  void ArmRescaleCut(const char* dirname, CkCallback cb, std::vector<char> avail,
     bool requestStatus = false, int writersPerNode = 0)
   {
     // If currently checkpointing, drop new requests
@@ -420,7 +421,7 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _reque
 #if CMK_SHRINK_EXPAND
   // pending_realloc_state only carries the SHRINK_IN_PROGRESS / EXPAND_IN_PROGRESS
   // distinction on PE 0 (set in CentralLB::CheckForRealloc); other PEs reach
-  // here via the RescaleCheckpoint broadcast which sets shrinkexpand_exit on
+  // here via the ArmRescaleCut broadcast which sets shrinkexpand_exit on
   // every PE. Trust shrinkexpand_exit as the rescale indicator; fall back to
   // pending_realloc_state on PE 0 for the SHRINK vs EXPAND callback selection
   // below.
@@ -448,7 +449,13 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback cb, bool _reque
       if (CkMyPe() == 0) {
         if (pending_realloc_state == SHRINK_IN_PROGRESS) {
           CkPrintf("Shrink in progress on PE%i\n", CkMyPe());
-          _rescaleResumeCb = CkCallback(CkIndex_LBManager::ResumeClients(), _lbmgr);
+          // Held-aware resume: releases clients only where a full barrier is
+          // actually pending. Covers every shrink flavor with one callback --
+          // hold-boundary (all held), early release / barrier-less (running;
+          // a blanket resume would fire spurious ResumeFromSync), and chares
+          // held at a racing LB round's barrier that the cut beheaded.
+          _rescaleResumeCb =
+              CkCallback(CkIndex_LBManager::ResumeClientsIfHeld(), _lbmgr);
         } else {
           CkPrintf("Expand in progress on PE%i\n", CkMyPe());
           _rescaleResumeCb = CkCallback(CkIndex_LBManager::StartLB(),
@@ -565,7 +572,7 @@ void CkCheckpointMgr::SendRestartCB(void){
 	const bool isRescale = false;
 #endif
 	CkPrintf("%s finished in %fs, sending out the cb...\n",
-		isRescale ? "Rescale snapshot (no-op)" : "Checkpoint to disk",
+		isRescale ? "Rescale cut armed (nothing saved)" : "Checkpoint to disk",
 		CmiWallTimer() - chkptStartTimer);
 	if(requestStatus)
 	{
@@ -976,11 +983,11 @@ void CkStartCheckpoint(const char* dirname, const CkCallback& cb, bool requestSt
       .Checkpoint(dirname, cb, requestStatus, writersPerNode);
 }
 
-void CkStartRescaleCheckpoint(const char* dirname, const CkCallback& cb, 
+void CkArmRescaleCut(const char* dirname, const CkCallback& cb, 
   std::vector<char> avail, bool requestStatus, int writersPerNode)
 {
 #if CMK_SHRINK_EXPAND
-  // Refresh PE 0's se_avail_vector as well (see RescaleCheckpoint).
+  // Refresh PE 0's se_avail_vector as well (see ArmRescaleCut).
   se_avail_vector = (char*) malloc(CkNumPes() * sizeof(char));
   memcpy(se_avail_vector, avail.data(), CkNumPes() * sizeof(char));
 
@@ -992,7 +999,7 @@ void CkStartRescaleCheckpoint(const char* dirname, const CkCallback& cb,
 
   // hand over to checkpoint managers for per-processor checkpointing
   CProxy_CkCheckpointWriteMgr(_sysChkptWriteMgr)
-      .RescaleCheckpoint(dirname, cb, avail, requestStatus, writersPerNode);
+      .ArmRescaleCut(dirname, cb, avail, requestStatus, writersPerNode);
 #endif
 }
 
@@ -1005,6 +1012,17 @@ void CkStartRescaleCheckpoint(const char* dirname, const CkCallback& cb,
 CkCallback globalCb;
 void CkRecvGroupROData(char* msg)
 {
+  // Open the reduction settling window first thing, before any group is
+  // constructed or restored. A newcomer's reduction managers come into
+  // existence inside CkPupGroupData below with no local contributors, and a
+  // barren manager announces itself inactive as soon as it exists -- which is
+  // the announcement that has to be suppressed. See
+  // CkReductionMgr::checkIsActive for what the window turns off and why.
+  {
+    extern bool _rescaleReductionSettling;
+    _rescaleReductionSettling = true;
+  }
+
   char* origMsg = msg;
   msg = msg + CmiMsgHeaderSizeBytes;
   int dirSize = *reinterpret_cast<int*>(msg);
@@ -1021,6 +1039,13 @@ void CkRecvGroupROData(char* msg)
   bRO|_numPes;
 	int _numNodes = -1;
 	bRO|_numNodes;
+	CmiUInt8 _isoStart = 0, _isoEnd = 0;
+	bRO|_isoStart;
+	bRO|_isoEnd;
+	// Before anything can create an Isomalloc context: a survivor already has
+	// this range and adopting is a no-op, while a newcomer is holding one it
+	// probed for itself and has to take the job's instead.
+	CmiIsomallocAdoptRegion(_isoStart, _isoEnd);
 	bRO|globalCb;
 	/*if (CmiMyRank() == 0)*/ CkPupROData(bRO);
 	bool requestStatus = false;
@@ -1046,7 +1071,7 @@ void CkRecvGroupROData(char* msg)
       CkGroupID gID = (*CkpvAccess(_groupIDTable))[i];
       IrrGroup *obj = CkpvAccess(_groupTable)->find(gID).getObj();
       if (obj && obj->isReductionMgr()) {
-        ((CkReductionMgr *)obj)->resetForRescale();
+        ((CkReductionMgr *)obj)->resetReductionForRescale();
       }
       // Survivor sends were crashing UCX with destPE = killed-PE. Cause: the
       // location cache and home-PE encoded in chare IDs were both stale after
@@ -1063,7 +1088,7 @@ void CkRecvGroupROData(char* msg)
         CkGroupID gID = CksvAccess(_nodeGroupIDTable)[i];
         IrrGroup *obj = CksvAccess(_nodeGroupTable)->find(gID).getObj();
         if (obj && obj->isNodeGroup()) {
-          ((CkNodeReductionMgr *)obj)->resetForRescale();
+          ((CkNodeReductionMgr *)obj)->resetReductionForRescale();
         }
       }
     }
@@ -1114,6 +1139,14 @@ void CkRecvGroupROData(char* msg)
     extern void CkDrainStashedGroupMsgs(void);
     CkDrainStashedGroupMsgs();
   }
+#if CMK_RECONVERSE
+  // The restore is finished, so a randomized message queue may resume
+  // perturbing delivery order; ConverseCleanup suspended it at the cut. All
+  // suspensions go, not one: coming back through _initCharm re-runs the
+  // proc-inits that take them, and on this path nothing constructs the objects
+  // they were protecting. Both a survivor and a newcomer come through here.
+  CmiRandomizedQueueResumeAll();
+#endif
   {
     // Restore _charmHandlerIdx/_bocHandlerIdx to _processHandler and deliver
     // everything _bufferHandler collected since the longjmp landing (messages
@@ -1121,6 +1154,22 @@ void CkRecvGroupROData(char* msg)
     // clients so buffered location informs/requests repair the caches first.
     extern void _resumeBufferedCharmMessages(void);
     _resumeBufferedCharmMessages();
+  }
+  {
+    // A rescale request that arrived while this one was in flight was replayed
+    // by callRealloc() during the group restore, when PE 0's peers could not
+    // yet take part in a reduction. They can now.
+    extern void CkArmDeferredRescalePoint(void);
+    CkArmDeferredRescalePoint();
+  }
+  {
+    // Re-drive any reduction whose in-progress round became completable when
+    // its tree lost a doomed child at the cut; the root would otherwise sit
+    // inProgress forever and the application's reduction callback never fire.
+    // After the buffered drain, so the callback (and the iteration it kicks
+    // off) fires only once the world is whole.
+    extern void CkDriveReductionsAfterRescale(void);
+    CkDriveReductionsAfterRescale();
   }
   set_in_restart(false);
 
@@ -1153,6 +1202,12 @@ void CkRecvGroupROData(char* msg)
       double now = rescale_wall_now();
       double total_s    = now - rescale_overhead_start_timer;
       double overhead_s = total_s - restore_s;
+      // Hand the stall to the scheduler telemetry. This is the cost a paced
+      // scheduler amortises: the job was not computing for this long.
+      {
+        extern void CkTelemetryRescaleCost(double);
+        CkTelemetryRescaleCost(total_s);
+      }
       // Break the overhead into the segments that span the longjmp. Any
       // segment whose endpoint wasn't stamped (e.g. on machines other than
       // UCX) shows up as 0.
@@ -1278,9 +1333,20 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
     int _numPes = CkNumPes();
     int _numNodes = CkNumNodes();
 
+    // The address range Isomalloc agreed on when the job started. A process
+    // that joined afterwards probed a range of its own and has to be told the
+    // real one, or every migratable object that lands on it is placed at an
+    // address the rest of the job does not use. This is the earliest channel
+    // that reaches a newcomer, and it is early enough: contexts are only
+    // created when elements arrive, which is after the restore.
+    CmiUInt8 _isoStart = 0, _isoEnd = 0;
+    CmiIsomallocGetRegion(&_isoStart, &_isoEnd);
+
     PUP::sizer pROsz(PUP::er::IS_CHECKPOINT);
     pROsz | _numPes;
     pROsz | _numNodes;
+    pROsz | _isoStart;
+    pROsz | _isoEnd;
     pROsz | _rescaleResumeCb;
     CkPupROData(pROsz);
     bool requestStatusLocal = false;
@@ -1306,6 +1372,8 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
       PUP::toMem pRO(buffer, PUP::er::IS_CHECKPOINT);
       pRO | _numPes;
       pRO | _numNodes;
+      pRO | _isoStart;
+      pRO | _isoEnd;
       pRO | _rescaleResumeCb;
       CkPupROData(pRO);
       pRO | requestStatusLocal;

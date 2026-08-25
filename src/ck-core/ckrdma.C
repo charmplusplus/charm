@@ -2011,20 +2011,28 @@ void zcPupIssueRgets(CmiUInt8 id, CkLocMgr *locMgr) {
   ref->pe = CmiMyPe();
 #endif
 
+  const CmiUInt1 numRgets = (CmiUInt1)CpvAccess(newZCPupGets).size();
+
+  // Both tables have to exist before the first Rget is issued, not after. A
+  // transport that can satisfy an Rget without going to the network -- shared
+  // memory between two processes on one host, which is the common case for a
+  // local run -- calls the completion handler from inside CmiIssueRget, and
+  // that handler looks the object up in both. Issuing first left a window in
+  // which the completion found neither ("zcPupGetCompleted: object not found",
+  // reproducible within a few thousand load balancing rounds on LCI).
+  CmiLock(CksvAccess(_nodeZCPendingLock));
+  CksvAccess(pendingZCOps).emplace(id, numRgets);
+  CmiUnlock(CksvAccess(_nodeZCPendingLock));
+
+  // Owned by locMgr, so no locking needed.
+  locMgr->bufferedActiveRgetMsgs.emplace(id, std::vector<CkArrayMessage *>());
+
   for(std::vector<NcpyOperationInfo *>::iterator it = CpvAccess(newZCPupGets).begin();
         it != CpvAccess(newZCPupGets).end(); ++it) {
     (*it)->destRef = (char *)ref;
     zcQdIncrement();
     CmiIssueRget(*it); // Issue the Rget
   }
-
-  // Create an entry for the unordered map with idx as the index and the vector size as the value
-  CmiLock(CksvAccess(_nodeZCPendingLock));
-  CksvAccess(pendingZCOps).emplace(id, (CmiUInt1)CpvAccess(newZCPupGets).size());
-  CmiUnlock(CksvAccess(_nodeZCPendingLock));
-
-  // Create an entry for the unordered map with idx as the index and vector of messages as the value
-  locMgr->bufferedActiveRgetMsgs.emplace(id, std::vector<CkArrayMessage *>()); // does not require locking as it is owned by locMgr
 }
 /***************************** End of Zerocopy PUP Support ****************************/
 

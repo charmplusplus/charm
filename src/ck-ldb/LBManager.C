@@ -16,6 +16,9 @@
 #include "LBManager.h"
 #include "LBSimulation.h"
 #include "TreeLB.h"
+#include "telemetry.h"
+#include "rescalepoint.h"
+#include "ckrescale.h"
 #include "topology.h"
 
 #include "json.hpp"
@@ -190,6 +193,80 @@ LBMgrInit::LBMgrInit(CkArgMsg* m)
 }
 
 // called from init.C
+/** How far ahead of its own iteration PE 0 opens the bidding. Set by
+ *  +RescaleLead.
+ *
+ *  This is no longer a correctness margin -- safety comes from every PE
+ *  installing its ceiling before reporting it, so the agreed iteration cannot
+ *  be one any element has passed. It is a stall knob. A larger value puts the
+ *  tentative ceiling further out, so elements keep working through the
+ *  consensus round trip instead of holding immediately; zero is legal and
+ *  simply means "hold at once". */
+static int _rescaleLead = 3;
+
+/** Fault-injection for the rescale consensus, off unless both are set.
+ *
+ * Delays the processing of RescaleTentative on one PE, deterministically
+ * widening the race the protocol exists to survive: the delayed PE's elements
+ * run on past the boundary where everyone else armed, so its reported ceiling
+ * comes back higher than theirs and the commit must rewind their parked
+ * elements. Test-only. */
+static int _rescaleTestDelayPe = -1;
+static int _rescaleTestDelayMs = 0;
+
+/** Whether the round now heading for CheckForRealloc was started barrier-less
+ *  (no declared boundaries; application still running). Read by CentralLB to
+ *  decide whether the checkpoint needs a grace window first. PE 0 only. */
+bool _rescaleBarrierlessRound = false;
+/** Whether the application opted into barrier-less rescaling
+ *  (+rescalebarrierless). Off by default: cutting an application at an
+ *  arbitrary point obliges it to tolerate message reordering across the cut
+ *  (a blind receive counter miscounts), which the runtime cannot verify --
+ *  the flag is the application asserting that property. It also protects a
+ *  boundary application from a request that arrives before its first element
+ *  has declared a boundary, which would otherwise read as "no boundaries" and
+ *  take the barrier-less cut. Set-once: a survivor's re-parse after the
+ *  longjmp sees an argv the first pass already consumed. */
+static bool _rescaleBarrierlessEnabled = false;
+// Boundary-mode early release: after the rescale LB decision at an AtSync
+// boundary, resume every chare before the cut (migrants resume on their
+// destination) instead of holding the whole application through the drain
+// and cut.
+//
+// Early release buys the application the drain -- a few milliseconds -- and
+// costs it the guarantee that nothing is in flight when the transport is cut.
+// A resumed chare can start new traffic toward a PE that is leaving: measured
+// as roughly two failures in five on a four-rescale campaign, in a Charm++
+// application as much as an AMPI one, appearing as a lost point-to-point
+// message, a group send to a departed PE ("Destnode N out of range N"), or a
+// job whose ranks simply exit. Holding instead is free by comparison: the
+// stop window is if anything shorter, since it skips the drain.
+//
+// So: off by default, but a job with AtSync-only migratable objects turns it
+// on for itself (see TCharm::procInit -- an AMPI rank cannot be moved anywhere
+// but a quiescent point, which makes the early release's premise false for it).
+// +rescaleholdboundary forces it on, +rescaleearlyrelease forces it off.
+bool _rescaleHoldBoundary = false;
+// Whether the setting above came from the command line. Without this, a
+// library that prefers holding could not tell "the user did not say" from
+// "the user said no".
+bool _rescaleHoldBoundaryExplicit = false;
+// Read-only accessor for other translation units (the flag itself stays
+// file-local so the parse in _loadbalancerInit remains the single writer).
+bool CkRescaleBarrierlessEnabled() { return _rescaleBarrierlessEnabled; }
+/** Grace between evacuation and the cut on the barrier-less path, in ms.
+ *
+ * The application never stops on that path, so at MigrationDone the doomed
+ * PEs still hold in-flight state their evacuated elements left behind --
+ * queued ghosts to forward, reduction partials to flush upward -- and cutting
+ * immediately loses it (observed as a post-rescale wedge: contributions
+ * absorbed by a doomed PE's reduction manager died with it). The grace lets
+ * that traffic land while everything keeps running: ghosts forward to the
+ * elements' new homes, partials flow up, location updates stop new traffic
+ * from targeting the leavers. A boundary rescale needs none of this -- the
+ * app is quiescent at the cut, which is the boundary path's whole point. */
+int _rescaleGraceMs = 100;
+
 void _loadbalancerInit()
 {
   CkpvInitialize(bool, lbmanagerInited);
@@ -451,6 +528,69 @@ void _loadbalancerInit()
   CmiGetArgDoubleDesc(argv, "+LBAlpha", &_lb_args.alpha(), "per message send overhead");
   CmiGetArgDoubleDesc(argv, "+LBBeta", &_lb_args.beta(), "per byte send overhead");
 
+  // Widths to predict this job's speedup at, for an elastic scheduler deciding
+  // how many workers to give it. Drained in a loop, and parsed here whether or
+  // not anything consumes the value: an option the runtime recognises but does
+  // not remove from argv shifts every positional argument the application
+  // reads, which surfaces as nonsense inside the application rather than as a
+  // complaint from the runtime.
+  {
+    char* simRange = NULL;
+    while (CmiGetArgStringDesc(argv, "+LBSimRange", &simRange,
+                               "Predict speedup over this width range, min:max"))
+    {
+      int simLo = 0, simHi = 0;
+      if (simRange != NULL && sscanf(simRange, "%d:%d", &simLo, &simHi) == 2 && simLo >= 1 &&
+          simHi >= simLo)
+        CkTelemetrySetSimRange(simLo, simHi);
+      else if (CkMyPe() == 0)
+        CmiPrintf("Warning: ignoring malformed +LBSimRange '%s'; expected min:max.\n",
+                  simRange != NULL ? simRange : "");
+    }
+  }
+
+  // How far ahead PE 0 opens the bidding for the rescale iteration. Parsed
+  // into the static directly rather than through a local: a survivor re-runs
+  // this after the rescale longjmp with an argv the first pass already
+  // stripped, and a local would reset the value to the default every time.
+  CmiGetArgIntDesc(argv, "+RescaleLead", &_rescaleLead,
+                   "Iterations to bid ahead when scheduling a rescale at an "
+                   "application-declared boundary");
+  if (_rescaleLead < 0) _rescaleLead = 0;
+
+  CmiGetArgIntDesc(argv, "+RescaleTestDelayPe", &_rescaleTestDelayPe,
+                   "TEST ONLY: PE whose RescaleTentative processing is delayed");
+  CmiGetArgIntDesc(argv, "+RescaleTestDelayMs", &_rescaleTestDelayMs,
+                   "TEST ONLY: milliseconds to delay it by");
+  CmiGetArgIntDesc(argv, "+RescaleGraceMs", &_rescaleGraceMs,
+                   "Grace between evacuation and the cut on a barrier-less rescale");
+  if (CmiGetArgFlagDesc(argv, "+rescalebarrierless",
+                        "Allow rescaling applications with no declared "
+                        "iteration boundaries by cutting at an arbitrary "
+                        "point (requires the app to tolerate message "
+                        "reordering across the cut)"))
+    _rescaleBarrierlessEnabled = true;
+
+  if (CmiGetArgFlagDesc(argv, "+rescaleholdboundary",
+                        "Hold every chare at the rescale boundary through "
+                        "migration and the cut, so that nothing is in flight "
+                        "when the transport is cut"))
+  {
+    _rescaleHoldBoundary = true;
+    _rescaleHoldBoundaryExplicit = true;
+  }
+  if (CmiGetArgFlagDesc(argv, "+rescaleearlyrelease",
+                        "Resume chares before the drain and cut, overriding a "
+                        "library that asked to hold. Faster by the length of "
+                        "the drain, at the cost of losing messages that are "
+                        "in flight when the transport is cut"))
+  {
+    _rescaleHoldBoundary = false;
+    _rescaleHoldBoundaryExplicit = true;
+  }
+
+  CkRescalePointInit();
+
   if (CkMyPe() == 0)
   {
     if (_lb_args.debug())
@@ -535,6 +675,13 @@ void LBManager::initnodeFn()
 
 void LBManager::InvokeLB()
 {
+  // A barrier round has begun, so this PE's offer of a boundary has been
+  // taken up. Disarm before the round decides anything. If it turns out not to
+  // be a rescale after all -- an ordinary balancing step reached the barrier
+  // first and consumed the pending request, say -- a PE left armed would offer
+  // every subsequent iteration, and the job would balance on all of them.
+  CkRescaleDisarm();
+
   if (loadbalancers.size() > 0)
   {
     loadbalancers[currentLBIndex]->InvokeLB();
@@ -596,6 +743,218 @@ void LBManager::init(void)
   {
     CkSyncBarrier::object()->addReceiver([this](void) { this->InvokeLB(); });
   }
+}
+
+/* Application-declared rescale points. See ../ck-ldb/rescalepoint.h. */
+
+#if CMK_SHRINK_EXPAND
+/* Opt-in trace of the rescale-point consensus (CHARM_RESCALE_TRACE=1). Cached,
+   so the cost when it is off is a load and a branch. */
+static bool CkRescaleTraceOn() {
+  static int on = -1;
+  if (on < 0) on = (getenv("CHARM_RESCALE_TRACE") != NULL) ? 1 : 0;
+  return on != 0;
+}
+#else
+static bool CkRescaleTraceOn() { return false; }
+#endif
+
+void LBManager::ArmRescalePoint()
+{
+  if (CkMyPe() != 0) return;
+
+  // A request replayed by callRealloc() during a survivor restore arrives here
+  // while this PE's peers are still rebuilding, so a broadcast issued now is
+  // only buffered and a reduction started now races the restore. Defer to the
+  // end of it, after the buffered-message drain has run.
+  if (get_in_restart())
+  {
+    rescaleArmDeferred = true;
+    return;
+  }
+
+  // The two mechanisms are exclusive by construction: with
+  // +rescalebarrierless the boundary consensus never starts (no tentative is
+  // broadcast, so no ceiling is ever installed and checkRescale() stays
+  // false), and without it the barrier-less round never starts. Running both
+  // for one request would race -- two paths consuming one
+  // pending_realloc_state.
+  if (_rescaleBarrierlessEnabled)
+  {
+    if (startLBFn_count > 0)
+    {
+      if (_lb_args.debug())
+        CkPrintf("CharmLB> Barrier-less rescale: immediate LB round.\n");
+      // The manual path skips InvokeLB, so raise the in-progress flag here or
+      // a second request arriving mid-round would not be buffered.
+      lb_in_progress = true;
+      _rescaleBarrierlessRound = true;
+      StartLB();
+    }
+    else
+      CkPrintf("CharmLB> Warning: rescale requested but no load balancer can "
+               "run a round; request will wait for one.\n");
+    return;
+  }
+
+  // Only an opening bid. Every PE raises it to at least its own next boundary
+  // in RescaleTentative, so PE 0 having no elements of its own, or lagging
+  // behind the rest, costs nothing but a slightly longer hold.
+  const int seen = CkRescaleIterSeen();
+  int tentative;
+  if (seen < 0)
+    tentative = CK_RESCALE_ARM_NOW;
+  else if (seen > 2147483647 - _rescaleLead)
+    tentative = CK_RESCALE_ARM_NOW;
+  else
+    tentative = seen + _rescaleLead;
+
+  extern int _rescaleGeneration;
+  if (CkRescaleTraceOn())
+    CmiPrintf("[%d] ArmRescalePoint: tentative=%d gen=%d\n", CkMyPe(),
+              tentative, _rescaleGeneration);
+  thisProxy.RescaleTentative(tentative, _rescaleGeneration);
+}
+
+void LBManager::ArmRescalePointIfDeferred()
+{
+  if (CkMyPe() != 0 || !rescaleArmDeferred) return;
+  rescaleArmDeferred = false;
+  ArmRescalePoint();
+}
+
+void LBManager::RescaleTentative(int tentative, int gen)
+{
+  extern int _rescaleGeneration;
+  if (CkRescaleTraceOn())
+    CmiPrintf("[%d] RescaleTentative(t=%d, gen=%d) myGen=%d %s\n", CkMyPe(),
+              tentative, gen, _rescaleGeneration,
+              gen != _rescaleGeneration ? "DROPPED" : "");
+  // A stamp from a dead world. The rescale that killed it already reset every
+  // PE's arming state; acting on its stragglers would re-arm a job that no
+  // longer has a request pending.
+  if (gen != _rescaleGeneration) return;
+
+  if (_rescaleTestDelayMs > 0 && CkMyPe() == _rescaleTestDelayPe)
+  {
+    // Deterministically lose the race on this PE: its elements process their
+    // next boundary before the arming lands, exactly the interleaving the
+    // consensus has to survive.
+    struct Delayed
+    {
+      LBManager* mgr;
+      int tentative, gen;
+      static void fire(void* p)
+      {
+        Delayed* d = (Delayed*)p;
+        d->mgr->RescaleTentativeNow(d->tentative, d->gen);
+        delete d;
+      }
+    };
+    CcdCallFnAfterOnPE((CcdVoidFn)Delayed::fire, new Delayed{this, tentative, gen},
+                       _rescaleTestDelayMs, CkMyPe());
+    return;
+  }
+  RescaleTentativeNow(tentative, gen);
+}
+
+void LBManager::RescaleTentativeNow(int tentative, int gen)
+{
+  extern int _rescaleGeneration;
+  if (gen != _rescaleGeneration) return;
+
+  // Ceiling first, report second. Both happen inside this entry method, which
+  // is not preemptible, so no element can advance between the read of iterSeen
+  // and the arm -- and that is exactly what makes the reduced maximum a bound
+  // nobody has passed. iterSeen is the last *completed* iteration, so the
+  // furthest element here is already executing iterSeen+1 and will next stand
+  // at that boundary; that is the earliest ceiling that can still catch it.
+  if (CkRescaleTraceOn())
+    CmiPrintf("[%d] RescaleTentativeNow(t=%d) iterSeen=%d\n", CkMyPe(),
+              tentative, CkRescaleIterSeen());
+  const int seen = CkRescaleIterSeen();
+  int local = tentative;
+  if (seen >= 0 && seen + 1 > local) local = seen + 1;
+  CkRescaleArmAt(local);
+
+  int v[3];
+  v[0] = CkRescaleUsesBoundaries() ? 1 : 0;
+  v[1] = local;
+  v[2] = gen;
+  contribute(3 * sizeof(int), v, CkReduction::max_int,
+             CkCallback(CkReductionTarget(LBManager, RescaleFinal), thisProxy[0]));
+}
+
+void LBManager::RescaleFinal(int n, int* v)
+{
+  if (n < 3) return;
+  extern int _rescaleGeneration;
+  if (CkRescaleTraceOn())
+    CmiPrintf("[%d] RescaleFinal(v0=%d v1=%d gen=%d) myGen=%d\n", CkMyPe(),
+              v[0], v[1], v[2], _rescaleGeneration);
+  if (v[2] != _rescaleGeneration) return;
+  if (v[0] == 0)
+  {
+    // No PE has ever seen a declared boundary: the job has no iteration
+    // boundaries to rescale at, and for an app that never calls AtSync no
+    // ordinary load balancing step is coming either. Lift the ceilings that
+    // were just installed (which also reopens the barrier on every PE), then
+    // start a load balancing round directly, with the application running.
+    //
+    // The boundary consensus stays the preferred path whenever any element
+    // declares boundaries, because entering at a boundary is also what makes
+    // the collected loads describe whole iterations -- the strategy that
+    // balances the shrunken world reads them. This round's stats instead
+    // describe whatever window the instrumentation happened to cover.
+    //
+    // The round needs no barrier: CentralLB::StartLB goes straight to
+    // ProcessAtSync, stats and migration work on running elements exactly as
+    // manual load balancing always has, and MigrationDone contributes to
+    // CheckForRealloc, which the pending rescale request then rides. Every PE
+    // enters the rescale exit flow by processing a message, so elements are
+    // between entry methods at the cut by non-preemptivity; survivors' queued
+    // and in-flight messages are the preserved/buffered population the
+    // restore machinery re-delivers.
+    thisProxy.RescaleCommit(2147483647, v[2]);
+    // Only reachable with +rescalebarrierless off (the flag skips the
+    // consensus entirely in ArmRescalePoint). Keep the pre-existing behavior
+    // of waiting for a boundary or an ordinary load balancing step -- and say
+    // so, because for an application that never declares boundaries and never
+    // calls AtSync, that wait is indefinite.
+    CkPrintf("CharmLB> Warning: rescale requested but the application has "
+             "declared no iteration boundaries; waiting for the next load "
+             "balancing step. If the application has none, run with "
+             "+rescalebarrierless to allow an arbitrary-point rescale.\n");
+    return;
+  }
+  if (_lb_args.debug())
+    CkPrintf("CharmLB> Rescale agreed for iteration %d.\n", v[1]);
+  thisProxy.RescaleCommit(v[1], v[2]);
+}
+
+void LBManager::RescaleAnnounceDoom(std::vector<char> bitmap)
+{
+  // See the header. new_ld=0 mirrors what PE 0's realloc() does locally.
+  set_avail_vector(bitmap.data(), 0);
+}
+
+void LBManager::RescaleCommit(int final, int gen)
+{
+  extern int _rescaleGeneration;
+  if (CkRescaleTraceOn())
+    CmiPrintf("[%d] RescaleCommit(final=%d, gen=%d) myGen=%d\n", CkMyPe(),
+              final, gen, _rescaleGeneration);
+  if (gen != _rescaleGeneration) return;
+  CkRescaleCommit(final);
+}
+
+/** Called from the restore path once buffered messages have been drained, to
+ *  run an arming that had to be deferred. Free function so ckcheckpoint.C need
+ *  not include this header. */
+void CkArmDeferredRescalePoint(void)
+{
+  LBManager* mgr = LBManager::Object();
+  if (mgr != NULL) mgr->ArmRescalePointIfDeferred();
 }
 
 int LBManager::AddStartLBFn(std::function<void()> fn)
@@ -923,9 +1282,38 @@ void LBManager::ResetAdaptive()
 #endif
 }
 
+void LBManager::ResumeClientsIfHeld()
+{
+#if CMK_LBDB_ON
+  if (_lb_args.metaLbOn() && metabalancer) metabalancer->ResumeClients();
+  if (_lb_args.lbperiod() != -1.0)
+    setTimer();  // re-arm periodic stepping in the new world
+  else
+    CkSyncBarrier::object()->resumeClientsIfHeld();
+#endif
+}
+
 void LBManager::ResumeClients()
 {
 #if CMK_LBDB_ON
+#if CMK_SHRINK_EXPAND
+  // A load balancing round has finished: whatever it was going to move has
+  // moved, so the reduction settling window opened by the rescale restore can
+  // close and the inactive-kid optimization can come back on. For an expand
+  // this is the populate round that gave the newcomer its elements.
+  {
+    extern bool _rescaleReductionSettling;
+    if (_rescaleReductionSettling)
+    {
+      _rescaleReductionSettling = false;
+      // Closing the window is not enough: a PE this round left barren was not
+      // allowed to say so while the window was open, and has no later occasion
+      // to. Give every manager one chance to notice now.
+      extern void CkReEvaluateReductionActivity(void);
+      CkReEvaluateReductionActivity();
+    }
+  }
+#endif
   if (_lb_args.metaLbOn())
   {
     if (metabalancer == NULL)

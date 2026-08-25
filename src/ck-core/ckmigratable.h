@@ -1,6 +1,8 @@
 #ifndef CKMIGRATABLE_H
 #define CKMIGRATABLE_H
 
+#include "rescalepoint.h"
+
 class CkMigratable : public Chare {
 protected:
 private:
@@ -15,6 +17,11 @@ private:
     LOAD_BALANCE
   } local_state;
   bool can_reset;
+  // Last iteration this element offered to checkRescale(); -1 before the
+  // first offer. Consumed by AtSync() to tag the barrier arrival, which is
+  // what lets a rescale commit rewind exactly the elements parked at a
+  // tentative ceiling and no others. Transient, like the barrier handle.
+  int lastRescaleCheckIter = -1;
 protected:
   bool usesAtSync;//You must set this in the constructor to use AtSync().
   bool usesAutoMeasure; //You must set this to use auto lb instrumentation.
@@ -88,6 +95,26 @@ public:
 
 #if CMK_LBDB_ON  //For load balancing:
   void AtSync(int waitForMigration=1);
+
+  /** Offer this iteration boundary as a place the job could change width.
+   *
+   * As checkRescale below, for a job with no globally meaningful iteration
+   * counter; see ../ck-ldb/rescalepoint.h for what it gives up. */
+  bool rescalePending();
+
+  /** Should this iteration be the one the job changes width at?
+   *
+   *      void iterate() {
+   *        if (checkRescale(iteration)) { quiesce(); AtSync(); return; }
+   *        ... send, compute, advance ...
+   *      }
+   *
+   * That is the whole application-side contract: one predicate, and AtSync()
+   * where you would have called it anyway. False at every boundary but one.
+   * Requires usesAtSync = true. See ../ck-ldb/rescalepoint.h for why it is
+   * safe for this to answer true before the exact iteration is settled. */
+  bool checkRescale(int iter);
+
   int MigrateToPe()  { return myRec->MigrateToPe(); }
 
 private:
@@ -101,6 +128,8 @@ public:
   void setGPUPupSize(size_t obj_gpu_pup_size);
 #else
   void AtSync(int waitForMigration=1) { ResumeFromSync();}
+  bool checkRescale(int iter) { return false; }
+  bool rescalePending() { return false; }
   void setMigratable(int migratable)  { }
   void setPupSize(size_t obj_pup_size) { }
 public:

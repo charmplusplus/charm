@@ -387,6 +387,18 @@ public:
   int getEpoch(const CmiUInt8 id) const { return getLocationEntry(id).epoch; }
   int homePe(const CmiUInt8 id) const { return ck::ObjID(id).getHomeID(); }
 
+  size_t getLocMapSize() const { return locMap.size(); }
+  size_t getBufferedIdReqSize() const { return bufferedIdRequests.size(); }
+  void debugDumpEntries() const
+  {
+    for (const auto& kv : locMap)
+      fprintf(stderr, "SEDUMP[%d]   loc id=%lu -> pe%d e%d\n", CkMyPe(),
+              (unsigned long)kv.first, kv.second.pe, kv.second.epoch);
+    for (const auto& kv : bufferedIdRequests)
+      fprintf(stderr, "SEDUMP[%d]   heldReq id=%lu waiters=%zu\n", CkMyPe(),
+              (unsigned long)kv.first, kv.second.size());
+  }
+
   // Insertion and removal
   void insert(CmiUInt8 id, int epoch = 0);
   void erase(CmiUInt8 id) { locMap.erase(id); }
@@ -442,6 +454,13 @@ public:
       else
         ++it;
     }
+    // Requester PEs in here were recorded under the OLD world's numbering;
+    // replying to them post-restore sends to renumbered or nonexistent PEs
+    // (observed: "Destnode 7 out of range 7" aborts on the first interior-
+    // hole shrink, from replyBufferedIdRequests). Drop them: every survivor
+    // re-runs its buffered messages through recvMsg after the restore and
+    // re-requests under the new numbering.
+    bufferedIdRequests.clear();
   }
   int getRescaleEpoch() const { return rescaleEpoch; }
 
@@ -812,6 +831,7 @@ public:
   //   3. Re-key every local CkLocRec under its new home-encoded ID.
   //   4. Inform the new home for each local element so remote PEs can resolve.
   void resetForRescale();
+  void debugDumpRescale();
 #endif
 };
 

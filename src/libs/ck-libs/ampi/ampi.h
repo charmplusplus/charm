@@ -4,7 +4,21 @@
 #include <stdlib.h> /* for redefinition of exit() below */
 #include <inttypes.h> /* for intptr_t */
 #include "charm-api.h"
+#include "conv-autoconfig.h"
+#if CMK_RECONVERSE
+/* conv-config.h starts with the machine layer's conv-common.h, and a
+   Reconverse build has no machine layer. Take the two headers that between
+   them carry what this one consults: conv-autoconfig.h above, and
+   conv-mach-opt.h for the build-time options (CMK_AMPI_WITH_ROMIO, and
+   CMK_CUDA / CMK_HIP via conv-mach-cuda.h / conv-mach-hip.h). */
+#include "conv-mach-opt.h"
+/* Only a machine layer sets this, and there is none here. */
+#ifndef CMK_CONVERSE_MPI
+#define CMK_CONVERSE_MPI 0
+#endif
+#else
 #include "conv-config.h"
+#endif
 
 #define AMPI_INTERNAL_SKIP_FUNCTIONS
 

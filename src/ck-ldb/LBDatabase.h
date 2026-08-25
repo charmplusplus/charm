@@ -205,6 +205,23 @@ public:
       MeasuredObjGPUTime(obj->data.gpuTime);
       #endif
     }
+    #if CMK_LB_WAIT_TIME
+    // Outside the StatsOn() guard: the next window's first wait is measured
+    // against this, and instrumentation may be switched on in between.
+    obj->MarkStopped();
+    #endif
+  };
+
+  /** Note that an object's next input was produced at sendTime.
+   *
+   * Called on delivery, before the entry method runs, so the object's own
+   * execution does not colour the measurement. */
+  inline void ObjectMessageArrived(const LDObjHandle &h, double sendTime) {
+  #if CMK_LB_WAIT_TIME
+    if (StatsOn()) LbObj(h)->RecordInput(sendTime);
+  #else
+    (void)h; (void)sendTime;
+  #endif
   };
   inline const LDObjHandle &GetObjHandle(int idx) {
     return LbObjIdx(idx)->GetLDObjHandle();

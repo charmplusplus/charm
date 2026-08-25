@@ -10,7 +10,12 @@ libraries written in Charm for other languages.
 //#include "charm-version-git.h"
 
 #include "charm-config.h"
-#include "converse.h" /* for CMK_FORTRAN symbols */
+/* conv-autoconfig.h is where the CMK_FORTRAN_USES_* name-mangling macros
+   live. Reconverse's converse.h does not carry them, so relying on that alone
+   silently downgrades FTN_NAME to its unmangled fallback -- and every Fortran
+   entry point then defines a name no Fortran caller looks for. */
+#include "conv-autoconfig.h"
+#include "converse.h"
 
 /** Used to define a C language entry point*/
 #ifdef __cplusplus

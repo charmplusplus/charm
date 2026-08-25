@@ -269,6 +269,45 @@ target_include_directories(conv-ccs PRIVATE
 
 add_dependencies(conv-ccs reconverse charm_cxx_utils)
 
+# Isomalloc. Reconverse has user-level threads but no way to give one a stack
+# at an address every process agrees on, which is what migration needs; that is
+# Isomalloc's job. It cannot live inside Reconverse because serializing a
+# context is written against PUP, which belongs to this layer -- so it is built
+# here and registered with Reconverse's thread layer through the
+# CthIsomallocOps table (see isomalloc-reconverse.C).
+add_library(isomalloc STATIC
+    src/conv-core/isomalloc.C
+    src/conv-core/isomalloc-reconverse.C
+    src/conv-core/memory-isomalloc.h)
+
+# Deliberately only the build include directory: adding src/conv-core or
+# src/util would put Charm++'s converse.h ahead of Reconverse's.
+target_include_directories(isomalloc PRIVATE
+    ${CMAKE_BINARY_DIR}/include)
+
+add_dependencies(isomalloc reconverse charm_cxx_utils)
+
+# Memory modules. These define malloc/free and friends for the whole program,
+# so they are linked only into executables that ask for one (charmc -memory
+# <mode>); the default is to leave the system allocator alone. Only the
+# Isomalloc mode is built here -- it is the one AMPI needs, so that a rank's
+# heap allocations land in its own migratable context.
+add_library(memory-os-isomalloc STATIC src/conv-core/memory.C)
+target_compile_definitions(memory-os-isomalloc PRIVATE
+    -DCMK_MEMORY_BUILD_OS_WRAPPED -DCMK_MEMORY_BUILD_ISOMALLOC)
+# Deliberately only the build include directory: adding src/conv-core or
+# src/util would put Charm++'s converse.h ahead of Reconverse's.
+target_include_directories(memory-os-isomalloc PRIVATE
+    ${CMAKE_BINARY_DIR}/include)
+add_dependencies(memory-os-isomalloc reconverse isomalloc)
+
+# The wrapper resolves the real allocator through dlsym(RTLD_NEXT), so that a
+# module that intercepts malloc still has something to fall back to.
+add_library(memory-os-wrapper STATIC src/conv-core/memory-os-wrapper.C)
+target_include_directories(memory-os-wrapper PRIVATE
+    ${CMAKE_BINARY_DIR}/include)
+add_dependencies(memory-os-wrapper reconverse)
+
 add_library(topomanager STATIC
     ${tmgr-cxx-sources}
     ${tmgr-h-sources}
@@ -285,7 +324,8 @@ target_include_directories(topomanager PUBLIC
 #     charm_cxx_utils
 # )
 add_custom_target(converse)
-add_dependencies(converse reconverse topomanager charm_cxx_utils ckrescale conv-ccs)
+add_dependencies(converse reconverse topomanager charm_cxx_utils ckrescale conv-ccs
+    isomalloc memory-os-isomalloc memory-os-wrapper)
 
 #file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/comm_backend)
 

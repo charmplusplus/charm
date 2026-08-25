@@ -575,6 +575,8 @@ AMPI_FUNC(int, MPIR_Status_set_bytes, MPI_Status *sts, MPI_Datatype dtype, MPI_C
 AMPI_CUSTOM_FUNC(char **, AMPI_Get_argv, void)
 AMPI_CUSTOM_FUNC(int, AMPI_Get_argc, void)
 AMPI_CUSTOM_FUNC(int, AMPI_Migrate, MPI_Info hints)
+AMPI_CUSTOM_FUNC(int, AMPI_Rescale_check, int iteration, int *flag)
+AMPI_CUSTOM_FUNC(int, AMPI_Rescale_armed, int *flag)
 AMPI_CUSTOM_FUNC(int, AMPI_Load_start_measure, void)
 AMPI_CUSTOM_FUNC(int, AMPI_Load_stop_measure, void)
 AMPI_CUSTOM_FUNC(int, AMPI_Load_reset_measure, void)

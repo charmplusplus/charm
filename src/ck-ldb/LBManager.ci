@@ -12,6 +12,11 @@ module LBManager {
     entry void LBManager(void);
     entry void StartLB();
     entry void ResumeClients();
+    entry void ResumeClientsIfHeld();
+    entry void RescaleTentative(int tentative, int gen);
+    entry [reductiontarget] void RescaleFinal(int n, int v[n]);
+    entry void RescaleCommit(int final, int gen);
+    entry void RescaleAnnounceDoom(std::vector<char> bitmap);
     initnode void initnodeFn();
   };
 

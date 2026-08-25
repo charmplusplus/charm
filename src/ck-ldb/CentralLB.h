@@ -10,6 +10,7 @@
 #include "CentralLB.decl.h"
 
 #include <vector>
+#include <unordered_map>
 #include "pup_stl.h"
 #include "manager.h"
 #include "ckcheckpoint.h"
@@ -125,7 +126,21 @@ public:
   //Shrink-Expand related functions
   void CheckForLB();
   void CheckForRealloc ();
-  void ResumeFromReallocCheckpoint();
+  // Quiet-probe drain for barrier-less rescales: instead of a flat grace
+  // timer, PE 0 probes until traffic toward every doomed PE has provably
+  // drained (per-destination send counters match the doomed PE's arrival
+  // counter, stable across two rounds), then fires the cut. The old grace
+  // value is kept as the ceiling. See StartRescaleQuietWatch in CentralLB.C.
+  // Boundary-mode early release: resume all clients (the application) before
+  // the drain and cut; the reduction handshake guarantees every PE resumed
+  // before the quiet watch starts, so no resume broadcast can be in flight at
+  // the cut (buffered balancer messages are dropped by the restore filter).
+  void RescaleEarlyResume();
+  void RescaleEarlyResumeDone();
+  void StartRescaleQuietWatch();
+  void RescaleQuietProbe(std::vector<int> doomed);
+  void RescaleQuietReport(long* data, int n);
+  void RescaleCutArmed();
   void MigrationDoneImpl (int );
   void WillIbekilled(std::vector<char> avail, int);
   void StartCleanup();
@@ -256,6 +271,16 @@ private:
   int stats_msg_count;
   CLBStatsMsg **statsMsgsList;
   LDStats *statsData;
+
+  // Per-object loads from the last well-measured window, keyed by LB object
+  // id, and the wall-clock length of that window. A round whose own window is
+  // much shorter than this one reads these instead of its live accumulators
+  // -- see applyLoadSnapshot in LoadBalance.
+  struct LoadSnapshot { LBRealType wall, cpu, gpu; };
+  std::unordered_map<CmiUInt8, LoadSnapshot> loadSnapshot;
+  double snapshotWindow = 0.0;   // seconds the snapshot's window covered
+  double lastRoundTime = 0.0;    // CmiWallTimer at the previous round
+  void applyLoadSnapshot(LDStats* stats);
   int migrates_completed;
   int migrates_expected;
   int future_migrates_completed;
@@ -264,6 +289,15 @@ private:
   double start_lb_time;
   double strat_start_time;
   LBMigrateMsg   *storedMigrateMsg;
+#if CMK_SHRINK_EXPAND
+  // Quiet-probe state (PE 0 only)
+  std::vector<long> quietPrev;    // summed report being accumulated this round
+  int quietReports = 0;           // reports received this round
+  std::vector<int>  quietDoomed;  // doomed PE list for this round
+  double quietT0 = 0.0;           // watch start (CkWallTimer)
+  int quietProbes = 0;
+  bool quietMatchedPrev = false;  // matched-twice guard
+#endif
   LBScatterMsg   *storedScatterMsg;
   bool  reduction_started;
   bool  use_thread;

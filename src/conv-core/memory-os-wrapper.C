@@ -1,4 +1,7 @@
-#include "conv-config.h"
+/* conv-autoconfig.h rather than conv-config.h: it holds every macro this file
+   consults (CMK_DLL_USE_DLOPEN, CMK_HAS_RTLD_NEXT, CMK_HAS_*ALLOC) and, unlike
+   conv-config.h, exists in a Reconverse build too. */
+#include "conv-autoconfig.h"
 
 #if CMK_DLL_USE_DLOPEN && CMK_HAS_RTLD_NEXT
 

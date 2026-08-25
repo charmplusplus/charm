@@ -1,7 +1,10 @@
 #if !defined(CMITLS_H)
 #define CMITLS_H
 
-#include "conv-config.h"
+/* conv-autoconfig.h rather than conv-config.h: it carries every macro this
+   header consults, and it is the one that exists in a Reconverse build too. */
+#include "conv-autoconfig.h"
+#include <stddef.h>
 
 #if CMK_HAS_TLS_VARIABLES
 

@@ -10,6 +10,7 @@
 
 #include "manager.h"
 #include "CentralLB.h"
+#include "telemetry.h"
 #include "converse.h"
 #include "conv-ccs.h"
 #include <vector>
@@ -82,7 +83,17 @@ void realloc(char* reallocMsg)
         }
 
         if((CkMyPe() == 0) && (load_balancer_created))
-        LBManagerObj()->set_avail_vector(new_bitmap, 0);
+        {
+            LBManagerObj()->set_avail_vector(new_bitmap, 0);
+            // Doom announcement: every other PE's avail vector was stale
+            // until now (set_avail_vector is PE-local). Broadcasting it while
+            // the application runs gives solver PEs correct availability in
+            // their stats and every PE a consistent doomed list for the
+            // quiet-probe protocol. PE 0 already applied it synchronously
+            // above; the broadcast copy it receives is idempotent.
+            std::vector<char> bm(new_bitmap, new_bitmap + CkNumPes());
+            CProxy_LBManager(LBManagerObj()->getGroupID()).RescaleAnnounceDoom(bm);
+        }
 
         se_avail_vector = (char *)malloc(sizeof(char) * CkNumPes());
         LBManagerObj()->get_avail_vector(se_avail_vector);
@@ -101,6 +112,14 @@ void realloc(char* reallocMsg)
                 pending_realloc_state == SHRINK_MSG_RECEIVED))
             pending_realloc_state = static_cast<realloc_state>(static_cast<uint8_t>(pending_realloc_state) | 
                 static_cast<uint8_t>(EXPAND_MSG_RECEIVED));
+
+        // Offer the application its own iteration boundaries, if it declared
+        // any. Nothing is lost when it did not: the rescale then lands at the
+        // next ordinary load balancing step, which is where it landed before
+        // this existed. Only for a request that actually changes the width --
+        // a no-op request has no boundary to wait for.
+        if (pending_realloc_state != NO_REALLOC)
+            LBManagerObj()->ArmRescalePoint();
 
         //free(reallocMsg);
         free(new_bitmap);
@@ -170,6 +189,7 @@ void manager_init(){
     willContinue = 0;
     CcsRegisterHandler("set_bitmap", (CmiHandler) handler);
     CcsRegisterHandler("realloc", (CmiHandler) realloc_handler);
+    CkTelemetryInit();
     if (stateInited) return;
     stateInited = 1;
     pending_realloc_state = NO_REALLOC;

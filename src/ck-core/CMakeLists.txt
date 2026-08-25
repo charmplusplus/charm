@@ -13,6 +13,9 @@ set(ck-cxx-sources
     ../ck-ldb/LBObj.C
     ../ck-ldb/LBSimulation.C ../ck-ldb/LButil.C
     ../ck-ldb/manager.C ../ck-ldb/MetaBalancer.C
+    ../ck-ldb/rescalepoint.C
+    ../ck-ldb/speedupsim.C
+    ../ck-ldb/telemetry.C
     ../ck-ldb/readmodel.C
     ../ck-ldb/Refiner.C ../ck-ldb/RefinerTemp.C
     ../ck-ldb/TreeLB.C
@@ -65,6 +68,9 @@ set(ldb-h-sources ../ck-ldb/BaseLB.h ../ck-ldb/CentralLBMsg.h
     ../ck-ldb/RecBipartLB.h
     ../ck-ldb/Refiner.h
     ../ck-ldb/RefinerTemp.h
+    ../ck-ldb/rescalepoint.h
+    ../ck-ldb/speedupsim.h
+    ../ck-ldb/telemetry.h
     ../ck-ldb/ScotchLB.h ../ck-ldb/ScotchRefineLB.h
     ../ck-ldb/ScotchTopoLB.h ../ck-ldb/TempAwareRefineLB.h
     ../ck-ldb/TreeLB.h

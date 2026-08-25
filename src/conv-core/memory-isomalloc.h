@@ -5,7 +5,14 @@ migratable heap allocation to arbitrary clients.
 #define CMK_MEMORY_ISOMALLOC_H
 
 #include <stddef.h>
-#include "conv-config.h"
+/* converse.h rather than conv-config.h: under Reconverse there is no
+   conv-config.h, and converse.h is the header that exists in both worlds and
+   supplies CthThread. */
+/* Angle brackets, not quotes: this file sits next to Charm++'s own
+   converse.h, and under Reconverse the converse.h that must win is the one on
+   the include path, not the sibling. */
+#include <converse.h>
+#include "pup_c.h"
 
 #ifdef __cplusplus
 #include <vector>
@@ -19,9 +26,12 @@ int CmiIsomallocEnabled(void);
 
 int CmiIsomallocInRange(void * addr);
 
+#ifndef CMI_ISOMALLOC_CONTEXT_DEFINED
+#define CMI_ISOMALLOC_CONTEXT_DEFINED 1
 typedef struct CmiIsomallocContext {
   void * opaque;
 } CmiIsomallocContext;
+#endif
 
 typedef struct CmiIsomallocRegion {
   void * start, * end;
@@ -53,6 +63,12 @@ void * CmiIsomallocContextPermanentAllocAlign(CmiIsomallocContext ctx, size_t al
 CmiIsomallocContext CmiIsomallocGetThreadContext(CthThread th);
 
 void CmiIsomallocContextEnableRecording(CmiIsomallocContext ctx, int enable); /* internal use only */
+
+/* The job's agreed global address range. A process that joined after the range
+   was agreed adopts it rather than using the one it probed for itself; see
+   CmiIsomallocAdoptRegion in isomalloc.C. */
+void CmiIsomallocGetRegion(CmiUInt8 * start, CmiUInt8 * end);
+void CmiIsomallocAdoptRegion(CmiUInt8 start, CmiUInt8 end);
 #ifdef __cplusplus
 void CmiIsomallocGetRecordedHeap(CmiIsomallocContext ctx,
   std::vector<std::tuple<uintptr_t, size_t, size_t>> & heap_vector);
@@ -60,9 +76,14 @@ void CmiIsomallocGetRecordedHeap(CmiIsomallocContext ctx,
 
 /****** Converse Thread functionality that depends on Isomalloc ********/
 
-int CthMigratable(void);
 CthThread CthPup(pup_er, CthThread);
+
+/* Under Reconverse the thread layer owns these two and declares them itself,
+   with C++ linkage; redeclaring them here inside extern "C" would conflict. */
+#ifndef CMI_MIGRATABLE_THREADS_DECLARED
+int CthMigratable(void);
 CthThread CthCreateMigratable(CthVoidFn fn, void * arg, int size, CmiIsomallocContext ctx);
+#endif
 
 /****** Memory-Isomalloc: malloc wrappers for Isomalloc ********/
 

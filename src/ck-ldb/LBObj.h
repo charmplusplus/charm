@@ -19,6 +19,9 @@ public:
     data.handle = _h;
     data.migratable = _migratable;
     data.asyncArrival = _asyncArrival;
+#if CMK_LB_WAIT_TIME
+    lastStopWTime = -1.0;
+#endif
     Clear();
     localUserData = usr_ptr;
   }
@@ -36,6 +39,18 @@ public:
     startCTime = CkCpuTimer();
 #endif
   }
+
+#if CMK_LB_WAIT_TIME
+  /** Fold in the wait implied by an input produced at sendTime.
+   *
+   * Clamped at zero: a message produced before this object last finished was
+   * already waiting for it, not the other way round. */
+  inline void RecordInput(double sendTime) {
+    if (lastStopWTime > 0.0 && sendTime > lastStopWTime)
+      data.waitTime += sendTime - lastStopWTime;
+  }
+  inline void MarkStopped(void) { lastStopWTime = CkWallTimer(); }
+#endif
 
   inline void StopTimer(LBRealType* walltime, LBRealType* cputime) {
     if (startWTime >= 0.0) {	// in case startOn in middle of entry
@@ -121,6 +136,9 @@ private:
   LDObjData data;
 //  bool registered;
   double startWTime;             // needs double precision
+#if CMK_LB_WAIT_TIME
+  double lastStopWTime;          // when this object last finished
+#endif
   LBRealType lastWallTime;
 #if CMK_LB_CPUTIMER
   double startCTime;

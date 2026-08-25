@@ -4,6 +4,7 @@ DIRS = \
   megatest \
   alignment \
   simplearrayhello \
+  migratable_threads \
   provisioning \
   load_balancing \
   chkpt \
@@ -43,6 +44,7 @@ TESTDIRS = $(filter-out $(FTDIRS),$(DIRS))
 
 NONSCALEDIRS = \
   alignment \
+  migratable_threads \
   queue \
   sdag \
   sparse \

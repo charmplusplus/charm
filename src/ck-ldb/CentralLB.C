@@ -9,6 +9,7 @@
 #include "ck.h"
 #include "envelope.h"
 #include "CentralLB.h"
+#include "telemetry.h"
 #include "LBSimulation.h"
 #if CMK_CUDA || CMK_HIP
 #if CMK_CUDA
@@ -232,9 +233,24 @@ void CentralLB::InvokeLB()
 #endif
 }
 
+#if CMK_SHRINK_EXPAND
+/* Opt-in trace of the load balancing round's completion chain, for diagnosing
+   a round that starts and never releases its clients. */
+static bool CkLBTraceOn() {
+  static int on = -1;
+  if (on < 0) on = (getenv("CHARM_LB_TRACE") != NULL) ? 1 : 0;
+  return on != 0;
+}
+#define LB_TRACE(...) do { if (CkLBTraceOn()) { fprintf(stderr, __VA_ARGS__); fflush(stderr); } } while (0)
+#else
+#define LB_TRACE(...) do { } while (0)
+#endif
+
 void CentralLB::ProcessAtSync()
 {
 #if CMK_LBDB_ON
+  LB_TRACE("[%d] LB ProcessAtSync (reduction_started=%d)\n", CkMyPe(),
+           (int)reduction_started);
   if (reduction_started) return;              // reducton in progress
 
   if (CkMyPe() == cur_ld_balancer) {
@@ -718,6 +734,10 @@ void CentralLB::LoadBalance()
   removeCommDataOfDeletedObjs(statsData);
   preprocess(statsData);
 
+  // Snapshot for the elastic scheduler. Everything it needs is already in
+  // statsData, so this costs a pass over the stats and no communication.
+  CkTelemetryRecord(statsData);
+
 //    CkPrintf("Before Calling Strategy\n");
 
   if (_lb_args.printSummary()) {
@@ -735,6 +755,8 @@ void CentralLB::LoadBalance()
 //      }
   }
   
+  applyLoadSnapshot(statsData);
+
   storedMigrateMsg = Strategy(statsData);
 
   if (!concurrent) ApplyDecision(); // immediately apply the migration decision
@@ -1210,6 +1232,30 @@ void CentralLB::ProcessReceiveMigration()
 void CentralLB::CheckForLB() {
   //sleep(5);
 #if CMK_SHRINK_EXPAND
+  // Concurrent-round guard. CentralLB has one statsData and one
+  // stats_msg_count: two interleaved rounds corrupt both (observed as the
+  // ProcessReceiveMigration SEGV when two rounds overlapped). The rescale
+  // round itself never passes through here in barrier-less mode (it starts
+  // via StartLB -> ProcessAtSync), so under the flag ANY arrival while a
+  // rescale is pending or in flight is a racing regular step -- drop it: a
+  // periodic step re-arms via setTimer, and chares held at a racing AtSync
+  // barrier are released by the post-restore ResumeClientsIfHeld. In
+  // boundary mode the *_MSG_RECEIVED round IS the rescale vehicle and must
+  // flow; only rounds racing the post-decision drain (*_IN_PROGRESS, the
+  // early-release window) are dropped.
+  {
+    extern bool CkRescaleBarrierlessEnabled();
+    const bool racing = CkRescaleBarrierlessEnabled()
+        ? (pending_realloc_state != NO_REALLOC)
+        : (pending_realloc_state &
+           (SHRINK_IN_PROGRESS | EXPAND_IN_PROGRESS)) != 0;
+    if (racing)
+    {
+      CkPrintf("CharmLB> Deferring a regular LB step: a rescale is in "
+               "flight.\n");
+      return;
+    }
+  }
   if (pending_realloc_state == EXPAND_MSG_RECEIVED)
     CheckForRealloc();
   //else if (pending_realloc_state == NO_REALLOC)
@@ -1227,22 +1273,184 @@ void CentralLB::CheckForLB() {
 // We assume that bit vector would have been aptly set async by either scheduler or charmrun.
 void CentralLB::CheckForRealloc(){
 #if CMK_SHRINK_EXPAND
+  LB_TRACE("[%d] LB CheckForRealloc (pending_realloc_state=%d)\n", CkMyPe(),
+           (int)pending_realloc_state);
   if(pending_realloc_state != NO_REALLOC) {
     pending_realloc_state = (pending_realloc_state == SHRINK_MSG_RECEIVED) ? SHRINK_IN_PROGRESS : EXPAND_IN_PROGRESS; //in progress
     CkPrintf("Load balancer invoking charmrun to handle reallocation on pe %d\n", CkMyPe());
     double end_lb_time = CkWallTimer();
     CkPrintf("CharmLB> %s: PE [%d] step %d finished at %f duration %f s\n\n",
         lbname, cur_ld_balancer, step()-1, end_lb_time,	end_lb_time-start_lb_time);
+    // On a barrier-less round the application is still running: the doomed
+    // PEs hold in-flight state their evacuated elements left behind (queued
+    // ghosts to forward, reduction partials to flush upward), and cutting now
+    // loses it. Let it land first -- everything keeps running through the
+    // grace, and the cut fires afterwards. A boundary round needs no grace:
+    // the application is quiescent at the cut by construction.
+    extern bool _rescaleBarrierlessRound;
+    extern int _rescaleGraceMs;
+    // No expand-populate hook needed here: the rescale checkpoint path sets
+    // _rescaleResumeCb = LBManager::StartLB() for expands, which runs the
+    // populating round after the restore. (A second kick from here raced
+    // that round's migrations -- stats built mid-flight, SEGV applying the
+    // decisions.)
+    if (_rescaleBarrierlessRound && _rescaleGraceMs > 0)
+    {
+      _rescaleBarrierlessRound = false;
+      CkPrintf("CharmLB> Barrier-less rescale: quiet-probe drain (ceiling %d ms) "
+               "before the cut.\n", _rescaleGraceMs);
+      StartRescaleQuietWatch();
+      return;
+    }
+    // Boundary-mode early release (shrink only): the LB decision is made and
+    // the evacuation migrations are complete, so nothing the application does
+    // from here on changes the rescale. Resume every chare now -- survivors
+    // keep iterating through the drain and cut; only real data dependencies
+    // (a ghost owed by a just-migrated neighbor) pace anyone. Expand keeps
+    // the hold: its populate round runs post-restore and resumes clients at
+    // its own end. The reduction handshake in RescaleEarlyResume guarantees
+    // every PE resumed before the quiet watch starts.
+    extern bool _rescaleHoldBoundary;
+    if (!_rescaleHoldBoundary && pending_realloc_state == SHRINK_IN_PROGRESS &&
+        _rescaleGraceMs > 0)
+    {
+      CkPrintf("CharmLB> Boundary rescale: early release -- resuming clients "
+               "before the drain and cut.\n");
+      thisProxy.RescaleEarlyResume();
+      return;
+    }
     // do checkpoint
-    CkCallback cb(CkIndex_CentralLB::ResumeFromReallocCheckpoint(), thisProxy[0]);
-    CkStartRescaleCheckpoint(_shrinkexpand_basedir, cb, se_avail_snapshot);
+    CkCallback cb(CkIndex_CentralLB::RescaleCutArmed(), thisProxy[0]);
+    CkArmRescaleCut(_shrinkexpand_basedir, cb, se_avail_snapshot);
   } else {
     thisProxy.MigrationDoneImpl(1);
   }
 #endif
 }
 
-void CentralLB::ResumeFromReallocCheckpoint(){
+#if CMK_SHRINK_EXPAND
+// The flat grace timer guessed how long the doomed PEs needed to finish
+// forwarding what their evacuated elements left behind. This measures it
+// instead: traffic toward doomed PE d has drained exactly when the summed
+// per-destination send counters for d equal d's own arrival counter, stable
+// across two consecutive probes (the stability round absorbs samples taken
+// while a message was between a sender's bump and the receiver's). The
+// application keeps running throughout; only the cut is moved earlier. The
+// grace value remains as a ceiling in case the counters never settle.
+void CentralLB::RescaleEarlyResume()
+{
+  // LBManager's resume (not CentralLB's): lb_in_progress must stay true
+  // until the post-restore reset, so a racing CCS request keeps buffering.
+  lbmgr->ResumeClients();
+  CkCallback cb(CkReductionTarget(CentralLB, RescaleEarlyResumeDone), thisProxy[0]);
+  contribute(cb);
+}
+
+void CentralLB::RescaleEarlyResumeDone()
+{
+  if (_lb_args.debug())
+    CkPrintf("CharmLB> Boundary rescale: clients resumed on every PE; "
+             "starting the drain.\n");
+  StartRescaleQuietWatch();
+}
+
+void CentralLB::StartRescaleQuietWatch()
+{
+  quietDoomed.clear();
+  const int lim = std::min((int)se_avail_snapshot.size(), CkNumPes());
+  for (int i = 0; i < lim; i++)
+    if (!se_avail_snapshot[i]) quietDoomed.push_back(i);
+  quietPrev.clear();
+  quietMatchedPrev = false;
+  quietProbes = 0;
+  quietT0 = CkWallTimer();
+  // Point-to-point on purpose: a broadcast reaches some PEs via relays, and a
+  // relay bumps its sent-counter AFTER that PE has already sampled for this
+  // round -- a persistent one-message skew that never settles. P2p sends all
+  // happen here on PE 0 before PE 0's own sample (its self-probe is delivered
+  // through the scheduler), so every probe message is counted on both sides
+  // within the same round.
+  for (int p = 0; p < CkNumPes(); p++)
+    thisProxy[p].RescaleQuietProbe(quietDoomed);
+}
+
+void CentralLB::RescaleQuietProbe(std::vector<int> doomed)
+{
+  std::vector<long> rep(2 * doomed.size() + 1, 0);
+  for (size_t k = 0; k < doomed.size(); k++)
+  {
+    rep[2 * k] = CmiRescaleAmSentTo(doomed[k]);
+    if (CkMyPe() == doomed[k]) rep[2 * k + 1] = CmiRescaleAmRecvP2p();
+  }
+  // Direct point-to-point report, NOT a contribute(): the group reduction
+  // tree routes kid contributions through interior PEs -- a doomed interior
+  // PE among them -- generating exactly the p2p traffic toward the doomed PE
+  // that the probe is trying to see drain, and each reduction's
+  // ReductionStarting chatter re-arms it every round (observed: interior-
+  // doom runs always hit the ceiling). Direct reports touch only
+  // survivor->PE0 paths plus PE0's counted probe sends.
+  thisProxy[0].RescaleQuietReport(rep.data(), (int)rep.size());
+}
+
+void CentralLB::RescaleQuietReport(long* data, int n)
+{
+  extern int _rescaleGraceMs;
+  // Accumulate this round's per-PE reports; evaluate once every PE reported.
+  if ((int)quietPrev.size() != n) quietPrev.assign(n, 0);
+  for (int i = 0; i < n; i++) quietPrev[i] += data[i];
+  if (++quietReports < CkNumPes()) return;
+  std::vector<long> sums;
+  sums.swap(quietPrev);
+  quietReports = 0;
+  data = sums.data();
+  quietProbes++;
+  bool matched = true;
+  for (int k = 0; k < n / 2; k++)
+    if (data[2 * k] != data[2 * k + 1]) { matched = false; break; }
+  if (!matched && _lb_args.debug() > 1)
+    for (int k = 0; k < n / 2; k++)
+      CkPrintf("CharmLB> quiet probe %d: doomed[%d] sent=%ld recv=%ld\n",
+               quietProbes, k, data[2 * k], data[2 * k + 1]);
+  const double elapsedMs = (CkWallTimer() - quietT0) * 1000.0;
+
+  // One matched round suffices: quiet is a trigger, not a safety condition --
+  // the cut's global flush drains whatever is in flight regardless.
+  bool fire = false;
+  if (matched)
+  {
+    CkPrintf("CharmLB> Rescale drain: doomed PEs quiet after %.2f ms "
+             "(%d probes); cutting now.\n", elapsedMs, quietProbes);
+    fire = true;
+  }
+  else if (elapsedMs > (double)_rescaleGraceMs)
+  {
+    CkPrintf("CharmLB> Warning: doomed PEs not provably quiet after %.2f ms "
+             "(ceiling %d ms); cutting anyway.\n", elapsedMs, _rescaleGraceMs);
+    fire = true;
+  }
+  if (fire)
+  {
+    CkCallback cb(CkIndex_CentralLB::RescaleCutArmed(), thisProxy[0]);
+    CkArmRescaleCut(_shrinkexpand_basedir, cb, se_avail_snapshot);
+    return;
+  }
+  // Not settled: wait out the in-flight runtime chatter before sampling
+  // again. The Ccd timer's real granularity is ~10 ms, which is fine here --
+  // an unmatched first round means a message was mid-flight, and the next
+  // sample only needs to land after it. Back-to-back rounds never converge
+  // (see above).
+  CcdCallFnAfterOnPE(
+      [](void* arg, double)
+      {
+        CentralLB* lb = (CentralLB*)arg;
+        for (int p = 0; p < CkNumPes(); p++)
+          lb->thisProxy[p].RescaleQuietProbe(lb->quietDoomed);
+      },
+      (void*)this, 1, CkMyPe());
+}
+#endif
+
+void CentralLB::RescaleCutArmed(){
 #if CMK_SHRINK_EXPAND
     // Stamp the start of the post-checkpoint rescale orchestration so the
     // PE-0 print at the end of CkRestartMain can report total / restore /
@@ -1278,6 +1486,8 @@ void CentralLB::StartCleanup(){
 void CentralLB::MigrationDone(int balancing)
 {
 #if CMK_SHRINK_EXPAND
+    LB_TRACE("[%d] LB MigrationDone -> contribute to CheckForRealloc\n",
+             CkMyPe());
    // barrier to check for reallocation
     CkCallback cb(CkIndex_CentralLB::CheckForRealloc(), thisProxy[0]);
     contribute(cb);
@@ -1290,6 +1500,7 @@ void CentralLB::MigrationDone(int balancing)
 void CentralLB::MigrationDoneImpl (int balancing)
 {
 #if CMK_LBDB_ON
+  LB_TRACE("[%d] LB MigrationDoneImpl\n", CkMyPe());
   migrates_completed = 0;
   migrates_expected = -1;
   // clear load stats
@@ -1331,6 +1542,7 @@ void CentralLB::ResumeClients()
 
 void CentralLB::ResumeClients(int balancing)
 {
+  LB_TRACE("[%d] LB ResumeClients(%d)\n", CkMyPe(), balancing);
 #if CMK_LBDB_ON
   //CkPrintf("[%d] Resuming clients. balancing:%d.\n",CkMyPe(),balancing);
   lbmgr->ResumeClients();
@@ -1431,6 +1643,82 @@ void CentralLB::removeCommDataOfDeletedObjs(LDStats* stats) {
   }
 
   stats->commData.resize(n_comm);
+}
+
+/** Balance on the last well-measured window, not on a short one.
+ *
+ * Per-object loads are accumulators since the previous round's ClearLoads,
+ * so a round that fires soon after another one -- the populating round after
+ * an expand, ~100 ms behind the restore; a rescale round landing just after a
+ * regular step -- sees a window of a few iterations in which each chare's
+ * partial current iteration is a large fraction of its total, and chares at
+ * different points of their loop read as differently loaded. A rescale
+ * balances the new world on that noise.
+ *
+ * So PE 0 keeps the per-object loads of the last window it judged well
+ * measured, and a round whose own window is much shorter reads those instead
+ * for every object it still knows. When this window is comparable or longer
+ * it becomes the new snapshot, so a permanently shorter cadence is adopted
+ * rather than pinned to history. Objects without a snapshot -- created or
+ * migrated between rescales, whose LB id then differs -- keep their live
+ * value. For an AtSync application this is exactly "the load at the last
+ * AtSync"; for one with no boundaries it is the last long window.
+ */
+void CentralLB::applyLoadSnapshot(LDStats* stats)
+{
+  const double now = CmiWallTimer();
+  const double window = (lastRoundTime > 0.0) ? (now - lastRoundTime) : 0.0;
+  lastRoundTime = now;
+  const bool haveSnapshot = !loadSnapshot.empty() && snapshotWindow > 0.0;
+  const bool shortWindow = haveSnapshot && window < 0.5 * snapshotWindow;
+
+  if (shortWindow)
+  {
+    int replaced = 0;
+    for (size_t i = 0; i < stats->objData.size(); i++)
+    {
+      LDObjData& o = stats->objData[i];
+      auto it = loadSnapshot.find(o.objID());
+      if (it == loadSnapshot.end()) continue;
+      o.wallTime = it->second.wall;
+#if CMK_LB_CPUTIMER
+      o.cpuTime = it->second.cpu;
+#endif
+#if CMK_CUDA || CMK_HIP
+      o.gpuTime = it->second.gpu;
+#endif
+      replaced++;
+    }
+    if (_lb_args.debug())
+      CkPrintf("CharmLB> step %d: window %.3fs is short; using snapshot loads (%.3fs "
+               "window) for %d of %zu objects\n",
+               step(), window, snapshotWindow, replaced, stats->objData.size());
+    return;
+  }
+
+  // This window is as good as the last one, or there is none: record it.
+  if (window > 0.0 || !haveSnapshot)
+  {
+    loadSnapshot.clear();
+    for (size_t i = 0; i < stats->objData.size(); i++)
+    {
+      const LDObjData& o = stats->objData[i];
+      LoadSnapshot snap;
+      snap.wall = o.wallTime;
+#if CMK_LB_CPUTIMER
+      snap.cpu = o.cpuTime;
+#else
+      snap.cpu = 0.0;
+#endif
+#if CMK_CUDA || CMK_HIP
+      snap.gpu = o.gpuTime;
+#else
+      snap.gpu = 0.0;
+#endif
+      loadSnapshot[o.objID()] = snap;
+    }
+    snapshotWindow = window;
+  }
 }
 
 void CentralLB::preprocess(LDStats* stats)

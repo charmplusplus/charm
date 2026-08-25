@@ -12,6 +12,7 @@
 #include "charm++.h"
 #include "ck.h"
 #include "cksyncbarrier.h"
+#include "rescalepoint.h"
 #include "hilbert.h"
 #include "partitioning_strategies.h"
 #include "pup_stl.h"
@@ -1945,6 +1946,30 @@ void CkMigratable::ckFinishConstruction(int epoch)
   barrierRegistered = true;
 }
 
+/* Application-declared rescale points. The predicate reads only per-PE state,
+ * so it does not touch the element at all -- it is a member for symmetry with
+ * AtSync() and so the usesAtSync requirement is checked where it is violated
+ * rather than one call later inside AtSync(). */
+
+bool CkMigratable::checkRescale(int iter)
+{
+  if (!usesAtSync)
+    CkAbort(
+        "You must set usesAtSync=true in your array element constructor to use "
+        "checkRescale!\n");
+  lastRescaleCheckIter = iter;
+  return CkRescaleCheck(iter);
+}
+
+bool CkMigratable::rescalePending()
+{
+  if (!usesAtSync)
+    CkAbort(
+        "You must set usesAtSync=true in your array element constructor to use "
+        "rescalePending!\n");
+  return CkRescaleArmed();
+}
+
 void CkMigratable::AtSync(int waitForMigration)
 {
   if (!usesAtSync)
@@ -1988,7 +2013,7 @@ void CkMigratable::AtSync(int waitForMigration)
 
   if (!_lb_args.metaLbOn())
   {
-    myRec->getSyncBarrier()->atBarrier(ldBarrierHandle);
+    myRec->getSyncBarrier()->atBarrier(ldBarrierHandle, lastRescaleCheckIter);
     return;
   }
 
@@ -2225,6 +2250,17 @@ bool CkLocRec::invokeEntry(CkMigratable* obj, void* msg, int epIdx, bool doFree)
   }
 #endif
 
+#if CMK_LBDB_ON && CMK_LB_WAIT_TIME
+  // Before the entry method runs, so the object's own execution time does not
+  // contaminate the measurement.
+  if (msg != NULL)
+  {
+    LBManager* const lbmgr = getLBMgr();
+    if (lbmgr != NULL)
+      lbmgr->ObjectMessageArrived(getLdHandle(), UsrToEnv(msg)->getSendTime());
+  }
+#endif
+
   if (doFree)
     CkDeliverMessageFree(epIdx, msg, obj);
   else /* !doFree */
@@ -2360,6 +2396,23 @@ void CkLocMgr::flushAllRecs(void) { flushLocalRecs(); }
 //   - hash[id] -> rec is keyed by the OLD home-encoded ID. With the new map,
 //     lookupID(idx) returns a different ID, so remote sends would miss this
 //     record entirely.
+/** SIGUSR2 diagnostic: location-layer parking spots, then each managed array. */
+void CkLocMgr::debugDumpRescale()
+{
+  fprintf(stderr, "SEDUMP[%d] CkLocMgr g%d: hash=%zu\n", CkMyPe(), thisgroup.idx,
+          hash.size());
+  if (cache)
+  {
+    fprintf(stderr, "SEDUMP[%d]   cache: locMap=%zu bufIdReq=%zu\n", CkMyPe(),
+            cache->getLocMapSize(), cache->getBufferedIdReqSize());
+    cache->debugDumpEntries();
+  }
+  for (auto& kv : bufferedActiveRgetMsgs)
+    fprintf(stderr, "SEDUMP[%d]   rgetBuf id=%lu n=%zu\n", CkMyPe(),
+            (unsigned long)kv.first, kv.second.size());
+  for (auto& kv : managers) kv.second->debugDumpRescale();
+}
+
 void CkLocMgr::resetForRescale()
 {
   // 1. Refresh per-array bin sizes against the new CkNumPes().
@@ -2370,6 +2423,10 @@ void CkLocMgr::resetForRescale()
   //    or are about to be invalidated by step 3's id rekey.
   if (cache)
     cache->resetForRescale();
+  // Same reasoning as the cache's bufferedIdRequests: these hold requester
+  // PE numbers from the old world; a post-restore reply would target a
+  // renumbered or nonexistent PE. Requesters re-request after their restore.
+  bufferedLocationRequests.clear();
 
   // 3. Re-key local records under the new home-encoded ID. Snapshot first so
   //    we can mutate the hash safely.
@@ -2506,15 +2563,65 @@ void CkLocCache::pup(PUP::er& p)
 void CkLocCache::requestLocation(CmiUInt8 id)
 {
   int home = homePe(id);
+#if CMK_SHRINK_EXPAND
+  if (home >= CkNumPes() || home < 0)
+  {
+    // Dead-world id (its embedded home left in a shrink): there is no PE to
+    // ask by this key, and sending would abort in the transport. Messages
+    // buffered behind this id drain when the element's inform fires the
+    // cache listeners; the answerable request is the by-index one the caller
+    // falls back to (see CkArray::handleUnknown).
+    return;
+  }
+#endif
   if (home != CkMyPe())
   {
     thisProxy[home].requestLocation(id, CkMyPe());
   }
+#if CMK_SHRINK_EXPAND
+  else
+  {
+    // This PE is the id's home, so there is no one to ask -- but the answer
+    // may already be in the local map, e.g. the element lived here and
+    // emigrated. Without this, a message buffered behind the request parks
+    // forever: the request-reply that would have drained it never happens.
+    // Reached when a stray arrives at a home PE after its element left,
+    // which a barrier-less rescale produces routinely on the PEs being
+    // removed (observed: ghosts parked on the doomed PE dying with it).
+    LocationMap::const_iterator itr = locMap.find(id);
+    if (itr != locMap.end() && itr->second.pe != CkMyPe())
+    {
+      notifyListeners(id, itr->second.pe);
+    }
+    else if (itr == locMap.end())
+    {
+      // We are the home and do not know yet -- the same race the remote
+      // request path handles just below: after a rescale wipes the cache, a
+      // request can beat the element's informHome to its own home PE.
+      // Dropping it parks the messages buffered behind it forever (observed:
+      // post-restore ghosts missing on the very PE that was their home). Hold
+      // it exactly as a remote request would be held; insert()/
+      // updateLocation() answers it when the inform lands.
+      bufferedIdRequests[id].push_back(CkMyPe());
+    }
+  }
+#endif
 }
 
 void CkLocCache::requestLocation(CmiUInt8 id, const int peToTell)
 {
   if (peToTell == CkMyPe()) return;
+#if CMK_SHRINK_EXPAND
+  if (peToTell >= CkNumPes() || peToTell < 0)
+  {
+    // A request message from the dead world, replayed from the survivors'
+    // buffered queue after the cut: its requester field uses the old
+    // numbering and may name a PE that no longer exists (observed: "Destnode
+    // 7 out of range 7" aborts on the first interior-hole shrink). The real
+    // requester re-requests under the new numbering after its own restore.
+    return;
+  }
+#endif
 
   LocationMap::const_iterator itr = locMap.find(id);
   if (itr != locMap.end())
@@ -2891,6 +2998,10 @@ void CkLocMgr::requestLocation(const CkArrayIndex& idx)
 bool CkLocMgr::requestLocation(const CkArrayIndex& idx, const int peToTell)
 {
   CkAssert(peToTell != CkMyPe());
+#if CMK_SHRINK_EXPAND
+  if (peToTell >= CkNumPes() || peToTell < 0)
+    return true;  // dead-world request replayed across the cut; see CkLocCache
+#endif
 
   CmiUInt8 id;
   if (lookupID(idx, id))

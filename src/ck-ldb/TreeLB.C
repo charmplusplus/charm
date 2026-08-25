@@ -689,7 +689,7 @@ if (_lb_args.debug() > 0) {
     }
 
     //print a couple object loads to sample;
-    CkStartRescaleCheckpoint(_shrinkexpand_basedir, cb, 
+    CkArmRescaleCut(_shrinkexpand_basedir, cb, 
       std::vector<char>(se_avail_vector, se_avail_vector + CkNumPes()));
   }
   else

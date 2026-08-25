@@ -283,6 +283,8 @@ PUPbytes(CkReduction::reducerType)
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  */
 struct CkReductionTypesExt {
+public:
+
     // No-op reducer
     int nop = CkReduction::nop;
     // Sum reducers
@@ -421,6 +423,11 @@ private:
     int sourceProcessorCount;
 #endif
     int fromPE;
+    // Membership generation the message was built in. PE numbering changes at
+    // every rescale commit, so fromPE is only meaningful within its
+    // generation; RecvMsg translates a previous-generation fromPE through the
+    // old->new survivor mapping before using it (and drops anything older).
+    int worldGen;
 	int redNo;//The serial number of this reduction
 	int gcount;//Contribution to the global contributor count
 	CkReduction::reducerType reducer;
@@ -492,7 +499,13 @@ public:
 	virtual void flushStates();	// flush state varaibles
 
 #if CMK_SHRINK_EXPAND
-	virtual void resetForRescale(); // flush state + rebuild spanning tree (survivor restart)
+	// Named for reductions rather than just resetForRescale: every Charm++ group
+	// inherits this class, so a plainly-named virtual here is silently overridden
+	// by any group that defines a same-signature resetForRescale() of its own --
+	// no warning, and the group's reduction tree then keeps its pre-rescale child
+	// count, so reductions on it hang after the first rescale.
+	virtual void resetReductionForRescale(); // flush state + rebuild spanning tree (survivor restart)
+	void driveCompletionAfterRescale();  // see CkReductionMgr version
 #endif
 
 	virtual int getTotalGCount(){return 0;};
@@ -653,8 +666,37 @@ public:
 	virtual bool isReductionMgr(void){ return true; }
 	virtual void flushStates();
 #if CMK_SHRINK_EXPAND
-	virtual void resetForRescale(); // flush state + rebuild spanning tree (survivor restart)
+	// Named for reductions rather than just resetForRescale: every Charm++ group
+	// inherits this class, so a plainly-named virtual here is silently overridden
+	// by any group that defines a same-signature resetForRescale() of its own --
+	// no warning, and the group's reduction tree then keeps its pre-rescale child
+	// count, so reductions on it hang after the first rescale.
+	virtual void resetReductionForRescale(); // flush state + rebuild spanning tree (survivor restart)
 	void rebuildTreeForRescale();   // rebuild spanning tree only (preserve redNo/contributors)
+	// Re-check whether this PE has anything to contribute, and tell the parent
+	// if it does not. Needed when the reduction settling window closes: a PE
+	// that became barren while the window was holding announcements back has
+	// no other occasion to make one, and its parent would wait for it forever.
+	void reEvaluateActivityAfterRescale();
+	void debugDumpRescale();        // SIGUSR2 diagnostic: protocol state
+	// Re-drive an in-progress reduction to completion after a rescale. The
+	// tree rebuild can shrink this PE's kid count (a doomed child leaves)
+	// below the remote contributions already counted, making an in-progress
+	// round completable -- but nothing re-evaluates the completion predicate,
+	// so the root sits inProgress forever and the app's reduction callback
+	// never fires. Run at the end of the restore, after buffered messages
+	// have drained, so the callback (and any iteration it kicks off) fires
+	// only once the world is whole. No-op unless inProgress. See
+	// CkDriveReductionsAfterRescale.
+	void driveCompletionAfterRescale();
+	// Called on a departing PE just before the exit flush: forward every held
+	// message to the tree parent -- remote subtree messages as-is (their
+	// original fromPE is what the survivor's per-kid completion gate matches
+	// against its promoted kids), local contributions merged into one partial
+	// stamped with this PE. Without this, an interior doomed PE holding child
+	// A's subtree while waiting on child B takes A's contributions down with
+	// it (RESCALE_KNOWN_ISSUES.md R1).
+	void flushForDoomedExit();
 #endif
 	/*FAULT_EVAC: used to get the gcount on a processor when
 		it is evacuated.
@@ -710,6 +752,7 @@ private:
 	void startReduction(int number,int srcPE);
 	void addContribution(CkReductionMsg *m);
 	void finishReduction(void);
+  void maybeCompleteObligationFreeRound();
   void checkIsActive();
   void informParentInactive();
   void checkAndAddToInactiveList(int id, int red_no);
@@ -740,6 +783,26 @@ private:
 	//This vector of adjustments is indexed by redNo,
 	// starting from the current redNo.
 	std::vector<countAdjustment> adjVec;
+#if CMK_SHRINK_EXPAND
+	bool postRescaleRound = false;  // see rebaseCountersForRescale
+	// Whether the round now being assembled contains a message built before
+	// the most recent rescale. Only such a round has counts from two eras
+	// mixed into it, and only such a round may be completed on the structural
+	// predicate. Cleared at every round completion, like kidsSeen.
+	bool eraMixedRound = false;
+	// Which current-round kids have actually delivered their subtree message
+	// (RecvMsg inserts m->fromPE; cleared when the round completes). Only
+	// consulted for the round spanning a rescale cut: there nRemote counts
+	// OLD-tree messages while treeKids() is the NEW tree, so the count gate
+	// can pass while a surviving kid's contribution is still in flight --
+	// completing then loses that subtree AND aborts with "Recv'd late remote
+	// contribution!" when it lands. The per-kid gate is exact.
+	std::set<int> kidsSeen;
+	// This PE is doomed and has flushed its held messages upward: relay any
+	// further arrival to the parent unmerged, preserving fromPE, so a straggler
+	// kid's contribution still reaches a survivor. Set by flushForDoomedExit.
+	bool doomedPassThrough = false;
+#endif
 	//Return the countAdjustment struct for the given redNo:
 	countAdjustment &adj(int number);
 
@@ -763,6 +826,23 @@ protected:
 	void rebaseCountersForRescale() {
 	  gcount = lcount;
 	  adjVec.clear();
+	  // The root may hold, for the round in flight at the cut, remote messages
+	  // carrying OLD-world subtree gcounts while its own gcount is rebased to
+	  // the new world. Summing the two (finishReduction line ~734) yields a
+	  // totalElements that does not match result->nSources(), and the root
+	  // waits forever for "migrants" that already contributed. For the first
+	  // round completed after this rebase, trust the structural predicate
+	  // (every current-tree child reported + all locals in) instead of the
+	  // era-mixed count. Cleared the first time a round completes. */
+	  postRescaleRound = true;
+	  // A manager that was mid-round at the cut *is* era-mixed, whether or not
+	  // a previous-generation message later arrives to say so: the partial it
+	  // is holding was built against counters this rebase just moved, and
+	  // nothing in RecvMsg will flag it. Without this the root can find more
+	  // sources than its count allows and abort with "Too many contributions
+	  // at root!" -- the residual early-release failure.
+	  if (inProgress || msgs.length() > 0 || nContrib > 0 || nRemote > 0)
+	    eraMixedRound = true;
 	}
 #endif
         bool isDestroying;

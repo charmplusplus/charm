@@ -178,11 +178,21 @@ the reduced message up the reduction tree to node zero, where
 they're passed to the user's client function.
 */
 
+#if CMK_SHRINK_EXPAND
+extern "C" void CkRescaleFlushDoomedReductions(void);
+extern "C" int CmiRescaleOldPeToNew(int oldPe);
+#endif
+
 CkReductionMgr::CkReductionMgr()
   :
   thisProxy(thisgroup),
   isDestroying(false)
-{ 
+{
+#if CMK_SHRINK_EXPAND
+  // idempotent: every construction (re)installs the departing-PE hook
+  CmiRescaleDoomedFlushFn = CkRescaleFlushDoomedReductions;
+#endif
+ 
 #ifdef BINOMIAL_TREE
   init_BinomialTree();
 #else
@@ -263,7 +273,7 @@ void CkReductionMgr::flushStates()
 // survivor's completedRedNo — RecvMsg aborts on
 // "Recv'd late remote contribution!". Drop pending state and rebuild the
 // tree against the current topology so survivor and newcomer are aligned.
-void CkReductionMgr::resetForRescale()
+void CkReductionMgr::resetReductionForRescale()
 {
   flushStates();
   rebuildTreeForRescale();
@@ -275,6 +285,117 @@ void CkReductionMgr::resetForRescale()
 // across the longjmp on each surviving array element — flushing manager
 // state would desync against those contributors and silently park
 // post-rescale contributions in futureMsgs forever.
+// See the header. finishReduction() early-returns when !inProgress, so this is
+// a no-op on every manager that was not mid-round at the cut.
+void CkReductionMgr::driveCompletionAfterRescale() { finishReduction(); }
+
+#if CMK_SHRINK_EXPAND
+void CkReductionMgr::reEvaluateActivityAfterRescale() { checkIsActive(); }
+
+/* Called when the settling window closes. While it was open no PE was allowed
+   to declare itself barren (see checkIsActive), and a PE that the post-rescale
+   load balancing round left with no elements has no later event that would
+   make it announce -- contributorLeaving and round completion have both
+   already happened. Its parent, back on the ordinary completion gate, then
+   waits for a contribution that is never coming: observed as the whole job
+   frozen with the root at nRemote=3 of kids=4 and an empty inactive list. */
+void CkReEvaluateReductionActivity(void)
+{
+  int numGroups = CkpvAccess(_groupIDTable)->size();
+  for (int i = 0; i < numGroups; i++) {
+    CkGroupID gID = (*CkpvAccess(_groupIDTable))[i];
+    IrrGroup* obj = CkpvAccess(_groupTable)->find(gID).getObj();
+    if (obj && obj->isReductionMgr())
+      ((CkReductionMgr*)obj)->reEvaluateActivityAfterRescale();
+  }
+}
+#endif
+
+#if CMK_SHRINK_EXPAND
+void CkReductionMgr::flushForDoomedExit()
+{
+  doomedPassThrough = true;
+  if (!hasParent()) return;  // PE 0 is never doomed; defensive
+  const int parent = treeParent();
+  int fwdRemote = 0, fwdLocal = 0, fwdFuture = 0;
+  CkMsgQ<CkReductionMsg> locals;
+  while (msgs.length() > 0)
+  {
+    CkReductionMsg* m = msgs.deq();
+    if (m == NULL) continue;
+    if (m->fromPE >= 0)
+    {
+      // A kid's subtree message: forward untouched. Its fromPE is what the
+      // survivor parent's per-kid gate matches against the promoted kid.
+      thisProxy[parent].RecvMsg(m);
+      fwdRemote++;
+    }
+    else
+      locals.enq(m);
+  }
+  if (locals.length() > 0)
+  {
+    fwdLocal = locals.length();
+    CkReductionMsg* part = reduceMessages(locals);
+    part->redNo = redNo;
+    part->fromPE = CkMyPe();
+    thisProxy[parent].RecvMsg(part);
+  }
+  // Future rounds' data must survive too; the parent future-queues them.
+  while (futureRemoteMsgs.length() > 0)
+  {
+    CkReductionMsg* m = futureRemoteMsgs.deq();
+    if (m) { thisProxy[parent].RecvMsg(m); fwdFuture++; }
+  }
+  while (futureMsgs.length() > 0)
+  {
+    CkReductionMsg* m = futureMsgs.deq();
+    if (m) { if (m->fromPE < 0) m->fromPE = CkMyPe(); thisProxy[parent].RecvMsg(m); fwdFuture++; }
+  }
+  if (fwdRemote || fwdLocal || fwdFuture)
+    CmiPrintf("[%d] Rescale: doomed PE flushed reduction g%d upward to %d "
+              "(%d subtree, %d local, %d future)\n",
+              CkMyPe(), thisgroup.idx, parent, fwdRemote, fwdLocal, fwdFuture);
+}
+#endif
+
+void CkReductionMgr::debugDumpRescale()
+{
+  fprintf(stderr,
+          "SEDUMP[%d] RedMgr g%d: redNo=%d completed=%d inProg=%d nContrib=%d nRemote=%d "
+          "lcount=%d gcount=%d parent=%d kids=%d inactive=%d msgs=%d future=%d "
+          "futureRemote=%d final=%d adjVec=%zu\n",
+          CkMyPe(), thisgroup.idx, redNo, completedRedNo, (int)inProgress, nContrib,
+          nRemote, lcount, gcount, treeParent(), treeKids(), (int)is_inactive,
+          msgs.length(), futureMsgs.length(), futureRemoteMsgs.length(),
+          finalMsgs.length(), adjVec.size());
+  for (size_t i = 0; i < adjVec.size(); i++)
+    if (adjVec[i].lcount != 0 || adjVec[i].gcount != 0)
+      fprintf(stderr, "SEDUMP[%d]   adj[redNo+%zu] lcount=%d gcount=%d\n", CkMyPe(), i,
+              adjVec[i].lcount, adjVec[i].gcount);
+}
+
+#if CMK_SHRINK_EXPAND
+/* Set for the window between a rescale restore and the end of the load
+   balancing round that follows it -- the round that hands a newcomer its
+   elements, or moves work off a PE emptied by evacuation. See
+   checkIsActive() for what it turns off and why. */
+bool _rescaleReductionSettling = false;
+#endif
+
+#if CMK_SHRINK_EXPAND
+/* Opt-in tracing of the barren-PE protocol, for diagnosing rounds that
+   complete without a kid that then contributes to them. */
+static bool CkRednTraceOn() {
+  static int on = -1;
+  if (on < 0) on = (getenv("CHARM_REDN_TRACE") != NULL) ? 1 : 0;
+  return on != 0;
+}
+#define REDN_TRACE(...) do { if (CkRednTraceOn()) { fprintf(stderr, __VA_ARGS__); fflush(stderr); } } while (0)
+#else
+#define REDN_TRACE(...) do { } while (0)
+#endif
+
 void CkReductionMgr::rebuildTreeForRescale()
 {
   kids.clear();
@@ -399,6 +520,35 @@ void CkReductionMgr::contributorDied(contributorInfo *ci)
     checkIsActive();
   }
   finishReduction();
+  maybeCompleteObligationFreeRound();  // same hole as migration (see below)
+}
+
+/* Anytime migration can leave this PE POPULATED BUT OBLIGATION-FREE for
+the current reduction: every local element that owed redNo migrated away
+before contributing, while every arrival already contributed to redNo
+elsewhere (each such arrival decrements adj(redNo).lcount, balancing its
+lcount++). Such a PE never starts the reduction on its own -- it gets no
+local contribution (addContribution is what normally calls
+startReduction), it may have no tree kids, and the parent's
+sendReductionStartingToKids pokes only kids on the inactiveList, which
+this PE never joined because lcount never reached 0. The subtree then
+never reports and the whole reduction hangs (issue #3939). When a
+migration event makes the current round's local requirement already
+satisfied, eagerly start and finish it (shipping the empty result up);
+a migrant that later owes this round contributes through the existing
+LateMigrantMsg path. lcount>0 keeps the barren case on the established
+inactive-list path.
+
+Ported from upstream 7cb0b4bad (charm #3939). Complementary to the
+settling-window work here: that covers lcount==0, this covers lcount>0. */
+void CkReductionMgr::maybeCompleteObligationFreeRound()
+{
+  if (!inProgress && !creating && lcount > 0 &&
+      nContrib >= lcount + adj(redNo).lcount) {
+    DEBR((AA "Migration left this PE obligation-free for #%d; completing it eagerly\n" AB,redNo));
+    startReduction(redNo, CkMyPe());
+    finishReduction();
+  }
 }
 
 //Migrating away (note that global count doesn't change)
@@ -415,6 +565,7 @@ void CkReductionMgr::contributorLeaving(contributorInfo *ci)
     checkIsActive();
   }
   finishReduction();
+  maybeCompleteObligationFreeRound();
 }
 
 //Migrating in (note that global count doesn't change)
@@ -435,6 +586,7 @@ void CkReductionMgr::contributorArriving(contributorInfo *ci)
   if (ci->redNo == redNo) {
     checkIsActive();
   }
+  maybeCompleteObligationFreeRound();
 }
 
 //Contribute-- the given msg can contain any data.  The reducerType
@@ -469,6 +621,26 @@ void CkReductionMgr::checkIsActive() {
   DEBR((AA "CheckIsActive redNo %d, kids %d(inactive %d), lcount %d\n" AB, redNo,
     numKids, c_inactive, lcount));
 
+#if CMK_SHRINK_EXPAND
+  if (_rescaleReductionSettling) {
+    /* Declaring inactivity is a promise to the parent: "I will not contribute
+       to this round or any later one." A PE cannot keep that promise while
+       migration is still moving elements toward it -- a newcomer is barren for
+       exactly as long as it takes the post-rescale round to populate it, and
+       an element landing there contributes to the round the PE just excused
+       itself from. The parent has closed that round by then, and the arriving
+       contribution aborts it ("Recv'd late remote contribution!", seen on an
+       interior node whose kid was the newcomer).
+
+       So for the length of the settling window the optimization is simply off:
+       nobody goes quiet, the parent waits for every kid, and a barren kid
+       answers each round with an empty contribution. startReduction prompts
+       every kid rather than only the quiet ones, so nothing stalls waiting to
+       be asked. */
+    is_inactive = false;
+    return;
+  }
+#endif
   if(numKids == c_inactive && lcount == 0) {
     if(!is_inactive) {
       informParentInactive();
@@ -483,13 +655,25 @@ void CkReductionMgr::checkIsActive() {
 * Add to the child to the inactiveList
 */
 void CkReductionMgr::checkAndAddToInactiveList(int id, int red_no) {
-  // If there is already a reduction in progress corresponding to red_no, then
-  // the time to call ReductionStarting is past so explicitly invoke
-  // ReductionStarting on the kid
-  if (inProgress && redNo == red_no) {
-    thisProxy[id].ReductionStarting(new CkReductionNumberMsg(red_no));
+  // A round already under way still needs this kid's (empty) contribution --
+  // the completion gate counts every kid, inactive or not -- and the kid will
+  // not start one on its own, so it has to be told.
+  //
+  // The prompt has to name the round *this* PE is in, not the one the kid
+  // named, and it has to go out whenever the kid's round is at or before it.
+  // Requiring the two to be equal loses the case that matters after a rescale:
+  // a newcomer left with no elements by the populate round announces itself
+  // quiet from its own current round, which by then can be behind the round
+  // its parent has already started. No prompt went out, the kid never sent,
+  // and the parent waited for it forever -- the whole job frozen with the root
+  // at nRemote=3 of kids=4 while every other PE had moved on.
+  if (inProgress && red_no <= redNo) {
+    thisProxy[id].ReductionStarting(new CkReductionNumberMsg(redNo));
   }
 
+  REDN_TRACE("[%d] KID %d declared inactive from %d (my redNo=%d, inProgress=%d) "
+             "group=%d\n", CkMyPe(), id, red_no, redNo, (int)inProgress,
+             (int)thisgroup.idx);
   std::unordered_map<int, int>::iterator it;
   it = inactiveList.find(id);
   if (it == inactiveList.end()) {
@@ -514,6 +698,8 @@ void CkReductionMgr::checkAndRemoveFromInactiveList(int id, int red_no) {
     return;
   }
   if (it->second <= red_no) {
+    REDN_TRACE("[%d] KID %d active again at %d (my redNo=%d) group=%d\n",
+               CkMyPe(), id, red_no, redNo, (int)thisgroup.idx);
     inactiveList.erase(it);
     DEBR((AA "Parent removing kid %d from inactivelist red_no %d\n" AB,
       id, red_no));
@@ -522,6 +708,8 @@ void CkReductionMgr::checkAndRemoveFromInactiveList(int id, int red_no) {
 
 // Inform parent that I am inactive
 void CkReductionMgr::informParentInactive() {
+  REDN_TRACE("[%d] INACTIVE from redNo=%d lcount=%d group=%d\n", CkMyPe(), redNo,
+             lcount, (int)thisgroup.idx);
   if (hasParent()) {
     DEBR((AA "Inform parent to add to inactivelist red_no %d\n" AB, redNo));
     thisProxy[treeParent()].AddToInactiveList(
@@ -541,6 +729,23 @@ void CkReductionMgr::sendReductionStartingToKids(int red_no) {
     thisProxy[kids[k]].ReductionStarting(new CkReductionNumberMsg(redNo));
   }
 #else
+#if CMK_SHRINK_EXPAND
+  if (_rescaleReductionSettling) {
+    // No kid is on the inactive list during the settling window (see
+    // checkIsActive), so prompt them all: a kid with nothing to contribute
+    // still has to be told the round exists before it can answer.
+    //
+    // The window opens before the trees are rebuilt, so kids[] can still name
+    // a PE that left in this rescale. Sending there aborts the job ("Destnode
+    // N out of range N"), and the prompt is advisory in any case -- the kid
+    // starts the round on its own as soon as it has something to contribute.
+    for (int k = 0; k < treeKids(); k++) {
+      if (kids[k] < 0 || kids[k] >= CkNumPes()) continue;
+      thisProxy[kids[k]].ReductionStarting(new CkReductionNumberMsg(red_no));
+    }
+    return;
+  }
+#endif
   std::unordered_map<int, int>::iterator it;
   for (it = inactiveList.begin(); it != inactiveList.end(); it++) {
     if (it->second <= red_no) {
@@ -679,7 +884,26 @@ void CkReductionMgr::finishReduction(void)
          }
   }
 
-  if (nRemote<treeKids()) {
+  bool remoteReady = (nRemote >= treeKids());
+#if CMK_SHRINK_EXPAND
+  if (postRescaleRound) {
+    // Across a rescale cut, nRemote counts OLD-tree messages while treeKids()
+    // is the NEW tree, so the count comparison can pass with a surviving
+    // kid's contribution still in flight. Require every current kid to have
+    // actually reported (or to have declared itself inactive for this round).
+    remoteReady = true;
+    for (int k = 0; k < treeKids(); k++) {
+      const int kid = kids[k];
+      if (kidsSeen.count(kid)) continue;
+      auto it = inactiveList.find(kid);
+      if (it != inactiveList.end() && it->second <= redNo) continue;
+      DEBR((AA "post-rescale round: kid %d has not reported yet\n" AB, kid));
+      remoteReady = false;
+      break;
+    }
+  }
+#endif
+  if (!remoteReady) {
     if (msgs.length() > 1 && CkReduction::reducerTable()[msgs.peek()->reducer].streamable) {
       partialReduction = true;
     }
@@ -690,9 +914,19 @@ void CkReductionMgr::finishReduction(void)
   }
 	
  
+  REDN_TRACE("[%d] CLOSING redNo=%d nContrib=%d lcount=%d nRemote=%d kids=%d "
+             "inactive=%d group=%d\n", CkMyPe(), redNo, nContrib, lcount,
+             nRemote, treeKids(), (int)inactiveList.size(),
+             (int)thisgroup.idx);
   DEBR((AA "Reducing data... %d %d\n" AB,nContrib,(lcount+adj(redNo).lcount)));
   CkReductionMsg *result=reduceMessages(msgs);
   result->fromPE = CkMyPe();
+#if CMK_SHRINK_EXPAND
+  {
+    extern int _rescaleGeneration;
+    result->worldGen = _rescaleGeneration;
+  }
+#endif
   result->redNo=redNo;
   DEBR((AA "Reduced gcount=%d; sourceFlag=%d\n" AB,result->gcount,result->sourceFlag));
 
@@ -712,6 +946,32 @@ void CkReductionMgr::finishReduction(void)
   {//We are root-- pass data to client
     DEBR((AA "Final gcount is %d+%d+%d.\n" AB,result->gcount,gcount,adj(redNo).gcount));
     int totalElements=result->gcount+gcount+adj(redNo).gcount;
+#if CMK_SHRINK_EXPAND
+    // First round after a rescale: the era-mixed gcount total is unreliable
+    // (see rebaseCountersForRescale). Every current-tree child subtree has
+    // reported (we are past the nRemote<treeKids gate) and all locals are in,
+    // so every element's data is present regardless of what totalElements
+    // computes to. Complete on that structural fact rather than waiting for
+    // migrants that already contributed under the old world.
+    // Only when this round actually carries a pre-rescale message. Truncating
+    // on every first post-rescale round instead was unsound: an element
+    // migrating during the round (evacuation before a shrink, the populate
+    // round after an expand) is counted in neither PE's locals, so the
+    // shortfall looks identical to era-mixed noise -- the round completed
+    // without it and its contribution then arrived at a closed round
+    // ("Recv'd late remote contribution!", roughly one expansion in three).
+    // With no old-world message in the round the counts are consistent, and
+    // the ordinary test below correctly waits for the migrant.
+    if (postRescaleRound && eraMixedRound && totalElements != result->nSources())
+    {
+      DEBR((AA "post-rescale round: accepting %d sources over era-mixed count %d\n" AB,
+            result->nSources(), totalElements));
+      DEBR((AA "post-rescale round %d completed on structural predicate "
+            "(%d sources, era-mixed count %d)\n" AB, redNo, result->nSources(),
+            totalElements));
+      totalElements = result->nSources();
+    }
+#endif
     if (totalElements>result->nSources()) 
     {
       DEBR((AA "Only got %d of %d contributions (c'mon, migrators!)\n" AB,result->nSources(),totalElements));
@@ -741,6 +1001,11 @@ void CkReductionMgr::finishReduction(void)
   //Shift the count adjustment vector down one slot (to match new redNo)
   int i;
   completedRedNo++;
+#if CMK_SHRINK_EXPAND
+  postRescaleRound = false;  // the post-rescale round has now completed
+  eraMixedRound = false;     // as kidsSeen, this is per round
+  kidsSeen.clear();          // arrivals tracked per round
+#endif
   adjVec.erase(adjVec.begin());
 
   inProgress=false;
@@ -775,6 +1040,45 @@ void CkReductionMgr::finishReduction(void)
 //Sent up the reduction tree with reduced data
   void CkReductionMgr::RecvMsg(CkReductionMsg *m)
 {
+#if CMK_SHRINK_EXPAND
+  {
+    extern int _rescaleGeneration;
+    if (m->worldGen != _rescaleGeneration)
+    {
+      if (m->worldGen == _rescaleGeneration - 1)
+      {
+        // Built one rescale ago: its fromPE uses the previous numbering (an
+        // interior-hole shrink renumbers every PE above the hole). Translate
+        // through the old->new survivor mapping so the per-kid completion
+        // gate matches the sender's promoted identity; a doomed sender maps
+        // to -1, which no gate consults. Without this the gate can pass
+        // without the flushed subtree (a silently partial reduction) and the
+        // late replay then aborts ("Recv'd late remote contribution!").
+        if (m->fromPE >= 0) m->fromPE = CmiRescaleOldPeToNew(m->fromPE);
+        m->worldGen = _rescaleGeneration;
+        // This round now has an old-world subtree count in it, which is what
+        // makes the count arithmetic below untrustworthy. Nothing else does.
+        eraMixedRound = true;
+      }
+      else
+      {
+        // Two or more generations old: no valid translation exists.
+        CmiPrintf("[%d] Rescale: dropping reduction msg from generation %d "
+                  "(now %d)\n", CkMyPe(), m->worldGen, _rescaleGeneration);
+        delete m;
+        return;
+      }
+    }
+  }
+  if (doomedPassThrough && hasParent())
+  {
+    // Departing PE after its exit flush: relay unmerged, preserving fromPE.
+    // A chain of doomed PEs composes hop by hop -- each relays to its own
+    // parent while the exit pump keeps delivering.
+    thisProxy[treeParent()].RecvMsg(m);
+    return;
+  }
+#endif
   if (isPresent(m->redNo)) { //Is a regular, in-order reduction message
     DEBR((AA "Recv'd remote contribution %d for #%d\n" AB,nRemote,m->redNo));
     // If the remote contribution is real, then check whether we can remove the
@@ -785,6 +1089,9 @@ void CkReductionMgr::finishReduction(void)
     startReduction(m->redNo, CkMyPe());
     msgs.enq(m);
     nRemote++;
+#if CMK_SHRINK_EXPAND
+    kidsSeen.insert(m->fromPE);  // per-kid arrival, for the rescale gate
+#endif
     finishReduction();
   }
   else if (isFuture(m->redNo)) {
@@ -792,6 +1099,22 @@ void CkReductionMgr::finishReduction(void)
     futureRemoteMsgs.enq(m);
   }
   else {
+#if CMK_SHRINK_EXPAND
+    {
+      // Say what was lost before dying. Without this the abort names only
+      // itself, and every diagnosis of it starts by adding this line back.
+      extern int _rescaleGeneration;
+      fprintf(stderr,
+              "[%d] late contribution to a closed round: message redNo=%d "
+              "fromPE=%d nSources=%d worldGen=%d; this manager is at redNo=%d "
+              "(completed %d, nContrib=%d nRemote=%d lcount=%d gcount=%d "
+              "parent=%d kids=%d) in generation %d, group %d\n",
+              CkMyPe(), m->redNo, m->fromPE, m->nSources(), m->worldGen, redNo,
+              completedRedNo, nContrib, nRemote, lcount, gcount, treeParent(),
+              treeKids(), _rescaleGeneration, (int)thisgroup.idx);
+      fflush(stderr);
+    }
+#endif
     CkAbort("Recv'd late remote contribution!\n");
   }
 }
@@ -1200,6 +1523,15 @@ CkReductionMsg *CkReductionMsg::buildNew(int NdataSize,const void *srcData,
   ret->sourceFlag=std::numeric_limits<int>::min();
   ret->gcount=0;
   ret->migratableContributor = true;
+  ret->fromPE = -1;  // meaningful only on tree-forwarded messages (finishReduction stamps it)
+#if CMK_SHRINK_EXPAND
+  {
+    extern int _rescaleGeneration;
+    ret->worldGen = _rescaleGeneration;
+  }
+#else
+  ret->worldGen = 0;
+#endif
   return ret;
 }
 
@@ -2095,7 +2427,7 @@ void CkNodeReductionMgr::flushStates()
 }
 
 #if CMK_SHRINK_EXPAND
-void CkNodeReductionMgr::resetForRescale()
+void CkNodeReductionMgr::resetReductionForRescale()
 {
   flushStates();
   if (CkMyRank() == 0) {
@@ -2169,7 +2501,10 @@ void CkNodeReductionMgr::doRecvMsg(CkReductionMsg *m){
 	    	   // DEBR((AA "Recv'd early remote contribution %d for #%d\n" AB,nRemote,m->redNo));
 		    futureRemoteMsgs.enq(m);
 	    }else{
-		   CkPrintf("BIG Problem Present %d Mesg RedNo %d \n",redNo,m->redNo);	
+		   fprintf(stderr, "[%d] LATE(nodegroup) msg redNo=%d | mgr redNo=%d "
+			   "nodegroup=%d\n", CkMyPe(), m->redNo, redNo,
+			   (int)thisgroup.idx);
+		   fflush(stderr);
 		   CkAbort("Recv'd late remote contribution!\n");
 	    }
 	}
@@ -2265,6 +2600,8 @@ void CkNodeReductionMgr::LateMigrantMsg(CkReductionMsg *m){
 
 /** check if the nodegroup reduction is finished at this node. In that case send it
 up the reduction tree **/
+
+void CkNodeReductionMgr::driveCompletionAfterRescale() { finishReduction(); }
 
 void CkNodeReductionMgr::finishReduction(void)
 {
@@ -2534,5 +2871,47 @@ void CkNodeReductionMgr::pup(PUP::er &p)
   }
 
 }
+
+#if CMK_SHRINK_EXPAND
+// Called from the restore tail (CkRecvGroupROData) once buffered messages have
+// drained. Re-drives every reduction manager whose in-progress round became
+// completable when the tree was rebuilt with fewer kids -- see
+// CkReductionMgr::driveCompletionAfterRescale.
+// Departing-PE hook, invoked by reconverse's ConverseCleanup (through
+// CmiRescaleDoomedFlushFn) before the exit flush loop: every reduction
+// manager on this doomed PE forwards its held state upward while the
+// transport still includes everyone. The forwarded sends are counted, so the
+// flush loop drains them like any other message.
+extern "C" void CkRescaleFlushDoomedReductions(void)
+{
+  int numGroups = CkpvAccess(_groupIDTable)->size();
+  for (int i = 0; i < numGroups; i++) {
+    CkGroupID gID = (*CkpvAccess(_groupIDTable))[i];
+    IrrGroup *obj = CkpvAccess(_groupTable)->find(gID).getObj();
+    if (obj && obj->isReductionMgr())
+      ((CkReductionMgr *)obj)->flushForDoomedExit();
+  }
+}
+
+void CkDriveReductionsAfterRescale(void)
+{
+  int numGroups = CkpvAccess(_groupIDTable)->size();
+  for (int i = 0; i < numGroups; i++) {
+    CkGroupID gID = (*CkpvAccess(_groupIDTable))[i];
+    IrrGroup *obj = CkpvAccess(_groupTable)->find(gID).getObj();
+    if (obj && obj->isReductionMgr())
+      ((CkReductionMgr *)obj)->driveCompletionAfterRescale();
+  }
+  if (CkMyRank() == 0) {
+    int numNodeGroups = CksvAccess(_nodeGroupIDTable).size();
+    for (int i = 0; i < numNodeGroups; i++) {
+      CkGroupID gID = CksvAccess(_nodeGroupIDTable)[i];
+      IrrGroup *obj = CksvAccess(_nodeGroupTable)->find(gID).getObj();
+      if (obj && obj->isNodeGroup())
+        ((CkNodeReductionMgr *)obj)->driveCompletionAfterRescale();
+    }
+  }
+}
+#endif
 
 #include "CkReduction.def.h"
