@@ -244,6 +244,11 @@ file(WRITE ${CMAKE_BINARY_DIR}/include/topomanager_config.h "// empty\n" )
 
 add_library(charm_cxx_utils STATIC
     ${conv-util-cxx-sources})
+# spanningTree.C includes charm++.h -> ckmarshall.h -> CkMarshall.decl.h, a
+# charmxi-generated header; without this target-level dependency the compile
+# races the generation and a fresh -j build can lose (found deterministically
+# on a clean tree).
+add_dependencies(charm_cxx_utils ci-generated)
 
 
 add_library(topomanager STATIC
