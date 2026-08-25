@@ -11,8 +11,12 @@ endif()
 
 set(CMK_MACHINE_NAME \"${CHARM_PLATFORM}\")
 
-set(CMK_CCS_AVAILABLE 0)
+set(CMK_CCS_AVAILABLE 1)
 if(${NETWORK} STREQUAL "pami" OR ${NETWORK} STREQUAL "pamilrts")
+  set(CMK_CCS_AVAILABLE 0)
+endif()
+if(RECONVERSE)
+  # CCS is not ported to reconverse yet.
   set(CMK_CCS_AVAILABLE 0)
 endif()
 
@@ -155,6 +159,9 @@ list(REMOVE_ITEM _variableNames CMK_OPTIMIZE)
 
 set(optfile ${CMAKE_BINARY_DIR}/include/conv-autoconfig.h)
 file(REMOVE ${optfile})
+# Include guard: this generated file is re-included transitively; without a
+# guard a mid-TU re-inclusion replays raw values over arch-header overrides.
+file(APPEND ${optfile} "#ifndef CONV_AUTOCONFIG_H\n#define CONV_AUTOCONFIG_H\n")
 
 foreach (v ${_variableNames})
     if(("${v}" MATCHES "^CMK_"  OR "${v}" MATCHES "^SIZEOF_" OR "${v}" MATCHES "^CHARM_" OR "${v}" MATCHES "^QLOGIC$") AND NOT "${v}" MATCHES "_CODE$" AND NOT "${v}" MATCHES "^CMK_LUSTREAPI")
@@ -174,3 +181,4 @@ foreach (v ${_variableNames})
         endif()
     endif()
 endforeach()
+file(APPEND ${optfile} "#endif /* CONV_AUTOCONFIG_H */\n")

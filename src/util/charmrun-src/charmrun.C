@@ -1,4 +1,4 @@
-#include "conv-autoconfig.h"
+#include "conv-autoconfig.h" /* guarded; safe to include early on both runtimes */
 #include "conv-mach.h"
 #include "converse.h"
 

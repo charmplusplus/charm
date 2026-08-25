@@ -72,7 +72,7 @@ class bar {
 #ifndef CHARM_H
 #  include "converse.h" // <- for CMK_* defines
 #include "charm-config.h"
-#include "conv-autoconfig.h"
+#include "conv-autoconfig.h" /* guarded; safe to include early on both runtimes */
 #endif
 #endif
 

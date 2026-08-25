@@ -8,7 +8,7 @@
 #include "charm-config.h"
 #include "conv-mach-opt.h" /* defines CMK_OPTIMIZE (and CMK_CUDA) before converse.h */
 #include "converse.h"
-#include "conv-autoconfig.h"
+#include "conv-autoconfig.h" /* guarded; safe to include early on both runtimes */
 #include <sys/types.h> /* for size_t */
 
 #ifdef __cplusplus

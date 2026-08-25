@@ -899,7 +899,14 @@ if(CMK_COMPILER STREQUAL "msvc")
 endif()
 
 # Header files
-if(EXISTS src/arch/${GDIR}/conv-common.h)
+if(NOT RECONVERSE)
+  # Boundary headers shared with reconverse builds include "charm-config.h"
+  # (reconverse's build-config header). Classic builds alias it to the
+  # conv-config chain so those headers work unchanged on both runtimes.
+  file(WRITE ${CMAKE_BINARY_DIR}/include/charm-config.h
+       "/* classic builds: charm-config.h aliases the conv-config chain */\n#include \"conv-config.h\"\n")
+endif()
+if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/conv-common.h)
   configure_file(src/arch/${GDIR}/conv-common.h                include/ COPYONLY)
 endif()
 if(EXISTS src/arch/${GDIR}/conv-common.sh)
@@ -997,9 +1004,9 @@ include(cmake/hwloc.cmake)
 include(cmake/converse.cmake)
 if(NOT RECONVERSE)
   add_subdirectory(src/QuickThreads)
+  add_subdirectory(src/util/boost-context)
+  add_subdirectory(src/conv-core)
 endif()
-# add_subdirectory(src/util/boost-context)
-# add_subdirectory(src/conv-core)
 
 # LIBS
 if(${TARGET} STREQUAL "LIBS")
@@ -1073,8 +1080,8 @@ endforeach()
 configure_file(src/libs/ck-libs/NDMeshStreamer/libmoduleNDMeshStreamer.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
 
 
-# TCharm
-#[[
+# TCharm (not yet ported to reconverse builds)
+if(NOT RECONVERSE)
 file(GLOB tcharm-c-sources src/libs/ck-libs/tcharm/*.c)
 set(tcharm-h-sources
     src/libs/ck-libs/tcharm/tcharm.h
@@ -1102,7 +1109,7 @@ endforeach(f)
 add_dependencies(moduletcharmmain ck)
 add_dependencies(moduletcharm ck)
 add_dependencies(tcharm-compat ck)
-]]
+endif()
 
 if(${TARGET} STREQUAL "AMPI" OR (${TARGET} STREQUAL "LIBS" AND NOT BUILD_CHANGA))
   add_subdirectory(src/libs/ck-libs/ampi)
@@ -1199,7 +1206,8 @@ foreach(l BUILDOPTS CMK_AMPI_WITH_ROMIO CMK_BUILD_PYTHON CMK_CAN_LINK_FORTRAN
         CXX_NO_AS_NEEDED LDXX_WHOLE_ARCHIVE_PRE LDXX_WHOLE_ARCHIVE_POST
         CMK_MACOSX CMK_POST_EXE CMK_SHARED_SUF CMK_USER_SUFFIX OPTS_LD
         CMK_COMPILER_KNOWS_FVISIBILITY CMK_LINKER_KNOWS_UNDEFINED
-        CMK_SUPPORTS_MEMORY_ISOMALLOC CUDA_DIR HIP_DIR CMK_USER_DISABLED_TLS CMK_CXI)
+        CMK_SUPPORTS_MEMORY_ISOMALLOC CUDA_DIR HIP_DIR CMK_USER_DISABLED_TLS CMK_CXI
+        CMK_RECONVERSE)
     file(APPEND ${optfile_sh} "${l}=\"${${l}}\"\n" )
 endforeach(l)
 

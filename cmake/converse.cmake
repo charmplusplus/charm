@@ -139,37 +139,57 @@ set(conv-util-h-sources
     src/util/cmirdmautils.h
 )
 
-set(conv-util-cxx-sources
-    ${CMAKE_BINARY_DIR}/include/commitid.C
-    #src/arch/util/mempool.C
-    src/arch/util/persist-comm.C
-    src/util/cmirdmautils.C
-    src/util/crc32.C
-    #src/util/sockRoutines.C
-    src/util/ckdll.C
-    src/util/ckhashtable.C
-    src/util/ckimage.C
-    src/util/conv-lists.C
-    src/util/hilbert.C
-    src/util/partitioning_strategies.C
-    src/util/pup_c.C
-    src/util/pup_cmialloc.C
-    src/util/pup_paged.C
-    src/util/pup_toNetwork.C
-    src/util/pup_toNetwork4.C
-    src/util/pup_util.C
-    src/util/pup_xlater.C
-    src/util/topomanager/TopoManager.C
-    src/util/spanningTree.C
-    ${conv-perf-cxx-sources}
-)
-
 if(RECONVERSE)
-    # Reconverse implements persistent communication itself, on top of its own
-    # comm backend, so the legacy machine-layer implementation has nothing to
-    # sit on: it needs machine-persistent.h from src/arch/<layer>, and its
-    # entry points would collide with the ones in libreconverse.
-    list(REMOVE_ITEM conv-util-cxx-sources src/arch/util/persist-comm.C)
+  # Reconverse builds: no mempool/sockRoutines (machine-layer helpers the
+  # reconverse comm backend replaces) and no persist-comm (reconverse
+  # implements persistent communication itself; the legacy machine-layer
+  # implementation needs machine-persistent.h and would collide with
+  # libreconverse's entry points). conv-perf and TopoManager ride along here
+  # because there is no classic converse library to hold them.
+  set(conv-util-cxx-sources
+      ${CMAKE_BINARY_DIR}/include/commitid.C
+      src/util/cmirdmautils.C
+      src/util/crc32.C
+      src/util/ckdll.C
+      src/util/ckhashtable.C
+      src/util/ckimage.C
+      src/util/conv-lists.C
+      src/util/hilbert.C
+      src/util/partitioning_strategies.C
+      src/util/pup_c.C
+      src/util/pup_cmialloc.C
+      src/util/pup_paged.C
+      src/util/pup_toNetwork.C
+      src/util/pup_toNetwork4.C
+      src/util/pup_util.C
+      src/util/pup_xlater.C
+      src/util/topomanager/TopoManager.C
+      src/util/spanningTree.C
+      ${conv-perf-cxx-sources}
+  )
+else()
+  # Classic builds: exactly mainline's list; these compile into libconverse.
+  set(conv-util-cxx-sources
+      src/arch/util/mempool.C
+      src/arch/util/persist-comm.C
+      src/util/cmirdmautils.C
+      src/util/crc32.C
+      src/util/sockRoutines.C
+      src/util/ckdll.C
+      src/util/ckhashtable.C
+      src/util/ckimage.C
+      src/util/conv-lists.C
+      src/util/hilbert.C
+      src/util/partitioning_strategies.C
+      src/util/pup_c.C
+      src/util/pup_cmialloc.C
+      src/util/pup_paged.C
+      src/util/pup_toNetwork.C
+      src/util/pup_toNetwork4.C
+      src/util/pup_util.C
+      src/util/pup_xlater.C
+      src/util/spanningTree.C
+  )
 endif()
 
 #Uncommenting spanning tree to satisfy ckrdma dep errors
@@ -204,13 +224,16 @@ set(conv-ldb-h-sources
     src/conv-ldb/topology.h
 )
 
-#add_library(ldb-none reconverse/src/cldb.none.C ${conv-ldb-h-sources})
-#add_library(ldb-test src/conv-ldb/cldb.test.C ${conv-ldb-h-sources})
-#add_library(ldb-rand reconverse/src/cl ${conv-ldb-h-sources})
-#add_library(ldb-neighbor src/conv-ldb/cldb.neighbor.C src/conv-ldb/cldb.neighbor.h ${conv-ldb-h-sources})
-#add_library(ldb-workstealing src/conv-ldb/cldb.workstealing.C src/conv-ldb/cldb.workstealing.h ${conv-ldb-h-sources})
-#add_library(ldb-spray src/conv-ldb/cldb.spray.C ${conv-ldb-h-sources})
-# add_library(ldb-prioritycentralized src/conv-ldb/cldb.prioritycentralized.C src/conv-ldb/cldb.prioritycentralized.h ${conv-ldb-h-sources})
+# Converse-level seed balancers: classic only (reconverse has its own
+# scheduler and no cldb layer).
+if(NOT RECONVERSE)
+  add_library(ldb-none src/conv-ldb/cldb.none.C ${conv-ldb-h-sources})
+  add_library(ldb-test src/conv-ldb/cldb.test.C ${conv-ldb-h-sources})
+  add_library(ldb-rand src/conv-ldb/cldb.rand.C ${conv-ldb-h-sources})
+  add_library(ldb-neighbor src/conv-ldb/cldb.neighbor.C src/conv-ldb/cldb.neighbor.h ${conv-ldb-h-sources})
+  add_library(ldb-workstealing src/conv-ldb/cldb.workstealing.C src/conv-ldb/cldb.workstealing.h ${conv-ldb-h-sources})
+  add_library(ldb-spray src/conv-ldb/cldb.spray.C ${conv-ldb-h-sources})
+endif()
 
 # TopoManager
 set(tmgr-c-sources src/util/topomanager/CrayNid.c)
@@ -242,34 +265,53 @@ file(WRITE ${CMAKE_BINARY_DIR}/include/topomanager_config.h "// empty\n" )
 # )
 # add_dependencies(converse hwloc)
 
-add_library(charm_cxx_utils STATIC
-    ${conv-util-cxx-sources})
-# spanningTree.C includes charm++.h -> ckmarshall.h -> CkMarshall.decl.h, a
-# charmxi-generated header; without this target-level dependency the compile
-# races the generation and a fresh -j build can lose (found deterministically
-# on a clean tree).
-add_dependencies(charm_cxx_utils ci-generated)
+if(RECONVERSE)
+  # The converse layer itself is libreconverse (external); charm's
+  # converse-adjacent utility sources build as helper libraries, and
+  # `converse` is an aggregation target for dependency purposes.
+  add_library(charm_cxx_utils STATIC
+      ${conv-util-cxx-sources})
+  # spanningTree.C includes charm++.h -> ckmarshall.h -> CkMarshall.decl.h, a
+  # charmxi-generated header; without this target-level dependency the compile
+  # races the generation and a fresh -j build can lose (found deterministically
+  # on a clean tree).
+  add_dependencies(charm_cxx_utils ci-generated)
 
+  add_library(topomanager STATIC
+      ${tmgr-cxx-sources}
+      ${tmgr-h-sources}
+  )
+  target_include_directories(topomanager PUBLIC
+      src/util/topomanager
+      ${CMAKE_BINARY_DIR}/include)
 
-add_library(topomanager STATIC
-    ${tmgr-cxx-sources}
-    ${tmgr-h-sources}
-)
-
-target_include_directories(topomanager PUBLIC
-    src/util/topomanager
-    ${CMAKE_BINARY_DIR}/include)
-
-# add_library(converse INTERFACE)
-# target_link_libraries(converse INTERFACE
-#     reconverse
-#     topomanager
-#     charm_cxx_utils
-# )
-add_custom_target(converse)
-add_dependencies(converse reconverse topomanager charm_cxx_utils)
-
-#file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/comm_backend)
+  add_custom_target(converse)
+  add_dependencies(converse reconverse topomanager charm_cxx_utils)
+else()
+  # Classic builds: the converse library, exactly as mainline builds it.
+  add_library(converse
+      ${CMAKE_BINARY_DIR}/include/commitid.C
+      ${conv-core-cxx-sources}
+      ${conv-core-h-sources}
+      ${conv-ccs-h-sources}
+      ${conv-ccs-cxx-sources}
+      ${conv-perf-cxx-sources}
+      ${conv-perf-h-sources}
+      ${conv-util-c-sources}
+      ${conv-util-cxx-sources}
+      ${conv-util-h-sources}
+      ${conv-partition-cxx-sources}
+      ${conv-ldb-cxx-sources}
+      ${conv-ldb-h-sources}
+      src/arch/${GDIR}/machine.C
+      ${tmgr-c-sources}
+      ${tmgr-cxx-sources}
+      ${tmgr-h-sources}
+      ${hwloc-objects}
+      ${all-ci-outputs}
+  )
+  add_dependencies(converse hwloc)
+endif()
 
 foreach (filename
         ${conv-ldb-h-sources}
@@ -279,6 +321,12 @@ foreach (filename
 endforeach()
 
 set(conv-core-h-to-install ${conv-core-h-sources})
+if(NOT RECONVERSE)
+    # Classic builds install the classic converse.h; reconverse builds get
+    # reconverse's own (installed by cmake/fetch_reconverse), which must not
+    # be shadowed.
+    list(APPEND conv-core-h-to-install src/conv-core/converse.h)
+endif()
 if(RECONVERSE)
     # Reconverse provides its own conv-rdma.h, which is the authority on the
     # RDMA configuration (CMK_REG_REQUIRED, CMK_NOCOPY_DIRECT_BYTES) and must
@@ -310,15 +358,16 @@ endforeach()
 # target_include_directories(converse PRIVATE src/util) # for sockRoutines.C
 # target_include_directories(converse PRIVATE src/conv-core src/util/topomanager src/ck-ldb src/ck-perf src/ck-cp)
 
-# conv-static: not needed for reconverse builds (reconverse provides its own converse layer)
+# conv-static: not needed for reconverse builds (reconverse provides its own
+# converse layer). Classic side is exactly mainline's.
 if(NOT RECONVERSE)
+  target_include_directories(converse PRIVATE src/arch/util) # for machine*.*
+  target_include_directories(converse PRIVATE src/util) # for sockRoutines.C
+  target_include_directories(converse PRIVATE src/conv-core src/util/topomanager src/ck-ldb src/ck-perf src/ck-cp)
+
   add_library(conv-static OBJECT src/conv-core/conv-static.c)
-  # (was add_dependencies(reconverse ...) -- that target only exists in
-  # reconverse builds, which never reach this branch; classic hangs the
-  # dependency off the converse target as mainline does, #3941)
   add_dependencies(converse conv-static)
-  add_dependencies(charm_cxx_utils conv-static)
-  add_custom_command(TARGET charm_cxx_utils
+  add_custom_command(TARGET converse
       POST_BUILD
       COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/conv-static.dir/src/conv-core/conv-static.c.o ${CMAKE_BINARY_DIR}/lib/conv-static.o
       VERBATIM
