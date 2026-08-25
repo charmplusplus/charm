@@ -58,7 +58,13 @@ void pup_bar(pup_er p,bar *b)
 */
 
 #include "charm-config.h"
+#if CMK_RECONVERSE
+/* reconverse's converse.h supplies the CMK_ flags and the CmiFopen/CmiFclose/
+ * CmiMkdir declarations pup uses there. Classic must NOT include converse.h
+ * here: pup_c.h is consumed by AMPI's function-renaming machinery (ampi.h),
+ * which conflicts with classic converse.h's declarations. */
 #include "converse.h"
+#endif
 #include <stddef.h>
 
 #ifdef __cplusplus
