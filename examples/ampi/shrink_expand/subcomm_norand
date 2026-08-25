@@ -1,0 +1,13 @@
+#!/bin/bash
+# Launch subcomm with address-space randomization off.
+#
+# Migrating an AMPI rank moves its stack, and that stack holds return addresses
+# into the program's own code. Isomalloc guarantees the stack lands at the same
+# virtual address in the destination process; it has no say over where the
+# loader put the code. With randomization on, the two processes disagree and a
+# migrated rank resumes into whatever happens to be mapped there.
+#
+# The launcher cannot do this for us: ranks are started through ssh, so they do
+# not inherit the launcher's personality.
+d="$(cd "$(dirname "$0")" && pwd)"
+exec setarch "$(uname -m)" -R "$d/subcomm" "$@"

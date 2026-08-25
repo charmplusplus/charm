@@ -362,6 +362,112 @@ skipping it is not a workaround for a missing wait -- there is nothing to wait
 for. The other two erases are the running thread's own objects and cannot be
 absent.
 
+### R13. A non-blocking collective resumed a thread waiting on a different one (FIXED 2026-08-25)
+
+Not a rescale bug at all — it reproduces on one process with no rescale in
+sight — but it was found while building the test for the one gap R3 names, and
+it would have made that test meaningless.
+
+`ampi::irednResult`, the completion path for `MPI_Iallreduce` and friends,
+ended with
+
+```c
+if (parent->resumeOnColl && parent->numBlockedReqs==0) thread->resume();
+```
+
+`resumeOnColl` means two different things. A thread parked inside a *blocking*
+collective sets it and leaves `numBlockedReqs` at zero, tracking its own
+request in `parent->blockingReq` instead. A thread parked in `MPI_Wait` on a
+non-blocking collective sets it too, with `numBlockedReqs` at one. The test
+above cannot tell them apart, so any unrelated non-blocking collective that
+finished while a thread sat in a blocking one woke it early. The blocking call
+then returned with its output buffer never written — silently, and with a
+plausible-looking zero in it.
+
+The same line has the opposite failure next to it. `MPI_Waitall` blocks
+through `blockOnRecv`, which sets `resumeOnRecv`, not `resumeOnColl` — so the
+test never fired for it and a `Waitall` on non-blocking collectives hung.
+`MPI_Wait` escaped only because `RednReq::wait` happens to route through
+`blockOnColl`.
+
+Isolated with a four-mode probe: blocking-only, blocking-then-blocking, and
+non-blocking-waited-immediately all passed; only a non-blocking collective left
+outstanding across a blocking one failed.
+
+Fixed by resuming when the thread is waiting on requests under *either* flag
+and is not parked in a blocking collective of its own, which `blockingReq`
+distinguishes. All four probe modes pass afterwards.
+
+### R14. A late placeholder contribution was fatal (FIXED 2026-08-25)
+
+Found by `examples/ampi/shrink_expand/subcomm.c`, which runs four reduction
+trees per iteration instead of one. Two runs in two failed at the third
+rescale with `Recv'd late remote contribution!`, and the diagnostic named it:
+
+```
+message redNo=25530 fromPE=4 nSources=0 worldGen=3;
+this manager is at redNo=25531 (completed 25530, ... lcount=0 gcount=1
+parent=-1 kids=4) in generation 3, group 41
+```
+
+`nSources=0`. `ckreduction.h` defines `sourceFlag == 0` as "a placeholder
+message (meaning: nothing to report)" -- it carries no contribution at all.
+The R6b settling window makes every barren PE send one of these per round in
+place of declaring itself inactive, and closing the window does not recall the
+ones already in flight, so one can arrive after its round has completed.
+
+Aborting on it was wrong: it carried no data, the round completed without
+needing it, and an empty message never touches the inactive list either.
+`RecvMsg` now drops a late placeholder and still aborts for a late message
+that actually carries sources -- which would genuinely mean a round closed
+while data was outstanding.
+
+Why several trees make it near-certain where one made it rare: each
+communicator is its own manager with its own barren PEs, so the number of
+placeholders in flight when the window closes scales with the number of trees.
+
+### R15. The counter rebase dropped elements in flight (FIXED 2026-08-25)
+
+The failure R6 predicted, arriving by a different route than R6 describes: not
+early release, but hold-boundary mode with several reduction trees. Roughly
+two runs in three ended at an expand with `ERROR! Too many contributions at
+root!`. Instrumenting the abort gave the whole answer in one line:
+
+```
+6 sources but totalElements=5 (result->gcount=5 + gcount=0 + adj=0);
+postRescale=1 eraMixed=0 lcount=1 nContrib=1 nRemote=3 kids=4 group=46
+```
+
+Six-member communicator, six sources, and a cluster sum of five. The root held
+`lcount=1` with `gcount=0` -- a local contributor its global count did not
+account for.
+
+`rebaseCountersForRescale()` sets `gcount = lcount`. The commentary at the top
+of `ckreduction.C` explains why that cannot be right in general:
+
+> `gcount` is the net birth-death contributor count on this PE. When a
+> contributor migrates away, `gcount` stays the same... We need a separate
+> `gcount` because for a short time, a migrant [is in neither PE's `lcount`].
+
+So `gcount = lcount` holds only when nothing is in flight, and at a rescale
+something usually is. An element between two PEs at that instant is in
+nobody's `lcount` and is dropped from the cluster sum permanently; every later
+round then finds one more source than the count allows.
+
+That is also why it looked like an early-release-only bug. With a single tree
+the era-mixed override happened to mask it; with four trees there is always
+some tree whose first post-rescale round is not era-mixed.
+
+Fixed by repairing rather than tolerating. When the root can first *measure*
+the truth -- every child subtree reported, all locals in -- the difference
+between the sources that arrived and the count is exactly what the rebase
+dropped, so it is added back to the root's own `gcount`, the only one that is
+summed. One repair per rebase, the licence cleared by the round that measures
+it, and the abort still fires for any mismatch a rebase does not explain.
+
+Not reproduced in 8 further attempts, having reproduced on the first attempt
+before.
+
 ## Residual failures on long chains (2026-08-25, OPEN)
 
 With R2b, R6b, R7, R8, R10 and the R9 requirement understood, campaigns pass

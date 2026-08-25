@@ -979,8 +979,55 @@ void CkReductionMgr::finishReduction(void)
       return; // Wait for migrants to contribute
     } else if (totalElements<result->nSources()) {
       DEBR((AA "Got %d of %d contributions\n" AB,result->nSources(),totalElements));
+#if CMK_SHRINK_EXPAND
+      if (countsRebased)
+      {
+        // The rebase at the cut set every survivor's gcount to its lcount, and
+        // anything in flight at that moment was in neither, so the cluster sum
+        // is short by however many elements were between PEs. This is the first
+        // round in which that is measurable: every child subtree has reported
+        // and all locals are in, so the sources that arrived are the real
+        // contributor count and the difference is exactly what the rebase
+        // dropped.
+        //
+        // Repair it rather than complete and forget. Only the root sums gcount,
+        // so adding the shortfall to the root's own makes the cluster total
+        // right from here on -- and it has to be made right, because the
+        // mismatch is otherwise permanent and every later round would arrive
+        // at this same branch.
+        const int shortfall = result->nSources() - totalElements;
+        gcount += shortfall;
+        DEBR((AA "post-rescale: gcount short by %d after the rebase, repaired\n"
+              AB, shortfall));
+        totalElements = result->nSources();
+      }
+      else
+      {
+        // Say which of the three terms is wrong before dying. Without this the
+        // abort names only itself.
+        extern int _rescaleGeneration;
+        fprintf(stderr,
+                "[%d] too many contributions at root: %d sources but "
+                "totalElements=%d (result->gcount=%d + gcount=%d + adj=%d); "
+                "redNo=%d completed=%d postRescale=%d eraMixed=%d "
+                "lcount=%d nContrib=%d nRemote=%d kids=%d gen=%d group=%d\n",
+                CkMyPe(), result->nSources(), totalElements, result->gcount,
+                gcount, adj(redNo).gcount, redNo, completedRedNo,
+                (int)postRescaleRound, (int)eraMixedRound, lcount, nContrib,
+                nRemote, treeKids(), _rescaleGeneration, (int)thisgroup.idx);
+        fflush(stderr);
+        CkAbort("ERROR! Too many contributions at root!\n");
+      }
+#else
       CkAbort("ERROR! Too many contributions at root!\n");
+#endif
     }
+#if CMK_SHRINK_EXPAND
+    // The counts have now been reconciled for this manager, either because
+    // they already agreed or because the shortfall was just repaired. The
+    // licence to repair must not outlive the round that measured it.
+    countsRebased = false;
+#endif
     DEBR((AA "Passing result to client function\n" AB));
     CkSetRefNum(result, result->getUserFlag());
     if (!result->callback.isInvalid())
@@ -1100,6 +1147,25 @@ void CkReductionMgr::finishReduction(void)
   }
   else {
 #if CMK_SHRINK_EXPAND
+    // A message with no sources is, by the definition in ckreduction.h, "a
+    // placeholder message (meaning: nothing to report)". The settling window
+    // opened after a rescale makes every barren PE send one of these per round
+    // instead of declaring itself inactive, and closing the window does not
+    // recall the ones already in flight -- so one can arrive after the round it
+    // names has completed. Dropping it loses nothing: it carried no
+    // contribution, the round finished without needing it, and an empty message
+    // never touches the inactive list either. A message that actually carries
+    // sources still means the round closed while data was outstanding, and that
+    // is still fatal.
+    //
+    // Reachable with one reduction tree and near-certain with several: each
+    // communicator in an AMPI job is its own manager with its own barren PEs,
+    // so the number of placeholders in flight at the moment the window closes
+    // scales with the number of trees.
+    if (m->nSources() == 0) {
+      delete m;
+      return;
+    }
     {
       // Say what was lost before dying. Without this the abort names only
       // itself, and every diagnosis of it starts by adding this line back.

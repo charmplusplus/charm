@@ -5134,7 +5134,24 @@ void ampi::irednResult(CkReductionMsg *msg) noexcept
   }
 #endif
 
-  if (parent->resumeOnColl && parent->numBlockedReqs==0) {
+  /* Resume only if this completion is one the thread is actually waiting for.
+     Two ways to get that wrong, and both were live:
+
+     A thread parked inside a *blocking* collective of its own sets
+     resumeOnColl and leaves numBlockedReqs at zero, so the old test fired for
+     any unrelated non-blocking collective that happened to finish first. It
+     resumed the thread, and the blocking collective returned without ever
+     writing its result. Its own completion arrives at rednResult; that is what
+     should wake it. parent->blockingReq is what distinguishes the two -- it is
+     set only while a blocking collective is outstanding.
+
+     And a thread parked in MPI_Waitall blocks through blockOnRecv, which sets
+     resumeOnRecv rather than resumeOnColl, so the old test never fired for it
+     at all and a Waitall on non-blocking collectives hung. MPI_Wait happened to
+     work only because RednReq::wait goes through blockOnColl instead. */
+  const bool waitingOnRequests =
+      (parent->resumeOnRecv || parent->resumeOnColl) && parent->blockingReq == NULL;
+  if (waitingOnRequests && parent->numBlockedReqs==0) {
     thread->resume();
   }
   // [nokeep] entry method, so do not delete msg

@@ -823,9 +823,23 @@ protected:
 	// Rebase gcount to lcount on each survivor so the sum equals the actual
 	// total local-contributor count. Also drop adjVec — entries were stamped
 	// against the pre-rescale topology and double-count post-rescale.
+	// Set by the rebase, cleared the first time a round completes with counts
+	// that agree. While it is set the root may find more sources than its
+	// count allows, and that is a repairable fact rather than a fatal one --
+	// see the "too many contributions" branch in finishReduction.
+	bool countsRebased = false;
+
 	void rebaseCountersForRescale() {
 	  gcount = lcount;
 	  adjVec.clear();
+	  // gcount is a net *birth* count, deliberately not moved by migration:
+	  // "for a short time, a migrant" is in neither PE's lcount (see the
+	  // commentary at the top of ckreduction.C). So gcount = lcount is only
+	  // equivalent when nothing is in flight, and at a rescale something
+	  // usually is -- an element that has left one PE and not yet arrived at
+	  // the next is dropped from the cluster sum, permanently. The root
+	  // repairs the shortfall the first time it can measure it.
+	  countsRebased = true;
 	  // The root may hold, for the round in flight at the cut, remote messages
 	  // carrying OLD-world subtree gcounts while its own gcount is rebased to
 	  // the new world. Summing the two (finishReduction line ~734) yields a

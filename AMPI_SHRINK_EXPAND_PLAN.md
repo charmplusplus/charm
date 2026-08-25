@@ -497,6 +497,24 @@ The one failing configuration was 6/6 without reordering, which is how
 R12 was identified as an ordering dependency rather than noise. With the
 null guard it is 10/10 with reordering on.
 
+Several reduction trees at once, `subcomm.c`, four trees per iteration on
+communicators of deliberately different membership. Before R14 and R15
+this configuration was 0/2, then 1/3; after them:
+
+| Configuration | Result |
+|---|---|
+| AMPI 6 PE, 24 ranks, overlapped, no reordering | 4/4 |
+| AMPI 6 PE, 24 ranks, overlapped, with reordering | 4/4 |
+| AMPI 6 PE, serialized collectives, with reordering | 3/3 |
+| AMPI 4 PE, 16 ranks, 4-3-2-3-4, with reordering | 3/3 |
+
+Every run above changed membership four times and checked all four
+reductions against their exact analytic values on every iteration.
+
+R14 and R15 are in the reduction manager, which every reduction in the
+runtime goes through, so the single-tree matrix was re-run afterwards as
+a regression: 17/17, unchanged.
+
 (AMPI rows are with default settings, which now means hold-boundary;
 Charm++ rows are with `setarch -R`. Before the A8 work the same AMPI
 rows read 4/5, 3/4 and 2/3, and the Charm++ early-release row 2/5.)
@@ -725,6 +743,14 @@ shared rescale machinery and fix plain Charm++ as much as AMPI. The
 | Hold-boundary is the default with TCharm | `tcharm.C` | `procInit` sets `_rescaleHoldBoundary` unless the user was explicit; a barrier-less cut cannot evacuate a thread parked mid-`MPI_Recv` |
 | Migration arrival restores page protections | `tcharm.C` | `CmiIsomallocContextJustMigrated` ran only on the synchronous path, so a PIEglobals rank arriving asynchronously resumed with its own text mapped read-write. Moved to `ckJustMigrated`, the arrival hook for both paths |
 | `MPI_COMM_SELF` cache prune tolerates a late element (R12) | `ampi.C` | `AMPI_Migrate` pruned the PE cache the moment a rank resumed on a new PE, dereferencing a null `ckLocal()` for an element that had not arrived |
+| A non-blocking collective no longer resumes the wrong thread (R13) | `ampi.C` | `irednResult` resumed on `resumeOnColl && numBlockedReqs==0`. That is also the state of a thread parked in a *blocking* collective of its own, so an unrelated non-blocking collective finishing first woke it and the blocking call returned without its result. The same test never fired for `MPI_Waitall`, which blocks through `blockOnRecv`, so a `Waitall` on non-blocking collectives hung outright |
+
+**Found by running several reduction trees at once** (`subcomm.c`)
+
+| Fix | Where | What went wrong |
+|---|---|---|
+| A late placeholder is dropped, not fatal (R14) | `ckreduction.C` | the settling window makes every barren PE send an empty "nothing to report" message per round, and closing the window does not recall the ones in flight. One arriving after its round closed aborted the job, though by `ckreduction.h`'s own definition it carried nothing |
+| The counter rebase no longer loses elements in flight (R15) | `ckreduction.C/.h` | `rebaseCountersForRescale` sets `gcount = lcount`, but `gcount` exists precisely because a migrating element is in neither PE's `lcount` for a while. Anything in flight at the cut was dropped from the cluster sum permanently, and every later round then found one more source than its count allowed. The root now repairs the shortfall the first time it can measure it |
 
 **Isomalloc and the memory module**
 
@@ -827,11 +853,16 @@ shared rescale machinery and fix plain Charm++ as much as AMPI. The
 
 ### Untested, and most likely to bite next
 
-- **Several reduction trees in flight at once.** R3 says only the first
-  post-rescale round is tolerated. A rank-loop code doing `MPI_Allreduce`
-  on `MPI_COMM_WORLD` *and* on a row communicator in the same iteration
-  is exactly the untested case, and AMPI makes it easy to write. This is
-  the single most likely source of a post-rescale hang.
+- ~~**Several reduction trees in flight at once.**~~ **Tested, and it was
+  worth doing.** `examples/ampi/shrink_expand/subcomm.c` runs four trees
+  per iteration on communicators with deliberately different membership,
+  two of them non-blocking so the rounds overlap. It found three bugs:
+  R13 in AMPI's collective blocking (not rescale-related at all —
+  reproducible on one process), R14 in the settling window, and R15 in
+  the counter rebase. R15 is the one R6 predicted, arriving by a
+  different route than R6 describes: hold-boundary mode, not early
+  release. A single `MPI_COMM_WORLD` reduction had been masking all
+  three.
 - **`MPI_Bcast` immediately after an expand.** AMPI's broadcast goes
   through the array broadcast path, and the newcomer broadcast epoch is
   listed as an untested gap in `RESCALE_KNOWN_ISSUES.md`. AMPI would
