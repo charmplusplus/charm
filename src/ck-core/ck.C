@@ -2739,12 +2739,20 @@ private:
   void flushLog(int verbose=1) {
     if (verbose) CkPrintf("[%d] flushing log\n", CkMyPe());
     fprintf(f, "%s", buffer.data());
+    fflush(f);  // make records survive a killed/hung run (the main use case)
     curpos=0;
   }
   virtual bool process(envelope **envptr,CkCoreState *ck) {
     if ((*envptr)->getEvent()) {
+      // Pack only when a CRC/checksum over the packed bytes is required.
+      // The logged header fields are all valid on an unpacked envelope, and
+      // the pack/unpack round trip swaps the envelope out from under senders
+      // that retain a pointer to it -- CkArrayBroadcaster keeps the broadcast
+      // envelope for multi-element delivery, so packing here segfaulted any
+      // program using array broadcasts under +record (issue #3940).
+      const bool needPacked = _recplay_crc || _recplay_checksum;
       bool wasPacked = (*envptr)->isPacked();
-      if (!wasPacked) CkPackMessage(envptr);
+      if (needPacked && !wasPacked) CkPackMessage(envptr);
       envelope *env = *envptr;
       unsigned int crc1=0, crc2=0;
       if (_recplay_crc) {
@@ -2756,8 +2764,11 @@ private:
         crc2 = checksum_initial(((unsigned char*)env)+sizeof(*env), env->getTotalsize()-sizeof(*env));
       }
       curpos+=snprintf(&buffer[curpos],buffer.size() - curpos,"%d %d %d %d %x %x %d\n",env->getSrcPe(),env->getTotalsize(),env->getEvent(), env->getMsgtype()==NodeBocInitMsg || env->getMsgtype()==ForNodeBocMsg, crc1, crc2, env->getEpIdx());
-      if (curpos > _recplay_logsize-128) flushLog();
-      if (!wasPacked) CkUnpackMessage(envptr);
+      // Quiet flush: with a small +recplay-logsize (continuous flushing, for
+      // recording runs that will be killed at a hang) the per-flush banner
+      // would flood the output.
+      if (curpos > _recplay_logsize-128) flushLog(0);
+      if (needPacked && !wasPacked) CkUnpackMessage(envptr);
     }
     return true;
   }
@@ -2817,11 +2828,22 @@ class CkMessageReplay : public CkMessageWatcher {
 	FILE *lbFile;
 	/// Read the next message we need from the file:
 	void getNext(void) {
-	  if (3!=fscanf(f,"%d%d%d", &nextPE,&nextSize,&nextEvent)) CkAbort("CkMessageReplay> Syntax error reading replay file");
+	  // A truncated log (recorder killed mid-run -- the normal case when
+	  // recording a hang) is treated like the "-1 -1 -1" end sentinel: this
+	  // PE holds all further messages at the recorded frontier instead of
+	  // aborting the whole replay. An empty log (e.g. an SMP comm thread
+	  // that recorded nothing before being killed) is the same case.
+	  if (3!=fscanf(f,"%d%d%d", &nextPE,&nextSize,&nextEvent)) {
+	    CkPrintf("[%d] CkMessageReplay> log ended without sentinel (truncated record?); holding all further messages\n", CkMyPe());
+	    nextPE=nextSize=nextEvent=-1;
+	    return;
+	  }
 	  if (nextSize > 0) {
 	    // We are reading a regular message
 	    if (4!=fscanf(f,"%d%x%x%d", &nexttype,&crc1,&crc2,&nextEP)) {
-	      CkAbort("CkMessageReplay> Syntax error reading replay file");
+	      CkPrintf("[%d] CkMessageReplay> log ended mid-record (truncated record?); holding all further messages\n", CkMyPe());
+	      nextPE=nextSize=nextEvent=-1;
+	      return;
 	    }
             REPLAYDEBUG("getNext: "<<nextPE<<" " << nextSize << " " << nextEvent)
 	  } else if (nextSize == -2) {
