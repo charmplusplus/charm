@@ -11,13 +11,7 @@
     @{
  */
 
-#include "charm-config.h"
-#if CMK_RECONVERSE
-/* reconverse's converse.h carries the scheduler-queue declarations this
- * header needs there. Classic must NOT include converse.h here: classic
- * converse.h consumes this header's Queue typedef (cycle). */
-#include "converse.h"
-#endif
+#include "conv-config.h"
 
 #ifdef __cplusplus
 extern "C" {

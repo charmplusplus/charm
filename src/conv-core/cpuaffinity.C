@@ -833,8 +833,9 @@ void CmiCheckAffinity(void)
     cpu_set_t my_aff;
     if (get_affinity(&my_aff) == -1) CmiAbort("get_affinity failed\n");
     CPU_OR(&core_usage, &core_usage, &my_aff); // add my affinity (pe0)
+
     cpuAffSyncWait(cpuPhyAffCheckDone);
-    
+
 #if CMK_SMP && !CMK_SMP_NO_COMMTHD
     CmiNodeBarrier();
 

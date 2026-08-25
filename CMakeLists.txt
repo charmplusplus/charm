@@ -554,6 +554,12 @@ elseif(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/charmrun)
 else()
   set(CMK_BUILD_CHARMRUN 1)
 endif()
+if(RECONVERSE)
+  # Reconverse launches without charmrun (standalone ./pgm +pe N, or lcrun /
+  # srun for multi-process); charmrun.C also assumes the classic conv-config
+  # environment. Do not build it.
+  set(CMK_BUILD_CHARMRUN 0)
+endif()
 
 set(CHARMRUN_ELASTIC_DIR src/arch/common)
 set(CHARMRUN_HAPI_DIR src/arch/common)
@@ -1022,7 +1028,7 @@ add_dependencies(modulecompletion ck)
 if(${CMK_BUILD_CHARMRUN})
   add_subdirectory(src/util/charmrun-src)
   add_dependencies(charmrun create_symlinks)
-else()
+elseif(DEFINED CHARMRUN_DIR)
   configure_file(${CHARMRUN_DIR}/charmrun ${CMAKE_BINARY_DIR}/bin COPYONLY)
   if(EXISTS ${CMAKE_SOURCE_DIR}/${CHARMRUN_ELASTIC_DIR}/charmrun_elastic)
     configure_file(${CHARMRUN_ELASTIC_DIR}/charmrun_elastic ${CMAKE_BINARY_DIR}/bin COPYONLY)
