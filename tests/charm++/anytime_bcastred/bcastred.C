@@ -34,6 +34,10 @@
 //        -m <migration period in steps, default 10; 0 disables migration>
 //        -c <elements migrated per event, default 1>
 //        -S <seed, default 42>  -v (verbose)
+//        -w <watchdog stall threshold seconds, default 5; 0 disables --
+//            use 0 for +record/+replay runs so no timer-driven messages
+//            perturb the recorded order>
+
 //
 // Run (reconverse): single process  ./bcastred +pe 4
 //   multi-process   lcrun -n 2 env DYLD_LIBRARY_PATH=<build>/lib ./bcastred +pe 4
@@ -52,6 +56,7 @@
 /*readonly*/ int migPerEvent;
 /*readonly*/ int gSeed;
 /*readonly*/ int verbose;
+/*readonly*/ int useP2P;
 
 // splitmix64: deterministic, replicated on every PE -- no state to pup.
 static inline unsigned long long mix64(unsigned long long z) {
@@ -90,6 +95,7 @@ class Main : public CBase_Main {
   double t0;
   double lastAdvance = 0;
   bool dumped = false;
+  int wdSecs = 5;  // -w: watchdog stall threshold; 0 disables (record/replay)
 
 public:
   Main(CkArgMsg* m) {
@@ -100,7 +106,9 @@ public:
     CmiGetArgInt(m->argv, "-m", &migPeriod);
     CmiGetArgInt(m->argv, "-c", &migPerEvent);
     CmiGetArgInt(m->argv, "-S", &gSeed);
+    CmiGetArgInt(m->argv, "-w", &wdSecs);
     if (CmiGetArgFlag(m->argv, "-v")) verbose = 1;
+    useP2P = CmiGetArgFlag(m->argv, "-B") ? 1 : 0;
     delete m;
     CkEnforce(nElems >= 3);  // ring with distinct left/right neighbors
     CkEnforce(nSteps >= 1);
@@ -112,12 +120,15 @@ public:
              "migration every %d steps x %d elements, seed %d\n",
              CkNumPes(), CkNumNodes(), nElems, nSteps, migPeriod,
              migPerEvent, gSeed);
+    if (useP2P)
+      CkPrintf("bcastred: -B set, per-step notification is p2p, not broadcast "
+               "(for +record/+replay, which crash on array broadcasts: #3940)\n");
     mainProxy = thisProxy;
     elemProxy = CProxy_Elem::ckNew(nElems);
     t0 = CkWallTimer();
     lastAdvance = t0;
-    CcdCallFnAfter(watchdogFire, NULL, 2000);
-    elemProxy.nextStep(0);
+    if (wdSecs > 0) CcdCallFnAfter(watchdogFire, NULL, 2000);
+    sendStep(0);
   }
 
   // Watchdog (Ccd timer -> entry message): if no reduction completed for
@@ -125,15 +136,21 @@ public:
   // lost neighbor message (gotNbr<2) from a lost broadcast (curStep behind)
   // from a lost reduction contribution (all contributed, no stepDone).
   void checkProgress() {
-    if (!dumped && CkWallTimer() - lastAdvance > 5.0) {
+    if (!dumped && CkWallTimer() - lastAdvance > (double)wdSecs) {
       dumped = true;
-      CkPrintf("bcastred WATCHDOG: no progress for 5 s; main at step %d "
-               "(waiting for that step's reduction). Element dumps:\n", step);
+      CkPrintf("bcastred WATCHDOG: no progress for %d s; main at step %d "
+               "(waiting for that step's reduction). Element dumps:\n",
+               wdSecs, step);
       elemProxy.dumpState();
       CcdCallFnAfter(abortFire, NULL, 3000);  // time for dumps, then abort
       return;
     }
     CcdCallFnAfter(watchdogFire, NULL, 2000);
+  }
+
+  void sendStep(int s) {
+    if (useP2P) for (int i = 0; i < nElems; i++) elemProxy[i].nextStep(s);
+    else        elemProxy.nextStep(s);
   }
 
   void stepDone(long long sum) {
@@ -146,7 +163,8 @@ public:
     CkEnforce(sum == expected);
     if (verbose) CkPrintf("bcastred: step %d ok (sum %lld)\n", step, sum);
     step++;
-    if (step < nSteps) elemProxy.nextStep(step);
+    if (step < nSteps) sendStep(step);
+    else if (useP2P)   { for (int i = 0; i < nElems; i++) elemProxy[i].finish(); }
     else               elemProxy.finish();
   }
 
