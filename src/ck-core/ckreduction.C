@@ -354,6 +354,32 @@ void CkReductionMgr::contributorDied(contributorInfo *ci)
     checkIsActive();
   }
   finishReduction();
+  maybeCompleteObligationFreeRound();  // same hole as migration (see below)
+}
+
+/* Anytime migration can leave this PE POPULATED BUT OBLIGATION-FREE for
+the current reduction: every local element that owed redNo migrated away
+before contributing, while every arrival already contributed to redNo
+elsewhere (each such arrival decrements adj(redNo).lcount, balancing its
+lcount++). Such a PE never starts the reduction on its own -- it gets no
+local contribution (addContribution is what normally calls
+startReduction), it may have no tree kids, and the parent's
+sendReductionStartingToKids pokes only kids on the inactiveList, which
+this PE never joined because lcount never reached 0. The subtree then
+never reports and the whole reduction hangs (issue #3939). When a
+migration event makes the current round's local requirement already
+satisfied, eagerly start and finish it (shipping the empty result up);
+a migrant that later owes this round contributes through the existing
+LateMigrantMsg path. lcount>0 keeps the barren case on the established
+inactive-list path. */
+void CkReductionMgr::maybeCompleteObligationFreeRound()
+{
+  if (!inProgress && !creating && lcount > 0 &&
+      nContrib >= lcount + adj(redNo).lcount) {
+    DEBR((AA "Migration left this PE obligation-free for #%d; completing it eagerly\n" AB,redNo));
+    startReduction(redNo, CkMyPe());
+    finishReduction();
+  }
 }
 
 //Migrating away (note that global count doesn't change)
@@ -370,6 +396,7 @@ void CkReductionMgr::contributorLeaving(contributorInfo *ci)
     checkIsActive();
   }
   finishReduction();
+  maybeCompleteObligationFreeRound();
 }
 
 //Migrating in (note that global count doesn't change)
@@ -390,6 +417,7 @@ void CkReductionMgr::contributorArriving(contributorInfo *ci)
   if (ci->redNo == redNo) {
     checkIsActive();
   }
+  maybeCompleteObligationFreeRound();
 }
 
 //Contribute-- the given msg can contain any data.  The reducerType
@@ -797,7 +825,8 @@ CkReductionMsg *CkReductionMgr::reduceMessages(CkMsgQ<CkReductionMsg> &msgs)
   // Copy message queue into msgArr, skipping placeholders:
   while (NULL!=(m=msgs.deq()))
   {
-    DEBR((AA "***** gcount=%d; sourceFlag=%d ismigratable %d \n" AB,m->gcount,m->nSources(),m->isMigratableContributor()));
+    // (static fn: AA/AB member context unavailable to DEBR)
+    DEBR(("Red PE%d> ***** gcount=%d; sourceFlag=%d ismigratable %d \n",CkMyPe(),m->gcount,m->nSources(),m->isMigratableContributor()));
     msgs_gcount+=m->gcount;
     if (m->sourceFlag!=0)
     { //This is a real message from an element, not just a placeholder
