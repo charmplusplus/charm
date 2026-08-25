@@ -24,10 +24,9 @@ public:
     CkArrayOptions opts;
     opts.setNumInitial(nElements);
     CkCallback initCB(CkIndex_Main::initDone(), thisProxy);
-    //opts.setInitCallback(initCB);
+    opts.setInitCallback(initCB);
     opts.setStaticInsertion(true);
     arrProxy = CProxy_Hello::ckNew(opts);
-    //CkExit();
   };
 
   void initDone(void) {
@@ -49,7 +48,6 @@ public:
   Hello()
   {
     CkPrintf("Hello %d created\n",thisIndex);
-    CkExit();
   }
 
   Hello(CkMigrateMessage *m) {}
