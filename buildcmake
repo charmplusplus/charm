@@ -132,7 +132,11 @@ opt_shmem=0
 opt_xpmem=0
 opt_qlogic=0
 opt_randomized_msgq=0
-opt_reconverse=1 # fake argument for now
+# OFF unless the target network is reconverse (set below) or
+# --enable-reconverse is passed. The old default of 1 made EVERY build --
+# netlrts included -- pull in fetch_reconverse, which installs reconverse's
+# converse.h over the classic one and breaks all classic arches (#3941).
+opt_reconverse=0
 opt_fetch_reconverse_tag=""
 opt_fetch_reconverse_dir=""
 opt_reconverse_fetch_lci=1
