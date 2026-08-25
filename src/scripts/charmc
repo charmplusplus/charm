@@ -1669,6 +1669,19 @@ else
   LANG_LIBS=("-L$CHARMLIB" "-L$CHARMRECONV")
 fi
 
+# libreconverse is a shared library, and it is linked by SONAME/install_name
+# (@rpath/libreconverse.<suf>), so -L alone only satisfies the link step: at run
+# time the loader still has to be told where the library lives. Without this,
+# every Charm++ binary requires (DY)LD_LIBRARY_PATH to be set by hand before it
+# will start. Record the directory it was linked from as an RPATH instead. This
+# also covers libreconverse's own dependencies (liblci, liblct, liblcw), since
+# the loader searches the main executable's RPATHs for those too.
+for dir in "$CHARMLIBSO" "$CHARMLIB" "$CHARMRECONV"
+do
+	[[ -n "$dir" && -r "$dir/libreconverse.${CMK_SHARED_SUF:-so}" ]] || continue
+	LANG_LIBS+=("-Wl,-rpath,$dir")
+done
+
 if [[ -z "$STANDALONE" ]]
 then
   ALL_LIBS=("${LANG_LIBS[@]}" "${PRE_LIBRARIES[@]}" "${MIDDLE_LIBS[@]}" "${BAL_OBJ[@]}" $CMK_LIBS "${POST_LIBRARIES[@]}")
