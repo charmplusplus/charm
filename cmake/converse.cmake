@@ -308,7 +308,10 @@ endforeach()
 # conv-static: not needed for reconverse builds (reconverse provides its own converse layer)
 if(NOT RECONVERSE)
   add_library(conv-static OBJECT src/conv-core/conv-static.c)
-  add_dependencies(reconverse conv-static)
+  # (was add_dependencies(reconverse ...) -- that target only exists in
+  # reconverse builds, which never reach this branch; classic hangs the
+  # dependency off the converse target as mainline does, #3941)
+  add_dependencies(converse conv-static)
   add_dependencies(charm_cxx_utils conv-static)
   add_custom_command(TARGET charm_cxx_utils
       POST_BUILD
