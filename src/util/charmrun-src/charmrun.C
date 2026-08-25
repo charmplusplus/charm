@@ -1,3 +1,5 @@
+#include "conv-autoconfig.h"
+#include "conv-mach.h"
 #include "converse.h"
 
 #include "sockRoutines.h"
@@ -25,12 +27,19 @@
 #include <sys/stat.h>
 
 #include <unordered_map>
+#include <unordered_set>
 #include <map>
 #include <string>
 #include <vector>
 #include <queue>
 #include <utility>
 #include <algorithm>
+
+#include <regex>
+#include <iostream>
+#include <fstream>
+#include <string>
+
 
 #if defined(_WIN32)
 /*Win32 has screwy names for the standard UNIX calls:*/
@@ -360,6 +369,8 @@ static char *getenv_display_no_tamper()
 static unsigned int server_port;
 static char server_addr[1024]; /* IP address or hostname of charmrun*/
 static SOCKET server_fd;
+
+static std::unordered_set<int> node_set;
 /*****************************************************************************
  *                                                                           *
  * PPARAM - obtaining "program parameters" from the user.                    *
@@ -745,8 +756,8 @@ static char **saved_argv;
 static int saved_argc;
 static int arg_realloc_pes;
 static int arg_old_pes;
-static int arg_shrinkexpand;
 static int arg_charmrun_port;
+static int arg_shrinkexpand;
 static const char *arg_shrinkexpand_basedir;
 #endif
 
@@ -778,7 +789,6 @@ static int arg_server;
 static int arg_server_port = 0;
 static const char *arg_server_auth = NULL;
 static int replay_single = 0;
-
 
 struct TopologyRequest
 {
@@ -816,6 +826,93 @@ struct TopologyRequest
 TopologyRequest proc_per;
 TopologyRequest onewth_per;
 int auto_provision;
+
+void print_nodelist(){
+    FILE *f=fopen("/app/hostfile","r");
+    char c;
+    c = fgetc(f); 
+    while (c != EOF) {
+      printf ("%c", c); 
+      c = fgetc(f); 
+    } 
+    fclose(f);
+}
+
+int count_num_slots()
+{
+  std::ifstream infile("/etc/mpi/hostfile");
+  std::string sLine;
+  
+  std::regex rgx("host (.*)-worker-(\\d+)\\.(.*) \\+\\+cpus (\\d+)");
+  std::smatch match;
+  int total_slots = 0;
+
+  printf("Counting slots in hostfile\n");
+
+  while(getline(infile, sLine))
+  {
+    if (std::regex_search(sLine, match, rgx))
+    {
+      total_slots += std::stoi(match[4]);
+    }
+    else
+    {
+      printf("Error parsing hostfile regex\n");
+      return 0;
+    }
+  }
+  printf("Total slots = %d\n", total_slots);
+  std::cout << std::flush;
+  return total_slots;
+}
+
+void wait_hostfile(int numProcs)
+{
+  int i = 0;
+  while (count_num_slots() != numProcs) 
+  {
+    sleep(1 << i++);
+  }
+}
+
+void write_hostfile(int numProcesses) 
+{
+    std::ifstream infile("/etc/mpi/hostfile");
+    std::string sLine;
+    getline(infile, sLine);
+    printf("Line = %s\n", sLine.c_str());
+    std::cout << std::flush;
+    std::regex rgx("host (.*)-worker-(\\d+)\\.(.*) \\+\\+cpus (\\d+)");
+    std::smatch match;
+    char hostStr[200];
+
+    if (std::regex_search(sLine, match, rgx))
+    {
+        std::string name = match[1];
+        std::string suffix = match[3];
+        int slots = std::stoi(match[4]);
+
+        infile.close();
+
+        std::ofstream outfile("/app/hostfile");
+
+        for (int i = 0; i < numProcesses; i++)
+        {
+            sprintf(hostStr, "host %s-worker-%i.%s ++cpus %i\n", name.c_str(), i, suffix.c_str(), slots);
+            printf("Writing: %s\n", hostStr);
+            outfile << hostStr;
+        }
+
+        outfile.flush();
+        outfile.close();
+
+        print_nodelist();
+    }
+    else
+    {
+        printf("Error parsing hostfile regex\n");
+    }
+}
 
 static void arg_init(int argc, const char **argv)
 {
@@ -867,6 +964,7 @@ static void arg_init(int argc, const char **argv)
   pparam_flag(&arg_child_charmrun, 0, "child-charmrun", "child charmrun");
 #endif
 #if CMK_SHRINK_EXPAND
+  arg_shrinkexpand = 0;
   pparam_int(&arg_realloc_pes, 1, "newp", "New number of processes to create");
   pparam_int(&arg_old_pes, 1, "oldp", "Old number of processes to create");
   pparam_flag(&arg_shrinkexpand, 0, "shrinkexpand", "Enable shrink/expand support");
@@ -964,7 +1062,13 @@ static void arg_init(int argc, const char **argv)
 #if CMK_SHRINK_EXPAND
   if (arg_shrinkexpand) {
     arg_requested_pes = arg_realloc_pes;
-    printf("\n \nCharmrun> %d Reallocated pes\n \n", arg_requested_pes);
+    //arg_nodelist = "/etc/mpi/hostfileScaled";
+    //write_hostfile(arg_requested_pes);
+    //printf("Waiting\n");
+    //wait_hostfile(arg_requested_nodes);
+    //printf("\n \nCharmrun> %d Reallocated pes\n \n", arg_requested_pes);
+    //print_nodelist();
+    //arg_nodelist = new_hostfile;
   }
 #endif
 
@@ -1319,6 +1423,7 @@ struct nodetab_host
 
   skt_ip_t ip = _skt_invalid_ip;      /*IP address of host*/
   int cpus = 1;     /* # of physical CPUs*/
+  int remaining_cpus = 1; /* # of physical CPUs remaining for this host */
   int nice = -100;     /* process priority */
 //  int forks = 0;    /* number of processes to fork on remote node */
 
@@ -1393,6 +1498,42 @@ static std::vector<nodetab_host *> my_host_table;
 static std::vector<nodetab_process> my_process_table;
 static std::vector<nodetab_process *> pe_to_process_map;
 
+#if CMK_SHRINK_EXPAND
+ /*This little snippet creates a OLDNODENAMES
+ environment variable entry*/
+ char *create_oldnodenames()
+ {
+   static char dest1[1024 * 1000];
+   int i;
+   for (i = 0; i < my_process_table.size(); i++)
+     sprintf(dest1, "%s %s", dest1, (my_process_table[i].host)->name);
+   printf("Charmrun> Created oldnames %s \n", dest1);
+   return dest1;
+ }
+
+ int isPresent(const char *names, char **listofnames)
+ {
+   int k;
+   for (k = 0; k < arg_old_pes; k++) {
+     if (strcmp(names, listofnames[k]) == 0)
+       return 1;
+   }
+   return 0;
+ }
+ void parse_oldnodenames(char **oldnodelist)
+ {
+   char *ns;
+   ns = getenv("OLDNODENAMES");
+   int i;
+   char buffer[1024 * 1000];
+   for (i = 0; i < arg_old_pes; i++) {
+     oldnodelist[i] = (char *) malloc(100 * sizeof(char));
+     int nread = sscanf(ns, "%s %[^\n]", oldnodelist[i], buffer);
+     ns = buffer;
+   }
+ }
+ #endif
+
 static const char *nodetab_args(const char *args, nodetab_host *h)
 {
   while (*args != 0)
@@ -1438,7 +1579,7 @@ static const char *nodetab_args(const char *args, nodetab_host *h)
 
     args = skipblanks(e2);
   }
-
+  h->remaining_cpus = h->cpus;
   return args;
 }
 
@@ -1531,6 +1672,7 @@ static void nodetab_init_with_nodelist()
             host->name = strdup(hostname.c_str());
             host->ip = nodetab_host::resolve(hostname.c_str());
             host->hostno = hostno++;
+            printf("Adding host %s, %i\n", host->name, host->hostno);
             temp_hosts.insert({hostname, host});
             nodetab_args(b3, host);
           }
@@ -1595,6 +1737,8 @@ static void nodeinfo_add(const ChSingleNodeinfo *in, nodetab_process & p)
     fprintf(stderr, "Charmrun> Warning: Process #%d received ChSingleNodeInfo #%d\n", p.nodeno, node);
 
   p.info = in->info;
+  fprintf(stdout, "Charmrun> client %d added -> dataport = %d\n", node, ChMessageInt(p.info.dataport));
+  fflush(stdout);
   p.num_pus = ChMessageInt(in->num_pus);
   p.num_cores = ChMessageInt(in->num_cores);
   p.num_sockets = ChMessageInt(in->num_sockets);
@@ -1961,7 +2105,6 @@ static int req_handle_initnode(ChMessage *msg, nodetab_process & p)
     fprintf(stderr, "Charmrun: possibly because: %s.\n", msg->data);
     exit(1);
   }
-
   nodeinfo_add((ChSingleNodeinfo *) msg->data, p);
   return REQ_OK;
 }
@@ -2429,6 +2572,8 @@ static int req_handle_realloc(ChMessage *msg, SOCKET fd)
     ret[restart_idx + 1] = dir;
     ret[saved_argc + index++] = NULL;
   }
+
+  setenv("OLDNODENAMES", create_oldnodenames(), 1);
 
   ChMessage ackmsg;
   ChMessage_new("realloc_ack", 0, &ackmsg);
@@ -3181,6 +3326,8 @@ static SOCKET errorcheck_one_client_connect(void)
 
   const SOCKET req_client = skt_accept(server_fd, &clientIP, &clientPort);
 
+  //printf("clientPort = %d\n", clientPort);
+
   /* FIXME: will this ever be triggered? It seems the skt_abort handler here is
    *        'client_connect_problem', which calls exit(1), so we'd exit
    *        in skt_accept. */
@@ -3314,6 +3461,13 @@ static void req_set_client_connect(std::vector<nodetab_process> & process_table,
   curclientend = 0;
 #endif
 
+  printf("Charmrun> Waiting for %d clients to connect.\n", count);
+  for (int i = 0; i < process_table.size(); i++)
+  {
+   nodetab_process & p = process_table[i];
+   printf("Charmrun> process table nodeno %d, name %s\n", p.nodeno, p.host->name);
+  }
+
   int finished = 0;
   while (finished < count)
   {
@@ -3327,8 +3481,18 @@ static void req_set_client_connect(std::vector<nodetab_process> & process_table,
 
       curclientend++;
     }
+    //fprintf(stdout, "open_sockets.size() = %d, clientstart,end=%d, %d\n", open_sockets.size(), 
+    //  curclientstart, curclientend);
+    //fflush(stdout);
 #endif
     /* check appropriate clients for messages */
+
+    //for (int i = 0; i < process_table.size(); i++)
+    //{
+    //  nodetab_process & p = process_table[i];
+    //  printf("Charmrun> process table nodeno %d\n", p.nodeno);
+    //}
+
     while (!open_sockets.empty())
     {
       const SOCKET req_client = open_sockets.front();
@@ -3340,6 +3504,17 @@ static void req_set_client_connect(std::vector<nodetab_process> & process_table,
         ChMessage_recv(req_client, &msg);
 
         int nodeNo = ChMessageInt(((ChSingleNodeinfo *)msg.data)->nodeNo);
+
+        printf("Charmrun> node %d is connecting\n", nodeNo);
+
+        if (node_set.find(nodeNo) != node_set.end())
+        {
+          printf("Charmrun> node %d is already in the node set\n", nodeNo);
+          continue;
+        }
+
+        node_set.insert(nodeNo);
+
         nodetab_process & p = get_process_for_nodeno(process_table, nodeNo);
         p.req_client = req_client;
 
@@ -3578,23 +3753,70 @@ static void req_construct_phase2_processes(std::vector<nodetab_process> & phase2
 
   for (nodetab_process & p : my_process_table)
   {
-    p.forkstart = active_host_count + p.nodeno * new_processes_per_host;
+    //p.forkstart = active_host_count + p.nodeno * new_processes_per_host;
     p.host->processes = 1;
+    p.host->remaining_cpus--;
   }
 
-  for (int i = 0; i < num_new_processes; ++i)
+  int i = 0;
+  //int curr_pe = active_host_count;
+  int num_forks = 0;
+
+  // FIXME this will hang if total PEs requested > total PEs available
+  while (num_forks < num_new_processes)
   {
-    nodetab_process & src = my_process_table[i % active_host_count];
-    phase2_processes.push_back(src);
+    nodetab_process & src = my_process_table[i++ % active_host_count];
 
-    nodetab_process & p = phase2_processes.back();
-    p.nodeno = src.forkstart + (src.host->processes++ - 1);
+    int prev_pe = src.nodeno;
+    while (src.host->remaining_cpus > 0)
+    {
+      if (num_forks >= num_new_processes)
+        break;
+      ++prev_pe;
+      if (src.forkstart == 0)
+        src.forkstart = prev_pe;
+      src.host->processes++;
+      src.host->remaining_cpus--;
+
+      phase2_processes.push_back(src);
+      nodetab_process & p = phase2_processes.back();
+      p.nodeno = prev_pe;
+      num_forks++;
+    }
   }
+
+  printf("PHASE2> %d processes will be forked\n", phase2_processes.size());
 }
 
 static void start_nodes_local(const std::vector<nodetab_process> &);
 static void start_nodes_ssh(std::vector<nodetab_process> &);
 static void finish_nodes(std::vector<nodetab_process> &);
+
+static void req_client_reconnect(std::vector<nodetab_process> & process_table)
+{
+  skt_set_abort(client_connect_problem_skt);
+
+  std::vector<nodetab_process> phase2_processes;
+
+  req_construct_phase2_processes(phase2_processes);
+  printf("Phase2 reconnect: %d processes will be forked\n", phase2_processes.size());
+  if (phase2_processes.size() > 0)
+  {
+      if (!arg_local)
+      {
+#if CMK_SHRINK_EXPAND
+        if (arg_requested_pes > arg_old_pes)
+#endif
+        {
+          assert(!arg_mpiexec);
+          start_nodes_ssh(phase2_processes);
+        }
+      }
+  }
+  req_add_phase2_processes(phase2_processes);
+  req_client_connect_table(process_table);
+  req_all_clients_connected();
+}
 
 static void req_client_connect(std::vector<nodetab_process> & process_table)
 {
@@ -3641,23 +3863,28 @@ static void req_client_connect(std::vector<nodetab_process> & process_table)
     }
     else
     {
-      // send nodefork packets
-      ChMessageHeader hdr;
-      ChMessageInt_t mydata[ChInitNodeforkFields];
-      ChMessageHeader_new("nodefork", sizeof(mydata), &hdr);
-      for (const nodetab_process & p : process_table)
+#if CMK_SHRINK_EXPAND
+      if (!arg_shrinkexpand)
+#endif
       {
-        int numforks = p.host->processes - 1;
-        if (numforks <= 0)
-          continue;
+        // send nodefork packets
+        ChMessageHeader hdr;
+        ChMessageInt_t mydata[ChInitNodeforkFields];
+        ChMessageHeader_new("nodefork", sizeof(mydata), &hdr);
+        for (const nodetab_process & p : process_table)
+        {
+          int numforks = p.host->processes - 1;
+          if (numforks <= 0)
+            continue;
 
-        if (arg_verbose)
-          printf("Charmrun> Instructing host \"%s\" to fork() x %d\n", p.host->name, numforks);
+          if (arg_verbose)
+            printf("Charmrun> Instructing host \"%s\" to fork() x %d\n", p.host->name, numforks);
 
-        mydata[0] = ChMessageInt_new(numforks);
-        mydata[1] = ChMessageInt_new(p.forkstart);
-        skt_sendN(p.req_client, (const char *) &hdr, sizeof(hdr));
-        skt_sendN(p.req_client, (const char *) mydata, sizeof(mydata));
+          mydata[0] = ChMessageInt_new(numforks);
+          mydata[1] = ChMessageInt_new(p.forkstart);
+          skt_sendN(p.req_client, (const char *) &hdr, sizeof(hdr));
+          skt_sendN(p.req_client, (const char *) mydata, sizeof(mydata));
+        }
       }
     }
 
@@ -4166,7 +4393,7 @@ int main(int argc, const char **argv, char **envp)
     for (const nodetab_host * h : host_table)
     {
       skt_print_ip(ips, sizeof(ips), h->ip);
-      printf("Charmrun> added host \"%s\", IP:%s\n", h->name, ips);
+      printf("Charmrun> added host \"%s\", hostno %d, IP:%s\n", h->name, h->hostno, ips);
     }
   }
 
@@ -4195,12 +4422,14 @@ int main(int argc, const char **argv, char **envp)
                                        ? (arg_requested_nodes > 0 ? std::min(my_host_count, arg_requested_nodes) : my_host_count)
                                        : std::min(my_host_count, get_old_style_process_count());
   my_process_table.resize(my_initial_process_count);
+  int curr_nodeno = 0;
   for (int i = 0; i < my_initial_process_count; ++i)
   {
     nodetab_host * h = my_host_table[i];
     nodetab_process & p = my_process_table[i];
     p.host = h;
-    p.nodeno = h->hostno;
+    p.nodeno = curr_nodeno;
+    curr_nodeno += h->cpus;
   }
 
   /* start the node processes */
@@ -4301,6 +4530,11 @@ int main(int argc, const char **argv, char **envp)
       finish_nodes(my_process_table);
 #endif
     if (!arg_batch_spawn)
+#if CMK_SHRINK_EXPAND
+      if (arg_shrinkexpand)
+#endif
+        req_client_reconnect(my_process_table);
+    else if (!arg_batch_spawn)
       req_client_connect(my_process_table);
   }
 #if CMK_SSH_KILL
@@ -5259,10 +5493,27 @@ static void start_one_node_ssh(nodetab_process & p, const char ** argv)
 
 static void start_nodes_ssh(std::vector<nodetab_process> & process_table)
 {
+  char **oldnodenames;
+#if CMK_SHRINK_EXPAND
+  if (arg_shrinkexpand)
+  {
+    oldnodenames = (char **) malloc(arg_old_pes * sizeof(char *));
+    parse_oldnodenames(oldnodenames);
+  }
+
   for (nodetab_process & p : process_table)
   {
+    if (arg_shrinkexpand && !isPresent(p.host->name, oldnodenames))
+      start_one_node_ssh(p);
+    else if (!arg_shrinkexpand)
       start_one_node_ssh(p);
   }
+#else
+  for (nodetab_process & p : process_table)
+  {
+    start_one_node_ssh(p);
+  }
+#endif
 }
 
 /* for mpiexec, for once calling mpiexec to start on all nodes  */

@@ -1766,26 +1766,14 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
 	/*#warning "CsdNextMessage: CMK_NODE_QUEUE_AVAILABLE" */
 	if (NULL!=(msg=CmiGetNonLocalNodeQ())) return msg;
 #if !CMK_NO_MSG_PRIOS
-#if CMK_NODE_QUEUE_LOCK_BEFORE_CHECK
-	//performs better on grace-hopper
-	if(CmiTryLock(s->nodeLock) == 0) {{
+	if(CmiTryLock(s->nodeLock) == 0) {
 	  if (!CqsEmpty(s->nodeQ)
-          && CqsPrioGT(CqsGetPriority(s->schedQ),
-                        CqsGetPriority(s->nodeQ))) {
-#else
-	/* Check the node queue lock-free if we have anything to work with. */
-	/* This significantly reduces redundant thread contention in CmiTryLock(). */
-	if (!CqsEmpty(s->nodeQ)) {
-	  if (CmiTryLock(s->nodeLock) == 0) {
-	    if (!CqsEmpty(s->nodeQ)
-	    && CqsPrioGT(CqsGetPriority(s->schedQ),
-	                    CqsGetPriority(s->nodeQ))) {
-#endif
-	      CqsDequeue(s->nodeQ,(void **)&msg);
-	    }
-	    CmiUnlock(s->nodeLock);
-	    if (msg!=NULL) return msg;
+	   && CqsPrioGT(CqsGetPriority(s->schedQ),
+		         CqsGetPriority(s->nodeQ))) {
+	    CqsDequeue(s->nodeQ,(void **)&msg);
 	  }
+	  CmiUnlock(s->nodeLock);
+	  if (msg!=NULL) return msg;
 	}
 #endif
 #endif
@@ -3985,10 +3973,15 @@ int quietModeRequested;  // user has requested quiet mode
 extern int quietMode;
 int quietMode; // quiet mode active (CmiPrintf's are disabled)
 CmiSpanningTreeInfo* _topoTree = NULL;
+void (*CmiTraceFn)(char **argv) = nullptr;
 
 #if CMK_HAS_IO_FILE_OVERFLOW
 extern "C" int _IO_file_overflow(FILE *, int);
 #endif
+
+void registerTraceInit(void (*fn)(char **argv)) {
+  CmiTraceFn = fn;
+}
 
 /**
   Main Converse initialization routine.  This routine is 
@@ -4093,8 +4086,8 @@ void ConverseCommonInit(char **argv)
 #endif
 
 #if CMK_TRACE_ENABLED
-  traceInit(argv);
-/*initTraceCore(argv);*/ /* projector */
+  if (CmiTraceFn != nullptr)
+    CmiTraceFn(argv);
 #endif
   CmiProcessPriority(argv);
 

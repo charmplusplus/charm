@@ -23,8 +23,8 @@ set(ck-cxx-sources
     ck.C ckarray.C ckarrayoptions.C ckcallback.C
     ckcheckpoint.C ckfutures.C ckIgetControl.C
     cklocation.C ckmemcheckpoint.C ckmulticast.C
-    ckobjQ.C ckrdma.C ckrdmadevice.C ckreduction.C cksyncbarrier.C debug-charm.C
-    debug-message.C init.C modifyScheduler.C mpi-interoperate.C msgalloc.C
+    ckrdma.C ckrdmadevice.C ckreduction.C cksyncbarrier.C debug-charm.C
+    debug-message.C init.C mpi-interoperate.C msgalloc.C
     qd.C register.C sdag.C waitqd.C
 )
 
@@ -118,7 +118,7 @@ add_library(moduleCkMulticast ../libs/ck-libs/dummy/ckdummy.C)
 configure_file(../libs/ck-libs/dummy/ckdummy.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 
 # CkIO
-add_library(moduleCkIO ../libs/ck-libs/io/ckio.C ../libs/ck-libs/io/fs_parameters.c ../libs/ck-libs/io/ckio.h)
+add_library(moduleCkIO ../libs/ck-libs/io/ckio.C ../libs/ck-libs/io/fs_parameters.C ../libs/ck-libs/io/ckio.h)
 add_dependencies(moduleCkIO ck)
 configure_file(../libs/ck-libs/io/ckio.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 
@@ -133,22 +133,14 @@ foreach(filename ${ck-h-sources} ${ldb-h-sources})
 endforeach()
 
 target_include_directories(ck PRIVATE . ../ck-ldb ../ck-perf ../ck-cp ../util/topomanager ../conv-perf)
+if(BUILD_CUDA AND CUPTI_LIBRARY)
+  target_include_directories(ck PRIVATE "${CUDA_DIR}/extras/CUPTI/include")
+  target_link_libraries(ck ${CUPTI_LIBRARY})
+endif()
 target_include_directories(ckmain PRIVATE . ../ck-ldb ../ck-perf ../ck-cp ../util/topomanager)
 
 # Fortran interface
-if(CMK_CAN_LINK_FORTRAN)
-    add_library(ckf charmf.C charmmod.f90 charmf.h)
-    add_dependencies(ckf ck)
-    add_custom_command(TARGET ckf
-        POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/charm.mod ${CMAKE_BINARY_DIR}/include/
-        VERBATIM
-    )
-    add_library(ckmainf mainf.f90)
 
-    add_library(f90charm ../langs/f90charm/f90main.C ${CMAKE_BINARY_DIR}/include/f90main.decl.h)
-    add_dependencies(f90charm ck)
-endif()
 
 add_library(mpi-mainmodule mpi-mainmodule.C)
 add_dependencies(mpi-mainmodule ck)

@@ -1430,7 +1430,7 @@ void ampiParent::pup(PUP::er &p) noexcept {
         case AMPI_G_REQ:
           blockingReq = new GReq;
           break;
-#if CMK_CUDA
+#if CMK_CUDA 
         case AMPI_GPU_REQ:
           CkAbort("AMPI> error trying to PUP a non-migratable GPU request!");
           break;
@@ -11720,7 +11720,7 @@ int AMPI_GPU_Iinvoke_wr(hapiWorkRequest *to_call, MPI_Request *request)
 /* Submit GPU request that will be notified of completion once the previous
  * operations in the given CUDA stream are complete */
 CLINKAGE
-int AMPI_GPU_Iinvoke(cudaStream_t stream, MPI_Request *request)
+int AMPI_GPU_Iinvoke(hapiStream_t stream, MPI_Request *request)
 {
   AMPI_API("AMPI_GPU_Iinvoke", stream, request);
 
@@ -11748,7 +11748,7 @@ int AMPI_GPU_Invoke_wr(hapiWorkRequest *to_call)
 }
 
 CLINKAGE
-int AMPI_GPU_Invoke(cudaStream_t stream)
+int AMPI_GPU_Invoke(hapiStream_t stream)
 {
   AMPI_API("AMPI_GPU_Invoke", stream);
 

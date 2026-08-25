@@ -107,7 +107,7 @@ else()
 endif()
 
 # Build options
-set(NETWORK "netlrts" CACHE STRING "Target network layer, can be one of mpi,multicore,netlrts,gni,ofi,pami,pamilrts,ucx,verbs")
+set(NETWORK "netlrts" CACHE STRING "Target network layer, can be one of mpi,multicore,netlrts,reconverse,gni,ofi,pami,pamilrts,ucx,verbs")
 set(TARGET "charm++" CACHE STRING "Target build type, can be one of charm++,AMPI,LIBS,charm4py,ChaNGa,everylb,all-test")
 set(ARCH "" CACHE STRING "Target architecture, can be one of i386,x86_64,arm7,arm8,ppc64le") # By default, detect arch we are running on.
 
@@ -185,7 +185,7 @@ option(ZLIB                "Enable zlib support" ON)
 option(AMPI_MPICH_TESTS    "Enable mpich tests for AMPI" OFF)
 option(DRONE_MODE          "Enable drone mode" OFF)
 option(TASK_QUEUE          "Enable task queue" OFF)
-
+option(RECONVERSE          "Use the Reconverse communication layer" OFF)
 
 if(TRACING STREQUAL "")
   if(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -208,6 +208,7 @@ option(BUILD_SHARED        "Build Charm++ dynamic libraries" OFF)
 
 # Other options
 option(BUILD_CUDA          "Build with CUDA support" OFF)
+option(BUILD_HIP           "Build with HIP support" OFF)
 option(PXSHM               "Build with PXSHM" OFF)
 
 # LRTS PMI options
@@ -245,6 +246,12 @@ else()
   set(BUILD_CHANGA 0)
 endif()
 
+# The GPU-aware load balancers store each object's device allocation size in LB
+# user data (registered by CentralLB::initLB), so GPU builds imply LBUSERDATA.
+if(BUILD_CUDA OR BUILD_HIP)
+  set(LBUSERDATA 1)
+endif()
+
 if(${TARGET} STREQUAL "everylb")
   set(TARGET "LIBS")
 endif()
@@ -266,6 +273,15 @@ else()
   set(CMK_TASKQUEUE 0)
 endif()
 
+if(${NETWORK} STREQUAL "reconverse")
+  set(RECONVERSE ON)
+endif()
+
+if(${RECONVERSE})
+  set(CMK_RECONVERSE 1)
+else()
+  set(CMK_RECONVERSE 0)
+endif()
 
 if(${AMPI_MPICH_TESTS})
   add_definitions(-DAMPI_ERRHANDLER_RETURN=1)
@@ -285,8 +301,10 @@ else()
   set(CMK_SMP 0)
 endif()
 
-if(${NETWORK} STREQUAL "multicore")
+if(${NETWORK} STREQUAL "multicore" OR ${NETWORK} STREQUAL "reconverse")
   set(CMK_SMP 1)
+endif()
+if(${NETWORK} STREQUAL "multicore")
   set(CMK_MULTICORE 1)
 else()
   set(CMK_MULTICORE 0)
@@ -322,7 +340,7 @@ IF(JPEG_FOUND)
   set(CMK_USE_LIBJPEG 1)
 ENDIF()
 
-if(NETWORK STREQUAL "pami")
+if(NETWORK STREQUAL "pami" OR NETWORK STREQUAL "reconverse")
   set(CMK_USE_LRTS 0)
 else()
   set(CMK_USE_LRTS 1)
@@ -449,7 +467,11 @@ file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/bin/)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/cklibs)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib_so)
+if(BUILD_SHARED)
+  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib_so)
+else()
+  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+endif()
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
 if (NOT CMAKE_INSTALL_PREFIX)
@@ -459,6 +481,21 @@ endif()
 if (NOT CMAKE_BUILD_TYPE)
     message(STATUS "${PROJECT_NAME}: No build type selected, default to Release")
     set(CMAKE_BUILD_TYPE "Release")
+endif()
+
+if(RECONVERSE)
+  # Reconverse has to be built with the same GPU support as Charm++, so that
+  # its GPU-aware loopback copies and LCI's GPUDirect registration are enabled.
+  # These must be set before the subdirectory is added.
+  if(BUILD_CUDA)
+    set(RECONVERSE_ENABLE_CUDA ON CACHE BOOL "Enable CUDA support in reconverse" FORCE)
+  endif()
+  if(BUILD_HIP)
+    set(RECONVERSE_ENABLE_HIP ON CACHE BOOL "Enable HIP support in reconverse" FORCE)
+  endif()
+  # This needs to be include before we set charmc as the linker
+  # but after CMAKE_LIBRARY_OUTPUT_DIRECTORY has been set
+  add_subdirectory(cmake/fetch_reconverse)
 endif()
 
 if (NOT CMK_MEMPOOL_CUTOFFNUM)
@@ -518,8 +555,12 @@ else()
   set(CMK_BUILD_CHARMRUN 1)
 endif()
 
+set(CHARMRUN_ELASTIC_DIR src/arch/common)
+set(CHARMRUN_HAPI_DIR src/arch/common)
+
 include(cmake/detect-features.cmake)
 include(cmake/ci-files.cmake)
+add_custom_target(ci-generated DEPENDS ${all-ci-outputs})
 
 
 if(${TARGET} STREQUAL "all-test")
@@ -645,6 +686,8 @@ configure_file(src/arch/common/cc-msvc.sh                    include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-craype.sh           include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-cuda.sh             include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-cuda.h              include/ COPYONLY)
+configure_file(src/arch/common/conv-mach-hip.sh              include/ COPYONLY)
+configure_file(src/arch/common/conv-mach-hip.h               include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-darwin.sh           include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-flang.h             include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-flang.sh            include/ COPYONLY)
@@ -674,8 +717,10 @@ configure_file(src/arch/common/conv-mach-tsan.sh             include/ COPYONLY)
 configure_file(src/scripts/conv-config.sh                    include/ COPYONLY)
 configure_file(src/arch/${VDIR}/conv-mach.sh                 include/ COPYONLY)
 
+
 set(CUDA_DIR "")
-if(BUILD_CUDA)
+set(HIP_DIR "")
+if(BUILD_CUDA OR BUILD_HIP)
 
   file(GLOB_RECURSE hybridAPI-h-sources ${CMAKE_SOURCE_DIR}/src/arch/cuda/*.h)
   file(GLOB_RECURSE hybridAPI-cxx-sources ${CMAKE_SOURCE_DIR}/src/arch/cuda/*.cpp)
@@ -683,19 +728,102 @@ if(BUILD_CUDA)
     configure_file(${file} include/ COPYONLY)
   endforeach()
 
-  if(CMAKE_VERSION VERSION_GREATER 3.17 OR CMAKE_VERSION VERSION_EQUAL 3.17)
-    find_package(CUDAToolkit REQUIRED)
-    set(CMAKE_CUDA_COMPILER "${CUDAToolkit_NVCC_EXECUTABLE}")
-    enable_language(CUDA)
-    set(CUDA_DIR "${CUDAToolkit_TARGET_DIR}")
-  else()
-    find_package(CUDA REQUIRED)
-    set(CUDA_DIR "${CUDA_TOOLKIT_ROOT_DIR}")
+  if (BUILD_CUDA)
+    if(CMAKE_VERSION VERSION_GREATER 3.17 OR CMAKE_VERSION VERSION_EQUAL 3.17)
+      find_package(CUDAToolkit REQUIRED)
+      set(CMAKE_CUDA_COMPILER "${CUDAToolkit_NVCC_EXECUTABLE}")
+      enable_language(CUDA)
+      set(CUDA_DIR "${CUDAToolkit_TARGET_DIR}")
+    else()
+      find_package(CUDA REQUIRED)
+      set(CUDA_DIR "${CUDA_TOOLKIT_ROOT_DIR}")
+    endif()
+
+    # Find CUPTI library and include directory
+    find_library(CUPTI_LIBRARY cupti
+      HINTS "${CUDA_DIR}/extras/CUPTI/lib64"
+            "${CUDA_DIR}/lib64"
+    )
+    set(CUPTI_INCLUDE_DIR "${CUDA_DIR}/extras/CUPTI/include")
+    if(NOT CUPTI_LIBRARY)
+      message(WARNING "CUPTI library not found. GPU load balancing will not be available.")
+    else()
+      message(STATUS "Found CUPTI: ${CUPTI_LIBRARY}")
+    endif()
+
+    add_library(hybridapi ${hybridAPI-cxx-sources})
+    add_dependencies(hybridapi ci-generated)
+
+    if(CUPTI_LIBRARY)
+      target_include_directories(hybridapi PRIVATE "${CUPTI_INCLUDE_DIR}")
+      target_link_libraries(hybridapi ${CUPTI_LIBRARY})
+    endif()
+
+    if(TRACING)
+      target_compile_definitions(hybridapi PRIVATE HAPI_TRACE)
+    endif()
   endif()
-  add_library(cudahybridapi ${hybridAPI-cxx-sources})
-  if(TRACING)
-    target_compile_definitions(cudahybridapi PRIVATE HAPI_TRACE)
+
+  if (BUILD_HIP)
+    add_compile_definitions(__HIP_PLATFORM_AMD__)
+    # Modern ROCm/HIP detection
+    if(NOT DEFINED ROCM_PATH)
+      if(NOT DEFINED ENV{ROCM_PATH})
+        set(ROCM_PATH "/opt/rocm" CACHE PATH "Path to ROCm installation")
+      else()
+        set(ROCM_PATH $ENV{ROCM_PATH} CACHE PATH "Path to ROCm installation")
+      endif()
+    endif()
+    
+    # Find hipcc wrapper for reference
+    find_program(HIP_HIPCC_EXECUTABLE
+      NAMES hipcc
+      PATHS "${ROCM_PATH}/bin" "${ROCM_PATH}/hip/bin"
+      NO_DEFAULT_PATH
+    )
+    
+    if(NOT HIP_HIPCC_EXECUTABLE)
+      message(FATAL_ERROR "Could not find hipcc. Please set ROCM_PATH to your ROCm installation directory.")
+    endif()
+    
+    # Find the actual clang compiler used by ROCm (required by CMake)
+    find_program(CMAKE_HIP_COMPILER
+      NAMES clang++
+      PATHS "${ROCM_PATH}/llvm/bin" "${ROCM_PATH}/bin"
+      NO_DEFAULT_PATH
+    )
+    
+    if(NOT CMAKE_HIP_COMPILER)
+      message(FATAL_ERROR "Could not find ROCm clang++ compiler in ${ROCM_PATH}")
+    endif()
+    
+    set(HIP_DIR "${ROCM_PATH}")
+    set(CMAKE_HIP_ARCHITECTURES "gfx803;gfx900;gfx906;gfx908;gfx90a;gfx1030;gfx1100" CACHE STRING "HIP architectures")
+    
+    # Enable HIP language support
+    enable_language(HIP)
+    
+    add_library(hybridapi ${hybridAPI-cxx-sources})
+    add_dependencies(hybridapi ci-generated)
+    target_include_directories(hybridapi PRIVATE "${ROCM_PATH}/include")
+
+    if(TRACING)
+      target_compile_definitions(hybridapi PRIVATE HAPI_TRACE)
+    endif()
   endif()
+
+  # hapi_memory_daemon - standalone executable for shrink/expand GPU memory management
+  if(BUILD_CUDA)
+    add_executable(hapi_memory_daemon src/arch/cuda/hybridAPI/hapi_memory_daemon.cpp)
+    set(hapi_memory_daemon_deps hybridapi ck converse moduleNDMeshStreamer ckmain modulecompletion)
+    # ckqt and conv-static are only built for non-reconverse builds; reconverse
+    # provides its own converse layer and threading.
+    if(NOT RECONVERSE)
+      list(APPEND hapi_memory_daemon_deps ckqt conv-static)
+    endif()
+    add_dependencies(hapi_memory_daemon ${hapi_memory_daemon_deps})
+  endif()
+
 endif()
 
 if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-cxi.sh)
@@ -711,12 +839,6 @@ endif()
 if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-pxshm.sh)
   configure_file(src/arch/${VDIR}/conv-mach-pxshm.sh         include/ COPYONLY)
   configure_file(src/arch/${VDIR}/conv-mach-pxshm.h          include/ COPYONLY)
-endif()
-
-if(${CMK_USE_SHMEM})
-  if (EXISTS ${CMAKE_SOURCE_DIR}/src/conv-core/cmishmem.h)
-    configure_file(src/conv-core/cmishmem.h                  include/ COPYONLY)
-  endif()
 endif()
 
 if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-sysvshm.sh)
@@ -777,7 +899,9 @@ if(CMK_COMPILER STREQUAL "msvc")
 endif()
 
 # Header files
-configure_file(src/arch/${GDIR}/conv-common.h                include/ COPYONLY)
+if(EXISTS src/arch/${GDIR}/conv-common.h)
+  configure_file(src/arch/${GDIR}/conv-common.h                include/ COPYONLY)
+endif()
 if(EXISTS src/arch/${GDIR}/conv-common.sh)
   configure_file(src/arch/${GDIR}/conv-common.sh               include/ COPYONLY)
 endif()
@@ -871,9 +995,11 @@ include(cmake/hwloc.cmake)
 
 # Converse
 include(cmake/converse.cmake)
-add_subdirectory(src/QuickThreads)
-add_subdirectory(src/util/boost-context)
-add_subdirectory(src/conv-core)
+if(NOT RECONVERSE)
+  add_subdirectory(src/QuickThreads)
+endif()
+# add_subdirectory(src/util/boost-context)
+# add_subdirectory(src/conv-core)
 
 # LIBS
 if(${TARGET} STREQUAL "LIBS")
@@ -902,6 +1028,12 @@ if(${CMK_BUILD_CHARMRUN})
   add_dependencies(charmrun create_symlinks)
 else()
   configure_file(${CHARMRUN_DIR}/charmrun ${CMAKE_BINARY_DIR}/bin COPYONLY)
+  if(EXISTS ${CMAKE_SOURCE_DIR}/${CHARMRUN_ELASTIC_DIR}/charmrun_elastic)
+    configure_file(${CHARMRUN_ELASTIC_DIR}/charmrun_elastic ${CMAKE_BINARY_DIR}/bin COPYONLY)
+  endif()
+  if(EXISTS ${CMAKE_SOURCE_DIR}/${CHARMRUN_HAPI_DIR}/charmrun_hapi)
+    configure_file(${CHARMRUN_HAPI_DIR}/charmrun_hapi ${CMAKE_BINARY_DIR}/bin COPYONLY)
+  endif()
 endif()
 configure_file(src/scripts/testrun bin/ COPYONLY)
 
@@ -942,6 +1074,7 @@ configure_file(src/libs/ck-libs/NDMeshStreamer/libmoduleNDMeshStreamer.dep ${CMA
 
 
 # TCharm
+#[[
 file(GLOB tcharm-c-sources src/libs/ck-libs/tcharm/*.c)
 set(tcharm-h-sources
     src/libs/ck-libs/tcharm/tcharm.h
@@ -965,9 +1098,11 @@ foreach(f ${tcharm-h-sources})
     configure_file(${f} ${CMAKE_BINARY_DIR}/include COPYONLY)
 endforeach(f)
 
+
 add_dependencies(moduletcharmmain ck)
 add_dependencies(moduletcharm ck)
 add_dependencies(tcharm-compat ck)
+]]
 
 if(${TARGET} STREQUAL "AMPI" OR (${TARGET} STREQUAL "LIBS" AND NOT BUILD_CHANGA))
   add_subdirectory(src/libs/ck-libs/ampi)
@@ -988,7 +1123,11 @@ if(${TARGET} STREQUAL "charm4py")
   endif()
 
   if (${BUILD_CUDA})
-    target_link_libraries(charm cudart cudahybridapi)
+    target_link_libraries(charm cudart hybridapi)
+  endif()
+
+  if (${BUILD_HIP})
+    target_link_libraries(charm hiprtc hybridapi)
   endif()
 
   if(${TRACING})
@@ -1004,9 +1143,17 @@ if(${TARGET} STREQUAL "charm4py")
 else()
   # Check that we are able to build and link an executable
   add_executable(ckhello ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.C)
-  add_dependencies(ckhello ck ldb-none memory-default threads-default conv-static
-    converse ckmain ckqt
-    moduleNDMeshStreamer modulecompletion)
+  if(RECONVERSE)
+    target_link_libraries(ckhello PRIVATE reconverse)
+  endif()
+  set(ckhello_deps ck converse ckmain moduleNDMeshStreamer modulecompletion)
+  if(NOT RECONVERSE)
+    list(APPEND ckhello_deps ckqt conv-static)
+  endif()
+  if(BUILD_CUDA OR BUILD_HIP)
+    list(APPEND ckhello_deps hybridapi)
+  endif()
+  add_dependencies(ckhello ${ckhello_deps})
 endif()
 
 # Create conv-mach-opt.sh
@@ -1052,7 +1199,7 @@ foreach(l BUILDOPTS CMK_AMPI_WITH_ROMIO CMK_BUILD_PYTHON CMK_CAN_LINK_FORTRAN
         CXX_NO_AS_NEEDED LDXX_WHOLE_ARCHIVE_PRE LDXX_WHOLE_ARCHIVE_POST
         CMK_MACOSX CMK_POST_EXE CMK_SHARED_SUF CMK_USER_SUFFIX OPTS_LD
         CMK_COMPILER_KNOWS_FVISIBILITY CMK_LINKER_KNOWS_UNDEFINED
-        CMK_SUPPORTS_MEMORY_ISOMALLOC CUDA_DIR CMK_USER_DISABLED_TLS CMK_CXI)
+        CMK_SUPPORTS_MEMORY_ISOMALLOC CUDA_DIR HIP_DIR CMK_USER_DISABLED_TLS CMK_CXI)
     file(APPEND ${optfile_sh} "${l}=\"${${l}}\"\n" )
 endforeach(l)
 
@@ -1072,10 +1219,13 @@ endif()
 set(optfile_h ${CMAKE_BINARY_DIR}/include/conv-mach-opt.h)
 
 file(WRITE  ${optfile_h} "/* Build-time options header, automatically generated by cmake. */\n")
-foreach(l CMK_AMPI_WITH_ROMIO CMK_OPTIMIZE CMK_AMPI_ONLY CMK_POST_EXE CMK_SHARED_SUF
+foreach(l CMK_AMPI_WITH_ROMIO CMK_AMPI_ONLY CMK_POST_EXE CMK_SHARED_SUF
         CMK_USER_SUFFIX CMK_CXI)
     file(APPEND ${optfile_h} "#define ${l} ${${l}}\n")
 endforeach(l)
+# Use #undef before #define so this overrides converse.h's #ifndef default
+# regardless of include order, without triggering a redefinition warning.
+file(APPEND ${optfile_h} "#undef CMK_OPTIMIZE\n#define CMK_OPTIMIZE ${CMK_OPTIMIZE}\n")
 
 if(NOT ${NETWORK} STREQUAL "mpi" AND NOT ${NETWORK} MATCHES "gni-" AND NOT ${NETWORK} MATCHES "-cray")
     file(APPEND ${optfile_h} "#include \"cc-${CMK_COMPILER}.h\"\n")
@@ -1089,7 +1239,7 @@ endif()
 set(optfile_mak ${CMAKE_BINARY_DIR}/include/conv-mach-opt.mak)
 
 file(WRITE  ${optfile_mak} "# Build-time options header for Makefiles, automatically generated by cmake.\n")
-foreach(l CUDA_DIR BUILD_CUDA CMK_AMPI_WITH_ROMIO CMK_MACOSX CMK_BUILD_PYTHON
+foreach(l CUDA_DIR HIP_DIR BUILD_CUDA BUILD_HIP CMK_AMPI_WITH_ROMIO CMK_MACOSX CMK_BUILD_PYTHON
         CMK_CHARMDEBUG CMK_COMPILER CMK_GDIR CMK_HAS_MALLOC_HOOK CMK_HAS_MMAP CMK_LIBJPEG
         CMK_LUSTREAPI CMK_MULTICORE CMK_NO_BUILD_SHARED CMK_NO_PARTITIONS CMK_SHARED_SUF
         CMK_SMP CMK_SUPPORTS_FSGLOBALS CMK_SUPPORTS_PIPGLOBALS CMK_SUPPORTS_PIEGLOBALS
@@ -1102,7 +1252,8 @@ endforeach(l)
 
 # Add options
 set(CUDA ${BUILD_CUDA}) # need CUDA to match conv-mach file name
-foreach(opt SMP OMP TCP PTHREADS SYNCFT PXSHM PERSISTENT OOC CUDA PAPI CXI)
+set(HIP ${BUILD_HIP})   # need HIP to match conv-mach file name
+foreach(opt SMP OMP TCP PTHREADS SYNCFT PXSHM PERSISTENT OOC CUDA HIP PAPI CXI)
     if(${opt})
         string(TOLOWER ${opt} optl)
         file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/conv-mach-${optl}.sh\n")
