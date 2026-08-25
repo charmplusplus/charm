@@ -9,9 +9,6 @@
 #include "trace-projections.h"
 #include "trace-projectionsBOC.h"
 #include "TopoManager.h"
-#include <sys/stat.h>
-
-#define CmiMkdir(x) mkdir(x, 0777)
 
 #if DEBUG_PROJ
 #define DEBUGF(...) CkPrintf(__VA_ARGS__)
