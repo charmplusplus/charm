@@ -53,6 +53,32 @@ jobs:
           set -e
           for d in $TEST_DIRS; do TESTRUN_PROCS=2 make -C $d test; done
 
+  # ARM64 Linux (Grace-class systems). Replaces the coverage CircleCI's
+  # arm.medium jobs provided on the classic line; -Werror=vla carried over
+  # from those jobs.
+  reconverse-linux-arm8:
+    timeout-minutes: 90
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - name: install dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake libfabric-dev
+      - name: build
+        run: ./build charm++ reconverse-linux-arm8 -j4 -g -Werror=vla
+      - name: build tests
+        run: |
+          set -e
+          B=$PWD/reconverse-linux-arm8
+          for d in $TEST_DIRS; do make -C $d CHARMC=$B/bin/charmc; done
+      - name: test (single process)
+        run: |
+          set -e
+          for d in $TEST_DIRS; do make -C $d test; done
+      - name: test (2 processes, lcrun)
+        run: |
+          set -e
+          for d in $TEST_DIRS; do TESTRUN_PROCS=2 make -C $d test; done
+
   reconverse-darwin-arm64:
     timeout-minutes: 90
     runs-on: macos-latest  # Apple Silicon
