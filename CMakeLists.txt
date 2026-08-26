@@ -1165,6 +1165,13 @@ file(APPEND  ${optfile_sh} "CMK_COMPILER_SUFFIX=${CMK_COMPILER_SUFFIX}\n")
 
 if(NOT ${NETWORK} STREQUAL "mpi" AND NOT ${NETWORK} MATCHES "gni-" AND NOT ${NETWORK} MATCHES "-cray")
     file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/cc-${CMK_COMPILER}.sh\n")
+    if(RECONVERSE)
+        # QuickThreads is not built under reconverse, but the cc-*.sh compiler
+        # files add -lckqt to CMK_LIBS. This file is sourced last by
+        # conv-config.sh (after conv-mach.sh has already sourced the compiler
+        # file once), so stripping here is authoritative.
+        file(APPEND ${optfile_sh} "CMK_LIBS=\"\${CMK_LIBS//-lckqt/}\"\n")
+    endif()
 endif()
 
 if(${BUILD_SHARED})
