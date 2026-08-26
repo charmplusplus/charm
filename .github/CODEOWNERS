@@ -4,7 +4,7 @@
 # eyes; everything else needs one.
 /src/ck-core/     @lvkale @ericjbohm
 /src/conv-core/   @lvkale @ericjbohm
-/src/ck-ldb/      @lvkale @ericjbohm
+/src/ck-ldb/      @adityapb @lvkale @ericjbohm
 /cmake/           @lvkale @ericjbohm
 /src/scripts/     @lvkale @ericjbohm
 /.github/         @lvkale @ericjbohm
