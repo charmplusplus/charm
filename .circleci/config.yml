@@ -15,8 +15,12 @@ jobs:
       - run:
           name: CCache
           command: |
-            sudo apt update
-            sudo apt -y install ccache
+            # Retry: the Ubuntu ports mirror intermittently returns 503s
+            for i in $(seq 1 10); do
+              sudo apt update && sudo apt -y install ccache && break
+              echo "apt attempt $i failed; retrying in 30s"; sleep 30
+            done
+            dpkg -s ccache > /dev/null
             ccache --show-stats
             ccache --max-size=1.0G
       - run:
@@ -49,8 +53,12 @@ jobs:
       - run:
           name: CCache
           command: |
-            sudo apt update
-            sudo apt -y install ccache
+            # Retry: the Ubuntu ports mirror intermittently returns 503s
+            for i in $(seq 1 10); do
+              sudo apt update && sudo apt -y install ccache && break
+              echo "apt attempt $i failed; retrying in 30s"; sleep 30
+            done
+            dpkg -s ccache > /dev/null
             ccache --show-stats
             ccache --max-size=1.0G
       - run:
@@ -83,8 +91,12 @@ jobs:
       - run:
           name: CCache
           command: |
-            sudo apt update
-            sudo apt -y install ccache libopenmpi-dev
+            # Retry: the Ubuntu ports mirror intermittently returns 503s
+            for i in $(seq 1 10); do
+              sudo apt update && sudo apt -y install ccache libopenmpi-dev && break
+              echo "apt attempt $i failed; retrying in 30s"; sleep 30
+            done
+            dpkg -s ccache > /dev/null
             ccache --show-stats
             ccache --max-size=1.0G
       - run:
