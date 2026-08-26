@@ -757,16 +757,16 @@ if(BUILD_CUDA OR BUILD_HIP)
       message(STATUS "Found CUPTI: ${CUPTI_LIBRARY}")
     endif()
 
-    add_library(hybridapi ${hybridAPI-cxx-sources})
-    add_dependencies(hybridapi ci-generated)
+    add_library(cudahybridapi ${hybridAPI-cxx-sources})
+    add_dependencies(cudahybridapi ci-generated)
 
     if(CUPTI_LIBRARY)
-      target_include_directories(hybridapi PRIVATE "${CUPTI_INCLUDE_DIR}")
-      target_link_libraries(hybridapi ${CUPTI_LIBRARY})
+      target_include_directories(cudahybridapi PRIVATE "${CUPTI_INCLUDE_DIR}")
+      target_link_libraries(cudahybridapi ${CUPTI_LIBRARY})
     endif()
 
     if(TRACING)
-      target_compile_definitions(hybridapi PRIVATE HAPI_TRACE)
+      target_compile_definitions(cudahybridapi PRIVATE HAPI_TRACE)
     endif()
   endif()
 
@@ -894,13 +894,6 @@ if(CMK_COMPILER STREQUAL "msvc")
 endif()
 
 # Header files
-if(NOT RECONVERSE)
-  # Boundary headers shared with reconverse builds include "charm-config.h"
-  # (reconverse's build-config header). Classic builds alias it to the
-  # conv-config chain so those headers work unchanged on both runtimes.
-  file(WRITE ${CMAKE_BINARY_DIR}/include/charm-config.h
-       "/* classic builds: charm-config.h aliases the conv-config chain */\n#include \"conv-config.h\"\n")
-endif()
 if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/conv-common.h)
   configure_file(src/arch/${GDIR}/conv-common.h                include/ COPYONLY)
 endif()
@@ -1125,7 +1118,7 @@ if(${TARGET} STREQUAL "charm4py")
   endif()
 
   if (${BUILD_CUDA})
-    target_link_libraries(charm cudart hybridapi)
+    target_link_libraries(charm cudart cudahybridapi)
   endif()
 
   if (${BUILD_HIP})
@@ -1152,7 +1145,10 @@ else()
   if(NOT RECONVERSE)
     list(APPEND ckhello_deps ckqt conv-static)
   endif()
-  if(BUILD_CUDA OR BUILD_HIP)
+  if(BUILD_CUDA)
+    # cudahybridapi: the name conv-mach-cuda.sh links (-lcudahybridapi)
+    list(APPEND ckhello_deps cudahybridapi)
+  elseif(BUILD_HIP)
     list(APPEND ckhello_deps hybridapi)
   endif()
   add_dependencies(ckhello ${ckhello_deps})

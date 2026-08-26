@@ -2649,14 +2649,14 @@ void CkArrayExtSend_multi(int aid, int *idx, int ndims, int epIdx, int num_bufs,
 
 
 // HAPI support
-#if CMK_CUDA || CMK_HIP
+#if CMK_CUDA
 #include "hapi.h"
 #endif
 
-void CkHapiAddCallback(long stream, void (*cb)(void*, void*), int fid) 
+void CkHapiAddCallback(long stream, void (*cb)(void*, void*), int fid)
 {
-  #if CMK_CUDA || CMK_HIP
-  hapiStream_t stream_ptr = (hapiStream_t)stream;
+  #if CMK_CUDA
+  cudaStream_t stream_ptr = (cudaStream_t)stream;
   CkCallback callback(cb, (void *) fid);
   
   hapiAddCallback(stream_ptr, callback, NULL);

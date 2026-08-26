@@ -78,7 +78,6 @@ never be excluded...
 #include "TreeLB.h"
 #endif
 
-#define CMK_GPU_COMM 1
 #if CMK_CUDA || CMK_HIP
 #include "hapi_impl.h"
 #include "ckrdmadevice.h"

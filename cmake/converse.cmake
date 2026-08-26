@@ -326,6 +326,7 @@ if(NOT RECONVERSE)
     # reconverse's own (installed by cmake/fetch_reconverse), which must not
     # be shadowed.
     list(APPEND conv-core-h-to-install src/conv-core/converse.h)
+    list(APPEND conv-core-h-to-install src/conv-core/charm-config.h)
 endif()
 if(RECONVERSE)
     # Reconverse provides its own conv-rdma.h, which is the authority on the
