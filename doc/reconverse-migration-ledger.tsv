@@ -1,0 +1,222 @@
+# Migration ledger: reconverse-specific-build -> reviewed-with-reconverse
+# Generated 2026-08-26 vs #3944 tip. Columns: file, changed-lines, disposition, note
+# Dispositions: item-N (plan item), pr-NNNN, with-feature, superseded,
+#               tombstone / tombstone-candidate, needs-judgment
+.github/workflows/ci.yaml	29	superseded	reviewed line two-way version is authoritative
+CMakeLists.txt	223	superseded	reviewed line two-way version is authoritative
+Dockerfile	25	needs-judgment	
+README.md	100	needs-judgment	
+benchmarks/charm++/cuda/gpudirect/latency/latency.C	12	item-9	
+buildcmake	59	superseded	reviewed line two-way version is authoritative
+buildold	4	superseded	reviewed line two-way version is authoritative
+cmake/converse.cmake	159	superseded	reviewed line two-way version is authoritative
+cmake/detect-features.cmake	4	superseded	reviewed line two-way version is authoritative
+cmake/fetch_reconverse/CMakeLists.txt	52	superseded	reviewed line two-way version is authoritative
+contrib/ci.vim	2	needs-judgment	
+doc/charm++/manual.rst	3	needs-judgment	
+examples/ampi/Cjacobi3D/Makefile	9	with-feature	lands with the series that exercises it
+examples/ampi/Cjacobi3D/jacobi.C	142	with-feature	lands with the series that exercises it
+examples/charm++/cuda/gpudirect/jacobi2d-imbalance/Makefile	31	item-9	
+examples/charm++/cuda/gpudirect/jacobi2d-imbalance/jacobi2d.C	646	item-9	
+examples/charm++/cuda/gpudirect/jacobi2d-imbalance/jacobi2d.ci	90	item-9	
+examples/charm++/cuda/gpudirect/jacobi2d-imbalance/jacobi2d.cu	195	item-9	
+examples/charm++/cuda/gpudirect/jacobi2d-imbalance/jacobi2d.h	12	item-9	
+examples/charm++/cuda/gpudirect/jacobi2d/Makefile	36	item-9	
+examples/charm++/cuda/gpudirect/jacobi2d/jacobi2d.C	264	item-9	
+examples/charm++/cuda/gpudirect/jacobi2d/jacobi2d.ci	27	item-9	
+examples/charm++/cuda/gpudirect/jacobi2d/jacobi2d.cu	49	item-9	
+examples/charm++/cuda/gpudirect/jacobi2d/jacobi2d.h	2	item-9	
+examples/charm++/cuda/gpudirect/sdag/sdag.C	38	item-9	
+examples/charm++/cuda/gpudirect/sdag/sdag.cu	4	item-9	
+examples/charm++/cuda/gpudirect/verify/Makefile	46	item-9	
+examples/charm++/cuda/gpudirect/verify/charmrun_hapi	292	item-9	
+examples/charm++/cuda/gpudirect/verify/helper.sh	6	item-9	
+examples/charm++/cuda/gpudirect/verify/verbose	1	item-9	
+examples/charm++/cuda/gpudirect/verify/verify.C	111	item-9	
+examples/charm++/cuda/gpudirect/verify/verify.cu	4	item-9	
+examples/charm++/cuda/stencil2d/Makefile	6	with-feature	lands with the series that exercises it
+examples/charm++/cuda/stencil2d/stencil2d.C	260	with-feature	lands with the series that exercises it
+examples/charm++/cuda/stencil2d/stencil2d.ci	17	with-feature	lands with the series that exercises it
+examples/charm++/cuda/stencil2d/stencil2d.cu	19	with-feature	lands with the series that exercises it
+examples/charm++/cuda/vecadd/Makefile	6	with-feature	lands with the series that exercises it
+examples/charm++/cuda/vecadd/vecadd.C	190	with-feature	lands with the series that exercises it
+examples/charm++/cuda/vecadd/vecadd.ci	12	with-feature	lands with the series that exercises it
+examples/charm++/cuda/vecadd/vecadd.cu	48	with-feature	lands with the series that exercises it
+examples/charm++/osu_bw/Makefile	27	with-feature	lands with the series that exercises it
+examples/charm++/osu_bw/osu_bw.C	165	with-feature	lands with the series that exercises it
+examples/charm++/osu_bw/osu_bw.ci	23	with-feature	lands with the series that exercises it
+examples/charm++/osu_latency/Makefile	21	with-feature	lands with the series that exercises it
+examples/charm++/osu_latency/osu_latency.C	164	with-feature	lands with the series that exercises it
+examples/charm++/osu_latency/osu_latency.ci	26	with-feature	lands with the series that exercises it
+examples/charm++/shrink_expand/README	25	with-feature	lands with the series that exercises it
+examples/charm++/shrink_expand/client.C	77	with-feature	lands with the series that exercises it
+examples/charm++/shrink_expand/jacobi2d-iter/jacobi2d.C	61	with-feature	lands with the series that exercises it
+examples/charm++/shrink_expand/jacobi2d-iter/jacobi2d.ci	2	with-feature	lands with the series that exercises it
+examples/charm++/shrink_expand/startup/Makefile	21	with-feature	lands with the series that exercises it
+examples/charm++/shrink_expand/startup/startup.C	12	with-feature	lands with the series that exercises it
+examples/charm++/shrink_expand/startup/startup.ci	7	with-feature	lands with the series that exercises it
+src/QuickThreads/md/setjmp64_.c	6	needs-judgment	
+src/arch/common/cc-gcc.sh	4	tombstone-candidate	classic machine layer; frozen line
+src/arch/common/cc-mpiopts.sh	2	tombstone-candidate	classic machine layer; frozen line
+src/arch/common/charmrun_elastic	69	tombstone-candidate	classic machine layer; frozen line
+src/arch/common/charmrun_hapi	292	item-9	
+src/arch/common/conv-mach-common.h	2	tombstone-candidate	classic machine layer; frozen line
+src/arch/common/conv-mach-cuda.sh	6	tombstone-candidate	classic machine layer; frozen line
+src/arch/common/conv-mach-darwin.sh	8	tombstone-candidate	classic machine layer; frozen line
+src/arch/common/conv-mach-hip.h	7	tombstone-candidate	classic machine layer; frozen line
+src/arch/common/conv-mach-hip.sh	21	tombstone-candidate	classic machine layer; frozen line
+src/arch/cuda/hybridAPI/Makefile	12	item-9	
+src/arch/cuda/hybridAPI/buddy_allocator.cpp	236	item-9	
+src/arch/cuda/hybridAPI/buddy_allocator.h	27	item-9	
+src/arch/cuda/hybridAPI/devicemanager.h	14	item-9	
+src/arch/cuda/hybridAPI/gpumanager.h	86	item-9	
+src/arch/cuda/hybridAPI/hapi.h	60	item-9	
+src/arch/cuda/hybridAPI/hapi_functions.h	27	item-9	
+src/arch/cuda/hybridAPI/hapi_impl.cpp	835	item-9	
+src/arch/cuda/hybridAPI/hapi_impl.h	4	item-9	
+src/arch/cuda/hybridAPI/hapi_memory_daemon.cpp	279	item-9	
+src/arch/cuda/hybridAPI/hapi_portable.h	209	item-9	
+src/arch/mpi-darwin-arm8/conv-mach.sh	2	tombstone-candidate	classic machine layer; frozen line
+src/arch/mpi-darwin-x86_64/conv-mach.sh	2	tombstone-candidate	classic machine layer; frozen line
+src/arch/mpi/charmrun	5	tombstone-candidate	classic machine layer; frozen line
+src/arch/mpi/charmrun_elastic	69	tombstone-candidate	classic machine layer; frozen line
+src/arch/mpi/conv-common.h	3	tombstone-candidate	classic machine layer; frozen line
+src/arch/mpi/machine.C	400	tombstone-candidate	classic machine layer; frozen line
+src/arch/netlrts/machine-eth.C	10	tombstone-candidate	classic machine layer; frozen line
+src/arch/netlrts/machine.C	33	tombstone-candidate	classic machine layer; frozen line
+src/arch/reconverse-darwin-arm8/conv-mach.h	68	superseded	reviewed line carries the curated version
+src/arch/reconverse-darwin-arm8/conv-mach.sh	10	superseded	reviewed line carries the curated version
+src/arch/reconverse-linux-arm8/conv-mach.h	62	superseded	reviewed line carries the curated version
+src/arch/reconverse-linux-arm8/conv-mach.sh	10	superseded	reviewed line carries the curated version
+src/arch/reconverse-linux-x86_64/conv-mach.h	62	superseded	reviewed line carries the curated version
+src/arch/reconverse-linux-x86_64/conv-mach.sh	10	superseded	reviewed line carries the curated version
+src/arch/template/conv-mach.sh	2	tombstone-candidate	classic machine layer; frozen line
+src/arch/ucx/charmrun	24	tombstone-candidate	classic machine layer; frozen line
+src/arch/ucx/machine.C	89	tombstone-candidate	classic machine layer; frozen line
+src/arch/util/machine-broadcast.C	4	tombstone-candidate	classic machine layer; frozen line
+src/arch/util/machine-common-core.C	17	tombstone-candidate	classic machine layer; frozen line
+src/arch/util/machine-rdma.h	8	tombstone-candidate	classic machine layer; frozen line
+src/arch/util/mempool.h	3	tombstone-candidate	classic machine layer; frozen line
+src/arch/util/proc_management/runtime-pmix.C	20	tombstone-candidate	classic machine layer; frozen line
+src/ck-core/CMakeLists.txt	34	superseded	reviewed line two-way version is authoritative
+src/ck-core/charm++.h	1	needs-judgment	
+src/ck-core/charm-api.h	7	needs-judgment	
+src/ck-core/charm.h	3	needs-judgment	
+src/ck-core/ck.C	82	needs-judgment	
+src/ck-core/ckcallback.C	2	needs-judgment	
+src/ck-core/ckcheckpoint.C	669	item-10	
+src/ck-core/ckcheckpoint.ci	8	item-10	
+src/ck-core/ckcheckpoint.h	40	item-10	
+src/ck-core/cklocation.C	249	needs-judgment	locmgr work (e417584dd); joint review queued
+src/ck-core/cklocation.ci	12	needs-judgment	
+src/ck-core/cklocation.h	31	needs-judgment	
+src/ck-core/cklocrec.h	5	needs-judgment	
+src/ck-core/ckmemcheckpoint.C	3	needs-judgment	
+src/ck-core/ckmigratable.h	3	needs-judgment	
+src/ck-core/ckobjQ.C	1	needs-judgment	
+src/ck-core/ckrdma.C	4	needs-judgment	
+src/ck-core/ckrdma.h	4	needs-judgment	
+src/ck-core/ckrdmadevice.C	336	item-9	
+src/ck-core/ckrdmadevice.h	46	item-9	
+src/ck-core/ckreduction.C	35	pr-3942	
+src/ck-core/ckreduction.h	1	pr-3942	
+src/ck-core/debug-charm.h	2	needs-judgment	
+src/ck-core/debug-message.C	2	needs-judgment	
+src/ck-core/init.C	32	needs-judgment	
+src/ck-core/init.h	1	needs-judgment	
+src/ck-core/middle.h	3	needs-judgment	
+src/ck-core/msgalloc.C	2	needs-judgment	
+src/ck-core/waitqd.h	1	needs-judgment	
+src/ck-cp/controlPoints.h	3	needs-judgment	
+src/ck-ldb/BaseLB.h	15	item-11	
+src/ck-ldb/CentralLB.C	186	item-11	
+src/ck-ldb/CentralLB.ci	4	item-11	
+src/ck-ldb/CentralLB.h	14	item-11	
+src/ck-ldb/CommonLBs.ci	2	item-11	
+src/ck-ldb/DistributedLB.C	2	item-11	
+src/ck-ldb/EveryLB.ci	2	item-11	
+src/ck-ldb/GreedyCentralLB.C	323	item-11	
+src/ck-ldb/GreedyCentralLB.ci	9	item-11	
+src/ck-ldb/GreedyCentralLB.h	45	item-11	
+src/ck-ldb/GreedyRefineCentralLB.C	810	item-11	
+src/ck-ldb/GreedyRefineCentralLB.ci	10	item-11	
+src/ck-ldb/GreedyRefineCentralLB.h	102	item-11	
+src/ck-ldb/LBComm.C	3	item-11	
+src/ck-ldb/LBDatabase.C	25	item-11	
+src/ck-ldb/LBDatabase.h	48	item-11	
+src/ck-ldb/LBManager.C	100	item-11	
+src/ck-ldb/LBManager.ci	1	item-11	
+src/ck-ldb/LBManager.h	45	item-11	
+src/ck-ldb/LBObj.C	20	item-11	
+src/ck-ldb/LBObj.h	64	item-11	
+src/ck-ldb/Make.lb	16	item-11	
+src/ck-ldb/Makefile_lb.sh	2	item-11	
+src/ck-ldb/MetisLB.C	24	item-11	
+src/ck-ldb/TreeBuilder.h	18	item-11	
+src/ck-ldb/TreeLB.C	298	item-11	
+src/ck-ldb/TreeLB.ci	15	item-11	
+src/ck-ldb/TreeLB.h	64	item-11	
+src/ck-ldb/TreeLevel.h	336	item-11	
+src/ck-ldb/TreeStrategyBase.h	2	item-11	
+src/ck-ldb/ckgraph.C	17	item-11	
+src/ck-ldb/ckgraph.h	8	item-11	
+src/ck-ldb/greedy.h	2	item-11	
+src/ck-ldb/lbdb.h	12	item-11	
+src/ck-ldb/manager.C	134	item-11	
+src/ck-ldb/manager.h	2	item-11	
+src/ck-ldb/refine.h	9	item-11	
+src/ck-perf/trace-common.C	2	pr-3943	
+src/ck-perf/trace-projections.C	3	pr-3943	
+src/ck-perf/trace-projections.h	1	pr-3943	
+src/ck-perf/trace-summary.C	29	pr-3943	
+src/ck-perf/trace-summary.ci	2	pr-3943	
+src/ck-perf/trace-summary.h	6	pr-3943	
+src/ck-perf/trace-summaryBOC.h	2	pr-3943	
+src/conv-ccs/ccs-builtins.C	8	needs-judgment	
+src/conv-ccs/ccs-builtins.h	2	needs-judgment	
+src/conv-ccs/conv-ccs.C	30	needs-judgment	
+src/conv-ccs/conv-ccs.h	12	needs-judgment	
+src/conv-core/conv-config.h	4	needs-judgment	
+src/conv-core/conv-rdma.h	197	item-9	
+src/conv-core/conv-rdmadevice.C	14	item-9	
+src/conv-core/conv-rdmadevice.h	44	item-9	
+src/conv-core/convcore.C	9	needs-judgment	
+src/conv-core/converse.h	2	needs-judgment	
+src/conv-core/cpuaffinity.C	3	needs-judgment	
+src/conv-core/queueing.h	3	needs-judgment	
+src/conv-core/taskqueue.h	1	needs-judgment	
+src/libs/ck-libs/ampi/ampi.C	6	needs-judgment	
+src/libs/ck-libs/ampi/ampi_functions.h	8	needs-judgment	
+src/libs/ck-libs/io/fs_parameters.h	3	needs-judgment	
+src/libs/ck-libs/io/{fs_parameters.c => fs_parameters.C}	0	needs-judgment	
+src/libs/ck-libs/metis/GKlib/GKlib.h	23	needs-judgment	
+src/libs/ck-libs/metis/GKlib/gkregex.c	2	needs-judgment	
+src/scripts/Make.depends	33	superseded	reviewed line two-way version is authoritative
+src/scripts/Makefile	6	superseded	reviewed line two-way version is authoritative
+src/scripts/charmc	96	superseded	reviewed line two-way version is authoritative
+src/scripts/configure.ac	16	superseded	reviewed line two-way version is authoritative
+src/util/charmrun-src/CMakeLists.txt	14	superseded	reviewed line two-way version is authoritative
+src/util/charmrun-src/Makefile	6	needs-judgment	
+src/util/charmrun-src/charmrun.C	306	tombstone	container/k8s debris; reconverse builds no charmrun
+src/util/ckrescale.C	19	item-10	
+src/util/ckrescale.h	5	item-10	
+src/util/cmirdmautils.h	73	needs-judgment	
+src/util/pup.h	83	needs-judgment	
+src/util/pup_c.h	3	needs-judgment	
+src/util/pup_c_functions.h	3	needs-judgment	
+src/util/pup_stl.h	4	needs-judgment	
+src/util/pup_toNetwork.h	6	needs-judgment	
+src/util/pup_util.C	111	needs-judgment	
+src/util/sockRoutines.C	1	needs-judgment	
+src/util/sockRoutines.h	3	needs-judgment	
+src/util/spanningTree.C	19	needs-judgment	
+src/util/spanningTree.h	3	needs-judgment	
+src/xlat-i/xi-util.h	4	needs-judgment	
+tests/ampi/migration/Makefile	4	with-feature	lands with the series that exercises it
+tests/charm++/Makefile	1	with-feature	lands with the series that exercises it
+tests/charm++/anytime_bcastred/Makefile	16	with-feature	lands with the series that exercises it
+tests/charm++/anytime_bcastred/bcastred.C	309	with-feature	lands with the series that exercises it
+tests/charm++/anytime_bcastred/bcastred.ci	26	with-feature	lands with the series that exercises it
+tests/charm++/qd/Makefile	23	with-feature	lands with the series that exercises it
+tests/charm++/qd/qdbench.C	178	with-feature	lands with the series that exercises it
+tests/charm++/qd/qdbench.ci	17	with-feature	lands with the series that exercises it

@@ -49,6 +49,12 @@ events, not dates: each stage unlocks when its predecessor merges.
 | 19 | Record-replay follow-ups: CkExit flush hook; threaded-entry replay validation | |
 | 20 | Rename `reviewed-with-reconverse` → `main` | at NAMD + ChaNGa parity |
 
+## Closure guarantee (mechanical)
+
+| # | Item | Notes |
+|---|---|---|
+| 22 | **Migration ledger**: `doc/reconverse-migration-ledger.tsv` + `doc/check-migration-ledger.sh` | Every file differing between the reviewed line and `reconverse-specific-build` carries a disposition (plan item, PR, superseded, tombstone, needs-judgment). The script fails on any undispositioned file — including new commits landing on the old branch — so nothing migrates silently or gets forgotten. Migration is provably complete when the check passes with only tombstone/superseded rows remaining. Resolve the needs-judgment rows (locmgr/cklocation.C via the queued joint review; conv-ccs; pup) as their reviews happen. |
+
 ## At the rename milestone (same trigger as #20)
 
 | # | Item | Notes |
