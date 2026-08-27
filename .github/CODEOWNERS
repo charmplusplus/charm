@@ -2,9 +2,9 @@
 # code-owner review on these paths IN ADDITION to the branch's required
 # approving review -- i.e., runtime-core changes effectively need two sets of
 # eyes; everything else needs one.
-/src/ck-core/     @lvkale @ericjbohm
-/src/conv-core/   @lvkale @ericjbohm
-/src/ck-ldb/      @adityapb @lvkale @ericjbohm
-/cmake/           @lvkale @ericjbohm
-/src/scripts/     @lvkale @ericjbohm
-/.github/         @lvkale @ericjbohm
+/src/ck-core/     @ritvikrao @lvkale @ericjbohm
+/src/conv-core/   @ritvikrao @lvkale @ericjbohm
+/src/ck-ldb/      @ritvikrao @adityapb @lvkale @ericjbohm
+/cmake/           @ritvikrao @lvkale @ericjbohm
+/src/scripts/     @ritvikrao @lvkale @ericjbohm
+/.github/         @ritvikrao @lvkale @ericjbohm
