@@ -125,16 +125,16 @@ jobs:
           make -C tests/charm++/anytime_bcastred CHARMC=$B/bin/charmc
           make -C tests/charm++/qd CHARMC=$B/bin/charmc
           make -C tests/charm++/megatest CHARMC=$B/bin/charmc
-      # NOTE: heavy migration configs (-m 1 -c 8) are enabled by the PR that
-      # lands the #3939 reduction fix -- they hang without it. Until then the
-      # stress tier runs the gentle shape.
+      # Heavy migration config (-m 1 -c 8): every step migrates 8 of the 8
+      # elements. Exercises the #3939 class (obligation-free PEs vs reduction
+      # tree) that this line's reduction fix closes; hangs without it.
       - name: anytime migration stress (single process)
         run: |
           set -e
           cd tests/charm++/anytime_bcastred
           B=$PWD/../../../reconverse-linux-x86_64
           for S in 1 2 3; do
-            env LD_LIBRARY_PATH=$B/lib ./bcastred +pe 4 -n 8 -i 500 -m 5 -c 1 -S $S -w 30
+            env LD_LIBRARY_PATH=$B/lib ./bcastred +pe 4 -n 8 -i 500 -m 1 -c 8 -S $S -w 30
           done
       - name: anytime migration stress (2 processes)
         run: |
@@ -142,7 +142,7 @@ jobs:
           cd tests/charm++/anytime_bcastred
           B=$PWD/../../../reconverse-linux-x86_64
           for S in 4 5; do
-            $B/_deps/lci-src/lcrun -n 2 env LD_LIBRARY_PATH=$B/lib ./bcastred +pe 4 -n 8 -i 500 -m 5 -c 1 -S $S -w 30
+            $B/_deps/lci-src/lcrun -n 2 env LD_LIBRARY_PATH=$B/lib ./bcastred +pe 4 -n 8 -i 500 -m 1 -c 8 -S $S -w 30
           done
       - name: qd + megatest multi-process
         run: |
