@@ -1484,7 +1484,9 @@ void CkUnpackMessage(envelope **pEnv)
 #if CMK_OBJECT_QUEUE_AVAILABLE
 static int index_objectQHandler;
 #endif
-//int index_tokenHandler;
+#if !CMK_RECONVERSE  /* token pool lives in ckobjQ.C, classic-only */
+int index_tokenHandler;
+#endif
 int index_skipCldHandler;
 
 void _skipCldHandler(void *converseMsg)
@@ -2137,9 +2139,11 @@ void _ckModuleInit(void) {
 #if CMK_OBJECT_QUEUE_AVAILABLE
 	CmiAssignOnce(&index_objectQHandler, CkRegisterHandler(_ObjectQHandler));
 #endif
-	//CmiAssignOnce(&index_tokenHandler, CkRegisterHandler(_TokenHandler));
-	//CkpvInitialize(TokenPool*, _tokenPool);
-	//CkpvAccess(_tokenPool) = new TokenPool;
+#if !CMK_RECONVERSE  /* _TokenHandler/TokenPool live in ckobjQ.C, classic-only */
+	CmiAssignOnce(&index_tokenHandler, CkRegisterHandler(_TokenHandler));
+	CkpvInitialize(TokenPool*, _tokenPool);
+	CkpvAccess(_tokenPool) = new TokenPool;
+#endif
 }
 
 
