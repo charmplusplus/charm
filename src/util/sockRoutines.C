@@ -1,3 +1,4 @@
+#include "conv-autoconfig.h" /* guarded; safe to include early on both runtimes */
 #include "sockRoutines.h"
 
 #ifndef CMK_NO_SOCKETS /*<- for ASCI Red*/

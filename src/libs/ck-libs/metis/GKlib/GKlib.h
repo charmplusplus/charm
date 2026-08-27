@@ -11,7 +11,21 @@
 #ifndef _GKLIB_H_
 #define _GKLIB_H_ 1
 
-#include "conv-config.h"
+/*
+ * These must be defined before any system header is pulled in (including
+ * transitively via charm-config.h/converse.h below), otherwise glibc's
+ * <features.h> locks in its feature-test macros on first inclusion and
+ * later attempts to influence __USE_XOPEN/strptime visibility are ignored.
+ */
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE
+#endif
+#ifndef __USE_XOPEN
+#define __USE_XOPEN
+#endif
+
+#include "charm-config.h"
+#include "converse.h"
 
 #define GKMSPACE
 
@@ -35,12 +49,6 @@
 # define CMK_THREADLOCAL __thread
 #endif
 
-#ifndef _XOPEN_SOURCE
-#define _XOPEN_SOURCE
-#endif
-#ifndef __USE_XOPEN
-#define __USE_XOPEN
-#endif
 #include "gk_arch.h" /*!< This should be here, prior to the includes */
 
 

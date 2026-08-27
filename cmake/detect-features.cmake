@@ -15,6 +15,10 @@ set(CMK_CCS_AVAILABLE 1)
 if(${NETWORK} STREQUAL "pami" OR ${NETWORK} STREQUAL "pamilrts")
   set(CMK_CCS_AVAILABLE 0)
 endif()
+if(RECONVERSE)
+  # CCS is not ported to reconverse yet.
+  set(CMK_CCS_AVAILABLE 0)
+endif()
 
 set(CMK_NO_PARTITIONS 0)
 if(${NETWORK} STREQUAL "netlrts" OR ${NETWORK} STREQUAL "multicore" OR ${NETWORK} STREQUAL "pami")
@@ -150,9 +154,14 @@ get_cmake_property(_variableNames VARIABLES)
 list (SORT _variableNames)
 
 list(REMOVE_ITEM _variableNames CMK_USE_CMA)
+# CMK_OPTIMIZE belongs in conv-mach-opt.h (build-time options), not conv-autoconfig.h
+list(REMOVE_ITEM _variableNames CMK_OPTIMIZE)
 
 set(optfile ${CMAKE_BINARY_DIR}/include/conv-autoconfig.h)
 file(REMOVE ${optfile})
+# Include guard: this generated file is re-included transitively; without a
+# guard a mid-TU re-inclusion replays raw values over arch-header overrides.
+file(APPEND ${optfile} "#ifndef CONV_AUTOCONFIG_H\n#define CONV_AUTOCONFIG_H\n")
 
 foreach (v ${_variableNames})
     if(("${v}" MATCHES "^CMK_"  OR "${v}" MATCHES "^SIZEOF_" OR "${v}" MATCHES "^CHARM_" OR "${v}" MATCHES "^QLOGIC$") AND NOT "${v}" MATCHES "_CODE$" AND NOT "${v}" MATCHES "^CMK_LUSTREAPI")
@@ -172,3 +181,4 @@ foreach (v ${_variableNames})
         endif()
     endif()
 endforeach()
+file(APPEND ${optfile} "#endif /* CONV_AUTOCONFIG_H */\n")

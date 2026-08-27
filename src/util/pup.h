@@ -57,6 +57,9 @@ class bar {
 #ifndef __CK_PUP_H
 #define __CK_PUP_H
 
+#include "conv-autoconfig.h" /* guarded; supplies feature macros (e.g.
+  CMK_SIGNEDCHAR_DIFF_CHAR) on reconverse builds, whose converse.h does not
+  pull the classic conv-config chain */
 #include <stdio.h> /*<- for "FILE *" */
 #include <type_traits>
 #include <utility>

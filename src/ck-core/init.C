@@ -73,11 +73,12 @@ never be excluded...
 #include <limits.h>
 #include "spanningTree.h"
 #include "CkSyncBarrier.decl.h"
+#include "converse.h"
 #if CMK_CHARM4PY
 #include "TreeLB.h"
 #endif
 
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
 #include "hapi_impl.h"
 #include "ckrdmadevice.h"
 
@@ -154,10 +155,12 @@ int   _infoIdx;
 int   _charmHandlerIdx;
 int   _initHandlerIdx;
 int   _roRestartHandlerIdx;
+int   _shrinkExpandRestartHandlerIdx;
 int   _bocHandlerIdx;
 int   _qdHandlerIdx;
 int   _qdCommHandlerIdx;
 int   _triggerHandlerIdx;
+
 bool  _mainDone = false;
 CksvDeclare(bool, _triggersSent);
 
@@ -682,13 +685,14 @@ static void _exitHandler(envelope *env)
       }
       else
         CmiFree(env);
-#if CMK_SHRINK_EXPAND
-      ConverseCleanup();
-#endif
 
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
       // Clean up HAPI
       hapiExit();
+#endif
+
+#if CMK_SHRINK_EXPAND
+      ConverseCleanup();
 #endif
 
       //everyone exits here - there may be issues with leftover messages in the queue
@@ -772,7 +776,7 @@ static inline void _processBufferedBocInits(void)
     envelope *env = inits[i];
     if(env==0) {
 #if CMK_SHRINK_EXPAND
-      if(_inrestart){
+      if(get_in_restart()){
         CkPrintf("_processBufferedBocInits: empty message in restart, ignoring\n");
         break;
       }
@@ -1444,6 +1448,7 @@ void _initCharm(int unused_argc, char **argv)
 #if CMK_SHRINK_EXPAND
 	// for shrink expand cleanup
 	CmiAssignOnce(&_ROGroupRestartHandlerIdx, CkRegisterHandler(_ROGroupRestartHandler));
+	CmiAssignOnce(&_shrinkExpandRestartHandlerIdx, CkRegisterHandler(CkRecvGroupROData));
 #endif
 
 	_infoIdx = CldRegisterInfoFn((CldInfoFn)_infoFn);
@@ -1480,8 +1485,8 @@ void _initCharm(int unused_argc, char **argv)
 	// Set the ack handler function used for the direct nocopy api
 	CmiSetDirectNcpyAckHandler(CkRdmaDirectAckHandler);
 
-#if CMK_CUDA && CMK_GPU_COMM
-	CmiRdmaDeviceRecvInit(CkRdmaDeviceRecvHandler);
+#if (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM
+  loopback_handler = CmiRegisterHandler((CmiHandler) loopback_bridge);
 #endif
 
 #if CMK_USE_SHMEM
@@ -1690,9 +1695,10 @@ void _initCharm(int unused_argc, char **argv)
         }
     }
 
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
   // Perform HAPI initialization for GPU support
   hapiInit(argv);
+  //hapiStartMemoryDaemon();
 
   // Initialize Charm++ layer functions
   hapiInvokeCallback = CUDACallbackManager;
@@ -1805,6 +1811,7 @@ void _initCharm(int unused_argc, char **argv)
 		// NOTE: this assumes commthreads will not block from this point on
 	}
 
+
 	DEBUGF(("[%d,%d%.6lf] inCommThread %d\n",CmiMyPe(),CmiMyRank(),CmiWallTimer(),inCommThread));
 	// when I am a communication thread, I don't participate initDone.
         if (inCommThread) {
@@ -1828,13 +1835,18 @@ void _initCharm(int unused_argc, char **argv)
                 readKillFile();                                        
         }
 #endif
-
 }
 
 int charm_main(int argc, char **argv)
 {
   int stack_top=0;
   memory_stack_top = &stack_top;
+
+#if CMK_TRACE_ENABLED && CMK_RECONVERSE
+  /* Hand converse the trace-init hook; reconverse's ConverseInit invokes it.
+   * Classic convcore calls traceInit through its own path. */
+  registerTraceInit(traceInit);
+#endif
 
   ConverseInit(argc, argv, (CmiStartFn) _initCharm, 0, 0);
 

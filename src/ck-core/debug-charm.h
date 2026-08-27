@@ -10,7 +10,9 @@
 #endif
 
 #include "converse.h"
+#if !CMK_RECONVERSE  /* reconverse has no converse-level debugger lists */
 #include "debug-conv++.h"
+#endif
 #include "pup.h"
 #include "cklists.h"
 #include <vector>

@@ -103,6 +103,7 @@ opt_ccs=0
 opt_charmdebug=0
 opt_controlpoint=0
 opt_cuda=0
+opt_amd=0
 opt_destination=""
 opt_disabletls=0
 opt_install_prefix=""
@@ -131,6 +132,14 @@ opt_shmem=0
 opt_xpmem=0
 opt_qlogic=0
 opt_randomized_msgq=0
+# OFF unless the target network is reconverse (set below) or
+# --enable-reconverse is passed. The old default of 1 made EVERY build --
+# netlrts included -- pull in fetch_reconverse, which installs reconverse's
+# converse.h over the classic one and breaks all classic arches (#3941).
+opt_reconverse=0
+opt_fetch_reconverse_tag=""
+opt_fetch_reconverse_dir=""
+opt_reconverse_fetch_lci=1
 opt_refnum_type="unsigned short"
 opt_replay=0
 opt_shrinkexpand=0
@@ -143,6 +152,7 @@ opt_tcp=0
 opt_tracing= #undef
 opt_tracing_commthread=0
 opt_zlib=1
+declare -a opt_cmake_extra_args=()
 
 # default to not building ROMIO on AMPI due to GCC 14 cascade failures
 case "$actual_triplet" in
@@ -175,6 +185,11 @@ function parse_platform_compilers() {
       ;;
     cuda)
       opt_cuda=1
+      ;;
+    amd|hip)
+      # AMD GPU support via HIP/ROCm. Both spellings are accepted; the build
+      # directory is always suffixed "-amd" (e.g. reconverse-linux-x86_64-amd).
+      opt_amd=1
       ;;
     cxi)
       opt_cxi=1
@@ -348,6 +363,18 @@ function processArgs() {
       --enable-ccs)
         opt_ccs=1
         ;;
+      --enable-reconverse)
+        opt_reconverse=1
+        ;;
+      --with-fetch-reconverse-tag=*)
+        opt_fetch_reconverse_tag=${arg#*=}
+        ;;
+      --with-fetch-reconverse-dir=*)
+        opt_fetch_reconverse_dir=${arg#*=}
+        ;;
+      --without-reconverse-fetch-lci)
+        opt_reconverse_fetch_lci=0
+        ;;
       --enable-controlpoint)
         opt_controlpoint=1
         ;;
@@ -462,6 +489,11 @@ function processArgs() {
       --incdir=*)
         opt_incdir+=("-I${arg#*=}")
         ;;
+      --with-cmake-args=*)
+        # Split the value into words (quotes preserved by the shell before this point)
+        read -r -a _vals <<< "${arg#*=}"
+        opt_cmake_extra_args+=("${_vals[@]}")
+        ;;
       *)
         echo "*** Note: Adding unknown option '$arg' to compiler flags."
         opt_extra_opts+=("$arg")
@@ -496,7 +528,7 @@ fi
 
 # Append certain features and compilers to the end of $builddir
 builddir_extra=""
-for flag in opt_omp opt_smp opt_tcp opt_pthreads opt_pxshm opt_syncft opt_ooc opt_persistent opt_cuda opt_cxi; do
+for flag in opt_omp opt_smp opt_tcp opt_pthreads opt_pxshm opt_syncft opt_ooc opt_persistent opt_cuda opt_amd opt_cxi; do
   [[ $flag -eq 1 ]] && builddir_extra+="-${flag/opt_/}"
 done
 
@@ -586,6 +618,14 @@ fi
 
 my_os=$(echo "$actual_triplet" | cut -d '-' -f2)
 
+# reconverse network type implies reconverse communication layer and inherent SMP.
+# CMK_SMP is forced to 1 by CMakeLists.txt for reconverse; we do not pass -DSMP=1
+# here because that would trigger the opt-file loop to source conv-mach-smp.sh,
+# which does not exist for reconverse (SMP flags are baked into conv-mach.h directly).
+if [[ $opt_network == "reconverse" ]]; then
+  opt_reconverse=1
+fi
+
 if [[ $opt_network == "mpi" && $my_os == "win" ]]; then
   echo "Warning: CMake build is not supported with MPI on Windows, running ./buildold instead."
   sleep 2
@@ -634,6 +674,17 @@ fi
 
 # Run configure step
 
+CMAKE_EXTRA_ARGS=()
+if [[ -n "$opt_fetch_reconverse_tag" ]]; then
+  CMAKE_EXTRA_ARGS+=(-DAUTOFETCH_RECONVERSE_TAG="$opt_fetch_reconverse_tag")
+fi
+if [[ -n "$opt_fetch_reconverse_dir" ]]; then
+  CMAKE_EXTRA_ARGS+=(-DFETCHCONTENT_SOURCE_DIR_RECONVERSE="$opt_fetch_reconverse_dir")
+fi
+if (( ${#opt_cmake_extra_args[@]} > 0 )); then
+  CMAKE_EXTRA_ARGS+=("${opt_cmake_extra_args[@]}")
+fi
+
 CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
   -G "Unix Makefiles" \
   -DARCH="$opt_arch" \
@@ -648,6 +699,7 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
   -DCHARMDEBUG="$opt_charmdebug" \
   -DCONTROLPOINT="$opt_controlpoint" \
   -DBUILD_CUDA="$opt_cuda" \
+  -DBUILD_HIP="$opt_amd" \
   -DDISABLE_TLS="$opt_disabletls" \
   -DDRONE_MODE="$opt_drone_mode" \
   -DENABLE_FORTRAN=$opt_enable_fortran \
@@ -670,6 +722,8 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
   -DCMK_USE_SHMEM="$opt_shmem" \
   -DQLOGIC="$opt_qlogic" \
   -DRANDOMIZED_MSGQ="$opt_randomized_msgq" \
+  -DRECONVERSE="$opt_reconverse" \
+  -DRECONVERSE_AUTOFETCH_LCI2="$opt_reconverse_fetch_lci" \
   -DREFNUM_TYPE="$opt_refnum_type" \
   -DREPLAY="$opt_replay" \
   -DSHRINKEXPAND="$opt_shrinkexpand" \
@@ -683,7 +737,8 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
   -DTRACING_COMMTHREAD="$opt_tracing_commthread" \
   -DCXI="$opt_cxi" \
   -DCMK_BUILD_OFI="$opt_build_ofi" \
-  -DZLIB="$opt_zlib"
+  -DZLIB="$opt_zlib" \
+  "${CMAKE_EXTRA_ARGS[@]}"
 
 
 # Run build step

@@ -8,7 +8,9 @@ clients, including the rest of Charm++, are actually C++.
 */
 #include "ck.h"
 #include "trace.h"
+#if !CMK_RECONVERSE  /* reconverse has no converse-level queueing.h */
 #include "queueing.h"
+#endif
 
 #include "pathHistory.h"
 
@@ -175,6 +177,7 @@ static void CkChareThreadListener_suspend(CkThreadListener *l) {
 }
 
 static void CkChareThreadListener_resume(CkThreadListener *l) {
+  // printf("[PE %d] CkChareThreadListener_resume: obj=%p\n", CkMyPe(), ((CkChareThreadListener*)l)->obj);
   CkCallstackPush(((CkChareThreadListener *)l)->obj);
 }
 
@@ -470,7 +473,7 @@ void CkSectionID::pup(PUP::er &p) {
 
 /**** Tiny random API routines */
 
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
 void CUDACallbackManager(void *fn, void *msg) {
   if (fn) {
     ((CkCallback*)fn)->send(msg);
@@ -574,6 +577,7 @@ int CkGetArgc(void) {
 }
 
 Chare *CkActiveObj(void) {
+  // printf("[PE %d] getting active: stack size now %zu\n", CkMyPe(), CkpvAccess(runningObjs).size());
   auto &objs = *(&CkpvAccess(runningObjs));
   if (objs.empty()) {
     return nullptr;
@@ -584,10 +588,12 @@ Chare *CkActiveObj(void) {
 
 inline void _pushObj(Chare *obj) {
   CkpvAccess(runningObjs).emplace_back(obj);
+  // printf("[PE %d] pushObj: stack size now %zu\n", CkMyPe(), CkpvAccess(runningObjs).size());
 }
 
 inline Chare *_popObj(void) {
   auto &objs = *(&CkpvAccess(runningObjs));
+  // printf("[PE %d] popobj: stack size now %zu\n", CkMyPe(), CkpvAccess(runningObjs).size());
   if (objs.empty()) {
     return nullptr;
   } else {
@@ -620,10 +626,16 @@ void CkCallstackPush(Chare *obj) {
 
 // removes all instances of ( obj ) from the stack
 void CkCallstackUnwind(Chare *obj) {
+  // printf("[%d] removing all instances of obj %p\n",CkMyPe(), obj);
+
   CkAssertMsg(obj != nullptr, "expected a valid object!");
   auto &objs = *(&CkpvAccess(runningObjs));
   auto start = std::begin(objs);
   auto end = std::end(objs);
+  //   for(auto it=start;it!=end;it++)
+  // {
+  //   printf("objects still in the stack are %p\n", *it);
+  // }
   // ensures that all copies of the object are null'd
   while (end != (start = std::find(start, end, obj))) {
     *start = nullptr;
@@ -1472,7 +1484,7 @@ void CkUnpackMessage(envelope **pEnv)
 #if CMK_OBJECT_QUEUE_AVAILABLE
 static int index_objectQHandler;
 #endif
-int index_tokenHandler;
+//int index_tokenHandler;
 int index_skipCldHandler;
 
 void _skipCldHandler(void *converseMsg)
@@ -2125,9 +2137,9 @@ void _ckModuleInit(void) {
 #if CMK_OBJECT_QUEUE_AVAILABLE
 	CmiAssignOnce(&index_objectQHandler, CkRegisterHandler(_ObjectQHandler));
 #endif
-	CmiAssignOnce(&index_tokenHandler, CkRegisterHandler(_TokenHandler));
-	CkpvInitialize(TokenPool*, _tokenPool);
-	CkpvAccess(_tokenPool) = new TokenPool;
+	//CmiAssignOnce(&index_tokenHandler, CkRegisterHandler(_TokenHandler));
+	//CkpvInitialize(TokenPool*, _tokenPool);
+	//CkpvAccess(_tokenPool) = new TokenPool;
 }
 
 
@@ -2643,7 +2655,7 @@ void CkArrayExtSend_multi(int aid, int *idx, int ndims, int epIdx, int num_bufs,
 #include "hapi.h"
 #endif
 
-void CkHapiAddCallback(long stream, void (*cb)(void*, void*), int fid) 
+void CkHapiAddCallback(long stream, void (*cb)(void*, void*), int fid)
 {
   #if CMK_CUDA
   cudaStream_t stream_ptr = (cudaStream_t)stream;
@@ -2729,12 +2741,20 @@ private:
   void flushLog(int verbose=1) {
     if (verbose) CkPrintf("[%d] flushing log\n", CkMyPe());
     fprintf(f, "%s", buffer.data());
+    fflush(f);  // make records survive a killed/hung run (the main use case)
     curpos=0;
   }
   virtual bool process(envelope **envptr,CkCoreState *ck) {
     if ((*envptr)->getEvent()) {
+      // Pack only when a CRC/checksum over the packed bytes is required.
+      // The logged header fields are all valid on an unpacked envelope, and
+      // the pack/unpack round trip swaps the envelope out from under senders
+      // that retain a pointer to it -- CkArrayBroadcaster keeps the broadcast
+      // envelope for multi-element delivery, so packing here segfaulted any
+      // program using array broadcasts under +record (issue #3940).
+      const bool needPacked = _recplay_crc || _recplay_checksum;
       bool wasPacked = (*envptr)->isPacked();
-      if (!wasPacked) CkPackMessage(envptr);
+      if (needPacked && !wasPacked) CkPackMessage(envptr);
       envelope *env = *envptr;
       unsigned int crc1=0, crc2=0;
       if (_recplay_crc) {
@@ -2746,8 +2766,11 @@ private:
         crc2 = checksum_initial(((unsigned char*)env)+sizeof(*env), env->getTotalsize()-sizeof(*env));
       }
       curpos+=snprintf(&buffer[curpos],buffer.size() - curpos,"%d %d %d %d %x %x %d\n",env->getSrcPe(),env->getTotalsize(),env->getEvent(), env->getMsgtype()==NodeBocInitMsg || env->getMsgtype()==ForNodeBocMsg, crc1, crc2, env->getEpIdx());
-      if (curpos > _recplay_logsize-128) flushLog();
-      if (!wasPacked) CkUnpackMessage(envptr);
+      // Quiet flush: with a small +recplay-logsize (continuous flushing, for
+      // recording runs that will be killed at a hang) the per-flush banner
+      // would flood the output.
+      if (curpos > _recplay_logsize-128) flushLog(0);
+      if (needPacked && !wasPacked) CkUnpackMessage(envptr);
     }
     return true;
   }
@@ -2807,11 +2830,22 @@ class CkMessageReplay : public CkMessageWatcher {
 	FILE *lbFile;
 	/// Read the next message we need from the file:
 	void getNext(void) {
-	  if (3!=fscanf(f,"%d%d%d", &nextPE,&nextSize,&nextEvent)) CkAbort("CkMessageReplay> Syntax error reading replay file");
+	  // A truncated log (recorder killed mid-run -- the normal case when
+	  // recording a hang) is treated like the "-1 -1 -1" end sentinel: this
+	  // PE holds all further messages at the recorded frontier instead of
+	  // aborting the whole replay. An empty log (e.g. an SMP comm thread
+	  // that recorded nothing before being killed) is the same case.
+	  if (3!=fscanf(f,"%d%d%d", &nextPE,&nextSize,&nextEvent)) {
+	    CkPrintf("[%d] CkMessageReplay> log ended without sentinel (truncated record?); holding all further messages\n", CkMyPe());
+	    nextPE=nextSize=nextEvent=-1;
+	    return;
+	  }
 	  if (nextSize > 0) {
 	    // We are reading a regular message
 	    if (4!=fscanf(f,"%d%x%x%d", &nexttype,&crc1,&crc2,&nextEP)) {
-	      CkAbort("CkMessageReplay> Syntax error reading replay file");
+	      CkPrintf("[%d] CkMessageReplay> log ended mid-record (truncated record?); holding all further messages\n", CkMyPe());
+	      nextPE=nextSize=nextEvent=-1;
+	      return;
 	    }
             REPLAYDEBUG("getNext: "<<nextPE<<" " << nextSize << " " << nextEvent)
 	  } else if (nextSize == -2) {
@@ -2931,8 +2965,13 @@ public:
 
 private:
 	virtual bool process(envelope **envptr,CkCoreState *ck) {
+          // Same rule as CkMessageRecorder::process (#3940): pack only when a
+          // CRC/checksum over packed bytes will be computed. The swap
+          // corrupts envelopes that other code retains a pointer to
+          // (CkArrayBroadcaster), and matching needs no packing.
+          const bool needPacked = _recplay_crc || _recplay_checksum;
           bool wasPacked = (*envptr)->isPacked();
-          if (!wasPacked) CkPackMessage(envptr);
+          if (needPacked && !wasPacked) CkPackMessage(envptr);
           envelope *env = *envptr;
 	  //CkAssert(*(int*)env == 0x34567890);
 	  REPLAYDEBUG("ProcessMessage message: "<<env->getSrcPe()<<" "<<env->getTotalsize()<<" "<<env->getEvent() <<" " <<env->getMsgtype() <<" " <<env->getMsgIdx() << " ep:" << env->getEpIdx());
@@ -2941,13 +2980,22 @@ private:
 			REPLAYDEBUG("Executing message: "<<env->getSrcPe()<<" "<<env->getTotalsize()<<" "<<env->getEvent())
 			getNext(); /* Advance over this message */
 			flush(); /* try to process queued-up stuff */
-    			if (!wasPacked) CkUnpackMessage(envptr);
+    			if (needPacked && !wasPacked) CkUnpackMessage(envptr);
 			return true;
 		}
 #if CMK_SMP
-                else if (env->getMsgtype()==NodeBocInitMsg || env->getMsgtype()==ForNodeBocMsg) {
+                else if (env->getMsgtype()==NodeBocInitMsg || env->getMsgtype()==ForNodeBocMsg
+                         || env->getMsgtype()==BocBcastMsg || env->getMsgtype()==ArrayBcastMsg) {
                          // try next rank, we can't just buffer the msg and left
-                         // we need to keep unprocessed msg on the fly
+                         // we need to keep unprocessed msg on the fly.
+                         // BocBcastMsg/ArrayBcastMsg belong here too (#3940): they ride
+                         // the node queue and are claimed by an arbitrary rank, which
+                         // then performs the within-node fan-out with its own
+                         // srcPe/event stamps (_processBocBcastMsg ->
+                         // _sendMsgBranchWithinNode). Buffering one at the wrong rank
+                         // both strands the original and suppresses the fan-out the
+                         // other ranks' logs expect -- the replay stalls with no
+                         // diagnostic. Bouncing lets the recorded winner claim it.
                         int nextpe = CkMyPe()+1;
                         if (nextpe == CkNodeFirst(CkMyNode())+CkMyNodeSize())
                         nextpe = CkNodeFirst(CkMyNode());
