@@ -449,10 +449,15 @@ jobs:
   mpi-linux-arm8:
     timeout-minutes: 90
     runs-on: ubuntu-24.04-arm
+    env:
+      # The runner has 4 vCPUs; let Open MPI oversubscribe for wider test shapes.
+      OMPI_MCA_rmaps_base_oversubscribe: "true"
     steps:
     - uses: actions/checkout@v4
     - name: install-prerequisites
-      run: sudo apt-get update && sudo apt-get install -y mpich libmpich-dev
+      # openmpi, as the retired CircleCI job used: Ubuntu 24.04's mpich is
+      # built on the ch4:ucx device, which crashes at startup on these runners.
+      run: sudo apt-get update && sudo apt-get install -y libopenmpi-dev openmpi-bin
     - name: build
       run: ./build all-test mpi-linux-arm8 --with-production --enable-error-checking --enable-lbuserdata -j4 -g -Werror=vla
     - name: test
