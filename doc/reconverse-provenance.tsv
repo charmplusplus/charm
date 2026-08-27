@@ -1,0 +1,220 @@
+# Provenance: branch-only commits touching each file in the migration delta.
+# Columns: file <TAB> origin commits (newest first, %h:%an:%s truncated)
+.github/workflows/ci.yaml	5ea290845:Jiakun Yan:improve cmake support for charm on top of reconve|81bd69bdd:Ritvik Rao:merge main|db242b5e9:Matthias Diener:Merge branch 'main' into reconverse-suport
+CMakeLists.txt	931d720d1:Ritvik Rao:cuda fixes|fdbe226d2:Ritvik Rao:Fix GPU/CPU build breakage exposed by the hapi me|98694d42c:Ritvik Rao:Merge branch 'cupti_lb_reconverse_hapi' into reco|6841dfe62:Ritvik Rao:fix CMK_OPTIMIZE redefinition|e337bccd8:Ritvik Rao:New build for reconverse|2a98e2ed7:Ritvik Rao:build fix
+Dockerfile	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+README.md	43651fd6f:Ritvik Rao:add reconverse-linux-arm8 build|e337bccd8:Ritvik Rao:New build for reconverse
+benchmarks/charm++/cuda/gpudirect/latency/latency.C	5acece198:Aditya Bhosale:Update latency benchmark|954893b58:Aditya Bhosale:Update latency benchmark|22c350a57:Aditya Bhosale:Update latency benchmark|332a30639:Aditya Bhosale:Update latency benchmark
+buildcmake	c1471a669:Laxmikant Kale:buildcmake: don't force RECONVERSE=ON for eve|98694d42c:Ritvik Rao:Merge branch 'cupti_lb_reconverse_hapi' into reco|e337bccd8:Ritvik Rao:New build for reconverse|50d524b37:Sh0g0-1758:Merge branch 'reconverse-support' into hapi_porta|4c9b86fb9:Anant Jain:working hapi port|5ea290845:Jiakun Yan:improve cmake support for charm on top of reconve
+buildold	6841dfe62:Ritvik Rao:fix CMK_OPTIMIZE redefinition
+cmake/converse.cmake	50dbead86:Laxmikant Kale:cmake: charm_cxx_utils must wait for charmxi-|15f774f0f:Laxmikant Kale:build: stop forcing RECONVERSE into every bui|98694d42c:Ritvik Rao:Merge branch 'cupti_lb_reconverse_hapi' into reco|86db40707:Ritvik Rao:copy persistent.h from reconverse|9794fead2:Ritvik Rao:copy conv-rdma from reconverse|e337bccd8:Ritvik Rao:New build for reconverse
+cmake/detect-features.cmake	6841dfe62:Ritvik Rao:fix CMK_OPTIMIZE redefinition|02ec45859:Ritvik Rao:cmake changes
+cmake/fetch_reconverse/CMakeLists.txt	3f8847602:Laxmikant Kale:fetch_reconverse: pin reconverse by commit SH|86db40707:Ritvik Rao:copy persistent.h from reconverse|9794fead2:Ritvik Rao:copy conv-rdma from reconverse|dfb6b119d:Ritvik Rao:cmake changes for building shmem with reconverse|adac3c4ce:Ritvik Rao:fix cmake|75bba6989:Ritvik Rao:add charm config
+contrib/ci.vim	3c63232e5:Matthias Diener:(untested) changes to charmc
+doc/charm++/manual.rst	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+examples/ampi/Cjacobi3D/Makefile	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+examples/ampi/Cjacobi3D/jacobi.C	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+examples/charm++/cuda/gpudirect/jacobi2d-imbalance/Makefile	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+examples/charm++/cuda/gpudirect/jacobi2d-imbalance/jacobi2d.C	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+examples/charm++/cuda/gpudirect/jacobi2d-imbalance/jacobi2d.ci	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+examples/charm++/cuda/gpudirect/jacobi2d-imbalance/jacobi2d.cu	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+examples/charm++/cuda/gpudirect/jacobi2d-imbalance/jacobi2d.h	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+examples/charm++/cuda/gpudirect/jacobi2d/Makefile	6f7a30957:Shourya Goel:verify and jacobi|9e48ce995:Ritvik Rao:merge reconverse changes with lb|bca7c3641:Shourya Goel:changes to prevent double free, cudastreamsynch|dbc3815c7:shourya goel:mpi smp for chareArray and group|66b8e92e5:Anant Jain:patches for bugs|4c9b86fb9:Anant Jain:working hapi port
+examples/charm++/cuda/gpudirect/jacobi2d/jacobi2d.C	6f7a30957:Shourya Goel:verify and jacobi|9e48ce995:Ritvik Rao:merge reconverse changes with lb|bca7c3641:Shourya Goel:changes to prevent double free, cudastreamsynch|79ccdda22:shourya goel:isend/irecv for mpi smp|4c9b86fb9:Anant Jain:working hapi port
+examples/charm++/cuda/gpudirect/jacobi2d/jacobi2d.ci	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+examples/charm++/cuda/gpudirect/jacobi2d/jacobi2d.cu	6f7a30957:Shourya Goel:verify and jacobi|9e48ce995:Ritvik Rao:merge reconverse changes with lb|66b8e92e5:Anant Jain:patches for bugs|4c9b86fb9:Anant Jain:working hapi port
+examples/charm++/cuda/gpudirect/jacobi2d/jacobi2d.h	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+examples/charm++/cuda/gpudirect/sdag/sdag.C	4c9b86fb9:Anant Jain:working hapi port
+examples/charm++/cuda/gpudirect/sdag/sdag.cu	4c9b86fb9:Anant Jain:working hapi port
+examples/charm++/cuda/gpudirect/verify/Makefile	931d720d1:Ritvik Rao:cuda fixes|34eca2f42:Ritvik Rao:verify example: default CHARM_DIR to the in-tree |6f7a30957:Shourya Goel:verify and jacobi|9e48ce995:Ritvik Rao:merge reconverse changes with lb|bca7c3641:Shourya Goel:changes to prevent double free, cudastreamsynch|c2597d03d:Shourya Goel:fixes to run intermittently
+examples/charm++/cuda/gpudirect/verify/charmrun_hapi	6f7a30957:Shourya Goel:verify and jacobi
+examples/charm++/cuda/gpudirect/verify/helper.sh	6f7a30957:Shourya Goel:verify and jacobi|9e48ce995:Ritvik Rao:merge reconverse changes with lb|c2597d03d:Shourya Goel:fixes to run intermittently|79ccdda22:shourya goel:isend/irecv for mpi smp|5ecffbb01:shourya goel:a couple patches|f2df1c6a7:Anant Jain:fix qd issue
+examples/charm++/cuda/gpudirect/verify/verbose	c2597d03d:Shourya Goel:fixes to run intermittently
+examples/charm++/cuda/gpudirect/verify/verify.C	6f7a30957:Shourya Goel:verify and jacobi|9e48ce995:Ritvik Rao:merge reconverse changes with lb|bca7c3641:Shourya Goel:changes to prevent double free, cudastreamsynch|c2597d03d:Shourya Goel:fixes to run intermittently|79ccdda22:shourya goel:isend/irecv for mpi smp|dbc3815c7:shourya goel:mpi smp for chareArray and group
+examples/charm++/cuda/gpudirect/verify/verify.cu	4c9b86fb9:Anant Jain:working hapi port
+examples/charm++/cuda/stencil2d/Makefile	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+examples/charm++/cuda/stencil2d/stencil2d.C	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+examples/charm++/cuda/stencil2d/stencil2d.ci	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+examples/charm++/cuda/stencil2d/stencil2d.cu	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+examples/charm++/cuda/vecadd/Makefile	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+examples/charm++/cuda/vecadd/vecadd.C	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+examples/charm++/cuda/vecadd/vecadd.ci	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+examples/charm++/cuda/vecadd/vecadd.cu	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+examples/charm++/osu_bw/Makefile	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+examples/charm++/osu_bw/osu_bw.C	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+examples/charm++/osu_bw/osu_bw.ci	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+examples/charm++/osu_latency/Makefile	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+examples/charm++/osu_latency/osu_latency.C	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+examples/charm++/osu_latency/osu_latency.ci	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+examples/charm++/shrink_expand/README	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+examples/charm++/shrink_expand/client.C	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+examples/charm++/shrink_expand/jacobi2d-iter/jacobi2d.C	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+examples/charm++/shrink_expand/jacobi2d-iter/jacobi2d.ci	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+examples/charm++/shrink_expand/startup/Makefile	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+examples/charm++/shrink_expand/startup/startup.C	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+examples/charm++/shrink_expand/startup/startup.ci	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/QuickThreads/md/setjmp64_.c	fc46dfd8e:Matthias Diener:restore ckqt, add -lcharm_cxx_utils
+src/arch/common/cc-gcc.sh	9460a3469:Laxmikant Kale:reconverse-darwin-arm8: compile with C++17 - |c3a9d74a0:Aditya Bhosale:Remove memory mode and thread mode checks and
+src/arch/common/cc-mpiopts.sh	c3a9d74a0:Aditya Bhosale:Remove memory mode and thread mode checks and
+src/arch/common/charmrun_elastic	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/arch/common/charmrun_hapi	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/arch/common/conv-mach-common.h	c2597d03d:Shourya Goel:fixes to run intermittently
+src/arch/common/conv-mach-cuda.sh	9e48ce995:Ritvik Rao:merge reconverse changes with lb|66b8e92e5:Anant Jain:patches for bugs
+src/arch/common/conv-mach-darwin.sh	9460a3469:Laxmikant Kale:reconverse-darwin-arm8: compile with C++17 - 
+src/arch/common/conv-mach-hip.h	4c9b86fb9:Anant Jain:working hapi port
+src/arch/common/conv-mach-hip.sh	a8a08ca11:Ritvik Rao:search for rocm paths|4c9b86fb9:Anant Jain:working hapi port
+src/arch/cuda/hybridAPI/Makefile	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/arch/cuda/hybridAPI/buddy_allocator.cpp	1df662ff5:Shourya Goel:better debugs|99413bd15:Shourya Goel:malloc for load balancing buffers|bca7c3641:Shourya Goel:changes to prevent double free, cudastreamsynch|33ebcd643:Shourya Goel:cleanup|82e168d93:Anant Jain:mpi for rdma + ipc for multiple processes per gpu|4c9b86fb9:Anant Jain:working hapi port
+src/arch/cuda/hybridAPI/buddy_allocator.h	1df662ff5:Shourya Goel:better debugs|99413bd15:Shourya Goel:malloc for load balancing buffers|33ebcd643:Shourya Goel:cleanup
+src/arch/cuda/hybridAPI/devicemanager.h	1df662ff5:Shourya Goel:better debugs|99413bd15:Shourya Goel:malloc for load balancing buffers|4c9b86fb9:Anant Jain:working hapi port
+src/arch/cuda/hybridAPI/gpumanager.h	9301b3787:Sh0g0-1758:hip is hapi now, cuda is also hapi|99413bd15:Shourya Goel:malloc for load balancing buffers|9e48ce995:Ritvik Rao:merge reconverse changes with lb|66b8e92e5:Anant Jain:patches for bugs|4c9b86fb9:Anant Jain:working hapi port
+src/arch/cuda/hybridAPI/hapi.h	9301b3787:Sh0g0-1758:hip is hapi now, cuda is also hapi|9e48ce995:Ritvik Rao:merge reconverse changes with lb|4c9b86fb9:Anant Jain:working hapi port
+src/arch/cuda/hybridAPI/hapi_functions.h	9301b3787:Sh0g0-1758:hip is hapi now, cuda is also hapi|9e48ce995:Ritvik Rao:merge reconverse changes with lb|4c9b86fb9:Anant Jain:working hapi port
+src/arch/cuda/hybridAPI/hapi_impl.cpp	f7c7605b3:Ritvik Rao:remove debug prints|fdbe226d2:Ritvik Rao:Fix GPU/CPU build breakage exposed by the hapi me|aa309d579:Shourya Goel:trying to build git tracing && bug fixed in IPC|04bb679af:Shourya Goel:more hapi hip changes|9301b3787:Sh0g0-1758:hip is hapi now, cuda is also hapi|b9dcb92e8:Shourya Goel:lb buffer size not restricted to power of 2 + c
+src/arch/cuda/hybridAPI/hapi_impl.h	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/arch/cuda/hybridAPI/hapi_memory_daemon.cpp	9301b3787:Sh0g0-1758:hip is hapi now, cuda is also hapi|9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/arch/cuda/hybridAPI/hapi_portable.h	9af1de4b6:Ritvik Rao:compile fix to allow cpu codes to compile|598563e0b:Ritvik Rao:getLastError|f8781187a:Ritvik Rao:hipHostFree|4f32e6690:Ritvik Rao:hapiStreamNonBlocking|57499ee49:Ritvik Rao:hipStreamCreateWithPriority|6b54206d0:Shourya Goel:add hapimemcpy2d
+src/arch/mpi-darwin-arm8/conv-mach.sh	9460a3469:Laxmikant Kale:reconverse-darwin-arm8: compile with C++17 - 
+src/arch/mpi-darwin-x86_64/conv-mach.sh	9460a3469:Laxmikant Kale:reconverse-darwin-arm8: compile with C++17 - 
+src/arch/mpi/charmrun	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/arch/mpi/charmrun_elastic	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/arch/mpi/conv-common.h	82e168d93:Anant Jain:mpi for rdma + ipc for multiple processes per gpu
+src/arch/mpi/machine.C	9e48ce995:Ritvik Rao:merge reconverse changes with lb|f048dbceb:Shourya Goel:use MPI_Testsome to test a vector of rdma_reque|b0def3d01:Shourya Goel:Reapply "Rget and polling for non-smp"|ceb4ad102:Shourya Goel:Revert "Rget and polling for non-smp"|e3284476a:Shourya Goel:Rget and polling for non-smp|33ebcd643:Shourya Goel:cleanup
+src/arch/netlrts/machine-eth.C	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/arch/netlrts/machine.C	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/arch/reconverse-darwin-arm8/conv-mach.h	e337bccd8:Ritvik Rao:New build for reconverse
+src/arch/reconverse-darwin-arm8/conv-mach.sh	e337bccd8:Ritvik Rao:New build for reconverse
+src/arch/reconverse-linux-arm8/conv-mach.h	43651fd6f:Ritvik Rao:add reconverse-linux-arm8 build
+src/arch/reconverse-linux-arm8/conv-mach.sh	43651fd6f:Ritvik Rao:add reconverse-linux-arm8 build
+src/arch/reconverse-linux-x86_64/conv-mach.h	e337bccd8:Ritvik Rao:New build for reconverse
+src/arch/reconverse-linux-x86_64/conv-mach.sh	e337bccd8:Ritvik Rao:New build for reconverse
+src/arch/template/conv-mach.sh	c3a9d74a0:Aditya Bhosale:Remove memory mode and thread mode checks and
+src/arch/ucx/charmrun	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/arch/ucx/machine.C	9e48ce995:Ritvik Rao:merge reconverse changes with lb|6cffad046:Aditya Bhosale:Fix UCX build
+src/arch/util/machine-broadcast.C	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/arch/util/machine-common-core.C	9e48ce995:Ritvik Rao:merge reconverse changes with lb|09757bf2a:Advait Tahilyani:Removed mentions of TopoGetDim and added Cm
+src/arch/util/machine-rdma.h	c2597d03d:Shourya Goel:fixes to run intermittently|a68d1efad:Shourya Goel:mpi rget and cached access windows|79ccdda22:shourya goel:isend/irecv for mpi smp|82e168d93:Anant Jain:mpi for rdma + ipc for multiple processes per gpu|4c9b86fb9:Anant Jain:working hapi port
+src/arch/util/mempool.h	75bba6989:Ritvik Rao:add charm config|02ec45859:Ritvik Rao:cmake changes
+src/arch/util/proc_management/runtime-pmix.C	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-core/CMakeLists.txt	9e48ce995:Ritvik Rao:merge reconverse changes with lb|043448a6e:Ritvik Rao:changes to queue implementation|e9a27a31f:Ritvik Rao:remove unnecessary fortran
+src/ck-core/charm++.h	02ec45859:Ritvik Rao:cmake changes
+src/ck-core/charm-api.h	75bba6989:Ritvik Rao:add charm config|02ec45859:Ritvik Rao:cmake changes
+src/ck-core/charm.h	6841dfe62:Ritvik Rao:fix CMK_OPTIMIZE redefinition|09cb9a15d:Ritvik Rao:include conv-mach-opt|75bba6989:Ritvik Rao:add charm config|81bd69bdd:Ritvik Rao:merge main|db242b5e9:Matthias Diener:Merge branch 'main' into reconverse-suport|02ec45859:Ritvik Rao:cmake changes
+src/ck-core/ck.C	ba308f72d:Laxmikant Kale:Fix +replay stall and crash on chare array br|56758e76b:Laxmikant Kale:record-replay repairs: broadcast crash, flush|7e9f3897d:Shourya Goel:remove debug prints|b3329386e:Shourya Goel:debugging ckactiveobject crash|50d524b37:Sh0g0-1758:Merge branch 'reconverse-support' into hapi_porta|4c9b86fb9:Anant Jain:working hapi port
+src/ck-core/ckcallback.C	dbc3815c7:shourya goel:mpi smp for chareArray and group
+src/ck-core/ckcheckpoint.C	9e48ce995:Ritvik Rao:merge reconverse changes with lb|7230175cd:Ritvik Rao:remove remaining whitespace|cf6929540:Laxmikant Kale:Fix whitespace formatting in core source file|81bd69bdd:Ritvik Rao:merge main|09757bf2a:Advait Tahilyani:Removed mentions of TopoGetDim and added Cm
+src/ck-core/ckcheckpoint.ci	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-core/ckcheckpoint.h	9e48ce995:Ritvik Rao:merge reconverse changes with lb|b273e0830:Ritvik Rao:replace CqsEnqueue with CsdEnqueue
+src/ck-core/cklocation.C	fdbe226d2:Ritvik Rao:Fix GPU/CPU build breakage exposed by the hapi me|04bb679af:Shourya Goel:more hapi hip changes|9301b3787:Sh0g0-1758:hip is hapi now, cuda is also hapi|b9dcb92e8:Shourya Goel:lb buffer size not restricted to power of 2 + c|1df662ff5:Shourya Goel:better debugs|99413bd15:Shourya Goel:malloc for load balancing buffers
+src/ck-core/cklocation.ci	04bb679af:Shourya Goel:more hapi hip changes|9301b3787:Sh0g0-1758:hip is hapi now, cuda is also hapi|9e48ce995:Ritvik Rao:merge reconverse changes with lb|09757bf2a:Advait Tahilyani:Removed mentions of TopoGetDim and added Cm
+src/ck-core/cklocation.h	9301b3787:Sh0g0-1758:hip is hapi now, cuda is also hapi|9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-core/cklocrec.h	bfec3b5ac:Shourya Goel:passing PUP size to stratergy and using user da|9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-core/ckmemcheckpoint.C	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-core/ckmigratable.h	bfec3b5ac:Shourya Goel:passing PUP size to stratergy and using user da|9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-core/ckobjQ.C	9c9de0a06:Ritvik Rao:libck compiles now
+src/ck-core/ckrdma.C	6841dfe62:Ritvik Rao:fix CMK_OPTIMIZE redefinition
+src/ck-core/ckrdma.h	7230175cd:Ritvik Rao:remove remaining whitespace|cf6929540:Laxmikant Kale:Fix whitespace formatting in core source file|8714a6e2e:Advait Tahilyani:Adapted ckrdma to implement pup itself|c3a9d74a0:Aditya Bhosale:Remove memory mode and thread mode checks and
+src/ck-core/ckrdmadevice.C	aa309d579:Shourya Goel:trying to build git tracing && bug fixed in IPC|9301b3787:Sh0g0-1758:hip is hapi now, cuda is also hapi|99413bd15:Shourya Goel:malloc for load balancing buffers|e2efb9d89:Shourya Goel:remove one extra level of cudaMalloc/cudaFree c|b3329386e:Shourya Goel:debugging ckactiveobject crash|0d203f1b4:Ritvik Rao:Merge branch 'hapi_portable_reconverse_support' i
+src/ck-core/ckrdmadevice.h	c2597d03d:Shourya Goel:fixes to run intermittently|82e168d93:Anant Jain:mpi for rdma + ipc for multiple processes per gpu|4c9b86fb9:Anant Jain:working hapi port
+src/ck-core/ckreduction.C	9d1177d84:Laxmikant Kale:Fix reduction hang when anytime migration lea|9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-core/ckreduction.h	9d1177d84:Laxmikant Kale:Fix reduction hang when anytime migration lea
+src/ck-core/debug-charm.h	02ec45859:Ritvik Rao:cmake changes
+src/ck-core/debug-message.C	043448a6e:Ritvik Rao:changes to queue implementation
+src/ck-core/init.C	9e48ce995:Ritvik Rao:merge reconverse changes with lb|c2597d03d:Shourya Goel:fixes to run intermittently|50d524b37:Sh0g0-1758:Merge branch 'reconverse-support' into hapi_porta|dbc3815c7:shourya goel:mpi smp for chareArray and group|5ecffbb01:shourya goel:a couple patches|4c9b86fb9:Anant Jain:working hapi port
+src/ck-core/init.h	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-core/middle.h	75bba6989:Ritvik Rao:add charm config|02ec45859:Ritvik Rao:cmake changes
+src/ck-core/msgalloc.C	043448a6e:Ritvik Rao:changes to queue implementation
+src/ck-core/waitqd.h	9c9de0a06:Ritvik Rao:libck compiles now
+src/ck-cp/controlPoints.h	75bba6989:Ritvik Rao:add charm config|02ec45859:Ritvik Rao:cmake changes
+src/ck-ldb/BaseLB.h	9301b3787:Sh0g0-1758:hip is hapi now, cuda is also hapi|b9dcb92e8:Shourya Goel:lb buffer size not restricted to power of 2 + c|bfec3b5ac:Shourya Goel:passing PUP size to stratergy and using user da|9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-ldb/CentralLB.C	fdbe226d2:Ritvik Rao:Fix GPU/CPU build breakage exposed by the hapi me|aa309d579:Shourya Goel:trying to build git tracing && bug fixed in IPC|9301b3787:Sh0g0-1758:hip is hapi now, cuda is also hapi|b9dcb92e8:Shourya Goel:lb buffer size not restricted to power of 2 + c|bfec3b5ac:Shourya Goel:passing PUP size to stratergy and using user da|b3329386e:Shourya Goel:debugging ckactiveobject crash
+src/ck-ldb/CentralLB.ci	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-ldb/CentralLB.h	9301b3787:Sh0g0-1758:hip is hapi now, cuda is also hapi|b9dcb92e8:Shourya Goel:lb buffer size not restricted to power of 2 + c|bfec3b5ac:Shourya Goel:passing PUP size to stratergy and using user da|b3329386e:Shourya Goel:debugging ckactiveobject crash|9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-ldb/CommonLBs.ci	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-ldb/DistributedLB.C	74c03f878:Ritvik Rao:remove cmilog
+src/ck-ldb/EveryLB.ci	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-ldb/GreedyCentralLB.C	fdbe226d2:Ritvik Rao:Fix GPU/CPU build breakage exposed by the hapi me|9301b3787:Sh0g0-1758:hip is hapi now, cuda is also hapi|b3329386e:Shourya Goel:debugging ckactiveobject crash|9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-ldb/GreedyCentralLB.ci	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-ldb/GreedyCentralLB.h	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-ldb/GreedyRefineCentralLB.C	fdbe226d2:Ritvik Rao:Fix GPU/CPU build breakage exposed by the hapi me|9301b3787:Sh0g0-1758:hip is hapi now, cuda is also hapi|b9dcb92e8:Shourya Goel:lb buffer size not restricted to power of 2 + c|bfec3b5ac:Shourya Goel:passing PUP size to stratergy and using user da|b3329386e:Shourya Goel:debugging ckactiveobject crash|9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-ldb/GreedyRefineCentralLB.ci	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-ldb/GreedyRefineCentralLB.h	9301b3787:Sh0g0-1758:hip is hapi now, cuda is also hapi|bfec3b5ac:Shourya Goel:passing PUP size to stratergy and using user da|9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-ldb/LBComm.C	fb1b19e0a:Ritvik Rao:add 1 more import|324cd3d25:Ritvik Rao:Revert "Changes for load balancing support using |3b9e08236:Aditya Bhosale:Changes for load balancing support using reco
+src/ck-ldb/LBDatabase.C	9301b3787:Sh0g0-1758:hip is hapi now, cuda is also hapi|9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-ldb/LBDatabase.h	9301b3787:Sh0g0-1758:hip is hapi now, cuda is also hapi|bfec3b5ac:Shourya Goel:passing PUP size to stratergy and using user da|b3329386e:Shourya Goel:debugging ckactiveobject crash|9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-ldb/LBManager.C	fdbe226d2:Ritvik Rao:Fix GPU/CPU build breakage exposed by the hapi me|9301b3787:Sh0g0-1758:hip is hapi now, cuda is also hapi|9e48ce995:Ritvik Rao:merge reconverse changes with lb|abfe9abb4:Ritvik Rao:adding back lbdb|324cd3d25:Ritvik Rao:Revert "Changes for load balancing support using |3b9e08236:Aditya Bhosale:Changes for load balancing support using reco
+src/ck-ldb/LBManager.ci	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-ldb/LBManager.h	bfec3b5ac:Shourya Goel:passing PUP size to stratergy and using user da|9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-ldb/LBObj.C	9301b3787:Sh0g0-1758:hip is hapi now, cuda is also hapi|9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-ldb/LBObj.h	fdbe226d2:Ritvik Rao:Fix GPU/CPU build breakage exposed by the hapi me|9301b3787:Sh0g0-1758:hip is hapi now, cuda is also hapi|bfec3b5ac:Shourya Goel:passing PUP size to stratergy and using user da|9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-ldb/Make.lb	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-ldb/Makefile_lb.sh	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-ldb/MetisLB.C	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-ldb/TreeBuilder.h	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-ldb/TreeLB.C	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-ldb/TreeLB.ci	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-ldb/TreeLB.h	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-ldb/TreeLevel.h	fdbe226d2:Ritvik Rao:Fix GPU/CPU build breakage exposed by the hapi me|9301b3787:Sh0g0-1758:hip is hapi now, cuda is also hapi|9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-ldb/TreeStrategyBase.h	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-ldb/ckgraph.C	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-ldb/ckgraph.h	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-ldb/greedy.h	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-ldb/lbdb.h	9301b3787:Sh0g0-1758:hip is hapi now, cuda is also hapi|bfec3b5ac:Shourya Goel:passing PUP size to stratergy and using user da|9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-ldb/manager.C	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-ldb/manager.h	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-ldb/refine.h	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/ck-perf/trace-common.C	81bd69bdd:Ritvik Rao:merge main|0ac287318:Ritvik Rao:build fixes
+src/ck-perf/trace-projections.C	abfe9abb4:Ritvik Rao:adding back lbdb|324cd3d25:Ritvik Rao:Revert "Changes for load balancing support using |3b9e08236:Aditya Bhosale:Changes for load balancing support using reco
+src/ck-perf/trace-projections.h	aa309d579:Shourya Goel:trying to build git tracing && bug fixed in IPC
+src/ck-perf/trace-summary.C	90ef159b9:Laxmikant Kale:trace-summary: self-closing shutdown for reco
+src/ck-perf/trace-summary.ci	90ef159b9:Laxmikant Kale:trace-summary: self-closing shutdown for reco
+src/ck-perf/trace-summary.h	90ef159b9:Laxmikant Kale:trace-summary: self-closing shutdown for reco
+src/ck-perf/trace-summaryBOC.h	90ef159b9:Laxmikant Kale:trace-summary: self-closing shutdown for reco
+src/conv-ccs/ccs-builtins.C	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/conv-ccs/ccs-builtins.h	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/conv-ccs/conv-ccs.C	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/conv-ccs/conv-ccs.h	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/conv-core/conv-config.h	9301b3787:Sh0g0-1758:hip is hapi now, cuda is also hapi
+src/conv-core/conv-rdma.h	c2597d03d:Shourya Goel:fixes to run intermittently
+src/conv-core/conv-rdmadevice.C	a68d1efad:Shourya Goel:mpi rget and cached access windows|79ccdda22:shourya goel:isend/irecv for mpi smp|5ecffbb01:shourya goel:a couple patches|82e168d93:Anant Jain:mpi for rdma + ipc for multiple processes per gpu|4c9b86fb9:Anant Jain:working hapi port
+src/conv-core/conv-rdmadevice.h	c2597d03d:Shourya Goel:fixes to run intermittently|50d524b37:Sh0g0-1758:Merge branch 'reconverse-support' into hapi_porta|7c0190499:Sh0g0-1758:use lci rdmaget for inter-node gpu comms|a68d1efad:Shourya Goel:mpi rget and cached access windows|79ccdda22:shourya goel:isend/irecv for mpi smp|82e168d93:Anant Jain:mpi for rdma + ipc for multiple processes per gpu
+src/conv-core/convcore.C	43f90408f:Aditya Bhosale:Register traceInit function|db242b5e9:Matthias Diener:Merge branch 'main' into reconverse-suport
+src/conv-core/converse.h	dba0437c6:Aditya Bhosale:Add registerTraceInit to old converse
+src/conv-core/cpuaffinity.C	5ecffbb01:shourya goel:a couple patches
+src/conv-core/queueing.h	75bba6989:Ritvik Rao:add charm config|0ac287318:Ritvik Rao:build fixes
+src/conv-core/taskqueue.h	83554ea4e:Aditya Bhosale:Add ckloop back to the build
+src/libs/ck-libs/ampi/ampi.C	4c9b86fb9:Anant Jain:working hapi port
+src/libs/ck-libs/ampi/ampi_functions.h	4c9b86fb9:Anant Jain:working hapi port
+src/libs/ck-libs/io/fs_parameters.C	4eea66ea1:Ritvik Rao:rename fs parameters
+src/libs/ck-libs/io/fs_parameters.h	75bba6989:Ritvik Rao:add charm config|e9a27a31f:Ritvik Rao:remove unnecessary fortran
+src/libs/ck-libs/metis/GKlib/GKlib.h	85dc995c9:Ritvik Rao:move _XOPEN_SOURCE|e337bccd8:Ritvik Rao:New build for reconverse
+src/libs/ck-libs/metis/GKlib/gkregex.c	6c8e7c0bc:Ritvik Rao:fix in metis
+src/scripts/Make.depends	9e48ce995:Ritvik Rao:merge reconverse changes with lb|52d8b8d73:Advait Tahilyani:Defined new symbols
+src/scripts/Makefile	52d8b8d73:Advait Tahilyani:Defined new symbols|5592ca04e:Ritvik Rao:remove memory-default
+src/scripts/charmc	98694d42c:Ritvik Rao:Merge branch 'cupti_lb_reconverse_hapi' into reco|e337bccd8:Ritvik Rao:New build for reconverse|9e48ce995:Ritvik Rao:merge reconverse changes with lb|fc46dfd8e:Matthias Diener:restore ckqt, add -lcharm_cxx_utils|ac30904ef:Matthias Diener:fixes for conv-static and LANG_LIBS|c3a9d74a0:Aditya Bhosale:Remove memory mode and thread mode checks and
+src/scripts/configure.ac	02ec45859:Ritvik Rao:cmake changes
+src/util/charmrun-src/CMakeLists.txt	98694d42c:Ritvik Rao:Merge branch 'cupti_lb_reconverse_hapi' into reco|e337bccd8:Ritvik Rao:New build for reconverse|9e48ce995:Ritvik Rao:merge reconverse changes with lb|5592ca04e:Ritvik Rao:remove memory-default
+src/util/charmrun-src/Makefile	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/util/charmrun-src/charmrun.C	98694d42c:Ritvik Rao:Merge branch 'cupti_lb_reconverse_hapi' into reco|e337bccd8:Ritvik Rao:New build for reconverse|9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/util/ckrescale.C	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/util/ckrescale.h	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/util/cmirdmautils.h	fdbe226d2:Ritvik Rao:Fix GPU/CPU build breakage exposed by the hapi me|9301b3787:Sh0g0-1758:hip is hapi now, cuda is also hapi|50d524b37:Sh0g0-1758:Merge branch 'reconverse-support' into hapi_porta|a68d1efad:Shourya Goel:mpi rget and cached access windows|82e168d93:Anant Jain:mpi for rdma + ipc for multiple processes per gpu|4c9b86fb9:Anant Jain:working hapi port
+src/util/pup.h	9e48ce995:Ritvik Rao:merge reconverse changes with lb|75bba6989:Ritvik Rao:add charm config|02ec45859:Ritvik Rao:cmake changes
+src/util/pup_c.h	7230175cd:Ritvik Rao:remove remaining whitespace|75bba6989:Ritvik Rao:add charm config|02ec45859:Ritvik Rao:cmake changes
+src/util/pup_c_functions.h	ee0069da5:Ritvik Rao:functional changes|ff4c71e58:Laxmikant Kale:more whitespace restoration changes|09757bf2a:Advait Tahilyani:Removed mentions of TopoGetDim and added Cm|b273e0830:Ritvik Rao:replace CqsEnqueue with CsdEnqueue
+src/util/pup_stl.h	75bba6989:Ritvik Rao:add charm config|e06d2db34:Ritvik Rao:move build forward|02ec45859:Ritvik Rao:cmake changes
+src/util/pup_toNetwork.h	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/util/pup_util.C	fdbe226d2:Ritvik Rao:Fix GPU/CPU build breakage exposed by the hapi me|9301b3787:Sh0g0-1758:hip is hapi now, cuda is also hapi|b3329386e:Shourya Goel:debugging ckactiveobject crash|9e48ce995:Ritvik Rao:merge reconverse changes with lb
+src/util/sockRoutines.C	e337bccd8:Ritvik Rao:New build for reconverse
+src/util/sockRoutines.h	75bba6989:Ritvik Rao:add charm config|02ec45859:Ritvik Rao:cmake changes
+src/util/spanningTree.C	7230175cd:Ritvik Rao:remove remaining whitespace|cf6929540:Laxmikant Kale:Fix whitespace formatting in core source file|52d8b8d73:Advait Tahilyani:Defined new symbols
+src/util/spanningTree.h	ee0069da5:Ritvik Rao:functional changes|ff4c71e58:Laxmikant Kale:more whitespace restoration changes|52d8b8d73:Advait Tahilyani:Defined new symbols
+src/xlat-i/xi-util.h	e337bccd8:Ritvik Rao:New build for reconverse
+tests/ampi/migration/Makefile	9e48ce995:Ritvik Rao:merge reconverse changes with lb
+tests/charm++/Makefile	da9a5f2f8:Laxmikant Kale:tests/charm++/qd: repeated CkStartQD without 
+tests/charm++/anytime_bcastred/Makefile	cdaf6a4fa:Laxmikant Kale:tests/charm++/anytime_bcastred: anytime migra
+tests/charm++/anytime_bcastred/bcastred.C	7030c2ea3:Laxmikant Kale:anytime_bcastred: -B p2p step mode, -w watchd|cdaf6a4fa:Laxmikant Kale:tests/charm++/anytime_bcastred: anytime migra
+tests/charm++/anytime_bcastred/bcastred.ci	7030c2ea3:Laxmikant Kale:anytime_bcastred: -B p2p step mode, -w watchd|cdaf6a4fa:Laxmikant Kale:tests/charm++/anytime_bcastred: anytime migra
+tests/charm++/qd/Makefile	da9a5f2f8:Laxmikant Kale:tests/charm++/qd: repeated CkStartQD without 
+tests/charm++/qd/qdbench.C	e606c3318:Laxmikant Kale:tests/charm++/qd: cliff-diagnosis knobs for q|da9a5f2f8:Laxmikant Kale:tests/charm++/qd: repeated CkStartQD without 
+tests/charm++/qd/qdbench.ci	e606c3318:Laxmikant Kale:tests/charm++/qd: cliff-diagnosis knobs for q|da9a5f2f8:Laxmikant Kale:tests/charm++/qd: repeated CkStartQD without 

@@ -1,0 +1,10 @@
+# Code owners for the reviewed reconverse line. Branch protection requires a
+# code-owner review on these paths IN ADDITION to the branch's required
+# approving review -- i.e., runtime-core changes effectively need two sets of
+# eyes; everything else needs one.
+/src/ck-core/     @ritvikrao @lvkale @ericjbohm
+/src/conv-core/   @ritvikrao @lvkale @ericjbohm
+/src/ck-ldb/      @ritvikrao @adityapb @lvkale @ericjbohm
+/cmake/           @ritvikrao @lvkale @ericjbohm
+/src/scripts/     @ritvikrao @lvkale @ericjbohm
+/.github/         @ritvikrao @lvkale @ericjbohm

@@ -1,5 +1,56 @@
 #!/bin/bash
 
+CHARMBIN=$(cd "$(dirname "$0")" && pwd)
+# NOTE: this reads the checkout's top-level bin/include symlinks, which
+# point at the LAST build made in the tree. One build per checkout (as in
+# CI, one job per arm); after switching arms in a shared tree, re-run
+# `make -C <build> create_symlinks` or the wrong runtime's idiom is used.
+[[ -f "$CHARMBIN/../include/conv-mach-opt.sh" ]] && . "$CHARMBIN/../include/conv-mach-opt.sh" 2>/dev/null
+
+if [[ "$CMK_RECONVERSE" = "1" ]]
+then
+  # Reconverse run idiom: no charmrun. Single process is `./pgm +pe N`;
+  # multi-process is `lcrun -n <procs> ./pgm +pe <total>` (set TESTRUN_PROCS).
+  # Translate the classic conventions used by the tests' Makefiles: +pN or
+  # "+p N" becomes +pe N; ++ppn and ++local are meaningless here and dropped.
+  p=1; prog=""; args=(); expect_p=0; expect_ppn=0
+  for a in "$@"; do
+    if [[ $expect_p -eq 1 ]];   then p=$a; expect_p=0; continue; fi
+    if [[ $expect_ppn -eq 1 ]]; then expect_ppn=0; continue; fi
+    case "$a" in
+      +p)        expect_p=1 ;;
+      +p[0-9]*)  p=${a#+p} ;;
+      ++ppn)     expect_ppn=1 ;;
+      ++ppn*)    ;;
+      ++local)   ;;
+      *) if [[ -z "$prog" && ( "$a" == ./* || -x "$a" ) ]]; then prog="$a"; else args+=("$a"); fi ;;
+    esac
+  done
+  if [[ -z "$prog" ]]; then echo "testrun: no program in args: $*" >&2; exit 1; fi
+  procs=${TESTRUN_PROCS:-1}
+  # Can't spread fewer PEs than processes; clamp. And reconverse requires
+  # PEs divisible by processes -- skip indivisible combinations with a
+  # warning (mirrors the classic ppn-divides-p courtesy skip).
+  if [[ $procs -gt $p ]]; then procs=$p; fi
+  if (( p % procs != 0 )); then
+    echo "testrun(reconverse): +pe $p not divisible by $procs processes. Skipping the test."
+    exit 0
+  fi
+  envpfx=(env "DYLD_LIBRARY_PATH=$CHARMBIN/../lib:${DYLD_LIBRARY_PATH}" "LD_LIBRARY_PATH=$CHARMBIN/../lib:${LD_LIBRARY_PATH}")
+  if [[ $procs -gt 1 ]]; then
+    LCRUN="$CHARMBIN/../_deps/lci-src/lcrun"
+    [[ -x "$LCRUN" ]] || LCRUN=lcrun
+    cmd=("$LCRUN" -n "$procs" "${envpfx[@]}" "$prog" +pe "$p" "${args[@]}")
+  else
+    cmd=("${envpfx[@]}" "$prog" +pe "$p" "${args[@]}")
+  fi
+  # Echo with library paths unexpanded: the real values inline the whole
+  # inherited module environment (~1KB per line in HPC logs).
+  echo "testrun(reconverse): ${cmd[*]}" | sed "s|LD_LIBRARY_PATH=[^ ]*|LD_LIBRARY_PATH=<build>/lib:...|g"
+  time "${cmd[@]}"
+  exit $?
+fi
+
 #check if ppn divides p
 ppn_found=0
 ppn=0

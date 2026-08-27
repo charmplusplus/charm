@@ -51,3 +51,12 @@ ampirun
 pgm
 *.swp
 reconverse-darwin-arm8/
+netlrts-darwin-arm8/
+bin
+*.decl.h
+*.def.h
+tests/charm++/anytime_bcastred/bcastred
+tests/charm++/qd/qdbench
+tests/charm++/anytime_migration/migrate
+tests/charm++/megatest/megatest
+tests/charm++/simplearrayhello/hello

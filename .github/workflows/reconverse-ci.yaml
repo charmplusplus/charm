@@ -1,0 +1,154 @@
+name: reconverse-ci
+
+# CI for the reviewed reconverse line. The tier below defines what CI
+# GUARANTEES; it is a floor, not the support surface. Features without a
+# test here are supported with coverage debt -- the tier is meant to GROW
+# toward them, and dropping support for anything is an explicit reviewed
+# act (a tombstone commit deleting its test), never a side effect of a
+# test not yet existing. Correctness-gated only -- never timing-gated:
+# hosted runners are noisy. Real-fabric behavior (IB, Slingshot) is NOT
+# covered here; runtime-core PRs get a manual run on an HPC site by a
+# reviewer (see PR template) until a sanctioned site runner exists.
+
+on:
+  push:
+    branches: [reviewed-with-reconverse]
+  pull_request:
+    branches: [reviewed-with-reconverse]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Curated test tier. Grows one reviewed PR at a time; every tests/ dir NOT
+  # listed here is by definition unsupported-on-reconverse until added (the
+  # parity matrix mirrors this list).
+  TEST_DIRS: >-
+    tests/charm++/megatest
+    tests/charm++/simplearrayhello
+    tests/charm++/anytime_migration
+    tests/charm++/anytime_bcastred
+    tests/charm++/qd
+
+jobs:
+
+  reconverse-linux-x86_64:
+    timeout-minutes: 90
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: install dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake libfabric-dev
+      - name: build
+        run: ./build charm++ reconverse-linux-x86_64 -j4 -g
+      - name: build tests
+        run: |
+          set -e
+          B=$PWD/reconverse-linux-x86_64
+          for d in $TEST_DIRS; do make -C $d CHARMC=$B/bin/charmc; done
+      - name: test (single process)
+        run: |
+          set -e
+          for d in $TEST_DIRS; do make -C $d test; done
+      - name: test (2 processes, lcrun)
+        run: |
+          set -e
+          for d in $TEST_DIRS; do TESTRUN_PROCS=2 make -C $d test; done
+
+  # ARM64 Linux (Grace-class systems). Replaces the coverage CircleCI's
+  # arm.medium jobs provided on the classic line; -Werror=vla carried over
+  # from those jobs.
+  reconverse-linux-arm8:
+    timeout-minutes: 90
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - name: install dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake libfabric-dev
+      - name: build
+        run: ./build charm++ reconverse-linux-arm8 -j4 -g -Werror=vla
+      - name: build tests
+        run: |
+          set -e
+          B=$PWD/reconverse-linux-arm8
+          for d in $TEST_DIRS; do make -C $d CHARMC=$B/bin/charmc; done
+      - name: test (single process)
+        run: |
+          set -e
+          for d in $TEST_DIRS; do make -C $d test; done
+      - name: test (2 processes, lcrun)
+        run: |
+          set -e
+          for d in $TEST_DIRS; do TESTRUN_PROCS=2 make -C $d test; done
+
+  reconverse-darwin-arm64:
+    timeout-minutes: 90
+    runs-on: macos-latest  # Apple Silicon
+    steps:
+      - uses: actions/checkout@v4
+      - name: install dependencies
+        run: brew install libfabric
+      - name: build
+        run: ./build charm++ reconverse-darwin-arm8 -j4 -g
+      - name: build tests
+        run: |
+          set -e
+          B=$PWD/reconverse-darwin-arm8
+          for d in $TEST_DIRS; do make -C $d CHARMC=$B/bin/charmc; done
+      - name: test (single process)
+        run: |
+          set -e
+          for d in $TEST_DIRS; do make -C $d test; done
+      - name: test (2 processes, lcrun)
+        run: |
+          set -e
+          for d in $TEST_DIRS; do TESTRUN_PROCS=2 make -C $d test; done
+
+  # Race/stress tier: error checking live (CkEnforce-heavy tests with teeth),
+  # heavy anytime-migration stress (the #3939 regression class), QD settles,
+  # both process shapes. This is the job that hunts the bug class this line's
+  # hardening exists for.
+  reconverse-linux-stress:
+    timeout-minutes: 90
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: install dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake libfabric-dev
+      - name: build (error checking on)
+        run: ./build charm++ reconverse-linux-x86_64 -j4 -g --enable-error-checking
+      - name: build stress tests
+        run: |
+          set -e
+          B=$PWD/reconverse-linux-x86_64
+          make -C tests/charm++/anytime_bcastred CHARMC=$B/bin/charmc
+          make -C tests/charm++/qd CHARMC=$B/bin/charmc
+          make -C tests/charm++/megatest CHARMC=$B/bin/charmc
+      # NOTE: heavy migration configs (-m 1 -c 8) are enabled by the PR that
+      # lands the #3939 reduction fix -- they hang without it. Until then the
+      # stress tier runs the gentle shape.
+      - name: anytime migration stress (single process)
+        run: |
+          set -e
+          cd tests/charm++/anytime_bcastred
+          B=$PWD/../../../reconverse-linux-x86_64
+          for S in 1 2 3; do
+            env LD_LIBRARY_PATH=$B/lib ./bcastred +pe 4 -n 8 -i 500 -m 5 -c 1 -S $S -w 30
+          done
+      - name: anytime migration stress (2 processes)
+        run: |
+          set -e
+          cd tests/charm++/anytime_bcastred
+          B=$PWD/../../../reconverse-linux-x86_64
+          for S in 4 5; do
+            $B/_deps/lci-src/lcrun -n 2 env LD_LIBRARY_PATH=$B/lib ./bcastred +pe 4 -n 8 -i 500 -m 5 -c 1 -S $S -w 30
+          done
+      - name: qd + megatest multi-process
+        run: |
+          set -e
+          B=$PWD/reconverse-linux-x86_64
+          cd tests/charm++/qd
+          $B/_deps/lci-src/lcrun -n 2 env LD_LIBRARY_PATH=$B/lib ./qdbench +pe 4
+          cd ../megatest
+          $B/_deps/lci-src/lcrun -n 2 env LD_LIBRARY_PATH=$B/lib ./megatest +pe 4
