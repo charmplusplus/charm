@@ -13,19 +13,20 @@ events, not dates: each stage unlocks when its predecessor merges.
 
 | # | Item | Trigger / owner |
 |---|---|---|
-| 1 | Group reviews + merges **#3944** (core two-way series, old CI green) | Kale announces to group |
-| 2 | Squash the empty retrigger commit (`61047352f`) at merge | whoever merges #3944 |
+| 1 | ~~Group reviews + merges **#3944**~~ | DONE 08-27: squash-merged `bc819bcf2` |
+| 2 | ~~Squash at merge~~ | DONE 08-27 (squash-merge) |
 
 ## After #3944 merges
 
 | # | Item | Notes |
 |---|---|---|
-| 3 | Retarget/merge **#3945** (reconverse CI: 4 jobs incl. ARM64 Linux `ff7e86224`, testrun, CODEOWNERS, PR template, `.circleci` dropped) | it self-tests: its own workflow runs on its own PR |
-| 4 | Add #3945's job names as **required status checks** on `reviewed-with-reconverse` | after its first green run on the merged base |
-| 5 | **#3942** (reduction fix #3939 + bcastred test) to the reviewed line | then flip stress job to heavy config (`-m 1 -c 8`) — it hangs without this fix |
-| 6 | **#3943** (record-replay repairs) to the reviewed line | after #3942 |
-| 7 | Re-pin `AUTOFETCH_RECONVERSE_TAG` to reconverse **main** | when reconverse#207 merges |
+| 3 | ~~Retarget/merge **#3945**~~ | DONE 08-27: squash-merged `24865a675`; post-merge push run green in 4m48s |
+| 4 | ~~Required status checks on the reviewed line~~ | DONE 08-27: all four reconverse jobs required, strict mode on |
+| 5 | Reduction fix (#3939) to the reviewed line, heavy stress enabled in the same PR | **PR #3947** (green, in review); #3942 remains the classic-main vehicle for item 8 |
+| 6 | ~~Record-replay repairs to the reviewed line~~ | DONE by subsumption: already present via #3944's ck.C graft (verified 08-27); #3943 remains the classic-main vehicle for item 8. Verification found the token-pool comment-out — proper guard in **PR #3948** |
+| 7 | Re-pin `AUTOFETCH_RECONVERSE_TAG` to reconverse **main** | THIS PR: pin -> `f3f4110` (#207 squash had missed the CMK_RECONVERSE define; reconverse#210 carried it to main 08-27) |
 | 8 | Merge #3942/#3943 to classic **main** too, then cut the freeze tag (last classic release) | order matters: fixes in before tag |
+| 8b | **Classic main is maintenance-mode after the freeze tag, not dead** | Policy (Kale, 08-27): bugfixes keep landing on main for users not yet on reconverse (known dependent: Quinoa/CFD, Aditya Pandare — fix current bug jointly, then migrate Quinoa to reconverse as an external pilot). Main keeps full CI incl. the #3946 ARM jobs; feature work on the reviewed line only |
 | 8a | Silence CircleCI's "no configuration found" status on the reviewed line | DONE 2026-08-27: Eric turned CircleCI off project-wide; the interim stub is removed. Classic main's ARM coverage moved to Actions (PR #3946: netlrts-linux-arm8, smp variant, mpi-linux-arm8 on ubuntu-24.04-arm) |
 
 ## After the core is stable on the reviewed line (deferred feature series, in order)
@@ -36,6 +37,7 @@ events, not dates: each stage unlocks when its predecessor merges.
 | 10 | **Shrink/expand** | |
 | 11 | **GPU-aware load balancing** | |
 | 12 | **LCW comm backend** (MPI-backed alternate to LCI — comparison + fallback where LCI is unavailable/inefficient) | deliberately post-core (Kale, 2026-08-26); additive behind the comm_backend interface |
+| 13b | **Object queues (ckobjQ) on reconverse** | with/after the locmgr changes (item 15 is the natural vehicle); classic-only today, token-pool registration guarded via PR #3948 |
 | 13 | **Windows multicore** via a null/self comm backend in reconverse (no LCI/libfabric dep) | raise with Aditya; NAMD-desktop use case; frozen classic serves it meanwhile |
 
 ## Parallel / independent
