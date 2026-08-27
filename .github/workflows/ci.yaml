@@ -419,6 +419,52 @@ jobs:
         # TODO: this should build tests with "-charm-shared". See #2735 on why this is not done currently.
         ./buildold all-test verbs-linux-x86_64 -j4 -g --build-shared
 
+  # ARM64 Linux jobs, moved from CircleCI when it was turned off for the
+  # project (2026-08-27). Native arm64 runners; configs mirror the old
+  # CircleCI arm.medium jobs.
+  netlrts-linux-arm8:
+    timeout-minutes: 60
+    runs-on: ubuntu-24.04-arm
+    steps:
+    - uses: actions/checkout@v4
+    - name: build
+      run: ./build all-test netlrts-linux-arm8 --with-production --enable-error-checking --enable-lbuserdata -j4 -g -Werror=vla
+    - name: test
+      run: make -C netlrts-linux-arm8/tmp test TESTOPTS="++local"
+    - name: testp P=2
+      run: make -C netlrts-linux-arm8/tmp testp P=2 TESTOPTS="++local"
+
+  netlrts-linux-arm8_smp:
+    timeout-minutes: 60
+    runs-on: ubuntu-24.04-arm
+    steps:
+    - uses: actions/checkout@v4
+    - name: build
+      run: ./build all-test netlrts-linux-arm8 smp --with-production --enable-error-checking --enable-lbuserdata -j4 -g -Werror=vla
+    - name: test
+      run: make -C netlrts-linux-arm8-smp/tmp test TESTOPTS="++local +setcpuaffinity +CmiSleepOnIdle"
+    - name: testp P=4 PPN=2
+      run: make -C netlrts-linux-arm8-smp/tmp testp P=4 TESTOPTS="++local +setcpuaffinity +CmiSleepOnIdle ++ppn 2"
+
+  mpi-linux-arm8:
+    timeout-minutes: 90
+    runs-on: ubuntu-24.04-arm
+    env:
+      # The runner has 4 vCPUs; let Open MPI oversubscribe for wider test shapes.
+      OMPI_MCA_rmaps_base_oversubscribe: "true"
+    steps:
+    - uses: actions/checkout@v4
+    - name: install-prerequisites
+      # openmpi, as the retired CircleCI job used: Ubuntu 24.04's mpich is
+      # built on the ch4:ucx device, which crashes at startup on these runners.
+      run: sudo apt-get update && sudo apt-get install -y libopenmpi-dev openmpi-bin
+    - name: build
+      run: ./build all-test mpi-linux-arm8 --with-production --enable-error-checking --enable-lbuserdata -j4 -g -Werror=vla
+    - name: test
+      run: make -C mpi-linux-arm8/tmp test
+    - name: testp P=2
+      run: make -C mpi-linux-arm8/tmp testp P=2
+
   netlrts-win-x86_64_mingw64:
     timeout-minutes: 90
 
