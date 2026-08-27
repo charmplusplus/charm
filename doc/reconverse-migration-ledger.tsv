@@ -56,7 +56,7 @@ examples/charm++/shrink_expand/startup/Makefile	21	with-feature	lands with the s
 examples/charm++/shrink_expand/startup/startup.C	12	with-feature	lands with the series that exercises it
 examples/charm++/shrink_expand/startup/startup.ci	7	with-feature	lands with the series that exercises it
 src/QuickThreads/md/setjmp64_.c	6	needs-judgment	
-src/arch/common/cc-gcc.sh	4	tombstone-candidate	classic machine layer; frozen line
+src/arch/common/cc-gcc.sh	4	tombstone	branch dropped -lckqt (superseded by conv-mach-opt.sh strip) and added -std=gnu++17 to CMK_CXX_FLAGS; the latter deliberately NOT migrated (gcc>=11 defaults to gnu++17, cmake pins the standard); revisit only if charmc-built user code on older gcc breaks
 src/arch/common/cc-mpiopts.sh	2	tombstone-candidate	classic machine layer; frozen line
 src/arch/common/charmrun_elastic	69	tombstone-candidate	classic machine layer; frozen line
 src/arch/common/charmrun_hapi	292	item-9	
