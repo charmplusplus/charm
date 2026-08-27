@@ -24,7 +24,6 @@
 #define __USE_XOPEN
 #endif
 
-//#include "conv-config.h"
 #include "charm-config.h"
 #include "converse.h"
 

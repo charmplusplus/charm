@@ -8,7 +8,9 @@ clients, including the rest of Charm++, are actually C++.
 */
 #include "ck.h"
 #include "trace.h"
-//#include "queueing.h"
+#if !CMK_RECONVERSE  /* reconverse has no converse-level queueing.h */
+#include "queueing.h"
+#endif
 
 #include "pathHistory.h"
 
