@@ -1,10 +1,12 @@
 #!/bin/bash
 #SBATCH --job-name=osu-gpu-ipc
+#SBATCH --account=mzu-delta-gpu
 #SBATCH --partition=gpuA40x4
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=2
 #SBATCH --cpus-per-task=16
 #SBATCH --gpus-per-node=4
+#SBATCH --mem=0
 #SBATCH --time=00:30:00
 #SBATCH --output=osu-gpu-ipc-%j.out
 
@@ -22,11 +24,21 @@ set -u
 REPO=$SLURM_SUBMIT_DIR
 export BENCH_DIR=$REPO/examples/charm++/cuda/gpudirect/osu
 
+# libreconverse.so is not rpath'd into the benchmark binaries, so it has to be
+# named here rather than inherited from whatever the submitting shell had.
+export LD_LIBRARY_PATH="$REPO/multicore-linux-x86_64-cuda/lib:/u/bhosale/lci_install/lib64:${LD_LIBRARY_PATH:-}"
+
 # libinfinipath installs a SIGSEGV handler that swallows real crash reports.
 export IPATH_NO_BACKTRACE=1
 
+# Which GPU layouts to sweep, in order (see scripts/delta_pin.sh):
+#   distinct  one GPU per rank -- peer copies, the multi-GPU job's layout
+#   same      both ranks on GPU 0 -- neither transport crosses a link, which is
+#             the cleanest read on what staging's second copy costs
+LAYOUTS=${GPU_LAYOUTS:-"distinct same"}
+
 export CHARMRUN=srun
-export LAUNCH_ARGS="--cpu-bind=none -n 2 $REPO/scripts/delta_pin.sh"
+export LAUNCH_ARGS="--cpu-bind=none --exact -n 2 $REPO/scripts/delta_pin.sh"
 
 # +gpushm is what enables the cross-process path at all.
 # +gpucommbuffer 512 (MB) so the staged arm is not throttled by its own buffer:
@@ -53,7 +65,7 @@ echo
 # staged/direct counts at exit -- read them: if the "direct" run reports
 # direct=0, the switch never fired and the whole sweep below would be measuring
 # staging twice.
-export GPU_FOR_RANK=distinct
+export GPU_FOR_RANK=${LAYOUTS%% *}
 export CHARM_ZC_STATS=1
 
 for bench in osu_latency_gpu osu_bw_gpu; do
@@ -73,7 +85,7 @@ done
 unset CHARM_GPU_IPC_THRESHOLD
 unset CHARM_ZC_STATS
 
-for layout in distinct same; do
+for layout in $LAYOUTS; do
   export GPU_FOR_RANK=$layout
   echo "================ GPU layout: $layout ================"
   "$REPO/scripts/ipc_crossover.sh" "$REPO/ipc_crossover_${layout}_${SLURM_JOB_ID}.csv"

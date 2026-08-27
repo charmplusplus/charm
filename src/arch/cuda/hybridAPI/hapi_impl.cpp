@@ -223,7 +223,16 @@ static void hapiPopulateDeviceProps(GPUManager& gm) {
     descriptor.smCount = static_cast<uint32_t>(std::max(props.multiProcessorCount, 0));
     descriptor.computeMajor = static_cast<uint32_t>(std::max(props.major, 0));
     descriptor.computeMinor = static_cast<uint32_t>(std::max(props.minor, 0));
-    descriptor.maxClockKHz = static_cast<uint32_t>(std::max(props.clockRate, 0));
+    // CUDA 13 dropped cudaDeviceProp::clockRate, so the device attribute is
+    // the only way left to ask. It can legitimately fail (on a MIG instance,
+    // for one); a zero here is what selects the Unknown-source path below.
+    int clock_khz = 0;
+    if (cudaDeviceGetAttribute(&clock_khz, cudaDevAttrClockRate, dev) !=
+        cudaSuccess) {
+      clock_khz = 0;
+      cudaGetLastError();  // don't leave the failure for the next hapiCheck
+    }
+    descriptor.maxClockKHz = static_cast<uint32_t>(std::max(clock_khz, 0));
     descriptor.totalMemory = static_cast<uint64_t>(props.totalGlobalMem);
     descriptor.typeId = gpuStableDeviceType(
         props.name, descriptor.smCount, descriptor.computeMajor,

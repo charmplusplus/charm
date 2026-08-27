@@ -37,6 +37,11 @@
 #               processes on ONE host (default "+p2 ++ppn 1")
 #   CHARM_ARGS  extra runtime arguments (default "+gpushm +gpucommbuffer 256")
 #   MIN_BYTES / MAX_BYTES   size sweep bounds (default 8 .. 4194304)
+#   MACHINE     name recorded in the CSV's machine column (default `hostname -s`,
+#               which is wrong when srun sends the work to another node)
+#   ARMS        which arms to run, space separated, from the three named above
+#               (default all three). Set to "staged direct" for the crossover
+#               alone, without the handle-cost diagnostic.
 
 set -u
 
@@ -46,9 +51,13 @@ LAUNCH_ARGS=${LAUNCH_ARGS:-"+p2 ++ppn 1"}
 CHARM_ARGS=${CHARM_ARGS:-"+gpushm +gpucommbuffer 256"}
 MIN_BYTES=${MIN_BYTES:-8}
 MAX_BYTES=${MAX_BYTES:-4194304}
+ARMS=${ARMS:-"staged direct direct-nocache"}
 OUT=${1:-ipc_crossover.csv}
 
-MACHINE=$(hostname -s)
+# The machine the numbers describe, which is not always the one running this
+# script: driven from a login node with CHARMRUN=srun, `hostname -s` names the
+# login node and the CSV would attribute the results to it.
+MACHINE=${MACHINE:-$(hostname -s)}
 
 if [ ! -x "$BENCH_DIR/osu_latency_gpu" ] || [ ! -x "$BENCH_DIR/osu_bw_gpu" ]; then
   echo "error: benchmarks not built. Run 'make' in $BENCH_DIR first." >&2
@@ -74,16 +83,28 @@ run_one() {
 }
 
 for bench in osu_latency_gpu osu_bw_gpu; do
-  unset CHARM_GPU_IPC_THRESHOLD CHARM_GPU_IPC_CACHE
-  run_one "$bench" staged on
-
-  export CHARM_GPU_IPC_THRESHOLD=0
-  unset CHARM_GPU_IPC_CACHE
-  run_one "$bench" direct on
-
-  export CHARM_GPU_IPC_THRESHOLD=0
-  export CHARM_GPU_IPC_CACHE=0
-  run_one "$bench" direct-nocache off
+  for arm in $ARMS; do
+    case "$arm" in
+      staged)
+        unset CHARM_GPU_IPC_THRESHOLD CHARM_GPU_IPC_CACHE
+        run_one "$bench" staged on
+        ;;
+      direct)
+        export CHARM_GPU_IPC_THRESHOLD=0
+        unset CHARM_GPU_IPC_CACHE
+        run_one "$bench" direct on
+        ;;
+      direct-nocache)
+        export CHARM_GPU_IPC_THRESHOLD=0
+        export CHARM_GPU_IPC_CACHE=0
+        run_one "$bench" direct-nocache off
+        ;;
+      *)
+        echo "error: unknown arm '$arm' in ARMS" >&2
+        exit 1
+        ;;
+    esac
+  done
 done
 
 unset CHARM_GPU_IPC_THRESHOLD CHARM_GPU_IPC_CACHE
