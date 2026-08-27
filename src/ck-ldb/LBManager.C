@@ -18,6 +18,8 @@
 #include "TreeLB.h"
 #include "topology.h"
 
+#include <cmath>
+
 #include "json.hpp"
 
 CkGroupID _lbmgr;
@@ -460,6 +462,32 @@ void _loadbalancerInit()
   _lb_args.diffusionGpuDim() = CmiGetArgFlagDesc(
       argv, "+LBDiffusionGpuDim",
       "DiffusionLB diffuses GPU load across nodes (default: CPU load)");
+
+  // Per-kernel relative GPU scaling. The model is opt-in while its CUPTI data
+  // path and destination-aware LB consumer are introduced in stages.
+  _lb_args.gpuScaling() = CmiGetArgFlagDesc(
+      argv, "+LBGpuScaling",
+      "Learn destination-dependent per-kernel costs for heterogeneous GPUs");
+  CmiGetArgDoubleDesc(
+      argv, "+LBGpuScalingAlphaMin", &_lb_args.gpuScalingAlphaMin(),
+      "Minimum log-space EWMA step (0 uses a stationary running mean)");
+  CmiGetArgIntDesc(
+      argv, "+LBGpuScalingMinSamples", &_lb_args.gpuScalingMinSamples(),
+      "Observations required before a kernel/GPU scaling factor is calibrated");
+  CmiGetArgIntDesc(
+      argv, "+LBGpuScalingMaxComponents", &_lb_args.gpuScalingMaxComponents(),
+      "Kernel buckets modeled per object per epoch; the rest become residual");
+  CmiGetArgStringDesc(
+      argv, "+LBGpuRateFile", &_lb_args.gpuRateFile(),
+      "Optional file containing GPU-type peak-rate overrides");
+  if (!std::isfinite(_lb_args.gpuScalingAlphaMin()) ||
+      _lb_args.gpuScalingAlphaMin() < 0.0 ||
+      _lb_args.gpuScalingAlphaMin() > 1.0)
+    CmiAbort("+LBGpuScalingAlphaMin must be in [0, 1]");
+  if (_lb_args.gpuScalingMinSamples() < 1)
+    CmiAbort("+LBGpuScalingMinSamples must be at least 1");
+  if (_lb_args.gpuScalingMaxComponents() < 1)
+    CmiAbort("+LBGpuScalingMaxComponents must be at least 1");
 
   // set alpha and beta
   _lb_args.alpha() = PER_MESSAGE_SEND_OVERHEAD_DEFAULT;

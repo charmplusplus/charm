@@ -13,7 +13,8 @@
 #include "json_fwd.hpp"
 using json = nlohmann::json;
 
-#define LB_FORMAT_VERSION 3
+// 4 adds GpuObjectEpochCosts to LDObjData and GpuDeviceDescriptor to ProcStats.
+#define LB_FORMAT_VERSION 4
 
 #define LB_MANAGER_VERSION 1
 
@@ -43,6 +44,11 @@ class CkLBArgs
   int _lb_diffnumnbors;     // DiffusionLB: number of diffusion neighbors
   double _lb_diffbeta;      // DiffusionLB: second-order diffusion momentum (1.0 = off)
   bool _lb_diffgpudim;      // DiffusionLB: diffuse GPU load across nodes (else CPU)
+  bool _lb_gpuScaling;      // Learn destination-dependent per-kernel GPU costs
+  double _lb_gpuScalingAlphaMin;  // EWMA floor; 0 selects a stationary mean
+  int _lb_gpuScalingMinSamples;   // Samples needed before a factor is calibrated
+  int _lb_gpuScalingMaxComponents;  // Modeled kernel buckets kept per object/epoch
+  char* _lb_gpuRateFile;           // Optional GPU-type peak-rate overrides
   int _lb_central_pe;      // processor number for centralized strategy
   int _lb_maxDistPhases;   // Specifies the max number of LB phases in DistributedLB
   double _lb_targetRatio;  // Specifies the target load ratio for LBs that aim for a
@@ -66,6 +72,11 @@ class CkLBArgs
     _lb_diffnumnbors = 1;
     _lb_diffbeta = 1.0;
     _lb_diffgpudim = false;
+    _lb_gpuScaling = false;
+    _lb_gpuScalingAlphaMin = 0.0;
+    _lb_gpuScalingMinSamples = 1;
+    _lb_gpuScalingMaxComponents = 64;
+    _lb_gpuRateFile = nullptr;
     _lb_loop = false;
     _lb_central_pe = 0;
     _lb_maxDistPhases = 10;
@@ -93,6 +104,11 @@ class CkLBArgs
   inline int& diffusionNumNbors() { return _lb_diffnumnbors; }
   inline double& diffusionBeta() { return _lb_diffbeta; }
   inline bool& diffusionGpuDim() { return _lb_diffgpudim; }
+  inline bool& gpuScaling() { return _lb_gpuScaling; }
+  inline double& gpuScalingAlphaMin() { return _lb_gpuScalingAlphaMin; }
+  inline int& gpuScalingMinSamples() { return _lb_gpuScalingMinSamples; }
+  inline int& gpuScalingMaxComponents() { return _lb_gpuScalingMaxComponents; }
+  inline char*& gpuRateFile() { return _lb_gpuRateFile; }
   inline int& central_pe() { return _lb_central_pe; }
   inline double& alpha() { return _lb_alpha; }
   inline double& beta() { return _lb_beta; }
@@ -357,10 +373,19 @@ class LBManager : public CBase_LBManager
   {
     lbdb_obj->GetObjGPULoad(h, gputime);
   };
-  void SetObjGPULoad(const std::unordered_map<uint64_t, double> &id_loadMap)
+  void SetObjGPULoad(
+      const std::unordered_map<LDObjKey, double, LDObjKeyHash> &id_loadMap)
   {
     lbdb_obj->SetObjGPULoad(id_loadMap);
   }
+#if CMK_CUDA
+  void SetObjGPUCosts(
+      const std::unordered_map<LDObjKey, GpuObjectEpochCosts, LDObjKeyHash>
+          &id_costMap)
+  {
+    lbdb_obj->SetObjGPUCosts(id_costMap);
+  }
+#endif
   void* GetObjUserData(LDObjHandle& h) { return lbdb_obj->GetObjUserData(h); }
   void MetaLBCallLBOnChares() { lbdb_obj->MetaLBCallLBOnChares(); }
   void MetaLBResumeWaitingChares(int lb_period)

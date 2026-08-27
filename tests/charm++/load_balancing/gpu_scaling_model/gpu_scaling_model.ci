@@ -1,0 +1,5 @@
+mainmodule gpu_scaling_model {
+  mainchare Main {
+    entry Main(CkArgMsg* msg);
+  };
+};

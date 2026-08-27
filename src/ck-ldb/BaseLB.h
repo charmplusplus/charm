@@ -72,6 +72,10 @@ public:
     size_t pool_buff_mem_remaining;
     uint64_t gpu_device_id;		// GPU device this PE is mapped to (-1 = no GPU)
     int gpu_total_sms;			// Number of SMs on that GPU (0 if unknown)
+    // Hardware identity and rate prior for that GPU. Empty (typeId 0) unless
+    // +LBGpuScaling is on. A destination-aware strategy needs this to know what
+    // kind of device a candidate PE actually has.
+    GpuDeviceDescriptor gpu_descriptor;
 #endif
     ProcStats(): n_objs(0), pe_speed(1), total_walltime(0.0), idletime(0.0),
 #if CMK_LB_CPUTIMER
@@ -108,6 +112,7 @@ public:
       p|pool_buff_mem_remaining;
       p|gpu_device_id;
       p|gpu_total_sms;
+      if (_lb_args.lbversion() > 3) p|gpu_descriptor;
 #endif
     }
   };

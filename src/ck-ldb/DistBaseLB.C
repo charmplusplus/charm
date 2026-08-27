@@ -61,6 +61,8 @@ void DistBaseLB::barrierDone() {
   hapiPrepareCuptiLoads();
   // Every PE picks up the normalized loads for its own objects.
   lbmgr->SetObjGPULoad(CsvAccess(gpu_manager).cupti_obj_norm_load_);
+  if (_lb_args.gpuScaling())
+    lbmgr->SetObjGPUCosts(CsvAccess(gpu_manager).cupti_obj_epoch_costs_);
 #endif
 
   AssembleStats();

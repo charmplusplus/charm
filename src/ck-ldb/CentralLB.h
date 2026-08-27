@@ -10,6 +10,7 @@
 #include "CentralLB.decl.h"
 
 #include <vector>
+#include <unordered_map>
 #include "pup_stl.h"
 #include "manager.h"
 #include "ckcheckpoint.h"
@@ -234,6 +235,18 @@ public:
     return Strategy(stats);
   }
 
+#if CMK_CUDA
+  // Destination-dependent GPU cost prediction, shared by every centralized
+  // strategy. Lives here rather than in one balancer so the estimator can be
+  // developed and judged independently of whichever policy consumes it.
+  const GpuScalingModel& gpuScalingModel() const { return gpuScalingModel_; }
+
+  // Predicted whole-device GPU seconds for `obj` if it ran on `destination`.
+  // Falls back to the measured scalar gpuTime when the model cannot price the
+  // pair, so a strategy always gets a usable number.
+  double predictGpuCost(const LDObjData& obj, const ProcStats& destination) const;
+#endif
+
 protected:
   virtual bool QueryBalanceNow(int) { return true; };  
   virtual bool QueryDumpData() { return false; };  
@@ -266,6 +279,23 @@ private:
 
   FutureModel *predicted_model;
 
+#if CMK_CUDA
+  GpuScalingModel gpuScalingModel_;
+  uint64_t gpuScalingEpoch_;
+  // Last epoch's shadow predictions, checked against what actually happened
+  // once the objects have run again. Keyed by full LB identity so a migration
+  // does not lose the pairing.
+  std::unordered_map<LDObjKey, GpuShadowPrediction, LDObjKeyHash> gpuShadow_;
+  GpuPredictionAccuracy gpuAccuracy_;
+
+  // Register device types, pick a reference, learn from this epoch's summaries,
+  // then score last epoch's predictions. Runs after the statistics are complete
+  // and before Strategy, and never influences placement.
+  void updateGpuScalingModel(LDStats* stats);
+  void scoreGpuShadowPredictions(LDStats* stats);
+  void reportGpuScalingModel(LDStats* stats) const;
+#endif
+
   void BuildStatsMsg();
   void buildStats();
   void printStrategyStats(LBMigrateMsg *msg);
@@ -291,6 +321,7 @@ public:
   size_t pool_buff_mem_remaining;
   uint64_t gpu_device_id;
   int gpu_total_sms;
+  GpuDeviceDescriptor gpu_descriptor;
 #endif
   LBRealType total_walltime;
   LBRealType idletime;

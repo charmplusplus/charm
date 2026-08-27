@@ -249,6 +249,28 @@ void hapiCuptiInit();
 void hapiCuptiFinalize();
 uint64_t hapiCuptiPushObjCorrelation();
 void hapiCuptiPopObjCorrelation();
+bool hapiCuptiPushKernelTag(uint64_t workTag);
+void hapiCuptiPopKernelTag();
+
+// Associates logical work that is not visible in launch geometry with every
+// kernel launched inside the scope. A separate CUPTI correlation kind keeps
+// this tag independent from object ownership, and RAII keeps nested scopes and
+// early returns balanced.
+class hapiCuptiKernelTagScope {
+ public:
+  explicit hapiCuptiKernelTagScope(uint64_t workTag)
+      : pushed_(hapiCuptiPushKernelTag(workTag)) {}
+  ~hapiCuptiKernelTagScope() {
+    if (pushed_) hapiCuptiPopKernelTag();
+  }
+
+  hapiCuptiKernelTagScope(const hapiCuptiKernelTagScope&) = delete;
+  hapiCuptiKernelTagScope& operator=(const hapiCuptiKernelTagScope&) = delete;
+
+ private:
+  bool pushed_;
+};
+
 void hapiProcessCuptiBuffers();
 // Flush, parse and normalize this round's CUPTI records, once per round however
 // many PE threads call it. Load balancers should call this rather than the three
@@ -267,6 +289,11 @@ void hapiClearCuptiData();
 void hapiCuptiStartTracing();
 void hapiCuptiStopTracing();
 bool hapiCuptiTracingActive();
+#else
+class hapiCuptiKernelTagScope {
+ public:
+  explicit hapiCuptiKernelTagScope(uint64_t) {}
+};
 #endif
 
 #ifdef CMK_LBDB_ON

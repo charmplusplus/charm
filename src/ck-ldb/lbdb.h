@@ -18,9 +18,14 @@
 #endif
 #include <inttypes.h>
 #include <list>
+#include <unordered_map>
 #include <vector>
 
 #include "pup_stl.h"
+
+#if CMK_CUDA
+#include "GpuScalingModel.h"
+#endif
 
 class LBManager;//Forward declaration
 
@@ -90,6 +95,66 @@ public:
   inline const LDOMid &omID() const { return omId; }
   inline const CmiUInt8 &objID() const { return objId; }
   inline void pup(PUP::er &p);
+};
+
+// Hash the complete load-balancing identity. Equality still verifies both
+// fields, so hash collisions cannot alias objects from different managers.
+struct LDObjKeyHash {
+  std::size_t operator()(const LDObjKey &key) const noexcept {
+    uint64_t hash = static_cast<uint64_t>(key.objID());
+    hash ^= static_cast<uint64_t>(key.omID().id.idx) +
+            UINT64_C(0x9e3779b97f4a7c15) + (hash << 6) + (hash >> 2);
+    hash ^= hash >> 30;
+    hash *= UINT64_C(0xbf58476d1ce4e5b9);
+    hash ^= hash >> 27;
+    hash *= UINT64_C(0x94d049bb133111eb);
+    hash ^= hash >> 31;
+    return static_cast<std::size_t>(hash);
+  }
+};
+
+// CUPTI external-correlation IDs carry only 64 bits, while a Charm++ load-
+// balancing identity contains both an object-manager ID and an element ID.
+// This table assigns process-local tokens without discarding either part of
+// that identity. Synchronization is intentionally left to its owner because
+// lookups during buffer processing are already serialized.
+class GpuObjectTokenTable {
+public:
+  static constexpr uint64_t noObjectToken() { return UINT64_MAX; }
+
+  bool intern(const LDObjKey &key, uint64_t &token) {
+    auto found = keyToToken_.find(key);
+    if (found != keyToToken_.end()) {
+      token = found->second;
+      return true;
+    }
+    if (nextToken_ == noObjectToken()) return false;
+
+    token = nextToken_++;
+    keyToToken_.emplace(key, token);
+    tokenToKey_.emplace(token, key);
+    return true;
+  }
+
+  bool resolve(uint64_t token, LDObjKey &key) const {
+    auto found = tokenToKey_.find(token);
+    if (found == tokenToKey_.end()) return false;
+    key = found->second;
+    return true;
+  }
+
+  std::size_t size() const { return keyToToken_.size(); }
+
+  void clear() {
+    keyToToken_.clear();
+    tokenToKey_.clear();
+    nextToken_ = 1;
+  }
+
+private:
+  std::unordered_map<LDObjKey, uint64_t, LDObjKeyHash> keyToToken_;
+  std::unordered_map<uint64_t, LDObjKey> tokenToKey_;
+  uint64_t nextToken_ = 1;
 };
 
 typedef int LDObjIndex;
@@ -168,6 +233,17 @@ struct LBKernelRecord {
   uint64_t end_ns;     // CUPTI device-clock timestamp (ns)
   uint32_t device_id;  // CUPTI device id this kernel ran on
   int      sms_used;   // Number of SMs occupied while this kernel was running
+  // Identity under which this invocation is modeled. The launch signature it
+  // was derived from is deliberately not kept: only the hash is consumed
+  // downstream, and there is one of these per kernel launch.
+  GpuKernelKey kernel_key;
+  bool has_explicit_work_tag;
+  // Set when the identity cannot be trusted -- currently only when a work tag
+  // was known to exist for this launch but had already been aged out by the
+  // time the kernel record arrived. Such a kernel still earns load and still
+  // occupies SMs, but its demand goes to unmodeledGpuTime rather than into a
+  // bucket it does not belong in. See design decision 2 in the plan.
+  bool unmodelable;
 };
 #endif
 
@@ -178,6 +254,10 @@ struct LDObjData {
   // SM-utilization-normalized GPU load, in seconds of whole-device occupancy.
   // Computed in-process by hapiNormalizeCuptiLoads before the stats are sent.
   LBRealType gpuTime;
+  // The same demand broken down by kernel identity, plus the GPU it was
+  // measured on. Empty unless +LBGpuScaling is on. gpuTime remains the
+  // authoritative scalar: gpuCosts.totalDemand() reconciles with it.
+  GpuObjectEpochCosts gpuCosts;
 #endif
 #if CMK_LB_CPUTIMER
   LBRealType cpuTime;
@@ -385,6 +465,9 @@ inline void LDObjData::pup(PUP::er &p) {
   p|pupSize;
 #if CMK_CUDA
   p|gpuPupSize;
+  // Version-gated so an older simulation dump loads with empty summaries
+  // rather than misreading the stream.
+  if (_lb_version > 3) p|gpuCosts;
 #endif
 }
 

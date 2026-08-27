@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "hapi_portable.h"
 #include "converse.h"
@@ -89,6 +90,13 @@ enum ProfilingStage{
 };
 
 // Contains per-process data and methods needed by HAPI.
+#ifdef CMK_LBDB_ON
+// Hardware identity of the GPU this PE is bound to. Forces the lazy property
+// discovery if it has not run yet, so this is safe to call before the first
+// CUPTI drain. Returns a zeroed descriptor when this PE has no device.
+const GpuDeviceDescriptor& hapiMyDeviceDescriptor();
+#endif
+
 struct GPUManager {
   std::vector<BufferPool> mempool_free_bufs_;
   std::vector<size_t> mempool_boundaries_;
@@ -171,10 +179,17 @@ struct GPUManager {
 
   //CUPTI load balancing
 #ifdef CMK_LBDB_ON
-  std::unordered_map<uint32_t, uint64_t> cupti_correlation_db_;//correlationID -> ObjectID
+  // Runtime correlation ID -> process-local full-object token. CUSTOM0 work
+  // tags use a separate namespace and must never overwrite object ownership.
+  std::unordered_map<uint32_t, uint64_t> cupti_object_correlation_db_;
+  std::unordered_map<uint32_t, uint64_t> cupti_work_tag_correlation_db_;
 
-  // Per-kernel records: objectID -> list of (start_ns, end_ns, device, sms_used).
-  std::unordered_map<uint64_t, std::vector<LBKernelRecord>> cupti_obj_kernel_records_;
+  GpuObjectTokenTable cupti_object_tokens_;
+  std::mutex cupti_object_token_lock_;
+
+  // Full LB object identity -> attributed kernel records.
+  std::unordered_map<LDObjKey, std::vector<LBKernelRecord>, LDObjKeyHash>
+      cupti_obj_kernel_records_;
 
   // Kernels that could not be attributed to any object (launched outside a
   // migratable entry method, or with no correlation record). They occupy SMs
@@ -183,10 +198,33 @@ struct GPUManager {
   // perfectly valid chare element ID.
   std::vector<LBKernelRecord> cupti_unattributed_kernels_;
 
-  // objectID -> SM-utilization-normalized GPU load in seconds, produced by
-  // hapiNormalizeCuptiLoads. This is what the LB actually consumes; every PE
-  // in the process reads it concurrently, so it is const after that call.
-  std::unordered_map<uint64_t, double> cupti_obj_norm_load_;
+  // Full object identity -> SM-utilization-normalized GPU load in seconds.
+  std::unordered_map<LDObjKey, double, LDObjKeyHash> cupti_obj_norm_load_;
+
+  // Full object identity -> this epoch's per-kernel summary. Built alongside
+  // cupti_obj_norm_load_ and read by every PE in the process, so like that map
+  // it is const once hapiPrepareCuptiLoads has run.
+  std::unordered_map<LDObjKey, GpuObjectEpochCosts, LDObjKeyHash>
+      cupti_obj_epoch_costs_;
+
+  // Kernel classes that have been observed carrying an explicit work tag. An
+  // untagged instance of such a class means the tag went missing, which is not
+  // the same thing as a kernel that is legitimately untagged.
+  std::unordered_set<uint64_t> cupti_tagged_kernel_classes_;
+
+  // Kernel classes that have completed a full drain with no tag, and so are
+  // known to be legitimately untagged. Their later instances need no second
+  // look and can be filed as soon as the object correlation is known.
+  std::unordered_set<uint64_t> cupti_untagged_kernel_classes_;
+
+  // Previous round's count of kernels whose correlations had not been parsed
+  // yet, used to size the parked vector.
+  uint32_t cupti_pending_hint_ = 0;
+
+  // Diagnostic name table for detecting deterministic kernel-hash collisions.
+  // Names are copied before CUPTI releases its activity buffer.
+  std::unordered_map<uint64_t, std::string> cupti_kernel_names_;
+  std::unordered_set<uint64_t> cupti_logged_device_types_;
 
   // Written by CUPTI's buffer-completed callback, which may run on a
   // CUPTI-owned thread. That thread exists in non-SMP builds too, where the
@@ -244,6 +282,13 @@ struct GPUManager {
     running_kernel_idx_ = 0;
     data_setup_idx_ = 0;
     data_cleanup_idx_ = 0;
+
+#ifdef CMK_LBDB_ON
+    cupti_initialized_ = false;
+    cupti_tracing_active_.store(false, std::memory_order_relaxed);
+    cupti_generation_ = 0;
+    cupti_loads_ready_ = false;
+#endif
 
 #if CMK_SMP
     // Create mutex locks

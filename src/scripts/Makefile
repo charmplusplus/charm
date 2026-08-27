@@ -193,7 +193,7 @@ CKHEADERS=ck.h ckstream.h objid.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckcheckpoint.h ckmemcheckpoint.h ckrdma.h ckrdmadevice.h cksyncbarrier.h \
 	  ckobjQ.h readonly.h charm++_type_traits.h \
           $(UTILHEADERS) \
-	  waitqd.h LBDatabase.h LBManager.h MetaBalancer.h RandomForestModel.h lbdb.h $(LBHEADERS) \
+	  waitqd.h GpuScalingModel.h LBDatabase.h LBManager.h MetaBalancer.h RandomForestModel.h lbdb.h $(LBHEADERS) \
           LBComm.h LBOM.h LBObj.h LBMachineUtil.h \
 	  RefinerTemp.h Refiner.h ckgraph.h ckheap.h \
           elements.h topology.h manager.h \
@@ -685,7 +685,7 @@ $(L)/libglobal-swap.a: global-elfgot.C $(CVHEADERS)
 LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
 	   msgalloc.o ckfutures.o ckIgetControl.o debug-message.o debug-charm.o ckcallback.o \
 	   cklocation.o ckmulticast.o ckarrayoptions.o ckarray.o ckreduction.o ckrdma.o ckrdmadevice.o cksyncbarrier.o \
-           waitqd.o LBDatabase.o LBManager.o MetaBalancer.o weakTest.o treeTest.o forestTest.o readmodel.o lbdbf.o ckobjQ.o  \
+	   waitqd.o GpuScalingModel.o LBDatabase.o LBManager.o MetaBalancer.o weakTest.o treeTest.o forestTest.o readmodel.o lbdbf.o ckobjQ.o  \
 	   ckcheckpoint.o ckmemcheckpoint.o \
            LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
 	   BaseLB.o CentralLB.o TreeLB.o HybridBaseLB.o DistBaseLB.o \

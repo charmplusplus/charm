@@ -420,9 +420,27 @@ class Block : public CBase_Block {
     hapiCheck(cudaStreamWaitEvent(compute_stream, comm_event, 0));
 
 #if !COMM_ONLY
-    // Invoke GPU kernel for Jacobi computation
-    invokeJacobiKernel(d_temperature, d_new_temperature, block_width, block_height, load_iters,
-        compute_stream);
+    // Invoke GPU kernel for Jacobi computation.
+    //
+    // Every chare launches this with identical grid and block dimensions and
+    // differs only in load_iters, which CUPTI cannot see. Without the tag the
+    // automatic launch-signature bucket merges all of them into one identity,
+    // and the estimator then averages incomparable amounts of work. The tag
+    // gives each loop count its own bucket.
+    //
+    // Set JACOBI_NO_WORK_TAG=1 to launch untagged instead. This benchmark is
+    // the case the tag exists for, so being able to A/B it is what makes the
+    // difference measurable rather than asserted.
+    static const bool tag_work =
+        (getenv("JACOBI_NO_WORK_TAG") == nullptr);
+    if (tag_work) {
+      hapiCuptiKernelTagScope work_tag(load_iters);
+      invokeJacobiKernel(d_temperature, d_new_temperature, block_width, block_height, load_iters,
+          compute_stream);
+    } else {
+      invokeJacobiKernel(d_temperature, d_new_temperature, block_width, block_height, load_iters,
+          compute_stream);
+    }
 #endif
 
     // Operations in communication stream (packing and transfers) should

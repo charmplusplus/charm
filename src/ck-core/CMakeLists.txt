@@ -6,6 +6,7 @@ set(ck-cxx-sources
     ../ck-ldb/ckheap.C ../ck-ldb/ckset.C
     ../ck-ldb/DistBaseLB.C ../ck-ldb/forestTest.C
     ../ck-ldb/HybridBaseLB.C
+    ../ck-ldb/GpuScalingModel.C
     ../ck-ldb/LBComm.C ../ck-ldb/LBDatabase.C
     ../ck-ldb/LBManager.C
     ../ck-ldb/lbdbf.C
@@ -57,6 +58,7 @@ set(ldb-cxx-sources
 set(ldb-h-sources ../ck-ldb/BaseLB.h ../ck-ldb/CentralLBMsg.h
     ../ck-ldb/DistBaseLB.h ../ck-ldb/DistributedLB.h
     ../ck-ldb/HybridBaseLB.h ../ck-ldb/HybridLBMsg.h
+    ../ck-ldb/GpuScalingModel.h
     ../ck-ldb/LBComm.h
     ../ck-ldb/LBDatabase.h ../ck-ldb/LBManager.h ../ck-ldb/LBMachineUtil.h ../ck-ldb/LBOM.h
     ../ck-ldb/LBObj.h ../ck-ldb/LBSimulation.h

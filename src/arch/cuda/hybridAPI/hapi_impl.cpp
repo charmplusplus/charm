@@ -35,6 +35,8 @@
 #if CMK_LBDB_ON
 #include <cupti.h>
 #include "LBManager.h"
+#include "ck.h"
+#include "cklocrec.h"
 
 #define CUPTI_SAFE_CALL(call)                                              \
   do {                                                                     \
@@ -145,7 +147,8 @@ static void ipcHandleOpen();
 #ifdef CMK_LBDB_ON
 // Sentinel external-correlation ID meaning "no owning migratable object".
 // Must not collide with a real chare ID -- 0 is a perfectly valid one.
-static const uint64_t HAPI_CUPTI_NO_OBJECT = UINT64_MAX;
+static constexpr uint64_t HAPI_CUPTI_NO_OBJECT =
+    GpuObjectTokenTable::noObjectToken();
 
 static void CUPTIAPI cuptiBufferRequested(uint8_t **buffer, size_t *size, size_t *maxNumRecords) {
   // CUPTI writes activity records straight into this buffer and has no way to
@@ -181,21 +184,57 @@ static void hapiPopulateDeviceProps(GPUManager& gm) {
   for (DeviceManager& dm : gm.device_managers) {
     if (dm.props_initialized) continue;
     int dev = dm.global_index;
-    cudaDeviceGetAttribute(&dm.multi_processor_count,
-                           cudaDevAttrMultiProcessorCount, dev);
-    cudaDeviceGetAttribute(&dm.max_threads_per_sm,
-                           cudaDevAttrMaxThreadsPerMultiProcessor, dev);
+    cudaDeviceProp props;
+    hapiCheck(cudaGetDeviceProperties(&props, dev));
+
+    dm.multi_processor_count = props.multiProcessorCount;
+    dm.max_threads_per_sm = props.maxThreadsPerMultiProcessor;
 #ifdef cudaDevAttrMaxBlocksPerMultiprocessor
-    cudaDeviceGetAttribute(&dm.max_blocks_per_sm,
-                           cudaDevAttrMaxBlocksPerMultiprocessor, dev);
+    hapiCheck(cudaDeviceGetAttribute(&dm.max_blocks_per_sm,
+                                     cudaDevAttrMaxBlocksPerMultiprocessor, dev));
 #else
     dm.max_blocks_per_sm = 0;
 #endif
-    cudaDeviceGetAttribute(&dm.max_registers_per_sm,
-                           cudaDevAttrMaxRegistersPerMultiprocessor, dev);
-    cudaDeviceGetAttribute(&dm.max_shared_mem_per_sm,
-                           cudaDevAttrMaxSharedMemoryPerMultiprocessor, dev);
-    cudaDeviceGetAttribute(&dm.warp_size, cudaDevAttrWarpSize, dev);
+    dm.max_registers_per_sm = props.regsPerMultiprocessor;
+    dm.max_shared_mem_per_sm = static_cast<int>(props.sharedMemPerMultiprocessor);
+    dm.warp_size = props.warpSize;
+
+    GpuDeviceDescriptor& descriptor = dm.descriptor;
+    descriptor.instanceId =
+        (static_cast<uint64_t>(static_cast<uint32_t>(CmiPhysicalNodeID(CmiMyPe())))
+         << 32) |
+        static_cast<uint32_t>(dm.global_index);
+    descriptor.smCount = static_cast<uint32_t>(std::max(props.multiProcessorCount, 0));
+    descriptor.computeMajor = static_cast<uint32_t>(std::max(props.major, 0));
+    descriptor.computeMinor = static_cast<uint32_t>(std::max(props.minor, 0));
+    descriptor.maxClockKHz = static_cast<uint32_t>(std::max(props.clockRate, 0));
+    descriptor.totalMemory = static_cast<uint64_t>(props.totalGlobalMem);
+    descriptor.typeId = gpuStableDeviceType(
+        props.name, descriptor.smCount, descriptor.computeMajor,
+        descriptor.computeMinor, descriptor.maxClockKHz, descriptor.totalMemory);
+    gpuDerivePeakRateScore(descriptor.smCount, descriptor.computeMajor,
+                           descriptor.computeMinor, descriptor.maxClockKHz,
+                           descriptor.peakRateScore, descriptor.peakRateSource);
+
+    if (_lb_args.gpuScaling() &&
+        gm.cupti_logged_device_types_.insert(descriptor.typeId).second) {
+      CmiPrintf("HAPI GPU scaling: device type=%" PRIu64
+                " name=%s cc=%u.%u sms=%u clock_khz=%u memory=%" PRIu64
+                " rate=%.0f source=%s\n",
+                descriptor.typeId, props.name, descriptor.computeMajor,
+                descriptor.computeMinor, descriptor.smCount,
+                descriptor.maxClockKHz, descriptor.totalMemory,
+                descriptor.peakRateScore,
+                gpuPeakRateSourceName(descriptor.peakRateSource));
+      // An Unknown source means a property the prior needs was missing and a
+      // nominal value stood in for it. The relative ordering against a fully
+      // described device is then only as good as that guess, so say so once.
+      if (descriptor.peakRateSource == GpuPeakRateSource::Unknown)
+        CmiPrintf("HAPI GPU scaling: device type=%" PRIu64
+                  " reported no usable clock rate; the cross-GPU prior for it "
+                  "assumes %u kHz and will be corrected by observation\n",
+                  descriptor.typeId, gpuNominalClockKHz());
+    }
     dm.props_initialized = true;
   }
 }
@@ -277,6 +316,8 @@ void hapiCuptiFinalize() {
   GPUManager& gm = CsvAccess(gpu_manager);
   if(gm.cupti_initialized_== false) return;
   gm.cupti_initialized_ = false;
+  gm.cupti_tracing_active_.store(false, std::memory_order_relaxed);
+  ++gm.cupti_generation_;
 
   CUPTI_SAFE_CALL(cuptiFinalize());
 }
@@ -551,19 +592,125 @@ void hapiProcessCuptiBuffers() {
   GPUManager& gm = CsvAccess(gpu_manager);
   hapiPopulateDeviceProps(gm);  // lazy: device_managers is ready by now
 
-  // A kernel record can be parsed before the external-correlation record that
-  // names its object: correlation and kernel records are queued at different
-  // points in the launch's life and land in buffers that complete
-  // independently. Park such kernels here and resolve them in a second pass
-  // once every buffer has been parsed, rather than dropping them.
+  const bool scaling = _lb_args.gpuScaling();
+
+  // A kernel record can be parsed before the correlation records that name it:
+  // correlation and kernel records are queued at different points in the
+  // launch's life and land in buffers that complete independently. Only those
+  // kernels are parked for a second pass; one whose correlations are already
+  // known is filed immediately, so the common case never holds two copies of
+  // every record. The launch signature rides along with a parked kernel because
+  // it is needed to rebucket if a work tag turns up, but it is deliberately not
+  // stored in LBKernelRecord: there is one of those per launch.
   struct PendingKernel {
-    uint32_t       correlation_id;
-    LBKernelRecord rec;
+    uint32_t           correlation_id;
+    GpuLaunchSignature launch;
+    LBKernelRecord     rec;
   };
   std::vector<PendingKernel> pending;
+  pending.reserve(gm.cupti_pending_hint_);
 
   uint32_t kernel_count = 0;
-  uint32_t corr_count = 0;
+  uint32_t object_corr_count = 0;
+  uint32_t work_tag_count = 0;
+  uint32_t invalid_duration_count = 0;
+  uint32_t hash_collision_count = 0;
+  uint32_t attributed = 0;
+  uint32_t unattributed = 0;
+  uint32_t unresolved_token = 0;
+  uint32_t deferred = 0;
+  uint32_t lost_work_tags = 0;
+
+  // Resolve each distinct token once rather than once per kernel record. A
+  // round holds far more kernels than objects, and this lock is the same one
+  // every entry method needs, so taking it per record would both dominate the
+  // drain and stall PEs that are still running.
+  struct ResolvedToken {
+    LDObjKey key{};
+    bool valid = false;
+  };
+  std::unordered_map<uint64_t, ResolvedToken> resolved_tokens;
+
+  auto fileKernel = [&](const LBKernelRecord& rec, uint64_t object_token) {
+    if (object_token == HAPI_CUPTI_NO_OBJECT) {
+      gm.cupti_unattributed_kernels_.push_back(rec);
+      unattributed++;
+      return;
+    }
+    auto memo = resolved_tokens.find(object_token);
+    if (memo == resolved_tokens.end()) {
+      ResolvedToken entry;
+      {
+        std::lock_guard<std::mutex> token_lock(gm.cupti_object_token_lock_);
+        entry.valid = gm.cupti_object_tokens_.resolve(object_token, entry.key);
+      }
+      memo = resolved_tokens.emplace(object_token, entry).first;
+    }
+    if (!memo->second.valid) {
+      gm.cupti_unattributed_kernels_.push_back(rec);
+      unattributed++;
+      unresolved_token++;
+      return;
+    }
+    gm.cupti_obj_kernel_records_[memo->second.key].push_back(rec);
+    attributed++;
+  };
+
+  // Applies the work tag for this launch, if one has been parsed. Returns false
+  // when the tag may still be in an unparsed buffer, in which case the bucket
+  // is not settled and the kernel must be parked until the whole drain is done.
+  auto applyWorkTag = [&](uint32_t correlation_id, const GpuLaunchSignature& launch,
+                          LBKernelRecord& rec, bool last_chance) {
+    // Already resolved during the parse loop. Without this the second pass
+    // would look the tag up again, fail to find the entry it consumed itself,
+    // and condemn a correctly tagged kernel as unmodelable.
+    if (rec.has_explicit_work_tag) return true;
+
+    auto work_tag = gm.cupti_work_tag_correlation_db_.find(correlation_id);
+    if (work_tag != gm.cupti_work_tag_correlation_db_.end()) {
+      rec.has_explicit_work_tag = true;
+      rec.kernel_key.workBucket =
+          gpuStableWorkBucket(launch, true, work_tag->second);
+      gm.cupti_tagged_kernel_classes_.insert(rec.kernel_key.kernelClass);
+      gm.cupti_work_tag_correlation_db_.erase(work_tag);
+      return true;
+    }
+
+    // No tag found yet. Whether that is final depends on what is known about
+    // this kernel class, because a tag record can be in a buffer this drain has
+    // not parsed. Deciding per class rather than per application matters: an
+    // application that tags one kernel usually leaves its others untagged, and
+    // parking all of them would give back the fast path this drain exists to
+    // preserve.
+    const uint64_t kernelClass = rec.kernel_key.kernelClass;
+    if (!last_chance) {
+      // Confirmed untagged by a previous full drain: nothing to wait for.
+      if (gm.cupti_untagged_kernel_classes_.count(kernelClass) != 0) return true;
+      // Either known-tagged (so this is a missing tag, or one still unparsed)
+      // or never seen before (so its first instance must not be committed to
+      // the untagged bucket on incomplete information). Both need the full
+      // drain first.
+      return false;
+    }
+
+    // Every buffer has been parsed, so the absence is real. A legitimately
+    // untagged class keeps the automatic launch-signature bucket and is
+    // remembered so its later instances stay on the fast path.
+    if (gm.cupti_tagged_kernel_classes_.count(kernelClass) == 0) {
+      gm.cupti_untagged_kernel_classes_.insert(kernelClass);
+      return true;
+    }
+
+    // The class has been seen tagged, so the tag went missing. The automatic
+    // bucket is guaranteed by the hasExplicitTag discriminator to be a
+    // different key from the one its tagged siblings use, and filing it there
+    // would blend unrelated work sizes into a bucket the estimator treats as
+    // one comparable population. Mark it unmodelable instead.
+    rec.unmodelable = true;
+    lost_work_tags++;
+    return true;
+  };
+
   while (true) {
     CuptiBufferItem item;
 
@@ -587,8 +734,15 @@ void hapiProcessCuptiBuffers() {
     while (cuptiActivityGetNextRecord(item.buffer, item.validSize, &record) == CUPTI_SUCCESS) {
       if (record->kind == CUPTI_ACTIVITY_KIND_EXTERNAL_CORRELATION) {
         CUpti_ActivityExternalCorrelation *corr = (CUpti_ActivityExternalCorrelation *)record;
-        corr_count++;
-        gm.cupti_correlation_db_[corr->correlationId] = corr->externalId;
+        if (corr->externalKind == CUPTI_EXTERNAL_CORRELATION_KIND_UNKNOWN) {
+          object_corr_count++;
+          gm.cupti_object_correlation_db_[corr->correlationId] = corr->externalId;
+        }
+        else if (_lb_args.gpuScaling() &&
+                 corr->externalKind == CUPTI_EXTERNAL_CORRELATION_KIND_CUSTOM0) {
+          work_tag_count++;
+          gm.cupti_work_tag_correlation_db_[corr->correlationId] = corr->externalId;
+        }
       }
       else if (record->kind == CUPTI_ACTIVITY_KIND_CONCURRENT_KERNEL ||
                record->kind == CUPTI_ACTIVITY_KIND_KERNEL) {
@@ -597,21 +751,48 @@ void hapiProcessCuptiBuffers() {
 
         DeviceManager* dm = findDeviceManager(gm, kernel->deviceId);
 
-        LBKernelRecord rec;
+        LBKernelRecord rec{};
         rec.start_ns  = kernel->start;
         rec.end_ns    = kernel->end;
         rec.device_id = kernel->deviceId;
         rec.sms_used  = dm ? computeKernelSMs(*dm, kernel) : 1;
+        if (rec.end_ns <= rec.start_ns) invalid_duration_count++;
 
-        auto it = gm.cupti_correlation_db_.find(kernel->correlationId);
-        if (it == gm.cupti_correlation_db_.end()) {
-          pending.push_back({kernel->correlationId, rec});
-          continue;
+        GpuLaunchSignature launch;
+        bool bucket_settled = true;
+        if (scaling) {
+          launch.gridX = kernel->gridX;
+          launch.gridY = kernel->gridY;
+          launch.gridZ = kernel->gridZ;
+          launch.blockX = kernel->blockX;
+          launch.blockY = kernel->blockY;
+          launch.blockZ = kernel->blockZ;
+          launch.staticSharedMemory = kernel->staticSharedMemory;
+          launch.dynamicSharedMemory = kernel->dynamicSharedMemory;
+          rec.kernel_key.kernelClass = gpuStableKernelClass(kernel->name);
+          rec.kernel_key.workBucket = gpuStableWorkBucket(launch, false, 0);
+
+          if (_lb_args.debug() > 0) {
+            const char* kernel_name = kernel->name != nullptr ? kernel->name : "";
+            auto inserted = gm.cupti_kernel_names_.emplace(
+                rec.kernel_key.kernelClass, kernel_name);
+            if (!inserted.second && inserted.first->second != kernel_name)
+              hash_collision_count++;
+          }
+
+          bucket_settled =
+              applyWorkTag(kernel->correlationId, launch, rec, /*last_chance=*/false);
         }
-        if (it->second == HAPI_CUPTI_NO_OBJECT)
-          gm.cupti_unattributed_kernels_.push_back(rec);
-        else gm.cupti_obj_kernel_records_[it->second].push_back(rec);
-        gm.cupti_correlation_db_.erase(it);
+
+        auto object = gm.cupti_object_correlation_db_.find(kernel->correlationId);
+        if (bucket_settled && object != gm.cupti_object_correlation_db_.end()) {
+          const uint64_t object_token = object->second;
+          gm.cupti_object_correlation_db_.erase(object);
+          fileKernel(rec, object_token);
+        } else {
+          pending.push_back({kernel->correlationId, launch, rec});
+          deferred++;
+        }
       }
     }
 
@@ -619,22 +800,27 @@ void hapiProcessCuptiBuffers() {
   }
 
   // Second pass: correlations that arrived in a later buffer are now known.
-  // Anything still unresolved goes to the unattributed bucket: it contributes
-  // SM occupancy to the contention model but receives no load.
-  uint32_t resolved_late = 0, unresolved = 0;
-  for (const PendingKernel& pk : pending) {
-    auto it = gm.cupti_correlation_db_.find(pk.correlation_id);
-    if (it == gm.cupti_correlation_db_.end()) {
-      gm.cupti_unattributed_kernels_.push_back(pk.rec);
-      unresolved++;
+  for (PendingKernel& pending_kernel : pending) {
+    if (scaling)
+      applyWorkTag(pending_kernel.correlation_id, pending_kernel.launch,
+                   pending_kernel.rec, /*last_chance=*/true);
+
+    auto object =
+        gm.cupti_object_correlation_db_.find(pending_kernel.correlation_id);
+    if (object == gm.cupti_object_correlation_db_.end()) {
+      gm.cupti_unattributed_kernels_.push_back(pending_kernel.rec);
+      unattributed++;
       continue;
     }
-    if (it->second == HAPI_CUPTI_NO_OBJECT)
-      gm.cupti_unattributed_kernels_.push_back(pk.rec);
-    else gm.cupti_obj_kernel_records_[it->second].push_back(pk.rec);
-    gm.cupti_correlation_db_.erase(it);
-    resolved_late++;
+
+    const uint64_t object_token = object->second;
+    gm.cupti_object_correlation_db_.erase(object);
+    fileKernel(pending_kernel.rec, object_token);
   }
+
+  // Size next round's parked vector from this one: the straggler count is a
+  // property of how CUPTI is batching buffers, which changes slowly.
+  gm.cupti_pending_hint_ = deferred;
 
   // Every entry method pushes a correlation ID, and CUPTI emits a record for
   // each runtime call made under it -- memcpys, syncs and so on, not just
@@ -642,14 +828,31 @@ void hapiProcessCuptiBuffers() {
   // force-flush before draining, so any kernel that was going to arrive has
   // arrived; whatever is left over is non-kernel traffic and would otherwise
   // accumulate without bound.
-  size_t corr_dropped = gm.cupti_correlation_db_.size();
-  gm.cupti_correlation_db_.clear();
+  size_t object_corr_dropped = gm.cupti_object_correlation_db_.size();
+  size_t work_tags_dropped = gm.cupti_work_tag_correlation_db_.size();
+  gm.cupti_object_correlation_db_.clear();
+  gm.cupti_work_tag_correlation_db_.clear();
+
+  // A lost work tag is not just a lost sample: it would otherwise file the
+  // kernel under a bucket its tagged siblings never use, so report it at the
+  // first debug level rather than burying it with the bookkeeping counters.
+  if (_lb_args.debug() > 0 && lost_work_tags > 0) {
+    CmiPrintf("HAPI[pe=%d]: %u kernel record(s) of a tagged class arrived with "
+              "no work tag and were excluded from the scaling model\n",
+              CmiMyPe(), lost_work_tags);
+  }
 
   if (_lb_args.debug() > 1) {
-    CmiPrintf("HAPI[pe=%d]: hapiProcessCuptiBuffers  kernels=%u  correlations=%u  "
-              "resolved_second_pass=%u  unattributed=%u  objs=%zu  corr_dropped=%zu\n",
-              CmiMyPe(), kernel_count, corr_count, resolved_late, unresolved,
-              gm.cupti_obj_kernel_records_.size(), corr_dropped);
+    CmiPrintf("HAPI[pe=%d]: hapiProcessCuptiBuffers kernels=%u "
+              "object_correlations=%u work_tags=%u attributed=%u "
+              "unattributed=%u deferred=%u invalid_durations=%u "
+              "unresolved_tokens=%u hash_collisions=%u lost_work_tags=%u "
+              "objects=%zu object_corr_dropped=%zu work_tags_dropped=%zu\n",
+              CmiMyPe(), kernel_count, object_corr_count, work_tag_count,
+              attributed, unattributed, deferred, invalid_duration_count,
+              unresolved_token, hash_collision_count, lost_work_tags,
+              gm.cupti_obj_kernel_records_.size(), object_corr_dropped,
+              work_tags_dropped);
   }
 }
 
@@ -675,25 +878,50 @@ void hapiProcessCuptiBuffers() {
 void hapiNormalizeCuptiLoads() {
   GPUManager& gm = CsvAccess(gpu_manager);
   gm.cupti_obj_norm_load_.clear();
+  gm.cupti_obj_epoch_costs_.clear();
+
+  const bool scaling = _lb_args.gpuScaling();
 
   struct SweepKernel {
-    uint64_t obj_id;
+    LDObjKey obj_key;
     uint64_t start_ns;
     uint64_t end_ns;
     int      sms_used;
     bool     attributed;   // false => consumes SMs but earns no load
+    GpuKernelKey kernel_key;
+    bool     unmodelable;
+    // Whole-device occupancy this kernel earned, filled in by the sweep. Held
+    // per kernel rather than summed straight into the object so the same
+    // numbers can also be aggregated per kernel identity.
+    double   demand;
   };
   std::unordered_map<uint32_t, std::vector<SweepKernel>> byDevice;
   for (const auto& kv : gm.cupti_obj_kernel_records_) {
     for (const LBKernelRecord& k : kv.second) {
       if (k.end_ns <= k.start_ns) continue;
-      byDevice[k.device_id].push_back({kv.first, k.start_ns, k.end_ns, k.sms_used, true});
+      byDevice[k.device_id].push_back({kv.first, k.start_ns, k.end_ns, k.sms_used,
+                                       true, k.kernel_key, k.unmodelable, 0.0});
     }
   }
   for (const LBKernelRecord& k : gm.cupti_unattributed_kernels_) {
     if (k.end_ns <= k.start_ns) continue;
-    byDevice[k.device_id].push_back({0, k.start_ns, k.end_ns, k.sms_used, false});
+    byDevice[k.device_id].push_back({LDObjKey{}, k.start_ns, k.end_ns, k.sms_used,
+                                     false, GpuKernelKey{}, true, 0.0});
   }
+
+  // Per-object accumulators. Components are gathered in a hash map and only
+  // flattened into the wire vector once, after the cap is applied.
+  struct ObjectAccumulator {
+    std::unordered_map<GpuKernelKey, GpuKernelEpochCost, GpuKernelKeyHash> components;
+    double unmodeled = 0.0;
+    // An object's kernels are almost always all on one device, but a migration
+    // mid-round can split them. The device that did most of the work is the one
+    // a destination prediction should scale from.
+    double sourceDemand = 0.0;
+    uint64_t sourceInstanceId = 0;
+    uint64_t sourceTypeId = 0;
+  };
+  std::unordered_map<LDObjKey, ObjectAccumulator, LDObjKeyHash> accumulators;
 
   size_t total_kernels = 0, devices_normalized = 0;
   for (auto& kv : byDevice) {
@@ -741,13 +969,90 @@ void hapiNormalizeCuptiLoads() {
           if (eff <= 0) continue;
           remaining -= eff;
           if (!kernels[ki].attributed) continue;  // contention only, no owner
-          gm.cupti_obj_norm_load_[kernels[ki].obj_id] +=
-              dt_s * ((double)eff / (double)total_sms);
+          kernels[ki].demand += dt_s * ((double)eff / (double)total_sms);
         }
       }
       if (ev.kind == 1) active.insert(ev.kidx);
       else              active.erase(ev.kidx);
       t_prev = ev.time;
+    }
+
+    for (const SweepKernel& k : kernels) {
+      if (!k.attributed || k.demand <= 0.0) continue;
+      gm.cupti_obj_norm_load_[k.obj_key] += k.demand;
+    }
+
+    if (!scaling) continue;
+
+    const uint64_t instanceId = dm->descriptor.instanceId;
+    const uint64_t typeId = dm->descriptor.typeId;
+    std::unordered_map<LDObjKey, double, LDObjKeyHash> deviceDemand;
+    for (const SweepKernel& k : kernels) {
+      if (!k.attributed || k.demand <= 0.0) continue;
+      deviceDemand[k.obj_key] += k.demand;
+
+      ObjectAccumulator& acc = accumulators[k.obj_key];
+      if (k.unmodelable) {
+        acc.unmodeled += k.demand;
+        continue;
+      }
+      GpuKernelEpochCost& component = acc.components[k.kernel_key];
+      component.key = k.kernel_key;
+      const double duration_s = (double)(k.end_ns - k.start_ns) / 1.0e9;
+      // A rejected sample still has to be accounted for somewhere, or the
+      // per-object total stops reconciling with the scalar load.
+      if (!component.observe(k.demand, duration_s)) acc.unmodeled += k.demand;
+    }
+    for (const auto& objectDemand : deviceDemand) {
+      ObjectAccumulator& acc = accumulators[objectDemand.first];
+      if (objectDemand.second > acc.sourceDemand) {
+        acc.sourceDemand = objectDemand.second;
+        acc.sourceInstanceId = instanceId;
+        acc.sourceTypeId = typeId;
+      }
+    }
+  }
+
+  if (scaling) {
+    const std::size_t cap =
+        static_cast<std::size_t>(_lb_args.gpuScalingMaxComponents());
+    size_t capped_objects = 0;
+    for (auto& kv : accumulators) {
+      GpuObjectEpochCosts costs;
+      costs.sourceInstanceId = kv.second.sourceInstanceId;
+      costs.sourceTypeId = kv.second.sourceTypeId;
+      costs.unmodeledGpuTime = kv.second.unmodeled;
+      costs.components.reserve(kv.second.components.size());
+      for (const auto& component : kv.second.components)
+        costs.components.push_back(component.second);
+
+      if (costs.components.size() > cap) capped_objects++;
+      costs.enforceComponentCap(cap);
+      // Canonical wire order, independent of hash iteration and of whether the
+      // cap reordered anything, so every replica sees the same bytes.
+      std::sort(costs.components.begin(), costs.components.end(),
+                [](const GpuKernelEpochCost& left, const GpuKernelEpochCost& right) {
+                  return left.key < right.key;
+                });
+
+      if (_lb_args.debug() > 0) {
+        auto scalar = gm.cupti_obj_norm_load_.find(kv.first);
+        const double expected =
+            scalar == gm.cupti_obj_norm_load_.end() ? 0.0 : scalar->second;
+        const double tolerance = 1.0e-9 + 1.0e-6 * expected;
+        if (std::fabs(expected - costs.totalDemand()) > tolerance) {
+          CmiPrintf("HAPI[pe=%d]: GPU summary does not reconcile: scalar=%.9f "
+                    "components+residual=%.9f\n",
+                    CmiMyPe(), expected, costs.totalDemand());
+        }
+      }
+
+      gm.cupti_obj_epoch_costs_[kv.first] = std::move(costs);
+    }
+
+    if (_lb_args.debug() > 1) {
+      CmiPrintf("HAPI[pe=%d]: GPU summaries objects=%zu capped=%zu cap=%zu\n",
+                CmiMyPe(), gm.cupti_obj_epoch_costs_.size(), capped_objects, cap);
     }
   }
 
@@ -800,10 +1105,10 @@ void hapiClearCuptiData() {
   gm.cupti_obj_kernel_records_.clear();
   gm.cupti_unattributed_kernels_.clear();
   gm.cupti_obj_norm_load_.clear();
-  // cupti_correlation_db_ is deliberately not cleared: a correlation whose
-  // kernel record has not been flushed yet is still resolvable on the next
-  // drain. Entries are erased as they are matched, so it does not grow in
-  // steady state.
+  gm.cupti_obj_epoch_costs_.clear();
+  // Correlation maps are drained alongside the CUPTI buffers in
+  // hapiProcessCuptiBuffers. Do not clear the object-token table: later epochs
+  // must reuse the same token for the same full LB identity.
 }
 
 #endif
@@ -2198,8 +2503,25 @@ hapiStream_t hapiGetStream() {
 // CUPTI_ERROR_QUEUE_EMPTY and attribution drifts. Each Charm++ PE is its own
 // thread, so thread_local is per-PE.
 static thread_local int cupti_pushed_depth = 0;
+static thread_local int cupti_tag_pushed_depth = 0;
 // The detach generation this PE last observed; see GPUManager::cupti_generation_.
 static thread_local uint64_t cupti_seen_generation = 0;
+
+// This PE's view of the process-wide token table. Every entry method on a
+// migratable chare needs its object's token, and the table behind it is shared
+// by every PE in the process, so consulting it under the node-wide lock would
+// serialize the whole process on one mutex for the length of the run.
+//
+// The table is append-only for the lifetime of the process: a token is never
+// reassigned, reused for a different identity, or dropped -- hapiClearCuptiData
+// deliberately keeps it so that later epochs reuse the same token for the same
+// LB identity. That invariant is what makes this cache safe without any
+// invalidation protocol: an entry, once correct, stays correct, including
+// across migration (the destination PE simply misses once and interns the same
+// token the source PE already has). Anything that gains the ability to clear or
+// renumber GpuObjectTokenTable must also invalidate these caches.
+static thread_local std::unordered_map<LDObjKey, uint64_t, LDObjKeyHash>
+    cupti_local_object_tokens;
 
 // Drop this PE's outstanding push count if CUPTI has been detached since we
 // last looked -- the stack those pushes referred to no longer exists, so
@@ -2208,6 +2530,7 @@ static inline void hapiCuptiSyncGeneration(GPUManager& gm) {
   if (cupti_seen_generation != gm.cupti_generation_) {
     cupti_seen_generation = gm.cupti_generation_;
     cupti_pushed_depth = 0;
+    cupti_tag_pushed_depth = 0;
   }
 }
 
@@ -2219,29 +2542,40 @@ uint64_t hapiCuptiPushObjCorrelation() {
   if (!gm.cupti_tracing_active_.load(std::memory_order_relaxed)) return 0;
   hapiCuptiSyncGeneration(gm);
 
-  // Identify the active Charm++ object, if there is a usable one. This is
-  // called for every entry method, including ones running on non-migratable
-  // chares and ones with no active object at all, so none of those cases is an
-  // error -- they simply have no owner to bill the GPU work to.
-  //
-  // Guard on ckInitialized before dereferencing: a Chare* is pushed onto the
-  // callstack before its base constructor has finished, so the vtable needed
-  // by dynamic_cast may not be set up yet.
-  uint64_t obj_id = HAPI_CUPTI_NO_OBJECT;
-  Chare* chare = CkActiveObj();
-  if (chare && chare->ckInitialized) {
-    if (CkMigratable* mig = dynamic_cast<CkMigratable*>(chare))
-      obj_id = (uint64_t)mig->ckGetID();
+  // The CUPTI external ID is a process-local token for the complete LB object
+  // key. Using CkMigratable::ckGetID() here loses the object-manager identity
+  // and aliases equal element IDs from different chare arrays.
+  uint64_t object_token = HAPI_CUPTI_NO_OBJECT;
+  if (CkLocRec* active = CkActiveLocRec()) {
+    const LDObjHandle& handle = active->getLdHandle();
+    LDObjKey key;
+    key.omID() = handle.omID();
+    key.objID() = handle.objID();
+
+    // Steady state is a PE-local hit: the shared lock is taken only the first
+    // time this PE runs a given object, so it costs O(objects that ever run
+    // here) acquisitions rather than one per entry method.
+    auto cached = cupti_local_object_tokens.find(key);
+    if (cached != cupti_local_object_tokens.end()) {
+      object_token = cached->second;
+    } else {
+      {
+        std::lock_guard<std::mutex> token_lock(gm.cupti_object_token_lock_);
+        if (!gm.cupti_object_tokens_.intern(key, object_token))
+          CmiAbort("HAPI: exhausted CUPTI object-correlation tokens");
+      }
+      cupti_local_object_tokens.emplace(key, object_token);
+    }
   }
 
   // Always push, even with the sentinel, so that the matching pop always has
   // something to remove; an unbalanced stack would mis-attribute every
   // subsequent kernel.
   CUPTI_SAFE_CALL(cuptiActivityPushExternalCorrelationId(
-      CUPTI_EXTERNAL_CORRELATION_KIND_UNKNOWN, obj_id));
+      CUPTI_EXTERNAL_CORRELATION_KIND_UNKNOWN, object_token));
   ++cupti_pushed_depth;
 
-  return obj_id;
+  return object_token;
 }
 
 void hapiCuptiPopObjCorrelation() {
@@ -2260,6 +2594,30 @@ void hapiCuptiPopObjCorrelation() {
   uint64_t tag;
   CUPTI_SAFE_CALL(cuptiActivityPopExternalCorrelationId(
       CUPTI_EXTERNAL_CORRELATION_KIND_UNKNOWN, &tag));
+}
+
+bool hapiCuptiPushKernelTag(uint64_t workTag) {
+  GPUManager& gm = CsvAccess(gpu_manager);
+  if (!_lb_args.gpuScaling() ||
+      !gm.cupti_tracing_active_.load(std::memory_order_relaxed))
+    return false;
+  hapiCuptiSyncGeneration(gm);
+
+  CUPTI_SAFE_CALL(cuptiActivityPushExternalCorrelationId(
+      CUPTI_EXTERNAL_CORRELATION_KIND_CUSTOM0, workTag));
+  ++cupti_tag_pushed_depth;
+  return true;
+}
+
+void hapiCuptiPopKernelTag() {
+  GPUManager& gm = CsvAccess(gpu_manager);
+  hapiCuptiSyncGeneration(gm);
+  if (cupti_tag_pushed_depth == 0 || !gm.cupti_initialized_) return;
+  --cupti_tag_pushed_depth;
+
+  uint64_t tag;
+  CUPTI_SAFE_CALL(cuptiActivityPopExternalCorrelationId(
+      CUPTI_EXTERNAL_CORRELATION_KIND_CUSTOM0, &tag));
 }
 
 // Lightweight HAPI, to be invoked after data transfer or kernel execution.
@@ -2377,6 +2735,22 @@ int hapiDeviceForPe(int pe) {
   return CpvAccessOther(my_device, CmiRankOf(pe));
 }
 
+#ifdef CMK_LBDB_ON
+const GpuDeviceDescriptor& hapiMyDeviceDescriptor() {
+  static const GpuDeviceDescriptor kNoDevice;
+  GPUManager& gm = CsvAccess(gpu_manager);
+  int local_id = CpvAccess(my_device_id);
+  if (local_id < 0 || local_id >= (int)gm.device_managers.size()) return kNoDevice;
+  // Same lock the CUPTI drain uses, because that is the other caller of the
+  // lazy discovery this may have to run.
+  {
+    std::lock_guard<std::mutex> lk(gm.cupti_prepare_lock_);
+    hapiPopulateDeviceProps(gm);
+  }
+  return gm.device_managers[local_id].descriptor;
+}
+#endif
+
 int hapiMyDeviceTotalSMs() {
 #ifdef CMK_LBDB_ON
   GPUManager& gm = CsvAccess(gpu_manager);
@@ -2396,4 +2770,3 @@ int hapiMyDeviceTotalSMs() {
   return 0;
 #endif
 }
-

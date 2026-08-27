@@ -5,6 +5,10 @@
 #include "converse.h"
 #include "buddy_allocator.h"
 
+#ifdef CMK_LBDB_ON
+#include "GpuScalingModel.h"
+#endif
+
 // Manages a GPU device, accessible through GPUManager
 struct DeviceManager {
 #if CMK_SMP
@@ -29,6 +33,7 @@ struct DeviceManager {
   int max_shared_mem_per_sm;
   int warp_size;
   bool props_initialized;
+  GpuDeviceDescriptor descriptor;
 #endif
 
   DeviceManager(int local_index_, int global_index_) :

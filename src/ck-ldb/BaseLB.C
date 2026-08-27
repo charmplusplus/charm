@@ -428,11 +428,19 @@ void BaseLB::LDStats::pup(PUP::er &p)
   }
 }
 
-int BaseLB::LDStats::useMem() { 
+int BaseLB::LDStats::useMem() {
   // calculate the memory usage of this LB (superclass).
-  return sizeof(LDStats) + sizeof(ProcStats) * procs.size() +
+  int mem = sizeof(LDStats) + sizeof(ProcStats) * procs.size() +
 	 (sizeof(LDObjData) + 2 * sizeof(int)) * objData.size() +
 	 sizeof(LDCommData) * commData.size();
+#if CMK_CUDA
+  // sizeof(LDObjData) counts the vector header but not what it points at, and
+  // the per-kernel summaries are the part that actually grows with the
+  // application.
+  for (const LDObjData &obj : objData)
+    mem += sizeof(GpuKernelEpochCost) * obj.gpuCosts.components.size();
+#endif
+  return mem;
 }
 
 #include "BaseLB.def.h"

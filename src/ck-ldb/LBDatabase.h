@@ -90,22 +90,49 @@ public:
   // Copy the per-object normalized GPU loads computed by
   // hapiNormalizeCuptiLoads into this PE's LB objects. The map is shared
   // per-process and every PE reads it concurrently, so this must not mutate it.
-  inline void SetObjGPULoad(const std::unordered_map<uint64_t, double> &id_loadMap)
+  inline void SetObjGPULoad(
+      const std::unordered_map<LDObjKey, double, LDObjKeyHash> &id_loadMap)
   {
     for (int i = 0; i < objs.size(); i++) {
       if(objs[i].obj == nullptr)
         continue;
-      // The CUPTI map is keyed by raw element IDs (from CkMigratable::ckGetID()).
-      // The LB database stores IDs with collection bits prepended (when
-      // CMK_GLOBAL_LOCATION_UPDATE is set). Strip collection bits to match.
-      CmiUInt8 lb_id = objs[i].obj->ObjData().objID();
-      CmiUInt8 raw_id = ck::ObjID(lb_id).getElementID();
-      auto it = id_loadMap.find(raw_id);
+      const LDObjHandle &handle = objs[i].obj->GetLDObjHandle();
+      LDObjKey key;
+      key.omID() = handle.omID();
+      key.objID() = handle.objID();
+      auto it = id_loadMap.find(key);
       if(it==id_loadMap.end())
         continue;
       objs[i].obj->setGPUTiming(it->second);
     }
   }
+
+#if CMK_CUDA
+  // Companion to SetObjGPULoad for the per-kernel breakdown. Objects missing
+  // from the map get an empty summary rather than a stale one from a previous
+  // epoch, so a load balancer can tell "no GPU work this round" from "the same
+  // GPU work as last round".
+  inline void SetObjGPUCosts(
+      const std::unordered_map<LDObjKey, GpuObjectEpochCosts, LDObjKeyHash>
+          &id_costMap)
+  {
+    for (int i = 0; i < objs.size(); i++) {
+      if (objs[i].obj == nullptr)
+        continue;
+      const LDObjHandle &handle = objs[i].obj->GetLDObjHandle();
+      LDObjKey key;
+      key.omID() = handle.omID();
+      key.objID() = handle.objID();
+      auto it = id_costMap.find(key);
+      if (it == id_costMap.end()) {
+        objs[i].obj->clearGPUCosts();
+        continue;
+      }
+      objs[i].obj->setGPUCosts(it->second);
+    }
+  }
+#endif
+
   inline void* GetObjUserData(LDObjHandle &h) {
     return LbObj(h)->getLocalUserData();
   }

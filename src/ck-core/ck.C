@@ -631,7 +631,8 @@ void CkCallstackPush(Chare *obj) {
   _ckStartTiming();   // start timing the current obj
 #if CMK_LBDB_ON && (CMK_CUDA || CMK_HIP)
   // After _pushObj, `obj` is the active chare. Push a CUPTI external
-  // correlation ID (its LB id, or 0 when not migratable) so every kernel
+  // correlation ID (a token for its full LB key, or a sentinel when there is
+  // no migratable owner) so every kernel
   // launched until the matching Pop is attributed to this chare.
   // Structurally paired 1:1 with CkCallstackPop.
   hapiCuptiPushObjCorrelation();

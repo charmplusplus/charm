@@ -87,6 +87,12 @@ void CentralLB::initLB(const CkLBOptions &opt)
   statsMsgsList = NULL;
   statsData = NULL;
 
+#if CMK_CUDA
+  gpuScalingEpoch_ = 0;
+  gpuScalingModel_.configure(_lb_args.gpuScalingAlphaMin(),
+                             (uint64_t)_lb_args.gpuScalingMinSamples());
+#endif
+
   storedMigrateMsg = NULL;
   reduction_started = false;
 
@@ -166,6 +172,8 @@ void CentralLB::CallLB()
   hapiPrepareCuptiLoads();
   // Every PE picks up the normalized loads for its own objects
   lbmgr->SetObjGPULoad(CsvAccess(gpu_manager).cupti_obj_norm_load_);
+  if (_lb_args.gpuScaling())
+    lbmgr->SetObjGPUCosts(CsvAccess(gpu_manager).cupti_obj_epoch_costs_);
 #endif
 
   {
@@ -345,6 +353,7 @@ void CentralLB::BuildStatsMsg()
   // printf("CMK_CUDA setting device is %ld\n", hapiMyDevice());
   msg->gpu_device_id = hapiMyDevice();
   msg->gpu_total_sms = hapiMyDeviceTotalSMs();
+  if (_lb_args.gpuScaling()) msg->gpu_descriptor = hapiMyDeviceDescriptor();
   size_t freeMem, totalMem;
   cudaMemGetInfo(&freeMem, &totalMem);
   msg->gpu_mem_remaining = freeMem;
@@ -505,6 +514,7 @@ void CentralLB::depositData(CLBStatsMsg *m)
   procStat.gpu_total_sms = m->gpu_total_sms;
   procStat.gpu_mem_remaining = m->gpu_mem_remaining;
   procStat.pool_buff_mem_remaining = m->pool_buff_mem_remaining;
+  procStat.gpu_descriptor = m->gpu_descriptor;
 #endif
 
   //procStat.utilization = 1.0;
@@ -586,6 +596,7 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &&msg)
       procStat.gpu_total_sms = m->gpu_total_sms;
       procStat.gpu_mem_remaining = m->gpu_mem_remaining;
       procStat.pool_buff_mem_remaining = m->pool_buff_mem_remaining;
+      procStat.gpu_descriptor = m->gpu_descriptor;
 #endif
       //procStat.utilization = 1.0;
       procStat.available = true;
@@ -651,6 +662,220 @@ void CentralLB::ReceiveStatsViaTree(CkMarshalledCLBStatsMessage &&msg)
 static LDHandle *loadBalancer_pointers;
 #endif
 
+#if CMK_CUDA
+// Every registered device type this job currently has, one entry per PE that
+// reports one, so the reference policy can pick the most common.
+static void collectGpuTypes(const BaseLB::LDStats* stats,
+                            std::vector<uint64_t>& available)
+{
+  for (const BaseLB::ProcStats& proc : stats->procs) {
+    if (!proc.available) continue;
+    if (proc.gpu_descriptor.typeId == 0) continue;
+    available.push_back(proc.gpu_descriptor.typeId);
+  }
+}
+
+static LDObjKey objKeyOf(const LDObjData& obj) {
+  LDObjKey key;
+  key.omID() = obj.omID();
+  key.objID() = obj.objID();
+  return key;
+}
+
+// The GPU type an object's work was measured on. Prefer what the summary itself
+// records, since that is the device the kernels actually ran on; fall back to
+// the descriptor of the PE it is currently assigned to.
+static uint64_t sourceTypeOf(const LDObjData& obj, const BaseLB::LDStats* stats,
+                             int pe) {
+  if (obj.gpuCosts.sourceTypeId != 0) return obj.gpuCosts.sourceTypeId;
+  if (pe < 0 || pe >= (int)stats->procs.size()) return 0;
+  return stats->procs[pe].gpu_descriptor.typeId;
+}
+
+void CentralLB::updateGpuScalingModel(LDStats* stats)
+{
+  if (!_lb_args.gpuScaling() || stats == NULL) return;
+
+  const double t0 = CmiWallTimer();
+
+  // Register every type before choosing a reference: registerGpuType refuses a
+  // score that disagrees with one already recorded for the same type id, which
+  // would mean two PEs described the same hardware differently.
+  size_t conflicting_types = 0;
+  for (const ProcStats& proc : stats->procs) {
+    const GpuDeviceDescriptor& descriptor = proc.gpu_descriptor;
+    if (descriptor.typeId == 0) continue;
+    if (!gpuScalingModel_.registerGpuType(descriptor.typeId, descriptor.peakRateScore))
+      conflicting_types++;
+  }
+  if (conflicting_types > 0) {
+    CmiPrintf("CharmLB> GPU scaling: %zu PE(s) reported a rate score that "
+              "disagrees with an earlier report of the same device type; the "
+              "first report is kept\n", conflicting_types);
+  }
+
+  std::vector<uint64_t> available;
+  collectGpuTypes(stats, available);
+  const uint64_t previousReference =
+      gpuScalingModel_.hasReference() ? gpuScalingModel_.referenceType() : 0;
+  gpuScalingModel_.selectReference(available);
+  if (gpuScalingModel_.hasReference() &&
+      gpuScalingModel_.referenceType() != previousReference && _lb_args.debug() > 0) {
+    // Rebasing is free here because the model stores raw per-type log costs and
+    // derives the relative factors on demand, so no stored moment is rewritten.
+    CmiPrintf("CharmLB> GPU scaling: reference type is now %" PRIu64
+              " (was %" PRIu64 ")\n",
+              gpuScalingModel_.referenceType(), previousReference);
+  }
+
+  // Score last epoch's claims before this epoch's observations move the model,
+  // so the error measured is the error of the prediction that was actually made.
+  scoreGpuShadowPredictions(stats);
+
+  gpuScalingEpoch_++;
+  size_t observed = 0, rejected = 0;
+  // objData order is deterministic (PE order, then arrival order within a PE),
+  // and every concurrent strategy replica walks it the same way, so all
+  // replicas see identical observations in identical order.
+  for (const LDObjData& obj : stats->objData) {
+    if (obj.gpuCosts.components.empty()) continue;
+    size_t objRejected = 0;
+    observed += gpuScalingModel_.observeObjectCosts(obj.gpuCosts, gpuScalingEpoch_,
+                                                    &objRejected);
+    rejected += objRejected;
+  }
+
+  // Shadow predictions for the next epoch: one per object, for every type this
+  // job currently has. Only the object's own destination is retained for
+  // scoring, but pricing every type is what a destination-aware strategy will
+  // ask for, so its cost is measured here too.
+  gpuShadow_.clear();
+  std::vector<uint64_t> distinctTypes = available;
+  std::sort(distinctTypes.begin(), distinctTypes.end());
+  distinctTypes.erase(std::unique(distinctTypes.begin(), distinctTypes.end()),
+                      distinctTypes.end());
+
+  size_t predictions = 0, unpriceable = 0;
+  for (size_t i = 0; i < stats->objData.size(); i++) {
+    const LDObjData& obj = stats->objData[i];
+    if (obj.gpuCosts.components.empty() && obj.gpuCosts.unmodeledGpuTime <= 0.0)
+      continue;
+
+    GpuObjectEpochCosts costs = obj.gpuCosts;
+    if (costs.sourceTypeId == 0)
+      costs.sourceTypeId = sourceTypeOf(obj, stats, stats->from_proc[i]);
+
+    for (uint64_t type : distinctTypes) {
+      double predicted = 0.0;
+      GpuPredictionSource source = GpuPredictionSource::Invalid;
+      if (!gpuScalingModel_.predictObjectCost(costs, type,
+                                              GpuCostMetric::NormalizedDemand,
+                                              predicted, &source)) {
+        unpriceable++;
+        continue;
+      }
+      predictions++;
+      if (type != costs.sourceTypeId) continue;
+
+      // Same-type prediction is the one that can be checked next epoch without
+      // assuming the object migrates anywhere in particular.
+      GpuShadowPrediction claim;
+      claim.destinationType = type;
+      claim.predictedCost = predicted;
+      claim.source = source;
+      claim.epoch = gpuScalingEpoch_;
+      gpuShadow_[objKeyOf(obj)] = claim;
+    }
+  }
+
+  const double elapsed = CmiWallTimer() - t0;
+  if (_lb_args.debug() > 0) {
+    CmiPrintf("CharmLB> GPU scaling epoch %" PRIu64 ": types=%zu entries=%zu "
+              "observed=%zu rejected=%zu predictions=%zu unpriceable=%zu "
+              "shadow=%zu in %.4fs\n",
+              gpuScalingEpoch_, distinctTypes.size(),
+              gpuScalingModel_.entryCount(), observed, rejected, predictions,
+              unpriceable, gpuShadow_.size(), elapsed);
+  }
+  if (_lb_args.debug() > 1) reportGpuScalingModel(stats);
+}
+
+void CentralLB::scoreGpuShadowPredictions(LDStats* stats)
+{
+  if (gpuShadow_.empty()) return;
+
+  size_t scored = 0;
+  for (size_t i = 0; i < stats->objData.size(); i++) {
+    const LDObjData& obj = stats->objData[i];
+    auto claim = gpuShadow_.find(objKeyOf(obj));
+    if (claim == gpuShadow_.end()) continue;
+
+    // Only score the claim if the object really did run on the type it was
+    // priced for; otherwise the difference is a change of hardware, not a
+    // prediction error.
+    const uint64_t actualType = sourceTypeOf(obj, stats, stats->from_proc[i]);
+    if (actualType != claim->second.destinationType) continue;
+
+    const double actual = obj.gpuCosts.totalDemand();
+    if (gpuAccuracy_.observe(claim->second.predictedCost, actual,
+                             claim->second.source))
+      scored++;
+  }
+
+  if (_lb_args.debug() > 0 && scored > 0) {
+    static const GpuPredictionSource kSources[] = {GpuPredictionSource::PriorOnly,
+                                                   GpuPredictionSource::Mixed,
+                                                   GpuPredictionSource::Calibrated};
+    static const char* kNames[] = {"prior-only", "mixed", "calibrated"};
+    for (int s = 0; s < 3; s++) {
+      const uint64_t n = gpuAccuracy_.samples(kSources[s]);
+      if (n == 0) continue;
+      double median = 0.0, p95 = 0.0;
+      gpuAccuracy_.quantileAbsolutePercentageError(kSources[s], 0.5, median);
+      gpuAccuracy_.quantileAbsolutePercentageError(kSources[s], 0.95, p95);
+      CmiPrintf("CharmLB> GPU scaling accuracy [%s]: n=%" PRIu64
+                " mean_ape=%.4f median_ape=%.4f p95_ape=%.4f%s\n",
+                kNames[s], n, gpuAccuracy_.meanAbsolutePercentageError(kSources[s]),
+                median, p95,
+                gpuAccuracy_.truncated(kSources[s]) > 0
+                    ? " (percentiles over a truncated sample)" : "");
+    }
+  }
+}
+
+void CentralLB::reportGpuScalingModel(LDStats* stats) const
+{
+  std::vector<uint64_t> available;
+  collectGpuTypes(stats, available);
+  std::sort(available.begin(), available.end());
+  available.erase(std::unique(available.begin(), available.end()), available.end());
+
+  for (uint64_t type : available) {
+    const GpuDeviceTypeInfo* info = gpuScalingModel_.findGpuType(type);
+    if (info == NULL) continue;
+    CmiPrintf("CharmLB>   type=%" PRIu64 " rate=%.0f%s\n", type, info->peakRateScore,
+              gpuScalingModel_.hasReference() &&
+                      gpuScalingModel_.referenceType() == type
+                  ? " (reference)" : "");
+  }
+}
+
+double CentralLB::predictGpuCost(const LDObjData& obj,
+                                 const ProcStats& destination) const
+{
+  const double measured = obj.gpuTime;
+  if (!_lb_args.gpuScaling()) return measured;
+  if (destination.gpu_descriptor.typeId == 0) return measured;
+
+  double predicted = 0.0;
+  if (!gpuScalingModel_.predictObjectCost(obj.gpuCosts,
+                                          destination.gpu_descriptor.typeId,
+                                          GpuCostMetric::NormalizedDemand, predicted))
+    return measured;
+  return predicted;
+}
+#endif
+
 void CentralLB::LoadBalance()
 {
 #if CMK_LBDB_ON
@@ -682,6 +907,12 @@ void CentralLB::LoadBalance()
 
   removeCommDataOfDeletedObjs(statsData);
   preprocess(statsData);
+
+#if CMK_CUDA
+  // After the statistics are complete and before any strategy runs. Shadow
+  // mode only: nothing here feeds placement.
+  updateGpuScalingModel(statsData);
+#endif
 
 //    CkPrintf("Before Calling Strategy\n");
 
@@ -1732,6 +1963,12 @@ void CentralLB::pup(PUP::er &p) {
     statsMsg->pup(p);
   }
   p | use_thread;
+#if CMK_CUDA
+  // Learning must survive checkpoint/restart and migration of the central PE,
+  // or every restart throws away the calibration and falls back to the prior.
+  gpuScalingModel_.pup(p);
+  p | gpuScalingEpoch_;
+#endif
 }
 
 int CentralLB::useMem() { 
@@ -1762,6 +1999,7 @@ void CLBStatsMsg::pup(PUP::er &p) {
   p|gpu_total_sms;
   p|gpu_mem_remaining;
   p|pool_buff_mem_remaining;
+  p|gpu_descriptor;
 #endif
   p|total_walltime;
   p|idletime;

@@ -87,6 +87,12 @@ public:
   #endif
   }
 
+#if CMK_CUDA
+  inline void setGPUCosts(const GpuObjectEpochCosts &costs) { data.gpuCosts = costs; }
+  inline void clearGPUCosts() { data.gpuCosts.clear(); }
+  inline const GpuObjectEpochCosts &getGPUCosts() const { return data.gpuCosts; }
+#endif
+
   inline LDOMHandle &parentOM() { return data.handle.omhandle; }
   inline const LDObjHandle &GetLDObjHandle() const { return data.handle; }
   inline void SetMigratable(bool mig) { data.migratable = mig; }
