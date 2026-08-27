@@ -32,8 +32,6 @@ typedef CMK_NETWORK_INT4 CMK_POINTER_SIZED_INT;
 class PUP_toNetwork_sizer : public PUP::er {
 	size_t nBytes;
 	virtual void bytes(void *p,size_t n,size_t itemSize,PUP::dataType t);
-	virtual void bytes(void *p,size_t n,size_t itemSize,PUP::dataType t,PUP::PUPMode mode) {}
-	virtual void bytes(void **p,size_t n,size_t itemSize,PUP::dataType t,PUP::PUPMode mode) {}
 	virtual void pup_buffer(void *&p, size_t n, size_t itemSize, PUP::dataType t);
 	virtual void pup_buffer(void *&p, size_t n, size_t itemSize, PUP::dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
 
@@ -72,8 +70,6 @@ class PUP_toNetwork_pack : public PUP::er {
 	}
 
 	virtual void bytes(void *p,size_t n,size_t itemSize,PUP::dataType t);
-	virtual void bytes(void *p,size_t n,size_t itemSize,PUP::dataType t,PUP::PUPMode mode) {}
-	virtual void bytes(void **p,size_t n,size_t itemSize,PUP::dataType t,PUP::PUPMode mode) {}
 	virtual void pup_buffer(void *&p, size_t n, size_t itemSize, PUP::dataType t);
 	virtual void pup_buffer(void *&p, size_t n, size_t itemSize, PUP::dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
 
@@ -122,8 +118,6 @@ class PUP_toNetwork_unpack : public PUP::er {
 	}
 
 	virtual void bytes(void *p,size_t n,size_t itemSize,PUP::dataType t);
-	virtual void bytes(void *p,size_t n,size_t itemSize,PUP::dataType t,PUP::PUPMode mode) {}
-	virtual void bytes(void **p,size_t n,size_t itemSize,PUP::dataType t,PUP::PUPMode mode) {}
 	virtual void pup_buffer(void *&p, size_t n, size_t itemSize, PUP::dataType t);
 	virtual void pup_buffer(void *&p, size_t n, size_t itemSize, PUP::dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
 

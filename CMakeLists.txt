@@ -554,6 +554,12 @@ elseif(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/charmrun)
 else()
   set(CMK_BUILD_CHARMRUN 1)
 endif()
+if(RECONVERSE)
+  # Reconverse launches without charmrun (standalone ./pgm +pe N, or lcrun /
+  # srun for multi-process); charmrun.C also assumes the classic conv-config
+  # environment. Do not build it.
+  set(CMK_BUILD_CHARMRUN 0)
+endif()
 
 set(CHARMRUN_ELASTIC_DIR src/arch/common)
 set(CHARMRUN_HAPI_DIR src/arch/common)
@@ -751,16 +757,16 @@ if(BUILD_CUDA OR BUILD_HIP)
       message(STATUS "Found CUPTI: ${CUPTI_LIBRARY}")
     endif()
 
-    add_library(hybridapi ${hybridAPI-cxx-sources})
-    add_dependencies(hybridapi ci-generated)
+    add_library(cudahybridapi ${hybridAPI-cxx-sources})
+    add_dependencies(cudahybridapi ci-generated)
 
     if(CUPTI_LIBRARY)
-      target_include_directories(hybridapi PRIVATE "${CUPTI_INCLUDE_DIR}")
-      target_link_libraries(hybridapi ${CUPTI_LIBRARY})
+      target_include_directories(cudahybridapi PRIVATE "${CUPTI_INCLUDE_DIR}")
+      target_link_libraries(cudahybridapi ${CUPTI_LIBRARY})
     endif()
 
     if(TRACING)
-      target_compile_definitions(hybridapi PRIVATE HAPI_TRACE)
+      target_compile_definitions(cudahybridapi PRIVATE HAPI_TRACE)
     endif()
   endif()
 
@@ -812,17 +818,6 @@ if(BUILD_CUDA OR BUILD_HIP)
     endif()
   endif()
 
-  # hapi_memory_daemon - standalone executable for shrink/expand GPU memory management
-  if(BUILD_CUDA)
-    add_executable(hapi_memory_daemon src/arch/cuda/hybridAPI/hapi_memory_daemon.cpp)
-    set(hapi_memory_daemon_deps hybridapi ck converse moduleNDMeshStreamer ckmain modulecompletion)
-    # ckqt and conv-static are only built for non-reconverse builds; reconverse
-    # provides its own converse layer and threading.
-    if(NOT RECONVERSE)
-      list(APPEND hapi_memory_daemon_deps ckqt conv-static)
-    endif()
-    add_dependencies(hapi_memory_daemon ${hapi_memory_daemon_deps})
-  endif()
 
 endif()
 
@@ -899,13 +894,6 @@ if(CMK_COMPILER STREQUAL "msvc")
 endif()
 
 # Header files
-if(NOT RECONVERSE)
-  # Boundary headers shared with reconverse builds include "charm-config.h"
-  # (reconverse's build-config header). Classic builds alias it to the
-  # conv-config chain so those headers work unchanged on both runtimes.
-  file(WRITE ${CMAKE_BINARY_DIR}/include/charm-config.h
-       "/* classic builds: charm-config.h aliases the conv-config chain */\n#include \"conv-config.h\"\n")
-endif()
 if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/conv-common.h)
   configure_file(src/arch/${GDIR}/conv-common.h                include/ COPYONLY)
 endif()
@@ -1033,7 +1021,7 @@ add_dependencies(modulecompletion ck)
 if(${CMK_BUILD_CHARMRUN})
   add_subdirectory(src/util/charmrun-src)
   add_dependencies(charmrun create_symlinks)
-else()
+elseif(DEFINED CHARMRUN_DIR)
   configure_file(${CHARMRUN_DIR}/charmrun ${CMAKE_BINARY_DIR}/bin COPYONLY)
   if(EXISTS ${CMAKE_SOURCE_DIR}/${CHARMRUN_ELASTIC_DIR}/charmrun_elastic)
     configure_file(${CHARMRUN_ELASTIC_DIR}/charmrun_elastic ${CMAKE_BINARY_DIR}/bin COPYONLY)
@@ -1130,7 +1118,7 @@ if(${TARGET} STREQUAL "charm4py")
   endif()
 
   if (${BUILD_CUDA})
-    target_link_libraries(charm cudart hybridapi)
+    target_link_libraries(charm cudart cudahybridapi)
   endif()
 
   if (${BUILD_HIP})
@@ -1157,7 +1145,10 @@ else()
   if(NOT RECONVERSE)
     list(APPEND ckhello_deps ckqt conv-static)
   endif()
-  if(BUILD_CUDA OR BUILD_HIP)
+  if(BUILD_CUDA)
+    # cudahybridapi: the name conv-mach-cuda.sh links (-lcudahybridapi)
+    list(APPEND ckhello_deps cudahybridapi)
+  elseif(BUILD_HIP)
     list(APPEND ckhello_deps hybridapi)
   endif()
   add_dependencies(ckhello ${ckhello_deps})
@@ -1174,6 +1165,13 @@ file(APPEND  ${optfile_sh} "CMK_COMPILER_SUFFIX=${CMK_COMPILER_SUFFIX}\n")
 
 if(NOT ${NETWORK} STREQUAL "mpi" AND NOT ${NETWORK} MATCHES "gni-" AND NOT ${NETWORK} MATCHES "-cray")
     file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/cc-${CMK_COMPILER}.sh\n")
+    if(RECONVERSE)
+        # QuickThreads is not built under reconverse, but the cc-*.sh compiler
+        # files add -lckqt to CMK_LIBS. This file is sourced last by
+        # conv-config.sh (after conv-mach.sh has already sourced the compiler
+        # file once), so stripping here is authoritative.
+        file(APPEND ${optfile_sh} "CMK_LIBS=\"\${CMK_LIBS//-lckqt/}\"\n")
+    endif()
 endif()
 
 if(${BUILD_SHARED})

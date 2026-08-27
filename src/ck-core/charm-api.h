@@ -6,11 +6,13 @@ libraries written in Charm for other languages.
 #ifndef __CHARM_API_H
 #define __CHARM_API_H
 
-//#include "charm-version.h"
-//#include "charm-version-git.h"
+#include "charm-version.h"
+#include "charm-version-git.h"
 
-#include "charm-config.h"
-#include "converse.h" /* for CMK_FORTRAN symbols */
+#include "charm-config.h" /* for CMK_FORTRAN symbols; classic aliases conv-config */
+#if CMK_RECONVERSE
+#include "converse.h"
+#endif
 
 /** Used to define a C language entry point*/
 #ifdef __cplusplus

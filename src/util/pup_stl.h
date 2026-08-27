@@ -15,8 +15,10 @@ Orion Sky Lawlor, olawlor@acm.org, 7/22/2002
 #ifndef _UIUC_CHARM_PUP_STL_H
 #define _UIUC_CHARM_PUP_STL_H
 
-#include "charm-config.h"
-#include "converse.h"
+#include "conv-autoconfig.h" /* guarded; classic gets full conv-config via pup.h; reconverse lacks the conv-config chain */
+#if CMK_RECONVERSE
+#include "pup_c.h" /* for pup_bytes; classic sees it transitively, and including it here would double-expand pup_c_functions.h inside AMPI TUs */
+#endif
 
 /*It's kind of annoying that we have to drag all these headers in
   just so the std:: parameter declarations will compile.
@@ -39,7 +41,6 @@ Orion Sky Lawlor, olawlor@acm.org, 7/22/2002
 #include <utility> /*for std::pair*/
 #include <chrono>
 #include "pup.h"
-#include "pup_c.h"
 
 #include <cstddef>
 

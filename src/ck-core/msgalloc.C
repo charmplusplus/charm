@@ -1,5 +1,7 @@
 #include "ck.h"
-//#include "queueing.h"
+#if !CMK_RECONVERSE  /* reconverse has no converse-level queueing.h */
+#include "queueing.h"
+#endif
 
 CkpvDeclare(size_t *, _offsets);
 

@@ -78,7 +78,6 @@ never be excluded...
 #include "TreeLB.h"
 #endif
 
-#define CMK_GPU_COMM 1
 #if CMK_CUDA || CMK_HIP
 #include "hapi_impl.h"
 #include "ckrdmadevice.h"
@@ -1843,7 +1842,9 @@ int charm_main(int argc, char **argv)
   int stack_top=0;
   memory_stack_top = &stack_top;
 
-#if CMK_TRACE_ENABLED
+#if CMK_TRACE_ENABLED && CMK_RECONVERSE
+  /* Hand converse the trace-init hook; reconverse's ConverseInit invokes it.
+   * Classic convcore calls traceInit through its own path. */
   registerTraceInit(traceInit);
 #endif
 

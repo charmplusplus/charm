@@ -7,9 +7,18 @@
 #include <vector>
 
 #ifndef XI_LIBRARY
-//#include "conv-config.h"
-#include "charm-config.h"
-#include "converse.h"
+/* cmake builds provide charm-config.h (reconverse's own, or the classic
+ * alias); the legacy build system provides only the conv-config chain. */
+#if defined(__has_include)
+# if __has_include("charm-config.h")
+#  include "charm-config.h"
+#  include "converse.h"
+# else
+#  include "conv-config.h"
+# endif
+#else
+# include "conv-config.h"
+#endif
 #endif
 #include <stdio.h>
 #include <stdlib.h>
