@@ -1,0 +1,28 @@
+// osu_latency_gpu.ci
+mainmodule osu_latency_gpu {
+  readonly CProxy_Main main_proxy;
+  readonly CProxy_Endpoint endpoint_proxy;
+  readonly int max_bytes;
+  readonly bool validate;
+
+  // Pins the two endpoints to the PEs the benchmark was told to use. A default
+  // map would place both wherever it liked, and the whole measurement depends
+  // on them landing in different processes on one host.
+  group PairMap : CkArrayMap {
+    entry PairMap(int pe0, int pe1);
+  };
+
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry [reductiontarget] void allReady();
+    entry void doneOne(double latency_us);
+  };
+
+  array [1D] Endpoint {
+    entry Endpoint();
+    entry void start(int bytes, int iters, int skip);
+    entry void launch();
+    entry void ping(int n, nocopydevice char buf[n]);
+    entry void pong(int n, nocopydevice char buf[n]);
+  };
+};

@@ -1,0 +1,27 @@
+// osu_bw_gpu.ci
+mainmodule osu_bw_gpu {
+  readonly CProxy_Main main_proxy;
+  readonly CProxy_Endpoint endpoint_proxy;
+  readonly int max_bytes;
+  readonly int window;
+  readonly bool validate;
+
+  // See the note in osu_latency_gpu.ci: the placement is the experiment.
+  group PairMap : CkArrayMap {
+    entry PairMap(int pe0, int pe1);
+  };
+
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry [reductiontarget] void allReady();
+    entry void doneOne(double bandwidth_mbps);
+  };
+
+  array [1D] Endpoint {
+    entry Endpoint();
+    entry void start(int bytes, int iters, int skip);
+    entry void launch();
+    entry void recvChunk(int slot, int n, nocopydevice char buf[n]);
+    entry void ack();
+  };
+};

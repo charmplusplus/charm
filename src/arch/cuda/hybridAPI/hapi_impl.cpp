@@ -144,6 +144,22 @@ static void shmCleanup();
 static void ipcHandleCreate();
 static void ipcHandleOpen();
 
+// Parse a byte count that may carry a K/M/G suffix, so a size threshold can be
+// written the way people say it ("256K") in an environment variable. Anything
+// unparseable yields SIZE_MAX, which for the direct IPC threshold means "never"
+// -- the safe reading of a typo.
+static size_t hapiParseByteSize(const char* s) {
+  char* end = NULL;
+  const unsigned long long value = strtoull(s, &end, 10);
+  if (end == s) return SIZE_MAX;
+  switch (*end) {
+    case 'k': case 'K': return (size_t)value << 10;
+    case 'm': case 'M': return (size_t)value << 20;
+    case 'g': case 'G': return (size_t)value << 30;
+    default:            return (size_t)value;
+  }
+}
+
 #ifdef CMK_LBDB_ON
 // Sentinel external-correlation ID meaning "no owning migratable object".
 // Must not collide with a real chare ID -- 0 is a perfectly valid one.
@@ -504,6 +520,13 @@ void hapiExit() {
 #endif
 
   if (CmiMyRank() == 0) {
+    if (getenv("CHARM_ZC_STATS") != NULL) hapiIpcReportStats();
+
+    // Safe to close peer mappings here and nowhere cheaper: the node barrier
+    // above has already quiesced GPU work, and closing a mapping some copy is
+    // still reading is an illegal access. See the note on hapiIpcFlushImportCache.
+    hapiIpcFlushImportCache();
+
     shmCleanup();
 
     hapiExitCsv();
@@ -1383,6 +1406,43 @@ static void hapiMapping(char** argv) {
       CmiPrintf("HAPI> CUDA IPC event pool size - %d per PE, %d per device\n",
           csv_gpu_manager.hapi_ipc_event_pool_size_pe, csv_gpu_manager.hapi_ipc_event_pool_size_total);
     }
+
+    // Payload size at which a cross-process send switches from staging through
+    // the device communication buffer to exporting its source allocation
+    // directly. Unset means never, so a run that does not ask for this behaves
+    // exactly as it did before. CHARM_GPU_IPC_THRESHOLD overrides
+    // +gpuipcthreshold, so a sweep can vary it without rewriting command lines.
+    int input_ipc_threshold = 0;
+    const bool have_arg = CmiGetArgIntDesc(argv, "+gpuipcthreshold",
+        &input_ipc_threshold,
+        "device payload size (bytes) at or above which cross-process sends "
+        "use direct CUDA IPC instead of staging");
+    if (CmiMyRank() == 0) {
+      size_t threshold = have_arg && input_ipc_threshold >= 0
+                             ? (size_t)input_ipc_threshold
+                             : SIZE_MAX;
+      const char* env = getenv("CHARM_GPU_IPC_THRESHOLD");
+      if (env != NULL) threshold = hapiParseByteSize(env);
+      csv_gpu_manager.ipc_direct_threshold = threshold;
+
+      const char* cache_env = getenv("CHARM_GPU_IPC_CACHE");
+      csv_gpu_manager.ipc_cache_imports = !(cache_env && atoi(cache_env) == 0);
+    }
+
+    CmiNodeBarrier(); // Ensure the threshold is set before any send reads it
+
+    if (CmiMyPe() == 0) {
+      if (csv_gpu_manager.ipc_direct_threshold == SIZE_MAX) {
+        CmiPrintf("HAPI> Direct CUDA IPC transport: disabled (all "
+                  "cross-process sends staged)\n");
+      } else {
+        CmiPrintf("HAPI> Direct CUDA IPC transport: payloads >= %zu bytes, "
+                  "import cache %s\n",
+                  csv_gpu_manager.ipc_direct_threshold,
+                  csv_gpu_manager.ipc_cache_imports ? "on" : "OFF (measurement "
+                  "mode: each receive opens, synchronizes and closes)");
+      }
+    }
   }
 
   // Check if P2P access should be enabled
@@ -2007,6 +2067,135 @@ static void ipcHandleOpen() {
 
     }
   }
+}
+
+/*** Direct CUDA IPC transport: export and import caches ***/
+
+size_t hapiIpcDirectThreshold() {
+  return CsvAccess(gpu_manager).ipc_direct_threshold;
+}
+
+bool hapiIpcCacheImports() {
+  return CsvAccess(gpu_manager).ipc_cache_imports;
+}
+
+bool hapiIpcExportBuffer(const void* ptr, hapiIpcMemHandle_t* handle,
+                         size_t* offset) {
+  // cudaIpcGetMemHandle names an allocation, and cudaIpcOpenMemHandle hands the
+  // peer that allocation's base -- so an interior pointer has to be split into
+  // (base, offset) here and reassembled on the far side.
+  void* base = NULL;
+  size_t alloc_size = 0;
+  if (!hapiMemGetAddressRange(&base, &alloc_size, ptr)) return false;
+
+  const void* base_ptr = (const void*)base;
+  *offset = (size_t)((const char*)ptr - (const char*)base_ptr);
+
+  GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
+#if CMK_SMP
+  CmiLock(csv_gpu_manager.ipc_cache_lock);
+#endif
+  auto it = csv_gpu_manager.ipc_export_cache.find(base_ptr);
+  if (it != csv_gpu_manager.ipc_export_cache.end()) {
+    *handle = it->second;
+#if CMK_SMP
+    CmiUnlock(csv_gpu_manager.ipc_cache_lock);
+#endif
+    return true;
+  }
+
+  hapiIpcMemHandle_t new_handle;
+  const hapiError_t err = hapiIpcGetMemHandle(&new_handle, (void*)base_ptr);
+  if (err != hapiSuccess) {
+    // Not an exportable allocation (managed or host-registered memory, for
+    // instance). Clear the sticky error and let the caller stage instead.
+    cudaGetLastError();
+#if CMK_SMP
+    CmiUnlock(csv_gpu_manager.ipc_cache_lock);
+#endif
+    return false;
+  }
+
+  csv_gpu_manager.ipc_export_cache.emplace(base_ptr, new_handle);
+  *handle = new_handle;
+#if CMK_SMP
+  CmiUnlock(csv_gpu_manager.ipc_cache_lock);
+#endif
+  return true;
+}
+
+void* hapiIpcImportBuffer(const hapiIpcMemHandle_t& handle) {
+  GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
+#if CMK_SMP
+  CmiLock(csv_gpu_manager.ipc_cache_lock);
+#endif
+  if (csv_gpu_manager.ipc_cache_imports) {
+    auto it = csv_gpu_manager.ipc_import_cache.find(handle);
+    if (it != csv_gpu_manager.ipc_import_cache.end()) {
+      void* ptr = it->second;
+      csv_gpu_manager.ipc_import_hits.fetch_add(1, std::memory_order_relaxed);
+#if CMK_SMP
+      CmiUnlock(csv_gpu_manager.ipc_cache_lock);
+#endif
+      return ptr;
+    }
+  }
+
+  // Open under the caller's current device, as ipcHandleOpen does for the comm
+  // buffers. Switching devices around cudaIpcOpen* breaks cross-process
+  // transfers (commit bec910fef) -- the call is defined in terms of the
+  // caller's context and the mapping is usable from here because P2P access is
+  // enabled between every pair of devices on the host.
+  void* mapped = NULL;
+  const hapiError_t err =
+      hapiIpcOpenMemHandle(&mapped, handle, hapiIpcMemLazyEnablePeerAccess);
+  if (err != hapiSuccess) {
+    cudaGetLastError();
+#if CMK_SMP
+    CmiUnlock(csv_gpu_manager.ipc_cache_lock);
+#endif
+    return NULL;
+  }
+
+  csv_gpu_manager.ipc_import_misses.fetch_add(1, std::memory_order_relaxed);
+  if (csv_gpu_manager.ipc_cache_imports)
+    csv_gpu_manager.ipc_import_cache.emplace(handle, mapped);
+#if CMK_SMP
+  CmiUnlock(csv_gpu_manager.ipc_cache_lock);
+#endif
+  return mapped;
+}
+
+void hapiIpcFlushImportCache() {
+  GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
+#if CMK_SMP
+  CmiLock(csv_gpu_manager.ipc_cache_lock);
+#endif
+  for (auto& entry : csv_gpu_manager.ipc_import_cache) {
+    if (hapiIpcCloseMemHandle(entry.second) != hapiSuccess) cudaGetLastError();
+  }
+  csv_gpu_manager.ipc_import_cache.clear();
+  // Exports name this process's own allocations, which migration also frees and
+  // reallocates -- and cudaMalloc reuses addresses, so a stale entry would hand
+  // out a handle for memory that is no longer there.
+  csv_gpu_manager.ipc_export_cache.clear();
+#if CMK_SMP
+  CmiUnlock(csv_gpu_manager.ipc_cache_lock);
+#endif
+}
+
+void hapiIpcReportStats() {
+  GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
+  const long staged = csv_gpu_manager.ipc_staged_sends.load();
+  const long direct = csv_gpu_manager.ipc_direct_sends.load();
+  const long hits = csv_gpu_manager.ipc_import_hits.load();
+  const long misses = csv_gpu_manager.ipc_import_misses.load();
+  if (staged + direct + hits + misses == 0) return;
+  CmiPrintf("[ipc-stats] pid=%d staged=%ld direct=%ld import_hits=%ld "
+            "import_misses=%ld threshold=%zu cache=%d\n",
+            (int)getpid(), staged, direct, hits, misses,
+            csv_gpu_manager.ipc_direct_threshold,
+            (int)csv_gpu_manager.ipc_cache_imports);
 }
 
 /******************** DEPRECATED ********************/

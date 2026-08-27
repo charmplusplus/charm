@@ -577,17 +577,24 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
       }
     }
 
-    // Prefer whatever the sender actually staged over the mode derived here.
-    // A staged copy already holds the bytes, so it survives the sending chare
-    // migrating away and freeing its source buffer -- which leanmd does on
-    // every LB step: Compute::sendForces hands out CkDeviceBuffer(d_force) with
-    // no completion callback and calls AtSync immediately after, so ~Compute
-    // releases d_force while receivers are still pulling from it. Reading
-    // source.ptr in that window is a use-after-free on the device.
-    const bool sender_staged =
-        (source.device_idx != -1 && csv_gpu_manager.use_shm);
+    // Prefer whatever the sender actually prepared over the mode derived here.
+    // The sender exported this buffer one of two ways -- staged into its
+    // communication buffer, or named directly by an IPC handle -- and either
+    // arrangement is what the metadata in hand describes, so honour it rather
+    // than re-deciding from locality.
+    //
+    // A staged copy additionally holds the bytes outright, so it survives the
+    // sending chare migrating away and freeing its source buffer. A direct one
+    // does not: it reads the sender's live allocation, which is why such a send
+    // must carry a completion callback the sender waits on before reusing or
+    // freeing that buffer.
+    const bool sender_exported =
+        (source.ipc_protocol != CmiIpcProtocol::NONE &&
+         source.device_idx != -1 && csv_gpu_manager.use_shm);
+    const bool sender_direct =
+        (sender_exported && source.ipc_protocol == CmiIpcProtocol::DIRECT);
 
-    if (mode == CkNcpyModeDevice::MEMCPY && !sender_staged) {
+    if (mode == CkNcpyModeDevice::MEMCPY && !sender_exported) {
       // Source and destination PEs are in the same process (logical node)
       // Directly invoke memcpy from source buffer to destination buffer.
       // Order against the sender's stream first: without this the copy could
@@ -623,8 +630,8 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
         shm_event_shared->dst_flag = true;
         pthread_mutex_unlock(&shm_event_shared->lock);
       }
-    } else if (sender_staged) {
-      // sender_staged already guarantees device_idx is a real index; guard the
+    } else if (sender_exported) {
+      // sender_exported already guarantees device_idx is a real index; guard the
       // upper bound only, since a corrupted index would index the pool out of
       // bounds and surface later as an asynchronous illegal access, far from here.
       if ((size_t)source.device_idx >= csv_gpu_manager.hapi_ipc_device_infos.size()) {
@@ -658,17 +665,47 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
         fflush(stdout);
       }
 
+      // 0. Resolve where the bytes actually are.
+      //
+      // Staged: in the peer's communication buffer, whose mapping every process
+      // opened once at startup.
+      //
+      // Direct: in the peer's own allocation, which has to be mapped now --
+      // unless this delivery turned out to be same-process after all, because
+      // the target migrated between the send and its arrival. Then the sender's
+      // pointer is directly readable and must be used: the driver does not let
+      // a process open a handle it exported itself.
+      void* imported_base = NULL;
+      const void* src_addr;
+      if (!sender_direct) {
+        src_addr = (const void*)((char*)device_info.buffer + source.comm_offset);
+      } else if (mode == CkNcpyModeDevice::MEMCPY) {
+        src_addr = source.ptr;
+      } else {
+        imported_base = hapiIpcImportBuffer(source.ipc_handle);
+        if (imported_base == NULL) {
+          CkAbort("CkRdmaDeviceIssueRgets: receive on PE %d from PE %d could not "
+                  "open the CUDA IPC handle for a %zu-byte direct transfer. The "
+                  "exporting process may have freed the allocation, or this "
+                  "process may already hold a mapping of it that was never "
+                  "closed.",
+                  CkMyPe(), env->getSrcPe(), (size_t)dest.cnt);
+        }
+        src_addr = (const void*)((char*)imported_base + source.ipc_offset);
+      }
+
       // 1. Make user-provided stream wait for IPC event using hapiStreamWaitEvent
-      //    (source buffer to device comm buffer on source)
+      //    (staged: source buffer to device comm buffer on source; direct: the
+      //    kernels that produced the source buffer)
       hapiCheck(hapiStreamWaitEvent(postStructs[i].hapi_stream,
             device_info.src_event_pool[source.event_idx], 0));
       ipcDebugSync("recv 1: wait imported src_event", postStructs[i].hapi_stream);
 
-      // 2. Invoke hapiMemcpyAsync (from source device comm buffer to destination buffer)
-      hapiCheck(hapiMemcpyAsync((void*)dest.ptr,
-            (void*)((char*)device_info.buffer + source.comm_offset),
+      // 2. Invoke hapiMemcpyAsync from the peer's memory to the destination
+      //    buffer. This is the only copy a direct transfer makes.
+      hapiCheck(hapiMemcpyAsync((void*)dest.ptr, src_addr,
             dest.cnt, hapiMemcpyDeviceToDevice, postStructs[i].hapi_stream));
-      ipcDebugSync("recv 2: peer copy comm_buffer -> dest", postStructs[i].hapi_stream);
+      ipcDebugSync("recv 2: peer copy -> dest", postStructs[i].hapi_stream);
 
       // 3. Record IPC event so that the sender can query it for freeing
       //    device comm buffer and corresponding pair of CUDA IPC events
@@ -699,6 +736,17 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
                   env->getSrcPe(), (size_t)source.comm_offset, (size_t)dest.cnt);
         fflush(stdout);
       }
+
+      // 5. Measurement mode (CHARM_GPU_IPC_CACHE=0): hand the mapping straight
+      //    back, so every transfer pays a full open and close and a sweep can
+      //    price those against the copy they save. Closing a mapping that an
+      //    in-flight copy is still reading is an illegal access, so this has to
+      //    block on the copy first -- which is exactly why it is a measurement
+      //    aid and not a transport option.
+      if (imported_base != NULL && !hapiIpcCacheImports()) {
+        hapiCheck(hapiStreamSynchronize(postStructs[i].hapi_stream));
+        if (hapiIpcCloseMemHandle(imported_base) != hapiSuccess) cudaGetLastError();
+      }
     } else {
       // Nothing staged and not same-process. That is legitimate only for a
       // genuine cross-physical-node transfer, where the sender's else-branch
@@ -716,11 +764,12 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
       // Fail here, where the send is still identifiable, rather than there.
       if (mode == CkNcpyModeDevice::IPC) {
         CkAbort("CkRdmaDeviceIssueRgets: receive on PE %d from PE %d resolved to "
-                "IPC, but the sender staged no IPC metadata (device_idx=%d, "
-                "cnt=%zu). The target migrated across processes after the sender "
-                "chose its transfer mode, so the source buffer is in another "
-                "address space and cannot be read from here.",
-                CkMyPe(), env->getSrcPe(), source.device_idx, (size_t)dest.cnt);
+                "IPC, but the sender exported no IPC metadata (protocol=%d, "
+                "device_idx=%d, cnt=%zu). The target migrated across processes "
+                "after the sender chose its transfer mode, so the source buffer "
+                "is in another address space and cannot be read from here.",
+                CkMyPe(), env->getSrcPe(), (int)source.ipc_protocol,
+                source.device_idx, (size_t)dest.cnt);
       }
       // CmiPrintf("it should never be called during intra node\n");
 #if CMK_GPU_COMM
@@ -807,7 +856,11 @@ static void reclaimCompletedIpcEvents(DeviceManager* dm, int cpv_my_device_id) {
           // to dest buffer is complete, so free the allocated block
           if (event_flag == 1) {
             dm->free_comm_buffer(buff_offset);
-          } else {
+          } else if (event_flag != 2) {
+            // 2 is a DIRECT transfer: it never allocated a block, so there is
+            // nothing to release beyond the event slot itself. Its completion
+            // still matters -- it is what tells the sender the receiver has
+            // finished reading its source buffer.
             CkAbort("Retrieved hapiSuccess for a free IPC event");
           }
 
@@ -835,7 +888,12 @@ static void reclaimCompletedIpcEvents(DeviceManager* dm, int cpv_my_device_id) {
 //    device comm buffer and IPC events can be freed.
 //
 // Caller must hold dm->lock and should have reclaimed first.
-static int claimFreeIpcEvent(int cpv_my_device_id, const size_t comm_offset) {
+// flag_value distinguishes what the slot is holding: 1 for a staged transfer,
+// whose comm-buffer block at comm_offset must be released when the slot
+// retires, 2 for a direct one, which holds no block. A sentinel offset would
+// not do -- 0 is a legal block offset.
+static int claimFreeIpcEvent(int cpv_my_device_id, const size_t comm_offset,
+                             int flag_value) {
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
   int pool_size = csv_gpu_manager.hapi_ipc_event_pool_size_pe;
   int pool_start = CkMyRank() * pool_size;
@@ -845,7 +903,7 @@ static int claimFreeIpcEvent(int cpv_my_device_id, const size_t comm_offset) {
     int& event_flag = my_device_info.event_pool_flags[i];
     size_t& buff_offset = my_device_info.event_pool_buff_offsets[i];
     if (event_flag == 0) {
-      event_flag = 1;
+      event_flag = flag_value;
       buff_offset = comm_offset;
       return i;
     }
@@ -877,8 +935,16 @@ static int claimFreeIpcEvent(int cpv_my_device_id, const size_t comm_offset) {
 // this runs mid-marshalling inside the caller's entry method, and re-entry
 // could deliver another message to the very chare that is partway through a
 // send.
+//
+// A direct transfer needs only the event pair -- it reads the sender's own
+// allocation, so there is no block to reserve -- and so cannot be held up by
+// comm-buffer exhaustion at all. It still needs the events: src_event orders
+// the receiver's copy after the kernels that produced the data, and dst_event
+// is how the sender learns the receiver has finished reading a buffer it does
+// not own.
 static void acquireIpcSendSlot(DeviceManager* dm, int cpv_my_device_id,
-                               bool is_lb_buffer, const void* src_ptr,
+                               bool is_lb_buffer, bool direct,
+                               const void* src_ptr,
                                size_t cnt, void** out_buffer,
                                int* out_event_idx) {
   static const double timeout_s = []() {
@@ -899,27 +965,37 @@ static void acquireIpcSendSlot(DeviceManager* dm, int cpv_my_device_id,
     // scan that frees comm buffers.)
     reclaimCompletedIpcEvents(dm, cpv_my_device_id);
 
-    void* buf = is_lb_buffer ? const_cast<void*>(src_ptr)
-                             : dm->alloc_comm_buffer(cnt);
-    if (buf != nullptr) {
-      const size_t off = (char*)buf - (char*)dm->comm_buffer->base_ptr;
-      const int ev = claimFreeIpcEvent(cpv_my_device_id, off);
-      if (ev != -1) {
-#if CMK_SMP
-        CmiUnlock(dm->lock);
-#endif
-        *out_buffer = buf;
-        *out_event_idx = ev;
-        return;
+    void* buf = nullptr;
+    int ev = -1;
+
+    if (direct) {
+      // No block to reserve, so nothing to hand back if the event pool is
+      // empty; only the events can hold this up.
+      ev = claimFreeIpcEvent(cpv_my_device_id, 0, 2);
+    } else {
+      buf = is_lb_buffer ? const_cast<void*>(src_ptr)
+                         : dm->alloc_comm_buffer(cnt);
+      if (buf != nullptr) {
+        const size_t off = (char*)buf - (char*)dm->comm_buffer->base_ptr;
+        ev = claimFreeIpcEvent(cpv_my_device_id, off, 1);
+        if (ev == -1) {
+          // Got a block but no event. Hand the block back before waiting:
+          // holding half the pair while blocked lets two senders pin each
+          // other's missing half indefinitely.
+          if (!is_lb_buffer) dm->free_comm_buffer(off);
+          buf = nullptr;
+        }
       }
-      // Got a block but no event. Hand the block back before waiting: holding
-      // half the pair while blocked lets two senders pin each other's missing
-      // half indefinitely.
-      if (!is_lb_buffer) dm->free_comm_buffer(off);
     }
 #if CMK_SMP
     CmiUnlock(dm->lock);
 #endif
+
+    if (ev != -1) {
+      *out_buffer = buf;
+      *out_event_idx = ev;
+      return;
+    }
 
     if (!waiting) {
       wait_start = CkWallTimer();
@@ -1119,14 +1195,66 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
 
     for (int i = 0; i < numops; i++) {
       bool is_lb_buffer = ( (size_t)((char*)(buffers[i]->ptr) - (char*)(dm->comm_buffer->base_ptr)) < dm->comm_buffer->total_size );
+
+      // Choose the transport for this buffer. Per buffer, not per message: one
+      // entry method can legitimately carry payloads on both sides of the
+      // threshold.
+      //
+      // A buffer that already lives in the comm buffer stays staged whatever
+      // its size -- staging it costs nothing, since there is no copy to make,
+      // and the receiver reads it through the mapping every peer already holds.
+      // Otherwise the direct transport applies at or above the threshold,
+      // unless the source allocation turns out not to be exportable, in which
+      // case hapiIpcExportBuffer says so and this falls back to staging.
+      hapiIpcMemHandle_t export_handle;
+      size_t export_offset = 0;
+      bool direct = false;
+      if (!is_lb_buffer && buffers[i]->cnt >= hapiIpcDirectThreshold()) {
+        direct = hapiIpcExportBuffer(buffers[i]->ptr, &export_handle,
+                                     &export_offset);
+      }
+
+      // Direct hands the receiver this chare's own buffer, so nothing orders
+      // the sender's next kernel against the receiver's read of it. The
+      // CkDeviceBuffer completion callback is the only signal that closes that
+      // window; a send without one cannot know when its buffer is free again.
+      // Staging happens to make this invisible -- it decouples the two sides
+      // with a copy on the sender's stream -- so an application that was
+      // correct staged can be racy direct, and it is worth saying so once
+      // rather than leaving it to surface as corrupted data.
+      if (direct && buffers[i]->cb.type == CkCallback::ignore) {
+        static std::atomic<bool> warned{false};
+        bool expected = false;
+        if (warned.compare_exchange_strong(expected, true)) {
+          CmiPrintf("[%d] WARNING: a %zu-byte device buffer is being sent over "
+                    "direct CUDA IPC with no completion callback. The receiver "
+                    "reads this buffer directly, so the sender cannot know when "
+                    "it is safe to overwrite or free it. Attach a CkCallback to "
+                    "the CkDeviceBuffer, or raise CHARM_GPU_IPC_THRESHOLD above "
+                    "%zu to keep these sends staged.\n",
+                    CkMyPe(), (size_t)buffers[i]->cnt, (size_t)buffers[i]->cnt);
+          fflush(stdout);
+        }
+      }
+
       // Waits for a slot if the pools are momentarily drained rather than
       // aborting; takes and releases dm->lock itself.
       void* alloc_comm_buffer;
       int acquired_event_idx;
-      acquireIpcSendSlot(dm, cpv_my_device_id, is_lb_buffer, buffers[i]->ptr,
-                         buffers[i]->cnt, &alloc_comm_buffer,
+      acquireIpcSendSlot(dm, cpv_my_device_id, is_lb_buffer, direct,
+                         buffers[i]->ptr, buffers[i]->cnt, &alloc_comm_buffer,
                          &acquired_event_idx);
-      buffers[i]->comm_offset = (char*)alloc_comm_buffer - (char*)dm->comm_buffer->base_ptr;
+      if (direct) {
+        buffers[i]->ipc_protocol = CmiIpcProtocol::DIRECT;
+        buffers[i]->ipc_handle = export_handle;
+        buffers[i]->ipc_offset = export_offset;
+        buffers[i]->comm_offset = 0;
+        csv_gpu_manager.ipc_direct_sends.fetch_add(1, std::memory_order_relaxed);
+      } else {
+        buffers[i]->ipc_protocol = CmiIpcProtocol::STAGED;
+        buffers[i]->comm_offset = (char*)alloc_comm_buffer - (char*)dm->comm_buffer->base_ptr;
+        csv_gpu_manager.ipc_staged_sends.fetch_add(1, std::memory_order_relaxed);
+      }
       buffers[i]->device_idx = (csv_gpu_manager.device_count * CmiMyNodeRankLocal() + cpv_my_device_id);
       buffers[i]->event_idx = acquired_event_idx;
 
@@ -1143,8 +1271,10 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
         fflush(stdout);
       }
 
-      // Initiate transfer from source buffer to device comm buffer
-      if(!is_lb_buffer) {
+      // Initiate transfer from source buffer to device comm buffer. A direct
+      // transfer has no comm buffer to fill -- that saved copy is the point of
+      // it -- and an LB buffer is already in place.
+      if(!is_lb_buffer && !direct) {
         // CHARM_ZC_VALIDATE: the buffer being staged belongs to the sending
         // chare. If that chare has migrated, its device scratch may already be
         // freed (or not yet reallocated on the new PE) while a send referencing
@@ -1167,7 +1297,10 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
         ipcDebugSync("send 1: stage src -> comm_buffer", buffers[i]->hapi_stream);
       }
 
-      // Record event
+      // Record the event the receiver waits on before it reads. Staged, that
+      // marks the staging copy as landed; direct, it marks the kernels that
+      // produced the source buffer as retired. Either way it is recorded on the
+      // application's own stream, so it sits after whatever produced the data.
       hapi_ipc_device_info& my_device_info = csv_gpu_manager.hapi_ipc_device_infos[(csv_gpu_manager.device_count * CmiMyNodeRankLocal() + cpv_my_device_id)];
       hapiCheck(hapiEventRecord(my_device_info.src_event_pool[buffers[i]->event_idx], buffers[i]->hapi_stream));
       ipcDebugSync("send 2: record own src_event", buffers[i]->hapi_stream);

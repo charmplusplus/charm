@@ -37,8 +37,8 @@ class Compute : public CBase_Compute {
     int cellIdx[2][3];
 
     // Force sends whose receiving cell has not finished pulling d_force yet.
-    // run() drains these before AtSync so migration cannot free the buffer
-    // out from under a cell that is still reading it.
+    // run() drains these at the end of every step, so neither the next step's
+    // kernels nor a migration can touch the buffer while a cell is reading it.
     int pendingForceSends;
     int ackCount;   // SDAG loop counter for draining them
 

@@ -244,6 +244,83 @@ static inline hapiError_t hapiFreeHost_Pool(void* ptr, bool pool) {
   return pool ? hapiPoolFree(ptr) : hapiFreeHost(ptr);
 }
 
+/*** Direct CUDA IPC transport (see CmiIpcProtocol in conv-rdmadevice.h) ***/
+
+// Base and size of the allocation containing an arbitrary device address.
+// Needed to export an interior pointer over CUDA IPC: a handle names an
+// allocation and opening one yields its base, so the offset has to travel
+// alongside. Returns false rather than aborting for memory that has no such
+// range.
+//
+// This lives here rather than in hapi_portable.h because that header is copied
+// into the build's include directory, so its "#pragma once" cannot dedupe the
+// two copies -- it holds macros only, which redefine harmlessly. hapi.h has a
+// real include guard and so may define functions.
+#ifdef CMK_CUDA
+#include <cuda.h>  // driver API; CUDA builds link -lcuda for this one call
+static inline bool hapiMemGetAddressRange(void** base, size_t* size,
+                                          const void* ptr) {
+  CUdeviceptr cu_base = 0;
+  size_t cu_size = 0;
+  if (cuMemGetAddressRange(&cu_base, &cu_size, (CUdeviceptr)ptr) != CUDA_SUCCESS)
+    return false;
+  *base = (void*)cu_base;
+  *size = cu_size;
+  return true;
+}
+#endif
+
+#ifdef CMK_HIP
+static inline bool hapiMemGetAddressRange(void** base, size_t* size,
+                                          const void* ptr) {
+  hipDeviceptr_t hip_base = nullptr;
+  size_t hip_size = 0;
+  if (hipMemGetAddressRange(&hip_base, &hip_size, (hipDeviceptr_t)ptr) != hipSuccess)
+    return false;
+  *base = (void*)hip_base;
+  *size = hip_size;
+  return true;
+}
+#endif
+
+// Payload size at or above which a cross-process device send exports its source
+// allocation instead of staging it. SIZE_MAX when the direct transport is off,
+// which is the default.
+size_t hapiIpcDirectThreshold();
+
+// Whether imported peer mappings are cached. False only under
+// CHARM_GPU_IPC_CACHE=0, which is a measurement aid -- see the note in
+// GPUManager.
+bool hapiIpcCacheImports();
+
+// Export the allocation containing ptr, so a peer process can read it. Fills
+// handle and the distance from the allocation's base to ptr, and returns false
+// (without aborting) if ptr names memory that cannot be exported -- managed or
+// host-registered memory, say -- in which case the caller should stage instead.
+// Repeat exports of the same allocation are served from a cache.
+bool hapiIpcExportBuffer(const void* ptr, hapiIpcMemHandle_t* handle,
+                         size_t* offset);
+
+// Map a peer allocation named by handle into this process, returning its base
+// address, or NULL if it cannot be opened. Cached: the same handle yields the
+// same mapping without a second cudaIpcOpenMemHandle.
+void* hapiIpcImportBuffer(const hapiIpcMemHandle_t& handle);
+
+// Drop every cached import, closing the mappings, and every cached export.
+//
+// Callers must be sure no transfer is still reading a mapping: closing one
+// mid-copy is an illegal access. That is why this is not called at a load
+// balancing step, where migration does free the exported allocations --
+// quiescing every device in the process to make it safe would cost more than
+// the problem is worth. Leaving a stale mapping in place leaks address space
+// but does not fault: an allocation freed and remade gets a fresh handle, so
+// the entry is simply never looked up again.
+void hapiIpcFlushImportCache();
+
+// Report per-process transport counts (staged vs direct sends, import cache
+// hits vs misses) to stdout. Enabled by CHARM_ZC_STATS.
+void hapiIpcReportStats();
+
 #ifdef CMK_LBDB_ON
 void hapiCuptiInit();
 void hapiCuptiFinalize();

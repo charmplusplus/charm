@@ -21,6 +21,22 @@ enum class CmiNcpyModeDevice : char { MEMCPY, IPC, RDMA };
 // Status of Direct API (persistent) transfer
 enum class CmiDeviceStatus : char { incomplete, complete };
 
+// Which inter-process transport the sender prepared for a device buffer.
+//
+// STAGED: the bytes were copied into the sender's device communication buffer,
+//   whose IPC handle every peer opened once at startup. {device_idx,
+//   comm_offset} locate them there. Two device copies, no per-transfer handle
+//   work, and the sender's own buffer is free for reuse as soon as its staging
+//   copy retires -- which is ordered on the sender's stream, so an application
+//   gets that for free without observing completion.
+//
+// DIRECT: nothing was copied. ipc_handle exports the allocation holding ptr and
+//   the receiver copies straight out of it at ipc_offset, saving one device
+//   copy and consuming no communication buffer. In exchange the sender's buffer
+//   stays live until the receiver signals completion, so an application that
+//   reuses or frees it MUST wait for the CkDeviceBuffer's completion callback.
+enum class CmiIpcProtocol : char { NONE = 0, STAGED = 1, DIRECT = 2 };
+
 class CmiDeviceBuffer {
 public:
   // Pointer to and size of the buffer
@@ -38,6 +54,14 @@ public:
   int device_idx;
   size_t comm_offset;
   int event_idx;
+
+  // Which of the two inter-process transports the sender prepared, and the
+  // export that DIRECT needs: a handle for the whole allocation containing ptr
+  // (cudaIpcGetMemHandle only ever names allocations, never interior
+  // addresses) plus the distance from that allocation's base to ptr.
+  CmiIpcProtocol ipc_protocol;
+  hapiIpcMemHandle_t ipc_handle;
+  size_t ipc_offset;
 
   // Same-process (MEMCPY) ordering. The receiver reads ptr directly on its own
   // stream, which has no ordering against the stream still producing the data,
@@ -62,6 +86,8 @@ public:
     device_idx = -1;
     comm_offset = 0;
     event_idx = -1;
+    ipc_protocol = CmiIpcProtocol::NONE;
+    ipc_offset = 0;
     memcpy_event = NULL;
     hapi_stream = hapiStreamPerThread;
 
@@ -79,6 +105,16 @@ public:
     p|device_idx;
     p|comm_offset;
     p|event_idx;
+    // The 64-byte handle is only meaningful to a DIRECT receive, and every
+    // device send carries one of these descriptors, so pup it conditionally.
+    // The width stays a function of ipc_protocol alone, which nothing rewrites
+    // -- what CkRdmaDeviceIssueRgets patches in place is ptr -- so the
+    // read-then-write retarget there still round-trips to the same size.
+    p((char *)&ipc_protocol, sizeof(ipc_protocol));
+    if (ipc_protocol == CmiIpcProtocol::DIRECT) {
+      p((char *)&ipc_handle, sizeof(ipc_handle));
+      p|ipc_offset;
+    }
     p((char *)&memcpy_event, sizeof(memcpy_event));
     p|data_stored;
     if (data_stored) {

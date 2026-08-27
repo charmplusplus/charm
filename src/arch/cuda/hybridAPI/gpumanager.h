@@ -3,6 +3,8 @@
 
 #include <vector>
 #include <string>
+#include <cstring>
+#include <cstdint>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -55,11 +57,35 @@ struct CuptiBufferItem {
 struct hapi_ipc_device_info {
   std::vector<hapiEvent_t> src_event_pool;
   std::vector<hapiEvent_t> dst_event_pool;
-  // Flag per event pair (0: free, 1: used)
+  // Flag per event pair (0: free, 1: used with a comm buffer block to release,
+  // 2: used by a DIRECT transfer, which holds no block)
   std::vector<int> event_pool_flags;
   // Offset in device comm buffer (per event)
   std::vector<size_t> event_pool_buff_offsets;
   void* buffer;
+};
+
+// Hash and equality over the raw bytes of a CUDA IPC memory handle, so
+// imported peer allocations can be looked up by the handle that named them.
+// The handle is an opaque fixed-size blob with no accessors, so byte identity
+// is all there is to go on -- which is exactly right, since the driver hands
+// out the same bytes for the same allocation.
+struct hapiIpcMemHandleHash {
+  size_t operator()(const hapiIpcMemHandle_t& h) const {
+    const unsigned char* bytes = (const unsigned char*)&h;
+    size_t hash = 1469598103934665603ULL;  // FNV-1a
+    for (size_t i = 0; i < sizeof(h); i++) {
+      hash ^= bytes[i];
+      hash *= 1099511628211ULL;
+    }
+    return hash;
+  }
+};
+
+struct hapiIpcMemHandleEq {
+  bool operator()(const hapiIpcMemHandle_t& a, const hapiIpcMemHandle_t& b) const {
+    return memcmp(&a, &b, sizeof(a)) == 0;
+  }
 };
 
 #ifdef HAPI_TRACE
@@ -176,6 +202,40 @@ struct GPUManager {
   // CUDA IPC handles opened for processes on the same node
   // Vector size is equal to the number of devices on the physical node
   std::vector<hapi_ipc_device_info> hapi_ipc_device_infos;
+
+  // Direct CUDA IPC transport (see CmiIpcProtocol). Payloads at or above the
+  // threshold skip the device communication buffer and are read out of the
+  // sender's allocation directly; SIZE_MAX (the default) means never.
+  size_t ipc_direct_threshold;
+
+  // Whether imported peer mappings are kept. Keeping them is what makes the
+  // direct transport worth using at all -- cudaIpcOpenMemHandle costs hundreds
+  // of microseconds, which no realistic payload amortizes -- and it is also
+  // required for correctness, since the driver refuses to open a handle a
+  // second time in a process that has not closed it. Turning it off
+  // (CHARM_GPU_IPC_CACHE=0) prices the handle operations for a sweep and is a
+  // measurement aid only, not a transport option.
+  bool ipc_cache_imports;
+
+  // Peer allocation base, keyed by the handle that exported it. Process-wide,
+  // like the comm buffer mappings ipcHandleOpen creates, and used from every PE
+  // regardless of which device it drives -- P2P access is enabled between all
+  // devices on the host.
+  std::unordered_map<hapiIpcMemHandle_t, void*, hapiIpcMemHandleHash,
+                     hapiIpcMemHandleEq> ipc_import_cache;
+
+  // Allocation base -> handle exporting it, so a repeated send from the same
+  // application buffer does not repeat cuMemGetAddressRange/IpcGetMemHandle.
+  std::unordered_map<const void*, hapiIpcMemHandle_t> ipc_export_cache;
+
+#if CMK_SMP
+  CmiNodeLock ipc_cache_lock;
+#endif
+
+  std::atomic<long> ipc_import_hits;
+  std::atomic<long> ipc_import_misses;
+  std::atomic<long> ipc_staged_sends;
+  std::atomic<long> ipc_direct_sends;
 
   //CUPTI load balancing
 #ifdef CMK_LBDB_ON
@@ -310,6 +370,13 @@ struct GPUManager {
     // Device communication buffer
     comm_buffer_size = 1 << 26; // 64MB by default
 
+    // Device load-balancing buffer. Zero unless +gpulbbuffer asks for one:
+    // create_comm_buffer allocates comm_buffer_size + lb_buffer_size on the
+    // device, so leaving this uninitialized made the size of that allocation
+    // whatever happened to be on the stack. Device migration needs the flag;
+    // everything else now gets a defined size without it.
+    lb_buffer_size = 0;
+
     // Shared memory region for CUDA IPC
     use_shm = false;
     shm_ptr = NULL;
@@ -321,6 +388,18 @@ struct GPUManager {
     // Number of CUDA IPC events per PE
     hapi_ipc_event_pool_size_pe = -1;
     hapi_ipc_event_pool_size_total = -1;
+
+    // Direct CUDA IPC transport: off until a threshold is asked for, so an
+    // unconfigured run behaves exactly as it did before.
+    ipc_direct_threshold = SIZE_MAX;
+    ipc_cache_imports = true;
+#if CMK_SMP
+    ipc_cache_lock = CmiCreateLock();
+#endif
+    ipc_import_hits = 0;
+    ipc_import_misses = 0;
+    ipc_staged_sends = 0;
+    ipc_direct_sends = 0;
 
     // Allocate host/device buffers array (both user and system-addressed)
     host_buffers_ = new void*[NUM_BUFFERS*2];

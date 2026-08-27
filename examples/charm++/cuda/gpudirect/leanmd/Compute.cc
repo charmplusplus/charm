@@ -270,31 +270,22 @@ void Compute::launchForces() {
 // reduction.
 // A device zerocopy send is a pull: the cell reads d_force out of this chare's
 // memory some time after the send returns. Nothing else keeps that memory
-// alive, and run() calls AtSync immediately after this -- so on a load
-// balancing step ~Compute could free d_force while the cell is still reading
-// it, which faults on the device. Attaching a callback per send makes the
-// completion observable; run() waits for them before reaching AtSync.
+// alive or unchanged -- the next step's invokeZeroForces rewrites it, and on a
+// balancing step ~Compute frees it outright -- so every send carries a
+// completion callback and run() drains them at the end of each step before
+// either can happen.
+//
+// This used to attach the callback only on balancing steps, relying on the fact
+// that a staged cross-process send copies d_force into the runtime's
+// communication buffer on this chare's own stream, which orders the next step's
+// kernels behind the copy for free. That is a property of the staged transport,
+// not of the API: the direct CUDA IPC transport hands the cell this buffer
+// itself and leaves the completion callback as the only ordering there is.
 void Compute::sendForces() {
   if (stepCount == 1) energy[0] = *h_energy;
   else if (stepCount == finalStepCount) energy[1] = *h_energy;
 
-  // Only a balancing step can free d_force from under the cells, and an
-  // unmatched completion message would sit in the SDAG queue forever, so the
-  // acknowledgement is attached exactly on the steps run() drains it.
-  const bool lbStep = (stepCount >= firstLdbStep &&
-                       (stepCount - firstLdbStep) % ldbPeriod == 0);
-  pendingForceSends = lbStep ? (selfCompute ? 1 : 2) : 0;
-
-  if (!lbStep) {
-    cellArray(cellIdx[0][0], cellIdx[0][1], cellIdx[0][2])
-        .receiveForces(stepCount, ordinal[0], nPart[0],
-                       CkDeviceBuffer(d_force[0], stream));
-    if (!selfCompute)
-      cellArray(cellIdx[1][0], cellIdx[1][1], cellIdx[1][2])
-          .receiveForces(stepCount, ordinal[1], nPart[1],
-                         CkDeviceBuffer(d_force[1], stream));
-    return;
-  }
+  pendingForceSends = selfCompute ? 1 : 2;
 
   CkCallback sentCb(CkIndex_Compute::forceSendDone(), thisProxy[thisIndex]);
 

@@ -179,8 +179,10 @@ mainmodule leanmd {
     entry void ResumeFromSync();
     entry void forcesReady();
     // One per force send, from the runtime, once the receiving cell has pulled
-    // d_force. run() drains these before AtSync: the buffer is owned by this
-    // chare and migrating (and so freeing it) mid-pull faults on the device.
+    // d_force. run() drains these at the end of every step: the buffer is owned
+    // by this chare, and the next step's kernels rewrite it while migration on a
+    // balancing step frees it outright -- either one while a cell is still
+    // pulling faults on the device or silently corrupts the forces it read.
     entry void forceSendDone();
 
     // Positions from one of my two cells, landing straight in device memory. The
@@ -202,15 +204,25 @@ mainmodule leanmd {
 
         when forcesReady() serial { sendForces(); }
 
+        // Wait until the cells have finished pulling the force arrays. A device
+        // zerocopy send is a pull: the cell reads d_force out of this chare's
+        // memory some time after the send returns, and nothing else orders that
+        // read against what this chare does next. The next iteration's
+        // invokeZeroForces rewrites d_force, and on a balancing step migration
+        // frees it -- so both have to wait here.
+        //
+        // Waiting only on balancing steps was enough while every cross-process
+        // send was staged through the runtime's communication buffer, because
+        // that staging copy is enqueued on this chare's own stream and so
+        // orders the next step's kernels behind it for free. The direct CUDA
+        // IPC transport hands the cell this buffer itself, and then the
+        // completion callback is the only thing standing between the two.
+        for (ackCount = 0; ackCount < pendingForceSends; ackCount++) {
+          when forceSendDone() { }
+        }
+
         //periodically call load balancer
         if (stepCount >= firstLdbStep && (stepCount - firstLdbStep) % ldbPeriod== 0) {
-          // Only on a balancing step: wait until the cells have finished pulling
-          // the force arrays before allowing migration to free them. Off the
-          // balancing steps nothing frees the buffers, so the sends are left to
-          // complete in the background as before.
-          for (ackCount = 0; ackCount < pendingForceSends; ackCount++) {
-            when forceSendDone() { }
-          }
           serial { AtSync();}
           when ResumeFromSync() { }
         }
