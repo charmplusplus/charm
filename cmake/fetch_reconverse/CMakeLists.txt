@@ -7,15 +7,9 @@ set_directory_properties(PROPERTIES
   INCLUDE_DIRECTORIES ""
 )
 
-# Pin an exact reconverse commit, not a branch: with a branch name, the same
-# charm commit fetches whatever reconverse's tip is that day, so builds are
-# unreproducible and can silently break when the pairing drifts (in Aug 2026 a
-# fresh clone stopped configuring for exactly this reason). Update by bumping
-# this SHA in a reviewed commit; --with-fetch-reconverse-tag/-dir still
-# override for development.
 set(AUTOFETCH_RECONVERSE_TAG
-    36ab139e2857719c2b19479863a4d80d09648b4c
-    CACHE STRING "The reconverse commit (full SHA) to fetch")
+    main
+    CACHE STRING "The reconverse branch/tag/commit to fetch")
 
 include(FetchContent)
 FetchContent_Declare(
