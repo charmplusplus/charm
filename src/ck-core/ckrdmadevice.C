@@ -1214,25 +1214,26 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
                                      &export_offset);
       }
 
-      // Direct hands the receiver this chare's own buffer, so nothing orders
-      // the sender's next kernel against the receiver's read of it. The
-      // CkDeviceBuffer completion callback is the only signal that closes that
-      // window; a send without one cannot know when its buffer is free again.
-      // Staging happens to make this invisible -- it decouples the two sides
-      // with a copy on the sender's stream -- so an application that was
-      // correct staged can be racy direct, and it is worth saying so once
-      // rather than leaving it to surface as corrupted data.
+      // A zero-copy device send may not reuse or free its source buffer until
+      // the CkDeviceBuffer's completion callback fires. That is the contract
+      // whatever transport carries it, so a send without a callback is already
+      // an application bug -- staging merely hides it, since the source happens
+      // to be free once the staging copy retires on the sender's own stream.
+      // Direct reads the sender's allocation itself, so the same bug shows up
+      // as corrupted data instead. Report it once, where the send is still
+      // identifiable, rather than let it surface there.
       if (direct && buffers[i]->cb.type == CkCallback::ignore) {
         static std::atomic<bool> warned{false};
         bool expected = false;
         if (warned.compare_exchange_strong(expected, true)) {
           CmiPrintf("[%d] WARNING: a %zu-byte device buffer is being sent over "
-                    "direct CUDA IPC with no completion callback. The receiver "
-                    "reads this buffer directly, so the sender cannot know when "
-                    "it is safe to overwrite or free it. Attach a CkCallback to "
-                    "the CkDeviceBuffer, or raise CHARM_GPU_IPC_THRESHOLD above "
-                    "%zu to keep these sends staged.\n",
-                    CkMyPe(), (size_t)buffers[i]->cnt, (size_t)buffers[i]->cnt);
+                    "direct CUDA IPC with no completion callback. Every "
+                    "zero-copy device send needs one: attach a CkCallback to "
+                    "the CkDeviceBuffer and leave the buffer alone until it "
+                    "fires. Staging happens to tolerate a missing callback, so "
+                    "forcing these sends back to staging would hide this rather "
+                    "than fix it.\n",
+                    CkMyPe(), (size_t)buffers[i]->cnt);
           fflush(stdout);
         }
       }

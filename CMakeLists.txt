@@ -797,6 +797,13 @@ if(BUILD_CUDA OR BUILD_HIP)
   if(BUILD_CUDA)
     add_executable(hapi_memory_daemon src/arch/cuda/hybridAPI/hapi_memory_daemon.cpp)
     add_dependencies(hapi_memory_daemon hybridapi ck converse ckqt moduleNDMeshStreamer ckmain modulecompletion conv-static)
+    if(RECONVERSE)
+      # charmc supplies a bare -lreconverse, which leaves the linker with no way
+      # to resolve libreconverse's own dependencies (LCI and the libraries it
+      # pulls in) since their install directory is on no search path. Linking
+      # the target the way ckhello does carries those full paths and the rpath.
+      target_link_libraries(hapi_memory_daemon PRIVATE reconverse)
+    endif()
   endif()
 
 endif()

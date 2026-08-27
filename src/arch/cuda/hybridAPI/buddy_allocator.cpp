@@ -59,8 +59,18 @@ namespace buddy {
     return free;
   }
 
+  // Integer ceil(log2(size)) - 2, so bucket b holds blocks of exactly 2^(b+2).
+  //
+  // Not std::log2: this has to agree exactly with the halving in malloc(), and
+  // a floating-point result landing a hair either side of an integer files a
+  // block under a bucket whose nominal size it does not have. The same
+  // inexactness at the caller (pow) is what produced a comm region of 2^k-1
+  // bytes and, from it, overlapping blocks.
   int allocator::get_bucket(size_t size) {
-    return (int)std::ceil(std::log2((double)size)) - 2;
+    int bucket = 0;
+    size_t block = 1;
+    while (block < size) { block <<= 1; bucket++; }
+    return bucket - 2;
   }
 
   int allocator::get_block_index(uint8_t* ptr, size_t size) {
@@ -70,6 +80,19 @@ namespace buddy {
   allocator::allocator(size_t _comm_lb_size, size_t _comm_size) : min_size(4), base_ptr(NULL) {
     if (_comm_size == 0) {
       fprintf(stderr, "Allocator size has to be larger than 0 bytes\n");
+      abort();
+    }
+
+    // The bucket scheme assumes a power-of-two region: the top bucket is seeded
+    // with the whole thing below and malloc() reaches every smaller bucket by
+    // halving it. Halving anything else truncates, and the buckets then hand
+    // out blocks that are smaller than they claim and overlap their neighbours
+    // -- silent data corruption, not an allocation failure. Say so here rather
+    // than let it be discovered as one wrong byte in a device transfer.
+    if ((_comm_size & (_comm_size - 1)) != 0) {
+      fprintf(stderr,
+              "Buddy allocator communication region must be a power of two, "
+              "got %zu bytes\n", _comm_size);
       abort();
     }
 
@@ -83,7 +106,7 @@ namespace buddy {
     DEBUG_PRINT("Initialized base_ptr %p with %zu bytes\n", (void*)base_ptr, total_size);
 
     // Initialize buckets and set up last bucket (for size min_size)
-    int total_size_log2 = std::ceil(std::log2((double)_comm_size));
+    int total_size_log2 = get_bucket(_comm_size) + 2;
     bucket_count = total_size_log2 - 1;
     buckets = new std::list<FreeBlock>[bucket_count];
     buckets[bucket_count-1].emplace_back(base_ptr, _comm_size);

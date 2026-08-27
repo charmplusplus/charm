@@ -6,10 +6,17 @@ file(GLOB_RECURSE ci-files ${CMAKE_SOURCE_DIR}/src/*.ci)
 # does. So a #if CMK_GLOBAL_LOCATION_UPDATE guard inside a .ci file (e.g.
 # DistBaseLB.ci) needs this threaded through by hand, mirroring CUDA_OPT below,
 # or charmxi silently strips the guarded entry and the later C++ compile (which
-# does see the arch's conv-mach.h #define) fails to find it on the proxy.
+# does see the macro) fails to find it on the proxy.
+#
+# The macro has two sources: the arch's conv-mach.h, and -DCMK_GLOBAL_LOCATION_UPDATE=1
+# handed to EXTRA_OPTS at configure time (which is how arches whose conv-mach.h
+# does not define it, e.g. multicore-linux-arm8, turn it on). OPTS carries
+# EXTRA_OPTS by this point, but only as one space-joined string, so charmc below
+# receives it as a single unparsed argument -- checking it here is what makes the
+# configure-time form reach charmxi.
 file(STRINGS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach.h GLU_MATCH
      REGEX "^#define[ \t]+CMK_GLOBAL_LOCATION_UPDATE[ \t]+1")
-if(GLU_MATCH)
+if(GLU_MATCH OR OPTS MATCHES "-DCMK_GLOBAL_LOCATION_UPDATE=1")
     set(GLU_OPT "-DCMK_GLOBAL_LOCATION_UPDATE=1")
 endif()
 

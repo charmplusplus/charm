@@ -1357,11 +1357,29 @@ static void hapiMapping(char** argv) {
     int input_comm_buffer_size = 0;
     if (CmiGetArgIntDesc(argv, "+gpucommbuffer", &input_comm_buffer_size,
           "GPU communication buffer size (in MB)")) {
-      if (CmiMyRank() == 0) {
-        // Round up size to the closest power of 2
-        size_t comm_buffer_size = (size_t)input_comm_buffer_size * 1024 * 1024;
-        int size_log2 = std::ceil(std::log2((double)comm_buffer_size));
-        csv_gpu_manager.comm_buffer_size = (size_t)std::pow(2, size_log2);
+      if (CmiMyRank() == 0 && input_comm_buffer_size > 0) {
+        // Round up to the next power of two, in integer arithmetic.
+        //
+        // This was pow(): `(size_t)std::pow(2, ceil(log2(bytes)))`. pow returns
+        // a double and is not exact here -- on this toolchain pow(2,29) and
+        // pow(2,31) both come back a hair under the true value, and the cast
+        // truncated them to 2^29-1 and 2^31-1. Requests of 64, 128, 256 and
+        // 1024 MB happened to survive; 512 and 2048 MB did not.
+        //
+        // A size one byte short of a power of two is not a rounding nuisance,
+        // it silently corrupts data: the buddy allocator seeds its top bucket
+        // with this whole region and reaches the smaller buckets by halving,
+        // and halving 2^k-1 truncates to 2^(k-1)-1 all the way down. Every
+        // bucket then hands out blocks one byte short of their nominal size,
+        // so consecutive blocks overlap by a byte and a request of exactly 2^n
+        // gets a 2^n-1 block. The staged copy writes its last byte into the
+        // next block, and the next sender's first byte overwrites it -- one
+        // wrong trailing byte per message, only for power-of-two payloads,
+        // only with more than one send in flight.
+        size_t requested_bytes = (size_t)input_comm_buffer_size * 1024 * 1024;
+        size_t rounded = 1;
+        while (rounded < requested_bytes) rounded <<= 1;
+        csv_gpu_manager.comm_buffer_size = rounded;
       }
     }
 

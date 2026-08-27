@@ -159,6 +159,9 @@
 
 /* Without stdint.h, CMK_TYPEDEF_(U)INT{2,4,8} must be defined in the
    corresponding conv-mach.h */
+// Reconverse's converse.h declares these same names (see the note in
+// conv-mach-common.h), so only declare them when it has not been seen here.
+#if !CMK_RECONVERSE || !defined(CONVERSE_H)
 #if CMK_HAS_STDINT_H && !defined(CMK_TYPEDEF_INT2)
 #include <stdint.h>
 typedef int8_t  CMK_TYPEDEF_INT1;
@@ -177,6 +180,8 @@ typedef CMK_TYPEDEF_UINT8     CmiIntPtr;
 typedef CMK_TYPEDEF_UINT4     CmiIntPtr;
 #endif
 #endif
+
+#endif // !CMK_RECONVERSE || !defined(CONVERSE_H)
 
 #endif
 
