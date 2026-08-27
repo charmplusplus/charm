@@ -164,6 +164,14 @@ set(conv-util-cxx-sources
     ${conv-perf-cxx-sources}
 )
 
+if(RECONVERSE)
+    # Reconverse implements persistent communication itself, on top of its own
+    # comm backend, so the legacy machine-layer implementation has nothing to
+    # sit on: it needs machine-persistent.h from src/arch/<layer>, and its
+    # entry points would collide with the ones in libreconverse.
+    list(REMOVE_ITEM conv-util-cxx-sources src/arch/util/persist-comm.C)
+endif()
+
 #Uncommenting spanning tree to satisfy ckrdma dep errors
 
 if(CMK_CAN_LINK_FORTRAN)
@@ -236,11 +244,17 @@ file(WRITE ${CMAKE_BINARY_DIR}/include/topomanager_config.h "// empty\n" )
 
 add_library(charm_cxx_utils STATIC
     ${conv-util-cxx-sources})
+# spanningTree.C includes charm++.h -> ckmarshall.h -> CkMarshall.decl.h, a
+# charmxi-generated header; without this target-level dependency the compile
+# races the generation and a fresh -j build can lose (found deterministically
+# on a clean tree).
+add_dependencies(charm_cxx_utils ci-generated)
 
 
 add_library(topomanager STATIC
     ${tmgr-cxx-sources}
-    ${tmgr-h-sources})
+    ${tmgr-h-sources}
+    $<TARGET_OBJECTS:ckrescale>)
 
 target_include_directories(topomanager PUBLIC
     src/util/topomanager
@@ -253,7 +267,7 @@ target_include_directories(topomanager PUBLIC
 #     charm_cxx_utils
 # )
 add_custom_target(converse)
-add_dependencies(converse reconverse topomanager charm_cxx_utils)
+add_dependencies(converse reconverse topomanager charm_cxx_utils ckrescale)
 
 #file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/comm_backend)
 
@@ -264,8 +278,25 @@ foreach (filename
 
 endforeach()
 
+set(conv-core-h-to-install ${conv-core-h-sources})
+if(RECONVERSE)
+    # Reconverse provides its own conv-rdma.h, which is the authority on the
+    # RDMA configuration (CMK_REG_REQUIRED, CMK_NOCOPY_DIRECT_BYTES) and must
+    # agree with what libreconverse was compiled against. Do not shadow it with
+    # the legacy Converse copy; cmake/fetch_reconverse installs the real one.
+    list(REMOVE_ITEM conv-core-h-to-install src/conv-core/conv-rdma.h)
+    # Same for persistent.h: reconverse's converse.h includes it, so the copy
+    # on the include path has to be reconverse's. The legacy one pulls in
+    # conv-config.h, which does not exist in a reconverse build.
+    list(REMOVE_ITEM conv-core-h-to-install src/conv-core/persistent.h)
+    # And for taskqueue.h, which reconverse's converse.h also includes: the
+    # TaskQueue layout Charm++ compiles against has to be the one libreconverse
+    # was built with.
+    list(REMOVE_ITEM conv-core-h-to-install src/conv-core/taskqueue.h)
+endif()
+
 foreach(filename
-    ${conv-core-h-sources}
+    ${conv-core-h-to-install}
     ${conv-ccs-h-sources}
     ${conv-perf-h-sources}
     ${conv-util-h-sources}
@@ -279,12 +310,17 @@ endforeach()
 # target_include_directories(converse PRIVATE src/util) # for sockRoutines.C
 # target_include_directories(converse PRIVATE src/conv-core src/util/topomanager src/ck-ldb src/ck-perf src/ck-cp)
 
-# conv-static
-add_library(conv-static OBJECT src/conv-core/conv-static.c)
-add_dependencies(reconverse conv-static)
-add_dependencies(charm_cxx_utils conv-static)
-add_custom_command(TARGET charm_cxx_utils
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/conv-static.dir/src/conv-core/conv-static.c.o ${CMAKE_BINARY_DIR}/lib/conv-static.o
-    VERBATIM
-)
+# conv-static: not needed for reconverse builds (reconverse provides its own converse layer)
+if(NOT RECONVERSE)
+  add_library(conv-static OBJECT src/conv-core/conv-static.c)
+  # (was add_dependencies(reconverse ...) -- that target only exists in
+  # reconverse builds, which never reach this branch; classic hangs the
+  # dependency off the converse target as mainline does, #3941)
+  add_dependencies(converse conv-static)
+  add_dependencies(charm_cxx_utils conv-static)
+  add_custom_command(TARGET charm_cxx_utils
+      POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/conv-static.dir/src/conv-core/conv-static.c.o ${CMAKE_BINARY_DIR}/lib/conv-static.o
+      VERBATIM
+  )
+endif()

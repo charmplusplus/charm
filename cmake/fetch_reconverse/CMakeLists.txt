@@ -9,7 +9,7 @@ set_directory_properties(PROPERTIES
 
 set(AUTOFETCH_RECONVERSE_TAG
     main
-    CACHE STRING "The tag to fetch for reconverse")
+    CACHE STRING "The reconverse branch/tag/commit to fetch")
 
 include(FetchContent)
 FetchContent_Declare(
@@ -29,3 +29,18 @@ set(BUILD_SHARED_LIBS ${_save_BUILD_SHARED_LIBS} CACHE INTERNAL "")
 configure_file(${reconverse_SOURCE_DIR}/include/converse.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 configure_file(${reconverse_SOURCE_DIR}/src/cldb.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 configure_file(${reconverse_SOURCE_DIR}/include/charm-config.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
+# Charm++ must build against the same RDMA configuration that libreconverse was
+# compiled with (CMK_REG_REQUIRED, CMK_NOCOPY_DIRECT_BYTES). The legacy
+# src/conv-core/conv-rdma.h is excluded from the Converse header copy in
+# cmake/converse.cmake so that this is the only conv-rdma.h on the include path.
+configure_file(${reconverse_SOURCE_DIR}/include/conv-rdma.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
+# reconverse's converse.h includes persistent.h, so this must be the copy on
+# the include path. The legacy src/conv-core/persistent.h is excluded from the
+# Converse header copy in cmake/converse.cmake, and its machine-layer
+# implementation (src/arch/util/persist-comm.C) is dropped from the build
+# there as well.
+configure_file(${reconverse_SOURCE_DIR}/include/persistent.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
+# Likewise taskqueue.h, the other header reconverse's converse.h includes. Note
+# that this copy does not include converse.h itself, so anything including it
+# directly has to include converse.h first.
+configure_file(${reconverse_SOURCE_DIR}/include/taskqueue.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)

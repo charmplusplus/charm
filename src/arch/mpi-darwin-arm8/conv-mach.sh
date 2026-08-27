@@ -9,7 +9,7 @@ case "${CMK_REAL_COMPILER##*/}" in
   gcc|g++|gcc-*|g++-*)
     # keep in sync with common/cc-gcc.sh
     CMK_CC_FLAGS="-fPIC"
-    CMK_CXX_FLAGS="-fPIC -Wno-deprecated"
+    CMK_CXX_FLAGS="-fPIC -Wno-deprecated -std=gnu++17"
     CMK_LD_FLAGS="-fPIC"
     CMK_LDXX_FLAGS="-fPIC -multiply_defined suppress"
     CMK_COMPILER='gcc'

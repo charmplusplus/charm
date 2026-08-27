@@ -1,0 +1,26 @@
+// osu_latency.ci
+mainmodule osu_latency {
+  readonly CProxy_Main mainProxy;
+
+  message LatencyMsg {
+    char data[];
+  };
+
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry void ready();
+    entry void nextSize();
+    entry void doneOne(double seconds);
+    entry void finish();
+  };
+
+  chare Endpoint {
+    entry Endpoint(CProxy_Main m, int iters, int skip);
+    entry void setPeer(CProxy_Endpoint p);
+    entry void start(int size);
+    entry void sendPing();
+    entry void ping(LatencyMsg* m);
+    entry void pong(LatencyMsg* m);
+  };
+
+};

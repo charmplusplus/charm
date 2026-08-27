@@ -678,7 +678,8 @@ static inline void _handleProcData(PUP::er &p)
 #endif
 
     // save groups into Groups.dat
-    CkPupGroupData(p);
+    //std::vector<GroupInfo> groupMetadata = CkPupGroupMetadata(p);
+    //CkPupGroupData(p, groupMetadata.size(), groupMetadata);
 
     // save nodegroups into NodeGroups.dat
     if(CkMyRank()==0) CkPupNodeGroupData(p);

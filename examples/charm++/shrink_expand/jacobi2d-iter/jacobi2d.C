@@ -23,7 +23,9 @@ public:
     CProxy_Jacobi array;
     int num_chares;
     int iterations;
+    int iterations_after_restart;
     int total_iterations;
+    int lbTime;
 	double stTime;
     double startTime;
 
@@ -35,6 +37,7 @@ public:
 
         // set iteration counter to zero
         iterations=0;
+        iterations_after_restart=0;
 
         // store the main proxy
         mainProxy = thisProxy;
@@ -55,8 +58,14 @@ public:
 	        total_iterations = atoi(m->argv[3]);
 	    }
 
+        if (m->argc > 4) {
+            lbTime = atoi(m->argv[4]);
+        } else {
+            lbTime = 100;
+        }
+
         // Create new array of worker chares
-        array = CProxy_Jacobi::ckNew(num_chare_cols, num_chare_rows);
+        array = CProxy_Jacobi::ckNew(lbTime, num_chare_cols, num_chare_rows);
 
         // save the total number of worker chares we have in this simulation
         num_chares = num_chare_rows*num_chare_cols;
@@ -81,6 +90,8 @@ public:
       // subtle: Chare proxy readonly needs to be updated manually because of
       // the object pointer inside it.
     mainProxy = thisProxy;
+    stTime = CkWallTimer();
+    iterations_after_restart = 0;
 
     CkPrintf("Resuming Jacobi on %d processors with (%d,%d) elements\n", CkNumPes(), num_chare_rows, num_chare_cols);
 
@@ -96,11 +107,13 @@ void report(int completed_iteration) {
         if (iterations == total_iterations || CkWallTimer()-stTime>=3000000) {
 			CkPrintf("Program Done! avg_it:%.6f\n",(CkWallTimer()-stTime)/iterations);
             CkExit();
+            //exit(0);
         } else {
-            if(iterations%1==0) CkPrintf("starting new iteration; iteration %d time: %.6lf time/itr::%.6f\n", iterations, CkWallTimer()-stTime,(CkWallTimer()-stTime)/iterations);
-            CkPrintf("Memory Usage: %ld bytes \n", CmiMemoryUsage());
+            if(iterations%10==0) CkPrintf("starting new iteration; iteration %d time: %.6lf time/itr::%.6f\n", iterations, CkWallTimer()-stTime,(CkWallTimer()-stTime)/iterations_after_restart);
+            //CkPrintf("Memory Usage: %ld bytes \n", CmiMemoryUsage());
             recieve_count=0;
             iterations++;
+            iterations_after_restart++;
             // Call begin_iteration on all worker chares in array
             startTime = CkWallTimer();
             array.begin_iteration();
@@ -113,6 +126,7 @@ void pup(PUP::er &p){
     p|num_chares;
     p|iterations;
     p|total_iterations;
+    p|lbTime;
     p|stTime;
     p|startTime;
     CkPrintf("Main's PUPer. \n");
@@ -130,13 +144,15 @@ public:
     int messages_due;
 	int iteration;
     int useLB;
+    int lbTime;
     array2d temperature;
 
     // Constructor, initialize values
-    Jacobi()
+    Jacobi(int lbTime_)
     : messages_due(4)
     , iteration(0)
     , useLB(1)
+    , lbTime(lbTime_)
     , temperature(block_height + 2, array1d(block_width + 2, 0.0))
     {
         usesAtSync = true;
@@ -144,9 +160,11 @@ public:
     }
 
     void pup(PUP::er &p){
+        //CkPrintf("[%d] Jacobi's PUPer. \n",CkMyPe());
         p|messages_due;
         p|iteration;
         p|useLB;
+        p|lbTime;
         p|temperature;
         /* There may be some more variables used in doWork */
     }
@@ -169,15 +187,15 @@ public:
     // Perform one iteration of work
     // The first step is to send the local state to the neighbors
     void begin_iteration(void) {
-        if (iteration %50 ==0 && useLB ) {
+        if (((iteration > 0 && iteration % lbTime == 0) || iteration == 10) && useLB) {
             useLB = 0;
-            if(thisIndex.x==0 && thisIndex.y==0) CkPrintf("PROC#%d Calling LBD --------------------- iteration=%d\n",CkMyPe(),iteration);
+            //if(thisIndex.x==0 && thisIndex.y==0) CkPrintf("PROC#%d Calling LBD --------------------- iteration=%d\n",CkMyPe(),iteration);
             AtSync();
         } else {
 
         useLB=1;
-        if(thisIndex.x==0 && thisIndex.y==0) CkPrintf("PROC#%d started --------------------- iteration=%d\n",CkMyPe(),iteration);
-				iteration++;
+        //if(thisIndex.x==0 && thisIndex.y==0) CkPrintf("PROC#%d started --------------------- iteration=%d\n",CkMyPe(),iteration);
+		iteration++;
         // Copy left column and right column into temporary arrays
         array1d left_edge(block_height);
         array1d right_edge(block_height);
@@ -245,17 +263,28 @@ void ResumeFromSync() {begin_iteration();}
             // and write them to temperature[][] after all of the new values are computed.
             array2d new_temperature(block_height + 2, array1d(block_width + 2));
 
-            for(int i=1;i<block_height+1;++i){
-                for(int j=1;j<block_width+1;++j){
-                    // update my value based on the surrounding values
-                    new_temperature[i][j] = (temperature[i-1][j]+temperature[i+1][j]+temperature[i][j-1]+temperature[i][j+1]+temperature[i][j]) / 5.0;
-
+            const int tile_size_i = 1024;
+            const int tile_size_j = 1024;
+            for(int ii=1; ii<block_height+1; ii+=tile_size_i){
+                for(int jj=1; jj<block_width+1; jj+=tile_size_j){
+                    for(int i=ii; i<std::min(ii+tile_size_i, block_height+1); ++i){
+                        for(int j=jj; j<std::min(jj+tile_size_j, block_width+1); ++j){
+                            // update my value based on the surrounding values
+                            new_temperature[i][j] = (temperature[i-1][j]+temperature[i+1][j]+temperature[i][j-1]+temperature[i][j+1]+temperature[i][j]) / 5.0;
+                        }
+                    }
                 }
             }
 
-            for(int i=0;i<block_height+2;++i)
-                for(int j=0;j<block_width+2;++j)
-                    temperature[i][j] = new_temperature[i][j];
+            for(int ii=0; ii<block_height+2; ii+=tile_size_i){
+                for(int jj=0; jj<block_width+2; jj+=tile_size_j){
+                    for(int i=ii; i<std::min(ii+tile_size_i, block_height+2); ++i){
+                        for(int j=jj; j<std::min(jj+tile_size_j, block_width+2); ++j){
+                            temperature[i][j] = new_temperature[i][j];
+                        }
+                    }
+                }
+            }
 
             // Enforce the boundary conditions again
             BC();

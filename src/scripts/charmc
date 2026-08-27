@@ -1614,7 +1614,7 @@ modInitObj="$modInitName.o"
 MAKE_LDXX="0"
 MAKE_LD="0"
 
-CORE_LIBS=(-lreconverse -lcharm_cxx_utils "${TRACE_OBJ[@]}" -lm)
+CORE_LIBS=(-lreconverse -lcharm_cxx_utils "${TRACE_OBJ[@]}" -lm -lckrescale)
 
 if [[ "$BUILD_SHARE" = '0' && "$USER_INITIATED_SHARED" = '0' ]]
 then
@@ -1669,6 +1669,19 @@ else
   LANG_LIBS=("-L$CHARMLIB" "-L$CHARMRECONV")
 fi
 
+# libreconverse is a shared library, and it is linked by SONAME/install_name
+# (@rpath/libreconverse.<suf>), so -L alone only satisfies the link step: at run
+# time the loader still has to be told where the library lives. Without this,
+# every Charm++ binary requires (DY)LD_LIBRARY_PATH to be set by hand before it
+# will start. Record the directory it was linked from as an RPATH instead. This
+# also covers libreconverse's own dependencies (liblci, liblct, liblcw), since
+# the loader searches the main executable's RPATHs for those too.
+for dir in "$CHARMLIBSO" "$CHARMLIB" "$CHARMRECONV"
+do
+	[[ -n "$dir" && -r "$dir/libreconverse.${CMK_SHARED_SUF:-so}" ]] || continue
+	LANG_LIBS+=("-Wl,-rpath,$dir")
+done
+
 if [[ -z "$STANDALONE" ]]
 then
   ALL_LIBS=("${LANG_LIBS[@]}" "${PRE_LIBRARIES[@]}" "${MIDDLE_LIBS[@]}" "${BAL_OBJ[@]}" $CMK_LIBS "${POST_LIBRARIES[@]}")
@@ -1688,7 +1701,7 @@ fi
 
 ALL_LIBS+=($CMK_SYSLIBS)
 
-if [[ "$BUILD_SHARE" = '0' && "$USER_INITIATED_SHARED" = '0' ]]
+if [[ "$BUILD_SHARE" = '0' && "$USER_INITIATED_SHARED" = '0' && -f "$CHARMLIB/conv-static.o" ]]
 then
   ALL_LIBS+=("$CHARMLIB/conv-static.o")
 fi
@@ -2297,14 +2310,41 @@ fi
 
 if [[ "$COPY_CHARMRUN" = 'true' ]]
 then
-  targ="charmrun$CMK_POST_EXE"
-  [[ ! -x "$CHARMBIN/$targ" && -n "$CMK_POST_EXE" ]] && targ=charmrun
+	targ="charmrun$CMK_POST_EXE"
+	[[ ! -x "$CHARMBIN/$targ" && -n "$CMK_POST_EXE" ]] && targ=charmrun
 
-  if [[ -x "$CHARMBIN/$targ" ]]
-  then
+	if [[ -x "$CHARMBIN/$targ" ]]
+	then
 	DoNoErrCheck $RM "$targ"
 	DoNoErrCheck $CP "$CHARMBIN/$targ" "$targ" 2> /dev/null
-  fi
+	fi
+
+	targ_elastic="charmrun_elastic$CMK_POST_EXE"
+	[[ ! -x "$CHARMBIN/$targ_elastic" && -n "$CMK_POST_EXE" ]] && targ_elastic=charmrun_elastic
+
+	if [[ -x "$CHARMBIN/$targ_elastic" ]]
+	then
+	DoNoErrCheck $RM "$targ_elastic"
+	DoNoErrCheck $CP "$CHARMBIN/$targ_elastic" "$targ_elastic" 2> /dev/null
+	fi
+
+	targ_elastic="charmrun_hapi$CMK_POST_EXE"
+	[[ ! -x "$CHARMBIN/$targ_elastic" && -n "$CMK_POST_EXE" ]] && targ_elastic=charmrun_hapi
+
+	if [[ -x "$CHARMBIN/$targ_elastic" ]]
+	then
+	DoNoErrCheck $RM "$targ_elastic"
+	DoNoErrCheck $CP "$CHARMBIN/$targ_elastic" "$targ_elastic" 2> /dev/null
+	fi
+
+	targ_elastic="hapi_memory_daemon$CMK_POST_EXE"
+	[[ ! -x "$CHARMBIN/$targ_elastic" && -n "$CMK_POST_EXE" ]] && targ_elastic=hapi_memory_daemon
+
+	if [[ -x "$CHARMBIN/$targ_elastic" ]]
+	then
+	DoNoErrCheck $RM "$targ_elastic"
+	DoNoErrCheck $CP "$CHARMBIN/$targ_elastic" "$targ_elastic" 2> /dev/null
+	fi
 fi
 
 [[ -z "$SKIP_MODULEINIT" && -z "$SAVE" ]] && DoNoErrCheck $RM "$modInitSrc" "$modInitObj" > /dev/null 2>&1

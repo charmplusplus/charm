@@ -283,6 +283,12 @@ class TraceSummary : public Trace {
     void traceClearEps();
     void traceWriteSts();
     void traceClose();
+    // Close while the scheduler is still running (exit-fn driven): writes
+    // and frees the pool but does NOT removeTrace() — the NULL hole that
+    // leaves in TraceArray crashes the reverse-iteration dispatch
+    // (ALLREVERSEDO) on the very next endExecute. Callers must disable the
+    // module first via setTraceOnPE(0).
+    void closePool() { delete _logPool; _logPool = NULL; }
 
     /**
        for trace summary event mark

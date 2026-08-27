@@ -2,11 +2,18 @@
 #define _CKRDMAUTILS_H
 
 #include "charm-config.h"
+/* CMK_CUDA / CMK_HIP gate the device RDMA declarations below. Under reconverse
+ * the converse.h on the include path is reconverse's and does not pull in
+ * conv-mach-opt.h, and several translation units (e.g. ckrdma.C) include this
+ * header before charm.h. Without this include those builds would silently
+ * compile the non-GPU version of this header and then fail later in
+ * conv-rdmadevice.h, where CMK_HIP is set. */
+#include "conv-mach-opt.h"
 #include "converse.h"
 #include <stdio.h>
 #include <stddef.h>
 
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
 enum DeviceRecvType {
   DEVICE_RECV_TYPE_CHARM,
   DEVICE_RECV_TYPE_AMPI,
@@ -20,18 +27,21 @@ typedef struct DeviceRdmaInfo_ {
 } DeviceRdmaInfo;
 
 typedef struct DeviceRdmaOp_ {
-  int dest_pe;
   const void* dest_ptr;
   size_t size;
   DeviceRdmaInfo* info;
   void* src_cb;
   void* dst_cb;
   uint64_t tag;
+  int dest_pe;
+  int src_pe;
+  int src_mpi_rank;
+  int dest_mpi_rank;
 } DeviceRdmaOp;
 
 typedef struct DeviceRdmaOpMsg_ {
   char header[CmiMsgHeaderSizeBytes];
-  DeviceRdmaOp op;
+  DeviceRdmaOp* op;
 } DeviceRdmaOpMsg;
 #endif // CMK_CUDA
 

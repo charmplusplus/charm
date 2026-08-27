@@ -251,7 +251,7 @@ int _kq = -1;
 #if CMK_SHRINK_EXPAND
 extern void resumeAfterRealloc(void);
 extern char willContinue;
-extern int mynewpe;
+int mynewpe=0;
 extern int numProcessAfterRestart;
 CcsDelayedReply shrinkExpandreplyToken;
 extern char *_shrinkexpand_basedir;
@@ -598,7 +598,6 @@ int    Cmi_isOldProcess = 0; // means this process was already there
 static int    Cmi_mynewpe = 0;
 static int    Cmi_oldpe = 0;
 static int    Cmi_newnumnodes = 0;
-int    Cmi_myoldpe = 0;
 static int Cmi_charmrun_assigned_pe;
 #endif
 
@@ -653,11 +652,17 @@ static void parse_netstart(void)
   int nread;
   int port;
   ns = getenv("NETSTART");
+  int dummy;
+#if CMK_SHRINK_EXPAND
+  int* ptr = Cmi_isOldProcess == 1 ? &dummy : &Lrts_myNode;
+#else
+  int* ptr = &Lrts_myNode;
+#endif
   if (ns!=0) 
   {/*Read values set by Charmrun*/
         char Cmi_charmrun_name[1024];
         nread = sscanf(ns, "%d%s%d%d%d",
-                 &Lrts_myNode,
+                 ptr,
                  Cmi_charmrun_name, &Cmi_charmrun_port,
                  &Cmi_charmrun_pid, &port);
 	Cmi_charmrun_IP=skt_lookup_ip(Cmi_charmrun_name);
@@ -666,11 +671,9 @@ static void parse_netstart(void)
                 fprintf(stderr,"Error parsing NETSTART '%s'\n",ns);
                 exit(1);
         }
+    
 #if CMK_SHRINK_EXPAND
     Cmi_charmrun_assigned_pe = Lrts_myNode;
-    if (Cmi_isOldProcess) {
-      Cmi_myoldpe = Lrts_myNode;
-    }
 #endif
     if (getenv("CmiLocal") != NULL) {      /* ++local */
           /* CmiMyLocalRank is used for setting default cpu affinity */
@@ -1395,8 +1398,10 @@ static void open_charmrun_socket(void)
   dataskt=skt_datagram(&dataport, Cmi_os_buffer_size);
 #endif
   MACHSTATE2(5,"skt_connect at dataskt:%d Cmi_charmrun_port:%d",dataskt, Cmi_charmrun_port);
+  //printf("skt_connect at dataskt:%d Cmi_charmrun_port:%d",dataskt, Cmi_charmrun_port);
   Cmi_charmrun_fd = skt_connect(Cmi_charmrun_IP, Cmi_charmrun_port, 1800);
   MACHSTATE2(5,"Opened connection to charmrun at socket %d, dataport=%d", Cmi_charmrun_fd, dataport);
+  //printf("Opened connection to charmrun at socket %d, dataport=%d", Cmi_charmrun_fd, dataport);
   skt_tcp_no_nagle(Cmi_charmrun_fd);
 }
 
@@ -1434,7 +1439,9 @@ static void send_singlenodeinfo(void)
   memset(&me, 0, sizeof(me));
 
 #if CMK_SHRINK_EXPAND
-  me.nodeNo = ChMessageInt_new(Cmi_charmrun_assigned_pe);
+  me.nodeNo = ChMessageInt_new(Lrts_myNode);
+  //if (Cmi_isOldProcess && ChMessageInt(me.nodeNo) == 3)
+  //  exit(1);
 #else
   me.nodeNo = ChMessageInt_new(Lrts_myNode);
 #endif
@@ -1454,6 +1461,8 @@ static void send_singlenodeinfo(void)
      use non-locking version */
   ctrl_sendone_nolock("initnode", (const char *)&me, sizeof(me), NULL, 0);
   MACHSTATE1(5, "send initnode - dataport:%d", dataport);
+  //fprintf(stderr, "send initnode - dataport:%d", dataport);
+  //fflush(stderr);
 
   MACHSTATE(3, "initnode sent");
 }
@@ -1798,7 +1807,7 @@ void LrtsPostCommonInit(int everReturn)
         CmiAbort("Charm++ Fatal Error: interrupt mode does not work with default system memory allocator. Run with +netpoll to disable the interrupt.");
     }
 #endif
-  }       
+  }
 
 #if MEMORYUSAGE_OUTPUT
   memoryusage_counter = 0;
@@ -1904,7 +1913,7 @@ void ConverseCleanup(void)
 
   if (CmiMyPe() == 0) {
     if (willContinue) {
-      CcsSendDelayedReply(shrinkExpandreplyToken, 0, 0); //reply to CCS client
+      //CcsSendDelayedReply(shrinkExpandreplyToken, 0, 0); //reply to CCS client
       // wait for this message to receive, hack
       // TODO: figure out why this is important
       usleep(500);
@@ -2146,14 +2155,16 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #if CMK_SHRINK_EXPAND
   if (Cmi_isOldProcess == 1) {
     Lrts_myNode = Cmi_mynewpe;
-    Cmi_myoldpe = Cmi_oldpe;
+    Cmi_charmrun_assigned_pe = Lrts_myNode;
+    //if (Cmi_isOldProcess && Lrts_myNode == 3)
+    //  exit(1);
     Lrts_numNodes = Cmi_newnumnodes;
   }
 #endif
 
     /* NOTE: can not acutally call timer before timerInit ! GZ */
 #if CMK_SHRINK_EXPAND
-  MACHSTATE3(2,"After reorg  %d %d %d \n", Cmi_oldpe, Lrts_myNode, Lrts_numNodes);
+  CmiPrintf("After reorg  %d %d %d \n", Cmi_oldpe, Lrts_myNode, Lrts_numNodes);
 #endif
   MACHSTATE2(5,"Init: (netpoll=%d), (idlepoll=%d)",Cmi_netpoll,Cmi_idlepoll);
 

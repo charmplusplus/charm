@@ -15,7 +15,7 @@ mainmodule jacobi2d {
 
   array [2D] Jacobi {
     // Normal Charm++ entry methods
-    entry Jacobi(void);
+    entry Jacobi(int);
     entry void begin_iteration(void);
     entry void ghostsFromLeft(int width, double s[width]);
     entry void ghostsFromRight(int width,double s[width]);

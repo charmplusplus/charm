@@ -42,6 +42,29 @@ restarting of Charm++ programs. ...
     }	\
   }
 
+  #if CMK_SHRINK_EXPAND
+  extern char* se_avail_vector;
+  #endif
+
+//int   _shrinkExpandRestartHandlerIdx;
+
+
+struct GroupInfo
+{
+  CkGroupID gID;
+  int MigCtor;
+  std::string name;
+  bool present;
+
+  void pup(PUP::er& p)
+  {
+    p | gID;
+    p | MigCtor;
+    p | name;
+    p | present;
+  }
+};
+
 // utility functions to pup system global tables
 void CkPupROData(PUP::er &p);
 void CkPupMainChareData(PUP::er &p, CkArgMsg *args);
@@ -51,22 +74,36 @@ void CkPupNodeGroupData(PUP::er &p);
 void CkPupArrayElementsData(PUP::er &p, int notifyListeners=1);
 void CkPupProcessorData(PUP::er &p);
 void CkRemoveArrayElements();
+void CkRecvGroupROData(char* msg);
 //void CkTestArrayElements();
 
 // If writersPerNode <= 0 the number of writers is unchanged, if > 0, then set to
 // min(writersPerNode, CkMyNodeSize())
 void CkStartCheckpoint(const char* dirname, const CkCallback& cb,
                        bool requestStatus = false, int writersPerNode = 0);
+void CkStartRescaleCheckpoint(const char* dirname, const CkCallback& cb, 
+  std::vector<char> avail, bool requestStatus = false, int writersPerNode = 0);
 void CkRestartMain(const char* dirname, CkArgMsg* args);
+
 #if CMK_SHRINK_EXPAND
+int GetNewPeNumber(std::vector<char> avail);
 void CkResumeRestartMain(char *msg);
 #endif
+
 #if __FAULT__
 int  CkCountArrayElements();
 #endif
 
 #if CMK_SHRINK_EXPAND
-enum realloc_state : uint8_t { NO_REALLOC=0, REALLOC_MSG_RECEIVED=1, REALLOC_IN_PROGRESS=2 };
+enum realloc_state : uint8_t 
+{
+  NO_REALLOC=0, 
+  SHRINK_MSG_RECEIVED=1 << 0, 
+  EXPAND_MSG_RECEIVED=1 << 1,
+  SHRINK_IN_PROGRESS=1 << 2,
+  EXPAND_IN_PROGRESS=1 << 3
+};
+
 extern realloc_state pending_realloc_state;
 extern CkGroupID _lbmgr;
 #endif
