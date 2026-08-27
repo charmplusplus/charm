@@ -1,6 +1,10 @@
 #!/bin/bash
 
 CHARMBIN=$(cd "$(dirname "$0")" && pwd)
+# NOTE: this reads the checkout's top-level bin/include symlinks, which
+# point at the LAST build made in the tree. One build per checkout (as in
+# CI, one job per arm); after switching arms in a shared tree, re-run
+# `make -C <build> create_symlinks` or the wrong runtime's idiom is used.
 [[ -f "$CHARMBIN/../include/conv-mach-opt.sh" ]] && . "$CHARMBIN/../include/conv-mach-opt.sh" 2>/dev/null
 
 if [[ "$CMK_RECONVERSE" = "1" ]]
@@ -40,7 +44,9 @@ then
   else
     cmd=("${envpfx[@]}" "$prog" +pe "$p" "${args[@]}")
   fi
-  echo "testrun(reconverse): ${cmd[*]}"
+  # Echo with library paths unexpanded: the real values inline the whole
+  # inherited module environment (~1KB per line in HPC logs).
+  echo "testrun(reconverse): ${cmd[*]}" | sed "s|LD_LIBRARY_PATH=[^ ]*|LD_LIBRARY_PATH=<build>/lib:...|g"
   time "${cmd[@]}"
   exit $?
 fi
