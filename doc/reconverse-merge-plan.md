@@ -26,7 +26,7 @@ events, not dates: each stage unlocks when its predecessor merges.
 | 6 | **#3943** (record-replay repairs) to the reviewed line | after #3942 |
 | 7 | Re-pin `AUTOFETCH_RECONVERSE_TAG` to reconverse **main** | when reconverse#207 merges |
 | 8 | Merge #3942/#3943 to classic **main** too, then cut the freeze tag (last classic release) | order matters: fixes in before tag |
-| 8a | Silence CircleCI's "no configuration found" status on the reviewed line | DONE-in-part 2026-08-27: filtered stub config posts no status on this line while classic main keeps CircleCI; at the freeze, flip the project-wide "stop building" toggle (Kale's CircleCI login) and delete the stub |
+| 8a | Silence CircleCI's "no configuration found" status on the reviewed line | DONE 2026-08-27: Eric turned CircleCI off project-wide; the interim stub is removed. Classic main's ARM coverage moved to Actions (PR #3946: netlrts-linux-arm8, smp variant, mpi-linux-arm8 on ubuntu-24.04-arm) |
 
 ## After the core is stable on the reviewed line (deferred feature series, in order)
 
