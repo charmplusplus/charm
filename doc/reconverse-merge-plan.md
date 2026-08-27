@@ -26,7 +26,7 @@ events, not dates: each stage unlocks when its predecessor merges.
 | 6 | **#3943** (record-replay repairs) to the reviewed line | after #3942 |
 | 7 | Re-pin `AUTOFETCH_RECONVERSE_TAG` to reconverse **main** | when reconverse#207 merges |
 | 8 | Merge #3942/#3943 to classic **main** too, then cut the freeze tag (last classic release) | order matters: fixes in before tag |
-| 8a | Silence CircleCI's "no configuration found" status on the reviewed line | project-level "stop building" toggle in CircleCI settings — needs Kale's CircleCI login; cosmetic, non-blocking until then |
+| 8a | Silence CircleCI's "no configuration found" status on the reviewed line | DONE-in-part 2026-08-27: filtered stub config posts no status on this line while classic main keeps CircleCI; at the freeze, flip the project-wide "stop building" toggle (Kale's CircleCI login) and delete the stub |
 
 ## After the core is stable on the reviewed line (deferred feature series, in order)
 

@@ -1,0 +1,21 @@
+# Stub so CircleCI finds a valid configuration on the reviewed reconverse
+# line and stops posting a failing "no configuration found" status. The
+# single workflow is branch-filtered to classic main, which never matches
+# refs on this line, so nothing builds and no status is posted here.
+# Classic main carries its own full config, unaffected by this file.
+# At the classic freeze: flip CircleCI's project-wide "stop building"
+# toggle and delete this stub (plan item 8a).
+version: 2.1
+jobs:
+  never-runs:
+    machine:
+      image: ubuntu-2204:current
+    steps:
+      - run: echo "unreachable - workflow is branch-filtered to classic main"
+workflows:
+  classic-main-only:
+    jobs:
+      - never-runs:
+          filters:
+            branches:
+              only: main
