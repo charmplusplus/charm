@@ -452,7 +452,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: install-prerequisites
-      run: sudo apt-get update && sudo apt-get install -y libopenmpi-dev openmpi-bin
+      run: sudo apt-get update && sudo apt-get install -y mpich libmpich-dev
     - name: build
       run: ./build all-test mpi-linux-arm8 --with-production --enable-error-checking --enable-lbuserdata -j4 -g -Werror=vla
     - name: test
