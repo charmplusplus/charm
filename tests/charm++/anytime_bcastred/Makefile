@@ -11,6 +11,7 @@ bcastred.decl.h: bcastred.ci
 
 test: bcastred
 	$(call run, +p2 ./bcastred)
+	$(call run, +p2 ./bcastred -n 8 -i 200 -m 1 -c 8 )
 
 clean:
 	rm -rf *.decl.h *.def.h bcastred charmrun
