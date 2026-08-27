@@ -42,6 +42,7 @@ events, not dates: each stage unlocks when its predecessor merges.
 
 | # | Item | Notes |
 |---|---|---|
+| 13a | **Grow the CI tier toward real coverage** | standing item, good student-sized increments: chkpt, sdag, zerocopy, io, dynamic insertion/deletion, partitions ... each addition = one reviewed commit adding a dir to TEST_DIRS (and fixing what it flushes out). The current 5-test tier is a floor, not the support surface. |
 | 14 | **Parity matrix document** (classic vs reconverse: works / planned / tombstoned) | LCW + Windows-multicore are "planned", message-logging FT and dead code are tombstones |
 | 15 | Joint **locmgr review** of Aditya's e417584dd (notes: recharm/NOTES-locmgr-review.md) | Kale + Claude |
 | 16 | Reconcile **#3939** with Aditya | Kale points him at the issue |

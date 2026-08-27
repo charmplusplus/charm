@@ -1,8 +1,11 @@
 name: reconverse-ci
 
-# CI for the reviewed reconverse line. Principle: a feature or platform is
-# supported iff a job here tests it; dropping support = deleting its job in a
-# reviewed (tombstone) commit. Correctness-gated only -- never timing-gated:
+# CI for the reviewed reconverse line. The tier below defines what CI
+# GUARANTEES; it is a floor, not the support surface. Features without a
+# test here are supported with coverage debt -- the tier is meant to GROW
+# toward them, and dropping support for anything is an explicit reviewed
+# act (a tombstone commit deleting its test), never a side effect of a
+# test not yet existing. Correctness-gated only -- never timing-gated:
 # hosted runners are noisy. Real-fabric behavior (IB, Slingshot) is NOT
 # covered here; runtime-core PRs get a manual run on an HPC site by a
 # reviewer (see PR template) until a sanctioned site runner exists.
