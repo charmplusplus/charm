@@ -31,6 +31,21 @@ events, not dates: each stage unlocks when its predecessor merges.
 
 ## After the core is stable on the reviewed line (deferred feature series, in order)
 
+**Validation protocol for the GPU-touching series (items 9, 10, 11), per
+Kale 2026-08-28:** CI provides build gates and GPU-free tests only (the
+path-filtered `reconverse-cuda` workflow builds both CUDA paths with
+install/naming assertions; no hosted runner has a GPU). Runtime evidence
+comes from people: (a) the author side ships every stage with at least
+one recorded real-GPU run (the Anvil pre-validation loop; e.g. 9.1's
+A100 smoke), and (b) reviewers test on the GPU types and networks of
+their choice — AMD/Frontier being the one that actually exercises the
+portability claim — recording where they ran in the PR template's
+HPC-site field, and **not approving until satisfied**. That approval
+discipline is deliberately manual; the template field makes it visible
+rather than enforced. Item 10 additionally needs multi-node runs with
+job resizing — login-node or single-node evidence is not sufficient
+there.
+
 | # | Item | Notes |
 |---|---|---|
 | 9 | **GPU device-to-device (LCI) + Kokkos** PR series | restores the branch's HAPI unification; revisit the `cudahybridapi`→`hybridapi` rename here, where the HIP path actually lands |
