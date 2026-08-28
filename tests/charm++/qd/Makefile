@@ -16,6 +16,9 @@ test: all
 	$(call run, ./qdbench +p2)
 	$(call run, ./qdbench +p4)
 
+testp: all
+	$(call run, ./qdbench +p$(P))
+
 smptest: all
 	$(call run, ./qdbench +p4 ++ppn 2)
 
