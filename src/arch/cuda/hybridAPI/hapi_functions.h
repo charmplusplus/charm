@@ -50,7 +50,9 @@ AMPI_CUSTOM_FUNC(void, hapiAddCallback, hapiStream_t, void*, void*)
 // AMPI_CUSTOM_FUNC(cudaError_t, hapiMemcpy2DAsync, void*, size_t, const void*, size_t, size_t, size_t, enum cudaMemcpyKind, cudaStream_t)
 
 // Kernel launch wrapper
+#ifdef HAPI_CUPTI_LB  /* pairs with HAPI_LAUNCH_KERNEL_WRAPPER; lands with plan item 11 */
 AMPI_CUSTOM_FUNC(hapiError_t, hapiLaunchKernel, const void*, dim3, dim3, void**, size_t, hapiStream_t)
+#endif
 
 // Explicit memory allocations using pinned memory pool.
 AMPI_CUSTOM_FUNC(hapiError_t, hapiPoolMalloc, void**, size_t)
