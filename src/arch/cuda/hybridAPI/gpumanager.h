@@ -1,15 +1,18 @@
 #ifndef __GPUMANAGER_H_
 #define __GPUMANAGER_H_
 
-#include <cuda_runtime.h>
 #include <vector>
 #include <string>
 #include <unordered_map>
 
+#include "hapi_portable.h"
 #include "converse.h"
 #include "hapi.h"
 #include "hapi_impl.h"
 #include "devicemanager.h"
+
+#include <unordered_map>
+#include <queue>
 
 // Initial size of the user-addressed portion of host/device buffer arrays;
 // the system-addressed portion of host/device buffer arrays (used when there
@@ -24,19 +27,26 @@
 // CUDA IPC Event related struct, stored in host-wide shared memory.
 // One object is used for each interaction/message between sender and receiver.
 // The number of these objects per device will be equal to the CUDA IPC event pool size.
-struct cuda_ipc_event_shared {
-  cudaIpcEventHandle_t src_event_handle;
-  cudaIpcEventHandle_t dst_event_handle;
+struct hapi_ipc_event_shared {
+  hapiIpcEventHandle_t src_event_handle;
+  hapiIpcEventHandle_t dst_event_handle;
   bool src_flag; // Unused for now
   bool dst_flag;
   pthread_mutex_t lock;
 };
 
+#if CMK_LBDB_ON
+struct CuptiBufferItem {
+  uint8_t* buffer;
+  size_t validSize;
+};
+#endif
+
 // Per-device struct containing data for CUDA IPC.
 // Use SMP lock in DeviceManager if needed.
-struct cuda_ipc_device_info {
-  std::vector<cudaEvent_t> src_event_pool;
-  std::vector<cudaEvent_t> dst_event_pool;
+struct hapi_ipc_device_info {
+  std::vector<hapiEvent_t> src_event_pool;
+  std::vector<hapiEvent_t> dst_event_pool;
   // Flag per event pair (0: free, 1: used)
   std::vector<int> event_pool_flags;
   // Offset in device comm buffer (per event)
@@ -87,7 +97,7 @@ struct GPUManager {
   // specifies an invalid buffer ID.
   int next_buffer_;
 
-  cudaStream_t *streams_;
+  hapiStream_t *streams_;
   int n_streams_;
   int last_stream_id_;
 
@@ -121,9 +131,6 @@ struct GPUManager {
   CmiNodeLock device_mapping_lock;
 #endif
 
-#ifdef HAPI_CUDA_CALLBACK
-#endif
-
   int device_count; // GPU devices usable by this process (could be less than the number of visible devices)
   int device_count_on_physical_node;
   int pes_per_device;
@@ -134,8 +141,12 @@ struct GPUManager {
   // Device communication buffer
   size_t comm_buffer_size;
 
+  // Device load-balancing buffer
+  size_t lb_buffer_size;
+
   // POSIX shared memory for sharing CUDA IPC handles between processes on the same host
   bool use_shm;
+  bool test_field;
   void* shm_ptr;
   std::string shm_name;
   int shm_file;
@@ -144,12 +155,23 @@ struct GPUManager {
   void* shm_my_ptr;
 
   // CUDA IPC event pool
-  int cuda_ipc_event_pool_size_pe;
-  int cuda_ipc_event_pool_size_total;
+  int hapi_ipc_event_pool_size_pe;
+  int hapi_ipc_event_pool_size_total;
 
   // CUDA IPC handles opened for processes on the same node
   // Vector size is equal to the number of devices on the physical node
-  std::vector<cuda_ipc_device_info> cuda_ipc_device_infos;
+  std::vector<hapi_ipc_device_info> hapi_ipc_device_infos;
+
+  //CUPTI load balancing
+#ifdef CMK_LBDB_ON
+  std::unordered_map<uint32_t, uint64_t> cupti_correlation_db_;//correlationID -> ObjectID
+
+  std::unordered_map<uint64_t, uint64_t> cupti_obj_gpu_times_;//objectID -> accumulated GPU time in ns
+  
+  std::queue<CuptiBufferItem> cupti_buffer_queue_;
+
+  bool cupti_initialized_;
+#endif
 
   void init() {
     next_buffer_ = NUM_BUFFERS;
@@ -189,8 +211,8 @@ struct GPUManager {
     shm_my_ptr = NULL;
 
     // Number of CUDA IPC events per PE
-    cuda_ipc_event_pool_size_pe = -1;
-    cuda_ipc_event_pool_size_total = -1;
+    hapi_ipc_event_pool_size_pe = -1;
+    hapi_ipc_event_pool_size_total = -1;
 
     // Allocate host/device buffers array (both user and system-addressed)
     host_buffers_ = new void*[NUM_BUFFERS*2];
@@ -245,7 +267,7 @@ struct GPUManager {
     // Destroy streams
     if (streams_) {
       for (int i = 0; i < n_streams_; i++) {
-        hapiCheck(cudaStreamDestroy(streams_[i]));
+        hapiCheck(hapiStreamDestroy(streams_[i]));
       }
     }
 
@@ -277,9 +299,9 @@ struct GPUManager {
   // Returns the number of created streams.
   int createStreams() {
     int device;
-    cudaDeviceProp device_prop;
-    hapiCheck(cudaGetDevice(&device));
-    hapiCheck(cudaGetDeviceProperties(&device_prop, device));
+    hapiDeviceProp device_prop;
+    hapiCheck(hapiGetDevice(&device));
+    hapiCheck(hapiGetDeviceProperties(&device_prop, device));
 
     int new_n_streams = 0;
 
@@ -311,7 +333,7 @@ struct GPUManager {
     // Allocate total physical streams between GPU managers sharing a device...
     // i.e. PEs / num devices
     int device_count;
-    hapiCheck(cudaGetDeviceCount(&device_count));
+    hapiCheck(hapiGetDeviceCount(&device_count));
     int pes_per_device = CmiNumPesOnPhysicalNode(0) / device_count;
     pes_per_device = pes_per_device > 0 ? pes_per_device : 1;
     new_n_streams =  (new_n_streams + pes_per_device - 1) / pes_per_device;
@@ -327,9 +349,9 @@ struct GPUManager {
       return n_streams_;
     }
 
-    cudaStream_t* old_streams = streams_;
+    hapiStream_t* old_streams = streams_;
 
-    streams_ = new cudaStream_t[new_n_streams];
+    streams_ = new hapiStream_t[new_n_streams];
 
     int i = 0;
     // Copy old streams
@@ -340,7 +362,7 @@ struct GPUManager {
 
     // Create new streams
     for (; i < new_n_streams; i++) {
-      hapiCheck(cudaStreamCreate(&streams_[i]));
+      hapiCheck(hapiStreamCreate(&streams_[i]));
     }
 
     // Update
@@ -350,7 +372,7 @@ struct GPUManager {
     return n_streams_;
   }
 
-  cudaStream_t getNextStream() {
+  hapiStream_t getNextStream() {
     if (streams_ == NULL)
       return NULL;
 
@@ -358,7 +380,7 @@ struct GPUManager {
     return streams_[last_stream_id_];
   }
 
-  cudaStream_t getStream(int i) {
+  hapiStream_t getStream(int i) {
     if (streams_ == NULL)
       return NULL;
 
@@ -418,7 +440,7 @@ struct GPUManager {
 
       if (device_buffers_[index] == NULL) {
         // allocate device memory
-        hapiCheck(cudaMalloc((void **)&device_buffers_[index], size));
+        hapiCheck(hapiMalloc((void **)&device_buffers_[index], size));
 
 #ifdef HAPI_DEBUG
         CmiPrintf("[HAPI] allocated buffer %d at %p, time: %.2f, size: %zu\n",
@@ -438,8 +460,8 @@ struct GPUManager {
       host_buffers_[index] = bi.host_buffer;
 
       if (bi.transfer_to_device) {
-        hapiCheck(cudaMemcpyAsync(device_buffers_[index], host_buffers_[index], size,
-                                  cudaMemcpyHostToDevice, wr->stream));
+        hapiCheck(hapiMemcpyAsync(device_buffers_[index], host_buffers_[index], size,
+                                  hapiMemcpyHostToDevice, wr->stream));
 
 #ifdef HAPI_DEBUG
         CmiPrintf("[HAPI] transferring buffer %d from host to device, time: %.2f, "
@@ -457,8 +479,8 @@ struct GPUManager {
       size_t size = bi.size;
 
       if (bi.transfer_to_host) {
-        hapiCheck(cudaMemcpyAsync(host_buffers_[index], device_buffers_[index], size,
-                                  cudaMemcpyDeviceToHost, wr->stream));
+        hapiCheck(hapiMemcpyAsync(host_buffers_[index], device_buffers_[index], size,
+                                  hapiMemcpyDeviceToHost, wr->stream));
 
 #ifdef HAPI_DEBUG
         CmiPrintf("[HAPI] transferring buffer %d from device to host, time %.2f, "
@@ -475,7 +497,7 @@ struct GPUManager {
       int index = bi.id;
 
       if (bi.need_free) {
-        hapiCheck(cudaFree(device_buffers_[index]));
+        hapiCheck(hapiFree(device_buffers_[index]));
         device_buffers_[index] = NULL;
 
 #ifdef HAPI_DEBUG
