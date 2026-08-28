@@ -14,9 +14,9 @@ libs: libhybridapi.a
 install: libhybridapi.a
 	cp libhybridapi.a $(CHARMDIR)/lib
 
-libhybridapi.a: hybridapi.o buddy_allocator.o ck.o
+libhybridapi.a: hybridapi.o buddy_allocator.o
 	-rm -f $@
-	ar q $@ hybridapi.o buddy_allocator.o ck.o
+	ar q $@ hybridapi.o buddy_allocator.o
 
 hybridapi.o: hapi_impl.cpp hapi_impl.h hapi_portable.h gpumanager.h devicemanager.h buddy_allocator.h hapi.h hapi_nvtx.h
 	$(CHARMC) $(FLAGS) $(INC) -o $@ -c $<

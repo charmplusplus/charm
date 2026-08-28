@@ -13,6 +13,10 @@
 /******************** DEPRECATED ********************/
 // Create a hapiWorkRequest object for the user. The runtime manages the associated
 // memory, so the user only needs to set it up properly.
+/* Self-sufficient for any includer (AMPI pulls this in with only
+ * cuda_runtime.h in scope): the hapi* type macros live here. */
+#include "hapi_portable.h"
+
 AMPI_CUSTOM_FUNC(hapiWorkRequest*, hapiCreateWorkRequest, void)
 
 /******************** DEPRECATED ********************/
