@@ -25,7 +25,7 @@
 #include "hapi_nvtx.h"
 #endif
 
-#if CMK_LBDB_ON
+#ifdef HAPI_CUPTI_LB
 #if CMK_CUDA
 #include <cupti.h>
 #endif
@@ -106,6 +106,12 @@ CpvDeclare(int, my_device); // GPU device that this thread is mapped to
 CpvDeclare(int, my_device_id); // index to the deviceManager that stores info about the device
 CpvDeclare(bool, device_rep); // Is this PE a device representative thread? (1 per device)
 
+// Returns the local rank of the logical node (process) that the given PE belongs to
+static inline int CmiNodeRankLocal(int pe) {
+  // Logical node index % Number of logical nodes per physical node
+  return CmiNodeOf(pe) % (CmiNumNodes() / CmiNumPhysicalNodes());
+}
+
 // Returns the local rank of the logical node that I belong to
 static inline int CmiMyNodeRankLocal() {
   return CmiNodeRankLocal(CmiMyPe());
@@ -130,7 +136,7 @@ static void shmCleanup();
 static void ipcHandleCreate();
 static void ipcHandleOpen();
 
-#ifdef CMK_LBDB_ON
+#ifdef HAPI_CUPTI_LB
 
 #if CMK_CUDA
 static void CUPTIAPI cuptiBufferRequested(uint8_t **buffer, size_t *size, size_t *maxNumRecords) {
@@ -238,14 +244,14 @@ static void hapiInitCsv(char** argv) {
   // Create and initialize GPU Manager object
   CsvInitialize(GPUManager, gpu_manager);
   CsvAccess(gpu_manager).init();
-  #if CMK_LBDB_ON
+  #ifdef HAPI_CUPTI_LB
     if (LBHasBalancersRegistered() && _lb_args.statsOn())
       hapiCuptiInit();
   #endif
 }
 
 
-#ifdef CMK_LBDB_ON
+#ifdef HAPI_CUPTI_LB
 
 void hapiProcessCuptiBuffers() {
   #if CMK_CUDA
@@ -644,7 +650,7 @@ void recordEvent(hapiStream_t stream, const CkCallback& cb, void* cb_msg, hapiWo
   hapiEvent_t ev;
   auto& hapi_event_pool_local = CpvAccess(hapi_event_pool);
   if(hapi_event_pool_local.size() == 0) {
-  #if CMK_LBDB_ON
+  #ifdef HAPI_CUPTI_LB
     hapiEventCreateWithFlags(&ev, hapiEventDefault);
   #else
     hapiEventCreateWithFlags(&ev, hapiEventDisableTiming);
@@ -1613,7 +1619,7 @@ void hapiPollEvents(void* param) {
     if (hapiEventQuery(hev.event) == hapiSuccess) {
       queue.pop(); // TODO: investigate possible race condition with charm4py futures - temporarily resolved by popping here
 
-#if CMK_LBDB_ON
+#ifdef HAPI_CUPTI_LB
       if (hev.obj) {
         // CmiPrintf("should not be printed w/o hapi hapi callback \n");
         float gpu_time;
@@ -1677,7 +1683,7 @@ hapiStream_t hapiGetStream() {
 
   return ret;
 }
-#if CMK_LBDB_ON
+#ifdef HAPI_CUPTI_LB
 // Lightweight HAPI, to be invoked after data transfer or kernel execution.
 void hapiRecordTime(hapiStream_t stream, hapiEvent_t start) {
   Chare* obj = CkActiveObj();

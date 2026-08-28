@@ -35,7 +35,7 @@ struct hapi_ipc_event_shared {
   pthread_mutex_t lock;
 };
 
-#if CMK_LBDB_ON
+#ifdef HAPI_CUPTI_LB
 struct CuptiBufferItem {
   uint8_t* buffer;
   size_t validSize;
@@ -163,7 +163,7 @@ struct GPUManager {
   std::vector<hapi_ipc_device_info> hapi_ipc_device_infos;
 
   //CUPTI load balancing
-#ifdef CMK_LBDB_ON
+#ifdef HAPI_CUPTI_LB
   std::unordered_map<uint32_t, uint64_t> cupti_correlation_db_;//correlationID -> ObjectID
 
   std::unordered_map<uint64_t, uint64_t> cupti_obj_gpu_times_;//objectID -> accumulated GPU time in ns

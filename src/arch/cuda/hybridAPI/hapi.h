@@ -2,6 +2,12 @@
 #define __HAPI_H_
 #include "hapi_portable.h"
 
+/* HAPI_CUPTI_LB: per-object GPU time attribution (CUPTI activity tracing,
+ * event-based kernel timing, launch wrappers) feeding GPU-aware load
+ * balancing. Dormant -- nothing defines it -- until the GPU-LB series
+ * (plan item 11) enables it together with its ck-ldb counterparts
+ * (setObjGPUTime and friends, LBHasBalancersRegistered). */
+
 /* See hapi_functions.h for the majority of function declarations provided
  * by the Hybrid API. */
 
@@ -245,7 +251,7 @@ static inline hapiError_t hapiFreeHost_Pool(void* ptr, bool pool) {
 }
 
 void hapiRecordTime(hapiStream_t stream, hapiEvent_t start);
-#ifdef CMK_LBDB_ON
+#ifdef HAPI_CUPTI_LB
 void hapiCuptiInit();
 void hapiCuptiFinalize();
 uint64_t hapiCuptiPushObjCorrelation();
@@ -254,7 +260,7 @@ void hapiProcessCuptiBuffers();
 void hapiClearCuptiData();
 #endif
 
-#ifdef CMK_LBDB_ON
+#ifdef HAPI_CUPTI_LB
 #define HAPI_LAUNCH_KERNEL_WRAPPER(call, stream)\
     hapiEvent_t start;\
     hapiEventCreate(&start);\
@@ -266,7 +272,7 @@ void hapiClearCuptiData();
     call;
 #endif
 
-#ifdef CMK_LBDB_ON
+#ifdef HAPI_CUPTI_LB
 #define CUPTI_LAUNCH_WRAPPER(call)\
   hapiCuptiPushObjCorrelation();\
   call;\
