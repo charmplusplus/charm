@@ -88,14 +88,21 @@ freeze tag on main. Order:
    `.github/workflows/ci.yaml`: its trigger is `branches: [main]`, so
    after step 4 it would otherwise start running the classic matrix on
    every PR to the renamed branch.
-4. Rename choreography: GitHub-rename `main` -> `classic` (protection
-   and redirects move with it); rename `reviewed-with-reconverse` ->
-   `main` (its protection and required checks move with it); set the
-   default branch. No open PRs may target old main at this point.
-5. Announcement to users, which MUST state: existing clones tracking
-   `origin/main` will receive the reconverse tree on their next pull;
-   classic dependents run `git checkout classic` (and update anything
-   pinned to the branch name `main`).
+4. Rename `main` -> `classic` (protection moves with it) and set the
+   DEFAULT branch to `reviewed-with-reconverse`. Deliberately do NOT
+   rename this line to `main` yet (amendment, Kale 2026-08-28): with no
+   branch named `main`, every stale consumer -- old clones pulling,
+   scripts pinned to origin/main -- fails loudly ("couldn't find remote
+   ref main") instead of silently receiving a different runtime's tree.
+   No open PRs may target old main at this point.
+5. Announcement to users: `main` no longer exists; classic dependents
+   run `git checkout classic`; new development and releases are on the
+   default branch `reviewed-with-reconverse`.
+5a. Adopting the name `main` for this line happens later as its own
+   small, announced event, once the loud-failure window has done its
+   job. Until then the reconverse workflows' branch triggers need no
+   changes, and the deleted classic ci.yaml could never have fired
+   anyway (its `branches: [main]` matches nothing here).
 6. Release: a release tag on the new main when the group deems it
    ready. Releasing does not require waiting for anything beyond this
    sequence; NAMD/ChaNGa validation continues in parallel and gates
