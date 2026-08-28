@@ -1296,6 +1296,21 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
         hapiCheck(hapiMemcpyAsync(alloc_comm_buffer, buffers[i]->ptr, buffers[i]->cnt,
               hapiMemcpyDeviceToDevice, buffers[i]->hapi_stream));
         ipcDebugSync("send 1: stage src -> comm_buffer", buffers[i]->hapi_stream);
+
+        // The completion callback's contract is "the source buffer is safe to
+        // reuse", and for a staged send that is the moment the staging copy
+        // above retires -- not when the receiver finishes reading the staged
+        // block, a full IPC round later. Fire it here on the sender's stream
+        // and ship an ignore callback, so the receiver does not fire it a
+        // second time. Every delivery of a STAGED payload reads the staged
+        // block rather than the source buffer (including same-process
+        // deliveries: a process's own devices are self-mapped in the comm
+        // buffer table), so nothing downstream depends on the source after
+        // this copy.
+        if (buffers[i]->cb.type != CkCallback::ignore) {
+          hapiAddCallback(buffers[i]->hapi_stream, buffers[i]->cb);
+          buffers[i]->cb = CkCallback(CkCallback::ignore);
+        }
       }
 
       // Record the event the receiver waits on before it reads. Staged, that

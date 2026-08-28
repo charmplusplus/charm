@@ -2004,6 +2004,15 @@ static void ipcHandleCreate() {
   // Create CUDA IPC events and store them locally (in hapi_ipc_device_info),
   // and create corresponding IPC handles in shared memory
   hapi_ipc_device_info& my_device_info = csv_gpu_manager.hapi_ipc_device_infos[csv_gpu_manager.device_count * CmiMyNodeRankLocal() + cpv_my_device_id];
+
+  // Self-map this device's comm buffer in the peer table. ipcHandleOpen
+  // skips the owning process (a process cannot cudaIpcOpen its own handle),
+  // which left own-device entries with a null buffer -- and a STAGED payload
+  // delivered same-process (an unconfirmed destination that stayed local, or
+  // a target that migrated home) reads exactly this entry. The events in
+  // this slot are already the local originals, so the mapping is the only
+  // missing piece.
+  my_device_info.buffer = comm_buffer->base_ptr;
   hapi_ipc_event_shared* shm_event_shared = (hapi_ipc_event_shared*)((char*)shm_mem_handle + sizeof(hapiIpcMemHandle_t));
 
   // Each slot carries a pthread mutex that lives in the shared-memory region
