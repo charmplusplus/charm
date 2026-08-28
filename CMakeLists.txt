@@ -1169,6 +1169,14 @@ if(NOT ${NETWORK} STREQUAL "mpi" AND NOT ${NETWORK} MATCHES "gni-" AND NOT ${NET
         # file once), so stripping here is authoritative.
         file(APPEND ${optfile_sh} "CMK_LIBS=\"\${CMK_LIBS//-lckqt/}\"\n")
     endif()
+    if(RECONVERSE AND BUILD_CUDA)
+        # liblci.so uses the CUDA driver API directly, so every charmc-linked
+        # binary needs -lcuda under reconverse+CUDA. Link against the toolkit
+        # stub (standard NVIDIA practice for non-GPU build nodes); the real
+        # driver resolves at runtime on GPU nodes. Classic never links LCI
+        # and its link line is untouched.
+        file(APPEND ${optfile_sh} "CMK_LIBS=\"$CMK_LIBS -L${CUDA_DIR}/lib64/stubs -lcuda\"\n")
+    endif()
 endif()
 
 if(${BUILD_SHARED})

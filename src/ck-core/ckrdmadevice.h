@@ -132,6 +132,8 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
 void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers);
 
 extern "C" {
+  /* implementations arrive with stage 9.2 (reconverse D2D in ckrdmadevice.C);
+   * the init.C registration site is gated to match */
   void* loopback_bridge(void* arg);
   extern int loopback_handler;
 }
