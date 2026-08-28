@@ -18,7 +18,7 @@ jobs:
     timeout-minutes: 90
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: Run build
       run: ./buildold all-test netlrts-linux-x86_64 -g -j4 --with-production
     - name: test
@@ -31,7 +31,7 @@ jobs:
   changa_netlrts-linux-x86_64:
     runs-on: ubuntu-latest 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: build-charm++
       run: ./build ChaNGa netlrts-linux-x86_64 -g -j4 --with-production
     - name: build-changa
@@ -51,7 +51,7 @@ jobs:
     timeout-minutes: 45
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: build
       run: |
         sudo apt-get update
@@ -65,8 +65,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v5
-    -
-      uses: actions/setup-python@v4
+    - uses: actions/setup-python@v6
       with:
         python-version: '3.x'
     - name: Install prerequisites
@@ -80,7 +79,7 @@ jobs:
     timeout-minutes: 90
     runs-on: ubuntu-22.04  #  ubuntu-latest does not work
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: install-prerequisites
       run: sudo apt-get update && sudo apt-get install -y mpich libmpich-dev
     - name: build
@@ -96,7 +95,7 @@ jobs:
     timeout-minutes: 90
     runs-on: ubuntu-22.04  #  ubuntu-latest does not work
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: install-prerequisites
       run: sudo apt-get update && sudo apt-get install -y mpich libmpich-dev
     - name: build
@@ -108,7 +107,7 @@ jobs:
     timeout-minutes: 60
     runs-on: macos-15-intel
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: build-only
       run: ./build LIBS multicore-darwin-x86_64 -g -j3 --with-production --enable-tracing
 #    - name: test
@@ -130,7 +129,7 @@ jobs:
   #   timeout-minutes: 60
   #   runs-on: macos-latest
   #   steps:
-  #   - uses: actions/checkout@v4
+  #   - uses: actions/checkout@v5
   #   - name: build
   #     run: ./build LIBS multicore-darwin-arm8 -g -j3 --with-production --enable-tracing
   #   - name: test
@@ -155,7 +154,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: install-prerequisites
       if: ${{ env.namd_secret != '' }}
       run: |
@@ -210,7 +209,7 @@ jobs:
     timeout-minutes: 60
     runs-on: macos-15-intel
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: build-only
       run: ./build all-test netlrts-darwin-x86_64 --build-shared --with-production --enable-error-checking --enable-lbuserdata -j3 -g -Werror=vla
       # TODO: this should build tests with "-charm-shared". See #2735 on why this is not done currently.
@@ -224,7 +223,7 @@ jobs:
   #   timeout-minutes: 60
   #   runs-on: macos-latest
   #   steps:
-  #   - uses: actions/checkout@v4
+  #   - uses: actions/checkout@v5
   #   - name: build
   #     run: ./build all-test netlrts-darwin-arm8 --build-shared --with-production --enable-error-checking --enable-lbuserdata -j3 -g -Werror=vla
   #     # TODO: this should build tests with "-charm-shared". See #2735 on why this is not done currently.
@@ -237,7 +236,7 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: install-prerequisites
       run: |
         sudo dpkg --add-architecture i386
@@ -255,7 +254,7 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: build
       run: ./build all-test netlrts-linux-x86_64 --with-production --enable-error-checking --enable-lbuserdata -j3 -g -Werror=vla
       # TODO: this should build tests with "-charm-shared". See #2735 on why this is not done currently.
@@ -268,7 +267,7 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: build
       run: ./build all-test netlrts-linux-x86_64 smp --with-production --enable-error-checking --enable-lbuserdata -j3 -g -Werror=vla
       # TODO: this should build tests with "-charm-shared". See #2735 on why this is not done currently.
@@ -281,7 +280,7 @@ jobs:
     timeout-minutes: 90
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: build
       run: ./build all-test netlrts-linux-x86_64 syncft -j2 -g
     - name: test
@@ -312,7 +311,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: Install Spack
       run: |
         pwd
@@ -358,7 +357,7 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-22.04
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v5
     # Uncomment the lines below to set up a tmate session for debugging.
     # See https://github.com/marketplace/actions/debugging-with-tmate for details.
     # This can't be enabled all the time as the tmate session will wait for a user to connect before running
@@ -403,7 +402,7 @@ jobs:
     timeout-minutes: 45
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: install-prerequisites
       run: |
         sudo apt-get update
@@ -431,7 +430,7 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-24.04-arm
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: build
       run: ./build all-test netlrts-linux-arm8 --with-production --enable-error-checking --enable-lbuserdata -j4 -g -Werror=vla
     - name: test
@@ -443,7 +442,7 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-24.04-arm
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: build
       run: ./build all-test netlrts-linux-arm8 smp --with-production --enable-error-checking --enable-lbuserdata -j4 -g -Werror=vla
     - name: test
@@ -458,7 +457,7 @@ jobs:
       # The runner has 4 vCPUs; let Open MPI oversubscribe for wider test shapes.
       OMPI_MCA_rmaps_base_oversubscribe: "true"
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: install-prerequisites
       # openmpi, as the retired CircleCI job used: Ubuntu 24.04's mpich is
       # built on the ch4:ucx device, which crashes at startup on these runners.
@@ -479,7 +478,7 @@ jobs:
         shell: msys2 {0}
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - uses: msys2/setup-msys2@v2
       with:
         msystem: MINGW64
