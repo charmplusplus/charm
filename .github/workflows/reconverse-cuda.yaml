@@ -13,6 +13,7 @@ on:
     branches: [reviewed-with-reconverse]
     paths:
       - 'src/arch/cuda/**'
+      - 'tests/charm++/cuda/**'
       - 'src/arch/common/conv-mach-cuda.*'
       - 'src/arch/common/special.sh'
       - 'src/ck-core/ckrdmadevice.*'
@@ -24,6 +25,7 @@ on:
     branches: [reviewed-with-reconverse]
     paths:
       - 'src/arch/cuda/**'
+      - 'tests/charm++/cuda/**'
       - 'src/arch/common/conv-mach-cuda.*'
       - 'src/arch/common/special.sh'
       - 'src/ck-core/ckrdmadevice.*'
@@ -53,6 +55,14 @@ jobs:
         run: |
           export CUDATOOLKIT_HOME=/usr
           make -j4 -C netlrts-linux-x86_64-cuda/examples/charm++/cuda OPTS="-g"
+      - name: hapitest compiles
+        # The stage 9.1 acceptance test. Running it needs a GPU, but compiling
+        # it is itself a check: hapitest.C is built by charmc, so this is the
+        # gate on hapi_portable.h staying self-sufficient for user code.
+        run: |
+          make -j4 -C netlrts-linux-x86_64-cuda/tests/charm++/cuda/hapitest \
+            GPU=cuda CUDATOOLKIT_HOME=/usr OPTS="-g"
+
       - name: legacy buildold path
         run: |
           rm -rf netlrts-linux-x86_64-cuda
