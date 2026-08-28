@@ -5,6 +5,7 @@ module CkLocation {
 
   message CkArrayElementMigrateMessage {
     char packData[];
+    size_t gpuManifest[];
   };
 
   message CkArrayElementIntraProcessMigrateMessage {
@@ -35,7 +36,8 @@ module CkLocation {
 #ifdef CMK_CUDA
 #if CMK_CUDA
     entry [expedited, threaded] void sendGPUMsg(CmiUInt8 id);
-    entry [expedited] void immigrateGPU(CmiUInt8 id, int size, nocopydevice char data[size]);
+    entry [expedited] void immigrateGPU(CmiUInt8 id, int size, nocopydevice char data[size], int srcPe);
+    entry [expedited] void finishGPUSend(CmiUInt8 id);
     entry [expedited] void immigrateGPUHandle(CkArrayElementMigrateHandleMessage *msg);
     entry [expedited] void finalizeGPUMigrate(CkLocMgrFinalizeMsg* msg);
     entry [expedited] void ackGPUMigrate(CmiUInt8 id);

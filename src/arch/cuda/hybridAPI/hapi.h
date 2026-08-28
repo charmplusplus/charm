@@ -321,6 +321,21 @@ void hapiIpcFlushImportCache();
 // hits vs misses) to stdout. Enabled by CHARM_ZC_STATS.
 void hapiIpcReportStats();
 
+/*** Migration arena registry ***/
+
+// An arena is one device allocation holding a migrated chare's rebound
+// buffers (see PUP::er::pup_buffer_device): the payload landed in it and the
+// chare's pointers aim into it. Registered by the migration unpack with the
+// number of live rebound buffers; each hapiFreeMigratable of an interior
+// pointer decrements that count, and the arena is freed when it reaches zero.
+void hapiArenaRegister(void* base, size_t extent, size_t liveBuffers);
+
+// Free a device buffer that may be arena-interior (a pointer rebound by
+// pup_buffer_device) or an ordinary allocation -- safe for both, so
+// applications using pup_buffer_device free every such buffer through this
+// instead of hapiFree.
+void hapiFreeMigratable(void* ptr);
+
 #ifdef CMK_LBDB_ON
 void hapiCuptiInit();
 void hapiCuptiFinalize();

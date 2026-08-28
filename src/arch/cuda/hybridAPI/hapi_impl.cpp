@@ -8,6 +8,7 @@
 #include <atomic>
 #include <vector>
 #include <set>
+#include <map>
 #include <mutex>
 #include <unistd.h>
 #include <sys/mman.h>
@@ -2223,6 +2224,54 @@ void hapiIpcReportStats() {
             (int)getpid(), staged, direct, hits, misses,
             csv_gpu_manager.ipc_direct_threshold,
             (int)csv_gpu_manager.ipc_cache_imports);
+}
+
+/*** Migration arena registry (see hapi.h) ***/
+
+namespace {
+struct HapiArenaRec {
+  size_t extent;
+  size_t live;
+};
+// Ordered by base so an interior pointer resolves with upper_bound. Shared by
+// every PE in the process (SMP threads included), hence the mutex.
+std::map<char*, HapiArenaRec> hapi_arena_registry;
+std::mutex hapi_arena_registry_lock;
+}
+
+void hapiArenaRegister(void* base, size_t extent, size_t liveBuffers) {
+  std::lock_guard<std::mutex> g(hapi_arena_registry_lock);
+  hapi_arena_registry[(char*)base] = HapiArenaRec{extent, liveBuffers};
+}
+
+void hapiFreeMigratable(void* ptr) {
+  if (ptr == NULL) return;
+  void* arena_to_free = NULL;
+  {
+    std::lock_guard<std::mutex> g(hapi_arena_registry_lock);
+    if (!hapi_arena_registry.empty()) {
+      auto it = hapi_arena_registry.upper_bound((char*)ptr);
+      if (it != hapi_arena_registry.begin()) {
+        --it;
+        if ((char*)ptr >= it->first &&
+            (char*)ptr < it->first + it->second.extent) {
+          if (--it->second.live == 0) {
+            arena_to_free = it->first;
+            hapi_arena_registry.erase(it);
+          }
+          // Interior pointer handled: either the arena still has live
+          // buffers (nothing to free yet) or it is freed below.
+          if (arena_to_free == NULL) return;
+        }
+      }
+    }
+  }
+  if (arena_to_free != NULL) {
+    hapiCheck(hapiFree(arena_to_free));
+    return;
+  }
+  // Not arena-interior: an ordinary allocation.
+  hapiCheck(hapiFree(ptr));
 }
 
 /******************** DEPRECATED ********************/

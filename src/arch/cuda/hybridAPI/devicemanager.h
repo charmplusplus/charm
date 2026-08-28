@@ -23,6 +23,14 @@ struct DeviceManager {
   // Buddy allocator for communication buffer
   buddy::allocator* comm_buffer;
 
+  // Dedicated stream for migration pack copies (PUP::toMem's device branch).
+  // Created lazily, with default (blocking) flags on purpose: a blocking
+  // stream keeps legacy ordering against null-stream work, while moving the
+  // pack copies off the null stream stops them barriering the application's
+  // streams the way null-stream memcpys do. Callers serialize creation with
+  // this manager's lock.
+  hapiStream_t migration_stream;
+
 #ifdef CMK_LBDB_ON
   // Device properties needed to estimate how many SMs a kernel occupies.
   // Filled lazily by hapiPopulateDeviceProps once device_managers is ready.
@@ -37,7 +45,8 @@ struct DeviceManager {
 #endif
 
   DeviceManager(int local_index_, int global_index_) :
-    local_index(local_index_), global_index(global_index_), comm_buffer(nullptr)
+    local_index(local_index_), global_index(global_index_), comm_buffer(nullptr),
+    migration_stream(NULL)
 #ifdef CMK_LBDB_ON
     , multi_processor_count(0), max_threads_per_sm(0), max_blocks_per_sm(0),
       max_registers_per_sm(0), max_shared_mem_per_sm(0), warp_size(0),

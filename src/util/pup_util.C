@@ -159,8 +159,12 @@ void PUP::sizer::bytes(void * p,size_t n,size_t itemSize,dataType t, PUPMode mod
 #endif
   if (mode == PUPMode::HOST)
     nBytes+=n*itemSize;
-  else if (mode == PUPMode::DEVICE)
-    gpuBytes += n * itemSize;
+  else if (mode == PUPMode::DEVICE) {
+    // Aligned exactly as toMem packs and fromMem walks (see DEVICE_PUP_ALIGN),
+    // so gpu_size() is the true extent of the packed region.
+    gpuBytes = alignDeviceOffset(gpuBytes) + n * itemSize;
+    gpuBufCount++;
+  }
 }
 
 /*Memory PUP::er's*/
@@ -212,10 +216,20 @@ void PUP::toMem::bytes(void *p,size_t n,size_t itemSize,dataType t, PUPMode mode
     }
     else
     {
-      // For GPU mode, we assume p is a device pointer and copy directly
+      // For GPU mode, we assume p is a device pointer and copy directly.
+      // Each buffer starts at an aligned offset from the region base -- the
+      // same rule the sizer counted with and fromMem (or the receiver's arena
+      // layout) walks with.
 #if CMK_CUDA
-      cudaMemcpy((void *)gpuBuf, p, n, cudaMemcpyDeviceToDevice);
+      gpuBuf = gpuOrigBuf + alignDeviceOffset((size_t)(gpuBuf - gpuOrigBuf));
+      if (gpuStream != nullptr)
+        cudaMemcpyAsync((void *)gpuBuf, p, n, cudaMemcpyDeviceToDevice,
+                        (cudaStream_t)gpuStream);
+      else
+        cudaMemcpy((void *)gpuBuf, p, n, cudaMemcpyDeviceToDevice);
       gpuBuf += n;
+      if (deviceManifestOut != nullptr)
+        deviceManifestOut[deviceManifestIdx++] = n;
 #endif
     }
   }
@@ -238,10 +252,71 @@ void PUP::fromMem::bytes(void *p,size_t n,size_t itemSize,dataType t, PUPMode mo
   {
     //CmiPrintf("[%d] Copying %zu bytes from GPU buffer to p=%p\n", CmiMyPe(), n, p);
 #if CMK_CUDA
+    deviceManifestCheck(n);
+    // Mirror of the toMem walk: skip to the aligned offset the packer wrote
+    // this buffer at before copying out.
+    gpuBuf = gpuOrigBuf + alignDeviceOffset((size_t)(gpuBuf - gpuOrigBuf));
     cudaMemcpy(p, (const void *)gpuBuf, n, cudaMemcpyDeviceToDevice);
     gpuBuf += n;
 #endif
   }
+}
+
+// Element-wise manifest check: the unpack pup must ask for exactly the
+// buffers the pack pup wrote, in order and size. Divergence means the
+// application's pup routine branches differently between the two sides, and
+// every byte after this point would land at a wrong offset.
+void PUP::fromMem::deviceManifestCheck(size_t nBytes)
+{
+  if (deviceManifestIn == nullptr) return;
+  if (deviceManifestIdx >= deviceManifestCount)
+    CmiAbort("Device pup direction mismatch: unpack requested device "
+             "buffer %zu (%zu bytes), but the sender packed only %zu "
+             "device buffers",
+             deviceManifestIdx + 1, nBytes, deviceManifestCount);
+  if (deviceManifestIn[deviceManifestIdx] != nBytes)
+    CmiAbort("Device pup direction mismatch: device buffer %zu is %zu "
+             "bytes on unpack but the sender packed %zu bytes",
+             deviceManifestIdx + 1, nBytes, deviceManifestIn[deviceManifestIdx]);
+  deviceManifestIdx++;
+}
+
+// ---- pup_buffer_device: the migration arena API ---------------------------
+// Sizing and packing are exactly DEVICE-mode bytes(). Unpacking either
+// rebinds the pointer into the arena the payload already landed in (arena
+// mode -- no copy, no allocation) or allocates the buffer and fills it from
+// the landing region (compatibility mode). The caller must not have
+// allocated the buffer before unpacking.
+
+void PUP::sizer::pup_buffer_device(void *&p, size_t n, size_t itemSize)
+{
+  bytes(p, n, itemSize, Tchar, PUPMode::DEVICE);
+}
+
+void PUP::toMem::pup_buffer_device(void *&p, size_t n, size_t itemSize)
+{
+  bytes(p, n, itemSize, Tchar, PUPMode::DEVICE);
+}
+
+void PUP::fromMem::pup_buffer_device(void *&p, size_t n, size_t itemSize)
+{
+#ifdef CK_CHECK_PUP
+  ((pupCheckRec *)buf)->check(Tchar, n);
+  buf += sizeof(pupCheckRec);
+#endif
+  n *= itemSize;
+#if CMK_CUDA
+  deviceManifestCheck(n);
+  gpuBuf = gpuOrigBuf + alignDeviceOffset((size_t)(gpuBuf - gpuOrigBuf));
+  if (deviceRebind) {
+    p = (void *)gpuBuf;
+    deviceReboundCount++;
+  } else {
+    cudaMalloc(&p, n);
+    cudaMemcpy(p, (const void *)gpuBuf, n, cudaMemcpyDeviceToDevice);
+  }
+  gpuBuf += n;
+#endif
 }
 
 void PUP::sizer::pup_buffer(void *&p,size_t n, size_t itemSize, dataType t) {

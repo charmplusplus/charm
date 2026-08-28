@@ -196,8 +196,12 @@ class Block : public CBase_Block {
   int x, y;
 
   DataType* __restrict__ h_temperature;
-  DataType* __restrict__ d_temperature;
-  DataType* __restrict__ d_new_temperature;
+  // No __restrict__: pup_buffer_device rebinds these through a T*& deduction
+  // that a restrict-qualified member cannot bind to -- and restrict on a
+  // class member carries no aliasing meaning anyway (its contract is
+  // function-scoped).
+  DataType* d_temperature;
+  DataType* d_new_temperature;
   DataType* __restrict__ h_left_ghost;
   DataType* __restrict__ h_right_ghost;
   DataType* __restrict__ h_top_ghost;
@@ -240,8 +244,10 @@ class Block : public CBase_Block {
     //cudaStreamSynchronize(compute_stream);
     //cudaStreamSynchronize(comm_stream);
     hapiCheck(cudaFreeHost(h_temperature));
-    hapiCheck(cudaFree(d_temperature));
-    hapiCheck(cudaFree(d_new_temperature));
+    // Runtime-owned when rebound into a migration arena; ordinary otherwise.
+    // hapiFreeMigratable handles both.
+    hapiFreeMigratable(d_temperature);
+    hapiFreeMigratable(d_new_temperature);
     hapiCheck(cudaFreeHost(h_left_ghost));
     hapiCheck(cudaFreeHost(h_right_ghost));
     hapiCheck(cudaFreeHost(h_top_ghost));
@@ -281,10 +287,10 @@ class Block : public CBase_Block {
     if (p.isUnpacking()) {
       hapiCheck(hapiMallocHost((void**)&h_temperature,
             sizeof(DataType) * (block_width + 2) * (block_height + 2)));
-      hapiCheck(hapiMalloc((void**)&d_temperature,
-            sizeof(DataType) * (block_width + 2) * (block_height + 2)));
-      hapiCheck(hapiMalloc((void**)&d_new_temperature,
-            sizeof(DataType) * (block_width + 2) * (block_height + 2)));
+      // d_temperature / d_new_temperature are NOT allocated here any more:
+      // pup_buffer_device below binds them -- into the migration arena when
+      // the runtime landed the payload there (zero-copy), or to a fresh
+      // allocation it fills otherwise.
       hapiCheck(hapiMallocHost((void**)&h_left_ghost, sizeof(DataType) * block_height));
       hapiCheck(hapiMallocHost((void**)&h_right_ghost, sizeof(DataType) * block_height));
       hapiCheck(hapiMallocHost((void**)&h_top_ghost, sizeof(DataType) * block_width));
@@ -304,8 +310,8 @@ class Block : public CBase_Block {
       }
     }
       
-    p(d_temperature, (block_width + 2) * (block_height + 2), PUP::PUPMode::DEVICE);
-    p(d_new_temperature, (block_width + 2) * (block_height + 2), PUP::PUPMode::DEVICE);
+    p.pup_buffer_device(d_temperature, (block_width + 2) * (block_height + 2));
+    p.pup_buffer_device(d_new_temperature, (block_width + 2) * (block_height + 2));
   }
 
   void init() {

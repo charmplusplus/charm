@@ -123,14 +123,16 @@ class CkArrayElementMigrateMessage : public CMessage_CkArrayElementMigrateMessag
 {
 public:
   CkArrayElementMigrateMessage(CkArrayIndex idx_, CmiUInt8 id_, bool ignoreArrival_,
-                               int length_, int nManagers_, int epoch_, bool hasGPUMsg_ = false)
+                               int length_, int nManagers_, int epoch_, bool hasGPUMsg_ = false,
+                               int nGpuBufs_ = 0)
       : idx(idx_),
         id(id_),
         ignoreArrival(ignoreArrival_),
         length(length_),
         nManagers(nManagers_),
         hasGPUMsg(hasGPUMsg_),
-        epoch(epoch_)
+        epoch(epoch_),
+        nGpuBufs(nGpuBufs_)
   {
   }
 
@@ -141,7 +143,13 @@ public:
   int length;          // Size in bytes of the packed data
   int nManagers;       // Number of associated array managers
   int epoch;
+  // Per-buffer sizes of the packed device stream, in pack order -- the
+  // manifest the unpack asserts against, element-wise. Zero-length for
+  // migrations whose device payload was not packed by PUP::toMem (the
+  // by-handle path records no manifest).
+  int nGpuBufs;
   char* packData;
+  size_t* gpuManifest;
 };
 
 #if CMK_CUDA
@@ -851,8 +859,9 @@ public:
   void immigrateIntraProcess(CkArrayElementIntraProcessMigrateMessage* msg);
 #if CMK_CUDA
   void sendGPUMsg(CmiUInt8 id);
-  void immigrateGPU(CmiUInt8& id, int& size, char* &data, CkDeviceBufferPost* post);
-  void immigrateGPU(CmiUInt8 id, int size, char* data);
+  void immigrateGPU(CmiUInt8& id, int& size, char* &data, int& srcPe, CkDeviceBufferPost* post);
+  void immigrateGPU(CmiUInt8 id, int size, char* data, int srcPe);
+  void finishGPUSend(CmiUInt8 id);
   // Pointer-and-get device migration path (see DeviceMigrationStrategy).
   void immigrateGPUHandle(CkArrayElementMigrateHandleMessage* msg);
   void finalizeGPUMigrate(CkLocMgrFinalizeMsg* msg);

@@ -137,6 +137,18 @@ enum class PUPMode {
   DEVICE
 };
 
+// Layout rule for the device side of a migration stream. Every DEVICE-mode
+// buffer starts at an offset that is a multiple of this, measured from the
+// start of the device region -- relative, not absolute, because a pool block's
+// base carries no alignment guarantee while a cudaMalloc'd arena's does. The
+// sizer, the packer, the unpacker, and the receiver's arena layout must all
+// apply this same rule, or bytes land at the wrong offsets: it is what lets
+// the receiver reconstruct the sender's layout from its own pup calls alone.
+constexpr size_t DEVICE_PUP_ALIGN = 256;
+static inline size_t alignDeviceOffset(size_t offset) {
+  return (offset + (DEVICE_PUP_ALIGN - 1)) & ~(DEVICE_PUP_ALIGN - 1);
+}
+
 static inline dataType getXlateDataType(signed char *a) { return Tchar; }
 #if CMK_SIGNEDCHAR_DIFF_CHAR
 static inline dataType getXlateDataType(char *a) { return Tchar; }
@@ -289,11 +301,27 @@ class er {
   }
 
   // Custom pup_buffer API that calls user provided 'allocate' function for allocation on isUnpacking and
-  // user provided 'deallocate' function for deallocation on isPacking
+  // user provided 'deallocate' function for deallocate on isPacking
   // Custom pup_buffer behaves same as the standard pup_buffer except for calling custom allocator and deallocator methods
   template<class T>
   void pup_buffer(T *&a, size_t nItems, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate) {
     pup_buffer((void *&)a, nItems, sizeof(T), getXlateDataType(a), allocate, deallocate);
+  }
+
+  // Device-buffer pup for migration. Packing copies the device buffer into
+  // the migration stream like operator()(a, n, PUPMode::DEVICE); unpacking
+  // REBINDS the pointer instead of copying when the runtime landed the
+  // payload in an arena (the pointer then aims into runtime-owned memory --
+  // free it with hapiFreeMigratable, never hapiFree), and otherwise
+  // allocates and fills it. The caller must not allocate the buffer before
+  // unpacking with this call. Non-memory PUP::ers ignore it, matching how
+  // they ignore DEVICE-mode bytes().
+  template<class T>
+  void pup_buffer_device(T *&a, size_t nItems) {
+    pup_buffer_device((void *&)a, nItems, sizeof(T));
+  }
+  virtual void pup_buffer_device(void *&p, size_t n, size_t itemSize) {
+    (void)p; (void)n; (void)itemSize;
   }
 
   //For pointers: the last parameter is to make it more difficult to call
@@ -408,6 +436,7 @@ class sizer : public er {
  protected:
   size_t nBytes;
   size_t gpuBytes;
+  size_t gpuBufCount;  // number of DEVICE-mode buffers the walk visited
   //Generic bottleneck: n items of size itemSize
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t, PUPMode mode);
@@ -416,8 +445,10 @@ class sizer : public er {
   virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
 
  public:
+  virtual void pup_buffer_device(void *&p, size_t n, size_t itemSize);
   //Write data to the given buffer
-  sizer(const unsigned int purpose = 0) : er(IS_SIZING | purpose), nBytes(0), gpuBytes(0)
+  sizer(const unsigned int purpose = 0) : er(IS_SIZING | purpose), nBytes(0), gpuBytes(0),
+    gpuBufCount(0)
   {
     CmiAssert((purpose & TYPE_MASK) == 0);
   }
@@ -426,6 +457,7 @@ class sizer : public er {
   size_t size(void) const {return nBytes;}
 
   size_t gpu_size(void) const {return gpuBytes;}
+  size_t gpu_buf_count(void) const {return gpuBufCount;}
 };
 
 template <class T>
@@ -493,6 +525,20 @@ class toMem : public mem {
   // the source's live buffers rather than the source packing a staging copy.
   std::vector<std::pair<void*, size_t>>* deviceCollector = nullptr;
 
+  // If non-null (a hapiStream_t), DEVICE-mode pack copies are issued
+  // asynchronously on this stream instead of on the null stream; the caller
+  // owns completion (stream-synchronize before freeing or reusing sources).
+  // void* so this header stays free of CUDA types.
+  void* gpuStream = nullptr;
+
+  // If non-null, each DEVICE-mode buffer's byte size is recorded here in pack
+  // order -- the manifest the unpack side asserts against. The caller sizes
+  // the array from sizer::gpu_buf_count().
+  size_t* deviceManifestOut = nullptr;
+  size_t deviceManifestIdx = 0;
+
+  virtual void pup_buffer_device(void *&p, size_t n, size_t itemSize);
+
   //Write data to the given buffer
   toMem(void* Nbuf, 
     void* gpuNbuf,
@@ -520,7 +566,31 @@ inline void toMemBuf(T &t,void *buf, size_t len) {
 
 //For unpacking from a memory buffer
 class fromMem : public mem {
+ public:
+  // Sender-recorded per-buffer sizes of the device stream (see
+  // toMem::deviceManifestOut). When set, every DEVICE-mode bytes() call is
+  // checked against the next entry and a mismatch aborts -- always on, like
+  // the host-side direction-mismatch check: it guards application pup code,
+  // and the alternative is bytes landing at wrong offsets silently. The
+  // caller verifies deviceManifestIdx == deviceManifestCount after the walk.
+  const size_t* deviceManifestIn = nullptr;
+  size_t deviceManifestCount = 0;
+  size_t deviceManifestIdx = 0;
+
+  // Arena mode: the device region this walker reads IS the arriving chare's
+  // permanent storage, so pup_buffer_device rebinds pointers into it instead
+  // of copying out of it. deviceReboundCount tells the caller whether the
+  // region ended up owned by the chare (keep + register) or was a pure
+  // landing area (free).
+  bool deviceRebind = false;
+  size_t deviceReboundCount = 0;
+
+  virtual void pup_buffer_device(void *&p, size_t n, size_t itemSize);
+
  protected:
+  // Shared by bytes(DEVICE) and pup_buffer_device: the element-wise manifest
+  // check against the sender's recorded sizes.
+  void deviceManifestCheck(size_t nBytes);
   //Generic bottleneck: unpack n items of size itemSize from p.
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t, PUPMode mode);

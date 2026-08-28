@@ -3126,24 +3126,45 @@ bool did_inter_node_gpudirect_rdma(int srcPe, int dstPe) {
 void CkLocMgr::sendGPUMsg(CmiUInt8 id)
 {
   auto gpuData = sendGPUBuffers[id];
-  sendGPUBuffers.erase(id);
-  thisProxy[gpuData.toPe].immigrateGPU(id, gpuData.size, CkDeviceBuffer(gpuData.data, gpuData.size,
-    CkCallbackResumeThread()));
 
-  if(did_inter_node_gpudirect_rdma(CkMyPe(), gpuData.toPe)) {
-    GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
-    if(csv_gpu_manager.use_shm) {
-      DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
-  #if CMK_SMP
-      CmiLock(dm->lock);
-  #endif
-    dm->free_comm_buffer((size_t)((char*)gpuData.data - (char*)dm->comm_buffer->base_ptr));
-  #if CMK_SMP
-      CmiUnlock(dm->lock);
-  #endif
-    }
+  // No completion callback and no blocking wait. The previous
+  // CkCallbackResumeThread parked this (threaded) entry's thread until the
+  // whole remote transfer completed, once per migrating chare -- serializing
+  // cross-node migrations behind their own transfers. The source pool block's
+  // lifetime is instead handled per transport: a same-node staged send
+  // registers the block with its IPC event and reclaimCompletedIpcEvents
+  // frees it once the receiver has read it; an inter-node send is acked
+  // explicitly -- the receiver's immigrateGPU entry runs only after the rget
+  // has landed, and its finishGPUSend(id) releases the block here.
+  thisProxy[gpuData.toPe].immigrateGPU(id, gpuData.size,
+    CkDeviceBuffer(gpuData.data, gpuData.size), CkMyPe());
+
+  if (!did_inter_node_gpudirect_rdma(CkMyPe(), gpuData.toPe)) {
+    // Same node: the IPC event reclaim owns the block from here.
+    sendGPUBuffers.erase(id);
   }
-  //CkPrintf("PE %d sent GPU msg of size %zu for id %llu\n", CkMyPe(), gpuData.size, id);
+  // Inter-node: the entry stays in sendGPUBuffers until finishGPUSend(id).
+}
+
+// Inter-node ack: the receiver's payload has fully arrived, so the packed
+// source block this migration was holding can be released.
+void CkLocMgr::finishGPUSend(CmiUInt8 id)
+{
+  auto it = sendGPUBuffers.find(id);
+  if (it == sendGPUBuffers.end()) return;
+
+  GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
+  if (csv_gpu_manager.use_shm) {
+    DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
+#if CMK_SMP
+    CmiLock(dm->lock);
+#endif
+    dm->free_comm_buffer((size_t)((char*)it->second.data - (char*)dm->comm_buffer->base_ptr));
+#if CMK_SMP
+    CmiUnlock(dm->lock);
+#endif
+  }
+  sendGPUBuffers.erase(it);
 }
 #endif
 
@@ -3288,8 +3309,10 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   bufSize = p.size();
 
   gpuBufSize = 0;
+  size_t nGpuBufs = 0;
 #if CMK_CUDA
   gpuBufSize = p.gpu_size();
+  nGpuBufs = p.gpu_buf_count();
 #endif
 
   // Fast path: for intra-process (same CmiNode) migration, transfer ownership
@@ -3317,7 +3340,14 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   // Same-process uses MemcpyStrategy (source pointers directly addressable);
   // cross-process uses IpcStrategy (CUDA IPC handles). Cross-node keeps the
   // existing staged path — RdmaStrategy is not available under reconverse.
-  if (gpuBufSize > 0 && CmiPeOnSamePhysicalNode(CkMyPe(), toPe) &&
+  // CHARM_FORCE_STAGED_MIGRATE routes every device migration through the
+  // staged packed path instead: the A/B knob for the transport switch, and
+  // the only way to exercise the staged path on a single-node build, where
+  // CmiPeOnSamePhysicalNode is always true.
+  static const bool forceStagedMigrate =
+      (getenv("CHARM_FORCE_STAGED_MIGRATE") != nullptr);
+  if (!forceStagedMigrate && gpuBufSize > 0 &&
+      CmiPeOnSamePhysicalNode(CkMyPe(), toPe) &&
       emigrateDeviceByHandle(rec, toPe, bufSize))
     return;
 #endif
@@ -3332,9 +3362,12 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 
 
   void* gpuMsg = nullptr;
+#if CMK_CUDA
+  hapiStream_t migStream = NULL;
+#endif
   // Allocate and pack into message
   CkArrayElementMigrateMessage* msg =
-      new (bufSize, 0) CkArrayElementMigrateMessage(idx, id,
+      new (bufSize, nGpuBufs, 0) CkArrayElementMigrateMessage(idx, id,
 #if CMK_LBDB_ON
                                                     rec->isAsyncMigrate(),
 #else
@@ -3342,7 +3375,8 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 #endif
                                                     bufSize, managers.size(),
                                                     cache->getEpoch(id) + 1,
-                                                    gpuBufSize > 0);
+                                                    gpuBufSize > 0,
+                                                    (int)nGpuBufs);
 
   {
 #if CMK_CUDA
@@ -3358,6 +3392,12 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
           CkAbort("PE %d, device %d: Not enough memory on device Load balance buffer (%zu free)",
               CkMyPe(), dm->global_index, dm->get_lb_buffer_free_size());
         }
+        // Pack copies go on the device's migration stream, not the null
+        // stream (see DeviceManager::migration_stream). Lazy creation is
+        // serialized by the lock already held here.
+        if (dm->migration_stream == NULL)
+          hapiCheck(hapiStreamCreate(&dm->migration_stream));
+        migStream = dm->migration_stream;
 #if CMK_SMP
         CmiUnlock(dm->lock);
 #endif
@@ -3365,6 +3405,10 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
     }
 #endif
     PUP::toMem p(msg->packData, gpuMsg, PUP::er::IS_MIGRATION);
+#if CMK_CUDA
+    p.gpuStream = (void*)migStream;
+    p.deviceManifestOut = msg->gpuManifest;
+#endif
     p.becomeDeleting();
     pupElementsFor(p, rec, CkElementCreation_migrate);
     if (p.size() != bufSize)
@@ -3380,10 +3424,16 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   DEBM((AA "Migrated index size %s to %d \n" AB, idx2str(idx), toPe));
 
 #if CMK_CUDA
-  // Ensure all device-to-device copies from PUP packing are complete before
-  // destroying elements, since cudaMemcpy(D2D) can be async in CUDA 12.x.
-  if (gpuBufSize > 0)
-    cudaDeviceSynchronize();
+  // Complete the pack copies before destroying elements. On the migration
+  // stream this waits for exactly those copies instead of the whole device;
+  // the device-wide fallback covers the no-pool path, whose packing still
+  // used the null stream (and cudaMemcpy(D2D) is async in CUDA 12.x).
+  if (gpuBufSize > 0) {
+    if (migStream != NULL)
+      hapiCheck(hapiStreamSynchronize(migStream));
+    else
+      cudaDeviceSynchronize();
+  }
 #endif
 
   thisProxy[toPe].immigrate(msg);
@@ -3518,6 +3568,10 @@ class MemcpyStrategy : public DeviceMigrationStrategy {
     size_t offset = 0;
     cudaStream_t stream = (cudaStream_t)0;
     for (int i = 0; i < n; ++i) {
+      // Every buffer starts at an aligned offset -- the same DEVICE_PUP_ALIGN
+      // rule the fromMem unpack walks with. Tight packing here would shift
+      // every buffer after the first against the unpack cursor.
+      offset = PUP::alignDeviceOffset(offset);
       hapiCheck(hapiMemcpyAsync((char*)dstGpuMsg + offset,
                                 reinterpret_cast<void*>(handles[i].src_ptr),
                                 handles[i].size,
@@ -3557,6 +3611,8 @@ class IpcStrategy : public DeviceMigrationStrategy {
       hapiCheck(hapiIpcOpenMemHandle(&src, handles[i].ipc_handle,
                                      hapiIpcMemLazyEnablePeerAccess));
       mgr->registerOpenedIpcPtr(id, src);
+      // Aligned like MemcpyStrategy: see the note there.
+      offset = PUP::alignDeviceOffset(offset);
       hapiCheck(hapiMemcpyAsync((char*)dstGpuMsg + offset, src, handles[i].size,
                                 hapiMemcpyDeviceToDevice, stream));
       offset += handles[i].size;
@@ -3622,6 +3678,8 @@ class RdmaStrategy : public DeviceMigrationStrategy {
     for (int i = 0; i < n; ++i) {
       auto* op = reinterpret_cast<DeviceRdmaOp*>(
           (char*)rdma_data + sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * i);
+      // Aligned like MemcpyStrategy: see the note there.
+      offset = PUP::alignDeviceOffset(offset);
       op->dest_ptr = (char*)dstGpuMsg + offset;
       op->size = handles[i].size;
       op->info = info;
@@ -3691,7 +3749,7 @@ bool CkLocMgr::emigrateDeviceByHandle(CkLocRec* rec, int toPe, size_t bufSize)
   CmiUInt8 id = rec->getID();
 
   CkArrayElementMigrateMessage* hostMsg =
-      new (bufSize, 0) CkArrayElementMigrateMessage(idx, id,
+      new (bufSize, 0, 0) CkArrayElementMigrateMessage(idx, id,
 #if CMK_LBDB_ON
                                                     rec->isAsyncMigrate(),
 #else
@@ -3796,10 +3854,12 @@ void _initGPUMigrateHandlers(void)
 
 void CkLocMgr::immigrateGPUHandle(CkArrayElementMigrateHandleMessage* msg)
 {
-  // One contiguous destination buffer large enough for every handle's bytes.
-  // immigrate()'s PUP::fromMem walks this buffer linearly.
+  // One contiguous destination buffer large enough for every handle's bytes,
+  // each starting at a DEVICE_PUP_ALIGN offset -- the layout immigrate()'s
+  // PUP::fromMem walks.
   size_t total = 0;
-  for (int i = 0; i < msg->nHandles; ++i) total += msg->handles[i].size;
+  for (int i = 0; i < msg->nHandles; ++i)
+    total = PUP::alignDeviceOffset(total) + msg->handles[i].size;
 
   // Allocate from the device LB buffer rather than cudaMalloc: per-migration
   // cudaMalloc/cudaFree are expensive and implicitly synchronizing, and the
@@ -3903,11 +3963,28 @@ void CkLocMgr::ackGPUMigrate(CmiUInt8 id)
   heldChares.erase(it);
 }
 
-void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char* &data, CkDeviceBufferPost* post)
+// Arena mode (CHARM_MIGRATE_ARENA): the staged payload lands in one ordinary
+// device allocation that becomes the arriving chare's permanent storage --
+// pup_buffer_device rebinds pointers into it at unpack, and nothing is
+// copied. The arena needs only the payload's size, which this message
+// carries, so it works with either arrival order of host message and
+// payload. Off by default while experimental.
+static inline bool ckMigrateArenaMode()
+{
+  static const bool on = (getenv("CHARM_MIGRATE_ARENA") != nullptr);
+  return on;
+}
+
+void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char* &data, int& srcPe, CkDeviceBufferPost* post)
 {
   //CkPrintf("PE %d allocating GPU memory size %d for id %llu\n", CkMyPe(), size, id);
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
-  if(csv_gpu_manager.use_shm) {
+  if (ckMigrateArenaMode()) {
+    // The arena: the chare's storage, not a landing block, so it comes from
+    // ordinary device memory -- pool memory is transient by contract.
+    data = nullptr;
+    hapiCheck(hapiMalloc((void**)&data, size));
+  } else if(csv_gpu_manager.use_shm) {
     DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
 #if CMK_SMP
     CmiLock(dm->lock);
@@ -3926,8 +4003,14 @@ void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char* &data, CkDeviceBuffer
   post[0].hapi_stream = (cudaStream_t) 0;
 }
 
-void CkLocMgr::immigrateGPU(CmiUInt8 id, int size, char* data)
+void CkLocMgr::immigrateGPU(CmiUInt8 id, int size, char* data, int srcPe)
 {
+  // This entry runs only after the device payload has fully landed, so an
+  // inter-node sender's packed source block is safe to release now. Same-node
+  // sends release theirs through the IPC event reclaim instead.
+  if (srcPe >= 0 && did_inter_node_gpudirect_rdma(srcPe, CkMyPe()))
+    thisProxy[srcPe].finishGPUSend(id);
+
   void* dataPtr = receivedDeviceMsgs[id];
   receivedDeviceMsgs.erase(id);
   bufferedDeviceMigrateMsgs[id] = dataPtr;
@@ -3961,6 +4044,23 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
   const CkArrayIndex& idx = msg->idx;
 
   PUP::fromMem p(msg->packData, gpuMsg, PUP::er::IS_MIGRATION);
+#if CMK_CUDA
+  // Sender-recorded device manifest: every DEVICE-mode unpack call is checked
+  // against it (see PUP::fromMem::deviceManifestIn). nGpuBufs is 0 for
+  // migrations whose payload was not packed by toMem (the by-handle path).
+  if (msg->hasGPUMsg && msg->nGpuBufs > 0) {
+    p.deviceManifestIn = msg->gpuManifest;
+    p.deviceManifestCount = (size_t)msg->nGpuBufs;
+  }
+  // Arena mode applies only to staged payloads (nGpuBufs > 0 identifies
+  // them; a by-handle payload landed in a pool block regardless of the env
+  // flag). pup_buffer_device calls then rebind into gpuMsg instead of
+  // copying out of it.
+  const bool gpuMsgIsArena =
+      ckMigrateArenaMode() && msg->hasGPUMsg && msg->nGpuBufs > 0 &&
+      gpuMsg != nullptr;
+  if (gpuMsgIsArena) p.deviceRebind = true;
+#endif
 
   if (msg->nManagers < managers.size())
     CkAbort("Array element arrived from location with fewer managers!\n");
@@ -4004,7 +4104,21 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
   // block above (gpuMsg stays null when msg->hasGPUMsg is false). Freeing
   // unconditionally handed the allocator base_ptr + (0 - base_ptr) == nullptr
   // and aborted, so migrating any element without GPU state was fatal.
-  if(csv_gpu_manager.use_shm && gpuMsg != nullptr) {
+  if (gpuMsgIsArena) {
+    if (p.deviceReboundCount > 0) {
+      // The chare's rebound buffers live in the arena: keep it, and let
+      // hapiFreeMigratable release it when the last one is freed. Extent is
+      // the packed stream's aligned extent, recomputed from the manifest.
+      size_t extent = 0;
+      for (int i = 0; i < msg->nGpuBufs; ++i)
+        extent = PUP::alignDeviceOffset(extent) + msg->gpuManifest[i];
+      hapiArenaRegister(gpuMsg, extent, p.deviceReboundCount);
+    } else {
+      // Nothing rebound: the arena served as a plain landing area for a
+      // legacy pup, and its contents were copied out.
+      hapiCheck(hapiFree(gpuMsg));
+    }
+  } else if(csv_gpu_manager.use_shm && gpuMsg != nullptr) {
     DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
 #if CMK_SMP
     CmiLock(dm->lock);
@@ -4026,6 +4140,15 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
     zcPupIssueRgets(msg->id, this);
   }
   CpvAccess(newZCPupGets).clear();  // Clear this to reuse the vector
+#if CMK_CUDA
+  // The element-wise check catches wrong sizes; this catches an unpack that
+  // asked for fewer device buffers than were packed -- also a direction
+  // mismatch, just one the per-call check cannot see.
+  if (p.deviceManifestCount > 0 && p.deviceManifestIdx != p.deviceManifestCount)
+    CkAbort("Device pup direction mismatch: sender packed %zu device buffers "
+            "but unpack consumed only %zu",
+            p.deviceManifestCount, p.deviceManifestIdx);
+#endif
   if (p.size() != msg->length)
   {
     CkError(
