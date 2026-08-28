@@ -2005,38 +2005,25 @@ static void ipcHandleCreate() {
   // and create corresponding IPC handles in shared memory
   hapi_ipc_device_info& my_device_info = csv_gpu_manager.hapi_ipc_device_infos[csv_gpu_manager.device_count * CmiMyNodeRankLocal() + cpv_my_device_id];
 
-  // Self-map this device's comm buffer in the peer table. ipcHandleOpen
-  // skips the owning process (a process cannot cudaIpcOpen its own handle),
-  // which left own-device entries with a null buffer -- and a STAGED payload
-  // delivered same-process (an unconfirmed destination that stayed local, or
-  // a target that migrated home) reads exactly this entry. The events in
-  // this slot are already the local originals, so the mapping is the only
-  // missing piece.
-  my_device_info.buffer = comm_buffer->base_ptr;
   hapi_ipc_event_shared* shm_event_shared = (hapi_ipc_event_shared*)((char*)shm_mem_handle + sizeof(hapiIpcMemHandle_t));
 
-  // Each slot carries a pthread mutex that lives in the shared-memory region
-  // and is locked by BOTH the owning process and whichever peer receives from
-  // it. A pthread mutex is process-private unless it is explicitly created
-  // with PTHREAD_PROCESS_SHARED, and mmap'd memory merely starts zeroed --
-  // which is not a valid initialized mutex. Locking it from the peer process
-  // was undefined behavior and segfaulted on the first cross-process transfer.
-  // Only the slot's owner initializes it, before any peer can reach it: the
-  // CmiBarrier between ipcHandleCreate and ipcHandleOpen orders that.
-  pthread_mutexattr_t shared_attr;
-  pthread_mutexattr_init(&shared_attr);
-  pthread_mutexattr_setpshared(&shared_attr, PTHREAD_PROCESS_SHARED);
-
+  // Each slot's flags live in the shared-memory region and are written by BOTH
+  // the owning process and whichever peer receives from it. Only the slot's
+  // owner initializes them, before any peer can reach them: the CmiBarrier
+  // between ipcHandleCreate and ipcHandleOpen orders that.
+  //
+  // These were once guarded by a per-slot pthread mutex, which had to be
+  // created with PTHREAD_PROCESS_SHARED -- mmap'd memory merely starts zeroed,
+  // which is not a valid initialized mutex, so locking it from the peer was
+  // undefined behavior and segfaulted on the first cross-process transfer.
+  // dst_flag is now a lock-free atomic (see hapi_ipc_event_shared), which needs
+  // no initialization ritual beyond the store below and cannot reintroduce that
+  // failure mode.
   for (int i = 0; i < csv_gpu_manager.hapi_ipc_event_pool_size_total; i++) {
     hapi_ipc_event_shared* cur_shm_event_shared = shm_event_shared + i;
 
-    // CHARM_NO_IPC_MUTEX_INIT restores the original (uninitialized) state for
-    // bisecting.
-    if (getenv("CHARM_NO_IPC_MUTEX_INIT") == nullptr) {
-      pthread_mutex_init(&cur_shm_event_shared->lock, &shared_attr);
-      cur_shm_event_shared->src_flag = false;
-      cur_shm_event_shared->dst_flag = false;
-    }
+    cur_shm_event_shared->src_flag = false;
+    cur_shm_event_shared->dst_flag.store(false, std::memory_order_relaxed);
 
     my_device_info.event_pool_flags.push_back(0);
     my_device_info.event_pool_buff_offsets.push_back(0);
@@ -2052,9 +2039,13 @@ static void ipcHandleCreate() {
           my_device_info.dst_event_pool[i]));
   }
 
-  pthread_mutexattr_destroy(&shared_attr);
-
-  // Store device comm buffer ptr in local info (just in case)
+  // Self-map this device's comm buffer in the peer table. ipcHandleOpen skips
+  // the owning process (a process cannot cudaIpcOpen its own handle), so this
+  // assignment is the only thing that ever populates an own-device entry -- and
+  // a STAGED payload delivered same-process (an unconfirmed destination that
+  // stayed local, or a target that migrated home) reads exactly this entry. The
+  // events in the slot are already the local originals, so the mapping is the
+  // only piece that would otherwise be missing.
   my_device_info.buffer = device_ptr;
 }
 

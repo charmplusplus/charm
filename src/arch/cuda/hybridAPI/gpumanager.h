@@ -41,9 +41,26 @@ struct hapi_ipc_event_shared {
   hapiIpcEventHandle_t src_event_handle;
   hapiIpcEventHandle_t dst_event_handle;
   bool src_flag; // Unused for now
-  bool dst_flag;
-  pthread_mutex_t lock;
+  // Set by the receiving process once it has recorded dst_event; read and
+  // cleared by the owning sender when it reclaims the slot.
+  //
+  // A lock-free atomic rather than the process-shared pthread mutex this used
+  // to carry. The handshake is a single bit with no invariant spanning any
+  // other field, so acquire/release on it gives exactly the ordering that
+  // matters -- the receiver's hapiEventRecord happens-before the sender's
+  // hapiEventQuery -- at a fraction of the cost. That cost is on the hot path:
+  // the sender's reclaim scan touches every slot in its slice on the send
+  // path, so a lock/unlock pair per slot was paid per message.
+  //
+  // This object lives in POSIX shared memory and is written by two processes,
+  // so it must be address-free; the assertion below is what guarantees the
+  // implementation does not hide a lock inside it (which would sit in one
+  // process's private memory and silently fail to synchronize the other).
+  std::atomic<bool> dst_flag;
 };
+static_assert(ATOMIC_BOOL_LOCK_FREE == 2,
+              "hapi_ipc_event_shared::dst_flag lives in shared memory and is "
+              "accessed from two processes, so it must be lock-free");
 
 #if CMK_LBDB_ON
 struct CuptiBufferItem {

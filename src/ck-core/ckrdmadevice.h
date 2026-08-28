@@ -154,9 +154,20 @@ extern "C" {
 size_t CkRdmaDeviceTakePendingSendBytes();
 // Claimed IPC event slots for this PE, or -1 when shm IPC is not in use.
 int CkRdmaDeviceBusyIpcSlots();
+// Allocate `size` bytes from the device load-balance region of `dm`'s buffer,
+// reclaiming retired IPC slots and retrying once if the first attempt does not
+// fit. Returns nullptr if it still does not. Handles dm->lock itself, so the
+// caller must not hold it.
+//
+// The migration path allocates from this region but never sends through
+// acquireIpcSendSlot, so it has no other way to reach the scan that hands these
+// blocks back. `dm` is a DeviceManager*, passed opaquely so this declaration
+// does not drag the HAPI headers into every includer.
+void* CkRdmaDeviceAllocLbBuffer(void* dm, size_t size);
 #else
 inline size_t CkRdmaDeviceTakePendingSendBytes() { return 0; }
 inline int CkRdmaDeviceBusyIpcSlots() { return -1; }
+inline void* CkRdmaDeviceAllocLbBuffer(void* dm, size_t size) { return nullptr; }
 #endif
 
 #endif // _CKRDMADEVICE_H_

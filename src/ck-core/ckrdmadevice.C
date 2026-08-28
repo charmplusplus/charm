@@ -308,6 +308,25 @@ static inline int CmiMyNodeRankLocal() {
   return CmiNodeRankLocal(CmiMyPe());
 }
 
+// Debug/validation knobs on the per-message IPC path, resolved once.
+//
+// getenv is a linear strncmp walk of the environment and a miss -- which is the
+// normal case for these -- scans all of it: measured at 770ns with 93 variables
+// and 950ns with 243, the sort of environment a batch scheduler hands out. The
+// staged path reads these nine times per message (five ipcDebugSync calls plus
+// four direct checks across send and receive), so leaving them uncached spent
+// 7-9us per message doing nothing. Read them through these accessors; do not
+// call getenv on this path.
+static inline bool ipcDebugOn() {
+  static const bool on = (getenv("CHARM_DEBUG_IPC_RECV") != nullptr);
+  return on;
+}
+
+static inline bool zcValidateOn() {
+  static const bool on = (getenv("CHARM_ZC_VALIDATE") != nullptr);
+  return on;
+}
+
 // TEMPORARY (CHARM_DEBUG_IPC_RECV): synchronize after each individual CUDA
 // operation on the shm/IPC path and abort naming the exact step that failed.
 // Illegal-access errors are sticky and asynchronous, so without this they
@@ -315,7 +334,7 @@ static inline int CmiMyNodeRankLocal() {
 // fault has been reported from three unrelated lines. With it, the first
 // failing operation identifies itself.
 static inline void ipcDebugSync(const char* step, hapiStream_t stream) {
-  if (!getenv("CHARM_DEBUG_IPC_RECV")) return;
+  if (!ipcDebugOn()) return;
   hapiError_t err = hapiStreamSynchronize(stream);
   if (err != hapiSuccess) {
     CmiPrintf("[%d] IPC step '%s' FAILED: %s\n", CmiMyPe(), step,
@@ -553,7 +572,7 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     // which side was bad. Migration is what makes this ambiguous: the source
     // buffer can be freed by an object that migrated away, and the destination
     // is whatever the (possibly just-migrated) receiver posted.
-    if (getenv("CHARM_ZC_VALIDATE")) {
+    if (zcValidateOn()) {
       cudaPointerAttributes sattr{}, dattr{};
       const cudaError_t serr = cudaPointerGetAttributes(&sattr, source.ptr);
       const cudaError_t derr = cudaPointerGetAttributes(&dattr, (void*)dest.ptr);
@@ -626,9 +645,7 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
           (hapi_ipc_event_shared*)((char*)csv_gpu_manager.shm_ptr
               + csv_gpu_manager.shm_chunk_size * source.device_idx
               + sizeof(hapiIpcMemHandle_t)) + source.event_idx;
-        pthread_mutex_lock(&shm_event_shared->lock);
-        shm_event_shared->dst_flag = true;
-        pthread_mutex_unlock(&shm_event_shared->lock);
+        shm_event_shared->dst_flag.store(true, std::memory_order_release);
       }
     } else if (sender_exported) {
       // sender_exported already guarantees device_idx is a real index; guard the
@@ -650,7 +667,7 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
       // pool sizes actually backing the indices used just below, so a null peer
       // buffer, an out-of-range index, or a desynchronised event pool is
       // visible directly rather than inferred.
-      if (getenv("CHARM_DEBUG_IPC_RECV")) {
+      if (ipcDebugOn()) {
         CmiPrintf("[%d] IPC recv: dev_idx=%d (infos=%zu) ev_idx=%d "
                   "(src_pool=%zu dst_pool=%zu flags=%zu) peer_buf=%p "
                   "off=%zu dest=%p cnt=%zu src_pe=%d\n",
@@ -719,16 +736,18 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
         (hapi_ipc_event_shared*)((char*)csv_gpu_manager.shm_ptr
             + csv_gpu_manager.shm_chunk_size * source.device_idx
             + sizeof(hapiIpcMemHandle_t)) + source.event_idx;
-      pthread_mutex_lock(&shm_event_shared->lock);
       // The sender clears this when it reclaims the slot, so finding it already
       // set means a second receive is signalling the same (device, event) pair
       // before the first was retired. The sender would then free the block
       // belonging to whichever transfer claimed the slot next, while that
       // transfer is still reading it -- a use-after-free inside the comm buffer
       // that surfaces later as an illegal access on an unrelated stream.
-      const bool already = shm_event_shared->dst_flag;
-      shm_event_shared->dst_flag = true;
-      pthread_mutex_unlock(&shm_event_shared->lock);
+      //
+      // Release pairs with the sender's acquire load in
+      // reclaimCompletedIpcEvents: it is what makes the hapiEventRecord above
+      // visible before the sender is allowed to query that event.
+      const bool already =
+          shm_event_shared->dst_flag.exchange(true, std::memory_order_acq_rel);
       if (already) {
         CmiPrintf("[%d] IPC DUPLICATE dst_flag dev_idx=%d ev_idx=%d srcPe=%d "
                   "off=%zu cnt=%zu\n",
@@ -814,7 +833,8 @@ int CkRdmaGetDestPEChare(int dest_pe, void* obj_ptr) {
 */
 
 // Reclaim the IPC events in this PE's slice whose transfers have completed,
-// releasing the device comm-buffer block each one was holding.
+// releasing the device comm-buffer block each one was holding. Returns how many
+// slots were freed.
 //
 // Split out of the old findFreeIpcEvent so a sender that finds either resource
 // exhausted can keep re-running just this scan while it waits (see
@@ -823,57 +843,88 @@ int CkRdmaGetDestPEChare(int dest_pe, void* obj_ptr) {
 // sets dst_flag in shared memory, so repeating the scan is what lets a
 // momentarily-exhausted pool recover.
 //
-// Caller must hold dm->lock (this frees comm-buffer blocks).
-static void reclaimCompletedIpcEvents(DeviceManager* dm, int cpv_my_device_id) {
+// max_to_free bounds the sweep: a sender that needs one event slot stops as
+// soon as it has one, instead of paying a driver query for every busy slot in
+// the slice. Pass 0 for an unbounded sweep, which is what a sender short of
+// comm-buffer *bytes* wants -- it cannot know in advance how many blocks it
+// must reclaim to fit its request.
+//
+// The caller must NOT hold dm->lock. The slice [pool_start, pool_start +
+// pool_size) belongs to this PE alone -- pool_start is derived from CkMyRank(),
+// so ranks index disjoint elements -- and the only shared state here is the
+// buddy allocator. So the scan runs lock-free and the lock is taken once, at
+// the end, around the batch of frees.
+static int reclaimCompletedIpcEvents(DeviceManager* dm, int cpv_my_device_id,
+                                     int max_to_free) {
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
   int pool_size = csv_gpu_manager.hapi_ipc_event_pool_size_pe;
   int pool_start = CkMyRank() * pool_size;
-  hapi_ipc_device_info& my_device_info = csv_gpu_manager.hapi_ipc_device_infos[csv_gpu_manager.device_count * CmiMyNodeRankLocal() + cpv_my_device_id];
+  const int my_device_index =
+      csv_gpu_manager.device_count * CmiMyNodeRankLocal() + cpv_my_device_id;
+  hapi_ipc_device_info& my_device_info = csv_gpu_manager.hapi_ipc_device_infos[my_device_index];
+  hapi_ipc_event_shared* my_shm_events =
+      (hapi_ipc_event_shared*)((char*)csv_gpu_manager.shm_ptr
+          + csv_gpu_manager.shm_chunk_size * my_device_index
+          + sizeof(hapiIpcMemHandle_t));
+
+  // Offsets of blocks whose slot has been retired but whose memory has not been
+  // handed back yet. Collected here so the whole scan stays outside dm->lock;
+  // flushed when full so this stays a fixed-size stack buffer whatever
+  // +gpuipceventpool is set to.
+  constexpr int kFreeBatch = 64;
+  size_t pending_free[kFreeBatch];
+  int npending = 0;
+  int nfreed = 0;
+
+  auto flush = [&]() {
+    if (npending == 0) return;
+#if CMK_SMP
+    CmiLock(dm->lock);
+#endif
+    for (int j = 0; j < npending; j++) dm->free_comm_buffer(pending_free[j]);
+#if CMK_SMP
+    CmiUnlock(dm->lock);
+#endif
+    npending = 0;
+  };
 
   // Free IPC events that are complete
   for (int i = pool_start; i < pool_start + pool_size; i++) {
     int& event_flag = my_device_info.event_pool_flags[i];
-    hapiEvent_t& ev = my_device_info.dst_event_pool[i];
-    size_t& buff_offset = my_device_info.event_pool_buff_offsets[i];
-    // For a used event, check if it's complete and mark as free if so
-    if (event_flag != 0) {
-      // Check in shared memory if receiver has invoked the memcpy from
-      // the device comm buffer on sender to destination buffer
-      hapi_ipc_event_shared* shm_event_shared =
-        (hapi_ipc_event_shared*)((char*)csv_gpu_manager.shm_ptr
-            + csv_gpu_manager.shm_chunk_size * (csv_gpu_manager.device_count * CmiMyNodeRankLocal() + cpv_my_device_id)
-            + sizeof(hapiIpcMemHandle_t)) + i;
-      bool can_query = false;
-      pthread_mutex_lock(&shm_event_shared->lock);
-      if (shm_event_shared->dst_flag == true) can_query = true;
-      pthread_mutex_unlock(&shm_event_shared->lock);
+    if (event_flag == 0) continue;  // slot is already free
 
-      // If the receiver has invoked the memcpy,
-      // the sender can query the event for completion
-      if (can_query) {
-        if (hapiEventQuery(ev) == hapiSuccess) {
-          // Event completion means that the transfer from source device comm buffer
-          // to dest buffer is complete, so free the allocated block
-          if (event_flag == 1) {
-            dm->free_comm_buffer(buff_offset);
-          } else if (event_flag != 2) {
-            // 2 is a DIRECT transfer: it never allocated a block, so there is
-            // nothing to release beyond the event slot itself. Its completion
-            // still matters -- it is what tells the sender the receiver has
-            // finished reading its source buffer.
-            CkAbort("Retrieved hapiSuccess for a free IPC event");
-          }
+    // Check in shared memory whether the receiver has invoked the memcpy from
+    // the device comm buffer on the sender to the destination buffer. Acquire
+    // pairs with the receiver's release store, and is what makes its
+    // hapiEventRecord visible before the query below.
+    if (!my_shm_events[i].dst_flag.load(std::memory_order_acquire)) continue;
 
-          // Mark event as free
-          event_flag = 0;
-          pthread_mutex_lock(&shm_event_shared->lock);
-          shm_event_shared->dst_flag = false;
-          pthread_mutex_unlock(&shm_event_shared->lock);
-        }
-      }
+    // The receiver has invoked the memcpy, so the sender may query the event.
+    if (hapiEventQuery(my_device_info.dst_event_pool[i]) != hapiSuccess) continue;
+
+    // Event completion means the transfer from the source device comm buffer to
+    // the destination buffer is done, so the allocated block can go back.
+    if (event_flag == 1) {
+      pending_free[npending++] = my_device_info.event_pool_buff_offsets[i];
+      if (npending == kFreeBatch) flush();
+    } else if (event_flag != 2) {
+      // 2 is a DIRECT transfer: it never allocated a block, so there is
+      // nothing to release beyond the event slot itself. Its completion
+      // still matters -- it is what tells the sender the receiver has
+      // finished reading its source buffer.
+      CkAbort("Retrieved hapiSuccess for a free IPC event");
     }
+
+    // Mark event as free. Ordered after the offset is read above, so the slot
+    // cannot be reclaimed and re-pointed before its old block is recorded.
+    event_flag = 0;
+    my_shm_events[i].dst_flag.store(false, std::memory_order_release);
+
+    if (++nfreed == max_to_free) break;
   }
 
+  flush();
+  return nfreed;
 }
 
 // Claim a free IPC event from this PE's slice, or -1 if none is free.
@@ -887,7 +938,7 @@ static void reclaimCompletedIpcEvents(DeviceManager* dm, int cpv_my_device_id) {
 //    It is used by the sender to determine when the allocated block on
 //    device comm buffer and IPC events can be freed.
 //
-// Caller must hold dm->lock and should have reclaimed first.
+// Needs no lock: the slice is this PE's alone (see reclaimCompletedIpcEvents).
 // flag_value distinguishes what the slot is holding: 1 for a staged transfer,
 // whose comm-buffer block at comm_offset must be released when the slot
 // retires, 2 for a direct one, which holds no block. A sentinel offset would
@@ -942,6 +993,17 @@ static int claimFreeIpcEvent(int cpv_my_device_id, const size_t comm_offset,
 // the receiver's copy after the kernels that produced the data, and dst_event
 // is how the sender learns the receiver has finished reading a buffer it does
 // not own.
+//
+// Reclaiming is a *failure* path, not part of every send. The scan costs a
+// driver query per busy slot in the slice, so running it up front made every
+// message pay for garbage collection it usually did not need -- and the cost
+// grew with +gpuipceventpool, which is exactly the knob a send-heavy run turns
+// up. The invariant that matters is only that no attempt reports exhaustion
+// without having reclaimed first (reclaiming solely *after* a failed
+// allocation, as the original code did, let comm-buffer exhaustion abort
+// without ever running the scan that frees comm buffers). Trying first and
+// reclaiming on failure preserves that: the slow path below always reclaims
+// before looping, and the timeout can only be reached through it.
 static void acquireIpcSendSlot(DeviceManager* dm, int cpv_my_device_id,
                                bool is_lb_buffer, bool direct,
                                const void* src_ptr,
@@ -952,18 +1014,31 @@ static void acquireIpcSendSlot(DeviceManager* dm, int cpv_my_device_id,
     return s ? atof(s) : 60.0;
   }();
 
+  // CHARM_IPC_LAZY_RECLAIM=1 takes the reclaim scan off the fast path (try
+  // first, reclaim only on failure). Opt-in rather than default: see the
+  // discussion at CkRdmaDeviceAllocLbBuffer -- other allocators of this buffer
+  // depend on the sweep running often, and the scan is cheap enough now that
+  // dst_flag is a plain atomic that removing it from the send path buys much
+  // less than it did.
+  static const bool lazy = (getenv("CHARM_IPC_LAZY_RECLAIM") != nullptr);
+
   double wait_start = 0.0;
   bool waiting = false;
+  bool first = lazy;
+  // Which resource came up short last time, so the next reclaim knows whether
+  // one slot is enough (event pool drained) or it must sweep for bytes (comm
+  // buffer drained). Always set by the attempt that precedes each reclaim, so
+  // the initializer here is only to keep it defined.
+  bool need_slot_only = false;
 
   for (;;) {
-#if CMK_SMP
-    CmiLock(dm->lock);
-#endif
-    // Reclaim before allocating, so a completed transfer's block is available
-    // to this attempt. (Reclaiming only after the allocation, as the original
-    // code did, meant comm-buffer exhaustion aborted without ever running the
-    // scan that frees comm buffers.)
-    reclaimCompletedIpcEvents(dm, cpv_my_device_id);
+    if (!first) {
+      // Bounded when the event pool is what ran dry: one freed slot is all this
+      // send can use. Unbounded when it is bytes, since how many blocks must
+      // come back to fit cnt is not knowable in advance.
+      reclaimCompletedIpcEvents(dm, cpv_my_device_id, need_slot_only ? 1 : 0);
+    }
+    first = false;
 
     void* buf = nullptr;
     int ev = -1;
@@ -972,24 +1047,44 @@ static void acquireIpcSendSlot(DeviceManager* dm, int cpv_my_device_id,
       // No block to reserve, so nothing to hand back if the event pool is
       // empty; only the events can hold this up.
       ev = claimFreeIpcEvent(cpv_my_device_id, 0, 2);
+      need_slot_only = true;
+    } else if (is_lb_buffer) {
+      // Already in the comm buffer; nothing to allocate, so only the event pool
+      // can hold this up.
+      buf = const_cast<void*>(src_ptr);
+      const size_t off = (char*)buf - (char*)dm->comm_buffer->base_ptr;
+      ev = claimFreeIpcEvent(cpv_my_device_id, off, 1);
+      if (ev == -1) buf = nullptr;
+      need_slot_only = true;
     } else {
-      buf = is_lb_buffer ? const_cast<void*>(src_ptr)
-                         : dm->alloc_comm_buffer(cnt);
-      if (buf != nullptr) {
+#if CMK_SMP
+      CmiLock(dm->lock);
+#endif
+      buf = dm->alloc_comm_buffer(cnt);
+#if CMK_SMP
+      CmiUnlock(dm->lock);
+#endif
+      if (buf == nullptr) {
+        need_slot_only = false;  // short of bytes
+      } else {
         const size_t off = (char*)buf - (char*)dm->comm_buffer->base_ptr;
         ev = claimFreeIpcEvent(cpv_my_device_id, off, 1);
         if (ev == -1) {
           // Got a block but no event. Hand the block back before waiting:
           // holding half the pair while blocked lets two senders pin each
           // other's missing half indefinitely.
-          if (!is_lb_buffer) dm->free_comm_buffer(off);
+#if CMK_SMP
+          CmiLock(dm->lock);
+#endif
+          dm->free_comm_buffer(off);
+#if CMK_SMP
+          CmiUnlock(dm->lock);
+#endif
           buf = nullptr;
+          need_slot_only = true;  // bytes were there, the slot was not
         }
       }
     }
-#if CMK_SMP
-    CmiUnlock(dm->lock);
-#endif
 
     if (ev != -1) {
       *out_buffer = buf;
@@ -1011,12 +1106,51 @@ static void acquireIpcSendSlot(DeviceManager* dm, int cpv_my_device_id,
     }
 
     // Back off so the peer processes that release these slots get the core,
-    // and so this does not spin on the lock that reclaiming needs.
+    // and so this does not spin on the allocator lock that other PEs sharing
+    // this device need.
     struct timespec ts;
     ts.tv_sec = 0;
     ts.tv_nsec = 50000;  // 50us
     nanosleep(&ts, nullptr);
   }
+}
+
+// Allocate from the device load-balance region, reclaiming and retrying once if
+// the first attempt does not fit. See the declaration in ckrdmadevice.h.
+//
+// Blocks in this region are handed back only by reclaimCompletedIpcEvents: a
+// migration's packed payload is released when the receiver acknowledges the
+// staged transfer that carried it, through the same slot machinery an ordinary
+// cross-process send uses. Nothing on the migration path calls
+// acquireIpcSendSlot, so without this the scan would never run on its behalf.
+//
+// This used to work by accident. The scan sat unconditionally at the top of
+// every acquireIpcSendSlot, so an application doing ordinary device sends swept
+// the slice often enough that migration always found free blocks waiting.
+// Taking that sweep off the send fast path removed the accident and made the
+// dependency explicit: the reclaim now happens where the memory is actually
+// needed, which is also better timed than sweeping on every unrelated send.
+void* CkRdmaDeviceAllocLbBuffer(void* dm_opaque, size_t size) {
+  DeviceManager* dm = (DeviceManager*)dm_opaque;
+
+  auto attempt = [&]() {
+#if CMK_SMP
+    CmiLock(dm->lock);
+#endif
+    void* p = dm->alloc_comm_buffer(size, false);
+#if CMK_SMP
+    CmiUnlock(dm->lock);
+#endif
+    return p;
+  };
+
+  void* p = attempt();
+  if (p != nullptr) return p;
+
+  if (!CsvAccess(gpu_manager).use_shm) return nullptr;
+  if (reclaimCompletedIpcEvents(dm, CpvAccess(my_device_id), 0) == 0) return nullptr;
+
+  return attempt();
 }
 
 // Device payload of the zerocopy send currently being marshalled, in bytes.
@@ -1136,8 +1270,7 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
   // "illegal memory access" inside an async copy with no hint of which send
   // produced it. Report it here, where dest_pe/cnt/mode still identify the send.
   {
-    static const bool validate = (getenv("CHARM_ZC_VALIDATE") != nullptr);
-    if (validate) {
+    if (zcValidateOn()) {
       int cur_dev = -1;
       cudaGetDevice(&cur_dev);
       for (int i = 0; i < numops; i++) {
@@ -1262,7 +1395,7 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
       // TEMPORARY: paired with the receive-side print, so the indices and
       // offsets the sender publishes can be compared against what the receiver
       // resolves them to.
-      if (getenv("CHARM_DEBUG_IPC_RECV")) {
+      if (ipcDebugOn()) {
         CmiPrintf("[%d] IPC send: dev_idx=%d ev_idx=%d off=%zu cnt=%zu "
                   "src_ptr=%p comm_base=%p alloc=%p is_lb=%d dest_pe=%d\n",
                   CkMyPe(), buffers[i]->device_idx, buffers[i]->event_idx,
@@ -1281,7 +1414,7 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
         // freed (or not yet reallocated on the new PE) while a send referencing
         // it is still being marshalled -- report that here rather than letting
         // it surface asynchronously somewhere unrelated.
-        if (getenv("CHARM_ZC_VALIDATE")) {
+        if (zcValidateOn()) {
           cudaPointerAttributes sattr{};
           const cudaError_t serr = cudaPointerGetAttributes(&sattr, buffers[i]->ptr);
           if (serr != cudaSuccess || sattr.type == cudaMemoryTypeUnregistered) {

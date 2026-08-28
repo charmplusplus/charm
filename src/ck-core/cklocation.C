@@ -3403,17 +3403,19 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
       GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
       if(csv_gpu_manager.use_shm) {
         DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
-#if CMK_SMP
-        CmiLock(dm->lock);
-#endif
-        gpuMsg = dm->alloc_comm_buffer(gpuBufSize, false);
+        // Takes dm->lock itself, and reclaims retired IPC slots before giving
+        // up -- this region is only ever freed by that scan.
+        gpuMsg = CkRdmaDeviceAllocLbBuffer(dm, gpuBufSize);
         if (gpuMsg == nullptr) {
           CkAbort("PE %d, device %d: Not enough memory on device Load balance buffer (%zu free)",
               CkMyPe(), dm->global_index, dm->get_lb_buffer_free_size());
         }
+#if CMK_SMP
+        CmiLock(dm->lock);
+#endif
         // Pack copies go on the device's migration stream, not the null
         // stream (see DeviceManager::migration_stream). Lazy creation is
-        // serialized by the lock already held here.
+        // serialized by this lock.
         if (dm->migration_stream == NULL)
           hapiCheck(hapiStreamCreate(&dm->migration_stream));
         migStream = dm->migration_stream;
@@ -3887,13 +3889,7 @@ void CkLocMgr::immigrateGPUHandle(CkArrayElementMigrateHandleMessage* msg)
   if (total > 0) {
     GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
     DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
-#if CMK_SMP
-    CmiLock(dm->lock);
-#endif
-    gpuMsg = dm->alloc_comm_buffer(total, false);
-#if CMK_SMP
-    CmiUnlock(dm->lock);
-#endif
+    gpuMsg = CkRdmaDeviceAllocLbBuffer(dm, total);
     if (gpuMsg == nullptr) {
       CkAbort("PE %d, device %d: Not enough memory on device Load balance "
               "buffer (%zu free) for incoming migration of %zu bytes",
@@ -4005,17 +4001,11 @@ void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char* &data, int& srcPe, Ck
     hapiCheck(hapiMalloc((void**)&data, size));
   } else if(csv_gpu_manager.use_shm) {
     DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
-#if CMK_SMP
-    CmiLock(dm->lock);
-#endif
-    data = (char*)(dm->alloc_comm_buffer(size, false));
+    data = (char*)CkRdmaDeviceAllocLbBuffer(dm, size);
     if (data == nullptr) {
       CkAbort("PE %d, device %d: Not enough memory on device Load balance buffer (%zu free)",
           CkMyPe(), dm->global_index, dm->get_lb_buffer_free_size());
     }
-#if CMK_SMP
-    CmiUnlock(dm->lock);
-#endif
   }
   cudaDeviceSynchronize();
   receivedDeviceMsgs[id] = data;
