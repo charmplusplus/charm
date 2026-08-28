@@ -183,7 +183,7 @@ jobs:
     - name: Cache apoa1 files
       if: ${{ env.namd_secret != '' }}
       id: cache-apoa1-files
-      uses: actions/cache@v3
+      uses: actions/cache@v5
       with:
         path: ~/namddata/apoa1
         key: namd-apoa1-files
@@ -363,7 +363,7 @@ jobs:
     # This can't be enabled all the time as the tmate session will wait for a user to connect before running
     # the build.
     #- name: Tmate session for debugging
-    #  uses: mxschmitt/action-tmate@v2
+    #  uses: mxschmitt/action-tmate@v3
     - name: install-prerequisites
       run: |
         sudo apt-get update
