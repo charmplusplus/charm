@@ -18,7 +18,7 @@ libhybridapi.a: hybridapi.o buddy_allocator.o ck.o
 	-rm -f $@
 	ar q $@ hybridapi.o buddy_allocator.o ck.o
 
-hybridapi.o: hapi_impl.cpp hapi_impl.h gpumanager.h devicemanager.h buddy_allocator.h hapi.h hapi_nvtx.h
+hybridapi.o: hapi_impl.cpp hapi_impl.h hapi_portable.h gpumanager.h devicemanager.h buddy_allocator.h hapi.h hapi_nvtx.h
 	$(CHARMC) $(FLAGS) $(INC) -o $@ -c $<
 
 buddy_allocator.o : buddy_allocator.cpp buddy_allocator.h

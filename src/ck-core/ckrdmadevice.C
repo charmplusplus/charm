@@ -266,8 +266,8 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     } else if (mode == CkNcpyModeDevice::IPC && csv_gpu_manager.use_shm) {
       // Inter-process using shared memory optimizations
       // Use optimiziations with POSIX shared memory
-      cuda_ipc_device_info& device_info =
-        csv_gpu_manager.cuda_ipc_device_infos[source.device_idx];
+      hapi_ipc_device_info& device_info =
+        csv_gpu_manager.hapi_ipc_device_infos[source.device_idx];
 
       // 1. Make user-provided stream wait for IPC event using cudaStreamWaitEvent
       //    (source buffer to device comm buffer on source)
@@ -286,8 +286,8 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
 
       // 4. Set flag in shared memory so that the sender can start querying
       //    completion of the IPC event
-      cuda_ipc_event_shared* shm_event_shared =
-        (cuda_ipc_event_shared*)((char*)csv_gpu_manager.shm_ptr
+      hapi_ipc_event_shared* shm_event_shared =
+        (hapi_ipc_event_shared*)((char*)csv_gpu_manager.shm_ptr
             + csv_gpu_manager.shm_chunk_size * source.device_idx
             + sizeof(cudaIpcMemHandle_t)) + source.event_idx;
       pthread_mutex_lock(&shm_event_shared->lock);
@@ -341,10 +341,10 @@ int CkRdmaGetDestPEChare(int dest_pe, void* obj_ptr) {
 */
 
 static int findFreeIpcEvent(DeviceManager* dm, const size_t comm_offset) {
-  int pool_size = CsvAccess(gpu_manager).cuda_ipc_event_pool_size_pe;
+  int pool_size = CsvAccess(gpu_manager).hapi_ipc_event_pool_size_pe;
   int pool_start = CkMyRank() * pool_size;
   int device_index = dm->global_index;
-  cuda_ipc_device_info& my_device_info = CsvAccess(gpu_manager).cuda_ipc_device_infos[device_index];
+  hapi_ipc_device_info& my_device_info = CsvAccess(gpu_manager).hapi_ipc_device_infos[device_index];
 
   // Free IPC events that are complete
   // TODO: Don't do this every time but only when the event pool is somewhat empty
@@ -356,8 +356,8 @@ static int findFreeIpcEvent(DeviceManager* dm, const size_t comm_offset) {
     if (event_flag != 0) {
       // Check in shared memory if receiver has invoked the memcpy from
       // the device comm buffer on sender to destination buffer
-      cuda_ipc_event_shared* shm_event_shared =
-        (cuda_ipc_event_shared*)((char*)CsvAccess(gpu_manager).shm_ptr
+      hapi_ipc_event_shared* shm_event_shared =
+        (hapi_ipc_event_shared*)((char*)CsvAccess(gpu_manager).shm_ptr
             + CsvAccess(gpu_manager).shm_chunk_size * device_index
             + sizeof(cudaIpcMemHandle_t)) + i;
       bool can_query = false;
@@ -462,7 +462,7 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
             cudaMemcpyDeviceToDevice, buffers[i]->cuda_stream));
 
       // Record event
-      cuda_ipc_device_info& my_device_info = csv_gpu_manager.cuda_ipc_device_infos[dm->global_index];
+      hapi_ipc_device_info& my_device_info = csv_gpu_manager.hapi_ipc_device_infos[dm->global_index];
       hapiCheck(cudaEventRecord(my_device_info.src_event_pool[buffers[i]->event_idx], buffers[i]->cuda_stream));
     }
   } else {
