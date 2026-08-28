@@ -1,0 +1,60 @@
+name: reconverse-cuda
+
+# Build-only CUDA gate for the reviewed line: compiling and linking CUDA
+# needs the toolkit, not a GPU, and catches the whole build-time defect
+# class (missing header installs, incomplete renames, cross-branch include
+# leaks). Path-filtered so ordinary PRs keep the 5-minute CI; therefore
+# advisory, NOT a required status check (a skipped required check would
+# block unrelated PRs). Runtime GPU validation stays with the PR
+# template's HPC-site field until a GPU runner exists (plan item 17).
+
+on:
+  push:
+    branches: [reviewed-with-reconverse]
+    paths:
+      - 'src/arch/cuda/**'
+      - 'src/arch/common/conv-mach-cuda.*'
+      - 'src/arch/common/special.sh'
+      - 'src/ck-core/ckrdmadevice.*'
+      - 'src/conv-core/conv-rdmadevice.*'
+      - 'CMakeLists.txt'
+      - 'cmake/**'
+      - '.github/workflows/reconverse-cuda.yaml'
+  pull_request:
+    branches: [reviewed-with-reconverse]
+    paths:
+      - 'src/arch/cuda/**'
+      - 'src/arch/common/conv-mach-cuda.*'
+      - 'src/arch/common/special.sh'
+      - 'src/ck-core/ckrdmadevice.*'
+      - 'src/conv-core/conv-rdmadevice.*'
+      - 'CMakeLists.txt'
+      - 'cmake/**'
+      - '.github/workflows/reconverse-cuda.yaml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cuda-buildonly:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: install cuda toolkit
+        run: sudo apt-get update && sudo apt-get -y install nvidia-cuda-toolkit
+      - name: cmake build (all-test)
+        run: |
+          ./build all-test netlrts-linux-x86_64 cuda -j4 -g
+          test -f netlrts-linux-x86_64-cuda/lib/libhybridapi.a
+          ! grep -r cudahybridapi netlrts-linux-x86_64-cuda/lib
+      - name: cuda examples compile
+        run: |
+          export CUDATOOLKIT_HOME=/usr
+          make -j4 -C netlrts-linux-x86_64-cuda/examples/charm++/cuda OPTS="-g"
+      - name: legacy buildold path
+        run: |
+          rm -rf netlrts-linux-x86_64-cuda
+          ./buildold charm++ netlrts-linux-x86_64 cuda -j4 -g
+          test -L netlrts-linux-x86_64-cuda/include/hapi_portable.h || test -f netlrts-linux-x86_64-cuda/include/hapi_portable.h
