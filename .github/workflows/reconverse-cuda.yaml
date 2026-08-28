@@ -13,7 +13,10 @@ on:
     branches: [reviewed-with-reconverse]
     paths:
       - 'src/arch/cuda/**'
-      - 'tests/charm++/cuda/**'
+      # NOT 'tests/charm++/cuda/**': in GitHub's filter-pattern syntax '+'
+      # means one-or-more of the preceding character, so that pattern is
+      # rejected as invalid. tests/charm++ is the only tests/charm* directory.
+      - 'tests/charm*/cuda/**'
       - 'src/arch/common/conv-mach-cuda.*'
       - 'src/arch/common/special.sh'
       - 'src/ck-core/ckrdmadevice.*'
@@ -25,7 +28,10 @@ on:
     branches: [reviewed-with-reconverse]
     paths:
       - 'src/arch/cuda/**'
-      - 'tests/charm++/cuda/**'
+      # NOT 'tests/charm++/cuda/**': in GitHub's filter-pattern syntax '+'
+      # means one-or-more of the preceding character, so that pattern is
+      # rejected as invalid. tests/charm++ is the only tests/charm* directory.
+      - 'tests/charm*/cuda/**'
       - 'src/arch/common/conv-mach-cuda.*'
       - 'src/arch/common/special.sh'
       - 'src/ck-core/ckrdmadevice.*'
