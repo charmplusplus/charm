@@ -1,5 +1,12 @@
 #pragma once
 
+// Named guard in addition to pragma once: this header is reachable through
+// two paths (the source tree and the installed include directory), which
+// pragma once treats as distinct files. The duplicate macros tolerated that;
+// the hapiMallocRecord/hapiFreeRecord function definitions do not.
+#ifndef HAPI_PORTABLE_H_SEEN
+#define HAPI_PORTABLE_H_SEEN
+
 #undef CMK_CUDA
 #undef CMK_HIP
 
@@ -66,8 +73,27 @@
 #define hapiGetDeviceProperties(prop, dev) cudaGetDeviceProperties(prop, dev)
 #define hapiGetDevice(dev) cudaGetDevice(dev)
 
-#define hapiMalloc(ptr, size) cudaMalloc(ptr, size)
-#define hapiFree(ptr) cudaFree(ptr)
+// Per-chare device footprint tracking (implemented in hapi_impl.cpp; no-ops
+// when the load balancer is compiled out). hapiMalloc/hapiFree route through
+// these so every allocation made inside an entry method is attributed to the
+// running chare -- the producer behind the LB memory contract. Allocations
+// outside entry methods (runtime startup, comm buffers) are left unattributed.
+void hapiRecordAlloc(void* ptr, size_t size);
+void hapiRecordFree(void* ptr);
+
+template <typename hapiMallocT>
+static inline cudaError_t hapiMallocRecord(hapiMallocT** ptr, size_t size) {
+  const cudaError_t hapi_malloc_err = cudaMalloc((void**)ptr, size);
+  if (hapi_malloc_err == cudaSuccess) hapiRecordAlloc((void*)*ptr, size);
+  return hapi_malloc_err;
+}
+static inline cudaError_t hapiFreeRecord(void* ptr) {
+  hapiRecordFree(ptr);
+  return cudaFree(ptr);
+}
+
+#define hapiMalloc(ptr, size) hapiMallocRecord(ptr, size)
+#define hapiFree(ptr) hapiFreeRecord(ptr)
 #define hapiMallocHost(ptr, size) cudaMallocHost(ptr, size)
 #define hapiFreeHost(ptr) cudaFreeHost(ptr)
 
@@ -147,8 +173,23 @@
 #define hapiGetDevice(dev) hipGetDevice(dev)
 #define hapiStreamCreate(stream) hipStreamCreate(stream)
 
-#define hapiMalloc(ptr, size) hipMalloc(ptr, size)
-#define hapiFree(ptr) hipFree(ptr)
+// See the CUDA branch: allocation attribution for the LB memory contract.
+void hapiRecordAlloc(void* ptr, size_t size);
+void hapiRecordFree(void* ptr);
+
+template <typename hapiMallocT>
+static inline hipError_t hapiMallocRecord(hapiMallocT** ptr, size_t size) {
+  const hipError_t hapi_malloc_err = hipMalloc((void**)ptr, size);
+  if (hapi_malloc_err == hipSuccess) hapiRecordAlloc((void*)*ptr, size);
+  return hapi_malloc_err;
+}
+static inline hipError_t hapiFreeRecord(void* ptr) {
+  hapiRecordFree(ptr);
+  return hipFree(ptr);
+}
+
+#define hapiMalloc(ptr, size) hapiMallocRecord(ptr, size)
+#define hapiFree(ptr) hapiFreeRecord(ptr)
 #define hapiMallocHost(ptr, size) hipHostMalloc(ptr, size)
 #define hapiFreeHost(ptr) hipFreeHost(ptr)
 
@@ -174,3 +215,5 @@
 
 
 #endif // CMK_HIP
+
+#endif // HAPI_PORTABLE_H_SEEN

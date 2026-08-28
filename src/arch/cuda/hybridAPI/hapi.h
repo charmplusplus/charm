@@ -336,6 +336,11 @@ void hapiArenaRegister(void* base, size_t extent, size_t liveBuffers);
 // instead of hapiFree.
 void hapiFreeMigratable(void* ptr);
 
+// The running chare's attributed live device-allocation bytes (see the
+// footprint tracking in hapi_portable.h/hapi_impl.cpp). Valid inside an entry
+// method of a migratable chare; returns 0 otherwise.
+size_t hapiCurrentObjectFootprint();
+
 #ifdef CMK_LBDB_ON
 void hapiCuptiInit();
 void hapiCuptiFinalize();

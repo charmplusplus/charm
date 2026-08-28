@@ -200,6 +200,13 @@ void _loadbalancerInit()
   CkpvInitialize(LBUserDataLayout, lbobjdatalayout);
   CkpvInitialize(int, _lb_obj_index);
   CkpvAccess(_lb_obj_index) = -1;
+#if CMK_CUDA
+  // Per-object device footprint slot (the LB memory contract's producer
+  // writes it at AtSync). Registered here, not in a balancer's initLB: every
+  // balancer family -- central, tree, distributed -- reads it, and layout
+  // claims must precede object registration.
+  CkpvAccess(_lb_obj_index) = LBRegisterObjUserData(sizeof(size_t));
+#endif
 
   char** argv = CkGetArgv();
   char* balancer = NULL;

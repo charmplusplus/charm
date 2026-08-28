@@ -121,6 +121,7 @@ public:
   void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data
   void ProcessMigrationDecision();
   void ProcessReceiveMigration();
+  void ReleaseNextBatch();
   void MissMigrate(int waitForBarrier);
 
   //Shrink-Expand related functions
@@ -276,6 +277,17 @@ private:
   LBScatterMsg   *storedScatterMsg;
   bool  reduction_started;
   bool  use_thread;
+
+  // Batched migration execution (memory contract I-batch). The decision PE
+  // stashes one message per batch and releases them sequentially; every PE
+  // tracks which batch it is executing so MigrationDone can distinguish a
+  // batch boundary (reset counters, contribute to ReleaseNextBatch) from the
+  // end of the step (resume clients).
+  std::vector<LBMigrateMsg*> lbBatchMsgs;
+  int lbNextBatch = 0;
+  int lbCurBatch = 0;
+  int lbCurNBatches = 1;
+  void sendDecision(LBMigrateMsg* msg);
 
   FutureModel *predicted_model;
 

@@ -10,6 +10,7 @@
 #include "envelope.h"
 #include "CentralLB.h"
 #include "LBSimulation.h"
+#include "LBMemoryContract.h"
 #if CMK_CUDA
 #include <cupti.h>
 #include "gpumanager.h"
@@ -80,7 +81,10 @@ void CentralLB::initLB(const CkLBOptions &opt)
     turnOff();
 
   #if CMK_CUDA
-  CkpvAccess(_lb_obj_index) = LBRegisterObjUserData(sizeof(size_t));//gpu allocation size
+  // The footprint slot is registered once per PE in _loadbalancerInit; a
+  // second claim here would leak layout space and desynchronize the index.
+  if (CkpvAccess(_lb_obj_index) < 0)
+    CkpvAccess(_lb_obj_index) = LBRegisterObjUserData(sizeof(size_t));
   #endif
 
   stats_msg_count = 0;
@@ -954,6 +958,41 @@ void CentralLB::ApplyDecision() {
 #if CMK_REPLAYSYSTEM
   CpdHandleLBMessage(&migrateMsg);
 #endif
+
+#if CMK_CUDA
+  // Memory contract, I-batch: partition the decision so each batch's staged
+  // bytes fit every device's staging reserve. One batch (the usual case)
+  // takes the unmodified path below; multiple batches are stashed here and
+  // released sequentially by ReleaseNextBatch as each completes.
+  {
+    std::vector<int> batchOf;
+    const int nBatches = LBBatchPlanner::plan(statsData, batchOf);
+    if (nBatches > 1) {
+      if (_lb_args.debug() || getenv("CHARM_DEBUG_MEMCONTRACT") != NULL)
+        CkPrintf("CharmLB> memory contract: executing this step's migrations "
+                 "in %d batches\n", nBatches);
+      std::vector<int> savedTo = statsData->to_proc;
+      lbBatchMsgs.clear();
+      for (int k = 0; k < nBatches; k++) {
+        for (int i = 0; i < (int)statsData->objData.size(); i++)
+          if (savedTo[i] != statsData->from_proc[i] && batchOf[i] != k)
+            statsData->to_proc[i] = statsData->from_proc[i];
+          else
+            statsData->to_proc[i] = savedTo[i];
+        LBMigrateMsg* bm = createMigrateMsg(statsData);
+        bm->lb_batch = k;
+        bm->lb_nbatches = nBatches;
+        LBManagerObj()->get_avail_vector(bm->avail_vector);
+        bm->next_lb = LBManagerObj()->new_lbbalancer();
+        lbBatchMsgs.push_back(bm);
+      }
+      statsData->to_proc = savedTo;
+      delete migrateMsg;
+      migrateMsg = lbBatchMsgs[0];
+      lbNextBatch = 1;
+    }
+  }
+#endif
   
   LBManagerObj()->get_avail_vector(migrateMsg->avail_vector);
   migrateMsg->next_lb = LBManagerObj()->new_lbbalancer();
@@ -978,22 +1017,7 @@ void CentralLB::ApplyDecision() {
 
   DEBUGF(("[%d]calling recv migration\n",CkMyPe()));
 
-#if CMK_SCATTER_LB_RESULTS
-  InitiateScatter(migrateMsg);
-#else
-  if (1) {
-      // broadcast
-    thisProxy.ReceiveMigration(migrateMsg);
-  }
-  else {
-    // split the migration for each processor
-    for (int p=0; p<CkNumPes(); p++) {
-      LBMigrateMsg *m = extractMigrateMsg(migrateMsg, p);
-      thisProxy[p].ReceiveMigration(m);
-    }
-    delete migrateMsg;
-  }
-#endif
+  sendDecision(migrateMsg);
   // Zero out data structures for next cycle
   // CkPrintf("zeroing out data\n");
   statsData->clear();
@@ -1004,6 +1028,30 @@ void CentralLB::ApplyDecision() {
 void CentralLB::t_LoadBalance()
 {
     LoadBalance();
+}
+
+// Ship one decision message to every PE -- the send tail shared by the
+// normal path and batched release.
+void CentralLB::sendDecision(LBMigrateMsg* migrateMsg)
+{
+#if CMK_SCATTER_LB_RESULTS
+  InitiateScatter(migrateMsg);
+#else
+  thisProxy.ReceiveMigration(migrateMsg);
+#endif
+}
+
+// Reduction target on the decision PE: the previous batch has completed on
+// every PE, so release the next one. The final batch flows into the normal
+// MigrationDone path, which resumes clients.
+void CentralLB::ReleaseNextBatch()
+{
+#if CMK_LBDB_ON
+  if (lbNextBatch >= (int)lbBatchMsgs.size()) return;
+  LBMigrateMsg* m = lbBatchMsgs[lbNextBatch++];
+  if (lbNextBatch >= (int)lbBatchMsgs.size()) lbBatchMsgs.clear();
+  sendDecision(m);
+#endif
 }
 
 void CentralLB::InitiateScatter(LBMigrateMsg *msg) {
@@ -1021,6 +1069,10 @@ void CentralLB::InitiateScatter(LBMigrateMsg *msg) {
     LBScatterMsg(0, middlePe - 1);
   LBScatterMsg *rightMsg = new (CkNumPes() - middlePe, msg->n_moves)
     LBScatterMsg(middlePe, CkNumPes() - 1);
+  leftMsg->lb_batch = msg->lb_batch;
+  leftMsg->lb_nbatches = msg->lb_nbatches;
+  rightMsg->lb_batch = msg->lb_batch;
+  rightMsg->lb_nbatches = msg->lb_nbatches;
 
   int *migrateTally = new int[CkNumPes()];
   memset(migrateTally, 0, CkNumPes() * sizeof(int));
@@ -1070,6 +1122,8 @@ void CentralLB::ScatterMigrationResults(LBScatterMsg *msg) {
         // TODO: multicast without allocating new message each time
         LBScatterMsg *msgCopy = new (numPesInSpan, msg->numMigrates)
           LBScatterMsg(msg->firstPeInSpan, msg->lastPeInSpan);
+        msgCopy->lb_batch = msg->lb_batch;
+        msgCopy->lb_nbatches = msg->lb_nbatches;
         msgCopy->numMigrates = msg->numMigrates;
         memcpy(msgCopy->numMigratesPerPe, msg->numMigratesPerPe,
                numPesInSpan * sizeof(int));
@@ -1090,6 +1144,8 @@ void CentralLB::ScatterMigrationResults(LBScatterMsg *msg) {
       LBScatterMsg *rightMsg =
         new (numPesInRightSpan, leftMsg->numMigrates)
         LBScatterMsg(middlePe, leftMsg->lastPeInSpan);
+      rightMsg->lb_batch = leftMsg->lb_batch;
+      rightMsg->lb_nbatches = leftMsg->lb_nbatches;
       leftMsg->numMigrates = 0;
       leftMsg->lastPeInSpan = middlePe - 1;
       for (int i = 0; i < numMigrates; i++) {
@@ -1262,6 +1318,9 @@ void CentralLB::ProcessMigrationDecision() {
   LBScatterMsg *m = storedScatterMsg;
   CkAssert(m != NULL);
 
+  lbCurBatch = m->lb_batch;
+  lbCurNBatches = m->lb_nbatches;
+
   migrates_expected = m->numMigratesPerPe[CkMyPe() - m->firstPeInSpan];
   future_migrates_expected = 0;
 
@@ -1299,7 +1358,10 @@ void CentralLB::ProcessReceiveMigration()
         LBMigrateMsg *m = storedMigrateMsg;
         CmiAssert(m!=NULL);
 
-  if (_lb_args.debug() > 1) 
+  lbCurBatch = m->lb_batch;
+  lbCurNBatches = m->lb_nbatches;
+
+  if (_lb_args.debug() > 1)
     if (CkMyPe()%1024==0) CmiPrintf("[%d] Starting ReceiveMigration step %d at %f\n",CkMyPe(),step(), CmiWallTimer());
 
   for (i=0; i<CkNumPes(); i++) lbmgr->lastLBInfo.expectedLoad[i] = m->expectedLoad[i];
@@ -1444,6 +1506,24 @@ void CentralLB::MigrationDoneImpl (int balancing)
     CkPrintf("[LBMIG %d] MigrationDone balancing=%d\n", CkMyPe(), balancing);
     fflush(stdout);
   }
+
+  // Batch boundary, not the end of the step: reset the arrival accounting
+  // and signal the decision PE to release the next batch. Clients stay at
+  // the sync barrier; loads, step counters, and callbacks are untouched
+  // until the final batch flows through below.
+  if (lbCurBatch < lbCurNBatches - 1) {
+    if (lbMigDbg())
+      CkPrintf("[LBMIG %d] batch %d/%d complete\n", CkMyPe(), lbCurBatch + 1,
+               lbCurNBatches);
+    migrates_completed = 0;
+    migrates_expected = -1;
+    contribute(CkCallback(CkReductionTarget(CentralLB, ReleaseNextBatch),
+                          thisProxy[cur_ld_balancer]));
+    return;
+  }
+  lbCurBatch = 0;
+  lbCurNBatches = 1;
+
   migrates_completed = 0;
   migrates_expected = -1;
   // clear load stats
@@ -1625,6 +1705,26 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats)
 
   work(stats);
 
+#if CMK_CUDA
+  // Memory contract: every strategy's output passes through the verifier,
+  // memory-aware or not. Moves that would violate a device's headroom are
+  // refused (the object stays home -- always feasible); strategies that plan
+  // with the ledger produce plans that pass untouched. CHARM_LB_NO_MEMVERIFY
+  // is the escape hatch for A/B measurement.
+  if (getenv("CHARM_LB_NO_MEMVERIFY") == NULL) {
+    std::vector<ContractVerifier::Move> cvMoves;
+    for (int i = 0; i < (int)stats->objData.size(); i++) {
+      if (!stats->objData[i].migratable) continue;
+      if (stats->to_proc[i] == stats->from_proc[i]) continue;
+      ContractVerifier::Move m;
+      m.obj = i;
+      m.fromPe = stats->from_proc[i];
+      m.toPe = &stats->to_proc[i];
+      cvMoves.push_back(m);
+    }
+    ContractVerifier::verifyAndRepair(stats, cvMoves);
+  }
+#endif
 
   if ((_lb_args.debug()>2) && (CkMyPe() == cur_ld_balancer))  {
     CkPrintf("CharmLB> Obj Map:\n");

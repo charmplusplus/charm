@@ -96,7 +96,15 @@ class Elem : public CBase_Elem {
       p.pup_buffer_device(d_b, N_B);
   }
 
-  void iterate() { AtSync(); }
+  void iterate() {
+    // Deliberate load imbalance (element i carries ~(i+1) units of walltime)
+    // so central greedy balancers produce real cross-PE migrations -- this
+    // app doubles as the exerciser for the memory contract's batched
+    // execution protocol, which only central balancers run.
+    const double until = CkWallTimer() + 0.0005 * (thisIndex + 1);
+    while (CkWallTimer() < until) { }
+    AtSync();
+  }
 
   void ResumeFromSync() { mainProxy.done(); }
 };

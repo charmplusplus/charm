@@ -312,6 +312,20 @@ void DiffusionLB::update_peload(int rank, double load) {
  * - create minheap of PEs sorted by load
  * - create maxheap of objects (using ckheap) sorted by load
  * - iterate through objects in maxheap and offload based on minheap (via LoadReceived)
+ *
+ * MEMORY CONTRACT (LBMemoryContract.h) -- integration design, not yet wired:
+ * DiffusionLB does not pass through CentralLB::Strategy, so the contract
+ * verifier does not cover it. The decentralized form of the contract is
+ * receiver-side acceptance: (1) each PE advertises its device's free memory
+ * on the neighbor load-exchange messages it already sends; (2) a transfer
+ * becomes an offer that the RECEIVER accepts or refuses against a local
+ * ledger of headroom minus committed arrivals (receiver-side serialization
+ * resolves concurrent senders; a refusal is ordinary diffusion back-pressure
+ * -- the object stays and later rounds retry); (3) I-batch is local: each PE
+ * bounds its own round's outgoing staged bytes by its staging reserve. The
+ * offer/refusal round-trip touches this file, DiffusionNeighbors, and the
+ * LoadMetaInfo/LoadReceived protocol, and must be validated on a multi-device
+ * run -- deliberately not implemented blind on a single-GPU machine.
  * */
 void DiffusionLB::WithinNodeLB()
 {

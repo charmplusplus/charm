@@ -23,6 +23,7 @@
 #include "charm++.h"
 #include "ckgraph.h"
 #include "GreedyRefineCentralLB.h"
+#include "LBMemoryContract.h"
 
 #include <float.h>
 #include <limits.h>
@@ -305,7 +306,12 @@ double GreedyRefineCentralLB::fillData(LDStats *stats,
     obj.id = i;
     obj.oldPE = pe;
     obj.gpuPupSize = oData.gpuPupSize;
-    obj.gpuAllocSize = *(size_t *)oData.getUserData(CkpvAccess(_lb_obj_index));
+    // Resident device footprint from the user-data slot, produced at AtSync
+    // (already floored at the serialized size there). Guard the slot index:
+    // reading through -1 would index past the user-data block.
+    obj.gpuAllocSize = (CkpvAccess(_lb_obj_index) >= 0)
+        ? *(size_t *)oData.getUserData(CkpvAccess(_lb_obj_index))
+        : (size_t)oData.gpuPupSize;
     CkAssert(pe >= 0 && pe <= n_pes);
     if (pe == n_pes) obj.oldPE = -1; // this can happen in HybridLB if object comes from outside group. mark oldPE as -1 in this situation
     if (!oData.migratable) {
@@ -552,6 +558,16 @@ void GreedyRefineCentralLB::work(LDStats *stats)
     for (int pe : gpuGroups[gi].peIds)
       peToGrpIdx[pe] = gi;
 
+  // Memory contract: the model and ledger replace the inline pool/free-memory
+  // arithmetic. Two-phase accounting (departures credited at pack) makes
+  // swaps into memory-full devices plannable; held transports (same-process
+  // peer copies) get no credit; the wave's staging demand is throttled until
+  // batched execution lands.
+  LBMemoryModel memModel;
+  memModel.build(stats);
+  MemoryLedger ledger;
+  ledger.init(&memModel, 0.95, /*waveStaging=*/true);
+
   for (int i = 0; i < (int)pobjs.size(); i++) {
     const GreedyRefineCentralLB::GObj *obj = pobjs[i];
     double obj_load = obj->load;
@@ -576,13 +592,25 @@ void GreedyRefineCentralLB::work(LDStats *stats)
             chosen_gi = src_gi;
     }
 
-    // Pool buffer constraint
-    if (chosen_gi != src_gi && src_gi >= 0 && obj->gpuPupSize > 0) {
-      if (gpuGroups[src_gi].pool_buff_mem_remaining < obj->gpuPupSize || gpuGroups[chosen_gi].pool_buff_mem_remaining < obj->gpuPupSize)
-        chosen_gi = src_gi;
-
-      if((size_t)(0.95 * gpuGroups[chosen_gi].gpu_mem_remaining) <  obj->gpuAllocSize )//95% of the rest of the memory can be filled
-        chosen_gi = src_gi;
+    // Memory contract: the chosen group must be able to receive this object.
+    // If the lightest group cannot, fall through to the next-lightest group
+    // that can, rather than pinning the object home; staying home is always
+    // feasible and is the terminal fallback.
+    if (chosen_gi != src_gi && src_gi >= 0 && obj->gpuPupSize > 0 &&
+        !ledger.feasible(obj->id, obj->oldPE, gpuGroups[chosen_gi].peIds[0])) {
+      std::vector<int> byLoad(nGroups);
+      for (int gi = 0; gi < nGroups; gi++) byLoad[gi] = gi;
+      std::sort(byLoad.begin(), byLoad.end(), [&](int a, int b) {
+        return gpuGroups[a].load < gpuGroups[b].load;
+      });
+      chosen_gi = src_gi;
+      for (int gi : byLoad) {
+        if (gi == src_gi) break;  // reached home before any feasible group
+        if (ledger.feasible(obj->id, obj->oldPE, gpuGroups[gi].peIds[0])) {
+          chosen_gi = gi;
+          break;
+        }
+      }
     }
 
     GPUGrp &g = gpuGroups[chosen_gi];
@@ -610,12 +638,10 @@ void GreedyRefineCentralLB::work(LDStats *stats)
     // Update GPU group aggregate
     g.load += scaled;
 
-    if (chosen_gi != src_gi && src_gi >= 0 && obj->gpuPupSize > 0)
-    {
-      gpuGroups[src_gi].pool_buff_mem_remaining -= obj->gpuPupSize;
-      gpuGroups[chosen_gi].pool_buff_mem_remaining -= obj->gpuPupSize;
-      gpuGroups[chosen_gi].gpu_mem_remaining-= obj->gpuAllocSize;
-    }
+    // Commit the accepted move to the ledger (no-op when the device does not
+    // change or the object carries no device state).
+    if (obj->oldPE >= 0 && bestPe != obj->oldPE && obj->gpuPupSize > 0)
+      ledger.commit(obj->id, obj->oldPE, bestPe);
 
     // Track max GPU-group load; expand M if exceeded
     if (g.load > maxLoad) {

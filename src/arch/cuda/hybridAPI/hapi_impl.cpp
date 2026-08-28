@@ -2274,6 +2274,75 @@ void hapiFreeMigratable(void* ptr) {
   hapiCheck(hapiFree(ptr));
 }
 
+/*** Per-chare device footprint tracking (see hapi_portable.h) ***/
+//
+// The producer behind the LB memory contract: every hapiMalloc/hapiFree made
+// while a chare's entry method is running is attributed to that chare's LB
+// identity, giving the balancer the per-object resident footprint its
+// final-placement feasibility check needs. Identity comes from the same
+// source as CUPTI kernel attribution -- the active location record -- and is
+// stable across migration within a process. Allocations made outside entry
+// methods (startup, comm buffers, arenas) are deliberately unattributed; the
+// consumer floors the footprint at the serialized size, so missing
+// attribution errs toward refusing a move, never toward approving one.
+
+#if CMK_LBDB_ON
+
+namespace {
+std::unordered_map<LDObjKey, size_t, LDObjKeyHash> gpu_obj_footprint;
+std::unordered_map<void*, std::pair<LDObjKey, size_t>> gpu_ptr_owner;
+std::mutex gpu_footprint_lock;
+
+bool hapiActiveObjKey(LDObjKey& key) {
+  CkLocRec* active = CkActiveLocRec();
+  if (active == NULL) return false;
+  const LDObjHandle& handle = active->getLdHandle();
+  key.omID() = handle.omID();
+  key.objID() = handle.objID();
+  return true;
+}
+}
+
+void hapiRecordAlloc(void* ptr, size_t size) {
+  if (ptr == NULL) return;
+  LDObjKey key{};
+  if (!hapiActiveObjKey(key)) return;  // runtime allocation: unattributed
+  std::lock_guard<std::mutex> g(gpu_footprint_lock);
+  gpu_obj_footprint[key] += size;
+  gpu_ptr_owner[ptr] = std::make_pair(key, size);
+}
+
+void hapiRecordFree(void* ptr) {
+  if (ptr == NULL) return;
+  std::lock_guard<std::mutex> g(gpu_footprint_lock);
+  auto it = gpu_ptr_owner.find(ptr);
+  if (it == gpu_ptr_owner.end()) return;  // was not attributed at allocation
+  auto owner = gpu_obj_footprint.find(it->second.first);
+  if (owner != gpu_obj_footprint.end()) {
+    owner->second -= (owner->second >= it->second.second)
+                         ? it->second.second : owner->second;
+  }
+  gpu_ptr_owner.erase(it);
+}
+
+// The running chare's attributed live bytes; called from the AtSync path,
+// where the active object is the chare itself.
+size_t hapiCurrentObjectFootprint() {
+  LDObjKey key{};
+  if (!hapiActiveObjKey(key)) return 0;
+  std::lock_guard<std::mutex> g(gpu_footprint_lock);
+  auto it = gpu_obj_footprint.find(key);
+  return (it == gpu_obj_footprint.end()) ? 0 : it->second;
+}
+
+#else
+
+void hapiRecordAlloc(void* ptr, size_t size) { (void)ptr; (void)size; }
+void hapiRecordFree(void* ptr) { (void)ptr; }
+size_t hapiCurrentObjectFootprint() { return 0; }
+
+#endif  // CMK_LBDB_ON
+
 /******************** DEPRECATED ********************/
 // Need to be updated with the Tracing API.
 static inline void gpuEventStart(hapiWorkRequest* wr, int* index,

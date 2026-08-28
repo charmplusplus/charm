@@ -2017,6 +2017,25 @@ void CkMigratable::AtSync(int waitForMigration)
   this->virtual_pup(ps);
   // printf("[%d] gpu pup size %ld\n",CkMyPe(), ps.gpu_size() );
   setGPUPupSize(ps.gpu_size());
+  #if CMK_LB_USER_DATA
+  // Per-chare device footprint, written into the LB user-data slot the
+  // memory-aware strategies read. Floored at the serialized size so an
+  // unattributed footprint (allocations outside entry methods, arena
+  // storage) can never read as "free to move".
+  {
+    const int udIdx = CkpvAccess(_lb_obj_index);
+    void* ud = (udIdx >= 0) ? getObjUserData(udIdx) : NULL;
+    size_t footprint = 0;
+    if (ud != NULL) {
+      footprint = hapiCurrentObjectFootprint();
+      if (footprint < ps.gpu_size()) footprint = ps.gpu_size();
+      *(size_t*)ud = footprint;
+    }
+    if (getenv("CHARM_DEBUG_GPU_FOOTPRINT") != NULL)
+      CkPrintf("[%d] LB footprint: idx=%d ud=%p fp=%zu pup=%zu\n",
+               CkMyPe(), udIdx, ud, footprint, ps.gpu_size());
+  }
+  #endif
   #endif
   if (_lb_psizer_on || _lb_args.metaLbOn())
   {

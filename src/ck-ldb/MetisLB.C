@@ -11,6 +11,7 @@
 
 #include "MetisLB.h"
 #include "ckgraph.h"
+#include "LBMemoryContract.h"
 #include <algorithm>
 #include <cstddef>
 #include <metis.h>
@@ -75,12 +76,27 @@ void MetisLB::work(LDStats* stats)
     numEdges += vertex.sendToList.size() + vertex.recvFromList.size();
   }
 
+  // Memory contract: when per-object device footprints exist, memory becomes
+  // a second METIS balancing constraint, so the partitioner spreads resident
+  // device bytes as well as load. The verifier in CentralLB::Strategy then
+  // hardens METIS's soft tolerance into hard capacity compliance.
+  int nConstraints = 1;
+#if CMK_CUDA
+  LBMemoryModel memModel;
+  memModel.build(stats);
+  bool memAware = false;
+  if (memModel.numDevices() > 0)
+    for (int i = 0; i < numVertices && !memAware; i++)
+      if (memModel.footprint(ogr->vertices[i].getVertexId()) > 0) memAware = true;
+  if (memAware) nConstraints = 2;
+#endif
+
   /* adjacency list */
   std::vector<idx_t> xadj(numVertices + 1);
   /* id of the neighbors */
   std::vector<idx_t> adjncy(numEdges);
-  /* weights of the vertices */
-  std::vector<idx_t> vwgt(numVertices);
+  /* weights of the vertices (interleaved when nConstraints > 1) */
+  std::vector<idx_t> vwgt((size_t)numVertices * nConstraints);
   /* weights of the edges */
   std::vector<idx_t> adjwgt(numEdges);
 
@@ -94,10 +110,19 @@ void MetisLB::work(LDStats* stats)
   for (int i = 0; i < numVertices; i++)
   {
     xadj[i] = edgeNum;
+    idx_t* w = &vwgt[(size_t)i * nConstraints];
     if (ogr->vertices[i].getVertexLoad() == 0 && ratio == 0)
-      vwgt[i] = 1;
+      w[0] = 1;
     else
-      vwgt[i] = (int)ceil(ogr->vertices[i].getVertexLoad() * ratio);
+      w[0] = (int)ceil(ogr->vertices[i].getVertexLoad() * ratio);
+#if CMK_CUDA
+    if (nConstraints > 1) {
+      // Footprint in MB, floored at 1 so every object has nonzero weight in
+      // the memory dimension (METIS requires positive weights to balance).
+      size_t fp = memModel.footprint(ogr->vertices[i].getVertexId());
+      w[1] = (idx_t)(fp >> 20) + 1;
+    }
+#endif
     for (const auto& outEdge : ogr->vertices[i].sendToList)
     {
       adjncy[edgeNum] = outEdge.getNeighborId();

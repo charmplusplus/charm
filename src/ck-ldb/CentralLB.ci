@@ -30,6 +30,7 @@ group [migratable] CentralLB : BaseLB {
   entry void ReceiveMigration(LBScatterMsg*);
   entry [reductiontarget] void ProcessReceiveMigration();
   entry [reductiontarget] void ProcessMigrationDecision();
+  entry [reductiontarget] void ReleaseNextBatch();
   entry void MissMigrate(int);
   entry void CallLB();
   entry void CheckForRealloc();

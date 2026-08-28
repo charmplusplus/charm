@@ -236,6 +236,10 @@ public:
   int numMigrates;
   int firstPeInSpan;
   int lastPeInSpan;
+  // Batched migration execution (the memory contract's I-batch): which batch
+  // of the step's decision this message carries, out of how many.
+  int lb_batch;
+  int lb_nbatches;
   int *numMigratesPerPe;
   MigrateDecision *moves;
 
@@ -243,6 +247,8 @@ public:
     numMigrates = 0;
     firstPeInSpan = firstPe;
     lastPeInSpan = lastPe;
+    lb_batch = 0;
+    lb_nbatches = 1;
   }
 };
 
@@ -263,12 +269,19 @@ public:
 
   double * expectedLoad;	// expected load for future
 
+  // Batched migration execution (the memory contract's I-batch): which batch
+  // of the step's decision this message carries, out of how many.
+  int lb_batch;
+  int lb_nbatches;
+
 public:
-  LBMigrateMsg(): level(0), n_moves(0), next_lb(0) {}
+  LBMigrateMsg(): level(0), n_moves(0), next_lb(0), lb_batch(0), lb_nbatches(1) {}
   void pup(PUP::er &p) {
     int i;
     p | level;
     p | n_moves;
+    p | lb_batch;
+    p | lb_nbatches;
     // Warning: it relies on the fact that the message has been allocated already
     // with the correct number of moves!
     p | next_lb;
