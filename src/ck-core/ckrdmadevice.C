@@ -50,10 +50,13 @@
 #include "ck.h"
 #include "ckrdmadevice.h"
 
-/* Stage 9.1 boundary: this file is the classic D2D implementation. The
- * condition lives in ckrdmadevice.h so that referencing sites test the same
- * macro; see the comment there. */
-#if CMK_CKRDMADEVICE_CLASSIC_D2D
+/* Stage 9.1 boundary: this file is the classic D2D implementation, written
+ * against the classic half of ckrdmadevice.h (cuda_* fields, 4-param
+ * CmiSendDevice). The reconverse D2D implementation arrives with stage 9.2
+ * (see doc/reconverse-migration-ledger.README.md); until then reconverse
+ * CUDA builds compile this file empty, and device-RDMA entry parameters
+ * fail at link with these symbols missing. */
+#if CMK_CUDA && !CMK_RECONVERSE
 
 #include "hapi.h"
 #include "gpumanager.h"

@@ -20,11 +20,12 @@ authoritative), `tombstone` / `tombstone-candidate`, `needs-judgment`.
   versions of these files onto the post-9.1 base; no line selection
   needed. 9.2 = GPU-direct D2D transport (validate on a multi-GPU
   Anvil node, `-A asc050025-gpu`); 9.3 = examples/benchmarks tier.
-  The 9.2 file boundary is named by `CMK_CKRDMADEVICE_CLASSIC_D2D`
-  (defined in `ckrdmadevice.h`): it is what excises `ckrdmadevice.C`
-  and what every referencing site tests, so 9.2 retires the macro
-  rather than hunting for guards that drifted. `grep -rn
-  CMK_CKRDMADEVICE_CLASSIC_D2D src/` enumerates it.
+  The 9.2 boundary is spelled `!CMK_RECONVERSE`, in `ckrdmadevice.C`
+  and at every site referencing a symbol it defines (today just the
+  `loopback_handler` registration in `init.C`). Those guards have to
+  move together: drifting apart is what broke the first reconverse+GPU
+  link. `grep -rn "loopback_bridge\|loopback_handler" src/` enumerates
+  the referencing sites.
 - Acceptance test for the GPU series: `tests/charm++/cuda/hapitest`,
   one self-checking program (device mapping, buddy allocator, N async
   callbacks). Build-only in CI per #3950; reviewers run it on their
