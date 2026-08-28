@@ -1704,6 +1704,7 @@ void hapiRecordTime(hapiStream_t stream, hapiEvent_t start) {
 }
 #endif
 
+#ifdef HAPI_CUPTI_LB
 uint64_t hapiCuptiPushObjCorrelation() {
   // printf("seeing CsvAccess(gpu_manager).cupti_initialized_ as %d\n", CsvAccess(gpu_manager).cupti_initialized_);
   if (!CsvAccess(gpu_manager).cupti_initialized_) return 0;
@@ -1739,6 +1740,7 @@ void hapiCuptiPopObjCorrelation() {
       CUPTI_EXTERNAL_CORRELATION_KIND_UNKNOWN, &tag));
 #endif
 }
+#endif  /* HAPI_CUPTI_LB */
 
 // Lightweight HAPI, to be invoked after data transfer or kernel execution.
 void hapiAddCallback(hapiStream_t stream, const CkCallback& cb, void* cb_msg) {
