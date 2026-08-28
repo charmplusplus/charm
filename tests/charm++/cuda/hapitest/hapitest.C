@@ -203,6 +203,24 @@ static void runBuddyChecks(int& checks) {
   CkEnforce(a.get_lb_free_size() == lbSize);
   CkEnforce(a.malloc(lbSize + 1, false) == NULL);
   checks += 2;
+
+  // No LB region at all -- which is the runtime's own default, not an exotic
+  // case: GPUManager::lb_buffer_size stays 0 unless +gpulbbuffer is passed, so
+  // create_comm_buffer() asks for total == comm. free() routes to the LB path
+  // by comparing against lb_base_ptr unconditionally, so that member has to be
+  // meaningful here too.
+  {
+    buddy::allocator b(commSize, commSize);
+    CkEnforce(b.get_free_size() == commSize);
+    CkEnforce(b.get_lb_free_size() == 0);
+    void* p1 = b.malloc(4096, true);
+    void* p2 = b.malloc(8192, true);
+    CkEnforce(p1 != NULL && p2 != NULL);
+    b.free(p1);
+    b.free(p2);
+    CkEnforce(b.get_free_size() == commSize);
+    checks += 5;
+  }
 }
 
 // ---------------------------------------------------------------------------
