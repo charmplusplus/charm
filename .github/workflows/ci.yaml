@@ -64,7 +64,7 @@ jobs:
   doc:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     -
       uses: actions/setup-python@v4
       with:
@@ -293,7 +293,7 @@ jobs:
     timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: ShellCheck
       run: |
         # TODO: add more scripts
