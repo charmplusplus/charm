@@ -74,6 +74,33 @@ there.
 |---|---|---|
 | 22 | **Migration ledger**: `doc/reconverse-migration-ledger.tsv` + `doc/check-migration-ledger.sh` | Every file differing between the reviewed line and `reconverse-specific-build` carries a disposition (plan item, PR, superseded, tombstone, needs-judgment). The script fails on any undispositioned file — including new commits landing on the old branch — so nothing migrates silently or gets forgotten. Migration is provably complete when the check passes with only tombstone/superseded rows remaining. Resolve the needs-judgment rows (locmgr/cklocation.C via the queued joint review; conv-ccs; pup) as their reviews happen. |
 
+## Endgame (accelerated per Kale, 2026-08-28)
+
+Item 21 no longer waits for NAMD/ChaNGa parity: it executes after the
+freeze tag on main. Order:
+
+1. Merge the in-flight PRs: #3951 (GPU stage 9.1), #3952 (ci.yaml
+   action upgrades on main).
+2. Kale tags main (e.g. `v8.0.1-classic-final`) — the immutable last
+   classic release. All planned fixes (#3942, #3943, #3946, #3952) are
+   in main before the tag.
+3. **Item-21 PR** on the reviewed line (below). Must include deleting
+   `.github/workflows/ci.yaml`: its trigger is `branches: [main]`, so
+   after step 4 it would otherwise start running the classic matrix on
+   every PR to the renamed branch.
+4. Rename choreography: GitHub-rename `main` -> `classic` (protection
+   and redirects move with it); rename `reviewed-with-reconverse` ->
+   `main` (its protection and required checks move with it); set the
+   default branch. No open PRs may target old main at this point.
+5. Announcement to users, which MUST state: existing clones tracking
+   `origin/main` will receive the reconverse tree on their next pull;
+   classic dependents run `git checkout classic` (and update anything
+   pinned to the branch name `main`).
+6. Release: a release tag on the new main when the group deems it
+   ready. Releasing does not require waiting for anything beyond this
+   sequence; NAMD/ChaNGa validation continues in parallel and gates
+   nothing here.
+
 ## At the rename milestone (same trigger as #20)
 
 | # | Item | Notes |
