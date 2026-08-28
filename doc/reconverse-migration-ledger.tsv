@@ -1,17 +1,4 @@
-# Migration ledger: reconverse-specific-build -> reviewed-with-reconverse
-# Generated 2026-08-26 vs #3944 tip. Columns: file, changed-lines, disposition, note
-# Dispositions: item-N (plan item), pr-NNNN, with-feature, superseded,
-#               tombstone / tombstone-candidate, needs-judgment
-# Sub-stage dispositions for the GPU series (2026-08-28):
-#   item-9.1-DONE -- landed via gpu-stage1-hapi (HAPI portable core).
-#   item-9.2 / item-9.3 -- whole-file boundaries; take the branch versions
-#     of these files onto post-9.1 base; no line selection needed.
-#   item-11 (GPU-LB) is a WITHIN-FILE boundary, not a file list: activate by
-#     defining HAPI_CUPTI_LB (cmake + charmc) together with its ck-ldb half
-#     (LBHasBalancersRegistered, setObjGPUTime/getObjGPUTime on migratables).
-#     The complete boundary is enumerable: grep -rn HAPI_CUPTI_LB src/
-#   item-10 note: the memory-daemon excision markers in hapi_impl.cpp say
-#     "returns with the shrink/expand series" -- grep those when staging it.
+file	changed_lines	disposition	note
 .github/workflows/ci.yaml	29	superseded	reviewed line two-way version is authoritative
 CMakeLists.txt	223	superseded	reviewed line two-way version is authoritative
 Dockerfile	25	needs-judgment	

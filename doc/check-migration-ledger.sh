@@ -16,5 +16,5 @@ done
 n_judge=$(grep -c "	needs-judgment	" "$LEDGER" || true)
 [ "$n_judge" -gt 0 ] && echo "NEEDS-JUDGMENT rows remaining: $n_judge"
 n_live=$(git diff --name-only "$REVIEWED...$BRANCH" | wc -l | tr -d ' ')
-echo "live delta: $n_live files (ledger covers $(grep -vc '^#' "$LEDGER") rows)"
+echo "live delta: $n_live files (ledger covers $(($(wc -l < "$LEDGER") - 1)) rows)"
 [ "$fail" -eq 0 ]
