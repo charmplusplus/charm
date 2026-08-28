@@ -1485,7 +1485,9 @@ void _initCharm(int unused_argc, char **argv)
 	// Set the ack handler function used for the direct nocopy api
 	CmiSetDirectNcpyAckHandler(CkRdmaDirectAckHandler);
 
-#if (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM
+/* loopback_bridge/handler live in ckrdmadevice.C's reconverse D2D
+ * implementation, which arrives with stage 9.2 -- gate follows the file. */
+#if (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM && !CMK_RECONVERSE
   loopback_handler = CmiRegisterHandler((CmiHandler) loopback_bridge);
 #endif
 
