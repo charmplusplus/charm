@@ -1485,7 +1485,9 @@ void _initCharm(int unused_argc, char **argv)
 	// Set the ack handler function used for the direct nocopy api
 	CmiSetDirectNcpyAckHandler(CkRdmaDirectAckHandler);
 
-#if (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM
+/* CMK_CKRDMADEVICE_CLASSIC_D2D: both symbols are defined by ckrdmadevice.C,
+ * which is excised until stage 9.2 ports D2D to reconverse. */
+#if (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM && CMK_CKRDMADEVICE_CLASSIC_D2D
   loopback_handler = CmiRegisterHandler((CmiHandler) loopback_bridge);
 #endif
 

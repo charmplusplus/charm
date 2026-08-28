@@ -4,6 +4,27 @@
 /* Two-runtime header (same pattern as conv-rdmadevice.h / cmirdmautils.h). */
 #include "charm-config.h"
 
+/* Stage 9.1/9.2 boundary, single source of truth.
+ *
+ * ckrdmadevice.C holds the classic D2D implementation, written against the
+ * classic half of this header (cuda_* fields, 4-param CmiSendDevice); the
+ * reconverse D2D port arrives with stage 9.2 (see
+ * doc/reconverse-migration-ledger.README.md). Until then the file compiles
+ * empty everywhere else.
+ *
+ * Every site that references a symbol *defined* in that file must test this
+ * macro, not re-derive the condition. Two guards that drifted apart are what
+ * broke the first reconverse+GPU link: the file was excised under
+ * `CMK_CUDA && !CMK_RECONVERSE` while init.C still registered
+ * loopback_bridge/loopback_handler under `(CMK_CUDA || CMK_HIP) &&
+ * CMK_GPU_COMM`, so both reconverse+CUDA and any HIP build failed with those
+ * two symbols undefined. Retire this macro with stage 9.2. */
+#if CMK_CUDA && !CMK_RECONVERSE
+#define CMK_CKRDMADEVICE_CLASSIC_D2D 1
+#else
+#define CMK_CKRDMADEVICE_CLASSIC_D2D 0
+#endif
+
 #if CMK_RECONVERSE
 
 #include "ckcallback.h"

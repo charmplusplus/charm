@@ -20,6 +20,16 @@ authoritative), `tombstone` / `tombstone-candidate`, `needs-judgment`.
   versions of these files onto the post-9.1 base; no line selection
   needed. 9.2 = GPU-direct D2D transport (validate on a multi-GPU
   Anvil node, `-A asc050025-gpu`); 9.3 = examples/benchmarks tier.
+  The 9.2 file boundary is named by `CMK_CKRDMADEVICE_CLASSIC_D2D`
+  (defined in `ckrdmadevice.h`): it is what excises `ckrdmadevice.C`
+  and what every referencing site tests, so 9.2 retires the macro
+  rather than hunting for guards that drifted. `grep -rn
+  CMK_CKRDMADEVICE_CLASSIC_D2D src/` enumerates it.
+- Acceptance test for the GPU series: `tests/charm++/cuda/hapitest`,
+  one self-checking program (device mapping, buddy allocator, N async
+  callbacks). Build-only in CI per #3950; reviewers run it on their
+  own GPUs. It is backend-neutral, so an NVIDIA run and an AMD run are
+  the same verdict on the same source.
 - **item 11 (GPU-LB) is a within-file boundary, not a file list**:
   activate by defining `HAPI_CUPTI_LB` (cmake + charmc) together with
   its ck-ldb half (`LBHasBalancersRegistered`, `setObjGPUTime` /
