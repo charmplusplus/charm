@@ -44,6 +44,9 @@ namespace buddy {
   }
 
   size_t allocator::get_lb_free_size() {
+    // No LB region: head/tail are null, so there is no free list to walk.
+    if (lb_size == 0) return 0;
+
     size_t free = 0;
     lb_free_list* tmp = head->next;
     while(tmp != tail) {
@@ -84,7 +87,26 @@ namespace buddy {
     buckets = new std::list<FreeBlock>[bucket_count];
     buckets[bucket_count-1].emplace_back(base_ptr, _comm_size);
 
-    // Initialize vars for load balancing
+    // Initialize vars for load balancing.
+    //
+    // These must be set even when no LB region was requested: free() routes a
+    // pointer to the LB path purely by comparing it against lb_base_ptr, and
+    // the runtime's default configuration is exactly the no-LB one
+    // (GPUManager::lb_buffer_size is 0 unless +gpulbbuffer is passed, so
+    // create_comm_buffer() is called with total == comm). Leaving lb_base_ptr
+    // uninitialized there made every comm-buffer free() compare against
+    // garbage and, about half the time, abort in the LB branch with
+    // "got a request to free buffer of size 0".
+    //
+    // Anchoring the empty LB region at the end of the comm region makes the
+    // comparison false for every comm allocation, which is the correct
+    // routing.
+    lb_size = 0;
+    lb_base_ptr = base_ptr + _comm_size;
+    lb_ptr = lb_base_ptr;
+    head = nullptr;
+    tail = nullptr;
+
     if(_comm_lb_size != _comm_size) {
       lb_free_pool.resize(128);
 
