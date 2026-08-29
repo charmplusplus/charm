@@ -281,9 +281,11 @@ void ParamList::size(XStr& str)
         // location is unconfirmed, and homePe() has no relationship to
         // where the element actually lives for arrays populated by explicit
         // insert() (e.g. round-robin). CkRdmaDeviceOnSender needs to know
-        // when it genuinely doesn't know -- whichPe() reports -1 rather
-        // than guessing.
-        str << "  dest_pe = ckLocalBranch()->getLocMgr()->whichPe(ckGetIndex());\n";
+        // when it genuinely doesn't know -- it reports -1 rather than
+        // guessing. deviceSendDestPe layers the process residency table over
+        // whichPe(), because only that table can say for certain whether the
+        // target is on this process's GPU.
+        str << "  dest_pe = ckLocalBranch()->getLocMgr()->deviceSendDestPe(ckGetIndex());\n";
       }
       else if (container->isGroup() || container->isNodeGroup())
       {

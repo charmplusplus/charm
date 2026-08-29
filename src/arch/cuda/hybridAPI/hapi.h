@@ -10,6 +10,7 @@
 #include "ckcallback.h"
 #include <cstring>
 #include <cstdlib>
+#include <cstdint>
 #include <vector>
 
 /******************** DEPRECATED ********************/
@@ -369,10 +370,25 @@ class hapiCuptiKernelTagScope {
 };
 
 void hapiProcessCuptiBuffers();
-// Flush, parse and normalize this round's CUPTI records, once per round however
-// many PE threads call it. Load balancers should call this rather than the three
-// steps individually -- see the comment on GPUManager::cupti_prepare_lock_.
-void hapiPrepareCuptiLoads();
+
+// Epoch a load balancer passes to hapiPrepareCuptiLoads: larger than any
+// sampling epoch, so an LB round always rebuilds on top of whatever the
+// samplers last produced, and a second PE arriving at the same round finds the
+// build already done.
+#define HAPI_CUPTI_EPOCH_LB_ROUND UINT64_MAX
+
+// Flush, parse and normalize the CUPTI records accumulated since the last
+// hapiClearCuptiData, once per epoch however many PE threads call it. Load
+// balancers should call this rather than the three steps individually -- see
+// the comment on GPUManager::cupti_prepare_lock_.
+//
+// The loads are cumulative, so a caller that only wants a current reading (the
+// MetaBalancer sampling its GPU imbalance between LB rounds) passes its own
+// monotonically increasing epoch and gets a rebuild when it has moved past the
+// last one. PEs of a process sample independently and drift by a sample or two;
+// taking the largest epoch means each of them reads data at least as fresh as
+// its own epoch, for one rebuild rather than one per PE.
+void hapiPrepareCuptiLoads(uint64_t epoch = HAPI_CUPTI_EPOCH_LB_ROUND);
 void hapiNormalizeCuptiLoads();
 void hapiClearCuptiData();
 

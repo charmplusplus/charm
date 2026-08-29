@@ -534,6 +534,14 @@ private:
 
   std::unordered_map<CmiUInt8, void*> receivedDeviceMsgs;
 
+  // Chares whose migration into this PE has begun but not finished: the source
+  // has released them and this PE has not constructed them yet, so they exist
+  // on no PE at all. Every location cache already names this PE as their home
+  // for the duration, so a message that arrives in that window would otherwise
+  // be handed to the scheduler, come straight back, and spin forever. See
+  // CkArray::sendToPe.
+  std::unordered_set<CmiUInt8> inFlightImmigrations;
+
   // The mapping of index to ID is either done via compression or an explicit map,
   // depending on if the bounds of this array are compressible into a 64bit ID.
   CkArrayIndex bounds;
@@ -572,6 +580,12 @@ private:
   void insertRec(CkLocRec* rec, const CmiUInt8& id);
   // Remove this entry from the table (does not delete record)
   void removeFromTable(const CmiUInt8 id);
+
+  // Residency table maintenance, driven from insertRec/removeFromTable so that
+  // every arrival and departure inside this process passes through it.
+  CmiUInt8 residentKey(CmiUInt8 id) const;
+  void noteResident(CmiUInt8 id);
+  void clearResident(CmiUInt8 id);
   // Look up location record in the table, return NULL if not there.
   CkLocRec* elementNrec(const CmiUInt8 id) const;
 
@@ -857,6 +871,28 @@ public:
   bool emigrateDeviceByHandle(CkLocRec* rec, int toPe, size_t bufSize);
 #endif
   void immigrateIntraProcess(CkArrayElementIntraProcessMigrateMessage* msg);
+
+  // See inFlightImmigrations. Registration happens wherever this PE first
+  // learns an element is on its way but cannot yet construct it; the entry is
+  // dropped in createLocal, the one point every arrival passes through.
+  // Process residency table. Authoritative for "is this element in my process,
+  // and on which PE" -- unlike the per-PE location cache, which only knows what
+  // it last heard. See CkResidentTable in cklocation.C for why that difference
+  // matters to device zerocopy.
+  int residentOwnerPe(CmiUInt8 id) const;
+  static size_t numResidentInProcess();
+
+  // Destination PE a device zerocopy send should decide its transfer mode
+  // from. Consults the residency table rather than the location cache alone.
+  int deviceSendDestPe(const CkArrayIndex& idx);
+
+  void noteImmigrationInFlight(CmiUInt8 id);
+  bool isImmigrationInFlight(CmiUInt8 id) const
+  {
+    return inFlightImmigrations.find(id) != inFlightImmigrations.end();
+  }
+  size_t numImmigrationsInFlight() const { return inFlightImmigrations.size(); }
+
 #if CMK_CUDA
   void sendGPUMsg(CmiUInt8 id);
   void immigrateGPU(CmiUInt8& id, int& size, char* &data, int& srcPe, CkDeviceBufferPost* post);

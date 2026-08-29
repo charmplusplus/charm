@@ -1940,6 +1940,25 @@ void CkArray::sendToPe(CkArrayMessage* msg, int pe, CkDeliver_t type, int opts)
   const size_t deviceBytes = CkRdmaDeviceTakePendingSendBytes();
 #endif
 
+  // An element mid-migration into this PE has been released by its source and
+  // not yet constructed here, so it exists nowhere -- but every location cache
+  // already names this PE. The queued path below would hand the message to the
+  // scheduler, which would route it back here, which would queue it again:
+  // a livelock that spins the scheduler with no progress. Park it against the
+  // element instead; createLocal drops the in-flight mark before the location
+  // listeners replay this buffer, so the message goes out in order once the
+  // element lands. Deliberately after the pending-bytes take above, which must
+  // happen on every path or the next send is charged for this one's payload.
+  if (pe == CkMyPe())
+  {
+    const CmiUInt8 id = msg->array_element_id();
+    if (locMgr->isImmigrationInFlight(id) && lookup(id) == nullptr)
+    {
+      bufferedIDMsgs[id].push_back(msg);
+      return;
+    }
+  }
+
   // If the message is not for me, or is supposed to be queued, send it via the normal
   // queuing infrastructure
   if (pe != CkMyPe() || type == CkDeliver_queue)

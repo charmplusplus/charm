@@ -28,6 +28,19 @@ void DistBaseLB::barrierDone() {
   }
   lb_started = true;
 
+  // Hold the AtSync barrier down for the duration of the step, the way
+  // CentralLB does. It is what makes the framework one-step-at-a-time: while a
+  // step is registering, checkBarrier cannot fire, so no element can start the
+  // next one. CentralLB has always done this; the distributed path never did,
+  // which only stayed invisible because its elements were parked in AtSync for
+  // the whole step. Under +LBAsync they are not.
+  {
+    LDOMHandle h;
+    h.id.id.idx = 0;
+    lbmgr->RegisteringObjects(h);
+  }
+  lbmgr->lb_in_progress = true;
+
   start_lb_time = 0;
 
   if (CkNumPes() == 1) {
@@ -216,7 +229,10 @@ void DistBaseLB::ProcessMigrationDecision(LBMigrateMsg *migrateMsg) {
   }
 
 #if CMK_GLOBAL_LOCATION_UPDATE
-  BroadcastLocationUpdate(migrateMsg);
+  // See the note in DiffusionLB::AcrossNodeLB: with +LBPeerDecision the process
+  // residency table settles the transfer-mode question locally, so no PE needs
+  // to be told about moves it is not party to.
+  if (!_lb_args.lbPeerDecision()) BroadcastLocationUpdate(migrateMsg);
 #endif
 
   if (CkMyPe() == 0) {
@@ -225,6 +241,12 @@ void DistBaseLB::ProcessMigrationDecision(LBMigrateMsg *migrateMsg) {
       CkPrintf("%s> Strategy took %fs memory usage: %f MB.\n", lbName(),
           strat_end_time - strat_start_time, CmiMemoryUsage()/(1024.0*1024.0));
   }
+
+  // The message is this function's to free: both callers (DiffusionLB and
+  // DistributedLB) build it, hand it over and forget it, and
+  // BroadcastLocationUpdate above copies rather than keeping it. Do it before
+  // MigrationDone, which can run the whole tail of the step.
+  delete migrateMsg;
 
   // If all the expected objs have migrated in, then migration is done
   if (migrates_expected == migrates_completed && lb_started) {
@@ -351,6 +373,19 @@ void DistBaseLB::ResumeClients(int balancing) {
   }
 
   lbmgr->ResumeClients();
+
+  // Release the barrier only after the clients have been resumed, matching
+  // CentralLB::CheckMigrationComplete. Turning it on any earlier would let an
+  // element that is still running under +LBAsync start the next step while this
+  // one was finishing. Unconditional, to pair exactly with the
+  // RegisteringObjects in barrierDone: MigrationDone reaches here once per step
+  // either way, and the single-PE path arrives with balancing == 0.
+  {
+    LDOMHandle h;
+    h.id.id.idx = 0;
+    lbmgr->DoneRegisteringObjects(h);
+  }
+  lbmgr->lb_in_progress = false;
 #endif
 }
 

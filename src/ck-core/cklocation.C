@@ -12,6 +12,8 @@
 #include "charm++.h"
 #include "ck.h"
 #include <atomic>
+#include <mutex>
+#include <unordered_map>
 #include <unistd.h>
 #include "cksyncbarrier.h"
 #include "hilbert.h"
@@ -52,6 +54,42 @@ CkpvExtern(int, currentChareIdx);
 #if CMK_GRID_QUEUE_AVAILABLE
 CpvExtern(void*, CkGridObject);
 #endif
+
+// CHARM_DEBUG_MIGRATE: trace the steps of the export-and-pull device migration
+// handshake and the in-flight immigration registry, so a stall can be located to
+// a specific step rather than inferred.
+static inline bool migDbg() {
+  static const bool on = (getenv("CHARM_DEBUG_MIGRATE") != nullptr);
+  return on;
+}
+
+// Process-wide table of which PE inside this process currently owns each
+// element, keyed by the globally unique (array id, element id) pair.
+//
+// The per-PE location cache cannot answer this question reliably. It names a PE
+// from whatever it last heard, so it can still claim an element is in this
+// process after the element left -- if it left from a *different* PE of the
+// process, this PE has heard nothing. Every arrival and departure inside the
+// process runs through CkLocMgr::insertRec and removeFromTable, so this table
+// cannot be stale about residency.
+//
+// That is exactly what a device zerocopy sender needs: "same process" is "same
+// GPU", and it decides whether the receiver may read the sender's device
+// pointer directly (MEMCPY) or the payload has to be staged. Getting it wrong
+// in the optimistic direction hands the receiver a pointer into an address
+// space it cannot read. A function-local static rather than a Csv: one copy per
+// process image is precisely the scope wanted, and C++11 guarantees the
+// initialization is thread safe without any runtime plumbing.
+namespace {
+struct CkResidentTable {
+  std::mutex lock;
+  std::unordered_map<CmiUInt8, int> owner;
+};
+CkResidentTable& residentTable() {
+  static CkResidentTable table;
+  return table;
+}
+}  // namespace
 
 #define ARRAY_DEBUG_OUTPUT 0
 
@@ -1749,12 +1787,28 @@ void CkMigratable::commonInit(void)
   local_state = OFF;
   prev_load = 0.0;
   can_reset = false;
+  lbStepSeen = 0;
+  lbStepPending = false;
+  waitParked = false;
+  lbWaitEpoch = 0;
 
 #if CMK_LBDB_ON
+  // Join whatever step this PE has already been asked for rather than trying to
+  // start it: a chare created (or migrated in) mid-step would otherwise call
+  // atBarrier for an epoch whose local barrier has already fired.
+  lbStepSeen = CkpvAccess(_lbStepRequested);
   if (_lb_args.metaLbOn())
   {
-    atsync_iteration = myRec->getMetaBalancer()->get_iteration();
-    myRec->getMetaBalancer()->AdjustCountForNewContributor(atsync_iteration);
+    // Deliberately not joining MetaBalancer's sample stream here. Joining means
+    // recording which sample index this element will first contribute to, and
+    // pre-crediting the open buckets it will therefore skip -- both of which are
+    // only true of the instant they are done. Once elements can migrate while
+    // their new PE is still sampling, which is what +LBAsync allows, that PE can
+    // close buckets between this constructor and this element's first
+    // AtSyncSample, and the recorded index is then already in the past. The join
+    // happens on the first sample instead, in sampleMetaLBLoad, where the
+    // instant it describes is the instant it is used.
+    atsync_iteration = -1;
   }
 #endif
 }
@@ -1797,6 +1851,14 @@ void CkMigratable::pup(PUP::er& p)
       epoch = (*ldBarrierHandle)->epoch;
     }
     p | epoch;
+    // +LBAsync wait state. An element can be parked in AtSyncWait() at the
+    // moment the step it is waiting on moves it, and the destination has to be
+    // able to finish that wait -- see lbCheckWaitRelease. Not checkpointed, for
+    // the same reason the barrier epoch is not: it describes a step in flight.
+    p | lbStepPending;
+    p | waitParked;
+    p | lbWaitEpoch;
+    p | lbStepSeen;
   }
 
   if (p.isUnpacking())
@@ -1863,7 +1925,9 @@ CkMigratable::~CkMigratable()
       myRec->getSyncBarrier()->removeClient(ldBarrierHandle);
   }
 
-  if (_lb_args.metaLbOn())
+  // atsync_iteration == -1 means this element never joined the sample stream,
+  // so no bucket is waiting on it and there is nothing to adjust.
+  if (_lb_args.metaLbOn() && atsync_iteration != -1)
   {
     myRec->getMetaBalancer()->AdjustCountForDeadContributor(atsync_iteration);
   }
@@ -1927,7 +1991,13 @@ void CkMigratable::clearMetaLBData()
 {
   //  if (can_reset) {
   local_state = OFF;
-  atsync_iteration = -1;
+  // The GPU trigger's sample stream runs free across load balancing steps:
+  // every PE completes every sample index in order, which is what keeps their
+  // contributions to MetaBalancer's reduction lined up. Resetting the counter
+  // here would make this chare re-contribute indices its PE has already closed.
+  // prev_load still resets, so the sample that straddles ClearLoads measures
+  // from zero rather than going negative.
+  if (!_lb_args.metaLbGpuTrigger()) atsync_iteration = -1;
   prev_load = 0.0;
   can_reset = false;
   //  }
@@ -2008,47 +2078,7 @@ void CkMigratable::AtSync(int waitForMigration)
     ReadyMigrate(true);
   ckFinishConstruction();
   DEBL((AA "Element %s going to sync\n" AB, idx2str(thisIndexMax)));
-  // model-based load balancing, ask user to provide cpu load
-  if (usesAutoMeasure == false)
-    UserSetLBLoad();
-
-  #ifdef CMK_CUDA
-  PUP::sizer ps(PUP::er::IS_MIGRATION);
-  this->virtual_pup(ps);
-  // printf("[%d] gpu pup size %ld\n",CkMyPe(), ps.gpu_size() );
-  setGPUPupSize(ps.gpu_size());
-  #if CMK_LB_USER_DATA
-  // Per-chare device footprint, written into the LB user-data slot the
-  // memory-aware strategies read. Floored at the serialized size so an
-  // unattributed footprint (allocations outside entry methods, arena
-  // storage) can never read as "free to move".
-  {
-    const int udIdx = CkpvAccess(_lb_obj_index);
-    void* ud = (udIdx >= 0) ? getObjUserData(udIdx) : NULL;
-    size_t footprint = 0;
-    if (ud != NULL) {
-      footprint = hapiCurrentObjectFootprint();
-      if (footprint < ps.gpu_size()) footprint = ps.gpu_size();
-      *(size_t*)ud = footprint;
-    }
-    if (getenv("CHARM_DEBUG_GPU_FOOTPRINT") != NULL)
-      CkPrintf("[%d] LB footprint: idx=%d ud=%p fp=%zu pup=%zu\n",
-               CkMyPe(), udIdx, ud, footprint, ps.gpu_size());
-  }
-  #endif
-  #endif
-  if (_lb_psizer_on || _lb_args.metaLbOn())
-  {
-    PUP::sizer ps(PUP::er::IS_MIGRATION);
-    this->virtual_pup(ps);
-    if (_lb_psizer_on)
-    {
-      setPupSize(ps.size());
-    }
-    //TODO: check if this is correct after gpuPUP size
-    if (_lb_args.metaLbOn())
-      myRec->getMetaBalancer()->SetCharePupSize(ps.size());
-  }
+  recordLBSizes(true);
 
   if (!_lb_args.metaLbOn())
   {
@@ -2058,40 +2088,7 @@ void CkMigratable::AtSync(int waitForMigration)
 
   // When MetaBalancer is turned on
 
-  if (atsync_iteration == -1)
-  {
-    can_reset = false;
-    local_state = OFF;
-    prev_load = 0.0;
-  }
-
-  atsync_iteration++;
-  // CkPrintf("[pe %s] atsync_iter %d && predicted period %d state: %d\n",
-  //    idx2str(thisIndexMax), atsync_iteration,
-  //    myRec->getMetaBalancer()->getPredictedLBPeriod(), local_state);
-  double tmp = prev_load;
-  prev_load = myRec->getObjTime();
-  double current_load = prev_load - tmp;
-
-  // If the load for the chares are based on certain model, then set the
-  // current_load to be whatever is the obj load.
-  if (!usesAutoMeasure)
-  {
-    current_load = myRec->getObjTime();
-  }
-
-  if (atsync_iteration <= myRec->getMetaBalancer()->get_finished_iteration())
-  {
-    CkPrintf("[%d:%s] Error!! Contributing to iter %d < current iter %d\n", CkMyPe(),
-             idx2str(thisIndexMax), atsync_iteration,
-             myRec->getMetaBalancer()->get_finished_iteration());
-    CkAbort("Not contributing to the right iteration\n");
-  }
-
-  if (atsync_iteration != 0)
-  {
-    myRec->getMetaBalancer()->AddLoad(atsync_iteration, current_load);
-  }
+  sampleMetaLBLoad();
 
   bool is_tentative;
   if (atsync_iteration < myRec->getMetaBalancer()->getPredictedLBPeriod(is_tentative))
@@ -2117,6 +2114,239 @@ void CkMigratable::AtSync(int waitForMigration)
   }
 }
 
+// Measure what the load balancer needs to know about this chare: its load, its
+// serialized size, and -- only when a step is actually starting -- the device
+// footprint the memory contract prices migration with. A sample skips that last
+// part: it is a second full pup traversal, and nothing reads the result until a
+// step runs.
+void CkMigratable::recordLBSizes(bool forStep)
+{
+  // model-based load balancing, ask user to provide cpu load
+  if (usesAutoMeasure == false)
+    UserSetLBLoad();
+
+  #ifdef CMK_CUDA
+  if (forStep) {
+  PUP::sizer ps(PUP::er::IS_MIGRATION);
+  this->virtual_pup(ps);
+  // printf("[%d] gpu pup size %ld\n",CkMyPe(), ps.gpu_size() );
+  setGPUPupSize(ps.gpu_size());
+  #if CMK_LB_USER_DATA
+  // Per-chare device footprint, written into the LB user-data slot the
+  // memory-aware strategies read. Floored at the serialized size so an
+  // unattributed footprint (allocations outside entry methods, arena
+  // storage) can never read as "free to move".
+  {
+    const int udIdx = CkpvAccess(_lb_obj_index);
+    void* ud = (udIdx >= 0) ? getObjUserData(udIdx) : NULL;
+    size_t footprint = 0;
+    if (ud != NULL) {
+      footprint = hapiCurrentObjectFootprint();
+      if (footprint < ps.gpu_size()) footprint = ps.gpu_size();
+      *(size_t*)ud = footprint;
+    }
+    if (getenv("CHARM_DEBUG_GPU_FOOTPRINT") != NULL)
+      CkPrintf("[%d] LB footprint: idx=%d ud=%p fp=%zu pup=%zu\n",
+               CkMyPe(), udIdx, ud, footprint, ps.gpu_size());
+  }
+  #endif
+  }
+  #endif
+  if (_lb_psizer_on || _lb_args.metaLbOn())
+  {
+    PUP::sizer ps(PUP::er::IS_MIGRATION);
+    this->virtual_pup(ps);
+    if (_lb_psizer_on)
+    {
+      setPupSize(ps.size());
+    }
+    //TODO: check if this is correct after gpuPUP size
+    if (_lb_args.metaLbOn())
+      myRec->getMetaBalancer()->SetCharePupSize(ps.size());
+  }
+}
+
+// Fold this chare's load since its last sample into the local MetaBalancer.
+// Once every chare on this PE has done so for a sample index, the PE contributes
+// it to a background reduction. Nothing here is collective and nothing blocks.
+void CkMigratable::sampleMetaLBLoad()
+{
+  if (atsync_iteration == -1)
+  {
+    can_reset = false;
+    local_state = OFF;
+    prev_load = 0.0;
+    // Join the stream where this PE is right now. AdjustCountForNewContributor
+    // credits the buckets still open here, which are exactly the ones this
+    // element is skipping past -- so they can complete without it, and the one
+    // it is about to open is the first it owes.
+    atsync_iteration = myRec->getMetaBalancer()->get_iteration();
+    myRec->getMetaBalancer()->AdjustCountForNewContributor(atsync_iteration);
+  }
+
+  atsync_iteration++;
+  // CkPrintf("[pe %s] atsync_iter %d && predicted period %d state: %d\n",
+  //    idx2str(thisIndexMax), atsync_iteration,
+  //    myRec->getMetaBalancer()->getPredictedLBPeriod(), local_state);
+  double tmp = prev_load;
+  prev_load = myRec->getObjTime();
+  double current_load = prev_load - tmp;
+
+  // If the load for the chares are based on certain model, then set the
+  // current_load to be whatever is the obj load.
+  if (!usesAutoMeasure)
+  {
+    current_load = myRec->getObjTime();
+  }
+
+  // A step's ClearLoads can land inside a sample window, restarting the object
+  // timer below the reading this chare last took.
+  if (current_load < 0.0) current_load = 0.0;
+
+  if (atsync_iteration <= myRec->getMetaBalancer()->get_finished_iteration())
+  {
+    CkPrintf("[%d:%s] Error!! Contributing to iter %d < current iter %d\n", CkMyPe(),
+             idx2str(thisIndexMax), atsync_iteration,
+             myRec->getMetaBalancer()->get_finished_iteration());
+    CkAbort("Not contributing to the right iteration\n");
+  }
+
+  if (atsync_iteration != 0)
+  {
+    myRec->getMetaBalancer()->AddLoad(atsync_iteration, current_load);
+  }
+}
+
+// Contribute load to MetaBalancer without going anywhere near the barrier. Call
+// this every few iterations: it is the expensive half (on CUDA it flushes and
+// normalizes the GPU counters once per sample per process), and MetaBalancer
+// only needs a periodic reading to spot an imbalance.
+void CkMigratable::AtSyncSample()
+{
+  if (!usesAtSync)
+    CkAbort(
+        "You must set usesAtSync=true in your array element constructor to use "
+        "AtSyncSample!\n");
+  // No balancer is listening, or MetaBalancer is off and nothing consumes the
+  // sample. Either way this is a no-op, so applications can call it blind.
+  if (!_lb_args.metaLbOn() || !myRec->getSyncBarrier()->hasReceivers()) return;
+
+  ckFinishConstruction();
+  recordLBSizes(false);
+  sampleMetaLBLoad();
+}
+
+bool CkMigratable::AtSyncPending() const
+{
+  if (!usesAtSync || !myRec->getSyncBarrier()->hasReceivers()) return false;
+  // Without MetaBalancer every AtSyncStart starts a step, so one is always due.
+  if (!_lb_args.metaLbOn()) return true;
+  return CkpvAccess(_lbStepRequested) > lbStepSeen;
+}
+
+// Start a load balancing step if one has been requested since this chare last
+// joined one. Cheap enough to call every iteration -- which is the point: a
+// step begins one iteration after MetaBalancer sees the imbalance, however
+// rarely AtSyncSample runs.
+//
+// Without +LBAsync this behaves like AtSync: the element joins the barrier and
+// waits for ResumeFromSync, and when no step is due it resumes inline. With
+// +LBAsync it never resumes -- it returns to its caller, which keeps running
+// while the strategy and the migrations proceed, and AtSyncWait() is where the
+// element finds out the step is over.
+void CkMigratable::AtSyncStart(int waitForMigration)
+{
+  if (!usesAtSync)
+    CkAbort(
+        "You must set usesAtSync=true in your array element constructor to use "
+        "AtSyncStart!\n");
+  const bool async = _lb_args.lbAsync();
+
+  if (!myRec->getSyncBarrier()->hasReceivers())
+  {
+    if (!async) ResumeFromSync();
+    return;
+  }
+
+  // One step at a time, per element. Joining again would pass the barrier
+  // twice for one element and could fire the next step's barrier before this
+  // step's migrations had even been released.
+  if (lbStepPending)
+    CkAbort(
+        "AtSyncStart() called while the load balancing step this element started "
+        "is still in flight. Every AtSyncStart() must be followed by an "
+        "AtSyncWait() before the next one.\n");
+
+  // With MetaBalancer off there is nothing to decide for us, so every call
+  // starts a step and the application's own cadence is the trigger.
+  if (_lb_args.metaLbOn())
+  {
+    if (CkpvAccess(_lbStepRequested) <= lbStepSeen)
+    {
+      if (!async) ResumeFromSync();
+      return;
+    }
+    lbStepSeen = CkpvAccess(_lbStepRequested);
+  }
+
+  myRec->AsyncMigrate(!waitForMigration);
+  // Migratable straight away, in both modes. An element that keeps running
+  // under +LBAsync can still be moved at any entry-method boundary, because
+  // making its own state safe to pack is its pup's job -- an element with
+  // device state settles its streams on the packing pass, which is the only
+  // code that knows which streams those are. Holding the move until AtSyncWait
+  // instead would mean an element never overlaps its own migration with its own
+  // iterations, which is most of the point of the split.
+  if (waitForMigration)
+    ReadyMigrate(true);
+  ckFinishConstruction();
+  DEBL((AA "Element %s starting LB step %d\n" AB, idx2str(thisIndexMax), lbStepSeen));
+  recordLBSizes(true);
+
+  local_state = LOAD_BALANCE;
+  can_reset = true;
+  lbStepPending = true;
+  lbWaitEpoch = myRec->getLBMgr()->resumeEpoch();
+  myRec->getSyncBarrier()->atBarrier(ldBarrierHandle);
+}
+
+// The blocking half of the split. See the header for the contract.
+void CkMigratable::AtSyncWait()
+{
+  if (!usesAtSync)
+    CkAbort(
+        "You must set usesAtSync=true in your array element constructor to use "
+        "AtSyncWait!\n");
+  // Without +LBAsync the element is already stopped waiting for the barrier's
+  // resume, and adding one here would resume it twice.
+  if (!_lb_args.lbAsync()) return;
+
+  if (!lbStepPending)
+  {
+    ResumeFromSync();
+    return;
+  }
+  waitParked = true;
+}
+
+// An element that parked in AtSyncWait() and was then moved by the very step it
+// was waiting on can land on its destination after that PE resumed its clients,
+// so nothing there would ever call it back. Under +LBSyncResume, which +LBAsync
+// forces on, the resume epoch advances globally in step, so comparing the
+// destination's against the one the element parked at settles it.
+void CkMigratable::lbCheckWaitRelease()
+{
+  if (!_lb_args.lbAsync() || !lbStepPending) return;
+  if (myRec->getLBMgr()->resumeEpoch() <= lbWaitEpoch) return;
+
+  lbStepPending = false;
+  if (!waitParked) return;
+  waitParked = false;
+  DEBL((AA "Element %s released after migrating into a resumed PE\n" AB,
+        idx2str(thisIndexMax)));
+  ResumeFromSync();
+}
+
 void CkMigratable::ReadyMigrate(bool ready) { myRec->ReadyMigrate(ready); }
 
 void CkMigratable::ResumeFromSyncHelper()
@@ -2126,6 +2356,18 @@ void CkMigratable::ResumeFromSyncHelper()
   if (_lb_args.metaLbOn())
   {
     clearMetaLBData();
+  }
+
+  // The step this element started is over, in either mode -- AtSyncStart()
+  // refuses to begin another while this is set.
+  lbStepPending = false;
+
+  if (_lb_args.lbAsync())
+  {
+    // Starting the step never stopped the element, so there is nothing to
+    // resume unless it went on to park in AtSyncWait().
+    if (!waitParked) return;
+    waitParked = false;
   }
 
   CkLocMgr* localLocMgr = myRec->getLocMgr();
@@ -2195,12 +2437,14 @@ CkLocRec::CkLocRec(CkLocMgr* mgr, bool fromMigration, bool ignoreArrival,
   if (fromMigration)
   {
     DEBL((AA "Element %s migrated in\n" AB, idx2str(idx)));
-    if (!ignoreArrival)
-    {
-      lbmgr->Migrated(ldHandle, true);
-      // load balancer should ignore this objects movement
-      //  AsyncMigrate(true);
-    }
+    // An asynchronous arrival is one the load balancer does not hold its
+    // migration barrier for, but it must still be counted. CentralLB tallies
+    // these separately in future_migrates_completed, and CheckMigrationComplete
+    // withholds its second token -- and with it DoneRegisteringObjects, and so
+    // the next LB step -- until every one of them has landed. Skipping the call
+    // entirely left future_migrates_completed at zero against a non-zero
+    // future_migrates_expected, and the step after an async migration hung.
+    lbmgr->Migrated(ldHandle, !ignoreArrival);
   }
 #endif
 }
@@ -2721,6 +2965,16 @@ void CkLocMgr::informHome(const CkArrayIndex& idx, int nowOnPe)
   }
 }
 
+void CkLocMgr::noteImmigrationInFlight(CmiUInt8 id)
+{
+  if (inFlightImmigrations.insert(id).second && migDbg())
+  {
+    CkPrintf("[MIG %d] in-flight immigration id=%llu (%zu outstanding)\n", CkMyPe(),
+             (unsigned long long)id, inFlightImmigrations.size());
+    fflush(stdout);
+  }
+}
+
 CkLocRec* CkLocMgr::createLocal(const CkArrayIndex& idx, bool forMigration,
                                 bool ignoreArrival, bool notifyHome, int epoch)
 {
@@ -2729,6 +2983,16 @@ CkLocRec* CkLocMgr::createLocal(const CkArrayIndex& idx, bool forMigration,
 
   CkLocRec* rec = new CkLocRec(this, forMigration, ignoreArrival, idx, id);
   insertRec(rec, id);
+  // The element is locally present from here on, so anything parked against it
+  // can be released. This must precede updateLocation: that fires the location
+  // listeners, and CkArray's listener replays bufferedIDMsgs through sendToPe,
+  // which would park them right back if the id still read as in flight.
+  if (inFlightImmigrations.erase(id) > 0 && migDbg())
+  {
+    CkPrintf("[MIG %d] immigration landed id=%llu (%zu outstanding)\n", CkMyPe(),
+             (unsigned long long)id, inFlightImmigrations.size());
+    fflush(stdout);
+  }
   cache->insert(id, epoch);
   updateLocation(idx, cache->getLocationEntry(id));
 
@@ -2745,6 +3009,7 @@ void CkLocMgr::processAfterActiveRgetsCompleted(CmiUInt8 id)
   // Call ckJustMigrated
   CkLocRec* myLocRec = elementNrec(id);
   callMethod(myLocRec, &CkMigratable::ckJustMigrated);
+  callMethod(myLocRec, &CkMigratable::lbCheckWaitRelease);
 
   // Call ResumeFromSync on elements that were waiting for rgets
   auto iter2 = toBeResumeFromSynced.find(id);
@@ -2952,6 +3217,7 @@ void CkLocMgr::removeFromTable(const CmiUInt8 id)
     CkAbort("CkLocMgr::removeFromTable called on invalid index!");
 #endif
   hash.erase(id);
+  clearResident(id);
   // Don't erase this during migration because the entry will be updated to reflect
   // the new location by calling recordEmigration
   if (!duringMigration)
@@ -3294,6 +3560,7 @@ void CkLocMgr::immigrateIntraProcess(CkArrayElementIntraProcessMigrateMessage* m
   }
 
   callMethod(rec, &CkMigratable::ckJustMigrated);
+  callMethod(rec, &CkMigratable::lbCheckWaitRelease);
 
   delete msg;
 }
@@ -3756,14 +4023,6 @@ void CkLocMgr::registerOpenedIpcPtr(CmiUInt8 id, void* ptr)
 // chare's device buffers as (ptr,size) instead of copying them, ships those as
 // transport handles, and holds the chare alive until the destination signals
 // (ackGPUMigrate) that its pulls have completed.
-// TEMPORARY (CHARM_DEBUG_MIGRATE): trace the four steps of the export-and-pull
-// device migration handshake, so a stall can be located to a specific step
-// rather than inferred.
-static inline bool migDbg() {
-  static const bool on = (getenv("CHARM_DEBUG_MIGRATE") != nullptr);
-  return on;
-}
-
 bool CkLocMgr::emigrateDeviceByHandle(CkLocRec* rec, int toPe, size_t bufSize)
 {
   CkArrayIndex idx = rec->getIndex();
@@ -3898,6 +4157,9 @@ void CkLocMgr::immigrateGPUHandle(CkArrayElementMigrateHandleMessage* msg)
   }
 
   pendingPulls[msg->id] = PendingPull{gpuMsg, total, msg->src_pe, {}};
+  // This is the first thing this PE hears about the element, and the pulls
+  // below complete asynchronously: until they do, the element is on no PE.
+  noteImmigrationInFlight(msg->id);
 
   if (migDbg()) {
     CkPrintf("[MIG %d] 2 immigrateGPUHandle id=%llu src=%d n=%d total=%zu\n",
@@ -4044,7 +4306,10 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
 
     if (it == bufferedDeviceMigrateMsgs.end())
     {
+      // Host state is here but the device pull is not. Park the message and
+      // record that the element is mid-flight into this PE.
       bufferedHostMigrateMsgs[msg->id] = msg;
+      noteImmigrationInFlight(msg->id);
       return;
     }
     gpuMsg = it->second;
@@ -4079,6 +4344,7 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
     DEBM((AA "Buffering %s immigrate msg waiting for array registration\n" AB,
           idx2str(idx)));
     pendingImmigrate.push_back(msg);
+    noteImmigrationInFlight(msg->id);
     return;
   }
 
@@ -4174,6 +4440,7 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
   {
     // Let all the elements know we've arrived
     callMethod(rec, &CkMigratable::ckJustMigrated);
+    callMethod(rec, &CkMigratable::lbCheckWaitRelease);
   }
 
   delete msg;
@@ -4249,6 +4516,89 @@ void CkLocMgr::insertRec(CkLocRec* rec, const CmiUInt8& id)
   CkLocRec* old_rec = elementNrec(id);
   hash[id] = rec;
   delete old_rec;
+  noteResident(id);
+}
+
+// --- process residency table (see CkResidentTable above) ---
+
+// Key an element by array as well as index: two arrays hand out the same ids.
+CmiUInt8 CkLocMgr::residentKey(CmiUInt8 id) const
+{
+  return ck::ObjID(thisgroup, id).getID();
+}
+
+void CkLocMgr::noteResident(CmiUInt8 id)
+{
+  const CmiUInt8 key = residentKey(id);
+  CkResidentTable& t = residentTable();
+  std::lock_guard<std::mutex> lk(t.lock);
+  auto it = t.owner.find(key);
+  if (it != t.owner.end() && it->second != CkMyPe() && migDbg())
+  {
+    // Not fatal: an intra-process handoff can legitimately publish the arrival
+    // before the source has retired its entry. Worth seeing, though, because a
+    // persistent one means a departure path is not calling clearResident.
+    CkPrintf("[MIG %d] resident table: id=%llu was owned by %d\n", CkMyPe(),
+             (unsigned long long)id, it->second);
+    fflush(stdout);
+  }
+  t.owner[key] = CkMyPe();
+}
+
+void CkLocMgr::clearResident(CmiUInt8 id)
+{
+  const CmiUInt8 key = residentKey(id);
+  CkResidentTable& t = residentTable();
+  std::lock_guard<std::mutex> lk(t.lock);
+  auto it = t.owner.find(key);
+  // Only retire our own entry. If another PE of this process has already
+  // claimed the element, that claim is the newer truth and this is the losing
+  // half of an intra-process handoff.
+  if (it != t.owner.end() && it->second == CkMyPe()) t.owner.erase(it);
+}
+
+int CkLocMgr::residentOwnerPe(CmiUInt8 id) const
+{
+  const CmiUInt8 key = residentKey(id);
+  CkResidentTable& t = residentTable();
+  std::lock_guard<std::mutex> lk(t.lock);
+  auto it = t.owner.find(key);
+  return (it == t.owner.end()) ? -1 : it->second;
+}
+
+// Where a device zerocopy send should believe its target is.
+//
+// The transfer mode turns on one question -- is the target in my process, and
+// therefore on my GPU -- and the location cache cannot answer it safely. It can
+// still name a PE of this process for an element that has left, if the element
+// left from another PE here; acting on that picks MEMCPY, stages nothing, and
+// hands the receiver a device pointer belonging to an address space it cannot
+// read. The residency table cannot be wrong about that, so it decides.
+//
+// Strictly more conservative than the cache alone: it only ever turns a MEMCPY
+// decision into a staged one, never the reverse.
+int CkLocMgr::deviceSendDestPe(const CkArrayIndex& idx)
+{
+  const int cached = whichPe(idx);
+
+  CmiUInt8 id;
+  if (!lookupID(idx, id)) return cached;  // index not known here at all
+
+  const int resident = residentOwnerPe(id);
+  if (resident != -1) return resident;  // in this process, exactly here
+
+  // Not in this process. A cached PE that says otherwise is stale; report the
+  // location as unconfirmed instead, which is what CkRdmaDeviceOnSender reads
+  // as "stage this, I cannot promise the destination".
+  if (cached != -1 && CmiNodeOf(cached) == CmiNodeOf(CkMyPe())) return -1;
+  return cached;
+}
+
+size_t CkLocMgr::numResidentInProcess()
+{
+  CkResidentTable& t = residentTable();
+  std::lock_guard<std::mutex> lk(t.lock);
+  return t.owner.size();
 }
 
 // Call this on an unrecognized array index

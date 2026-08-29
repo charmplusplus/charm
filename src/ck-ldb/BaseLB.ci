@@ -10,6 +10,7 @@ message LBMigrateMsg {
 
 message LBScatterMsg {
   int numMigratesPerPe[];
+  int numFutureMigratesPerPe[];
   MigrateDecision moves[];
 };
 

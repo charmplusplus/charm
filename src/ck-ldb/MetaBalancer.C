@@ -15,6 +15,14 @@
 #include "limits.h"
 #include <limits>
 #include <algorithm>
+#include <map>
+#include <vector>
+
+#if CMK_CUDA
+#include "gpumanager.h"
+#include "hapi.h"
+CsvExtern(GPUManager, gpu_manager);
+#endif
 
 #define VEC_SIZE 50
 #define IMB_TOLERANCE 1.1
@@ -22,7 +30,49 @@
 #define UTILIZATION_THRESHOLD 0.7
 #define NEGLECT_IDLE 2 // Should never be == 1
 #define MIN_STATS 6
-#define STATS_COUNT 29 // The number of stats collected during reduction
+#define STATS_COUNT METALB_STATS_COUNT // The number of scalar stats collected during reduction
+
+// A contribution carries the scalars, then a device count, then that many
+// {device id, gpu load} pairs. Only the scalars have fixed positions.
+// How many GPU sample indices PE 0 will hold open at once. A PE whose objects
+// are parked in AtSyncWait falls a few samples behind, which is normal; beyond
+// this the oldest are dropped so a PE that stops reporting entirely cannot grow
+// the table without bound.
+#define METALB_MAX_OPEN_SAMPLES 64
+
+#define METALB_NDEV_SLOT STATS_COUNT
+#define METALB_DEV_BASE (STATS_COUNT + 1)
+static inline int metalbPayloadDoubles(int n_dev) { return METALB_DEV_BASE + 2 * n_dev; }
+static inline int metalbDeviceCount(int n_doubles) {
+  return (n_doubles <= METALB_DEV_BASE) ? 0 : (n_doubles - METALB_DEV_BASE) / 2;
+}
+
+// Device ids are uint64 (hapiMyDevice() packs a physical node number and a
+// device number) and travel in double slots. Move the bit pattern rather than
+// the value: the numeric conversion is lossy above 2^53 and two devices that
+// round to the same double would merge into one.
+static inline double metalbDevIdToSlot(CmiUInt8 id) {
+  double d;
+  memcpy(&d, &id, sizeof(d));
+  return d;
+}
+static inline CmiUInt8 metalbSlotToDevId(double d) {
+  CmiUInt8 id;
+  memcpy(&id, &d, sizeof(id));
+  return id;
+}
+
+#if CMK_CUDA
+// The device this PE's work lands on. CHARM_METALB_GPU_FAKE_DEVICES=<k> splits
+// the PEs across k imaginary devices instead, which is the only way to exercise
+// the imbalance trigger on a machine with a single GPU.
+static CmiUInt8 metalbMyDeviceId() {
+  static const char* const fake_env = getenv("CHARM_METALB_GPU_FAKE_DEVICES");
+  static const int n_fake = (fake_env != NULL) ? atoi(fake_env) : 0;
+  if (n_fake > 0) return (CmiUInt8)(CkMyPe() % n_fake);
+  return (CmiUInt8)hapiMyDevice();
+}
+#endif
 
 #define MAXDOUBLE  std::numeric_limits<double>::max()
 
@@ -34,16 +84,30 @@ using std::min;
 using std::max;
 
 CkReductionMsg* lbDataCollection(int nMsg, CkReductionMsg** msgs) {
+  // Scalars merge in place into msgs[0]; the device tail cannot, because the
+  // union of two PEs' devices may be larger than either contribution.
+  std::map<CmiUInt8, double> devices;
+  auto absorbDevices = [&devices](const double* m, int n_doubles) {
+    const int n_dev = metalbDeviceCount(n_doubles);
+    for (int d = 0; d < n_dev; d++) {
+      const double* pair = m + METALB_DEV_BASE + 2 * d;
+      devices[metalbSlotToDevId(pair[0])] += pair[1];
+    }
+  };
+
   double *lb_data;
   lb_data = (double*)msgs[0]->getData();
+  absorbDevices(lb_data, msgs[0]->getSize() / sizeof(double));
   for (int i = 1; i < nMsg; i++) {
-    CkAssert(msgs[i]->getSize() == STATS_COUNT*sizeof(double));
-    if (msgs[i]->getSize() != STATS_COUNT*sizeof(double)) {
+    const int n_doubles = msgs[i]->getSize() / sizeof(double);
+    if (n_doubles < METALB_DEV_BASE ||
+        n_doubles != metalbPayloadDoubles(metalbDeviceCount(n_doubles))) {
       CkPrintf("Error!!! Reduction not correct. Msg size is %d\n",
           msgs[i]->getSize());
       CkAbort("Incorrect Reduction size in MetaBalancer\n");
     }
     double* m = (double *)msgs[i]->getData();
+    absorbDevices(m, n_doubles);
     lb_data[NUM_PROCS] += m[NUM_PROCS];
     lb_data[TOTAL_LOAD] += m[TOTAL_LOAD];
     lb_data[MAX_LOAD] = max(m[MAX_LOAD], lb_data[MAX_LOAD]);
@@ -72,6 +136,7 @@ CkReductionMsg* lbDataCollection(int nMsg, CkReductionMsg** msgs) {
     lb_data[LOAD_SKEWNESS] += m[LOAD_SKEWNESS];
     lb_data[LOAD_KURTOSIS] += m[LOAD_KURTOSIS];
     lb_data[TOTAL_OVERLOADED_PES] += m[TOTAL_OVERLOADED_PES];
+    lb_data[STEP_IN_FLIGHT] += m[STEP_IN_FLIGHT];
 
     if (m[ITER_NO] != lb_data[ITER_NO]) {
       CkPrintf("Error!!! Reduction is intermingled between iteration %lf \
@@ -79,7 +144,18 @@ CkReductionMsg* lbDataCollection(int nMsg, CkReductionMsg** msgs) {
       CkAbort("Intermingling iterations in MetaBalancer\n");
     }
   }
-  return CkReductionMsg::buildNew(msgs[0]->getSize(), NULL, msgs[0]->getReducer(), msgs[0]);
+
+  std::vector<double> out(metalbPayloadDoubles(devices.size()));
+  memcpy(out.data(), lb_data, STATS_COUNT * sizeof(double));
+  out[METALB_NDEV_SLOT] = (double)devices.size();
+  int d = 0;
+  for (const auto& kv : devices) {  // std::map: deterministic order by device id
+    out[METALB_DEV_BASE + 2 * d] = metalbDevIdToSlot(kv.first);
+    out[METALB_DEV_BASE + 2 * d + 1] = kv.second;
+    d++;
+  }
+  return CkReductionMsg::buildNew(out.size() * sizeof(double), out.data(),
+                                  msgs[0]->getReducer());
 }
 
 /*global*/ CkReduction::reducerType lbDataCollectionType;
@@ -154,6 +230,9 @@ void MetaBalancer::init(void) {
   adaptive_struct.total_syncs_called = 0;
   adaptive_struct.last_lb_type = -1;
 
+  lb_step_in_flight_ = false;
+  lb_step_seq_ = 0;
+
 
   // This is indicating if the load balancing strategy and migration started.
   // This is mainly used to register callbacks for noobj pes. They would
@@ -203,6 +282,22 @@ void MetaBalancer::pup(PUP::er& p) {
 
 
 void MetaBalancer::ResumeClients() {
+  lb_step_in_flight_ = false;
+
+  // The GPU trigger runs a free-running sample stream: every PE completes every
+  // sample index in order, forever, which is what keeps their contributions to
+  // this reduction lined up with each other. Resetting the counters here -- safe
+  // in the wall-time path only because its period agreement guarantees every PE
+  // has contributed the same number of times by now -- would desynchronize them.
+  if (gpuTriggerOn()) {
+    if (lb_in_progress) {
+      lbdb_no_obj_callback.clear();
+      lb_in_progress = false;
+    }
+    HandleAdaptiveNoObj();
+    return;
+  }
+
   // If metabalancer enabled, initialize the variables
   adaptive_lbdb.history_data.clear();
 
@@ -267,14 +362,16 @@ void MetaBalancer::AdjustCountForDeadContributor(int it_n) {
     total_count_vec[index]--;
   }
 
-  // Check whether any of the future iterations now become valid
+  // Check whether any of the future iterations now become valid. Strictly in
+  // order, stopping at the first one that is still short: ContributeStats moves
+  // finished_iteration_no forward, so closing a later index before an earlier
+  // one would skip the earlier one for good.
   for (int i = (it_n + 1); i <= adaptive_struct.lb_iteration_no; i++) {
     index = i % VEC_SIZE;
     // When this contributor dies, the objDataCount gets updated only later so
     // we need to account for that by -1
-    if (total_count_vec[index] == (lbmanager->GetObjDataSz() - 1)){
-      ContributeStats(i);
-    }
+    if (total_count_vec[index] != (lbmanager->GetObjDataSz() - 1)) break;
+    ContributeStats(i);
   }
 #endif
 }
@@ -295,9 +392,9 @@ bool MetaBalancer::AddLoad(int it_n, double load) {
   int index = it_n % VEC_SIZE;
   total_count_vec[index]++;
   adaptive_struct.total_syncs_called++;
-  CkPrintf("At PE %d Total contribution for iteration %d is %d \
+  DEBAD(("At PE %d Total contribution for iteration %d is %d \
       total objs %d\n", CkMyPe(), it_n, total_count_vec[index],
-      lbmanager->GetObjDataSz());
+      lbmanager->GetObjDataSz()));
 
   if (it_n <= adaptive_struct.finished_iteration_no) {
     CkAbort("Error!! Received load for iteration that has contributed\n");
@@ -356,7 +453,15 @@ void MetaBalancer::ContributeStats(int it_n) {
     idle_time = idle_time * lbmanager->GetObjDataSz() / total_countable_syncs;
   }
 
-  double lb_data[STATS_COUNT];
+  // One device entry when this PE is reporting GPU load, none otherwise. Sized
+  // up front so lb_data stays valid for the whole function.
+#if CMK_CUDA
+  const bool report_device = gpuTriggerOn();
+#else
+  const bool report_device = false;
+#endif
+  std::vector<double> payload(metalbPayloadDoubles(report_device ? 1 : 0), 0.0);
+  double* lb_data = payload.data();
   lb_data[0] = it_n;
   lb_data[NUM_PROCS] = 1;
   lb_data[TOTAL_LOAD] = total_load_vec[index]; // For average load
@@ -400,6 +505,23 @@ void MetaBalancer::ContributeStats(int it_n) {
     lb_data[SUM_HOP_KBYTES] = ((double) hopbytes/1024.0);
   }
   lb_data[MAX_ITER_TIME] = total_load_vec[index] + idle_time;
+  // A sample taken while a step is in flight straddles ClearLoads and a round
+  // of migrations. It is contributed anyway -- skipping it would leave this PE
+  // one reduction behind everyone else -- but flagged so PE 0 ignores it.
+  lb_data[STEP_IN_FLIGHT] = lb_step_in_flight_ ? 1.0 : 0.0;
+  lb_data[METALB_NDEV_SLOT] = report_device ? 1.0 : 0.0;
+
+#if CMK_CUDA
+  if (report_device) {
+    // Cumulative since the last hapiClearCuptiData, so what lands here is this
+    // PE's share of its device's load over the whole window since the last LB
+    // round -- exactly the quantity whose max/avg across devices we want.
+    hapiPrepareCuptiLoads((uint64_t)it_n);
+    lbmanager->SetObjGPULoad(CsvAccess(gpu_manager).cupti_obj_norm_load_);
+    lb_data[METALB_DEV_BASE] = metalbDevIdToSlot(metalbMyDeviceId());
+    lb_data[METALB_DEV_BASE + 1] = lbmanager->GetTotalObjGPULoad();
+  }
+#endif
 
   total_load_vec[index] = 0.0;
   total_count_vec[index] = 0;
@@ -412,16 +534,103 @@ void MetaBalancer::ContributeStats(int it_n) {
         CkMyPe(), total_load_vec[index], idle_time,
         lb_data[5], adaptive_struct.finished_iteration_no));
 
-  CkCallback cb(CkReductionTarget(MetaBalancer, ReceiveMinStats),
-        thisProxy[0]);
-  contribute(STATS_COUNT*sizeof(double), lb_data, lbDataCollectionType, cb);
+  if (gpuTriggerOn()) {
+    // Point to point, keyed by sample index -- see MetaBalancer::gpu_samples_
+    // for why this stream cannot ride the reduction.
+    thisProxy[0].ReceiveGpuSample(payload.size(), payload.data());
+  } else {
+    CkCallback cb(CkReductionTarget(MetaBalancer, ReceiveMinStats),
+          thisProxy[0]);
+    contribute(payload.size()*sizeof(double), payload.data(), lbDataCollectionType, cb);
+  }
 
 #endif
 }
 
+// PE 0: fold one PE's sample into the accumulator for its index, and evaluate
+// the index once every PE has reported it.
+void MetaBalancer::ReceiveGpuSample(int n, double* data) {
+  const int sample_no = (int)data[ITER_NO];
+  if (sample_no <= gpu_sample_evaluated_) return;  // stale, already decided
+
+  GpuSampleAcc& acc = gpu_samples_[sample_no];
+  acc.pes_reported += (int)data[NUM_PROCS];
+  if (data[STEP_IN_FLIGHT] > 0.0) acc.step_in_flight = true;
+  const int n_dev = metalbDeviceCount(n);
+  for (int d = 0; d < n_dev; d++) {
+    const double* pair = data + METALB_DEV_BASE + 2 * d;
+    acc.device_load[metalbSlotToDevId(pair[0])] += pair[1];
+  }
+
+  if (acc.pes_reported < CkNumPes()) {
+    // A PE whose objects are all parked can be several samples behind, so a few
+    // indices are legitimately open at once. Cap it so a PE that stops
+    // reporting for good cannot grow this without bound.
+    while (gpu_samples_.size() > METALB_MAX_OPEN_SAMPLES)
+      gpu_samples_.erase(gpu_samples_.begin());
+    return;
+  }
+
+  EvaluateGpuSample(sample_no, acc);
+  gpu_sample_evaluated_ = sample_no;
+  // Anything at or below the index just decided can no longer say anything new.
+  gpu_samples_.erase(gpu_samples_.begin(), gpu_samples_.upper_bound(sample_no));
+}
+
+// PE 0: decide from the merged per-device GPU loads whether to ask everyone to
+// balance. Unlike the wall-time path below, this predicts no period. The step is
+// requested now and every chare joins it at its next AtSyncStart, one
+// application iteration later, however many iterations apart the samples are.
+void MetaBalancer::EvaluateGpuSample(int sample_no, const GpuSampleAcc& acc) {
+  // Keep PEs that hold no objects reporting, or their samples never arrive and
+  // no index ever completes.
+  for (int i = 0; i < lbdb_no_obj_callback.size(); i++) {
+    thisProxy[lbdb_no_obj_callback[i]].TriggerAdaptiveReduction();
+  }
+
+  // Some PE took this sample across a ClearLoads and a round of migrations, or
+  // the step we asked for last time has not finished. Either way the loads here
+  // describe nothing we can act on.
+  if (acc.step_in_flight || lb_step_in_flight_) return;
+
+  const int n_dev = (int)acc.device_load.size();
+  if (n_dev < 2) return;  // one device: nothing to be imbalanced against
+
+  double max_dev = 0.0, sum_dev = 0.0;
+  for (const auto& kv : acc.device_load) {
+    sum_dev += kv.second;
+    if (kv.second > max_dev) max_dev = kv.second;
+  }
+  if (sum_dev <= 0.0) return;
+
+  const double avg_dev = sum_dev / n_dev;
+  const double ratio = max_dev / avg_dev;
+  const double tolerance = _lb_args.metaLbGpuTolerance();
+  const bool trigger = (ratio > tolerance);
+  if (_lb_args.debug()) {
+    CkPrintf("[MetaLB] sample=%d gpu-dev n=%d max=%g avg=%g ratio=%g tol=%g%s\n",
+             sample_no, n_dev, max_dev, avg_dev, ratio, tolerance,
+             trigger ? " -> LB" : "");
+  }
+  if (!trigger) return;
+
+  // Claim the step here rather than waiting for our own broadcast to come back,
+  // so samples already in flight cannot trigger a second one.
+  lb_step_in_flight_ = true;
+  thisProxy.RequestLBStep(++lb_step_seq_);
+}
+
+// Every PE: a step has been asked for. Chares pick this up at their next
+// AtSyncStart; nothing parks and no period is agreed.
+void MetaBalancer::RequestLBStep(int seq) {
+  if (seq <= CkpvAccess(_lbStepRequested)) return;
+  lb_step_in_flight_ = true;
+  CkpvAccess(_lbStepRequested) = seq;
+}
+
 void MetaBalancer::ReceiveMinStats(double *load, int n) {
     // verify number of elements sent for reduction
-  CmiAssert(n == STATS_COUNT);
+  CmiAssert(n == METALB_DEV_BASE);
   double pe_count = load[NUM_PROCS];
   double avg_load = load[TOTAL_LOAD]/load[NUM_PROCS];
   double max_load = load[MAX_LOAD];
@@ -1027,22 +1236,39 @@ void MetaBalancer::TriggerAdaptiveReduction() {
   if (lbmanager->GetObjDataSz() == 0) {
     adaptive_struct.finished_iteration_no++;
     adaptive_struct.lb_iteration_no++;
-    double lb_data[STATS_COUNT];
+    // Zero-initialized: the reducer reads every scalar slot, and the min-valued
+    // ones below would otherwise merge whatever was on the stack.
+#if CMK_CUDA
+    const bool report_device = gpuTriggerOn();
+#else
+    const bool report_device = false;
+#endif
+    std::vector<double> payload(metalbPayloadDoubles(report_device ? 1 : 0), 0.0);
+    double* lb_data = payload.data();
     lb_data[ITER_NO] = adaptive_struct.finished_iteration_no;
     lb_data[NUM_PROCS] = 1;
-    lb_data[TOTAL_LOAD] = 0.0;
-    lb_data[MAX_LOAD] = 0.0;
-    lb_data[IDLE_TIME] = 0.0;
-    lb_data[UTILIZATION] = 0.0;
-    lb_data[TOTAL_LOAD_W_BG] = 0.0;
-    lb_data[MAX_LOAD_W_BG] = 0.0;
+    lb_data[MIN_LOAD] = 0.0;
+    lb_data[MIN_BG] = 0.0;
+    lb_data[MIN_OBJ_LOAD] = 0.0;
+    lb_data[STEP_IN_FLIGHT] = lb_step_in_flight_ ? 1.0 : 0.0;
+    lb_data[METALB_NDEV_SLOT] = report_device ? 1.0 : 0.0;
+#if CMK_CUDA
+    // An empty PE still sits on a device, and contributes zero to its load.
+    // Reporting it keeps the device set complete even when every PE bound to a
+    // device has been emptied out.
+    if (report_device) lb_data[METALB_DEV_BASE] = metalbDevIdToSlot(metalbMyDeviceId());
+#endif
 
     DEBAD(("[%d] Triggered adaptive reduction for noobj %d\n", CkMyPe(),
           adaptive_struct.finished_iteration_no));
 
-    CkCallback cb(CkReductionTarget(MetaBalancer, ReceiveMinStats),
-        thisProxy[0]);
-    contribute(STATS_COUNT*sizeof(double), lb_data, lbDataCollectionType, cb);
+    if (gpuTriggerOn()) {
+      thisProxy[0].ReceiveGpuSample(payload.size(), payload.data());
+    } else {
+      CkCallback cb(CkReductionTarget(MetaBalancer, ReceiveMinStats),
+          thisProxy[0]);
+      contribute(payload.size()*sizeof(double), payload.data(), lbDataCollectionType, cb);
+    }
   }
 #endif
 }

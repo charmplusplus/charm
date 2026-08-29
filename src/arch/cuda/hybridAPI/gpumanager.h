@@ -349,6 +349,11 @@ struct GPUManager {
   std::mutex cupti_prepare_lock_;
   // Set once this round's loads are built; cleared by hapiClearCuptiData.
   bool cupti_loads_ready_ = false;
+  // Epoch the built loads correspond to. Samplers pass their own increasing
+  // epoch and rebuild only when they have moved past this; load balancers pass
+  // HAPI_CUPTI_EPOCH_LB_ROUND, which is above every sampling epoch and so
+  // always rebuilds once and then satisfies the rest of the round's PEs.
+  uint64_t cupti_loads_epoch_ = 0;
 #endif
 
   void init() {

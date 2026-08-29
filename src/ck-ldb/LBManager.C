@@ -28,6 +28,7 @@ CkpvDeclare(LBUserDataLayout, lbobjdatalayout);
 CkpvDeclare(int, _lb_obj_index);
 
 CkpvDeclare(bool, lbmanagerInited); /**< true if lbdatabase is inited */
+CkpvDeclare(int, _lbStepRequested);
 
 extern int quietModeRequested;
 
@@ -197,6 +198,9 @@ void _loadbalancerInit()
   CkpvInitialize(bool, lbmanagerInited);
   CkpvAccess(lbmanagerInited) = false;
 
+  CkpvInitialize(int, _lbStepRequested);
+  CkpvAccess(_lbStepRequested) = 0;
+
   CkpvInitialize(LBUserDataLayout, lbobjdatalayout);
   CkpvInitialize(int, _lb_obj_index);
   CkpvAccess(_lb_obj_index) = -1;
@@ -218,6 +222,12 @@ void _loadbalancerInit()
   _lb_args.metaLbOn() = CmiGetArgFlagDesc(argv, "+MetaLB", "Turn on MetaBalancer");
   CmiGetArgStringDesc(argv, "+MetaLBModelDir", &_lb_args.metaLbModelDir(),
                       "Use this directory to read model for MetaLB");
+  _lb_args.metaLbGpuTrigger() = CmiGetArgFlagDesc(
+      argv, "+MetaLBGpuTrigger",
+      "MetaBalancer triggers on per-device GPU load imbalance");
+  CmiGetArgDoubleDesc(argv, "+MetaLBGpuTolerance", &_lb_args.metaLbGpuTolerance(),
+                      "max/avg GPU device load above which MetaLB balances");
+  if (_lb_args.metaLbGpuTolerance() <= 1.0) _lb_args.metaLbGpuTolerance() = 1.1;
 
   if (_lb_args.metaLbOn() && _lb_args.metaLbModelDir() != nullptr)
   {
@@ -388,6 +398,21 @@ void _loadbalancerInit()
                         "Write to File: Load Balancing Object to Processor Map decisions "
                         "during LB Simulation");
 
+  // Asynchronous load balancing: AtSyncStart() returns without waiting for the
+  // step it starts, and AtSyncWait() is the separate rendezvous for its
+  // completion.
+  _lb_args.lbAsync() = CmiGetArgFlagDesc(
+      argv, "+LBAsync",
+      "AtSyncStart returns immediately; AtSyncWait blocks for migration completion");
+  _lb_args.lbPeerDecision() = CmiGetArgFlagDesc(
+      argv, "+LBPeerDecision",
+      "Scatter each PE only the migration decisions it is party to, instead of "
+      "broadcasting the whole decision");
+  // Async load balancing has no use for the broadcast: its only value to a
+  // bystander PE is a location-cache update, and under async the caches are
+  // being corrected by ordinary home-based routing continuously anyway.
+  if (_lb_args.lbAsync()) _lb_args.lbPeerDecision() = true;
+
   // force a global barrier after migration done
   _lb_args.syncResume() = CmiGetArgFlagDesc(
       argv, "+LBSyncResume", "LB performs a barrier after migration is finished");
@@ -412,6 +437,10 @@ void _loadbalancerInit()
 #else
     (void)noSync;
 #endif
+    // AtSyncWait() means "every migration this step planned, everywhere, is
+    // done". Only the sync-resume reduction gives that; per-PE resume would let
+    // a waiter return while other PEs were still moving objects.
+    if (_lb_args.lbAsync()) _lb_args.syncResume() = true;
   }
 
   // both +LBDebug and +LBDebug level should work
@@ -585,7 +614,11 @@ void LBManager::initnodeFn()
   _registerCommandLineOpt("+LBDiffusionNumNbors");
   _registerCommandLineOpt("+LBDiffusionBeta");
   _registerCommandLineOpt("+LBDiffusionGpuDim");
+  _registerCommandLineOpt("+LBAsync");
+  _registerCommandLineOpt("+LBPeerDecision");
   _registerCommandLineOpt("+MetaLB");
+  _registerCommandLineOpt("+MetaLBGpuTrigger");
+  _registerCommandLineOpt("+MetaLBGpuTolerance");
   _registerCommandLineOpt("+LBAlpha");
   _registerCommandLineOpt("+LBBeta");
 }
@@ -983,6 +1016,7 @@ void LBManager::ResetAdaptive()
 void LBManager::ResumeClients()
 {
 #if CMK_LBDB_ON
+  resume_epoch++;
   if (_lb_args.metaLbOn())
   {
     if (metabalancer == NULL)

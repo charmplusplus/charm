@@ -32,6 +32,7 @@
 
 #include "LBManager.h"
 #include "RandomForestModel.h"
+#include <map>
 #include <vector>
 
 #include "MetaBalancer.decl.h"
@@ -82,7 +83,19 @@ enum metalb_stats_types{
   LOAD_SKEWNESS,
   LOAD_KURTOSIS,
   TOTAL_OVERLOADED_PES,
+  // Non-zero if any contributing PE had a load balancing step in flight while
+  // it took this sample. Such a sample straddles ClearLoads and a round of
+  // migrations, so its loads mean nothing; PE 0 skips the imbalance check for
+  // it. The sample is still contributed, because skipping one would desynchronize
+  // this PE's reduction sequence from everyone else's.
+  STEP_IN_FLIGHT,
 };
+
+// The fixed part of a MetaBalancer stats reduction. A contribution is
+//   [STATS_COUNT scalars][n_devices][{device id, gpu load} * n_devices]
+// where the device ids carry the bit pattern of a uint64 hapiMyDevice() rather
+// than its numeric value, so no identity is lost above 2^53.
+#define METALB_STATS_COUNT (STEP_IN_FLIGHT + 1)
 
 class MetaBalancer : public CBase_MetaBalancer {
 public:
@@ -117,6 +130,8 @@ public:
   void SetCharePupSize(size_t psize);
   void ReceiveMinStats(double *load, int n);
   void TriggerSoon(int iteration_no, double imbalance_ratio, double tolerate_imb);
+  void ReceiveGpuSample(int n, double* data);
+  void RequestLBStep(int seq);
   void LoadBalanceDecision(int, int);
   void LoadBalanceDecisionFinal(int, int);
   void MetaLBCallLBOnChares();
@@ -234,9 +249,44 @@ private:
     AdaptiveLBInfo info_first_iter;
   } adaptive_struct;
 
+  // GPU-imbalance triggering (+MetaLBGpuTrigger). The sample stream runs free
+  // and is never reset, so these are the only pieces of per-step state.
+  //
+  // On every PE: a step was requested and has not resumed clients yet, so this
+  // PE's samples straddle ClearLoads and a round of migrations.
+  bool lb_step_in_flight_;
+  // On PE 0 only: sequence number of the last step requested. Chares compare it
+  // against the one they last joined, so it only has to increase.
+  int lb_step_seq_;
+
+  // On PE 0 only: GPU samples arriving from each PE, keyed by sample index.
+  //
+  // These come as point-to-point messages rather than through the stats
+  // reduction, because the reduction matches contributions by arrival order,
+  // not by what they describe: it pairs each PE's Nth contribution with every
+  // other PE's Nth. The sample stream cannot honour that. A PE closes a sample
+  // only once every one of its objects has reported, so an object that stops
+  // sampling -- one parked in AtSyncWait, say -- stalls its PE while the others
+  // run ahead, and AdjustCountForDeadContributor can close a later index before
+  // an earlier one when an object leaves. Either way one PE's Nth contribution
+  // stops describing the same sample as another's, which the reduction can only
+  // report as intermingled iterations. Keyed accumulation here does not care.
+  struct GpuSampleAcc {
+    int pes_reported = 0;
+    bool step_in_flight = false;
+    std::map<CmiUInt8, double> device_load;
+  };
+  std::map<int, GpuSampleAcc> gpu_samples_;
+  // Highest sample index already evaluated; anything at or below it is stale.
+  int gpu_sample_evaluated_ = -1;
+
+  void EvaluateGpuSample(int sample_no, const GpuSampleAcc& acc);
+
 public:
   bool lb_in_progress;
   bool ignore_periodic;
+
+  inline bool gpuTriggerOn() const { return _lb_args.metaLbGpuTrigger(); }
 };
 
 class MetaBalancerRedn : public CBase_MetaBalancerRedn {

@@ -53,7 +53,11 @@ class CkLBArgs
   int _lb_maxDistPhases;   // Specifies the max number of LB phases in DistributedLB
   double _lb_targetRatio;  // Specifies the target load ratio for LBs that aim for a
                            // particular load ratio
+  bool _lb_async;              // AtSyncStart returns without waiting for the step
+  bool _lb_peerDecision;       // Scatter the LB decision instead of broadcasting it
   bool _lb_metaLbOn;
+  bool _lb_metaLbGpuTrigger;   // MetaLB: trigger on per-device GPU imbalance
+  double _lb_metaLbGpuTol;     // MetaLB: max/avg device load that triggers
   char* _lb_metaLbModelDir;
   char* _lb_treeLBFile = (char*)"treelb.json";
   int _lb_percentMovesAllowed;  // for GreedyRefineCentralLB, as percentage of chares that can be moved
@@ -81,7 +85,11 @@ class CkLBArgs
     _lb_central_pe = 0;
     _lb_maxDistPhases = 10;
     _lb_targetRatio = 1.05;
+    _lb_async = false;
+    _lb_peerDecision = false;
     _lb_metaLbOn = false;
+    _lb_metaLbGpuTrigger = false;
+    _lb_metaLbGpuTol = 1.1;
     _lb_metaLbModelDir = nullptr;
     _lb_percentMovesAllowed = 100;
   }
@@ -114,7 +122,11 @@ class CkLBArgs
   inline double& beta() { return _lb_beta; }
   inline int& maxDistPhases() { return _lb_maxDistPhases; }
   inline double& targetRatio() { return _lb_targetRatio; }
+  inline bool& lbAsync() { return _lb_async; }
+  inline bool& lbPeerDecision() { return _lb_peerDecision; }
   inline bool& metaLbOn() { return _lb_metaLbOn; }
+  inline bool& metaLbGpuTrigger() { return _lb_metaLbGpuTrigger; }
+  inline double& metaLbGpuTolerance() { return _lb_metaLbGpuTol; }
   inline char*& metaLbModelDir() { return _lb_metaLbModelDir; }
   inline int& percentMovesAllowed() { return _lb_percentMovesAllowed; }
 };
@@ -162,6 +174,13 @@ class CkLBOptions
     extern CkGroupID _lbmgr;
 
 CkpvExtern(bool, lbmanagerInited);
+
+// Sequence number of the most recent load balancing step MetaBalancer has asked
+// for on this PE, or 0 if none. Monotonic, never cleared: a chare joins a step
+// when this rises above the sequence it last joined, which makes the check in
+// AtSyncStart a single read against a PE-private int and lets it run on every
+// application iteration.
+CkpvExtern(int, _lbStepRequested);
 
 // LB options, mostly controled by user parameter
 extern char* _lbtopo;
@@ -277,11 +296,21 @@ class LBManager : public CBase_LBManager
 
   int startLBFn_count;
 
+  int resume_epoch = 0;
+
   char* reallocBuffer;
 
  public:
   int chare_count;
   bool lb_in_progress;
+
+  // Number of load balancing steps whose clients this PE has resumed. Under
+  // +LBSyncResume -- which +LBAsync forces on -- the resume is driven by a
+  // global reduction, so this advances in lockstep everywhere and is
+  // comparable across PEs. An element parked in AtSyncWait() records the value
+  // it is waiting past, which is how one that gets migrated by the very step it
+  // is waiting on can tell, on arrival, that its destination already resumed.
+  int resumeEpoch() const { return resume_epoch; }
 
 
   LBManager(void) { init(); }
@@ -373,6 +402,7 @@ class LBManager : public CBase_LBManager
   {
     lbdb_obj->GetObjGPULoad(h, gputime);
   };
+  LBRealType GetTotalObjGPULoad(void) { return lbdb_obj->GetTotalObjGPULoad(); }
   void SetObjGPULoad(
       const std::unordered_map<LDObjKey, double, LDObjKeyHash> &id_loadMap)
   {

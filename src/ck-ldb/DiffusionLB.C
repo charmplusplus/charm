@@ -581,11 +581,15 @@ void DiffusionLB::ProcessMigrations()
 
 #if CMK_GLOBAL_LOCATION_UPDATE
   // SAME AS IN PROCESSMIGRATIONDECISION
-  BroadcastLocationUpdate(msg);
+  if (!_lb_args.lbPeerDecision()) BroadcastLocationUpdate(msg);
 #endif
 
     CkCallback cb(CkIndex_DiffusionLB::MigrationDoneWrapper(), thisProxy);
     contribute(cb);
+    // Nothing holds the message past this point: the moves have been issued and
+    // BroadcastLocationUpdate copies. The syncResume branch below hands
+    // ownership to ProcessMigrationDecision, which frees it.
+    delete msg;
   }
   else
     ProcessMigrationDecision(msg);
@@ -634,7 +638,13 @@ void DiffusionLB::CascadingMigration(LDObjHandle h, double load)
       // left -- and a MEMCPY chosen that way hands the receiver a pointer into
       // an address space it cannot read. Migrating one object at a time means
       // the move-list broadcast never sees these.
-      BroadcastSingleLocationUpdate(h, acrossNodeToPe);
+      //
+      // +LBPeerDecision drops the broadcast: CkLocMgr's process residency table
+      // answers the "is it on my GPU" question exactly, without anyone having
+      // to be told, so the mode decision no longer depends on every PE holding
+      // a fresh cache entry. Ordinary messages route by home as always.
+      if (!_lb_args.lbPeerDecision())
+        BroadcastSingleLocationUpdate(h, acrossNodeToPe);
 #endif
     }
   }
@@ -658,7 +668,8 @@ void DiffusionLB::CascadingMigration(LDObjHandle h, double load)
 #if CMK_GLOBAL_LOCATION_UPDATE
       // Within-node move: same process, so no transfer mode changes meaning,
       // but other PEs still cache a location that is now wrong.
-      BroadcastSingleLocationUpdate(h, rank0PE + minRank);
+      if (!_lb_args.lbPeerDecision())
+        BroadcastSingleLocationUpdate(h, rank0PE + minRank);
 #endif
     }
   }

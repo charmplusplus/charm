@@ -211,6 +211,18 @@ public:
   void GetGPUBGTime(LBRealType *bg_gputime);
   const std::vector<LBObjEntry>& getObjs() {return objs;}
 
+  // Sum of this PE's per-object GPU loads as they stand right now. Valid only
+  // after SetObjGPULoad has copied a normalized round in; MetaBalancer uses it
+  // to report this PE's contribution to its device's load between LB rounds.
+  inline LBRealType GetTotalObjGPULoad(void) const {
+    LBRealType total = 0.0;
+#if CMK_CUDA
+    for (const LBObjEntry &e : objs)
+      if (e.obj != nullptr) total += e.obj->data.gpuTime;
+#endif
+    return total;
+  }
+
   inline void ObjectStart(const LDObjHandle &h) {
     if (StatsOn()) {
       LbObj(h)->StartTimer();

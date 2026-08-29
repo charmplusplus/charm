@@ -17,6 +17,10 @@ mainmodule jacobi2d {
   readonly int lb_freq;
   readonly int first_lb;
   readonly int imbalance;
+  readonly bool metalb_mode;
+  readonly int sample_freq;
+  readonly bool async_mode;
+  readonly int wait_lag;
 
   mainchare Main {
     entry Main(CkArgMsg* m);
@@ -25,6 +29,7 @@ mainmodule jacobi2d {
     entry [reductiontarget] void updateDone();
     entry [reductiontarget] void commDone();
     entry [reductiontarget] void allDone();
+    entry [reductiontarget] void checksumDone(unsigned long long sum);
     entry void printDone();
   };
 
@@ -39,6 +44,7 @@ mainmodule jacobi2d {
     entry void receiveGhostsZC(int ref, int dir, int w, nocopydevice DataType gh[w]);
     entry void receiveGhostsReg(int ref, int dir, int w, DataType gh[w]);
     entry void iterate();
+    entry void checksum();
 
     entry void exchangeGhosts() {
       serial {

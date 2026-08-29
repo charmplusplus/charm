@@ -24,6 +24,17 @@
 /* readonly */ int lb_freq;
 /* readonly */ int first_lb;
 /* readonly */ int imbalance;
+// MetaBalancer mode: instead of balancing on a fixed schedule, sample the load
+// every sample_freq iterations and let MetaBalancer decide when to balance. The
+// two rates are separate on purpose -- sampling is the expensive half, and a
+// step must be able to start on any iteration, not just a sampling one.
+/* readonly */ bool metalb_mode;
+/* readonly */ int sample_freq;
+// Async mode (-A, needs +LBAsync): AtSyncStart() returns without waiting, the
+// block keeps iterating, and AtSyncWait() comes wait_lag iterations later. The
+// gap between the two is the overlap.
+/* readonly */ bool async_mode;
+/* readonly */ int wait_lag;
 
 extern void invokeInitKernel(DataType* d_temperature, int block_width,
     int block_height, cudaStream_t stream);
@@ -66,6 +77,10 @@ public:
     first_lb = 10;
     lb_freq = 100;
     imbalance = 5;  // Max extra iterations for load imbalance
+    metalb_mode = false;
+    sample_freq = 5;
+    async_mode = false;
+    wait_lag = 3;
 
     // Initialize aggregate timers
     update_agg_time = 0.0;
@@ -73,7 +88,7 @@ public:
 
     // Process arguments
     int c;
-    while ((c = getopt(m->argc, m->argv, "W:H:w:h:i:b:f:m:u:yzp")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "W:H:w:h:i:b:f:m:u:s:l:yzpMA")) != -1) {
       switch (c) {
         case 'W':
           grid_width = atoi(optarg);
@@ -102,6 +117,19 @@ public:
         case 'u':
           warmup_iters = atoi(optarg);
           break;
+        case 's':
+          sample_freq = atoi(optarg);
+          break;
+        case 'l':
+          wait_lag = atoi(optarg);
+          break;
+        case 'M':
+          metalb_mode = true;
+          break;
+        case 'A':
+          metalb_mode = true;
+          async_mode = true;
+          break;
         case 'y':
           sync_ver = true;
           break;
@@ -115,6 +143,8 @@ public:
           CkPrintf(
               "Usage: %s -W [grid width] -H [grid height] -w [block width] -h [block height]"
               "-b [lb frequency] -f [first lb] -m [max imbalance] "
+              "-M (let MetaBalancer decide when to balance) -s [sample frequency, -M only] "
+              "-A (async LB: implies -M, needs +LBAsync) -l [wait lag in iterations, -A only] "
               "-i [iterations] -u [warmup] -y (use sync version) -z (use GPU zerocopy) -p (print blocks)\n",
               m->argv[0]);
           CkExit();
@@ -182,6 +212,15 @@ public:
           (comm_agg_time / n_iters) * 1e6, (update_agg_time / n_iters) * 1e6);
     }
 
+    // Sum the whole grid. Jacobi is deterministic for a fixed iteration count,
+    // so this value must match between a run that balances and one that does
+    // not, and between sync and async load balancing -- a message dropped or
+    // delivered twice across a migration shows up here.
+    block_proxy.checksum();
+  }
+
+  void checksumDone(unsigned long long sum) {
+    CkPrintf("Final checksum: %016llx\n", sum);
     if (print_elements) {
       sleep(1);
       block_proxy(0,0).print();
@@ -204,6 +243,11 @@ class Block : public CBase_Block {
   int remote_count;
   int x, y;
   int load_iters;
+
+  // Async mode bookkeeping: the iteration at which this block's current LB step
+  // began, and whether it still owes that step an AtSyncWait.
+  int lb_start_iter = 0;
+  bool lb_waiting = false;
 
   DataType* __restrict__ h_temperature;
   DataType* __restrict__ d_temperature;
@@ -270,6 +314,18 @@ class Block : public CBase_Block {
   }
 
   void pup(PUP::er& p) {
+    // Migration copies d_temperature and d_new_temperature straight off the
+    // device, on a stream of its own that is not ordered against ours. Under
+    // async load balancing this block is still computing when that happens, so
+    // settle our own work first, or the pack copies out a half-written grid.
+    // The packing pass specifically: it is the one that issues those copies,
+    // and the sizing pass also runs from AtSyncSample's size measurement, where
+    // draining every sample would cost for nothing.
+    if (p.isPacking()) {
+      cudaStreamSynchronize(compute_stream);
+      cudaStreamSynchronize(comm_stream);
+    }
+
     p | my_iter;
     p | neighbors;
     p | remote_count;
@@ -280,6 +336,8 @@ class Block : public CBase_Block {
     p | top_bound;
     p | bottom_bound;
     p | load_iters;
+    p | lb_start_iter;
+    p | lb_waiting;
 
     if (p.isUnpacking()) {
       // hapiCheck(hapiMallocHost((void**)&h_temperature,
@@ -395,8 +453,101 @@ class Block : public CBase_Block {
     contribute(CkCallback(CkReductionTarget(Main, initDone), main_proxy));
   }
 
+  // Reports the iteration a block is moved at, which is how the overlap is
+  // observed: under async LB the move should land inside the window between
+  // "LB step starting" and "waiting for LB", not bunched at the wait.
+  //
+  // Chaining to ArrayElement is not optional. Its version notifies the array
+  // listeners that this element is leaving, and an override that skips it lets
+  // every migration complete and resume and then stalls the application.
+  void ckAboutToMigrate() override {
+    if (getenv("CHARM_DEBUG_MIGRATE") != NULL)
+      CkPrintf("[APP] block (%d,%d) migrating at iteration %d\n",
+               thisIndex.x, thisIndex.y, my_iter);
+    ArrayElement::ckAboutToMigrate();
+  }
+
+  // Runs once at the end of the run, off the hot path. Uses its own host buffer
+  // rather than h_temperature, which the unpacking path does not reallocate.
+  //
+  // A bitwise hash rather than a numeric sum: the field legitimately holds
+  // non-finite values here, which a sum collapses to nan. Migration does not
+  // change the arithmetic any cell sees, so a correct run is bit-identical
+  // whatever the object-to-PE mapping was, and a hash says so crisply. Summed
+  // across blocks so the reduction does not depend on their order.
+  void checksum() {
+    const size_t n = (size_t)(block_width + 2) * (block_height + 2);
+    std::vector<DataType> host(n);
+    cudaStreamSynchronize(compute_stream);
+    cudaStreamSynchronize(comm_stream);
+    hapiCheck(cudaMemcpy(host.data(), d_temperature, sizeof(DataType) * n,
+                         cudaMemcpyDeviceToHost));
+
+    uint64_t h = 1469598103934665603ULL;  // FNV-1a
+    for (int j = 1; j <= block_height; j++) {
+      const unsigned char* row =
+          (const unsigned char*)(host.data() + (block_width + 2) * j + 1);
+      for (size_t b = 0; b < sizeof(DataType) * (size_t)block_width; b++) {
+        h ^= row[b];
+        h *= 1099511628211ULL;
+      }
+    }
+    contribute(sizeof(uint64_t), &h, CkReduction::sum_ulong_long,
+               CkCallback(CkReductionTarget(Main, checksumDone), main_proxy));
+  }
+
   void iterate() {
-    if (my_iter == first_lb || (my_iter != 0 && my_iter % lb_freq == 0)) {
+    if (metalb_mode) {
+      // Sampling is throttled; starting a step is not. AtSyncStart runs every
+      // iteration and costs an integer compare unless MetaBalancer has asked
+      // for a step, so a step begins the iteration after the imbalance is seen
+      // however rarely we sample.
+      // Sampling is unconditional: MetaBalancer's sample stream expects every
+      // element to keep contributing at the same cadence, including while a
+      // step is in flight, or the PE's bucket for that sample never completes.
+      const bool sampling = (my_iter != 0 && my_iter % sample_freq == 0);
+      // Do not start another step while this block still owes one a wait --
+      // it would lose track of the first. A step requested in that window is
+      // picked up on a later iteration, once the wait is done.
+      const bool starting = !lb_waiting && AtSyncPending();
+      const bool finishing = lb_waiting && (my_iter >= lb_start_iter + wait_lag);
+      if (sampling || starting || finishing) {
+        cudaStreamSynchronize(comm_stream);
+        cudaStreamSynchronize(compute_stream);
+      }
+      if (sampling) AtSyncSample();
+      if (starting) {
+        lb_start_iter = my_iter;
+        lb_waiting = true;
+        if (thisIndex.x == 0 && thisIndex.y == 0)
+          CkPrintf("[APP] LB step starting at iteration %d\n", my_iter);
+      }
+
+      if (!async_mode) {
+        // Called every iteration: AtSyncStart either joins the barrier (and the
+        // resume arrives as ResumeFromSync) or resumes inline, so there is
+        // nothing left to do here either way.
+        AtSyncStart();
+        return;
+      }
+      if (starting) AtSyncStart();
+
+      if (lb_waiting && my_iter >= lb_start_iter + wait_lag) {
+        lb_waiting = false;
+        if (thisIndex.x == 0 && thisIndex.y == 0)
+          CkPrintf("[APP] waiting for LB at iteration %d (%d iterations overlapped)\n",
+                   my_iter, my_iter - lb_start_iter);
+        // The element has to be quiesced before it can be pupped, and
+        // AtSyncWait is where it becomes migratable.
+        cudaStreamSynchronize(comm_stream);
+        cudaStreamSynchronize(compute_stream);
+        AtSyncWait();
+        return;
+      }
+      // Nothing to wait for: keep iterating while the strategy runs and other
+      // blocks migrate. This is the overlap the split buys.
+      thisProxy[thisIndex].exchangeGhosts();
+    } else if (my_iter == first_lb || (my_iter != 0 && my_iter % lb_freq == 0)) {
       cudaStreamSynchronize(comm_stream);
       cudaStreamSynchronize(compute_stream);
       AtSync();

@@ -1102,10 +1102,13 @@ void hapiNormalizeCuptiLoads() {
 // reads its own objects out of it, and the work itself must be done by one
 // thread; holding the lock across both gives the readers their ordering without
 // a barrier that every PE has to reach.
-void hapiPrepareCuptiLoads() {
+void hapiPrepareCuptiLoads(uint64_t epoch) {
   GPUManager& gm = CsvAccess(gpu_manager);
   std::lock_guard<std::mutex> lk(gm.cupti_prepare_lock_);
-  if (gm.cupti_loads_ready_) return;
+  // Already built for this epoch or a later one. A sampler that is behind its
+  // process-mates reads their fresher loads rather than paying for a rebuild;
+  // an LB round always wins this comparison and rebuilds exactly once.
+  if (gm.cupti_loads_ready_ && epoch <= gm.cupti_loads_epoch_) return;
 
   const bool timeIt = (getenv("CHARM_LB_CUPTI_TIME") != nullptr);
   const double t0 = timeIt ? CmiWallTimer() : 0.0;
@@ -1126,6 +1129,7 @@ void hapiPrepareCuptiLoads() {
   }
 
   gm.cupti_loads_ready_ = true;
+  gm.cupti_loads_epoch_ = epoch;
 }
 
 void hapiClearCuptiData() {
@@ -1134,6 +1138,7 @@ void hapiClearCuptiData() {
   // builds and that every PE reads, so it must not run underneath either.
   std::lock_guard<std::mutex> lk(gm.cupti_prepare_lock_);
   gm.cupti_loads_ready_ = false;
+  gm.cupti_loads_epoch_ = 0;
 
   gm.cupti_obj_kernel_records_.clear();
   gm.cupti_unattributed_kernels_.clear();

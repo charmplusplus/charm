@@ -288,7 +288,16 @@ int LBDatabase::Migrate(LDObjHandle h, int dest)
     CmiAbort("[%d] LBDB::Migrate: Handle %d out of range 0-%zu\n",CkMyPe(),h.handle,objs.size());
   }
   else if (!(objs[h.handle].obj)) {
-    CmiAbort("[%d] LBDB::Migrate: Handle %d no longer registered, range 0-%zu\n", CkMyPe(),h.handle,objs.size());
+    // The object died between the stats collection the strategy planned from
+    // and this decision arriving. That is legal, and the caller's contract is
+    // to tell the destination to stop expecting it (CentralLB::MissMigrate).
+    // Aborting here made that path unreachable.
+    if (getenv("CHARM_DEBUG_MIGRATE") != nullptr) {
+      CkPrintf("[LBMIG %d] handle %d no longer registered, reporting a missed migrate\n",
+               CkMyPe(), h.handle);
+      fflush(stdout);
+    }
+    return 0;
   }
 
   LBOM *const om = oms[(objs[h.handle].obj)->parentOM().handle];

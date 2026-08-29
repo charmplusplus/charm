@@ -15,6 +15,19 @@ private:
     LOAD_BALANCE
   } local_state;
   bool can_reset;
+  // Sequence number of the last load balancing step this chare joined. It rises
+  // to CkpvAccess(_lbStepRequested) in AtSyncStart; comparing the two is the
+  // whole cost of an AtSyncStart that has no step to start.
+  int lbStepSeen;
+  // +LBAsync state. lbStepPending is set when AtSyncStart joins a step and
+  // cleared when that step resumes clients here; waitParked records that
+  // AtSyncWait found the step still running and stopped the element. lbWaitEpoch
+  // is the LBManager resume epoch the element is waiting past, which lets an
+  // element migrated by the very step it waits on notice, on arrival, that its
+  // destination has already resumed. All three are pupped across migration.
+  bool lbStepPending;
+  bool waitParked;
+  int lbWaitEpoch;
 protected:
   bool usesAtSync;//You must set this in the constructor to use AtSync().
   bool usesAutoMeasure; //You must set this to use auto lb instrumentation.
@@ -88,10 +101,40 @@ public:
 
 #if CMK_LBDB_ON  //For load balancing:
   void AtSync(int waitForMigration=1);
+
+  // MetaBalancer's AtSync split in two, so that collecting load and starting a
+  // step can run at different rates. Call AtSyncSample() every few iterations
+  // (it flushes GPU counters and feeds a background reduction) and
+  // AtSyncStart() every iteration (it costs one integer compare unless a step
+  // has actually been requested, so a step begins one iteration after the
+  // imbalance that caused it was seen).
+  void AtSyncSample();
+  void AtSyncStart(int waitForMigration=1);
+
+  // The other half of the split. Under +LBAsync this blocks the element until
+  // every migration the in-flight step planned, on every PE, has completed, and
+  // then calls ResumeFromSync() exactly once; with no step in flight it calls
+  // ResumeFromSync() inline. Without +LBAsync it does nothing, because the
+  // resume already arrives from the AtSync barrier -- so an application written
+  // to the async pattern runs correctly either way.
+  void AtSyncWait();
+
+  // True when the next AtSyncStart() will actually start a step, so an
+  // application can do its pre-migration work -- draining device streams, say
+  // -- only on the iterations where that work is needed.
+  bool AtSyncPending() const;
+
+  // Release an element that parked in AtSyncWait() and was then migrated by the
+  // step it was waiting on, landing after its destination had already resumed.
+  // Called from the migration arrival paths in CkLocMgr.
+  void lbCheckWaitRelease();
+
   int MigrateToPe()  { return myRec->MigrateToPe(); }
 
 private:
   void ResumeFromSyncHelper();
+  void recordLBSizes(bool forStep);
+  void sampleMetaLBLoad();
 public:
 
   void ReadyMigrate(bool ready);
@@ -101,6 +144,11 @@ public:
   void setGPUPupSize(size_t obj_gpu_pup_size);
 #else
   void AtSync(int waitForMigration=1) { ResumeFromSync();}
+  void AtSyncSample() { }
+  void AtSyncStart(int waitForMigration=1) { ResumeFromSync();}
+  void AtSyncWait() { }
+  bool AtSyncPending() const { return false; }
+  void lbCheckWaitRelease() { }
   void setMigratable(int migratable)  { }
   void setPupSize(size_t obj_pup_size) { }
 public:

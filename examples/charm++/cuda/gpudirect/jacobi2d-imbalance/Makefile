@@ -6,7 +6,7 @@ CHARM_INC = -I$(CHARM_DIR)/include
 
 NVCC = nvcc
 NVCC_FLAGS = -c -std=c++11 -use_fast_math $(OPTS)
-LD_LIBS = -module EveryLB
+LD_LIBS = -module EveryLB -module DiffusionLB
 
 TARGET = jacobi2d
 all: $(TARGET)

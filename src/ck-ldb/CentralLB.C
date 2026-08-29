@@ -60,7 +60,14 @@ static void lbinit()
   LBRegisterBalancer<CentralLB>("CentralLB", "CentralLB base class", false);
 }
 
-static int broadcastThreshold = 32;
+// Below this many PEs a broadcast beats building a scatter tree, so the peer
+// decision path falls back to one. CHARM_LB_SCATTER_THRESHOLD overrides it,
+// which is the only way to exercise the scatter path on a small run.
+static int broadcastThreshold = []() {
+  const char* env = getenv("CHARM_LB_SCATTER_THRESHOLD");
+  const int v = (env != nullptr) ? atoi(env) : 0;
+  return (v > 0) ? v : 32;
+}();
 
 static void getPredictedLoadWithMsg(BaseLB::LDStats* stats, int count, 
 		             LBMigrateMsg *, LBInfo &info, int considerComm);
@@ -453,6 +460,11 @@ void CentralLB::Migrated(int waitBarrier)
   else {
     future_migrates_completed ++;
     DEBUGF(("[%d] An object migrated with no barrier! %d expected: %d\n",CkMyPe(),future_migrates_completed,future_migrates_expected));
+    if (lbMigDbg()) {
+      CkPrintf("[LBMIG %d] async arrived %d/%d\n", CkMyPe(),
+               future_migrates_completed, future_migrates_expected);
+      fflush(stdout);
+    }
     if (future_migrates_completed == future_migrates_expected)  {
 	CheckMigrationComplete();
     }
@@ -1034,11 +1046,16 @@ void CentralLB::t_LoadBalance()
 // normal path and batched release.
 void CentralLB::sendDecision(LBMigrateMsg* migrateMsg)
 {
-#if CMK_SCATTER_LB_RESULTS
-  InitiateScatter(migrateMsg);
-#else
-  thisProxy.ReceiveMigration(migrateMsg);
-#endif
+  // +LBPeerDecision (forced on by +LBAsync) ships each PE only the moves it is
+  // party to plus its own arrival counts, instead of broadcasting the whole
+  // decision to everyone. Under async load balancing the broadcast is not just
+  // wasteful: the only thing a bystander PE does with it is update its location
+  // cache, and with elements migrating while the application runs those caches
+  // are being corrected continuously by the ordinary home-based routing anyway.
+  if (_lb_args.lbPeerDecision())
+    InitiateScatter(migrateMsg);
+  else
+    thisProxy.ReceiveMigration(migrateMsg);
 }
 
 // Reduction target on the decision PE: the previous batch has completed on
@@ -1065,21 +1082,26 @@ void CentralLB::InitiateScatter(LBMigrateMsg *msg) {
 
   // allocate maximum possible size to avoid later copies
   // the messages will be resized before sending
-  LBScatterMsg *leftMsg = new (middlePe, msg->n_moves)
+  LBScatterMsg *leftMsg = new (middlePe, middlePe, msg->n_moves)
     LBScatterMsg(0, middlePe - 1);
-  LBScatterMsg *rightMsg = new (CkNumPes() - middlePe, msg->n_moves)
+  LBScatterMsg *rightMsg = new (CkNumPes() - middlePe, CkNumPes() - middlePe, msg->n_moves)
     LBScatterMsg(middlePe, CkNumPes() - 1);
   leftMsg->lb_batch = msg->lb_batch;
   leftMsg->lb_nbatches = msg->lb_nbatches;
+  leftMsg->next_lb = msg->next_lb;
   rightMsg->lb_batch = msg->lb_batch;
   rightMsg->lb_nbatches = msg->lb_nbatches;
+  rightMsg->next_lb = msg->next_lb;
 
   int *migrateTally = new int[CkNumPes()];
+  int *futureTally = new int[CkNumPes()];
   memset(migrateTally, 0, CkNumPes() * sizeof(int));
+  memset(futureTally, 0, CkNumPes() * sizeof(int));
 
   for (int i = 0; i < msg->n_moves; i++) {
     MigrateInfo* item = (MigrateInfo*) &msg->moves[i];
-    migrateTally[item->to_pe]++;
+    if (item->async_arrival) futureTally[item->to_pe]++;
+    else migrateTally[item->to_pe]++;
     if (item->from_pe < middlePe) {
       leftMsg->moves[leftMsg->numMigrates++] = *item;
     }
@@ -1090,8 +1112,12 @@ void CentralLB::InitiateScatter(LBMigrateMsg *msg) {
 
   memcpy(leftMsg->numMigratesPerPe, migrateTally, middlePe * sizeof(int));
   memcpy(rightMsg->numMigratesPerPe, &migrateTally[middlePe], (CkNumPes() - middlePe) * sizeof(int));
+  memcpy(leftMsg->numFutureMigratesPerPe, futureTally, middlePe * sizeof(int));
+  memcpy(rightMsg->numFutureMigratesPerPe, &futureTally[middlePe],
+         (CkNumPes() - middlePe) * sizeof(int));
 
   delete [] migrateTally;
+  delete [] futureTally;
 
   // shrink the size of the messages
   envelope *env = UsrToEnv(rightMsg);
@@ -1120,12 +1146,15 @@ void CentralLB::ScatterMigrationResults(LBScatterMsg *msg) {
     if (numPesInSpan <= broadcastThreshold) {
       for (int i = msg->firstPeInSpan; i < msg->lastPeInSpan; i++) {
         // TODO: multicast without allocating new message each time
-        LBScatterMsg *msgCopy = new (numPesInSpan, msg->numMigrates)
+        LBScatterMsg *msgCopy = new (numPesInSpan, numPesInSpan, msg->numMigrates)
           LBScatterMsg(msg->firstPeInSpan, msg->lastPeInSpan);
         msgCopy->lb_batch = msg->lb_batch;
         msgCopy->lb_nbatches = msg->lb_nbatches;
+        msgCopy->next_lb = msg->next_lb;
         msgCopy->numMigrates = msg->numMigrates;
         memcpy(msgCopy->numMigratesPerPe, msg->numMigratesPerPe,
+               numPesInSpan * sizeof(int));
+        memcpy(msgCopy->numFutureMigratesPerPe, msg->numFutureMigratesPerPe,
                numPesInSpan * sizeof(int));
         memcpy(msgCopy->moves, msg->moves,
                msg->numMigrates * sizeof(MigrateDecision));
@@ -1142,10 +1171,11 @@ void CentralLB::ScatterMigrationResults(LBScatterMsg *msg) {
       int numMigrates = leftMsg->numMigrates;
       int numPesInRightSpan = leftMsg->lastPeInSpan - middlePe + 1;
       LBScatterMsg *rightMsg =
-        new (numPesInRightSpan, leftMsg->numMigrates)
+        new (numPesInRightSpan, numPesInRightSpan, leftMsg->numMigrates)
         LBScatterMsg(middlePe, leftMsg->lastPeInSpan);
       rightMsg->lb_batch = leftMsg->lb_batch;
       rightMsg->lb_nbatches = leftMsg->lb_nbatches;
+      rightMsg->next_lb = leftMsg->next_lb;
       leftMsg->numMigrates = 0;
       leftMsg->lastPeInSpan = middlePe - 1;
       for (int i = 0; i < numMigrates; i++) {
@@ -1159,6 +1189,9 @@ void CentralLB::ScatterMigrationResults(LBScatterMsg *msg) {
 
       memcpy(rightMsg->numMigratesPerPe,
              &leftMsg->numMigratesPerPe[middlePe - leftMsg->firstPeInSpan],
+             (numPesInRightSpan) * sizeof(int));
+      memcpy(rightMsg->numFutureMigratesPerPe,
+             &leftMsg->numFutureMigratesPerPe[middlePe - leftMsg->firstPeInSpan],
              (numPesInRightSpan) * sizeof(int));
 
       // shrink the size of the messages
@@ -1321,8 +1354,15 @@ void CentralLB::ProcessMigrationDecision() {
   lbCurBatch = m->lb_batch;
   lbCurNBatches = m->lb_nbatches;
 
-  migrates_expected = m->numMigratesPerPe[CkMyPe() - m->firstPeInSpan];
-  future_migrates_expected = 0;
+  // Each PE is told only its own two arrival counts, which is all
+  // ProcessReceiveMigration ever derived from the full move list. Every
+  // destination has these before any source moves anything: this runs from the
+  // pre-migration reduction in ReceiveMigration, so every PE has arrived here
+  // before any of them issues a migrate.
+  const int myIdx = CkMyPe() - m->firstPeInSpan;
+  migrates_expected = m->numMigratesPerPe[myIdx];
+  future_migrates_expected = m->numFutureMigratesPerPe[myIdx];
+  cur_ld_balancer = m->next_lb;
 
   for(int i = 0; i < m->numMigrates; i++) {
     MigrateDecision& move = m->moves[i];
@@ -1336,9 +1376,11 @@ void CentralLB::ProcessMigrationDecision() {
       // migrate object, in case it is already gone, inform toPe
       LDObjHandle objInfo = lbmgr->GetObjHandle(move.dbIndex);
 
-      if (lbmgr->Migrate(objInfo,move.toPe) == 0) {
-        CkAbort("Error: Async arrival not supported in scattering mode\n");
-      }
+      // The object died between the stats this decision was planned from and
+      // now. Tell the destination to stop expecting it, exactly as the
+      // broadcast path does -- it is counting on the arrival.
+      if (lbmgr->Migrate(objInfo,move.toPe) == 0)
+        thisProxy[move.toPe].MissMigrate(!move.asyncArrival);
     }
   }
 
@@ -1567,7 +1609,11 @@ void CentralLB::ResumeClients(int balancing)
 {
 #if CMK_LBDB_ON
   if (lbMigDbg()) {
-    CkPrintf("[LBMIG %d] ResumeClients balancing=%d\n", CkMyPe(), balancing);
+    // The residency table must describe exactly the elements this process holds
+    // once a step has settled. A count that drifts step over step means an
+    // arrival or departure path is not maintaining it.
+    CkPrintf("[LBMIG %d] ResumeClients balancing=%d resident=%zu\n", CkMyPe(),
+             balancing, CkLocMgr::numResidentInProcess());
     fflush(stdout);
   }
   //CkPrintf("[%d] Resuming clients. balancing:%d.\n",CkMyPe(),balancing);
