@@ -1,0 +1,17 @@
+mainmodule hapi_verify {
+  readonly CProxy_Main mainProxy;
+  readonly int nBufs;
+  readonly int nKernels;
+  readonly int wdSecs;
+
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry [reductiontarget] void done(int nFail);
+  };
+
+  group Tester {
+    entry Tester();
+    entry void run();
+    entry void kernelDone();
+  };
+}
