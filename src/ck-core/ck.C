@@ -8,7 +8,7 @@ clients, including the rest of Charm++, are actually C++.
 */
 #include "ck.h"
 #include "trace.h"
-#include "queueing.h"
+//#include "queueing.h"
 
 #include "pathHistory.h"
 
@@ -1472,7 +1472,7 @@ void CkUnpackMessage(envelope **pEnv)
 #if CMK_OBJECT_QUEUE_AVAILABLE
 static int index_objectQHandler;
 #endif
-int index_tokenHandler;
+//int index_tokenHandler;
 int index_skipCldHandler;
 
 void _skipCldHandler(void *converseMsg)
@@ -2125,9 +2125,9 @@ void _ckModuleInit(void) {
 #if CMK_OBJECT_QUEUE_AVAILABLE
 	CmiAssignOnce(&index_objectQHandler, CkRegisterHandler(_ObjectQHandler));
 #endif
-	CmiAssignOnce(&index_tokenHandler, CkRegisterHandler(_TokenHandler));
-	CkpvInitialize(TokenPool*, _tokenPool);
-	CkpvAccess(_tokenPool) = new TokenPool;
+	//CmiAssignOnce(&index_tokenHandler, CkRegisterHandler(_TokenHandler));
+	//CkpvInitialize(TokenPool*, _tokenPool);
+	//CkpvAccess(_tokenPool) = new TokenPool;
 }
 
 

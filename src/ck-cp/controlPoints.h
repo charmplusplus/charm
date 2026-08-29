@@ -9,7 +9,8 @@
 #ifndef __CONTROLPOINTS_H__
 #define __CONTROLPOINTS_H__
 
-#include "conv-config.h"
+#include "charm-config.h"
+#include "converse.h"
 
 #if CMK_WITH_CONTROLPOINT
 

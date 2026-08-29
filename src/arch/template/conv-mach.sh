@@ -10,7 +10,7 @@ CMK_CXX_FLAGS="-D_REENTRANT -I/usr/opt/rms/include"
 CMK_LD_FLAGS="$CMK_CC_FLAGS"
 
 CMK_RANLIB='ranlib'
-CMK_LIBS='-lckqt'
+CMK_LIBS=''
 CMK_LD_LIBRARY_PATH="-rpath $CHARMLIBSO/"
 CMK_QT='generic64-light'
 CMK_XIOPTS='-ansi'

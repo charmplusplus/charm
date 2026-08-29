@@ -20,6 +20,8 @@ using std::ostringstream;
 #include "ck.h"
 #include "ckcheckpoint.h"
 #include "CkCheckpoint.decl.h"
+#include <sys/stat.h>
+#include "converse.h"
 
 void noopit(const char*, ...)
 {}
@@ -28,6 +30,8 @@ void noopit(const char*, ...)
 #define DEBCHK noopit
 
 #define SUBDIR_SIZE 256
+
+#define CmiMkdir(x) mkdir(x, 0777)
 
 CkGroupID _sysChkptWriteMgr;
 CkGroupID _sysChkptMgr;
