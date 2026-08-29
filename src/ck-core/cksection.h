@@ -43,7 +43,7 @@ public:
   CkSectionInfo(int e, void *p, int r, CkArrayID _aid)
     : val(p), aid(_aid), pe(e), redNo(r) { }
 
-  bool operator==(CkSectionInfo &other) const {
+  bool operator==(const CkSectionInfo &other) const {
     return (val == other.val && aid == other.aid && pe == other.pe && redNo == other.redNo);
   }
 
