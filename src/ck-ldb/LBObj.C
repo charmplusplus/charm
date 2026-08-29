@@ -4,11 +4,10 @@
 /*@{*/
 
 #include <charm++.h>
-
-#if CMK_LBDB_ON
-
 #include "LBObj.h"
 #include "LBOM.h"
+
+#if CMK_LBDB_ON
 
 /*************************************************************
  * LBObj Object-data Code
@@ -30,6 +29,8 @@ void LBObj::Clear(void)
 #endif
 }
 
+#endif
+
 void LBObj::IncrementTime(LBRealType walltime, LBRealType cputime)
 {
   data.wallTime += walltime;
@@ -41,7 +42,5 @@ void LBObj::IncrementTime(LBRealType walltime, LBRealType cputime)
   if (walltime > data.maxWall) data.maxWall = walltime;
 #endif
 }
-
-#endif
 
 /*@}*/
