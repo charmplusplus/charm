@@ -397,6 +397,8 @@ public:
   inline const CkArrayID& ckGetArrayID(void) const { return thisArrayID; }
   inline ck::ObjID ckGetID(void) const { return ck::ObjID(thisArrayID, myRec->getID()); }
 
+  void ckStopFastDelivery() override;
+
   inline int ckGetArraySize(void) const { return numInitialElements; }
 
   int getRedNo(void) const;

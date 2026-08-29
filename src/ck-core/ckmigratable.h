@@ -19,6 +19,17 @@ private:
   // to CkpvAccess(_lbStepRequested) in AtSyncStart; comparing the two is the
   // whole cost of an AtSyncStart that has no step to start.
   int lbStepSeen;
+  // Count of AtSyncStart() calls this chare has made. The application calls
+  // AtSyncStart on a fixed cadence, so every chare's k-th call is the same
+  // application iteration -- which makes this counter a clock all chares agree
+  // on without exchanging iteration numbers. The load balancing step is agreed
+  // as a value of this counter. Deliberately not atsync_iteration: that one
+  // advances in AtSyncSample(), whose cadence is kept sparse because CUPTI
+  // sampling is expensive, and is therefore far too coarse to schedule on.
+  int lbIterNo;
+  // Set when AtSyncStart stopped this chare at the tentative count because the
+  // step's count had not been agreed yet. Released by recvLBPeriod.
+  bool lbStepBlocked;
   // +LBAsync state. lbStepPending is set when AtSyncStart joins a step and
   // cleared when that step resumes clients here; waitParked records that
   // AtSyncWait found the step still running and stopped the element. lbWaitEpoch
@@ -109,7 +120,15 @@ public:
   // has actually been requested, so a step begins one iteration after the
   // imbalance that caused it was seen).
   void AtSyncSample();
-  void AtSyncStart(int waitForMigration=1);
+  // What an AtSyncStart() call did.
+  //   Continue -- no step at this count; carry on iterating.
+  //   Started  -- this call joined the step.
+  //   Blocked  -- the step's count is still being agreed and this chare has
+  //               reached the tentative count. It is stopped: do not iterate,
+  //               do not call AtSyncStart again. It will be resumed (through
+  //               ResumeFromSync) or joined for you once the count is agreed.
+  enum class AtSyncStatus { Continue, Started, Blocked };
+  AtSyncStatus AtSyncStart(int waitForMigration=1);
 
   // The other half of the split. Under +LBAsync this blocks the element until
   // every migration the in-flight step planned, on every PE, has completed, and
@@ -119,10 +138,25 @@ public:
   // to the async pattern runs correctly either way.
   void AtSyncWait();
 
+  // Remove this element from the PE-level fast-delivery table, so messages for
+  // it fall through to the location manager and are forwarded. Needed by any
+  // migration path that does not destroy the element on the source: the
+  // destructor is what normally keeps that table honest.
+  virtual void ckStopFastDelivery() {}
+private:
+  void lbJoinStep(int waitForMigration);
+public:
+
   // True when the next AtSyncStart() will actually start a step, so an
   // application can do its pre-migration work -- draining device streams, say
   // -- only on the iterations where that work is needed.
   bool AtSyncPending() const;
+
+  // True while this chare owes AtSyncWait() to a step it has already joined --
+  // including a step it was joined into by the runtime, after blocking at the
+  // tentative count. An application cannot track that itself, because that join
+  // does not happen inside its AtSyncStart() call.
+  bool AtSyncStepInFlight() const { return lbStepPending; }
 
   // Release an element that parked in AtSyncWait() and was then migrated by the
   // step it was waiting on, landing after its destination had already resumed.
@@ -144,6 +178,8 @@ public:
   void setGPUPupSize(size_t obj_gpu_pup_size);
 #else
   void AtSync(int waitForMigration=1) { ResumeFromSync();}
+  enum class AtSyncStatus { Continue, Started, Blocked };
+  AtSyncStatus AtSyncStart(int waitForMigration=1) { ResumeFromSync(); return AtSyncStatus::Continue; }
   void AtSyncSample() { }
   void AtSyncStart(int waitForMigration=1) { ResumeFromSync();}
   void AtSyncWait() { }

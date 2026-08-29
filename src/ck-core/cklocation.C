@@ -1788,6 +1788,8 @@ void CkMigratable::commonInit(void)
   prev_load = 0.0;
   can_reset = false;
   lbStepSeen = 0;
+  lbIterNo = 0;
+  lbStepBlocked = false;
   lbStepPending = false;
   waitParked = false;
   lbWaitEpoch = 0;
@@ -1859,6 +1861,8 @@ void CkMigratable::pup(PUP::er& p)
     p | waitParked;
     p | lbWaitEpoch;
     p | lbStepSeen;
+    p | lbIterNo;
+    p | lbStepBlocked;
   }
 
   if (p.isUnpacking())
@@ -2005,6 +2009,29 @@ void CkMigratable::clearMetaLBData()
 
 void CkMigratable::recvLBPeriod(void* data)
 {
+  if (_lb_args.metaLbGpuTrigger())
+  {
+    // The GPU trigger schedules on lbIterNo, not on the wall-time path's
+    // extrapolated period, so none of the state machine below applies. This is
+    // the agreed count arriving: a chare stopped at the tentative floor either
+    // joins here, or is let go to keep iterating until it reaches the count.
+    if (!lbStepBlocked) return;
+    lbStepBlocked = false;
+    const int agreed = *((int*)data);
+    if (lbIterNo >= agreed)
+    {
+      lbJoinStep(1);
+      // Under +LBAsync joining never stops a chare, so one that was stopped at
+      // the tentative floor has to be handed back to the application here --
+      // its AtSyncStart() already returned, so nothing else will do it.
+      if (_lb_args.lbAsync()) ResumeFromSync();
+    }
+    else
+    {
+      ResumeFromSync();
+    }
+    return;
+  }
   if (atsync_iteration < 0)
   {
     return;
@@ -2234,6 +2261,12 @@ void CkMigratable::AtSyncSample()
   ckFinishConstruction();
   recordLBSizes(false);
   sampleMetaLBLoad();
+  // The decision is made from this sample, so this is where the measurement
+  // window closes. It opened when AtSyncWait() released this chare, which the
+  // application places a few iterations back -- so what the strategy sees is a
+  // short, recent window, measured entirely after the previous step's
+  // migrations settled and ending at the decision itself.
+  LBTurnInstrumentOff();
 }
 
 bool CkMigratable::AtSyncPending() const
@@ -2241,7 +2274,12 @@ bool CkMigratable::AtSyncPending() const
   if (!usesAtSync || !myRec->getSyncBarrier()->hasReceivers()) return false;
   // Without MetaBalancer every AtSyncStart starts a step, so one is always due.
   if (!_lb_args.metaLbOn()) return true;
-  return CkpvAccess(_lbStepRequested) > lbStepSeen;
+  // A step is agreed, and this chare's next AtSyncStart is the one it was
+  // agreed for. Both halves matter: a step can be requested many iterations
+  // before the count it is to be joined at.
+  if (CkpvAccess(_lbStepRequested) <= lbStepSeen) return false;
+  const int agreed = CkpvAccess(_lbStepPeriod);
+  return agreed > 0 && lbIterNo + 1 >= agreed;
 }
 
 // Start a load balancing step if one has been requested since this chare last
@@ -2254,7 +2292,7 @@ bool CkMigratable::AtSyncPending() const
 // +LBAsync it never resumes -- it returns to its caller, which keeps running
 // while the strategy and the migrations proceed, and AtSyncWait() is where the
 // element finds out the step is over.
-void CkMigratable::AtSyncStart(int waitForMigration)
+CkMigratable::AtSyncStatus CkMigratable::AtSyncStart(int waitForMigration)
 {
   if (!usesAtSync)
     CkAbort(
@@ -2265,7 +2303,7 @@ void CkMigratable::AtSyncStart(int waitForMigration)
   if (!myRec->getSyncBarrier()->hasReceivers())
   {
     if (!async) ResumeFromSync();
-    return;
+    return AtSyncStatus::Continue;
   }
 
   // One step at a time, per element. Joining again would pass the barrier
@@ -2281,13 +2319,54 @@ void CkMigratable::AtSyncStart(int waitForMigration)
   // starts a step and the application's own cadence is the trigger.
   if (_lb_args.metaLbOn())
   {
+    // The application calls this on a fixed cadence, so this counter is the
+    // clock every chare agrees on. It has to advance on every call, including
+    // the calls with no step to start, or the counts drift apart.
+    ++lbIterNo;
+    myRec->getMetaBalancer()->reportStartNo(lbIterNo);
+
     if (CkpvAccess(_lbStepRequested) <= lbStepSeen)
     {
       if (!async) ResumeFromSync();
-      return;
+      return AtSyncStatus::Continue;
     }
-    lbStepSeen = CkpvAccess(_lbStepRequested);
+
+    const int agreed = CkpvAccess(_lbStepPeriod);
+    if (agreed == 0)
+    {
+      // A step has been called for but its count is still being agreed. Run up
+      // to the tentative floor and stop there. Stopping is the whole mechanism:
+      // it bounds how far any chare can get before the count is settled, so the
+      // agreed count is one no chare has passed. Relying instead on the final
+      // broadcast outrunning the application would make correctness a race.
+      if (lbIterNo < CkpvAccess(_lbStepTentative))
+      {
+        if (!async) ResumeFromSync();
+        return AtSyncStatus::Continue;
+      }
+      lbStepBlocked = true;
+      if (migDbg())
+        CkPrintf("[LBSTEP] pe=%d elem=%s BLOCK iter=%d tentative=%d\n", CkMyPe(),
+                 idx2str(thisIndexMax), lbIterNo, CkpvAccess(_lbStepTentative));
+      return AtSyncStatus::Blocked;
+    }
+
+    if (lbIterNo < agreed)
+    {
+      if (!async) ResumeFromSync();
+      return AtSyncStatus::Continue;
+    }
   }
+
+  lbJoinStep(waitForMigration);
+  return AtSyncStatus::Started;
+}
+
+// The tail of a step join, shared by AtSyncStart and the release that happens
+// when a blocked chare learns the agreed count.
+void CkMigratable::lbJoinStep(int waitForMigration)
+{
+  if (_lb_args.metaLbOn()) lbStepSeen = CkpvAccess(_lbStepRequested);
 
   myRec->AsyncMigrate(!waitForMigration);
   // Migratable straight away, in both modes. An element that keeps running
@@ -2307,6 +2386,9 @@ void CkMigratable::AtSyncStart(int waitForMigration)
   can_reset = true;
   lbStepPending = true;
   lbWaitEpoch = myRec->getLBMgr()->resumeEpoch();
+  if (migDbg())
+    CkPrintf("[LBSTEP] pe=%d elem=%s JOIN seq=%d iter=%d epoch=%d\n", CkMyPe(),
+             idx2str(thisIndexMax), lbStepSeen, lbIterNo, lbWaitEpoch);
   myRec->getSyncBarrier()->atBarrier(ldBarrierHandle);
 }
 
@@ -2323,6 +2405,8 @@ void CkMigratable::AtSyncWait()
 
   if (!lbStepPending)
   {
+    // The step already finished, so the wait is where the window opens.
+    if (_lb_args.metaLbOn()) LBTurnInstrumentOn();
     ResumeFromSync();
     return;
   }
@@ -2344,6 +2428,7 @@ void CkMigratable::lbCheckWaitRelease()
   waitParked = false;
   DEBL((AA "Element %s released after migrating into a resumed PE\n" AB,
         idx2str(thisIndexMax)));
+  if (_lb_args.metaLbOn()) LBTurnInstrumentOn();
   ResumeFromSync();
 }
 
@@ -2360,6 +2445,9 @@ void CkMigratable::ResumeFromSyncHelper()
 
   // The step this element started is over, in either mode -- AtSyncStart()
   // refuses to begin another while this is set.
+  if (migDbg())
+    CkPrintf("[LBSTEP] pe=%d elem=%s RESUME seen=%d epoch=%d\n", CkMyPe(),
+             idx2str(thisIndexMax), lbStepSeen, myRec->getLBMgr()->resumeEpoch());
   lbStepPending = false;
 
   if (_lb_args.lbAsync())
@@ -2369,6 +2457,11 @@ void CkMigratable::ResumeFromSyncHelper()
     if (!waitParked) return;
     waitParked = false;
   }
+  // Released from the wait -- open the measurement window. Under +LBAsync this
+  // is AtSyncWait() returning, which the application places a few iterations
+  // before its next AtSyncSample(); without it the step's own resume is the
+  // same moment. Either way nothing between the step and here is measured.
+  if (_lb_args.metaLbOn()) LBTurnInstrumentOn();
 
   CkLocMgr* localLocMgr = myRec->getLocMgr();
   auto iter = localLocMgr->bufferedActiveRgetMsgs.find(ckGetID());
@@ -4083,8 +4176,28 @@ bool CkLocMgr::emigrateDeviceByHandle(CkLocRec* rec, int toPe, size_t bufSize)
     elt->ckSuspendBarrierForDeferredDestroy();
 #endif
     held.chares.push_back(elt);
+    // Stop the PE-level fast path resolving to this copy. _processArrayEltMsg
+    // consults CkpvAccess(array_objs) first and, on a hit, delivers straight to
+    // the object without ever asking the location manager -- so it never sees
+    // the emigration recorded below. The packed path keeps that table honest
+    // through ~ArrayElement(), and the intra-process path erases it explicitly;
+    // this path does neither, because it deliberately keeps the element alive
+    // for the destination to pull from. Without this the element goes on
+    // receiving its own messages on the PE it has already left.
+    elt->ckStopFastDelivery();
     itr->second->eraseEltFromArrMgr(id);
   }
+
+  // Stop the PE-level fast path resolving this id to the held copy.
+  // _processArrayEltMsg consults CkpvAccess(array_objs) first and, on a hit,
+  // delivers straight to the object -- never consulting the location manager,
+  // so it never sees the emigration recorded just below. The packed path keeps
+  // this table honest implicitly, because ~ArrayElement() erases the entry, and
+  // the intra-process path erases it explicitly in
+  // ckPrepareIntraProcessMigrate(). This path does neither: it deliberately
+  // does not destroy the element, so without this the entry outlives the move
+  // and every message from a sender whose location cache still names this PE is
+  // delivered to a copy that is on its way out, instead of being forwarded.
   heldChares[id] = std::move(held);
 
   duringMigration = true;

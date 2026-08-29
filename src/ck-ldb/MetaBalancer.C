@@ -232,6 +232,10 @@ void MetaBalancer::init(void) {
 
   lb_step_in_flight_ = false;
   lb_step_seq_ = 0;
+  gpu_start_no_ = 0;
+  gpu_vote_seq_ = -1;
+  gpu_vote_count_ = 0;
+  gpu_vote_max_ = -1;
 
 
   // This is indicating if the load balancing strategy and migration started.
@@ -282,6 +286,8 @@ void MetaBalancer::pup(PUP::er& p) {
 
 
 void MetaBalancer::ResumeClients() {
+  if (getenv("CHARM_DEBUG_MIGRATE") != NULL)
+    CkPrintf("[LBSTEP] pe=%d METALB_RESUMECLIENTS\n", CkMyPe());
   lb_step_in_flight_ = false;
 
   // The GPU trigger runs a free-running sample stream: every PE completes every
@@ -617,15 +623,63 @@ void MetaBalancer::EvaluateGpuSample(int sample_no, const GpuSampleAcc& acc) {
   // Claim the step here rather than waiting for our own broadcast to come back,
   // so samples already in flight cannot trigger a second one.
   lb_step_in_flight_ = true;
-  thisProxy.RequestLBStep(++lb_step_seq_);
+  // Agree on which iteration to balance at before asking anyone to balance.
+  // Telling chares to join at their next AtSyncStart instead lets each one enter
+  // at whatever iteration the broadcast happened to reach it, and a chare that
+  // stops there starves the neighbours it owes data to, so they never reach
+  // their own join and the barrier never fills.
+  // The floor goes out with the vote so that no chare can run past the count
+  // that is about to be agreed. PE 0's own next count will do: chares already
+  // beyond it simply stop at their next AtSyncStart instead.
+  thisProxy.GpuCollectIter(++lb_step_seq_, gpu_start_no_ + 1);
 }
 
-// Every PE: a step has been asked for. Chares pick this up at their next
-// AtSyncStart; nothing parks and no period is agreed.
-void MetaBalancer::RequestLBStep(int seq) {
-  if (seq <= CkpvAccess(_lbStepRequested)) return;
+// Every PE reports how far its chares have got, point to point. A reduction
+// would pair this with whatever else is in flight on the same group; there is
+// exactly one of these per step, so counting the replies is simpler and cannot
+// be knocked out of step by a chare that migrates mid-vote.
+void MetaBalancer::GpuCollectIter(int seq, int tentative) {
+  if (seq > CkpvAccess(_lbStepRequested)) {
+    CkpvAccess(_lbStepRequested) = seq;
+    CkpvAccess(_lbStepTentative) = tentative;
+    CkpvAccess(_lbStepPeriod) = 0;  // not agreed yet
+    lb_step_in_flight_ = true;
+  }
+  thisProxy[0].GpuReportIter(seq, gpu_start_no_);
+}
+
+void MetaBalancer::GpuReportIter(int seq, int iter) {
+  CmiAssert(CkMyPe() == 0);
+  if (seq != gpu_vote_seq_) {
+    gpu_vote_seq_ = seq;
+    gpu_vote_count_ = 0;
+    gpu_vote_max_ = -1;
+  }
+  if (iter > gpu_vote_max_) gpu_vote_max_ = iter;
+  if (++gpu_vote_count_ < CkNumPes()) return;
+
+  // One past the furthest any chare reported. Nothing can have gone beyond it:
+  // a chare advances at most one call past the count it reported before it
+  // reaches the tentative floor and stops.
+  const int period = gpu_vote_max_ + 1;
+  if (_lb_args.debug())
+    CkPrintf("[MetaLB] step %d agreed at lbIterNo %d\n", seq, period);
+  thisProxy.RequestLBStep(seq, period);
+}
+
+// Every PE: a step has been agreed, and the count to join it at. Chares pick it
+// up at the AtSyncStart where their own lbIterNo reaches that count -- the same
+// application iteration on every chare. Nothing parks waiting for it.
+void MetaBalancer::RequestLBStep(int seq, int period) {
+  if (seq < CkpvAccess(_lbStepRequested)) return;
   lb_step_in_flight_ = true;
   CkpvAccess(_lbStepRequested) = seq;
+  CkpvAccess(_lbStepPeriod) = period;
+  if (getenv("CHARM_DEBUG_MIGRATE") != NULL)
+    CkPrintf("[LBSTEP] pe=%d AGREED seq=%d at lbIterNo=%d\n", CkMyPe(), seq, period);
+  // Let go of whatever stopped at the tentative floor: each of those chares
+  // either joins now or keeps iterating up to the agreed count.
+  lbmanager->MetaLBResumeWaitingChares(period);
 }
 
 void MetaBalancer::ReceiveMinStats(double *load, int n) {

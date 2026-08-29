@@ -18,7 +18,9 @@ module MetaBalancer {
     entry [expedited] void RegisterNoObjCallback(int);
     entry [expedited] void TriggerAdaptiveReduction();
     entry [expedited] void ReceiveGpuSample(int n, double data[n]);
-    entry [expedited] void RequestLBStep(int seq);
+    entry [expedited] void RequestLBStep(int seq, int period);
+    entry [expedited] void GpuCollectIter(int seq, int tentative);
+    entry [expedited] void GpuReportIter(int seq, int iter);
     entry [expedited] void MetaLBCallLBOnChares();
     entry [expedited] void MetaLBSetLBOnChares(int switchFrom, int switchTo);
     entry [expedited] void PreviousAvgLoad(double avg);

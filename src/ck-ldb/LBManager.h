@@ -182,6 +182,19 @@ CkpvExtern(bool, lbmanagerInited);
 // application iteration.
 CkpvExtern(int, _lbStepRequested);
 
+// The value of CkMigratable::lbIterNo at which the requested step is to be
+// joined, agreed across all PEs before the request is broadcast. Chares join at
+// this count and not before, so every chare enters the step at the same
+// application iteration.
+CkpvExtern(int, _lbStepPeriod);
+
+// The floor broadcast when the vote opens, before the count is agreed. No chare
+// runs past this, which is what makes the agreed count authoritative rather
+// than a race the broadcast has to win: the furthest any chare can be when the
+// count is settled is one call past what it reported, and the agreed count is
+// one past the furthest report.
+CkpvExtern(int, _lbStepTentative);
+
 // LB options, mostly controled by user parameter
 extern char* _lbtopo;
 

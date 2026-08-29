@@ -29,6 +29,8 @@ CkpvDeclare(int, _lb_obj_index);
 
 CkpvDeclare(bool, lbmanagerInited); /**< true if lbdatabase is inited */
 CkpvDeclare(int, _lbStepRequested);
+CkpvDeclare(int, _lbStepPeriod);
+CkpvDeclare(int, _lbStepTentative);
 
 extern int quietModeRequested;
 
@@ -200,6 +202,10 @@ void _loadbalancerInit()
 
   CkpvInitialize(int, _lbStepRequested);
   CkpvAccess(_lbStepRequested) = 0;
+  CkpvInitialize(int, _lbStepPeriod);
+  CkpvAccess(_lbStepPeriod) = 0;
+  CkpvInitialize(int, _lbStepTentative);
+  CkpvAccess(_lbStepTentative) = 0;
 
   CkpvInitialize(LBUserDataLayout, lbobjdatalayout);
   CkpvInitialize(int, _lb_obj_index);

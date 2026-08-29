@@ -131,7 +131,9 @@ public:
   void ReceiveMinStats(double *load, int n);
   void TriggerSoon(int iteration_no, double imbalance_ratio, double tolerate_imb);
   void ReceiveGpuSample(int n, double* data);
-  void RequestLBStep(int seq);
+  void RequestLBStep(int seq, int period);
+  void GpuCollectIter(int seq, int tentative);
+  void GpuReportIter(int seq, int iter);
   void LoadBalanceDecision(int, int);
   void LoadBalanceDecisionFinal(int, int);
   void MetaLBCallLBOnChares();
@@ -258,6 +260,25 @@ private:
   // On PE 0 only: sequence number of the last step requested. Chares compare it
   // against the one they last joined, so it only has to increase.
   int lb_step_seq_;
+
+  // Iteration agreement for the GPU trigger. The step is scheduled as a value
+  // of CkMigratable::lbIterNo rather than "join at your next AtSyncStart", so
+  // that every chare enters it at the same application iteration. One unit of
+  // that counter is a whole AtSyncStart cadence, which is what gives the final
+  // broadcast time to land before any chare can reach the agreed count.
+  //
+  // On every PE: the largest lbIterNo any local chare has reached.
+  int gpu_start_no_;
+  // On PE 0 only: the vote in progress.
+  int gpu_vote_seq_;
+  int gpu_vote_count_;
+  int gpu_vote_max_;
+
+ public:
+  // Called from AtSyncStart. Cheap: a compare and a possible store.
+  void reportStartNo(int n) { if (n > gpu_start_no_) gpu_start_no_ = n; }
+
+ private:
 
   // On PE 0 only: GPU samples arriving from each PE, keyed by sample index.
   //

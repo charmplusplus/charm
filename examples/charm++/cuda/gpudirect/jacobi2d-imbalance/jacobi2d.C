@@ -31,7 +31,8 @@
 /* readonly */ bool metalb_mode;
 /* readonly */ int sample_freq;
 // Async mode (-A, needs +LBAsync): AtSyncStart() returns without waiting, the
-// block keeps iterating, and AtSyncWait() comes wait_lag iterations later. The
+// block keeps iterating, and AtSyncWait() comes wait_lag iterations before the
+// next AtSyncSample(). The
 // gap between the two is the overlap.
 /* readonly */ bool async_mode;
 /* readonly */ int wait_lag;
@@ -144,7 +145,9 @@ public:
               "Usage: %s -W [grid width] -H [grid height] -w [block width] -h [block height]"
               "-b [lb frequency] -f [first lb] -m [max imbalance] "
               "-M (let MetaBalancer decide when to balance) -s [sample frequency, -M only] "
-              "-A (async LB: implies -M, needs +LBAsync) -l [wait lag in iterations, -A only] "
+              "-A (async LB: implies -M, needs +LBAsync) "
+              "-l [instrumentation window: iterations before each sample at which "
+              "AtSyncWait is called, -A only] "
               "-i [iterations] -u [warmup] -y (use sync version) -z (use GPU zerocopy) -p (print blocks)\n",
               m->argv[0]);
           CkExit();
@@ -157,6 +160,14 @@ public:
     }
 
     // Number of chares per dimension
+    if (async_mode && (wait_lag <= 0 || wait_lag >= sample_freq)) {
+      CkPrintf("Error: -l (%d) must be in 1..%d, i.e. inside one sampling "
+               "period (-s). The instrumentation window runs from AtSyncWait to "
+               "the next sample; a window as long as the period leaves no "
+               "overlap, and a longer one inverts it.\n", wait_lag, sample_freq - 1);
+      CkExit();
+    }
+
     n_chares_x = grid_width / block_width;
     n_chares_y = grid_height / block_height;
 
@@ -278,6 +289,8 @@ class Block : public CBase_Block {
   }
 
   Block(CkMigrateMessage* m) {
+    if (getenv("CHARM_DEBUG_MIGRATE") != NULL)
+      CkPrintf("[APP] block ctor-migrated pe=%d obj=%p\n", CkMyPe(), (void*)this);
     usesAtSync = true;
     hapiCheck(cudaStreamCreateWithPriority(&compute_stream, cudaStreamDefault, 0));
     hapiCheck(cudaStreamCreateWithPriority(&comm_stream, cudaStreamDefault, -1));
@@ -287,13 +300,13 @@ class Block : public CBase_Block {
   }
 
   ~Block() {
-    // hapiCheck(cudaFreeHost(h_temperature));
+    hapiCheck(cudaFreeHost(h_temperature));
     hapiCheck(cudaFree(d_temperature));
     hapiCheck(cudaFree(d_new_temperature));
-    // hapiCheck(cudaFreeHost(h_left_ghost));
-    // hapiCheck(cudaFreeHost(h_right_ghost));
-    // hapiCheck(cudaFreeHost(h_top_ghost));
-    // hapiCheck(cudaFreeHost(h_bottom_ghost));
+    hapiCheck(cudaFreeHost(h_left_ghost));
+    hapiCheck(cudaFreeHost(h_right_ghost));
+    hapiCheck(cudaFreeHost(h_top_ghost));
+    hapiCheck(cudaFreeHost(h_bottom_ghost));
     if (!use_zerocopy) {
       hapiCheck(cudaFree(d_left_ghost));
       hapiCheck(cudaFree(d_right_ghost));
@@ -340,16 +353,16 @@ class Block : public CBase_Block {
     p | lb_waiting;
 
     if (p.isUnpacking()) {
-      // hapiCheck(hapiMallocHost((void**)&h_temperature,
-      //       sizeof(DataType) * (block_width + 2) * (block_height + 2)));
+      hapiCheck(hapiMallocHost((void**)&h_temperature,
+            sizeof(DataType) * (block_width + 2) * (block_height + 2)));
       hapiCheck(hapiMalloc((void**)&d_temperature,
             sizeof(DataType) * (block_width + 2) * (block_height + 2)));
       hapiCheck(hapiMalloc((void**)&d_new_temperature,
             sizeof(DataType) * (block_width + 2) * (block_height + 2)));
-      // hapiCheck(hapiMallocHost((void**)&h_left_ghost, sizeof(DataType) * block_height));
-      // hapiCheck(hapiMallocHost((void**)&h_right_ghost, sizeof(DataType) * block_height));
-      // hapiCheck(hapiMallocHost((void**)&h_top_ghost, sizeof(DataType) * block_width));
-      // hapiCheck(hapiMallocHost((void**)&h_bottom_ghost, sizeof(DataType) * block_width));
+      hapiCheck(hapiMallocHost((void**)&h_left_ghost, sizeof(DataType) * block_height));
+      hapiCheck(hapiMallocHost((void**)&h_right_ghost, sizeof(DataType) * block_height));
+      hapiCheck(hapiMallocHost((void**)&h_top_ghost, sizeof(DataType) * block_width));
+      hapiCheck(hapiMallocHost((void**)&h_bottom_ghost, sizeof(DataType) * block_width));
       if (!use_zerocopy) {
         hapiCheck(hapiMalloc((void**)&d_left_ghost, sizeof(DataType) * block_height));
         hapiCheck(hapiMalloc((void**)&d_right_ghost, sizeof(DataType) * block_height));
@@ -363,6 +376,15 @@ class Block : public CBase_Block {
       }
     }
       
+    // The outgoing ghosts are live from packGhosts() until sendGhosts() reads
+    // them, and under +LBAsync a step can move this block inside that window.
+    // Carrying only the two grids left the destination's sendGhosts() reading
+    // freshly allocated buffers, so its neighbours got garbage halos.
+    PUParray(p, h_left_ghost, block_height);
+    PUParray(p, h_right_ghost, block_height);
+    PUParray(p, h_top_ghost, block_width);
+    PUParray(p, h_bottom_ghost, block_width);
+
     p(d_temperature, (block_width + 2) * (block_height + 2), PUP::PUPMode::DEVICE);
     p(d_new_temperature, (block_width + 2) * (block_height + 2), PUP::PUPMode::DEVICE);
   }
@@ -462,8 +484,8 @@ class Block : public CBase_Block {
   // every migration complete and resume and then stalls the application.
   void ckAboutToMigrate() override {
     if (getenv("CHARM_DEBUG_MIGRATE") != NULL)
-      CkPrintf("[APP] block (%d,%d) migrating at iteration %d\n",
-               thisIndex.x, thisIndex.y, my_iter);
+      CkPrintf("[APP] block (%d,%d) pe=%d obj=%p migrating at iteration %d\n",
+               thisIndex.x, thisIndex.y, CkMyPe(), (void*)this, my_iter);
     ArrayElement::ckAboutToMigrate();
   }
 
@@ -475,6 +497,28 @@ class Block : public CBase_Block {
   // change the arithmetic any cell sees, so a correct run is bit-identical
   // whatever the object-to-PE mapping was, and a hash says so crisply. Summed
   // across blocks so the reduction does not depend on their order.
+  // Hash of this block's interior, for locating the first point at which an
+  // async run diverges from a no-LB reference. Drains both streams, so only
+  // used under CHARM_DEBUG_HASH.
+  uint64_t gridHash() {
+    const size_t n = (size_t)(block_width + 2) * (block_height + 2);
+    std::vector<DataType> host(n);
+    cudaStreamSynchronize(compute_stream);
+    cudaStreamSynchronize(comm_stream);
+    hapiCheck(cudaMemcpy(host.data(), d_temperature, sizeof(DataType) * n,
+                         cudaMemcpyDeviceToHost));
+    uint64_t h = 1469598103934665603ULL;
+    for (int j = 1; j <= block_height; j++) {
+      const unsigned char* row =
+          (const unsigned char*)(host.data() + (block_width + 2) * j + 1);
+      for (size_t b = 0; b < sizeof(DataType) * (size_t)block_width; b++) {
+        h ^= row[b];
+        h *= 1099511628211ULL;
+      }
+    }
+    return h;
+  }
+
   void checksum() {
     const size_t n = (size_t)(block_width + 2) * (block_height + 2);
     std::vector<DataType> host(n);
@@ -497,6 +541,14 @@ class Block : public CBase_Block {
   }
 
   void iterate() {
+    {
+      static const bool hashDbg = (getenv("CHARM_DEBUG_HASH") != NULL);
+      if (hashDbg)
+        CkPrintf("[HASH] (%d,%d) iter=%d h=%016llx\n", x, y, my_iter,
+                 (unsigned long long)gridHash());
+    }
+    if (getenv("CHARM_DEBUG_GHOSTV") != NULL)
+      CkPrintf("[GH] (%d,%d) pe=%d ITER iter=%d\n", x, y, CkMyPe(), my_iter);
     if (metalb_mode) {
       // Sampling is throttled; starting a step is not. AtSyncStart runs every
       // iteration and costs an integer compare unless MetaBalancer has asked
@@ -510,30 +562,54 @@ class Block : public CBase_Block {
       // it would lose track of the first. A step requested in that window is
       // picked up on a later iteration, once the wait is done.
       const bool starting = !lb_waiting && AtSyncPending();
-      const bool finishing = lb_waiting && (my_iter >= lb_start_iter + wait_lag);
+      // The wait is placed relative to the *sampling* cadence, not to the start:
+      // the decision is made at the sample, and instrumentation runs for the
+      // wait_lag iterations leading up to it. So wait at the first iteration of
+      // that window, which leaves the overlap running from the join all the way
+      // to here -- most of a sampling period.
+      //
+      // Deliberately not conditioned on having started a step: a block that
+      // blocked at the tentative count is joined by the runtime rather than by
+      // its own AtSyncStart(), so it cannot know it started one. AtSyncWait()
+      // resumes inline when there is nothing to wait for, so calling it on the
+      // cadence is always safe.
+      const bool finishing = (my_iter % sample_freq) >= (sample_freq - wait_lag);
       if (sampling || starting || finishing) {
         cudaStreamSynchronize(comm_stream);
         cudaStreamSynchronize(compute_stream);
       }
       if (sampling) AtSyncSample();
-      if (starting) {
-        lb_start_iter = my_iter;
-        lb_waiting = true;
-        if (thisIndex.x == 0 && thisIndex.y == 0)
-          CkPrintf("[APP] LB step starting at iteration %d\n", my_iter);
-      }
 
       if (!async_mode) {
-        // Called every iteration: AtSyncStart either joins the barrier (and the
-        // resume arrives as ResumeFromSync) or resumes inline, so there is
-        // nothing left to do here either way.
+        // Called every iteration -- that cadence is what makes the runtime's
+        // step counter a clock every block agrees on. It joins only at the
+        // agreed count and resumes inline otherwise, so there is nothing left
+        // to do here either way.
         AtSyncStart();
         return;
       }
-      if (starting) AtSyncStart();
 
-      if (lb_waiting && my_iter >= lb_start_iter + wait_lag) {
-        lb_waiting = false;
+      // Same cadence in async, except while this block still owes a wait: the
+      // contract is one step at a time per element, and every block starts and
+      // waits at the same iterations, so they all skip the same calls and their
+      // counters stay level.
+      // The runtime knows whether this block still owes a wait; the application
+      // cannot, for the reason above.
+      if (!AtSyncStepInFlight()) {
+        const CkMigratable::AtSyncStatus st = AtSyncStart();
+        // Stopped at the tentative count while the step's iteration is agreed.
+        // Do nothing at all: the runtime resumes this block, or joins it, once
+        // the count is settled. Iterating on would be running past the count
+        // that is about to be agreed, which is what the stop exists to prevent.
+        if (st == CkMigratable::AtSyncStatus::Blocked) return;
+        if (st == CkMigratable::AtSyncStatus::Started) {
+          lb_start_iter = my_iter;
+          if (thisIndex.x == 0 && thisIndex.y == 0)
+            CkPrintf("[APP] LB step starting at iteration %d\n", my_iter);
+        }
+      }
+
+      if (finishing) {
         if (thisIndex.x == 0 && thisIndex.y == 0)
           CkPrintf("[APP] waiting for LB at iteration %d (%d iterations overlapped)\n",
                    my_iter, my_iter - lb_start_iter);
@@ -561,6 +637,8 @@ class Block : public CBase_Block {
   }
 
   void update() {
+    if (getenv("CHARM_DEBUG_GHOSTV") != NULL)
+      CkPrintf("[GH] (%d,%d) pe=%d UPD iter=%d\n", x, y, CkMyPe(), my_iter);
     std::ostringstream os;
     os << "update (" << std::to_string(x) << "," << std::to_string(y) << ")";
     NVTXTracer(os.str(), NVTXColor::WetAsphalt);
@@ -622,6 +700,8 @@ class Block : public CBase_Block {
   }
 
   void packGhosts() {
+    if (getenv("CHARM_DEBUG_GHOSTV") != NULL)
+      CkPrintf("[GH] (%d,%d) pe=%d PACK iter=%d\n", x, y, CkMyPe(), my_iter);
     std::ostringstream os;
     os << "packGhosts (" << std::to_string(x) << "," << std::to_string(y) << ")";
     NVTXTracer(os.str(), NVTXColor::Emerald);
@@ -669,6 +749,8 @@ class Block : public CBase_Block {
     // Add asynchronous callback to be invoked when packing kernels and
     // ghost transfers are complete
     CkCallback* cb = new CkCallback(CkIndex_Block::packGhostsDone(), thisProxy[thisIndex]);
+    if (getenv("CHARM_DEBUG_GHOST") != NULL)
+      CkPrintf("[GH] (%d,%d) pe=%d PACKARM iter=%d\n", x, y, CkMyPe(), my_iter);
     hapiAddCallback(comm_stream, cb);
 #endif
   }
@@ -693,6 +775,13 @@ class Block : public CBase_Block {
         thisProxy(x, y + 1).receiveGhostsZC(my_iter, TOP, block_width,
             CkDeviceBuffer(d_send_bottom_ghost, comm_stream));
     } else {
+      if (getenv("CHARM_DEBUG_GHOST") != NULL) {
+        CkPrintf("[GH] (%d,%d) pe=%d obj=%p SEND iter=%d\n", x, y, CkMyPe(), (void*)this, my_iter);
+        if (!left_bound)   CkPrintf("[TX] %d,%d -> %d,%d iter=%d\n", x, y, x-1, y, my_iter);
+        if (!right_bound)  CkPrintf("[TX] %d,%d -> %d,%d iter=%d\n", x, y, x+1, y, my_iter);
+        if (!top_bound)    CkPrintf("[TX] %d,%d -> %d,%d iter=%d\n", x, y, x, y-1, my_iter);
+        if (!bottom_bound) CkPrintf("[TX] %d,%d -> %d,%d iter=%d\n", x, y, x, y+1, my_iter);
+      }
       if (!left_bound)
         thisProxy(x - 1, y).receiveGhostsReg(my_iter, RIGHT, block_height, h_left_ghost);
       if (!right_bound)
@@ -749,6 +838,14 @@ class Block : public CBase_Block {
   }
 
   void processGhostsReg(int dir, int size, DataType* gh) {
+    if (getenv("CHARM_DEBUG_GHOSTV") != NULL)
+      CkPrintf("[GH] (%d,%d) pe=%d RECV iter=%d dir=%d count=%d/%d\n", x, y,
+               CkMyPe(), my_iter, dir, remote_count + 1, neighbors);
+    else if (getenv("CHARM_DEBUG_GHOST") != NULL) {
+      CkPrintf("[RX] %d,%d iter=%d dir=%d\n", x, y, my_iter, dir);
+    }
+    if (getenv("CHARM_DEBUG_GHOST") != NULL && remote_count + 1 == neighbors)
+      CkPrintf("[GH] (%d,%d) pe=%d obj=%p RECVDONE iter=%d\n", x, y, CkMyPe(), (void*)this, my_iter);
     std::ostringstream os;
     os << "processGhostsReg (" << std::to_string(x) << "," << std::to_string(y) << ")";
     NVTXTracer(os.str(), NVTXColor::Amethyst);

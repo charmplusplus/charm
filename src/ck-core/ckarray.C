@@ -396,6 +396,14 @@ void ArrayElement::ckDestroy(void)
 // fast delivery on the PE it left, and keeps calling into that PE's CkArray
 // branch.
 
+// The key here is the full ObjID -- array id combined with element id -- which
+// only the element can build, which is why this is a hook rather than an erase
+// at the call site.
+void ArrayElement::ckStopFastDelivery()
+{
+  CkpvAccess(array_objs).erase(ckGetID().getID());
+}
+
 int ArrayElement::ckPrepareIntraProcessMigrate()
 {
   // Stop fast message delivery finding this element on the source PE.
