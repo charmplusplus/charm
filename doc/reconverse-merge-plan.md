@@ -42,7 +42,10 @@ their choice — AMD/Frontier being the one that actually exercises the
 portability claim — recording where they ran in the PR template's
 HPC-site field, and **not approving until satisfied**. That approval
 discipline is deliberately manual; the template field makes it visible
-rather than enforced. Item 10 additionally needs multi-node runs with
+rather than enforced. The programs reviewers run are
+`tests/charm++/cuda/hapitest` and `tests/charm++/cuda/hapi_verify` —
+independently written, catching different failure classes; each prints
+a single PASS line. Item 10 additionally needs multi-node runs with
 job resizing — login-node or single-node evidence is not sufficient
 there.
 
