@@ -849,8 +849,33 @@ int CkRdmaGetDestPEChare(int dest_pe, void* obj_ptr) {
 // comm-buffer *bytes* wants -- it cannot know in advance how many blocks it
 // must reclaim to fit its request.
 //
+// Index of this PE among the PEs sharing its device.
+//
+// The IPC event pool holds one slice per PE *sharing a device* -- its total is
+// hapi_ipc_event_pool_size_pe * pes_per_device -- so a slice must be chosen by
+// this index, not by the PE's rank in the process. The two differ as soon as a
+// process drives more than one GPU: with 8 PEs over 4 devices, CkMyRank()
+// reaches 7 and would index 1792 into a 512-entry pool, handing back an event
+// that was never created and failing as 'invalid resource handle' when it is
+// recorded.
+//
+// Derived from the device ids rather than from arithmetic on the rank, because
+// Block and RoundRobin group PEs onto devices differently and each would
+// otherwise need its own formula. Cached: the mapping is fixed after startup.
+static int ipcEventPoolSlice(int cpv_my_device_id) {
+  static thread_local int cached = -1;
+  if (cached < 0) {
+    int slice = 0;
+    for (int k = 0; k < CkMyRank(); k++)
+      if (CpvAccessOther(my_device_id, k) == cpv_my_device_id) slice++;
+    cached = slice;
+  }
+  return cached;
+}
+
 // The caller must NOT hold dm->lock. The slice [pool_start, pool_start +
-// pool_size) belongs to this PE alone -- pool_start is derived from CkMyRank(),
+// pool_size) belongs to this PE alone -- pool_start is derived from this PE's
+// index among those sharing its device,
 // so ranks index disjoint elements -- and the only shared state here is the
 // buddy allocator. So the scan runs lock-free and the lock is taken once, at
 // the end, around the batch of frees.
@@ -858,7 +883,7 @@ static int reclaimCompletedIpcEvents(DeviceManager* dm, int cpv_my_device_id,
                                      int max_to_free) {
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
   int pool_size = csv_gpu_manager.hapi_ipc_event_pool_size_pe;
-  int pool_start = CkMyRank() * pool_size;
+  int pool_start = ipcEventPoolSlice(cpv_my_device_id) * pool_size;
   const int my_device_index =
       csv_gpu_manager.device_count * CmiMyNodeRankLocal() + cpv_my_device_id;
   hapi_ipc_device_info& my_device_info = csv_gpu_manager.hapi_ipc_device_infos[my_device_index];
@@ -947,7 +972,7 @@ static int claimFreeIpcEvent(int cpv_my_device_id, const size_t comm_offset,
                              int flag_value) {
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
   int pool_size = csv_gpu_manager.hapi_ipc_event_pool_size_pe;
-  int pool_start = CkMyRank() * pool_size;
+  int pool_start = ipcEventPoolSlice(cpv_my_device_id) * pool_size;
   hapi_ipc_device_info& my_device_info = csv_gpu_manager.hapi_ipc_device_infos[csv_gpu_manager.device_count * CmiMyNodeRankLocal() + cpv_my_device_id];
 
   for (int i = pool_start; i < pool_start + pool_size; i++) {
