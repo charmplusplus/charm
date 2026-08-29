@@ -1367,7 +1367,8 @@ void hapiPollEvents(void* param) {
   std::queue<hapiEvent>& queue = CpvAccess(hapi_event_queue);
   while (!queue.empty()) {
     hapiEvent hev = queue.front();
-    if (cudaEventQuery(hev.event) == cudaSuccess) {
+    cudaError_t retCode = cudaEventQuery(hev.event);
+    if (retCode == cudaSuccess) {
       queue.pop(); // TODO: investigate possible race condition with charm4py futures - temporarily resolved by popping here
 
       // invoke Charm++ callback if one was given
@@ -1385,6 +1386,11 @@ void hapiPollEvents(void* param) {
       hapiQdProcess(1);
     }
     else {
+        if(retCode != cudaErrorNotReady) {
+            CkPrintf("%d %d: Fatal CUDA Error %s: %d.\n", CkMyNode(), CkMyPe(),
+                     cudaGetErrorString(retCode), retCode);
+            CkAbort("%d: hapiPollEvents: bad CUDA event\n", CkMyPe());
+        }
       // stop going through the queue once we encounter a non-successful event
       break;
     }
