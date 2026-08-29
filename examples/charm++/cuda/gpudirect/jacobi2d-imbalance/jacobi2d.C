@@ -275,6 +275,14 @@ class Block : public CBase_Block {
   DataType* __restrict__ d_send_bottom_ghost;
   DataType* __restrict__ d_recv_left_ghost;
   DataType* __restrict__ d_recv_right_ghost;
+  // Top and bottom ghosts land here rather than straight into d_temperature's
+  // halo. Posting the halo directly is a race: the post hook runs whenever the
+  // message arrives, which may be before this block has swapped d_temperature
+  // with d_new_temperature for the iteration, so the data lands in whichever
+  // array the pointer happened to name. Staging and copying in
+  // processGhostsZC puts the write after the swap, where it is deterministic.
+  DataType* __restrict__ d_recv_top_ghost;
+  DataType* __restrict__ d_recv_bottom_ghost;
 
   cudaStream_t compute_stream;
   cudaStream_t comm_stream;
@@ -317,6 +325,8 @@ class Block : public CBase_Block {
       hapiCheck(cudaFree(d_send_bottom_ghost));
       hapiCheck(cudaFree(d_recv_left_ghost));
       hapiCheck(cudaFree(d_recv_right_ghost));
+      hapiCheck(cudaFree(d_recv_top_ghost));
+      hapiCheck(cudaFree(d_recv_bottom_ghost));
     }
 
     hapiCheck(cudaStreamDestroy(compute_stream));
@@ -367,12 +377,14 @@ class Block : public CBase_Block {
         hapiCheck(hapiMalloc((void**)&d_left_ghost, sizeof(DataType) * block_height));
         hapiCheck(hapiMalloc((void**)&d_right_ghost, sizeof(DataType) * block_height));
       } else {
-        hapiCheck(hapiMalloc((void**)&d_send_left_ghost, sizeof(DataType) * block_height));
-        hapiCheck(hapiMalloc((void**)&d_send_right_ghost, sizeof(DataType) * block_height));
-        hapiCheck(hapiMalloc((void**)&d_send_top_ghost, sizeof(DataType) * block_width));
-        hapiCheck(hapiMalloc((void**)&d_send_bottom_ghost, sizeof(DataType) * block_width));
-        hapiCheck(hapiMalloc((void**)&d_recv_left_ghost, sizeof(DataType) * block_height));
-        hapiCheck(hapiMalloc((void**)&d_recv_right_ghost, sizeof(DataType) * block_height));
+        hapiCheck(hapiMalloc((void**)&d_send_left_ghost, sizeof(DataType) * block_height * 2));
+        hapiCheck(hapiMalloc((void**)&d_send_right_ghost, sizeof(DataType) * block_height * 2));
+        hapiCheck(hapiMalloc((void**)&d_send_top_ghost, sizeof(DataType) * block_width * 2));
+        hapiCheck(hapiMalloc((void**)&d_send_bottom_ghost, sizeof(DataType) * block_width * 2));
+        hapiCheck(hapiMalloc((void**)&d_recv_left_ghost, sizeof(DataType) * block_height * 2));
+        hapiCheck(hapiMalloc((void**)&d_recv_right_ghost, sizeof(DataType) * block_height * 2));
+        hapiCheck(hapiMalloc((void**)&d_recv_top_ghost, sizeof(DataType) * block_width * 2));
+        hapiCheck(hapiMalloc((void**)&d_recv_bottom_ghost, sizeof(DataType) * block_width * 2));
       }
     }
       
@@ -437,12 +449,14 @@ class Block : public CBase_Block {
       hapiCheck(hapiMalloc((void**)&d_left_ghost, sizeof(DataType) * block_height));
       hapiCheck(hapiMalloc((void**)&d_right_ghost, sizeof(DataType) * block_height));
     } else {
-      hapiCheck(hapiMalloc((void**)&d_send_left_ghost, sizeof(DataType) * block_height));
-      hapiCheck(hapiMalloc((void**)&d_send_right_ghost, sizeof(DataType) * block_height));
-      hapiCheck(hapiMalloc((void**)&d_send_top_ghost, sizeof(DataType) * block_width));
-      hapiCheck(hapiMalloc((void**)&d_send_bottom_ghost, sizeof(DataType) * block_width));
-      hapiCheck(hapiMalloc((void**)&d_recv_left_ghost, sizeof(DataType) * block_height));
-      hapiCheck(hapiMalloc((void**)&d_recv_right_ghost, sizeof(DataType) * block_height));
+      hapiCheck(hapiMalloc((void**)&d_send_left_ghost, sizeof(DataType) * block_height * 2));
+      hapiCheck(hapiMalloc((void**)&d_send_right_ghost, sizeof(DataType) * block_height * 2));
+      hapiCheck(hapiMalloc((void**)&d_send_top_ghost, sizeof(DataType) * block_width * 2));
+      hapiCheck(hapiMalloc((void**)&d_send_bottom_ghost, sizeof(DataType) * block_width * 2));
+      hapiCheck(hapiMalloc((void**)&d_recv_left_ghost, sizeof(DataType) * block_height * 2));
+      hapiCheck(hapiMalloc((void**)&d_recv_right_ghost, sizeof(DataType) * block_height * 2));
+      hapiCheck(hapiMalloc((void**)&d_recv_top_ghost, sizeof(DataType) * block_width * 2));
+      hapiCheck(hapiMalloc((void**)&d_recv_bottom_ghost, sizeof(DataType) * block_width * 2));
     }
 
     hapiCheck(cudaStreamCreateWithPriority(&compute_stream, cudaStreamDefault, 0));
@@ -699,6 +713,16 @@ class Block : public CBase_Block {
     contribute(CkCallback(CkReductionTarget(Main, updateDone), main_proxy));
   }
 
+  // The receiver pulls straight out of these buffers, asynchronously, and
+  // nothing tells this block when that pull has finished. Reusing one buffer
+  // every iteration therefore lets a block overwrite ghosts a neighbour has not
+  // read yet -- which is why -z gave a different answer every run even with no
+  // load balancing at all. Alternating halves gives the neighbour a full
+  // iteration to pull: this block cannot reach iteration N+2 until it has the
+  // ghosts its neighbour sent at N+1, which it could only have sent after
+  // reading this block's N.
+  DataType* sendSlice(DataType* base, int n) const { return base + (my_iter & 1) * n; }
+
   void packGhosts() {
     if (getenv("CHARM_DEBUG_GHOSTV") != NULL)
       CkPrintf("[GH] (%d,%d) pe=%d PACK iter=%d\n", x, y, CkMyPe(), my_iter);
@@ -709,16 +733,17 @@ class Block : public CBase_Block {
     if (use_zerocopy) {
 #if !COMM_ONLY
       // Pack non-contiguous ghosts to temporary contiguous buffers on device
-      invokePackingKernels(d_new_temperature, d_send_left_ghost, d_send_right_ghost,
+      invokePackingKernels(d_new_temperature, sendSlice(d_send_left_ghost, block_height),
+          sendSlice(d_send_right_ghost, block_height),
           left_bound, right_bound, block_width, block_height, comm_stream);
 #endif
 
       // Copy top and bottom ghosts to send buffers
       if (!top_bound)
-        hapiCheck(hapiMemcpyAsync(d_send_top_ghost, d_new_temperature + (block_width + 2) + 1,
+        hapiCheck(hapiMemcpyAsync(sendSlice(d_send_top_ghost, block_width), d_new_temperature + (block_width + 2) + 1,
               block_width * sizeof(DataType), cudaMemcpyDeviceToDevice, comm_stream));
       if (!bottom_bound)
-        hapiCheck(hapiMemcpyAsync(d_send_bottom_ghost, d_new_temperature + (block_width + 2) * block_height + 1,
+        hapiCheck(hapiMemcpyAsync(sendSlice(d_send_bottom_ghost, block_width), d_new_temperature + (block_width + 2) * block_height + 1,
               block_width * sizeof(DataType), cudaMemcpyDeviceToDevice, comm_stream));
     } else {
 #if !COMM_ONLY
@@ -764,16 +789,16 @@ class Block : public CBase_Block {
     if (use_zerocopy) {
       if (!left_bound)
         thisProxy(x - 1, y).receiveGhostsZC(my_iter, RIGHT, block_height,
-            CkDeviceBuffer(d_send_left_ghost, comm_stream));
+            CkDeviceBuffer(sendSlice(d_send_left_ghost, block_height), comm_stream));
       if (!right_bound)
         thisProxy(x + 1, y).receiveGhostsZC(my_iter, LEFT, block_height,
-            CkDeviceBuffer(d_send_right_ghost, comm_stream));
+            CkDeviceBuffer(sendSlice(d_send_right_ghost, block_height), comm_stream));
       if (!top_bound)
         thisProxy(x, y - 1).receiveGhostsZC(my_iter, BOTTOM, block_width,
-            CkDeviceBuffer(d_send_top_ghost, comm_stream));
+            CkDeviceBuffer(sendSlice(d_send_top_ghost, block_width), comm_stream));
       if (!bottom_bound)
         thisProxy(x, y + 1).receiveGhostsZC(my_iter, TOP, block_width,
-            CkDeviceBuffer(d_send_bottom_ghost, comm_stream));
+            CkDeviceBuffer(sendSlice(d_send_bottom_ghost, block_width), comm_stream));
     } else {
       if (getenv("CHARM_DEBUG_GHOST") != NULL) {
         CkPrintf("[GH] (%d,%d) pe=%d obj=%p SEND iter=%d\n", x, y, CkMyPe(), (void*)this, my_iter);
@@ -797,17 +822,22 @@ class Block : public CBase_Block {
   // SDAG entry method in the .ci file
   void receiveGhostsZC(int ref, int dir, int &size, DataType *&buf, CkDeviceBufferPost *devicePost) {
     switch (dir) {
+      // Alternate halves by the sender's iteration tag. A landing buffer is
+      // still being read by the unpack kernel queued on comm_stream for the
+      // previous iteration, and the runtime's write is not ordered against
+      // that stream, so reusing one buffer every iteration lets an arrival
+      // overwrite ghosts that have not been consumed yet.
       case LEFT:
-        buf = d_recv_left_ghost;
+        buf = d_recv_left_ghost + (ref & 1) * block_height;
         break;
       case RIGHT:
-        buf = d_recv_right_ghost;
+        buf = d_recv_right_ghost + (ref & 1) * block_height;
         break;
       case TOP:
-        buf = d_temperature + 1;
+        buf = d_recv_top_ghost + (ref & 1) * block_width;
         break;
       case BOTTOM:
-        buf = d_temperature + (block_width + 2) * (block_height + 1) + 1;
+        buf = d_recv_bottom_ghost + (ref & 1) * block_width;
         break;
       default:
         CkAbort("Error: invalid direction");
@@ -821,16 +851,24 @@ class Block : public CBase_Block {
     NVTXTracer(os.str(), NVTXColor::Amethyst);
 
     switch (dir) {
+      // gh is the pointer the runtime actually landed into -- the correct half
+      // of the double buffer. Reading the buffer base instead would defeat the
+      // alternation done in the post hook.
       case LEFT:
-        invokeUnpackingKernel(d_temperature, d_recv_left_ghost, true, block_width,
+        invokeUnpackingKernel(d_temperature, gh, true, block_width,
             block_height, comm_stream);
         break;
       case RIGHT:
-        invokeUnpackingKernel(d_temperature, d_recv_right_ghost, false, block_width,
+        invokeUnpackingKernel(d_temperature, gh, false, block_width,
             block_height, comm_stream);
         break;
       case TOP:
+        hapiCheck(cudaMemcpyAsync(d_temperature + 1, gh,
+            block_width * sizeof(DataType), cudaMemcpyDeviceToDevice, comm_stream));
+        break;
       case BOTTOM:
+        hapiCheck(cudaMemcpyAsync(d_temperature + (block_width + 2) * (block_height + 1) + 1,
+            gh, block_width * sizeof(DataType), cudaMemcpyDeviceToDevice, comm_stream));
         break;
       default:
         CkAbort("Error: invalid direction");
