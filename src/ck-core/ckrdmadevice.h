@@ -149,9 +149,11 @@ extern "C" {
   void* device_restage_req_bridge(void* arg);
   void* device_restage_meta_bridge(void* arg);
   void* device_restage_rdma_bridge(void* arg);
+  void* device_restage_put_done_bridge(void* arg);
   extern int device_restage_req_handler;
   extern int device_restage_meta_handler;
   extern int device_restage_rdma_handler;
+  extern int device_restage_put_done_handler;
 }
 
 #endif // CMK_CUDA

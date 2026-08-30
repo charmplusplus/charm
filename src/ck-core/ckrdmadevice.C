@@ -127,9 +127,25 @@ extern "C" {
   int loopback_handler;
 }
 
+// Sender side of a correction put; defined with the rest of the protocol below.
+static void notifyDeviceRestagePut(int dest_pe, void* dest_op);
+
 void CkRdmaDeviceRecvHandler(void* data)
 {
   NcpyOperationInfo *ncpy_op_info = (NcpyOperationInfo *)data;
+
+  if (ncpy_op_info->opMode == CMK_DEVICE_RESTAGE_PUT) {
+    // A put raises its completion on the initiator only, and for a correction
+    // the initiator is the sender. deviceRdmaOpInfo names the receiver's
+    // DeviceRdmaOp, which is a pointer into that other process and must not be
+    // followed here -- so tell the receiver the payload has landed and let it
+    // resolve the op. destPe is a plain int in the ncpyOpInfo, so it is the one
+    // piece of the destination that is safe to read from this side.
+    notifyDeviceRestagePut(ncpy_op_info->destPe,
+                           ncpy_op_info->deviceRdmaOpInfo);
+    return;
+  }
+
   DeviceRdmaOp* op = (DeviceRdmaOp*)(ncpy_op_info->deviceRdmaOpInfo);
 
   if(op->dest_pe != CmiMyPe()) {
@@ -652,9 +668,9 @@ static void acquireIpcSendSlot(DeviceManager* dm, int cpv_my_device_id,
 //                 metadata; the receiver pulls, as it does for any staged send,
 //                 through the once-per-device mapping it already holds.
 //   inter-node -- the sender registers its source and RDMA-puts straight into
-//                 the descriptor the receiver registered for it. The receiver's
-//                 CmiNcpyBuffer carries its DeviceRdmaOp as the ref, so the
-//                 RDMA ack completes the op with no extra notify message.
+//                 the descriptor the receiver registered for it, then sends a
+//                 one-word notification, because an RDMA write raises its
+//                 completion on the initiator and leaves the target unaware.
 // Putting into an app buffer costs nothing extra inter-node, where the receiver
 // registers that buffer on every receive anyway; the same trick same-node would
 // mean a cold cuIpcOpenMemHandle per correction, which is exactly what the
@@ -685,10 +701,45 @@ struct DeviceRestageMeta {         // sender -> receiver, same node
   size_t cnt;
 };
 
+struct DeviceRestagePutDone {      // sender -> receiver, inter-node put
+  char header[CmiMsgHeaderSizeBytes];
+  void* dest_op;                   // receiver's DeviceRdmaOp*
+};
+
 extern "C" {
   int device_restage_req_handler;
   int device_restage_meta_handler;
   int device_restage_rdma_handler;
+  int device_restage_put_done_handler;
+}
+
+// Sender side: the write has completed locally, and nothing on the target has
+// been told, because an RDMA write raises no completion there. So tell it. This
+// is the same shape as LCI's own rendezvous protocol, which posts its puts and
+// then, from the local write completion, sends a FIN carrying the receiver's
+// context pointer -- ordering the notification behind the payload by waiting
+// for the write rather than by trusting the network to order two operations.
+static void notifyDeviceRestagePut(int dest_pe, void* dest_op)
+{
+  auto* m = (DeviceRestagePutDone*)CmiAlloc(sizeof(DeviceRestagePutDone));
+  CmiEnforce(m);
+  m->dest_op = dest_op;
+  // No QdCreate: the count raised before the put is still outstanding and is
+  // handed to this message, so quiescence stays blocked across the whole
+  // correction rather than reopening between the write and the notification.
+  CmiSetHandler(m, device_restage_put_done_handler);
+  CmiSyncSendAndFree(dest_pe, sizeof(DeviceRestagePutDone), (char*)m);
+}
+
+// Receiver side, inter-node put: the payload is already in the destination
+// buffer, so the op only has to be resolved.
+extern "C" void* device_restage_put_done_bridge(void* arg)
+{
+  QdProcess(1);
+  auto* m = (DeviceRestagePutDone*)arg;
+  CkRdmaDeviceRecvHandler(m->dest_op, NULL);
+  CmiFree(m);
+  return NULL;
 }
 
 // Receiver side: defer this buffer and ask the sender to retransmit it.
@@ -704,12 +755,10 @@ static void requestDeviceRestage(int srcPe, void* dest_op, const void* src_ptr,
   req->cnt = cnt;
   req->inter_node = inter_node;
   if (inter_node) {
-    // Register the landing buffer here and hand the sender its descriptor, so a
-    // put can be addressed directly at it. The ref is this receive's
-    // DeviceRdmaOp, which is what the direct-ncpy ack handler resolves when the
-    // transfer completes -- that is the notification half of "put with
-    // notification": the target is told by the RDMA completion rather than by a
-    // second message of ours.
+    // Register the landing buffer here and hand the sender its descriptor, so
+    // the put can be addressed straight at it. The buffer also carries this
+    // receive's DeviceRdmaOp, which rides along in the operation info and comes
+    // back in the sender's notification as the name of what to resolve.
     req->dest_ncpy = CmiNcpyBuffer(dest_ptr, dest_cnt, dest_op);
   }
   // CHARM_ZC_RESTAGE_DEBUG: a pass on the migration paths only means something
@@ -752,28 +801,22 @@ extern "C" void* device_restage_req_bridge(void* arg)
       CmiSyncSendAndFree(req->dest_pe, sizeof(DeviceRestageRdma), (char*)m);
     } else {
       // Put with notification. The NACK already carried the receiver's
-      // registered landing buffer, so the payload goes straight there and the
-      // RDMA completion tells the target -- one message and one RDMA operation,
-      // against the get's two messages and a read.
+      // registered landing buffer, so the payload goes straight there: one
+      // RDMA write from the side that already owns the source registration,
+      // against the get's second message and a read issued by the far side.
       //
-      // The notification is the ack payload: rdmaPut delivers destAck to the
-      // destination, where the direct-ncpy ack handler is CkRdmaDeviceRecvHandler
-      // and resolves the DeviceRdmaOp carried as the destination buffer's ref.
-      // A put with no ack raises its completion only on the sender -- see
-      // CommRputLocalHandler -- which is why an earlier attempt landed the bytes
-      // and stalled the run with zero load balancing steps.
-      //
-      // UNTESTED. Written after the allocation was released; the get path above
-      // is what the 20-of-20 matrix was measured with. Validate by confirming a
-      // correction still completes (CHARM_ZC_RESTAGE_DEBUG shows "inter-node
-      // put") and the run reaches its reference checksum, before making this the
-      // default in earnest.
+      // CMK_DEVICE_RESTAGE_PUT marks the operation so that its completion --
+      // which a write raises on the initiator, here the sender -- is turned
+      // into a notification to the target instead of being resolved locally.
+      // Without that the receiver is never told, and the run stalls with the
+      // bytes already in place and zero load balancing steps.
       CmiSetDirectNcpyAckHandler(CkRdmaDeviceRecvHandler);
-      CmiNcpyBuffer src_ncpy(req->src_ptr, req->cnt, req->dest_op);
-      void* dst_tok = req->dest_op;
-      void* src_tok = NULL;
-      src_ncpy.rdmaPut(req->dest_ncpy, sizeof(void*),
-                       (char*)&src_tok, (char*)&dst_tok);
+      CmiNcpyBuffer src_ncpy(req->src_ptr, req->cnt);
+      NcpyOperationInfo* info = src_ncpy.createNcpyOpInfo(
+          src_ncpy, req->dest_ncpy, /*ackSize=*/0, NULL, NULL, /*rootNode=*/-1,
+          CMK_DEVICE_RESTAGE_PUT, NULL);
+      QdCreate(1);   // released by device_restage_put_done_bridge
+      CmiIssueRput(info);
     }
   } else {
     DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
