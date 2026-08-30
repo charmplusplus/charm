@@ -789,7 +789,7 @@ struct DeviceRestageReq {          // receiver -> sender
   void* dest_op;                   // receiver's DeviceRdmaOp*, opaque here
   int dest_pe;
   const void* src_ptr;             // the sender's live source, if it still owns one
-  int src_device_idx;              // -1, or the staged block to read instead
+  bool src_staged;                 // true: read the staged block below instead
   size_t src_comm_offset;
   size_t cnt;
   bool inter_node;
@@ -847,7 +847,7 @@ extern "C" void* device_restage_put_done_bridge(void* arg)
 
 // Receiver side: defer this buffer and ask the sender to retransmit it.
 static void requestDeviceRestage(int srcPe, void* dest_op, const void* src_ptr,
-                                 int src_device_idx, size_t src_comm_offset,
+                                 bool src_staged, size_t src_comm_offset,
                                  size_t cnt, void* dest_ptr, size_t dest_cnt,
                                  bool inter_node)
 {
@@ -866,7 +866,7 @@ static void requestDeviceRestage(int srcPe, void* dest_op, const void* src_ptr,
   // exactly as a staged one does but stages nothing, leaving comm_offset at 0.
   // Reading that would hand back the base of the comm buffer -- some other
   // transfer's bytes.
-  req->src_device_idx = src_device_idx;
+  req->src_staged = src_staged;
   req->src_comm_offset = src_comm_offset;
   req->cnt = cnt;
   req->inter_node = inter_node;
@@ -906,7 +906,7 @@ extern "C" void* device_restage_req_bridge(void* arg)
   // was staged the comm buffer holds the only copy that is still the payload
   // this transfer promised; src_ptr may already carry the next iteration.
   const void* src_ptr = req->src_ptr;
-  if (req->src_device_idx != -1 && csv_gpu_manager.use_shm) {
+  if (req->src_staged && csv_gpu_manager.use_shm) {
     DeviceManager* src_dm = csv_gpu_manager.device_map[CkMyPe()];
     src_ptr = (const char*)src_dm->comm_buffer->base_ptr + req->src_comm_offset;
   }
@@ -1353,7 +1353,8 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
            !CmiPeOnSamePhysicalNode(env->getSrcPe(), CkMyPe()))) {
         if (watch) watch->deferred[i] = 1;
         requestDeviceRestage(env->getSrcPe(), (void*)&save_op, source.ptr,
-                             source.device_idx, source.comm_offset,
+                             source.ipc_protocol == CmiIpcProtocol::STAGED,
+                             source.comm_offset,
                              (size_t)dest.cnt, arrPtrs[i], (size_t)arrSizes[i],
                              mode != CkNcpyModeDevice::IPC);
         continue;  // completion deferred until the retransmit lands
