@@ -780,9 +780,18 @@ static void acquireIpcSendSlot(DeviceManager* dm, int cpv_my_device_id,
 //                 one-word notification, because an RDMA write raises its
 //                 completion on the initiator and leaves the target unaware.
 // Putting into an app buffer costs nothing extra inter-node, where the receiver
-// registers that buffer on every receive anyway; the same trick same-node would
-// mean a cold cuIpcOpenMemHandle per correction, which is exactly what the
-// once-per-device comm-buffer mapping exists to avoid.
+// registers that buffer on every receive anyway. Same-node it would mean a cold
+// cuIpcOpenMemHandle, charged to the one transfer least able to afford it: a
+// corrected payload has already taken the extra forwarding hops and waited out
+// a request round trip before any of its bytes move. Not that the mapping would
+// be wasted under DIRECT -- that protocol is chosen precisely because the
+// application reuses its buffers, so later sends to the chare's new location
+// would hit it --
+// but it does not have to be opened here. The forwarding above repairs the
+// sender's cache, so the next ordinary send opens it instead, off the critical
+// path of a transfer that is already late. Corrections also come in a burst
+// right after a load balancing step, which is the worst moment in the run to
+// add hundreds of microseconds apiece.
 
 struct DeviceRestageReq {          // receiver -> sender
   char header[CmiMsgHeaderSizeBytes];
