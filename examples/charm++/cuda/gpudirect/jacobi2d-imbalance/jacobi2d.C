@@ -397,6 +397,18 @@ class Block : public CBase_Block {
     PUParray(p, h_top_ghost, block_width);
     PUParray(p, h_bottom_ghost, block_width);
 
+    // The landing buffers travel with the element. A ghost rget issued before a
+    // step moves this block has already landed by the time this runs -- the
+    // copy is issued on comm_stream and the packing pass above drains it -- but
+    // the entry method that consumes it has not run yet, and will run on the
+    // copy that resumes. So the bytes have to come along.
+    if (use_zerocopy) {
+      p(d_recv_left_ghost, block_height * 2, PUP::PUPMode::DEVICE);
+      p(d_recv_right_ghost, block_height * 2, PUP::PUPMode::DEVICE);
+      p(d_recv_top_ghost, block_width * 2, PUP::PUPMode::DEVICE);
+      p(d_recv_bottom_ghost, block_width * 2, PUP::PUPMode::DEVICE);
+    }
+
     p(d_temperature, (block_width + 2) * (block_height + 2), PUP::PUPMode::DEVICE);
     p(d_new_temperature, (block_width + 2) * (block_height + 2), PUP::PUPMode::DEVICE);
   }
@@ -854,21 +866,29 @@ class Block : public CBase_Block {
       // gh is the pointer the runtime actually landed into -- the correct half
       // of the double buffer. Reading the buffer base instead would defeat the
       // alternation done in the post hook.
+      // This copy's own buffer, not gh. gh is the address owned by the copy that
+      // posted the rget; if a step moved this block since, that address is on
+      // another device. The contents came across in pup, and the half is the
+      // sender's iteration tag, which the SDAG matched against my_iter.
       case LEFT:
-        invokeUnpackingKernel(d_temperature, gh, true, block_width,
+        invokeUnpackingKernel(d_temperature,
+            d_recv_left_ghost + (my_iter & 1) * block_height, true, block_width,
             block_height, comm_stream);
         break;
       case RIGHT:
-        invokeUnpackingKernel(d_temperature, gh, false, block_width,
+        invokeUnpackingKernel(d_temperature,
+            d_recv_right_ghost + (my_iter & 1) * block_height, false, block_width,
             block_height, comm_stream);
         break;
       case TOP:
-        hapiCheck(cudaMemcpyAsync(d_temperature + 1, gh,
+        hapiCheck(cudaMemcpyAsync(d_temperature + 1,
+            d_recv_top_ghost + (my_iter & 1) * block_width,
             block_width * sizeof(DataType), cudaMemcpyDeviceToDevice, comm_stream));
         break;
       case BOTTOM:
         hapiCheck(cudaMemcpyAsync(d_temperature + (block_width + 2) * (block_height + 1) + 1,
-            gh, block_width * sizeof(DataType), cudaMemcpyDeviceToDevice, comm_stream));
+            d_recv_bottom_ghost + (my_iter & 1) * block_width,
+            block_width * sizeof(DataType), cudaMemcpyDeviceToDevice, comm_stream));
         break;
       default:
         CkAbort("Error: invalid direction");

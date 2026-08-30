@@ -1837,7 +1837,13 @@ static void shmInit() {
 
   if (!CmiInCommThread()) CmiNodeBarrier(); // Ensure shared memory has been mapped into the logical node
 
-  if (!CmiInCommThread()) ipcHandleCreate(); // Create CUDA IPC handles
+  // Once per device, not once per PE. Everything ipcHandleCreate does is
+  // per-device state living in csv_gpu_manager and in shared memory: the
+  // device's memory handle, and hapi_ipc_event_pool_size_total events pushed
+  // into hapi_ipc_device_infos. Running it on every PE sharing a device pushed
+  // the pool twice and overwrote the shared-memory event handles, so the events
+  // a peer opened were not the ones the local side went on to index.
+  if (!CmiInCommThread() && CpvAccess(device_rep)) ipcHandleCreate();
 
   // Ensure CUDA IPC handles are available for all processes
   // Note: Causes a hang when this barrier is placed after CPU topology initialization
