@@ -13,7 +13,18 @@ extern bool CmiUseCopyBasedRDMA;
 #define CMK_REG_REQUIRED 1
 // 8-byte for mr, 16-byte for rmr
 // TODO: better to use dynamic allocation and PUP
+//
+// Do not override a value the build has already chosen. charm-config.h sets
+// this to whatever the reconverse library was actually compiled with, and that
+// is the only value that can be right: reconverse writes [mr_t][rmr] into this
+// array and sizes its own bounds check against its own macro, while this side
+// allocates the array and -- the part that actually breaks -- pups exactly this
+// many bytes. Redefining it smaller here truncated the remote key in transit,
+// so every rdmaGet reached fi_readmsg with a garbage rkey and failed as
+// "Message too long", host and device memory alike.
+#ifndef CMK_NOCOPY_DIRECT_BYTES
 #define CMK_NOCOPY_DIRECT_BYTES 24
+#endif
 
 /*********************************** Zerocopy Direct API
  * **********************************/
