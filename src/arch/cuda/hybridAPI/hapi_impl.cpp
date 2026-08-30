@@ -145,22 +145,6 @@ static void shmCleanup();
 static void ipcHandleCreate();
 static void ipcHandleOpen();
 
-// Parse a byte count that may carry a K/M/G suffix, so a size threshold can be
-// written the way people say it ("256K") in an environment variable. Anything
-// unparseable yields SIZE_MAX, which for the direct IPC threshold means "never"
-// -- the safe reading of a typo.
-static size_t hapiParseByteSize(const char* s) {
-  char* end = NULL;
-  const unsigned long long value = strtoull(s, &end, 10);
-  if (end == s) return SIZE_MAX;
-  switch (*end) {
-    case 'k': case 'K': return (size_t)value << 10;
-    case 'm': case 'M': return (size_t)value << 20;
-    case 'g': case 'G': return (size_t)value << 30;
-    default:            return (size_t)value;
-  }
-}
-
 #ifdef CMK_LBDB_ON
 // Sentinel external-correlation ID meaning "no owning migratable object".
 // Must not collide with a real chare ID -- 0 is a perfectly valid one.
@@ -1440,41 +1424,21 @@ static void hapiMapping(char** argv) {
           csv_gpu_manager.hapi_ipc_event_pool_size_pe, csv_gpu_manager.hapi_ipc_event_pool_size_total);
     }
 
-    // Payload size at which a cross-process send switches from staging through
-    // the device communication buffer to exporting its source allocation
-    // directly. Unset means never, so a run that does not ask for this behaves
-    // exactly as it did before. CHARM_GPU_IPC_THRESHOLD overrides
-    // +gpuipcthreshold, so a sweep can vary it without rewriting command lines.
-    int input_ipc_threshold = 0;
-    const bool have_arg = CmiGetArgIntDesc(argv, "+gpuipcthreshold",
-        &input_ipc_threshold,
-        "device payload size (bytes) at or above which cross-process sends "
-        "use direct CUDA IPC instead of staging");
-    if (CmiMyRank() == 0) {
-      size_t threshold = have_arg && input_ipc_threshold >= 0
-                             ? (size_t)input_ipc_threshold
-                             : SIZE_MAX;
-      const char* env = getenv("CHARM_GPU_IPC_THRESHOLD");
-      if (env != NULL) threshold = hapiParseByteSize(env);
-      csv_gpu_manager.ipc_direct_threshold = threshold;
+    // Whether cross-process sends export their source allocation instead of
+    // staging it through the device communication buffer. One choice for the
+    // whole run, not a per-payload one.
+    const bool want_direct = CmiGetArgFlagDesc(argv, "+gpuipcdirect",
+        "cross-process device sends export their source allocation (direct "
+        "CUDA IPC) instead of staging it");
+    if (CmiMyRank() == 0) csv_gpu_manager.ipc_use_direct = want_direct;
 
-      const char* cache_env = getenv("CHARM_GPU_IPC_CACHE");
-      csv_gpu_manager.ipc_cache_imports = !(cache_env && atoi(cache_env) == 0);
-    }
-
-    CmiNodeBarrier(); // Ensure the threshold is set before any send reads it
+    CmiNodeBarrier(); // Ensure the choice is set before any send reads it
 
     if (CmiMyPe() == 0) {
-      if (csv_gpu_manager.ipc_direct_threshold == SIZE_MAX) {
-        CmiPrintf("HAPI> Direct CUDA IPC transport: disabled (all "
-                  "cross-process sends staged)\n");
-      } else {
-        CmiPrintf("HAPI> Direct CUDA IPC transport: payloads >= %zu bytes, "
-                  "import cache %s\n",
-                  csv_gpu_manager.ipc_direct_threshold,
-                  csv_gpu_manager.ipc_cache_imports ? "on" : "OFF (measurement "
-                  "mode: each receive opens, synchronizes and closes)");
-      }
+      CmiPrintf("HAPI> Cross-process device sends: %s\n",
+                csv_gpu_manager.ipc_use_direct
+                    ? "direct CUDA IPC (source allocation exported)"
+                    : "staged through the device communication buffer");
     }
   }
 
@@ -2110,12 +2074,8 @@ static void ipcHandleOpen() {
 
 /*** Direct CUDA IPC transport: export and import caches ***/
 
-size_t hapiIpcDirectThreshold() {
-  return CsvAccess(gpu_manager).ipc_direct_threshold;
-}
-
-bool hapiIpcCacheImports() {
-  return CsvAccess(gpu_manager).ipc_cache_imports;
+bool hapiIpcUseDirect() {
+  return CsvAccess(gpu_manager).ipc_use_direct;
 }
 
 bool hapiIpcExportBuffer(const void* ptr, hapiIpcMemHandle_t* handle,
@@ -2168,16 +2128,14 @@ void* hapiIpcImportBuffer(const hapiIpcMemHandle_t& handle) {
 #if CMK_SMP
   CmiLock(csv_gpu_manager.ipc_cache_lock);
 #endif
-  if (csv_gpu_manager.ipc_cache_imports) {
-    auto it = csv_gpu_manager.ipc_import_cache.find(handle);
-    if (it != csv_gpu_manager.ipc_import_cache.end()) {
-      void* ptr = it->second;
-      csv_gpu_manager.ipc_import_hits.fetch_add(1, std::memory_order_relaxed);
+  auto it = csv_gpu_manager.ipc_import_cache.find(handle);
+  if (it != csv_gpu_manager.ipc_import_cache.end()) {
+    void* ptr = it->second;
+    csv_gpu_manager.ipc_import_hits.fetch_add(1, std::memory_order_relaxed);
 #if CMK_SMP
-      CmiUnlock(csv_gpu_manager.ipc_cache_lock);
+    CmiUnlock(csv_gpu_manager.ipc_cache_lock);
 #endif
-      return ptr;
-    }
+    return ptr;
   }
 
   // Open under the caller's current device, as ipcHandleOpen does for the comm
@@ -2197,12 +2155,39 @@ void* hapiIpcImportBuffer(const hapiIpcMemHandle_t& handle) {
   }
 
   csv_gpu_manager.ipc_import_misses.fetch_add(1, std::memory_order_relaxed);
-  if (csv_gpu_manager.ipc_cache_imports)
-    csv_gpu_manager.ipc_import_cache.emplace(handle, mapped);
+  csv_gpu_manager.ipc_import_cache.emplace(handle, mapped);
 #if CMK_SMP
   CmiUnlock(csv_gpu_manager.ipc_cache_lock);
 #endif
   return mapped;
+}
+
+// Drop the export entry for the allocation containing ptr, before it is freed.
+//
+// The export cache is keyed by allocation base, and migration frees and
+// reallocates device buffers constantly while cudaMalloc happily reuses
+// addresses. Without this, a send from a fresh allocation that landed on a
+// recycled base hands the peer the dead allocation's handle, and the peer's
+// import cache -- keyed by that handle -- serves the mapping it opened for the
+// memory that is gone. Both sides then agree, and both are wrong.
+//
+// The flush below does exactly this reasoning at teardown, which is too late to
+// help a running job. Must be called while ptr is still valid: finding the base
+// needs the allocation to exist.
+void hapiIpcInvalidateExport(const void* ptr) {
+  if (ptr == NULL) return;
+  GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
+  if (csv_gpu_manager.ipc_export_cache.empty()) return;
+  void* base = NULL;
+  size_t alloc_size = 0;
+  if (!hapiMemGetAddressRange(&base, &alloc_size, ptr)) return;
+#if CMK_SMP
+  CmiLock(csv_gpu_manager.ipc_cache_lock);
+#endif
+  csv_gpu_manager.ipc_export_cache.erase((const void*)base);
+#if CMK_SMP
+  CmiUnlock(csv_gpu_manager.ipc_cache_lock);
+#endif
 }
 
 void hapiIpcFlushImportCache() {
@@ -2231,10 +2216,9 @@ void hapiIpcReportStats() {
   const long misses = csv_gpu_manager.ipc_import_misses.load();
   if (staged + direct + hits + misses == 0) return;
   CmiPrintf("[ipc-stats] pid=%d staged=%ld direct=%ld import_hits=%ld "
-            "import_misses=%ld threshold=%zu cache=%d\n",
+            "import_misses=%ld transport=%s\n",
             (int)getpid(), staged, direct, hits, misses,
-            csv_gpu_manager.ipc_direct_threshold,
-            (int)csv_gpu_manager.ipc_cache_imports);
+            csv_gpu_manager.ipc_use_direct ? "direct" : "staged");
 }
 
 /*** Migration arena registry (see hapi.h) ***/
@@ -2257,6 +2241,9 @@ void hapiArenaRegister(void* base, size_t extent, size_t liveBuffers) {
 
 void hapiFreeMigratable(void* ptr) {
   if (ptr == NULL) return;
+  // Before anything is freed: a recycled base would otherwise keep handing out
+  // this allocation's IPC handle. See hapiIpcInvalidateExport.
+  hapiIpcInvalidateExport(ptr);
   void* arena_to_free = NULL;
   {
     std::lock_guard<std::mutex> g(hapi_arena_registry_lock);

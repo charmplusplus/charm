@@ -63,13 +63,8 @@ static inline CmiUInt8 metalbSlotToDevId(double d) {
 }
 
 #if CMK_CUDA
-// The device this PE's work lands on. CHARM_METALB_GPU_FAKE_DEVICES=<k> splits
-// the PEs across k imaginary devices instead, which is the only way to exercise
-// the imbalance trigger on a machine with a single GPU.
+// The device this PE's work lands on.
 static CmiUInt8 metalbMyDeviceId() {
-  static const char* const fake_env = getenv("CHARM_METALB_GPU_FAKE_DEVICES");
-  static const int n_fake = (fake_env != NULL) ? atoi(fake_env) : 0;
-  if (n_fake > 0) return (CmiUInt8)(CkMyPe() % n_fake);
   return (CmiUInt8)hapiMyDevice();
 }
 #endif

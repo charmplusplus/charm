@@ -284,15 +284,9 @@ static inline bool hapiMemGetAddressRange(void** base, size_t* size,
 }
 #endif
 
-// Payload size at or above which a cross-process device send exports its source
-// allocation instead of staging it. SIZE_MAX when the direct transport is off,
-// which is the default.
-size_t hapiIpcDirectThreshold();
-
-// Whether imported peer mappings are cached. False only under
-// CHARM_GPU_IPC_CACHE=0, which is a measurement aid -- see the note in
-// GPUManager.
-bool hapiIpcCacheImports();
+// Whether cross-process device sends export their source allocation instead of
+// staging it. Off by default; see the note in GPUManager.
+bool hapiIpcUseDirect();
 
 // Export the allocation containing ptr, so a peer process can read it. Fills
 // handle and the distance from the allocation's base to ptr, and returns false
@@ -317,6 +311,12 @@ void* hapiIpcImportBuffer(const hapiIpcMemHandle_t& handle);
 // but does not fault: an allocation freed and remade gets a fresh handle, so
 // the entry is simply never looked up again.
 void hapiIpcFlushImportCache();
+
+// Drop the cached IPC export for the allocation containing ptr. Call before
+// freeing a device buffer that may have been exported: the cache is keyed by
+// allocation base and cudaMalloc reuses addresses, so a stale entry outlives
+// the memory it names. See the note at the definition.
+void hapiIpcInvalidateExport(const void* ptr);
 
 // Report per-process transport counts (staged vs direct sends, import cache
 // hits vs misses) to stdout. Enabled by CHARM_ZC_STATS.

@@ -220,19 +220,19 @@ struct GPUManager {
   // Vector size is equal to the number of devices on the physical node
   std::vector<hapi_ipc_device_info> hapi_ipc_device_infos;
 
-  // Direct CUDA IPC transport (see CmiIpcProtocol). Payloads at or above the
-  // threshold skip the device communication buffer and are read out of the
-  // sender's allocation directly; SIZE_MAX (the default) means never.
-  size_t ipc_direct_threshold;
-
-  // Whether imported peer mappings are kept. Keeping them is what makes the
-  // direct transport worth using at all -- cudaIpcOpenMemHandle costs hundreds
-  // of microseconds, which no realistic payload amortizes -- and it is also
+  // Direct CUDA IPC transport (see CmiIpcProtocol). When on, a cross-process
+  // send skips the device communication buffer and the receiver reads the
+  // sender's allocation directly. Off by default, and a whole-transport choice
+  // rather than a per-payload one: the two differ in what they hold and when
+  // they release it, not in how much they copy, so picking between them by
+  // message size only makes a run harder to reason about.
+  //
+  // Imported peer mappings are always kept. That is what makes the direct
+  // transport worth using -- cudaIpcOpenMemHandle costs hundreds of
+  // microseconds, which no realistic payload amortizes -- and it is also
   // required for correctness, since the driver refuses to open a handle a
-  // second time in a process that has not closed it. Turning it off
-  // (CHARM_GPU_IPC_CACHE=0) prices the handle operations for a sweep and is a
-  // measurement aid only, not a transport option.
-  bool ipc_cache_imports;
+  // second time in a process that has not closed it.
+  bool ipc_use_direct;
 
   // Peer allocation base, keyed by the handle that exported it. Process-wide,
   // like the comm buffer mappings ipcHandleOpen creates, and used from every PE
@@ -244,6 +244,7 @@ struct GPUManager {
   // Allocation base -> handle exporting it, so a repeated send from the same
   // application buffer does not repeat cuMemGetAddressRange/IpcGetMemHandle.
   std::unordered_map<const void*, hapiIpcMemHandle_t> ipc_export_cache;
+
 
 #if CMK_SMP
   CmiNodeLock ipc_cache_lock;
@@ -413,8 +414,7 @@ struct GPUManager {
 
     // Direct CUDA IPC transport: off until a threshold is asked for, so an
     // unconfigured run behaves exactly as it did before.
-    ipc_direct_threshold = SIZE_MAX;
-    ipc_cache_imports = true;
+    ipc_use_direct = false;
 #if CMK_SMP
     ipc_cache_lock = CmiCreateLock();
 #endif

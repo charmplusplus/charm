@@ -263,13 +263,12 @@ public:
 // nothing and always ride the first batch. Greedy first-fit; returns the
 // number of batches, and batchOf[i] for every object whose to != from.
 // CHARM_LB_FORCE_BATCHES=N round-robins moves into N batches regardless of
-// staging -- the protocol-test knob; CHARM_LB_NO_BATCH forces one batch.
+// staging -- the protocol-test knob.
 // ---------------------------------------------------------------------------
 class LBBatchPlanner {
 public:
   static int plan(BaseLB::LDStats* stats, std::vector<int>& batchOf) {
     batchOf.assign(stats->objData.size(), 0);
-    if (getenv("CHARM_LB_NO_BATCH") != NULL) return 1;
 
     std::vector<int> moved;
     for (int i = 0; i < (int)stats->objData.size(); i++)
