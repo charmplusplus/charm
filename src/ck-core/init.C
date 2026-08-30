@@ -1491,6 +1491,7 @@ void _initCharm(int unused_argc, char **argv)
   loopback_handler = CmiRegisterHandler((CmiHandler) loopback_bridge);
   device_restage_req_handler = CmiRegisterHandler((CmiHandler) device_restage_req_bridge);
   device_restage_meta_handler = CmiRegisterHandler((CmiHandler) device_restage_meta_bridge);
+  device_restage_rdma_handler = CmiRegisterHandler((CmiHandler) device_restage_rdma_bridge);
 #endif
 
 #if CMK_USE_SHMEM

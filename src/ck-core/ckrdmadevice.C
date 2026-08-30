@@ -670,6 +670,12 @@ struct DeviceRestageReq {          // receiver -> sender
   CmiNcpyBuffer dest_ncpy;         // inter-node only: registered destination
 };
 
+struct DeviceRestageRdma {         // sender -> receiver, inter-node
+  char header[CmiMsgHeaderSizeBytes];
+  void* dest_op;                   // receiver's DeviceRdmaOp*
+  CmiNcpyBuffer src_ncpy;          // registered on the sender, read by the get
+};
+
 struct DeviceRestageMeta {         // sender -> receiver, same node
   char header[CmiMsgHeaderSizeBytes];
   void* dest_op;
@@ -682,6 +688,7 @@ struct DeviceRestageMeta {         // sender -> receiver, same node
 extern "C" {
   int device_restage_req_handler;
   int device_restage_meta_handler;
+  int device_restage_rdma_handler;
 }
 
 // Receiver side: defer this buffer and ask the sender to retransmit it.
@@ -696,11 +703,6 @@ static void requestDeviceRestage(int srcPe, void* dest_op, const void* src_ptr,
   req->src_ptr = src_ptr;
   req->cnt = cnt;
   req->inter_node = inter_node;
-  if (inter_node) {
-    // Registered here, and carrying the op as its ref, so the sender's put
-    // lands with the ack routed straight into CkRdmaDeviceRecvHandler.
-    req->dest_ncpy = CmiNcpyBuffer(dest_ptr, dest_cnt, dest_op);
-  }
   // CHARM_ZC_RESTAGE_DEBUG: a pass on the migration paths only means something
   // if this path actually ran, so make it countable rather than inferred.
   static const bool restage_debug = (getenv("CHARM_ZC_RESTAGE_DEBUG") != nullptr);
@@ -726,11 +728,34 @@ extern "C" void* device_restage_req_bridge(void* arg)
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
 
   if (req->inter_node) {
-    // UNTESTED: reachable only when the target migrates to another physical
-    // node mid-flight, which a single-node allocation cannot produce.
-    CmiSetDirectNcpyAckHandler(CkRdmaDeviceRecvHandler);
-    CmiNcpyBuffer src_ncpy(req->src_ptr, req->cnt);
-    src_ncpy.rdmaPut(req->dest_ncpy, 0, nullptr, nullptr);
+    // The target migrated to another physical node mid-flight. Both attempts at
+    // correcting this are wrong and must not ship silently:
+    //
+    //   rdmaPut with no ack   the bytes land and nothing tells the receiver, so
+    //                         the transfer never completes and the job stalls
+    //                         with zero load balancing steps.
+    //   receiver-issued get   completes, but the delivered data is wrong, and
+    //                         differently wrong each run. Measured 1/5 against
+    //                         the reference checksum, where the same geometry
+    //                         without -z -- so without this path -- is 4/4.
+    //                         Snapshotting the payload before registering does
+    //                         not help, so the source data is not the problem.
+    //
+    // Aborting is not a fix, it is a refusal to corrupt. This is no worse than
+    // the behaviour before the correction existed, when the same case fell
+    // through to an rdmaGet against an unregistered descriptor and died as an
+    // LCI "Message too long".
+    //
+    // The route worth taking next is LCI's post_putImm: the NACK carries the
+    // destination's registered descriptor, one put with immediate data both
+    // moves the payload and raises a completion at the target, and no separate
+    // notify is needed. That is one message and one RDMA operation, against the
+    // two messages and a read this path was using.
+    CkAbort("CkRdmaDeviceIssueRgets: target migrated to another physical node "
+            "mid-flight (src PE %d, %zu bytes). The inter-node correction is "
+            "not yet correct -- see the notes at device_restage_req_bridge -- "
+            "and aborting here is deliberate rather than delivering wrong data.",
+            CkMyPe(), (size_t)req->cnt);
   } else {
     DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
     const int cpv_my_device_id = CpvAccess(my_device_id);
@@ -766,6 +791,24 @@ extern "C" void* device_restage_req_bridge(void* arg)
     CmiSyncSendAndFree(req->dest_pe, sizeof(DeviceRestageMeta), (char*)m);
   }
   CmiFree(req);
+  return NULL;
+}
+
+// Receiver side, inter-node: the sender registered its source, so pull it with
+// the same rdmaGet the ordinary inter-node receive uses. Completion therefore
+// runs through the existing direct-ncpy ack path, with save_op as the ref.
+extern "C" void* device_restage_rdma_bridge(void* arg)
+{
+  QdProcess(1);
+  auto* m = (DeviceRestageRdma*)arg;
+  DeviceRdmaOp* op = (DeviceRdmaOp*)m->dest_op;
+
+  QdCreate(1);
+  CmiSetDirectNcpyAckHandler(CkRdmaDeviceRecvHandler);
+  CmiNcpyBuffer dest_ncpy(op->dest_ptr, op->size, (void*)op);
+  dest_ncpy.rdmaGet(m->src_ncpy, 0, nullptr, nullptr);
+
+  CmiFree(m);
   return NULL;
 }
 
