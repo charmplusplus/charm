@@ -329,10 +329,21 @@ class Block : public CBase_Block {
       //
       // The proper fix is a completion callback on the send, with the free
       // deferred until it fires.
-      hapiCheck(cudaFree(d_recv_left_ghost));
-      hapiCheck(cudaFree(d_recv_right_ghost));
-      hapiCheck(cudaFree(d_recv_top_ghost));
-      hapiCheck(cudaFree(d_recv_bottom_ghost));
+      // With completion callbacks on the sends and a count of posted receives,
+      // the block knows when its buffers are quiet -- which is what the comment
+      // above asks for. Release everything then, including the send buffers,
+      // which previously leaked on every migration. If anything is still
+      // outstanding, leak rather than pull memory out from under a transfer.
+      if (outstanding_ghost_ops == 0) {
+        hapiCheck(cudaFree(d_send_left_ghost));
+        hapiCheck(cudaFree(d_send_right_ghost));
+        hapiCheck(cudaFree(d_send_top_ghost));
+        hapiCheck(cudaFree(d_send_bottom_ghost));
+        hapiCheck(cudaFree(d_recv_left_ghost));
+        hapiCheck(cudaFree(d_recv_right_ghost));
+        hapiCheck(cudaFree(d_recv_top_ghost));
+        hapiCheck(cudaFree(d_recv_bottom_ghost));
+      }
     }
 
     hapiCheck(cudaStreamDestroy(compute_stream));
@@ -749,6 +760,15 @@ class Block : public CBase_Block {
   // reading this block's N.
   DataType* sendSlice(DataType* base, int n) const { return base + (my_iter & 1) * n; }
 
+  // Zerocopy operations with one of this block's buffers as source or
+  // destination. The runtime reads d_send_* after the send returns and writes
+  // d_recv_* after the post returns, so neither may be freed while this is
+  // non-zero. That is the completion-callback contract the frees below used to
+  // work around by leaking.
+  int outstanding_ghost_ops = 0;
+
+  void ghostSendDone() { if (outstanding_ghost_ops > 0) outstanding_ghost_ops--; }
+
   void packGhosts() {
     if (getenv("CHARM_DEBUG_GHOSTV") != NULL)
       CkPrintf("[GH] (%d,%d) pe=%d PACK iter=%d\n", x, y, CkMyPe(), my_iter);
@@ -815,16 +835,20 @@ class Block : public CBase_Block {
     if (use_zerocopy) {
       if (!left_bound)
         thisProxy(x - 1, y).receiveGhostsZC(my_iter, RIGHT, block_height,
-            CkDeviceBuffer(sendSlice(d_send_left_ghost, block_height), comm_stream));
+            (outstanding_ghost_ops++, CkDeviceBuffer(sendSlice(d_send_left_ghost, block_height),
+                CkCallback(CkIndex_Block::ghostSendDone(), thisProxy[thisIndex]), comm_stream)));
       if (!right_bound)
         thisProxy(x + 1, y).receiveGhostsZC(my_iter, LEFT, block_height,
-            CkDeviceBuffer(sendSlice(d_send_right_ghost, block_height), comm_stream));
+            (outstanding_ghost_ops++, CkDeviceBuffer(sendSlice(d_send_right_ghost, block_height),
+                CkCallback(CkIndex_Block::ghostSendDone(), thisProxy[thisIndex]), comm_stream)));
       if (!top_bound)
         thisProxy(x, y - 1).receiveGhostsZC(my_iter, BOTTOM, block_width,
-            CkDeviceBuffer(sendSlice(d_send_top_ghost, block_width), comm_stream));
+            (outstanding_ghost_ops++, CkDeviceBuffer(sendSlice(d_send_top_ghost, block_width),
+                CkCallback(CkIndex_Block::ghostSendDone(), thisProxy[thisIndex]), comm_stream)));
       if (!bottom_bound)
         thisProxy(x, y + 1).receiveGhostsZC(my_iter, TOP, block_width,
-            CkDeviceBuffer(sendSlice(d_send_bottom_ghost, block_width), comm_stream));
+            (outstanding_ghost_ops++, CkDeviceBuffer(sendSlice(d_send_bottom_ghost, block_width),
+                CkCallback(CkIndex_Block::ghostSendDone(), thisProxy[thisIndex]), comm_stream)));
     } else {
       if (getenv("CHARM_DEBUG_GHOST") != NULL) {
         CkPrintf("[GH] (%d,%d) pe=%d obj=%p SEND iter=%d\n", x, y, CkMyPe(), (void*)this, my_iter);
@@ -869,9 +893,24 @@ class Block : public CBase_Block {
         CkAbort("Error: invalid direction");
     }
     devicePost[0].hapi_stream = comm_stream;
+    outstanding_ghost_ops++;   // released in processGhostsZC
   }
 
-  void processGhostsZC(int dir, int size, DataType* gh) {
+  void processGhostsZC(int ref, int dir, int size, DataType* gh) {
+    if (outstanding_ghost_ops > 0) outstanding_ghost_ops--;
+    // gh is the address the posting copy owned. If a step moved this block
+    // between the post and here, that address belongs to the allocation the old
+    // copy left behind -- on another device -- and reading it yields zeros.
+    // Measured: 31 ghosts per run arrived in a buffer that was never written.
+    // The contents travel in pup, so recompute the slice from this copy's own
+    // buffers, using the sender's tag exactly as the post hook did.
+    switch (dir) {
+      case LEFT:   gh = d_recv_left_ghost   + (ref & 1) * block_height; break;
+      case RIGHT:  gh = d_recv_right_ghost  + (ref & 1) * block_height; break;
+      case TOP:    gh = d_recv_top_ghost    + (ref & 1) * block_width;  break;
+      case BOTTOM: gh = d_recv_bottom_ghost + (ref & 1) * block_width;  break;
+      default: break;
+    }
     std::ostringstream os;
     os << "processGhostsZC (" << std::to_string(x) << "," << std::to_string(y) << ")";
     NVTXTracer(os.str(), NVTXColor::Amethyst);
