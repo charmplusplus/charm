@@ -1896,6 +1896,17 @@ int CkMigratable::ckPrepareIntraProcessMigrate()
     myRec->getSyncBarrier()->removeClient(ldBarrierHandle);
     barrierRegistered = false;
   }
+#if CMK_LBDB_ON
+  // This element is leaving this PE's MetaBalancer sample stream without being
+  // destroyed, and ~CkMigratable -- the only other place that decrements a
+  // stream -- therefore never runs for this PE. Without this the stream goes on
+  // waiting for a contribution that has become somebody else's, which surfaces
+  // on the far side of the arithmetic as "Abort!!! Received more contribution".
+  // Pairs with the credit the destination makes in sampleMetaLBLoad when it
+  // sees the element arrive on a PE whose stream it has not credited.
+  if (_lb_args.metaLbOn() && atsync_iteration != -1)
+    myRec->getMetaBalancer()->AdjustCountForDeadContributor(atsync_iteration);
+#endif
   myRec = nullptr;
   return epoch;
 }
