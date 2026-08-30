@@ -906,6 +906,10 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     save_op.dest_ptr = arrPtrs[i];
     save_op.size = (size_t)arrSizes[i];
     save_op.info = rdma_info;
+    // DIAGNOSTIC: what buffer did this receive post, for which element, and in
+    // which mode. Correlated against the application's own record of which
+    // ghost it later reads out of that buffer, this shows whether the runtime
+    // ever lands one message's payload in another message's posted buffer.
     save_op.src_pe = env->getSrcPe();
     save_op.stream = (void*)postStructs[i].hapi_stream;
     save_op.src_cb = (source.cb.type != CkCallback::ignore) ? new CkCallback(source.cb) : nullptr;
@@ -980,9 +984,21 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     // does not: it reads the sender's live allocation, which is why such a send
     // must carry a completion callback the sender waits on before reusing or
     // freeing that buffer.
+    // device_idx is node-local -- device_count * CmiMyNodeRankLocal() +
+    // my_device_id -- so PE 1 on one node and PE 5 on another both produce 1.
+    // Indexing this node's hapi_ipc_device_infos with a remote sender's index
+    // resolves to an unrelated local staged block, and the receive silently
+    // delivers some other chare's ghost. Measured: staged blocks (dev=1,off=0)
+    // were referenced by receives naming srcPEs 1 and 5 in the same run.
+    //
+    // A sender only stages for a destination it believes is in another process
+    // on its own node, so an export arriving from another physical node means
+    // the target moved after the mode was chosen. Treat it as unprepared and
+    // let the correction path re-fetch the payload by a route that works.
     const bool sender_exported =
         (source.ipc_protocol != CmiIpcProtocol::NONE &&
-         source.device_idx != -1 && csv_gpu_manager.use_shm);
+         source.device_idx != -1 && csv_gpu_manager.use_shm &&
+         CmiPeOnSamePhysicalNode(env->getSrcPe(), CkMyPe()));
     const bool sender_direct =
         (sender_exported && source.ipc_protocol == CmiIpcProtocol::DIRECT);
 
@@ -1077,7 +1093,9 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
       // chosen. Defer this buffer and ask for the payload again by a route
       // this process can read; see the protocol notes above. The message is
       // already where it belongs -- only the bytes are missing.
-      if (!source.sender_prepared) {
+      if (!source.sender_prepared ||
+          (source.device_idx != -1 &&
+           !CmiPeOnSamePhysicalNode(env->getSrcPe(), CkMyPe()))) {
         requestDeviceRestage(env->getSrcPe(), (void*)&save_op, source.ptr,
                              (size_t)dest.cnt, arrPtrs[i], (size_t)arrSizes[i],
                              mode != CkNcpyModeDevice::IPC);
@@ -1639,6 +1657,21 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
     // that stall dominated. Record an event instead and let the receiver's
     // stream wait on it: identical ordering, no host block, no extra copy.
     // Set CHARM_ZC_MEMCPY_SYNC to restore the blocking behaviour.
+    // A same-process memcpy send leaves the payload in the application's buffer
+    // for the receiver to copy out of, exactly as the inter-node path leaves it
+    // for the network to read. Migration frees and reallocates that buffer, so
+    // count these against the issuing element too -- this is the common case in
+    // a blocked decomposition, where most neighbours share a process, and it
+    // was the one path with no protection at all.
+    CkLocRec* memcpy_rec = CkpvAccess(_currentLocRec);
+    if (memcpy_rec) {
+      for (int i = 0; i < numops; i++) {
+        memcpy_rec->noteDeviceSendPosted();
+        buffers[i]->cb = CkCallback(deviceSendReleaseFn,
+                                    (void*)new DeviceSendRelease{memcpy_rec, buffers[i]->cb});
+      }
+    }
+
     static const bool force_sync = (getenv("CHARM_ZC_MEMCPY_SYNC") != nullptr);
     for (int i = 0; i < numops; i++) {
       if (force_sync) {
