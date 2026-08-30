@@ -653,11 +653,24 @@ static void acquireIpcSendSlot(DeviceManager* dm, int cpv_my_device_id,
 // perfectly well by the location manager.
 //
 // So only the payload is missing, not the message. The receiver detects the
-// disagreement -- it resolved a cross-process mode, but source.sender_prepared
-// is false -- defers that buffer's completion, and asks the sender to send the
-// bytes again by a route this process can read. Previously this aborted (IPC)
-// or issued an unregistered rdmaGet that surfaced as an LCI "Message too long"
-// assert far from the cause (inter-node).
+// disagreement, defers that buffer's completion, and asks the sender to send
+// the bytes again by a route this process can read. Previously this aborted
+// (IPC) or issued an unregistered rdmaGet that surfaced as an LCI "Message too
+// long" assert far from the cause (inter-node).
+//
+// Two disagreements reach here, and they differ in what the sender still owns:
+//   sender_prepared false -- a plain same-process memcpy was chosen, so nothing
+//                 was exported, but the chare's source buffer is still live: a
+//                 memcpy send ships its completion callback to the receiver
+//                 rather than firing it, so nobody has released that buffer.
+//   staged, target off-node -- the sender did export, into its comm buffer, and
+//                 a staged send fires its own callback as soon as that copy
+//                 lands. The chare's buffer is free from that moment and may
+//                 already hold the next iteration, so the staged block is the
+//                 only copy that is still this transfer's payload. The request
+//                 carries device_idx and comm_offset back for it; those are
+//                 node-local, so they mean nothing where the request is built
+//                 and are exact on the PE it is sent to.
 //
 // The sender's stale location cache needs no help from this protocol: the
 // forwarded message took more than one hop, so CkArray::deliverToElement calls
@@ -680,7 +693,9 @@ struct DeviceRestageReq {          // receiver -> sender
   char header[CmiMsgHeaderSizeBytes];
   void* dest_op;                   // receiver's DeviceRdmaOp*, opaque here
   int dest_pe;
-  const void* src_ptr;             // the source the sender never prepared
+  const void* src_ptr;             // the sender's live source, if it still owns one
+  int src_device_idx;              // -1, or the staged block to read instead
+  size_t src_comm_offset;
   size_t cnt;
   bool inter_node;
   CmiNcpyBuffer dest_ncpy;         // inter-node only: registered destination
@@ -744,6 +759,7 @@ extern "C" void* device_restage_put_done_bridge(void* arg)
 
 // Receiver side: defer this buffer and ask the sender to retransmit it.
 static void requestDeviceRestage(int srcPe, void* dest_op, const void* src_ptr,
+                                 int src_device_idx, size_t src_comm_offset,
                                  size_t cnt, void* dest_ptr, size_t dest_cnt,
                                  bool inter_node)
 {
@@ -752,6 +768,13 @@ static void requestDeviceRestage(int srcPe, void* dest_op, const void* src_ptr,
   req->dest_op = dest_op;
   req->dest_pe = CkMyPe();
   req->src_ptr = src_ptr;
+  // A staged send hands the bytes to the comm buffer and releases the chare's
+  // own source buffer, so src_ptr is only trustworthy when the sender staged
+  // nothing. Carry the staged location back too: device_idx and comm_offset are
+  // node-local, meaningless where this request is built, and exact on the PE it
+  // is being sent to -- the one that staged them.
+  req->src_device_idx = src_device_idx;
+  req->src_comm_offset = src_comm_offset;
   req->cnt = cnt;
   req->inter_node = inter_node;
   if (inter_node) {
@@ -785,6 +808,16 @@ extern "C" void* device_restage_req_bridge(void* arg)
   DeviceRestageReq* req = (DeviceRestageReq*)arg;
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
 
+  // Read back whatever this PE still owns. A staged send copied the payload
+  // into the comm buffer and let the chare reuse its own buffer, so where one
+  // was staged the comm buffer holds the only copy that is still the payload
+  // this transfer promised; src_ptr may already carry the next iteration.
+  const void* src_ptr = req->src_ptr;
+  if (req->src_device_idx != -1 && csv_gpu_manager.use_shm) {
+    DeviceManager* src_dm = csv_gpu_manager.device_map[CkMyPe()];
+    src_ptr = (const char*)src_dm->comm_buffer->base_ptr + req->src_comm_offset;
+  }
+
   if (req->inter_node) {
     // CHARM_ZC_RESTAGE_GET selects the receiver-issued get instead. Kept so the
     // two can be compared directly: the get is the variant this fix was
@@ -795,7 +828,7 @@ extern "C" void* device_restage_req_bridge(void* arg)
       auto* m = (DeviceRestageRdma*)CmiAlloc(sizeof(DeviceRestageRdma));
       CmiEnforce(m);
       m->dest_op = req->dest_op;
-      m->src_ncpy = CmiNcpyBuffer(req->src_ptr, req->cnt);
+      m->src_ncpy = CmiNcpyBuffer(src_ptr, req->cnt);
       QdCreate(1);
       CmiSetHandler(m, device_restage_rdma_handler);
       CmiSyncSendAndFree(req->dest_pe, sizeof(DeviceRestageRdma), (char*)m);
@@ -811,7 +844,7 @@ extern "C" void* device_restage_req_bridge(void* arg)
       // Without that the receiver is never told, and the run stalls with the
       // bytes already in place and zero load balancing steps.
       CmiSetDirectNcpyAckHandler(CkRdmaDeviceRecvHandler);
-      CmiNcpyBuffer src_ncpy(req->src_ptr, req->cnt);
+      CmiNcpyBuffer src_ncpy(src_ptr, req->cnt);
       NcpyOperationInfo* info = src_ncpy.createNcpyOpInfo(
           src_ncpy, req->dest_ncpy, /*ackSize=*/0, NULL, NULL, /*rootNode=*/-1,
           CMK_DEVICE_RESTAGE_PUT, NULL);
@@ -824,9 +857,9 @@ extern "C" void* device_restage_req_bridge(void* arg)
     void* staged = NULL;
     int event_idx = -1;
     acquireIpcSendSlot(dm, cpv_my_device_id, /*is_lb_buffer=*/false,
-                       /*direct=*/false, req->src_ptr, req->cnt, &staged,
+                       /*direct=*/false, src_ptr, req->cnt, &staged,
                        &event_idx);
-    hapiCheck(hapiMemcpyAsync(staged, req->src_ptr, req->cnt,
+    hapiCheck(hapiMemcpyAsync(staged, src_ptr, req->cnt,
                               hapiMemcpyDeviceToDevice, hapiStreamPerThread));
 
     const int device_idx =
@@ -1180,6 +1213,7 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
           (source.device_idx != -1 &&
            !CmiPeOnSamePhysicalNode(env->getSrcPe(), CkMyPe()))) {
         requestDeviceRestage(env->getSrcPe(), (void*)&save_op, source.ptr,
+                             source.device_idx, source.comm_offset,
                              (size_t)dest.cnt, arrPtrs[i], (size_t)arrSizes[i],
                              mode != CkNcpyModeDevice::IPC);
         continue;  // completion deferred until the retransmit lands
