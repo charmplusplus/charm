@@ -639,8 +639,37 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
       if (source.device_idx != -1 && csv_gpu_manager.use_shm) {
         hapi_ipc_device_info& device_info =
           csv_gpu_manager.hapi_ipc_device_infos[source.device_idx];
-        hapiCheck(hapiEventRecord(device_info.dst_event_pool[source.event_idx],
-              postStructs[i].hapi_stream));
+
+        // The event belongs to the sender's device, and cudaEventRecord
+        // requires the event and the stream to be on the same one. Across
+        // processes that is never a problem: ipcHandleOpen imports a peer's
+        // events under our own device. It skips our own process, though -- a
+        // process cannot open a handle it exported itself -- so when the source
+        // is a different device inside this same process, what sits in the pool
+        // is that device's original event, and recording it on our stream fails
+        // with 'invalid argument'. This only became reachable once load
+        // balancing started moving chares between GPUs in one process.
+        //
+        // Settle the copy, then record on the owning device. Synchronous, but
+        // it applies only to this one case: a same-process transfer that
+        // crossed devices and whose sender staged IPC state that has to be
+        // released.
+        const int my_dev_idx =
+            csv_gpu_manager.device_count * CmiMyNodeRankLocal() + CpvAccess(my_device_id);
+        if (source.device_idx != my_dev_idx) {
+          hapiCheck(hapiStreamSynchronize(postStructs[i].hapi_stream));
+          const int src_local = source.device_idx % csv_gpu_manager.device_count;
+          const int src_global =
+              csv_gpu_manager.device_managers[src_local].global_index;
+          int prev_dev = 0;
+          hapiCheck(hapiGetDevice(&prev_dev));
+          hapiCheck(hapiSetDevice(src_global));
+          hapiCheck(hapiEventRecord(device_info.dst_event_pool[source.event_idx], 0));
+          hapiCheck(hapiSetDevice(prev_dev));
+        } else {
+          hapiCheck(hapiEventRecord(device_info.dst_event_pool[source.event_idx],
+                postStructs[i].hapi_stream));
+        }
         hapi_ipc_event_shared* shm_event_shared =
           (hapi_ipc_event_shared*)((char*)csv_gpu_manager.shm_ptr
               + csv_gpu_manager.shm_chunk_size * source.device_idx
