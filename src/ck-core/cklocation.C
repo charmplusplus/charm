@@ -2225,6 +2225,14 @@ void CkMigratable::sampleMetaLBLoad()
   }
   else if (metaLBStreamJoinedPe != CkMyPe())
   {
+    // Arrived from another PE carrying that PE's sample index. Streams advance
+    // per PE, so the index it brings can already be behind this one -- and then
+    // the credit below, which only covers finished+1 through atsync_iteration,
+    // cannot reach the bucket it is about to contribute to. It contributes to a
+    // bucket this PE has already closed and trips the guard further down.
+    // Join where this PE actually is, exactly as a first-time contributor does.
+    const int here = myRec->getMetaBalancer()->get_iteration();
+    if (atsync_iteration < here) atsync_iteration = here;
     // Arrived by migration, carrying its own atsync_iteration, so the branch
     // above did not run. This PE's open buckets still have to be credited for a
     // contributor they were not counting, exactly as for a new chare -- without
