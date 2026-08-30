@@ -3529,11 +3529,22 @@ void CkLocMgr::sendGPUMsg(CmiUInt8 id)
   thisProxy[gpuData.toPe].immigrateGPU(id, gpuData.size,
     CkDeviceBuffer(gpuData.data, gpuData.size), CkMyPe());
 
-  if (!did_inter_node_gpudirect_rdma(CkMyPe(), gpuData.toPe)) {
-    // Same node: the IPC event reclaim owns the block from here.
+  // Who releases the staged block depends on how the send actually travelled.
+  //
+  // Same node, different process: the send goes through CUDA IPC, which
+  // registers the block against an IPC event, and reclaimCompletedIpcEvents
+  // frees it once the receiver sets dst_flag. Hand it over.
+  //
+  // Same process: the send is a plain device-to-device memcpy. Nothing
+  // registers the block with an event, so the reclaim scan can never see it --
+  // measured, 213 allocations produced zero reclaims, which exhausted the load
+  // balance buffer after two steps at 128MB. Keep the entry and let the
+  // receiver's ack free it, as inter-node already does.
+  const bool same_process = (CmiNodeOf(CkMyPe()) == CmiNodeOf(gpuData.toPe));
+  if (!did_inter_node_gpudirect_rdma(CkMyPe(), gpuData.toPe) && !same_process) {
     sendGPUBuffers.erase(id);
   }
-  // Inter-node: the entry stays in sendGPUBuffers until finishGPUSend(id).
+  // Otherwise the entry stays in sendGPUBuffers until finishGPUSend(id).
 }
 
 // Inter-node ack: the receiver's payload has fully arrived, so the packed
@@ -4404,7 +4415,11 @@ void CkLocMgr::immigrateGPU(CmiUInt8 id, int size, char* data, int srcPe)
   // This entry runs only after the device payload has fully landed, so an
   // inter-node sender's packed source block is safe to release now. Same-node
   // sends release theirs through the IPC event reclaim instead.
-  if (srcPe >= 0 && did_inter_node_gpudirect_rdma(srcPe, CkMyPe()))
+  // Ack for the two cases where the sender still holds the staged block:
+  // inter-node, and same-process, whose memcpy send registers no IPC event so
+  // nothing else would ever free it.
+  if (srcPe >= 0 && (did_inter_node_gpudirect_rdma(srcPe, CkMyPe()) ||
+                     CmiNodeOf(srcPe) == CmiNodeOf(CkMyPe())))
     thisProxy[srcPe].finishGPUSend(id);
 
   void* dataPtr = receivedDeviceMsgs[id];
