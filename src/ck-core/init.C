@@ -1489,6 +1489,8 @@ void _initCharm(int unused_argc, char **argv)
 
 #if (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM
   loopback_handler = CmiRegisterHandler((CmiHandler) loopback_bridge);
+  device_restage_req_handler = CmiRegisterHandler((CmiHandler) device_restage_req_bridge);
+  device_restage_meta_handler = CmiRegisterHandler((CmiHandler) device_restage_meta_bridge);
 #endif
 
 #if CMK_USE_SHMEM

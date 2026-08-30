@@ -141,6 +141,12 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers);
 extern "C" {
   void* loopback_bridge(void* arg);
   extern int loopback_handler;
+  // Migration-mismatch payload correction; see the protocol notes in
+  // ckrdmadevice.C.
+  void* device_restage_req_bridge(void* arg);
+  void* device_restage_meta_bridge(void* arg);
+  extern int device_restage_req_handler;
+  extern int device_restage_meta_handler;
 }
 
 #endif // CMK_CUDA

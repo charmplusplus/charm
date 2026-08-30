@@ -72,6 +72,15 @@ public:
   void* memcpy_event;
 
   // Store the actual data for host-staged inter-node messaging (no GPUDirect RDMA)
+  // Whether the sender prepared a source this buffer's receiver can actually
+  // read from another process -- staged/exported for IPC, or registered for
+  // RDMA. False means the sender resolved the destination to its own process
+  // and chose a plain memcpy, which is only readable in that address space.
+  // The receiver compares this against the mode it resolves for itself; the
+  // two disagree exactly when the target migrated across a process boundary
+  // after the send was posted.
+  bool sender_prepared;
+
   bool data_stored;
   void* data;
 
@@ -91,6 +100,7 @@ public:
     memcpy_event = NULL;
     hapi_stream = hapiStreamPerThread;
 
+    sender_prepared = false;
     data_stored = false;
     data = NULL;
   }
@@ -105,6 +115,7 @@ public:
     p|device_idx;
     p|comm_offset;
     p|event_idx;
+    p|sender_prepared;
     // The 64-byte handle is only meaningful to a DIRECT receive, and every
     // device send carries one of these descriptors, so pup it conditionally.
     // The width stays a function of ipc_protocol alone, which nothing rewrites

@@ -20,6 +20,10 @@ typedef struct DeviceRdmaInfo_ {
 } DeviceRdmaInfo;
 
 typedef struct DeviceRdmaOp_ {
+  // The stream this receive was posted on. Kept so a transfer deferred by the
+  // migration-mismatch correction can resume on the same stream it would have
+  // used had the sender guessed the destination right.
+  void* stream;
   const void* dest_ptr;
   size_t size;
   DeviceRdmaInfo* info;
