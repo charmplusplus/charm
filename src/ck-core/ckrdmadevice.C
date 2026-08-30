@@ -72,6 +72,7 @@ CmiNcpyModeDevice findTransferModeDevice(int srcPe, int dstPe) {
 
 #include <atomic>
 #include <stdio.h>
+#include <unordered_map>
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
@@ -109,6 +110,110 @@ CpvExtern(int, my_device_id);
 //     CmiFree(info);
 //   }
 // }
+
+// ---- Device registration cache (CHARM_DEVICE_MR_CACHE) --------------------
+//
+// The device path builds a fresh CmiNcpyBuffer for every send, and constructing
+// one registers the buffer with the network. The application reuses the same
+// device buffers every iteration, so nearly all of that is re-registration of
+// memory that is already registered: 5318 registration calls resolving to 710
+// distinct regions in one 60-iteration run. Nothing is ever deregistered
+// either, which is why disabling the provider's own MR cache costs 3.3x -- with
+// nothing absorbing the repeats, every one becomes a real fi_mr_reg.
+//
+// Keep the registration instead, keyed by the range it covers, and hand out
+// copies that differ only in the per-transfer ref field.
+//
+// The hard part of any registration cache is knowing when the memory died, and
+// this one claims to know exactly one case: an element's device buffers are
+// freed when it migrates, and migration is mediated by the runtime, so entries
+// are attributed to the element that registered them and dropped when it
+// leaves. An application that frees and reallocates a device buffer in place is
+// invisible here for the same reason it is invisible to the provider's cache --
+// CUDA suballocates, so a free usually raises no address-space event at all.
+// That is the gap, and it is why this is off unless CHARM_DEVICE_MR_CACHE is
+// set.
+//
+// Only the send path is cached. A receive registers the destination buffer the
+// element posted, but CkRdmaDeviceIssueRgets runs before the entry method, so
+// _currentLocRec is not yet set and there is no owner to attribute the entry
+// to. Caching without an owner would mean never dropping it, which is the
+// staleness this design exists to avoid.
+
+struct DeviceMrKey {
+  const void* ptr;
+  size_t cnt;
+  bool operator==(const DeviceMrKey& o) const {
+    return ptr == o.ptr && cnt == o.cnt;
+  }
+};
+
+struct DeviceMrKeyHash {
+  size_t operator()(const DeviceMrKey& k) const {
+    return std::hash<const void*>()(k.ptr) * 31 + std::hash<size_t>()(k.cnt);
+  }
+};
+
+struct DeviceMrEntry {
+  CmiNcpyBuffer reg;   // registered once; copies differ only in the ref field
+  CkLocRec* owner;     // whose migration retires this entry
+};
+
+typedef std::unordered_map<DeviceMrKey, DeviceMrEntry, DeviceMrKeyHash>
+    DeviceMrCache;
+
+CkpvDeclare(DeviceMrCache*, device_mr_cache);
+
+static bool deviceMrCacheEnabled()
+{
+  static const bool on = (getenv("CHARM_DEVICE_MR_CACHE") != nullptr);
+  return on;
+}
+
+void CkRdmaDeviceRegistrationCacheInit()
+{
+  CkpvInitialize(DeviceMrCache*, device_mr_cache);
+  CkpvAccess(device_mr_cache) = deviceMrCacheEnabled() ? new DeviceMrCache() : NULL;
+}
+
+// Registered descriptor for [ptr, ptr+cnt). Registers on a miss, and without
+// the cache behaves exactly as constructing one in place did.
+static CmiNcpyBuffer acquireDeviceRegistration(const void* ptr, size_t cnt,
+                                               CkLocRec* owner)
+{
+  DeviceMrCache* cache = CkpvAccess(device_mr_cache);
+  if (cache == NULL) return CmiNcpyBuffer(ptr, cnt);
+
+  DeviceMrKey key{ptr, cnt};
+  auto it = cache->find(key);
+  if (it == cache->end()) {
+    DeviceMrEntry entry;
+    entry.reg = CmiNcpyBuffer(ptr, cnt);   // the one real registration
+    entry.owner = owner;
+    it = cache->emplace(key, entry).first;
+  } else if (it->second.owner == NULL) {
+    // First use came from a context with no element attached; adopt the first
+    // owner that does appear, so the entry becomes retirable.
+    it->second.owner = owner;
+  }
+  return it->second.reg;
+}
+
+// Retire everything registered for an element. Called from the migration paths,
+// where the element's device buffers are about to be freed.
+void CkRdmaDeviceDropRegistrations(CkLocRec* owner)
+{
+  DeviceMrCache* cache = CkpvAccess(device_mr_cache);
+  if (cache == NULL || owner == NULL) return;
+  for (auto it = cache->begin(); it != cache->end();) {
+    if (it->second.owner == owner) {
+      it->second.reg.deregisterMem();
+      it = cache->erase(it);
+    } else {
+      ++it;
+    }
+  }
+}
 
 struct LoopBackMsg {
   char header[CmiMsgHeaderSizeBytes];
@@ -624,16 +729,6 @@ static void deviceIpcReceive(CkDeviceBuffer& source, CkDeviceBuffer& dest,
         fflush(stdout);
       }
 
-      // 5. Measurement mode (CHARM_GPU_IPC_CACHE=0): hand the mapping straight
-      //    back, so every transfer pays a full open and close and a sweep can
-      //    price those against the copy they save. Closing a mapping that an
-      //    in-flight copy is still reading is an illegal access, so this has to
-      //    block on the copy first -- which is exactly why it is a measurement
-      //    aid and not a transport option.
-      if (imported_base != NULL && !hapiIpcCacheImports()) {
-        hapiCheck(hapiStreamSynchronize(recv_stream));
-        if (hapiIpcCloseMemHandle(imported_base) != hapiSuccess) cudaGetLastError();
-      }
 }
 
 
@@ -701,12 +796,6 @@ struct DeviceRestageReq {          // receiver -> sender
   CmiNcpyBuffer dest_ncpy;         // inter-node only: registered destination
 };
 
-struct DeviceRestageRdma {         // sender -> receiver, inter-node
-  char header[CmiMsgHeaderSizeBytes];
-  void* dest_op;                   // receiver's DeviceRdmaOp*
-  CmiNcpyBuffer src_ncpy;          // registered on the sender, read by the get
-};
-
 struct DeviceRestageMeta {         // sender -> receiver, same node
   char header[CmiMsgHeaderSizeBytes];
   void* dest_op;
@@ -724,7 +813,6 @@ struct DeviceRestagePutDone {      // sender -> receiver, inter-node put
 extern "C" {
   int device_restage_req_handler;
   int device_restage_meta_handler;
-  int device_restage_rdma_handler;
   int device_restage_put_done_handler;
 }
 
@@ -770,9 +858,14 @@ static void requestDeviceRestage(int srcPe, void* dest_op, const void* src_ptr,
   req->src_ptr = src_ptr;
   // A staged send hands the bytes to the comm buffer and releases the chare's
   // own source buffer, so src_ptr is only trustworthy when the sender staged
-  // nothing. Carry the staged location back too: device_idx and comm_offset are
-  // node-local, meaningless where this request is built, and exact on the PE it
-  // is being sent to -- the one that staged them.
+  // nothing. Carry the staged location back too: comm_offset is node-local,
+  // meaningless where this request is built, and exact on the PE it is being
+  // sent to -- the one that staged it.
+  //
+  // Keyed on the protocol, not on device_idx: a DIRECT send sets device_idx
+  // exactly as a staged one does but stages nothing, leaving comm_offset at 0.
+  // Reading that would hand back the base of the comm buffer -- some other
+  // transfer's bytes.
   req->src_device_idx = src_device_idx;
   req->src_comm_offset = src_comm_offset;
   req->cnt = cnt;
@@ -819,38 +912,22 @@ extern "C" void* device_restage_req_bridge(void* arg)
   }
 
   if (req->inter_node) {
-    // CHARM_ZC_RESTAGE_GET selects the receiver-issued get instead. Kept so the
-    // two can be compared directly: the get is the variant this fix was
-    // validated with, the put below is the one that should cost less.
-    static const bool use_get = (getenv("CHARM_ZC_RESTAGE_GET") != nullptr);
-
-    if (use_get) {
-      auto* m = (DeviceRestageRdma*)CmiAlloc(sizeof(DeviceRestageRdma));
-      CmiEnforce(m);
-      m->dest_op = req->dest_op;
-      m->src_ncpy = CmiNcpyBuffer(src_ptr, req->cnt);
-      QdCreate(1);
-      CmiSetHandler(m, device_restage_rdma_handler);
-      CmiSyncSendAndFree(req->dest_pe, sizeof(DeviceRestageRdma), (char*)m);
-    } else {
-      // Put with notification. The NACK already carried the receiver's
-      // registered landing buffer, so the payload goes straight there: one
-      // RDMA write from the side that already owns the source registration,
-      // against the get's second message and a read issued by the far side.
-      //
-      // CMK_DEVICE_RESTAGE_PUT marks the operation so that its completion --
-      // which a write raises on the initiator, here the sender -- is turned
-      // into a notification to the target instead of being resolved locally.
-      // Without that the receiver is never told, and the run stalls with the
-      // bytes already in place and zero load balancing steps.
-      CmiSetDirectNcpyAckHandler(CkRdmaDeviceRecvHandler);
-      CmiNcpyBuffer src_ncpy(src_ptr, req->cnt);
-      NcpyOperationInfo* info = src_ncpy.createNcpyOpInfo(
-          src_ncpy, req->dest_ncpy, /*ackSize=*/0, NULL, NULL, /*rootNode=*/-1,
-          CMK_DEVICE_RESTAGE_PUT, NULL);
-      QdCreate(1);   // released by device_restage_put_done_bridge
-      CmiIssueRput(info);
-    }
+    // Put with notification. The NACK already carried the receiver's registered
+    // landing buffer, so the payload goes straight there: one RDMA write from
+    // the side that already owns the source registration.
+    //
+    // CMK_DEVICE_RESTAGE_PUT marks the operation so that its completion --
+    // which a write raises on the initiator, here the sender -- is turned into
+    // a notification to the target instead of being resolved locally. Without
+    // that the receiver is never told, and the run stalls with the bytes
+    // already in place and zero load balancing steps.
+    CmiSetDirectNcpyAckHandler(CkRdmaDeviceRecvHandler);
+    CmiNcpyBuffer src_ncpy(src_ptr, req->cnt);
+    NcpyOperationInfo* info = src_ncpy.createNcpyOpInfo(
+        src_ncpy, req->dest_ncpy, /*ackSize=*/0, NULL, NULL, /*rootNode=*/-1,
+        CMK_DEVICE_RESTAGE_PUT, NULL);
+    QdCreate(1);   // released by device_restage_put_done_bridge
+    CmiIssueRput(info);
   } else {
     DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
     const int cpv_my_device_id = CpvAccess(my_device_id);
@@ -889,24 +966,6 @@ extern "C" void* device_restage_req_bridge(void* arg)
   return NULL;
 }
 
-// Receiver side, inter-node: the sender registered its source, so pull it with
-// the same rdmaGet the ordinary inter-node receive uses. Completion therefore
-// runs through the existing direct-ncpy ack path, with save_op as the ref.
-extern "C" void* device_restage_rdma_bridge(void* arg)
-{
-  QdProcess(1);
-  auto* m = (DeviceRestageRdma*)arg;
-  DeviceRdmaOp* op = (DeviceRdmaOp*)m->dest_op;
-
-  QdCreate(1);
-  CmiSetDirectNcpyAckHandler(CkRdmaDeviceRecvHandler);
-  CmiNcpyBuffer dest_ncpy(op->dest_ptr, op->size, (void*)op);
-  dest_ncpy.rdmaGet(m->src_ncpy, 0, nullptr, nullptr);
-
-  CmiFree(m);
-  return NULL;
-}
-
 // Receiver side, same node: the sender has staged the payload, so run the
 // ordinary staged-IPC receive against the metadata it just sent.
 extern "C" void* device_restage_meta_bridge(void* arg)
@@ -935,6 +994,77 @@ extern "C" void* device_restage_meta_bridge(void* arg)
   return NULL;
 }
 
+// ---- Stalled-receive watchdog (CHARM_ZC_STALL_SECS) -----------------------
+//
+// A device receive releases its message only on counter == n_ops, so a single
+// op that never completes wedges that message for good: the entry method never
+// runs, the element never advances, and every PE ends up waiting at the load
+// balancing barrier with no error anywhere. That is what every stall this code
+// has produced looks like from the outside, and it is invisible to a debugger
+// attached after the fact -- the stack just shows an idle scheduler.
+//
+// So make the receive say so itself. Every in-flight DeviceRdmaInfo is
+// registered here with the time it was posted; once a second, anything older
+// than the threshold is printed with the ops it is still waiting on. A stall
+// then names the op that never completed -- which buffer, from which PE, and
+// whether it was deferred for correction -- on whatever run happens to hit it,
+// with nothing to attach and nothing to reproduce on demand.
+
+struct DeviceRecvWatch {
+  DeviceRdmaInfo* info;
+  double posted;
+  int numops;
+  std::vector<int> src_pe;
+  std::vector<size_t> size;
+  std::vector<char> deferred;   // asked the sender to send it again
+  bool reported;
+};
+
+CkpvDeclare(std::vector<DeviceRecvWatch>*, device_recv_watch);
+
+static double deviceStallSecs()
+{
+  static const double s = []() {
+    const char* e = getenv("CHARM_ZC_STALL_SECS");
+    return e ? atof(e) : 0.0;   // 0 disables
+  }();
+  return s;
+}
+
+static void deviceStallScan(void*, double)
+{
+  auto* w = CkpvAccess(device_recv_watch);
+  if (w == NULL) return;
+  const double now = CkWallTimer();
+  const double limit = deviceStallSecs();
+  for (auto it = w->begin(); it != w->end();) {
+    if (it->info->counter >= it->info->n_ops) {
+      it = w->erase(it);
+      continue;
+    }
+    if (!it->reported && now - it->posted > limit) {
+      CmiPrintf("[%d] ZC STALL: receive stuck %.0fs, %d of %d ops complete\n",
+                CkMyPe(), now - it->posted, it->info->counter, it->info->n_ops);
+      for (int i = 0; i < it->numops; i++)
+        CmiPrintf("[%d]   op %d: srcPe=%d bytes=%zu %s\n", CkMyPe(), i,
+                  it->src_pe[i], it->size[i],
+                  it->deferred[i] ? "DEFERRED for correction" : "ordinary");
+      fflush(stdout);
+      it->reported = true;
+    }
+    ++it;
+  }
+}
+
+void CkRdmaDeviceStallWatchInit()
+{
+  CkpvInitialize(std::vector<DeviceRecvWatch>*, device_recv_watch);
+  CkpvAccess(device_recv_watch) = NULL;
+  if (deviceStallSecs() <= 0.0) return;
+  CkpvAccess(device_recv_watch) = new std::vector<DeviceRecvWatch>();
+  CcdCallOnConditionKeep(CcdPERIODIC_1second, (CcdCondFn)deviceStallScan, NULL);
+}
+
 void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs) {
   // Change message header to invoke regular entry method
   CMI_ZC_MSGTYPE(env) = CMK_REG_NO_ZC_MSG;
@@ -945,17 +1075,14 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
   envelope* new_env = UsrToEnv(CkCopyMsg(&old_msg));
 
   // Retarget the copied message's device buffers to the buffers this receiver
-  // posted. Set CHARM_NO_ZC_RETARGET to skip this and restore the previous
-  // behaviour (entry method sees the SENDER's pointer) for A/B testing.
-  // The transfers below land in arrPtrs[], but the copy still carries
+  // posted. The transfers below land in arrPtrs[], but the copy still carries
   // the SENDER's CkDeviceBuffer::ptr, and the entry method delivered from it
   // reads that pointer as its data. Within one process the sender's pointer is
   // a valid local address holding the same bytes, so this went unnoticed;
   // across processes it names memory in another address space and the first
   // kernel touching it faults. Rewriting in place is safe because pupping a
   // CkDeviceBuffer is fixed-width -- only ptr changes value.
-  static const bool zc_retarget_off = (getenv("CHARM_NO_ZC_RETARGET") != nullptr);
-  if (!zc_retarget_off) {
+  {
     char* new_buf = ((CkMarshallMsg*)EnvToUsr(new_env))->msgBuf;
     PUP::fromMem walk(new_buf);
     int copy_numops;
@@ -1002,6 +1129,17 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
   rdma_info->counter = 0;
   rdma_info->msg = new_env;
 
+  // Watchdog bookkeeping; no cost unless CHARM_ZC_STALL_SECS is set.
+  DeviceRecvWatch* watch = NULL;
+  if (CkpvAccess(device_recv_watch) != NULL) {
+    CkpvAccess(device_recv_watch)->push_back(
+        DeviceRecvWatch{rdma_info, CkWallTimer(), numops,
+                        std::vector<int>(numops, -1),
+                        std::vector<size_t>(numops, 0),
+                        std::vector<char>(numops, 0), false});
+    watch = &CkpvAccess(device_recv_watch)->back();
+  }
+
   for (int i = 0; i < numops; i++) {
     // Unpack source buffer from sender
     up|source;
@@ -1027,6 +1165,7 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     // ghost it later reads out of that buffer, this shows whether the runtime
     // ever lands one message's payload in another message's posted buffer.
     save_op.src_pe = env->getSrcPe();
+    if (watch) { watch->src_pe[i] = env->getSrcPe(); watch->size[i] = (size_t)arrSizes[i]; }
     save_op.stream = (void*)postStructs[i].hapi_stream;
     save_op.src_cb = (source.cb.type != CkCallback::ignore) ? new CkCallback(source.cb) : nullptr;
     save_op.dst_cb = nullptr;
@@ -1212,6 +1351,7 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
       if (!source.sender_prepared ||
           (source.device_idx != -1 &&
            !CmiPeOnSamePhysicalNode(env->getSrcPe(), CkMyPe()))) {
+        if (watch) watch->deferred[i] = 1;
         requestDeviceRestage(env->getSrcPe(), (void*)&save_op, source.ptr,
                              source.device_idx, source.comm_offset,
                              (size_t)dest.cnt, arrPtrs[i], (size_t)arrSizes[i],
@@ -1703,23 +1843,11 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
     transfer_mode = CkNcpyModeDevice::RDMA;
   }
 
-  // CHARM_ZC_ALWAYS_IPC makes migration-safe staging the rule rather than the
-  // exception. The mode above is chosen from where the target is *now*, but only
-  // becomes true when the message lands: if the element migrates to another
-  // process in between, a MEMCPY decision leaves the receiver with a pointer
-  // into an address space it cannot read (see the abort in
-  // CkRdmaDeviceIssueRgets). Staging IPC for every send off this PE keeps the
-  // transfer serviceable wherever it is delivered; the receiver's MEMCPY branch
-  // ignores and releases the staging when the destination did stay local.
-  // The cost is real -- a same-process transfer becomes two device copies plus
-  // an event pair instead of one copy -- so this is opt-in while the proper
-  // fix (re-staging on demand when the receiver detects the mismatch) does not
-  // exist.
-  static const bool always_ipc = (getenv("CHARM_ZC_ALWAYS_IPC") != nullptr);
-  if (always_ipc && transfer_mode == CkNcpyModeDevice::MEMCPY &&
-      dest_pe != CkMyPe() && CmiNumPhysicalNodes() == 1) {
-    transfer_mode = CkNcpyModeDevice::IPC;
-  }
+  // The mode above is chosen from where the target is now, but only becomes
+  // true when the message lands. A target that migrates across a process
+  // boundary in between is handled by the correction protocol, which re-sends
+  // the payload by a route the new host can read -- so the mode does not have
+  // to be pessimistic here.
 
   // Store destination PE in the metadata message
   // FIXME: Not necessary? save_op.dest_pe is set to CkMyPe() on the receiver
@@ -1821,13 +1949,13 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
       // A buffer that already lives in the comm buffer stays staged whatever
       // its size -- staging it costs nothing, since there is no copy to make,
       // and the receiver reads it through the mapping every peer already holds.
-      // Otherwise the direct transport applies at or above the threshold,
+      // Otherwise the direct transport applies when the run asked for it,
       // unless the source allocation turns out not to be exportable, in which
       // case hapiIpcExportBuffer says so and this falls back to staging.
       hapiIpcMemHandle_t export_handle;
       size_t export_offset = 0;
       bool direct = false;
-      if (!is_lb_buffer && buffers[i]->cnt >= hapiIpcDirectThreshold()) {
+      if (!is_lb_buffer && hapiIpcUseDirect()) {
         direct = hapiIpcExportBuffer(buffers[i]->ptr, &export_handle,
                                      &export_offset);
       }
@@ -1869,6 +1997,25 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
         buffers[i]->ipc_offset = export_offset;
         buffers[i]->comm_offset = 0;
         csv_gpu_manager.ipc_direct_sends.fetch_add(1, std::memory_order_relaxed);
+
+        // Direct exports the application's live allocation and ships the peer a
+        // handle to it, so the buffer has to outlive the peer's read -- exactly
+        // the condition the send interlock exists for, and the same reason the
+        // memcpy and inter-node paths register above and below. This path was
+        // added later and never did, so emigrate saw no outstanding sends,
+        // migrated the element, and freed the allocation whose handle was
+        // already on the wire; the peer then opened a dead handle and aborted
+        // with "could not open the CUDA IPC handle".
+        //
+        // Staged needs none of this: it copies into the comm buffer, so the
+        // element's own buffer is free the moment that copy retires.
+        CkLocRec* direct_rec = CkpvAccess(_currentLocRec);
+        if (direct_rec) {
+          direct_rec->noteDeviceSendPosted();
+          buffers[i]->cb = CkCallback(deviceSendReleaseFn,
+                                      (void*)new DeviceSendRelease{direct_rec,
+                                                                   buffers[i]->cb});
+        }
       } else {
         buffers[i]->ipc_protocol = CmiIpcProtocol::STAGED;
         buffers[i]->comm_offset = (char*)alloc_comm_buffer - (char*)dm->comm_buffer->base_ptr;
@@ -1959,12 +2106,15 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
 #else
   for (int i = 0; i < numops; i++) {
     cudaStreamSynchronize(buffers[i]->hapi_stream);
-    buffers[i]->lci_ncpy_buffer = CmiNcpyBuffer(buffers[i]->ptr, buffers[i]->cnt);
-    buffers[i]->sender_prepared = true;
     // This registers the application's own buffer and the receiver reads it over
     // the network, so it stays live well past this call. Count it against the
     // issuing element; emigrate stands down while any are outstanding.
     CkLocRec* sender_rec = CkpvAccess(_currentLocRec);
+    // Same element owns the registration: it is that element's buffer, and its
+    // migration is when the buffer dies.
+    buffers[i]->lci_ncpy_buffer =
+        acquireDeviceRegistration(buffers[i]->ptr, buffers[i]->cnt, sender_rec);
+    buffers[i]->sender_prepared = true;
     if (sender_rec) {
       sender_rec->noteDeviceSendPosted();
       buffers[i]->cb = CkCallback(deviceSendReleaseFn,

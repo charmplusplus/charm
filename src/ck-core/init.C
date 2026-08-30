@@ -1491,10 +1491,11 @@ void _initCharm(int unused_argc, char **argv)
   loopback_handler = CmiRegisterHandler((CmiHandler) loopback_bridge);
   device_restage_req_handler = CmiRegisterHandler((CmiHandler) device_restage_req_bridge);
   device_restage_meta_handler = CmiRegisterHandler((CmiHandler) device_restage_meta_bridge);
-  device_restage_rdma_handler = CmiRegisterHandler((CmiHandler) device_restage_rdma_bridge);
   device_restage_put_done_handler = CmiRegisterHandler((CmiHandler) device_restage_put_done_bridge);
   CkpvInitialize(CkLocRec*, _currentLocRec);
   CkpvAccess(_currentLocRec) = NULL;
+  CkRdmaDeviceRegistrationCacheInit();
+  CkRdmaDeviceStallWatchInit();
 #endif
 
 #if CMK_USE_SHMEM

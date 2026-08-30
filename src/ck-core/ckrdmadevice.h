@@ -60,18 +60,6 @@ struct CkDevicePersistent {
   CkDeviceStatus put(CkDevicePersistent& dst);
 };
 
-// Descriptor for a single device buffer being transferred via the
-// pointer-and-get migration path. Which fields are populated depends on
-// the transport chosen for the source->destination pair (see
-// DeviceMigrationStrategy). The destination derives the source's CmiNode
-// from CkArrayElementMigrateHandleMessage::src_pe.
-struct CkDeviceMigrateHandle {
-  uintptr_t src_ptr;              // MEMCPY: raw src pointer (same process)
-  size_t size;                    // bytes
-  hapiIpcMemHandle_t ipc_handle;  // IPC: handle openable in dst process
-  uint64_t rdma_tag;              // RDMA: tag assigned by CmiSendDevice
-};
-
 struct CkDeviceBufferPost {
   // CUDA stream for device transfers
   hapiStream_t hapi_stream;
@@ -141,6 +129,15 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers);
 class CkLocRec;
 CkpvExtern(CkLocRec*, _currentLocRec);
 
+// Device registration cache, off unless CHARM_DEVICE_MR_CACHE is set; see the
+// design note in ckrdmadevice.C. DropRegistrations must be called wherever an
+// element's device buffers are about to be freed, and only where no transfer
+// against them is in flight.
+void CkRdmaDeviceRegistrationCacheInit();
+// Stalled-receive watchdog, off unless CHARM_ZC_STALL_SECS is set.
+void CkRdmaDeviceStallWatchInit();
+void CkRdmaDeviceDropRegistrations(CkLocRec* owner);
+
 extern "C" {
   void* loopback_bridge(void* arg);
   extern int loopback_handler;
@@ -148,11 +145,9 @@ extern "C" {
   // ckrdmadevice.C.
   void* device_restage_req_bridge(void* arg);
   void* device_restage_meta_bridge(void* arg);
-  void* device_restage_rdma_bridge(void* arg);
   void* device_restage_put_done_bridge(void* arg);
   extern int device_restage_req_handler;
   extern int device_restage_meta_handler;
-  extern int device_restage_rdma_handler;
   extern int device_restage_put_done_handler;
 }
 

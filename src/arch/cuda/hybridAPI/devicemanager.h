@@ -4,6 +4,7 @@
 #include <hapi_portable.h>
 #include "converse.h"
 #include "buddy_allocator.h"
+#include <unordered_map>
 
 #ifdef CMK_LBDB_ON
 #include "GpuScalingModel.h"
@@ -30,6 +31,7 @@ struct DeviceManager {
   // streams the way null-stream memcpys do. Callers serialize creation with
   // this manager's lock.
   hapiStream_t migration_stream;
+
 
 #ifdef CMK_LBDB_ON
   // Device properties needed to estimate how many SMs a kernel occupies.
