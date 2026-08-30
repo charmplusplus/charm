@@ -409,6 +409,14 @@ class Block : public CBase_Block {
     // the entry method that consumes it has not run yet, and will run on the
     // copy that resumes. So the bytes have to come along.
     if (use_zerocopy) {
+      // The outgoing halves too: a neighbour may not have pulled the ghosts
+      // this block packed before the step moved it, and the pull reads the
+      // sender's live buffer. Carrying them keeps what was packed available to
+      // whichever copy the neighbour ends up reading from.
+      p(d_send_left_ghost, block_height * 2, PUP::PUPMode::DEVICE);
+      p(d_send_right_ghost, block_height * 2, PUP::PUPMode::DEVICE);
+      p(d_send_top_ghost, block_width * 2, PUP::PUPMode::DEVICE);
+      p(d_send_bottom_ghost, block_width * 2, PUP::PUPMode::DEVICE);
       p(d_recv_left_ghost, block_height * 2, PUP::PUPMode::DEVICE);
       p(d_recv_right_ghost, block_height * 2, PUP::PUPMode::DEVICE);
       p(d_recv_top_ghost, block_width * 2, PUP::PUPMode::DEVICE);

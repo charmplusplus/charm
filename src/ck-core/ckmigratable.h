@@ -27,6 +27,11 @@ private:
   // advances in AtSyncSample(), whose cadence is kept sparse because CUPTI
   // sampling is expensive, and is therefore far too coarse to schedule on.
   int lbIterNo;
+  // Whether this chare has adjusted the sample-stream counts of the PE it is
+  // currently on. Deliberately not pupped: a chare arriving by migration starts
+  // false and so performs the adjustment for its new PE, which the
+  // atsync_iteration == -1 path only ever did for a freshly created chare.
+  bool joinedMetaLBStreamHere;
   // Set when AtSyncStart stopped this chare at the tentative count because the
   // step's count had not been agreed yet. Released by recvLBPeriod.
   bool lbStepBlocked;

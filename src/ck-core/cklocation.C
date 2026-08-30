@@ -1790,6 +1790,7 @@ void CkMigratable::commonInit(void)
   lbStepSeen = 0;
   lbIterNo = 0;
   lbStepBlocked = false;
+  joinedMetaLBStreamHere = false;
   lbStepPending = false;
   waitParked = false;
   lbWaitEpoch = 0;
@@ -2209,6 +2210,17 @@ void CkMigratable::sampleMetaLBLoad()
     // it is about to open is the first it owes.
     atsync_iteration = myRec->getMetaBalancer()->get_iteration();
     myRec->getMetaBalancer()->AdjustCountForNewContributor(atsync_iteration);
+    joinedMetaLBStreamHere = true;
+  }
+  else if (!joinedMetaLBStreamHere)
+  {
+    // Arrived by migration, carrying its own atsync_iteration, so the branch
+    // above did not run. This PE's open buckets still have to be credited for a
+    // contributor they were not counting, exactly as for a new chare -- without
+    // it this PE eventually sees more contributions to an index than it has
+    // objects, and aborts.
+    myRec->getMetaBalancer()->AdjustCountForNewContributor(atsync_iteration);
+    joinedMetaLBStreamHere = true;
   }
 
   atsync_iteration++;

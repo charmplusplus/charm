@@ -200,6 +200,7 @@ void MetaBalancer::init(void) {
   CkpvAccess(metalbInited) = 1;
   total_load_vec.resize(VEC_SIZE, 0.0);
   total_count_vec.resize(VEC_SIZE, 0);
+  max_objs_vec.resize(VEC_SIZE, 0);
   max_load_vec.resize(VEC_SIZE, 0.0);
   min_load_vec.resize(VEC_SIZE, MAXDOUBLE);
   prev_idle = 0.0;
@@ -397,6 +398,10 @@ bool MetaBalancer::AddLoad(int it_n, double load) {
 
   int index = it_n % VEC_SIZE;
   total_count_vec[index]++;
+  {
+    const int now = lbmanager->GetObjDataSz();
+    if (now > max_objs_vec[index]) max_objs_vec[index] = now;
+  }
   adaptive_struct.total_syncs_called++;
   DEBAD(("At PE %d Total contribution for iteration %d is %d \
       total objs %d\n", CkMyPe(), it_n, total_count_vec[index],
@@ -415,9 +420,9 @@ bool MetaBalancer::AddLoad(int it_n, double load) {
   if (load < min_load_vec[index]) {
     min_load_vec[index] = load;
   }
-  if (total_count_vec[index] > lbmanager->GetObjDataSz()) {
+  if (total_count_vec[index] > max_objs_vec[index]) {
     CkPrintf("iteration %d received %d contributions and expected %d\n", it_n,
-        total_count_vec[index], lbmanager->GetObjDataSz());
+        total_count_vec[index], max_objs_vec[index]);
     CkAbort("Abort!!! Received more contribution");
   }
   if (total_count_vec[index] == lbmanager->GetObjDataSz()){
@@ -531,6 +536,7 @@ void MetaBalancer::ContributeStats(int it_n) {
 
   total_load_vec[index] = 0.0;
   total_count_vec[index] = 0;
+  max_objs_vec[index] = 0;
   max_load_vec[index] = 0.0;
   min_load_vec[index] = MAXDOUBLE;
 

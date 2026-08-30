@@ -268,6 +268,13 @@ private:
   // broadcast time to land before any chare can reach the agreed count.
   //
   // On every PE: the largest lbIterNo any local chare has reached.
+  // Largest object count seen while a sample index was open. The bound on
+  // contributions to an index is not the object count now, but the most this PE
+  // ever held while that index was accepting them: an object that contributes
+  // and then migrates away leaves its contribution counted while GetObjDataSz
+  // drops beneath it.
+  std::vector<int> max_objs_vec;
+
   int gpu_start_no_;
   // On PE 0 only: the vote in progress.
   int gpu_vote_seq_;
