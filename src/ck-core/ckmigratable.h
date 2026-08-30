@@ -31,7 +31,12 @@ private:
   // currently on. Deliberately not pupped: a chare arriving by migration starts
   // false and so performs the adjustment for its new PE, which the
   // atsync_iteration == -1 path only ever did for a freshly created chare.
-  bool joinedMetaLBStreamHere;
+  // Which PE's MetaBalancer sample stream this element has credited, or -1 for
+  // none. A bool cannot answer the question that matters -- "have I credited
+  // the stream I am contributing to now?" -- because an element can reach a new
+  // PE without being reconstructed, and then carries a stale "yes" from the PE
+  // it left.
+  int metaLBStreamJoinedPe;
   // Set when AtSyncStart stopped this chare at the tentative count because the
   // step's count had not been agreed yet. Released by recvLBPeriod.
   bool lbStepBlocked;
