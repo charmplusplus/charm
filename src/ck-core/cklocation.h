@@ -152,37 +152,6 @@ public:
   size_t* gpuManifest;
 };
 
-#if CMK_CUDA
-/**
- *  Device-migration handle message for the pointer-and-get path.
- *  Source ships only per-buffer transport info (src_ptr + one of
- *  {ipc_handle, rdma_tag}); the destination pulls the bytes via the
- *  DeviceMigrationStrategy selected for the (src, dst) pair.
- */
-class CkArrayElementMigrateHandleMessage
-  : public CMessage_CkArrayElementMigrateHandleMessage
-{
-public:
-  CkArrayElementMigrateHandleMessage(CmiUInt8 id_, int src_pe_, int nHandles_)
-      : id(id_), src_pe(src_pe_), nHandles(nHandles_) {}
-
-  CmiUInt8 id;
-  int src_pe;
-  int nHandles;
-  CkDeviceMigrateHandle* handles;
-};
-
-/**
- *  Completion hook message delivered to CkLocMgr::finalizeGPUMigrate() when
- *  all device-buffer pulls for a given migration have completed.
- */
-class CkLocMgrFinalizeMsg : public CMessage_CkLocMgrFinalizeMsg
-{
-public:
-  CmiUInt8 id;
-};
-#endif
-
 /******************* Map object ******************/
 
 extern CkGroupID _defaultArrayMapID;
@@ -864,12 +833,6 @@ public:
   // the fast path is not applicable and the caller should fall through to
   // the packed emigrate path.
   bool emigrateIntraProcess(CkLocRec* rec, int toPe);
-#if CMK_CUDA
-  // Pointer-and-get device migration: pack host state only, export the chare's
-  // device buffers as handles, and let the destination pull them. Returns
-  // false if the caller should fall through to the staged path.
-  bool emigrateDeviceByHandle(CkLocRec* rec, int toPe, size_t bufSize);
-#endif
   void immigrateIntraProcess(CkArrayElementIntraProcessMigrateMessage* msg);
 
   // See inFlightImmigrations. Registration happens wherever this PE first
@@ -898,33 +861,6 @@ public:
   void immigrateGPU(CmiUInt8& id, int& size, char* &data, int& srcPe, CkDeviceBufferPost* post);
   void immigrateGPU(CmiUInt8 id, int size, char* data, int srcPe);
   void finishGPUSend(CmiUInt8 id);
-  // Pointer-and-get device migration path (see DeviceMigrationStrategy).
-  void immigrateGPUHandle(CkArrayElementMigrateHandleMessage* msg);
-  void finalizeGPUMigrate(CkLocMgrFinalizeMsg* msg);
-  void ackGPUMigrate(CmiUInt8 id);
-  // Record an IPC pointer opened by IpcStrategy so finalizeGPUMigrate can
-  // close it once the pull for this migration completes.
-  void registerOpenedIpcPtr(CmiUInt8 id, void* ptr);
-
-  // Destination-side state while a handle-path migration is in flight. The
-  // gpuMsg has been allocated and device pulls have been issued; when all
-  // pulls complete, finalizeGPUMigrate(id) runs and drains this map.
-  struct PendingPull {
-    void* gpuMsg;
-    size_t size;
-    int src_pe;
-    std::vector<void*> openedIpcPtrs;
-  };
-  std::unordered_map<CmiUInt8, PendingPull> pendingPulls;
-
-  // Source-side state: chares whose device buffers the destination is still
-  // pulling from. They must stay alive (and their device pointers valid)
-  // until ackGPUMigrate arrives, so destruction is deferred.
-  struct HeldMigratingChares {
-    CkLocRec* rec;
-    std::vector<CkMigratable*> chares;
-  };
-  std::unordered_map<CmiUInt8, HeldMigratingChares> heldChares;
 #endif
   void requestLocation(CmiUInt8 id);
   // See CkLocCache::requestLocationOnce.

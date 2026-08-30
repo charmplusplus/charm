@@ -13,16 +13,6 @@ module CkLocation {
     uintptr_t eltPtrs[];
   };
 
-#ifdef CMK_CUDA
-#if CMK_CUDA
-  message CkArrayElementMigrateHandleMessage {
-    CkDeviceMigrateHandle handles[];
-  };
-
-  message CkLocMgrFinalizeMsg;
-#endif
-#endif
-
   group [migratable] CkLocCache {
     entry CkLocCache();
     entry [expedited] void requestLocation(CmiUInt8 id, int peToTell);
@@ -38,9 +28,6 @@ module CkLocation {
     entry [expedited, threaded] void sendGPUMsg(CmiUInt8 id);
     entry [expedited] void immigrateGPU(CmiUInt8 id, int size, nocopydevice char data[size], int srcPe);
     entry [expedited] void finishGPUSend(CmiUInt8 id);
-    entry [expedited] void immigrateGPUHandle(CkArrayElementMigrateHandleMessage *msg);
-    entry [expedited] void finalizeGPUMigrate(CkLocMgrFinalizeMsg* msg);
-    entry [expedited] void ackGPUMigrate(CmiUInt8 id);
 #endif
 #endif
     entry [expedited] void requestLocation(const CkArrayIndex& idx, int peToTell);
@@ -99,7 +86,6 @@ module CkLocation {
 
 #ifdef CMK_CUDA
 #if CMK_CUDA
-  initproc void _initGPUMigrateHandlers(void);
 #endif
 #endif
   group [migratable] PropMap : CkArrayMap {
