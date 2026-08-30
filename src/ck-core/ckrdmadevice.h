@@ -138,6 +138,9 @@ void CkRdmaDeviceRecvHandler(void* data, void* msg);
 void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs);
 void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers);
 
+class CkLocRec;
+CkpvExtern(CkLocRec*, _currentLocRec);
+
 extern "C" {
   void* loopback_bridge(void* arg);
   extern int loopback_handler;

@@ -29,6 +29,17 @@ private:
 #endif
 
 public:
+  // Device zerocopy sends this element issued whose source buffers the runtime
+  // has not finished reading. Zerocopy means the runtime keeps reading the
+  // application's buffer after the send call returns -- the completion callback
+  // is what says it may be reused -- so migrating inside that window frees and
+  // reallocates a buffer a transfer is still sourcing from.
+  int outstandingDeviceSends = 0;
+  // Destination of a migration deferred because of the above, or -1. The
+  // migration is re-driven from noteDeviceSendDone once the count reaches zero.
+  int pendingMigrateTo = -1;
+  void noteDeviceSendPosted() { outstandingDeviceSends++; }
+  void noteDeviceSendDone();
 
   //Creation and Destruction:
   CkLocRec(CkLocMgr *mgr,bool fromMigration,bool ignoreArrival, const CkArrayIndex &idx_, CmiUInt8 id);

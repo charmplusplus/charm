@@ -2590,10 +2590,28 @@ void CkLocRec::migrateMe(int toPe)  // Leaving this processor
 }
 
 #if CMK_LBDB_ON
+CkpvDeclare(CkLocRec*, _currentLocRec);
+
+// Releasing the last outstanding send is what lets a migration that was waiting
+// on it proceed. Deferring rather than blocking matters: an inter-node send
+// completes only when the receiver acknowledges, so spinning here would deadlock
+// against a receiver that is itself mid-migration.
+void CkLocRec::noteDeviceSendDone()
+{
+  if (outstandingDeviceSends > 0) outstandingDeviceSends--;
+  if (outstandingDeviceSends == 0 && pendingMigrateTo != -1)
+  {
+    const int toPe = pendingMigrateTo;
+    pendingMigrateTo = -1;
+    myLocMgr->emigrate(this, toPe);  // does not return to this object
+  }
+}
+
 void CkLocRec::startTiming(int ignore_running)
 {
   if (!ignore_running)
     running = true;
+  CkpvAccess(_currentLocRec) = this;
   DEBL((AA "Start timing for %s at %.3fs {\n" AB, idx2str(idx), CkWallTimer()));
   if (enable_measure)
     lbmgr->ObjectStart(ldHandle);
@@ -2603,8 +2621,10 @@ void CkLocRec::stopTiming(int ignore_running)
   DEBL((AA "} Stop timing for %s at %.3fs\n" AB, idx2str(idx), CkWallTimer()));
   if ((ignore_running || running) && enable_measure)
     lbmgr->ObjectStop(ldHandle);
-  if (!ignore_running)
+  if (!ignore_running) {
     running = false;
+    if (CkpvAccess(_currentLocRec) == this) CkpvAccess(_currentLocRec) = NULL;
+  }
 }
 void CkLocRec::setObjTime(double cputime) { 
   lbmgr->EstObjLoad(ldHandle, cputime); }
@@ -3705,6 +3725,16 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   CK_MAGICNUMBER_CHECK
   if (toPe == CkMyPe())
     return;  // You're already there!
+
+  // Do not move an element while the runtime is still reading buffers it handed
+  // to a zerocopy send: migration frees and reallocates exactly those buffers.
+  // Stand the migration down and let noteDeviceSendDone re-drive it when the
+  // last transfer completes.
+  if (rec->outstandingDeviceSends > 0)
+  {
+    rec->pendingMigrateTo = toPe;
+    return;
+  }
 
   CkArrayIndex idx = rec->getIndex();
   CmiUInt8 id = rec->getID();

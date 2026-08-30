@@ -728,34 +728,13 @@ extern "C" void* device_restage_req_bridge(void* arg)
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
 
   if (req->inter_node) {
-    // The target migrated to another physical node mid-flight. Both attempts at
-    // correcting this are wrong and must not ship silently:
-    //
-    //   rdmaPut with no ack   the bytes land and nothing tells the receiver, so
-    //                         the transfer never completes and the job stalls
-    //                         with zero load balancing steps.
-    //   receiver-issued get   completes, but the delivered data is wrong, and
-    //                         differently wrong each run. Measured 1/5 against
-    //                         the reference checksum, where the same geometry
-    //                         without -z -- so without this path -- is 4/4.
-    //                         Snapshotting the payload before registering does
-    //                         not help, so the source data is not the problem.
-    //
-    // Aborting is not a fix, it is a refusal to corrupt. This is no worse than
-    // the behaviour before the correction existed, when the same case fell
-    // through to an rdmaGet against an unregistered descriptor and died as an
-    // LCI "Message too long".
-    //
-    // The route worth taking next is LCI's post_putImm: the NACK carries the
-    // destination's registered descriptor, one put with immediate data both
-    // moves the payload and raises a completion at the target, and no separate
-    // notify is needed. That is one message and one RDMA operation, against the
-    // two messages and a read this path was using.
-    CkAbort("CkRdmaDeviceIssueRgets: target migrated to another physical node "
-            "mid-flight (src PE %d, %zu bytes). The inter-node correction is "
-            "not yet correct -- see the notes at device_restage_req_bridge -- "
-            "and aborting here is deliberate rather than delivering wrong data.",
-            CkMyPe(), (size_t)req->cnt);
+    auto* m = (DeviceRestageRdma*)CmiAlloc(sizeof(DeviceRestageRdma));
+    CmiEnforce(m);
+    m->dest_op = req->dest_op;
+    m->src_ncpy = CmiNcpyBuffer(req->src_ptr, req->cnt);
+    QdCreate(1);
+    CmiSetHandler(m, device_restage_rdma_handler);
+    CmiSyncSendAndFree(req->dest_pe, sizeof(DeviceRestageRdma), (char*)m);
   } else {
     DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
     const int cpv_my_device_id = CpvAccess(my_device_id);
@@ -1538,6 +1517,23 @@ size_t CkRdmaDeviceTakePendingSendBytes() {
   return bytes;
 }
 
+// Releases the element that issued an inter-node zerocopy send once the runtime
+// has finished reading its source buffer, then hands control to the callback the
+// application attached. A callCFn callback records the PE that built it and
+// CkCallback::send routes back there, so this runs on the sending PE.
+struct DeviceSendRelease { CkLocRec* rec; CkCallback app_cb; };
+
+static void deviceSendReleaseFn(void* param, void* msg)
+{
+  DeviceSendRelease* r = (DeviceSendRelease*)param;
+  CkLocRec* rec = r->rec;
+  CkCallback cb = r->app_cb;
+  delete r;
+  if (cb.type != CkCallback::ignore) cb.send(msg);
+  else if (msg) CkFreeMsg(msg);
+  if (rec) rec->noteDeviceSendDone();  // may start a deferred migration
+}
+
 // Performs sender-side operations necessary for device zerocopy
 void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
   // dest_pe == -1 means this PE has never confirmed where the target element
@@ -1815,6 +1811,15 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
     cudaStreamSynchronize(buffers[i]->hapi_stream);
     buffers[i]->lci_ncpy_buffer = CmiNcpyBuffer(buffers[i]->ptr, buffers[i]->cnt);
     buffers[i]->sender_prepared = true;
+    // This registers the application's own buffer and the receiver reads it over
+    // the network, so it stays live well past this call. Count it against the
+    // issuing element; emigrate stands down while any are outstanding.
+    CkLocRec* sender_rec = CkpvAccess(_currentLocRec);
+    if (sender_rec) {
+      sender_rec->noteDeviceSendPosted();
+      buffers[i]->cb = CkCallback(deviceSendReleaseFn,
+                                  (void*)new DeviceSendRelease{sender_rec, buffers[i]->cb});
+    }
   }
 #endif
   }
