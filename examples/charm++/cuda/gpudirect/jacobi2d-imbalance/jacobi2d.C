@@ -319,10 +319,16 @@ class Block : public CBase_Block {
       hapiCheck(cudaFree(d_left_ghost));
       hapiCheck(cudaFree(d_right_ghost));
     } else {
-      hapiCheck(cudaFree(d_send_left_ghost));
-      hapiCheck(cudaFree(d_send_right_ghost));
-      hapiCheck(cudaFree(d_send_top_ghost));
-      hapiCheck(cudaFree(d_send_bottom_ghost));
+      // Deliberately not freed. A direct device-zerocopy send reads this
+      // block's live allocation -- the runtime's own contract says such a send
+      // must carry a completion callback the sender waits on before freeing.
+      // These ghost sends carry none, so under +LBAsync a step can destroy this
+      // block while a neighbour is still copying out of these buffers, and the
+      // copy then faults on freed memory. They are four short vectors; leaking
+      // them per migration is the price of not having that callback.
+      //
+      // The proper fix is a completion callback on the send, with the free
+      // deferred until it fires.
       hapiCheck(cudaFree(d_recv_left_ghost));
       hapiCheck(cudaFree(d_recv_right_ghost));
       hapiCheck(cudaFree(d_recv_top_ghost));

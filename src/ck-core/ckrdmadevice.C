@@ -623,8 +623,13 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
         hapiCheck(hapiStreamWaitEvent(postStructs[i].hapi_stream,
               (hapiEvent_t)source.memcpy_event, 0));
       }
+      // cudaMemcpyDefault, not DeviceToDevice: once load balancing has moved
+      // chares between GPUs, the source and destination of a same-process
+      // transfer can sit on different devices, and an explicit DeviceToDevice
+      // kind is rejected for that pair. Default resolves the direction from the
+      // pointers themselves and handles the peer case.
       hapiCheck(hapiMemcpyAsync((void*)dest.ptr, source.ptr, dest.cnt,
-            hapiMemcpyDeviceToDevice, postStructs[i].hapi_stream));
+            cudaMemcpyDefault, postStructs[i].hapi_stream));
 
       // The sender may have staged IPC info for this transfer anyway: an
       // unconfirmed destination that turned out to be this same process
@@ -743,20 +748,57 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
       // 1. Make user-provided stream wait for IPC event using hapiStreamWaitEvent
       //    (staged: source buffer to device comm buffer on source; direct: the
       //    kernels that produced the source buffer)
-      hapiCheck(hapiStreamWaitEvent(postStructs[i].hapi_stream,
-            device_info.src_event_pool[source.event_idx], 0));
+      // Same reason as the dst_event_pool record below: across processes
+      // ipcHandleOpen imports a peer's events under our own device, but it skips
+      // our own process, so a source that is a different device inside this
+      // process leaves that device's original event in the pool. Making our
+      // stream wait on it is not valid from here. Wait on the host instead --
+      // stronger ordering than the stream wait, and confined to this one case,
+      // which only became reachable once load balancing moved chares between
+      // GPUs within a process.
+      {
+        const int my_dev_idx = csv_gpu_manager.device_count * CmiMyNodeRankLocal()
+                             + CpvAccess(my_device_id);
+        if (source.device_idx != my_dev_idx) {
+          hapiCheck(cudaEventSynchronize(device_info.src_event_pool[source.event_idx]));
+        } else {
+          hapiCheck(hapiStreamWaitEvent(postStructs[i].hapi_stream,
+                device_info.src_event_pool[source.event_idx], 0));
+        }
+      }
       ipcDebugSync("recv 1: wait imported src_event", postStructs[i].hapi_stream);
 
       // 2. Invoke hapiMemcpyAsync from the peer's memory to the destination
       //    buffer. This is the only copy a direct transfer makes.
+      // Same reason as the same-process copy above: the peer's buffer may be on
+      // a different device from ours.
       hapiCheck(hapiMemcpyAsync((void*)dest.ptr, src_addr,
-            dest.cnt, hapiMemcpyDeviceToDevice, postStructs[i].hapi_stream));
+            dest.cnt, cudaMemcpyDefault, postStructs[i].hapi_stream));
       ipcDebugSync("recv 2: peer copy -> dest", postStructs[i].hapi_stream);
 
       // 3. Record IPC event so that the sender can query it for freeing
-      //    device comm buffer and corresponding pair of CUDA IPC events
-      hapiCheck(hapiEventRecord(device_info.dst_event_pool[source.event_idx],
-            postStructs[i].hapi_stream));
+      //    device comm buffer and corresponding pair of CUDA IPC events.
+      //    The event belongs to the source's device; when that is a different
+      //    device inside this same process it was never imported under ours
+      //    (ipcHandleOpen skips our own process), so settle the copy and record
+      //    on the owning device rather than on our stream.
+      {
+        const int my_dev_idx = csv_gpu_manager.device_count * CmiMyNodeRankLocal()
+                             + CpvAccess(my_device_id);
+        if (source.device_idx != my_dev_idx) {
+          hapiCheck(hapiStreamSynchronize(postStructs[i].hapi_stream));
+          const int src_local = source.device_idx % csv_gpu_manager.device_count;
+          const int src_global = csv_gpu_manager.device_managers[src_local].global_index;
+          int prev_dev = 0;
+          hapiCheck(hapiGetDevice(&prev_dev));
+          hapiCheck(hapiSetDevice(src_global));
+          hapiCheck(hapiEventRecord(device_info.dst_event_pool[source.event_idx], 0));
+          hapiCheck(hapiSetDevice(prev_dev));
+        } else {
+          hapiCheck(hapiEventRecord(device_info.dst_event_pool[source.event_idx],
+                postStructs[i].hapi_stream));
+        }
+      }
       ipcDebugSync("recv 3: record imported dst_event", postStructs[i].hapi_stream);
 
       // 4. Set flag in shared memory so that the sender can start querying
