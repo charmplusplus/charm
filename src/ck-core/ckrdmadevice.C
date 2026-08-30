@@ -703,6 +703,15 @@ static void requestDeviceRestage(int srcPe, void* dest_op, const void* src_ptr,
   req->src_ptr = src_ptr;
   req->cnt = cnt;
   req->inter_node = inter_node;
+  if (inter_node) {
+    // Register the landing buffer here and hand the sender its descriptor, so a
+    // put can be addressed directly at it. The ref is this receive's
+    // DeviceRdmaOp, which is what the direct-ncpy ack handler resolves when the
+    // transfer completes -- that is the notification half of "put with
+    // notification": the target is told by the RDMA completion rather than by a
+    // second message of ours.
+    req->dest_ncpy = CmiNcpyBuffer(dest_ptr, dest_cnt, dest_op);
+  }
   // CHARM_ZC_RESTAGE_DEBUG: a pass on the migration paths only means something
   // if this path actually ran, so make it countable rather than inferred.
   static const bool restage_debug = (getenv("CHARM_ZC_RESTAGE_DEBUG") != nullptr);
@@ -728,13 +737,44 @@ extern "C" void* device_restage_req_bridge(void* arg)
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
 
   if (req->inter_node) {
-    auto* m = (DeviceRestageRdma*)CmiAlloc(sizeof(DeviceRestageRdma));
-    CmiEnforce(m);
-    m->dest_op = req->dest_op;
-    m->src_ncpy = CmiNcpyBuffer(req->src_ptr, req->cnt);
-    QdCreate(1);
-    CmiSetHandler(m, device_restage_rdma_handler);
-    CmiSyncSendAndFree(req->dest_pe, sizeof(DeviceRestageRdma), (char*)m);
+    // CHARM_ZC_RESTAGE_GET selects the receiver-issued get instead. Kept so the
+    // two can be compared directly: the get is the variant this fix was
+    // validated with, the put below is the one that should cost less.
+    static const bool use_get = (getenv("CHARM_ZC_RESTAGE_GET") != nullptr);
+
+    if (use_get) {
+      auto* m = (DeviceRestageRdma*)CmiAlloc(sizeof(DeviceRestageRdma));
+      CmiEnforce(m);
+      m->dest_op = req->dest_op;
+      m->src_ncpy = CmiNcpyBuffer(req->src_ptr, req->cnt);
+      QdCreate(1);
+      CmiSetHandler(m, device_restage_rdma_handler);
+      CmiSyncSendAndFree(req->dest_pe, sizeof(DeviceRestageRdma), (char*)m);
+    } else {
+      // Put with notification. The NACK already carried the receiver's
+      // registered landing buffer, so the payload goes straight there and the
+      // RDMA completion tells the target -- one message and one RDMA operation,
+      // against the get's two messages and a read.
+      //
+      // The notification is the ack payload: rdmaPut delivers destAck to the
+      // destination, where the direct-ncpy ack handler is CkRdmaDeviceRecvHandler
+      // and resolves the DeviceRdmaOp carried as the destination buffer's ref.
+      // A put with no ack raises its completion only on the sender -- see
+      // CommRputLocalHandler -- which is why an earlier attempt landed the bytes
+      // and stalled the run with zero load balancing steps.
+      //
+      // UNTESTED. Written after the allocation was released; the get path above
+      // is what the 20-of-20 matrix was measured with. Validate by confirming a
+      // correction still completes (CHARM_ZC_RESTAGE_DEBUG shows "inter-node
+      // put") and the run reaches its reference checksum, before making this the
+      // default in earnest.
+      CmiSetDirectNcpyAckHandler(CkRdmaDeviceRecvHandler);
+      CmiNcpyBuffer src_ncpy(req->src_ptr, req->cnt, req->dest_op);
+      void* dst_tok = req->dest_op;
+      void* src_tok = NULL;
+      src_ncpy.rdmaPut(req->dest_ncpy, sizeof(void*),
+                       (char*)&src_tok, (char*)&dst_tok);
+    }
   } else {
     DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
     const int cpv_my_device_id = CpvAccess(my_device_id);
