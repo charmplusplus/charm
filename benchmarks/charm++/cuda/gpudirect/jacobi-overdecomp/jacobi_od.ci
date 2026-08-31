@@ -22,6 +22,7 @@ mainmodule jacobi_od {
     entry [reductiontarget] void updateDone();
     entry [reductiontarget] void commDone();
     entry [reductiontarget] void allDone();
+    entry [reductiontarget] void placementDone();
     entry void printDone();
   };
 
@@ -82,5 +83,7 @@ mainmodule jacobi_od {
     }
 
     entry void print();
+    // Instrumentation: each block reports where it ran and what its sends cost.
+    entry void reportPlacement();
   };
 };

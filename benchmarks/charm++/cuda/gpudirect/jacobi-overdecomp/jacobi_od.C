@@ -190,11 +190,29 @@ public:
     double total_time = CkWallTimer() - start_time;
     CkPrintf("Total time: %.3lf s\nAverage iteration time: %.3lf us\n",
         total_time, (total_time / n_iters) * 1e6);
+    // One parseable line per run, for sweeping overdecomposition. chares/device
+    // is what the sweep varies; the queue ceiling (32 NVIDIA, ~8 AMD) divided by
+    // streams per chare is where the arrangement stops buying concurrency.
+    {
+      int devs = 0;
+      hapiCheck(hapiGetDeviceCount(&devs));
+      const int chares = n_chares_x * n_chares_y;
+      CkPrintf("JACOBI_OD_RESULT pes=%d nodes=%d phys_nodes=%d visible_devices=%d "
+               "chares=%d chares_per_visible_device=%.2f iters=%d "
+               "avg_iter_us=%.2f zerocopy=%d\n",
+               CkNumPes(), CmiNumNodes(), CmiNumPhysicalNodes(), devs, chares,
+               devs > 0 ? (double)chares / devs : 0.0, n_iters,
+               (total_time / n_iters) * 1e6, use_zerocopy ? 1 : 0);
+    }
     if (sync_ver) {
       CkPrintf("Comm time per iteration: %.3lf us\nUpdate time per iteration: %.3lf us\n",
           (comm_agg_time / n_iters) * 1e6, (update_agg_time / n_iters) * 1e6);
     }
 
+    block_proxy.reportPlacement();
+  }
+
+  void placementDone() {
     if (print_elements) {
       sleep(1);
       block_proxy(0,0).print();
@@ -448,7 +466,29 @@ class Block : public CBase_Block {
 #endif
   }
 
+  // --- instrumentation -------------------------------------------------
+  // send_agg_time isolates the cost of issuing the ghost sends. On the
+  // same-process (MEMCPY) path CkRdmaDeviceOnSender synchronises the stream
+  // before the metadata message goes out (issue #3957), so this is where a
+  // blocking wait on the GPU would show up: it grows with chares per PE while
+  // kernel time stays flat.
+  double send_agg_time = 0.0;
+
+  // Reports where this block ran and what its ghost sends cost, so a run can
+  // be checked for the configuration it was meant to have (chares per device,
+  // devices per process) rather than assumed to have it.
+  void reportPlacement() {
+    int dev = -1;
+    hapiCheck(hapiGetDevice(&dev));
+    CkPrintf("JACOBI_OD_PLACE block=(%d,%d) pe=%d node=%d device=%d "
+             "send_us_per_iter=%.2f\n",
+             x, y, CkMyPe(), CmiMyNode(), dev,
+             (send_agg_time / (n_iters > 0 ? n_iters : 1)) * 1e6);
+    contribute(CkCallback(CkReductionTarget(Main, placementDone), main_proxy));
+  }
+
   void sendGhosts() {
+    const double send_start_time = CkWallTimer();
     std::ostringstream os;
     os << "sendGhosts (" << std::to_string(x) << "," << std::to_string(y) << ")";
     JACOBI_OD_NVTX(os.str(), NVTXColor::PeterRiver);
@@ -477,7 +517,9 @@ class Block : public CBase_Block {
       if (!bottom_bound)
         thisProxy(x, y + 1).receiveGhostsReg(my_iter, TOP, block_width, h_bottom_ghost);
     }
-  }
+  
+    if (my_iter > warmup_iters) send_agg_time += CkWallTimer() - send_start_time;
+}
 
   // This is the post entry method, the regular entry method is defined as a
   // SDAG entry method in the .ci file
