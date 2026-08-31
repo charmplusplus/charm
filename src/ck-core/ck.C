@@ -1304,7 +1304,16 @@ static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
     // First see if we already have a direct pointer to the object
     _SET_USED(env, 0);
     ck->process(); // ck->process() updates mProcessed count used in QD
-    if (msg->array_hops()>1) {
+    // >= 1, not > 1: only CkArray::recvMsg increments the hop count, and this
+    // fast path runs before any local recvMsg, so a message forwarded exactly
+    // once arrives here with one hop, not two. deliverToElement's > 1 is
+    // correct for its own path, where the final receive also counted. With the
+    // threshold copied from there, the repair never fired for the common
+    // single-forward case: a sender with a stale location entry was never told,
+    // and every one of its later sends took the same detour -- measured as a
+    // flat per-iteration tax after any migration when the balancer's
+    // location-update broadcast was off (+LBPeerDecision).
+    if (msg->array_hops()>=1) {
       CProxy_ArrayBase(env->getArrayMgr()).ckLocMgr()->multiHop(msg);
     }
     bool doFree = true;
