@@ -15,6 +15,8 @@ mainmodule pic2d {
   readonly int ppc;
   readonly int first_lb;
   readonly int lb_freq;
+  readonly int async_lb;
+  readonly int lb_wait_lag;
   readonly int dist_type;
   readonly long n_total_particles;
   readonly double bunch_frac;
@@ -44,6 +46,19 @@ mainmodule pic2d {
 
     // Targets of hapiAddCallback, invoked when GPU stream work completes
     entry void chargeGhostsPacked();
+    // Completion callbacks for the zerocopy device sends. A zc send may not
+    // reuse or free its source buffer until this fires -- that is the
+    // CkDeviceBuffer contract on every transport, and direct IPC reads the
+    // sender's allocation itself, so a send without one corrupts data. The
+    // phi callbacks are split by round parity to match the slab
+    // double-buffering.
+    entry void sendDone();
+    entry void phiSendDoneEven();
+    entry void phiSendDoneOdd();
+    // Gate releases: the phi round's parity buffer is quiet / all of this
+    // step's sends are quiet.
+    entry void phiRoundFree();
+    entry void sendsDrained();
     entry void phiGhostsPacked();
     entry void eGhostsPacked();
     entry void pushDone();
@@ -74,7 +89,11 @@ mainmodule pic2d {
       // exchange per iteration; the final round is exchange-only so the
       // E field sees up-to-date boundary potentials
       for (jacobi_k = 0; jacobi_k <= jacobi_iters; jacobi_k++) {
-        serial { phi_iter++; packPhiGhosts(); }
+        // Round k+2 reuses round k's parity slab, so its pack waits until
+        // every send from round k has confirmed completion. Almost always
+        // free: two full rounds of neighbour latency have passed.
+        serial { phi_iter++; gatePhiRound(); }
+        when phiRoundFree() serial { packPhiGhosts(); }
         when phiGhostsPacked() serial { sendPhiGhosts(); }
         for (recv_count = 0; recv_count < 4; recv_count++) {
           when receivePhiGhosts[phi_iter](int ref, int dir, int n, nocopydevice RealType buf[n])
@@ -101,7 +120,11 @@ mainmodule pic2d {
           serial { appendParticles(dir, n); }
       }
 
-      serial { endOfStep(); }
+      // The step is not over until every zerocopy send it issued has
+      // confirmed completion: the next iteration repacks all of the send
+      // buffers, and under async load balancing a migration's pup frees them.
+      serial { gateStepDrain(); }
+      when sendsDrained() serial { endOfStep(); }
     };
 
     entry void print();

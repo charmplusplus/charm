@@ -18,6 +18,8 @@
 /* readonly */ int jacobi_iters;
 /* readonly */ int ppc;
 /* readonly */ int first_lb;
+/* readonly */ int async_lb;
+/* readonly */ int lb_wait_lag;
 /* readonly */ int lb_freq;
 
 // How many steps before an AtSync step to start gathering load measurements.
@@ -139,12 +141,14 @@ public:
     double exch_frac = 0.05;
     first_lb = 10;
     lb_freq = 9999;
+    async_lb = 0;
+    lb_wait_lag = 3;
     stats_freq = 1;
     print_parts = false;
     stats_iter = 0;
 
     int c;
-    while ((c = getopt(m->argc, m->argv, "W:H:w:h:p:i:u:j:d:F:s:v:t:T:q:f:b:r:x:c:P")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "W:H:w:h:p:i:u:j:d:F:s:v:t:T:q:f:b:r:x:c:Pal:")) != -1) {
       switch (c) {
         case 'W': grid_width = atoi(optarg); break;
         case 'H': grid_height = atoi(optarg); break;
@@ -167,6 +171,8 @@ public:
         case 'x': exch_frac = atof(optarg); break;
         case 'c': stats_freq = atoi(optarg); break;
         case 'P': print_parts = true; break;
+        case 'a': async_lb = 1; break;
+        case 'l': lb_wait_lag = atoi(optarg); break;
         default:
           CkPrintf(
               "Usage: %s -W [grid width] -H [grid height] -w [patch width] -h [patch height]\n"
@@ -177,6 +183,7 @@ public:
               "  -v [drift velocity, cells/time]\n"
               "  -t [thermal velocity] -T [dt override] -q [field coupling strength]\n"
               "  -f [first LB iteration] -b [LB frequency]\n"
+              "  -a (async LB: overlap the step; needs +LBAsync) -l [wait lag]\n"
               "  -r [particle capacity headroom] -x [exchange buffer fraction]\n"
               "  -c [stats frequency, 0 disables] -P (print final particle counts)\n",
               m->argv[0]);
@@ -191,6 +198,19 @@ public:
     if (dist_type < 0 || dist_type > 2) {
       CkAbort("Invalid distribution type %d (-d): 0 uniform, 1 gaussian "
           "bunch, 2 two-stream\n", dist_type);
+    }
+    // Only safe under +LBAsync, and not as a preference: with the flag off,
+    // an AtSyncStart() with no step due calls ResumeFromSync() inline *and*
+    // returns, so a patch written to the split pattern would drive runStep
+    // twice. Fall back rather than let that happen.
+    if (async_lb && !_lb_args.lbAsync()) {
+      CkPrintf("[WARN] -a ignored: async LB needs +LBAsync on the command "
+               "line. Running the unsplit AtSync barrier instead.\n");
+      async_lb = 0;
+    }
+    if (async_lb && (lb_wait_lag < 1 || lb_wait_lag >= lb_freq)) {
+      CkAbort("-l (%d) must be in [1, lb_freq): the wait must land before "
+              "the next AtSyncStart\n", lb_wait_lag);
     }
 
     n_chares_x = grid_width / block_width;
@@ -305,6 +325,20 @@ class Patch : public CBase_Patch {
  public:
   int my_iter;
   bool instrumenting = true;  // matches the runtime default at startup
+
+  // Zerocopy send-completion accounting. A send's source buffer is live until
+  // its completion callback fires; these counters are what the two gates in
+  // runStep wait on. The phi counters are per round parity, matching the slab
+  // double-buffering. All travel: sendDone() entries follow a migrated patch.
+  int outstanding_sends = 0;   // charge + E + particle sends of this step
+  int phi_out[2] = {0, 0};     // phi sends, by round parity
+  bool drain_pending = false;  // gateStepDrain is waiting
+  bool phi_gate_pending = false;  // gatePhiRound is waiting on cur parity
+
+  // Async LB state (see iterate): the step was joined at lb_start_iter and
+  // AtSyncWait is owed lb_wait_lag iterations later.
+  bool lb_waiting = false;
+  int lb_start_iter = 0;
   int phi_iter;
   int recv_count;
   int jacobi_k;
@@ -427,6 +461,11 @@ class Patch : public CBase_Patch {
     p | jacobi_k;
     p | np;
     p | cur;
+    p | outstanding_sends;
+    p | phi_out[0];
+    p | phi_out[1];
+    p | lb_waiting;
+    p | lb_start_iter;
 
     if (p.isUnpacking()) {
       computeNeighbors();
@@ -519,7 +558,28 @@ class Patch : public CBase_Patch {
     if (isLBIter(my_iter)) {
       cudaStreamSynchronize(comm_stream);
       cudaStreamSynchronize(compute_stream);
-      AtSync();
+      if (!async_lb) {
+        // The patch stops here; the next thing it hears (ResumeFromSync) is
+        // that the whole step -- strategy and migrations -- is over.
+        AtSync();
+        return;
+      }
+      // Split barrier: join the step and keep iterating while the strategy
+      // runs and other patches migrate. Fixed cadence and no MetaBalancer, so
+      // every AtSyncStart starts a step; the runStep gates guarantee no
+      // zerocopy send was in flight across the join.
+      AtSyncStart();
+      lb_start_iter = my_iter;
+      lb_waiting = true;
+      thisProxy[thisIndex].runStep();
+    } else if (lb_waiting && my_iter >= lb_start_iter + lb_wait_lag) {
+      // The other half of the split, a few iterations later: the patch has to
+      // be quiesced before it can be pupped, and AtSyncWait is where the step
+      // is collected. Resumes inline if the step is already over.
+      lb_waiting = false;
+      cudaStreamSynchronize(comm_stream);
+      cudaStreamSynchronize(compute_stream);
+      AtSyncWait();
     } else {
       thisProxy[thisIndex].runStep();
     }
@@ -561,7 +621,11 @@ class Patch : public CBase_Patch {
   void sendChargeGhosts() {
     for (int d = 0; d < NUM_DIRS; d++) {
       thisProxy(nbr_x[d], nbr_y[d]).receiveChargeGhosts(my_iter, flipDir(d),
-          stripLen(d), CkDeviceBuffer(d_send_rho + stripOff(d), comm_stream));
+          stripLen(d),
+          (outstanding_sends++,
+           CkDeviceBuffer(d_send_rho + stripOff(d),
+               CkCallback(CkIndex_Patch::sendDone(), thisProxy[thisIndex]),
+               comm_stream)));
     }
   }
 
@@ -626,7 +690,13 @@ class Patch : public CBase_Patch {
         (size_t)(phi_iter & 1) * 2 * (block_width + block_height);
     for (int d = 0; d < 4; d++) {
       thisProxy(nbr_x[d], nbr_y[d]).receivePhiGhosts(phi_iter, flipDir(d),
-          stripLen(d), CkDeviceBuffer(slab + phiOff(d), comm_stream));
+          stripLen(d),
+          (phi_out[phi_iter & 1]++,
+           CkDeviceBuffer(slab + phiOff(d),
+               CkCallback((phi_iter & 1) ? CkIndex_Patch::phiSendDoneOdd()
+                                         : CkIndex_Patch::phiSendDoneEven(),
+                          thisProxy[thisIndex]),
+               comm_stream)));
     }
   }
 
@@ -696,7 +766,10 @@ class Patch : public CBase_Patch {
     for (int d = 0; d < NUM_DIRS; d++) {
       thisProxy(nbr_x[d], nbr_y[d]).receiveEGhosts(my_iter, flipDir(d),
           2 * stripLen(d),
-          CkDeviceBuffer((RealType*)(d_send_e + stripOff(d)), comm_stream));
+          (outstanding_sends++,
+           CkDeviceBuffer((RealType*)(d_send_e + stripOff(d)),
+               CkCallback(CkIndex_Patch::sendDone(), thisProxy[thisIndex]),
+               comm_stream)));
     }
   }
 
@@ -761,8 +834,10 @@ class Patch : public CBase_Patch {
       int cnt = h_counts[d];
       thisProxy(nbr_x[d], nbr_y[d]).receiveParticles(my_iter, flipDir(d), cnt,
           std::max(cnt, 1),
-          CkDeviceBuffer(d_send_parts + (size_t)d * exch_capacity,
-              compute_stream));
+          (outstanding_sends++,
+           CkDeviceBuffer(d_send_parts + (size_t)d * exch_capacity,
+               CkCallback(CkIndex_Patch::sendDone(), thisProxy[thisIndex]),
+               compute_stream)));
     }
   }
 
@@ -792,6 +867,46 @@ class Patch : public CBase_Patch {
         d_recv_parts + (size_t)dir * exch_capacity, sizeof(Particle) * n,
         cudaMemcpyDeviceToDevice, comm_stream));
     np += n;
+  }
+
+  void sendDone() {
+    outstanding_sends--;
+    maybeReleaseGates();
+  }
+  void phiSendDoneEven() { phi_out[0]--; maybeReleaseGates(); }
+  void phiSendDoneOdd()  { phi_out[1]--; maybeReleaseGates(); }
+
+  // Round k+2's pack reuses round k's parity slab, so it waits for that
+  // parity's sends. In steady state two rounds of neighbour latency have
+  // passed and this releases immediately.
+  void gatePhiRound() {
+    if (phi_out[phi_iter & 1] == 0) {
+      thisProxy[thisIndex].phiRoundFree();
+    } else {
+      phi_gate_pending = true;
+    }
+  }
+
+  // The next iteration repacks every send buffer, and under async LB a
+  // migration's pup frees them; neither may happen over a live transport read.
+  void gateStepDrain() {
+    if (outstanding_sends == 0 && phi_out[0] == 0 && phi_out[1] == 0) {
+      thisProxy[thisIndex].sendsDrained();
+    } else {
+      drain_pending = true;
+    }
+  }
+
+  void maybeReleaseGates() {
+    if (phi_gate_pending && phi_out[phi_iter & 1] == 0) {
+      phi_gate_pending = false;
+      thisProxy[thisIndex].phiRoundFree();
+    }
+    if (drain_pending && outstanding_sends == 0 && phi_out[0] == 0 &&
+        phi_out[1] == 0) {
+      drain_pending = false;
+      thisProxy[thisIndex].sendsDrained();
+    }
   }
 
   void endOfStep() {
