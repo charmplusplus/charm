@@ -26,6 +26,10 @@ on:
       - 'src/arch/common/special.sh'
       - 'src/ck-core/ckrdmadevice.*'
       - 'src/conv-core/conv-rdmadevice.*'
+      # ckrdma.C routes device (D2D) completions, and xi-Parameter.C emits the
+      # sender-side device call, so both can break the device path on their own.
+      - 'src/ck-core/ckrdma.*'
+      - 'src/xlat-i/xi-Parameter.C'
       - 'CMakeLists.txt'
       - 'cmake/**'
       - '.github/workflows/reconverse-cuda.yaml'
@@ -46,6 +50,10 @@ on:
       - 'src/arch/common/special.sh'
       - 'src/ck-core/ckrdmadevice.*'
       - 'src/conv-core/conv-rdmadevice.*'
+      # ckrdma.C routes device (D2D) completions, and xi-Parameter.C emits the
+      # sender-side device call, so both can break the device path on their own.
+      - 'src/ck-core/ckrdma.*'
+      - 'src/xlat-i/xi-Parameter.C'
       - 'CMakeLists.txt'
       - 'cmake/**'
       - '.github/workflows/reconverse-cuda.yaml'
@@ -80,6 +88,16 @@ jobs:
         # gate on hapi_portable.h staying self-sufficient for user code.
         run: |
           make -j4 -C netlrts-linux-x86_64-cuda/tests/charm++/cuda/hapitest \
+            GPU=cuda CUDATOOLKIT_HOME=/usr OPTS="-g"
+      - name: d2dtest compiles
+        # The stage 9.2 acceptance test. Running it needs GPUs on more than one
+        # host to mean anything (see its README), but compiling it is the gate
+        # on the nocopydevice entry-method surface: it drives two device
+        # buffers in one entry method plus array, group and nodegroup proxies,
+        # so a regression in the code charmxi emits for any of those shows up
+        # here rather than at a reviewer's HPC site.
+        run: |
+          make -j4 -C netlrts-linux-x86_64-cuda/tests/charm++/cuda/d2dtest \
             GPU=cuda CUDATOOLKIT_HOME=/usr OPTS="-g"
 
       - name: legacy buildold path

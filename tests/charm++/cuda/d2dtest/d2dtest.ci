@@ -1,0 +1,43 @@
+mainmodule d2dtest {
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_Ring ringProxy;
+  readonly CProxy_RingGroup groupProxy;
+  readonly CProxy_RingNodeGroup nodegroupProxy;
+  readonly int blockSize;
+  readonly int nIters;
+  readonly int nElems;
+  readonly int verbose;
+
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry [threaded] void run();
+    entry void tally(CkReductionMsg* m);
+  };
+
+  // Two device buffers per message, so the multi-op path (numops > 1) is
+  // exercised rather than just the single-buffer case.
+  array [1D] Ring {
+    entry Ring();
+    entry void send(int iter);
+    entry void recv(int srcIdx, int iter, int size,
+                    nocopydevice double a[size], nocopydevice double b[size]);
+    entry void reuse();
+    entry void collect();
+  };
+
+  group RingGroup {
+    entry RingGroup();
+    entry void send(int iter);
+    entry void recv(int srcPe, int iter, int size, nocopydevice double a[size]);
+    entry void reuse();
+    entry void collect();
+  };
+
+  nodegroup RingNodeGroup {
+    entry RingNodeGroup();
+    entry void send(int iter);
+    entry void recv(int srcNode, int iter, int size, nocopydevice double a[size]);
+    entry void reuse();
+    entry void collect();
+  };
+};
