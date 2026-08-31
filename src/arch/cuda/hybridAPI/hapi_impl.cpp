@@ -106,17 +106,6 @@ CpvDeclare(int, my_device); // GPU device that this thread is mapped to
 CpvDeclare(int, my_device_id); // index to the deviceManager that stores info about the device
 CpvDeclare(bool, device_rep); // Is this PE a device representative thread? (1 per device)
 
-// Returns the local rank of the logical node (process) that the given PE belongs to
-static inline int CmiNodeRankLocal(int pe) {
-  // Logical node index % Number of logical nodes per physical node
-  return CmiNodeOf(pe) % (CmiNumNodes() / CmiNumPhysicalNodes());
-}
-
-// Returns the local rank of the logical node that I belong to
-static inline int CmiMyNodeRankLocal() {
-  return CmiNodeRankLocal(CmiMyPe());
-}
-
 // HAPI internal function declarations
 static void hapiInitCsv(char** argv);
 static void hapiInitCpv();

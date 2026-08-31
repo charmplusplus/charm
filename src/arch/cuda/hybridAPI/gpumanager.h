@@ -14,6 +14,24 @@
 #include <unordered_map>
 #include <queue>
 
+// Local rank of the logical node (process) that the given PE belongs to,
+// within its physical node: the logical node index modulo the number of
+// logical nodes per physical node.
+//
+// This lives here rather than in either caller because the device comm buffer
+// and the IPC event pools are both indexed by it, and hapi_impl.cpp and
+// ckrdmadevice.C index them from opposite sides of the same transfer. Two
+// copies that drift apart would not present as a mapping bug -- they would
+// present as corrupted payloads.
+inline int CmiNodeRankLocal(int pe) {
+  return CmiNodeOf(pe) % (CmiNumNodes() / CmiNumPhysicalNodes());
+}
+
+// Local rank of the logical node that I belong to
+inline int CmiMyNodeRankLocal() {
+  return CmiNodeRankLocal(CmiMyPe());
+}
+
 // Initial size of the user-addressed portion of host/device buffer arrays;
 // the system-addressed portion of host/device buffer arrays (used when there
 // is no need to share buffers between work requests) will be equivalant in size.

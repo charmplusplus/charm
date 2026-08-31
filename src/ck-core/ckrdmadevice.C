@@ -751,18 +751,6 @@ CkDeviceStatus CkDevicePersistent::put(CkDevicePersistent& dst) {
 
 /****************************** Recv Entry Method API ******************************/
 
-// Local rank of the logical node (process) that the given PE belongs to,
-// within its physical node. hapi_impl.cpp has its own copy of this pair; the
-// device comm buffer and IPC event pools are indexed by it, so the two must
-// agree.
-static inline int CmiNodeRankLocal(int pe) {
-  return CmiNodeOf(pe) % (CmiNumNodes() / CmiNumPhysicalNodes());
-}
-
-static inline int CmiMyNodeRankLocal() {
-  return CmiNodeRankLocal(CmiMyPe());
-}
-
 // Invoked after post entry method
 void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs) {
   // Change message header to invoke regular entry method
