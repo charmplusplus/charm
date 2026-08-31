@@ -24,6 +24,7 @@ void run_VECADD_KERNEL(hapiWorkRequest* wr, cudaStream_t kernel_stream,
       (float*)devBuffers[wr->getBufferID(C_INDEX)],
       (float*)devBuffers[wr->getBufferID(A_INDEX)],
       (float*)devBuffers[wr->getBufferID(B_INDEX)], *((int*)wr->getUserData()));
+  hapiCheck(cudaPeekAtLastError());
 }
 #endif
 

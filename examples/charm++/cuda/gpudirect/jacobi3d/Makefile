@@ -5,7 +5,12 @@ CHARMC = $(CHARM_DIR)/bin/charmc $(OPTS)
 CHARM_INC = -I$(CHARM_DIR)/include
 
 NVCC = nvcc
-NVCC_FLAGS = -c -std=c++11 -use_fast_math $(OPTS)
+# GPU architecture the kernels are compiled for. Without this nvcc emits only
+# its default target (sm_75 as of CUDA 13), and on a newer device the kernel
+# can fail to launch with nothing but an unchecked error to show for it.
+# sm_80 is the A100; override CUDA_ARCH for other devices (sm_86 A40, sm_90 H100).
+CUDA_ARCH ?= sm_80
+NVCC_FLAGS = -arch=$(CUDA_ARCH) -c -std=c++11 -use_fast_math $(OPTS)
 LD_LIBS =
 
 TARGET = jacobi3d
