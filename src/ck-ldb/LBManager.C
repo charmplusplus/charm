@@ -414,10 +414,21 @@ void _loadbalancerInit()
       argv, "+LBPeerDecision",
       "Scatter each PE only the migration decisions it is party to, instead of "
       "broadcasting the whole decision");
-  // Async load balancing has no use for the broadcast: its only value to a
-  // bystander PE is a location-cache update, and under async the caches are
-  // being corrected by ordinary home-based routing continuously anyway.
-  if (_lb_args.lbAsync()) _lb_args.lbPeerDecision() = true;
+  // Forced under async because a location-update broadcast can race an async
+  // migration, and a device-zerocopy sender reading the stale cache picks its
+  // transfer mode for the process the object just left -- a MEMCPY chosen that
+  // way hands the receiver a pointer into an address space it cannot read.
+  // Peer decision sidesteps the cache entirely.
+  //
+  // The price, measured on barnes (host messages only, 500K on 2 nodes): with
+  // the broadcast dropped, every message to a migrated element pays the
+  // home-forwarding hop on every later iteration -- the routing never
+  // converges -- and ordinary iterations ran 14% slower, wiping out more than
+  // the whole overlap gain (async lost 6% to sync; with broadcasts restored it
+  // wins by 2%, near its ceiling). An application that does no device
+  // zerocopy can opt out of the forcing with CHARM_LB_ASYNC_NO_PEER_DECISION=1.
+  if (_lb_args.lbAsync() && getenv("CHARM_LB_ASYNC_NO_PEER_DECISION") == NULL)
+    _lb_args.lbPeerDecision() = true;
 
   // force a global barrier after migration done
   _lb_args.syncResume() = CmiGetArgFlagDesc(
