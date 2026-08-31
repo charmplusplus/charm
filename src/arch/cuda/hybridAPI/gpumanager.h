@@ -23,14 +23,16 @@
 // ckrdmadevice.C index them from opposite sides of the same transfer. Two
 // copies that drift apart would not present as a mapping bug -- they would
 // present as corrupted payloads.
-inline int CmiNodeRankLocal(int pe) {
-  return CmiNodeOf(pe) % (CmiNumNodes() / CmiNumPhysicalNodes());
-}
+//
+// Cached rather than recomputed: the transfer path reads it per buffer, while
+// the topology query behind it is O(PEs on the physical node). It is a
+// property of the job's node set, so anything that changes that set
+// (shrink/expand) must call hapiRefreshTopologyCache() on every PE before the
+// next device operation, and rebuild the per-host structures indexed by it.
+CpvExtern(int, my_node_rank_local);
+void hapiRefreshTopologyCache();
 
-// Local rank of the logical node that I belong to
-inline int CmiMyNodeRankLocal() {
-  return CmiNodeRankLocal(CmiMyPe());
-}
+inline int CmiMyNodeRankLocal() { return CpvAccess(my_node_rank_local); }
 
 // Initial size of the user-addressed portion of host/device buffer arrays;
 // the system-addressed portion of host/device buffer arrays (used when there
