@@ -849,6 +849,9 @@ extern "C" void* device_restage_put_done_bridge(void* arg)
 {
   QdProcess(1);
   auto* m = (DeviceRestagePutDone*)arg;
+  DeviceRdmaOp* done_op = (DeviceRdmaOp*)m->dest_op;
+  CkGroupID daid; daid.idx = done_op->dest_aid_idx;
+  CkNoteDeviceRecvComplete(daid, done_op->dest_id);
   CkRdmaDeviceRecvHandler(m->dest_op, NULL);
   CmiFree(m);
   return NULL;
@@ -856,6 +859,7 @@ extern "C" void* device_restage_put_done_bridge(void* arg)
 
 // Receiver side: defer this buffer and ask the sender to retransmit it.
 static void requestDeviceRestage(int srcPe, void* dest_op, const void* src_ptr,
+                                 CkGroupID dest_aid, CmiUInt8 dest_id,
                                  bool src_staged, size_t src_comm_offset,
                                  size_t cnt, void* dest_ptr, size_t dest_cnt,
                                  bool inter_node)
@@ -864,6 +868,9 @@ static void requestDeviceRestage(int srcPe, void* dest_op, const void* src_ptr,
   CmiEnforce(req);
   req->dest_op = dest_op;
   req->dest_pe = CkMyPe();
+  // Stand this element's migration down until the correction lands: the
+  // destination below is captured now and written a round trip later.
+  CkNoteDeviceRecvDeferred(dest_aid, dest_id);
   req->src_ptr = src_ptr;
   // A staged send hands the bytes to the comm buffer and releases the chare's
   // own source buffer, so src_ptr is only trustworthy when the sender staged
@@ -891,8 +898,9 @@ static void requestDeviceRestage(int srcPe, void* dest_op, const void* src_ptr,
   static const bool restage_debug = (getenv("CHARM_ZC_RESTAGE_DEBUG") != nullptr);
   if (restage_debug) {
     static std::atomic<unsigned> n{0};
-    CmiPrintf("[%d] ZC RESTAGE #%u srcPe=%d cnt=%zu %s\n", CkMyPe(),
+    CmiPrintf("[%d] ZC RESTAGE #%u srcPe=%d cnt=%zu id=%llu %s\n", CkMyPe(),
               n.fetch_add(1, std::memory_order_relaxed) + 1, srcPe, cnt,
+              (unsigned long long)dest_id,
               inter_node ? "inter-node put" : "same-node stage");
     fflush(stdout);
   }
@@ -975,6 +983,20 @@ extern "C" void* device_restage_req_bridge(void* arg)
   return NULL;
 }
 
+// Completion of a same-node corrected receive: the restaged bytes are now in
+// the destination buffer, so the migration stand-down taken at
+// requestDeviceRestage can finally come off -- and only now. Runs on the
+// destination PE via hapiAddCallback, the same context deviceSendReleaseFn
+// already uses, so the deferred migration this may start is safe to start
+// here.
+static void deviceRestageRecvDone(void* data, void* msg)
+{
+  DeviceRdmaOp* op = (DeviceRdmaOp*)data;
+  { CkGroupID daid; daid.idx = op->dest_aid_idx;
+    CkNoteDeviceRecvComplete(daid, op->dest_id); }
+  CkRdmaDeviceRecvHandler(data, msg);
+}
+
 // Receiver side, same node: the sender has staged the payload, so run the
 // ordinary staged-IPC receive against the metadata it just sent.
 extern "C" void* device_restage_meta_bridge(void* arg)
@@ -982,6 +1004,15 @@ extern "C" void* device_restage_meta_bridge(void* arg)
   QdProcess(1);
   DeviceRestageMeta* m = (DeviceRestageMeta*)arg;
   DeviceRdmaOp* op = (DeviceRdmaOp*)m->dest_op;
+  // The stand-down taken at requestDeviceRestage is NOT lifted here. The
+  // copy below has not even been issued yet: releasing the element now opens
+  // a stream-latency window in which it can emigrate, pack its grid off
+  // migration_stream -- which is not ordered against recv_stream -- and leave
+  // with the pre-correction bytes while the copy lands in the buffer the
+  // departed element abandoned (or in freed device memory). The inter-node
+  // path may resolve on arrival of the put-done because the payload is
+  // already in place; here that is only true once recv_stream has executed
+  // the copy, so the note moves to the completion callback.
 
   CkDeviceBuffer source;
   source.ptr = NULL;                 // never dereferenced on a staged receive
@@ -997,7 +1028,7 @@ extern "C" void* device_restage_meta_bridge(void* arg)
 
   deviceIpcReceive(source, dest, recv_stream, op->src_pe,
                    CkNcpyModeDevice::IPC);
-  hapiAddCallback(recv_stream, CkCallback(CkRdmaDeviceRecvHandler, op));
+  hapiAddCallback(recv_stream, CkCallback(deviceRestageRecvDone, op));
 
   CmiFree(m);
   return NULL;
@@ -1174,6 +1205,18 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     // ghost it later reads out of that buffer, this shows whether the runtime
     // ever lands one message's payload in another message's posted buffer.
     save_op.src_pe = env->getSrcPe();
+    // Only an array-element message names an element; the migration payload
+    // arrives on a group entry, and asking it for an ArrayID aborts. Those
+    // receives are never deferred for correction, so -1 simply means "no
+    // element to stand down".
+    if (env->getMsgtype() == ForArrayEltMsg) {
+      save_op.dest_aid_idx = env->getArrayMgr().idx;
+      save_op.dest_id = env->getRecipientID();
+    } else {
+      save_op.dest_aid_idx = -1;
+      save_op.dest_id = 0;
+    }
+
     if (watch) { watch->src_pe[i] = env->getSrcPe(); watch->size[i] = (size_t)arrSizes[i]; }
     save_op.stream = (void*)postStructs[i].hapi_stream;
     save_op.src_cb = (source.cb.type != CkCallback::ignore) ? new CkCallback(source.cb) : nullptr;
@@ -1361,7 +1404,9 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
           (source.device_idx != -1 &&
            !CmiPeOnSamePhysicalNode(env->getSrcPe(), CkMyPe()))) {
         if (watch) watch->deferred[i] = 1;
+        CkGroupID def_aid; def_aid.idx = save_op.dest_aid_idx;
         requestDeviceRestage(env->getSrcPe(), (void*)&save_op, source.ptr,
+                             def_aid, save_op.dest_id,
                              source.ipc_protocol == CmiIpcProtocol::STAGED,
                              source.comm_offset,
                              (size_t)dest.cnt, arrPtrs[i], (size_t)arrSizes[i],

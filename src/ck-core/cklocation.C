@@ -2596,6 +2596,39 @@ void CkLocRec::migrateMe(int toPe)  // Leaving this processor
 
 #if CMK_LBDB_ON
 CkpvDeclare(CkLocRec*, _currentLocRec);
+// A device receive deferred for correction resumes against the destination
+// buffer captured before the request round trip. If the element migrates in
+// that window its buffers are freed, and the correction writes into memory that
+// has since been handed to another chare -- silent corruption -- while the
+// message is enqueued to the PE the element has left. Count these against the
+// element exactly as an outstanding send is counted, so emigrate stands down
+// until the correction lands.
+void CkNoteDeviceRecvDeferred(CkGroupID aid, CmiUInt8 id)
+{
+  if (aid.idx == -1) return;   // not an array element; nothing to stand down
+  CkArray* arr = (CkArray*)CkLocalBranch(aid);
+  CkLocMgr* mgr = arr ? arr->getLocMgr() : NULL;
+  // The rec table is keyed by the bare element id; `id` arrives as the
+  // envelope's packed ObjID (collection|home|element), which never matches it
+  // as-is. Looking up the packed value here made this stand-down a silent
+  // no-op for every element -- migration proceeded with corrections in
+  // flight, and the correction then wrote into the departed element's freed
+  // buffers.
+  CkLocRec* rec = mgr ? mgr->elementNrec(ck::ObjID(id).getElementID()) : NULL;
+  if (rec == NULL) return;   // already gone; nothing left here to hold
+  rec->noteDeviceSendPosted();
+}
+
+void CkNoteDeviceRecvComplete(CkGroupID aid, CmiUInt8 id)
+{
+  if (aid.idx == -1) return;   // not an array element; nothing to stand down
+  CkArray* arr = (CkArray*)CkLocalBranch(aid);
+  CkLocMgr* mgr = arr ? arr->getLocMgr() : NULL;
+  CkLocRec* rec = mgr ? mgr->elementNrec(ck::ObjID(id).getElementID()) : NULL;
+  if (rec == NULL) return;   // departed; the stand-down it held died with it
+  rec->noteDeviceSendDone();
+}
+
 
 // Releasing the last outstanding send is what lets a migration that was waiting
 // on it proceed. Deferring rather than blocking matters: an inter-node send

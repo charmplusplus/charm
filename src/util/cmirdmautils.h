@@ -31,6 +31,10 @@ typedef struct DeviceRdmaOp_ {
   void* dst_cb;
   uint64_t tag;
   int dest_pe;
+  // Receiving element, so a correction's completion can release the migration
+  // stand-down it took when the receive was deferred.
+  int dest_aid_idx;
+  CmiUInt8 dest_id;
   int src_pe;
   int src_mpi_rank;
   int dest_mpi_rank;

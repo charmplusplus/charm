@@ -557,6 +557,10 @@ private:
   void clearResident(CmiUInt8 id);
   // Look up location record in the table, return NULL if not there.
   CkLocRec* elementNrec(const CmiUInt8 id) const;
+  // Device corrections need to find the receiving element to stand its
+  // migration down; see CkNoteDeviceRecvDeferred in cklocation.C.
+  friend void CkNoteDeviceRecvDeferred(CkGroupID aid, CmiUInt8 id);
+  friend void CkNoteDeviceRecvComplete(CkGroupID aid, CmiUInt8 id);
 
   // Call this member function on each element of this location:
   typedef void (CkMigratable::*CkMigratable_voidfn_t)(void);

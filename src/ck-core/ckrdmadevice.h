@@ -136,6 +136,12 @@ CkpvExtern(CkLocRec*, _currentLocRec);
 void CkRdmaDeviceRegistrationCacheInit();
 // Stalled-receive watchdog, off unless CHARM_ZC_STALL_SECS is set.
 void CkRdmaDeviceStallWatchInit();
+
+// A correction defers a receive across a round trip; these count it against the
+// receiving element so migration stands down until it lands. See the note at
+// the definitions in cklocation.C.
+void CkNoteDeviceRecvDeferred(CkGroupID aid, CmiUInt8 id);
+void CkNoteDeviceRecvComplete(CkGroupID aid, CmiUInt8 id);
 void CkRdmaDeviceDropRegistrations(CkLocRec* owner);
 
 extern "C" {
