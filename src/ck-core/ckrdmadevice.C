@@ -291,6 +291,8 @@ void CkRdmaDeviceRecvHandler(void* data)
     // CmiFree(info);
   }
 }
+static void deviceRecvWatchDrop(DeviceRdmaInfo* info);  // defined by the stall watch below
+
 // Invoked when a GPU buffer arrives on the receiver
 void CkRdmaDeviceRecvHandler(void* data, void* msg)
 {
@@ -315,6 +317,7 @@ void CkRdmaDeviceRecvHandler(void* data, void* msg)
     enqueueNcpyMessage(op->dest_pe, info->msg);
 
     // Free RDMA metadata
+    deviceRecvWatchDrop(info);
     CmiFree(info);
   }
 }
@@ -1104,6 +1107,15 @@ struct DeviceRecvWatch {
   std::vector<int> src_pe;
   std::vector<size_t> size;
   std::vector<char> deferred;   // asked the sender to send it again
+  // IPC identity of each op's transfer, when it went through the shm path
+  // (-1 otherwise): lets the scan query the actual CUDA events of a stuck op
+  // and say WHICH side's stream never fired -- src_event pending means the
+  // sender's staging copy never executed; src done with dst pending means the
+  // receiver's copy is parked behind something else on its stream. Slots are
+  // only reclaimed after dst_event completes, so for a genuinely stuck op the
+  // indices still name the live pair.
+  std::vector<int> dev_idx;
+  std::vector<int> ev_idx;
   bool reported;
 };
 
@@ -1116,6 +1128,20 @@ static double deviceStallSecs()
     return e ? atof(e) : 0.0;   // 0 disables
   }();
   return s;
+}
+
+// Drop a resolved receive's watch entries before its DeviceRdmaInfo is freed.
+// The scan otherwise reads the freed struct on its next pass -- observed as
+// stall reports with garbage n_ops in the billions. Resolve and scan run on
+// the same PE's scheduler, so erasing here fully closes the race.
+static void deviceRecvWatchDrop(DeviceRdmaInfo* info)
+{
+  auto* w = CkpvAccess(device_recv_watch);
+  if (w == NULL) return;
+  for (auto it = w->begin(); it != w->end();) {
+    if (it->info == info) it = w->erase(it);
+    else ++it;
+  }
 }
 
 static void deviceStallScan(void*, double)
@@ -1132,10 +1158,33 @@ static void deviceStallScan(void*, double)
     if (!it->reported && now - it->posted > limit) {
       CmiPrintf("[%d] ZC STALL: receive stuck %.0fs, %d of %d ops complete\n",
                 CkMyPe(), now - it->posted, it->info->counter, it->info->n_ops);
-      for (int i = 0; i < it->numops; i++)
-        CmiPrintf("[%d]   op %d: srcPe=%d bytes=%zu %s\n", CkMyPe(), i,
+      GPUManager& gm = CsvAccess(gpu_manager);
+      for (int i = 0; i < it->numops; i++) {
+        char ev_state[96] = "";
+        const int di = it->dev_idx[i], ei = it->ev_idx[i];
+        if (gm.use_shm && di >= 0 && ei >= 0 &&
+            (size_t)di < gm.hapi_ipc_device_infos.size()) {
+          hapi_ipc_device_info& dinfo = gm.hapi_ipc_device_infos[di];
+          if ((size_t)ei < dinfo.src_event_pool.size()) {
+            const bool src_done =
+                (hapiEventQuery(dinfo.src_event_pool[ei]) == hapiSuccess);
+            const bool dst_done =
+                (hapiEventQuery(dinfo.dst_event_pool[ei]) == hapiSuccess);
+            hapi_ipc_event_shared* sh =
+                (hapi_ipc_event_shared*)((char*)gm.shm_ptr
+                    + gm.shm_chunk_size * di + sizeof(hapiIpcMemHandle_t)) + ei;
+            snprintf(ev_state, sizeof(ev_state),
+                     " dev=%d ev=%d src_ev=%s dst_ev=%s dst_flag=%d", di, ei,
+                     src_done ? "DONE" : "PENDING",
+                     dst_done ? "DONE" : "PENDING",
+                     (int)sh->dst_flag.load(std::memory_order_relaxed));
+          }
+        }
+        CmiPrintf("[%d]   op %d: srcPe=%d bytes=%zu %s%s\n", CkMyPe(), i,
                   it->src_pe[i], it->size[i],
-                  it->deferred[i] ? "DEFERRED for correction" : "ordinary");
+                  it->deferred[i] ? "DEFERRED for correction" : "ordinary",
+                  ev_state);
+      }
       fflush(stdout);
       it->reported = true;
     }
@@ -1223,7 +1272,9 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
         DeviceRecvWatch{rdma_info, CkWallTimer(), numops,
                         std::vector<int>(numops, -1),
                         std::vector<size_t>(numops, 0),
-                        std::vector<char>(numops, 0), false});
+                        std::vector<char>(numops, 0),
+                        std::vector<int>(numops, -1),
+                        std::vector<int>(numops, -1), false});
     watch = &CkpvAccess(device_recv_watch)->back();
   }
 
@@ -1264,7 +1315,10 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
       save_op.dest_id = 0;
     }
 
-    if (watch) { watch->src_pe[i] = env->getSrcPe(); watch->size[i] = (size_t)arrSizes[i]; }
+    if (watch) {
+      watch->src_pe[i] = env->getSrcPe(); watch->size[i] = (size_t)arrSizes[i];
+      watch->dev_idx[i] = source.device_idx; watch->ev_idx[i] = source.event_idx;
+    }
     save_op.stream = (void*)postStructs[i].hapi_stream;
     save_op.src_cb = (source.cb.type != CkCallback::ignore) ? new CkCallback(source.cb) : nullptr;
     save_op.dst_cb = nullptr;
