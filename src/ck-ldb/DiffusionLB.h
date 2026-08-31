@@ -106,6 +106,34 @@ public:
   void askNbor(int nbor, int rnd);
   void okayNbor(int agree, int nborId);
   void ackNbor(int nbor);
+  void ackNborDone();
+  // Counting barrier that replaces the quiescence detector between the pseudo
+  // rounds and AcrossNodeLB. The convergence reduction already proves every
+  // round message was processed before the verdict goes out, so all that is
+  // left to know is that every member has left the loop.
+  void roundsDone();
+  int roundsDoneCount;
+  // Migration-handoff completion counting, replacing the quiescence detectors
+  // between AcrossNodeLB -> WithinNodeLB -> ProcessMigrations. Each
+  // LoadMetaInfo/LoadReceived a rank0PE sends is acked by its receiver after
+  // processing; the phase's barrier contribution is held until every ack is
+  // back, so barrier completion proves every handoff has been applied.
+  int mig_acksOut;
+  bool across_owed;
+  bool within_owed;
+  void migMsgAck();
+  void migMaybeDone();
+  void acrossDone();
+  int acrossDoneCount;
+  void withinDone();
+  int withinDoneCount;
+  void withinNodeReport();
+  // The neighbour graph survives across LB steps: topology-derived and
+  // comm-derived neighbourhoods change slowly, and rebuilding the graph is the
+  // most expensive phase of a step. Set once the first step's rounds start
+  // (the graph is final by then); CHARM_DIFFUSION_GRAPH_REBUILD=1 restores a
+  // rebuild every step.
+  bool hs_graphCached;
   void statsAssembled();
   void startStrategy();
   void startStrategyBarrier();
@@ -127,7 +155,7 @@ public:
   void buildMSTinRounds(double best_weight, int best_from, int best_to);
   void next_MSTphase(double newcost, int newparent, int newto);
 
-  void LoadReceived(int objId, int fromPE);
+  void LoadReceived(int objId, int fromPE, int ackPE);
   void update_peload(int rank, double load);
   void AcrossNodeLB();
 
@@ -142,7 +170,7 @@ public:
     void print_internal_comm(double sum);
     void print_num_migrations(int sum);
 
-  void LoadMetaInfo(LDObjHandle h, int objId, double load, int senderPE, int only_mcount);
+  void LoadMetaInfo(LDObjHandle h, int objId, double load, int senderPE, int only_mcount, int ackPE);
 
 protected:
   virtual bool QueryBalanceNow(int) { return true; };
@@ -214,6 +242,16 @@ private:
   int round;
   int requests_sent;
   int acks, max;
+
+  // Handshake completion counting, which replaces the quiescence detection that
+  // used to drain the ask/okay/ack exchange (see hsMaybeAdvance in
+  // DiffusionNeighbors.C). All on the node's rank0PE.
+  int hs_asksOut;      // askNbor sent, okayNbor not yet back
+  int hs_confirmOut;   // ackNbor sent, ackNborDone not yet back
+  bool hs_phaseOwed;   // this round's next_phase() contribution is being held
+  int hs_phaseVal;     //   ... and the value it will carry
+  bool hs_barrierOwed; // the final startStrategyBarrier() is being held
+  void hsMaybeAdvance();
 
   // phase 2: pseudo load balancing --------------------------------
   void PseudoLoadBalancing();

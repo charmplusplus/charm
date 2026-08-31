@@ -106,7 +106,29 @@ DiffusionLB::DiffusionLB(const CkLBOptions& opt) : CBase_DiffusionLB(opt)
   myNodeId = CkMyPe() / nodeSize;
   acks = 0;
   max = 0;
+  hs_asksOut = 0;
+  hs_confirmOut = 0;
+  hs_phaseOwed = false;
+  hs_barrierOwed = false;
+  roundsDoneCount = 0;
+  hs_graphCached = false;
+  mig_acksOut = 0;
+  across_owed = false;
+  within_owed = false;
+  acrossDoneCount = 0;
+  withinDoneCount = 0;
   round = 0;
+  hs_asksOut = 0;
+  hs_confirmOut = 0;
+  hs_phaseOwed = false;
+  hs_barrierOwed = false;
+  roundsDoneCount = 0;
+  hs_graphCached = false;
+  mig_acksOut = 0;
+  across_owed = false;
+  within_owed = false;
+  acrossDoneCount = 0;
+  withinDoneCount = 0;
   statsReceived = 0;
   rank0_barrier_counter = 0;
 
@@ -183,6 +205,17 @@ void DiffusionLB::Strategy(const DistBaseLB::LDStats* const stats)
   acks = 0;
   max = 0;
   round = 0;
+  hs_asksOut = 0;
+  hs_confirmOut = 0;
+  hs_phaseOwed = false;
+  hs_barrierOwed = false;
+  roundsDoneCount = 0;
+  // hs_graphCached deliberately NOT reset here: the graph survives steps.
+  mig_acksOut = 0;
+  across_owed = false;
+  within_owed = false;
+  acrossDoneCount = 0;
+  withinDoneCount = 0;
   rank0_barrier_counter = 0;
   pseudo_done = true;
 
@@ -270,8 +303,9 @@ void DiffusionLB::InitializeObjHeap(int n)
 
 // Create a migrate message for this obj from resident PE to rank0PE
 // objId should be PE local id of the object
-void DiffusionLB::LoadReceived(int objId, int destPE)
+void DiffusionLB::LoadReceived(int objId, int destPE, int ackPE)
 {
+  thisProxy[ackPE].migMsgAck();
   int sourcePE = CkMyPe();
   
   if (objId < 0 || objId >= myStats->objData.size()) {
@@ -335,26 +369,13 @@ void DiffusionLB::WithinNodeLB()
   if (thisIndex == 0)
     if (_lb_args.debug() == 3) CkPrintf("--------STARTING WITHIN NODE LB--------\n");
 
-  if (CkMyPe() == 0)
-    {
-      if (step() == LBSimulation::dumpStep)
-      {
-        CkCallback cb(CkIndex_DiffusionLB::ProcessFinalStats(), thisProxy);
-         CkStartQD(cb);
-      }
-      else if (_lb_args.debug() > 0) {
-        CkCallback cb(CkIndex_DiffusionLB::CollectStats(), thisProxy);
-         CkStartQD(cb);
-      }
-      else
-      {
-        CkCallback cb(CkIndex_DiffusionLB::ProcessMigrations(), thisProxy);
-        CkStartQD(cb);
-      }
-    }
+  // The next phase now starts from the withinDone barrier (see withinDone),
+  // which makes the same three-way choice the quiescence callback made here.
 
   if( nodeSize == 1) {
       if (_lb_args.debug() == 3) CkPrintf("--------Node size is 1--------\n");
+    // Every PE is its own node's rank0PE: report with nothing outstanding.
+    withinNodeReport();
     return;
   }
   if (CkMyPe() == rank0PE)
@@ -499,8 +520,9 @@ void DiffusionLB::WithinNodeLB()
         CkAbort("Error: objId %d is negative for objId %d on donorPE %d (rank0PE %d)\n",
                 objId, objId, donorPE, rank0PE);
       }
-      thisProxy[destPE].LoadMetaInfo(objHandle, objId, currLoad, donorPE, 1); // to the receiving PE (mig++)
-      thisProxy[donorPE].LoadReceived(objId, destPE);
+      mig_acksOut += 2;
+      thisProxy[destPE].LoadMetaInfo(objHandle, objId, currLoad, donorPE, 1, CkMyPe()); // to the receiving PE (mig++)
+      thisProxy[donorPE].LoadReceived(objId, destPE, CkMyPe());
       pe_load[minPE->Id] += maxObj->load;
       pe_load[rank] -= maxObj->load;
       if (pe_load[minPE->Id] < avgPE)
@@ -525,12 +547,10 @@ void DiffusionLB::WithinNodeLB()
       delete maxObj;
     }
 
-    // TODO: submit to print stats
-    // This QD is essential because, before the actual migration starts, load should be
-    // divided amongs intra node PE's.
-
-
     endWithinTiming();
+    // Held until every handoff issued above is acked as processed -- the
+    // property the quiescence detector used to provide.
+    withinNodeReport();
   }
 }
 
@@ -676,6 +696,28 @@ void DiffusionLB::CascadingMigration(LDObjHandle h, double load)
 #endif
 }
 
+
+// A rank0PE reports its within-node handoffs done (Fix D arms this; until
+// then the quiescence detector in WithinNodeLB still drives the transition).
+void DiffusionLB::withinNodeReport()
+{
+  within_owed = true;
+  migMaybeDone();
+}
+
+// PE 0: every node's within-node handoffs are applied. The same three-way
+// choice the quiescence callback used to make.
+void DiffusionLB::withinDone()
+{
+  if (++withinDoneCount < numNodes) return;
+  withinDoneCount = 0;
+  if (step() == LBSimulation::dumpStep)
+    thisProxy.ProcessFinalStats();
+  else if (_lb_args.debug() > 0)
+    thisProxy.CollectStats();
+  else
+    thisProxy.ProcessMigrations();
+}
 
 void DiffusionLB::MigrationDoneWrapper()
 {

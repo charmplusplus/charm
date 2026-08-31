@@ -13,8 +13,9 @@ void DiffusionLB::startStrategy(){
   endNeighborTiming();
 
   if (CkMyPe() == 0 && numNodes == 1) {
-    CkCallback cb(CkIndex_DiffusionLB::WithinNodeLB(), thisProxy);
-    CkStartQD(cb);
+    // One node: no handshake happened and no rounds will run, so there is
+    // nothing of the balancer's in flight to drain. Straight to within-node.
+    thisProxy.WithinNodeLB();
   }
 
   if (_lb_args.debug() > 1) CkPrintf("--------NEIGHBOR SELECTION COMPLETE (Using Comm? %s)--------\n",
@@ -46,11 +47,15 @@ void DiffusionLB::startStrategy(){
     // measured at 4 nodes, zero asymmetric edges over ten runs with and without
     // this drain. It becomes reachable once the graph is a genuine subgraph.
     //
-    // Quiescence closes it cheaply: it guarantees every handshake message has
-    // been delivered and processed, so the graph is final before any round
-    // starts. One extra QD per LB step is noise against the round loop.
-    CkCallback cb(CkIndex_DiffusionLB::beginPseudoRounds(), thisProxy[0]);
-    CkStartQD(cb);
+    // Quiescence used to close it, cheaply in sync mode -- but under +LBAsync
+    // the application keeps iterating through the step, the network never
+    // drains, and every phase of this balancer stalled behind global silence
+    // that was never going to fall. The race is now closed at its source: a
+    // node's barrier contribution is held until its own asks are answered and
+    // its own edge-adds are confirmed processed (hsMaybeAdvance), so barrier
+    // completion itself proves the graph final and symmetric. Nothing is left
+    // to drain, and the rounds can start directly.
+    beginPseudoRounds();
   }
 }
 
@@ -58,8 +63,8 @@ void DiffusionLB::startStrategy(){
 // the post-rounds quiescence detector and kick the rounds off.
 void DiffusionLB::beginPseudoRounds()
 {
-  CkCallback cb(CkIndex_DiffusionLB::AcrossNodeLB(), thisProxy);
-  CkStartQD(cb);
+  // AcrossNodeLB now starts from the roundsDone counting barrier rather than
+  // from quiescence; see the note in the pseudolb_rounds loop.
 
   // Build the section of diffusing PEs once (one per node) and delegate it to
   // a multicast manager, so the per-round convergence reduction runs over
@@ -379,4 +384,12 @@ void DiffusionLB::pseudoConvergeResult(PseudoRoundMsg* m)
   const double maxRatio = m->maxRatio;
   delete m;
   thisProxy[CkMyPe()].pseudoVerdict(maxRatio);
+}
+
+// PE 0: every section member has left its round loop.
+void DiffusionLB::roundsDone()
+{
+  if (++roundsDoneCount < numNodes) return;
+  roundsDoneCount = 0;
+  thisProxy.AcrossNodeLB();
 }

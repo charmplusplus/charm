@@ -16,12 +16,16 @@ void DiffusionLB::AcrossNodeLB()
   if (thisIndex == 0)
   {
     if (_lb_args.debug() > 1) CkPrintf("--------STARTING ACROSS NODE LB--------\n");
-    CkCallback cb(CkIndex_DiffusionLB::WithinNodeLB(), thisProxy);
-    CkStartQD(cb);
   }
+  // WithinNodeLB now starts from the acrossDone barrier below, once every
+  // handoff this phase issued has been acked as processed.
 
   if (numNodes == 1)
+  {
+    across_owed = true;
+    migMaybeDone();
     return;  // nothing to do
+  }
 
   int n_objs = nodeStats->objData.size();
 
@@ -143,13 +147,50 @@ void DiffusionLB::AcrossNodeLB()
         pe_local_id = v_id - prefixObjects[donorPE - rank0PE - 1];
       }
 
-      thisProxy[destPE].LoadMetaInfo(objHandle, pe_local_id, cpuLoad, donorPE, 0);
-      thisProxy[donorPE].LoadReceived(pe_local_id, destPE);
+      mig_acksOut += 2;
+      thisProxy[destPE].LoadMetaInfo(objHandle, pe_local_id, cpuLoad, donorPE, 0, CkMyPe());
+      thisProxy[donorPE].LoadReceived(pe_local_id, destPE, CkMyPe());
       nodeStats->to_proc[v_id] = destPE;
     }
   }
 
+  across_owed = true;
+  migMaybeDone();
+}
 
+// The phase-completion machinery shared by the across- and within-node
+// handoffs. A rank0PE holds its barrier contribution until every
+// LoadMetaInfo/LoadReceived it sent has been acked by its receiver's handler,
+// so the barrier on PE 0 completes only when every migration record this
+// phase created is in place everywhere. The phases are sequential, so one
+// counter serves both.
+void DiffusionLB::migMsgAck()
+{
+  mig_acksOut--;
+  migMaybeDone();
+}
+
+void DiffusionLB::migMaybeDone()
+{
+  if (mig_acksOut > 0) return;
+  if (across_owed)
+  {
+    across_owed = false;
+    thisProxy[0].acrossDone();
+  }
+  if (within_owed)
+  {
+    within_owed = false;
+    thisProxy[0].withinDone();
+  }
+}
+
+// PE 0: every node's across-node handoffs are applied.
+void DiffusionLB::acrossDone()
+{
+  if (++acrossDoneCount < numNodes) return;
+  acrossDoneCount = 0;
+  thisProxy.WithinNodeLB();
 }
 
 // When load balancing, remove object handle from your list, since it is about to be
@@ -157,8 +198,13 @@ void DiffusionLB::AcrossNodeLB()
 /* LoadMetaInfo is called on the receiver with the object that will be migrated to it
  * (via a MigrateMe in  LoadReceived). It is only called when migrating at the node
  * level. Not sure why the receiver would already have this handle though...*/
-void DiffusionLB::LoadMetaInfo(LDObjHandle h, int local_id, double load, int senderPE, int only_mcount)
+void DiffusionLB::LoadMetaInfo(LDObjHandle h, int local_id, double load, int senderPE, int only_mcount, int ackPE)
 {
+  // The rank0PE that issued this handoff and is holding its phase barrier
+  // open. Carried explicitly: a within-node token's donorPE is on another
+  // node, so the issuer cannot be inferred from the other fields.
+  thisProxy[ackPE].migMsgAck();
+
 
   // local_id should be PE local here
   migrates_expected++;
@@ -235,12 +281,8 @@ void DiffusionLB::ProcessFinalStats() {
     nodeStats->n_migrateobjs = 0;
     }
 
-  if (thisIndex == 0)
-  {
-    CkCallback cb(CkIndex_DiffusionLB::ProcessMigrations(), thisProxy);
-    CkStartQD(cb);
-  }
-
+  // ProcessMigrations starts once PE 0 has every node's stats; see
+  // ReceiveFinalStats.
 }
 
 void DiffusionLB::CollectStats() {
@@ -277,10 +319,9 @@ void DiffusionLB::CollectStats() {
   CkCallback cb_num_migrations(CkReductionTarget(DiffusionLB, print_num_migrations), thisProxy[0]);
   contribute(sizeof(int), &total_crossnode_migrates, CkReduction::sum_int, cb_num_migrations);
 
-  if (thisIndex == 0){
-    CkCallback cb(CkIndex_DiffusionLB::ProcessMigrations(), thisProxy);
-    CkStartQD(cb);
-  }
+  // Group reductions complete in contribution order, so the
+  // print_num_migrations target -- the last contribute above -- is the end of
+  // this phase, and it starts ProcessMigrations from there. No quiescence.
 }
 
 void DiffusionLB::print_max_load(double max){
@@ -292,7 +333,8 @@ void DiffusionLB::print_avg_load(double sum){
 }
 void DiffusionLB::print_num_migrations(int sum){
     CkPrintf("Number of cross node migrations AFTER LB: %d\n", sum);
-
+    // Last of the CollectStats reductions: the stats phase is over.
+    thisProxy.ProcessMigrations();
 }
 void DiffusionLB::print_external_comm(double sum){
     CkPrintf("External comm BEFORE LB: %f MB\n", sum / (1024 * 1024 * 2));
@@ -334,6 +376,11 @@ void DiffusionLB::ReceiveFinalStats(std::vector<bool> isMigratable,
 
   // store the message
   statsReceived++;
+  if (statsReceived == numNodes)
+  {
+    statsReceived = 0;
+    thisProxy.ProcessMigrations();
+  }
 
   // Clear fullStats at the start of each new round
   if (statsReceived == 1) {

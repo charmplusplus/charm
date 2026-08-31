@@ -31,6 +31,13 @@ module DiffusionLB
     entry void update_peload(int rank, double load);
     entry[expedited] void okayNbor(int agree, int nborId);
     entry void ackNbor(int nbor);
+    // Confirms an ackNbor was processed, so the asker can prove its edge is
+    // symmetric before it reports the round done; see hsMaybeAdvance.
+    entry[expedited] void ackNborDone();
+    entry void roundsDone();
+    entry[expedited] void migMsgAck();
+    entry void acrossDone();
+    entry void withinDone();
 
     entry void ReceiveFinalStats(
         std::vector<bool> isMigratable, std::vector<int> from_proc,
@@ -42,7 +49,7 @@ module DiffusionLB
     entry void ReceiveLoadInfo(int itr, double load, int node);
     entry void ReceiveStats(CkMarshalledCLBStatsMessage data);
     // entry void LoadTransfer(double load, int initPE, int objId);
-    entry void LoadReceived(int objId, int fromPE);
+    entry void LoadReceived(int objId, int fromPE, int ackPE);
     entry void AcrossNodeLB();
 
     // (pseudolb_barrier removed -- global convergence check deleted)
@@ -57,7 +64,7 @@ module DiffusionLB
     entry void ProcessFinalStats();
     entry void CollectStats();
     entry void next_phase(int val);
-    entry void LoadMetaInfo(LDObjHandle h, int objId, double load, int senderPE, int only_mcount);
+    entry void LoadMetaInfo(LDObjHandle h, int objId, double load, int senderPE, int only_mcount, int ackPE);
     entry void MigrationDoneWrapper();  // Call when migration is complete
     entry void WithinNodeLB();
   
@@ -124,6 +131,9 @@ module DiffusionLB
         }
 
         if (_lb_args.debug() > 1) CkPrintf("Node %d has neighbors: %s\n", myNodeId, neighborsStr.c_str());
+
+        // The graph this member holds is final: keep it for later steps.
+        hs_graphCached = true;
 
         // Size the per-neighbour vectors off the list the loops below actually
         // walk. findNBorsRound latches neighborCount before the last round's
@@ -254,6 +264,11 @@ module DiffusionLB
         if (_lb_args.debug() > 1) CkPrintf("PSEUDO: Node %d (load %f) with pseudo_load after LB %f\n", myNodeId,
                  my_load, my_pseudo_load);
         loadReceivers = 0;
+        // Every member leaving the loop is the whole condition AcrossNodeLB
+        // needs: the convergence verdict cannot have been issued while any
+        // round message was unprocessed, so nothing of the rounds is in
+        // flight once the last member reports.
+        thisProxy[0].roundsDone();
       }
     }
   };

@@ -23,6 +23,11 @@ void DiffusionLB::findNBors(int do_again)
 
     startNeighborTiming();
 
+    hs_asksOut = 0;
+    hs_confirmOut = 0;
+    hs_phaseOwed = false;
+    hs_barrierOwed = false;
+
 
     // Start timing neighbor selection
    
@@ -35,6 +40,18 @@ void DiffusionLB::findNBors(int do_again)
         thisProxy[0].startStrategy();
         return;
     }
+
+    // Reuse the graph a previous step built. Everything from here to the
+    // rounds exists to construct sendToNeighbors, and it is the most
+    // expensive phase of a step; the graph it produces changes slowly, so a
+    // step that already has one skips straight to the rounds. One node kicks
+    // the strategy -- startStrategy must run exactly once.
+    if (hs_graphCached && getenv("CHARM_DIFFUSION_GRAPH_REBUILD") == NULL)
+    {
+        if (thisIndex == 0) thisProxy[0].startStrategy();
+        return;
+    }
+    sendToNeighbors.clear();
 
     // general setup
     holds = new int[ROUNDS + 1];
@@ -328,7 +345,8 @@ void DiffusionLB::findNBorsRound()
             }
             CkPrintf("%s\n", myNbors.c_str());
         }
-        thisProxy[0].startStrategyBarrier();
+        hs_barrierOwed = true;
+        hsMaybeAdvance();
         return;
     }
 
@@ -354,6 +372,7 @@ void DiffusionLB::findNBorsRound()
                 potentialNbor >= 0)
             {
                 node_idx[pick] = -1;
+                hs_asksOut++;
                 thisProxy[potentialNbor * nodeSize].askNbor(myNodeId, round);
             }
             local_tries++;
@@ -361,14 +380,36 @@ void DiffusionLB::findNBorsRound()
     }
 
 
-    thisProxy[0].next_phase(nborsNeeded);
-    /*
-      else
-      {
-        int do_again = 0;
-        thisProxy[0].next_phase(do_again);
-      }
-    */
+    // Held, not sent: the barrier used to count a node as done the moment its
+    // asks were *issued*, and a quiescence detector then drained the in-flight
+    // okay/ack tail before the rounds started. The hold replaces that detector:
+    // the contribution goes out only once every ask this node issued has been
+    // answered and every edge it added at a peer has been confirmed processed.
+    hs_phaseOwed = true;
+    hs_phaseVal = nborsNeeded;
+    hsMaybeAdvance();
+}
+
+// The barrier contributions this node owes go out only when it has no
+// handshake message in flight. An ask is in flight until its okayNbor lands;
+// an ackNbor -- the message whose processing is what makes an edge symmetric
+// at the peer -- is in flight until the peer confirms it with ackNborDone. A
+// node that has neither owes nothing and contributes immediately. The barrier
+// therefore completes only when the graph is final and symmetric, which is the
+// property the quiescence detector used to buy.
+void DiffusionLB::hsMaybeAdvance()
+{
+    if (hs_asksOut > 0 || hs_confirmOut > 0) return;
+    if (hs_phaseOwed)
+    {
+        hs_phaseOwed = false;
+        thisProxy[0].next_phase(hs_phaseVal);
+    }
+    if (hs_barrierOwed)
+    {
+        hs_barrierOwed = false;
+        thisProxy[0].startStrategyBarrier();
+    }
 }
 void DiffusionLB::next_phase(int val)
 {
@@ -428,17 +469,20 @@ void DiffusionLB::askNbor(int nborId, int rnd)
 }
 void DiffusionLB::okayNbor(int agree, int nborId)
 {
+    hs_asksOut--;
     int nborsNeeded = NUM_NEIGHBORS - sendToNeighbors.size() - holds[round];
     if (nborsNeeded > 0 && agree && std::find(sendToNeighbors.begin(), sendToNeighbors.end(), nborId) == sendToNeighbors.end())
     {
         if (_lb_args.debug() == 3) CkPrintf("\n[Node-%d, round-%d] Rcvd ack, adding %d as nbor (neighbors:%d/%d, holds[%d]=%d)", thisIndex, round, nborId, sendToNeighbors.size(), NUM_NEIGHBORS, round, holds[round]);
         addNeighbor(nborId);
+        hs_confirmOut++;
         thisProxy[nborId * nodeSize].ackNbor(myNodeId /*thisIndex*/);
     }
     else
     {
         if (_lb_args.debug() == 3) CkPrintf("\n[Node-%d] Decided not to pursue orig request to node %d", thisIndex, nborId);
     }
+    hsMaybeAdvance();
 }
 void DiffusionLB::ackNbor(int nborId)
 {
@@ -447,6 +491,15 @@ void DiffusionLB::ackNbor(int nborId)
         if (_lb_args.debug() == 3) CkPrintf("\n[Node-%d] Adding neighbor [%d] through final ack (neighbors:%d/%d)", thisIndex, nborId, sendToNeighbors.size(), NUM_NEIGHBORS);
         addNeighbor(nborId);
     }
+    // The edge is now in place on this side; releasing the asker is what lets
+    // it report its round done.
+    thisProxy[nborId * nodeSize].ackNborDone();
+}
+
+void DiffusionLB::ackNborDone()
+{
+    hs_confirmOut--;
+    hsMaybeAdvance();
 }
 void DiffusionLB::sortArr(long arr[], int n, int *nbors)
 {
