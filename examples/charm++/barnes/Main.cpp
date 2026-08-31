@@ -36,6 +36,17 @@ Main::Main(CkArgMsg *msg){
   dataManagerProxy = CProxy_DataManager::ckNew();
 
   CkArrayOptions opts(globalParams.numTreePieces);
+  if(globalParams.blockMap){
+    // Tree piece indices follow the SFC key order the decomposition assigns,
+    // so the map from index to PE is a map from space to PE. The default map
+    // interleaves indices across PEs, which hands every PE a representative
+    // mix of dense and sparse regions -- close to the best static balance
+    // there is, and the reason a balancer has nothing to recover on a smooth
+    // input. Charm++'s built-in BlockMap gives each PE one contiguous run of
+    // indices instead, so the density variation of the distribution becomes
+    // load variation between PEs.
+    opts.setMap(CProxy_BlockMap::ckNew());
+  }
   treePieceProxy = CProxy_TreePiece::ckNew(opts);
 
   mainProxy = thisProxy;
@@ -101,8 +112,27 @@ void Main::setParameters(CkArgMsg *m){
 
   globalParams.lbPeriod = params.getiparam("lbperiod", DEFAULT_LB_PERIOD, table);
   globalParams.firstLbIteration = params.getiparam("firstlb", DEFAULT_FIRST_LB_ITERATION, table);
-  CkPrintf("lbPeriod: %d firstLbIteration: %d\n",
-           globalParams.lbPeriod, globalParams.firstLbIteration);
+  globalParams.blockMap = params.getiparam("blockmap", 0, table);
+  if(globalParams.blockMap) CkPrintf("blockMap: contiguous key ranges per PE\n");
+  globalParams.lbWindow = params.getiparam("lbwindow", DEFAULT_LB_WINDOW, table);
+  // A window as long as the period is a window that never closes.
+  if(globalParams.lbWindow >= globalParams.lbPeriod) globalParams.lbWindow = 0;
+  CkPrintf("lbWindow: %d iterations%s\n", globalParams.lbWindow,
+           globalParams.lbWindow > 0 ? "" : " (instrumenting continuously)");
+  globalParams.asyncLb = params.getiparam("lbasync", DEFAULT_ASYNC_LB, table);
+  CkPrintf("lbPeriod: %d firstLbIteration: %d asyncLb: %d\n",
+           globalParams.lbPeriod, globalParams.firstLbIteration,
+           globalParams.asyncLb);
+  // The split is only safe under +LBAsync, and this is not a preference: with
+  // the flag off, an AtSyncStart() that finds no step due calls ResumeFromSync()
+  // inline *and* returns Continue, so an application written to the split
+  // pattern reports the same iteration twice -- once from the resume and once
+  // from the return path. Fall back rather than let that happen.
+  if(globalParams.asyncLb && !_lb_args.lbAsync()){
+    CkPrintf("[WARN] -lbasync=1 ignored: it needs +LBAsync on the command line. "
+             "Running the unsplit AtSync barrier instead.\n");
+    globalParams.asyncLb = 0;
+  }
 
   globalParams.quiescenceCheck = params.getiparam("qd", 1, table);
 
@@ -200,6 +230,9 @@ void Main::usage(){
   usage["ppc"] = "particleschare";
   usage["lbperiod"] = "run the load balancer every N iterations (0 = never)";
   usage["firstlb"] = "first iteration after which the load balancer may run";
+  usage["lbasync"] = "split the AtSync barrier so decomposition overlaps the step (needs +LBAsync)";
+  usage["lbwindow"] = "instrument only the N iterations before each balancing iteration (0 = always)";
+  usage["blockmap"] = "place tree pieces in contiguous blocks per PE (1 = imbalanced, 0 = round robin)";
   usage["gpuflush"] = "interaction-list length at which a tree piece launches";
   usage["qd"] = "arm the quiescence deadlock detector (1 = yes, default)";
 

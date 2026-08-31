@@ -37,6 +37,19 @@ struct Parameters {
   // iterations after that.
   int firstLbIteration;
   int lbPeriod;
+  // Split the AtSync barrier (needs +LBAsync). The tree pieces report the end
+  // of an iteration as soon as they have joined the step, so the DataManager
+  // decomposes while the strategy runs and elements move, and it waits for the
+  // step only where it needs the elements to be still.
+  int asyncLb;
+  // How many iterations before a balancing iteration the measurement window
+  // opens. Instrumentation is off outside it, so the strategy reads a short,
+  // recent window: measured entirely after the previous step's migrations
+  // settled, and ending at the decision. 0 instruments continuously.
+  int lbWindow;
+  // Initial tree piece placement. 0 = the default round-robin map, 1 = a block
+  // map, which is what makes this benchmark imbalanced; see BlockMap.
+  int blockMap;
 
   // Interaction-list size, in sources, at which a tree piece stops
   // accumulating and launches. Only a memory bound: at typical particle
@@ -65,6 +78,9 @@ struct Parameters {
     p | iterations;
     p | firstLbIteration;
     p | lbPeriod;
+    p | asyncLb;
+    p | lbWindow;
+    p | blockMap;
     p | gpuFlushLimit;
     p | quiescenceCheck;
   }
@@ -154,5 +170,15 @@ struct Parameters {
 
 
 };
+
+// Is `iter` an iteration at which the balancer runs? Shared so that the
+// DataManager's instrumentation window and the tree pieces' AtSync schedule
+// are driven by one definition rather than two that have to agree.
+inline bool isBalancingIteration(const Parameters &p, int iter){
+  if(p.lbPeriod <= 0) return false;
+  if(iter < p.firstLbIteration) return false;
+  if(iter >= p.iterations) return false;
+  return ((iter - p.firstLbIteration) % p.lbPeriod) == 0;
+}
 
 #endif

@@ -55,7 +55,30 @@ class TreePiece : public CBase_TreePiece {
 
   // Is the iteration just finished one at which the balancer should run?
   bool isLbIteration() const;
-  void lbBarrierDone();
+  // Reports the end of an iteration to the DataManager. stepInFlight says
+  // whether a balancing step is still moving elements, which is what tells the
+  // DataManager how far it may take the next decomposition before it has to
+  // wait -- see DataManager::distributeParticles.
+  void lbBarrierDone(int stepInFlight);
+  // Reports that the step this element joined is over.
+  void lbMigrationDone();
+
+  // Where this element is in a balancing step. Under the split barrier the end
+  // of an iteration and the end of the step it started are two separate
+  // events, and ResumeFromSync is the one callback that reports either, so it
+  // has to be told which it is. Travels: an element parked in AtSyncWait can
+  // be moved by the very step it is waiting on, and is then resumed on the
+  // destination.
+  enum LbState {
+    LB_IDLE,      // no step
+    LB_SYNC,      // parked in AtSync(); the resume is the end of the step
+    LB_BLOCKED,   // stopped by AtSyncStart() at the tentative count
+    LB_OVERLAP    // reported the iteration, parked in AtSyncWait()
+  };
+  int lbState;
+  // Report the iteration and then park for the step, in that order: the point
+  // of the split is that the DataManager gets to work in between.
+  void startLbOverlap();
 
   void checkTraversals();
 

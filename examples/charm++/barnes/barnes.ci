@@ -95,6 +95,7 @@ mainmodule barnes {
 
     entry void recvUnivBoundingBox(CkReductionMsg *msg);
     entry void treePiecesReady(CkReductionMsg *msg);
+    entry void treePiecesMigrated(CkReductionMsg *msg);
 #ifdef GPU_GRAVITY
     entry void forcesReady();
 #endif

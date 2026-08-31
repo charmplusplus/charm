@@ -46,7 +46,12 @@ DataManager::DataManager() :
   numTreePiecesDoneTraversals(0),
   prevIterationStart(0.0),
   haveUniverse(false),
-  treePiecesSettled(false)
+  treePiecesSettled(false),
+  migrationsSettled(true),
+  atDistribute(false),
+  pendingRangeMsg(NULL),
+  stepThisIteration(false),
+  decompStalledAt(0.0)
 {
 #ifdef STATISTICS
   numInteractions[0] = 0;
@@ -262,30 +267,11 @@ void DataManager::receiveHistogram(CkReductionMsg *msg){
     CkPrintf("[0] decomp done after %d iterations used treepieces %d\n", decompIterations, numTreePieces);
     #endif
     decompIterations = 0;
-    
-    keyRanges = new Key[numTreePieces*2];
-    // so that by the time tree pieces start submitting
-    // particles (which can only happen after the flushParticles()
-    // below, we have the right count of local tree pieces
-    senseTreePieces();
-    flushParticles();
-    // PE 0 sets ranges in sendParticlesToTreePiece
-    haveRanges = true;
 
-    // The same check every other PE makes at the end of sendParticles. It
-    // matters here once elements can move: a balancer is allowed to leave PE 0
-    // with no tree pieces, and then no submitParticles would ever arrive to
-    // start the tree build and the iteration would stall.
-    if(submittedParticles.length() == numLocalTreePieces){
-      processSubmittedParticles();
-    }
-
-    int numKeys = numTreePieces*2;
-
-    RangeMsg *rmsg = new (numKeys) RangeMsg;
-    rmsg->numTreePieces = numTreePieces;
-    memcpy(rmsg->keys,keyRanges,sizeof(Key)*numKeys);
-    thisProxy.sendParticles(rmsg);
+    // Everything past here needs the local tree pieces to hold still, so it
+    // lives in distributeParticles() behind the migration gate.
+    atDistribute = true;
+    distributeParticles();
   }
 
   delete msg;
@@ -359,18 +345,12 @@ void DataManager::sendParticlesToTreePiece(Node<NodeDescriptor> *nd, int tp) {
 void DataManager::sendParticles(RangeMsg *msg){
 
   if(CkMyPe() != 0){
-    numTreePieces = msg->numTreePieces;
-    keyRanges = msg->keys;
-    haveRanges = true;
-    // delete this later
-    rangeMsg = msg;
-    flushParticles();
-
-    senseTreePieces();
-
-    if(submittedParticles.length() == numLocalTreePieces){
-      processSubmittedParticles();
-    }
+    // Same gate as PE 0's. The ranges have arrived, but this PE's own tree
+    // pieces may still be in flight, so hold the message until they are not.
+    CkAssert(pendingRangeMsg == NULL);
+    pendingRangeMsg = msg;
+    atDistribute = true;
+    distributeParticles();
   }
   else{
     CkAssert(numTreePieces == msg->numTreePieces);
@@ -980,6 +960,7 @@ void DataManager::advance(CkReductionMsg *msg){
   else delete rangeMsg;
 
   iteration++;
+  updateLbInstrumentation();
   CkCallback cb;
   if(iteration == globalParams.iterations){
     cb = CkCallback(CkIndex_Main::niceExit(),mainProxy);
@@ -1001,13 +982,118 @@ void DataManager::recvUnivBoundingBox(CkReductionMsg *msg){
   startNextIteration();
 }
 
-// Broadcast from the tree pieces' end-of-iteration reduction, which they
-// contribute to from ResumeFromSync on a balancing iteration and directly
-// otherwise.
+// Broadcast from the tree pieces' end-of-iteration reduction. Under the
+// unsplit barrier they contribute to it from ResumeFromSync on a balancing
+// iteration and directly otherwise; under the split barrier a balancing
+// iteration contributes as soon as the step has been joined, which is what
+// lets the decomposition below start while the step runs.
 void DataManager::treePiecesReady(CkReductionMsg *msg){
+  // Max over the elements: 1 if any of them is still owed a migration.
+  const int stepInFlight = *((int *)msg->getData());
+  stepThisIteration = (stepInFlight != 0);
   treePiecesSettled = true;
+  // Nothing is moving, so the local element set is stable already and the
+  // decomposition runs straight through. This is every iteration of an
+  // unsplit-barrier run, and every non-balancing iteration of a split one.
+  if(!stepInFlight) migrationsSettled = true;
   delete msg;
   startNextIteration();
+}
+
+// Broadcast from the tree pieces' second reduction, contributed when
+// AtSyncWait() releases them. Every element everywhere has come out of the
+// step by the time this completes, so no tree piece is in flight to or from
+// any PE.
+void DataManager::treePiecesMigrated(CkReductionMsg *msg){
+  migrationsSettled = true;
+  delete msg;
+  distributeParticles();
+}
+
+// The strategy should read a short, recent window: opened after the previous
+// step's migrations settled and closed at the decision, rather than the whole
+// period between steps, most of which is stale by the time it is read. The
+// same switch gates CUPTI tracing, which is by far the more expensive half, so
+// this is also what keeps an instrumented run affordable -- the tracing that
+// no strategy will ever read is simply not done.
+void DataManager::updateLbInstrumentation(){
+  if(globalParams.lbWindow <= 0) return;
+  // Level-triggered, not edge-triggered: whether the window is open is a
+  // function of the iteration alone, so there is no switch state that can end
+  // up out of step with the schedule. Open when one of the next lbWindow
+  // iterations is a balancing iteration; closed at the balancing iteration
+  // itself, since lbWindow is clamped below the period.
+  bool inWindow = false;
+  for(int k = 1; k <= globalParams.lbWindow && !inWindow; k++){
+    inWindow = isBalancingIteration(globalParams, iteration + k);
+  }
+  if(inWindow) LBTurnInstrumentOn();
+  else LBTurnInstrumentOff();
+}
+
+// The tail of the decomposition: hand each tree piece its particles and start
+// the tree build. Runs once the decomposition has reached this point and the
+// balancer has finished moving elements, in whichever order those happen.
+void DataManager::distributeParticles(){
+  if(!atDistribute || !migrationsSettled){
+    // The decomposition is here and the elements are not still. Time the gap:
+    // it is the part of the step the decomposition failed to cover.
+    if(atDistribute && decompStalledAt == 0.0) decompStalledAt = CkWallTimer();
+    return;
+  }
+  if(CkMyPe() == 0 && stepThisIteration){
+    if(decompStalledAt != 0.0){
+      CkPrintf("[LBOVERLAP] iteration %d: decomposition waited %f s for the step\n",
+               iteration, CkWallTimer()-decompStalledAt);
+    }
+    else{
+      CkPrintf("[LBOVERLAP] iteration %d: step finished before the decomposition "
+               "needed it -- fully overlapped\n", iteration);
+    }
+  }
+  decompStalledAt = 0.0;
+  stepThisIteration = false;
+  atDistribute = false;
+  migrationsSettled = false;
+
+  if(CkMyPe() == 0){
+    keyRanges = new Key[numTreePieces*2];
+    // so that by the time tree pieces start submitting
+    // particles (which can only happen after the flushParticles()
+    // below, we have the right count of local tree pieces
+    senseTreePieces();
+    flushParticles();
+    // PE 0 sets ranges in sendParticlesToTreePiece
+    haveRanges = true;
+  }
+  else{
+    RangeMsg *msg = pendingRangeMsg;
+    pendingRangeMsg = NULL;
+    numTreePieces = msg->numTreePieces;
+    keyRanges = msg->keys;
+    haveRanges = true;
+    // delete this later
+    rangeMsg = msg;
+    flushParticles();
+
+    senseTreePieces();
+  }
+
+  // On PE 0 this matters once elements can move: a balancer is allowed to
+  // leave PE 0 with no tree pieces, and then no submitParticles would ever
+  // arrive to start the tree build and the iteration would stall.
+  if(submittedParticles.length() == numLocalTreePieces){
+    processSubmittedParticles();
+  }
+
+  if(CkMyPe() == 0){
+    int numKeys = numTreePieces*2;
+
+    RangeMsg *rmsg = new (numKeys) RangeMsg;
+    rmsg->numTreePieces = numTreePieces;
+    memcpy(rmsg->keys,keyRanges,sizeof(Key)*numKeys);
+    thisProxy.sendParticles(rmsg);
+  }
 }
 
 void DataManager::startNextIteration(){

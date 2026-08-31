@@ -30,6 +30,16 @@
 #define DEFAULT_FIRST_LB_ITERATION 2
 #define DEFAULT_LB_PERIOD 0
 
+// The split barrier is opt-in: it needs +LBAsync on the command line to do
+// anything, and the unsplit path is what every existing run used.
+#define DEFAULT_ASYNC_LB 0
+
+// Instrument the two iterations before each balancing iteration. The same
+// switch gates CUPTI tracing, which is the expensive half, so a window is what
+// keeps a load-balanced run from paying for tracing it never reads. 0 restores
+// continuous instrumentation.
+#define DEFAULT_LB_WINDOW 2
+
 // 1M sources is 16 MB of pinned staging per tree piece, and only reached by a
 // tree piece holding an unusually large share of the PE's particles.
 #define DEFAULT_GPU_FLUSH_LIMIT (1 << 20)

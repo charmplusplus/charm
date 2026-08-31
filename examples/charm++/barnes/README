@@ -89,22 +89,103 @@ LOAD BALANCING
 --------------
   -lbperiod <N>    run the balancer every N iterations (0, the default, never)
   -firstlb <N>     first iteration after which it may run (default 2)
+  -lbasync 1       split the barrier so the next decomposition overlaps the
+                   step; needs +LBAsync on the command line, and is ignored
+                   with a warning without it
+  -lbwindow <N>    instrument only the N iterations before each balancing
+                   iteration (default 2; 0 instruments continuously)
   -qd 0            disarm the quiescence deadlock detector
 
   ./charmrun +p8 ./barnes -in=particles.bin -p=256 -killat=40 \
              -lbperiod=5 +balancer GreedyRefineCentralGPULB
 
 Every iteration ends at a barrier -- AtSync on a balancing iteration, a nop
-reduction otherwise -- and the DataManager waits for it before starting the
-next decomposition. It has to: decompose() sends particles to tree pieces by
-index and then counts the ones registered locally, and both are wrong if an
-element is still in flight.
+reduction otherwise -- and the DataManager waits for it before it needs the set
+of tree pieces registered on this PE to hold still. It has to wait somewhere:
+decompose() sends particles to tree pieces by index and then counts the ones
+registered locally, and both are wrong if an element is still in flight. Where
+it waits is what -lbasync changes; see ASYNC LOAD BALANCING below.
 
 Migration is nearly free here. A tree piece's whole state is its iteration
-counter: particles arrive from the decomposition, buckets are handed out by the
-local DataManager, and the traversal states are rebuilt every iteration. What
-moving one accomplishes is moving its share of the particles, since the
-decomposition sends by index.
+counter and where it is in a balancing step: particles arrive from the
+decomposition, buckets are handed out by the local DataManager, and the
+traversal states are rebuilt every iteration. What moving one accomplishes is
+moving its share of the particles, since the decomposition sends by index.
 
-See GPU_LB_PLAN.md for how this is meant to be used against the GPU-aware
-balancers on this branch, and for what barnes tests that leanmd does not.
+
+ASYNC LOAD BALANCING (-lbasync=1 +LBAsync)
+------------------------------------------
+AtSync() is one event: the element stops, and the next thing it hears is that
+the whole step -- strategy and every migration it planned -- is over. Under
+-lbasync the barrier is split, AtSyncStart() returns without waiting and
+AtSyncWait() is where the step is collected, so the two ends of the step become
+two events the application can put work between.
+
+There is no work to put there in a tree piece. It has nothing of its own to do
+between iterations; the DataManager drives everything. So what overlaps the
+step here is the next decomposition, and the split is what makes that legal to
+start: the tree pieces report the end of the iteration as soon as they have
+joined the step, and the DataManager runs the kick-drift-kick, the universe
+bounding box reduction and every histogram round while the strategy runs and
+elements move.
+
+One point in the iteration cannot overlap. senseTreePieces() snapshots the tree
+pieces registered on this PE and processSubmittedParticles() then waits for
+exactly that many submissions, so an element arriving or leaving across it
+either stalls the tree build or overruns the vector. That is the whole reason
+the unsplit barrier is placed where it is. The split moves the wait to just
+before that snapshot instead of removing it: the tree pieces contribute a
+second reduction when AtSyncWait() releases them, and the decomposition holds
+at DataManager::distributeParticles() until it arrives -- on both PE 0, where
+the histogram converged, and the PEs that were handed their ranges.
+
+Whichever of the two arrives second runs the rest, so the cost when there is
+nothing to wait for is one branch. Under the unsplit barrier the release is
+already set by the time the decomposition gets there, which is why that path is
+unchanged.
+
+A balancing iteration prints what the split bought:
+
+  [LBOVERLAP] iteration 7: step finished before the decomposition needed it
+              -- fully overlapped
+  [LBOVERLAP] iteration 12: decomposition waited 0.014 s for the step
+
+-lbasync needs +LBAsync and falls back to the unsplit barrier without it. Not a
+preference: with the flag off, an AtSyncStart() that finds no step due calls
+ResumeFromSync() inline *and* returns Continue, so an application written to
+the split pattern would report the same iteration twice.
+
+
+MEASUREMENT WINDOW (-lbwindow)
+------------------------------
+The balancer should read a short, recent window: opened after the previous
+step's migrations have settled, closed at the decision. The whole period
+between steps is the wrong thing to hand it -- most of it is stale by the time
+it is read, and it includes the step itself.
+
+So instrumentation is off outside that window. The DataManager opens and closes
+it on the iteration count, and it does so rather than the tree pieces because a
+balancer is allowed to leave a PE with none and the window still has to be
+managed there. The closing edge is duplicated in TreePiece::finishIteration,
+which is the only place that runs before the decision: the last tree piece's
+reportTraversalsDone() merely *starts* the reduction that reaches advance(), so
+advance() lands after AtSyncStart and a window closed only there would stay
+open across the decision it was meant to bound.
+
+The switch is the same one that gates CUPTI tracing, which is by far the more
+expensive half. A window is therefore not only what makes the measurement
+meaningful, it is what makes an instrumented run affordable: tracing that no
+strategy will ever read is simply not done. With -lbwindow=0 a run traces every
+iteration and pays for it.
+
+Under +MetaLB the runtime manages the same switch on its own -- on when
+AtSyncWait releases, off in AtSyncSample -- and the calls here are idempotent,
+so the two agree rather than fight.
+
+
+RUNNING
+-------
++pe is the total number of PEs, not the number per process, and without an
+explicit +pemap each process pins its own PEs starting from core 0, so every
+rank lands on the same cores. Give a map that follows the node's NUMA
+topology; pemap is indexed by global PE, so one map covers every rank.

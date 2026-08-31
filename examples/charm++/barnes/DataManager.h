@@ -134,6 +134,42 @@ class DataManager : public CBase_DataManager {
   BoundingBox nextUniverse;
   void startNextIteration();
 
+  // Async LB. With the split barrier the end of an iteration and the end of
+  // the balancing step it started arrive separately, so the decomposition may
+  // begin -- and run all the way through its histogram rounds -- while
+  // elements are still moving. senseTreePieces() is the one point that may
+  // not: it snapshots the local element set and processSubmittedParticles()
+  // then waits for exactly that many submissions, so an element arriving or
+  // leaving across it either stalls the tree build or overruns the vector.
+  //
+  // migrationsSettled is that release. Under the unsplit barrier it is already
+  // set by the time the decomposition gets here, so this path costs nothing.
+  // Starts set: nothing is migrating at startup, and the first decomposition
+  // is driven from Main before any tree piece has finished an iteration and so
+  // before anything could set it.
+  bool migrationsSettled;
+  // Set when the decomposition reached the point above. Whichever of the two
+  // is second runs the rest.
+  bool atDistribute;
+  // Held across the gate on the PEs that are handed their ranges.
+  RangeMsg *pendingRangeMsg;
+  void distributeParticles();
+
+  // Opens and closes the load-balancing measurement window. Lives here, not in
+  // the tree pieces, because a balancer is allowed to leave a PE with none and
+  // the window still has to be managed there. The closing edge is duplicated
+  // in TreePiece::finishIteration, which is the only place that runs before
+  // the decision; both calls are idempotent.
+  void updateLbInstrumentation();
+
+  // Whether a balancing step was still running when this iteration's tree
+  // pieces reported, and when the decomposition first reached the gate without
+  // it having finished. Together they say what the split actually bought: the
+  // decomposition either covered the step outright or stalled, and by how
+  // long.
+  bool stepThisIteration;
+  double decompStalledAt;
+
   // The body of finishIteration, after the accelerations are in host memory.
   void finishIterationTail();
 
@@ -214,6 +250,7 @@ class DataManager : public CBase_DataManager {
 
   void recvUnivBoundingBox(CkReductionMsg *msg);
   void treePiecesReady(CkReductionMsg *msg);
+  void treePiecesMigrated(CkReductionMsg *msg);
 
 #ifdef GPU_GRAVITY
   // Take a stream and the device arrays. Called from an entry method, never

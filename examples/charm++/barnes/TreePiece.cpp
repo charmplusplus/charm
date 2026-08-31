@@ -57,6 +57,7 @@ TreePiece::TreePiece() :
   initGpuState();
 #endif
   usesAtSync = true;
+  lbState = LB_IDLE;
   myDM = dataManagerProxy.ckLocalBranch();
 }
 
@@ -78,6 +79,7 @@ TreePiece::TreePiece(CkMigrateMessage *m) :
   initGpuState();
 #endif
   usesAtSync = true;
+  lbState = LB_IDLE;
   myDM = dataManagerProxy.ckLocalBranch();
 }
 
@@ -142,7 +144,13 @@ void TreePiece::startTraversal(){
   thisProxy[thisIndex].doLocalGravity(msg);
 }
 
+// thread_local: in this build PEs are threads in a process, so a file-scope
+// double would aggregate the whole process and hide the per-PE distribution.
+thread_local double _tpWalkLocal = 0.0;
+thread_local double _tpWalkRemote = 0.0;
+
 void TreePiece::doLocalGravity(RescheduleMsg *msg){
+  const double _t0 = CmiWallTimer();
   int i;
   for(i = 0; i < globalParams.yieldPeriod &&
                  localTraversalState.current < myNumBuckets;
@@ -164,6 +172,8 @@ void TreePiece::doLocalGravity(RescheduleMsg *msg){
   if(batch.wantsFlush()) flushGpu();
 #endif
 
+  _tpWalkLocal += CmiWallTimer() - _t0;
+
   if(localTraversalState.decrPending(i)){
     localGravityDone();
     delete msg;
@@ -174,6 +184,7 @@ void TreePiece::doLocalGravity(RescheduleMsg *msg){
 }
 
 void TreePiece::doRemoteGravity(RescheduleMsg *msg){
+  const double _t0 = CmiWallTimer();
   int i;
   for(i = 0; i < globalParams.yieldPeriod &&
                  remoteTraversalState.current < myNumBuckets;
@@ -188,6 +199,8 @@ void TreePiece::doRemoteGravity(RescheduleMsg *msg){
 #ifdef GPU_GRAVITY
   if(batch.wantsFlush()) flushGpu();
 #endif
+
+  _tpWalkRemote += CmiWallTimer() - _t0;
 
   if(remoteTraversalState.decrPending(i)){
     remoteGravityDone();
@@ -286,10 +299,7 @@ void TreePiece::maybeReportDone(){
 #endif
 
 bool TreePiece::isLbIteration() const {
-  if(globalParams.lbPeriod <= 0) return false;
-  if(iteration < globalParams.firstLbIteration) return false;
-  if(iteration >= globalParams.iterations) return false;
-  return ((iteration - globalParams.firstLbIteration) % globalParams.lbPeriod) == 0;
+  return isBalancingIteration(globalParams, iteration);
 }
 
 void TreePiece::finishIteration(){
@@ -304,21 +314,102 @@ void TreePiece::finishIteration(){
 
   // Every iteration ends at this barrier, whether or not the balancer runs, so
   // that the DataManager has one condition to wait on before it starts the
-  // next decomposition. It has to wait: decompose() sends particles to tree
-  // pieces by index and then counts the ones registered locally, and both
-  // would be wrong if an element were still in flight.
-  if(isLbIteration()) AtSync();
-  else lbBarrierDone();
+  // next decomposition. It has to wait somewhere: decompose() sends particles
+  // to tree pieces by index and then counts the ones registered locally, and
+  // both would be wrong if an element were still in flight. Where it waits is
+  // what the two paths below differ in.
+  if(iteration >= globalParams.iterations){
+    static thread_local bool _walkPrinted = false;
+    if(!_walkPrinted && getenv("BARNES_WALK_REPORT") != NULL){
+      _walkPrinted = true;
+      CkPrintf("[WALK] pe %2d local %.4f s  remote %.4f s  total %.4f s\n",
+               CkMyPe(), _tpWalkLocal, _tpWalkRemote,
+               _tpWalkLocal + _tpWalkRemote);
+    }
+  }
+
+  if(!isLbIteration()){
+    lbBarrierDone(0);
+    return;
+  }
+
+  if(!globalParams.asyncLb){
+    // The element stops here and the DataManager hears nothing until the whole
+    // step -- strategy and migrations -- is over.
+    lbState = LB_SYNC;
+    AtSync();
+    return;
+  }
+
+  // Close the measurement window. This has to happen here rather than in the
+  // DataManager's own end-of-iteration hook: the last tree piece's
+  // reportTraversalsDone() only *starts* the reduction that reaches advance(),
+  // so advance() lands after this point, and the strategy would read a window
+  // that stayed open across its own decision.
+  if(globalParams.lbWindow > 0) LBTurnInstrumentOff();
+
+  // Flushes this element's GPU counters and feeds MetaBalancer's sample
+  // stream. A no-op when MetaBalancer is off, so it is safe to call on this
+  // application's own -lbperiod cadence either way.
+  AtSyncSample();
+  // Set before the call, not after: an element stopped at the tentative count
+  // is handed back through ResumeFromSync, which then has to know that this
+  // iteration was never reported.
+  lbState = LB_BLOCKED;
+  if(AtSyncStart() == CkMigratable::AtSyncStatus::Blocked) return;
+  startLbOverlap();
+}
+
+// What the split buys here. A tree piece has no work of its own between
+// iterations -- the DataManager drives everything -- so the work that overlaps
+// the step is the next decomposition: the kick-drift-kick, the universe
+// bounding box reduction and every histogram round run while the strategy runs
+// and elements move. Only senseTreePieces() needs the elements to be still,
+// and lbMigrationDone() is what releases it.
+void TreePiece::startLbOverlap(){
+  lbState = LB_OVERLAP;
+  lbBarrierDone(1);
+  // Resumes inline when the step is already over, in which case ResumeFromSync
+  // runs from inside this call and finds LB_OVERLAP, which is correct.
+  AtSyncWait();
 }
 
 void TreePiece::ResumeFromSync(){
   // This may be a different PE from the one the constructor ran on.
   myDM = dataManagerProxy.ckLocalBranch();
-  lbBarrierDone();
+
+  const int was = lbState;
+  lbState = LB_IDLE;
+  switch(was){
+    case LB_OVERLAP:
+      // The iteration was reported when the step started. This is the step
+      // ending, which is the other half.
+      lbMigrationDone();
+      break;
+    case LB_BLOCKED:
+      // Released from the tentative count -- either joined to the step or let
+      // go to keep iterating. Either way the iteration is still unreported.
+      startLbOverlap();
+      break;
+    default:
+      // Unsplit AtSync: one event, so one report, and nothing is moving by the
+      // time it is made.
+      lbBarrierDone(0);
+      break;
+  }
 }
 
-void TreePiece::lbBarrierDone(){
+void TreePiece::lbBarrierDone(int stepInFlight){
+  // max_int rather than nop: the reduction has to carry whether anything is
+  // still moving. The DataManager would otherwise need its own copy of the
+  // balancing cadence to work that out, and two counters that have to agree is
+  // a worse thing to own than one extra int.
   CkCallback cb(CkIndex_DataManager::treePiecesReady(NULL), dataManagerProxy);
+  contribute(sizeof(int),&stepInFlight,CkReduction::max_int,cb);
+}
+
+void TreePiece::lbMigrationDone(){
+  CkCallback cb(CkIndex_DataManager::treePiecesMigrated(NULL), dataManagerProxy);
   contribute(0,0,CkReduction::nop,cb);
 }
 
@@ -359,6 +450,9 @@ int TreePiece::getIteration() {
 
 void TreePiece::pup(PUP::er &p){
   p | iteration;
+  // Travels because an element parked in AtSyncWait() can be moved by the step
+  // it is waiting on, and the destination is where its ResumeFromSync runs.
+  p | lbState;
   // Nothing else travels. AtSync is reached from finishIteration(), after the
   // interaction list has been consumed and every per-iteration counter has
   // been reset, so the destination reconstructs the rest in
