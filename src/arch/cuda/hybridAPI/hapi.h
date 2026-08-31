@@ -1,6 +1,12 @@
 #ifndef __HAPI_H_
 #define __HAPI_H_
-#include <cuda_runtime.h>
+#include "hapi_portable.h"
+
+/* HAPI_CUPTI_LB: per-object GPU time attribution (CUPTI activity tracing,
+ * event-based kernel timing, launch wrappers) feeding GPU-aware load
+ * balancing. Dormant -- nothing defines it -- until the GPU-LB series
+ * (plan item 11) enables it together with its ck-ldb counterparts
+ * (setObjGPUTime and friends, LBHasBalancersRegistered). */
 
 /* See hapi_functions.h for the majority of function declarations provided
  * by the Hybrid API. */
@@ -74,10 +80,10 @@ typedef struct hapiWorkRequest {
 #endif
 
   // Pointer to host-side function that actually invokes the kernel.
-  // The user implements this function, using the given CUDA stream and
+  // The user implements this function, using the given hapi stream and
   // device buffers (which are indexed by hapiBufferInfo->id).
   // Could be set to NULL if no kernel needs to be executed.
-  void (*runKernel)(struct hapiWorkRequest* wr, cudaStream_t kernel_stream,
+  void (*runKernel)(struct hapiWorkRequest* wr, hapiStream_t kernel_stream,
                     void** device_buffers);
 
   // flag used for control by the system
@@ -89,8 +95,8 @@ typedef struct hapiWorkRequest {
   // flags determining whether memory should be freed on destruction
   bool free_user_data;
 
-  // CUDA stream index provided by the user or assigned by GPUManager
-  cudaStream_t stream;
+  // hapi stream index provided by the user or assigned by GPUManager
+  hapiStream_t stream;
 
 #ifdef HAPI_INSTRUMENT_WRS
   double phase_start_time;
@@ -151,15 +157,15 @@ typedef struct hapiWorkRequest {
   }
 #endif
 
-  void setRunKernel(void (*_runKernel)(struct hapiWorkRequest*, cudaStream_t, void**)) {
+  void setRunKernel(void (*_runKernel)(struct hapiWorkRequest*, hapiStream_t, void**)) {
     runKernel = _runKernel;
   }
 
-  void setStream(cudaStream_t _stream) {
+  void setStream(hapiStream_t _stream) {
     stream = _stream;
   }
 
-  cudaStream_t getStream() {
+  hapiStream_t getStream() {
     return stream;
   }
 
@@ -189,7 +195,7 @@ typedef struct hapiWorkRequest hapiWorkRequest;
 
 #endif /* defined __cplusplus */
 
-// Provides support for detecting errors with CUDA API calls.
+// Provides support for detecting errors with hapi API calls.
 #ifndef HAPI_CHECK_OFF
 #define hapiCheck(code) hapiErrorDie(code, #code, __FILE__, __LINE__)
 #else
@@ -228,21 +234,66 @@ extern "C" {
 #ifdef __cplusplus
 
 // Provide a C++-only stub for this function's default parameter.
-void hapiAddCallback(cudaStream_t stream, const CkCallback& cb, void* cb_msg);
-static inline void hapiAddCallback(cudaStream_t stream, const CkCallback& cb) {
+void hapiAddCallback(hapiStream_t stream, const CkCallback& cb, void* cb_msg);
+static inline void hapiAddCallback(hapiStream_t stream, const CkCallback& cb) {
   hapiAddCallback(stream, cb, nullptr);
 }
-static inline void hapiAddCallback(cudaStream_t stream, void* cb) {
+static inline void hapiAddCallback(hapiStream_t stream, void* cb) {
   hapiAddCallback(stream, cb, nullptr);
 }
 
 // Overloaded C++ wrappers for selecting whether to pool or not using a bool.
-static inline cudaError_t hapiMallocHost(void** ptr, size_t size, bool pool) {
+// These keep the names and signatures they have always had: external HAPI
+// users (ChaNGa's allocatePinnedHostMemory/freePinnedHostMemory) call
+// hapiMallocHost(ptr, size, pool) and hapiFreeHost(ptr, pool) directly.
+static inline hapiError_t hapiMallocHost(void** ptr, size_t size, bool pool) {
   return pool ? hapiPoolMalloc(ptr, size) : hapiMallocHost(ptr, size);
 }
-static inline cudaError_t hapiFreeHost(void* ptr, bool pool) {
+static inline hapiError_t hapiFreeHost(void* ptr, bool pool) {
   return pool ? hapiPoolFree(ptr) : hapiFreeHost(ptr);
 }
+
+// Explicitly-named spellings of the same two calls. The portable-header
+// rework briefly made these the only spelling; they are kept as aliases so
+// that code written against that interval still builds.
+static inline hapiError_t hapiMallocHost_Pool(void** ptr, size_t size, bool pool) {
+  return hapiMallocHost(ptr, size, pool);
+}
+static inline hapiError_t hapiFreeHost_Pool(void* ptr, bool pool) {
+  return hapiFreeHost(ptr, pool);
+}
+
+void hapiRecordTime(hapiStream_t stream, hapiEvent_t start);
+#ifdef HAPI_CUPTI_LB
+void hapiCuptiInit();
+void hapiCuptiFinalize();
+uint64_t hapiCuptiPushObjCorrelation();
+void hapiCuptiPopObjCorrelation();
+void hapiProcessCuptiBuffers();
+void hapiClearCuptiData();
+#endif
+
+#ifdef HAPI_CUPTI_LB
+#define HAPI_LAUNCH_KERNEL_WRAPPER(call, stream)\
+    hapiEvent_t start;\
+    hapiEventCreate(&start);\
+    hapiEventRecord(start, stream);\
+    call;\
+    hapiRecordTime(stream, start);
+#else
+#define HAPI_LAUNCH_KERNEL_WRAPPER(call, stream)\
+    call;
+#endif
+
+#ifdef HAPI_CUPTI_LB
+#define CUPTI_LAUNCH_WRAPPER(call)\
+  hapiCuptiPushObjCorrelation();\
+  call;\
+  hapiCuptiPopObjCorrelation();
+#else
+#define CUPTI_LAUNCH_WRAPPER(call)\
+  call;
+#endif
 
 #endif /* defined __cplusplus */
 

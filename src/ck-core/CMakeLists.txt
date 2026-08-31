@@ -142,7 +142,7 @@ foreach(filename ${ck-h-sources} ${ldb-h-sources})
 endforeach()
 
 target_include_directories(ck PRIVATE . ../ck-ldb ../ck-perf ../ck-cp ../util/topomanager ../conv-perf)
-if(BUILD_CUDA AND CUPTI_LIBRARY)
+if(HAPI_CUPTI_LB AND BUILD_CUDA AND CUPTI_LIBRARY)  # dormant until the GPU-LB series (plan item 11)
   target_include_directories(ck PRIVATE "${CUDA_DIR}/extras/CUPTI/include")
   target_link_libraries(ck ${CUPTI_LIBRARY})
 endif()

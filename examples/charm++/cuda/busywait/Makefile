@@ -8,7 +8,6 @@ NVCC = $(CUDATOOLKIT_HOME)/bin/nvcc
 NVCC_FLAGS = -c -std=c++11
 NVCC_INC = -I$(CUDATOOLKIT_HOME)/include
 CHARM_INC = -I../../../../include
-LD_LIBS = -lnvToolsExt
 
 TARGET = busywait
 all: $(TARGET)

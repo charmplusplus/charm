@@ -13,6 +13,10 @@
 /******************** DEPRECATED ********************/
 // Create a hapiWorkRequest object for the user. The runtime manages the associated
 // memory, so the user only needs to set it up properly.
+/* Self-sufficient for any includer (AMPI pulls this in with only
+ * cuda_runtime.h in scope): the hapi* type macros live here. */
+#include "hapi_portable.h"
+
 AMPI_CUSTOM_FUNC(hapiWorkRequest*, hapiCreateWorkRequest, void)
 
 /******************** DEPRECATED ********************/
@@ -30,26 +34,35 @@ AMPI_CUSTOM_FUNC(int, hapiCreateStreams, void)
 
 // Get a CUDA stream that was created by the runtime. Current scheme is to
 // hand out streams in a round-robin fashion.
-AMPI_CUSTOM_FUNC(cudaStream_t, hapiGetStream, void)
+AMPI_CUSTOM_FUNC(hapiStream_t, hapiGetStream, void)
 
 // Add a Charm++ callback function to be invoked after the previous operation
 // in the stream completes. This call should be placed after data transfers or
 // a kernel invocation.
-AMPI_CUSTOM_FUNC(void, hapiAddCallback, cudaStream_t, void*, void*)
+AMPI_CUSTOM_FUNC(void, hapiAddCallback, hapiStream_t, void*, void*)
 
 // Thin wrappers for memory related CUDA API calls.
-AMPI_CUSTOM_FUNC(cudaError_t, hapiMalloc, void**, size_t)
-AMPI_CUSTOM_FUNC(cudaError_t, hapiFree, void*)
-AMPI_CUSTOM_FUNC(cudaError_t, hapiMallocHost, void**, size_t)
-AMPI_CUSTOM_FUNC(cudaError_t, hapiFreeHost, void*)
-AMPI_CUSTOM_FUNC(cudaError_t, hapiMemcpyAsync, void*, const void*, size_t, enum cudaMemcpyKind, cudaStream_t)
+// AMPI_CUSTOM_FUNC(cudaError_t, hapiMalloc, void**, size_t)
+// AMPI_CUSTOM_FUNC(cudaError_t, hapiFree, void*)
+// AMPI_CUSTOM_FUNC(cudaError_t, hapiMallocHost, void**, size_t)
+// AMPI_CUSTOM_FUNC(cudaError_t, hapiFreeHost, void*)
+// AMPI_CUSTOM_FUNC(cudaError_t, hapiMemcpyAsync, void*, const void*, size_t, enum cudaMemcpyKind, cudaStream_t)
+// AMPI_CUSTOM_FUNC(cudaError_t, hapiMemcpy2DAsync, void*, size_t, const void*, size_t, size_t, size_t, enum cudaMemcpyKind, cudaStream_t)
+
+// Kernel launch wrapper
+#ifdef HAPI_CUPTI_LB  /* pairs with HAPI_LAUNCH_KERNEL_WRAPPER; lands with plan item 11 */
+AMPI_CUSTOM_FUNC(hapiError_t, hapiLaunchKernel, const void*, dim3, dim3, void**, size_t, hapiStream_t)
+#endif
 
 // Explicit memory allocations using pinned memory pool.
-AMPI_CUSTOM_FUNC(cudaError_t, hapiPoolMalloc, void**, size_t)
-AMPI_CUSTOM_FUNC(cudaError_t, hapiPoolFree, void*)
+AMPI_CUSTOM_FUNC(hapiError_t, hapiPoolMalloc, void**, size_t)
+AMPI_CUSTOM_FUNC(hapiError_t, hapiPoolFree, void*)
 
 // Provides support for detecting errors with CUDA API calls.
-AMPI_CUSTOM_FUNC(void, hapiErrorDie, cudaError_t, const char*, const char*, int)
+AMPI_CUSTOM_FUNC(void, hapiErrorDie, hapiError_t, const char*, const char*, int)
+
+// Returns the GPU device index this PE is mapped to (set during hapiMapping).
+AMPI_CUSTOM_FUNC(uint64_t, hapiMyDevice, void)
 
 #ifdef HAPI_INSTRUMENT_WRS
 AMPI_CUSTOM_FUNC(void, hapiInitInstrument, int n_chares, char n_types)

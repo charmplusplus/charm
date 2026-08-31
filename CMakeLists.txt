@@ -757,16 +757,16 @@ if(BUILD_CUDA OR BUILD_HIP)
       message(STATUS "Found CUPTI: ${CUPTI_LIBRARY}")
     endif()
 
-    add_library(cudahybridapi ${hybridAPI-cxx-sources})
-    add_dependencies(cudahybridapi ci-generated)
+    add_library(hybridapi ${hybridAPI-cxx-sources})
+    add_dependencies(hybridapi ci-generated)
 
     if(CUPTI_LIBRARY)
-      target_include_directories(cudahybridapi PRIVATE "${CUPTI_INCLUDE_DIR}")
-      target_link_libraries(cudahybridapi ${CUPTI_LIBRARY})
+      target_include_directories(hybridapi PRIVATE "${CUPTI_INCLUDE_DIR}")
+      target_link_libraries(hybridapi ${CUPTI_LIBRARY})
     endif()
 
     if(TRACING)
-      target_compile_definitions(cudahybridapi PRIVATE HAPI_TRACE)
+      target_compile_definitions(hybridapi PRIVATE HAPI_TRACE)
     endif()
   endif()
 
@@ -1118,7 +1118,7 @@ if(${TARGET} STREQUAL "charm4py")
   endif()
 
   if (${BUILD_CUDA})
-    target_link_libraries(charm cudart cudahybridapi)
+    target_link_libraries(charm cudart hybridapi)
   endif()
 
   if (${BUILD_HIP})
@@ -1145,10 +1145,7 @@ else()
   if(NOT RECONVERSE)
     list(APPEND ckhello_deps ckqt conv-static)
   endif()
-  if(BUILD_CUDA)
-    # cudahybridapi: the name conv-mach-cuda.sh links (-lcudahybridapi)
-    list(APPEND ckhello_deps cudahybridapi)
-  elseif(BUILD_HIP)
+  if(BUILD_CUDA OR BUILD_HIP)
     list(APPEND ckhello_deps hybridapi)
   endif()
   add_dependencies(ckhello ${ckhello_deps})
@@ -1171,6 +1168,14 @@ if(NOT ${NETWORK} STREQUAL "mpi" AND NOT ${NETWORK} MATCHES "gni-" AND NOT ${NET
         # conv-config.sh (after conv-mach.sh has already sourced the compiler
         # file once), so stripping here is authoritative.
         file(APPEND ${optfile_sh} "CMK_LIBS=\"\${CMK_LIBS//-lckqt/}\"\n")
+    endif()
+    if(RECONVERSE AND BUILD_CUDA)
+        # liblci.so uses the CUDA driver API directly, so every charmc-linked
+        # binary needs -lcuda under reconverse+CUDA. Link against the toolkit
+        # stub (standard NVIDIA practice for non-GPU build nodes); the real
+        # driver resolves at runtime on GPU nodes. Classic never links LCI
+        # and its link line is untouched.
+        file(APPEND ${optfile_sh} "CMK_LIBS=\"$CMK_LIBS -L${CUDA_DIR}/lib64/stubs -lcuda\"\n")
     endif()
 endif()
 

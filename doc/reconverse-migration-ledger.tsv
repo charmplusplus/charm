@@ -1,12 +1,9 @@
-# Migration ledger: reconverse-specific-build -> reviewed-with-reconverse
-# Generated 2026-08-26 vs #3944 tip. Columns: file, changed-lines, disposition, note
-# Dispositions: item-N (plan item), pr-NNNN, with-feature, superseded,
-#               tombstone / tombstone-candidate, needs-judgment
+file	changed_lines	disposition	note
 .github/workflows/ci.yaml	29	superseded	reviewed line two-way version is authoritative
 CMakeLists.txt	223	superseded	reviewed line two-way version is authoritative
 Dockerfile	25	needs-judgment	
 README.md	100	needs-judgment	
-benchmarks/charm++/cuda/gpudirect/latency/latency.C	12	item-9	
+benchmarks/charm++/cuda/gpudirect/latency/latency.C	12	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
 buildcmake	59	superseded	reviewed line two-way version is authoritative
 buildold	4	superseded	reviewed line two-way version is authoritative
 cmake/converse.cmake	159	superseded	reviewed line two-way version is authoritative
@@ -16,24 +13,24 @@ contrib/ci.vim	2	needs-judgment
 doc/charm++/manual.rst	3	needs-judgment	
 examples/ampi/Cjacobi3D/Makefile	9	with-feature	lands with the series that exercises it
 examples/ampi/Cjacobi3D/jacobi.C	142	with-feature	lands with the series that exercises it
-examples/charm++/cuda/gpudirect/jacobi2d-imbalance/Makefile	31	item-9	
-examples/charm++/cuda/gpudirect/jacobi2d-imbalance/jacobi2d.C	646	item-9	
-examples/charm++/cuda/gpudirect/jacobi2d-imbalance/jacobi2d.ci	90	item-9	
-examples/charm++/cuda/gpudirect/jacobi2d-imbalance/jacobi2d.cu	195	item-9	
-examples/charm++/cuda/gpudirect/jacobi2d-imbalance/jacobi2d.h	12	item-9	
-examples/charm++/cuda/gpudirect/jacobi2d/Makefile	36	item-9	
-examples/charm++/cuda/gpudirect/jacobi2d/jacobi2d.C	264	item-9	
-examples/charm++/cuda/gpudirect/jacobi2d/jacobi2d.ci	27	item-9	
-examples/charm++/cuda/gpudirect/jacobi2d/jacobi2d.cu	49	item-9	
-examples/charm++/cuda/gpudirect/jacobi2d/jacobi2d.h	2	item-9	
-examples/charm++/cuda/gpudirect/sdag/sdag.C	38	item-9	
-examples/charm++/cuda/gpudirect/sdag/sdag.cu	4	item-9	
-examples/charm++/cuda/gpudirect/verify/Makefile	46	item-9	
-examples/charm++/cuda/gpudirect/verify/charmrun_hapi	292	item-9	
-examples/charm++/cuda/gpudirect/verify/helper.sh	6	item-9	
-examples/charm++/cuda/gpudirect/verify/verbose	1	item-9	
-examples/charm++/cuda/gpudirect/verify/verify.C	111	item-9	
-examples/charm++/cuda/gpudirect/verify/verify.cu	4	item-9	
+examples/charm++/cuda/gpudirect/jacobi2d-imbalance/Makefile	31	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
+examples/charm++/cuda/gpudirect/jacobi2d-imbalance/jacobi2d.C	646	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
+examples/charm++/cuda/gpudirect/jacobi2d-imbalance/jacobi2d.ci	90	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
+examples/charm++/cuda/gpudirect/jacobi2d-imbalance/jacobi2d.cu	195	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
+examples/charm++/cuda/gpudirect/jacobi2d-imbalance/jacobi2d.h	12	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
+examples/charm++/cuda/gpudirect/jacobi2d/Makefile	36	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
+examples/charm++/cuda/gpudirect/jacobi2d/jacobi2d.C	264	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
+examples/charm++/cuda/gpudirect/jacobi2d/jacobi2d.ci	27	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
+examples/charm++/cuda/gpudirect/jacobi2d/jacobi2d.cu	49	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
+examples/charm++/cuda/gpudirect/jacobi2d/jacobi2d.h	2	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
+examples/charm++/cuda/gpudirect/sdag/sdag.C	38	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
+examples/charm++/cuda/gpudirect/sdag/sdag.cu	4	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
+examples/charm++/cuda/gpudirect/verify/Makefile	46	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
+examples/charm++/cuda/gpudirect/verify/charmrun_hapi	292	item-9.2	GPU-direct D2D transport; whole-file; depends on 9.1; validate on multi-GPU Anvil node (-A asc050025-gpu)
+examples/charm++/cuda/gpudirect/verify/helper.sh	6	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
+examples/charm++/cuda/gpudirect/verify/verbose	1	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
+examples/charm++/cuda/gpudirect/verify/verify.C	111	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
+examples/charm++/cuda/gpudirect/verify/verify.cu	4	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
 examples/charm++/cuda/stencil2d/Makefile	6	with-feature	lands with the series that exercises it
 examples/charm++/cuda/stencil2d/stencil2d.C	260	with-feature	lands with the series that exercises it
 examples/charm++/cuda/stencil2d/stencil2d.ci	17	with-feature	lands with the series that exercises it
@@ -59,23 +56,23 @@ src/QuickThreads/md/setjmp64_.c	6	needs-judgment
 src/arch/common/cc-gcc.sh	4	tombstone	branch dropped -lckqt (superseded by conv-mach-opt.sh strip) and added -std=gnu++17 to CMK_CXX_FLAGS; the latter deliberately NOT migrated (gcc>=11 defaults to gnu++17, cmake pins the standard); revisit only if charmc-built user code on older gcc breaks
 src/arch/common/cc-mpiopts.sh	2	tombstone-candidate	classic machine layer; frozen line
 src/arch/common/charmrun_elastic	69	tombstone-candidate	classic machine layer; frozen line
-src/arch/common/charmrun_hapi	292	item-9	
+src/arch/common/charmrun_hapi	292	item-9.2	GPU-direct D2D transport; whole-file; depends on 9.1; validate on multi-GPU Anvil node (-A asc050025-gpu)
 src/arch/common/conv-mach-common.h	2	tombstone-candidate	classic machine layer; frozen line
 src/arch/common/conv-mach-cuda.sh	6	tombstone-candidate	classic machine layer; frozen line
 src/arch/common/conv-mach-darwin.sh	8	tombstone-candidate	classic machine layer; frozen line
 src/arch/common/conv-mach-hip.h	7	tombstone-candidate	classic machine layer; frozen line
 src/arch/common/conv-mach-hip.sh	21	tombstone-candidate	classic machine layer; frozen line
-src/arch/cuda/hybridAPI/Makefile	12	item-9	
-src/arch/cuda/hybridAPI/buddy_allocator.cpp	236	item-9	
-src/arch/cuda/hybridAPI/buddy_allocator.h	27	item-9	
-src/arch/cuda/hybridAPI/devicemanager.h	14	item-9	
-src/arch/cuda/hybridAPI/gpumanager.h	86	item-9	
-src/arch/cuda/hybridAPI/hapi.h	60	item-9	
-src/arch/cuda/hybridAPI/hapi_functions.h	27	item-9	
-src/arch/cuda/hybridAPI/hapi_impl.cpp	835	item-9	
-src/arch/cuda/hybridAPI/hapi_impl.h	4	item-9	
-src/arch/cuda/hybridAPI/hapi_memory_daemon.cpp	279	item-9	
-src/arch/cuda/hybridAPI/hapi_portable.h	209	item-9	
+src/arch/cuda/hybridAPI/Makefile	12	item-9.1-DONE	landed via branch gpu-stage1-hapi (HAPI portable core; hybridapi naming unified)
+src/arch/cuda/hybridAPI/buddy_allocator.cpp	236	item-9.1-DONE	landed via branch gpu-stage1-hapi (HAPI portable core; hybridapi naming unified)
+src/arch/cuda/hybridAPI/buddy_allocator.h	27	item-9.1-DONE	landed via branch gpu-stage1-hapi (HAPI portable core; hybridapi naming unified)
+src/arch/cuda/hybridAPI/devicemanager.h	14	item-9.1-DONE	landed via branch gpu-stage1-hapi (HAPI portable core; hybridapi naming unified)
+src/arch/cuda/hybridAPI/gpumanager.h	86	item-9.1-DONE	landed via branch gpu-stage1-hapi (HAPI portable core; hybridapi naming unified)
+src/arch/cuda/hybridAPI/hapi.h	60	item-9.1-DONE	landed via branch gpu-stage1-hapi (HAPI portable core; hybridapi naming unified)
+src/arch/cuda/hybridAPI/hapi_functions.h	27	item-9.1-DONE	landed via branch gpu-stage1-hapi (HAPI portable core; hybridapi naming unified)
+src/arch/cuda/hybridAPI/hapi_impl.cpp	835	item-9.1-DONE	landed via branch gpu-stage1-hapi (HAPI portable core; hybridapi naming unified)
+src/arch/cuda/hybridAPI/hapi_impl.h	4	item-9.1-DONE	landed via branch gpu-stage1-hapi (HAPI portable core; hybridapi naming unified)
+src/arch/cuda/hybridAPI/hapi_memory_daemon.cpp	279	item-10	GPU ckpt/restart via OS memory daemon; possibly superseded by newer approach that avoids the daemon (Kale 08-27) -- decide port-vs-tombstone at item 10. Client-side excision markers in hapi_impl.cpp.
+src/arch/cuda/hybridAPI/hapi_portable.h	209	item-9.1-DONE	landed via branch gpu-stage1-hapi (HAPI portable core; hybridapi naming unified)
 src/arch/mpi-darwin-arm8/conv-mach.sh	2	tombstone-candidate	classic machine layer; frozen line
 src/arch/mpi-darwin-x86_64/conv-mach.sh	2	tombstone-candidate	classic machine layer; frozen line
 src/arch/mpi/charmrun	5	tombstone-candidate	classic machine layer; frozen line
@@ -116,8 +113,8 @@ src/ck-core/ckmigratable.h	3	needs-judgment
 src/ck-core/ckobjQ.C	1	needs-judgment	
 src/ck-core/ckrdma.C	4	needs-judgment	
 src/ck-core/ckrdma.h	4	needs-judgment	
-src/ck-core/ckrdmadevice.C	336	item-9	
-src/ck-core/ckrdmadevice.h	46	item-9	
+src/ck-core/ckrdmadevice.C	336	item-9.2	GPU-direct D2D transport; whole-file; depends on 9.1; validate on multi-GPU Anvil node (-A asc050025-gpu)
+src/ck-core/ckrdmadevice.h	46	item-9.2	GPU-direct D2D transport; whole-file; depends on 9.1; validate on multi-GPU Anvil node (-A asc050025-gpu)
 src/ck-core/ckreduction.C	35	pr-3942	
 src/ck-core/ckreduction.h	1	pr-3942	
 src/ck-core/debug-charm.h	2	needs-judgment	
@@ -177,9 +174,9 @@ src/conv-ccs/ccs-builtins.h	2	needs-judgment
 src/conv-ccs/conv-ccs.C	30	needs-judgment	
 src/conv-ccs/conv-ccs.h	12	needs-judgment	
 src/conv-core/conv-config.h	4	needs-judgment	
-src/conv-core/conv-rdma.h	197	item-9	
-src/conv-core/conv-rdmadevice.C	14	item-9	
-src/conv-core/conv-rdmadevice.h	44	item-9	
+src/conv-core/conv-rdma.h	197	item-9.2	GPU-direct D2D transport; whole-file; depends on 9.1; validate on multi-GPU Anvil node (-A asc050025-gpu)
+src/conv-core/conv-rdmadevice.C	14	item-9.2	GPU-direct D2D transport; whole-file; depends on 9.1; validate on multi-GPU Anvil node (-A asc050025-gpu)
+src/conv-core/conv-rdmadevice.h	44	item-9.2	GPU-direct D2D transport; whole-file; depends on 9.1; validate on multi-GPU Anvil node (-A asc050025-gpu)
 src/conv-core/convcore.C	9	needs-judgment	
 src/conv-core/converse.h	2	needs-judgment	
 src/conv-core/cpuaffinity.C	3	needs-judgment	
