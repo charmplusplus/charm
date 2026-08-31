@@ -26,7 +26,16 @@
 //      regression here is every PE silently landing on device 0, which every
 //      per-PE check above would happily accept.
 //
-//   3. The buddy allocator. Exercised directly (it is a plain class in
+//   3. The pinned-host allocation API, in all three of its spellings:
+//      hapiMallocHost(ptr, size), the pooled overload
+//      hapiMallocHost(ptr, size, pool), and the hapiMallocHost_Pool alias
+//      (and their hapiFreeHost counterparts). The pooled overloads are what
+//      external users -- ChaNGa's allocatePinnedHostMemory and
+//      freePinnedHostMemory -- actually call, and they can only exist while
+//      hapi_portable.h keeps those names overloadable, so a regression there
+//      breaks this file at the preprocessor.
+//
+//   4. The buddy allocator. Exercised directly (it is a plain class in
 //      libhybridapi, and buddy_allocator.h is installed) rather than through
 //      the D2D path, which does not arrive until stage 9.2. The checks pin
 //      down the properties the D2D path will depend on: power-of-two rounding,
@@ -34,7 +43,7 @@
 //      its name -- that freeing everything coalesces back to a single whole
 //      region, in any free order.
 //
-//   4. N asynchronous callbacks. Each worker issues nKernels independent
+//   5. N asynchronous callbacks. Each worker issues nKernels independent
 //      H2D/kernel/D2H chains and hangs a hapiAddCallback off each. Completions
 //      are counted per element and summed; the result of every chain is
 //      verified against a closed form, out of a buffer pre-filled with a
@@ -59,6 +68,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <cstring>
 #include <vector>
 #include <unistd.h>
 
@@ -102,7 +112,7 @@ static inline double slotAddend(int chare, int chain) {
 }
 
 // ---------------------------------------------------------------------------
-// 3. Buddy allocator
+// 4. Buddy allocator
 // ---------------------------------------------------------------------------
 static void runBuddyChecks(int& checks) {
   const size_t commSize = (size_t)1 << 20;  // 1 MB communication region
@@ -294,7 +304,46 @@ public:
     if (g_streamPoolSize > 1) CkEnforce(s1 != s2);  // handed out round-robin
     checks += 3;
 
-    // ---- 3. buddy allocator ----
+    // ---- 3. pinned host memory: every spelling of the public API ----
+    // hapiMallocHost/hapiFreeHost carry pooled overloads that external HAPI
+    // users call directly -- ChaNGa's allocatePinnedHostMemory and
+    // freePinnedHostMemory are hapiMallocHost(ptr, size, pool) and
+    // hapiFreeHost(ptr, pool). Those overloads can only exist if the portable
+    // header leaves the names overloadable, so this block is as much a
+    // compile-time assertion as a runtime one: if hapiMallocHost goes back to
+    // being a function-like macro, the 3-argument call below does not even
+    // preprocess ("macro passed 3 arguments, but takes just 2").
+    {
+      const size_t nbytes = 4096;
+      void* h = NULL;
+
+      hapiCheck(hapiMallocHost(&h, nbytes));              // plain, 2 arguments
+      CkEnforce(h != NULL);
+      memset(h, 0xA5, nbytes);                            // must be real host memory
+      CkEnforce(*((unsigned char*)h) == 0xA5);
+      hapiCheck(hapiFreeHost(h));
+
+      h = NULL;
+      hapiCheck(hapiMallocHost(&h, nbytes, false));       // pooled overload, unpooled
+      CkEnforce(h != NULL);
+      hapiCheck(hapiFreeHost(h, false));
+
+      h = NULL;
+      hapiCheck(hapiMallocHost(&h, nbytes, true));        // pooled overload, pooled
+      CkEnforce(h != NULL);
+      memset(h, 0x5A, nbytes);
+      CkEnforce(*((unsigned char*)h + nbytes - 1) == 0x5A);
+      hapiCheck(hapiFreeHost(h, true));
+
+      h = NULL;
+      hapiCheck(hapiMallocHost_Pool(&h, nbytes, true));   // explicit-name alias
+      CkEnforce(h != NULL);
+      hapiCheck(hapiFreeHost_Pool(h, true));
+
+      checks += 7;
+    }
+
+    // ---- 4. buddy allocator ----
     runBuddyChecks(checks);
 
     if (verbose)
@@ -314,7 +363,7 @@ public:
 };
 
 // ---------------------------------------------------------------------------
-// 4. N asynchronous callbacks
+// 5. N asynchronous callbacks
 // ---------------------------------------------------------------------------
 class Worker : public CBase_Worker {
   hapiStream_t stream;

@@ -243,11 +243,24 @@ static inline void hapiAddCallback(hapiStream_t stream, void* cb) {
 }
 
 // Overloaded C++ wrappers for selecting whether to pool or not using a bool.
-static inline hapiError_t hapiMallocHost_Pool(void** ptr, size_t size, bool pool) {
+// These keep the names and signatures they have always had: external HAPI
+// users (ChaNGa's allocatePinnedHostMemory/freePinnedHostMemory) call
+// hapiMallocHost(ptr, size, pool) and hapiFreeHost(ptr, pool) directly.
+static inline hapiError_t hapiMallocHost(void** ptr, size_t size, bool pool) {
   return pool ? hapiPoolMalloc(ptr, size) : hapiMallocHost(ptr, size);
 }
-static inline hapiError_t hapiFreeHost_Pool(void* ptr, bool pool) {
+static inline hapiError_t hapiFreeHost(void* ptr, bool pool) {
   return pool ? hapiPoolFree(ptr) : hapiFreeHost(ptr);
+}
+
+// Explicitly-named spellings of the same two calls. The portable-header
+// rework briefly made these the only spelling; they are kept as aliases so
+// that code written against that interval still builds.
+static inline hapiError_t hapiMallocHost_Pool(void** ptr, size_t size, bool pool) {
+  return hapiMallocHost(ptr, size, pool);
+}
+static inline hapiError_t hapiFreeHost_Pool(void* ptr, bool pool) {
+  return hapiFreeHost(ptr, pool);
 }
 
 void hapiRecordTime(hapiStream_t stream, hapiEvent_t start);

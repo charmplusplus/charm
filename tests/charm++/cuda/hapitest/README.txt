@@ -28,12 +28,23 @@ What it checks
      reaches min(devices, PEs) distinct devices per physical node and spreads
      them evenly. That last pair is what catches every PE landing on device 0.
 
-  3. The buddy allocator, driven directly: power-of-two rounding, blocks that
+  3. The pinned-host allocation API in all three of its spellings:
+     hapiMallocHost(ptr, size), the pooled overload
+     hapiMallocHost(ptr, size, pool), and the hapiMallocHost_Pool alias, plus
+     the matching hapiFreeHost forms. The pooled overloads are what outside
+     users call -- ChaNGa's allocatePinnedHostMemory and freePinnedHostMemory
+     are exactly hapiMallocHost(ptr, size, pool) / hapiFreeHost(ptr, pool) --
+     and they only exist while hapi_portable.h leaves those names
+     overloadable rather than defining them as function-like macros. So this
+     one is a compile-time check first and a runtime check second: a macro
+     definition makes the 3-argument call fail to preprocess.
+
+  4. The buddy allocator, driven directly: power-of-two rounding, blocks that
      do not overlap, whole-region allocation, oversize refusal, and full
      coalescing back to one region under three different free orders. Plus the
      load-balancing sub-region's separate accounting.
 
-  4. N asynchronous callbacks: each chare issues -k independent
+  5. N asynchronous callbacks: each chare issues -k independent
      H2D/kernel/D2H chains and hangs a hapiAddCallback off each, then verifies
      every result against a closed form out of a sentinel-filled buffer, so a
      callback delivered before its copy landed fails rather than passes.

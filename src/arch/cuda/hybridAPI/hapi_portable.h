@@ -1,4 +1,12 @@
-#pragma once
+/* A named include guard, not #pragma once: the build installs a copy of this
+ * header into include/, so a translation unit that includes both the in-tree
+ * copy and the installed one (hapi_impl.cpp reaches the latter through
+ * charm++.h -> ckrdmadevice.h -> conv-rdmadevice.h) sees two distinct files
+ * and #pragma once guards neither against the other. That was harmless while
+ * this header held only macros -- identical macro redefinition is legal --
+ * but not once it defines functions. */
+#ifndef __HAPI_PORTABLE_H_
+#define __HAPI_PORTABLE_H_
 
 #undef CMK_CUDA
 #undef CMK_HIP
@@ -77,8 +85,24 @@
 
 #define hapiMalloc(ptr, size) cudaMalloc(ptr, size)
 #define hapiFree(ptr) cudaFree(ptr)
+/* hapiMallocHost/hapiFreeHost are real functions, not macros, in C++.  The
+ * pooled forms in hapi.h -- hapiMallocHost(ptr, size, pool) and
+ * hapiFreeHost(ptr, pool) -- are overloads of these names, and a function-like
+ * macro cannot be overloaded: with a macro here, every 3-argument call becomes
+ * a hard preprocessor error ("macro passed 3 arguments, but takes just 2").
+ * That signature is part of the public HAPI surface -- ChaNGa calls it -- so
+ * the macro form is kept only for the C path, which has no overloads anyway. */
+#ifdef __cplusplus
+static inline cudaError_t hapiMallocHost(void** ptr, size_t size) {
+  return cudaMallocHost(ptr, size);
+}
+static inline cudaError_t hapiFreeHost(void* ptr) {
+  return cudaFreeHost(ptr);
+}
+#else
 #define hapiMallocHost(ptr, size) cudaMallocHost(ptr, size)
 #define hapiFreeHost(ptr) cudaFreeHost(ptr)
+#endif
 
 #define hapiErrorMemoryAllocation cudaErrorMemoryAllocation
 #define hapiErrorInitializationError cudaErrorInitializationError
@@ -177,8 +201,27 @@
 
 #define hapiMalloc(ptr, size) hipMalloc(ptr, size)
 #define hapiFree(ptr) hipFree(ptr)
-#define hapiMallocHost(ptr, size) hipHostMalloc(ptr, size)
+/* hapiMallocHost/hapiFreeHost are real functions, not macros, in C++.  The
+ * pooled forms in hapi.h -- hapiMallocHost(ptr, size, pool) and
+ * hapiFreeHost(ptr, pool) -- are overloads of these names, and a function-like
+ * macro cannot be overloaded: with a macro here, every 3-argument call becomes
+ * a hard preprocessor error ("macro passed 3 arguments, but takes just 2").
+ * That signature is part of the public HAPI surface -- ChaNGa calls it -- so
+ * the macro form is kept only for the C path, which has no overloads anyway. */
+#ifdef __cplusplus
+static inline hipError_t hapiMallocHost(void** ptr, size_t size) {
+  return hipHostMalloc(ptr, size);
+}
+static inline hipError_t hapiFreeHost(void* ptr) {
+  return hipHostFree(ptr);
+}
+#else
+/* hipHostMalloc's third parameter is defaulted only in its C++ declaration,
+ * so the C spelling has to pass the flag explicitly. hipHostMallocDefault is
+ * that same default (0). */
+#define hapiMallocHost(ptr, size) hipHostMalloc(ptr, size, hipHostMallocDefault)
 #define hapiFreeHost(ptr) hipHostFree(ptr)
+#endif
 
 #define hapiErrorMemoryAllocation hipErrorMemoryAllocation
 #define hapiErrorInitializationError hipErrorInitializationError
@@ -207,3 +250,5 @@
 #define hapiMemcpy2DAsync hipMemcpy2DAsync
 
 #endif // CMK_HIP
+
+#endif /* __HAPI_PORTABLE_H_ */
