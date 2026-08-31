@@ -1,0 +1,110 @@
+This is a Barnes-Hut simulator written on top of Charm++.
+
+To build:
+1. Edit the Makefile CHARM_PATH to point to your built copy of Charm++.
+2. Edit the Makefile STRUCTURES_PATH to point to the Changa structures library.
+   git clone https://github.com/N-BodyShop/utility
+   STRUCTURES_PATH = utility/structures
+3. make            (GPU force evaluation, needs a CUDA Charm++ and nvcc)
+   make GPU=0      (the original CPU force loop)
+
+Usage:
+1. Prepare a data file with 10K particles:
+   ./plummer 10000 particles.bin
+2. Run on a single processor with 100 TreePieces and 50 iterations
+   ./charmrun +p1 ./barnes -in=particles.bin -p=100 -killat=50
+
+
+GPU PORT
+--------
+The tree walk stays on the host; only the force evaluation moves to the device.
+
+A traversal used to call grav() the moment it decided a node or a remote
+particle acted on the bucket it was working on. It now appends that source to
+an interaction list and moves on, and one kernel per tree piece evaluates the
+whole list at the end of the iteration. This is the shape ChaNGa's GPU port
+uses, and it is the only one that gives the device enough work at a time: a
+single bucket against a single multipole is a few hundred flops.
+
+Notes on the port:
+
+ * One source type covers both interaction kinds. nodeBucketForce and
+   partBucketForce look different but both call grav() with a mass and a
+   position -- a multipole is used only through totalMass and cm -- so the list
+   is a flat array of point masses and the kernel has one inner loop.
+
+ * A source is tagged with the target bucket it acts on rather than being
+   written into a per-bucket list. A tree piece's two traversals interleave:
+   doLocalGravity and doRemoteGravity yield to each other every -yield buckets,
+   and a remote traversal resumes whenever a deferred node or particle reply
+   lands. Comparing each source against the last target turns that interleaved
+   sequence into contiguous runs, and each run becomes one CUDA block. Several
+   blocks of a launch can therefore target the same bucket, which is why the
+   kernel commits through atomicAdd.
+
+ * The particles live on the device for the whole iteration, in the
+   DataManager, not in the tree pieces. That is where they already are on the
+   host: tree pieces hand their particles to the local DataManager every
+   iteration, which sorts them into one array and builds one tree over it, so a
+   bucket is a contiguous range of that array. Ordering between the
+   DataManager's upload and the tree pieces' kernels is a recorded event, not a
+   device synchronize, so the tree pieces of a PE overlap.
+
+ * Every kernel launch happens inside a TreePiece entry method. This is what
+   makes CUPTI attribute the GPU time to the tree piece, which is what the
+   balancer reads. The last sources of a remote traversal are appended from
+   DataManager::recvParticles, so the final flush is bounced through
+   TreePiece::finishGpuWork rather than launched where the traversal finished.
+
+ * -b defaults to 128 in a GPU build and 10 in a CPU build. The kernel gives one
+   block of 128 threads to a bucket and one thread to each of its particles, so
+   a bucket of 10 wastes 118 of them.
+
+ * Forces are not bit-identical to the CPU build. Per interaction the
+   arithmetic is the same -- the CPU's sqrt in double, stored to a float, is
+   what sqrtf produces -- but a thread accumulates its particle's whole
+   acceleration in registers and commits once, where the CPU adds each
+   interaction in traversal order.
+
+Three bugs in the stock code had to be fixed for any of this to work, and they
+were real before the port too:
+
+ * TreePiece::smallestKey and largestKey were set once in the constructor and
+   never reset. They bound the key range a tree piece submitted, and
+   DataManager::startTraversal splits the PE's buckets between its tree pieces
+   by largestKey; a range accumulated over iterations describes a tree piece
+   that no longer exists. From iteration 1 on, the first tree piece on each PE
+   was handed every bucket and the rest none. Forces stayed correct; the work
+   split did not.
+
+ * doLocalGravity and doRemoteGravity advanced currentBucketPtr past the end of
+   their slice of the PE's bucket vector and then read through it. Harmless
+   while the value was only stored; not once setContext looks the bucket up.
+
+ * TreePiece(CkMigrateMessage *) was empty, leaving myDM dangling and every
+   counter uninitialised. Nothing migrated before, so it never ran.
+
+
+LOAD BALANCING
+--------------
+  -lbperiod <N>    run the balancer every N iterations (0, the default, never)
+  -firstlb <N>     first iteration after which it may run (default 2)
+  -qd 0            disarm the quiescence deadlock detector
+
+  ./charmrun +p8 ./barnes -in=particles.bin -p=256 -killat=40 \
+             -lbperiod=5 +balancer GreedyRefineCentralGPULB
+
+Every iteration ends at a barrier -- AtSync on a balancing iteration, a nop
+reduction otherwise -- and the DataManager waits for it before starting the
+next decomposition. It has to: decompose() sends particles to tree pieces by
+index and then counts the ones registered locally, and both are wrong if an
+element is still in flight.
+
+Migration is nearly free here. A tree piece's whole state is its iteration
+counter: particles arrive from the decomposition, buckets are handed out by the
+local DataManager, and the traversal states are rebuilt every iteration. What
+moving one accomplishes is moving its share of the particles, since the
+decomposition sends by index.
+
+See GPU_LB_PLAN.md for how this is meant to be used against the GPU-aware
+balancers on this branch, and for what barnes tests that leanmd does not.

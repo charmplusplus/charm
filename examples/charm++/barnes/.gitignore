@@ -1,0 +1,17 @@
+*.decl.h*
+*.def.h
+charmrun.*
+out*
+*.dat
+.*.swp
+*.o
+*.a
+makefile
+charmrun*
+hapi_memory_daemon
+# The binary and the crash dumps, not barnes.cu / barnes_cuda.h / barnes.ci.
+/barnes
+barnes.*.btr
+gen
+plummer
+*.bin
