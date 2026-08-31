@@ -134,33 +134,28 @@ CpvExtern(int, my_device_id);
 // That is the gap, and it is why this is off unless CHARM_DEVICE_MR_CACHE is
 // set.
 //
-// Only the send path is cached. A receive registers the destination buffer the
-// element posted, but CkRdmaDeviceIssueRgets runs before the entry method, so
-// _currentLocRec is not yet set and there is no owner to attribute the entry
-// to. Caching without an owner would mean never dropping it, which is the
-// staleness this design exists to avoid.
-
-struct DeviceMrKey {
-  const void* ptr;
-  size_t cnt;
-  bool operator==(const DeviceMrKey& o) const {
-    return ptr == o.ptr && cnt == o.cnt;
-  }
-};
-
-struct DeviceMrKeyHash {
-  size_t operator()(const DeviceMrKey& k) const {
-    return std::hash<const void*>()(k.ptr) * 31 + std::hash<size_t>()(k.cnt);
-  }
-};
+// Both directions are cached. The send path attributes entries to
+// _currentLocRec, the element issuing the send. The receive path runs before
+// the entry method, so _currentLocRec is not yet set -- but the envelope names
+// the element the receive is addressed to, and CkFindDeviceRecvElement
+// resolves it to the same CkLocRec the migration paths retire. A receive with
+// no element attached (a migration payload on a group entry) is not cached:
+// its buffer is freshly allocated per transfer and freed after, exactly the
+// staleness an unowned entry would hide.
 
 struct DeviceMrEntry {
-  CmiNcpyBuffer reg;   // registered once; copies differ only in the ref field
+  CmiNcpyBuffer reg;   // registered once; copies differ only in ref and cnt
   CkLocRec* owner;     // whose migration retires this entry
 };
 
-typedef std::unordered_map<DeviceMrKey, DeviceMrEntry, DeviceMrKeyHash>
-    DeviceMrCache;
+// Keyed by pointer alone, not (ptr, cnt): the particle-exchange pattern sends
+// from a fixed buffer with a different count every iteration, and a
+// count-qualified key turns that into one fresh registration per distinct
+// count -- the same unbounded growth this cache exists to stop. A registration
+// covers [ptr, ptr+cnt); a request for fewer bytes reuses it with the copy's
+// cnt shrunk to the request, and a request for more re-registers the larger
+// extent in place.
+typedef std::unordered_map<const void*, DeviceMrEntry> DeviceMrCache;
 
 CkpvDeclare(DeviceMrCache*, device_mr_cache);
 
@@ -184,19 +179,30 @@ static CmiNcpyBuffer acquireDeviceRegistration(const void* ptr, size_t cnt,
   DeviceMrCache* cache = CkpvAccess(device_mr_cache);
   if (cache == NULL) return CmiNcpyBuffer(ptr, cnt);
 
-  DeviceMrKey key{ptr, cnt};
-  auto it = cache->find(key);
+  auto it = cache->find(ptr);
   if (it == cache->end()) {
     DeviceMrEntry entry;
     entry.reg = CmiNcpyBuffer(ptr, cnt);   // the one real registration
     entry.owner = owner;
-    it = cache->emplace(key, entry).first;
-  } else if (it->second.owner == NULL) {
-    // First use came from a context with no element attached; adopt the first
-    // owner that does appear, so the entry becomes retirable.
-    it->second.owner = owner;
+    it = cache->emplace(ptr, entry).first;
+  } else {
+    if (cnt > it->second.reg.cnt) {
+      // A larger transfer from the same buffer: re-register the larger
+      // extent, once. Counts only ever grow entries; they never multiply them.
+      it->second.reg.deregisterMem();
+      it->second.reg = CmiNcpyBuffer(ptr, cnt);
+    }
+    if (it->second.owner == NULL) {
+      // First use came from a context with no element attached; adopt the
+      // first owner that does appear, so the entry becomes retirable.
+      it->second.owner = owner;
+    }
   }
-  return it->second.reg;
+  CmiNcpyBuffer out = it->second.reg;
+  // The registration spans at least [ptr, ptr+cnt); the transfer must still
+  // be sized by the request, not by the registered extent.
+  out.cnt = cnt;
+  return out;
 }
 
 // Retire everything registered for an element. Called from the migration paths,
@@ -1520,7 +1526,23 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
       // Machine layer supports GPU-aware communication
       QdCreate(1);
       CmiSetDirectNcpyAckHandler(CkRdmaDeviceRecvHandler);
-      CmiNcpyBuffer lci_dest_ncpy_buffer(arrPtrs[i], (size_t)arrSizes[i], (void*)(&save_op));
+      // The destination registration is cached against the element this
+      // receive is addressed to, whose migration frees the posted buffer and
+      // retires the entry. A receive with no element behind it (a migration
+      // payload on a group entry) registers per-op as before.
+      CmiNcpyBuffer lci_dest_ncpy_buffer;
+      CkGroupID recv_aid; recv_aid.idx = save_op.dest_aid_idx;
+      CkLocRec* recv_rec = CkFindDeviceRecvElement(recv_aid, save_op.dest_id);
+      if (recv_rec != NULL) {
+        lci_dest_ncpy_buffer =
+            acquireDeviceRegistration(arrPtrs[i], (size_t)arrSizes[i], recv_rec);
+        // What the uncached 3-arg constructor's third argument sets: the
+        // completion handler finds this operation's DeviceRdmaOp through it.
+        lci_dest_ncpy_buffer.deviceRdmaOpInfo = (void*)(&save_op);
+      } else {
+        lci_dest_ncpy_buffer =
+            CmiNcpyBuffer(arrPtrs[i], (size_t)arrSizes[i], (void*)(&save_op));
+      }
       lci_dest_ncpy_buffer.rdmaGet(source.lci_ncpy_buffer, 0, nullptr, nullptr);
       continue;
 #else

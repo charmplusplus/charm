@@ -2629,6 +2629,18 @@ void CkNoteDeviceRecvComplete(CkGroupID aid, CmiUInt8 id)
   rec->noteDeviceSendDone();
 }
 
+// Same resolution, exported as a lookup: the receive path of the device
+// registration cache (ckrdmadevice.C) attributes a destination-buffer
+// registration to the element that posted it, so the entry is retired when
+// that element migrates and its buffers are freed.
+CkLocRec* CkFindDeviceRecvElement(CkGroupID aid, CmiUInt8 id)
+{
+  if (aid.idx == -1) return NULL;
+  CkArray* arr = (CkArray*)CkLocalBranch(aid);
+  CkLocMgr* mgr = arr ? arr->getLocMgr() : NULL;
+  return mgr ? mgr->elementNrec(ck::ObjID(id).getElementID()) : NULL;
+}
+
 
 // Releasing the last outstanding send is what lets a migration that was waiting
 // on it proceed. Deferring rather than blocking matters: an inter-node send

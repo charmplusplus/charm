@@ -142,6 +142,10 @@ void CkRdmaDeviceStallWatchInit();
 // the definitions in cklocation.C.
 void CkNoteDeviceRecvDeferred(CkGroupID aid, CmiUInt8 id);
 void CkNoteDeviceRecvComplete(CkGroupID aid, CmiUInt8 id);
+// The element a device zerocopy receive is addressed to, or NULL. Lets the
+// registration cache attribute a receive-side registration to the element
+// whose migration must retire it (see acquireDeviceRegistration).
+CkLocRec* CkFindDeviceRecvElement(CkGroupID aid, CmiUInt8 id);
 void CkRdmaDeviceDropRegistrations(CkLocRec* owner);
 
 extern "C" {
