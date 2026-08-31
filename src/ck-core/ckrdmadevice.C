@@ -800,6 +800,13 @@ struct DeviceRestageReq {          // receiver -> sender
   const void* src_ptr;             // the sender's live source, if it still owns one
   bool src_staged;                 // true: read the staged block below instead
   size_t src_comm_offset;
+  // What the source read below must be ordered behind. The original send
+  // established this ordering and the correction has to re-establish it: the
+  // payload is produced by the application's stream (a packing kernel, or the
+  // staging copy), and the re-read runs on hapiStreamPerThread, which is
+  // ordered against neither.
+  const void* src_event;           // memcpy path: the sender's recorded event
+  int src_event_idx;               // staged path: the sender's IPC event slot
   size_t cnt;
   bool inter_node;
   CmiNcpyBuffer dest_ncpy;         // inter-node only: registered destination
@@ -861,6 +868,7 @@ extern "C" void* device_restage_put_done_bridge(void* arg)
 static void requestDeviceRestage(int srcPe, void* dest_op, const void* src_ptr,
                                  CkGroupID dest_aid, CmiUInt8 dest_id,
                                  bool src_staged, size_t src_comm_offset,
+                                 const void* src_event, int src_event_idx,
                                  size_t cnt, void* dest_ptr, size_t dest_cnt,
                                  bool inter_node)
 {
@@ -884,6 +892,8 @@ static void requestDeviceRestage(int srcPe, void* dest_op, const void* src_ptr,
   // transfer's bytes.
   req->src_staged = src_staged;
   req->src_comm_offset = src_comm_offset;
+  req->src_event = src_event;
+  req->src_event_idx = src_event_idx;
   req->cnt = cnt;
   req->inter_node = inter_node;
   if (inter_node) {
@@ -928,6 +938,33 @@ extern "C" void* device_restage_req_bridge(void* arg)
     src_ptr = (const char*)src_dm->comm_buffer->base_ptr + req->src_comm_offset;
   }
 
+  // What produced these bytes has not necessarily run yet. The original send
+  // never read the source itself -- it recorded an event on the application's
+  // stream and let the receiver wait on it -- so the payload is only ordered
+  // behind the packing kernel (or the staging copy) through that event. The
+  // re-read below runs on hapiStreamPerThread, which is ordered against neither
+  // the application's stream nor anything else here, so without re-imposing it
+  // the correction can copy a slice the kernel has not filled and ship the
+  // previous contents of a buffer the application rotates. That lands as a
+  // plausible but wrong ghost in one element, far from here.
+  //
+  // A null event on the unstaged path means the sender blocked at send time
+  // (CHARM_ZC_MEMCPY_SYNC, or no event was free), so the data is already there.
+  hapiEvent_t src_ready = NULL;
+  bool src_needs_full_sync = false;
+  if (req->src_staged && csv_gpu_manager.use_shm) {
+    if (req->src_event_idx >= 0) {
+      const int src_dev_idx = csv_gpu_manager.device_count * CmiMyNodeRankLocal()
+                            + CpvAccess(my_device_id);
+      src_ready = csv_gpu_manager.hapi_ipc_device_infos[src_dev_idx]
+                      .src_event_pool[req->src_event_idx];
+    } else {
+      src_needs_full_sync = true;
+    }
+  } else if (req->src_event != NULL) {
+    src_ready = (hapiEvent_t)req->src_event;
+  }
+
   if (req->inter_node) {
     // Put with notification. The NACK already carried the receiver's registered
     // landing buffer, so the payload goes straight there: one RDMA write from
@@ -938,6 +975,11 @@ extern "C" void* device_restage_req_bridge(void* arg)
     // a notification to the target instead of being resolved locally. Without
     // that the receiver is never told, and the run stalls with the bytes
     // already in place and zero load balancing steps.
+    // The NIC reads this buffer outside any CUDA stream, so the production has
+    // to be complete before the write is issued, not merely ordered behind it.
+    if (src_ready) hapiCheck(cudaEventSynchronize(src_ready));
+    else if (src_needs_full_sync) hapiCheck(cudaDeviceSynchronize());
+
     CmiSetDirectNcpyAckHandler(CkRdmaDeviceRecvHandler);
     CmiNcpyBuffer src_ncpy(src_ptr, req->cnt);
     NcpyOperationInfo* info = src_ncpy.createNcpyOpInfo(
@@ -953,6 +995,11 @@ extern "C" void* device_restage_req_bridge(void* arg)
     acquireIpcSendSlot(dm, cpv_my_device_id, /*is_lb_buffer=*/false,
                        /*direct=*/false, src_ptr, req->cnt, &staged,
                        &event_idx);
+    if (src_ready)
+      hapiCheck(hapiStreamWaitEvent(hapiStreamPerThread, src_ready, 0));
+    else if (src_needs_full_sync)
+      hapiCheck(cudaDeviceSynchronize());
+
     hapiCheck(hapiMemcpyAsync(staged, src_ptr, req->cnt,
                               hapiMemcpyDeviceToDevice, hapiStreamPerThread));
 
@@ -1409,6 +1456,7 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
                              def_aid, save_op.dest_id,
                              source.ipc_protocol == CmiIpcProtocol::STAGED,
                              source.comm_offset,
+                             source.memcpy_event, source.event_idx,
                              (size_t)dest.cnt, arrPtrs[i], (size_t)arrSizes[i],
                              mode != CkNcpyModeDevice::IPC);
         continue;  // completion deferred until the retransmit lands
