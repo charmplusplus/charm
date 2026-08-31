@@ -382,6 +382,25 @@ class Patch : public CBase_Patch {
   }
 
   ~Patch() {
+    // Under async LB this destructor runs mid-step on a migrating element:
+    // kernels and the staging copies of its own zerocopy sends may still be
+    // in flight on these streams. Settle them before freeing what they read.
+    cudaStreamSynchronize(compute_stream);
+    cudaStreamSynchronize(comm_stream);
+    if (outstanding_sends != 0 || phi_out[0] != 0 || phi_out[1] != 0) {
+      // A transport may still be reading a send buffer (direct IPC reads the
+      // source allocation itself). Leak rather than pull memory out from
+      // under it -- the jacobi2d-imbalance convention.
+      if (getenv("CHARM_DEBUG_MIGRATE"))
+        CkPrintf("[%d] (%d,%d) leaking device buffers at destruction: "
+                 "%d+%d+%d sends outstanding\n", CkMyPe(), thisIndex.x,
+                 thisIndex.y, outstanding_sends, phi_out[0], phi_out[1]);
+      hapiCheck(cudaStreamDestroy(compute_stream));
+      hapiCheck(cudaStreamDestroy(comm_stream));
+      hapiCheck(cudaEventDestroy(compute_event));
+      hapiCheck(cudaEventDestroy(comm_event));
+      return;
+    }
     hapiCheck(hapiFree(d_rho));
     hapiCheck(hapiFree(d_phi));
     hapiCheck(hapiFree(d_phi_new));
@@ -455,6 +474,17 @@ class Patch : public CBase_Patch {
   }
 
   void pup(PUP::er& p) {
+    // Migration copies phi and the particles straight off the device on a
+    // stream of its own that is not ordered against ours. Under async LB this
+    // patch is still computing when that happens, so settle our own work
+    // first, or the pack copies out a half-written grid -- and the frees that
+    // follow pull buffers out from under in-flight kernels and staging
+    // copies. (jacobi2d-imbalance does the same; sync-mode migration never
+    // needed it because AtSync ran with both streams drained.)
+    if (p.isPacking()) {
+      cudaStreamSynchronize(compute_stream);
+      cudaStreamSynchronize(comm_stream);
+    }
     p | my_iter;
     p | phi_iter;
     p | recv_count;
