@@ -106,15 +106,20 @@ CpvDeclare(int, my_device); // GPU device that this thread is mapped to
 CpvDeclare(int, my_device_id); // index to the deviceManager that stores info about the device
 CpvDeclare(bool, device_rep); // Is this PE a device representative thread? (1 per device)
 
-// Returns the local rank of the logical node (process) that the given PE belongs to
-static inline int CmiNodeRankLocal(int pe) {
-  // Logical node index % Number of logical nodes per physical node
-  return CmiNodeOf(pe) % (CmiNumNodes() / CmiNumPhysicalNodes());
-}
+// See gpumanager.h for what this indexes and why it is cached.
+CpvDeclare(int, my_node_rank_local);
 
-// Returns the local rank of the logical node that I belong to
-static inline int CmiMyNodeRankLocal() {
-  return CmiNodeRankLocal(CmiMyPe());
+void hapiRefreshTopologyCache() {
+#if CMK_RECONVERSE
+  CpvAccess(my_node_rank_local) = CmiNodeRankOnPhysicalNode(CmiMyNode());
+#else
+  // Classic Converse has no equivalent query and the line is frozen, so it
+  // keeps the arithmetic it has always used. That form assumes processes per
+  // host are uniform and that logical node numbering is contiguous and
+  // host-ordered; reconverse asks the machine layer instead (reconverse#211).
+  CpvAccess(my_node_rank_local) =
+      CmiNodeOf(CmiMyPe()) % (CmiNumNodes() / CmiNumPhysicalNodes());
+#endif
 }
 
 // HAPI internal function declarations
@@ -191,6 +196,9 @@ void hapiCuptiFinalize() {
 
 // Called by all PEs in Charm++ layer init
 void hapiInit(char** argv) {
+  // Before hapiInitCsv: device-manager creation already indexes by it.
+  CpvInitialize(int, my_node_rank_local);
+  hapiRefreshTopologyCache();
   if (!CmiInCommThread()) {
     if (CmiMyRank() == 0) {
       hapiInitCsv(argv); // Initialize per-process variables (GPUManager)

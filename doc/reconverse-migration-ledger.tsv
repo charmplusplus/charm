@@ -26,7 +26,7 @@ examples/charm++/cuda/gpudirect/jacobi2d/jacobi2d.h	2	item-9.3	examples/benchmar
 examples/charm++/cuda/gpudirect/sdag/sdag.C	38	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
 examples/charm++/cuda/gpudirect/sdag/sdag.cu	4	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
 examples/charm++/cuda/gpudirect/verify/Makefile	46	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
-examples/charm++/cuda/gpudirect/verify/charmrun_hapi	292	item-9.2	GPU-direct D2D transport; whole-file; depends on 9.1; validate on multi-GPU Anvil node (-A asc050025-gpu)
+examples/charm++/cuda/gpudirect/verify/charmrun_hapi	292	item-10	reclassified from item-9.2 while doing 9.2: this script exists to start and stop hapi_memory_daemon, so it belongs with the memory daemon, not with the D2D transport
 examples/charm++/cuda/gpudirect/verify/helper.sh	6	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
 examples/charm++/cuda/gpudirect/verify/verbose	1	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
 examples/charm++/cuda/gpudirect/verify/verify.C	111	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
@@ -56,7 +56,7 @@ src/QuickThreads/md/setjmp64_.c	6	needs-judgment
 src/arch/common/cc-gcc.sh	4	tombstone	branch dropped -lckqt (superseded by conv-mach-opt.sh strip) and added -std=gnu++17 to CMK_CXX_FLAGS; the latter deliberately NOT migrated (gcc>=11 defaults to gnu++17, cmake pins the standard); revisit only if charmc-built user code on older gcc breaks
 src/arch/common/cc-mpiopts.sh	2	tombstone-candidate	classic machine layer; frozen line
 src/arch/common/charmrun_elastic	69	tombstone-candidate	classic machine layer; frozen line
-src/arch/common/charmrun_hapi	292	item-9.2	GPU-direct D2D transport; whole-file; depends on 9.1; validate on multi-GPU Anvil node (-A asc050025-gpu)
+src/arch/common/charmrun_hapi	292	item-10	reclassified from item-9.2 while doing 9.2: this script exists to start and stop hapi_memory_daemon, so it belongs with the memory daemon, not with the D2D transport
 src/arch/common/conv-mach-common.h	2	tombstone-candidate	classic machine layer; frozen line
 src/arch/common/conv-mach-cuda.sh	6	tombstone-candidate	classic machine layer; frozen line
 src/arch/common/conv-mach-darwin.sh	8	tombstone-candidate	classic machine layer; frozen line
@@ -113,8 +113,8 @@ src/ck-core/ckmigratable.h	3	needs-judgment
 src/ck-core/ckobjQ.C	1	needs-judgment	
 src/ck-core/ckrdma.C	4	needs-judgment	
 src/ck-core/ckrdma.h	4	needs-judgment	
-src/ck-core/ckrdmadevice.C	336	item-9.2	GPU-direct D2D transport; whole-file; depends on 9.1; validate on multi-GPU Anvil node (-A asc050025-gpu)
-src/ck-core/ckrdmadevice.h	46	item-9.2	GPU-direct D2D transport; whole-file; depends on 9.1; validate on multi-GPU Anvil node (-A asc050025-gpu)
+src/ck-core/ckrdmadevice.C	336	item-9.2-DONE	landed via branch gpu-stage2-d2d (GPU-direct D2D transport); reconverse half added alongside the untouched classic half
+src/ck-core/ckrdmadevice.h	46	item-9.2-DONE	landed via branch gpu-stage2-d2d (GPU-direct D2D transport); the reconverse half of this header had already landed with 9.1
 src/ck-core/ckreduction.C	35	pr-3942	
 src/ck-core/ckreduction.h	1	pr-3942	
 src/ck-core/debug-charm.h	2	needs-judgment	
@@ -174,9 +174,9 @@ src/conv-ccs/ccs-builtins.h	2	needs-judgment
 src/conv-ccs/conv-ccs.C	30	needs-judgment	
 src/conv-ccs/conv-ccs.h	12	needs-judgment	
 src/conv-core/conv-config.h	4	needs-judgment	
-src/conv-core/conv-rdma.h	197	item-9.2	GPU-direct D2D transport; whole-file; depends on 9.1; validate on multi-GPU Anvil node (-A asc050025-gpu)
-src/conv-core/conv-rdmadevice.C	14	item-9.2	GPU-direct D2D transport; whole-file; depends on 9.1; validate on multi-GPU Anvil node (-A asc050025-gpu)
-src/conv-core/conv-rdmadevice.h	44	item-9.2	GPU-direct D2D transport; whole-file; depends on 9.1; validate on multi-GPU Anvil node (-A asc050025-gpu)
+src/conv-core/conv-rdma.h	197	item-9.2-DONE	landed via branch gpu-stage2-d2d (GPU-direct D2D transport); no change needed -- reconverse builds use reconverse's own conv-rdma.h and this copy is excluded from the Converse header copy (see cmake/fetch_reconverse), so it stays classic-only
+src/conv-core/conv-rdmadevice.C	14	item-9.2-DONE	landed via branch gpu-stage2-d2d (GPU-direct D2D transport); no change needed -- Converse's copy is not compiled in a reconverse build, so findTransferModeDevice lives in ckrdmadevice.C's reconverse half instead
+src/conv-core/conv-rdmadevice.h	44	item-9.2-DONE	landed via branch gpu-stage2-d2d (GPU-direct D2D transport); the reconverse half of this header had already landed with 9.1
 src/conv-core/convcore.C	9	needs-judgment	
 src/conv-core/converse.h	2	needs-judgment	
 src/conv-core/cpuaffinity.C	3	needs-judgment	

@@ -293,6 +293,27 @@ void handleDirectApiCompletion(NcpyOperationInfo *info) {
 // Ack handler function which invokes the callback
 void CkRdmaDirectAckHandler(void *ack) {
 
+#if CMK_RECONVERSE && (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM
+  /* Inter-node device (D2D) transfers ride this same ack path, but their
+   * completion bookkeeping is entirely different -- see ckrdmadevice.C. They
+   * are recognised by the deviceRdmaOpInfo the device path attaches to the
+   * destination buffer; every host-side buffer leaves it null.
+   *
+   * Dispatching here is deliberate. The obvious alternative -- having the
+   * device path call CmiSetDirectNcpyAckHandler(CkRdmaDeviceRecvHandler) when
+   * it posts a get -- swaps a process-wide function pointer, so from the first
+   * inter-node D2D message onward every host-side Direct-API and nocopy
+   * entry-method ack would also be delivered to the device handler and
+   * dereference a null deviceRdmaOpInfo.
+   *
+   * The device handler does its own QD accounting, so return before the
+   * QdProcess below rather than after it. */
+  if (((NcpyOperationInfo *)ack)->deviceRdmaOpInfo != nullptr) {
+    CkRdmaDeviceRecvHandler(ack);
+    return;
+  }
+#endif
+
   // Process QD to mark completion of the outstanding RDMA operation
   QdProcess(1);
 

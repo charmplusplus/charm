@@ -79,6 +79,7 @@ class Main : public CBase_Main {
 #endif
 
     CkPrintf("\nElapsed time: %f s\n", CkWallTimer() - startTime);
+    CkPrintf("Results verified\n");
     CkExit();
   }
 };
@@ -174,11 +175,24 @@ class Workers : public CBase_Workers {
 
     CkPrintf("[%d] C-gold\n", thisIndex);
     for (int j = 0; j < vectorSize; j++) {
-      h_C[j] = h_A[j] + h_B[j];
-      CkPrintf("%.2f ", h_C[j]);
+      CkPrintf("%.2f ", h_A[j] + h_B[j]);
     }
     CkPrintf("\n");
 #endif
+
+    // Check the result the GPU produced. A single float add rounds the same
+    // way on host and device, so this compares exactly. Without it a kernel
+    // that never launched -- the object carrying no code for this device's
+    // architecture, for instance -- would leave h_C untouched and the example
+    // would still print a time and exit 0.
+    for (int i = 0; i < vectorSize; i++) {
+      float gold = h_A[i] + h_B[i];
+      if (h_C[i] != gold) {
+        CkAbort("chare %d: C[%d] is %f, expected %f -- the kernel did not run "
+                "correctly on this device\n",
+                thisIndex, i, h_C[i], gold);
+      }
+    }
 
     contribute(CkCallback(CkIndex_Main::done(), mainProxy));
   }
