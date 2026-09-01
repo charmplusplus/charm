@@ -571,6 +571,16 @@ void DiffusionLB::ProcessMigrations()
     migrateInfo[i] = 0;
   }
   migrateInfo.clear();
+  // The idempotency map still points at the MigrateInfo objects deleted just
+  // above, and total_migrates still counts them; both were only reset at the
+  // next Strategy(). A LoadReceived straggling in after this point therefore
+  // wrote through a dangling pointer (map hit) or desynchronized the
+  // vector/counter pair for the following round (map miss). The phase barrier
+  // is supposed to make such a straggler impossible; reset here so that if it
+  // ever is not, the straggler creates a fresh, harmless entry instead of
+  // corrupting the heap.
+  mig_id_map.clear();
+  total_migrates = 0;
 
   // if we don't do the barrier here, must be done with LBSyncResume so that it is done in
   // MigrationDone

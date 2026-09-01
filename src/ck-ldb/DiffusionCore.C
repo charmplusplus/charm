@@ -166,6 +166,15 @@ void DiffusionLB::AcrossNodeLB()
 // counter serves both.
 void DiffusionLB::migMsgAck()
 {
+  // Every ack pairs with a += 2 at a handoff this step. One stray or
+  // duplicated ack silently collapses the phase barrier: acrossDone or
+  // withinDone then fires before every LoadReceived has landed, so
+  // ProcessMigrations both loses migrations (the step never completes) and
+  // reopens the dangling-map window it resets. Make that protocol violation
+  // loud instead of letting it surface as heap corruption far away.
+  if (mig_acksOut <= 0)
+    CkAbort("DiffusionLB: migMsgAck on PE %d with no ack outstanding "
+            "(mig_acksOut=%d)\n", CkMyPe(), mig_acksOut);
   mig_acksOut--;
   migMaybeDone();
 }
