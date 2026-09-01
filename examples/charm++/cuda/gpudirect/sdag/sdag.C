@@ -2,6 +2,16 @@
 #include <string>
 #include "hapi.h"
 
+/* CkDeviceBufferPost names its stream field hapi_stream on the reconverse line
+ * and cuda_stream on the classic one (ckrdmadevice.h splits at CMK_RECONVERSE),
+ * so a single copy of this example has to spell it both ways until the classic
+ * line is removed. Same shim as tests/charm++/cuda/d2dtest. */
+#if CMK_RECONVERSE
+#define POST_STREAM(p) ((p).hapi_stream)
+#else
+#define POST_STREAM(p) ((p).cuda_stream)
+#endif
+
 #define ERROR_TOLERANCE 1e-6
 
 /* readonly */ CProxy_Main main_proxy;
@@ -9,7 +19,7 @@
 /* readonly */ int block_size;
 /* readonly */ int n_iters;
 
-extern void invokeInitKernel(double*, int, double, cudaStream_t);
+extern void invokeInitKernel(double*, int, double, hapiStream_t);
 
 class Main : public CBase_Main {
   double start_time;
@@ -71,19 +81,19 @@ class Block : public CBase_Block {
   int* reg_local_data;
   int* reg_remote_data;
 
-  cudaStream_t stream;
+  hapiStream_t stream;
 
   Block() {}
 
   ~Block() {
-    // Free memory and destroy CUDA stream
-    hapiCheck(cudaFreeHost(h_local_data));
-    hapiCheck(cudaFreeHost(h_remote_data));
-    hapiCheck(cudaFree(d_local_data));
-    hapiCheck(cudaFree(d_remote_data));
+    // Free memory and destroy GPU stream
+    hapiCheck(hapiFreeHost(h_local_data));
+    hapiCheck(hapiFreeHost(h_remote_data));
+    hapiCheck(hapiFree(d_local_data));
+    hapiCheck(hapiFree(d_remote_data));
     free(reg_local_data);
     free(reg_remote_data);
-    cudaStreamDestroy(stream);
+    hapiStreamDestroy(stream);
   }
 
   void init() {
@@ -93,14 +103,14 @@ class Block : public CBase_Block {
     peer = (thisIndex < CkNumPes() / 2) ? (thisIndex + CkNumPes() / 2) :
       (thisIndex - CkNumPes() / 2);
 
-    // Allocate memory and create CUDA stream
-    hapiCheck(cudaMallocHost(&h_local_data, sizeof(double) * block_size));
-    hapiCheck(cudaMallocHost(&h_remote_data, sizeof(double) * block_size));
-    hapiCheck(cudaMalloc(&d_local_data, sizeof(double) * block_size));
-    hapiCheck(cudaMalloc(&d_remote_data, sizeof(double) * block_size));
+    // Allocate memory and create GPU stream
+    hapiCheck(hapiMallocHost(&h_local_data, sizeof(double) * block_size));
+    hapiCheck(hapiMallocHost(&h_remote_data, sizeof(double) * block_size));
+    hapiCheck(hapiMalloc(&d_local_data, sizeof(double) * block_size));
+    hapiCheck(hapiMalloc(&d_remote_data, sizeof(double) * block_size));
     reg_local_data = (int*)malloc(sizeof(int) * block_size);
     reg_remote_data = (int*)malloc(sizeof(int) * block_size);
-    cudaStreamCreate(&stream);
+    hapiStreamCreate(&stream);
 
     // Initialize data
     invokeInitKernel(d_local_data, block_size, (double)thisIndex, stream);
@@ -115,9 +125,9 @@ class Block : public CBase_Block {
   void receive(int ref, int &size1, double *&arr1, int size2, int *arr2,
       CkDeviceBufferPost *devicePost) {
     // Inform the runtime where the incoming data should be stored
-    // and which CUDA stream should be used for the transfer
+    // and which GPU stream should be used for the transfer
     arr1 = d_remote_data;
-    devicePost[0].cuda_stream = stream;
+    POST_STREAM(devicePost[0]) = stream;
 
     // Last array should be available here as it is not RDMA
     // Copy it over for validation
@@ -127,9 +137,9 @@ class Block : public CBase_Block {
 
   void validateData() {
     // Move the data to the host for validation
-    hapiCheck(cudaMemcpyAsync(h_remote_data, d_remote_data,
-          sizeof(double) * block_size, cudaMemcpyDeviceToHost, stream));
-    hapiCheck(cudaStreamSynchronize(stream));
+    hapiCheck(hapiMemcpyAsync(h_remote_data, d_remote_data,
+          sizeof(double) * block_size, hapiMemcpyDeviceToHost, stream));
+    hapiCheck(hapiStreamSynchronize(stream));
 
     // Validate data
     bool validated = true;

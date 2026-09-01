@@ -16,16 +16,33 @@ authoritative), `tombstone` / `tombstone-candidate`, `needs-judgment`.
 
 - `item-9.1-DONE` — landed via branch `gpu-stage1-hapi` (HAPI portable
   core; hybridapi naming unified across all three build paths).
-- `item-9.2` / `item-9.3` — whole-file boundaries: take the branch
-  versions of these files onto the post-9.1 base; no line selection
-  needed. 9.2 = GPU-direct D2D transport (validate on a multi-GPU
-  Anvil node, `-A asc050025-gpu`); 9.3 = examples/benchmarks tier.
-  The 9.2 boundary is spelled `!CMK_RECONVERSE`, in `ckrdmadevice.C`
-  and at every site referencing a symbol it defines (today just the
-  `loopback_handler` registration in `init.C`). Those guards have to
-  move together: drifting apart is what broke the first reconverse+GPU
-  link. `grep -rn "loopback_bridge\|loopback_handler" src/` enumerates
-  the referencing sites.
+- `item-9.2-DONE` — landed via branch `gpu-stage2-d2d` (GPU-direct D2D
+  transport). Its boundary is spelled `!CMK_RECONVERSE`, in
+  `ckrdmadevice.C` and at every site referencing a symbol it defines
+  (today just the `loopback_handler` registration in `init.C`). Those
+  guards have to move together: drifting apart is what broke the first
+  reconverse+GPU link. `grep -rn "loopback_bridge\|loopback_handler"
+  src/` enumerates the referencing sites.
+- `item-9.3-DONE` — landed via branch `gpu-stage3-examples`
+  (examples/benchmarks tier). Both sub-stages were billed as
+  whole-file boundaries — take the branch version, no line selection.
+  That held for 9.2 and did **not** hold for 9.3: roughly a third of
+  the branch's delta here is development scratch (a hardcoded personal
+  `CHARM_DIR`, `DataType` switched to `float`, tests and guards
+  commented out, per-iteration `printf` debugging, an allocation added
+  inside a benchmark's timing loop, a stray Slurm log). Each 9.3 row's
+  note records what was taken and what was not.
+  Two things 9.3 turned up that outlive it:
+  - Nothing built `examples/charm++/cuda/gpudirect` or
+    `benchmarks/charm++/cuda`. Neither was in a parent Makefile's
+    `DIRS`, so every GPU-direct example was staged into the build tree
+    and compiled by nothing — and had in fact stopped compiling after
+    9.1. Both are now wired into CI.
+  - `CkDeviceBufferPost`'s stream field is `hapi_stream` on the
+    reconverse line and `cuda_stream` on the classic one, so no single
+    source compiles against both. The examples paper over it with a
+    `POST_STREAM` macro, the same shim `tests/charm++/cuda/d2dtest`
+    uses. Delete both when the classic line goes.
 - Acceptance test for the GPU series: `tests/charm++/cuda/hapitest`,
   one self-checking program (device mapping, buddy allocator, N async
   callbacks). Build-only in CI per #3950; reviewers run it on their

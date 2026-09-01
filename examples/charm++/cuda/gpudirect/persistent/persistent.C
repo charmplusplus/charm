@@ -13,22 +13,22 @@
 /* readonly */ bool lb_test;
 /* readonly */ int lb_period;
 
-extern void invokeFillKernel(double*, int, double, cudaStream_t);
+extern void invokeFillKernel(double*, int, double, hapiStream_t);
 
 struct Container {
   double* h_remote_data;
   double* d_local_data;
   double* d_remote_data;
-  cudaStream_t stream;
+  hapiStream_t stream;
 
   Container() : h_remote_data(nullptr), d_local_data(nullptr),
     d_remote_data(nullptr) {}
 
   ~Container() {
-    hapiCheck(cudaFreeHost(h_remote_data));
-    hapiCheck(cudaFree(d_local_data));
-    hapiCheck(cudaFree(d_remote_data));
-    hapiCheck(cudaStreamDestroy(stream));
+    hapiCheck(hapiFreeHost(h_remote_data));
+    hapiCheck(hapiFree(d_local_data));
+    hapiCheck(hapiFree(d_remote_data));
+    hapiCheck(hapiStreamDestroy(stream));
   }
 
   void pup(PUP::er& p) {
@@ -40,22 +40,22 @@ struct Container {
   }
 
   void init() {
-    hapiCheck(cudaMallocHost(&h_remote_data, sizeof(double) * block_size));
-    hapiCheck(cudaMalloc(&d_local_data, sizeof(double) * block_size));
-    hapiCheck(cudaMalloc(&d_remote_data, sizeof(double) * block_size));
-    hapiCheck(cudaStreamCreate(&stream));
+    hapiCheck(hapiMallocHost(&h_remote_data, sizeof(double) * block_size));
+    hapiCheck(hapiMalloc(&d_local_data, sizeof(double) * block_size));
+    hapiCheck(hapiMalloc(&d_remote_data, sizeof(double) * block_size));
+    hapiCheck(hapiStreamCreate(&stream));
   }
 
   void fill(double val) {
     invokeFillKernel(d_local_data, block_size, val, stream);
 
-    hapiCheck(cudaStreamSynchronize(stream));
+    hapiCheck(hapiStreamSynchronize(stream));
   }
 
   void verify(double val) {
-    hapiCheck(cudaMemcpyAsync(h_remote_data, d_remote_data,
-          sizeof(double) * block_size, cudaMemcpyDeviceToHost, stream));
-    hapiCheck(cudaStreamSynchronize(stream));
+    hapiCheck(hapiMemcpyAsync(h_remote_data, d_remote_data,
+          sizeof(double) * block_size, hapiMemcpyDeviceToHost, stream));
+    hapiCheck(hapiStreamSynchronize(stream));
 
     for (int i = 0; i < block_size; i++) {
       if (fabs(h_remote_data[i] - val) > ERROR_TOLERANCE) {
@@ -105,7 +105,7 @@ public:
     delete m;
 
     // Print info
-    CkPrintf("[CUDA Zerocopy Verification Test]\n"
+    CkPrintf("[GPU Zerocopy Verification Test]\n"
         "Block size: %d, Iters: %d, LB: %s (period: %d)\n",
         block_size, n_iters, lb_test ? "true" : "false", lb_period);
 

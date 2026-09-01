@@ -8,6 +8,17 @@
 #ifndef __HAPI_PORTABLE_H_
 #define __HAPI_PORTABLE_H_
 
+/* Everything below is C++ even when the includer is not. ampi.h wraps its
+ * includes in extern "C", and reaches this header through ampi_functions.h ->
+ * hapi_functions.h; without this, the template overloads further down are
+ * rejected outright ("template with C linkage"), and on the HIP side
+ * hip_runtime.h's own <thread> include fails the same way before we get that
+ * far. extern "C++" restores C++ linkage for the whole body regardless of the
+ * context the header lands in. */
+#ifdef __cplusplus
+extern "C++" {
+#endif
+
 #undef CMK_CUDA
 #undef CMK_HIP
 
@@ -96,6 +107,15 @@
 static inline cudaError_t hapiMallocHost(void** ptr, size_t size) {
   return cudaMallocHost(ptr, size);
 }
+/* cudaMallocHost also declares a C++ template overload on T**, so user code
+ * has never needed a cast: hapiMallocHost(&d_ptr, n) with a double** just
+ * works. Without this overload the void** signature above is a narrowing of
+ * the API this header stands in for, and every such call stops compiling --
+ * which is what happened to the gpudirect examples. */
+template <typename T>
+static inline cudaError_t hapiMallocHost(T** ptr, size_t size) {
+  return cudaMallocHost(reinterpret_cast<void**>(ptr), size);
+}
 static inline cudaError_t hapiFreeHost(void* ptr) {
   return cudaFreeHost(ptr);
 }
@@ -125,6 +145,9 @@ static inline cudaError_t hapiFreeHost(void* ptr) {
 
 #define hapiMemcpyAsync cudaMemcpyAsync
 #define hapiMemcpy2DAsync cudaMemcpy2DAsync
+#define hapiMemset(ptr, value, count) cudaMemset(ptr, value, count)
+#define hapiMemsetAsync(ptr, value, count, stream) \
+    cudaMemsetAsync(ptr, value, count, stream)
 
 #endif // CMK_CUDA
 
@@ -212,6 +235,15 @@ static inline cudaError_t hapiFreeHost(void* ptr) {
 static inline hipError_t hapiMallocHost(void** ptr, size_t size) {
   return hipHostMalloc(ptr, size);
 }
+/* hipHostMalloc also declares a C++ template overload on T**, so user code
+ * has never needed a cast: hapiMallocHost(&d_ptr, n) with a double** just
+ * works. Without this overload the void** signature above is a narrowing of
+ * the API this header stands in for, and every such call stops compiling --
+ * which is what happened to the gpudirect examples. */
+template <typename T>
+static inline hipError_t hapiMallocHost(T** ptr, size_t size) {
+  return hipHostMalloc(reinterpret_cast<void**>(ptr), size);
+}
 static inline hipError_t hapiFreeHost(void* ptr) {
   return hipHostFree(ptr);
 }
@@ -248,7 +280,14 @@ static inline hipError_t hapiFreeHost(void* ptr) {
 
 #define hapiMemcpyAsync hipMemcpyAsync
 #define hapiMemcpy2DAsync hipMemcpy2DAsync
+#define hapiMemset(ptr, value, count) hipMemset(ptr, value, count)
+#define hapiMemsetAsync(ptr, value, count, stream) \
+    hipMemsetAsync(ptr, value, count, stream)
 
 #endif // CMK_HIP
+
+#ifdef __cplusplus
+}  /* extern "C++" */
+#endif
 
 #endif /* __HAPI_PORTABLE_H_ */
