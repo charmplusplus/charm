@@ -14,7 +14,7 @@ set_directory_properties(PROPERTIES
 # this SHA in a reviewed commit; --with-fetch-reconverse-tag/-dir still
 # override for development.
 set(AUTOFETCH_RECONVERSE_TAG
-    0673ee82ab71fee347536691e2c781df99b2ba6d
+    2c50813e71e23e5f8aec5a258c4c35e898f7144f
     CACHE STRING "The reconverse commit (full SHA) to fetch")
 
 include(FetchContent)
