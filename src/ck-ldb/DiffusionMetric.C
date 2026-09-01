@@ -1,4 +1,5 @@
 
+#include <limits>
 #include <vector>
 
 class DiffusionMetric
@@ -160,23 +161,41 @@ MetricComm::MetricComm(BaseLB::LDStats* ns, int nodeId, int nodeSize, int nCount
 
 int MetricComm::popBestObject(int nbor)
 {
-  // find index of object with max internal comm
-  int maxExternalComm = -1;
+  // Pick the object whose move costs this node the least edge cut: the bytes it
+  // already sends across to `nbor` (which the move turns into local traffic)
+  // minus the bytes that are local today (which the move turns into cut).
+  //
+  // Ranking on externalComm alone is only a tie-break away from arbitrary. On a
+  // well-placed stencil almost all traffic is internal, so externalComm[nbor][i]
+  // is 0 for nearly every object; with a -1 seed the first candidate that fits
+  // capacity wins and no later 0 can beat it, so the choice collapses to the
+  // lowest object index that fits -- always the same corner of the index space,
+  // regardless of who the object talks to. That is what shreds the locality the
+  // BLOCK map starts with: measured on pic2d, cross-node traffic went 8.9 -> 48
+  // MB across two LB rounds and the iteration time went 40 -> 98 ms.
+  //
+  // Subtracting internalComm restores a real signal in exactly that case: with
+  // no external traffic to discriminate on, the least-wired-in object wins
+  // instead of the lowest-numbered one. Doubles throughout -- externalComm and
+  // internalComm are byte counts and were being truncated to int.
+  double bestGain = -std::numeric_limits<double>::max();
   int bestObject = -1;
 
   double nborCapacity = toSendLoad[nbor];
 
   for (int i = 0; i < n_objs; i++)
   {
-    if(!objAvailable[i]) continue;
+    if (!objAvailable[i]) continue;
+    if (!nodeStats->objData[i].migratable) continue;
+
     double objLoad = diffusionObjLoad(nodeStats->objData[i]);
+    if (objLoad > nborCapacity) continue;
 
-    int testComm = externalComm[nbor][i];
+    const double gain = externalComm[nbor][i] - internalComm[i];
 
-    if ((testComm > maxExternalComm) && objAvailable[i] &&
-        (nodeStats->objData[i].migratable) && (objLoad <= nborCapacity))
+    if (gain > bestGain)
     {
-      maxExternalComm = testComm;
+      bestGain = gain;
       bestObject = i;
     }
   }
