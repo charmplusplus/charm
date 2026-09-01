@@ -22,6 +22,8 @@ on:
       # touches only the CUDA examples never triggers the job that builds them.
       - 'examples/charm*/cuda/**'
       - 'examples/ampi/cuda/**'
+      # Same '+' caveat as above: benchmarks/charm++ is the only benchmarks/charm*.
+      - 'benchmarks/charm*/cuda/**'
       - 'src/arch/common/conv-mach-cuda.*'
       - 'src/arch/common/special.sh'
       - 'src/ck-core/ckrdmadevice.*'
@@ -46,6 +48,8 @@ on:
       # touches only the CUDA examples never triggers the job that builds them.
       - 'examples/charm*/cuda/**'
       - 'examples/ampi/cuda/**'
+      # Same '+' caveat as above: benchmarks/charm++ is the only benchmarks/charm*.
+      - 'benchmarks/charm*/cuda/**'
       - 'src/arch/common/conv-mach-cuda.*'
       - 'src/arch/common/special.sh'
       - 'src/ck-core/ckrdmadevice.*'
@@ -68,8 +72,47 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      # The toolkit download, not the build, is what makes this job's wall time
+      # swing: measured 2.1 / 15.2 / 51.0 minutes across three runs of the same
+      # unchanged step, while every build step stayed within a minute of itself.
+      # Two fixes, in order of how much they buy:
+      #
+      #  --no-install-recommends: nvidia-cuda-toolkit recommends nsight-compute
+      #  (307 MB), nsight-systems (141 MB) and nvidia-visual-profiler (106 MB,
+      #  plus a JRE) -- interactive profilers that a build-only job never runs.
+      #  Dropping them roughly halves the download, to nvidia-cuda-dev (653 MB)
+      #  plus the toolkit itself (84 MB).
+      #
+      #  Caching the .debs: what remains then comes off the Actions cache
+      #  instead of an apt mirror, which is what removes the variance rather
+      #  than just shrinking its worst case. The key carries the runner image
+      #  version, so an image bump (different preinstalled packages, hence a
+      #  different dependency set to download) starts a fresh cache rather than
+      #  restoring an incomplete one.
+      # ImageVersion is a runner-image environment variable, not something the
+      # `env` expression context is guaranteed to carry, so read it in a step
+      # and hand it over as an output rather than interpolating it directly.
+      - name: cache key inputs
+        id: keyinfo
+        run: echo "image=${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
+      - name: cache cuda toolkit packages
+        uses: actions/cache@v5
+        with:
+          path: ~/cuda-debs
+          # Exact key only, no restore-keys: a partial match would restore a
+          # deb set built for a different image and the install would fail.
+          key: cuda-debs-${{ steps.keyinfo.outputs.image }}-nvidia-cuda-toolkit-v1
       - name: install cuda toolkit
-        run: sudo apt-get update && sudo apt-get -y install nvidia-cuda-toolkit
+        run: |
+          set -e
+          mkdir -p ~/cuda-debs/partial
+          if ! ls ~/cuda-debs/*.deb >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends -d \
+              -o Dir::Cache::archives="$HOME/cuda-debs" nvidia-cuda-toolkit
+            sudo chown -R "$(id -u):$(id -g)" ~/cuda-debs
+          fi
+          sudo apt-get install -y --no-install-recommends ~/cuda-debs/*.deb
       - name: cmake build (all-test)
         run: |
           ./build all-test netlrts-linux-x86_64 cuda -j4 -g
@@ -78,10 +121,23 @@ jobs:
       - name: cuda examples compile
         run: |
           export CUDATOOLKIT_HOME=/usr
+          # This now reaches examples/charm++/cuda/gpudirect too: it was absent
+          # from that Makefile's DIRS, so until stage 9.3 added it, every
+          # GPU-direct example was staged into the build tree and then compiled
+          # by nothing at all. They had in fact stopped compiling -- they still
+          # set CkDeviceBufferPost::cuda_stream, which 9.1 renamed to
+          # hapi_stream -- and no CI job noticed.
           make -j4 -C netlrts-linux-x86_64-cuda/examples/charm++/cuda OPTS="-g"
           # AMPI's CUDA example is the gate on hapi_functions.h staying
           # self-sufficient under AMPI's own include order.
           make -j4 -C netlrts-linux-x86_64-cuda/examples/ampi/cuda OPTS="-g"
+      - name: cuda benchmarks compile
+        # The GPU-direct latency/bandwidth benchmarks were never built by CI
+        # either. They drive the same nocopydevice surface as the examples, from
+        # a group rather than an array.
+        run: |
+          export CUDATOOLKIT_HOME=/usr
+          make -j4 -C netlrts-linux-x86_64-cuda/benchmarks/charm++/cuda OPTS="-g"
       - name: hapitest compiles
         # The stage 9.1 acceptance test. Running it needs a GPU, but compiling
         # it is itself a check: hapitest.C is built by charmc, so this is the

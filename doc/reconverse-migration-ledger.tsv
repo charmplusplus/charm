@@ -3,7 +3,7 @@ file	changed_lines	disposition	note
 CMakeLists.txt	223	superseded	reviewed line two-way version is authoritative
 Dockerfile	25	needs-judgment	
 README.md	100	needs-judgment	
-benchmarks/charm++/cuda/gpudirect/latency/latency.C	12	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
+benchmarks/charm++/cuda/gpudirect/latency/latency.C	12	item-9.3-DONE	landed via branch gpu-stage3-examples (examples/benchmarks tier ported to the portable hapi* layer; CI build-only, runs via HPC-site protocol); the branch also allocates and frees the whole max-size device buffer inside the send path each iteration and subtracts the cost back out of the reported latency -- a registration-cost experiment, not a benchmark change; NOT migrated
 buildcmake	59	superseded	reviewed line two-way version is authoritative
 buildold	4	superseded	reviewed line two-way version is authoritative
 cmake/converse.cmake	159	superseded	reviewed line two-way version is authoritative
@@ -13,24 +13,24 @@ contrib/ci.vim	2	needs-judgment
 doc/charm++/manual.rst	3	needs-judgment	
 examples/ampi/Cjacobi3D/Makefile	9	with-feature	lands with the series that exercises it
 examples/ampi/Cjacobi3D/jacobi.C	142	with-feature	lands with the series that exercises it
-examples/charm++/cuda/gpudirect/jacobi2d-imbalance/Makefile	31	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
-examples/charm++/cuda/gpudirect/jacobi2d-imbalance/jacobi2d.C	646	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
-examples/charm++/cuda/gpudirect/jacobi2d-imbalance/jacobi2d.ci	90	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
-examples/charm++/cuda/gpudirect/jacobi2d-imbalance/jacobi2d.cu	195	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
-examples/charm++/cuda/gpudirect/jacobi2d-imbalance/jacobi2d.h	12	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
-examples/charm++/cuda/gpudirect/jacobi2d/Makefile	36	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
-examples/charm++/cuda/gpudirect/jacobi2d/jacobi2d.C	264	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
-examples/charm++/cuda/gpudirect/jacobi2d/jacobi2d.ci	27	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
-examples/charm++/cuda/gpudirect/jacobi2d/jacobi2d.cu	49	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
-examples/charm++/cuda/gpudirect/jacobi2d/jacobi2d.h	2	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
-examples/charm++/cuda/gpudirect/sdag/sdag.C	38	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
-examples/charm++/cuda/gpudirect/sdag/sdag.cu	4	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
-examples/charm++/cuda/gpudirect/verify/Makefile	46	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
+examples/charm++/cuda/gpudirect/jacobi2d-imbalance/Makefile	31	item-9.3-DONE	landed via branch gpu-stage3-examples (examples/benchmarks tier ported to the portable hapi* layer; CI build-only, runs via HPC-site protocol)
+examples/charm++/cuda/gpudirect/jacobi2d-imbalance/jacobi2d.C	646	item-9.3-DONE	landed via branch gpu-stage3-examples (examples/benchmarks tier ported to the portable hapi* layer; CI build-only, runs via HPC-site protocol); derived from the cleaned jacobi2d rather than transcribed -- the branch's copy is a stale fork (still raw cuda*, frees commented out, no send-completion handshakes)
+examples/charm++/cuda/gpudirect/jacobi2d-imbalance/jacobi2d.ci	90	item-9.3-DONE	landed via branch gpu-stage3-examples (examples/benchmarks tier ported to the portable hapi* layer; CI build-only, runs via HPC-site protocol)
+examples/charm++/cuda/gpudirect/jacobi2d-imbalance/jacobi2d.cu	195	item-9.3-DONE	landed via branch gpu-stage3-examples (examples/benchmarks tier ported to the portable hapi* layer; CI build-only, runs via HPC-site protocol); the branch's imbalance kernel averages `iter` stencil evaluations and divides by iter, which is a divide-by-zero for the load_iters==0 corner. Rewritten as a serially dependent relaxation chain: exact for reps==1 and not hoistable under fast-math
+examples/charm++/cuda/gpudirect/jacobi2d-imbalance/jacobi2d.h	12	item-9.3-DONE	landed via branch gpu-stage3-examples (examples/benchmarks tier ported to the portable hapi* layer; CI build-only, runs via HPC-site protocol)
+examples/charm++/cuda/gpudirect/jacobi2d/Makefile	36	item-9.3-DONE	landed via branch gpu-stage3-examples (examples/benchmarks tier ported to the portable hapi* layer; CI build-only, runs via HPC-site protocol); the branch version hardcodes CHARM_DIR=/u/ajain18/oldCharm and hipcc, so it was rewritten rather than taken: GPU=cuda|hip, defaulted from the Charm++ build's conv-mach-opt.h
+examples/charm++/cuda/gpudirect/jacobi2d/jacobi2d.C	264	item-9.3-DONE	landed via branch gpu-stage3-examples (examples/benchmarks tier ported to the portable hapi* layer; CI build-only, runs via HPC-site protocol); plus migration support (usesAtSync, migration ctor, pup) and send-completion handshakes. The branch's pup() uses PUP::PUPMode::DEVICE, which does not exist on this line -- that is the GPU-aware LB step -- so the device data is staged through pinned host memory by hand for now
+examples/charm++/cuda/gpudirect/jacobi2d/jacobi2d.ci	27	item-9.3-DONE	landed via branch gpu-stage3-examples (examples/benchmarks tier ported to the portable hapi* layer; CI build-only, runs via HPC-site protocol); plus the d_send_*_ghost_done completions and the iterate() LB boundary. The branch guards those waits on !sync_ver; guarded on use_zerocopy here instead, since only the zerocopy path attaches a completion callback and the other one would wait forever
+examples/charm++/cuda/gpudirect/jacobi2d/jacobi2d.cu	49	item-9.3-DONE	landed via branch gpu-stage3-examples (examples/benchmarks tier ported to the portable hapi* layer; CI build-only, runs via HPC-site protocol)
+examples/charm++/cuda/gpudirect/jacobi2d/jacobi2d.h	2	item-9.3-DONE	the branch's only change here is DataType double->float, a local experiment that silently changes what the benchmark measures; NOT migrated
+examples/charm++/cuda/gpudirect/sdag/sdag.C	38	item-9.3-DONE	landed via branch gpu-stage3-examples (examples/benchmarks tier ported to the portable hapi* layer; CI build-only, runs via HPC-site protocol)
+examples/charm++/cuda/gpudirect/sdag/sdag.cu	4	item-9.3-DONE	landed via branch gpu-stage3-examples (examples/benchmarks tier ported to the portable hapi* layer; CI build-only, runs via HPC-site protocol)
+examples/charm++/cuda/gpudirect/verify/Makefile	46	item-9.3-DONE	landed via branch gpu-stage3-examples (examples/benchmarks tier ported to the portable hapi* layer; CI build-only, runs via HPC-site protocol); the branch had begun the same GPU=cuda|hip split, regenerated here from the hapitest/d2dtest template so all eight gpudirect Makefiles match
 examples/charm++/cuda/gpudirect/verify/charmrun_hapi	292	item-10	reclassified from item-9.2 while doing 9.2: this script exists to start and stop hapi_memory_daemon, so it belongs with the memory daemon, not with the D2D transport
-examples/charm++/cuda/gpudirect/verify/helper.sh	6	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
-examples/charm++/cuda/gpudirect/verify/verbose	1	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
-examples/charm++/cuda/gpudirect/verify/verify.C	111	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
-examples/charm++/cuda/gpudirect/verify/verify.cu	4	item-9.3	examples/benchmarks tier; whole-file; after 9.2; CI build-only, runs via HPC-site protocol
+examples/charm++/cuda/gpudirect/verify/helper.sh	6	tombstone	six lines of personal scratch (make clean; make; five commented-out srun lines); superseded by examples/charm++/cuda/gpudirect/README.txt
+examples/charm++/cuda/gpudirect/verify/verbose	1	tombstone	a stray Slurm 'CANCELLED ... DUE to SIGNAL Killed' log committed by accident
+examples/charm++/cuda/gpudirect/verify/verify.C	111	item-9.3-DONE	landed via branch gpu-stage3-examples (examples/benchmarks tier ported to the portable hapi* layer; CI build-only, runs via HPC-site protocol); the branch version has the group and nodegroup tests and the 2-PE guard commented out, per-iteration printf debugging and an n_warpup_iters typo -- only the hapi* rename was taken
+examples/charm++/cuda/gpudirect/verify/verify.cu	4	item-9.3-DONE	landed via branch gpu-stage3-examples (examples/benchmarks tier ported to the portable hapi* layer; CI build-only, runs via HPC-site protocol)
 examples/charm++/cuda/stencil2d/Makefile	6	with-feature	lands with the series that exercises it
 examples/charm++/cuda/stencil2d/stencil2d.C	260	with-feature	lands with the series that exercises it
 examples/charm++/cuda/stencil2d/stencil2d.ci	17	with-feature	lands with the series that exercises it

@@ -206,7 +206,7 @@ __global__ void backUnpackingKernel(DataType* temperature, DataType* ghost,
 }
 
 void invokeInitKernel(DataType* d_temperature, int block_width, int block_height,
-    int block_depth, cudaStream_t stream) {
+    int block_depth, hapiStream_t stream) {
   dim3 block_dim(TILE_SIZE_3D, TILE_SIZE_3D, TILE_SIZE_3D);
   dim3 grid_dim(((block_width+2)+(block_dim.x-1))/block_dim.x,
       ((block_height+2)+(block_dim.y-1))/block_dim.y,
@@ -214,11 +214,11 @@ void invokeInitKernel(DataType* d_temperature, int block_width, int block_height
 
   initKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature, block_width,
       block_height, block_depth);
-  hapiCheck(cudaPeekAtLastError());
+  hapiCheck(hapiPeekAtLastError());
 }
 
 void invokeGhostInitKernels(const std::vector<DataType*>& ghosts,
-    const std::vector<int>& ghost_counts, cudaStream_t stream) {
+    const std::vector<int>& ghost_counts, hapiStream_t stream) {
   dim3 block_dim(256);
   for (int i = 0; i < ghosts.size(); i++) {
     DataType* ghost = ghosts[i];
@@ -228,12 +228,12 @@ void invokeGhostInitKernels(const std::vector<DataType*>& ghosts,
 
     ghostInitKernel<<<grid_dim, block_dim, 0, stream>>>(ghost,
         ghost_count);
-    hapiCheck(cudaPeekAtLastError());
+    hapiCheck(hapiPeekAtLastError());
   }
 }
 
 void invokeBoundaryKernels(DataType* d_temperature, int block_width,
-    int block_height, int block_depth, bool bounds[], cudaStream_t stream) {
+    int block_height, int block_depth, bool bounds[], hapiStream_t stream) {
   dim3 block_dim(TILE_SIZE_2D, TILE_SIZE_2D);
 
   if (bounds[LEFT]) {
@@ -272,11 +272,11 @@ void invokeBoundaryKernels(DataType* d_temperature, int block_width,
     backBoundaryKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature,
         block_width, block_height, block_depth);
   }
-  hapiCheck(cudaPeekAtLastError());
+  hapiCheck(hapiPeekAtLastError());
 }
 
 void invokeJacobiKernel(DataType* d_temperature, DataType* d_new_temperature,
-    int block_width, int block_height, int block_depth, cudaStream_t stream) {
+    int block_width, int block_height, int block_depth, hapiStream_t stream) {
   dim3 block_dim(TILE_SIZE_3D, TILE_SIZE_3D, TILE_SIZE_3D);
   dim3 grid_dim((block_width+(block_dim.x-1))/block_dim.x,
       (block_height+(block_dim.y-1))/block_dim.y,
@@ -284,12 +284,12 @@ void invokeJacobiKernel(DataType* d_temperature, DataType* d_new_temperature,
 
   jacobiKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature, d_new_temperature,
       block_width, block_height, block_depth);
-  hapiCheck(cudaPeekAtLastError());
+  hapiCheck(hapiPeekAtLastError());
 }
 
 void invokePackingKernels(DataType* d_temperature, DataType* d_ghosts[],
     bool bounds[], int block_width, int block_height, int block_depth,
-    cudaStream_t stream) {
+    hapiStream_t stream) {
   dim3 block_dim(TILE_SIZE_2D, TILE_SIZE_2D);
 
   if (!bounds[LEFT]) {
@@ -328,11 +328,11 @@ void invokePackingKernels(DataType* d_temperature, DataType* d_ghosts[],
     backPackingKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature,
         d_ghosts[BACK], block_width, block_height, block_depth);
   }
-  hapiCheck(cudaPeekAtLastError());
+  hapiCheck(hapiPeekAtLastError());
 }
 
 void invokeUnpackingKernel(DataType* d_temperature, DataType* d_ghost, int dir,
-    int block_width, int block_height, int block_depth, cudaStream_t stream) {
+    int block_width, int block_height, int block_depth, hapiStream_t stream) {
   dim3 block_dim(TILE_SIZE_2D, TILE_SIZE_2D);
 
   if (dir == LEFT) {
@@ -366,5 +366,5 @@ void invokeUnpackingKernel(DataType* d_temperature, DataType* d_ghost, int dir,
     backUnpackingKernel<<<grid_dim, block_dim, 0, stream>>>(d_temperature,
         d_ghost, block_width, block_height, block_depth);
   }
-  hapiCheck(cudaPeekAtLastError());
+  hapiCheck(hapiPeekAtLastError());
 }

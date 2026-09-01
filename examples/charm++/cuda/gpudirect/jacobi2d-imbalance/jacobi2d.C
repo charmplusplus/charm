@@ -53,6 +53,7 @@
 /* readonly */ bool print_elements;
 /* readonly */ int lb_freq;
 /* readonly */ int first_lb;
+/* readonly */ int imbalance;
 
 extern void invokeInitKernel(DataType* d_temperature, int block_width,
     int block_height, hapiStream_t stream);
@@ -60,7 +61,7 @@ extern void invokeBoundaryKernels(DataType* d_temperature, int block_width,
     int block_height, bool left_bound, bool right_bound, bool top_bound,
     bool bottom_bound, hapiStream_t stream);
 extern void invokeJacobiKernel(DataType* d_temperature, DataType* d_new_temperature,
-    int block_width, int block_height, hapiStream_t stream);
+    int block_width, int block_height, int reps, hapiStream_t stream);
 extern void invokePackingKernels(DataType* d_temperature, DataType* d_left_ghost,
     DataType* d_right_ghost, bool left_bound, bool right_bound, int block_width,
     int block_height, hapiStream_t stream);
@@ -82,10 +83,12 @@ public:
   Main(CkArgMsg* m) {
     // Set default values
     main_proxy = thisProxy;
-    grid_width = 16384;
-    grid_height = 16384;
-    block_width = 4096;
-    block_height = 4096;
+    // A smaller default grid than plain jacobi2d: this variant exists to be
+    // migrated, and 16384/4096 is only 16 chares to spread over the PEs.
+    grid_width = 8192;
+    grid_height = 8192;
+    block_width = 2048;
+    block_height = 2048;
     n_iters = 100;
     warmup_iters = 10;
     use_zerocopy = false;
@@ -94,6 +97,9 @@ public:
     // 0 disables load balancing; -f/-l turn it on.
     first_lb = 0;
     lb_freq = 0;
+    // Extra stencil passes the most-loaded block does relative to the
+    // least-loaded one. This is the whole point of the variant.
+    imbalance = 5;
     my_iter = 0;
 
     // Initialize aggregate timers
@@ -102,7 +108,7 @@ public:
 
     // Process arguments
     int c;
-    while ((c = getopt(m->argc, m->argv, "W:H:w:h:i:u:f:l:yzp")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "W:H:w:h:i:u:f:l:m:yzp")) != -1) {
       switch (c) {
         case 'W':
           grid_width = atoi(optarg);
@@ -128,6 +134,9 @@ public:
         case 'l':
           lb_freq = atoi(optarg);
           break;
+        case 'm':
+          imbalance = atoi(optarg);
+          break;
         case 'y':
           sync_ver = true;
           break;
@@ -141,6 +150,7 @@ public:
           CkPrintf(
               "Usage: %s -W [grid width] -H [grid height] -w [block width] -h [block height]"
               "-i [iterations] -u [warmup] -f [first LB iteration] -l [LB interval] "
+              "-m [max extra stencil passes] "
               "-y (use sync version) -z (use GPU zerocopy) -p (print blocks)\n",
               m->argv[0]);
           CkExit();
@@ -157,7 +167,7 @@ public:
     n_chares_y = grid_height / block_height;
 
     // Print configuration
-    CkPrintf("\n[GPU 2D Jacobi example]\n");
+    CkPrintf("\n[GPU 2D Jacobi example, load imbalance variant]\n");
     CkPrintf("Grid: %d x %d, Block: %d x %d, Chares: %d x %d, Iterations: %d, "
         "Warm-up: %d, Bulk-synchronous: %d, Zerocopy: %d, Print: %d\n\n",
         grid_width, grid_height, block_width, block_height, n_chares_x, n_chares_y,
@@ -229,6 +239,7 @@ class Block : public CBase_Block {
   int neighbors;
   int remote_count;
   int x, y;
+  int load_iters;
 
   DataType* __restrict__ h_temperature;
   DataType* __restrict__ d_temperature;
@@ -324,6 +335,7 @@ class Block : public CBase_Block {
     p | remote_count;
     p | x;
     p | y;
+    p | load_iters;
     p | left_bound;
     p | right_bound;
     p | top_bound;
@@ -379,6 +391,12 @@ class Block : public CBase_Block {
     neighbors = 0;
     x = thisIndex.x;
     y = thisIndex.y;
+
+    // Graded load: blocks toward the bottom-right of the grid do up to
+    // `imbalance` extra stencil passes, blocks at the top-left do none. A
+    // block-mapped decomposition therefore leaves the last PEs overloaded,
+    // which is what gives the load balancer something to move.
+    load_iters = (int)(((float)(x + y) / (n_chares_x + n_chares_y)) * imbalance);
 
     NVTX_RANGE("Init", Turquoise);
 
@@ -461,7 +479,7 @@ class Block : public CBase_Block {
 #if !COMM_ONLY
     // Invoke GPU kernel for Jacobi computation
     invokeJacobiKernel(d_temperature, d_new_temperature, block_width, block_height,
-        compute_stream);
+        1 + load_iters, compute_stream);
 #endif
 
     // Operations in communication stream (packing and transfers) should

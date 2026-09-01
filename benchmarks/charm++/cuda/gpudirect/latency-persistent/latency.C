@@ -112,7 +112,7 @@ public:
   char* d_remote_data;
   bool memory_allocated;
 
-  cudaStream_t stream;
+  hapiStream_t stream;
   bool stream_created;
 
   CkDevicePersistent my_send_buf;
@@ -128,13 +128,13 @@ public:
   ~Block() {
     if (memory_allocated) {
       if (CkMyPe() == 0) free(times);
-      hapiCheck(cudaFreeHost(h_local_data));
-      hapiCheck(cudaFreeHost(h_remote_data));
-      hapiCheck(cudaFree(d_local_data));
-      hapiCheck(cudaFree(d_remote_data));
+      hapiCheck(hapiFreeHost(h_local_data));
+      hapiCheck(hapiFreeHost(h_remote_data));
+      hapiCheck(hapiFree(d_local_data));
+      hapiCheck(hapiFree(d_remote_data));
     }
 
-    if (stream_created) cudaStreamDestroy(stream);
+    if (stream_created) hapiStreamDestroy(stream);
   }
 
   void init() {
@@ -152,20 +152,20 @@ public:
 
     // Allocate memory
     if (memory_allocated) {
-      hapiCheck(cudaFreeHost(h_local_data));
-      hapiCheck(cudaFreeHost(h_remote_data));
-      hapiCheck(cudaFree(d_local_data));
-      hapiCheck(cudaFree(d_remote_data));
+      hapiCheck(hapiFreeHost(h_local_data));
+      hapiCheck(hapiFreeHost(h_remote_data));
+      hapiCheck(hapiFree(d_local_data));
+      hapiCheck(hapiFree(d_remote_data));
     }
-    hapiCheck(cudaMallocHost(&h_local_data, max_size));
-    hapiCheck(cudaMallocHost(&h_remote_data, max_size));
-    hapiCheck(cudaMalloc(&d_local_data, max_size));
-    hapiCheck(cudaMalloc(&d_remote_data, max_size));
+    hapiCheck(hapiMallocHost(&h_local_data, max_size));
+    hapiCheck(hapiMallocHost(&h_remote_data, max_size));
+    hapiCheck(hapiMalloc(&d_local_data, max_size));
+    hapiCheck(hapiMalloc(&d_remote_data, max_size));
     memory_allocated = true;
 
-    // Create CUDA stream
+    // Create GPU stream
     if (!stream_created) {
-      cudaStreamCreate(&stream);
+      hapiStreamCreate(&stream);
       stream_created = true;
     }
 

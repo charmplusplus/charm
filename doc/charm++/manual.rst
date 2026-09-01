@@ -9329,16 +9329,18 @@ specifier to the corresponding parameter of the receiver's entry method in the `
 This entry method should be invoked on the sender by wrapping the
 source buffer with ``CkDeviceBuffer``, whose constructor takes a pointer
 to the source buffer, a Charm++ callback to be invoked once the transfer
-completes (optional), and a CUDA stream associated with the transfer
-(which is only used internally in the CUDA memcpy and IPC based implementation and is also optional):
+completes (optional), and a GPU stream associated with the transfer
+(which is only used internally in the device memcpy and IPC based implementation and is also optional).
+``hapiStream_t`` is the backend-neutral stream type: it is ``cudaStream_t`` in a
+CUDA build and ``hipStream_t`` in a HIP build.
 
 .. code-block:: c++
 
    // Constructors of CkDeviceBuffer
    CkDeviceBuffer(const void* ptr);
    CkDeviceBuffer(const void* ptr, const CkCallback& cb);
-   CkDeviceBuffer(const void* ptr, cudaStream_t stream);
-   CkDeviceBuffer(const void* ptr, const CkCallback& cb, cudaStream_t stream);
+   CkDeviceBuffer(const void* ptr, hapiStream_t stream);
+   CkDeviceBuffer(const void* ptr, const CkCallback& cb, hapiStream_t stream);
 
    // Call on sender
    someProxy.foo(size, CkDeviceBuffer(buf, cb, stream));
@@ -9346,15 +9348,15 @@ completes (optional), and a CUDA stream associated with the transfer
 As with the Zero Copy Entry Method Post API, both the post entry method
 and regular entry method must be defined. In the post entry method,
 the user must specify the location of the destination GPU buffer,
-and the ``CkDeviceBufferPost`` parameter can be used to specify the CUDA stream
-where the CUDA data transfer will be enqueued (only used in the CUDA memcpy and IPC based mechanism):
+and the ``CkDeviceBufferPost`` parameter can be used to specify the GPU stream
+where the data transfer will be enqueued (only used in the device memcpy and IPC based mechanism):
 
 .. code-block:: c++
 
    // Post entry method
    void foo(int& size, double*& arr, CkDeviceBufferPost* post) {
      arr = dest_buffer; // Inform the location of the destination buffer to the runtime
-     post[0].cuda_stream = stream; // Perform the data transfer in the specified CUDA stream
+     post[0].hapi_stream = stream; // Perform the data transfer in the specified GPU stream
    }
 
    // Regular entry method
@@ -9368,11 +9370,11 @@ system after the GPU buffer has arrived at the destination.
 
 For non-UCX builds, a more optimized mechanism for inter-process communication using CUDA IPC, POSIX shared memory,
 and pre-allocated GPU communication buffers are available through runtime flags.
-This significantly reduces the overhead from creating and opening CUDA IPC handles,
+This significantly reduces the overhead from creating and opening device IPC handles,
 especially for small messages. ``+gpushm`` enables this optimization
 feature, ``+gpucommbuffer [size]`` specifies the size of the communication buffer
 allocated on each GPU (default is 64MB), and ``+gpuipceventpool`` determines the number of
-CUDA IPC events per PE (default is 16).
+device IPC events per PE (default is 16).
 
 Examples and benchmarks of the direct GPU messaging feature can be found in
 ``examples/charm++/cuda/gpudirect`` and ``benchmarks/charm++/cuda/gpudirect``.
