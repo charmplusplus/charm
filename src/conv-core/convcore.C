@@ -1766,6 +1766,13 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
 	/*#warning "CsdNextMessage: CMK_NODE_QUEUE_AVAILABLE" */
 	if (NULL!=(msg=CmiGetNonLocalNodeQ())) return msg;
 #if !CMK_NO_MSG_PRIOS
+#if CMK_NODE_QUEUE_LOCK_BEFORE_CHECK
+	//performs better on grace-hopper
+	if(CmiTryLock(s->nodeLock) == 0) {{
+	  if (!CqsEmpty(s->nodeQ)
+          && CqsPrioGT(CqsGetPriority(s->schedQ),
+                        CqsGetPriority(s->nodeQ))) {
+#else
 	/* Check the node queue lock-free if we have anything to work with. */
 	/* This significantly reduces redundant thread contention in CmiTryLock(). */
 	if (!CqsEmpty(s->nodeQ)) {
@@ -1773,6 +1780,7 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
 	    if (!CqsEmpty(s->nodeQ)
 	    && CqsPrioGT(CqsGetPriority(s->schedQ),
 	                    CqsGetPriority(s->nodeQ))) {
+#endif
 	      CqsDequeue(s->nodeQ,(void **)&msg);
 	    }
 	    CmiUnlock(s->nodeLock);

@@ -82,5 +82,6 @@ In fault tolerant architectures, CK_MEM_CHECKPOINT can be set. In this case the
 extended header must contain also another field called "pn" (phase number).
 
 */
+#define CMK_NODE_QUEUE_LOCK_BEFORE_CHECK	1
 
 #endif
