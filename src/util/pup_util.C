@@ -229,7 +229,16 @@ void PUP::toMem::bytes(void *p,size_t n,size_t itemSize,dataType t, PUPMode mode
         cudaMemcpy((void *)gpuBuf, p, n, cudaMemcpyDeviceToDevice);
       gpuBuf += n;
       if (deviceManifestOut != nullptr)
+      {
+        if (deviceManifestIdx >= deviceManifestCap)
+          CmiAbort(
+              "PUP device manifest overflow: packing pass emitted device "
+              "buffer #%zu but the sizing pass counted only %zu. The pup "
+              "routine does not emit the same device buffers in both "
+              "passes.\n",
+              deviceManifestIdx + 1, deviceManifestCap);
         deviceManifestOut[deviceManifestIdx++] = n;
+      }
 #endif
     }
   }

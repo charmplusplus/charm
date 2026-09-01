@@ -491,6 +491,12 @@ class mem : public er { //Memory-buffer packers and unpackers
   //Return the current number of buffer bytes used
   size_t size(void) const {return buf-origBuf;}
 
+  //Device bytes consumed so far, including the inter-buffer alignment
+  //padding, so it is directly comparable with sizer::gpu_size().
+  size_t gpu_size(void) const {
+    return (gpuOrigBuf == nullptr) ? 0 : (size_t)(gpuBuf - gpuOrigBuf);
+  }
+
   inline char* get_current_pointer() const {
     return reinterpret_cast<char*>(buf);
   }
@@ -536,6 +542,14 @@ class toMem : public mem {
   // the array from sizer::gpu_buf_count().
   size_t* deviceManifestOut = nullptr;
   size_t deviceManifestIdx = 0;
+  // Capacity of that array. The caller sizes it from sizer::gpu_buf_count(),
+  // so a packing pass that emits more device buffers than the sizing pass
+  // counted runs off the end of a *host* allocation (the manifest lives in
+  // the migration message) and silently corrupts the heap -- the failure then
+  // surfaces as an unrelated malloc abort many iterations later. The unpack
+  // side has always bounds-checked its manifest; this is the matching check
+  // for the pack side.
+  size_t deviceManifestCap = 0;
 
   virtual void pup_buffer_device(void *&p, size_t n, size_t itemSize);
 

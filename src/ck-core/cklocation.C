@@ -4025,6 +4025,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 #if CMK_CUDA
     p.gpuStream = (void*)migStream;
     p.deviceManifestOut = msg->gpuManifest;
+    p.deviceManifestCap = nGpuBufs;
 #endif
     p.becomeDeleting();
     pupElementsFor(p, rec, CkElementCreation_migrate);
@@ -4036,6 +4037,25 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
           bufSize, p.size());
       CkAbort("Array element's pup routine has a direction mismatch.\n");
     }
+#if CMK_CUDA
+    // The same check for the device stream. Both totals matter and neither is
+    // implied by the host size: gpu_size() sizes the device region the pack
+    // copies into, and gpu_buf_count() sizes msg->gpuManifest, a host array
+    // inside this message. Under-counting either one is a buffer overflow --
+    // of device memory, or of the heap -- that shows up much later as
+    // unrelated corruption, so catch it where the mismatch actually is.
+    // Overflow only: a pass that packs *less* than it sized wastes room but
+    // corrupts nothing, and the sizer may legitimately round up trailing
+    // alignment. Packing more is the bug worth aborting on.
+    if (p.gpu_size() > gpuBufSize || p.deviceManifestIdx > nGpuBufs)
+    {
+      CkError(
+          "ERROR! Array element claimed %zu device bytes in %zu buffers to a "
+          "sizing PUP::er, but packed %zu bytes in %zu buffers!\n",
+          gpuBufSize, nGpuBufs, p.gpu_size(), p.deviceManifestIdx);
+      CkAbort("Array element's pup routine has a device direction mismatch.\n");
+    }
+#endif
   }
 
   DEBM((AA "Migrated index size %s to %d \n" AB, idx2str(idx), toPe));
