@@ -13,7 +13,11 @@ mainmodule jacobi_od {
   readonly int warmup_iters;
   readonly bool sync_ver;
   readonly bool use_zerocopy;
+  readonly bool use_nonblocking;
   readonly bool print_elements;
+  readonly bool no_exchange;
+  readonly bool empty_msgs;
+  readonly bool single_stream;
 
   mainchare Main {
     entry Main(CkArgMsg* m);
@@ -54,7 +58,7 @@ mainmodule jacobi_od {
       }
 
       for (remote_count = 0; remote_count < neighbors; remote_count++) {
-        if (use_zerocopy) {
+        if (use_zerocopy && !empty_msgs) {
           when receiveGhostsZC[my_iter](int ref, int dir, int w, nocopydevice DataType buf[w]) {
             serial {
               processGhostsZC(dir, w, buf);

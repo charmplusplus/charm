@@ -49,7 +49,11 @@
 /* readonly */ int warmup_iters;
 /* readonly */ bool sync_ver;
 /* readonly */ bool use_zerocopy;
+/* readonly */ bool use_nonblocking;
 /* readonly */ bool print_elements;
+/* readonly */ bool no_exchange;    // -n  L0: no ghost sends/receives
+/* readonly */ bool empty_msgs;     // -e  L1: sends with zero-length payload, no GPU work per message
+/* readonly */ bool single_stream;  // -s  S : one stream per chare, no comm<->compute event ordering
 
 extern void invokeInitKernel(DataType* d_temperature, int block_width,
     int block_height, hapiStream_t stream);
@@ -86,7 +90,11 @@ public:
     n_iters = 100;
     warmup_iters = 10;
     use_zerocopy = false;
+    use_nonblocking = false;
     print_elements = false;
+    no_exchange = false;
+    empty_msgs = false;
+    single_stream = false;
     sync_ver = false;
     my_iter = 0;
 
@@ -96,7 +104,7 @@ public:
 
     // Process arguments
     int c;
-    while ((c = getopt(m->argc, m->argv, "W:H:w:h:i:u:yzp")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "W:H:w:h:i:u:yzfpnes")) != -1) {
       switch (c) {
         case 'W':
           grid_width = atoi(optarg);
@@ -122,13 +130,27 @@ public:
         case 'z':
           use_zerocopy = true;
           break;
+        case 'f':
+          use_nonblocking = true;
+          break;
         case 'p':
           print_elements = true;
+          break;
+        case 'n':
+          no_exchange = true;
+          break;
+        case 'e':
+          empty_msgs = true;
+          break;
+        case 's':
+          single_stream = true;
           break;
         default:
           CkPrintf(
               "Usage: %s -W [grid width] -H [grid height] -w [block width] -h [block height]"
-              "-i [iterations] -u [warmup] -y (use sync version) -z (use GPU zerocopy) -p (print blocks)\n",
+              "-i [iterations] -u [warmup] -y (use sync version) -z (use GPU zerocopy) "
+              "-f (non-blocking streams) -p (print blocks) "
+              "-n (no ghost exchange) -e (empty ghost messages) -s (single stream per chare)\n",
               m->argv[0]);
           CkExit();
       }
@@ -199,10 +221,12 @@ public:
       const int chares = n_chares_x * n_chares_y;
       CkPrintf("JACOBI_OD_RESULT pes=%d nodes=%d phys_nodes=%d visible_devices=%d "
                "chares=%d chares_per_visible_device=%.2f iters=%d "
-               "avg_iter_us=%.2f zerocopy=%d\n",
+               "avg_iter_us=%.2f zerocopy=%d nonblocking=%d noexch=%d empty=%d onestream=%d\n",
                CkNumPes(), CmiNumNodes(), CmiNumPhysicalNodes(), devs, chares,
                devs > 0 ? (double)chares / devs : 0.0, n_iters,
-               (total_time / n_iters) * 1e6, use_zerocopy ? 1 : 0);
+               (total_time / n_iters) * 1e6, use_zerocopy ? 1 : 0,
+               use_nonblocking ? 1 : 0, no_exchange ? 1 : 0, empty_msgs ? 1 : 0,
+               single_stream ? 1 : 0);
     }
     if (sync_ver) {
       CkPrintf("Comm time per iteration: %.3lf us\nUpdate time per iteration: %.3lf us\n",
@@ -282,7 +306,7 @@ class Block : public CBase_Block {
     }
 
     hapiCheck(hapiStreamDestroy(compute_stream));
-    hapiCheck(hapiStreamDestroy(comm_stream));
+    if (!single_stream) hapiCheck(hapiStreamDestroy(comm_stream));
 
     hapiCheck(hapiEventDestroy(compute_event));
     hapiCheck(hapiEventDestroy(comm_event));
@@ -317,6 +341,7 @@ class Block : public CBase_Block {
       bottom_bound = true;
     else
       neighbors++;
+    if (no_exchange) neighbors = 0;  // -n: the SDAG waits for nothing
 
     // Allocate memory and create device entities
     hapiCheck(hapiMallocHost((void**)&h_temperature,
@@ -341,8 +366,13 @@ class Block : public CBase_Block {
       hapiCheck(hapiMalloc((void**)&d_recv_right_ghost, sizeof(DataType) * block_height));
     }
 
-    hapiCheck(hapiStreamCreateWithPriority(&compute_stream, hapiStreamDefault, 0));
-    hapiCheck(hapiStreamCreateWithPriority(&comm_stream, hapiStreamDefault, -1));
+    const unsigned int stream_flags =
+        use_nonblocking ? hapiStreamNonBlocking : hapiStreamDefault;
+    hapiCheck(hapiStreamCreateWithPriority(&compute_stream, stream_flags, 0));
+    if (single_stream)
+      comm_stream = compute_stream;  // -s: everything in order on one stream
+    else
+      hapiCheck(hapiStreamCreateWithPriority(&comm_stream, stream_flags, -1));
 
     hapiCheck(hapiEventCreateWithFlags(&compute_event, hapiEventDisableTiming));
     hapiCheck(hapiEventCreateWithFlags(&comm_event, hapiEventDisableTiming));
@@ -378,8 +408,10 @@ class Block : public CBase_Block {
 
     // Operations in compute stream should only be executed when
     // operations in communication stream (transfers and unpacking) complete
-    hapiCheck(hapiEventRecord(comm_event, comm_stream));
-    hapiCheck(hapiStreamWaitEvent(compute_stream, comm_event, 0));
+    if (!single_stream) {
+      hapiCheck(hapiEventRecord(comm_event, comm_stream));
+      hapiCheck(hapiStreamWaitEvent(compute_stream, comm_event, 0));
+    }
 
 #if !COMM_ONLY
     // Invoke GPU kernel for Jacobi computation
@@ -389,8 +421,10 @@ class Block : public CBase_Block {
 
     // Operations in communication stream (packing and transfers) should
     // only be executed when operations in compute stream complete
-    hapiCheck(hapiEventRecord(compute_event, compute_stream));
-    hapiCheck(hapiStreamWaitEvent(comm_stream, compute_event, 0));
+    if (!single_stream) {
+      hapiCheck(hapiEventRecord(compute_event, compute_stream));
+      hapiCheck(hapiStreamWaitEvent(comm_stream, compute_event, 0));
+    }
 
     // Copy final temperature data back to host
     if (print_elements && (my_iter == warmup_iters + n_iters)) {
@@ -494,7 +528,19 @@ class Block : public CBase_Block {
     JACOBI_OD_NVTX(os.str(), NVTXColor::PeterRiver);
 
     // Send ghosts to neighboring chares
-    if (use_zerocopy) {
+    if (no_exchange) {
+      // -n: nothing is sent; neighbors==0 so the SDAG loop does not wait
+    } else if (empty_msgs) {
+      // -e: the same four messages, zero-length payload, no GPU work on receipt
+      if (!left_bound)
+        thisProxy(x - 1, y).receiveGhostsReg(my_iter, RIGHT, 0, h_left_ghost);
+      if (!right_bound)
+        thisProxy(x + 1, y).receiveGhostsReg(my_iter, LEFT, 0, h_right_ghost);
+      if (!top_bound)
+        thisProxy(x, y - 1).receiveGhostsReg(my_iter, BOTTOM, 0, h_top_ghost);
+      if (!bottom_bound)
+        thisProxy(x, y + 1).receiveGhostsReg(my_iter, TOP, 0, h_bottom_ghost);
+    } else if (use_zerocopy) {
       if (!left_bound)
         thisProxy(x - 1, y).receiveGhostsZC(my_iter, RIGHT, block_height,
             CkDeviceBuffer(d_send_left_ghost, comm_stream));
@@ -566,6 +612,7 @@ class Block : public CBase_Block {
   }
 
   void processGhostsReg(int dir, int size, DataType* gh) {
+    if (size == 0) return;  // -e: empty message, nothing to unpack
     std::ostringstream os;
     os << "processGhostsReg (" << std::to_string(x) << "," << std::to_string(y) << ")";
     JACOBI_OD_NVTX(os.str(), NVTXColor::Amethyst);
