@@ -941,6 +941,14 @@ void hapiNormalizeCuptiLoads() {
   std::unordered_map<LDObjKey, ObjectAccumulator, LDObjKeyHash> accumulators;
 
   size_t total_kernels = 0, devices_normalized = 0;
+  // Completeness accounting. The existing reconcile check compares the scalar
+  // load against its own components, so it cannot see work that never reached
+  // either -- a kernel whose object token failed to resolve is dropped from
+  // both sides equally and the check still passes. These totals are what shows
+  // that: device-seconds credited to an object, device-seconds consumed by
+  // kernels with no owner, and the wall time the device had any work at all.
+  double sweep_attr_demand = 0.0, sweep_unattr_demand = 0.0, sweep_busy_s = 0.0;
+  size_t sweep_unattr_kernels = gm.cupti_unattributed_kernels_.size();
   for (auto& kv : byDevice) {
     std::vector<SweepKernel>& kernels = kv.second;
     if (kernels.empty()) continue;
@@ -979,14 +987,67 @@ void hapiNormalizeCuptiLoads() {
     for (const auto& ev : events) {
       if (ev.time > t_prev && !active.empty()) {
         double dt_s = (double)(ev.time - t_prev) / 1.0e9;
-        int remaining = total_sms;
-        for (int ki : active) {       // FIFO iteration
-          if (remaining <= 0) break;
-          int eff = std::min(kernels[ki].sms_used, remaining);
-          if (eff <= 0) continue;
-          remaining -= eff;
-          if (!kernels[ki].attributed) continue;  // contention only, no owner
-          kernels[ki].demand += dt_s * ((double)eff / (double)total_sms);
+
+        // Split this interval's occupancy in proportion to what each active
+        // kernel asked for, capping the pool at the device's SMs.
+        //
+        // This used to hand SMs out FIFO by submission and stop at the first
+        // kernel that found the pool empty, so under oversubscription every
+        // kernel behind that point earned nothing for the interval. Whether an
+        // object was credited then depended on where its kernels happened to
+        // land in the launch order relative to its neighbours' -- which
+        // reshuffles whenever placement changes.
+        //
+        // That made the metric unstable in the one direction that matters: a
+        // device running more objects oversubscribes harder, so more of its
+        // kernels fall past the cut-off and its objects measure cheaper than
+        // they are. A load balancer reading that sends the busiest node still
+        // more work. Measured on pic2d, diffusing on GPU load drove per-process
+        // object counts from an even 32 to a 16..39 spread, the reported load
+        // swung 4x round to round, and the balancer issued 1415 migrations
+        // against 250 for the host-time dimension.
+        //
+        // Proportional sharing is also the better model of the hardware:
+        // kernels that oversubscribe an SM pool time-share it rather than
+        // running strictly in submission order.
+        long want = 0;
+        for (int ki : active) {
+          if (kernels[ki].sms_used > 0) want += kernels[ki].sms_used;
+        }
+        if (want > 0) {
+          sweep_busy_s += dt_s;
+          // Split the interval's DEVICE TIME among the kernels holding the
+          // device, in proportion to the SMs each asked for. The weights decide
+          // how concurrent work is divided; they must not decide how much there
+          // is to divide.
+          //
+          // This used to charge dt * sms_used/total_sms, i.e. SM-occupancy
+          // seconds, so a kernel that held the device for an interval at low
+          // occupancy was recorded as almost no load. That is the right measure
+          // of throughput and the wrong one for balancing: an object whose
+          // kernels tie up the GPU for 10ms costs its PE 10ms whether they fill
+          // 4 SMs or 80.
+          //
+          // The error is not uniform, which is what made it dangerous. An
+          // imbalanced particle distribution gives lightly-loaded patches small
+          // grids, so a node holding many of them runs many low-occupancy
+          // kernels: busy the whole interval, yet reporting almost nothing.
+          // Measured on pic2d, nodes that gained objects fell to util 0.055 --
+          // 5.5% of their busy time counted as load -- so the balancer read them
+          // as idle and sent still more work, and object counts ran away from an
+          // even 32 to 1..162 across processes.
+          //
+          // Weighting by sms_used keeps a big kernel worth more than a small one
+          // running beside it, while the interval total stays dt: summed over a
+          // device, attributed demand now equals its busy time.
+          for (int ki : active) {
+            const int used = kernels[ki].sms_used;
+            if (used <= 0) continue;
+            // Computed for unowned kernels too; they are still not credited to
+            // any object below, but leaving their share uncomputed is what makes
+            // such a loss invisible to the audit.
+            kernels[ki].demand += dt_s * ((double)used / (double)want);
+          }
         }
       }
       if (ev.kind == 1) active.insert(ev.kidx);
@@ -995,7 +1056,9 @@ void hapiNormalizeCuptiLoads() {
     }
 
     for (const SweepKernel& k : kernels) {
-      if (!k.attributed || k.demand <= 0.0) continue;
+      if (k.demand <= 0.0) continue;
+      if (!k.attributed) { sweep_unattr_demand += k.demand; continue; }
+      sweep_attr_demand += k.demand;
       gm.cupti_obj_norm_load_[k.obj_key] += k.demand;
     }
 
@@ -1078,6 +1141,21 @@ void hapiNormalizeCuptiLoads() {
               "device(s) -> %zu objects\n",
               CmiMyPe(), total_kernels, devices_normalized,
               gm.cupti_obj_norm_load_.size());
+  }
+
+  // Where the device's work went. attributed+unowned is every device-second the
+  // sweep saw; the unowned share is work that no object is charged for, so it
+  // vanishes from the balancer's view of the node.
+  if (getenv("CHARM_GPU_LOAD_AUDIT") != nullptr) {
+    const double seen = sweep_attr_demand + sweep_unattr_demand;
+    CmiPrintf("[gpu-audit pe=%d] kernels=%zu unowned_kernels=%zu objects=%zu "
+              "attributed_s=%.6f unowned_s=%.6f unowned_frac=%.3f busy_s=%.6f "
+              "util=%.3f\n",
+              CmiMyPe(), total_kernels, sweep_unattr_kernels,
+              gm.cupti_obj_norm_load_.size(), sweep_attr_demand,
+              sweep_unattr_demand, (seen > 0.0) ? sweep_unattr_demand / seen : 0.0,
+              sweep_busy_s, (sweep_busy_s > 0.0) ? seen / sweep_busy_s : 0.0);
+    fflush(stdout);
   }
 }
 
