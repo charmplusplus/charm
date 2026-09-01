@@ -36,7 +36,7 @@ enum Dir { LEFT = 0, RIGHT, TOP, BOTTOM, TL, TR, BL, BR, NUM_DIRS = 8, STAY = 8 
 // it writes, and the charge exchange fills one ghost layer. H=2 is therefore
 // the most that works without widening that exchange too -- which is the next
 // step if more is wanted.
-#define PHI_HALO 2
+#define PHI_HALO 1
 
 // Reduces to ((block_width+2)*(y)+(x)) at PHI_HALO 1, so interior indices are
 // unchanged and only the array grows. Negative x/y reach the outer halo.
