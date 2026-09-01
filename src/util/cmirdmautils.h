@@ -17,6 +17,14 @@ typedef struct DeviceRdmaInfo_ {
   int n_ops; // Number of RDMA operations, i.e. number of buffers being sent
   int counter; // Used to track the number of completed RDMA operations
   void* msg; // Charm++ message to be (re-)enqueued after all operations complete
+  // Timed tally (CHARM_ZC_STATS), zero when it is off. Carried here rather than
+  // in the stall watch because this struct already lives exactly from the
+  // moment the receive is posted to the moment its last op completes, which is
+  // the interval the measurement wants; the watch is gated on a different env
+  // var and would tie the two together.
+  double zc_posted;   // CkWallTimer() when the receive was issued
+  size_t zc_bytes;    // total bytes across all ops
+  int zc_mode;        // CkNcpyModeDevice the ops resolved to
 } DeviceRdmaInfo;
 
 typedef struct DeviceRdmaOp_ {

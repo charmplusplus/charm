@@ -407,6 +407,10 @@ void CkRdmaDeviceRecvHandler(void* data)
   }
 }
 static void deviceRecvWatchDrop(DeviceRdmaInfo* info);  // defined by the stall watch below
+// Defined just below the zerocopy stats, which live in an anonymous namespace
+// this declaration cannot name. The completion path above is where a receive's
+// elapsed time becomes known, hence the forward declaration.
+void zcRecordRecvTime(int slot, size_t bytes, double seconds);
 
 // Invoked when a GPU buffer arrives on the receiver
 void CkRdmaDeviceRecvHandler(void* data, void* msg)
@@ -428,6 +432,12 @@ void CkRdmaDeviceRecvHandler(void* data, void* msg)
   // If so, invoke regular entry method
   if (info->counter == info->n_ops) {
     QdCreate(1);
+
+    // The receive is complete here, which is the moment the application can
+    // act on it, so this is the interval worth charging to the transport.
+    if (info->zc_posted > 0.0)
+      zcRecordRecvTime(info->zc_mode, info->zc_bytes,
+                       CkWallTimer() - info->zc_posted);
 
     enqueueNcpyMessage(op->dest_pe, info->msg);
 
@@ -595,6 +605,28 @@ struct ZcModeStats {
   std::atomic<long> memcpy_n{0};
   std::atomic<long> ipc_n{0};
   std::atomic<long> other_n{0};
+  // Completed receives, their bytes, and the wall time from posting the receive
+  // to its last op completing -- per mode. Counts alone answer "did placement
+  // move traffic to a slower transport"; they cannot answer "by how much", and
+  // a cost model needs the second question. A pingpong benchmark cannot answer
+  // it either: it measures a transfer alone on the machine, whereas what a
+  // balancer needs is what the transfer costs amid all the others contending
+  // for the same device, link and NIC. Only the application's own traffic has
+  // that contention in it.
+  //
+  // Recorded per receive, not per op: the receive is the unit the application
+  // waits on, and its ops complete concurrently.
+  std::atomic<long> recv_n[3];
+  std::atomic<long> recv_bytes[3];
+  // Microseconds, as an integer so the accumulation stays a relaxed atomic add.
+  std::atomic<long> recv_us[3];
+
+  ZcModeStats() {
+    for (int i = 0; i < 3; i++) { recv_n[i] = 0; recv_bytes[i] = 0; recv_us[i] = 0; }
+  }
+  static const char* slotName(int s) {
+    return (s == 0) ? "MEMCPY" : (s == 1) ? "IPC" : "OTHER";
+  }
   ~ZcModeStats() {
     const long m = memcpy_n.load(), i = ipc_n.load(), o = other_n.load();
     const long total = m + i + o;
@@ -602,6 +634,17 @@ struct ZcModeStats {
     fprintf(stderr, "[zc-stats] pid=%d MEMCPY=%ld IPC=%ld OTHER=%ld "
                     "(same-process %.1f%% of %ld)\n",
             (int)getpid(), m, i, o, 100.0 * m / total, total);
+    for (int s = 0; s < 3; s++) {
+      const long n = recv_n[s].load();
+      if (n == 0) continue;
+      const long us = recv_us[s].load(), by = recv_bytes[s].load();
+      // mean us/receive and mean bytes/receive: fit alpha and beta across the
+      // three rows and the result already carries the real contention.
+      fprintf(stderr, "[zc-time] pid=%d %-6s recvs=%ld bytes=%ld total_us=%ld "
+                      "mean_us=%.3f mean_bytes=%.1f\n",
+              (int)getpid(), slotName(s), n, by, us, (double)us / n,
+              (double)by / n);
+    }
     fflush(stderr);
   }
 };
@@ -631,6 +674,28 @@ inline void zcDestCount(bool confirmed) {
   else zc_dest_stats.unconfirmed.fetch_add(1, std::memory_order_relaxed);
 }
 
+// Slot a mode falls into, matching the count buckets above.
+inline int zcModeSlot(CkNcpyModeDevice mode) {
+  if (mode == CkNcpyModeDevice::MEMCPY) return 0;
+  if (mode == CkNcpyModeDevice::IPC) return 1;
+  return 2;
+}
+
+inline bool zcStatsOn() {
+  static const bool on = (getenv("CHARM_ZC_STATS") != nullptr);
+  return on;
+}
+
+// Called once per receive, when its last op completes.
+inline void zcStatsTime(int slot, size_t bytes, double seconds) {
+  if (!zcStatsOn()) return;
+  if (slot < 0 || slot > 2) return;
+  zc_mode_stats.recv_n[slot].fetch_add(1, std::memory_order_relaxed);
+  zc_mode_stats.recv_bytes[slot].fetch_add((long)bytes, std::memory_order_relaxed);
+  zc_mode_stats.recv_us[slot].fetch_add((long)(seconds * 1e6),
+                                        std::memory_order_relaxed);
+}
+
 inline void zcStatsCount(CkNcpyModeDevice mode) {
   static const bool on = (getenv("CHARM_ZC_STATS") != nullptr);
   if (!on) return;
@@ -641,6 +706,13 @@ inline void zcStatsCount(CkNcpyModeDevice mode) {
   }
 }
 }  // namespace
+
+// File-scope bridge to the tally above, for the completion path that runs
+// earlier in this translation unit.
+void zcRecordRecvTime(int slot, size_t bytes, double seconds)
+{
+  zcStatsTime(slot, bytes, seconds);
+}
 
 // Per-PE ring of events used only to order same-process transfers.
 //
@@ -1435,6 +1507,11 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
   CmiEnforce(rdma_data);
   DeviceRdmaInfo* rdma_info = (DeviceRdmaInfo*)rdma_data;
   rdma_info->n_ops = numops;
+  // Timed tally: zero posted time means "not measuring", so the completion path
+  // can tell an untimed receive from one that completed instantly.
+  rdma_info->zc_posted = zcStatsOn() ? CkWallTimer() : 0.0;
+  rdma_info->zc_bytes = 0;
+  rdma_info->zc_mode = 2;
   rdma_info->counter = 0;
   rdma_info->msg = new_env;
 
@@ -1540,6 +1617,10 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     // ruled out, so an unconfirmed-destination send still leaves
     // source.device_idx valid for the IPC branch below.
     zcStatsCount(mode);
+    // Every op of one receive comes from the same sender and so resolves the
+    // same way; recording it per op just avoids a second mode computation.
+    rdma_info->zc_bytes += (size_t)arrSizes[i];
+    rdma_info->zc_mode = zcModeSlot(mode);
 
     // CHARM_ZC_VALIDATE: check both pointers before handing them to CUDA. An
     // illegal access raised by the copies below is asynchronous and sticky, so
