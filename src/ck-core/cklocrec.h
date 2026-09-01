@@ -38,6 +38,12 @@ public:
   // Destination of a migration deferred because of the above, or -1. The
   // migration is re-driven from noteDeviceSendDone once the count reaches zero.
   int pendingMigrateTo = -1;
+  // Step of the balancer move ledger this element's pending move is recorded
+  // in, or -1. Set in recvMigrate while a decision loop is recording; consumed
+  // by emigrate, which stamps the migration message so the destination knows
+  // to ack this PE's LBManager once the element registers there. Survives any
+  // deferral in between; never pupped (the message carries it instead).
+  int lbLedgerStep = -1;
   // Set while the element is parked in AtSyncWait. A parked element runs no
   // SDAG, so a device receive delivered to it could only sit preprocessed and
   // unconsumed -- pinned to this process -- until the resume; admission

@@ -216,6 +216,8 @@ void DiffusionLB::LoadMetaInfo(LDObjHandle h, int local_id, double load, int sen
 
 
   // local_id should be PE local here
+  // Diagnostic only: the step's barrier is the source-side move ledger (see
+  // DistBaseLB::ProcessMigrationDecision), not this arrival count.
   migrates_expected++;
   if(only_mcount)
     return;

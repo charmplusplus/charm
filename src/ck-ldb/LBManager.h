@@ -334,6 +334,19 @@ class LBManager : public CBase_LBManager
   void init();
   void InvokeLB();
 
+  // Move-ledger state (see the ledger* methods below). Transient within one
+  // balancer step; deliberately not pupped.
+  std::unordered_map<CmiUInt8, int> ledgerEntries;  // element id -> dest PE
+  bool ledgerRecording = false;  // inside the decision loop
+  bool ledgerActive = false;     // open, or closed and draining
+  bool ledgerClosed = false;     // all moves issued; fire when empty
+  int ledgerStep = -1;
+  double ledgerOpenTime = 0.0;
+  double ledgerLastWarn = 0.0;
+  std::function<void()> ledgerDoneFn;
+  void maybeFireLedger();
+  static void ledgerWatch(void* arg);
+
  public:
   LBDatabase* getLBDB() { return lbdb_obj; }
   inline static LBManager* Object()
@@ -377,6 +390,30 @@ class LBManager : public CBase_LBManager
     return lbdb_obj->RegisterOM(userID, userptr, cb);
   }
   int Migrate(LDObjHandle h, int dest) { return lbdb_obj->Migrate(h, dest); }
+
+  // ---- Migration move ledger --------------------------------------------
+  // One entry per move this PE must execute in the current balancer step,
+  // keyed by the element id both sides know. Opened around the strategy's
+  // decision loop (DistBaseLB::ProcessMigrationDecision); recorded from
+  // CkLocRec::recvMigrate, the one point every LB-ordered move passes
+  // through however the async machinery later defers it; retired by the
+  // destination once the element has registered there. The PE's share of the
+  // step's resume is held until the ledger drains, so the barrier waits on
+  // the identity of every move -- deferred ones included -- instead of on
+  // anonymous arrival counts that cannot detect a duplicate or name a
+  // straggler.
+  void ledgerOpen(int step);
+  // Returns the step to tag the element's record with, or -1 when no ledger
+  // is recording (a non-ledgered balancer path, or an app-driven move).
+  int ledgerRecord(CmiUInt8 id, int toPe);
+  // All moves are issued; run `done` once every entry has been retired
+  // (immediately when the ledger is already empty).
+  void ledgerClose(std::function<void()> done);
+  // Entry method: the destination's ack that the element registered.
+  void ledgerRetire(CmiUInt8 id, int step);
+  // A recorded move that will never execute (the element was destroyed
+  // before it left). Without this the step would wait forever.
+  void ledgerRetireLocal(CmiUInt8 id, const char* why);
   void UnregisterOM(LDOMHandle omh) { lbdb_obj->UnregisterOM(omh); }
   void RegisteringObjects(LDOMHandle omh) { lbdb_obj->RegisteringObjects(omh); }
   void DoneRegisteringObjects(LDOMHandle omh)

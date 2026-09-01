@@ -510,6 +510,8 @@ void DiffusionLB::WithinNodeLB()
       double currLoad = maxObj->load;     
  
       if(!is_local) {
+        // Diagnostic only, like every migrates_expected adjustment: the step's
+        // barrier is the source-side move ledger, not this arrival count.
         migrates_expected--;
         //subtract from intermediate PE (rank0, i.e. me)
       } else {

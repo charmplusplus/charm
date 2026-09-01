@@ -2500,6 +2500,14 @@ void CkMigratable::lbCheckWaitRelease()
   waitParked = false;
   myRec->deviceRecvParked = false;
   CkDeviceRecvAdmissionReplay(myRec->getID());
+  // With the move ledger, the resume cannot complete before every migrated
+  // element has registered at its destination, so landing on an
+  // already-resumed PE should be impossible. This stays as a safety net, but
+  // if it fires the ledger has a hole -- say so.
+  CkPrintf("[%d] WARNING: element %s released by the arrival epoch check: it "
+           "landed after its step's resume. The move ledger should have made "
+           "this impossible -- investigate.\n",
+           CkMyPe(), idx2str(thisIndexMax));
   DEBL((AA "Element %s released after migrating into a resumed PE\n" AB,
         idx2str(thisIndexMax)));
   if (_lb_args.metaLbOn()) LBTurnInstrumentOn();
@@ -2622,6 +2630,10 @@ CkLocRec::~CkLocRec()
   if (deletedMarker != NULL)
     *deletedMarker = true;
 #if CMK_LBDB_ON
+  // A move recorded in a step's ledger that will now never execute: the
+  // element is being destroyed without having emigrated (emigrate clears the
+  // tag when it consumes it). Retire locally or the step never resumes.
+  if (lbLedgerStep >= 0) lbmgr->ledgerRetireLocal(getID(), "element destroyed");
   stopTiming();
   DEBL((AA "Unregistering element %s from load balancer\n" AB, idx2str(idx)));
   lbmgr->UnregisterObj(ldHandle);
@@ -2863,6 +2875,14 @@ void CkLocRec::staticMigrate(LDObjHandle h, int dest)
 
 void CkLocRec::recvMigrate(int toPe)
 {
+#if CMK_LBDB_ON
+  // The one point every LB-ordered move passes through, before any deferral
+  // (readyMigrate buffering, outstanding-send stand-down, park). If a balancer
+  // step is recording its decisions, enter this move in its ledger and tag the
+  // record so emigrate can tell the destination whom to ack.
+  const int step = lbmgr->ledgerRecord(getID(), toPe);
+  if (step >= 0) lbLedgerStep = step;
+#endif
   // we are in the mode of delaying actual migration
   // till readyMigrate()
   if (readyMigrate)
@@ -3804,6 +3824,13 @@ bool CkLocMgr::emigrateIntraProcess(CkLocRec* rec, int toPe)
     msg->aids[i] = aids[i];
     msg->eltPtrs[i] = eltPtrs[i];
   }
+#if CMK_LBDB_ON
+  // Ledger-tracked move: the destination acks this PE's LBManager on
+  // registration. Consume the tag so the destructor below does not retire it.
+  msg->lbLedgerSrcPe = (rec->lbLedgerStep >= 0) ? CkMyPe() : -1;
+  msg->lbLedgerStep = rec->lbLedgerStep;
+  rec->lbLedgerStep = -1;
+#endif
 
   DEBM((AA "Intra-process migrating index %s to %d\n" AB, idx2str(idx), toPe));
 
@@ -3867,6 +3894,14 @@ void CkLocMgr::immigrateIntraProcess(CkArrayElementIntraProcessMigrateMessage* m
     mit->second->putEltInArrMgr(msg->id, elt);
     elt->ckFinalizeIntraProcessMigrate(rec, msg->barrierEpoch);
   }
+
+#if CMK_LBDB_ON
+  // The element is registered here: retire its entry in the source's move
+  // ledger. This is what holds the source's share of the step's resume.
+  if (msg->lbLedgerSrcPe >= 0)
+    CProxy_LBManager(_lbmgr)[msg->lbLedgerSrcPe].ledgerRetire(msg->id,
+                                                              msg->lbLedgerStep);
+#endif
 
   callMethod(rec, &CkMigratable::ckJustMigrated);
   callMethod(rec, &CkMigratable::lbCheckWaitRelease);
@@ -3992,6 +4027,13 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
                                                     cache->getEpoch(id) + 1,
                                                     gpuBufSize > 0,
                                                     (int)nGpuBufs);
+#if CMK_LBDB_ON
+  // Ledger-tracked move: the destination acks this PE's LBManager on
+  // registration. Consume the tag so the destructor does not retire it.
+  msg->lbLedgerSrcPe = (rec->lbLedgerStep >= 0) ? CkMyPe() : -1;
+  msg->lbLedgerStep = rec->lbLedgerStep;
+  rec->lbLedgerStep = -1;
+#endif
 
   {
 #if CMK_CUDA
@@ -4404,6 +4446,16 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
 
     CkAbort("Array element's pup routine has a direction mismatch.\n");
   }
+
+#if CMK_LBDB_ON
+  // The element is registered here: retire its entry in the source's move
+  // ledger. This is what holds the source's share of the step's resume.
+  // Deliberately before the zcRgetsActive branch -- registration, not host
+  // buffer completion, is the barrier's contract.
+  if (msg->lbLedgerSrcPe >= 0)
+    CProxy_LBManager(_lbmgr)[msg->lbLedgerSrcPe].ledgerRetire(msg->id,
+                                                              msg->lbLedgerStep);
+#endif
 
   if (migDbg())
     CkPrintf("[JUSTMIG %d] elem %s zcRgetsActive=%d\n", CkMyPe(),

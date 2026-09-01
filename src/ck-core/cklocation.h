@@ -115,6 +115,11 @@ public:
   int nManagers;
   int locEpoch;      // location cache epoch (for createLocal)
   int barrierEpoch;  // AtSync sync-barrier epoch (for ckFinishConstruction)
+  // Move-ledger tag: PE whose LBManager tracks this move (-1 for a move no
+  // balancer step is waiting on), and the step to ack it under. The
+  // destination retires the entry once the element has registered.
+  int lbLedgerSrcPe = -1;
+  int lbLedgerStep = -1;
   CkGroupID* aids;
   uintptr_t* eltPtrs;
 };
@@ -148,6 +153,11 @@ public:
   // migrations whose device payload was not packed by PUP::toMem (the
   // by-handle path records no manifest).
   int nGpuBufs;
+  // Move-ledger tag: PE whose LBManager tracks this move (-1 for a move no
+  // balancer step is waiting on), and the step to ack it under. The
+  // destination retires the entry once the element has registered.
+  int lbLedgerSrcPe = -1;
+  int lbLedgerStep = -1;
   char* packData;
   size_t* gpuManifest;
 };

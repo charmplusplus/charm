@@ -197,14 +197,16 @@ void DistBaseLB::LoadBalance() {
 }
 
 void DistBaseLB::Migrated(int waitBarrier) {
+  // Diagnostic count only. The step's barrier no longer keys off anonymous
+  // arrivals: each source PE holds its share of the resume until every move it
+  // issued is acked by the destination's registration (the move ledger opened
+  // in ProcessMigrationDecision), so an arrival can neither spuriously satisfy
+  // the step nor silently fail to.
   migrates_completed++;
   if (getenv("CHARM_DEBUG_MIGRATE"))
     CkPrintf("[MIGRATED %d] step=%d completed=%d expected=%d lb_started=%d\n",
              CkMyPe(), step(), migrates_completed, migrates_expected,
              (int)lb_started);
-  if (migrates_completed == migrates_expected && lb_started) {
-    MigrationDone(1);
-  }
 }
 
 /*
@@ -215,6 +217,12 @@ void DistBaseLB::ProcessMigrationDecision(LBMigrateMsg *migrateMsg) {
 #if CMK_LBDB_ON
   strat_end_time = CkWallTimer() - strat_start_time;
   const int me = CkMyPe();
+
+  // Every lbmgr->Migrate below reaches CkLocRec::recvMigrate synchronously,
+  // which records the move in this ledger -- by element identity, before any
+  // async deferral. The ledger, not an arrival count, is what holds this PE's
+  // share of the step's resume.
+  lbmgr->ledgerOpen(step());
 
   // Migrate messages from me to elsewhere
   for(int i=0; i < migrateMsg->n_moves; i++) {
@@ -252,10 +260,13 @@ void DistBaseLB::ProcessMigrationDecision(LBMigrateMsg *migrateMsg) {
   // MigrationDone, which can run the whole tail of the step.
   delete migrateMsg;
 
-  // If all the expected objs have migrated in, then migration is done
-  if (migrates_expected == migrates_completed && lb_started) {
-    MigrationDone(1);
-  }
+  // All moves are issued. The step completes on this PE when every one of them
+  // has registered at its destination -- deferred moves included, which the
+  // old expected/completed arrival counters never waited for on the source
+  // side. Fires inline when there is nothing outstanding.
+  lbmgr->ledgerClose([this]() {
+    if (lb_started) MigrationDone(1);
+  });
 #endif
 }
 
