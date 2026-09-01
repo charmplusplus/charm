@@ -2458,7 +2458,7 @@ void CkMigratable::AtSyncWait()
   if (!lbStepPending)
   {
     // The step already finished, so the wait is where the window opens.
-    if (_lb_args.metaLbOn()) LBTurnInstrumentOn();
+    LBTurnInstrumentOn();
     ResumeFromSync();
     return;
   }
@@ -2510,7 +2510,7 @@ void CkMigratable::lbCheckWaitRelease()
            CkMyPe(), idx2str(thisIndexMax));
   DEBL((AA "Element %s released after migrating into a resumed PE\n" AB,
         idx2str(thisIndexMax)));
-  if (_lb_args.metaLbOn()) LBTurnInstrumentOn();
+  LBTurnInstrumentOn();
   ResumeFromSync();
 }
 
@@ -2545,7 +2545,7 @@ void CkMigratable::ResumeFromSyncHelper()
   // is AtSyncWait() returning, which the application places a few iterations
   // before its next AtSyncSample(); without it the step's own resume is the
   // same moment. Either way nothing between the step and here is measured.
-  if (_lb_args.metaLbOn()) LBTurnInstrumentOn();
+  LBTurnInstrumentOn();
 
   CkLocMgr* localLocMgr = myRec->getLocMgr();
   auto iter = localLocMgr->bufferedActiveRgetMsgs.find(ckGetID());
@@ -2694,6 +2694,7 @@ CkLocRec* CkFindDeviceRecvElement(CkGroupID aid, CmiUInt8 id)
   CkLocMgr* mgr = arr ? arr->getLocMgr() : NULL;
   return mgr ? mgr->elementNrec(ck::ObjID(id).getElementID()) : NULL;
 }
+
 
 
 // Releasing the last outstanding send is what lets a migration that was waiting
