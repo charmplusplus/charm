@@ -115,6 +115,43 @@ __global__ void packChargeGhostsKernel(const RealType* rho, RealType* slab,
 // boundary cells (the sender's ghost ring overlays them). Launches for
 // different directions overlap at the corners but are serialized on the
 // comm stream, so no atomics are needed.
+// Final rho outward, so a multi-sweep Jacobi block has valid charge density
+// where it writes. The charge exchange above cannot serve: it ships the ghost
+// ring (this patch's own deposit spill) and the receiver ADDS it to its
+// interior, so nobody ever writes a neighbour's finished rho into our ghost
+// ring. Same 8-way slab layout as that exchange -- see stripOff() in pic2d.C.
+__global__ void packRhoHaloKernel(const RealType* rho, RealType* slab,
+    int block_width, int block_height) {
+  int t = blockDim.x * blockIdx.x + threadIdx.x;
+  const int W = block_width, H = block_height;
+  if (t < H)                   slab[t] = rho[IDX(1, 1 + t)];
+  else if (t < 2*H)            slab[t] = rho[IDX(W, 1 + (t - H))];
+  else if (t < 2*H + W)        slab[t] = rho[IDX(1 + (t - 2*H), 1)];
+  else if (t < 2*H + 2*W)      slab[t] = rho[IDX(1 + (t - 2*H - W), H)];
+  else if (t == 2*H + 2*W)     slab[t] = rho[IDX(1, 1)];
+  else if (t == 2*H + 2*W + 1) slab[t] = rho[IDX(W, 1)];
+  else if (t == 2*H + 2*W + 2) slab[t] = rho[IDX(1, H)];
+  else if (t == 2*H + 2*W + 3) slab[t] = rho[IDX(W, H)];
+}
+
+// Overwrite, not accumulate: this is the neighbour's value for a cell we do
+// not own, not a contribution to one we do.
+__global__ void unpackRhoHaloKernel(RealType* rho, const RealType* buf, int dir,
+    int block_width, int block_height) {
+  int t = blockDim.x * blockIdx.x + threadIdx.x;
+  const int W = block_width, H = block_height;
+  switch (dir) {
+    case LEFT:   if (t < H) rho[IDX(0,   1 + t)] = buf[t]; break;
+    case RIGHT:  if (t < H) rho[IDX(W+1, 1 + t)] = buf[t]; break;
+    case TOP:    if (t < W) rho[IDX(1 + t, 0)]   = buf[t]; break;
+    case BOTTOM: if (t < W) rho[IDX(1 + t, H+1)] = buf[t]; break;
+    case TL: if (t == 0) rho[IDX(0,   0)]   = buf[0]; break;
+    case TR: if (t == 0) rho[IDX(W+1, 0)]   = buf[0]; break;
+    case BL: if (t == 0) rho[IDX(0,   H+1)] = buf[0]; break;
+    case BR: if (t == 0) rho[IDX(W+1, H+1)] = buf[0]; break;
+  }
+}
+
 __global__ void accumChargeGhostKernel(RealType* rho, const RealType* buf,
     int dir, int block_width, int block_height) {
   int t = blockDim.x * blockIdx.x + threadIdx.x;
@@ -320,6 +357,22 @@ void invokeDepositKernel(const Particle* d_parts, int n, RealType* d_rho,
   if (n == 0) return;
   depositKernel<<<nblocks(n), BLOCK_1D, 0, stream>>>(
       d_parts, n, d_rho, weight, px0, py0, block_width, block_height);
+  hapiCheck(cudaPeekAtLastError());
+}
+
+void invokePackRhoHaloKernel(const RealType* d_rho, RealType* d_slab,
+    int block_width, int block_height, cudaStream_t stream) {
+  const int total = 2*(block_width + block_height) + 4;
+  packRhoHaloKernel<<<nblocks(total), BLOCK_1D, 0, stream>>>(
+      d_rho, d_slab, block_width, block_height);
+  hapiCheck(cudaPeekAtLastError());
+}
+
+void invokeUnpackRhoHaloKernel(RealType* d_rho, const RealType* d_buf, int dir,
+    int block_width, int block_height, cudaStream_t stream) {
+  const int n = (block_width > block_height) ? block_width : block_height;
+  unpackRhoHaloKernel<<<nblocks(n), BLOCK_1D, 0, stream>>>(
+      d_rho, d_buf, dir, block_width, block_height);
   hapiCheck(cudaPeekAtLastError());
 }
 

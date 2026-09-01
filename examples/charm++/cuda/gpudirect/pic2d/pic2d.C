@@ -51,6 +51,10 @@ extern void invokeInitParticlesKernel(Particle* d_parts, int* d_np,
 extern void invokeDepositKernel(const Particle* d_parts, int n,
     RealType* d_rho, float weight, float px0, float py0, int block_width,
     int block_height, cudaStream_t stream);
+extern void invokePackRhoHaloKernel(const RealType* d_rho, RealType* d_slab,
+    int block_width, int block_height, cudaStream_t stream);
+extern void invokeUnpackRhoHaloKernel(RealType* d_rho, const RealType* d_buf,
+    int dir, int block_width, int block_height, cudaStream_t stream);
 extern void invokePackChargeGhostsKernel(const RealType* d_rho,
     RealType* d_slab, int block_width, int block_height, cudaStream_t stream);
 extern void invokeAccumChargeGhostKernel(RealType* d_rho,
@@ -390,6 +394,11 @@ class Patch : public CBase_Patch {
   Particle* d_recv_parts;  // 8 segments of exch_capacity
   RealType* d_send_rho;    // 8-way slab, 2*(W+H)+4
   RealType* d_recv_rho;
+  // Second 8-way slab, for shipping FINAL rho outward once the charge
+  // accumulation above has settled. Separate buffers because that exchange is
+  // still in flight -- its sends are only retired by sendDone.
+  RealType* d_send_rhoh;
+  RealType* d_recv_rhoh;
   float2* d_send_e;        // 8-way slab, 2*(W+H)+4
   float2* d_recv_e;
   // Phi slabs are double-buffered by Jacobi round parity: a neighbor may run
@@ -445,6 +454,8 @@ class Patch : public CBase_Patch {
     hapiCheck(hapiFree(d_recv_parts));
     hapiCheck(hapiFree(d_send_rho));
     hapiCheck(hapiFree(d_recv_rho));
+    hapiCheck(hapiFree(d_send_rhoh));
+    hapiCheck(hapiFree(d_recv_rhoh));
     hapiCheck(hapiFree(d_send_e));
     hapiCheck(hapiFree(d_recv_e));
     hapiCheck(hapiFree(d_send_phi));
@@ -499,6 +510,8 @@ class Patch : public CBase_Patch {
         sizeof(Particle) * (size_t)NUM_DIRS * exch_capacity));
     hapiCheck(hapiMalloc((void**)&d_send_rho, sizeof(RealType) * slab8));
     hapiCheck(hapiMalloc((void**)&d_recv_rho, sizeof(RealType) * slab8));
+    hapiCheck(hapiMalloc((void**)&d_send_rhoh, sizeof(RealType) * slab8));
+    hapiCheck(hapiMalloc((void**)&d_recv_rhoh, sizeof(RealType) * slab8));
     hapiCheck(hapiMalloc((void**)&d_send_e, sizeof(float2) * slab8));
     hapiCheck(hapiMalloc((void**)&d_recv_e, sizeof(float2) * slab8));
     hapiCheck(hapiMalloc((void**)&d_send_phi, sizeof(RealType) * 2 * slab4));
@@ -697,6 +710,41 @@ class Patch : public CBase_Patch {
     CkCallback* cb = new CkCallback(CkIndex_Patch::chargeGhostsPacked(),
         thisProxy[thisIndex]);
     hapiAddCallback(comm_stream, cb);
+  }
+
+  // Only reached when the sweeps actually need it; at PHI_HALO 1 the sweep
+  // runs at margin 0 and never looks outside the interior.
+  static bool rhoHaloNeeded() { return PHI_HALO > 1; }
+
+  void packRhoHalo() {
+    // rho was last written by accumChargeGhost on the comm stream.
+    invokePackRhoHaloKernel(d_rho, d_send_rhoh, block_width, block_height,
+        comm_stream);
+    CkCallback* cb = new CkCallback(CkIndex_Patch::rhoHaloPacked(),
+        thisProxy[thisIndex]);
+    hapiAddCallback(comm_stream, cb);
+  }
+
+  void sendRhoHalo() {
+    for (int d = 0; d < NUM_DIRS; d++) {
+      thisProxy(nbr_x[d], nbr_y[d]).receiveRhoHalo(my_iter, flipDir(d),
+          stripLen(d),
+          (outstanding_sends++,
+           CkDeviceBuffer(d_send_rhoh + stripOff(d),
+               CkCallback(CkIndex_Patch::sendDone(), thisProxy[thisIndex]),
+               comm_stream)));
+    }
+  }
+
+  void receiveRhoHalo(int ref, int dir, int& n, RealType*& buf,
+      CkDeviceBufferPost* devicePost) {
+    buf = d_recv_rhoh + stripOff(dir);
+    devicePost[0].hapi_stream = comm_stream;
+  }
+
+  void unpackRhoHalo(int dir, int n, RealType* buf) {
+    invokeUnpackRhoHaloKernel(d_rho, buf, dir, block_width, block_height,
+        comm_stream);
   }
 
   void sendChargeGhosts() {

@@ -68,6 +68,8 @@ mainmodule pic2d {
     // supply the device buffers are defined in pic2d.C
     entry void receiveChargeGhosts(int ref, int dir, int n, nocopydevice RealType buf[n]);
     entry void receivePhiGhosts(int ref, int dir, int n, nocopydevice RealType buf[n]);
+    entry void receiveRhoHalo(int ref, int dir, int n, nocopydevice RealType buf[n]);
+    entry void rhoHaloPacked();
     entry void receiveEGhosts(int ref, int dir, int n, nocopydevice RealType buf[n]);
     // m = max(n,1) so that zero-particle messages still carry a valid buffer
     entry void receiveParticles(int ref, int dir, int n, int m, nocopydevice Particle parts[m]);
@@ -84,6 +86,21 @@ mainmodule pic2d {
       for (recv_count = 0; recv_count < NUM_DIRS; recv_count++) {
         when receiveChargeGhosts[my_iter](int ref, int dir, int n, nocopydevice RealType buf[n])
           serial { accumChargeGhost(dir, n, buf); }
+      }
+
+      // Phase 1b: rho is final on the interior now, so push it outward once.
+      // A Jacobi sweep run at margin m reads charge m cells outside the
+      // interior, and nothing else puts a neighbour's finished rho there --
+      // the exchange above ships deposit spill and adds it to the RECEIVER's
+      // interior. One round trip per timestep, which is what buys PHI_HALO
+      // sweeps per phi exchange rather than one.
+      if (PHI_HALO > 1) {
+        serial { packRhoHalo(); }
+        when rhoHaloPacked() serial { sendRhoHalo(); }
+        for (recv_count = 0; recv_count < NUM_DIRS; recv_count++) {
+          when receiveRhoHalo[my_iter](int ref, int dir, int n, nocopydevice RealType buf[n])
+            serial { unpackRhoHalo(dir, n, buf); }
+        }
       }
 
       // Phase 2: Jacobi iterations for the Poisson solve. One 4-way ghost
