@@ -40,7 +40,8 @@ void DiffusionLB::AcrossNodeLB()
   if (_lb_args.diffusionCommOn())
   {
     metric = new MetricComm(nodeStats, myNodeId, nodeSize, neighborCount, toSendLoad,
-                            sendToNeighbors, myNodeInternalBytes, myNodeExternalBytes);
+                            sendToNeighbors, myNodeInternalBytes, myNodeExternalBytes,
+                            &diffusionCostCfg);
   }
   else
     metric = new MetricCentroid(nborCentroids, nborDistances, myCentroid, nodeStats,
@@ -90,6 +91,11 @@ void DiffusionLB::AcrossNodeLB()
         CkAbort("Error: no neighbor found to send to, but my_loadAfterTransfer = %f\n",
                 my_loadAfterTransfer);
       }
+
+      // What this node still owes, so the metric can cap a candidate's benefit:
+      // load shed beyond the fair share buys nothing and must not pay for a
+      // move. Refreshed every iteration because each accepted move reduces it.
+      metric->setRemainingShed(my_loadAfterTransfer);
 
       int v_id = metric->popBestObject(nborId);
 
@@ -153,6 +159,21 @@ void DiffusionLB::AcrossNodeLB()
       nodeStats->to_proc[v_id] = destPE;
     }
   }
+
+  // Says which of the two reasons a quiet step had: nothing available to move,
+  // or everything available priced out. Without this the two are
+  // indistinguishable from the outside, and they call for opposite responses.
+  if (_lb_args.debug() > 1 && metric != NULL)
+    CkPrintf("[node %d] AcrossNodeLB: %d move(s) accepted, %d neighbour(s) with "
+             "no move worth making, %.6f load left unshed\n",
+             myNodeId, metric->acceptedCount(), metric->rejectedCount(),
+             my_loadAfterTransfer > 0 ? my_loadAfterTransfer : 0.0);
+
+  // Owned by this function since it was created here; the per-object vectors
+  // inside it are sized by the node's object count, so leaking one per node per
+  // balancer step is not free.
+  delete metric;
+  metric = NULL;
 
   across_owed = true;
   migMaybeDone();

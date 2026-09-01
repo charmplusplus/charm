@@ -9,6 +9,17 @@ public:
   virtual int popBestObject(int nbor) = 0;
   virtual int getBestNeighbor() = 0;
   virtual void updateState(int objId, int destNbor) = 0;
+  virtual ~DiffusionMetric() {}
+  // This node's remaining shed obligation, refreshed before each selection. A
+  // metric that prices moves needs it to cap a move's benefit: shedding past
+  // the fair share buys nothing, so an object bigger than what is left over is
+  // only worth the excess it actually removes. Metrics that do not price moves
+  // ignore it.
+  virtual void setRemainingShed(double) {}
+  // How the last decision loop split. Zero from a metric that does not price
+  // moves, which cannot reject one.
+  virtual int acceptedCount() const { return 0; }
+  virtual int rejectedCount() const { return 0; }
 };
 
 class MetricComm : public DiffusionMetric
@@ -40,6 +51,17 @@ private:
   int n_objs;
   int neighborCount;
   int myNodeId;
+  int nodeSize;
+
+  // Set when a calibrated cost table was loaded (+LBCostConfig). Null means no
+  // model: selection falls back to edge-cut ranking and never refuses a move,
+  // which is what this balancer did before the model existed.
+  const DiffusionCostConfig* costCfg;
+  // Transport tier reached by each neighbour, and the tier traffic that stays
+  // here runs at. A DiffusionLB "node" is a process, so local means intra-process.
+  std::vector<DiffusionTier> nborTier;
+  DiffusionTier localTier;
+  double remainingShed;
 
   // The inbound half of an external edge is recorded on the peer node, so a
   // locally-observed external byte stands for this many incident bytes. Exactly
@@ -57,10 +79,17 @@ private:
 
 public:
   MetricComm(BaseLB::LDStats* ns, int nodeId, int nodeSize, int nCount,
-             std::vector<double> tSL, std::vector<int> sendToNbrs, double &internal, double &external);
+             std::vector<double> tSL, std::vector<int> sendToNbrs, double &internal, double &external,
+             const DiffusionCostConfig* cfg);
   int popBestObject(int nbor) override;
   int getBestNeighbor() override;
   void updateState(int objId, int destNbor) override;
+  void setRemainingShed(double r) override { remainingShed = r; }
+  // Diagnostics: how the last decision loop split, so a step that moved nothing
+  // can say whether it found nothing to move or priced everything out.
+  int acceptedMoves = 0, rejectedMoves = 0;
+  int acceptedCount() const override { return acceptedMoves; }
+  int rejectedCount() const override { return rejectedMoves; }
 };
 
 class MetricCentroid : public DiffusionMetric
@@ -110,16 +139,28 @@ public:
 
 
 
-MetricComm::MetricComm(BaseLB::LDStats* ns, int nodeId, int nodeSize, int nCount,
+MetricComm::MetricComm(BaseLB::LDStats* ns, int nodeId, int nodeSize_, int nCount,
                        std::vector<double> tSL, std::vector<int> sendToNbrs, 
-                       double &internalbytes, double &externalbytes)
+                       double &internalbytes, double &externalbytes,
+                       const DiffusionCostConfig* cfg)
     : nodeStats(ns),
       myNodeId(nodeId),
-      n_objs(ns->objData.size()),
+      nodeSize(nodeSize_),
       neighborCount(nCount),
+      n_objs(ns->objData.size()),
       toSendLoad(tSL),
-      sendToNeighbors(sendToNbrs)
+      sendToNeighbors(sendToNbrs),
+      costCfg((cfg != NULL && cfg->calibrated) ? cfg : NULL),
+      localTier(DIFF_TIER_INTRA_PROCESS),
+      remainingShed(0.0)
 {
+  // Which transport each neighbour is reached over. A DiffusionLB node is a
+  // Charm node, i.e. a process, so its rank0 PE stands for the whole node here.
+  nborTier.resize(neighborCount, DIFF_TIER_INTER_NODE);
+  for (int i = 0; i < neighborCount && i < (int)sendToNeighbors.size(); i++)
+    nborTier[i] = DiffusionCostConfig::tierBetween(myNodeId * nodeSize,
+                                                   sendToNeighbors[i] * nodeSize);
+
   internalComm.resize(n_objs, 0);
   internalMsgs.resize(n_objs, 0);
   for (int nbor = 0; nbor < neighborCount; nbor++)
@@ -224,10 +265,35 @@ int MetricComm::popBestObject(int nbor)
   // no external traffic to discriminate on, the least-wired-in object wins
   // instead of the lowest-numbered one. Doubles throughout -- externalComm and
   // internalComm are byte counts and were being truncated to int.
-  double bestGain = -std::numeric_limits<double>::max();
+  // With a calibrated cost table the same loop answers both questions at once:
+  // which object is best for this neighbour, and whether moving any of them is
+  // worth doing. Splitting those apart would let the cheapest candidate be
+  // chosen by one criterion and then vetoed by another, which is how a
+  // quota-driven balancer ends up making the least-bad move rather than no move.
+  //
+  // Score is the marginal effect on this node's per-interval time:
+  //   benefit  load this move sheds, capped at what is still owed
+  //   cost     the migration itself, amortised, plus the change in steady-state
+  //            communication the new placement leaves behind
+  // Both sides are seconds per balancer interval, which is the unit the load
+  // figures already come in (see the horizon note in DiffusionCostModel.h).
+  //
+  // Uncalibrated, this degrades to the edge-cut ranking with no veto -- the
+  // behaviour before the cost model existed. Refusing moves on guessed
+  // constants would be worse than not pricing them at all.
+  double bestScore = -std::numeric_limits<double>::max();
   int bestObject = -1;
 
   double nborCapacity = toSendLoad[nbor];
+  // Static, not a temporary: DiffusionCostModel keeps a reference, and binding
+  // one to a temporary in a constructor does not extend its lifetime. The
+  // uncalibrated path never reads it, but a dangling reference that happens to
+  // go untouched is a trap for the next person to add a branch here.
+  static const DiffusionCostConfig kNoCostConfig;
+  const DiffusionCostModel model(costCfg ? *costCfg : kNoCostConfig, localTier);
+  const DiffusionTier destTier =
+      (nbor >= 0 && nbor < (int)nborTier.size()) ? nborTier[nbor]
+                                                 : DIFF_TIER_INTER_NODE;
 
   for (int i = 0; i < n_objs; i++)
   {
@@ -237,13 +303,40 @@ int MetricComm::popBestObject(int nbor)
     double objLoad = diffusionObjLoad(nodeStats->objData[i]);
     if (objLoad > nborCapacity) continue;
 
-    const double gain = externalComm[nbor][i] - internalComm[i];
-
-    if (gain > bestGain)
+    double score;
+    if (costCfg == NULL)
     {
-      bestGain = gain;
+      score = externalComm[nbor][i] - internalComm[i];
+    }
+    else
+    {
+      const double benefit = DiffusionCostModel::loadBenefit(objLoad, remainingShed);
+      const double cost =
+          model.migrateCost(nodeStats->objData[i]) +
+          model.commDelta(internalComm[i], internalMsgs[i], externalComm[nbor][i],
+                          externalMsgs[nbor][i], destTier);
+      score = benefit - cost;
+    }
+
+    if (score > bestScore)
+    {
+      bestScore = score;
       bestObject = i;
     }
+  }
+
+  // A move that does not pay for itself is not made, even with quota left. An
+  // unmet quota is the correct answer when meeting it costs more than the
+  // imbalance it removes; the caller already treats -1 as "nothing for this
+  // neighbour" and stops once every neighbour says so.
+  if (costCfg != NULL && bestObject != -1 && bestScore <= 0.0)
+  {
+    rejectedMoves++;
+    bestObject = -1;
+  }
+  else if (bestObject != -1)
+  {
+    acceptedMoves++;
   }
 
   // if (bestObject != -1)
