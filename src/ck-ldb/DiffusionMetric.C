@@ -14,8 +14,14 @@ public:
 class MetricComm : public DiffusionMetric
 {
 private:
+  // All four of these are INCIDENT traffic -- both directions of every edge
+  // touching the object -- so that internal and external are on the same basis
+  // and their difference is meaningful. See the constructor for how the
+  // inbound half of an external edge is recovered.
   std::vector<double> internalComm;               // internal comm for each obj
   std::vector<std::vector<double>> externalComm;  // external comm for each obj for each nbor
+  std::vector<double> internalMsgs;               // message counts, same basis
+  std::vector<std::vector<double>> externalMsgs;
 
   std::vector<double> toSendLoad;  // comm outward to each neighbor
   BaseLB::LDStats* nodeStats;
@@ -23,12 +29,23 @@ private:
   std::vector<int> sendToNeighbors;
   std::vector<bool> objAvailable;
 
-  std::vector<std::vector<std::pair<int, int>>>
+  // One entry per recorded local edge incident to the object, carrying both
+  // dimensions. A symmetric exchange between a and b yields two records (a->b
+  // and b->a), so a's list holds b twice and the sum over the list is the
+  // incident traffic between them -- which is what updateState moves.
+  struct CommEdge { int obj; double bytes; double msgs; };
+  std::vector<std::vector<CommEdge>>
       objCommEdges;  // for each object, list of internal comm edges
 
   int n_objs;
   int neighborCount;
   int myNodeId;
+
+  // The inbound half of an external edge is recorded on the peer node, so a
+  // locally-observed external byte stands for this many incident bytes. Exactly
+  // 2 under the symmetric-exchange assumption documented in the constructor;
+  // named so the assumption is greppable rather than a bare literal.
+  static constexpr double kIncidentFactor = 2.0;
 
   int getNborId(int nbor)
   {
@@ -104,11 +121,13 @@ MetricComm::MetricComm(BaseLB::LDStats* ns, int nodeId, int nodeSize, int nCount
       sendToNeighbors(sendToNbrs)
 {
   internalComm.resize(n_objs, 0);
+  internalMsgs.resize(n_objs, 0);
   for (int nbor = 0; nbor < neighborCount; nbor++)
   {
     std::vector<double> nborComm;
     nborComm.resize(n_objs, 0);
     externalComm.push_back(nborComm);
+    externalMsgs.push_back(nborComm);
   }
 
   objAvailable.resize(n_objs, true);
@@ -131,13 +150,22 @@ MetricComm::MetricComm(BaseLB::LDStats* ns, int nodeId, int nodeSize, int nCount
         // internal communication
         int fromObj = nodeStats->getHash(from);
         int toObj = nodeStats->getHash(to);
+        // LBDatabase::Send only ever records a locally-running sender, so this
+        // should always resolve; guard anyway, because the miss would index
+        // internalComm at -1 rather than announce itself.
+        if (fromObj == -1 || fromObj >= n_objs)
+          continue;
         internalComm[fromObj] += commData.bytes;
+        internalMsgs[fromObj] += commData.messages;
 
         if (toObj != -1 && toObj < n_objs)
         {
           internalComm[toObj] += commData.bytes;
-          objCommEdges[toObj].push_back(std::make_pair(fromObj, commData.bytes));
-          objCommEdges[fromObj].push_back(std::make_pair(toObj, commData.bytes));
+          internalMsgs[toObj] += commData.messages;
+          objCommEdges[toObj].push_back(
+              CommEdge{fromObj, (double)commData.bytes, (double)commData.messages});
+          objCommEdges[fromObj].push_back(
+              CommEdge{toObj, (double)commData.bytes, (double)commData.messages});
         }
 
         internalbytes += commData.bytes;
@@ -153,7 +181,25 @@ MetricComm::MetricComm(BaseLB::LDStats* ns, int nodeId, int nodeSize, int nCount
 
         int fromObj = nodeStats->getHash(from);
         if (fromObj != -1 && fromObj < n_objs)
-          externalComm[nborId][fromObj] += commData.bytes;
+        {
+          // Incident, not outbound. LBDatabase::Send records a message on the
+          // sender's node only, so this node sees i->nbor but never nbor->i:
+          // that half is in the peer's stats and never reaches us. Internal
+          // traffic has no such gap -- both endpoints are local, so both
+          // directions are recorded here and internalComm is already incident.
+          //
+          // Comparing the two as they stood put a bidirectional internal figure
+          // against a one-directional external one, understating every external
+          // edge by 2x and so making every candidate look more expensive to move
+          // than it is. Complete the external side by assuming the reciprocal
+          // edge carries what the observed one carries, which holds for the
+          // neighbour exchanges this balancer is aimed at. The residual error is
+          // a per-object scale factor on one term, which the alpha/beta
+          // calibration absorbs; the previous mismatch was a systematic bias
+          // between two terms that no calibration could.
+          externalComm[nborId][fromObj] += kIncidentFactor * commData.bytes;
+          externalMsgs[nborId][fromObj] += kIncidentFactor * commData.messages;
+        }
       }
     }
   }
@@ -239,16 +285,20 @@ void MetricComm::updateState(int objId, int destNbor)
   toSendLoad[destNbor] -= objLoad;
   if(objId<0 || objId>=n_objs)
     return;
-  for (std::pair<int, int> edge : objCommEdges[objId])
+  // Every local edge incident to the departing object stops being local for the
+  // partner that stays: it now runs between that partner and destNbor. Both
+  // sides of the ledger move together, and both dimensions move with them, so
+  // the next candidate is weighed against the partition this move just created.
+  for (const CommEdge& edge : objCommEdges[objId])
   {
-    int toObj = edge.first;
-    int comm = edge.second;
-//    CkPrintf("\n[%d][%d]", toObj, comm);
+    int toObj = edge.obj;
     if(toObj<0 || toObj>=n_objs) CkAbort("Error: invalid toObj %d in MetricComm::updateState\n", toObj);
     if (objAvailable[toObj])
     {
-      externalComm[destNbor][toObj] += comm;
-      internalComm[toObj] -= comm;
+      externalComm[destNbor][toObj] += edge.bytes;
+      internalComm[toObj] -= edge.bytes;
+      externalMsgs[destNbor][toObj] += edge.msgs;
+      internalMsgs[toObj] -= edge.msgs;
     }
   }
   objAvailable[objId] = false;
