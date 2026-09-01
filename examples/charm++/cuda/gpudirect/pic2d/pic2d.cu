@@ -197,20 +197,50 @@ __global__ void packPhiKernel(const RealType* phi, RealType* slab,
   } else if (t < 2 * nLR + 2 * nTB) {        // BOTTOM: rows H .. H-PHI_HALO+1
     const int u = t - 2 * nLR - nTB;
     slab[t] = phi[IDX(1 + u % W, H - u / W)];
+  } else if (PHI_CORNER > 0) {
+    // Four corner blocks, the interior square nearest each diagonal.
+    const int base = 2 * nLR + 2 * nTB;
+    const int c = (t - base) / PHI_CORNER;     // which diagonal
+    const int u = (t - base) % PHI_CORNER;
+    if (c > 3) return;
+    const int l1 = u % PHI_CORNER_D, l2 = u / PHI_CORNER_D;
+    switch (c) {
+      case 0: slab[t] = phi[IDX(1 + l1, 1 + l2)]; break;   // TL
+      case 1: slab[t] = phi[IDX(W - l1, 1 + l2)]; break;   // TR
+      case 2: slab[t] = phi[IDX(1 + l1, H - l2)]; break;   // BL
+      default: slab[t] = phi[IDX(W - l1, H - l2)]; break;  // BR
+    }
   }
 }
 
 // Writes a received phi strip into the ghost column on side `dir`
-__global__ void unpackPhiLRKernel(RealType* phi, const RealType* buf, int dir,
+// Layer 0 is the neighbour's edge cell, so it lands immediately outside ours
+// and deeper layers stack outward from there. Corners arrive as a square block
+// from the diagonal neighbour.
+__global__ void unpackPhiKernel(RealType* phi, const RealType* buf, int dir,
     int block_width, int block_height) {
   int t = blockDim.x * blockIdx.x + threadIdx.x;
-  int W = block_width, H = block_height;
-  if (t >= PHI_HALO * H) return;
-  const int layer = t / H, r = 1 + t % H;
-  // Layer 0 is the neighbour's edge column, so it lands immediately outside
-  // ours and deeper layers stack outward from there.
-  if (dir == LEFT) phi[IDX(-layer, r)] = buf[t];
-  else             phi[IDX(W + 1 + layer, r)] = buf[t];
+  const int W = block_width, H = block_height;
+  if (dir == LEFT || dir == RIGHT) {
+    if (t >= PHI_HALO * H) return;
+    const int layer = t / H, r = 1 + t % H;
+    if (dir == LEFT) phi[IDX(-layer, r)] = buf[t];
+    else             phi[IDX(W + 1 + layer, r)] = buf[t];
+  } else if (dir == TOP || dir == BOTTOM) {
+    if (t >= PHI_HALO * W) return;
+    const int layer = t / W, c = 1 + t % W;
+    if (dir == TOP) phi[IDX(c, -layer)] = buf[t];
+    else            phi[IDX(c, H + 1 + layer)] = buf[t];
+  } else if (PHI_CORNER > 0) {
+    if (t >= PHI_CORNER) return;
+    const int l1 = t % PHI_CORNER_D, l2 = t / PHI_CORNER_D;
+    switch (dir) {
+      case TL: phi[IDX(-l1,        -l2)]        = buf[t]; break;
+      case TR: phi[IDX(W + 1 + l1, -l2)]        = buf[t]; break;
+      case BL: phi[IDX(-l1,        H + 1 + l2)] = buf[t]; break;
+      default: phi[IDX(W + 1 + l1, H + 1 + l2)] = buf[t]; break;  // BR
+    }
+  }
 }
 
 // One weighted-Jacobi step of grad^2(phi) = -(rho - rho_bar) with dx = dy = 1
@@ -395,15 +425,16 @@ void invokeAccumChargeGhostKernel(RealType* d_rho, const RealType* d_buf,
 
 void invokePackPhiKernel(const RealType* d_phi, RealType* d_slab,
     int block_width, int block_height, cudaStream_t stream) {
-  const int total = 2 * PHI_HALO * (block_width + block_height);
+  const int total = 2 * PHI_HALO * (block_width + block_height)
+      + 4 * PHI_CORNER;
   packPhiKernel<<<nblocks(total), BLOCK_1D, 0, stream>>>(
       d_phi, d_slab, block_width, block_height);
   hapiCheck(cudaPeekAtLastError());
 }
 
-void invokeUnpackPhiLRKernel(RealType* d_phi, const RealType* d_buf, int dir,
+void invokeUnpackPhiKernel(RealType* d_phi, const RealType* d_buf, int dir,
     int block_width, int block_height, cudaStream_t stream) {
-  unpackPhiLRKernel<<<nblocks(block_height), BLOCK_1D, 0, stream>>>(
+  unpackPhiKernel<<<nblocks(block_height), BLOCK_1D, 0, stream>>>(
       d_phi, d_buf, dir, block_width, block_height);
   hapiCheck(cudaPeekAtLastError());
 }

@@ -62,7 +62,7 @@ extern void invokeAccumChargeGhostKernel(RealType* d_rho,
     cudaStream_t stream);
 extern void invokePackPhiKernel(const RealType* d_phi, RealType* d_slab,
     int block_width, int block_height, cudaStream_t stream);
-extern void invokeUnpackPhiLRKernel(RealType* d_phi, const RealType* d_buf,
+extern void invokeUnpackPhiKernel(RealType* d_phi, const RealType* d_buf,
     int dir, int block_width, int block_height, cudaStream_t stream);
 extern void invokeJacobiPhiKernel(const RealType* d_phi, RealType* d_phi_new,
     const RealType* d_rho, float rho_bar, int block_width, int block_height,
@@ -110,11 +110,15 @@ static inline int stripOff(int d) {
 
 // Phi exchanges PHI_HALO layers per side, so its strips are that much longer
 // than the single-layer charge/E strips stripLen() describes.
-static inline int phiStripLen(int d) { return PHI_HALO * stripLen(d); }
+static inline int phiStripLen(int d) {
+  if (d == LEFT || d == RIGHT || d == TOP || d == BOTTOM)
+    return PHI_HALO * stripLen(d);
+  return PHI_CORNER;   // diagonal: a square block, zero at PHI_HALO 1
+}
 
 // Total 4-way phi slab, one parity.
 static inline int phiSlab4() {
-  return 2 * PHI_HALO * (block_width + block_height);
+  return 2 * PHI_HALO * (block_width + block_height) + 4 * PHI_CORNER;
 }
 
 // Offsets in the 4-way phi slab (see packPhiLRKernel in pic2d.cu)
@@ -124,7 +128,9 @@ static inline int phiOff(int d) {
     case LEFT:   return 0;
     case RIGHT:  return PHI_HALO*H;
     case TOP:    return 2*PHI_HALO*H;
-    default:     return 2*PHI_HALO*H + PHI_HALO*W;  // BOTTOM
+    case BOTTOM: return 2*PHI_HALO*H + PHI_HALO*W;
+    // Diagonals, in TL, TR, BL, BR order to match packPhiKernel.
+    default:     return 2*PHI_HALO*(H + W) + (d - TL) * PHI_CORNER;
   }
 }
 
@@ -814,7 +820,7 @@ class Patch : public CBase_Patch {
 
   void sendPhiGhosts() {
     RealType* slab = d_send_phi + (size_t)(phi_iter & 1) * phiSlab4();
-    for (int d = 0; d < 4; d++) {
+    for (int d = 0; d < PHI_DIRS; d++) {
       thisProxy(nbr_x[d], nbr_y[d]).receivePhiGhosts(phi_iter, flipDir(d),
           phiStripLen(d),
           (phi_out[phi_iter & 1]++,
@@ -860,20 +866,10 @@ class Patch : public CBase_Patch {
       CkPrintf("[%d] usePHI  (%d,%d): dir=%d n=%d buf=%p base=%p delta=%ld\n",
                CkMyPe(), thisIndex.x, thisIndex.y, dir, n, (void*)buf,
                (void*)d_recv_phi, (long)(buf - d_recv_phi));
-    if (dir == LEFT || dir == RIGHT) {
-      invokeUnpackPhiLRKernel(d_phi, buf, dir, block_width, block_height,
-          comm_stream);
-    } else if (dir == TOP) {
-      for (int l = 0; l < PHI_HALO; l++)
-        hapiCheck(hapiMemcpyAsync(d_phi + IDX(1, -l),
-            buf + (size_t)l * block_width, sizeof(RealType) * block_width,
-            cudaMemcpyDeviceToDevice, comm_stream));
-    } else {  // BOTTOM
-      for (int l = 0; l < PHI_HALO; l++)
-        hapiCheck(hapiMemcpyAsync(d_phi + IDX(1, block_height + 1 + l),
-            buf + (size_t)l * block_width, sizeof(RealType) * block_width,
-            cudaMemcpyDeviceToDevice, comm_stream));
-    }
+    // One kernel for every direction now, corners included; top and bottom
+    // used to be per-layer device-to-device copies.
+    invokeUnpackPhiKernel(d_phi, buf, dir, block_width, block_height,
+        comm_stream);
   }
 
   void jacobiUpdate() {

@@ -42,6 +42,16 @@ enum Dir { LEFT = 0, RIGHT, TOP, BOTTOM, TL, TR, BL, BR, NUM_DIRS = 8, STAY = 8 
 // unchanged and only the array grows. Negative x/y reach the outer halo.
 #define IDX(x,y) ((block_width+2*PHI_HALO)*((y)+PHI_HALO-1)+((x)+PHI_HALO-1))
 
+// Corner block a diagonal neighbour must supply, per side. A margin-m sweep
+// writes the halo out to layer m and reads one layer beyond, and near a corner
+// that read lands in the diagonal neighbour's territory -- which the 4-way
+// cross exchange never covers. Zero at PHI_HALO 1, where nothing reads the
+// halo at all.
+#define PHI_CORNER_D (PHI_HALO - 1)
+#define PHI_CORNER   (PHI_CORNER_D * PHI_CORNER_D)
+// 4 directions when no corner data is needed, 8 once it is.
+#define PHI_DIRS     ((PHI_HALO > 1) ? NUM_DIRS : 4)
+
 // Cells per row/column including both halos.
 #define FIELD_W (block_width + 2*PHI_HALO)
 #define FIELD_H (block_height + 2*PHI_HALO)

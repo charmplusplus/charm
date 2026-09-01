@@ -1,0 +1,9 @@
+number of physical nodes is 1
+number of nodes is 4
+my rank is 0
+device count 1
+Registering StartLB function 0x3ea89c0
+------- Processor 1 Exiting: Called CmiAbort ------
+Reason: Unhandled C++ exception in user code: 1:1424450:0:/u/bhosale/lci/src/./network/ofi/backend_ofi_inline.hpp:post_get_impl:381<lci:Assert failed: false> err : Message too long (/u/bhosale/lci/src/./network/ofi/backend_ofi_inline.hpp:381)
+.
+

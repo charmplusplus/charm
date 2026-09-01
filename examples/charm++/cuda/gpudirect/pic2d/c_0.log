@@ -1,0 +1,30 @@
+Reconverse> Starting Reconverse with 4 processes, 4 PEs (1 PE = 1 thread), and 1 PE per process
+CharmLB> Verbose level 2, load balancing period: -1 seconds
+CharmLB> Topology torus_nd_5 alpha: 3.500000e-05s beta: 8.500000e-09s.
+CharmLB> Load balancer assumes all CPUs are same.
+Charm++> cpu affinity NOT enabled.
+Charm++> cpu topology info is gathered in 0.001 seconds.
+number of physical nodes is 1
+number of nodes is 4
+my rank is 0
+device count 1
+HAPI> Config: 1 device(s) per process, 1 PE(s) per device, 4 device(s) per host
+HAPI> Enabled POSIX shared memory optimizations for inter-process GPU messaging
+HAPI> GPU communication buffer size: 1024 MB (rounded up to the nearest power of two)
+HAPI> GPU load balancing buffer size: 512 MB 
+HAPI> CUDA IPC event pool size - 16 per PE, 16 per device
+HAPI> Enabling P2P access between devices
+Converse> pxshm pool init'd with 8388608B segment and 262144B cutoff.
+Registering StartLB function 0x33e1040
+CharmLB> GreedyRefineCentralGPULB created.
+
+[CUDA 2D electrostatic PIC]
+Grid: 1024 x 1024, Patch: 128 x 128, Chares: 8 x 8
+Particles: 4194304 total (4 per cell), capacity/patch: 786432, exchange capacity: 39321
+Distribution: gaussian bunch, bunch fraction: 0.50, sigma: 102.4 cells, drift: 5.00, vth: 1.00
+dt: 0.1000, coupling: 1.00e-03, jacobi iterations: 20
+Iterations: 30 (+3 warmup), first LB: 10, LB frequency: 9999
+
+Init time: 0.072 s (4194304 particles)
+------- Processor 0 Exiting: Called CmiAbort ------
+Reason: CUDA IPC event pool empty

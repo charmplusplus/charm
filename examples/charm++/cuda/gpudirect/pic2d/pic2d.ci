@@ -117,7 +117,7 @@ mainmodule pic2d {
         serial { phi_iter++; gatePhiRound(); }
         when phiRoundFree() serial { packPhiGhosts(); }
         when phiGhostsPacked() serial { sendPhiGhosts(); }
-        for (recv_count = 0; recv_count < 4; recv_count++) {
+        for (recv_count = 0; recv_count < PHI_DIRS; recv_count++) {
           when receivePhiGhosts[phi_iter](int ref, int dir, int n, nocopydevice RealType buf[n])
             serial { unpackPhiGhost(dir, n, buf); }
         }
