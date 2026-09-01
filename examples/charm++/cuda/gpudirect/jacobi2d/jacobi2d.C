@@ -148,6 +148,24 @@ public:
     }
     delete m;
 
+    /* Migrating a chare that sends GPU-direct buffers only works while every
+     * such send stays inside one process. The sender resolves the destination
+     * PE before the transfer, and the receiving process rejects a device
+     * buffer the sender addressed elsewhere -- CkRdmaDeviceRecvHandler aborts
+     * with "Destination process does not match the one the sender determined".
+     * Lifting that needs location updates on the device path, which the
+     * runtime does not have yet (its own message points at
+     * CMK_GLOBAL_LOCATION_UPDATE, which is referenced in ck-core but not
+     * defined by any build). Until then this combination is a hard abort the
+     * moment a chare actually moves, so say so up front rather than letting it
+     * surface as an unexplained crash thirty iterations in. */
+    if (lb_freq > 0 && use_zerocopy && CkNumNodes() > 1) {
+      CkPrintf("WARNING: -l (load balancing) with -z (GPU-direct transfers) across %d\n"
+               "         processes will abort as soon as a chare migrates between them.\n"
+               "         Run in a single process, or drop -z, until the device path\n"
+               "         learns about migrations.\n", CkNumNodes());
+    }
+
     if (grid_width % block_width != 0 || grid_height % block_height != 0) {
       CkAbort("Invalid grid & block configuration\n");
     }
