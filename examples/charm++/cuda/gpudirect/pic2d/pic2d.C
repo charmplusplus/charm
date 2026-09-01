@@ -16,6 +16,9 @@
 /* readonly */ int n_iters;
 /* readonly */ int warmup_iters;
 /* readonly */ int jacobi_iters;
+// Phi exchanges per timestep: one per block of PHI_HALO sweeps. The solve used
+// one exchange per sweep, which on a latency-bound run is the whole cost.
+/* readonly */ int jacobi_rounds;
 /* readonly */ int ppc;
 /* readonly */ int first_lb;
 /* readonly */ int async_lb;
@@ -52,13 +55,13 @@ extern void invokePackChargeGhostsKernel(const RealType* d_rho,
 extern void invokeAccumChargeGhostKernel(RealType* d_rho,
     const RealType* d_buf, int dir, int block_width, int block_height,
     cudaStream_t stream);
-extern void invokePackPhiLRKernel(const RealType* d_phi, RealType* d_slab,
+extern void invokePackPhiKernel(const RealType* d_phi, RealType* d_slab,
     int block_width, int block_height, cudaStream_t stream);
 extern void invokeUnpackPhiLRKernel(RealType* d_phi, const RealType* d_buf,
     int dir, int block_width, int block_height, cudaStream_t stream);
 extern void invokeJacobiPhiKernel(const RealType* d_phi, RealType* d_phi_new,
     const RealType* d_rho, float rho_bar, int block_width, int block_height,
-    cudaStream_t stream);
+    int margin, cudaStream_t stream);
 extern void invokeEFieldKernel(const RealType* d_phi, float2* d_efield,
     int block_width, int block_height, cudaStream_t stream);
 extern void invokePackEGhostsKernel(const float2* d_efield, float2* d_slab,
@@ -100,14 +103,23 @@ static inline int stripOff(int d) {
   }
 }
 
+// Phi exchanges PHI_HALO layers per side, so its strips are that much longer
+// than the single-layer charge/E strips stripLen() describes.
+static inline int phiStripLen(int d) { return PHI_HALO * stripLen(d); }
+
+// Total 4-way phi slab, one parity.
+static inline int phiSlab4() {
+  return 2 * PHI_HALO * (block_width + block_height);
+}
+
 // Offsets in the 4-way phi slab (see packPhiLRKernel in pic2d.cu)
 static inline int phiOff(int d) {
   int W = block_width, H = block_height;
   switch (d) {
     case LEFT:   return 0;
-    case RIGHT:  return H;
-    case TOP:    return 2*H;
-    default:     return 2*H + W;  // BOTTOM
+    case RIGHT:  return PHI_HALO*H;
+    case TOP:    return 2*PHI_HALO*H;
+    default:     return 2*PHI_HALO*H + PHI_HALO*W;  // BOTTOM
   }
 }
 
@@ -195,6 +207,9 @@ public:
     if (grid_width % block_width != 0 || grid_height % block_height != 0) {
       CkAbort("Invalid grid & patch configuration\n");
     }
+    // One exchange per PHI_HALO sweeps, plus the trailing exchange-only round.
+    jacobi_rounds = (jacobi_iters + PHI_HALO - 1) / PHI_HALO;
+
     if (dist_type < 0 || dist_type > 2) {
       CkAbort("Invalid distribution type %d (-d): 0 uniform, 1 gaussian "
           "bunch, 2 two-stream\n", dist_type);
@@ -343,6 +358,7 @@ class Patch : public CBase_Patch {
   int phi_iter;
   int recv_count;
   int jacobi_k;
+  int jacobi_done;   // sweeps completed this timestep
   int np;
   int cur;  // which of d_parts[2] holds the live particles
   int x, y;
@@ -375,6 +391,7 @@ class Patch : public CBase_Patch {
 
   Patch() {
     usesAtSync = true;
+    jacobi_done = 0;
   }
 
   Patch(CkMigrateMessage* m) {
@@ -447,15 +464,15 @@ class Patch : public CBase_Patch {
   }
 
   void allocateDeviceBuffers() {
-    size_t field_size = sizeof(RealType) * (block_width + 2) * (block_height + 2);
+    size_t field_size = sizeof(RealType) * FIELD_W * FIELD_H;
     int slab8 = 2 * (block_width + block_height) + 4;
-    int slab4 = 2 * (block_width + block_height);
+    int slab4 = phiSlab4();
 
     hapiCheck(hapiMalloc((void**)&d_rho, field_size));
     hapiCheck(hapiMalloc((void**)&d_phi, field_size));
     hapiCheck(hapiMalloc((void**)&d_phi_new, field_size));
     hapiCheck(hapiMalloc((void**)&d_efield,
-        sizeof(float2) * (block_width + 2) * (block_height + 2)));
+        sizeof(float2) * FIELD_W * FIELD_H));
     hapiCheck(hapiMalloc((void**)&d_parts[0],
         sizeof(Particle) * part_capacity));
     hapiCheck(hapiMalloc((void**)&d_parts[1],
@@ -496,6 +513,7 @@ class Patch : public CBase_Patch {
     _sdag_pup(p);
     p | recv_count;
     p | jacobi_k;
+    p | jacobi_done;
     p | np;
     p | cur;
     p | outstanding_sends;
@@ -513,7 +531,7 @@ class Patch : public CBase_Patch {
     // solve) migrate; rho, E and all exchange buffers are recomputed or
     // overwritten every step. Particles are pup'ed as a flat RealType array
     // since the device pup overload only accepts fundamental types.
-    p(d_phi, (block_width + 2) * (block_height + 2), PUP::PUPMode::DEVICE);
+    p(d_phi, FIELD_W * FIELD_H, PUP::PUPMode::DEVICE);
     p((RealType*)d_parts[cur], (size_t)np * (sizeof(Particle) / sizeof(RealType)),
         PUP::PUPMode::DEVICE);
   }
@@ -528,11 +546,11 @@ class Patch : public CBase_Patch {
     allocateDeviceBuffers();
     createCudaEntities();
 
-    size_t field_size = sizeof(RealType) * (block_width + 2) * (block_height + 2);
+    size_t field_size = sizeof(RealType) * FIELD_W * FIELD_H;
     hapiCheck(cudaMemsetAsync(d_phi, 0, field_size, compute_stream));
     hapiCheck(cudaMemsetAsync(d_phi_new, 0, field_size, compute_stream));
     hapiCheck(cudaMemsetAsync(d_efield, 0,
-        sizeof(float2) * (block_width + 2) * (block_height + 2),
+        sizeof(float2) * FIELD_W * FIELD_H,
         compute_stream));
     hapiCheck(cudaMemsetAsync(d_counts, 0, sizeof(int) * NUM_COUNTERS,
         compute_stream));
@@ -649,7 +667,7 @@ class Patch : public CBase_Patch {
     hapiCheck(cudaStreamWaitEvent(compute_stream, comm_event, 0));
 
     hapiCheck(cudaMemsetAsync(d_rho, 0,
-        sizeof(RealType) * (block_width + 2) * (block_height + 2),
+        sizeof(RealType) * FIELD_W * FIELD_H,
         compute_stream));
     float weight = (float)(-coupling / ppc);
     invokeDepositKernel(d_parts[cur], np, d_rho, weight, (float)px0,
@@ -720,17 +738,10 @@ class Patch : public CBase_Patch {
     hapiCheck(cudaEventRecord(compute_event, compute_stream));
     hapiCheck(cudaStreamWaitEvent(comm_stream, compute_event, 0));
 
-    RealType* slab = d_send_phi +
-        (size_t)(phi_iter & 1) * 2 * (block_width + block_height);
-    invokePackPhiLRKernel(d_phi, slab, block_width, block_height,
-        comm_stream);
-    // Top and bottom interior rows are contiguous
-    hapiCheck(hapiMemcpyAsync(slab + phiOff(TOP), d_phi + IDX(1, 1),
-        sizeof(RealType) * block_width, cudaMemcpyDeviceToDevice,
-        comm_stream));
-    hapiCheck(hapiMemcpyAsync(slab + phiOff(BOTTOM),
-        d_phi + IDX(1, block_height), sizeof(RealType) * block_width,
-        cudaMemcpyDeviceToDevice, comm_stream));
+    RealType* slab = d_send_phi + (size_t)(phi_iter & 1) * phiSlab4();
+    // One launch for all four directions; top and bottom used to be
+    // 2*PHI_HALO separate device-to-device copies on top of the LR kernel.
+    invokePackPhiKernel(d_phi, slab, block_width, block_height, comm_stream);
 
     CkCallback* cb = new CkCallback(CkIndex_Patch::phiGhostsPacked(),
         thisProxy[thisIndex]);
@@ -738,11 +749,10 @@ class Patch : public CBase_Patch {
   }
 
   void sendPhiGhosts() {
-    RealType* slab = d_send_phi +
-        (size_t)(phi_iter & 1) * 2 * (block_width + block_height);
+    RealType* slab = d_send_phi + (size_t)(phi_iter & 1) * phiSlab4();
     for (int d = 0; d < 4; d++) {
       thisProxy(nbr_x[d], nbr_y[d]).receivePhiGhosts(phi_iter, flipDir(d),
-          stripLen(d),
+          phiStripLen(d),
           (phi_out[phi_iter & 1]++,
            CkDeviceBuffer(slab + phiOff(d),
                CkCallback((phi_iter & 1) ? CkIndex_Patch::phiSendDoneOdd()
@@ -780,8 +790,7 @@ class Patch : public CBase_Patch {
   }
 
   void unpackPhiGhost(int dir, int n, RealType* buf) {
-    if (foreignBuf("phi", buf, d_recv_phi,
-                   (size_t)2 * 2 * (block_width + block_height), dir, n))
+    if (foreignBuf("phi", buf, d_recv_phi, (size_t)2 * phiSlab4(), dir, n))
       return;
     if (getenv("CHARM_DEBUG_IPC_RECV"))
       CkPrintf("[%d] usePHI  (%d,%d): dir=%d n=%d buf=%p base=%p delta=%ld\n",
@@ -791,13 +800,15 @@ class Patch : public CBase_Patch {
       invokeUnpackPhiLRKernel(d_phi, buf, dir, block_width, block_height,
           comm_stream);
     } else if (dir == TOP) {
-      hapiCheck(hapiMemcpyAsync(d_phi + IDX(1, 0), buf,
-          sizeof(RealType) * block_width, cudaMemcpyDeviceToDevice,
-          comm_stream));
+      for (int l = 0; l < PHI_HALO; l++)
+        hapiCheck(hapiMemcpyAsync(d_phi + IDX(1, -l),
+            buf + (size_t)l * block_width, sizeof(RealType) * block_width,
+            cudaMemcpyDeviceToDevice, comm_stream));
     } else {  // BOTTOM
-      hapiCheck(hapiMemcpyAsync(d_phi + IDX(1, block_height + 1), buf,
-          sizeof(RealType) * block_width, cudaMemcpyDeviceToDevice,
-          comm_stream));
+      for (int l = 0; l < PHI_HALO; l++)
+        hapiCheck(hapiMemcpyAsync(d_phi + IDX(1, block_height + 1 + l),
+            buf + (size_t)l * block_width, sizeof(RealType) * block_width,
+            cudaMemcpyDeviceToDevice, comm_stream));
     }
   }
 
@@ -807,10 +818,18 @@ class Patch : public CBase_Patch {
     hapiCheck(cudaEventRecord(comm_event, comm_stream));
     hapiCheck(cudaStreamWaitEvent(compute_stream, comm_event, 0));
 
+    // One exchange buys PHI_HALO sweeps. Each consumes a halo layer, so the
+    // swept margin shrinks to zero on the last of them; `remaining` stops the
+    // block short when fewer sweeps are left than the halo would allow.
     float rho_bar = (float)(-coupling);
-    invokeJacobiPhiKernel(d_phi, d_phi_new, d_rho, rho_bar, block_width,
-        block_height, compute_stream);
-    std::swap(d_phi, d_phi_new);
+    const int remaining = jacobi_iters - jacobi_done;
+    const int sweeps = (remaining < PHI_HALO) ? remaining : PHI_HALO;
+    for (int s = 0; s < sweeps; s++) {
+      invokeJacobiPhiKernel(d_phi, d_phi_new, d_rho, rho_bar, block_width,
+          block_height, sweeps - 1 - s, compute_stream);
+      std::swap(d_phi, d_phi_new);
+    }
+    jacobi_done += sweeps;
   }
 
   // ---- Phase 3: electric field ----

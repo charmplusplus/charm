@@ -135,12 +135,32 @@ __global__ void accumChargeGhostKernel(RealType* rho, const RealType* buf,
 // interior column, [2H,2H+W) top interior row, [2H+W,2H+2W) bottom interior
 // row. The contiguous rows are copied with memcpy on the host side; this
 // kernel only packs the strided columns.
-__global__ void packPhiLRKernel(const RealType* phi, RealType* slab,
+// All four directions in one launch, PHI_HALO layers each, innermost layer
+// first so the receiver can lay them down outward from its own edge without
+// knowing the sender's geometry.
+//
+// Top and bottom used to go as separate device-to-device copies because their
+// rows are contiguous -- one copy per layer per side, so the pack cost a kernel
+// plus 2*PHI_HALO copies. On a run whose steps are almost entirely per-message
+// and per-launch overhead those add up, and the rows are just as cheap to
+// gather here. Layout matches phiOff() in pic2d.C.
+__global__ void packPhiKernel(const RealType* phi, RealType* slab,
     int block_width, int block_height) {
   int t = blockDim.x * blockIdx.x + threadIdx.x;
-  int W = block_width, H = block_height;
-  if (t < H)        slab[t] = phi[IDX(1, 1 + t)];
-  else if (t < 2*H) slab[t] = phi[IDX(W, 1 + (t - H))];
+  const int W = block_width, H = block_height;
+  const int nLR = PHI_HALO * H, nTB = PHI_HALO * W;
+  if (t < nLR) {                             // LEFT: columns 1 .. PHI_HALO
+    slab[t] = phi[IDX(1 + t / H, 1 + t % H)];
+  } else if (t < 2 * nLR) {                  // RIGHT: columns W .. W-PHI_HALO+1
+    const int u = t - nLR;
+    slab[t] = phi[IDX(W - u / H, 1 + u % H)];
+  } else if (t < 2 * nLR + nTB) {            // TOP: rows 1 .. PHI_HALO
+    const int u = t - 2 * nLR;
+    slab[t] = phi[IDX(1 + u % W, 1 + u / W)];
+  } else if (t < 2 * nLR + 2 * nTB) {        // BOTTOM: rows H .. H-PHI_HALO+1
+    const int u = t - 2 * nLR - nTB;
+    slab[t] = phi[IDX(1 + u % W, H - u / W)];
+  }
 }
 
 // Writes a received phi strip into the ghost column on side `dir`
@@ -148,17 +168,26 @@ __global__ void unpackPhiLRKernel(RealType* phi, const RealType* buf, int dir,
     int block_width, int block_height) {
   int t = blockDim.x * blockIdx.x + threadIdx.x;
   int W = block_width, H = block_height;
-  if (t >= H) return;
-  if (dir == LEFT) phi[IDX(0, 1 + t)] = buf[t];
-  else             phi[IDX(W+1, 1 + t)] = buf[t];
+  if (t >= PHI_HALO * H) return;
+  const int layer = t / H, r = 1 + t % H;
+  // Layer 0 is the neighbour's edge column, so it lands immediately outside
+  // ours and deeper layers stack outward from there.
+  if (dir == LEFT) phi[IDX(-layer, r)] = buf[t];
+  else             phi[IDX(W + 1 + layer, r)] = buf[t];
 }
 
 // One weighted-Jacobi step of grad^2(phi) = -(rho - rho_bar) with dx = dy = 1
+// `margin` extends the swept region into the halo. A sweep given a halo of
+// depth d can update out to margin d-1 and still read valid neighbours, which
+// is what lets several sweeps run between exchanges: each consumes one layer.
+// The stencil reads rho wherever it writes, so margin is capped by the charge
+// halo (one layer), not by PHI_HALO.
 __global__ void jacobiPhiKernel(const RealType* phi, RealType* phi_new,
-    const RealType* rho, float rho_bar, int block_width, int block_height) {
-  int i = (blockDim.x * blockIdx.x + threadIdx.x) + 1;
-  int j = (blockDim.y * blockIdx.y + threadIdx.y) + 1;
-  if (i <= block_width && j <= block_height) {
+    const RealType* rho, float rho_bar, int block_width, int block_height,
+    int margin) {
+  int i = (blockDim.x * blockIdx.x + threadIdx.x) + 1 - margin;
+  int j = (blockDim.y * blockIdx.y + threadIdx.y) + 1 - margin;
+  if (i <= block_width + margin && j <= block_height + margin) {
     phi_new[IDX(i,j)] = 0.25f * (phi[IDX(i-1,j)] + phi[IDX(i+1,j)] +
         phi[IDX(i,j-1)] + phi[IDX(i,j+1)] + (rho[IDX(i,j)] - rho_bar));
   }
@@ -311,9 +340,10 @@ void invokeAccumChargeGhostKernel(RealType* d_rho, const RealType* d_buf,
   hapiCheck(cudaPeekAtLastError());
 }
 
-void invokePackPhiLRKernel(const RealType* d_phi, RealType* d_slab,
+void invokePackPhiKernel(const RealType* d_phi, RealType* d_slab,
     int block_width, int block_height, cudaStream_t stream) {
-  packPhiLRKernel<<<nblocks(2 * block_height), BLOCK_1D, 0, stream>>>(
+  const int total = 2 * PHI_HALO * (block_width + block_height);
+  packPhiKernel<<<nblocks(total), BLOCK_1D, 0, stream>>>(
       d_phi, d_slab, block_width, block_height);
   hapiCheck(cudaPeekAtLastError());
 }
@@ -327,12 +357,13 @@ void invokeUnpackPhiLRKernel(RealType* d_phi, const RealType* d_buf, int dir,
 
 void invokeJacobiPhiKernel(const RealType* d_phi, RealType* d_phi_new,
     const RealType* d_rho, float rho_bar, int block_width, int block_height,
-    cudaStream_t stream) {
+    int margin, cudaStream_t stream) {
+  const int w = block_width + 2 * margin, h = block_height + 2 * margin;
   dim3 block_dim(TILE_SIZE, TILE_SIZE);
-  dim3 grid_dim((block_width + block_dim.x - 1) / block_dim.x,
-      (block_height + block_dim.y - 1) / block_dim.y);
+  dim3 grid_dim((w + block_dim.x - 1) / block_dim.x,
+      (h + block_dim.y - 1) / block_dim.y);
   jacobiPhiKernel<<<grid_dim, block_dim, 0, stream>>>(
-      d_phi, d_phi_new, d_rho, rho_bar, block_width, block_height);
+      d_phi, d_phi_new, d_rho, rho_bar, block_width, block_height, margin);
   hapiCheck(cudaPeekAtLastError());
 }
 

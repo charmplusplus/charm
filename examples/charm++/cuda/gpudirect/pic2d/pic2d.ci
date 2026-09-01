@@ -12,6 +12,7 @@ mainmodule pic2d {
   readonly int n_iters;
   readonly int warmup_iters;
   readonly int jacobi_iters;
+  readonly int jacobi_rounds;
   readonly int ppc;
   readonly int first_lb;
   readonly int lb_freq;
@@ -85,10 +86,14 @@ mainmodule pic2d {
           serial { accumChargeGhost(dir, n, buf); }
       }
 
-      // Phase 2: Jacobi iterations for the Poisson solve, one 4-way ghost
-      // exchange per iteration; the final round is exchange-only so the
-      // E field sees up-to-date boundary potentials
-      for (jacobi_k = 0; jacobi_k <= jacobi_iters; jacobi_k++) {
+      // Phase 2: Jacobi iterations for the Poisson solve. One 4-way ghost
+      // exchange per BLOCK of PHI_HALO sweeps -- the exchange ships that many
+      // halo layers and each sweep spends one, so the solve costs
+      // ceil(jacobi_iters/PHI_HALO)+1 round trips instead of jacobi_iters+1.
+      // The final round is exchange-only so the E field sees up-to-date
+      // boundary potentials.
+      serial { jacobi_done = 0; }
+      for (jacobi_k = 0; jacobi_k <= jacobi_rounds; jacobi_k++) {
         // Round k+2 reuses round k's parity slab, so its pack waits until
         // every send from round k has confirmed completion. Almost always
         // free: two full rounds of neighbour latency have passed.
@@ -99,7 +104,7 @@ mainmodule pic2d {
           when receivePhiGhosts[phi_iter](int ref, int dir, int n, nocopydevice RealType buf[n])
             serial { unpackPhiGhost(dir, n, buf); }
         }
-        serial { if (jacobi_k < jacobi_iters) jacobiUpdate(); }
+        serial { if (jacobi_k < jacobi_rounds) jacobiUpdate(); }
       }
 
       // Phase 3: E = -grad(phi) on interior cells, then an 8-way exchange to
