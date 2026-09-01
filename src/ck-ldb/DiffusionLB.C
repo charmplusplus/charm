@@ -44,6 +44,14 @@ static int diffusionIterations() {
 }
 #define ITERATIONS (diffusionIterations())
 
+#include "DiffusionCostModel.h"
+
+// The across-node transfer-cost table, loaded once per process from the file
+// named by +LBCostConfig. Shared by every DiffusionLB branch in the process;
+// nothing mutates it after the load.
+DiffusionCostConfig diffusionCostCfg;
+
+#include "DiffusionCostModel.C"
 #include "DiffusionMetric.C"
 #include "DiffusionNeighbors.C"
 #include "DiffusionPseudo.C"
@@ -102,6 +110,17 @@ using std::vector;
 
 DiffusionLB::DiffusionLB(const CkLBOptions& opt) : CBase_DiffusionLB(opt)
 {
+  // Once per process: every branch shares one table, and the loader prints on
+  // PE 0 only. Left uncalibrated when no +LBCostConfig was given, in which case
+  // the across-node phase behaves exactly as it did before the model existed.
+  static bool costCfgLoadAttempted = false;
+  if (!costCfgLoadAttempted)
+  {
+    costCfgLoadAttempted = true;
+    if (_lb_args.costConfig() != NULL)
+      diffusionCostCfg.load(_lb_args.costConfig());
+  }
+
   nodeSize = CkNodeSize(0);
   myNodeId = CkMyPe() / nodeSize;
   acks = 0;

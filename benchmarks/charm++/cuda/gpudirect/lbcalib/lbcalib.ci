@@ -1,0 +1,29 @@
+mainmodule lbcalib {
+  readonly CProxy_Main main_proxy;
+  readonly CProxy_Calib calib_proxy;
+  readonly size_t max_size;
+  readonly int n_iters;
+  readonly int warmup_iters;
+
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry void reportPlacement(int pe, int host, int process, int device);
+    entry [reductiontarget] void initDone();
+    entry [reductiontarget] void pairReady();
+    entry void sampleDone(double seconds);
+    entry void runNextSize();
+    entry void runNextTier();
+  };
+
+  group Calib {
+    entry Calib();
+    entry void reportPlacement();
+    entry void init();
+    // Both endpoints of the pair learn who they are talking to; only the
+    // initiator times.
+    entry void setPair(int initiator, int responder);
+    entry void startSweep(size_t size);
+    entry void ping(size_t size, nocopydevice char data[size]);
+    entry void pong(size_t size, nocopydevice char data[size]);
+  };
+};

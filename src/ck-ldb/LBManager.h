@@ -40,6 +40,10 @@ class CkLBArgs
   bool _lb_statson;         // stats collection
   bool _lb_traceComm;       // stats collection for comm
   bool _lb_diffcomm;        // DiffusionLB: use the communication graph
+  // Path to the transfer-cost table written by the lbcalib benchmark. Empty
+  // means no cost model: DiffusionLB accepts every quota-driven move, which is
+  // the historical behaviour.
+  const char* _lb_costConfig;
   bool _lb_noMST;           // DiffusionLB: skip MST neighbor construction
   int _lb_diffnumnbors;     // DiffusionLB: number of diffusion neighbors
   double _lb_diffbeta;      // DiffusionLB: second-order diffusion momentum (1.0 = off)
@@ -72,6 +76,7 @@ class CkLBArgs
     _lb_statson = true;
     _lb_traceComm = false;
     _lb_diffcomm = false;
+    _lb_costConfig = NULL;
     _lb_noMST = false;
     _lb_diffnumnbors = 1;
     _lb_diffbeta = 1.0;
@@ -108,6 +113,7 @@ class CkLBArgs
   inline bool& statsOn() { return _lb_statson; }
   inline bool& traceComm() { return _lb_traceComm; }
   inline bool& diffusionCommOn() { return _lb_diffcomm; }
+  inline const char*& costConfig() { return _lb_costConfig; }
   inline bool& noMST() { return _lb_noMST; }
   inline int& diffusionNumNbors() { return _lb_diffnumnbors; }
   inline double& diffusionBeta() { return _lb_diffbeta; }

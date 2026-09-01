@@ -516,6 +516,12 @@ void _loadbalancerInit()
       argv, "+LBDiffusionGpuDim",
       "DiffusionLB diffuses GPU load across nodes (default: CPU load)");
 
+  // Transfer-cost table, as produced by benchmarks/charm++/cuda/gpudirect/lbcalib.
+  // With it, DiffusionLB weighs each across-node move against what the move
+  // costs; without it, every move the diffusion quota asks for is made.
+  CmiGetArgStringDesc(argv, "+LBCostConfig", (char**)&_lb_args.costConfig(),
+                      "Path to the DiffusionLB transfer-cost table");
+
   // Per-kernel relative GPU scaling. The model is opt-in while its CUPTI data
   // path and destination-aware LB consumer are introduced in stages.
   _lb_args.gpuScaling() = CmiGetArgFlagDesc(
