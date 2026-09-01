@@ -8,6 +8,17 @@
 #ifndef __HAPI_PORTABLE_H_
 #define __HAPI_PORTABLE_H_
 
+/* Everything below is C++ even when the includer is not. ampi.h wraps its
+ * includes in extern "C", and reaches this header through ampi_functions.h ->
+ * hapi_functions.h; without this, the template overloads further down are
+ * rejected outright ("template with C linkage"), and on the HIP side
+ * hip_runtime.h's own <thread> include fails the same way before we get that
+ * far. extern "C++" restores C++ linkage for the whole body regardless of the
+ * context the header lands in. */
+#ifdef __cplusplus
+extern "C++" {
+#endif
+
 #undef CMK_CUDA
 #undef CMK_HIP
 
@@ -274,5 +285,9 @@ static inline hipError_t hapiFreeHost(void* ptr) {
     hipMemsetAsync(ptr, value, count, stream)
 
 #endif // CMK_HIP
+
+#ifdef __cplusplus
+}  /* extern "C++" */
+#endif
 
 #endif /* __HAPI_PORTABLE_H_ */
