@@ -340,19 +340,15 @@ extern "C" {
 // Sender side of a correction put; defined with the rest of the protocol below.
 static void notifyDeviceRestagePut(int dest_pe, void* dest_op);
 
-
-// Release every stand-down the ops of this message took, called after
-// enqueueNcpyMessage has delivered the entry method. The order is the point:
-// on this build enqueueNcpyMessage runs the entry inline (CmiHandleMessage)
-// when it is already on the destination rank, so by the time this runs the
-// application has consumed the buffers the message referenced. Releasing at
-// transfer completion instead is too early -- noteDeviceSendDone fires a
-// pending migrateMe synchronously, the element packs and frees its buffers
-// before the just-enqueued message is consumed, and the message is then
-// forwarded to the new process carrying pointers into this one. That was the
-// DiffusionLB-async failure: diffusion moves both ends of many send pairs
-// per step, so the window was hit constantly.
-
+// Neither completion handler below releases the migration stand-downs the
+// message's receives took: those release when the completion message itself
+// dies (CkRdmaDeviceMsgFreed), i.e. at consumption. Releasing at transfer
+// completion is too early -- noteDeviceSendDone fires a pending migrateMe,
+// the element packs and frees its buffers before the just-enqueued message
+// is consumed, and the message is then forwarded to the new process carrying
+// pointers into this one. That was the DiffusionLB-async failure: diffusion
+// moves both ends of many send pairs per step, so the window was hit
+// constantly.
 
 void CkRdmaDeviceRecvHandler(void* data)
 {
@@ -978,8 +974,9 @@ extern "C" void* device_restage_put_done_bridge(void* arg)
 {
   QdProcess(1);
   auto* m = (DeviceRestagePutDone*)arg;
-  // The stand-down release now lives in the handler itself, keyed off the
-  // op's stood_down flag, so every resolution path releases exactly once.
+  // No stand-down release here: it happens when the completion message is
+  // freed (CkRdmaDeviceMsgFreed), the same as an uncorrected receive, so a
+  // corrected op must not release a second time.
   CkRdmaDeviceRecvHandler(m->dest_op, NULL);
   CmiFree(m);
   return NULL;
@@ -1154,14 +1151,12 @@ extern "C" void* device_restage_req_bridge(void* arg)
 }
 
 // Completion of a same-node corrected receive: the restaged bytes are now in
-// the destination buffer, so the migration stand-down taken at
-// requestDeviceRestage can finally come off -- and only now. Runs on the
-// destination PE via hapiAddCallback, the same context deviceSendReleaseFn
-// already uses, so the deferred migration this may start is safe to start
-// here.
+// the destination buffer. Runs on the destination PE via hapiAddCallback, the
+// same context deviceSendReleaseFn already uses. No stand-down release here:
+// it happens when the completion message is freed (CkRdmaDeviceMsgFreed), the
+// same as an uncorrected receive, so a corrected op must not release twice.
 static void deviceRestageRecvDone(void* data, void* msg)
 {
-  // The handler releases the op's stand-down itself now.
   CkRdmaDeviceRecvHandler(data, msg);
 }
 
@@ -1320,6 +1315,15 @@ void CkRdmaDeviceStallWatchInit()
 }
 
 void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs) {
+  // The element every op of this message is addressed to, or NULL for a
+  // message with no element behind it (a migration payload arriving on a
+  // group entry -- asking such an envelope for an ArrayID aborts, hence the
+  // guard). Resolved once here: admission control, the per-op migration
+  // stand-down, and the receive-side registration cache all name the same
+  // recipient.
+  CkLocRec* recv_elt = (env->getMsgtype() == ForArrayEltMsg)
+      ? CkFindDeviceRecvElement(env->getArrayMgr(), env->getRecipientID())
+      : NULL;
 #if CMK_LBDB_ON
   // Admission control against a departing element. Preprocessing this message
   // pins it to this process: the transfers land in buffers the element just
@@ -1332,48 +1336,43 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
   // for its moves to finish. The requeued envelope is untouched (the bail is
   // before any mutation), so once the element departs, ordinary delivery
   // forwards it and the new host preprocesses it with local pointers.
-  if (env->getMsgtype() == ForArrayEltMsg) {
-    CkGroupID adm_aid = env->getArrayMgr();
-    CkLocRec* adm_rec = CkFindDeviceRecvElement(adm_aid, env->getRecipientID());
-    // Migration pending: admit while the element still holds unconsumed
-    // messages -- it needs its current round's receives to advance far enough
-    // to consume what it already accepted -- and start bouncing at its first
-    // quiet moment, freezing it quiesced for the move. Bouncing outright
-    // deadlocks: the element stalls on the receives held back while its
-    // held future-round messages wait on rounds it can now never reach.
-    // Parked: always bounce; a parked element runs nothing, and the
-    // application only parks when quiet (CkDeviceRecvQuiet).
-    // Only a PARKED element bounces. Under migrate-at-park, an element with a
-    // migration pending keeps running -- it must, to consume what it holds and
-    // to keep feeding its neighbours -- and parks only when quiet; the park is
-    // where admission closes and the move happens. Freezing it earlier, at its
-    // first quiet moment mid-run, stalls its neighbours on missing ghosts and
-    // deadlocks the step -- measured, not hypothetical.
-    // Only a parked element WITH A MIGRATION PENDING bounces. Buffering
-    // returns before the transfer is issued, so the sender's completion
-    // callback never fires -- and an application that gates its step on
-    // "every zerocopy send I issued has completed" (it must, since the next
-    // iteration repacks those buffers) then hangs at that gate forever. It
-    // cannot reach its own park, so the step never finishes, so nothing ever
-    // unparks and replays what was buffered. Measured: one element stuck at
-    // its send drain, two neighbours holding 7 of 8 particle messages, and
-    // sixty-one elements parked behind them.
+  //
+  // Only a parked element WITH A MIGRATION PENDING bounces, and both halves
+  // of that condition are load bearing. An element with a migration pending
+  // that is still running must keep admitting: it needs its current round's
+  // receives to consume what it already accepted and to keep feeding its
+  // neighbours, and it parks only once quiet -- freezing it at its first
+  // quiet moment mid-run stalls its neighbours on missing ghosts and
+  // deadlocks the step (measured, not hypothetical). A parked element with
+  // no migration decision admits normally: buffering returns before the
+  // transfer is issued, so the sender's completion callback never fires, and
+  // an application that gates its step on "every zerocopy send I issued has
+  // completed" (it must, since the next iteration repacks those buffers)
+  // then hangs at that gate forever, never reaches its own park, and nothing
+  // ever unparks and replays what was buffered. Measured: one element stuck
+  // at its send drain, two neighbours holding 7 of 8 particle messages, and
+  // sixty-one elements parked behind them.
+  if (recv_elt != NULL && recv_elt->deviceRecvParked
+      && recv_elt->pendingMigrateTo != -1) {
+    // Buffered, NOT requeued: a requeue spins on the scheduler's local
+    // queue, which is popped ahead of the network -- so the resume
+    // broadcast that would unpark this element starves behind its own
+    // bounced messages, and the wedge sustains itself. Buffer the envelope
+    // and replay it when the element unparks or departs.
     //
-    // Admission control exists to stop preprocessing from pinning an element
-    // that is about to LEAVE this process. A parked element with no migration
-    // decision is not going anywhere, so it admits normally and its senders
-    // complete.
-    if (adm_rec != NULL && adm_rec->deviceRecvParked
-        && adm_rec->pendingMigrateTo != -1) {
-      // Buffered, NOT requeued: a requeue spins on the scheduler's local
-      // queue, which is popped ahead of the network -- so the resume
-      // broadcast that would unpark this element starves behind its own
-      // bounced messages, and the wedge sustains itself. Buffer the envelope
-      // and replay it when the element unparks or departs.
-      CkDeviceRecvAdmissionBuffer(
-          ck::ObjID(env->getRecipientID()).getElementID(), (void*)env);
-      return;
-    }
+    // The delivery framework owns this envelope: every marshalled entry is
+    // noKeep, so CkDeliverMessageFree frees the message the moment the
+    // entry invocation this bail returns into completes -- the normal path
+    // below survives that only by copying into new_env. Take a reference
+    // so the buffered envelope stays alive until replay re-injects it;
+    // redelivery then admits it (a copy is made and this reference is the
+    // one the framework frees), bounces it again (another reference is
+    // taken here), or forwards it to the element's new home (the send path
+    // frees it after transmission).
+    CmiReference((void*)env);
+    CkDeviceRecvAdmissionBuffer(
+        ck::ObjID(env->getRecipientID()).getElementID(), (void*)env);
+    return;
   }
 #endif
   // Change message header to invoke regular entry method
@@ -1481,7 +1480,6 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     // arrives on a group entry, and asking it for an ArrayID aborts. Those
     // receives are never deferred for correction, so -1 simply means "no
     // element to stand down".
-    save_op.stood_down = 0;
     if (env->getMsgtype() == ForArrayEltMsg) {
       save_op.dest_aid_idx = env->getArrayMgr().idx;
       save_op.dest_id = env->getRecipientID();
@@ -1493,19 +1491,15 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
       // then unpacks a pointer from an address space the new host cannot
       // read. The sender has held its side of every raw-buffer transfer since
       // the interlock was introduced; this is the receiving half.
-      { CkGroupID stand_aid; stand_aid.idx = save_op.dest_aid_idx;
-        CkLocRec* stand_rec =
-            CkFindDeviceRecvElement(stand_aid, save_op.dest_id);
-        if (stand_rec != NULL) {
-          stand_rec->noteDeviceSendPosted();
-          save_op.stood_down = 1;
-          // Released when the completion message is freed -- consumption, not
-          // transfer completion. An SDAG entry can buffer that message for a
-          // future round; migrating in that window ships it, still carrying
-          // this process's pointers, to a host that cannot read them.
-          (*CkpvAccess(device_recv_holds))[(void*)new_env].push_back(
-              DeviceRecvHold{save_op.dest_aid_idx, save_op.dest_id});
-        } }
+      if (recv_elt != NULL) {
+        recv_elt->noteDeviceSendPosted();
+        // Released when the completion message is freed -- consumption, not
+        // transfer completion. An SDAG entry can buffer that message for a
+        // future round; migrating in that window ships it, still carrying
+        // this process's pointers, to a host that cannot read them.
+        (*CkpvAccess(device_recv_holds))[(void*)new_env].push_back(
+            DeviceRecvHold{save_op.dest_aid_idx, save_op.dest_id});
+      }
     } else {
       save_op.dest_aid_idx = -1;
       save_op.dest_id = 0;
@@ -1721,11 +1715,9 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
       // retires the entry. A receive with no element behind it (a migration
       // payload on a group entry) registers per-op as before.
       CmiNcpyBuffer lci_dest_ncpy_buffer;
-      CkGroupID recv_aid; recv_aid.idx = save_op.dest_aid_idx;
-      CkLocRec* recv_rec = CkFindDeviceRecvElement(recv_aid, save_op.dest_id);
-      if (recv_rec != NULL) {
+      if (recv_elt != NULL) {
         lci_dest_ncpy_buffer =
-            acquireDeviceRegistration(arrPtrs[i], (size_t)arrSizes[i], recv_rec);
+            acquireDeviceRegistration(arrPtrs[i], (size_t)arrSizes[i], recv_elt);
         // What the uncached 3-arg constructor's third argument sets: the
         // completion handler finds this operation's DeviceRdmaOp through it.
         lci_dest_ncpy_buffer.deviceRdmaOpInfo = (void*)(&save_op);

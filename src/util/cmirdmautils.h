@@ -31,14 +31,12 @@ typedef struct DeviceRdmaOp_ {
   void* dst_cb;
   uint64_t tag;
   int dest_pe;
-  // Receiving element, so the completion of this receive -- normal or
-  // corrected -- can release the migration stand-down taken when its
-  // transfers were issued.
+  // Receiving element. The stand-down its receives took is released when the
+  // completion message dies (see the consumption-hold map in ckrdmadevice.C),
+  // so completion handlers themselves never release it; these fields let a
+  // deferred correction name the element it is resolving for.
   int dest_aid_idx;
   CmiUInt8 dest_id;
-  // The stand-down was actually taken (the element resolved locally when the
-  // transfers were issued); completion releases it exactly once.
-  char stood_down;
   int src_pe;
   int src_mpi_rank;
   int dest_mpi_rank;
