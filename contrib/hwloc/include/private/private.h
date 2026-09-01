@@ -1,9 +1,9 @@
 /*
+ * SPDX-License-Identifier: BSD-3-Clause
  * Copyright © 2009      CNRS
- * Copyright © 2009-2023 Inria.  All rights reserved.
+ * Copyright © 2009-2025 Inria.  All rights reserved.
  * Copyright © 2009-2012, 2020 Université Bordeaux
  * Copyright © 2009-2011 Cisco Systems, Inc.  All rights reserved.
- *
  * See COPYING in top-level directory.
  */
 
@@ -258,14 +258,14 @@ struct hwloc_topology {
   struct hwloc_numanode_attr_s machine_memory;
 
   /* pci stuff */
-  int pci_has_forced_locality;
-  unsigned pci_forced_locality_nr;
-  struct hwloc_pci_forced_locality_s {
+  /* FIXME: keep until topo destroy and reuse for finding specific buses */
+  struct hwloc_pci_locality_s {
     unsigned domain;
-    unsigned bus_first, bus_last;
-    hwloc_bitmap_t cpuset;
-  } * pci_forced_locality;
-  hwloc_uint64_t pci_locality_quirks;
+    unsigned bus_min;
+    unsigned bus_max;
+    hwloc_obj_t parent;
+    struct hwloc_pci_locality_s *prev, *next;
+  } *first_pci_locality, *last_pci_locality; /* contains unsorted forced localities first, then sorted real ones */
 
   /* component blacklisting */
   unsigned nr_blacklisted_components;
@@ -273,16 +273,6 @@ struct hwloc_topology {
     struct hwloc_disc_component *component;
     unsigned phases;
   } *blacklisted_components;
-
-  /* FIXME: keep until topo destroy and reuse for finding specific buses */
-  struct hwloc_pci_locality_s {
-    unsigned domain;
-    unsigned bus_min;
-    unsigned bus_max;
-    hwloc_bitmap_t cpuset;
-    hwloc_obj_t parent;
-    struct hwloc_pci_locality_s *prev, *next;
-  } *first_pci_locality, *last_pci_locality;
 };
 
 extern void hwloc_alloc_root_sets(hwloc_obj_t root);
@@ -301,6 +291,9 @@ extern void hwloc__reorder_children(hwloc_obj_t parent);
 
 extern void hwloc_topology_setup_defaults(struct hwloc_topology *topology);
 extern void hwloc_topology_clear(struct hwloc_topology *topology);
+
+#define _HWLOC_RECONNECT_FLAG_KEEPSTRUCTURE (1UL<<0)
+extern int hwloc__reconnect(struct hwloc_topology *topology, unsigned long flags);
 
 /* insert memory object as memory child of normal parent */
 extern struct hwloc_obj * hwloc__attach_memory_object(struct hwloc_topology *topology, hwloc_obj_t parent,

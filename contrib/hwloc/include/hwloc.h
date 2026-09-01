@@ -1,6 +1,7 @@
 /*
+ * SPDX-License-Identifier: BSD-3-Clause
  * Copyright © 2009 CNRS
- * Copyright © 2009-2023 Inria.  All rights reserved.
+ * Copyright © 2009-2025 Inria.  All rights reserved.
  * Copyright © 2009-2012 Université Bordeaux
  * Copyright © 2009-2020 Cisco Systems, Inc.  All rights reserved.
  * See COPYING in top-level directory.
@@ -47,6 +48,8 @@
  * See hwloc/inlines.h for the actual inline code of some functions below.
  * See hwloc/export.h for exporting topologies to XML or to synthetic descriptions.
  * See hwloc/distances.h for querying and modifying distances between objects.
+ * See hwloc/memattrs.h for querying and modifying memory attributes such as Bandwidth.
+ * See hwloc/cpukinds.h for querying and modifying kinds of CPU cores.
  * See hwloc/diff.h for manipulating differences between similar topologies.
  */
 
@@ -112,7 +115,7 @@ extern "C" {
  * Two stable releases of the same series usually have the same ::HWLOC_API_VERSION
  * even if their HWLOC_VERSION are different.
  */
-#define HWLOC_API_VERSION 0x00020800
+#define HWLOC_API_VERSION 0x00020c00
 
 /** \brief Indicate at runtime which hwloc API version was used at build time.
  *
@@ -157,6 +160,7 @@ HWLOC_DECLSPEC unsigned hwloc_get_api_version(void);
  *
  * Each bit may be converted into a PU object using
  * hwloc_get_pu_obj_by_os_index().
+ * \sa faq_indexes
  */
 typedef hwloc_bitmap_t hwloc_cpuset_t;
 /** \brief A non-modifiable ::hwloc_cpuset_t. */
@@ -169,6 +173,7 @@ typedef hwloc_const_bitmap_t hwloc_const_cpuset_t;
  * ::hwloc_bitmap_t (see hwloc/bitmap.h).
  * Each bit may be converted into a NUMA node object using
  * hwloc_get_numanode_obj_by_os_index().
+ * \sa faq_indexes
  *
  * When binding memory on a system without any NUMA node,
  * the single main memory bank is considered as NUMA node #0.
@@ -346,9 +351,10 @@ typedef enum {
 			 *
 			 * Some operating systems (e.g. Linux) may expose a single die per package
 			 * even if the hardware does not support dies at all. To avoid showing
-			 * such non-existing dies, the corresponding hwloc backend may filter them out.
+			 * such non-existing dies, hwloc will filter them out if all of them are
+                         * identical to packages.
 			 * This is functionally equivalent to ::HWLOC_TYPE_FILTER_KEEP_STRUCTURE
-			 * being enforced.
+			 * being enforced for Dies versus Packages.
 			 */
 
   HWLOC_OBJ_TYPE_MAX    /**< \private Sentinel value */
@@ -1047,7 +1053,7 @@ HWLOC_DECLSPEC const char * hwloc_obj_type_string (hwloc_obj_type_t type) __hwlo
  * If \p size is 0, \p string may safely be \c NULL.
  *
  * \return the number of characters that were actually written if not truncating,
- * or that would have been written (not including the ending \\0).
+ * or that would have been written (not including the ending \c \0).
  */
 HWLOC_DECLSPEC int hwloc_obj_type_snprintf(char * __hwloc_restrict string, size_t size,
 					   hwloc_obj_t obj,
@@ -1062,7 +1068,7 @@ HWLOC_DECLSPEC int hwloc_obj_type_snprintf(char * __hwloc_restrict string, size_
  * If \p size is 0, \p string may safely be \c NULL.
  *
  * \return the number of characters that were actually written if not truncating,
- * or that would have been written (not including the ending \\0).
+ * or that would have been written (not including the ending \c \0).
  */
 HWLOC_DECLSPEC int hwloc_obj_attr_snprintf(char * __hwloc_restrict string, size_t size,
 					   hwloc_obj_t obj, const char * __hwloc_restrict separator,
@@ -1158,6 +1164,22 @@ hwloc_obj_get_info_by_name(hwloc_obj_t obj, const char *name) __hwloc_attribute_
  * be dropped when exporting to XML, see hwloc_topology_export_xml() in hwloc/export.h.
  */
 HWLOC_DECLSPEC int hwloc_obj_add_info(hwloc_obj_t obj, const char *name, const char *value);
+
+/** \brief Set (or replace) the subtype of an object.
+ *
+ * The given \p subtype is copied internally, the caller is responsible
+ * for freeing the original \p subtype if needed.
+ *
+ * If another subtype already exists in \p object, it is replaced.
+ * The given \p subtype may be \c NULL to remove the existing subtype.
+ *
+ * \note This function is mostly meant to initialize the subtype of user-added
+ * objects such as groups with hwloc_topology_alloc_group_object().
+ *
+ * \return \c 0 on success.
+ * \return \c -1 with \p errno set to \c ENOMEM on failure to allocate memory.
+ */
+HWLOC_DECLSPEC int hwloc_obj_set_subtype(hwloc_topology_t topology, hwloc_obj_t obj, const char *subtype);
 
 /** @} */
 
@@ -1527,6 +1549,16 @@ typedef enum {
    * the interleave will then balance the memory references.
    * \hideinitializer */
   HWLOC_MEMBIND_INTERLEAVE =	3,
+
+  /** \brief Allocate memory on the given nodes in an interleaved
+   * / weighted manner.  The precise layout of the memory across
+   * multiple NUMA nodes is OS/system specific. Weighted interleaving
+   * can be useful when threads distributed across the specified NUMA
+   * nodes with different bandwidth capabilities will all be accessing
+   * the whole memory range concurrently, since the interleave will then
+   * balance the memory references.
+   * \hideinitializer */
+  HWLOC_MEMBIND_WEIGHTED_INTERLEAVE = 5,
 
   /** \brief For each page bound with this policy, by next time
    * it is touched (and next time only), it is moved from its current
@@ -1976,7 +2008,7 @@ HWLOC_DECLSPEC int hwloc_topology_set_xml(hwloc_topology_t __hwloc_restrict topo
  * a file, as with hwloc_topology_set_xml()).
  *
  * Gather topology information from the XML memory buffer given at
- * \p buffer and of length \p size (including an ending \0).
+ * \p buffer and of length \p size (including an ending \c \0).
  * This buffer may have been filled earlier with
  * hwloc_topology_export_xmlbuffer() in hwloc/export.h.
  *
@@ -2346,6 +2378,8 @@ struct hwloc_topology_membind_support {
   unsigned char migrate_membind;
   /** Getting the last NUMA nodes where a memory area was allocated is supported */
   unsigned char get_area_memlocation;
+  /** Weighted interleave policy is supported. */
+  unsigned char weighted_interleave_membind;
 };
 
 /** \brief Flags describing miscellaneous features.
@@ -2651,6 +2685,9 @@ HWLOC_DECLSPEC int hwloc_topology_allow(hwloc_topology_t __hwloc_restrict topolo
  *
  * The new leaf object will not have any \p cpuset.
  *
+ * The \p subtype object attribute may be defined with hwloc_obj_set_subtype()
+ * after successful insertion.
+ *
  * \return the newly-created object
  *
  * \return \c NULL on error.
@@ -2701,19 +2738,37 @@ HWLOC_DECLSPEC int hwloc_topology_free_group_object(hwloc_topology_t topology, h
  * the final location of the Group in the topology.
  * Then the object can be passed to this function for actual insertion in the topology.
  *
- * Either the cpuset or nodeset field (or both, if compatible) must be set
- * to a non-empty bitmap. The complete_cpuset or complete_nodeset may be set
- * instead if inserting with respect to the complete topology
+ * The main use case for this function is to group a subset of
+ * siblings among the list of children below a single parent.
+ * For instance, if grouping 4 cores out of a 8-core socket,
+ * the logical list of cores will be reordered so that the 4 grouped
+ * ones are consecutive.
+ * Then, if needed, a new depth is added between the parent and those
+ * children, and the Group is inserted there.
+ * At the end, the 4 grouped cores are now children of the Group,
+ * which replaces them as a child of the original parent.
+ *
+ * In practice, the grouped objects are specified through cpusets
+ * and/or nodesets, for instance using hwloc_obj_add_other_obj_sets()
+ * iteratively.
+ * Hence it is possible to group objects that are not children of the
+ * same parent, for instance some PUs below the 4 cores in example above.
+ * However this general case may fail if the expected Group conflicts
+ * with the existing hierarchy.
+ * For instance if each core has two PUs, it is not possible to insert
+ * a Group containing a single PU of each core.
+ *
+ * To specify the objects to group, either the cpuset or nodeset field
+ * (or both, if compatible) must be set to a non-empty bitmap.
+ * The complete_cpuset or complete_nodeset may be set instead if
+ * inserting with respect to the complete topology
  * (including disallowed, offline or unknown objects).
- * If grouping several objects, hwloc_obj_add_other_obj_sets() is an easy way
- * to build the Group sets iteratively.
  * These sets cannot be larger than the current topology, or they would get
  * restricted silently.
  * The core will setup the other sets after actual insertion.
  *
- * The \p subtype object attribute may be defined (to a dynamically
- * allocated string) to display something else than "Group" as the
- * type name for this object in lstopo.
+ * The \p subtype object attribute may be defined with hwloc_obj_set_subtype()
+ * to display something else than "Group" as the type name for this object in lstopo.
  * Custom name-value info pairs may be added with hwloc_obj_add_info() after
  * insertion.
  *

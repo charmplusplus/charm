@@ -1,6 +1,7 @@
 /*
+ * SPDX-License-Identifier: BSD-3-Clause
  * Copyright © 2009 CNRS
- * Copyright © 2009-2023 Inria.  All rights reserved.
+ * Copyright © 2009-2025 Inria.  All rights reserved.
  * Copyright © 2009-2011, 2020 Université Bordeaux
  * Copyright © 2009-2018 Cisco Systems, Inc.  All rights reserved.
  * See COPYING in top-level directory.
@@ -410,6 +411,20 @@ hwloc__xml_import_object_attr(struct hwloc_topology *topology,
     default:
       if (hwloc__xml_verbose())
 	fprintf(stderr, "%s: ignoring osdev_type attribute for non-osdev object\n",
+		state->global->msgprefix);
+      break;
+    }
+  }
+
+  else if (!strcmp(name, "numanode_type")) {
+    switch (obj->type) {
+    case HWLOC_OBJ_NUMANODE: {
+      /* ignored for now, here for possible forward compat */
+      break;
+    }
+    default:
+      if (hwloc__xml_verbose())
+	fprintf(stderr, "%s: ignoring numanode_type attribute for non-NUMA object\n",
 		state->global->msgprefix);
       break;
     }
@@ -872,14 +887,23 @@ hwloc__xml_import_object(hwloc_topology_t topology,
 	  /* deal with possible future type */
 	  obj->type = HWLOC_OBJ_GROUP;
 	  obj->attr->group.kind = HWLOC_GROUP_KIND_INTEL_MODULE;
-	} else if (!strcasecmp(attrvalue, "MemCache")) {
+	} else if (!strcasecmp(attrvalue, "Cluster")) {
+	  /* deal with possible future type */
+	  obj->type = HWLOC_OBJ_GROUP;
+	  obj->attr->group.kind = HWLOC_GROUP_KIND_LINUX_CLUSTER;
+	}
+#if 0
+        /* reenable if there's ever a future type that should be ignored without being an error */
+        else if (!strcasecmp(attrvalue, "MemCache")) {
 	  /* ignore possible future type */
 	  obj->type = _HWLOC_OBJ_FUTURE;
 	  ignored = 1;
 	  if (hwloc__xml_verbose())
 	    fprintf(stderr, "%s: %s object not-supported, will be ignored\n",
 		    state->global->msgprefix, attrvalue);
-	} else {
+	}
+#endif
+        else {
 	  if (hwloc__xml_verbose())
 	    fprintf(stderr, "%s: unrecognized object type string %s\n",
 		    state->global->msgprefix, attrvalue);
@@ -954,22 +978,22 @@ hwloc__xml_import_object(hwloc_topology_t topology,
     if (hwloc__obj_type_is_normal(obj->type)) {
       if (!hwloc__obj_type_is_normal(parent->type)) {
 	if (hwloc__xml_verbose())
-	  fprintf(stderr, "normal object %s cannot be child of non-normal parent %s\n",
-		  hwloc_obj_type_string(obj->type), hwloc_obj_type_string(parent->type));
+	  fprintf(stderr, "%s: normal object %s cannot be child of non-normal parent %s\n",
+		  state->global->msgprefix, hwloc_obj_type_string(obj->type), hwloc_obj_type_string(parent->type));
 	goto error_with_object;
       }
     } else if (hwloc__obj_type_is_memory(obj->type)) {
       if (hwloc__obj_type_is_io(parent->type) || HWLOC_OBJ_MISC == parent->type) {
 	if (hwloc__xml_verbose())
-	  fprintf(stderr, "Memory object %s cannot be child of non-normal-or-memory parent %s\n",
-		  hwloc_obj_type_string(obj->type), hwloc_obj_type_string(parent->type));
+	  fprintf(stderr, "%s: Memory object %s cannot be child of non-normal-or-memory parent %s\n",
+		  state->global->msgprefix, hwloc_obj_type_string(obj->type), hwloc_obj_type_string(parent->type));
 	goto error_with_object;
       }
     } else if (hwloc__obj_type_is_io(obj->type)) {
       if (hwloc__obj_type_is_memory(parent->type) || HWLOC_OBJ_MISC == parent->type) {
 	if (hwloc__xml_verbose())
-	  fprintf(stderr, "I/O object %s cannot be child of non-normal-or-I/O parent %s\n",
-		  hwloc_obj_type_string(obj->type), hwloc_obj_type_string(parent->type));
+	  fprintf(stderr, "%s: I/O object %s cannot be child of non-normal-or-I/O parent %s\n",
+		  state->global->msgprefix, hwloc_obj_type_string(obj->type), hwloc_obj_type_string(parent->type));
 	goto error_with_object;
       }
     }
@@ -1344,7 +1368,7 @@ hwloc__xml_v2import_support(hwloc_topology_t topology,
     HWLOC_BUILD_ASSERT(sizeof(struct hwloc_topology_support) == 4*sizeof(void*));
     HWLOC_BUILD_ASSERT(sizeof(struct hwloc_topology_discovery_support) == 6);
     HWLOC_BUILD_ASSERT(sizeof(struct hwloc_topology_cpubind_support) == 11);
-    HWLOC_BUILD_ASSERT(sizeof(struct hwloc_topology_membind_support) == 15);
+    HWLOC_BUILD_ASSERT(sizeof(struct hwloc_topology_membind_support) == 16);
     HWLOC_BUILD_ASSERT(sizeof(struct hwloc_topology_misc_support) == 1);
 #endif
 
@@ -1378,6 +1402,7 @@ hwloc__xml_v2import_support(hwloc_topology_t topology,
     else DO(membind,firsttouch_membind);
     else DO(membind,bind_membind);
     else DO(membind,interleave_membind);
+    else DO(membind,weighted_interleave_membind);
     else DO(membind,nexttouch_membind);
     else DO(membind,migrate_membind);
     else DO(membind,get_area_memlocation);
@@ -1436,6 +1461,10 @@ hwloc__xml_v2import_distances(hwloc_topology_t topology,
     }
     else if (!strcmp(attrname, "kind")) {
       kind = strtoul(attrvalue, NULL, 10);
+      /* forward compat with "HOPS" kind in v3 */
+      if (kind & (1UL<<5))
+        /* hops becomes latency */
+        kind = (kind & ~(1UL<<5)) | HWLOC_DISTANCES_KIND_MEANS_LATENCY;
     }
     else if (!strcmp(attrname, "name")) {
       name = attrvalue;
@@ -2230,6 +2259,46 @@ done:
       fprintf(stderr, "%s: invalid root object without cpuset\n",
 	      data->msgprefix);
     goto err;
+  }
+
+  /* update v3.0 NUMA page types */
+  if (data->version_major > 2 && data->first_numanode) {
+    const char *nrs = hwloc_obj_get_info_by_name(topology->levels[0][0], "PageSizeNr");
+    const char *sizes = hwloc_obj_get_info_by_name(topology->levels[0][0], "PageSizes");
+    if (nrs && sizes) {
+      unsigned nr = atoi(nrs);
+      if (nr) {
+        struct hwloc_memory_page_type_s * page_types = calloc(nr, sizeof(*page_types));
+        if (page_types) {
+          unsigned i;
+          const char *current;
+          char *end;
+          current = sizes;
+          for(i=0; i<nr; i++) {
+            page_types[i].size = strtoull(current, &end, 0);
+            if (!*end) {
+              i++;
+              break;
+            }
+            current = end+1; /* skip the comma */
+          }
+          nr = i; /* in case we broke out. things will be cleaned in propagate_total_memory() anyway */
+          hwloc_obj_t node = data->first_numanode;
+          do {
+            if (!node->attr->numanode.page_types_len) {
+              node->attr->numanode.page_types = malloc(nr * sizeof(*page_types));
+              if (node->attr->numanode.page_types) {
+                memcpy(node->attr->numanode.page_types, page_types, nr * sizeof(*page_types));
+                node->attr->numanode.page_types_len = nr;
+                node->attr->numanode.page_types[0].count = node->attr->numanode.local_memory / node->attr->numanode.page_types[0].size; /* assume all memory is in normal/small pages */
+              }
+            }
+            node = node->next_cousin;
+          } while (node);
+          free(page_types);
+        }
+      }
+    }
   }
 
   /* update pre-v2.0 memory group gp_index */
@@ -3087,7 +3156,7 @@ hwloc__xml_v2export_support(hwloc__xml_export_state_t parentstate, hwloc_topolog
   HWLOC_BUILD_ASSERT(sizeof(struct hwloc_topology_support) == 4*sizeof(void*));
   HWLOC_BUILD_ASSERT(sizeof(struct hwloc_topology_discovery_support) == 6);
   HWLOC_BUILD_ASSERT(sizeof(struct hwloc_topology_cpubind_support) == 11);
-  HWLOC_BUILD_ASSERT(sizeof(struct hwloc_topology_membind_support) == 15);
+  HWLOC_BUILD_ASSERT(sizeof(struct hwloc_topology_membind_support) == 16);
   HWLOC_BUILD_ASSERT(sizeof(struct hwloc_topology_misc_support) == 1);
 #endif
 
@@ -3132,6 +3201,7 @@ hwloc__xml_v2export_support(hwloc__xml_export_state_t parentstate, hwloc_topolog
   DO(membind,firsttouch_membind);
   DO(membind,bind_membind);
   DO(membind,interleave_membind);
+  DO(membind,weighted_interleave_membind);
   DO(membind,nexttouch_membind);
   DO(membind,migrate_membind);
   DO(membind,get_area_memlocation);

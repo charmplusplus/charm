@@ -1,5 +1,6 @@
 /*
- * Copyright © 2020-2022 Inria.  All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * Copyright © 2020-2026 Inria.  All rights reserved.
  * See COPYING in top-level directory.
  */
 
@@ -50,6 +51,7 @@ hwloc_internal_cpukinds_dup(hwloc_topology_t new, hwloc_topology_t old)
     return -1;
   new->cpukinds = kinds;
   new->nr_cpukinds = old->nr_cpukinds;
+  new->nr_cpukinds_allocated = old->nr_cpukinds;
   memcpy(kinds, old->cpukinds, old->nr_cpukinds * sizeof(*kinds));
 
   for(i=0;i<old->nr_cpukinds; i++) {
@@ -300,7 +302,7 @@ struct hwloc_cpukinds_info_summary {
   int have_base_freq;
   int have_intel_core_type;
   struct hwloc_cpukind_info_summary {
-    unsigned intel_core_type; /* 1 for atom, 2 for core */
+    unsigned intel_core_type; /* 1 for lowpower, 2 for atom (default), 3 for core */
     unsigned max_freq, base_freq; /* MHz, hence < 100000 */
   } * summaries;
 };
@@ -313,7 +315,7 @@ hwloc__cpukinds_summarize_info(struct hwloc_topology *topology,
 
   summary->have_max_freq = 1;
   summary->have_base_freq = 1;
-  summary->have_intel_core_type = 1;
+  summary->have_intel_core_type = 2; /* atom by default */
 
   for(i=0; i<topology->nr_cpukinds; i++) {
     struct hwloc_internal_cpukind_s *kind = &topology->cpukinds[i];
@@ -325,9 +327,11 @@ hwloc__cpukinds_summarize_info(struct hwloc_topology *topology,
         summary->summaries[i].base_freq = atoi(info->value);
       } else if (!strcmp(info->name, "CoreType")) {
         if (!strcmp(info->value, "IntelAtom"))
-          summary->summaries[i].intel_core_type = 1;
-        else if (!strcmp(info->value, "IntelCore"))
           summary->summaries[i].intel_core_type = 2;
+        else if (!strcmp(info->value, "IntelCore"))
+          summary->summaries[i].intel_core_type = 3;
+        else if (!strcmp(info->value, "IntelLowPower"))
+          summary->summaries[i].intel_core_type = 1;
       }
     }
     hwloc_debug("cpukind #%u has intel_core_type %u max_freq %u base_freq %u\n",
