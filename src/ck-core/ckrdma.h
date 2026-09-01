@@ -216,6 +216,17 @@ void invokeDestinationCallback(NcpyOperationInfo *info);
 
 // Method to enqueue a message after the completion of an payload transfer
 void enqueueNcpyMessage(int destPe, void *msg);
+// Device-receive consumption hook: CkFreeMsg tells the device layer a message
+// died, so the migration stand-downs it pinned can come off. No-op cheap when
+// nothing is held.
+void CkRdmaDeviceMsgFreed(void* env);
+// True when the running element holds no unconsumed device receive; the
+// application must not park in AtSyncWait until it is.
+bool CkDeviceRecvQuiet();
+// Admission-control buffering for receives to a parked element; replay on
+// unpark or departure re-injects them into ordinary delivery.
+void CkDeviceRecvAdmissionBuffer(CmiUInt8 id, void* env);
+void CkDeviceRecvAdmissionReplay(CmiUInt8 id);
 
 // Method to increment Qd counter
 inline void zcQdIncrement();

@@ -339,6 +339,7 @@ class Patch : public CBase_Patch {
   // AtSyncWait is owed lb_wait_lag iterations later.
   bool lb_waiting = false;
   int lb_start_iter = 0;
+  int park_skips = 0;
   int phi_iter;
   int recv_count;
   int jacobi_k;
@@ -487,6 +488,12 @@ class Patch : public CBase_Patch {
     }
     p | my_iter;
     p | phi_iter;
+    // The SDAG dependency state travels too: admission control can migrate a
+    // patch mid-step, and the continuations (which whens are outstanding,
+    // buffered ordinary messages) must follow it. Safe only because the
+    // consumption-holds guarantee no device-zerocopy message -- whose payload
+    // pointers cannot cross a process -- is buffered here at migration time.
+    _sdag_pup(p);
     p | recv_count;
     p | jacobi_k;
     p | np;
@@ -585,7 +592,11 @@ class Patch : public CBase_Patch {
       if (want) LBTurnInstrumentOn(); else LBTurnInstrumentOff();
     }
 
-    if (isLBIter(my_iter)) {
+    if (isLBIter(my_iter) && !lb_waiting) {
+      // The !lb_waiting guard: one step at a time per element. If the wait
+      // for the previous step is still owed -- the quiet check can delay the
+      // park -- starting another AtSyncStart aborts by contract; the missed
+      // step is simply skipped and the cadence resumes at the next one.
       cudaStreamSynchronize(comm_stream);
       cudaStreamSynchronize(compute_stream);
       if (!async_lb) {
@@ -603,6 +614,12 @@ class Patch : public CBase_Patch {
       lb_waiting = true;
       thisProxy[thisIndex].runStep();
     } else if (lb_waiting && my_iter >= lb_start_iter + lb_wait_lag) {
+      // Park unconditionally, even with device sends still draining. Every
+      // patch parks here before running this iteration's step, so no ghost
+      // for it can have been sent yet -- nothing unconsumed can be buffered.
+      // A patch that skips the park to wait out its drain runs a step its
+      // parked neighbors never feed, and wedges the whole app; the runtime
+      // already defers an actual migration until the drain completes.
       // The other half of the split, a few iterations later: the patch has to
       // be quiesced before it can be pupped, and AtSyncWait is where the step
       // is collected. Resumes inline if the step is already over.
@@ -649,6 +666,8 @@ class Patch : public CBase_Patch {
   }
 
   void sendChargeGhosts() {
+    if (getenv("CHARM_DEBUG_MIGRATE"))
+      CkPrintf("[PH1] (%d,%d) iter=%d\n", thisIndex.x, thisIndex.y, my_iter);
     for (int d = 0; d < NUM_DIRS; d++) {
       thisProxy(nbr_x[d], nbr_y[d]).receiveChargeGhosts(my_iter, flipDir(d),
           stripLen(d),
@@ -677,6 +696,9 @@ class Patch : public CBase_Patch {
   }
 
   void accumChargeGhost(int dir, int n, RealType* buf) {
+    if (getenv("CHARM_DEBUG_MIGRATE"))
+      CkPrintf("[CRECV] (%d,%d) iter=%d dir=%d\n", thisIndex.x, thisIndex.y,
+               my_iter, dir);
     if (getenv("CHARM_DEBUG_IPC_RECV")) {
       const int slab8 = 2 * (block_width + block_height) + 4;
       CkPrintf("[%d] accum (%d,%d): dir=%d n=%d buf=%p recv_base=%p "
@@ -742,7 +764,25 @@ class Patch : public CBase_Patch {
                (void*)d_recv_phi, (void*)buf);
   }
 
+  // Forensic probe: is a received device pointer inside the posted buffer it
+  // is supposed to be? A foreign pointer means the message was preprocessed
+  // in another process (retargeted to ITS posted buffers) and delivered here
+  // after a migration. Report and skip instead of copying: a poisoned async
+  // copy would take the whole context down and hide every later event.
+  bool foreignBuf(const char* what, const RealType* buf, const RealType* base,
+                  size_t span, int dir, int n) {
+    if (buf >= base && buf < base + span) return false;
+    CkPrintf("[FOREIGN] pe=%d (%d,%d) %s iter=%d phi_iter=%d dir=%d n=%d "
+             "buf=%p base=%p\n", CkMyPe(), thisIndex.x, thisIndex.y, what,
+             my_iter, phi_iter, dir, n, (void*)buf, (void*)base);
+    fflush(stdout);
+    return true;
+  }
+
   void unpackPhiGhost(int dir, int n, RealType* buf) {
+    if (foreignBuf("phi", buf, d_recv_phi,
+                   (size_t)2 * 2 * (block_width + block_height), dir, n))
+      return;
     if (getenv("CHARM_DEBUG_IPC_RECV"))
       CkPrintf("[%d] usePHI  (%d,%d): dir=%d n=%d buf=%p base=%p delta=%ld\n",
                CkMyPe(), thisIndex.x, thisIndex.y, dir, n, (void*)buf,
@@ -825,6 +865,8 @@ class Patch : public CBase_Patch {
   // ---- Phase 4: particle push and exchange ----
 
   void pushParticles() {
+    if (getenv("CHARM_DEBUG_MIGRATE"))
+      CkPrintf("[PH4] (%d,%d) iter=%d\n", thisIndex.x, thisIndex.y, my_iter);
     // E ghosts were unpacked on the comm stream
     hapiCheck(cudaEventRecord(comm_event, comm_stream));
     hapiCheck(cudaStreamWaitEvent(compute_stream, comm_event, 0));
@@ -844,6 +886,8 @@ class Patch : public CBase_Patch {
   }
 
   void finishPush() {
+    if (getenv("CHARM_DEBUG_MIGRATE"))
+      CkPrintf("[PUSHD] (%d,%d) iter=%d\n", thisIndex.x, thisIndex.y, my_iter);
     if (h_counts[ERR_COUNTER]) {
       CkAbort("Patch (%d,%d): particle moved more than one patch in one "
           "step at iteration %d; reduce dt (-T) or drift (-v)\n",
@@ -882,6 +926,8 @@ class Patch : public CBase_Patch {
   }
 
   void appendParticles(int dir, int n) {
+    if (getenv("CHARM_DEBUG_MIGRATE"))
+      CkPrintf("[PRECV] (%d,%d) iter=%d\n", thisIndex.x, thisIndex.y, my_iter);
     if (getenv("CHARM_DEBUG_IPC_RECV"))
       CkPrintf("[%d] usePART (%d,%d): dir=%d n=%d np=%d cap=%d%s\n",
                CkMyPe(), thisIndex.x, thisIndex.y, dir, n, np, part_capacity,
@@ -920,6 +966,8 @@ class Patch : public CBase_Patch {
   // The next iteration repacks every send buffer, and under async LB a
   // migration's pup frees them; neither may happen over a live transport read.
   void gateStepDrain() {
+    if (getenv("CHARM_DEBUG_MIGRATE"))
+      CkPrintf("[GATE] (%d,%d) iter=%d\n", thisIndex.x, thisIndex.y, my_iter);
     if (outstanding_sends == 0 && phi_out[0] == 0 && phi_out[1] == 0) {
       thisProxy[thisIndex].sendsDrained();
     } else {
@@ -940,6 +988,9 @@ class Patch : public CBase_Patch {
   }
 
   void endOfStep() {
+    if (getenv("CHARM_DEBUG_MIGRATE"))
+      CkPrintf("[EOS] pe=%d (%d,%d) iter=%d\n", CkMyPe(), thisIndex.x,
+               thisIndex.y, my_iter);
     long sum_np = np;
     long max_np = np;
     CkReduction::tupleElement tuple[] = {

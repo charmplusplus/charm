@@ -38,6 +38,11 @@ public:
   // Destination of a migration deferred because of the above, or -1. The
   // migration is re-driven from noteDeviceSendDone once the count reaches zero.
   int pendingMigrateTo = -1;
+  // Set while the element is parked in AtSyncWait. A parked element runs no
+  // SDAG, so a device receive delivered to it could only sit preprocessed and
+  // unconsumed -- pinned to this process -- until the resume; admission
+  // control bounces such receives instead (see CkRdmaDeviceIssueRgets).
+  bool deviceRecvParked = false;
   void noteDeviceSendPosted() { outstandingDeviceSends++; }
   void noteDeviceSendDone();
 

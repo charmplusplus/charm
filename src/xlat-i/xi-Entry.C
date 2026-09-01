@@ -1702,7 +1702,9 @@ void Entry::genClosure(XStr& decls, bool isDef) {
               << "char* _impl_buf_in;\n";
     structure << "      "
               << "int _impl_buf_size;\n";
-    dealloc << "        if (_impl_marshall) CmiFree(UsrToEnv(_impl_marshall));\n";
+    // CkFreeMsg, not raw CmiFree: the device-zerocopy layer keys migration
+    // stand-downs to message death, and CkFreeMsg is where it is told.
+    dealloc << "        if (_impl_marshall) CkFreeMsg((void*)_impl_marshall);\n";
     initCode << "        _impl_marshall = 0;\n";
     initCode << "        _impl_buf_in = 0;\n";
     initCode << "        _impl_buf_size = 0;\n";

@@ -242,6 +242,8 @@ void CkSyncBarrier::callReceiverList(const std::list<LBReceiver*>& receiverList)
 
 void CkSyncBarrier::resumeClients()
 {
+  if (getenv("CHARM_DEBUG_MIGRATE"))
+    CkPrintf("[BRESUME %d] clients=%zu\n", CkMyPe(), clients.size());
   // The end receiver or client functions may trigger the barrier again, so make sure
   // reset() is called before them to put the barrier in a valid state to be triggered
   reset();

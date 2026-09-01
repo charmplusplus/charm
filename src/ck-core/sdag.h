@@ -84,7 +84,9 @@ namespace SDAG {
     }
 
     virtual ~MsgClosure() {
-      if (msg) CmiFree(UsrToEnv(msg));
+      // CkFreeMsg, not raw CmiFree: message death is what releases the
+      // device-receive migration stand-downs pinned to this message.
+      if (msg) CkFreeMsg(msg);
     }
 
     PUPable_decl(MsgClosure);

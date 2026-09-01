@@ -185,6 +185,20 @@ unsigned short& CkArrayMessage::array_ep_bcast(void)
 {
   return UsrToEnv((void*)this)->getsetArrayBcastEp();
 }
+// A small self-message carrying the identity of an element whose deferred
+// migration is ready to start. Identity, not the CkLocRec pointer: the record
+// can die between enqueue and handling. Used by both the send-completion
+// release path and the AtSyncWait park.
+struct DeferredMigrateMsg
+{
+  char header[CmiMsgHeaderSizeBytes];
+  CkGroupID mgrGid;
+  CmiUInt8 id;
+  int toPe;
+};
+
+int _deferredMigrateHandlerIdx;
+
 unsigned char& CkArrayMessage::array_hops(void)
 {
   return UsrToEnv((void*)this)->getsetArrayHops();
@@ -1793,6 +1807,8 @@ void CkMigratable::commonInit(void)
   metaLBStreamJoinedPe = -1;
   lbStepPending = false;
   waitParked = false;
+  // (CkLocRec::deviceRecvParked default-initializes to false; myRec is not
+  // necessarily wired yet in this init path, so it is not touched here.)
   lbWaitEpoch = 0;
 
 #if CMK_LBDB_ON
@@ -2447,6 +2463,26 @@ void CkMigratable::AtSyncWait()
     return;
   }
   waitParked = true;
+  myRec->deviceRecvParked = true;
+  if (migDbg())
+    CkPrintf("[PARK %d] elem %s pending=%d count=%d\n", CkMyPe(),
+             idx2str(thisIndexMax), myRec->pendingMigrateTo,
+             myRec->outstandingDeviceSends);
+  // A migration decided while this element was still running was deferred to
+  // this park. Enqueued, not driven inline: this is the element's own entry
+  // method, and emigrate deletes the object under it.
+  if (myRec->pendingMigrateTo != -1 && myRec->outstandingDeviceSends == 0)
+  {
+    const int toPe = myRec->pendingMigrateTo;
+    myRec->pendingMigrateTo = -1;
+    DeferredMigrateMsg* m =
+        (DeferredMigrateMsg*)CmiAlloc(sizeof(DeferredMigrateMsg));
+    m->mgrGid = myRec->getLocMgr()->ckGetGroupID();
+    m->id = myRec->getID();
+    m->toPe = toPe;
+    CmiSetHandler(m, _deferredMigrateHandlerIdx);
+    CmiPushPE(CmiMyRank(), m);
+  }
 }
 
 // An element that parked in AtSyncWait() and was then moved by the very step it
@@ -2462,6 +2498,8 @@ void CkMigratable::lbCheckWaitRelease()
   lbStepPending = false;
   if (!waitParked) return;
   waitParked = false;
+  myRec->deviceRecvParked = false;
+  CkDeviceRecvAdmissionReplay(myRec->getID());
   DEBL((AA "Element %s released after migrating into a resumed PE\n" AB,
         idx2str(thisIndexMax)));
   if (_lb_args.metaLbOn()) LBTurnInstrumentOn();
@@ -2492,6 +2530,8 @@ void CkMigratable::ResumeFromSyncHelper()
     // resume unless it went on to park in AtSyncWait().
     if (!waitParked) return;
     waitParked = false;
+    myRec->deviceRecvParked = false;
+    CkDeviceRecvAdmissionReplay(myRec->getID());
   }
   // Released from the wait -- open the measurement window. Under +LBAsync this
   // is AtSyncWait() returning, which the application places a few iterations
@@ -2596,6 +2636,8 @@ void CkLocRec::migrateMe(int toPe)  // Leaving this processor
 
 #if CMK_LBDB_ON
 CkpvDeclare(CkLocRec*, _currentLocRec);
+
+
 // A device receive deferred for correction resumes against the destination
 // buffer captured before the request round trip. If the element migrates in
 // that window its buffers are freed, and the correction writes into memory that
@@ -2646,6 +2688,37 @@ CkLocRec* CkFindDeviceRecvElement(CkGroupID aid, CmiUInt8 id)
 // on it proceed. Deferring rather than blocking matters: an inter-node send
 // completes only when the receiver acknowledges, so spinning here would deadlock
 // against a receiver that is itself mid-migration.
+// (DeferredMigrateMsg and its handler index are declared near the top of
+// this file; the handler body lives beside noteDeviceSendDone below.)
+
+extern "C" void _deferredMigrateHandler(void* arg)
+{
+  DeferredMigrateMsg* m = (DeferredMigrateMsg*)arg;
+  CkLocMgr* mgr = (CkLocMgr*)CkLocalBranch(m->mgrGid);
+  CkLocRec* rec = mgr ? mgr->elementNrec(m->id) : NULL;
+  if (rec != NULL) {
+    bool movable = (rec->outstandingDeviceSends == 0);
+#if CMK_LBDB_ON
+    if (_lb_args.lbAsync() && !rec->deviceRecvParked) movable = false;
+#endif
+    if (getenv("CHARM_DEBUG_MIGRATE"))
+      CmiPrintf("[KICK %d] id=%llu movable=%d toPe=%d\n", CkMyPe(),
+                (unsigned long long)m->id, (int)movable, m->toPe);
+    if (movable) {
+      mgr->emigrate(rec, m->toPe);  // does not return to this record
+    } else if (rec->pendingMigrateTo == -1) {
+      // New transfers started between the zero crossing that enqueued this
+      // kick and now. Re-arm rather than drop: the next zero crossing kicks
+      // again, and dropping here would lose the migration outright -- the
+      // balancer's resume barrier then waits forever for a move that no one
+      // is going to make.
+      rec->pendingMigrateTo = m->toPe;
+    }
+  }
+  // An element that moved or died since the enqueue made this moot.
+  CmiFree(m);
+}
+
 void CkLocRec::noteDeviceSendDone()
 {
   if (outstandingDeviceSends > 0) outstandingDeviceSends--;
@@ -2653,7 +2726,19 @@ void CkLocRec::noteDeviceSendDone()
   {
     const int toPe = pendingMigrateTo;
     pendingMigrateTo = -1;
-    myLocMgr->emigrate(this, toPe);  // does not return to this object
+    // Enqueued, never called inline. The release that brought the count to
+    // zero can run inside the very handler that has just enqueued this
+    // element's completion message: migrating here packs the element before
+    // that message is consumed, and the message is then forwarded to the new
+    // process carrying pointers into this one. Going through the scheduler
+    // puts the migration behind everything already enqueued -- including that
+    // message -- at the cost of one local hop.
+    DeferredMigrateMsg* m = (DeferredMigrateMsg*)CmiAlloc(sizeof(DeferredMigrateMsg));
+    m->mgrGid = myLocMgr->ckGetGroupID();
+    m->id = getID();
+    m->toPe = toPe;
+    CmiSetHandler(m, _deferredMigrateHandlerIdx);
+    CmiPushPE(CmiMyRank(), m);
   }
 }
 
@@ -3604,6 +3689,8 @@ bool did_inter_node_gpudirect_rdma(int srcPe, int dstPe) {
 #if CMK_CUDA
 void CkLocMgr::sendGPUMsg(CmiUInt8 id)
 {
+  if (migDbg())
+    CkPrintf("[GPUSEND %d] dispatch id=%llu\n", CkMyPe(), (unsigned long long)id);
   auto gpuData = sendGPUBuffers[id];
 
   // No completion callback and no blocking wait. The previous
@@ -3615,8 +3702,22 @@ void CkLocMgr::sendGPUMsg(CmiUInt8 id)
   // frees it once the receiver has read it; an inter-node send is acked
   // explicitly -- the receiver's immigrateGPU entry runs only after the rget
   // has landed, and its finishGPUSend(id) releases the block here.
-  thisProxy[gpuData.toPe].immigrateGPU(id, gpuData.size,
-    CkDeviceBuffer(gpuData.data, gpuData.size), CkMyPe());
+  // This send belongs to the RUNTIME, not to whatever element last ran on
+  // this PE: _currentLocRec can still name one here, and attributing the
+  // payload send to it corrupts that element's migration interlock -- and,
+  // with the registration cache on, registers the LB-buffer block against an
+  // owner whose own migration then deregisters it mid-transfer, wedging this
+  // immigration permanently ("in-flight immigration" that never lands).
+  {
+    CkLocRec* saved_rec = CkpvAccess(_currentLocRec);
+    if (saved_rec != NULL && getenv("CHARM_DEBUG_MIGRATE"))
+      CkPrintf("[GPUSEND %d] stale _currentLocRec at payload send (id=%llu)\n",
+               CkMyPe(), (unsigned long long)id);
+    CkpvAccess(_currentLocRec) = NULL;
+    thisProxy[gpuData.toPe].immigrateGPU(id, gpuData.size,
+      CkDeviceBuffer(gpuData.data, gpuData.size), CkMyPe());
+    CkpvAccess(_currentLocRec) = saved_rec;
+  }
 
   // Who releases the staged block depends on how the send actually travelled.
   //
@@ -3721,6 +3822,9 @@ bool CkLocMgr::emigrateIntraProcess(CkLocRec* rec, int toPe)
 
   cache->recordEmigration(id, toPe);
   informHome(idx, toPe);
+  // Anything admission control held for this element can now go back through
+  // delivery, which will forward it to the new home.
+  CkDeviceRecvAdmissionReplay(id);
 
 #if !CMK_LBDB_ON && CMK_GLOBAL_LOCATION_UPDATE
   CmiPrintf((AA "Global location update. idx %s "
@@ -3780,8 +3884,23 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   // to a zerocopy send: migration frees and reallocates exactly those buffers.
   // Stand the migration down and let noteDeviceSendDone re-drive it when the
   // last transfer completes.
-  if (rec->outstandingDeviceSends > 0)
+  // Under the split barrier, only a parked element moves. A running element
+  // frozen in place mid-step deadlocks in cycles -- it stalls on receives
+  // from neighbours that are themselves frozen awaiting their own moves, which
+  // a batch decision (every element at once) makes certain. The park is the
+  // one point where the element provably holds no unconsumed device receive
+  // (CkDeviceRecvQuiet gates it), runs nothing, and admission control bounces
+  // everything new -- quiesced by construction, exactly what a move needs.
+  if (rec->outstandingDeviceSends > 0
+#if CMK_LBDB_ON
+      || (_lb_args.lbAsync() && !rec->deviceRecvParked)
+#endif
+     )
   {
+    if (getenv("CHARM_DEBUG_MIGRATE"))
+      CmiPrintf("[DEFER-MIG %d] elem %s count=%d parked=%d toPe=%d\n", CkMyPe(),
+                idx2str(rec->getIndex()), rec->outstandingDeviceSends,
+                (int)rec->deviceRecvParked, toPe);
     rec->pendingMigrateTo = toPe;
     return;
   }
@@ -3951,7 +4070,22 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
     sendGPUBuffers[id] = GPUMigrateData(toPe, gpuBufSize, gpuMsg);
     thisProxy[CkMyPe()].sendGPUMsg(id);
   }
+  if (getenv("CHARM_DEBUG_MIGRATE"))
+    CmiPrintf("[EMIG %d] id=%llu gpuBufSize=%zu toPe=%d\n", CkMyPe(),
+              (unsigned long long)id, (size_t)gpuBufSize, toPe);
 #endif
+  // Anything admission control held for this element goes back through
+  // delivery, which forwards it to the new home.
+  //
+  // This runs AFTER the GPU payload is dispatched, and the order is load
+  // bearing. Both the replay and sendGPUMsg go onto this PE's own queue,
+  // which the scheduler drains ahead of the network. Replaying first puts
+  // every message the element buffered while parked in front of the send
+  // that ships its device buffers, so the destination waits forever for a
+  // payload that is stuck behind traffic addressed to the element that
+  // already left -- the migration never completes, its PE never reports in,
+  // and the balancer's resume reduction hangs with it.
+  CkDeviceRecvAdmissionReplay(id);
 
 #if !CMK_LBDB_ON && CMK_GLOBAL_LOCATION_UPDATE
   CmiPrintf((AA "Global location update. idx %s "
@@ -4086,6 +4220,9 @@ void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char* &data, int& srcPe, Ck
 
 void CkLocMgr::immigrateGPU(CmiUInt8 id, int size, char* data, int srcPe)
 {
+  if (migDbg())
+    CkPrintf("[GPURECV %d] id=%llu size=%d srcPe=%d\n", CkMyPe(),
+             (unsigned long long)id, size, srcPe);
   // This entry runs only after the device payload has fully landed, so an
   // inter-node sender's packed source block is safe to release now. Same-node
   // sends release theirs through the IPC event reclaim instead.
@@ -4248,6 +4385,9 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
     CkAbort("Array element's pup routine has a direction mismatch.\n");
   }
 
+  if (migDbg())
+    CkPrintf("[JUSTMIG %d] elem %s zcRgetsActive=%d\n", CkMyPe(),
+             idx2str(idx), (int)zcRgetsActive);
   if (!zcRgetsActive)
   {
     // Let all the elements know we've arrived

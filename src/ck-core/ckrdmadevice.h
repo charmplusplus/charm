@@ -146,6 +146,10 @@ void CkNoteDeviceRecvComplete(CkGroupID aid, CmiUInt8 id);
 // registration cache attribute a receive-side registration to the element
 // whose migration must retire it (see acquireDeviceRegistration).
 CkLocRec* CkFindDeviceRecvElement(CkGroupID aid, CmiUInt8 id);
+// Deferred-migration kick, enqueued by CkLocRec::noteDeviceSendDone so a
+// migration never starts inside the handler that released it.
+extern int _deferredMigrateHandlerIdx;
+extern "C" void _deferredMigrateHandler(void* arg);
 void CkRdmaDeviceDropRegistrations(CkLocRec* owner);
 
 extern "C" {

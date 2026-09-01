@@ -564,6 +564,7 @@ private:
   // The element a device zerocopy receive is addressed to, or NULL: lets the
   // registration cache retire receive-side entries when the element migrates.
   friend CkLocRec* CkFindDeviceRecvElement(CkGroupID aid, CmiUInt8 id);
+  friend void _deferredMigrateHandler(void* arg);
 
   // Call this member function on each element of this location:
   typedef void (CkMigratable::*CkMigratable_voidfn_t)(void);

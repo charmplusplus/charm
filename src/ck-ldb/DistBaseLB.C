@@ -198,6 +198,10 @@ void DistBaseLB::LoadBalance() {
 
 void DistBaseLB::Migrated(int waitBarrier) {
   migrates_completed++;
+  if (getenv("CHARM_DEBUG_MIGRATE"))
+    CkPrintf("[MIGRATED %d] step=%d completed=%d expected=%d lb_started=%d\n",
+             CkMyPe(), step(), migrates_completed, migrates_expected,
+             (int)lb_started);
   if (migrates_completed == migrates_expected && lb_started) {
     MigrationDone(1);
   }
@@ -337,6 +341,8 @@ void DistBaseLB::MigrationDone(int balancing) {
   // paths performs the migrations, so turning the barrier on behind its back
   // leaves the two halves waiting on each other.
   if (balancing && _lb_args.syncResume()) {
+    if (getenv("CHARM_DEBUG_MIGRATE"))
+      CkPrintf("[MDONE %d] step=%d contributing resume\n", CkMyPe(), step());
     contribute(CkCallback(CkReductionTarget(DistBaseLB, ResumeClients),
                 thisProxy));
   }
@@ -362,6 +368,8 @@ void DistBaseLB::ResumeClients() {
 
 void DistBaseLB::ResumeClients(int balancing) {
 #if CMK_LBDB_ON
+  if (getenv("CHARM_DEBUG_MIGRATE"))
+    CkPrintf("[RCLIENTS %d] balancing=%d\n", CkMyPe(), balancing);
   DEBUGF(("[%d] ResumeClients. \n", CkMyPe()));
 
   if (CkMyPe() == 0 && balancing) {
