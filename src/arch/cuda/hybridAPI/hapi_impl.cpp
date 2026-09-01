@@ -552,11 +552,35 @@ static void hapiMapping(char** argv) {
 
   CmiNodeBarrier();
 
+  /* These three are consumed unconditionally, even though only the
+   * shared-memory path acts on them. CmiGetArgIntDesc also *removes* the
+   * argument from argv, so leaving the calls inside the use_shm branch meant
+   * that passing any of them without +gpushm left a stray '+arg' behind, and
+   * the RTS then reported "not parsed by the RTS ... you may need to recompile
+   * Charm++ with different options" -- pointing at a build problem that does
+   * not exist, for a flag that was simply inapplicable. Parse them always and
+   * say plainly when they do not apply. */
+  int input_comm_buffer_size = 0;
+  const bool given_comm_buffer = CmiGetArgIntDesc(argv, "+gpucommbuffer",
+      &input_comm_buffer_size, "GPU communication buffer size (in MB); requires +gpushm");
+
+  int input_lb_buffer_size = 0;
+  const bool given_lb_buffer = CmiGetArgIntDesc(argv, "+gpulbbuffer",
+      &input_lb_buffer_size, "GPU load balancing buffer size (in MB); requires +gpushm");
+
+  int input_hapi_ipc_event_pool_size = 16;
+  const bool given_event_pool = CmiGetArgIntDesc(argv, "+gpuipceventpool",
+      &input_hapi_ipc_event_pool_size, "GPU IPC event pool size per PE; requires +gpushm");
+
+  if (!csv_gpu_manager.use_shm && CmiMyPe() == 0 &&
+      (given_comm_buffer || given_lb_buffer || given_event_pool)) {
+    CmiPrintf("HAPI> Ignoring +gpucommbuffer/+gpulbbuffer/+gpuipceventpool: "
+        "these configure the shared-memory inter-process path, which is off "
+        "unless +gpushm is also given\n");
+  }
+
   if (csv_gpu_manager.use_shm) {
-    // Process device communication buffer parameters (in MB)
-    int input_comm_buffer_size = 0;
-    if (CmiGetArgIntDesc(argv, "+gpucommbuffer", &input_comm_buffer_size,
-          "GPU communication buffer size (in MB)")) {
+    if (given_comm_buffer) {
       if (CmiMyRank() == 0) {
         // Round up size to the closest power of 2
         size_t comm_buffer_size = (size_t)input_comm_buffer_size * 1024 * 1024;
@@ -565,10 +589,7 @@ static void hapiMapping(char** argv) {
       }
     }
 
-    // Process device communication buffer parameters (in MB)
-    int input_lb_buffer_size = 0;
-    if (CmiGetArgIntDesc(argv, "+gpulbbuffer", &input_lb_buffer_size,
-          "GPU load balancing buffer size (in MB)")) {
+    if (given_lb_buffer) {
       if (CmiMyRank() == 0) {
         csv_gpu_manager.lb_buffer_size =  (size_t)input_lb_buffer_size * 1024 * 1024;
       }
@@ -597,13 +618,6 @@ static void hapiMapping(char** argv) {
 #if CMK_SMP
       CmiUnlock(dm->lock);
 #endif
-    }
-
-    // Process custom size for hapi IPC event pool
-    int input_hapi_ipc_event_pool_size;
-    if (!CmiGetArgIntDesc(argv, "+gpuipceventpool", &input_hapi_ipc_event_pool_size,
-          "GPU IPC event pool size per PE")) {
-      input_hapi_ipc_event_pool_size = 16;
     }
 
     if (CmiMyRank() == 0) {
