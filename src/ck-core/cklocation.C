@@ -3013,11 +3013,20 @@ namespace {
 struct MigStats {
   std::atomic<double> intraSecs{0.0}, packedSecs{0.0};
   std::atomic<long> intraN{0}, packedN{0};
+  // Send side. The receive side was already timed; this is the half that packs
+  // the element and then destroys it, and an element with device state frees
+  // that state in its destructor. cudaFree synchronises the device, so this can
+  // cost far more than the bytes involved suggest -- and it runs on the
+  // scheduler thread, so the whole PE stops for it.
+  std::atomic<double> emigSecs{0.0};
+  std::atomic<long> emigN{0};
   ~MigStats() {
-    if (intraN.load() + packedN.load() == 0) return;
-    fprintf(stderr, "[mig-stats] pid=%d intraproc n=%ld time=%.3fs | packed n=%ld time=%.3fs\n",
+    if (intraN.load() + packedN.load() + emigN.load() == 0) return;
+    fprintf(stderr, "[mig-stats] pid=%d intraproc n=%ld time=%.3fs | packed n=%ld "
+                    "time=%.3fs | emigrate n=%ld time=%.3fs\n",
             (int)getpid(), intraN.load(), intraSecs.load(),
-            packedN.load(), packedSecs.load());
+            packedN.load(), packedSecs.load(),
+            emigN.load(), emigSecs.load());
     fflush(stderr);
   }
 };
@@ -3940,6 +3949,10 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
     rec->pendingMigrateTo = toPe;
     return;
   }
+
+  // Started only past the stand-down above, so the count is actual emigrations
+  // rather than deferral attempts.
+  MigTimer _te(&g_mig.emigSecs, &g_mig.emigN);
 
 #if (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM
   // Those same buffers are about to be freed, so any registration cached for
