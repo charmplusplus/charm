@@ -3,6 +3,7 @@
 #include "pic2d.h"
 #include <algorithm>
 #include <cmath>
+#include <vector>
 #include <utility>
 
 /* readonly */ CProxy_Main main_proxy;
@@ -292,6 +293,12 @@ public:
     msg->toTuple(&results, &num_elems);
     long total_np = *(long*)results[0].data;
     long max_np = *(long*)results[1].data;
+    // Sum of phi^2 over every interior cell, when CHARM_PIC2D_CHECKSUM is set.
+    // The particle-imbalance figure this used to be checked against is an
+    // aggregate printed to two decimals, and two runs of the same build differ
+    // at that precision -- far too coarse to tell a correct field from a
+    // slightly wrong one. Squares rather than values so nothing cancels.
+    double phi_sum = (num_elems > 2) ? *(double*)results[2].data : 0.0;
     delete msg;
     delete [] results;
 
@@ -310,9 +317,18 @@ public:
         (stats_iter - warmup_iters) % stats_freq == 0) {
       double now = CkWallTimer();
       double avg_np = (double)n_total_particles / (n_chares_x * n_chares_y);
-      CkPrintf("Iter %d: %.3lf ms/iter, particle imbalance (max/avg): %.2lf\n",
-          stats_iter, (now - window_start_time) / stats_freq * 1e3,
-          (double)max_np / avg_np);
+      // %.15e on the checksum: a build-to-build comparison needs every digit,
+      // since the point is to catch a field error too small for the imbalance
+      // figure beside it to register.
+      if (phi_sum != 0.0)
+        CkPrintf("Iter %d: %.3lf ms/iter, particle imbalance (max/avg): %.2lf, "
+            "phi2 %.15e\n",
+            stats_iter, (now - window_start_time) / stats_freq * 1e3,
+            (double)max_np / avg_np, phi_sum);
+      else
+        CkPrintf("Iter %d: %.3lf ms/iter, particle imbalance (max/avg): %.2lf\n",
+            stats_iter, (now - window_start_time) / stats_freq * 1e3,
+            (double)max_np / avg_np);
       window_start_time = now;
     }
   }
@@ -1006,16 +1022,45 @@ class Patch : public CBase_Patch {
     }
   }
 
+  static bool checksumOn() {
+    static const bool on = (getenv("CHARM_PIC2D_CHECKSUM") != nullptr);
+    return on;
+  }
+
+  // Deterministic on purpose: the field comes back to the host and is summed
+  // in a fixed order in double. A device-side reduction with atomics would
+  // reorder between runs and blur the low bits, which is the opposite of what
+  // a build-to-build comparison needs.
+  double phiCheckSum() {
+    cudaStreamSynchronize(compute_stream);
+    cudaStreamSynchronize(comm_stream);
+    std::vector<RealType> h((size_t)FIELD_W * FIELD_H);
+    hapiCheck(cudaMemcpy(h.data(), d_phi,
+        sizeof(RealType) * FIELD_W * FIELD_H, cudaMemcpyDeviceToHost));
+    double s = 0.0;
+    for (int j = 1; j <= block_height; j++)
+      for (int i = 1; i <= block_width; i++) {
+        const double v = (double)h[IDX(i, j)];
+        s += v * v;
+      }
+    return s;
+  }
+
   void endOfStep() {
     if (getenv("CHARM_DEBUG_MIGRATE"))
       CkPrintf("[EOS] pe=%d (%d,%d) iter=%d\n", CkMyPe(), thisIndex.x,
                thisIndex.y, my_iter);
     long sum_np = np;
     long max_np = np;
+    // Off unless asked for: it drains both streams and pulls the field back to
+    // the host, which would distort exactly the timings this app is used to
+    // measure. On, it is what makes a field regression visible.
+    double phi_sq = checksumOn() ? phiCheckSum() : 0.0;
     CkReduction::tupleElement tuple[] = {
         CkReduction::tupleElement(sizeof(long), &sum_np, CkReduction::sum_long),
-        CkReduction::tupleElement(sizeof(long), &max_np, CkReduction::max_long)};
-    CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tuple, 2);
+        CkReduction::tupleElement(sizeof(long), &max_np, CkReduction::max_long),
+        CkReduction::tupleElement(sizeof(double), &phi_sq, CkReduction::sum_double)};
+    CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tuple, 3);
     msg->setCallback(CkCallback(CkIndex_Main::stepStats(NULL), main_proxy));
     contribute(msg);
 
