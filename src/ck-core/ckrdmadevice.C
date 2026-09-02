@@ -604,72 +604,288 @@ extern "C" {
   int device_dereg_handler;
 }
 
-/* Persistent device-buffer registration (fix (b) for #3960).
+/* Persistent device-buffer registration (fix (b) for #3960), and a
+ * registered device pool.
  *
- * A device buffer that an application sends from, or posts receives into,
- * over many messages can be registered ONCE with CkDeviceBufferRegister and
- * released with CkDeviceBufferDeregister when the application frees it.
- * Both the send path (CkRdmaDeviceOnSender) and the receive path
- * (CkRdmaDeviceIssueRgets) look the buffer up by exact (pointer, length);
- * a hit reuses the kept handle and marks the buffer NODEREG so the
+ * Registered REGIONS live in one interval map per process: [start, end)
+ * with the layer's memory-region handle.  Two ways in:
+ *   - CkDeviceBufferRegister(ptr, cnt): the application registers a buffer
+ *     it allocated itself, once; CkDeviceBufferDeregister before freeing.
+ *   - CkDeviceMalloc(size) / CkDeviceFree(ptr): a device pool of arenas
+ *     (buddy allocator over one large device allocation each, grown on
+ *     demand).  An arena is registered LAZILY, whole, on the first send or
+ *     receive post that lands in it, so arenas that never cross the network
+ *     are never pinned.  The pool owns the arena's lifetime, which is what
+ *     makes the registration safe without allocator hooks.
+ * The send path (CkRdmaDeviceOnSender) and the receive path
+ * (CkRdmaDeviceIssueRgets) look a buffer up by range containment; a hit
+ * reuses the region's handle and marks the buffer NODEREG so the
  * completion-time release above leaves it alone; a miss falls back to the
- * per-message registration that fix (a) releases.  The lifetime is the
- * application's, explicitly -- no allocator hooks, no cache eviction, and an
- * unregistered buffer stays correct, only slower.  The table is per process
- * (registrations are process-level state) under one mutex. */
+ * per-message registration that fix (a) releases.  Sweeping idle arenas is
+ * deliberately not done here (idle-time / load-balancing-time work, later). */
 #include <mutex>
-#include <unordered_map>
+#include <map>
+#include <vector>
+#include "buddy_allocator.h"
 
-struct DeviceRegKey {
-  uintptr_t ptr; size_t cnt;
-  bool operator==(const DeviceRegKey& o) const { return ptr == o.ptr && cnt == o.cnt; }
-};
-struct DeviceRegKeyHash {
-  size_t operator()(const DeviceRegKey& k) const {
-    return std::hash<uintptr_t>()(k.ptr) ^ (std::hash<size_t>()(k.cnt) << 1);
-  }
-};
-struct DeviceRegEntry { char layerInfo[CMK_NOCOPY_DIRECT_BYTES]; };
-static std::unordered_map<DeviceRegKey, DeviceRegEntry, DeviceRegKeyHash> device_reg_table;
+struct DeviceRegion { uintptr_t end; bool arena; char layerInfo[CMK_NOCOPY_DIRECT_BYTES]; };
+struct DeviceArena { buddy::allocator* alloc; uintptr_t start, end; bool registered; };
+static std::map<uintptr_t, DeviceRegion> device_regions;   // start -> region
+static std::vector<DeviceArena> device_arenas;
 static std::mutex device_reg_mutex;
 
+// Under device_reg_mutex.  Registers the arena on first use.
+static const DeviceRegion* deviceRegionFind(uintptr_t p, size_t cnt) {
+  auto it = device_regions.upper_bound(p);
+  if (it != device_regions.begin()) {
+    --it;
+    if (p >= it->first && p + cnt <= it->second.end) return &it->second;
+  }
+  for (auto& ar : device_arenas) {
+    if (p >= ar.start && p + cnt <= ar.end) {
+      if (!ar.registered) {
+        DeviceRegion r; r.end = ar.end; r.arena = true;
+        CmiSetRdmaBufferInfo(r.layerInfo, (const void*)ar.start, ar.end - ar.start, CMK_BUFFER_REG);
+        ar.registered = true;
+        if (CkMyPe() == 0)
+          CmiPrintf("CkRdmaDevice> device pool arena at %p (%zu MB) registered on first use\n",
+                    (void*)ar.start, (size_t)((ar.end - ar.start) >> 20));
+        return &device_regions.emplace(ar.start, r).first->second;
+      }
+      return nullptr;  // registered arena is in the map; containment failed, so the range straddles
+    }
+  }
+  return nullptr;
+}
+
 void CkDeviceBufferRegister(const void* ptr, size_t cnt) {
-  DeviceRegKey k{(uintptr_t)ptr, cnt};
+  uintptr_t p = (uintptr_t)ptr;
   std::lock_guard<std::mutex> g(device_reg_mutex);
-  if (device_reg_table.find(k) != device_reg_table.end()) return;
-  if (device_reg_table.empty() && CkMyPe() == 0)
+  if (deviceRegionFind(p, cnt)) return;  // already covered (explicit or arena)
+  if (device_regions.empty() && CkMyPe() == 0)
     CmiPrintf("CkRdmaDevice> persistent device-buffer registration in use (CkDeviceBufferRegister)\n");
-  DeviceRegEntry e;
-  CmiSetRdmaBufferInfo(e.layerInfo, ptr, cnt, CMK_BUFFER_REG);
-  device_reg_table.emplace(k, e);
+  DeviceRegion r; r.end = p + cnt; r.arena = false;
+  CmiSetRdmaBufferInfo(r.layerInfo, ptr, cnt, CMK_BUFFER_REG);
+  device_regions.emplace(p, r);
 }
 
 void CkDeviceBufferDeregister(const void* ptr, size_t cnt) {
-  DeviceRegKey k{(uintptr_t)ptr, cnt};
   std::lock_guard<std::mutex> g(device_reg_mutex);
-  auto it = device_reg_table.find(k);
-  if (it == device_reg_table.end()) return;
+  auto it = device_regions.find((uintptr_t)ptr);
+  if (it == device_regions.end() || it->second.arena) return;
   CmiDeregisterMem(ptr, it->second.layerInfo, CkMyPe(), CMK_BUFFER_REG);
-  device_reg_table.erase(it);
+  device_regions.erase(it);
 }
 
-// Initialise 'b' for ptr/cnt: from the table if the application registered
-// the buffer (kept handle, never released per message), else per message.
+static size_t deviceArenaBytes() {
+  static size_t bytes = 0;
+  if (!bytes) {
+    const char* e = getenv("CK_GPU_ARENA_MB");
+    bytes = (size_t)(e ? atol(e) : 256) << 20;
+  }
+  return bytes;
+}
+
+void* CkDeviceMalloc(size_t size) {
+  std::lock_guard<std::mutex> g(device_reg_mutex);
+  for (auto& ar : device_arenas) {
+    void* q = ar.alloc->malloc(size, true);
+    if (q) return q;
+  }
+  size_t bytes = deviceArenaBytes();
+  while (bytes < size * 2) bytes <<= 1;
+  DeviceArena ar;
+  ar.alloc = new buddy::allocator(bytes, bytes);
+  ar.start = (uintptr_t)ar.alloc->base_ptr; ar.end = ar.start + bytes; ar.registered = false;
+  device_arenas.push_back(ar);
+  if (CkMyPe() == 0)
+    CmiPrintf("CkRdmaDevice> device pool: arena %zu of %zu MB at %p (CK_GPU_ARENA_MB)\n",
+              device_arenas.size(), bytes >> 20, (void*)ar.start);
+  void* q = ar.alloc->malloc(size, true);
+  if (!q) CkAbort("CkDeviceMalloc: request larger than a fresh arena");
+  return q;
+}
+
+void CkDeviceFree(void* ptr) {
+  uintptr_t p = (uintptr_t)ptr;
+  std::lock_guard<std::mutex> g(device_reg_mutex);
+  for (auto& ar : device_arenas)
+    if (p >= ar.start && p < ar.end) { ar.alloc->free(ptr); return; }
+  CkAbort("CkDeviceFree: pointer is not from the device pool");
+}
+
+// Initialise 'b' for ptr/cnt: from a registered region if one covers it
+// (kept handle, never released per message), else per message.
 static void deviceNcpyBufferInit(CmiNcpyBuffer& b, const void* ptr, size_t cnt, void* opinfo) {
   b.deviceRdmaOpInfo = opinfo;
-  DeviceRegKey k{(uintptr_t)ptr, cnt};
   {
     std::lock_guard<std::mutex> g(device_reg_mutex);
-    auto it = device_reg_table.find(k);
-    if (it != device_reg_table.end()) {
+    const DeviceRegion* r = deviceRegionFind((uintptr_t)ptr, cnt);
+    if (r) {
       b.init(ptr, cnt, CMK_BUFFER_UNREG, CMK_BUFFER_NODEREG);  // common info only, no registration
-      memcpy(b.layerInfo + CmiGetRdmaCommonInfoSize(), it->second.layerInfo, CMK_NOCOPY_DIRECT_BYTES);
+      memcpy(b.layerInfo + CmiGetRdmaCommonInfoSize(), r->layerInfo, CMK_NOCOPY_DIRECT_BYTES);
       b.regMode = CMK_BUFFER_REG;   // rdmaGet must not register it again
       b.isRegistered = true;
       return;
     }
   }
   b.init(ptr, cnt, CMK_BUFFER_REG, CMK_BUFFER_DEREG);  // per message; released on completion
+}
+
+/* Piggybacked acknowledgements for the RDMA path.
+ *
+ * Two things the sender needs to learn after a get completes on the far
+ * side: that a per-message registration may be released (fix (a)), and,
+ * if it asked, that the source buffer may be reused (the source callback).
+ * Both used to cost one message per buffer.  Now the sender mints an 8-byte
+ * id per buffer that needs either, keeps the work in a per-process table,
+ * and the receiver hands the id back inside the next device message it
+ * sends to that PE (CkDeviceBuffer::acks, capacity CK_DEVICE_ACK_CAP, on the
+ * first buffer of the message).  Ids that find no such message go out in a
+ * standalone DeviceAckMsg when the block fills, and at idle.  A stencil
+ * therefore sends no standalone acks at all in steady state.
+ * CK_GPU_ACK_NOPIGGY in the environment flushes every id at once, for
+ * measurement of what the piggyback saves. */
+#include <vector>
+
+struct DevicePendingAck {
+  const void* ptr; size_t cnt;
+  unsigned char needs_dereg; unsigned char has_cb;
+  char mr[CMK_NOCOPY_DIRECT_BYTES];
+  CkCallback cb;
+};
+struct DeviceAckMsg {
+  char header[CmiMsgHeaderSizeBytes];
+  int count;
+  uint64_t ids[CK_DEVICE_ACK_CAP];
+};
+static std::unordered_map<uint64_t, DevicePendingAck> device_pending;
+static std::unordered_map<int, std::vector<uint64_t>> device_ack_acc;  // dest PE -> ids owed
+static std::mutex device_ack_mutex;
+static uint64_t device_ack_seq = 0;
+static int device_ack_nopiggy = -1;
+
+static void deviceResolveAck(uint64_t id) {
+  DevicePendingAck rec;
+  {
+    std::lock_guard<std::mutex> g(device_ack_mutex);
+    auto it = device_pending.find(id);
+    if (it == device_pending.end()) {
+      CmiPrintf("[%d] CkRdmaDevice> WARNING: ack for unknown id %llu\n", CmiMyPe(), (unsigned long long)id);
+      return;
+    }
+    rec = it->second;
+    device_pending.erase(it);
+  }
+  if (rec.needs_dereg) CmiDeregisterMem(rec.ptr, rec.mr, CkMyPe(), CMK_BUFFER_REG);
+  if (rec.has_cb) rec.cb.send();
+}
+
+extern "C" {
+  void* device_ack_bridge(void* arg) {
+    DeviceAckMsg* m = (DeviceAckMsg*)arg;
+    QdProcess(1);
+    for (int i = 0; i < m->count; i++) deviceResolveAck(m->ids[i]);
+    CmiFree(m);
+    return NULL;
+  }
+  int device_ack_handler;
+}
+
+static void deviceSendAcks(int pe, const uint64_t* ids, int n) {
+  for (int off = 0; off < n; off += CK_DEVICE_ACK_CAP) {
+    int k = std::min(n - off, (int)CK_DEVICE_ACK_CAP);
+    DeviceAckMsg* m = (DeviceAckMsg*)CmiAlloc(sizeof(DeviceAckMsg));
+    m->count = k;
+    memcpy(m->ids, ids + off, k * sizeof(uint64_t));
+    CmiSetHandler(m, device_ack_handler);
+    QdCreate(1);
+    CmiSyncSendAndFree(pe, sizeof(DeviceAckMsg), m);
+  }
+}
+
+static void deviceFlushAcks(int pe) {
+  std::vector<uint64_t> ids;
+  {
+    std::lock_guard<std::mutex> g(device_ack_mutex);
+    auto it = device_ack_acc.find(pe);
+    if (it == device_ack_acc.end()) return;
+    ids.swap(it->second);
+    device_ack_acc.erase(it);
+  }
+  QdProcess((int)ids.size());
+  deviceSendAcks(pe, ids.data(), (int)ids.size());
+}
+
+static void deviceFlushAllAcks(void*) {
+  std::vector<int> pes;
+  {
+    std::lock_guard<std::mutex> g(device_ack_mutex);
+    if (device_ack_acc.empty()) return;
+    for (auto& kv : device_ack_acc) pes.push_back(kv.first);
+  }
+  for (int pe : pes) deviceFlushAcks(pe);
+}
+
+void CkRdmaDeviceInit() {
+  CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE, (CcdCondFn)deviceFlushAllAcks, NULL);
+}
+
+// The receiver owes 'id' to 'pe'.  Held for the next device message to that
+// PE; sent now if the block is full or piggybacking is disabled.
+static void deviceQueueAck(int pe, uint64_t id) {
+  if (device_ack_nopiggy < 0) {
+    device_ack_nopiggy = (getenv("CK_GPU_ACK_NOPIGGY") != nullptr) ? 1 : 0;
+    if (device_ack_nopiggy && CkMyPe() == 0)
+      CmiPrintf("CkRdmaDevice> acks sent standalone, one per buffer (CK_GPU_ACK_NOPIGGY)\n");
+  }
+  size_t n;
+  {
+    std::lock_guard<std::mutex> g(device_ack_mutex);
+    auto& v = device_ack_acc[pe];
+    v.push_back(id);
+    n = v.size();
+  }
+  QdCreate(1);
+  if (device_ack_nopiggy || n >= CK_DEVICE_ACK_CAP) deviceFlushAcks(pe);
+}
+
+// Sender side: drain what this PE owes 'pe' into the first buffer of the
+// message about to go there.
+static void deviceDrainAcksInto(int pe, CkDeviceBuffer* b) {
+  b->ack_count = 0;
+  int n = 0;
+  {
+    std::lock_guard<std::mutex> g(device_ack_mutex);
+    auto it = device_ack_acc.find(pe);
+    if (it == device_ack_acc.end()) return;
+    auto& v = it->second;
+    n = std::min((int)v.size(), (int)CK_DEVICE_ACK_CAP);
+    memcpy(b->acks, v.data(), n * sizeof(uint64_t));
+    v.erase(v.begin(), v.begin() + n);
+    if (v.empty()) device_ack_acc.erase(it);
+  }
+  b->ack_count = (unsigned char)n;
+  QdProcess(n);
+}
+
+// Sender side: mint an id for a buffer that will need a release and/or a
+// source callback when the far side's get completes.  0 if neither.
+static uint64_t deviceMintAck(CmiNcpyBuffer& nb, CkCallback& cb) {
+  DevicePendingAck rec;
+  rec.ptr = nb.ptr; rec.cnt = nb.cnt;
+  rec.needs_dereg = (nb.isRegistered && nb.deregMode == CMK_BUFFER_DEREG) ? 1 : 0;
+  rec.has_cb = (cb.type != CkCallback::ignore) ? 1 : 0;
+  if (!rec.needs_dereg && !rec.has_cb) return 0;
+  if (rec.needs_dereg) memcpy(rec.mr, nb.layerInfo + CmiGetRdmaCommonInfoSize(), CMK_NOCOPY_DIRECT_BYTES);
+  if (rec.has_cb) { rec.cb = cb; cb = CkCallback(CkCallback::ignore); }  // the sender fires it, not the receiver
+  uint64_t id;
+  {
+    std::lock_guard<std::mutex> g(device_ack_mutex);
+    id = ++device_ack_seq;
+    device_pending.emplace(id, rec);
+  }
+  return id;
 }
 
 static bool deviceDeregEnabled() {
@@ -686,13 +902,20 @@ static bool deviceDeregEnabled() {
   return enabled == 1;
 }
 
-static void releaseDeviceRegistrations(NcpyOperationInfo* info) {
+static void releaseDeviceRegistrations(NcpyOperationInfo* info, uint64_t ack_id) {
   if (!deviceDeregEnabled()) return;
   if (info->isDestRegistered && info->destDeregMode == CMK_BUFFER_DEREG) {
     CmiDeregisterMem(info->destPtr,
                      info->destLayerInfo + CmiGetRdmaCommonInfoSize(),
                      info->destPe, info->destRegMode);
     info->isDestRegistered = 0;
+  }
+  if (ack_id != 0) {
+    // The sender minted an id: it releases its own registration and fires
+    // its own callback when the id comes back, piggybacked or flushed.
+    deviceQueueAck(info->srcPe, ack_id);
+    info->isSrcRegistered = 0;
+    return;
   }
   if (info->isSrcRegistered && info->srcDeregMode == CMK_BUFFER_DEREG) {
     DeviceDeregMsg* m = (DeviceDeregMsg*)CmiAlloc(sizeof(DeviceDeregMsg));
@@ -720,7 +943,7 @@ void CkRdmaDeviceRecvHandler(void* data)
   // This runs on the PE the backend raised the completion on, and the
   // registrations are process-level state, so no hand-off is needed; the
   // flags it clears keep the loopback copy below from releasing them twice.
-  releaseDeviceRegistrations(ncpy_op_info);
+  releaseDeviceRegistrations(ncpy_op_info, op->tag);
 
   // The backend raises the completion on whichever PE of this process was
   // progressing the network, which is not necessarily the PE that posted the
@@ -930,6 +1153,9 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
   for (int i = 0; i < numops; i++) {
     // Unpack source buffer from sender
     up|source;
+    // Acks the sender owes THIS PE ride on its first buffer: resolve them.
+    if (i == 0)
+      for (int k = 0; k < source.ack_count; k++) deviceResolveAck(source.acks[k]);
 
     if (arrSizes[i] > source.cnt) {
       CkAbort("CkRdmaDeviceIssueRgets: posted data size is larger than source data size!");
@@ -948,6 +1174,7 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     save_op.info = rdma_info;
     save_op.src_cb = (source.cb.type != CkCallback::ignore) ? new CkCallback(source.cb) : nullptr;
     save_op.dst_cb = nullptr;
+    save_op.tag = 0;
 
     // What has to hold is that the sender picked the same transfer mode we are
     // about to use, and mode is a property of the process pair, not the PE
@@ -1009,6 +1236,9 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
       // CkRdmaDirectAckHandler, which recognises the operation as a device one
       // from the deviceRdmaOpInfo we attach to the destination buffer here.
       QdCreate(1);
+      // With an ack id the SENDER fires its source callback (on ack), not us.
+      save_op.tag = source.ack_id;
+      if (save_op.tag != 0 && save_op.src_cb) { delete (CkCallback*)save_op.src_cb; save_op.src_cb = nullptr; }
       CmiNcpyBuffer lci_dest_ncpy_buffer;
       deviceNcpyBufferInit(lci_dest_ncpy_buffer, arrPtrs[i], (size_t)arrSizes[i], (void*)(&save_op));
       lci_dest_ncpy_buffer.rdmaGet(source.lci_ncpy_buffer, 0, nullptr, nullptr);
@@ -1154,8 +1384,11 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
     for (int i = 0; i < numops; i++) {
       hapiCheck(hapiStreamSynchronize(buffers[i]->hapi_stream));
       deviceNcpyBufferInit(buffers[i]->lci_ncpy_buffer, buffers[i]->ptr, buffers[i]->cnt, nullptr);
+      buffers[i]->ack_id = deviceMintAck(buffers[i]->lci_ncpy_buffer, buffers[i]->cb);
     }
   }
+  // Whatever this PE owes the destination rides on the first buffer.
+  if (numops > 0) deviceDrainAcksInto(dest_pe, buffers[0]);
 }
 
 #endif // (CMK_CUDA || CMK_HIP) && CMK_RECONVERSE

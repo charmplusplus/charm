@@ -55,6 +55,8 @@
 /* readonly */ bool empty_msgs;     // -e  L1: sends with zero-length payload, no GPU work per message
 /* readonly */ bool single_stream;  // -s  S : one stream per chare, no comm<->compute event ordering
 /* readonly */ bool prereg;         // -r  register the ghost buffers once (CkDeviceBufferRegister)
+/* readonly */ bool use_srcack;     // -a  request source callbacks; double-buffered send sets
+/* readonly */ bool use_devpool;    // -P  device buffers from the registered pool (CkDeviceMalloc)
 
 extern void invokeInitKernel(DataType* d_temperature, int block_width,
     int block_height, hapiStream_t stream);
@@ -70,6 +72,17 @@ extern void invokeUnpackingKernel(DataType* d_temperature, DataType* d_ghost,
     bool is_left, int block_width, int block_height, hapiStream_t stream);
 
 enum Direction { LEFT = 1, RIGHT, TOP, BOTTOM };
+
+// Source-callback ack (-a).  The runtime fires the callback with no
+// payload, so the entry takes a message: the reference number the callback
+// carries (the iteration, set with setRefnum) rides in the envelope, which
+// is what the SDAG when-clause matches.  The message body is empty.
+class AckMsg : public CMessage_AckMsg {};
+
+// -P: device buffers from the runtime's registered pool; else raw hipMalloc.
+#define DEV_ALLOC(ptr, bytes) do { if (use_devpool) (ptr) = (DataType*)CkDeviceMalloc(bytes); \
+                                   else hapiCheck(hapiMalloc((void**)&(ptr), (bytes))); } while (0)
+#define DEV_FREE(ptr) do { if (use_devpool) CkDeviceFree(ptr); else hapiCheck(hapiFree(ptr)); } while (0)
 
 class Main : public CBase_Main {
   int my_iter;
@@ -97,6 +110,8 @@ public:
     empty_msgs = false;
     single_stream = false;
     prereg = false;
+    use_srcack = false;
+    use_devpool = false;
     sync_ver = false;
     my_iter = 0;
 
@@ -106,7 +121,7 @@ public:
 
     // Process arguments
     int c;
-    while ((c = getopt(m->argc, m->argv, "W:H:w:h:i:u:yzfpnesr")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "W:H:w:h:i:u:yzfpnesraP")) != -1) {
       switch (c) {
         case 'W':
           grid_width = atoi(optarg);
@@ -150,12 +165,18 @@ public:
         case 'r':
           prereg = true;
           break;
+        case 'a':
+          use_srcack = true;
+          break;
+        case 'P':
+          use_devpool = true;
+          break;
         default:
           CkPrintf(
               "Usage: %s -W [grid width] -H [grid height] -w [block width] -h [block height]"
               "-i [iterations] -u [warmup] -y (use sync version) -z (use GPU zerocopy) "
               "-f (non-blocking streams) -p (print blocks) "
-              "-n (no ghost exchange) -e (empty ghost messages) -s (single stream per chare) -r (register ghost buffers once)\n",
+              "-n (no ghost exchange) -e (empty ghost messages) -s (single stream per chare) -r (register ghost buffers once) -a (source acks, double-buffered sends) -P (device pool)\n",
               m->argv[0]);
           CkExit();
       }
@@ -226,12 +247,12 @@ public:
       const int chares = n_chares_x * n_chares_y;
       CkPrintf("JACOBI_OD_RESULT pes=%d nodes=%d phys_nodes=%d visible_devices=%d "
                "chares=%d chares_per_visible_device=%.2f iters=%d "
-               "avg_iter_us=%.2f zerocopy=%d nonblocking=%d noexch=%d empty=%d onestream=%d prereg=%d\n",
+               "avg_iter_us=%.2f zerocopy=%d nonblocking=%d noexch=%d empty=%d onestream=%d prereg=%d srcack=%d devpool=%d\n",
                CkNumPes(), CmiNumNodes(), CmiNumPhysicalNodes(), devs, chares,
                devs > 0 ? (double)chares / devs : 0.0, n_iters,
                (total_time / n_iters) * 1e6, use_zerocopy ? 1 : 0,
                use_nonblocking ? 1 : 0, no_exchange ? 1 : 0, empty_msgs ? 1 : 0,
-               single_stream ? 1 : 0, prereg ? 1 : 0);
+               single_stream ? 1 : 0, prereg ? 1 : 0, use_srcack ? 1 : 0, use_devpool ? 1 : 0);
     }
     if (sync_ver) {
       CkPrintf("Comm time per iteration: %.3lf us\nUpdate time per iteration: %.3lf us\n",
@@ -279,6 +300,8 @@ class Block : public CBase_Block {
   DataType* __restrict__ d_send_bottom_ghost;
   DataType* __restrict__ d_recv_left_ghost;
   DataType* __restrict__ d_recv_right_ghost;
+  DataType* d_send_set[2][4];   // -a: two send sets, alternated by iteration parity
+  int ack_count;
 
   hapiStream_t compute_stream;
   hapiStream_t comm_stream;
@@ -292,16 +315,26 @@ class Block : public CBase_Block {
 
   ~Block() {
     hapiCheck(hapiFreeHost(h_temperature));
-    hapiCheck(hapiFree(d_temperature));
-    hapiCheck(hapiFree(d_new_temperature));
+    DEV_FREE(d_temperature);
+    DEV_FREE(d_new_temperature);
     hapiCheck(hapiFreeHost(h_left_ghost));
     hapiCheck(hapiFreeHost(h_right_ghost));
     hapiCheck(hapiFreeHost(h_top_ghost));
     hapiCheck(hapiFreeHost(h_bottom_ghost));
     if (!use_zerocopy) {
-      hapiCheck(hapiFree(d_left_ghost));
-      hapiCheck(hapiFree(d_right_ghost));
+      DEV_FREE(d_left_ghost);
+      DEV_FREE(d_right_ghost);
     } else {
+      // -a: the send pointers may currently name set 1; restore set 0 so the
+      // frees and deregistrations below name every buffer exactly once.
+      d_send_left_ghost = d_send_set[0][0];  d_send_right_ghost = d_send_set[0][1];
+      d_send_top_ghost = d_send_set[0][2];   d_send_bottom_ghost = d_send_set[0][3];
+      if (use_srcack) {
+        if (prereg)
+          for (int k = 0; k < 4; k++)
+            CkDeviceBufferDeregister(d_send_set[1][k], sizeof(DataType) * (k < 2 ? block_height : block_width));
+        for (int k = 0; k < 4; k++) DEV_FREE(d_send_set[1][k]);
+      }
       if (prereg) {
         CkDeviceBufferDeregister(d_send_left_ghost,   sizeof(DataType) * block_height);
         CkDeviceBufferDeregister(d_send_right_ghost,  sizeof(DataType) * block_height);
@@ -313,12 +346,12 @@ class Block : public CBase_Block {
         CkDeviceBufferDeregister(d_temperature + (block_width + 2) * (block_height + 1) + 1,
                                  sizeof(DataType) * block_width);
       }
-      hapiCheck(hapiFree(d_send_left_ghost));
-      hapiCheck(hapiFree(d_send_right_ghost));
-      hapiCheck(hapiFree(d_send_top_ghost));
-      hapiCheck(hapiFree(d_send_bottom_ghost));
-      hapiCheck(hapiFree(d_recv_left_ghost));
-      hapiCheck(hapiFree(d_recv_right_ghost));
+      DEV_FREE(d_send_left_ghost);
+      DEV_FREE(d_send_right_ghost);
+      DEV_FREE(d_send_top_ghost);
+      DEV_FREE(d_send_bottom_ghost);
+      DEV_FREE(d_recv_left_ghost);
+      DEV_FREE(d_recv_right_ghost);
     }
 
     hapiCheck(hapiStreamDestroy(compute_stream));
@@ -362,24 +395,38 @@ class Block : public CBase_Block {
     // Allocate memory and create device entities
     hapiCheck(hapiMallocHost((void**)&h_temperature,
           sizeof(DataType) * (block_width + 2) * (block_height + 2)));
-    hapiCheck(hapiMalloc((void**)&d_temperature,
-          sizeof(DataType) * (block_width + 2) * (block_height + 2)));
-    hapiCheck(hapiMalloc((void**)&d_new_temperature,
-          sizeof(DataType) * (block_width + 2) * (block_height + 2)));
+    DEV_ALLOC(d_temperature, sizeof(DataType) * (block_width + 2) * (block_height + 2));
+    DEV_ALLOC(d_new_temperature, sizeof(DataType) * (block_width + 2) * (block_height + 2));
     hapiCheck(hapiMallocHost((void**)&h_left_ghost, sizeof(DataType) * block_height));
     hapiCheck(hapiMallocHost((void**)&h_right_ghost, sizeof(DataType) * block_height));
     hapiCheck(hapiMallocHost((void**)&h_top_ghost, sizeof(DataType) * block_width));
     hapiCheck(hapiMallocHost((void**)&h_bottom_ghost, sizeof(DataType) * block_width));
     if (!use_zerocopy) {
-      hapiCheck(hapiMalloc((void**)&d_left_ghost, sizeof(DataType) * block_height));
-      hapiCheck(hapiMalloc((void**)&d_right_ghost, sizeof(DataType) * block_height));
+      DEV_ALLOC(d_left_ghost, sizeof(DataType) * block_height);
+      DEV_ALLOC(d_right_ghost, sizeof(DataType) * block_height);
     } else {
-      hapiCheck(hapiMalloc((void**)&d_send_left_ghost, sizeof(DataType) * block_height));
-      hapiCheck(hapiMalloc((void**)&d_send_right_ghost, sizeof(DataType) * block_height));
-      hapiCheck(hapiMalloc((void**)&d_send_top_ghost, sizeof(DataType) * block_width));
-      hapiCheck(hapiMalloc((void**)&d_send_bottom_ghost, sizeof(DataType) * block_width));
-      hapiCheck(hapiMalloc((void**)&d_recv_left_ghost, sizeof(DataType) * block_height));
-      hapiCheck(hapiMalloc((void**)&d_recv_right_ghost, sizeof(DataType) * block_height));
+      DEV_ALLOC(d_send_left_ghost, sizeof(DataType) * block_height);
+      DEV_ALLOC(d_send_right_ghost, sizeof(DataType) * block_height);
+      DEV_ALLOC(d_send_top_ghost, sizeof(DataType) * block_width);
+      DEV_ALLOC(d_send_bottom_ghost, sizeof(DataType) * block_width);
+      DEV_ALLOC(d_recv_left_ghost, sizeof(DataType) * block_height);
+      DEV_ALLOC(d_recv_right_ghost, sizeof(DataType) * block_height);
+      d_send_set[0][0] = d_send_left_ghost;  d_send_set[0][1] = d_send_right_ghost;
+      d_send_set[0][2] = d_send_top_ghost;   d_send_set[0][3] = d_send_bottom_ghost;
+      if (use_srcack) {
+        DEV_ALLOC(d_send_set[1][0], sizeof(DataType) * block_height);
+        DEV_ALLOC(d_send_set[1][1], sizeof(DataType) * block_height);
+        DEV_ALLOC(d_send_set[1][2], sizeof(DataType) * block_width);
+        DEV_ALLOC(d_send_set[1][3], sizeof(DataType) * block_width);
+        if (prereg) {
+          CkDeviceBufferRegister(d_send_set[1][0], sizeof(DataType) * block_height);
+          CkDeviceBufferRegister(d_send_set[1][1], sizeof(DataType) * block_height);
+          CkDeviceBufferRegister(d_send_set[1][2], sizeof(DataType) * block_width);
+          CkDeviceBufferRegister(d_send_set[1][3], sizeof(DataType) * block_width);
+        }
+      } else {
+        for (int k = 0; k < 4; k++) d_send_set[1][k] = d_send_set[0][k];
+      }
       if (prereg) {
         // -r: register each ghost buffer once, for the life of the chare.
         // Sizes and pointers must match what the sends and receive posts use.
@@ -483,6 +530,12 @@ class Block : public CBase_Block {
     JACOBI_OD_NVTX(os.str(), NVTXColor::Emerald);
 
     if (use_zerocopy) {
+      if (use_srcack) {  // -a: alternate send sets by iteration parity
+        const int k = my_iter & 1;
+        d_send_left_ghost = d_send_set[k][0];  d_send_right_ghost = d_send_set[k][1];
+        d_send_top_ghost = d_send_set[k][2];   d_send_bottom_ghost = d_send_set[k][3];
+      }
+
 #if !COMM_ONLY
       // Pack non-contiguous ghosts to temporary contiguous buffers on device
       invokePackingKernels(d_new_temperature, d_send_left_ghost, d_send_right_ghost,
@@ -570,18 +623,25 @@ class Block : public CBase_Block {
       if (!bottom_bound)
         thisProxy(x, y + 1).receiveGhostsReg(my_iter, TOP, 0, h_bottom_ghost);
     } else if (use_zerocopy) {
+      // -a: ask to be told when the neighbour's get has read the buffer;
+      // the refnum is the iteration, matched by the SDAG before that send
+      // set is written again (two iterations later).
+      CkCallback ack_cb = use_srcack
+          ? CkCallback(CkIndex_Block::sourceAck(NULL), thisProxy[thisIndex])
+          : CkCallback(CkCallback::ignore);
+      if (use_srcack) ack_cb.setRefnum(my_iter);
       if (!left_bound)
         thisProxy(x - 1, y).receiveGhostsZC(my_iter, RIGHT, block_height,
-            CkDeviceBuffer(d_send_left_ghost, comm_stream));
+            CkDeviceBuffer(d_send_left_ghost, ack_cb, comm_stream));
       if (!right_bound)
         thisProxy(x + 1, y).receiveGhostsZC(my_iter, LEFT, block_height,
-            CkDeviceBuffer(d_send_right_ghost, comm_stream));
+            CkDeviceBuffer(d_send_right_ghost, ack_cb, comm_stream));
       if (!top_bound)
         thisProxy(x, y - 1).receiveGhostsZC(my_iter, BOTTOM, block_width,
-            CkDeviceBuffer(d_send_top_ghost, comm_stream));
+            CkDeviceBuffer(d_send_top_ghost, ack_cb, comm_stream));
       if (!bottom_bound)
         thisProxy(x, y + 1).receiveGhostsZC(my_iter, TOP, block_width,
-            CkDeviceBuffer(d_send_bottom_ghost, comm_stream));
+            CkDeviceBuffer(d_send_bottom_ghost, ack_cb, comm_stream));
     } else {
       if (!left_bound)
         thisProxy(x - 1, y).receiveGhostsReg(my_iter, RIGHT, block_height, h_left_ghost);

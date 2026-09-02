@@ -19,6 +19,11 @@ mainmodule jacobi_od {
   readonly bool empty_msgs;
   readonly bool single_stream;
   readonly bool prereg;
+  readonly bool use_srcack;
+  readonly bool use_devpool;
+
+  message AckMsg;
+
 
   mainchare Main {
     entry Main(CkArgMsg* m);
@@ -42,7 +47,15 @@ mainmodule jacobi_od {
     entry void receiveGhostsZC(int ref, int dir, int w, nocopydevice DataType gh[w]);
     entry void receiveGhostsReg(int ref, int dir, int w, DataType gh[w]);
 
+    entry void sourceAck(AckMsg* m);
     entry void exchangeGhosts() {
+      // -a: the send set about to be written was last read by the
+      // neighbours' gets of iteration my_iter-1; wait for their acks.
+      if (use_srcack && use_zerocopy && !empty_msgs && my_iter >= 2) {
+        for (ack_count = 0; ack_count < neighbors; ack_count++) {
+          when sourceAck[my_iter - 1](AckMsg* m) serial { delete m; }
+        }
+      }
       serial {
         my_iter++;
         update();
