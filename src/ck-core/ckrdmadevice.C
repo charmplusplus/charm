@@ -43,6 +43,7 @@
  */
 
 #ifndef _WIN32
+#include <cstdlib>
 #include <pthread.h>
 #endif
 #include "envelope.h"
@@ -604,6 +605,74 @@ extern "C" {
   int device_dereg_handler;
 }
 
+/* Persistent device-buffer registration (fix (b) for #3960).
+ *
+ * A device buffer that an application sends from, or posts receives into,
+ * over many messages can be registered ONCE with CkDeviceBufferRegister and
+ * released with CkDeviceBufferDeregister when the application frees it.
+ * Both the send path (CkRdmaDeviceOnSender) and the receive path
+ * (CkRdmaDeviceIssueRgets) look the buffer up by exact (pointer, length);
+ * a hit reuses the kept handle and marks the buffer NODEREG so the
+ * completion-time release above leaves it alone; a miss falls back to the
+ * per-message registration that fix (a) releases.  The lifetime is the
+ * application's, explicitly -- no allocator hooks, no cache eviction, and an
+ * unregistered buffer stays correct, only slower.  The table is per process
+ * (registrations are process-level state) under one mutex. */
+#include <mutex>
+#include <unordered_map>
+
+struct DeviceRegKey {
+  uintptr_t ptr; size_t cnt;
+  bool operator==(const DeviceRegKey& o) const { return ptr == o.ptr && cnt == o.cnt; }
+};
+struct DeviceRegKeyHash {
+  size_t operator()(const DeviceRegKey& k) const {
+    return std::hash<uintptr_t>()(k.ptr) ^ (std::hash<size_t>()(k.cnt) << 1);
+  }
+};
+struct DeviceRegEntry { char layerInfo[CMK_NOCOPY_DIRECT_BYTES]; };
+static std::unordered_map<DeviceRegKey, DeviceRegEntry, DeviceRegKeyHash> device_reg_table;
+static std::mutex device_reg_mutex;
+
+void CkDeviceBufferRegister(const void* ptr, size_t cnt) {
+  DeviceRegKey k{(uintptr_t)ptr, cnt};
+  std::lock_guard<std::mutex> g(device_reg_mutex);
+  if (device_reg_table.find(k) != device_reg_table.end()) return;
+  if (device_reg_table.empty() && CkMyPe() == 0)
+    CmiPrintf("CkRdmaDevice> persistent device-buffer registration in use (CkDeviceBufferRegister)\n");
+  DeviceRegEntry e;
+  CmiSetRdmaBufferInfo(e.layerInfo, ptr, cnt, CMK_BUFFER_REG);
+  device_reg_table.emplace(k, e);
+}
+
+void CkDeviceBufferDeregister(const void* ptr, size_t cnt) {
+  DeviceRegKey k{(uintptr_t)ptr, cnt};
+  std::lock_guard<std::mutex> g(device_reg_mutex);
+  auto it = device_reg_table.find(k);
+  if (it == device_reg_table.end()) return;
+  CmiDeregisterMem(ptr, it->second.layerInfo, CkMyPe(), CMK_BUFFER_REG);
+  device_reg_table.erase(it);
+}
+
+// Initialise 'b' for ptr/cnt: from the table if the application registered
+// the buffer (kept handle, never released per message), else per message.
+static void deviceNcpyBufferInit(CmiNcpyBuffer& b, const void* ptr, size_t cnt, void* opinfo) {
+  b.deviceRdmaOpInfo = opinfo;
+  DeviceRegKey k{(uintptr_t)ptr, cnt};
+  {
+    std::lock_guard<std::mutex> g(device_reg_mutex);
+    auto it = device_reg_table.find(k);
+    if (it != device_reg_table.end()) {
+      b.init(ptr, cnt, CMK_BUFFER_UNREG, CMK_BUFFER_NODEREG);  // common info only, no registration
+      memcpy(b.layerInfo + CmiGetRdmaCommonInfoSize(), it->second.layerInfo, CMK_NOCOPY_DIRECT_BYTES);
+      b.regMode = CMK_BUFFER_REG;   // rdmaGet must not register it again
+      b.isRegistered = true;
+      return;
+    }
+  }
+  b.init(ptr, cnt, CMK_BUFFER_REG, CMK_BUFFER_DEREG);  // per message; released on completion
+}
+
 static bool deviceDeregEnabled() {
   static int enabled = -1;
   if (enabled < 0) {
@@ -941,12 +1010,32 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
       // CkRdmaDirectAckHandler, which recognises the operation as a device one
       // from the deviceRdmaOpInfo we attach to the destination buffer here.
       QdCreate(1);
-      CmiNcpyBuffer lci_dest_ncpy_buffer(arrPtrs[i], (size_t)arrSizes[i], (void*)(&save_op));
+      CmiNcpyBuffer lci_dest_ncpy_buffer;
+      deviceNcpyBufferInit(lci_dest_ncpy_buffer, arrPtrs[i], (size_t)arrSizes[i], (void*)(&save_op));
       lci_dest_ncpy_buffer.rdmaGet(source.lci_ncpy_buffer, 0, nullptr, nullptr);
       continue;  // no stream callback: the network, not the GPU, completes this
     }
 
-    // Intra-node transfers finish on the stream, so hang the completion off it
+    // Intra-node transfers finish on the stream, so hang the completion off it.
+    // CK_GPU_STREAMORDER prototype (2026-09-01): "stream-ordered delivery".
+    // The copy into the destination buffer is already enqueued on the stream
+    // the receiver posted, so any device work the entry method issues on that
+    // same stream is ordered after it.  With the env var set, and when the
+    // sender asked for no source callback (which would otherwise promise the
+    // source buffer is reusable), complete the operation now instead of
+    // spending an event record + pending polls per message.  The entry method
+    // must not touch the buffer from the host or from another stream without
+    // its own synchronisation -- that is the contract this mode trades on.
+    static int stream_order = -1;
+    if (stream_order < 0) {
+      stream_order = (getenv("CK_GPU_STREAMORDER") != nullptr) ? 1 : 0;
+      if (stream_order && CkMyPe() == 0)
+        CmiPrintf("CkRdmaDevice> stream-ordered delivery for intra-node device receives (CK_GPU_STREAMORDER)\n");
+    }
+    if (stream_order && save_op.src_cb == nullptr) {
+      CkRdmaDeviceRecvHandler(&save_op, nullptr);
+      continue;
+    }
     hapiAddCallback(postStructs[i].hapi_stream, CkCallback(CkRdmaDeviceRecvHandler, &save_op));
   }
 }
@@ -1084,7 +1173,7 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
     // CkDeviceBuffer is PUP'd into the metadata message.
     for (int i = 0; i < numops; i++) {
       hapiCheck(hapiStreamSynchronize(buffers[i]->hapi_stream));
-      buffers[i]->lci_ncpy_buffer = CmiNcpyBuffer(buffers[i]->ptr, buffers[i]->cnt);
+      deviceNcpyBufferInit(buffers[i]->lci_ncpy_buffer, buffers[i]->ptr, buffers[i]->cnt, nullptr);
     }
   }
 }

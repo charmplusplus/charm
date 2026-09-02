@@ -140,6 +140,12 @@ extern "C" {
   extern int device_dereg_handler;
 }
 
+// Persistent registration of a device buffer used across many messages
+// (send source or posted receive destination): register once, deregister
+// when the application frees the buffer.  Exact (pointer, length) match.
+void CkDeviceBufferRegister(const void* ptr, size_t cnt);
+void CkDeviceBufferDeregister(const void* ptr, size_t cnt);
+
 #endif // CMK_CUDA
 
 #else /* classic */
