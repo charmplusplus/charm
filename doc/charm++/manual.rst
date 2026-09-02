@@ -9416,6 +9416,32 @@ declare the target entry method to take a message (for example
 ``CkCallback::setRefnum``; a zero-argument entry method cannot be matched by
 reference number.
 
+A registered device pool
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+Device buffers can also be taken from a pool the runtime registers for you:
+
+.. code-block:: c++
+
+   double* buf = (double*)CkDeviceMalloc(bytes);
+   ...
+   CkDeviceFree(buf);
+
+The pool hands out buffers from arenas, large device allocations grown on
+demand (``CK_GPU_ARENA_MB`` in the environment sets the arena size, default
+256). An arena is registered with the network the first time a buffer in it
+is sent or received into, whole, and stays registered; arenas whose buffers
+never cross the network are never registered. Buffers from the pool need no
+``CkDeviceBufferRegister`` call and no release per message, and a process
+sending from many such buffers holds one registration per arena rather than
+one per buffer, which measured faster than registering each buffer
+explicitly. The pool owns the arena, so freeing and reallocating pool buffers
+is safe with respect to registration.
+
+The pool answers the registration question only. When a send buffer may be
+overwritten is still decided by the callback on ``CkDeviceBuffer`` or by
+alternating between two buffers, as described above.
+
 For non-UCX builds, a more optimized mechanism for inter-process communication using CUDA IPC, POSIX shared memory,
 and pre-allocated GPU communication buffers are available through runtime flags.
 This significantly reduces the overhead from creating and opening device IPC handles,
