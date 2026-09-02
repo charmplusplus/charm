@@ -65,6 +65,8 @@ struct CkDevicePersistent {
   CkDeviceStatus put(CkDevicePersistent& dst);
 };
 
+#define CK_DEVICE_ACK_CAP 8
+
 struct CkDeviceBufferPost {
   // CUDA stream for device transfers
   hapiStream_t hapi_stream;
@@ -77,6 +79,16 @@ class CkDeviceBuffer : public CmiDeviceBuffer {
 public:
   // Callback to be invoked on the sender/receiver
   CkCallback cb;
+
+  // Piggybacked acknowledgements (reconverse RDMA path).  ack_id is the id
+  // the sender minted for THIS buffer (0: nothing to acknowledge); the
+  // receiver returns it, and the sender resolves it locally to a release
+  // of a per-message registration and/or the source callback.  acks[] is
+  // the block of ids this MESSAGE carries back to its destination PE; only
+  // the first buffer of a message carries any, the rest pup one zero byte.
+  uint64_t ack_id = 0;
+  unsigned char ack_count = 0;
+  uint64_t acks[CK_DEVICE_ACK_CAP];
 
   CkDeviceBuffer() : CmiDeviceBuffer() {
     cb = CkCallback(CkCallback::ignore);
@@ -121,6 +133,9 @@ public:
   void pup(PUP::er &p) {
     CmiDeviceBuffer::pup(p);
     p|cb;
+    p|ack_id;
+    p|ack_count;
+    PUParray(p, acks, ack_count);
   }
 
   friend void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs);
@@ -138,6 +153,8 @@ extern "C" {
   extern int loopback_handler;
   void* device_dereg_bridge(void* arg);
   extern int device_dereg_handler;
+  void* device_ack_bridge(void* arg);
+  extern int device_ack_handler;
 }
 
 // Persistent registration of a device buffer used across many messages
@@ -145,6 +162,8 @@ extern "C" {
 // when the application frees the buffer.  Exact (pointer, length) match.
 void CkDeviceBufferRegister(const void* ptr, size_t cnt);
 void CkDeviceBufferDeregister(const void* ptr, size_t cnt);
+// Per-PE init of the device zerocopy path (idle-time ack flush).
+void CkRdmaDeviceInit();
 
 #endif // CMK_CUDA
 
