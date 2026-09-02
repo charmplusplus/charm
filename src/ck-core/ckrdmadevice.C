@@ -569,6 +569,77 @@ extern "C" {
   int loopback_handler;
 }
 
+/* Registration release for the inter-node (RDMA) device path
+ * (charmplusplus/charm#3960).  Both ends of every device get are registered
+ * per message -- the sender in CkRdmaDeviceOnSender (CmiNcpyBuffer ctor), the
+ * receiver in CkRdmaDeviceIssueRgets -- and, before this, neither was ever
+ * released: the completion returns from CkRdmaDirectAckHandler before the
+ * host path's deregistration, and CkRdmaDeviceRecvHandler had none of its
+ * own.  With LCI's registration cache off that exhausts the NIC's
+ * registration table (ENOSPC in fi_mr_regattr) after ~1e5 messages per
+ * rank; with the cache on it pins every region at a refcount that never
+ * returns to zero.
+ *
+ * The destination registration belongs to this process, so it is released
+ * in place when the get completes.  The source registration belongs to the
+ * sender's process; the sender is told with a DeviceDeregMsg carrying only
+ * what CmiDeregisterMem needs.  CK_GPU_NODEREG in the environment restores
+ * the leaking behaviour, for measurement only. */
+struct DeviceDeregMsg {
+  char header[CmiMsgHeaderSizeBytes];
+  const void* ptr;
+  int pe;
+  unsigned short regMode;
+  char mr[CMK_NOCOPY_DIRECT_BYTES];  // the layer's memory-region handle
+};
+
+extern "C" {
+  void* device_dereg_bridge(void* arg) {
+    DeviceDeregMsg* m = (DeviceDeregMsg*)arg;
+    QdProcess(1);  // matches the QdCreate in releaseDeviceRegistrations
+    CmiDeregisterMem(m->ptr, m->mr, m->pe, m->regMode);
+    CmiFree(m);
+    return NULL;
+  }
+  int device_dereg_handler;
+}
+
+static bool deviceDeregEnabled() {
+  static int enabled = -1;
+  if (enabled < 0) {
+    enabled = (getenv("CK_GPU_NODEREG") != nullptr) ? 0 : 1;
+    if (CkMyPe() == 0) {
+      if (enabled)
+        CmiPrintf("CkRdmaDevice> device RDMA registrations released on completion\n");
+      else
+        CmiPrintf("CkRdmaDevice> WARNING: device RDMA registrations are NOT released (CK_GPU_NODEREG set)\n");
+    }
+  }
+  return enabled == 1;
+}
+
+static void releaseDeviceRegistrations(NcpyOperationInfo* info) {
+  if (!deviceDeregEnabled()) return;
+  if (info->isDestRegistered && info->destDeregMode == CMK_BUFFER_DEREG) {
+    CmiDeregisterMem(info->destPtr,
+                     info->destLayerInfo + CmiGetRdmaCommonInfoSize(),
+                     info->destPe, info->destRegMode);
+    info->isDestRegistered = 0;
+  }
+  if (info->isSrcRegistered && info->srcDeregMode == CMK_BUFFER_DEREG) {
+    DeviceDeregMsg* m = (DeviceDeregMsg*)CmiAlloc(sizeof(DeviceDeregMsg));
+    m->ptr = info->srcPtr;
+    m->pe = info->srcPe;
+    m->regMode = info->srcRegMode;
+    memcpy(m->mr, info->srcLayerInfo + CmiGetRdmaCommonInfoSize(),
+           CMK_NOCOPY_DIRECT_BYTES);
+    CmiSetHandler(m, device_dereg_handler);
+    QdCreate(1);  // matched in device_dereg_bridge
+    CmiSyncSendAndFree(info->srcPe, sizeof(DeviceDeregMsg), m);
+    info->isSrcRegistered = 0;
+  }
+}
+
 // Completion of an inter-node (RDMA) device transfer. Reached through
 // CkRdmaDirectAckHandler, which routes any NcpyOperationInfo carrying a
 // deviceRdmaOpInfo here; 'data' is that NcpyOperationInfo.
@@ -576,6 +647,12 @@ void CkRdmaDeviceRecvHandler(void* data)
 {
   NcpyOperationInfo* ncpy_op_info = (NcpyOperationInfo*)data;
   DeviceRdmaOp* op = (DeviceRdmaOp*)(ncpy_op_info->deviceRdmaOpInfo);
+
+  // The get is complete: release both registrations now, before any bounce.
+  // This runs on the PE the backend raised the completion on, and the
+  // registrations are process-level state, so no hand-off is needed; the
+  // flags it clears keep the loopback copy below from releasing them twice.
+  releaseDeviceRegistrations(ncpy_op_info);
 
   // The backend raises the completion on whichever PE of this process was
   // progressing the network, which is not necessarily the PE that posted the
