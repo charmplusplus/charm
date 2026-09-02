@@ -162,6 +162,9 @@ extern "C" {
 // when the application frees the buffer.  Exact (pointer, length) match.
 void CkDeviceBufferRegister(const void* ptr, size_t cnt);
 void CkDeviceBufferDeregister(const void* ptr, size_t cnt);
+// Device pool: arenas registered lazily, whole, on first network use.
+void* CkDeviceMalloc(size_t size);
+void CkDeviceFree(void* ptr);
 // Per-PE init of the device zerocopy path (idle-time ack flush).
 void CkRdmaDeviceInit();
 
