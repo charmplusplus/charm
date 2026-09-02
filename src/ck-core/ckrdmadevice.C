@@ -43,7 +43,6 @@
  */
 
 #ifndef _WIN32
-#include <cstdlib>
 #include <pthread.h>
 #endif
 #include "envelope.h"
@@ -1241,26 +1240,7 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
       continue;  // no stream callback: the network, not the GPU, completes this
     }
 
-    // Intra-node transfers finish on the stream, so hang the completion off it.
-    // CK_GPU_STREAMORDER prototype (2026-09-01): "stream-ordered delivery".
-    // The copy into the destination buffer is already enqueued on the stream
-    // the receiver posted, so any device work the entry method issues on that
-    // same stream is ordered after it.  With the env var set, and when the
-    // sender asked for no source callback (which would otherwise promise the
-    // source buffer is reusable), complete the operation now instead of
-    // spending an event record + pending polls per message.  The entry method
-    // must not touch the buffer from the host or from another stream without
-    // its own synchronisation -- that is the contract this mode trades on.
-    static int stream_order = -1;
-    if (stream_order < 0) {
-      stream_order = (getenv("CK_GPU_STREAMORDER") != nullptr) ? 1 : 0;
-      if (stream_order && CkMyPe() == 0)
-        CmiPrintf("CkRdmaDevice> stream-ordered delivery for intra-node device receives (CK_GPU_STREAMORDER)\n");
-    }
-    if (stream_order && save_op.src_cb == nullptr) {
-      CkRdmaDeviceRecvHandler(&save_op, nullptr);
-      continue;
-    }
+    // Intra-node transfers finish on the stream, so hang the completion off it
     hapiAddCallback(postStructs[i].hapi_stream, CkCallback(CkRdmaDeviceRecvHandler, &save_op));
   }
 }
