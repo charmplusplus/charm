@@ -47,7 +47,11 @@ enum Dir { LEFT = 0, RIGHT, TOP, BOTTOM, TL, TR, BL, BR, NUM_DIRS = 8, STAY = 8 
 // that read lands in the diagonal neighbour's territory -- which the 4-way
 // cross exchange never covers. Zero at PHI_HALO 1, where nothing reads the
 // halo at all.
-#define PHI_CORNER_D (PHI_HALO - 1)
+// H deep, not H-1. Sweep 1 runs at margin H-1 and writes the whole square,
+// including its corner (2-H, 2-H), whose stencil reaches (1-H, 2-H) -- layer H
+// in x. Later sweeps then read the corner cells earlier sweeps wrote, so the
+// exchange has to supply an H x H block per diagonal.
+#define PHI_CORNER_D ((PHI_HALO > 1) ? PHI_HALO : 0)
 // Charge must be valid as deep as the deepest sweep writes, one layer less
 // than phi, which the sweep reads one beyond where it writes.
 #define RHO_HALO_D   (PHI_HALO - 1)

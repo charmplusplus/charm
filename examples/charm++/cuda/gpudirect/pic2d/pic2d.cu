@@ -466,7 +466,14 @@ void invokePackPhiKernel(const RealType* d_phi, RealType* d_slab,
 
 void invokeUnpackPhiKernel(RealType* d_phi, const RealType* d_buf, int dir,
     int block_width, int block_height, cudaStream_t stream) {
-  unpackPhiKernel<<<nblocks(block_height), BLOCK_1D, 0, stream>>>(
+  // Every direction goes through one kernel now, so the grid has to cover the
+  // largest of them: PHI_HALO layers along the longer edge. It was sized
+  // block_height, which was right when this unpacked a single left/right
+  // column and silently dropped every deeper layer once the halo grew --
+  // half the halo at depth 2, three quarters at depth 4.
+  const int edge = (block_width > block_height) ? block_width : block_height;
+  const int n = PHI_HALO * edge > PHI_CORNER ? PHI_HALO * edge : PHI_CORNER;
+  unpackPhiKernel<<<nblocks(n), BLOCK_1D, 0, stream>>>(
       d_phi, d_buf, dir, block_width, block_height);
   hapiCheck(cudaPeekAtLastError());
 }
