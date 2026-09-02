@@ -9431,7 +9431,10 @@ The pool hands out buffers from arenas, large device allocations grown on
 demand (``CK_GPU_ARENA_MB`` in the environment sets the arena size, default
 256). An arena is registered with the network the first time a buffer in it
 is sent or received into, whole, and stays registered; arenas whose buffers
-never cross the network are never registered. Buffers from the pool need no
+never cross the network are never registered. Arenas are per device: a
+request is served from arenas on the calling PE's current device, so a
+process that drives several GPUs gets one arena set per device. Buffers
+from the pool need no
 ``CkDeviceBufferRegister`` call and no release per message, and a process
 sending from many such buffers holds one registration per arena rather than
 one per buffer, which measured faster than registering each buffer

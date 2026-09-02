@@ -629,7 +629,7 @@ extern "C" {
 #include "buddy_allocator.h"
 
 struct DeviceRegion { uintptr_t end; bool arena; char layerInfo[CMK_NOCOPY_DIRECT_BYTES]; };
-struct DeviceArena { buddy::allocator* alloc; uintptr_t start, end; bool registered; };
+struct DeviceArena { buddy::allocator* alloc; uintptr_t start, end; bool registered; int device; };
 static std::map<uintptr_t, DeviceRegion> device_regions;   // start -> region
 static std::vector<DeviceArena> device_arenas;
 static std::mutex device_reg_mutex;
@@ -687,8 +687,14 @@ static size_t deviceArenaBytes() {
 }
 
 void* CkDeviceMalloc(size_t size) {
+  // Arenas are per device: a process driving several GPUs gets one arena
+  // set per device, and a request is served only from arenas on the
+  // calling PE's current device (the device hapiMalloc would allocate on).
+  int dev = 0;
+  hapiCheck(hapiGetDevice(&dev));
   std::lock_guard<std::mutex> g(device_reg_mutex);
   for (auto& ar : device_arenas) {
+    if (ar.device != dev) continue;
     void* q = ar.alloc->malloc(size, true);
     if (q) return q;
   }
@@ -697,10 +703,11 @@ void* CkDeviceMalloc(size_t size) {
   DeviceArena ar;
   ar.alloc = new buddy::allocator(bytes, bytes);
   ar.start = (uintptr_t)ar.alloc->base_ptr; ar.end = ar.start + bytes; ar.registered = false;
+  ar.device = dev;
   device_arenas.push_back(ar);
   if (CkMyPe() == 0)
-    CmiPrintf("CkRdmaDevice> device pool: arena %zu of %zu MB at %p (CK_GPU_ARENA_MB)\n",
-              device_arenas.size(), bytes >> 20, (void*)ar.start);
+    CmiPrintf("CkRdmaDevice> device pool: arena %zu of %zu MB at %p on device %d (CK_GPU_ARENA_MB)\n",
+              device_arenas.size(), bytes >> 20, (void*)ar.start, dev);
   void* q = ar.alloc->malloc(size, true);
   if (!q) CkAbort("CkDeviceMalloc: request larger than a fresh arena");
   return q;
