@@ -1493,6 +1493,8 @@ void _initCharm(int unused_argc, char **argv)
 #if (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM && CMK_RECONVERSE
   loopback_handler = CmiRegisterHandler((CmiHandler) loopback_bridge);
   device_dereg_handler = CmiRegisterHandler((CmiHandler) device_dereg_bridge);
+  device_ack_handler = CmiRegisterHandler((CmiHandler) device_ack_bridge);
+  CkRdmaDeviceInit();
 #endif
 
 #if CMK_USE_SHMEM
