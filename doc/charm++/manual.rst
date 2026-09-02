@@ -9368,6 +9368,54 @@ where the data transfer will be enqueued (only used in the device memcpy and IPC
 As with the host-side Zero Copy API, the regular entry method is executed by the runtime
 system after the GPU buffer has arrived at the destination.
 
+Registration of device buffers, and when a source buffer may be reused
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+In reconverse builds (for example ``reconverse-linux-x86_64-amd``), a message
+whose source and destination are in different processes is transferred as a
+device-to-device RDMA get through the network backend, and both the source
+and the destination buffers have to be registered with the network for the
+duration of the transfer. By default the runtime registers each buffer per
+message and releases both registrations when the get completes; the
+release of the source registration is carried back to the sender inside the
+next device message the receiver sends to it, so no extra message is
+normally needed. This is correct for any buffer, but registration costs a
+few microseconds per message on each side.
+
+A buffer that is sent from, or received into, many times can instead be
+registered once for its lifetime:
+
+.. code-block:: c++
+
+   CkDeviceBufferRegister(ptr, bytes);    // after allocating the buffer
+   ...                                    // any number of sends and receive posts
+   CkDeviceBufferDeregister(ptr, bytes);  // before freeing it
+
+The runtime finds a registered buffer by address range, so a whole array may
+be registered once and sub-ranges of it sent or posted. The registration is
+released only by ``CkDeviceBufferDeregister``: call it before the buffer is
+freed, and in a chare's destructor or ``pup`` before migration. A buffer that
+is not registered this way falls back to per-message registration, which is
+correct and only slower.
+
+Registration and buffer reuse are separate questions. The callback given to
+``CkDeviceBuffer`` is invoked when the receiver's transfer out of the source
+buffer has completed, and it is the only signal a sender gets that the buffer
+may be written again. An application that overwrites a send buffer every
+iteration must either wait for that callback before writing, or alternate
+between two send buffers: a neighbour that has sent its message for
+iteration ``i+1`` has already finished reading the buffer it received for
+iteration ``i``, so with two buffers no callback is needed. Overwriting a
+buffer the receiver may still be reading is a silent data race; registering
+the buffer does not change this. The callback, when requested, is delivered
+through the same piggybacked acknowledgement as the release, and costs a
+few percent of a small chare-iteration. A callback with no message is
+delivered as an empty message: to match it by reference number in SDAG,
+declare the target entry method to take a message (for example
+``entry void ack(AckMsg*)``) and set the reference number with
+``CkCallback::setRefnum``; a zero-argument entry method cannot be matched by
+reference number.
+
 For non-UCX builds, a more optimized mechanism for inter-process communication using CUDA IPC, POSIX shared memory,
 and pre-allocated GPU communication buffers are available through runtime flags.
 This significantly reduces the overhead from creating and opening device IPC handles,
