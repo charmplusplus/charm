@@ -136,6 +136,8 @@ extern "C" {
    * the init.C registration site is gated to match */
   void* loopback_bridge(void* arg);
   extern int loopback_handler;
+  void* device_dereg_bridge(void* arg);
+  extern int device_dereg_handler;
 }
 
 #endif // CMK_CUDA
