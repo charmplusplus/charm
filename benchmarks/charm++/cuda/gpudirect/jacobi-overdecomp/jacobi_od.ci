@@ -18,6 +18,7 @@ mainmodule jacobi_od {
   readonly bool no_exchange;
   readonly bool empty_msgs;
   readonly bool single_stream;
+  readonly bool prereg;
 
   mainchare Main {
     entry Main(CkArgMsg* m);

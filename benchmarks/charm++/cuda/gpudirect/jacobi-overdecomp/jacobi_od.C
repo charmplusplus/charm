@@ -54,6 +54,7 @@
 /* readonly */ bool no_exchange;    // -n  L0: no ghost sends/receives
 /* readonly */ bool empty_msgs;     // -e  L1: sends with zero-length payload, no GPU work per message
 /* readonly */ bool single_stream;  // -s  S : one stream per chare, no comm<->compute event ordering
+/* readonly */ bool prereg;         // -r  register the ghost buffers once (CkDeviceBufferRegister)
 
 extern void invokeInitKernel(DataType* d_temperature, int block_width,
     int block_height, hapiStream_t stream);
@@ -95,6 +96,7 @@ public:
     no_exchange = false;
     empty_msgs = false;
     single_stream = false;
+    prereg = false;
     sync_ver = false;
     my_iter = 0;
 
@@ -104,7 +106,7 @@ public:
 
     // Process arguments
     int c;
-    while ((c = getopt(m->argc, m->argv, "W:H:w:h:i:u:yzfpnes")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "W:H:w:h:i:u:yzfpnesr")) != -1) {
       switch (c) {
         case 'W':
           grid_width = atoi(optarg);
@@ -145,12 +147,15 @@ public:
         case 's':
           single_stream = true;
           break;
+        case 'r':
+          prereg = true;
+          break;
         default:
           CkPrintf(
               "Usage: %s -W [grid width] -H [grid height] -w [block width] -h [block height]"
               "-i [iterations] -u [warmup] -y (use sync version) -z (use GPU zerocopy) "
               "-f (non-blocking streams) -p (print blocks) "
-              "-n (no ghost exchange) -e (empty ghost messages) -s (single stream per chare)\n",
+              "-n (no ghost exchange) -e (empty ghost messages) -s (single stream per chare) -r (register ghost buffers once)\n",
               m->argv[0]);
           CkExit();
       }
@@ -221,12 +226,12 @@ public:
       const int chares = n_chares_x * n_chares_y;
       CkPrintf("JACOBI_OD_RESULT pes=%d nodes=%d phys_nodes=%d visible_devices=%d "
                "chares=%d chares_per_visible_device=%.2f iters=%d "
-               "avg_iter_us=%.2f zerocopy=%d nonblocking=%d noexch=%d empty=%d onestream=%d\n",
+               "avg_iter_us=%.2f zerocopy=%d nonblocking=%d noexch=%d empty=%d onestream=%d prereg=%d\n",
                CkNumPes(), CmiNumNodes(), CmiNumPhysicalNodes(), devs, chares,
                devs > 0 ? (double)chares / devs : 0.0, n_iters,
                (total_time / n_iters) * 1e6, use_zerocopy ? 1 : 0,
                use_nonblocking ? 1 : 0, no_exchange ? 1 : 0, empty_msgs ? 1 : 0,
-               single_stream ? 1 : 0);
+               single_stream ? 1 : 0, prereg ? 1 : 0);
     }
     if (sync_ver) {
       CkPrintf("Comm time per iteration: %.3lf us\nUpdate time per iteration: %.3lf us\n",
@@ -297,6 +302,17 @@ class Block : public CBase_Block {
       hapiCheck(hapiFree(d_left_ghost));
       hapiCheck(hapiFree(d_right_ghost));
     } else {
+      if (prereg) {
+        CkDeviceBufferDeregister(d_send_left_ghost,   sizeof(DataType) * block_height);
+        CkDeviceBufferDeregister(d_send_right_ghost,  sizeof(DataType) * block_height);
+        CkDeviceBufferDeregister(d_send_top_ghost,    sizeof(DataType) * block_width);
+        CkDeviceBufferDeregister(d_send_bottom_ghost, sizeof(DataType) * block_width);
+        CkDeviceBufferDeregister(d_recv_left_ghost,   sizeof(DataType) * block_height);
+        CkDeviceBufferDeregister(d_recv_right_ghost,  sizeof(DataType) * block_height);
+        CkDeviceBufferDeregister(d_temperature + 1,   sizeof(DataType) * block_width);
+        CkDeviceBufferDeregister(d_temperature + (block_width + 2) * (block_height + 1) + 1,
+                                 sizeof(DataType) * block_width);
+      }
       hapiCheck(hapiFree(d_send_left_ghost));
       hapiCheck(hapiFree(d_send_right_ghost));
       hapiCheck(hapiFree(d_send_top_ghost));
@@ -364,6 +380,19 @@ class Block : public CBase_Block {
       hapiCheck(hapiMalloc((void**)&d_send_bottom_ghost, sizeof(DataType) * block_width));
       hapiCheck(hapiMalloc((void**)&d_recv_left_ghost, sizeof(DataType) * block_height));
       hapiCheck(hapiMalloc((void**)&d_recv_right_ghost, sizeof(DataType) * block_height));
+      if (prereg) {
+        // -r: register each ghost buffer once, for the life of the chare.
+        // Sizes and pointers must match what the sends and receive posts use.
+        CkDeviceBufferRegister(d_send_left_ghost,   sizeof(DataType) * block_height);
+        CkDeviceBufferRegister(d_send_right_ghost,  sizeof(DataType) * block_height);
+        CkDeviceBufferRegister(d_send_top_ghost,    sizeof(DataType) * block_width);
+        CkDeviceBufferRegister(d_send_bottom_ghost, sizeof(DataType) * block_width);
+        CkDeviceBufferRegister(d_recv_left_ghost,   sizeof(DataType) * block_height);
+        CkDeviceBufferRegister(d_recv_right_ghost,  sizeof(DataType) * block_height);
+        CkDeviceBufferRegister(d_temperature + 1,   sizeof(DataType) * block_width);
+        CkDeviceBufferRegister(d_temperature + (block_width + 2) * (block_height + 1) + 1,
+                               sizeof(DataType) * block_width);
+      }
     }
 
     const unsigned int stream_flags =
