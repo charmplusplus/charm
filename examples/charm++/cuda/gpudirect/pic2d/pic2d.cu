@@ -120,18 +120,34 @@ __global__ void packChargeGhostsKernel(const RealType* rho, RealType* slab,
 // ring (this patch's own deposit spill) and the receiver ADDS it to its
 // interior, so nobody ever writes a neighbour's finished rho into our ghost
 // ring. Same 8-way slab layout as that exchange -- see stripOff() in pic2d.C.
+// D = PHI_HALO-1 layers, because a sweep at margin m reads charge m cells out
+// and the deepest sweep of a block runs at margin PHI_HALO-1. Same layout as
+// the phi slab, one depth shallower.
 __global__ void packRhoHaloKernel(const RealType* rho, RealType* slab,
     int block_width, int block_height) {
   int t = blockDim.x * blockIdx.x + threadIdx.x;
   const int W = block_width, H = block_height;
-  if (t < H)                   slab[t] = rho[IDX(1, 1 + t)];
-  else if (t < 2*H)            slab[t] = rho[IDX(W, 1 + (t - H))];
-  else if (t < 2*H + W)        slab[t] = rho[IDX(1 + (t - 2*H), 1)];
-  else if (t < 2*H + 2*W)      slab[t] = rho[IDX(1 + (t - 2*H - W), H)];
-  else if (t == 2*H + 2*W)     slab[t] = rho[IDX(1, 1)];
-  else if (t == 2*H + 2*W + 1) slab[t] = rho[IDX(W, 1)];
-  else if (t == 2*H + 2*W + 2) slab[t] = rho[IDX(1, H)];
-  else if (t == 2*H + 2*W + 3) slab[t] = rho[IDX(W, H)];
+  const int D = RHO_HALO_D;
+  if (D <= 0) return;
+  const int nLR = D * H, nTB = D * W, nC = D * D;
+  if (t < nLR)                       slab[t] = rho[IDX(1 + t / H, 1 + t % H)];
+  else if (t < 2*nLR)              { const int u = t - nLR;
+                                     slab[t] = rho[IDX(W - u / H, 1 + u % H)]; }
+  else if (t < 2*nLR + nTB)        { const int u = t - 2*nLR;
+                                     slab[t] = rho[IDX(1 + u % W, 1 + u / W)]; }
+  else if (t < 2*nLR + 2*nTB)      { const int u = t - 2*nLR - nTB;
+                                     slab[t] = rho[IDX(1 + u % W, H - u / W)]; }
+  else if (t < 2*nLR + 2*nTB + 4*nC) {
+    const int base = 2*nLR + 2*nTB;
+    const int c = (t - base) / nC, u = (t - base) % nC;
+    const int l1 = u % D, l2 = u / D;
+    switch (c) {
+      case 0: slab[t] = rho[IDX(1 + l1, 1 + l2)]; break;   // TL
+      case 1: slab[t] = rho[IDX(W - l1, 1 + l2)]; break;   // TR
+      case 2: slab[t] = rho[IDX(1 + l1, H - l2)]; break;   // BL
+      default: slab[t] = rho[IDX(W - l1, H - l2)]; break;  // BR
+    }
+  }
 }
 
 // Overwrite, not accumulate: this is the neighbour's value for a cell we do
@@ -140,15 +156,27 @@ __global__ void unpackRhoHaloKernel(RealType* rho, const RealType* buf, int dir,
     int block_width, int block_height) {
   int t = blockDim.x * blockIdx.x + threadIdx.x;
   const int W = block_width, H = block_height;
-  switch (dir) {
-    case LEFT:   if (t < H) rho[IDX(0,   1 + t)] = buf[t]; break;
-    case RIGHT:  if (t < H) rho[IDX(W+1, 1 + t)] = buf[t]; break;
-    case TOP:    if (t < W) rho[IDX(1 + t, 0)]   = buf[t]; break;
-    case BOTTOM: if (t < W) rho[IDX(1 + t, H+1)] = buf[t]; break;
-    case TL: if (t == 0) rho[IDX(0,   0)]   = buf[0]; break;
-    case TR: if (t == 0) rho[IDX(W+1, 0)]   = buf[0]; break;
-    case BL: if (t == 0) rho[IDX(0,   H+1)] = buf[0]; break;
-    case BR: if (t == 0) rho[IDX(W+1, H+1)] = buf[0]; break;
+  const int D = RHO_HALO_D;
+  if (D <= 0) return;
+  if (dir == LEFT || dir == RIGHT) {
+    if (t >= D * H) return;
+    const int l = t / H, r = 1 + t % H;
+    if (dir == LEFT) rho[IDX(-l, r)] = buf[t];
+    else             rho[IDX(W + 1 + l, r)] = buf[t];
+  } else if (dir == TOP || dir == BOTTOM) {
+    if (t >= D * W) return;
+    const int l = t / W, c = 1 + t % W;
+    if (dir == TOP) rho[IDX(c, -l)] = buf[t];
+    else            rho[IDX(c, H + 1 + l)] = buf[t];
+  } else {
+    if (t >= D * D) return;
+    const int l1 = t % D, l2 = t / D;
+    switch (dir) {
+      case TL: rho[IDX(-l1,        -l2)]        = buf[t]; break;
+      case TR: rho[IDX(W + 1 + l1, -l2)]        = buf[t]; break;
+      case BL: rho[IDX(-l1,        H + 1 + l2)] = buf[t]; break;
+      default: rho[IDX(W + 1 + l1, H + 1 + l2)] = buf[t]; break;  // BR
+    }
   }
 }
 
@@ -392,7 +420,9 @@ void invokeDepositKernel(const Particle* d_parts, int n, RealType* d_rho,
 
 void invokePackRhoHaloKernel(const RealType* d_rho, RealType* d_slab,
     int block_width, int block_height, cudaStream_t stream) {
-  const int total = 2*(block_width + block_height) + 4;
+  const int D = RHO_HALO_D;
+  const int total = 2*D*(block_width + block_height) + 4*D*D;
+  if (total <= 0) return;
   packRhoHaloKernel<<<nblocks(total), BLOCK_1D, 0, stream>>>(
       d_rho, d_slab, block_width, block_height);
   hapiCheck(cudaPeekAtLastError());
@@ -400,7 +430,9 @@ void invokePackRhoHaloKernel(const RealType* d_rho, RealType* d_slab,
 
 void invokeUnpackRhoHaloKernel(RealType* d_rho, const RealType* d_buf, int dir,
     int block_width, int block_height, cudaStream_t stream) {
-  const int n = (block_width > block_height) ? block_width : block_height;
+  const int n = RHO_HALO_D *
+      ((block_width > block_height) ? block_width : block_height);
+  if (n <= 0) return;
   unpackRhoHaloKernel<<<nblocks(n), BLOCK_1D, 0, stream>>>(
       d_rho, d_buf, dir, block_width, block_height);
   hapiCheck(cudaPeekAtLastError());

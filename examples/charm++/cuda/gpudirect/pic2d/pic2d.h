@@ -48,6 +48,9 @@ enum Dir { LEFT = 0, RIGHT, TOP, BOTTOM, TL, TR, BL, BR, NUM_DIRS = 8, STAY = 8 
 // cross exchange never covers. Zero at PHI_HALO 1, where nothing reads the
 // halo at all.
 #define PHI_CORNER_D (PHI_HALO - 1)
+// Charge must be valid as deep as the deepest sweep writes, one layer less
+// than phi, which the sweep reads one beyond where it writes.
+#define RHO_HALO_D   (PHI_HALO - 1)
 #define PHI_CORNER   (PHI_CORNER_D * PHI_CORNER_D)
 // 4 directions when no corner data is needed, 8 once it is.
 #define PHI_DIRS     ((PHI_HALO > 1) ? NUM_DIRS : 4)

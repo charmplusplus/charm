@@ -116,6 +116,31 @@ static inline int phiStripLen(int d) {
   return PHI_CORNER;   // diagonal: a square block, zero at PHI_HALO 1
 }
 
+// Final-rho halo: D layers per side with D*D corner blocks, the same shape as
+// the phi slab one depth shallower.
+static inline int rhoHaloLen(int d) {
+  const int D = RHO_HALO_D;
+  if (d == LEFT || d == RIGHT) return D * block_height;
+  if (d == TOP || d == BOTTOM) return D * block_width;
+  return D * D;
+}
+
+static inline int rhoHaloOff(int d) {
+  const int D = RHO_HALO_D, W = block_width, H = block_height;
+  switch (d) {
+    case LEFT:   return 0;
+    case RIGHT:  return D*H;
+    case TOP:    return 2*D*H;
+    case BOTTOM: return 2*D*H + D*W;
+    default:     return 2*D*(H + W) + (d - TL) * D * D;
+  }
+}
+
+static inline int rhoHaloSlab() {
+  const int D = RHO_HALO_D;
+  return 2*D*(block_width + block_height) + 4*D*D;
+}
+
 // Total 4-way phi slab, one parity.
 static inline int phiSlab4() {
   return 2 * PHI_HALO * (block_width + block_height) + 4 * PHI_CORNER;
@@ -516,8 +541,11 @@ class Patch : public CBase_Patch {
         sizeof(Particle) * (size_t)NUM_DIRS * exch_capacity));
     hapiCheck(hapiMalloc((void**)&d_send_rho, sizeof(RealType) * slab8));
     hapiCheck(hapiMalloc((void**)&d_recv_rho, sizeof(RealType) * slab8));
-    hapiCheck(hapiMalloc((void**)&d_send_rhoh, sizeof(RealType) * slab8));
-    hapiCheck(hapiMalloc((void**)&d_recv_rhoh, sizeof(RealType) * slab8));
+    // Zero-sized when no sweep reads outside the interior; hapiMalloc(0) is
+    // not worth relying on, so keep one element.
+    const int rslab = rhoHaloSlab() > 0 ? rhoHaloSlab() : 1;
+    hapiCheck(hapiMalloc((void**)&d_send_rhoh, sizeof(RealType) * rslab));
+    hapiCheck(hapiMalloc((void**)&d_recv_rhoh, sizeof(RealType) * rslab));
     hapiCheck(hapiMalloc((void**)&d_send_e, sizeof(float2) * slab8));
     hapiCheck(hapiMalloc((void**)&d_recv_e, sizeof(float2) * slab8));
     hapiCheck(hapiMalloc((void**)&d_send_phi, sizeof(RealType) * 2 * slab4));
@@ -720,7 +748,7 @@ class Patch : public CBase_Patch {
 
   // Only reached when the sweeps actually need it; at PHI_HALO 1 the sweep
   // runs at margin 0 and never looks outside the interior.
-  static bool rhoHaloNeeded() { return PHI_HALO > 1; }
+  static bool rhoHaloNeeded() { return RHO_HALO_D > 0; }
 
   void packRhoHalo() {
     // rho was last written by accumChargeGhost on the comm stream.
@@ -734,9 +762,9 @@ class Patch : public CBase_Patch {
   void sendRhoHalo() {
     for (int d = 0; d < NUM_DIRS; d++) {
       thisProxy(nbr_x[d], nbr_y[d]).receiveRhoHalo(my_iter, flipDir(d),
-          stripLen(d),
+          rhoHaloLen(d),
           (outstanding_sends++,
-           CkDeviceBuffer(d_send_rhoh + stripOff(d),
+           CkDeviceBuffer(d_send_rhoh + rhoHaloOff(d),
                CkCallback(CkIndex_Patch::sendDone(), thisProxy[thisIndex]),
                comm_stream)));
     }
@@ -744,7 +772,7 @@ class Patch : public CBase_Patch {
 
   void receiveRhoHalo(int ref, int dir, int& n, RealType*& buf,
       CkDeviceBufferPost* devicePost) {
-    buf = d_recv_rhoh + stripOff(dir);
+    buf = d_recv_rhoh + rhoHaloOff(dir);
     devicePost[0].hapi_stream = comm_stream;
   }
 
