@@ -863,8 +863,10 @@ class Patch : public CBase_Patch {
   void receivePhiGhosts(int ref, int dir, int& n, RealType*& buf,
       CkDeviceBufferPost* devicePost) {
     // ref is the sender's round number; pick the matching parity buffer
-    buf = d_recv_phi + (size_t)(ref & 1) * 2 * (block_width + block_height) +
-        phiOff(dir);
+    // phiSlab4(), not the old 2*(W+H): that was the depth-1 slab size, so at
+    // any deeper halo the odd-parity landing region overlapped the even one
+    // and consecutive rounds scribbled on each other.
+    buf = d_recv_phi + (size_t)(ref & 1) * phiSlab4() + phiOff(dir);
     devicePost[0].hapi_stream = comm_stream;
     if (getenv("CHARM_DEBUG_IPC_RECV"))
       CkPrintf("[%d] postPHI (%d,%d): ref=%d dir=%d n=%d base=%p buf=%p\n",
