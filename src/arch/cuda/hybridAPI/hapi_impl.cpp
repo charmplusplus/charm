@@ -2235,7 +2235,7 @@ bool hapiIpcExportBuffer(const void* ptr, hapiIpcMemHandle_t* handle,
 }
 
 void* hapiIpcImportBuffer(const hapiIpcMemHandle_t& handle, int src_process,
-                          const void* src_base) {
+                          const void* src_base, size_t span) {
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
 #if CMK_SMP
   CmiLock(csv_gpu_manager.ipc_cache_lock);
@@ -2273,6 +2273,28 @@ void* hapiIpcImportBuffer(const hapiIpcMemHandle_t& handle, int src_process,
   void* mapped = NULL;
   const hapiError_t err =
       hapiIpcOpenMemHandle(&mapped, handle, hapiIpcMemLazyEnablePeerAccess);
+
+  // One cudaIpcOpenMemHandle maps the whole suballocator region containing the
+  // allocation, so a live allocation sitting between live siblings already
+  // mapped cannot be opened at all -- the driver says AlreadyMapped. Reach it by
+  // offset from a sibling instead.
+  //
+  // Which sibling: entries mapped through one region share a constant
+  // (mapped - base) delta, measured at 0x2134800000 across the 11 entries
+  // bracketing the failure this handles. Requiring a mapped base on either side
+  // of src_base with the same delta is what establishes that src_base is
+  // interior to that one mapping -- extents cannot, because
+  // cuMemGetAddressRange on an imported pointer reports the allocation's size,
+  // not the region's, which is why an earlier extent-based version of this
+  // never once fired.
+  // No attempt to reach this allocation through a mapping already held. One
+  // open maps the whole suballocator region, so a sibling from that region is
+  // genuinely unopenable here, and there is no supported way to learn which
+  // held mapping covers it: an address that merely verifies as mapped can
+  // belong to an unrelated region, which returns wrong bytes instead of an
+  // error. The caller asks for the payload by another route instead.
+  (void)span;
+
   if (err != hapiSuccess) {
     // Keep the reason: the caller only learns that the import returned NULL.
     // already-mapped means this process still holds a mapping of this memory
@@ -2296,7 +2318,7 @@ void* hapiIpcImportBuffer(const hapiIpcMemHandle_t& handle, int src_process,
   }
 
   csv_gpu_manager.ipc_import_misses.fetch_add(1, std::memory_order_relaxed);
-  cache[key] = GPUManager::IpcImportEntry{handle, mapped};
+  cache[key] = GPUManager::IpcImportEntry{handle, mapped, true};
 #if CMK_SMP
   CmiUnlock(csv_gpu_manager.ipc_cache_lock);
 #endif
@@ -2350,6 +2372,8 @@ void hapiIpcFlushImportCache() {
   CmiLock(csv_gpu_manager.ipc_cache_lock);
 #endif
   for (auto& entry : csv_gpu_manager.ipc_import_cache) {
+    // Borrowed mappings share the owner's pointer; only that one can be closed.
+    if (!entry.second.owns_mapping) continue;
     if (hapiIpcCloseMemHandle(entry.second.mapped) != hapiSuccess)
       cudaGetLastError();
   }
@@ -2370,10 +2394,11 @@ void hapiIpcReportStats() {
   const long hits = csv_gpu_manager.ipc_import_hits.load();
   const long misses = csv_gpu_manager.ipc_import_misses.load();
   const long stale = csv_gpu_manager.ipc_import_stale_dropped.load();
+  const long shared = csv_gpu_manager.ipc_import_region_shared.load();
   if (staged + direct + hits + misses == 0) return;
   CmiPrintf("[ipc-stats] pid=%d staged=%ld direct=%ld import_hits=%ld "
-            "import_misses=%ld stale_dropped=%ld transport=%s\n",
-            (int)getpid(), staged, direct, hits, misses, stale,
+            "import_misses=%ld stale_dropped=%ld region_shared=%ld transport=%s\n",
+            (int)getpid(), staged, direct, hits, misses, stale, shared,
             csv_gpu_manager.ipc_use_direct ? "direct" : "staged");
 }
 

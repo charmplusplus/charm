@@ -299,12 +299,14 @@ bool hapiIpcExportBuffer(const void* ptr, hapiIpcMemHandle_t* handle,
 // Map a peer allocation into this process, returning the address its base is
 // reachable at, or NULL if it cannot be opened.
 //
-// src_process/src_base name the exporting allocation. The address is the key
-// and the handle validates it: migration recycles addresses, and a cache that
-// matched on the address alone would return a mapping of freed memory. See the
-// cache declaration in gpumanager.h.
+// src_process/src_base name the exporting allocation and span is how many bytes
+// past src_base will be read. The address is the key and the handle validates
+// it: migration recycles addresses, and a cache that matched on the address
+// alone would return a mapping of freed memory. span is needed because one open
+// maps a whole region, so an allocation may have to be reached by offset from a
+// sibling already mapped. See the cache declaration in gpumanager.h.
 void* hapiIpcImportBuffer(const hapiIpcMemHandle_t& handle, int src_process,
-                          const void* src_base);
+                          const void* src_base, size_t span);
 
 // Drop every cached import, closing the mappings, and every cached export.
 //

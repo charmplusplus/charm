@@ -252,11 +252,18 @@ struct GPUManager {
   struct IpcImportEntry {
     hapiIpcMemHandle_t handle;
     void* mapped;
+    // Whether cudaIpcOpenMemHandle returned this pointer. One open maps a whole
+    // suballocator region, so several allocations in it are reached by offset
+    // from whichever one opened it -- those entries borrow the mapping and must
+    // not close it, and it is the owner's pointer that CloseMemHandle accepts.
+    bool owns_mapping;
   };
   std::map<std::pair<int, const void*>, IpcImportEntry> ipc_import_cache;
   // Entries dropped because the base came back under a different handle, i.e.
   // the allocation they mapped was freed and the address reused.
   std::atomic<long> ipc_import_stale_dropped;
+  // Imports resolved by offset into a region another allocation already opened.
+  std::atomic<long> ipc_import_region_shared;
 
   // Allocation base -> handle exporting it, so a repeated send from the same
   // application buffer does not repeat cuMemGetAddressRange/IpcGetMemHandle.
@@ -440,6 +447,7 @@ struct GPUManager {
     ipc_import_hits = 0;
     ipc_import_last_err = 0;
     ipc_import_stale_dropped = 0;
+    ipc_import_region_shared = 0;
     ipc_import_misses = 0;
     ipc_staged_sends = 0;
     ipc_direct_sends = 0;

@@ -826,7 +826,8 @@ static void deviceIpcReceive(CkDeviceBuffer& source, CkDeviceBuffer& dest,
         src_addr = source.ptr;
       } else {
         imported_base = hapiIpcImportBuffer(source.ipc_handle,
-                                            CmiNodeOf(srcPe), source.ipc_base);
+                                            CmiNodeOf(srcPe), source.ipc_base,
+                                            source.ipc_offset + (size_t)dest.cnt);
         if (imported_base == NULL) {
           // Name the CUDA error rather than listing the possibilities.
           // cudaErrorAlreadyMapped means this process still holds a mapping of
@@ -1755,6 +1756,36 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
         shm_event_shared->dst_flag.store(true, std::memory_order_release);
       }
     } else if (sender_exported) {
+      // A direct send can be unmappable here even though nothing is wrong with
+      // it. One cudaIpcOpenMemHandle maps the whole suballocator region behind
+      // an allocation, so a second allocation carved from that same region
+      // cannot be opened at all -- the driver returns cudaErrorAlreadyMapped --
+      // and no API says which held mapping already covers it.
+      //
+      // This is not a migration effect: it reproduces with load balancing
+      // switched off entirely, around iteration 15 of pic2d.
+      //
+      // So take the route that exists for a payload this process cannot read,
+      // the same correction the migration mismatch below uses. Importing here
+      // rather than inside deviceIpcReceive is what makes that possible: the
+      // mapping has to be known to have failed while the send is still
+      // identifiable and the buffer can still be asked for again. A successful
+      // import is cached, so the one inside deviceIpcReceive hits.
+      if (sender_direct && mode != CkNcpyModeDevice::MEMCPY &&
+          hapiIpcImportBuffer(source.ipc_handle, CmiNodeOf(env->getSrcPe()),
+                              source.ipc_base,
+                              source.ipc_offset + (size_t)dest.cnt) == NULL) {
+        if (watch) watch->deferred[i] = 1;
+        CkGroupID def_aid; def_aid.idx = save_op.dest_aid_idx;
+        requestDeviceRestage(env->getSrcPe(), (void*)&save_op, source.ptr,
+                             def_aid, save_op.dest_id,
+                             source.ipc_protocol == CmiIpcProtocol::STAGED,
+                             source.comm_offset,
+                             source.memcpy_event, source.event_idx,
+                             (size_t)dest.cnt, arrPtrs[i], (size_t)arrSizes[i],
+                             mode != CkNcpyModeDevice::IPC);
+        continue;  // completion deferred until the retransmit lands
+      }
       deviceIpcReceive(source, dest, postStructs[i].hapi_stream,
                        env->getSrcPe(), mode);
     } else {

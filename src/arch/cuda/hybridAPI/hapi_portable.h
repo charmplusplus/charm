@@ -99,6 +99,7 @@ static inline cudaError_t hapiFreeRecord(void* ptr) {
 
 #define hapiErrorMemoryAllocation cudaErrorMemoryAllocation
 #define hapiErrorInitializationError cudaErrorInitializationError
+#define hapiErrorAlreadyMapped cudaErrorAlreadyMapped
 #define hapiSuccess cudaSuccess
 #define hapiError_t cudaError_t
 
@@ -195,6 +196,7 @@ static inline hipError_t hapiFreeRecord(void* ptr) {
 
 #define hapiErrorMemoryAllocation hipErrorMemoryAllocation
 #define hapiErrorInitializationError hipErrorInitializationError
+#define hapiErrorAlreadyMapped hipErrorAlreadyMapped
 #define hapiSuccess hipSuccess
 #define hapiError_t hipError_t
 #define hapiStreamDestroy hipStreamDestroy
