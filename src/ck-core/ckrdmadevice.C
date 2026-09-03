@@ -1208,6 +1208,34 @@ extern "C" void* device_restage_req_bridge(void* arg)
     hapiCheck(hapiEventRecord(my_device_info.src_event_pool[event_idx],
                               hapiStreamPerThread));
 
+    // Retire the ORIGINAL send's slot, now that its bytes have been re-read.
+    //
+    // The deferral could not do this. Where the original send staged, the comm
+    // buffer holds the only copy of the payload still owed -- the chare's own
+    // buffer may already carry the next iteration -- so the block has to stay
+    // intact until the memcpy above has read it. Releasing at the deferral site
+    // would hand the block back while it was still the source.
+    //
+    // Nothing released it afterwards either, so every correction burned one
+    // event slot of the per-PE slice for the life of the run, and one comm
+    // block with it. Single-digit correction counts kept that invisible until
+    // unmappable direct sends started routing through here in volume, at which
+    // point the pic2d repro needed +gpuipceventpool 2048 where 16 had done.
+    //
+    // reclaimCompletedIpcEvents wants both halves: dst_flag set, and the slot's
+    // dst_event complete. Record the event on the stream that did the re-read
+    // so it retires exactly when that read is done, then publish the flag --
+    // the same order, and the same release pairing, the receiving side uses.
+    if (req->src_event_idx >= 0) {
+      hapiCheck(hapiEventRecord(my_device_info.dst_event_pool[req->src_event_idx],
+                                hapiStreamPerThread));
+      hapi_ipc_event_shared* orig_shared =
+          (hapi_ipc_event_shared*)((char*)csv_gpu_manager.shm_ptr
+              + csv_gpu_manager.shm_chunk_size * device_idx
+              + sizeof(hapiIpcMemHandle_t)) + req->src_event_idx;
+      orig_shared->dst_flag.store(true, std::memory_order_release);
+    }
+
     // Deliberately no completion callback for the source buffer here. The
     // sender chose memcpy, so it shipped the real CkCallback to the receiver
     // rather than firing it itself as a staged send would; the receiver still
