@@ -825,14 +825,19 @@ static void deviceIpcReceive(CkDeviceBuffer& source, CkDeviceBuffer& dest,
       } else if (mode == CkNcpyModeDevice::MEMCPY) {
         src_addr = source.ptr;
       } else {
-        imported_base = hapiIpcImportBuffer(source.ipc_handle);
+        imported_base = hapiIpcImportBuffer(source.ipc_handle,
+                                            CmiNodeOf(srcPe), source.ipc_base);
         if (imported_base == NULL) {
+          // Name the CUDA error rather than listing the possibilities.
+          // cudaErrorAlreadyMapped means this process still holds a mapping of
+          // this memory that the import cache did not find; an invalid-handle
+          // error means the exporter's allocation is genuinely gone, so the
+          // sender released it while its handle was in flight.
           CkAbort("CkRdmaDeviceIssueRgets: receive on PE %d from PE %d could not "
-                  "open the CUDA IPC handle for a %zu-byte direct transfer. The "
-                  "exporting process may have freed the allocation, or this "
-                  "process may already hold a mapping of it that was never "
-                  "closed.",
-                  CkMyPe(), srcPe, (size_t)dest.cnt);
+                  "open the CUDA IPC handle for a %zu-byte direct transfer: "
+                  "%s (%d).",
+                  CkMyPe(), srcPe, (size_t)dest.cnt,
+                  hapiIpcLastImportErrorName(), hapiIpcLastImportError());
         }
         src_addr = (const void*)((char*)imported_base + source.ipc_offset);
       }
@@ -2396,10 +2401,11 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
       // case hapiIpcExportBuffer says so and this falls back to staging.
       hapiIpcMemHandle_t export_handle;
       size_t export_offset = 0;
+      void* export_base = NULL;
       bool direct = false;
       if (!is_lb_buffer && hapiIpcUseDirect()) {
         direct = hapiIpcExportBuffer(buffers[i]->ptr, &export_handle,
-                                     &export_offset);
+                                     &export_offset, &export_base);
       }
 
       // A zero-copy device send may not reuse or free its source buffer until
@@ -2437,6 +2443,7 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
         buffers[i]->ipc_protocol = CmiIpcProtocol::DIRECT;
         buffers[i]->ipc_handle = export_handle;
         buffers[i]->ipc_offset = export_offset;
+        buffers[i]->ipc_base = export_base;
         buffers[i]->comm_offset = 0;
         csv_gpu_manager.ipc_direct_sends.fetch_add(1, std::memory_order_relaxed);
 

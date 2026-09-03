@@ -62,6 +62,15 @@ public:
   CmiIpcProtocol ipc_protocol;
   hapiIpcMemHandle_t ipc_handle;
   size_t ipc_offset;
+  // The exporting allocation's base address, in the SENDER's address space.
+  // The receiver cannot address with it -- it maps at its own address -- but it
+  // cannot do without it either. cudaIpcGetMemHandle names the whole
+  // suballocator region containing an allocation, so the receiver may already
+  // hold this memory through a mapping opened for a neighbouring allocation in
+  // the same region, and reaching it means knowing how far this allocation sits
+  // from the one that opened the mapping. That distance is a sender-side
+  // quantity, and only the sender can supply it.
+  void* ipc_base;
 
   // Same-process (MEMCPY) ordering. The receiver reads ptr directly on its own
   // stream, which has no ordering against the stream still producing the data,
@@ -97,6 +106,7 @@ public:
     event_idx = -1;
     ipc_protocol = CmiIpcProtocol::NONE;
     ipc_offset = 0;
+    ipc_base = NULL;
     memcpy_event = NULL;
     hapi_stream = hapiStreamPerThread;
 
@@ -125,6 +135,7 @@ public:
     if (ipc_protocol == CmiIpcProtocol::DIRECT) {
       p((char *)&ipc_handle, sizeof(ipc_handle));
       p|ipc_offset;
+      p((char *)&ipc_base, sizeof(ipc_base));
     }
     p((char *)&memcpy_event, sizeof(memcpy_event));
     p|data_stored;

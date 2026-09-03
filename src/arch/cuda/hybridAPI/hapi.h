@@ -294,12 +294,17 @@ bool hapiIpcUseDirect();
 // host-registered memory, say -- in which case the caller should stage instead.
 // Repeat exports of the same allocation are served from a cache.
 bool hapiIpcExportBuffer(const void* ptr, hapiIpcMemHandle_t* handle,
-                         size_t* offset);
+                         size_t* offset, void** base_out);
 
-// Map a peer allocation named by handle into this process, returning its base
-// address, or NULL if it cannot be opened. Cached: the same handle yields the
-// same mapping without a second cudaIpcOpenMemHandle.
-void* hapiIpcImportBuffer(const hapiIpcMemHandle_t& handle);
+// Map a peer allocation into this process, returning the address its base is
+// reachable at, or NULL if it cannot be opened.
+//
+// src_process/src_base name the exporting allocation. The address is the key
+// and the handle validates it: migration recycles addresses, and a cache that
+// matched on the address alone would return a mapping of freed memory. See the
+// cache declaration in gpumanager.h.
+void* hapiIpcImportBuffer(const hapiIpcMemHandle_t& handle, int src_process,
+                          const void* src_base);
 
 // Drop every cached import, closing the mappings, and every cached export.
 //
@@ -307,9 +312,9 @@ void* hapiIpcImportBuffer(const hapiIpcMemHandle_t& handle);
 // mid-copy is an illegal access. That is why this is not called at a load
 // balancing step, where migration does free the exported allocations --
 // quiescing every device in the process to make it safe would cost more than
-// the problem is worth. Leaving a stale mapping in place leaks address space
-// but does not fault: an allocation freed and remade gets a fresh handle, so
-// the entry is simply never looked up again.
+// the problem is worth. Leaving a mapping in place leaks address space but does
+// not fault, and holding it keeps the region alive on both sides, so an address
+// the sender recycles within that region stays correct to read.
 void hapiIpcFlushImportCache();
 
 // Drop the cached IPC export for the allocation containing ptr. Call before
@@ -317,6 +322,13 @@ void hapiIpcFlushImportCache();
 // allocation base and cudaMalloc reuses addresses, so a stale entry outlives
 // the memory it names. See the note at the definition.
 void hapiIpcInvalidateExport(const void* ptr);
+
+// Reason the last hapiIpcImportBuffer failed, as a CUDA error code, and its
+// name. The failure site has to be able to say which cause it hit: an
+// already-mapped error means the region containment logic missed a mapping this
+// process holds, an invalid handle means the sender's allocation is gone.
+int hapiIpcLastImportError();
+const char* hapiIpcLastImportErrorName();
 
 // Report per-process transport counts (staged vs direct sends, import cache
 // hits vs misses) to stdout. Enabled by CHARM_ZC_STATS.

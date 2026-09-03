@@ -6,6 +6,7 @@
 #include <cstring>
 #include <cstdint>
 #include <unordered_map>
+#include <map>
 #include <unordered_set>
 
 #include "hapi_portable.h"
@@ -234,12 +235,28 @@ struct GPUManager {
   // second time in a process that has not closed it.
   bool ipc_use_direct;
 
-  // Peer allocation base, keyed by the handle that exported it. Process-wide,
+  // Peer allocations mapped into this process, keyed by the exporting
+  // allocation's identity -- (sender process, sender-side base). Process-wide,
   // like the comm buffer mappings ipcHandleOpen creates, and used from every PE
   // regardless of which device it drives -- P2P access is enabled between all
   // devices on the host.
-  std::unordered_map<hapiIpcMemHandle_t, void*, hapiIpcMemHandleHash,
-                     hapiIpcMemHandleEq> ipc_import_cache;
+  //
+  // Keyed on the address but validated by the handle, because migration frees
+  // and reallocates constantly and cudaMalloc reuses addresses. The base says
+  // which entry to look at; the handle says whether it is still the same
+  // allocation. Measured 2026-09-02: 2240 exports produced 2240 distinct
+  // handles, no handle ever covered two bases, and a recycled base got fresh
+  // handle bytes in all 208 cases -- so a handle names one allocation and
+  // separates its generations. Matching on the address alone would hand back a
+  // mapping of freed memory, silently.
+  struct IpcImportEntry {
+    hapiIpcMemHandle_t handle;
+    void* mapped;
+  };
+  std::map<std::pair<int, const void*>, IpcImportEntry> ipc_import_cache;
+  // Entries dropped because the base came back under a different handle, i.e.
+  // the allocation they mapped was freed and the address reused.
+  std::atomic<long> ipc_import_stale_dropped;
 
   // Allocation base -> handle exporting it, so a repeated send from the same
   // application buffer does not repeat cuMemGetAddressRange/IpcGetMemHandle.
@@ -251,6 +268,8 @@ struct GPUManager {
 #endif
 
   std::atomic<long> ipc_import_hits;
+  // Reason the last hapiIpcOpenMemHandle failed, so the abort can name it.
+  int ipc_import_last_err;
   std::atomic<long> ipc_import_misses;
   std::atomic<long> ipc_staged_sends;
   std::atomic<long> ipc_direct_sends;
@@ -419,6 +438,8 @@ struct GPUManager {
     ipc_cache_lock = CmiCreateLock();
 #endif
     ipc_import_hits = 0;
+    ipc_import_last_err = 0;
+    ipc_import_stale_dropped = 0;
     ipc_import_misses = 0;
     ipc_staged_sends = 0;
     ipc_direct_sends = 0;

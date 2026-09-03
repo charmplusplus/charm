@@ -1148,13 +1148,21 @@ void hapiNormalizeCuptiLoads() {
   // vanishes from the balancer's view of the node.
   if (getenv("CHARM_GPU_LOAD_AUDIT") != nullptr) {
     const double seen = sweep_attr_demand + sweep_unattr_demand;
+    // Wall time this window actually covered. busy_s alone cannot say whether a
+    // round measured more work or simply measured for longer, and those call
+    // for opposite responses.
+    static double s_last_audit_t = 0.0;
+    const double now_t = CmiWallTimer();
+    const double window_s = (s_last_audit_t > 0.0) ? (now_t - s_last_audit_t) : 0.0;
+    s_last_audit_t = now_t;
     CmiPrintf("[gpu-audit pe=%d] kernels=%zu unowned_kernels=%zu objects=%zu "
               "attributed_s=%.6f unowned_s=%.6f unowned_frac=%.3f busy_s=%.6f "
-              "util=%.3f\n",
+              "util=%.3f window_s=%.6f occ=%.4f\n",
               CmiMyPe(), total_kernels, sweep_unattr_kernels,
               gm.cupti_obj_norm_load_.size(), sweep_attr_demand,
               sweep_unattr_demand, (seen > 0.0) ? sweep_unattr_demand / seen : 0.0,
-              sweep_busy_s, (sweep_busy_s > 0.0) ? seen / sweep_busy_s : 0.0);
+              sweep_busy_s, (sweep_busy_s > 0.0) ? seen / sweep_busy_s : 0.0,
+              window_s, (window_s > 0.0) ? sweep_busy_s / window_s : 0.0);
     fflush(stdout);
   }
 }
@@ -1183,6 +1191,19 @@ void hapiPrepareCuptiLoads(uint64_t epoch) {
   hapiProcessCuptiBuffers();
   const double t2 = timeIt ? CmiWallTimer() : 0.0;
   hapiNormalizeCuptiLoads();
+  // Close the measurement window exactly where it was read. These records were
+  // just consumed; anything recorded from here on belongs to the next round.
+  //
+  // They used to be dropped at MigrationDone instead, which is after the
+  // strategy has run and the migrations have executed. Kernels running through
+  // all of that were recorded and then discarded, belonging to no round at
+  // all, and the amount discarded depended on how long that round's LB step
+  // took -- so the window was "the interval minus a variable tail" rather than
+  // the interval. That is a feedback loop between migration count and measured
+  // load, and it is what made the GPU load dimension swing round to round even
+  // after per-kernel attribution was fixed.
+  gm.cupti_obj_kernel_records_.clear();
+  gm.cupti_unattributed_kernels_.clear();
   if (timeIt) {
     const double t3 = CmiWallTimer();
     CmiPrintf("[LBCUPTI pe=%d] flush=%.3fs process=%.3fs normalize=%.3fs total=%.3fs\n",
@@ -2157,7 +2178,7 @@ bool hapiIpcUseDirect() {
 }
 
 bool hapiIpcExportBuffer(const void* ptr, hapiIpcMemHandle_t* handle,
-                         size_t* offset) {
+                         size_t* offset, void** base_out) {
   // cudaIpcGetMemHandle names an allocation, and cudaIpcOpenMemHandle hands the
   // peer that allocation's base -- so an interior pointer has to be split into
   // (base, offset) here and reassembled on the far side.
@@ -2167,6 +2188,9 @@ bool hapiIpcExportBuffer(const void* ptr, hapiIpcMemHandle_t* handle,
 
   const void* base_ptr = (const void*)base;
   *offset = (size_t)((const char*)ptr - (const char*)base_ptr);
+  // The receiver cannot address with this, but it is what lets it recognise a
+  // stale mapping of a recycled base. See CmiNcpyBufferDevice::ipc_base.
+  if (base_out != NULL) *base_out = base;
 
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
 #if CMK_SMP
@@ -2194,6 +2218,15 @@ bool hapiIpcExportBuffer(const void* ptr, hapiIpcMemHandle_t* handle,
   }
 
   csv_gpu_manager.ipc_export_cache.emplace(base_ptr, new_handle);
+  // Whether a handle names an allocation or the segment containing it decides
+  // the whole import protocol, and the handle is opaque, so the only way to ask
+  // is to log identity against address and compare. Fresh GetMemHandle calls
+  // only: a cache hit re-serves bytes this already printed.
+  if (getenv("CHARM_IPC_IDENT") != nullptr) {
+    CmiPrintf("[%d] IPCEXPORT base=%p size=%zu hh=%016zx\n", CmiMyPe(),
+              base_ptr, alloc_size, hapiIpcMemHandleHash()(new_handle));
+    fflush(stdout);
+  }
   *handle = new_handle;
 #if CMK_SMP
   CmiUnlock(csv_gpu_manager.ipc_cache_lock);
@@ -2201,19 +2234,35 @@ bool hapiIpcExportBuffer(const void* ptr, hapiIpcMemHandle_t* handle,
   return true;
 }
 
-void* hapiIpcImportBuffer(const hapiIpcMemHandle_t& handle) {
+void* hapiIpcImportBuffer(const hapiIpcMemHandle_t& handle, int src_process,
+                          const void* src_base) {
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
 #if CMK_SMP
   CmiLock(csv_gpu_manager.ipc_cache_lock);
 #endif
-  auto it = csv_gpu_manager.ipc_import_cache.find(handle);
-  if (it != csv_gpu_manager.ipc_import_cache.end()) {
-    void* ptr = it->second;
-    csv_gpu_manager.ipc_import_hits.fetch_add(1, std::memory_order_relaxed);
+  auto& cache = csv_gpu_manager.ipc_import_cache;
+  const auto key = std::make_pair(src_process, src_base);
+  auto it = cache.find(key);
+  if (it != cache.end()) {
+    if (hapiIpcMemHandleEq()(it->second.handle, handle)) {
+      void* ptr = it->second.mapped;
+      csv_gpu_manager.ipc_import_hits.fetch_add(1, std::memory_order_relaxed);
 #if CMK_SMP
-    CmiUnlock(csv_gpu_manager.ipc_cache_lock);
+      CmiUnlock(csv_gpu_manager.ipc_cache_lock);
 #endif
-    return ptr;
+      return ptr;
+    }
+    // Same address, different allocation: the sender freed what this mapped and
+    // the allocator handed the address to something new. Measured: a recycled
+    // base got fresh handle bytes 208 times out of 208, so the handle is what
+    // separates the generations -- the address alone cannot.
+    //
+    // Dropped, not closed. A transfer may still be reading this mapping and
+    // closing one mid-copy is an illegal access, so the mapping is left to the
+    // process teardown and only the entry goes.
+    cache.erase(it);
+    csv_gpu_manager.ipc_import_stale_dropped.fetch_add(1,
+                                                       std::memory_order_relaxed);
   }
 
   // Open under the caller's current device, as ipcHandleOpen does for the comm
@@ -2225,6 +2274,20 @@ void* hapiIpcImportBuffer(const hapiIpcMemHandle_t& handle) {
   const hapiError_t err =
       hapiIpcOpenMemHandle(&mapped, handle, hapiIpcMemLazyEnablePeerAccess);
   if (err != hapiSuccess) {
+    // Keep the reason: the caller only learns that the import returned NULL.
+    // already-mapped means this process still holds a mapping of this memory
+    // that the key above did not find; an invalid handle means the sender's
+    // allocation is gone.
+    csv_gpu_manager.ipc_import_last_err = (int)err;
+    if (getenv("CHARM_IPC_DEBUG") != nullptr) {
+      CmiPrintf("[%d] IPCFAIL %s(%d) want proc=%d base=%p ; holds %zu\n",
+                CmiMyPe(), cudaGetErrorName((cudaError_t)err), (int)err,
+                src_process, src_base, cache.size());
+      for (const auto& kv : cache)
+        CmiPrintf("[%d]   held proc=%d base=%p mapped=%p\n", CmiMyPe(),
+                  kv.first.first, kv.first.second, kv.second.mapped);
+      fflush(stdout);
+    }
     cudaGetLastError();
 #if CMK_SMP
     CmiUnlock(csv_gpu_manager.ipc_cache_lock);
@@ -2233,7 +2296,7 @@ void* hapiIpcImportBuffer(const hapiIpcMemHandle_t& handle) {
   }
 
   csv_gpu_manager.ipc_import_misses.fetch_add(1, std::memory_order_relaxed);
-  csv_gpu_manager.ipc_import_cache.emplace(handle, mapped);
+  cache[key] = GPUManager::IpcImportEntry{handle, mapped};
 #if CMK_SMP
   CmiUnlock(csv_gpu_manager.ipc_cache_lock);
 #endif
@@ -2252,6 +2315,15 @@ void* hapiIpcImportBuffer(const hapiIpcMemHandle_t& handle) {
 // The flush below does exactly this reasoning at teardown, which is too late to
 // help a running job. Must be called while ptr is still valid: finding the base
 // needs the allocation to exist.
+int hapiIpcLastImportError() {
+  return CsvAccess(gpu_manager).ipc_import_last_err;
+}
+
+const char* hapiIpcLastImportErrorName() {
+  const int e = CsvAccess(gpu_manager).ipc_import_last_err;
+  return (e == 0) ? "none" : cudaGetErrorName((cudaError_t)e);
+}
+
 void hapiIpcInvalidateExport(const void* ptr) {
   if (ptr == NULL) return;
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
@@ -2262,7 +2334,11 @@ void hapiIpcInvalidateExport(const void* ptr) {
 #if CMK_SMP
   CmiLock(csv_gpu_manager.ipc_cache_lock);
 #endif
-  csv_gpu_manager.ipc_export_cache.erase((const void*)base);
+  const size_t erased = csv_gpu_manager.ipc_export_cache.erase((const void*)base);
+  if (erased != 0 && getenv("CHARM_IPC_IDENT") != nullptr) {
+    CmiPrintf("[%d] IPCINVAL base=%p\n", CmiMyPe(), base);
+    fflush(stdout);
+  }
 #if CMK_SMP
   CmiUnlock(csv_gpu_manager.ipc_cache_lock);
 #endif
@@ -2274,7 +2350,8 @@ void hapiIpcFlushImportCache() {
   CmiLock(csv_gpu_manager.ipc_cache_lock);
 #endif
   for (auto& entry : csv_gpu_manager.ipc_import_cache) {
-    if (hapiIpcCloseMemHandle(entry.second) != hapiSuccess) cudaGetLastError();
+    if (hapiIpcCloseMemHandle(entry.second.mapped) != hapiSuccess)
+      cudaGetLastError();
   }
   csv_gpu_manager.ipc_import_cache.clear();
   // Exports name this process's own allocations, which migration also frees and
@@ -2292,10 +2369,11 @@ void hapiIpcReportStats() {
   const long direct = csv_gpu_manager.ipc_direct_sends.load();
   const long hits = csv_gpu_manager.ipc_import_hits.load();
   const long misses = csv_gpu_manager.ipc_import_misses.load();
+  const long stale = csv_gpu_manager.ipc_import_stale_dropped.load();
   if (staged + direct + hits + misses == 0) return;
   CmiPrintf("[ipc-stats] pid=%d staged=%ld direct=%ld import_hits=%ld "
-            "import_misses=%ld transport=%s\n",
-            (int)getpid(), staged, direct, hits, misses,
+            "import_misses=%ld stale_dropped=%ld transport=%s\n",
+            (int)getpid(), staged, direct, hits, misses, stale,
             csv_gpu_manager.ipc_use_direct ? "direct" : "staged");
 }
 
@@ -2390,6 +2468,19 @@ void hapiRecordAlloc(void* ptr, size_t size) {
 
 void hapiRecordFree(void* ptr) {
   if (ptr == NULL) return;
+  // Freeing an allocation must retire any IPC handle exported for it. The
+  // export cache is keyed by base pointer, so once this address is recycled by
+  // a later cudaMalloc the cached handle still names the dead allocation, and
+  // hapiIpcExportBuffer hands it out to peers -- who fail to open it. That is
+  // the "+gpuipcdirect plus load balancing" abort: the element whose buffer was
+  // exported migrates, its buffers are freed and reallocated, and a base gets
+  // reused. It is not the sender's own migration racing its sends, which is why
+  // registering direct sends with the send interlock did not stop it.
+  //
+  // hapiFreeMigratable already did this, but only applications that free
+  // through that entry point were covered; an ordinary hapiFree left the stale
+  // entry behind. Invalidation belongs with the free itself, at every free.
+  hapiIpcInvalidateExport(ptr);
   std::lock_guard<std::mutex> g(gpu_footprint_lock);
   auto it = gpu_ptr_owner.find(ptr);
   if (it == gpu_ptr_owner.end()) return;  // was not attributed at allocation
