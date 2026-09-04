@@ -792,6 +792,53 @@ plain `Remote`, so the walk asked for subtrees where it wanted particles); and
 a dropped `getOwnershipFromChildren`, which sent requests to the wrong tree
 pieces and cost 11% force error.
 
+## 8.9 LET: correct at one scale, double counting at another
+
+`-let=1` pushes a locally essential tree instead of pulling. It is off by
+default and **not yet trustworthy**.
+
+What is established:
+
+- **Sufficiency.** Remote requests go 12166 -> 0 per iteration. A destination
+  bucket sits inside its domain, so it is never nearer to a cell than the
+  domain is, so it never opens anything the sender accepted.
+- **Delivery.** Nothing is dropped: every entry places, and the per-sender
+  particle totals reconcile exactly against the global count.
+- **The pull path it replaces loses mass.** `BARNES_MASS_CHECK=1` sums every
+  source one bucket accepts against the universe mass of 1:
+
+  | | mass seen |
+  |---|---|
+  | single PE, no remote path | 0.99999993 |
+  | 4 PEs, pull, theta 0.5 | 0.982380 |
+  | 4 PEs, pull, theta 0.05 | 0.967860 |
+  | 4 PEs, **LET**, 50K, theta 0.5 | 0.99999993 |
+  | 4 PEs, **LET**, 500K, theta 0.5 | **1.294642** |
+
+At 50K the push is exact and 3.4x more accurate than the pull (8.0e-4 against
+2.7e-3 versus a mass-correct reference). At 500K it counts **29% too much
+mass**. The error is scale dependent and its cause is not isolated. Runtime at
+500K is 0.108 against the pull's 0.104, but that comparison is not meaningful
+while one side is double counting and the other is dropping.
+
+Ruled out so far: nothing is dropped by the splice; the arrival race between a
+push and the receiver's own frontier callback (fixed, no effect); senders
+overlapping (frontier subtrees are disjoint by construction). The remaining
+suspect is that a node's mass is reaching a bucket by two paths at once, and
+the obvious candidate is the pre-existing arrangement in which both
+`LocalTraversalWorker` and `RemoteTraversalWorker` have `keep[Boundary] = true`
+-- a Boundary cell neither walk opens gets its complete multipole added by
+both. That is latent under the pull path, where the same nodes are also short
+of mass, and completing the data may simply be exposing it. Unverified.
+
+The check that found all of this is worth keeping in mind on its own:
+`compare_accel.py` compares two runs, so it can only find *disagreements*.
+Every earlier validation in this port put two runs side by side that both used
+the pull path, so both carried its 1.8% loss, agreed to 1e-6, and said nothing.
+It took a conservation check against an absolute.
+
+**Stage 5b is not started**, and remains gated behind LET being right.
+
 ## 9. Where this stopped, and why
 
 Not started: Stage 1 (LET), the moment spine all-reduce, incremental
