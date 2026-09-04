@@ -738,6 +738,20 @@ static void deviceNcpyBufferInit(CmiNcpyBuffer& b, const void* ptr, size_t cnt, 
  * first buffer of the message).  Ids that find no such message go out in a
  * standalone DeviceAckMsg when the block fills, and at idle.  A stencil
  * therefore sends no standalone acks at all in steady state.
+ *
+ * The two are not equally urgent, so they are not treated alike.  A release
+ * that waits costs only a registration held longer than necessary, which
+ * nothing observes.  A source callback that waits is the application waiting:
+ * it is the only signal that the send buffer may be written again, and
+ * holding it behind the receiver's own outgoing traffic can stall a sender
+ * behind a receiver's compute phase -- indefinitely, if the receiver neither
+ * sends to that PE nor goes idle.  So an id carrying a callback is flushed
+ * the moment the get completes and is never aggregated, and only
+ * release-only ids ride the piggyback.  The receiver cannot see inside an id
+ * (the record is the sender's), so the sender marks it: DEVICE_ACK_URGENT.
+ * The flush takes the whole block, so any release-only ids owed to that PE
+ * go out in the same message for free.
+ *
  * CK_GPU_ACK_NOPIGGY in the environment flushes every id at once, for
  * measurement of what the piggyback saves. */
 #include <vector>
@@ -758,6 +772,11 @@ static std::unordered_map<int, std::vector<uint64_t>> device_ack_acc;  // dest P
 static std::mutex device_ack_mutex;
 static uint64_t device_ack_seq = 0;
 static int device_ack_nopiggy = -1;
+
+// Top bit of an ack id: this one carries a source callback, so the receiver
+// must not sit on it.  Set at mint time and left in the key device_pending is
+// looked up by, so resolution needs no masking; 63 bits of sequence remain.
+static const uint64_t DEVICE_ACK_URGENT = (uint64_t)1 << 63;
 
 static void deviceResolveAck(uint64_t id) {
   DevicePendingAck rec;
@@ -826,7 +845,8 @@ void CkRdmaDeviceInit() {
 }
 
 // The receiver owes 'id' to 'pe'.  Held for the next device message to that
-// PE; sent now if the block is full or piggybacking is disabled.
+// PE; sent now if it carries a source callback (the application is waiting on
+// it), if the block is full, or if piggybacking is disabled.
 static void deviceQueueAck(int pe, uint64_t id) {
   if (device_ack_nopiggy < 0) {
     device_ack_nopiggy = (getenv("CK_GPU_ACK_NOPIGGY") != nullptr) ? 1 : 0;
@@ -841,7 +861,10 @@ static void deviceQueueAck(int pe, uint64_t id) {
     n = v.size();
   }
   QdCreate(1);
-  if (device_ack_nopiggy || n >= CK_DEVICE_ACK_CAP) deviceFlushAcks(pe);
+  // The flush takes the whole block, so release-only ids already owed to this
+  // PE leave with the urgent one rather than costing a message of their own.
+  if (device_ack_nopiggy || (id & DEVICE_ACK_URGENT) || n >= CK_DEVICE_ACK_CAP)
+    deviceFlushAcks(pe);
 }
 
 // Sender side: drain what this PE owes 'pe' into the first buffer of the
@@ -864,7 +887,9 @@ static void deviceDrainAcksInto(int pe, CkDeviceBuffer* b) {
 }
 
 // Sender side: mint an id for a buffer that will need a release and/or a
-// source callback when the far side's get completes.  0 if neither.
+// source callback when the far side's get completes.  0 if neither.  An id
+// with a callback is marked urgent, so the receiver returns it at once
+// instead of holding it for the piggyback.
 static uint64_t deviceMintAck(CmiNcpyBuffer& nb, CkCallback& cb) {
   DevicePendingAck rec;
   rec.ptr = nb.ptr; rec.cnt = nb.cnt;
@@ -877,6 +902,7 @@ static uint64_t deviceMintAck(CmiNcpyBuffer& nb, CkCallback& cb) {
   {
     std::lock_guard<std::mutex> g(device_ack_mutex);
     id = ++device_ack_seq;
+    if (rec.has_cb) id |= DEVICE_ACK_URGENT;
     device_pending.emplace(id, rec);
   }
   return id;

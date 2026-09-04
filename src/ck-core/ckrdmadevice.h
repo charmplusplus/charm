@@ -83,9 +83,11 @@ public:
   // Piggybacked acknowledgements (reconverse RDMA path).  ack_id is the id
   // the sender minted for THIS buffer (0: nothing to acknowledge); the
   // receiver returns it, and the sender resolves it locally to a release
-  // of a per-message registration and/or the source callback.  acks[] is
-  // the block of ids this MESSAGE carries back to its destination PE; only
-  // the first buffer of a message carries any, the rest pup one zero byte.
+  // of a per-message registration and/or the source callback.  Its top bit
+  // says the id carries a source callback, which the receiver returns at
+  // once rather than holding for the piggyback.  acks[] is the block of ids
+  // this MESSAGE carries back to its destination PE; only the first buffer
+  // of a message carries any, the rest pup one zero byte.
   uint64_t ack_id = 0;
   unsigned char ack_count = 0;
   uint64_t acks[CK_DEVICE_ACK_CAP];

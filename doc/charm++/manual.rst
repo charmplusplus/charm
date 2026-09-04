@@ -9396,9 +9396,13 @@ between two send buffers: a neighbour that has sent its message for
 iteration ``i+1`` has already finished reading the buffer it received for
 iteration ``i``, so with two buffers no callback is needed. Overwriting a
 buffer the receiver may still be reading is a silent data race; where the
-buffer came from does not change this. The callback, when requested, is delivered
-through the same piggybacked acknowledgement as the release, and costs a
-few percent of a small chare-iteration. A callback with no message is
+buffer came from does not change this. The callback, when requested, is sent
+as soon as the receiver's transfer completes, in an acknowledgement of its
+own: it is what the sender is waiting on, so it is never held back for the
+receiver's next message the way the registration release is, and it cannot be
+delayed behind a receiver's compute phase. That costs a few percent of a
+small chare-iteration, which double-buffering avoids entirely by not asking
+for a callback at all. A callback with no message is
 delivered as an empty message: to match it by reference number in SDAG,
 declare the target entry method to take a message (for example
 ``entry void ack(AckMsg*)``) and set the reference number with
