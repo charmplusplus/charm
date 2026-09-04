@@ -417,6 +417,84 @@ void DiffusionLB::WithinNodeLB()
     minHeap minPes(nodeSize);
     double threshold = THRESHOLD * avgPE / 100.0;
 
+    // ---- interval repartition ----------------------------------------
+    // When the application registered a 1-D ordering key, do not shuffle
+    // individual objects between this node's PEs by load. Cut the node's key
+    // interval into nodeSize CONTIGUOUS pieces of equal load instead.
+    //
+    // The distinction matters because peBoxes -- what the neighbour exchange
+    // prunes against -- is per PE, while the across-node interval rule only
+    // keeps a NODE contiguous. A node can hold one clean interval while its
+    // PEs hold interleaved fragments of it, and it is this phase that
+    // interleaves them. Partitioning gives every PE one interval by
+    // construction, which is the property blockmap had before any balancing.
+    //
+    // Skipped when objects have arrived from another node this round: those
+    // are not in nodeStats and have no key here, so the partition would be
+    // computed over an incomplete set.
+    {
+      bool allKeyed = !nodeStats->objData.empty() && objectLoads.empty();
+      for (int j = 0; j < (int)nodeStats->objData.size() && allKeyed; j++)
+        if (nodeStats->objData[j].position.size() != 1) allKeyed = false;
+
+      if (allKeyed)
+      {
+        const int n = nodeStats->objData.size();
+        std::vector<int> ord(n);
+        for (int j = 0; j < n; j++) ord[j] = j;
+        std::sort(ord.begin(), ord.end(), [&](int a, int b) {
+          return nodeStats->objData[a].position[0] <
+                 nodeStats->objData[b].position[0];
+        });
+
+        double total = 0.0;
+        for (int j = 0; j < n; j++) total += objs[j].getCompLoad();
+        const double share = total / (double)nodeSize;
+
+        int moved = 0;
+        double acc = 0.0;
+        int target = 0;
+        for (int k = 0; k < n; k++)
+        {
+          const int j = ord[k];
+          // Advance the cut once this chunk has its share, but never past the
+          // last rank, and leave at least one object for each remaining rank.
+          while (target < nodeSize - 1 && acc >= share * (target + 1) &&
+                 (n - k) > (nodeSize - 1 - target))
+            target++;
+          acc += objs[j].getCompLoad();
+
+          const int rank = GetRank(j);
+          if (rank == target) continue;
+          if (!nodeStats->objData[j].migratable) continue;
+          if (objs[j].getCurrPe() == -1) continue;
+
+          const int pe_local_id = j - (rank > 0 ? prefixObjects[rank - 1] : 0);
+          const int donorPE = rank0PE + rank;
+          const int destPE = rank0PE + target;
+          if (donorPE == destPE) continue;
+
+          mig_acksOut += 2;
+          thisProxy[destPE].LoadMetaInfo(nodeStats->objData[j].handle,
+                                         pe_local_id, objs[j].getCompLoad(),
+                                         donorPE, 1, CkMyPe());
+          thisProxy[donorPE].LoadReceived(pe_local_id, destPE, CkMyPe());
+          nodeStats->to_proc[j] = destPE;
+          pe_load[rank] -= objs[j].getCompLoad();
+          pe_load[target] += objs[j].getCompLoad();
+          moved++;
+        }
+        if (_lb_args.debug() > 1)
+          CkPrintf("[WITHIN node %d] interval repartition: %d of %d objects "
+                   "moved, share=%.6f\n", myNodeId, moved, n, share);
+
+        endWithinTiming();
+        withinNodeReport();
+        return;
+      }
+    }
+    // ------------------------------------------------------------------
+
     // for each pe... find overload, something with prefix sum?
     // and store the underloaded pes
     for (int rank = 0; rank < nodeSize; rank++)
