@@ -209,6 +209,15 @@ instrumentation back on, so a park inside that window bills the resume and the
 step's migrations to the objects as load, and the next decision is then made
 from a window describing the last balancing step rather than the application.
 
+A migrating Compute carries its device scratch (pup_buffer_device), so it is
+packable at any entry-method boundary and needs no application-declared window.
+That path needs two runtime knobs that are off by default and without which it
+cannot run at all: `+gpulbbuffer <MB>` to size the staging buffer, and
+CHARM_MIGRATE_ARENA=1 for the zero-copy rebind. Carrying the scratch is not
+faster here -- the emigrate time roughly doubles, 0.24s to 0.42s, because the
+data is now copied instead of dropped -- but it is what makes "migrate whenever"
+true rather than a policy the application has to promise.
+
 So the split pays when the strategy is expensive relative to the moves, which at
 4 nodes it is not -- DiffusionLB's cost grows with the node graph, not with the
 box or the step count. On this application the lever is the move itself: a

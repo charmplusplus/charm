@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <list>
 #include <unordered_map>
 #include <vector>
@@ -59,7 +60,13 @@ namespace buddy {
     };
     lb_free_list* head;
     lb_free_list* tail;
-    std::vector<lb_free_list> lb_free_pool;
+    // A deque, not a vector: the free list is threaded through these nodes by
+    // raw prev/next pointers, and growing a vector reallocates and dangles
+    // every one of them. A deque never moves an element that already exists,
+    // so the pool can grow while the list stays intact -- which is what let
+    // the fixed size of 128 become a hard abort ("does not have any more free
+    // nodes") instead of a starting size.
+    std::deque<lb_free_list> lb_free_pool;
     std::unordered_map<size_t, bool> lb_free_pool_taken;
     std::unordered_map<void*, size_t> lb_ptr_size;
     uint8_t* lb_ptr;

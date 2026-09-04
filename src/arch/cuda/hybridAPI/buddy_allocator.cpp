@@ -318,15 +318,24 @@ namespace buddy {
 
       // add a free node just before tmp
       size_t free_space_indx = 2;
-      while(lb_free_pool_taken[free_space_indx] && free_space_indx < lb_free_pool.size())
+      while(free_space_indx < lb_free_pool.size() && lb_free_pool_taken[free_space_indx])
         free_space_indx++;
       lb_free_list* free_node;
       if(free_space_indx == lb_free_pool.size()) {
-        // TODO : Implement this logic or just increase the default size of 
-        // lb_free_pool
-        printf("Load balancing allocator does not have any more free nodes\n");
-        fflush(stdout);
-        std::abort();
+        // Out of free-list nodes. How many are needed is a property of how
+        // fragmented the load balancing arena gets, which is a property of how
+        // many chares migrate at once and in what order they are released --
+        // not something a fixed size can bound. Grow instead of aborting: the
+        // pool is a deque, so nodes already threaded into the list keep their
+        // addresses.
+        //
+        // This used to abort. It is reachable from any application whose chares
+        // carry device state through pup_buffer_device: 6x6x6 leanmd migrating
+        // ~250 Computes onto one process exhausted 128 nodes in four runs out
+        // of five.
+        lb_free_pool.resize(lb_free_pool.size() * 2);
+        free_node = &(lb_free_pool[free_space_indx]);
+        lb_free_pool_taken[free_space_indx] = true;
       } else {
         free_node = &(lb_free_pool[free_space_indx]);
         lb_free_pool_taken[free_space_indx] = true;

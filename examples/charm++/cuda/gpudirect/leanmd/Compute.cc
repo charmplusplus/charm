@@ -49,6 +49,16 @@ inline hapiError_t mdDevFree(void* p, cudaStream_t s) {
   return hapiFree(p);
 }
 
+// Every buffer that travels through pup_buffer_device is released through this
+// instead. After a migration the pointer aims into the runtime's arena rather
+// than at an allocation of ours, and hapiFreeMigratable is the one call that is
+// correct for both. It also means the migrating buffers cannot come from the
+// stream-ordered pool -- cudaFreeAsync cannot release an arena interior -- which
+// costs nothing, because carrying the scratch is what the pool was working
+// around in the first place.
+inline hapiError_t mdMigMalloc(void** p, size_t n) { return hapiMalloc(p, n); }
+inline void mdMigFree(void* p) { hapiFreeMigratable(p); }
+
 struct AllocTimer {
   double t0; bool on;
   AllocTimer() : t0(0), on(allocStatsOn()) { if (on) t0 = CkWallTimer(); }
@@ -128,8 +138,13 @@ bool Compute::lbWaitDue() const {
 void Compute::ensureDevice() {
   if (stream != NULL) return;
   stream = streamPool.ckLocalBranch()->acquire();
-  hapiCheck(mdDevMalloc((void**)&d_energyScalar, sizeof(double), stream));
-  hapiCheck(hapiMallocHost((void**)&h_energy, sizeof(double)));
+  // Guarded individually rather than by the stream alone: a migrated chare
+  // arrives with stream NULL but with everything pup() carried already in
+  // place, and reallocating over those would leak them and lose the contents.
+  if (d_energyScalar == NULL)
+    hapiCheck(mdMigMalloc((void**)&d_energyScalar, sizeof(double)));
+  if (h_energy == NULL)
+    hapiCheck(hapiMallocHost((void**)&h_energy, sizeof(double)));
 }
 
 Compute::~Compute() { freeDevice(); }
@@ -161,15 +176,15 @@ void Compute::ensureSlot(int s, int n) {
   AllocTimer _t;
   const int newcap = n + n / 4 + 64;
 
-  if (d_pos[s]) hapiCheck(mdDevFree(d_pos[s], stream));
-  if (d_force[s]) hapiCheck(mdDevFree(d_force[s], stream));
-  hapiCheck(mdDevMalloc((void**)&d_pos[s], sizeof(vec3) * newcap, stream));
-  hapiCheck(mdDevMalloc((void**)&d_force[s], sizeof(vec3) * newcap, stream));
+  if (d_pos[s]) mdMigFree(d_pos[s]);
+  if (d_force[s]) mdMigFree(d_force[s]);
+  hapiCheck(mdMigMalloc((void**)&d_pos[s], sizeof(vec3) * newcap));
+  hapiCheck(mdMigMalloc((void**)&d_force[s], sizeof(vec3) * newcap));
 
   // The energy partials are indexed by the A-side atom, one entry per block.
   if (s == 0) {
-    if (d_energyPartial) hapiCheck(mdDevFree(d_energyPartial, stream));
-    hapiCheck(mdDevMalloc((void**)&d_energyPartial, sizeof(double) * newcap, stream));
+    if (d_energyPartial) mdMigFree(d_energyPartial);
+    hapiCheck(mdMigMalloc((void**)&d_energyPartial, sizeof(double) * newcap));
   }
   cap[s] = newcap;
 }
@@ -177,12 +192,12 @@ void Compute::ensureSlot(int s, int n) {
 void Compute::freeDevice() {
   AllocTimer _t;
   for (int s = 0; s < 2; s++) {
-    if (d_pos[s])   { hapiCheck(mdDevFree(d_pos[s], stream));   d_pos[s] = NULL; }
-    if (d_force[s]) { hapiCheck(mdDevFree(d_force[s], stream)); d_force[s] = NULL; }
+    if (d_pos[s])   { mdMigFree(d_pos[s]);   d_pos[s] = NULL; }
+    if (d_force[s]) { mdMigFree(d_force[s]); d_force[s] = NULL; }
     cap[s] = 0;
   }
-  if (d_energyPartial) { hapiCheck(mdDevFree(d_energyPartial, stream)); d_energyPartial = NULL; }
-  if (d_energyScalar)  { hapiCheck(mdDevFree(d_energyScalar, stream));  d_energyScalar = NULL; }
+  if (d_energyPartial) { mdMigFree(d_energyPartial); d_energyPartial = NULL; }
+  if (d_energyScalar)  { mdMigFree(d_energyScalar);  d_energyScalar = NULL; }
   if (h_energy)        { hapiCheck(hapiFreeHost(h_energy));    h_energy = NULL; }
 }
 
@@ -251,15 +266,6 @@ void Compute::updateInstrumentation() {
 
 void Compute::launchForces() {
   updateInstrumentation();
-  // Closes this chare's safe-to-pack window for the rest of the step. pup()
-  // carries no device state -- it does not have to, because the scratch holds
-  // nothing that outlives a step -- but that is only true at a step boundary.
-  // Moved from here to sendForces() the chare would land on its new PE with a
-  // freshly allocated, never-written d_force and hand a cell garbage forces,
-  // while the kernel that computed the real ones ran out on the source. Under
-  // +LBAsync a move can be taken at any device-quiet moment, so the window has
-  // to be stated rather than assumed.
-  ReadyMigrate(false);
   const double cutoffSq = (double)PTP_CUT_OFF * (double)PTP_CUT_OFF;
   const bool doEnergy = (stepCount == 1 || stepCount == finalStepCount);
   const int nA = nPart[0];
@@ -337,14 +343,40 @@ void Compute::pup(PUP::er &p) {
   __sdag_pup(p);
   p | stepCount;
   p | pendingForceSends;
+  p | ackCount;
   p | lbBlocked;
   p | lbWaitPending;
   p | lbStartStep;
   PUParray(p, energy, 2);
 
-  // Nothing device-side is puped. The scratch holds nothing that outlives a step
-  // -- AtSync is called between steps -- so the destructor releases it on the old
-  // PE and the migration constructor starts empty, reallocating on first use.
-  // Freeing here instead would misfire under PUP::sizer, which also reports
-  // isPacking().
+  // The step this chare is in the middle of, so that being in the middle of one
+  // is not a reason it cannot move. Which cell filled which slot, and how many
+  // atoms it sent, is what sendForces needs to address the force arrays -- and
+  // on a mid-step move only one of the two may have arrived so far.
+  PUParray(p, cap, 2);
+  PUParray(p, nPart, 2);
+  PUParray(p, ordinal, 2);
+  for (int s = 0; s < 2; s++) PUParray(p, cellIdx[s], 3);
+
+  // Settle this chare's stream before anything is copied out of its buffers.
+  // The runtime cannot do this -- only the chare knows which stream its kernels
+  // were launched on -- and the migration copy reads these buffers as soon as
+  // pup returns. This is the whole of what a chare owes migration; it is not a
+  // restriction on WHEN it may move.
+  if (p.isPacking() && !p.isSizing() && stream != NULL)
+    hapiCheck(cudaStreamSynchronize(stream));
+
+  // The scratch travels. Unpacking rebinds these pointers into the arena the
+  // payload landed in, so they are released through hapiFreeMigratable (see
+  // mdMigFree) rather than by the allocator that first produced them.
+  for (int s = 0; s < 2; s++) {
+    if (cap[s] <= 0) continue;
+    p.pup_buffer_device(d_pos[s], (size_t)cap[s]);
+    p.pup_buffer_device(d_force[s], (size_t)cap[s]);
+  }
+  if (cap[0] > 0) p.pup_buffer_device(d_energyPartial, (size_t)cap[0]);
+
+  // d_energyScalar and h_energy deliberately do not travel: both are written
+  // and read within one launchForces, and ensureDevice takes them again on the
+  // destination.
 }
