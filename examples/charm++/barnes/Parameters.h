@@ -54,6 +54,9 @@ struct Parameters {
   // host. The remote half stays on the host either way: the data it needs is
   // not resident here until push-based LET lands.
   int deviceWalk;
+  // Push a locally essential tree to every other PE before the traversal,
+  // instead of pulling remote nodes one round trip at a time.
+  int useLet;
   // Initial tree piece placement. 0 = the default round-robin map, 1 = a block
   // map, which is what makes this benchmark imbalanced; see BlockMap.
   int blockMap;
@@ -94,6 +97,7 @@ struct Parameters {
     p | lbWindow;
     p | decompLevels;
     p | deviceWalk;
+    p | useLet;
     p | blockMap;
     p | mapChunk;
     p | mapCyclic;

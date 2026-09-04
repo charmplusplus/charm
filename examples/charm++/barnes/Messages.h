@@ -38,6 +38,25 @@ struct ParticleBlockMsg : public CMessage_ParticleBlockMsg {
   int fromPe;
 };
 
+// One PE's push to another: the part of its tree that the destination could
+// possibly need, decided by walking against the destination's domain with the
+// destination's own opening criterion.
+//
+// Nodes are addressed by SFC key rather than serialised as a subtree with
+// pointer offsets: the receiver descends from its own root, refining where a
+// node does not exist yet, which avoids the offset fixups entirely. `mom` is
+// LET_W reals per node and `parts` holds the particles of every leaf the
+// destination would open, in the order the keys list them.
+struct LetMsg : public CMessage_LetMsg {
+  Key *keys;
+  Real *mom;
+  int *npart;
+  ExternalParticle *parts;
+  int numNodes;
+  int numParts;
+  int fromPe;
+};
+
 struct RangeMsg : public CMessage_RangeMsg {
   Key *keys;
   int numTreePieces;

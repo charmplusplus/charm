@@ -117,6 +117,12 @@ void TraversalWorker::cacheBucketRange(){
 }
 #endif
 
+// Every source a chosen bucket accepts, summed. A correct walk sees each
+// particle exactly once, directly or through one multipole, so this must come
+// to the universe mass. More than that is double counting.
+thread_local double _srcMass = 0.0;
+thread_local const void *_srcBucket = NULL;
+
 int TraversalWorker::work(Node<ForceData> *node){
   NodeType type = node->getType();
   state->nodeEncountered(currentBucket->getKey(),node);
@@ -145,12 +151,14 @@ int TraversalWorker::work(Node<ForceData> *node){
 #else
   int computed = nodeBucketForce(node,currentBucket);
 #endif
+  if(currentBucket == _srcBucket) _srcMass += node->data.moments.totalMass;
   state->nodeComputed(currentBucket,node->getKey());
   state->incrPartNodeInteractions(currentBucket->getKey(),computed);
   return 0;
 }
 
 void TraversalWorker::work(ExternalParticle *particle){
+  if(currentBucket == _srcBucket) _srcMass += particle->mass;
 #ifdef GPU_GRAVITY
   ownerTreePiece->getBatch().addSource(currentBucket,
                                        bucketPartStart, bucketPartCount,

@@ -122,6 +122,8 @@ void Main::setParameters(CkArgMsg *m){
   else if(!globalParams.blockMap)
     CkPrintf("map: Charm++ default\n");
   if(globalParams.blockMap) CkPrintf("blockMap: contiguous key ranges per PE\n");
+  globalParams.useLet = params.getiparam("let", 0, table);
+  if(globalParams.useLet) CkPrintf("LET: pushing locally essential trees\n");
   globalParams.deviceWalk = params.getiparam("devwalk", DEFAULT_DEVICE_WALK, table);
   CkPrintf("deviceWalk: %d\n", globalParams.deviceWalk);
 
@@ -238,6 +240,7 @@ void Main::usage(){
   usage["in"] = "input file";
   usage["ppc"] = "particles per chare";
   usage["b"] = "particles per bucket (leaf)";
+  usage["let"] = "push locally essential trees instead of pulling remote nodes";
   usage["devwalk"] = "run the local traversal on the device";
   usage["decomplevels"] = "levels one histogram round may refine a bin by";
   usage["theta"] = "opening angle";

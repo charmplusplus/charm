@@ -54,7 +54,11 @@ DataManager::DataManager() :
   decompStalledAt(0.0),
   numBlocksRecvd(0),
   expectedBlocks(0),
-  haveExpected(false)
+  haveExpected(false),
+  letsExpected(0),
+  letsRecvd(0),
+  letsDone(false),
+  frontierReady(false)
 {
 #ifdef STATISTICS
   numInteractions[0] = 0;
@@ -947,9 +951,14 @@ void DataManager::contributeFrontierMoments(){
   // The bounding box travels too. getMomentsFromChildren derives rsq from the
   // box, so a boundary node whose remote children have no box would get a
   // meaningless opening radius and the walk would open the wrong cells.
+  // Six more slots per PE at the end: this PE's own domain box, which the LET
+  // walk needs for every other PE. It rides along rather than costing a second
+  // collective.
+  const int boxBase = n*FRONTIER_W + 1;
+  const int total = boxBase + 6*CkNumPes();
   CkVec<Real> mine;
-  mine.resize(n*FRONTIER_W + 1);
-  for(int i = 0; i < n*FRONTIER_W + 1; i++) mine[i] = 0.0;
+  mine.resize(total);
+  for(int i = 0; i < total; i++) mine[i] = 0.0;
   // A tripwire on the assumption this whole scheme rests on: that every PE
   // enumerates the same frontier in the same order. If the lengths ever
   // diverge the sum below is meaningless, so carry the count and check it.
@@ -986,9 +995,27 @@ void DataManager::contributeFrontierMoments(){
             CkMyPe(), n, n*FRONTIER_W + 1);
     fflush(stderr);
   }
+  // This PE's domain: the union of the frontier nodes it owns.
+  myDomain.reset();
+  for(int i = 0; i < n; i++){
+    Node<ForceData> *f = frontier[i];
+    if(f->getType() == Remote || f->getType() == RemoteBucket ||
+       f->getType() == RemoteEmptyBucket) continue;
+    if(f->getNumParticles() <= 0) continue;
+    myDomain.grow(f->data.box);
+  }
+  if(myDomain.initialized()){
+    Real *b = mine.getVec() + boxBase + 6*CkMyPe();
+    b[0] = myDomain.lesser_corner.x;
+    b[1] = myDomain.lesser_corner.y;
+    b[2] = myDomain.lesser_corner.z;
+    b[3] = myDomain.greater_corner.x;
+    b[4] = myDomain.greater_corner.y;
+    b[5] = myDomain.greater_corner.z;
+  }
+
   CkCallback cb(CkIndex_DataManager::recvFrontierMoments(NULL),thisProxy);
-  contribute(sizeof(Real)*(n*FRONTIER_W + 1), mine.getVec(),
-             CkReduction::sum_float, cb);
+  contribute(sizeof(Real)*total, mine.getVec(), CkReduction::sum_float, cb);
 }
 
 // Boundary nodes -- everything above the frontier -- from their children, now
@@ -1008,6 +1035,272 @@ void DataManager::fillBoundaryMoments(Node<ForceData> *n){
   n->getOwnershipFromChildren();
 }
 
+// What a push to `dest` would carry, counted rather than built.
+//
+// The predicate is the destination's own walk: a cell it would accept becomes
+// one multipole, a cell it would open is descended into, and a leaf it opens
+// contributes its particles. Measuring against the destination's whole domain
+// rather than its individual buckets is deliberately conservative -- a larger
+// box opens more, so the result is a superset of what any one of its buckets
+// could ask for, which is what makes a push sufficient.
+void DataManager::letSize(Node<ForceData> *n, const OrientedBox<Real> &dest,
+                          int &nodes, int &parts){
+  if(n == NULL) return;
+  const NodeType t = n->getType();
+  // Only what this PE actually owns can be pushed.
+  if(t == Remote || t == RemoteBucket || t == RemoteEmptyBucket) return;
+  if(t == EmptyBucket) return;
+
+  // openCriterionBucket, with the destination's domain in place of a bucket.
+  const MultipoleMoments &m = n->data.moments;
+  if(m.totalMass <= 0.0) return;
+  Real dx = dest.lesser_corner.x - m.cm.x;
+  Real ex = m.cm.x - dest.greater_corner.x;
+  if(dx < ex) dx = ex;  if(dx < 0) dx = 0;
+  Real dy = dest.lesser_corner.y - m.cm.y;
+  Real ey = m.cm.y - dest.greater_corner.y;
+  if(dy < ey) dy = ey;  if(dy < 0) dy = 0;
+  Real dz = dest.lesser_corner.z - m.cm.z;
+  Real ez = m.cm.z - dest.greater_corner.z;
+  if(dz < ez) dz = ez;  if(dz < 0) dz = 0;
+  const bool open = (globalParams.tolsq*(dx*dx+dy*dy+dz*dz) < m.rsq);
+
+  if(!open){ nodes++; return; }          // accepted: one multipole travels
+  if(n->getNumChildren() == 0){          // opened leaf: its particles travel
+    nodes++;
+    parts += n->getNumParticles();
+    return;
+  }
+  nodes++;
+  for(int i = 0; i < n->getNumChildren(); i++)
+    letSize(n->getChild(i), dest, nodes, parts);
+}
+
+void DataManager::reportLetSizes(){
+  if(getenv("BARNES_LET_SIZE") == NULL) return;
+  for(int q = 0; q < CkNumPes(); q++){
+    if(q == CkMyPe() || !peBoxes[q].initialized()) continue;
+    int nodes = 0, parts = 0;
+    letSize(root, peBoxes[q], nodes, parts);
+    CkPrintf("[LET] pe %d -> pe %d: %d cells, %d particles (%.1f KB)\n",
+             CkMyPe(), q, nodes, parts,
+             (nodes*(double)sizeof(Node<ForceData>) +
+              parts*(double)sizeof(ExternalParticle))/1024.0);
+  }
+}
+
+// mass, cm(3), rsq, quadrupole(5), box(6), type.
+#define LET_W 17
+
+// Collect what `dest` could need from this PE's tree.
+//
+// Same shape as letSize: accept -> one multipole travels; open -> descend;
+// opened leaf -> its particles travel. Emitting a node whether it is accepted
+// or opened is what lets the receiver rebuild the structure, and marking an
+// accepted cell RemoteBucket-or-Remote by whether particles came with it is
+// what tells its walk which of the two it is looking at.
+void DataManager::collectLet(Node<ForceData> *n, const OrientedBox<Real> &dest,
+                             CkVec<Key> &keys, CkVec<Real> &mom,
+                             CkVec<int> &npart,
+                             CkVec<ExternalParticle> &parts){
+  if(n == NULL) return;
+  const NodeType t = n->getType();
+  if(t == Remote || t == RemoteBucket || t == RemoteEmptyBucket) return;
+  if(t == EmptyBucket) return;
+
+  const MultipoleMoments &m = n->data.moments;
+  if(m.totalMass <= 0.0) return;
+
+  Real dx = dest.lesser_corner.x - m.cm.x;
+  Real ex = m.cm.x - dest.greater_corner.x;
+  if(dx < ex) dx = ex;  if(dx < 0) dx = 0;
+  Real dy = dest.lesser_corner.y - m.cm.y;
+  Real ey = m.cm.y - dest.greater_corner.y;
+  if(dy < ey) dy = ey;  if(dy < 0) dy = 0;
+  Real dz = dest.lesser_corner.z - m.cm.z;
+  Real ez = m.cm.z - dest.greater_corner.z;
+  if(dz < ez) dz = ez;  if(dz < 0) dz = 0;
+  const bool open = (globalParams.tolsq*(dx*dx+dy*dy+dz*dz) < m.rsq);
+
+  const bool leaf = (n->getNumChildren() == 0);
+  if(open && !leaf){
+    // Interior: the destination will descend, so send the node as a marker and
+    // recurse. It carries moments too, in case a shallower bucket accepts it.
+    keys.push_back(n->getKey());
+    Real o[LET_W];
+    o[0]=m.totalMass; o[1]=m.cm.x; o[2]=m.cm.y; o[3]=m.cm.z; o[4]=m.rsq;
+    o[5]=m.qxx; o[6]=m.qxy; o[7]=m.qxz; o[8]=m.qyy; o[9]=m.qyz;
+    o[10]=n->data.box.lesser_corner.x; o[11]=n->data.box.lesser_corner.y;
+    o[12]=n->data.box.lesser_corner.z; o[13]=n->data.box.greater_corner.x;
+    o[14]=n->data.box.greater_corner.y; o[15]=n->data.box.greater_corner.z;
+    o[16]=(Real)(int)Internal;
+    for(int i = 0; i < LET_W; i++) mom.push_back(o[i]);
+    npart.push_back(0);
+    for(int i = 0; i < n->getNumChildren(); i++)
+      collectLet(n->getChild(i), dest, keys, mom, npart, parts);
+    return;
+  }
+
+  // Accepted, or an opened leaf. Either way one entry; particles only when the
+  // destination would open it.
+  keys.push_back(n->getKey());
+  Real o[LET_W];
+  o[0]=m.totalMass; o[1]=m.cm.x; o[2]=m.cm.y; o[3]=m.cm.z; o[4]=m.rsq;
+  o[5]=m.qxx; o[6]=m.qxy; o[7]=m.qxz; o[8]=m.qyy; o[9]=m.qyz;
+  o[10]=n->data.box.lesser_corner.x; o[11]=n->data.box.lesser_corner.y;
+  o[12]=n->data.box.lesser_corner.z; o[13]=n->data.box.greater_corner.x;
+  o[14]=n->data.box.greater_corner.y; o[15]=n->data.box.greater_corner.z;
+
+  if(open && leaf && n->getNumParticles() > 0){
+    o[16] = (Real)(int)Bucket;
+    for(int i = 0; i < LET_W; i++) mom.push_back(o[i]);
+    npart.push_back(n->getNumParticles());
+    Particle *pp = n->getParticles();
+    for(int i = 0; i < n->getNumParticles(); i++){
+      ExternalParticle e;
+      e.position = pp[i].position;
+      e.mass = pp[i].mass;
+      parts.push_back(e);
+    }
+  }
+  else{
+    o[16] = (Real)(int)Internal;   // multipole only
+    for(int i = 0; i < LET_W; i++) mom.push_back(o[i]);
+    npart.push_back(0);
+  }
+}
+
+void DataManager::sendLets(){
+  letsExpected = 0;
+  for(int q = 0; q < CkNumPes(); q++)
+    if(q != CkMyPe() && peBoxes[q].initialized()) letsExpected++;
+
+  for(int q = 0; q < CkNumPes(); q++){
+    if(q == CkMyPe() || !peBoxes[q].initialized()) continue;
+    CkVec<Key> keys; CkVec<Real> mom; CkVec<int> npart;
+    CkVec<ExternalParticle> parts;
+    // From the frontier down, not from the root. Above the frontier the tree
+    // is shared: those nodes are Boundary on every PE and their moments were
+    // completed by the frontier reduction. Emitting them here would ship one
+    // PE's partial view of a node the destination already has complete, and
+    // the splice would overwrite the good copy with it.
+    for(int i = 0; i < frontier.length(); i++){
+      Node<ForceData> *f = frontier[i];
+      const NodeType ft = f->getType();
+      if(ft == Remote || ft == RemoteBucket || ft == RemoteEmptyBucket) continue;
+      collectLet(f, peBoxes[q], keys, mom, npart, parts);
+    }
+
+    const int nn = keys.length();
+    const int np = parts.length();
+    LetMsg *m = new (nn, nn*LET_W, nn, (np > 0 ? np : 1), 0) LetMsg;
+    m->numNodes = nn;
+    m->numParts = np;
+    m->fromPe = CkMyPe();
+    if(nn > 0){
+      memcpy(m->keys, keys.getVec(), sizeof(Key)*nn);
+      memcpy(m->mom, mom.getVec(), sizeof(Real)*nn*LET_W);
+      memcpy(m->npart, npart.getVec(), sizeof(int)*nn);
+    }
+    if(np > 0) memcpy(m->parts, parts.getVec(), sizeof(ExternalParticle)*np);
+    thisProxy[q].recvLet(m);
+  }
+  if(letsExpected == 0){ letsDone = true; treeReady(); }
+}
+
+// Find the node with this key, creating it if the local tree does not go that
+// deep. The key is the path: bit 63 is the leading one and the bits below it,
+// most significant first, are the child choices.
+Node<ForceData> *DataManager::descendToKey(Key k){
+  int depth = 0;
+  Key t = k;
+  while(t > Key(1)){ t >>= 1; depth++; }
+
+  Node<ForceData> *cur = root;
+  for(int level = depth - 1; level >= 0 && cur != NULL; level--){
+    if(cur->getNumChildren() == 0){
+      // Only ever grow below something this PE does not own; refining a local
+      // subtree would cut its buckets loose from myParticles.
+      const NodeType ct = cur->getType();
+      if(ct != Remote && ct != RemoteBucket && ct != RemoteEmptyBucket) return NULL;
+      cur->refine();
+      for(int i = 0; i < cur->getNumChildren(); i++){
+        cur->getChild(i)->setType(Remote);
+        cur->getChild(i)->setCached();
+      }
+    }
+    const int child = (int)((k >> level) & Key(1));
+    cur = cur->getChild(child);
+  }
+  return cur;
+}
+
+void DataManager::recvLet(LetMsg *msg){
+  // The reduction callback and a push from a faster PE are two queued
+  // messages with no order between them. Splicing before the frontier types
+  // are set would find untyped nodes, refuse to grow into them, and silently
+  // drop the payload.
+  if(!frontierReady){
+    pendingLets.push_back(msg);
+    return;
+  }
+  spliceLet(msg);
+}
+
+void DataManager::spliceLet(LetMsg *msg){
+  int po = 0;
+  int droppedNull = 0, droppedOwned = 0, droppedParts = 0, placed = 0;
+  for(int i = 0; i < msg->numNodes; i++){
+    Node<ForceData> *n = descendToKey(msg->keys[i]);
+    const int np = msg->npart[i];
+    if(n == NULL){ po += np; droppedNull++; droppedParts += np; continue; }
+
+    // Never write over a node this PE owns or shares. Anything above the
+    // frontier is already complete here, and anything below one of our own
+    // frontier nodes is ours.
+    const NodeType nt = n->getType();
+    if(nt != Remote && nt != RemoteBucket && nt != RemoteEmptyBucket){
+      po += np;
+      droppedOwned++; droppedParts += np;
+      continue;
+    }
+    placed++;
+
+    const Real *o = msg->mom + (size_t)i*LET_W;
+    MultipoleMoments &m = n->data.moments;
+    m.totalMass = o[0];
+    m.cm = Vector3D<Real>(o[1], o[2], o[3]);
+    m.rsq = o[4];
+    m.qxx = o[5]; m.qxy = o[6]; m.qxz = o[7]; m.qyy = o[8]; m.qyz = o[9];
+    n->data.box.lesser_corner  = Vector3D<Real>(o[10], o[11], o[12]);
+    n->data.box.greater_corner = Vector3D<Real>(o[13], o[14], o[15]);
+
+    if(np > 0){
+      ExternalParticle *dst = new ExternalParticle[np];
+      memcpy(dst, msg->parts + po, sizeof(ExternalParticle)*np);
+      n->setParticles((Particle *)dst, np);
+      n->setType(RemoteBucket);
+    }
+    else{
+      n->setType(Node<ForceData>::makeRemote((NodeType)(int)o[16]));
+    }
+    n->setCached();
+    po += np;
+  }
+  if(getenv("BARNES_LET_DEBUG") != NULL){
+    CkPrintf("[LETDBG] pe %d <- pe %d: %d nodes (%d placed, %d no-path, "
+             "%d owned), %d particles, %d particles dropped\n",
+             CkMyPe(), msg->fromPe, msg->numNodes, placed, droppedNull,
+             droppedOwned, msg->numParts, droppedParts);
+  }
+  delete msg;
+
+  if(++letsRecvd == letsExpected){
+    letsDone = true;
+    treeReady();
+  }
+}
+
 void DataManager::recvFrontierMoments(CkReductionMsg *msg){
   const Real *all = (const Real *)msg->getData();
   const int n = frontier.length();
@@ -1016,7 +1309,7 @@ void DataManager::recvFrontierMoments(CkReductionMsg *msg){
   // message size first: if the frontiers diverged the contributions had
   // different lengths and indexing by our own n would read past the end.
   const int got = msg->getSize()/(int)sizeof(Real);
-  const int want = n*FRONTIER_W + 1;
+  const int want = n*FRONTIER_W + 1 + 6*CkNumPes();
   if(got != want){
     CkPrintf("[FRONTIER] pe %d: reduced %d reals, expected %d (frontier %d) -- "
              "the PEs did not enumerate the same frontier\n",
@@ -1055,10 +1348,34 @@ void DataManager::recvFrontierMoments(CkReductionMsg *msg){
 
   const bool dbg = getenv("BARNES_FRONTIER_DEBUG") != NULL;
   if(dbg){ fprintf(stderr,"[FRONTIER] pe %d filled remotes\n",CkMyPe()); fflush(stderr); }
+  // Unpack every PE's domain box before anything uses it.
+  peBoxes.resize(CkNumPes());
+  for(int q = 0; q < CkNumPes(); q++){
+    const Real *b = all + (n*FRONTIER_W + 1) + 6*q;
+    if(b[0] == 0.0 && b[3] == 0.0 && b[1] == 0.0 && b[4] == 0.0){
+      peBoxes[q].reset();   // that PE holds nothing
+    }
+    else{
+      peBoxes[q].lesser_corner  = Vector3D<Real>(b[0], b[1], b[2]);
+      peBoxes[q].greater_corner = Vector3D<Real>(b[3], b[4], b[5]);
+    }
+  }
+
   fillBoundaryMoments(root);
   if(dbg){ fprintf(stderr,"[FRONTIER] pe %d boundary done, root mass %g\n",
                    CkMyPe(), root?(double)root->data.moments.totalMass:-1.0); fflush(stderr); }
-  treeReady();
+  reportLetSizes();
+  if(globalParams.useLet){
+    letsRecvd = 0;
+    letsDone = false;
+    frontierReady = true;
+    // Anything that arrived early can be spliced now.
+    CkVec<LetMsg *> held = pendingLets;
+    pendingLets.length() = 0;
+    sendLets();
+    for(int i = 0; i < held.length(); i++) spliceLet(held[i]);
+  }
+  else treeReady();
   if(dbg){ fprintf(stderr,"[FRONTIER] pe %d treeReady returned\n",CkMyPe()); fflush(stderr); }
 }
 
@@ -1650,6 +1967,7 @@ void DataManager::advanceTail(){
   numTreePiecesDoneTraversals = 0;
 
   firstSplitterRound = true;
+  frontierReady = false;
   freeTree();
   nodeTable.clear();
 

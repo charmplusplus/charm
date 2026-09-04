@@ -104,7 +104,15 @@ void TreePiece::prepare(Node<ForceData> *_root, Node<ForceData> **buckets, int b
   myNumBuckets = bucketEnd-bucketStart;
 }
 
+extern thread_local double _srcMass;
+extern thread_local const void *_srcBucket;
+
 void TreePiece::startTraversal(){
+  if(getenv("BARNES_MASS_CHECK") != NULL && CkMyPe() == 0 &&
+     _srcBucket == NULL && myNumBuckets > 0){
+    _srcBucket = myBuckets[0];
+    _srcMass = 0.0;
+  }
   numTraversalsDone = 0;
   trav.setDataManager(myDM);
 #ifdef GPU_GRAVITY
@@ -396,6 +404,14 @@ void TreePiece::finishIteration(){
   // to tree pieces by index and then counts the ones registered locally, and
   // both would be wrong if an element were still in flight. Where it waits is
   // what the two paths below differ in.
+  if(getenv("BARNES_MASS_CHECK") != NULL && _srcBucket != NULL){
+    static thread_local bool _massPrinted = false;
+    if(!_massPrinted){
+      _massPrinted = true;
+      CkPrintf("[MASSCHK] pe %d bucket sources total mass %.9f "
+               "(universe mass is 1)\n", CkMyPe(), _srcMass);
+    }
+  }
   if(iteration >= globalParams.iterations){
     static thread_local bool _walkPrinted = false;
     if(!_walkPrinted && getenv("BARNES_WALK_REPORT") != NULL){

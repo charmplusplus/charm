@@ -258,6 +258,37 @@ class DataManager : public CBase_DataManager {
   void contributeFrontierMoments();
   void fillBoundaryMoments(Node<ForceData> *n);
   CkVec<Node<ForceData>*> frontier;
+
+  // Stage 1 (LET). Each PE's own domain box, gathered from every PE by riding
+  // along on the frontier reduction. A sender walks its tree against these to
+  // decide what a destination could possibly need.
+  CkVec<OrientedBox<Real> > peBoxes;
+  OrientedBox<Real> myDomain;
+  // What a push to `dest` would contain, without building it. The predicate is
+  // the walk's own: a cell the destination would accept is sent as a
+  // multipole, one it would open is descended into, and an opened leaf sends
+  // its particles.
+  void letSize(Node<ForceData> *n, const OrientedBox<Real> &dest,
+               int &nodes, int &parts);
+  void reportLetSizes();
+
+  // Stage 1 (LET). Walk the local tree against a destination's domain and
+  // collect what it could need; ship one message per destination; splice what
+  // arrives. Runs alongside the request/reply path rather than replacing it,
+  // so the request counters measure whether the push was actually sufficient.
+  void collectLet(Node<ForceData> *n, const OrientedBox<Real> &dest,
+                  CkVec<Key> &keys, CkVec<Real> &mom, CkVec<int> &npart,
+                  CkVec<ExternalParticle> &parts);
+  void sendLets();
+  Node<ForceData> *descendToKey(Key k);
+  int letsExpected, letsRecvd;
+  bool letsDone;
+  // A push can arrive before this PE's own frontier callback has run, and the
+  // splice needs the frontier types to know what it may grow into. Hold them
+  // until it has.
+  bool frontierReady;
+  CkVec<LetMsg *> pendingLets;
+  void spliceLet(LetMsg *msg);
   void flushMomentRequests();
   void respondToMomentsRequest(Node<ForceData> *,CkVec<int>&);
   Node<ForceData> *lookupNode(Key k);
@@ -291,6 +322,7 @@ class DataManager : public CBase_DataManager {
   void recvTreePieceMap(CkReductionMsg *msg);
   void recvSenderCounts(CkReductionMsg *msg);
   void recvFrontierMoments(CkReductionMsg *msg);
+  void recvLet(LetMsg *msg);
   void receiveParticleBlock(ParticleBlockMsg *msg);
 
   void receiveMoments(MomentsMsg *msg);

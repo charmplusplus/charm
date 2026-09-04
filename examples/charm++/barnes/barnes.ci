@@ -25,6 +25,13 @@ mainmodule barnes {
     Key keys[];
   };
 
+  message LetMsg {
+    Key keys[];
+    Real mom[];
+    int npart[];
+    ExternalParticle parts[];
+  };
+
   message ParticleBlockMsg {
     int tpIndex[];
     int tpCount[];
@@ -98,6 +105,7 @@ mainmodule barnes {
     entry void recvTreePieceMap(CkReductionMsg *msg);
     entry void recvSenderCounts(CkReductionMsg *msg);
     entry void recvFrontierMoments(CkReductionMsg *msg);
+    entry void recvLet(LetMsg *msg);
     entry void receiveParticleBlock(ParticleBlockMsg *msg);
     entry void receiveMoments(MomentsMsg *msg);
 
